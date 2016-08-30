@@ -138,6 +138,19 @@ inline std::shared_ptr<_Tp> make_aligned_shared(_Args&&... __args)
 namespace dart {
 namespace math {
 
+namespace detail {
+
+template <typename T> struct traits;
+
+// here we say once and for all that traits<const T> == traits<T>
+// When constness must affect traits, it has to be constness on template
+// parameters on which T itself depends.
+// For example, traits<Map<const T> > != traits<Map<T> >, but
+//              traits<const Map<T> > == traits<Map<T> >
+template <typename T> struct traits<const T> : traits<T> {};
+
+} // namespace detial
+
 typedef Eigen::Matrix6d Inertia;
 typedef Eigen::Matrix<double, 3, Eigen::Dynamic> LinearJacobian;
 typedef Eigen::Matrix<double, 3, Eigen::Dynamic> AngularJacobian;
