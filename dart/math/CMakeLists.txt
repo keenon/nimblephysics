@@ -2,7 +2,7 @@
 file(GLOB hdrs "*.hpp")
 file(GLOB srcs "*.cpp")
 file(GLOB detail_srcs "detail/*.cpp")
-file(GLOB detail_hdrs "detail/*.h")
+file(GLOB detail_hdrs "detail/*.hpp")
 
 set(dart_math_hdrs "${hdrs};${detail_hdrs}" PARENT_SCOPE)
 set(dart_math_srcs "${srcs};${detail_srcs}" PARENT_SCOPE)
