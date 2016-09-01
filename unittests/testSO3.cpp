@@ -37,6 +37,27 @@
 using namespace dart;
 
 //==============================================================================
+TEST(SO3, UtilityTraits)
+{
+  using TestType = SO3<double, SO3RotationMatrix>;
+  EXPECT_TRUE(math::detail::SO3_is_canonical<TestType>::value);
+}
+
+//==============================================================================
+TEST(SO3, Canonicals)
+{
+  EXPECT_TRUE(SO3d<SO3Canonical>::isCanonical());
+  EXPECT_TRUE(SO3d<SO3RotationMatrix>::isCanonical());
+  EXPECT_FALSE(SO3d<SO3AxisAngle>::isCanonical());
+
+  const SO3d<SO3Canonical> RCanonical;
+  EXPECT_TRUE(RCanonical.canonical().isCanonical());
+
+  const SO3d<SO3AxisAngle> RNonCanonical;
+  EXPECT_TRUE(RNonCanonical.canonical().isCanonical());
+}
+
+//==============================================================================
 template <typename Derived>
 void genericSO3(const math::SO3Base<Derived>& so3)
 {
@@ -44,34 +65,43 @@ void genericSO3(const math::SO3Base<Derived>& so3)
 }
 
 //==============================================================================
+template <typename DerivedA, typename DerivedB>
+void genericSO3(math::SO3Base<DerivedA> R1,
+                math::SO3Base<DerivedB> R2)
+{
+  R1 = R2;
+
+//  R1 *= R2;
+}
+
+//==============================================================================
 TEST(SO3, FunctionsTakingGenericSO3AsParameters)
 {
-  genericSO3(SO3d<SO3Rep::RotationMatrix>());
-  genericSO3(SO3d<SO3Rep::AngleAxis>());
+  genericSO3(SO3d<SO3RotationMatrix>());
+  genericSO3(SO3d<SO3AxisAngle>());
+
+  genericSO3(SO3d<SO3AxisAngle>::Random(),
+             SO3d<SO3AxisAngle>::Random());
+
+  genericSO3(SO3d<SO3RotationMatrix>::Random(),
+             SO3d<SO3AxisAngle>::Random());
 }
 
 //==============================================================================
 template <typename SO3Type>
 void testSettersAndGetters()
 {
-  SO3Type id = SO3Type::Identity();
-  genericSO3(id);
-
-  using S = typename SO3Type::S;
-  using Matrix3 = Eigen::Matrix<S, 3, 3>;
-
   SO3Type point;
 
   point.setIdentity();
-  EXPECT_TRUE(point.matrix() == Matrix3::Identity());
   EXPECT_TRUE(point == SO3Type::Identity());
 }
 
 //==============================================================================
 TEST(SO3, SettersAndGetters)
 {
-  testSettersAndGetters<SO3d<SO3Rep::RotationMatrix>>();
-  testSettersAndGetters<SO3d<SO3Rep::AngleAxis>>();
+  testSettersAndGetters<SO3d<SO3RotationMatrix>>();
+  testSettersAndGetters<SO3d<SO3AxisAngle>>();
 }
 
 //==============================================================================
@@ -86,17 +116,14 @@ void testGroupOperations()
 
   SO3Type w4 = w1 * w2;
 
-  std::cout << w3.matrix() << std::endl;
-  std::cout << w4.matrix() << std::endl;
-
   EXPECT_TRUE(w3.isApprox(w4));
 }
 
 //==============================================================================
 TEST(SO3, GroupOperations)
 {
-  testGroupOperations<SO3d<SO3Rep::RotationMatrix>>();
-  testGroupOperations<SO3d<SO3Rep::AngleAxis>>();
+  testGroupOperations<SO3d<SO3RotationMatrix>>();
+  testGroupOperations<SO3d<SO3AxisAngle>>();
 }
 
 //==============================================================================
@@ -111,34 +138,32 @@ void testLieAlgebraOperations()
 //==============================================================================
 TEST(SO3, LieAlgebraOperations)
 {
-  testLieAlgebraOperations<SO3d<SO3Rep::RotationMatrix>>();
-  testLieAlgebraOperations<SO3d<SO3Rep::AngleAxis>>();
+  testLieAlgebraOperations<SO3d<SO3RotationMatrix>>();
+  testLieAlgebraOperations<SO3d<SO3AxisAngle>>();
 }
 
 //==============================================================================
 template <typename SO3Type>
 void testExponentialAndLogarithm()
 {
-  using S = typename SO3Type::S;
-  using Matrix3 = Eigen::Matrix<S, 3, 3>;
   using so3 = typename SO3Type::so3;
 
-  EXPECT_TRUE(SO3Type::exp(so3::Zero()).matrix() == Matrix3::Identity());
+  EXPECT_TRUE(SO3Type::exp(so3::Zero()) == SO3Type::Identity());
   EXPECT_TRUE(SO3Type::log(SO3Type::Identity()) == so3::Zero());
 }
 
 //==============================================================================
 TEST(SO3, ExponentialAndLogarithm)
 {
-  testExponentialAndLogarithm<SO3d<SO3Rep::RotationMatrix>>();
-  testExponentialAndLogarithm<SO3d<SO3Rep::AngleAxis>>();
+  testExponentialAndLogarithm<SO3d<SO3RotationMatrix>>();
+  testExponentialAndLogarithm<SO3d<SO3AxisAngle>>();
 }
 
 //==============================================================================
 TEST(SO3, HeterogeneousAssignment)
 {
-  SO3<double, SO3Rep::RotationMatrix> r1;
-  SO3<double, SO3Rep::AngleAxis> r2;
+  SO3<double, SO3RotationMatrix> r1;
+  SO3<double, SO3AxisAngle> r2;
 
   r1.setRandom();
   r2.setRandom();
@@ -146,6 +171,61 @@ TEST(SO3, HeterogeneousAssignment)
 
   r1 = r2;
   EXPECT_TRUE(r1.isApprox(r2));
+}
+
+//==============================================================================
+TEST(SO3, HeterogeneousGroupMultiplication)
+{
+  SO3<double, SO3RotationMatrix> w1;
+  SO3<double, SO3AxisAngle> w2;
+
+  w1.setRandom();
+  w2.setRandom();
+  EXPECT_FALSE(w1.isApprox(w2));
+
+  SO3<double, SO3RotationMatrix> w3 = w1;
+  EXPECT_TRUE(w3.isApprox(w1));
+  w3 *= w2;
+
+  SO3<double, SO3AxisAngle> w4 = w1 * w2;
+
+  EXPECT_TRUE(w3.isApprox(w4));
+}
+
+//==============================================================================
+TEST(SO3, GeneralizedCoordinates)
+{
+  SO3d<> R = SO3d<>::Random();
+
+  std::cout << R.genCoords<SO3AxisAngle>().transpose() << std::endl;
+}
+
+//==============================================================================
+template <typename SO3Type>
+void testInteractingWithRegularMatrices()
+{
+  using S = typename SO3Type::S;
+  using Matrix3 = Eigen::Matrix<S, 3, 3>;
+
+  SO3Type so3a = SO3Type::Random();
+
+  // Assign to raw matrix
+  Matrix3 rawMat3a = so3a.toRotationMatrix();
+  EXPECT_TRUE(rawMat3a.isApprox(so3a.toRotationMatrix()));
+
+  // Construct from raw matrix
+  SO3Type so3b;
+  so3b.fromRotationMatrix(rawMat3a);
+  EXPECT_TRUE(so3b.toRotationMatrix().isApprox(rawMat3a));
+}
+
+//==============================================================================
+TEST(SO3, InteractingWithRegularMatrices)
+{
+
+
+  testInteractingWithRegularMatrices<SO3d<SO3RotationMatrix>>();
+  testInteractingWithRegularMatrices<SO3d<SO3AxisAngle>>();
 }
 
 //==============================================================================

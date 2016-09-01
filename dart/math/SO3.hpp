@@ -43,49 +43,83 @@ namespace math {
 
 //==============================================================================
 template <typename S_>
-class SO3<S_, SO3Rep::RotationMatrix>
-    : public SO3Base<SO3<S_, SO3Rep::RotationMatrix>>
+class SO3<S_, SO3RotationMatrix>
+    : public SO3Base<SO3<S_, SO3RotationMatrix>>
 {
 public:
 
-  using This = SO3<S_, SO3Rep::RotationMatrix>;
+  using This = SO3<S_, SO3RotationMatrix>;
   using Base = SO3Base<This>;
   using S = typename Base::S;
-  static constexpr SO3Rep Rep = Base::Rep;
+  using Rep = typename Base::Rep;
   using MatrixType = typename Base::MatrixType;
-  using DataType = Eigen::Matrix<S, 3, 3>;
-  using RotationMatrix = typename Base::RotationMatrix;
+  using RepDataType = typename Base::DataType;
   using Tangent = typename Base::Tangent;
   using so3 = typename Base::so3;
 
   using Base::operator =;
+  using Base::operator *;
   using Base::operator *=;
 
-  SO3() : mData(DataType())
+  using Base::matrix;
+
+  SO3() : mRepData(RepDataType())
   {
     // Do nothing
   }
 
-  SO3(const SO3& other) : mData(other.mData)
+  SO3(const SO3& other) : Base(), mRepData(other.mRepData)
   {
     // Do nothing
   }
 
-  explicit SO3(const so3& tangent) : mData(expMapRot(tangent))
+  SO3(SO3&& other) : mRepData(std::move(other.mRepData))
   {
     // Do nothing
   }
 
   template <typename Derived>
-  explicit SO3(const Eigen::MatrixBase<Derived>& rotMat) : mData(rotMat)
-  {
-    using namespace Eigen;
-    EIGEN_STATIC_ASSERT_SAME_MATRIX_SIZE(Derived, DataType)
-  }
-
-  explicit SO3(const RotationMatrix& rotMat) : mData(rotMat)
+  SO3(const SO3Base<Derived>& other)
+    : mRepData(detail::SO3_convert_impl<S, typename Derived::Rep, Rep>::run(
+              other.derived().matrix()))
   {
     // Do nothing
+  }
+
+  template <typename Derived>
+  explicit SO3(const Eigen::MatrixBase<Derived>& matrix) : mRepData(matrix)
+  {
+    using namespace Eigen;
+    EIGEN_STATIC_ASSERT_SAME_MATRIX_SIZE(Derived, RepDataType)
+  }
+
+  template <typename Derived>
+  explicit SO3(Eigen::MatrixBase<Derived>&& matrix) : mRepData(std::move(matrix))
+  {
+    using namespace Eigen;
+    EIGEN_STATIC_ASSERT_SAME_MATRIX_SIZE(Derived, RepDataType)
+  }
+
+  explicit SO3(const so3& tangent) : mRepData(expMapRot(tangent))
+  {
+    // Do nothing
+  }
+
+  explicit SO3(so3&& tangent) : mRepData(expMapRot(std::move(tangent)))
+  {
+    // Do nothing
+  }
+
+  SO3& operator=(const SO3& other)
+  {
+    Base::operator =(other);
+    return *this;
+  }
+
+  SO3& operator=(SO3&& other)
+  {
+    Base::operator=(std::move(other));
+    return *this;
   }
 
   template <typename OtherDerived>
@@ -94,29 +128,9 @@ public:
     return matrix() == point.matrix();
   }
 
-  SO3& operator=(const MatrixType& matrix)
-  {
-    mData = matrix;
-    return *this;
-  }
-
-  const SO3 operator*(const SO3& other) const
-  {
-    SO3 result(*this);
-    result *= other;
-
-    return result;
-  }
-
-  /// In-place group multiplication
-  void operator*=(const SO3& other)
-  {
-    mData *= other.mData;
-  }
-
   void setIdentity()
   {
-    mData.setIdentity();
+    mRepData.setIdentity();
   }
 
   void setRandom()
@@ -127,7 +141,7 @@ public:
 
   const SO3 inversed() const
   {
-    return SO3(mData.transpose());
+    return SO3(mRepData.transpose());
   }
 
   static SO3 exp(const so3& tangent)
@@ -138,19 +152,14 @@ public:
 
   static so3 log(const This& point)
   {
-    return ::dart::math::logMap(point.mData);
+    return ::dart::math::logMap(point.mRepData);
     // TODO(JS): improve
-  }
-
-  const MatrixType matrix() const
-  {
-    return mData;
   }
 
   /// \returns A pointer to the data array of internal data type
   S* data()
   {
-    return mData.data();
+    return mRepData.data();
   }
 
 protected:
@@ -158,55 +167,88 @@ protected:
   template <typename>
   friend class SO3Base;
 
-  DataType mData;
+  RepDataType mRepData;
 };
 
 //==============================================================================
 template <typename S_>
-class SO3<S_, SO3Rep::AngleAxis>
-    : public SO3Base<SO3<S_, SO3Rep::AngleAxis>>
+class SO3<S_, SO3AxisAngle>
+    : public SO3Base<SO3<S_, SO3AxisAngle>>
 {
 public:
 
-  using This = SO3<S_, SO3Rep::AngleAxis>;
+  using This = SO3<S_, SO3AxisAngle>;
   using Base = SO3Base<This>;
   using S = typename Base::S;
-  static constexpr SO3Rep Rep = Base::Rep;
+  using Rep = typename Base::Rep;
   using MatrixType = typename Base::MatrixType;
-  using DataType = Eigen::Matrix<S, 3, 1>;
-  using RotationMatrix = typename Base::RotationMatrix;
+  using RepDataType = typename Base::DataType;
   using Tangent = typename Base::Tangent;
   using so3 = typename Base::so3;
 
   using Base::operator =;
+  using Base::operator *;
   using Base::operator *=;
 
-  SO3() : mData(DataType())
+  using Base::matrix;
+
+  SO3() : mRepData(RepDataType())
   {
     // Do nothing
   }
 
-  SO3(const SO3& other) : mData(other.mData)
+  SO3(const SO3& other) : Base(), mRepData(other.mRepData)
+  {
+    // Do nothing
+  }
+
+  SO3(SO3&& other) : mRepData(std::move(other.mRepData))
   {
     // Do nothing
   }
 
   template <typename Derived>
-  explicit SO3(const Eigen::MatrixBase<Derived>& tangent) : mData(tangent)
+  SO3(const SO3Base<Derived>& other)
+    : mRepData(detail::SO3_convert_impl<S, typename Derived::Rep, Rep>::run(
+              other.derived().matrix()))
+  {
+    // Do nothing
+  }
+
+  template <typename Derived>
+  explicit SO3(const Eigen::MatrixBase<Derived>& matrix) : mRepData(matrix)
   {
     using namespace Eigen;
-    EIGEN_STATIC_ASSERT_SAME_MATRIX_SIZE(Derived, DataType)
+    EIGEN_STATIC_ASSERT_SAME_MATRIX_SIZE(Derived, RepDataType)
   }
 
-  explicit SO3(const so3& tangent) : mData(tangent)
+  template <typename Derived>
+  explicit SO3(Eigen::MatrixBase<Derived>&& matrix) : mRepData(std::move(matrix))
+  {
+    using namespace Eigen;
+    EIGEN_STATIC_ASSERT_SAME_MATRIX_SIZE(Derived, RepDataType)
+  }
+
+  explicit SO3(const so3& tangent) : mRepData(tangent)
   {
     // Do nothing
   }
 
-  explicit SO3(const RotationMatrix& rotMat)
-    : mData(::dart::math::logMap(rotMat))
+  explicit SO3(so3&& tangent) : mRepData(std::move(tangent))
   {
     // Do nothing
+  }
+
+  SO3& operator=(const SO3& other)
+  {
+    Base::operator =(other);
+    return *this;
+  }
+
+  SO3& operator=(SO3&& other)
+  {
+    Base::operator=(std::move(other));
+    return *this;
   }
 
   template <typename OtherDerived>
@@ -215,39 +257,19 @@ public:
     return matrix() == point.matrix();
   }
 
-  SO3& operator=(const MatrixType& matrix)
-  {
-    mData = ::dart::math::logMap(matrix);
-    return *this;
-  }
-
-  const SO3 operator*(const SO3& other) const
-  {
-    SO3 result(*this);
-    result *= other;
-
-    return result;
-  }
-
-  /// In-place group multiplication
-  void operator*=(const SO3& other)
-  {
-    *this = matrix() * other.matrix();
-  }
-
   void setIdentity()
   {
-    mData.setZero();
+    mRepData.setZero();
   }
 
   void setRandom()
   {
-    mData.setRandom();
+    mRepData.setRandom();
   }
 
   const SO3 inversed() const
   {
-    return SO3(-mData);
+    return SO3(-mRepData);
   }
 
   static This exp(const so3& tangent)
@@ -257,29 +279,24 @@ public:
 
   static so3 log(const This& point)
   {
-    return point.mData;
-  }
-
-  const MatrixType matrix() const
-  {
-    return ::dart::math::expMapRot(mData);
+    return point.mRepData;
   }
 
   /// \returns A pointer to the data array of internal data type
   S* data()
   {
-    return mData.data();
+    return mRepData.data();
   }
 
 protected:
   template <typename>
   friend class SO3Base;
 
-  DataType mData;
+  RepDataType mRepData;
 };
 
-template <typename S_, SO3Rep Mode_>
-using so3 = typename SO3<S_, Mode_>::Tangent;
+template <typename S, typename Rep>
+using so3 = typename SO3<S, Rep>::Tangent;
 
 } // namespace math
 } // namespace dart

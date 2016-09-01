@@ -32,85 +32,16 @@
 #ifndef DART_MATH_SO3BASE_HPP_
 #define DART_MATH_SO3BASE_HPP_
 
+#include <type_traits>
+
 #include <Eigen/Eigen>
 
 #include "dart/math/MathTypes.hpp"
 #include "dart/math/Geometry.hpp"
+#include "dart/math/detail/SO3Utils.hpp"
 
 namespace dart {
 namespace math {
-
-enum class SO3Rep // or SO3Rep
-{
-  RotationMatrix,
-  AngleAxis, // or RotationVector
-  // AngleAndAxis,
-  EulerAngleXYZ,
-  Quaternion
-};
-
-enum class SO3Param // or ParameterizationType
-{
-  AngleAxis, // or RotationVector
-  EulerAngleXYZ,
-  Quaternion
-};
-
-// Forward declarations
-template <typename, SO3Rep> class SO3;
-
-namespace detail {
-
-//==============================================================================
-template <typename S_, SO3Rep Rep_>
-struct traits<SO3<S_, Rep_>>
-{
-  using S = S_;
-  using MatrixType = Eigen::Matrix<S, 3, 3>;
-
-  static constexpr SO3Rep Rep = Rep_;
-};
-
-//==============================================================================
-template <typename S_, SO3Rep Rep_>
-struct so3_rep_traits;
-
-//==============================================================================
-template <typename S_>
-struct so3_rep_traits<S_, SO3Rep::RotationMatrix>
-{
-  static constexpr SO3Rep Rep = SO3Rep::RotationMatrix;
-
-  using RepType = Eigen::Matrix<S_, 3, 3>;
-};
-
-//==============================================================================
-template <typename S_, SO3Param Param_>
-struct so3_param_traits;
-
-//==============================================================================
-template <typename S_>
-struct so3_param_traits<S_, SO3Param::AngleAxis>
-{
-  static constexpr SO3Param Param = SO3Param::AngleAxis;
-
-  using ParamType = Eigen::Matrix<S_, 3, 1>;
-};
-
-//==============================================================================
-template <typename S, SO3Rep Rep, SO3Param Param>
-struct so3_convert_rep_to_param
-{
-  static typename so3_param_traits<S, Param>::ParamType
-  run(const typename so3_rep_traits<S, Rep>::RepType& data)
-  {
-    // Generic version:
-    // 1. convert data to the canonical data type
-    // 2. convert the canonical data type to the canonical parameter type
-  }
-};
-
-} // namespace detail
 
 //==============================================================================
 template <typename Derived>
@@ -119,38 +50,111 @@ class SO3Base
 public:
 
   using S = typename detail::traits<Derived>::S;
-  using MatrixType = typename detail::traits<Derived>::MatrixType;
 
-  static constexpr SO3Rep Rep = detail::traits<Derived>::Rep;
+  using MatrixType = typename detail::traits<Derived>::MatrixType; // TODO(JS): remove
+  using RotationMatrixType = typename detail::traits<Derived>::RotationMatrixType;
 
-  using RotationMatrix = MatrixType;
+  using Rep = typename detail::traits<Derived>::Rep;
+  using DataType = typename detail::SO3_rep_traits<S, Rep>::DataType;
+  // TODO(JS): rename to MatrixType
 
-//  using Point;
   using Tangent = Eigen::Matrix<S, 3, 1>;
-  using so3 = Eigen::Matrix<S, 3, 1>;
+  using so3 = Tangent;
 
-  SO3Base<Derived>& operator=(const SO3Base<Derived>& other)
+  SO3Base() = default;
+
+  SO3Base(const SO3Base&) = default;
+
+  /// A reference to the derived object
+  const Derived& derived() const
   {
-    derived().mData = other.derived().mData;
-    return *this;
+    return *static_cast<const Derived*>(this);
+  }
+
+  /// A const reference to the derived object
+  Derived& derived()
+  {
+    return *static_cast<Derived*>(this);
   }
 
   template <typename OtherDerived>
   Derived& operator=(const SO3Base<OtherDerived>& other)
   {
-    derived() = other.matrix();
-    return this->derived();
+    detail::SO3_assign_impl<S, Derived, OtherDerived>::run(
+          derived(), other.derived());
+
+    return derived();
   }
 
-  const Derived operator*(const SO3Base<Derived>& other) const
+  template <typename OtherDerived>
+  Derived& operator=(SO3Base<OtherDerived>&& other)
   {
-    return derived().operator*(other.derived());
+    detail::SO3_assign_impl<S, Derived, OtherDerived>::run(
+          derived(), std::move(other.derived()));
+
+    return derived();
   }
 
-  /// In-place group multiplication
-  void operator*=(const SO3Base<Derived>& other)
+  template <typename OtherDerived>
+  Derived& operator=(const Eigen::MatrixBase<OtherDerived>& matrix)
   {
-    derived().operator*=(other.derived());
+    {
+      using namespace Eigen;
+      EIGEN_STATIC_ASSERT_SAME_MATRIX_SIZE(DataType, OtherDerived)
+    }
+
+    derived().mRepData = matrix;
+
+    return derived();
+  }
+
+  template <typename OtherDerived>
+  Derived& operator=(Eigen::MatrixBase<OtherDerived>&& matrix)
+  {
+    {
+      using namespace Eigen;
+      EIGEN_STATIC_ASSERT_SAME_MATRIX_SIZE(DataType, OtherDerived)
+    }
+
+    derived().mRepData = std::move(matrix);
+
+    return derived();
+  }
+
+  template <typename OtherDerived>
+  const Derived operator*(const SO3Base<OtherDerived>& other) const
+  {
+    Derived result(derived());
+    result *= other;
+
+    return result;
+  }
+
+  template <typename OtherDerived>
+  void operator*=(const SO3Base<OtherDerived>& other)
+  {
+    detail::SO3_inplace_group_multiplication_impl<Derived, OtherDerived>::run(
+          derived(), other.derived());
+  }
+
+  typename detail::traits<Derived>::Canonical
+  canonical()
+  {
+    return canonical(
+          std::is_same<typename detail::traits<Derived>::Canonical, Derived>());
+  }
+
+  const typename detail::traits<Derived>::Canonical
+  canonical() const
+  {
+    return canonical(
+          std::is_same<typename detail::traits<Derived>::Canonical, Derived>());
+  }
+
+  static constexpr bool isCanonical()
+  {
+    return std::is_same<typename detail::traits<Derived>::Canonical,
+        Derived>::value;
   }
 
   void setIdentity()
@@ -160,24 +164,18 @@ public:
 
   void setRandom()
   {
-    derived().mData.setRandom();
+    derived().mRepData.setRandom();
     // TODO(JS): improve
   }
 
-  bool isApprox(const SO3Base& other, S tol = 1e-6)
-  {
-    return derived().mData.isApprox(other.derived().mData, tol);
-    // TODO(JS): consider using geometric distance metric in measuring the
-    // proximity rather than one provided by Eigen that might be the Euclidean
-    // distance metric (not sure).
-  }
-
   template <typename OtherDerived>
-  bool isApprox(const SO3Base<OtherDerived>& other, S tol = 1e-6)
+  bool isApprox(const SO3Base<OtherDerived>& other, S tol = 1e-6) const
   {
-    return matrix().isApprox(other.matrix(), tol);
-    // TODO(JS): use identical distance metric with homogeneous version of
-    // isApprox()
+    return detail::SO3_is_approx_impl<Derived, OtherDerived>::run(
+          derived(), other.derived(), tol);
+    // TODO(JS): consider using geometric distance metric for measuring the
+    // proximity between two point on the manifolds rather than one provided by
+    // Eigen that might be the Euclidean distance metric (not sure).
   }
 
   static Derived Identity()
@@ -233,18 +231,36 @@ public:
 
   /// \}
 
-  template <SO3Param Param>
-  const typename detail::so3_param_traits<S, Param>::ParamType
-  parameters() const
+  RotationMatrixType toRotationMatrix() const
   {
-    typename detail::so3_param_traits<S, Param>::ParamType params;
-
-    return params;
+    return detail::SO3_convert_to_canonical_impl<S, Rep>::run(
+          derived().matrix());
   }
 
-  const MatrixType matrix() const
+  void fromRotationMatrix(const RotationMatrixType& rotMat)
   {
-    return derived().matrix();
+    derived().matrix()
+        = detail::SO3_convert_to_noncanonical_impl<S, Rep>::run(rotMat);
+  }
+
+  ///
+  template <typename RepTo>
+  typename detail::SO3_rep_traits<S, RepTo>::RepType
+  genCoords() const
+  {
+//    static_assert()
+
+    return detail::SO3_convert_impl<S, Rep, RepTo>::run(derived().matrix());
+  }
+
+  DataType& matrix()
+  {
+    return derived().mRepData;
+  }
+
+  const DataType& matrix() const
+  {
+    return derived().mRepData;
   }
 
   /// \returns A pointer to the data array of internal data type
@@ -253,29 +269,59 @@ public:
     return derived().data();
   }
 
-protected:
-
-  /// a reference to the derived object
-  const Derived& derived() const
+  /// \returns the number of rows. \sa cols()
+  std::size_t rows() const
   {
-    return *static_cast<const Derived*>(this);
+    return matrix().rows();
   }
 
-  /// a const reference to the derived object
-  Derived& derived()
+  /// \returns the number of columns. \sa rows()
+  std::size_t cols() const
   {
-    return *static_cast<Derived*>(this);
+    return matrix().cols();
   }
 
+  /// \returns the number of coefficients, which is rows()*cols().
+  /// \sa rows(), cols()
+  std::size_t size() const
+  {
+    return rows() * cols();
+  }
+
+private:
+
+  typename detail::traits<Derived>::Canonical
+  canonical(std::true_type)
+  {
+    return derived();
+  }
+
+  const typename detail::traits<Derived>::Canonical
+  canonical(std::true_type) const
+  {
+    return derived();
+  }
+
+  typename detail::traits<Derived>::Canonical
+  canonical(std::false_type)
+  {
+    return typename detail::traits<Derived>::Canonical(derived());
+  }
+
+  const typename detail::traits<Derived>::Canonical
+  canonical(std::false_type) const
+  {
+    return typename detail::traits<Derived>::Canonical(derived());
+  }
 };
 
 //==============================================================================
-template <typename S_, SO3Rep Mode_ = SO3Rep::RotationMatrix>
-class SO3 : public SO3Base<SO3<S_, Mode_>> {};
+template <typename S, typename Rep = SO3RotationMatrix>
+class SO3 : public SO3Base<SO3<S, Rep>> {};
 
 //==============================================================================
-template <SO3Rep Rep = SO3Rep::RotationMatrix> using SO3f = SO3<float, Rep>;
-template <SO3Rep Rep = SO3Rep::RotationMatrix> using SO3d = SO3<double, Rep>;
+template <typename Rep = SO3RotationMatrix> using SO3f = SO3<float, Rep>;
+template <typename Rep = SO3RotationMatrix> using SO3d = SO3<double, Rep>;
 
 } // namespace math
 } // namespace dart

@@ -33,6 +33,7 @@
 #include <gtest/gtest.h>
 #include "TestHelpers.hpp"
 
+#include "dart/common/Timer.hpp"
 #include "dart/math/Geometry.hpp"
 #include "dart/math/Helpers.hpp"
 #include "dart/dynamics/BallJoint.hpp"
@@ -594,11 +595,186 @@ TEST(LIE_GROUP_OPERATORS, ADJOINT_MAPPINGS)
     }
 }
 
+template <typename Derived, typename Enable = void>
+struct AdTImpl2
+{
+  static typename Derived::PlainObject run(
+      const Eigen::Isometry3d& T, const Eigen::MatrixBase<Derived>& J)
+  {
+    typename Derived::PlainObject ret;
+
+    // Compute AdT column by column
+    for (int i = 0; i < J.cols(); ++i)
+      ret.col(i) = AdT(T, J.col(i));
+
+    return ret;
+  }
+};
+
+template <typename Derived>
+struct AdTImpl2<
+    Derived,
+    typename std::enable_if<Derived::ColsAtCompileTime == 1
+    >::type>
+{
+  static typename Derived::PlainObject run(
+      const Eigen::Isometry3d& T, const Eigen::MatrixBase<Derived>& S)
+  {
+    typename Derived::PlainObject transformedTwist;
+
+    transformedTwist.template head<3>().noalias()
+        = T.linear() * S.template head<3>();
+
+    transformedTwist.template tail<3>().noalias()
+        = T.linear() * S.template tail<3>();
+    transformedTwist.template tail<3>().noalias()
+        += T.translation().cross(transformedTwist.template head<3>());
+
+    return transformedTwist;
+  }
+};
+
+/// Adjoint mapping for dynamic size Jacobian
+template <typename Derived>
+typename Derived::PlainObject AdT2(const Eigen::Isometry3d& T,
+                                   const Eigen::MatrixBase<Derived>& J)
+{
+  // Check the number of rows is 6 at compile time
+  EIGEN_STATIC_ASSERT(Derived::RowsAtCompileTime == 6,
+                      THIS_METHOD_IS_ONLY_FOR_MATRICES_OF_A_SPECIFIC_SIZE);
+
+  return AdTImpl2<Derived>::run(T, J);
+}
+
+template <typename Derived, typename Enable = void>
+struct AdTImpl3
+{
+  static typename Derived::PlainObject run(
+      const Eigen::Isometry3d& T, const Eigen::MatrixBase<Derived>& J)
+  {
+    typename Derived::PlainObject ret;
+
+    // Compute AdT column by column
+    for (int i = 0; i < J.cols(); ++i)
+    {
+      ret.col(i).template head<3>().noalias()
+          = T.linear() * J.col(i).template head<3>();
+      ret.col(i).template tail<3>().noalias()
+          = T.linear() * J.col(i).template tail<3>()
+          + T.translation().cross(ret.col(i).template head<3>());
+//      ret.col(i).template tail<3>()
+//          = T.translation().cross(ret.col(i).template head<3>());
+//      ret.col(i).template tail<3>().noalias()
+//          += T.linear() * J.col(i).template tail<3>();
+    }
+
+    return ret;
+
+//    return math::getAdTMatrix(T) * J;
+//    typename Derived::PlainObject transformedTwist;
+
+//    Eigen::Matrix6d adjointMatrix = math::getAdTMatrix(T);
+
+//    transformedTwist.noalias() = adjointMatrix * J;
+
+////    transformedTwist.template topRows<3>().noalias()
+////        = T.linear() * J.template topRows<3>();
+
+////    transformedTwist.template bottomRows<3>().noalias()
+////        = T.linear() * J.template bottomRows<3>();
+////    transformedTwist.template bottomRows<3>().noalias()
+////        -= transformedTwist.template topRows<3>().colwise().cross(T.translation());
+
+//    return transformedTwist;
+  }
+};
+
+template <typename Derived>
+struct AdTImpl3<
+    Derived,
+    typename std::enable_if<Derived::ColsAtCompileTime == 1
+    >::type>
+{
+  static typename Derived::PlainObject run(
+      const Eigen::Isometry3d& T, const Eigen::MatrixBase<Derived>& S)
+  {
+    typename Derived::PlainObject transformedTwist;
+
+    transformedTwist.template head<3>().noalias()
+        = T.linear() * S.template head<3>();
+
+    transformedTwist.template tail<3>().noalias()
+        = T.linear() * S.template tail<3>();
+    transformedTwist.template tail<3>().noalias()
+        += T.translation().cross(transformedTwist.template head<3>());
+
+    return transformedTwist;
+  }
+};
+
+/// Adjoint mapping for dynamic size Jacobian
+template <typename Derived>
+typename Derived::PlainObject AdT3(const Eigen::Isometry3d& T,
+                                   const Eigen::MatrixBase<Derived>& J)
+{
+  // Check the number of rows is 6 at compile time
+  EIGEN_STATIC_ASSERT(Derived::RowsAtCompileTime == 6,
+                      THIS_METHOD_IS_ONLY_FOR_MATRICES_OF_A_SPECIFIC_SIZE);
+
+  return AdTImpl3<Derived>::run(T, J);
+}
+
+//==============================================================================
+TEST(LIE_GROUP_OPERATORS, ADJOINT_MAPPINGS_TEMPLATE)
+{
+  Eigen::Vector6d t = Eigen::Vector6d::Random();
+  Eigen::Isometry3d T = math::expMap(t);
+  Eigen::Vector6d V = Eigen::Vector6d::Random();
+  Eigen::Matrix<double, 6, 100> J;
+  J.setRandom();
+//  Eigen::Matrix<double, 7, Eigen::Dynamic> wrongJ;
+
+  const auto nTests = 1e+4;
+
+  dart::common::Timer sw;
+
+  Eigen::MatrixXd sum1 = Eigen::MatrixXd::Zero(6, 100);
+  Eigen::MatrixXd sum2 = Eigen::MatrixXd::Zero(6, 100);
+  Eigen::MatrixXd sum3 = Eigen::MatrixXd::Zero(6, 100);
+
+  Eigen::Vector6d adjointTwist2 = AdT2(T, V);
+  Eigen::MatrixXd adjointJacobian2 = AdT2(T, J);
+//  Eigen::MatrixXd adjointWrongJacobian = AdT2(T, wrongJ);
+
+  Eigen::Vector6d adjointTwist3 = AdT3(T, V);
+  Eigen::MatrixXd adjointJacobian3 = AdT3(T, J);
+
+  math::AdTJacFixed(T, J);
+
+  sw.start();
+  for (auto i = 0; i < nTests; ++i)
+    sum1 += AdT2(T, J);
+  sw.stop();
+  std::cout << "Mark1: " << sw.getLastElapsedTime() << std::endl;
+
+  sw.start();
+  for (auto i = 0; i < nTests; ++i)
+    sum2 += AdT3(T, J);
+  sw.stop();
+  std::cout << "Mark2: " << sw.getLastElapsedTime() << std::endl;
+
+  sw.start();
+  for (auto i = 0; i < nTests; ++i)
+    sum3 += math::AdTJacFixed(T, J);
+  sw.stop();
+  std::cout << "Mark3: " << sw.getLastElapsedTime() << std::endl;
+
+  std::cout << "sum: " << sum1.rows() + sum2.rows() + sum3.rows() << std::endl;
+}
+
 /******************************************************************************/
 int main(int argc, char* argv[])
 {
 	::testing::InitGoogleTest(&argc, argv);
 	return RUN_ALL_TESTS();
 }
-
-

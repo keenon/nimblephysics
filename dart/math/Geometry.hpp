@@ -32,6 +32,8 @@
 #ifndef DART_MATH_GEOMETRY_HPP_
 #define DART_MATH_GEOMETRY_HPP_
 
+#include <iostream>
+
 #include <Eigen/Dense>
 
 #include "dart/common/Deprecated.hpp"
@@ -226,6 +228,61 @@ typename Derived::PlainObject AdTJac(const Eigen::Isometry3d& _T,
 
   return ret;
 }
+
+//template <typename Derived, typename Enable = void>
+//struct AdTImpl
+//{
+//  static typename Derived::PlainObject run(
+//      const Eigen::Isometry3d& T, const Eigen::MatrixBase<Derived>& J)
+//  {
+//    // Check the number of rows is 6 at compile time
+//    EIGEN_STATIC_ASSERT(Derived::RowsAtCompileTime == 6,
+//                        THIS_METHOD_IS_ONLY_FOR_MATRICES_OF_A_SPECIFIC_SIZE);
+
+//    typename Derived::PlainObject ret(J.rows(), J.cols());
+
+//    // Compute AdT column by column
+//    for (int i = 0; i < J.cols(); ++i)
+//      ret.col(i) = AdT(T, J.col(i));
+
+//    return ret;
+//  }
+//};
+
+//template <typename Derived>
+//struct AdTImpl<
+//    Derived,
+//    typename std::enable_if<
+//        Derived::RowsAtCompileTime == 6 && Derived::ColsAtCompileTime == 1
+//    >::type>
+//{
+//  static typename Derived::PlainObject run(
+//      const Eigen::Isometry3d& T, const Eigen::MatrixBase<Derived>& S)
+//  {
+//    //--------------------------------------------------------------------------
+//    // w' = R*w
+//    // v' = p x R*w + R*v
+//    //--------------------------------------------------------------------------
+
+//    typename Derived::PlainObject transformedTwist;
+
+//    transformedTwist.noalias() = T.linear() * S;
+//    transformedTwist.template tail<3>().noalias()
+//        += T.translation().cross(transformedTwist.template head<3>());
+
+//    std::cout << "AdT2 6x1 version" << std::endl;
+
+//    return transformedTwist;
+//  }
+//};
+
+///// Adjoint mapping for dynamic size Jacobian
+//template <typename Derived>
+//typename Derived::PlainObject AdT2(const Eigen::Isometry3d& T,
+//                                   const Eigen::MatrixBase<Derived>& J)
+//{
+//  return AdTImpl<Derived>::run(T, J);
+//}
 
 /// Adjoint mapping for fixed size Jacobian
 template<typename Derived>
