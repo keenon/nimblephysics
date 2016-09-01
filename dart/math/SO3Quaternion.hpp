@@ -152,11 +152,11 @@ public:
     using std::sin;
     using std::cos;
 
-    const S u1 = Eigen::internal::random<S>(0, 1),
-                 u2 = Eigen::internal::random<S>(0, 2*constants<S>::pi()),
-                 u3 = Eigen::internal::random<S>(0, 2*constants<S>::pi());
-    const S a = sqrt(1 - u1),
-                 b = sqrt(u1);
+    const S u1 = Eigen::internal::random<S>(0, 1);
+    const S u2 = Eigen::internal::random<S>(0, 2*constants<S>::pi());
+    const S u3 = Eigen::internal::random<S>(0, 2*constants<S>::pi());
+    const S a = sqrt(1 - u1);
+    const S b = sqrt(u1);
     mRepData = RepDataType(a * sin(u2), a * cos(u2), b * sin(u3), b * cos(u3));
   }
 
