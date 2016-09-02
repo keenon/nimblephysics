@@ -60,18 +60,20 @@ public:
   using se3 = typename Base::se3;
 
   using Base::operator =;
-  using Base::operator *;
-  using Base::operator *=;
+//  using Base::operator *;
+//  using Base::operator *=;
 
-  using Base::coordinates;
-  using Base::matrix;
+  using Base::rotation;
+  using Base::translation;
+//  using Base::coordinates;
+//  using Base::matrix;
 
   SE3() : Base(), mRotation(SO3Type()), mTranslation(TranslationType())
   {
     // Do nothing
   }
 
-  SE3(const SE3& other)
+  explicit SE3(const SE3& other)
     : Base(),
       mRotation(other.mRotation),
       mTranslation(other.mTranslation)
@@ -79,7 +81,7 @@ public:
     // Do nothing
   }
 
-  SE3(SE3&& other)
+  explicit SE3(SE3&& other)
     : Base(),
       mRotation(std::move(other.mRotation)),
       mTranslation(std::move(other.mTranslation))
@@ -87,10 +89,63 @@ public:
     // Do nothing
   }
 
+  template <typename OtherDerived>
+  SE3(const SE3Base<OtherDerived>& other)
+    : Base(),
+      mRotation(other.derived().rotation()),
+      mTranslation(other.derived().translation())
+  {
+    // Do nothing
+  }
+
+  template <typename OtherDerived>
+  SE3(SE3Base<OtherDerived>&& other)
+    : Base(),
+      mRotation(std::move(other.derived().rotation())),
+      mTranslation(std::move(other.derived().translation()))
+  {
+    // Do nothing
+  }
+
+  explicit SE3(const SO3Type& rotation,
+      const TranslationType& translation = TranslationType::Zero())
+    : Base(),
+      mRotation(rotation),
+      mTranslation(translation)
+  {
+    // Do nothing
+  }
+
+  explicit SE3(SO3Type&& rotation,
+      TranslationType&& translation = TranslationType::Zero())
+    : Base(),
+      mRotation(std::move(rotation)),
+      mTranslation(std::move(translation))
+  {
+    // Do nothing
+  }
+
+  explicit SE3(const TranslationType& translation)
+    : Base(),
+      mRotation(SO3Type::Identity()),
+      mTranslation(translation)
+  {
+    // Do nothing
+  }
+
+  explicit SE3(TranslationType&& translation)
+    : Base(),
+      mRotation(std::move(SO3Type::Identity())),
+      mTranslation(std::move(translation))
+  {
+    // Do nothing
+  }
+
 //  template <typename Derived>
 //  SE3(const SE3Base<Derived>& other)
-//    : mRepData(detail::SE3::convert_impl<S, typename Derived::Rep, Rep>::run(
-//              other.derived().matrix()))
+//    : Base(),
+//      mRotation(other.derived().rotation()),
+//      mTranslation(other.derived().translation())
 //  {
 //    // Do nothing
 //  }
@@ -117,17 +172,39 @@ public:
 //  explicit SE3(SE3&& tangent) : mRepData(expMapRot(std::move(tangent)))
 //  {
 //    // Do nothing
-//  }
+//  }  template <typename OtherDerived>
 
   SE3& operator=(const SE3& other)
   {
-    Base::operator =(other);
+    mRotation = other.mRotation;
+    mTranslation = other.mTranslation;
+
     return *this;
   }
 
   SE3& operator=(SE3&& other)
   {
-    Base::operator=(std::move(other));
+    mRotation = std::move(other.mRotation);
+    mTranslation = std::move(other.mTranslation);
+
+    return *this;
+  }
+
+  template <typename OtherDerived>
+  SE3& operator=(const SE3Base<OtherDerived>& other)
+  {
+    mRotation = other.derived().rotation();
+    mTranslation = other.derived().translation();
+
+    return *this;
+  }
+
+  template <typename OtherDerived>
+  SE3& operator=(SE3Base<OtherDerived>&& other)
+  {
+    mRotation = std::move(other.derived().rotation());
+    mTranslation = std::move(other.derived().translation());
+
     return *this;
   }
 
@@ -149,15 +226,15 @@ public:
     mTranslation.setRandom();
   }
 
-  void inverse()
+  void inverseInPlace()
   {
-    mRotation.inverse();
+    mRotation.inverseInPlace();
     mTranslation = -(mRotation * mTranslation);
   }
 
-  const SE3 inversed() const
+  const SE3 inverse() const
   {
-    SO3Type inversed = mRotation.inversed();
+    SO3Type inversed = mRotation.inverse();
 
     return SE3(inversed, -(inversed * mTranslation));
   }
@@ -185,7 +262,6 @@ protected:
   template <typename>
   friend class SE3Base;
 
-//  RepDataType mRepData;
   SO3<S, Rep> mRotation;
   Eigen::Matrix<S, 3, 1> mTranslation;
 };

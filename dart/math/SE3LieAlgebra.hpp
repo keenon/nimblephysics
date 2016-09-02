@@ -29,20 +29,103 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef DART_MATH_DETAIL_SE3BASE_HPP_
-#define DART_MATH_DETAIL_SE3BASE_HPP_
+#ifndef DART_MATH_SE3LIEALGEBRA_HPP_
+#define DART_MATH_SE3LIEALGEBRA_HPP_
 
-#include "dart/math/detail/SE3Operations.hpp"
+#include <Eigen/Eigen>
+
+#include "dart/math/MathTypes.hpp"
+#include "dart/math/Geometry.hpp"
+//#include "dart/math/SE3Base.hpp"
 
 namespace dart {
 namespace math {
-namespace detail {
-namespace SE3 {
 
+template <typename S_>
+class se3
+{
+public:
 
-} // namespace SE3
-} // namespace detail
+  using S = S_;
+
+  using LinearMotionType = Eigen::Matrix<S, 3, 1>;
+  using AngularMotionType = Eigen::Matrix<S, 3, 1>;
+
+  AngularMotionType& angular()
+  {
+    return mAngular;
+  }
+
+  const AngularMotionType& angular() const
+  {
+    return mAngular;
+  }
+
+  LinearMotionType& linear()
+  {
+    return mLinear;
+  }
+
+  const LinearMotionType& linear() const
+  {
+    return mLinear;
+  }
+
+protected:
+
+  template <typename>
+  friend class SE3Base;
+
+  Eigen::Matrix<S, 3, 1> mAngular;
+  Eigen::Matrix<S, 3, 1> mLinear;
+};
+
+template <typename S>
+using SpatialMotion = se3<S>;
+
+template <typename S_>
+class dse3
+{
+public:
+
+  using S = S_;
+
+  using LinearForceType = Eigen::Matrix<S, 3, 1>;
+  using AngularForceType = Eigen::Matrix<S, 3, 1>;
+
+  AngularForceType& angular()
+  {
+    return mAngular;
+  }
+
+  const AngularForceType& angular() const
+  {
+    return mAngular;
+  }
+
+  LinearForceType& linear()
+  {
+    return mLinear;
+  }
+
+  const LinearForceType& linear() const
+  {
+    return mLinear;
+  }
+
+protected:
+
+  template <typename>
+  friend class SE3Base;
+
+  Eigen::Matrix<S, 3, 1> mAngular;
+  Eigen::Matrix<S, 3, 1> mLinear;
+};
+
+template <typename S>
+using SpatialForce = dse3<S>;
+
 } // namespace math
 } // namespace dart
 
-#endif // DART_MATH_DETAIL_SE3BASE_HPP_
+#endif // DART_MATH_SE3LIEALGEBRA_HPP_

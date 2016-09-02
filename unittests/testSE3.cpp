@@ -37,23 +37,51 @@
 using namespace dart;
 
 //==============================================================================
-template <typename SO3Type>
+template <typename SE3Type>
 void testSettersAndGetters()
 {
-  SO3Type point;
+  using SO3Type = typename SE3Type::SO3Type;
+  using TranslationType = typename SE3Type::TranslationType;
 
-  point.setIdentity();
-  EXPECT_TRUE(point == SO3Type::Identity());
+  SE3Type tf1;
+  tf1.setIdentity();
+  EXPECT_TRUE(tf1 == SE3Type::Identity());
+
+  SE3Type tf2(SO3Type::Random());
+  EXPECT_TRUE(tf2.translation() == TranslationType::Zero());
+
+  SE3Type tf3(TranslationType::Zero());
+  EXPECT_TRUE(tf3.rotation() == SO3Type::Identity());
+
+//  Eigen::Isometry3d q = Eigen::Matrix<double, 4, 4>::Zero();
 }
 
 //==============================================================================
-TEST(SO3, SettersAndGetters)
+TEST(SE3, SettersAndGetters)
 {
-  testSettersAndGetters<SO3d<RotationMatrixRep>>();
-  testSettersAndGetters<SO3d<AxisAngleRep>>();
-  testSettersAndGetters<SO3d<QuaternionRep>>();
-  testSettersAndGetters<SO3d<RotationVectorRep>>();
+  testSettersAndGetters<SE3<double, RotationMatrixRep>>();
+  testSettersAndGetters<SE3<double, AxisAngleRep>>();
+  testSettersAndGetters<SE3<double, QuaternionRep>>();
+  testSettersAndGetters<SE3<double, RotationVectorRep>>();
   // EulerAngles
+}
+
+//==============================================================================
+TEST(SE3, HeterogeneousAssignment)
+{
+  SE3<double, RotationMatrixRep> tf1;
+  SE3<double, AxisAngleRep> tf2;
+  SE3<double, AxisAngleRep> tf3;
+
+  tf1 = tf2;
+  tf2 = tf3;
+
+//  tf1.setRandom();
+//  tf2.setRandom();
+//  EXPECT_FALSE(tf1.isApprox(tf2));
+
+//  tf1 = tf2;
+//  EXPECT_TRUE(tf1.isApprox(tf2));
 }
 
 //==============================================================================

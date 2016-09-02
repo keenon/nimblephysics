@@ -48,6 +48,8 @@ class SO3<S_, RotationMatrixRep> : public SO3Base<SO3<S_, RotationMatrixRep>>
 {
 public:
 
+  enum ConstructFromRotationMatrixTag { ConstructFromRotationMatrix };
+
   using This = SO3<S_, RotationMatrixRep>;
   using Base = SO3Base<This>;
   using S = typename Base::S;
@@ -88,14 +90,24 @@ public:
   }
 
   template <typename Derived>
-  explicit SO3(const Eigen::MatrixBase<Derived>& matrix) : mRepData(matrix)
+  SO3(SO3Base<Derived>&& other)
+    : mRepData(detail::SO3::convert_impl<S, typename Derived::Rep, Rep>::run(
+              std::move(other.derived().matrix())))
+  {
+    // Do nothing
+  }
+
+  template <typename Derived>
+  SO3(ConstructFromRotationMatrixTag,
+      const Eigen::MatrixBase<Derived>& matrix) : mRepData(matrix)
   {
     using namespace Eigen;
     EIGEN_STATIC_ASSERT_SAME_MATRIX_SIZE(Derived, RepDataType)
   }
 
   template <typename Derived>
-  explicit SO3(Eigen::MatrixBase<Derived>&& matrix) : mRepData(std::move(matrix))
+  SO3(ConstructFromRotationMatrixTag,
+      Eigen::MatrixBase<Derived>&& matrix) : mRepData(std::move(matrix))
   {
     using namespace Eigen;
     EIGEN_STATIC_ASSERT_SAME_MATRIX_SIZE(Derived, RepDataType)
@@ -139,19 +151,19 @@ public:
     // TODO(JS): improve
   }
 
-  void inverse()
+  void inverseInPlace()
   {
     mRepData.transposeInPlace();
   }
 
-  const SO3 inversed() const
+  const SO3 inverse() const
   {
-    return SO3(mRepData.transpose());
+    return SO3(ConstructFromRotationMatrix, mRepData.transpose());
   }
 
   static SO3 exp(const so3& tangent)
   {
-    return SO3(expMapRot(tangent));
+    return SO3(ConstructFromRotationMatrix, expMapRot(tangent));
     // TODO(JS): improve
   }
 

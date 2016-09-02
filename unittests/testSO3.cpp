@@ -116,9 +116,9 @@ void testGroupOperations()
 
   EXPECT_TRUE(w3.isApprox(w4));
 
-  SO3Type inversed1 = w1.inversed();
+  SO3Type inversed1 = w1.inverse();
   SO3Type inversed2 = w1;
-  inversed2.inverse();
+  inversed2.inverseInPlace();
 
   EXPECT_TRUE(inversed1.isApprox(inversed2));
 }

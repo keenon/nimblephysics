@@ -48,6 +48,8 @@ class SO3<S_, RotationVectorRep> : public SO3Base<SO3<S_, RotationVectorRep>>
 {
 public:
 
+  enum ConstructFromRotationMatrixTag { ConstructFromRotationVector };
+
   using This = SO3<S_, RotationVectorRep>;
   using Base = SO3Base<This>;
   using S = typename Base::S;
@@ -90,14 +92,18 @@ public:
   }
 
   template <typename Derived>
-  explicit SO3(const Eigen::MatrixBase<Derived>& matrix) : mRepData(matrix)
+  explicit SO3(
+      ConstructFromRotationMatrixTag,
+      const Eigen::MatrixBase<Derived>& matrix) : mRepData(matrix)
   {
     using namespace Eigen;
     EIGEN_STATIC_ASSERT_SAME_MATRIX_SIZE(Derived, RepDataType)
   }
 
   template <typename Derived>
-  explicit SO3(Eigen::MatrixBase<Derived>&& matrix) : mRepData(std::move(matrix))
+  explicit SO3(
+      ConstructFromRotationMatrixTag,
+      Eigen::MatrixBase<Derived>&& matrix) : mRepData(std::move(matrix))
   {
     using namespace Eigen;
     EIGEN_STATIC_ASSERT_SAME_MATRIX_SIZE(Derived, RepDataType)
@@ -145,14 +151,14 @@ public:
     mRepData.setRandom();
   }
 
-  void inverse()
+  void inverseInPlace()
   {
     mRepData *= static_cast<S>(-1);
   }
 
-  const SO3 inversed() const
+  const SO3 inverse() const
   {
-    return SO3(-mRepData);
+    return SO3(ConstructFromRotationVector, -mRepData);
   }
 
   static This exp(const so3& tangent)

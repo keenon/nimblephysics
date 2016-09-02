@@ -39,6 +39,10 @@
 #include "dart/math/MathTypes.hpp"
 #include "dart/math/Geometry.hpp"
 #include "dart/math/SO3Base.hpp"
+#include "dart/math/SO3AxisAngle.hpp"
+#include "dart/math/SO3Quaternion.hpp"
+#include "dart/math/SO3RotationMatrix.hpp"
+#include "dart/math/SO3RotationVector.hpp"
 #include "dart/math/detail/SE3Base.hpp"
 
 namespace dart {
@@ -59,17 +63,18 @@ public:
   using RotationMatrixType = Eigen::Matrix<S, Dim, Dim>;
   using VectorType = Eigen::Matrix<S, Dim, 1>;
 
-  /// The representation type of this SO(3)
+  /// The representation type of this SE(3)
   using Rep = typename detail::traits<Derived>::Rep;
 
-  /// The data type for this SO(3) representation type
+  /// The data type for this SE(3) representation type
   using SO3Type = SO3<S, Rep>;
+  using RotationType = SO3Type;
   using TranslationType = Eigen::Matrix<S, 3, 1>;
 //  using RepDataType = typename detail::SE3::rep_traits<S, Rep>::RepDataType;
 
   using Canonical = typename detail::traits<Derived>::Canonical;
 
-  /// The data type for the lie algebra of SO(3) called so(3)
+  /// The data type for the lie algebra of SE(3) called SE(3)
   using Tangent = Eigen::Matrix<S, Dim, 1>;
   using se3 = Tangent;
 
@@ -91,15 +96,7 @@ public:
     return *static_cast<Derived*>(this);
   }
 
-//  template <typename OtherRep>
-//  ProxySE3<S, OtherRep> as()
-//  {
-//    SE3<S, OtherRep> casted(derived);
-
-//    derived() = casted;
-//  }
-
-//  /// Set this SO(3) from any kinds of SO(3) types
+//  /// Set this SE(3) from any kinds of SE(3) types
 //  template <typename OtherDerived>
 //  Derived& operator=(const SE3Base<OtherDerived>& other)
 //  {
@@ -109,7 +106,7 @@ public:
 //    return derived();
 //  }
 
-//  /// Set this SO(3) from any kinds of SO(3) types
+//  /// Set this SE(3) from any kinds of SE(3) types
 //  template <typename OtherDerived>
 //  Derived& operator=(SE3Base<OtherDerived>&& other)
 //  {
@@ -119,7 +116,7 @@ public:
 //    return derived();
 //  }
 
-//  /// Set this SO(3) from the raw representation type
+//  /// Set this SE(3) from the raw representation type
 //  template <typename OtherDerived>
 //  Derived& operator=(const Eigen::MatrixBase<OtherDerived>& mat)
 //  {
@@ -133,7 +130,7 @@ public:
 //    return derived();
 //  }
 
-//  /// Set this SO(3) from the raw representation type
+//  /// Set this SE(3) from the raw representation type
 //  template <typename OtherDerived>
 //  Derived& operator=(Eigen::MatrixBase<OtherDerived>&& matrix)
 //  {
@@ -176,32 +173,52 @@ public:
 //    return toRotationMatrix() == other.toRotationMatrix();
 //  }
 
-//  void setIdentity()
-//  {
-//    derived().setIdentity();
-//  }
+  void setIdentity()
+  {
+    derived().setIdentity();
+  }
 
-//  static Derived Identity()
-//  {
-//    Derived I;
-//    I.setIdentity();
+  static Derived Identity()
+  {
+    Derived I;
+    I.setIdentity();
 
-//    return I;
-//  }
+    return I;
+  }
 
-//  void setRandom()
-//  {
-//    derived().mRepData.setRandom();
-//    // TODO(JS): improve
-//  }
+  void setRandom()
+  {
+    derived().mRepData.setRandom();
+    // TODO(JS): improve
+  }
 
-//  static Derived Random()
-//  {
-//    Derived R;
-//    R.setRandom();
+  static Derived Random()
+  {
+    Derived R;
+    R.setRandom();
 
-//    return R;
-//  }
+    return R;
+  }
+
+  SO3Type& rotation()
+  {
+    return derived().mRotation;
+  }
+
+  const SO3Type& rotation() const
+  {
+    return derived().mRotation;
+  }
+
+  TranslationType& translation()
+  {
+    return derived().mTranslation;
+  }
+
+  const TranslationType& translation() const
+  {
+    return derived().mTranslation;
+  }
 
 //  template <typename OtherDerived>
 //  bool isApprox(const SE3Base<OtherDerived>& other, S tol = 1e-6) const
@@ -213,13 +230,13 @@ public:
 //    // Eigen that might be the Euclidean distance metric (not sure).
 //  }
 
-//  /// Inverse this SO(3).
+//  /// Inverse this SE(3).
 //  void inverse()
 //  {
 //    return derived().inverse();
 //  }
 
-//  /// Return the inversion of this SO(3). This SO(3) doesn't change itself.
+//  /// Return the inversion of this SE(3). This SE(3) doesn't change itself.
 //  Derived inversed() const
 //  {
 //    return derived().inversed();

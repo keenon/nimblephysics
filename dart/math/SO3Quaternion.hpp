@@ -160,12 +160,12 @@ public:
     mRepData = RepDataType(a * sin(u2), a * cos(u2), b * sin(u3), b * cos(u3));
   }
 
-  void inverse()
+  void inverseInPlace()
   {
     mRepData = mRepData.conjugate();
   }
 
-  const SO3 inversed() const
+  const SO3 inverse() const
   {
     return SO3(mRepData.conjugate());
   }

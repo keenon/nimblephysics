@@ -210,16 +210,16 @@ public:
     // Eigen that might be the Euclidean distance metric (not sure).
   }
 
-  /// Inverse this SO(3).
-  void inverse()
+  /// Inverse this SO(3) in place.
+  void inverseInPlace()
   {
-    return derived().inverse();
+    return derived().inverseInPlace();
   }
 
   /// Return the inversion of this SO(3). This SO(3) doesn't change itself.
-  Derived inversed() const
+  Derived inverse() const
   {
-    return derived().inversed();
+    return derived().inverse();
   }
 
   // TODO(JS): add in-place inversion void inverse()

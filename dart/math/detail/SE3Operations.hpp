@@ -39,7 +39,25 @@
 namespace dart {
 namespace math {
 
+// Forward declarations
+template <typename, typename> class SE3;
+
 namespace detail {
+
+//==============================================================================
+// traits:
+// Traits for all SO3 classes that is agnostic to representation types
+//==============================================================================
+
+//==============================================================================
+template <typename S_, typename Rep_>
+struct traits<SE3<S_, Rep_>>
+{
+  using S = S_;
+  using Rep = Rep_;
+
+  using Canonical = SE3<S, SO3CanonicalRep>;
+};
 
 namespace SE3 {
 

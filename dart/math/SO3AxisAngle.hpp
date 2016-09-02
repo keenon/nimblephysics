@@ -81,27 +81,35 @@ public:
     // Do nothing
   }
 
-  template <typename Derived>
-  SO3(const SO3Base<Derived>& other)
-    : mRepData(detail::SO3::convert_impl<S, typename Derived::Rep, Rep>::run(
+  template <typename OtherDerived>
+  SO3(const SO3Base<OtherDerived>& other)
+    : mRepData(detail::SO3::convert_impl<S, typename OtherDerived::Rep, Rep>::run(
               other.derived().matrix()))
   {
     // Do nothing
   }
 
-  template <typename Derived>
-  explicit SO3(const Eigen::MatrixBase<Derived>& matrix) : mRepData(matrix)
+  template <typename OtherDerived>
+  SO3(SO3Base<OtherDerived>&& other)
+    : mRepData(detail::SO3::convert_impl<S, typename OtherDerived::Rep, Rep>::run(
+              std::move(other.derived().matrix())))
   {
-    using namespace Eigen;
-    EIGEN_STATIC_ASSERT_SAME_MATRIX_SIZE(Derived, RepDataType)
+    // Do nothing
   }
 
-  template <typename Derived>
-  explicit SO3(Eigen::MatrixBase<Derived>&& matrix) : mRepData(std::move(matrix))
-  {
-    using namespace Eigen;
-    EIGEN_STATIC_ASSERT_SAME_MATRIX_SIZE(Derived, RepDataType)
-  }
+//  template <typename Derived>
+//  SO3(const Eigen::MatrixBase<Derived>& matrix) : mRepData(matrix)
+//  {
+//    using namespace Eigen;
+//    EIGEN_STATIC_ASSERT_SAME_MATRIX_SIZE(Derived, RepDataType)
+//  }
+
+//  template <typename Derived>
+//  SO3(Eigen::MatrixBase<Derived>&& matrix) : mRepData(std::move(matrix))
+//  {
+//    using namespace Eigen;
+//    EIGEN_STATIC_ASSERT_SAME_MATRIX_SIZE(Derived, RepDataType)
+//  }
 
   explicit SO3(const so3& tangent) : mRepData(tangent)
   {
@@ -145,12 +153,12 @@ public:
     mRepData.setRandom();
   }
 
-  void inverse()
+  void inverseInPlace()
   {
     mRepData *= static_cast<S>(-1);
   }
 
-  const SO3 inversed() const
+  const SO3 inverse() const
   {
     return SO3(-mRepData);
   }
