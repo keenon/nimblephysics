@@ -66,7 +66,7 @@ public:
   using Base::operator *;
   using Base::operator *=;
 
-  using Base::matrix;
+  using Base::getRepData;
 
   SO3() : mRepData(RepDataType())
   {
@@ -151,22 +151,22 @@ public:
     mRepData.setRandom();
   }
 
-  void inverseInPlace()
+  void invert()
   {
     mRepData *= static_cast<S>(-1);
   }
 
-  const SO3 inverse() const
+  const SO3 getInverse() const
   {
     return SO3(ConstructFromRotationVector, -mRepData);
   }
 
-  static This exp(const so3& tangent)
+  static This Exp(const so3& tangent)
   {
     return This(tangent);
   }
 
-  static so3 log(const This& point)
+  static so3 Log(const This& point)
   {
     return point.mRepData;
   }
@@ -183,6 +183,9 @@ protected:
 
   RepDataType mRepData;
 };
+
+extern template
+class SO3<double, RotationVectorRep>;
 
 } // namespace math
 } // namespace dart

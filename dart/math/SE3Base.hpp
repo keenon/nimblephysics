@@ -237,9 +237,9 @@ public:
 //  }
 
 //  /// Return the inversion of this SE(3). This SE(3) doesn't change itself.
-//  Derived inversed() const
+//  Derived inverse() const
 //  {
-//    return derived().inversed();
+//    return derived().inverse();
 //  }
 
 //  // TODO(JS): add in-place inversion void inverse()

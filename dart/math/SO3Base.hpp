@@ -116,34 +116,6 @@ public:
     return derived();
   }
 
-  /// Set this SO(3) from the raw representation type
-  template <typename OtherDerived>
-  Derived& operator=(const Eigen::MatrixBase<OtherDerived>& mat)
-  {
-    {
-      using namespace Eigen;
-      EIGEN_STATIC_ASSERT_SAME_MATRIX_SIZE(RepDataType, OtherDerived)
-    }
-
-    derived().mRepData = mat;
-
-    return derived();
-  }
-
-  /// Set this SO(3) from the raw representation type
-  template <typename OtherDerived>
-  Derived& operator=(Eigen::MatrixBase<OtherDerived>&& matrix)
-  {
-    {
-      using namespace Eigen;
-      EIGEN_STATIC_ASSERT_SAME_MATRIX_SIZE(RepDataType, OtherDerived)
-    }
-
-    derived().mRepData = std::move(matrix);
-
-    return derived();
-  }
-
   /// Group multiplication
   template <typename OtherDerived>
   const Derived operator*(const SO3Base<OtherDerived>& other) const
@@ -178,6 +150,11 @@ public:
     derived().setIdentity();
   }
 
+  bool isIdentity()
+  {
+    return derived().isIdentity();
+  }
+
   static Derived Identity()
   {
     Derived I;
@@ -210,31 +187,31 @@ public:
     // Eigen that might be the Euclidean distance metric (not sure).
   }
 
-  /// Inverse this SO(3) in place.
-  void inverseInPlace()
+  /// Invert this SO(3) in place.
+  void invert()
   {
-    return derived().inverseInPlace();
+    return derived().invert();
   }
 
-  /// Return the inversion of this SO(3). This SO(3) doesn't change itself.
-  Derived inverse() const
+  /// Return the inverse of this SO(3). This SO(3) doesn't change itself.
+  Derived getInverse() const
   {
     return derived().inverse();
   }
 
   // TODO(JS): add in-place inversion void inverse()
 
-  static Derived exp(const so3& tangent)
+  static Derived Exp(const so3& tangent)
   {
-    return derived().exp(tangent);
+    return Derived::Exp(tangent);
   }
 
-  static so3 log(const Derived& point)
+  static so3 Log(const Derived& point)
   {
-    return derived().log(point);
+    return Derived::Log(point);
   }
 
-  static RotationMatrixType hat(const Tangent& angleAxis)
+  static RotationMatrixType Hat(const Tangent& angleAxis)
   {
     RotationMatrixType res;
     res <<  static_cast<S>(0),     -angleAxis(2),      angleAxis(1),
@@ -244,7 +221,7 @@ public:
     return res;
   }
 
-  static Tangent vee(const RotationMatrixType& mat)
+  static Tangent Vee(const RotationMatrixType& mat)
   {
     // TODO(JS): Add validity check if mat is skew-symmetric for debug mode
     return Tangent(mat(2, 1), mat(0, 2), mat(1, 0));
@@ -254,27 +231,33 @@ public:
   {
     // We assume the canonical representation is the rotation matrix
     return detail::SO3::convert_to_canonical_impl<S, Rep>::run(
-          derived().matrix());
+          derived().getRepData());
   }
 
   void fromRotationMatrix(const RotationMatrixType& rotMat)
   {
     // We assume the canonical representation is the rotation matrix
-    derived().matrix()
-        = detail::SO3::convert_to_noncanonical_impl<S, Rep>::run(rotMat);
+    derived().setRepData(
+          detail::SO3::convert_to_noncanonical_impl<S, Rep>::run(rotMat));
   }
 
   ///
   template <typename RepTo>
-  typename detail::SO3::rep_traits<S, RepTo>::RepDataType coordinates() const
+  typename detail::SO3::rep_traits<S, RepTo>::RepDataType getCoordinates() const
+  // TODO(JS): Change return type to Eigen::Matrix<S, Dim, 1>
   {
     // TODO(JS): Check if the raw data of RepTo is a vector type.
 
     return detail::SO3::convert_impl<S, Rep, RepTo>::run(derived().mRepData);
   }
 
+  void setRepData(const RepDataType& data)
+  {
+    derived().mRepData = data;
+  }
+
   /// Return a reference of the raw data of the representation type
-  RepDataType& matrix()
+  RepDataType& getRepData()
   {
     return derived().mRepData;
     // TODO(JS): Note that we return the raw data of the representation type
@@ -287,34 +270,9 @@ public:
   }
 
   /// Return a const reference of the raw data of the representation type
-  const RepDataType& matrix() const
+  const RepDataType& getRepData() const
   {
     return derived().mRepData;
-  }
-
-  /// \returns A pointer to the data array of internal data type
-  S* data()
-  {
-    return derived().data();
-  }
-
-  /// \returns the number of rows. \sa cols()
-  std::size_t rows() const
-  {
-    return matrix().rows();
-  }
-
-  /// \returns the number of columns. \sa rows()
-  std::size_t cols() const
-  {
-    return matrix().cols();
-  }
-
-  /// \returns the number of coefficients, which is rows()*cols().
-  /// \sa rows(), cols()
-  std::size_t size() const
-  {
-    return rows() * cols();
   }
 
   Canonical canonical()

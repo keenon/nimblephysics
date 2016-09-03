@@ -67,8 +67,9 @@ struct assign_impl
 
   static void run(SO3To& dataTo, const SO3From& dataFrom)
   {
-    dataTo.matrix() = convert_to_noncanonical_impl<S, RepTo>::run(
-          convert_to_canonical_impl<S, RepFrom>::run(dataFrom.matrix()));
+    dataTo.setRepData(
+          convert_to_noncanonical_impl<S, RepTo>::run(
+          convert_to_canonical_impl<S, RepFrom>::run(dataFrom.getRepData())));
   }
 };
 
@@ -87,10 +88,10 @@ struct inplace_group_multiplication_impl
 
   static void run(SO3A& data, const SO3B& otherData)
   {
-    data.matrix() = convert_to_noncanonical_impl<S, RepA>::run(
+    data.getRepData() = convert_to_noncanonical_impl<S, RepA>::run(
           canonical_group_multiplication_impl<S>::run(
-            convert_to_canonical_impl<S, RepA>::run(data.matrix()),
-            convert_to_canonical_impl<S, RepB>::run(otherData.matrix())));
+            convert_to_canonical_impl<S, RepA>::run(data.getRepData()),
+            convert_to_canonical_impl<S, RepB>::run(otherData.getRepData())));
   }
 };
 
@@ -108,8 +109,8 @@ struct inplace_group_multiplication_impl<
 
   static void run(SO3A& data, const SO3B& otherData)
   {
-    data.matrix() *= convert_to_canonical_impl<S, RepB>::run(
-          otherData.matrix());
+    data.getRepData() *= convert_to_canonical_impl<S, RepB>::run(
+          otherData.getRepData());
   }
 };
 
@@ -128,9 +129,9 @@ struct is_approx_impl
 
   static bool run(const SO3A& dataA, const SO3B& dataB, S tol)
   {
-    return convert_to_canonical_impl<S, RepA>::run(dataA.matrix())
+    return convert_to_canonical_impl<S, RepA>::run(dataA.getRepData())
         .isApprox(
-          convert_to_canonical_impl<S, RepB>::run(dataB.matrix()),
+          convert_to_canonical_impl<S, RepB>::run(dataB.getRepData()),
           tol);
   }
 };

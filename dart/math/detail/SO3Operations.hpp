@@ -35,6 +35,7 @@
 #include <Eigen/Eigen>
 #include "dart/math/MathTypes.hpp"
 #include "dart/math/Geometry.hpp"
+#include "dart/math/Constants.hpp"
 
 namespace dart {
 namespace math {
@@ -94,8 +95,7 @@ struct rep_traits<S_, AxisAngleRep>
 {
   using S = S_;
   using Rep = AxisAngleRep;
-  using RepDataType = Eigen::Matrix<S, 3, 1>;
-  // TODO(JS): Change to Eigen::AngleAxis<S>
+  using RepDataType = Eigen::AngleAxis<S>;
 };
 
 //==============================================================================
@@ -115,6 +115,66 @@ struct rep_traits<S_, RotationVectorRep>
   using Rep = QuaternionRep;
   using RepDataType = Eigen::Matrix<S, 3, 1>;
 };
+
+
+//==============================================================================
+//
+//==============================================================================
+
+//==============================================================================
+
+template <typename S>
+Eigen::Matrix<S, 3, 3> exp(const Eigen::Matrix<S, 3, 1>& w)
+{
+  using Matrix3 = Eigen::Matrix<S, 3, 3>;
+
+  Matrix3 res;
+
+  S s2[] = { w[0]*w[0], w[1]*w[1], w[2]*w[2] };
+  S s3[] = { w[0]*w[1], w[1]*w[2], w[2]*w[0] };
+  S theta = std::sqrt(s2[0] + s2[1] + s2[2]);
+  S cos_t = std::cos(theta), alpha, beta;
+
+  if (theta > constants<S>::eps())
+  {
+    S sin_t = std::sin(theta);
+    alpha = sin_t / theta;
+    beta = (1.0 - cos_t) / theta / theta;
+  }
+  else
+  {
+    alpha = 1.0 - theta*theta/6.0;
+    beta = 0.5 - theta*theta/24.0;
+  }
+
+  res(0, 0) = beta*s2[0] + cos_t;
+  res(1, 0) = beta*s3[0] + alpha*w[2];
+  res(2, 0) = beta*s3[2] - alpha*w[1];
+
+  res(0, 1) = beta*s3[0] - alpha*w[2];
+  res(1, 1) = beta*s2[1] + cos_t;
+  res(2, 1) = beta*s3[1] + alpha*w[0];
+
+  res(0, 2) = beta*s3[2] + alpha*w[1];
+  res(1, 2) = beta*s3[1] - alpha*w[0];
+  res(2, 2) = beta*s2[2] + cos_t;
+
+  return res;
+}
+
+//==============================================================================
+//
+//==============================================================================
+
+//==============================================================================
+
+template <typename S>
+Eigen::Matrix<S, 3, 1> log(const Eigen::Matrix<S, 3, 3>& R)
+{
+  Eigen::AngleAxis<S> aa(R);
+
+  return aa.angle()*aa.axis();
+}
 
 //==============================================================================
 // convert_to_canonical_impl:
@@ -146,7 +206,7 @@ struct convert_to_canonical_impl<S, AxisAngleRep>
 
   static const RepDataTo run(const RepDataFrom& data)
   {
-    return ::dart::math::expMapRot(data);
+    return data.toRotationMatrix();
   }
 };
 
@@ -172,7 +232,7 @@ struct convert_to_canonical_impl<S, RotationVectorRep>
 
   static const RepDataTo run(const RepDataFrom& data)
   {
-    return ::dart::math::expMapRot(data);
+    return exp(data);
   }
 };
 
@@ -206,7 +266,9 @@ struct convert_to_noncanonical_impl<S, AxisAngleRep>
 
   static const RepDataTo run(const RepDataFrom& canonicalData)
   {
-    return ::dart::math::logMap(canonicalData);
+    return RepDataTo(canonicalData);
+    // Above is identical to:
+    // return Eigen::AngleAxis<S>(canonicalData);
   }
 };
 
@@ -220,6 +282,8 @@ struct convert_to_noncanonical_impl<S, QuaternionRep>
   static const RepDataTo run(const RepDataFrom& canonicalData)
   {
     return RepDataTo(canonicalData);
+    // Above is identical to:
+    // return Eigen::Quaternion<S>(canonicalData);
   }
 };
 

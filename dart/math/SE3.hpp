@@ -66,7 +66,7 @@ public:
   using Base::rotation;
   using Base::translation;
 //  using Base::coordinates;
-//  using Base::matrix;
+//  using Base::getRepData;
 
   SE3() : Base(), mRotation(SO3Type()), mTranslation(TranslationType())
   {
@@ -226,17 +226,17 @@ public:
     mTranslation.setRandom();
   }
 
-  void inverseInPlace()
+  void invert()
   {
-    mRotation.inverseInPlace();
-    mTranslation = -(mRotation * mTranslation);
+    mRotation.invert();
+    //mTranslation = -(mRotation * mTranslation);
   }
 
-  const SE3 inverse() const
+  const SE3 getInverse() const
   {
-    SO3Type inversed = mRotation.inverse();
+    SO3Type inverse = mRotation.getInverse();
 
-    return SE3(inversed, -(inversed * mTranslation));
+    //return SE3(inverse, -(inverse * mTranslation));
   }
 
 //  static SE3 exp(const SE3& tangent)
@@ -265,6 +265,18 @@ protected:
   SO3<S, Rep> mRotation;
   Eigen::Matrix<S, 3, 1> mTranslation;
 };
+
+extern template
+class SE3<double, RotationMatrixRep>;
+
+extern template
+class SE3<double, RotationVectorRep>;
+
+extern template
+class SE3<double, AxisAngleRep>;
+
+extern template
+class SE3<double, QuaternionRep>;
 
 } // namespace math
 } // namespace dart

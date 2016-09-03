@@ -29,37 +29,13 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef DART_MATH_CONSTANTS_HPP_
-#define DART_MATH_CONSTANTS_HPP_
-
-#include <limits>
+#include "dart/math/SO3Quaternion.hpp"
 
 namespace dart {
 namespace math {
 
-template <typename T>
-struct constants {
+template
+class SO3<double, QuaternionRep>;
 
-  static constexpr T pi()
-      { return 3.141592653589793238462643383279502884197169399375105820974944592L; }
-  static constexpr T two_pi()  { return 2.0 * pi();  }
-  static constexpr T half_pi() { return 0.5 * pi();  }
-  static constexpr T pi_sqr()  { return pi() * pi(); }
-
-  /// The golden ratio
-  static constexpr T phi()
-      { return 1.618033988749894848204586834365638117720309179805762862135448623L; }
-
-  static constexpr T inf() { return std::numeric_limits<T>::infinity(); }
-
-  static constexpr T eps() { return static_cast<T>(1e-6); }
-
-};
-
-using constantsf = constants<float>;
-using constantsd = constants<double>;
-
-}  // namespace math
-}  // namespace dart
-
-#endif  // DART_MATH_CONSTANTS_HPP_
+} // namespace math
+} // namespace dart

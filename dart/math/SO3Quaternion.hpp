@@ -63,7 +63,7 @@ public:
   using Base::operator *;
   using Base::operator *=;
 
-  using Base::matrix;
+  using Base::getRepData;
 
   SO3() : mRepData(RepDataType())
   {
@@ -160,30 +160,39 @@ public:
     mRepData = RepDataType(a * sin(u2), a * cos(u2), b * sin(u3), b * cos(u3));
   }
 
-  void inverseInPlace()
+  void invert()
   {
     mRepData = mRepData.conjugate();
   }
 
-  const SO3 inverse() const
+  const SO3 getInverse() const
   {
     return SO3(mRepData.conjugate());
   }
 
-  static This exp(const so3& /*tangent*/)
+  static This Exp(const so3& /*tangent*/)
   {
     // TODO(JS): Not implemented yet
   }
 
-  static so3 log(const This& /*point*/)
+  static so3 Log(const This& /*point*/)
   {
     // TODO(JS): Not implemented yet
   }
+
+  ///
+//  template <typename RepTo>
+//  typename detail::SO3::rep_traits<S, RepTo>::RepDataType coordinates() const
+//  {
+//    // TODO(JS): Check if the raw data of RepTo is a vector type.
+
+//    return detail::SO3::convert_impl<S, Rep, RepTo>::run(derived().mRepData);
+//  }
 
   /// \returns A pointer to the data array of internal data type
   S* data()
   {
-    return mRepData.data();
+    return mRepData.matrix().data();
   }
 
 protected:
@@ -192,6 +201,9 @@ protected:
 
   RepDataType mRepData;
 };
+
+extern template
+class SO3<double, QuaternionRep>;
 
 } // namespace math
 } // namespace dart

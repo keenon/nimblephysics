@@ -63,114 +63,170 @@ public:
   using Base::operator *;
   using Base::operator *=;
 
-  using Base::coordinates;
-  using Base::matrix;
+  using Base::getCoordinates;
+  using Base::setRepData;
+  using Base::getRepData;
 
-  SO3() : mRepData(RepDataType())
+  /// \{ \name Constructors
+
+  /// Default constructor. By default, the constructed SO(3) is not identity.
+  SO3() : Base()
   {
     // Do nothing
   }
 
+  /// Copy constructor.
   SO3(const SO3& other) : Base(), mRepData(other.mRepData)
   {
     // Do nothing
   }
 
+  /// Move constructor.
   SO3(SO3&& other) : mRepData(std::move(other.mRepData))
   {
     // Do nothing
   }
 
+  /// Construct from a raw rotation matrix whose dimension is 3x3. We use
+  /// a construction tag ConstructFromRotationMatrixTag to prevent this class
+  /// gets implicitly created from arbitrary Eigen::MatrixBase classes.
+  template <typename Derived>
+  SO3(ConstructFromRotationMatrixTag,
+      const Eigen::MatrixBase<Derived>& matrix)
+    : Base(), mRepData(matrix)
+  {
+    assert(matrix.rows() == 3);
+    assert(matrix.cols() == 3);
+  }
+
+  /// Construct from a raw rotation matrix whose dimension is 3x3. We use
+  /// a construction tag ConstructFromRotationMatrixTag to prevent this class
+  /// gets implicitly created from arbitrary Eigen::MatrixBase classes.
+  template <typename Derived>
+  SO3(ConstructFromRotationMatrixTag,
+      Eigen::MatrixBase<Derived>&& matrix)
+    : Base(), mRepData(std::move(matrix))
+  {
+    assert(matrix.rows() == 3);
+    assert(matrix.cols() == 3);
+  }
+
+  /// Construct from other SO3 with different representation.
   template <typename Derived>
   SO3(const SO3Base<Derived>& other)
-    : mRepData(detail::SO3::convert_impl<S, typename Derived::Rep, Rep>::run(
-              other.derived().matrix()))
+    : Base(),
+      mRepData(detail::SO3::convert_impl<S, typename Derived::Rep, Rep>::run(
+              other.derived().getRepData()))
   {
     // Do nothing
   }
 
+  /// Construct from other SO3 with different representation.
   template <typename Derived>
   SO3(SO3Base<Derived>&& other)
-    : mRepData(detail::SO3::convert_impl<S, typename Derived::Rep, Rep>::run(
-              std::move(other.derived().matrix())))
+    : Base(),
+      mRepData(detail::SO3::convert_impl<S, typename Derived::Rep, Rep>::run(
+              std::move(other.derived().getRepData())))
   {
     // Do nothing
   }
 
-  template <typename Derived>
-  SO3(ConstructFromRotationMatrixTag,
-      const Eigen::MatrixBase<Derived>& matrix) : mRepData(matrix)
-  {
-    using namespace Eigen;
-    EIGEN_STATIC_ASSERT_SAME_MATRIX_SIZE(Derived, RepDataType)
-  }
+  /// \} // Constructors
 
-  template <typename Derived>
-  SO3(ConstructFromRotationMatrixTag,
-      Eigen::MatrixBase<Derived>&& matrix) : mRepData(std::move(matrix))
-  {
-    using namespace Eigen;
-    EIGEN_STATIC_ASSERT_SAME_MATRIX_SIZE(Derived, RepDataType)
-  }
+  /// \{ \name Operators
 
-  explicit SO3(const so3& tangent) : mRepData(expMapRot(tangent))
-  {
-    // Do nothing
-  }
-
-  explicit SO3(so3&& tangent) : mRepData(expMapRot(std::move(tangent)))
-  {
-    // Do nothing
-  }
-
+  /// Assign a SO3 with the same representation.
   SO3& operator=(const SO3& other)
   {
     Base::operator =(other);
     return *this;
   }
 
+  /// Move in a SO3 with the same representation.
   SO3& operator=(SO3&& other)
   {
     Base::operator=(std::move(other));
     return *this;
   }
 
+  /// Whether \b exactly equal to a SO3.
   bool operator ==(const SO3& other)
   {
     return mRepData == other.mRepData;
   }
+
+  /// \} // Operators
+
+  /// \{ \name Representation properties
+
+  template <typename Derived>
+  void setRotationMatrix(const Eigen::MatrixBase<Derived>& matrix)
+  {
+    assert(matrix.rows() == 3);
+    assert(matrix.cols() == 3);
+
+    mRepData = matrix;
+  }
+
+  template <typename Derived>
+  void setRotationMatrix(Eigen::MatrixBase<Derived>&& mat)
+  {
+    assert(mat.rows() == 3);
+    assert(mat.cols() == 3);
+
+    mRepData = std::move(mat);
+  }
+
+  const RotationMatrixType& getRotationMatrix() const
+  {
+    return mRepData;
+  }
+
+  RotationMatrixType& getRotationMatrix()
+  {
+    return mRepData;
+  }
+
+  void setRandom()
+  {
+    *this = Exp(Tangent::Random());
+    // TODO(JS): improve
+  }
+
+  /// \} // Representation properties
+
+  /// \{ \name \f$SO3\f$ group properties
 
   void setIdentity()
   {
     mRepData.setIdentity();
   }
 
-  void setRandom()
+  bool isIdentity()
   {
-    *this = exp(Tangent::Random());
-    // TODO(JS): improve
+    return mRepData == RepDataType::Identity();
   }
 
-  void inverseInPlace()
+  void invert()
   {
     mRepData.transposeInPlace();
   }
 
-  const SO3 inverse() const
+  const SO3 getInverse() const
   {
     return SO3(ConstructFromRotationMatrix, mRepData.transpose());
   }
 
-  static SO3 exp(const so3& tangent)
+  /// \} // \f$SO3\f$ group properties
+
+  static SO3 Exp(const so3& tangent)
   {
-    return SO3(ConstructFromRotationMatrix, expMapRot(tangent));
-    // TODO(JS): improve
+    return SO3(ConstructFromRotationMatrix, detail::SO3::exp(tangent));
   }
 
-  static so3 log(const This& point)
+  static so3 Log(const SO3& point)
   {
-    return ::dart::math::logMap(point.mRepData);
-    // TODO(JS): improve
+    return detail::SO3::log(point.mRepData);
   }
 
   /// \returns A pointer to the data array of internal data type
@@ -184,8 +240,11 @@ protected:
   template <typename>
   friend class SO3Base;
 
-  RepDataType mRepData;
+  RepDataType mRepData{RepDataType()};
 };
+
+extern template
+class SO3<double, RotationMatrixRep>;
 
 } // namespace math
 } // namespace dart

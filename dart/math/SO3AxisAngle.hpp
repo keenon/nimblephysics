@@ -36,6 +36,7 @@
 
 #include "dart/math/MathTypes.hpp"
 #include "dart/math/Geometry.hpp"
+#include "dart/math/Helpers.hpp"
 #include "dart/math/SO3Base.hpp"
 
 namespace dart {
@@ -64,127 +65,201 @@ public:
   using Base::operator *;
   using Base::operator *=;
 
-  using Base::matrix;
+  using Base::getCoordinates;
+  using Base::setRepData;
+  using Base::getRepData;
 
-  SO3() : mRepData(RepDataType())
+  /// \{ \name Constructors
+
+  /// Default constructor. By default, the constructed SO(3) is not identity.
+  SO3() : Base()
   {
     // Do nothing
   }
 
+  /// Copy constructor.
   SO3(const SO3& other) : Base(), mRepData(other.mRepData)
   {
     // Do nothing
   }
 
+  /// Move constructor.
   SO3(SO3&& other) : mRepData(std::move(other.mRepData))
   {
     // Do nothing
   }
 
-  template <typename OtherDerived>
-  SO3(const SO3Base<OtherDerived>& other)
-    : mRepData(detail::SO3::convert_impl<S, typename OtherDerived::Rep, Rep>::run(
-              other.derived().matrix()))
+  /// Construct from Eigen::AngleAxis.
+  explicit SO3(const Eigen::AngleAxis<S>& angleAxis)
+    : Base(), mRepData(angleAxis)
   {
     // Do nothing
   }
 
-  template <typename OtherDerived>
-  SO3(SO3Base<OtherDerived>&& other)
-    : mRepData(detail::SO3::convert_impl<S, typename OtherDerived::Rep, Rep>::run(
-              std::move(other.derived().matrix())))
+  /// Construct from Eigen::AngleAxis.
+  explicit SO3(Eigen::AngleAxis<S>&& angleAxis)
+    : Base(), mRepData(std::move(angleAxis))
   {
     // Do nothing
   }
 
-//  template <typename Derived>
-//  SO3(const Eigen::MatrixBase<Derived>& matrix) : mRepData(matrix)
-//  {
-//    using namespace Eigen;
-//    EIGEN_STATIC_ASSERT_SAME_MATRIX_SIZE(Derived, RepDataType)
-//  }
-
-//  template <typename Derived>
-//  SO3(Eigen::MatrixBase<Derived>&& matrix) : mRepData(std::move(matrix))
-//  {
-//    using namespace Eigen;
-//    EIGEN_STATIC_ASSERT_SAME_MATRIX_SIZE(Derived, RepDataType)
-//  }
-
-  explicit SO3(const so3& tangent) : mRepData(tangent)
+  explicit SO3(const VectorType& axis, S angle)
+    : Base(), mRepData(angle, axis)
   {
     // Do nothing
   }
 
-  explicit SO3(so3&& tangent) : mRepData(std::move(tangent))
+  explicit SO3(VectorType&& axis, S angle)
+    : Base(), mRepData(std::move(angle), axis)
   {
     // Do nothing
   }
 
+  /// Construct from other SO3 with different representation.
+  template <typename Derived>
+  SO3(const SO3Base<Derived>& other)
+    : Base(),
+      mRepData(detail::SO3::convert_impl<S, typename Derived::Rep, Rep>::run(
+              other.derived().getRepData()))
+  {
+    // Do nothing
+  }
+
+  /// Construct from other SO3 with different representation.
+  template <typename Derived>
+  SO3(SO3Base<Derived>&& other)
+    : Base(),
+      mRepData(detail::SO3::convert_impl<S, typename Derived::Rep, Rep>::run(
+              std::move(other.derived().getRepData())))
+  {
+    // Do nothing
+  }
+
+  /// \} // Constructors
+
+  /// \{ \name Operators
+
+  /// Assign a SO3 with the same representation.
   SO3& operator=(const SO3& other)
   {
     Base::operator =(other);
     return *this;
   }
 
+  /// Move in a SO3 with the same representation.
   SO3& operator=(SO3&& other)
   {
     Base::operator=(std::move(other));
     return *this;
   }
 
+  /// Whether \b exactly equal to a SO3.
   bool operator ==(const SO3& other)
   {
-    return mRepData == other.mRepData;
+    if (mRepData.angle() == static_cast<S>(0)
+        && other.getRepData().angle() == static_cast<S>(0))
+      return true;
+
+    return mRepData.isApprox(other.mRepData, static_cast<S>(0));
   }
+
+  /// \} // Operators
+
+  /// \{ \name Representation properties
 
   void setAxisAngle(const VectorType& axis, S angle)
   {
-    mRepData = angle * axis;
+    mRepData.axis() = axis;
+    mRepData.angle() = angle;
   }
 
-  void setIdentity()
+  void setAxis(const VectorType& axis)
   {
-    mRepData.setZero();
+    mRepData.axis() = axis;
+  }
+
+  const VectorType& getAxis() const
+  {
+    return mRepData.axis();
+  }
+
+  VectorType& getAxis()
+  {
+    return mRepData.axis();
+  }
+
+  void setAngle(const S angle)
+  {
+    mRepData.angle() = angle;
+  }
+
+  S getAngle() const
+  {
+    return mRepData.angle();
+  }
+
+  S& getAngle()
+  {
+    return mRepData.angle();
   }
 
   void setRandom()
   {
-    mRepData.setRandom();
+    mRepData.axis().setRandom().normalize();
+    mRepData.angle() = math::random<S>();
+    // TODO(JS): improve
   }
 
-  void inverseInPlace()
+  /// \} // Representation properties
+
+  /// \{ \name \f$SO3\f$ group properties
+
+  void setIdentity()
   {
-    mRepData *= static_cast<S>(-1);
+    mRepData.angle() = static_cast<S>(0);
   }
 
-  const SO3 inverse() const
+  bool isIdentity()
   {
-    return SO3(-mRepData);
+    return mRepData.angle() == static_cast<S>(0);
   }
 
-  static This exp(const so3& tangent)
+  void invert()
   {
-    return This(tangent);
+    mRepData.angle() *= static_cast<S>(-1);
   }
 
-  static so3 log(const This& point)
+  const SO3 getInverse() const
   {
-    return point.mRepData;
+    return SO3(RepDataType(-mRepData.angle(), mRepData.axis()));
   }
 
-  /// \returns A pointer to the data array of internal data type
-  S* data()
+  /// \} // \f$SO3\f$ group properties
+
+  static SO3 Exp(const so3& tangent)
   {
-    return mRepData.data();
+    const S norm = tangent.norm();
+
+    if (norm > static_cast<S>(0))
+      return SO3(RepDataType(norm, tangent/norm));
+    else
+      return SO3(RepDataType(0, VectorType::UnitX()));
+  }
+
+  static so3 Log(const SO3& point)
+  {
+    return point.mRepData.angle() * point.mRepData.axis();
   }
 
 protected:
   template <typename>
   friend class SO3Base;
 
-  RepDataType mRepData;
+  RepDataType mRepData{RepDataType()};
 };
+
+extern template
+class SO3<double, AxisAngleRep>;
 
 } // namespace math
 } // namespace dart

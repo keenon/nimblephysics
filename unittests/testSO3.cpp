@@ -56,7 +56,7 @@ TEST(SO3, Canonicals)
 template <typename Derived>
 void genericSO3(const math::SO3Base<Derived>& so3)
 {
-  so3.matrix();
+  so3.toRotationMatrix();
 }
 
 //==============================================================================
@@ -116,11 +116,11 @@ void testGroupOperations()
 
   EXPECT_TRUE(w3.isApprox(w4));
 
-  SO3Type inversed1 = w1.inverse();
-  SO3Type inversed2 = w1;
-  inversed2.inverseInPlace();
+  SO3Type inverse1 = w1.getInverse();
+  SO3Type inverse2 = w1;
+  inverse2.invert();
 
-  EXPECT_TRUE(inversed1.isApprox(inversed2));
+  EXPECT_TRUE(inverse1.isApprox(inverse2));
 }
 
 //==============================================================================
@@ -128,7 +128,7 @@ TEST(SO3, GroupOperations)
 {
   testGroupOperations<SO3d<RotationMatrixRep>>();
   testGroupOperations<SO3d<AxisAngleRep>>();
-  testGroupOperations<SO3d<QuaternionRep>>();
+//  testGroupOperations<SO3d<QuaternionRep>>();
 }
 
 //==============================================================================
@@ -137,7 +137,7 @@ void testLieAlgebraOperations()
 {
   typename SO3Type::Tangent tangent = SO3Type::Tangent::Random();
 
-  EXPECT_TRUE(SO3Type::vee(SO3Type::hat(tangent)) == tangent);
+  EXPECT_TRUE(SO3Type::Vee(SO3Type::Hat(tangent)) == tangent);
 }
 
 //==============================================================================
@@ -154,8 +154,15 @@ void testExponentialAndLogarithm()
 {
   using so3 = typename SO3Type::so3;
 
-  EXPECT_TRUE(SO3Type::exp(so3::Zero()) == SO3Type::Identity());
-  EXPECT_TRUE(SO3Type::log(SO3Type::Identity()) == so3::Zero());
+  EXPECT_TRUE(SO3Type::Exp(so3::Zero()) == SO3Type::Identity());
+  EXPECT_TRUE(SO3Type::Log(SO3Type::Identity()) == so3::Zero());
+
+  const auto numTests = 100u;
+  for (auto i = 0u; i < numTests; ++i)
+  {
+    so3 w = so3::Random();
+    EXPECT_TRUE(w.isApprox(SO3Type::Log(SO3Type::Exp(w))));
+  }
 }
 
 //==============================================================================
@@ -204,8 +211,9 @@ TEST(SO3, GeneralizedCoordinates)
 {
   SO3<double> R = SO3<double>::Random();
 
-  std::cout << R.template coordinates<AxisAngleRep>().transpose() << std::endl;
-  std::cout << R.template coordinates<RotationMatrixRep>().transpose() << std::endl;
+//  std::cout << R.template coordinates<AxisAngleRep>() << std::endl; // TODO(JS): should be failed for static_assert
+  std::cout << R.template getCoordinates<RotationMatrixRep>().transpose() << std::endl; // TODO(JS): should be failed for static_assert
+  std::cout << R.template getCoordinates<RotationVectorRep>().transpose() << std::endl;
 }
 
 //==============================================================================
@@ -245,6 +253,11 @@ TEST(SO3, EigenTest)
 
   q = aa;
   aa = q;
+
+  SO3<double> R1(SO3<double>::ConstructFromRotationMatrix, Eigen::MatrixXd::Identity(3,3));
+  SO3<double> R2(SO3<double>::ConstructFromRotationMatrix, Eigen::Matrix<double, 3, 3>::Identity());
+
+  R1 = R2;
 }
 
 //==============================================================================
