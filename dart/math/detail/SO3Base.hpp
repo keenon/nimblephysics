@@ -133,6 +133,9 @@ struct is_approx_impl
         .isApprox(
           convert_to_canonical_impl<S, RepB>::run(dataB.getRepData()),
           tol);
+    // TODO(JS): consider using geometric distance metric for measuring the
+    // proximity between two point on the manifolds rather than one provided by
+    // Eigen that might be the Euclidean distance metric (not sure).
   }
 };
 

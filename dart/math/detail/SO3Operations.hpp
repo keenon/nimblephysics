@@ -296,7 +296,7 @@ struct convert_to_noncanonical_impl<S, RotationVectorRep>
 
   static const RepDataTo run(const RepDataFrom& canonicalData)
   {
-    return ::dart::math::logMap(canonicalData);
+    return log(canonicalData);
   }
 };
 
@@ -315,6 +315,102 @@ struct convert_impl
   {
     return convert_to_noncanonical_impl<S, RepTo>::run(
           convert_to_canonical_impl<S, RepFrom>::run(data));
+  }
+};
+
+//==============================================================================
+template <typename S, typename Rep>
+struct convert_impl<S, Rep, Rep>
+{
+  using RepData = typename rep_traits<S, Rep>::RepDataType;
+
+  static const RepData run(const RepData& data)
+  {
+    return data;
+  }
+};
+
+//==============================================================================
+template <typename S>
+struct convert_impl<S, RotationVectorRep, AxisAngleRep>
+{
+  using RepDataFrom = typename rep_traits<S, RotationVectorRep>::RepDataType;
+  using RepDataTo = typename rep_traits<S, AxisAngleRep>::RepDataType;
+
+  static const RepDataTo run(const RepDataFrom& data)
+  {
+    const S norm = data.norm();
+
+    if (norm > static_cast<S>(0))
+      return RepDataTo(norm, data/norm);
+    else
+      return RepDataTo(static_cast<S>(0), Eigen::Matrix<S, 3, 1>::UnitX());
+  }
+};
+
+//==============================================================================
+template <typename S>
+struct convert_impl<S, AxisAngleRep, RotationVectorRep>
+{
+  using RepDataFrom = typename rep_traits<S, AxisAngleRep>::RepDataType;
+  using RepDataTo = typename rep_traits<S, RotationVectorRep>::RepDataType;
+
+  static const RepDataTo run(const RepDataFrom& data)
+  {
+    return data.angle() * data.axis();
+  }
+};
+
+//==============================================================================
+//template <typename S>
+//struct convert_impl<S, RotationVectorRep, QuaternionRep>
+//{
+//  using RepDataFrom = typename rep_traits<S, RotationVectorRep>::RepDataType;
+//  using RepDataTo = typename rep_traits<S, QuaternionRep>::RepDataType;
+
+//  static const RepDataTo run(const RepDataFrom& data)
+//  {
+//    // TODO(JS): Not implemented
+//  }
+//};
+
+//==============================================================================
+//template <typename S>
+//struct convert_impl<S, QuaternionRep, RotationVectorRep>
+//{
+//  using RepDataFrom = typename rep_traits<S, QuaternionRep>::RepDataType;
+//  using RepDataTo = typename rep_traits<S, RotationVectorRep>::RepDataType;
+
+//  static const RepDataTo run(const RepDataFrom& data)
+//  {
+//    return ;
+//    // TODO(JS): Not implemented
+//  }
+//};
+
+//==============================================================================
+template <typename S>
+struct convert_impl<S, QuaternionRep, AxisAngleRep>
+{
+  using RepDataFrom = typename rep_traits<S, QuaternionRep>::RepDataType;
+  using RepDataTo = typename rep_traits<S, AxisAngleRep>::RepDataType;
+
+  static const RepDataTo run(const RepDataFrom& data)
+  {
+    return RepDataTo(data);
+  }
+};
+
+//==============================================================================
+template <typename S>
+struct convert_impl<S, AxisAngleRep, QuaternionRep>
+{
+  using RepDataFrom = typename rep_traits<S, AxisAngleRep>::RepDataType;
+  using RepDataTo = typename rep_traits<S, QuaternionRep>::RepDataType;
+
+  static const RepDataTo run(const RepDataFrom& data)
+  {
+    return RepDataTo(data);
   }
 };
 

@@ -69,6 +69,9 @@ public:
   using Base::setRepData;
   using Base::getRepData;
 
+  using Base::Exp;
+  using Base::Log;
+
   /// \{ \name Constructors
 
   /// Default constructor. By default, the constructed SO(3) is not identity.
@@ -89,32 +92,6 @@ public:
     // Do nothing
   }
 
-  /// Construct from Eigen::AngleAxis.
-  explicit SO3(const Eigen::AngleAxis<S>& angleAxis)
-    : Base(), mRepData(angleAxis)
-  {
-    // Do nothing
-  }
-
-  /// Construct from Eigen::AngleAxis.
-  explicit SO3(Eigen::AngleAxis<S>&& angleAxis)
-    : Base(), mRepData(std::move(angleAxis))
-  {
-    // Do nothing
-  }
-
-  explicit SO3(const VectorType& axis, S angle)
-    : Base(), mRepData(angle, axis)
-  {
-    // Do nothing
-  }
-
-  explicit SO3(VectorType&& axis, S angle)
-    : Base(), mRepData(std::move(angle), axis)
-  {
-    // Do nothing
-  }
-
   /// Construct from other SO3 with different representation.
   template <typename Derived>
   SO3(const SO3Base<Derived>& other)
@@ -131,6 +108,34 @@ public:
     : Base(),
       mRepData(detail::SO3::convert_impl<S, typename Derived::Rep, Rep>::run(
               std::move(other.derived().getRepData())))
+  {
+    // Do nothing
+  }
+
+  /// Construct from Eigen::AngleAxis.
+  explicit SO3(const Eigen::AngleAxis<S>& angleAxis)
+    : Base(), mRepData(angleAxis)
+  {
+    // Do nothing
+  }
+
+  /// Construct from Eigen::AngleAxis.
+  explicit SO3(Eigen::AngleAxis<S>&& angleAxis)
+    : Base(), mRepData(std::move(angleAxis))
+  {
+    // Do nothing
+  }
+
+  /// Construct from axis and angle
+  explicit SO3(const VectorType& axis, S angle)
+    : Base(), mRepData(angle, axis)
+  {
+    // Do nothing
+  }
+
+  /// Construct from axis and angle
+  explicit SO3(VectorType&& axis, S angle)
+    : Base(), mRepData(std::move(angle), axis)
   {
     // Do nothing
   }
@@ -183,22 +188,12 @@ public:
     return mRepData.axis();
   }
 
-  VectorType& getAxis()
-  {
-    return mRepData.axis();
-  }
-
   void setAngle(const S angle)
   {
     mRepData.angle() = angle;
   }
 
   S getAngle() const
-  {
-    return mRepData.angle();
-  }
-
-  S& getAngle()
   {
     return mRepData.angle();
   }
@@ -212,7 +207,7 @@ public:
 
   /// \} // Representation properties
 
-  /// \{ \name \f$SO3\f$ group properties
+  /// \{ \name SO3 group operations
 
   void setIdentity()
   {
@@ -234,22 +229,7 @@ public:
     return SO3(RepDataType(-mRepData.angle(), mRepData.axis()));
   }
 
-  /// \} // \f$SO3\f$ group properties
-
-  static SO3 Exp(const so3& tangent)
-  {
-    const S norm = tangent.norm();
-
-    if (norm > static_cast<S>(0))
-      return SO3(RepDataType(norm, tangent/norm));
-    else
-      return SO3(RepDataType(0, VectorType::UnitX()));
-  }
-
-  static so3 Log(const SO3& point)
-  {
-    return point.mRepData.angle() * point.mRepData.axis();
-  }
+  /// \} // SO3 group operations
 
 protected:
   template <typename>

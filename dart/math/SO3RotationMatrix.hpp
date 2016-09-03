@@ -48,8 +48,6 @@ class SO3<S_, RotationMatrixRep> : public SO3Base<SO3<S_, RotationMatrixRep>>
 {
 public:
 
-  enum ConstructFromRotationMatrixTag { ConstructFromRotationMatrix };
-
   using This = SO3<S_, RotationMatrixRep>;
   using Base = SO3Base<This>;
   using S = typename Base::S;
@@ -66,6 +64,9 @@ public:
   using Base::getCoordinates;
   using Base::setRepData;
   using Base::getRepData;
+
+  using Base::Exp;
+  using Base::Log;
 
   /// \{ \name Constructors
 
@@ -87,30 +88,6 @@ public:
     // Do nothing
   }
 
-  /// Construct from a raw rotation matrix whose dimension is 3x3. We use
-  /// a construction tag ConstructFromRotationMatrixTag to prevent this class
-  /// gets implicitly created from arbitrary Eigen::MatrixBase classes.
-  template <typename Derived>
-  SO3(ConstructFromRotationMatrixTag,
-      const Eigen::MatrixBase<Derived>& matrix)
-    : Base(), mRepData(matrix)
-  {
-    assert(matrix.rows() == 3);
-    assert(matrix.cols() == 3);
-  }
-
-  /// Construct from a raw rotation matrix whose dimension is 3x3. We use
-  /// a construction tag ConstructFromRotationMatrixTag to prevent this class
-  /// gets implicitly created from arbitrary Eigen::MatrixBase classes.
-  template <typename Derived>
-  SO3(ConstructFromRotationMatrixTag,
-      Eigen::MatrixBase<Derived>&& matrix)
-    : Base(), mRepData(std::move(matrix))
-  {
-    assert(matrix.rows() == 3);
-    assert(matrix.cols() == 3);
-  }
-
   /// Construct from other SO3 with different representation.
   template <typename Derived>
   SO3(const SO3Base<Derived>& other)
@@ -129,6 +106,22 @@ public:
               std::move(other.derived().getRepData())))
   {
     // Do nothing
+  }
+
+  /// Construct from a raw rotation matrix where the dimension is 3x3.
+  template <typename Derived>
+  SO3(const Eigen::MatrixBase<Derived>& matrix) : Base(), mRepData(matrix)
+  {
+    assert(matrix.rows() == 3);
+    assert(matrix.cols() == 3);
+  }
+
+  /// Construct from a raw rotation matrix where the dimension is 3x3.
+  template <typename Derived>
+  SO3(Eigen::MatrixBase<Derived>&& matrix) : Base(), mRepData(std::move(matrix))
+  {
+    assert(matrix.rows() == 3);
+    assert(matrix.cols() == 3);
   }
 
   /// \} // Constructors
@@ -182,11 +175,6 @@ public:
     return mRepData;
   }
 
-  RotationMatrixType& getRotationMatrix()
-  {
-    return mRepData;
-  }
-
   void setRandom()
   {
     *this = Exp(Tangent::Random());
@@ -195,7 +183,7 @@ public:
 
   /// \} // Representation properties
 
-  /// \{ \name \f$SO3\f$ group properties
+  /// \{ \name SO3 group operations
 
   void setIdentity()
   {
@@ -214,26 +202,10 @@ public:
 
   const SO3 getInverse() const
   {
-    return SO3(ConstructFromRotationMatrix, mRepData.transpose());
+    return SO3(mRepData.transpose());
   }
 
-  /// \} // \f$SO3\f$ group properties
-
-  static SO3 Exp(const so3& tangent)
-  {
-    return SO3(ConstructFromRotationMatrix, detail::SO3::exp(tangent));
-  }
-
-  static so3 Log(const SO3& point)
-  {
-    return detail::SO3::log(point.mRepData);
-  }
-
-  /// \returns A pointer to the data array of internal data type
-  S* data()
-  {
-    return mRepData.data();
-  }
+  /// \} // SO3 group operations
 
 protected:
 

@@ -96,9 +96,9 @@ void testSettersAndGetters()
 TEST(SO3, SettersAndGetters)
 {
   testSettersAndGetters<SO3d<RotationMatrixRep>>();
+  testSettersAndGetters<SO3d<RotationVectorRep>>();
   testSettersAndGetters<SO3d<AxisAngleRep>>();
   testSettersAndGetters<SO3d<QuaternionRep>>();
-  testSettersAndGetters<SO3d<RotationVectorRep>>();
   // EulerAngles
 }
 
@@ -127,8 +127,9 @@ void testGroupOperations()
 TEST(SO3, GroupOperations)
 {
   testGroupOperations<SO3d<RotationMatrixRep>>();
+  testGroupOperations<SO3d<RotationMatrixRep>>();
   testGroupOperations<SO3d<AxisAngleRep>>();
-//  testGroupOperations<SO3d<QuaternionRep>>();
+  testGroupOperations<SO3d<QuaternionRep>>();
 }
 
 //==============================================================================
@@ -144,6 +145,7 @@ void testLieAlgebraOperations()
 TEST(SO3, LieAlgebraOperations)
 {
   testLieAlgebraOperations<SO3d<RotationMatrixRep>>();
+  testLieAlgebraOperations<SO3d<RotationVectorRep>>();
   testLieAlgebraOperations<SO3d<AxisAngleRep>>();
   testLieAlgebraOperations<SO3d<QuaternionRep>>();
 }
@@ -169,8 +171,9 @@ void testExponentialAndLogarithm()
 TEST(SO3, ExponentialAndLogarithm)
 {
   testExponentialAndLogarithm<SO3d<RotationMatrixRep>>();
+  testExponentialAndLogarithm<SO3d<RotationVectorRep>>();
   testExponentialAndLogarithm<SO3d<AxisAngleRep>>();
-  //testExponentialAndLogarithm<SO3d<SO3Quaternion>>(); // TODO(JS): not implemented yet
+  testExponentialAndLogarithm<SO3d<QuaternionRep>>();
 }
 
 //==============================================================================
@@ -238,7 +241,8 @@ void testInteractingWithRegularMatrices()
 //==============================================================================
 TEST(SO3, InteractingWithRegularMatrices)
 {
-  testInteractingWithRegularMatrices<SO3<double>>();
+  testInteractingWithRegularMatrices<SO3<double, RotationMatrixRep>>();
+  testInteractingWithRegularMatrices<SO3<double, RotationVectorRep>>();
   testInteractingWithRegularMatrices<SO3<double, AxisAngleRep>>();
   testInteractingWithRegularMatrices<SO3<double, QuaternionRep>>();
 }
@@ -254,8 +258,8 @@ TEST(SO3, EigenTest)
   q = aa;
   aa = q;
 
-  SO3<double> R1(SO3<double>::ConstructFromRotationMatrix, Eigen::MatrixXd::Identity(3,3));
-  SO3<double> R2(SO3<double>::ConstructFromRotationMatrix, Eigen::Matrix<double, 3, 3>::Identity());
+  SO3<double> R1(Eigen::MatrixXd::Identity(3,3));
+  SO3<double> R2(Eigen::Matrix<double, 3, 3>::Identity());
 
   R1 = R2;
 }

@@ -70,11 +70,17 @@ public:
   using Tangent = Eigen::Matrix<S, 3, 1>;
   using so3 = Tangent;
 
+  /// \{ \name Constructors
+
   /// Default constructor
   SO3Base() = default;
 
   /// Copy constructor
   SO3Base(const SO3Base&) = default;
+
+  /// \}
+
+  /// \{ \name Casters to derived class
 
   /// A reference to the derived object
   const Derived& derived() const
@@ -88,6 +94,8 @@ public:
     return *static_cast<Derived*>(this);
   }
 
+  /// \}
+
 //  template <typename OtherRep>
 //  ProxySO3<S, OtherRep> as()
 //  {
@@ -95,6 +103,8 @@ public:
 
 //    derived() = casted;
 //  }
+
+  /// \{ \name Operators
 
   /// Set this SO(3) from any kinds of SO(3) types
   template <typename OtherDerived>
@@ -145,6 +155,27 @@ public:
     return toRotationMatrix() == other.toRotationMatrix();
   }
 
+  /// \}
+
+  /// \{ \name Representation properties
+
+  void setRandom()
+  {
+    derived().setRandom();
+  }
+
+  static Derived Random()
+  {
+    Derived R;
+    R.setRandom();
+
+    return R;
+  }
+
+  /// \}
+
+  /// \{ \name SO3 group operations
+
   void setIdentity()
   {
     derived().setIdentity();
@@ -163,30 +194,6 @@ public:
     return I;
   }
 
-  void setRandom()
-  {
-    derived().mRepData.setRandom();
-    // TODO(JS): improve
-  }
-
-  static Derived Random()
-  {
-    Derived R;
-    R.setRandom();
-
-    return R;
-  }
-
-  template <typename OtherDerived>
-  bool isApprox(const SO3Base<OtherDerived>& other, S tol = 1e-6) const
-  {
-    return detail::SO3::is_approx_impl<Derived, OtherDerived>::run(
-          derived(), other.derived(), tol);
-    // TODO(JS): consider using geometric distance metric for measuring the
-    // proximity between two point on the manifolds rather than one provided by
-    // Eigen that might be the Euclidean distance metric (not sure).
-  }
-
   /// Invert this SO(3) in place.
   void invert()
   {
@@ -199,16 +206,25 @@ public:
     return derived().inverse();
   }
 
-  // TODO(JS): add in-place inversion void inverse()
+  /// \} // SO3 group operations
+
+  template <typename OtherDerived>
+  bool isApprox(const SO3Base<OtherDerived>& other, S tol = 1e-6) const
+  {
+    return detail::SO3::is_approx_impl<Derived, OtherDerived>::run(
+          derived(), other.derived(), tol);
+  }
 
   static Derived Exp(const so3& tangent)
   {
-    return Derived::Exp(tangent);
+    return Derived(
+          detail::SO3::convert_impl<S, RotationVectorRep, Rep>::run(tangent));
   }
 
   static so3 Log(const Derived& point)
   {
-    return Derived::Log(point);
+    return detail::SO3::convert_impl<S, Rep, RotationVectorRep>::run(
+          point.getRepData());
   }
 
   static RotationMatrixType Hat(const Tangent& angleAxis)
@@ -226,6 +242,8 @@ public:
     // TODO(JS): Add validity check if mat is skew-symmetric for debug mode
     return Tangent(mat(2, 1), mat(0, 2), mat(1, 0));
   }
+
+  /// \{ \name Representation conversions
 
   RotationMatrixType toRotationMatrix() const
   {
@@ -250,6 +268,8 @@ public:
 
     return detail::SO3::convert_impl<S, Rep, RepTo>::run(derived().mRepData);
   }
+
+  /// \} // Representation conversions
 
   void setRepData(const RepDataType& data)
   {

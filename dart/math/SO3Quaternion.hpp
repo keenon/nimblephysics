@@ -63,83 +63,161 @@ public:
   using Base::operator *;
   using Base::operator *=;
 
+  using Base::getCoordinates;
+  using Base::setRepData;
   using Base::getRepData;
 
-  SO3() : mRepData(RepDataType())
+  using Base::Exp;
+  using Base::Log;
+
+  /// \{ \name Constructors
+
+  /// Default constructor. By default, the constructed SO(3) is not identity.
+  SO3() : Base()
   {
     // Do nothing
   }
 
+  /// Copy constructor.
   SO3(const SO3& other) : Base(), mRepData(other.mRepData)
   {
     // Do nothing
   }
 
+  /// Move constructor.
   SO3(SO3&& other) : mRepData(std::move(other.mRepData))
   {
     // Do nothing
   }
 
+  /// Construct from other SO3 with different representation.
   template <typename Derived>
   SO3(const SO3Base<Derived>& other)
-    : mRepData(detail::SO3::convert_impl<S, typename Derived::Rep, Rep>::run(
-              other.derived().matrix()))
+    : Base(),
+      mRepData(detail::SO3::convert_impl<S, typename Derived::Rep, Rep>::run(
+              other.derived().getRepData()))
   {
     // Do nothing
   }
 
+  /// Construct from other SO3 with different representation.
+  template <typename Derived>
+  SO3(SO3Base<Derived>&& other)
+    : Base(),
+      mRepData(detail::SO3::convert_impl<S, typename Derived::Rep, Rep>::run(
+              std::move(other.derived().getRepData())))
+  {
+    // Do nothing
+  }
+
+  /// Construct from Eigen::Quaternion.
   SO3(const Eigen::Quaternion<S>& quat) : Base(), mRepData(quat)
   {
     // Do nothing
   }
 
+  /// Construct from Eigen::Quaternion.
   SO3(Eigen::Quaternion<S>&& quat) : Base(), mRepData(std::move(quat))
   {
     // Do nothing
   }
 
-  template <typename Derived>
-  explicit SO3(const Eigen::MatrixBase<Derived>& matrix) : mRepData(matrix)
-  {
-    // Do nothing
-  }
+  // TODO(JS): Add more constructs that takes raw components of quaternions
 
-  template <typename Derived>
-  explicit SO3(Eigen::MatrixBase<Derived>&& matrix) : mRepData(std::move(matrix))
-  {
-    // Do nothing
-  }
+  /// \} // Constructors
 
-//  explicit SO3(const so3& tangent) : mRepData(tangent)
-//  {
-//    // Do nothing
-//  }
+  /// \{ \name Operators
 
-//  explicit SO3(so3&& tangent) : mRepData(std::move(tangent))
-//  {
-//    // Do nothing
-//  }
-
+  /// Assign a SO3 with the same representation.
   SO3& operator=(const SO3& other)
   {
     Base::operator =(other);
     return *this;
   }
 
+  /// Move in a SO3 with the same representation.
   SO3& operator=(SO3&& other)
   {
     Base::operator=(std::move(other));
     return *this;
   }
 
+  /// Whether \b exactly equal to a SO3.
   bool operator ==(const SO3& other)
   {
     return mRepData.isApprox(other.mRepData, static_cast<S>(0));
   }
 
-  void setIdentity()
+  /// \} // Operators
+
+  /// \{ \name Representation properties
+
+  void setQuaternion(const RepDataType& quat)
   {
-    mRepData.setIdentity();
+    mRepData = quat;
+  }
+
+  const RepDataType& getQuaternion() const
+  {
+    return mRepData;
+  }
+
+  void setQuaternion(S w, S x, S y, S z)
+  {
+    mRepData.w() = w;
+    mRepData.x() = x;
+    mRepData.y() = y;
+    mRepData.z() = z;
+  }
+
+//  void fromVector(const VectorType& vector)
+//  {
+//    mRepData.vec() = vector;
+//  }
+
+//  VectorType toVector() const
+//  {
+//    return mRepData.vec();
+//  }
+
+  void setW(S w)
+  {
+    mRepData.w() = w;
+  }
+
+  void setX(S x)
+  {
+    mRepData.x() = x;
+  }
+
+  void setY(S y)
+  {
+    mRepData.y() = y;
+  }
+
+  void setZ(S z)
+  {
+    mRepData.z() = z;
+  }
+
+  S getW() const
+  {
+    return mRepData.w();
+  }
+
+  S getX() const
+  {
+    return mRepData.x();
+  }
+
+  S getY() const
+  {
+    return mRepData.y();
+  }
+
+  S getZ() const
+  {
+    return mRepData.z();
   }
 
   void setRandom()
@@ -160,6 +238,21 @@ public:
     mRepData = RepDataType(a * sin(u2), a * cos(u2), b * sin(u3), b * cos(u3));
   }
 
+  /// \} // Representation properties
+
+  /// \{ \name SO3 group operations
+
+  void setIdentity()
+  {
+    mRepData.setIdentity();
+  }
+
+  bool isIdentity()
+  {
+    return mRepData.coeffs() == Eigen::Matrix<S, 4, 1>::Zero();
+    // TODO(JS): double-check if this is correct
+  }
+
   void invert()
   {
     mRepData = mRepData.conjugate();
@@ -170,36 +263,13 @@ public:
     return SO3(mRepData.conjugate());
   }
 
-  static This Exp(const so3& /*tangent*/)
-  {
-    // TODO(JS): Not implemented yet
-  }
-
-  static so3 Log(const This& /*point*/)
-  {
-    // TODO(JS): Not implemented yet
-  }
-
-  ///
-//  template <typename RepTo>
-//  typename detail::SO3::rep_traits<S, RepTo>::RepDataType coordinates() const
-//  {
-//    // TODO(JS): Check if the raw data of RepTo is a vector type.
-
-//    return detail::SO3::convert_impl<S, Rep, RepTo>::run(derived().mRepData);
-//  }
-
-  /// \returns A pointer to the data array of internal data type
-  S* data()
-  {
-    return mRepData.matrix().data();
-  }
+  /// \} // SO3 group operations
 
 protected:
   template <typename>
   friend class SO3Base;
 
-  RepDataType mRepData;
+  RepDataType mRepData{RepDataType()};
 };
 
 extern template

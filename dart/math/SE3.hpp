@@ -48,6 +48,8 @@ class SE3 : public SE3Base<SE3<S_, Rep>>
 {
 public:
 
+  enum FromTranslationTag { FromTranslation };
+
   using This = SE3<S_, Rep>;
   using Base = SE3Base<This>;
 
@@ -125,7 +127,7 @@ public:
     // Do nothing
   }
 
-  explicit SE3(const TranslationType& translation)
+  explicit SE3(FromTranslationTag, const TranslationType& translation)
     : Base(),
       mRotation(SO3Type::Identity()),
       mTranslation(translation)
@@ -133,7 +135,7 @@ public:
     // Do nothing
   }
 
-  explicit SE3(TranslationType&& translation)
+  explicit SE3(FromTranslationTag, TranslationType&& translation)
     : Base(),
       mRotation(std::move(SO3Type::Identity())),
       mTranslation(std::move(translation))
@@ -232,12 +234,12 @@ public:
     //mTranslation = -(mRotation * mTranslation);
   }
 
-  const SE3 getInverse() const
-  {
-    SO3Type inverse = mRotation.getInverse();
+//  const SE3 getInverse() const
+//  {
+//    SO3Type inverse = mRotation.getInverse();
 
-    //return SE3(inverse, -(inverse * mTranslation));
-  }
+//    //return SE3(inverse, -(inverse * mTranslation));
+//  }
 
 //  static SE3 exp(const SE3& tangent)
 //  {

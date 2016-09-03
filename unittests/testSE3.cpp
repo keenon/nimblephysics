@@ -50,7 +50,7 @@ void testSettersAndGetters()
   SE3Type tf2(SO3Type::Random());
   EXPECT_TRUE(tf2.translation() == TranslationType::Zero());
 
-  SE3Type tf3(TranslationType::Zero());
+  SE3Type tf3(SE3Type::FromTranslation, TranslationType::Zero());
   EXPECT_TRUE(tf3.rotation() == SO3Type::Identity());
 
 //  Eigen::Isometry3d q = Eigen::Matrix<double, 4, 4>::Zero();
