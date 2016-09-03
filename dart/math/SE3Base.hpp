@@ -226,8 +226,8 @@ public:
 //    return detail::SE3::is_approx_impl<Derived, OtherDerived>::run(
 //          derived(), other.derived(), tol);
 //    // TODO(JS): consider using geometric distance metric for measuring the
-//    // proximity between two point on the manifolds rather than one provided by
-//    // Eigen that might be the Euclidean distance metric (not sure).
+//    // discrepancy between two point on the manifolds rather than one provided
+//    // by Eigen that might be the Euclidean distance metric (not sure).
 //  }
 
 //  /// Inverse this SE(3).
