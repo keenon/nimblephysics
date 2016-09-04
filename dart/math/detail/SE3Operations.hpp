@@ -50,13 +50,13 @@ namespace detail {
 //==============================================================================
 
 //==============================================================================
-template <typename S_, typename Rep_>
-struct traits<SE3<S_, Rep_>>
+template <typename S_, typename SO3CanonicalRep>
+struct traits<SE3<S_, SO3CanonicalRep>>
 {
   using S = S_;
-  using Rep = Rep_;
+  using Rep = SO3CanonicalRep;
 
-  using Canonical = SE3<S, SO3CanonicalRep>;
+  using SE3Canonical = SE3<S, SO3CanonicalRep>;
 };
 
 namespace SE3 {

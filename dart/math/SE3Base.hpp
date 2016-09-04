@@ -72,7 +72,7 @@ public:
   using TranslationType = Eigen::Matrix<S, 3, 1>;
 //  using RepDataType = typename detail::SE3::rep_traits<S, Rep>::RepDataType;
 
-  using Canonical = typename detail::traits<Derived>::Canonical;
+  using SE3Canonical = typename detail::traits<Derived>::SE3Canonical;
 
   /// The data type for the lie algebra of SE(3) called SE(3)
   using Tangent = Eigen::Matrix<S, Dim, 1>;
@@ -158,7 +158,7 @@ public:
 //  template <typename OtherDerived>
 //  void operator*=(const SE3Base<OtherDerived>& other)
 //  {
-//    detail::SE3::inplace_group_multiplication_impl<Derived, OtherDerived>::run(
+//    detail::SE3::group_inplace_multiplication_impl<Derived, OtherDerived>::run(
 //          derived(), other.derived());
 //  }
 
@@ -186,6 +186,25 @@ public:
     return I;
   }
 
+  bool isIdentity()
+  {
+    return derived().getRotation().isIdentity()
+        && derived().getTranslation() == Eigen::Matrix<S, 3, 1>::Zero();
+  }
+
+  void invert()
+  {
+    derived().mRotation.invert();
+    derived().mTranslation = derived().mRotation * -derived().mTranslation;
+  }
+
+  const Derived getInverse() const
+  {
+    RotationType inverse = derived().mRotation.getInverse();
+
+    return Derived(inverse, inverse * -derived().mTranslation);
+  }
+
   void setRandom()
   {
     derived().mRepData.setRandom();
@@ -207,7 +226,7 @@ public:
 
   const SO3Type& rotation() const
   {
-    return derived().mRotation;
+    return derived().getRotation();
   }
 
   TranslationType& translation()
@@ -220,26 +239,23 @@ public:
     return derived().mTranslation;
   }
 
-//  template <typename OtherDerived>
-//  bool isApprox(const SE3Base<OtherDerived>& other, S tol = 1e-6) const
-//  {
-//    return detail::SE3::is_approx_impl<Derived, OtherDerived>::run(
-//          derived(), other.derived(), tol);
-//    // TODO(JS): consider using geometric distance metric for measuring the
-//    // discrepancy between two point on the manifolds rather than one provided
-//    // by Eigen that might be the Euclidean distance metric (not sure).
-//  }
+  template <typename OtherDerived>
+  bool isApprox(const SE3Base<OtherDerived>& other, S tol = 1e-6) const
+  {
+    return rotation().isApprox(other.rotation(), tol)
+        && translation().isApprox(other.translation(), tol);
+  }
 
 //  /// Inverse this SE(3).
-//  void inverse()
+//  void invert()
 //  {
-//    return derived().inverse();
+//    derived().invert();
 //  }
 
 //  /// Return the inversion of this SE(3). This SE(3) doesn't change itself.
-//  Derived inverse() const
+//  Derived getInverse() const
 //  {
-//    return derived().inverse();
+//    return derived().getInverse();
 //  }
 
 //  // TODO(JS): add in-place inversion void inverse()
@@ -273,7 +289,7 @@ public:
 //  RotationMatrixType toRotationMatrix() const
 //  {
 //    // We assume the canonical representation is the rotation matrix
-//    return detail::SE3::convert_to_canonical_impl<S, Rep>::run(
+//    return detail::SE3::rep_convert_to_canonical_impl<S, Rep>::run(
 //          derived().matrix());
 //  }
 
@@ -281,7 +297,7 @@ public:
 //  {
 //    // We assume the canonical representation is the rotation matrix
 //    derived().matrix()
-//        = detail::SE3::convert_to_noncanonical_impl<S, Rep>::run(rotMat);
+//        = detail::SE3::rep_convert_from_canonical_impl<S, Rep>::run(rotMat);
 //  }
 
 //  ///
@@ -290,7 +306,7 @@ public:
 //  {
 //    // TODO(JS): Check if the raw data of RepTo is a vector type.
 
-//    return detail::SE3::convert_impl<S, Rep, RepTo>::run(derived().mRepData);
+//    return detail::SE3::rep_convert_impl<S, Rep, RepTo>::run(derived().mRepData);
 //  }
 
 //  /// Return a reference of the raw data of the representation type
@@ -339,17 +355,17 @@ public:
 
 //  Canonical canonical()
 //  {
-//    return canonical(detail::SE3::is_canonical<Derived>());
+//    return canonical(detail::SE3::group_is_canonical<Derived>());
 //  }
 
 //  const Canonical canonical() const
 //  {
-//    return canonical(detail::SE3::is_canonical<Derived>());
+//    return canonical(detail::SE3::group_is_canonical<Derived>());
 //  }
 
 //  static constexpr bool isCanonical()
 //  {
-//    return detail::SE3::is_canonical<Derived>::value;
+//    return detail::SE3::group_is_canonical<Derived>::value;
 //  }
 
 private:

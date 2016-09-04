@@ -60,10 +60,32 @@ void testSettersAndGetters()
 TEST(SE3, SettersAndGetters)
 {
   testSettersAndGetters<SE3<double, RotationMatrixRep>>();
+  testSettersAndGetters<SE3<double, RotationVectorRep>>();
   testSettersAndGetters<SE3<double, AxisAngleRep>>();
   testSettersAndGetters<SE3<double, QuaternionRep>>();
-  testSettersAndGetters<SE3<double, RotationVectorRep>>();
   // EulerAngles
+}
+
+//==============================================================================
+template <typename SE3Type>
+void testGroupOperations()
+{
+  SE3Type tf1 = SE3Type::Random();
+
+  SE3Type inverse1 = tf1.getInverse();
+  SE3Type inverse2 = tf1;
+  inverse2.invert();
+
+  EXPECT_TRUE(inverse1.isApprox(inverse2));
+}
+
+//==============================================================================
+TEST(SE3, GroupOperations)
+{
+  testGroupOperations<SE3<double, RotationMatrixRep>>();
+//  testGroupOperations<SE3<double, RotationVectorRep>>();
+//  testGroupOperations<SE3<double, AxisAngleRep>>();
+//  testGroupOperations<SE3<double, QuaternionRep>>();
 }
 
 //==============================================================================

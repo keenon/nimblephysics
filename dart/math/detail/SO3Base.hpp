@@ -40,16 +40,19 @@ namespace detail {
 namespace SO3 {
 
 //==============================================================================
-// is_canonical:
+// group_is_canonical:
 //==============================================================================
 
 //==============================================================================
-template <typename SO3Type, typename Enable = void>
-struct is_canonical : std::false_type {};
+template <typename SO3Type,
+          typename SO3CanonicalRep = DefaultSO3CanonicalRep,
+          typename Enable = void>
+struct group_is_canonical : std::false_type {};
 
-template <typename SO3Type>
-struct is_canonical<
+template <typename SO3Type, typename SO3CanonicalRep>
+struct group_is_canonical<
     SO3Type,
+    SO3CanonicalRep,
     typename std::enable_if
         <std::is_same<typename SO3Type::Rep, SO3CanonicalRep>::value>::type>
     : std::true_type {};
@@ -60,78 +63,148 @@ struct is_canonical<
 
 //==============================================================================
 template <typename S, typename SO3To, typename SO3From>
-struct assign_impl
+struct group_assign_impl
 {
   using RepFrom = typename SO3From::Rep;
   using RepTo = typename SO3To::Rep;
 
-  static void run(SO3To& dataTo, const SO3From& dataFrom)
+  static void run(SO3To& to, const SO3From& from)
   {
-    dataTo.setRepData(
-          convert_to_noncanonical_impl<S, RepTo>::run(
-          convert_to_canonical_impl<S, RepFrom>::run(dataFrom.getRepData())));
+    to.setRepData(rep_convert_impl<S, RepFrom, RepTo>::run(from.getRepData()));
   }
 };
 
 //==============================================================================
-// canonical_inplace_group_multiplication_impl:
+// group_multiplication_impl:
 //==============================================================================
 
 //==============================================================================
+// Generic version. Convert the input representation to canonical representation
+// (i.e., 3x3 rotation matrix), perform group multiplication for those converted
+// 3x3 rotation matrices, then finally convert the result to the output
+// representation.
 template <typename SO3A, typename SO3B, typename Enable = void>
-struct inplace_group_multiplication_impl
+struct group_multiplication_impl
 {
   using S = typename SO3A::S;
 
   using RepA = typename SO3A::Rep;
   using RepB = typename SO3B::Rep;
 
-  static void run(SO3A& data, const SO3B& otherData)
+  static const SO3A run(const SO3A& Ra, const SO3B& Rb)
   {
-    data.getRepData() = convert_to_noncanonical_impl<S, RepA>::run(
-          canonical_group_multiplication_impl<S>::run(
-            convert_to_canonical_impl<S, RepA>::run(data.getRepData()),
-            convert_to_canonical_impl<S, RepB>::run(otherData.getRepData())));
+    return SO3A(rep_convert_from_canonical_impl<S, RepA>::run(
+          rep_canonical_multiplication_impl<S>::run(
+            rep_convert_to_canonical_impl<S, RepA>::run(Ra.getRepData()),
+            rep_convert_to_canonical_impl<S, RepB>::run(Rb.getRepData()))));
   }
 };
 
 //==============================================================================
+// Data conversions between ones supported by Eigen (i.e., 3x3 matrix,
+// AngleAxis, and Quaternion)
 template <typename SO3A, typename SO3B>
-struct inplace_group_multiplication_impl<
+struct group_multiplication_impl<
     SO3A,
     SO3B,
-    typename std::enable_if<is_canonical<SO3A>::value>::type>
+    typename std::enable_if<
+//        !std::is_same<typename SO3A::RepDataType,  typename SO3B::RepDataType>::value
+        true
+        && (std::is_same<typename SO3A::RepDataType, Eigen::Matrix<typename SO3A::S, 3, 3>>::value
+            || std::is_same<typename SO3A::RepDataType, Eigen::AngleAxis<typename SO3A::S>>::value
+            || std::is_same<typename SO3A::RepDataType, Eigen::Quaternion<typename SO3A::S>>::value)
+        && (std::is_same<typename SO3B::RepDataType, Eigen::Matrix<typename SO3A::S, 3, 3>>::value
+            || std::is_same<typename SO3B::RepDataType, Eigen::AngleAxis<typename SO3A::S>>::value
+            || std::is_same<typename SO3B::RepDataType, Eigen::Quaternion<typename SO3A::S>>::value)
+    >::type>
 {
   using S = typename SO3A::S;
 
   using RepA = typename SO3A::Rep;
   using RepB = typename SO3B::Rep;
 
-  static void run(SO3A& data, const SO3B& otherData)
+  using RepDataTypeA = typename rep_traits<S, RepA>::RepDataType;
+  using RepDataTypeB = typename rep_traits<S, RepB>::RepDataType;
+
+  static const SO3A run(const SO3A& Ra, const SO3B& Rb)
   {
-    data.getRepData() *= convert_to_canonical_impl<S, RepB>::run(
-          otherData.getRepData());
+    return SO3A(Ra.getRepData() * Rb.getRepData());
   }
 };
 
 //==============================================================================
-// assign_impl:
+// group_inplace_multiplication_impl:
 //==============================================================================
 
 //==============================================================================
-template <typename SO3A, typename SO3B>
-struct is_approx_impl
+// Generic version. Convert the input representation to canonical representation
+// (i.e., 3x3 rotation matrix), perform group multiplication for those converted
+// 3x3 rotation matrices, then finally convert the result to the output
+// representation.
+template <typename SO3A, typename SO3B, typename Enable = void>
+struct group_inplace_multiplication_impl
 {
   using S = typename SO3A::S;
 
   using RepA = typename SO3A::Rep;
   using RepB = typename SO3B::Rep;
 
-  static bool run(const SO3A& dataA, const SO3B& dataB, S tol)
+  static void run(SO3A& Ra, const SO3B& Rb)
   {
-    return convert_to_canonical_impl<S, RepA>::run(dataA.getRepData())
+    Ra.setRepData(rep_convert_from_canonical_impl<S, RepA>::run(
+          rep_canonical_multiplication_impl<S>::run(
+            rep_convert_to_canonical_impl<S, RepA>::run(Ra.getRepData()),
+            rep_convert_to_canonical_impl<S, RepB>::run(Rb.getRepData()))));
+  }
+};
+
+//==============================================================================
+// Data conversions between ones supported by Eigen (i.e., 3x3 matrix,
+// AngleAxis, and Quaternion)
+template <typename SO3A, typename SO3B>
+struct group_inplace_multiplication_impl<
+    SO3A,
+    SO3B,
+    typename std::enable_if<
+//        !std::is_same<typename SO3A::RepDataType,  typename SO3B::RepDataType>::value
+        true
+        && (std::is_same<typename SO3A::RepDataType, Eigen::Matrix<typename SO3A::S, 3, 3>>::value
+            || std::is_same<typename SO3A::RepDataType, Eigen::AngleAxis<typename SO3A::S>>::value
+            || std::is_same<typename SO3A::RepDataType, Eigen::Quaternion<typename SO3A::S>>::value)
+        && (std::is_same<typename SO3B::RepDataType, Eigen::Matrix<typename SO3A::S, 3, 3>>::value
+            || std::is_same<typename SO3B::RepDataType, Eigen::AngleAxis<typename SO3A::S>>::value
+            || std::is_same<typename SO3B::RepDataType, Eigen::Quaternion<typename SO3A::S>>::value)
+    >::type>
+{
+  using S = typename SO3A::S;
+
+  using RepA = typename SO3A::Rep;
+  using RepB = typename SO3B::Rep;
+
+  static void run(SO3A& so3A, const SO3B& so3B)
+  {
+//    so3A.getRepData() *= so3B.getRepData();
+  }
+};
+
+//==============================================================================
+// group_is_approx_impl:
+//==============================================================================
+
+//==============================================================================
+template <typename SO3A, typename SO3B>
+struct group_is_approx_impl
+{
+  using S = typename SO3A::S;
+
+  using RepA = typename SO3A::Rep;
+  using RepB = typename SO3B::Rep;
+
+  static bool run(const SO3A& Ra, const SO3B& Rb, S tol)
+  {
+    return rep_convert_to_canonical_impl<S, RepA>::run(Ra.getRepData())
         .isApprox(
-          convert_to_canonical_impl<S, RepB>::run(dataB.getRepData()),
+          rep_convert_to_canonical_impl<S, RepB>::run(Rb.getRepData()),
           tol);
     // TODO(JS): consider using geometric distance metric for measuring the
     // discrepancy between two point on the manifolds rather than one provided

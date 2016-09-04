@@ -38,4 +38,30 @@
 #include "dart/math/SO3RotationVector.hpp"
 #include "dart/math/SO3AxisAngle.hpp"
 
+namespace dart {
+namespace math {
+
+template <typename S> using SO3Matrix     = SO3<S, RotationMatrixRep>;
+template <typename S> using SO3Vector     = SO3<S, RotationVectorRep>;
+template <typename S> using SO3AxisAngle  = SO3<S, AxisAngleRep>;
+template <typename S> using SO3Quaternion = SO3<S, QuaternionRep>;
+
+using SO3Matrixf = SO3Matrix<float>;
+using SO3Matrixd = SO3Matrix<double>;
+
+using SO3Vectorf = SO3Vector<float>;
+using SO3Vectord = SO3Vector<double>;
+
+using SO3AxisAnglef = SO3AxisAngle<float>;
+using SO3AxisAngled = SO3AxisAngle<double>;
+
+using SO3Quaternionf = SO3Quaternion<float>;
+using SO3Quaterniond = SO3Quaternion<double>;
+
+using SO3f = SO3<float, DefaultSO3CanonicalRep>;
+using SO3d = SO3<double, DefaultSO3CanonicalRep>;
+
+} // namespace math
+} // namespace dart
+
 #endif // DART_MATH_SO3_HPP_

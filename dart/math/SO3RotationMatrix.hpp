@@ -53,6 +53,8 @@ public:
   using S = typename Base::S;
   using Rep = typename Base::Rep;
   using RotationMatrixType = typename Base::RotationMatrixType;
+  using VectorType = typename Base::VectorType;
+
   using RepDataType = typename Base::RepDataType;
   using Tangent = typename Base::Tangent;
   using so3 = typename Base::so3;
@@ -66,7 +68,9 @@ public:
   using Base::getRepData;
 
   using Base::Exp;
+  using Base::setExp;
   using Base::Log;
+  using Base::getLog;
 
   /// \{ \name Constructors
 
@@ -83,7 +87,7 @@ public:
   }
 
   /// Move constructor.
-  SO3(SO3&& other) : mRepData(std::move(other.mRepData))
+  SO3(SO3&& other) : Base(), mRepData(std::move(other.mRepData))
   {
     // Do nothing
   }
@@ -92,8 +96,9 @@ public:
   template <typename Derived>
   SO3(const SO3Base<Derived>& other)
     : Base(),
-      mRepData(detail::SO3::convert_impl<S, typename Derived::Rep, Rep>::run(
-              other.derived().getRepData()))
+      mRepData(
+        detail::SO3::rep_convert_impl<S, typename Derived::Rep, Rep>::run(
+          other.getRepData()))
   {
     // Do nothing
   }
@@ -102,8 +107,8 @@ public:
   template <typename Derived>
   SO3(SO3Base<Derived>&& other)
     : Base(),
-      mRepData(detail::SO3::convert_impl<S, typename Derived::Rep, Rep>::run(
-              std::move(other.derived().getRepData())))
+      mRepData(detail::SO3::rep_convert_impl<S, typename Derived::Rep, Rep>::run(
+              std::move(other.getRepData())))
   {
     // Do nothing
   }
@@ -131,15 +136,48 @@ public:
   /// Assign a SO3 with the same representation.
   SO3& operator=(const SO3& other)
   {
-    Base::operator =(other);
+    mRepData = other.mRepData;
     return *this;
   }
 
   /// Move in a SO3 with the same representation.
   SO3& operator=(SO3&& other)
   {
-    Base::operator=(std::move(other));
+    mRepData = std::move(other.mRepData);
     return *this;
+  }
+
+  template <typename Derived>
+  SO3& operator=(const Eigen::MatrixBase<Derived>& matrix)
+  {
+    mRepData = matrix;
+    return *this;
+  }
+
+  template <typename Derived>
+  SO3& operator=(Eigen::MatrixBase<Derived>&& matrix)
+  {
+    mRepData = std::move(matrix);
+    return *this;
+  }
+
+  template <typename RotationDerived>
+  SO3& operator=(const Eigen::RotationBase<RotationDerived, Base::Dim>& rot)
+  {
+    mRepData = rot;
+    return *this;
+  }
+
+  template <typename RotationDerived>
+  SO3& operator=(Eigen::RotationBase<RotationDerived, Base::Dim>&& rot)
+  {
+    mRepData = std::move(rot);
+    return *this;
+  }
+
+  const VectorType operator*(const VectorType& vector)
+  {
+    return mRepData * vector;
   }
 
   /// Whether \b exactly equal to a SO3.

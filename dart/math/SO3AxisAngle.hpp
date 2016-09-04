@@ -61,7 +61,7 @@ public:
   using Tangent = typename Base::Tangent;
   using so3 = typename Base::so3;
 
-  using Base::operator =;
+  //using Base::operator =;
   using Base::operator *;
   using Base::operator *=;
 
@@ -70,7 +70,9 @@ public:
   using Base::getRepData;
 
   using Base::Exp;
+  using Base::setExp;
   using Base::Log;
+  using Base::getLog;
 
   /// \{ \name Constructors
 
@@ -96,8 +98,8 @@ public:
   template <typename Derived>
   SO3(const SO3Base<Derived>& other)
     : Base(),
-      mRepData(detail::SO3::convert_impl<S, typename Derived::Rep, Rep>::run(
-              other.derived().getRepData()))
+      mRepData(detail::SO3::rep_convert_impl<S, typename Derived::Rep, Rep>::run(
+              other.getRepData()))
   {
     // Do nothing
   }
@@ -106,8 +108,8 @@ public:
   template <typename Derived>
   SO3(SO3Base<Derived>&& other)
     : Base(),
-      mRepData(detail::SO3::convert_impl<S, typename Derived::Rep, Rep>::run(
-              std::move(other.derived().getRepData())))
+      mRepData(detail::SO3::rep_convert_impl<S, typename Derived::Rep, Rep>::run(
+              std::move(other.getRepData())))
   {
     // Do nothing
   }
@@ -140,6 +142,13 @@ public:
     // Do nothing
   }
 
+  /// Construct from quaternion
+  template <typename QuatDerived>
+  explicit SO3(const Eigen::QuaternionBase<QuatDerived>& q)
+  {
+    mRepData = q;
+  }
+
   /// \} // Constructors
 
   /// \{ \name Operators
@@ -147,14 +156,54 @@ public:
   /// Assign a SO3 with the same representation.
   SO3& operator=(const SO3& other)
   {
-    Base::operator =(other);
+    mRepData = other.mRepData;
     return *this;
   }
 
   /// Move in a SO3 with the same representation.
   SO3& operator=(SO3&& other)
   {
-    Base::operator=(std::move(other));
+    mRepData = std::move(other.mRepData);
+    return *this;
+  }
+
+  SO3& operator=(const Eigen::AngleAxis<S>& quat)
+  {
+    mRepData = quat;
+    return *this;
+  }
+
+  SO3& operator=(Eigen::AngleAxis<S>&& quat)
+  {
+    mRepData = std::move(quat);
+    return *this;
+  }
+
+  template <typename QuatDerived>
+  SO3& operator=(const Eigen::QuaternionBase<QuatDerived>& quat)
+  {
+    mRepData = quat;
+    return *this;
+  }
+
+  template <typename QuatDerived>
+  SO3& operator=(Eigen::QuaternionBase<QuatDerived>&& quat)
+  {
+    mRepData = std::move(quat);
+    return *this;
+  }
+
+  template <typename Derived>
+  SO3& operator=(const Eigen::MatrixBase<Derived>& matrix)
+  {
+    mRepData = matrix;
+    return *this;
+  }
+
+  template <typename Derived>
+  SO3& operator=(Eigen::MatrixBase<Derived>&& matrix)
+  {
+    mRepData = std::move(matrix);
     return *this;
   }
 
@@ -208,6 +257,13 @@ public:
   /// \} // Representation properties
 
   /// \{ \name SO3 group operations
+
+//  template <typename OtherDerived>
+//  bool isApprox(const SO3Base<OtherDerived>& other, S tol = 1e-6) const
+//  {
+//    return detail::SO3::group_is_approx_impl<Derived, OtherDerived>::run(
+//          derived(), other.derived(), tol);
+//  }
 
   void setIdentity()
   {

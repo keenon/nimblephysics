@@ -68,6 +68,11 @@ public:
   using Base::setRepData;
   using Base::getRepData;
 
+  using Base::Exp;
+  using Base::setExp;
+  using Base::Log;
+  using Base::getLog;
+
   /// \{ \name Constructors
 
   /// Default constructor. By default, the constructed SO(3) is not identity.
@@ -92,8 +97,8 @@ public:
   template <typename Derived>
   SO3(const SO3Base<Derived>& other)
     : Base(),
-      mRepData(detail::SO3::convert_impl<S, typename Derived::Rep, Rep>::run(
-              other.derived().getRepData()))
+      mRepData(detail::SO3::rep_convert_impl<S, typename Derived::Rep, Rep>::run(
+              other.getRepData()))
   {
     // Do nothing
   }
@@ -102,8 +107,8 @@ public:
   template <typename Derived>
   SO3(SO3Base<Derived>&& other)
     : Base(),
-      mRepData(detail::SO3::convert_impl<S, typename Derived::Rep, Rep>::run(
-              std::move(other.derived().getRepData())))
+      mRepData(detail::SO3::rep_convert_impl<S, typename Derived::Rep, Rep>::run(
+              std::move(other.getRepData())))
   {
     // Do nothing
   }
@@ -131,16 +136,60 @@ public:
   /// Assign a SO3 with the same representation.
   SO3& operator=(const SO3& other)
   {
-    Base::operator =(other);
+    mRepData = other.mRepData;
     return *this;
   }
 
   /// Move in a SO3 with the same representation.
   SO3& operator=(SO3&& other)
   {
-    Base::operator=(std::move(other));
+    mRepData = std::move(other.mRepData);
     return *this;
   }
+
+  SO3& operator=(const Eigen::AngleAxis<S>& quat)
+  {
+    mRepData = detail::SO3::rep_convert_impl<S, AxisAngleRep, Rep>::run(quat);
+    // TODO(JS): improve; need a way to deduce representation type from Eigen
+    // data type
+    return *this;
+  }
+
+  SO3& operator=(Eigen::AngleAxis<S>&& quat)
+  {
+    mRepData = detail::SO3::rep_convert_impl<S, AxisAngleRep, Rep>::run(
+          std::move(quat));
+    // TODO(JS): improve; need a way to deduce representation type from Eigen
+    // data type
+    return *this;
+  }
+
+  template <typename QuatDerived>
+  SO3& operator=(const Eigen::QuaternionBase<QuatDerived>& quat)
+  {
+    mRepData = detail::SO3::rep_convert_impl<S, QuaternionRep, Rep>::run(quat);
+    // TODO(JS): improve; need a way to deduce representation type from Eigen
+    // data type
+    return *this;
+  }
+
+  template <typename QuatDerived>
+  SO3& operator=(Eigen::QuaternionBase<QuatDerived>&& quat)
+  {
+    mRepData = detail::SO3::rep_convert_impl<S, QuaternionRep, Rep>::run(
+          std::move(quat));
+    // TODO(JS): improve; need a way to deduce representation type from Eigen
+    // data type
+    return *this;
+  }
+
+  // Deleted to avoid ambiguity between rotation matrix and rotation vector
+  template <typename Derived>
+  SO3& operator=(const Eigen::MatrixBase<Derived>& matrix) = delete;
+
+  // Deleted to avoid ambiguity between rotation matrix and rotation vector
+  template <typename Derived>
+  SO3& operator=(Eigen::MatrixBase<Derived>&& matrix) = delete;
 
   /// Whether \b exactly equal to a SO3.
   bool operator ==(const SO3& other)
@@ -151,6 +200,29 @@ public:
   /// \} // Operators
 
   /// \{ \name Representation properties
+
+  template <typename MatrixDerived>
+  void fromRotationVector(const Eigen::MatrixBase<MatrixDerived>& vector)
+  {
+    assert(vector.rows() == 3);
+    assert(vector.cols() == 1);
+
+    mRepData = vector;
+  }
+
+  template <typename MatrixDerived>
+  void fromRotationVector(Eigen::MatrixBase<MatrixDerived>&& vector)
+  {
+    assert(vector.rows() == 3);
+    assert(vector.cols() == 1);
+
+    mRepData = std::move(vector);
+  }
+
+  Eigen::Matrix<S, 3, 1> toRotationVector() const
+  {
+    return mRepData;
+  }
 
   void setRotationVector(const VectorType& axisAngle)
   {

@@ -68,7 +68,9 @@ public:
   using Base::getRepData;
 
   using Base::Exp;
+  using Base::setExp;
   using Base::Log;
+  using Base::getLog;
 
   /// \{ \name Constructors
 
@@ -94,8 +96,7 @@ public:
   template <typename Derived>
   SO3(const SO3Base<Derived>& other)
     : Base(),
-      mRepData(detail::SO3::convert_impl<S, typename Derived::Rep, Rep>::run(
-              other.derived().getRepData()))
+      mRepData(other.getRepData())
   {
     // Do nothing
   }
@@ -104,8 +105,8 @@ public:
   template <typename Derived>
   SO3(SO3Base<Derived>&& other)
     : Base(),
-      mRepData(detail::SO3::convert_impl<S, typename Derived::Rep, Rep>::run(
-              std::move(other.derived().getRepData())))
+      mRepData(detail::SO3::rep_convert_impl<S, typename Derived::Rep, Rep>::run(
+              std::move(other.getRepData())))
   {
     // Do nothing
   }
@@ -131,14 +132,54 @@ public:
   /// Assign a SO3 with the same representation.
   SO3& operator=(const SO3& other)
   {
-    Base::operator =(other);
+    mRepData = other.mRepData;
     return *this;
   }
 
   /// Move in a SO3 with the same representation.
   SO3& operator=(SO3&& other)
   {
-    Base::operator=(std::move(other));
+    mRepData = std::move(other.mRepData);
+    return *this;
+  }
+
+  SO3& operator=(const Eigen::AngleAxis<S>& quat)
+  {
+    mRepData = quat;
+    return *this;
+  }
+
+  SO3& operator=(Eigen::AngleAxis<S>&& quat)
+  {
+    mRepData = std::move(quat);
+    return *this;
+  }
+
+  template <typename QuatDerived>
+  SO3& operator=(const Eigen::QuaternionBase<QuatDerived>& quat)
+  {
+    mRepData = quat;
+    return *this;
+  }
+
+  template <typename QuatDerived>
+  SO3& operator=(Eigen::QuaternionBase<QuatDerived>&& quat)
+  {
+    mRepData = std::move(quat);
+    return *this;
+  }
+
+  template <typename Derived>
+  SO3& operator=(const Eigen::MatrixBase<Derived>& matrix)
+  {
+    mRepData = matrix;
+    return *this;
+  }
+
+  template <typename Derived>
+  SO3& operator=(Eigen::MatrixBase<Derived>&& matrix)
+  {
+    mRepData = std::move(matrix);
     return *this;
   }
 
