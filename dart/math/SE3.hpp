@@ -228,9 +228,9 @@ public:
     return mTranslation;
   }
 
-  void rotate(const RotationType& rotation)
+  void rotate(const RotationType& /*rotation*/)
   {
-    mRotation *= rotation;
+//    mRotation *= rotation;
   }
 
 //  void preRotate(const RotationType& rotation)

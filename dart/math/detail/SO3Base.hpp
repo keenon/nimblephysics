@@ -202,13 +202,8 @@ struct group_is_approx_impl
 
   static bool run(const SO3A& Ra, const SO3B& Rb, S tol)
   {
-    return rep_convert_to_canonical_impl<S, RepA>::run(Ra.getRepData())
-        .isApprox(
-          rep_convert_to_canonical_impl<S, RepB>::run(Rb.getRepData()),
-          tol);
-    // TODO(JS): consider using geometric distance metric for measuring the
-    // discrepancy between two point on the manifolds rather than one provided
-    // by Eigen that might be the Euclidean distance metric (not sure).
+    return rep_is_approx_impl<S, RepA, RepB>::run(
+          Ra.getRepData(), Rb.getRepData(), tol);
   }
 };
 

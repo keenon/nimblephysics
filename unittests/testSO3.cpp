@@ -392,14 +392,13 @@ TEST(SO3, CompatibilityToEigen)
   // SO3Matrixd <- various types
   //------------------------------
   so3MatOut = eigMatIn;
-  EXPECT_TRUE(so3MatOut.getRepData().isApprox(eigMatIn));
-  //EXPECT_TRUE(so3Mat2.isApprox(eigMat)); // TODO(JS)
+  EXPECT_TRUE(so3MatOut.isApprox(eigMatIn));
 
   so3MatOut = eigAaIn;
-  //EXPECT_TRUE(so3Mat2.isApprox(eigAa)); // TODO(JS)
+  EXPECT_TRUE(so3MatOut.isApprox(eigAaIn));
 
   so3MatOut = eigQuatIn;
-  //EXPECT_TRUE(so3Mat2.isApprox(eigQuat)); // TODO(JS)
+  EXPECT_TRUE(so3MatOut.isApprox(eigQuatIn));
 
   so3MatOut = so3MatIn;
   EXPECT_TRUE(so3MatOut.isApprox(so3MatIn));
@@ -416,15 +415,16 @@ TEST(SO3, CompatibilityToEigen)
   //------------------------------
   // SO3Vectord <- various types
   //------------------------------
-  //so3VecOut = eigMat; // Deleted to avoid ambiguity between rotation matrix and rotation vector
+  //so3VecOut = eigMat; // Deleted to avoid ambiguity between rotation matrix
+                        // and rotation vector
   so3VecOut.fromRotationMatrix(eigMatIn);
-  //EXPECT_TRUE(so3Vec2.isApprox(eigMat)); // TODO(JS)
+  EXPECT_TRUE(so3VecOut.isApprox(eigMatIn));
 
   so3VecOut = eigAaIn;
-  //EXPECT_TRUE(so3Vec2.isApprox(eigAa)); // TODO(JS)
+  EXPECT_TRUE(so3VecOut.isApprox(eigAaIn));
 
   so3VecOut = eigQuatIn;
-  //EXPECT_TRUE(so3Vec2.isApprox(eigQuat)); // TODO(JS)
+  EXPECT_TRUE(so3VecOut.isApprox(eigQuatIn));
 
   so3VecOut = so3MatIn;
   EXPECT_TRUE(so3VecOut.isApprox(so3MatIn));
@@ -442,13 +442,13 @@ TEST(SO3, CompatibilityToEigen)
   // SO3AxisAngled <- various types
   //------------------------------
   so3AaOut = eigMatIn;
-  //EXPECT_TRUE(so3Aa2.isApprox(eigMat)); // TODO(JS)
+  EXPECT_TRUE(so3AaOut.isApprox(eigMatIn));
 
   so3AaOut = eigAaIn;
-  //EXPECT_TRUE(so3Aa2.isApprox(eigAa)); // TODO(JS)
+  EXPECT_TRUE(so3AaOut.isApprox(eigAaIn));
 
   so3AaOut = eigQuatIn;
-  //EXPECT_TRUE(so3Aa2.isApprox(eigQuat)); // TODO(JS)
+  EXPECT_TRUE(so3AaOut.isApprox(eigQuatIn));
 
   so3AaOut = so3MatIn;
   EXPECT_TRUE(so3AaOut.isApprox(so3MatIn));
@@ -466,13 +466,13 @@ TEST(SO3, CompatibilityToEigen)
   // SO3AxisAngled <- various types
   //------------------------------
   so3QuatOut = eigMatIn;
-  //EXPECT_TRUE(so3Quat2.isApprox(eigMat)); // TODO(JS)
+  EXPECT_TRUE(so3QuatOut.isApprox(eigMatIn));
 
   so3QuatOut = eigAaIn;
-  //EXPECT_TRUE(so3Quat2.isApprox(eigAa)); // TODO(JS)
+  EXPECT_TRUE(so3QuatOut.isApprox(eigAaIn));
 
   so3QuatOut = eigQuatIn;
-  //EXPECT_TRUE(so3Quat2.isApprox(eigQuat)); // TODO(JS)
+  EXPECT_TRUE(so3QuatOut.isApprox(eigQuatIn));
 
   so3QuatOut = so3MatIn;
   EXPECT_TRUE(so3QuatOut.isApprox(so3MatIn));

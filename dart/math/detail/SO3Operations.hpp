@@ -208,6 +208,15 @@ Eigen::Matrix<S, 3, 1> log(const Eigen::Matrix<S, 3, 3>& R)
 }
 
 //==============================================================================
+template <typename S>
+Eigen::Matrix<S, 3, 1> log(Eigen::Matrix<S, 3, 3>&& R)
+{
+  Eigen::AngleAxis<S> aa(std::move(R));
+
+  return aa.angle()*aa.axis();
+}
+
+//==============================================================================
 // rep_convert_to_canonical_impl:
 //==============================================================================
 
@@ -247,15 +256,20 @@ struct rep_convert_to_canonical_impl<S, SO3CanonicalRep, SO3CanonicalRep>
 };
 
 //==============================================================================
-template <typename S, typename SO3CanonicalRep>
-struct rep_convert_to_canonical_impl<S, RotationVectorRep, SO3CanonicalRep>
+template <typename S>
+struct rep_convert_to_canonical_impl<S, RotationVectorRep, RotationMatrixRep>
 {
   using RepDataFrom = typename rep_traits<S, RotationVectorRep>::RepDataType;
-  using RepDataTo = typename rep_traits<S, SO3CanonicalRep>::RepDataType;
+  using RepDataTo = typename rep_traits<S, RotationMatrixRep>::RepDataType;
 
   static const RepDataTo run(const RepDataFrom& data)
   {
     return exp(data);
+  }
+
+  static const RepDataTo run(RepDataFrom&& data)
+  {
+    return exp(std::move(data));
   }
 };
 
@@ -290,7 +304,6 @@ template <typename S, typename SO3CanonicalRep>
 struct rep_convert_from_canonical_impl<S, SO3CanonicalRep, SO3CanonicalRep>
 {
   using RepDataFrom = typename rep_traits<S, SO3CanonicalRep>::RepDataType;
-  using RepDataTo = typename rep_traits<S, SO3CanonicalRep>::RepDataType;
 
   static const RepDataFrom& run(const RepDataFrom& canonicalData)
   {
@@ -299,15 +312,20 @@ struct rep_convert_from_canonical_impl<S, SO3CanonicalRep, SO3CanonicalRep>
 };
 
 //==============================================================================
-template <typename S, typename SO3CanonicalRep>
-struct rep_convert_from_canonical_impl<S, RotationVectorRep, SO3CanonicalRep>
+template <typename S>
+struct rep_convert_from_canonical_impl<S, RotationVectorRep, RotationMatrixRep>
 {
-  using RepDataFrom = typename rep_traits<S, SO3CanonicalRep>::RepDataType;
+  using RepDataFrom = typename rep_traits<S, RotationMatrixRep>::RepDataType;
   using RepDataTo = typename rep_traits<S, RotationVectorRep>::RepDataType;
 
   static const RepDataTo run(const RepDataFrom& canonicalData)
   {
     return log(canonicalData);
+  }
+
+  static const RepDataTo run(RepDataFrom&& canonicalData)
+  {
+    return log(std::move(canonicalData));
   }
 };
 
@@ -315,8 +333,30 @@ struct rep_convert_from_canonical_impl<S, RotationVectorRep, SO3CanonicalRep>
 // rep_convert_impl:
 //==============================================================================
 
+// +-------+ ------+-------+-------+-------+-------+
+// |from\to|  Mat  |  Vec  |  Aa   | Quat  | Euler |
+// +-------+ ------+-------+-------+-------+-------+
+// |  Mat  |   0   |   1   |   1   |   1   |       |
+// +-------+ ------+-------+-------+-------+-------+
+// |  Vec  |   1   |   0   |   1   |   2   |       |
+// +-------+ ------+-------+-------+-------+-------+
+// |  Aa   |   1   |   1   |   0   |   1   |       |
+// +-------+ ------+-------+-------+-------+-------+
+// | Quat  |   1   |   2   |   1   |   0   |       |
+// +-------+ ------+-------+-------+-------+-------+
+// | Euler |       |       |       |       |       |
+// +-------+ ------+-------+-------+-------+-------+
+//
+// 0: zero conversion; return input as const reference
+// 1: single conversion; from -> canonical, or canonical -> to
+// 2: double conversion; from -> canonical -> to
+
 //==============================================================================
-template <typename S, typename RepFrom, typename RepTo, typename Enable = void>
+template <typename S,
+          typename RepFrom,
+          typename RepTo,
+          typename SO3CanonicalRep = DefaultSO3CanonicalRep,
+          typename Enable = void>
 struct rep_convert_impl
 {
   using RepDataFrom = typename rep_traits<S, RepFrom>::RepDataType;
@@ -324,8 +364,15 @@ struct rep_convert_impl
 
   static const RepDataTo run(const RepDataFrom& data)
   {
-    return rep_convert_from_canonical_impl<S, RepTo>::run(
-          rep_convert_to_canonical_impl<S, RepFrom>::run(data));
+    return rep_convert_from_canonical_impl<S, RepTo, SO3CanonicalRep>::run(
+        rep_convert_to_canonical_impl<S, RepFrom, SO3CanonicalRep>::run(data));
+  }
+
+  static const RepDataTo run(RepDataFrom&& data)
+  {
+    return rep_convert_from_canonical_impl<S, RepTo, SO3CanonicalRep>::run(
+        rep_convert_to_canonical_impl<S, RepFrom, SO3CanonicalRep>::run(
+            std::move(data)));
   }
 };
 
@@ -339,38 +386,6 @@ struct rep_convert_impl<S, Rep, Rep>
   static const RepData& run(const RepData& data)
   {
     return data;
-  }
-};
-
-//==============================================================================
-// Data conversions between ones supported by Eigen (i.e., matrix, AngleAxis,
-// and Quaternion)
-template <typename S, typename RepFrom, typename RepTo>
-struct rep_convert_impl<
-    S,
-    RepFrom,
-    RepTo,
-    typename std::enable_if<
-        !std::is_same<RepFrom, RepTo>::value
-        && !std::is_same<RepFrom, RotationVectorRep>::value
-        && !std::is_same<RepTo, RotationVectorRep>::value
-        && (rep_is_eigen_matrix_impl<S, RepFrom>::value
-            || rep_is_eigen_rotation_impl<S, RepFrom>::value)
-        && (rep_is_eigen_matrix_impl<S, RepTo>::value
-            || rep_is_eigen_rotation_impl<S, RepTo>::value)
-    >::type>
-{
-  using RepDataFrom = typename rep_traits<S, RepFrom>::RepDataType;
-  using RepDataTo = typename rep_traits<S, RepTo>::RepDataType;
-
-  static const RepDataTo run(const RepDataFrom& data)
-  {
-    return RepDataTo(data);
-  }
-
-  static const RepDataTo run(RepDataFrom&& data)
-  {
-    return RepDataTo(std::move(data));
   }
 };
 
@@ -419,8 +434,26 @@ struct rep_convert_impl<S, AxisAngleRep, RotationVectorRep>
 };
 
 //==============================================================================
-//template <typename S>
-//struct rep_convert_impl<S, QuaternionRep, RotationVectorRep>
+template <typename S>
+struct rep_convert_impl<S, AxisAngleRep, QuaternionRep>
+{
+  using RepDataFrom = typename rep_traits<S, AxisAngleRep>::RepDataType;
+  using RepDataTo = typename rep_traits<S, QuaternionRep>::RepDataType;
+
+  static const RepDataTo run(const RepDataFrom& data)
+  {
+    return RepDataTo(data);
+  }
+
+  static const RepDataTo run(RepDataFrom&& data)
+  {
+    return RepDataTo(std::move(data));
+  }
+};
+
+//==============================================================================
+//template <typename S, typename SO3CanonicalRep>
+//struct rep_convert_impl<S, QuaternionRep, RotationVectorRep, SO3Canonical>
 //{
 //  using RepDataFrom = typename rep_traits<S, QuaternionRep>::RepDataType;
 //  using RepDataTo = typename rep_traits<S, RotationVectorRep>::RepDataType;
@@ -433,29 +466,80 @@ struct rep_convert_impl<S, AxisAngleRep, RotationVectorRep>
 //};
 
 //==============================================================================
+template <typename S>
+struct rep_convert_impl<S, QuaternionRep, AxisAngleRep>
+{
+  using RepDataFrom = typename rep_traits<S, QuaternionRep>::RepDataType;
+  using RepDataTo = typename rep_traits<S, AxisAngleRep>::RepDataType;
+
+  static const RepDataTo run(const RepDataFrom& data)
+  {
+    return RepDataTo(data);
+  }
+
+  static const RepDataTo run(RepDataFrom&& data)
+  {
+    return RepDataTo(std::move(data));
+  }
+};
+
+//==============================================================================
 // group_is_approx_impl:
 //==============================================================================
 
+// +-------+ ------+-------+-------+-------+-------+
+// |from\to|  Mat  |  Vec  |  Aa   | Quat  | Euler |
+// +-------+ ------+-------+-------+-------+-------+
+// |  Mat  |   0   |   1   |   1   |   1   |       |
+// +-------+ ------+-------+-------+-------+-------+
+// |  Vec  |   1   |   0   |   2   |   2   |       |
+// +-------+ ------+-------+-------+-------+-------+
+// |  Aa   |   1   |   2   |   0   |   2   |       |
+// +-------+ ------+-------+-------+-------+-------+
+// | Quat  |   1   |   2   |   2   |   0   |       |
+// +-------+ ------+-------+-------+-------+-------+
+// | Euler |       |       |       |       |       |
+// +-------+ ------+-------+-------+-------+-------+
+//
+// 0: zero conversion; compare in the given representation
+// 2: double conversion; repA -> canonical rep (compare) <- repB
+
 //==============================================================================
-//template <typename S, typename RepFrom, typename RepTo, typename Enable = void>
-//struct rep_is_approx_impl
-//{
-//  using S = typename SO3A::S;
+template <typename S,
+          typename RepA,
+          typename RepB,
+          typename SO3CanonicalRep = DefaultSO3CanonicalRep,
+          typename Enable = void>
+struct rep_is_approx_impl
+{
+  using RepDataTypeA = typename rep_traits<S, RepA>::RepDataType;
+  using RepDataTypeB = typename rep_traits<S, RepB>::RepDataType;
 
-//  using RepA = typename SO3A::Rep;
-//  using RepB = typename SO3B::Rep;
+  static bool run(const RepDataTypeA& dataA, const RepDataTypeB& dataB, S tol)
+  {
+    return rep_convert_to_canonical_impl<S, RepA, SO3CanonicalRep>::run(dataA)
+        .isApprox(rep_convert_to_canonical_impl<S, RepB, SO3CanonicalRep>
+                  ::run(dataB), tol);
+    // TODO(JS): consider using geometric distance metric for measuring the
+    // discrepancy between two point on the manifolds rather than one provided
+    // by Eigen that might be the Euclidean distance metric (not sure).
+  }
+};
 
-//  static bool run(const SO3A& Ra, const SO3B& Rb, S tol)
-//  {
-//    return rep_convert_to_canonical_impl<S, RepA>::run(Ra.getRepData())
-//        .isApprox(
-//          rep_convert_to_canonical_impl<S, RepB>::run(Rb.getRepData()),
-//          tol);
-//    // TODO(JS): consider using geometric distance metric for measuring the
-//    // discrepancy between two point on the manifolds rather than one provided
-//    // by Eigen that might be the Euclidean distance metric (not sure).
-//  }
-//};
+//==============================================================================
+template <typename S, typename Rep>
+struct rep_is_approx_impl<S, Rep, Rep>
+{
+  using RepDataType = typename rep_traits<S, Rep>::RepDataType;
+
+  static bool run(const RepDataType& dataA, const RepDataType& dataB, S tol)
+  {
+    return dataA.isApprox(dataB, tol);
+    // TODO(JS): consider using geometric distance metric for measuring the
+    // discrepancy between two point on the manifolds rather than one provided
+    // by Eigen that might be the Euclidean distance metric (not sure).
+  }
+};
 
 //==============================================================================
 // rep_canonical_multiplication_impl:
