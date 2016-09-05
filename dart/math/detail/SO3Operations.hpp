@@ -606,19 +606,35 @@ struct rep_canonical_inplace_multiplication_impl<S, RotationVectorRep>
 };
 
 //==============================================================================
-// group_multiplication_impl:
+// rep_multiplication_impl:
 //==============================================================================
+
+// +-------+ ------+-------+-------+-------+-------+
+// |from\to|  Mat  |  Vec  |  Aa   | Quat  | Euler |
+// +-------+ ------+-------+-------+-------+-------+
+// |  Mat  |   0   |   -   |   -   |   -   |   -   |
+// +-------+ ------+-------+-------+-------+-------+
+// |  Vec  |   X   |   3   |   -   |   -   |   -   |
+// +-------+ ------+-------+-------+-------+-------+
+// |  Aa   |   X   |   X   |   0   |   -   |   -   |
+// +-------+ ------+-------+-------+-------+-------+
+// | Quat  |   X   |   X   |   X   |   0   |   -   |
+// +-------+ ------+-------+-------+-------+-------+
+// | Euler |       |       |       |       |       |
+// +-------+ ------+-------+-------+-------+-------+
+//
+// 0: zero conversion
+// 3: triple conversions; [(rep -> canonical) * (rep -> canonical)] -> rep
 
 //==============================================================================
 template <typename S, typename RepA, typename RepB>
 struct rep_multiplication_impl
 {
   using RepDataTypeA = typename rep_traits<S, RepA>::RepDataType;
-  using RepDataType = typename rep_traits<S, RepB>::RepDataType;
+  using RepDataTypeB = typename rep_traits<S, RepB>::RepDataType;
 
-  static const auto run(
-      const RepDataTypeA& dataA, const RepDataType& dataB)
-      -> decltype(dataA * dataB)
+  static auto run(const RepDataTypeA& dataA, const RepDataTypeB& dataB)
+  -> decltype(dataA * dataB)
   {
     return dataA * dataB;
   }
@@ -629,15 +645,19 @@ template <typename S>
 struct rep_multiplication_impl<S, RotationVectorRep, RotationVectorRep>
 {
   using RepDataType = typename rep_traits<S, RotationVectorRep>::RepDataType;
-  using AxisAngleType = typename rep_traits<S, AxisAngleRep>::RepDataType;
+  using CanonicalRep = QuaternionRep; // TODO(JS): find best canonical for vec * vec
+  using CanonicalRepDataType = typename rep_traits<S, CanonicalRep>::RepDataType;
 
-  static const auto run(
-      const RepDataType& dataA, const RepDataType& dataB)
-      -> decltype(std::declval<AxisAngleType>() * std::declval<AxisAngleType>())
+  static auto run(const RepDataType& dataA, const RepDataType& dataB)
+  -> decltype(std::declval<CanonicalRepDataType>() * std::declval<CanonicalRepDataType>())
   {
-    return AxisAngleType(dataA) * AxisAngleType(dataB);
+    return rep_convert_impl<S, RotationVectorRep, CanonicalRep>::run(dataA)
+        * rep_convert_impl<S, RotationVectorRep, CanonicalRep>::run(dataB);
+    // TODO(JS): improve; super slow
   }
 };
+
+// TODO(JS): Heterogeneous multiplications are not implemented yet.
 
 //==============================================================================
 //template <typename S, typename RepB>

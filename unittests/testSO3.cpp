@@ -486,29 +486,11 @@ TEST(SO3, CompatibilityToEigen)
   so3QuatOut = so3QuatIn;
   EXPECT_TRUE(so3QuatOut.isApprox(so3QuatIn));
 
-//  eigMat = eigMat * eigAa;
-//  eigMat = eigAa * eigQuat;
-//  eigMat = eigQuat * eigMat;
+  //------------------------------
+  // Heterogeneous multiplication
+  //------------------------------
 
-//  eigAa = eigMat * eigAa;
-//  eigAa = eigAa * eigQuat;
-//  eigAa = eigQuat * eigMat;
-
-//  eigQuat = eigMat * eigAa;
-//  eigQuat = eigAa * eigQuat;
-//  eigQuat = eigQuat * eigMat;
-
-  eigMatIn *= eigMatIn;
-  // eigMat *= eigAa; // Not defined
-  // eigMat *= eigQuat; // Not defined
-
-  // eigAa *= eigMat; // Not defined
-  // eigAa *= eigAa; // Not defined
-  // eigAa *= eigQuat; // Not defined
-
-  // eigQuat *= eigMat; // Not defined
-  // eigQuat *= eigAa; // Not defined
-  eigQuatIn *= eigQuatIn;
+  // TODO(JS):
 }
 
 //==============================================================================
@@ -517,56 +499,32 @@ TEST(SO3, Performance)
   Eigen::Vector3d r = Eigen::Vector3d::Random();
 
   SO3Matrixd so3Mat = SO3Matrixd::Exp(r);
-//  SO3Vectord so3Vec = SO3Vectord::Exp(r);
-//  SO3AxisAngled so3Aa = SO3AxisAngled::Exp(r);
-//  SO3Quaterniond so3Quat = SO3Quaterniond::Exp(r);
+  SO3Vectord so3Vec = SO3Vectord::Exp(r);
+  SO3AxisAngled so3Aa = SO3AxisAngled::Exp(r);
+  SO3Quaterniond so3Quat = SO3Quaterniond::Exp(r);
+
+  std::cout << so3Quat.toRotationMatrix() << std::endl;
+  std::cout << so3Mat.toRotationMatrix() << std::endl;
 
   Eigen::Matrix3d eigMat = SO3d::Exp(r).toRotationMatrix();
-//  Eigen::AngleAxisd eigAa(eigMat);
-//  Eigen::Quaterniond eigQuat(eigMat);
+  Eigen::AngleAxisd eigAa(eigMat);
+  Eigen::Quaterniond eigQuat(eigMat);
 
-//  EXPECT_TRUE(so3Mat.getRepData().isApprox(eigMat));
-//  EXPECT_TRUE(so3Aa.getRepData().isApprox(eigAa));
-//  EXPECT_TRUE(so3Quat.getRepData().isApprox(eigQuat));
+  SO3d::Random();
 
-//  EXPECT_TRUE(so3Mat.toRotationMatrix().isApprox(eigMat));
-//  EXPECT_TRUE(so3Aa.toRotationMatrix().isApprox(eigAa.toRotationMatrix()));
-//  EXPECT_TRUE(so3Quat.toRotationMatrix().isApprox(eigQuat.toRotationMatrix()));
+  EXPECT_TRUE(so3Mat.isApprox(eigMat));
+  EXPECT_TRUE(so3Aa.isApprox(eigAa));
+  EXPECT_TRUE(so3Quat.isApprox(eigQuat));
 
-  const auto numTests = 1e+2;
+  const auto numTests = 3e+1;
   common::Timer t;
 
-  t.start();
-  for (auto i = 0u; i < numTests; ++i)
-  {
-    so3Mat = so3Mat * so3Mat;
-  }
-  t.stop();
-  std::cout << "SO3Matrixd: " << t.getLastElapsedTime() << " (sec)" << std::endl;
-
-//  t.start();
-//  for (auto i = 0u; i < numTests; ++i)
-//  {
-//    so3Vec = so3Vec * so3Vec;
-//  }
-//  t.stop();
-//  std::cout << "SO3Vectord: " << t.getLastElapsedTime() << " (sec)" << std::endl;
-
-//  t.start();
-//  for (auto i = 0u; i < numTests; ++i)
-//  {
-//    so3Aa = so3Aa * so3Aa;
-//  }
-//  t.stop();
-//  std::cout << "SO3AxisAngled: " << t.getLastElapsedTime() << " (sec)" << std::endl;
-
-//  t.start();
-//  for (auto i = 0u; i < numTests; ++i)
-//  {
-//    so3Quat = so3Quat * so3Quat;
-//  }
-//  t.stop();
-//  std::cout << "SO3Quaterniond: " << t.getLastElapsedTime() << " (sec)" << std::endl;
+  //----------------------------------------------------------------------------
+  //----------------------------------------------------------------------------
+  std::cout << "[ R = R * R ]" << std::endl;
+  std::cout << std::endl;
+  //----------------------------------------------------------------------------
+  //----------------------------------------------------------------------------
 
   t.start();
   for (auto i = 0u; i < numTests; ++i)
@@ -574,23 +532,133 @@ TEST(SO3, Performance)
     eigMat = eigMat * eigMat;
   }
   t.stop();
-  std::cout << "Eigen::Matrix3d: " << t.getLastElapsedTime() << " (sec)" << std::endl;
+  std::cout << "Eigen::Matrix3d   : " << t.getLastElapsedTime() << " (sec)" << std::endl;
 
-//  t.start();
-//  for (auto i = 0u; i < numTests; ++i)
-//  {
-//    eigQuat = eigQuat * eigQuat;
-//  }
-//  t.stop();
-//  std::cout << "Eigen::AngleAxisd: " << t.getLastElapsedTime() << " (sec)" << std::endl;
+  t.start();
+  for (auto i = 0u; i < numTests; ++i)
+  {
+    so3Mat = so3Mat * so3Mat;
+  }
+  t.stop();
+  std::cout << "SO3Matrixd        : " << t.getLastElapsedTime() << " (sec)" << std::endl;
+  std::cout << std::endl;
 
-//  t.start();
-//  for (auto i = 0u; i < numTests; ++i)
-//  {
-//    eigQuat = eigQuat * eigQuat;
-//  }
-//  t.stop();
-//  std::cout << "Eigen::Quaterniond: " << t.getLastElapsedTime() << " (sec)" << std::endl;
+  t.start();
+  for (auto i = 0u; i < numTests; ++i)
+  {
+    so3Vec = so3Vec * so3Vec;
+  }
+  t.stop();
+  std::cout << "SO3Vectord:         " << t.getLastElapsedTime() << " (sec)" << std::endl;
+  std::cout << std::endl;
+
+  t.start();
+  for (auto i = 0u; i < numTests; ++i)
+  {
+    eigAa = eigAa * eigAa;
+  }
+  t.stop();
+  std::cout << "Eigen::AngleAxisd : " << t.getLastElapsedTime() << " (sec)" << std::endl;
+
+  t.start();
+  for (auto i = 0u; i < numTests; ++i)
+  {
+    so3Aa = so3Aa * so3Aa;
+  }
+  t.stop();
+  std::cout << "SO3AxisAngled:      " << t.getLastElapsedTime() << " (sec)" << std::endl;
+  std::cout << std::endl;
+
+  t.start();
+  for (auto i = 0u; i < numTests; ++i)
+  {
+    eigQuat = eigQuat * eigQuat;
+  }
+  t.stop();
+  std::cout << "Eigen::Quaterniond: " << t.getLastElapsedTime() << " (sec)" << std::endl;
+
+  t.start();
+  for (auto i = 0u; i < numTests; ++i)
+  {
+    so3Quat = so3Quat * so3Quat;
+  }
+  t.stop();
+  std::cout << "SO3Quaterniond:     " << t.getLastElapsedTime() << " (sec)" << std::endl;
+  std::cout << std::endl;
+
+  //----------------------------------------------------------------------------
+  //----------------------------------------------------------------------------
+  std::cout << "[ R *= R ]" << std::endl;
+  std::cout << std::endl;
+  //----------------------------------------------------------------------------
+  //----------------------------------------------------------------------------
+
+  t.start();
+  for (auto i = 0u; i < numTests; ++i)
+  {
+    eigMat *= eigMat;
+  }
+  t.stop();
+  std::cout << "Eigen::Matrix3d   : " << t.getLastElapsedTime() << " (sec)" << std::endl;
+
+  t.start();
+  for (auto i = 0u; i < numTests; ++i)
+  {
+    so3Mat *= so3Mat;
+  }
+  t.stop();
+  std::cout << "SO3Matrixd        : " << t.getLastElapsedTime() << " (sec)" << std::endl;
+  std::cout << std::endl;
+
+  t.start();
+  for (auto i = 0u; i < numTests; ++i)
+  {
+    so3Vec *= so3Vec;
+  }
+  t.stop();
+  std::cout << "SO3Vectord:         " << t.getLastElapsedTime() << " (sec)" << std::endl;
+  std::cout << std::endl;
+
+  // AngleAxis *= AngleAxis is not supported by Eigen
+  //t.start();
+  //for (auto i = 0u; i < numTests; ++i)
+  //{
+  //  eigAa *= eigAa;
+  //}
+  //t.stop();
+  //std::cout << "Eigen::AngleAxisd : " << t.getLastElapsedTime() << " (sec)" << std::endl;
+
+  t.start();
+  for (auto i = 0u; i < numTests; ++i)
+  {
+    so3Aa *= so3Aa;
+  }
+  t.stop();
+  std::cout << "SO3AxisAngled:      " << t.getLastElapsedTime() << " (sec)" << std::endl;
+  std::cout << std::endl;
+
+  t.start();
+  for (auto i = 0u; i < numTests; ++i)
+  {
+    eigQuat *= eigQuat;
+  }
+  t.stop();
+  std::cout << "Eigen::Quaterniond: " << t.getLastElapsedTime() << " (sec)" << std::endl;
+
+  t.start();
+  for (auto i = 0u; i < numTests; ++i)
+  {
+    so3Quat *= so3Quat;
+  }
+  t.stop();
+  std::cout << "SO3Quaterniond:     " << t.getLastElapsedTime() << " (sec)" << std::endl;
+  std::cout << std::endl;
+
+  std::cout << eigQuat.toRotationMatrix() << std::endl;
+  std::cout << eigMat << std::endl;
+
+  std::cout << so3Quat.toRotationMatrix() << std::endl;
+  std::cout << so3Mat.toRotationMatrix() << std::endl;
 }
 
 //==============================================================================

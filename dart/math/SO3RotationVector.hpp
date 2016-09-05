@@ -183,13 +183,21 @@ public:
     return *this;
   }
 
-  // Deleted to avoid ambiguity between rotation matrix and rotation vector
   template <typename Derived>
-  SO3& operator=(const Eigen::MatrixBase<Derived>& matrix) = delete;
+  SO3& operator=(const Eigen::MatrixBase<Derived>& matrix)
+  {
+    mRepData = detail::SO3::rep_convert_impl<S, RotationMatrixRep, Rep>::run(
+          matrix);
+    return *this;
+  }
 
-  // Deleted to avoid ambiguity between rotation matrix and rotation vector
   template <typename Derived>
-  SO3& operator=(Eigen::MatrixBase<Derived>&& matrix) = delete;
+  SO3& operator=(Eigen::MatrixBase<Derived>&& matrix)
+  {
+    mRepData = detail::SO3::rep_convert_impl<S, RotationMatrixRep, Rep>::run(
+          std::move(matrix));
+    return *this;
+  }
 
   /// Whether \b exactly equal to a SO3.
   bool operator ==(const SO3& other)

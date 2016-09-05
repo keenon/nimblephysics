@@ -156,15 +156,12 @@ public:
 
   /// Group multiplication
   template <typename OtherDerived>
-  const auto
+  auto
   operator*(const SO3Base<OtherDerived>& other) const
-  -> typename std::result_of<
-         decltype(
-             &detail::SO3::rep_multiplication_impl<
-                 S, Rep, typename OtherDerived::Rep
-             >::run
-         )(const RepDataType&, const typename OtherDerived::RepDataType)
-     >::type
+  -> decltype(detail::SO3::rep_multiplication_impl<
+      S, Rep, typename OtherDerived::Rep>::run(
+                std::declval<RepDataType>(),
+                std::declval<typename OtherDerived::RepDataType>()))
   {
     return detail::SO3::rep_multiplication_impl<
         S, Rep, typename OtherDerived::Rep>::run(
