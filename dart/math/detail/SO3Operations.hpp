@@ -85,6 +85,7 @@ template <typename S>
 struct rep_traits<S, RotationMatrixRep>
 {
   using RepDataType = Eigen::Matrix<S, 3, 3>;
+  static constexpr bool CanBeCoordinates = false;
 };
 
 //==============================================================================
@@ -92,6 +93,7 @@ template <typename S>
 struct rep_traits<S, AxisAngleRep>
 {
   using RepDataType = Eigen::AngleAxis<S>;
+  static constexpr bool CanBeCoordinates = false;
 };
 
 //==============================================================================
@@ -99,6 +101,7 @@ template <typename S>
 struct rep_traits<S, QuaternionRep>
 {
   using RepDataType = Eigen::Quaternion<S>;
+  static constexpr bool CanBeCoordinates = false;
 };
 
 //==============================================================================
@@ -106,6 +109,7 @@ template <typename S>
 struct rep_traits<S, RotationVectorRep>
 {
   using RepDataType = Eigen::Matrix<S, 3, 1>;
+  static constexpr bool CanBeCoordinates = true;
 };
 
 //==============================================================================

@@ -48,10 +48,10 @@ void testSettersAndGetters()
   EXPECT_TRUE(tf1 == SE3Type::Identity());
 
   SE3Type tf2(SO3Type::Random());
-  EXPECT_TRUE(tf2.translation() == TranslationType::Zero());
+  EXPECT_TRUE(tf2.getTranslation() == TranslationType::Zero());
 
   SE3Type tf3(SE3Type::FromTranslation, TranslationType::Zero());
-  EXPECT_TRUE(tf3.rotation() == SO3Type::Identity());
+  EXPECT_TRUE(tf3.getRotation() == SO3Type::Identity());
 
 //  Eigen::Isometry3d q = Eigen::Matrix<double, 4, 4>::Zero();
 }
@@ -92,11 +92,13 @@ TEST(SE3, GroupOperations)
 TEST(SE3, HeterogeneousAssignment)
 {
   SE3<double, RotationMatrixRep> tf1;
-  SE3<double, AxisAngleRep> tf2;
+  SE3<double, RotationVectorRep> tf2;
   SE3<double, AxisAngleRep> tf3;
+  SE3<double, QuaternionRep> tf4;
 
   tf1 = tf2;
   tf2 = tf3;
+  tf3 = tf4;
 
 //  tf1.setRandom();
 //  tf2.setRandom();

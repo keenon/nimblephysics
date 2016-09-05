@@ -66,8 +66,8 @@ public:
 //  using Base::operator *;
 //  using Base::operator *=;
 
-  using Base::rotation;
-  using Base::translation;
+  using Base::getRotation;
+  using Base::getTranslation;
 //  using Base::coordinates;
 //  using Base::getRepData;
 
@@ -101,8 +101,8 @@ public:
   template <typename Derived>
   SE3(const SE3Base<Derived>& other)
     : Base(),
-      mRotation(other.derived().rotation()),
-      mTranslation(other.derived().translation())
+      mRotation(other.derived().getRotation()),
+      mTranslation(other.derived().getTranslation())
   {
     // Do nothing
   }
@@ -111,8 +111,8 @@ public:
   template <typename Derived>
   SE3(SE3Base<Derived>&& other)
     : Base(),
-      mRotation(std::move(other.derived().rotation())),
-      mTranslation(std::move(other.derived().translation()))
+      mRotation(std::move(other.derived().getRotation())),
+      mTranslation(std::move(other.derived().getTranslation()))
   {
     // Do nothing
   }
@@ -160,6 +160,16 @@ public:
     // Do nothing
   }
 
+  template <typename Derived>
+  SE3(const Eigen::MatrixBase<Derived>& matrix)
+    : Base(),
+      mRotation(matrix.template topLeftCorner<3,3>()),
+      mTranslation(matrix.template topRightCorner<3,1>())
+  {
+    assert(matrix.rows() == 3);
+    assert(matrix.cols() == 3);
+  }
+
   /// \} // Constructors
 
   /// \{ \name Operators
@@ -183,8 +193,8 @@ public:
   template <typename OtherDerived>
   SE3& operator=(const SE3Base<OtherDerived>& other)
   {
-    mRotation = other.derived().rotation();
-    mTranslation = other.derived().translation();
+    mRotation = other.derived().getRotation();
+    mTranslation = other.derived().getTranslation();
 
     return *this;
   }
@@ -192,8 +202,8 @@ public:
   template <typename OtherDerived>
   SE3& operator=(SE3Base<OtherDerived>&& other)
   {
-    mRotation = std::move(other.derived().rotation());
-    mTranslation = std::move(other.derived().translation());
+    mRotation = std::move(other.derived().getRotation());
+    mTranslation = std::move(other.derived().getTranslation());
 
     return *this;
   }

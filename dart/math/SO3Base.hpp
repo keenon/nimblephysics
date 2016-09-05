@@ -45,6 +45,14 @@ namespace math {
 
 struct SO3Representation {};
 
+//template <typename S, typename Rep>
+//auto Exp(const Eigen::Matrix<S, 3, 1>& tangent)
+//-> decltype(detail::SO3::rep_convert_impl<S, RotationVectorRep, Rep>::run(tangent))
+//{
+//  return detail::SO3::rep_convert_impl<S, RotationVectorRep, Rep>::run(
+//          tangent);
+//}
+
 template <typename Derived>
 class SO3Base
 {
@@ -370,6 +378,8 @@ public:
   {
     // TODO(JS): Change return type to Eigen::Matrix<S, Dim, 1> or
     // check if the raw data of RepTo is a vector type.
+    static_assert(detail::SO3::rep_traits<S, RepTo>::CanBeCoordinates,
+                  "Attempting to get invalid coordinate type.");
 
     return to<RepTo>();
   }

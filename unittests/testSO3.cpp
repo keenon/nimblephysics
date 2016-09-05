@@ -256,15 +256,17 @@ TEST(SO3, SO3MatrixInteractWithEigen)
 //  EXPECT_TRUE(w3.isApprox(w4));
 //}
 
-////==============================================================================
-//TEST(SO3, GeneralizedCoordinates)
-//{
-//  SO3<double> R = SO3<double>::Random();
+//==============================================================================
+TEST(SO3, GeneralizedCoordinates)
+{
+  SO3d R = SO3d::Random();
 
-////  std::cout << R.template coordinates<AxisAngleRep>() << std::endl; // TODO(JS): should be failed for static_assert
-//  std::cout << R.template getCoordinates<RotationMatrixRep>().transpose() << std::endl; // TODO(JS): should be failed for static_assert
-//  std::cout << R.template getCoordinates<RotationVectorRep>().transpose() << std::endl;
-//}
+  Eigen::VectorXd axisAngle = R.getLog();
+
+  Eigen::VectorXd coords = R.getCoordinates<RotationVectorRep>();
+
+  EXPECT_TRUE(axisAngle.isApprox(coords));
+}
 
 ////==============================================================================
 //template <typename SO3Type>
@@ -516,7 +518,7 @@ TEST(SO3, Performance)
   EXPECT_TRUE(so3Aa.isApprox(eigAa));
   EXPECT_TRUE(so3Quat.isApprox(eigQuat));
 
-  const auto numTests = 3e+1;
+  const auto numTests = 2e+1;
   common::Timer t;
 
   //----------------------------------------------------------------------------

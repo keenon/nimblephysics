@@ -219,22 +219,22 @@ public:
     return R;
   }
 
-  SO3Type& rotation()
+  SO3Type& getRotation()
   {
     return derived().mRotation;
   }
 
-  const SO3Type& rotation() const
+  const SO3Type& getRotation() const
   {
     return derived().getRotation();
   }
 
-  TranslationType& translation()
+  TranslationType& getTranslation()
   {
     return derived().mTranslation;
   }
 
-  const TranslationType& translation() const
+  const TranslationType& getTranslation() const
   {
     return derived().mTranslation;
   }
@@ -242,8 +242,8 @@ public:
   template <typename OtherDerived>
   bool isApprox(const SE3Base<OtherDerived>& other, S tol = 1e-6) const
   {
-    return rotation().isApprox(other.rotation(), tol)
-        && translation().isApprox(other.translation(), tol);
+    return getRotation().isApprox(other.getRotation(), tol)
+        && getTranslation().isApprox(other.getTranslation(), tol);
   }
 
 //  /// Inverse this SE(3).
