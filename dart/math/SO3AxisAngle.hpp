@@ -250,7 +250,7 @@ public:
   void setRandom()
   {
     mRepData.axis().setRandom().normalize();
-    mRepData.angle() = math::random<S>();
+    mRepData.angle() = math::random(-1.0, 1.0);
     // TODO(JS): improve
   }
 

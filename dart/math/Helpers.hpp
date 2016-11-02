@@ -247,10 +247,9 @@ inline unsigned seedRand() {
   return seed;
 }
 
-template <typename S>
-inline double random(S min = static_cast<S>(-1), S max = static_cast<S>(1))
+inline double random(double min, double max)
 {
-  return min + ((static_cast<S>(rand()) / (RAND_MAX + 1.0)) * (max - min));
+  return min + ((static_cast<double>(rand()) / (RAND_MAX + 1.0)) * (max - min));
 }
 
 template<int N>

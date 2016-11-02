@@ -358,7 +358,9 @@ public:
           getRepData());
   }
 
-  auto toRotationMatrix() const -> decltype(to<RotationMatrixRep>())
+  auto toRotationMatrix() const
+  -> decltype(detail::SO3::rep_convert_impl<S, Rep, RotationMatrixRep>::run(
+      std::declval<RepDataType>()))
   {
     // The return type could be either of const and const reference depending on
     // the Derived type. So the trailing return type deduction is used here.
@@ -374,7 +376,9 @@ public:
   }
 
   template <typename RepTo>
-  auto getCoordinates() const -> decltype(to<RepTo>())
+  auto getCoordinates() const
+  -> decltype(detail::SO3::rep_convert_impl<S, Rep, RepTo>::run(
+      std::declval<RepDataType>()))
   {
     // TODO(JS): Change return type to Eigen::Matrix<S, Dim, 1> or
     // check if the raw data of RepTo is a vector type.
