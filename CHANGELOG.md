@@ -2,11 +2,27 @@
 
 ### DART 6.2.0 (201X-XX-XX)
 
+* Math
+
+  * Fixed Lemke LCP solver (#808 for DART 6): [#812](https://github.com/dartsim/dart/pull/812)
+
+* GUI
+
+  * Fixed that GUI was rendering white lines with nvidia drivers: : [#804](https://github.com/dartsim/dart/pull/804)
+
+* Misc
+
+  * Added CMake targets for code formatting using clang-format: [#811](https://github.com/dartsim/dart/pull/811), [#817](https://github.com/dartsim/dart/pull/817)
+
 ### DART 6.1.2 (2016-XX-XX)
 
 * Dynamics
 
   * Fixed bug of ContactConstraint with kinematic joints: [#809](https://github.com/dartsim/dart/pull/809)
+
+* Misc
+
+  * Fixed that ZeroDofJoint::getIndexInTree was called: [#818](https://github.com/dartsim/dart/pull/818)
 
 ### DART 6.1.1 (2016-10-14)
 
