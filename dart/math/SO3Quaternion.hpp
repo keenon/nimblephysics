@@ -54,7 +54,7 @@ public:
   using Base = SO3Base<This>;
   using S = typename Base::S;
   using Rep = typename Base::Rep;
-  using RotationMatrixType = typename Base::RotationMatrixType;
+  using RotationMatrix = typename Base::RotationMatrix;
   using RepDataType = typename Base::RepDataType;
   using Tangent = typename Base::Tangent;
   using so3 = typename Base::so3;
@@ -211,12 +211,12 @@ public:
     mRepData.z() = z;
   }
 
-//  void fromVector(const VectorType& vector)
+//  void fromVector(const Vector& vector)
 //  {
 //    mRepData.vec() = vector;
 //  }
 
-//  VectorType toVector() const
+//  Vector toVector() const
 //  {
 //    return mRepData.vec();
 //  }

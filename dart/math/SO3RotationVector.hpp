@@ -53,8 +53,8 @@ public:
   using S = typename Base::S;
   using Rep = typename Base::Rep;
 
-  using RotationMatrixType = typename Base::RotationMatrixType;
-  using VectorType = typename Base::VectorType;
+  using RotationMatrix = typename Base::RotationMatrix;
+  using RotationVector = typename Base::RotationVector;
 
   using RepDataType = typename Base::RepDataType;
   using Tangent = typename Base::Tangent;
@@ -232,12 +232,12 @@ public:
     return mRepData;
   }
 
-  void setRotationVector(const VectorType& axisAngle)
+  void setRotationVector(const RotationVector& axisAngle)
   {
     mRepData = axisAngle;
   }
 
-  const VectorType& getRotationVector() const
+  const RotationVector& getRotationVector() const
   {
     return mRepData;
   }

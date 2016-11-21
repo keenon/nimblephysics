@@ -52,8 +52,8 @@ public:
   using Base = SO3Base<This>;
   using S = typename Base::S;
   using Rep = typename Base::Rep;
-  using RotationMatrixType = typename Base::RotationMatrixType;
-  using VectorType = typename Base::VectorType;
+  using RotationMatrix = typename Base::RotationMatrix;
+  using RotationVector = typename Base::RotationVector;
 
   using RepDataType = typename Base::RepDataType;
   using Tangent = typename Base::Tangent;
@@ -175,7 +175,7 @@ public:
     return *this;
   }
 
-  const VectorType operator*(const VectorType& vector)
+  const RotationVector operator*(const RotationVector& vector)
   {
     return mRepData * vector;
   }
@@ -208,7 +208,7 @@ public:
     mRepData = std::move(mat);
   }
 
-  const RotationMatrixType& getRotationMatrix() const
+  const RotationMatrix& getRotationMatrix() const
   {
     return mRepData;
   }

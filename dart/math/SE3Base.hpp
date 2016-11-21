@@ -60,8 +60,8 @@ public:
   /// The scalar type of the coefficients
   using S = typename detail::traits<Derived>::S;
 
-  using RotationMatrixType = Eigen::Matrix<S, Dim, Dim>;
-  using VectorType = Eigen::Matrix<S, Dim, 1>;
+  using RotationMatrix = Eigen::Matrix<S, Dim, Dim>;
+  using Vector = Eigen::Matrix<S, Dim, 1>;
 
   /// The representation type of this SE(3)
   using Rep = typename detail::traits<Derived>::Rep;
@@ -270,9 +270,9 @@ public:
 //    return derived().log(point);
 //  }
 
-//  static RotationMatrixType hat(const Tangent& angleAxis)
+//  static RotationMatrix hat(const Tangent& angleAxis)
 //  {
-//    RotationMatrixType res;
+//    RotationMatrix res;
 //    res <<  static_cast<S>(0),     -angleAxis(2),      angleAxis(1),
 //                 angleAxis(2), static_cast<S>(0),     -angleAxis(0),
 //                -angleAxis(1),      angleAxis(0), static_cast<S>(0);
@@ -280,20 +280,20 @@ public:
 //    return res;
 //  }
 
-//  static Tangent vee(const RotationMatrixType& mat)
+//  static Tangent vee(const RotationMatrix& mat)
 //  {
 //    // TODO(JS): Add validity check if mat is skew-symmetric for debug mode
 //    return Tangent(mat(2, 1), mat(0, 2), mat(1, 0));
 //  }
 
-//  RotationMatrixType toRotationMatrix() const
+//  RotationMatrix toRotationMatrix() const
 //  {
 //    // We assume the canonical representation is the rotation matrix
 //    return detail::SE3::rep_convert_to_canonical_impl<S, Rep>::run(
 //          derived().matrix());
 //  }
 
-//  void fromRotationMatrix(const RotationMatrixType& rotMat)
+//  void fromRotationMatrix(const RotationMatrix& rotMat)
 //  {
 //    // We assume the canonical representation is the rotation matrix
 //    derived().matrix()

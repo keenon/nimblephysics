@@ -54,8 +54,8 @@ public:
   using S = typename Base::S;
   using Rep = typename Base::Rep;
 
-  using RotationMatrixType = typename Base::RotationMatrixType;
-  using VectorType = typename Base::VectorType;
+  using RotationMatrix = typename Base::RotationMatrix;
+  using RotationVector = typename Base::RotationVector;
 
   using RepDataType = typename Base::RepDataType;
   using Tangent = typename Base::Tangent;
@@ -129,14 +129,14 @@ public:
   }
 
   /// Construct from axis and angle
-  explicit SO3(const VectorType& axis, S angle)
+  explicit SO3(const RotationVector& axis, S angle)
     : Base(), mRepData(angle, axis)
   {
     // Do nothing
   }
 
   /// Construct from axis and angle
-  explicit SO3(VectorType&& axis, S angle)
+  explicit SO3(RotationVector&& axis, S angle)
     : Base(), mRepData(std::move(angle), axis)
   {
     // Do nothing
@@ -221,18 +221,18 @@ public:
 
   /// \{ \name Representation properties
 
-  void setAxisAngle(const VectorType& axis, S angle)
+  void setAxisAngle(const RotationVector& axis, S angle)
   {
     mRepData.axis() = axis;
     mRepData.angle() = angle;
   }
 
-  void setAxis(const VectorType& axis)
+  void setAxis(const RotationVector& axis)
   {
     mRepData.axis() = axis;
   }
 
-  const VectorType& getAxis() const
+  const RotationVector& getAxis() const
   {
     return mRepData.axis();
   }

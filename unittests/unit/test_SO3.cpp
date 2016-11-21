@@ -95,12 +95,12 @@ TEST(SO3, SO3MatrixInteractWithEigen)
 //  EXPECT_TRUE(RNonCanonical.canonical().isCanonical());
 //}
 
-////==============================================================================
-//template <typename Derived>
-//void genericSO3(const math::SO3Base<Derived>& so3)
-//{
-//  so3.toRotationMatrix();
-//}
+//==============================================================================
+template <typename Derived>
+void genericSO3(const math::SO3Base<Derived>& so3)
+{
+  so3.toRotationMatrix();
+}
 
 ////==============================================================================
 //template <typename DerivedA, typename DerivedB>
@@ -112,38 +112,38 @@ TEST(SO3, SO3MatrixInteractWithEigen)
 ////  R1 *= R2;
 //}
 
-////==============================================================================
-//TEST(SO3, FunctionsTakingGenericSO3AsParameters)
-//{
-//  genericSO3(SO3<double, RotationMatrixRep>());
-//  genericSO3(SO3<double, AxisAngleRep>());
+//==============================================================================
+TEST(SO3, FunctionsTakingGenericSO3AsParameters)
+{
+  genericSO3(SO3<double, RotationMatrixRep>());
+  genericSO3(SO3<double, AxisAngleRep>());
 
 //  genericSO3(SO3<double, AxisAngleRep>::Random(),
 //             SO3<double, AxisAngleRep>::Random());
 
 //  genericSO3(SO3<double, RotationMatrixRep>::Random(),
 //             SO3<double, AxisAngleRep>::Random());
-//}
+}
 
-////==============================================================================
-//template <typename SO3Type>
-//void testSettersAndGetters()
-//{
-//  SO3Type point;
+//==============================================================================
+template <typename SO3Type>
+void testSettersAndGetters()
+{
+  SO3Type point;
 
-//  point.setIdentity();
-//  EXPECT_TRUE(point == SO3Type::Identity());
-//}
+  point.setIdentity();
+  EXPECT_TRUE(point == SO3Type::Identity());
+}
 
-////==============================================================================
-//TEST(SO3, SettersAndGetters)
-//{
-//  testSettersAndGetters<SO3<double, RotationMatrixRep>>();
-//  testSettersAndGetters<SO3<double, RotationVectorRep>>();
-//  testSettersAndGetters<SO3<double, AxisAngleRep>>();
-//  testSettersAndGetters<SO3<double, QuaternionRep>>();
-//  // EulerAngles
-//}
+//==============================================================================
+TEST(SO3, SettersAndGetters)
+{
+  testSettersAndGetters<SO3<double, RotationMatrixRep>>();
+  testSettersAndGetters<SO3<double, RotationVectorRep>>();
+  testSettersAndGetters<SO3<double, AxisAngleRep>>();
+  testSettersAndGetters<SO3<double, QuaternionRep>>();
+  // EulerAngles
+}
 
 ////==============================================================================
 //template <typename SO3Type>
@@ -517,8 +517,11 @@ TEST(SO3, Performance)
   EXPECT_TRUE(so3Mat.isApprox(eigMat));
   EXPECT_TRUE(so3Aa.isApprox(eigAa));
   EXPECT_TRUE(so3Quat.isApprox(eigQuat));
-
-  const auto numTests = 2e+1;
+#ifdef NDEBUG // release mode
+  const auto numTests = 1e+4;
+#else
+  const auto numTests = 1e+2;
+#endif
   common::Timer t;
 
   //----------------------------------------------------------------------------
