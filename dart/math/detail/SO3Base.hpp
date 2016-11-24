@@ -37,7 +37,7 @@
 namespace dart {
 namespace math {
 namespace detail {
-namespace SO3 {
+namespace SO3_ {
 
 //==============================================================================
 // group_is_canonical:
@@ -123,8 +123,8 @@ struct group_multiplication_impl<
   using RepA = typename SO3A::Rep;
   using RepB = typename SO3B::Rep;
 
-  using RepDataTypeA = typename rep_traits<S, RepA>::RepDataType;
-  using RepDataTypeB = typename rep_traits<S, RepB>::RepDataType;
+  using RepDataTypeA = typename traits<SO3<S, RepA>>::RepDataType;
+  using RepDataTypeB = typename traits<SO3<S, RepB>>::RepDataType;
 
   static const SO3A run(const SO3A& Ra, const SO3B& Rb)
   {

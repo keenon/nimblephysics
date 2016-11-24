@@ -70,7 +70,7 @@ public:
   using SO3Type = SO3<S, Rep>;
   using RotationType = SO3Type;
   using TranslationType = Eigen::Matrix<S, 3, 1>;
-//  using RepDataType = typename detail::SE3::rep_traits<S, Rep>::RepDataType;
+//  using RepDataType = typename detail::SE3::traits<SO3<S, Rep>>::RepDataType;
 
   using SE3Canonical = typename detail::traits<Derived>::SE3Canonical;
 
@@ -302,7 +302,7 @@ public:
 
 //  ///
 //  template <typename RepTo>
-//  typename detail::SE3::rep_traits<S, RepTo>::RepDataType coordinates() const
+//  typename detail::SE3::traits<SO3<S, RepTo>>::RepDataType coordinates() const
 //  {
 //    // TODO(JS): Check if the raw data of RepTo is a vector type.
 

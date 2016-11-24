@@ -142,13 +142,6 @@ namespace detail {
 
 template <typename T> struct traits;
 
-// here we say once and for all that traits<const T> == traits<T>
-// When constness must affect traits, it has to be constness on template
-// parameters on which T itself depends.
-// For example, traits<Map<const T> > != traits<Map<T> >, but
-//              traits<const Map<T> > == traits<Map<T> >
-template <typename T> struct traits<const T> : traits<T> {};
-
 } // namespace detial
 
 typedef Eigen::Matrix6d Inertia;

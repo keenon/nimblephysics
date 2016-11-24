@@ -39,7 +39,7 @@ using namespace dart;
 //==============================================================================
 TEST(SO3, SFINAE)
 {
-  using namespace math::detail::SO3;
+  using namespace math::detail::SO3_;
 
   auto resAa = rep_is_eigen_rotation_impl<double, math::AxisAngleRep>::value;
   EXPECT_TRUE(resAa);

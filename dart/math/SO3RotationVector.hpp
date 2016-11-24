@@ -97,7 +97,7 @@ public:
   template <typename Derived>
   SO3(const SO3Base<Derived>& other)
     : Base(),
-      mRepData(detail::SO3::rep_convert_impl<S, typename Derived::Rep, Rep>::run(
+      mRepData(detail::SO3_::rep_convert_impl<S, typename Derived::Rep, Rep>::run(
               other.getRepData()))
   {
     // Do nothing
@@ -107,7 +107,7 @@ public:
   template <typename Derived>
   SO3(SO3Base<Derived>&& other)
     : Base(),
-      mRepData(detail::SO3::rep_convert_impl<S, typename Derived::Rep, Rep>::run(
+      mRepData(detail::SO3_::rep_convert_impl<S, typename Derived::Rep, Rep>::run(
               std::move(other.getRepData())))
   {
     // Do nothing
@@ -149,7 +149,7 @@ public:
 
   SO3& operator=(const Eigen::AngleAxis<S>& quat)
   {
-    mRepData = detail::SO3::rep_convert_impl<S, AxisAngleRep, Rep>::run(quat);
+    mRepData = detail::SO3_::rep_convert_impl<S, AxisAngleRep, Rep>::run(quat);
     // TODO(JS): improve; need a way to deduce representation type from Eigen
     // data type
     return *this;
@@ -157,7 +157,7 @@ public:
 
   SO3& operator=(Eigen::AngleAxis<S>&& quat)
   {
-    mRepData = detail::SO3::rep_convert_impl<S, AxisAngleRep, Rep>::run(
+    mRepData = detail::SO3_::rep_convert_impl<S, AxisAngleRep, Rep>::run(
           std::move(quat));
     // TODO(JS): improve; need a way to deduce representation type from Eigen
     // data type
@@ -167,7 +167,7 @@ public:
   template <typename QuatDerived>
   SO3& operator=(const Eigen::QuaternionBase<QuatDerived>& quat)
   {
-    mRepData = detail::SO3::rep_convert_impl<S, QuaternionRep, Rep>::run(quat);
+    mRepData = detail::SO3_::rep_convert_impl<S, QuaternionRep, Rep>::run(quat);
     // TODO(JS): improve; need a way to deduce representation type from Eigen
     // data type
     return *this;
@@ -176,7 +176,7 @@ public:
   template <typename QuatDerived>
   SO3& operator=(Eigen::QuaternionBase<QuatDerived>&& quat)
   {
-    mRepData = detail::SO3::rep_convert_impl<S, QuaternionRep, Rep>::run(
+    mRepData = detail::SO3_::rep_convert_impl<S, QuaternionRep, Rep>::run(
           std::move(quat));
     // TODO(JS): improve; need a way to deduce representation type from Eigen
     // data type
@@ -186,7 +186,7 @@ public:
   template <typename Derived>
   SO3& operator=(const Eigen::MatrixBase<Derived>& matrix)
   {
-    mRepData = detail::SO3::rep_convert_impl<S, RotationMatrixRep, Rep>::run(
+    mRepData = detail::SO3_::rep_convert_impl<S, RotationMatrixRep, Rep>::run(
           matrix);
     return *this;
   }
@@ -194,7 +194,7 @@ public:
   template <typename Derived>
   SO3& operator=(Eigen::MatrixBase<Derived>&& matrix)
   {
-    mRepData = detail::SO3::rep_convert_impl<S, RotationMatrixRep, Rep>::run(
+    mRepData = detail::SO3_::rep_convert_impl<S, RotationMatrixRep, Rep>::run(
           std::move(matrix));
     return *this;
   }
