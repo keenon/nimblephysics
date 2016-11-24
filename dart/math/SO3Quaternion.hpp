@@ -55,7 +55,7 @@ public:
   using S = typename Base::S;
   using Rep = typename Base::Rep;
   using RotationMatrix = typename Base::RotationMatrix;
-  using RepDataType = typename Base::RepDataType;
+  using RepData = typename Base::RepData;
   using Tangent = typename Base::Tangent;
   using so3 = typename Base::so3;
 
@@ -193,12 +193,12 @@ public:
 
   /// \{ \name Representation properties
 
-  void setQuaternion(const RepDataType& quat)
+  void setQuaternion(const RepData& quat)
   {
     mRepData = quat;
   }
 
-  const RepDataType& getQuaternion() const
+  const RepData& getQuaternion() const
   {
     return mRepData;
   }
@@ -266,7 +266,7 @@ public:
     // TODO(JS): This code was copied from
     // https://bitbucket.org/eigen/eigen/commits/5d78b569eac3/#LEigen/src/Geometry/Quaternion.hT621
     // This should be replaced to:
-    // mRepData = RepDataType::UnitRandom() once the commit is released
+    // mRepData = RepData::UnitRandom() once the commit is released
     using std::sqrt;
     using std::sin;
     using std::cos;
@@ -276,7 +276,7 @@ public:
     const S u3 = Eigen::internal::random<S>(0, 2*constants<S>::pi());
     const S a = sqrt(1 - u1);
     const S b = sqrt(u1);
-    mRepData = RepDataType(a * sin(u2), a * cos(u2), b * sin(u3), b * cos(u3));
+    mRepData = RepData(a * sin(u2), a * cos(u2), b * sin(u3), b * cos(u3));
   }
 
   /// \} // Representation properties
@@ -310,7 +310,7 @@ protected:
   template <typename>
   friend class SO3Base;
 
-  RepDataType mRepData{RepDataType()};
+  RepData mRepData{RepData()};
 };
 
 extern template

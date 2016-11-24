@@ -76,7 +76,7 @@ struct rep_traits<S_, RotationMatrixRep>
 {
   using S = S_;
   using Rep = RotationMatrixRep;
-  using RepDataType = Eigen::Matrix<S, 3, 3>;
+  using RepData = Eigen::Matrix<S, 3, 3>;
 };
 
 //==============================================================================
@@ -85,7 +85,7 @@ struct rep_traits<S_, AxisAngleRep>
 {
   using S = S_;
   using Rep = AxisAngleRep;
-  using RepDataType = Eigen::Matrix<S, 3, 1>;
+  using RepData = Eigen::Matrix<S, 3, 1>;
   // TODO(JS): Change to Eigen::AngleAxis<S>
 };
 
@@ -95,7 +95,7 @@ struct rep_traits<S_, QuaternionRep>
 {
   using S = S_;
   using Rep = QuaternionRep;
-  using RepDataType = Eigen::Quaternion<S>;
+  using RepData = Eigen::Quaternion<S>;
 };
 
 //==============================================================================
@@ -104,7 +104,7 @@ struct rep_traits<S_, RotationVectorRep>
 {
   using S = S_;
   using Rep = QuaternionRep;
-  using RepDataType = Eigen::Matrix<S, 3, 1>;
+  using RepData = Eigen::Matrix<S, 3, 1>;
 };
 
 } // namespace SE3

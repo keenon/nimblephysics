@@ -116,8 +116,8 @@ auto
 SO3Base<Derived>::operator*(const SO3Base<OtherDerived>& other) const
 -> decltype(detail::SO3_::rep_multiplication_impl<
     S, Rep, typename OtherDerived::Rep>::run(
-              std::declval<RepDataType>(),
-              std::declval<typename OtherDerived::RepDataType>()))
+              std::declval<RepData>(),
+              std::declval<typename OtherDerived::RepData>()))
 {
   return detail::SO3_::rep_multiplication_impl<
       S, Rep, typename OtherDerived::Rep>::run(
@@ -336,7 +336,7 @@ template <typename Derived>
 template <typename RepTo>
 auto SO3Base<Derived>::to() const
 -> decltype(detail::SO3_::rep_convert_impl<S, Rep, RepTo>::run(
-    std::declval<RepDataType>()))
+    std::declval<RepData>()))
 {
   return detail::SO3_::rep_convert_impl<S, Rep, RepTo>::run(
         getRepData());
@@ -346,7 +346,7 @@ auto SO3Base<Derived>::to() const
 template <typename Derived>
 auto SO3Base<Derived>::toRotationMatrix() const
 -> decltype(detail::SO3_::rep_convert_impl<S, Rep, RotationMatrixRep>::run(
-    std::declval<RepDataType>()))
+    std::declval<RepData>()))
 {
   // The return type could be either of const and const reference depending on
   // the Derived type. So the trailing return type deduction is used here.
@@ -368,7 +368,7 @@ template <typename Derived>
 template <typename RepTo>
 auto SO3Base<Derived>::getCoordinates() const
 -> decltype(detail::SO3_::rep_convert_impl<S, Rep, RepTo>::run(
-    std::declval<RepDataType>()))
+    std::declval<RepData>()))
 {
   // TODO(JS): Change return type to Eigen::Matrix<S, Dim, 1> or
   // check if the raw data of RepTo is a vector type.
@@ -380,21 +380,21 @@ auto SO3Base<Derived>::getCoordinates() const
 
 //==============================================================================
 template <typename Derived>
-void SO3Base<Derived>::setRepData(const RepDataType& data)
+void SO3Base<Derived>::setRepData(const RepData& data)
 {
   derived().mRepData = data;
 }
 
 //==============================================================================
 template <typename Derived>
-void SO3Base<Derived>::setRepData(RepDataType&& data)
+void SO3Base<Derived>::setRepData(RepData&& data)
 {
   derived().mRepData = std::move(data);
 }
 
 //==============================================================================
 template <typename Derived>
-const typename SO3Base<Derived>::RepDataType& SO3Base<Derived>::getRepData() const
+const typename SO3Base<Derived>::RepData& SO3Base<Derived>::getRepData() const
 {
   return derived().mRepData;
 }

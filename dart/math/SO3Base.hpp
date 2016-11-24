@@ -62,7 +62,7 @@ public:
   using Rep = typename detail::traits<Derived>::Rep;
 
   /// The data type for this SO(3) representation type
-  using RepDataType = typename detail::traits<SO3<S, Rep>>::RepDataType;
+  using RepData = typename detail::traits<SO3<S, Rep>>::RepData;
 
   //using SO3Canonical = typename detail::traits<Derived>::SO3Canonical;
 
@@ -128,8 +128,8 @@ public:
   operator*(const SO3Base<OtherDerived>& other) const
   -> decltype(detail::SO3_::rep_multiplication_impl<
       S, Rep, typename OtherDerived::Rep>::run(
-                std::declval<RepDataType>(),
-                std::declval<typename OtherDerived::RepDataType>()));
+                std::declval<RepData>(),
+                std::declval<typename OtherDerived::RepData>()));
 
   const RotationVector operator*(const RotationVector& vector);
 
@@ -216,18 +216,18 @@ public:
   template <typename RepTo>
   auto to() const
   -> decltype(detail::SO3_::rep_convert_impl<S, Rep, RepTo>::run(
-      std::declval<RepDataType>()));
+      std::declval<RepData>()));
 
   auto toRotationMatrix() const
   -> decltype(detail::SO3_::rep_convert_impl<S, Rep, RotationMatrixRep>::run(
-      std::declval<RepDataType>()));
+      std::declval<RepData>()));
 
   void fromRotationMatrix(const RotationMatrix& rotMat);
 
   template <typename RepTo>
   auto getCoordinates() const
   -> decltype(detail::SO3_::rep_convert_impl<S, Rep, RepTo>::run(
-      std::declval<RepDataType>()));
+      std::declval<RepData>()));
 
   /// \} // Representation conversions
 
@@ -236,13 +236,13 @@ public:
   //----------------------------------------------------------------------------
 
   /// Set representation data
-  void setRepData(const RepDataType& data);
+  void setRepData(const RepData& data);
 
   /// Set representation data
-  void setRepData(RepDataType&& data);
+  void setRepData(RepData&& data);
 
   /// Return a const reference of the raw data of the representation type
-  const RepDataType& getRepData() const;
+  const RepData& getRepData() const;
 
   /// \}
 

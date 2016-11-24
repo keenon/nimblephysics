@@ -108,14 +108,14 @@ struct group_multiplication_impl<
     SO3A,
     SO3B,
     typename std::enable_if<
-//        !std::is_same<typename SO3A::RepDataType,  typename SO3B::RepDataType>::value
+//        !std::is_same<typename SO3A::RepData,  typename SO3B::RepData>::value
         true
-        && (std::is_same<typename SO3A::RepDataType, Eigen::Matrix<typename SO3A::S, 3, 3>>::value
-            || std::is_same<typename SO3A::RepDataType, Eigen::AngleAxis<typename SO3A::S>>::value
-            || std::is_same<typename SO3A::RepDataType, Eigen::Quaternion<typename SO3A::S>>::value)
-        && (std::is_same<typename SO3B::RepDataType, Eigen::Matrix<typename SO3A::S, 3, 3>>::value
-            || std::is_same<typename SO3B::RepDataType, Eigen::AngleAxis<typename SO3A::S>>::value
-            || std::is_same<typename SO3B::RepDataType, Eigen::Quaternion<typename SO3A::S>>::value)
+        && (std::is_same<typename SO3A::RepData, Eigen::Matrix<typename SO3A::S, 3, 3>>::value
+            || std::is_same<typename SO3A::RepData, Eigen::AngleAxis<typename SO3A::S>>::value
+            || std::is_same<typename SO3A::RepData, Eigen::Quaternion<typename SO3A::S>>::value)
+        && (std::is_same<typename SO3B::RepData, Eigen::Matrix<typename SO3A::S, 3, 3>>::value
+            || std::is_same<typename SO3B::RepData, Eigen::AngleAxis<typename SO3A::S>>::value
+            || std::is_same<typename SO3B::RepData, Eigen::Quaternion<typename SO3A::S>>::value)
     >::type>
 {
   using S = typename SO3A::S;
@@ -123,8 +123,8 @@ struct group_multiplication_impl<
   using RepA = typename SO3A::Rep;
   using RepB = typename SO3B::Rep;
 
-  using RepDataTypeA = typename traits<SO3<S, RepA>>::RepDataType;
-  using RepDataTypeB = typename traits<SO3<S, RepB>>::RepDataType;
+  using RepDataTypeA = typename traits<SO3<S, RepA>>::RepData;
+  using RepDataTypeB = typename traits<SO3<S, RepB>>::RepData;
 
   static const SO3A run(const SO3A& Ra, const SO3B& Rb)
   {
@@ -166,14 +166,14 @@ struct group_inplace_multiplication_impl<
     SO3A,
     SO3B,
     typename std::enable_if<
-//        !std::is_same<typename SO3A::RepDataType,  typename SO3B::RepDataType>::value
+//        !std::is_same<typename SO3A::RepData,  typename SO3B::RepData>::value
         true
-        && (std::is_same<typename SO3A::RepDataType, Eigen::Matrix<typename SO3A::S, 3, 3>>::value
-            || std::is_same<typename SO3A::RepDataType, Eigen::AngleAxis<typename SO3A::S>>::value
-            || std::is_same<typename SO3A::RepDataType, Eigen::Quaternion<typename SO3A::S>>::value)
-        && (std::is_same<typename SO3B::RepDataType, Eigen::Matrix<typename SO3A::S, 3, 3>>::value
-            || std::is_same<typename SO3B::RepDataType, Eigen::AngleAxis<typename SO3A::S>>::value
-            || std::is_same<typename SO3B::RepDataType, Eigen::Quaternion<typename SO3A::S>>::value)
+        && (std::is_same<typename SO3A::RepData, Eigen::Matrix<typename SO3A::S, 3, 3>>::value
+            || std::is_same<typename SO3A::RepData, Eigen::AngleAxis<typename SO3A::S>>::value
+            || std::is_same<typename SO3A::RepData, Eigen::Quaternion<typename SO3A::S>>::value)
+        && (std::is_same<typename SO3B::RepData, Eigen::Matrix<typename SO3A::S, 3, 3>>::value
+            || std::is_same<typename SO3B::RepData, Eigen::AngleAxis<typename SO3A::S>>::value
+            || std::is_same<typename SO3B::RepData, Eigen::Quaternion<typename SO3A::S>>::value)
     >::type>
 {
   using S = typename SO3A::S;

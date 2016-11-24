@@ -56,7 +56,7 @@ public:
   using RotationMatrix = typename Base::RotationMatrix;
   using RotationVector = typename Base::RotationVector;
 
-  using RepDataType = typename Base::RepDataType;
+  using RepData = typename Base::RepData;
   using Tangent = typename Base::Tangent;
   using so3 = typename Base::so3;
 
@@ -258,7 +258,7 @@ public:
 
   bool isIdentity()
   {
-    return mRepData == RepDataType::Zero();
+    return mRepData == RepData::Zero();
   }
 
   void invert()
@@ -277,7 +277,7 @@ protected:
   template <typename>
   friend class SO3Base;
 
-  RepDataType mRepData{RepDataType()};
+  RepData mRepData{RepData()};
 };
 
 extern template

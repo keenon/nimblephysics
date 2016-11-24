@@ -70,7 +70,7 @@ public:
   using SO3Type = SO3<S, Rep>;
   using RotationType = SO3Type;
   using TranslationType = Eigen::Matrix<S, 3, 1>;
-//  using RepDataType = typename detail::SE3::traits<SO3<S, Rep>>::RepDataType;
+//  using RepData = typename detail::SE3::traits<SO3<S, Rep>>::RepData;
 
   using SE3Canonical = typename detail::traits<Derived>::SE3Canonical;
 
@@ -122,7 +122,7 @@ public:
 //  {
 //    {
 //      using namespace Eigen;
-//      EIGEN_STATIC_ASSERT_SAME_MATRIX_SIZE(RepDataType, OtherDerived)
+//      EIGEN_STATIC_ASSERT_SAME_MATRIX_SIZE(RepData, OtherDerived)
 //    }
 
 //    derived().mRepData = mat;
@@ -136,7 +136,7 @@ public:
 //  {
 //    {
 //      using namespace Eigen;
-//      EIGEN_STATIC_ASSERT_SAME_MATRIX_SIZE(RepDataType, OtherDerived)
+//      EIGEN_STATIC_ASSERT_SAME_MATRIX_SIZE(RepData, OtherDerived)
 //    }
 
 //    derived().mRepData = std::move(matrix);
@@ -302,7 +302,7 @@ public:
 
 //  ///
 //  template <typename RepTo>
-//  typename detail::SE3::traits<SO3<S, RepTo>>::RepDataType coordinates() const
+//  typename detail::SE3::traits<SO3<S, RepTo>>::RepData coordinates() const
 //  {
 //    // TODO(JS): Check if the raw data of RepTo is a vector type.
 
@@ -310,7 +310,7 @@ public:
 //  }
 
 //  /// Return a reference of the raw data of the representation type
-//  RepDataType& matrix()
+//  RepData& matrix()
 //  {
 //    return derived().mRepData;
 //    // TODO(JS): Note that we return the raw data of the representation type
@@ -323,7 +323,7 @@ public:
 //  }
 
 //  /// Return a const reference of the raw data of the representation type
-//  const RepDataType& matrix() const
+//  const RepData& matrix() const
 //  {
 //    return derived().mRepData;
 //  }
