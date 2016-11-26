@@ -35,16 +35,16 @@ namespace dart {
 namespace math {
 
 //template
-//class SE3<double, SO3RotationMatrix<double>>;
+//class SE3<double, SO3Matrix<double>>;
 
 //template
-//class SE3<double, SO3RotationVector<double>>;
+//class SE3<double, SO3Vector<double>>;
 
 //template
-//class SE3<double, SO3AngleAxis<double>>;
+//class SE3<double, AngleAxis<double>>;
 
 //template
-//class SE3<double, SO3Quaternion<double>>;
+//class SE3<double, Quaternion<double>>;
 
 } // namespace math
 } // namespace dart

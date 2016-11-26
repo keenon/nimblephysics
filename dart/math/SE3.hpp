@@ -41,7 +41,7 @@
 namespace dart {
 namespace math {
 
-//struct SO3RotationMatrix : SE3Representation {};
+//struct SO3Matrix : SE3Representation {};
 
 //template <typename S_, typename Rep> // TODO(JS): Rename Rep to RotRep
 //class SE3 : public SE3Base<SE3<S_, Rep>>
@@ -297,19 +297,19 @@ namespace math {
 //};
 
 //extern template
-//class SE3<double, SO3RotationMatrix<double>>;
+//class SE3<double, SO3Matrix<double>>;
 
 //extern template
-//class SE3<double, SO3RotationVector<double>>;
+//class SE3<double, SO3Vector<double>>;
 
 //extern template
-//class SE3<double, SO3AngleAxis<double>>;
+//class SE3<double, AngleAxis<double>>;
 
 //extern template
-//class SE3<double, SO3Quaternion<double>>;
+//class SE3<double, Quaternion<double>>;
 
-//using SE3f = SE3<float, SO3RotationMatrix<double>>;
-//using SE3d = SE3<double, SO3RotationMatrix<double>>;
+//using SE3f = SE3<float, SO3Matrix<double>>;
+//using SE3d = SE3<double, SO3Matrix<double>>;
 
 } // namespace math
 } // namespace dart

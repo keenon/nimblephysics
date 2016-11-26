@@ -72,38 +72,38 @@ struct rep_traits;
 
 //==============================================================================
 template <typename S_>
-struct rep_traits<S_, SO3RotationMatrix<S_>>
+struct rep_traits<S_, SO3Matrix<S_>>
 {
   using S = S_;
-//  using Rep = SO3RotationMatrix;
+//  using Rep = SO3Matrix;
   using RepData = Eigen::Matrix<S, 3, 3>;
 };
 
 //==============================================================================
 template <typename S_>
-struct rep_traits<S_, SO3AngleAxis<S_>>
+struct rep_traits<S_, AngleAxis<S_>>
 {
   using S = S_;
-//  using Rep = SO3AngleAxis;
+//  using Rep = AngleAxis;
   using RepData = Eigen::Matrix<S, 3, 1>;
   // TODO(JS): Change to Eigen::AngleAxis<S>
 };
 
 //==============================================================================
 template <typename S_>
-struct rep_traits<S_, SO3Quaternion<S_>>
+struct rep_traits<S_, Quaternion<S_>>
 {
   using S = S_;
-//  using Rep = SO3Quaternion;
+//  using Rep = Quaternion;
   using RepData = Eigen::Quaternion<S>;
 };
 
 //==============================================================================
 template <typename S_>
-struct rep_traits<S_, SO3RotationVector<S_>>
+struct rep_traits<S_, SO3Vector<S_>>
 {
   using S = S_;
-//  using Rep = SO3Quaternion;
+//  using Rep = Quaternion;
   using RepData = Eigen::Matrix<S, 3, 1>;
 };
 

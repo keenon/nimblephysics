@@ -29,13 +29,13 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "dart/math/SO3Quaternion.hpp"
+#include "dart/math/EulerAngles.hpp"
 
 namespace dart {
 namespace math {
 
 template
-class SO3Quaternion<double>;
+class EulerAngles<double>;
 
 } // namespace math
 } // namespace dart

@@ -54,7 +54,7 @@ namespace math {
 //  static constexpr bool AngularFirst = AngularFirst_;
 //};
 
-//using Twist = SE3Coordinates<SO3RotationMatrix, true>;
+//using Twist = SE3Coordinates<SO3Matrix, true>;
 
 } // namespace math
 } // namespace dart

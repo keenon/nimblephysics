@@ -29,12 +29,14 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef DART_MATH_SO3ROTATIONMATRIX_HPP_
-#define DART_MATH_SO3ROTATIONMATRIX_HPP_
+#ifndef DART_MATH_QUATERNION_HPP_
+#define DART_MATH_QUATERNION_HPP_
 
 #include <Eigen/Eigen>
+#include <Eigen/Geometry>
 
 #include "dart/math/MathTypes.hpp"
+#include "dart/math/Constants.hpp"
 #include "dart/math/Geometry.hpp"
 #include "dart/math/SO3Base.hpp"
 
@@ -42,18 +44,18 @@ namespace dart {
 namespace math {
 
 template <typename S_>
-class SO3RotationMatrix : public SO3Base<SO3RotationMatrix<S_>>
+class Quaternion : public SO3Base<Quaternion<S_>>
 {
 public:
 
-  using This = SO3RotationMatrix;
-  using Base = SO3Base<SO3RotationMatrix>;
+  using This = Quaternion;
+  using Base = SO3Base<Quaternion<S_>>;
   using S = S_;
 
   using RotationMatrix = typename Base::RotationMatrix;
-  using RotationVector = typename Base::RotationVector;
 
   using RepData = typename Base::RepData;
+  // TODO(JS): Rename to Data
 
   using Tangent = typename Base::Tangent;
   using so3 = typename Base::so3;
@@ -74,148 +76,208 @@ public:
   /// \{ \name Constructors
 
   /// Default constructor. By default, the constructed SO(3) is not identity.
-  SO3RotationMatrix() : Base()
+  Quaternion() : Base()
   {
     // Do nothing
   }
 
   /// Copy constructor.
-  SO3RotationMatrix(const SO3RotationMatrix& other) : Base(), mRepData(other.mRepData)
+  Quaternion(const Quaternion& other) : Base(), mRepData(other.mRepData)
   {
     // Do nothing
   }
 
   /// Move constructor.
-  SO3RotationMatrix(SO3RotationMatrix&& other) : Base(), mRepData(std::move(other.mRepData))
+  Quaternion(Quaternion&& other) : mRepData(std::move(other.mRepData))
   {
     // Do nothing
   }
 
   /// Construct from other SO3 with different representation.
   template <typename Derived>
-  SO3RotationMatrix(const SO3Base<Derived>& other)
+  Quaternion(const SO3Base<Derived>& other)
     : Base(),
-      mRepData(
-        detail::so3_operations::so3_convert_impl<S, Derived, This>::run(
-          other.getRepData()))
+      mRepData(other.getRepData())
   {
     // Do nothing
   }
 
   /// Construct from other SO3 with different representation.
   template <typename Derived>
-  SO3RotationMatrix(SO3Base<Derived>&& other)
+  Quaternion(SO3Base<Derived>&& other)
     : Base(),
-      mRepData(detail::so3_operations::so3_convert_impl<S, Derived, This>::run(
-              std::move(other.getRepData())))
+      mRepData(detail::so3_operations::so3_convert_impl<
+          S, Derived, This>::run(std::move(other.getRepData())))
   {
     // Do nothing
   }
 
-  /// Construct from a raw rotation matrix where the dimension is 3x3.
-  template <typename Derived>
-  SO3RotationMatrix(const Eigen::MatrixBase<Derived>& matrix) : Base(), mRepData(matrix)
+  /// Construct from Eigen::Quaternion.
+  Quaternion(const Eigen::Quaternion<S>& quat) : Base(), mRepData(quat)
   {
-    assert(matrix.rows() == 3);
-    assert(matrix.cols() == 3);
+    // Do nothing
   }
 
-  /// Construct from a raw rotation matrix where the dimension is 3x3.
-  template <typename Derived>
-  SO3RotationMatrix(Eigen::MatrixBase<Derived>&& matrix) : Base(), mRepData(std::move(matrix))
+  /// Construct from Eigen::Quaternion.
+  Quaternion(Eigen::Quaternion<S>&& quat) : Base(), mRepData(std::move(quat))
   {
-    assert(matrix.rows() == 3);
-    assert(matrix.cols() == 3);
+    // Do nothing
   }
+
+  // TODO(JS): Add more constructs that takes raw components of quaternions
 
   /// \} // Constructors
 
   /// \{ \name Operators
 
   /// Assign a SO3 with the same representation.
-  SO3RotationMatrix& operator=(const SO3RotationMatrix& other)
+  Quaternion& operator=(const Quaternion& other)
   {
     mRepData = other.mRepData;
     return *this;
   }
 
   /// Move in a SO3 with the same representation.
-  SO3RotationMatrix& operator=(SO3RotationMatrix&& other)
+  Quaternion& operator=(Quaternion&& other)
   {
     mRepData = std::move(other.mRepData);
     return *this;
   }
 
+  Quaternion& operator=(const Eigen::AngleAxis<S>& quat)
+  {
+    mRepData = quat;
+    return *this;
+  }
+
+  Quaternion& operator=(Eigen::AngleAxis<S>&& quat)
+  {
+    mRepData = std::move(quat);
+    return *this;
+  }
+
+  template <typename QuatDerived>
+  Quaternion& operator=(const Eigen::QuaternionBase<QuatDerived>& quat)
+  {
+    mRepData = quat;
+    return *this;
+  }
+
+  template <typename QuatDerived>
+  Quaternion& operator=(Eigen::QuaternionBase<QuatDerived>&& quat)
+  {
+    mRepData = std::move(quat);
+    return *this;
+  }
+
   template <typename Derived>
-  SO3RotationMatrix& operator=(const Eigen::MatrixBase<Derived>& matrix)
+  Quaternion& operator=(const Eigen::MatrixBase<Derived>& matrix)
   {
     mRepData = matrix;
     return *this;
   }
 
   template <typename Derived>
-  SO3RotationMatrix& operator=(Eigen::MatrixBase<Derived>&& matrix)
+  Quaternion& operator=(Eigen::MatrixBase<Derived>&& matrix)
   {
     mRepData = std::move(matrix);
     return *this;
   }
 
-  template <typename RotationDerived>
-  SO3RotationMatrix& operator=(const Eigen::RotationBase<RotationDerived, Base::Dim>& rot)
-  {
-    mRepData = rot;
-    return *this;
-  }
-
-  template <typename RotationDerived>
-  SO3RotationMatrix& operator=(Eigen::RotationBase<RotationDerived, Base::Dim>&& rot)
-  {
-    mRepData = std::move(rot);
-    return *this;
-  }
-
-  const RotationVector operator*(const RotationVector& vector)
-  {
-    return mRepData * vector;
-  }
-
   /// Whether \b exactly equal to a SO3.
-  bool operator ==(const SO3RotationMatrix& other)
+  bool operator ==(const Quaternion& other)
   {
-    return mRepData == other.mRepData;
+    return mRepData.isApprox(other.mRepData, static_cast<S>(0));
   }
 
   /// \} // Operators
 
   /// \{ \name Representation properties
 
-  template <typename Derived>
-  void setRotationMatrix(const Eigen::MatrixBase<Derived>& matrix)
+  void setQuaternion(const RepData& quat)
   {
-    assert(matrix.rows() == 3);
-    assert(matrix.cols() == 3);
-
-    mRepData = matrix;
+    mRepData = quat;
   }
 
-  template <typename Derived>
-  void setRotationMatrix(Eigen::MatrixBase<Derived>&& mat)
-  {
-    assert(mat.rows() == 3);
-    assert(mat.cols() == 3);
-
-    mRepData = std::move(mat);
-  }
-
-  const RotationMatrix& getRotationMatrix() const
+  const RepData& getQuaternion() const
   {
     return mRepData;
   }
 
+  void setQuaternion(S w, S x, S y, S z)
+  {
+    mRepData.w() = w;
+    mRepData.x() = x;
+    mRepData.y() = y;
+    mRepData.z() = z;
+  }
+
+//  void fromVector(const Vector& vector)
+//  {
+//    mRepData.vec() = vector;
+//  }
+
+//  Vector toVector() const
+//  {
+//    return mRepData.vec();
+//  }
+
+  void setW(S w)
+  {
+    mRepData.w() = w;
+  }
+
+  void setX(S x)
+  {
+    mRepData.x() = x;
+  }
+
+  void setY(S y)
+  {
+    mRepData.y() = y;
+  }
+
+  void setZ(S z)
+  {
+    mRepData.z() = z;
+  }
+
+  S getW() const
+  {
+    return mRepData.w();
+  }
+
+  S getX() const
+  {
+    return mRepData.x();
+  }
+
+  S getY() const
+  {
+    return mRepData.y();
+  }
+
+  S getZ() const
+  {
+    return mRepData.z();
+  }
+
   void setRandom()
   {
-    *this = Exp(Tangent::Random());
-    // TODO(JS): improve
+    // TODO(JS): This code was copied from
+    // https://bitbucket.org/eigen/eigen/commits/5d78b569eac3/#LEigen/src/Geometry/Quaternion.hT621
+    // This should be replaced to:
+    // mRepData = RepData::UnitRandom() once the commit is released
+    using std::sqrt;
+    using std::sin;
+    using std::cos;
+
+    const S u1 = Eigen::internal::random<S>(0, 1);
+    const S u2 = Eigen::internal::random<S>(0, 2*constants<S>::pi());
+    const S u3 = Eigen::internal::random<S>(0, 2*constants<S>::pi());
+    const S a = sqrt(1 - u1);
+    const S b = sqrt(u1);
+    mRepData = RepData(a * sin(u2), a * cos(u2), b * sin(u3), b * cos(u3));
   }
 
   /// \} // Representation properties
@@ -229,36 +291,36 @@ public:
 
   bool isIdentity()
   {
-    return mRepData == RepData::Identity();
+    return mRepData.coeffs() == Eigen::Matrix<S, 4, 1>::Zero();
+    // TODO(JS): double-check if this is correct
   }
 
   void invert()
   {
-    mRepData.transposeInPlace();
+    mRepData = mRepData.conjugate();
   }
 
-  const SO3RotationMatrix getInverse() const
+  const Quaternion getInverse() const
   {
-    return SO3RotationMatrix(mRepData.transpose());
+    return Quaternion(mRepData.conjugate());
   }
 
   /// \} // SO3 group operations
 
 protected:
-
   template <typename>
   friend class SO3Base;
 
   RepData mRepData{RepData()};
 };
 
-using SO3RotationMatrixf = SO3RotationMatrix<float>;
-using SO3RotationMatrixd = SO3RotationMatrix<double>;
+using Quaternionf = Quaternion<float>;
+using Quaterniond = Quaternion<double>;
 
 extern template
-class SO3RotationMatrix<double>;
+class Quaternion<double>;
 
 } // namespace math
 } // namespace dart
 
-#endif // DART_MATH_SO3ROTATIONMATRIX_HPP_
+#endif // DART_MATH_QUATERNION_HPP_

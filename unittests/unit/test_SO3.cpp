@@ -35,22 +35,23 @@
 #include "TestHelpers.hpp"
 
 using namespace dart;
+using namespace math;
 
 //==============================================================================
 TEST(SO3, SFINAE)
 {
   using namespace math::detail::so3_operations;
 
-  auto resAa = rep_is_eigen_rotation_impl<double, math::SO3AngleAxisd>::value;
+  auto resAa = rep_is_eigen_rotation_impl<double, math::AngleAxisd>::value;
   EXPECT_TRUE(resAa);
 
-  auto resQuat = rep_is_eigen_rotation_impl<double, math::SO3Quaterniond>::value;
+  auto resQuat = rep_is_eigen_rotation_impl<double, math::Quaterniond>::value;
   EXPECT_TRUE(resQuat);
 
-  auto resMat3x3 = rep_is_eigen_matrix_impl<double, math::SO3RotationMatrixd>::value;
+  auto resMat3x3 = rep_is_eigen_matrix_impl<double, math::SO3Matrixd>::value;
   EXPECT_TRUE(resMat3x3);
 
-  auto resMatXxX = rep_is_eigen_matrix_impl<double, math::SO3RotationVectord>::value;
+  auto resMatXxX = rep_is_eigen_matrix_impl<double, math::SO3Vectord>::value;
   EXPECT_TRUE(resMatXxX);
 }
 
@@ -61,13 +62,13 @@ TEST(SO3, SO3MatrixInteractWithEigen)
   Eigen::Matrix3d eig3x3 = SO3d::Exp(r).toRotationMatrix();
   Eigen::MatrixXd eigXxX = SO3d::Exp(r).toRotationMatrix();
 
-  SO3RotationMatrixd so3Mat1 = eig3x3;
-  SO3RotationMatrixd so3Mat2 = eigXxX;
+  SO3Matrixd so3Mat1 = eig3x3;
+  SO3Matrixd so3Mat2 = eigXxX;
   EXPECT_TRUE(so3Mat1.toRotationMatrix() == eig3x3);
   EXPECT_TRUE(so3Mat2.toRotationMatrix() == eigXxX);
 
-  SO3RotationMatrixd so3Mat3 = eig3x3 * eig3x3;
-  SO3RotationMatrixd so3Mat4 = eigXxX * eigXxX;
+  SO3Matrixd so3Mat3 = eig3x3 * eig3x3;
+  SO3Matrixd so3Mat4 = eigXxX * eigXxX;
   EXPECT_TRUE(so3Mat3.toRotationMatrix() == eig3x3 * eig3x3);
   EXPECT_TRUE(so3Mat4.toRotationMatrix() == eigXxX * eigXxX);
 }
@@ -77,20 +78,20 @@ TEST(SO3, SO3MatrixInteractWithEigen)
 //{
 //  EXPECT_TRUE(SO3d::isCanonical());
 //  EXPECT_TRUE(SO3d::isCanonical());
-//  EXPECT_TRUE(SO3RotationMatrixd::isCanonical());
-//  EXPECT_TRUE(SO3RotationMatrixd::isCanonical());
-//  EXPECT_FALSE(SO3RotationVectord::isCanonical());
-//  EXPECT_FALSE(SO3RotationVectord::isCanonical());
-//  EXPECT_FALSE(SO3AngleAxisd::isCanonical());
-//  EXPECT_FALSE(SO3AngleAxisd::isCanonical());
-//  EXPECT_FALSE(SO3Quaterniond::isCanonical());
-//  EXPECT_FALSE(SO3Quaterniond::isCanonical());
+//  EXPECT_TRUE(SO3Matrixd::isCanonical());
+//  EXPECT_TRUE(SO3Matrixd::isCanonical());
+//  EXPECT_FALSE(SO3Vectord::isCanonical());
+//  EXPECT_FALSE(SO3Vectord::isCanonical());
+//  EXPECT_FALSE(AngleAxisd::isCanonical());
+//  EXPECT_FALSE(AngleAxisd::isCanonical());
+//  EXPECT_FALSE(Quaterniond::isCanonical());
+//  EXPECT_FALSE(Quaterniond::isCanonical());
 
 //  const SO3<double, SO3Canonical> RCanonical;
 //  EXPECT_TRUE(RCanonical.isCanonical());
 //  EXPECT_TRUE(RCanonical.canonical().isCanonical());
 
-//  const SO3AngleAxisd RNonCanonical;
+//  const AngleAxisd RNonCanonical;
 //  EXPECT_FALSE(RNonCanonical.isCanonical());
 //  EXPECT_TRUE(RNonCanonical.canonical().isCanonical());
 //}
@@ -115,14 +116,14 @@ void genericSO3(const math::SO3Base<Derived>& so3)
 //==============================================================================
 TEST(SO3, FunctionsTakingGenericSO3AsParameters)
 {
-  genericSO3(SO3RotationMatrixd());
-  genericSO3(SO3AngleAxisd());
+  genericSO3(SO3Matrixd());
+  genericSO3(math::AngleAxisd());
 
-//  genericSO3(SO3AngleAxisd::Random(),
-//             SO3AngleAxisd::Random());
+//  genericSO3(AngleAxisd::Random(),
+//             AngleAxisd::Random());
 
-//  genericSO3(SO3RotationMatrixd::Random(),
-//             SO3AngleAxisd::Random());
+//  genericSO3(SO3Matrixd::Random(),
+//             AngleAxisd::Random());
 }
 
 //==============================================================================
@@ -138,10 +139,10 @@ void testSettersAndGetters()
 //==============================================================================
 TEST(SO3, SettersAndGetters)
 {
-  testSettersAndGetters<SO3RotationMatrixd>();
-  testSettersAndGetters<SO3RotationVectord>();
-  testSettersAndGetters<SO3AngleAxisd>();
-  testSettersAndGetters<SO3Quaterniond>();
+  testSettersAndGetters<SO3Matrixd>();
+  testSettersAndGetters<SO3Vectord>();
+  testSettersAndGetters<math::AngleAxisd>();
+  testSettersAndGetters<math::Quaterniond>();
   // EulerAngles
 }
 
@@ -169,10 +170,10 @@ TEST(SO3, SettersAndGetters)
 ////==============================================================================
 //TEST(SO3, GroupOperations)
 //{
-//  testGroupOperations<SO3RotationMatrixd>();
-//  testGroupOperations<SO3RotationVectord>();
-//  testGroupOperations<SO3AngleAxisd>();
-//  testGroupOperations<SO3Quaterniond>();
+//  testGroupOperations<SO3Matrixd>();
+//  testGroupOperations<SO3Vectord>();
+//  testGroupOperations<AngleAxisd>();
+//  testGroupOperations<Quaterniond>();
 //}
 
 ////==============================================================================
@@ -187,10 +188,10 @@ TEST(SO3, SettersAndGetters)
 ////==============================================================================
 //TEST(SO3, LieAlgebraOperations)
 //{
-//  testLieAlgebraOperations<SO3RotationMatrixd>();
-//  testLieAlgebraOperations<SO3RotationVectord>();
-//  testLieAlgebraOperations<SO3AngleAxisd>();
-//  testLieAlgebraOperations<SO3Quaterniond>();
+//  testLieAlgebraOperations<SO3Matrixd>();
+//  testLieAlgebraOperations<SO3Vectord>();
+//  testLieAlgebraOperations<AngleAxisd>();
+//  testLieAlgebraOperations<Quaterniond>();
 //}
 
 ////==============================================================================
@@ -217,17 +218,17 @@ TEST(SO3, SettersAndGetters)
 ////==============================================================================
 //TEST(SO3, ExponentialAndLogarithm)
 //{
-//  testExponentialAndLogarithm<SO3RotationMatrixd>();
-//  testExponentialAndLogarithm<SO3RotationVectord>();
-//  testExponentialAndLogarithm<SO3AngleAxisd>();
-//  testExponentialAndLogarithm<SO3Quaterniond>();
+//  testExponentialAndLogarithm<SO3Matrixd>();
+//  testExponentialAndLogarithm<SO3Vectord>();
+//  testExponentialAndLogarithm<AngleAxisd>();
+//  testExponentialAndLogarithm<Quaterniond>();
 //}
 
 ////==============================================================================
 //TEST(SO3, HeterogeneousAssignment)
 //{
-//  SO3RotationMatrixd r1;
-//  SO3AngleAxisd r2;
+//  SO3Matrixd r1;
+//  AngleAxisd r2;
 
 //  r1.setRandom();
 //  r2.setRandom();
@@ -240,18 +241,18 @@ TEST(SO3, SettersAndGetters)
 ////==============================================================================
 //TEST(SO3, HeterogeneousGroupMultiplication)
 //{
-//  SO3RotationMatrixd w1;
-//  SO3AngleAxisd w2;
+//  SO3Matrixd w1;
+//  AngleAxisd w2;
 
 //  w1.setRandom();
 //  w2.setRandom();
 //  EXPECT_FALSE(w1.isApprox(w2));
 
-//  SO3RotationMatrixd w3 = w1;
+//  SO3Matrixd w3 = w1;
 //  EXPECT_TRUE(w3.isApprox(w1));
 //  w3 *= w2;
 
-//  SO3AngleAxisd w4 = w1 * w2;
+//  AngleAxisd w4 = w1 * w2;
 
 //  EXPECT_TRUE(w3.isApprox(w4));
 //}
@@ -263,7 +264,7 @@ TEST(SO3, GeneralizedCoordinates)
 
 //  Eigen::VectorXd axisAngle = R.getLog();
 
-//  Eigen::VectorXd coords = R.getCoordinates<SO3RotationVectord>();
+//  Eigen::VectorXd coords = R.getCoordinates<SO3Vectord>();
 
 //  EXPECT_TRUE(axisAngle.isApprox(coords));
 }
@@ -290,35 +291,35 @@ TEST(SO3, GeneralizedCoordinates)
 ////==============================================================================
 //TEST(SO3, InteractingWithRegularMatrices)
 //{
-//  testInteractingWithRegularMatrices<SO3RotationMatrixd>();
-//  testInteractingWithRegularMatrices<SO3RotationVectord>();
-//  testInteractingWithRegularMatrices<SO3AngleAxisd>();
-//  testInteractingWithRegularMatrices<SO3Quaterniond>();
+//  testInteractingWithRegularMatrices<SO3Matrixd>();
+//  testInteractingWithRegularMatrices<SO3Vectord>();
+//  testInteractingWithRegularMatrices<AngleAxisd>();
+//  testInteractingWithRegularMatrices<Quaterniond>();
 //}
 
 //==============================================================================
 TEST(SO3, Conversions)
 {
   //Eigen::Matrix3d    eigMatIn  = Eigen::Matrix3d::Random(); // Not a rotation matrix
-  Eigen::Matrix3d    eigMatIn  = SO3RotationMatrixd::Random().to<SO3RotationMatrixd>();
+  Eigen::Matrix3d    eigMatIn  = SO3Matrixd::Random().to<Eigen::Matrix3d>();
   //Eigen::AngleAxisd  eigAaIn   = Eigen::AngleAxisd::Random(); // Not supported by Eigen
-  Eigen::AngleAxisd  eigAaIn   = SO3AngleAxisd::Random().to<SO3AngleAxisd>();
+  Eigen::AngleAxisd  eigAaIn   = math::AngleAxisd::Random().to<Eigen::AngleAxisd>();
   //Eigen::Quaterniond eigQuatIn = Eigen::Quaterniond::Random(); // Not supported by Eigen
-  Eigen::Quaterniond eigQuatIn = SO3Quaterniond::Random().to<SO3Quaterniond>();
-  Eigen::Vector3d    eigVecIn  = SO3RotationVectord::Random().to<SO3RotationVectord>();
-  SO3RotationMatrixd so3MatIn  = SO3RotationMatrixd::Random();
-  SO3RotationVectord so3VecIn  = SO3RotationVectord::Random();
-  SO3AngleAxisd      so3AaIn   = SO3AngleAxisd::Random();
-  SO3Quaterniond     so3QuatIn = SO3Quaterniond::Random();
+  Eigen::Quaterniond eigQuatIn = math::Quaterniond::Random().to<Eigen::Quaterniond>();
+  Eigen::Vector3d    eigVecIn  = SO3Vectord::Random().to<Eigen::Vector3d>();
+  SO3Matrixd so3MatIn  = SO3Matrixd::Random();
+  SO3Vectord so3VecIn  = SO3Vectord::Random();
+  math::AngleAxisd      so3AaIn   = math::AngleAxisd::Random();
+  math::Quaterniond     so3QuatIn = math::Quaterniond::Random();
 
   Eigen::Matrix3d    eigMatOut;
   Eigen::AngleAxisd  eigAaOut;
   Eigen::Quaterniond eigQuatOut;
   Eigen::Vector3d    eigVecOut;
-  SO3RotationMatrixd         so3MatOut;
-  SO3RotationVectord         so3VecOut;
-  SO3AngleAxisd      so3AaOut;
-  SO3Quaterniond     so3QuatOut;
+  SO3Matrixd         so3MatOut;
+  SO3Vectord         so3VecOut;
+  math::AngleAxisd      so3AaOut;
+  math::Quaterniond     so3QuatOut;
 
   //------------------------------
   // Eigen::Matrix3d <- various types
@@ -374,26 +375,26 @@ TEST(SO3, Conversions)
   //eigVecOut = eigQuatIn;
   //EXPECT_TRUE(eigVecOut.isApprox(eigQuatIn.toRotationMatrix()));
 
-  eigVecOut = so3MatIn.to<SO3RotationVectord>();
-  EXPECT_TRUE(eigVecOut.isApprox(so3MatIn.to<SO3RotationVectord>()));
+  eigVecOut = so3MatIn.to<SO3Vectord>().getRepData();
+  EXPECT_TRUE(eigVecOut.isApprox(so3MatIn.to<SO3Vectord>().getRepData()));
 
   eigVecOut = so3MatIn.to<Eigen::Vector3d>();
   EXPECT_TRUE(eigVecOut.isApprox(so3MatIn.to<Eigen::Vector3d>()));
 
-  eigVecOut = so3VecIn.to<SO3RotationVectord>();
-  EXPECT_TRUE(eigVecOut.isApprox(so3VecIn.to<SO3RotationVectord>()));
+  eigVecOut = so3VecIn.to<SO3Vectord>().getRepData();
+  EXPECT_TRUE(eigVecOut.isApprox(so3VecIn.to<SO3Vectord>().getRepData()));
 
   eigVecOut = so3VecIn.to<Eigen::Vector3d>();
   EXPECT_TRUE(eigVecOut.isApprox(so3VecIn.to<Eigen::Vector3d>()));
 
-  eigVecOut = so3AaIn.to<SO3RotationVectord>();
-  EXPECT_TRUE(eigVecOut.isApprox(so3AaIn.to<SO3RotationVectord>()));
+  eigVecOut = so3AaIn.to<SO3Vectord>().getRepData();
+  EXPECT_TRUE(eigVecOut.isApprox(so3AaIn.to<SO3Vectord>().getRepData()));
 
   eigVecOut = so3AaIn.to<Eigen::Vector3d>();
   EXPECT_TRUE(eigVecOut.isApprox(so3AaIn.to<Eigen::Vector3d>()));
 
-  eigVecOut = so3QuatIn.to<SO3RotationVectord>();
-  EXPECT_TRUE(eigVecOut.isApprox(so3QuatIn.to<SO3RotationVectord>()));
+  eigVecOut = so3QuatIn.to<SO3Vectord>().getRepData();
+  EXPECT_TRUE(eigVecOut.isApprox(so3QuatIn.to<SO3Vectord>().getRepData()));
 
   eigVecOut = so3QuatIn.to<Eigen::Vector3d>();
   EXPECT_TRUE(eigVecOut.isApprox(so3QuatIn.to<Eigen::Vector3d>()));
@@ -413,26 +414,26 @@ TEST(SO3, Conversions)
   eigAaOut = eigQuatIn;
   EXPECT_TRUE(eigAaOut.toRotationMatrix().isApprox(eigQuatIn.toRotationMatrix()));
 
-  eigAaOut = so3MatIn.to<SO3AngleAxisd>();
-  EXPECT_TRUE(eigAaOut.isApprox(so3MatIn.to<SO3AngleAxisd>()));
+  eigAaOut = so3MatIn.to<math::AngleAxisd>().getRepData();
+  EXPECT_TRUE(eigAaOut.isApprox(so3MatIn.to<math::AngleAxisd>().getRepData()));
 
   eigAaOut = so3MatIn.to<Eigen::AngleAxisd>();
   EXPECT_TRUE(eigAaOut.isApprox(so3MatIn.to<Eigen::AngleAxisd>()));
 
-  eigAaOut = so3VecIn.to<SO3AngleAxisd>();
-  EXPECT_TRUE(eigAaOut.isApprox(so3VecIn.to<SO3AngleAxisd>()));
+  eigAaOut = so3VecIn.to<math::AngleAxisd>().getRepData();
+  EXPECT_TRUE(eigAaOut.isApprox(so3VecIn.to<math::AngleAxisd>().getRepData()));
 
   eigAaOut = so3VecIn.to<Eigen::AngleAxisd>();
   EXPECT_TRUE(eigAaOut.isApprox(so3VecIn.to<Eigen::AngleAxisd>()));
 
-  eigAaOut = so3AaIn.to<SO3AngleAxisd>();
-  EXPECT_TRUE(eigAaOut.isApprox(so3AaIn.to<SO3AngleAxisd>()));
+  eigAaOut = so3AaIn.to<math::AngleAxisd>().getRepData();
+  EXPECT_TRUE(eigAaOut.isApprox(so3AaIn.to<math::AngleAxisd>().getRepData()));
 
   eigAaOut = so3AaIn.to<Eigen::AngleAxisd>();
   EXPECT_TRUE(eigAaOut.isApprox(so3AaIn.to<Eigen::AngleAxisd>()));
 
-  eigAaOut = so3QuatIn.to<SO3AngleAxisd>();
-  EXPECT_TRUE(eigAaOut.isApprox(so3QuatIn.to<SO3AngleAxisd>()));
+  eigAaOut = so3QuatIn.to<math::AngleAxisd>().getRepData();
+  EXPECT_TRUE(eigAaOut.isApprox(so3QuatIn.to<math::AngleAxisd>().getRepData()));
 
   eigAaOut = so3QuatIn.to<Eigen::AngleAxisd>();
   EXPECT_TRUE(eigAaOut.isApprox(so3QuatIn.to<Eigen::AngleAxisd>()));
@@ -452,32 +453,32 @@ TEST(SO3, Conversions)
   eigQuatOut = eigQuatIn;
   EXPECT_TRUE(eigQuatOut.isApprox(eigQuatIn));
 
-  eigQuatOut = so3MatIn.to<SO3Quaterniond>();
-  EXPECT_TRUE(eigQuatOut.isApprox(so3MatIn.to<SO3Quaterniond>()));
+  eigQuatOut = so3MatIn.to<math::Quaterniond>().getRepData();
+  EXPECT_TRUE(eigQuatOut.isApprox(so3MatIn.to<math::Quaterniond>().getRepData()));
 
   eigQuatOut = so3MatIn.to<Eigen::Quaterniond>();
   EXPECT_TRUE(eigQuatOut.isApprox(so3MatIn.to<Eigen::Quaterniond>()));
 
-  eigQuatOut = so3VecIn.to<SO3Quaterniond>();
-  EXPECT_TRUE(eigQuatOut.isApprox(so3VecIn.to<SO3Quaterniond>()));
+  eigQuatOut = so3VecIn.to<math::Quaterniond>().getRepData();
+  EXPECT_TRUE(eigQuatOut.isApprox(so3VecIn.to<math::Quaterniond>().getRepData()));
 
   eigQuatOut = so3VecIn.to<Eigen::Quaterniond>();
   EXPECT_TRUE(eigQuatOut.isApprox(so3VecIn.to<Eigen::Quaterniond>()));
 
-  eigQuatOut = so3AaIn.to<SO3Quaterniond>();
-  EXPECT_TRUE(eigQuatOut.isApprox(so3AaIn.to<SO3Quaterniond>()));
+  eigQuatOut = so3AaIn.to<math::Quaterniond>().getRepData();
+  EXPECT_TRUE(eigQuatOut.isApprox(so3AaIn.to<math::Quaterniond>().getRepData()));
 
   eigQuatOut = so3AaIn.to<Eigen::Quaterniond>();
   EXPECT_TRUE(eigQuatOut.isApprox(so3AaIn.to<Eigen::Quaterniond>()));
 
-  eigQuatOut = so3QuatIn.to<SO3Quaterniond>();
-  EXPECT_TRUE(eigQuatOut.isApprox(so3QuatIn.to<SO3Quaterniond>()));
+  eigQuatOut = so3QuatIn.to<math::Quaterniond>().getRepData();
+  EXPECT_TRUE(eigQuatOut.isApprox(so3QuatIn.to<math::Quaterniond>().getRepData()));
 
   eigQuatOut = so3QuatIn.to<Eigen::Quaterniond>();
   EXPECT_TRUE(eigQuatOut.isApprox(so3QuatIn.to<Eigen::Quaterniond>()));
 
   //------------------------------
-  // SO3RotationMatrixd <- various types
+  // SO3Matrixd <- various types
   //------------------------------
   so3MatOut = eigMatIn;
   EXPECT_TRUE(so3MatOut.isApprox(eigMatIn));
@@ -504,7 +505,7 @@ TEST(SO3, Conversions)
   EXPECT_TRUE(so3MatOut.isApprox(so3QuatIn));
 
   //------------------------------
-  // SO3RotationVectord <- various types
+  // SO3Vectord <- various types
   //------------------------------
   //so3VecOut = eigMat; // Deleted to avoid ambiguity between rotation matrix
                         // and rotation vector
@@ -534,7 +535,7 @@ TEST(SO3, Conversions)
   EXPECT_TRUE(so3VecOut.isApprox(so3QuatIn));
 
   //------------------------------
-  // SO3AngleAxisd <- various types
+  // AngleAxisd <- various types
   //------------------------------
   so3AaOut = eigMatIn;
   EXPECT_TRUE(so3AaOut.isApprox(eigMatIn));
@@ -562,7 +563,7 @@ TEST(SO3, Conversions)
   EXPECT_TRUE(so3AaOut.isApprox(so3QuatIn));
 
   //------------------------------
-  // SO3Quaterniond <- various types
+  // Quaterniond <- various types
   //------------------------------
   so3QuatOut = eigMatIn;
   EXPECT_TRUE(so3QuatOut.isApprox(eigMatIn));
@@ -595,10 +596,10 @@ TEST(SO3, Performance)
 {
   Eigen::Vector3d r = Eigen::Vector3d::Random();
 
-  SO3RotationMatrixd so3Mat = SO3RotationMatrixd::Exp(r);
-  SO3RotationVectord so3Vec = SO3RotationVectord::Exp(r);
-  SO3AngleAxisd so3Aa = SO3AngleAxisd::Exp(r);
-  SO3Quaterniond so3Quat = SO3Quaterniond::Exp(r);
+  SO3Matrixd so3Mat = SO3Matrixd::Exp(r);
+  SO3Vectord so3Vec = SO3Vectord::Exp(r);
+  math::AngleAxisd so3Aa = math::AngleAxisd::Exp(r);
+  math::Quaterniond so3Quat = math::Quaterniond::Exp(r);
 
   std::cout << so3Quat.toRotationMatrix() << std::endl;
   std::cout << so3Mat.toRotationMatrix() << std::endl;
@@ -632,7 +633,7 @@ TEST(SO3, Performance)
     eigMat = eigMat * eigMat;
   }
   t.stop();
-  std::cout << "Eigen::Matrix3d   : " << t.getLastElapsedTime() << " (sec)" << std::endl;
+  std::cout << "Eigen::Matrix3d  : " << t.getLastElapsedTime() << " (sec)" << std::endl;
 
   t.start();
   for (auto i = 0u; i < numTests; ++i)
@@ -640,7 +641,7 @@ TEST(SO3, Performance)
     so3Mat = so3Mat * so3Mat;
   }
   t.stop();
-  std::cout << "SO3RotationMatrixd        : " << t.getLastElapsedTime() << " (sec)" << std::endl;
+  std::cout << "math::SO3Matrixd : " << t.getLastElapsedTime() << " (sec)" << std::endl;
   std::cout << std::endl;
 
   t.start();
@@ -649,7 +650,7 @@ TEST(SO3, Performance)
     so3Vec = so3Vec * so3Vec;
   }
   t.stop();
-  std::cout << "SO3RotationVectord:         " << t.getLastElapsedTime() << " (sec)" << std::endl;
+  std::cout << "math::SO3Vectord : " << t.getLastElapsedTime() << " (sec)" << std::endl;
   std::cout << std::endl;
 
   t.start();
@@ -658,7 +659,7 @@ TEST(SO3, Performance)
     eigAa = eigAa * eigAa;
   }
   t.stop();
-  std::cout << "Eigen::AngleAxisd : " << t.getLastElapsedTime() << " (sec)" << std::endl;
+  std::cout << "Eigen::AngleAxisd: " << t.getLastElapsedTime() << " (sec)" << std::endl;
 
   t.start();
   for (auto i = 0u; i < numTests; ++i)
@@ -666,7 +667,7 @@ TEST(SO3, Performance)
     so3Aa = so3Aa * so3Aa;
   }
   t.stop();
-  std::cout << "SO3AngleAxisd:      " << t.getLastElapsedTime() << " (sec)" << std::endl;
+  std::cout << "math::AngleAxisd :" << t.getLastElapsedTime() << " (sec)" << std::endl;
   std::cout << std::endl;
 
   t.start();
@@ -683,7 +684,7 @@ TEST(SO3, Performance)
     so3Quat = so3Quat * so3Quat;
   }
   t.stop();
-  std::cout << "SO3Quaterniond:     " << t.getLastElapsedTime() << " (sec)" << std::endl;
+  std::cout << "math::Quaterniond :" << t.getLastElapsedTime() << " (sec)" << std::endl;
   std::cout << std::endl;
 
   //----------------------------------------------------------------------------
@@ -707,7 +708,7 @@ TEST(SO3, Performance)
     so3Mat *= so3Mat;
   }
   t.stop();
-  std::cout << "SO3RotationMatrixd        : " << t.getLastElapsedTime() << " (sec)" << std::endl;
+  std::cout << "math::SO3Matrixd  : " << t.getLastElapsedTime() << " (sec)" << std::endl;
   std::cout << std::endl;
 
   t.start();
@@ -716,7 +717,7 @@ TEST(SO3, Performance)
     so3Vec *= so3Vec;
   }
   t.stop();
-  std::cout << "SO3RotationVectord:         " << t.getLastElapsedTime() << " (sec)" << std::endl;
+  std::cout << "math::SO3Vectord:   " << t.getLastElapsedTime() << " (sec)" << std::endl;
   std::cout << std::endl;
 
   // AngleAxis *= AngleAxis is not supported by Eigen
@@ -734,7 +735,7 @@ TEST(SO3, Performance)
     so3Aa *= so3Aa;
   }
   t.stop();
-  std::cout << "SO3AngleAxisd:      " << t.getLastElapsedTime() << " (sec)" << std::endl;
+  std::cout << "math::AngleAxisd: " << t.getLastElapsedTime() << " (sec)" << std::endl;
   std::cout << std::endl;
 
   t.start();
@@ -751,7 +752,7 @@ TEST(SO3, Performance)
     so3Quat *= so3Quat;
   }
   t.stop();
-  std::cout << "SO3Quaterniond:     " << t.getLastElapsedTime() << " (sec)" << std::endl;
+  std::cout << "math::Quaterniond : " << t.getLastElapsedTime() << " (sec)" << std::endl;
   std::cout << std::endl;
 
   std::cout << eigQuat.toRotationMatrix() << std::endl;

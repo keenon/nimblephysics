@@ -29,13 +29,72 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "dart/math/SO3AngleAxis.hpp"
+#ifndef DART_MATH_EULERANGLES_HPP_
+#define DART_MATH_EULERANGLES_HPP_
+
+#include <Eigen/Eigen>
+#include <Eigen/Geometry>
+
+#include "dart/math/MathTypes.hpp"
+#include "dart/math/Constants.hpp"
+#include "dart/math/Geometry.hpp"
+#include "dart/math/SO3Base.hpp"
 
 namespace dart {
 namespace math {
 
-template
-class SO3AngleAxis<double>;
+template <typename S_>
+class EulerAngles : public SO3Base<EulerAngles<S_>>
+{
+public:
+
+  using This = EulerAngles;
+  using Base = SO3Base<EulerAngles<S_>>;
+  using S = S_;
+
+  using RotationMatrix = typename Base::RotationMatrix;
+
+  using RepData = typename Base::RepData;
+  // TODO(JS): Rename to Data
+
+  using Tangent = typename Base::Tangent;
+  using so3 = typename Base::so3;
+
+  using Base::operator =;
+  using Base::operator *;
+  using Base::operator *=;
+
+//  using Base::getCoordinates;
+  using Base::setRepData;
+  using Base::getRepData;
+
+  using Base::Exp;
+  using Base::setExp;
+  using Base::Log;
+  using Base::getLog;
+
+  /// \{ \name Constructors
+
+  /// Default constructor. By default, the constructed SO(3) is not identity.
+  EulerAngles() : Base()
+  {
+    // Do nothing
+  }
+
+protected:
+  template <typename>
+  friend class SO3Base;
+
+  RepData mRepData{RepData()};
+};
+
+using EulerAnglesf = EulerAngles<float>;
+using EulerAnglesd = EulerAngles<double>;
+
+extern template
+class EulerAngles<double>;
 
 } // namespace math
 } // namespace dart
+
+#endif // DART_MATH_EULERANGLES_HPP_

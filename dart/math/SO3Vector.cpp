@@ -29,39 +29,13 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef DART_MATH_SO3_HPP_
-#define DART_MATH_SO3_HPP_
-
-#include "dart/math/AngleAxis.hpp"
-#include "dart/math/Quaternion.hpp"
-#include "dart/math/SO3Matrix.hpp"
 #include "dart/math/SO3Vector.hpp"
-#include "dart/math/EulerAngles.hpp"
 
 namespace dart {
 namespace math {
 
-//template <typename S> using SO3Matrix     = SO3Matrix<S>;
-//template <typename S> using SO3Vector     = SO3<S, SO3Vector>;
-//template <typename S> using AngleAxis  = AngleAxis<S>;
-//template <typename S> using Quaternion = Quaternion<S>;
-
-//using SO3Matrixf = SO3Matrix<float>;
-//using SO3Matrixd = SO3Matrix<double>;
-
-//using SO3Vectorf = SO3Vector<float>;
-//using SO3Vectord = SO3Vector<double>;
-
-//using AngleAxisf = AngleAxis<float>;
-//using AngleAxisd = AngleAxis<double>;
-
-//using Quaternionf = Quaternion<float>;
-//using Quaterniond = Quaternion<double>;
-
-using SO3f = DefaultSO3Canonical<float>;
-using SO3d = DefaultSO3Canonical<double>;
+template
+class SO3Vector<double>;
 
 } // namespace math
 } // namespace dart
-
-#endif // DART_MATH_SO3_HPP_

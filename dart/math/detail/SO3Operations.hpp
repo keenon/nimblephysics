@@ -44,19 +44,22 @@ template <typename>
 class SO3Base;
 
 template <typename>
-class SO3RotationMatrix;
+class SO3Matrix;
 
 template <typename>
-class SO3RotationVector;
+class SO3Vector;
 
 template <typename>
-class SO3AngleAxis;
+class AngleAxis;
 
 template <typename>
-class SO3Quaternion;
+class Quaternion;
+
+template <typename>
+class EulerAngles;
 
 template <typename S>
-using DefaultSO3Canonical = SO3RotationMatrix<S>;
+using DefaultSO3Canonical = SO3Matrix<S>;
 
 // Forward declarations
 template <typename, typename> class SO3;
@@ -70,7 +73,7 @@ namespace detail {
 
 //==============================================================================
 template <typename S_>
-struct traits<SO3RotationMatrix<S_>>
+struct traits<SO3Matrix<S_>>
 {
   using S = S_;
   using RepData = Eigen::Matrix<S, 3, 3>;
@@ -79,7 +82,7 @@ struct traits<SO3RotationMatrix<S_>>
 
 //==============================================================================
 template <typename S_>
-struct traits<SO3AngleAxis<S_>>
+struct traits<AngleAxis<S_>>
 {
   using S = S_;
   using RepData = Eigen::AngleAxis<S>;
@@ -88,7 +91,7 @@ struct traits<SO3AngleAxis<S_>>
 
 //==============================================================================
 template <typename S_>
-struct traits<SO3Quaternion<S_>>
+struct traits<Quaternion<S_>>
 {
   using S = S_;
   using RepData = Eigen::Quaternion<S>;
@@ -97,7 +100,16 @@ struct traits<SO3Quaternion<S_>>
 
 //==============================================================================
 template <typename S_>
-struct traits<SO3RotationVector<S_>>
+struct traits<SO3Vector<S_>>
+{
+  using S = S_;
+  using RepData = Eigen::Matrix<S, 3, 1>;
+  static constexpr bool IsCoordinates = true;
+};
+
+//==============================================================================
+template <typename S_>
+struct traits<EulerAngles<S_>>
 {
   using S = S_;
   using RepData = Eigen::Matrix<S, 3, 1>;
@@ -254,10 +266,10 @@ struct so3_convert_to_canonical_impl<SO3Canonical, SO3Canonical>
 
 //==============================================================================
 template <typename S>
-struct so3_convert_to_canonical_impl<SO3RotationVector<S>, SO3RotationMatrix<S>>
+struct so3_convert_to_canonical_impl<SO3Vector<S>, SO3Matrix<S>>
 {
-  using RepDataFrom = typename traits<SO3RotationVector<S>>::RepData;
-  using RepDataTo = typename traits<SO3RotationMatrix<S>>::RepData;
+  using RepDataFrom = typename traits<SO3Vector<S>>::RepData;
+  using RepDataTo = typename traits<SO3Matrix<S>>::RepData;
 
   static const RepDataTo run(const RepDataFrom& data)
   {
@@ -310,10 +322,10 @@ struct so3_convert_from_canonical_impl<S, SO3Canonical, SO3Canonical>
 
 //==============================================================================
 template <typename S>
-struct so3_convert_from_canonical_impl<S, SO3RotationVector<S>, SO3RotationMatrix<S>>
+struct so3_convert_from_canonical_impl<S, SO3Vector<S>, SO3Matrix<S>>
 {
-  using RepDataFrom = typename traits<SO3RotationMatrix<S>>::RepData;
-  using RepDataTo = typename traits<SO3RotationVector<S>>::RepData;
+  using RepDataFrom = typename traits<SO3Matrix<S>>::RepData;
+  using RepDataTo = typename traits<SO3Vector<S>>::RepData;
 
   static const RepDataTo run(const RepDataFrom& canonicalData)
   {
@@ -388,10 +400,10 @@ struct so3_convert_impl<S, SO3Type, SO3Type>
 
 //==============================================================================
 template <typename S>
-struct so3_convert_impl<S, SO3RotationVector<S>, SO3AngleAxis<S>>
+struct so3_convert_impl<S, SO3Vector<S>, AngleAxis<S>>
 {
-  using RepDataFrom = typename traits<SO3RotationVector<S>>::RepData;
-  using RepDataTo = typename traits<SO3AngleAxis<S>>::RepData;
+  using RepDataFrom = typename traits<SO3Vector<S>>::RepData;
+  using RepDataTo = typename traits<AngleAxis<S>>::RepData;
 
   static const RepDataTo run(const RepDataFrom& data)
   {
@@ -406,10 +418,10 @@ struct so3_convert_impl<S, SO3RotationVector<S>, SO3AngleAxis<S>>
 
 //==============================================================================
 //template <typename S>
-//struct rep_convert_impl<S, SO3RotationVector, SO3Quaternion>
+//struct rep_convert_impl<S, SO3Vector, Quaternion>
 //{
-//  using RepDataFrom = typename traits<SO3RotationVector<S>>::RepData;
-//  using RepDataTo = typename traits<SO3Quaternion<S>>::RepData;
+//  using RepDataFrom = typename traits<SO3Vector<S>>::RepData;
+//  using RepDataTo = typename traits<Quaternion<S>>::RepData;
 
 //  static const RepDataTo run(const RepDataFrom& data)
 //  {
@@ -419,10 +431,10 @@ struct so3_convert_impl<S, SO3RotationVector<S>, SO3AngleAxis<S>>
 
 //==============================================================================
 template <typename S>
-struct so3_convert_impl<S, SO3AngleAxis<S>, SO3RotationVector<S>>
+struct so3_convert_impl<S, AngleAxis<S>, SO3Vector<S>>
 {
-  using RepDataFrom = typename traits<SO3AngleAxis<S>>::RepData;
-  using RepDataTo = typename traits<SO3RotationVector<S>>::RepData;
+  using RepDataFrom = typename traits<AngleAxis<S>>::RepData;
+  using RepDataTo = typename traits<SO3Vector<S>>::RepData;
 
   static const RepDataTo run(const RepDataFrom& data)
   {
@@ -432,10 +444,10 @@ struct so3_convert_impl<S, SO3AngleAxis<S>, SO3RotationVector<S>>
 
 //==============================================================================
 template <typename S>
-struct so3_convert_impl<S, SO3AngleAxis<S>, SO3Quaternion<S>>
+struct so3_convert_impl<S, AngleAxis<S>, Quaternion<S>>
 {
-  using RepDataFrom = typename traits<SO3AngleAxis<S>>::RepData;
-  using RepDataTo = typename traits<SO3Quaternion<S>>::RepData;
+  using RepDataFrom = typename traits<AngleAxis<S>>::RepData;
+  using RepDataTo = typename traits<Quaternion<S>>::RepData;
 
   static const RepDataTo run(const RepDataFrom& data)
   {
@@ -450,10 +462,10 @@ struct so3_convert_impl<S, SO3AngleAxis<S>, SO3Quaternion<S>>
 
 //==============================================================================
 //template <typename S, typename SO3Canonical>
-//struct rep_convert_impl<S, SO3Quaternion, SO3RotationVector, SO3Canonical>
+//struct rep_convert_impl<S, Quaternion, SO3Vector, SO3Canonical>
 //{
-//  using RepDataFrom = typename traits<SO3Quaternion<S>>::RepData;
-//  using RepDataTo = typename traits<SO3RotationVector<S>>::RepData;
+//  using RepDataFrom = typename traits<Quaternion<S>>::RepData;
+//  using RepDataTo = typename traits<SO3Vector<S>>::RepData;
 
 //  static const RepDataTo run(const RepDataFrom& data)
 //  {
@@ -464,10 +476,10 @@ struct so3_convert_impl<S, SO3AngleAxis<S>, SO3Quaternion<S>>
 
 //==============================================================================
 template <typename S>
-struct so3_convert_impl<S, SO3Quaternion<S>, SO3AngleAxis<S>>
+struct so3_convert_impl<S, Quaternion<S>, AngleAxis<S>>
 {
-  using RepDataFrom = typename traits<SO3Quaternion<S>>::RepData;
-  using RepDataTo = typename traits<SO3AngleAxis<S>>::RepData;
+  using RepDataFrom = typename traits<Quaternion<S>>::RepData;
+  using RepDataTo = typename traits<AngleAxis<S>>::RepData;
 
   static const RepDataTo run(const RepDataFrom& data)
   {
@@ -558,10 +570,10 @@ struct so3_canonical_multiplication_impl
 
 //==============================================================================
 template <typename S>
-struct so3_canonical_multiplication_impl<S, SO3RotationVector<S>>
+struct so3_canonical_multiplication_impl<S, SO3Vector<S>>
 {
   using CanonicalRepData
-      = typename traits<SO3RotationMatrix<S>>::RepData;
+      = typename traits<SO3Matrix<S>>::RepData;
 
   static const CanonicalRepData run(
       const CanonicalRepData& data, const CanonicalRepData& otherData)
@@ -590,10 +602,10 @@ struct so3_canonical_inplace_multiplication_impl
 
 //==============================================================================
 template <typename S>
-struct so3_canonical_inplace_multiplication_impl<S, SO3RotationVector<S>>
+struct so3_canonical_inplace_multiplication_impl<S, SO3Vector<S>>
 {
   using CanonicalRepData
-      = typename traits<SO3RotationVector<S>>::RepData;
+      = typename traits<SO3Vector<S>>::RepData;
 
   static void run(
       CanonicalRepData& data, const CanonicalRepData& otherData)
@@ -639,17 +651,17 @@ struct so3_multiplication_impl
 
 //==============================================================================
 template <typename S>
-struct so3_multiplication_impl<SO3RotationVector<S>, SO3RotationVector<S>>
+struct so3_multiplication_impl<SO3Vector<S>, SO3Vector<S>>
 {
-  using RepData = typename traits<SO3RotationVector<S>>::RepData;
-  using SO3CanonicalRep = SO3Quaternion<S>; // TODO(JS): find best canonical for vec * vec
+  using RepData = typename traits<SO3Vector<S>>::RepData;
+  using SO3CanonicalRep = Quaternion<S>; // TODO(JS): find best canonical for vec * vec
   using CanonicalRepData = typename traits<SO3CanonicalRep>::RepData;
 
   static auto run(const RepData& dataA, const RepData& dataB)
   -> decltype(std::declval<CanonicalRepData>() * std::declval<CanonicalRepData>())
   {
-    return so3_convert_impl<S, SO3RotationVector<S>, SO3CanonicalRep>::run(dataA)
-        * so3_convert_impl<S, SO3RotationVector<S>, SO3CanonicalRep>::run(dataB);
+    return so3_convert_impl<S, SO3Vector<S>, SO3CanonicalRep>::run(dataA)
+        * so3_convert_impl<S, SO3Vector<S>, SO3CanonicalRep>::run(dataB);
     // TODO(JS): improve; super slow
   }
 };
@@ -658,9 +670,9 @@ struct so3_multiplication_impl<SO3RotationVector<S>, SO3RotationVector<S>>
 
 //==============================================================================
 //template <typename S, typename RepB>
-//struct rep_multiplication_impl<S, SO3RotationVector, RepB>
+//struct rep_multiplication_impl<S, SO3Vector, RepB>
 //{
-//  using RepDataTypeA = typename traits<SO3RotationVector<S>>::RepData;
+//  using RepDataTypeA = typename traits<SO3Vector<S>>::RepData;
 //  using RepData = typename traits<SO3B>::RepData;
 
 //  static const auto run(
@@ -673,10 +685,10 @@ struct so3_multiplication_impl<SO3RotationVector<S>, SO3RotationVector<S>>
 
 ////==============================================================================
 //template <typename S, typename RepA>
-//struct rep_multiplication_impl<S, RepA, SO3RotationVector>
+//struct rep_multiplication_impl<S, RepA, SO3Vector>
 //{
 //  using RepDataTypeA = typename traits<SO3A>::RepData;
-//  using RepData = typename traits<SO3RotationVector<S>>::RepData;
+//  using RepData = typename traits<SO3Vector<S>>::RepData;
 
 //  static const auto run(
 //      const RepDataTypeA& dataA, const RepData& dataB)
@@ -859,11 +871,34 @@ struct to_impl<
 {
   using RepData = typename detail::traits<RepFrom>::RepData;
 
+  static RepTo run(const RepData& repData)
+  {
+    return RepTo(detail::so3_operations::so3_convert_impl<S, RepFrom, RepTo>::run(
+          repData));
+  }
+};
+
+//==============================================================================
+// Converting to the raw data type from given raw data type
+template <typename S, typename RepFrom, typename RepTo>
+struct to_impl<
+    S,
+    RepFrom,
+    RepTo,
+    typename std::enable_if<
+        std::is_same<
+            typename detail::traits<SO3Matrix<S>>::RepData,
+            RepTo>::value
+        >::type
+    >
+{
+  using RepData = typename detail::traits<RepFrom>::RepData;
+
   static auto run(const RepData& repData)
-  -> decltype(detail::so3_operations::so3_convert_impl<S, RepFrom, RepTo>::run(
+  -> decltype(detail::so3_operations::so3_convert_impl<S, RepFrom, SO3Matrix<S>>::run(
       std::declval<RepData>()))
   {
-    return detail::so3_operations::so3_convert_impl<S, RepFrom, RepTo>::run(
+    return detail::so3_operations::so3_convert_impl<S, RepFrom, SO3Matrix<S>>::run(
           repData);
   }
 };
@@ -877,7 +912,7 @@ struct to_impl<
     RepTo,
     typename std::enable_if<
         std::is_same<
-            typename detail::traits<SO3RotationMatrix<S>>::RepData,
+            typename detail::traits<SO3Vector<S>>::RepData,
             RepTo>::value
         >::type
     >
@@ -885,10 +920,10 @@ struct to_impl<
   using RepData = typename detail::traits<RepFrom>::RepData;
 
   static auto run(const RepData& repData)
-  -> decltype(detail::so3_operations::so3_convert_impl<S, RepFrom, SO3RotationMatrix<S>>::run(
+  -> decltype(detail::so3_operations::so3_convert_impl<S, RepFrom, SO3Vector<S>>::run(
       std::declval<RepData>()))
   {
-    return detail::so3_operations::so3_convert_impl<S, RepFrom, SO3RotationMatrix<S>>::run(
+    return detail::so3_operations::so3_convert_impl<S, RepFrom, SO3Vector<S>>::run(
           repData);
   }
 };
@@ -902,7 +937,7 @@ struct to_impl<
     RepTo,
     typename std::enable_if<
         std::is_same<
-            typename detail::traits<SO3RotationVector<S>>::RepData,
+            typename detail::traits<AngleAxis<S>>::RepData,
             RepTo>::value
         >::type
     >
@@ -910,35 +945,10 @@ struct to_impl<
   using RepData = typename detail::traits<RepFrom>::RepData;
 
   static auto run(const RepData& repData)
-  -> decltype(detail::so3_operations::so3_convert_impl<S, RepFrom, SO3RotationVector<S>>::run(
+  -> decltype(detail::so3_operations::so3_convert_impl<S, RepFrom, AngleAxis<S>>::run(
       std::declval<RepData>()))
   {
-    return detail::so3_operations::so3_convert_impl<S, RepFrom, SO3RotationVector<S>>::run(
-          repData);
-  }
-};
-
-//==============================================================================
-// Converting to the raw data type from given raw data type
-template <typename S, typename RepFrom, typename RepTo>
-struct to_impl<
-    S,
-    RepFrom,
-    RepTo,
-    typename std::enable_if<
-        std::is_same<
-            typename detail::traits<SO3AngleAxis<S>>::RepData,
-            RepTo>::value
-        >::type
-    >
-{
-  using RepData = typename detail::traits<RepFrom>::RepData;
-
-  static auto run(const RepData& repData)
-  -> decltype(detail::so3_operations::so3_convert_impl<S, RepFrom, SO3AngleAxis<S>>::run(
-      std::declval<RepData>()))
-  {
-    return detail::so3_operations::so3_convert_impl<S, RepFrom, SO3AngleAxis<S>>::run(
+    return detail::so3_operations::so3_convert_impl<S, RepFrom, AngleAxis<S>>::run(
           repData);
   }
 };
@@ -953,7 +963,7 @@ struct to_impl<
     RepTo,
     typename std::enable_if<
         std::is_same<
-            typename detail::traits<SO3Quaternion<S>>::RepData,
+            typename detail::traits<Quaternion<S>>::RepData,
             RepTo>::value
         >::type
     >
@@ -961,10 +971,10 @@ struct to_impl<
   using RepData = typename detail::traits<RepFrom>::RepData;
 
   static auto run(const RepData& repData)
-  -> decltype(detail::so3_operations::so3_convert_impl<S, RepFrom, SO3Quaternion<S>>::run(
+  -> decltype(detail::so3_operations::so3_convert_impl<S, RepFrom, Quaternion<S>>::run(
       std::declval<RepData>()))
   {
-    return detail::so3_operations::so3_convert_impl<S, RepFrom, SO3Quaternion<S>>::run(
+    return detail::so3_operations::so3_convert_impl<S, RepFrom, Quaternion<S>>::run(
           repData);
   }
 };

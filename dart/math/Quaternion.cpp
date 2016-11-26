@@ -29,13 +29,13 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "dart/math/SO3RotationVector.hpp"
+#include "dart/math/Quaternion.hpp"
 
 namespace dart {
 namespace math {
 
 template
-class SO3RotationVector<double>;
+class Quaternion<double>;
 
 } // namespace math
 } // namespace dart

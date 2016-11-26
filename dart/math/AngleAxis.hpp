@@ -29,24 +29,25 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef DART_MATH_SO3TROTATIONVECTOR_HPP_
-#define DART_MATH_SO3TROTATIONVECTOR_HPP_
+#ifndef DART_MATH_SO3AXISANGLE_HPP_
+#define DART_MATH_SO3AXISANGLE_HPP_
 
 #include <Eigen/Eigen>
 
 #include "dart/math/MathTypes.hpp"
 #include "dart/math/Geometry.hpp"
+#include "dart/math/Helpers.hpp"
 #include "dart/math/SO3Base.hpp"
 
 namespace dart {
 namespace math {
 
 template <typename S_>
-class SO3RotationVector : public SO3Base<SO3RotationVector<S_>>
+class AngleAxis : public SO3Base<AngleAxis<S_>>
 {
 public:
 
-  using This = SO3RotationVector<S_>;
+  using This = AngleAxis<S_>;
   using Base = SO3Base<This>;
   using S = typename Base::S;
 
@@ -54,10 +55,11 @@ public:
   using RotationVector = typename Base::RotationVector;
 
   using RepData = typename Base::RepData;
+
   using Tangent = typename Base::Tangent;
   using so3 = typename Base::so3;
 
-  using Base::operator =;
+  //using Base::operator =;
   using Base::operator *;
   using Base::operator *=;
 
@@ -73,26 +75,26 @@ public:
   /// \{ \name Constructors
 
   /// Default constructor. By default, the constructed SO(3) is not identity.
-  SO3RotationVector() : Base()
+  AngleAxis() : Base()
   {
     // Do nothing
   }
 
   /// Copy constructor.
-  SO3RotationVector(const SO3RotationVector& other) : Base(), mRepData(other.mRepData)
+  AngleAxis(const AngleAxis& other) : Base(), mRepData(other.mRepData)
   {
     // Do nothing
   }
 
   /// Move constructor.
-  SO3RotationVector(SO3RotationVector&& other) : mRepData(std::move(other.mRepData))
+  AngleAxis(AngleAxis&& other) : mRepData(std::move(other.mRepData))
   {
     // Do nothing
   }
 
   /// Construct from other SO3 with different representation.
   template <typename Derived>
-  SO3RotationVector(const SO3Base<Derived>& other)
+  AngleAxis(const SO3Base<Derived>& other)
     : Base(),
       mRepData(detail::so3_operations::so3_convert_impl<S, Derived, This>::run(
               other.getRepData()))
@@ -102,7 +104,7 @@ public:
 
   /// Construct from other SO3 with different representation.
   template <typename Derived>
-  SO3RotationVector(SO3Base<Derived>&& other)
+  AngleAxis(SO3Base<Derived>&& other)
     : Base(),
       mRepData(detail::so3_operations::so3_convert_impl<S, Derived, This>::run(
               std::move(other.getRepData())))
@@ -110,20 +112,39 @@ public:
     // Do nothing
   }
 
-  /// Construct from a raw rotation vector where the dimension is 3x1.
-  template <typename Derived>
-  SO3RotationVector(const Eigen::MatrixBase<Derived>& matrix) : Base(), mRepData(matrix)
+  /// Construct from Eigen::AngleAxis.
+  explicit AngleAxis(const Eigen::AngleAxis<S>& angleAxis)
+    : Base(), mRepData(angleAxis)
   {
-    assert(matrix.rows() == 3);
-    assert(matrix.cols() == 1);
+    // Do nothing
   }
 
-  /// Construct from a raw rotation matrix where the dimension is 3x3.
-  template <typename Derived>
-  SO3RotationVector(Eigen::MatrixBase<Derived>&& matrix) : Base(), mRepData(std::move(matrix))
+  /// Construct from Eigen::AngleAxis.
+  explicit AngleAxis(Eigen::AngleAxis<S>&& angleAxis)
+    : Base(), mRepData(std::move(angleAxis))
   {
-    assert(matrix.rows() == 3);
-    assert(matrix.cols() == 1);
+    // Do nothing
+  }
+
+  /// Construct from axis and angle
+  explicit AngleAxis(const RotationVector& axis, S angle)
+    : Base(), mRepData(angle, axis)
+  {
+    // Do nothing
+  }
+
+  /// Construct from axis and angle
+  explicit AngleAxis(RotationVector&& axis, S angle)
+    : Base(), mRepData(std::move(angle), axis)
+  {
+    // Do nothing
+  }
+
+  /// Construct from quaternion
+  template <typename QuatDerived>
+  explicit AngleAxis(const Eigen::QuaternionBase<QuatDerived>& q)
+  {
+    mRepData = q;
   }
 
   /// \} // Constructors
@@ -131,145 +152,135 @@ public:
   /// \{ \name Operators
 
   /// Assign a SO3 with the same representation.
-  SO3RotationVector& operator=(const SO3RotationVector& other)
+  AngleAxis& operator=(const AngleAxis& other)
   {
     mRepData = other.mRepData;
     return *this;
   }
 
   /// Move in a SO3 with the same representation.
-  SO3RotationVector& operator=(SO3RotationVector&& other)
+  AngleAxis& operator=(AngleAxis&& other)
   {
     mRepData = std::move(other.mRepData);
     return *this;
   }
 
-  SO3RotationVector& operator=(const Eigen::AngleAxis<S>& quat)
+  AngleAxis& operator=(const Eigen::AngleAxis<S>& quat)
   {
-    mRepData = detail::so3_operations::so3_convert_impl<S, SO3AngleAxis<S>, SO3RotationVector>::run(quat);
-    // TODO(JS): improve; need a way to deduce representation type from Eigen
-    // data type
+    mRepData = quat;
     return *this;
   }
 
-  SO3RotationVector& operator=(Eigen::AngleAxis<S>&& quat)
+  AngleAxis& operator=(Eigen::AngleAxis<S>&& quat)
   {
-    mRepData = detail::so3_operations::so3_convert_impl<S, SO3AngleAxis<S>, SO3RotationVector>::run(
-          std::move(quat));
-    // TODO(JS): improve; need a way to deduce representation type from Eigen
-    // data type
+    mRepData = std::move(quat);
     return *this;
   }
 
   template <typename QuatDerived>
-  SO3RotationVector& operator=(const Eigen::QuaternionBase<QuatDerived>& quat)
+  AngleAxis& operator=(const Eigen::QuaternionBase<QuatDerived>& quat)
   {
-    mRepData = detail::so3_operations::so3_convert_impl<S, SO3Quaternion<S>, SO3RotationVector>::run(quat);
-    // TODO(JS): improve; need a way to deduce representation type from Eigen
-    // data type
+    mRepData = quat;
     return *this;
   }
 
   template <typename QuatDerived>
-  SO3RotationVector& operator=(Eigen::QuaternionBase<QuatDerived>&& quat)
+  AngleAxis& operator=(Eigen::QuaternionBase<QuatDerived>&& quat)
   {
-    mRepData = detail::so3_operations::so3_convert_impl<
-        S, SO3Quaternion<S>, SO3RotationVector>::run(
-          std::move(quat));
-    // TODO(JS): improve; need a way to deduce representation type from Eigen
-    // data type
+    mRepData = std::move(quat);
     return *this;
   }
 
   template <typename Derived>
-  SO3RotationVector& operator=(const Eigen::MatrixBase<Derived>& matrix)
+  AngleAxis& operator=(const Eigen::MatrixBase<Derived>& matrix)
   {
-    mRepData = detail::so3_operations::so3_convert_impl<
-        S, SO3RotationMatrix<S>, SO3RotationVector>::run(
-          matrix);
+    mRepData = matrix;
     return *this;
   }
-  // TODO(JS): take rotation vector as well using a template struct
 
   template <typename Derived>
-  SO3RotationVector& operator=(Eigen::MatrixBase<Derived>&& matrix)
+  AngleAxis& operator=(Eigen::MatrixBase<Derived>&& matrix)
   {
-    mRepData = detail::so3_operations::so3_convert_impl<
-        S, SO3RotationMatrix<S>, SO3RotationVector>::run(
-          std::move(matrix));
+    mRepData = std::move(matrix);
     return *this;
   }
 
   /// Whether \b exactly equal to a SO3.
-  bool operator ==(const SO3RotationVector& other)
+  bool operator ==(const AngleAxis& other)
   {
-    return mRepData == other.mRepData;
+    if (mRepData.angle() == static_cast<S>(0)
+        && other.getRepData().angle() == static_cast<S>(0))
+      return true;
+
+    return mRepData.isApprox(other.mRepData, static_cast<S>(0));
   }
 
   /// \} // Operators
 
   /// \{ \name Representation properties
 
-  template <typename MatrixDerived>
-  void fromRotationVector(const Eigen::MatrixBase<MatrixDerived>& vector)
+  void setAngleAxis(const RotationVector& axis, S angle)
   {
-    assert(vector.rows() == 3);
-    assert(vector.cols() == 1);
-
-    mRepData = vector;
+    mRepData.axis() = axis;
+    mRepData.angle() = angle;
   }
 
-  template <typename MatrixDerived>
-  void fromRotationVector(Eigen::MatrixBase<MatrixDerived>&& vector)
+  void setAxis(const RotationVector& axis)
   {
-    assert(vector.rows() == 3);
-    assert(vector.cols() == 1);
-
-    mRepData = std::move(vector);
+    mRepData.axis() = axis;
   }
 
-  Eigen::Matrix<S, 3, 1> toRotationVector() const
+  const RotationVector& getAxis() const
   {
-    return mRepData;
+    return mRepData.axis();
   }
 
-  void setRotationVector(const RotationVector& axisAngle)
+  void setAngle(const S angle)
   {
-    mRepData = axisAngle;
+    mRepData.angle() = angle;
   }
 
-  const RotationVector& getRotationVector() const
+  S getAngle() const
   {
-    return mRepData;
+    return mRepData.angle();
   }
 
   void setRandom()
   {
-    mRepData.setRandom();
+    mRepData.axis().setRandom().normalize();
+    mRepData.angle() = math::random(-1.0, 1.0);
+    // TODO(JS): improve
   }
 
   /// \} // Representation properties
 
   /// \{ \name SO3 group operations
 
+//  template <typename OtherDerived>
+//  bool isApprox(const SO3Base<OtherDerived>& other, S tol = 1e-6) const
+//  {
+//    return detail::SO3::group_is_approx_impl<Derived, OtherDerived>::run(
+//          derived(), other.derived(), tol);
+//  }
+
   void setIdentity()
   {
-    mRepData.setZero();
+    mRepData.angle() = static_cast<S>(0);
   }
 
   bool isIdentity()
   {
-    return mRepData == RepData::Zero();
+    return mRepData.angle() == static_cast<S>(0);
   }
 
   void invert()
   {
-    mRepData *= static_cast<S>(-1);
+    mRepData.angle() *= static_cast<S>(-1);
   }
 
-  const SO3RotationVector getInverse() const
+  const AngleAxis getInverse() const
   {
-    return SO3RotationVector(-mRepData);
+    return AngleAxis(RepData(-mRepData.angle(), mRepData.axis()));
   }
 
   /// \} // SO3 group operations
@@ -281,13 +292,13 @@ protected:
   RepData mRepData{RepData()};
 };
 
-using SO3RotationVectorf = SO3RotationVector<float>;
-using SO3RotationVectord = SO3RotationVector<double>;
+using AngleAxisf = AngleAxis<float>;
+using AngleAxisd = AngleAxis<double>;
 
 extern template
-class SO3RotationVector<double>;
+class AngleAxis<double>;
 
 } // namespace math
 } // namespace dart
 
-#endif // DART_MATH_SO3TROTATIONVECTOR_HPP_
+#endif // DART_MATH_SO3AXISANGLE_HPP_

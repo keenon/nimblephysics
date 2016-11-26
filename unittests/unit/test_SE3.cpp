@@ -59,10 +59,10 @@ using namespace dart;
 ////==============================================================================
 //TEST(SE3, SettersAndGetters)
 //{
-//  testSettersAndGetters<SE3<double, SO3RotationMatrix>>();
-//  testSettersAndGetters<SE3<double, SO3RotationVector>>();
-//  testSettersAndGetters<SE3<double, SO3AngleAxis>>();
-//  testSettersAndGetters<SE3<double, SO3Quaternion>>();
+//  testSettersAndGetters<SE3<double, SO3Matrix>>();
+//  testSettersAndGetters<SE3<double, SO3Vector>>();
+//  testSettersAndGetters<SE3<double, AngleAxis>>();
+//  testSettersAndGetters<SE3<double, Quaternion>>();
 //  // EulerAngles
 //}
 
@@ -82,19 +82,19 @@ using namespace dart;
 ////==============================================================================
 //TEST(SE3, GroupOperations)
 //{
-//  testGroupOperations<SE3<double, SO3RotationMatrix>>();
-////  testGroupOperations<SE3<double, SO3RotationVector>>();
-////  testGroupOperations<SE3<double, SO3AngleAxis>>();
-////  testGroupOperations<SE3<double, SO3Quaternion>>();
+//  testGroupOperations<SE3<double, SO3Matrix>>();
+////  testGroupOperations<SE3<double, SO3Vector>>();
+////  testGroupOperations<SE3<double, AngleAxis>>();
+////  testGroupOperations<SE3<double, Quaternion>>();
 //}
 
 ////==============================================================================
 //TEST(SE3, HeterogeneousAssignment)
 //{
-//  SE3<double, SO3RotationMatrix> tf1;
-//  SE3<double, SO3RotationVector> tf2;
-//  SE3<double, SO3AngleAxis> tf3;
-//  SE3<double, SO3Quaternion> tf4;
+//  SE3<double, SO3Matrix> tf1;
+//  SE3<double, SO3Vector> tf2;
+//  SE3<double, AngleAxis> tf3;
+//  SE3<double, Quaternion> tf4;
 
 //  tf1 = tf2;
 //  tf2 = tf3;

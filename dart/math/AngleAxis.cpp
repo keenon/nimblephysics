@@ -29,13 +29,13 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "dart/math/SO3RotationMatrix.hpp"
+#include "dart/math/AngleAxis.hpp"
 
 namespace dart {
 namespace math {
 
 template
-class SO3RotationMatrix<double>;
+class AngleAxis<double>;
 
 } // namespace math
 } // namespace dart

@@ -215,9 +215,7 @@ public:
   // TODO(JS): implement as<OtherDerived>()
 
   auto toRotationMatrix() const
-  -> decltype(detail::so3_operations::so3_convert_impl<
-              S, Derived, SO3RotationMatrix<S>>::run(
-                  std::declval<RepData>()));
+  -> typename detail::traits<SO3Matrix<S>>::RepData;
 
   void fromRotationMatrix(const RotationMatrix& rotMat);
 

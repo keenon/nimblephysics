@@ -39,10 +39,10 @@
 #include "dart/math/MathTypes.hpp"
 #include "dart/math/Geometry.hpp"
 #include "dart/math/SO3Base.hpp"
-#include "dart/math/SO3AngleAxis.hpp"
-#include "dart/math/SO3Quaternion.hpp"
-#include "dart/math/SO3RotationMatrix.hpp"
-#include "dart/math/SO3RotationVector.hpp"
+#include "dart/math/AngleAxis.hpp"
+#include "dart/math/Quaternion.hpp"
+#include "dart/math/SO3Matrix.hpp"
+#include "dart/math/SO3Vector.hpp"
 #include "dart/math/detail/SE3Base.hpp"
 
 namespace dart {
