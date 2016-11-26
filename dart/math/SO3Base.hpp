@@ -58,11 +58,8 @@ public:
   using RotationMatrix = Eigen::Matrix<S, Dim, Dim>;
   using RotationVector = Eigen::Matrix<S, Dim, 1>;
 
-  /// The representation type of this SO(3)
-  using Rep = typename detail::traits<Derived>::Rep;
-
   /// The data type of this SO(3) representation type
-  using RepData = typename detail::traits<SO3<S, Rep>>::RepData;
+  using RepData = typename detail::traits<Derived>::RepData;
 
   /// The data type for the Lie algebra of SO(3) namely so(3)
   using Tangent = Eigen::Matrix<S, Dim, 1>;
@@ -124,8 +121,8 @@ public:
   template <typename OtherDerived>
   auto
   operator*(const SO3Base<OtherDerived>& other) const
-  -> decltype(detail::so3_operations::rep_multiplication_impl<
-      S, Rep, typename OtherDerived::Rep>::run(
+  -> decltype(detail::so3_operations::so3_multiplication_impl<
+      Derived, OtherDerived>::run(
                 std::declval<RepData>(),
                 std::declval<typename OtherDerived::RepData>()));
 
@@ -213,20 +210,21 @@ public:
 
   template <typename RepTo>
   auto to() const
-  -> decltype(detail::to_impl<S, Rep, RepTo>::run(std::declval<RepData>()));
+  -> decltype(detail::to_impl<S, Derived, RepTo>::run(std::declval<RepData>()));
 
   // TODO(JS): implement as<OtherDerived>()
 
   auto toRotationMatrix() const
-  -> decltype(detail::so3_operations::rep_convert_impl<S, Rep, RotationMatrixRep>::run(
-      std::declval<RepData>()));
+  -> decltype(detail::so3_operations::so3_convert_impl<
+              S, Derived, SO3RotationMatrix<S>>::run(
+                  std::declval<RepData>()));
 
   void fromRotationMatrix(const RotationMatrix& rotMat);
 
-  template <typename RepTo>
-  auto getCoordinates() const
-  -> decltype(detail::so3_operations::rep_convert_impl<S, Rep, RepTo>::run(
-      std::declval<RepData>()));
+//  template <typename RepTo>
+//  auto getCoordinates() const
+//  -> decltype(detail::so3_operations::so3_convert_impl<Derived, RepTo>::run(
+//      std::declval<RepData>()));
 
   /// \} // Representation conversions
 
@@ -287,10 +285,10 @@ public:
 };
 
 template <typename S, typename Rep>
-using so3 = typename SO3<S, Rep>::Tangent;
+using so3 = typename Rep::Tangent;
 
-template <typename S, typename Rep = DefaultSO3CanonicalRep>
-class SO3 : public SO3Base<SO3<S, Rep>> {};
+template <typename S, typename Rep = DefaultSO3Canonical<S>>
+class SO3 : public SO3Base<Rep> {};
 
 } // namespace math
 } // namespace dart

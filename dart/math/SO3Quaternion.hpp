@@ -43,19 +43,20 @@
 namespace dart {
 namespace math {
 
-struct QuaternionRep : SO3Representation {};
-
 template <typename S_>
-class SO3<S_, QuaternionRep> : public SO3Base<SO3<S_, QuaternionRep>>
+class SO3Quaternion : public SO3Base<SO3Quaternion<S_>>
 {
 public:
 
-  using This = SO3<S_, QuaternionRep>;
-  using Base = SO3Base<This>;
-  using S = typename Base::S;
-  using Rep = typename Base::Rep;
+  using This = SO3Quaternion;
+  using Base = SO3Base<SO3Quaternion<S_>>;
+  using S = S_;
+
   using RotationMatrix = typename Base::RotationMatrix;
+
   using RepData = typename Base::RepData;
+  // TODO(JS): Rename to Data
+
   using Tangent = typename Base::Tangent;
   using so3 = typename Base::so3;
 
@@ -63,7 +64,7 @@ public:
   using Base::operator *;
   using Base::operator *=;
 
-  using Base::getCoordinates;
+//  using Base::getCoordinates;
   using Base::setRepData;
   using Base::getRepData;
 
@@ -75,26 +76,26 @@ public:
   /// \{ \name Constructors
 
   /// Default constructor. By default, the constructed SO(3) is not identity.
-  SO3() : Base()
+  SO3Quaternion() : Base()
   {
     // Do nothing
   }
 
   /// Copy constructor.
-  SO3(const SO3& other) : Base(), mRepData(other.mRepData)
+  SO3Quaternion(const SO3Quaternion& other) : Base(), mRepData(other.mRepData)
   {
     // Do nothing
   }
 
   /// Move constructor.
-  SO3(SO3&& other) : mRepData(std::move(other.mRepData))
+  SO3Quaternion(SO3Quaternion&& other) : mRepData(std::move(other.mRepData))
   {
     // Do nothing
   }
 
   /// Construct from other SO3 with different representation.
   template <typename Derived>
-  SO3(const SO3Base<Derived>& other)
+  SO3Quaternion(const SO3Base<Derived>& other)
     : Base(),
       mRepData(other.getRepData())
   {
@@ -103,22 +104,22 @@ public:
 
   /// Construct from other SO3 with different representation.
   template <typename Derived>
-  SO3(SO3Base<Derived>&& other)
+  SO3Quaternion(SO3Base<Derived>&& other)
     : Base(),
-      mRepData(detail::so3_operations::rep_convert_impl<S, typename Derived::Rep, Rep>::run(
-              std::move(other.getRepData())))
+      mRepData(detail::so3_operations::so3_convert_impl<
+          S, Derived, This>::run(std::move(other.getRepData())))
   {
     // Do nothing
   }
 
   /// Construct from Eigen::Quaternion.
-  SO3(const Eigen::Quaternion<S>& quat) : Base(), mRepData(quat)
+  SO3Quaternion(const Eigen::Quaternion<S>& quat) : Base(), mRepData(quat)
   {
     // Do nothing
   }
 
   /// Construct from Eigen::Quaternion.
-  SO3(Eigen::Quaternion<S>&& quat) : Base(), mRepData(std::move(quat))
+  SO3Quaternion(Eigen::Quaternion<S>&& quat) : Base(), mRepData(std::move(quat))
   {
     // Do nothing
   }
@@ -130,61 +131,61 @@ public:
   /// \{ \name Operators
 
   /// Assign a SO3 with the same representation.
-  SO3& operator=(const SO3& other)
+  SO3Quaternion& operator=(const SO3Quaternion& other)
   {
     mRepData = other.mRepData;
     return *this;
   }
 
   /// Move in a SO3 with the same representation.
-  SO3& operator=(SO3&& other)
+  SO3Quaternion& operator=(SO3Quaternion&& other)
   {
     mRepData = std::move(other.mRepData);
     return *this;
   }
 
-  SO3& operator=(const Eigen::AngleAxis<S>& quat)
+  SO3Quaternion& operator=(const Eigen::AngleAxis<S>& quat)
   {
     mRepData = quat;
     return *this;
   }
 
-  SO3& operator=(Eigen::AngleAxis<S>&& quat)
+  SO3Quaternion& operator=(Eigen::AngleAxis<S>&& quat)
   {
     mRepData = std::move(quat);
     return *this;
   }
 
   template <typename QuatDerived>
-  SO3& operator=(const Eigen::QuaternionBase<QuatDerived>& quat)
+  SO3Quaternion& operator=(const Eigen::QuaternionBase<QuatDerived>& quat)
   {
     mRepData = quat;
     return *this;
   }
 
   template <typename QuatDerived>
-  SO3& operator=(Eigen::QuaternionBase<QuatDerived>&& quat)
+  SO3Quaternion& operator=(Eigen::QuaternionBase<QuatDerived>&& quat)
   {
     mRepData = std::move(quat);
     return *this;
   }
 
   template <typename Derived>
-  SO3& operator=(const Eigen::MatrixBase<Derived>& matrix)
+  SO3Quaternion& operator=(const Eigen::MatrixBase<Derived>& matrix)
   {
     mRepData = matrix;
     return *this;
   }
 
   template <typename Derived>
-  SO3& operator=(Eigen::MatrixBase<Derived>&& matrix)
+  SO3Quaternion& operator=(Eigen::MatrixBase<Derived>&& matrix)
   {
     mRepData = std::move(matrix);
     return *this;
   }
 
   /// Whether \b exactly equal to a SO3.
-  bool operator ==(const SO3& other)
+  bool operator ==(const SO3Quaternion& other)
   {
     return mRepData.isApprox(other.mRepData, static_cast<S>(0));
   }
@@ -299,9 +300,9 @@ public:
     mRepData = mRepData.conjugate();
   }
 
-  const SO3 getInverse() const
+  const SO3Quaternion getInverse() const
   {
-    return SO3(mRepData.conjugate());
+    return SO3Quaternion(mRepData.conjugate());
   }
 
   /// \} // SO3 group operations
@@ -313,8 +314,11 @@ protected:
   RepData mRepData{RepData()};
 };
 
+using SO3Quaternionf = SO3Quaternion<float>;
+using SO3Quaterniond = SO3Quaternion<double>;
+
 extern template
-class SO3<double, QuaternionRep>;
+class SO3Quaternion<double>;
 
 } // namespace math
 } // namespace dart

@@ -35,7 +35,7 @@ namespace dart {
 namespace math {
 
 template
-class SO3<double, RotationVectorRep>;
+class SO3RotationVector<double>;
 
 } // namespace math
 } // namespace dart

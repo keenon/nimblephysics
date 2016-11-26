@@ -39,7 +39,7 @@
 #include "dart/math/MathTypes.hpp"
 #include "dart/math/Geometry.hpp"
 #include "dart/math/SO3Base.hpp"
-#include "dart/math/SO3AxisAngle.hpp"
+#include "dart/math/SO3AngleAxis.hpp"
 #include "dart/math/SO3Quaternion.hpp"
 #include "dart/math/SO3RotationMatrix.hpp"
 #include "dart/math/SO3RotationVector.hpp"
@@ -50,346 +50,346 @@ namespace math {
 
 //struct SE3Representation {};
 
-template <typename Derived>
-class SE3Base
-{
-public:
+//template <typename Derived>
+//class SE3Base
+//{
+//public:
 
-  static constexpr int Dim = 6;
+//  static constexpr int Dim = 6;
 
-  /// The scalar type of the coefficients
-  using S = typename detail::traits<Derived>::S;
+//  /// The scalar type of the coefficients
+//  using S = typename detail::traits<Derived>::S;
 
-  using RotationMatrix = Eigen::Matrix<S, Dim, Dim>;
-  using Vector = Eigen::Matrix<S, Dim, 1>;
+//  using RotationMatrix = Eigen::Matrix<S, Dim, Dim>;
+//  using Vector = Eigen::Matrix<S, Dim, 1>;
 
-  /// The representation type of this SE(3)
-  using Rep = typename detail::traits<Derived>::Rep;
+//  /// The representation type of this SE(3)
+//  using Rep = typename detail::traits<Derived>::Rep;
 
-  /// The data type for this SE(3) representation type
-  using SO3Type = SO3<S, Rep>;
-  using RotationType = SO3Type;
-  using TranslationType = Eigen::Matrix<S, 3, 1>;
-//  using RepData = typename detail::SE3::traits<SO3<S, Rep>>::RepData;
+//  /// The data type for this SE(3) representation type
+//  using SO3Type = Rep;
+//  using RotationType = SO3Type;
+//  using TranslationType = Eigen::Matrix<S, 3, 1>;
+////  using RepData = typename detail::SE3::traits<Rep>::RepData;
 
-  using SE3Canonical = typename detail::traits<Derived>::SE3Canonical;
+//  using SE3Canonical = typename detail::traits<Derived>::SE3Canonical;
 
-  /// The data type for the lie algebra of SE(3) called SE(3)
-  using Tangent = Eigen::Matrix<S, Dim, 1>;
-  using se3 = Tangent;
+//  /// The data type for the lie algebra of SE(3) called SE(3)
+//  using Tangent = Eigen::Matrix<S, Dim, 1>;
+//  using se3 = Tangent;
 
-  /// Default constructor
-  SE3Base() = default;
+//  /// Default constructor
+//  SE3Base() = default;
 
-  /// Copy constructor
-  SE3Base(const SE3Base&) = default;
+//  /// Copy constructor
+//  SE3Base(const SE3Base&) = default;
 
-  /// A reference to the derived object
-  const Derived& derived() const
-  {
-    return *static_cast<const Derived*>(this);
-  }
-
-  /// A const reference to the derived object
-  Derived& derived()
-  {
-    return *static_cast<Derived*>(this);
-  }
-
-//  /// Set this SE(3) from any kinds of SE(3) types
-//  template <typename OtherDerived>
-//  Derived& operator=(const SE3Base<OtherDerived>& other)
+//  /// A reference to the derived object
+//  const Derived& derived() const
 //  {
-//    detail::SE3::assign_impl<S, Derived, OtherDerived>::run(
-//          derived(), other.derived());
-
-//    return derived();
+//    return *static_cast<const Derived*>(this);
 //  }
 
-//  /// Set this SE(3) from any kinds of SE(3) types
-//  template <typename OtherDerived>
-//  Derived& operator=(SE3Base<OtherDerived>&& other)
+//  /// A const reference to the derived object
+//  Derived& derived()
 //  {
-//    detail::SE3::assign_impl<S, Derived, OtherDerived>::run(
-//          derived(), std::move(other.derived()));
-
-//    return derived();
+//    return *static_cast<Derived*>(this);
 //  }
 
-//  /// Set this SE(3) from the raw representation type
-//  template <typename OtherDerived>
-//  Derived& operator=(const Eigen::MatrixBase<OtherDerived>& mat)
+////  /// Set this SE(3) from any kinds of SE(3) types
+////  template <typename OtherDerived>
+////  Derived& operator=(const SE3Base<OtherDerived>& other)
+////  {
+////    detail::SE3::assign_impl<S, Derived, OtherDerived>::run(
+////          derived(), other.derived());
+
+////    return derived();
+////  }
+
+////  /// Set this SE(3) from any kinds of SE(3) types
+////  template <typename OtherDerived>
+////  Derived& operator=(SE3Base<OtherDerived>&& other)
+////  {
+////    detail::SE3::assign_impl<S, Derived, OtherDerived>::run(
+////          derived(), std::move(other.derived()));
+
+////    return derived();
+////  }
+
+////  /// Set this SE(3) from the raw representation type
+////  template <typename OtherDerived>
+////  Derived& operator=(const Eigen::MatrixBase<OtherDerived>& mat)
+////  {
+////    {
+////      using namespace Eigen;
+////      EIGEN_STATIC_ASSERT_SAME_MATRIX_SIZE(RepData, OtherDerived)
+////    }
+
+////    derived().mRepData = mat;
+
+////    return derived();
+////  }
+
+////  /// Set this SE(3) from the raw representation type
+////  template <typename OtherDerived>
+////  Derived& operator=(Eigen::MatrixBase<OtherDerived>&& matrix)
+////  {
+////    {
+////      using namespace Eigen;
+////      EIGEN_STATIC_ASSERT_SAME_MATRIX_SIZE(RepData, OtherDerived)
+////    }
+
+////    derived().mRepData = std::move(matrix);
+
+////    return derived();
+////  }
+
+////  /// Group multiplication
+////  template <typename OtherDerived>
+////  const Derived operator*(const SE3Base<OtherDerived>& other) const
+////  {
+////    Derived result(derived());
+////    result *= other;
+
+////    return result;
+////  }
+
+////  /// In-place group multiplication
+////  template <typename OtherDerived>
+////  void operator*=(const SE3Base<OtherDerived>& other)
+////  {
+////    detail::SE3::group_inplace_multiplication_impl<Derived, OtherDerived>::run(
+////          derived(), other.derived());
+////  }
+
+////  bool operator ==(const SE3Base& other)
+////  {
+////    return derived() == other.derived();
+////  }
+
+////  template <typename OtherDerived>
+////  bool operator ==(const SE3Base<OtherDerived>& other)
+////  {
+////    return toRotationMatrix() == other.toRotationMatrix();
+////  }
+
+//  void setIdentity()
 //  {
-//    {
-//      using namespace Eigen;
-//      EIGEN_STATIC_ASSERT_SAME_MATRIX_SIZE(RepData, OtherDerived)
-//    }
-
-//    derived().mRepData = mat;
-
-//    return derived();
+//    derived().setIdentity();
 //  }
 
-//  /// Set this SE(3) from the raw representation type
-//  template <typename OtherDerived>
-//  Derived& operator=(Eigen::MatrixBase<OtherDerived>&& matrix)
+//  static Derived Identity()
 //  {
-//    {
-//      using namespace Eigen;
-//      EIGEN_STATIC_ASSERT_SAME_MATRIX_SIZE(RepData, OtherDerived)
-//    }
+//    Derived I;
+//    I.setIdentity();
 
-//    derived().mRepData = std::move(matrix);
-
-//    return derived();
+//    return I;
 //  }
 
-//  /// Group multiplication
-//  template <typename OtherDerived>
-//  const Derived operator*(const SE3Base<OtherDerived>& other) const
+//  bool isIdentity()
 //  {
-//    Derived result(derived());
-//    result *= other;
-
-//    return result;
+//    return derived().getRotation().isIdentity()
+//        && derived().getTranslation() == Eigen::Matrix<S, 3, 1>::Zero();
 //  }
 
-//  /// In-place group multiplication
-//  template <typename OtherDerived>
-//  void operator*=(const SE3Base<OtherDerived>& other)
-//  {
-//    detail::SE3::group_inplace_multiplication_impl<Derived, OtherDerived>::run(
-//          derived(), other.derived());
-//  }
-
-//  bool operator ==(const SE3Base& other)
-//  {
-//    return derived() == other.derived();
-//  }
-
-//  template <typename OtherDerived>
-//  bool operator ==(const SE3Base<OtherDerived>& other)
-//  {
-//    return toRotationMatrix() == other.toRotationMatrix();
-//  }
-
-  void setIdentity()
-  {
-    derived().setIdentity();
-  }
-
-  static Derived Identity()
-  {
-    Derived I;
-    I.setIdentity();
-
-    return I;
-  }
-
-  bool isIdentity()
-  {
-    return derived().getRotation().isIdentity()
-        && derived().getTranslation() == Eigen::Matrix<S, 3, 1>::Zero();
-  }
-
-  void invert()
-  {
-    derived().mRotation.invert();
-    derived().mTranslation = derived().mRotation * -derived().mTranslation;
-  }
-
-  const Derived getInverse() const
-  {
-    RotationType inverse = derived().mRotation.getInverse();
-
-    return Derived(inverse, inverse * -derived().mTranslation);
-  }
-
-  void setRandom()
-  {
-    derived().mRepData.setRandom();
-    // TODO(JS): improve
-  }
-
-  static Derived Random()
-  {
-    Derived R;
-    R.setRandom();
-
-    return R;
-  }
-
-  SO3Type& getRotation()
-  {
-    return derived().mRotation;
-  }
-
-  const SO3Type& getRotation() const
-  {
-    return derived().getRotation();
-  }
-
-  TranslationType& getTranslation()
-  {
-    return derived().mTranslation;
-  }
-
-  const TranslationType& getTranslation() const
-  {
-    return derived().mTranslation;
-  }
-
-  template <typename OtherDerived>
-  bool isApprox(const SE3Base<OtherDerived>& other, S tol = 1e-6) const
-  {
-    return getRotation().isApprox(other.getRotation(), tol)
-        && getTranslation().isApprox(other.getTranslation(), tol);
-  }
-
-//  /// Inverse this SE(3).
 //  void invert()
 //  {
-//    derived().invert();
+//    derived().mRotation.invert();
+//    derived().mTranslation = derived().mRotation * -derived().mTranslation;
 //  }
 
-//  /// Return the inversion of this SE(3). This SE(3) doesn't change itself.
-//  Derived getInverse() const
+//  const Derived getInverse() const
 //  {
-//    return derived().getInverse();
+//    RotationType inverse = derived().mRotation.getInverse();
+
+//    return Derived(inverse, inverse * -derived().mTranslation);
 //  }
 
-//  // TODO(JS): add in-place inversion void inverse()
-
-//  static Derived exp(const SE3& tangent)
+//  void setRandom()
 //  {
-//    return derived().exp(tangent);
+//    derived().mRepData.setRandom();
+//    // TODO(JS): improve
 //  }
 
-//  static SE3 log(const Derived& point)
+//  static Derived Random()
 //  {
-//    return derived().log(point);
+//    Derived R;
+//    R.setRandom();
+
+//    return R;
 //  }
 
-//  static RotationMatrix hat(const Tangent& angleAxis)
+//  SO3Type& getRotation()
 //  {
-//    RotationMatrix res;
-//    res <<  static_cast<S>(0),     -angleAxis(2),      angleAxis(1),
-//                 angleAxis(2), static_cast<S>(0),     -angleAxis(0),
-//                -angleAxis(1),      angleAxis(0), static_cast<S>(0);
-
-//    return res;
+//    return derived().mRotation;
 //  }
 
-//  static Tangent vee(const RotationMatrix& mat)
+//  const SO3Type& getRotation() const
 //  {
-//    // TODO(JS): Add validity check if mat is skew-symmetric for debug mode
-//    return Tangent(mat(2, 1), mat(0, 2), mat(1, 0));
+//    return derived().getRotation();
 //  }
 
-//  RotationMatrix toRotationMatrix() const
+//  TranslationType& getTranslation()
 //  {
-//    // We assume the canonical representation is the rotation matrix
-//    return detail::SE3::rep_convert_to_canonical_impl<S, Rep>::run(
-//          derived().matrix());
+//    return derived().mTranslation;
 //  }
 
-//  void fromRotationMatrix(const RotationMatrix& rotMat)
+//  const TranslationType& getTranslation() const
 //  {
-//    // We assume the canonical representation is the rotation matrix
-//    derived().matrix()
-//        = detail::SE3::rep_convert_from_canonical_impl<S, Rep>::run(rotMat);
+//    return derived().mTranslation;
 //  }
 
-//  ///
-//  template <typename RepTo>
-//  typename detail::SE3::traits<SO3<S, RepTo>>::RepData coordinates() const
+//  template <typename OtherDerived>
+//  bool isApprox(const SE3Base<OtherDerived>& other, S tol = 1e-6) const
 //  {
-//    // TODO(JS): Check if the raw data of RepTo is a vector type.
-
-//    return detail::SE3::rep_convert_impl<S, Rep, RepTo>::run(derived().mRepData);
+//    return getRotation().isApprox(other.getRotation(), tol)
+//        && getTranslation().isApprox(other.getTranslation(), tol);
 //  }
 
-//  /// Return a reference of the raw data of the representation type
-//  RepData& matrix()
-//  {
-//    return derived().mRepData;
-//    // TODO(JS): Note that we return the raw data of the representation type
-//    // rather than rotation matrix here where the matrix size of the raw data
-//    // can be different depending on the representation types.
-//    // Eigen::RotationBase returns rotation matrix to be conform with the
-//    // Eigen::Transform class's naming scheme. I'm not sure whether we should
-//    // follow Eigen's policy since haven't seen any compelling reason to do so.
-//    // I'm open to this issue.
-//  }
+////  /// Inverse this SE(3).
+////  void invert()
+////  {
+////    derived().invert();
+////  }
 
-//  /// Return a const reference of the raw data of the representation type
-//  const RepData& matrix() const
-//  {
-//    return derived().mRepData;
-//  }
+////  /// Return the inversion of this SE(3). This SE(3) doesn't change itself.
+////  Derived getInverse() const
+////  {
+////    return derived().getInverse();
+////  }
 
-//  /// \returns A pointer to the data array of internal data type
-//  S* data()
-//  {
-//    return derived().data();
-//  }
+////  // TODO(JS): add in-place inversion void inverse()
 
-//  /// \returns the number of rows. \sa cols()
-//  std::size_t rows() const
-//  {
-//    return matrix().rows();
-//  }
+////  static Derived exp(const SE3& tangent)
+////  {
+////    return derived().exp(tangent);
+////  }
 
-//  /// \returns the number of columns. \sa rows()
-//  std::size_t cols() const
-//  {
-//    return matrix().cols();
-//  }
+////  static SE3 log(const Derived& point)
+////  {
+////    return derived().log(point);
+////  }
 
-//  /// \returns the number of coefficients, which is rows()*cols().
-//  /// \sa rows(), cols()
-//  std::size_t size() const
-//  {
-//    return rows() * cols();
-//  }
+////  static RotationMatrix hat(const Tangent& angleAxis)
+////  {
+////    RotationMatrix res;
+////    res <<  static_cast<S>(0),     -angleAxis(2),      angleAxis(1),
+////                 angleAxis(2), static_cast<S>(0),     -angleAxis(0),
+////                -angleAxis(1),      angleAxis(0), static_cast<S>(0);
 
-//  Canonical canonical()
-//  {
-//    return canonical(detail::SE3::group_is_canonical<Derived>());
-//  }
+////    return res;
+////  }
 
-//  const Canonical canonical() const
-//  {
-//    return canonical(detail::SE3::group_is_canonical<Derived>());
-//  }
+////  static Tangent vee(const RotationMatrix& mat)
+////  {
+////    // TODO(JS): Add validity check if mat is skew-symmetric for debug mode
+////    return Tangent(mat(2, 1), mat(0, 2), mat(1, 0));
+////  }
 
-//  static constexpr bool isCanonical()
-//  {
-//    return detail::SE3::group_is_canonical<Derived>::value;
-//  }
+////  RotationMatrix toRotationMatrix() const
+////  {
+////    // We assume the canonical representation is the rotation matrix
+////    return detail::SE3::rep_convert_to_canonical_impl<S, Rep>::run(
+////          derived().matrix());
+////  }
 
-private:
+////  void fromRotationMatrix(const RotationMatrix& rotMat)
+////  {
+////    // We assume the canonical representation is the rotation matrix
+////    derived().matrix()
+////        = detail::SE3::rep_convert_from_canonical_impl<S, Rep>::run(rotMat);
+////  }
 
-//  Canonical canonical(std::true_type)
-//  {
-//    return derived();
-//  }
+////  ///
+////  template <typename RepTo>
+////  typename detail::SE3::traits<RepTo>::RepData coordinates() const
+////  {
+////    // TODO(JS): Check if the raw data of RepTo is a vector type.
 
-//  const Canonical canonical(std::true_type) const
-//  {
-//    return derived();
-//  }
+////    return detail::SE3::rep_convert_impl<S, Rep, RepTo>::run(derived().mRepData);
+////  }
 
-//  Canonical canonical(std::false_type)
-//  {
-//    return typename detail::traits<Derived>::Canonical(derived());
-//  }
+////  /// Return a reference of the raw data of the representation type
+////  RepData& matrix()
+////  {
+////    return derived().mRepData;
+////    // TODO(JS): Note that we return the raw data of the representation type
+////    // rather than rotation matrix here where the matrix size of the raw data
+////    // can be different depending on the representation types.
+////    // Eigen::RotationBase returns rotation matrix to be conform with the
+////    // Eigen::Transform class's naming scheme. I'm not sure whether we should
+////    // follow Eigen's policy since haven't seen any compelling reason to do so.
+////    // I'm open to this issue.
+////  }
 
-//  const Canonical canonical(std::false_type) const
-//  {
-//    return typename detail::traits<Derived>::Canonical(derived());
-//  }
-};
+////  /// Return a const reference of the raw data of the representation type
+////  const RepData& matrix() const
+////  {
+////    return derived().mRepData;
+////  }
+
+////  /// \returns A pointer to the data array of internal data type
+////  S* data()
+////  {
+////    return derived().data();
+////  }
+
+////  /// \returns the number of rows. \sa cols()
+////  std::size_t rows() const
+////  {
+////    return matrix().rows();
+////  }
+
+////  /// \returns the number of columns. \sa rows()
+////  std::size_t cols() const
+////  {
+////    return matrix().cols();
+////  }
+
+////  /// \returns the number of coefficients, which is rows()*cols().
+////  /// \sa rows(), cols()
+////  std::size_t size() const
+////  {
+////    return rows() * cols();
+////  }
+
+////  Canonical canonical()
+////  {
+////    return canonical(detail::SE3::group_is_canonical<Derived>());
+////  }
+
+////  const Canonical canonical() const
+////  {
+////    return canonical(detail::SE3::group_is_canonical<Derived>());
+////  }
+
+////  static constexpr bool isCanonical()
+////  {
+////    return detail::SE3::group_is_canonical<Derived>::value;
+////  }
+
+//private:
+
+////  Canonical canonical(std::true_type)
+////  {
+////    return derived();
+////  }
+
+////  const Canonical canonical(std::true_type) const
+////  {
+////    return derived();
+////  }
+
+////  Canonical canonical(std::false_type)
+////  {
+////    return typename detail::traits<Derived>::Canonical(derived());
+////  }
+
+////  const Canonical canonical(std::false_type) const
+////  {
+////    return typename detail::traits<Derived>::Canonical(derived());
+////  }
+//};
 
 } // namespace math
 } // namespace dart

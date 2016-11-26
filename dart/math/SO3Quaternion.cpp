@@ -35,7 +35,7 @@ namespace dart {
 namespace math {
 
 template
-class SO3<double, QuaternionRep>;
+class SO3Quaternion<double>;
 
 } // namespace math
 } // namespace dart

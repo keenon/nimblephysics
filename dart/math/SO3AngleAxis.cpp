@@ -29,13 +29,13 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "dart/math/SO3AxisAngle.hpp"
+#include "dart/math/SO3AngleAxis.hpp"
 
 namespace dart {
 namespace math {
 
 template
-class SO3<double, AxisAngleRep>;
+class SO3AngleAxis<double>;
 
 } // namespace math
 } // namespace dart

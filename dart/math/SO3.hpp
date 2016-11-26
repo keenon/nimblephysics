@@ -32,34 +32,34 @@
 #ifndef DART_MATH_SO3_HPP_
 #define DART_MATH_SO3_HPP_
 
-#include "dart/math/SO3AxisAngle.hpp"
+#include "dart/math/SO3AngleAxis.hpp"
 #include "dart/math/SO3Quaternion.hpp"
 #include "dart/math/SO3RotationMatrix.hpp"
 #include "dart/math/SO3RotationVector.hpp"
-#include "dart/math/SO3AxisAngle.hpp"
+#include "dart/math/SO3AngleAxis.hpp"
 
 namespace dart {
 namespace math {
 
-template <typename S> using SO3Matrix     = SO3<S, RotationMatrixRep>;
-template <typename S> using SO3Vector     = SO3<S, RotationVectorRep>;
-template <typename S> using SO3AxisAngle  = SO3<S, AxisAngleRep>;
-template <typename S> using SO3Quaternion = SO3<S, QuaternionRep>;
+//template <typename S> using SO3Matrix     = SO3RotationMatrix<S>;
+//template <typename S> using SO3Vector     = SO3<S, SO3RotationVector>;
+//template <typename S> using SO3AngleAxis  = SO3AngleAxis<S>;
+//template <typename S> using SO3Quaternion = SO3Quaternion<S>;
 
-using SO3Matrixf = SO3Matrix<float>;
-using SO3Matrixd = SO3Matrix<double>;
+//using SO3Matrixf = SO3Matrix<float>;
+//using SO3Matrixd = SO3Matrix<double>;
 
-using SO3Vectorf = SO3Vector<float>;
-using SO3Vectord = SO3Vector<double>;
+//using SO3Vectorf = SO3Vector<float>;
+//using SO3Vectord = SO3Vector<double>;
 
-using SO3AxisAnglef = SO3AxisAngle<float>;
-using SO3AxisAngled = SO3AxisAngle<double>;
+//using SO3AngleAxisf = SO3AngleAxis<float>;
+//using SO3AngleAxisd = SO3AngleAxis<double>;
 
-using SO3Quaternionf = SO3Quaternion<float>;
-using SO3Quaterniond = SO3Quaternion<double>;
+//using SO3Quaternionf = SO3Quaternion<float>;
+//using SO3Quaterniond = SO3Quaternion<double>;
 
-using SO3f = SO3<float, DefaultSO3CanonicalRep>;
-using SO3d = SO3<double, DefaultSO3CanonicalRep>;
+using SO3f = DefaultSO3Canonical<float>;
+using SO3d = DefaultSO3Canonical<double>;
 
 } // namespace math
 } // namespace dart

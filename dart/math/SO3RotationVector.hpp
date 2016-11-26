@@ -41,17 +41,14 @@
 namespace dart {
 namespace math {
 
-struct RotationVectorRep : SO3Representation {};
-
 template <typename S_>
-class SO3<S_, RotationVectorRep> : public SO3Base<SO3<S_, RotationVectorRep>>
+class SO3RotationVector : public SO3Base<SO3RotationVector<S_>>
 {
 public:
 
-  using This = SO3<S_, RotationVectorRep>;
+  using This = SO3RotationVector<S_>;
   using Base = SO3Base<This>;
   using S = typename Base::S;
-  using Rep = typename Base::Rep;
 
   using RotationMatrix = typename Base::RotationMatrix;
   using RotationVector = typename Base::RotationVector;
@@ -64,7 +61,7 @@ public:
   using Base::operator *;
   using Base::operator *=;
 
-  using Base::getCoordinates;
+//  using Base::getCoordinates;
   using Base::setRepData;
   using Base::getRepData;
 
@@ -76,28 +73,28 @@ public:
   /// \{ \name Constructors
 
   /// Default constructor. By default, the constructed SO(3) is not identity.
-  SO3() : Base()
+  SO3RotationVector() : Base()
   {
     // Do nothing
   }
 
   /// Copy constructor.
-  SO3(const SO3& other) : Base(), mRepData(other.mRepData)
+  SO3RotationVector(const SO3RotationVector& other) : Base(), mRepData(other.mRepData)
   {
     // Do nothing
   }
 
   /// Move constructor.
-  SO3(SO3&& other) : mRepData(std::move(other.mRepData))
+  SO3RotationVector(SO3RotationVector&& other) : mRepData(std::move(other.mRepData))
   {
     // Do nothing
   }
 
   /// Construct from other SO3 with different representation.
   template <typename Derived>
-  SO3(const SO3Base<Derived>& other)
+  SO3RotationVector(const SO3Base<Derived>& other)
     : Base(),
-      mRepData(detail::so3_operations::rep_convert_impl<S, typename Derived::Rep, Rep>::run(
+      mRepData(detail::so3_operations::so3_convert_impl<S, Derived, This>::run(
               other.getRepData()))
   {
     // Do nothing
@@ -105,9 +102,9 @@ public:
 
   /// Construct from other SO3 with different representation.
   template <typename Derived>
-  SO3(SO3Base<Derived>&& other)
+  SO3RotationVector(SO3Base<Derived>&& other)
     : Base(),
-      mRepData(detail::so3_operations::rep_convert_impl<S, typename Derived::Rep, Rep>::run(
+      mRepData(detail::so3_operations::so3_convert_impl<S, Derived, This>::run(
               std::move(other.getRepData())))
   {
     // Do nothing
@@ -115,7 +112,7 @@ public:
 
   /// Construct from a raw rotation vector where the dimension is 3x1.
   template <typename Derived>
-  SO3(const Eigen::MatrixBase<Derived>& matrix) : Base(), mRepData(matrix)
+  SO3RotationVector(const Eigen::MatrixBase<Derived>& matrix) : Base(), mRepData(matrix)
   {
     assert(matrix.rows() == 3);
     assert(matrix.cols() == 1);
@@ -123,7 +120,7 @@ public:
 
   /// Construct from a raw rotation matrix where the dimension is 3x3.
   template <typename Derived>
-  SO3(Eigen::MatrixBase<Derived>&& matrix) : Base(), mRepData(std::move(matrix))
+  SO3RotationVector(Eigen::MatrixBase<Derived>&& matrix) : Base(), mRepData(std::move(matrix))
   {
     assert(matrix.rows() == 3);
     assert(matrix.cols() == 1);
@@ -134,30 +131,30 @@ public:
   /// \{ \name Operators
 
   /// Assign a SO3 with the same representation.
-  SO3& operator=(const SO3& other)
+  SO3RotationVector& operator=(const SO3RotationVector& other)
   {
     mRepData = other.mRepData;
     return *this;
   }
 
   /// Move in a SO3 with the same representation.
-  SO3& operator=(SO3&& other)
+  SO3RotationVector& operator=(SO3RotationVector&& other)
   {
     mRepData = std::move(other.mRepData);
     return *this;
   }
 
-  SO3& operator=(const Eigen::AngleAxis<S>& quat)
+  SO3RotationVector& operator=(const Eigen::AngleAxis<S>& quat)
   {
-    mRepData = detail::so3_operations::rep_convert_impl<S, AxisAngleRep, Rep>::run(quat);
+    mRepData = detail::so3_operations::so3_convert_impl<S, SO3AngleAxis<S>, SO3RotationVector>::run(quat);
     // TODO(JS): improve; need a way to deduce representation type from Eigen
     // data type
     return *this;
   }
 
-  SO3& operator=(Eigen::AngleAxis<S>&& quat)
+  SO3RotationVector& operator=(Eigen::AngleAxis<S>&& quat)
   {
-    mRepData = detail::so3_operations::rep_convert_impl<S, AxisAngleRep, Rep>::run(
+    mRepData = detail::so3_operations::so3_convert_impl<S, SO3AngleAxis<S>, SO3RotationVector>::run(
           std::move(quat));
     // TODO(JS): improve; need a way to deduce representation type from Eigen
     // data type
@@ -165,18 +162,19 @@ public:
   }
 
   template <typename QuatDerived>
-  SO3& operator=(const Eigen::QuaternionBase<QuatDerived>& quat)
+  SO3RotationVector& operator=(const Eigen::QuaternionBase<QuatDerived>& quat)
   {
-    mRepData = detail::so3_operations::rep_convert_impl<S, QuaternionRep, Rep>::run(quat);
+    mRepData = detail::so3_operations::so3_convert_impl<S, SO3Quaternion<S>, SO3RotationVector>::run(quat);
     // TODO(JS): improve; need a way to deduce representation type from Eigen
     // data type
     return *this;
   }
 
   template <typename QuatDerived>
-  SO3& operator=(Eigen::QuaternionBase<QuatDerived>&& quat)
+  SO3RotationVector& operator=(Eigen::QuaternionBase<QuatDerived>&& quat)
   {
-    mRepData = detail::so3_operations::rep_convert_impl<S, QuaternionRep, Rep>::run(
+    mRepData = detail::so3_operations::so3_convert_impl<
+        S, SO3Quaternion<S>, SO3RotationVector>::run(
           std::move(quat));
     // TODO(JS): improve; need a way to deduce representation type from Eigen
     // data type
@@ -184,24 +182,26 @@ public:
   }
 
   template <typename Derived>
-  SO3& operator=(const Eigen::MatrixBase<Derived>& matrix)
+  SO3RotationVector& operator=(const Eigen::MatrixBase<Derived>& matrix)
   {
-    mRepData = detail::so3_operations::rep_convert_impl<S, RotationMatrixRep, Rep>::run(
+    mRepData = detail::so3_operations::so3_convert_impl<
+        S, SO3RotationMatrix<S>, SO3RotationVector>::run(
           matrix);
     return *this;
   }
   // TODO(JS): take rotation vector as well using a template struct
 
   template <typename Derived>
-  SO3& operator=(Eigen::MatrixBase<Derived>&& matrix)
+  SO3RotationVector& operator=(Eigen::MatrixBase<Derived>&& matrix)
   {
-    mRepData = detail::so3_operations::rep_convert_impl<S, RotationMatrixRep, Rep>::run(
+    mRepData = detail::so3_operations::so3_convert_impl<
+        S, SO3RotationMatrix<S>, SO3RotationVector>::run(
           std::move(matrix));
     return *this;
   }
 
   /// Whether \b exactly equal to a SO3.
-  bool operator ==(const SO3& other)
+  bool operator ==(const SO3RotationVector& other)
   {
     return mRepData == other.mRepData;
   }
@@ -267,9 +267,9 @@ public:
     mRepData *= static_cast<S>(-1);
   }
 
-  const SO3 getInverse() const
+  const SO3RotationVector getInverse() const
   {
-    return SO3(-mRepData);
+    return SO3RotationVector(-mRepData);
   }
 
   /// \} // SO3 group operations
@@ -281,8 +281,11 @@ protected:
   RepData mRepData{RepData()};
 };
 
+using SO3RotationVectorf = SO3RotationVector<float>;
+using SO3RotationVectord = SO3RotationVector<double>;
+
 extern template
-class SO3<double, RotationVectorRep>;
+class SO3RotationVector<double>;
 
 } // namespace math
 } // namespace dart

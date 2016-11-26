@@ -41,275 +41,275 @@
 namespace dart {
 namespace math {
 
-//struct RotationMatrixRep : SE3Representation {};
+//struct SO3RotationMatrix : SE3Representation {};
 
-template <typename S_, typename Rep> // TODO(JS): Rename Rep to RotRep
-class SE3 : public SE3Base<SE3<S_, Rep>>
-{
-public:
+//template <typename S_, typename Rep> // TODO(JS): Rename Rep to RotRep
+//class SE3 : public SE3Base<SE3<S_, Rep>>
+//{
+//public:
 
-  enum FromTranslationTag { FromTranslation };
+//  enum FromTranslationTag { FromTranslation };
 
-  using S = S_;
+//  using S = S_;
 
-  using This = SE3<S, Rep>;
-  using Base = SE3Base<This>;
+//  using This = SE3<S, Rep>;
+//  using Base = SE3Base<This>;
 
-  using SO3Type = typename Base::SO3Type;
-  using RotationType = typename Base::RotationType;
-  using TranslationType = typename Base::TranslationType;
+//  using SO3Type = typename Base::SO3Type;
+//  using RotationType = typename Base::RotationType;
+//  using TranslationType = typename Base::TranslationType;
 
-  using Tangent = typename Base::Tangent;
-  using se3 = typename Base::se3;
+//  using Tangent = typename Base::Tangent;
+//  using se3 = typename Base::se3;
 
-  using Base::operator =;
-//  using Base::operator *;
-//  using Base::operator *=;
+//  using Base::operator =;
+////  using Base::operator *;
+////  using Base::operator *=;
 
-  using Base::getRotation;
-  using Base::getTranslation;
-//  using Base::coordinates;
-//  using Base::getRepData;
+//  using Base::getRotation;
+//  using Base::getTranslation;
+////  using Base::coordinates;
+////  using Base::getRepData;
 
-  /// \{ \name Constructors
+//  /// \{ \name Constructors
 
-  /// Default constructor. By default, the constructed SE(3) is not identity.
-  SE3() : Base()
-  {
-    // Do nothing
-  }
-
-  /// Copy constructor.
-  explicit SE3(const SE3& other)
-    : Base(),
-      mRotation(other.mRotation),
-      mTranslation(other.mTranslation)
-  {
-    // Do nothing
-  }
-
-  /// Move constructor.
-  explicit SE3(SE3&& other)
-    : Base(),
-      mRotation(std::move(other.mRotation)),
-      mTranslation(std::move(other.mTranslation))
-  {
-    // Do nothing
-  }
-
-  /// Construct from other SE3 with different SO3 representation.
-  template <typename Derived>
-  SE3(const SE3Base<Derived>& other)
-    : Base(),
-      mRotation(other.derived().getRotation()),
-      mTranslation(other.derived().getTranslation())
-  {
-    // Do nothing
-  }
-
-  /// Construct from other SE3 with different SO3 representation.
-  template <typename Derived>
-  SE3(SE3Base<Derived>&& other)
-    : Base(),
-      mRotation(std::move(other.derived().getRotation())),
-      mTranslation(std::move(other.derived().getTranslation()))
-  {
-    // Do nothing
-  }
-
-  /// Construct from SO3 and translation.
-  SE3(const SO3Type& rotation,
-      const TranslationType& translation = TranslationType::Zero())
-    : Base(),
-      mRotation(rotation),
-      mTranslation(translation)
-  {
-    // Do nothing
-  }
-
-  /// Construct from SO3 and translation.
-  SE3(SO3Type&& rotation,
-      TranslationType&& translation = TranslationType::Zero())
-    : Base(),
-      mRotation(std::move(rotation)),
-      mTranslation(std::move(translation))
-  {
-    // Do nothing
-  }
-
-  /// Construct from translation.
-  ///
-  /// Example:
-  /// \code{.cpp}
-  /// SE3<double>(FromTranslation, Eigen::Vector3d::Random()) tf;
-  /// \endcode
-  SE3(FromTranslationTag, const TranslationType& translation)
-    : Base(),
-      mRotation(SO3Type::Identity()),
-      mTranslation(translation)
-  {
-    // Do nothing
-  }
-
-  /// Construct from translation.
-  SE3(FromTranslationTag, TranslationType&& translation)
-    : Base(),
-      mRotation(std::move(SO3Type::Identity())),
-      mTranslation(std::move(translation))
-  {
-    // Do nothing
-  }
-
-  template <typename Derived>
-  SE3(const Eigen::MatrixBase<Derived>& matrix)
-    : Base(),
-      mRotation(matrix.template topLeftCorner<3,3>()),
-      mTranslation(matrix.template topRightCorner<3,1>())
-  {
-    assert(matrix.rows() == 3);
-    assert(matrix.cols() == 3);
-  }
-
-  /// \} // Constructors
-
-  /// \{ \name Operators
-
-  SE3& operator=(const SE3& other)
-  {
-    mRotation = other.mRotation;
-    mTranslation = other.mTranslation;
-
-    return *this;
-  }
-
-  SE3& operator=(SE3&& other)
-  {
-    mRotation = std::move(other.mRotation);
-    mTranslation = std::move(other.mTranslation);
-
-    return *this;
-  }
-
-  template <typename OtherDerived>
-  SE3& operator=(const SE3Base<OtherDerived>& other)
-  {
-    mRotation = other.derived().getRotation();
-    mTranslation = other.derived().getTranslation();
-
-    return *this;
-  }
-
-  template <typename OtherDerived>
-  SE3& operator=(SE3Base<OtherDerived>&& other)
-  {
-    mRotation = std::move(other.derived().getRotation());
-    mTranslation = std::move(other.derived().getTranslation());
-
-    return *this;
-  }
-
-  bool operator ==(const SE3& other)
-  {
-    return (mRotation == other.mRotation)
-        && (mTranslation == other.mTranslation);
-  }
-
-  /// \} // Operators
-
-  /// \{ \name Representation properties
-
-  void setRotation(const RotationType& rotation)
-  {
-    mRotation = rotation;
-  }
-
-  const RotationType& getRotation() const
-  {
-    return mRotation;
-  }
-
-  void setTranslation(const TranslationType& translation)
-  {
-    mTranslation = translation;
-  }
-
-  const TranslationType& getTranslation() const
-  {
-    return mTranslation;
-  }
-
-  void rotate(const RotationType& /*rotation*/)
-  {
-//    mRotation *= rotation;
-  }
-
-//  void preRotate(const RotationType& rotation)
+//  /// Default constructor. By default, the constructed SE(3) is not identity.
+//  SE3() : Base()
 //  {
-//    mRotation = rotation * mRotation;
+//    // Do nothing
 //  }
 
-  void translate(const TranslationType& translation)
-  {
-    mTranslation += translation;
-  }
-
-  void setRandom()
-  {
-    mRotation.setRandom();
-    mTranslation.setRandom();
-  }
-
-  /// \} // Representation properties
-
-  /// \{ \name SO3 group operations
-
-  void setIdentity()
-  {
-    mRotation.setIdentity();
-    mTranslation.setZero();
-  }
-
-  using Base::isIdentity;
-  using Base::invert;
-  using Base::getInverse;
-
-  /// \} // SO3 group operations
-
-//  static SE3 exp(const SE3& tangent)
+//  /// Copy constructor.
+//  explicit SE3(const SE3& other)
+//    : Base(),
+//      mRotation(other.mRotation),
+//      mTranslation(other.mTranslation)
 //  {
-//    return SE3(expMapRot(tangent));
-//    // TODO(JS): improve
+//    // Do nothing
 //  }
 
-//  static SE3 log(const This& point)
+//  /// Move constructor.
+//  explicit SE3(SE3&& other)
+//    : Base(),
+//      mRotation(std::move(other.mRotation)),
+//      mTranslation(std::move(other.mTranslation))
 //  {
-//    return ::dart::math::logMap(point.mRepData);
-//    // TODO(JS): improve
+//    // Do nothing
 //  }
 
-protected:
+//  /// Construct from other SE3 with different SO3 representation.
+//  template <typename Derived>
+//  SE3(const SE3Base<Derived>& other)
+//    : Base(),
+//      mRotation(other.derived().getRotation()),
+//      mTranslation(other.derived().getTranslation())
+//  {
+//    // Do nothing
+//  }
 
-  template <typename>
-  friend class SE3Base;
+//  /// Construct from other SE3 with different SO3 representation.
+//  template <typename Derived>
+//  SE3(SE3Base<Derived>&& other)
+//    : Base(),
+//      mRotation(std::move(other.derived().getRotation())),
+//      mTranslation(std::move(other.derived().getTranslation()))
+//  {
+//    // Do nothing
+//  }
 
-  SO3<S, Rep> mRotation{SO3<S, Rep>()};
-  Eigen::Matrix<S, 3, 1> mTranslation{Eigen::Matrix<S, 3, 1>()};
-};
+//  /// Construct from SO3 and translation.
+//  SE3(const SO3Type& rotation,
+//      const TranslationType& translation = TranslationType::Zero())
+//    : Base(),
+//      mRotation(rotation),
+//      mTranslation(translation)
+//  {
+//    // Do nothing
+//  }
 
-extern template
-class SE3<double, RotationMatrixRep>;
+//  /// Construct from SO3 and translation.
+//  SE3(SO3Type&& rotation,
+//      TranslationType&& translation = TranslationType::Zero())
+//    : Base(),
+//      mRotation(std::move(rotation)),
+//      mTranslation(std::move(translation))
+//  {
+//    // Do nothing
+//  }
 
-extern template
-class SE3<double, RotationVectorRep>;
+//  /// Construct from translation.
+//  ///
+//  /// Example:
+//  /// \code{.cpp}
+//  /// SE3<double>(FromTranslation, Eigen::Vector3d::Random()) tf;
+//  /// \endcode
+//  SE3(FromTranslationTag, const TranslationType& translation)
+//    : Base(),
+//      mRotation(SO3Type::Identity()),
+//      mTranslation(translation)
+//  {
+//    // Do nothing
+//  }
 
-extern template
-class SE3<double, AxisAngleRep>;
+//  /// Construct from translation.
+//  SE3(FromTranslationTag, TranslationType&& translation)
+//    : Base(),
+//      mRotation(std::move(SO3Type::Identity())),
+//      mTranslation(std::move(translation))
+//  {
+//    // Do nothing
+//  }
 
-extern template
-class SE3<double, QuaternionRep>;
+//  template <typename Derived>
+//  SE3(const Eigen::MatrixBase<Derived>& matrix)
+//    : Base(),
+//      mRotation(matrix.template topLeftCorner<3,3>()),
+//      mTranslation(matrix.template topRightCorner<3,1>())
+//  {
+//    assert(matrix.rows() == 3);
+//    assert(matrix.cols() == 3);
+//  }
 
-using SE3f = SE3<float, RotationMatrixRep>;
-using SE3d = SE3<double, RotationMatrixRep>;
+//  /// \} // Constructors
+
+//  /// \{ \name Operators
+
+//  SE3& operator=(const SE3& other)
+//  {
+//    mRotation = other.mRotation;
+//    mTranslation = other.mTranslation;
+
+//    return *this;
+//  }
+
+//  SE3& operator=(SE3&& other)
+//  {
+//    mRotation = std::move(other.mRotation);
+//    mTranslation = std::move(other.mTranslation);
+
+//    return *this;
+//  }
+
+//  template <typename OtherDerived>
+//  SE3& operator=(const SE3Base<OtherDerived>& other)
+//  {
+//    mRotation = other.derived().getRotation();
+//    mTranslation = other.derived().getTranslation();
+
+//    return *this;
+//  }
+
+//  template <typename OtherDerived>
+//  SE3& operator=(SE3Base<OtherDerived>&& other)
+//  {
+//    mRotation = std::move(other.derived().getRotation());
+//    mTranslation = std::move(other.derived().getTranslation());
+
+//    return *this;
+//  }
+
+//  bool operator ==(const SE3& other)
+//  {
+//    return (mRotation == other.mRotation)
+//        && (mTranslation == other.mTranslation);
+//  }
+
+//  /// \} // Operators
+
+//  /// \{ \name Representation properties
+
+//  void setRotation(const RotationType& rotation)
+//  {
+//    mRotation = rotation;
+//  }
+
+//  const RotationType& getRotation() const
+//  {
+//    return mRotation;
+//  }
+
+//  void setTranslation(const TranslationType& translation)
+//  {
+//    mTranslation = translation;
+//  }
+
+//  const TranslationType& getTranslation() const
+//  {
+//    return mTranslation;
+//  }
+
+//  void rotate(const RotationType& /*rotation*/)
+//  {
+////    mRotation *= rotation;
+//  }
+
+////  void preRotate(const RotationType& rotation)
+////  {
+////    mRotation = rotation * mRotation;
+////  }
+
+//  void translate(const TranslationType& translation)
+//  {
+//    mTranslation += translation;
+//  }
+
+//  void setRandom()
+//  {
+//    mRotation.setRandom();
+//    mTranslation.setRandom();
+//  }
+
+//  /// \} // Representation properties
+
+//  /// \{ \name SO3 group operations
+
+//  void setIdentity()
+//  {
+//    mRotation.setIdentity();
+//    mTranslation.setZero();
+//  }
+
+//  using Base::isIdentity;
+//  using Base::invert;
+//  using Base::getInverse;
+
+//  /// \} // SO3 group operations
+
+////  static SE3 exp(const SE3& tangent)
+////  {
+////    return SE3(expMapRot(tangent));
+////    // TODO(JS): improve
+////  }
+
+////  static SE3 log(const This& point)
+////  {
+////    return ::dart::math::logMap(point.mRepData);
+////    // TODO(JS): improve
+////  }
+
+//protected:
+
+//  template <typename>
+//  friend class SE3Base;
+
+//  Rep mRotation{Rep()};
+//  Eigen::Matrix<S, 3, 1> mTranslation{Eigen::Matrix<S, 3, 1>()};
+//};
+
+//extern template
+//class SE3<double, SO3RotationMatrix<double>>;
+
+//extern template
+//class SE3<double, SO3RotationVector<double>>;
+
+//extern template
+//class SE3<double, SO3AngleAxis<double>>;
+
+//extern template
+//class SE3<double, SO3Quaternion<double>>;
+
+//using SE3f = SE3<float, SO3RotationMatrix<double>>;
+//using SE3d = SE3<double, SO3RotationMatrix<double>>;
 
 } // namespace math
 } // namespace dart

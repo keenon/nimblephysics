@@ -114,14 +114,13 @@ template <typename Derived>
 template <typename OtherDerived>
 auto
 SO3Base<Derived>::operator*(const SO3Base<OtherDerived>& other) const
--> decltype(detail::so3_operations::rep_multiplication_impl<
-    S, Rep, typename OtherDerived::Rep>::run(
+-> decltype(detail::so3_operations::so3_multiplication_impl<
+    Derived, OtherDerived>::run(
               std::declval<RepData>(),
               std::declval<typename OtherDerived::RepData>()))
 {
-  return detail::so3_operations::rep_multiplication_impl<
-      S, Rep, typename OtherDerived::Rep>::run(
-        getRepData(), other.getRepData());
+  return detail::so3_operations::so3_multiplication_impl<
+      Derived, OtherDerived>::run(getRepData(), other.getRepData());
 }
 
 //==============================================================================
@@ -227,9 +226,9 @@ bool SO3Base<Derived>::isApprox(const SO3Base<OtherDerived>& other, S tol) const
 template <typename Derived>
 bool SO3Base<Derived>::isApprox(const Eigen::AngleAxis<S>& aa, S tol) const
 {
-  return detail::so3_operations::rep_is_approx_impl<S, Rep, AxisAngleRep>::run(
+  return detail::so3_operations::so3_is_approx_impl<S, Derived, SO3AngleAxis<S>>::run(
         getRepData(), aa, tol);
-  // TODO(JS): improve; Eigen::AngleAxis and AxisAngleRep are in weak
+  // TODO(JS): improve; Eigen::AngleAxis and SO3AngleAxis are in weak
   // connection..
 }
 
@@ -238,9 +237,9 @@ template <typename Derived>
 template <typename QuatDerived>
 bool SO3Base<Derived>::isApprox(const Eigen::QuaternionBase<QuatDerived>& quat, S tol) const
 {
-  return detail::so3_operations::rep_is_approx_impl<S, Rep, QuaternionRep>::run(
+  return detail::so3_operations::so3_is_approx_impl<S, Derived, SO3Quaternion<S>>::run(
         getRepData(), quat, tol);
-  // TODO(JS): improve; Eigen::QuaternionBase and QuaternionRep are in weak
+  // TODO(JS): improve; Eigen::QuaternionBase and SO3Quaternion are in weak
   // connection..
 }
 
@@ -250,9 +249,9 @@ template <typename MatrixDerived>
 bool SO3Base<Derived>::isApprox(const Eigen::MatrixBase<MatrixDerived>& matrix, S tol) const
 {
   // We assume matrix is 3x3 rotation matrix
-  return detail::so3_operations::rep_is_approx_impl<S, Rep, RotationMatrixRep>::run(
+  return detail::so3_operations::so3_is_approx_impl<S, Derived, SO3RotationMatrix<S>>::run(
         getRepData(), matrix, tol);
-  // TODO(JS): improve; Eigen::QuaternionBase and QuaternionRep are in weak
+  // TODO(JS): improve; Eigen::QuaternionBase and SO3Quaternion are in weak
   // connection..
 }
 
@@ -261,7 +260,7 @@ template <typename Derived>
 Derived SO3Base<Derived>::Exp(const so3& tangent)
 {
   return Derived(
-        detail::so3_operations::rep_convert_impl<S, RotationVectorRep, Rep>::run(
+        detail::so3_operations::so3_convert_impl<S, SO3RotationVector<S>, Derived>::run(
           tangent));
 }
 
@@ -270,7 +269,7 @@ template <typename Derived>
 Derived SO3Base<Derived>::Exp(so3&& tangent)
 {
   return Derived(
-        detail::so3_operations::rep_convert_impl<S, RotationVectorRep, Rep>::run(
+        detail::so3_operations::so3_convert_impl<S, SO3RotationVector<S>, Derived>::run(
           std::move(tangent)));
 }
 
@@ -292,7 +291,7 @@ void SO3Base<Derived>::setExp(so3&& tangent)
 template <typename Derived>
 typename SO3Base<Derived>::so3 SO3Base<Derived>::Log(const Derived& point)
 {
-  return detail::so3_operations::rep_convert_impl<S, Rep, RotationVectorRep>::run(
+  return detail::so3_operations::so3_convert_impl<S, Derived, SO3RotationVector<S>>::run(
         point.getRepData());
 }
 
@@ -300,7 +299,7 @@ typename SO3Base<Derived>::so3 SO3Base<Derived>::Log(const Derived& point)
 template <typename Derived>
 typename SO3Base<Derived>::so3 SO3Base<Derived>::Log(Derived&& point)
 {
-  return detail::so3_operations::rep_convert_impl<S, Rep, RotationVectorRep>::run(
+  return detail::so3_operations::so3_convert_impl<S, Derived, SO3RotationVector<S>>::run(
         std::move(point.getRepData()));
 }
 
@@ -335,21 +334,22 @@ typename SO3Base<Derived>::Tangent SO3Base<Derived>::Vee(const RotationMatrix& m
 template <typename Derived>
 template <typename RepTo>
 auto SO3Base<Derived>::to() const
--> decltype(detail::to_impl<S, Rep, RepTo>::run(std::declval<RepData>()))
+-> decltype(detail::to_impl<S, Derived, RepTo>::run(std::declval<RepData>()))
 {
-  return detail::to_impl<S, Rep, RepTo>::run(getRepData());
+  return detail::to_impl<S, Derived, RepTo>::run(getRepData());
 }
 
 //==============================================================================
 template <typename Derived>
 auto SO3Base<Derived>::toRotationMatrix() const
--> decltype(detail::so3_operations::rep_convert_impl<S, Rep, RotationMatrixRep>::run(
+-> decltype(detail::so3_operations::so3_convert_impl<
+            S, Derived, SO3RotationMatrix<S>>::run(
     std::declval<RepData>()))
 {
   // The return type could be either of const and const reference depending on
   // the Derived type. So the trailing return type deduction is used here.
 
-  return to<RotationMatrixRep>();
+  return to<SO3RotationMatrix<S>>();
 }
 
 //==============================================================================
@@ -358,23 +358,23 @@ void SO3Base<Derived>::fromRotationMatrix(const RotationMatrix& rotMat)
 {
   // We assume the canonical representation is the rotation matrix
   setRepData(
-        detail::so3_operations::rep_convert_from_canonical_impl<S, Rep>::run(rotMat));
+        detail::so3_operations::so3_convert_from_canonical_impl<S, Derived>::run(rotMat));
 }
 
 //==============================================================================
-template <typename Derived>
-template <typename RepTo>
-auto SO3Base<Derived>::getCoordinates() const
--> decltype(detail::so3_operations::rep_convert_impl<S, Rep, RepTo>::run(
-    std::declval<RepData>()))
-{
-  // TODO(JS): Change return type to Eigen::Matrix<S, Dim, 1> or
-  // check if the raw data of RepTo is a vector type.
-  static_assert(detail::traits<SO3<S, RepTo>>::IsCoordinates,
-                "Attempting to get invalid coordinate type.");
+//template <typename Derived>
+//template <typename RepTo>
+//auto SO3Base<Derived>::getCoordinates() const
+//-> decltype(detail::so3_operations::so3_convert_impl<S, Derived, RepTo>::run(
+//    std::declval<RepData>()))
+//{
+//  // TODO(JS): Change return type to Eigen::Matrix<S, Dim, 1> or
+//  // check if the raw data of RepTo is a vector type.
+//  static_assert(detail::traits<RepTo>::IsCoordinates,
+//                "Attempting to get invalid coordinate type.");
 
-  return to<RepTo>();
-}
+//  return to<RepTo>();
+//}
 
 //==============================================================================
 template <typename Derived>

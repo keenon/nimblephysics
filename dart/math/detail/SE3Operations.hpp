@@ -50,13 +50,13 @@ namespace detail {
 //==============================================================================
 
 //==============================================================================
-template <typename S_, typename SO3CanonicalRep>
-struct traits<SE3<S_, SO3CanonicalRep>>
+template <typename S_, typename SO3Canonical>
+struct traits<SE3<S_, SO3Canonical>>
 {
   using S = S_;
-  using Rep = SO3CanonicalRep;
+  using Rep = SO3Canonical;
 
-  using SE3Canonical = SE3<S, SO3CanonicalRep>;
+  using SE3Canonical = SE3<S, SO3Canonical>;
 };
 
 namespace SE3 {
@@ -72,38 +72,38 @@ struct rep_traits;
 
 //==============================================================================
 template <typename S_>
-struct rep_traits<S_, RotationMatrixRep>
+struct rep_traits<S_, SO3RotationMatrix<S_>>
 {
   using S = S_;
-  using Rep = RotationMatrixRep;
+//  using Rep = SO3RotationMatrix;
   using RepData = Eigen::Matrix<S, 3, 3>;
 };
 
 //==============================================================================
 template <typename S_>
-struct rep_traits<S_, AxisAngleRep>
+struct rep_traits<S_, SO3AngleAxis<S_>>
 {
   using S = S_;
-  using Rep = AxisAngleRep;
+//  using Rep = SO3AngleAxis;
   using RepData = Eigen::Matrix<S, 3, 1>;
   // TODO(JS): Change to Eigen::AngleAxis<S>
 };
 
 //==============================================================================
 template <typename S_>
-struct rep_traits<S_, QuaternionRep>
+struct rep_traits<S_, SO3Quaternion<S_>>
 {
   using S = S_;
-  using Rep = QuaternionRep;
+//  using Rep = SO3Quaternion;
   using RepData = Eigen::Quaternion<S>;
 };
 
 //==============================================================================
 template <typename S_>
-struct rep_traits<S_, RotationVectorRep>
+struct rep_traits<S_, SO3RotationVector<S_>>
 {
   using S = S_;
-  using Rep = QuaternionRep;
+//  using Rep = SO3Quaternion;
   using RepData = Eigen::Matrix<S, 3, 1>;
 };
 

@@ -41,20 +41,20 @@
 namespace dart {
 namespace math {
 
-template <int foo>
-struct SO3Coordinates
-{
+//template <int foo>
+//struct SO3Coordinates
+//{
 
-};
+//};
 
-template <typename SO3Rep_, bool AngularFirst_ = true>
-struct SE3Coordinates
-{
-  using SO3Rep = SO3Rep_;
-  static constexpr bool AngularFirst = AngularFirst_;
-};
+//template <typename SO3Rep_, bool AngularFirst_ = true>
+//struct SE3Coordinates
+//{
+//  using SO3Rep = SO3Rep_;
+//  static constexpr bool AngularFirst = AngularFirst_;
+//};
 
-using Twist = SE3Coordinates<RotationMatrixRep, true>;
+//using Twist = SE3Coordinates<SO3RotationMatrix, true>;
 
 } // namespace math
 } // namespace dart
