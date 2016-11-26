@@ -38,7 +38,7 @@
 
 #include "dart/math/MathTypes.hpp"
 #include "dart/math/Geometry.hpp"
-#include "dart/math/detail/SO3Base.hpp"
+#include "dart/math/detail/SO3Operations.hpp"
 
 namespace dart {
 namespace math {
@@ -61,10 +61,8 @@ public:
   /// The representation type of this SO(3)
   using Rep = typename detail::traits<Derived>::Rep;
 
-  /// The data type for this SO(3) representation type
+  /// The data type of this SO(3) representation type
   using RepData = typename detail::traits<SO3<S, Rep>>::RepData;
-
-  //using SO3Canonical = typename detail::traits<Derived>::SO3Canonical;
 
   /// The data type for the Lie algebra of SO(3) namely so(3)
   using Tangent = Eigen::Matrix<S, Dim, 1>;
@@ -126,7 +124,7 @@ public:
   template <typename OtherDerived>
   auto
   operator*(const SO3Base<OtherDerived>& other) const
-  -> decltype(detail::SO3_::rep_multiplication_impl<
+  -> decltype(detail::so3_operations::rep_multiplication_impl<
       S, Rep, typename OtherDerived::Rep>::run(
                 std::declval<RepData>(),
                 std::declval<typename OtherDerived::RepData>()));
@@ -215,18 +213,19 @@ public:
 
   template <typename RepTo>
   auto to() const
-  -> decltype(detail::SO3_::rep_convert_impl<S, Rep, RepTo>::run(
-      std::declval<RepData>()));
+  -> decltype(detail::to_impl<S, Rep, RepTo>::run(std::declval<RepData>()));
+
+  // TODO(JS): implement as<OtherDerived>()
 
   auto toRotationMatrix() const
-  -> decltype(detail::SO3_::rep_convert_impl<S, Rep, RotationMatrixRep>::run(
+  -> decltype(detail::so3_operations::rep_convert_impl<S, Rep, RotationMatrixRep>::run(
       std::declval<RepData>()));
 
   void fromRotationMatrix(const RotationMatrix& rotMat);
 
   template <typename RepTo>
   auto getCoordinates() const
-  -> decltype(detail::SO3_::rep_convert_impl<S, Rep, RepTo>::run(
+  -> decltype(detail::so3_operations::rep_convert_impl<S, Rep, RepTo>::run(
       std::declval<RepData>()));
 
   /// \} // Representation conversions
@@ -243,6 +242,9 @@ public:
 
   /// Return a const reference of the raw data of the representation type
   const RepData& getRepData() const;
+
+  /// Return a reference of the raw data of the representation type
+  RepData& getRepData();
 
   /// \}
 

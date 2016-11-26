@@ -105,7 +105,7 @@ public:
   template <typename Derived>
   SO3(SO3Base<Derived>&& other)
     : Base(),
-      mRepData(detail::SO3_::rep_convert_impl<S, typename Derived::Rep, Rep>::run(
+      mRepData(detail::so3_operations::rep_convert_impl<S, typename Derived::Rep, Rep>::run(
               std::move(other.getRepData())))
   {
     // Do nothing
