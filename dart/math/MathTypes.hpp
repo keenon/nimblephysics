@@ -140,7 +140,7 @@ namespace math {
 
 namespace detail {
 
-template <typename T> struct traits;
+template <typename T> struct Traits;
 
 } // namespace detial
 

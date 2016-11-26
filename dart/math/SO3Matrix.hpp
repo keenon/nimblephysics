@@ -71,176 +71,93 @@ public:
   using Base::Log;
   using Base::getLog;
 
+  //----------------------------------------------------------------------------
   /// \{ \name Constructors
+  //----------------------------------------------------------------------------
 
   /// Default constructor. By default, the constructed SO(3) is not identity.
-  SO3Matrix() : Base()
-  {
-    // Do nothing
-  }
+  SO3Matrix();
 
   /// Copy constructor.
-  SO3Matrix(const SO3Matrix& other) : Base(), mRepData(other.mRepData)
-  {
-    // Do nothing
-  }
+  SO3Matrix(const SO3Matrix& other);
 
   /// Move constructor.
-  SO3Matrix(SO3Matrix&& other) : Base(), mRepData(std::move(other.mRepData))
-  {
-    // Do nothing
-  }
+  SO3Matrix(SO3Matrix&& other);
 
   /// Construct from other SO3 with different representation.
   template <typename Derived>
-  SO3Matrix(const SO3Base<Derived>& other)
-    : Base(),
-      mRepData(
-        detail::so3_operations::so3_convert_impl<S, Derived, This>::run(
-          other.getRepData()))
-  {
-    // Do nothing
-  }
+  SO3Matrix(const SO3Base<Derived>& other);
 
   /// Construct from other SO3 with different representation.
   template <typename Derived>
-  SO3Matrix(SO3Base<Derived>&& other)
-    : Base(),
-      mRepData(detail::so3_operations::so3_convert_impl<S, Derived, This>::run(
-              std::move(other.getRepData())))
-  {
-    // Do nothing
-  }
+  SO3Matrix(SO3Base<Derived>&& other);
 
   /// Construct from a raw rotation matrix where the dimension is 3x3.
   template <typename Derived>
-  SO3Matrix(const Eigen::MatrixBase<Derived>& matrix) : Base(), mRepData(matrix)
-  {
-    assert(matrix.rows() == 3);
-    assert(matrix.cols() == 3);
-  }
+  SO3Matrix(const Eigen::MatrixBase<Derived>& matrix);
 
   /// Construct from a raw rotation matrix where the dimension is 3x3.
   template <typename Derived>
-  SO3Matrix(Eigen::MatrixBase<Derived>&& matrix) : Base(), mRepData(std::move(matrix))
-  {
-    assert(matrix.rows() == 3);
-    assert(matrix.cols() == 3);
-  }
+  SO3Matrix(Eigen::MatrixBase<Derived>&& matrix);
 
   /// \} // Constructors
 
+  //----------------------------------------------------------------------------
   /// \{ \name Operators
+  //----------------------------------------------------------------------------
 
   /// Assign a SO3 with the same representation.
-  SO3Matrix& operator=(const SO3Matrix& other)
-  {
-    mRepData = other.mRepData;
-    return *this;
-  }
+  SO3Matrix& operator=(const SO3Matrix& other);
 
   /// Move in a SO3 with the same representation.
-  SO3Matrix& operator=(SO3Matrix&& other)
-  {
-    mRepData = std::move(other.mRepData);
-    return *this;
-  }
+  SO3Matrix& operator=(SO3Matrix&& other);
 
   template <typename Derived>
-  SO3Matrix& operator=(const Eigen::MatrixBase<Derived>& matrix)
-  {
-    mRepData = matrix;
-    return *this;
-  }
+  SO3Matrix& operator=(const Eigen::MatrixBase<Derived>& matrix);
 
   template <typename Derived>
-  SO3Matrix& operator=(Eigen::MatrixBase<Derived>&& matrix)
-  {
-    mRepData = std::move(matrix);
-    return *this;
-  }
+  SO3Matrix& operator=(Eigen::MatrixBase<Derived>&& matrix);
 
   template <typename RotationDerived>
-  SO3Matrix& operator=(const Eigen::RotationBase<RotationDerived, Base::Dim>& rot)
-  {
-    mRepData = rot;
-    return *this;
-  }
+  SO3Matrix& operator=(const Eigen::RotationBase<RotationDerived, Base::Dim>& rot);
 
   template <typename RotationDerived>
-  SO3Matrix& operator=(Eigen::RotationBase<RotationDerived, Base::Dim>&& rot)
-  {
-    mRepData = std::move(rot);
-    return *this;
-  }
+  SO3Matrix& operator=(Eigen::RotationBase<RotationDerived, Base::Dim>&& rot);
 
-  const RotationVector operator*(const RotationVector& vector)
-  {
-    return mRepData * vector;
-  }
+  const RotationVector operator*(const RotationVector& vector);
 
   /// Whether \b exactly equal to a SO3.
-  bool operator ==(const SO3Matrix& other)
-  {
-    return mRepData == other.mRepData;
-  }
+  bool operator ==(const SO3Matrix& other);
 
   /// \} // Operators
 
+  //----------------------------------------------------------------------------
   /// \{ \name Representation properties
+  //----------------------------------------------------------------------------
 
   template <typename Derived>
-  void setRotationMatrix(const Eigen::MatrixBase<Derived>& matrix)
-  {
-    assert(matrix.rows() == 3);
-    assert(matrix.cols() == 3);
-
-    mRepData = matrix;
-  }
+  void setRotationMatrix(const Eigen::MatrixBase<Derived>& matrix);
 
   template <typename Derived>
-  void setRotationMatrix(Eigen::MatrixBase<Derived>&& mat)
-  {
-    assert(mat.rows() == 3);
-    assert(mat.cols() == 3);
+  void setRotationMatrix(Eigen::MatrixBase<Derived>&& mat);
 
-    mRepData = std::move(mat);
-  }
+  const RotationMatrix& getRotationMatrix() const;
 
-  const RotationMatrix& getRotationMatrix() const
-  {
-    return mRepData;
-  }
-
-  void setRandom()
-  {
-    *this = Exp(Tangent::Random());
-    // TODO(JS): improve
-  }
+  void setRandom();
 
   /// \} // Representation properties
 
+  //----------------------------------------------------------------------------
   /// \{ \name SO3 group operations
+  //----------------------------------------------------------------------------
 
-  void setIdentity()
-  {
-    mRepData.setIdentity();
-  }
+  void setIdentity();
 
-  bool isIdentity()
-  {
-    return mRepData == RepData::Identity();
-  }
+  bool isIdentity();
 
-  void invert()
-  {
-    mRepData.transposeInPlace();
-  }
+  void invert();
 
-  const SO3Matrix getInverse() const
-  {
-    return SO3Matrix(mRepData.transpose());
-  }
+  const SO3Matrix getInverse() const;
 
   /// \} // SO3 group operations
 
@@ -260,5 +177,7 @@ class SO3Matrix<double>;
 
 } // namespace math
 } // namespace dart
+
+#include "dart/math/detail/SO3Matrix-impl.hpp"
 
 #endif // DART_MATH_SO3ROTATIONMATRIX_HPP_

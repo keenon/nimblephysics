@@ -51,7 +51,7 @@ namespace detail {
 
 //==============================================================================
 template <typename S_, typename SO3Canonical>
-struct traits<SE3<S_, SO3Canonical>>
+struct Traits<SE3<S_, SO3Canonical>>
 {
   using S = S_;
   using Rep = SO3Canonical;

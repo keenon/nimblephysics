@@ -43,13 +43,13 @@
 namespace dart {
 namespace math {
 
-template <typename S_>
-class EulerAngles : public SO3Base<EulerAngles<S_>>
+template <typename S_, int index0, int index1, int index2>
+class EulerAngles : public SO3Base<EulerAngles<S_, index0, index1, index2>>
 {
 public:
 
   using This = EulerAngles;
-  using Base = SO3Base<EulerAngles<S_>>;
+  using Base = SO3Base<EulerAngles<S_, index0, index1, index2>>;
   using S = S_;
 
   using RotationMatrix = typename Base::RotationMatrix;
@@ -73,13 +73,118 @@ public:
   using Base::Log;
   using Base::getLog;
 
+  //----------------------------------------------------------------------------
   /// \{ \name Constructors
+  //----------------------------------------------------------------------------
 
   /// Default constructor. By default, the constructed SO(3) is not identity.
   EulerAngles() : Base()
   {
     // Do nothing
   }
+
+  /// Copy constructor.
+  EulerAngles(const EulerAngles& other) : Base(), mRepData(other.mRepData)
+  {
+    // Do nothing
+  }
+
+  /// Move constructor.
+  EulerAngles(EulerAngles&& other) : Base(), mRepData(std::move(other.mRepData))
+  {
+    // Do nothing
+  }
+
+  /// Construct from other SO3 with different representation.
+  template <typename Derived>
+  EulerAngles(const SO3Base<Derived>& other)
+    : Base(),
+      mRepData(detail::so3_operations::SO3RepDataConvertImpl<Derived, This>::run(
+               other.getRepData()))
+  {
+    // Do nothing
+  }
+
+  /// Construct from other SO3 with different representation.
+  template <typename Derived>
+  EulerAngles(SO3Base<Derived>&& other)
+    : Base(),
+      mRepData(detail::so3_operations::SO3RepDataConvertImpl<Derived, This>::run(
+               other.getRepData()))
+  {
+    // Do nothing
+  }
+
+  /// \}
+
+  //----------------------------------------------------------------------------
+  /// \{ \name Representation properties
+  //----------------------------------------------------------------------------
+
+  void setAngles(const Eigen::Matrix<S, 3, 1>& angles)
+  {
+    mRepData = angles;
+  }
+
+  Eigen::Matrix<S, 3, 1> getAngles() const
+  {
+    return mRepData;
+  }
+
+  void setAngles(S angle0, S angle1, S angle2)
+  {
+    mRepData << angle0, angle1, angle2;
+  }
+
+  template <int index>
+  void setAngle(S angle)
+  {
+    static_assert(0 <= index && index <= 2, "Invalid index");
+    mRepData[index] = angle;
+  }
+
+  template <int index>
+  S getAngle() const
+  {
+    static_assert(0 <= index && index <= 2, "Invalid index");
+    return mRepData[index];
+  }
+
+  void setRandom()
+  {
+    mRepData.setRandom();
+  }
+
+  /// \} // Representation properties
+
+  //----------------------------------------------------------------------------
+  /// \{ \name SO3 group operations
+  //----------------------------------------------------------------------------
+
+//  template <typename OtherDerived>
+//  bool isApprox(const SO3Base<OtherDerived>& other, S tol = 1e-6) const;
+
+  void setIdentity()
+  {
+    mRepData.setZero();
+  }
+
+  bool isIdentity()
+  {
+    return mRepData == RepData::Zero();
+  }
+
+  void invert()
+  {
+    mRepData.reverseInPlace();
+  }
+
+  const EulerAngles getInverse() const
+  {
+    return EulerAngles(RepData(-mRepData.reverse()));
+  }
+
+  /// \} // SO3 group operations
 
 protected:
   template <typename>
@@ -88,11 +193,20 @@ protected:
   RepData mRepData{RepData()};
 };
 
-using EulerAnglesf = EulerAngles<float>;
-using EulerAnglesd = EulerAngles<double>;
+template <int index0, int index1, int index2>
+using EulerAnglesf = EulerAngles<float, index0, index1, index2>;
 
-extern template
-class EulerAngles<double>;
+template <int index0, int index1, int index2>
+using EulerAnglesd = EulerAngles<double, index0, index1, index2>;
+
+using EulerXYZf = EulerAngles<float, 0, 1, 2>;
+using EulerXYZd = EulerAngles<double, 0, 1, 2>;
+
+using EulerZYXf = EulerAngles<float, 2, 1, 0>;
+using EulerZYXd = EulerAngles<double, 2, 1, 0>;
+
+//extern template
+//class EulerAngles<double>;
 
 } // namespace math
 } // namespace dart

@@ -73,237 +73,116 @@ public:
   using Base::Log;
   using Base::getLog;
 
+  //----------------------------------------------------------------------------
   /// \{ \name Constructors
+  //----------------------------------------------------------------------------
 
   /// Default constructor. By default, the constructed SO(3) is not identity.
-  Quaternion() : Base()
-  {
-    // Do nothing
-  }
+  Quaternion();
 
   /// Copy constructor.
-  Quaternion(const Quaternion& other) : Base(), mRepData(other.mRepData)
-  {
-    // Do nothing
-  }
+  Quaternion(const Quaternion& other);
 
   /// Move constructor.
-  Quaternion(Quaternion&& other) : mRepData(std::move(other.mRepData))
-  {
-    // Do nothing
-  }
+  Quaternion(Quaternion&& other);
 
   /// Construct from other SO3 with different representation.
   template <typename Derived>
-  Quaternion(const SO3Base<Derived>& other)
-    : Base(),
-      mRepData(other.getRepData())
-  {
-    // Do nothing
-  }
+  Quaternion(const SO3Base<Derived>& other);
 
   /// Construct from other SO3 with different representation.
   template <typename Derived>
-  Quaternion(SO3Base<Derived>&& other)
-    : Base(),
-      mRepData(detail::so3_operations::so3_convert_impl<
-          S, Derived, This>::run(std::move(other.getRepData())))
-  {
-    // Do nothing
-  }
+  Quaternion(SO3Base<Derived>&& other);
 
   /// Construct from Eigen::Quaternion.
-  Quaternion(const Eigen::Quaternion<S>& quat) : Base(), mRepData(quat)
-  {
-    // Do nothing
-  }
+  Quaternion(const Eigen::Quaternion<S>& quat);
 
   /// Construct from Eigen::Quaternion.
-  Quaternion(Eigen::Quaternion<S>&& quat) : Base(), mRepData(std::move(quat))
-  {
-    // Do nothing
-  }
+  Quaternion(Eigen::Quaternion<S>&& quat);
 
   // TODO(JS): Add more constructs that takes raw components of quaternions
 
   /// \} // Constructors
 
+  //----------------------------------------------------------------------------
   /// \{ \name Operators
+  //----------------------------------------------------------------------------
 
   /// Assign a SO3 with the same representation.
-  Quaternion& operator=(const Quaternion& other)
-  {
-    mRepData = other.mRepData;
-    return *this;
-  }
+  Quaternion& operator=(const Quaternion& other);
 
   /// Move in a SO3 with the same representation.
-  Quaternion& operator=(Quaternion&& other)
-  {
-    mRepData = std::move(other.mRepData);
-    return *this;
-  }
+  Quaternion& operator=(Quaternion&& other);
 
-  Quaternion& operator=(const Eigen::AngleAxis<S>& quat)
-  {
-    mRepData = quat;
-    return *this;
-  }
+  Quaternion& operator=(const Eigen::AngleAxis<S>& quat);
 
-  Quaternion& operator=(Eigen::AngleAxis<S>&& quat)
-  {
-    mRepData = std::move(quat);
-    return *this;
-  }
+  Quaternion& operator=(Eigen::AngleAxis<S>&& quat);
 
   template <typename QuatDerived>
-  Quaternion& operator=(const Eigen::QuaternionBase<QuatDerived>& quat)
-  {
-    mRepData = quat;
-    return *this;
-  }
+  Quaternion& operator=(const Eigen::QuaternionBase<QuatDerived>& quat);
 
   template <typename QuatDerived>
-  Quaternion& operator=(Eigen::QuaternionBase<QuatDerived>&& quat)
-  {
-    mRepData = std::move(quat);
-    return *this;
-  }
+  Quaternion& operator=(Eigen::QuaternionBase<QuatDerived>&& quat);
 
   template <typename Derived>
-  Quaternion& operator=(const Eigen::MatrixBase<Derived>& matrix)
-  {
-    mRepData = matrix;
-    return *this;
-  }
+  Quaternion& operator=(const Eigen::MatrixBase<Derived>& matrix);
 
   template <typename Derived>
-  Quaternion& operator=(Eigen::MatrixBase<Derived>&& matrix)
-  {
-    mRepData = std::move(matrix);
-    return *this;
-  }
+  Quaternion& operator=(Eigen::MatrixBase<Derived>&& matrix);
 
   /// Whether \b exactly equal to a SO3.
-  bool operator ==(const Quaternion& other)
-  {
-    return mRepData.isApprox(other.mRepData, static_cast<S>(0));
-  }
+  bool operator ==(const Quaternion& other);
 
   /// \} // Operators
 
+  //----------------------------------------------------------------------------
   /// \{ \name Representation properties
+  //----------------------------------------------------------------------------
 
-  void setQuaternion(const RepData& quat)
-  {
-    mRepData = quat;
-  }
+  void setQuaternion(const RepData& quat);
+  // TODO(JS): Rename
 
-  const RepData& getQuaternion() const
-  {
-    return mRepData;
-  }
+  const RepData& getQuaternion() const;
+  // TODO(JS): Rename
 
-  void setQuaternion(S w, S x, S y, S z)
-  {
-    mRepData.w() = w;
-    mRepData.x() = x;
-    mRepData.y() = y;
-    mRepData.z() = z;
-  }
+  void setQuaternion(S w, S x, S y, S z);
+  // TODO(JS): Rename
 
-//  void fromVector(const Vector& vector)
-//  {
-//    mRepData.vec() = vector;
-//  }
+//  void fromVector(const Vector& vector);
 
-//  Vector toVector() const
-//  {
-//    return mRepData.vec();
-//  }
+//  Vector toVector() const;
 
-  void setW(S w)
-  {
-    mRepData.w() = w;
-  }
+  void setW(S w);
 
-  void setX(S x)
-  {
-    mRepData.x() = x;
-  }
+  void setX(S x);
 
-  void setY(S y)
-  {
-    mRepData.y() = y;
-  }
+  void setY(S y);
 
-  void setZ(S z)
-  {
-    mRepData.z() = z;
-  }
+  void setZ(S z);
 
-  S getW() const
-  {
-    return mRepData.w();
-  }
+  S getW() const;
 
-  S getX() const
-  {
-    return mRepData.x();
-  }
+  S getX() const;
 
-  S getY() const
-  {
-    return mRepData.y();
-  }
+  S getY() const;
 
-  S getZ() const
-  {
-    return mRepData.z();
-  }
+  S getZ() const;
 
-  void setRandom()
-  {
-    // TODO(JS): This code was copied from
-    // https://bitbucket.org/eigen/eigen/commits/5d78b569eac3/#LEigen/src/Geometry/Quaternion.hT621
-    // This should be replaced to:
-    // mRepData = RepData::UnitRandom() once the commit is released
-    using std::sqrt;
-    using std::sin;
-    using std::cos;
-
-    const S u1 = Eigen::internal::random<S>(0, 1);
-    const S u2 = Eigen::internal::random<S>(0, 2*constants<S>::pi());
-    const S u3 = Eigen::internal::random<S>(0, 2*constants<S>::pi());
-    const S a = sqrt(1 - u1);
-    const S b = sqrt(u1);
-    mRepData = RepData(a * sin(u2), a * cos(u2), b * sin(u3), b * cos(u3));
-  }
+  void setRandom();
 
   /// \} // Representation properties
 
+  //----------------------------------------------------------------------------
   /// \{ \name SO3 group operations
+  //----------------------------------------------------------------------------
 
-  void setIdentity()
-  {
-    mRepData.setIdentity();
-  }
+  void setIdentity();
 
-  bool isIdentity()
-  {
-    return mRepData.coeffs() == Eigen::Matrix<S, 4, 1>::Zero();
-    // TODO(JS): double-check if this is correct
-  }
+  bool isIdentity();
 
-  void invert()
-  {
-    mRepData = mRepData.conjugate();
-  }
+  void invert();
 
-  const Quaternion getInverse() const
-  {
-    return Quaternion(mRepData.conjugate());
-  }
+  const Quaternion getInverse() const;
 
   /// \} // SO3 group operations
 
@@ -322,5 +201,7 @@ class Quaternion<double>;
 
 } // namespace math
 } // namespace dart
+
+#include "dart/math/detail/Quaternion-impl.hpp"
 
 #endif // DART_MATH_QUATERNION_HPP_

@@ -289,7 +289,7 @@ namespace math {
 ////  RotationMatrix toRotationMatrix() const
 ////  {
 ////    // We assume the canonical representation is the rotation matrix
-////    return detail::SE3::rep_convert_to_canonical_impl<S, Rep>::run(
+////    return detail::SE3::so3_convert_to_canonical_impl<S, Rep>::run(
 ////          derived().matrix());
 ////  }
 
@@ -297,7 +297,7 @@ namespace math {
 ////  {
 ////    // We assume the canonical representation is the rotation matrix
 ////    derived().matrix()
-////        = detail::SE3::rep_convert_from_canonical_impl<S, Rep>::run(rotMat);
+////        = detail::SE3::so3_convert_from_canonical_impl<S, Rep>::run(rotMat);
 ////  }
 
 ////  ///
@@ -306,7 +306,7 @@ namespace math {
 ////  {
 ////    // TODO(JS): Check if the raw data of RepTo is a vector type.
 
-////    return detail::SE3::rep_convert_impl<S, Rep, RepTo>::run(derived().mRepData);
+////    return detail::SE3::SO3ConvertImpl<Rep, RepTo>::run(derived().mRepData);
 ////  }
 
 ////  /// Return a reference of the raw data of the representation type

@@ -42,16 +42,16 @@ TEST(SO3, SFINAE)
 {
   using namespace math::detail::so3_operations;
 
-  auto resAa = rep_is_eigen_rotation_impl<double, math::AngleAxisd>::value;
+  auto resAa = SO3RepDataIsEigenRotationImpl<math::AngleAxisd>::value;
   EXPECT_TRUE(resAa);
 
-  auto resQuat = rep_is_eigen_rotation_impl<double, math::Quaterniond>::value;
+  auto resQuat = SO3RepDataIsEigenRotationImpl<math::Quaterniond>::value;
   EXPECT_TRUE(resQuat);
 
-  auto resMat3x3 = rep_is_eigen_matrix_impl<double, math::SO3Matrixd>::value;
+  auto resMat3x3 = SO3RepDataIsEigenMatrixImpl<math::SO3Matrixd>::value;
   EXPECT_TRUE(resMat3x3);
 
-  auto resMatXxX = rep_is_eigen_matrix_impl<double, math::SO3Vectord>::value;
+  auto resMatXxX = SO3RepDataIsEigenMatrixImpl<math::SO3Vectord>::value;
   EXPECT_TRUE(resMatXxX);
 }
 
@@ -300,17 +300,18 @@ TEST(SO3, GeneralizedCoordinates)
 //==============================================================================
 TEST(SO3, Conversions)
 {
-  //Eigen::Matrix3d    eigMatIn  = Eigen::Matrix3d::Random(); // Not a rotation matrix
-  Eigen::Matrix3d    eigMatIn  = SO3Matrixd::Random().to<Eigen::Matrix3d>();
-  //Eigen::AngleAxisd  eigAaIn   = Eigen::AngleAxisd::Random(); // Not supported by Eigen
-  Eigen::AngleAxisd  eigAaIn   = math::AngleAxisd::Random().to<Eigen::AngleAxisd>();
-  //Eigen::Quaterniond eigQuatIn = Eigen::Quaterniond::Random(); // Not supported by Eigen
-  Eigen::Quaterniond eigQuatIn = math::Quaterniond::Random().to<Eigen::Quaterniond>();
-  Eigen::Vector3d    eigVecIn  = SO3Vectord::Random().to<Eigen::Vector3d>();
-  SO3Matrixd so3MatIn  = SO3Matrixd::Random();
-  SO3Vectord so3VecIn  = SO3Vectord::Random();
-  math::AngleAxisd      so3AaIn   = math::AngleAxisd::Random();
-  math::Quaterniond     so3QuatIn = math::Quaterniond::Random();
+  const math::SO3d randomSO3 = math::SO3d::Random();
+
+  const Eigen::Matrix3d    eigMatIn  = randomSO3.to<Eigen::Matrix3d>();
+  const Eigen::AngleAxisd  eigAaIn   = randomSO3.to<Eigen::AngleAxisd>();
+  const Eigen::Quaterniond eigQuatIn = randomSO3.to<Eigen::Quaterniond>();
+  const Eigen::Vector3d    eigVecIn  = randomSO3.to<Eigen::Vector3d>();
+  const math::SO3Matrixd   so3MatIn  = randomSO3;
+  const math::SO3Vectord   so3VecIn  = randomSO3;
+  const math::AngleAxisd   so3AaIn   = randomSO3;
+  const math::Quaterniond  so3QuatIn = randomSO3;
+  const math::EulerXYZd    so3XYZIn  = randomSO3;
+  const math::EulerZYXd    so3ZYXIn  = randomSO3;
 
   Eigen::Matrix3d    eigMatOut;
   Eigen::AngleAxisd  eigAaOut;
@@ -318,8 +319,8 @@ TEST(SO3, Conversions)
   Eigen::Vector3d    eigVecOut;
   SO3Matrixd         so3MatOut;
   SO3Vectord         so3VecOut;
-  math::AngleAxisd      so3AaOut;
-  math::Quaterniond     so3QuatOut;
+  math::AngleAxisd   so3AaOut;
+  math::Quaterniond  so3QuatOut;
 
   //------------------------------
   // Eigen::Matrix3d <- various types
@@ -331,178 +332,184 @@ TEST(SO3, Conversions)
   //EXPECT_TRUE(eigMatOut.isApprox(eigVecIn));
 
   eigMatOut = eigAaIn;
-  EXPECT_TRUE(eigMatOut.isApprox(eigAaIn.toRotationMatrix()));
+  EXPECT_TRUE(eigMatOut.isApprox(eigMatIn));
 
   eigMatOut = eigQuatIn;
-  EXPECT_TRUE(eigMatOut.isApprox(eigQuatIn.toRotationMatrix()));
+  EXPECT_TRUE(eigMatOut.isApprox(eigMatIn));
 
   eigMatOut = so3MatIn.toRotationMatrix();
-  EXPECT_TRUE(eigMatOut.isApprox(so3MatIn.toRotationMatrix()));
+  EXPECT_TRUE(eigMatOut.isApprox(eigMatIn));
 
   eigMatOut = so3MatIn.to<Eigen::Matrix3d>();
-  EXPECT_TRUE(eigMatOut.isApprox(so3MatIn.to<Eigen::Matrix3d>()));
+  EXPECT_TRUE(eigMatOut.isApprox(eigMatIn));
 
   eigMatOut = so3VecIn.toRotationMatrix();
-  EXPECT_TRUE(eigMatOut.isApprox(so3VecIn.toRotationMatrix()));
+  EXPECT_TRUE(eigMatOut.isApprox(eigMatIn));
 
   eigMatOut = so3VecIn.to<Eigen::Matrix3d>();
-  EXPECT_TRUE(eigMatOut.isApprox(so3VecIn.to<Eigen::Matrix3d>()));
+  EXPECT_TRUE(eigMatOut.isApprox(eigMatIn));
 
   eigMatOut = so3AaIn.toRotationMatrix();
-  EXPECT_TRUE(eigMatOut.isApprox(so3AaIn.toRotationMatrix()));
+  EXPECT_TRUE(eigMatOut.isApprox(eigMatIn));
 
   eigMatOut = so3AaIn.to<Eigen::Matrix3d>();
-  EXPECT_TRUE(eigMatOut.isApprox(so3AaIn.to<Eigen::Matrix3d>()));
+  EXPECT_TRUE(eigMatOut.isApprox(eigMatIn));
 
   eigMatOut = so3QuatIn.toRotationMatrix();
-  EXPECT_TRUE(eigMatOut.isApprox(so3QuatIn.toRotationMatrix()));
+  EXPECT_TRUE(eigMatOut.isApprox(eigMatIn));
 
   eigMatOut = so3QuatIn.to<Eigen::Matrix3d>();
-  EXPECT_TRUE(eigMatOut.isApprox(so3QuatIn.to<Eigen::Matrix3d>()));
+  EXPECT_TRUE(eigMatOut.isApprox(eigMatIn));
+
+  eigMatOut = so3XYZIn.to<Eigen::Matrix3d>();
+  EXPECT_TRUE(eigMatOut.isApprox(eigMatIn));
+
+  eigMatOut = so3ZYXIn.to<Eigen::Matrix3d>();
+  EXPECT_TRUE(eigMatOut.isApprox(eigMatIn));
 
   //------------------------------
   // Eigen::Vector3d <- various types
   //------------------------------
   //eigVecOut = eigMatIn;
-  //EXPECT_TRUE(eigVecOut.isApprox(eigMatIn));
+  //EXPECT_TRUE(eigVecOut.isApprox(eigVecIn));
 
   eigVecOut = eigVecIn;
   EXPECT_TRUE(eigVecOut.isApprox(eigVecIn));
 
   //eigVecOut = eigAaIn;
-  //EXPECT_TRUE(eigVecOut.isApprox(eigAaIn.toRotationMatrix()));
+  //EXPECT_TRUE(eigVecOut.isApprox(eigVecIn));
 
   //eigVecOut = eigQuatIn;
-  //EXPECT_TRUE(eigVecOut.isApprox(eigQuatIn.toRotationMatrix()));
+  //EXPECT_TRUE(eigVecOut.isApprox(eigVecIn));
 
   eigVecOut = so3MatIn.to<SO3Vectord>().getRepData();
-  EXPECT_TRUE(eigVecOut.isApprox(so3MatIn.to<SO3Vectord>().getRepData()));
+  EXPECT_TRUE(eigVecOut.isApprox(eigVecIn));
 
   eigVecOut = so3MatIn.to<Eigen::Vector3d>();
-  EXPECT_TRUE(eigVecOut.isApprox(so3MatIn.to<Eigen::Vector3d>()));
+  EXPECT_TRUE(eigVecOut.isApprox(eigVecIn));
 
   eigVecOut = so3VecIn.to<SO3Vectord>().getRepData();
-  EXPECT_TRUE(eigVecOut.isApprox(so3VecIn.to<SO3Vectord>().getRepData()));
+  EXPECT_TRUE(eigVecOut.isApprox(eigVecIn));
 
   eigVecOut = so3VecIn.to<Eigen::Vector3d>();
-  EXPECT_TRUE(eigVecOut.isApprox(so3VecIn.to<Eigen::Vector3d>()));
+  EXPECT_TRUE(eigVecOut.isApprox(eigVecIn));
 
   eigVecOut = so3AaIn.to<SO3Vectord>().getRepData();
-  EXPECT_TRUE(eigVecOut.isApprox(so3AaIn.to<SO3Vectord>().getRepData()));
+  EXPECT_TRUE(eigVecOut.isApprox(eigVecIn));
 
   eigVecOut = so3AaIn.to<Eigen::Vector3d>();
-  EXPECT_TRUE(eigVecOut.isApprox(so3AaIn.to<Eigen::Vector3d>()));
+  EXPECT_TRUE(eigVecOut.isApprox(eigVecIn));
 
   eigVecOut = so3QuatIn.to<SO3Vectord>().getRepData();
-  EXPECT_TRUE(eigVecOut.isApprox(so3QuatIn.to<SO3Vectord>().getRepData()));
+  EXPECT_TRUE(eigVecOut.isApprox(eigVecIn));
 
   eigVecOut = so3QuatIn.to<Eigen::Vector3d>();
-  EXPECT_TRUE(eigVecOut.isApprox(so3QuatIn.to<Eigen::Vector3d>()));
+  EXPECT_TRUE(eigVecOut.isApprox(eigVecIn));
 
   //------------------------------
   // Eigen::AngleAxisd <- various types
   //------------------------------
   eigAaOut = eigMatIn;
-  EXPECT_TRUE(eigAaOut.toRotationMatrix().isApprox(eigMatIn));
+  EXPECT_TRUE(eigAaOut.isApprox(eigAaIn));
 
   //eigAaOut = eigVecIn; // Not supported by Eigen
-  //EXPECT_TRUE(eigAaOut.isApprox(eigVecIn));
+  //EXPECT_TRUE(eigAaOut.isApprox(eigAaIn));
 
   eigAaOut = eigAaIn;
   EXPECT_TRUE(eigAaOut.isApprox(eigAaIn));
 
   eigAaOut = eigQuatIn;
-  EXPECT_TRUE(eigAaOut.toRotationMatrix().isApprox(eigQuatIn.toRotationMatrix()));
+  EXPECT_TRUE(eigAaOut.isApprox(eigAaIn));
 
   eigAaOut = so3MatIn.to<math::AngleAxisd>().getRepData();
-  EXPECT_TRUE(eigAaOut.isApprox(so3MatIn.to<math::AngleAxisd>().getRepData()));
+  EXPECT_TRUE(eigAaOut.isApprox(eigAaIn));
 
   eigAaOut = so3MatIn.to<Eigen::AngleAxisd>();
-  EXPECT_TRUE(eigAaOut.isApprox(so3MatIn.to<Eigen::AngleAxisd>()));
+  EXPECT_TRUE(eigAaOut.isApprox(eigAaIn));
 
   eigAaOut = so3VecIn.to<math::AngleAxisd>().getRepData();
-  EXPECT_TRUE(eigAaOut.isApprox(so3VecIn.to<math::AngleAxisd>().getRepData()));
+  EXPECT_TRUE(eigAaOut.isApprox(eigAaIn));
 
   eigAaOut = so3VecIn.to<Eigen::AngleAxisd>();
-  EXPECT_TRUE(eigAaOut.isApprox(so3VecIn.to<Eigen::AngleAxisd>()));
+  EXPECT_TRUE(eigAaOut.isApprox(eigAaIn));
 
   eigAaOut = so3AaIn.to<math::AngleAxisd>().getRepData();
-  EXPECT_TRUE(eigAaOut.isApprox(so3AaIn.to<math::AngleAxisd>().getRepData()));
+  EXPECT_TRUE(eigAaOut.isApprox(eigAaIn));
 
   eigAaOut = so3AaIn.to<Eigen::AngleAxisd>();
-  EXPECT_TRUE(eigAaOut.isApprox(so3AaIn.to<Eigen::AngleAxisd>()));
+  EXPECT_TRUE(eigAaOut.isApprox(eigAaIn));
 
   eigAaOut = so3QuatIn.to<math::AngleAxisd>().getRepData();
-  EXPECT_TRUE(eigAaOut.isApprox(so3QuatIn.to<math::AngleAxisd>().getRepData()));
+  EXPECT_TRUE(eigAaOut.isApprox(eigAaIn));
 
   eigAaOut = so3QuatIn.to<Eigen::AngleAxisd>();
-  EXPECT_TRUE(eigAaOut.isApprox(so3QuatIn.to<Eigen::AngleAxisd>()));
+  EXPECT_TRUE(eigAaOut.isApprox(eigAaIn));
 
   //------------------------------
   // Eigen::Quaterniond <- various types
   //------------------------------
   eigQuatOut = eigMatIn;
-  EXPECT_TRUE(eigQuatOut.toRotationMatrix().isApprox(eigMatIn));
+  EXPECT_TRUE(eigQuatOut.isApprox(eigQuatIn));
 
   //eigQuatOut = eigVecIn; // Not supported by Eigen
-  //EXPECT_TRUE(eigQuatOut.toRotationMatrix().isApprox(eigVecIn));
+  //EXPECT_TRUE(eigQuatOut.isApprox(eigQuatIn));
 
   eigQuatOut = eigAaIn;
-  EXPECT_TRUE(eigQuatOut.toRotationMatrix().isApprox(eigAaIn.toRotationMatrix()));
+  EXPECT_TRUE(eigQuatOut.isApprox(eigQuatIn));
 
   eigQuatOut = eigQuatIn;
   EXPECT_TRUE(eigQuatOut.isApprox(eigQuatIn));
 
   eigQuatOut = so3MatIn.to<math::Quaterniond>().getRepData();
-  EXPECT_TRUE(eigQuatOut.isApprox(so3MatIn.to<math::Quaterniond>().getRepData()));
+  EXPECT_TRUE(eigQuatOut.isApprox(eigQuatIn));
 
   eigQuatOut = so3MatIn.to<Eigen::Quaterniond>();
-  EXPECT_TRUE(eigQuatOut.isApprox(so3MatIn.to<Eigen::Quaterniond>()));
+  EXPECT_TRUE(eigQuatOut.isApprox(eigQuatIn));
 
   eigQuatOut = so3VecIn.to<math::Quaterniond>().getRepData();
-  EXPECT_TRUE(eigQuatOut.isApprox(so3VecIn.to<math::Quaterniond>().getRepData()));
+  EXPECT_TRUE(eigQuatOut.isApprox(eigQuatIn));
 
   eigQuatOut = so3VecIn.to<Eigen::Quaterniond>();
-  EXPECT_TRUE(eigQuatOut.isApprox(so3VecIn.to<Eigen::Quaterniond>()));
+  EXPECT_TRUE(eigQuatOut.isApprox(eigQuatIn));
 
   eigQuatOut = so3AaIn.to<math::Quaterniond>().getRepData();
-  EXPECT_TRUE(eigQuatOut.isApprox(so3AaIn.to<math::Quaterniond>().getRepData()));
+  EXPECT_TRUE(eigQuatOut.isApprox(eigQuatIn));
 
   eigQuatOut = so3AaIn.to<Eigen::Quaterniond>();
-  EXPECT_TRUE(eigQuatOut.isApprox(so3AaIn.to<Eigen::Quaterniond>()));
+  EXPECT_TRUE(eigQuatOut.isApprox(eigQuatIn));
 
   eigQuatOut = so3QuatIn.to<math::Quaterniond>().getRepData();
-  EXPECT_TRUE(eigQuatOut.isApprox(so3QuatIn.to<math::Quaterniond>().getRepData()));
+  EXPECT_TRUE(eigQuatOut.isApprox(eigQuatIn));
 
   eigQuatOut = so3QuatIn.to<Eigen::Quaterniond>();
-  EXPECT_TRUE(eigQuatOut.isApprox(so3QuatIn.to<Eigen::Quaterniond>()));
+  EXPECT_TRUE(eigQuatOut.isApprox(eigQuatIn));
 
   //------------------------------
   // SO3Matrixd <- various types
   //------------------------------
   so3MatOut = eigMatIn;
-  EXPECT_TRUE(so3MatOut.isApprox(eigMatIn));
+  EXPECT_TRUE(so3MatOut.isApprox(so3MatIn));
 
   //so3MatOut = eigVecIn; // Not supported by Eigen
-  //EXPECT_TRUE(so3MatOut.isApprox(eigVecIn));
+  //EXPECT_TRUE(so3MatOut.isApprox(so3MatIn));
 
   so3MatOut = eigAaIn;
-  EXPECT_TRUE(so3MatOut.isApprox(eigAaIn));
+  EXPECT_TRUE(so3MatOut.isApprox(so3MatIn));
 
   so3MatOut = eigQuatIn;
-  EXPECT_TRUE(so3MatOut.isApprox(eigQuatIn));
+  EXPECT_TRUE(so3MatOut.isApprox(so3MatIn));
 
   so3MatOut = so3MatIn;
   EXPECT_TRUE(so3MatOut.isApprox(so3MatIn));
 
   so3MatOut = so3VecIn;
-  EXPECT_TRUE(so3MatOut.isApprox(so3VecIn));
+  EXPECT_TRUE(so3MatOut.isApprox(so3MatIn));
 
   so3MatOut = so3AaIn;
-  EXPECT_TRUE(so3MatOut.isApprox(so3AaIn));
+  EXPECT_TRUE(so3MatOut.isApprox(so3MatIn));
 
   so3MatOut = so3QuatIn;
-  EXPECT_TRUE(so3MatOut.isApprox(so3QuatIn));
+  EXPECT_TRUE(so3MatOut.isApprox(so3MatIn));
 
   //------------------------------
   // SO3Vectord <- various types
@@ -510,82 +517,82 @@ TEST(SO3, Conversions)
   //so3VecOut = eigMat; // Deleted to avoid ambiguity between rotation matrix
                         // and rotation vector
   so3VecOut.fromRotationMatrix(eigMatIn);
-  EXPECT_TRUE(so3VecOut.isApprox(eigMatIn));
+  EXPECT_TRUE(so3VecOut.isApprox(so3VecIn));
 
   //so3VecOut = eigVecIn;
-  //EXPECT_TRUE(so3VecOut.isApprox(eigVecIn));
+  //EXPECT_TRUE(so3VecOut.isApprox(so3VecIn));
   // TODO(JS): implement additional assign operator that takes rotation vector.
 
   so3VecOut = eigAaIn;
-  EXPECT_TRUE(so3VecOut.isApprox(eigAaIn));
+  EXPECT_TRUE(so3VecOut.isApprox(so3VecIn));
 
   so3VecOut = eigQuatIn;
-  EXPECT_TRUE(so3VecOut.isApprox(eigQuatIn));
+  EXPECT_TRUE(so3VecOut.isApprox(so3VecIn));
 
   so3VecOut = so3MatIn;
-  EXPECT_TRUE(so3VecOut.isApprox(so3MatIn));
+  EXPECT_TRUE(so3VecOut.isApprox(so3VecIn));
 
   so3VecOut = so3VecIn;
   EXPECT_TRUE(so3VecOut.isApprox(so3VecIn));
 
   so3VecOut = so3AaIn;
-  EXPECT_TRUE(so3VecOut.isApprox(so3AaIn));
+  EXPECT_TRUE(so3VecOut.isApprox(so3VecIn));
 
   so3VecOut = so3QuatIn;
-  EXPECT_TRUE(so3VecOut.isApprox(so3QuatIn));
+  EXPECT_TRUE(so3VecOut.isApprox(so3VecIn));
 
   //------------------------------
   // AngleAxisd <- various types
   //------------------------------
   so3AaOut = eigMatIn;
-  EXPECT_TRUE(so3AaOut.isApprox(eigMatIn));
+  EXPECT_TRUE(so3AaOut.isApprox(so3AaIn));
 
   //so3AaOut = eigVecIn;
   //EXPECT_TRUE(so3AaOut.isApprox(eigVecIn));
   // TODO(JS): implement additional assign operator that takes rotation vector.
 
   so3AaOut = eigAaIn;
-  EXPECT_TRUE(so3AaOut.isApprox(eigAaIn));
+  EXPECT_TRUE(so3AaOut.isApprox(so3AaIn));
 
   so3AaOut = eigQuatIn;
-  EXPECT_TRUE(so3AaOut.isApprox(eigQuatIn));
+  EXPECT_TRUE(so3AaOut.isApprox(so3AaIn));
 
   so3AaOut = so3MatIn;
-  EXPECT_TRUE(so3AaOut.isApprox(so3MatIn));
+  EXPECT_TRUE(so3AaOut.isApprox(so3AaIn));
 
   so3AaOut = so3VecIn;
-  EXPECT_TRUE(so3AaOut.isApprox(so3VecIn));
+  EXPECT_TRUE(so3AaOut.isApprox(so3AaIn));
 
   so3AaOut = so3AaIn;
   EXPECT_TRUE(so3AaOut.isApprox(so3AaIn));
 
   so3AaOut = so3QuatIn;
-  EXPECT_TRUE(so3AaOut.isApprox(so3QuatIn));
+  EXPECT_TRUE(so3AaOut.isApprox(so3AaIn));
 
   //------------------------------
   // Quaterniond <- various types
   //------------------------------
   so3QuatOut = eigMatIn;
-  EXPECT_TRUE(so3QuatOut.isApprox(eigMatIn));
+  EXPECT_TRUE(so3QuatOut.isApprox(so3QuatIn));
 
   //so3QuatOut = eigVecIn;
-  //EXPECT_TRUE(so3QuatOut.isApprox(eigVecIn));
+  //EXPECT_TRUE(so3QuatOut.isApprox(so3QuatIn));
   // TODO(JS): implement additional assign operator that takes rotation vector.
 
   so3QuatOut = eigAaIn;
-  EXPECT_TRUE(so3QuatOut.isApprox(eigAaIn));
+  EXPECT_TRUE(so3QuatOut.isApprox(so3QuatIn));
 
   so3QuatOut = eigQuatIn;
-  EXPECT_TRUE(so3QuatOut.isApprox(eigQuatIn));
+  EXPECT_TRUE(so3QuatOut.isApprox(so3QuatIn));
 
   so3QuatOut = so3MatIn;
-  EXPECT_TRUE(so3QuatOut.isApprox(so3MatIn));
+  EXPECT_TRUE(so3QuatOut.isApprox(so3QuatIn));
 
   so3QuatOut = so3VecIn;
-  EXPECT_TRUE(so3QuatOut.isApprox(so3VecIn));
+  EXPECT_TRUE(so3QuatOut.isApprox(so3QuatIn));
 
   so3QuatOut = so3AaIn;
-  EXPECT_TRUE(so3QuatOut.isApprox(so3AaIn));
+  EXPECT_TRUE(so3QuatOut.isApprox(so3QuatIn));
 
   so3QuatOut = so3QuatIn;
   EXPECT_TRUE(so3QuatOut.isApprox(so3QuatIn));

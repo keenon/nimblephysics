@@ -29,13 +29,13 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "dart/math/EulerAngles.hpp"
+#ifndef DART_MATH_DETAIL_EULERANGLES_IMPL_HPP_
+#define DART_MATH_DETAIL_EULERANGLES_IMPL_HPP_
 
 namespace dart {
 namespace math {
 
-//template
-//class EulerAngles<double>;
-
 } // namespace math
 } // namespace dart
+
+#endif // DART_MATH_DETAIL_EULERANGLES_IMPL_HPP_

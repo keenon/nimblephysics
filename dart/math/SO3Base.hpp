@@ -53,13 +53,13 @@ public:
   static constexpr int Dim = 3;
 
   /// The scalar type of the coefficients
-  using S = typename detail::traits<Derived>::S;
+  using S = typename detail::Traits<Derived>::S;
 
   using RotationMatrix = Eigen::Matrix<S, Dim, Dim>;
   using RotationVector = Eigen::Matrix<S, Dim, 1>;
 
   /// The data type of this SO(3) representation type
-  using RepData = typename detail::traits<Derived>::RepData;
+  using RepData = typename detail::Traits<Derived>::RepData;
 
   /// The data type for the Lie algebra of SO(3) namely so(3)
   using Tangent = Eigen::Matrix<S, Dim, 1>;
@@ -210,18 +210,18 @@ public:
 
   template <typename RepTo>
   auto to() const
-  -> decltype(detail::to_impl<S, Derived, RepTo>::run(std::declval<RepData>()));
+  -> decltype(detail::SO3ConvertImpl<S, Derived, RepTo>::run(std::declval<RepData>()));
 
   // TODO(JS): implement as<OtherDerived>()
 
   auto toRotationMatrix() const
-  -> typename detail::traits<SO3Matrix<S>>::RepData;
+  -> typename detail::Traits<SO3Matrix<S>>::RepData;
 
   void fromRotationMatrix(const RotationMatrix& rotMat);
 
 //  template <typename RepTo>
 //  auto getCoordinates() const
-//  -> decltype(detail::so3_operations::so3_convert_impl<Derived, RepTo>::run(
+//  -> decltype(detail::so3_operations::SO3ConvertImpl<Derived, RepTo>::run(
 //      std::declval<RepData>()));
 
   /// \} // Representation conversions
