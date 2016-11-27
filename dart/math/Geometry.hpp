@@ -158,6 +158,12 @@ Eigen::Vector3d matrixToEulerZYX(const Eigen::Matrix3d& _R);
 ///// \brief get the Euler ZYZ angle from R
 // Eigen::Vector3d matrixToEulerZYZ(const Eigen::Matrix3d& R);
 
+template <typename S, int index0, int index1, int index2>
+Eigen::Matrix<S, 3, 3> eulerAnglesToMatrix(const Eigen::Matrix<S, 3, 1>& angles);
+
+template <typename S, int index0, int index1, int index2>
+Eigen::Matrix<S, 3, 1> matrixToEulerAngles(const Eigen::Matrix<S, 3, 3>& matrix);
+
 //------------------------------------------------------------------------------
 /// \brief Exponential mapping
 Eigen::Isometry3d expMap(const Eigen::Vector6d& _S);
@@ -657,5 +663,7 @@ class BoundingBox {
 
 }  // namespace math
 }  // namespace dart
+
+#include "dart/math/detail/Geometry-impl.hpp"
 
 #endif  // DART_MATH_GEOMETRY_HPP_

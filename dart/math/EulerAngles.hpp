@@ -199,8 +199,42 @@ using EulerAnglesf = EulerAngles<float, index0, index1, index2>;
 template <int index0, int index1, int index2>
 using EulerAnglesd = EulerAngles<double, index0, index1, index2>;
 
+// Proper Euler angles (x-y-x, x-z-x, y-x-y, y-z-y, z-x-z, z-y-z)
+
+using EulerXYXf = EulerAngles<float, 0, 1, 0>;
+using EulerXYXd = EulerAngles<double, 0, 1, 0>;
+
+using EulerXZXf = EulerAngles<float, 0, 2, 0>;
+using EulerXZXd = EulerAngles<double, 0, 2, 0>;
+
+using EulerYXYf = EulerAngles<float, 1, 0, 1>;
+using EulerYXYd = EulerAngles<double, 1, 0, 1>;
+
+using EulerYZYf = EulerAngles<float, 1, 2, 1>;
+using EulerYZYd = EulerAngles<double, 1, 2, 1>;
+
+using EulerZXZf = EulerAngles<float, 2, 0, 2>;
+using EulerZXZd = EulerAngles<double, 2, 0, 2>;
+
+using EulerZYZf = EulerAngles<float, 2, 1, 2>;
+using EulerZYZd = EulerAngles<double, 2, 1, 2>;
+
+// Tait–Bryan angles (x-y-z, x-z-y, y-x-z, y-z-x, z-x-y, z-y-x)
+
 using EulerXYZf = EulerAngles<float, 0, 1, 2>;
 using EulerXYZd = EulerAngles<double, 0, 1, 2>;
+
+using EulerXZYf = EulerAngles<float, 0, 2, 1>;
+using EulerXZYd = EulerAngles<double, 0, 2, 1>;
+
+using EulerYXZf = EulerAngles<float, 1, 0, 2>;
+using EulerYXZd = EulerAngles<double, 1, 0, 2>;
+
+using EulerYZXf = EulerAngles<float, 1, 2, 0>;
+using EulerYZXd = EulerAngles<double, 1, 2, 0>;
+
+using EulerZXYf = EulerAngles<float, 2, 0, 1>;
+using EulerZXYd = EulerAngles<double, 2, 0, 1>;
 
 using EulerZYXf = EulerAngles<float, 2, 1, 0>;
 using EulerZYXd = EulerAngles<double, 2, 1, 0>;

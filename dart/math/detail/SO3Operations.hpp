@@ -289,34 +289,36 @@ struct SO3RepDataDirectConvertImpl<SO3Matrix<S>, SO3Vector<S>>
 };
 
 //==============================================================================
-template <typename S>
-struct SO3RepDataDirectConvertImpl<SO3Matrix<S>, EulerAngles<S, 0, 1, 2>>
-{
-  using RepDataFrom = typename Traits<SO3Matrix<S>>::RepData;
-  using RepDataTo = typename Traits<EulerAngles<S, 0, 1, 2>>::RepData;
+#define DART_SO3REPDATA_CONVERT_IMPL_TO_EULER_ANGLES(id0, id1, id2)\
+  template <typename S>\
+  struct SO3RepDataDirectConvertImpl<SO3Matrix<S>, EulerAngles<S, id0, id1, id2>>\
+  {\
+    using RepDataFrom = typename Traits<SO3Matrix<S>>::RepData;\
+    using RepDataTo = typename Traits<EulerAngles<S, id0, id1, id2>>::RepData;\
+  \
+    static constexpr bool IsSpecialized = true;\
+  \
+    static const RepDataTo run(const RepDataFrom& canonicalData)\
+    {\
+      return math::matrixToEulerXYZ(canonicalData);\
+    }\
+  };
 
-  static constexpr bool IsSpecialized = true;
+// Proper Euler angles (x-y-x, x-z-x, y-x-y, y-z-y, z-x-z, z-y-z)
+DART_SO3REPDATA_CONVERT_IMPL_TO_EULER_ANGLES(0, 1, 0)
+DART_SO3REPDATA_CONVERT_IMPL_TO_EULER_ANGLES(0, 2, 0)
+DART_SO3REPDATA_CONVERT_IMPL_TO_EULER_ANGLES(1, 0, 1)
+DART_SO3REPDATA_CONVERT_IMPL_TO_EULER_ANGLES(1, 2, 1)
+DART_SO3REPDATA_CONVERT_IMPL_TO_EULER_ANGLES(2, 0, 2)
+DART_SO3REPDATA_CONVERT_IMPL_TO_EULER_ANGLES(2, 1, 2)
 
-  static const RepDataTo run(const RepDataFrom& canonicalData)
-  {
-    return math::matrixToEulerXYZ(canonicalData);
-  }
-};
-
-//==============================================================================
-template <typename S>
-struct SO3RepDataDirectConvertImpl<SO3Matrix<S>, EulerAngles<S, 2, 1, 0>>
-{
-  using RepDataFrom = typename Traits<SO3Matrix<S>>::RepData;
-  using RepDataTo = typename Traits<EulerAngles<S, 2, 1, 0>>::RepData;
-
-  static constexpr bool IsSpecialized = true;
-
-  static const RepDataTo run(const RepDataFrom& canonicalData)
-  {
-    return math::matrixToEulerZYX(canonicalData);
-  }
-};
+// Tait–Bryan angles (x-y-z, x-z-y, y-x-z, y-z-x, z-x-y, z-y-x)
+DART_SO3REPDATA_CONVERT_IMPL_TO_EULER_ANGLES(0, 1, 2)
+DART_SO3REPDATA_CONVERT_IMPL_TO_EULER_ANGLES(0, 2, 1)
+DART_SO3REPDATA_CONVERT_IMPL_TO_EULER_ANGLES(1, 0, 2)
+DART_SO3REPDATA_CONVERT_IMPL_TO_EULER_ANGLES(1, 2, 0)
+DART_SO3REPDATA_CONVERT_IMPL_TO_EULER_ANGLES(2, 0, 1)
+DART_SO3REPDATA_CONVERT_IMPL_TO_EULER_ANGLES(2, 1, 0)
 
 //==============================================================================
 template <typename S>
@@ -443,44 +445,41 @@ struct SO3RepDataDirectConvertImpl<Quaternion<S>, AngleAxis<S>>
 };
 
 //==============================================================================
-template <typename S>
-struct SO3RepDataDirectConvertImpl<EulerAngles<S, 0, 1, 2>, SO3Matrix<S>>
-{
-  using RepDataFrom = typename Traits<EulerAngles<S, 0, 1, 2>>::RepData;
-  using RepDataTo = typename Traits<SO3Matrix<S>>::RepData;
+#define DART_SO3REPDATA_CONVERT_IMPL_FROM_EULER_ANGLES(id0, id1, id2)\
+  template <typename S>\
+  struct SO3RepDataDirectConvertImpl<EulerAngles<S, id0, id1, id2>, SO3Matrix<S>>\
+  {\
+    using RepDataFrom = typename Traits<EulerAngles<S, id0, id1, id2>>::RepData;\
+    using RepDataTo = typename Traits<SO3Matrix<S>>::RepData;\
+  \
+    static constexpr bool IsSpecialized = true;\
+  \
+    static const RepDataTo run(const RepDataFrom& data)\
+    {\
+      return math::eulerAnglesToMatrix<S, id0, id1, id2>(data);\
+    }\
+  \
+    static const RepDataTo run(RepDataFrom&& data)\
+    {\
+      return math::eulerAnglesToMatrix<S, id0, id1, id2>(std::move(data));\
+    }\
+  };
 
-  static constexpr bool IsSpecialized = true;
+// Proper Euler angles (x-y-x, x-z-x, y-x-y, y-z-y, z-x-z, z-y-z)
+DART_SO3REPDATA_CONVERT_IMPL_FROM_EULER_ANGLES(0, 1, 0)
+DART_SO3REPDATA_CONVERT_IMPL_FROM_EULER_ANGLES(0, 2, 0)
+DART_SO3REPDATA_CONVERT_IMPL_FROM_EULER_ANGLES(1, 0, 1)
+DART_SO3REPDATA_CONVERT_IMPL_FROM_EULER_ANGLES(1, 2, 1)
+DART_SO3REPDATA_CONVERT_IMPL_FROM_EULER_ANGLES(2, 0, 2)
+DART_SO3REPDATA_CONVERT_IMPL_FROM_EULER_ANGLES(2, 1, 2)
 
-  static const RepDataTo run(const RepDataFrom& data)
-  {
-    return math::eulerXYZToMatrix(data);
-  }
-
-  static const RepDataTo run(RepDataFrom&& data)
-  {
-    return math::eulerXYZToMatrix(std::move(data));
-  }
-};
-
-//==============================================================================
-template <typename S>
-struct SO3RepDataDirectConvertImpl<EulerAngles<S, 2, 1, 0>, SO3Matrix<S>>
-{
-  using RepDataFrom = typename Traits<EulerAngles<S, 2, 1, 0>>::RepData;
-  using RepDataTo = typename Traits<SO3Matrix<S>>::RepData;
-
-  static constexpr bool IsSpecialized = true;
-
-  static const RepDataTo run(const RepDataFrom& data)
-  {
-    return math::eulerZYXToMatrix(data);
-  }
-
-  static const RepDataTo run(RepDataFrom&& data)
-  {
-    return math::eulerZYXToMatrix(std::move(data));
-  }
-};
+// Tait–Bryan angles (x-y-z, x-z-y, y-x-z, y-z-x, z-x-y, z-y-x)
+DART_SO3REPDATA_CONVERT_IMPL_FROM_EULER_ANGLES(0, 1, 2)
+DART_SO3REPDATA_CONVERT_IMPL_FROM_EULER_ANGLES(0, 2, 1)
+DART_SO3REPDATA_CONVERT_IMPL_FROM_EULER_ANGLES(1, 0, 2)
+DART_SO3REPDATA_CONVERT_IMPL_FROM_EULER_ANGLES(1, 2, 0)
+DART_SO3REPDATA_CONVERT_IMPL_FROM_EULER_ANGLES(2, 0, 1)
+DART_SO3REPDATA_CONVERT_IMPL_FROM_EULER_ANGLES(2, 1, 0)
 
 //==============================================================================
 // SO3ConvertViaCanonicalImpl:
