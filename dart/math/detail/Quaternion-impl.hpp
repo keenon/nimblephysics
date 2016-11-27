@@ -163,7 +163,7 @@ Quaternion<S>& Quaternion<S>::operator=(Eigen::MatrixBase<Derived>&& matrix)
 
 //==============================================================================
 template <typename S>
-bool Quaternion<S>::operator ==(const Quaternion& other)
+bool Quaternion<S>::operator==(const Quaternion& other)
 {
   return mRepData.isApprox(other.mRepData, static_cast<S>(0));
 }

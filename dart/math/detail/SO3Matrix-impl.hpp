@@ -160,7 +160,7 @@ const typename SO3Matrix<S>::RotationVector SO3Matrix<S>::operator*(const Rotati
 
 //==============================================================================
 template <typename S>
-bool SO3Matrix<S>::operator ==(const SO3Matrix& other)
+bool SO3Matrix<S>::operator==(const SO3Matrix& other)
 {
   return mRepData == other.mRepData;
 }

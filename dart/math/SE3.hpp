@@ -208,7 +208,7 @@ namespace math {
 //    return *this;
 //  }
 
-//  bool operator ==(const SE3& other)
+//  bool operator==(const SE3& other)
 //  {
 //    return (mRotation == other.mRotation)
 //        && (mTranslation == other.mTranslation);

@@ -138,7 +138,7 @@ public:
   AngleAxis& operator=(Eigen::MatrixBase<Derived>&& matrix);
 
   /// Whether \b exactly equal to a SO3.
-  bool operator ==(const AngleAxis& other);
+  bool operator==(const AngleAxis& other);
 
   /// \} // Operators
 

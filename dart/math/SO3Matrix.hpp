@@ -127,7 +127,7 @@ public:
   const RotationVector operator*(const RotationVector& vector);
 
   /// Whether \b exactly equal to a SO3.
-  bool operator ==(const SO3Matrix& other);
+  bool operator==(const SO3Matrix& other);
 
   /// \} // Operators
 

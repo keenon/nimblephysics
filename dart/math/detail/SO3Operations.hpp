@@ -298,9 +298,14 @@ struct SO3RepDataDirectConvertImpl<SO3Matrix<S>, SO3Vector<S>>
   \
     static constexpr bool IsSpecialized = true;\
   \
-    static const RepDataTo run(const RepDataFrom& canonicalData)\
+    static const RepDataTo run(const RepDataFrom& data)\
     {\
-      return math::matrixToEulerXYZ(canonicalData);\
+      return math::matrixToEulerAngles<S, id0, id1, id2>(data);\
+    }\
+  \
+    static const RepDataTo run(RepDataFrom&& data)\
+    {\
+      return math::matrixToEulerAngles<S, id0, id1, id2>(std::move(data));\
     }\
   };
 
@@ -895,100 +900,74 @@ struct group_inplace_multiplication_impl<
 } // namespace so3_operations
 
 //==============================================================================
-template <typename S, typename SO3From, typename SO3To, typename Enable = void>
-struct SO3ConvertImpl {};
+template <typename SO3From, typename SO3OrEigenObject, typename Enable = void>
+struct SO3ToImpl {};
 
 //==============================================================================
 // Converting to the raw data type from given SO3 representation type
-template <typename S, typename RepFrom, typename RepTo>
-struct SO3ConvertImpl<
-    S,
-    RepFrom,
-    RepTo,
+template <typename SO3From, typename SO3OrEigenObject>
+struct SO3ToImpl<
+    SO3From,
+    SO3OrEigenObject,
     typename std::enable_if<
-        std::is_base_of<SO3Base<RepTo>, RepTo>::value>::type
+        std::is_base_of<SO3Base<SO3OrEigenObject>, SO3OrEigenObject>::value>::type
     >
 {
-  using RepData = typename detail::Traits<RepFrom>::RepData;
+  using RepData = typename detail::Traits<SO3From>::RepData;
 
-  static RepTo run(const RepData& repData)
+  static SO3OrEigenObject run(const RepData& repData)
   {
-    return RepTo(detail::so3_operations::SO3RepDataConvertImpl<RepFrom, RepTo>::run(
+    return SO3OrEigenObject(detail::so3_operations::SO3RepDataConvertImpl<SO3From, SO3OrEigenObject>::run(
           repData));
   }
 };
 
 //==============================================================================
 // Converting to the raw data type from given raw data type
-template <typename S, typename RepFrom, typename RepTo>
-struct SO3ConvertImpl<
-    S,
-    RepFrom,
-    RepTo,
+template <typename SO3From, typename SO3OrEigenObject>
+struct SO3ToImpl<
+    SO3From,
+    SO3OrEigenObject,
     typename std::enable_if<
         std::is_same<
-            typename detail::Traits<SO3Matrix<S>>::RepData,
-            RepTo>::value
+            typename detail::Traits<SO3Matrix<typename Traits<SO3From>::S>>::RepData,
+            SO3OrEigenObject>::value
         >::type
     >
 {
-  using RepData = typename detail::Traits<RepFrom>::RepData;
+  using S = typename Traits<SO3From>::S;
+  using RepData = typename detail::Traits<SO3From>::RepData;
 
   static auto run(const RepData& repData)
-  -> decltype(detail::so3_operations::SO3RepDataConvertImpl<RepFrom, SO3Matrix<S>>::run(
+  -> decltype(detail::so3_operations::SO3RepDataConvertImpl<SO3From, SO3Matrix<S>>::run(
       std::declval<RepData>()))
   {
-    return detail::so3_operations::SO3RepDataConvertImpl<RepFrom, SO3Matrix<S>>::run(
+    return detail::so3_operations::SO3RepDataConvertImpl<SO3From, SO3Matrix<S>>::run(
           repData);
   }
 };
 
 //==============================================================================
 // Converting to the raw data type from given raw data type
-template <typename S, typename RepFrom, typename RepTo>
-struct SO3ConvertImpl<
-    S,
-    RepFrom,
-    RepTo,
+template <typename SO3From, typename SO3OrEigenObject>
+struct SO3ToImpl<
+    SO3From,
+    SO3OrEigenObject,
     typename std::enable_if<
         std::is_same<
-            typename detail::Traits<SO3Vector<S>>::RepData,
-            RepTo>::value
+            typename detail::Traits<AngleAxis<typename Traits<SO3From>::S>>::RepData,
+            SO3OrEigenObject>::value
         >::type
     >
 {
-  using RepData = typename detail::Traits<RepFrom>::RepData;
+  using S = typename Traits<SO3From>::S;
+  using RepData = typename detail::Traits<SO3From>::RepData;
 
   static auto run(const RepData& repData)
-  -> decltype(detail::so3_operations::SO3RepDataConvertImpl<RepFrom, SO3Vector<S>>::run(
+  -> decltype(detail::so3_operations::SO3RepDataConvertImpl<SO3From, AngleAxis<S>>::run(
       std::declval<RepData>()))
   {
-    return detail::so3_operations::SO3RepDataConvertImpl<RepFrom, SO3Vector<S>>::run(
-          repData);
-  }
-};
-
-//==============================================================================
-// Converting to the raw data type from given raw data type
-template <typename S, typename RepFrom, typename RepTo>
-struct SO3ConvertImpl<
-    S,
-    RepFrom,
-    RepTo,
-    typename std::enable_if<
-        std::is_same<
-            typename detail::Traits<AngleAxis<S>>::RepData,
-            RepTo>::value
-        >::type
-    >
-{
-  using RepData = typename detail::Traits<RepFrom>::RepData;
-
-  static auto run(const RepData& repData)
-  -> decltype(detail::so3_operations::SO3RepDataConvertImpl<RepFrom, AngleAxis<S>>::run(
-      std::declval<RepData>()))
-  {
-    return detail::so3_operations::SO3RepDataConvertImpl<RepFrom, AngleAxis<S>>::run(
+    return detail::so3_operations::SO3RepDataConvertImpl<SO3From, AngleAxis<S>>::run(
           repData);
   }
 };
@@ -996,25 +975,25 @@ struct SO3ConvertImpl<
 
 //==============================================================================
 // Converting to the raw data type from given raw data type
-template <typename S, typename RepFrom, typename RepTo>
-struct SO3ConvertImpl<
-    S,
-    RepFrom,
-    RepTo,
+template <typename SO3From, typename SO3OrEigenObject>
+struct SO3ToImpl<
+    SO3From,
+    SO3OrEigenObject,
     typename std::enable_if<
         std::is_same<
-            typename detail::Traits<Quaternion<S>>::RepData,
-            RepTo>::value
+            typename detail::Traits<Quaternion<typename Traits<SO3From>::S>>::RepData,
+            SO3OrEigenObject>::value
         >::type
     >
 {
-  using RepData = typename detail::Traits<RepFrom>::RepData;
+  using S = typename Traits<SO3From>::S;
+  using RepData = typename detail::Traits<SO3From>::RepData;
 
   static auto run(const RepData& repData)
-  -> decltype(detail::so3_operations::SO3RepDataConvertImpl<RepFrom, Quaternion<S>>::run(
+  -> decltype(detail::so3_operations::SO3RepDataConvertImpl<SO3From, Quaternion<S>>::run(
       std::declval<RepData>()))
   {
-    return detail::so3_operations::SO3RepDataConvertImpl<RepFrom, Quaternion<S>>::run(
+    return detail::so3_operations::SO3RepDataConvertImpl<SO3From, Quaternion<S>>::run(
           repData);
   }
 };

@@ -147,7 +147,7 @@ void SO3Base<Derived>::operator*=(const SO3Base<OtherDerived>& other)
 
 //==============================================================================
 template <typename Derived>
-bool SO3Base<Derived>::operator ==(const SO3Base& other)
+bool SO3Base<Derived>::operator==(const SO3Base& other)
 {
   return derived() == other.derived();
 }
@@ -155,7 +155,7 @@ bool SO3Base<Derived>::operator ==(const SO3Base& other)
 //==============================================================================
 template <typename Derived>
 template <typename OtherDerived>
-bool SO3Base<Derived>::operator ==(const SO3Base<OtherDerived>& other)
+bool SO3Base<Derived>::operator==(const SO3Base<OtherDerived>& other)
 {
   return toRotationMatrix() == other.toRotationMatrix();
 }
@@ -336,9 +336,9 @@ typename SO3Base<Derived>::Tangent SO3Base<Derived>::Vee(const RotationMatrix& m
 template <typename Derived>
 template <typename RepTo>
 auto SO3Base<Derived>::to() const
--> decltype(detail::SO3ConvertImpl<S, Derived, RepTo>::run(std::declval<RepData>()))
+-> decltype(detail::SO3ToImpl<Derived, RepTo>::run(std::declval<RepData>()))
 {
-  return detail::SO3ConvertImpl<S, Derived, RepTo>::run(getRepData());
+  return detail::SO3ToImpl<Derived, RepTo>::run(getRepData());
 }
 
 //==============================================================================

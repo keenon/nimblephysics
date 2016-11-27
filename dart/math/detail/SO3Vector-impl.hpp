@@ -184,7 +184,7 @@ SO3Vector<S>& SO3Vector<S>::operator=(Eigen::MatrixBase<Derived>&& matrix)
 
 //==============================================================================
 template <typename S>
-bool SO3Vector<S>::operator ==(const SO3Vector& other)
+bool SO3Vector<S>::operator==(const SO3Vector& other)
 {
   return mRepData == other.mRepData;
 }

@@ -32,8 +32,226 @@
 #ifndef DART_MATH_DETAIL_EULERANGLES_IMPL_HPP_
 #define DART_MATH_DETAIL_EULERANGLES_IMPL_HPP_
 
+#include "dart/math/EulerAngles.hpp"
+
 namespace dart {
 namespace math {
+
+//==============================================================================
+template <typename S, int index0, int index1, int index2>
+EulerAngles<S, index0, index1, index2>::EulerAngles() : Base()
+{
+  // Do nothing
+}
+
+//==============================================================================
+template <typename S, int index0, int index1, int index2>
+EulerAngles<S, index0, index1, index2>::EulerAngles(const EulerAngles& other) : Base(), mRepData(other.mRepData)
+{
+  // Do nothing
+}
+
+//==============================================================================
+template <typename S, int index0, int index1, int index2>
+EulerAngles<S, index0, index1, index2>::EulerAngles(EulerAngles&& other) : Base(), mRepData(std::move(other.mRepData))
+{
+  // Do nothing
+}
+
+//==============================================================================
+template <typename S, int index0, int index1, int index2>
+template <typename Derived>
+EulerAngles<S, index0, index1, index2>::EulerAngles(const SO3Base<Derived>& other)
+  : Base(),
+    mRepData(detail::so3_operations::SO3RepDataConvertImpl<Derived, This>::run(
+             other.getRepData()))
+{
+  // Do nothing
+}
+
+//==============================================================================
+template <typename S, int index0, int index1, int index2>
+template <typename Derived>
+EulerAngles<S, index0, index1, index2>::EulerAngles(SO3Base<Derived>&& other)
+  : Base(),
+    mRepData(detail::so3_operations::SO3RepDataConvertImpl<Derived, This>::run(
+             other.getRepData()))
+{
+  // Do nothing
+}
+
+//==============================================================================
+template <typename S, int index0, int index1, int index2>
+template <typename Derived>
+EulerAngles<S, index0, index1, index2>::EulerAngles(const Eigen::MatrixBase<Derived>& angles)
+  : Base(), mRepData(angles)
+{
+  // Do nothing
+}
+
+//==============================================================================
+template <typename S, int index0, int index1, int index2>
+template <typename Derived>
+EulerAngles<S, index0, index1, index2>::EulerAngles(Eigen::MatrixBase<Derived>&& angles)
+  : Base(), mRepData(std::move(angles))
+{
+  // Do nothing
+}
+
+//==============================================================================
+template <typename S, int index0, int index1, int index2>
+EulerAngles<S, index0, index1, index2>& EulerAngles<S, index0, index1, index2>::operator=(const EulerAngles& other)
+{
+  mRepData = other.mRepData;
+  return *this;
+}
+
+//==============================================================================
+template <typename S, int index0, int index1, int index2>
+EulerAngles<S, index0, index1, index2>& EulerAngles<S, index0, index1, index2>::operator=(EulerAngles&& other)
+{
+  mRepData = std::move(other.mRepData);
+  return *this;
+}
+
+//==============================================================================
+template <typename S, int index0, int index1, int index2>
+EulerAngles<S, index0, index1, index2>& EulerAngles<S, index0, index1, index2>::operator=(const Eigen::AngleAxis<S>& aa)
+{
+  mRepData = detail::so3_operations::SO3RepDataConvertImpl<
+      AngleAxis<S>, This>::run(aa);
+  return *this;
+}
+
+//==============================================================================
+template <typename S, int index0, int index1, int index2>
+EulerAngles<S, index0, index1, index2>& EulerAngles<S, index0, index1, index2>::operator=(Eigen::AngleAxis<S>&& aa)
+{
+  mRepData = detail::so3_operations::SO3RepDataConvertImpl<
+      AngleAxis<S>, This>::run(std::move(aa));
+  return *this;
+}
+
+//==============================================================================
+template <typename S, int index0, int index1, int index2>
+template <typename QuatDerived>
+EulerAngles<S, index0, index1, index2>& EulerAngles<S, index0, index1, index2>::operator=(const Eigen::QuaternionBase<QuatDerived>& quat)
+{
+  mRepData = detail::so3_operations::SO3RepDataConvertImpl<
+      Quaternion<S>, This>::run(quat);
+  return *this;
+}
+
+//==============================================================================
+template <typename S, int index0, int index1, int index2>
+template <typename QuatDerived>
+EulerAngles<S, index0, index1, index2>& EulerAngles<S, index0, index1, index2>::operator=(Eigen::QuaternionBase<QuatDerived>&& quat)
+{
+  mRepData = detail::so3_operations::SO3RepDataConvertImpl<
+      Quaternion<S>, This>::run(std::move(quat));
+  return *this;
+}
+
+//==============================================================================
+template <typename S, int index0, int index1, int index2>
+template <typename Derived>
+EulerAngles<S, index0, index1, index2>& EulerAngles<S, index0, index1, index2>::operator=(const Eigen::MatrixBase<Derived>& matrix)
+{
+  mRepData = detail::so3_operations::SO3RepDataConvertImpl<
+      SO3Matrix<S>, This>::run(matrix);
+  return *this;
+}
+
+//==============================================================================
+template <typename S, int index0, int index1, int index2>
+template <typename Derived>
+EulerAngles<S, index0, index1, index2>& EulerAngles<S, index0, index1, index2>::operator=(Eigen::MatrixBase<Derived>&& matrix)
+{
+  mRepData = detail::so3_operations::SO3RepDataConvertImpl<
+      SO3Matrix<S>, This>::run(std::move(matrix));
+  return *this;
+}
+
+//==============================================================================
+template <typename S, int index0, int index1, int index2>
+bool EulerAngles<S, index0, index1, index2>::operator==(const EulerAngles& other)
+{
+  return (mRepData == other.mRepData);
+}
+
+//==============================================================================
+template <typename S, int index0, int index1, int index2>
+void EulerAngles<S, index0, index1, index2>::setAngles(const Eigen::Matrix<S, 3, 1>& angles)
+{
+  mRepData = angles;
+}
+
+//==============================================================================
+template <typename S, int index0, int index1, int index2>
+Eigen::Matrix<S, 3, 1> EulerAngles<S, index0, index1, index2>::getAngles() const
+{
+  return mRepData;
+}
+
+//==============================================================================
+template <typename S, int index0, int index1, int index2>
+void EulerAngles<S, index0, index1, index2>::setAngles(S angle0, S angle1, S angle2)
+{
+  mRepData << angle0, angle1, angle2;
+}
+
+//==============================================================================
+template <typename S, int index0, int index1, int index2>
+template <int index>
+void EulerAngles<S, index0, index1, index2>::setAngle(S angle)
+{
+  static_assert(0 <= index && index <= 2, "Invalid index");
+  mRepData[index] = angle;
+}
+
+//==============================================================================
+template <typename S, int index0, int index1, int index2>
+template <int index>
+S EulerAngles<S, index0, index1, index2>::getAngle() const
+{
+  static_assert(0 <= index && index <= 2, "Invalid index");
+  return mRepData[index];
+}
+
+//==============================================================================
+template <typename S, int index0, int index1, int index2>
+void EulerAngles<S, index0, index1, index2>::setRandom()
+{
+  mRepData.setRandom();
+}
+
+//==============================================================================
+template <typename S, int index0, int index1, int index2>
+void EulerAngles<S, index0, index1, index2>::setIdentity()
+{
+  mRepData.setZero();
+}
+
+//==============================================================================
+template <typename S, int index0, int index1, int index2>
+bool EulerAngles<S, index0, index1, index2>::isIdentity()
+{
+  return mRepData == RepData::Zero();
+}
+
+//==============================================================================
+template <typename S, int index0, int index1, int index2>
+void EulerAngles<S, index0, index1, index2>::invert()
+{
+  mRepData.reverseInPlace();
+}
+
+//==============================================================================
+template <typename S, int index0, int index1, int index2>
+const EulerAngles<S, index0, index1, index2> EulerAngles<S, index0, index1, index2>::getInverse() const
+{
+  return EulerAngles(RepData(-mRepData.reverse()));
+}
 
 } // namespace math
 } // namespace dart

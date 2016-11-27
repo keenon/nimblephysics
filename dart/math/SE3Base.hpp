@@ -162,13 +162,13 @@ namespace math {
 ////          derived(), other.derived());
 ////  }
 
-////  bool operator ==(const SE3Base& other)
+////  bool operator==(const SE3Base& other)
 ////  {
 ////    return derived() == other.derived();
 ////  }
 
 ////  template <typename OtherDerived>
-////  bool operator ==(const SE3Base<OtherDerived>& other)
+////  bool operator==(const SE3Base<OtherDerived>& other)
 ////  {
 ////    return toRotationMatrix() == other.toRotationMatrix();
 ////  }

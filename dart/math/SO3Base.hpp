@@ -133,11 +133,11 @@ public:
   void operator*=(const SO3Base<OtherDerived>& other);
 
   /// Equality operator
-  bool operator ==(const SO3Base& other);
+  bool operator==(const SO3Base& other);
 
   /// Equality operator
   template <typename OtherDerived>
-  bool operator ==(const SO3Base<OtherDerived>& other);
+  bool operator==(const SO3Base<OtherDerived>& other);
 
   /// \}
 
@@ -210,7 +210,7 @@ public:
 
   template <typename RepTo>
   auto to() const
-  -> decltype(detail::SO3ConvertImpl<S, Derived, RepTo>::run(std::declval<RepData>()));
+  -> decltype(detail::SO3ToImpl<Derived, RepTo>::run(std::declval<RepData>()));
 
   // TODO(JS): implement as<OtherDerived>()
 

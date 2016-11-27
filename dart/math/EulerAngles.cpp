@@ -34,8 +34,12 @@
 namespace dart {
 namespace math {
 
-//template
-//class EulerAngles<double>;
+#define DART_INSTANTIATE_EULER_ANGLES(XYZ, id0, id1, id2)\
+  template\
+  class EulerAngles<double, id0, id1, id2>;
+
+DART_INSTANTIATE_EULER_ANGLES(XYZ, 0, 1, 2)
+DART_INSTANTIATE_EULER_ANGLES(ZYX, 2, 1, 0)
 
 } // namespace math
 } // namespace dart

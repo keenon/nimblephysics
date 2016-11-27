@@ -129,7 +129,7 @@ public:
   SO3Vector& operator=(Eigen::MatrixBase<Derived>&& matrix);
 
   /// Whether \b exactly equal to a SO3.
-  bool operator ==(const SO3Vector& other);
+  bool operator==(const SO3Vector& other);
 
   /// \} // Operators
 

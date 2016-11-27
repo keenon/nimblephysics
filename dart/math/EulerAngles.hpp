@@ -78,82 +78,80 @@ public:
   //----------------------------------------------------------------------------
 
   /// Default constructor. By default, the constructed SO(3) is not identity.
-  EulerAngles() : Base()
-  {
-    // Do nothing
-  }
+  EulerAngles();
 
   /// Copy constructor.
-  EulerAngles(const EulerAngles& other) : Base(), mRepData(other.mRepData)
-  {
-    // Do nothing
-  }
+  EulerAngles(const EulerAngles& other);
 
   /// Move constructor.
-  EulerAngles(EulerAngles&& other) : Base(), mRepData(std::move(other.mRepData))
-  {
-    // Do nothing
-  }
+  EulerAngles(EulerAngles&& other);
 
   /// Construct from other SO3 with different representation.
   template <typename Derived>
-  EulerAngles(const SO3Base<Derived>& other)
-    : Base(),
-      mRepData(detail::so3_operations::SO3RepDataConvertImpl<Derived, This>::run(
-               other.getRepData()))
-  {
-    // Do nothing
-  }
+  EulerAngles(const SO3Base<Derived>& other);
 
   /// Construct from other SO3 with different representation.
   template <typename Derived>
-  EulerAngles(SO3Base<Derived>&& other)
-    : Base(),
-      mRepData(detail::so3_operations::SO3RepDataConvertImpl<Derived, This>::run(
-               other.getRepData()))
-  {
-    // Do nothing
-  }
+  EulerAngles(SO3Base<Derived>&& other);
+
+  /// Construct from a raw rotation vector where the dimension is 3x1.
+  template <typename Derived>
+  EulerAngles(const Eigen::MatrixBase<Derived>& angles);
+
+  /// Construct from a raw rotation matrix where the dimension is 3x3.
+  template <typename Derived>
+  EulerAngles(Eigen::MatrixBase<Derived>&& angles);
 
   /// \}
+
+  //----------------------------------------------------------------------------
+  /// \{ \name Operators
+  //----------------------------------------------------------------------------
+
+  /// Assign a SO3 with the same representation.
+  EulerAngles& operator=(const EulerAngles& other);
+
+  /// Move in a SO3 with the same representation.
+  EulerAngles& operator=(EulerAngles&& other);
+
+  EulerAngles& operator=(const Eigen::AngleAxis<S>& aa);
+
+  EulerAngles& operator=(Eigen::AngleAxis<S>&& aa);
+
+  template <typename QuatDerived>
+  EulerAngles& operator=(const Eigen::QuaternionBase<QuatDerived>& quat);
+
+  template <typename QuatDerived>
+  EulerAngles& operator=(Eigen::QuaternionBase<QuatDerived>&& quat);
+
+  template <typename Derived>
+  EulerAngles& operator=(const Eigen::MatrixBase<Derived>& matrix);
+
+  template <typename Derived>
+  EulerAngles& operator=(Eigen::MatrixBase<Derived>&& matrix);
+
+  /// Whether \b exactly equal to a SO3.
+  bool operator==(const EulerAngles& other);
+
+  /// \} // Operators
 
   //----------------------------------------------------------------------------
   /// \{ \name Representation properties
   //----------------------------------------------------------------------------
 
-  void setAngles(const Eigen::Matrix<S, 3, 1>& angles)
-  {
-    mRepData = angles;
-  }
+  void setAngles(const Eigen::Matrix<S, 3, 1>& angles);
 
-  Eigen::Matrix<S, 3, 1> getAngles() const
-  {
-    return mRepData;
-  }
+  Eigen::Matrix<S, 3, 1> getAngles() const;
 
-  void setAngles(S angle0, S angle1, S angle2)
-  {
-    mRepData << angle0, angle1, angle2;
-  }
+  void setAngles(S angle0, S angle1, S angle2);
 
   template <int index>
-  void setAngle(S angle)
-  {
-    static_assert(0 <= index && index <= 2, "Invalid index");
-    mRepData[index] = angle;
-  }
+  void setAngle(S angle);
 
   template <int index>
-  S getAngle() const
-  {
-    static_assert(0 <= index && index <= 2, "Invalid index");
-    return mRepData[index];
-  }
+  S getAngle() const;
 
-  void setRandom()
-  {
-    mRepData.setRandom();
-  }
+  void setRandom();
 
   /// \} // Representation properties
 
@@ -164,25 +162,13 @@ public:
 //  template <typename OtherDerived>
 //  bool isApprox(const SO3Base<OtherDerived>& other, S tol = 1e-6) const;
 
-  void setIdentity()
-  {
-    mRepData.setZero();
-  }
+  void setIdentity();
 
-  bool isIdentity()
-  {
-    return mRepData == RepData::Zero();
-  }
+  bool isIdentity();
 
-  void invert()
-  {
-    mRepData.reverseInPlace();
-  }
+  void invert();
 
-  const EulerAngles getInverse() const
-  {
-    return EulerAngles(RepData(-mRepData.reverse()));
-  }
+  const EulerAngles getInverse() const;
 
   /// \} // SO3 group operations
 
@@ -199,50 +185,36 @@ using EulerAnglesf = EulerAngles<float, index0, index1, index2>;
 template <int index0, int index1, int index2>
 using EulerAnglesd = EulerAngles<double, index0, index1, index2>;
 
+#define DART_TYPEDEF_EULER_ANGLES(XYZ, id0, id1, id2)\
+  using Euler##XYZ##f = EulerAngles<float, id0, id1, id2>;\
+  using Euler##XYZ##d = EulerAngles<double, id0, id1, id2>;
+
 // Proper Euler angles (x-y-x, x-z-x, y-x-y, y-z-y, z-x-z, z-y-z)
-
-using EulerXYXf = EulerAngles<float, 0, 1, 0>;
-using EulerXYXd = EulerAngles<double, 0, 1, 0>;
-
-using EulerXZXf = EulerAngles<float, 0, 2, 0>;
-using EulerXZXd = EulerAngles<double, 0, 2, 0>;
-
-using EulerYXYf = EulerAngles<float, 1, 0, 1>;
-using EulerYXYd = EulerAngles<double, 1, 0, 1>;
-
-using EulerYZYf = EulerAngles<float, 1, 2, 1>;
-using EulerYZYd = EulerAngles<double, 1, 2, 1>;
-
-using EulerZXZf = EulerAngles<float, 2, 0, 2>;
-using EulerZXZd = EulerAngles<double, 2, 0, 2>;
-
-using EulerZYZf = EulerAngles<float, 2, 1, 2>;
-using EulerZYZd = EulerAngles<double, 2, 1, 2>;
+DART_TYPEDEF_EULER_ANGLES(XYX, 0, 1, 0)
+DART_TYPEDEF_EULER_ANGLES(XZX, 0, 2, 0)
+DART_TYPEDEF_EULER_ANGLES(YXY, 1, 0, 1)
+DART_TYPEDEF_EULER_ANGLES(YZY, 1, 2, 1)
+DART_TYPEDEF_EULER_ANGLES(ZXZ, 2, 0, 2)
+DART_TYPEDEF_EULER_ANGLES(ZYZ, 2, 1, 2)
 
 // Tait–Bryan angles (x-y-z, x-z-y, y-x-z, y-z-x, z-x-y, z-y-x)
+DART_TYPEDEF_EULER_ANGLES(XYZ, 0, 1, 2)
+DART_TYPEDEF_EULER_ANGLES(XZY, 0, 2, 1)
+DART_TYPEDEF_EULER_ANGLES(YXZ, 1, 0, 2)
+DART_TYPEDEF_EULER_ANGLES(YZX, 1, 2, 0)
+DART_TYPEDEF_EULER_ANGLES(ZXY, 2, 0, 1)
+DART_TYPEDEF_EULER_ANGLES(ZYX, 2, 1, 0)
 
-using EulerXYZf = EulerAngles<float, 0, 1, 2>;
-using EulerXYZd = EulerAngles<double, 0, 1, 2>;
+#define DART_EXPLICITLY_INSTANTIATE_EULER_ANGLES(XYZ, id0, id1, id2)\
+  extern template\
+  class EulerAngles<double, id0, id1, id2>;
 
-using EulerXZYf = EulerAngles<float, 0, 2, 1>;
-using EulerXZYd = EulerAngles<double, 0, 2, 1>;
-
-using EulerYXZf = EulerAngles<float, 1, 0, 2>;
-using EulerYXZd = EulerAngles<double, 1, 0, 2>;
-
-using EulerYZXf = EulerAngles<float, 1, 2, 0>;
-using EulerYZXd = EulerAngles<double, 1, 2, 0>;
-
-using EulerZXYf = EulerAngles<float, 2, 0, 1>;
-using EulerZXYd = EulerAngles<double, 2, 0, 1>;
-
-using EulerZYXf = EulerAngles<float, 2, 1, 0>;
-using EulerZYXd = EulerAngles<double, 2, 1, 0>;
-
-//extern template
-//class EulerAngles<double>;
+DART_EXPLICITLY_INSTANTIATE_EULER_ANGLES(XYZ, 0, 1, 2)
+DART_EXPLICITLY_INSTANTIATE_EULER_ANGLES(ZYX, 2, 1, 0)
 
 } // namespace math
 } // namespace dart
+
+#include "dart/math/detail/EulerAngles-impl.hpp"
 
 #endif // DART_MATH_EULERANGLES_HPP_

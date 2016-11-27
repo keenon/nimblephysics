@@ -190,7 +190,7 @@ AngleAxis<S>& AngleAxis<S>::operator=(Eigen::MatrixBase<Derived>&& matrix)
 
 //==============================================================================
 template <typename S>
-bool AngleAxis<S>::operator ==(const AngleAxis& other)
+bool AngleAxis<S>::operator==(const AngleAxis& other)
 {
   if (mRepData.angle() == static_cast<S>(0)
       && other.getRepData().angle() == static_cast<S>(0))
