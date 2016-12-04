@@ -51,8 +51,8 @@ public:
   using Base = SO3Base<This>;
   using S = typename Base::S;
 
-  using RotationMatrix = typename Base::RotationMatrix;
-  using RotationVector = typename Base::RotationVector;
+  using Matrix3 = typename Base::Matrix3;
+  using Axis = Eigen::Matrix<double, 3, 1>;
 
   using RepData = typename Base::RepData;
 
@@ -100,10 +100,10 @@ public:
   explicit AngleAxis(Eigen::AngleAxis<S>&& angleAxis);
 
   /// Construct from axis and angle
-  explicit AngleAxis(const RotationVector& axis, S angle);
+  explicit AngleAxis(const Axis& axis, S angle);
 
   /// Construct from axis and angle
-  explicit AngleAxis(RotationVector&& axis, S angle);
+  explicit AngleAxis(Axis&& axis, S angle);
 
   /// Construct from quaternion
   template <typename QuatDerived>
@@ -146,11 +146,11 @@ public:
   /// \{ \name Representation properties
   //----------------------------------------------------------------------------
 
-  void setAngleAxis(const RotationVector& axis, S angle);
+  void setAngleAxis(const Axis& axis, S angle);
 
-  void setAxis(const RotationVector& axis);
+  void setAxis(const Axis& axis);
 
-  const RotationVector& getAxis() const;
+  const Axis& getAxis() const;
 
   void setAngle(const S angle);
 

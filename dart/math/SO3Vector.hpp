@@ -50,8 +50,8 @@ public:
   using Base = SO3Base<This>;
   using S = typename Base::S;
 
-  using RotationMatrix = typename Base::RotationMatrix;
-  using RotationVector = typename Base::RotationVector;
+  using Matrix3 = typename Base::Matrix3;
+  using Vector3 = typename Base::Vector3;
 
   using RepData = typename Base::RepData;
   using Tangent = typename Base::Tangent;
@@ -143,11 +143,11 @@ public:
   template <typename MatrixDerived>
   void fromRotationVector(Eigen::MatrixBase<MatrixDerived>&& vector);
 
-  RotationVector toRotationVector() const;
+  Vector3 toRotationVector() const;
 
-  void setRotationVector(const RotationVector& axisAngle);
+  void setRotationVector(const Vector3& axisAngle);
 
-  const RotationVector& getRotationVector() const;
+  const Vector3& getRotationVector() const;
 
   void setRandom();
 

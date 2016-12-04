@@ -127,8 +127,8 @@ SO3Base<Derived>::operator*(const SO3Base<OtherDerived>& other) const
 
 //==============================================================================
 template <typename Derived>
-const typename SO3Base<Derived>::RotationVector
-SO3Base<Derived>::operator*(const RotationVector& vector)
+const typename SO3Base<Derived>::Vector3
+SO3Base<Derived>::operator*(const Vector3& vector)
 {
   return derived().operator*(vector);
 }
@@ -314,9 +314,9 @@ typename SO3Base<Derived>::so3 SO3Base<Derived>::getLog() const
 
 //==============================================================================
 template <typename Derived>
-typename SO3Base<Derived>::RotationMatrix SO3Base<Derived>::Hat(const Tangent& angleAxis)
+typename SO3Base<Derived>::Matrix3 SO3Base<Derived>::Hat(const Tangent& angleAxis)
 {
-  RotationMatrix res;
+  Matrix3 res;
   res <<  static_cast<S>(0),     -angleAxis(2),      angleAxis(1),
                angleAxis(2), static_cast<S>(0),     -angleAxis(0),
               -angleAxis(1),      angleAxis(0), static_cast<S>(0);
@@ -326,7 +326,7 @@ typename SO3Base<Derived>::RotationMatrix SO3Base<Derived>::Hat(const Tangent& a
 
 //==============================================================================
 template <typename Derived>
-typename SO3Base<Derived>::Tangent SO3Base<Derived>::Vee(const RotationMatrix& mat)
+typename SO3Base<Derived>::Tangent SO3Base<Derived>::Vee(const Matrix3& mat)
 {
   // TODO(JS): Add validity check if mat is skew-symmetric for debug mode
   return Tangent(mat(2, 1), mat(0, 2), mat(1, 0));
@@ -354,7 +354,7 @@ auto SO3Base<Derived>::toRotationMatrix() const
 
 //==============================================================================
 template <typename Derived>
-void SO3Base<Derived>::fromRotationMatrix(const RotationMatrix& rotMat)
+void SO3Base<Derived>::fromRotationMatrix(const Matrix3& rotMat)
 {
   // We assume the canonical representation is the rotation matrix
   setRepData(detail::so3_operations::SO3RepDataConvertImpl<

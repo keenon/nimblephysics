@@ -213,21 +213,21 @@ void SO3Vector<S>::fromRotationVector(Eigen::MatrixBase<MatrixDerived>&& vector)
 
 //==============================================================================
 template <typename S>
-typename SO3Vector<S>::RotationVector SO3Vector<S>::toRotationVector() const
+typename SO3Vector<S>::Vector3 SO3Vector<S>::toRotationVector() const
 {
   return mRepData;
 }
 
 //==============================================================================
 template <typename S>
-void SO3Vector<S>::setRotationVector(const RotationVector& axisAngle)
+void SO3Vector<S>::setRotationVector(const Vector3& axisAngle)
 {
   mRepData = axisAngle;
 }
 
 //==============================================================================
 template <typename S>
-const typename SO3Vector<S>::RotationVector& SO3Vector<S>::getRotationVector() const
+const typename SO3Vector<S>::Vector3& SO3Vector<S>::getRotationVector() const
 {
   return mRepData;
 }

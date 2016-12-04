@@ -50,8 +50,8 @@ public:
   using Base = SO3Base<SO3Matrix>;
   using S = S_;
 
-  using RotationMatrix = typename Base::RotationMatrix;
-  using RotationVector = typename Base::RotationVector;
+  using Matrix3 = typename Base::Matrix3;
+  using Vector3 = typename Base::Vector3;
 
   using RepData = typename Base::RepData;
 
@@ -124,7 +124,7 @@ public:
   template <typename RotationDerived>
   SO3Matrix& operator=(Eigen::RotationBase<RotationDerived, Base::Dim>&& rot);
 
-  const RotationVector operator*(const RotationVector& vector);
+  const Vector3 operator*(const Vector3& vector);
 
   /// Whether \b exactly equal to a SO3.
   bool operator==(const SO3Matrix& other);
@@ -141,7 +141,7 @@ public:
   template <typename Derived>
   void setRotationMatrix(Eigen::MatrixBase<Derived>&& mat);
 
-  const RotationMatrix& getRotationMatrix() const;
+  const Matrix3& getRotationMatrix() const;
 
   void setRandom();
 

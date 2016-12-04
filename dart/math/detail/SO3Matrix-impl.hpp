@@ -153,7 +153,7 @@ SO3Matrix<S>& SO3Matrix<S>::operator=(Eigen::RotationBase<RotationDerived, Base:
 
 //==============================================================================
 template <typename S>
-const typename SO3Matrix<S>::RotationVector SO3Matrix<S>::operator*(const RotationVector& vector)
+const typename SO3Matrix<S>::Vector3 SO3Matrix<S>::operator*(const Vector3& vector)
 {
   return mRepData * vector;
 }
@@ -189,7 +189,7 @@ void SO3Matrix<S>::setRotationMatrix(Eigen::MatrixBase<Derived>&& mat)
 
 //==============================================================================
 template <typename S>
-const typename SO3Matrix<S>::RotationMatrix& SO3Matrix<S>::getRotationMatrix() const
+const typename SO3Matrix<S>::Matrix3& SO3Matrix<S>::getRotationMatrix() const
 {
   return mRepData;
 }

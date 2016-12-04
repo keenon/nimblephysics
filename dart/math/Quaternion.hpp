@@ -52,7 +52,7 @@ public:
   using Base = SO3Base<Quaternion<S_>>;
   using S = S_;
 
-  using RotationMatrix = typename Base::RotationMatrix;
+  using Matrix3 = typename Base::Matrix3;
 
   using RepData = typename Base::RepData;
   // TODO(JS): Rename to Data

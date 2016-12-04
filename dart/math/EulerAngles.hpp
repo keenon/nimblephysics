@@ -52,7 +52,7 @@ public:
   using Base = SO3Base<EulerAngles<S_, index0, index1, index2>>;
   using S = S_;
 
-  using RotationMatrix = typename Base::RotationMatrix;
+  using Matrix3 = typename Base::Matrix3;
 
   using RepData = typename Base::RepData;
   // TODO(JS): Rename to Data

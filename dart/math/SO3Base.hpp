@@ -55,8 +55,8 @@ public:
   /// The scalar type of the coefficients
   using S = typename detail::Traits<Derived>::S;
 
-  using RotationMatrix = Eigen::Matrix<S, Dim, Dim>;
-  using RotationVector = Eigen::Matrix<S, Dim, 1>;
+  using Vector3 = Eigen::Matrix<S, 3, 1>;
+  using Matrix3 = Eigen::Matrix<S, 3, 3>;
 
   /// The data type of this SO(3) representation type
   using RepData = typename detail::Traits<Derived>::RepData;
@@ -126,7 +126,7 @@ public:
                 std::declval<RepData>(),
                 std::declval<typename OtherDerived::RepData>()));
 
-  const RotationVector operator*(const RotationVector& vector);
+  const Vector3 operator*(const Vector3& vector);
 
   /// In-place group multiplication
   template <typename OtherDerived>
@@ -200,9 +200,9 @@ public:
 
   /// \}
 
-  static RotationMatrix Hat(const Tangent& angleAxis);
+  static Matrix3 Hat(const Tangent& angleAxis);
 
-  static Tangent Vee(const RotationMatrix& mat);
+  static Tangent Vee(const Matrix3& mat);
 
   //----------------------------------------------------------------------------
   /// \{ \name Representation conversions
@@ -217,7 +217,7 @@ public:
   auto toRotationMatrix() const
   -> typename detail::Traits<SO3Matrix<S>>::RepData;
 
-  void fromRotationMatrix(const RotationMatrix& rotMat);
+  void fromRotationMatrix(const Matrix3& rotMat);
 
 //  template <typename RepTo>
 //  auto getCoordinates() const

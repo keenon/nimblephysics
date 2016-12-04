@@ -98,7 +98,7 @@ AngleAxis<S>::AngleAxis(Eigen::AngleAxis<S>&& angleAxis)
 
 //==============================================================================
 template <typename S>
-AngleAxis<S>::AngleAxis(const RotationVector& axis, S angle)
+AngleAxis<S>::AngleAxis(const Axis& axis, S angle)
   : Base(), mRepData(angle, axis)
 {
   // Do nothing
@@ -106,7 +106,7 @@ AngleAxis<S>::AngleAxis(const RotationVector& axis, S angle)
 
 //==============================================================================
 template <typename S>
-AngleAxis<S>::AngleAxis(RotationVector&& axis, S angle)
+AngleAxis<S>::AngleAxis(Axis&& axis, S angle)
   : Base(), mRepData(std::move(angle), axis)
 {
   // Do nothing
@@ -201,7 +201,7 @@ bool AngleAxis<S>::operator==(const AngleAxis& other)
 
 //==============================================================================
 template <typename S>
-void AngleAxis<S>::setAngleAxis(const RotationVector& axis, S angle)
+void AngleAxis<S>::setAngleAxis(const Axis& axis, S angle)
 {
   mRepData.axis() = axis;
   mRepData.angle() = angle;
@@ -209,14 +209,14 @@ void AngleAxis<S>::setAngleAxis(const RotationVector& axis, S angle)
 
 //==============================================================================
 template <typename S>
-void AngleAxis<S>::setAxis(const RotationVector& axis)
+void AngleAxis<S>::setAxis(const Axis& axis)
 {
   mRepData.axis() = axis;
 }
 
 //==============================================================================
 template <typename S>
-const typename AngleAxis<S>::RotationVector& AngleAxis<S>::getAxis() const
+const typename AngleAxis<S>::Axis& AngleAxis<S>::getAxis() const
 {
   return mRepData.axis();
 }
