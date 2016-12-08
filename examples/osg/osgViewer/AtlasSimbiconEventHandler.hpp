@@ -29,62 +29,28 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef DART_GUI_OSG_IMGUIVIEWER_HPP_
-#define DART_GUI_OSG_IMGUIVIEWER_HPP_
+#ifndef DART_EXAMPLE_OSG_OSGATLASSIMBICON_ATLASSIMBICONEVENTHANDLER_HPP_
+#define DART_EXAMPLE_OSG_OSGATLASSIMBICON_ATLASSIMBICONEVENTHANDLER_HPP_
 
-#include <memory>
+#include <dart/dart.hpp>
+#include <dart/utils/utils.hpp>
+#include <dart/gui/osg/osg.hpp>
 
-#include "dart/gui/osg/Viewer.hpp"
+#include "AtlasSimbiconWorldNode.hpp"
 
-namespace dart {
-namespace gui {
-namespace osg {
-
-class ImGuiHandler;
-class MainMenuWidget;
-class AboutWidget;
-
-class ImGuiViewer : public Viewer
+class AtlasSimbiconEventHandler : public osgGA::GUIEventHandler
 {
 public:
 
-  /// Constructor for dart::gui::osg::Viewer. This will automatically create the
-  /// default event handler.
-  ImGuiViewer(
-      const ::osg::Vec4& clearColor = ::osg::Vec4(0.9f, 0.9f, 0.9f, 1.0f));
+  AtlasSimbiconEventHandler(AtlasSimbiconWorldNode* node);
 
-  /// Destructor.
-  virtual ~ImGuiViewer();
-
-  /// Get ImGui handler.
-  ImGuiHandler* getImGuiHandler();
-
-  /// Get cosnt ImGui handler.
-  const ImGuiHandler* getImGuiHandler() const;
-
-  /// Show About widget.
-  void showAbout();
-
-  /// Hide About widget.
-  void hideAbout();
-
-  unsigned int getWidth() const;
-  unsigned int getHeight() const;
-  int getX() const;
-  int getY() const;
+  bool handle(const osgGA::GUIEventAdapter& ea,
+              osgGA::GUIActionAdapter&) override;
 
 protected:
 
-  /// ImGui handler.
-  ImGuiHandler* mImGuiHandler;
-
-  /// About widget.
-  std::shared_ptr<AboutWidget> mAboutWidget;
+  AtlasSimbiconWorldNode* mNode;
 
 };
 
-} // namespace osg
-} // namespace gui
-} // namespace dart
-
-#endif // DART_GUI_OSG_IMGUIVIEWER_HPP_
+#endif // DART_EXAMPLE_OSG_OSGATLASSIMBICON_ATLASSIMBICONEVENTHANDLER_HPP_

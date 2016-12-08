@@ -29,81 +29,52 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "dart/gui/osg/ImGuiViewer.hpp"
-
-#include "dart/gui/osg/ImGuiWidget.hpp"
-#include "dart/gui/osg/ImGuiHandler.hpp"
-
-namespace dart {
-namespace gui {
-namespace osg {
+#include "AtlasSimbiconEventHandler.hpp"
 
 //==============================================================================
-ImGuiViewer::ImGuiViewer(const ::osg::Vec4& clearColor)
-  : Viewer(clearColor),
-    mImGuiHandler(new ImGuiHandler()),
-    mAboutWidget(new AboutWidget())
-{
-  mImGuiHandler->setCameraCallbacks(getCamera());
-  mImGuiHandler->addWidget(mAboutWidget, false);
-
-  addEventHandler(mImGuiHandler);
-}
-
-//==============================================================================
-ImGuiViewer::~ImGuiViewer()
+AtlasSimbiconEventHandler::AtlasSimbiconEventHandler(
+    AtlasSimbiconWorldNode* node)
+  : mNode(node)
 {
   // Do nothing
 }
 
 //==============================================================================
-ImGuiHandler* ImGuiViewer::getImGuiHandler()
+bool AtlasSimbiconEventHandler::handle(
+    const osgGA::GUIEventAdapter& ea, osgGA::GUIActionAdapter&)
 {
-  return mImGuiHandler;
-}
+  if(ea.getEventType() == osgGA::GUIEventAdapter::KEYDOWN)
+  {
+    if(ea.getKey() == 'r' || ea.getKey() == 'R')
+    {
+      mNode->reset();
+      return true;
+    }
+    else if(ea.getKey() == 'a' || ea.getKey() == 'A')
+    {
+      mNode->pushForwardAtlas();
+      return true;
+    }
+    else if(ea.getKey() == 's' || ea.getKey() == 'S')
+    {
+      mNode->pushBackwardAtlas();
+      return true;
+    }
+    else if(ea.getKey() == 'd' || ea.getKey() == 'D')
+    {
+      mNode->pushLeftAtlas();
+      return true;
+    }
+    else if(ea.getKey() == 'f' || ea.getKey() == 'F')
+    {
+      mNode->pushRightAtlas();
+      return true;
+    }
+  }
 
-//==============================================================================
-const ImGuiHandler* ImGuiViewer::getImGuiHandler() const
-{
-  return mImGuiHandler;
+  // The return value should be 'true' if the input has been fully handled
+  // and should not be visible to any remaining event handlers. It should be
+  // false if the input has not been fully handled and should be viewed by
+  // any remaining event handlers.
+  return false;
 }
-
-//==============================================================================
-void ImGuiViewer::showAbout()
-{
-  mAboutWidget->show();
-}
-
-//==============================================================================
-void ImGuiViewer::hideAbout()
-{
-  mAboutWidget->hide();
-}
-
-//==============================================================================
-unsigned int ImGuiViewer::getWidth() const
-{
-  return getCamera()->getViewport()->width();
-}
-
-//==============================================================================
-unsigned int ImGuiViewer::getHeight() const
-{
-  return getCamera()->getViewport()->height();
-}
-
-//==============================================================================
-int ImGuiViewer::getX() const
-{
-  return getCamera()->getViewport()->x();
-}
-
-//==============================================================================
-int ImGuiViewer::getY() const
-{
-  return getCamera()->getViewport()->y();
-}
-
-} // namespace osg
-} // namespace gui
-} // namespace dart

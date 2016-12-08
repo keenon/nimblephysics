@@ -14,6 +14,12 @@
  *     copyright notice, this list of conditions and the following
  *     disclaimer in the documentation and/or other materials provided
  *     with the distribution.
+ *   * This code incorporates portions of Open Dynamics Engine
+ *     (Copyright (c) 2001-2004, Russell L. Smith. All rights
+ *     reserved.) and portions of FCL (Copyright (c) 2011, Willow
+ *     Garage, Inc. All rights reserved.), which were released under
+ *     the same BSD license as below
+ *
  *   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND
  *   CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
  *   INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
@@ -29,62 +35,48 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef DART_GUI_OSG_IMGUIVIEWER_HPP_
-#define DART_GUI_OSG_IMGUIVIEWER_HPP_
+#ifndef DART_EXAMPLE_OSG_OSGATLASSIMBICON_ATLASSIMBICONWIDGET_HPP_
+#define DART_EXAMPLE_OSG_OSGATLASSIMBICON_ATLASSIMBICONWIDGET_HPP_
 
-#include <memory>
+#include "dart/gui/osg/ImGuiWidget.hpp"
+#include "dart/gui/osg/ImGuiViewer.hpp"
 
-#include "dart/gui/osg/Viewer.hpp"
+class AtlasSimbiconWorldNode;
 
-namespace dart {
-namespace gui {
-namespace osg {
-
-class ImGuiHandler;
-class MainMenuWidget;
-class AboutWidget;
-
-class ImGuiViewer : public Viewer
+class AtlasSimbiconWidget : public dart::gui::osg::ImGuiWidget
 {
 public:
 
-  /// Constructor for dart::gui::osg::Viewer. This will automatically create the
-  /// default event handler.
-  ImGuiViewer(
-      const ::osg::Vec4& clearColor = ::osg::Vec4(0.9f, 0.9f, 0.9f, 1.0f));
+  /// Constructor
+  AtlasSimbiconWidget(dart::gui::osg::ImGuiViewer* viewer,
+                      AtlasSimbiconWorldNode* node);
 
-  /// Destructor.
-  virtual ~ImGuiViewer();
-
-  /// Get ImGui handler.
-  ImGuiHandler* getImGuiHandler();
-
-  /// Get cosnt ImGui handler.
-  const ImGuiHandler* getImGuiHandler() const;
-
-  /// Show About widget.
-  void showAbout();
-
-  /// Hide About widget.
-  void hideAbout();
-
-  unsigned int getWidth() const;
-  unsigned int getHeight() const;
-  int getX() const;
-  int getY() const;
+  // Documentation inherited
+  void render() override;\
 
 protected:
 
-  /// ImGui handler.
-  ImGuiHandler* mImGuiHandler;
+  void setGravity(float gravity);
 
-  /// About widget.
-  std::shared_ptr<AboutWidget> mAboutWidget;
+  dart::gui::osg::ImGuiViewer* mViewer;
+
+  AtlasSimbiconWorldNode* mNode;
+
+  float mGuiGravityAcc;
+
+  float mGravityAcc;
+
+  bool mGuiHeadlights;
+
+  /// Control mode value for GUI
+  int mGuiControlMode;
+
+  /// Actual control mode
+  ///   - 0: No control
+  ///   - 1: Short-stride walking control
+  ///   - 1: Normal-stride walking control
+  int mControlMode;
 
 };
 
-} // namespace osg
-} // namespace gui
-} // namespace dart
-
-#endif // DART_GUI_OSG_IMGUIVIEWER_HPP_
+#endif // DART_EXAMPLE_OSG_OSGATLASSIMBICON_ATLASSIMBICONWIDGET_HPP_

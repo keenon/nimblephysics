@@ -14,6 +14,12 @@
  *     copyright notice, this list of conditions and the following
  *     disclaimer in the documentation and/or other materials provided
  *     with the distribution.
+ *   * This code incorporates portions of Open Dynamics Engine
+ *     (Copyright (c) 2001-2004, Russell L. Smith. All rights
+ *     reserved.) and portions of FCL (Copyright (c) 2011, Willow
+ *     Garage, Inc. All rights reserved.), which were released under
+ *     the same BSD license as below
+ *
  *   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND
  *   CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
  *   INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
@@ -29,81 +35,49 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "dart/gui/osg/ImGuiViewer.hpp"
+#include "SimulationWidget.hpp"
 
-#include "dart/gui/osg/ImGuiWidget.hpp"
-#include "dart/gui/osg/ImGuiHandler.hpp"
+#include "dart/external/imgui/imgui.h"
 
-namespace dart {
-namespace gui {
-namespace osg {
+#include "AtlasSimbiconWorldNode.hpp"
 
 //==============================================================================
-ImGuiViewer::ImGuiViewer(const ::osg::Vec4& clearColor)
-  : Viewer(clearColor),
-    mImGuiHandler(new ImGuiHandler()),
-    mAboutWidget(new AboutWidget())
-{
-  mImGuiHandler->setCameraCallbacks(getCamera());
-  mImGuiHandler->addWidget(mAboutWidget, false);
-
-  addEventHandler(mImGuiHandler);
-}
-
-//==============================================================================
-ImGuiViewer::~ImGuiViewer()
+SimulationWidget::SimulationWidget(
+    dart::gui::osg::ImGuiViewer* viewer,
+    AtlasSimbiconWorldNode* node)
+  : mViewer(viewer),
+    mNode(node)
 {
   // Do nothing
 }
 
 //==============================================================================
-ImGuiHandler* ImGuiViewer::getImGuiHandler()
+void SimulationWidget::render()
 {
-  return mImGuiHandler;
-}
+  const auto w = mViewer->getWidth();
+  const auto h = mViewer->getHeight();
 
-//==============================================================================
-const ImGuiHandler* ImGuiViewer::getImGuiHandler() const
-{
-  return mImGuiHandler;
-}
+  ImGui::SetNextWindowPos(ImVec2(mMargin, h - (mWidgetHeight + mMargin)));
+  ImGui::SetNextWindowSize(ImVec2(w - 2.0f * mMargin, mWidgetHeight));
+  if (!ImGui::Begin("Simulation Control", &mIsVisible,
+                    ImGuiWindowFlags_NoTitleBar |
+                    ImGuiWindowFlags_NoCollapse |
+                    ImGuiWindowFlags_NoResize |
+                    ImGuiWindowFlags_NoMove))
+  {
+    // Early out if the window is collapsed, as an optimization.
+    ImGui::End();
+    return;
+  }
 
-//==============================================================================
-void ImGuiViewer::showAbout()
-{
-  mAboutWidget->show();
-}
+  auto simFrames = mNode->getWorld()->getSimFrames();
+  auto simTime = mNode->getWorld()->getTime();
 
-//==============================================================================
-void ImGuiViewer::hideAbout()
-{
-  mAboutWidget->hide();
-}
+  ImGui::Text("Simulation Time: %.1f ", simTime);
+  ImGui::SameLine();
+  ImGui::Text("| Simulation Frames: %d ", simFrames);
+  ImGui::SameLine();
+  ImGui::Text("| %.1f FPS", ImGui::GetIO().Framerate);
 
-//==============================================================================
-unsigned int ImGuiViewer::getWidth() const
-{
-  return getCamera()->getViewport()->width();
+  ImGui::End();
 }
-
-//==============================================================================
-unsigned int ImGuiViewer::getHeight() const
-{
-  return getCamera()->getViewport()->height();
-}
-
-//==============================================================================
-int ImGuiViewer::getX() const
-{
-  return getCamera()->getViewport()->x();
-}
-
-//==============================================================================
-int ImGuiViewer::getY() const
-{
-  return getCamera()->getViewport()->y();
-}
-
-} // namespace osg
-} // namespace gui
-} // namespace dart

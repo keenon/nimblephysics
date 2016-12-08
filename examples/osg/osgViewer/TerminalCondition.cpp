@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 2016, Graphics Lab, Georgia Tech Research Corporation
- * Copyright (c) 2016, Humanoid Lab, Georgia Tech Research Corporation
+ * Copyright (c) 2014-2016, Graphics Lab, Georgia Tech Research Corporation
+ * Copyright (c) 2014-2016, Humanoid Lab, Georgia Tech Research Corporation
  * Copyright (c) 2016, Personal Robotics Lab, Carnegie Mellon University
  * All rights reserved.
  *
@@ -29,81 +29,99 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "dart/gui/osg/ImGuiViewer.hpp"
+#include "TerminalCondition.hpp"
 
-#include "dart/gui/osg/ImGuiWidget.hpp"
-#include "dart/gui/osg/ImGuiHandler.hpp"
+#include "State.hpp"
 
-namespace dart {
-namespace gui {
-namespace osg {
+// Macro for functions not implemented yet
+#define NOT_YET(FUNCTION) std::cout << #FUNCTION\
+                                  << "Not implemented yet."\
+                                  << std::endl;
+
+using namespace std;
+
+using namespace dart::dynamics;
+using namespace dart::constraint;
 
 //==============================================================================
-ImGuiViewer::ImGuiViewer(const ::osg::Vec4& clearColor)
-  : Viewer(clearColor),
-    mImGuiHandler(new ImGuiHandler()),
-    mAboutWidget(new AboutWidget())
+TerminalCondition::TerminalCondition(State* _state)
+  : mState(_state)
 {
-  mImGuiHandler->setCameraCallbacks(getCamera());
-  mImGuiHandler->addWidget(mAboutWidget, false);
-
-  addEventHandler(mImGuiHandler);
+  assert(_state != nullptr);
 }
 
 //==============================================================================
-ImGuiViewer::~ImGuiViewer()
+TerminalCondition::~TerminalCondition()
 {
-  // Do nothing
+
 }
 
 //==============================================================================
-ImGuiHandler* ImGuiViewer::getImGuiHandler()
+TimerCondition::TimerCondition(State* _state, double _duration)
+  : TerminalCondition(_state),
+    mDuration(_duration)
 {
-  return mImGuiHandler;
+
 }
 
 //==============================================================================
-const ImGuiHandler* ImGuiViewer::getImGuiHandler() const
+TimerCondition::~TimerCondition()
 {
-  return mImGuiHandler;
+
 }
 
 //==============================================================================
-void ImGuiViewer::showAbout()
+bool TimerCondition::isSatisfied()
 {
-  mAboutWidget->show();
+  if (mState->getElapsedTime() > mDuration)
+    return true;
+  else
+    return false;
 }
 
 //==============================================================================
-void ImGuiViewer::hideAbout()
+BodyContactCondition::BodyContactCondition(State* _state, BodyNode* _body)
+  : TerminalCondition(_state),
+    mBodyNode(_body)
 {
-  mAboutWidget->hide();
+  assert(_state != nullptr);
+  assert(_body != nullptr);
 }
 
 //==============================================================================
-unsigned int ImGuiViewer::getWidth() const
+BodyContactCondition::~BodyContactCondition()
 {
-  return getCamera()->getViewport()->width();
 }
 
 //==============================================================================
-unsigned int ImGuiViewer::getHeight() const
+bool BodyContactCondition::isSatisfied()
 {
-  return getCamera()->getViewport()->height();
+  SoftBodyNode* soft = dynamic_cast<SoftBodyNode*>(mBodyNode);
+  if (soft)
+  {
+    for (std::size_t i = 0; i < soft->getNumPointMasses(); ++i)
+    {
+      PointMass* pm = soft->getPointMass(i);
+      if (pm->isColliding() > 0)
+        return true;
+    }
+  }
+
+  // TODO(JS): Need more elegant condition check method
+DART_SUPPRESS_DEPRECATED_BEGIN
+  if (mBodyNode->isColliding() > 0)
+DART_SUPPRESS_DEPRECATED_END
+  {
+//    dtmsg << "BodyNode [" << mBodyNode->getName() << "] is in contact."
+//          << std::endl;
+    return true;
+  }
+  else
+  {
+//    dtmsg << "Waiting for BodyNode [" << mBodyNode->getName()
+//          << "] is in contact."
+//          << std::endl;
+    return false;
+  }
 }
 
-//==============================================================================
-int ImGuiViewer::getX() const
-{
-  return getCamera()->getViewport()->x();
-}
-
-//==============================================================================
-int ImGuiViewer::getY() const
-{
-  return getCamera()->getViewport()->y();
-}
-
-} // namespace osg
-} // namespace gui
-} // namespace dart

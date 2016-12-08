@@ -29,81 +29,84 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "dart/gui/osg/ImGuiViewer.hpp"
-
-#include "dart/gui/osg/ImGuiWidget.hpp"
-#include "dart/gui/osg/ImGuiHandler.hpp"
-
-namespace dart {
-namespace gui {
-namespace osg {
+#include "AtlasSimbiconWorldNode.hpp"
 
 //==============================================================================
-ImGuiViewer::ImGuiViewer(const ::osg::Vec4& clearColor)
-  : Viewer(clearColor),
-    mImGuiHandler(new ImGuiHandler()),
-    mAboutWidget(new AboutWidget())
+AtlasSimbiconWorldNode::AtlasSimbiconWorldNode(
+    const dart::simulation::WorldPtr& world,
+    const dart::dynamics::SkeletonPtr& atlas)
+  : dart::gui::osg::WorldNode(world),
+    mExternalForce(Eigen::Vector3d::Zero()),
+    mForceDuration(0.0)
 {
-  mImGuiHandler->setCameraCallbacks(getCamera());
-  mImGuiHandler->addWidget(mAboutWidget, false);
+  assert(world);
+  assert(atlas);
 
-  addEventHandler(mImGuiHandler);
+  mController.reset(new Controller(atlas, world->getConstraintSolver()));
 }
 
 //==============================================================================
-ImGuiViewer::~ImGuiViewer()
+void AtlasSimbiconWorldNode::customPreStep()
 {
-  // Do nothing
+  auto pelvis = mController->getAtlasRobot()->getBodyNode("pelvis");
+  pelvis->addExtForce(mExternalForce);
+  mController->update();
+
+  if (mForceDuration > 0)
+    mForceDuration--;
+  else
+    mExternalForce.setZero();
 }
 
 //==============================================================================
-ImGuiHandler* ImGuiViewer::getImGuiHandler()
+void AtlasSimbiconWorldNode::reset()
 {
-  return mImGuiHandler;
+  mExternalForce.setZero();
+  mController->resetRobot();
 }
 
 //==============================================================================
-const ImGuiHandler* ImGuiViewer::getImGuiHandler() const
+void AtlasSimbiconWorldNode::pushForwardAtlas(double force, int frames)
 {
-  return mImGuiHandler;
+  mExternalForce.x() = force;
+  mForceDuration = frames;
 }
 
 //==============================================================================
-void ImGuiViewer::showAbout()
+void AtlasSimbiconWorldNode::pushBackwardAtlas(double force, int frames)
 {
-  mAboutWidget->show();
+  mExternalForce.x() = -force;
+  mForceDuration = frames;
 }
 
 //==============================================================================
-void ImGuiViewer::hideAbout()
+void AtlasSimbiconWorldNode::pushLeftAtlas(double force, int frames)
 {
-  mAboutWidget->hide();
+  mExternalForce.z() = force;
+  mForceDuration = frames;
 }
 
 //==============================================================================
-unsigned int ImGuiViewer::getWidth() const
+void AtlasSimbiconWorldNode::pushRightAtlas(double force, int frames)
 {
-  return getCamera()->getViewport()->width();
+  mExternalForce.z() = -force;
+  mForceDuration = frames;
 }
 
 //==============================================================================
-unsigned int ImGuiViewer::getHeight() const
+void AtlasSimbiconWorldNode::switchToNormalStrideWalking()
 {
-  return getCamera()->getViewport()->height();
+  mController->changeStateMachine("walking", mWorld->getTime());
 }
 
 //==============================================================================
-int ImGuiViewer::getX() const
+void AtlasSimbiconWorldNode::switchToShortStrideWalking()
 {
-  return getCamera()->getViewport()->x();
+  mController->changeStateMachine("running", mWorld->getTime());
 }
 
 //==============================================================================
-int ImGuiViewer::getY() const
+void AtlasSimbiconWorldNode::switchToNoControl()
 {
-  return getCamera()->getViewport()->y();
+  mController->changeStateMachine("standing", mWorld->getTime());
 }
-
-} // namespace osg
-} // namespace gui
-} // namespace dart
