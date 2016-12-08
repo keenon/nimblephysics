@@ -73,9 +73,66 @@ void SimulationWidget::render()
   auto simFrames = mNode->getWorld()->getSimFrames();
   auto simTime = mNode->getWorld()->getTime();
 
-  ImGui::Text("Simulation Time: %.1f ", simTime);
+  // Play or pause
+  const auto simulating = mViewer->isSimulating();
+  const auto playOrPause = simulating ? "Pause" : "Play ";
+  const auto buttonPushed = ImGui::Button(playOrPause);
+  if (buttonPushed)
+  {
+    if (simulating)
+      mViewer->simulate(false);
+    else
+      mViewer->simulate(true);
+  }
+
+  // Manual steps
+  if (!simulating)
+  {
+    ImGui::SameLine();
+    const auto buttonPushed = ImGui::Button("Simulate");
+    if (buttonPushed)
+    {
+      std::cout << "steps!" << std::endl;
+    }
+  }
   ImGui::SameLine();
-  ImGui::Text("| Simulation Frames: %d ", simFrames);
+  ImGui::Text("Steps: ");
+  ImGui::SameLine();
+  ImGui::PushItemWidth(100);
+  ImGui::InputInt("", &mSteps);
+  mSteps = std::max(1, mSteps);
+  ImGui::PopItemWidth();
+
+  char simTimeBuff[16];
+  std::size_t simTimeBuffSize = 16;
+
+  // Simulation time
+  std::sprintf(simTimeBuff, "%.3f", simTime);
+  ImGui::SameLine();
+  ImGui::Spacing();
+  ImGui::SameLine();
+  ImGui::Text("Simulation Time: ");
+  ImGui::SameLine();
+  ImGui::PushItemWidth(100);
+  ImGui::InputText("sec", simTimeBuff, simTimeBuffSize,
+                   ImGuiInputTextFlags_ReadOnly |
+                   ImGuiInputTextFlags_AutoSelectAll);
+  ImGui::PopItemWidth();
+
+  // Simulation frames
+  std::sprintf(simTimeBuff, "%d", simFrames);
+  ImGui::SameLine();
+  ImGui::Spacing();
+  ImGui::SameLine();
+  ImGui::Text("| Simulation Frames: ");
+  ImGui::SameLine();
+  ImGui::PushItemWidth(100);
+  ImGui::InputText("", simTimeBuff, simTimeBuffSize,
+                   ImGuiInputTextFlags_ReadOnly |
+                   ImGuiInputTextFlags_AutoSelectAll);
+  ImGui::PopItemWidth();
+
+  // FPS
   ImGui::SameLine();
   ImGui::Text("| %.1f FPS", ImGui::GetIO().Framerate);
 

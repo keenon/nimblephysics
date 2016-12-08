@@ -61,7 +61,8 @@ protected:
   AtlasSimbiconWorldNode* mNode;
 
   float mMargin{5.0f};
-  float mWidgetHeight{30.0f};
+  float mWidgetHeight{35.0f};
+  int mSteps{1};
 
 };
 
