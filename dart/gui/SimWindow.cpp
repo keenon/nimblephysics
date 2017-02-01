@@ -1,7 +1,7 @@
 /*
- * Copyright (c) 2013-2016, Graphics Lab, Georgia Tech Research Corporation
  * Copyright (c) 2013-2016, Humanoid Lab, Georgia Tech Research Corporation
- * Copyright (c) 2016, Personal Robotics Lab, Carnegie Mellon University
+ * Copyright (c) 2013-2017, Graphics Lab, Georgia Tech Research Corporation
+ * Copyright (c) 2016-2017, Personal Robotics Lab, Carnegie Mellon University
  * All rights reserved.
  *
  * This file is provided under the following "BSD-style" License:
@@ -420,7 +420,7 @@ void SimWindow::drawShape(const dynamics::Shape* shape,
   else if (shape->is<EllipsoidShape>())
   {
     const auto* ellipsoid = static_cast<const EllipsoidShape*>(shape);
-    mRI->drawEllipsoid(ellipsoid->getSize());
+    mRI->drawEllipsoid(ellipsoid->getDiameters());
   }
   else if (shape->is<CylinderShape>())
   {

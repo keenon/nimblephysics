@@ -5,6 +5,7 @@
 * Math
 
   * Fixed Lemke LCP solver (#808 for DART 6): [#812](https://github.com/dartsim/dart/pull/812)
+  * Added accessors for diameters and radii of EllipsoidShape, and deprecated EllipsoidShape::get/setSize(): [#829](https://github.com/dartsim/dart/pull/829)
 
 * GUI
 
@@ -12,9 +13,11 @@
 
 * Misc
 
+  * Modified the member function names pertain to lazy evaluation to be more relevant to their functionalities: [#833](https://github.com/dartsim/dart/pull/833)
+  * Added Skeleton::getRootJoint(): [#832](https://github.com/dartsim/dart/pull/832)
   * Added CMake targets for code formatting using clang-format: [#811](https://github.com/dartsim/dart/pull/811), [#817](https://github.com/dartsim/dart/pull/817)
 
-### DART 6.1.2 (2016-XX-XX)
+### DART 6.1.2 (2017-01-13)
 
 * Dynamics
 
@@ -195,7 +198,13 @@
 
 ## DART 5
 
-### Version 5.1.5 (201X-XX-XX)
+### Version 5.1.5 (2017-01-20)
+
+1. Fixed Lemke LCP solver for several failing cases
+    * [Pull request #808](https://github.com/dartsim/dart/pull/808)
+
+1. Increase minimum required Ipopt version to 3.11.9
+    * [Pull request #800](https://github.com/dartsim/dart/pull/800)
 
 1. Added support of urdfdom_headers 1.0 for DART 5.1 (backport of [#766](https://github.com/dartsim/dart/pull/766))
     * [Pull request #799](https://github.com/dartsim/dart/pull/799)
