@@ -119,12 +119,12 @@ public:
 
   /// Group multiplication
   template <typename OtherDerived>
-  auto
-  operator*(const SO3Base<OtherDerived>& other) const
-  -> decltype(detail::so3_operations::so3_multiplication_impl<
-      Derived, OtherDerived>::run(
-                std::declval<RepData>(),
-                std::declval<typename OtherDerived::RepData>()));
+  Derived
+  operator*(const SO3Base<OtherDerived>& other) const;
+  //-> decltype(detail::so3_operations::group_multiplication_impl<
+  //    Derived, OtherDerived>::run(
+  //              std::declval<RepData>(),
+  //              std::declval<typename OtherDerived::RepData>()));
 
   const Vector3 operator*(const Vector3& vector);
 

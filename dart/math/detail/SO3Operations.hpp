@@ -772,7 +772,7 @@ struct so3_multiplication_impl<SO3Vector<S>, SO3Vector<S>>
 
 //==============================================================================
 template <typename SO3Type,
-          typename SO3Canonical = DefaultSO3Canonical<typename SO3Type::S>,
+          typename SO3Canonical = DefaultSO3Canonical<typename Traits<SO3Type>::S>,
           typename Enable = void>
 struct group_is_canonical : std::false_type {};
 
@@ -795,13 +795,13 @@ struct group_is_canonical<
 // representation.
 template <typename SO3A,
           typename SO3B,
-          typename SO3Canonical = DefaultSO3Canonical<typename SO3A::S>,
+          typename SO3Canonical = DefaultSO3Canonical<typename Traits<SO3A>::S>,
           typename Enable = void>
 struct group_multiplication_impl
 {
-  using S = typename SO3A::S;
+  using S = typename Traits<SO3A>::S;
 
-  static const SO3A run(const SO3A& Ra, const SO3B& Rb)
+  static SO3A run(const SO3A& Ra, const SO3B& Rb)
   {
     return SO3A(SO3RepDataDirectConvertImpl<SO3Canonical, SO3A>::run(
           so3_canonical_multiplication_impl<S>::run( // TODO(JS): Remove _canonical_
@@ -821,20 +821,20 @@ struct group_multiplication_impl<
     typename std::enable_if<
 //        !std::is_same<typename SO3A::RepData,  typename SO3B::RepData>::value
         true
-        && (std::is_same<typename SO3A::RepData, Eigen::Matrix<typename SO3A::S, 3, 3>>::value
-            || std::is_same<typename SO3A::RepData, Eigen::AngleAxis<typename SO3A::S>>::value
-            || std::is_same<typename SO3A::RepData, Eigen::Quaternion<typename SO3A::S>>::value)
-        && (std::is_same<typename SO3B::RepData, Eigen::Matrix<typename SO3A::S, 3, 3>>::value
-            || std::is_same<typename SO3B::RepData, Eigen::AngleAxis<typename SO3A::S>>::value
-            || std::is_same<typename SO3B::RepData, Eigen::Quaternion<typename SO3A::S>>::value)
+        && (std::is_same<typename Traits<SO3A>::RepData, Eigen::Matrix<typename Traits<SO3A>::S, 3, 3>>::value
+            || std::is_same<typename Traits<SO3A>::RepData, Eigen::AngleAxis<typename Traits<SO3A>::S>>::value
+            || std::is_same<typename Traits<SO3A>::RepData, Eigen::Quaternion<typename Traits<SO3A>::S>>::value)
+        && (std::is_same<typename Traits<SO3B>::RepData, Eigen::Matrix<typename Traits<SO3B>::S, 3, 3>>::value
+            || std::is_same<typename Traits<SO3B>::RepData, Eigen::AngleAxis<typename Traits<SO3B>::S>>::value
+            || std::is_same<typename Traits<SO3B>::RepData, Eigen::Quaternion<typename Traits<SO3B>::S>>::value)
     >::type>
 {
-  using S = typename SO3A::S;
+  using S = typename Traits<SO3A>::S;
 
   using RepDataTypeA = typename Traits<SO3A>::RepData;
   using RepDataTypeB = typename Traits<SO3B>::RepData;
 
-  static const SO3A run(const SO3A& Ra, const SO3B& Rb)
+  static SO3A run(const SO3A& Ra, const SO3B& Rb)
   {
     return SO3A(Ra.getRepData() * Rb.getRepData());
   }

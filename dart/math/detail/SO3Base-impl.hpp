@@ -114,15 +114,16 @@ Derived& SO3Base<Derived>::operator=(Eigen::MatrixBase<MatrixDerived>&& matrix)
 //==============================================================================
 template <typename Derived>
 template <typename OtherDerived>
-auto
+//auto
+Derived
 SO3Base<Derived>::operator*(const SO3Base<OtherDerived>& other) const
--> decltype(detail::so3_operations::so3_multiplication_impl<
-    Derived, OtherDerived>::run(
-              std::declval<RepData>(),
-              std::declval<typename OtherDerived::RepData>()))
+//-> decltype(detail::so3_operations::group_multiplication_impl<
+//    Derived, OtherDerived>::run(
+//              std::declval<RepData>(),
+//              std::declval<typename OtherDerived::RepData>()))
 {
-  return detail::so3_operations::so3_multiplication_impl<
-      Derived, OtherDerived>::run(getRepData(), other.getRepData());
+  return detail::so3_operations::group_multiplication_impl<
+      Derived, OtherDerived>::run(derived(), other.derived());
 }
 
 //==============================================================================
