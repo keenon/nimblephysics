@@ -100,6 +100,12 @@ public:
   template <typename Derived>
   SO3Matrix(Eigen::MatrixBase<Derived>&& matrix);
 
+  /// Construct from Eigen::AngleAxis
+  SO3Matrix(const Eigen::AngleAxis<S>& aa);
+
+  /// Construct from Eigen::Quaternion
+  SO3Matrix(const Eigen::Quaternion<S>& quat);
+
   /// \} // Constructors
 
   //----------------------------------------------------------------------------

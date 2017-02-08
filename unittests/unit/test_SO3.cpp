@@ -116,7 +116,7 @@ void genericSO3(const math::SO3Base<Derived>& so3)
 //==============================================================================
 TEST(SO3, FunctionsTakingGenericSO3AsParameters)
 {
-  genericSO3(SO3Matrixd());
+  genericSO3(math::SO3Matrixd());
   genericSO3(math::AngleAxisd());
 
 //  genericSO3(AngleAxisd::Random(),
@@ -139,8 +139,8 @@ void testSettersAndGetters()
 //==============================================================================
 TEST(SO3, SettersAndGetters)
 {
-  testSettersAndGetters<SO3Matrixd>();
-  testSettersAndGetters<SO3Vectord>();
+  testSettersAndGetters<math::SO3Matrixd>();
+  testSettersAndGetters<math::SO3Vectord>();
   testSettersAndGetters<math::AngleAxisd>();
   testSettersAndGetters<math::Quaterniond>();
   // EulerAngles
@@ -298,6 +298,34 @@ TEST(SO3, GeneralizedCoordinates)
 //}
 
 //==============================================================================
+template <typename T>
+void testConstruction()
+{
+  // TODO(JS): Implement
+//  T(Eigen::Matrix3d   ()).isApprox(T::Identity());
+//  T(Eigen::AngleAxisd ()).isApprox(T::Identity());
+//  T(Eigen::Quaterniond()).isApprox(T::Identity());
+  T(math::SO3Matrixd  ()).isApprox(T::Identity());
+  T(math::SO3Vectord  ()).isApprox(T::Identity());
+  T(math::AngleAxisd  ()).isApprox(T::Identity());
+  T(math::Quaterniond ()).isApprox(T::Identity());
+  T(math::EulerXYZd   ()).isApprox(T::Identity());
+  T(math::EulerZYXd   ()).isApprox(T::Identity());
+}
+
+//==============================================================================
+TEST(SO3, Constructions)
+{
+  testConstruction<math::SO3Matrixd>();
+  testConstruction<math::SO3Vectord>();
+  testConstruction<math::SO3Vectord>();
+  testConstruction<math::AngleAxisd>();
+  testConstruction<math::Quaterniond>();
+  testConstruction<math::EulerXYZd>();
+  testConstruction<math::EulerZYXd>();
+}
+
+//==============================================================================
 TEST(SO3, Conversions)
 {
   const math::SO3d randomSO3 = math::SO3d::Random();
@@ -315,8 +343,8 @@ TEST(SO3, Conversions)
   Eigen::Matrix3d    eigMatOut;
   Eigen::AngleAxisd  eigAaOut;
   Eigen::Quaterniond eigQuatOut;
-  SO3Matrixd         so3MatOut;
-  SO3Vectord         so3VecOut;
+  math::SO3Matrixd   so3MatOut;
+  math::SO3Vectord   so3VecOut;
   math::AngleAxisd   so3AaOut;
   math::Quaterniond  so3QuatOut;
   math::EulerXYZd    so3XYZOut;
@@ -634,8 +662,8 @@ TEST(SO3, Performance)
 {
   Eigen::Vector3d r = Eigen::Vector3d::Random();
 
-  SO3Matrixd so3Mat = SO3Matrixd::Exp(r);
-  SO3Vectord so3Vec = SO3Vectord::Exp(r);
+  math::SO3Matrixd so3Mat = math::SO3Matrixd::Exp(r);
+  math::SO3Vectord so3Vec = math::SO3Vectord::Exp(r);
   math::AngleAxisd so3Aa = math::AngleAxisd::Exp(r);
   math::Quaterniond so3Quat = math::Quaterniond::Exp(r);
 
@@ -646,7 +674,7 @@ TEST(SO3, Performance)
   Eigen::AngleAxisd eigAa(eigMat);
   Eigen::Quaterniond eigQuat(eigMat);
 
-  SO3d::Random();
+  math::SO3d::Random();
 
   EXPECT_TRUE(so3Mat.isApprox(eigMat));
   EXPECT_TRUE(so3Aa.isApprox(eigAa));

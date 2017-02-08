@@ -43,13 +43,13 @@
 namespace dart {
 namespace math {
 
-struct SO3Representation {};
-
+/// SO3Base represents SO(3) class that is representation agnostic.
 template <typename Derived>
 class SO3Base
 {
 public:
 
+  /// Number of dimensions of SO(3)
   static constexpr int Dim = 3;
 
   /// The scalar type of the coefficients

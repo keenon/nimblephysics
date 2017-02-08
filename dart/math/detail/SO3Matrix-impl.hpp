@@ -101,6 +101,22 @@ SO3Matrix<S>::SO3Matrix(Eigen::MatrixBase<Derived>&& matrix) : Base(), mRepData(
 
 //==============================================================================
 template <typename S>
+SO3Matrix<S>::SO3Matrix(const Eigen::AngleAxis<S>& aa)
+  : Base(), mRepData(aa)
+{
+  // Do nothing
+}
+
+//==============================================================================
+template <typename S>
+SO3Matrix<S>::SO3Matrix(const Eigen::Quaternion<S>& quat)
+  : Base(), mRepData(quat)
+{
+  // Do nothing
+}
+
+//==============================================================================
+template <typename S>
 SO3Matrix<S>& SO3Matrix<S>::operator=(const SO3Matrix& other)
 {
   mRepData = other.mRepData;
