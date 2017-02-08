@@ -742,14 +742,19 @@ TEST(LIE_GROUP_OPERATORS, ADJOINT_MAPPINGS_TEMPLATE)
   Eigen::MatrixXd sum2 = Eigen::MatrixXd::Zero(6, 100);
   Eigen::MatrixXd sum3 = Eigen::MatrixXd::Zero(6, 100);
 
-  Eigen::Vector6d adjointTwist2 = AdT2(T, V);
+  const Eigen::MatrixXd adjointJacobian = math::AdTJacFixed(T, J);
   Eigen::MatrixXd adjointJacobian2 = AdT2(T, J);
-//  Eigen::MatrixXd adjointWrongJacobian = AdT2(T, wrongJ);
-
-  Eigen::Vector6d adjointTwist3 = AdT3(T, V);
   Eigen::MatrixXd adjointJacobian3 = AdT3(T, J);
+  EXPECT_TRUE(adjointJacobian2.isApprox(adjointJacobian));
+  EXPECT_TRUE(adjointJacobian3.isApprox(adjointJacobian));
 
-  math::AdTJacFixed(T, J);
+  const Eigen::Vector6d adjointTwist = math::AdT(T, V);
+  Eigen::Vector6d adjointTwist2 = AdT2(T, V);
+  Eigen::Vector6d adjointTwist3 = AdT3(T, V);
+  EXPECT_TRUE(adjointTwist2.isApprox(adjointTwist));
+  EXPECT_TRUE(adjointTwist3.isApprox(adjointTwist));
+
+//  Eigen::MatrixXd adjointWrongJacobian = AdT2(T, wrongJ);
 
   sw.start();
   for (auto i = 0; i < nTests; ++i)
