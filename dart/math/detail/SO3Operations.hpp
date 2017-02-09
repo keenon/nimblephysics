@@ -37,6 +37,31 @@
 #include "dart/math/Geometry.hpp"
 #include "dart/math/Constants.hpp"
 
+//------------------------------------------------------------------------------
+// Contents of this file:
+//
+// - Traits of SO(3) classes
+//
+// - SO3Exp
+// - SO3Log
+//
+// - SO3RepDataIsEigenRotationBase3Impl
+// - SO3RepDataIsEigenMatrixBaseImpl
+// - SO3RepDataDirectConvertImpl
+// - SO3RepDataConvertImpl
+// - SO3RepDataMultiplicationImpl
+// - SO3RepDataInplaceMultiplicationImpl
+//
+// - SO3IsCanonicalImpl
+// - SO3MultiplicationImpl
+// - SO3InplaceMultiplicationImpl
+// - SO3ToImpl
+//
+// Naming convention is SO3[RepData](OperationName). 'RepData' is used if the
+// fuction takes the representation data types. Otherwise, the function takes
+// SO3 class types.
+//------------------------------------------------------------------------------
+
 namespace dart {
 namespace math {
 
@@ -67,8 +92,7 @@ template <typename, typename> class SO3;
 namespace detail {
 
 //==============================================================================
-// traits:
-// Traits for all SO3 classes that is agnostic to representation types
+// Traits for all SO3 classes that is agnostic to the representation types
 //==============================================================================
 
 //==============================================================================
@@ -116,55 +140,13 @@ struct Traits<EulerAngles<S_, index0, index1, index2>>
   static constexpr bool IsCoordinates = true;
 };
 
-namespace so3_operations {
-
 //==============================================================================
-// SO3RepDataIsEigenRotationImpl:
-//==============================================================================
-
-//==============================================================================
-template <typename Rep, typename Enable = void>
-struct SO3RepDataIsEigenRotationImpl : std::false_type {};
-
-//==============================================================================
-template <typename Rep>
-struct SO3RepDataIsEigenRotationImpl<
-    Rep,
-    typename std::enable_if<
-        std::is_base_of<
-            Eigen::RotationBase<typename Traits<Rep>::RepData, 3>,
-            typename Traits<Rep>::RepData
-        >::value
-    >::type>
-    : std::true_type {};
-
-//==============================================================================
-// SO3RepDataIsEigenMatrixImpl:
-//==============================================================================
-
-//==============================================================================
-template <typename Rep, typename Enable = void>
-struct SO3RepDataIsEigenMatrixImpl : std::false_type {};
-
-//==============================================================================
-template <typename Rep>
-struct SO3RepDataIsEigenMatrixImpl<
-    Rep,
-    typename std::enable_if<
-        std::is_base_of<
-            Eigen::MatrixBase<typename Traits<Rep>::RepData>,
-            typename Traits<Rep>::RepData
-        >::value
-    >::type>
-    : std::true_type {};
-
-//==============================================================================
-// exp:
+// Exponential map for SO(3)
 //==============================================================================
 
 //==============================================================================
 template <typename S>
-Eigen::Matrix<S, 3, 3> exp(const Eigen::Matrix<S, 3, 1>& w)
+Eigen::Matrix<S, 3, 3> SO3Exp(const Eigen::Matrix<S, 3, 1>& w)
 {
   using Matrix3 = Eigen::Matrix<S, 3, 3>;
 
@@ -203,12 +185,12 @@ Eigen::Matrix<S, 3, 3> exp(const Eigen::Matrix<S, 3, 1>& w)
 }
 
 //==============================================================================
-// log:
+// Logarithm map for SO(3)
 //==============================================================================
 
 //==============================================================================
 template <typename S>
-Eigen::Matrix<S, 3, 1> log(const Eigen::Matrix<S, 3, 3>& R)
+Eigen::Matrix<S, 3, 1> SO3Log(const Eigen::Matrix<S, 3, 3>& R)
 {
   Eigen::AngleAxis<S> aa(R);
 
@@ -217,7 +199,7 @@ Eigen::Matrix<S, 3, 1> log(const Eigen::Matrix<S, 3, 3>& R)
 
 //==============================================================================
 template <typename S>
-Eigen::Matrix<S, 3, 1> log(Eigen::Matrix<S, 3, 3>&& R)
+Eigen::Matrix<S, 3, 1> SO3Log(Eigen::Matrix<S, 3, 3>&& R)
 {
   Eigen::AngleAxis<S> aa(std::move(R));
 
@@ -225,11 +207,77 @@ Eigen::Matrix<S, 3, 1> log(Eigen::Matrix<S, 3, 3>&& R)
 }
 
 //==============================================================================
-// SO3ConvertImpl:
+// SO3RepDataIsEigenRotationBase3Impl
 //==============================================================================
 
 //==============================================================================
-template <typename SO3From, typename SO3To>
+template <typename SO3T, typename Enable = void>
+struct SO3RepDataIsEigenRotationBase3Impl : std::false_type {};
+
+//==============================================================================
+template <typename SO3T>
+struct SO3RepDataIsEigenRotationBase3Impl<
+    SO3T,
+    typename std::enable_if<
+        std::is_base_of<
+            Eigen::RotationBase<typename Traits<SO3T>::RepData, 3>,
+            typename Traits<SO3T>::RepData
+        >::value
+    >::type>
+    : std::true_type {};
+
+//==============================================================================
+// SO3RepDataIsEigenMatrixBaseImpl is specialized to std::true_type if the given
+// template parameter (SO3 class) is Eigen::MatrixBase, otherwise
+// std::false_type.
+//==============================================================================
+
+//==============================================================================
+template <typename SO3T, typename Enable = void>
+struct SO3RepDataIsEigenMatrixBaseImpl : std::false_type {};
+
+//==============================================================================
+template <typename SO3T>
+struct SO3RepDataIsEigenMatrixBaseImpl<
+    SO3T,
+    typename std::enable_if<
+        std::is_base_of<
+            Eigen::MatrixBase<typename Traits<SO3T>::RepData>,
+            typename Traits<SO3T>::RepData
+        >::value
+    >::type>
+    : std::true_type {};
+
+//==============================================================================
+// SO3RepDataIsSupportedByEigenImpl
+//==============================================================================
+
+//==============================================================================
+template <typename SO3A, typename SO3B, typename Enable = void>
+struct SO3RepDataIsSupportedByEigenImpl : std::false_type {};
+
+//==============================================================================
+template <typename SO3A, typename SO3B>
+struct SO3RepDataIsSupportedByEigenImpl<
+    SO3A,
+    SO3B,
+    typename std::enable_if<
+        (std::is_same<typename SO3A::RepData, Eigen::Matrix<typename SO3A::S, 3, 3>>::value
+            || std::is_same<typename SO3A::RepData, Eigen::AngleAxis<typename SO3A::S>>::value
+            || std::is_same<typename SO3A::RepData, Eigen::Quaternion<typename SO3A::S>>::value)
+        &&
+        (std::is_same<typename SO3B::RepData, Eigen::Matrix<typename SO3B::S, 3, 3>>::value
+            || std::is_same<typename SO3B::RepData, Eigen::AngleAxis<typename SO3B::S>>::value
+            || std::is_same<typename SO3B::RepData, Eigen::Quaternion<typename SO3B::S>>::value)
+    >::type>
+    : std::true_type {};
+
+//==============================================================================
+// SO3RepDataDirectConvertImpl
+//==============================================================================
+
+//==============================================================================
+template <typename SO3From, typename SO3To, typename Enable = void>
 struct SO3RepDataDirectConvertImpl
 {
   using RepDataFrom = typename Traits<SO3From>::RepData;
@@ -237,23 +285,46 @@ struct SO3RepDataDirectConvertImpl
 
   static constexpr bool IsSpecialized = false;
 
-  static const RepDataTo run(const RepDataFrom& data)
+  static RepDataTo run(const RepDataFrom& data)
   {
     return RepDataTo(data);
   }
 
-  static const RepDataTo run(RepDataFrom&& data)
+//  static RepDataTo run(RepDataFrom&& data)
+//  {
+//    return RepDataTo(std::move(data));
+//  }
+};
+
+//==============================================================================
+template <typename SO3From, typename SO3To>
+struct SO3RepDataDirectConvertImpl<
+    SO3From,
+    SO3To,
+    typename std::enable_if<SO3RepDataIsSupportedByEigenImpl<SO3From, SO3To>::value>::type>
+{
+  using RepDataFrom = typename Traits<SO3From>::RepData;
+  using RepDataTo = typename Traits<SO3To>::RepData;
+
+  static constexpr bool IsSpecialized = false;
+
+  static RepDataTo run(const RepDataFrom& data)
   {
-    return RepDataTo(std::move(data));
+    return RepDataTo(data);
   }
+
+//  static RepDataTo run(RepDataFrom&& data)
+//  {
+//    return RepDataTo(std::move(data));
+//  }
 };
 
 //==============================================================================
 // For the same representations, simply return the data without conversion
-template <typename SO3Type>
-struct SO3RepDataDirectConvertImpl<SO3Type, SO3Type>
+template <typename SO3T>
+struct SO3RepDataDirectConvertImpl<SO3T, SO3T>
 {
-  using RepData = typename Traits<SO3Type>::RepData;
+  using RepData = typename Traits<SO3T>::RepData;
 
   static constexpr bool IsSpecialized = true;
 
@@ -277,14 +348,14 @@ struct SO3RepDataDirectConvertImpl<SO3Matrix<S>, SO3Vector<S>>
 
   static constexpr bool IsSpecialized = true;
 
-  static const RepDataTo run(const RepDataFrom& canonicalData)
+  static const RepDataTo run(const RepDataFrom& data)
   {
-    return log(canonicalData);
+    return SO3Log(data);
   }
 
-  static const RepDataTo run(RepDataFrom&& canonicalData)
+  static const RepDataTo run(RepDataFrom&& data)
   {
-    return log(std::move(canonicalData));
+    return SO3Log(std::move(data));
   }
 };
 
@@ -336,12 +407,12 @@ struct SO3RepDataDirectConvertImpl<SO3Vector<S>, SO3Matrix<S>>
 
   static const RepDataTo run(const RepDataFrom& data)
   {
-    return exp(data);
+    return SO3Exp(data);
   }
 
   static const RepDataTo run(RepDataFrom&& data)
   {
-    return exp(std::move(data));
+    return SO3Exp(std::move(data));
   }
 };
 
@@ -367,7 +438,7 @@ struct SO3RepDataDirectConvertImpl<SO3Vector<S>, AngleAxis<S>>
 
 //==============================================================================
 //template <typename S>
-//struct so3_convert2_impl<SO3Vector, Quaternion>
+//struct SO3RepDataDirectConvertImpl<SO3Vector, Quaternion>
 //{
 //  using RepDataFrom = typename traits<SO3Vector<S>>::RepData;
 //  using RepDataTo = typename traits<Quaternion<S>>::RepData;
@@ -487,21 +558,21 @@ DART_SO3REPDATA_CONVERT_IMPL_FROM_EULER_ANGLES(2, 0, 1)
 DART_SO3REPDATA_CONVERT_IMPL_FROM_EULER_ANGLES(2, 1, 0)
 
 //==============================================================================
-// SO3ConvertViaCanonicalImpl:
+// SO3RepDataConvertImpl
 //==============================================================================
 
 // +-------+ ------+-------+-------+-------+-------+
 // |from\to|  Mat  |  Vec  |  Aa   | Quat  | Euler |
 // +-------+ ------+-------+-------+-------+-------+
-// |  Mat  |   0   |   1   |   1   |   1   |       |
+// |  Mat  |   0   |   1   |   1   |   1   |   1   |
 // +-------+ ------+-------+-------+-------+-------+
-// |  Vec  |   1   |   0   |   1   |   2   |       |
+// |  Vec  |   1   |   0   |   1   |   2   |   2   |
 // +-------+ ------+-------+-------+-------+-------+
-// |  Aa   |   1   |   1   |   0   |   1   |       |
+// |  Aa   |   1   |   1   |   0   |   1   |   2   |
 // +-------+ ------+-------+-------+-------+-------+
-// | Quat  |   1   |   2   |   1   |   0   |       |
+// | Quat  |   1   |   2   |   1   |   0   |   2   |
 // +-------+ ------+-------+-------+-------+-------+
-// | Euler |       |       |       |       |       |
+// | Euler |   1   |   2   |   2   |   2   |   0   |
 // +-------+ ------+-------+-------+-------+-------+
 //
 // 0: zero conversion; return input as const reference
@@ -559,7 +630,7 @@ struct SO3RepDataConvertImpl<
 };
 
 //==============================================================================
-// group_is_approx_impl:
+// SO3RepDataIsApproxImpl
 //==============================================================================
 
 // +-------+ ------+-------+-------+-------+-------+
@@ -582,8 +653,7 @@ struct SO3RepDataConvertImpl<
 //==============================================================================
 template <typename SO3A,
           typename SO3B,
-          typename SO3Canonical = DefaultSO3Canonical<typename Traits<SO3A>::S>,
-          typename Enable = void>
+          typename SO3ToPerform = DefaultSO3Canonical<typename Traits<SO3A>::S>>
 struct SO3RepDataIsApproxImpl
 {
   using RepDataTypeA = typename Traits<SO3A>::RepData;
@@ -593,10 +663,10 @@ struct SO3RepDataIsApproxImpl
 
   static bool run(const RepDataTypeA& dataA, const RepDataTypeB& dataB, S tol)
   {
-    return SO3RepDataDirectConvertImpl<SO3A, SO3Canonical>::run(dataA)
-        .isApprox(SO3RepDataDirectConvertImpl<SO3B, SO3Canonical>::run(dataB), tol);
+    return SO3RepDataDirectConvertImpl<SO3A, SO3ToPerform>::run(dataA)
+        .isApprox(SO3RepDataDirectConvertImpl<SO3B, SO3ToPerform>::run(dataB), tol);
     // TODO(JS): consider using geometric distance metric for measuring the
-    // discrepancy between two point on the manifolds rather than one provided
+    // discrepancy between two points on the manifolds rather than one provided
     // by Eigen that might be the Euclidean distance metric (not sure).
   }
 };
@@ -613,24 +683,22 @@ struct SO3RepDataIsApproxImpl<SO3Type, SO3Type>
   {
     return dataA.isApprox(dataB, tol);
     // TODO(JS): consider using geometric distance metric for measuring the
-    // discrepancy between two point on the manifolds rather than one provided
+    // discrepancy between two points on the manifolds rather than one provided
     // by Eigen that might be the Euclidean distance metric (not sure).
   }
 };
 
 //==============================================================================
-// rep_canonical_multiplication_impl:
+// SO3RepDataHomogeneousMultiplicationImpl
 //==============================================================================
 
 //==============================================================================
-template <typename S, typename SO3Canonical = DefaultSO3Canonical<S>>
-struct so3_canonical_multiplication_impl
+template <typename S, typename SO3T>
+struct SO3RepDataHomogeneousMultiplicationImpl
 {
-  using CanonicalRepData
-      = typename Traits<SO3Canonical>::RepData;
+  using RepData = typename Traits<SO3T>::RepData;
 
-  static const CanonicalRepData run(
-      const CanonicalRepData& data, const CanonicalRepData& otherData)
+  static const RepData run(const RepData& data, const RepData& otherData)
   {
     return data * otherData;
   }
@@ -638,31 +706,29 @@ struct so3_canonical_multiplication_impl
 
 //==============================================================================
 template <typename S>
-struct so3_canonical_multiplication_impl<S, SO3Vector<S>>
+struct SO3RepDataHomogeneousMultiplicationImpl<S, SO3Vector<S>>
 {
-  using CanonicalRepData
-      = typename Traits<SO3Matrix<S>>::RepData;
+  using RepData = typename Traits<SO3Matrix<S>>::RepData;
 
-  static const CanonicalRepData run(
-      const CanonicalRepData& data, const CanonicalRepData& otherData)
+  static const RepData run(const RepData& data, const RepData& otherData)
   {
-    return log(exp(data) * exp(otherData));
+    return SO3Log(SO3Exp(data) * SO3Exp(otherData));
   }
 };
 
+// TODO(JS): EulerAngles, AngleAxis(?)
+
 //==============================================================================
-// rep_canonical_inplace_multiplication_impl:
+// SO3RepDataHomogeneousInplaceMultiplicationImpl
 //==============================================================================
 
 //==============================================================================
 template <typename S, typename SO3Canonical = DefaultSO3Canonical<S>>
-struct so3_canonical_inplace_multiplication_impl
+struct SO3RepDataHomogeneousInplaceMultiplicationImpl
 {
-  using CanonicalRepData
-      = typename Traits<SO3Canonical>::RepData;
+  using RepData = typename Traits<SO3Canonical>::RepData;
 
-  static void run(
-      CanonicalRepData& data, const CanonicalRepData& otherData)
+  static void run(RepData& data, const RepData& otherData)
   {
     data *= otherData;
   }
@@ -670,20 +736,18 @@ struct so3_canonical_inplace_multiplication_impl
 
 //==============================================================================
 template <typename S>
-struct so3_canonical_inplace_multiplication_impl<S, SO3Vector<S>>
+struct SO3RepDataHomogeneousInplaceMultiplicationImpl<S, SO3Vector<S>>
 {
-  using CanonicalRepData
-      = typename Traits<SO3Vector<S>>::RepData;
+  using RepData = typename Traits<SO3Vector<S>>::RepData;
 
-  static void run(
-      CanonicalRepData& data, const CanonicalRepData& otherData)
+  static void run(RepData& data, const RepData& otherData)
   {
-    data = log(exp(data) * exp(otherData));
+    data = SO3Log(SO3Exp(data) * SO3Exp(otherData));
   }
 };
 
 //==============================================================================
-// rep_multiplication_impl:
+// SO3RepDataMultiplicationImpl
 //==============================================================================
 
 // +-------+ ------+-------+-------+-------+-------+
@@ -705,7 +769,7 @@ struct so3_canonical_inplace_multiplication_impl<S, SO3Vector<S>>
 
 //==============================================================================
 template <typename SO3A, typename SO3B>
-struct so3_multiplication_impl
+struct SO3RepDataMultiplicationImpl
 {
   using RepDataTypeA = typename Traits<SO3A>::RepData;
   using RepDataTypeB = typename Traits<SO3B>::RepData;
@@ -719,7 +783,7 @@ struct so3_multiplication_impl
 
 //==============================================================================
 template <typename S>
-struct so3_multiplication_impl<SO3Vector<S>, SO3Vector<S>>
+struct SO3RepDataMultiplicationImpl<SO3Vector<S>, SO3Vector<S>>
 {
   using RepData = typename Traits<SO3Vector<S>>::RepData;
   using SO3CanonicalRep = Quaternion<S>; // TODO(JS): find best canonical for vec * vec
@@ -738,7 +802,7 @@ struct so3_multiplication_impl<SO3Vector<S>, SO3Vector<S>>
 
 //==============================================================================
 //template <typename S, typename RepB>
-//struct rep_multiplication_impl<S, SO3Vector, RepB>
+//struct SO3RepDataMultiplicationImpl<S, SO3Vector, RepB>
 //{
 //  using RepDataTypeA = typename traits<SO3Vector<S>>::RepData;
 //  using RepData = typename traits<SO3B>::RepData;
@@ -753,7 +817,7 @@ struct so3_multiplication_impl<SO3Vector<S>, SO3Vector<S>>
 
 ////==============================================================================
 //template <typename S, typename RepA>
-//struct rep_multiplication_impl<S, RepA, SO3Vector>
+//struct SO3RepDataMultiplicationImpl<S, RepA, SO3Vector>
 //{
 //  using RepDataTypeA = typename traits<SO3A>::RepData;
 //  using RepData = typename traits<SO3Vector<S>>::RepData;
@@ -767,17 +831,18 @@ struct so3_multiplication_impl<SO3Vector<S>, SO3Vector<S>>
 //};
 
 //==============================================================================
-// group_is_canonical:
+// SO3IsCanonical
 //==============================================================================
 
 //==============================================================================
 template <typename SO3Type,
           typename SO3Canonical = DefaultSO3Canonical<typename Traits<SO3Type>::S>,
           typename Enable = void>
-struct group_is_canonical : std::false_type {};
+struct SO3IsCanonical : std::false_type {};
 
+//==============================================================================
 template <typename SO3Type, typename SO3Canonical>
-struct group_is_canonical<
+struct SO3IsCanonical<
     SO3Type,
     SO3Canonical,
     typename std::enable_if
@@ -785,54 +850,51 @@ struct group_is_canonical<
     : std::true_type {};
 
 //==============================================================================
-// group_multiplication_impl:
+// SO3MultiplicationImpl
 //==============================================================================
 
 //==============================================================================
 // Generic version. Convert the input representation to canonical representation
-// (i.e., 3x3 rotation matrix), perform group multiplication for those converted
+// (e.g., 3x3 rotation matrix), perform group multiplication for those converted
 // 3x3 rotation matrices, then finally convert the result to the output
 // representation.
 template <typename SO3A,
           typename SO3B,
-          typename SO3Canonical = DefaultSO3Canonical<typename Traits<SO3A>::S>,
+          typename SO3ToPerform = DefaultSO3Canonical<typename Traits<SO3A>::S>,
           typename Enable = void>
-struct group_multiplication_impl
+struct SO3MultiplicationImpl
 {
   using S = typename Traits<SO3A>::S;
 
   static SO3A run(const SO3A& Ra, const SO3B& Rb)
   {
-    return SO3A(SO3RepDataDirectConvertImpl<SO3Canonical, SO3A>::run(
-          so3_canonical_multiplication_impl<S>::run( // TODO(JS): Remove _canonical_
-            SO3RepDataDirectConvertImpl<SO3A, SO3Canonical>::run(Ra.getRepData()),
-            SO3RepDataDirectConvertImpl<SO3B, SO3Canonical>::run(Rb.getRepData()))));
+    return SO3A(SO3RepDataConvertImpl<SO3ToPerform, SO3A>::run(
+          SO3RepDataHomogeneousMultiplicationImpl<S, SO3ToPerform>::run( // TODO(JS): Remove _canonical_
+            SO3RepDataConvertImpl<SO3A, SO3ToPerform>::run(Ra.getRepData()),
+            SO3RepDataConvertImpl<SO3B, SO3ToPerform>::run(Rb.getRepData()))));
   }
 };
 
 //==============================================================================
-// Data conversions between ones supported by Eigen (i.e., 3x3 matrix,
-// AngleAxis, and Quaternion)
+// Data conversions between representation types supported by Eigen (i.e.,
+// rotation matrix, AngleAxis, and Quaternion)
 template <typename SO3A, typename SO3B, typename SO3Canonical>
-struct group_multiplication_impl<
+struct SO3MultiplicationImpl<
     SO3A,
     SO3B,
     SO3Canonical,
     typename std::enable_if<
-//        !std::is_same<typename SO3A::RepData,  typename SO3B::RepData>::value
-        true
-        && (std::is_same<typename Traits<SO3A>::RepData, Eigen::Matrix<typename Traits<SO3A>::S, 3, 3>>::value
-            || std::is_same<typename Traits<SO3A>::RepData, Eigen::AngleAxis<typename Traits<SO3A>::S>>::value
-            || std::is_same<typename Traits<SO3A>::RepData, Eigen::Quaternion<typename Traits<SO3A>::S>>::value)
-        && (std::is_same<typename Traits<SO3B>::RepData, Eigen::Matrix<typename Traits<SO3B>::S, 3, 3>>::value
-            || std::is_same<typename Traits<SO3B>::RepData, Eigen::AngleAxis<typename Traits<SO3B>::S>>::value
-            || std::is_same<typename Traits<SO3B>::RepData, Eigen::Quaternion<typename Traits<SO3B>::S>>::value)
+        (SO3RepDataIsEigenRotationBase3Impl<SO3A>::value
+            || std::is_same<typename Traits<SO3A>::RepData, Eigen::Matrix<typename Traits<SO3A>::S, 3, 3>>::value)
+        &&
+        (SO3RepDataIsEigenRotationBase3Impl<SO3B>::value
+            || std::is_same<typename Traits<SO3B>::RepData, Eigen::Matrix<typename Traits<SO3B>::S, 3, 3>>::value)
     >::type>
 {
   using S = typename Traits<SO3A>::S;
 
-  using RepDataTypeA = typename Traits<SO3A>::RepData;
-  using RepDataTypeB = typename Traits<SO3B>::RepData;
+  using RepDataA = typename Traits<SO3A>::RepData;
+  using RepDataB = typename Traits<SO3B>::RepData;
 
   static SO3A run(const SO3A& Ra, const SO3B& Rb)
   {
@@ -841,7 +903,7 @@ struct group_multiplication_impl<
 };
 
 //==============================================================================
-// group_inplace_multiplication_impl:
+// SO3InplaceMultiplicationImpl
 //==============================================================================
 
 //==============================================================================
@@ -853,7 +915,7 @@ template <typename SO3A,
           typename SO3B,
           typename SO3Canonical = DefaultSO3Canonical<typename SO3A::S>,
           typename Enable = void>
-struct group_inplace_multiplication_impl
+struct SO3InplaceMultiplicationImpl
 {
   using S = typename SO3A::S;
 
@@ -862,10 +924,10 @@ struct group_inplace_multiplication_impl
 
   static void run(SO3A& Ra, const SO3B& Rb)
   {
-    Ra.setRepData(SO3RepDataDirectConvertImpl<SO3Canonical, RepA>::run(
-          so3_canonical_multiplication_impl<S>::run(
-            SO3RepDataDirectConvertImpl<RepA, SO3Canonical>::run(Ra.getRepData()),
-            SO3RepDataDirectConvertImpl<RepB, SO3Canonical>::run(Rb.getRepData()))));
+    Ra.setRepData(SO3RepDataConvertImpl<SO3Canonical, RepA>::run(
+          SO3RepDataHomogeneousMultiplicationImpl<S, SO3Canonical>::run(
+            SO3RepDataConvertImpl<RepA, SO3Canonical>::run(Ra.getRepData()),
+            SO3RepDataConvertImpl<RepB, SO3Canonical>::run(Rb.getRepData()))));
   }
 };
 
@@ -873,18 +935,12 @@ struct group_inplace_multiplication_impl
 // Data conversions between ones supported by Eigen (i.e., 3x3 matrix,
 // AngleAxis, and Quaternion)
 template <typename SO3A, typename SO3B, typename SO3Canonical>
-struct group_inplace_multiplication_impl<
+struct SO3InplaceMultiplicationImpl<
     SO3A,
     SO3B,
     SO3Canonical,
-    typename std::enable_if<
-        (std::is_same<typename SO3A::RepData, Eigen::Matrix<typename SO3A::S, 3, 3>>::value
-            || std::is_same<typename SO3A::RepData, Eigen::AngleAxis<typename SO3A::S>>::value
-            || std::is_same<typename SO3A::RepData, Eigen::Quaternion<typename SO3A::S>>::value)
-        && (std::is_same<typename SO3B::RepData, Eigen::Matrix<typename SO3A::S, 3, 3>>::value
-            || std::is_same<typename SO3B::RepData, Eigen::AngleAxis<typename SO3A::S>>::value
-            || std::is_same<typename SO3B::RepData, Eigen::Quaternion<typename SO3A::S>>::value)
-    >::type>
+    typename std::enable_if<SO3RepDataIsSupportedByEigenImpl<SO3A, SO3B>::value>::type
+    >
 {
   using S = typename SO3A::S;
 
@@ -897,9 +953,10 @@ struct group_inplace_multiplication_impl<
   }
 };
 
-} // namespace so3_operations
-
 //==============================================================================
+// SO3ToImpl
+//==============================================================================
+
 template <typename SO3From, typename SO3OrEigenObject, typename Enable = void>
 struct SO3ToImpl {};
 
@@ -917,7 +974,7 @@ struct SO3ToImpl<
 
   static SO3OrEigenObject run(const RepData& repData)
   {
-    return SO3OrEigenObject(detail::so3_operations::SO3RepDataConvertImpl<SO3From, SO3OrEigenObject>::run(
+    return SO3OrEigenObject(detail::SO3RepDataConvertImpl<SO3From, SO3OrEigenObject>::run(
           repData));
   }
 };
@@ -939,11 +996,10 @@ struct SO3ToImpl<
   using RepData = typename detail::Traits<SO3From>::RepData;
 
   static auto run(const RepData& repData)
-  -> decltype(detail::so3_operations::SO3RepDataConvertImpl<SO3From, SO3Matrix<S>>::run(
+  -> decltype(detail::SO3RepDataConvertImpl<SO3From, SO3Matrix<S>>::run(
       std::declval<RepData>()))
   {
-    return detail::so3_operations::SO3RepDataConvertImpl<SO3From, SO3Matrix<S>>::run(
-          repData);
+    return detail::SO3RepDataConvertImpl<SO3From, SO3Matrix<S>>::run(repData);
   }
 };
 
@@ -964,11 +1020,10 @@ struct SO3ToImpl<
   using RepData = typename detail::Traits<SO3From>::RepData;
 
   static auto run(const RepData& repData)
-  -> decltype(detail::so3_operations::SO3RepDataConvertImpl<SO3From, AngleAxis<S>>::run(
+  -> decltype(detail::SO3RepDataConvertImpl<SO3From, AngleAxis<S>>::run(
       std::declval<RepData>()))
   {
-    return detail::so3_operations::SO3RepDataConvertImpl<SO3From, AngleAxis<S>>::run(
-          repData);
+    return detail::SO3RepDataConvertImpl<SO3From, AngleAxis<S>>::run(repData);
   }
 };
 
@@ -990,10 +1045,10 @@ struct SO3ToImpl<
   using RepData = typename detail::Traits<SO3From>::RepData;
 
   static auto run(const RepData& repData)
-  -> decltype(detail::so3_operations::SO3RepDataConvertImpl<SO3From, Quaternion<S>>::run(
+  -> decltype(detail::SO3RepDataConvertImpl<SO3From, Quaternion<S>>::run(
       std::declval<RepData>()))
   {
-    return detail::so3_operations::SO3RepDataConvertImpl<SO3From, Quaternion<S>>::run(
+    return detail::SO3RepDataConvertImpl<SO3From, Quaternion<S>>::run(
           repData);
   }
 };

@@ -63,7 +63,7 @@ template <typename S>
 template <typename Derived>
 AngleAxis<S>::AngleAxis(const SO3Base<Derived>& other)
   : Base(),
-    mRepData(detail::so3_operations::SO3RepDataConvertImpl<Derived, This>::run(
+    mRepData(detail::SO3RepDataConvertImpl<Derived, This>::run(
              other.getRepData()))
 {
   // Do nothing
@@ -74,7 +74,7 @@ template <typename S>
 template <typename Derived>
 AngleAxis<S>::AngleAxis(SO3Base<Derived>&& other)
   : Base(),
-    mRepData(detail::so3_operations::SO3RepDataConvertImpl<Derived, This>::run(
+    mRepData(detail::SO3RepDataConvertImpl<Derived, This>::run(
              std::move(other.getRepData())))
 {
   // Do nothing

@@ -158,7 +158,7 @@ namespace math {
 ////  template <typename OtherDerived>
 ////  void operator*=(const SE3Base<OtherDerived>& other)
 ////  {
-////    detail::SE3::group_inplace_multiplication_impl<Derived, OtherDerived>::run(
+////    detail::SE3::SO3InplaceMultiplicationImpl<Derived, OtherDerived>::run(
 ////          derived(), other.derived());
 ////  }
 
@@ -355,17 +355,17 @@ namespace math {
 
 ////  Canonical canonical()
 ////  {
-////    return canonical(detail::SE3::group_is_canonical<Derived>());
+////    return canonical(detail::SE3::SO3IsCanonical<Derived>());
 ////  }
 
 ////  const Canonical canonical() const
 ////  {
-////    return canonical(detail::SE3::group_is_canonical<Derived>());
+////    return canonical(detail::SE3::SO3IsCanonical<Derived>());
 ////  }
 
 ////  static constexpr bool isCanonical()
 ////  {
-////    return detail::SE3::group_is_canonical<Derived>::value;
+////    return detail::SE3::SO3IsCanonical<Derived>::value;
 ////  }
 
 //private:

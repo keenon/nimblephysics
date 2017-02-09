@@ -63,7 +63,7 @@ template <typename S>
 template <typename Derived>
 SO3Vector<S>::SO3Vector(const SO3Base<Derived>& other)
   : Base(),
-    mRepData(detail::so3_operations::SO3RepDataConvertImpl<Derived, This>::run(
+    mRepData(detail::SO3RepDataConvertImpl<Derived, This>::run(
             other.getRepData()))
 {
   // Do nothing
@@ -74,7 +74,7 @@ template <typename S>
 template <typename Derived>
 SO3Vector<S>::SO3Vector(SO3Base<Derived>&& other)
   : Base(),
-    mRepData(detail::so3_operations::SO3RepDataConvertImpl<Derived, This>::run(
+    mRepData(detail::SO3RepDataConvertImpl<Derived, This>::run(
             std::move(other.getRepData())))
 {
   // Do nothing
@@ -118,7 +118,7 @@ SO3Vector<S>& SO3Vector<S>::operator=(SO3Vector&& other)
 template <typename S>
 SO3Vector<S>& SO3Vector<S>::operator=(const Eigen::AngleAxis<S>& quat)
 {
-  mRepData = detail::so3_operations::SO3RepDataConvertImpl<
+  mRepData = detail::SO3RepDataConvertImpl<
       AngleAxis<S>, SO3Vector<S>>::run(quat);
   // TODO(JS): improve; need a way to deduce representation type from Eigen
   // data type
@@ -129,7 +129,7 @@ SO3Vector<S>& SO3Vector<S>::operator=(const Eigen::AngleAxis<S>& quat)
 template <typename S>
 SO3Vector<S>& SO3Vector<S>::operator=(Eigen::AngleAxis<S>&& quat)
 {
-  mRepData = detail::so3_operations::SO3RepDataConvertImpl<
+  mRepData = detail::SO3RepDataConvertImpl<
       AngleAxis<S>, SO3Vector<S>>::run(std::move(quat));
   // TODO(JS): improve; need a way to deduce representation type from Eigen
   // data type
@@ -141,7 +141,7 @@ template <typename S>
 template <typename QuatDerived>
 SO3Vector<S>& SO3Vector<S>::operator=(const Eigen::QuaternionBase<QuatDerived>& quat)
 {
-  mRepData = detail::so3_operations::SO3RepDataConvertImpl<Quaternion<S>, SO3Vector<S>>::run(quat);
+  mRepData = detail::SO3RepDataConvertImpl<Quaternion<S>, SO3Vector<S>>::run(quat);
   // TODO(JS): improve; need a way to deduce representation type from Eigen
   // data type
   return *this;
@@ -152,7 +152,7 @@ template <typename S>
 template <typename QuatDerived>
 SO3Vector<S>& SO3Vector<S>::operator=(Eigen::QuaternionBase<QuatDerived>&& quat)
 {
-  mRepData = detail::so3_operations::SO3RepDataConvertImpl<
+  mRepData = detail::SO3RepDataConvertImpl<
       Quaternion<S>, SO3Vector<S>>::run(
         std::move(quat));
   // TODO(JS): improve; need a way to deduce representation type from Eigen
@@ -165,7 +165,7 @@ template <typename S>
 template <typename Derived>
 SO3Vector<S>& SO3Vector<S>::operator=(const Eigen::MatrixBase<Derived>& matrix)
 {
-  mRepData = detail::so3_operations::SO3RepDataConvertImpl<
+  mRepData = detail::SO3RepDataConvertImpl<
       SO3Matrix<S>, SO3Vector<S>>::run(
         matrix);
   return *this;
@@ -176,7 +176,7 @@ template <typename S>
 template <typename Derived>
 SO3Vector<S>& SO3Vector<S>::operator=(Eigen::MatrixBase<Derived>&& matrix)
 {
-  mRepData = detail::so3_operations::SO3RepDataConvertImpl<
+  mRepData = detail::SO3RepDataConvertImpl<
       SO3Matrix<S>, SO3Vector<S>>::run(
         std::move(matrix));
   return *this;

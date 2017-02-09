@@ -64,7 +64,7 @@ template <typename Derived>
 SO3Matrix<S>::SO3Matrix(const SO3Base<Derived>& other)
   : Base(),
     mRepData(
-      detail::so3_operations::SO3RepDataConvertImpl<Derived, This>::run(
+      detail::SO3RepDataConvertImpl<Derived, This>::run(
         other.getRepData()))
 {
   // Do nothing
@@ -75,7 +75,7 @@ template <typename S>
 template <typename Derived>
 SO3Matrix<S>::SO3Matrix(SO3Base<Derived>&& other)
   : Base(),
-    mRepData(detail::so3_operations::SO3RepDataConvertImpl<Derived, This>::run(
+    mRepData(detail::SO3RepDataConvertImpl<Derived, This>::run(
             std::move(other.getRepData())))
 {
   // Do nothing

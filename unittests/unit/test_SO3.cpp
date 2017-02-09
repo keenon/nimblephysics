@@ -40,19 +40,16 @@ using namespace math;
 //==============================================================================
 TEST(SO3, SFINAE)
 {
-  using namespace math::detail::so3_operations;
+  using math::detail::SO3RepDataIsEigenRotationBase3Impl;
+  using math::detail::SO3RepDataIsEigenMatrixBaseImpl;
 
-  auto resAa = SO3RepDataIsEigenRotationImpl<math::AngleAxisd>::value;
-  EXPECT_TRUE(resAa);
+  EXPECT_TRUE(SO3RepDataIsEigenRotationBase3Impl<math::AngleAxisd>::value);
+  EXPECT_TRUE(SO3RepDataIsEigenRotationBase3Impl<math::Quaterniond>::value);
 
-  auto resQuat = SO3RepDataIsEigenRotationImpl<math::Quaterniond>::value;
-  EXPECT_TRUE(resQuat);
-
-  auto resMat3x3 = SO3RepDataIsEigenMatrixImpl<math::SO3Matrixd>::value;
-  EXPECT_TRUE(resMat3x3);
-
-  auto resMatXxX = SO3RepDataIsEigenMatrixImpl<math::SO3Vectord>::value;
-  EXPECT_TRUE(resMatXxX);
+  EXPECT_TRUE(SO3RepDataIsEigenMatrixBaseImpl<math::SO3Matrixd>::value);
+  EXPECT_TRUE(SO3RepDataIsEigenMatrixBaseImpl<math::SO3Vectord>::value);
+  EXPECT_TRUE(SO3RepDataIsEigenMatrixBaseImpl<math::EulerXYZd>::value);
+  EXPECT_TRUE(SO3RepDataIsEigenMatrixBaseImpl<math::EulerZYXd>::value);
 }
 
 //==============================================================================
@@ -655,6 +652,14 @@ TEST(SO3, Conversions)
 
   so3ZYXOut = so3ZYXIn;
   EXPECT_TRUE(so3ZYXOut.isApprox(so3ZYXIn));
+}
+
+//==============================================================================
+TEST(SO3, GroupMultiplication)
+{
+  // TODO(JS):
+  auto res = math::detail::SO3RepDataIsSupportedByEigenImpl<math::AngleAxisd, math::SO3Matrixd>::value;
+  EXPECT_TRUE(res);
 }
 
 //==============================================================================

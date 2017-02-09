@@ -190,6 +190,7 @@ using EulerAnglesd = EulerAngles<double, index0, index1, index2>;
   using Euler##XYZ##d = EulerAngles<double, id0, id1, id2>;
 
 // Proper Euler angles (x-y-x, x-z-x, y-x-y, y-z-y, z-x-z, z-y-z)
+// Ref: https://en.wikipedia.org/wiki/Euler_angles#Proper_Euler_angles
 DART_TYPEDEF_EULER_ANGLES(XYX, 0, 1, 0)
 DART_TYPEDEF_EULER_ANGLES(XZX, 0, 2, 0)
 DART_TYPEDEF_EULER_ANGLES(YXY, 1, 0, 1)
@@ -198,6 +199,7 @@ DART_TYPEDEF_EULER_ANGLES(ZXZ, 2, 0, 2)
 DART_TYPEDEF_EULER_ANGLES(ZYZ, 2, 1, 2)
 
 // Tait–Bryan angles (x-y-z, x-z-y, y-x-z, y-z-x, z-x-y, z-y-x)
+// Ref: https://en.wikipedia.org/wiki/Euler_angles#Tait.E2.80.93Bryan_angles
 DART_TYPEDEF_EULER_ANGLES(XYZ, 0, 1, 2)
 DART_TYPEDEF_EULER_ANGLES(XZY, 0, 2, 1)
 DART_TYPEDEF_EULER_ANGLES(YXZ, 1, 0, 2)

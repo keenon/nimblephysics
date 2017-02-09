@@ -73,7 +73,7 @@ template <typename S>
 template <typename Derived>
 Quaternion<S>::Quaternion(SO3Base<Derived>&& other)
   : Base(),
-    mRepData(detail::so3_operations::SO3RepDataConvertImpl<
+    mRepData(detail::SO3RepDataConvertImpl<
         Derived, This>::run(std::move(other.getRepData())))
 {
   // Do nothing

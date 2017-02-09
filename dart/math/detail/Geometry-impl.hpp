@@ -37,6 +37,12 @@
 namespace dart {
 namespace math {
 
+namespace detail {
+
+//==============================================================================
+// eulerAnglesToMatrixImpl
+//==============================================================================
+
 //==============================================================================
 template <typename S, int index0, int index1, int index2>
 struct eulerAnglesToMatrixImpl
@@ -179,11 +185,8 @@ struct eulerAnglesToMatrixImpl<S, 2, 1, 2>
 };
 
 //==============================================================================
-template <typename S, int index0, int index1, int index2>
-Eigen::Matrix<S, 3, 3> eulerAnglesToMatrix(const Eigen::Matrix<S, 3, 1>& angles)
-{
-  return eulerAnglesToMatrixImpl<S, index0, index1, index2>::run(angles);
-}
+// matrixToEulerAnglesImpl
+//==============================================================================
 
 //==============================================================================
 template <typename S, int index0, int index1, int index2>
@@ -315,14 +318,23 @@ struct matrixToEulerAnglesImpl<S, 2, 1, 0>
 //  }
 //};
 
+} // namespace detail
+
+//==============================================================================
+template <typename S, int index0, int index1, int index2>
+Eigen::Matrix<S, 3, 3> eulerAnglesToMatrix(const Eigen::Matrix<S, 3, 1>& angles)
+{
+  return detail::eulerAnglesToMatrixImpl<S, index0, index1, index2>::run(angles);
+}
+
 //==============================================================================
 template <typename S, int index0, int index1, int index2>
 Eigen::Matrix<S, 3, 1> matrixToEulerAngles(const Eigen::Matrix<S, 3, 3>& matrix)
 {
-  return matrixToEulerAnglesImpl<S, index0, index1, index2>::run(matrix);
+  return detail::matrixToEulerAnglesImpl<S, index0, index1, index2>::run(matrix);
 }
 
-}  // namespace math
-}  // namespace dart
+} // namespace math
+} // namespace dart
 
 #endif  // DART_MATH_DETAIL_GEOMETRY_IMPL_HPP_

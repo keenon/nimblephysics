@@ -121,7 +121,7 @@ public:
   template <typename OtherDerived>
   Derived
   operator*(const SO3Base<OtherDerived>& other) const;
-  //-> decltype(detail::so3_operations::group_multiplication_impl<
+  //-> decltype(detail::SO3MultiplicationImpl<
   //    Derived, OtherDerived>::run(
   //              std::declval<RepData>(),
   //              std::declval<typename OtherDerived::RepData>()));
@@ -221,7 +221,7 @@ public:
 
 //  template <typename RepTo>
 //  auto getCoordinates() const
-//  -> decltype(detail::so3_operations::SO3ConvertImpl<Derived, RepTo>::run(
+//  -> decltype(detail::SO3ConvertImpl<Derived, RepTo>::run(
 //      std::declval<RepData>()));
 
   /// \} // Representation conversions
@@ -246,17 +246,17 @@ public:
 
 //  SO3Canonical canonical()
 //  {
-//    return canonical(detail::SO3::group_is_canonical<Derived>());
+//    return canonical(detail::SO3::SO3IsCanonical<Derived>());
 //  }
 
 //  const SO3Canonical canonical() const
 //  {
-//    return canonical(detail::SO3::group_is_canonical<Derived>());
+//    return canonical(detail::SO3::SO3IsCanonical<Derived>());
 //  }
 
 //  static constexpr bool isCanonical()
 //  {
-//    return detail::SO3::group_is_canonical<Derived>::value;
+//    return detail::SO3::SO3IsCanonical<Derived>::value;
 //  }
 
 //private:

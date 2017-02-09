@@ -63,7 +63,7 @@ template <typename S, int index0, int index1, int index2>
 template <typename Derived>
 EulerAngles<S, index0, index1, index2>::EulerAngles(const SO3Base<Derived>& other)
   : Base(),
-    mRepData(detail::so3_operations::SO3RepDataConvertImpl<Derived, This>::run(
+    mRepData(detail::SO3RepDataConvertImpl<Derived, This>::run(
              other.getRepData()))
 {
   // Do nothing
@@ -74,7 +74,7 @@ template <typename S, int index0, int index1, int index2>
 template <typename Derived>
 EulerAngles<S, index0, index1, index2>::EulerAngles(SO3Base<Derived>&& other)
   : Base(),
-    mRepData(detail::so3_operations::SO3RepDataConvertImpl<Derived, This>::run(
+    mRepData(detail::SO3RepDataConvertImpl<Derived, This>::run(
              other.getRepData()))
 {
   // Do nothing
@@ -118,7 +118,7 @@ EulerAngles<S, index0, index1, index2>& EulerAngles<S, index0, index1, index2>::
 template <typename S, int index0, int index1, int index2>
 EulerAngles<S, index0, index1, index2>& EulerAngles<S, index0, index1, index2>::operator=(const Eigen::AngleAxis<S>& aa)
 {
-  mRepData = detail::so3_operations::SO3RepDataConvertImpl<
+  mRepData = detail::SO3RepDataConvertImpl<
       AngleAxis<S>, This>::run(aa);
   return *this;
 }
@@ -127,7 +127,7 @@ EulerAngles<S, index0, index1, index2>& EulerAngles<S, index0, index1, index2>::
 template <typename S, int index0, int index1, int index2>
 EulerAngles<S, index0, index1, index2>& EulerAngles<S, index0, index1, index2>::operator=(Eigen::AngleAxis<S>&& aa)
 {
-  mRepData = detail::so3_operations::SO3RepDataConvertImpl<
+  mRepData = detail::SO3RepDataConvertImpl<
       AngleAxis<S>, This>::run(std::move(aa));
   return *this;
 }
@@ -137,7 +137,7 @@ template <typename S, int index0, int index1, int index2>
 template <typename QuatDerived>
 EulerAngles<S, index0, index1, index2>& EulerAngles<S, index0, index1, index2>::operator=(const Eigen::QuaternionBase<QuatDerived>& quat)
 {
-  mRepData = detail::so3_operations::SO3RepDataConvertImpl<
+  mRepData = detail::SO3RepDataConvertImpl<
       Quaternion<S>, This>::run(quat);
   return *this;
 }
@@ -147,7 +147,7 @@ template <typename S, int index0, int index1, int index2>
 template <typename QuatDerived>
 EulerAngles<S, index0, index1, index2>& EulerAngles<S, index0, index1, index2>::operator=(Eigen::QuaternionBase<QuatDerived>&& quat)
 {
-  mRepData = detail::so3_operations::SO3RepDataConvertImpl<
+  mRepData = detail::SO3RepDataConvertImpl<
       Quaternion<S>, This>::run(std::move(quat));
   return *this;
 }
@@ -157,7 +157,7 @@ template <typename S, int index0, int index1, int index2>
 template <typename Derived>
 EulerAngles<S, index0, index1, index2>& EulerAngles<S, index0, index1, index2>::operator=(const Eigen::MatrixBase<Derived>& matrix)
 {
-  mRepData = detail::so3_operations::SO3RepDataConvertImpl<
+  mRepData = detail::SO3RepDataConvertImpl<
       SO3Matrix<S>, This>::run(matrix);
   return *this;
 }
@@ -167,7 +167,7 @@ template <typename S, int index0, int index1, int index2>
 template <typename Derived>
 EulerAngles<S, index0, index1, index2>& EulerAngles<S, index0, index1, index2>::operator=(Eigen::MatrixBase<Derived>&& matrix)
 {
-  mRepData = detail::so3_operations::SO3RepDataConvertImpl<
+  mRepData = detail::SO3RepDataConvertImpl<
       SO3Matrix<S>, This>::run(std::move(matrix));
   return *this;
 }
