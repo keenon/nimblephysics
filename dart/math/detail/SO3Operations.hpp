@@ -249,6 +249,40 @@ struct SO3RepDataIsEigenMatrixBaseImpl<
     : std::true_type {};
 
 //==============================================================================
+// EigenHasAssignmentOperatorImpl
+//==============================================================================
+
+template <typename SO3A, typename SO3B>
+class EigenHasAssignmentOperatorImpl
+{
+protected:
+  template <typename SO3C, typename SO3D>
+  static auto check(SO3C c1, SO3D c2) -> decltype(c1 = c2, std::true_type());
+  static auto check(...) -> decltype(std::false_type());
+
+public:
+  static constexpr bool value
+    = decltype( check( std::declval<SO3A>(), std::declval<SO3B>() ) )::value;
+};
+
+//==============================================================================
+// EigenHasMuliplicationOperatorImpl
+//==============================================================================
+
+template <typename SO3A, typename SO3B>
+class EigenHasMuliplicationOperatorImpl
+{
+protected:
+  template <typename SO3C, typename SO3D>
+  static auto check(SO3C c1, SO3D c2) -> decltype(c1 * c2, std::true_type());
+  static auto check(...) -> decltype(std::false_type());
+
+public:
+  static constexpr bool value
+    = decltype( check( std::declval<SO3A>(), std::declval<SO3B>() ) )::value;
+};
+
+//==============================================================================
 // SO3RepDataIsSupportedByEigenImpl
 //==============================================================================
 
@@ -285,12 +319,12 @@ struct SO3RepDataDirectConvertImpl
 
   static constexpr bool IsSpecialized = false;
 
-  static RepDataTo run(const RepDataFrom& data)
-  {
-    return RepDataTo(data);
-  }
+//  static const RepDataTo run(const RepDataFrom& data)
+//  {
+//    return RepDataTo(data);
+//  }
 
-//  static RepDataTo run(RepDataFrom&& data)
+//  static const RepDataTo run(RepDataFrom&& data)
 //  {
 //    return RepDataTo(std::move(data));
 //  }
@@ -301,22 +335,22 @@ template <typename SO3From, typename SO3To>
 struct SO3RepDataDirectConvertImpl<
     SO3From,
     SO3To,
-    typename std::enable_if<SO3RepDataIsSupportedByEigenImpl<SO3From, SO3To>::value>::type>
+    typename std::enable_if<EigenHasAssignmentOperatorImpl<SO3From, SO3To>::value>::type>
 {
   using RepDataFrom = typename Traits<SO3From>::RepData;
   using RepDataTo = typename Traits<SO3To>::RepData;
 
   static constexpr bool IsSpecialized = false;
 
-  static RepDataTo run(const RepDataFrom& data)
+  static const RepDataTo run(const RepDataFrom& data)
   {
     return RepDataTo(data);
   }
 
-//  static RepDataTo run(RepDataFrom&& data)
-//  {
-//    return RepDataTo(std::move(data));
-//  }
+  static RepDataTo run(RepDataFrom&& data)
+  {
+    return RepDataTo(std::move(data));
+  }
 };
 
 //==============================================================================
@@ -972,10 +1006,10 @@ struct SO3ToImpl<
 {
   using RepData = typename detail::Traits<SO3From>::RepData;
 
-  static SO3OrEigenObject run(const RepData& repData)
+  static SO3OrEigenObject run(const RepData& data)
   {
     return SO3OrEigenObject(detail::SO3RepDataConvertImpl<SO3From, SO3OrEigenObject>::run(
-          repData));
+          data));
   }
 };
 
@@ -995,11 +1029,11 @@ struct SO3ToImpl<
   using S = typename Traits<SO3From>::S;
   using RepData = typename detail::Traits<SO3From>::RepData;
 
-  static auto run(const RepData& repData)
+  static auto run(const RepData& data)
   -> decltype(detail::SO3RepDataConvertImpl<SO3From, SO3Matrix<S>>::run(
       std::declval<RepData>()))
   {
-    return detail::SO3RepDataConvertImpl<SO3From, SO3Matrix<S>>::run(repData);
+    return detail::SO3RepDataConvertImpl<SO3From, SO3Matrix<S>>::run(data);
   }
 };
 
