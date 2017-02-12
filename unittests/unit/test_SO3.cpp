@@ -82,30 +82,59 @@ TEST(SO3, DETAIL_EXP_LOG)
 }
 
 //==============================================================================
-template <typename T>
-void testDetailSfinaeTestForEigenAssignment()
+TEST(SO3, SfinaeForEigenCopyConstructors)
 {
-  using math::detail::EigenHasAssignmentOperatorImpl;
+  using common::HasCopyConstructor;
 
   bool res;
 
-  res = EigenHasAssignmentOperatorImpl<T, Eigen::Matrix3d>::value;
+  res = HasCopyConstructor<Eigen::Matrix3d, Eigen::Matrix3d>::value;
+  EXPECT_TRUE(res);
+  res = HasCopyConstructor<Eigen::Matrix3d, Eigen::AngleAxisd>::value;
+  EXPECT_TRUE(res);
+  res = HasCopyConstructor<Eigen::Matrix3d, Eigen::Quaterniond>::value;
   EXPECT_TRUE(res);
 
-  res = EigenHasAssignmentOperatorImpl<T, Eigen::AngleAxisd>::value;
+  res = HasCopyConstructor<Eigen::AngleAxisd, Eigen::Matrix3d>::value;
+  EXPECT_TRUE(res);
+  res = HasCopyConstructor<Eigen::AngleAxisd, Eigen::AngleAxisd>::value;
+  EXPECT_TRUE(res);
+  res = HasCopyConstructor<Eigen::AngleAxisd, Eigen::Quaterniond>::value;
   EXPECT_TRUE(res);
 
-  res = EigenHasAssignmentOperatorImpl<T, Eigen::Quaterniond>::value;
+  res = HasCopyConstructor<Eigen::Quaterniond, Eigen::Matrix3d>::value;
+  EXPECT_TRUE(res);
+  res = HasCopyConstructor<Eigen::Quaterniond, Eigen::AngleAxisd>::value;
+  EXPECT_TRUE(res);
+  res = HasCopyConstructor<Eigen::Quaterniond, Eigen::Quaterniond>::value;
   EXPECT_TRUE(res);
 }
 
-//==============================================================================
-TEST(SO3, DetailSfinaeTestForEigenAssignment)
-{
-  testDetailSfinaeTestForEigenAssignment<Eigen::Matrix3d>();
-  testDetailSfinaeTestForEigenAssignment<Eigen::AngleAxisd>();
-  testDetailSfinaeTestForEigenAssignment<Eigen::Quaterniond>();
-}
+////==============================================================================
+//template <typename T>
+//void testSfinaeForEigenAssignment()
+//{
+//  using common::HasAssignmentOperator;
+
+//  bool res;
+
+//  res = HasAssignmentOperator<T, Eigen::Matrix3d>::value;
+//  EXPECT_TRUE(res);
+
+//  res = HasAssignmentOperator<T, Eigen::AngleAxisd>::value;
+//  EXPECT_TRUE(res);
+
+//  res = HasAssignmentOperator<T, Eigen::Quaterniond>::value;
+//  EXPECT_TRUE(res);
+//}
+
+////==============================================================================
+//TEST(SO3, SfinaeForEigenAssignment)
+//{
+//  testSfinaeForEigenAssignment<Eigen::Matrix3d>();
+//  testSfinaeForEigenAssignment<Eigen::AngleAxisd>();
+//  testSfinaeForEigenAssignment<Eigen::Quaterniond>();
+//}
 
 //==============================================================================
 TEST(SO3, DETAIL_SO3RepDataIsSupportedByEigenImpl)
@@ -242,11 +271,11 @@ TEST(SO3, DETAIL_SO3RepDataIsSupportedByEigenImpl)
 
   bool ress;
 
-  ress = math::detail::EigenHasMuliplicationOperatorImpl<
+  ress = common::HasMuliplicationOperator<
       Eigen::Matrix3d, Eigen::Matrix3d>::value;
   EXPECT_TRUE(ress);
 
-  ress = math::detail::EigenHasMuliplicationOperatorImpl<
+  ress = common::HasMuliplicationOperator<
       Eigen::AngleAxisd, Eigen::Vector3d>::value;
   EXPECT_TRUE(ress);
 

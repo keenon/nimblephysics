@@ -33,6 +33,7 @@
 #define DART_MATH_DETAIL_SO3OPERATIONS_HPP_
 
 #include <Eigen/Eigen>
+#include "dart/common/Sfinae.hpp"
 #include "dart/math/MathTypes.hpp"
 #include "dart/math/Geometry.hpp"
 #include "dart/math/Constants.hpp"
@@ -249,40 +250,6 @@ struct SO3RepDataIsEigenMatrixBaseImpl<
     : std::true_type {};
 
 //==============================================================================
-// EigenHasAssignmentOperatorImpl
-//==============================================================================
-
-template <typename SO3A, typename SO3B>
-class EigenHasAssignmentOperatorImpl
-{
-protected:
-  template <typename SO3C, typename SO3D>
-  static auto check(SO3C c1, SO3D c2) -> decltype(c1 = c2, std::true_type());
-  static auto check(...) -> decltype(std::false_type());
-
-public:
-  static constexpr bool value
-    = decltype( check( std::declval<SO3A>(), std::declval<SO3B>() ) )::value;
-};
-
-//==============================================================================
-// EigenHasMuliplicationOperatorImpl
-//==============================================================================
-
-template <typename SO3A, typename SO3B>
-class EigenHasMuliplicationOperatorImpl
-{
-protected:
-  template <typename SO3C, typename SO3D>
-  static auto check(SO3C c1, SO3D c2) -> decltype(c1 * c2, std::true_type());
-  static auto check(...) -> decltype(std::false_type());
-
-public:
-  static constexpr bool value
-    = decltype( check( std::declval<SO3A>(), std::declval<SO3B>() ) )::value;
-};
-
-//==============================================================================
 // SO3RepDataIsSupportedByEigenImpl
 //==============================================================================
 
@@ -319,15 +286,15 @@ struct SO3RepDataDirectConvertImpl
 
   static constexpr bool IsSpecialized = false;
 
-//  static const RepDataTo run(const RepDataFrom& data)
-//  {
-//    return RepDataTo(data);
-//  }
+  static const RepDataTo run(const RepDataFrom& data)
+  {
+    return RepDataTo(data);
+  }
 
-//  static const RepDataTo run(RepDataFrom&& data)
-//  {
-//    return RepDataTo(std::move(data));
-//  }
+  static const RepDataTo run(RepDataFrom&& data)
+  {
+    return RepDataTo(std::move(data));
+  }
 };
 
 //==============================================================================
@@ -335,7 +302,7 @@ template <typename SO3From, typename SO3To>
 struct SO3RepDataDirectConvertImpl<
     SO3From,
     SO3To,
-    typename std::enable_if<EigenHasAssignmentOperatorImpl<SO3From, SO3To>::value>::type>
+    typename std::enable_if<common::HasAssignmentOperator<SO3From, SO3To>::value>::type>
 {
   using RepDataFrom = typename Traits<SO3From>::RepData;
   using RepDataTo = typename Traits<SO3To>::RepData;
@@ -616,8 +583,7 @@ DART_SO3REPDATA_CONVERT_IMPL_FROM_EULER_ANGLES(2, 1, 0)
 //==============================================================================
 template <typename SO3From,
           typename SO3To,
-          typename SO3Canonical
-              = DefaultSO3Canonical<typename Traits<SO3From>::S>,
+          typename SO3Via = DefaultSO3Canonical<typename Traits<SO3From>::S>,
           typename Enable = void>
 struct SO3RepDataConvertImpl
 {
@@ -626,25 +592,25 @@ struct SO3RepDataConvertImpl
 
   static const RepDataTo run(const RepDataFrom& data)
   {
-    return SO3RepDataDirectConvertImpl<SO3Canonical, SO3To>::run(
-        SO3RepDataDirectConvertImpl<SO3From, SO3Canonical>::run(data));
+    return SO3RepDataDirectConvertImpl<SO3Via, SO3To>::run(
+        SO3RepDataDirectConvertImpl<SO3From, SO3Via>::run(data));
   }
 
   static const RepDataTo run(RepDataFrom&& data)
   {
-    return SO3RepDataDirectConvertImpl<SO3Canonical, SO3To>::run(
-        SO3RepDataDirectConvertImpl<SO3From, SO3Canonical>::run(std::move(data)));
+    return SO3RepDataDirectConvertImpl<SO3Via, SO3To>::run(
+        SO3RepDataDirectConvertImpl<SO3From, SO3Via>::run(std::move(data)));
   }
 };
 
 //==============================================================================
 template <typename SO3From,
           typename SO3To,
-          typename SO3Canonical>
+          typename SO3Via>
 struct SO3RepDataConvertImpl<
     SO3From,
     SO3To,
-    SO3Canonical,
+    SO3Via,
     typename std::enable_if<
         SO3RepDataDirectConvertImpl<SO3From, SO3To>::IsSpecialized>::type
     >
@@ -870,7 +836,8 @@ struct SO3RepDataMultiplicationImpl<SO3Vector<S>, SO3Vector<S>>
 
 //==============================================================================
 template <typename SO3Type,
-          typename SO3Canonical = DefaultSO3Canonical<typename Traits<SO3Type>::S>,
+          typename SO3Canonical
+              = DefaultSO3Canonical<typename Traits<SO3Type>::S>,
           typename Enable = void>
 struct SO3IsCanonical : std::false_type {};
 
