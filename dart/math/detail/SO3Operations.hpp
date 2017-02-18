@@ -250,6 +250,25 @@ struct SO3RepDataIsEigenMatrixBaseImpl<
     : std::true_type {};
 
 //==============================================================================
+// SO3IsSupportedEigenSO3Type
+//==============================================================================
+
+//==============================================================================
+template <typename T, typename Enable = void>
+struct SO3IsSupportedEigenSO3Type : std::false_type {};
+
+//==============================================================================
+template <typename T>
+struct SO3IsSupportedEigenSO3Type<
+    T,
+    typename std::enable_if<
+        std::is_same<T, Eigen::Matrix<typename T::Scalar, 3, 3>>::value
+            || std::is_same<T, Eigen::AngleAxis<typename T::Scalar>>::value
+            || std::is_same<T, Eigen::Quaternion<typename T::Scalar>>::value
+    >::type>
+    : std::true_type {};
+
+//==============================================================================
 // SO3RepDataIsSupportedByEigenImpl
 //==============================================================================
 
@@ -263,15 +282,55 @@ struct SO3RepDataIsSupportedByEigenImpl<
     SO3A,
     SO3B,
     typename std::enable_if<
-        (std::is_same<typename SO3A::RepData, Eigen::Matrix<typename SO3A::S, 3, 3>>::value
-            || std::is_same<typename SO3A::RepData, Eigen::AngleAxis<typename SO3A::S>>::value
-            || std::is_same<typename SO3A::RepData, Eigen::Quaternion<typename SO3A::S>>::value)
+        SO3IsSupportedEigenSO3Type<typename SO3A::RepData>::value
         &&
-        (std::is_same<typename SO3B::RepData, Eigen::Matrix<typename SO3B::S, 3, 3>>::value
-            || std::is_same<typename SO3B::RepData, Eigen::AngleAxis<typename SO3B::S>>::value
-            || std::is_same<typename SO3B::RepData, Eigen::Quaternion<typename SO3B::S>>::value)
+        SO3IsSupportedEigenSO3Type<typename SO3B::RepData>::value
     >::type>
     : std::true_type {};
+
+//==============================================================================
+// SO3RepDataDirectConvertEigenToEigenImpl
+//==============================================================================
+
+//==============================================================================
+template <typename SO3From, typename SO3To, typename Enable = void>
+struct SO3RepDataConvertEigenToSO3Impl
+{
+  using RepDataFrom = typename Traits<SO3From>::RepData;
+  using RepDataTo = typename Traits<SO3To>::RepData;
+
+  static constexpr bool IsSpecialized = false;
+
+  static const RepDataTo run(const RepDataFrom& data)
+  {
+    return RepDataTo(data);
+  }
+
+  static const RepDataTo run(RepDataFrom&& data)
+  {
+    return RepDataTo(std::move(data));
+  }
+};
+
+//==============================================================================
+template <typename SO3From, typename SO3To, typename Enable = void>
+struct SO3RepDataConvertSO3ToEigenImpl
+{
+  using RepDataFrom = typename Traits<SO3From>::RepData;
+  using RepDataTo = typename Traits<SO3To>::RepData;
+
+  static constexpr bool IsSpecialized = false;
+
+  static const RepDataTo run(const RepDataFrom& data)
+  {
+    return RepDataTo(data);
+  }
+
+  static const RepDataTo run(RepDataFrom&& data)
+  {
+    return RepDataTo(std::move(data));
+  }
+};
 
 //==============================================================================
 // SO3RepDataDirectConvertImpl

@@ -84,7 +84,8 @@ SO3Matrix<S>::SO3Matrix(SO3Base<Derived>&& other)
 //==============================================================================
 template <typename S>
 template <typename Derived>
-SO3Matrix<S>::SO3Matrix(const Eigen::MatrixBase<Derived>& matrix) : Base(), mRepData(matrix)
+SO3Matrix<S>::SO3Matrix(const Eigen::MatrixBase<Derived>& matrix)
+  : Base(), mRepData(matrix)
 {
   assert(matrix.rows() == 3);
   assert(matrix.cols() == 3);
@@ -93,7 +94,8 @@ SO3Matrix<S>::SO3Matrix(const Eigen::MatrixBase<Derived>& matrix) : Base(), mRep
 //==============================================================================
 template <typename S>
 template <typename Derived>
-SO3Matrix<S>::SO3Matrix(Eigen::MatrixBase<Derived>&& matrix) : Base(), mRepData(std::move(matrix))
+SO3Matrix<S>::SO3Matrix(Eigen::MatrixBase<Derived>&& matrix)
+  : Base(), mRepData(std::move(matrix))
 {
   assert(matrix.rows() == 3);
   assert(matrix.cols() == 3);

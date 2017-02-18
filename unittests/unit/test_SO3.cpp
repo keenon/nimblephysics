@@ -284,6 +284,29 @@ TEST(SO3, DETAIL_SO3RepDataIsSupportedByEigenImpl)
   a1 * a2;
 }
 
+//==============================================================================
+TEST(SO3, DETAIL_SO3RepDataDirectConvertImpl)
+{
+  using math::detail::SO3IsSupportedEigenSO3Type;
+
+  bool res;
+
+  res = SO3IsSupportedEigenSO3Type<Eigen::Matrix3d>::value;
+  EXPECT_TRUE(res);
+
+  res = SO3IsSupportedEigenSO3Type<Eigen::AngleAxisd>::value;
+  EXPECT_TRUE(res);
+
+  res = SO3IsSupportedEigenSO3Type<Eigen::Quaterniond>::value;
+  EXPECT_TRUE(res);
+
+  res = SO3IsSupportedEigenSO3Type<Eigen::Matrix2d>::value;
+  EXPECT_FALSE(res);
+
+  res = SO3IsSupportedEigenSO3Type<Eigen::Vector3d>::value;
+  EXPECT_FALSE(res);
+}
+
 ////==============================================================================
 //TEST(SO3, SO3MatrixInteractWithEigen)
 //{
@@ -531,10 +554,10 @@ template <typename T>
 void testConstruction()
 {
   // TODO(JS): Implement
-//  T(Eigen::Matrix3d   ()).isApprox(T::Identity());
-//  T(Eigen::AngleAxisd ()).isApprox(T::Identity());
-//  T(Eigen::Quaterniond()).isApprox(T::Identity());
-  T(math::SO3Matrixd  ()).isApprox(T::Identity());
+  T(Eigen::Matrix3d   ()).isApprox(T::Identity());
+  T(Eigen::AngleAxisd ()).isApprox(T::Identity());
+  T(Eigen::Quaterniond()).isApprox(T::Identity());
+//  T(math::SO3Matrixd  ()).isApprox(T::Identity());
 //  T(math::SO3Vectord  ()).isApprox(T::Identity());
 //  T(math::AngleAxisd  ()).isApprox(T::Identity());
 //  T(math::Quaterniond ()).isApprox(T::Identity());
