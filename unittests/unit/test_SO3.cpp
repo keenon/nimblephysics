@@ -64,15 +64,15 @@ TEST(SO3, DETAIL_TRAITS)
 TEST(SO3, DETAIL_EIGEN_TYPE_CHECKER)
 {
   using math::detail::SO3RepDataIsEigenRotationBase3Impl;
-  using math::detail::SO3RepDataIsEigenMatrixBaseImpl;
+  using math::detail::SO3RepDataIsEigenMatrixBase;
 
   EXPECT_TRUE(SO3RepDataIsEigenRotationBase3Impl<math::AngleAxisd>::value);
   EXPECT_TRUE(SO3RepDataIsEigenRotationBase3Impl<math::Quaterniond>::value);
 
-  EXPECT_TRUE(SO3RepDataIsEigenMatrixBaseImpl<math::SO3Matrixd>::value);
-  EXPECT_TRUE(SO3RepDataIsEigenMatrixBaseImpl<math::SO3Vectord>::value);
-  EXPECT_TRUE(SO3RepDataIsEigenMatrixBaseImpl<math::EulerXYZd>::value);
-  EXPECT_TRUE(SO3RepDataIsEigenMatrixBaseImpl<math::EulerZYXd>::value);
+  EXPECT_TRUE(SO3RepDataIsEigenMatrixBase<math::SO3Matrixd>::value);
+  EXPECT_TRUE(SO3RepDataIsEigenMatrixBase<math::SO3Vectord>::value);
+  EXPECT_TRUE(SO3RepDataIsEigenMatrixBase<math::EulerXYZd>::value);
+  EXPECT_TRUE(SO3RepDataIsEigenMatrixBase<math::EulerZYXd>::value);
 }
 
 //==============================================================================
@@ -285,26 +285,236 @@ TEST(SO3, DETAIL_SO3RepDataIsSupportedByEigenImpl)
 }
 
 //==============================================================================
-TEST(SO3, DETAIL_SO3RepDataDirectConvertImpl)
+TEST(SO3, SO3IsSupportedEigenType)
 {
-  using math::detail::SO3IsSupportedEigenSO3Type;
+  using math::detail::SO3IsEigen;
 
   bool res;
 
-  res = SO3IsSupportedEigenSO3Type<Eigen::Matrix3d>::value;
+  res = SO3IsEigen<Eigen::Matrix3d>::value;
   EXPECT_TRUE(res);
 
-  res = SO3IsSupportedEigenSO3Type<Eigen::AngleAxisd>::value;
+  res = SO3IsEigen<Eigen::AngleAxisd>::value;
   EXPECT_TRUE(res);
 
-  res = SO3IsSupportedEigenSO3Type<Eigen::Quaterniond>::value;
+  res = SO3IsEigen<Eigen::Quaterniond>::value;
   EXPECT_TRUE(res);
 
-  res = SO3IsSupportedEigenSO3Type<Eigen::Matrix2d>::value;
+  res = SO3IsEigen<Eigen::Matrix2d>::value;
   EXPECT_FALSE(res);
 
-  res = SO3IsSupportedEigenSO3Type<Eigen::Vector3d>::value;
+  res = SO3IsEigen<Eigen::Vector3d>::value;
   EXPECT_FALSE(res);
+}
+
+//==============================================================================
+TEST(SO3, SO3IsSupportedEigenType2)
+{
+  using math::detail::SO3IsEigen2;
+
+  bool res;
+
+  res = SO3IsEigen2<Eigen::Matrix3d, Eigen::Matrix3d>::value;
+  EXPECT_TRUE(res);
+  res = SO3IsEigen2<Eigen::Matrix3d, Eigen::AngleAxisd>::value;
+  EXPECT_TRUE(res);
+  res = SO3IsEigen2<Eigen::Matrix3d, Eigen::Quaterniond>::value;
+  EXPECT_TRUE(res);
+
+  res = SO3IsEigen2<Eigen::AngleAxisd, Eigen::Matrix3d>::value;
+  EXPECT_TRUE(res);
+  res = SO3IsEigen2<Eigen::AngleAxisd, Eigen::AngleAxisd>::value;
+  EXPECT_TRUE(res);
+  res = SO3IsEigen2<Eigen::AngleAxisd, Eigen::Quaterniond>::value;
+  EXPECT_TRUE(res);
+
+  res = SO3IsEigen2<Eigen::Quaterniond, Eigen::Matrix3d>::value;
+  EXPECT_TRUE(res);
+  res = SO3IsEigen2<Eigen::Quaterniond, Eigen::AngleAxisd>::value;
+  EXPECT_TRUE(res);
+  res = SO3IsEigen2<Eigen::Quaterniond, Eigen::Quaterniond>::value;
+  EXPECT_TRUE(res);
+
+  res = SO3IsEigen2<Eigen::Matrix2d, Eigen::Matrix3d>::value;
+  EXPECT_FALSE(res);
+
+  res = SO3IsEigen2<Eigen::Vector3d, Eigen::Matrix3d>::value;
+  EXPECT_FALSE(res);
+}
+
+//==============================================================================
+TEST(SO3, SO3IsSO3)
+{
+  using math::detail::SO3IsSO3;
+
+  bool res;
+
+  res = SO3IsSO3<Eigen::Matrix3d>::value;
+  EXPECT_FALSE(res);
+
+  res = SO3IsSO3<Eigen::AngleAxisd>::value;
+  EXPECT_FALSE(res);
+
+  res = SO3IsSO3<Eigen::Quaterniond>::value;
+  EXPECT_FALSE(res);
+
+  res = SO3IsSO3<Eigen::Matrix2d>::value;
+  EXPECT_FALSE(res);
+
+  res = SO3IsSO3<Eigen::Vector3d>::value;
+  EXPECT_FALSE(res);
+
+  res = SO3IsSO3<math::SO3Matrixd>::value;
+  EXPECT_TRUE(res);
+
+  res = SO3IsSO3<math::SO3Vectord>::value;
+  EXPECT_TRUE(res);
+
+  res = SO3IsSO3<math::AngleAxisd>::value;
+  EXPECT_TRUE(res);
+
+  res = SO3IsSO3<math::Quaterniond>::value;
+  EXPECT_TRUE(res);
+}
+
+//==============================================================================
+TEST(SO3, SO3RepDataConvertEigenToEigenImpl)
+{
+  using math::detail::SO3ConvertEigenToEigen;
+
+  Eigen::Matrix3d eigMat3In;
+  Eigen::AngleAxisd eigAaIn;
+  Eigen::Quaterniond eigQuatIn;
+
+  Eigen::Matrix3d eigMat3Out;
+  Eigen::AngleAxisd eigAaOut;
+  Eigen::Quaterniond eigQuatOut;
+
+  eigMat3Out = SO3ConvertEigenToEigen<
+      Eigen::Matrix3d, Eigen::Matrix3d>::run(eigMat3In);
+  eigAaOut = SO3ConvertEigenToEigen<
+      Eigen::Matrix3d, Eigen::AngleAxisd>::run(eigMat3In);
+  eigQuatOut = SO3ConvertEigenToEigen<
+      Eigen::Matrix3d, Eigen::Quaterniond>::run(eigMat3In);
+
+  eigMat3Out = SO3ConvertEigenToEigen<
+      Eigen::AngleAxisd, Eigen::Matrix3d>::run(eigAaIn);
+  eigAaOut = SO3ConvertEigenToEigen<
+      Eigen::AngleAxisd, Eigen::AngleAxisd>::run(eigAaIn);
+  eigQuatOut = SO3ConvertEigenToEigen<
+      Eigen::AngleAxisd, Eigen::Quaterniond>::run(eigAaIn);
+
+  eigMat3Out = SO3ConvertEigenToEigen<
+      Eigen::Quaterniond, Eigen::Matrix3d>::run(eigQuatIn);
+  eigAaOut = SO3ConvertEigenToEigen<
+      Eigen::Quaterniond, Eigen::AngleAxisd>::run(eigQuatIn);
+  eigQuatOut = SO3ConvertEigenToEigen<
+      Eigen::Quaterniond, Eigen::Quaterniond>::run(eigQuatIn);
+}
+
+//==============================================================================
+TEST(SO3, SO3Assign)
+{
+  using math::detail::SO3Assign;
+
+  Eigen::Matrix3d eigMat3In;
+  Eigen::AngleAxisd eigAaIn;
+  Eigen::Quaterniond eigQuatIn;
+  math::SO3Matrixd so3MatIn;
+  math::SO3Vectord so3VecIn;
+  math::AngleAxisd so3AaIn;
+  math::Quaterniond so3QuatIn;
+  math::EulerXYZd so3EulerXYZIn;
+  math::EulerZYXd so3EulerZYXIn;
+
+  Eigen::Matrix3d eigMat3Out;
+  Eigen::AngleAxisd eigAaOut;
+  Eigen::Quaterniond eigQuatOut;
+  math::SO3Matrixd so3MatOut;
+  math::SO3Vectord so3VecOut;
+  math::AngleAxisd so3AaOut;
+  math::Quaterniond so3QuatOut;
+  math::EulerXYZd so3EulerXYZOut;
+  math::EulerZYXd so3EulerZYXOut;
+
+  SO3Assign<Eigen::Matrix3d, Eigen::Matrix3d>::run(eigMat3Out, eigMat3In);
+  SO3Assign<Eigen::Matrix3d, Eigen::AngleAxisd>::run(eigMat3Out, eigAaIn);
+  SO3Assign<Eigen::Matrix3d, Eigen::Quaterniond>::run(eigMat3Out, eigQuatIn);
+
+  SO3Assign<Eigen::AngleAxisd, Eigen::Matrix3d>::run(eigAaOut, eigMat3In);
+  SO3Assign<Eigen::AngleAxisd, Eigen::AngleAxisd>::run(eigAaOut, eigAaIn);
+  SO3Assign<Eigen::AngleAxisd, Eigen::Quaterniond>::run(eigAaOut, eigQuatIn);
+
+  SO3Assign<Eigen::Quaterniond, Eigen::Matrix3d>::run(eigQuatOut, eigMat3In);
+  SO3Assign<Eigen::Quaterniond, Eigen::AngleAxisd>::run(eigQuatOut, eigAaIn);
+  SO3Assign<Eigen::Quaterniond, Eigen::Quaterniond>::run(eigQuatOut, eigQuatIn);
+
+  // This should be identical to: eig[X]Out = eig[Y]In
+  // TODO: eig[X]Out = eig[Y]In
+
+  Eigen::Matrix3d matTest1(eigQuatIn);
+  Eigen::Matrix3d matTest2(eigAaIn);
+  Eigen::Quaterniond quatTest1(eigMat3In);
+
+//  SO3Assign<math::SO3Matrixd, Eigen::Matrix3d>::run(so3MatOut, eigMat3In);
+//  SO3Assign<math::SO3Matrixd, Eigen::AngleAxisd>::run(so3MatOut, eigAaIn);
+//  SO3Assign<math::SO3Matrixd, Eigen::Quaterniond>::run(so3MatOut, eigQuatIn);
+//  SO3Assign<math::SO3Matrixd, math::SO3Matrixd>::run(so3MatOut, so3MatIn);
+  SO3Assign<math::SO3Matrixd, math::SO3Vectord>::run(so3MatOut, so3VecIn);
+//  SO3Assign<math::SO3Matrixd, math::AngleAxisd>::run(so3MatOut, so3AaIn);
+//  SO3Assign<math::SO3Matrixd, math::Quaterniond>::run(so3MatOut, so3QuatIn);
+//  SO3Assign<math::SO3Matrixd, math::EulerXYZd>::run(so3MatOut, so3EulerXYZIn);
+//  SO3Assign<math::SO3Matrixd, math::EulerZYXd>::run(so3MatOut, so3EulerZYXIn);
+
+//  SO3Assign<math::SO3Vectord, Eigen::Matrix3d>::run(so3VecOut, eigMat3In);
+//  SO3Assign<math::SO3Vectord, Eigen::AngleAxisd>::run(so3VecOut, eigAaIn);
+//  SO3Assign<math::SO3Vectord, Eigen::Quaterniond>::run(so3VecOut, eigQuatIn);
+//  SO3Assign<math::SO3Vectord, math::SO3Matrixd>::run(so3VecOut, so3MatIn);
+//  SO3Assign<math::SO3Vectord, math::SO3Vectord>::run(so3VecOut, so3VecIn);
+//  SO3Assign<math::SO3Vectord, math::AngleAxisd>::run(so3VecOut, so3AaIn);
+//  SO3Assign<math::SO3Vectord, math::Quaterniond>::run(so3VecOut, so3QuatIn);
+//  SO3Assign<math::SO3Vectord, math::EulerXYZd>::run(so3VecOut, so3EulerXYZIn);
+//  SO3Assign<math::SO3Vectord, math::EulerZYXd>::run(so3VecOut, so3EulerZYXIn);
+
+//  SO3Assign<math::AngleAxisd, Eigen::Matrix3d>::run(so3AaOut, eigMat3In);
+//  SO3Assign<math::AngleAxisd, Eigen::AngleAxisd>::run(so3AaOut, eigAaIn);
+//  SO3Assign<math::AngleAxisd, Eigen::Quaterniond>::run(so3AaOut, eigQuatIn);
+//  SO3Assign<math::AngleAxisd, math::SO3Matrixd>::run(so3AaOut, so3MatIn);
+//  SO3Assign<math::AngleAxisd, math::SO3Vectord>::run(so3AaOut, so3VecIn);
+//  SO3Assign<math::AngleAxisd, math::AngleAxisd>::run(so3AaOut, so3AaIn);
+//  SO3Assign<math::AngleAxisd, math::Quaterniond>::run(so3AaOut, so3QuatIn);
+//  SO3Assign<math::AngleAxisd, math::EulerXYZd>::run(so3AaOut, so3EulerXYZIn);
+//  SO3Assign<math::AngleAxisd, math::EulerZYXd>::run(so3AaOut, so3EulerZYXIn);
+
+//  SO3Assign<math::Quaterniond, Eigen::Matrix3d>::run(so3QuatOut, eigMat3In);
+//  SO3Assign<math::Quaterniond, Eigen::AngleAxisd>::run(so3QuatOut, eigAaIn);
+//  SO3Assign<math::Quaterniond, Eigen::Quaterniond>::run(so3QuatOut, eigQuatIn);
+//  SO3Assign<math::Quaterniond, math::SO3Matrixd>::run(so3QuatOut, so3MatIn);
+//  SO3Assign<math::Quaterniond, math::SO3Vectord>::run(so3QuatOut, so3VecIn);
+//  SO3Assign<math::Quaterniond, math::AngleAxisd>::run(so3QuatOut, so3AaIn);
+//  SO3Assign<math::Quaterniond, math::Quaterniond>::run(so3QuatOut, so3QuatIn);
+//  SO3Assign<math::Quaterniond, math::EulerXYZd>::run(so3QuatOut, so3EulerXYZIn);
+//  SO3Assign<math::Quaterniond, math::EulerZYXd>::run(so3QuatOut, so3EulerZYXIn);
+
+//  SO3Assign<math::EulerXYZd, Eigen::Matrix3d>::run(so3EulerXYZOut, eigMat3In);
+//  SO3Assign<math::EulerXYZd, Eigen::AngleAxisd>::run(so3EulerXYZOut, eigAaIn);
+//  SO3Assign<math::EulerXYZd, Eigen::Quaterniond>::run(so3EulerXYZOut, eigQuatIn);
+//  SO3Assign<math::EulerXYZd, math::SO3Matrixd>::run(so3EulerXYZOut, so3MatIn);
+//  SO3Assign<math::EulerXYZd, math::SO3Vectord>::run(so3EulerXYZOut, so3VecIn);
+//  SO3Assign<math::EulerXYZd, math::AngleAxisd>::run(so3EulerXYZOut, so3AaIn);
+//  SO3Assign<math::EulerXYZd, math::Quaterniond>::run(so3EulerXYZOut, so3QuatIn);
+//  SO3Assign<math::EulerXYZd, math::EulerXYZd>::run(so3EulerXYZOut, so3EulerXYZIn);
+//  SO3Assign<math::EulerXYZd, math::EulerZYXd>::run(so3EulerXYZOut, so3EulerZYXIn);
+
+//  SO3Assign<math::EulerZYXd, Eigen::Matrix3d>::run(so3EulerZYXOut, eigMat3In);
+//  SO3Assign<math::EulerZYXd, Eigen::AngleAxisd>::run(so3EulerZYXOut, eigAaIn);
+//  SO3Assign<math::EulerZYXd, Eigen::Quaterniond>::run(so3EulerZYXOut, eigQuatIn);
+//  SO3Assign<math::EulerZYXd, math::SO3Matrixd>::run(so3EulerZYXOut, so3MatIn);
+//  SO3Assign<math::EulerZYXd, math::SO3Vectord>::run(so3EulerZYXOut, so3VecIn);
+//  SO3Assign<math::EulerZYXd, math::AngleAxisd>::run(so3EulerZYXOut, so3AaIn);
+//  SO3Assign<math::EulerZYXd, math::Quaterniond>::run(so3EulerZYXOut, so3QuatIn);
+//  SO3Assign<math::EulerZYXd, math::EulerXYZd>::run(so3EulerZYXOut, so3EulerXYZIn);
+//  SO3Assign<math::EulerZYXd, math::EulerZYXd>::run(so3EulerZYXOut, so3EulerZYXIn);
 }
 
 ////==============================================================================

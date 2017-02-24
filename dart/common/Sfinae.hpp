@@ -71,6 +71,23 @@ public:
 };
 
 //==============================================================================
+// HasMoveAssignmentOperator
+//==============================================================================
+
+template <typename A, typename B>
+class HasMoveAssignmentOperator
+{
+protected:
+  template <typename C, typename D>
+  static constexpr auto check(C c, D d) -> decltype(c = std::move(d), std::true_type());
+  static constexpr auto check(...) -> decltype(std::false_type());
+
+public:
+  static constexpr bool value
+    = decltype( check( std::declval<A>(), std::declval<B>() ) )::value;
+};
+
+//==============================================================================
 // HasMuliplicationOperator
 //==============================================================================
 

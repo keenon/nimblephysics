@@ -56,6 +56,21 @@ static T getVectorObjectIfAvailable(std::size_t index, const std::vector<T>& vec
   return nullptr;
 }
 
+//==============================================================================
+template <template <typename...> class C, typename...Ts>
+std::true_type is_base_of_template_impl(const C<Ts...>*);
+// TODO(JS): move to detail namespace
+
+//==============================================================================
+template <template <typename...> class C>
+std::false_type is_base_of_template_impl(...);
+// TODO(JS): move to detail namespace
+
+//==============================================================================
+// Reference: http://stackoverflow.com/a/34672753
+template <typename T, template <typename...> class C>
+using is_base_of_template = decltype(is_base_of_template_impl<C>(std::declval<T*>()));
+
 } // namespace common
 } // namespace dart
 

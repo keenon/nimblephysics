@@ -34,6 +34,7 @@
 
 #include <Eigen/Eigen>
 #include "dart/common/Sfinae.hpp"
+#include "dart/common/StlHelpers.hpp"
 #include "dart/math/MathTypes.hpp"
 #include "dart/math/Geometry.hpp"
 #include "dart/math/Constants.hpp"
@@ -47,7 +48,7 @@
 // - SO3Log
 //
 // - SO3RepDataIsEigenRotationBase3Impl
-// - SO3RepDataIsEigenMatrixBaseImpl
+// - SO3RepDataIsEigenMatrixBase
 // - SO3RepDataDirectConvertImpl
 // - SO3RepDataConvertImpl
 // - SO3RepDataMultiplicationImpl
@@ -186,6 +187,40 @@ Eigen::Matrix<S, 3, 3> SO3Exp(const Eigen::Matrix<S, 3, 1>& w)
 }
 
 //==============================================================================
+template <typename S>
+void SO3Exp(Eigen::Matrix<S, 3, 3>& res, const Eigen::Matrix<S, 3, 1>& w)
+{
+  S s2[] = { w[0]*w[0], w[1]*w[1], w[2]*w[2] };
+  S s3[] = { w[0]*w[1], w[1]*w[2], w[2]*w[0] };
+  S theta = std::sqrt(s2[0] + s2[1] + s2[2]);
+  S cos_t = std::cos(theta), alpha, beta;
+
+  if (theta > constants<S>::eps())
+  {
+    S sin_t = std::sin(theta);
+    alpha = sin_t / theta;
+    beta = (1.0 - cos_t) / theta / theta;
+  }
+  else
+  {
+    alpha = 1.0 - theta*theta/6.0;
+    beta = 0.5 - theta*theta/24.0;
+  }
+
+  res(0, 0) = beta*s2[0] + cos_t;
+  res(1, 0) = beta*s3[0] + alpha*w[2];
+  res(2, 0) = beta*s3[2] - alpha*w[1];
+
+  res(0, 1) = beta*s3[0] - alpha*w[2];
+  res(1, 1) = beta*s2[1] + cos_t;
+  res(2, 1) = beta*s3[1] + alpha*w[0];
+
+  res(0, 2) = beta*s3[2] + alpha*w[1];
+  res(1, 2) = beta*s3[1] - alpha*w[0];
+  res(2, 2) = beta*s2[2] + cos_t;
+}
+
+//==============================================================================
 // Logarithm map for SO(3)
 //==============================================================================
 
@@ -205,6 +240,22 @@ Eigen::Matrix<S, 3, 1> SO3Log(Eigen::Matrix<S, 3, 3>&& R)
   Eigen::AngleAxis<S> aa(std::move(R));
 
   return aa.angle()*aa.axis();
+}
+
+//==============================================================================
+template <typename S>
+void SO3Log(Eigen::Matrix<S, 3, 1>& vec, const Eigen::Matrix<S, 3, 3>& R)
+{
+  Eigen::AngleAxis<S> aa(R);
+  vec = aa.angle()*aa.axis();
+}
+
+//==============================================================================
+template <typename S>
+void SO3Log(Eigen::Matrix<S, 3, 1>& vec, Eigen::Matrix<S, 3, 3>&& R)
+{
+  Eigen::AngleAxis<S> aa(std::move(R));
+  vec = aa.angle()*aa.axis();
 }
 
 //==============================================================================
@@ -228,18 +279,18 @@ struct SO3RepDataIsEigenRotationBase3Impl<
     : std::true_type {};
 
 //==============================================================================
-// SO3RepDataIsEigenMatrixBaseImpl is specialized to std::true_type if the given
+// SO3RepDataIsEigenMatrixBase is specialized to std::true_type if the given
 // template parameter (SO3 class) is Eigen::MatrixBase, otherwise
 // std::false_type.
 //==============================================================================
 
 //==============================================================================
 template <typename SO3T, typename Enable = void>
-struct SO3RepDataIsEigenMatrixBaseImpl : std::false_type {};
+struct SO3RepDataIsEigenMatrixBase : std::false_type {};
 
 //==============================================================================
 template <typename SO3T>
-struct SO3RepDataIsEigenMatrixBaseImpl<
+struct SO3RepDataIsEigenMatrixBase<
     SO3T,
     typename std::enable_if<
         std::is_base_of<
@@ -250,21 +301,57 @@ struct SO3RepDataIsEigenMatrixBaseImpl<
     : std::true_type {};
 
 //==============================================================================
-// SO3IsSupportedEigenSO3Type
+// SO3IsEigen
 //==============================================================================
 
 //==============================================================================
 template <typename T, typename Enable = void>
-struct SO3IsSupportedEigenSO3Type : std::false_type {};
+struct SO3IsEigen : std::false_type {};
 
 //==============================================================================
 template <typename T>
-struct SO3IsSupportedEigenSO3Type<
+struct SO3IsEigen<
     T,
     typename std::enable_if<
         std::is_same<T, Eigen::Matrix<typename T::Scalar, 3, 3>>::value
             || std::is_same<T, Eigen::AngleAxis<typename T::Scalar>>::value
             || std::is_same<T, Eigen::Quaternion<typename T::Scalar>>::value
+    >::type>
+    : std::true_type {};
+
+//==============================================================================
+// SO3IsSupportedEigenType2
+//==============================================================================
+
+//==============================================================================
+template <typename EigenA, typename EigenB, typename Enable = void>
+struct SO3IsEigen2 : std::false_type {};
+
+//==============================================================================
+template <typename EigenA, typename EigenB>
+struct SO3IsEigen2<
+    EigenA,
+    EigenB,
+    typename std::enable_if<
+        SO3IsEigen<EigenA>::value
+        && SO3IsEigen<EigenB>::value
+    >::type>
+    : std::true_type {};
+
+//==============================================================================
+// SO3IsSO3
+//==============================================================================
+
+//==============================================================================
+template <typename T, typename Enable = void>
+struct SO3IsSO3 : std::false_type {};
+
+//==============================================================================
+template <typename T>
+struct SO3IsSO3<
+    T,
+    typename std::enable_if<
+        dart::common::is_base_of_template<T, SO3Base>::value
     >::type>
     : std::true_type {};
 
@@ -282,14 +369,14 @@ struct SO3RepDataIsSupportedByEigenImpl<
     SO3A,
     SO3B,
     typename std::enable_if<
-        SO3IsSupportedEigenSO3Type<typename SO3A::RepData>::value
+        SO3IsEigen<typename SO3A::RepData>::value
         &&
-        SO3IsSupportedEigenSO3Type<typename SO3B::RepData>::value
+        SO3IsEigen<typename SO3B::RepData>::value
     >::type>
     : std::true_type {};
 
 //==============================================================================
-// SO3RepDataDirectConvertEigenToEigenImpl
+// SO3RepDataConvertEigenToSO3Impl
 //==============================================================================
 
 //==============================================================================
@@ -685,6 +772,411 @@ struct SO3RepDataConvertImpl<
   static const RepDataTo run(RepDataFrom&& data)
   {
     return SO3RepDataDirectConvertImpl<SO3From, SO3To>::run(std::move(data));
+  }
+};
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//==============================================================================
+// SO3SetEigenFromEigen
+//==============================================================================
+
+template <typename EigenTo, typename EigenFrom>
+struct SO3SetEigenFromEigen
+{
+  static void run(EigenTo& to, const EigenFrom& from)
+  {
+    static_assert(
+        common::HasAssignmentOperator<EigenTo, EigenFrom>::value,
+        "The assignment operator from EigenFrom to EigenTo is not define. "
+        "Please make sure if the Eigen classes are relevant.");
+
+    to = from;
+  }
+
+  static void run(EigenTo& to, EigenFrom&& from)
+  {
+    static_assert(
+        common::HasMoveAssignmentOperator<EigenTo, EigenFrom>::value,
+        "The move assignment operator from EigenFrom to EigenTo is not define. "
+        "Please make sure if the Eigen classes are relevant.");
+
+    to = std::move(from);
+  }
+};
+
+//==============================================================================
+// SO3SetEigenFromSO3
+//==============================================================================
+
+template <typename SO3To, typename SO3From, typename Enable = void>
+struct SO3SetEigenFromSO3 {};
+
+//==============================================================================
+// SO3SetSO3FromSO3
+//==============================================================================
+
+template <typename SO3To, typename SO3From, typename Enable = void>
+struct SO3SetSO3FromSO3
+{
+  using RepDataTo = typename Traits<SO3To>::RepData;
+  using RepDataFrom = typename Traits<SO3From>::RepData;
+
+  static constexpr bool IsSpecialized = false;
+
+  static void run(SO3To& to, const SO3From& from)
+  {
+    to.getRepData() = from.getRepData();
+  }
+
+  static void run(SO3To& to, SO3From&& from)
+  {
+    to.getRepData() = std::move(from.getRepData());
+  }
+};
+
+//==============================================================================
+template <typename SO3T>
+struct SO3SetSO3FromSO3<SO3T, SO3T>
+{
+  using RepData = typename Traits<SO3T>::RepData;
+
+  static constexpr bool IsSpecialized = true;
+
+  static void run(SO3T& to, const SO3T& from)
+  {
+    to.getRepData() = from.getRepData();
+  }
+
+  static void run(SO3T& to, SO3T&& from)
+  {
+    to.getRepData() = std::move(from.getRepData());
+  }
+};
+
+//==============================================================================
+template <typename S>
+struct SO3SetSO3FromSO3<SO3Matrix<S>, SO3Vector<S>>
+{
+  using RepDataTo = typename Traits<SO3Matrix<S>>::RepData;
+  using RepDataFrom = typename Traits<SO3Vector<S>>::RepData;
+
+  static constexpr bool IsSpecialized = true;
+
+  static void run(SO3Matrix<S>& to, const SO3Vector<S>& from)
+  {
+    SO3Exp(to.getRepData(), from.getRepData());
+  }
+
+  static void run(SO3Matrix<S>& to, SO3Vector<S>&& from)
+  {
+    SO3Exp(to.getRepData(), std::move(from.getRepData()));
+  }
+};
+
+//==============================================================================
+// SO3SetSO3FromEigen
+//==============================================================================
+
+template <typename SO3To, typename EigenFrom, typename Enable = void>
+struct SO3SetSO3FromEigen
+{
+  static void run(SO3To& to, const EigenFrom& from)
+  {
+//    to = from;
+  }
+
+  static void run(SO3To& to, EigenFrom&& from)
+  {
+//    to = std::move(from);
+  }
+};
+
+//==============================================================================
+template <typename SO3To, typename EigenFrom>
+struct SO3SetSO3FromEigen<
+    SO3To,
+    EigenFrom,
+    int>
+//    typename std::enable_if<
+//        SO3IsSO3<EigenTo, EigenFrom>::value
+//    >::type>
+{
+  static void run(SO3To& to, const EigenFrom& from)
+  {
+//    to = from;
+  }
+
+  static void run(SO3To& to, EigenFrom&& from)
+  {
+//    to = std::move(from);
+  }
+};
+
+//==============================================================================
+// SO3SetEigenFromX
+//==============================================================================
+
+template <typename EigenTo, typename From, typename Enable = void>
+struct SO3SetEigenFromX {};
+
+//==============================================================================
+template <typename EigenTo, typename From>
+struct SO3SetEigenFromX<
+    EigenTo,
+    From,
+    typename std::enable_if<SO3IsEigen<From>::value>::type
+    >
+{
+  static void run(EigenTo& to, const From& from)
+  {
+    SO3SetEigenFromEigen<EigenTo, From>::run(to, from);
+  }
+
+  static void run(EigenTo& to, From&& from)
+  {
+    SO3SetEigenFromEigen<EigenTo, From>::run(to, std::move(from));
+  }
+};
+
+//==============================================================================
+// SO3SetSO3FromX
+//==============================================================================
+
+template <typename SO3To, typename From, typename Enable = void>
+struct SO3SetSO3FromX {};
+
+//==============================================================================
+template <typename SO3To, typename From>
+struct SO3SetSO3FromX<
+    SO3To,
+    From,
+    typename std::enable_if<SO3IsSO3<From>::value>::type
+    >
+{
+  static void run(SO3To& to, const From& from)
+  {
+    SO3SetSO3FromSO3<SO3To, From>::run(to, from);
+  }
+
+  static void run(SO3To& to, From&& from)
+  {
+    SO3SetSO3FromSO3<SO3To, From>::run(to, std::move(from));
+  }
+};
+
+//==============================================================================
+template <typename SO3To, typename From>
+struct SO3SetSO3FromX<
+    SO3To,
+    From,
+    typename std::enable_if<SO3IsEigen<From>::value>::type
+    >
+{
+  static void run(SO3To& to, const From& from)
+  {
+    SO3SetSO3FromEigen<SO3To, From>::run(to, from);
+  }
+
+  static void run(SO3To& to, From&& from)
+  {
+    SO3SetSO3FromEigen<SO3To, From>::run(to, std::move(from));
+  }
+};
+
+//==============================================================================
+template <typename To, typename From, typename Enable = void>
+struct SO3Assign {};
+
+//==============================================================================
+template <typename To, typename From>
+struct SO3Assign<To, From, typename std::enable_if<SO3IsEigen<To>::value>::type>
+{
+  static void run(To& to, const From& from)
+  {
+    SO3SetEigenFromX<To, From>::run(to, from);
+  }
+
+  static void run(To& to, From&& from)
+  {
+    SO3SetEigenFromX<To, From>::run(to, std::move(from));
+  }
+};
+
+//==============================================================================
+template <typename To, typename From>
+struct SO3Assign<To, From, typename std::enable_if<SO3IsSO3<To>::value>::type>
+{
+  static void run(To& to, const From& from)
+  {
+    SO3SetSO3FromX<To, From>::run(to, from);
+  }
+
+  static void run(To& to, From&& from)
+  {
+    SO3SetSO3FromX<To, From>::run(to, std::move(from));
+  }
+};
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//==============================================================================
+// SO3ConvertEigenToEigen
+//==============================================================================
+
+//==============================================================================
+template <typename EigenFrom, typename EigenTo, typename Enable = void>
+struct SO3ConvertEigenToEigen {};
+
+//==============================================================================
+template <typename EigenFrom, typename EigenTo>
+struct SO3ConvertEigenToEigen<
+    EigenFrom,
+    EigenTo,
+    typename std::enable_if<
+        SO3IsEigen2<EigenFrom, EigenTo>::value
+    >::type>
+{
+  static const EigenTo run(const EigenFrom& data)
+  {
+    return EigenTo(data);
+  }
+
+  static const EigenTo run(EigenFrom&& data)
+  {
+    return EigenTo(std::move(data));
+  }
+};
+
+//==============================================================================
+// SO3ConvertEigenToDart
+//==============================================================================
+
+template <typename EigenFrom, typename To, typename Enable = void>
+struct SO3ConvertEigenToDart {};
+
+//==============================================================================
+// SO3ConvertDartToEigen
+//==============================================================================
+
+template <typename EigenFrom, typename To, typename Enable = void>
+struct SO3ConvertDartToEigen {};
+
+//==============================================================================
+// SO3ConvertDartToDart
+//==============================================================================
+
+template <typename EigenFrom, typename To, typename Enable = void>
+struct SO3ConvertDartToDart {};
+
+//==============================================================================
+// SO3ConvertEigenToX
+//==============================================================================
+
+template <typename EigenFrom, typename To, typename Enable = void>
+struct SO3ConvertEigenToX {};
+
+//==============================================================================
+template <typename EigenFrom, typename SO3To>
+struct SO3ConvertEigenToX<
+    EigenFrom,
+    SO3To,
+    typename std::enable_if<SO3IsEigen<SO3To>::value>::type
+    >
+{
+  static const SO3To run(const EigenFrom& data)
+  {
+    return SO3ConvertEigenToEigen<EigenFrom, SO3To>::run(data);
+  }
+
+  static const SO3To run(EigenFrom&& data)
+  {
+    return SO3ConvertEigenToEigen<EigenFrom, SO3To>::run(std::move(data));
+  }
+};
+
+////==============================================================================
+//template <typename DartSO3From, typename To, typename Enable = void>
+//struct SO3ConvertDartToX
+//{
+////  using RepDataFrom = typename Traits<SO3From>::RepData;
+////  using RepDataTo = typename Traits<SO3To>::RepData;
+
+//  static const SO3To run(const SO3From& data)
+//  {
+//  }
+
+//  static const SO3To run(SO3From&& data)
+//  {
+//  }
+//};
+
+//==============================================================================
+template <typename SO3From, typename SO3To, typename Enable = void>
+struct SO3Convert_ {};
+
+//==============================================================================
+template <typename SO3From, typename SO3To>
+struct SO3Convert_<
+    SO3From,
+    SO3To,
+    typename std::enable_if<SO3IsEigen<SO3From>::value>::type
+    >
+{
+  static const SO3To run(const SO3From& data)
+  {
+    return SO3ConvertEigenToX<SO3From, SO3To>::run(data);
+  }
+
+  static const SO3To run(SO3From&& data)
+  {
+    return SO3ConvertEigenToX<SO3From, SO3To>::run(std::move(data));
   }
 };
 
