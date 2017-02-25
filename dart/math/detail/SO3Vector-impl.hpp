@@ -62,28 +62,25 @@ SO3Vector<S>::SO3Vector(SO3Vector&& other) : mRepData(std::move(other.mRepData))
 template <typename S>
 template <typename Derived>
 SO3Vector<S>::SO3Vector(const SO3Base<Derived>& other)
-  : Base(),
-    mRepData(detail::SO3RepDataConvertImpl<Derived, This>::run(
-            other.getRepData()))
+  : Base(), mRepData()
 {
-  // Do nothing
+  *this = other;
 }
 
 //==============================================================================
 template <typename S>
 template <typename Derived>
 SO3Vector<S>::SO3Vector(SO3Base<Derived>&& other)
-  : Base(),
-    mRepData(detail::SO3RepDataConvertImpl<Derived, This>::run(
-            std::move(other.getRepData())))
+  : Base(), mRepData()
 {
-  // Do nothing
+  *this = std::move(other);
 }
 
 //==============================================================================
 template <typename S>
 template <typename Derived>
-SO3Vector<S>::SO3Vector(const Eigen::MatrixBase<Derived>& matrix) : Base(), mRepData(matrix)
+SO3Vector<S>::SO3Vector(const Eigen::MatrixBase<Derived>& matrix)
+  : Base(), mRepData(matrix)
 {
   assert(matrix.rows() == 3);
   assert(matrix.cols() == 1);
@@ -92,7 +89,8 @@ SO3Vector<S>::SO3Vector(const Eigen::MatrixBase<Derived>& matrix) : Base(), mRep
 //==============================================================================
 template <typename S>
 template <typename Derived>
-SO3Vector<S>::SO3Vector(Eigen::MatrixBase<Derived>&& matrix) : Base(), mRepData(std::move(matrix))
+SO3Vector<S>::SO3Vector(Eigen::MatrixBase<Derived>&& matrix)
+  : Base(), mRepData(std::move(matrix))
 {
   assert(matrix.rows() == 3);
   assert(matrix.cols() == 1);
@@ -118,10 +116,7 @@ SO3Vector<S>& SO3Vector<S>::operator=(SO3Vector&& other)
 template <typename S>
 SO3Vector<S>& SO3Vector<S>::operator=(const Eigen::AngleAxis<S>& quat)
 {
-  mRepData = detail::SO3RepDataConvertImpl<
-      AngleAxis<S>, SO3Vector<S>>::run(quat);
-  // TODO(JS): improve; need a way to deduce representation type from Eigen
-  // data type
+  detail::SO3Assign<This, Eigen::AngleAxis<S>>::run(*this, quat);
   return *this;
 }
 
@@ -129,10 +124,7 @@ SO3Vector<S>& SO3Vector<S>::operator=(const Eigen::AngleAxis<S>& quat)
 template <typename S>
 SO3Vector<S>& SO3Vector<S>::operator=(Eigen::AngleAxis<S>&& quat)
 {
-  mRepData = detail::SO3RepDataConvertImpl<
-      AngleAxis<S>, SO3Vector<S>>::run(std::move(quat));
-  // TODO(JS): improve; need a way to deduce representation type from Eigen
-  // data type
+  detail::SO3Assign<This, Eigen::AngleAxis<S>>::run(*this, std::move(quat));
   return *this;
 }
 
@@ -141,9 +133,7 @@ template <typename S>
 template <typename QuatDerived>
 SO3Vector<S>& SO3Vector<S>::operator=(const Eigen::QuaternionBase<QuatDerived>& quat)
 {
-  mRepData = detail::SO3RepDataConvertImpl<Quaternion<S>, SO3Vector<S>>::run(quat);
-  // TODO(JS): improve; need a way to deduce representation type from Eigen
-  // data type
+  detail::SO3Assign<This, Eigen::QuaternionBase<QuatDerived>>::run(*this, quat);
   return *this;
 }
 
@@ -152,11 +142,7 @@ template <typename S>
 template <typename QuatDerived>
 SO3Vector<S>& SO3Vector<S>::operator=(Eigen::QuaternionBase<QuatDerived>&& quat)
 {
-  mRepData = detail::SO3RepDataConvertImpl<
-      Quaternion<S>, SO3Vector<S>>::run(
-        std::move(quat));
-  // TODO(JS): improve; need a way to deduce representation type from Eigen
-  // data type
+  detail::SO3Assign<This, Eigen::QuaternionBase<QuatDerived>>::run(*this, std::move(quat));
   return *this;
 }
 
@@ -165,9 +151,7 @@ template <typename S>
 template <typename Derived>
 SO3Vector<S>& SO3Vector<S>::operator=(const Eigen::MatrixBase<Derived>& matrix)
 {
-  mRepData = detail::SO3RepDataConvertImpl<
-      SO3Matrix<S>, SO3Vector<S>>::run(
-        matrix);
+  detail::SO3Assign<This, Eigen::MatrixBase<Derived>>::run(*this, matrix);
   return *this;
 }
 
@@ -176,9 +160,7 @@ template <typename S>
 template <typename Derived>
 SO3Vector<S>& SO3Vector<S>::operator=(Eigen::MatrixBase<Derived>&& matrix)
 {
-  mRepData = detail::SO3RepDataConvertImpl<
-      SO3Matrix<S>, SO3Vector<S>>::run(
-        std::move(matrix));
+  detail::SO3Assign<This, Eigen::MatrixBase<Derived>>::run(*this, std::move(matrix));
   return *this;
 }
 

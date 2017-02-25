@@ -731,7 +731,7 @@ template <typename SO3From,
           typename SO3To,
           typename SO3Via = DefaultSO3Canonical<typename Traits<SO3From>::S>,
           typename Enable = void>
-struct SO3RepDataConvertImpl
+struct SO3RepDataAssign
 {
   using RepDataFrom = typename Traits<SO3From>::RepData;
   using RepDataTo = typename Traits<SO3To>::RepData;
@@ -753,7 +753,7 @@ struct SO3RepDataConvertImpl
 template <typename SO3From,
           typename SO3To,
           typename SO3Via>
-struct SO3RepDataConvertImpl<
+struct SO3RepDataAssign<
     SO3From,
     SO3To,
     SO3Via,
@@ -775,7 +775,43 @@ struct SO3RepDataConvertImpl<
   }
 };
 
+////==============================================================================
+//// SO3Assign
+////==============================================================================
 
+////==============================================================================
+//template <typename To, typename From, typename Enable = void>
+//struct SO3RepDataAssign {};
+
+////==============================================================================
+//template <typename To, typename From>
+//struct SO3RepDataAssign<To, From, typename std::enable_if<SO3IsEigen<To>::value>::type>
+//{
+//  static void run(To& to, const From& from)
+//  {
+//    SO3RepDataSetEigenFromX<To, From>::run(to, from);
+//  }
+
+//  static void run(To& to, From&& from)
+//  {
+//    SO3RepDataSetEigenFromX<To, From>::run(to, std::move(from));
+//  }
+//};
+
+////==============================================================================
+//template <typename To, typename From>
+//struct SO3RepDataAssign<To, From, typename std::enable_if<SO3IsSO3<To>::value>::type>
+//{
+//  static void run(To& to, const From& from)
+//  {
+//    SO3RepDataSetSO3FromX<To, From>::run(to, from);
+//  }
+
+//  static void run(To& to, From&& from)
+//  {
+//    SO3RepDataSetSO3FromX<To, From>::run(to, std::move(from));
+//  }
+//};
 
 
 
@@ -842,12 +878,12 @@ struct SO3SetSO3FromSO3
 
   static void run(SO3To& to, const SO3From& from)
   {
-    to.getRepData() = from.getRepData();
+    to.fromCanonical(from.toCanonical());
   }
 
   static void run(SO3To& to, SO3From&& from)
   {
-    to.getRepData() = std::move(from.getRepData());
+    to.fromCanonical(std::move(from.toCanonical()));
   }
 };
 
@@ -999,6 +1035,10 @@ struct SO3SetSO3FromX<
     SO3SetSO3FromEigen<SO3To, From>::run(to, std::move(from));
   }
 };
+
+//==============================================================================
+// SO3Assign
+//==============================================================================
 
 //==============================================================================
 template <typename To, typename From, typename Enable = void>
@@ -1343,8 +1383,8 @@ struct SO3RepDataMultiplicationImpl<SO3Vector<S>, SO3Vector<S>>
   static auto run(const RepData& dataA, const RepData& dataB)
   -> decltype(std::declval<CanonicalRepData>() * std::declval<CanonicalRepData>())
   {
-    return SO3RepDataConvertImpl<SO3Vector<S>, SO3CanonicalRep>::run(dataA)
-        * SO3RepDataConvertImpl<SO3Vector<S>, SO3CanonicalRep>::run(dataB);
+    return SO3RepDataAssign<SO3Vector<S>, SO3CanonicalRep>::run(dataA)
+        * SO3RepDataAssign<SO3Vector<S>, SO3CanonicalRep>::run(dataB);
     // TODO(JS): improve; super slow
   }
 };
@@ -1420,10 +1460,10 @@ struct SO3MultiplicationImpl
 
   static SO3A run(const SO3A& Ra, const SO3B& Rb)
   {
-    return SO3A(SO3RepDataConvertImpl<SO3ToPerform, SO3A>::run(
+    return SO3A(SO3RepDataAssign<SO3ToPerform, SO3A>::run(
           SO3RepDataHomogeneousMultiplicationImpl<S, SO3ToPerform>::run( // TODO(JS): Remove _canonical_
-            SO3RepDataConvertImpl<SO3A, SO3ToPerform>::run(Ra.getRepData()),
-            SO3RepDataConvertImpl<SO3B, SO3ToPerform>::run(Rb.getRepData()))));
+            SO3RepDataAssign<SO3A, SO3ToPerform>::run(Ra.getRepData()),
+            SO3RepDataAssign<SO3B, SO3ToPerform>::run(Rb.getRepData()))));
   }
 };
 
@@ -1476,10 +1516,10 @@ struct SO3InplaceMultiplicationImpl
 
   static void run(SO3A& Ra, const SO3B& Rb)
   {
-    Ra.setRepData(SO3RepDataConvertImpl<SO3Canonical, RepA>::run(
+    Ra.setRepData(SO3RepDataAssign<SO3Canonical, RepA>::run(
           SO3RepDataHomogeneousMultiplicationImpl<S, SO3Canonical>::run(
-            SO3RepDataConvertImpl<RepA, SO3Canonical>::run(Ra.getRepData()),
-            SO3RepDataConvertImpl<RepB, SO3Canonical>::run(Rb.getRepData()))));
+            SO3RepDataAssign<RepA, SO3Canonical>::run(Ra.getRepData()),
+            SO3RepDataAssign<RepB, SO3Canonical>::run(Rb.getRepData()))));
   }
 };
 
@@ -1526,7 +1566,7 @@ struct SO3ToImpl<
 
   static SO3OrEigenObject run(const RepData& data)
   {
-    return SO3OrEigenObject(detail::SO3RepDataConvertImpl<SO3From, SO3OrEigenObject>::run(
+    return SO3OrEigenObject(detail::SO3RepDataAssign<SO3From, SO3OrEigenObject>::run(
           data));
   }
 };
@@ -1548,10 +1588,10 @@ struct SO3ToImpl<
   using RepData = typename detail::Traits<SO3From>::RepData;
 
   static auto run(const RepData& data)
-  -> decltype(detail::SO3RepDataConvertImpl<SO3From, SO3Matrix<S>>::run(
+  -> decltype(detail::SO3RepDataAssign<SO3From, SO3Matrix<S>>::run(
       std::declval<RepData>()))
   {
-    return detail::SO3RepDataConvertImpl<SO3From, SO3Matrix<S>>::run(data);
+    return detail::SO3RepDataAssign<SO3From, SO3Matrix<S>>::run(data);
   }
 };
 
@@ -1572,10 +1612,10 @@ struct SO3ToImpl<
   using RepData = typename detail::Traits<SO3From>::RepData;
 
   static auto run(const RepData& repData)
-  -> decltype(detail::SO3RepDataConvertImpl<SO3From, AngleAxis<S>>::run(
+  -> decltype(detail::SO3RepDataAssign<SO3From, AngleAxis<S>>::run(
       std::declval<RepData>()))
   {
-    return detail::SO3RepDataConvertImpl<SO3From, AngleAxis<S>>::run(repData);
+    return detail::SO3RepDataAssign<SO3From, AngleAxis<S>>::run(repData);
   }
 };
 
@@ -1597,10 +1637,10 @@ struct SO3ToImpl<
   using RepData = typename detail::Traits<SO3From>::RepData;
 
   static auto run(const RepData& repData)
-  -> decltype(detail::SO3RepDataConvertImpl<SO3From, Quaternion<S>>::run(
+  -> decltype(detail::SO3RepDataAssign<SO3From, Quaternion<S>>::run(
       std::declval<RepData>()))
   {
-    return detail::SO3RepDataConvertImpl<SO3From, Quaternion<S>>::run(
+    return detail::SO3RepDataAssign<SO3From, Quaternion<S>>::run(
           repData);
   }
 };

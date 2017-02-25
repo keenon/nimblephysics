@@ -34,6 +34,8 @@
 
 #include "dart/math/AngleAxis.hpp"
 
+#include "dart/math/SO3Matrix.hpp"
+
 namespace dart {
 namespace math {
 
@@ -62,22 +64,18 @@ AngleAxis<S>::AngleAxis(AngleAxis&& other) : mRepData(std::move(other.mRepData))
 template <typename S>
 template <typename Derived>
 AngleAxis<S>::AngleAxis(const SO3Base<Derived>& other)
-  : Base(),
-    mRepData(detail::SO3RepDataConvertImpl<Derived, This>::run(
-             other.getRepData()))
+  : Base(), mRepData()
 {
-  // Do nothing
+  *this = other;
 }
 
 //==============================================================================
 template <typename S>
 template <typename Derived>
 AngleAxis<S>::AngleAxis(SO3Base<Derived>&& other)
-  : Base(),
-    mRepData(detail::SO3RepDataConvertImpl<Derived, This>::run(
-             std::move(other.getRepData())))
+  : Base(), mRepData()
 {
-  // Do nothing
+  *this = std::move(other);
 }
 
 //==============================================================================
@@ -197,6 +195,20 @@ bool AngleAxis<S>::operator==(const AngleAxis& other)
     return true;
 
   return mRepData.isApprox(other.mRepData, static_cast<S>(0));
+}
+
+//==============================================================================
+template <typename S>
+void AngleAxis<S>::fromCanonical(const SO3Matrix<S>& mat)
+{
+  mRepData = mat.getRepData();
+}
+
+//==============================================================================
+template <typename S>
+SO3Matrix<S> AngleAxis<S>::toCanonical() const
+{
+  return SO3Matrix<S>(mRepData.toRotationMatrix());
 }
 
 //==============================================================================

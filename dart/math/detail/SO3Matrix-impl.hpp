@@ -62,23 +62,18 @@ SO3Matrix<S>::SO3Matrix(SO3Matrix&& other) : Base(), mRepData(std::move(other.mR
 template <typename S>
 template <typename Derived>
 SO3Matrix<S>::SO3Matrix(const SO3Base<Derived>& other)
-  : Base(),
-    mRepData(
-      detail::SO3RepDataConvertImpl<Derived, This>::run(
-        other.getRepData()))
+  : Base(), mRepData()
 {
-  // Do nothing
+  *this = other;
 }
 
 //==============================================================================
 template <typename S>
 template <typename Derived>
 SO3Matrix<S>::SO3Matrix(SO3Base<Derived>&& other)
-  : Base(),
-    mRepData(detail::SO3RepDataConvertImpl<Derived, This>::run(
-            std::move(other.getRepData())))
+  : Base(), mRepData()
 {
-  // Do nothing
+  *this = std::move(other);
 }
 
 //==============================================================================
@@ -181,6 +176,20 @@ template <typename S>
 bool SO3Matrix<S>::operator==(const SO3Matrix& other)
 {
   return mRepData == other.mRepData;
+}
+
+//==============================================================================
+template <typename S>
+void SO3Matrix<S>::fromCanonical(const SO3Matrix& mat)
+{
+  *this = mat;
+}
+
+//==============================================================================
+template <typename S>
+SO3Matrix<S> SO3Matrix<S>::toCanonical() const
+{
+  return *this;
 }
 
 //==============================================================================

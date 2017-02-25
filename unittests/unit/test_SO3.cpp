@@ -375,6 +375,12 @@ TEST(SO3, SO3IsSO3)
 
   res = SO3IsSO3<math::Quaterniond>::value;
   EXPECT_TRUE(res);
+
+  res = SO3IsSO3<math::EulerXYZd>::value;
+  EXPECT_TRUE(res);
+
+  res = SO3IsSO3<math::EulerZYXd>::value;
+  EXPECT_TRUE(res);
 }
 
 //==============================================================================
@@ -456,12 +462,14 @@ TEST(SO3, SO3Assign)
   Eigen::Matrix3d matTest2(eigAaIn);
   Eigen::Quaterniond quatTest1(eigMat3In);
 
-//  SO3Assign<math::SO3Matrixd, Eigen::Matrix3d>::run(so3MatOut, eigMat3In);
-//  SO3Assign<math::SO3Matrixd, Eigen::AngleAxisd>::run(so3MatOut, eigAaIn);
-//  SO3Assign<math::SO3Matrixd, Eigen::Quaterniond>::run(so3MatOut, eigQuatIn);
-//  SO3Assign<math::SO3Matrixd, math::SO3Matrixd>::run(so3MatOut, so3MatIn);
+  so3MatOut = so3VecOut;
+
+  SO3Assign<math::SO3Matrixd, Eigen::Matrix3d>::run(so3MatOut, eigMat3In);
+  SO3Assign<math::SO3Matrixd, Eigen::AngleAxisd>::run(so3MatOut, eigAaIn);
+  SO3Assign<math::SO3Matrixd, Eigen::Quaterniond>::run(so3MatOut, eigQuatIn);
+  SO3Assign<math::SO3Matrixd, math::SO3Matrixd>::run(so3MatOut, so3MatIn);
   SO3Assign<math::SO3Matrixd, math::SO3Vectord>::run(so3MatOut, so3VecIn);
-//  SO3Assign<math::SO3Matrixd, math::AngleAxisd>::run(so3MatOut, so3AaIn);
+  SO3Assign<math::SO3Matrixd, math::AngleAxisd>::run(so3MatOut, so3AaIn);
 //  SO3Assign<math::SO3Matrixd, math::Quaterniond>::run(so3MatOut, so3QuatIn);
 //  SO3Assign<math::SO3Matrixd, math::EulerXYZd>::run(so3MatOut, so3EulerXYZIn);
 //  SO3Assign<math::SO3Matrixd, math::EulerZYXd>::run(so3MatOut, so3EulerZYXIn);
@@ -506,8 +514,8 @@ TEST(SO3, SO3Assign)
 //  SO3Assign<math::EulerXYZd, math::EulerXYZd>::run(so3EulerXYZOut, so3EulerXYZIn);
 //  SO3Assign<math::EulerXYZd, math::EulerZYXd>::run(so3EulerXYZOut, so3EulerZYXIn);
 
-//  SO3Assign<math::EulerZYXd, Eigen::Matrix3d>::run(so3EulerZYXOut, eigMat3In);
-//  SO3Assign<math::EulerZYXd, Eigen::AngleAxisd>::run(so3EulerZYXOut, eigAaIn);
+  SO3Assign<math::EulerZYXd, Eigen::Matrix3d>::run(so3EulerZYXOut, eigMat3In);
+  SO3Assign<math::EulerZYXd, Eigen::AngleAxisd>::run(so3EulerZYXOut, eigAaIn);
 //  SO3Assign<math::EulerZYXd, Eigen::Quaterniond>::run(so3EulerZYXOut, eigQuatIn);
 //  SO3Assign<math::EulerZYXd, math::SO3Matrixd>::run(so3EulerZYXOut, so3MatIn);
 //  SO3Assign<math::EulerZYXd, math::SO3Vectord>::run(so3EulerZYXOut, so3VecIn);

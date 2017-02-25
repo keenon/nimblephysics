@@ -72,23 +72,23 @@ Quaternion<S>::Quaternion(const SO3Base<Derived>& other)
 template <typename S>
 template <typename Derived>
 Quaternion<S>::Quaternion(SO3Base<Derived>&& other)
-  : Base(),
-    mRepData(detail::SO3RepDataConvertImpl<
-        Derived, This>::run(std::move(other.getRepData())))
+  : Base(), mRepData()
+{
+  *this = other;
+}
+
+//==============================================================================
+template <typename S>
+Quaternion<S>::Quaternion(const Eigen::Quaternion<S>& quat)
+  : Base(), mRepData(quat)
 {
   // Do nothing
 }
 
 //==============================================================================
 template <typename S>
-Quaternion<S>::Quaternion(const Eigen::Quaternion<S>& quat) : Base(), mRepData(quat)
-{
-  // Do nothing
-}
-
-//==============================================================================
-template <typename S>
-Quaternion<S>::Quaternion(Eigen::Quaternion<S>&& quat) : Base(), mRepData(std::move(quat))
+Quaternion<S>::Quaternion(Eigen::Quaternion<S>&& quat)
+  : Base(), mRepData(std::move(quat))
 {
   // Do nothing
 }

@@ -56,9 +56,7 @@ template <typename Derived>
 template <typename OtherDerived>
 Derived& SO3Base<Derived>::operator=(const SO3Base<OtherDerived>& other)
 {
-  derived().setRepData(
-        detail::SO3RepDataConvertImpl<OtherDerived, Derived>::run(
-          other.derived().getRepData()));
+  detail::SO3Assign<Derived, OtherDerived>::run(derived(), other.derived());
 
   return derived();
 }
@@ -68,9 +66,8 @@ template <typename Derived>
 template <typename OtherDerived>
 Derived& SO3Base<Derived>::operator=(SO3Base<OtherDerived>&& other)
 {
-  derived().setRepData(
-        detail::SO3RepDataConvertImpl<OtherDerived, Derived>::run(
-          other.derived().getRepData()));
+  detail::SO3Assign<Derived, OtherDerived>::run(
+      derived(), std::move(other.derived()));
 
   return derived();
 }
@@ -262,18 +259,22 @@ bool SO3Base<Derived>::isApprox(const Eigen::MatrixBase<MatrixDerived>& matrix, 
 template <typename Derived>
 Derived SO3Base<Derived>::Exp(const so3& tangent)
 {
-  return Derived(
-        detail::SO3RepDataConvertImpl<SO3Vector<S>, Derived>::run(
-          tangent));
+//  return Derived(
+//        detail::SO3RepDataConvertImpl<SO3Vector<S>, Derived>::run(
+//          tangent));
+  return Derived();
+  // TODO(JS)
 }
 
 //==============================================================================
 template <typename Derived>
 Derived SO3Base<Derived>::Exp(so3&& tangent)
 {
-  return Derived(
-        detail::SO3RepDataConvertImpl<SO3Vector<S>, Derived>::run(
-          std::move(tangent)));
+//  return Derived(
+//        detail::SO3RepDataConvertImpl<SO3Vector<S>, Derived>::run(
+//          std::move(tangent)));
+  return Derived();
+  // TODO(JS)
 }
 
 //==============================================================================
@@ -294,16 +295,20 @@ void SO3Base<Derived>::setExp(so3&& tangent)
 template <typename Derived>
 typename SO3Base<Derived>::so3 SO3Base<Derived>::Log(const Derived& point)
 {
-  return detail::SO3RepDataConvertImpl<Derived, SO3Vector<S>>::run(
-        point.getRepData());
+//  return detail::SO3RepDataConvertImpl<Derived, SO3Vector<S>>::run(
+//        point.getRepData());
+  return SO3Base<Derived>::so3();
+  // TODO(JS):
 }
 
 //==============================================================================
 template <typename Derived>
 typename SO3Base<Derived>::so3 SO3Base<Derived>::Log(Derived&& point)
 {
-  return detail::SO3RepDataConvertImpl<Derived, SO3Vector<S>>::run(
-        std::move(point.getRepData()));
+//  return detail::SO3RepDataConvertImpl<Derived, SO3Vector<S>>::run(
+//        std::move(point.getRepData()));
+  return SO3Base<Derived>::so3();
+  // TODO(JS):
 }
 
 //==============================================================================
@@ -357,9 +362,7 @@ auto SO3Base<Derived>::toRotationMatrix() const
 template <typename Derived>
 void SO3Base<Derived>::fromRotationMatrix(const Matrix3& rotMat)
 {
-  // We assume the canonical representation is the rotation matrix
-  setRepData(detail::SO3RepDataConvertImpl<
-             SO3Matrix<S>, Derived>::run(rotMat));
+  detail::SO3Assign<Derived, Matrix3>::run(derived(), rotMat);
 }
 
 //==============================================================================

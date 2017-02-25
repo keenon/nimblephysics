@@ -136,6 +136,18 @@ public:
   /// \} // Operators
 
   //----------------------------------------------------------------------------
+  /// \{ \name Conversions
+  //----------------------------------------------------------------------------
+
+  /// Set from the canonical type
+  void fromCanonical(const SO3Matrix<S_>& mat);
+
+  /// Convert to the canonical type
+  SO3Matrix<S_> toCanonical() const;
+
+  /// \} // Conversions
+
+  //----------------------------------------------------------------------------
   /// \{ \name Representation properties
   //----------------------------------------------------------------------------
 
