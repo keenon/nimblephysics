@@ -255,40 +255,17 @@ bool SO3Base<Derived>::isApprox(const Eigen::MatrixBase<MatrixDerived>& matrix, 
   // connection..
 }
 
-//==============================================================================
-template <typename Derived>
-Derived SO3Base<Derived>::Exp(const so3& tangent)
-{
-//  return Derived(
-//        detail::SO3RepDataConvertImpl<SO3Vector<S>, Derived>::run(
-//          tangent));
-  return Derived();
-  // TODO(JS)
-}
-
-//==============================================================================
-template <typename Derived>
-Derived SO3Base<Derived>::Exp(so3&& tangent)
-{
-//  return Derived(
-//        detail::SO3RepDataConvertImpl<SO3Vector<S>, Derived>::run(
-//          std::move(tangent)));
-  return Derived();
-  // TODO(JS)
-}
-
-//==============================================================================
 template <typename Derived>
 void SO3Base<Derived>::setExp(const so3& tangent)
 {
-  derived() = Exp(tangent);
+  derived().setExp(tangent);
 }
 
 //==============================================================================
 template <typename Derived>
 void SO3Base<Derived>::setExp(so3&& tangent)
 {
-  derived() = Exp(std::move(tangent));
+  derived().setExp(std::move(tangent));
 }
 
 //==============================================================================

@@ -66,11 +66,6 @@ public:
   using Base::setRepData;
   using Base::getRepData;
 
-  using Base::Exp;
-  using Base::setExp;
-  using Base::Log;
-  using Base::getLog;
-
   //----------------------------------------------------------------------------
   /// \{ \name Constructors
   //----------------------------------------------------------------------------
@@ -178,6 +173,26 @@ public:
   const SO3Matrix getInverse() const;
 
   /// \} // SO3 group operations
+
+  //----------------------------------------------------------------------------
+  /// \{ \name Exponential and logarithm maps
+  //----------------------------------------------------------------------------
+
+  static SO3Matrix Exp(const so3& tangent);
+
+  static SO3Matrix Exp(so3&& tangent);
+
+  void setExp(const so3& tangent);
+
+  void setExp(so3&& tangent);
+
+  static so3 Log(const SO3Matrix& point);
+
+  static so3 Log(SO3Matrix&& point);
+
+  so3 getLog() const;
+
+  /// \}
 
 protected:
 

@@ -731,7 +731,7 @@ template <typename SO3From,
           typename SO3To,
           typename SO3Via = DefaultSO3Canonical<typename Traits<SO3From>::S>,
           typename Enable = void>
-struct SO3RepDataAssign
+struct SO3RepDataAssignOriginal
 {
   using RepDataFrom = typename Traits<SO3From>::RepData;
   using RepDataTo = typename Traits<SO3To>::RepData;
@@ -753,7 +753,7 @@ struct SO3RepDataAssign
 template <typename SO3From,
           typename SO3To,
           typename SO3Via>
-struct SO3RepDataAssign<
+struct SO3RepDataAssignOriginal<
     SO3From,
     SO3To,
     SO3Via,
@@ -907,6 +907,7 @@ struct SO3SetSO3FromSO3<SO3T, SO3T>
 };
 
 //==============================================================================
+// Specializations for SO3Matrix <-- SO3Vector
 template <typename S>
 struct SO3SetSO3FromSO3<SO3Matrix<S>, SO3Vector<S>>
 {
@@ -923,6 +924,109 @@ struct SO3SetSO3FromSO3<SO3Matrix<S>, SO3Vector<S>>
   static void run(SO3Matrix<S>& to, SO3Vector<S>&& from)
   {
     SO3Exp(to.getRepData(), std::move(from.getRepData()));
+  }
+};
+
+//==============================================================================
+// Specializations for SO3Vector <-- SO3Matrix
+template <typename S>
+struct SO3SetSO3FromSO3<SO3Vector<S>, SO3Matrix<S>>
+{
+  using RepDataTo = typename Traits<SO3Vector<S>>::RepData;
+  using RepDataFrom = typename Traits<SO3Matrix<S>>::RepData;
+
+  static constexpr bool IsSpecialized = true;
+
+  static void run(SO3Vector<S>& to, const SO3Matrix<S>& from)
+  {
+    SO3Log(to.getRepData(), from.getRepData());
+  }
+
+  static void run(SO3Vector<S>& to, SO3Matrix<S>&& from)
+  {
+    SO3Log(to.getRepData(), std::move(from.getRepData()));
+  }
+};
+
+//==============================================================================
+// Specializations for SO3Vector <-- AngleAxis
+template <typename S>
+struct SO3SetSO3FromSO3<SO3Vector<S>, AngleAxis<S>>
+{
+  using RepDataTo = typename Traits<SO3Vector<S>>::RepData;
+  using RepDataFrom = typename Traits<AngleAxis<S>>::RepData;
+
+  static constexpr bool IsSpecialized = true;
+
+  static void run(SO3Vector<S>& to, const AngleAxis<S>& from)
+  {
+    const Eigen::AngleAxis<S>& aa = from.getRepData();
+
+    to.getRepData() = aa.angle() * aa.axis();
+  }
+};
+
+//==============================================================================
+// Specializations for AngleAxis <-- SO3Vector
+template <typename S>
+struct SO3SetSO3FromSO3<AngleAxis<S>, SO3Vector<S>>
+{
+  using RepDataTo = typename Traits<AngleAxis<S>>::RepData;
+  using RepDataFrom = typename Traits<SO3Vector<S>>::RepData;
+
+  static constexpr bool IsSpecialized = true;
+
+  static void run(AngleAxis<S>& to, const SO3Vector<S>& from)
+  {
+    const auto& axis = from.getRepData();
+    const S norm = axis.norm();
+
+    if (norm > static_cast<S>(0))
+      to.setAngleAxis(axis/norm, norm);
+    else
+      to.setAngleAxis(Eigen::Matrix<S, 3, 1>::UnitX(), static_cast<S>(0));
+  }
+};
+
+//==============================================================================
+// Specializations for AngleAxis <-- Quaternion
+template <typename S>
+struct SO3SetSO3FromSO3<AngleAxis<S>, Quaternion<S>>
+{
+  using RepDataTo = typename Traits<AngleAxis<S>>::RepData;
+  using RepDataFrom = typename Traits<Quaternion<S>>::RepData;
+
+  static constexpr bool IsSpecialized = true;
+
+  static void run(AngleAxis<S>& to, const Quaternion<S>& from)
+  {
+    const Eigen::Quaternion<S>& quat = from.getRepData();
+    Eigen::AngleAxis<S>& aa = to.gteRepData();
+
+    aa = quat;
+  }
+};
+
+//==============================================================================
+// Specializations for Quaternion <-- SO3Vector
+// TODO(JS): Not implemented
+
+//==============================================================================
+// Specializations for Quaternion <-- AngleAxis
+template <typename S>
+struct SO3SetSO3FromSO3<Quaternion<S>, AngleAxis<S>>
+{
+  using RepDataTo = typename Traits<Quaternion<S>>::RepData;
+  using RepDataFrom = typename Traits<AngleAxis<S>>::RepData;
+
+  static constexpr bool IsSpecialized = true;
+
+  static void run(Quaternion<S>& to, const AngleAxis<S>& from)
+  {
+    const Eigen::AngleAxis<S>& aa = from.getRepData();
+    Eigen::Quaternion<S>& quat = to.gteRepData();
+
+    quat = aa;
   }
 };
 
@@ -1073,6 +1177,7 @@ struct SO3Assign<To, From, typename std::enable_if<SO3IsSO3<To>::value>::type>
     SO3SetSO3FromX<To, From>::run(to, std::move(from));
   }
 };
+
 
 
 
@@ -1383,8 +1488,8 @@ struct SO3RepDataMultiplicationImpl<SO3Vector<S>, SO3Vector<S>>
   static auto run(const RepData& dataA, const RepData& dataB)
   -> decltype(std::declval<CanonicalRepData>() * std::declval<CanonicalRepData>())
   {
-    return SO3RepDataAssign<SO3Vector<S>, SO3CanonicalRep>::run(dataA)
-        * SO3RepDataAssign<SO3Vector<S>, SO3CanonicalRep>::run(dataB);
+    return SO3RepDataAssignOriginal<SO3Vector<S>, SO3CanonicalRep>::run(dataA)
+        * SO3RepDataAssignOriginal<SO3Vector<S>, SO3CanonicalRep>::run(dataB);
     // TODO(JS): improve; super slow
   }
 };
@@ -1460,10 +1565,10 @@ struct SO3MultiplicationImpl
 
   static SO3A run(const SO3A& Ra, const SO3B& Rb)
   {
-    return SO3A(SO3RepDataAssign<SO3ToPerform, SO3A>::run(
+    return SO3A(SO3RepDataAssignOriginal<SO3ToPerform, SO3A>::run(
           SO3RepDataHomogeneousMultiplicationImpl<S, SO3ToPerform>::run( // TODO(JS): Remove _canonical_
-            SO3RepDataAssign<SO3A, SO3ToPerform>::run(Ra.getRepData()),
-            SO3RepDataAssign<SO3B, SO3ToPerform>::run(Rb.getRepData()))));
+            SO3RepDataAssignOriginal<SO3A, SO3ToPerform>::run(Ra.getRepData()),
+            SO3RepDataAssignOriginal<SO3B, SO3ToPerform>::run(Rb.getRepData()))));
   }
 };
 
@@ -1516,10 +1621,10 @@ struct SO3InplaceMultiplicationImpl
 
   static void run(SO3A& Ra, const SO3B& Rb)
   {
-    Ra.setRepData(SO3RepDataAssign<SO3Canonical, RepA>::run(
+    Ra.setRepData(SO3RepDataAssignOriginal<SO3Canonical, RepA>::run(
           SO3RepDataHomogeneousMultiplicationImpl<S, SO3Canonical>::run(
-            SO3RepDataAssign<RepA, SO3Canonical>::run(Ra.getRepData()),
-            SO3RepDataAssign<RepB, SO3Canonical>::run(Rb.getRepData()))));
+            SO3RepDataAssignOriginal<RepA, SO3Canonical>::run(Ra.getRepData()),
+            SO3RepDataAssignOriginal<RepB, SO3Canonical>::run(Rb.getRepData()))));
   }
 };
 
@@ -1566,7 +1671,7 @@ struct SO3ToImpl<
 
   static SO3OrEigenObject run(const RepData& data)
   {
-    return SO3OrEigenObject(detail::SO3RepDataAssign<SO3From, SO3OrEigenObject>::run(
+    return SO3OrEigenObject(detail::SO3RepDataAssignOriginal<SO3From, SO3OrEigenObject>::run(
           data));
   }
 };
@@ -1588,10 +1693,10 @@ struct SO3ToImpl<
   using RepData = typename detail::Traits<SO3From>::RepData;
 
   static auto run(const RepData& data)
-  -> decltype(detail::SO3RepDataAssign<SO3From, SO3Matrix<S>>::run(
+  -> decltype(detail::SO3RepDataAssignOriginal<SO3From, SO3Matrix<S>>::run(
       std::declval<RepData>()))
   {
-    return detail::SO3RepDataAssign<SO3From, SO3Matrix<S>>::run(data);
+    return detail::SO3RepDataAssignOriginal<SO3From, SO3Matrix<S>>::run(data);
   }
 };
 
@@ -1612,10 +1717,10 @@ struct SO3ToImpl<
   using RepData = typename detail::Traits<SO3From>::RepData;
 
   static auto run(const RepData& repData)
-  -> decltype(detail::SO3RepDataAssign<SO3From, AngleAxis<S>>::run(
+  -> decltype(detail::SO3RepDataAssignOriginal<SO3From, AngleAxis<S>>::run(
       std::declval<RepData>()))
   {
-    return detail::SO3RepDataAssign<SO3From, AngleAxis<S>>::run(repData);
+    return detail::SO3RepDataAssignOriginal<SO3From, AngleAxis<S>>::run(repData);
   }
 };
 
@@ -1637,10 +1742,10 @@ struct SO3ToImpl<
   using RepData = typename detail::Traits<SO3From>::RepData;
 
   static auto run(const RepData& repData)
-  -> decltype(detail::SO3RepDataAssign<SO3From, Quaternion<S>>::run(
+  -> decltype(detail::SO3RepDataAssignOriginal<SO3From, Quaternion<S>>::run(
       std::declval<RepData>()))
   {
-    return detail::SO3RepDataAssign<SO3From, Quaternion<S>>::run(
+    return detail::SO3RepDataAssignOriginal<SO3From, Quaternion<S>>::run(
           repData);
   }
 };

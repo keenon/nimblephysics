@@ -257,6 +257,67 @@ const SO3Matrix<S> SO3Matrix<S>::getInverse() const
   return SO3Matrix(mRepData.transpose());
 }
 
+//==============================================================================
+template <typename S>
+SO3Matrix<S> SO3Matrix<S>::Exp(const so3& tangent)
+{
+  SO3Matrix<S> res;
+  res.setExp(tangent);
+
+  return res;
+}
+
+//==============================================================================
+template <typename S>
+SO3Matrix<S> SO3Matrix<S>::Exp(so3&& tangent)
+{
+  SO3Matrix<S> res;
+  res.setExp(std::move(tangent));
+
+  return res;
+}
+
+//==============================================================================
+template <typename S>
+void SO3Matrix<S>::setExp(const so3& tangent)
+{
+  setExp(tangent);
+}
+
+//==============================================================================
+template <typename S>
+void SO3Matrix<S>::setExp(so3&& tangent)
+{
+  setExp(std::move(tangent));
+}
+
+//==============================================================================
+template <typename S>
+typename SO3Matrix<S>::so3 SO3Matrix<S>::Log(const SO3Matrix<S>& point)
+{
+//  return detail::SO3RepDataConvertImpl<Derived, SO3Vector<S>>::run(
+//        point.getRepData());
+  return SO3Matrix<S>::so3();
+  // TODO(JS):
+}
+
+//==============================================================================
+template <typename S>
+typename SO3Matrix<S>::so3 SO3Matrix<S>::Log(SO3Matrix<S>&& point)
+{
+//  return detail::SO3RepDataConvertImpl<Derived, SO3Vector<S>>::run(
+//        std::move(point.getRepData()));
+  return SO3Matrix<S>::so3();
+  // TODO(JS):
+}
+
+//==============================================================================
+template <typename S>
+typename SO3Matrix<S>::so3 SO3Matrix<S>::getLog() const
+{
+  return Log(*this);
+}
+
 } // namespace math
 } // namespace dart
 
