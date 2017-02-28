@@ -1729,6 +1729,19 @@ template <typename From, typename To>
 struct SO3ToImpl<
     From,
     To,
+    typename std::enable_if<SO3IsSO3<To>::value>::type>
+{
+  static To run(const From& from)
+  {
+    return To(from);
+  }
+};
+
+//==============================================================================
+template <typename From, typename To>
+struct SO3ToImpl<
+    From,
+    To,
     typename std::enable_if<
         std::is_same<
             typename Traits<From>::RepData,
