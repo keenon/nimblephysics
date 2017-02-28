@@ -56,7 +56,7 @@ template <typename Derived>
 template <typename OtherDerived>
 Derived& SO3Base<Derived>::operator=(const SO3Base<OtherDerived>& other)
 {
-  detail::SO3Assign<Derived, OtherDerived>::run(derived(), other.derived());
+  detail::SO3Assign<OtherDerived, Derived>::run(other.derived(), derived());
 
   return derived();
 }
@@ -66,8 +66,8 @@ template <typename Derived>
 template <typename OtherDerived>
 Derived& SO3Base<Derived>::operator=(SO3Base<OtherDerived>&& other)
 {
-  detail::SO3Assign<Derived, OtherDerived>::run(
-      derived(), std::move(other.derived()));
+  detail::SO3Assign<OtherDerived, Derived>::run(
+      std::move(other.derived()), derived());
 
   return derived();
 }
@@ -339,7 +339,7 @@ auto SO3Base<Derived>::toRotationMatrix() const
 template <typename Derived>
 void SO3Base<Derived>::fromRotationMatrix(const Matrix3& rotMat)
 {
-  detail::SO3Assign<Derived, Matrix3>::run(derived(), rotMat);
+  detail::SO3Assign<Matrix3, Derived>::run(rotMat, derived());
 }
 
 //==============================================================================

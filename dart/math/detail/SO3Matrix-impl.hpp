@@ -46,14 +46,16 @@ SO3Matrix<S>::SO3Matrix() : Base()
 
 //==============================================================================
 template <typename S>
-SO3Matrix<S>::SO3Matrix(const SO3Matrix& other) : Base(), mRepData(other.mRepData)
+SO3Matrix<S>::SO3Matrix(const SO3Matrix& other)
+  : Base(), mRepData(other.mRepData)
 {
   // Do nothing
 }
 
 //==============================================================================
 template <typename S>
-SO3Matrix<S>::SO3Matrix(SO3Matrix&& other) : Base(), mRepData(std::move(other.mRepData))
+SO3Matrix<S>::SO3Matrix(SO3Matrix&& other)
+  : Base(), mRepData(std::move(other.mRepData))
 {
   // Do nothing
 }
@@ -176,6 +178,35 @@ template <typename S>
 bool SO3Matrix<S>::operator==(const SO3Matrix& other)
 {
   return mRepData == other.mRepData;
+}
+
+//==============================================================================
+template <typename S>
+template <typename Derived>
+void SO3Matrix<S>::fromEigenCanonical(const Eigen::MatrixBase<Derived>& matrix)
+{
+  assert(matrix.rows() == 3);
+  assert(matrix.cols() == 3);
+
+  mRepData = matrix;
+}
+
+//==============================================================================
+template <typename S>
+template <typename Derived>
+void SO3Matrix<S>::fromEigenCanonical(Eigen::MatrixBase<Derived>&& mat)
+{
+  assert(mat.rows() == 3);
+  assert(mat.cols() == 3);
+
+  mRepData = std::move(mat);
+}
+
+//==============================================================================
+template <typename S>
+const typename SO3Matrix<S>::Matrix3& SO3Matrix<S>::toEigenCanonical() const
+{
+  return mRepData;
 }
 
 //==============================================================================

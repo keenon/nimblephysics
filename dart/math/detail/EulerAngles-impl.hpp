@@ -119,7 +119,7 @@ template <typename S, int index0, int index1, int index2>
 EulerAngles<S, index0, index1, index2>&
 EulerAngles<S, index0, index1, index2>::operator=(const Eigen::AngleAxis<S>& aa)
 {
-  detail::SO3Assign<This, Eigen::AngleAxis<S>>::run(*this, aa);
+  detail::SO3Assign<Eigen::AngleAxis<S>, This>::run(aa, *this);
   return *this;
 }
 
@@ -128,7 +128,7 @@ template <typename S, int index0, int index1, int index2>
 EulerAngles<S, index0, index1, index2>&
 EulerAngles<S, index0, index1, index2>::operator=(Eigen::AngleAxis<S>&& aa)
 {
-  detail::SO3Assign<This, Eigen::AngleAxis<S>>::run(*this, std::move(aa));
+  detail::SO3Assign<Eigen::AngleAxis<S>, This>::run(std::move(aa), *this);
   return *this;
 }
 
@@ -139,7 +139,7 @@ EulerAngles<S, index0, index1, index2>&
 EulerAngles<S, index0, index1, index2>::operator=(
     const Eigen::QuaternionBase<QuatDerived>& quat)
 {
-  detail::SO3Assign<This, Quaternion<S>>::run(*this, quat);
+  detail::SO3Assign<Quaternion<S>, This>::run(quat, *this);
   return *this;
 }
 
@@ -150,7 +150,7 @@ EulerAngles<S, index0, index1, index2>&
 EulerAngles<S, index0, index1, index2>::operator=(
     Eigen::QuaternionBase<QuatDerived>&& quat)
 {
-  detail::SO3Assign<This, Quaternion<S>>::run(*this, std::move(quat));
+  detail::SO3Assign<Quaternion<S>, This>::run(std::move(quat), *this);
   return *this;
 }
 
@@ -161,7 +161,7 @@ EulerAngles<S, index0, index1, index2>&
 EulerAngles<S, index0, index1, index2>::operator=(
     const Eigen::MatrixBase<Derived>& matrix)
 {
-  detail::SO3Assign<This, Eigen::MatrixBase<Derived>>::run(*this, matrix);
+  detail::SO3Assign<Eigen::MatrixBase<Derived>, This>::run(matrix, *this);
   return *this;
 }
 
@@ -172,7 +172,7 @@ EulerAngles<S, index0, index1, index2>&
 EulerAngles<S, index0, index1, index2>::operator=(
     Eigen::MatrixBase<Derived>&& matrix)
 {
-  detail::SO3Assign<This, Eigen::MatrixBase<Derived>>::run(*this, std::move(matrix));
+  detail::SO3Assign<Eigen::MatrixBase<Derived>, This>::run(std::move(matrix), *this);
   return *this;
 }
 
@@ -181,6 +181,40 @@ template <typename S, int index0, int index1, int index2>
 bool EulerAngles<S, index0, index1, index2>::operator==(const EulerAngles& other)
 {
   return (mRepData == other.mRepData);
+}
+
+//==============================================================================
+template <typename S, int index0, int index1, int index2>
+template <typename Derived>
+void EulerAngles<S, index0, index1, index2>::fromEigenCanonical(
+    const Eigen::MatrixBase<Derived>& matrix)
+{
+  assert(matrix.rows() == 3);
+  assert(matrix.cols() == 3);
+
+  mRepData = math::matrixToEulerAngles<S, index0, index1, index2>(
+      matrix);
+}
+
+//==============================================================================
+template <typename S, int index0, int index1, int index2>
+template <typename Derived>
+void EulerAngles<S, index0, index1, index2>::fromEigenCanonical(
+    Eigen::MatrixBase<Derived>&& mat)
+{
+  assert(mat.rows() == 3);
+  assert(mat.cols() == 3);
+
+  mRepData = math::matrixToEulerAngles<S, index0, index1, index2>(
+      std::move(mat));
+}
+
+//==============================================================================
+template <typename S, int index0, int index1, int index2>
+typename EulerAngles<S, index0, index1, index2>::Matrix3
+EulerAngles<S, index0, index1, index2>::toEigenCanonical() const
+{
+  return math::eulerAnglesToMatrix<S, index0, index1, index2>(mRepData);
 }
 
 //==============================================================================

@@ -116,7 +116,7 @@ SO3Vector<S>& SO3Vector<S>::operator=(SO3Vector&& other)
 template <typename S>
 SO3Vector<S>& SO3Vector<S>::operator=(const Eigen::AngleAxis<S>& quat)
 {
-  detail::SO3Assign<This, Eigen::AngleAxis<S>>::run(*this, quat);
+  detail::SO3Assign<Eigen::AngleAxis<S>, This>::run(quat, *this);
   return *this;
 }
 
@@ -124,7 +124,7 @@ SO3Vector<S>& SO3Vector<S>::operator=(const Eigen::AngleAxis<S>& quat)
 template <typename S>
 SO3Vector<S>& SO3Vector<S>::operator=(Eigen::AngleAxis<S>&& quat)
 {
-  detail::SO3Assign<This, Eigen::AngleAxis<S>>::run(*this, std::move(quat));
+  detail::SO3Assign<Eigen::AngleAxis<S>, This>::run(std::move(quat), *this);
   return *this;
 }
 
@@ -133,7 +133,7 @@ template <typename S>
 template <typename QuatDerived>
 SO3Vector<S>& SO3Vector<S>::operator=(const Eigen::QuaternionBase<QuatDerived>& quat)
 {
-  detail::SO3Assign<This, Eigen::QuaternionBase<QuatDerived>>::run(*this, quat);
+  detail::SO3Assign<Eigen::QuaternionBase<QuatDerived>, This>::run(quat, *this);
   return *this;
 }
 
@@ -142,7 +142,7 @@ template <typename S>
 template <typename QuatDerived>
 SO3Vector<S>& SO3Vector<S>::operator=(Eigen::QuaternionBase<QuatDerived>&& quat)
 {
-  detail::SO3Assign<This, Eigen::QuaternionBase<QuatDerived>>::run(*this, std::move(quat));
+  detail::SO3Assign<Eigen::QuaternionBase<QuatDerived>, This>::run(std::move(quat), *this);
   return *this;
 }
 
@@ -151,7 +151,7 @@ template <typename S>
 template <typename Derived>
 SO3Vector<S>& SO3Vector<S>::operator=(const Eigen::MatrixBase<Derived>& matrix)
 {
-  detail::SO3Assign<This, Eigen::MatrixBase<Derived>>::run(*this, matrix);
+  detail::SO3Assign<Eigen::MatrixBase<Derived>, This>::run(matrix, *this);
   return *this;
 }
 
@@ -160,7 +160,7 @@ template <typename S>
 template <typename Derived>
 SO3Vector<S>& SO3Vector<S>::operator=(Eigen::MatrixBase<Derived>&& matrix)
 {
-  detail::SO3Assign<This, Eigen::MatrixBase<Derived>>::run(*this, std::move(matrix));
+  detail::SO3Assign<Eigen::MatrixBase<Derived>, This>::run(std::move(matrix), *this);
   return *this;
 }
 

@@ -136,6 +136,14 @@ public:
   /// \{ \name Conversions
   //----------------------------------------------------------------------------
 
+  template <typename Derived>
+  void fromEigenCanonical(const Eigen::MatrixBase<Derived>& matrix);
+
+  template <typename Derived>
+  void fromEigenCanonical(Eigen::MatrixBase<Derived>&& mat);
+
+  const Matrix3& toEigenCanonical() const;
+
   /// Set from the canonical type
   void fromCanonical(const SO3Matrix<S_>& mat);
 
