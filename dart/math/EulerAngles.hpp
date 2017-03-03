@@ -39,6 +39,7 @@
 #include "dart/math/Constants.hpp"
 #include "dart/math/Geometry.hpp"
 #include "dart/math/SO3Base.hpp"
+#include "dart/math/detail/EulerAnglesOperations.hpp"
 
 namespace dart {
 namespace math {

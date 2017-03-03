@@ -37,6 +37,7 @@
 #include "dart/math/MathTypes.hpp"
 #include "dart/math/Geometry.hpp"
 #include "dart/math/SO3Base.hpp"
+#include "dart/math/detail/SO3MatrixOperations.hpp"
 
 namespace dart {
 namespace math {

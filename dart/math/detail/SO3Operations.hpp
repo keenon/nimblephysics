@@ -284,11 +284,11 @@ struct SO3RepDataIsEigenRotationBase3Impl<
 
 //==============================================================================
 template <typename T, typename Enable = void>
-struct SO3IsEigenRotationBase3 : std::false_type {};
+struct SO3IsEigenRotationBase : std::false_type {};
 
 //==============================================================================
 template <typename T>
-struct SO3IsEigenRotationBase3<
+struct SO3IsEigenRotationBase<
     T,
     typename std::enable_if<
         std::is_base_of<
@@ -321,6 +321,27 @@ struct SO3RepDataIsEigenMatrixBase<
     : std::true_type {};
 
 //==============================================================================
+// SO3RepDataIsEigenMatrixBase is specialized to std::true_type if the given
+// template parameter (SO3 class) is Eigen::MatrixBase, otherwise
+// std::false_type.
+//==============================================================================
+
+//==============================================================================
+template <typename T, typename Enable = void>
+struct SO3IsEigenMatrixBase : std::false_type {};
+
+//==============================================================================
+template <typename T>
+struct SO3IsEigenMatrixBase<
+    T,
+    typename std::enable_if<
+        std::is_base_of<Eigen::MatrixBase<T>, T>::value
+        && T::RowsAtCompileTime == 3
+        && T::ColsAtCompileTime == 3
+    >::type>
+    : std::true_type {};
+
+//==============================================================================
 // SO3IsEigen
 //==============================================================================
 
@@ -333,9 +354,7 @@ template <typename T>
 struct SO3IsEigen<
     T,
     typename std::enable_if<
-        std::is_same<T, Eigen::Matrix<typename T::Scalar, 3, 3>>::value
-            || std::is_same<T, Eigen::AngleAxis<typename T::Scalar>>::value
-            || std::is_same<T, Eigen::Quaternion<typename T::Scalar>>::value
+        SO3IsEigenMatrixBase<T>::value || SO3IsEigenRotationBase<T>::value
     >::type>
     : std::true_type {};
 
@@ -894,44 +913,12 @@ struct SO3AssignEigenToEigen
 // SO3AssignSO3ToEigen
 //==============================================================================
 
-template <typename SO3From, typename EigenTo>
+template <typename SO3From, typename EigenTo, typename Enable = void>
 struct SO3AssignSO3ToEigen
 {
   static void run(const SO3From& from, EigenTo& to)
   {
-    to = from.toEigenCanonical();
-  }
-
-  static void run(SO3From&& from, EigenTo& to)
-  {
-    to = from.toEigenCanonical();
-  }
-};
-
-//==============================================================================
-// SO3ToEigenCanonical
-//==============================================================================
-
-template <typename EigenT, typename Enable = void>
-struct SO3ToEigenCanonical
-{
-  static const EigenT& run(const EigenT& from)
-  {
-    return from;
-  }
-};
-
-//==============================================================================
-template <typename EigenT>
-struct SO3ToEigenCanonical<
-    EigenT,
-    typename std::enable_if<
-        SO3IsEigenRotationBase3<EigenT>::value
-    >::type>
-{
-  static auto run(const EigenT& from) -> decltype(from.toRotationMatrix())
-  {
-    return from.toRotationMatrix();
+    to = from.getRepData();
   }
 };
 
@@ -939,20 +926,14 @@ struct SO3ToEigenCanonical<
 // SO3AssignEigenToSO3
 //==============================================================================
 
-template <typename EigenFrom, typename SO3To>
-struct SO3AssignEigenToSO3
-{
-  static void run(const EigenFrom& from, SO3To& to)
-  {
-    to.fromRotationMatrix(SO3ToEigenCanonical<EigenFrom>::run(from));
-  }
-};
+template <typename EigenFrom, typename SO3To, typename Enable = void>
+struct SO3AssignEigenToSO3 {};
 
 //==============================================================================
 // SO3AssignSO3ToSO3
 //==============================================================================
 
-template <typename SO3From, typename SO3To>
+template <typename SO3From, typename SO3To, typename Enable = void>
 struct SO3AssignSO3ToSO3
 {
   static constexpr bool IsSpecialized = false;
@@ -982,112 +963,6 @@ struct SO3AssignSO3ToSO3<SO3T, SO3T>
   static void run(SO3T&& from, SO3T& to)
   {
     to.getRepData() = std::move(from.getRepData());
-  }
-};
-
-//==============================================================================
-// Specializations for SO3Vector --> SO3Matrix
-template <typename S>
-struct SO3AssignSO3ToSO3<SO3Vector<S>, SO3Matrix<S>>
-{
-  static constexpr bool IsSpecialized = true;
-
-  static void run(const SO3Vector<S>& from, SO3Matrix<S>& to)
-  {
-    SO3Exp(to.getRepData(), from.getRepData());
-  }
-
-  static void run(SO3Vector<S>&& from, SO3Matrix<S>& to)
-  {
-    SO3Exp(to.getRepData(), std::move(from.getRepData()));
-  }
-};
-
-//==============================================================================
-// Specializations for SO3Matrix --> SO3Vector
-template <typename S>
-struct SO3AssignSO3ToSO3<SO3Matrix<S>, SO3Vector<S>>
-{
-  static constexpr bool IsSpecialized = true;
-
-  static void run(const SO3Matrix<S>& from, SO3Vector<S>& to)
-  {
-    SO3Log(to.getRepData(), from.getRepData());
-  }
-
-  static void run(SO3Matrix<S>&& from, SO3Vector<S>& to)
-  {
-    SO3Log(to.getRepData(), std::move(from.getRepData()));
-  }
-};
-
-//==============================================================================
-// Specializations for AngleAxis --> SO3Vector
-template <typename S>
-struct SO3AssignSO3ToSO3<AngleAxis<S>, SO3Vector<S>>
-{
-  static constexpr bool IsSpecialized = true;
-
-  static void run(const AngleAxis<S>& from, SO3Vector<S>& to)
-  {
-    const Eigen::AngleAxis<S>& aa = from.getRepData();
-
-    to.getRepData() = aa.angle() * aa.axis();
-  }
-};
-
-//==============================================================================
-// Specializations for SO3Vector --> AngleAxis
-template <typename S>
-struct SO3AssignSO3ToSO3<SO3Vector<S>, AngleAxis<S>>
-{
-  static constexpr bool IsSpecialized = true;
-
-  static void run(const SO3Vector<S>& from, AngleAxis<S>& to)
-  {
-    const auto& axis = from.getRepData();
-    const S norm = axis.norm();
-
-    if (norm > static_cast<S>(0))
-      to.setAngleAxis(axis/norm, norm);
-    else
-      to.setAngleAxis(Eigen::Matrix<S, 3, 1>::UnitX(), static_cast<S>(0));
-  }
-};
-
-//==============================================================================
-// Specializations for Quaternion --> AngleAxis
-template <typename S>
-struct SO3AssignSO3ToSO3<Quaternion<S>, AngleAxis<S>>
-{
-  static constexpr bool IsSpecialized = true;
-
-  static void run(const Quaternion<S>& from, AngleAxis<S>& to)
-  {
-    const Eigen::Quaternion<S>& quat = from.getRepData();
-    Eigen::AngleAxis<S>& aa = to.gteRepData();
-
-    aa = quat;
-  }
-};
-
-//==============================================================================
-// Specializations for SO3Vector --> Quaternion
-// TODO(JS): Not implemented
-
-//==============================================================================
-// Specializations for AngleAxis --> Quaternion
-template <typename S>
-struct SO3AssignSO3ToSO3<AngleAxis<S>, Quaternion<S>>
-{
-  static constexpr bool IsSpecialized = true;
-
-  static void run(const AngleAxis<S>& from, Quaternion<S>& to)
-  {
-    const Eigen::AngleAxis<S>& aa = from.getRepData();
-    Eigen::Quaternion<S>& quat = to.gteRepData();
-
-    quat = aa;
   }
 };
 

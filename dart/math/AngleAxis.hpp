@@ -38,6 +38,7 @@
 #include "dart/math/Geometry.hpp"
 #include "dart/math/Helpers.hpp"
 #include "dart/math/SO3Base.hpp"
+#include "dart/math/detail/AngleAxisOperations.hpp"
 
 namespace dart {
 namespace math {
