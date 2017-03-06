@@ -40,20 +40,7 @@ namespace math {
 namespace detail {
 
 //==============================================================================
-// SO3AssignEigenToSO3
-//==============================================================================
-
-template <typename EigenFrom>
-struct SO3AssignEigenToSO3<EigenFrom, AngleAxis<typename EigenFrom::Scalar>>
-{
-  static void run(const EigenFrom& from, AngleAxis<typename EigenFrom::Scalar>& to)
-  {
-    to.getRepData() = from;
-  }
-};
-
-//==============================================================================
-// SO3AssignEigenToSO3
+// SO3AssignSO3ToSO3
 //==============================================================================
 
 //==============================================================================
@@ -61,8 +48,6 @@ struct SO3AssignEigenToSO3<EigenFrom, AngleAxis<typename EigenFrom::Scalar>>
 template <typename S>
 struct SO3AssignSO3ToSO3<SO3Vector<S>, AngleAxis<S>>
 {
-  static constexpr bool IsSpecialized = true;
-
   static void run(const SO3Vector<S>& from, AngleAxis<S>& to)
   {
     const auto& axis = from.getRepData();
@@ -80,11 +65,9 @@ struct SO3AssignSO3ToSO3<SO3Vector<S>, AngleAxis<S>>
 template <typename S>
 struct SO3AssignSO3ToSO3<AngleAxis<S>, SO3Vector<S>>
 {
-  static constexpr bool IsSpecialized = true;
-
   static void run(const AngleAxis<S>& from, SO3Vector<S>& to)
   {
-    const Eigen::AngleAxis<S>& aa = from.getRepData();
+    const auto& aa = from.getRepData();
 
     to.getRepData() = aa.angle() * aa.axis();
   }

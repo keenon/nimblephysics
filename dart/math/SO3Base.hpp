@@ -172,14 +172,6 @@ public:
   template <typename OtherDerived>
   bool isApprox(const SO3Base<OtherDerived>& other, S tol = 1e-6) const;
 
-  bool isApprox(const Eigen::AngleAxis<S>& aa, S tol = 1e-6) const;
-
-  template <typename QuatDerived>
-  bool isApprox(const Eigen::QuaternionBase<QuatDerived>& quat, S tol = 1e-6) const;
-
-  template <typename MatrixDerived>
-  bool isApprox(const Eigen::MatrixBase<MatrixDerived>& matrix, S tol = 1e-6) const;
-
   //----------------------------------------------------------------------------
   /// \{ \name Exponential and logarithm maps
   //----------------------------------------------------------------------------
@@ -210,7 +202,7 @@ public:
 
   template <typename RepTo>
   auto to() const
-  -> decltype(detail::SO3ToImpl<Derived, RepTo>::run(std::declval<RepData>()));
+  -> decltype(detail::SO3ToImpl<Derived, RepTo>::run(std::declval<Derived>()));
 
   // TODO(JS): implement as<OtherDerived>()
 

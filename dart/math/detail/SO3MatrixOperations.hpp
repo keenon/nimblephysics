@@ -39,24 +39,6 @@ namespace dart {
 namespace math {
 namespace detail {
 
-//==============================================================================
-// SO3AssignEigenToSO3
-//==============================================================================
-
-//==============================================================================
-template <typename EigenFrom>
-struct SO3AssignEigenToSO3<EigenFrom, math::SO3Matrix<typename EigenFrom::Scalar>>
-{
-  static void run(const EigenFrom& from, math::SO3Matrix<typename EigenFrom::Scalar>& to)
-  {
-    to = from;
-  }
-};
-
-//==============================================================================
-// SO3AssignSO3ToSO3
-//==============================================================================
-
 } // namespace detail
 } // namespace math
 } // namespace dart

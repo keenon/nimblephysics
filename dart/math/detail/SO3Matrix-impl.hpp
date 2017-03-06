@@ -100,16 +100,18 @@ SO3Matrix<S>::SO3Matrix(Eigen::MatrixBase<Derived>&& matrix)
 
 //==============================================================================
 template <typename S>
-SO3Matrix<S>::SO3Matrix(const Eigen::AngleAxis<S>& aa)
-  : Base(), mRepData(aa)
+template <typename Derived>
+SO3Matrix<S>::SO3Matrix(const Eigen::RotationBase<Derived, Dim>& rot)
+  : Base(), mRepData(rot)
 {
   // Do nothing
 }
 
 //==============================================================================
 template <typename S>
-SO3Matrix<S>::SO3Matrix(const Eigen::Quaternion<S>& quat)
-  : Base(), mRepData(quat)
+template <typename Derived>
+SO3Matrix<S>::SO3Matrix(Eigen::RotationBase<Derived, Dim>&& rot)
+  : Base(), mRepData(std::move(rot))
 {
   // Do nothing
 }
@@ -312,14 +314,14 @@ SO3Matrix<S> SO3Matrix<S>::Exp(so3&& tangent)
 template <typename S>
 void SO3Matrix<S>::setExp(const so3& tangent)
 {
-  setExp(tangent);
+  detail::SO3Exp(mRepData, tangent);
 }
 
 //==============================================================================
 template <typename S>
 void SO3Matrix<S>::setExp(so3&& tangent)
 {
-  setExp(std::move(tangent));
+  detail::SO3Exp(mRepData, std::move(tangent));
 }
 
 //==============================================================================

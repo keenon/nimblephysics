@@ -77,7 +77,9 @@ template <typename Derived>
 template <typename RotationDerived>
 Derived& SO3Base<Derived>::operator=(const Eigen::RotationBase<RotationDerived, Dim>& rot)
 {
-  derived() = rot;
+  detail::SO3Assign<Eigen::RotationBase<RotationDerived, Dim>, Derived>::run(
+        rot, derived());
+
   return derived();
 }
 
@@ -86,7 +88,9 @@ template <typename Derived>
 template <typename RotationDerived>
 Derived& SO3Base<Derived>::operator=(Eigen::RotationBase<RotationDerived, Dim>&& rot)
 {
-  derived() = std::move(rot);
+  detail::SO3Assign<Eigen::RotationBase<RotationDerived, Dim>, Derived>::run(
+        std::move(rot), derived());
+
   return derived();
 }
 
@@ -95,7 +99,9 @@ template <typename Derived>
 template <typename MatrixDerived>
 Derived& SO3Base<Derived>::operator=(const Eigen::MatrixBase<MatrixDerived>& matrix)
 {
-  derived() = matrix;
+  detail::SO3Assign<Eigen::MatrixBase<MatrixDerived>, Derived>::run(
+        matrix, derived());
+
   return derived();
 }
 
@@ -104,7 +110,9 @@ template <typename Derived>
 template <typename MatrixDerived>
 Derived& SO3Base<Derived>::operator=(Eigen::MatrixBase<MatrixDerived>&& matrix)
 {
-  derived() = std::move(matrix);
+  detail::SO3Assign<Eigen::MatrixBase<MatrixDerived>, Derived>::run(
+        std::move(matrix), derived());
+
   return derived();
 }
 
@@ -218,43 +226,11 @@ template <typename Derived>
 template <typename OtherDerived>
 bool SO3Base<Derived>::isApprox(const SO3Base<OtherDerived>& other, S tol) const
 {
-  return detail::SO3RepDataIsApproxImpl<Derived, OtherDerived>::run(
-        derived().getRepData(), other.derived().getRepData(), tol);
+  return detail::SO3IsApprox<Derived, OtherDerived>::run(
+        derived(), other.derived(), tol);
 }
 
 //==============================================================================
-template <typename Derived>
-bool SO3Base<Derived>::isApprox(const Eigen::AngleAxis<S>& aa, S tol) const
-{
-  return detail::SO3RepDataIsApproxImpl<Derived, AngleAxis<S>>::run(
-        getRepData(), aa, tol);
-  // TODO(JS): improve; Eigen::AngleAxis and AngleAxis are in weak
-  // connection..
-}
-
-//==============================================================================
-template <typename Derived>
-template <typename QuatDerived>
-bool SO3Base<Derived>::isApprox(const Eigen::QuaternionBase<QuatDerived>& quat, S tol) const
-{
-  return detail::SO3RepDataIsApproxImpl<Derived, Quaternion<S>>::run(
-        getRepData(), quat, tol);
-  // TODO(JS): improve; Eigen::QuaternionBase and Quaternion are in weak
-  // connection..
-}
-
-//==============================================================================
-template <typename Derived>
-template <typename MatrixDerived>
-bool SO3Base<Derived>::isApprox(const Eigen::MatrixBase<MatrixDerived>& matrix, S tol) const
-{
-  // We assume matrix is 3x3 rotation matrix
-  return detail::SO3RepDataIsApproxImpl<Derived, SO3Matrix<S>>::run(
-        getRepData(), matrix, tol);
-  // TODO(JS): improve; Eigen::QuaternionBase and Quaternion are in weak
-  // connection..
-}
-
 template <typename Derived>
 void SO3Base<Derived>::setExp(const so3& tangent)
 {
@@ -319,9 +295,9 @@ typename SO3Base<Derived>::Tangent SO3Base<Derived>::Vee(const Matrix3& mat)
 template <typename Derived>
 template <typename RepTo>
 auto SO3Base<Derived>::to() const
--> decltype(detail::SO3ToImpl<Derived, RepTo>::run(std::declval<RepData>()))
+-> decltype(detail::SO3ToImpl<Derived, RepTo>::run(std::declval<Derived>()))
 {
-  return detail::SO3ToImpl<Derived, RepTo>::run(getRepData());
+  return detail::SO3ToImpl<Derived, RepTo>::run(derived());
 }
 
 //==============================================================================

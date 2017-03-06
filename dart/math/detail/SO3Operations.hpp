@@ -1,7 +1,6 @@
 /*
- * Copyright (c) 2016, Graphics Lab, Georgia Tech Research Corporation
- * Copyright (c) 2016, Humanoid Lab, Georgia Tech Research Corporation
- * Copyright (c) 2016, Personal Robotics Lab, Carnegie Mellon University
+ * Copyright (c) 2017, Graphics Lab, Georgia Tech Research Corporation
+ * Copyright (c) 2017, Personal Robotics Lab, Carnegie Mellon University
  * All rights reserved.
  *
  * This file is provided under the following "BSD-style" License:
@@ -336,8 +335,6 @@ struct SO3IsEigenMatrixBase<
     T,
     typename std::enable_if<
         std::is_base_of<Eigen::MatrixBase<T>, T>::value
-        && T::RowsAtCompileTime == 3
-        && T::ColsAtCompileTime == 3
     >::type>
     : std::true_type {};
 
@@ -387,7 +384,7 @@ template <typename T>
 struct SO3IsSO3<
     T,
     typename std::enable_if<
-        dart::common::is_base_of_template<T, SO3Base>::value
+        dart::common::is_base_of_template<SO3Base, T>::value
     >::type>
     : std::true_type {};
 
@@ -774,9 +771,9 @@ DART_SO3REPDATA_CONVERT_IMPL_FROM_EULER_ANGLES(2, 1, 0)
 // | Euler |   1   |   2   |   2   |   2   |   0   |
 // +-------+ ------+-------+-------+-------+-------+
 //
-// 0: zero conversion; return input as const reference
-// 1: single conversion; from -> canonical, or canonical -> to
-// 2: double conversion; from -> canonical -> to
+// 0: no conversion; return input as const reference
+// 1: convert once; from -> canonical, or canonical -> to
+// 2: convert twice; from -> canonical -> to
 
 //==============================================================================
 template <typename SO3From,
@@ -910,6 +907,24 @@ struct SO3AssignEigenToEigen
 };
 
 //==============================================================================
+// SO3AssignEigenToSO3
+//==============================================================================
+
+template <typename EigenFrom, typename SO3To, typename Enable = void>
+struct SO3AssignEigenToSO3
+{
+  static void run(const EigenFrom& from, SO3To& to)
+  {
+    to.getRepData() = from;
+  }
+
+  static void run(EigenFrom&& from, SO3To& to)
+  {
+    to.getRepData() = std::move(from);
+  }
+};
+
+//==============================================================================
 // SO3AssignSO3ToEigen
 //==============================================================================
 
@@ -920,24 +935,38 @@ struct SO3AssignSO3ToEigen
   {
     to = from.getRepData();
   }
+
+  static void run(SO3From&& from, EigenTo& to)
+  {
+    to = std::move(from.getRepData());
+  }
 };
-
-//==============================================================================
-// SO3AssignEigenToSO3
-//==============================================================================
-
-template <typename EigenFrom, typename SO3To, typename Enable = void>
-struct SO3AssignEigenToSO3 {};
 
 //==============================================================================
 // SO3AssignSO3ToSO3
 //==============================================================================
 
+// +-------+ ------+-------+-------+-------+-------+
+// |from\to|  Mat  |  Vec  |  Aa   | Quat  | Euler |
+// +-------+ ------+-------+-------+-------+-------+
+// |  Mat  |   0   |   1   |   1   |   1   |   1   |
+// +-------+ ------+-------+-------+-------+-------+
+// |  Vec  |   1   |   0   |   1   |   2   |   2   |
+// +-------+ ------+-------+-------+-------+-------+
+// |  Aa   |   1   |   1   |   0   |   1   |   2   |
+// +-------+ ------+-------+-------+-------+-------+
+// | Quat  |   1   |   2   |   1   |   0   |   2   |
+// +-------+ ------+-------+-------+-------+-------+
+// | Euler |   1   |   2   |   2   |   2   |   0   |
+// +-------+ ------+-------+-------+-------+-------+
+//
+// 0: no conversion; return input as const reference
+// 1: convert once; from -> canonical, or canonical -> to
+// 2: convert twice; from -> canonical -> to
+
 template <typename SO3From, typename SO3To, typename Enable = void>
 struct SO3AssignSO3ToSO3
 {
-  static constexpr bool IsSpecialized = false;
-
   static void run(const SO3From& from, SO3To& to)
   {
     to.fromCanonical(from.toCanonical());
@@ -953,14 +982,34 @@ struct SO3AssignSO3ToSO3
 template <typename SO3T>
 struct SO3AssignSO3ToSO3<SO3T, SO3T>
 {
-  static constexpr bool IsSpecialized = true;
-
   static void run(const SO3T& from, SO3T& to)
   {
     to.getRepData() = from.getRepData();
   }
 
   static void run(SO3T&& from, SO3T& to)
+  {
+    to.getRepData() = std::move(from.getRepData());
+  }
+};
+
+//==============================================================================
+template <typename SO3From, typename SO3To>
+struct SO3AssignSO3ToSO3<
+    SO3From,
+    SO3To,
+    typename std::enable_if<
+        !std::is_same<SO3From, SO3To>::value
+        && SO3IsEigen<typename Traits<SO3From>::RepData>::value
+        && SO3IsEigen<typename Traits<SO3To>::RepData>::value
+    >::type>
+{
+  static void run(const SO3From& from, SO3To& to)
+  {
+    to.getRepData() = from.getRepData();
+  }
+
+  static void run(SO3From&& from, SO3To& to)
   {
     to.getRepData() = std::move(from.getRepData());
   }
@@ -997,9 +1046,7 @@ template <typename From, typename To>
 struct SO3Assign<
     From,
     To,
-    typename std::enable_if<
-      SO3IsEigen<From>::value
-      && SO3IsSO3<To>::value
+    typename std::enable_if<SO3IsEigen<From>::value && SO3IsSO3<To>::value
     >::type>
 {
   static void run(const From& from, To& to)
@@ -1018,9 +1065,7 @@ template <typename From, typename To>
 struct SO3Assign<
     From,
     To,
-    typename std::enable_if<
-      SO3IsSO3<From>::value
-      && SO3IsEigen<To>::value
+    typename std::enable_if<SO3IsSO3<From>::value && SO3IsEigen<To>::value
     >::type>
 {
   static void run(const From& from, To& to)
@@ -1084,121 +1129,51 @@ struct SO3Assign<
 
 
 //==============================================================================
-// SO3ConvertEigenToEigen
+// SO3ToImpl
 //==============================================================================
 
-//==============================================================================
-template <typename EigenFrom, typename EigenTo, typename Enable = void>
-struct SO3ConvertEigenToEigen {};
+template <typename SO3From, typename To, typename Enable = void>
+struct SO3ToImpl
+{
+  static To run(const SO3From& from)
+  {
+    To res;
+    SO3Assign<SO3From, To>::run(from, res);
+
+    return res;
+  }
+};
 
 //==============================================================================
-template <typename EigenFrom, typename EigenTo>
-struct SO3ConvertEigenToEigen<
-    EigenFrom,
-    EigenTo,
+template <typename SO3T>
+struct SO3ToImpl<SO3T, SO3T>
+{
+  static const SO3T& run(const SO3T& from)
+  {
+    return from;
+  }
+};
+
+//==============================================================================
+template <typename SO3From, typename To>
+struct SO3ToImpl<
+    SO3From,
+    To,
     typename std::enable_if<
-        SO3IsEigen2<EigenFrom, EigenTo>::value
+        std::is_same<
+            typename Traits<SO3From>::RepData,
+            To
+        >::value
     >::type>
 {
-  static const EigenTo run(const EigenFrom& data)
+  static const To& run(const SO3From& from)
   {
-    return EigenTo(data);
-  }
-
-  static const EigenTo run(EigenFrom&& data)
-  {
-    return EigenTo(std::move(data));
+    return from.getRepData();
   }
 };
 
 //==============================================================================
-// SO3ConvertEigenToDart
-//==============================================================================
-
-template <typename EigenFrom, typename To, typename Enable = void>
-struct SO3ConvertEigenToDart {};
-
-//==============================================================================
-// SO3ConvertDartToEigen
-//==============================================================================
-
-template <typename EigenFrom, typename To, typename Enable = void>
-struct SO3ConvertDartToEigen {};
-
-//==============================================================================
-// SO3ConvertDartToDart
-//==============================================================================
-
-template <typename EigenFrom, typename To, typename Enable = void>
-struct SO3ConvertDartToDart {};
-
-//==============================================================================
-// SO3ConvertEigenToX
-//==============================================================================
-
-template <typename EigenFrom, typename To, typename Enable = void>
-struct SO3ConvertEigenToX {};
-
-//==============================================================================
-template <typename EigenFrom, typename SO3To>
-struct SO3ConvertEigenToX<
-    EigenFrom,
-    SO3To,
-    typename std::enable_if<SO3IsEigen<SO3To>::value>::type
-    >
-{
-  static const SO3To run(const EigenFrom& data)
-  {
-    return SO3ConvertEigenToEigen<EigenFrom, SO3To>::run(data);
-  }
-
-  static const SO3To run(EigenFrom&& data)
-  {
-    return SO3ConvertEigenToEigen<EigenFrom, SO3To>::run(std::move(data));
-  }
-};
-
-////==============================================================================
-//template <typename DartSO3From, typename To, typename Enable = void>
-//struct SO3ConvertDartToX
-//{
-////  using RepDataFrom = typename Traits<SO3From>::RepData;
-////  using RepDataTo = typename Traits<SO3To>::RepData;
-
-//  static const SO3To run(const SO3From& data)
-//  {
-//  }
-
-//  static const SO3To run(SO3From&& data)
-//  {
-//  }
-//};
-
-//==============================================================================
-template <typename SO3From, typename SO3To, typename Enable = void>
-struct SO3Convert_ {};
-
-//==============================================================================
-template <typename SO3From, typename SO3To>
-struct SO3Convert_<
-    SO3From,
-    SO3To,
-    typename std::enable_if<SO3IsEigen<SO3From>::value>::type
-    >
-{
-  static const SO3To run(const SO3From& data)
-  {
-    return SO3ConvertEigenToX<SO3From, SO3To>::run(data);
-  }
-
-  static const SO3To run(SO3From&& data)
-  {
-    return SO3ConvertEigenToX<SO3From, SO3To>::run(std::move(data));
-  }
-};
-
-//==============================================================================
-// SO3RepDataIsApproxImpl
+// SO3IsApprox
 //==============================================================================
 
 // +-------+ ------+-------+-------+-------+-------+
@@ -1221,91 +1196,99 @@ struct SO3Convert_<
 //==============================================================================
 template <typename SO3A,
           typename SO3B,
-          typename SO3ToPerform = DefaultSO3Canonical<typename Traits<SO3A>::S>>
-struct SO3RepDataIsApproxImpl
+          typename SO3ToPerform = DefaultSO3Canonical<typename Traits<SO3A>::S>,
+          typename Enable = void>
+struct SO3IsApprox
 {
-  using RepDataTypeA = typename Traits<SO3A>::RepData;
-  using RepDataTypeB = typename Traits<SO3B>::RepData;
-
   using S = typename Traits<SO3A>::S;
 
-  static bool run(const RepDataTypeA& dataA, const RepDataTypeB& dataB, S tol)
+  static bool run(const SO3A& so3A, const SO3A& so3B, S tol)
   {
-    return SO3RepDataDirectConvertImpl<SO3A, SO3ToPerform>::run(dataA)
-        .isApprox(SO3RepDataDirectConvertImpl<SO3B, SO3ToPerform>::run(dataB), tol);
+    const auto a = SO3ToImpl<SO3A, SO3ToPerform>::run(so3A);
+    const auto b = SO3ToImpl<SO3B, SO3ToPerform>::run(so3B);
+
+    return a.isApprox(b, tol);
     // TODO(JS): consider using geometric distance metric for measuring the
-    // discrepancy between two points on the manifolds rather than one provided
+    // discrepancy between two points on the manifold rather than one provided
     // by Eigen that might be the Euclidean distance metric (not sure).
   }
 };
 
 //==============================================================================
-template <typename SO3Type>
-struct SO3RepDataIsApproxImpl<SO3Type, SO3Type>
+template <typename SO3A,
+          typename SO3B,
+          typename SO3ToPerform>
+struct SO3IsApprox<
+    SO3A,
+    SO3B,
+    SO3ToPerform,
+    typename std::enable_if<
+        std::is_same<SO3A, SO3ToPerform>::value
+        && !std::is_same<SO3B, SO3ToPerform>::value
+    >::type>
 {
-  using RepData = typename Traits<SO3Type>::RepData;
+  using S = typename Traits<SO3A>::S;
 
-  using S = typename Traits<SO3Type>::S;
-
-  static bool run(const RepData& dataA, const RepData& dataB, S tol)
+  static bool run(const SO3A& so3A, const SO3A& so3B, S tol)
   {
-    return dataA.isApprox(dataB, tol);
+    const auto b = SO3ToImpl<SO3B, SO3ToPerform>::run(so3B);
+
+    return so3A.isApprox(b, tol);
     // TODO(JS): consider using geometric distance metric for measuring the
-    // discrepancy between two points on the manifolds rather than one provided
+    // discrepancy between two points on the manifold rather than one provided
     // by Eigen that might be the Euclidean distance metric (not sure).
   }
 };
 
 //==============================================================================
-// SO3IsApprox
-//==============================================================================
-
-//==============================================================================
-template <typename To, typename From, typename Enable = void>
-struct SO3IsApprox {};
-
-//==============================================================================
-template <typename A, typename B>
-struct SO3IsApprox<A, B, typename std::enable_if<SO3IsEigen<A>::value>::type>
+template <typename SO3A,
+          typename SO3B,
+          typename SO3ToPerform>
+struct SO3IsApprox<
+    SO3A,
+    SO3B,
+    SO3ToPerform,
+    typename std::enable_if<
+        !std::is_same<SO3A, SO3ToPerform>::value
+        && std::is_same<SO3B, SO3ToPerform>::value
+    >::type>
 {
-  static void run(const A& to, const B& from)
+  using S = typename Traits<SO3A>::S;
+
+  static bool run(const SO3A& so3A, const SO3A& so3B, S tol)
   {
-//    SO3IsApproxEigenAndX<To, From>::run(to, from);
+    const auto a = SO3ToImpl<SO3A, SO3ToPerform>::run(so3B);
+
+    return a.isApprox(so3B, tol);
+    // TODO(JS): consider using geometric distance metric for measuring the
+    // discrepancy between two points on the manifold rather than one provided
+    // by Eigen that might be the Euclidean distance metric (not sure).
   }
 };
 
 //==============================================================================
-template <typename A, typename B>
-struct SO3IsApprox<A, B, typename std::enable_if<SO3IsSO3<A>::value>::type>
+template <typename SO3A,
+          typename SO3B,
+          typename SO3ToPerform>
+struct SO3IsApprox<
+    SO3A,
+    SO3B,
+    SO3ToPerform,
+    typename std::enable_if<
+        std::is_same<SO3A, SO3ToPerform>::value
+        && std::is_same<SO3B, SO3ToPerform>::value
+    >::type>
 {
-  static void run(const A& to, const B& from)
+  using S = typename SO3ToPerform::S;
+
+  static bool run(const SO3ToPerform& so3A, const SO3ToPerform& so3B, S tol)
   {
-//    SO3IsApproxSO3AndX<To, From>::run(to, from);
+    return so3A.getRepData().isApprox(so3B.getRepData(), tol);
+    // TODO(JS): consider using geometric distance metric for measuring the
+    // discrepancy between two points on the manifold rather than one provided
+    // by Eigen that might be the Euclidean distance metric (not sure).
   }
 };
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 //==============================================================================
 // SO3RepDataHomogeneousMultiplicationImpl
@@ -1570,64 +1553,6 @@ struct SO3InplaceMultiplicationImpl<
   static void run(SO3A& so3A, const SO3B& so3B)
   {
     so3A.getRepData() *= so3B.getRepData();
-  }
-};
-
-//==============================================================================
-// SO3ToImpl
-//==============================================================================
-
-template <typename From, typename To, typename Enable = void>
-struct SO3ToImpl
-{
-  static To run(const From& from)
-  {
-    To res;
-    SO3Assign<From, To>::run(from, res);
-
-    return res;
-  }
-};
-
-//==============================================================================
-template <typename T>
-struct SO3ToImpl<T, T>
-{
-  static const T& run(const T& from)
-  {
-    return from;
-  }
-};
-
-//==============================================================================
-template <typename From, typename To>
-struct SO3ToImpl<
-    From,
-    To,
-    typename std::enable_if<SO3IsSO3<To>::value>::type>
-{
-  static To run(const From& from)
-  {
-    return To(from);
-  }
-};
-
-//==============================================================================
-template <typename From, typename To>
-struct SO3ToImpl<
-    From,
-    To,
-    typename std::enable_if<
-        std::is_same<
-            typename Traits<From>::RepData,
-            To
-        >::value
-    >::type>
-{
-  static auto run(const From& from)
-  -> const typename Traits<From>::RepData&
-  {
-    return from.getRepData();
   }
 };
 

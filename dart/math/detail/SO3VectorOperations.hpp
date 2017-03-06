@@ -45,16 +45,20 @@ namespace detail {
 
 //==============================================================================
 template <typename EigenFrom>
-struct SO3AssignEigenToSO3<EigenFrom, SO3Vector<typename EigenFrom::Scalar>>
+struct SO3AssignEigenToSO3<
+    EigenFrom,
+    SO3Vector<typename EigenFrom::Scalar>,
+    typename std::enable_if<SO3IsEigenMatrixBase<EigenFrom>::value>::type
+    >
 {
   static void run(const EigenFrom& from, SO3Vector<typename EigenFrom::Scalar>& to)
   {
-//    to.getRepData() = from;
+    SO3Log(to.getRepData(), from);
   }
 
   static void run(EigenFrom&& from, SO3Vector<typename EigenFrom::Scalar>& to)
   {
-//    to.getRepData() = std::move(from);
+    SO3Log(to.getRepData(), std::move(from));
   }
 };
 
@@ -63,16 +67,58 @@ template <typename EigenFrom>
 struct SO3AssignEigenToSO3<
     EigenFrom,
     SO3Vector<typename EigenFrom::Scalar>,
-    int>
+    typename std::enable_if<SO3IsEigenRotationBase<EigenFrom>::value>::type
+    >
 {
   static void run(const EigenFrom& from, SO3Vector<typename EigenFrom::Scalar>& to)
   {
-    to.getRepData() = from;
+    SO3Log(to.getRepData(), from.toRotationMatrix());
+  }
+};
+
+//==============================================================================
+// SO3AssignSO3ToEigen
+//==============================================================================
+
+//==============================================================================
+template <typename EigenTo>
+struct SO3AssignSO3ToEigen<
+    SO3Vector<typename EigenTo::Scalar>,
+    EigenTo,
+    typename std::enable_if<SO3IsEigenMatrixBase<EigenTo>::value>::type
+    >
+{
+  static void run(const SO3Vector<typename EigenTo::Scalar>& from, EigenTo& to)
+  {
+    SO3Exp(to, from.getRepData());
   }
 
-  static void run(EigenFrom&& from, SO3Vector<typename EigenFrom::Scalar>& to)
+  static void run(SO3Vector<typename EigenTo::Scalar>&& from, EigenTo& to)
   {
-    to.getRepData() = std::move(from);
+    SO3Exp(to, std::move(from.getRepData()));
+  }
+};
+
+//==============================================================================
+template <typename EigenTo>
+struct SO3AssignSO3ToEigen<
+    SO3Vector<typename EigenTo::Scalar>,
+    EigenTo,
+    typename std::enable_if<SO3IsEigenRotationBase<EigenTo>::value>::type
+    >
+{
+  static void run(const SO3Vector<typename EigenTo::Scalar>& from, EigenTo& to)
+  {
+    Eigen::Matrix<typename EigenTo::Scalar, 3, 3> rotMat;
+    SO3Exp(rotMat, from.getRepData());
+    to = rotMat;
+  }
+
+  static void run(SO3Vector<typename EigenTo::Scalar>&& from, EigenTo& to)
+  {
+    Eigen::Matrix<typename EigenTo::Scalar, 3, 3> rotMat;
+    SO3Exp(rotMat, std::move(from.getRepData()));
+    to = rotMat;
   }
 };
 
@@ -81,12 +127,9 @@ struct SO3AssignEigenToSO3<
 //==============================================================================
 
 //==============================================================================
-// Specializations for SO3Matrix --> SO3Vector
 template <typename S>
 struct SO3AssignSO3ToSO3<SO3Matrix<S>, SO3Vector<S>>
 {
-  static constexpr bool IsSpecialized = true;
-
   static void run(const SO3Matrix<S>& from, SO3Vector<S>& to)
   {
     SO3Log(to.getRepData(), from.getRepData());
@@ -99,12 +142,9 @@ struct SO3AssignSO3ToSO3<SO3Matrix<S>, SO3Vector<S>>
 };
 
 //==============================================================================
-// Specializations for SO3Vector --> SO3Matrix
 template <typename S>
 struct SO3AssignSO3ToSO3<SO3Vector<S>, SO3Matrix<S>>
 {
-  static constexpr bool IsSpecialized = true;
-
   static void run(const SO3Vector<S>& from, SO3Matrix<S>& to)
   {
     SO3Exp(to.getRepData(), from.getRepData());

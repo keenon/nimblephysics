@@ -115,22 +115,6 @@ public:
   /// Move in a SO3 with the same representation.
   EulerAngles& operator=(EulerAngles&& other);
 
-  EulerAngles& operator=(const Eigen::AngleAxis<S>& aa);
-
-  EulerAngles& operator=(Eigen::AngleAxis<S>&& aa);
-
-  template <typename QuatDerived>
-  EulerAngles& operator=(const Eigen::QuaternionBase<QuatDerived>& quat);
-
-  template <typename QuatDerived>
-  EulerAngles& operator=(Eigen::QuaternionBase<QuatDerived>&& quat);
-
-  template <typename Derived>
-  EulerAngles& operator=(const Eigen::MatrixBase<Derived>& matrix);
-
-  template <typename Derived>
-  EulerAngles& operator=(Eigen::MatrixBase<Derived>&& matrix);
-
   /// Whether \b exactly equal to a SO3.
   bool operator==(const EulerAngles& other);
 

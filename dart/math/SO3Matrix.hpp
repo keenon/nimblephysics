@@ -51,6 +51,8 @@ public:
   using Base = SO3Base<SO3Matrix>;
   using S = S_;
 
+  using Base::Dim;
+
   using Matrix3 = typename Base::Matrix3;
   using Vector3 = typename Base::Vector3;
 
@@ -96,11 +98,13 @@ public:
   template <typename Derived>
   SO3Matrix(Eigen::MatrixBase<Derived>&& matrix);
 
-  /// Construct from Eigen::AngleAxis
-  SO3Matrix(const Eigen::AngleAxis<S>& aa);
+  /// Construct from Eigen::RotationBase
+  template <typename Derived>
+  SO3Matrix(const Eigen::RotationBase<Derived, Dim>& rot);
 
-  /// Construct from Eigen::Quaternion
-  SO3Matrix(const Eigen::Quaternion<S>& quat);
+  /// Construct from Eigen::RotationBase
+  template <typename Derived>
+  SO3Matrix(Eigen::RotationBase<Derived, Dim>&& rot);
 
   /// \} // Constructors
 

@@ -37,6 +37,7 @@
 #include "dart/math/MathTypes.hpp"
 #include "dart/math/Geometry.hpp"
 #include "dart/math/SO3Base.hpp"
+#include "dart/math/SO3Matrix.hpp"
 #include "dart/math/detail/SO3VectorOperations.hpp"
 
 namespace dart {
@@ -50,6 +51,8 @@ public:
   using This = SO3Vector<S_>;
   using Base = SO3Base<This>;
   using S = typename Base::S;
+
+  using Base::Dim;
 
   using Matrix3 = typename Base::Matrix3;
   using Vector3 = typename Base::Vector3;
@@ -100,6 +103,14 @@ public:
   template <typename Derived>
   SO3Vector(Eigen::MatrixBase<Derived>&& matrix);
 
+  /// Construct from Eigen::RotationBase
+  template <typename Derived>
+  SO3Vector(const Eigen::RotationBase<Derived, Dim>& rot);
+
+  /// Construct from Eigen::RotationBase
+  template <typename Derived>
+  SO3Vector(Eigen::RotationBase<Derived, Dim>&& rot);
+
   /// \} // Constructors
 
   //----------------------------------------------------------------------------
@@ -112,27 +123,22 @@ public:
   /// Move in a SO3 with the same representation.
   SO3Vector& operator=(SO3Vector&& other);
 
-  SO3Vector& operator=(const Eigen::AngleAxis<S>& quat);
-
-  SO3Vector& operator=(Eigen::AngleAxis<S>&& quat);
-
-  template <typename QuatDerived>
-  SO3Vector& operator=(const Eigen::QuaternionBase<QuatDerived>& quat);
-
-  template <typename QuatDerived>
-  SO3Vector& operator=(Eigen::QuaternionBase<QuatDerived>&& quat);
-
-  template <typename Derived>
-  SO3Vector& operator=(const Eigen::MatrixBase<Derived>& matrix);
-  // TODO(JS): take rotation vector as well using a template struct
-
-  template <typename Derived>
-  SO3Vector& operator=(Eigen::MatrixBase<Derived>&& matrix);
-
   /// Whether \b exactly equal to a SO3.
   bool operator==(const SO3Vector& other);
 
   /// \} // Operators
+
+  //----------------------------------------------------------------------------
+  /// \{ \name Conversions
+  //----------------------------------------------------------------------------
+
+  /// Set from the canonical type
+  void fromCanonical(const SO3Matrix<S>& mat);
+
+  /// Convert to the canonical type
+  SO3Matrix<S_> toCanonical() const;
+
+  /// \} // Conversions
 
   //----------------------------------------------------------------------------
   /// \{ \name Representation properties

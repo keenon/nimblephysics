@@ -39,21 +39,23 @@ namespace math {
 
 //==============================================================================
 template <typename S>
-Quaternion<S>::Quaternion() : Base()
+Quaternion<S>::Quaternion() : Base(), mRepData()
 {
   // Do nothing
 }
 
 //==============================================================================
 template <typename S>
-Quaternion<S>::Quaternion(const Quaternion& other) : Base(), mRepData(other.mRepData)
+Quaternion<S>::Quaternion(const Quaternion& other)
+  : Base(), mRepData(other.mRepData)
 {
   // Do nothing
 }
 
 //==============================================================================
 template <typename S>
-Quaternion<S>::Quaternion(Quaternion&& other) : mRepData(std::move(other.mRepData))
+Quaternion<S>::Quaternion(Quaternion&& other)
+  : Base(), mRepData(std::move(other.mRepData))
 {
   // Do nothing
 }
@@ -62,10 +64,9 @@ Quaternion<S>::Quaternion(Quaternion&& other) : mRepData(std::move(other.mRepDat
 template <typename S>
 template <typename Derived>
 Quaternion<S>::Quaternion(const SO3Base<Derived>& other)
-  : Base(),
-    mRepData(other.getRepData())
+  : Base(), mRepData()
 {
-  // Do nothing
+  *this = other;
 }
 
 //==============================================================================
@@ -74,23 +75,43 @@ template <typename Derived>
 Quaternion<S>::Quaternion(SO3Base<Derived>&& other)
   : Base(), mRepData()
 {
-  *this = other;
+  *this = std::move(other);
 }
 
 //==============================================================================
 template <typename S>
-Quaternion<S>::Quaternion(const Eigen::Quaternion<S>& quat)
-  : Base(), mRepData(quat)
+template <typename Derived>
+Quaternion<S>::Quaternion(const Eigen::MatrixBase<Derived>& matrix)
+  : Base(), mRepData()
 {
-  // Do nothing
+  *this = matrix;
 }
 
 //==============================================================================
 template <typename S>
-Quaternion<S>::Quaternion(Eigen::Quaternion<S>&& quat)
-  : Base(), mRepData(std::move(quat))
+template <typename Derived>
+Quaternion<S>::Quaternion(Eigen::MatrixBase<Derived>&& matrix)
+  : Base(), mRepData()
 {
-  // Do nothing
+  *this = std::move(matrix);
+}
+
+//==============================================================================
+template <typename S>
+template <typename Derived>
+Quaternion<S>::Quaternion(const Eigen::RotationBase<Derived, Dim>& rot)
+  : Base(), mRepData()
+{
+  *this = rot;
+}
+
+//==============================================================================
+template <typename S>
+template <typename Derived>
+Quaternion<S>::Quaternion(Eigen::RotationBase<Derived, Dim>&& rot)
+  : Base(), mRepData()
+{
+  *this = std::move(rot);
 }
 
 //==============================================================================
@@ -166,6 +187,20 @@ template <typename S>
 bool Quaternion<S>::operator==(const Quaternion& other)
 {
   return mRepData.isApprox(other.mRepData, static_cast<S>(0));
+}
+
+//==============================================================================
+template <typename S>
+void Quaternion<S>::fromCanonical(const SO3Matrix<S>& mat)
+{
+  mRepData = mat.getRepData();
+}
+
+//==============================================================================
+template <typename S>
+SO3Matrix<S> Quaternion<S>::toCanonical() const
+{
+  return SO3Matrix<S>(mRepData.toRotationMatrix());
 }
 
 //==============================================================================

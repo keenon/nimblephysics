@@ -68,8 +68,8 @@ std::false_type is_base_of_template_impl(...);
 
 //==============================================================================
 // Reference: http://stackoverflow.com/a/34672753
-template <typename T, template <typename...> class C>
-using is_base_of_template = decltype(is_base_of_template_impl<C>(std::declval<T*>()));
+template <template <typename...> class Base, typename Derived>
+using is_base_of_template = decltype(is_base_of_template_impl<Base>(std::declval<Derived*>()));
 
 } // namespace common
 } // namespace dart

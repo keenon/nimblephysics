@@ -60,7 +60,7 @@ public:
   using Tangent = typename Base::Tangent;
   using so3 = typename Base::so3;
 
-  //using Base::operator =;
+  using Base::operator =;
   using Base::operator *;
   using Base::operator *=;
 

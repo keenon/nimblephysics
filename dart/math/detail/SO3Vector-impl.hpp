@@ -39,21 +39,23 @@ namespace math {
 
 //==============================================================================
 template <typename S>
-SO3Vector<S>::SO3Vector() : Base()
+SO3Vector<S>::SO3Vector() : Base(), mRepData()
 {
   // Do nothing
 }
 
 //==============================================================================
 template <typename S>
-SO3Vector<S>::SO3Vector(const SO3Vector& other) : Base(), mRepData(other.mRepData)
+SO3Vector<S>::SO3Vector(const SO3Vector& other)
+  : Base(), mRepData(other.mRepData)
 {
   // Do nothing
 }
 
 //==============================================================================
 template <typename S>
-SO3Vector<S>::SO3Vector(SO3Vector&& other) : mRepData(std::move(other.mRepData))
+SO3Vector<S>::SO3Vector(SO3Vector&& other)
+  : Base(), mRepData(std::move(other.mRepData))
 {
   // Do nothing
 }
@@ -80,20 +82,36 @@ SO3Vector<S>::SO3Vector(SO3Base<Derived>&& other)
 template <typename S>
 template <typename Derived>
 SO3Vector<S>::SO3Vector(const Eigen::MatrixBase<Derived>& matrix)
-  : Base(), mRepData(matrix)
+  : Base(), mRepData()
 {
-  assert(matrix.rows() == 3);
-  assert(matrix.cols() == 1);
+  *this = matrix;
 }
 
 //==============================================================================
 template <typename S>
 template <typename Derived>
 SO3Vector<S>::SO3Vector(Eigen::MatrixBase<Derived>&& matrix)
-  : Base(), mRepData(std::move(matrix))
+  : Base(), mRepData()
 {
-  assert(matrix.rows() == 3);
-  assert(matrix.cols() == 1);
+  *this = std::move(matrix);
+}
+
+//==============================================================================
+template <typename S>
+template <typename Derived>
+SO3Vector<S>::SO3Vector(const Eigen::RotationBase<Derived, Dim>& rot)
+  : Base(), mRepData()
+{
+  *this = rot;
+}
+
+//==============================================================================
+template <typename S>
+template <typename Derived>
+SO3Vector<S>::SO3Vector(Eigen::RotationBase<Derived, Dim>&& rot)
+  : Base(), mRepData()
+{
+  *this = std::move(rot);
 }
 
 //==============================================================================
@@ -114,61 +132,26 @@ SO3Vector<S>& SO3Vector<S>::operator=(SO3Vector&& other)
 
 //==============================================================================
 template <typename S>
-SO3Vector<S>& SO3Vector<S>::operator=(const Eigen::AngleAxis<S>& quat)
-{
-  detail::SO3Assign<Eigen::AngleAxis<S>, This>::run(quat, *this);
-  return *this;
-}
-
-//==============================================================================
-template <typename S>
-SO3Vector<S>& SO3Vector<S>::operator=(Eigen::AngleAxis<S>&& quat)
-{
-  detail::SO3Assign<Eigen::AngleAxis<S>, This>::run(std::move(quat), *this);
-  return *this;
-}
-
-//==============================================================================
-template <typename S>
-template <typename QuatDerived>
-SO3Vector<S>& SO3Vector<S>::operator=(const Eigen::QuaternionBase<QuatDerived>& quat)
-{
-  detail::SO3Assign<Eigen::QuaternionBase<QuatDerived>, This>::run(quat, *this);
-  return *this;
-}
-
-//==============================================================================
-template <typename S>
-template <typename QuatDerived>
-SO3Vector<S>& SO3Vector<S>::operator=(Eigen::QuaternionBase<QuatDerived>&& quat)
-{
-  detail::SO3Assign<Eigen::QuaternionBase<QuatDerived>, This>::run(std::move(quat), *this);
-  return *this;
-}
-
-//==============================================================================
-template <typename S>
-template <typename Derived>
-SO3Vector<S>& SO3Vector<S>::operator=(const Eigen::MatrixBase<Derived>& matrix)
-{
-  detail::SO3Assign<Eigen::MatrixBase<Derived>, This>::run(matrix, *this);
-  return *this;
-}
-
-//==============================================================================
-template <typename S>
-template <typename Derived>
-SO3Vector<S>& SO3Vector<S>::operator=(Eigen::MatrixBase<Derived>&& matrix)
-{
-  detail::SO3Assign<Eigen::MatrixBase<Derived>, This>::run(std::move(matrix), *this);
-  return *this;
-}
-
-//==============================================================================
-template <typename S>
 bool SO3Vector<S>::operator==(const SO3Vector& other)
 {
   return mRepData == other.mRepData;
+}
+
+//==============================================================================
+template <typename S>
+void SO3Vector<S>::fromCanonical(const SO3Matrix<S>& mat)
+{
+  detail::SO3Log(mRepData, mat.getRepData());
+}
+
+//==============================================================================
+template <typename S>
+SO3Matrix<S> SO3Vector<S>::toCanonical() const
+{
+  SO3Matrix<S> res;
+  detail::SO3Exp(res.getRepData(), mRepData);
+
+  return res;
 }
 
 //==============================================================================

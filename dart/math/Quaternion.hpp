@@ -39,6 +39,7 @@
 #include "dart/math/Constants.hpp"
 #include "dart/math/Geometry.hpp"
 #include "dart/math/SO3Base.hpp"
+#include "dart/math/SO3Matrix.hpp"
 #include "dart/math/detail/QuaternionOperations.hpp"
 
 namespace dart {
@@ -52,6 +53,8 @@ public:
   using This = Quaternion;
   using Base = SO3Base<Quaternion<S_>>;
   using S = S_;
+
+  using Base::Dim;
 
   using Matrix3 = typename Base::Matrix3;
 
@@ -95,13 +98,21 @@ public:
   template <typename Derived>
   Quaternion(SO3Base<Derived>&& other);
 
-  /// Construct from Eigen::Quaternion.
-  Quaternion(const Eigen::Quaternion<S>& quat);
+  /// Construct from a raw rotation vector where the dimension is 3x1.
+  template <typename Derived>
+  Quaternion(const Eigen::MatrixBase<Derived>& matrix);
 
-  /// Construct from Eigen::Quaternion.
-  Quaternion(Eigen::Quaternion<S>&& quat);
+  /// Construct from a raw rotation matrix where the dimension is 3x3.
+  template <typename Derived>
+  Quaternion(Eigen::MatrixBase<Derived>&& matrix);
 
-  // TODO(JS): Add more constructs that takes raw components of quaternions
+  /// Construct from Eigen::RotationBase
+  template <typename Derived>
+  Quaternion(const Eigen::RotationBase<Derived, Dim>& rot);
+
+  /// Construct from Eigen::RotationBase
+  template <typename Derived>
+  Quaternion(Eigen::RotationBase<Derived, Dim>&& rot);
 
   /// \} // Constructors
 
@@ -135,6 +146,18 @@ public:
   bool operator==(const Quaternion& other);
 
   /// \} // Operators
+
+  //----------------------------------------------------------------------------
+  /// \{ \name Conversions
+  //----------------------------------------------------------------------------
+
+  /// Set from the canonical type
+  void fromCanonical(const SO3Matrix<S>& mat);
+
+  /// Convert to the canonical type
+  SO3Matrix<S_> toCanonical() const;
+
+  /// \} // Conversions
 
   //----------------------------------------------------------------------------
   /// \{ \name Representation properties

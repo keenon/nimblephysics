@@ -40,61 +40,35 @@ namespace math {
 namespace detail {
 
 //==============================================================================
-// SO3AssignEigenToSO3
+// SO3AssignSO3ToSO3
 //==============================================================================
 
 //==============================================================================
-template <typename EigenFrom>
-struct SO3AssignEigenToSO3<EigenFrom, Quaternion<typename EigenFrom::Scalar>>
+template <typename S>
+struct SO3AssignSO3ToSO3<SO3Vector<S>, Quaternion<S>>
 {
-  static void run(const EigenFrom& from, Quaternion<typename EigenFrom::Scalar>& to)
+  static void run(const SO3Vector<S>& from, Quaternion<S>& to)
   {
-    to.getRepData() = from;
-  }
+    // TODO(JS): improve
+    const auto& fromData = from.getRepData();
+    const auto& norm = fromData.norm();
+    const Eigen::AngleAxis<S> eigAa(norm, fromData/norm);
 
-  static void run(EigenFrom&& from, Quaternion<typename EigenFrom::Scalar>& to)
-  {
-    to.getRepData() = std::move(from);
+    to.getRepData() = std::move(eigAa);
   }
 };
 
 //==============================================================================
-// SO3AssignEigenToSO3
-//==============================================================================
-
-//==============================================================================
-// Specializations for SO3Vector --> Quaternion
-// TODO(JS): Not implemented
-
-//==============================================================================
-// Specializations for AngleAxis --> Quaternion
 template <typename S>
-struct SO3AssignSO3ToSO3<AngleAxis<S>, Quaternion<S>>
+struct SO3AssignSO3ToSO3<Quaternion<S>, SO3Vector<S>>
 {
-  static constexpr bool IsSpecialized = true;
-
-  static void run(const AngleAxis<S>& from, Quaternion<S>& to)
+  static void run(const Quaternion<S>& from, SO3Vector<S>& to)
   {
-    const Eigen::AngleAxis<S>& aa = from.getRepData();
-    Eigen::Quaternion<S>& quat = to.gteRepData();
+    // TODO(JS): improve
+    const auto& fromData = from.getRepData();
+    const Eigen::AngleAxis<S> eigAa(fromData);
 
-    quat = aa;
-  }
-};
-
-//==============================================================================
-// Specializations for Quaternion --> AngleAxis
-template <typename S>
-struct SO3AssignSO3ToSO3<Quaternion<S>, AngleAxis<S>>
-{
-  static constexpr bool IsSpecialized = true;
-
-  static void run(const Quaternion<S>& from, AngleAxis<S>& to)
-  {
-    const Eigen::Quaternion<S>& quat = from.getRepData();
-    Eigen::AngleAxis<S>& aa = to.gteRepData();
-
-    aa = quat;
+    to.getRepData() = eigAa.angle() * eigAa.axis();
   }
 };
 
