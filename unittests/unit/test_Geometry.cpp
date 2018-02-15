@@ -1,8 +1,9 @@
 /*
- * Copyright (c) 2013-2016, Humanoid Lab, Georgia Tech Research Corporation
- * Copyright (c) 2013-2017, Graphics Lab, Georgia Tech Research Corporation
- * Copyright (c) 2016-2017, Personal Robotics Lab, Carnegie Mellon University
+ * Copyright (c) 2011-2017, The DART development contributors
  * All rights reserved.
+ *
+ * The list of contributors can be found at:
+ *   https://github.com/dartsim/dart/blob/master/LICENSE
  *
  * This file is provided under the following "BSD-style" License:
  *   Redistribution and use in source and binary forms, with or
@@ -775,11 +776,4 @@ TEST(LIE_GROUP_OPERATORS, ADJOINT_MAPPINGS_TEMPLATE)
   std::cout << "Mark3: " << sw.getLastElapsedTime() << std::endl;
 
   std::cout << "sum: " << sum1.rows() + sum2.rows() + sum3.rows() << std::endl;
-}
-
-/******************************************************************************/
-int main(int argc, char* argv[])
-{
-	::testing::InitGoogleTest(&argc, argv);
-	return RUN_ALL_TESTS();
 }

@@ -101,15 +101,15 @@ function(dart_check_required_package variable dependency)
 endfunction()
 
 #===============================================================================
-function(dart_check_optional_package variable component dependency)
+macro(dart_check_optional_package variable component dependency)
   if(${${variable}_FOUND})
-    set(HAVE_${variable} TRUE PARENT_SCOPE)
+    set(HAVE_${variable} TRUE CACHE BOOL "Check if ${variable} found." FORCE)
     if(DART_VERBOSE)
       message(STATUS "Looking for ${dependency} - version ${${variable}_VERSION}"
                      " found")
     endif()
   else()
-    set(HAVE_${variable} FALSE PARENT_SCOPE)
+    set(HAVE_${variable} FALSE CACHE BOOL "Check if ${variable} found." FORCE)
     if(ARGV3) # version
       message(STATUS "Looking for ${dependency} - NOT found, to use"
                      " ${component}, please install ${dependency} (>= ${ARGV3})")
@@ -119,7 +119,7 @@ function(dart_check_optional_package variable component dependency)
     endif()
     return()
   endif()
-endfunction()
+endmacro()
 
 #===============================================================================
 function(dart_add_custom_target rel_dir property_name)
@@ -153,5 +153,20 @@ endfunction(dart_add_tutorial)
 
 #===============================================================================
 function(dart_format_add)
-  dart_property_add(DART_FORMAT_FILES ${ARGN})
+  foreach(source ${ARGN})
+    if(IS_ABSOLUTE "${source}")
+      set(source_abs "${source}")
+    else()
+      get_filename_component(source_abs
+        "${CMAKE_CURRENT_LIST_DIR}/${source}" ABSOLUTE)
+    endif()
+    if(EXISTS "${source_abs}")
+      dart_property_add(DART_FORMAT_FILES "${source_abs}")
+    else()
+      message(FATAL_ERROR
+        "Source file '${source}' does not exist at absolute path"
+        " '${source_abs}'. This should never happen. Did you recently delete"
+        " this file or modify 'CMAKE_CURRENT_LIST_DIR'")
+    endif()
+  endforeach()
 endfunction()

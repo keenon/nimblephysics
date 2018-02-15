@@ -1,8 +1,9 @@
 /*
- * Copyright (c) 2013-2016, Humanoid Lab, Georgia Tech Research Corporation
- * Copyright (c) 2013-2017, Graphics Lab, Georgia Tech Research Corporation
- * Copyright (c) 2016-2017, Personal Robotics Lab, Carnegie Mellon University
+ * Copyright (c) 2011-2017, The DART development contributors
  * All rights reserved.
+ *
+ * The list of contributors can be found at:
+ *   https://github.com/dartsim/dart/blob/master/LICENSE
  *
  * This file is provided under the following "BSD-style" License:
  *   Redistribution and use in source and binary forms, with or
@@ -51,7 +52,7 @@
 #include "dart/dynamics/CapsuleShape.hpp"
 #include "dart/dynamics/ConeShape.hpp"
 #include "dart/dynamics/PlaneShape.hpp"
-#include "dart/dynamics/MultiSphereShape.hpp"
+#include "dart/dynamics/MultiSphereConvexHullShape.hpp"
 #include "dart/dynamics/MeshShape.hpp"
 #include "dart/dynamics/SoftMeshShape.hpp"
 #include "dart/dynamics/LineSegmentShape.hpp"
@@ -404,7 +405,7 @@ void SimWindow::drawShape(const dynamics::Shape* shape,
   using dynamics::CapsuleShape;
   using dynamics::ConeShape;
   using dynamics::PlaneShape;
-  using dynamics::MultiSphereShape;
+  using dynamics::MultiSphereConvexHullShape;
   using dynamics::MeshShape;
   using dynamics::SoftMeshShape;
   using dynamics::LineSegmentShape;
@@ -439,18 +440,10 @@ void SimWindow::drawShape(const dynamics::Shape* shape,
     const auto* cone = static_cast<const ConeShape*>(shape);
     mRI->drawCone(cone->getRadius(), cone->getHeight());
   }
-  else if (shape->is<MultiSphereShape>())
+  else if (shape->is<MultiSphereConvexHullShape>())
   {
-    const auto* multiSphere = static_cast<const MultiSphereShape*>(shape);
-    const auto& spheres = multiSphere->getSpheres();
-    for (const auto& sphere : spheres)
-    {
-      glTranslated(sphere.second.x(), sphere.second.y(), sphere.second.z());
-      mRI->drawSphere(sphere.first);
-      glTranslated(-sphere.second.x(), -sphere.second.y(), -sphere.second.z());
-    }
-    // TODO(JS): This is an workaround that draws only spheres rather than the
-    // actual convex hull.
+    const auto* multiSphere = static_cast<const MultiSphereConvexHullShape*>(shape);
+    mRI->drawMultiSphere(multiSphere->getSpheres());
   }
   else if (shape->is<MeshShape>())
   {
