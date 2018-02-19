@@ -40,6 +40,11 @@ if(TARGET dart-utils)
   dart_add_test("unit" test_SdfParser)
   target_link_libraries(test_SdfParser dart-utils)
 
+  if(TARGET dart-utils-urdf)
+    dart_add_test("unit" test_Sensor)
+    target_link_libraries(test_Sensor dart-utils-urdf)
+  endif()
+
   dart_add_test("unit" test_SkelParser)
   target_link_libraries(test_SkelParser dart-utils)
 
@@ -84,5 +89,8 @@ foreach(collision_engine
 
 endforeach()
 
-dart_format_add(test_Inertia.cpp)
-dart_format_add(test_VskParser.cpp)
+dart_format_add(
+  test_Inertia.cpp
+  test_Sensor.cpp
+  test_VskParser.cpp
+)

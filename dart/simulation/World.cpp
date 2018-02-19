@@ -200,6 +200,12 @@ void World::step(bool _resetCommand)
     }
   }
 
+  // Update sensors
+  for (auto& skel : mSkeletons)
+  {
+    skel->updateSensors();
+  }
+
   mTime += mTimeStep;
   mFrame++;
 }

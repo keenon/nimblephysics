@@ -564,7 +564,12 @@ std::unique_ptr< CloneableVector<T> > CloneableVector<T>::clone() const
   clonedVector.reserve(mVector.size());
 
   for(const T& entry : mVector)
-    clonedVector.push_back(entry->clone());
+  {
+    if (entry)
+      clonedVector.push_back(entry->clone());
+    else
+      clonedVector.push_back(nullptr);
+  }
 
   return common::make_unique< CloneableVector<T> >( std::move(clonedVector) );
 }

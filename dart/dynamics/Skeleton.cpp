@@ -4075,6 +4075,12 @@ math::LinearJacobian Skeleton::getCOMLinearJacobianDeriv(
 }
 
 //==============================================================================
+void Skeleton::updateSensors()
+{
+
+}
+
+//==============================================================================
 Skeleton::DirtyFlags::DirtyFlags()
   : mArticulatedInertia(true),
     mMassMatrix(true),
