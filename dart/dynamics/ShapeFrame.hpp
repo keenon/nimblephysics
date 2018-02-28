@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2017, The DART development contributors
+ * Copyright (c) 2011-2018, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -67,12 +67,15 @@ public:
   void setRGBA(const Eigen::Vector4d& color);
 
   DART_COMMON_GET_ASPECT_PROPERTY( Eigen::Vector4d, RGBA )
-  // void setRGBA(const Eigen::Vector4d& value);
   // const Eigen::Vector4d& getRGBA() const;
 
   DART_COMMON_SET_GET_ASPECT_PROPERTY( bool, Hidden )
-  // void setHidden(const Eigen::Vector4d& value);
-  // const Eigen::Vector4d& getHidden() const;
+  // void setHidden(const bool& value);
+  // const bool& getHidden() const;
+
+  DART_COMMON_SET_GET_ASPECT_PROPERTY( bool, Shadowed )
+  // void setShadowed(const bool& value);
+  // const bool& getShadowed() const;
 
   /// Identical to setRGB(const Eigen::Vector3d&)
   void setColor(const Eigen::Vector3d& color);
