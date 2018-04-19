@@ -59,7 +59,15 @@ namespace common {
 std::shared_ptr<SharedLibrary> SharedLibrary::create(
     const boost::filesystem::path& path)
 {
-  return detail::SharedLibraryManager::getSingleton().load(path);
+  return detail::SharedLibraryManager::getSingleton().load(
+      Uri(path.string()), nullptr);
+}
+
+//==============================================================================
+std::shared_ptr<SharedLibrary> SharedLibrary::create(
+    const common::Uri& uri, const common::ResourceRetrieverPtr& retriever)
+{
+  return detail::SharedLibraryManager::getSingleton().load(uri, retriever);
 }
 
 //==============================================================================

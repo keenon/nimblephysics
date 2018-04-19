@@ -36,7 +36,11 @@
 #include <memory>
 #include <string>
 #include <boost/filesystem.hpp>
+#include "dart/common/Deprecated.hpp"
 #include "dart/common/Platform.hpp"
+#include "dart/common/ResourceRetriever.hpp"
+#include "dart/common/Singleton.hpp"
+#include "dart/common/Uri.hpp"
 
 #if DART_OS_LINUX
 
@@ -88,8 +92,27 @@ public:
   /// "/path/../to/yourfile".
   /// \return Pointer to the created SharedLibrary upon success in loading.
   /// Otherwise, returns nullptr.
+  DART_DEPRECATED(6.4)
   static std::shared_ptr<SharedLibrary> create(
       const boost::filesystem::path& path);
+
+  /// Creates a SharedLibrary from a path to the shared library.
+  ///
+  /// \note SharedLibrary should be always created from this create function.
+  /// \param[in] path The path to the shared library. The path can be a relative
+  /// path or an absolute path. If the path doens't exist this function returns
+  /// nullptr. If the path exist, the path will be stored as the canonical path
+  /// where a canonical path is an absolute path that has no elements which are
+  /// symbolic links, and no dot or dot dot elements such as
+  /// "/path/../to/yourfile".
+  /// \return Pointer to the created SharedLibrary upon success in loading.
+  /// Otherwise, returns nullptr.
+  static std::shared_ptr<SharedLibrary> create(
+      const common::Uri& uri,
+      const common::ResourceRetrieverPtr& retriever);
+  // TODO(JS): retriever doens't have a default value to avoid ambiguity with
+  // create(path) functions. Once create(path) is removed, this function should
+  // be create(uri, retriever = nullptr).
 
   /// Constructs from a path to the shared library.
   ///

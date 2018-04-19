@@ -36,9 +36,11 @@
 #include <memory>
 #include <unordered_map>
 #include <boost/filesystem.hpp>
-#include "dart/common/Singleton.hpp"
-
 #include <boost/functional/hash.hpp>
+#include "dart/common/Deprecated.hpp"
+#include "dart/common/ResourceRetriever.hpp"
+#include "dart/common/Singleton.hpp"
+#include "dart/common/Uri.hpp"
 
 namespace std {
 
@@ -64,13 +66,25 @@ class SharedLibraryManager final : public Singleton<SharedLibraryManager>
 public:
   /// Loads the shared library with the specified path.
   ///
-  /// \param[in] path The path to the shared library. If the path doesn't
-  /// include the extension, this function will use the best guess depending on
-  /// the OS (e.g., '.so' for Linux, '.dylib' for macOS, and '.dll' for
-  /// Windows).
+  /// \param[in] path The path to the shared library.
   /// \return Pointer to the shared library upon success. Otherwise, returns
   /// nullptr.
+  DART_DEPRECATED(6.4)
   std::shared_ptr<SharedLibrary> load(const boost::filesystem::path& path);
+
+  /// Loads the shared library with the specified path.
+  ///
+  /// \param[in] uri The URI to the shared library.
+  /// \param[in] retriever Resource retriever for \c uri. If it's null,
+  /// LocalResourceRetriever is used by default.
+  /// \return Pointer to the shared library upon success. Otherwise, returns
+  /// nullptr.
+  std::shared_ptr<SharedLibrary> load(
+      const common::Uri& uri,
+      const common::ResourceRetrieverPtr& retriever);
+  // TODO(JS): retriever doens't have a default value to avoid ambiguity with
+  // load(path) functions. Once load(path) is removed, this function should be
+  // load(uri, retriever = nullptr).
 
 protected:
   friend class Singleton<SharedLibraryManager>;

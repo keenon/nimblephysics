@@ -34,20 +34,46 @@
 
 #include "dart/common/SharedLibrary.hpp"
 #include "dart/common/Console.hpp"
+#include "dart/common/LocalResourceRetriever.hpp"
 
 namespace dart {
 namespace common {
 namespace detail {
 
+namespace {
+
+//==============================================================================
+common::ResourceRetrieverPtr getRetriever(
+    const common::ResourceRetrieverPtr& retriever)
+{
+  if (retriever)
+    return retriever;
+  else
+    return std::make_shared<common::LocalResourceRetriever>();
+}
+
+} // (anonymous) namespace
+
 //==============================================================================
 std::shared_ptr<SharedLibrary> SharedLibraryManager::load(
     const boost::filesystem::path& path)
 {
+  return load(Uri(path.string()), nullptr);
+}
+
+//==============================================================================
+std::shared_ptr<SharedLibrary> SharedLibraryManager::load(
+    const Uri& uri, const ResourceRetrieverPtr& retrieverOrNull)
+{
+  const auto retriever = getRetriever(retrieverOrNull);
+  const auto path = retriever->getFilePath(uri);
+
   // Check if the given path exits
   const bool exists = boost::filesystem::exists(path);
   if (!exists)
   {
-    dtwarn << "[SharedLibraryManager::load] The given path doesn't exist. "
+    dtwarn << "[SharedLibraryManager::load] Failed to open file: "
+           << path << " "
            << "Returning nullptr.\n";
     return nullptr;
   }

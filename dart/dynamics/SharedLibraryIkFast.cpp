@@ -70,7 +70,8 @@ bool loadFunction(
 } // namespace (anonymous)
 
 //==============================================================================
-SharedLibraryIkFast::SharedLibraryIkFast(InverseKinematics* ik,
+SharedLibraryIkFast::SharedLibraryIkFast(
+    InverseKinematics* ik,
     const std::string& filePath,
     const std::vector<std::size_t>& dofMap,
     const std::vector<std::size_t>& freeDofMap,
