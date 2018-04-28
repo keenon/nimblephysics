@@ -60,9 +60,35 @@ public:
   /// \param[in] methodName The name of this analytical inverse kinematics
   /// method.
   /// \param[in] properties Properties of InverseKinematics::Analytical.
+  ///
+  /// \deprecated Please use the other contructor that takes URI.
+  DART_DEPRECATED(6.5)
   SharedLibraryIkFast(
       InverseKinematics* ik,
       const std::string& filePath,
+      const std::vector<std::size_t>& dofMap,
+      const std::vector<std::size_t>& freeDofMap,
+      const std::string& methodName = "IKFast",
+      const Analytical::Properties& properties = Analytical::Properties());
+
+  /// Constructor
+  ///
+  /// \param[in] ik The parent InverseKinematics solver that is associated with
+  /// this gradient method.
+  /// \param[in] uri URI to the shared library of the IkFast binary file
+  /// \param[in] retriever To retrieve the shared library from the URI.
+  /// \param[in] dofMap The indices to the degrees-of-freedom that will be
+  /// solved by IkFast. The number of DOFs can be varied depending on the IkFast
+  /// solvers.
+  /// \param[in] freeDofMap The indices to the DOFs that are not solved by the
+  /// IkFast solver. The values of these DOFs should be set properly.
+  /// \param[in] methodName The name of this analytical inverse kinematics
+  /// method.
+  /// \param[in] properties Properties of InverseKinematics::Analytical.
+  SharedLibraryIkFast(
+      InverseKinematics* ik,
+      const common::Uri& uri,
+      common::ResourceRetrieverPtr retriever,
       const std::vector<std::size_t>& dofMap,
       const std::vector<std::size_t>& freeDofMap,
       const std::string& methodName = "IKFast",
@@ -114,8 +140,11 @@ protected:
       ikfast::IkSolutionListBase<IkReal>& solutions);
   using IkFastFuncGetConstCharPtr = const char* (*)();
 
-  /// File path to the ikfast shared library.
-  std::string mFilePath;
+  /// URI path to the ikfast shared library.
+  common::Uri mUri;
+
+  /// Resource retriver to read the URI to the ikfast shared library.
+  common::ResourceRetrieverPtr mRetriever;
 
   mutable std::shared_ptr<common::SharedLibrary> mSharedLibrary;
 

@@ -37,6 +37,7 @@
 
 #include "dart/common/Console.hpp"
 #include "dart/common/SharedLibrary.hpp"
+#include "dart/common/LocalResourceRetriever.hpp"
 #include "dart/dynamics/Skeleton.hpp"
 
 namespace dart {
@@ -77,8 +78,24 @@ SharedLibraryIkFast::SharedLibraryIkFast(
     const std::vector<std::size_t>& freeDofMap,
     const std::string& methodName,
     const InverseKinematics::Analytical::Properties& properties)
+  : SharedLibraryIkFast(
+      ik, filePath, nullptr, dofMap, freeDofMap, methodName, properties)
+{
+  // Do northing
+}
+
+//==============================================================================
+SharedLibraryIkFast::SharedLibraryIkFast(
+    InverseKinematics* ik,
+    const common::Uri& uri,
+    common::ResourceRetrieverPtr retrieverOrNull,
+    const std::vector<std::size_t>& dofMap,
+    const std::vector<std::size_t>& freeDofMap,
+    const std::string& methodName,
+    const InverseKinematics::Analytical::Properties& properties)
   : IkFast{ik, dofMap, freeDofMap, methodName, properties},
-    mFilePath{filePath},
+    mUri{uri},
+    mRetriever{std::move(retrieverOrNull)},
     mSharedLibrary{nullptr},
     mGetNumFreeParameters{nullptr},
     mGetFreeParameters{nullptr},
@@ -89,7 +106,11 @@ SharedLibraryIkFast::SharedLibraryIkFast(
     mGetKinematicsHash{nullptr},
     mGetIkFastVersion{nullptr}
 {
-  auto lib = common::SharedLibrary::create(mFilePath);
+  if (!mRetriever)
+    mRetriever = std::make_shared<common::LocalResourceRetriever>();
+
+  auto lib = common::SharedLibrary::create(uri, mRetriever);
+  const auto mFilePath = mRetriever->getFilePath(uri);
 
   if (!lib)
   {
@@ -134,7 +155,8 @@ auto SharedLibraryIkFast::clone(InverseKinematics* newIK) const
 {
   return dart::common::make_unique<SharedLibraryIkFast>(
       newIK,
-      mFilePath,
+      mUri,
+      mRetriever,
       mDofs,
       mFreeDofs,
       getMethodName(),
