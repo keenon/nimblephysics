@@ -491,12 +491,16 @@ DART_SUPPRESS_DEPRECATED_END
       }
 
       if (joint->isPositionLimitEnforced())
+      {
         mJointLimitConstraints.push_back(
               std::make_shared<JointLimitConstraint>(joint));
+      }
 
       if (joint->getActuatorType() == dynamics::Joint::SERVO)
+      {
         mServoMotorConstraints.push_back(
               std::make_shared<ServoMotorConstraint>(joint));
+      }
     }
   }
 

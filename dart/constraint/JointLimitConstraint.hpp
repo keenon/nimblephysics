@@ -33,6 +33,8 @@
 #ifndef DART_CONSTRAINT_JOINTLIMITCONSTRAINT_HPP_
 #define DART_CONSTRAINT_JOINTLIMITCONSTRAINT_HPP_
 
+#include <vector>
+#include <Eigen/Core>
 #include "dart/constraint/ConstraintBase.hpp"
 
 namespace dart {
@@ -40,45 +42,44 @@ namespace dart {
 namespace dynamics {
 class BodyNode;
 class Joint;
-}  // namespace dynamics
+} // namespace dynamics
 
 namespace constraint {
 
-/// JointLimitConstraint handles joint position or velocity limits
-// TOOD: better naming
+/// JointLimitConstraint handles joint position or velocity limits.
 class JointLimitConstraint : public ConstraintBase
 {
 public:
   /// Constructor
-  explicit JointLimitConstraint(dynamics::Joint* _joint);
+  explicit JointLimitConstraint(dynamics::Joint* joint);
 
   /// Destructor
-  virtual ~JointLimitConstraint();
+  virtual ~JointLimitConstraint() = default;
 
   //----------------------------------------------------------------------------
   // Property settings
   //----------------------------------------------------------------------------
 
   /// Set global error reduction parameter
-  static void setErrorAllowance(double _allowance);
+  static void setErrorAllowance(double allowance);
 
   /// Get global error reduction parameter
   static double getErrorAllowance();
 
   /// Set global error reduction parameter
-  static void setErrorReductionParameter(double _erp);
+  static void setErrorReductionParameter(double erp);
 
   /// Get global error reduction parameter
   static double getErrorReductionParameter();
 
   /// Set global error reduction parameter
-  static void setMaxErrorReductionVelocity(double _erv);
+  static void setMaxErrorReductionVelocity(double erv);
 
   /// Get global error reduction parameter
   static double getMaxErrorReductionVelocity();
 
   /// Set global constraint force mixing parameter
-  static void setConstraintForceMixing(double _cfm);
+  static void setConstraintForceMixing(double cfm);
 
   /// Get global constraint force mixing parameter
   static double getConstraintForceMixing();
@@ -99,13 +100,13 @@ protected:
   void update() override;
 
   // Documentation inherited
-  void getInformation(ConstraintInfo* _lcp) override;
+  void getInformation(ConstraintInfo* lcp) override;
 
   // Documentation inherited
-  void applyUnitImpulse(std::size_t _index) override;
+  void applyUnitImpulse(std::size_t index) override;
 
   // Documentation inherited
-  void getVelocityChange(double* _delVel, bool _withCfm) override;
+  void getVelocityChange(double* delVel, bool withCfm) override;
 
   // Documentation inherited
   void excite() override;
@@ -114,7 +115,7 @@ protected:
   void unexcite() override;
 
   // Documentation inherited
-  void applyImpulse(double* _lambda) override;
+  void applyImpulse(double* lambda) override;
 
   // Documentation inherited
   dynamics::SkeletonPtr getRootSkeleton() const override;
@@ -123,35 +124,33 @@ protected:
   bool isActive() const override;
 
 private:
-  ///
+  /// Joint associated with this constraint.
   dynamics::Joint* mJoint;
 
-  ///
+  /// BodyNode associated with this constraint.
   dynamics::BodyNode* mBodyNode;
 
-  /// Index of applied impulse
+  /// Index of applied impulse.
   std::size_t mAppliedImpulseIndex;
 
-  ///
-  std::size_t mLifeTime[6];
+  /// Number of steps this constraint has been consecutively active.
+  std::vector<std::size_t> mLifeTime;
 
-  ///
-  bool mActive[6];
+  /// Whether this constraint is active.
+  std::vector<bool> mActive;
 
-  ///
-  double mViolation[6];
+  /// Velocity change that should be made to satisfy the constraints.
+  Eigen::VectorXd mTargetVelocityChange;
 
-  ///
-  double mNegativeVel[6];
+  /// Constraint impulse in the previous time step. This is usually used as an
+  /// initial guess by iterative constraint solvers.
+  Eigen::VectorXd mPreviousConstraintImpulse;
 
-  ///
-  double mOldX[6];
+  /// Lower bound of allowed constraint impulse.
+  Eigen::VectorXd mConstraintImpulseLowerBound;
 
-  ///
-  double mUpperBound[6];
-
-  ///
-  double mLowerBound[6];
+  /// Upper bound of allowed constraint impulse.
+  Eigen::VectorXd mConstraintImpulseUpperBound;
 
   /// Global constraint error allowance
   static double mErrorAllowance;
@@ -169,8 +168,7 @@ private:
   static double mConstraintForceMixing;
 };
 
-}  // namespace constraint
-}  // namespace dart
+} // namespace constraint
+} // namespace dart
 
-#endif  // DART_CONSTRAINT_JOINTLIMITCONSTRAINT_HPP_
-
+#endif // DART_CONSTRAINT_JOINTLIMITCONSTRAINT_HPP_
