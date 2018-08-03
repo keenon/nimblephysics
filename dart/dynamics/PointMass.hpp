@@ -67,11 +67,19 @@ public:
     /// Generalized force
     Eigen::Vector3d mForces;
 
+    /// External force.
+    Eigen::Vector3d mExternalForces;
+
+    /// Generalized constraint impulse
+    Eigen::Vector3d mConstraintImpulses;
+
     /// Default constructor
     State(const Eigen::Vector3d& positions = Eigen::Vector3d::Zero(),
           const Eigen::Vector3d& velocities = Eigen::Vector3d::Zero(),
           const Eigen::Vector3d& accelerations = Eigen::Vector3d::Zero(),
-          const Eigen::Vector3d& forces = Eigen::Vector3d::Zero());
+          const Eigen::Vector3d& forces = Eigen::Vector3d::Zero(),
+          const Eigen::Vector3d& extForces = Eigen::Vector3d::Zero(),
+          const Eigen::Vector3d& constraintImpulses = Eigen::Vector3d::Zero());
 
     bool operator==(const State& other) const;
 
@@ -551,91 +559,69 @@ protected:
   /// Index of this PointMass within the SoftBodyNode
   std::size_t mIndex;
 
+  struct DataCache
+  {
+    /// Current position viewed in world frame.
+    Eigen::Vector3d mW;
+
+    /// Current position viewed in parent soft body node frame.
+    Eigen::Vector3d mX;
+
+    /// Current velocity viewed in parent soft body node frame.
+    Eigen::Vector3d mV;
+
+    /// Partial Acceleration of this PointMass
+    Eigen::Vector3d mEta;
+
+    ///
+    Eigen::Vector3d mAlpha;
+
+    ///
+    Eigen::Vector3d mBeta;
+
+    /// Current acceleration viewed in parent body node frame.
+    Eigen::Vector3d mA;
+
+    ///
+    Eigen::Vector3d mF;
+
+    ///
+    double mPsi;
+
+    ///
+    double mImplicitPsi;
+
+    ///
+    double mPi;
+
+    ///
+    double mImplicitPi;
+
+    /// Bias force
+    Eigen::Vector3d mB;
+
+    /// Velocity change due to constraint impulse
+    Eigen::Vector3d mDelV;
+
+    /// Impulsive bias force due to external impulsive force exerted on
+    ///        bodies of the parent skeleton.
+    Eigen::Vector3d mImpB;
+
+    /// Cache data for mImpB
+    Eigen::Vector3d mImpAlpha;
+
+    /// Cache data for mImpB
+    Eigen::Vector3d mImpBeta;
+
+    /// Generalized impulsive body force w.r.t. body frame.
+    Eigen::Vector3d mImpF;
+
+    DataCache();
+  };
+
+  mutable DataCache mCache;
+
   //----------------------------------------------------------------------------
-  // Configuration
-  //----------------------------------------------------------------------------
-
-  /// Derivatives w.r.t. an arbitrary scalr variable
-  Eigen::Vector3d mPositionDeriv;
-
-  //----------------------------------------------------------------------------
-  // Velocity
-  //----------------------------------------------------------------------------
-
-  /// Derivatives w.r.t. an arbitrary scalr variable
-  Eigen::Vector3d mVelocitiesDeriv;
-
-  //----------------------------------------------------------------------------
-  // Acceleration
-  //----------------------------------------------------------------------------
-
-  /// Derivatives w.r.t. an arbitrary scalr variable
-  Eigen::Vector3d mAccelerationsDeriv;
-
-  //----------------------------------------------------------------------------
-  // Force
-  //----------------------------------------------------------------------------
-
-
-  /// Derivatives w.r.t. an arbitrary scalr variable
-  Eigen::Vector3d mForcesDeriv;
-
-  //----------------------------------------------------------------------------
-  // Impulse
-  //----------------------------------------------------------------------------
-
-  /// Change of generalized velocity
-  Eigen::Vector3d mVelocityChanges;
-
-//  /// Generalized impulse
-//  Eigen::Vector3d mImpulse;
-
-  /// Generalized constraint impulse
-  Eigen::Vector3d mConstraintImpulses;
-
-  //----------------------------------------------------------------------------
-
-  /// Current position viewed in world frame.
-  mutable Eigen::Vector3d mW;
-
-  /// Current position viewed in parent soft body node frame.
-  mutable Eigen::Vector3d mX;
-
-  /// Current velocity viewed in parent soft body node frame.
-  mutable Eigen::Vector3d mV;
-
-  /// Partial Acceleration of this PointMass
-  mutable Eigen::Vector3d mEta;
-
-  ///
-  Eigen::Vector3d mAlpha;
-
-  ///
-  Eigen::Vector3d mBeta;
-
-  /// Current acceleration viewed in parent body node frame.
-  mutable Eigen::Vector3d mA;
-
-  ///
-  Eigen::Vector3d mF;
-
-  ///
-  mutable double mPsi;
-
-  ///
-  mutable double mImplicitPsi;
-
-  ///
-  mutable double mPi;
-
-  ///
-  mutable double mImplicitPi;
-
-  /// Bias force
-  Eigen::Vector3d mB;
-
-  /// External force.
-  Eigen::Vector3d mFext;
 
   /// A increasingly sorted list of dependent dof indices.
   std::vector<std::size_t> mDependentGenCoordIndices;
@@ -644,21 +630,6 @@ protected:
   bool mIsColliding;
 
   //------------------------- Impulse-based Dyanmics ---------------------------
-  /// Velocity change due to constraint impulse
-  Eigen::Vector3d mDelV;
-
-  /// Impulsive bias force due to external impulsive force exerted on
-  ///        bodies of the parent skeleton.
-  Eigen::Vector3d mImpB;
-
-  /// Cache data for mImpB
-  Eigen::Vector3d mImpAlpha;
-
-  /// Cache data for mImpB
-  Eigen::Vector3d mImpBeta;
-
-  /// Generalized impulsive body force w.r.t. body frame.
-  Eigen::Vector3d mImpF;
 
   PointMassNotifier* mNotifier;
 };
@@ -685,6 +656,8 @@ public:
   void dirtyTransform() override;
   void dirtyVelocity() override;
   void dirtyAcceleration() override;
+  void dirtyVelocityChange();
+
 
   // Documentation inherited
   const std::string& setName(const std::string& _name) override;

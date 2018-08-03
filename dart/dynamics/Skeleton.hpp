@@ -687,7 +687,11 @@ public:
 
   /// \brief Update velocity changes in body nodes and joints due to applied
   /// impulse
-  void updateVelocityChange();
+  void updateVelocityChange() const;
+
+  /// \brief Update velocity changes in body nodes and joints due to applied
+  /// impulse for a specific tree
+  void updateVelocityChange(std::size_t tree) const;
 
   // TODO(JS): Better naming
   /// Set whether this skeleton is constrained. ConstraintSolver will
@@ -881,6 +885,9 @@ public:
   /// Notify that the articulated inertia and everything that depends on it
   /// needs to be updated
   void dirtyArticulatedInertia(std::size_t _treeIdx);
+
+  /// Notify the velocity change that it needs an update
+  void dirtyVelocityChange(std::size_t _treeIdx);
 
   /// Notify that the support polygon of a tree needs to be updated
   DART_DEPRECATED(6.2)
@@ -1197,6 +1204,9 @@ protected:
 
     /// Dirty flag for the damping force vector.
     bool mDampingForces;
+
+    /// Dirty flag for velocity change
+    bool mDelV;
 
     /// Dirty flag for the support polygon
     bool mSupport;

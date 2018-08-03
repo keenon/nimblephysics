@@ -43,20 +43,23 @@ using namespace Eigen;
 namespace dart {
 namespace dynamics {
 
-#define RETURN_FALSE_IF_OTHER_IS_EQUAL( X )\
+#define RETURN_FALSE_IF_OTHER_IS_INEQUAL( X )\
   if( other. X != X )\
     return false;
 
 //==============================================================================
-PointMass::State::State(
-    const Vector3d& positions,
+PointMass::State::State(const Vector3d& positions,
     const Vector3d& velocities,
     const Vector3d& accelerations,
-    const Vector3d& forces)
+    const Vector3d& forces,
+    const Vector3d& extForces,
+    const Vector3d& constraintImpulses)
   : mPositions(positions),
     mVelocities(velocities),
     mAccelerations(accelerations),
-    mForces(forces)
+    mForces(forces),
+    mExternalForces(extForces),
+    mConstraintImpulses(constraintImpulses)
 {
   // Do nothing
 }
@@ -64,10 +67,12 @@ PointMass::State::State(
 //==============================================================================
 bool PointMass::State::operator ==(const PointMass::State& other) const
 {
-  RETURN_FALSE_IF_OTHER_IS_EQUAL(mPositions);
-  RETURN_FALSE_IF_OTHER_IS_EQUAL(mVelocities);
-  RETURN_FALSE_IF_OTHER_IS_EQUAL(mAccelerations);
-  RETURN_FALSE_IF_OTHER_IS_EQUAL(mForces);
+  RETURN_FALSE_IF_OTHER_IS_INEQUAL(mPositions);
+  RETURN_FALSE_IF_OTHER_IS_INEQUAL(mVelocities);
+  RETURN_FALSE_IF_OTHER_IS_INEQUAL(mAccelerations);
+  RETURN_FALSE_IF_OTHER_IS_INEQUAL(mForces);
+  RETURN_FALSE_IF_OTHER_IS_INEQUAL(mExternalForces);
+  RETURN_FALSE_IF_OTHER_IS_INEQUAL(mConstraintImpulses);
 
   return true;
 }
@@ -115,17 +120,17 @@ void PointMass::Properties::setMass(double _mass)
 //==============================================================================
 bool PointMass::Properties::operator ==(const PointMass::Properties& other) const
 {
-  RETURN_FALSE_IF_OTHER_IS_EQUAL(mX0);
-  RETURN_FALSE_IF_OTHER_IS_EQUAL(mMass);
-  RETURN_FALSE_IF_OTHER_IS_EQUAL(mConnectedPointMassIndices);
-  RETURN_FALSE_IF_OTHER_IS_EQUAL(mPositionLowerLimits);
-  RETURN_FALSE_IF_OTHER_IS_EQUAL(mPositionUpperLimits);
-  RETURN_FALSE_IF_OTHER_IS_EQUAL(mVelocityLowerLimits);
-  RETURN_FALSE_IF_OTHER_IS_EQUAL(mVelocityUpperLimits);
-  RETURN_FALSE_IF_OTHER_IS_EQUAL(mAccelerationLowerLimits);
-  RETURN_FALSE_IF_OTHER_IS_EQUAL(mAccelerationUpperLimits);
-  RETURN_FALSE_IF_OTHER_IS_EQUAL(mForceLowerLimits);
-  RETURN_FALSE_IF_OTHER_IS_EQUAL(mForceUpperLimits);
+  RETURN_FALSE_IF_OTHER_IS_INEQUAL(mX0);
+  RETURN_FALSE_IF_OTHER_IS_INEQUAL(mMass);
+  RETURN_FALSE_IF_OTHER_IS_INEQUAL(mConnectedPointMassIndices);
+  RETURN_FALSE_IF_OTHER_IS_INEQUAL(mPositionLowerLimits);
+  RETURN_FALSE_IF_OTHER_IS_INEQUAL(mPositionUpperLimits);
+  RETURN_FALSE_IF_OTHER_IS_INEQUAL(mVelocityLowerLimits);
+  RETURN_FALSE_IF_OTHER_IS_INEQUAL(mVelocityUpperLimits);
+  RETURN_FALSE_IF_OTHER_IS_INEQUAL(mAccelerationLowerLimits);
+  RETURN_FALSE_IF_OTHER_IS_INEQUAL(mAccelerationUpperLimits);
+  RETURN_FALSE_IF_OTHER_IS_INEQUAL(mForceLowerLimits);
+  RETURN_FALSE_IF_OTHER_IS_INEQUAL(mForceUpperLimits);
 
   // Nothing was inequal, so we return true
   return true;
@@ -141,33 +146,7 @@ bool PointMass::Properties::operator !=(const PointMass::Properties& other) cons
 PointMass::PointMass(SoftBodyNode* _softBodyNode)
   : // mIndexInSkeleton(Eigen::Matrix<std::size_t, 3, 1>::Zero()),
     mParentSoftBodyNode(_softBodyNode),
-    mPositionDeriv(Eigen::Vector3d::Zero()),
-    mVelocitiesDeriv(Eigen::Vector3d::Zero()),
-    mAccelerationsDeriv(Eigen::Vector3d::Zero()),
-    mForcesDeriv(Eigen::Vector3d::Zero()),
-    mVelocityChanges(Eigen::Vector3d::Zero()),
-    // mImpulse(Eigen::Vector3d::Zero()),
-    mConstraintImpulses(Eigen::Vector3d::Zero()),
-    mW(Eigen::Vector3d::Zero()),
-    mX(Eigen::Vector3d::Zero()),
-    mV(Eigen::Vector3d::Zero()),
-    mEta(Eigen::Vector3d::Zero()),
-    mAlpha(Eigen::Vector3d::Zero()),
-    mBeta(Eigen::Vector3d::Zero()),
-    mA(Eigen::Vector3d::Zero()),
-    mF(Eigen::Vector3d::Zero()),
-    mPsi(0.0),
-    mImplicitPsi(0.0),
-    mPi(0.0),
-    mImplicitPi(0.0),
-    mB(Eigen::Vector3d::Zero()),
-    mFext(Eigen::Vector3d::Zero()),
     mIsColliding(false),
-    mDelV(Eigen::Vector3d::Zero()),
-    mImpB(Eigen::Vector3d::Zero()),
-    mImpAlpha(Eigen::Vector3d::Zero()),
-    mImpBeta(Eigen::Vector3d::Zero()),
-    mImpF(Eigen::Vector3d::Zero()),
     mNotifier(_softBodyNode->mNotifier)
 {
   assert(mParentSoftBodyNode != nullptr);
@@ -469,7 +448,10 @@ void PointMass::setVelocityChange(std::size_t _index, double _velocityChange)
 {
   assert(_index < 3);
 
-  mVelocityChanges[_index] = _velocityChange;
+  // TODO(MXG): This just seems to get clobbered by updateVelocityChange(), so
+  // what is this supposed to be good for? It doesn't seem to be used anywhere,
+  // so we should consider removing it.
+  getState().mVelocityChanges[_index] = _velocityChange;
 }
 
 //==============================================================================
@@ -477,13 +459,14 @@ double PointMass::getVelocityChange(std::size_t _index)
 {
   assert(_index < 3);
 
-  return mVelocityChanges[_index];
+  return getState().mVelocityChanges[_index];
 }
 
 //==============================================================================
 void PointMass::resetVelocityChanges()
 {
-  mVelocityChanges.setZero();
+  getState().mVelocityChanges.setZero();
+  mNotifier->dirtyVelocityChange();
 }
 
 //==============================================================================
@@ -491,7 +474,7 @@ void PointMass::setConstraintImpulse(std::size_t _index, double _impulse)
 {
   assert(_index < 3);
 
-  mConstraintImpulses[_index] = _impulse;
+  getState().mConstraintImpulses[_index] = _impulse;
 }
 
 //==============================================================================
@@ -525,19 +508,19 @@ void PointMass::addExtForce(const Eigen::Vector3d& _force, bool _isForceLocal)
 {
   if (_isForceLocal)
   {
-    mFext += _force;
+    getState().mFext += _force;
   }
   else
   {
-    mFext += mParentSoftBodyNode->getWorldTransform().linear().transpose()
-             * _force;
+    getState().mFext +=
+        mParentSoftBodyNode->getWorldTransform().linear().transpose() * _force;
   }
 }
 
 //==============================================================================
 void PointMass::clearExtForce()
 {
-  mFext.setZero();
+  getState().mFext.setZero();
 }
 
 //==============================================================================
@@ -546,13 +529,13 @@ void PointMass::setConstraintImpulse(const Eigen::Vector3d& _constImp,
 {
   if (_isLocal)
   {
-    mConstraintImpulses = _constImp;
+    getState().mConstraintImpulses = _constImp;
   }
   else
   {
     const Matrix3d Rt
         = mParentSoftBodyNode->getWorldTransform().linear().transpose();
-    mConstraintImpulses = Rt * _constImp;
+    getState().mConstraintImpulses = Rt * _constImp;
   }
 }
 
@@ -562,27 +545,27 @@ void PointMass::addConstraintImpulse(const Eigen::Vector3d& _constImp,
 {
   if (_isLocal)
   {
-    mConstraintImpulses += _constImp;
+    getState().mConstraintImpulses += _constImp;
   }
   else
   {
     const Matrix3d Rt
         = mParentSoftBodyNode->getWorldTransform().linear().transpose();
-    mConstraintImpulses.noalias() += Rt * _constImp;
+    getState().mConstraintImpulses.noalias() += Rt * _constImp;
   }
 }
 
 //==============================================================================
 Eigen::Vector3d PointMass::getConstraintImpulses() const
 {
-  return mConstraintImpulses;
+  return getState().mConstraintImpulses;
 }
 
 //==============================================================================
 void PointMass::clearConstraintImpulse()
 {
   assert(getNumDofs() == 3);
-  mConstraintImpulses.setZero();
+  getState().mConstraintImpulses.setZero();
   mDelV.setZero();
   mImpB.setZero();
   mImpAlpha.setZero();
@@ -1077,6 +1060,30 @@ void PointMass::aggregateExternalForces(VectorXd& /*_Fext*/)
 }
 
 //==============================================================================
+PointMass::DataCache::DataCache()
+  : mW(Eigen::Vector3d::Zero()),
+    mX(Eigen::Vector3d::Zero()),
+    mV(Eigen::Vector3d::Zero()),
+    mEta(Eigen::Vector3d::Zero()),
+    mAlpha(Eigen::Vector3d::Zero()),
+    mBeta(Eigen::Vector3d::Zero()),
+    mA(Eigen::Vector3d::Zero()),
+    mF(Eigen::Vector3d::Zero()),
+    mPsi(0.0),
+    mImplicitPsi(0.0),
+    mPi(0.0),
+    mImplicitPi(0.0),
+    mB(Eigen::Vector3d::Zero()),
+    mDelV(Eigen::Vector3d::Zero()),
+    mImpB(Eigen::Vector3d::Zero()),
+    mImpAlpha(Eigen::Vector3d::Zero()),
+    mImpBeta(Eigen::Vector3d::Zero()),
+    mImpF(Eigen::Vector3d::Zero())
+{
+  // Do nothing
+}
+
+//==============================================================================
 PointMassNotifier::PointMassNotifier(SoftBodyNode* _parentSoftBody,
                                      const std::string& _name)
   : Entity(_parentSoftBody, false),
@@ -1142,6 +1149,12 @@ void PointMassNotifier::dirtyVelocity()
 void PointMassNotifier::dirtyAcceleration()
 {
   mNeedAccelerationUpdate = true;
+}
+
+//==============================================================================
+void PointMassNotifier::dirtyVelocityChange()
+{
+  mParentSoftBodyNode->dirtyVelocityChange();
 }
 
 //==============================================================================

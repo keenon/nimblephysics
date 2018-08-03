@@ -711,7 +711,7 @@ void ZeroDofJoint::addVelocityTo(Eigen::Vector6d& /*_vel*/)
 }
 
 //==============================================================================
-void ZeroDofJoint::addVelocityChangeTo(Eigen::Vector6d& /*_velocityChange*/)
+void ZeroDofJoint::addVelocityChangeTo(Eigen::Vector6d& /*_velocityChange*/) const
 {
   // Do nothing
 }
@@ -819,7 +819,7 @@ void ZeroDofJoint::updateAcceleration(const Eigen::Matrix6d& /*_artInertia*/,
 //==============================================================================
 void ZeroDofJoint::updateVelocityChange(
     const Eigen::Matrix6d& /*_artInertia*/,
-    const Eigen::Vector6d& /*_velocityChange*/)
+    const Eigen::Vector6d& /*_velocityChange*/) const
 {
   // Do nothing
 }

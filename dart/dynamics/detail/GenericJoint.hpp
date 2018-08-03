@@ -1310,6 +1310,7 @@ void GenericJoint<ConfigSpaceT>::setVelocityChange(
   }
 
   mVelocityChanges[index] = velocityChange;
+  this->getSkeleton()->dirtyVelocityChange();
 }
 
 //==============================================================================
@@ -1330,6 +1331,7 @@ template <class ConfigSpaceT>
 void GenericJoint<ConfigSpaceT>::resetVelocityChanges()
 {
   mVelocityChanges.setZero();
+  this->getSkeleton()->dirtyVelocityChange();
 }
 
 //==============================================================================
@@ -1714,7 +1716,7 @@ void GenericJoint<ConfigSpaceT>::addAccelerationTo(
 //==============================================================================
 template <class ConfigSpaceT>
 void GenericJoint<ConfigSpaceT>::addVelocityChangeTo(
-    Eigen::Vector6d& velocityChange)
+    Eigen::Vector6d& velocityChange) const
 {
   // Add joint velocity change to velocityChange
   velocityChange.noalias() += getRelativeJacobianStatic() * mVelocityChanges;
@@ -2280,7 +2282,7 @@ void GenericJoint<ConfigSpaceT>::updateAccelerationKinematic(
 template <class ConfigSpaceT>
 void GenericJoint<ConfigSpaceT>::updateVelocityChange(
     const Eigen::Matrix6d& artInertia,
-    const Eigen::Vector6d& velocityChange)
+    const Eigen::Vector6d& velocityChange) const
 {
   switch (Joint::mAspectProperties.mActuatorType)
   {
@@ -2310,10 +2312,12 @@ void GenericJoint<ConfigSpaceT>::updateVelocityChangeDynamic(
   mVelocityChanges
       = getInvProjArtInertia()
       * (mTotalImpulse - getRelativeJacobianStatic().transpose()
-         *artInertia*math::AdInvT(this->getRelativeTransform(), velocityChange));
+         *artInertia*math::AdInvT(this->getRelativeTransform(),
+                                  velocityChange));
 
   // Verification
   assert(!math::isNan(mVelocityChanges));
+  this->getSkeleton()->dirtyVelocityChange();
 }
 
 //==============================================================================

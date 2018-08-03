@@ -585,26 +585,26 @@ void SoftBodyNode::updateTransmittedForceID(const Eigen::Vector3d& _gravity,
 
   // Gravity force
   if (BodyNode::mAspectProperties.mGravityMode == true)
-    mFgravity.noalias() = mI * math::AdInvRLinear(getWorldTransform(),_gravity);
+    mCache.mFgravity.noalias() = mI * math::AdInvRLinear(getWorldTransform(),_gravity);
   else
-    mFgravity.setZero();
+    mCache.mFgravity.setZero();
 
   // Inertial force
-  mF.noalias() = mI * getSpatialAcceleration();
+  mCache.mF.noalias() = mI * getSpatialAcceleration();
 
   // External force
   if (_withExternalForces)
-    mF -= BodyNode::mAspectState.mFext;
+    mCache.mF -= BodyNode::mAspectState.mFext;
 
   // Verification
   assert(!math::isNan(mF));
 
   // Gravity force
-  mF -= mFgravity;
+  mCache.mF -= mCache.mFgravity;
 
   // Coriolis force
   const Eigen::Vector6d& V = getSpatialVelocity();
-  mF -= math::dad(V, mI * V);
+  mCache.mF -= math::dad(V, mI * V);
 
   //
   for (const auto& childBodyNode : mChildBodyNodes)
@@ -612,13 +612,13 @@ void SoftBodyNode::updateTransmittedForceID(const Eigen::Vector3d& _gravity,
     Joint* childJoint = childBodyNode->getParentJoint();
     assert(childJoint != nullptr);
 
-    mF += math::dAdInvT(childJoint->getRelativeTransform(),
+    mCache.mF += math::dAdInvT(childJoint->getRelativeTransform(),
                         childBodyNode->getBodyForce());
   }
   for (auto& pointMass : mPointMasses)
   {
-    mF.head<3>() += pointMass->getLocalPosition().cross(pointMass->mF);
-    mF.tail<3>() += pointMass->mF;
+    mCache.mF.head<3>() += pointMass->getLocalPosition().cross(pointMass->mF);
+    mCache.mF.tail<3>() += pointMass->mF;
   }
 
   // Verification
@@ -934,7 +934,7 @@ void SoftBodyNode::aggregateAugMassMatrix(Eigen::MatrixXd& _MCol, std::size_t _c
 }
 
 //==============================================================================
-void SoftBodyNode::updateInvMassMatrix()
+void SoftBodyNode::updateInvMassMatrix() const
 {
   //------------------------ PointMass Part ------------------------------------
   for (std::size_t i = 0; i < mPointMasses.size(); ++i)
@@ -1075,8 +1075,9 @@ void SoftBodyNode::aggregateCoriolisForceVector(Eigen::VectorXd& _C)
 }
 
 //==============================================================================
-void SoftBodyNode::aggregateGravityForceVector(Eigen::VectorXd& _g,
-                                               const Eigen::Vector3d& _gravity)
+void SoftBodyNode::aggregateGravityForceVector(
+    Eigen::VectorXd& _g,
+    const Eigen::Vector3d& _gravity) const
 {
   const Eigen::Matrix6d& mI =
       BodyNode::mAspectProperties.mInertia.getSpatialTensor();

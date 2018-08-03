@@ -2922,7 +2922,7 @@ void Skeleton::updateInvMassMatrix(std::size_t _treeIdx) const
     cache.mDofs[j]->setForce(1.0);
 
     // Prepare cache data
-    for (std::vector<BodyNode*>::const_reverse_iterator it =
+    for (std::vector<const BodyNode*>::const_reverse_iterator it =
          cache.mBodyNodes.rbegin(); it != cache.mBodyNodes.rend(); ++it)
     {
       (*it)->updateInvMassMatrix();
@@ -3099,13 +3099,13 @@ void Skeleton::updateCoriolisForces(std::size_t _treeIdx) const
 
   cache.mCvec.setZero();
 
-  for (std::vector<BodyNode*>::const_iterator it = cache.mBodyNodes.begin();
-       it != cache.mBodyNodes.end(); ++it)
+  for (std::vector<const BodyNode*>::const_iterator it =
+       cache.mBodyNodes.begin(); it != cache.mBodyNodes.end(); ++it)
   {
     (*it)->updateCombinedVector();
   }
 
-  for (std::vector<BodyNode*>::const_reverse_iterator it =
+  for (std::vector<const BodyNode*>::const_reverse_iterator it =
        cache.mBodyNodes.rbegin(); it != cache.mBodyNodes.rend(); ++it)
   {
     (*it)->aggregateCoriolisForceVector(cache.mCvec);
@@ -3207,13 +3207,13 @@ void Skeleton::updateCoriolisAndGravityForces(std::size_t _treeIdx) const
 
   cache.mCg.setZero();
 
-  for (std::vector<BodyNode*>::const_iterator it = cache.mBodyNodes.begin();
-       it != cache.mBodyNodes.end(); ++it)
+  for (std::vector<const BodyNode*>::const_iterator it =
+       cache.mBodyNodes.begin(); it != cache.mBodyNodes.end(); ++it)
   {
     (*it)->updateCombinedVector();
   }
 
-  for (std::vector<BodyNode*>::const_reverse_iterator it =
+  for (std::vector<const BodyNode*>::const_reverse_iterator it =
        cache.mBodyNodes.rbegin(); it != cache.mBodyNodes.rend(); ++it)
   {
     (*it)->aggregateCombinedVector(cache.mCg, mAspectProperties.mGravity);
@@ -3622,6 +3622,13 @@ void Skeleton::dirtyArticulatedInertia(std::size_t _treeIdx)
   SET_FLAG(_treeIdx, mCoriolisForces);
   SET_FLAG(_treeIdx, mGravityForces);
   SET_FLAG(_treeIdx, mCoriolisAndGravityForces);
+  SET_FLAG(_treeIdx, mDelV);
+}
+
+//==============================================================================
+void Skeleton::dirtyVelocityChange(std::size_t _treeIdx)
+{
+  SET_FLAG(_treeIdx, mDelV);
 }
 
 //==============================================================================
@@ -3798,10 +3805,19 @@ void Skeleton::updateBiasImpulse(SoftBodyNode* _softBodyNode,
 }
 
 //==============================================================================
-void Skeleton::updateVelocityChange()
+void Skeleton::updateVelocityChange() const
 {
-  for (auto& bodyNode : mSkelCache.mBodyNodes)
+  for (std::size_t i = 0; i < mTreeCache.size(); ++i)
+    updateVelocityChange(i);
+}
+
+//==============================================================================
+void Skeleton::updateVelocityChange(const std::size_t tree) const
+{
+  for (auto& bodyNode : mTreeCache[tree].mBodyNodes)
     bodyNode->updateVelocityChangeFD();
+
+  mTreeCache[tree].mDirty.mDelV = false;
 }
 
 //==============================================================================

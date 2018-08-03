@@ -815,7 +815,7 @@ protected:
   virtual void addAccelerationTo(Eigen::Vector6d& _acc) = 0;
 
   /// Add joint velocity change to _velocityChange
-  virtual void addVelocityChangeTo(Eigen::Vector6d& _velocityChange) = 0;
+  virtual void addVelocityChangeTo(Eigen::Vector6d& _velocityChange) const = 0;
 
   /// Add child's articulated inertia to parent's one
   virtual void addChildArtInertiaTo(
@@ -871,7 +871,7 @@ protected:
   /// \param _velocityChange
   virtual void updateVelocityChange(
       const Eigen::Matrix6d& _artInertia,
-      const Eigen::Vector6d& _velocityChange) = 0;
+      const Eigen::Vector6d& _velocityChange) const = 0;
 
   /// Update joint force for inverse dynamics.
   /// \param[in] _bodyForce Transmitting spatial body force from the parent

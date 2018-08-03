@@ -554,7 +554,7 @@ const math::Inertia& BodyNode::getArticulatedInertia() const
   if( skel && CHECK_FLAG(mArticulatedInertia) )
     skel->updateArticulatedInertia(mTreeIndex);
 
-  return mArtInertia;
+  return mCache.mArtInertia;
 }
 
 //==============================================================================
@@ -564,7 +564,7 @@ const math::Inertia& BodyNode::getArticulatedInertiaImplicit() const
   if( skel && CHECK_FLAG(mArticulatedInertia) )
     skel->updateArticulatedInertia(mTreeIndex);
 
-  return mArtInertiaImplicit;
+  return mCache.mArtInertiaImplicit;
 }
 
 //==============================================================================
@@ -1083,10 +1083,10 @@ const Eigen::Vector6d& BodyNode::getPrimaryRelativeAcceleration() const
 //==============================================================================
 const Eigen::Vector6d& BodyNode::getPartialAcceleration() const
 {
-  if(mIsPartialAccelerationDirty)
+  if(mCache.mDirty.mPartialAcceleration)
     updatePartialAcceleration();
 
-  return mPartialAcceleration;
+  return mCache.mPartialAcceleration;
 }
 
 //==============================================================================
@@ -1095,7 +1095,7 @@ const math::Jacobian& BodyNode::getJacobian() const
   if (mIsBodyJacobianDirty)
     updateBodyJacobian();
 
-  return mBodyJacobian;
+  return mCache.mBodyJacobian;
 }
 
 //==============================================================================
@@ -1104,7 +1104,7 @@ const math::Jacobian& BodyNode::getWorldJacobian() const
   if(mIsWorldJacobianDirty)
     updateWorldJacobian();
 
-  return mWorldJacobian;
+  return mCache.mWorldJacobian;
 }
 
 //==============================================================================
@@ -1113,7 +1113,7 @@ const math::Jacobian& BodyNode::getJacobianSpatialDeriv() const
   if(mIsBodyJacobianSpatialDerivDirty)
     updateBodyJacobianSpatialDeriv();
 
-  return mBodyJacobianSpatialDeriv;
+  return mCache.mBodyJacobianSpatialDeriv;
 }
 
 //==============================================================================
@@ -1122,13 +1122,17 @@ const math::Jacobian& BodyNode::getJacobianClassicDeriv() const
   if(mIsWorldJacobianClassicDerivDirty)
     updateWorldJacobianClassicDeriv();
 
-  return mWorldJacobianClassicDeriv;
+  return mCache.mWorldJacobianClassicDeriv;
 }
 
 //==============================================================================
 const Eigen::Vector6d& BodyNode::getBodyVelocityChange() const
 {
-  return mDelV;
+  const ConstSkeletonPtr& skel = getSkeleton();
+  if( skel && CHECK_FLAG(mDelV) )
+    skel->updateVelocityChange(mTreeIndex);
+
+  return mCache.mDelV;
 }
 
 //==============================================================================
@@ -1360,10 +1364,10 @@ void BodyNode::init(const SkeletonPtr& _skeleton)
   // Set dimensions of dynamics matrices and vectors.
   //--------------------------------------------------------------------------
   std::size_t numDepGenCoords = getNumDependentGenCoords();
-  mBodyJacobian.setZero(6, numDepGenCoords);
-  mWorldJacobian.setZero(6, numDepGenCoords);
-  mBodyJacobianSpatialDeriv.setZero(6, numDepGenCoords);
-  mWorldJacobianClassicDeriv.setZero(6, numDepGenCoords);
+  mCache.mBodyJacobian.setZero(6, numDepGenCoords);
+  mCache.mWorldJacobian.setZero(6, numDepGenCoords);
+  mCache.mBodyJacobianSpatialDeriv.setZero(6, numDepGenCoords);
+  mCache.mWorldJacobianClassicDeriv.setZero(6, numDepGenCoords);
   dirtyTransform();
 }
 
@@ -1539,8 +1543,15 @@ void BodyNode::notifyCoriolisUpdate()
 //==============================================================================
 void BodyNode::dirtyCoriolisForces()
 {
-  SKEL_SET_FLAGS(mCoriolisForces);
-  SKEL_SET_FLAGS(mCoriolisAndGravityForces);
+  const SkeletonPtr& skel = getSkeleton();
+  SET_FLAGS(mCoriolisForces);
+  SET_FLAGS(mCoriolisAndGravityForces);
+}
+
+//==============================================================================
+void BodyNode::dirtyVelocityChange()
+{
+  SKEL_SET_FLAGS(mDelV);
 }
 
 //==============================================================================
@@ -1724,7 +1735,7 @@ void BodyNode::updateTransmittedForceFD()
 void BodyNode::updateTransmittedImpulse()
 {
   mImpF = mBiasImpulse;
-  mImpF.noalias() += getArticulatedInertia() * mDelV;
+  mImpF.noalias() += getArticulatedInertia() * mCache.mDelV;
 
   assert(!math::isNan(mImpF));
 }
@@ -1750,17 +1761,18 @@ void BodyNode::updateAccelerationFD()
 }
 
 //==============================================================================
-void BodyNode::updateVelocityChangeFD()
+void BodyNode::updateVelocityChangeFD() const
 {
   if (mParentBodyNode)
   {
+    const Eigen::Vector6d& parentDelV = mParentBodyNode->mCache.mDelV;
+
     // Update joint velocity change
-    mParentJoint->updateVelocityChange(getArticulatedInertia(),
-                                       mParentBodyNode->mDelV);
+    mParentJoint->updateVelocityChange(getArticulatedInertia(), parentDelV);
 
     // Transmit spatial acceleration of parent body to this body
-    mDelV = math::AdInvT(mParentJoint->getRelativeTransform(),
-                         mParentBodyNode->mDelV);
+    mCache.mDelV = math::AdInvT(mParentJoint->getRelativeTransform(),
+                                parentDelV);
   }
   else
   {
@@ -1769,14 +1781,14 @@ void BodyNode::updateVelocityChangeFD()
                                        Eigen::Vector6d::Zero());
 
     // Transmit spatial acceleration of parent body to this body
-    mDelV.setZero();
+    mCache.mDelV.setZero();
   }
 
   // Add parent joint's acceleration to this body
-  mParentJoint->addVelocityChangeTo(mDelV);
+  mParentJoint->addVelocityChangeTo(mCache.mDelV);
 
   // Verify the spatial velocity change of this body
-  assert(!math::isNan(mDelV));
+  assert(!math::isNan(mCache.mDelV));
 }
 
 //==============================================================================
@@ -1990,8 +2002,9 @@ void BodyNode::aggregateCoriolisForceVector(Eigen::VectorXd& _C)
 }
 
 //==============================================================================
-void BodyNode::aggregateGravityForceVector(Eigen::VectorXd& _g,
-                                           const Eigen::Vector3d& _gravity)
+void BodyNode::aggregateGravityForceVector(
+    Eigen::VectorXd& _g,
+    const Eigen::Vector3d& _gravity) const
 {
   const Eigen::Matrix6d& mI = mAspectProperties.mInertia.getSpatialTensor();
   if (mAspectProperties.mGravityMode == true)
@@ -2016,7 +2029,7 @@ void BodyNode::aggregateGravityForceVector(Eigen::VectorXd& _g,
 }
 
 //==============================================================================
-void BodyNode::updateCombinedVector()
+void BodyNode::updateCombinedVector() const
 {
   if (mParentBodyNode)
   {
@@ -2077,7 +2090,8 @@ void BodyNode::aggregateExternalForces(Eigen::VectorXd& _Fext)
   std::size_t nGenCoords = mParentJoint->getNumDofs();
   if (nGenCoords > 0)
   {
-    Eigen::VectorXd Fext = mParentJoint->getRelativeJacobian().transpose()*mFext_F;
+    Eigen::VectorXd Fext =
+        mParentJoint->getRelativeJacobian().transpose()*mFext_F;
     std::size_t iStart = mParentJoint->getIndexInTree(0);
     _Fext.segment(iStart, nGenCoords) = Fext;
   }
@@ -2094,8 +2108,9 @@ void BodyNode::aggregateSpatialToGeneralized(Eigen::VectorXd& _generalized,
   for (std::vector<BodyNode*>::const_iterator it = mChildBodyNodes.begin();
        it != mChildBodyNodes.end(); ++it)
   {
-    mArbitrarySpatial += math::dAdInvT((*it)->mParentJoint->getRelativeTransform(),
-                                       (*it)->mArbitrarySpatial);
+    mArbitrarySpatial += math::dAdInvT(
+          (*it)->mParentJoint->getRelativeTransform(),
+          (*it)->mArbitrarySpatial);
   }
 
   // Project the spatial quantity to generalized coordinates
@@ -2202,7 +2217,7 @@ void BodyNode::aggregateAugMassMatrix(Eigen::MatrixXd& _MCol, std::size_t _col,
 }
 
 //==============================================================================
-void BodyNode::updateInvMassMatrix()
+void BodyNode::updateInvMassMatrix() const
 {
   //
   mInvM_c.setZero();

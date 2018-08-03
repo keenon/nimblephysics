@@ -431,7 +431,7 @@ protected:
   void addAccelerationTo(Eigen::Vector6d& _acc) override;
 
   // Documentation inherited
-  void addVelocityChangeTo(Eigen::Vector6d& _velocityChange) override;
+  void addVelocityChangeTo(Eigen::Vector6d& _velocityChange) const override;
 
   // Documentation inherited
   void addChildArtInertiaTo(
@@ -484,7 +484,7 @@ protected:
   // Documentation inherited
   void updateVelocityChange(
       const Eigen::Matrix6d& _artInertia,
-      const Eigen::Vector6d& _velocityChange) override;
+      const Eigen::Vector6d& _velocityChange) const override;
 
   // Documentation inherited
   void updateForceID(const Eigen::Vector6d& _bodyForce,

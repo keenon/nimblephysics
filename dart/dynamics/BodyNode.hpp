@@ -857,12 +857,15 @@ public:
   /// Tell the Skeleton that the external forces need to be updated
   void dirtyExternalForces();
 
-  /// Tell the Skeleton that the coriolis forces need to be update
+  /// Tell the Skeleton that the coriolis forces need to be updated
   DART_DEPRECATED(6.2)
   void notifyCoriolisUpdate();
 
-  /// Tell the Skeleton that the coriolis forces need to be update
+  /// Tell the Skeleton that the coriolis forces need to be updated
   void dirtyCoriolisForces();
+
+  /// Tell the Skeleton that the velocity change needs to be updated
+  void dirtyVelocityChange();
 
   //----------------------------------------------------------------------------
   // Friendship
@@ -941,7 +944,7 @@ protected:
   virtual void updateAccelerationFD();
 
   /// Update spatical body velocity change for impluse-based forward dynamics.
-  virtual void updateVelocityChangeFD();
+  virtual void updateVelocityChangeFD() const;
 
   /// Update spatial body force for inverse dynamics.
   ///
@@ -997,7 +1000,7 @@ protected:
                                       double _timeStep);
 
   ///
-  virtual void updateInvMassMatrix();
+  virtual void updateInvMassMatrix() const;
   virtual void updateInvAugMassMatrix();
   virtual void aggregateInvMassMatrix(Eigen::MatrixXd& _InvMCol, std::size_t _col);
   virtual void aggregateInvAugMassMatrix(Eigen::MatrixXd& _InvMCol, std::size_t _col,
@@ -1007,11 +1010,12 @@ protected:
   virtual void aggregateCoriolisForceVector(Eigen::VectorXd& _C);
 
   ///
-  virtual void aggregateGravityForceVector(Eigen::VectorXd& _g,
-                                           const Eigen::Vector3d& _gravity);
+  virtual void aggregateGravityForceVector(
+      Eigen::VectorXd& _g,
+      const Eigen::Vector3d& _gravity) const;
 
   ///
-  virtual void updateCombinedVector();
+  virtual void updateCombinedVector() const;
   virtual void aggregateCombinedVector(Eigen::VectorXd& _Cg,
                                        const Eigen::Vector3d& _gravity);
 
@@ -1095,95 +1099,109 @@ protected:
   /// Same as mDependentDofs, but holds const pointers
   std::vector<const DegreeOfFreedom*> mConstDependentDofs;
 
-  //--------------------------------------------------------------------------
-  // Dynamical Properties
-  //--------------------------------------------------------------------------
+  struct DirtyFlags
+  {
+    /// Is the partial acceleration vector dirty
+    bool mPartialAcceleration;
+  };
 
-  /// Body Jacobian
-  ///
-  /// Do not use directly! Use getJacobian() to access this quantity
-  mutable math::Jacobian mBodyJacobian;
+  struct DataCache
+  {
+    //--------------------------------------------------------------------------
+    // Dynamical Properties
+    //--------------------------------------------------------------------------
 
-  /// Cached World Jacobian
-  ///
-  /// Do not use directly! Use getJacobian() to access this quantity
-  mutable math::Jacobian mWorldJacobian;
+    /// Body Jacobian
+    ///
+    /// Do not use directly! Use getJacobian() to access this quantity
+    math::Jacobian mBodyJacobian;
 
-  /// Spatial time derivative of body Jacobian.
-  ///
-  /// Do not use directly! Use getJacobianSpatialDeriv() to access this quantity
-  mutable math::Jacobian mBodyJacobianSpatialDeriv;
+    /// Cached World Jacobian
+    ///
+    /// Do not use directly! Use getJacobian() to access this quantity
+    math::Jacobian mWorldJacobian;
 
-  /// Classic time derivative of Body Jacobian
-  ///
-  /// Do not use directly! Use getJacobianClassicDeriv() to access this quantity
-  mutable math::Jacobian mWorldJacobianClassicDeriv;
+    /// Spatial time derivative of body Jacobian.
+    ///
+    /// Do not use directly! Use getJacobianSpatialDeriv() to access this quantity
+    math::Jacobian mBodyJacobianSpatialDeriv;
 
-  /// Partial spatial body acceleration due to parent joint's velocity
-  ///
-  /// Do not use directly! Use getPartialAcceleration() to access this quantity
-  mutable Eigen::Vector6d mPartialAcceleration;
-  // TODO(JS): Rename with more informative name
+    /// Classic time derivative of Body Jacobian
+    ///
+    /// Do not use directly! Use getJacobianClassicDeriv() to access this quantity
+    math::Jacobian mWorldJacobianClassicDeriv;
 
-  /// Is the partial acceleration vector dirty
-  mutable bool mIsPartialAccelerationDirty;
+    /// Partial spatial body acceleration due to parent joint's velocity
+    ///
+    /// Do not use directly! Use getPartialAcceleration() to access this quantity
+    Eigen::Vector6d mPartialAcceleration;
+    // TODO(JS): Rename with more informative name
 
-  /// Transmitted wrench from parent to the bodynode expressed in body-fixed
-  /// frame
-  Eigen::Vector6d mF;
+    /// Transmitted wrench from parent to the bodynode expressed in body-fixed
+    /// frame
+    Eigen::Vector6d mF;
 
-  /// Spatial gravity force
-  Eigen::Vector6d mFgravity;
+    /// Spatial gravity force
+    Eigen::Vector6d mFgravity;
 
-  /// Articulated body inertia
-  ///
-  /// Do not use directly! Use getArticulatedInertia() to access this quantity
-  mutable math::Inertia mArtInertia;
+    /// Articulated body inertia
+    ///
+    /// Do not use directly! Use getArticulatedInertia() to access this quantity
+    math::Inertia mArtInertia;
 
-  /// Articulated body inertia for implicit joint damping and spring forces
-  ///
-  /// DO not use directly! Use getArticulatedInertiaImplicit() to access this
-  mutable math::Inertia mArtInertiaImplicit;
+    /// Articulated body inertia for implicit joint damping and spring forces
+    ///
+    /// DO not use directly! Use getArticulatedInertiaImplicit() to access this
+    math::Inertia mArtInertiaImplicit;
 
-  /// Bias force
-  Eigen::Vector6d mBiasForce;
+    /// Bias force
+    Eigen::Vector6d mBiasForce;
 
-  /// Cache data for combined vector of the system.
-  Eigen::Vector6d mCg_dV;
-  Eigen::Vector6d mCg_F;
+    /// Cache data for combined vector of the system.
+    Eigen::Vector6d mCg_dV;
+    Eigen::Vector6d mCg_F;
 
-  /// Cache data for gravity force vector of the system.
-  Eigen::Vector6d mG_F;
+    /// Cache data for gravity force vector of the system.
+    Eigen::Vector6d mG_F;
 
-  /// Cache data for external force vector of the system.
-  Eigen::Vector6d mFext_F;
+    /// Cache data for external force vector of the system.
+    Eigen::Vector6d mFext_F;
 
-  /// Cache data for mass matrix of the system.
-  Eigen::Vector6d mM_dV;
-  Eigen::Vector6d mM_F;
+    /// Cache data for mass matrix of the system.
+    Eigen::Vector6d mM_dV;
+    Eigen::Vector6d mM_F;
 
-  /// Cache data for inverse mass matrix of the system.
-  Eigen::Vector6d mInvM_c;
-  Eigen::Vector6d mInvM_U;
+    /// Cache data for inverse mass matrix of the system.
+    Eigen::Vector6d mInvM_c;
+    Eigen::Vector6d mInvM_U;
 
-  /// Cache data for arbitrary spatial value
-  Eigen::Vector6d mArbitrarySpatial;
+    /// Cache data for arbitrary spatial value
+    Eigen::Vector6d mArbitrarySpatial;
 
-  //------------------------- Impulse-based Dyanmics ---------------------------
-  /// Velocity change due to to external impulsive force exerted on
-  ///        bodies of the parent skeleton.
-  Eigen::Vector6d mDelV;
+    //----------------------- Impulse-based Dyanmics --------------------------
+    /// Velocity change due to to external impulsive force exerted on
+    ///        bodies of the parent skeleton.
+    Eigen::Vector6d mDelV;
 
-  /// Impulsive bias force due to external impulsive force exerted on
-  ///        bodies of the parent skeleton.
-  Eigen::Vector6d mBiasImpulse;
+    /// Impulsive bias force due to external impulsive force exerted on
+    ///        bodies of the parent skeleton.
+    Eigen::Vector6d mBiasImpulse;
+
+    // TODO(JS): rename with more informative one
+    /// Generalized impulsive body force w.r.t. body frame.
+    Eigen::Vector6d mImpF;
+
+    /// Dirty flags for entries in this cache
+    DirtyFlags mDirty;
+
+    /// Constructor
+    DataCache();
+  };
+
+  mutable DataCache mCache;
 
   /// Constraint impulse: contact impulse, dynamic joint impulse
   Eigen::Vector6d mConstraintImpulse;
-
-  // TODO(JS): rename with more informative one
-  /// Generalized impulsive body force w.r.t. body frame.
-  Eigen::Vector6d mImpF;
 
   /// Collision shape added signal
   ColShapeAddedSignal mColShapeAddedSignal;

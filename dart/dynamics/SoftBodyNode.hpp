@@ -211,7 +211,7 @@ protected:
   void updateAccelerationFD() override;
 
   // Documentation inherited.
-  void updateVelocityChangeFD() override;
+  void updateVelocityChangeFD() const override;
 
   // Documentation inherited.
   void updateTransmittedForceID(
@@ -257,7 +257,7 @@ protected:
                               double _timeStep) override;
 
   // Documentation inherited.
-  void updateInvMassMatrix() override;
+  void updateInvMassMatrix() const override;
 
   // Documentation inherited.
   void updateInvAugMassMatrix() override;
@@ -274,11 +274,12 @@ protected:
   void aggregateCoriolisForceVector(Eigen::VectorXd& _C) override;
 
   // Documentation inherited.
-  void aggregateGravityForceVector(Eigen::VectorXd& _g,
-                                   const Eigen::Vector3d& _gravity) override;
+  void aggregateGravityForceVector(
+      Eigen::VectorXd& _g,
+      const Eigen::Vector3d& _gravity) const override;
 
   // Documentation inherited.
-  void updateCombinedVector() override;
+  void updateCombinedVector() const override;
 
   // Documentation inherited.
   void aggregateCombinedVector(Eigen::VectorXd& _Cg,
