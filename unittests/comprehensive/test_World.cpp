@@ -95,9 +95,16 @@ TEST(World, AddingAndRemovingSkeletons)
   for (int i = 0; i < nSteps; ++i)
       world->step();
 
+  EXPECT_FALSE(world->hasSkeleton(skeleton1));
+  EXPECT_FALSE(world->hasSkeleton(skeleton2));
+  EXPECT_FALSE(world->hasSkeleton(skeleton3));
+  EXPECT_FALSE(world->hasSkeleton(skeleton4));
+
   // Add skeleton1, skeleton2
   world->addSkeleton(skeleton1);
+  EXPECT_TRUE(world->hasSkeleton(skeleton1));
   world->addSkeleton(skeleton2);
+  EXPECT_TRUE(world->hasSkeleton(skeleton2));
   EXPECT_TRUE(world->getNumSkeletons() == 2);
   for (int i = 0; i < nSteps; ++i)
       world->step();
@@ -119,7 +126,9 @@ TEST(World, AddingAndRemovingSkeletons)
 
   // Add skeleton3, skeleton4
   world->addSkeleton(skeleton3);
+  EXPECT_TRUE(world->hasSkeleton(skeleton3));
   world->addSkeleton(skeleton4);
+  EXPECT_TRUE(world->hasSkeleton(skeleton4));
   EXPECT_TRUE(world->getNumSkeletons() == 3);
   for (int i = 0; i < nSteps; ++i)
       world->step();
@@ -211,7 +220,7 @@ TEST(World, Cloning)
         // Generate a random command vector
         Eigen::VectorXd commands = skel->getCommands();
         for(int q=0; q<commands.size(); ++q)
-          commands[q] = random(-0.1, 0.1);
+          commands[q] = Random::uniform(-0.1, 0.1);
 
         // Assign the command vector to each clone of the kth skeleton
         for(std::size_t c=0; c<clones.size(); ++c)

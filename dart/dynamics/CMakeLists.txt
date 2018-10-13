@@ -39,3 +39,11 @@ dart_format_add(
   detail/TranslationalJoint2DAspect.hpp
   detail/TranslationalJoint2DAspect.cpp
 )
+
+dart_format_add(
+  HeightmapShape.hpp
+  VoxelGridShape.hpp
+  VoxelGridShape.cpp
+  SmartPointer.hpp
+  detail/HeightmapShape-impl.hpp
+)
