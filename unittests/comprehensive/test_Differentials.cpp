@@ -1,8 +1,9 @@
 /*
- * Copyright (c) 2016, Graphics Lab, Georgia Tech Research Corporation
- * Copyright (c) 2016, Humanoid Lab, Georgia Tech Research Corporation
- * Copyright (c) 2016, Personal Robotics Lab, Carnegie Mellon University
+ * Copyright (c) 2011-2018, The DART development contributors
  * All rights reserved.
+ *
+ * The list of contributors can be found at:
+ *   https://github.com/dartsim/dart/blob/master/LICENSE
  *
  * This file is provided under the following "BSD-style" License:
  *   Redistribution and use in source and binary forms, with or
@@ -42,12 +43,10 @@ void setRandomState(const dynamics::SkeletonPtr& skel);
 SkeletonPtr createRandomSkeleton();
 
 Eigen::VectorXd computeNumericalLagrangianWrtQ(
-    const dynamics::SkeletonPtr& skel,
-    double delta = 1e-12);
+    const dynamics::SkeletonPtr& skel, double delta = 1e-12);
 
 Eigen::VectorXd computeNumericalLagrangianWrtDQ(
-    const dynamics::SkeletonPtr& skel,
-    double delta = 1e-12);
+    const dynamics::SkeletonPtr& skel, double delta = 1e-12);
 
 // Compute gradients of spatial velocities of bodies with respect to the joint
 // positions using finite difference method
@@ -79,8 +78,7 @@ computeNumericalBodyVelocityHessiansWrtQDQ(
     std::size_t withRespectTo2,
     double delta = 1e-12);
 
-Eigen::aligned_vector<Eigen::Vector6d>
-computeNumericalBodyVelocityHessiansDQQ(
+Eigen::aligned_vector<Eigen::Vector6d> computeNumericalBodyVelocityHessiansDQQ(
     const dynamics::SkeletonPtr& skel,
     std::size_t withRespectTo1,
     std::size_t withRespectTo2,
@@ -121,10 +119,12 @@ TEST(Differentials, BodyVelocityGradients)
       JacobianMatrix bodyVelocityGradient_dq_analytical
           = bodyNodeDiff->getBodyVelocityGradientWrtDQ(indexWrt);
 
-      EXPECT_TRUE(bodyVelocityGradients_q_fd[i].isApprox(
-                    bodyVelocityGradient_q_analytical, 1e-1));
-      EXPECT_TRUE(bodyVelocityGradients_dq_fd[i].isApprox(
-                    bodyVelocityGradient_dq_analytical, 1e-1));
+      EXPECT_TRUE(
+          bodyVelocityGradients_q_fd[i].isApprox(
+              bodyVelocityGradient_q_analytical, 1e-1));
+      EXPECT_TRUE(
+          bodyVelocityGradients_dq_fd[i].isApprox(
+              bodyVelocityGradient_dq_analytical, 1e-1));
     }
   }
 }
@@ -147,14 +147,14 @@ TEST(Differentials, LagragianGradients)
   auto* skelComposite = skelDiff->getComposite();
   EXPECT_TRUE(skelComposite != nullptr);
 
-  //auto lagGradWrtQ = skelDiff->computeLagrangianGradientWrtPositions();
-  //auto lagGradWrtQNumerical = computeNumericalLagrangianWrtQ(skel);
-  //EXPECT_TRUE(lagGradWrtQ.isApprox(lagGradWrtQNumerical));
+  // auto lagGradWrtQ = skelDiff->computeLagrangianGradientWrtPositions();
+  // auto lagGradWrtQNumerical = computeNumericalLagrangianWrtQ(skel);
+  // EXPECT_TRUE(lagGradWrtQ.isApprox(lagGradWrtQNumerical));
   // TODO(JS): not implemented yet
 
-  //auto lagGradWrtDQ = skelDiff->computeLagrangianGradientWrtVelocities();
-  //auto lagGradWrtDQNumerical = computeNumericalLagrangianWrtDQ(skel);
-  //EXPECT_TRUE(lagGradWrtDQ.isApprox(lagGradWrtDQNumerical));
+  // auto lagGradWrtDQ = skelDiff->computeLagrangianGradientWrtVelocities();
+  // auto lagGradWrtDQNumerical = computeNumericalLagrangianWrtDQ(skel);
+  // EXPECT_TRUE(lagGradWrtDQ.isApprox(lagGradWrtDQNumerical));
   // TODO(JS): not implemented yet
 }
 
@@ -177,9 +177,9 @@ void setRandomState(const dynamics::SkeletonPtr& skel)
   const auto pi = math::constantsd::pi();
   const auto numDofs = skel->getNumDofs();
   const auto posLower = pi * -0.5;
-  const auto posUpper = pi *  0.5;
+  const auto posUpper = pi * 0.5;
   const auto velLower = pi * -0.5;
-  const auto velUpper = pi *  0.5;
+  const auto velUpper = pi * 0.5;
 
   for (auto i = 0u; i < numDofs; ++i)
   {
@@ -198,7 +198,8 @@ SkeletonPtr createRandomSkeleton()
 {
   const auto numLinks = 25u;
   const auto l = 1.5;
-  auto skel = createNLinkRobot(numLinks, Eigen::Vector3d(0.3, 0.3, l), DOF_ROLL);
+  auto skel
+      = createNLinkRobot(numLinks, Eigen::Vector3d(0.3, 0.3, l), DOF_ROLL);
   setRandomState(skel);
 
   return skel;
@@ -253,9 +254,7 @@ Eigen::VectorXd computeNumericalLagrangianWrtDQ(
 //==============================================================================
 Eigen::aligned_vector<Eigen::Vector6d>
 computeNumericalBodyVelocityGradientsWrtQ(
-    const dynamics::SkeletonPtr& skel,
-    std::size_t withRespectTo,
-    double delta)
+    const dynamics::SkeletonPtr& skel, std::size_t withRespectTo, double delta)
 {
   const auto numBodies = skel->getNumBodyNodes();
   Eigen::aligned_vector<Eigen::Vector6d> grads(numBodies);
@@ -272,9 +271,8 @@ computeNumericalBodyVelocityGradientsWrtQ(
 
   for (auto i = 0u; i < numBodies; ++i)
   {
-    grads[i]
-        = (skel->getBodyNode(i)->getSpatialVelocity() - bodyVelocities[i])
-        / delta;
+    grads[i] = (skel->getBodyNode(i)->getSpatialVelocity() - bodyVelocities[i])
+               / delta;
   }
 
   skel->setPositions(oldPositions);
@@ -285,9 +283,7 @@ computeNumericalBodyVelocityGradientsWrtQ(
 //==============================================================================
 Eigen::aligned_vector<Eigen::Vector6d>
 computeNumericalBodyVelocityGradientsWrtDQ(
-    const dynamics::SkeletonPtr& skel,
-    std::size_t withRespectTo,
-    double delta)
+    const dynamics::SkeletonPtr& skel, std::size_t withRespectTo, double delta)
 {
   const auto numBodies = skel->getNumBodyNodes();
   Eigen::aligned_vector<Eigen::Vector6d> grads(numBodies);
@@ -304,9 +300,8 @@ computeNumericalBodyVelocityGradientsWrtDQ(
 
   for (auto i = 0u; i < numBodies; ++i)
   {
-    grads[i]
-        = (skel->getBodyNode(i)->getSpatialVelocity() - bodyVelocities[i])
-        / delta;
+    grads[i] = (skel->getBodyNode(i)->getSpatialVelocity() - bodyVelocities[i])
+               / delta;
   }
 
   skel->setVelocities(oldVelocities);
@@ -368,9 +363,10 @@ computeNumericalBodyVelocityHessiansWrtQQ(
 
   for (auto i = 0u; i < numBodies; ++i)
   {
-    hessians[i]
-        = (bodyVelocityGradient1B[i] - bodyVelocityGradient1A[i]) / (2.0*delta)
-        + (bodyVelocityGradient2B[i] - bodyVelocityGradient2A[i]) / (2.0*delta);
+    hessians[i] = (bodyVelocityGradient1B[i] - bodyVelocityGradient1A[i])
+                      / (2.0 * delta)
+                  + (bodyVelocityGradient2B[i] - bodyVelocityGradient2A[i])
+                        / (2.0 * delta);
   }
 
   skel->setPositions(oldPositions);
@@ -435,9 +431,10 @@ computeNumericalBodyVelocityHessiansWrtQDQ(
 
   for (auto i = 0u; i < numBodies; ++i)
   {
-    hessians[i]
-        = (bodyVelocityGradient1B[i] - bodyVelocityGradient1A[i]) / (2.0*delta)
-        + (bodyVelocityGradient2B[i] - bodyVelocityGradient2A[i]) / (2.0*delta);
+    hessians[i] = (bodyVelocityGradient1B[i] - bodyVelocityGradient1A[i])
+                      / (2.0 * delta)
+                  + (bodyVelocityGradient2B[i] - bodyVelocityGradient2A[i])
+                        / (2.0 * delta);
   }
 
   skel->setPositions(oldPositions);
@@ -447,15 +444,14 @@ computeNumericalBodyVelocityHessiansWrtQDQ(
 }
 
 //==============================================================================
-Eigen::aligned_vector<Eigen::Vector6d>
-computeNumericalBodyVelocityHessiansDQQ(
+Eigen::aligned_vector<Eigen::Vector6d> computeNumericalBodyVelocityHessiansDQQ(
     const dynamics::SkeletonPtr& skel,
     std::size_t withRespectTo1,
     std::size_t withRespectTo2,
     double delta)
 {
   return computeNumericalBodyVelocityHessiansWrtQDQ(
-        skel, withRespectTo2, withRespectTo1, delta);
+      skel, withRespectTo2, withRespectTo1, delta);
 }
 
 //==============================================================================
@@ -512,9 +508,10 @@ computeNumericalBodyVelocityHessiansWrtDQDQ(
 
   for (auto i = 0u; i < numDofs; ++i)
   {
-    hessians[i]
-        = (bodyVelocityGradient1B[i] - bodyVelocityGradient1A[i]) / (2.0*delta)
-        + (bodyVelocityGradient2B[i] - bodyVelocityGradient2A[i]) / (2.0*delta);
+    hessians[i] = (bodyVelocityGradient1B[i] - bodyVelocityGradient1A[i])
+                      / (2.0 * delta)
+                  + (bodyVelocityGradient2B[i] - bodyVelocityGradient2A[i])
+                        / (2.0 * delta);
   }
 
   skel->setVelocities(oldVelocities);

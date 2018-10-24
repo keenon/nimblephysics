@@ -1,8 +1,9 @@
 /*
- * Copyright (c) 2016, Graphics Lab, Georgia Tech Research Corporation
- * Copyright (c) 2016, Humanoid Lab, Georgia Tech Research Corporation
- * Copyright (c) 2016, Personal Robotics Lab, Carnegie Mellon University
+ * Copyright (c) 2011-2018, The DART development contributors
  * All rights reserved.
+ *
+ * The list of contributors can be found at:
+ *   https://github.com/dartsim/dart/blob/master/LICENSE
  *
  * This file is provided under the following "BSD-style" License:
  *   Redistribution and use in source and binary forms, with or
@@ -100,8 +101,7 @@ SkeletonDifferential::getBodyVelocityGradientWrtQ(
 
 //==============================================================================
 Eigen::Vector6d SkeletonDifferential::getBodyVelocityGradientWrtQ(
-    std::size_t bodyNodeIndexInSkeleton,
-    std::size_t withRespectTo) const
+    std::size_t bodyNodeIndexInSkeleton, std::size_t withRespectTo) const
 {
   // TODO(JS): emit warning if the index is not valid
   const auto* bodyNode = mComposite->getBodyNode(bodyNodeIndexInSkeleton);
@@ -109,8 +109,7 @@ Eigen::Vector6d SkeletonDifferential::getBodyVelocityGradientWrtQ(
 
   assert(bodyNodeDifferential);
 
-  return bodyNodeDifferential->getBodyVelocityGradientWrtQ(
-        withRespectTo);
+  return bodyNodeDifferential->getBodyVelocityGradientWrtQ(withRespectTo);
 }
 
 //==============================================================================
@@ -124,8 +123,7 @@ Eigen::Vector6d SkeletonDifferential::getBodyVelocityGradientWrtQ(
 
   assert(bodyNodeDifferential);
 
-  return bodyNodeDifferential->getBodyVelocityGradientWrtQ(
-        withRespectTo);
+  return bodyNodeDifferential->getBodyVelocityGradientWrtQ(withRespectTo);
 }
 
 //==============================================================================
@@ -144,8 +142,7 @@ SkeletonDifferential::getBodyVelocityGradientWrtDQ(
 
 //==============================================================================
 Eigen::Vector6d SkeletonDifferential::getBodyVelocityGradientWrtDQ(
-    std::size_t bodyNodeIndexInSkeleton,
-    std::size_t withRespectTo) const
+    std::size_t bodyNodeIndexInSkeleton, std::size_t withRespectTo) const
 {
   // TODO(JS): emit warning if the index is not valid
   const auto* bodyNode = mComposite->getBodyNode(bodyNodeIndexInSkeleton);
@@ -153,8 +150,7 @@ Eigen::Vector6d SkeletonDifferential::getBodyVelocityGradientWrtDQ(
 
   assert(bodyNodeDifferential);
 
-  return bodyNodeDifferential->getBodyVelocityGradientWrtDQ(
-        withRespectTo);
+  return bodyNodeDifferential->getBodyVelocityGradientWrtDQ(withRespectTo);
 }
 
 //==============================================================================
@@ -168,8 +164,7 @@ Eigen::Vector6d SkeletonDifferential::getBodyVelocityGradientWrtDQ(
 
   assert(bodyNodeDifferential);
 
-  return bodyNodeDifferential->getBodyVelocityGradientWrtDQ(
-        withRespectTo);
+  return bodyNodeDifferential->getBodyVelocityGradientWrtDQ(withRespectTo);
 }
 
 //==============================================================================

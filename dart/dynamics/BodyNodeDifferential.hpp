@@ -1,8 +1,9 @@
 /*
- * Copyright (c) 2016, Graphics Lab, Georgia Tech Research Corporation
- * Copyright (c) 2016, Humanoid Lab, Georgia Tech Research Corporation
- * Copyright (c) 2016, Personal Robotics Lab, Carnegie Mellon University
+ * Copyright (c) 2011-2018, The DART development contributors
  * All rights reserved.
+ *
+ * The list of contributors can be found at:
+ *   https://github.com/dartsim/dart/blob/master/LICENSE
  *
  * This file is provided under the following "BSD-style" License:
  *   Redistribution and use in source and binary forms, with or
@@ -40,7 +41,7 @@
 namespace dart {
 namespace dynamics {
 
-//class Skeleton;
+// class Skeleton;
 
 namespace detail {
 
@@ -62,23 +63,20 @@ struct BodyNodeDifferentialState
   virtual ~BodyNodeDifferentialState() = default;
 };
 
-}  // namespace detail
+} // namespace detail
 
 //==============================================================================
-class BodyNodeDifferential final :
-    public common::AspectWithState<
-        BodyNodeDifferential,
-        detail::BodyNodeDifferentialState,
-        BodyNode>
+class BodyNodeDifferential final
+    : public common::AspectWithState<BodyNodeDifferential,
+                                     detail::BodyNodeDifferentialState,
+                                     BodyNode>
 {
 public:
-
   friend class SkeletonDifferential;
 
-  using Base = common::AspectWithState<
-      BodyNodeDifferential,
-      detail::BodyNodeDifferentialState,
-      BodyNode>;
+  using Base = common::AspectWithState<BodyNodeDifferential,
+                                       detail::BodyNodeDifferentialState,
+                                       BodyNode>;
 
   using GradientMatrix = Eigen::Matrix<double, 6, Eigen::Dynamic>;
 
@@ -102,8 +100,7 @@ public:
   Eigen::Vector6d getBodyVelocityGradientWrtQ(
       const DegreeOfFreedom* withRespectTo) const;
 
-  GradientMatrix getBodyVelocityGradientWrtQ(
-      const Joint* withRespectTo) const;
+  GradientMatrix getBodyVelocityGradientWrtQ(const Joint* withRespectTo) const;
 
   GradientMatrix getBodyVelocityGradientWrtQ() const;
 
@@ -113,19 +110,17 @@ public:
   Eigen::Vector6d getBodyVelocityGradientWrtDQ(
       const DegreeOfFreedom* withRespectTo) const;
 
-  GradientMatrix getBodyVelocityGradientWrtDQ(
-      const Joint* withRespectTo) const;
+  GradientMatrix getBodyVelocityGradientWrtDQ(const Joint* withRespectTo) const;
 
   GradientMatrix getBodyVelocityGradientWrtDQ() const;
 
   void print();
 
 protected:
-
   void setComposite(common::Composite* newComposite) override;
 };
 
-}  // namespace dynamics
-}  // namespace dart
+} // namespace dynamics
+} // namespace dart
 
-#endif  // DART_DYNAMICS_BODYNODEDIFFERENTIAL_HPP_
+#endif // DART_DYNAMICS_BODYNODEDIFFERENTIAL_HPP_

@@ -1,8 +1,9 @@
 /*
- * Copyright (c) 2016, Graphics Lab, Georgia Tech Research Corporation
- * Copyright (c) 2016, Humanoid Lab, Georgia Tech Research Corporation
- * Copyright (c) 2016, Personal Robotics Lab, Carnegie Mellon University
+ * Copyright (c) 2011-2018, The DART development contributors
  * All rights reserved.
+ *
+ * The list of contributors can be found at:
+ *   https://github.com/dartsim/dart/blob/master/LICENSE
  *
  * This file is provided under the following "BSD-style" License:
  *   Redistribution and use in source and binary forms, with or
@@ -40,7 +41,7 @@
 namespace dart {
 namespace dynamics {
 
-//class Skeleton;
+// class Skeleton;
 
 namespace detail {
 
@@ -69,25 +70,23 @@ struct SkeletonLagrangianAspectState
   Eigen::MatrixXd mDM_D2D1LD;
 };
 
-}  // namespace detail
+} // namespace detail
 
 //==============================================================================
-class SkeletonDifferential final :
-    public common::AspectWithState<
-        SkeletonDifferential,
-        detail::SkeletonLagrangianAspectState,
-        Skeleton>
+class SkeletonDifferential final
+    : public common::AspectWithState<SkeletonDifferential,
+                                     detail::SkeletonLagrangianAspectState,
+                                     Skeleton>
 {
 public:
-
-  using Base = common::AspectWithState<
-      SkeletonDifferential,
-      detail::SkeletonLagrangianAspectState,
-      Skeleton>;
+  using Base = common::AspectWithState<SkeletonDifferential,
+                                       detail::SkeletonLagrangianAspectState,
+                                       Skeleton>;
 
   using GradientMatrix = Eigen::Matrix<double, 6, Eigen::Dynamic>;
 
-//  SkeletonLagrangianAspect(const PropertiesData& properties = PropertiesData());
+  //  SkeletonLagrangianAspect(const PropertiesData& properties =
+  //  PropertiesData());
 
   SkeletonDifferential(const StateData& state = StateData());
 
@@ -105,8 +104,7 @@ public:
       std::size_t bodyNodeIndexInSkeleton) const;
 
   Eigen::Vector6d getBodyVelocityGradientWrtQ(
-      std::size_t bodyNodeIndexInSkeleton,
-      std::size_t withRespectTo) const;
+      std::size_t bodyNodeIndexInSkeleton, std::size_t withRespectTo) const;
 
   Eigen::Vector6d getBodyVelocityGradientWrtQ(
       std::size_t bodyNodeIndexInSkeleton,
@@ -116,8 +114,7 @@ public:
       std::size_t bodyNodeIndexInSkeleton) const;
 
   Eigen::Vector6d getBodyVelocityGradientWrtDQ(
-      std::size_t bodyNodeIndexInSkeleton,
-      std::size_t withRespectTo) const;
+      std::size_t bodyNodeIndexInSkeleton, std::size_t withRespectTo) const;
 
   Eigen::Vector6d getBodyVelocityGradientWrtDQ(
       std::size_t bodyNodeIndexInSkeleton,
@@ -126,15 +123,12 @@ public:
   void print();
 
 protected:
-
   void setComposite(common::Composite* newComposite) override;
 
   void loseComposite(common::Composite* oldComposite) override;
-
-
 };
 
-}  // namespace dynamics
-}  // namespace dart
+} // namespace dynamics
+} // namespace dart
 
-#endif  // DART_DYNAMICS_SKELETONDIFFERENTIAL_HPP_
+#endif // DART_DYNAMICS_SKELETONDIFFERENTIAL_HPP_

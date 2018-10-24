@@ -1,8 +1,9 @@
 /*
- * Copyright (c) 2016, Graphics Lab, Georgia Tech Research Corporation
- * Copyright (c) 2016, Humanoid Lab, Georgia Tech Research Corporation
- * Copyright (c) 2016, Personal Robotics Lab, Carnegie Mellon University
+ * Copyright (c) 2011-2018, The DART development contributors
  * All rights reserved.
+ *
+ * The list of contributors can be found at:
+ *   https://github.com/dartsim/dart/blob/master/LICENSE
  *
  * This file is provided under the following "BSD-style" License:
  *   Redistribution and use in source and binary forms, with or
@@ -31,8 +32,8 @@
 
 #include "dart/dynamics/BodyNodeDifferential.hpp"
 
-#include "dart/dynamics/DegreeOfFreedom.hpp"
 #include "dart/dynamics/BodyNode.hpp"
+#include "dart/dynamics/DegreeOfFreedom.hpp"
 
 namespace dart {
 namespace dynamics {
@@ -72,15 +73,13 @@ void BodyNodeDifferential::updateBodyVelocityGradients()
     const auto* thisParentBodyNodeDifferential
         = thisParentBodyNode->get<BodyNodeDifferential>();
 
-    mState.mV_q
-        = math::AdInvTJac(
-          thisJoint->getRelativeTransform(),
-          thisParentBodyNodeDifferential->mState.mV_q);
+    mState.mV_q = math::AdInvTJac(
+        thisJoint->getRelativeTransform(),
+        thisParentBodyNodeDifferential->mState.mV_q);
 
-    mState.mV_dq
-        = math::AdInvTJac(
-          thisJoint->getRelativeTransform(),
-          thisParentBodyNodeDifferential->mState.mV_dq);
+    mState.mV_dq = math::AdInvTJac(
+        thisJoint->getRelativeTransform(),
+        thisParentBodyNodeDifferential->mState.mV_dq);
   }
   else
   {
@@ -95,9 +94,8 @@ void BodyNodeDifferential::updateBodyVelocityGradients()
 
   const auto index = thisJoint->getDof(0)->getIndexInSkeleton();
 
-  mState.mV_q.block(0, index, 6, numDofs)
-      += math::adJac(thisBodyNode->getSpatialVelocity(),
-                     thisJoint->getRelativeJacobian());
+  mState.mV_q.block(0, index, 6, numDofs) += math::adJac(
+      thisBodyNode->getSpatialVelocity(), thisJoint->getRelativeJacobian());
 
   mState.mV_dq.block(0, index, 6, numDofs) += thisJoint->getRelativeJacobian();
 }
@@ -114,42 +112,40 @@ void BodyNodeDifferential::updateSpatialVelocityHessian()
   const auto nBodyNodes = thisBodyNode->getSkeleton()->getNumBodyNodes();
   const auto* thisParentBodyNode = thisBodyNode->getParentBodyNode();
 
-//  if (thisParentBodyNode)
-//  {
-//    const auto* thisParentBodyNodeDifferential
-//        = thisParentBodyNode->get<BodyNodeDifferential>();
+  //  if (thisParentBodyNode)
+  //  {
+  //    const auto* thisParentBodyNodeDifferential
+  //        = thisParentBodyNode->get<BodyNodeDifferential>();
 
-//    for (auto i = 0u; i < nBodyNodes; ++i))
+  //    for (auto i = 0u; i < nBodyNodes; ++i))
 
-//    mState.mV_q_q
-//        = math::AdInvTJac(
-//          thisJoint->getRelativeTransform(),
-//          thisParentBodyNodeDifferential->mState.mV_q_q);
+  //    mState.mV_q_q
+  //        = math::AdInvTJac(
+  //          thisJoint->getRelativeTransform(),
+  //          thisParentBodyNodeDifferential->mState.mV_q_q);
 
-//    mState.mV_dq_dq
-//        = math::AdInvTJac(
-//          thisJoint->getRelativeTransform(),
-//          thisParentBodyNodeDifferential->mState.mV_dq_dq);
-//  }
-//  else
-//  {
-//    mState.mV_q_q.setZero();
-//    mState.mV_q_dq.setZero();
-//    mState.mV_dq_dq.setZero();
-//  }
+  //    mState.mV_dq_dq
+  //        = math::AdInvTJac(
+  //          thisJoint->getRelativeTransform(),
+  //          thisParentBodyNodeDifferential->mState.mV_dq_dq);
+  //  }
+  //  else
+  //  {
+  //    mState.mV_q_q.setZero();
+  //    mState.mV_q_dq.setZero();
+  //    mState.mV_dq_dq.setZero();
+  //  }
 }
 
 //==============================================================================
-Eigen::Vector6d
-BodyNodeDifferential::getBodyVelocityGradientWrtQ(
+Eigen::Vector6d BodyNodeDifferential::getBodyVelocityGradientWrtQ(
     std::size_t indexInSkeleton) const
 {
   return mState.mV_q.col(indexInSkeleton);
 }
 
 //==============================================================================
-Eigen::Vector6d
-BodyNodeDifferential::getBodyVelocityGradientWrtQ(
+Eigen::Vector6d BodyNodeDifferential::getBodyVelocityGradientWrtQ(
     const DegreeOfFreedom* withRespectTo) const
 {
   const auto index = withRespectTo->getIndexInSkeleton();
@@ -176,16 +172,14 @@ BodyNodeDifferential::getBodyVelocityGradientWrtQ() const
 }
 
 //==============================================================================
-Eigen::Vector6d
-BodyNodeDifferential::getBodyVelocityGradientWrtDQ(
+Eigen::Vector6d BodyNodeDifferential::getBodyVelocityGradientWrtDQ(
     std::size_t indexInSkeleton) const
 {
   return mState.mV_dq.col(indexInSkeleton);
 }
 
 //==============================================================================
-Eigen::Vector6d
-BodyNodeDifferential::getBodyVelocityGradientWrtDQ(
+Eigen::Vector6d BodyNodeDifferential::getBodyVelocityGradientWrtDQ(
     const DegreeOfFreedom* withRespectTo) const
 {
   const auto index = withRespectTo->getIndexInSkeleton();
@@ -214,7 +208,8 @@ BodyNodeDifferential::getBodyVelocityGradientWrtDQ() const
 //==============================================================================
 void BodyNodeDifferential::print()
 {
-  std::cout << mState.mV_q << std::endl;;
+  std::cout << mState.mV_q << std::endl;
+  ;
 }
 
 //==============================================================================

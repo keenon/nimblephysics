@@ -34,16 +34,17 @@ install(
 )
 
 dart_format_add(
-  TranslationalJoint2D.hpp
-  TranslationalJoint2D.cpp
-  detail/TranslationalJoint2DAspect.hpp
-  detail/TranslationalJoint2DAspect.cpp
-)
-
-dart_format_add(
+  BodyNodeDifferential.hpp
+  BodyNodeDifferential.cpp
   HeightmapShape.hpp
   VoxelGridShape.hpp
   VoxelGridShape.cpp
   SmartPointer.hpp
+  SkeletonDifferential.hpp
+  SkeletonDifferential.cpp
+  TranslationalJoint2D.hpp
+  TranslationalJoint2D.cpp
   detail/HeightmapShape-impl.hpp
+  detail/TranslationalJoint2DAspect.hpp
+  detail/TranslationalJoint2DAspect.cpp
 )
