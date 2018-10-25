@@ -184,9 +184,13 @@ void SkeletonDifferential::setComposite(common::Composite* newComposite)
   Base::setComposite(newComposite);
 
   auto* skel = mComposite;
-  const auto numDofs = skel->getNumDofs();
+  const auto numDofs = static_cast<int>(skel->getNumDofs());
+  const auto numBodies = static_cast<int>(skel->getNumBodyNodes());
 
   assert(skel);
+
+  mState.mV_q.resize(6*numBodies, numDofs);
+  mState.mV_dq.resize(6*numBodies, numDofs);
 
   mState.mDM_GradientKineticEnergy_q.resize(numDofs);
   mState.mDM_GradientKineticEnergy_dq.resize(numDofs);

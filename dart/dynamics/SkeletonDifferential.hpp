@@ -53,6 +53,13 @@ struct SkeletonLagrangianAspectState
   /// Destructor
   virtual ~SkeletonLagrangianAspectState() = default;
 
+  Eigen::MatrixXd mV_q;
+  Eigen::MatrixXd mV_dq;
+
+  Eigen::MatrixXd mV_q_q;
+  Eigen::MatrixXd mV_q_dq;
+  Eigen::MatrixXd mV_dq_dq;
+
   Eigen::VectorXd mDM_GradientKineticEnergy_q;
   Eigen::VectorXd mDM_GradientKineticEnergy_dq;
   Eigen::MatrixXd mDM_HessianKineticEnergy_q_q;
