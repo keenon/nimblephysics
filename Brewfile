@@ -17,6 +17,7 @@ brew 'libccd'
 brew 'octomap'
 brew 'ode'
 brew 'open-scene-graph'
+#brew 'pagmo'  # disabled to reduce the build time
 brew 'sdl2'
 brew 'tinyxml2'
 brew 'urdfdom'

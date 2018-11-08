@@ -145,12 +145,11 @@ std::string DartResourceRetriever::getFilePath(const common::Uri& uri)
       if (!path.empty())
         return path;
     }
-
+    
     dtwarn << "Failed to retrieve a resource from '" << uri.toString()
-           << "'. Please make sure you set the environment variable for "
-           << "DART data path. For example:\n"
-           << "  $ export DART_DATA_PATH=/usr/local/share/doc/dart/data/\n";
-    return "";
+             << "'. Please make sure you set the environment variable for "
+             << "DART data path. For example:\n"
+             << "  $ export DART_DATA_PATH=/usr/local/share/doc/dart/data/\n";
   }
   else
   {
