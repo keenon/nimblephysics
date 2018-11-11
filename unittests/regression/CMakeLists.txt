@@ -9,4 +9,8 @@ if(TARGET dart-utils-urdf)
 
   dart_add_test("regression" test_Issue986)
 
+  dart_add_test("regression" test_Issue1193)
+
 endif()
+
+dart_format_add(test_Issue1193.cpp)
