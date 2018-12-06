@@ -71,7 +71,9 @@ Branch::Criteria Branch::Criteria::convert(const Linkage::Criteria& criteria)
   BodyNodePtr startBodyNode = criteria.mStart.mNode.lock();
   if (!startBodyNode)
   {
-    // TODO: Warning for invalid criteria
+    dtwarn << "[Chain::Criteria::convert] Failed in conversion because the "
+           << "start node of the input criteria is not valid anymore. Using "
+           << "the returning Criteria will lead to creating an empty Branch.\n";
     return Branch::Criteria(nullptr);
   }
 
@@ -90,6 +92,12 @@ BranchPtr Branch::create(const Branch::Criteria& _criteria,
 //==============================================================================
 BranchPtr Branch::cloneBranch() const
 {
+  return cloneBranch(getName());
+}
+
+//==============================================================================
+BranchPtr Branch::cloneBranch(const std::string& cloneName) const
+{
   // Clone the skeleton (assuming one skeleton is involved)
   BodyNodePtr bodyNode = mCriteria.mStart.mNode.lock();
   if (!bodyNode)
@@ -99,7 +107,7 @@ BranchPtr Branch::cloneBranch() const
            << "Returning nullptr.\n";
     return nullptr;
   }
-  SkeletonPtr skelClone = bodyNode->getSkeleton()->clone();
+  SkeletonPtr skelClone = bodyNode->getSkeleton()->cloneSkeleton();
 
   // Create a Criteria
   Criteria newCriteria = Criteria::convert(mCriteria);
@@ -108,15 +116,15 @@ BranchPtr Branch::cloneBranch() const
       = skelClone->getBodyNode(newCriteria.mStart.lock()->getName());
 
   // Create a Branch clone with the Criteria
-  BranchPtr newBranch = create(newCriteria, getName());
+  BranchPtr newBranch = create(newCriteria, cloneName);
 
   return newBranch;
 }
 
 //==============================================================================
-MetaSkeletonPtr Branch::cloneMetaSkeleton() const
+MetaSkeletonPtr Branch::cloneMetaSkeleton(const std::string& cloneName) const
 {
-  return cloneBranch();
+  return cloneBranch(cloneName);
 }
 
 //==============================================================================
