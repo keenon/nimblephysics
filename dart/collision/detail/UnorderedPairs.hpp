@@ -56,6 +56,12 @@ public:
   /// Returns true if this container contains the pair.
   bool contains(const T* left, const T* right) const;
 
+  const std::unordered_map<const T*, std::unordered_set<const T*>>& getMap()
+  const
+  {
+    return mList;
+  }
+
 private:
   /// The actual container to store pairs.
   ///
