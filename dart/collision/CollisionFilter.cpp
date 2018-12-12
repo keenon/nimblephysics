@@ -150,6 +150,13 @@ bool BodyNodeCollisionFilter::ignoresCollision(
 }
 
 //==============================================================================
+const detail::UnorderedPairs<dynamics::BodyNode>&
+BodyNodeCollisionFilter::getPairs() const
+{
+  return mBodyNodeBlackList;
+}
+
+//==============================================================================
 bool BodyNodeCollisionFilter::areAdjacentBodies(
     const dynamics::BodyNode* bodyNode1,
     const dynamics::BodyNode* bodyNode2) const

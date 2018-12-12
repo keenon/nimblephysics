@@ -107,6 +107,9 @@ public:
       const CollisionObject* object1,
       const CollisionObject* object2) const override;
 
+  /// Returns all the disabled pairs
+  const detail::UnorderedPairs<dynamics::BodyNode>& getPairs() const;
+
 private:
   /// Returns true if the two BodyNodes are adjacent BodyNodes (i.e., the two
   /// BodyNodes are connected by a Joint).
