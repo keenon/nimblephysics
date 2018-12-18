@@ -13,4 +13,13 @@ if(TARGET dart-utils-urdf)
 
 endif()
 
+<<<<<<< HEAD
 dart_format_add(test_Issue1193.cpp)
+=======
+if(TARGET dart-collision-bullet)
+
+  dart_add_test("regression" test_Issue1184)
+  target_link_libraries(test_Issue1184 dart-collision-bullet)
+
+endif()
+>>>>>>> origin/release-6.7
