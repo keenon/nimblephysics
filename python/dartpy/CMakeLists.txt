@@ -1,10 +1,18 @@
+cmake_minimum_required(VERSION 3.5.1)
+
 project(dartpy)
 
 if(NOT DARTPY_PYTHON_VERSION)
   set(DARTPY_PYTHON_VERSION 3.4 CACHE STRING "Choose the target Python version (e.g., 3.4, 2.7)" FORCE)
 endif()
 
-find_package(PythonInterp ${DARTPY_PYTHON_VERSION} REQUIRED)
+find_package(PythonInterp ${DARTPY_PYTHON_VERSION} QUIET)
+if(NOT PythonInterp_FOUND)
+  message(STATUS "DART_BUILD_DARTPY is ON, but failed to find PythonInterp. "
+    "Disabling dartpy."
+  )
+  return()
+endif()
 execute_process(COMMAND ${PYTHON_EXECUTABLE} -c
   "from distutils.sysconfig import get_python_lib;\
   print(get_python_lib(plat_specific=True, prefix=''))"
@@ -12,27 +20,23 @@ execute_process(COMMAND ${PYTHON_EXECUTABLE} -c
   OUTPUT_STRIP_TRAILING_WHITESPACE
 )
 
-find_package(PythonLibs ${DARTPY_PYTHON_VERSION} REQUIRED)
-
-# Find boost with python components. The name of python component varies
-# depending on the platform, boost version, and python version.
-if(APPLE)
-  find_package(Boost REQUIRED
-    COMPONENTS
-      python${PYTHON_VERSION_MAJOR}${PYTHON_VERSION_MINOR} thread
+find_package(PythonLibs ${DARTPY_PYTHON_VERSION} QUIET)
+if(NOT PythonLibs_FOUND)
+  message(STATUS "DART_BUILD_DARTPY is ON, but failed to find PythonLibs. "
+    "Disabling dartpy."
   )
-else() # LINUX assumed
-  if(${PYTHON_VERSION_MAJOR} EQUAL 3)
-    find_package(Boost
-      COMPONENTS
-        python-py${PYTHON_VERSION_MAJOR}${PYTHON_VERSION_MINOR} thread
-    )
-    if(NOT Boost_FOUND)
-      find_package(Boost REQUIRED COMPONENTS python3 thread)
-    endif()
-  else() # Python 2 assumed
-    find_package(Boost REQUIRED COMPONENTS python thread)
-  endif()
+  return()
+endif()
+
+# Find pybind11
+# Needs to set PYBIND11_PYTHON_VERSION before finding pybind11
+set(PYBIND11_PYTHON_VERSION ${DARTPY_PYTHON_VERSION})
+find_package(pybind11 2.2.0 QUIET)
+if(NOT pybind11_FOUND)
+  message(STATUS "DART_BUILD_DARTPY is ON, but failed to find pybind11 >= "
+    "2.2.0. Disabling dartpy."
+  )
+  return()
 endif()
 
 include_directories(SYSTEM
@@ -46,34 +50,6 @@ include_directories(SYSTEM
 #===================
 
 find_package(chimera QUIET)
-
-# Check whether the CXX compiler and boost::python support get_pointer for
-# std::shared_ptr<T> references.
-include(CheckCXXSourceCompiles)
-set(CMAKE_REQUIRED_INCLUDES
-  ${Boost_INCLUDE_DIRS}
-  ${PYTHON_INCLUDE_DIRS}
-)
-set(CMAKE_REQUIRED_LIBRARIES
-  ${Boost_LIBRARIES}
-  ${PYTHON_LIBRARIES}
-)
-check_cxx_source_compiles(
-  "
-  #include <memory>
-  #include <boost/python.hpp>
-  int main() { std::shared_ptr<int> ptr; int *p = boost::get_pointer(ptr); }
-  "
-  DARTPY_HAS_STD_SHARED_GET_POINTER
-)
-
-unset(CMAKE_REQUIRED_INCLUDES)
-unset(CMAKE_REQUIRED_LIBRARIES)
-
-# Generate a header file for the DARTPY_HAS_STD_SHARED_GET_POINTER flag.
-configure_file("cmake/config.h.in"
-  "include/dartpy/config.h"
-)
 
 # Check if DART is built with octomap so that it supports VoxelGridShape
 include(CheckCXXSourceCompiles)
@@ -94,11 +70,12 @@ check_cxx_source_compiles(
   DART_HAS_VOXELGRIDSHAPE
 )
 
-if(DART_HAS_VOXELGRIDSHAPE)
-  set(CHIMERA_CONFIG "${CMAKE_CURRENT_SOURCE_DIR}/chimera/chimera.yml")
-else()
-  set(CHIMERA_CONFIG "${CMAKE_CURRENT_SOURCE_DIR}/chimera/chimera_without_voxel.yml")
-endif()
+#if(DART_HAS_VOXELGRIDSHAPE)
+#  set(CHIMERA_CONFIG "${CMAKE_CURRENT_SOURCE_DIR}/chimera/chimera.yml")
+#else()
+#  set(CHIMERA_CONFIG "${CMAKE_CURRENT_SOURCE_DIR}/chimera/chimera_without_voxel.yml")
+#endif()
+set(CHIMERA_CONFIG "${CMAKE_CURRENT_SOURCE_DIR}/chimera/chimera.yml")
 if(chimera_FOUND)
   add_chimera_binding(TARGET "${PROJECT_NAME}_CHIMERA"
     MODULE "${PROJECT_NAME}"
@@ -109,7 +86,6 @@ if(chimera_FOUND)
   )
   target_link_libraries("${PROJECT_NAME}_CHIMERA"
     PUBLIC
-      ${Boost_LIBRARIES}
       ${PYTHON_LIBRARIES}
       dart
       dart-collision-bullet
@@ -135,14 +111,14 @@ if(EXISTS "${SOURCES_TXT}")
 
   add_library("${PROJECT_NAME}" MODULE
     ${SOURCES_GENERATED}
-    src/BodyNode.cpp
-    src/Skeleton.cpp
-    src/skel_parser.cpp
-    src/template_registry.cpp
+    src/eigen_geometry_py.cpp
+#    src/BodyNode.cpp
+#    src/Skeleton.cpp
+#    src/skel_parser.cpp
+#    src/template_registry.cpp
   )
   target_link_libraries("${PROJECT_NAME}"
     PUBLIC
-      ${Boost_LIBRARIES}
       ${PYTHON_LIBRARIES}
       dart
       dart-collision-bullet

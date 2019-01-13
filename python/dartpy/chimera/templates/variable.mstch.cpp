@@ -1,20 +1,24 @@
-{{{header}}}
+{{header}}
 {{#includes}}
-#include <{{{.}}}>
+#include <{{.}}>
 {{/includes}}
-{{{precontent}}}
-#include <boost/python.hpp>
-#include <cmath>
+{{#sources}}
+#include <{{.}}>
+{{/sources}}
+{{precontent}}
+#include <pybind11/pybind11.h>
+{{postinclude}}
 
-/* postinclude */
-
-void {{variable.mangled_name}}()
+void {{variable.mangled_name}}(::pybind11::module& m)
 {
-::boost::python::object parent_object(::boost::python::scope(){{!
-    }}{{#variable.scope}}{{#name}}.attr("{{name}}"){{/name}}{{/variable.scope}});
-::boost::python::scope parent_scope(parent_object);
+    auto sm = m{{!
+        }}{{#variable.namespace_scope}}{{#name}}.def_submodule("{{name}}"){{/name}}{{/variable.namespace_scope}};
 
-::boost::python::scope().attr("{{variable.name}}") = {{{variable.qualified_name}}};
+    auto attr = sm{{!
+        }}{{#variable.class_scope}}{{#name}}.attr("{{name}}"){{/name}}{{/variable.class_scope}};
+
+    attr.attr("{{variable.name}}") = {{variable.qualified_name}};
 }
-{{{postcontent}}}
-{{{footer}}}
+
+{{postcontent}}
+{{footer}}

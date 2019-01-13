@@ -1,37 +1,21 @@
-{{{header}}}
+{{header}}
 {{#includes}}
-#include <{{{.}}}>
+#include <{{.}}>
 {{/includes}}
+{{#sources}}
+#include <{{.}}>
+{{/sources}}
+{{precontent}}
+#include <pybind11/pybind11.h>
+{{postinclude}}
 
-#include <boost/python.hpp>
-#include <cmath>
-#include <iostream>
-
-/* main postinclude */
-
-BOOST_PYTHON_MODULE({{module.name}})
+PYBIND11_MODULE({{module.name}}, m)
 {
-::boost::python::docstring_options options(true, true, false);
-
-{{{precontent}}}
-{{#module.namespaces}}{{#name}}
-  ::boost::python::scope(){{!
-    }}{{#scope}}{{#name}}.attr("{{name}}"){{/name}}{{/scope}}.attr("{{name}}") = {{!
-    }}::boost::python::object(::boost::python::handle<>({{!
-        }}::boost::python::borrowed(::PyImport_AddModule({{!
-            }}"{{module.name}}{{#scope}}{{#name}}.{{name}}{{/name}}{{/scope}}.{{name}}"))));
-{{/name}}{{/module.namespaces}}
-
 {{#module.bindings}}
-  void {{.}}();
-  try {
-    {{.}}();
-  } catch(...) {
-    std::cerr << "Exception in: {{.}}" << std::endl;
-    throw;
-  }
+  void {{.}}(pybind11::module& m);
+  {{.}}(m);
 
 {{/module.bindings}}
-{{{postcontent}}}
+{{postcontent}}
 }
-{{{footer}}}
+{{footer}}

@@ -2,21 +2,24 @@
 {{#includes}}
 #include <{{{.}}}>
 {{/includes}}
+{{#sources}}
+#include <{{.}}>
+{{/sources}}
 {{{precontent}}}
-#include <boost/python.hpp>
-#include <cmath>
+#include <pybind11/pybind11.h>
+{{postinclude}}
 
-/* postinclude */
-
-void {{enum.mangled_name}}()
+void {{enum.mangled_name}}(pybind11::module& m)
 {
-::boost::python::object parent_object(::boost::python::scope(){{!
-    }}{{#enum.scope}}{{#name}}.attr("{{name}}"){{/name}}{{/enum.scope}});
-::boost::python::scope parent_scope(parent_object);
+    auto sm = m{{!
+        }}{{#enum.namespace_scope}}{{#name}}.def_submodule("{{name}}"){{/name}}{{/enum.namespace_scope}};
 
-::boost::python::enum_<{{{enum.type}}}>("{{enum.name}}"){{#enum.values}}
-.value("{{name}}", {{{qualified_name}}}){{/enum.values}}
-;
+    auto attr = sm{{!
+        }}{{#enum.class_scope}}{{#name}}.attr("{{name}}"){{/name}}{{/enum.class_scope}};
+
+    ::pybind11::enum_<{{{enum.type}}}>(attr, "{{enum.name}}"){{#enum.values}}
+        .value("{{name}}", {{{qualified_name}}}){{/enum.values}}
+        .export_values();
 }
 {{{postcontent}}}
 {{{footer}}}
