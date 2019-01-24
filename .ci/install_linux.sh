@@ -58,6 +58,10 @@ else
   exit 1
 fi
 
+if [ "$BUILD_NAME" = "DARTPY" ]; then
+  $SUDO apt-get -y install python3-dev
+fi
+
 $SUDO apt-get -y install lcov
 
 if [ $BUILD_NAME = DOCS ]; then
