@@ -59,6 +59,10 @@ else
 fi
 
 if [ "$BUILD_NAME" = "DARTPY" ]; then
+  $SUDO apt-add-repository -y ppa:personalrobotics/ppa
+  $SUDO apt-get -qq update
+  $SUDO apt-get -y install chimera
+
   # Install pybind11 from source (we need pybind11 (>=2.2.0))
   git clone https://github.com/pybind/pybind11.git
   cd pybind11
