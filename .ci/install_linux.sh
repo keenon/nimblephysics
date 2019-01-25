@@ -59,6 +59,17 @@ else
 fi
 
 if [ "$BUILD_NAME" = "DARTPY" ]; then
+  # Install pybind11 from source (we need pybind11 (>=2.2.0))
+  git clone https://github.com/pybind/pybind11.git
+  cd pybind11
+  git checkout tags/v2.2.3
+  mkdir build
+  cd build
+  cmake .. -DPYBIND11_TEST=OFF -DPYBIND11_PYTHON_VERSION=$PYTHON_VERSION
+  make -j4
+  $SUDO make install
+  cd ../..
+
   $SUDO apt-get -y install python3-dev
 fi
 
