@@ -260,6 +260,21 @@ classes:
   'dart::dynamics::SimpleFrame':
     held_type: 'std::shared_ptr<dart::dynamics::SimpleFrame>'
 
+  #----------------------------------------------------------------------------
+  # dart::collision::
+  #----------------------------------------------------------------------------
+
+  'dart::collision::CollisionDetector':
+    held_type: 'std::shared_ptr<dart::collision::CollisionDetector>'
+  'dart::collision::DARTCollisionDetector':
+    held_type: 'std::shared_ptr<dart::collision::DARTCollisionDetector>'
+  'dart::collision::FCLCollisionDetector':
+    held_type: 'std::shared_ptr<dart::collision::FCLCollisionDetector>'
+  'dart::collision::BulletCollisionDetector':
+    held_type: 'std::shared_ptr<dart::collision::BulletCollisionDetector>'
+  # 'dart::collision::ODECollisionDetector':
+  #   held_type: 'std::shared_ptr<dart::collision::ODECollisionDetector>'
+
   # Eigen
   'template <typename Derived> Eigen::Map': null
 
