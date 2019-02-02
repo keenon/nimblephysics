@@ -275,6 +275,26 @@ classes:
   # 'dart::collision::ODECollisionDetector':
   #   held_type: 'std::shared_ptr<dart::collision::ODECollisionDetector>'
 
+  #----------------------------------------------------------------------------
+  # dart::constraint::
+  #----------------------------------------------------------------------------
+  'dart::constraint::ConstraintBase':
+    held_type: 'std::shared_ptr<dart::constraint::ConstraintBase>'
+  'dart::constraint::ClosedLoopConstraint':
+    held_type: 'std::shared_ptr<dart::constraint::ClosedLoopConstraint>'
+  'dart::constraint::ContactConstraint':
+    held_type: 'std::shared_ptr<dart::constraint::ContactConstraint>'
+  'dart::constraint::SoftContactConstraint':
+    held_type: 'std::shared_ptr<dart::constraint::SoftContactConstraint>'
+  'dart::constraint::JointLimitConstraint':
+    held_type: 'std::shared_ptr<dart::constraint::JointLimitConstraint>'
+  'dart::constraint::ServoMotorConstraint':
+    held_type: 'std::shared_ptr<dart::constraint::ServoMotorConstraint>'
+  'dart::constraint::MimicMotorConstraint':
+    held_type: 'std::shared_ptr<dart::constraint::MimicMotorConstraint>'
+  'dart::constraint::JointCoulombFrictionConstraint':
+    held_type: 'std::shared_ptr<dart::constraint::JointCoulombFrictionConstraint>'
+
   # Eigen
   'template <typename Derived> Eigen::Map': null
 
