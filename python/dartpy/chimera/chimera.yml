@@ -260,6 +260,9 @@ classes:
   'dart::dynamics::SimpleFrame':
     held_type: 'std::shared_ptr<dart::dynamics::SimpleFrame>'
 
+  # Eigen
+  'template <typename Derived> Eigen::Map': null
+
   # Test
   # 'dart::dynamics::AssimpInputResourceRetrieverAdaptor': null
   # 'dart::dynamics::ArrowShape::Properties': null
