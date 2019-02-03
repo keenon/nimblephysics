@@ -120,7 +120,7 @@ public:
   friend class ConstraintSolver;
   friend class ConstrainedGroup;
 
-protected:
+// protected:
   /// Default contructor
   ConstraintBase();
 
