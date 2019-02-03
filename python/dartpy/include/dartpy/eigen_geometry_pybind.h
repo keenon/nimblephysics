@@ -97,9 +97,10 @@ struct type_caster_wrapped {
       // `constexpr char[]`, so we use `::pybind11::detail::descr`.
       // See `pybind11/pybind11.h`, `cpp_function::initialize(...)` for an
       // example.
-      static constexpr auto original_name = Wrapper::original_name;
+      // static constexpr auto original_name = Wrapper::original_name;
       throw ::pybind11::cast_error(
-          std::string("Can only pass ") + original_name.text +
+          std::string("Can only pass ") +
+          // original_name.text +
           " by value.");
     }
     return WrappedTypeCaster::cast(
@@ -119,7 +120,7 @@ template <typename T, int Dim>
 struct wrapper_eigen_translation {
   using Type = Eigen::Translation<T, Dim>;
   using WrappedType = Eigen::Matrix<T, Dim, 1>;
-  static constexpr auto original_name = ::pybind11::detail::_("Eigen::Translation<>");
+  // static constexpr auto original_name = ::pybind11::detail::_("Eigen::Translation<>");
   static Type unwrap(const WrappedType& arg_wrapped) {
     return Type(arg_wrapped);
   }
