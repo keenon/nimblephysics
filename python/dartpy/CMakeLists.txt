@@ -80,9 +80,13 @@ if(chimera_FOUND)
   add_chimera_binding(TARGET "${PROJECT_NAME}_CHIMERA"
     MODULE "${PROJECT_NAME}"
     CONFIGURATION "${CHIMERA_CONFIG}"
-    SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/chimera/chimera.cpp"
+    SOURCES "chimera/chimera.hpp"
     DESTINATION "${CMAKE_CURRENT_SOURCE_DIR}/src/generated"
     DEBUG EXCLUDE_FROM_ALL
+  )
+  target_include_directories("${PROJECT_NAME}_CHIMERA"
+    PUBLIC
+      ${CMAKE_CURRENT_SOURCE_DIR}
   )
   target_link_libraries("${PROJECT_NAME}_CHIMERA"
     PUBLIC
@@ -116,6 +120,10 @@ if(EXISTS "${SOURCES_TXT}")
 #    src/Skeleton.cpp
 #    src/skel_parser.cpp
 #    src/template_registry.cpp
+  )
+  target_include_directories("${PROJECT_NAME}"
+    PUBLIC
+      ${CMAKE_CURRENT_SOURCE_DIR}
   )
   target_link_libraries("${PROJECT_NAME}"
     PUBLIC
