@@ -81,7 +81,7 @@ template:
     prebody:
       '/* main prebody */'
     precontent:
-      '/* main precontent */'
+      pybind11::module::import("numpy");
     postcontent: |
       void eigen(pybind11::module& m);
       eigen(m);
@@ -278,8 +278,11 @@ classes:
   #----------------------------------------------------------------------------
   # dart::constraint::
   #----------------------------------------------------------------------------
+  # Used pybind11::nodelete to disable errors due to the protected destructor
+  # See https://pybind11.readthedocs.io/en/stable/advanced/classes.html#non-public-destructors
   'dart::constraint::ConstraintBase':
-    held_type: 'std::shared_ptr<dart::constraint::ConstraintBase>'
+    held_type: 'std::unique_ptr<dart::constraint::ConstraintBase, pybind11::nodelete>'
+
   'dart::constraint::ClosedLoopConstraint':
     held_type: 'std::shared_ptr<dart::constraint::ClosedLoopConstraint>'
   'dart::constraint::ContactConstraint':
