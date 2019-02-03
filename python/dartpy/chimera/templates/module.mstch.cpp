@@ -5,16 +5,18 @@
 {{#sources}}
 #include <{{.}}>
 {{/sources}}
-{{precontent}}
 #include <pybind11/pybind11.h>
 {{postinclude}}
 
+{{#module.bindings}}
+void {{.}}(pybind11::module& m);
+{{/module.bindings}}
+
 PYBIND11_MODULE({{module.name}}, m)
 {
+{{precontent}}
 {{#module.bindings}}
-  void {{.}}(pybind11::module& m);
-  {{.}}(m);
-
+    {{.}}(m);
 {{/module.bindings}}
 {{postcontent}}
 }
