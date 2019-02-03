@@ -5,7 +5,6 @@
 {{#sources}}
 #include <{{.}}>
 {{/sources}}
-{{precontent}}
 #include <pybind11/pybind11.h>
 {{postinclude}}
 
@@ -34,6 +33,8 @@ namespace {
 
 void {{class.mangled_name}}(pybind11::module& m)
 {
+    {{precontent}}
+
     auto sm = m{{!
         }}{{#class.namespace_scope}}{{#name}}.def_submodule("{{name}}"){{/name}}{{/class.namespace_scope}};
 
@@ -101,6 +102,7 @@ void {{class.mangled_name}}(pybind11::module& m)
     }}("{{name}}", &{{qualified_name}})
 {{/class.static_fields}}
     ;
+
+    {{postcontent}}
 }
-{{postcontent}}
 {{footer}}

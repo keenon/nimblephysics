@@ -5,12 +5,13 @@
 {{#sources}}
 #include <{{.}}>
 {{/sources}}
-{{precontent}}
 #include <pybind11/pybind11.h>
 {{postinclude}}
 
 void {{variable.mangled_name}}(::pybind11::module& m)
 {
+    {{precontent}}
+
     auto sm = m{{!
         }}{{#variable.namespace_scope}}{{#name}}.def_submodule("{{name}}"){{/name}}{{/variable.namespace_scope}};
 
@@ -18,7 +19,7 @@ void {{variable.mangled_name}}(::pybind11::module& m)
         }}{{#variable.class_scope}}{{#name}}.attr("{{name}}"){{/name}}{{/variable.class_scope}};
 
     attr.attr("{{variable.name}}") = {{variable.qualified_name}};
-}
 
-{{postcontent}}
+    {{postcontent}}
+}
 {{footer}}

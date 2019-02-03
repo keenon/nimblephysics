@@ -5,12 +5,13 @@
 {{#sources}}
 #include <{{.}}>
 {{/sources}}
-{{{precontent}}}
 #include <pybind11/pybind11.h>
 {{postinclude}}
 
 void {{enum.mangled_name}}(pybind11::module& m)
 {
+    {{{precontent}}}
+
     auto sm = m{{!
         }}{{#enum.namespace_scope}}{{#name}}.def_submodule("{{name}}"){{/name}}{{/enum.namespace_scope}};
 
@@ -20,6 +21,7 @@ void {{enum.mangled_name}}(pybind11::module& m)
     ::pybind11::enum_<{{{enum.type}}}>(attr, "{{enum.name}}"){{#enum.values}}
         .value("{{name}}", {{{qualified_name}}}){{/enum.values}}
         .export_values();
+
+    {{{postcontent}}}
 }
-{{{postcontent}}}
 {{{footer}}}

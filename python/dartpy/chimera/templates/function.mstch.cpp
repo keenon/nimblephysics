@@ -5,12 +5,13 @@
 {{#sources}}
 #include <{{.}}>
 {{/sources}}
-{{precontent}}
 #include <pybind11/pybind11.h>
 {{postinclude}}
 
 void {{function.mangled_name}}(pybind11::module& m)
 {
+    {{precontent}}
+
     auto sm = m{{!
         }}{{#function.namespace_scope}}{{#name}}.def_submodule("{{name}}"){{/name}}{{/function.namespace_scope}};
 
@@ -25,7 +26,7 @@ void {{function.mangled_name}}(pybind11::module& m)
     }}{{#return_value_policy}}, ::pybind11::return_value_policy<{{.}} >(){{/return_value_policy}}{{!
     }}{{#params?}}, {{#params}}::pybind11::arg("{{name}}"){{^last}}, {{/last}}{{/params}}{{/params?}});
 {{/function.overloads}}
-}
 
-{{postcontent}}
+    {{postcontent}}
+}
 {{footer}}
