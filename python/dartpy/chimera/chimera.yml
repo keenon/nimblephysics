@@ -116,10 +116,10 @@ types:
   #----------------------------------------------------------------------------
 
   # Disable const pointers
-  'const aiScene *': null
-  'const aiMesh *': null
-  'Assimp::IOStream *':
-    return_value_policy: reference_internal
+  # 'const aiScene *': null
+  # 'const aiMesh *': null
+  # 'Assimp::IOStream *':
+  #   return_value_policy: reference_internal
 
   #----------------------------------------------------------------------------
   # Eigen::
@@ -272,6 +272,9 @@ classes:
     held_type: 'std::shared_ptr<dart::collision::BulletCollisionDetector>'
   'dart::collision::OdeCollisionDetector':
     held_type: 'std::shared_ptr<dart::collision::OdeCollisionDetector>'
+
+  # Disabled for now
+  'dart::collision::OdeTypes': null
 
   #----------------------------------------------------------------------------
   # dart::constraint::

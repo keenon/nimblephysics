@@ -5,11 +5,14 @@
 {{#sources}}
 #include <{{.}}>
 {{/sources}}
+#include <iostream>
 #include <pybind11/pybind11.h>
 {{postinclude}}
 
 void {{function.mangled_name}}(pybind11::module& m)
 {
+    std::cout << "[Debug] Loading function '" << "{{function.mangled_name}}" << "'" << std::endl;
+
     {{precontent}}
 
     auto sm = m{{!

@@ -4,7 +4,9 @@
 
 #include <dart/common/common.hpp>
 #include <dart/math/math.hpp>
-#include <dart/optimizer/optimizer.hpp>
+#include "dart/integration/integration.hpp"
+#include "dart/lcpsolver/lcpsolver.hpp"
+#include "dart/optimizer/optimizer.hpp"
 
 // #include "dart/dynamics/ArrowShape.hpp"
 // #include "dart/dynamics/AssimpInputResourceAdaptor.hpp"

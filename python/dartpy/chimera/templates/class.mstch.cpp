@@ -5,6 +5,7 @@
 {{#sources}}
 #include <{{.}}>
 {{/sources}}
+#include <iostream>
 #include <pybind11/pybind11.h>
 {{postinclude}}
 
@@ -33,20 +34,19 @@ namespace {
 
 void {{class.mangled_name}}(pybind11::module& m)
 {
+    std::cout << "[Debug] Loading class '" << "{{variable.mangled_name}}" << "'" << std::endl;
+
     {{precontent}}
 
     auto sm = m{{!
         }}{{#class.namespace_scope}}{{#name}}.def_submodule("{{name}}"){{/name}}{{/class.namespace_scope}};
-
-    auto attr = sm{{!
-        }}{{#class.class_scope}}{{#name}}.attr("{{name}}"){{/name}}{{/class.class_scope}};
 
     ::pybind11::class_<{{class.type}}{{!
         }}{{#class.held_type}}, {{!
         }}{{.}}{{/class.held_type}}{{#class.bases?}}, {{!
         }}{{!
             }}{{#class.bases}}{{qualified_name}}{{^last}}, {{/last}}{{/class.bases}}{{!
-        }}{{/class.bases?}} >(attr, "{{class.name}}"{{!
+        }}{{/class.bases?}} >(sm, "{{#class.class_scope}}{{#name}}{{.}}{{/name}}{{/class.class_scope}}{{class.name}}"{{!
         }}{{#class.comment?}}, {{class.mangled_name}}_docstring{{/class.comment?}}{{!
         }}){{!
 
