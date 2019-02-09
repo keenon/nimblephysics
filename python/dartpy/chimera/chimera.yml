@@ -96,7 +96,7 @@ namespaces:
     name: null  # Collapse the 'dart' namespace into its parent.
   'dart::common::detail': null
   'dart::math::detail': null
-  'dart::dynamics::detail': null
+  # 'dart::dynamics::detail': null
 
 #==============================================================================
 #
@@ -155,8 +155,8 @@ types:
   #----------------------------------------------------------------------------
 
   # Return value policy
-  'const dart::dynamics::ArrowShape::Properties &':
-    return_value_policy: reference_internal
+  # 'const dart::dynamics::ArrowShape::Properties &':
+  #   return_value_policy: reference_internal
 
 #==============================================================================
 #
@@ -226,55 +226,55 @@ classes:
   #----------------------------------------------------------------------------
 
   # Hide details
-  'dart::common::CloneableMap<std::map<std::type_index, std::unique_ptr<dart::common::CloneableVector<std::unique_ptr<dart::dynamics::Node::Properties, std::default_delete<dart::dynamics::Node::Properties> > >, std::default_delete<dart::common::CloneableVector<std::unique_ptr<dart::dynamics::Node::Properties, std::default_delete<dart::dynamics::Node::Properties> > > > >, std::less<std::type_index>, std::allocator<std::pair<const std::type_index, std::unique_ptr<dart::common::CloneableVector<std::unique_ptr<dart::dynamics::Node::Properties, std::default_delete<dart::dynamics::Node::Properties> > >, std::default_delete<dart::common::CloneableVector<std::unique_ptr<dart::dynamics::Node::Properties, std::default_delete<dart::dynamics::Node::Properties> > > > > > > > >': null
-  'dart::common::CompositeJoiner<dart::dynamics::EntityNode<dart::dynamics::TemplatedJacobianNode<dart::dynamics::FixedJacobianNode> >, dart::common::Virtual<dart::dynamics::FixedFrame> >': null
-  'dart::common::CompositeJoiner<dart::dynamics::FixedJacobianNode, dart::dynamics::ShapeFrame>': null
-  'dart::common::CompositeJoiner<dart::dynamics::FixedJacobianNode, dart::common::SpecializedForAspect<dart::dynamics::Support> >': null
-  'dart::common::EmbedProperties<dart::dynamics::EndEffector, dart::dynamics::detail::EndEffectorProperties>': null
-  'dart::common::EmbedProperties<dart::dynamics::EntityNode<dart::dynamics::TemplatedJacobianNode<dart::dynamics::FixedJacobianNode> >, dart::dynamics::detail::EntityNodeProperties>': null
-  'dart::common::EmbedProperties<dart::dynamics::Marker, dart::dynamics::detail::MarkerProperties>': null
-  'dart::common::RequiresAspect<dart::common::EmbeddedPropertiesAspect<dart::dynamics::EndEffector, dart::dynamics::detail::EndEffectorProperties> >': null
-  'dart::common::RequiresAspect<dart::common::EmbeddedPropertiesAspect<dart::dynamics::EntityNode<dart::dynamics::TemplatedJacobianNode<dart::dynamics::FixedJacobianNode> >, dart::dynamics::detail::EntityNodeProperties> >': null
-  'dart::common::RequiresAspect<dart::common::EmbeddedPropertiesAspect<dart::dynamics::Marker, dart::dynamics::detail::MarkerProperties> >': null
-  'dart::common::SpecializedForAspect<dart::common::EmbeddedPropertiesAspect<dart::dynamics::EntityNode<dart::dynamics::TemplatedJacobianNode<dart::dynamics::FixedJacobianNode> >, dart::dynamics::detail::EntityNodeProperties> >': null
-  'dart::common::SpecializedForAspect<dart::common::EmbeddedPropertiesAspect<dart::dynamics::EndEffector, dart::dynamics::detail::EndEffectorProperties> >': null
-  'dart::common::SpecializedForAspect<dart::common::EmbeddedPropertiesAspect<dart::dynamics::Marker, dart::dynamics::detail::MarkerProperties> >': null
-  'dart::dynamics::AccessoryNode<dart::dynamics::FixedJacobianNode>': null
-  'dart::dynamics::CompositeNode<dart::common::CompositeJoiner<dart::dynamics::FixedJacobianNode, dart::dynamics::ShapeFrame> >': null
-  'dart::dynamics::CompositeNode<dart::common::CompositeJoiner<dart::dynamics::FixedJacobianNode, dart::common::SpecializedForAspect<dart::dynamics::Support> > >': null
-  'dart::dynamics::CompositeNode<dart::common::CompositeJoiner<dart::dynamics::FixedJacobianNode, dart::dynamics::ShapeFrame> >': null
-  'dart::dynamics::CompositePropertiesNode<dart::dynamics::CompositeStateNode<dart::common::CompositeJoiner<dart::dynamics::FixedJacobianNode, dart::dynamics::ShapeFrame> > >': null
-  'dart::dynamics::CompositePropertiesNode<dart::dynamics::CompositeStateNode<dart::common::CompositeJoiner<dart::dynamics::FixedJacobianNode, dart::common::SpecializedForAspect<dart::dynamics::Support> > > >': null
-  'dart::dynamics::CompositeStateNode<dart::common::CompositeJoiner<dart::dynamics::FixedJacobianNode, dart::dynamics::ShapeFrame> >': null
-  'dart::dynamics::CompositeStateNode<dart::common::CompositeJoiner<dart::dynamics::FixedJacobianNode, dart::common::SpecializedForAspect<dart::dynamics::Support> > >': null
-  'dart::dynamics::CompositePropertiesNode<dart::dynamics::CompositeStateNode<dart::common::CompositeJoiner<dart::dynamics::FixedJacobianNode, dart::common::SpecializedForAspect<dart::dynamics::Support> > > >': null
-  'dart::dynamics::detail::EntityNodeBase<dart::dynamics::TemplatedJacobianNode<dart::dynamics::FixedJacobianNode>, false>': null
-  'dart::dynamics::EntityNode<dart::dynamics::TemplatedJacobianNode<dart::dynamics::FixedJacobianNode> >': null
-  'dart::dynamics::TemplatedJacobianNode<dart::dynamics::FixedJacobianNode>': null
-  'dart::dynamics::TemplateWeakBodyNodePtr<dart::dynamics::BodyNode>': null
-  'dart::dynamics::TemplateWeakNodePtr<dart::dynamics::ShapeNode, dart::dynamics::BodyNode>': null
+  # 'dart::common::CloneableMap<std::map<std::type_index, std::unique_ptr<dart::common::CloneableVector<std::unique_ptr<dart::dynamics::Node::Properties, std::default_delete<dart::dynamics::Node::Properties> > >, std::default_delete<dart::common::CloneableVector<std::unique_ptr<dart::dynamics::Node::Properties, std::default_delete<dart::dynamics::Node::Properties> > > > >, std::less<std::type_index>, std::allocator<std::pair<const std::type_index, std::unique_ptr<dart::common::CloneableVector<std::unique_ptr<dart::dynamics::Node::Properties, std::default_delete<dart::dynamics::Node::Properties> > >, std::default_delete<dart::common::CloneableVector<std::unique_ptr<dart::dynamics::Node::Properties, std::default_delete<dart::dynamics::Node::Properties> > > > > > > > >': null
+  # 'dart::common::CompositeJoiner<dart::dynamics::EntityNode<dart::dynamics::TemplatedJacobianNode<dart::dynamics::FixedJacobianNode> >, dart::common::Virtual<dart::dynamics::FixedFrame> >': null
+  # 'dart::common::CompositeJoiner<dart::dynamics::FixedJacobianNode, dart::dynamics::ShapeFrame>': null
+  # 'dart::common::CompositeJoiner<dart::dynamics::FixedJacobianNode, dart::common::SpecializedForAspect<dart::dynamics::Support> >': null
+  # 'dart::common::EmbedProperties<dart::dynamics::EndEffector, dart::dynamics::detail::EndEffectorProperties>': null
+  # 'dart::common::EmbedProperties<dart::dynamics::EntityNode<dart::dynamics::TemplatedJacobianNode<dart::dynamics::FixedJacobianNode> >, dart::dynamics::detail::EntityNodeProperties>': null
+  # 'dart::common::EmbedProperties<dart::dynamics::Marker, dart::dynamics::detail::MarkerProperties>': null
+  # 'dart::common::RequiresAspect<dart::common::EmbeddedPropertiesAspect<dart::dynamics::EndEffector, dart::dynamics::detail::EndEffectorProperties> >': null
+  # 'dart::common::RequiresAspect<dart::common::EmbeddedPropertiesAspect<dart::dynamics::EntityNode<dart::dynamics::TemplatedJacobianNode<dart::dynamics::FixedJacobianNode> >, dart::dynamics::detail::EntityNodeProperties> >': null
+  # 'dart::common::RequiresAspect<dart::common::EmbeddedPropertiesAspect<dart::dynamics::Marker, dart::dynamics::detail::MarkerProperties> >': null
+  # 'dart::common::SpecializedForAspect<dart::common::EmbeddedPropertiesAspect<dart::dynamics::EntityNode<dart::dynamics::TemplatedJacobianNode<dart::dynamics::FixedJacobianNode> >, dart::dynamics::detail::EntityNodeProperties> >': null
+  # 'dart::common::SpecializedForAspect<dart::common::EmbeddedPropertiesAspect<dart::dynamics::EndEffector, dart::dynamics::detail::EndEffectorProperties> >': null
+  # 'dart::common::SpecializedForAspect<dart::common::EmbeddedPropertiesAspect<dart::dynamics::Marker, dart::dynamics::detail::MarkerProperties> >': null
+  # 'dart::dynamics::AccessoryNode<dart::dynamics::FixedJacobianNode>': null
+  # 'dart::dynamics::CompositeNode<dart::common::CompositeJoiner<dart::dynamics::FixedJacobianNode, dart::dynamics::ShapeFrame> >': null
+  # 'dart::dynamics::CompositeNode<dart::common::CompositeJoiner<dart::dynamics::FixedJacobianNode, dart::common::SpecializedForAspect<dart::dynamics::Support> > >': null
+  # 'dart::dynamics::CompositeNode<dart::common::CompositeJoiner<dart::dynamics::FixedJacobianNode, dart::dynamics::ShapeFrame> >': null
+  # 'dart::dynamics::CompositePropertiesNode<dart::dynamics::CompositeStateNode<dart::common::CompositeJoiner<dart::dynamics::FixedJacobianNode, dart::dynamics::ShapeFrame> > >': null
+  # 'dart::dynamics::CompositePropertiesNode<dart::dynamics::CompositeStateNode<dart::common::CompositeJoiner<dart::dynamics::FixedJacobianNode, dart::common::SpecializedForAspect<dart::dynamics::Support> > > >': null
+  # 'dart::dynamics::CompositeStateNode<dart::common::CompositeJoiner<dart::dynamics::FixedJacobianNode, dart::dynamics::ShapeFrame> >': null
+  # 'dart::dynamics::CompositeStateNode<dart::common::CompositeJoiner<dart::dynamics::FixedJacobianNode, dart::common::SpecializedForAspect<dart::dynamics::Support> > >': null
+  # 'dart::dynamics::CompositePropertiesNode<dart::dynamics::CompositeStateNode<dart::common::CompositeJoiner<dart::dynamics::FixedJacobianNode, dart::common::SpecializedForAspect<dart::dynamics::Support> > > >': null
+  # 'dart::dynamics::detail::EntityNodeBase<dart::dynamics::TemplatedJacobianNode<dart::dynamics::FixedJacobianNode>, false>': null
+  # 'dart::dynamics::EntityNode<dart::dynamics::TemplatedJacobianNode<dart::dynamics::FixedJacobianNode> >': null
+  # 'dart::dynamics::TemplatedJacobianNode<dart::dynamics::FixedJacobianNode>': null
+  # 'dart::dynamics::TemplateWeakBodyNodePtr<dart::dynamics::BodyNode>': null
+  # 'dart::dynamics::TemplateWeakNodePtr<dart::dynamics::ShapeNode, dart::dynamics::BodyNode>': null
 
   # Held type
-  'dart::dynamics::SimpleFrame':
-    held_type: 'std::shared_ptr<dart::dynamics::SimpleFrame>'
+  # 'dart::dynamics::SimpleFrame':
+  #   held_type: 'std::shared_ptr<dart::dynamics::SimpleFrame>'
 
   #----------------------------------------------------------------------------
   # dart::collision::
   #----------------------------------------------------------------------------
 
-  'dart::collision::CollisionDetector':
-    held_type: 'std::shared_ptr<dart::collision::CollisionDetector>'
-  'dart::collision::DARTCollisionDetector':
-    held_type: 'std::shared_ptr<dart::collision::DARTCollisionDetector>'
-  'dart::collision::FCLCollisionDetector':
-    held_type: 'std::shared_ptr<dart::collision::FCLCollisionDetector>'
-  'dart::collision::BulletCollisionDetector':
-    held_type: 'std::shared_ptr<dart::collision::BulletCollisionDetector>'
-  'dart::collision::OdeCollisionDetector':
-    held_type: 'std::shared_ptr<dart::collision::OdeCollisionDetector>'
+  # 'dart::collision::CollisionDetector':
+  #   held_type: 'std::shared_ptr<dart::collision::CollisionDetector>'
+  # 'dart::collision::DARTCollisionDetector':
+  #   held_type: 'std::shared_ptr<dart::collision::DARTCollisionDetector>'
+  # 'dart::collision::FCLCollisionDetector':
+  #   held_type: 'std::shared_ptr<dart::collision::FCLCollisionDetector>'
+  # 'dart::collision::BulletCollisionDetector':
+  #   held_type: 'std::shared_ptr<dart::collision::BulletCollisionDetector>'
+  # 'dart::collision::OdeCollisionDetector':
+  #   held_type: 'std::shared_ptr<dart::collision::OdeCollisionDetector>'
 
   # Disabled for now
-  'dart::collision::OdeTypes': null
+  # 'dart::collision::OdeTypes': null
 
   #----------------------------------------------------------------------------
   # dart::constraint::
@@ -303,7 +303,7 @@ classes:
   'template <typename Derived> Eigen::Map': null
 
   # Assimp
-  'Assimp::IOStream': null
+  # 'Assimp::IOStream': null
 
 #==============================================================================
 #
@@ -355,5 +355,5 @@ functions:
   #----------------------------------------------------------------------------
 
   # Disable std::unique_ptr<T>& parameter
-  'void dart::dynamics::Node::copyNodeStateTo(std::unique_ptr<dart::dynamics::Node::State> &) const': null
-  'void dart::dynamics::Node::copyNodePropertiesTo(std::unique_ptr<dart::dynamics::Node::Properties> &) const': null
+  # 'void dart::dynamics::Node::copyNodeStateTo(std::unique_ptr<dart::dynamics::Node::State> &) const': null
+  # 'void dart::dynamics::Node::copyNodePropertiesTo(std::unique_ptr<dart::dynamics::Node::Properties> &) const': null
