@@ -13,8 +13,8 @@
 #include <dart/dynamics/dynamics.hpp>
 
 #include <dart/collision/collision.hpp>
-// #include <dart/collision/bullet/bullet.hpp>
-// #include <dart/collision/ode/ode.hpp>
+#include <dart/collision/bullet/bullet.hpp>
+#include <dart/collision/ode/ode.hpp>
 
 // #include <dart/dart.hpp>
 // #include <dart/collision/bullet/bullet.hpp>

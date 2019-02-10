@@ -15,7 +15,7 @@ void {{.}}(pybind11::module& m);
 
 PYBIND11_MODULE({{module.name}}, m)
 {
-    std::cout << "[Debug] Loading module '" << "{{function.mangled_name}}" << "'" << std::endl;
+    std::cout << "[Debug] Loading module '" << "{{module.mangled_name}}" << "'" << std::endl;
 
     {{precontent}}
 

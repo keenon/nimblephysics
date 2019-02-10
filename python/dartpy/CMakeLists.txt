@@ -92,9 +92,9 @@ if(chimera_FOUND)
     PUBLIC
       ${PYTHON_LIBRARIES}
       dart
-      # dart-collision-bullet
-      # dart-collision-ode
-      # dart-gui
+      dart-collision-bullet
+      dart-collision-ode
+      dart-gui
   )
   add_custom_target(binding DEPENDS "${PROJECT_NAME}_CHIMERA_REBUILD")
 else()
@@ -130,9 +130,9 @@ if(EXISTS "${SOURCES_TXT}")
     PUBLIC
       ${PYTHON_LIBRARIES}
       dart
-      # dart-collision-bullet
-      # dart-collision-ode
-      # dart-gui
+      dart-collision-bullet
+      dart-collision-ode
+      dart-gui
   )
   set_target_properties("${PROJECT_NAME}" PROPERTIES
     PREFIX ""
