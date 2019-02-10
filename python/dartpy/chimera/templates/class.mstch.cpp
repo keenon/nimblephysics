@@ -34,7 +34,7 @@ namespace {
 
 void {{class.mangled_name}}(pybind11::module& m)
 {
-    std::cout << "[Debug] Loading class '" << "{{variable.mangled_name}}" << "'" << std::endl;
+    std::cout << "[Debug] Loading class '" << "{{class.mangled_name}}" << "'" << std::endl;
 
     {{precontent}}
 

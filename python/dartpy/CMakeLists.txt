@@ -54,7 +54,7 @@ find_package(chimera QUIET)
 # Check if DART is built with octomap so that it supports VoxelGridShape
 include(CheckCXXSourceCompiles)
 set(CMAKE_REQUIRED_DEFINITIONS "")
-set(CMAKE_REQUIRED_FLAGS "-std=c++11")
+set(CMAKE_REQUIRED_FLAGS "-std=c++14")
 set(CMAKE_REQUIRED_INCLUDES ${DART_INCLUDE_DIRS})
 set(CMAKE_REQUIRED_LIBRARIES ${DART_LIBRARIES})
 check_cxx_source_compiles(
@@ -92,8 +92,9 @@ if(chimera_FOUND)
     PUBLIC
       ${PYTHON_LIBRARIES}
       dart
-      dart-collision-bullet
-      dart-gui
+      # dart-collision-bullet
+      # dart-collision-ode
+      # dart-gui
   )
   add_custom_target(binding DEPENDS "${PROJECT_NAME}_CHIMERA_REBUILD")
 else()
@@ -129,8 +130,9 @@ if(EXISTS "${SOURCES_TXT}")
     PUBLIC
       ${PYTHON_LIBRARIES}
       dart
-      dart-collision-bullet
-      dart-gui
+      # dart-collision-bullet
+      # dart-collision-ode
+      # dart-gui
   )
   set_target_properties("${PROJECT_NAME}" PROPERTIES
     PREFIX ""
@@ -141,6 +143,7 @@ if(EXISTS "${SOURCES_TXT}")
       PRIVATE -fabi-version=6
     )
   endif()
+  target_compile_options("${PROJECT_NAME}" PRIVATE -fvisibility=hidden)
 
   install(TARGETS "${PROJECT_NAME}"
     LIBRARY DESTINATION "${PYTHON_SITE_PACKAGES}"

@@ -35,7 +35,7 @@ template:
       // #include <dartpy/pointers.h>
       // #include <dartpy/template_registry.h>
       #include <dart/dart.hpp>
-      #include <dart/collision/bullet/bullet.hpp>
+      // #include <dart/collision/bullet/bullet.hpp>
       // #include <dart/collision/ode/ode.hpp>
       #include <dart/optimizer/optimizer.hpp>
       #include <dart/optimizer/nlopt/nlopt.hpp>
@@ -62,7 +62,7 @@ template:
       // #include <dartpy/collections.h>
       // #include <dartpy/util.h>
       #include <dart/dart.hpp>
-      #include <dart/collision/bullet/bullet.hpp>
+      // #include <dart/collision/bullet/bullet.hpp>
       // #include <dart/collision/ode/ode.hpp>
       #include <dart/optimizer/optimizer.hpp>
       #include <dart/optimizer/nlopt/nlopt.hpp>
@@ -96,7 +96,11 @@ namespaces:
     name: null  # Collapse the 'dart' namespace into its parent.
   'dart::common::detail': null
   'dart::math::detail': null
-  # 'dart::dynamics::detail': null
+  'dart::dynamics::detail': null
+  'dart::dynamics': null
+  # 'dart::collision': null
+  # 'dart::collision::bullet': null
+  # 'dart::collision::ode': null
 
 #==============================================================================
 #
@@ -155,8 +159,8 @@ types:
   #----------------------------------------------------------------------------
 
   # Return value policy
-  # 'const dart::dynamics::ArrowShape::Properties &':
-  #   return_value_policy: reference_internal
+  'const dart::dynamics::ArrowShape::Properties &':
+    return_value_policy: reference_internal
 
 #==============================================================================
 #
@@ -198,21 +202,21 @@ classes:
   #----------------------------------------------------------------------------
 
   # Hide details
-  'dart::math::detail::toEuclideanPointImpl<dart::math::RealVectorSpace<1> >': null
-  'dart::math::detail::toEuclideanPointImpl<dart::math::RealVectorSpace<3> >': null
-  'dart::math::detail::toEuclideanPointImpl<dart::math::RealVectorSpace<2> >': null
-  'dart::math::detail::toEuclideanPointImpl<dart::math::SO3Space>': null
-  'dart::math::detail::toEuclideanPointImpl<dart::math::SE3Space>': null
-  'dart::math::detail::toManifoldPointImpl<dart::math::RealVectorSpace<1> >': null
-  'dart::math::detail::toManifoldPointImpl<dart::math::RealVectorSpace<3> >': null
-  'dart::math::detail::toManifoldPointImpl<dart::math::RealVectorSpace<2> >': null
-  'dart::math::detail::toManifoldPointImpl<dart::math::SO3Space>': null
-  'dart::math::detail::toManifoldPointImpl<dart::math::SE3Space>': null
-  'dart::math::detail::integratePositionImpl<dart::math::RealVectorSpace<1> >': null
-  'dart::math::detail::integratePositionImpl<dart::math::RealVectorSpace<3> >': null
-  'dart::math::detail::integratePositionImpl<dart::math::RealVectorSpace<2> >': null
-  'dart::math::detail::integratePositionImpl<dart::math::SO3Space>': null
-  'dart::math::detail::integratePositionImpl<dart::math::SE3Space>': null
+  # 'dart::math::detail::toEuclideanPointImpl<dart::math::RealVectorSpace<1> >': null
+  # 'dart::math::detail::toEuclideanPointImpl<dart::math::RealVectorSpace<3> >': null
+  # 'dart::math::detail::toEuclideanPointImpl<dart::math::RealVectorSpace<2> >': null
+  # 'dart::math::detail::toEuclideanPointImpl<dart::math::SO3Space>': null
+  # 'dart::math::detail::toEuclideanPointImpl<dart::math::SE3Space>': null
+  # 'dart::math::detail::toManifoldPointImpl<dart::math::RealVectorSpace<1> >': null
+  # 'dart::math::detail::toManifoldPointImpl<dart::math::RealVectorSpace<3> >': null
+  # 'dart::math::detail::toManifoldPointImpl<dart::math::RealVectorSpace<2> >': null
+  # 'dart::math::detail::toManifoldPointImpl<dart::math::SO3Space>': null
+  # 'dart::math::detail::toManifoldPointImpl<dart::math::SE3Space>': null
+  # 'dart::math::detail::integratePositionImpl<dart::math::RealVectorSpace<1> >': null
+  # 'dart::math::detail::integratePositionImpl<dart::math::RealVectorSpace<3> >': null
+  # 'dart::math::detail::integratePositionImpl<dart::math::RealVectorSpace<2> >': null
+  # 'dart::math::detail::integratePositionImpl<dart::math::SO3Space>': null
+  # 'dart::math::detail::integratePositionImpl<dart::math::SE3Space>': null
   'dart::math::MapsToManifoldPoint': null
 
   # Name
@@ -255,19 +259,19 @@ classes:
   # 'dart::dynamics::TemplateWeakNodePtr<dart::dynamics::ShapeNode, dart::dynamics::BodyNode>': null
 
   # Held type
-  # 'dart::dynamics::SimpleFrame':
-  #   held_type: 'std::shared_ptr<dart::dynamics::SimpleFrame>'
+  'dart::dynamics::SimpleFrame':
+    held_type: 'std::shared_ptr<dart::dynamics::SimpleFrame>'
 
   #----------------------------------------------------------------------------
   # dart::collision::
   #----------------------------------------------------------------------------
 
-  # 'dart::collision::CollisionDetector':
-  #   held_type: 'std::shared_ptr<dart::collision::CollisionDetector>'
-  # 'dart::collision::DARTCollisionDetector':
-  #   held_type: 'std::shared_ptr<dart::collision::DARTCollisionDetector>'
-  # 'dart::collision::FCLCollisionDetector':
-  #   held_type: 'std::shared_ptr<dart::collision::FCLCollisionDetector>'
+  'dart::collision::CollisionDetector':
+    held_type: 'std::shared_ptr<dart::collision::CollisionDetector>'
+  'dart::collision::DARTCollisionDetector':
+    held_type: 'std::shared_ptr<dart::collision::DARTCollisionDetector>'
+  'dart::collision::FCLCollisionDetector':
+    held_type: 'std::shared_ptr<dart::collision::FCLCollisionDetector>'
   # 'dart::collision::BulletCollisionDetector':
   #   held_type: 'std::shared_ptr<dart::collision::BulletCollisionDetector>'
   # 'dart::collision::OdeCollisionDetector':
@@ -303,7 +307,7 @@ classes:
   'template <typename Derived> Eigen::Map': null
 
   # Assimp
-  # 'Assimp::IOStream': null
+  'Assimp::IOStream': null
 
 #==============================================================================
 #
@@ -355,5 +359,5 @@ functions:
   #----------------------------------------------------------------------------
 
   # Disable std::unique_ptr<T>& parameter
-  # 'void dart::dynamics::Node::copyNodeStateTo(std::unique_ptr<dart::dynamics::Node::State> &) const': null
-  # 'void dart::dynamics::Node::copyNodePropertiesTo(std::unique_ptr<dart::dynamics::Node::Properties> &) const': null
+  'void dart::dynamics::Node::copyNodeStateTo(std::unique_ptr<dart::dynamics::Node::State> &) const': null
+  'void dart::dynamics::Node::copyNodePropertiesTo(std::unique_ptr<dart::dynamics::Node::Properties> &) const': null
