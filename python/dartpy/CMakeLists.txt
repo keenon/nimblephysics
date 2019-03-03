@@ -107,7 +107,7 @@ set(CHIMERA_CONFIG "${CMAKE_CURRENT_SOURCE_DIR}/chimera/chimera.yml")
 # endif()
 if(chimera_FOUND)
   add_chimera_binding(TARGET "dartpy_CHIMERA"
-    MODULE "dartpy"
+    MODULE dartpy
     CONFIGURATION "${CHIMERA_CONFIG}"
     SOURCES "chimera/chimera.hpp"
     DESTINATION "${CMAKE_CURRENT_SOURCE_DIR}/src/generated"
@@ -131,9 +131,16 @@ if(chimera_FOUND)
       dart-gui
   )
   add_custom_target(binding DEPENDS "dartpy_CHIMERA_REBUILD")
+  add_custom_target(binding_forced DEPENDS clear_binding "dartpy_CHIMERA_REBUILD")
 else()
   add_custom_target(binding
-    COMMAND ${CMAKE_COMMAND} -E cmake_echo_color --red "ERROR: Cannot generate bindings without \\'chimera\\' installed."
+    COMMAND ${CMAKE_COMMAND} -E cmake_echo_color --red
+      "ERROR: Cannot generate bindings without \\'chimera\\' installed."
+    COMMAND false
+  )
+  add_custom_target(binding_forced
+    COMMAND ${CMAKE_COMMAND} -E cmake_echo_color --red
+      "ERROR: Cannot generate bindings without \\'chimera\\' installed."
     COMMAND false
   )
 endif()
@@ -148,18 +155,18 @@ if(EXISTS "${SOURCES_TXT}")
     list(APPEND SOURCES_GENERATED "${CMAKE_CURRENT_SOURCE_DIR}/src/generated/${relative_path}")
   endforeach()
 
-  add_library("dartpy" MODULE
+  add_library(dartpy MODULE
     ${SOURCES_GENERATED}
     src/BodyNode.cpp
     src/Skeleton.cpp
     src/skel_parser.cpp
     src/template_registry.cpp
   )
-  target_include_directories("dartpy"
+  target_include_directories(dartpy
   PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
   )
-  target_link_libraries("dartpy"
+  target_link_libraries(dartpy
     PUBLIC
       ${Boost_LIBRARIES}
       ${PYTHON_LIBRARIES}
@@ -172,16 +179,16 @@ if(EXISTS "${SOURCES_TXT}")
       dart-utils-urdf
       dart-gui
   )
-  set_target_properties("dartpy" PROPERTIES
+  set_target_properties(dartpy PROPERTIES
     PREFIX ""
     SUFFIX ".so"  # python uses '.so' extension even on macOS
   )
   if(CMAKE_COMPILER_IS_GNUCXX)
-    target_compile_options("dartpy"
+    target_compile_options(dartpy
       PRIVATE -fabi-version=6
     )
   endif()
-  target_compile_options("dartpy" PRIVATE -fvisibility=hidden -w)
+  target_compile_options(dartpy PRIVATE -fvisibility=hidden -w)
 
   # dart_format_add(
   #   ${SOURCES_GENERATED}
@@ -191,12 +198,22 @@ if(EXISTS "${SOURCES_TXT}")
   #   src/template_registry.cpp
   # )
 
-  install(TARGETS "dartpy"
+  install(TARGETS dartpy
     LIBRARY DESTINATION "${PYTHON_SITE_PACKAGES}"
+  )
+
+  add_custom_target(clear_binding
+    COMMAND rm ${SOURCES_TXT}
+    COMMAND rm ${SOURCES_GENERATED}
+    COMMENT "Removed generated bindings."
   )
 else()
   add_custom_target(dartpy ALL
-    COMMAND ${CMAKE_COMMAND} -E cmake_echo_color --red "ERROR: Generate bindings using \\'make binding\\' before attempting to build."
+    COMMAND ${CMAKE_COMMAND} -E cmake_echo_color --red
+      "ERROR: Generate bindings using \\'make binding\\' before attempting to build."
     COMMAND false
+  )
+  add_custom_target(clear_binding
+    COMMENT "Removed generated bindings."
   )
 endif()
