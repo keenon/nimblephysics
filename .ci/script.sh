@@ -75,9 +75,7 @@ cmake .. \
 if [ "$BUILD_DARTPY" = "ON" ]; then
   make -j$num_threads binding
   make -j$num_threads dartpy
-
-  # Disabled for now
-  # make pytest
+  make pytest
 fi
 
 if [ "$OS_NAME" = "linux" ]; then
