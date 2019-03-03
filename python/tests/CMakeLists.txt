@@ -40,6 +40,8 @@ add_custom_target(pytest
   COMMAND ${CMAKE_COMMAND} -E echo "Running pytest by: PYTHONPATH=${DART_DARTPY_BUILD_DIR} ${PYTHON_EXECUTABLE} -m pytest \"${dartpy_test_files}\""
   COMMAND ${CMAKE_COMMAND} -E echo "[DEBUG BEGIN]"
   COMMAND ls ${DART_DARTPY_BUILD_DIR}
+  COMMAND pwd
+  COMMAND PYTHONPATH=${DART_DARTPY_BUILD_DIR} python2 -c "import dartpy"
   COMMAND PYTHONPATH=${DART_DARTPY_BUILD_DIR} ${PYTHON_EXECUTABLE} -c "import dartpy"
   COMMAND ${CMAKE_COMMAND} -E echo "[DEBUG END]"
   COMMAND PYTHONPATH=${DART_DARTPY_BUILD_DIR} ${PYTHON_EXECUTABLE} -m pytest ${dartpy_test_files} ${pytest_verbose}

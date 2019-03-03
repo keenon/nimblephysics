@@ -203,8 +203,8 @@ if(EXISTS "${SOURCES_TXT}")
   )
 
   add_custom_target(clear_binding
-    COMMAND rm ${SOURCES_TXT}
-    COMMAND rm ${SOURCES_GENERATED}
+    COMMAND rm "${SOURCES_TXT}"
+    COMMAND rm "${SOURCES_GENERATED}"
     COMMENT "Removed generated bindings."
   )
 else()
