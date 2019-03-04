@@ -126,9 +126,12 @@ if(chimera_FOUND)
       dart-collision-ode
       dart-optimizer-nlopt
       dart-planning
+      dart-simulation
       dart-utils
       dart-utils-urdf
       dart-gui
+
+      dart-simulator
   )
   add_custom_target(binding DEPENDS "dartpy_CHIMERA_REBUILD")
   add_custom_target(binding_forced DEPENDS clear_binding "dartpy_CHIMERA_REBUILD")
@@ -175,9 +178,12 @@ if(EXISTS "${SOURCES_TXT}")
       dart-collision-ode
       dart-optimizer-nlopt
       dart-planning
+      dart-simulation
       dart-utils
       dart-utils-urdf
       dart-gui
+
+      dart-simulator
   )
   set_target_properties(dartpy PROPERTIES
     PREFIX ""

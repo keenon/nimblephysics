@@ -8,3 +8,5 @@
 #include <dart/utils/utils.hpp>
 #include <dart/utils/urdf/urdf.hpp>
 #include <dart/gui/gui.hpp>
+
+#include <simulator/Simulator.hpp>

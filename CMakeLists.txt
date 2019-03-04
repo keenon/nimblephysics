@@ -320,6 +320,9 @@ if(DART_BUILD_EXTRAS)
   add_subdirectory(extras)
 endif()
 
+# TODO(JS): Add option for building simulator
+add_subdirectory(simulator)
+
 #===============================================================================
 # CMake configuration files for components and targets
 #===============================================================================

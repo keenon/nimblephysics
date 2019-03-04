@@ -49,6 +49,7 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
 # dart-gui - {dart}, gui, [opengl, glut]
 # dart-gui-osg - {dart-gui}, gui/osg, gui/osg/render, [openscenegraph]
 # dart-planning - {dart}, planning, [flann]
+# dart-simulator - {dart-utils, dart-gui-osg}, simulator
 
 #===============================================================================
 # Components - (dependency component), {dependency targets}
@@ -62,6 +63,7 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
 # gui - (utils), {dart-gui}
 # gui-osg - (gui), {dart-gui-osg}
 # planning - (dart), {dart-planning}
+# simulator - (dart, utils, gui-osg), dart-simulator
 
 # Component. This should be called before adding subdirectories.
 add_component(${PROJECT_NAME} dart)
