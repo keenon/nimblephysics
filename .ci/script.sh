@@ -75,6 +75,7 @@ cmake .. \
 if [ "$BUILD_DARTPY" = "ON" ]; then
   make -j$num_threads binding
   make -j$num_threads dartpy
+  $SUDO make install
   make pytest
 fi
 

@@ -42,7 +42,6 @@ add_custom_target(pytest
   COMMAND ls ${DART_DARTPY_BUILD_DIR}
   COMMAND pwd
   COMMAND ldd ${DART_DARTPY_BUILD_DIR}/dartpy.so
-  COMMAND PYTHONPATH=${DART_DARTPY_BUILD_DIR} python3 -c "import dartpy"
   COMMAND PYTHONPATH=${DART_DARTPY_BUILD_DIR} ${PYTHON_EXECUTABLE} -c "import dartpy"
   COMMAND ${CMAKE_COMMAND} -E echo "[DEBUG END]"
   COMMAND PYTHONPATH=${DART_DARTPY_BUILD_DIR} ${PYTHON_EXECUTABLE} -m pytest ${dartpy_test_files} ${pytest_verbose}

@@ -126,7 +126,6 @@ if(chimera_FOUND)
       dart-collision-ode
       dart-optimizer-nlopt
       dart-planning
-      dart-simulation
       dart-utils
       dart-utils-urdf
       dart-gui
@@ -178,7 +177,6 @@ if(EXISTS "${SOURCES_TXT}")
       dart-collision-ode
       dart-optimizer-nlopt
       dart-planning
-      dart-simulation
       dart-utils
       dart-utils-urdf
       dart-gui
