@@ -313,7 +313,7 @@ if(TARGET dart)
 endif()
 
 if (DART_BUILD_DARTPY)
-  add_subdirectory(python)
+  add_subdirectory(dartpy)
 endif()
 
 if(DART_BUILD_EXTRAS)
