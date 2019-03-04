@@ -167,6 +167,9 @@ namespaces:
   'dart::math::detail': null
   'dart::dynamics::detail': null
   'dart::collision::detail': null
+  'dart::gui::osg': null
+  '::osg': null
+  '::osgGA': null
 
 #==============================================================================
 #
