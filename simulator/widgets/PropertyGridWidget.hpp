@@ -36,37 +36,33 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef DART_SIMULATOR_SIMULATOR_HPP_
-#define DART_SIMULATOR_SIMULATOR_HPP_
+#pragma once
+
+#include <mutex>
 
 #include <dart/dart.hpp>
 #include <dart/external/imgui/imgui.h>
 #include <dart/gui/osg/osg.hpp>
 
-#include "Engine.hpp"
-
 namespace dart {
 namespace simulator {
 
-class Simulator
+class PropertyGridWidget : public gui::osg::ImGuiWidget
 {
 public:
-  /// Default constructor
-  Simulator();
+  PropertyGridWidget() = default;
 
-  /// Begins running the application loop
-  void run();
+  void setWorld(simulation::WorldPtr world);
+
+  // Documentation inherited
+  void render() override;
 
 protected:
-  // TODO: Use engine instead
+  std::mutex mWorldMutex;
+
+  // TODO(JS): Needs to be changed to project
   simulation::WorldPtr mWorld;
-
-  Engine mEngine;
-
-  gui::osg::ImGuiViewer mViewer;
 };
 
 } // namespace simulator
 } // namespace dart
-
-#endif

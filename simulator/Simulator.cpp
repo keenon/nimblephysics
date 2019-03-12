@@ -38,7 +38,16 @@
 
 #include "Simulator.hpp"
 
-#include "MainMenuWidget.hpp"
+#include <dart/utils/urdf/urdf.hpp>
+#include "widgets/MainMenuWidget.hpp"
+#include "widgets/PropertyGridWidget.hpp"
+#include "widgets/TestWidget.hpp"
+
+using namespace dart::common;
+using namespace dart::dynamics;
+using namespace dart::simulation;
+using namespace dart::utils;
+using namespace dart::math;
 
 namespace dart {
 namespace simulator {
@@ -150,133 +159,28 @@ public:
 };
 
 //==============================================================================
-class TestWidget : public dart::gui::osg::ImGuiWidget
+SkeletonPtr createAtlas()
 {
-public:
-  /// Constructor
-  TestWidget(
-      dart::gui::osg::ImGuiViewer* viewer, dart::simulation::WorldPtr world)
-    : mViewer(viewer),
-      mWorld(std::move(world)),
-      mGuiGravity(true),
-      mGravity(true),
-      mGuiHeadlights(true)
-  {
-    // Do nothing
-  }
+  // Parse in the atlas model
+  DartLoader urdf;
+  SkeletonPtr atlas
+      = urdf.parseSkeleton("dart://sample/sdf/atlas/atlas_v3_no_head.urdf");
 
-  // Documentation inherited
-  void render() override
-  {
-    ImGui::SetNextWindowPos(ImVec2(10, 20));
-    if (!ImGui::Begin(
-            "Tinkertoy Control",
-            nullptr,
-            ImVec2(240, 320),
-            0.5f,
-            ImGuiWindowFlags_NoResize | ImGuiWindowFlags_MenuBar
-                | ImGuiWindowFlags_HorizontalScrollbar))
-    {
-      // Early out if the window is collapsed, as an optimization.
-      ImGui::End();
-      return;
-    }
+  // Add a box to the root node to make it easier to click and drag
+  double scale = 0.25;
+  ShapePtr boxShape
+      = std::make_shared<BoxShape>(scale * Eigen::Vector3d(1.0, 1.0, 0.5));
 
-    // Menu
-    if (ImGui::BeginMenuBar())
-    {
-      if (ImGui::BeginMenu("Menu"))
-      {
-        if (ImGui::MenuItem("Exit"))
-          mViewer->setDone(true);
-        ImGui::EndMenu();
-      }
-      if (ImGui::BeginMenu("Help"))
-      {
-        if (ImGui::MenuItem("About DART"))
-          mViewer->showAbout();
-        ImGui::EndMenu();
-      }
-      ImGui::EndMenuBar();
-    }
+  Eigen::Isometry3d tf(Eigen::Isometry3d::Identity());
+  tf.translation() = Eigen::Vector3d(0.1 * Eigen::Vector3d(0.0, 0.0, 1.0));
 
-    ImGui::Text("An empty OSG example with ImGui");
-    ImGui::Spacing();
+  auto shapeNode
+      = atlas->getBodyNode(0)->createShapeNodeWith<VisualAspect>(boxShape);
+  shapeNode->getVisualAspect()->setColor(dart::Color::Black());
+  shapeNode->setRelativeTransform(tf);
 
-    if (ImGui::CollapsingHeader("Simulation", ImGuiTreeNodeFlags_DefaultOpen))
-    {
-      int e = mViewer->isSimulating() ? 0 : 1;
-      if (mViewer->isAllowingSimulation())
-      {
-        if (ImGui::RadioButton("Play", &e, 0) && !mViewer->isSimulating())
-          mViewer->simulate(true);
-        ImGui::SameLine();
-        if (ImGui::RadioButton("Pause", &e, 1) && mViewer->isSimulating())
-          mViewer->simulate(false);
-      }
-
-      ImGui::Text("Time: %.3f", mWorld->getTime());
-    }
-
-    if (ImGui::CollapsingHeader(
-            "World Options", ImGuiTreeNodeFlags_DefaultOpen))
-    {
-      // Gravity
-      ImGui::Checkbox("Gravity On/Off", &mGuiGravity);
-      setGravity(mGuiGravity);
-
-      ImGui::Spacing();
-
-      // Headlights
-      mGuiHeadlights = mViewer->checkHeadlights();
-      ImGui::Checkbox("Headlights On/Off", &mGuiHeadlights);
-      mViewer->switchHeadlights(mGuiHeadlights);
-    }
-
-    if (ImGui::CollapsingHeader("View", ImGuiTreeNodeFlags_DefaultOpen))
-    {
-      osg::Vec3d eye;
-      osg::Vec3d center;
-      osg::Vec3d up;
-      mViewer->getCamera()->getViewMatrixAsLookAt(eye, center, up);
-
-      ImGui::Text("Eye   : (%.2f, %.2f, %.2f)", eye.x(), eye.y(), eye.z());
-      ImGui::Text(
-          "Center: (%.2f, %.2f, %.2f)", center.x(), center.y(), center.z());
-      ImGui::Text("Up    : (%.2f, %.2f, %.2f)", up.x(), up.y(), up.z());
-    }
-
-    if (ImGui::CollapsingHeader("Help"))
-    {
-      ImGui::PushTextWrapPos(ImGui::GetCursorPos().x + 320);
-      ImGui::Text("User Guide:\n");
-      ImGui::Text("%s", mViewer->getInstructions().c_str());
-      ImGui::PopTextWrapPos();
-    }
-
-    ImGui::End();
-  }
-
-protected:
-  void setGravity(bool gravity)
-  {
-    if (mGravity == gravity)
-      return;
-
-    mGravity = gravity;
-
-    if (mGravity)
-      mWorld->setGravity(-9.81 * Eigen::Vector3d::UnitZ());
-    else
-      mWorld->setGravity(Eigen::Vector3d::Zero());
-  }
-
-  dart::gui::osg::ImGuiViewer* mViewer;
-  dart::simulation::WorldPtr mWorld;
-  bool mGuiGravity;
-  bool mGravity;
-  bool mGuiHeadlights;
-};
+  return atlas;
+}
 
 //==============================================================================
 Simulator::Simulator()
@@ -285,9 +189,13 @@ Simulator::Simulator()
   mWorld = simulation::World::create();
 
   // Add a target object to the world
-  auto target
-      = std::make_shared<gui::osg::InteractiveFrame>(dynamics::Frame::World());
-  mWorld->addSimpleFrame(target);
+  //  auto target
+  //      =
+  //      std::make_shared<gui::osg::InteractiveFrame>(dynamics::Frame::World());
+  //  mWorld->addSimpleFrame(target);
+
+  dynamics::SkeletonPtr atlas = createAtlas();
+  mWorld->addSkeleton(atlas);
 
   // Wrap a WorldNode around it
   ::osg::ref_ptr<CustomWorldNode> node = new CustomWorldNode(mWorld);
@@ -295,14 +203,15 @@ Simulator::Simulator()
   // Create a Viewer and set it up with the WorldNode
   mViewer.addWorldNode(node);
 
-  // Add control widget for atlas
-  mViewer.getImGuiHandler()->addWidget(
-      std::make_shared<TestWidget>(&mViewer, mWorld));
-  mViewer.getImGuiHandler()->addWidget(
-      std::make_shared<MainMenuWidget>());
+  // Add control widgets
+  mViewer.addWidget(std::make_shared<TestWidget>(&mViewer, mWorld));
+  mViewer.addWidget(std::make_shared<MainMenuWidget>());
+  auto propertyGridWidget = std::make_shared<PropertyGridWidget>();
+  propertyGridWidget->setWorld(mWorld);
+  mViewer.addWidget(propertyGridWidget);
 
   // Active the drag-and-drop feature for the target
-  mViewer.enableDragAndDrop(target.get());
+  //  mViewer.enableDragAndDrop(target.get());
 
   // Pass in the custom event handler
   mViewer.addEventHandler(new CustomEventHandler);

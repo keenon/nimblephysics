@@ -4,8 +4,8 @@ if (NOT TARGET dart-utils OR NOT TARGET dart-gui-osg)
 endif()
 
 # Search all header and source files
-file(GLOB hdrs "*.hpp" "*.h" "detail/*.hpp")
-file(GLOB srcs "*.cpp" "*.c" "detail/*.cpp")
+file(GLOB_RECURSE hdrs "*.hpp" "*.h")
+file(GLOB_RECURSE srcs "*.cpp" "*.c")
 
 # Set local target name
 set(target_name ${PROJECT_NAME}-simulator)
@@ -16,7 +16,9 @@ dart_add_library(${target_name} ${hdrs} ${srcs})
 # target_include_directories(${target_name} PUBLIC ${})
 target_link_libraries(${target_name}
   PUBLIC
+    dart
     dart-utils
+    dart-utils-urdf
     dart-gui-osg
     ${PROJECT_NAME}-external-imgui
 )

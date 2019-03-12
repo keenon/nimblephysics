@@ -44,6 +44,7 @@ namespace osg {
 class ImGuiHandler;
 class MainMenuWidget;
 class AboutWidget;
+class ImGuiWidget;
 
 class ImGuiViewer : public Viewer
 {
@@ -57,11 +58,14 @@ public:
   /// Destructor.
   virtual ~ImGuiViewer();
 
+  void addWidget(const std::shared_ptr<ImGuiWidget>& widget,
+                 bool visible = true);
+
   /// Get ImGui handler.
-  ImGuiHandler* getImGuiHandler();
+  // ImGuiHandler* getImGuiHandler();
 
   /// Get cosnt ImGui handler.
-  const ImGuiHandler* getImGuiHandler() const;
+  // const ImGuiHandler* getImGuiHandler() const;
 
   /// Show About widget.
   void showAbout();

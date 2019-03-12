@@ -54,20 +54,29 @@ ImGuiViewer::ImGuiViewer(const ::osg::Vec4& clearColor)
 //==============================================================================
 ImGuiViewer::~ImGuiViewer()
 {
-  // Do nothing
+    // Do nothing
 }
 
 //==============================================================================
-ImGuiHandler* ImGuiViewer::getImGuiHandler()
+void ImGuiViewer::addWidget(const std::shared_ptr<ImGuiWidget> &widget, bool visible)
 {
-  return mImGuiHandler;
+  if (!mImGuiHandler)
+    return;
+
+  mImGuiHandler->addWidget(widget, visible);
 }
 
-//==============================================================================
-const ImGuiHandler* ImGuiViewer::getImGuiHandler() const
-{
-  return mImGuiHandler;
-}
+////==============================================================================
+//ImGuiHandler* ImGuiViewer::getImGuiHandler()
+//{
+//  return mImGuiHandler;
+//}
+
+////==============================================================================
+//const ImGuiHandler* ImGuiViewer::getImGuiHandler() const
+//{
+//  return mImGuiHandler;
+//}
 
 //==============================================================================
 void ImGuiViewer::showAbout()

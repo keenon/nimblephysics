@@ -15,11 +15,6 @@
  *     copyright notice, this list of conditions and the following
  *     disclaimer in the documentation and/or other materials provided
  *     with the distribution.
- *   * This code incorporates portions of Open Dynamics Engine
- *     (Copyright (c) 2001-2004, Russell L. Smith. All rights
- *     reserved.) and portions of FCL (Copyright (c) 2011, Willow
- *     Garage, Inc. All rights reserved.), which were released under
- *     the same BSD license as below
  *
  *   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND
  *   CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
@@ -36,37 +31,22 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef DART_SIMULATOR_SIMULATOR_HPP_
-#define DART_SIMULATOR_SIMULATOR_HPP_
-
-#include <dart/dart.hpp>
-#include <dart/external/imgui/imgui.h>
-#include <dart/gui/osg/osg.hpp>
-
 #include "Engine.hpp"
+
+using namespace dart::common;
+using namespace dart::dynamics;
+using namespace dart::simulation;
+// using namespace dart::utils;
+using namespace dart::math;
 
 namespace dart {
 namespace simulator {
 
-class Simulator
+//==============================================================================
+Engine::Engine()
 {
-public:
-  /// Default constructor
-  Simulator();
-
-  /// Begins running the application loop
-  void run();
-
-protected:
-  // TODO: Use engine instead
-  simulation::WorldPtr mWorld;
-
-  Engine mEngine;
-
-  gui::osg::ImGuiViewer mViewer;
-};
+  mSelectManager = std::make_shared<SelectManager>();
+}
 
 } // namespace simulator
 } // namespace dart
-
-#endif

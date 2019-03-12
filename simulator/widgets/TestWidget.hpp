@@ -36,37 +36,52 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef DART_SIMULATOR_SIMULATOR_HPP_
-#define DART_SIMULATOR_SIMULATOR_HPP_
+#pragma once
 
 #include <dart/dart.hpp>
 #include <dart/external/imgui/imgui.h>
 #include <dart/gui/osg/osg.hpp>
 
-#include "Engine.hpp"
-
 namespace dart {
 namespace simulator {
 
-class Simulator
+class TestWidget : public gui::osg::ImGuiWidget
 {
 public:
-  /// Default constructor
-  Simulator();
+  TestWidget(
+      dart::gui::osg::ImGuiViewer* viewer, dart::simulation::WorldPtr world)
+    : mViewer(viewer),
+      mWorld(std::move(world)),
+      mGuiGravity(true),
+      mGravity(true),
+      mGuiHeadlights(true)
+  {
+    // Do nothing
+  }
 
-  /// Begins running the application loop
-  void run();
+  // Documentation inherited
+  void render() override;
 
 protected:
-  // TODO: Use engine instead
-  simulation::WorldPtr mWorld;
+  void setGravity(bool gravity)
+  {
+    if (mGravity == gravity)
+      return;
 
-  Engine mEngine;
+    mGravity = gravity;
 
-  gui::osg::ImGuiViewer mViewer;
+    if (mGravity)
+      mWorld->setGravity(-9.81 * Eigen::Vector3d::UnitZ());
+    else
+      mWorld->setGravity(Eigen::Vector3d::Zero());
+  }
+
+  dart::gui::osg::ImGuiViewer* mViewer;
+  dart::simulation::WorldPtr mWorld;
+  bool mGuiGravity;
+  bool mGravity;
+  bool mGuiHeadlights;
 };
 
 } // namespace simulator
 } // namespace dart
-
-#endif

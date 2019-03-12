@@ -36,37 +36,44 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef DART_SIMULATOR_SIMULATOR_HPP_
-#define DART_SIMULATOR_SIMULATOR_HPP_
-
-#include <dart/dart.hpp>
-#include <dart/external/imgui/imgui.h>
-#include <dart/gui/osg/osg.hpp>
-
-#include "Engine.hpp"
+#include "MainMenuWidget.hpp"
 
 namespace dart {
 namespace simulator {
 
-class Simulator
+//==============================================================================
+void MainMenuWidget::render()
 {
-public:
-  /// Default constructor
-  Simulator();
-
-  /// Begins running the application loop
-  void run();
-
-protected:
-  // TODO: Use engine instead
-  simulation::WorldPtr mWorld;
-
-  Engine mEngine;
-
-  gui::osg::ImGuiViewer mViewer;
-};
+  if (ImGui::BeginMainMenuBar())
+  {
+    if (ImGui::BeginMenu("File"))
+    {
+      //          ShowExampleMenuFile();
+      ImGui::EndMenu();
+    }
+    if (ImGui::BeginMenu("Edit"))
+    {
+      if (ImGui::MenuItem("Undo", "CTRL+Z"))
+      {
+      }
+      if (ImGui::MenuItem("Redo", "CTRL+Y", false, false))
+      {
+      } // Disabled item
+      ImGui::Separator();
+      if (ImGui::MenuItem("Cut", "CTRL+X"))
+      {
+      }
+      if (ImGui::MenuItem("Copy", "CTRL+C"))
+      {
+      }
+      if (ImGui::MenuItem("Paste", "CTRL+V"))
+      {
+      }
+      ImGui::EndMenu();
+    }
+    ImGui::EndMainMenuBar();
+  }
+}
 
 } // namespace simulator
 } // namespace dart
-
-#endif

@@ -36,37 +36,25 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef DART_SIMULATOR_SIMULATOR_HPP_
-#define DART_SIMULATOR_SIMULATOR_HPP_
+#pragma once
 
 #include <dart/dart.hpp>
 #include <dart/external/imgui/imgui.h>
 #include <dart/gui/osg/osg.hpp>
 
-#include "Engine.hpp"
-
 namespace dart {
 namespace simulator {
 
-class Simulator
+class MainMenuWidget : public gui::osg::ImGuiWidget
 {
 public:
-  /// Default constructor
-  Simulator();
+  MainMenuWidget() = default;
 
-  /// Begins running the application loop
-  void run();
+  // Documentation inherited
+  void render() override;
 
 protected:
-  // TODO: Use engine instead
-  simulation::WorldPtr mWorld;
-
-  Engine mEngine;
-
-  gui::osg::ImGuiViewer mViewer;
 };
 
 } // namespace simulator
 } // namespace dart
-
-#endif
