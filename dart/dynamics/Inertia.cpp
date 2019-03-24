@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -356,8 +356,8 @@ bool Inertia::verifySpatialTensor(const Eigen::Matrix6d& _spatial,
       std::size_t i1 = i;
       std::size_t j1 = j+3;
 
-      std::size_t i2 = i+3;
-      std::size_t j2 = j;
+      std::size_t i2 = j1;
+      std::size_t j2 = i1;
 
       if(std::abs(_spatial(i1,j1) - _spatial(i2,j2)) > _tolerance)
       {

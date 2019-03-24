@@ -1,4 +1,4 @@
-# Copyright (c) 2011-2018, The DART development contributors
+# Copyright (c) 2011-2019, The DART development contributors
 # All rights reserved.
 #
 # The list of contributors can be found at:
@@ -38,8 +38,7 @@ set(ASSIMP_VERSION ${PC_ASSIMP_VERSION})
 
 # Set (NAME)_FOUND if all the variables and the version are satisfied.
 include(FindPackageHandleStandardArgs)
-find_package_handle_standard_args(ASSIMP
+find_package_handle_standard_args(assimp
     FAIL_MESSAGE  DEFAULT_MSG
     REQUIRED_VARS ASSIMP_INCLUDE_DIRS ASSIMP_LIBRARIES
     VERSION_VAR   ASSIMP_VERSION)
-

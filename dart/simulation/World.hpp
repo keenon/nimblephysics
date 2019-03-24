@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -236,6 +236,9 @@ public:
   //--------------------------------------------------------------------------
 
   /// Sets the constraint solver
+  ///
+  /// Note that the internal properties of \c solver will be overwritten by this
+  /// World.
   void setConstraintSolver(constraint::UniqueConstraintSolverPtr solver);
 
   /// Get the constraint solver

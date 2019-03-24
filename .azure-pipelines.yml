@@ -2,7 +2,7 @@
 # Ref: https://docs.microsoft.com/en-us/azure/devops/pipelines
 
 jobs:
-- job: ubuntu_xenial_gcc_debug
+- job: xenial_gcc_debug
   pool:
     vmImage: 'Ubuntu 16.04'
   variables:
@@ -14,63 +14,76 @@ jobs:
   steps:
   - template: .ci/azure-pipelines/native.yml
 
-- job: ubuntu_xenial_gcc_release
+- job: xenial_32bit_gcc_release
   pool:
     vmImage: 'Ubuntu 16.04'
   variables:
     OS_NAME: linux
     COMPILER: gcc
-    BUILD_TYPE: Release
+    BUILD_TYPE: Release  # TODO: Tests fail in debug mode
     BUILD_DIR: $(Build.SourcesDirectory)
-    SUDO: sudo
+    DOCKERFILE: Dockerfile.ubuntu-xenial-32bit
   steps:
-  - template: .ci/azure-pipelines/native.yml
+  - template: .ci/azure-pipelines/docker.yml
 
-- job: ubuntu_bionic_gcc_release
+- job: bionic_gcc_debug_with_codecov
+  pool:
+    vmImage: 'Ubuntu 16.04'
+  variables:
+    OS_NAME: linux
+    COMPILER: gcc
+    BUILD_TYPE: Debug
+    BUILD_DIR: $(Build.SourcesDirectory)
+    DOCKERFILE: Dockerfile.ubuntu-bionic
+    CODECOV: ON
+  steps:
+  - template: .ci/azure-pipelines/docker.yml
+
+- job: bionic_gcc_dartpy_release
   pool:
     vmImage: 'Ubuntu 16.04'
   variables:
     OS_NAME: linux
     COMPILER: gcc
     BUILD_TYPE: Release
+    BUILD_DARTPY: ON
     BUILD_DIR: $(Build.SourcesDirectory)
     DOCKERFILE: Dockerfile.ubuntu-bionic
   steps:
   - template: .ci/azure-pipelines/docker.yml
+  timeoutInMinutes: 0
 
-- job: ubuntu_cosmic_gcc_release
+- job: cosmic_gcc_debug
   pool:
     vmImage: 'Ubuntu 16.04'
   variables:
     OS_NAME: linux
     COMPILER: gcc
-    BUILD_TYPE: Release
+    BUILD_TYPE: Debug
     BUILD_DIR: $(Build.SourcesDirectory)
     DOCKERFILE: Dockerfile.ubuntu-cosmic
   steps:
   - template: .ci/azure-pipelines/docker.yml
 
-- job: macos_high_seirra_clang_debug
+- job: disco_gcc_debug
+  continueOnError: true
+  pool:
+    vmImage: 'Ubuntu 16.04'
+  variables:
+    OS_NAME: linux
+    COMPILER: gcc
+    BUILD_TYPE: Debug
+    BUILD_DIR: $(Build.SourcesDirectory)
+    DOCKERFILE: Dockerfile.ubuntu-disco
+  steps:
+  - template: .ci/azure-pipelines/docker.yml
+
+- job: high_seirra_clang_debug
   pool:
     vmImage: 'macOS 10.13'
   variables:
     OS_NAME: osx
     BUILD_TYPE: Debug
-    BUILD_DIR: $(Build.SourcesDirectory)
-  steps:
-  - script: |
-      '.ci/install.sh'
-    displayName: 'Install'
-  - script: |
-      '.ci/script.sh'
-    displayName: 'Script'
-
-- job: macos_high_seirra_clang_release
-  pool:
-    vmImage: 'macOS 10.13'
-  variables:
-    OS_NAME: osx
-    BUILD_TYPE: Release
     BUILD_DIR: $(Build.SourcesDirectory)
   steps:
   - script: |
