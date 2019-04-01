@@ -647,14 +647,28 @@ Eigen::Matrix6d getAdTMatrix(const Eigen::Isometry3d& T)
   return AdT;
 }
 
-Eigen::Vector6d AdR(const Eigen::Isometry3d& _T, const Eigen::Vector6d& _V) {
+//==============================================================================
+Eigen::Vector6d AdR(const Eigen::Isometry3d& T, const Eigen::Vector6d& V)
+{
   //--------------------------------------------------------------------------
   // w' = R*w
   // v' = R*v
   //--------------------------------------------------------------------------
   Eigen::Vector6d res;
-  res.head<3>().noalias() = _T.linear() * _V.head<3>();
-  res.tail<3>().noalias() = _T.linear() * _V.tail<3>();
+  res.head<3>().noalias() = T.linear() * V.head<3>();
+  res.tail<3>().noalias() = T.linear() * V.tail<3>();
+  return res;
+}
+
+//==============================================================================
+Eigen::Vector6d AdP(const Eigen::Isometry3d& T, const Eigen::Vector6d& V)
+{
+  //--------------------------------------------------------------------------
+  // w' = w
+  // v' = [p]w + v
+  //--------------------------------------------------------------------------
+  Eigen::Vector6d res = V;
+  res.tail<3>() += T.translation().cross(V.head<3>());
   return res;
 }
 
@@ -720,19 +734,30 @@ Eigen::Vector6d AdInvT(const Eigen::Isometry3d& _T, const Eigen::Vector6d& _V) {
   return res;
 }
 
-// se3 AdInvR(const SE3& T, const se3& s)
-// {
-//     se3 ret;
+//==============================================================================
+Eigen::Vector6d AdInvR(const Eigen::Isometry3d& T, const Eigen::Vector6d& V)
+{
+  //--------------------------------------------------------------------------
+  // w' = R^T*w
+  // v' = R^T*v
+  //--------------------------------------------------------------------------
+  Eigen::Vector6d res;
+  res.head<3>().noalias() = T.linear().transpose() * V.head<3>();
+  res.tail<3>().noalias() = T.linear().transpose() * V.tail<3>();
+  return res;
+}
 
-//     ret << T(0,0)*s[0] + T(1,0)*s[1] + T(2,0)*s[2],
-//                 T(0,1)*s[0] + T(1,1)*s[1] + T(2,1)*s[2],
-//                 T(0,2)*s[0] + T(1,2)*s[1] + T(2,2)*s[2],
-//                 T(0,0)*s[3] + T(1,0)*s[4] + T(2,0)*s[5],
-//                 T(0,1)*s[3] + T(1,1)*s[4] + T(2,1)*s[5],
-//                 T(0,2)*s[3] + T(1,2)*s[4] + T(2,2)*s[5];
-
-//     return ret;
-// }
+//==============================================================================
+Eigen::Vector6d AdInvP(const Eigen::Isometry3d& T, const Eigen::Vector6d& V)
+{
+  //--------------------------------------------------------------------------
+  // w' = w
+  // v' = [p]^T w + v
+  //--------------------------------------------------------------------------
+  Eigen::Vector6d res = V;
+  res.tail<3>() += V.head<3>().cross(T.translation());
+  return res;
+}
 
 Eigen::Vector6d AdInvRLinear(const Eigen::Isometry3d& _T,
                              const Eigen::Vector3d& _v) {
@@ -1983,7 +2008,6 @@ BoundingBox::BoundingBox(const Eigen::Vector3d& min, const Eigen::Vector3d& max)
 {
 
 }
-
 
 }  // namespace math
 }  // namespace dart

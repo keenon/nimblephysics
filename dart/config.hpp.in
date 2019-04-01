@@ -75,4 +75,7 @@
 // BULLET_DEFINITIONS or generate a #cmakedefine header.
 #cmakedefine BT_USE_DOUBLE_PRECISION
 
+// FOR DEBUGGING
+#define DART_USE_WORLD_COORDINATES 1
+
 #endif // #ifndef DART_CONFIG_HPP_

@@ -255,6 +255,9 @@ typename Derived::PlainObject AdTJacFixed(const Eigen::Isometry3d& _T,
 /// \brief Fast version of Ad([R 0; 0 1], V)
 Eigen::Vector6d AdR(const Eigen::Isometry3d& _T, const Eigen::Vector6d& _V);
 
+/// Fast version of Ad([I p; 0 1], V)
+Eigen::Vector6d AdP(const Eigen::Isometry3d& T, const Eigen::Vector6d& V);
+
 /// \brief fast version of Ad(T, se3(w, 0))
 Eigen::Vector6d AdTAngular(const Eigen::Isometry3d& _T,
                            const Eigen::Vector3d& _w);
@@ -324,6 +327,12 @@ typename Derived::PlainObject adJac(const Eigen::Vector6d& _V,
 
 /// \brief fast version of Ad(Inv(T), V)
 Eigen::Vector6d AdInvT(const Eigen::Isometry3d& _T, const Eigen::Vector6d& _V);
+
+/// Fast version of Ad(Inv([R 0; 0 1]), V)
+Eigen::Vector6d AdInvR(const Eigen::Isometry3d& T, const Eigen::Vector6d& V);
+
+/// Fast version of Ad(Inv([I p; 0 1]), V)
+Eigen::Vector6d AdInvP(const Eigen::Isometry3d& T, const Eigen::Vector6d& V);
 
 /// Adjoint mapping for dynamic size Jacobian
 template<typename Derived>

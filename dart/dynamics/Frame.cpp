@@ -129,10 +129,20 @@ const Eigen::Vector6d& Frame::getSpatialVelocity() const
 
   if(mNeedVelocityUpdate)
   {
+#if DART_USE_WORLD_COORDINATES
+    const Eigen::Vector6d& parentVel = getParentFrame()->getSpatialVelocity();
+    const Eigen::Vector3d p
+        = getParentFrame()->getWorldTransform().linear()
+        * getRelativeTransform().translation();
+    mVelocity = parentVel;
+    mVelocity.tail<3>().noalias() += parentVel.head<3>().cross(p);
+    mVelocity.noalias()
+        += math::AdR(getWorldTransform(), getRelativeSpatialVelocity());
+#else
     mVelocity = math::AdInvT(getRelativeTransform(),
                              getParentFrame()->getSpatialVelocity())
                 + getRelativeSpatialVelocity();
-
+#endif
     mNeedVelocityUpdate = false;
   }
 
@@ -140,68 +150,158 @@ const Eigen::Vector6d& Frame::getSpatialVelocity() const
 }
 
 //==============================================================================
-Eigen::Vector6d Frame::getSpatialVelocity(const Frame* _relativeTo,
-                                          const Frame* _inCoordinatesOf) const
+Eigen::Vector6d Frame::getSpatialVelocity(const Frame* relativeTo,
+                                          const Frame* inCoordinatesOf) const
 {
-  if(this == _relativeTo)
+#if DART_USE_WORLD_COORDINATES
+  if(this == relativeTo)
     return Eigen::Vector6d::Zero();
 
-  if(_relativeTo->isWorld())
+  if(relativeTo->isWorld())
   {
-    if(this == _inCoordinatesOf)
+    if(inCoordinatesOf->isWorld())
       return getSpatialVelocity();
 
-    if(_inCoordinatesOf->isWorld())
+    if(this == inCoordinatesOf)
+      return math::AdInvR(getWorldTransform(), getSpatialVelocity());
+
+    return math::AdInvR(
+        inCoordinatesOf->getWorldTransform(), getSpatialVelocity());
+  }
+
+  // Optimized code of
+  //   V' = V1 - Ad([I p12; 0 1], V2)
+  // or
+  //   w' = w1 - w2
+  //   v' = v1 - (v2 + [p12]w2)
+  // where
+  //   V': The result spatial velocity in the world coordinates.
+  //   V1: The spatial velocity of this Frame in the world coordinates.
+  //   V2: The spatial velocity of relativeTo Frame in the world coordinates.
+  //   p12: The vector from body2 to body1 in the world coordinates.
+  const Eigen::Vector3d p12
+      = getWorldTransform().translation()
+      - relativeTo->getWorldTransform().translation();
+  Eigen::Vector6d result
+      = getSpatialVelocity() - relativeTo->getSpatialVelocity();
+  result.tail<3>().noalias()
+      += p12.cross(relativeTo->getSpatialVelocity().head<3>());
+
+  if(inCoordinatesOf->isWorld())
+    return result;
+
+  return math::AdInvR(inCoordinatesOf->getWorldTransform(), result);
+#else
+  if(this == relativeTo)
+    return Eigen::Vector6d::Zero();
+
+  if(relativeTo->isWorld())
+  {
+    if(this == inCoordinatesOf)
+      return getSpatialVelocity();
+
+    if(inCoordinatesOf->isWorld())
       return math::AdR(getWorldTransform(), getSpatialVelocity());
 
-    return math::AdR(getTransform(_inCoordinatesOf), getSpatialVelocity());
+    return math::AdR(getTransform(inCoordinatesOf), getSpatialVelocity());
   }
 
   const Eigen::Vector6d& result =
-      (getSpatialVelocity() - math::AdT(_relativeTo->getTransform(this),
-                                    _relativeTo->getSpatialVelocity())).eval();
+      (getSpatialVelocity() - math::AdT(relativeTo->getTransform(this),
+                                    relativeTo->getSpatialVelocity())).eval();
 
-  if(this == _inCoordinatesOf)
+  if(this == inCoordinatesOf)
     return result;
 
-  return math::AdR(getTransform(_inCoordinatesOf), result);
+  return math::AdR(getTransform(inCoordinatesOf), result);
+#endif
 }
 
 //==============================================================================
-Eigen::Vector6d Frame::getSpatialVelocity(const Eigen::Vector3d& _offset) const
+Eigen::Vector6d Frame::getSpatialVelocity(const Eigen::Vector3d& offset) const
 {
-  return getSpatialVelocity(_offset, Frame::World(), this);
+  return getSpatialVelocity(offset, Frame::World(), this);
 }
 
 //==============================================================================
-Eigen::Vector6d Frame::getSpatialVelocity(const Eigen::Vector3d& _offset,
-                                          const Frame* _relativeTo,
-                                          const Frame* _inCoordinatesOf) const
+Eigen::Vector6d Frame::getSpatialVelocity(const Eigen::Vector3d& offset,
+                                          const Frame* relativeTo,
+                                          const Frame* inCoordinatesOf) const
 {
-  if(this == _relativeTo)
+#if DART_USE_WORLD_COORDINATES
+  if(this == relativeTo)
+    return Eigen::Vector6d::Zero();
+
+  // Optimized code of
+  //   V' = Ad([I -R1*offset; 0 1], V1)
+  // or
+  //   w' = w1
+  //   v' = v1 - [R1*offset]w1
+  // where
+  //   V': The result spatial velocity in the world coordinates.
+  //   V1: The spatial velocity of this Frame in the world coordinates.
+  //   R1: The rotation matrix of this Frame.
+  //   offset: The vector from the origin of this Frame to the offset in this
+  //   Frame coordinates.
+  const Eigen::Vector3d offsetInWorldCoords
+      = getWorldTransform().linear() * offset;
+  Eigen::Vector6d v = getSpatialVelocity();
+  v.tail<3>().noalias() += v.head<3>().cross(offsetInWorldCoords);
+
+  if(relativeTo->isWorld())
+  {
+    if(inCoordinatesOf->isWorld())
+      return v;
+
+    return math::AdInvR(inCoordinatesOf->getWorldTransform(), v);
+  }
+
+  // Optimized code of
+  //   V" = V' - Ad([I -R1*offset; 0 1], Ad([I p1r; 0 1], Vrel))
+  // or
+  //   w" = w' - wr
+  //   v" = v' - (vr - [R1*offset]wr + [p1r]wr)
+  // where
+  //   V': The result spatial velocity in the world coordinates.
+  //   V": The result spatial velocity relative to relativeTo in the world
+  //       coordinates.
+  const Eigen::Vector3d p1r
+      = relativeTo->getWorldTransform().translation()
+      - getWorldTransform().translation();
+  Eigen::Vector6d v_0 = relativeTo->getSpatialVelocity();
+  v_0.tail<3>().noalias() += v_0.head<3>().cross(offsetInWorldCoords - p1r);
+  v = v - v_0;
+
+  if(inCoordinatesOf->isWorld())
+    return v;
+
+  return math::AdInvR(inCoordinatesOf->getWorldTransform(), v);
+#else
+  if(this == relativeTo)
     return Eigen::Vector6d::Zero();
 
   Eigen::Vector6d v = getSpatialVelocity();
-  v.tail<3>().noalias() += v.head<3>().cross(_offset);
+  v.tail<3>().noalias() += v.head<3>().cross(offset);
 
-  if(_relativeTo->isWorld())
+  if(relativeTo->isWorld())
   {
-    if(this == _inCoordinatesOf)
+    if(this == inCoordinatesOf)
       return v;
 
-    return math::AdR(getTransform(_inCoordinatesOf), v);
+    return math::AdR(getTransform(inCoordinatesOf), v);
   }
 
-  Eigen::Vector6d v_0 = math::AdT(_relativeTo->getTransform(this),
-                                  _relativeTo->getSpatialVelocity());
-  v_0.tail<3>().noalias() += v_0.head<3>().cross(_offset);
+  Eigen::Vector6d v_0 = math::AdT(relativeTo->getTransform(this),
+                                  relativeTo->getSpatialVelocity());
+  v_0.tail<3>().noalias() += v_0.head<3>().cross(offset);
 
   v = v - v_0;
 
-  if(this == _inCoordinatesOf)
+  if(this == inCoordinatesOf)
     return v;
 
-  return math::AdR(getTransform(_inCoordinatesOf), v);
+  return math::AdR(getTransform(inCoordinatesOf), v);
+#endif
 }
 
 //==============================================================================
@@ -234,10 +334,33 @@ const Eigen::Vector6d& Frame::getSpatialAcceleration() const
 
   if(mNeedAccelerationUpdate)
   {
+#if DART_USE_WORLD_COORDINATES
+    // V(i) = Ad([I p(i-1,i); 0 1]^{-1}, V(i-1))
+    //      + ad(V(i), S(i)*dq(i)) + dS(i)*dq(i)
+    //      + S(i)*ddq(i)
+    // where
+    //   p(i-1,i): The relative translation of this Frmae in world coordinates.
+    //       S(i): The relative Jacobian of this Frame in world coordinates.
+    //      dS(i): The time derivative of the relative Jacobian of this Frame in
+    //             world coordiantes.
+    //     V(i-1): The velocity of the parent Frame of this Frame in world
+    //             coordinates.
+    //       V(i): The velocity of this Frame in world coordinates.
+    //      dq(i): The joint velocities of the parent joint of this Frame.
+    //     ddq(i): The joint acceleration of the parent joint of this Frame.
     mAcceleration = math::AdInvT(getRelativeTransform(),
                                  getParentFrame()->getSpatialAcceleration())
-        + getPrimaryRelativeAcceleration()
-        + getPartialAcceleration();
+        + getPartialAcceleration()
+        + getPrimaryRelativeAcceleration();
+#else
+    // V(i) = Ad([R(i-1,i) p(i-1,i); 0 1]^{-1}, V(i-1))
+    //      + ad(V(i), S(i)*dq(i)) + dS(i)*dq(i)
+    //      + S(i)*ddq(i)
+    mAcceleration = math::AdInvT(getRelativeTransform(),
+                                 getParentFrame()->getSpatialAcceleration())
+        + getPartialAcceleration()
+        + getPrimaryRelativeAcceleration();
+#endif
 
     mNeedAccelerationUpdate = false;
   }

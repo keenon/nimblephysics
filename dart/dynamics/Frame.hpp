@@ -79,7 +79,7 @@ public:
 
   /// Get the transform of this Frame with respect to some other Frame
   Eigen::Isometry3d getTransform(
-      const Frame* _withRespectTo = Frame::World()) const;
+      const Frame* withRespectTo = Frame::World()) const;
 
   /// Get the transform of this Frame with respect to some other Frame. It can
   /// be expressed in the coordinates of any Frame.
@@ -100,37 +100,37 @@ public:
 
   /// Get the spatial velocity of this Frame relative to some other Frame. It
   /// can be expressed in the coordinates of any Frame.
-  Eigen::Vector6d getSpatialVelocity(const Frame* _relativeTo,
-                                     const Frame* _inCoordinatesOf) const;
+  Eigen::Vector6d getSpatialVelocity(const Frame* relativeTo,
+                                     const Frame* inCoordinatesOf) const;
 
   /// Get the spatial velocity of a fixed point in this Frame. The velocity is
   /// in coordinates of this Frame and is relative to the World Frame.
-  Eigen::Vector6d getSpatialVelocity(const Eigen::Vector3d& _offset) const;
+  Eigen::Vector6d getSpatialVelocity(const Eigen::Vector3d& offset) const;
 
   /// Get the spatial velocity of a fixed point in this Frame.
-  Eigen::Vector6d getSpatialVelocity(const Eigen::Vector3d& _offset,
-                                     const Frame* _relativeTo,
-                                     const Frame* _inCoordinatesOf) const;
+  Eigen::Vector6d getSpatialVelocity(const Eigen::Vector3d& offset,
+                                     const Frame* relativeTo,
+                                     const Frame* inCoordinatesOf) const;
 
   /// Get the linear portion of classical velocity of this Frame relative to
   /// some other Frame. It can be expressed in the coordinates of any Frame.
   Eigen::Vector3d getLinearVelocity(
-      const Frame* _relativeTo = Frame::World(),
-      const Frame* _inCoordinatesOf = Frame::World()) const;
+      const Frame* relativeTo = Frame::World(),
+      const Frame* inCoordinatesOf = Frame::World()) const;
 
   /// Get the linear velocity of a point that is fixed in this Frame. You can
   /// specify a relative Frame, and it can be expressed in the coordinates of
   /// any Frame.
   Eigen::Vector3d getLinearVelocity(
       const Eigen::Vector3d& _offset,
-      const Frame* _relativeTo = Frame::World(),
-      const Frame* _inCoordinatesOf = Frame::World()) const;
+      const Frame* relativeTo = Frame::World(),
+      const Frame* inCoordinatesOf = Frame::World()) const;
 
   /// Get the angular portion of classical velocity of this Frame relative to
   /// some other Frame. It can be expressed in the coordinates of any Frame.
   Eigen::Vector3d getAngularVelocity(
-      const Frame* _relativeTo = Frame::World(),
-      const Frame* _inCoordinatesOf = Frame::World()) const;
+      const Frame* relativeTo = Frame::World(),
+      const Frame* inCoordinatesOf = Frame::World()) const;
 
   //--------------------------------------------------------------------------
   // Acceleration
@@ -163,35 +163,35 @@ public:
 
   /// Get the spatial acceleration of this Frame relative to some other Frame.
   /// It can be expressed in the coordinates of any Frame.
-  Eigen::Vector6d getSpatialAcceleration(const Frame* _relativeTo,
-                                         const Frame* _inCoordinatesOf) const;
+  Eigen::Vector6d getSpatialAcceleration(const Frame* relativeTo,
+                                         const Frame* inCoordinatesOf) const;
 
   /// Get the spatial acceleration of a fixed point in this Frame. The
   /// acceleration is in coordinates of this Frame and is relative to the World
   /// Frame.
-  Eigen::Vector6d getSpatialAcceleration(const Eigen::Vector3d& _offset) const;
+  Eigen::Vector6d getSpatialAcceleration(const Eigen::Vector3d& offset) const;
 
   /// Get the spatial acceleration of a fixed point in this Frame
-  Eigen::Vector6d getSpatialAcceleration(const Eigen::Vector3d& _offset,
-                                         const Frame* _relativeTo,
-                                         const Frame* _inCoordinatesOf) const;
+  Eigen::Vector6d getSpatialAcceleration(const Eigen::Vector3d& offset,
+                                         const Frame* relativeTo,
+                                         const Frame* inCoordinatesOf) const;
 
   /// Get the linear portion of classical acceleration of this Frame relative to
   /// some other Frame. It can be expressed in the coordinates of any Frame.
   Eigen::Vector3d getLinearAcceleration(
-      const Frame* _relativeTo=Frame::World(),
-      const Frame* _inCoordinatesOf=Frame::World()) const;
+      const Frame* relativeTo=Frame::World(),
+      const Frame* inCoordinatesOf=Frame::World()) const;
 
   Eigen::Vector3d getLinearAcceleration(
       const Eigen::Vector3d& _offset,
-      const Frame* _relativeTo=Frame::World(),
-      const Frame* _inCoordinatesOf=Frame::World()) const;
+      const Frame* relativeTo=Frame::World(),
+      const Frame* inCoordinatesOf=Frame::World()) const;
 
   /// Get the angular portion of classical acceleration of this Frame relative
   /// to some other Frame. It can be expressed in the coordinates of any Frame.
   Eigen::Vector3d getAngularAcceleration(
-      const Frame* _relativeTo=Frame::World(),
-      const Frame* _inCoordinatesOf=Frame::World()) const;
+      const Frame* relativeTo=Frame::World(),
+      const Frame* inCoordinatesOf=Frame::World()) const;
 
   //--------------------------------------------------------------------------
   // Relationships
@@ -266,16 +266,16 @@ protected:
   explicit Frame(ConstructAbstractTag);
 
   // Documentation inherited
-  virtual void changeParentFrame(Frame* _newParentFrame) override;
+  virtual void changeParentFrame(Frame* newParentFrame) override;
 
   /// Called during a parent Frame change to allow extensions of the Frame class
   /// to handle new children in customized ways. This function is a no op unless
   /// an inheriting class (such as BodyNode) overrides it.
-  virtual void processNewEntity(Entity* _newChildEntity);
+  virtual void processNewEntity(Entity* newChildEntity);
 
   /// Called when a child Entity is removed from its parent Frame. This allows
   /// special post-processing to be performed for extensions of the Frame class.
-  virtual void processRemovedEntity(Entity* _oldChildEntity);
+  virtual void processRemovedEntity(Entity* oldChildEntity);
 
 private:
 

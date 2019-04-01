@@ -101,11 +101,88 @@ bool equals(const Eigen::DenseBase<MATRIX>& _expected,
 bool equals(const Eigen::Isometry3d& tf1,
             const Eigen::Isometry3d& tf2, double tol = 1e-5)
 {
-  auto se3 = dart::math::logMap(tf1.inverse()*tf2);
-  auto norm = se3.norm();
-
-  return (norm < tol);
+  const Eigen::Isometry3d tf_error = tf1.inverse() * tf2;
+  Eigen::Vector6d error;
+  error.head<3>() = dart::math::logMap(tf_error.linear());
+  error.tail<3>() = tf_error.translation();
+  return (error.norm() < tol);
 }
+
+//==============================================================================
+#define EXPECT_VECTOR_DOUBLE_EQ(vec1, vec2)\
+  if (!equals(vec1, vec2))\
+  {\
+    std::stringstream ss;\
+    ss << "Expected equality of these vectors:\n"\
+       << "  Expected: " << vec1.transpose() << "\n"\
+       << "  Actual  : " << vec2.transpose() << "\n";\
+    GTEST_NONFATAL_FAILURE_(ss.str().c_str());\
+  }
+
+//==============================================================================
+#define EXPECT_MATRIX_DOUBLE_EQ(mat1, mat2)\
+  if (!equals(mat1, mat2))\
+  {\
+    std::stringstream ss;\
+    ss << "Expected equality of these matrices:\n"\
+       << "  Expected:\n"\
+       << "  " << mat1.matrix() << "\n"\
+       << "  Actual  :\n"\
+       << "  " << mat2.matrix() << "\n";\
+    GTEST_NONFATAL_FAILURE_(ss.str().c_str());\
+  }
+
+//==============================================================================
+#define EXPECT_TRANSFORM_DOUBLE_EQ(tf1, tf2)\
+  if (!equals(tf1, tf2))\
+  {\
+    std::stringstream ss;\
+    ss << "Expected equality of these transforms:\n"\
+       << "  Expected:\n"\
+       << "  " << tf1.matrix() << "\n"\
+       << "  Actual  :\n"\
+       << "  " << tf2.matrix() << "\n";\
+    GTEST_NONFATAL_FAILURE_(ss.str().c_str());\
+  }
+
+//==============================================================================
+#define EXPECT_VECTOR_NEAR(vec1, vec2, abs_error)\
+  if (!equals(vec1, vec2, abs_error))\
+  {\
+    std::stringstream ss;\
+    ss << "The element wise difference between:\n"\
+       << vec1.transpose() << "\n"\
+       << "and\n"\
+       << vec2.transpose() << "\n"\
+       << "exceeds " << abs_error << ".\n";\
+    GTEST_NONFATAL_FAILURE_(ss.str().c_str());\
+  }
+
+//==============================================================================
+#define EXPECT_MATRIX_NEAR(mat1, mat2, abs_error)\
+  if (!equals(mat1, mat2, abs_error))\
+  {\
+    std::stringstream ss;\
+    ss << "The element wise difference between:\n"\
+       << mat1.matrix() << "\n"\
+       << "and\n"\
+       << mat2.matrix() << "\n"\
+       << "exceeds " << abs_error << ".\n";\
+    GTEST_NONFATAL_FAILURE_(ss.str().c_str());\
+  }
+
+//==============================================================================
+#define EXPECT_TRANSFORM_NEAR(tf1, tf2, abs_error)\
+  if (!equals(tf1, tf2, abs_error))\
+  {\
+    std::stringstream ss;\
+    ss << "The distance between:\n"\
+       << tf1.matrix() << "\n"\
+       << "and\n"\
+       << tf2.matrix() << "\n"\
+       << "exceeds " << abs_error << ".\n";\
+    GTEST_NONFATAL_FAILURE_(ss.str().c_str());\
+  }
 
 //==============================================================================
 /// Add an end-effector to the last link of the given robot
