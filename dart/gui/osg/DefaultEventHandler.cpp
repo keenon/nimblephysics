@@ -51,7 +51,7 @@ namespace osg {
 
 DefaultEventHandler::DefaultEventHandler(Viewer* _viewer)
   : mViewer(_viewer),
-    mLastCursorPosition(Eigen::Vector2d::Zero()),
+    mLastCursorPosition(Eigen::Vector2f::Zero()),
     mLastModKeyMask(0)
 {
   mViewer->addInstructionText("Spacebar:     Turn simulation on/off\n");
@@ -84,13 +84,13 @@ int DefaultEventHandler::getModKeyMask() const
 }
 
 //==============================================================================
-double DefaultEventHandler::getWindowCursorX() const
+float DefaultEventHandler::getWindowCursorX() const
 {
   return mLastCursorPosition[0];
 }
 
 //==============================================================================
-double DefaultEventHandler::getWindowCursorY() const
+float DefaultEventHandler::getWindowCursorY() const
 {
   return mLastCursorPosition[1];
 }
@@ -139,14 +139,12 @@ Eigen::Vector3d DefaultEventHandler::getDeltaCursor(
     double s = n.dot(_fromPosition - near) / n.dot(v1);
     return near - _fromPosition + s*v1;
   }
-
-  return Eigen::Vector3d::Zero();
 }
 
 //==============================================================================
 void DefaultEventHandler::getNearAndFarPointUnderCursor(Eigen::Vector3d& near,
                                                         Eigen::Vector3d& far,
-                                                        double distance) const
+                                                        float distance) const
 {
   ::osg::Camera* C = mViewer->getCamera();
   ::osg::Matrix VPW = C->getViewMatrix() * C->getProjectionMatrix()
@@ -154,7 +152,8 @@ void DefaultEventHandler::getNearAndFarPointUnderCursor(Eigen::Vector3d& near,
   ::osg::Matrix invVPW;
   invVPW.invert(VPW);
 
-  double x = getWindowCursorX(), y = getWindowCursorY();
+  auto x = getWindowCursorX();
+  auto y = getWindowCursorY();
   ::osg::Vec3 osgNear = ::osg::Vec3(x,y,0.0) * invVPW;
   ::osg::Vec3 osgFar = ::osg::Vec3(x,y,distance) * invVPW;
 

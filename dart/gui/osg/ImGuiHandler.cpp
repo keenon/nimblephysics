@@ -104,7 +104,7 @@ ImGuiHandler::ImGuiHandler()
 //==============================================================================
 ImGuiHandler::~ImGuiHandler()
 {
-  // Do nothing
+  ImGui_ImplOpenGL2_Shutdown();
 }
 
 //==============================================================================
@@ -212,7 +212,7 @@ bool ImGuiHandler::handle(
     }
     case (osgGA::GUIEventAdapter::SCROLL):
     {
-      float increment = 0.1;
+      const float increment = 0.1f;
 
       switch (eventAdapter.getScrollingMotion())
       {
@@ -240,8 +240,6 @@ bool ImGuiHandler::handle(
       return false;
     }
   }
-
-  return false;
 }
 
 //==============================================================================
@@ -256,9 +254,9 @@ void ImGuiHandler::newFrame(::osg::RenderInfo& renderInfo)
 
   const auto currentTime
       = renderInfo.getView()->getFrameStamp()->getSimulationTime();
-
   io.DeltaTime
       = mTime > 0.0 ? static_cast<float>(currentTime - mTime) : 1.0f / 60.0f;
+  io.DeltaTime = std::max(io.DeltaTime, std::numeric_limits<float>::min());
   mTime = currentTime;
   assert(mTime >= 0.0);
 

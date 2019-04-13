@@ -114,10 +114,10 @@ public:
   int getModKeyMask() const;
 
   /// Get the last x value of the cursor in Window coordinates
-  double getWindowCursorX() const;
+  float getWindowCursorX() const;
 
   /// Get the last y value of the cursor in Window coordinates
-  double getWindowCursorY() const;
+  float getWindowCursorY() const;
 
   /// Get the change change in the cursor position with respect to some previous
   /// location in the world (_fromPosition). For the unconstrained case, this
@@ -140,7 +140,7 @@ public:
   /// distance from the plane of the camera (default is 1.0).
   void getNearAndFarPointUnderCursor(Eigen::Vector3d& near,
                                      Eigen::Vector3d& far,
-                                     double distance=1.0) const;
+                                     float distance=1.0f) const;
 
   /// Get the most recent picks for the specified button and event type
   const std::vector<PickInfo>& getButtonPicks(MouseButton button,
@@ -221,7 +221,7 @@ protected:
 
   /// X/Y values of the cursor (in the window coordinates) during the last mouse
   /// event
-  Eigen::Vector2d mLastCursorPosition;
+  Eigen::Vector2f mLastCursorPosition;
 
   /// Storage for the last modkey mask
   int mLastModKeyMask;
