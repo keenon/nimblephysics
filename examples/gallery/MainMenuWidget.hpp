@@ -41,17 +41,17 @@
 namespace dart {
 namespace examples {
 
-class MainMenuWidget : public dart::gui::osg::ImGuiWidget
+class MainMenuWidget : public gui::osg::ImGuiWidget
 {
 public:
-  MainMenuWidget(Gallery* gallery, dart::gui::osg::ImGuiViewer* viewer);
+  MainMenuWidget(Gallery* gallery, gui::osg::ImGuiViewer* viewer);
 
   // Documentation inherited
   void render() override;
 
 protected:
   Gallery* mGallery;
-  dart::gui::osg::ImGuiViewer* mViewer;
+  ::osg::ref_ptr<gui::osg::ImGuiViewer> mViewer;
 };
 
 } // namespace examples

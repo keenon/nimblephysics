@@ -41,18 +41,18 @@ namespace examples {
 
 class Gallery;
 
-class ProjectWidget : public dart::gui::osg::ImGuiWidget
+class ProjectWidget : public gui::osg::ImGuiWidget
 {
 public:
   /// Constructor
-  ProjectWidget(Gallery* gallery, dart::gui::osg::ImGuiViewer* viewer);
+  ProjectWidget(Gallery* gallery, gui::osg::ImGuiViewer* viewer);
 
   // Documentation inherited
   void render() override;
 
 protected:
   Gallery* mGallery;
-  dart::gui::osg::ImGuiViewer* mViewer;
+  ::osg::ref_ptr<gui::osg::ImGuiViewer> mViewer;
 
 private:
 };

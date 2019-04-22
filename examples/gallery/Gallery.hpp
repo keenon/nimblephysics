@@ -71,8 +71,12 @@ public:
   ProjectWidget* getProjectWidget();
   OutputWidget* getOutputWidget();
 
+  gui::osg::GridVisual* getGrid();
+  void setGridVisibility(bool show);
+  bool isGridVisible() const;
+
 protected:
-  dart::gui::osg::ImGuiViewer viewer;
+  ::osg::ref_ptr<gui::osg::ImGuiViewer> mViewer;
 
   std::shared_ptr<MainMenuWidget> mMainMenuWidget;
   std::shared_ptr<ProjectExplorerWidget> mProjectExplorerWidget;
@@ -82,6 +86,8 @@ protected:
   ProjectGroup mProjectTreeRoot;
 
   std::unique_ptr<Project> mCurrentProject;
+
+  ::osg::ref_ptr<gui::osg::GridVisual> mGrid;
 };
 
 } // namespace examples

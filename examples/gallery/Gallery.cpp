@@ -47,35 +47,40 @@ namespace examples {
 //==============================================================================
 Gallery::Gallery() : mProjectTreeRoot(""), mCurrentProject(nullptr)
 {
-  viewer.setKeyEventSetsDone(0);
+  mViewer = new gui::osg::ImGuiViewer();
 
-  mMainMenuWidget = std::make_shared<MainMenuWidget>(this, &viewer);
+  mViewer->setKeyEventSetsDone(0);
+
+  mMainMenuWidget = std::make_shared<MainMenuWidget>(this, mViewer);
   mProjectExplorerWidget
-      = std::make_shared<ProjectExplorerWidget>(this, &viewer);
-  mProjectWidget = std::make_shared<ProjectWidget>(this, &viewer);
-  mOutputWidget = std::make_shared<OutputWidget>(this, &viewer);
+      = std::make_shared<ProjectExplorerWidget>(this, mViewer);
+  mProjectWidget = std::make_shared<ProjectWidget>(this, mViewer);
+  mOutputWidget = std::make_shared<OutputWidget>(this, mViewer);
 
-  viewer.getImGuiHandler()->addWidget(mMainMenuWidget);
-  viewer.getImGuiHandler()->addWidget(mProjectExplorerWidget);
-  viewer.getImGuiHandler()->addWidget(mProjectWidget);
-  viewer.getImGuiHandler()->addWidget(mOutputWidget);
+  mViewer->getImGuiHandler()->addWidget(mMainMenuWidget);
+  mViewer->getImGuiHandler()->addWidget(mProjectExplorerWidget);
+  mViewer->getImGuiHandler()->addWidget(mProjectWidget);
+  mViewer->getImGuiHandler()->addWidget(mOutputWidget);
 
-  viewer.addEventHandler(new EventHandler);
+  mViewer->addEventHandler(new EventHandler);
 
-  viewer.setUpViewInWindow(0, 0, 1280, 720);
+  mViewer->setUpViewInWindow(0, 0, 1280, 720);
 
-  viewer.getCameraManipulator()->setHomePosition(
+  mViewer->getCameraManipulator()->setHomePosition(
       ::osg::Vec3(2.57f, 3.14f, 1.64f),
       ::osg::Vec3(0.00f, 0.00f, 0.00f),
       ::osg::Vec3(-0.24f, -0.25f, 0.94f));
 
   // We need to re-dirty the CameraManipulator by passing it into the viewer
   // again, so that the viewer knows to update its HomePosition setting
-  viewer.setCameraManipulator(viewer.getCameraManipulator());
+  mViewer->setCameraManipulator(mViewer->getCameraManipulator());
+
+  // Add Grid
+  mGrid = new gui::osg::GridVisual();
+  mViewer->addAttachment(mGrid);
 
   auto oldProjects = ProjectGroup::create("Old Projects");
   mProjectTreeRoot.addChild(oldProjects);
-  oldProjects->addChild(TProjectNote<RigidCubesProject>::create());
   oldProjects->addChild(TProjectNote<RigidCubesProject>::create());
   oldProjects->addChild(TProjectNote<BoxStackingProject>::create());
 }
@@ -83,7 +88,7 @@ Gallery::Gallery() : mProjectTreeRoot(""), mCurrentProject(nullptr)
 //==============================================================================
 void Gallery::run()
 {
-  viewer.run();
+  mViewer->run();
 }
 
 //==============================================================================
@@ -92,7 +97,7 @@ void Gallery::selectProject(const ProjectNode* node)
   if (mCurrentProject)
   {
     mCurrentProject->finalize();
-    viewer.removeWorldNode(mCurrentProject->getOsgNode());
+    mViewer->removeWorldNode(mCurrentProject->getOsgNode());
     mCurrentProject = nullptr;
   }
 
@@ -121,7 +126,7 @@ void Gallery::selectProject(const ProjectNode* node)
     return;
   }
 
-  viewer.addWorldNode(osgNode);
+  mViewer->addWorldNode(osgNode);
 
   std::stringstream ss;
   ss << "Project '" << mCurrentProject->getName() << "' is loaded.\n";
@@ -174,6 +179,24 @@ ProjectWidget* Gallery::getProjectWidget()
 OutputWidget* Gallery::getOutputWidget()
 {
   return mOutputWidget.get();
+}
+
+//==============================================================================
+gui::osg::GridVisual* Gallery::getGrid()
+{
+  return mGrid.get();
+}
+
+//==============================================================================
+void Gallery::setGridVisibility(bool show)
+{
+  mGrid->display(show);
+}
+
+//==============================================================================
+bool Gallery::isGridVisible() const
+{
+  return mGrid->isDisplayed();
 }
 
 } // namespace examples

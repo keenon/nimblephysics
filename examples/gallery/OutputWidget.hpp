@@ -41,11 +41,11 @@
 namespace dart {
 namespace examples {
 
-class OutputWidget : public dart::gui::osg::ImGuiWidget
+class OutputWidget : public gui::osg::ImGuiWidget
 {
 public:
   /// Constructor
-  OutputWidget(Gallery* gallery, dart::gui::osg::ImGuiViewer* viewer);
+  OutputWidget(Gallery* gallery, gui::osg::ImGuiViewer* viewer);
 
   // Documentation inherited
   void render() override;
@@ -56,7 +56,7 @@ public:
 
 protected:
   Gallery* mGallery;
-  dart::gui::osg::ImGuiViewer* mViewer;
+  ::osg::ref_ptr<gui::osg::ImGuiViewer> mViewer;
 
 private:
   ImGuiTextBuffer Buf;
