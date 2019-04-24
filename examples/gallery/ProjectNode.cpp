@@ -42,7 +42,7 @@ ProjectNode::~ProjectNode()
 }
 
 //==============================================================================
-std::function<std::unique_ptr<Project>()> ProjectNode::getCreateFunction() const
+std::function<std::shared_ptr<Project>()> ProjectNode::getCreateFunction() const
 {
   return nullptr;
 }

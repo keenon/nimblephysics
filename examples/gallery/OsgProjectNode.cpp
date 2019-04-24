@@ -41,10 +41,12 @@ namespace dart {
 namespace examples {
 
 //==============================================================================
-OsgProjectNode::OsgProjectNode(Project* project)
+OsgProjectNode::OsgProjectNode(std::shared_ptr<Project> project)
   : dart::gui::osg::WorldNode(), mProject(project)
 {
   // Do nothing
+//  if (auto lock = project.lock())
+//    pro
 }
 
 //==============================================================================

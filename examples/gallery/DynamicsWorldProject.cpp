@@ -40,10 +40,10 @@ namespace examples {
 //==============================================================================
 DynamicsWorldProject::DynamicsWorldProject()
 {
-  mOsgNode = new OsgProjectNode(this);
+//  mOsgNode = new OsgProjectNode(shared_from_this());
   mWorld = dart::simulation::World::create();
-  mOsgNode->setWorld(mWorld);
-  mOsgNode->setNumStepsPerCycle(16);
+//  mOsgNode->setWorld(mWorld);
+//  mOsgNode->setNumStepsPerCycle(16);
 }
 
 //==============================================================================
@@ -104,9 +104,9 @@ void DynamicsWorldProject::drawToMainMenuWidget()
 //==============================================================================
 void DynamicsWorldProject::setWorld(simulation::WorldPtr world)
 {
-  assert(mOsgNode);
+//  assert(mOsgNode);
   mWorld = std::move(world);
-  mOsgNode->setWorld(mWorld);
+//  mOsgNode->setWorld(mWorld);
 }
 
 //==============================================================================

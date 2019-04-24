@@ -214,7 +214,7 @@ public:
   void setUpwardsDirection(const Eigen::Vector3d& _up);
 
   /// Set the given WorldNode to active
-  void setWorldNodeActive(WorldNode* _node, bool _active=true);
+  void setWorldNodeActive(WorldNode* node, bool active = true);
 
   /// Set the given World to active
   void setWorldNodeActive(std::shared_ptr<dart::simulation::World> _world,
@@ -365,7 +365,7 @@ protected:
 
   /// Map of WorldNodes in this dart::gui::osg::Viewer. A WorldNode will map to
   /// true iff it is currently active
-  std::map<WorldNode*,bool> mWorldNodes;
+  std::map<::osg::ref_ptr<WorldNode>,bool> mWorldNodes;
 
   std::unordered_set<ViewerAttachment*> mAttachments;
 

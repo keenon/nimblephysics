@@ -120,10 +120,10 @@ void Project::drawToMainMenuWidget()
 }
 
 //==============================================================================
-OsgProjectNode* Project::getOsgNode()
-{
-  return mOsgNode;
-}
+//OsgProjectNode* Project::getOsgNode()
+//{
+//  return mOsgNode;
+//}
 
 } // namespace examples
 } // namespace dart

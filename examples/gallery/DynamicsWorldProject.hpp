@@ -39,7 +39,7 @@
 namespace dart {
 namespace examples {
 
-class DynamicsWorldProject : public Project
+class DynamicsWorldProject : public Project, public std::enable_shared_from_this<DynamicsWorldProject>
 {
 public:
   DynamicsWorldProject();

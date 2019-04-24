@@ -97,7 +97,11 @@ void Gallery::selectProject(const ProjectNode* node)
   if (mCurrentProject)
   {
     mCurrentProject->finalize();
-    mViewer->removeWorldNode(mCurrentProject->getOsgNode());
+
+    mViewer->removeWorldNode(mOsgNode);
+
+//    mViewer->removeWorldNode(mCurrentProject->getOsgNode());
+//    mPrevProject = std::move(mCurrentProject);
     mCurrentProject = nullptr;
   }
 
@@ -118,15 +122,15 @@ void Gallery::selectProject(const ProjectNode* node)
 
   mCurrentProject->initialize();
 
-  auto osgNode = mCurrentProject->getOsgNode();
-  if (!osgNode)
+  mOsgNode = new OsgProjectNode(mCurrentProject);
+  if (!mOsgNode)
   {
     dtwarn << "[Gallery] Failed to get OSG node from project. This will lead "
            << "to rendering nothing and simulating nothing.\n";
     return;
   }
 
-  mViewer->addWorldNode(osgNode);
+  mViewer->addWorldNode(mOsgNode);
 
   std::stringstream ss;
   ss << "Project '" << mCurrentProject->getName() << "' is loaded.\n";

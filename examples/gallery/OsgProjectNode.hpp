@@ -44,7 +44,7 @@ class Project;
 class OsgProjectNode : public dart::gui::osg::WorldNode
 {
 public:
-  OsgProjectNode(Project* project = nullptr);
+  OsgProjectNode(std::shared_ptr<Project> project);
 
   void refresh() override;
 
@@ -57,7 +57,7 @@ public:
   void customPostStep() override;
 
 protected:
-  Project* mProject;
+  std::shared_ptr<Project> mProject;
 };
 
 } // namespace examples

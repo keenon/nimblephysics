@@ -51,7 +51,7 @@ class ProjectNode
 public:
   virtual ~ProjectNode();
 
-  virtual std::function<std::unique_ptr<Project>()> getCreateFunction() const;
+  virtual std::function<std::shared_ptr<Project> ()> getCreateFunction() const;
 
   virtual std::string getName() const;
 
@@ -118,9 +118,9 @@ public:
     return std::make_shared<TProjectNote>();
   }
 
-  std::function<std::unique_ptr<Project>()> getCreateFunction() const override
+  std::function<std::shared_ptr<Project>()> getCreateFunction() const override
   {
-    return []() { return dart::common::make_unique<T>(); };
+    return []() { return std::make_shared<T>(); };
   }
 
   std::string getName() const override

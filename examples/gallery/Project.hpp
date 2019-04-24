@@ -67,8 +67,8 @@ public:
 
 protected:
   friend class Gallery;
-  OsgProjectNode* getOsgNode();
-  osg::ref_ptr<OsgProjectNode> mOsgNode;
+//  OsgProjectNode* getOsgNode();
+//  ::osg::ref_ptr<OsgProjectNode> mOsgNode;
   std::weak_ptr<dart::gui::osg::ImGuiViewer> mViewer;
 };
 

@@ -85,7 +85,11 @@ protected:
 
   ProjectGroup mProjectTreeRoot;
 
-  std::unique_ptr<Project> mCurrentProject;
+  ::osg::ref_ptr<OsgProjectNode> mOsgNode{nullptr};
+
+  std::shared_ptr<Project> mCurrentProject;
+
+  std::shared_ptr<Project> mPrevProject;
 
   ::osg::ref_ptr<gui::osg::GridVisual> mGrid;
 };

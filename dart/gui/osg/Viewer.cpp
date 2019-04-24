@@ -386,9 +386,15 @@ void Viewer::addWorldNode(WorldNode* _newWorldNode, bool _active)
 }
 
 //==============================================================================
-void Viewer::removeWorldNode(WorldNode* _oldWorldNode)
+void Viewer::removeWorldNode(WorldNode* oldWorldNode)
 {
-  std::map<WorldNode*,bool>::iterator it = mWorldNodes.find(_oldWorldNode);
+  auto it = std::find_if(
+      mWorldNodes.begin(),
+      mWorldNodes.end(),
+      [&oldWorldNode](const std::pair<::osg::ref_ptr<WorldNode>, bool>& pair)
+      {
+        return pair.first == oldWorldNode;
+      });
   if(it == mWorldNodes.end())
     return;
 
@@ -410,15 +416,15 @@ void Viewer::removeWorldNode(std::shared_ptr<dart::simulation::World> _oldWorld)
 
 //==============================================================================
 WorldNode* Viewer::getWorldNode(
-    std::shared_ptr<dart::simulation::World> _world) const
+    std::shared_ptr<dart::simulation::World> world) const
 {
-  std::map<WorldNode*,bool>::const_iterator it = mWorldNodes.begin(),
-                                            end = mWorldNodes.end();
+  auto it = mWorldNodes.begin();
+  auto end = mWorldNodes.end();
   WorldNode* node = nullptr;
   for( ; it != end; ++it)
   {
-    WorldNode* checkNode = it->first;
-    if(checkNode->getWorld() == _world)
+    WorldNode* checkNode = it->first.get();
+    if(checkNode->getWorld() == world)
     {
       node = checkNode;
       break;
@@ -533,13 +539,19 @@ void Viewer::setUpwardsDirection(const Eigen::Vector3d& _up)
 }
 
 //==============================================================================
-void Viewer::setWorldNodeActive(WorldNode* _node, bool _active)
+void Viewer::setWorldNodeActive(WorldNode* node, bool active)
 {
-  std::map<WorldNode*,bool>::iterator it = mWorldNodes.find(_node);
+  auto it = std::find_if(
+      mWorldNodes.begin(),
+      mWorldNodes.end(),
+      [&node](const std::pair<::osg::ref_ptr<WorldNode>, bool>& pair)
+      {
+        return pair.first == node;
+      });
   if(it == mWorldNodes.end())
     return;
 
-  it->second = _active;
+  it->second = active;
 }
 
 //==============================================================================
