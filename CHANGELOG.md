@@ -1,6 +1,68 @@
 ## DART 6
 
-### [DART 6.8.0 (20XX-XX-XX)](https://github.com/dartsim/dart/milestone/48?closed=1)
+### [DART 6.9.0 (20XX-XX-XX)](https://github.com/dartsim/dart/milestone/52?closed=1)
+
+#### Changes
+
+* XXX
+
+  * XXX: [#XXXX](https://github.com/dartsim/dart/pull/XXXX)
+
+#### Compilers Tested
+
+* Linux
+
+  * GCC 64-bit: 5.4.0, 7.3.0, 8.2.0
+  * GCC 32-bit: 5.4.0
+
+* macOS
+
+  * AppleClang: 9.1.0, 10.0.0
+
+* Windows
+
+  * MSVC: 19.20
+
+### [DART 6.8.2 (2019-04-23)](https://github.com/dartsim/dart/milestone/54?closed=1)
+
+#### Changes
+
+* Dynamics
+
+  * Fixed BoxedLcpConstraintSolver is not API compatible with 6.7: [#1291](https://github.com/dartsim/dart/pull/1291)
+
+#### Compilers Tested
+
+* Linux
+
+  * GCC 64-bit: 5.4.0, 7.3.0, 8.2.0
+  * GCC 32-bit: 5.4.0
+
+* macOS
+
+  * AppleClang: 9.1.0, 10.0.0
+
+### [DART 6.8.1 (2019-04-23)](https://github.com/dartsim/dart/milestone/53?closed=1)
+
+#### Changes
+
+* Build System
+
+  * Fixed invalid double quotation marks in DARTFindBoost.cmake: [#1283](https://github.com/dartsim/dart/pull/1283)
+  * Disabled octomap support on macOS: [#1284](https://github.com/dartsim/dart/pull/1284)
+
+#### Compilers Tested
+
+* Linux
+
+  * GCC 64-bit: 5.4.0, 7.3.0, 8.2.0
+  * GCC 32-bit: 5.4.0
+
+* macOS
+
+  * AppleClang: 9.1.0, 10.0.0
+
+### [DART 6.8.0 (2019-04-22)](https://github.com/dartsim/dart/milestone/48?closed=1)
 
 #### Changes
 
@@ -40,7 +102,7 @@
   * Updated ImGui to 1.69: [#1274](https://github.com/dartsim/dart/pull/1274)
   * Added VoxelGridShape support to OSG renderer: [#1276](https://github.com/dartsim/dart/pull/1276)
   * Added PointCloudShape and its OSG rendering: [#1277](https://github.com/dartsim/dart/pull/1277)
-  * Added grid visual to OSG renderer: [#1278](https://github.com/dartsim/dart/pull/1278)
+  * Added grid visual to OSG renderer: [#1278](https://github.com/dartsim/dart/pull/1278), [#1280](https://github.com/dartsim/dart/pull/1280)
 
 * Build System
 
