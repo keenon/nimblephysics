@@ -3,7 +3,8 @@ version: "{build}"
 
 image:
   - Visual Studio 2017
-  #- Ubuntu
+  - Ubuntu1604
+  - Ubuntu1804
 
 platform: x64
 
@@ -57,14 +58,14 @@ install:
   - cmd: vcpkg integrate install
   - cmd: cd "%APPVEYOR_BUILD_FOLDER%"
 
-  #------------------
-  # Ubuntu 16.04 LTS
-  #------------------
+  #-------------------------------
+  # Ubuntu 16.04 LTS && 18.04 LTS
+  #-------------------------------
   - sh: sudo apt-get update
   - sh: sudo apt-get --yes install build-essential cmake pkg-config git
   - sh: sudo apt-get --yes install libeigen3-dev libassimp-dev libccd-dev libfcl-dev libboost-regex-dev libboost-system-dev
   - sh: sudo apt-get --yes install libnlopt-dev coinor-libipopt-dev libbullet-dev libflann-dev libtinyxml2-dev liburdfdom-dev libxi-dev libxmu-dev freeglut3-dev libopenscenegraph-dev
-  - sh: sudo apt-get --yes install clang-format-3.8
+  - sh: sudo apt-get --yes install clang-format-6.0
 
 # preserve contents of selected directories and files across project builds
 cache:
@@ -78,9 +79,9 @@ build_script:
   - cmd: cmake %CMAKE_GENERATOR% -DCMAKE_BUILD_TYPE=%configuration% -DDART_MSVC_DEFAULT_OPTIONS="%MSVC_DEFAULT_OPTIONS%" %CMAKE_TOOLCHAIN_FILE% %CMAKE_TOOLCHAIN% ..
   - cmd: cmake --build . --target ALL_BUILD --config %configuration% -- /maxcpucount:4 /verbosity:quiet
 
-  #------------------
-  # Ubuntu 16.04 LTS
-  #------------------
+  #-------------------------------
+  # Ubuntu 16.04 LTS && 18.04 LTS
+  #-------------------------------
   - sh: mkdir build && cd build
   - sh: cmake -DCMAKE_BUILD_TYPE=$configuration -DDART_TREAT_WARNINGS_AS_ERRORS=ON ..
   - sh: make -j4 tests examples tutorials
