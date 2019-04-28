@@ -3,8 +3,8 @@ version: "{build}"
 
 image:
   - Visual Studio 2017
-  - Ubuntu1604
-  - Ubuntu1804
+  # - Ubuntu1604
+  # - Ubuntu1804
 
 platform: x64
 
@@ -38,9 +38,9 @@ install:
   # Windows 10
   #------------------
   # update vcpkg
-  - cmd: cd C:\tools\vcpkg
-  - cmd: git pull
-  - cmd: .\bootstrap-vcpkg.bat
+  # - cmd: cd C:\tools\vcpkg
+  # - cmd: git pull
+  # - cmd: .\bootstrap-vcpkg.bat
 
   - cmd: if "%platform%"=="Win32" set VCPKG_ARCH=x86-windows
   - cmd: if "%platform%"=="x64"   set VCPKG_ARCH=x64-windows
