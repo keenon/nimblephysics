@@ -100,6 +100,8 @@ install(
 )
 
 dart_format_add(
+  FrameVisual.hpp
+  FrameVisual.cpp
   GridVisual.hpp
   GridVisual.cpp
   ImGuiHandler.hpp

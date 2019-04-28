@@ -36,6 +36,7 @@
 #include "dart/dynamics/SimpleFrame.hpp"
 #include "dart/dynamics/Skeleton.hpp"
 #include "dart/dynamics/SphereShape.hpp"
+#include "dart/gui/osg/Utils.hpp"
 #include "dart/math/Helpers.hpp"
 
 namespace dart {
@@ -238,15 +239,6 @@ float GridVisual::getMinorLineWidth() const
 }
 
 //==============================================================================
-::osg::Vec3 toVec3(const Eigen::Vector3d& point)
-{
-  return ::osg::Vec3(
-      static_cast<float>(point.x()),
-      static_cast<float>(point.y()),
-      static_cast<float>(point.z()));
-}
-
-//==============================================================================
 void setVertices(
     ::osg::Vec3Array* axisLineVertices,
     ::osg::Vec3Array* majorLineVertices,
@@ -305,7 +297,7 @@ void setVertices(
   const auto axis1Positive = +posInAxis1;
 
   ::osg::Vec3 vec3;
-  const ::osg::Vec3 osgOffset = toVec3(offset);
+  const ::osg::Vec3 osgOffset = eigToOsgVec3(offset);
 
   //----------------
   // Axis Vertices

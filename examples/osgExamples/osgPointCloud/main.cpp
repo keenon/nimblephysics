@@ -44,6 +44,7 @@ using namespace dart::dynamics;
 using namespace dart::math;
 
 static const std::string& robotName = "KR5";
+static const std::string& eeName = "palm";
 
 class PointCloudWorld : public gui::osg::WorldNode
 {
@@ -535,6 +536,14 @@ int main()
       std::make_shared<PointCloudWidget>(&viewer, node.get(), grid));
 
   viewer.addAttachment(grid);
+
+  auto ee = robot->getBodyNode(eeName);
+  if (ee)
+  {
+    ::osg::ref_ptr<gui::osg::FrameVisual> frameVisual
+        = new gui::osg::FrameVisual(ee);
+    viewer.addAttachment(frameVisual);
+  }
 
   // Print out instructions
   std::cout << viewer.getInstructions() << std::endl;
