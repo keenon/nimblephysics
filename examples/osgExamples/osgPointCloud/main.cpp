@@ -52,18 +52,19 @@ public:
       simulation::WorldPtr world, dynamics::SkeletonPtr robot)
     : gui::osg::WorldNode(std::move(world)), mRobot(std::move(robot))
   {
-    auto pointCloudFrame = mWorld->getSimpleFrame("point cloud");
-    auto voxelGridFrame = mWorld->getSimpleFrame("voxel");
+    if (auto pointCloudFrame = mWorld->getSimpleFrame("point cloud"))
+    {
+      mPointCloudShape = std::dynamic_pointer_cast<dynamics::PointCloudShape>(
+          pointCloudFrame->getShape());
+      mPointCloudVisualAspect = pointCloudFrame->getVisualAspect();
+    }
 
-    mPointCloudShape = std::dynamic_pointer_cast<dynamics::PointCloudShape>(
-        pointCloudFrame->getShape());
-    mVoxelGridShape = std::dynamic_pointer_cast<dynamics::VoxelGridShape>(
-        voxelGridFrame->getShape());
-
-    mPointCloudVisualAspect = pointCloudFrame->getVisualAspect();
-    mVoxelGridVisualAspect = voxelGridFrame->getVisualAspect();
-
-    assert(mVoxelGridShape);
+    if (auto voxelGridFrame = mWorld->getSimpleFrame("voxel"))
+    {
+      mVoxelGridShape = std::dynamic_pointer_cast<dynamics::VoxelGridShape>(
+          voxelGridFrame->getShape());
+      mVoxelGridVisualAspect = voxelGridFrame->getVisualAspect();
+    }
   }
 
   // Triggered at the beginning of each simulation step
@@ -84,24 +85,25 @@ public:
     auto pointCloud = generatePointCloud(500);
 
     // Update sensor position
-    static double time = 0.0;
-    const double dt = 0.001;
-    const double radius = 1.0;
-    Eigen::Vector3d center = Eigen::Vector3d(0.0, 0.1, 0.0);
-    Eigen::Vector3d sensorPos = center;
-    sensorPos[0] = radius * std::sin(time);
-    sensorPos[1] = radius * std::cos(time);
-    sensorPos[2] = 0.5 + 0.25 * std::sin(time * 2.0);
-    time += dt;
-    auto sensorFrame = mWorld->getSimpleFrame("sensor");
-    assert(sensorFrame);
-    sensorFrame->setTranslation(sensorPos);
+    if (auto sensorFrame = mWorld->getSimpleFrame("sensor"))
+    {
+      static double time = 0.0;
+      const double dt = 0.001;
+      const double radius = 1.0;
+      Eigen::Vector3d center = Eigen::Vector3d(0.0, 0.1, 0.0);
+      Eigen::Vector3d sensorPos = center;
+      sensorPos[0] = radius * std::sin(time);
+      sensorPos[1] = radius * std::cos(time);
+      sensorPos[2] = 0.5 + 0.25 * std::sin(time * 2.0);
+      time += dt;
+      sensorFrame->setTranslation(sensorPos);
+
+      // Update voxel
+      mVoxelGridShape->updateOccupancy(pointCloud, sensorPos);
+    }
 
     // Update point cloud
     mPointCloudShape->setPoints(pointCloud);
-
-    // Update voxel
-    mVoxelGridShape->updateOccupancy(pointCloud, sensorPos);
   }
 
   dynamics::VisualAspect* getPointCloudVisualAspect()
@@ -128,6 +130,9 @@ protected:
   octomap::Pointcloud generatePointCloud(std::size_t numPoints)
   {
     octomap::Pointcloud pointCloud;
+
+    if (!mRobot)
+      return pointCloud;
 
     const auto numBodies = mRobot->getNumBodyNodes();
     assert(numBodies > 0);
@@ -180,13 +185,13 @@ protected:
     }
   }
 
-  SkeletonPtr mRobot;
+  SkeletonPtr mRobot{nullptr};
 
-  std::shared_ptr<dynamics::PointCloudShape> mPointCloudShape;
-  std::shared_ptr<dynamics::VoxelGridShape> mVoxelGridShape;
+  std::shared_ptr<dynamics::PointCloudShape> mPointCloudShape{nullptr};
+  std::shared_ptr<dynamics::VoxelGridShape> mVoxelGridShape{nullptr};
 
-  dynamics::VisualAspect* mPointCloudVisualAspect;
-  dynamics::VisualAspect* mVoxelGridVisualAspect;
+  dynamics::VisualAspect* mPointCloudVisualAspect{nullptr};
+  dynamics::VisualAspect* mVoxelGridVisualAspect{nullptr};
 
   bool mUpdate{true};
 };
@@ -206,11 +211,11 @@ public:
   void render() override
   {
     ImGui::SetNextWindowPos(ImVec2(10, 20));
+    ImGui::SetNextWindowSize(ImVec2(360, 600));
+    ImGui::SetNextWindowBgAlpha(0.5f);
     if (!ImGui::Begin(
             "Point Cloud & Voxel Grid Demo",
             nullptr,
-            ImVec2(360, 600),
-            0.5f,
             ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_HorizontalScrollbar))
     {
       // Early out if the window is collapsed, as an optimization.
@@ -265,12 +270,10 @@ public:
       }
 
       int robotUpdate = mNode->getUpdate() ? 0 : 1;
-      if (ImGui::RadioButton("Run Robot Updating", &robotUpdate, 0)
-          && mNode->getUpdate())
+      if (ImGui::RadioButton("Run Robot Updating", &robotUpdate, 0))
         mNode->setUpdate(true);
       ImGui::SameLine();
-      if (ImGui::RadioButton("Stop Robot Updating", &robotUpdate, 1)
-          && mNode->getUpdate())
+      if (ImGui::RadioButton("Stop Robot Updating", &robotUpdate, 1))
         mNode->setUpdate(false);
     }
 
@@ -278,138 +281,150 @@ public:
     {
       if (mViewer->isAllowingSimulation())
       {
-        bool pcShow = !mNode->getPointCloudVisualAspect()->isHidden();
-        if (ImGui::Checkbox("Point Cloud", &pcShow))
+        if (auto pointCloudVisualAspect = mNode->getPointCloudVisualAspect())
         {
-          if (pcShow)
-            mNode->getPointCloudVisualAspect()->show();
-          else
-            mNode->getPointCloudVisualAspect()->hide();
+          bool pcShow = !pointCloudVisualAspect->isHidden();
+          if (ImGui::Checkbox("Point Cloud", &pcShow))
+          {
+            if (pcShow)
+              pointCloudVisualAspect->show();
+            else
+              pointCloudVisualAspect->hide();
+          }
         }
 
-        bool vgShow = !mNode->getVoxelGridVisualAspect()->isHidden();
-        if (ImGui::Checkbox("Voxel Grid", &vgShow))
+        if (auto voxelGridVisualAspect = mNode->getVoxelGridVisualAspect())
         {
-          if (vgShow)
-            mNode->getVoxelGridVisualAspect()->show();
-          else
-            mNode->getVoxelGridVisualAspect()->hide();
+          bool vgShow = !voxelGridVisualAspect->isHidden();
+          if (ImGui::Checkbox("Voxel Grid", &vgShow))
+          {
+            if (vgShow)
+              voxelGridVisualAspect->show();
+            else
+              voxelGridVisualAspect->hide();
+          }
         }
       }
 
       if (ImGui::CollapsingHeader("Grid", ImGuiTreeNodeFlags_None))
       {
-        assert(mGrid);
-        ImGui::Text("Grid");
-
-        bool display = mGrid->isDisplayed();
-        if (ImGui::Checkbox("Show", &display))
-          mGrid->display(display);
-
-        if (display)
+        if (mGrid)
         {
-          int e = static_cast<int>(mGrid->getPlaneType());
-          if (mViewer->isAllowingSimulation())
-          {
-            if (ImGui::RadioButton("XY-Plane", &e, 0))
-              mGrid->setPlaneType(gui::osg::GridVisual::PlaneType::XY);
-            ImGui::SameLine();
-            if (ImGui::RadioButton("YZ-Plane", &e, 1))
-              mGrid->setPlaneType(gui::osg::GridVisual::PlaneType::YZ);
-            ImGui::SameLine();
-            if (ImGui::RadioButton("ZX-Plane", &e, 2))
-              mGrid->setPlaneType(gui::osg::GridVisual::PlaneType::ZX);
-          }
+          ImGui::Text("Grid");
 
-          static Eigen::Vector3f offset;
-          ImGui::Columns(3);
-          offset = mGrid->getOffset().cast<float>();
-          if (ImGui::InputFloat("X", &offset[0], 0.1f, 0.5f, "%.1f"))
-            mGrid->setOffset(offset.cast<double>());
-          ImGui::NextColumn();
-          if (ImGui::InputFloat("Y", &offset[1], 0.1f, 0.5f, "%.1f"))
-            mGrid->setOffset(offset.cast<double>());
-          ImGui::NextColumn();
-          if (ImGui::InputFloat("Z", &offset[2], 0.1f, 0.5f, "%.1f"))
-            mGrid->setOffset(offset.cast<double>());
-          ImGui::Columns(1);
+          bool display = mGrid->isDisplayed();
+          if (ImGui::Checkbox("Show", &display))
+            mGrid->display(display);
 
-          static int cellCount;
-          cellCount = static_cast<int>(mGrid->getNumCells());
-          if (ImGui::InputInt("Line Count", &cellCount, 1, 5))
+          if (display)
           {
-            if (cellCount < 0)
-              cellCount = 0;
-            mGrid->setNumCells(static_cast<std::size_t>(cellCount));
-          }
+            int e = static_cast<int>(mGrid->getPlaneType());
+            if (mViewer->isAllowingSimulation())
+            {
+              if (ImGui::RadioButton("XY-Plane", &e, 0))
+                mGrid->setPlaneType(gui::osg::GridVisual::PlaneType::XY);
+              ImGui::SameLine();
+              if (ImGui::RadioButton("YZ-Plane", &e, 1))
+                mGrid->setPlaneType(gui::osg::GridVisual::PlaneType::YZ);
+              ImGui::SameLine();
+              if (ImGui::RadioButton("ZX-Plane", &e, 2))
+                mGrid->setPlaneType(gui::osg::GridVisual::PlaneType::ZX);
+            }
 
-          static float cellStepSize;
-          cellStepSize = static_cast<float>(mGrid->getMinorLineStepSize());
-          if (ImGui::InputFloat("Line Step Size", &cellStepSize, 0.001f, 0.1f))
-          {
-            mGrid->setMinorLineStepSize(static_cast<double>(cellStepSize));
-          }
+            static Eigen::Vector3f offset;
+            ImGui::Columns(3);
+            offset = mGrid->getOffset().cast<float>();
+            if (ImGui::InputFloat("X", &offset[0], 0.1f, 0.5f, "%.1f"))
+              mGrid->setOffset(offset.cast<double>());
+            ImGui::NextColumn();
+            if (ImGui::InputFloat("Y", &offset[1], 0.1f, 0.5f, "%.1f"))
+              mGrid->setOffset(offset.cast<double>());
+            ImGui::NextColumn();
+            if (ImGui::InputFloat("Z", &offset[2], 0.1f, 0.5f, "%.1f"))
+              mGrid->setOffset(offset.cast<double>());
+            ImGui::Columns(1);
 
-          static int minorLinesPerMajorLine;
-          minorLinesPerMajorLine
-              = static_cast<int>(mGrid->getNumMinorLinesPerMajorLine());
-          if (ImGui::InputInt(
-                  "Minor Lines per Major Line", &minorLinesPerMajorLine, 1, 5))
-          {
-            if (minorLinesPerMajorLine < 0)
-              minorLinesPerMajorLine = 0;
-            mGrid->setNumMinorLinesPerMajorLine(
-                static_cast<std::size_t>(minorLinesPerMajorLine));
-          }
+            static int cellCount;
+            cellCount = static_cast<int>(mGrid->getNumCells());
+            if (ImGui::InputInt("Line Count", &cellCount, 1, 5))
+            {
+              if (cellCount < 0)
+                cellCount = 0;
+              mGrid->setNumCells(static_cast<std::size_t>(cellCount));
+            }
 
-          static float axisLineWidth;
-          axisLineWidth = mGrid->getAxisLineWidth();
-          if (ImGui::InputFloat(
-                  "Axis Line Width", &axisLineWidth, 1.f, 2.f, "%.0f"))
-          {
-            mGrid->setAxisLineWidth(axisLineWidth);
-          }
+            static float cellStepSize;
+            cellStepSize = static_cast<float>(mGrid->getMinorLineStepSize());
+            if (ImGui::InputFloat(
+                    "Line Step Size", &cellStepSize, 0.001f, 0.1f))
+            {
+              mGrid->setMinorLineStepSize(static_cast<double>(cellStepSize));
+            }
 
-          static float majorLineWidth;
-          majorLineWidth = mGrid->getMajorLineWidth();
-          if (ImGui::InputFloat(
-                  "Major Line Width", &majorLineWidth, 1.f, 2.f, "%.0f"))
-          {
-            mGrid->setMajorLineWidth(majorLineWidth);
-          }
+            static int minorLinesPerMajorLine;
+            minorLinesPerMajorLine
+                = static_cast<int>(mGrid->getNumMinorLinesPerMajorLine());
+            if (ImGui::InputInt(
+                    "Minor Lines per Major Line",
+                    &minorLinesPerMajorLine,
+                    1,
+                    5))
+            {
+              if (minorLinesPerMajorLine < 0)
+                minorLinesPerMajorLine = 0;
+              mGrid->setNumMinorLinesPerMajorLine(
+                  static_cast<std::size_t>(minorLinesPerMajorLine));
+            }
 
-          static float majorColor[3];
-          auto internalmajorColor = mGrid->getMajorLineColor();
-          majorColor[0] = static_cast<float>(internalmajorColor.x());
-          majorColor[1] = static_cast<float>(internalmajorColor.y());
-          majorColor[2] = static_cast<float>(internalmajorColor.z());
-          if (ImGui::ColorEdit3("Major Line Color", majorColor))
-          {
-            internalmajorColor[0] = static_cast<double>(majorColor[0]);
-            internalmajorColor[1] = static_cast<double>(majorColor[1]);
-            internalmajorColor[2] = static_cast<double>(majorColor[2]);
-            mGrid->setMajorLineColor(internalmajorColor);
-          }
+            static float axisLineWidth;
+            axisLineWidth = mGrid->getAxisLineWidth();
+            if (ImGui::InputFloat(
+                    "Axis Line Width", &axisLineWidth, 1.f, 2.f, "%.0f"))
+            {
+              mGrid->setAxisLineWidth(axisLineWidth);
+            }
 
-          static float minorLineWidth;
-          minorLineWidth = mGrid->getMinorLineWidth();
-          if (ImGui::InputFloat(
-                  "Minor Line Width", &minorLineWidth, 1.f, 2.f, "%.0f"))
-          {
-            mGrid->setMinorLineWidth(minorLineWidth);
-          }
+            static float majorLineWidth;
+            majorLineWidth = mGrid->getMajorLineWidth();
+            if (ImGui::InputFloat(
+                    "Major Line Width", &majorLineWidth, 1.f, 2.f, "%.0f"))
+            {
+              mGrid->setMajorLineWidth(majorLineWidth);
+            }
 
-          float minorColor[3];
-          auto internalMinorColor = mGrid->getMinorLineColor();
-          minorColor[0] = static_cast<float>(internalMinorColor.x());
-          minorColor[1] = static_cast<float>(internalMinorColor.y());
-          minorColor[2] = static_cast<float>(internalMinorColor.z());
-          if (ImGui::ColorEdit3("Minor Line Color", minorColor))
-          {
-            internalMinorColor[0] = static_cast<double>(minorColor[0]);
-            internalMinorColor[1] = static_cast<double>(minorColor[1]);
-            internalMinorColor[2] = static_cast<double>(minorColor[2]);
-            mGrid->setMinorLineColor(internalMinorColor);
+            static float majorColor[3];
+            auto internalmajorColor = mGrid->getMajorLineColor();
+            majorColor[0] = static_cast<float>(internalmajorColor.x());
+            majorColor[1] = static_cast<float>(internalmajorColor.y());
+            majorColor[2] = static_cast<float>(internalmajorColor.z());
+            if (ImGui::ColorEdit3("Major Line Color", majorColor))
+            {
+              internalmajorColor[0] = static_cast<double>(majorColor[0]);
+              internalmajorColor[1] = static_cast<double>(majorColor[1]);
+              internalmajorColor[2] = static_cast<double>(majorColor[2]);
+              mGrid->setMajorLineColor(internalmajorColor);
+            }
+
+            static float minorLineWidth;
+            minorLineWidth = mGrid->getMinorLineWidth();
+            if (ImGui::InputFloat(
+                    "Minor Line Width", &minorLineWidth, 1.f, 2.f, "%.0f"))
+            {
+              mGrid->setMinorLineWidth(minorLineWidth);
+            }
+
+            float minorColor[3];
+            auto internalMinorColor = mGrid->getMinorLineColor();
+            minorColor[0] = static_cast<float>(internalMinorColor.x());
+            minorColor[1] = static_cast<float>(internalMinorColor.y());
+            minorColor[2] = static_cast<float>(internalMinorColor.z());
+            if (ImGui::ColorEdit3("Minor Line Color", minorColor))
+            {
+              internalMinorColor[0] = static_cast<double>(minorColor[0]);
+              internalMinorColor[1] = static_cast<double>(minorColor[1]);
+              internalMinorColor[2] = static_cast<double>(minorColor[2]);
+              mGrid->setMinorLineColor(internalMinorColor);
+            }
           }
         }
       }
@@ -534,7 +549,7 @@ int main()
   viewer.getImGuiHandler()->addWidget(
       std::make_shared<PointCloudWidget>(&viewer, node.get(), grid));
 
-  viewer.addAttachment(grid);
+  //  viewer.addAttachment(grid);
 
   // Print out instructions
   std::cout << viewer.getInstructions() << std::endl;
