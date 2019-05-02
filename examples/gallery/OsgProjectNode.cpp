@@ -44,9 +44,7 @@ namespace examples {
 OsgProjectNode::OsgProjectNode(std::shared_ptr<Project> project)
   : dart::gui::osg::WorldNode(), mProject(project)
 {
-  // Do nothing
-//  if (auto lock = project.lock())
-//    pro
+  setWorld(mProject->getWorld());
 }
 
 //==============================================================================

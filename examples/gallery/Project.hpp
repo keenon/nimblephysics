@@ -65,10 +65,14 @@ public:
   virtual void drawToProjectWidget();
   virtual void drawToMainMenuWidget();
 
+  simulation::WorldPtr getWorld();
+  simulation::ConstWorldPtr getWorld() const;
+
 protected:
   friend class Gallery;
 //  OsgProjectNode* getOsgNode();
 //  ::osg::ref_ptr<OsgProjectNode> mOsgNode;
+  simulation::WorldPtr mWorld;
   std::weak_ptr<dart::gui::osg::ImGuiViewer> mViewer;
 };
 

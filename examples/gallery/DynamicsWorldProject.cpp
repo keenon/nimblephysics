@@ -40,10 +40,7 @@ namespace examples {
 //==============================================================================
 DynamicsWorldProject::DynamicsWorldProject()
 {
-//  mOsgNode = new OsgProjectNode(shared_from_this());
   mWorld = dart::simulation::World::create();
-//  mOsgNode->setWorld(mWorld);
-//  mOsgNode->setNumStepsPerCycle(16);
 }
 
 //==============================================================================
@@ -99,26 +96,6 @@ void DynamicsWorldProject::drawToProjectWidget()
 void DynamicsWorldProject::drawToMainMenuWidget()
 {
 
-}
-
-//==============================================================================
-void DynamicsWorldProject::setWorld(simulation::WorldPtr world)
-{
-//  assert(mOsgNode);
-  mWorld = std::move(world);
-//  mOsgNode->setWorld(mWorld);
-}
-
-//==============================================================================
-simulation::WorldPtr DynamicsWorldProject::getWorld()
-{
-  return mWorld;
-}
-
-//==============================================================================
-simulation::ConstWorldPtr DynamicsWorldProject::getWorld() const
-{
-  return mWorld;
 }
 
 } // namespace examples

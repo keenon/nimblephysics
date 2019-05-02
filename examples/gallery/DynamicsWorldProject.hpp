@@ -39,7 +39,7 @@
 namespace dart {
 namespace examples {
 
-class DynamicsWorldProject : public Project, public std::enable_shared_from_this<DynamicsWorldProject>
+class DynamicsWorldProject : public Project
 {
 public:
   DynamicsWorldProject();
@@ -54,14 +54,6 @@ public:
 
   void drawToProjectWidget() override;
   void drawToMainMenuWidget() override;
-
-  void setWorld(simulation::WorldPtr world);
-
-  simulation::WorldPtr getWorld();
-  simulation::ConstWorldPtr getWorld() const;
-
-protected:
-  simulation::WorldPtr mWorld;
 };
 
 } // namespace examples

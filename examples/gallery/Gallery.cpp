@@ -89,6 +89,7 @@ Gallery::Gallery() : mProjectTreeRoot(""), mCurrentProject(nullptr)
 void Gallery::run()
 {
   mViewer->run();
+  mViewer->stopThreading();
 }
 
 //==============================================================================
@@ -98,12 +99,14 @@ void Gallery::selectProject(const ProjectNode* node)
   {
     mCurrentProject->finalize();
 
-    mViewer->stopThreading();
+//    mViewer->stopThreading();
     mViewer->removeWorldNode(mOsgNode);
 
 //    mViewer->removeWorldNode(mCurrentProject->getOsgNode());
 //    mPrevProject = std::move(mCurrentProject);
+    mViewer->stopThreading();
     mCurrentProject = nullptr;
+    mViewer->startThreading();
   }
 
   if (!node)
@@ -124,6 +127,7 @@ void Gallery::selectProject(const ProjectNode* node)
   mCurrentProject->initialize();
 
   mOsgNode = new OsgProjectNode(mCurrentProject);
+//  mOsgNode = mCurrentProject->getOsgNode();
   if (!mOsgNode)
   {
     dtwarn << "[Gallery] Failed to get OSG node from project. This will lead "
@@ -136,20 +140,18 @@ void Gallery::selectProject(const ProjectNode* node)
   std::stringstream ss;
   ss << "Project '" << mCurrentProject->getName() << "' is loaded.\n";
   mOutputWidget->addLog(ss.str());
-
-  mViewer->startThreading();
 }
 
 //==============================================================================
-Project* Gallery::getCurrentProject()
+std::shared_ptr<Project> Gallery::getCurrentProject()
 {
-  return mCurrentProject.get();
+  return mCurrentProject;
 }
 
 //==============================================================================
-const Project* Gallery::getCurrentProject() const
+std::shared_ptr<const Project> Gallery::getCurrentProject() const
 {
-  return mCurrentProject.get();
+  return mCurrentProject;
 }
 
 //==============================================================================

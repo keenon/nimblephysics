@@ -58,9 +58,9 @@ public:
 
   void selectProject(const ProjectNode* node);
 
-  Project* getCurrentProject();
+  std::shared_ptr<Project> getCurrentProject();
 
-  const Project* getCurrentProject() const;
+  std::shared_ptr<const Project> getCurrentProject() const;
 
   ProjectGroup* getProjectTreeRoot();
 

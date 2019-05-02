@@ -115,15 +115,13 @@ dynamics::SkeletonPtr createFloor()
 void BoxStackingProject::initialize()
 {
   // Create and initialize the world
-  auto world = simulation::World::create("Box Stacking World");
+  mWorld = simulation::World::create("Box Stacking World");
 
-  world->addSkeleton(createFloor());
+  mWorld->addSkeleton(createFloor());
 
   auto boxSkels = createBoxStack(5);
   for (const auto& boxSkel : boxSkels)
-    world->addSkeleton(boxSkel);
-
-  setWorld(world);
+    mWorld->addSkeleton(boxSkel);
 }
 
 //==============================================================================

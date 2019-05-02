@@ -152,13 +152,13 @@ void DefaultEventHandler::getNearAndFarPointUnderCursor(Eigen::Vector3d& near,
   ::osg::Matrix invVPW;
   invVPW.invert(VPW);
 
-  auto x = getWindowCursorX();
-  auto y = getWindowCursorY();
-  ::osg::Vec3 osgNear = ::osg::Vec3(x,y,0.0) * invVPW;
-  ::osg::Vec3 osgFar = ::osg::Vec3(x,y,distance) * invVPW;
+  float x = getWindowCursorX();
+  float y = getWindowCursorY();
+  auto osgNear = ::osg::Vec3f(x,y,0.0) * invVPW;
+  auto osgFar = ::osg::Vec3f(x,y,distance) * invVPW;
 
-  near = osgToEigVec3(osgNear);
-  far = osgToEigVec3(osgFar);
+  near = osgToEigVec3(osgNear).cast<double>();
+  far = osgToEigVec3(osgFar).cast<double>();
 }
 
 //==============================================================================

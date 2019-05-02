@@ -125,5 +125,17 @@ void Project::drawToMainMenuWidget()
 //  return mOsgNode;
 //}
 
+//==============================================================================
+simulation::WorldPtr Project::getWorld()
+{
+  return mWorld;
+}
+
+//==============================================================================
+simulation::ConstWorldPtr Project::getWorld() const
+{
+  return mWorld;
+}
+
 } // namespace examples
 } // namespace dart
