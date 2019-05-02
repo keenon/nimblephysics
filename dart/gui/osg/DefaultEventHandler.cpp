@@ -229,7 +229,7 @@ void DefaultEventHandler::pick(std::vector<PickInfo>& infoVector,
         PickInfo info;
         info.shape = shape->getShape();
         info.frame = shape->getParentShapeFrameNode()->getShapeFrame();
-        info.normal = osgToEigVec3(intersect.getWorldIntersectNormal());
+        info.normal = osgToEigVec3(intersect.getWorldIntersectNormal()).cast<double>();
         info.position = osgToEigVec3(intersect.getWorldIntersectPoint());
 
         infoVector.push_back(info);

@@ -98,6 +98,7 @@ void Gallery::selectProject(const ProjectNode* node)
   {
     mCurrentProject->finalize();
 
+    mViewer->stopThreading();
     mViewer->removeWorldNode(mOsgNode);
 
 //    mViewer->removeWorldNode(mCurrentProject->getOsgNode());
@@ -135,6 +136,8 @@ void Gallery::selectProject(const ProjectNode* node)
   std::stringstream ss;
   ss << "Project '" << mCurrentProject->getName() << "' is loaded.\n";
   mOutputWidget->addLog(ss.str());
+
+  mViewer->startThreading();
 }
 
 //==============================================================================

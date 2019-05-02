@@ -4,9 +4,15 @@
 
 #### Changes
 
-* XXX
+* Parser
 
-  * XXX: [#XXXX](https://github.com/dartsim/dart/pull/XXXX)
+  * Changed URDF parser to use URDF material color when specified: [#1295](https://github.com/dartsim/dart/pull/1295)
+
+* GUI
+
+  * Added heightmap support to OSG renderer: [#1293](https://github.com/dartsim/dart/pull/1293)
+  * Improved voxel grid and point cloud rendering performance: [#1294](https://github.com/dartsim/dart/pull/1294)
+  * Fixed incorrect alpha value update of InteractiveFrame: [#1297](https://github.com/dartsim/dart/pull/1297)
 
 #### Compilers Tested
 
@@ -22,6 +28,29 @@
 * Windows
 
   * MSVC: 19.20
+
+### [DART 6.8.3 (2019-05-01)](https://github.com/dartsim/dart/milestone/55?closed=1)
+
+#### Changes
+
+* Parser
+
+  * Fixed VskParker returning incorrect resource retriever: [#1300](https://github.com/dartsim/dart/pull/1300)
+
+* Build
+
+  * Fixed building with pagmo's optional dependencies: [#1301](https://github.com/dartsim/dart/pull/1301)
+
+#### Compilers Tested
+
+* Linux
+
+  * GCC 64-bit: 5.4.0, 7.3.0, 8.2.0
+  * GCC 32-bit: 5.4.0
+
+* macOS
+
+  * AppleClang: 9.1.0, 10.0.0
 
 ### [DART 6.8.2 (2019-04-23)](https://github.com/dartsim/dart/milestone/54?closed=1)
 

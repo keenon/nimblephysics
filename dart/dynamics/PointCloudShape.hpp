@@ -48,7 +48,7 @@ class PointCloudShape : public Shape
 public:
   /// Constructor
   ///
-  /// \param[in] size The size of cube that represents each point.
+  /// \param[in] visualSize The size of cube that represents each point.
   explicit PointCloudShape(double visualSize = 0.01);
 
   /// Destructor
@@ -97,6 +97,9 @@ public:
 
   /// Returns size of visual object that represents each point.
   double getVisualSize() const;
+
+  // Documentation inherited.
+  void notifyColorUpdated(const Eigen::Vector4d& color) override;
 
 protected:
   // Documentation inherited.
