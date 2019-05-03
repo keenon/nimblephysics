@@ -40,13 +40,13 @@ namespace examples {
 //==============================================================================
 void Project::initialize()
 {
-  // Do nothing
+  mWorld = dart::simulation::World::create();
 }
 
 //==============================================================================
 void Project::reset()
 {
-  // Do nothing
+  mWorld->reset();
 }
 
 //==============================================================================
@@ -58,7 +58,7 @@ void Project::prestep()
 //==============================================================================
 void Project::step()
 {
-  // Do nothing
+  mWorld->step();
 }
 
 //==============================================================================
@@ -111,6 +111,19 @@ void Project::drawToProjectWidget()
   {
     ImGui::Text("Name: %s", getName().c_str());
   }
+
+  if (ImGui::CollapsingHeader("Simulation", ImGuiTreeNodeFlags_DefaultOpen))
+  {
+    //    int e = mGallery->isSimulating() ? 0 : 1;
+    //    if (mViewer->isAllowingSimulation())
+    //    {
+    //      if (ImGui::RadioButton("Play", &e, 0) && !mViewer->isSimulating())
+    //        mViewer->simulate(true);
+    //      ImGui::SameLine();
+    //      if (ImGui::RadioButton("Pause", &e, 1) && mViewer->isSimulating())
+    //        mViewer->simulate(false);
+    //    }
+  }
 }
 
 //==============================================================================
@@ -118,12 +131,6 @@ void Project::drawToMainMenuWidget()
 {
   // Do nothing
 }
-
-//==============================================================================
-//OsgProjectNode* Project::getOsgNode()
-//{
-//  return mOsgNode;
-//}
 
 //==============================================================================
 simulation::WorldPtr Project::getWorld()

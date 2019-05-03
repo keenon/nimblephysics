@@ -43,8 +43,7 @@ namespace examples {
 void RigidCubesProject::initialize()
 {
   // Create and initialize the world
-  mWorld
-      = dart::utils::SkelParser::readWorld("dart://sample/skel/cubes.skel");
+  mWorld = dart::utils::SkelParser::readWorld("dart://sample/skel/cubes.skel");
   if (!mWorld)
   {
     dterr << "Failed to load world.\n";

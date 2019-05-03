@@ -38,8 +38,8 @@
 #include "OutputWidget.hpp"
 #include "ProjectExplorerWidget.hpp"
 #include "ProjectWidget.hpp"
-#include "rigidCubes/RigidCubesProject.hpp"
 #include "boxStacking/BoxStackingProject.hpp"
+#include "rigidCubes/RigidCubesProject.hpp"
 
 namespace dart {
 namespace examples {
@@ -81,8 +81,8 @@ Gallery::Gallery() : mProjectTreeRoot(""), mCurrentProject(nullptr)
 
   auto oldProjects = ProjectGroup::create("Old Projects");
   mProjectTreeRoot.addChild(oldProjects);
-  oldProjects->addChild(TProjectNote<RigidCubesProject>::create());
-  oldProjects->addChild(TProjectNote<BoxStackingProject>::create());
+  oldProjects->addChild(TProjectNode<RigidCubesProject>::create());
+  oldProjects->addChild(TProjectNode<BoxStackingProject>::create());
 }
 
 //==============================================================================
@@ -99,9 +99,9 @@ void Gallery::selectProject(const ProjectNode* node)
     mCurrentProject->finalize();
 
     mViewer->removeWorldNode(mOsgNode);
-    
-//    mViewer->removeWorldNode(mCurrentProject->getOsgNode());
-//    mPrevProject = std::move(mCurrentProject);
+
+    //    mViewer->removeWorldNode(mCurrentProject->getOsgNode());
+    //    mPrevProject = std::move(mCurrentProject);
     mCurrentProject = nullptr;
   }
 
@@ -124,7 +124,7 @@ void Gallery::selectProject(const ProjectNode* node)
 
   mOsgNode = new OsgProjectNode(mCurrentProject);
 
-//  mOsgNode = mCurrentProject->getOsgNode();
+  //  mOsgNode = mCurrentProject->getOsgNode();
   if (!mOsgNode)
   {
     dtwarn << "[Gallery] Failed to get OSG node from project. This will lead "

@@ -42,7 +42,7 @@ ProjectNode::~ProjectNode()
 }
 
 //==============================================================================
-std::function<std::shared_ptr<Project>()> ProjectNode::getCreateFunction() const
+auto ProjectNode::getCreateFunction() const -> CreateFunction
 {
   return nullptr;
 }
@@ -57,6 +57,18 @@ std::string ProjectNode::getName() const
 std::string ProjectNode::getDiscription() const
 {
   return std::string();
+}
+
+//==============================================================================
+ProjectGroup* ProjectNode::asGroup()
+{
+  return nullptr;
+}
+
+//==============================================================================
+const ProjectGroup* ProjectNode::asGroup() const
+{
+  return nullptr;
 }
 
 //==============================================================================
@@ -117,6 +129,18 @@ auto ProjectGroup::end() const -> NodeList::const_iterator
 std::string ProjectGroup::getName() const
 {
   return mName;
+}
+
+//==============================================================================
+ProjectGroup* ProjectGroup::asGroup()
+{
+  return this;
+}
+
+//==============================================================================
+const ProjectGroup* ProjectGroup::asGroup() const
+{
+  return this;
 }
 
 } // namespace examples

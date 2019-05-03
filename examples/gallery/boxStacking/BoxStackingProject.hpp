@@ -34,12 +34,12 @@
 
 #include <dart/dart.hpp>
 
-#include "../DynamicsWorldProject.hpp"
+#include "../Project.hpp"
 
 namespace dart {
 namespace examples {
 
-class BoxStackingProject : public DynamicsWorldProject
+class BoxStackingProject : public Project
 {
 public:
   BoxStackingProject() = default;

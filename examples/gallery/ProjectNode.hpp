@@ -49,22 +49,19 @@ class ProjectGroup;
 class ProjectNode
 {
 public:
+  using CreateFunction = std::function<std::shared_ptr<Project>()>;
+
   virtual ~ProjectNode();
 
-  virtual std::function<std::shared_ptr<Project> ()> getCreateFunction() const;
+  virtual CreateFunction getCreateFunction() const;
 
   virtual std::string getName() const;
 
   virtual std::string getDiscription() const;
 
-  virtual ProjectGroup* asGroup()
-  {
-    return nullptr;
-  }
-  virtual const ProjectGroup* asGroup() const
-  {
-    return nullptr;
-  }
+  virtual ProjectGroup* asGroup();
+
+  virtual const ProjectGroup* asGroup() const;
 };
 
 class ProjectGroup : public ProjectNode
@@ -92,14 +89,9 @@ public:
 
   std::string getName() const override;
 
-  ProjectGroup* asGroup() override
-  {
-    return this;
-  }
-  const ProjectGroup* asGroup() const override
-  {
-    return this;
-  }
+  ProjectGroup* asGroup() override;
+
+  const ProjectGroup* asGroup() const override;
 
 protected:
   std::string mName;
@@ -108,14 +100,14 @@ protected:
 };
 
 template <typename T>
-class TProjectNote : public ProjectNode
+class TProjectNode : public ProjectNode
 {
 public:
   using ProjectType = T;
 
-  static std::shared_ptr<TProjectNote> create()
+  static std::shared_ptr<TProjectNode> create()
   {
-    return std::make_shared<TProjectNote>();
+    return std::make_shared<TProjectNode>();
   }
 
   std::function<std::shared_ptr<Project>()> getCreateFunction() const override

@@ -34,12 +34,12 @@
 
 #include <dart/dart.hpp>
 
-#include "../DynamicsWorldProject.hpp"
+#include "../Project.hpp"
 
 namespace dart {
 namespace examples {
 
-class RigidCubesProject : public DynamicsWorldProject
+class RigidCubesProject : public Project
 {
 public:
   RigidCubesProject() = default;
