@@ -89,7 +89,6 @@ Gallery::Gallery() : mProjectTreeRoot(""), mCurrentProject(nullptr)
 void Gallery::run()
 {
   mViewer->run();
-  mViewer->stopThreading();
 }
 
 //==============================================================================
@@ -99,14 +98,11 @@ void Gallery::selectProject(const ProjectNode* node)
   {
     mCurrentProject->finalize();
 
-//    mViewer->stopThreading();
     mViewer->removeWorldNode(mOsgNode);
-
+    
 //    mViewer->removeWorldNode(mCurrentProject->getOsgNode());
 //    mPrevProject = std::move(mCurrentProject);
-    mViewer->stopThreading();
     mCurrentProject = nullptr;
-    mViewer->startThreading();
   }
 
   if (!node)
@@ -127,6 +123,7 @@ void Gallery::selectProject(const ProjectNode* node)
   mCurrentProject->initialize();
 
   mOsgNode = new OsgProjectNode(mCurrentProject);
+
 //  mOsgNode = mCurrentProject->getOsgNode();
   if (!mOsgNode)
   {
