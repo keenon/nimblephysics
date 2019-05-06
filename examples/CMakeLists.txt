@@ -23,5 +23,7 @@ add_subdirectory(soft_bodies)
 add_subdirectory(tinkertoy)
 add_subdirectory(wam_ikfast)
 
+add_subdirectory(gallery)
+
 # Deprecated examples
 add_subdirectory(deprecated_examples)
