@@ -93,6 +93,7 @@ option(DART_CODECOV "Turn on codecov support" OFF)
 option(DART_TREAT_WARNINGS_AS_ERRORS "Treat warnings as errors" OFF)
 option(DART_FAST_DEBUG "Add -O1 option for DEBUG mode build" OFF)
 option(DART_BUILD_DARTPY "Build dartpy (the python binding)" OFF)
+option(DART_BUILD_DARTSIM "Build dartsim (the DART simulator)" ON)
 
 if(DART_BUILD_DARTPY)
   set(BUILD_SHARED_LIBS OFF)
@@ -329,6 +330,10 @@ if(TARGET dart)
     message(STATUS "Adding ${tutorials_length} tutorials")
   endif(DART_VERBOSE)
 
+endif()
+
+if (DART_BUILD_DARTSIM)
+  add_subdirectory(dartsim)
 endif()
 
 if (DART_BUILD_DARTPY)
