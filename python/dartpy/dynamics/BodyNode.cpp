@@ -860,9 +860,26 @@ void BodyNode(pybind11::module& m)
       .def(
           "dirtyExternalForces",
           +[](dart::dynamics::BodyNode* self) { self->dirtyExternalForces(); })
-      .def("dirtyCoriolisForces", +[](dart::dynamics::BodyNode* self) {
-        self->dirtyCoriolisForces();
-      });
+      .def(
+          "dirtyCoriolisForces",
+          +[](dart::dynamics::BodyNode* self) { self->dirtyCoriolisForces(); })
+      .def(
+          "createChildBodyNode",
+          +[](dart::dynamics::BodyNode* self,
+              const std::string& jointType) -> dart::dynamics::BodyNode* {
+            if (jointType == "Revolute")
+            {
+              auto pair = self->createChildJointAndBodyNodePair<
+                  dart::dynamics::RevoluteJoint>();
+              return pair.second;
+            }
+            else
+            {
+              return nullptr;
+            }
+          },
+          ::pybind11::return_value_policy::reference_internal)
+      ;
 }
 
 } // namespace python

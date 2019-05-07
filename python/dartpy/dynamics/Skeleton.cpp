@@ -1136,7 +1136,24 @@ void Skeleton(pybind11::module& m)
       .def_readwrite(
           "mUnionRootSkeleton", &dart::dynamics::Skeleton::mUnionRootSkeleton)
       .def_readwrite("mUnionSize", &dart::dynamics::Skeleton::mUnionSize)
-      .def_readwrite("mUnionIndex", &dart::dynamics::Skeleton::mUnionIndex);
+      .def_readwrite("mUnionIndex", &dart::dynamics::Skeleton::mUnionIndex)
+      .def(
+          "createBodyNode",
+          +[](dart::dynamics::Skeleton* self,
+              dart::dynamics::BodyNode* parentBody,
+              const std::string& jointType) -> dart::dynamics::BodyNode* {
+            if (jointType == "Revolute")
+            {
+              auto pair = self->createJointAndBodyNodePair<
+                  dart::dynamics::RevoluteJoint>(parentBody);
+              return pair.second;
+            }
+            else
+            {
+              return nullptr;
+            }
+          },
+          ::pybind11::return_value_policy::reference_internal);
 }
 
 } // namespace python
