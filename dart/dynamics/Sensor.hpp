@@ -45,11 +45,10 @@ class BodyNode;
 
 class Sensor : public common::EmbedPropertiesOnTopOf<Sensor,
                                                      detail::SensorProperties,
-                                                     FixedJacobianNode>
+                                                     FixedFrame>
 {
 public:
-  using BasicProperties
-      = common::Composite::MakeProperties<NameAspect, FixedFrame, Sensor>;
+  using BasicProperties = common::Composite::MakeProperties<FixedFrame, Sensor>;
   using Properties = common::Composite::Properties;
 
   /// Destructor
@@ -58,6 +57,10 @@ public:
   /// Set the AspectProperties of this Sensor
   void setAspectProperties(const AspectProperties& properties);
 
+  const std::string& setName(const std::string& name) override;
+
+  const std::string& getName() const override;
+
   friend class BodyNode;
 
 protected:
@@ -65,7 +68,9 @@ protected:
   Sensor(BodyNode* parent, const BasicProperties& properties);
 
   // Documentation inherited
-  Node* cloneNode(BodyNode* parent) const override;
+//  Node* cloneNode(BodyNode* parent) const override;
+
+  std::string mName;
 };
 
 } // namespace dynamics

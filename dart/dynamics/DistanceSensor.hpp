@@ -70,7 +70,7 @@ protected:
   DistanceSensor(BodyNode* parent, const BasicProperties& properties);
 
   // Documentation inherited
-  Node* cloneNode(BodyNode* parent) const override;
+//  Node* cloneNode(BodyNode* parent) const override;
 };
 
 } // namespace dynamics

@@ -32,15 +32,11 @@ dart_format_add(
   DistanceSensor.hpp
   DistanceSensor.cpp
   HeightmapShape.hpp
-  ImuSensor.hpp
-  ImuSensor.cpp
   PointCloudShape.hpp
   PointCloudShape.cpp
   Sensor.hpp
   Sensor.cpp
   SmartPointer.hpp
-  TouchSensor.hpp
-  TouchSensor.cpp
   TranslationalJoint2D.hpp
   TranslationalJoint2D.cpp
   VoxelGridShape.hpp
@@ -48,12 +44,8 @@ dart_format_add(
   detail/DistanceSensorAspect.hpp
   detail/DistanceSensorAspect.cpp
   detail/HeightmapShape-impl.hpp
-  detail/ImuSensorAspect.hpp
-  detail/ImuSensorAspect.cpp
   detail/SensorAspect.hpp
   detail/SensorAspect.cpp
-  detail/TouchSensorAspect.hpp
-  detail/TouchSensorAspect.cpp
   detail/TranslationalJoint2DAspect.hpp
   detail/TranslationalJoint2DAspect.cpp
 )

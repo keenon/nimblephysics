@@ -44,13 +44,25 @@ void Sensor::setAspectProperties(const AspectProperties& /*properties*/)
 }
 
 //==============================================================================
+const std::string& Sensor::setName(const std::string& name)
+{
+  mName = name;
+  return mName;
+}
+
+//==============================================================================
+const std::string& Sensor::getName() const
+{
+  return mName;
+}
+
+//==============================================================================
 Sensor::Sensor(BodyNode* parent, const BasicProperties& properties)
   : Entity(ConstructFrame),
     Frame(parent),
-    FixedFrame(parent, properties.mRelativeTf),
     common::EmbedPropertiesOnTopOf<Sensor,
                                    detail::SensorProperties,
-                                   FixedJacobianNode>(
+                                   FixedFrame>(
         parent, properties.mRelativeTf)
 {
   createAspect<Aspect>();
@@ -58,16 +70,16 @@ Sensor::Sensor(BodyNode* parent, const BasicProperties& properties)
 }
 
 //==============================================================================
-Node* Sensor::cloneNode(BodyNode* parent) const
-{
-  Sensor* sensor = new Sensor(parent, BasicProperties());
-  sensor->duplicateAspects(this);
+//Node* Sensor::cloneNode(BodyNode* parent) const
+//{
+//  Sensor* sensor = new Sensor(parent, BasicProperties());
+//  sensor->duplicateAspects(this);
 
-  if (mIK)
-    sensor->mIK = mIK->clone(sensor);
+//  if (mIK)
+//    sensor->mIK = mIK->clone(sensor);
 
-  return sensor;
-}
+//  return sensor;
+//}
 
 } // namespace dynamics
 } // namespace dart

@@ -269,7 +269,7 @@ SensorT* BodyNode::createSensor()
 //    properties.mRelativeTf.translation() = position;
 //    properties.mColor = color;
 
-  return createNode<SensorT>(properties);
+//  return createNode<SensorT>(properties);
 }
 
 } // namespace dynamics

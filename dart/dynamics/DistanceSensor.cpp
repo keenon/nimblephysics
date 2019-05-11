@@ -56,7 +56,6 @@ void DistanceSensor::setAspectProperties(const AspectProperties& /*properties*/)
 DistanceSensor::DistanceSensor(BodyNode* parent, const BasicProperties& properties)
   : Entity(ConstructFrame),
     Frame(parent),
-    FixedFrame(parent),
     common::EmbedStateAndPropertiesOnTopOf<DistanceSensor,
                                            detail::DistanceSensorState,
                                            detail::DistanceSensorProperties,
@@ -67,16 +66,16 @@ DistanceSensor::DistanceSensor(BodyNode* parent, const BasicProperties& properti
 }
 
 //==============================================================================
-Node* DistanceSensor::cloneNode(BodyNode* parent) const
-{
-  auto* sensor = new DistanceSensor(parent, BasicProperties());
-  sensor->duplicateAspects(this);
+//Node* DistanceSensor::cloneNode(BodyNode* parent) const
+//{
+//  auto* sensor = new DistanceSensor(parent, BasicProperties());
+//  sensor->duplicateAspects(this);
 
-  if (mIK)
-    sensor->mIK = mIK->clone(sensor);
+//  if (mIK)
+//    sensor->mIK = mIK->clone(sensor);
 
-  return sensor;
-}
+//  return sensor;
+//}
 
 } // namespace dynamics
 } // namespace dart

@@ -50,6 +50,8 @@
 namespace dart {
 namespace dynamics {
 
+class Sensor;
+
 /// class Skeleton
 class Skeleton :
     public virtual common::VersionCounter,
@@ -995,6 +997,7 @@ public:
   friend class Joint;
   template<class> friend class GenericJoint;
   friend class DegreeOfFreedom;
+  friend class Sensor;
   friend class Node;
   friend class ShapeNode;
   friend class EndEffector;
@@ -1016,6 +1019,8 @@ protected:
 
   /// Register a Joint with the Skeleton. Internal use only.
   void registerJoint(Joint* _newJoint);
+
+  void registerSensor(Sensor* newSensor);
 
   /// Register a Node with the Skeleton. Internal use only.
   void registerNode(NodeMap& nodeMap, Node* _newNode, std::size_t& _index);

@@ -57,7 +57,7 @@ public:
           Eigen::Isometry3d::Identity());
 
   /// Destructor
-  virtual ~FixedFrame();
+  ~FixedFrame() override;
 
   /// Set the AspectProperties of this FixedFrame
   void setAspectProperties(const AspectProperties& properties);

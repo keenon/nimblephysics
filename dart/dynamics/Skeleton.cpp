@@ -2239,6 +2239,12 @@ void Skeleton::registerJoint(Joint* _newJoint)
 }
 
 //==============================================================================
+void Skeleton::registerSensor(Sensor* newSensor)
+{
+
+}
+
+//==============================================================================
 void Skeleton::registerNode(NodeMap& nodeMap, Node* _newNode, std::size_t& _index)
 {
   NodeMap::iterator it = nodeMap.find(typeid(*_newNode));
