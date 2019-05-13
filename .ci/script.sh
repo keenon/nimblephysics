@@ -22,6 +22,11 @@ if [ -z "$CODECOV" ]; then
   CODECOV=OFF
 fi
 
+if [ -z "$SONARCLOUD" ]; then
+  echo "Info: Environment variable SONARCLOUD is unset. Using OFF by default."
+  SONARCLOUD=OFF
+fi
+
 if [ -z "$OS_NAME" ]; then
   echo "Error: Environment variable OS_NAME is unset."
   exit 1
@@ -92,10 +97,14 @@ if [ "$OS_NAME" = "linux" ] && [ $(lsb_release -sc) = "bionic" ]; then
   make check-format
 fi
 
-if [ $CODECOV = ON ]; then
+if [ "$CODECOV" = "ON" ]; then
   make -j$num_threads codecov
 else
   ctest --output-on-failure -j$num_threads
+fi
+
+if [ "$SONARCLOUD" = "ON" ]; then
+  sonar-scanner
 fi
 
 # Make sure we can install with no issues
