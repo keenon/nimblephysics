@@ -30,6 +30,7 @@ matrix:
         - BUILD_TYPE=Debug
         - COMPILER=GCC
         - CODECOV=ON
+        - SONARCLOUD=ON
 
     - os: linux
       env:
