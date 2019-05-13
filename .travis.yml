@@ -4,6 +4,10 @@ sudo: required
 
 dist: xenial
 
+addons:
+  sonarcloud:
+    organization: "dartsim"
+
 cache:
   apt: true
 
