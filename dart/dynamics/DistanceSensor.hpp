@@ -50,11 +50,11 @@ class DistanceSensor : public common::EmbedStateAndPropertiesOnTopOf<
                            Sensor>
 {
 public:
+  friend class BodyNode;
+
   using BasicProperties = common::Composite::MakeProperties<DistanceSensor>;
   using State = common::Composite::State;
   using Properties = common::Composite::Properties;
-
-  friend class BodyNode;
 
   /// Destructor
   ~DistanceSensor() override = default;

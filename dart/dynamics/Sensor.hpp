@@ -48,6 +48,8 @@ class Sensor
         EmbedPropertiesOnTopOf<Sensor, detail::SensorProperties, FixedFrame>
 {
 public:
+  friend class BodyNode;
+
   using BasicProperties = common::Composite::MakeProperties<FixedFrame, Sensor>;
   using Properties = common::Composite::Properties;
 
@@ -60,8 +62,6 @@ public:
   const std::string& setName(const std::string& name) override;
 
   const std::string& getName() const override;
-
-  friend class BodyNode;
 
 protected:
   /// Constructor used by BodyNode

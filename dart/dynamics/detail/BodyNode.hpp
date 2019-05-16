@@ -269,7 +269,7 @@ std::shared_ptr<SensorT> BodyNode::createSensor(
 //  properties.template mName = name;
 //  properties.template mRelativeTf.translation() = relativeTf;
 
-  return std::make_shared<SensorT>(properties);
+  return std::shared_ptr<SensorT>(new SensorT(this, properties));
 }
 
 } // namespace dynamics
