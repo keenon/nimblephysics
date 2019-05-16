@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2017, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -136,6 +136,7 @@ MeshShape::MeshShape(
   : Shape(MESH),
     mDisplayList(0),
     mColorMode(MATERIAL_COLOR),
+    mAlphaMode(BLEND),
     mColorIndex(0)
 {
   setMesh(mesh, path, std::move(resourceRetriever));
@@ -145,7 +146,7 @@ MeshShape::MeshShape(
 //==============================================================================
 MeshShape::~MeshShape()
 {
-  delete mMesh;
+  aiReleaseImport(mMesh);
 }
 
 //==============================================================================
@@ -183,17 +184,6 @@ const common::Uri& MeshShape::getMeshUri2() const
 void MeshShape::update()
 {
   // Do nothing
-}
-
-//==============================================================================
-void MeshShape::notifyAlphaUpdated(double alpha)
-{
-  for(std::size_t i=0; i<mMesh->mNumMeshes; ++i)
-  {
-    aiMesh* mesh = mMesh->mMeshes[i];
-    for(std::size_t j=0; j<mesh->mNumVertices; ++j)
-      mesh->mColors[0][j][3] = alpha;
-  }
 }
 
 //==============================================================================
@@ -240,6 +230,8 @@ void MeshShape::setMesh(
     mMeshPath.clear();
 
   mResourceRetriever = std::move(resourceRetriever);
+
+  incrementVersion();
 }
 
 //==============================================================================
@@ -250,6 +242,8 @@ void MeshShape::setScale(const Eigen::Vector3d& scale)
   mScale = scale;
   mIsBoundingBoxDirty = true;
   mIsVolumeDirty = true;
+
+  incrementVersion();
 }
 
 //==============================================================================
@@ -268,6 +262,18 @@ void MeshShape::setColorMode(ColorMode mode)
 MeshShape::ColorMode MeshShape::getColorMode() const
 {
   return mColorMode;
+}
+
+//==============================================================================
+void MeshShape::setAlphaMode(MeshShape::AlphaMode mode)
+{
+  mAlphaMode = mode;
+}
+
+//==============================================================================
+MeshShape::AlphaMode MeshShape::getAlphaMode() const
+{
+  return mAlphaMode;
 }
 
 //==============================================================================
@@ -385,6 +391,7 @@ const aiScene* MeshShape::loadMesh(const std::string& _uri, const common::Resour
   if(!scene)
   {
     dtwarn << "[MeshShape::loadMesh] Failed loading mesh '" << _uri << "'.\n";
+    aiReleasePropertyStore(propertyStore);
     return nullptr;
   }
 
@@ -409,6 +416,8 @@ const aiScene* MeshShape::loadMesh(const std::string& _uri, const common::Resour
   scene = aiApplyPostProcessing(scene, aiProcess_PreTransformVertices);
   if(!scene)
     dtwarn << "[MeshShape::loadMesh] Failed pre-transforming vertices.\n";
+
+  aiReleasePropertyStore(propertyStore);
 
   return scene;
 }

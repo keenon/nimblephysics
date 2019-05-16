@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2017, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -54,6 +54,19 @@ std::shared_ptr<CollisionGroup>
 CollisionDetector::createCollisionGroupAsSharedPtr()
 {
   return std::shared_ptr<CollisionGroup>(createCollisionGroup().release());
+}
+
+//==============================================================================
+bool CollisionDetector::raycast(
+    CollisionGroup* /*group*/,
+    const Eigen::Vector3d& /*from*/,
+    const Eigen::Vector3d& /*to*/,
+    const RaycastOption& /*option*/,
+    RaycastResult* /*result*/)
+{
+  dtwarn << "[CollisionDetector] Raycast is not supported by '" << getType()
+         << "'\n";
+  return false;
 }
 
 //==============================================================================
@@ -159,7 +172,7 @@ CollisionDetector::ManagerForSharableCollisionObjects::claimCollisionObject(
   {
     const auto& collObj = search->second;
     assert(collObj.lock());
-    // Ensure all the collision object in the map should be alive pointers.
+    // Ensure all the collision objects in the map are valid pointers
 
     return collObj.lock();
   }

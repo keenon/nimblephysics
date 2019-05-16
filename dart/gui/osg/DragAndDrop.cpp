@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2017, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -797,7 +797,7 @@ void BodyNodeDnD::move()
   if(mUseExternalIK)
   {
     mIK->getSolver()->setNumMaxIterations(10);
-    mIK->solve();
+    mIK->solveAndApply(true);
   }
 }
 

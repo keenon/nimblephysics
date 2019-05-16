@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2017, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -54,19 +54,29 @@ const btCollisionObject* BulletCollisionObject::getBulletCollisionObject() const
 BulletCollisionObject::BulletCollisionObject(
     CollisionDetector* collisionDetector,
     const dynamics::ShapeFrame* shapeFrame,
-    btCollisionShape* bulletCollisionShape)
+    const std::shared_ptr<BulletCollisionShape>& bulletCollisionShape)
   : CollisionObject(collisionDetector, shapeFrame),
+    mBulletCollisionShape(bulletCollisionShape),
     mBulletCollisionObject(new btCollisionObject())
 {
-  mBulletCollisionObject->setCollisionShape(bulletCollisionShape);
+  assert(bulletCollisionShape);
+
+  mBulletCollisionObject->setCollisionShape(
+        mBulletCollisionShape->mCollisionShape.get());
+
   mBulletCollisionObject->setUserPointer(this);
 }
 
 //==============================================================================
 void BulletCollisionObject::updateEngineData()
 {
-  mBulletCollisionObject->setWorldTransform(
-      convertTransform(mShapeFrame->getWorldTransform()));
+  btTransform worldTransform =
+    convertTransform(mShapeFrame->getWorldTransform());
+
+  if (mBulletCollisionShape->mRelativeTransform)
+    worldTransform *= (*mBulletCollisionShape->mRelativeTransform);
+
+  mBulletCollisionObject->setWorldTransform(worldTransform);
 }
 
 }  // namespace collision

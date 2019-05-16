@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2017, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -34,6 +34,9 @@
 
 #include <osg/NodeCallback>
 
+#include <osgShadow/ShadowedScene>
+#include <osgShadow/ShadowMap>
+
 #include "dart/gui/osg/WorldNode.hpp"
 #include "dart/gui/osg/ShapeFrameNode.hpp"
 
@@ -61,19 +64,40 @@ public:
 };
 
 //==============================================================================
-WorldNode::WorldNode(std::shared_ptr<dart::simulation::World> _world)
-  : mWorld(_world),
+WorldNode::WorldNode(std::shared_ptr<dart::simulation::World> world, ::osg::ref_ptr<osgShadow::ShadowTechnique> shadowTechnique)
+  : mWorld(world),
     mSimulating(false),
     mNumStepsPerCycle(1),
-    mViewer(nullptr)
+    mViewer(nullptr),
+    mNormalGroup(new ::osg::Group)
 {
+  // Flags for shadowing; maybe this needs to be global?
+  constexpr int ReceivesShadowTraversalMask = 0x2;
+  constexpr int CastsShadowTraversalMask = 0x1;
+
+  // Setup shadows
+  // Create a ShadowedScene
+  ::osg::ref_ptr<osgShadow::ShadowedScene> shadowedScene = new osgShadow::ShadowedScene;
+  shadowedScene->setReceivesShadowTraversalMask(ReceivesShadowTraversalMask);
+  shadowedScene->setCastsShadowTraversalMask(CastsShadowTraversalMask);
+
+  // set the shadowed group
+  mShadowedGroup = shadowedScene.get();
+  mShadowedGroup->getOrCreateStateSet();
+
+  // Add normal and shadowed groups
+  addChild(mNormalGroup);
+  addChild(mShadowedGroup);
+
+  setShadowTechnique(shadowTechnique);
+
   setUpdateCallback(new WorldNodeCallback);
 }
 
 //==============================================================================
-void WorldNode::setWorld(std::shared_ptr<dart::simulation::World> _newWorld)
+void WorldNode::setWorld(std::shared_ptr<dart::simulation::World> newWorld)
 {
-  mWorld = _newWorld;
+  mWorld = newWorld;
 }
 
 //==============================================================================
@@ -138,15 +162,15 @@ bool WorldNode::isSimulating() const
 }
 
 //==============================================================================
-void WorldNode::simulate(bool _on)
+void WorldNode::simulate(bool on)
 {
-  mSimulating = _on;
+  mSimulating = on;
 }
 
 //==============================================================================
-void WorldNode::setNumStepsPerCycle(std::size_t _steps)
+void WorldNode::setNumStepsPerCycle(std::size_t steps)
 {
-  mNumStepsPerCycle = _steps;
+  mNumStepsPerCycle = steps;
 }
 
 //==============================================================================
@@ -193,7 +217,8 @@ void WorldNode::clearUnusedNodes()
   {
     NodeMap::iterator it = mFrameToNode.find(frame);
     ShapeFrameNode* node = it->second;
-    removeChild(node);
+    mNormalGroup->removeChild(node);
+    mShadowedGroup->removeChild(node);
     mFrameToNode.erase(it);
   }
 }
@@ -261,6 +286,17 @@ void WorldNode::refreshShapeFrameNode(dart::dynamics::Frame* frame)
       return;
 
     node->refresh(true);
+
+    // update the group that ShapeFrameNode should be
+    if((!node->getShapeFrame()->hasVisualAspect() || !node->getShapeFrame()->getVisualAspect(true)->getShadowed()) && node->getParent(0) != mNormalGroup) {
+      mShadowedGroup->removeChild(node);
+      mNormalGroup->addChild(node);
+    }
+    else if(node->getShapeFrame()->hasVisualAspect() && node->getShapeFrame()->getVisualAspect(true)->getShadowed() && node->getParent(0) != mShadowedGroup) {
+      mNormalGroup->removeChild(node);
+      mShadowedGroup->addChild(node);
+    }
+
     return;
   }
 
@@ -276,7 +312,55 @@ void WorldNode::refreshShapeFrameNode(dart::dynamics::Frame* frame)
   ::osg::ref_ptr<ShapeFrameNode> node = new ShapeFrameNode(frame->asShapeFrame(),
                                                          this);
   it->second = node;
-  addChild(node);
+  if(!node->getShapeFrame()->hasVisualAspect() || !node->getShapeFrame()->getVisualAspect(true)->getShadowed()) {
+    mNormalGroup->addChild(node);
+  }
+  else
+    mShadowedGroup->addChild(node);
+}
+
+//==============================================================================
+bool WorldNode::isShadowed() const
+{
+  return mShadowed;
+}
+
+//==============================================================================
+void WorldNode::setShadowTechnique(::osg::ref_ptr<osgShadow::ShadowTechnique> shadowTechnique)
+{
+  if(!shadowTechnique)
+  {
+    mShadowed = false;
+    mShadowedGroup->setShadowTechnique(nullptr);
+  }
+  else
+  {
+    mShadowed = true;
+    mShadowedGroup->setShadowTechnique(shadowTechnique);
+  }
+}
+
+//==============================================================================
+::osg::ref_ptr<osgShadow::ShadowTechnique> WorldNode::getShadowTechnique() const
+{
+  if(!mShadowed)
+    return nullptr;
+  return mShadowedGroup->getShadowTechnique();
+}
+
+//==============================================================================
+::osg::ref_ptr<osgShadow::ShadowTechnique> WorldNode::createDefaultShadowTechnique(const Viewer* viewer)
+{
+  assert(viewer);
+
+  ::osg::ref_ptr<osgShadow::ShadowMap> sm = new osgShadow::ShadowMap;
+  // increase the resolution of default shadow texture for higher quality
+  auto mapres = static_cast<short>(std::pow(2, 13));
+  sm->setTextureSize(::osg::Vec2s(mapres,mapres));
+  // we are using Light1 because this is the highest one (on up direction)
+  sm->setLight(viewer->getLightSource(0));
+
+  return sm;
 }
 
 } // namespace osg

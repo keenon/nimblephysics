@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2017, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -42,6 +42,7 @@
 #include "dart/dynamics/PrismaticJoint.hpp"
 #include "dart/dynamics/RevoluteJoint.hpp"
 #include "dart/dynamics/TranslationalJoint.hpp"
+#include "dart/dynamics/TranslationalJoint2D.hpp"
 #include "dart/dynamics/UniversalJoint.hpp"
 #include "dart/dynamics/WeldJoint.hpp"
 #include "dart/dynamics/EulerJoint.hpp"
@@ -119,16 +120,16 @@ void JOINTS::randomizeRefFrames()
   {
     SimpleFrame* F = frames[i];
 
-    Eigen::Vector3d p = randomVector<3>(100);
-    Eigen::Vector3d theta = randomVector<3>(2*M_PI);
+    Eigen::Vector3d p = Random::uniform<Eigen::Vector3d>(-100, 100);
+    Eigen::Vector3d theta = Random::uniform<Eigen::Vector3d>(-2*M_PI, 2*M_PI);
 
     Eigen::Isometry3d tf(Eigen::Isometry3d::Identity());
     tf.translate(p);
     tf.linear() = math::eulerXYZToMatrix(theta);
 
     F->setRelativeTransform(tf);
-    F->setRelativeSpatialVelocity(randomVector<6>(100));
-    F->setRelativeSpatialAcceleration(randomVector<6>(100));
+    F->setRelativeSpatialVelocity(Random::uniform<Eigen::Vector6d>(-100, 100));
+    F->setRelativeSpatialAcceleration(Random::uniform<Eigen::Vector6d>(-100, 100));
   }
 }
 
@@ -158,8 +159,8 @@ void JOINTS::kinematicsTest(const typename JointType::Properties& _properties)
 
     for (int i = 0; i < dof; ++i)
     {
-      q(i) = random(-constantsd::pi()*1.0, constantsd::pi()*1.0);
-      dq(i) = random(-constantsd::pi()*1.0, constantsd::pi()*1.0);
+      q(i) = Random::uniform(-constantsd::pi()*1.0, constantsd::pi()*1.0);
+      dq(i) = Random::uniform(-constantsd::pi()*1.0, constantsd::pi()*1.0);
     }
 
     skeleton->setPositions(q);
@@ -262,7 +263,7 @@ void JOINTS::kinematicsTest(const typename JointType::Properties& _properties)
   for (int idxTest = 0; idxTest < numTests; ++idxTest)
   {
     for (int i = 0; i < dof; ++i)
-      q(i) = random(posMin, posMax);
+      q(i) = Random::uniform(posMin, posMax);
 
     skeleton->setPositions(q);
 
@@ -302,6 +303,12 @@ TEST_F(JOINTS, SCREW_JOINT)
 TEST_F(JOINTS, UNIVERSAL_JOINT)
 {
   kinematicsTest<UniversalJoint>();
+}
+
+// 2-dof joint
+TEST_F(JOINTS, TRANSLATIONAL_JOINT_2D)
+{
+  kinematicsTest<TranslationalJoint2D>();
 }
 
 // 3-dof joint
@@ -495,6 +502,75 @@ TEST_F(JOINTS, POSITION_LIMIT)
     EXPECT_LE(jointPos0, limit0 + tol);
     EXPECT_LE(jointPos1, limit1 + tol);
   }
+}
+
+//==============================================================================
+TEST_F(JOINTS, JOINT_LIMITS)
+{
+  simulation::WorldPtr myWorld
+      = utils::SkelParser::readWorld(
+        "dart://sample/skel/test/joint_limit_test.skel");
+  EXPECT_TRUE(myWorld != nullptr);
+
+  myWorld->setGravity(Eigen::Vector3d(0.0, 0.0, 0.0));
+
+  dynamics::SkeletonPtr pendulum = myWorld->getSkeleton("double_pendulum");
+  EXPECT_TRUE(pendulum != nullptr);
+
+  dynamics::Joint* joint0 = pendulum->getJoint("joint0");
+
+  EXPECT_TRUE(joint0 != nullptr);
+
+  double limit = constantsd::pi() / 6.0;
+  Eigen::VectorXd limits = Eigen::VectorXd::Constant(1, constantsd::pi() / 2.0);
+
+  joint0->setPositionLowerLimit(0, -limit);
+  joint0->setPositionUpperLimit(0, limit);
+  EXPECT_EQ(
+      joint0->getPositionLowerLimits(), Eigen::VectorXd::Constant(1, -limit));
+  EXPECT_EQ(
+      joint0->getPositionUpperLimits(), Eigen::VectorXd::Constant(1, limit));
+
+  joint0->setPositionLowerLimits(-limits);
+  joint0->setPositionUpperLimits(limits);
+  EXPECT_EQ(joint0->getPositionLowerLimits(), -limits);
+  EXPECT_EQ(joint0->getPositionUpperLimits(), limits);
+
+  joint0->setVelocityLowerLimit(0, -limit);
+  joint0->setVelocityUpperLimit(0, limit);
+  EXPECT_EQ(
+      joint0->getVelocityLowerLimits(), Eigen::VectorXd::Constant(1, -limit));
+  EXPECT_EQ(
+      joint0->getVelocityUpperLimits(), Eigen::VectorXd::Constant(1, limit));
+
+  joint0->setVelocityLowerLimits(-limits);
+  joint0->setVelocityUpperLimits(limits);
+  EXPECT_EQ(joint0->getVelocityLowerLimits(), -limits);
+  EXPECT_EQ(joint0->getVelocityUpperLimits(), limits);
+
+  joint0->setAccelerationLowerLimit(0, -limit);
+  joint0->setAccelerationUpperLimit(0, limit);
+  EXPECT_EQ(
+      joint0->getAccelerationLowerLimits(), Eigen::VectorXd::Constant(1, -limit));
+  EXPECT_EQ(
+      joint0->getAccelerationUpperLimits(), Eigen::VectorXd::Constant(1, limit));
+
+  joint0->setAccelerationLowerLimits(-limits);
+  joint0->setAccelerationUpperLimits(limits);
+  EXPECT_EQ(joint0->getAccelerationLowerLimits(), -limits);
+  EXPECT_EQ(joint0->getAccelerationUpperLimits(), limits);
+
+  joint0->setForceLowerLimit(0, -limit);
+  joint0->setForceUpperLimit(0, limit);
+  EXPECT_EQ(
+      joint0->getForceLowerLimits(), Eigen::VectorXd::Constant(1, -limit));
+  EXPECT_EQ(
+      joint0->getForceUpperLimits(), Eigen::VectorXd::Constant(1, limit));
+
+  joint0->setForceLowerLimits(-limits);
+  joint0->setForceUpperLimits(limits);
+  EXPECT_EQ(joint0->getForceLowerLimits(), -limits);
+  EXPECT_EQ(joint0->getForceUpperLimits(), limits);
 }
 
 //==============================================================================
@@ -810,6 +886,100 @@ TEST_F(JOINTS, SERVO_MOTOR)
 }
 
 //==============================================================================
+void testMimicJoint()
+{
+  using namespace dart::math::suffixes;
+
+  double timestep = 1e-3;
+  double tol = 1e-9;
+  double tolPos = 1e-3;
+  double sufficient_force   = 1e+5;
+
+  // World
+  simulation::WorldPtr world = simulation::World::create();
+  EXPECT_TRUE(world != nullptr);
+
+  world->setGravity(Eigen::Vector3d(0, 0, -9.81));
+  world->setTimeStep(timestep);
+
+  Vector3d dim(1, 1, 1);
+  Vector3d offset(0, 0, 2);
+
+  SkeletonPtr pendulum = createNLinkPendulum(2, dim, DOF_ROLL, offset);
+  EXPECT_NE(pendulum, nullptr);
+
+  pendulum->disableSelfCollisionCheck();
+
+  for (std::size_t i = 0; i < pendulum->getNumBodyNodes(); ++i)
+  {
+    auto bodyNode = pendulum->getBodyNode(i);
+    bodyNode->removeAllShapeNodesWith<CollisionAspect>();
+  }
+
+  std::vector<JointPtr> joints(2);
+
+  for (std::size_t i = 0; i < pendulum->getNumBodyNodes(); ++i)
+  {
+    dynamics::Joint* joint = pendulum->getJoint(i);
+    EXPECT_NE(joint, nullptr);
+
+    joint->setActuatorType(Joint::SERVO);
+    joint->setPosition(0, 90.0_deg);
+    joint->setDampingCoefficient(0, 0.0);
+    joint->setSpringStiffness(0, 0.0);
+    joint->setPositionLimitEnforced(true);
+    joint->setCoulombFriction(0, 0.0);
+
+    joints[i] = joint;
+  }
+
+  joints[0]->setForceUpperLimit(0, sufficient_force);
+  joints[0]->setForceLowerLimit(0, -sufficient_force);
+
+  joints[1]->setForceUpperLimit(0, sufficient_force);
+  joints[1]->setForceLowerLimit(0, -sufficient_force);
+
+  // Second joint mimics the first one
+  joints[1]->setActuatorType(Joint::MIMIC);
+  joints[1]->setMimicJoint(joints[0], 1., 0.);
+
+  world->addSkeleton(pendulum);
+
+#ifndef NDEBUG // Debug mode
+  double simTime = 0.2;
+#else
+  double simTime = 2.0;
+#endif // ------- Debug mode
+  double timeStep = world->getTimeStep();
+  int nSteps = simTime / timeStep;
+
+  // Two seconds with lower control forces than the friction
+  for (int i = 0; i < nSteps; i++)
+  {
+    const double expected_vel = std::sin(world->getTime());
+
+    joints[0]->setCommand(0, expected_vel);
+
+    world->step();
+
+    // Check if the first joint achieved the velocity at each time-step
+    EXPECT_NEAR(joints[0]->getVelocity(0), expected_vel, tol);
+
+    // Check if the mimic joint follows the "master" joint
+    EXPECT_NEAR(joints[0]->getPosition(0), joints[1]->getPosition(0), tolPos);
+  }
+
+  // In the end, check once more if the mimic joint followed the "master" joint
+  EXPECT_NEAR(joints[0]->getPosition(0), joints[1]->getPosition(0), tolPos);
+}
+
+//==============================================================================
+TEST_F(JOINTS, MIMIC_JOINT)
+{
+  testMimicJoint();
+}
+
+//==============================================================================
 TEST_F(JOINTS, JOINT_COULOMB_FRICTION_AND_POSITION_LIMIT)
 {
   const double timeStep = 1e-3;
@@ -927,7 +1097,7 @@ Eigen::Matrix<double,N,1> random_vec(double limit=100)
 {
   Eigen::Matrix<double,N,1> v;
   for(std::size_t i=0; i<N; ++i)
-    v[i] = math::random(-std::abs(limit), std::abs(limit));
+    v[i] = math::Random::uniform(-std::abs(limit), std::abs(limit));
   return v;
 }
 

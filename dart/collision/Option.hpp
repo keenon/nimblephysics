@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2017, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -33,8 +33,8 @@
 #ifndef DART_COLLISION_OPTION_HPP_
 #define DART_COLLISION_OPTION_HPP_
 
-#warning "This header has been deprecated in DART 6.1. "\
-  "Please include CollisionOption.hpp intead."
+#pragma message("This header has been deprecated in DART 6.1. "\
+  "Please include CollisionOption.hpp intead.")
 
 #include "dart/collision/CollisionOption.hpp"
 

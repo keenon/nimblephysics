@@ -1,16 +1,25 @@
-brew 'git'
+# tap 'dartsim/dart' # for ipopt
+
+# Build dependencies
 brew 'cmake'
+brew 'pkg-config'
+
 brew 'assimp'
-brew 'fcl'
-brew 'bullet', args: ['--with-double-precision']
-brew 'ode', args: ['--with-libccd', '--with-double-precision']
-brew 'flann'
 brew 'boost'
+brew 'bullet'
 brew 'eigen'
-brew 'tinyxml'
-brew 'tinyxml2'
-brew 'libccd'
-brew 'nlopt'
+brew 'fcl'
+#brew 'flann'
 #brew 'ipopt'
-brew 'urdfdom'
+brew 'libccd'
+#brew 'nlopt'
+brew 'octomap'
+brew 'ode'
 brew 'open-scene-graph'
+#brew 'pagmo'  # disabled to reduce the build time
+brew 'tinyxml2'
+brew 'urdfdom'
+
+# dartpy dependencies
+brew 'pybind11'
+brew 'numpy'

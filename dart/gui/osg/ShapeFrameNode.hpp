@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2017, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -35,7 +35,10 @@
 
 #include <map>
 #include <memory>
+
 #include <osg/MatrixTransform>
+
+#include "dart/config.hpp"
 #include "dart/dynamics/SmartPointer.hpp"
 
 namespace dart {
@@ -64,10 +67,10 @@ public:
                  WorldNode* worldNode);
 
   /// Pointer to the ShapeFrame associated with this ShapeFrameNode
-  dart::dynamics::ShapeFrame* getShapeFrame();
+  dart::dynamics::ShapeFrame* getShapeFrame(bool checkUtilization = false);
 
   /// Pointer to the ShapeFrame associated with this ShapeFrameNode
-  const dart::dynamics::ShapeFrame* getShapeFrame() const;
+  const dart::dynamics::ShapeFrame* getShapeFrame(bool checkUtilization = false) const;
 
   WorldNode* getWorldNode();
 

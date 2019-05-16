@@ -44,7 +44,7 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
 # dart-optimizer-ipopt - {dart}, optimizer/ipopt, [ipopt]
 # dart-optimizer-nlopt - {dart}, optimizer/nlopt, [nlopt]
 # dart-collision-bullet - {dart}, collision/bullet, [bullet]
-# dart-utils - {dart}, utils, utils/sdf, [tinyxml, tinyxml2]
+# dart-utils - {dart}, utils, utils/sdf, [tinyxml2]
 # dart-utils-urdf - {dart-utils}, utils/urdf, [urdfdom]
 # dart-gui - {dart}, gui, [opengl, glut]
 # dart-gui-osg - {dart-gui}, gui/osg, gui/osg/render, [openscenegraph]
@@ -85,7 +85,7 @@ add_subdirectory(collision)
 add_subdirectory(constraint)
 add_subdirectory(simulation)
 add_subdirectory(planning) # flann
-add_subdirectory(utils) # tinyxml, tinyxml2, bullet
+add_subdirectory(utils) # tinyxml2, bullet
 add_subdirectory(gui) # opengl, glut, bullet
 
 set(DART_CONFIG_HPP_IN ${CMAKE_SOURCE_DIR}/dart/config.hpp.in)
@@ -118,25 +118,35 @@ get_property(dart_core_sources GLOBAL PROPERTY DART_CORE_SOURCES)
 
 # Add target
 dart_add_library(dart ${dart_core_headers} ${dart_core_sources})
-target_include_directories(
-  dart SYSTEM
+target_include_directories(dart BEFORE
   PUBLIC
-    ${EIGEN3_INCLUDE_DIRS}
-    ${CCD_INCLUDE_DIRS}
-    ${FCL_INCLUDE_DIRS}
-    ${ASSIMP_INCLUDE_DIRS}
-    ${Boost_INCLUDE_DIRS}
+    $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}>
+    $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}>
+    $<INSTALL_INTERFACE:include>
 )
-target_link_libraries(
-  dart
+target_link_libraries(dart
   PUBLIC
     ${CMAKE_DL_LIBS}
-    ${CCD_LIBRARIES}
-    ${FCL_LIBRARIES}
-    ${ASSIMP_LIBRARIES}
-    ${Boost_LIBRARIES}
     ${PROJECT_NAME}-external-odelcpsolver
+    Eigen3::Eigen
+    ccd
+    fcl
+    assimp
+    Boost::boost
+    Boost::system
+    Boost::filesystem
 )
+if (TARGET octomap)
+  target_link_libraries(dart PUBLIC octomap)
+endif()
+if(NOT MSVC)
+  target_link_libraries(dart PUBLIC Boost::regex)
+endif()
+if(CMAKE_VERSION VERSION_LESS 3.8.2)
+  target_compile_options(dart PUBLIC -std=c++14)
+else()
+  target_compile_features(dart PUBLIC cxx_std_14)
+endif()
 
 # Build DART with all available SIMD instructions
 if(DART_ENABLE_SIMD)
@@ -149,21 +159,19 @@ if(DART_ENABLE_SIMD)
     # depending on the architectures.
   elseif(CMAKE_COMPILER_IS_GNUCXX)
     target_compile_options(dart PUBLIC -march=native)
-  elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
-    target_compile_options(dart PUBLIC -march=native)
+    if(GCC_VERSION VERSION_GREATER 7.0)
+      target_compile_options(dart PUBLIC -faligned-new)
+    endif()
+  elseif("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
+    target_compile_options(dart PUBLIC -march=native -faligned-new)
   endif()
 endif()
 
 # Default component
-add_component_targets(
-  ${PROJECT_NAME}
-  dart # component name
-  dart # target name
-)
-add_component_dependencies(
-  ${PROJECT_NAME}
-  dart
-  external-odelcpsolver
+add_component_targets(${PROJECT_NAME} dart dart)
+add_component_dependencies(${PROJECT_NAME} dart external-odelcpsolver)
+add_component_dependency_packages(${PROJECT_NAME} dart
+  Eigen3 ccd fcl assimp Boost octomap
 )
 
 if(MSVC)

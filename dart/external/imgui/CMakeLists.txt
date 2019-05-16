@@ -1,3 +1,6 @@
+dart_find_package(OpenGL)
+dart_check_optional_package(OPENGL "dart-external-imgui" "OpenGL")
+
 # Search all header and source files
 file(GLOB hdrs "*.h")
 file(GLOB srcs "*.cpp")
@@ -7,10 +10,15 @@ set(target_name ${PROJECT_NAME}-external-imgui)
 set(component_name external-imgui)
 
 dart_add_external_library(${target_name} ${hdrs} ${srcs})
-include_directories(
-  ${target_name}
-  PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}"
+target_include_directories(${target_name}
+  PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
 )
+target_link_libraries(${target_name} PUBLIC OpenGL::GL)
+
+if(CMAKE_COMPILER_IS_GNUCXX)
+  target_compile_options(${target_name} PRIVATE -w)
+endif()
+target_compile_definitions(${target_name} PUBLIC IMGUI_DISABLE_OBSOLETE_FUNCTIONS)
 
 # Component
 add_component(${PROJECT_NAME} ${component_name})

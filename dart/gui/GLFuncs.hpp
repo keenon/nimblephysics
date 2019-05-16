@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2017, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -34,15 +34,18 @@
 #define DART_GUI_GLFUNCS_HPP_
 
 #include <string>
-
 #include <Eigen/Eigen>
+#include "dart/common/Deprecated.hpp"
 
 namespace dart {
 namespace gui {
 
-/// \brief
-  void drawStringOnScreen(float _x, float _y, const std::string& _s,
-                          bool _bigFont = true);
+/// \deprecated Deprecated in 6.6. Please use
+/// dart::gui::glut::drawStringOnScreen() instead in
+/// dart/gui/glut/GLUTFuncs.hpp file.
+DART_DEPRECATED(6.6)
+void drawStringOnScreen(float _x, float _y, const std::string& _s,
+                        bool _bigFont = true);
 
 /// \brief
 void drawArrow3D(const Eigen::Vector3d& _pt, const Eigen::Vector3d& _dir,

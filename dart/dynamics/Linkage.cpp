@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2017, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -122,6 +122,36 @@ Linkage::Criteria::Terminal::Terminal(BodyNode* _terminal, bool _inclusive)
     mInclusive(_inclusive)
 {
   // Do nothing
+}
+
+//==============================================================================
+Linkage::Criteria::Criteria(
+    BodyNode* start, BodyNode* target, bool includeUpstreamParentJoint)
+{
+  mStart.mNode = start;
+  mStart.mPolicy = Linkage::Criteria::INCLUDE;
+
+  Target endPoint;
+  endPoint.mNode = target;
+  endPoint.mChain = false;
+  endPoint.mPolicy = Linkage::Criteria::INCLUDE;
+
+  if (!includeUpstreamParentJoint)
+  {
+    if(endPoint.mNode.lock() &&
+       endPoint.mNode.lock()->descendsFrom(mStart.mNode.lock()))
+    {
+      mStart.mPolicy = Linkage::Criteria::EXCLUDE;
+    }
+
+    if (mStart.mNode.lock() &&
+       mStart.mNode.lock()->descendsFrom(endPoint.mNode.lock()))
+    {
+      endPoint.mPolicy = Linkage::Criteria::EXCLUDE;
+    }
+  }
+
+  mTargets.push_back(endPoint);
 }
 
 //==============================================================================
@@ -483,6 +513,84 @@ LinkagePtr Linkage::create(const Criteria &_criteria, const std::string& _name)
   LinkagePtr linkage(new Linkage(_criteria, _name));
   linkage->mPtr = linkage;
   return linkage;
+}
+
+//==============================================================================
+Linkage::Criteria::Target createTargetFromClone(
+    Skeleton& skelClone,
+    const Linkage::Criteria::Target& target)
+{
+  BodyNodePtr bodyNodePtr = target.mNode.lock();
+  assert(bodyNodePtr);
+  BodyNode* bodyNodeClone = skelClone.getBodyNode(bodyNodePtr->getName());
+  assert(bodyNodeClone);
+  assert(bodyNodeClone != bodyNodePtr.get());
+
+  return Linkage::Criteria::Target(
+      bodyNodeClone, target.mPolicy, target.mPolicy);
+}
+
+//==============================================================================
+Linkage::Criteria::Terminal createTerminalFromClone(
+    Skeleton& skelClone,
+    const Linkage::Criteria::Terminal& terminal)
+{
+  BodyNodePtr bodyNodePtr = terminal.mTerminal.lock();
+  assert(bodyNodePtr);
+  BodyNode* bodyNodeClone = skelClone.getBodyNode(bodyNodePtr->getName());
+  assert(bodyNodeClone);
+  assert(bodyNodeClone != bodyNodePtr.get());
+
+  return Linkage::Criteria::Terminal(bodyNodeClone, terminal.mInclusive);
+}
+
+//==============================================================================
+LinkagePtr Linkage::cloneLinkage() const
+{
+  return cloneLinkage(getName());
+}
+
+//==============================================================================
+LinkagePtr Linkage::cloneLinkage(const std::string& cloneName) const
+{
+  // Clone the skeleton (assuming one skeleton is involved)
+  BodyNodePtr bodyNode = mCriteria.mStart.mNode.lock();
+  if (!bodyNode)
+  {
+    dtwarn << "[Linkage::cloneMetaSkeleton] Failed to clone because the "
+           << "start node of the criteria in this Linkage is not valid "
+           << "anymore. Returning nullptr.\n";
+    return nullptr;
+  }
+  SkeletonPtr skelClone = bodyNode->getSkeleton()->cloneSkeleton();
+  assert(skelClone != bodyNode->getSkeleton());
+
+  // Create a Criteria
+  Criteria newCriteria;
+  newCriteria.mStart = createTargetFromClone(*skelClone, mCriteria.mStart);
+  newCriteria.mTargets.reserve(mCriteria.mTargets.size());
+  for (const Criteria::Target& target : mCriteria.mTargets)
+  {
+    newCriteria.mTargets.emplace_back(
+        createTargetFromClone(*skelClone, target));
+  }
+  newCriteria.mTerminals.reserve(mCriteria.mTerminals.size());
+  for (const Criteria::Terminal& terminal : newCriteria.mTerminals)
+  {
+    newCriteria.mTerminals.emplace_back(
+        createTerminalFromClone(*skelClone, terminal));
+  }
+
+  // Create a Chain clone with the Criteria
+  LinkagePtr newLinkage = create(newCriteria, cloneName);
+
+  return newLinkage;
+}
+
+//==============================================================================
+MetaSkeletonPtr Linkage::cloneMetaSkeleton(const std::string& cloneName) const
+{
+  return cloneLinkage(cloneName);
 }
 
 //==============================================================================

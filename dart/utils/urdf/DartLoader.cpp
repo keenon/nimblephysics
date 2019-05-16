@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2017, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -190,53 +190,44 @@ simulation::WorldPtr DartLoader::parseWorldString(
   return world;
 }
 
-/**
- * @function modelInterfaceToSkeleton
- * @brief Read the ModelInterface and spits out a Skeleton object
- */
+//==============================================================================
 dynamics::SkeletonPtr DartLoader::modelInterfaceToSkeleton(
-  const urdf::ModelInterface* _model,
-  const common::Uri& _baseUri,
-  const common::ResourceRetrieverPtr& _resourceRetriever)
+  const urdf::ModelInterface* model,
+  const common::Uri& baseUri,
+  const common::ResourceRetrieverPtr& resourceRetriever)
 {
-  dynamics::SkeletonPtr skeleton = dynamics::Skeleton::create(_model->getName());
+  dynamics::SkeletonPtr skeleton = dynamics::Skeleton::create(model->getName());
 
   dynamics::BodyNode* rootNode = nullptr;
-  const urdf::Link* root = _model->getRoot().get();
+  const urdf::Link* root = model->getRoot().get();
+
+  // If the link name is "world" then the link is regarded as the inertial frame
+  // rather than a body in the robot model so we don't create a BodyNode for it.
+  // This is not officially specified in the URDF spec, but "world" is
+  // practically treated as a keyword.
   if(root->name == "world")
   {
-    if(_model->getRoot()->child_links.size() != 1)
+    if(model->getRoot()->child_links.size() > 1)
     {
-      dterr << "[DartLoader::modelInterfaceToSkeleton] No unique link attached to world.\n";
-    }
-    else
-    {
-      root = root->child_links[0].get();
-      dynamics::BodyNode::Properties rootProperties;
-      if (!createDartNodeProperties(root, rootProperties, _baseUri, _resourceRetriever))
-        return nullptr;
-
-      rootNode = createDartJointAndNode(
-        root->parent_joint.get(), rootProperties, nullptr, skeleton,
-        _baseUri, _resourceRetriever);
-      if(nullptr == rootNode)
-      {
-        dterr << "[DartLoader::modelInterfaceToSkeleton] Failed to create root node!\n";
-        return nullptr;
-      }
-
-      const auto result
-          = createShapeNodes(_model, root, rootNode,
-                             _baseUri, _resourceRetriever);
-      if(!result)
-        return nullptr;
+      dtwarn << "[DartLoader::modelInterfaceToSkeleton] The world link has "
+             << "more than one child links. This leads to creating a "
+             << "multi-tree robot. Multi-tree robot is supported by DART, but "
+             << "not the URDF standard. Please consider changing the robot "
+             << "model as a single tree robot.\n";
     }
   }
   else
   {
+    // If the root link is not "world" then it means the robot model is a free
+    // floating robot (like humanoid robots). So we create the root body with
+    // FreeJoint.
+
     dynamics::BodyNode::Properties rootProperties;
-    if (!createDartNodeProperties(root, rootProperties, _baseUri, _resourceRetriever))
+    if (!createDartNodeProperties(
+        root, rootProperties, baseUri, resourceRetriever))
+    {
       return nullptr;
+    }
 
     std::pair<dynamics::Joint*, dynamics::BodyNode*> pair =
         skeleton->createJointAndBodyNodePair<dynamics::FreeJoint>(
@@ -247,8 +238,8 @@ dynamics::SkeletonPtr DartLoader::modelInterfaceToSkeleton(
     rootNode = pair.second;
 
     const auto result
-        = createShapeNodes(_model, root, rootNode,
-                           _baseUri, _resourceRetriever);
+        = createShapeNodes(model, root, rootNode, baseUri, resourceRetriever);
+
     if(!result)
       return nullptr;
   }
@@ -256,49 +247,105 @@ dynamics::SkeletonPtr DartLoader::modelInterfaceToSkeleton(
   for(std::size_t i = 0; i < root->child_links.size(); i++)
   {
     if (!createSkeletonRecursive(
-           _model, skeleton, root->child_links[i].get(), rootNode,
-           _baseUri, _resourceRetriever))
+           model, skeleton, root->child_links[i].get(), rootNode,
+           baseUri, resourceRetriever))
+    {
       return nullptr;
-
+    }
   }
+
+  // Find mimic joints
+  for(std::size_t i = 0; i < root->child_links.size(); i++)
+    addMimicJointsRecursive(model, skeleton, root->child_links[i].get());
 
   return skeleton;
 }
 
+//==============================================================================
 bool DartLoader::createSkeletonRecursive(
   const urdf::ModelInterface* model,
-  dynamics::SkeletonPtr _skel,
-  const urdf::Link* _lk,
-  dynamics::BodyNode* _parentNode,
-  const common::Uri& _baseUri,
-  const common::ResourceRetrieverPtr& _resourceRetriever)
+  dynamics::SkeletonPtr skel,
+  const urdf::Link* lk,
+  dynamics::BodyNode* parentNode,
+  const common::Uri& baseUri,
+  const common::ResourceRetrieverPtr& resourceRetriever)
 {
   dynamics::BodyNode::Properties properties;
-  if (!createDartNodeProperties(_lk, properties, _baseUri, _resourceRetriever))
+  if (!createDartNodeProperties(lk, properties, baseUri, resourceRetriever))
     return false;
 
   dynamics::BodyNode* node = createDartJointAndNode(
-    _lk->parent_joint.get(), properties, _parentNode, _skel,
-    _baseUri, _resourceRetriever);
+    lk->parent_joint.get(), properties, parentNode, skel,
+    baseUri, resourceRetriever);
 
   if(!node)
     return false;
 
   const auto result = createShapeNodes(
-        model, _lk, node, _baseUri, _resourceRetriever);
+      model, lk, node, baseUri, resourceRetriever);
 
   if(!result)
     return false;
-  
-  for(std::size_t i = 0; i < _lk->child_links.size(); ++i)
+
+  for(std::size_t i = 0; i < lk->child_links.size(); ++i)
   {
-    if (!createSkeletonRecursive(model, _skel, _lk->child_links[i].get(), node,
-                                 _baseUri, _resourceRetriever))
+    if (!createSkeletonRecursive(model, skel, lk->child_links[i].get(), node,
+                                 baseUri, resourceRetriever))
+    {
       return false;
+    }
   }
   return true;
 }
 
+bool DartLoader::addMimicJointsRecursive(
+  const urdf::ModelInterface* model,
+  dynamics::SkeletonPtr _skel,
+  const urdf::Link* _lk)
+{
+  const urdf::Joint* jt = _lk->parent_joint.get();
+  if (jt->mimic)
+  {
+    const std::string& jointName = jt->name;
+    const double multiplier = jt->mimic->multiplier;
+    const double offset = jt->mimic->offset;
+    const std::string& mimicJointName = jt->mimic->joint_name;
+
+    dynamics::Joint* joint = _skel->getJoint(jointName);
+    const dynamics::Joint* mimicJoint = _skel->getJoint(mimicJointName);
+
+    if (!joint)
+    {
+      dterr << "Failed to configure a mimic joint [" << jointName
+            << "] because the joint isn't found in Skeleton ["
+            << _skel->getName() << "]\n.";
+      return false;
+    }
+
+    if (!mimicJoint)
+    {
+      dterr << "Failed to configure a mimic joint [" << jointName
+            << "] because the joint to mimic [" << mimicJoint
+            << "] isn't found in Skeleton [" << _skel->getName() << "]\n.";
+      return false;
+    }
+
+    dynamics::Joint::Properties properties = joint->getJointProperties();
+    properties.mActuatorType = dynamics::Joint::MIMIC;
+    properties.mMimicJoint = mimicJoint;
+    properties.mMimicMultiplier = multiplier;
+    properties.mMimicOffset = offset;
+    joint->setProperties(properties);
+  }
+
+  for(std::size_t i = 0; i < _lk->child_links.size(); ++i)
+  {
+    if (!addMimicJointsRecursive(model, _skel, _lk->child_links[i].get()))
+      return false;
+  }
+
+  return true;
+}
 
 /**
  * @function readXml
@@ -374,8 +421,25 @@ dynamics::BodyNode* DartLoader::createDartJointAndNode(
   std::pair<dynamics::Joint*, dynamics::BodyNode*> pair;
   switch(_jt->type)
   {
-    case urdf::Joint::REVOLUTE:
     case urdf::Joint::CONTINUOUS:
+    {
+      // We overwrite joint position limits to negative/positive infinities
+      // for "continuous" joint. The URDF parser, by default, either reads
+      // the limits, if specified for this joint, or sets them to 0.
+      singleDof.mPositionLowerLimits[0] = -math::constantsd::inf();
+      singleDof.mPositionUpperLimits[0] = math::constantsd::inf();
+
+      // This joint is still revolute but with no joint limits
+      dynamics::RevoluteJoint::Properties properties(
+            dynamics::GenericJoint<math::R1Space>::Properties(basicProperties, singleDof),
+            toEigen(_jt->axis));
+
+      pair = _skeleton->createJointAndBodyNodePair<dynamics::RevoluteJoint>(
+            _parent, properties, _body);
+
+      break;
+    }
+    case urdf::Joint::REVOLUTE:
     {
       dynamics::RevoluteJoint::Properties properties(
             dynamics::GenericJoint<math::R1Space>::Properties(basicProperties, singleDof),
@@ -443,7 +507,7 @@ bool DartLoader::createDartNodeProperties(
   const common::ResourceRetrieverPtr& /*_resourceRetriever*/)
 {
   node.mName = _lk->name;
-  
+
   // Load Inertial information
   if(_lk->inertial) {
     urdf::Pose origin = _lk->inertial->origin;
@@ -465,6 +529,7 @@ bool DartLoader::createDartNodeProperties(
   return true;
 }
 
+//==============================================================================
 void setMaterial(
   const urdf::ModelInterface* model,
   dynamics::VisualAspect* visualAspect,
@@ -478,10 +543,16 @@ void setMaterial(
     if(m_it != model->materials_.end())
       urdf_color = m_it->second->color;
 
-    Eigen::Vector4d color(urdf_color.r, urdf_color.g,
-                          urdf_color.b, urdf_color.a);
-
+    const Eigen::Vector4d color(
+        static_cast<double>(urdf_color.r),
+        static_cast<double>(urdf_color.g),
+        static_cast<double>(urdf_color.b),
+        static_cast<double>(urdf_color.a));
     visualAspect->setColor(color);
+    auto shapeFrame = visualAspect->getComposite();
+    auto shape = shapeFrame->getShape();
+    if (auto mesh = std::dynamic_pointer_cast<dynamics::MeshShape>(shape))
+      mesh->setColorMode(dynamics::MeshShape::ColorMode::SHAPE_COLOR);
   }
 }
 

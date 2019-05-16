@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2017, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -45,7 +45,8 @@
 #include "dart/common/Console.hpp"
 #include "dart/integration/SemiImplicitEulerIntegrator.hpp"
 #include "dart/dynamics/Skeleton.hpp"
-#include "dart/constraint/ConstraintSolver.hpp"
+#include "dart/constraint/ConstrainedGroup.hpp"
+#include "dart/constraint/BoxedLcpConstraintSolver.hpp"
 #include "dart/collision/CollisionGroup.hpp"
 
 namespace dart {
@@ -66,17 +67,18 @@ World::World(const std::string& _name)
     mTimeStep(0.001),
     mTime(0.0),
     mFrame(0),
-    mConstraintSolver(new constraint::ConstraintSolver(mTimeStep)),
     mRecording(new Recording(mSkeletons)),
     onNameChanged(mNameChangedSignal)
 {
   mIndices.push_back(0);
+
+  auto solver = common::make_unique<constraint::BoxedLcpConstraintSolver>();
+  setConstraintSolver(std::move(solver));
 }
 
 //==============================================================================
 World::~World()
 {
-  delete mConstraintSolver;
   delete mRecording;
 
   for(common::Connection& connection : mNameConnectionsForSkeletons)
@@ -101,7 +103,7 @@ WorldPtr World::clone() const
   // Clone and add each Skeleton
   for(std::size_t i=0; i<mSkeletons.size(); ++i)
   {
-    worldClone->addSkeleton(mSkeletons[i]->clone());
+    worldClone->addSkeleton(mSkeletons[i]->cloneSkeleton());
   }
 
   // Clone and add each SimpleFrame
@@ -131,16 +133,18 @@ WorldPtr World::clone() const
 //==============================================================================
 void World::setTimeStep(double _timeStep)
 {
-  assert(_timeStep > 0.0 && "Invalid timestep.");
+  if (_timeStep <= 0.0)
+  {
+    dtwarn << "[World] Attempting to set negative timestep. Ignoring this "
+           << "request because it can lead to undefined behavior.\n";
+    return;
+  }
 
   mTimeStep = _timeStep;
-//  mConstraintHandler->setTimeStep(_timeStep);
+  assert(mConstraintSolver);
   mConstraintSolver->setTimeStep(_timeStep);
-  for (std::vector<dynamics::SkeletonPtr>::iterator it = mSkeletons.begin();
-       it != mSkeletons.end(); ++it)
-  {
-    (*it)->setTimeStep(_timeStep);
-  }
+  for (auto& skel : mSkeletons)
+    skel->setTimeStep(_timeStep);
 }
 
 //==============================================================================
@@ -392,6 +396,13 @@ std::set<dynamics::SkeletonPtr> World::removeAllSkeletons()
 }
 
 //==============================================================================
+bool World::hasSkeleton(const dynamics::ConstSkeletonPtr& skeleton) const
+{
+  return std::find(mSkeletons.begin(), mSkeletons.end(), skeleton)
+      != mSkeletons.end();
+}
+
+//==============================================================================
 int World::getIndex(int _index) const
 {
   return mIndices[_index];
@@ -522,9 +533,32 @@ const collision::CollisionResult& World::getLastCollisionResult() const
 }
 
 //==============================================================================
-constraint::ConstraintSolver* World::getConstraintSolver() const
+void World::setConstraintSolver(constraint::UniqueConstraintSolverPtr solver)
 {
-  return mConstraintSolver;
+  if (!solver)
+  {
+    dtwarn << "[World::setConstraintSolver] nullptr for constraint solver is "
+           << "not allowed. Doing nothing.";
+    return;
+  }
+
+  if (mConstraintSolver)
+    solver->setFromOtherConstraintSolver(*mConstraintSolver);
+
+  mConstraintSolver = std::move(solver);
+  mConstraintSolver->setTimeStep(mTimeStep);
+}
+
+//==============================================================================
+constraint::ConstraintSolver* World::getConstraintSolver()
+{
+  return mConstraintSolver.get();
+}
+
+//==============================================================================
+const constraint::ConstraintSolver* World::getConstraintSolver() const
+{
+  return mConstraintSolver.get();
 }
 
 //==============================================================================

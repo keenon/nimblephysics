@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2017, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -44,11 +44,13 @@ class DARTCollisionObject;
 class DARTCollisionDetector : public CollisionDetector
 {
 public:
+  using CollisionDetector::createCollisionGroup;
 
   static std::shared_ptr<DARTCollisionDetector> create();
 
   // Documentation inherited
-  std::shared_ptr<CollisionDetector> cloneWithoutCollisionObjects() override;
+  std::shared_ptr<CollisionDetector> cloneWithoutCollisionObjects() const
+  override;
 
   // Documentation inherited
   const std::string& getType() const override;
@@ -93,6 +95,9 @@ protected:
   // Documentation inherited
   std::unique_ptr<CollisionObject> createCollisionObject(
       const dynamics::ShapeFrame* shapeFrame) override;
+
+  // Documentation inherited
+  void refreshCollisionObject(CollisionObject* object) override;
 
 private:
   static Registrar<DARTCollisionDetector> mRegistrar;

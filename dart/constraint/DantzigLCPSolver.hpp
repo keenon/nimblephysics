@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2017, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -41,6 +41,9 @@
 namespace dart {
 namespace constraint {
 
+/// \deprecated This header has been deprecated in DART 6.7. Please include
+/// DantzigBoxedLcpSolver.hpp intead.
+///
 /// DantzigLCPSolver is a LCP solver that uses ODE's implementation of Dantzig
 /// algorithm
 class DantzigLCPSolver : public LCPSolver

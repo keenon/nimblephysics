@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2017, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -40,6 +40,7 @@
 #include "dart/common/Console.hpp"
 #include "dart/math/Geometry.hpp"
 #include "dart/math/Helpers.hpp"
+#include "dart/math/Random.hpp"
 #include "dart/dynamics/BodyNode.hpp"
 #include "dart/dynamics/Skeleton.hpp"
 #include "dart/dynamics/SimpleFrame.hpp"
@@ -169,16 +170,16 @@ void DynamicsTest::randomizeRefFrames()
   {
     SimpleFrame* F = refFrames[i];
 
-    Eigen::Vector3d p = randomVector<3>(100);
-    Eigen::Vector3d theta = randomVector<3>(2*M_PI);
+    Eigen::Vector3d p = Random::uniform<Eigen::Vector3d>(-100, 100);
+    Eigen::Vector3d theta = Random::uniform<Eigen::Vector3d>(-2*M_PI, 2*M_PI);
 
     Eigen::Isometry3d tf(Eigen::Isometry3d::Identity());
     tf.translate(p);
     tf.linear() = math::eulerXYZToMatrix(theta);
 
     F->setRelativeTransform(tf);
-    F->setRelativeSpatialVelocity(randomVector<6>(100));
-    F->setRelativeSpatialAcceleration(randomVector<6>(100));
+    F->setRelativeSpatialVelocity(Random::uniform<Eigen::Vector6d>(-100, 100));
+    F->setRelativeSpatialAcceleration(Random::uniform<Eigen::Vector6d>(-100, 100));
   }
 }
 
@@ -561,6 +562,183 @@ void compareBodyNodeFkToJacobian(const BodyNode* bn,
 }
 
 //==============================================================================
+template <typename T>
+void printComparisonError(const std::string& _comparison,
+                          const std::string& _nameBN,
+                          const std::string& _nameBNRelativeTo,
+                          const std::string& _frame,
+                          const T& fk,
+                          const T& jac)
+{
+  std::cout << "Disagreement between FK and relative Jacobian results for "
+            << _comparison << " of '" << _nameBN << "' relative to '"
+            << _nameBNRelativeTo
+            << "' with a reference Frame of '" << _frame << "'\n"
+            << "FK:  " << fk.transpose() << "\n"
+            << "Jac: " << jac.transpose() << "\n";
+}
+
+//==============================================================================
+void compareBodyNodeFkToJacobianRelative(const JacobianNode* bn,
+                                         const JacobianNode* relativeTo,
+                                         const Frame* refFrame,
+                                         double tolerance)
+{
+  using math::Jacobian;
+  using math::LinearJacobian;
+  using math::AngularJacobian;
+
+  assert(bn->getSkeleton() == relativeTo->getSkeleton());
+  auto skel = bn->getSkeleton();
+
+  VectorXd dq  = skel->getVelocities();
+  VectorXd ddq = skel->getAccelerations();
+
+  //-- Spatial Jacobian tests --------------------------------------------------
+
+  Vector6d SpatialVelFk = bn->getSpatialVelocity(relativeTo, refFrame);
+  Vector6d SpatialAccFk = bn->getSpatialAcceleration(relativeTo, refFrame);
+
+  Jacobian SpatialJac
+      = skel->getJacobian(bn, relativeTo, refFrame);
+  Jacobian SpatialJacDeriv
+      = skel->getJacobianSpatialDeriv(bn, relativeTo, refFrame);
+
+  Vector6d SpatialVelJac = SpatialJac * dq;
+  Vector6d SpatialAccJac = SpatialJac * ddq + SpatialJacDeriv * dq;
+
+  bool spatialVelEqual = equals(SpatialVelFk, SpatialVelJac, tolerance);
+  EXPECT_TRUE(spatialVelEqual);
+  if (!spatialVelEqual)
+  {
+    printComparisonError("spatial velocity",
+                         bn->getName(), relativeTo->getName(),
+                         refFrame->getName(),
+                         SpatialVelFk,  SpatialVelJac);
+  }
+
+  bool spatialAccEqual = equals(SpatialAccFk, SpatialAccJac, tolerance);
+  EXPECT_TRUE(spatialAccEqual);
+  if (!spatialAccEqual)
+  {
+    printComparisonError("spatial acceleration",
+                         bn->getName(), relativeTo->getName(),
+                         refFrame->getName(),
+                         SpatialAccFk,  SpatialAccJac);
+  }
+
+  //-- Linear Jacobian tests --------------------------------------------------
+
+  Vector3d LinearVelFk = bn->getLinearVelocity(relativeTo, refFrame);
+
+  LinearJacobian LinearJac
+      = skel->getLinearJacobian(bn, relativeTo, refFrame);
+
+  Vector3d LinearVelJac = LinearJac * dq;
+
+  bool linearVelEqual = equals(LinearVelFk, LinearVelJac, tolerance);
+  EXPECT_TRUE(linearVelEqual);
+  if (!linearVelEqual)
+  {
+    printComparisonError("linear velocity",
+                         bn->getName(), relativeTo->getName(),
+                         refFrame->getName(),
+                         LinearVelFk,  LinearVelJac);
+  }
+
+  //-- Angular Jacobian tests --------------------------------------------------
+
+  Vector3d AngularVelFk = bn->getAngularVelocity(relativeTo, refFrame);
+
+  AngularJacobian AngularJac
+      = skel->getAngularJacobian(bn, relativeTo, refFrame);
+
+  Vector3d AngularVelJac = AngularJac * dq;
+
+  bool angularVelEqual = equals(AngularVelFk, AngularVelJac, tolerance);
+  EXPECT_TRUE(angularVelEqual);
+  if (!angularVelEqual)
+  {
+    printComparisonError("angular velocity",
+                         bn->getName(), relativeTo->getName(),
+                         refFrame->getName(),
+                         AngularVelFk,  AngularVelJac);
+  }
+}
+
+//==============================================================================
+void compareBodyNodeFkToJacobianRelative(const JacobianNode* bn,
+                                         const Eigen::Vector3d& _offset,
+                                         const JacobianNode* relativeTo,
+                                         const Frame* refFrame,
+                                         double tolerance)
+{
+  using math::Jacobian;
+  using math::LinearJacobian;
+  using math::AngularJacobian;
+
+  assert(bn->getSkeleton() == relativeTo->getSkeleton());
+  auto skel = bn->getSkeleton();
+
+  VectorXd dq  = skel->getVelocities();
+  VectorXd ddq = skel->getAccelerations();
+
+  //-- Spatial Jacobian tests --------------------------------------------------
+
+  Vector6d SpatialVelFk
+      = bn->getSpatialVelocity(_offset, relativeTo, refFrame);
+  Vector6d SpatialAccFk
+      = bn->getSpatialAcceleration(_offset, relativeTo, refFrame);
+
+  Jacobian SpatialJac
+      = skel->getJacobian(bn, _offset, relativeTo, refFrame);
+  Jacobian SpatialJacDeriv
+      = skel->getJacobianSpatialDeriv(bn, _offset, relativeTo, refFrame);
+
+  Vector6d SpatialVelJac = SpatialJac * dq;
+  Vector6d SpatialAccJac = SpatialJac * ddq + SpatialJacDeriv * dq;
+
+  bool spatialVelEqual = equals(SpatialVelFk, SpatialVelJac, tolerance);
+  EXPECT_TRUE(spatialVelEqual);
+  if (!spatialVelEqual)
+  {
+    printComparisonError("spatial velocity w/ offset",
+                         bn->getName(), relativeTo->getName(),
+                         refFrame->getName(),
+                         SpatialVelFk,  SpatialVelJac);
+  }
+
+  bool spatialAccEqual = equals(SpatialAccFk, SpatialAccJac, tolerance);
+  EXPECT_TRUE(spatialAccEqual);
+  if (!spatialAccEqual)
+  {
+    printComparisonError("spatial acceleration w/ offset",
+                         bn->getName(), relativeTo->getName(),
+                         refFrame->getName(),
+                         SpatialAccFk,  SpatialAccJac);
+  }
+
+  //-- Linear Jacobian tests --------------------------------------------------
+
+  Vector3d LinearVelFk = bn->getLinearVelocity(_offset, relativeTo, refFrame);
+
+  LinearJacobian LinearJac
+      = skel->getLinearJacobian(bn, _offset, relativeTo, refFrame);
+
+  Vector3d LinearVelJac = LinearJac * dq;
+
+  bool linearVelEqual = equals(LinearVelFk, LinearVelJac, tolerance);
+  EXPECT_TRUE(linearVelEqual);
+  if (!linearVelEqual)
+  {
+    printComparisonError("linear velocity w/ offset",
+                         bn->getName(), relativeTo->getName(),
+                         refFrame->getName(),
+                         LinearVelFk,  LinearVelJac);
+  }
+}
+
+//==============================================================================
 void DynamicsTest::testJacobians(const common::Uri& uri)
 {
   using namespace std;
@@ -576,7 +754,7 @@ void DynamicsTest::testJacobians(const common::Uri& uri)
 #ifndef NDEBUG  // Debug mode
   int nTestItr = 2;
 #else
-  int nTestItr = 100;
+  int nTestItr = 5;
 #endif
   double qLB  = -0.5 * constantsd::pi();
   double qUB  =  0.5 * constantsd::pi();
@@ -601,12 +779,12 @@ void DynamicsTest::testJacobians(const common::Uri& uri)
     for (int j = 0; j < nTestItr; ++j)
     {
       // For the second half of the tests, scramble up the Skeleton
-      if(j > ceil(nTestItr/2))
+      if(j > std::ceil(nTestItr/2))
       {
-        SkeletonPtr copy = skeleton->clone();
+        SkeletonPtr copy = skeleton->cloneSkeleton();
         std::size_t maxNode = skeleton->getNumBodyNodes()-1;
-        BodyNode* bn1 = skeleton->getBodyNode(ceil(math::random(0, maxNode)));
-        BodyNode* bn2 = skeleton->getBodyNode(ceil(math::random(0, maxNode)));
+        BodyNode* bn1 = skeleton->getBodyNode(math::Random::uniform<std::size_t>(0, maxNode));
+        BodyNode* bn2 = skeleton->getBodyNode(math::Random::uniform<std::size_t>(0, maxNode));
 
         if(bn1 != bn2)
         {
@@ -626,9 +804,9 @@ void DynamicsTest::testJacobians(const common::Uri& uri)
       VectorXd ddq = VectorXd(dof);
       for (int k = 0; k < dof; ++k)
       {
-        q[k]   = math::random(qLB,   qUB);
-        dq[k]  = math::random(dqLB,  dqUB);
-        ddq[k] = math::random(ddqLB, ddqUB);
+        q[k]   = math::Random::uniform(qLB,   qUB);
+        dq[k]  = math::Random::uniform(dqLB,  dqUB);
+        ddq[k] = math::Random::uniform(ddqLB, ddqUB);
       }
       skeleton->setPositions(q);
       skeleton->setVelocities(dq);
@@ -643,33 +821,72 @@ void DynamicsTest::testJacobians(const common::Uri& uri)
 
         // Compare results using the World reference Frame
         compareBodyNodeFkToJacobian(bn, Frame::World(), TOLERANCE);
+        compareBodyNodeFkToJacobian(
+              bn, Frame::World(), bn->getLocalCOM(), TOLERANCE);
+        compareBodyNodeFkToJacobian(
+              bn, Frame::World(), Random::uniform<Eigen::Vector3d>(-10, 10), TOLERANCE);
+
         // Compare results using this BodyNode's own reference Frame
         compareBodyNodeFkToJacobian(bn, bn, TOLERANCE);
+        compareBodyNodeFkToJacobian(bn, bn, bn->getLocalCOM(), TOLERANCE);
+        compareBodyNodeFkToJacobian(bn, bn, Random::uniform<Eigen::Vector3d>(-10, 10), TOLERANCE);
 
         // Compare results using the randomized reference Frames
         for(std::size_t r=0; r<refFrames.size(); ++r)
         {
           compareBodyNodeFkToJacobian(bn, refFrames[r], TOLERANCE);
+          compareBodyNodeFkToJacobian(
+              bn, refFrames[r], bn->getLocalCOM(), TOLERANCE);
+          compareBodyNodeFkToJacobian(
+              bn, refFrames[r], Random::uniform<Eigen::Vector3d>(-10, 10), TOLERANCE);
         }
 
-        compareBodyNodeFkToJacobian(
-              bn, Frame::World(), bn->getLocalCOM(), TOLERANCE);
-        compareBodyNodeFkToJacobian(bn, bn, bn->getLocalCOM(), TOLERANCE);
+        // -- Relative Jacobian tests
 
-        for(std::size_t r=0; r<refFrames.size(); ++r)
+        compareBodyNodeFkToJacobianRelative(bn, bn, Frame::World(), TOLERANCE);
+
+#ifndef NDEBUG // Debug mode
+        if (skeleton->getNumBodyNodes() == 0u)
+          continue;
+
+        for (std::size_t l = skeleton->getNumBodyNodes() - 1;
+             l < skeleton->getNumBodyNodes(); ++l)
+#else
+        for (std::size_t l = 0; l < skeleton->getNumBodyNodes(); ++l)
+#endif
         {
-          compareBodyNodeFkToJacobian(
-                bn, refFrames[r], bn->getLocalCOM(), TOLERANCE);
-        }
+          const BodyNode* relativeTo = skeleton->getBodyNode(l);
 
-        compareBodyNodeFkToJacobian(
-              bn, Frame::World(), randomVector<3>(10), TOLERANCE);
-        compareBodyNodeFkToJacobian(bn, bn, randomVector<3>(10), TOLERANCE);
+          compareBodyNodeFkToJacobianRelative(
+                bn, relativeTo, Frame::World(), TOLERANCE);
+          compareBodyNodeFkToJacobianRelative(
+                bn, bn->getLocalCOM(), relativeTo, Frame::World(), TOLERANCE);
+          compareBodyNodeFkToJacobianRelative(
+                bn, Random::uniform<Eigen::Vector3d>(-10, 10), relativeTo, Frame::World(), TOLERANCE);
 
-        for(std::size_t r=0; r<refFrames.size(); ++r)
-        {
-          compareBodyNodeFkToJacobian(
-                bn, refFrames[r], randomVector<3>(10), TOLERANCE);
+          compareBodyNodeFkToJacobianRelative(
+                bn, relativeTo, bn, TOLERANCE);
+          compareBodyNodeFkToJacobianRelative(
+                bn, bn->getLocalCOM(), relativeTo, bn, TOLERANCE);
+          compareBodyNodeFkToJacobianRelative(
+                bn, Random::uniform<Eigen::Vector3d>(-10, 10), relativeTo, bn, TOLERANCE);
+
+          compareBodyNodeFkToJacobianRelative(
+                bn, relativeTo, relativeTo, TOLERANCE);
+          compareBodyNodeFkToJacobianRelative(
+                bn, bn->getLocalCOM(), relativeTo, relativeTo, TOLERANCE);
+          compareBodyNodeFkToJacobianRelative(
+                bn, Random::uniform<Eigen::Vector3d>(-10, 10), relativeTo, relativeTo, TOLERANCE);
+
+          for (std::size_t r = 0; r < refFrames.size(); ++r)
+          {
+            compareBodyNodeFkToJacobianRelative(
+                  bn, relativeTo, refFrames[r], TOLERANCE);
+            compareBodyNodeFkToJacobianRelative(
+                  bn, bn->getLocalCOM(), relativeTo, refFrames[r], TOLERANCE);
+            compareBodyNodeFkToJacobianRelative(
+                  bn, Random::uniform<Eigen::Vector3d>(-10, 10), relativeTo, refFrames[r], TOLERANCE);
+          }
         }
       }
     }
@@ -725,9 +942,9 @@ void DynamicsTest::testFiniteDifferenceGeneralizedCoordinates(
       VectorXd ddq0 = VectorXd(dof);
       for (int k = 0; k < dof; ++k)
       {
-        q0[k]   = math::random(qLB,   qUB);
-        dq0[k]  = math::random(dqLB,  dqUB);
-        ddq0[k] = math::random(ddqLB, ddqUB);
+        q0[k]   = math::Random::uniform(qLB,   qUB);
+        dq0[k]  = math::Random::uniform(dqLB,  dqUB);
+        ddq0[k] = math::Random::uniform(ddqLB, ddqUB);
       }
 
       skeleton->setPositions(q0);
@@ -825,9 +1042,9 @@ void DynamicsTest::testFiniteDifferenceBodyNodeVelocity(const common::Uri& uri)
       std::size_t numBodies = skeleton->getNumBodyNodes();
 
       // Generate random states
-      VectorXd   q = randomVectorXd(dof,   qLB,   qUB);
-      VectorXd  dq = randomVectorXd(dof,  dqLB,  dqUB);
-      VectorXd ddq = randomVectorXd(dof, ddqLB, ddqUB);
+      VectorXd   q = Random::uniform<Eigen::VectorXd>(dof,   qLB,   qUB);
+      VectorXd  dq = Random::uniform<Eigen::VectorXd>(dof,  dqLB,  dqUB);
+      VectorXd ddq = Random::uniform<Eigen::VectorXd>(dof, ddqLB, ddqUB);
 
       skeleton->setPositions(q);
       skeleton->setVelocities(dq);
@@ -923,9 +1140,9 @@ void DynamicsTest::testFiniteDifferenceBodyNodeAcceleration(
       VectorXd ddq = VectorXd(dof);
       for (int k = 0; k < dof; ++k)
       {
-        q[k]   = math::random(qLB,   qUB);
-        dq[k]  = math::random(dqLB,  dqUB);
-        ddq[k] = math::random(ddqLB, ddqUB);
+        q[k]   = math::Random::uniform(qLB,   qUB);
+        dq[k]  = math::Random::uniform(dqLB,  dqUB);
+        ddq[k] = math::Random::uniform(ddqLB, ddqUB);
       }
 
       // For each body node
@@ -1072,9 +1289,9 @@ void testForwardKinematicsSkeleton(const dynamics::SkeletonPtr& skel)
 
   for (auto i = 0u; i < nRandomItr; ++i)
   {
-    q   = randomVectorXd(dof,   qLB,   qUB);
-    dq  = randomVectorXd(dof,  dqLB,  dqUB);
-    ddq = randomVectorXd(dof, ddqLB, ddqUB);
+    q   = Random::uniform<Eigen::VectorXd>(dof,   qLB,   qUB);
+    dq  = Random::uniform<Eigen::VectorXd>(dof,  dqLB,  dqUB);
+    ddq = Random::uniform<Eigen::VectorXd>(dof, ddqLB, ddqUB);
 
     skel->setPositions(q);
     skel->setVelocities(dq);
@@ -1230,8 +1447,8 @@ void DynamicsTest::compareEquationsOfMotion(const common::Uri& uri)
 
         for (std::size_t l = 0; l < localDof; ++l)
         {
-          joint->setDampingCoefficient(l, random(lbD,  ubD));
-          joint->setSpringStiffness   (l, random(lbK,  ubK));
+          joint->setDampingCoefficient(l, Random::uniform(lbD,  ubD));
+          joint->setSpringStiffness   (l, Random::uniform(lbK,  ubK));
 
           double lbRP = joint->getPositionLowerLimit(l);
           double ubRP = joint->getPositionUpperLimit(l);
@@ -1239,7 +1456,7 @@ void DynamicsTest::compareEquationsOfMotion(const common::Uri& uri)
             lbRP = -constantsd::pi();
           if (ubRP > constantsd::pi())
             ubRP = constantsd::pi();
-          joint->setRestPosition      (l, random(lbRP, ubRP));
+          joint->setRestPosition      (l, Random::uniform(lbRP, ubRP));
         }
       }
 
@@ -1248,8 +1465,8 @@ void DynamicsTest::compareEquationsOfMotion(const common::Uri& uri)
             Skeleton::CONFIG_POSITIONS | Skeleton::CONFIG_VELOCITIES);
       for (auto k = 0u; k < skel->getNumDofs(); ++k)
       {
-        x.mPositions[k] = random(lb, ub);
-        x.mVelocities[k] = random(lb, ub);
+        x.mPositions[k] = Random::uniform(lb, ub);
+        x.mVelocities[k] = Random::uniform(lb, ub);
       }
       skel->setConfiguration(x);
 
@@ -1499,10 +1716,10 @@ void DynamicsTest::testCenterOfMass(const common::Uri& uri)
       // For the second half of the tests, scramble up the Skeleton
       if(j > ceil(nRandomItr/2))
       {
-        SkeletonPtr copy = skeleton->clone();
+        SkeletonPtr copy = skeleton->cloneSkeleton();
         std::size_t maxNode = skeleton->getNumBodyNodes()-1;
-        BodyNode* bn1 = skeleton->getBodyNode(ceil(math::random(0, maxNode)));
-        BodyNode* bn2 = skeleton->getBodyNode(ceil(math::random(0, maxNode)));
+        BodyNode* bn1 = skeleton->getBodyNode(math::Random::uniform<std::size_t>(0, maxNode));
+        BodyNode* bn2 = skeleton->getBodyNode(math::Random::uniform<std::size_t>(0, maxNode));
 
         if(bn1 != bn2)
         {
@@ -1525,8 +1742,8 @@ void DynamicsTest::testCenterOfMass(const common::Uri& uri)
 
         for (int l = 0; l < localDof; ++l)
         {
-          joint->setDampingCoefficient(l, random(lbD,  ubD));
-          joint->setSpringStiffness   (l, random(lbK,  ubK));
+          joint->setDampingCoefficient(l, Random::uniform(lbD,  ubD));
+          joint->setSpringStiffness   (l, Random::uniform(lbK,  ubK));
 
           double lbRP = joint->getPositionLowerLimit(l);
           double ubRP = joint->getPositionUpperLimit(l);
@@ -1534,7 +1751,7 @@ void DynamicsTest::testCenterOfMass(const common::Uri& uri)
             lbRP = -constantsd::pi();
           if (ubRP > constantsd::pi())
             ubRP = constantsd::pi();
-          joint->setRestPosition      (l, random(lbRP, ubRP));
+          joint->setRestPosition      (l, Random::uniform(lbRP, ubRP));
         }
       }
 
@@ -1544,9 +1761,9 @@ void DynamicsTest::testCenterOfMass(const common::Uri& uri)
       VectorXd ddq = VectorXd(dof);
       for (std::size_t k = 0; k < dof; ++k)
       {
-        q[k]   = math::random(lb, ub);
-        dq[k]  = math::random(lb, ub);
-        ddq[k] = math::random(lb, ub);
+        q[k]   = math::Random::uniform(lb, ub);
+        dq[k]  = math::Random::uniform(lb, ub);
+        ddq[k] = math::Random::uniform(lb, ub);
       }
       skeleton->setPositions(q);
       skeleton->setVelocities(dq);
@@ -1684,8 +1901,8 @@ void DynamicsTest::testCenterOfMassFreeFall(const common::Uri& uri)
 
         for (std::size_t l = 0; l < localDof; ++l)
         {
-          joint->setDampingCoefficient(l, random(lbD,  ubD));
-          joint->setSpringStiffness(l, random(lbK,  ubK));
+          joint->setDampingCoefficient(l, Random::uniform(lbD,  ubD));
+          joint->setSpringStiffness(l, Random::uniform(lbK,  ubK));
 
           double lbRP = joint->getPositionLowerLimit(l);
           double ubRP = joint->getPositionUpperLimit(l);
@@ -1693,7 +1910,7 @@ void DynamicsTest::testCenterOfMassFreeFall(const common::Uri& uri)
             lbRP = -constantsd::pi();
           if (ubRP > constantsd::pi())
             ubRP = constantsd::pi();
-          joint->setRestPosition(l, random(lbRP, ubRP));
+          joint->setRestPosition(l, Random::uniform(lbRP, ubRP));
         }
       }
 
@@ -1702,8 +1919,8 @@ void DynamicsTest::testCenterOfMassFreeFall(const common::Uri& uri)
       VectorXd dq = VectorXd(dof);
       for (std::size_t k = 0; k < dof; ++k)
       {
-        q[k]   = math::random(lb, ub);
-        dq[k]  = math::random(lb, ub);
+        q[k]   = math::Random::uniform(lb, ub);
+        dq[k]  = math::Random::uniform(lb, ub);
       }
       VectorXd ddq = VectorXd::Zero(dof);
       skel->setPositions(q);
@@ -1778,7 +1995,7 @@ void DynamicsTest::testConstraintImpulse(const common::Uri& uri)
             lbRP = -constantsd::pi();
           if (ubRP > constantsd::pi())
             ubRP = constantsd::pi();
-          joint->setPosition(l, random(lbRP, ubRP));
+          joint->setPosition(l, Random::uniform(lbRP, ubRP));
         }
 
         // Set constraint impulse on each body
@@ -1829,7 +2046,7 @@ void DynamicsTest::testImpulseBasedDynamics(const common::Uri& uri)
   std::size_t nRandomItr = 100;
 #endif
 
-  double TOLERANCE = 1e-3;
+  double TOLERANCE = 1e-1;
 
   // Lower and upper bound of configuration for system
   double lb = -1.5 * constantsd::pi();
@@ -1874,7 +2091,7 @@ void DynamicsTest::testImpulseBasedDynamics(const common::Uri& uri)
             lbRP = -constantsd::pi();
           if (ubRP > constantsd::pi())
             ubRP = constantsd::pi();
-          joint->setPosition(l, random(lbRP, ubRP));
+          joint->setPosition(l, Random::uniform(lbRP, ubRP));
         }
       }
 //      skel->setPositions(VectorXd::Zero(dof));
@@ -1886,7 +2103,7 @@ void DynamicsTest::testImpulseBasedDynamics(const common::Uri& uri)
       // Set random impulses
       VectorXd impulses = VectorXd::Zero(dof);
       for (int k = 0; k < impulses.size(); ++k)
-        impulses[k] = random(lb, ub);
+        impulses[k] = Random::uniform(lb, ub);
       skel->setJointConstraintImpulses(impulses);
 
       // Compute impulse-based forward dynamics
@@ -2024,7 +2241,7 @@ TEST_F(DynamicsTest, testImpulseBasedDynamics)
 //==============================================================================
 TEST_F(DynamicsTest, HybridDynamics)
 {
-  const double tol       = 1e-9;
+  const double tol       = 1e-8;
   const double timeStep  = 1e-3;
 #ifndef NDEBUG // Debug mode
   const std::size_t numFrames = 50;  // 0.05 secs
@@ -2066,7 +2283,7 @@ TEST_F(DynamicsTest, HybridDynamics)
   Eigen::MatrixXd command = Eigen::MatrixXd::Zero(numFrames, numDofs);
   Eigen::VectorXd amp = Eigen::VectorXd::Zero(numDofs);
   for (std::size_t i = 0; i < numDofs; ++i)
-    amp[i] = math::random(-1.5, 1.5);
+    amp[i] = math::Random::uniform(-1.5, 1.5);
   for (std::size_t i = 0; i < numFrames; ++i)
   {
     for (std::size_t j = 0; j < numDofs; ++j)

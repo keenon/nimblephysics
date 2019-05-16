@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2017, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -42,9 +42,12 @@
 using namespace dart;
 
 //==============================================================================
-TEST(ContactConstraint, ContactWithKinematicJoint)
+void testContactWithKinematicJoint(
+    const constraint::BoxedLcpSolverPtr& lcpSolver, double tol)
 {
   auto world = std::make_shared<simulation::World>();
+  world->setConstraintSolver(
+      common::make_unique<constraint::BoxedLcpConstraintSolver>(lcpSolver));
 
   auto skeleton1 = dynamics::Skeleton::create("skeleton1");
   auto pair1 = skeleton1->createJointAndBodyNodePair<dynamics::FreeJoint>();
@@ -82,7 +85,22 @@ TEST(ContactConstraint, ContactWithKinematicJoint)
     // Need few steps to settle down
     if (i > 15)
     {
-      EXPECT_NEAR(bodyNode2->getLinearVelocity()[0], 0.1, 1e-6);
+      EXPECT_NEAR(bodyNode2->getLinearVelocity()[0], 0.1, tol);
     }
   }
+}
+
+//==============================================================================
+TEST(ContactConstraint, ContactWithKinematicJoint)
+{
+  testContactWithKinematicJoint(
+        std::make_shared<constraint::DantzigBoxedLcpSolver>(), 1e-6);
+
+#ifdef DART_ARCH_32BITS
+  testContactWithKinematicJoint(
+        std::make_shared<constraint::PgsBoxedLcpSolver>(), 1e-3);
+#else
+  testContactWithKinematicJoint(
+        std::make_shared<constraint::PgsBoxedLcpSolver>(), 1e-4);
+#endif
 }

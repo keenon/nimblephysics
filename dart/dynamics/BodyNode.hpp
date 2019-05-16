@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2017, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -174,7 +174,7 @@ public:
   void setCollidable(bool _isCollidable);
 
   /// Set the mass of the bodynode
-  void setMass(double _mass);
+  void setMass(double mass);
 
   /// Return the mass of the bodynode
   double getMass() const;
@@ -196,7 +196,7 @@ public:
   const Eigen::Matrix6d& getSpatialInertia() const;
 
   /// Set the inertia data for this BodyNode
-  void setInertia(const Inertia& _inertia);
+  void setInertia(const Inertia& inertia);
 
   /// Get the inertia data for this BodyNode
   const Inertia& getInertia() const;
@@ -537,13 +537,13 @@ public:
   /// ShapeNode::Properties argument into its constructor. If automaticName is
   /// true, then the mName field of properties will be ignored, and the
   /// ShapeNode will be automatically assigned a name:
-  /// <BodyNodeName>_ShapeNode_<#>
+  /// \<BodyNodeName\>_ShapeNode_<#>
   template <class ShapeNodeProperties>
   ShapeNode* createShapeNode(ShapeNodeProperties properties,
                              bool automaticName = true);
 
   /// Create a ShapeNode with an automatically assigned name:
-  /// <BodyNodeName>_ShapeNode_<#>.
+  /// \<BodyNodeName\>_ShapeNode_<#>.
   template <class ShapeType>
   ShapeNode* createShapeNode(const std::shared_ptr<ShapeType>& shape);
 
@@ -563,7 +563,7 @@ public:
   void removeAllShapeNodes();
 
   /// Create a ShapeNode with the specified Aspects and an automatically assigned
-  /// name: <BodyNodeName>_ShapeNode_<#>.
+  /// name: \<BodyNodeName\>_ShapeNode_<#>.
   template <class... Aspects>
   ShapeNode* createShapeNodeWith(const ShapePtr& shape);
 
@@ -707,7 +707,7 @@ public:
   /// Set whether this body node is colliding with other objects. Note that
   /// this status is set by the constraint solver during dynamics simulation but
   /// not by collision detector.
-  /// \param[in] True if this body node is colliding.
+  /// \param[in] _isColliding True if this body node is colliding.
   DART_DEPRECATED(6.0)
   void setColliding(bool _isColliding);
 

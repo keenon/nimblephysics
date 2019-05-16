@@ -6,8 +6,18 @@ endif()
 # OpenSceneGraph
 if(DART_BUILD_GUI_OSG)
 
+  if (CMAKE_VERSION VERSION_LESS 3.12)
+    get_property(old_find_library_use_lib64_paths GLOBAL PROPERTY FIND_LIBRARY_USE_LIB64_PATHS)
+    set_property(GLOBAL PROPERTY FIND_LIBRARY_USE_LIB64_PATHS TRUE)
+  endif()
+
   find_package(OpenSceneGraph 3.0 QUIET
-    COMPONENTS osg osgViewer osgManipulator osgGA osgDB)
+    COMPONENTS osg osgViewer osgManipulator osgGA osgDB osgShadow
+  )
+
+  if (CMAKE_VERSION VERSION_LESS 3.12)
+    set_property(GLOBAL PROPERTY FIND_LIBRARY_USE_LIB64_PATHS ${old_find_library_use_lib64_paths})
+  endif()
 
   # It seems that OPENSCENEGRAPH_FOUND will inadvertently get set to true when
   # OpenThreads is found, even if OpenSceneGraph is not installed. This is quite
@@ -31,7 +41,7 @@ if(DART_BUILD_GUI_OSG)
         set(warning_msg "Could NOT find OpenSceneGraph nor OpenThreads")
       endif()
     endif()
-    message(WARNING "${warning_msg} -- we will skip dart-gui-osg\n"
+    message(STATUS "${warning_msg} -- we will skip dart-gui-osg\n"
             "If you believe you do have both OSG and OpenThreads installed, try setting OSG_DIR")
     return()
   endif()
@@ -76,15 +86,10 @@ add_component_dependencies(${PROJECT_NAME} ${component_name} gui)
 # Generate header for this namespace
 dart_get_filename_components(header_names "gui osg headers" ${hdrs})
 list(APPEND header_names "render/render.hpp")
-dart_generate_include_header_list(
-  gui_osg_headers
+dart_generate_include_header_file(
+  "${CMAKE_CURRENT_BINARY_DIR}/osg.hpp"
   "dart/gui/osg/"
-  "gui osg headers"
   ${header_names}
-)
-configure_file(
-  ${CMAKE_CURRENT_SOURCE_DIR}/osg.hpp.in
-  ${CMAKE_CURRENT_BINARY_DIR}/osg.hpp
 )
 
 # Install
@@ -92,4 +97,14 @@ install(
   FILES ${hdrs} ${CMAKE_CURRENT_BINARY_DIR}/osg.hpp
   DESTINATION include/dart/gui/osg
   COMPONENT headers
+)
+
+dart_format_add(
+  GridVisual.hpp
+  GridVisual.cpp
+  ImGuiHandler.hpp
+  ImGuiHandler.cpp
+  RealTimeWorldNode.hpp
+  RealTimeWorldNode.cpp
+  Utils.hpp
 )

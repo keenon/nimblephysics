@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2017, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -42,7 +42,7 @@ namespace dynamics {
 /// axes and one rotational axis.
 ///
 /// First and second coordiantes represent translation along first and second
-/// translational axese, respectively. Third coordinate represents rotation
+/// translational axes, respectively. Third coordinate represents rotation
 /// along rotational axis.
 class PlanarJoint : public detail::PlanarJointBase
 {
@@ -108,6 +108,8 @@ public:
 
   /// \brief Set plane type as arbitrary plane with two orthogonal translational
   /// axes
+  /// \param[in] _transAxis1 An orthogonal translational axis
+  /// \param[in] _transAxis2 Another orthogonal translation axis
   /// \param[in] _renameDofs If true, the names of dofs in this joint will be
   /// renmaed according to the plane type.
   void setArbitraryPlane(const Eigen::Vector3d& _transAxis1,

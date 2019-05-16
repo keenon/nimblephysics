@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2017, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -155,8 +155,8 @@ void DefaultEventHandler::getNearAndFarPointUnderCursor(Eigen::Vector3d& near,
   invVPW.invert(VPW);
 
   double x = getWindowCursorX(), y = getWindowCursorY();
-  ::osg::Vec3 osgNear = ::osg::Vec3(x,y,0.0) * invVPW;
-  ::osg::Vec3 osgFar = ::osg::Vec3(x,y,distance) * invVPW;
+  auto osgNear = ::osg::Vec3d(x,y,0.0) * invVPW;
+  auto osgFar = ::osg::Vec3d(x,y,distance) * invVPW;
 
   near = osgToEigVec3(osgNear);
   far = osgToEigVec3(osgFar);
@@ -230,7 +230,7 @@ void DefaultEventHandler::pick(std::vector<PickInfo>& infoVector,
         PickInfo info;
         info.shape = shape->getShape();
         info.frame = shape->getParentShapeFrameNode()->getShapeFrame();
-        info.normal = osgToEigVec3(intersect.getWorldIntersectNormal());
+        info.normal = osgToEigVec3(intersect.getWorldIntersectNormal()).cast<double>();
         info.position = osgToEigVec3(intersect.getWorldIntersectPoint());
 
         infoVector.push_back(info);
@@ -331,7 +331,6 @@ bool DefaultEventHandler::handle(const ::osgGA::GUIEventAdapter& ea,
         {
           mViewer->switchHeadlights(!mViewer->checkHeadlights());
           return true;
-          break;
         }
 
         case ' ':
@@ -344,6 +343,7 @@ bool DefaultEventHandler::handle(const ::osgGA::GUIEventAdapter& ea,
           break;
         }
       }
+      break;
     }
 
     case ::osgGA::GUIEventAdapter::MOVE:

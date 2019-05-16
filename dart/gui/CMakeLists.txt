@@ -3,7 +3,7 @@ if (NOT TARGET dart-utils)
   return()
 endif()
 
-find_package(OpenGL QUIET)
+dart_find_package(OpenGL)
 dart_check_optional_package(OPENGL "dart-gui" "OpenGL")
 
 if(WIN32 AND NOT CYGWIN)
@@ -11,10 +11,9 @@ if(WIN32 AND NOT CYGWIN)
   set(GLUT_LIBRARIES glut32)
   set(HAVE_GLUT TRUE)
 else()
-  find_package(GLUT QUIET)
+  dart_find_package(GLUT)
   dart_check_optional_package(GLUT "dart-gui" "freeglut3")
   if(GLUT_FOUND)
-    set(GLUT_LIBRARIES ${GLUT_glut_LIBRARY})
     set(HAVE_GLUT TRUE)
   else()
     set(HAVE_GLUT FALSE)
@@ -22,27 +21,38 @@ else()
 endif()
 
 # Search all header and source files
-file(GLOB hdrs "*.hpp")
-file(GLOB srcs "*.cpp")
+file(GLOB hdrs "*.hpp" "*.h" "detail/*.hpp")
+file(GLOB srcs "*.cpp" "*.c" "detail/*.cpp")
+
+function(dart_add_gui_headers)
+  dart_property_add(DART_GUI_HEADERS ${ARGN})
+endfunction()
+
+function(dart_add_gui_sources)
+  dart_property_add(DART_GUI_SOURCES ${ARGN})
+endfunction()
+
+# Add required subdirectory
+add_subdirectory(glut)
+
+get_property(dart_gui_headers GLOBAL PROPERTY DART_GUI_HEADERS)
+get_property(dart_gui_sources GLOBAL PROPERTY DART_GUI_SOURCES)
 
 # Set local target name
 set(target_name ${PROJECT_NAME}-gui)
 set(component_name gui)
 
 # Add target
-dart_add_library(${target_name} ${hdrs} ${srcs})
-target_include_directories(
-  ${target_name} SYSTEM
-  PUBLIC
-    ${OPENGL_INCLUDE_DIR}
-    ${GLUT_INCLUDE_DIR}
+dart_add_library(${target_name}
+  ${hdrs} ${srcs} ${dart_gui_headers} ${dart_gui_sources}
 )
-target_link_libraries(
-  ${target_name}
+target_include_directories(${target_name} PUBLIC ${GLUT_INCLUDE_DIRS})
+target_link_libraries(${target_name}
   PUBLIC
     dart-utils
-    ${GLUT_LIBRARY}
-    ${OPENGL_LIBRARIES}
+    ${GLUT_LIBRARIES}
+    OpenGL::GLU
+    OpenGL::GL
     ${PROJECT_NAME}-external-lodepng
     ${PROJECT_NAME}-external-imgui
 )
@@ -57,21 +67,39 @@ add_component_dependencies(
   external-lodepng
   external-imgui
 )
+add_component_dependency_packages(${PROJECT_NAME} ${component_name} OpenGL)
+if(NOT WIN32 OR CYGWIN)
+  add_component_dependency_packages(${PROJECT_NAME} ${component_name} GLUT)
+endif()
 
 # Add subdirectories
 add_subdirectory(osg)
 
 # Generate header for this namespace
 dart_get_filename_components(header_names "gui headers" ${hdrs})
-dart_generate_include_header_list(
-  gui_headers
-  "dart/gui/"
-  "gui headers"
-  ${header_names}
+
+# Remove deprecated files from the list
+list(REMOVE_ITEM header_names
+  "GLFuncs.hpp"
+  "GlutWindow.hpp"
+  "GraphWindow.hpp"
+  "LoadGlut.hpp"
+  "MotionBlurSimWindow.hpp"
+  "SimWindow.hpp"
+  "SoftSimWindow.hpp"
+  "Win2D.hpp"
+  "Win3D.hpp"
 )
-configure_file(
-  ${CMAKE_CURRENT_SOURCE_DIR}/gui.hpp.in
-  ${CMAKE_CURRENT_BINARY_DIR}/gui.hpp
+
+set(
+  header_names
+  ${header_names}
+  glut/glut.hpp
+)
+dart_generate_include_header_file(
+  "${CMAKE_CURRENT_BINARY_DIR}/gui.hpp"
+  "dart/gui/"
+  ${header_names}
 )
 
 # Install

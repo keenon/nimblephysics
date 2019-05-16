@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2017, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -71,7 +71,14 @@ std::size_t ConstrainedGroup::getNumConstraints() const
 }
 
 //==============================================================================
-ConstraintBasePtr ConstrainedGroup::getConstraint(std::size_t _index) const
+ConstraintBasePtr ConstrainedGroup::getConstraint(std::size_t _index)
+{
+  assert(_index < mConstraints.size());
+  return mConstraints[_index];
+}
+
+//==============================================================================
+ConstConstraintBasePtr ConstrainedGroup::getConstraint(std::size_t _index) const
 {
   assert(_index < mConstraints.size());
   return mConstraints[_index];

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2017, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -34,6 +34,7 @@
 
 #include "dart/dynamics/SimpleFrame.hpp"
 #include "dart/math/Helpers.hpp"
+#include "dart/math/Random.hpp"
 
 #include "TestHelpers.hpp"
 
@@ -43,7 +44,7 @@ using namespace dynamics;
 template<int N>
 Eigen::Matrix<double,N,1> random_vec(double limit=100)
 {
-  return randomVector<N>(limit);
+  return Random::uniform<Eigen::Matrix<double,N,1>>(-limit, limit);
 }
 
 void randomize_transform(Eigen::Isometry3d& tf,

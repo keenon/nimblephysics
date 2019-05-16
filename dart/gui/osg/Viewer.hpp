@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2017, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -38,6 +38,7 @@
 #include <memory>
 
 #include <osgViewer/Viewer>
+#include <osgShadow/ShadowTechnique>
 
 #include <Eigen/Core>
 
@@ -114,7 +115,6 @@ private:
 class Viewer : public osgViewer::Viewer, public dart::common::Subject
 {
 public:
-
   /// Constructor for dart::gui::osg::Viewer. This will automatically create the
   /// default event handler.
   Viewer(const ::osg::Vec4& clearColor = ::osg::Vec4(0.9,0.9,0.9,1.0));
@@ -196,6 +196,11 @@ public:
 
   /// Get the Group node that contains the LightSources for this Viewer
   const ::osg::Group* getLightGroup() const;
+
+  /// Get one of the LightSources of this Viewer
+  /// index either 0 or 1
+  /// Useful for shadowing techniques
+  const ::osg::ref_ptr<::osg::LightSource>& getLightSource(std::size_t index = 0) const;
 
   /// Set up the default lighting scheme
   void setupDefaultLights();
@@ -287,6 +292,15 @@ public:
 
   /// Get the root ::osg::Group of this Viewer
   const ::osg::ref_ptr<::osg::Group>& getRootGroup() const;
+
+  /// Sets the vertical field of view of the master camera of the view.
+  /// \param[in] fov Vertical field of view in degrees.
+  void setVerticalFieldOfView(double fov);
+
+  /// Returns the vertical field of view of the master camera of the view.
+  /// \return Vertical field of view in degrees if the camera is perspective
+  /// view, 0.0 otherwise.
+  double getVerticalFieldOfView() const;
 
 protected:
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2017, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -179,7 +179,7 @@ Eigen::Matrix3d expMapJacDot(const Eigen::Vector3d& _expmap,
                              const Eigen::Vector3d& _qdot);
 
 /// \brief computes the derivative of the Jacobian of the expmap wrt to _qi
-/// indexed dof; _qi \in {0,1,2}
+/// indexed dof; _qi \f$ \in \f$ {0,1,2}
 Eigen::Matrix3d expMapJacDeriv(const Eigen::Vector3d& _expmap, int _qi);
 
 /// \brief Log mapping

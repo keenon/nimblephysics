@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2017, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -1143,7 +1143,7 @@ TEST(MATH, UTILS) {
   EXPECT_DOUBLE_EQ(dart::math::CR(0, 1), -1.0);
 
   // Test randomize function
-  double x = dart::math::random(0.0, 2.0);
+  double x = dart::math::Random::uniform(0.0, 2.0);
   EXPECT_LT(0.0, x);
   EXPECT_LT(x, 2.0);
 

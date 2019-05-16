@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2017, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -382,6 +382,13 @@ std::mutex& Skeleton::getMutex() const
 }
 
 //==============================================================================
+std::unique_ptr<common::LockableReference> Skeleton::getLockableReference() const
+{
+  return common::make_unique<common::SingleLockableReference<std::mutex>>(
+      mPtr, mMutex);
+}
+
+//==============================================================================
 Skeleton::~Skeleton()
 {
   for (BodyNode* bn : mSkelCache.mBodyNodes)
@@ -391,11 +398,23 @@ Skeleton::~Skeleton()
 //==============================================================================
 SkeletonPtr Skeleton::clone() const
 {
-  return clone(getName());
+  return cloneSkeleton(getName());
 }
 
 //==============================================================================
 SkeletonPtr Skeleton::clone(const std::string& cloneName) const
+{
+  return cloneSkeleton(cloneName);
+}
+
+//==============================================================================
+SkeletonPtr Skeleton::cloneSkeleton() const
+{
+  return cloneSkeleton(getName());
+}
+
+//==============================================================================
+SkeletonPtr Skeleton::cloneSkeleton(const std::string& cloneName) const
 {
   SkeletonPtr skelClone = Skeleton::create(cloneName);
 
@@ -450,7 +469,34 @@ SkeletonPtr Skeleton::clone(const std::string& cloneName) const
   skelClone->setName(cloneName);
   skelClone->setState(getState());
 
+  // Fix mimic joint references
+  for(std::size_t i=0; i<getNumJoints(); ++i)
+  {
+    Joint* joint = skelClone->getJoint(i);
+    if(joint->getActuatorType() == Joint::MIMIC)
+    {
+      const Joint* mimicJoint = skelClone->getJoint(joint->getMimicJoint()->getName());
+      if(mimicJoint)
+      {
+        joint->setMimicJoint(mimicJoint, joint->getMimicMultiplier(), joint->getMimicOffset());
+      }
+      else
+      {
+        dterr << "[Skeleton::clone] Failed to clone mimic joint successfully: "
+              << "Unable to find the mimic joint ["
+              << joint->getMimicJoint()->getName()
+              << "] in the cloned Skeleton. Please report this as a bug!\n";
+      }
+    }
+  }
+
   return skelClone;
+}
+
+//==============================================================================
+MetaSkeletonPtr Skeleton::cloneMetaSkeleton(const std::string& cloneName) const
+{
+  return cloneSkeleton(cloneName);
 }
 
 //==============================================================================
@@ -914,6 +960,14 @@ std::vector<const BodyNode*> Skeleton::getBodyNodes(
 }
 
 //==============================================================================
+bool Skeleton::hasBodyNode(const BodyNode* bodyNode) const
+{
+  return std::find(
+      mSkelCache.mBodyNodes.begin(), mSkelCache.mBodyNodes.end(), bodyNode)
+      != mSkelCache.mBodyNodes.end();
+}
+
+//==============================================================================
 template <class ObjectT, std::size_t (ObjectT::*getIndexInSkeleton)() const>
 static std::size_t templatedGetIndexOf(const Skeleton* _skel, const ObjectT* _obj,
                                   const std::string& _type, bool _warning)
@@ -1056,6 +1110,18 @@ std::vector<const Joint*> Skeleton::getJoints(const std::string& name) const
     return {joint};
   else
     return std::vector<const Joint*>();
+}
+
+//==============================================================================
+bool Skeleton::hasJoint(const Joint* joint) const
+{
+  return std::find_if(
+      mSkelCache.mBodyNodes.begin(), mSkelCache.mBodyNodes.end(),
+      [&joint](const BodyNode* bodyNode)
+      {
+        return bodyNode->getParentJoint() == joint;
+      })
+      != mSkelCache.mBodyNodes.end();
 }
 
 //==============================================================================

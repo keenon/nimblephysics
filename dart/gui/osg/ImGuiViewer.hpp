@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2017, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -72,7 +72,7 @@ public:
 protected:
 
   /// ImGui handler.
-  ImGuiHandler* mImGuiHandler;
+  ::osg::ref_ptr<ImGuiHandler> mImGuiHandler;
 
   /// About widget.
   std::shared_ptr<AboutWidget> mAboutWidget;

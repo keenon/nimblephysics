@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2017, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -66,6 +66,7 @@ public:
   static constexpr ActuatorType FORCE        = detail::FORCE;
   static constexpr ActuatorType PASSIVE      = detail::PASSIVE;
   static constexpr ActuatorType SERVO        = detail::SERVO;
+  static constexpr ActuatorType MIMIC        = detail::MIMIC;
   static constexpr ActuatorType ACCELERATION = detail::ACCELERATION;
   static constexpr ActuatorType VELOCITY     = detail::VELOCITY;
   static constexpr ActuatorType LOCKED       = detail::LOCKED;
@@ -115,6 +116,7 @@ public:
   Joint& operator=(const Joint& _otherJoint);
 
   /// \brief Set joint name and return the name.
+  /// \param[in] _name The specified joint name to be set.
   /// \param[in] _renameDofs If true, the names of the joint's degrees of
   /// freedom will be updated by calling updateDegreeOfFreedomNames().
   ///
@@ -134,6 +136,18 @@ public:
 
   /// Get actuator type
   ActuatorType getActuatorType() const;
+
+  /// Set mimic joint
+  void setMimicJoint(const Joint* _mimicJoint, double _mimicMultiplier = 1.0, double _mimicOffset = 0.0);
+
+  /// Get mimic joint
+  const Joint* getMimicJoint() const;
+
+  /// Get mimic joint multiplier
+  double getMimicMultiplier() const;
+
+  /// Get mimic joint offset
+  double getMimicOffset() const;
 
   /// Return true if this joint is kinematic joint.
   ///
@@ -276,11 +290,23 @@ public:
   /// Get lower limit for position
   virtual double getPositionLowerLimit(std::size_t _index) const = 0;
 
+  /// Set the position lower limits of all the generalized coordinates.
+  virtual void setPositionLowerLimits(const Eigen::VectorXd& lowerLimits) = 0;
+
+  /// Get the position lower limits of all the generalized coordinates.
+  virtual Eigen::VectorXd getPositionLowerLimits() const = 0;
+
   /// Set upper limit for position
   virtual void setPositionUpperLimit(std::size_t _index, double _position) = 0;
 
   /// Get upper limit for position
   virtual double getPositionUpperLimit(std::size_t _index) const = 0;
+
+  /// Set the position upper limits of all the generalized coordinates.
+  virtual void setPositionUpperLimits(const Eigen::VectorXd& upperLimits) = 0;
+
+  /// Get the position upper limits of all the generalized coordinates.
+  virtual Eigen::VectorXd getPositionUpperLimits() const = 0;
 
   /// Get whether a generalized coordinate is cyclic. Return true if and only
   /// if this generalized coordinate has an infinite number of positions that
@@ -337,11 +363,23 @@ public:
   /// Get lower limit for velocity
   virtual double getVelocityLowerLimit(std::size_t _index) const = 0;
 
+  /// Set the velocity lower limits of all the generalized coordinates.
+  virtual void setVelocityLowerLimits(const Eigen::VectorXd& lowerLimits) = 0;
+
+  /// Get the velocity lower limits of all the generalized coordinates.
+  virtual Eigen::VectorXd getVelocityLowerLimits() const = 0;
+
   /// Set upper limit for velocity
   virtual void setVelocityUpperLimit(std::size_t _index, double _velocity) = 0;
 
   /// Get upper limit for velocity
   virtual double getVelocityUpperLimit(std::size_t _index) const = 0;
+
+  /// Set the velocity upper limits of all the generalized coordinates.
+  virtual void setVelocityUpperLimits(const Eigen::VectorXd& upperLimits) = 0;
+
+  /// Get the velocity upper limits of all the generalized coordinates.
+  virtual Eigen::VectorXd getVelocityUpperLimits() const = 0;
 
   /// Set the velocity of a generalized coordinate in this Joint to its initial
   /// velocity
@@ -392,11 +430,23 @@ public:
   /// Get lower limit for acceleration
   virtual double getAccelerationLowerLimit(std::size_t _index) const = 0;
 
+  /// Set the acceleration upper limits of all the generalized coordinates.
+  virtual void setAccelerationLowerLimits(const Eigen::VectorXd& lowerLimits) = 0;
+
+  /// Get the acceleration upper limits of all the generalized coordinates.
+  virtual Eigen::VectorXd getAccelerationLowerLimits() const = 0;
+
   /// Set upper limit for acceleration
   virtual void setAccelerationUpperLimit(std::size_t _index, double _acceleration) = 0;
 
   /// Get upper limit for acceleration
   virtual double getAccelerationUpperLimit(std::size_t _index) const = 0;
+
+  /// Set the acceleration upper limits of all the generalized coordinates.
+  virtual void setAccelerationUpperLimits(const Eigen::VectorXd& upperLimits) = 0;
+
+  /// Get the acceleration upper limits of all the generalized coordinates.
+  virtual Eigen::VectorXd getAccelerationUpperLimits() const = 0;
 
   /// \}
 
@@ -408,7 +458,7 @@ public:
   virtual void setForce(std::size_t _index, double _force) = 0;
 
   /// Get the force of a single generalized coordinate
-  virtual double getForce(std::size_t _index) = 0;
+  virtual double getForce(std::size_t _index) const = 0;
 
   /// Set the forces of all generalized coordinates in this Joint
   virtual void setForces(const Eigen::VectorXd& _forces) = 0;
@@ -425,11 +475,23 @@ public:
   /// Get lower limit for force
   virtual double getForceLowerLimit(std::size_t _index) const = 0;
 
+  /// Set the force upper limits of all the generalized coordinates.
+  virtual void setForceLowerLimits(const Eigen::VectorXd& lowerLimits) = 0;
+
+  /// Get the force upper limits of all the generalized coordinates.
+  virtual Eigen::VectorXd getForceLowerLimits() const = 0;
+
   /// Set upper limit for force
   virtual void setForceUpperLimit(std::size_t _index, double _force) = 0;
 
   /// Get upper limit for force
   virtual double getForceUpperLimit(std::size_t _index) const = 0;
+
+  /// Set the force upper limits of all the generalized coordinates.
+  virtual void setForceUpperLimits(const Eigen::VectorXd& upperLimits) = 0;
+
+  /// Get the force upper limits of all the generalized coordinates.
+  virtual Eigen::VectorXd getForceUpperLimits() const = 0;
 
   /// \}
 
@@ -583,7 +645,7 @@ public:
   /// BodyNode expressed in the child BodyNode frame
   const Eigen::Vector6d& getRelativeSpatialAcceleration() const;
 
-  /// Get J * \ddot{q} of this joint
+  /// Get J * \f$ \ddot{q} \f$ of this joint
   const Eigen::Vector6d& getRelativePrimaryAcceleration() const;
 
   /// Get spatial Jacobian of the child BodyNode relative to the parent BodyNode
@@ -679,7 +741,6 @@ protected:
   virtual void registerDofs() = 0;
 
   /// \brief Create a DegreeOfFreedom pointer.
-  /// \param[in] _name DegreeOfFreedom's name.
   /// \param[in] _indexInJoint DegreeOfFreedom's index within the joint. Note
   /// that the index should be unique within the joint.
   ///
@@ -732,7 +793,7 @@ protected:
   /// BodyNode expressed in the child BodyNode frame
   virtual void updateRelativeSpatialAcceleration() const = 0;
 
-  /// Update J * \ddot{q} of this joint
+  /// Update J * \f$ \ddot{q} \f$ of this joint
   virtual void updateRelativePrimaryAcceleration() const = 0;
 
   /// Update spatial Jacobian of the child BodyNode relative to the parent
@@ -829,6 +890,9 @@ protected:
   /// \param[in] _bodyForce Transmitting spatial body force from the parent
   /// BodyNode to the child BodyNode. The spatial force is expressed in the
   /// child BodyNode's frame.
+  /// \param[in] _timeStep
+  /// \param[in] _withDampingForces
+  /// \param[in] _withSpringForces
   virtual void updateForceID(const Eigen::Vector6d& _bodyForce,
                              double _timeStep,
                              bool _withDampingForces,
@@ -838,9 +902,12 @@ protected:
   /// \param[in] _bodyForce Transmitting spatial body force from the parent
   /// BodyNode to the child BodyNode. The spatial force is expressed in the
   /// child BodyNode's frame.
+  /// \param[in] _timeStep
+  /// \param[in] _withDampingForces
+  /// \param[in] _withSpringForces
   virtual void updateForceFD(const Eigen::Vector6d& _bodyForce,
                              double _timeStep,
-                             bool _withDampingForcese,
+                             bool _withDampingForces,
                              bool _withSpringForces) = 0;
 
   /// Update joint impulses for inverse dynamics

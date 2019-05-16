@@ -16,15 +16,10 @@ set(
   dart/dart.hpp
   fcl/fcl.hpp
 )
-dart_generate_include_header_list(
-  collision_headers
+dart_generate_include_header_file(
+  "${CMAKE_CURRENT_BINARY_DIR}/collision.hpp"
   "dart/collision/"
-  "collision headers"
   ${header_names}
-)
-configure_file(
-  ${CMAKE_CURRENT_SOURCE_DIR}/collision.hpp.in
-  ${CMAKE_CURRENT_BINARY_DIR}/collision.hpp
 )
 
 # Install
@@ -44,3 +39,11 @@ add_subdirectory(dart)
 add_subdirectory(fcl)
 add_subdirectory(ode)
 add_subdirectory(bullet)
+
+dart_format_add(
+  RaycastOption.hpp
+  RaycastOption.cpp
+  RaycastResult.hpp
+  RaycastResult.cpp
+  SmartPointer.hpp
+)

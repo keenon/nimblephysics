@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2017, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -41,7 +41,6 @@
 #include <typeindex>
 
 #include "dart/common/Aspect.hpp"
-#include "dart/math/MathTypes.hpp"
 
 namespace dart {
 namespace common {

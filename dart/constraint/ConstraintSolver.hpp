@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2017, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -39,6 +39,7 @@
 
 #include "dart/common/Deprecated.hpp"
 #include "dart/constraint/SmartPointer.hpp"
+#include "dart/constraint/ConstrainedGroup.hpp"
 #include "dart/constraint/ConstraintBase.hpp"
 #include "dart/collision/CollisionDetector.hpp"
 
@@ -56,21 +57,36 @@ class ConstraintSolver
 {
 public:
   /// Constructor
+  ///
+  /// \deprecated Deprecated in DART 6.8. Please use other constructors that
+  /// doesn't take timespte. Timestep should be set by the owner of this solver
+  /// such as dart::simulation::World when the solver added.
+  DART_DEPRECATED(6.8)
   explicit ConstraintSolver(double timeStep);
+
+  // TODO(JS): Remove timeStep. The timestep can be set by world when a
+  // constraint solver is assigned to a world.
+  // Deprecate
+
+  /// Default constructor
+  ConstraintSolver();
 
   /// Copy constructor
   // TODO: implement copy constructor since this class contains a pointer to
   // allocated memory.
-  ConstraintSolver(const ConstraintSolver& _other) = delete;
+  ConstraintSolver(const ConstraintSolver& other) = delete;
 
   /// Destructor
-  virtual ~ConstraintSolver();
+  virtual ~ConstraintSolver() = default;
 
   /// Add single skeleton
   void addSkeleton(const dynamics::SkeletonPtr& skeleton);
 
   /// Add mutiple skeletons
   void addSkeletons(const std::vector<dynamics::SkeletonPtr>& skeletons);
+
+  /// Returns all the skeletons added to this ConstraintSolver.
+  const std::vector<dynamics::SkeletonPtr>& getSkeletons() const;
 
   /// Remove single skeleton
   void removeSkeleton(const dynamics::SkeletonPtr& skeleton);
@@ -82,19 +98,34 @@ public:
   void removeAllSkeletons();
 
   /// Add a constraint
-  void addConstraint(const ConstraintBasePtr& _constraint);
+  void addConstraint(const ConstraintBasePtr& constraint);
 
   /// Remove a constraint
-  void removeConstraint(const ConstraintBasePtr& _constraint);
+  void removeConstraint(const ConstraintBasePtr& constraint);
 
   /// Remove all constraints
   void removeAllConstraints();
+
+  /// Returns the number of constraints that was manually added to this ConstraintSolver.
+  std::size_t getNumConstraints() const;
+
+  /// Returns a constraint by index.
+  constraint::ConstraintBasePtr getConstraint(std::size_t index);
+
+  /// Returns a constraint by index.
+  constraint::ConstConstraintBasePtr getConstraint(std::size_t index) const;
+
+  /// Returns all the constraints added to this ConstraintSolver.
+  std::vector<constraint::ConstraintBasePtr> getConstraints();
+
+  /// Returns all the constraints added to this ConstraintSolver.
+  std::vector<constraint::ConstConstraintBasePtr> getConstraints() const;
 
   /// Clears the last collision result
   void clearLastCollisionResult();
 
   /// Set time step
-  void setTimeStep(double _timeStep);
+  virtual void setTimeStep(double _timeStep);
 
   /// Get time step
   double getTimeStep() const;
@@ -138,26 +169,35 @@ public:
   const collision::CollisionResult& getLastCollisionResult() const;
 
   /// Set LCP solver
-  void setLCPSolver(std::unique_ptr<LCPSolver> _lcpSolver);
+  DART_DEPRECATED(6.7)
+  void setLCPSolver(std::unique_ptr<LCPSolver> lcpSolver);
 
   /// Get LCP solver
+  DART_DEPRECATED(6.7)
   LCPSolver* getLCPSolver() const;
 
   /// Solve constraint impulses and apply them to the skeletons
   void solve();
 
-private:
+  /// Sets this constraint solver using other constraint solver. All the
+  /// properties and registered skeletons and constraints will be copied over.
+  virtual void setFromOtherConstraintSolver(const ConstraintSolver& other);
+
+protected:
+  // TODO(JS): Docstring
+  virtual void solveConstrainedGroup(ConstrainedGroup& group) = 0;
+
   /// Check if the skeleton is contained in this solver
-  bool containSkeleton(const dynamics::ConstSkeletonPtr& _skeleton) const;
+  bool containSkeleton(const dynamics::ConstSkeletonPtr& skeleton) const;
 
   /// Add skeleton if the constraint is not contained in this solver
-  bool checkAndAddSkeleton(const dynamics::SkeletonPtr& _skeleton);
+  bool checkAndAddSkeleton(const dynamics::SkeletonPtr& skeleton);
 
   /// Check if the constraint is contained in this solver
-  bool containConstraint(const ConstConstraintBasePtr& _constraint) const;
+  bool containConstraint(const ConstConstraintBasePtr& constraint) const;
 
   /// Add constraint if the constraint is not contained in this solver
-  bool checkAndAddConstraint(const ConstraintBasePtr& _constraint);
+  bool checkAndAddConstraint(const ConstraintBasePtr& constraint);
 
   /// Update constraints
   void updateConstraints();
@@ -169,7 +209,7 @@ private:
   void solveConstrainedGroups();
 
   /// Return true if at least one of colliding body is soft body
-  bool isSoftContact(const collision::Contact& _contact) const;
+  bool isSoftContact(const collision::Contact& contact) const;
 
   using CollisionDetector = collision::CollisionDetector;
 
@@ -188,9 +228,6 @@ private:
   /// Time step
   double mTimeStep;
 
-  /// LCP solver
-  std::unique_ptr<LCPSolver> mLCPSolver;
-
   /// Skeleton list
   std::vector<dynamics::SkeletonPtr> mSkeletons;
 
@@ -205,6 +242,9 @@ private:
 
   /// Servo motor constraints those are automatically created
   std::vector<ServoMotorConstraintPtr> mServoMotorConstraints;
+
+  /// Mimic motor constraints those are automatically created
+  std::vector<MimicMotorConstraintPtr> mMimicMotorConstraints;
 
   /// Joint Coulomb friction constraints those are automatically created
   std::vector<JointCoulombFrictionConstraintPtr> mJointCoulombFrictionConstraints;

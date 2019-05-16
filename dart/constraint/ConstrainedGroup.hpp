@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2017, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -78,7 +78,10 @@ public:
   std::size_t getNumConstraints() const;
 
   /// Return a constraint
-  ConstraintBasePtr getConstraint(std::size_t _index) const;
+  ConstraintBasePtr getConstraint(std::size_t _index);
+
+  /// Return a constraint
+  ConstConstraintBasePtr getConstraint(std::size_t _index) const;
 
   /// Remove constraint
   void removeConstraint(const ConstraintBasePtr& _constraint);

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2017, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -50,11 +50,13 @@ namespace constraint {
 //==============================================================================
 DantzigLCPSolver::DantzigLCPSolver(double _timestep) : LCPSolver(_timestep)
 {
+  // Do nothing
 }
 
 //==============================================================================
 DantzigLCPSolver::~DantzigLCPSolver()
 {
+  // Do nothing
 }
 
 //==============================================================================

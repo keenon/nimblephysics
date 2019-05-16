@@ -1,14 +1,15 @@
 #===============================================================================
 # CMake settings
 #===============================================================================
-# CMake 2.8.12 or above is required for CMakeParseArguments.
 if(MSVC)
   cmake_minimum_required(VERSION 3.8.0)
 else()
-  cmake_minimum_required(VERSION 2.8.12)
+  cmake_minimum_required(VERSION 3.5.1)
 endif()
 
 project(dart)
+
+string(TOUPPER ${PROJECT_NAME} PROJECT_NAME_UPPERCASE)
 
 # Use MACOSX_RPATH by default on OS X. This was added in CMake 2.8.12 and
 # became default in CMake 3.0. Explicitly setting this policy is necessary to
@@ -24,14 +25,18 @@ if(POLICY CMP0053)
   cmake_policy(SET CMP0053 NEW)
 endif()
 
+include(GNUInstallDirs)
+
 # Variables used in Components.cmake
-set(INCLUDE_INSTALL_DIR "include")
-set(LIBRARY_INSTALL_DIR "lib")
-set(CONFIG_INSTALL_DIR "share/${PROJECT_NAME}/cmake")
+set(INCLUDE_INSTALL_DIR ${CMAKE_INSTALL_INCLUDEDIR})
+set(LIBRARY_INSTALL_DIR ${CMAKE_INSTALL_LIBDIR})
+set(CONFIG_INSTALL_DIR "${CMAKE_INSTALL_DATAROOTDIR}/${PROJECT_NAME}/cmake")
 
 # Set relative location to install additional documentation (sample data,
 # examples, and tutorials)
-set(DART_ADDITIONAL_DOCUMENTATION_INSTALL_PATH "share/doc/${PROJECT_NAME}")
+set(DART_ADDITIONAL_DOCUMENTATION_INSTALL_PATH
+  "${CMAKE_INSTALL_DATAROOTDIR}/doc/${PROJECT_NAME}"
+)
 
 set(CMAKE_DEBUG_POSTFIX "d")
 set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
@@ -55,7 +60,7 @@ endif()
 
 # If you change the version, please update the <version> tag in package.xml.
 set(DART_MAJOR_VERSION "6")
-set(DART_MINOR_VERSION "4")
+set(DART_MINOR_VERSION "9")
 set(DART_PATCH_VERSION "0")
 set(DART_VERSION "${DART_MAJOR_VERSION}.${DART_MINOR_VERSION}.${DART_PATCH_VERSION}")
 set(DART_PKG_DESC "Dynamic Animation and Robotics Toolkit.")
@@ -83,8 +88,15 @@ endif()
 option(DART_ENABLE_SIMD
   "Build DART with all SIMD instructions on the current local machine" OFF)
 option(DART_BUILD_GUI_OSG "Build osgDart library" ON)
+option(DART_BUILD_EXTRAS "Build extra projects" OFF)
 option(DART_CODECOV "Turn on codecov support" OFF)
 option(DART_TREAT_WARNINGS_AS_ERRORS "Treat warnings as errors" OFF)
+option(DART_FAST_DEBUG "Add -O1 option for DEBUG mode build" OFF)
+option(DART_BUILD_DARTPY "Build dartpy (the python binding)" OFF)
+
+if(DART_BUILD_DARTPY)
+  set(BUILD_SHARED_LIBS OFF)
+endif()
 
 #===============================================================================
 # Print intro
@@ -127,19 +139,13 @@ elseif("${CMAKE_BUILD_TYPE_UPPERCASE}" STREQUAL "RELWITHDEBINFO")
 elseif("${CMAKE_BUILD_TYPE_UPPERCASE}" STREQUAL "MINSIZEREL")
   set(BUILD_TYPE_MINSIZEREL TRUE)
 else()
-  build_error("CMAKE_BUILD_TYPE ${CMAKE_BUILD_TYPE} unknown. Valid options are: Debug | Release | RelWithDebInfo | MinSizeRel")
+  message(STATUS "CMAKE_BUILD_TYPE ${CMAKE_BUILD_TYPE} unknown. Valid options are: Debug | Release | RelWithDebInfo | MinSizeRel")
 endif()
 
 #===============================================================================
 # Find dependencies
 #===============================================================================
 include(DARTFindDependencies)
-
-#===============================================================================
-# Include directories
-#===============================================================================
-include_directories(BEFORE ${PROJECT_SOURCE_DIR})
-include_directories("${CMAKE_BINARY_DIR}")
 
 #===============================================================================
 # Check for non-case-sensitive filesystems
@@ -157,14 +163,14 @@ endif()
 #===============================================================================
 if(MSVC)
 
-  # Visual Studio enables c++11 support by default
+  # Visual Studio enables C++14 support by default
   if(MSVC_VERSION VERSION_LESS 1900)
     message(FATAL_ERROR "${PROJECT_NAME} requires VS2017 or greater.")
   endif()
   if(DART_TREAT_WARNINGS_AS_ERRORS)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /WX")
   endif()
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHsc /permissive-")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHsc /permissive- /Zc:twoPhase-")
   #set(CMAKE_EXE_LINKER_FLAGS_RELEASE "/LTCG /INCREMENTAL:NO")
   if(NOT DART_MSVC_DEFAULT_OPTIONS)
     set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} ${DART_RUNTIME_LIBRARY}d /Zi /Gy /W1 /EHsc")
@@ -180,6 +186,9 @@ if(MSVC)
   add_compile_options(/wd4305)
   add_compile_options(/wd4838)
   add_compile_options(/bigobj)
+  if(MSVC_VERSION GREATER_EQUAL 1915)
+    add_compile_definitions(_ENABLE_EXTENDED_ALIGNED_STORAGE)
+  endif()
 
 elseif(CMAKE_COMPILER_IS_GNUCXX)
 
@@ -188,20 +197,21 @@ elseif(CMAKE_COMPILER_IS_GNUCXX)
   endif()
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -fPIC")
   execute_process(
-    COMMAND ${CMAKE_CXX_COMPILER} -dumpversion OUTPUT_VARIABLE GCC_VERSION)
+    COMMAND ${CMAKE_CXX_COMPILER} -dumpfullversion -dumpversion OUTPUT_VARIABLE GCC_VERSION)
   set(CXX_COMPILER_VERSION ${GCC_VERSION})
-  if(GCC_VERSION VERSION_LESS 4.8)
-    message(FATAL_ERROR "The installed g++ version is ${GCC_VERSION}. ${PROJECT_NAME} requires g++ 4.8 or greater.")
-  else()
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+  if(GCC_VERSION VERSION_LESS 5.3.1)
+    message(FATAL_ERROR "The installed g++ version is ${GCC_VERSION}. ${PROJECT_NAME} requires g++ 5.3.1 or greater.")
   endif()
   set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")
   set(CMAKE_CXX_FLAGS_DEBUG "-g -fno-omit-frame-pointer -fno-inline-functions -fno-inline-functions-called-once -fno-optimize-sibling-calls")
+  if(DART_FAST_DEBUG)
+    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O1")
+  endif()
   set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELEASE} ${CMAKE_CXX_FLAGS_DEBUG}")
   set(CMAKE_CXX_FLAGS_PROFILE "${CMAKE_CXX_FLAGS_DEBUG} -pg")
   set(CMAKE_SHARED_LINKER_FLAGS "-Wl,--no-undefined")
 
-elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+elseif("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
 
   if(DART_TREAT_WARNINGS_AS_ERRORS)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror -Wno-error=deprecated-declarations")
@@ -212,18 +222,20 @@ elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
   execute_process(
     COMMAND ${CMAKE_CXX_COMPILER} -dumpversion OUTPUT_VARIABLE CLANG_VERSION)
   set(CXX_COMPILER_VERSION ${CLANG_VERSION})
-  if(CLANG_VERSION VERSION_LESS 3.3)
-    message(FATAL_ERROR "The installed Clang version is ${CLANG_VERSION}. ${PROJECT_NAME} requires clang 3.3 or greater.")
-  else()
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+  if(CLANG_VERSION VERSION_LESS 3.8)
+    message(FATAL_ERROR "The installed Clang version is ${CLANG_VERSION}. ${PROJECT_NAME} requires clang 3.8 or greater.")
   endif()
   if("${CMAKE_SYSTEM_NAME}" MATCHES "Darwin")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++")
   endif()
   set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")
   set(CMAKE_CXX_FLAGS_DEBUG "-g -fno-omit-frame-pointer -fno-inline-functions -fno-optimize-sibling-calls")
+  if(DART_FAST_DEBUG)
+    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O1")
+  endif()
   set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELEASE} ${CMAKE_CXX_FLAGS_DEBUG}")
   set(CMAKE_CXX_FLAGS_PROFILE "${CMAKE_CXX_FLAGS_DEBUG} -pg")
+  set(CMAKE_OSX_DEPLOYMENT_TARGET "10.8")
 
 else()
 
@@ -265,99 +277,66 @@ endif(DART_VERBOSE)
 
 add_subdirectory(dart)
 
+set(DART_IN_SOURCE_BUILD TRUE)
+
 if(TARGET dart)
 
   # Add a "tests" target to build unit tests.
   enable_testing()
-  add_subdirectory(unittests EXCLUDE_FROM_ALL)
-
-  if (TARGET dart-utils-urdf AND TARGET dart-gui)
-
-    # Add example targets
-    dart_add_example(examples/addDeleteSkels dart dart-utils-urdf dart-gui)
-    dart_add_example(examples/atlasSimbicon dart dart-utils-urdf dart-gui)
-    dart_add_example(examples/bipedStand dart dart-utils-urdf dart-gui)
-    dart_add_example(examples/hardcodedDesign dart dart-utils-urdf dart-gui)
-    dart_add_example(examples/hybridDynamics dart dart-utils-urdf dart-gui)
-    dart_add_example(examples/jointConstraints dart dart-utils-urdf dart-gui)
-    dart_add_example(examples/mixedChain dart dart-utils-urdf dart-gui)
-    dart_add_example(examples/operationalSpaceControl dart dart-utils-urdf dart-gui)
-    dart_add_example(examples/rigidChain dart dart-utils-urdf dart-gui)
-    dart_add_example(examples/rigidCubes dart dart-utils-urdf dart-gui)
-    dart_add_example(examples/rigidLoop dart dart-utils-urdf dart-gui)
-    dart_add_example(examples/rigidShapes dart dart-utils-urdf dart-gui)
-    dart_add_example(examples/simpleFrames dart dart-utils-urdf dart-gui)
-    dart_add_example(examples/softBodies dart dart-utils-urdf dart-gui)
-    dart_add_example(examples/speedTest dart dart-utils-urdf dart-gui)
-    dart_add_example(examples/vehicle dart dart-utils-urdf dart-gui)
-
-    if(TARGET dart-gui-osg)
-      dart_add_example(examples/osgExamples/osgAtlasPuppet dart dart-utils-urdf dart-gui-osg)
-      dart_add_example(examples/osgExamples/osgAtlasSimbicon dart dart-utils-urdf dart-gui-osg)
-      dart_add_example(examples/osgExamples/osgDragAndDrop dart dart-utils-urdf dart-gui-osg)
-      dart_add_example(examples/osgExamples/osgEmpty dart dart-utils-urdf dart-gui-osg)
-      dart_add_example(examples/osgExamples/osgHuboPuppet dart dart-utils-urdf dart-gui-osg)
-      dart_add_example(examples/osgExamples/osgImGui dart dart-utils-urdf dart-gui-osg)
-      dart_add_example(examples/osgExamples/osgOperationalSpaceControl dart dart-utils-urdf dart-gui-osg)
-      dart_add_example(examples/osgExamples/osgSoftBodies dart dart-utils-urdf dart-gui-osg)
-      dart_add_example(examples/osgExamples/osgTinkertoy dart dart-utils-urdf dart-gui-osg)
-
-      add_library(example_wamIk examples/osgExamples/osgWamIkFast/ikfast/ikfast71.Transform6D.4_6_9_10_11_12_f8.cpp)
-      target_link_libraries(example_wamIk PUBLIC dart)
-      target_compile_definitions(example_wamIk PUBLIC IKFAST_NO_MAIN IKFAST_CLIBRARY)
-      target_compile_options(example_wamIk PRIVATE -w)
-
-      dart_add_example(examples/osgExamples/osgWamIkFast dart dart-utils-urdf dart-gui-osg example_wamIk)
-    endif()
-
-    # Add an "examples" target to build examples.
-    get_property(examples GLOBAL PROPERTY DART_EXAMPLES)
-    add_custom_target(examples DEPENDS ${examples})
-
-    if(DART_VERBOSE)
-      message(STATUS "")
-      message(STATUS "[ Examples ]")
-      foreach(example ${examples})
-        message(STATUS "Adding example: ${example}")
-      endforeach(example ${examples})
-    else(DART_VERBOSE)
-      list(LENGTH examples examples_length)
-      message(STATUS "Adding ${examples_length} examples")
-    endif(DART_VERBOSE)
-
-    # Add tutorial targets
-    if(TARGET dart-collision-bullet)
-      dart_add_tutorial(tutorials/tutorialBiped dart-utils-urdf dart-gui dart-collision-bullet)
-      dart_add_tutorial(tutorials/tutorialBiped-Finished dart-utils-urdf dart-gui dart-collision-bullet)
-    else()
-      dart_add_tutorial(tutorials/tutorialBiped dart-utils-urdf dart-gui)
-      dart_add_tutorial(tutorials/tutorialBiped-Finished dart-utils-urdf dart-gui)
-    endif()
-
-    dart_add_tutorial(tutorials/tutorialCollisions dart-utils-urdf dart-gui)
-    dart_add_tutorial(tutorials/tutorialCollisions-Finished dart-utils-urdf dart-gui)
-    dart_add_tutorial(tutorials/tutorialDominoes dart-utils-urdf dart-gui)
-    dart_add_tutorial(tutorials/tutorialDominoes-Finished dart-utils-urdf dart-gui)
-    dart_add_tutorial(tutorials/tutorialMultiPendulum dart-utils-urdf dart-gui)
-    dart_add_tutorial(tutorials/tutorialMultiPendulum-Finished dart-utils-urdf dart-gui)
-
-    # Add a "tutorials" target to build tutorials.
-    get_property(tutorials GLOBAL PROPERTY DART_TUTORIALS)
-    add_custom_target(tutorials DEPENDS ${tutorials})
-
-    if(DART_VERBOSE)
-      message(STATUS "")
-      message(STATUS "[ Tutorials ]")
-      foreach(tutorial ${tutorials})
-        message(STATUS "Adding tutorial: ${tutorial}")
-      endforeach(tutorial ${tutorials})
-    else(DART_VERBOSE)
-      list(LENGTH tutorials tutorials_length)
-      message(STATUS "Adding ${tutorials_length} tutorials")
-    endif(DART_VERBOSE)
-
+  if(MSVC)
+    # add_subdirectory(unittests)
+  else()
+    add_subdirectory(unittests EXCLUDE_FROM_ALL)
   endif()
 
+  # Add example subdirectories and an "examples" target.
+  if(MSVC)
+    # add_subdirectory(examples)
+  else()
+    add_subdirectory(examples EXCLUDE_FROM_ALL)
+    get_property(examples GLOBAL PROPERTY DART_EXAMPLES)
+    add_custom_target(examples DEPENDS ${examples})
+  endif()
+
+  if(DART_VERBOSE)
+    message(STATUS "")
+    message(STATUS "[ Examples ]")
+    foreach(example ${examples})
+      message(STATUS "Adding example: ${example}")
+    endforeach(example ${examples})
+  else(DART_VERBOSE)
+    list(LENGTH examples examples_length)
+    message(STATUS "Adding ${examples_length} examples")
+  endif(DART_VERBOSE)
+
+  # Add a "tutorials" target to build tutorials.
+  if(MSVC)
+    # add_subdirectory(tutorials)
+  else()
+    add_subdirectory(tutorials EXCLUDE_FROM_ALL)
+    get_property(tutorials GLOBAL PROPERTY DART_TUTORIALS)
+    add_custom_target(tutorials DEPENDS ${tutorials})
+  endif()
+
+  if(DART_VERBOSE)
+    message(STATUS "")
+    message(STATUS "[ Tutorials ]")
+    foreach(tutorial ${tutorials})
+      message(STATUS "Adding tutorial: ${tutorial}")
+    endforeach(tutorial ${tutorials})
+  else(DART_VERBOSE)
+    list(LENGTH tutorials tutorials_length)
+    message(STATUS "Adding ${tutorials_length} tutorials")
+  endif(DART_VERBOSE)
+
+endif()
+
+if (DART_BUILD_DARTPY)
+  add_subdirectory(python)
+endif()
+
+if(DART_BUILD_EXTRAS)
+  add_subdirectory(extras)
 endif()
 
 #===============================================================================
@@ -377,8 +356,6 @@ if(DART_VERBOSE)
   message(STATUS "")
   message(STATUS "[ Configured files ]")
 endif()
-
-string(TOUPPER ${PROJECT_NAME} PROJECT_NAME_UPPERCASE)
 
 # Generate and install a Config.cmake file. This file includes the
 # <C>Component.cmake and <C>Targets.cmake created above. It also uses the
@@ -420,10 +397,12 @@ if(DART_VERBOSE)
   message(STATUS ${PC_CONFIG_OUT})
 endif()
 configure_file(${PC_CONFIG_IN} ${PC_CONFIG_OUT} @ONLY)
-install(FILES ${PC_CONFIG_OUT} DESTINATION lib/pkgconfig)
+install(FILES ${PC_CONFIG_OUT} DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
 
 # Install a Catkin 'package.xml' file. This is required by REP-136.
-install(FILES package.xml DESTINATION share/${PROJECT_NAME})
+install(FILES package.xml DESTINATION
+  ${CMAKE_INSTALL_DATAROOTDIR}/${PROJECT_NAME}
+)
 
 #===============================================================================
 # Install sample data, examples, and tutorials
@@ -460,18 +439,19 @@ endif()
 
 find_program(
   CLANG_FORMAT_EXECUTABLE
-  NAMES clang-format clang-format-3.8
+  NAMES clang-format-6.0
 )
 
 get_property(formatting_files GLOBAL PROPERTY DART_FORMAT_FILES)
 list(LENGTH formatting_files formatting_files_length)
-message(STATUS "Formatting ${formatting_files_length} source files using clang-format.")
 
 if(CLANG_FORMAT_EXECUTABLE)
 
   if(DART_VERBOSE)
     message(STATUS "Looking for clang-format - found")
   endif()
+
+  message(STATUS "Formatting on ${formatting_files_length} source files.")
 
   if(formatting_files)
     add_custom_target(format
@@ -497,7 +477,9 @@ if(CLANG_FORMAT_EXECUTABLE)
 
 else()
 
-  message(STATUS "Looking for clang-format - NOT found, please install clang-format to enable automatic code formatting")
+  if(DART_VERBOSE)
+    message(STATUS "Looking for clang-format - NOT found, please install clang-format to enable automatic code formatting")
+  endif()
 
 endif()
 
@@ -511,8 +493,8 @@ if(DOXYGEN_FOUND)
 
   set(DOXYGEN_DOXYFILE_IN      "${PROJECT_SOURCE_DIR}/doxygen/Doxyfile.in"    )
   set(DOXYGEN_DOXYFILE         "${PROJECT_BINARY_DIR}/doxygen/Doxyfile"       )
-  set(DOXYGEN_HTML_INDEX       "${PROJECT_SOURCE_DIR}/doxygen/html/index.html")
-  set(DOXYGEN_OUTPUT_ROOT      "${PROJECT_SOURCE_DIR}/doxygen/html"           )
+  set(DOXYGEN_HTML_INDEX       "${PROJECT_BINARY_DIR}/doxygen/html/index.html")
+  set(DOXYGEN_OUTPUT_ROOT      "${PROJECT_BINARY_DIR}/doxygen/html"           )
   set(DOXYGEN_GENERATE_TAGFILE "${DOXYGEN_OUTPUT_ROOT}/${PROJECT_NAME}.tag"   )
   set(DOXYGEN_INCLUDE_PATH     "${PROJECT_SOURCE_DIR}"                        )
   set(DOXYGEN_INPUT_ROOT       "${PROJECT_SOURCE_DIR}/dart"                   )

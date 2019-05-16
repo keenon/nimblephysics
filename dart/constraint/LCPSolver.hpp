@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2017, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -38,6 +38,8 @@ namespace constraint {
 
 class ConstrainedGroup;
 
+/// \deprecated This header has been deprecated in DART 6.7.
+///
 /// LCPSolver
 class LCPSolver
 {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2017, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -38,21 +38,30 @@
 namespace dart {
 namespace constraint {
 
-DART_COMMON_MAKE_SHARED_WEAK(ConstrainedGroup)
-DART_COMMON_MAKE_SHARED_WEAK(ConstraintBase)
-DART_COMMON_MAKE_SHARED_WEAK(ClosedLoopConstraint)
-DART_COMMON_MAKE_SHARED_WEAK(ContactConstraint)
-DART_COMMON_MAKE_SHARED_WEAK(SoftContactConstraint)
-DART_COMMON_MAKE_SHARED_WEAK(JointLimitConstraint)
-DART_COMMON_MAKE_SHARED_WEAK(ServoMotorConstraint)
-DART_COMMON_MAKE_SHARED_WEAK(JointCoulombFrictionConstraint)
-DART_COMMON_MAKE_SHARED_WEAK(JointConstraint)
-DART_COMMON_MAKE_SHARED_WEAK(LCPSolver)
+DART_COMMON_DECLARE_SMART_POINTERS(ConstraintSolver)
 
-DART_COMMON_MAKE_SHARED_WEAK(BallJointConstraint)
-DART_COMMON_MAKE_SHARED_WEAK(WeldJointConstraint)
+DART_COMMON_DECLARE_SHARED_WEAK(ConstrainedGroup)
 
-DART_COMMON_MAKE_SHARED_WEAK(BalanceConstraint)
+DART_COMMON_DECLARE_SHARED_WEAK(ConstraintBase)
+DART_COMMON_DECLARE_SHARED_WEAK(ClosedLoopConstraint)
+DART_COMMON_DECLARE_SHARED_WEAK(ContactConstraint)
+DART_COMMON_DECLARE_SHARED_WEAK(SoftContactConstraint)
+DART_COMMON_DECLARE_SHARED_WEAK(JointLimitConstraint)
+DART_COMMON_DECLARE_SHARED_WEAK(ServoMotorConstraint)
+DART_COMMON_DECLARE_SHARED_WEAK(MimicMotorConstraint)
+DART_COMMON_DECLARE_SHARED_WEAK(JointCoulombFrictionConstraint)
+
+DART_COMMON_DECLARE_SHARED_WEAK(LCPSolver)
+DART_COMMON_DECLARE_SHARED_WEAK(BoxedLcpSolver)
+DART_COMMON_DECLARE_SHARED_WEAK(PgsBoxedLcpSolver)
+DART_COMMON_DECLARE_SHARED_WEAK(PsorBoxedLcpSolver)
+DART_COMMON_DECLARE_SHARED_WEAK(JacobiBoxedLcpSolver)
+
+DART_COMMON_DECLARE_SHARED_WEAK(JointConstraint)
+DART_COMMON_DECLARE_SHARED_WEAK(BallJointConstraint)
+DART_COMMON_DECLARE_SHARED_WEAK(WeldJointConstraint)
+
+DART_COMMON_DECLARE_SHARED_WEAK(BalanceConstraint)
 
 } // namespace constraint
 } // namespace dart

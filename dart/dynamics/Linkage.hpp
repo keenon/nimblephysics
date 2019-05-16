@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2017, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -59,7 +59,8 @@ public:
   {
     /// The ExpansionPolicy indicates how the collection of BodyNodes should
     /// expand from the starting BodyNode (mStart)
-    enum ExpansionPolicy {
+    enum ExpansionPolicy
+    {
       INCLUDE = 0,  ///< Do not expand from the target. Include everything up to the target and then stop.
       EXCLUDE,      ///< Do not expand from the target. Include everything up to the target, but NOT the target, and then stop.
       DOWNSTREAM,   ///< Include the target, and then expand downstream, toward the leaves of the tree.
@@ -126,6 +127,26 @@ public:
     /// entry in mTargets) will be halted if it reaches any entry in mTerminal
     std::vector<Terminal> mTerminals;
 
+    /// Constructs an empty criteria that will lead to creating an empty Linkage
+    Criteria() = default;
+
+    /// Utility constructor to create a contiguous sequence of BodyNodes that
+    /// doesn't include branches in it.
+    ///
+    /// The start and target can be interchangeably set if both are included in
+    /// the sequence.
+    ///
+    /// \param[in] start The first BodyNode in the sequence. If \c nullptr is
+    /// passed the sequence will expand from \c target to the root.
+    /// \param[in] target The second BodyNode in the sequence. If \c nullptr is
+    /// passed the sequence will expand from \c start to the root.
+    /// \param[in] includeUpstreamParentJoint Set this to true if the parent
+    /// joint of whichever is upstream of the other should be included.
+    Criteria(
+        BodyNode* start,
+        BodyNode* target,
+        bool includeUpstreamParentJoint = false);
+
   protected:
 
     /// Refresh the content of mMapOfTerminals
@@ -166,6 +187,18 @@ public:
   /// Create a Linkage with the given Criteria
   static LinkagePtr create(const Criteria& _criteria,
                            const std::string& _name = "Linkage");
+
+  /// Creates and returns a clone of this Linkage.
+  LinkagePtr cloneLinkage() const;
+
+  /// Creates and returns a clone of this Linkage.
+  LinkagePtr cloneLinkage(const std::string& cloneName) const;
+
+  // To expose MetaSkeleton::cloneMetaSkeleton(), which takes no cloneName.
+  using MetaSkeleton::cloneMetaSkeleton;
+
+  // Documentation inherited
+  MetaSkeletonPtr cloneMetaSkeleton(const std::string& cloneName) const override;
 
   /// Returns false if the original assembly of this Linkage has been broken in
   /// some way

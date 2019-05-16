@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2017, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -58,6 +58,16 @@ class Skeleton :
     public detail::SkeletonAspectBase
 {
 public:
+  // Some of non-virtual functions of MetaSkeleton are hidden because of the
+  // functions of the same name in this class. We expose those functions as
+  // follows.
+  using MetaSkeleton::getJacobian;
+  using MetaSkeleton::getLinearJacobian;
+  using MetaSkeleton::getAngularJacobian;
+  using MetaSkeleton::getJacobianSpatialDeriv;
+  using MetaSkeleton::getJacobianClassicDeriv;
+  using MetaSkeleton::getLinearJacobianDeriv;
+  using MetaSkeleton::getAngularJacobianDeriv;
 
   using AspectPropertiesData = detail::SkeletonAspectProperties;
   using AspectProperties = common::Aspect::MakeProperties<AspectPropertiesData>;
@@ -151,6 +161,10 @@ public:
   /// Get the mutex that protects the state of this Skeleton
   std::mutex& getMutex() const;
 
+  /// Get the mutex that protects the state of this Skeleton
+  std::unique_ptr<common::LockableReference> getLockableReference() const
+  override;
+
   Skeleton(const Skeleton&) = delete;
 
   /// Destructor
@@ -160,10 +174,28 @@ public:
   Skeleton& operator=(const Skeleton& _other) = delete;
 
   /// Create an identical clone of this Skeleton.
+  /// \deprecated Deprecated in DART 6.7. Please use cloneSkeleton() instead.
+  DART_DEPRECATED(6.7)
   SkeletonPtr clone() const;
+  // TODO: In DART 7, change this function to override MetaSkeleton::clone()
+  // that returns MetaSkeletonPtr
 
   /// Create an identical clone of this Skeleton, except that it has a new name.
+  /// \deprecated Deprecated in DART 6.7. Please use cloneSkeleton() instead.
+  DART_DEPRECATED(6.7)
   SkeletonPtr clone(const std::string& cloneName) const;
+  // TODO: In DART 7, change this function to override MetaSkeleton::clone()
+  // that returns MetaSkeletonPtr
+
+  /// Creates and returns a clone of this Skeleton.
+  SkeletonPtr cloneSkeleton() const;
+
+  /// Creates and returns a clone of this Skeleton.
+  SkeletonPtr cloneSkeleton(const std::string& cloneName) const;
+
+  // Documentation inherited
+  MetaSkeletonPtr cloneMetaSkeleton(
+      const std::string& cloneName) const override;
 
   /// \}
 
@@ -398,6 +430,9 @@ public:
       const std::string& name) const override;
 
   // Documentation inherited
+  bool hasBodyNode(const BodyNode* bodyNode) const override;
+
+  // Documentation inherited
   std::size_t getIndexOf(const BodyNode* _bn, bool _warning=true) const override;
 
   /// Get the BodyNodes belonging to a tree in this Skeleton
@@ -438,6 +473,9 @@ public:
   /// \note Skeleton always guarantees name uniqueness for BodyNodes and Joints.
   /// So this function returns the single Joint of the given name if it exists.
   std::vector<const Joint*> getJoints(const std::string& name) const override;
+
+  // Documentation inherited
+  bool hasJoint(const Joint* joint) const override;
 
   // Documentation inherited
   std::size_t getIndexOf(const Joint* _joint, bool _warning=true) const override;
@@ -653,10 +691,10 @@ public:
   void updateBiasImpulse(BodyNode* _bodyNode, const Eigen::Vector6d& _imp);
 
   /// \brief Update bias impulses due to impulse [_imp] on body node [_bodyNode]
-  /// \param _bodyNode Body node contraint impulse, _imp1, is applied
-  /// \param _imp Constraint impulse expressed in body frame of _bodyNode1
-  /// \param _bodyNode Body node contraint impulse, _imp2, is applied
-  /// \param _imp Constraint impulse expressed in body frame of _bodyNode2
+  /// \param _bodyNode1 Body node contraint impulse, _imp1, is applied
+  /// \param _imp1 Constraint impulse expressed in body frame of _bodyNode1
+  /// \param _bodyNode2 Body node contraint impulse, _imp2, is applied
+  /// \param _imp2 Constraint impulse expressed in body frame of _bodyNode2
   void updateBiasImpulse(BodyNode* _bodyNode1, const Eigen::Vector6d& _imp1,
                          BodyNode* _bodyNode2, const Eigen::Vector6d& _imp2);
 

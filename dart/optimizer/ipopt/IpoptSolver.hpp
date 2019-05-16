@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2017, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -33,15 +33,8 @@
 #ifndef DART_OPTIMIZER_IPOPT_IPOPTSOLVER_HPP_
 #define DART_OPTIMIZER_IPOPT_IPOPTSOLVER_HPP_
 
-//------------------------------------------------------------------------------
-// Workaround for bug:
-// (see https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=684062)
-// This is fixed at IpOpt 3.11.4-1
-#define HAVE_CSTDDEF
 #include <coin/IpTNLP.hpp>
 #include <coin/IpIpoptApplication.hpp>
-#undef HAVE_CSTDDEF
-//------------------------------------------------------------------------------
 
 #include <memory>
 
