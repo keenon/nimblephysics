@@ -34,7 +34,6 @@
 #define DART_DYNAMICS_DETAIL_SENSORASPECT_HPP_
 
 #include <Eigen/Core>
-#include "dart/math/Helpers.hpp"
 
 namespace dart {
 namespace dynamics {

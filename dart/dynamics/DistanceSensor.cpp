@@ -53,20 +53,22 @@ void DistanceSensor::setAspectProperties(const AspectProperties& /*properties*/)
 }
 
 //==============================================================================
-DistanceSensor::DistanceSensor(BodyNode* parent, const BasicProperties& properties)
+DistanceSensor::DistanceSensor(
+    BodyNode* parent, const BasicProperties& properties)
   : Entity(ConstructFrame),
     Frame(parent),
-    common::EmbedStateAndPropertiesOnTopOf<DistanceSensor,
-                                           detail::DistanceSensorState,
-                                           detail::DistanceSensorProperties,
-                                           Sensor>(parent, properties)
+    common::EmbedStateAndPropertiesOnTopOf<
+        DistanceSensor,
+        detail::DistanceSensorState,
+        detail::DistanceSensorProperties,
+        Sensor>(parent, properties)
 {
   createAspect<Aspect>();
   setCompositeProperties(properties);
 }
 
 //==============================================================================
-//Node* DistanceSensor::cloneNode(BodyNode* parent) const
+// Node* DistanceSensor::cloneNode(BodyNode* parent) const
 //{
 //  auto* sensor = new DistanceSensor(parent, BasicProperties());
 //  sensor->duplicateAspects(this);

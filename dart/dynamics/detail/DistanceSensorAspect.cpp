@@ -43,7 +43,8 @@ DistanceSensorProperties::DistanceSensorProperties(double range) : mRange(range)
 }
 
 //==============================================================================
-DistanceSensorState::DistanceSensorState(bool hasDetected) : mHasDetected(hasDetected)
+DistanceSensorState::DistanceSensorState(bool hasDetected)
+  : mHasDetected(hasDetected)
 {
   // Do nothing
 }

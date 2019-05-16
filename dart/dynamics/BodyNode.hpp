@@ -614,7 +614,9 @@ public:
   Marker* createMarker(const Marker::BasicProperties& properties);
 
   template <typename SensorT>
-  SensorT* createSensor();
+  std::shared_ptr<SensorT> createSensor(
+      const std::string& name = "sensor",
+      const Eigen::Isometry3d& relativeTf = Eigen::Isometry3d::Identity());
 
   // Documentation inherited
   bool dependsOn(std::size_t _genCoordIndex) const override;

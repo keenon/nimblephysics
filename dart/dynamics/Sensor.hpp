@@ -43,9 +43,9 @@ namespace dynamics {
 
 class BodyNode;
 
-class Sensor : public common::EmbedPropertiesOnTopOf<Sensor,
-                                                     detail::SensorProperties,
-                                                     FixedFrame>
+class Sensor
+  : public common::
+        EmbedPropertiesOnTopOf<Sensor, detail::SensorProperties, FixedFrame>
 {
 public:
   using BasicProperties = common::Composite::MakeProperties<FixedFrame, Sensor>;
@@ -68,7 +68,7 @@ protected:
   Sensor(BodyNode* parent, const BasicProperties& properties);
 
   // Documentation inherited
-//  Node* cloneNode(BodyNode* parent) const override;
+  //  Node* cloneNode(BodyNode* parent) const override;
 
   std::string mName;
 };

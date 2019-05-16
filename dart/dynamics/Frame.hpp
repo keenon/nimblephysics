@@ -63,7 +63,7 @@ public:
   Frame(const Frame&) = delete;
 
   /// Destructor
-  virtual ~Frame();
+  ~Frame() override;
 
   static Frame* World();
 

@@ -60,17 +60,16 @@ const std::string& Sensor::getName() const
 Sensor::Sensor(BodyNode* parent, const BasicProperties& properties)
   : Entity(ConstructFrame),
     Frame(parent),
-    common::EmbedPropertiesOnTopOf<Sensor,
-                                   detail::SensorProperties,
-                                   FixedFrame>(
-        parent, properties.mRelativeTf)
+    common::
+        EmbedPropertiesOnTopOf<Sensor, detail::SensorProperties, FixedFrame>(
+            parent, properties.mRelativeTf)
 {
   createAspect<Aspect>();
   setCompositeProperties(properties);
 }
 
 //==============================================================================
-//Node* Sensor::cloneNode(BodyNode* parent) const
+// Node* Sensor::cloneNode(BodyNode* parent) const
 //{
 //  Sensor* sensor = new Sensor(parent, BasicProperties());
 //  sensor->duplicateAspects(this);

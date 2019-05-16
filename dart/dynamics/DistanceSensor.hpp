@@ -43,11 +43,11 @@ namespace dynamics {
 class BodyNode;
 
 /// This class implements Inertial Measuring Unit (IMU) sensor.
-class DistanceSensor
-    : public common::EmbedStateAndPropertiesOnTopOf<DistanceSensor,
-                                                    detail::DistanceSensorState,
-                                                    detail::DistanceSensorProperties,
-                                                    Sensor>
+class DistanceSensor : public common::EmbedStateAndPropertiesOnTopOf<
+                           DistanceSensor,
+                           detail::DistanceSensorState,
+                           detail::DistanceSensorProperties,
+                           Sensor>
 {
 public:
   using BasicProperties = common::Composite::MakeProperties<DistanceSensor>;
@@ -70,7 +70,7 @@ protected:
   DistanceSensor(BodyNode* parent, const BasicProperties& properties);
 
   // Documentation inherited
-//  Node* cloneNode(BodyNode* parent) const override;
+  //  Node* cloneNode(BodyNode* parent) const override;
 };
 
 } // namespace dynamics

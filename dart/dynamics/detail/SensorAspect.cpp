@@ -39,6 +39,7 @@ namespace detail {
 //==============================================================================
 SensorProperties::SensorProperties()
 {
+  // Do nothing
 }
 
 } // namespace detail

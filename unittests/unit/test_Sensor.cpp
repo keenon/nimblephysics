@@ -49,23 +49,24 @@ TEST(Sensor, DistanceSensor)
       = loader.parseSkeleton("dart://sample/urdf/KR5/KR5 sixx R650.urdf");
 
   auto lastBn1 = skeleton1->getBodyNode(skeleton1->getNumBodyNodes() - 1);
-//  auto sensor = lastBn1->createSensor<DistanceSensor>();
-//  Eigen::Isometry3d tf1 = sensor->getTransform();
+  auto sensor = lastBn1->createSensor<DistanceSensor>();
+  EXPECT_NE(sensor, nullptr);
+  Eigen::Isometry3d tf1 = sensor->getTransform();
 
-//  EXPECT_TRUE(equals(tf1, lastBn1->getTransform()));
+  EXPECT_TRUE(equals(tf1, lastBn1->getTransform()));
 
-//  SkeletonPtr skeleton2 = skeleton1->clone();
-//  BodyNode* lastBn2 = skeleton2->getBodyNode(skeleton2->getNumBodyNodes() - 1);
-//  auto imuSensor2 = lastBn2->createSensor<ImuSensor>();
-//  sensor->setRelativeTransform(Eigen::Isometry3d::Identity());
+  //  SkeletonPtr skeleton2 = skeleton1->clone();
+  //  BodyNode* lastBn2 = skeleton2->getBodyNode(skeleton2->getNumBodyNodes() -
+  //  1); auto imuSensor2 = lastBn2->createSensor<ImuSensor>();
+  //  sensor->setRelativeTransform(Eigen::Isometry3d::Identity());
 
-//  Eigen::Isometry3d tf2 = imuSensor2->getTransform();
+  //  Eigen::Isometry3d tf2 = imuSensor2->getTransform();
 
-//  EXPECT_TRUE(equals(tf2, lastBn2->getTransform()));
+  //  EXPECT_TRUE(equals(tf2, lastBn2->getTransform()));
 
-//  std::vector<std::size_t> active_indices;
-//  for (std::size_t i = 0; i < 3; ++i)
-//    active_indices.push_back(i);
+  //  std::vector<std::size_t> active_indices;
+  //  for (std::size_t i = 0; i < 3; ++i)
+  //    active_indices.push_back(i);
 
-//  Eigen::VectorXd q = Eigen::VectorXd::Random(active_indices.size());
+  //  Eigen::VectorXd q = Eigen::VectorXd::Random(active_indices.size());
 }

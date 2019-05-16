@@ -262,14 +262,14 @@ void BodyNode::removeAllShapeNodesWith()
 
 //==============================================================================
 template <typename SensorT>
-SensorT* BodyNode::createSensor()
+std::shared_ptr<SensorT> BodyNode::createSensor(
+    const std::string& /*name*/, const Eigen::Isometry3d& /*relativeTf*/)
 {
   typename SensorT::BasicProperties properties;
-//    properties.mName = name;
-//    properties.mRelativeTf.translation() = position;
-//    properties.mColor = color;
+//  properties.template mName = name;
+//  properties.template mRelativeTf.translation() = relativeTf;
 
-//  return createNode<SensorT>(properties);
+  return std::make_shared<SensorT>(properties);
 }
 
 } // namespace dynamics
