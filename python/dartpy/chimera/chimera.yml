@@ -101,6 +101,7 @@ namespaces:
   # 'dart::collision': null
   # 'dart::collision::bullet': null
   # 'dart::collision::ode': null
+  'dart::gui::glut': null
 
 #==============================================================================
 #
@@ -176,7 +177,7 @@ classes:
   # Hide details
   'dart::common::CloneableMap<std::map<std::type_index, std::unique_ptr<dart::common::Aspect::State, std::default_delete<dart::common::Aspect::State> >, std::less<std::type_index>, std::allocator<std::pair<const std::type_index, std::unique_ptr<dart::common::Aspect::State, std::default_delete<dart::common::Aspect::State> > > > > >': null
   'dart::common::CloneableMap<std::map<std::type_index, std::unique_ptr<dart::common::Aspect::Properties, std::default_delete<dart::common::Aspect::Properties> >, std::less<std::type_index>, std::allocator<std::pair<const std::type_index, std::unique_ptr<dart::common::Aspect::Properties, std::default_delete<dart::common::Aspect::Properties> > > > > >': null
-  'template <class DerivedT, typename PropertiesDataT, typename... CompositeBases> dart::common::EmbedPropertiesOnTopOf': null
+  # 'template <class DerivedT, typename PropertiesDataT, typename... CompositeBases> dart::common::EmbedPropertiesOnTopOf': null
   'dart::common::VersionCounter': null
 
   # Held type
