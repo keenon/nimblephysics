@@ -1,7 +1,5 @@
 cmake_minimum_required(VERSION 3.5.1)
 
-project(dartpy)
-
 if(NOT DARTPY_PYTHON_VERSION)
   set(DARTPY_PYTHON_VERSION 3.4 CACHE STRING "Choose the target Python version (e.g., 3.4, 2.7)" FORCE)
 endif()
@@ -77,18 +75,18 @@ check_cxx_source_compiles(
 #endif()
 set(CHIMERA_CONFIG "${CMAKE_CURRENT_SOURCE_DIR}/chimera/chimera.yml")
 if(chimera_FOUND)
-  add_chimera_binding(TARGET "${PROJECT_NAME}_CHIMERA"
-    MODULE "${PROJECT_NAME}"
+  add_chimera_binding(TARGET "dartpy_CHIMERA"
+    MODULE "dartpy"
     CONFIGURATION "${CHIMERA_CONFIG}"
     SOURCES "chimera/chimera.hpp"
     DESTINATION "${CMAKE_CURRENT_SOURCE_DIR}/src/generated"
     DEBUG EXCLUDE_FROM_ALL
   )
-  target_include_directories("${PROJECT_NAME}_CHIMERA"
+  target_include_directories("dartpy_CHIMERA"
     PUBLIC
       ${CMAKE_CURRENT_SOURCE_DIR}
   )
-  target_link_libraries("${PROJECT_NAME}_CHIMERA"
+  target_link_libraries("dartpy_CHIMERA"
     PUBLIC
       ${PYTHON_LIBRARIES}
       dart
@@ -96,7 +94,7 @@ if(chimera_FOUND)
       dart-collision-ode
       dart-gui
   )
-  add_custom_target(binding DEPENDS "${PROJECT_NAME}_CHIMERA_REBUILD")
+  add_custom_target(binding DEPENDS "dartpy_CHIMERA_REBUILD")
 else()
   add_custom_target(binding
     COMMAND ${CMAKE_COMMAND} -E cmake_echo_color --red "ERROR: Cannot generate bindings without \\'chimera\\' installed."
@@ -114,7 +112,7 @@ if(EXISTS "${SOURCES_TXT}")
     list(APPEND SOURCES_GENERATED "${CMAKE_CURRENT_SOURCE_DIR}/src/generated/${relative_path}")
   endforeach()
 
-  add_library("${PROJECT_NAME}" MODULE
+  add_library("dartpy" MODULE
     ${SOURCES_GENERATED}
     src/eigen_geometry_py.cpp
 #    src/BodyNode.cpp
@@ -122,11 +120,11 @@ if(EXISTS "${SOURCES_TXT}")
 #    src/skel_parser.cpp
 #    src/template_registry.cpp
   )
-  target_include_directories("${PROJECT_NAME}"
+  target_include_directories("dartpy"
     PUBLIC
       ${CMAKE_CURRENT_SOURCE_DIR}
   )
-  target_link_libraries("${PROJECT_NAME}"
+  target_link_libraries("dartpy"
     PUBLIC
       ${PYTHON_LIBRARIES}
       dart
@@ -134,22 +132,22 @@ if(EXISTS "${SOURCES_TXT}")
       dart-collision-ode
       dart-gui
   )
-  set_target_properties("${PROJECT_NAME}" PROPERTIES
+  set_target_properties("dartpy" PROPERTIES
     PREFIX ""
     SUFFIX ".so"  # python uses '.so' extension even on macOS
   )
   if(CMAKE_COMPILER_IS_GNUCXX)
-    target_compile_options("${PROJECT_NAME}"
+    target_compile_options("dartpy"
       PRIVATE -fabi-version=6
     )
   endif()
-  target_compile_options("${PROJECT_NAME}" PRIVATE -fvisibility=hidden)
+  target_compile_options("dartpy" PRIVATE -fvisibility=hidden)
 
-  install(TARGETS "${PROJECT_NAME}"
+  install(TARGETS "dartpy"
     LIBRARY DESTINATION "${PYTHON_SITE_PACKAGES}"
   )
 else()
-  add_custom_target(${PROJECT_NAME} ALL
+  add_custom_target(dartpy ALL
     COMMAND ${CMAKE_COMMAND} -E cmake_echo_color --red "ERROR: Generate bindings using \\'make binding\\' before attempting to build."
     COMMAND false
   )
