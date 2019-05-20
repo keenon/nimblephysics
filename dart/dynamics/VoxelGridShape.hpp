@@ -49,6 +49,10 @@ namespace dynamics {
 class VoxelGridShape : public Shape
 {
 public:
+  // TODO(JS):
+  // - Alpha range
+  // - Occupancy range
+
   /// Constructor.
   /// \param[in] resolution Size of voxel. Default is 0.01.
   explicit VoxelGridShape(double resolution = 0.01);

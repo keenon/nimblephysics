@@ -81,7 +81,7 @@ protected:
 };
 
 //==============================================================================
-class QuadDrawable : public ::osg::Geometry
+class QuadDrawable final : public ::osg::Geometry
 {
 public:
   QuadDrawable(double size, const Eigen::Vector4d& color)
@@ -127,7 +127,7 @@ protected:
 };
 
 //==============================================================================
-class CircleDrawable : public ::osg::Geometry
+class CircleDrawable final : public ::osg::Geometry
 {
 public:
   CircleDrawable(double size, const Eigen::Vector4d& color)

@@ -49,6 +49,75 @@ namespace osg {
 namespace render {
 
 //==============================================================================
+class BoxDrawable final : public ::osg::ShapeDrawable
+{
+public:
+  BoxDrawable(double size, const Eigen::Vector4d& color)
+  {
+    mShape = new ::osg::Box(::osg::Vec3(), static_cast<float>(size));
+    setColor(eigToOsgVec4f(color));
+    setShape(mShape);
+    setDataVariance(::osg::Object::DYNAMIC);
+  }
+
+  void updateSize(double size)
+  {
+    mShape->setHalfLengths(::osg::Vec3(
+        static_cast<float>(size * 0.5),
+        static_cast<float>(size * 0.5),
+        static_cast<float>(size * 0.5)));
+    dirtyBound();
+    dirtyDisplayList();
+  }
+
+  void updateColor(const Eigen::Vector4d& color)
+  {
+    setColor(eigToOsgVec4f(color));
+  }
+
+protected:
+  ::osg::ref_ptr<::osg::Box> mShape;
+};
+
+//==============================================================================
+class VoxelNode : public ::osg::MatrixTransform
+{
+public:
+  VoxelNode(const Eigen::Vector3d& point, double size, const Eigen::Vector4d& color)
+  {
+    mDrawable = new BoxDrawable(size, color);
+    mGeode = new ::osg::Geode();
+
+    mGeode->addDrawable(mDrawable);
+    addChild(mGeode);
+
+    updateCenter(point);
+  }
+
+  void updateCenter(const Eigen::Vector3d& point)
+  {
+    Eigen::Isometry3d tf = Eigen::Isometry3d::Identity();
+    tf.translation() = point;
+    setMatrix(eigToOsgMatrix(tf));
+  }
+
+  void updateSize(double size)
+  {
+    mDrawable->updateSize(size);
+  }
+
+  void updateColor(const Eigen::Vector4d& color)
+  {
+    mDrawable->updateColor(color);
+  }
+
+protected:
+  ::osg::ref_ptr<BoxDrawable> mDrawable;
+  ::osg::ref_ptr<::osg::Geode> mGeode;
+};
+
+//==============================================================================
+// Deprecated
 class VoxelGridShapeDrawable : public ::osg::ShapeDrawable
 {
 public:
@@ -76,6 +145,7 @@ private:
 };
 
 //==============================================================================
+// Deprecated
 class VoxelGridShapeGeode : public ShapeNode, public ::osg::Geode
 {
 public:
@@ -126,17 +196,60 @@ void VoxelGridShapeNode::refresh()
 }
 
 //==============================================================================
+Eigen::Vector3d toVector3d(const octomap::point3d& point)
+{
+  return Eigen::Vector3d(
+      static_cast<double>(point.x()),
+      static_cast<double>(point.y()),
+      static_cast<double>(point.z()));
+}
+
+//==============================================================================
 void VoxelGridShapeNode::extractData(bool /*firstTime*/)
 {
-  if (nullptr == mGeode)
+  auto tree = mVoxelGridShape->getOctree();
+  const auto visualSize = tree->getResolution();
+  const auto& color = mVisualAspect->getRGBA();
+
+  // Pre-allocate for the case that the size of new points are greater than
+  // previous update
+  const auto newVoxels = tree->getNumLeafNodes();
+  mVoxelNodes.reserve(newVoxels);
+
+  // Update position of cache boxes.
+  std::size_t boxIndex = 0u;
+  for (auto it = tree->begin_leafs(), end = tree->end_leafs(); it != end; ++it)
   {
-    mGeode = new VoxelGridShapeGeode(
-        mVoxelGridShape.get(), mParentShapeFrameNode, this);
-    addChild(mGeode);
-    return;
+    auto threashold = tree->getOccupancyThres();
+
+    if (it->getOccupancy() < threashold)
+      continue;
+
+    if (boxIndex < mVoxelNodes.size())
+    {
+      mVoxelNodes[boxIndex]->updateCenter(toVector3d(it.getCoordinate()));
+      mVoxelNodes[boxIndex]->updateSize(visualSize);
+      mVoxelNodes[boxIndex]->updateColor(color);
+    }
+    else
+    {
+      ::osg::ref_ptr<VoxelNode> voxelNode = new VoxelNode(toVector3d(it.getCoordinate()), visualSize, color);
+      mVoxelNodes.emplace_back(voxelNode);
+      addChild(mVoxelNodes.back());
+    }
+
+    boxIndex++;
   }
 
-  mGeode->refresh();
+  // Fit the size of cache box list to the new points. No effect new boxes are
+  // added to the list.
+  if (mVoxelNodes.size() > boxIndex)
+  {
+    removeChildren(
+        static_cast<unsigned int>(boxIndex),
+        static_cast<unsigned int>(mVoxelNodes.size() - boxIndex));
+    mVoxelNodes.resize(boxIndex);
+  }
 }
 
 //==============================================================================
