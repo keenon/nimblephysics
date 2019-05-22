@@ -1,22 +1,20 @@
-cmake_minimum_required(VERSION 3.5.1)
-
 if(NOT DARTPY_PYTHON_VERSION)
   set(DARTPY_PYTHON_VERSION 3.4 CACHE STRING "Choose the target Python version (e.g., 3.4, 2.7)" FORCE)
 endif()
 
 find_package(PythonInterp ${DARTPY_PYTHON_VERSION} QUIET)
-if(NOT PythonInterp_FOUND)
-  message(STATUS "DART_BUILD_DARTPY is ON, but failed to find PythonInterp. "
-    "Disabling dartpy."
-  )
-  return()
-endif()
 execute_process(COMMAND ${PYTHON_EXECUTABLE} -c
   "from distutils.sysconfig import get_python_lib;\
   print(get_python_lib(plat_specific=True, prefix=''))"
   OUTPUT_VARIABLE PYTHON_SITE_PACKAGES
   OUTPUT_STRIP_TRAILING_WHITESPACE
 )
+if(NOT PythonInterp_FOUND)
+  message(STATUS "DART_BUILD_DARTPY is ON, but failed to find PythonInterp. "
+    "Disabling dartpy."
+  )
+  return()
+endif()
 
 find_package(PythonLibs ${DARTPY_PYTHON_VERSION} QUIET)
 if(NOT PythonLibs_FOUND)
@@ -90,10 +88,18 @@ if(chimera_FOUND)
     PUBLIC
       ${PYTHON_LIBRARIES}
       dart
+      dart-utils
+      dart-utils-urdf
       dart-collision-bullet
       dart-collision-ode
       dart-gui
   )
+  if(TARGET dart-optimizer-nlopt)
+    target_link_libraries("dartpy_CHIMERA" PUBLIC dart-optimizer-nlopt)
+  endif()
+  if(TARGET dart-collision-bullet)
+    target_link_libraries("dartpy_CHIMERA" PUBLIC dart-collision-bullet)
+  endif()
   add_custom_target(binding DEPENDS "dartpy_CHIMERA_REBUILD")
 else()
   add_custom_target(binding
@@ -128,10 +134,18 @@ if(EXISTS "${SOURCES_TXT}")
     PUBLIC
       ${PYTHON_LIBRARIES}
       dart
+      dart-utils
+      dart-utils-urdf
       dart-collision-bullet
       dart-collision-ode
       dart-gui
   )
+  if(TARGET dart-optimizer-nlopt)
+    target_link_libraries(dartpy PUBLIC dart-optimizer-nlopt)
+  endif()
+  if(TARGET dart-collision-bullet)
+    target_link_libraries(dartpy PUBLIC dart-collision-bullet)
+  endif()
   set_target_properties("dartpy" PROPERTIES
     PREFIX ""
     SUFFIX ".so"  # python uses '.so' extension even on macOS

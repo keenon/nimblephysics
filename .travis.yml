@@ -2,7 +2,7 @@ language: cpp
 
 sudo: required
 
-dist: trusty
+dist: xenial
 
 cache:
   apt: true
@@ -13,23 +13,20 @@ env:
     - IS_PULL_REQUEST=$TRAVIS_PULL_REQUEST
     - OS_NAME=$TRAVIS_OS_NAME
     - BUILD_DIR=$TRAVIS_BUILD_DIR
+    - BUILD_DARTPY=OFF
+    - CODECOV=OFF
 
 matrix:
+  fast_finish: true
   include:
     - os: linux
       env:
-        - BUILD_NAME=XENIAL_RELEASE
-        - DOCKERFILE="Dockerfile.ubuntu-xenial"
-        - BUILD_TYPE=Release
-        - COMPILER=GCC
-      services: docker
-    - os: linux
-      env:
-        - BUILD_NAME=BIONIC_DEBUG
-        - DOCKERFILE="Dockerfile.ubuntu-bionic"
+        - BUILD_NAME=XENIAL_DEBUG_CODECOV
+        - SUDO=sudo
         - BUILD_TYPE=Debug
         - COMPILER=GCC
-      services: docker
+        - CODECOV=ON
+
     - os: linux
       env:
         - BUILD_NAME=BIONIC_RELEASE
@@ -37,30 +34,26 @@ matrix:
         - BUILD_TYPE=Release
         - COMPILER=GCC
       services: docker
+
     - os: linux
       env:
-        - BUILD_NAME=COSMIC_RELEASE
-        - DOCKERFILE="Dockerfile.ubuntu-cosmic"
+        - BUILD_NAME=DISCO_RELEASE
+        - DOCKERFILE="Dockerfile.ubuntu-disco"
         - BUILD_TYPE=Release
         - COMPILER=GCC
       services: docker
-    # - os: osx
-    #   osx_image: xcode9.4
-    #   compiler: clang
-    #   env:
-    #     - BUILD_NAME=XCODE94_DEBUG
-    #     - BUILD_TYPE=Debug
-    #     - COMPILER=CLANG
-    # - os: osx
-    #   osx_image: xcode9.4
-    #   compiler: clang
-    #   env:
-    #     - BUILD_NAME=XCODE94_RELEASE
-    #     - BUILD_TYPE=Release
-    #     - COMPILER=CLANG
+
+    - os: osx
+      osx_image: xcode10.2
+      compiler: clang
+      env:
+        - BUILD_NAME=XCODE102_RELEASE
+        - BUILD_TYPE=Release
+        - COMPILER=CLANG
+
     - os: linux
       env:
-        - BUILD_NAME=DOCS
+        - BUILD_DOCS=ON
         - DOCKERFILE="Dockerfile.ubuntu-bionic"
         - BUILD_TYPE=Release
         - COMPILER=GCC
@@ -82,10 +75,6 @@ script:
       '.ci/script.sh';
     fi
 
-after_failure:
-  - cat build/Testing/Temporary/LastTest.log
-  - cat build/Testing/Temporary/LastTestsFailed.log
-
 deploy:
   github-token: $GITHUB_TOKEN
   provider: pages
@@ -95,4 +84,4 @@ deploy:
   verbose: true
   on:
     branch: master
-    condition: $BUILD_NAME == DOCS && $TRAVIS_EVENT_TYPE != cron
+    condition: $BUILD_DOCS == ON && $TRAVIS_EVENT_TYPE != cron
