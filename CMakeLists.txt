@@ -25,14 +25,18 @@ if(POLICY CMP0053)
   cmake_policy(SET CMP0053 NEW)
 endif()
 
+include(GNUInstallDirs)
+
 # Variables used in Components.cmake
-set(INCLUDE_INSTALL_DIR "include")
-set(LIBRARY_INSTALL_DIR "lib")
-set(CONFIG_INSTALL_DIR "share/${PROJECT_NAME}/cmake")
+set(INCLUDE_INSTALL_DIR ${CMAKE_INSTALL_INCLUDEDIR})
+set(LIBRARY_INSTALL_DIR ${CMAKE_INSTALL_LIBDIR})
+set(CONFIG_INSTALL_DIR "${CMAKE_INSTALL_DATAROOTDIR}/${PROJECT_NAME}/cmake")
 
 # Set relative location to install additional documentation (sample data,
 # examples, and tutorials)
-set(DART_ADDITIONAL_DOCUMENTATION_INSTALL_PATH "share/doc/${PROJECT_NAME}")
+set(DART_ADDITIONAL_DOCUMENTATION_INSTALL_PATH
+  "${CMAKE_INSTALL_DATAROOTDIR}/doc/${PROJECT_NAME}"
+)
 
 set(CMAKE_DEBUG_POSTFIX "d")
 set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
@@ -56,7 +60,7 @@ endif()
 
 # If you change the version, please update the <version> tag in package.xml.
 set(DART_MAJOR_VERSION "6")
-set(DART_MINOR_VERSION "8")
+set(DART_MINOR_VERSION "9")
 set(DART_PATCH_VERSION "0")
 set(DART_VERSION "${DART_MAJOR_VERSION}.${DART_MINOR_VERSION}.${DART_PATCH_VERSION}")
 set(DART_PKG_DESC "Dynamic Animation and Robotics Toolkit.")
@@ -89,6 +93,10 @@ option(DART_CODECOV "Turn on codecov support" OFF)
 option(DART_TREAT_WARNINGS_AS_ERRORS "Treat warnings as errors" OFF)
 option(DART_FAST_DEBUG "Add -O1 option for DEBUG mode build" OFF)
 option(DART_BUILD_DARTPY "Build dartpy (the python binding)" OFF)
+
+if(DART_BUILD_DARTPY)
+  set(BUILD_SHARED_LIBS OFF)
+endif()
 
 #===============================================================================
 # Print intro
@@ -155,14 +163,14 @@ endif()
 #===============================================================================
 if(MSVC)
 
-  # Visual Studio enables c++11 support by default
+  # Visual Studio enables C++14 support by default
   if(MSVC_VERSION VERSION_LESS 1900)
     message(FATAL_ERROR "${PROJECT_NAME} requires VS2017 or greater.")
   endif()
   if(DART_TREAT_WARNINGS_AS_ERRORS)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /WX")
   endif()
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHsc /permissive-")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHsc /permissive- /Zc:twoPhase-")
   #set(CMAKE_EXE_LINKER_FLAGS_RELEASE "/LTCG /INCREMENTAL:NO")
   if(NOT DART_MSVC_DEFAULT_OPTIONS)
     set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} ${DART_RUNTIME_LIBRARY}d /Zi /Gy /W1 /EHsc")
@@ -178,6 +186,9 @@ if(MSVC)
   add_compile_options(/wd4305)
   add_compile_options(/wd4838)
   add_compile_options(/bigobj)
+  if(MSVC_VERSION GREATER_EQUAL 1915)
+    add_compile_definitions(_ENABLE_EXTENDED_ALIGNED_STORAGE)
+  endif()
 
 elseif(CMAKE_COMPILER_IS_GNUCXX)
 
@@ -188,8 +199,8 @@ elseif(CMAKE_COMPILER_IS_GNUCXX)
   execute_process(
     COMMAND ${CMAKE_CXX_COMPILER} -dumpfullversion -dumpversion OUTPUT_VARIABLE GCC_VERSION)
   set(CXX_COMPILER_VERSION ${GCC_VERSION})
-  if(GCC_VERSION VERSION_LESS 4.8)
-    message(FATAL_ERROR "The installed g++ version is ${GCC_VERSION}. ${PROJECT_NAME} requires g++ 4.8 or greater.")
+  if(GCC_VERSION VERSION_LESS 5.3.1)
+    message(FATAL_ERROR "The installed g++ version is ${GCC_VERSION}. ${PROJECT_NAME} requires g++ 5.3.1 or greater.")
   endif()
   set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")
   set(CMAKE_CXX_FLAGS_DEBUG "-g -fno-omit-frame-pointer -fno-inline-functions -fno-inline-functions-called-once -fno-optimize-sibling-calls")
@@ -211,8 +222,8 @@ elseif("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
   execute_process(
     COMMAND ${CMAKE_CXX_COMPILER} -dumpversion OUTPUT_VARIABLE CLANG_VERSION)
   set(CXX_COMPILER_VERSION ${CLANG_VERSION})
-  if(CLANG_VERSION VERSION_LESS 3.3)
-    message(FATAL_ERROR "The installed Clang version is ${CLANG_VERSION}. ${PROJECT_NAME} requires clang 3.3 or greater.")
+  if(CLANG_VERSION VERSION_LESS 3.8)
+    message(FATAL_ERROR "The installed Clang version is ${CLANG_VERSION}. ${PROJECT_NAME} requires clang 3.8 or greater.")
   endif()
   if("${CMAKE_SYSTEM_NAME}" MATCHES "Darwin")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++")
@@ -272,12 +283,20 @@ if(TARGET dart)
 
   # Add a "tests" target to build unit tests.
   enable_testing()
-  add_subdirectory(unittests EXCLUDE_FROM_ALL)
+  if(MSVC)
+    # add_subdirectory(unittests)
+  else()
+    add_subdirectory(unittests EXCLUDE_FROM_ALL)
+  endif()
 
   # Add example subdirectories and an "examples" target.
-  add_subdirectory(examples EXCLUDE_FROM_ALL)
-  get_property(examples GLOBAL PROPERTY DART_EXAMPLES)
-  add_custom_target(examples DEPENDS ${examples})
+  if(MSVC)
+    # add_subdirectory(examples)
+  else()
+    add_subdirectory(examples EXCLUDE_FROM_ALL)
+    get_property(examples GLOBAL PROPERTY DART_EXAMPLES)
+    add_custom_target(examples DEPENDS ${examples})
+  endif()
 
   if(DART_VERBOSE)
     message(STATUS "")
@@ -291,9 +310,13 @@ if(TARGET dart)
   endif(DART_VERBOSE)
 
   # Add a "tutorials" target to build tutorials.
-  add_subdirectory(tutorials EXCLUDE_FROM_ALL)
-  get_property(tutorials GLOBAL PROPERTY DART_TUTORIALS)
-  add_custom_target(tutorials DEPENDS ${tutorials})
+  if(MSVC)
+    # add_subdirectory(tutorials)
+  else()
+    add_subdirectory(tutorials EXCLUDE_FROM_ALL)
+    get_property(tutorials GLOBAL PROPERTY DART_TUTORIALS)
+    add_custom_target(tutorials DEPENDS ${tutorials})
+  endif()
 
   if(DART_VERBOSE)
     message(STATUS "")
@@ -374,10 +397,12 @@ if(DART_VERBOSE)
   message(STATUS ${PC_CONFIG_OUT})
 endif()
 configure_file(${PC_CONFIG_IN} ${PC_CONFIG_OUT} @ONLY)
-install(FILES ${PC_CONFIG_OUT} DESTINATION lib/pkgconfig)
+install(FILES ${PC_CONFIG_OUT} DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
 
 # Install a Catkin 'package.xml' file. This is required by REP-136.
-install(FILES package.xml DESTINATION share/${PROJECT_NAME})
+install(FILES package.xml DESTINATION
+  ${CMAKE_INSTALL_DATAROOTDIR}/${PROJECT_NAME}
+)
 
 #===============================================================================
 # Install sample data, examples, and tutorials

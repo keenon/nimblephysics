@@ -26,7 +26,7 @@ find_path(ASSIMP_INCLUDE_DIRS assimp/scene.h
 
 # Libraries
 if(MSVC)
-  set(ASSIMP_LIBRARIES optimized assimp debug assimpd)
+  set(ASSIMP_LIBRARIES "assimp$<$<CONFIG:Debug>:d>")
 else()
   find_library(ASSIMP_LIBRARIES
       NAMES assimp
@@ -38,7 +38,7 @@ set(ASSIMP_VERSION ${PC_ASSIMP_VERSION})
 
 # Set (NAME)_FOUND if all the variables and the version are satisfied.
 include(FindPackageHandleStandardArgs)
-find_package_handle_standard_args(ASSIMP
+find_package_handle_standard_args(assimp
     FAIL_MESSAGE  DEFAULT_MSG
     REQUIRED_VARS ASSIMP_INCLUDE_DIRS ASSIMP_LIBRARIES
     VERSION_VAR   ASSIMP_VERSION)

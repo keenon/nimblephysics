@@ -37,7 +37,7 @@ endif()
 
 # Libraries
 if(MSVC)
-  set(FCL_LIBRARIES optimized fcl debug fcld)
+  set(FCL_LIBRARIES "fcl$<$<CONFIG:Debug>:d>")
 else()
   # Give explicit precedence to ${PC_FCL_LIBDIR}
   find_library(FCL_LIBRARIES
@@ -57,7 +57,7 @@ set(FCL_VERSION ${PC_FCL_VERSION})
 
 # Set (NAME)_FOUND if all the variables and the version are satisfied.
 include(FindPackageHandleStandardArgs)
-find_package_handle_standard_args(FCL
+find_package_handle_standard_args(fcl
     FAIL_MESSAGE  DEFAULT_MSG
     REQUIRED_VARS FCL_INCLUDE_DIRS FCL_LIBRARIES
     VERSION_VAR   FCL_VERSION)
