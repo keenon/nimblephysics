@@ -18,3 +18,11 @@ install(
   DESTINATION include/dart/gui/osg/render
   COMPONENT headers
 )
+
+dart_format_add(
+  HeightmapShapeNode.hpp
+  PointCloudShapeNode.hpp
+  PointCloudShapeNode.cpp
+  VoxelGridShapeNode.hpp
+  VoxelGridShapeNode.cpp
+)
