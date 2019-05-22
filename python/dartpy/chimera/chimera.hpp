@@ -16,6 +16,8 @@
 #include <dart/collision/bullet/bullet.hpp>
 #include <dart/collision/ode/ode.hpp>
 
+#include <dart/constraint/constraint.hpp>
+
 // #include <dart/dart.hpp>
 // #include <dart/collision/bullet/bullet.hpp>
 // #include <dart/collision/ode/ode.hpp>
