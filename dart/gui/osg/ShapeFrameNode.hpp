@@ -89,9 +89,9 @@ public:
   /// Set mUtilized to false
   void clearUtilization();
 
-protected:
-
   virtual ~ShapeFrameNode();
+
+protected:
 
   void refreshShapeNode(const std::shared_ptr<dart::dynamics::Shape>& shape);
 

@@ -102,6 +102,7 @@ namespaces:
   # 'dart::collision::bullet': null
   # 'dart::collision::ode': null
   'dart::gui::glut': null
+  'dart::gui::osg::render': null
 
 #==============================================================================
 #
