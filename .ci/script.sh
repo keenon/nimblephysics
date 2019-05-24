@@ -102,6 +102,7 @@ else
     make -j$num_threads codecov
   else
     ctest --output-on-failure -j$num_threads
+  fi
 fi
 
 # Make sure we can install with no issues
