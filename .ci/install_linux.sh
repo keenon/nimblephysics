@@ -92,6 +92,11 @@ if [ "$BUILD_DARTPY" = "ON" ]; then
     echo -e "$(lsb_release -sc) is not supported."
     exit 1
   fi
+  
+  # Chimera
+  $SUDO apt-add-repository -y ppa:personalrobotics/ppa
+  $SUDO apt-get -qq update
+  $SUDO apt-get -y install chimera
 fi
 
 $SUDO apt-get -y install lcov
