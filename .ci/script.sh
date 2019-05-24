@@ -68,6 +68,13 @@ if [ "$OS_NAME" = "linux" ]; then
   install_prefix_option="-DCMAKE_INSTALL_PREFIX=/usr/"
 fi
 
+if [ "$BUILD_DARTPY" = "ON" ]; then
+  # Disable until Chimera resolves https://github.com/personalrobotics/chimera/issues/258
+  treat_warnings_as_errors=OFF
+else
+  treat_warnings_as_errors=ON
+fi
+
 # Cmake
 cmake .. \
   -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
