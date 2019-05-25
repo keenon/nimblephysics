@@ -77,7 +77,7 @@ template:
       #include <dartpy/eigen_pybind.h>
       #include <dartpy/eigen_geometry_pybind.h>
     postinclude: |
-      PYBIND11_DECLARE_HOLDER_TYPE(T, dart::dynamics::TemplateJointPtr<T, dart::dynamics::BodyNode>);
+      PYBIND11_DECLARE_HOLDER_TYPE(T, dart::dynamics::TemplateBodyNodePtr<T>, true);
     prebody:
       '/* main prebody */'
     precontent:
