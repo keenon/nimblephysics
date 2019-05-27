@@ -32,16 +32,336 @@
 
 #include <dart/dart.hpp>
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 #include "eigen_geometry_pybind.h"
 #include "eigen_pybind.h"
+
+PYBIND11_DECLARE_HOLDER_TYPE(T, dart::dynamics::TemplateBodyNodePtr<T>, true);
+
+#define DARTPY_DEFINE_CREATE_CHILD_JOINT_AND_BODY_NODE_PAIR(joint_type)        \
+  .def(                                                                        \
+      "create" #joint_type "AndBodyNodePair",                                  \
+      +[](dart::dynamics::BodyNode* self)                                      \
+          -> std::                                                             \
+              pair<dart::dynamics::joint_type*, dart::dynamics::BodyNode*> {   \
+                return self->createChildJointAndBodyNodePair<                  \
+                    dart::dynamics::joint_type,                                \
+                    dart::dynamics::BodyNode>();                               \
+              },                                                               \
+      ::pybind11::return_value_policy::reference_internal)                     \
+      .def(                                                                    \
+          "create" #joint_type "AndBodyNodePair",                              \
+          +[](dart::dynamics::BodyNode* self,                                  \
+              const dart::dynamics::joint_type::Properties& jointProperties)   \
+              -> std::pair<                                                    \
+                  dart::dynamics::joint_type*,                                 \
+                  dart::dynamics::BodyNode*> {                                 \
+            return self->createChildJointAndBodyNodePair<                      \
+                dart::dynamics::joint_type,                                    \
+                dart::dynamics::BodyNode>(jointProperties);                    \
+          },                                                                   \
+          ::pybind11::return_value_policy::reference_internal,                 \
+          ::pybind11::arg("jointProperties"))                                  \
+      .def(                                                                    \
+          "create" #joint_type "AndBodyNodePair",                              \
+          +[](dart::dynamics::BodyNode* self,                                  \
+              const dart::dynamics::joint_type::Properties& jointProperties,   \
+              const dart::dynamics::BodyNode::Properties& bodyProperties)      \
+              -> std::pair<                                                    \
+                  dart::dynamics::joint_type*,                                 \
+                  dart::dynamics::BodyNode*> {                                 \
+            return self->createChildJointAndBodyNodePair<                      \
+                dart::dynamics::joint_type,                                    \
+                dart::dynamics::BodyNode>(jointProperties, bodyProperties);    \
+          },                                                                   \
+          ::pybind11::return_value_policy::reference_internal,                 \
+          ::pybind11::arg("jointProperties"),                                  \
+          ::pybind11::arg("bodyProperties"))
 
 namespace dart {
 namespace python {
 
 void BodyNode(pybind11::module& m)
 {
-  ::pybind11::class_<dart::dynamics::BodyNode, dart::dynamics::Frame>(
-      m, "BodyNode")
+  ::pybind11::class_<dart::dynamics::detail::BodyNodeAspectProperties>(
+      m, "BodyNodeAspectProperties")
+      .def(::pybind11::init<>())
+      .def(::pybind11::init<const std::string&>(), ::pybind11::arg("name"))
+      .def(
+          ::pybind11::
+              init<const std::string&, const dart::dynamics::Inertia&>(),
+          ::pybind11::arg("name"),
+          ::pybind11::arg("inertia"))
+      .def(
+          ::pybind11::
+              init<const std::string&, const dart::dynamics::Inertia&, bool>(),
+          ::pybind11::arg("name"),
+          ::pybind11::arg("inertia"),
+          ::pybind11::arg("isCollidable"))
+      .def(
+          ::pybind11::init<
+              const std::string&,
+              const dart::dynamics::Inertia&,
+              bool,
+              double>(),
+          ::pybind11::arg("name"),
+          ::pybind11::arg("inertia"),
+          ::pybind11::arg("isCollidable"),
+          ::pybind11::arg("frictionCoeff"))
+      .def(
+          ::pybind11::init<
+              const std::string&,
+              const dart::dynamics::Inertia&,
+              bool,
+              double,
+              double>(),
+          ::pybind11::arg("name"),
+          ::pybind11::arg("inertia"),
+          ::pybind11::arg("isCollidable"),
+          ::pybind11::arg("frictionCoeff"),
+          ::pybind11::arg("restitutionCoeff"))
+      .def(
+          ::pybind11::init<
+              const std::string&,
+              const dart::dynamics::Inertia&,
+              bool,
+              double,
+              double,
+              bool>(),
+          ::pybind11::arg("name"),
+          ::pybind11::arg("inertia"),
+          ::pybind11::arg("isCollidable"),
+          ::pybind11::arg("frictionCoeff"),
+          ::pybind11::arg("restitutionCoeff"),
+          ::pybind11::arg("gravityMode"))
+      .def_readwrite(
+          "mName", &dart::dynamics::detail::BodyNodeAspectProperties::mName)
+      .def_readwrite(
+          "mInertia",
+          &dart::dynamics::detail::BodyNodeAspectProperties::mInertia)
+      .def_readwrite(
+          "mIsCollidable",
+          &dart::dynamics::detail::BodyNodeAspectProperties::mIsCollidable)
+      .def_readwrite(
+          "mFrictionCoeff",
+          &dart::dynamics::detail::BodyNodeAspectProperties::mFrictionCoeff)
+      .def_readwrite(
+          "mRestitutionCoeff",
+          &dart::dynamics::detail::BodyNodeAspectProperties::mRestitutionCoeff)
+      .def_readwrite(
+          "mGravityMode",
+          &dart::dynamics::detail::BodyNodeAspectProperties::mGravityMode);
+
+  ::pybind11::class_<dart::dynamics::BodyNode::Properties>(
+      m, "BodyNodeProperties")
+      .def(::pybind11::init<>())
+      .def(
+          ::pybind11::init<
+              const dart::dynamics::detail::BodyNodeAspectProperties&>(),
+          ::pybind11::arg("aspectProperties"));
+
+  ::pybind11::class_<
+      dart::dynamics::TemplatedJacobianNode<dart::dynamics::BodyNode>,
+      dart::dynamics::JacobianNode,
+      std::shared_ptr<
+          dart::dynamics::TemplatedJacobianNode<dart::dynamics::BodyNode>>>(
+      m, "TemplatedJacobianBodyNode")
+      .def(
+          "getJacobian",
+          +[](const dart::dynamics::TemplatedJacobianNode<
+                  dart::dynamics::BodyNode>* self,
+              const dart::dynamics::Frame* _inCoordinatesOf)
+              -> dart::math::Jacobian {
+            return self->getJacobian(_inCoordinatesOf);
+          },
+          ::pybind11::arg("inCoordinatesOf"))
+      .def(
+          "getJacobian",
+          +[](const dart::dynamics::TemplatedJacobianNode<
+                  dart::dynamics::BodyNode>* self,
+              const Eigen::Vector3d& _offset) -> dart::math::Jacobian {
+            return self->getJacobian(_offset);
+          },
+          ::pybind11::arg("offset"))
+      .def(
+          "getJacobian",
+          +[](const dart::dynamics::TemplatedJacobianNode<
+                  dart::dynamics::BodyNode>* self,
+              const Eigen::Vector3d& _offset,
+              const dart::dynamics::Frame* _inCoordinatesOf)
+              -> dart::math::Jacobian {
+            return self->getJacobian(_offset, _inCoordinatesOf);
+          },
+          ::pybind11::arg("offset"),
+          ::pybind11::arg("inCoordinatesOf"))
+      .def(
+          "getWorldJacobian",
+          +[](const dart::dynamics::TemplatedJacobianNode<
+                  dart::dynamics::BodyNode>* self,
+              const Eigen::Vector3d& _offset) -> dart::math::Jacobian {
+            return self->getWorldJacobian(_offset);
+          },
+          ::pybind11::arg("offset"))
+      .def(
+          "getLinearJacobian",
+          +[](const dart::dynamics::TemplatedJacobianNode<
+               dart::dynamics::BodyNode>* self) -> dart::math::LinearJacobian {
+            return self->getLinearJacobian();
+          })
+      .def(
+          "getLinearJacobian",
+          +[](const dart::dynamics::TemplatedJacobianNode<
+                  dart::dynamics::BodyNode>* self,
+              const dart::dynamics::Frame* _inCoordinatesOf)
+              -> dart::math::LinearJacobian {
+            return self->getLinearJacobian(_inCoordinatesOf);
+          },
+          ::pybind11::arg("inCoordinatesOf"))
+      .def(
+          "getLinearJacobian",
+          +[](const dart::dynamics::TemplatedJacobianNode<
+                  dart::dynamics::BodyNode>* self,
+              const Eigen::Vector3d& _offset) -> dart::math::LinearJacobian {
+            return self->getLinearJacobian(_offset);
+          },
+          ::pybind11::arg("offset"))
+      .def(
+          "getLinearJacobian",
+          +[](const dart::dynamics::TemplatedJacobianNode<
+                  dart::dynamics::BodyNode>* self,
+              const Eigen::Vector3d& _offset,
+              const dart::dynamics::Frame* _inCoordinatesOf)
+              -> dart::math::LinearJacobian {
+            return self->getLinearJacobian(_offset, _inCoordinatesOf);
+          },
+          ::pybind11::arg("offset"),
+          ::pybind11::arg("inCoordinatesOf"))
+      .def(
+          "getAngularJacobian",
+          +[](const dart::dynamics::TemplatedJacobianNode<
+               dart::dynamics::BodyNode>* self) -> dart::math::AngularJacobian {
+            return self->getAngularJacobian();
+          })
+      .def(
+          "getAngularJacobian",
+          +[](const dart::dynamics::TemplatedJacobianNode<
+                  dart::dynamics::BodyNode>* self,
+              const dart::dynamics::Frame* _inCoordinatesOf)
+              -> dart::math::AngularJacobian {
+            return self->getAngularJacobian(_inCoordinatesOf);
+          },
+          ::pybind11::arg("inCoordinatesOf"))
+      .def(
+          "getJacobianSpatialDeriv",
+          +[](const dart::dynamics::TemplatedJacobianNode<
+                  dart::dynamics::BodyNode>* self,
+              const dart::dynamics::Frame* _inCoordinatesOf)
+              -> dart::math::Jacobian {
+            return self->getJacobianSpatialDeriv(_inCoordinatesOf);
+          },
+          ::pybind11::arg("inCoordinatesOf"))
+      .def(
+          "getJacobianSpatialDeriv",
+          +[](const dart::dynamics::TemplatedJacobianNode<
+                  dart::dynamics::BodyNode>* self,
+              const Eigen::Vector3d& _offset) -> dart::math::Jacobian {
+            return self->getJacobianSpatialDeriv(_offset);
+          },
+          ::pybind11::arg("offset"))
+      .def(
+          "getJacobianSpatialDeriv",
+          +[](const dart::dynamics::TemplatedJacobianNode<
+                  dart::dynamics::BodyNode>* self,
+              const Eigen::Vector3d& _offset,
+              const dart::dynamics::Frame* _inCoordinatesOf)
+              -> dart::math::Jacobian {
+            return self->getJacobianSpatialDeriv(_offset, _inCoordinatesOf);
+          },
+          ::pybind11::arg("offset"),
+          ::pybind11::arg("inCoordinatesOf"))
+      .def(
+          "getJacobianClassicDeriv",
+          +[](const dart::dynamics::TemplatedJacobianNode<
+                  dart::dynamics::BodyNode>* self,
+              const dart::dynamics::Frame* _inCoordinatesOf)
+              -> dart::math::Jacobian {
+            return self->getJacobianClassicDeriv(_inCoordinatesOf);
+          },
+          ::pybind11::arg("inCoordinatesOf"))
+      .def(
+          "getJacobianClassicDeriv",
+          +[](const dart::dynamics::TemplatedJacobianNode<
+                  dart::dynamics::BodyNode>* self,
+              const Eigen::Vector3d& _offset) -> dart::math::Jacobian {
+            return self->getJacobianClassicDeriv(_offset);
+          },
+          ::pybind11::arg("offset"))
+      .def(
+          "getJacobianClassicDeriv",
+          +[](const dart::dynamics::TemplatedJacobianNode<
+                  dart::dynamics::BodyNode>* self,
+              const Eigen::Vector3d& _offset,
+              const dart::dynamics::Frame* _inCoordinatesOf)
+              -> dart::math::Jacobian {
+            return self->getJacobianClassicDeriv(_offset, _inCoordinatesOf);
+          },
+          ::pybind11::arg("offset"),
+          ::pybind11::arg("inCoordinatesOf"))
+      .def(
+          "getLinearJacobianDeriv",
+          +[](const dart::dynamics::TemplatedJacobianNode<
+               dart::dynamics::BodyNode>* self) -> dart::math::LinearJacobian {
+            return self->getLinearJacobianDeriv();
+          })
+      .def(
+          "getLinearJacobianDeriv",
+          +[](const dart::dynamics::TemplatedJacobianNode<
+                  dart::dynamics::BodyNode>* self,
+              const dart::dynamics::Frame* _inCoordinatesOf)
+              -> dart::math::LinearJacobian {
+            return self->getLinearJacobianDeriv(_inCoordinatesOf);
+          },
+          ::pybind11::arg("inCoordinatesOf"))
+      .def(
+          "getLinearJacobianDeriv",
+          +[](const dart::dynamics::TemplatedJacobianNode<
+                  dart::dynamics::BodyNode>* self,
+              const Eigen::Vector3d& _offset) -> dart::math::LinearJacobian {
+            return self->getLinearJacobianDeriv(_offset);
+          },
+          ::pybind11::arg("offset"))
+      .def(
+          "getLinearJacobianDeriv",
+          +[](const dart::dynamics::TemplatedJacobianNode<
+                  dart::dynamics::BodyNode>* self,
+              const Eigen::Vector3d& _offset,
+              const dart::dynamics::Frame* _inCoordinatesOf)
+              -> dart::math::LinearJacobian {
+            return self->getLinearJacobianDeriv(_offset, _inCoordinatesOf);
+          },
+          ::pybind11::arg("offset"),
+          ::pybind11::arg("inCoordinatesOf"))
+      .def(
+          "getAngularJacobianDeriv",
+          +[](const dart::dynamics::TemplatedJacobianNode<
+               dart::dynamics::BodyNode>* self) -> dart::math::AngularJacobian {
+            return self->getAngularJacobianDeriv();
+          })
+      .def(
+          "getAngularJacobianDeriv",
+          +[](const dart::dynamics::TemplatedJacobianNode<
+                  dart::dynamics::BodyNode>* self,
+              const dart::dynamics::Frame* _inCoordinatesOf)
+              -> dart::math::AngularJacobian {
+            return self->getAngularJacobianDeriv(_inCoordinatesOf);
+          },
+          ::pybind11::arg("inCoordinatesOf"));
+
+  ::pybind11::class_<
+      dart::dynamics::BodyNode,
+      dart::dynamics::TemplatedJacobianNode<dart::dynamics::BodyNode>,
+      dart::dynamics::Frame,
+      dart::dynamics::BodyNodePtr>(m, "BodyNode")
       .def(
           "setAllNodeStates",
           +[](dart::dynamics::BodyNode* self,
@@ -102,14 +422,14 @@ void BodyNode(pybind11::module& m)
                                               dart::dynamics::Node::State,
                                               std::default_delete<
                                                   dart::dynamics::Node::
-                                                      State> > >,
+                                                      State>>>,
                                       std::default_delete<
                                           dart::common::CloneableVector<
                                               std::unique_ptr<
                                                   dart::dynamics::Node::State,
                                                   std::default_delete<
                                                       dart::dynamics::Node::
-                                                          State> > > > >,
+                                                          State>>>>>,
                                   std::less<std::type_index>,
                                   std::allocator<std::pair<
                                       const std::type_index,
@@ -119,7 +439,7 @@ void BodyNode(pybind11::module& m)
                                                   dart::dynamics::Node::State,
                                                   std::default_delete<
                                                       dart::dynamics::Node::
-                                                          State> > >,
+                                                          State>>>,
                                           std::default_delete<
                                               dart::common::CloneableVector<
                                                   std::unique_ptr<
@@ -127,7 +447,7 @@ void BodyNode(pybind11::module& m)
                                                           State,
                                                       std::default_delete<
                                                           dart::dynamics::Node::
-                                                              State> > > > > > > > >,
+                                                              State>>>>>>>>>,
                               &dart::dynamics::detail::setAllNodeStates,
                               &dart::dynamics::detail::getAllNodeStates>,
                           dart::common::ProxyCloneable<
@@ -141,7 +461,7 @@ void BodyNode(pybind11::module& m)
                                               dart::dynamics::Node::Properties,
                                               std::default_delete<
                                                   dart::dynamics::Node::
-                                                      Properties> > >,
+                                                      Properties>>>,
                                       std::default_delete<
                                           dart::common::CloneableVector<
                                               std::unique_ptr<
@@ -149,7 +469,7 @@ void BodyNode(pybind11::module& m)
                                                       Properties,
                                                   std::default_delete<
                                                       dart::dynamics::Node::
-                                                          Properties> > > > >,
+                                                          Properties>>>>>,
                                   std::less<std::type_index>,
                                   std::allocator<std::pair<
                                       const std::type_index,
@@ -160,7 +480,7 @@ void BodyNode(pybind11::module& m)
                                                       Properties,
                                                   std::default_delete<
                                                       dart::dynamics::Node::
-                                                          Properties> > >,
+                                                          Properties>>>,
                                           std::default_delete<
                                               dart::common::CloneableVector<
                                                   std::unique_ptr<
@@ -168,10 +488,10 @@ void BodyNode(pybind11::module& m)
                                                           Properties,
                                                       std::default_delete<
                                                           dart::dynamics::Node::
-                                                              Properties> > > > > > > > >,
+                                                              Properties>>>>>>>>>,
                               &dart::dynamics::detail::setAllNodeProperties,
                               &dart::dynamics::detail::
-                                  getAllNodeProperties> > > >::AspectState&
+                                  getAllNodeProperties>>>>::AspectState&
                   state) { self->setAspectState(state); },
           ::pybind11::arg("state"))
       .def(
@@ -572,6 +892,31 @@ void BodyNode(pybind11::module& m)
             return self->getSkeleton();
           })
       .def(
+          "getParentJoint",
+          +[](dart::dynamics::BodyNode* self) -> dart::dynamics::Joint* {
+            return self->getParentJoint();
+          },
+          ::pybind11::return_value_policy::reference_internal)
+      .def(
+          "getParentBodyNode",
+          +[](dart::dynamics::BodyNode* self) -> dart::dynamics::BodyNode* {
+            return self->getParentBodyNode();
+          },
+          ::pybind11::return_value_policy::reference_internal)
+      // clang-format off
+      DARTPY_DEFINE_CREATE_CHILD_JOINT_AND_BODY_NODE_PAIR(WeldJoint)
+      DARTPY_DEFINE_CREATE_CHILD_JOINT_AND_BODY_NODE_PAIR(RevoluteJoint)
+      DARTPY_DEFINE_CREATE_CHILD_JOINT_AND_BODY_NODE_PAIR(PrismaticJoint)
+      DARTPY_DEFINE_CREATE_CHILD_JOINT_AND_BODY_NODE_PAIR(ScrewJoint)
+      DARTPY_DEFINE_CREATE_CHILD_JOINT_AND_BODY_NODE_PAIR(UniversalJoint)
+      DARTPY_DEFINE_CREATE_CHILD_JOINT_AND_BODY_NODE_PAIR(TranslationalJoint2D)
+      DARTPY_DEFINE_CREATE_CHILD_JOINT_AND_BODY_NODE_PAIR(PlanarJoint)
+      DARTPY_DEFINE_CREATE_CHILD_JOINT_AND_BODY_NODE_PAIR(EulerJoint)
+      DARTPY_DEFINE_CREATE_CHILD_JOINT_AND_BODY_NODE_PAIR(BallJoint)
+      DARTPY_DEFINE_CREATE_CHILD_JOINT_AND_BODY_NODE_PAIR(TranslationalJoint)
+      DARTPY_DEFINE_CREATE_CHILD_JOINT_AND_BODY_NODE_PAIR(FreeJoint)
+      // clang-format on
+      .def(
           "getNumChildBodyNodes",
           +[](const dart::dynamics::BodyNode* self) -> std::size_t {
             return self->getNumChildBodyNodes();
@@ -587,17 +932,38 @@ void BodyNode(pybind11::module& m)
             return self->getNumShapeNodes();
           })
       .def(
+          "getShapeNode",
+          +[](dart::dynamics::BodyNode* self,
+              std::size_t index) -> dart::dynamics::ShapeNode* {
+            return self->getShapeNode(index);
+          },
+          ::pybind11::return_value_policy::reference_internal,
+          ::pybind11::arg("index"))
+      .def(
+          "createShapeNode",
+          +[](dart::dynamics::BodyNode* self,
+              dart::dynamics::ShapePtr shape) -> dart::dynamics::ShapeNode* {
+            return self->createShapeNode(shape);
+          },
+          ::pybind11::return_value_policy::reference_internal,
+          ::pybind11::arg("shape"))
+      .def(
+          "createShapeNode",
+          +[](dart::dynamics::BodyNode* self,
+              dart::dynamics::ShapePtr shape,
+              const std::string& name) -> dart::dynamics::ShapeNode* {
+            return self->createShapeNode(shape, name);
+          },
+          ::pybind11::return_value_policy::reference_internal,
+          ::pybind11::arg("shape"),
+          ::pybind11::arg("name"))
+      .def(
           "getShapeNodes",
           +[](dart::dynamics::BodyNode* self)
               -> const std::vector<dart::dynamics::ShapeNode*> {
             return self->getShapeNodes();
-          })
-      .def(
-          "getShapeNodes",
-          +[](const dart::dynamics::BodyNode* self)
-              -> const std::vector<const dart::dynamics::ShapeNode*> {
-            return self->getShapeNodes();
-          })
+          },
+          ::pybind11::return_value_policy::reference_internal)
       .def(
           "removeAllShapeNodes",
           +[](dart::dynamics::BodyNode* self) { self->removeAllShapeNodes(); })

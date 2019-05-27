@@ -59,6 +59,7 @@ public:
     setColor(eigToOsgVec4f(color));
     setShape(mShape);
     setDataVariance(::osg::Object::DYNAMIC);
+    getOrCreateStateSet()->setMode(GL_BLEND, ::osg::StateAttribute::ON);
   }
 
   void updateSize(double size)
@@ -81,7 +82,7 @@ protected:
 };
 
 //==============================================================================
-class QuadDrawable : public ::osg::Geometry
+class QuadDrawable final : public ::osg::Geometry
 {
 public:
   QuadDrawable(double size, const Eigen::Vector4d& color)
@@ -96,6 +97,7 @@ public:
     addPrimitiveSet(new ::osg::DrawArrays(::osg::PrimitiveSet::QUADS, 0, 4));
 
     setDataVariance(::osg::Object::DYNAMIC);
+    getOrCreateStateSet()->setMode(GL_BLEND, ::osg::StateAttribute::ON);
   }
 
   void updateSize(double size)
@@ -127,7 +129,7 @@ protected:
 };
 
 //==============================================================================
-class CircleDrawable : public ::osg::Geometry
+class CircleDrawable final : public ::osg::Geometry
 {
 public:
   CircleDrawable(double size, const Eigen::Vector4d& color)
@@ -142,6 +144,7 @@ public:
     updateColor(color);
 
     setDataVariance(::osg::Object::DYNAMIC);
+    getOrCreateStateSet()->setMode(GL_BLEND, ::osg::StateAttribute::ON);
   }
 
   void updateSize(double size)
@@ -438,7 +441,7 @@ PointCloudShapeNode::~PointCloudShapeNode()
   }
   else if (
       mPointShapeType
-      == dynamics::PointCloudShape::PointShapeType::BILLBOARD_QUAD)
+      == dynamics::PointCloudShape::PointShapeType::BILLBOARD_SQUARE)
   {
     return new BillboardPointNode<QuadDrawable>(point, size, color);
   }

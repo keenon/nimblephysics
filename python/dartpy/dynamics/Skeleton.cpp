@@ -32,8 +32,67 @@
 
 #include <dart/dart.hpp>
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 #include "eigen_geometry_pybind.h"
 #include "eigen_pybind.h"
+
+#define DARTPY_DEFINE_CREATE_JOINT_AND_BODY_NODE_PAIR(joint_type)              \
+  .def(                                                                        \
+      "create" #joint_type "AndBodyNodePair",                                  \
+      +[](dart::dynamics::Skeleton* self)                                      \
+          -> std::                                                             \
+              pair<dart::dynamics::joint_type*, dart::dynamics::BodyNode*> {   \
+                return self->createJointAndBodyNodePair<                       \
+                    dart::dynamics::joint_type,                                \
+                    dart::dynamics::BodyNode>();                               \
+              },                                                               \
+      ::pybind11::return_value_policy::reference_internal)                     \
+      .def(                                                                    \
+          "create" #joint_type "AndBodyNodePair",                              \
+          +[](dart::dynamics::Skeleton* self,                                  \
+              dart::dynamics::BodyNode* parent)                                \
+              -> std::pair<                                                    \
+                  dart::dynamics::joint_type*,                                 \
+                  dart::dynamics::BodyNode*> {                                 \
+            return self->createJointAndBodyNodePair<                           \
+                dart::dynamics::joint_type,                                    \
+                dart::dynamics::BodyNode>(parent);                             \
+          },                                                                   \
+          ::pybind11::return_value_policy::reference_internal,                 \
+          ::pybind11::arg("parent"))                                           \
+      .def(                                                                    \
+          "create" #joint_type "AndBodyNodePair",                              \
+          +[](dart::dynamics::Skeleton* self,                                  \
+              dart::dynamics::BodyNode* parent,                                \
+              const dart::dynamics::joint_type::Properties& jointProperties)   \
+              -> std::pair<                                                    \
+                  dart::dynamics::joint_type*,                                 \
+                  dart::dynamics::BodyNode*> {                                 \
+            return self->createJointAndBodyNodePair<                           \
+                dart::dynamics::joint_type,                                    \
+                dart::dynamics::BodyNode>(parent, jointProperties);            \
+          },                                                                   \
+          ::pybind11::return_value_policy::reference_internal,                 \
+          ::pybind11::arg("parent"),                                           \
+          ::pybind11::arg("jointProperties"))                                  \
+      .def(                                                                    \
+          "create" #joint_type "AndBodyNodePair",                              \
+          +[](dart::dynamics::Skeleton* self,                                  \
+              dart::dynamics::BodyNode* parent,                                \
+              const dart::dynamics::joint_type::Properties& jointProperties,   \
+              const dart::dynamics::BodyNode::Properties& bodyProperties)      \
+              -> std::pair<                                                    \
+                  dart::dynamics::joint_type*,                                 \
+                  dart::dynamics::BodyNode*> {                                 \
+            return self->createJointAndBodyNodePair<                           \
+                dart::dynamics::joint_type,                                    \
+                dart::dynamics::BodyNode>(                                     \
+                parent, jointProperties, bodyProperties);                      \
+          },                                                                   \
+          ::pybind11::return_value_policy::reference_internal,                 \
+          ::pybind11::arg("parent").none(true),                                \
+          ::pybind11::arg("jointProperties"),                                  \
+          ::pybind11::arg("bodyProperties"))
 
 namespace dart {
 namespace python {
@@ -44,6 +103,22 @@ void Skeleton(pybind11::module& m)
       dart::dynamics::Skeleton,
       dart::dynamics::MetaSkeleton,
       std::shared_ptr<dart::dynamics::Skeleton>>(m, "Skeleton")
+      .def(::pybind11::init(+[]() -> dart::dynamics::SkeletonPtr {
+        return dart::dynamics::Skeleton::create();
+      }))
+      .def(
+          ::pybind11::init(
+              +[](const std::string& _name) -> dart::dynamics::SkeletonPtr {
+                return dart::dynamics::Skeleton::create(_name);
+              }),
+          ::pybind11::arg("name"))
+      .def(
+          ::pybind11::init(
+              +[](const dart::dynamics::Skeleton::AspectPropertiesData&
+                      properties) -> dart::dynamics::SkeletonPtr {
+                return dart::dynamics::Skeleton::create(properties);
+              }),
+          ::pybind11::arg("properties"))
       .def(
           "getPtr",
           +[](dart::dynamics::Skeleton* self) -> dart::dynamics::SkeletonPtr {
@@ -165,14 +240,6 @@ void Skeleton(pybind11::module& m)
             return self->getName();
           },
           ::pybind11::return_value_policy::reference_internal)
-      //      .def("enableSelfCollision", +[](dart::dynamics::Skeleton *self) ->
-      //      void { return self->enableSelfCollision(); })
-      //      .def("enableSelfCollision", +[](dart::dynamics::Skeleton *self,
-      //      bool enableAdjacentBodyCheck) -> void { return
-      //      self->enableSelfCollision(enableAdjacentBodyCheck); },
-      //      ::pybind11::arg("enableAdjacentBodyCheck"))
-      //      .def("disableSelfCollision", +[](dart::dynamics::Skeleton *self)
-      //      -> void { return self->disableSelfCollision(); })
       .def(
           "setSelfCollisionCheck",
           +[](dart::dynamics::Skeleton* self, bool enable) -> void {
@@ -258,6 +325,19 @@ void Skeleton(pybind11::module& m)
             return self->getGravity();
           },
           ::pybind11::return_value_policy::reference_internal)
+      // clang-format off
+      DARTPY_DEFINE_CREATE_JOINT_AND_BODY_NODE_PAIR(WeldJoint)
+      DARTPY_DEFINE_CREATE_JOINT_AND_BODY_NODE_PAIR(RevoluteJoint)
+      DARTPY_DEFINE_CREATE_JOINT_AND_BODY_NODE_PAIR(PrismaticJoint)
+      DARTPY_DEFINE_CREATE_JOINT_AND_BODY_NODE_PAIR(ScrewJoint)
+      DARTPY_DEFINE_CREATE_JOINT_AND_BODY_NODE_PAIR(UniversalJoint)
+      DARTPY_DEFINE_CREATE_JOINT_AND_BODY_NODE_PAIR(TranslationalJoint2D)
+      DARTPY_DEFINE_CREATE_JOINT_AND_BODY_NODE_PAIR(PlanarJoint)
+      DARTPY_DEFINE_CREATE_JOINT_AND_BODY_NODE_PAIR(EulerJoint)
+      DARTPY_DEFINE_CREATE_JOINT_AND_BODY_NODE_PAIR(BallJoint)
+      DARTPY_DEFINE_CREATE_JOINT_AND_BODY_NODE_PAIR(TranslationalJoint)
+      DARTPY_DEFINE_CREATE_JOINT_AND_BODY_NODE_PAIR(FreeJoint)
+      // clang-format on
       .def(
           "getNumBodyNodes",
           +[](const dart::dynamics::Skeleton* self) -> std::size_t {
@@ -283,7 +363,7 @@ void Skeleton(pybind11::module& m)
           +[](dart::dynamics::Skeleton* self) -> dart::dynamics::BodyNode* {
             return self->getRootBodyNode();
           },
-          pybind11::return_value_policy::reference_internal)
+          pybind11::return_value_policy::reference)
       .def(
           "getRootBodyNode",
           +[](dart::dynamics::Skeleton* self,
@@ -291,7 +371,7 @@ void Skeleton(pybind11::module& m)
             return self->getRootBodyNode(index);
           },
           ::pybind11::arg("treeIndex"),
-          pybind11::return_value_policy::reference_internal)
+          pybind11::return_value_policy::reference)
       .def(
           "getRootJoint",
           +[](dart::dynamics::Skeleton* self) -> dart::dynamics::Joint* {
@@ -357,12 +437,14 @@ void Skeleton(pybind11::module& m)
           "getJoint",
           +[](dart::dynamics::Skeleton* self, std::size_t _idx)
               -> dart::dynamics::Joint* { return self->getJoint(_idx); },
-          ::pybind11::arg("idx"))
+          ::pybind11::arg("idx"),
+          pybind11::return_value_policy::reference_internal)
       .def(
           "getJoint",
           +[](dart::dynamics::Skeleton* self, const std::string& name)
               -> dart::dynamics::Joint* { return self->getJoint(name); },
-          ::pybind11::arg("name"))
+          ::pybind11::arg("name"),
+          pybind11::return_value_policy::reference_internal)
       .def(
           "getJoints",
           +[](dart::dynamics::Skeleton* self)
@@ -417,6 +499,14 @@ void Skeleton(pybind11::module& m)
           +[](const dart::dynamics::Skeleton* self) -> std::size_t {
             return self->getNumDofs();
           })
+      .def(
+          "getDof",
+          +[](dart::dynamics::Skeleton* self,
+              const std::string& name) -> dart::dynamics::DegreeOfFreedom* {
+            return self->getDof(name);
+          },
+          ::pybind11::return_value_policy::reference_internal,
+          ::pybind11::arg("index"))
       .def(
           "getDofs",
           +[](const dart::dynamics::Skeleton* self)
@@ -917,6 +1007,98 @@ void Skeleton(pybind11::module& m)
           +[](const dart::dynamics::Skeleton* self)
               -> double { return self->getMass(); })
       .def(
+          "getMassMatrix",
+          +[](const dart::dynamics::Skeleton* self,
+              std::size_t treeIndex) -> const Eigen::MatrixXd& {
+            return self->getMassMatrix(treeIndex);
+          })
+      // TODO(JS): Redefining get[~]() that are already defined in MetaSkeleton.
+      // We need this because the methods with same name (but different
+      // arguments) are hidden. Update (or remove) once following issue is
+      // resolved: https://github.com/pybind/pybind11/issues/974
+      .def(
+          "getMassMatrix",
+          +[](const dart::dynamics::Skeleton* self) -> const Eigen::MatrixXd& {
+            return self->getMassMatrix();
+          })
+      .def(
+          "getAugMassMatrix",
+          +[](const dart::dynamics::Skeleton* self,
+              std::size_t treeIndex) -> const Eigen::MatrixXd& {
+            return self->getAugMassMatrix(treeIndex);
+          })
+      .def(
+          "getAugMassMatrix",
+          +[](const dart::dynamics::Skeleton* self) -> const Eigen::MatrixXd& {
+            return self->getAugMassMatrix();
+          })
+      .def(
+          "getInvMassMatrix",
+          +[](const dart::dynamics::Skeleton* self,
+              std::size_t treeIndex) -> const Eigen::MatrixXd& {
+            return self->getInvMassMatrix(treeIndex);
+          })
+      .def(
+          "getInvMassMatrix",
+          +[](const dart::dynamics::Skeleton* self) -> const Eigen::MatrixXd& {
+            return self->getInvMassMatrix();
+          })
+      .def(
+          "getCoriolisForces",
+          +[](dart::dynamics::Skeleton* self,
+              std::size_t treeIndex) -> const Eigen::VectorXd& {
+            return self->getCoriolisForces(treeIndex);
+          })
+      .def(
+          "getCoriolisForces",
+          +[](dart::dynamics::Skeleton* self) -> const Eigen::VectorXd& {
+            return self->getCoriolisForces();
+          })
+      .def(
+          "getGravityForces",
+          +[](dart::dynamics::Skeleton* self,
+              std::size_t treeIndex) -> const Eigen::VectorXd& {
+            return self->getCoriolisForces(treeIndex);
+          })
+      .def(
+          "getGravityForces",
+          +[](dart::dynamics::Skeleton* self) -> const Eigen::VectorXd& {
+            return self->getCoriolisForces();
+          })
+      .def(
+          "getCoriolisAndGravityForces",
+          +[](dart::dynamics::Skeleton* self,
+              std::size_t treeIndex) -> const Eigen::VectorXd& {
+            return self->getCoriolisAndGravityForces(treeIndex);
+          })
+      .def(
+          "getCoriolisAndGravityForces",
+          +[](dart::dynamics::Skeleton* self) -> const Eigen::VectorXd& {
+            return self->getCoriolisAndGravityForces();
+          })
+      .def(
+          "getExternalForces",
+          +[](dart::dynamics::Skeleton* self,
+              std::size_t treeIndex) -> const Eigen::VectorXd& {
+            return self->getCoriolisAndGravityForces(treeIndex);
+          })
+      .def(
+          "getExternalForces",
+          +[](dart::dynamics::Skeleton* self) -> const Eigen::VectorXd& {
+            return self->getCoriolisAndGravityForces();
+          })
+      .def(
+          "getConstraintForces",
+          +[](dart::dynamics::Skeleton* self,
+              std::size_t treeIndex) -> const Eigen::VectorXd& {
+            return self->getConstraintForces(treeIndex);
+          })
+      .def(
+          "getConstraintForces",
+          +[](dart::dynamics::Skeleton* self) -> const Eigen::VectorXd& {
+            return self->getConstraintForces();
+          })
+      .def(
           "clearExternalForces",
           +[](dart::dynamics::Skeleton* self)
               -> void { return self->clearExternalForces(); })
@@ -1116,23 +1298,6 @@ void Skeleton(pybind11::module& m)
           "resetUnion",
           +[](dart::dynamics::Skeleton* self)
               -> void { return self->resetUnion(); })
-      .def_static(
-          "create",
-          +[]() -> dart::dynamics::
-                    SkeletonPtr { return dart::dynamics::Skeleton::create(); })
-      .def_static(
-          "create",
-          +[](const std::string& _name) -> dart::dynamics::SkeletonPtr {
-            return dart::dynamics::Skeleton::create(_name);
-          },
-          ::pybind11::arg("name"))
-      .def_static(
-          "create",
-          +[](const dart::dynamics::Skeleton::AspectPropertiesData& properties)
-              -> dart::dynamics::SkeletonPtr {
-            return dart::dynamics::Skeleton::create(properties);
-          },
-          ::pybind11::arg("properties"))
       .def_readwrite(
           "mUnionRootSkeleton", &dart::dynamics::Skeleton::mUnionRootSkeleton)
       .def_readwrite("mUnionSize", &dart::dynamics::Skeleton::mUnionSize)

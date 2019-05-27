@@ -2,6 +2,10 @@
 
 ### [DART 6.9.0 (20XX-XX-XX)](https://github.com/dartsim/dart/milestone/52?closed=1)
 
+* Common
+
+  * Deprecated custom make_unique in favor of std::make_unique: [#1317](https://github.com/dartsim/dart/pull/1317)
+
 * Collision Detection
 
   * Added raycast query to BulletCollisionDetector: [#1309](https://github.com/dartsim/dart/pull/1309)
@@ -23,6 +27,8 @@
   * Removed warning of ImGuiViewer + OSG shadow: [#1312](https://github.com/dartsim/dart/pull/1312)
   * Added shape type and color options to PointCloudShape: [#1314](https://github.com/dartsim/dart/pull/1314), [#1316](https://github.com/dartsim/dart/pull/1316)
   * Fixed incorrect transparency of MeshShape for MATERIAL_COLOR mode: [#1315](https://github.com/dartsim/dart/pull/1315)
+  * Fixed incorrect PointCloudShape transparency: [#1330](https://github.com/dartsim/dart/pull/1330)
+  * Improved voxel rendering by using multiple nodes instead of CompositeShape: [#1334](https://github.com/dartsim/dart/pull/1334)
 
 * Examples and Tutorials
 
@@ -31,6 +37,20 @@
 * dartpy
 
   * Switched to pybind11: [#1307](https://github.com/dartsim/dart/pull/1307)
+  * Added grid visual: [#1318](https://github.com/dartsim/dart/pull/1318)
+  * Added ReferentialSkeleton, Linkage, and Chain: [#1321](https://github.com/dartsim/dart/pull/1321)
+  * Enabled WorldNode classes to overload virtual functions in Python: [#1322](https://github.com/dartsim/dart/pull/1322)
+  * Added JacobianNode and operational space controller example: [#1323](https://github.com/dartsim/dart/pull/1323)
+  * Removed static create() functions in favor of custom constructors: [#1324](https://github.com/dartsim/dart/pull/1324)
+  * Added optimizer APIs with GradientDescentSolver and NloptSolver: [#1325](https://github.com/dartsim/dart/pull/1325)
+  * Added SimpleFrame: [#1326](https://github.com/dartsim/dart/pull/1326)
+  * Added basic inverse kinematics APIs: [#1327](https://github.com/dartsim/dart/pull/1327)
+  * Added shapes and ShapeFrame aspects: [#1328](https://github.com/dartsim/dart/pull/1328)
+  * Added collision APIs: [#1329](https://github.com/dartsim/dart/pull/1329)
+  * Added DegreeOfFreedom and ShapeNode: [#1332](https://github.com/dartsim/dart/pull/1332)
+  * Added constraint APIs: [#1333](https://github.com/dartsim/dart/pull/1333)
+  * Added BallJoint, RevoluteJoint, joint properties, and chain tutorial (incomplete): [#1335](https://github.com/dartsim/dart/pull/1335)
+  * Added all the joints: [#1337](https://github.com/dartsim/dart/pull/1337)
 
 ### [DART 6.8.4 (2019-05-03)](https://github.com/dartsim/dart/milestone/56?closed=1)
 
