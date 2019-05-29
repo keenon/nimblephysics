@@ -1,0 +1,2 @@
+﻿include CMakeLists.txt
+recursiv-include cmake dart python doxygen

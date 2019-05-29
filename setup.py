@@ -20,20 +20,24 @@ with open(os.path.join(dart_root, 'README.md'), encoding='utf-8') as f:
     long_description = f.read()
 description = 'Python API of Dynamic Animation and Robotics Toolkit.'
 
-distutils.log.set_verbosity(distutils.log.DEBUG)  # Set DEBUG level
+# distutils.log.set_verbosity(distutils.log.DEBUG)  # Set DEBUG level
 
 
 class CMakeExtension(Extension):
     def __init__(self, name, sourcedir='', sources=[]):
-        Extension.__init__(self, name, sources=sources)
+        Extension.__init__(self, name=name, sources=sources)
         self.sourcedir = os.path.abspath(sourcedir)
 
 
-class CMakeBuild(build_ext):
-    """ Wrapper class that builds the extension using CMake. """
+class CMakeBuildExt(build_ext):
+    """
+    Builds using cmake instead of the python setuptools implicit build
+    """
 
     def run(self):
-        """ Build using CMake from the specified build directory. """
+        """
+        Perform build_cmake before doing the 'normal' stuff
+        """
         try:
             out = subprocess.check_output(['cmake', '--version'])
         except OSError:
@@ -47,15 +51,17 @@ class CMakeBuild(build_ext):
             if cmake_version < '3.8.0':
                 raise RuntimeError("CMake >= 3.8.0 is required on Windows")
 
-        distutils.log.set_verbosity(distutils.log.DEBUG)  # Set DEBUG level
-
         for ext in self.extensions:
-            self.build_extension(ext)
+            self.build_cmake(ext)
+         
+        super().run()
 
-    def build_extension(self, ext):
+    def build_cmake(self, ext):
         cmake_args = [
             '-DDART_BUILD_DARTPY=ON', '-DPYTHON_EXECUTABLE=' + sys.executable
         ]
+
+        self.announce("Preparing the build environment", level=3)
 
         cfg = 'Debug' if self.debug else 'Release'
         build_args = ['--config', cfg]
@@ -66,28 +72,34 @@ class CMakeBuild(build_ext):
             build_args += ['--', '/m']
         else:
             cmake_args += ['-DCMAKE_BUILD_TYPE=' + cfg]
-            build_args += ['--', '-j4']
+            build_args += ['--', '-j36']
 
         env = os.environ.copy()
         env['CXXFLAGS'] = '{} -DVERSION_INFO=\\"{}\\"'.format(
             env.get('CXXFLAGS', ''), self.distribution.get_version())
         if not os.path.exists(self.build_temp):
             os.makedirs(self.build_temp)
+
+        # Now that the necessary directories are created, build
+
+        distutils.log.info("Configuring cmake project")
+        self.announce("Configuring cmake project", level=distutils.log.INFO)
+
+        # Change your cmake arguments below as necessary
+        # Below is just an example set of arguments for building Blender as a Python module
+
         subprocess.check_call(['cmake', ext.sourcedir] + cmake_args,
                               cwd=self.build_temp,
                               env=env)
+
+        self.announce("Building binaries", level=distutils.log.INFO)
+        
         subprocess.check_call(['cmake', '--build', '.', '--target', 'dartpy'] +
                               build_args,
                               cwd=self.build_temp)
-        subprocess.check_call(['cmake', '--build', '.', '--target', 'install'],
-                              cwd=self.build_temp)
+        # subprocess.check_call(['cmake', '--build', '.', '--target', 'install'],
+        #                       cwd=self.build_temp)
 
-
-sources = ['CMakeLists.txt']
-sources.extend(glob.glob('cmake/**/*', recursive=True))
-sources.extend(glob.glob('dart/**/*', recursive=True))
-sources.extend(glob.glob('python/**/*', recursive=True))
-sources.extend(glob.glob('doxygen/**/*', recursive=True))
 
 # Set up the python package wrapping this extension.
 setup(
@@ -96,7 +108,7 @@ setup(
     description=description,
     long_description=long_description,
     long_description_content_type='text/markdown',
-    ext_modules=[CMakeExtension('dartpy', sources=sources)],
+    ext_modules=[CMakeExtension('dartpy')],
     url='https://github.com/dartsim/dart',
     author='Jeongseok Lee',
     author_email='jslee02@gmail.com',
@@ -109,5 +121,5 @@ setup(
         'License :: OSI Approved :: BSD License',
         'Topic :: Scientific/Engineering',
     ],
-    cmdclass=dict(build_ext=CMakeBuild),
+    cmdclass=dict(build_ext=CMakeBuildExt, install_lib=install_lib),
 )
