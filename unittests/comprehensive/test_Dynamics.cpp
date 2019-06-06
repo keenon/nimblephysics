@@ -57,6 +57,9 @@ public:
   // Get Skel file URI to test.
   const std::vector<common::Uri>& getList() const;
 
+  // Get Skel file URI to test.
+  const std::vector<common::Uri>& getListForDebug() const;
+
   // Get reference frames
   const std::vector<SimpleFrame*>& getRefFrames() const;
 
@@ -115,6 +118,9 @@ protected:
   // Skel file list.
   std::vector<common::Uri> fileList;
 
+  // Skel file list for debug mode
+  std::vector<common::Uri> fileListForDebug;
+
   std::vector<SimpleFrame*> refFrames;
 };
 
@@ -142,6 +148,12 @@ void DynamicsTest::SetUp()
   fileList.push_back("dart://sample/skel/test/tree_structure_ball_joint.skel");
   fileList.push_back("dart://sample/skel/fullbody1.skel");
 
+  fileListForDebug.push_back("dart://sample/skel/test/serial_chain_revolute_joint.skel");
+  fileListForDebug.push_back("dart://sample/skel/test/serial_chain_eulerxyz_joint.skel");
+  fileListForDebug.push_back("dart://sample/skel/test/serial_chain_ball_joint.skel");
+  fileListForDebug.push_back("dart://sample/skel/test/simple_tree_structure.skel");
+  fileListForDebug.push_back("dart://sample/skel/fullbody1.skel");
+
   // Create a list of reference frames to use during tests
   refFrames.push_back(new SimpleFrame(Frame::World(), "refFrame1"));
   refFrames.push_back(new SimpleFrame(refFrames.back(), "refFrame2"));
@@ -155,6 +167,12 @@ void DynamicsTest::SetUp()
 const std::vector<common::Uri>& DynamicsTest::getList() const
 {
   return fileList;
+}
+
+//==============================================================================
+const std::vector<common::Uri>& DynamicsTest::getListForDebug() const
+{
+  return fileListForDebug;
 }
 
 //==============================================================================
@@ -1249,8 +1267,8 @@ void DynamicsTest::testFiniteDifferenceBodyNodeAcceleration(
 void testForwardKinematicsSkeleton(const dynamics::SkeletonPtr& skel)
 {
 #ifndef NDEBUG  // Debug mode
-  std::size_t nRandomItr = 1e+1;
-  std::size_t numSteps = 1e+1;
+  std::size_t nRandomItr = 5;
+  std::size_t numSteps = 5;
 #else
   std::size_t nRandomItr = 1e+2;
   std::size_t numSteps = 1e+2;
@@ -1430,11 +1448,7 @@ void DynamicsTest::compareEquationsOfMotion(const common::Uri& uri)
 //    int nBodyNodes = skel->getNumBodyNodes();
 
     if (dof == 0)
-    {
-      dtmsg << "Skeleton [" << skel->getName() << "] is skipped since it has "
-            << "0 DOF." << endl;
       continue;
-    }
 
     for (std::size_t j = 0; j < nRandomItr; ++j)
     {
@@ -1705,11 +1719,7 @@ void DynamicsTest::testCenterOfMass(const common::Uri& uri)
 
     std::size_t dof = skeleton->getNumDofs();
     if (dof == 0)
-    {
-      dtmsg << "Skeleton [" << skeleton->getName() << "] is skipped since it "
-            << "has 0 DOF." << endl;
       continue;
-    }
 
     for (std::size_t j = 0; j < nRandomItr; ++j)
     {
@@ -1870,11 +1880,6 @@ void DynamicsTest::testCenterOfMassFreeFall(const common::Uri& uri)
 
     if (nullptr == rootFreeJoint || !skel->isMobile() || 0 == dof)
     {
-#if BUILD_TYPE_DEBUG
-      dtmsg << "Skipping COM free fall test for Skeleton [" << skel->getName()
-            << "] since the Skeleton doesn't have FreeJoint at the root body "
-            << " or immobile." << endl;
-#endif
       continue;
     }
     else
@@ -1949,7 +1954,7 @@ void DynamicsTest::testConstraintImpulse(const common::Uri& uri)
 #ifndef NDEBUG  // Debug mode
   std::size_t nRandomItr = 1;
 #else
-  std::size_t nRandomItr = 1;
+  std::size_t nRandomItr = 2;
 #endif
 
   // Lower and upper bound of configuration for system
@@ -2128,50 +2133,64 @@ void DynamicsTest::testImpulseBasedDynamics(const common::Uri& uri)
 //==============================================================================
 TEST_F(DynamicsTest, testJacobians)
 {
-  for (std::size_t i = 0; i < getList().size(); ++i)
-  {
-#ifndef NDEBUG
-    dtdbg << getList()[i].toString() << std::endl;
+#ifndef NDEBUG  // Debug mode
+  const auto& list = getListForDebug();
+#else
+  const auto& list = getList();
 #endif
-    testJacobians(getList()[i]);
+
+  for (const auto& uri : list)
+  {
+    testJacobians(uri);
   }
 }
 
 //==============================================================================
 TEST_F(DynamicsTest, testFiniteDifference)
 {
-  for (std::size_t i = 0; i < getList().size(); ++i)
-  {
-#if BUILD_TYPE_DEBUG
-    dtdbg << getList()[i].toString() << std::endl;
+#ifndef NDEBUG  // Debug mode
+  const auto& list = getListForDebug();
+#else
+  const auto& list = getList();
 #endif
-    testFiniteDifferenceGeneralizedCoordinates(getList()[i]);
-    testFiniteDifferenceBodyNodeVelocity(getList()[i]);
-    testFiniteDifferenceBodyNodeAcceleration(getList()[i]);
+
+  for (const auto& uri : list)
+  {
+    testFiniteDifferenceGeneralizedCoordinates(uri);
+    testFiniteDifferenceBodyNodeVelocity(uri);
+    testFiniteDifferenceBodyNodeAcceleration(uri);
   }
 }
 
 //==============================================================================
 TEST_F(DynamicsTest, testForwardKinematics)
 {
-  for (std::size_t i = 0; i < getList().size(); ++i)
-  {
-#ifndef NDEBUG
-    dtdbg << getList()[i].toString() << std::endl;
+#ifndef NDEBUG  // Debug mode
+  const auto& list = getListForDebug();
+#else
+  const auto& list = getList();
 #endif
-    testForwardKinematics(getList()[i]);
+
+  for (const auto& uri : list)
+  {
+    testForwardKinematics(uri);
   }
 }
 
 //==============================================================================
 TEST_F(DynamicsTest, compareEquationsOfMotion)
 {
-  for (std::size_t i = 0; i < getList().size(); ++i)
+#ifndef NDEBUG  // Debug mode
+  const auto& list = getListForDebug();
+#else
+  const auto& list = getList();
+#endif
+
+  for (const auto& uri : list)
   {
     ////////////////////////////////////////////////////////////////////////////
     // TODO(JS): Following skel files, which contain euler joints couldn't
     //           pass EQUATIONS_OF_MOTION, are disabled.
-    const auto uri = getList()[i];
     if (uri.toString() == "dart://sample/skel/test/double_pendulum_euler_joint.skel"
         || uri.toString() == "dart://sample/skel/test/chainwhipa.skel"
         || uri.toString() == "dart://sample/skel/test/serial_chain_eulerxyz_joint.skel"
@@ -2183,58 +2202,67 @@ TEST_F(DynamicsTest, compareEquationsOfMotion)
     }
     ////////////////////////////////////////////////////////////////////////////
 
-#ifndef NDEBUG
-    dtdbg << getList()[i].toString() << std::endl;
-#endif
-    compareEquationsOfMotion(getList()[i]);
+    compareEquationsOfMotion(uri);
   }
 }
 
 //==============================================================================
 TEST_F(DynamicsTest, testCenterOfMass)
 {
-  for (std::size_t i = 0; i < getList().size(); ++i)
-  {
-#ifndef NDEBUG
-    dtdbg << getList()[i].toString() << std::endl;
+#ifndef NDEBUG  // Debug mode
+  const auto& list = getListForDebug();
+#else
+  const auto& list = getList();
 #endif
-    testCenterOfMass(getList()[i]);
+
+  for (const auto& uri : list)
+  {
+    testCenterOfMass(uri);
   }
 }
 
 //==============================================================================
 TEST_F(DynamicsTest, testCenterOfMassFreeFall)
 {
-  for (std::size_t i = 0; i < getList().size(); ++i)
-  {
-#ifndef NDEBUG
-    dtdbg << getList()[i].toString() << std::endl;
+#ifndef NDEBUG  // Debug mode
+  const auto& list = getListForDebug();
+#else
+  const auto& list = getList();
 #endif
-    testCenterOfMassFreeFall(getList()[i]);
+
+  for (const auto& uri : list)
+  {
+    testCenterOfMassFreeFall(uri);
   }
 }
 
 //==============================================================================
 TEST_F(DynamicsTest, testConstraintImpulse)
 {
-  for (std::size_t i = 0; i < getList().size(); ++i)
-  {
-#ifndef NDEBUG
-    dtdbg << getList()[i].toString() << std::endl;
+#ifndef NDEBUG  // Debug mode
+  const auto& list = getListForDebug();
+#else
+  const auto& list = getList();
 #endif
-    testConstraintImpulse(getList()[i]);
+
+  for (const auto& uri : list)
+  {
+    testConstraintImpulse(uri);
   }
 }
 
 //==============================================================================
 TEST_F(DynamicsTest, testImpulseBasedDynamics)
 {
-  for (std::size_t i = 0; i < getList().size(); ++i)
-  {
-#ifndef NDEBUG
-    dtdbg << getList()[i].toString() << std::endl;
+#ifndef NDEBUG  // Debug mode
+  const auto& list = getListForDebug();
+#else
+  const auto& list = getList();
 #endif
-    testImpulseBasedDynamics(getList()[i]);
+
+  for (const auto& uri : list)
+  {
+    testImpulseBasedDynamics(uri);
   }
 }
 
@@ -2244,7 +2272,7 @@ TEST_F(DynamicsTest, HybridDynamics)
   const double tol       = 1e-8;
   const double timeStep  = 1e-3;
 #ifndef NDEBUG // Debug mode
-  const std::size_t numFrames = 50;  // 0.05 secs
+  const std::size_t numFrames = 20;  // 0.02 secs
 #else
   const std::size_t numFrames = 5e+3;  // 5 secs
 #endif // ------- Debug mode
