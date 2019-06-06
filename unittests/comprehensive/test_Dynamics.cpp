@@ -770,7 +770,7 @@ void DynamicsTest::testJacobians(const common::Uri& uri)
   //----------------------------- Settings -------------------------------------
   const double TOLERANCE = 1.0e-6;
 #ifndef NDEBUG  // Debug mode
-  int nTestItr = 2;
+  int nTestItr = 1;
 #else
   int nTestItr = 5;
 #endif
@@ -1794,7 +1794,11 @@ void compareCOMAccelerationToGravity(SkeletonPtr skel,
                                      const Eigen::Vector3d& gravity,
                                      double tolerance)
 {
+#ifndef NDEBUG  // Debug mode
+  const std::size_t numFrames = 1e+1;
+#else
   const std::size_t numFrames = 1e+2;
+#endif
   skel->setGravity(gravity);
 
   for (std::size_t i = 0; i < numFrames; ++i)
@@ -1974,14 +1978,9 @@ void DynamicsTest::testConstraintImpulse(const common::Uri& uri)
     dynamics::SkeletonPtr skel = myWorld->getSkeleton(i);
 
     std::size_t dof            = skel->getNumDofs();
-//    int nBodyNodes     = skel->getNumBodyNodes();
 
     if (dof == 0 || !skel->isMobile())
-    {
-      dtdbg << "Skeleton [" << skel->getName() << "] is skipped since it has "
-            << "0 DOF or is immobile." << endl;
       continue;
-    }
 
     for (std::size_t j = 0; j < nRandomItr; ++j)
     {
@@ -2070,14 +2069,9 @@ void DynamicsTest::testImpulseBasedDynamics(const common::Uri& uri)
     dynamics::SkeletonPtr skel = myWorld->getSkeleton(i);
 
     int dof            = skel->getNumDofs();
-//    int nBodyNodes     = skel->getNumBodyNodes();
 
     if (dof == 0 || !skel->isMobile())
-    {
-      dtdbg << "Skeleton [" << skel->getName() << "] is skipped since it has "
-            << "0 DOF or is immobile." << endl;
       continue;
-    }
 
     for (std::size_t j = 0; j < nRandomItr; ++j)
     {
