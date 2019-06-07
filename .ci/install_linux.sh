@@ -12,6 +12,7 @@ $SUDO apt-get -y install \
   cmake \
   curl \
   git \
+  ninja-build \
   pkg-config \
   sudo
 
