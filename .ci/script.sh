@@ -84,31 +84,31 @@ cmake .. \
   ${install_prefix_option}
 
 if [ "$BUILD_DARTPY" = "ON" ]; then
-  make dartpy
-  make pytest
+  ninja dartpy
+  ninja pytest
 else
   if [ "$CODECOV" = "ON" ]; then
-    make tests
+    ninja tests
   else
-    make tutorials examples tests
+    ninja tutorials examples tests
   fi
 
   if [ "$OS_NAME" = "linux" ] && [ $(lsb_release -sc) = "bionic" ]; then
-    make check-format
+    ninja check-format
   fi
 
   if [ $CODECOV = "ON" ]; then
-    make codecov
+    ninja codecov
   else
     ctest --output-on-failure -j$num_threads
     if [ $MEMCHECK = "ON" ]; then
-      make run_memcheck
+      ninja run_memcheck
     fi
   fi
 fi
 
 # Make sure we can install with no issues
-$SUDO make install
+$SUDO ninja install
 
 if [ "$BUILD_DARTPY" = "ON" ]; then
   # Run a python example (experimental)
@@ -121,5 +121,5 @@ else
   cd $BUILD_DIR/examples/hello_world
   mkdir build && cd build
   cmake -GNinja ..
-  make
+  ninja
 fi
