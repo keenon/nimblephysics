@@ -74,6 +74,7 @@ if [ "$OS_NAME" = "linux" ]; then
 fi
 
 cmake .. \
+  -Gninja \
   -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
   -DDART_BUILD_DARTPY=$BUILD_DARTPY \
   -DDART_VERBOSE=ON \
@@ -119,6 +120,6 @@ else
   # Build an example using installed DART
   cd $BUILD_DIR/examples/hello_world
   mkdir build && cd build
-  cmake ..
+  cmake -Gninja ..
   make -j$num_threads
 fi
