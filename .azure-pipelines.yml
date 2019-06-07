@@ -22,6 +22,7 @@ jobs:
     OS_NAME: linux
     COMPILER: gcc
     BUILD_TYPE: Debug
+    MEMCHECK: ON
     BUILD_DIR: $(Build.SourcesDirectory)
     DOCKERFILE: Dockerfile.ubuntu-bionic
   steps:
