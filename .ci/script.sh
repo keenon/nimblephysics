@@ -88,9 +88,9 @@ if [ "$BUILD_DARTPY" = "ON" ]; then
   ninja pytest
 else
   if [ "$CODECOV" = "ON" ]; then
-    ninja tests
+    ninja all tests
   else
-    ninja tutorials examples tests
+    ninja all tests examples tutorials
   fi
 
   if [ "$OS_NAME" = "linux" ] && [ $(lsb_release -sc) = "bionic" ]; then
