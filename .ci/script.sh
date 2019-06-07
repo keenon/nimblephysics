@@ -84,13 +84,13 @@ cmake .. \
   ${install_prefix_option}
 
 if [ "$BUILD_DARTPY" = "ON" ]; then
-  make -j$num_threads dartpy
+  make dartpy
   make pytest
 else
   if [ "$CODECOV" = "ON" ]; then
-    make -j$num_threads all tests
+    make tests
   else
-    make -j$num_threads all tutorials examples tests
+    make tutorials examples tests
   fi
 
   if [ "$OS_NAME" = "linux" ] && [ $(lsb_release -sc) = "bionic" ]; then
@@ -98,17 +98,17 @@ else
   fi
 
   if [ $CODECOV = "ON" ]; then
-    make -j$num_threads codecov
+    make codecov
   else
     ctest --output-on-failure -j$num_threads
     if [ $MEMCHECK = "ON" ]; then
-      make -j$num_threads run_memcheck
+      make run_memcheck
     fi
   fi
 fi
 
 # Make sure we can install with no issues
-$SUDO make -j$num_threads install
+$SUDO make install
 
 if [ "$BUILD_DARTPY" = "ON" ]; then
   # Run a python example (experimental)
@@ -121,5 +121,5 @@ else
   cd $BUILD_DIR/examples/hello_world
   mkdir build && cd build
   cmake -GNinja ..
-  make -j$num_threads
+  make
 fi
