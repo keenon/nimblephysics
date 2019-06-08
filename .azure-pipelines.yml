@@ -26,6 +26,7 @@ jobs:
     DOCKERFILE: Dockerfile.ubuntu-bionic
   steps:
   - template: .ci/azure-pipelines/docker.yml
+  timeoutInMinutes: 0
 
 - job: bionic_gcc_dartpy_release
   pool:
