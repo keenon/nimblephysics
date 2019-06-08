@@ -2,7 +2,6 @@
 
 # Build dependencies
 brew 'cmake'
-brew 'ninja'
 brew 'pkg-config'
 
 brew 'assimp'
