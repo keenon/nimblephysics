@@ -9,7 +9,6 @@ jobs:
     OS_NAME: linux
     COMPILER: gcc
     BUILD_TYPE: Release
-    MEMCHECK: ON
     BUILD_DIR: $(Build.SourcesDirectory)
     DOCKERFILE: Dockerfile.ubuntu-xenial
   steps:

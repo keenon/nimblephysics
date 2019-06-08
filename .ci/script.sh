@@ -102,7 +102,7 @@ else
   else
     ctest --output-on-failure -j$num_threads
     if [ $MEMCHECK = "ON" ]; then
-      ninja run_memcheck
+      ctest -T memcheck
     fi
   fi
 fi
