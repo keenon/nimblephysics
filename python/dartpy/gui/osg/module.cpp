@@ -40,11 +40,15 @@ namespace python {
 void WorldNode(py::module& sm);
 void RealTimeWorldNode(py::module& sm);
 
+void GUIEventHandler(py::module& sm);
+
 void Viewer(py::module& sm);
 void ViewerAttachment(py::module& sm);
 void GridVisual(py::module& sm);
 
 void DragAndDrop(py::module& sm);
+
+void ShadowTechnique(py::module& sm);
 
 void dart_gui_osg(py::module& m)
 {
@@ -53,11 +57,15 @@ void dart_gui_osg(py::module& m)
   WorldNode(sm);
   RealTimeWorldNode(sm);
 
+  GUIEventHandler(sm);
+
   Viewer(sm);
   ViewerAttachment(sm);
   GridVisual(sm);
 
   DragAndDrop(sm);
+
+  ShadowTechnique(sm);
 }
 
 } // namespace python

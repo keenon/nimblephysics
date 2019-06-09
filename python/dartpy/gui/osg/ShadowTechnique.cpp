@@ -31,52 +31,29 @@
  */
 
 #include <dart/dart.hpp>
-#include <pybind11/eigen.h>
+#include <dart/gui/osg/osg.hpp>
+#include <osgShadow/ShadowTechnique>
+#include <osgShadow/ShadowMap>
 #include <pybind11/pybind11.h>
+
+PYBIND11_DECLARE_HOLDER_TYPE(T, ::osg::ref_ptr<T>, true);
 
 namespace py = pybind11;
 
 namespace dart {
 namespace python {
 
-void Contact(py::module& m)
+void ShadowTechnique(py::module& m)
 {
-  ::py::class_<dart::collision::Contact>(m, "Contact")
-      .def(::py::init<>())
-      .def_static(
-          "getNormalEpsilon",
-          +[]() -> double {
-            return dart::collision::Contact::getNormalEpsilon();
-          })
-      .def_static(
-          "getNormalEpsilonSquared",
-          +[]() -> double {
-            return dart::collision::Contact::getNormalEpsilonSquared();
-          })
-      .def_static(
-          "isZeroNormal",
-          +[](const Eigen::Vector3d& normal) -> bool {
-            return dart::collision::Contact::isZeroNormal(normal);
-          },
-          ::py::arg("normal"))
-      .def_static(
-          "isNonZeroNormal",
-          +[](const Eigen::Vector3d& normal) -> bool {
-            return dart::collision::Contact::isNonZeroNormal(normal);
-          },
-          ::py::arg("normal"))
-      .def_readwrite("point", &dart::collision::Contact::point)
-      .def_readwrite("normal", &dart::collision::Contact::normal)
-      .def_readwrite("force", &dart::collision::Contact::force)
-      .def_readwrite(
-          "collisionObject1", &dart::collision::Contact::collisionObject1)
-      .def_readwrite(
-          "collisionObject2", &dart::collision::Contact::collisionObject2)
-      .def_readwrite(
-          "penetrationDepth", &dart::collision::Contact::penetrationDepth)
-      .def_readwrite("triID1", &dart::collision::Contact::triID1)
-      .def_readwrite("triID2", &dart::collision::Contact::triID2)
-      .def_readwrite("userData", &dart::collision::Contact::userData);
+  ::py::class_<
+      ::osgShadow::ShadowTechnique,
+      ::osg::ref_ptr<::osgShadow::ShadowTechnique>>(m, "ShadowTechnique");
+
+  ::py::class_<
+      ::osgShadow::ShadowMap,
+      ::osgShadow::ShadowTechnique,
+      ::osg::ref_ptr<::osgShadow::ShadowMap>>(m, "ShadowMap")
+      .def(::py::init<>());
 }
 
 } // namespace python
