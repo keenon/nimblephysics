@@ -59,8 +59,8 @@ target_include_directories(dartpy
 target_link_libraries(dartpy
   PUBLIC
     dart
-    dart-utils
-    dart-utils-urdf
+    dart-io
+    dart-io-urdf
     dart-gui
     dart-gui-osg
     ${PYTHON_LIBRARIES}

@@ -271,3 +271,47 @@ function(dart_build_tutorial_in_source target)
   dart_build_target_in_source(${target} ${ARGN})
   dart_add_tutorial(${target})
 endfunction()
+
+#===============================================================================
+# Generate header file.
+# Usage:
+#   dart_generate_component_namespace_alias(
+#     FILES file1 [file2 ...]
+#     OLD_NAMESPACE ns1
+#     NEW_NAMESPACE ns2
+#   )
+#===============================================================================
+function(dart_generate_component_namespace_alias)
+  set(prefix comp_ns)
+  set(options )
+  set(oneValueArgs OLD_NAMESPACE NEW_NAMESPACE DESTINATION)
+  set(multiValueArgs HEADERS)
+  cmake_parse_arguments("${prefix}" "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
+
+  set(old_namespace ${comp_ns_OLD_NAMESPACE})
+  set(new_namespace ${comp_ns_NEW_NAMESPACE})
+
+  foreach(header ${comp_ns_HEADERS})
+    set(file_path "${CMAKE_CURRENT_BINARY_DIR}/_${old_namespace}_/${header}")
+    file(WRITE ${file_path} "// Automatically generated file by cmake\n")
+    file(APPEND ${file_path} "\n")
+    file(APPEND ${file_path} "#include \"dart/${new_namespace}/${header}\"\n")
+    file(APPEND ${file_path} "\n")
+    file(APPEND ${file_path} "#ifndef DART_UTILS_IO_ALIAS\n")
+    file(APPEND ${file_path} "#define DART_UTILS_IO_ALIAS\n")
+    file(APPEND ${file_path} "\n")
+    file(APPEND ${file_path} "namespace dart {\n")
+    file(APPEND ${file_path} "namespace ${old_namespace} = ${new_namespace};\n")
+    file(APPEND ${file_path} "} // namespace dart\n")
+    file(APPEND ${file_path} "\n")
+    file(APPEND ${file_path} "#warning \"Use of the [dart::${old_namespace}] namespace is deprecated and should be changed to [dart::${new_namespace}]\"\n")
+    file(APPEND ${file_path} "\n")
+    file(APPEND ${file_path} "#endif // DART_UTILS_IO_ALIAS\n")
+    install(
+      FILES ${file_path}
+      DESTINATION ${comp_ns_DESTINATION}
+      COMPONENT headers
+    )
+    message(STATUS "[DEBUG] file_path: ${file_path}")
+  endforeach()
+endfunction()

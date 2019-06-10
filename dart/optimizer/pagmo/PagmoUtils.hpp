@@ -30,8 +30,8 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef DART_OPTIMIZER_PAGMO_PAGMOUTILS_HPP_
-#define DART_OPTIMIZER_PAGMO_PAGMOUTILS_HPP_
+#ifndef DART_OPTIMIZER_PAGMO_PAGMOIO_HPP_
+#define DART_OPTIMIZER_PAGMO_PAGMOIO_HPP_
 
 #include <pagmo/pagmo.hpp>
 #include "dart/optimizer/MultiObjectiveSolver.hpp"
@@ -58,4 +58,4 @@ public:
 } // namespace optimizer
 } // namespace dart
 
-#endif // DART_OPTIMIZER_PAGMO_PAGMOUTILS_HPP_
+#endif // DART_OPTIMIZER_PAGMO_PAGMOIO_HPP_

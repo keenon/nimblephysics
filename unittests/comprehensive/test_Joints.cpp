@@ -51,7 +51,7 @@
 #include "dart/dynamics/BodyNode.hpp"
 #include "dart/dynamics/Skeleton.hpp"
 #include "dart/simulation/World.hpp"
-#include "dart/utils/SkelParser.hpp"
+#include "dart/io/SkelParser.hpp"
 
 using namespace dart;
 using namespace dart::math;
@@ -393,7 +393,7 @@ void testCommandLimits(dynamics::Joint* joint)
 TEST_F(JOINTS, COMMAND_LIMIT)
 {
   simulation::WorldPtr myWorld
-      = utils::SkelParser::readWorld(
+      = io::SkelParser::readWorld(
         "dart://sample/skel/test/joint_limit_test.skel");
   EXPECT_TRUE(myWorld != nullptr);
 
@@ -435,7 +435,7 @@ TEST_F(JOINTS, POSITION_LIMIT)
   double tol = 1e-3;
 
   simulation::WorldPtr myWorld
-      = utils::SkelParser::readWorld(
+      = io::SkelParser::readWorld(
         "dart://sample/skel/test/joint_limit_test.skel");
   EXPECT_TRUE(myWorld != nullptr);
 
@@ -508,7 +508,7 @@ TEST_F(JOINTS, POSITION_LIMIT)
 TEST_F(JOINTS, JOINT_LIMITS)
 {
   simulation::WorldPtr myWorld
-      = utils::SkelParser::readWorld(
+      = io::SkelParser::readWorld(
         "dart://sample/skel/test/joint_limit_test.skel");
   EXPECT_TRUE(myWorld != nullptr);
 
@@ -579,7 +579,7 @@ void testJointCoulombFrictionForce(double _timeStep)
   double tol = 1e-9;
 
   simulation::WorldPtr myWorld
-      = utils::SkelParser::readWorld(
+      = io::SkelParser::readWorld(
         "dart://sample/skel/test/joint_friction_test.skel");
   EXPECT_TRUE(myWorld != nullptr);
 
@@ -986,7 +986,7 @@ TEST_F(JOINTS, JOINT_COULOMB_FRICTION_AND_POSITION_LIMIT)
   const double tol = 1e-2;
 
   simulation::WorldPtr myWorld
-      = utils::SkelParser::readWorld(
+      = io::SkelParser::readWorld(
         "dart://sample/skel/test/joint_friction_test.skel");
   EXPECT_TRUE(myWorld != nullptr);
 

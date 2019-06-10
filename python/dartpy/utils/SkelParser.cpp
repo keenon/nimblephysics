@@ -31,7 +31,7 @@
  */
 
 #include <dart/dart.hpp>
-#include <dart/utils/utils.hpp>
+#include <dart/io/io.hpp>
 #include <pybind11/pybind11.h>
 
 namespace py = pybind11;
@@ -44,7 +44,7 @@ void SkelParser(py::module& m)
   auto sm = m.def_submodule("SkelParser");
 
   sm.def("readWorld", +[](const common::Uri& uri) -> simulation::WorldPtr {
-    return utils::SkelParser::readWorld(uri);
+    return io::SkelParser::readWorld(uri);
   });
 }
 

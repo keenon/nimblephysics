@@ -34,7 +34,7 @@
 
 #include <dart/dart.hpp>
 #include <dart/gui/osg/osg.hpp>
-#include <dart/utils/utils.hpp>
+#include <dart/io/io.hpp>
 
 using namespace dart::dynamics;
 
@@ -209,7 +209,7 @@ int main()
 {
   using namespace dart::dynamics;
 
-  dart::simulation::WorldPtr world = dart::utils::SkelParser::readWorld(
+  dart::simulation::WorldPtr world = dart::io::SkelParser::readWorld(
       "dart://sample/skel/softBodies.skel");
 
   osg::ref_ptr<RecordingWorld> node = new RecordingWorld(world);

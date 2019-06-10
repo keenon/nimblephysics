@@ -15,7 +15,7 @@ CHECK_DIRS="#../dart/collision\
             #../dart/planning\
             #../dart/renderer\
             #../dart/simulation\
-            #../dart/utils\
+            #../dart/io\
             #../apps/cubes\
             #../apps/meshCollision"
 NOT_CHECK_DIRS=""

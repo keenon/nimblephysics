@@ -31,7 +31,7 @@
  */
 
 #include <dart/dart.hpp>
-#include <dart/utils/urdf/urdf.hpp>
+#include <dart/io/urdf/urdf.hpp>
 #include <pybind11/pybind11.h>
 
 namespace py = pybind11;
@@ -41,11 +41,11 @@ namespace python {
 
 void DartLoader(py::module& m)
 {
-  ::py::class_<dart::utils::DartLoader>(m, "DartLoader")
+  ::py::class_<dart::io::DartLoader>(m, "DartLoader")
       .def(::py::init<>())
       .def(
           "addPackageDirectory",
-          +[](dart::utils::DartLoader* self,
+          +[](dart::io::DartLoader* self,
               const std::string& _packageName,
               const std::string& _packageDirectory) -> void {
             return self->addPackageDirectory(_packageName, _packageDirectory);
@@ -54,14 +54,14 @@ void DartLoader(py::module& m)
           ::py::arg("packageDirectory"))
       .def(
           "parseSkeleton",
-          +[](dart::utils::DartLoader* self,
+          +[](dart::io::DartLoader* self,
               const dart::common::Uri& _uri) -> dart::dynamics::SkeletonPtr {
             return self->parseSkeleton(_uri);
           },
           ::py::arg("uri"))
       .def(
           "parseSkeleton",
-          +[](dart::utils::DartLoader* self,
+          +[](dart::io::DartLoader* self,
               const dart::common::Uri& _uri,
               const dart::common::ResourceRetrieverPtr& _resourceRetriever)
               -> dart::dynamics::SkeletonPtr {
@@ -71,7 +71,7 @@ void DartLoader(py::module& m)
           ::py::arg("resourceRetriever"))
       .def(
           "parseSkeletonString",
-          +[](dart::utils::DartLoader* self,
+          +[](dart::io::DartLoader* self,
               const std::string& _urdfString,
               const dart::common::Uri& _baseUri)
               -> dart::dynamics::SkeletonPtr {
@@ -81,7 +81,7 @@ void DartLoader(py::module& m)
           ::py::arg("baseUri"))
       .def(
           "parseSkeletonString",
-          +[](dart::utils::DartLoader* self,
+          +[](dart::io::DartLoader* self,
               const std::string& _urdfString,
               const dart::common::Uri& _baseUri,
               const dart::common::ResourceRetrieverPtr& _resourceRetriever)
@@ -94,12 +94,12 @@ void DartLoader(py::module& m)
           ::py::arg("resourceRetriever"))
       .def(
           "parseWorld",
-          +[](dart::utils::DartLoader* self, const dart::common::Uri& _uri)
+          +[](dart::io::DartLoader* self, const dart::common::Uri& _uri)
               -> dart::simulation::WorldPtr { return self->parseWorld(_uri); },
           ::py::arg("uri"))
       .def(
           "parseWorld",
-          +[](dart::utils::DartLoader* self,
+          +[](dart::io::DartLoader* self,
               const dart::common::Uri& _uri,
               const dart::common::ResourceRetrieverPtr& _resourceRetriever)
               -> dart::simulation::WorldPtr {
@@ -109,7 +109,7 @@ void DartLoader(py::module& m)
           ::py::arg("resourceRetriever"))
       .def(
           "parseWorldString",
-          +[](dart::utils::DartLoader* self,
+          +[](dart::io::DartLoader* self,
               const std::string& _urdfString,
               const dart::common::Uri& _baseUri) -> dart::simulation::WorldPtr {
             return self->parseWorldString(_urdfString, _baseUri);
@@ -118,7 +118,7 @@ void DartLoader(py::module& m)
           ::py::arg("baseUri"))
       .def(
           "parseWorldString",
-          +[](dart::utils::DartLoader* self,
+          +[](dart::io::DartLoader* self,
               const std::string& _urdfString,
               const dart::common::Uri& _baseUri,
               const dart::common::ResourceRetrieverPtr& _resourceRetriever)

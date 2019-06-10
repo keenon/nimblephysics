@@ -1138,7 +1138,7 @@ TEST(MATH, ROTATION) {
 }
 
 /******************************************************************************/
-TEST(MATH, UTILS) {
+TEST(MATH, IO) {
   // Test CR Matrix
   EXPECT_DOUBLE_EQ(dart::math::CR(0, 1), -1.0);
 

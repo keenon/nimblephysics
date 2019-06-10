@@ -97,7 +97,7 @@ mWorld->addSkeleton(newDomino);
 
 Similar to **Lesson 3** of the **Collisions** tutorial, we'll want to make sure
 that the newly inserted Skeleton is not starting out in collision with anything,
-because this could make for a very ugly (perhaps even broken) simulation. 
+because this could make for a very ugly (perhaps even broken) simulation.
 
 First, we'll tell the world to compute collisions:
 
@@ -215,11 +215,11 @@ Instead, let's load a robotic manipulator and have it push over the first domino
 ### Lesson 2a: Load a URDF file
 
 Our manipulator is going to be loaded from a URDF file. URDF files are loaded
-by the ``dart::utils::DartLoader`` class (pending upcoming changes to DART's
+by the ``dart::io::DartLoader`` class (pending upcoming changes to DART's
 loading system). First, create a loader:
 
 ```cpp
-dart::utils::DartLoader loader;
+dart::io::DartLoader loader;
 ```
 
 Note that many URDF files use ROS's ``package:`` scheme to specify the locations
@@ -269,7 +269,7 @@ although all it will be able to do is collapse pitifully onto the floor.**
 
 To make the manipulator actually useful, we'll want to have the ``Controller``
 control its joint forces. For it to do that, the ``Controller`` class will need
-to be informed of what we want the manipulator's joint angles to be. This is 
+to be informed of what we want the manipulator's joint angles to be. This is
 easily done in the constructor of the ``Controller`` class:
 
 ```cpp
@@ -550,7 +550,7 @@ mManipulator->setForces(mForces);
 <script type="text/javascript">
     /* * * CONFIGURATION VARIABLES * * */
     var disqus_shortname = 'dartsim';
-    
+
     /* * * DON'T EDIT BELOW THIS LINE * * */
     (function() {
         var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
