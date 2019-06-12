@@ -105,140 +105,105 @@ class TinkertoyWorldNode(dart.gui.osg.RealTimeWorldNode):
 
           target.setTransform(tf)
 
-#        void clearPick()
-#        {
-#          picked_node = nullptr
-#          target.setTransform(Eigen.Isometry3d.Identity())
-#        }
+        def clearPick(self):
+          self.picked_node = None
+          self.target.setTransform(dart.math.Isometry3.Identity())
 
-#        void deletePick()
-#        {
-#          if self.!picked_node)
-#            return
+        def deletePick(self):
+          if picked_node is None:
+            return
 
-#          if self.isSimulating())
-#          {
-#            std.cout << " -- Please pause simulation [using the Spacebar] before "
-#                      << "attempting to delete blocks." << std.endl
-#            return
-#          }
+          if self.isSimulating():
+            print(' -- Please pause simulation [using the Spacebar] before attempting to delete blocks.')
+            return
 
-#          dart.dynamics.SkeletonPtr temporary = picked_node.remove()
-#          for (size_t i = 0 i < temporary.getNumBodyNodes() ++i)
-#          {
-#            mViewer.disableDragAndDrop(
-#                mViewer.enableDragAndDrop(temporary.getBodyNode(i)))
-#          }
+          temporary = self.picked_node.remove()
+          for i in range(temporary.getNumBodyNodes()):
+            self.viewer.disableDragAndDrop(self.viewer.enableDragAndDrop(temporary.getBodyNode(i)))
 
-#          getWorld().getConstraintSolver().getCollisionGroup().removeShapeFramesOf(
-#              temporary.get())
+          getWorld().getConstraintSolver().getCollisionGroup().removeShapeFramesOf(temporary)
 
-#          clearPick()
-#        }
+          self.clearPick()
 
-#        void createShapes()
-#        {
-#          createWeldJointShape()
-#          createRevoluteJointShape()
-#          createBallJointShape()
-#          createBlockShape()
-#        }
+        def createShapes(self):
+          self.createWeldJointShape()
+          self.createRevoluteJointShape()
+          self.createBallJointShape()
+          self.createBlockShape()
 
-#        void createWeldJointShape()
-#        {
-#          mWeldJointShape
-#              = std.make_shared<dart.dynamics.BoxShape>(Eigen.Vector3d(
-#                  2.0 * DefaultJointRadius, DefaultBlockWidth, DefaultBlockWidth))
+        def createWeldJointShape():
+          self.weld_joint_shape
+              = dart.dynamics.BoxShape([2.0 * self.DefaultJointRadius, self.DefaultBlockWidth, self.DefaultBlockWidth])
 
-#          mWeldJointShape.addDataVariance(dart.dynamics.Shape.DYNAMIC_COLOR)
-#        }
+          self.weld_joint_shape.addDataVariance(dart.dynamics.Shape.DYNAMIC_COLOR)
 
-#        void createRevoluteJointShape()
-#        {
-#          mRevoluteJointShape = std.make_shared<dart.dynamics.CylinderShape>(
-#              DefaultJointRadius, 1.5 * DefaultBlockWidth)
+        def createRevoluteJointShape():
+          self.revolute_joint_shape = dart.dynamics.CylinderShape(self.DefaultJointRadius, 1.5 * self.DefaultBlockWidth)
+          self.revolute_joint_shape.addDataVariance(dart.dynamics.Shape.DYNAMIC_COLOR)
 
-#          mRevoluteJointShape.addDataVariance(dart.dynamics.Shape.DYNAMIC_COLOR)
-#        }
+        def createBallJointShape(self):
+          self.ball_joint_shape = dart.dynamics.SphereShape(self.DefaultJointRadius)
+          self.ball_joint_shape.addDataVariance(dart.dynamics.Shape.DYNAMIC_COLOR)
 
-#        void createBallJointShape()
-#        {
-#          mBallJointShape
-#              = std.make_shared<dart.dynamics.SphereShape>(DefaultJointRadius)
+        def createBlockShape(self)
+          self.block_shape = dart.dynamics.BoxShape([self.DefaultBlockLength, self.DefaultBlockWidth, self.DefaultBlockWidth])
+          self.block_shape.addDataVariance(dart.dynamics.Shape.DYNAMIC_COLOR)
 
-#          mBallJointShape.addDataVariance(dart.dynamics.Shape.DYNAMIC_COLOR)
-#        }
+          self.block_offset = dart.math.Isometry3()
+          pos = self.block_offset.translation()
+          pos[0] = self.DefaultBlockLength / 2.0
+          self.block_offset.set_translation(pos)
 
-#        void createBlockShape()
-#        {
-#          mBlockShape = std.make_shared<dart.dynamics.BoxShape>(Eigen.Vector3d(
-#              DefaultBlockLength, DefaultBlockWidth, DefaultBlockWidth))
+        def addBlock(self, parent, rel_tf, joint_shape):
+          if self.isSimulating():
+            print(' -- Please pause simulation [using the Spacebar] before attempting to add new bodies')
+            return None, None
 
-#          mBlockShape.addDataVariance(dart.dynamics.Shape.DYNAMIC_COLOR)
+          dart.dynamics.SkeletonPtr skel
+          if self.parent)
+          {
+            skel = parent.getSkeleton()
+          }
+          else
+          {
+            skel = dart.dynamics.Skeleton.create(
+                "toy_#" + std.to_string(getWorld().getNumSkeletons() + 1))
+            getWorld().addSkeleton(skel)
+          }
 
-#          mBlockOffset = Eigen.Isometry3d.Identity()
-#          mBlockOffset.translation()[0] = DefaultBlockLength / 2.0
-#        }
+          auto pair = skel.createJointAndBodyNodePair<JointType>(parent)
+          JointType* joint = pair.first
+          dart.dynamics.BodyNode* bn = pair.second
+          bn.setName("block_#" + std.to_string(skel.getNumBodyNodes()))
+          joint.setName("joint_#" + std.to_string(skel.getNumJoints()))
 
-#        template <class JointType>
-#        std.pair<JointType*, dart.dynamics.BodyNode*> addBlock(
-#            dart.dynamics.BodyNode* parent,
-#            const Eigen.Isometry3d& relTf,
-#            const dart.dynamics.ShapePtr& jointShape)
-#        {
-#          if self.isSimulating())
-#          {
-#            std.cout << " -- Please pause simulation [using the Spacebar] before "
-#                      << "attempting to add new bodies" << std.endl
-#            return std.make_pair(nullptr, nullptr)
-#          }
+          joint.setTransformFromParentBodyNode(relTf)
+          for (size_t i = 0 i < joint.getNumDofs() ++i)
+            joint.getDof(i).setDampingCoefficient(DefaultDamping)
 
-#          dart.dynamics.SkeletonPtr skel
-#          if self.parent)
-#          {
-#            skel = parent.getSkeleton()
-#          }
-#          else
-#          {
-#            skel = dart.dynamics.Skeleton.create(
-#                "toy_#" + std.to_string(getWorld().getNumSkeletons() + 1))
-#            getWorld().addSkeleton(skel)
-#          }
+          bn.createShapeNodeWith<
+              dart.dynamics.VisualAspect,
+              dart.dynamics.CollisionAspect,
+              dart.dynamics.DynamicsAspect>(jointShape)
 
-#          auto pair = skel.createJointAndBodyNodePair<JointType>(parent)
-#          JointType* joint = pair.first
-#          dart.dynamics.BodyNode* bn = pair.second
-#          bn.setName("block_#" + std.to_string(skel.getNumBodyNodes()))
-#          joint.setName("joint_#" + std.to_string(skel.getNumJoints()))
+          dart.dynamics.ShapeNode* block = bn.createShapeNodeWith<
+              dart.dynamics.VisualAspect,
+              dart.dynamics.CollisionAspect,
+              dart.dynamics.DynamicsAspect>(block_shape)
+          block.setRelativeTransform(block_offset)
 
-#          joint.setTransformFromParentBodyNode(relTf)
-#          for (size_t i = 0 i < joint.getNumDofs() ++i)
-#            joint.getDof(i).setDampingCoefficient(DefaultDamping)
+          dart.dynamics.Inertia inertia = bn.getInertia()
+          inertia.setMass(DefaultBlockMass)
+          inertia.setMoment(block_shape.computeInertia(DefaultBlockMass))
+          inertia.setLocalCOM(DefaultBlockLength / 2.0 * Eigen.Vector3d.UnitX())
+          bn.setInertia(inertia)
 
-#          bn.createShapeNodeWith<
-#              dart.dynamics.VisualAspect,
-#              dart.dynamics.CollisionAspect,
-#              dart.dynamics.DynamicsAspect>(jointShape)
+          getWorld().getConstraintSolver().getCollisionGroup().addShapeFramesOf(
+              bn)
 
-#          dart.dynamics.ShapeNode* block = bn.createShapeNodeWith<
-#              dart.dynamics.VisualAspect,
-#              dart.dynamics.CollisionAspect,
-#              dart.dynamics.DynamicsAspect>(mBlockShape)
-#          block.setRelativeTransform(mBlockOffset)
+          clearPick()
 
-#          dart.dynamics.Inertia inertia = bn.getInertia()
-#          inertia.setMass(DefaultBlockMass)
-#          inertia.setMoment(mBlockShape.computeInertia(DefaultBlockMass))
-#          inertia.setLocalCOM(DefaultBlockLength / 2.0 * Eigen.Vector3d.UnitX())
-#          bn.setInertia(inertia)
-
-#          getWorld().getConstraintSolver().getCollisionGroup().addShapeFramesOf(
-#              bn)
-
-#          clearPick()
-
-#          return std.make_pair(joint, bn)
-#        }
+          return std.make_pair(joint, bn)
 
 #        Eigen.Isometry3d getRelTf() const
 #        {
@@ -254,7 +219,7 @@ class TinkertoyWorldNode(dart.gui.osg.RealTimeWorldNode):
 #        dart.dynamics.BodyNode* addWeldJointBlock(
 #            dart.dynamics.BodyNode* parent, const Eigen.Isometry3d& relTf)
 #        {
-#          return addBlock<dart.dynamics.WeldJoint>(parent, relTf, mWeldJointShape)
+#          return addBlock<dart.dynamics.WeldJoint>(parent, relTf, weld_joint_shape)
 #              .second
 #        }
 
@@ -267,7 +232,7 @@ class TinkertoyWorldNode(dart.gui.osg.RealTimeWorldNode):
 #            dart.dynamics.BodyNode* parent, const Eigen.Isometry3d& relTf)
 #        {
 #          auto pair = addBlock<dart.dynamics.RevoluteJoint>(
-#              parent, relTf, mRevoluteJointShape)
+#              parent, relTf, revolute_joint_shape)
 
 #          if self.pair.first)
 #            pair.first.setAxis(Eigen.Vector3d.UnitZ())
@@ -283,7 +248,7 @@ class TinkertoyWorldNode(dart.gui.osg.RealTimeWorldNode):
 #        dart.dynamics.BodyNode* addBallJointBlock(
 #            dart.dynamics.BodyNode* parent, const Eigen.Isometry3d& relTf)
 #        {
-#          return addBlock<dart.dynamics.BallJoint>(parent, relTf, mBallJointShape)
+#          return addBlock<dart.dynamics.BallJoint>(parent, relTf, ball_joint_shape)
 #              .second
 #        }
 
@@ -403,7 +368,7 @@ class TinkertoyWorldNode(dart.gui.osg.RealTimeWorldNode):
 #protected:
 #  void setupViewer() override
 #  {
-#    mViewer.enableDragAndDrop(target.get())
+#    viewer.enableDragAndDrop(target.get())
 #  }
 #}
 
