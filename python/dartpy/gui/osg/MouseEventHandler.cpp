@@ -30,56 +30,42 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <dart/dart.hpp>
+#include <dart/gui/osg/osg.hpp>
+#include <pybind11/eigen.h>
 #include <pybind11/pybind11.h>
+
+PYBIND11_DECLARE_HOLDER_TYPE(T, ::osg::ref_ptr<T>, true);
 
 namespace py = pybind11;
 
 namespace dart {
 namespace python {
 
-void WorldNode(py::module& sm);
-void RealTimeWorldNode(py::module& sm);
-
-void GUIEventHandler(py::module& sm);
-void MouseEventHandler(py::module& sm);
-
-void InteractiveFrame(py::module& sm);
-
-void ImGuiHandler(py::module& sm);
-void ImGuiWidget(py::module& sm);
-
-void Viewer(py::module& sm);
-void ImGuiViewer(py::module& sm);
-void ViewerAttachment(py::module& sm);
-void GridVisual(py::module& sm);
-
-void DragAndDrop(py::module& sm);
-
-void ShadowTechnique(py::module& sm);
-
-void dart_gui_osg(py::module& m)
+void MouseEventHandler(py::module& m)
 {
-  auto sm = m.def_submodule("osg");
+  class PyMouseEventHandler final : public dart::gui::osg::MouseEventHandler
+  {
+  public:
+    // Inherit the constructors
+    using MouseEventHandler::MouseEventHandler;
 
-  WorldNode(sm);
-  RealTimeWorldNode(sm);
+    // Trampoline for virtual function
+    void update() override
+    {
+      PYBIND11_OVERLOAD_PURE(
+          void,              // Return type
+          MouseEventHandler, // Parent class
+          update,            // Name of function in C++ (must match Python name)
+      );
+    }
+  };
 
-  GUIEventHandler(sm);
-  MouseEventHandler(sm);
-
-  InteractiveFrame(sm);
-
-  ImGuiHandler(sm);
-  ImGuiWidget(sm);
-
-  Viewer(sm);
-  ImGuiViewer(sm);
-  ViewerAttachment(sm);
-  GridVisual(sm);
-
-  DragAndDrop(sm);
-
-  ShadowTechnique(sm);
+  ::py::class_<
+      dart::gui::osg::MouseEventHandler,
+      PyMouseEventHandler,
+      std::shared_ptr<dart::gui::osg::MouseEventHandler>>(
+      m, "MouseEventHandler");
 }
 
 } // namespace python

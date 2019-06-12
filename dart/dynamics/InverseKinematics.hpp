@@ -51,13 +51,13 @@
 namespace dart {
 namespace dynamics {
 
-const double DefaultIKTolerance = 1e-6;
-const double DefaultIKErrorClamp = 1.0;
-const double DefaultIKGradientComponentClamp = 0.2;
-const double DefaultIKGradientComponentWeight = 1.0;
-const double DefaultIKDLSCoefficient = 0.05;
-const double DefaultIKAngularWeight = 0.4;
-const double DefaultIKLinearWeight = 1.0;
+constexpr double DefaultIKTolerance = 1e-6;
+constexpr double DefaultIKErrorClamp = 1.0;
+constexpr double DefaultIKGradientComponentClamp = 0.2;
+constexpr double DefaultIKGradientComponentWeight = 1.0;
+constexpr double DefaultIKDLSCoefficient = 0.05;
+constexpr double DefaultIKAngularWeight = 0.4;
+constexpr double DefaultIKLinearWeight = 1.0;
 
 /// The InverseKinematics class provides a convenient way of setting up an IK
 /// optimization problem. It generates constraint functions based on the
