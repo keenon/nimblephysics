@@ -43,7 +43,13 @@ void RealTimeWorldNode(py::module& sm);
 void GUIEventHandler(py::module& sm);
 void MouseEventHandler(py::module& sm);
 
+void InteractiveFrame(py::module& sm);
+
+void ImGuiHandler(py::module& sm);
+void ImGuiWidget(py::module& sm);
+
 void Viewer(py::module& sm);
+void ImGuiViewer(py::module& sm);
 void ViewerAttachment(py::module& sm);
 void GridVisual(py::module& sm);
 
@@ -61,7 +67,13 @@ void dart_gui_osg(py::module& m)
   GUIEventHandler(sm);
   MouseEventHandler(sm);
 
+  InteractiveFrame(sm);
+
+  ImGuiHandler(sm);
+  ImGuiWidget(sm);
+
   Viewer(sm);
+  ImGuiViewer(sm);
   ViewerAttachment(sm);
   GridVisual(sm);
 
