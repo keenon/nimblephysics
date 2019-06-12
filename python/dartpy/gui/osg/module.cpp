@@ -48,6 +48,11 @@ void InteractiveFrame(py::module& sm);
 void ImGuiHandler(py::module& sm);
 void ImGuiWidget(py::module& sm);
 
+void InteractiveFrame(py::module& sm);
+
+void ImGuiHandler(py::module& sm);
+void ImGuiWidget(py::module& sm);
+
 void Viewer(py::module& sm);
 void ImGuiViewer(py::module& sm);
 void ViewerAttachment(py::module& sm);
@@ -66,6 +71,11 @@ void dart_gui_osg(py::module& m)
 
   GUIEventHandler(sm);
   MouseEventHandler(sm);
+
+  InteractiveFrame(sm);
+
+  ImGuiHandler(sm);
+  ImGuiWidget(sm);
 
   InteractiveFrame(sm);
 
