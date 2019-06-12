@@ -16,17 +16,17 @@ class InputHandler(dart.gui.osg.GUIEventHandler):
                 ext_force[0] = 40
                 self.node.set_external_force(ext_force, 100)
                 return True
-            if ea.getKey() == dart.gui.osg.GUIEventAdapter.KEY_2:
+            elif ea.getKey() == dart.gui.osg.GUIEventAdapter.KEY_2:
                 ext_force = np.zeros(3)
                 ext_force[0] = -40
                 self.node.set_external_force(ext_force, 100)
                 return True
-            if ea.getKey() == dart.gui.osg.GUIEventAdapter.KEY_3:
+            elif ea.getKey() == dart.gui.osg.GUIEventAdapter.KEY_3:
                 ext_force = np.zeros(3)
                 ext_force[2] = 40
                 self.node.set_external_force(ext_force, 100)
                 return True
-            if ea.getKey() == dart.gui.osg.GUIEventAdapter.KEY_4:
+            elif ea.getKey() == dart.gui.osg.GUIEventAdapter.KEY_4:
                 ext_force = np.zeros(3)
                 ext_force[2] = -40
                 self.node.set_external_force(ext_force, 100)

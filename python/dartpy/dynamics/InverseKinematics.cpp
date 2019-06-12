@@ -42,9 +42,41 @@ namespace python {
 
 void InverseKinematics(py::module& m)
 {
+  class PyErrorMethod : public dart::dynamics::InverseKinematics::ErrorMethod
+  {
+  public:
+    // Inherit the constructors
+    using ErrorMethod::ErrorMethod;
+
+    // Trampoline for virtual function
+    Eigen::Vector6d computeError() override
+    {
+      PYBIND11_OVERLOAD_PURE(
+          Eigen::Vector6d, // Return type
+          ErrorMethod,     // Parent class
+          computeError,    // Name of function in C++ (must match Python name)
+      );
+    }
+
+    // Trampoline for virtual function
+    Eigen::Isometry3d computeDesiredTransform(
+        const Eigen::Isometry3d& currentTf,
+        const Eigen::Vector6d& error) override
+    {
+      PYBIND11_OVERLOAD_PURE(
+          Eigen::Isometry3d,       // Return type
+          ErrorMethod,             // Parent class
+          computeDesiredTransform, // Name of function in C++ (must match Python
+                                   // name)
+          currentTf,
+          error);
+    }
+  };
+
   ::py::class_<
       dart::dynamics::InverseKinematics::ErrorMethod,
       dart::common::Subject,
+      PyErrorMethod,
       std::shared_ptr<dart::dynamics::InverseKinematics::ErrorMethod>>(
       m, "InverseKinematicsErrorMethod")
       .def(
