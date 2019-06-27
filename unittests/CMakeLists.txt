@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2011-2018, The DART development contributors
+# Copyright (c) 2011-2019, The DART development contributors
 # All rights reserved.
 #
 # The list of contributors can be found at:
@@ -76,6 +76,8 @@ function(dart_add_test test_type target_name) # ARGN for source files
   else()
     target_link_libraries(${target_name} dart gtest gtest_main)
   endif()
+
+  dart_format_add(${sources})
 
 endfunction()
 

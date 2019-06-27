@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -60,8 +60,8 @@ protected:
   bool mShowMeshs;
 };
 
-}  // namespace glut
-}  // namespace gui
-}  // namespace dart
+} // namespace glut
+} // namespace gui
+} // namespace dart
 
-#endif  // DART_GUI_SOFTSIMWINDOW_HPP_
+#endif // DART_GUI_SOFTSIMWINDOW_HPP_

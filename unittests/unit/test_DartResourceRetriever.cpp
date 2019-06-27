@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -52,9 +52,9 @@ TEST(DartResourceRetriever, ExistsAndGetFilePathAndRetrieve)
   EXPECT_EQ(retriever->getFilePath("unknown://sample/test"), "");
   EXPECT_EQ(retriever->getFilePath("dart://unknown/test"), "");
   EXPECT_EQ(retriever->getFilePath("dart://sample/does/not/exist"), "");
-  EXPECT_EQ(retriever->getFilePath(
-      "dart://sample/skel/shapes.skel"),
-      DART_DATA_PATH"skel/shapes.skel");
+  EXPECT_EQ(
+      retriever->getFilePath("dart://sample/skel/shapes.skel"),
+      DART_DATA_PATH "skel/shapes.skel");
 
   EXPECT_EQ(nullptr, retriever->retrieve("unknown://test"));
   EXPECT_EQ(nullptr, retriever->retrieve("unknown://sample/test"));

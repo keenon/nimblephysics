@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -46,7 +46,7 @@ namespace common {
 ///
 /// // Call before main() and use theT only instead of calling getSingleton()
 /// static T& theT = T::getSingleton();
-template<typename T>
+template <typename T>
 class Singleton
 {
 public:
@@ -55,7 +55,7 @@ public:
   static T& getSingleton(Args... _args);
 
   /// Returns pointer of the singleton
-  template <typename ... Args>
+  template <typename... Args>
   static T* getSingletonPtr(Args... _args);
 
 protected:

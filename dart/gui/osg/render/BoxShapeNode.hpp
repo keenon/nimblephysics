@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -53,20 +53,17 @@ class BoxShapeDrawable;
 class BoxShapeNode : public ShapeNode, public ::osg::Group
 {
 public:
-
-  BoxShapeNode(std::shared_ptr<dart::dynamics::BoxShape> shape,
-               ShapeFrameNode* parent);
+  BoxShapeNode(
+      std::shared_ptr<dart::dynamics::BoxShape> shape, ShapeFrameNode* parent);
 
   void refresh();
   void extractData(bool firstTime);
 
 protected:
-
   virtual ~BoxShapeNode();
 
   std::shared_ptr<dart::dynamics::BoxShape> mBoxShape;
   BoxShapeGeode* mGeode;
-
 };
 
 } // namespace render

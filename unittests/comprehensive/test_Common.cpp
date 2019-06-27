@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -48,9 +48,9 @@ TEST(Common, Timer)
   {
     timer2.start();
 #ifdef _WIN32
-	Sleep(2);  // 2 milliseconds
+    Sleep(2); // 2 milliseconds
 #else
-	usleep(2000);  // 2 milliseconds
+    usleep(2000); // 2 milliseconds
 #endif
     timer2.stop();
   }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -53,20 +53,18 @@ class CylinderShapeDrawable;
 class CylinderShapeNode : public ShapeNode, public ::osg::Group
 {
 public:
-
-  CylinderShapeNode(std::shared_ptr<dart::dynamics::CylinderShape> shape,
-                    ShapeFrameNode* parent);
+  CylinderShapeNode(
+      std::shared_ptr<dart::dynamics::CylinderShape> shape,
+      ShapeFrameNode* parent);
 
   void refresh();
   void extractData(bool firstTime);
 
 protected:
-
   virtual ~CylinderShapeNode();
 
   std::shared_ptr<dart::dynamics::CylinderShape> mCylinderShape;
   CylinderShapeGeode* mGeode;
-
 };
 
 } // namespace render

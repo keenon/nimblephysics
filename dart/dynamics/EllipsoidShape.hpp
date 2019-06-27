@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -106,7 +106,7 @@ private:
   Eigen::Vector3d mDiameters;
 };
 
-}  // namespace dynamics
-}  // namespace dart
+} // namespace dynamics
+} // namespace dart
 
-#endif  // DART_DYNAMICS_ELLIPSOIDSHAPE_HPP_
+#endif // DART_DYNAMICS_ELLIPSOIDSHAPE_HPP_

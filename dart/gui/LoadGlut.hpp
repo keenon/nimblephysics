@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -33,9 +33,10 @@
 #ifndef DART_GUI_LOADGLUT_HPP_
 #define DART_GUI_LOADGLUT_HPP_
 
-#pragma message("This file is deprecated as of DART 6.6. "\
-         "Please use dart/gui/glut/LoadGlut.hpp instead.")
+#pragma message(                                                               \
+    "This file is deprecated as of DART 6.6. "                                 \
+    "Please use dart/gui/glut/LoadGlut.hpp instead.")
 
 #include "dart/gui/glut/LoadGlut.hpp"
 
-#endif  // DART_GUI_LOADGLUT_HPP_
+#endif // DART_GUI_LOADGLUT_HPP_

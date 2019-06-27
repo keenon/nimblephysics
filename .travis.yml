@@ -2,110 +2,105 @@ language: cpp
 
 sudo: required
 
-dist: trusty
+dist: xenial
 
 cache:
   apt: true
 
+env:
+  global:
+    - REPO_SLUG=$TRAVIS_REPO_SLUG
+    - IS_PULL_REQUEST=$TRAVIS_PULL_REQUEST
+    - OS_NAME=$TRAVIS_OS_NAME
+    - BUILD_DIR=$TRAVIS_BUILD_DIR
+    - BUILD_DARTPY=OFF
+    - CODECOV=OFF
+
 matrix:
+  fast_finish: true
   include:
     - os: linux
-      compiler: gcc
       env:
-        - BUILD_NAME=TRUSTY_DEBUG
+        - BUILD_NAME=XENIAL_DEBUG_CODECOV
         - SUDO=sudo
         - BUILD_TYPE=Debug
         - COMPILER=GCC
-        - BUILD_ONLY_ON_PULL_REQUEST=ON
-    - os: linux
-      compiler: gcc
-      env:
-        - BUILD_NAME=TRUSTY_RELEASE
-        - SUDO=sudo
-        - BUILD_TYPE=Release
-        - COMPILER=GCC
+        - CODECOV=ON
+
     - os: linux
       env:
-        - BUILD_NAME=XENIAL_DEBUG
-        - DOCKER_FILE="ubuntu-xenial"
-        - BUILD_TYPE=Debug
+        - BUILD_NAME=XENIAL_32BIT_DEBUG_CODECOV
+        - DOCKERFILE="Dockerfile.ubuntu-xenial-32bit"
+        - BUILD_TYPE=Release  # TODO: Tests fail in debug mode
         - COMPILER=GCC
+        - CODECOV=ON
       services: docker
-    - os: linux
-      env:
-        - BUILD_NAME=XENIAL_RELEASE
-        - DOCKER_FILE="ubuntu-xenial"
-        - BUILD_TYPE=Release
-        - COMPILER=GCC
-      services: docker
-    - os: linux
-      env:
-        - BUILD_NAME=BIONIC_DEBUG
-        - DOCKER_FILE="ubuntu-bionic"
-        - BUILD_TYPE=Debug
-        - COMPILER=GCC
-      services: docker
+
     - os: linux
       env:
         - BUILD_NAME=BIONIC_RELEASE
-        - DOCKER_FILE="ubuntu-bionic"
+        - DOCKERFILE="Dockerfile.ubuntu-bionic"
         - BUILD_TYPE=Release
         - COMPILER=GCC
       services: docker
+
     - os: linux
       env:
-        - BUILD_NAME=COSMIC_DEBUG
-        - DOCKER_FILE="ubuntu-cosmic"
-        - BUILD_TYPE=Debug
-        - COMPILER=GCC
-      services: docker
-    - os: linux
-      env:
-        - BUILD_NAME=COSMIC_RELEASE
-        - DOCKER_FILE="ubuntu-cosmic"
+        - BUILD_NAME=DISCO_RELEASE
+        - DOCKERFILE="Dockerfile.ubuntu-disco"
         - BUILD_TYPE=Release
         - COMPILER=GCC
       services: docker
+
+    - os: linux
+      env:
+        - BUILD_NAME=EOAN_RELEASE
+        - DOCKERFILE="Dockerfile.ubuntu-eoan"
+        - BUILD_TYPE=Release
+        - COMPILER=GCC
+      services: docker
+
     - os: osx
-      osx_image: xcode9.4
+      osx_image: xcode10.2
       compiler: clang
       env:
-        - BUILD_NAME=XCODE94_DEBUG
-        - BUILD_TYPE=Debug
-        - COMPILER=CLANG
-    - os: osx
-      osx_image: xcode9.4
-      compiler: clang
-      env:
-        - BUILD_NAME=XCODE94_RELEASE
+        - BUILD_NAME=XCODE102_RELEASE
         - BUILD_TYPE=Release
         - COMPILER=CLANG
+
     - os: linux
-      compiler: gcc
       env:
-        - BUILD_NAME=DOCS
-        - SUDO=sudo
+        - BUILD_DOCS=ON
+        - DOCKERFILE="Dockerfile.ubuntu-bionic"
         - BUILD_TYPE=Release
         - COMPILER=GCC
+      services: docker
+
+  allow_failures:
+    - os: linux
+      env:
+        - BUILD_NAME=EOAN_RELEASE
+        - DOCKERFILE="Dockerfile.ubuntu-eoan"
+        - BUILD_TYPE=Release
+        - COMPILER=GCC
+      services: docker
+
 
 install:
-  - if [ -n "$DOCKER_FILE" ]; then
-      docker build -t "$DOCKER_FILE" -f ".ci/docker/$DOCKER_FILE" .;
-      docker run -itd -v $TRAVIS_BUILD_DIR:$TRAVIS_BUILD_DIR --env-file .ci/env.list --name dart-docker "$DOCKER_FILE";
+  - if [ -n "$DOCKERFILE" ]; then
+      docker build -t "${DOCKERFILE,,}" -f ".ci/docker/$DOCKERFILE" .;
+      docker run -itd -v $TRAVIS_BUILD_DIR:$TRAVIS_BUILD_DIR --env-file .ci/docker/env.list --name dart-docker "${DOCKERFILE,,}";
+      docker exec dart-docker /bin/sh -c "cd $TRAVIS_BUILD_DIR && ./.ci/install.sh";
     else
       '.ci/install.sh';
     fi
 
 script:
-  - if [ -n "$DOCKER_FILE" ]; then
+  - if [ -n "$DOCKERFILE" ]; then
       docker exec dart-docker /bin/sh -c "cd $TRAVIS_BUILD_DIR && ./.ci/script.sh";
     else
       '.ci/script.sh';
     fi
-
-after_failure:
-  - cat build/Testing/Temporary/LastTest.log
-  - cat build/Testing/Temporary/LastTestsFailed.log
 
 deploy:
   github-token: $GITHUB_TOKEN
@@ -116,4 +111,4 @@ deploy:
   verbose: true
   on:
     branch: master
-    condition: $BUILD_NAME == DOCS && $TRAVIS_EVENT_TYPE != cron
+    condition: $BUILD_DOCS == ON && $TRAVIS_EVENT_TYPE != cron

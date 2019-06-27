@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -35,8 +35,8 @@
 
 #include <Eigen/Dense>
 
-#include "dart/math/MathTypes.hpp"
 #include "dart/constraint/JointConstraint.hpp"
+#include "dart/math/MathTypes.hpp"
 
 namespace dart {
 namespace constraint {
@@ -120,8 +120,7 @@ public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
 
-}  // namespace constraint
-}  // namespace dart
+} // namespace constraint
+} // namespace dart
 
-#endif  // DART_CONSTRAINT_WELDJOINTCONSTRAINT_HPP_
-
+#endif // DART_CONSTRAINT_WELDJOINTCONSTRAINT_HPP_

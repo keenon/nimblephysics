@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -53,20 +53,18 @@ class CapsuleShapeDrawable;
 class CapsuleShapeNode : public ShapeNode, public ::osg::Group
 {
 public:
-
-  CapsuleShapeNode(std::shared_ptr<dart::dynamics::CapsuleShape> shape,
-                   ShapeFrameNode* parent);
+  CapsuleShapeNode(
+      std::shared_ptr<dart::dynamics::CapsuleShape> shape,
+      ShapeFrameNode* parent);
 
   void refresh();
   void extractData(bool firstTime);
 
 protected:
-
   virtual ~CapsuleShapeNode();
 
   std::shared_ptr<dart::dynamics::CapsuleShape> mCapsuleShape;
   CapsuleShapeGeode* mGeode;
-
 };
 
 } // namespace render

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -36,8 +36,7 @@ namespace dart {
 namespace integration {
 
 //==============================================================================
-EulerIntegrator::EulerIntegrator()
-  : Integrator()
+EulerIntegrator::EulerIntegrator() : Integrator()
 {
 }
 
@@ -65,5 +64,5 @@ void EulerIntegrator::integrateVel(IntegrableSystem* _system, double _dt)
   _system->integrateGenVels(_system->evalGenAccs(), _dt);
 }
 
-}  // namespace integration
-}  // namespace dart
+} // namespace integration
+} // namespace dart

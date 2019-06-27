@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -33,8 +33,8 @@
 #ifndef DART_GUI_OSG_RENDER_WARNINGSHAPENODE_HPP_
 #define DART_GUI_OSG_RENDER_WARNINGSHAPENODE_HPP_
 
-#include <osg/Node>
 #include <memory>
+#include <osg/Node>
 
 #include "dart/gui/osg/render/ShapeNode.hpp"
 
@@ -46,16 +46,13 @@ namespace render {
 class WarningShapeNode : public ShapeNode, public ::osg::Node
 {
 public:
-
-  WarningShapeNode(std::shared_ptr<dart::dynamics::Shape> shape,
-                   ShapeFrameNode* parent);
+  WarningShapeNode(
+      std::shared_ptr<dart::dynamics::Shape> shape, ShapeFrameNode* parent);
 
   void refresh();
 
 protected:
-
   virtual ~WarningShapeNode();
-
 };
 
 } // namespace render

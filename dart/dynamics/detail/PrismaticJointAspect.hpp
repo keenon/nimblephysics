@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -58,24 +58,25 @@ struct PrismaticJointUniqueProperties
 };
 
 //==============================================================================
-struct PrismaticJointProperties :
-    GenericJoint<math::R1Space>::Properties,
-    PrismaticJointUniqueProperties
+struct PrismaticJointProperties : GenericJoint<math::R1Space>::Properties,
+                                  PrismaticJointUniqueProperties
 {
   DART_DEFINE_ALIGNED_SHARED_OBJECT_CREATOR(PrismaticJointProperties)
 
   PrismaticJointProperties(
-      const GenericJoint<math::R1Space>::Properties& genericJointProperties =
-          GenericJoint<math::R1Space>::Properties(),
-      const PrismaticJointUniqueProperties& prismaticProperties =
-          PrismaticJointUniqueProperties());
+      const GenericJoint<math::R1Space>::Properties& genericJointProperties
+      = GenericJoint<math::R1Space>::Properties(),
+      const PrismaticJointUniqueProperties& prismaticProperties
+      = PrismaticJointUniqueProperties());
 
   virtual ~PrismaticJointProperties() = default;
 };
 
 //==============================================================================
 using PrismaticJointBase = common::EmbedPropertiesOnTopOf<
-    PrismaticJoint, PrismaticJointUniqueProperties, GenericJoint<math::R1Space> >;
+    PrismaticJoint,
+    PrismaticJointUniqueProperties,
+    GenericJoint<math::R1Space> >;
 
 } // namespace detail
 } // namespace dynamics

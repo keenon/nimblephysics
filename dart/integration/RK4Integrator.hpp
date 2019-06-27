@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -62,7 +62,7 @@ private:
   Eigen::VectorXd ddq1, ddq2, ddq3, ddq4;
 };
 
-}  // namespace integration
-}  // namespace dart
+} // namespace integration
+} // namespace dart
 
-#endif  // DART_INTEGRATION_RK4INTEGRATOR_HPP_
+#endif // DART_INTEGRATION_RK4INTEGRATOR_HPP_

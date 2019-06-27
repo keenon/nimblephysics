@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -39,8 +39,7 @@ namespace detail {
 //==============================================================================
 ScrewJointUniqueProperties::ScrewJointUniqueProperties(
     const Eigen::Vector3d& _axis, double _pitch)
-  : mAxis(_axis.normalized()),
-    mPitch(_pitch)
+  : mAxis(_axis.normalized()), mPitch(_pitch)
 {
   // Do nothing
 }

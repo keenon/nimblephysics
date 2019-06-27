@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -42,7 +42,6 @@ namespace dynamics {
 class RevoluteJoint : public detail::RevoluteJointBase
 {
 public:
-
   friend class Skeleton;
   using UniqueProperties = detail::RevoluteJointUniqueProperties;
   using Properties = detail::RevoluteJointProperties;
@@ -96,7 +95,6 @@ public:
       const GenericJoint<math::R1Space>::Vector& positions) const override;
 
 protected:
-
   /// Constructor called by Skeleton class
   RevoluteJoint(const Properties& properties);
 
@@ -110,14 +108,13 @@ protected:
   void updateRelativeTransform() const override;
 
   // Documentation inherited
-  void updateRelativeJacobian(bool _mandatory=true) const override;
+  void updateRelativeJacobian(bool _mandatory = true) const override;
 
   // Documentation inherited
   void updateRelativeJacobianTimeDeriv() const override;
 };
 
-}  // namespace dynamics
-}  // namespace dart
+} // namespace dynamics
+} // namespace dart
 
-#endif  // DART_DYNAMICS_REVOLUTEJOINT_HPP_
-
+#endif // DART_DYNAMICS_REVOLUTEJOINT_HPP_

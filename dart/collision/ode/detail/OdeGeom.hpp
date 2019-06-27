@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -35,8 +35,8 @@
 
 #include <ode/ode.h>
 
-#include "dart/collision/ode/OdeCollisionObject.hpp"
 #include "dart/collision/ode/OdeCollisionDetector.hpp"
+#include "dart/collision/ode/OdeCollisionObject.hpp"
 
 namespace dart {
 namespace collision {
@@ -80,4 +80,4 @@ protected:
 } // namespace collision
 } // namespace dart
 
-#endif  // DART_COLLISION_ODE_DETAIL_ODEGEOM_HPP_
+#endif // DART_COLLISION_ODE_DETAIL_ODEGEOM_HPP_

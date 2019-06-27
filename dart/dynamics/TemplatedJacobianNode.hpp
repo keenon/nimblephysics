@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -50,7 +50,6 @@ template <class NodeType>
 class TemplatedJacobianNode : public JacobianNode
 {
 public:
-
   // Documentation inherited
   math::Jacobian getJacobian(
       const Frame* _inCoordinatesOf) const override final;
@@ -117,10 +116,8 @@ public:
       const Frame* _inCoordinatesOf = Frame::World()) const override final;
 
 protected:
-
   /// Constructor
   TemplatedJacobianNode(BodyNode* bn);
-
 };
 
 } // namespace dynamics

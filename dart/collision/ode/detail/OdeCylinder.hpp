@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -45,8 +45,7 @@ class OdeCylinder : public OdeGeom
 {
 public:
   /// Constructor
-  OdeCylinder(
-      const OdeCollisionObject* parent, double radius, double height);
+  OdeCylinder(const OdeCollisionObject* parent, double radius, double height);
 
   /// Destructor
   virtual ~OdeCylinder();
@@ -56,4 +55,4 @@ public:
 } // namespace collision
 } // namespace dart
 
-#endif  // DART_COLLISION_ODE_DETAIL_ODECYLINDER_HPP_
+#endif // DART_COLLISION_ODE_DETAIL_ODECYLINDER_HPP_

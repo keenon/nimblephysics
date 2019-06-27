@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -73,7 +73,7 @@ protected:
   std::unique_ptr<btCollisionObject> mBulletCollisionObject;
 };
 
-}  // namespace collision
-}  // namespace dart
+} // namespace collision
+} // namespace dart
 
-#endif  // DART_COLLISION_BULLET_BULLETCOLLISIONOBJECT_HPP_
+#endif // DART_COLLISION_BULLET_BULLETCOLLISIONOBJECT_HPP_

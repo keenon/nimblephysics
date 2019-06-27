@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -30,10 +30,10 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <gtest/gtest.h>
 #include <TestHelpers.hpp>
 #include <dart/dart.hpp>
 #include <dart/utils/urdf/DartLoader.hpp>
+#include <gtest/gtest.h>
 
 //==============================================================================
 TEST(Issue986, CreateShapeNodeShouldCompile)
@@ -45,8 +45,8 @@ TEST(Issue986, CreateShapeNodeShouldCompile)
   bn->createShapeNode(sphere);
   bn->createShapeNode(sphere, "custom name");
 
-  const dart::dynamics::ShapePtr generic =
-      std::make_shared<dart::dynamics::SphereShape>(1.0);
+  const dart::dynamics::ShapePtr generic
+      = std::make_shared<dart::dynamics::SphereShape>(1.0);
 
   bn->createShapeNode(generic);
   bn->createShapeNode(generic, "another name");

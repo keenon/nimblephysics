@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -42,7 +42,6 @@ namespace collision {
 class FCLCollisionObject : public CollisionObject
 {
 public:
-
   friend class FCLCollisionDetector;
 
   /// Return FCL collision object
@@ -52,23 +51,22 @@ public:
   const dart::collision::fcl::CollisionObject* getFCLCollisionObject() const;
 
 protected:
-
   /// Constructor
-  FCLCollisionObject(CollisionDetector* collisionDetector,
+  FCLCollisionObject(
+      CollisionDetector* collisionDetector,
       const dynamics::ShapeFrame* shapeFrame,
-      const fcl_shared_ptr<dart::collision::fcl::CollisionGeometry>& fclCollGeom);
+      const fcl_shared_ptr<dart::collision::fcl::CollisionGeometry>&
+          fclCollGeom);
 
   // Documentation inherited
   void updateEngineData() override;
 
 protected:
-
   /// FCL collision object
   std::unique_ptr<dart::collision::fcl::CollisionObject> mFCLCollisionObject;
-
 };
 
-}  // namespace collision
-}  // namespace dart
+} // namespace collision
+} // namespace dart
 
-#endif  // DART_COLLISION_FCL_FCLCOLLISIONOBJECT_HPP_
+#endif // DART_COLLISION_FCL_FCLCOLLISIONOBJECT_HPP_

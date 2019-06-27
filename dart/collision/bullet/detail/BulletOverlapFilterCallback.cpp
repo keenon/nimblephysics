@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -42,9 +42,7 @@ namespace detail {
 //==============================================================================
 BulletOverlapFilterCallback::BulletOverlapFilterCallback(
     const std::shared_ptr<CollisionFilter>& filter)
-  : foundCollision(false),
-    done(false),
-    filter(filter)
+  : foundCollision(false), done(false), filter(filter)
 {
   // Do nothing
 }
@@ -56,8 +54,9 @@ bool BulletOverlapFilterCallback::needBroadphaseCollision(
   if (done)
     return false;
 
-  assert((proxy0 != nullptr && proxy1 != nullptr) &&
-         "Bullet broadphase overlapping pair proxies are nullptr");
+  assert(
+      (proxy0 != nullptr && proxy1 != nullptr)
+      && "Bullet broadphase overlapping pair proxies are nullptr");
 
   const bool collide1
       = proxy0->m_collisionFilterGroup & proxy1->m_collisionFilterMask;
@@ -83,6 +82,6 @@ bool BulletOverlapFilterCallback::needBroadphaseCollision(
   return collide;
 }
 
-}  // namespace detail
-}  // namespace collision
-}  // namespace dart
+} // namespace detail
+} // namespace collision
+} // namespace dart

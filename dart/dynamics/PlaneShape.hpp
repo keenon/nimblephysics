@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -73,8 +73,8 @@ public:
   void setNormalAndOffset(const Eigen::Vector3d& _normal, double _offset);
 
   /// Set plane normal and point
-  void setNormalAndPoint(const Eigen::Vector3d& _normal,
-                         const Eigen::Vector3d& _point);
+  void setNormalAndPoint(
+      const Eigen::Vector3d& _normal, const Eigen::Vector3d& _point);
 
   /// Compute distance between the plane and the given point
   double computeDistance(const Eigen::Vector3d& _point) const;
@@ -96,7 +96,7 @@ private:
   double mOffset;
 };
 
-}  // namespace dynamics
-}  // namespace dart
+} // namespace dynamics
+} // namespace dart
 
-#endif  // DART_DYNAMICS_PLANESHAPE_HPP_
+#endif // DART_DYNAMICS_PLANESHAPE_HPP_

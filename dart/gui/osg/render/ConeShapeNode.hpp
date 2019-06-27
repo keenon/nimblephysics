@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -53,20 +53,17 @@ class ConeShapeDrawable;
 class ConeShapeNode : public ShapeNode, public ::osg::Group
 {
 public:
-
-  ConeShapeNode(std::shared_ptr<dart::dynamics::ConeShape> shape,
-                    ShapeFrameNode* parent);
+  ConeShapeNode(
+      std::shared_ptr<dart::dynamics::ConeShape> shape, ShapeFrameNode* parent);
 
   void refresh();
   void extractData(bool firstTime);
 
 protected:
-
   virtual ~ConeShapeNode();
 
   std::shared_ptr<dart::dynamics::ConeShape> mConeShape;
   ConeShapeGeode* mGeode;
-
 };
 
 } // namespace render

@@ -1,4 +1,4 @@
-# Copyright (c) 2011-2018, The DART development contributors
+# Copyright (c) 2011-2019, The DART development contributors
 # All rights reserved.
 #
 # The list of contributors can be found at:
@@ -9,10 +9,13 @@
 # Find ODE
 #
 # This sets the following variables:
-# ODE_FOUND
-# ODE_INCLUDE_DIRS
-# ODE_LIBRARIES
-# ODE_VERSION
+#   ODE_FOUND
+#   ODE_INCLUDE_DIRS
+#   ODE_LIBRARIES
+#   ODE_VERSION
+#
+# and the following targets:
+#   ODE::ODE
 
 find_package(PkgConfig QUIET)
 
@@ -27,7 +30,7 @@ find_path(ODE_INCLUDE_DIRS
 
 # Libraries
 if(MSVC)
-  set(ODE_LIBRARIES optimized ode debug oded)
+  set(ODE_LIBRARIES "ode$<$<CONFIG:Debug>:d>")
 else()
   find_library(ODE_LIBRARIES
       NAMES ode
@@ -43,4 +46,3 @@ find_package_handle_standard_args(ODE
     FAIL_MESSAGE  DEFAULT_MSG
     REQUIRED_VARS ODE_INCLUDE_DIRS ODE_LIBRARIES
     VERSION_VAR   ODE_VERSION)
-

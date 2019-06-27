@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -53,20 +53,18 @@ class PlaneShapeDrawable;
 class PlaneShapeNode : public ShapeNode, public ::osg::Group
 {
 public:
-
-  PlaneShapeNode(std::shared_ptr<dart::dynamics::PlaneShape> shape,
-                 ShapeFrameNode* parent);
+  PlaneShapeNode(
+      std::shared_ptr<dart::dynamics::PlaneShape> shape,
+      ShapeFrameNode* parent);
 
   void refresh();
   void extractData(bool firstTime);
 
 protected:
-
   virtual ~PlaneShapeNode();
 
   std::shared_ptr<dart::dynamics::PlaneShape> mPlaneShape;
   PlaneShapeGeode* mGeode;
-
 };
 
 } // namespace render

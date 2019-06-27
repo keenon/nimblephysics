@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -46,7 +46,6 @@ namespace collision {
 class BulletCollisionGroup : public CollisionGroup
 {
 public:
-
   friend class BulletCollisionDetector;
 
   /// Constructor
@@ -56,7 +55,6 @@ public:
   virtual ~BulletCollisionGroup() = default;
 
 protected:
-
   // Documentation inherited
   void initializeEngineData() override;
 
@@ -83,7 +81,6 @@ protected:
   const btCollisionWorld* getBulletCollisionWorld() const;
 
 protected:
-
   using CollisionGroup::updateEngineData;
 
   /// Bullet broad-phase algorithm
@@ -97,10 +94,9 @@ protected:
 
   /// Bullet collision world
   std::unique_ptr<btCollisionWorld> mBulletCollisionWorld;
-
 };
 
-}  // namespace collision
-}  // namespace dart
+} // namespace collision
+} // namespace dart
 
-#endif  // DART_COLLISION_BULLET_BULLETCOLLISIONGROUP_HPP_
+#endif // DART_COLLISION_BULLET_BULLETCOLLISIONGROUP_HPP_

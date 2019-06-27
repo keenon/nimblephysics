@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -43,7 +43,8 @@ namespace gui {
 namespace glut {
 
 /// \brief
-class Window {
+class Window
+{
 public:
   Window();
   virtual ~Window();
@@ -94,8 +95,8 @@ protected:
   std::vector<unsigned char> mScreenshotTemp2;
 };
 
-}  // namespace glut
-}  // namespace gui
-}  // namespace dart
+} // namespace glut
+} // namespace gui
+} // namespace dart
 
-#endif  // DART_GUI_GLUT_WINDOW_HPP_
+#endif // DART_GUI_GLUT_WINDOW_HPP_

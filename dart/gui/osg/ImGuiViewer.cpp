@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -32,8 +32,8 @@
 
 #include "dart/gui/osg/ImGuiViewer.hpp"
 
-#include "dart/gui/osg/ImGuiWidget.hpp"
 #include "dart/gui/osg/ImGuiHandler.hpp"
+#include "dart/gui/osg/ImGuiWidget.hpp"
 
 namespace dart {
 namespace gui {
@@ -60,13 +60,13 @@ ImGuiViewer::~ImGuiViewer()
 //==============================================================================
 ImGuiHandler* ImGuiViewer::getImGuiHandler()
 {
-  return mImGuiHandler;
+  return mImGuiHandler.get();
 }
 
 //==============================================================================
 const ImGuiHandler* ImGuiViewer::getImGuiHandler() const
 {
-  return mImGuiHandler;
+  return mImGuiHandler.get();
 }
 
 //==============================================================================

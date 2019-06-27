@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -60,5 +60,5 @@ LCPSolver::~LCPSolver()
 {
 }
 
-}  // namespace constraint
-}  // namespace dart
+} // namespace constraint
+} // namespace dart

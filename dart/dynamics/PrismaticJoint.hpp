@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -42,7 +42,6 @@ namespace dynamics {
 class PrismaticJoint : public detail::PrismaticJointBase
 {
 public:
-
   friend class Skeleton;
   using Base = detail::PrismaticJointBase;
   using UniqueProperties = detail::PrismaticJointUniqueProperties;
@@ -75,7 +74,7 @@ public:
 
   /// Same as copy(const PrismaticJoint&)
   PrismaticJoint& operator=(const PrismaticJoint& _otherJoint);
-  
+
   // Documentation inherited
   const std::string& getType() const override;
 
@@ -96,7 +95,6 @@ public:
       const GenericJoint<math::R1Space>::Vector& positions) const override;
 
 protected:
-
   /// Constructor called by Skeleton class
   PrismaticJoint(const Properties& properties);
 
@@ -110,13 +108,13 @@ protected:
   void updateRelativeTransform() const override;
 
   // Documentation inherited
-  void updateRelativeJacobian(bool _mandatory=true) const override;
+  void updateRelativeJacobian(bool _mandatory = true) const override;
 
   // Documentation inherited
   void updateRelativeJacobianTimeDeriv() const override;
 };
 
-}  // namespace dynamics
-}  // namespace dart
+} // namespace dynamics
+} // namespace dart
 
-#endif  // DART_DYNAMICS_PRISMATICJOINT_HPP_
+#endif // DART_DYNAMICS_PRISMATICJOINT_HPP_

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -43,9 +43,9 @@ namespace planning {
 class Trajectory
 {
 public:
-	virtual double getDuration() const = 0;
-	virtual Eigen::VectorXd getPosition(double time) const = 0;
-	virtual Eigen::VectorXd getVelocity(double time) const = 0;
+  virtual double getDuration() const = 0;
+  virtual Eigen::VectorXd getPosition(double time) const = 0;
+  virtual Eigen::VectorXd getVelocity(double time) const = 0;
 };
 
 } // namespace planning

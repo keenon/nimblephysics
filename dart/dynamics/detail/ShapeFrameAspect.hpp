@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -95,8 +95,8 @@ struct DynamicsAspectProperties
   double mRestitutionCoeff;
 
   /// Constructor
-  DynamicsAspectProperties(const double frictionCoeff = 1.0,
-                           const double restitutionCoeff = 0.0);
+  DynamicsAspectProperties(
+      const double frictionCoeff = 1.0, const double restitutionCoeff = 0.0);
 
   /// Destructor
   virtual ~DynamicsAspectProperties() = default;
@@ -115,9 +115,10 @@ struct ShapeFrameProperties
 };
 
 using ShapeFrameCompositeBase = common::EmbedPropertiesOnTopOf<
-    ShapeFrame, ShapeFrameProperties,
-    common::SpecializedForAspect<
-        VisualAspect, CollisionAspect, DynamicsAspect> >;
+    ShapeFrame,
+    ShapeFrameProperties,
+    common::
+        SpecializedForAspect<VisualAspect, CollisionAspect, DynamicsAspect> >;
 
 } // namespace detail
 } // namespace dynamics

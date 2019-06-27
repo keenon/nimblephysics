@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -132,11 +132,10 @@ struct DefaultCombiner
   }
 };
 
-}  // namespace detail
-}  // namespace signal
+} // namespace detail
+} // namespace signal
 
-}  // namespace common
-}  // namespace dart
+} // namespace common
+} // namespace dart
 
-#endif  // DART_COMMON_DETAIL_CONNECTIONBODY_HPP_
-
+#endif // DART_COMMON_DETAIL_CONNECTIONBODY_HPP_

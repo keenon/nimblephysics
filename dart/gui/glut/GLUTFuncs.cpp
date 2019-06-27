@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -64,9 +64,9 @@ void drawStringOnScreen(float x, float y, const std::string& s, bool bigFont)
   for (unsigned int c = 0; c < length; c++)
   {
     if (bigFont)
-      glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, s.at(c) );
+      glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, s.at(c));
     else
-      glutBitmapCharacter(GLUT_BITMAP_HELVETICA_10, s.at(c) );
+      glutBitmapCharacter(GLUT_BITMAP_HELVETICA_10, s.at(c));
   }
   glPopMatrix();
 
@@ -75,6 +75,6 @@ void drawStringOnScreen(float x, float y, const std::string& s, bool bigFont)
   glMatrixMode(oldMode);
 }
 
-}  // namespace glut
-}  // namespace gui
-}  // namespace dart
+} // namespace glut
+} // namespace gui
+} // namespace dart

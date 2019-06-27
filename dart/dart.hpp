@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -30,6 +30,7 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
+// clang-format off
 #include "dart/config.hpp"
 #include "dart/common/common.hpp"
 #include "dart/math/math.hpp"
@@ -40,3 +41,4 @@
 #include "dart/optimizer/optimizer.hpp"
 #include "dart/dynamics/dynamics.hpp"
 #include "dart/simulation/simulation.hpp"
+// clang-format on

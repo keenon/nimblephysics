@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -33,8 +33,8 @@
 #include <gtest/gtest.h>
 
 #include "dart/common/sub_ptr.hpp"
-#include "dart/dynamics/SimpleFrame.hpp"
 #include "dart/dynamics/BoxShape.hpp"
+#include "dart/dynamics/SimpleFrame.hpp"
 
 using namespace dart;
 using namespace dynamics;
@@ -68,7 +68,7 @@ TEST(Subjects, ImplicitConversion)
 
   // This checks whether the sub_ptr class can successfully be implicitly
   // converted to the type of class it's supposed to be pointing to
-  EXPECT_TRUE( getPointer(entity_ptr) == entity_ptr.get() );
+  EXPECT_TRUE(getPointer(entity_ptr) == entity_ptr.get());
 
   delete entity_ptr;
 }

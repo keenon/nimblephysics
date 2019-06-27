@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -43,7 +43,6 @@ namespace dynamics {
 class ConeShape : public Shape
 {
 public:
-
   /// Constructor.
   /// \param[in] radius Radius of the circular base.
   /// \param[in] height Lateral height of the cone.
@@ -97,10 +96,9 @@ private:
 
   /// Height of the cylindrical part.
   double mHeight;
-
 };
 
-}  // namespace dynamics
-}  // namespace dart
+} // namespace dynamics
+} // namespace dart
 
-#endif  // DART_DYNAMICS_CONESHAPE_HPP_
+#endif // DART_DYNAMICS_CONESHAPE_HPP_

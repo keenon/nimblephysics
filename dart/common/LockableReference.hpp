@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -86,6 +86,7 @@ public:
   /// \param[in] lockableHolder Weak pointer to an object that holds the
   /// lockable. This is used to check whether the lockable holder is not
   /// destructed before lock/unlock.
+  /// \param[in] lockable
   SingleLockableReference(
       std::weak_ptr<const void> lockableHolder, Lockable& lockable) noexcept;
 

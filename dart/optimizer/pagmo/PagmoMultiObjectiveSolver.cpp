@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -86,6 +86,7 @@ PagmoMultiObjectiveSolver::~PagmoMultiObjectiveSolver()
 }
 
 //==============================================================================
+#ifdef PAGMO_WITH_NLOPT
 static pagmo::algorithm createNloptCobyla(
     const PagmoMultiObjectiveSolver::Properties& properties)
 {
@@ -95,6 +96,7 @@ static pagmo::algorithm createNloptCobyla(
 
   return alg;
 }
+#endif
 
 //==============================================================================
 static pagmo::algorithm createMoead(
@@ -120,10 +122,12 @@ static pagmo::algorithm createPagmoAlgorithm(
 {
   switch (properties.mAlgorithm)
   {
+#ifdef PAGMO_WITH_NLOPT
     case PagmoMultiObjectiveSolver::Algorithm::Local_nlopt_COBYLA:
     {
       return createNloptCobyla(properties);
     }
+#endif
     case PagmoMultiObjectiveSolver::Algorithm::Global_MOEAD:
     {
       return createMoead(properties);

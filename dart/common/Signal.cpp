@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -94,8 +94,8 @@ Connection::~Connection()
 //==============================================================================
 bool Connection::isConnected() const
 {
-  std::shared_ptr<signal::detail::ConnectionBodyBase>
-      connectionBody(mWeakConnectionBody.lock());
+  std::shared_ptr<signal::detail::ConnectionBodyBase> connectionBody(
+      mWeakConnectionBody.lock());
 
   if (nullptr == connectionBody)
     return false;
@@ -106,8 +106,8 @@ bool Connection::isConnected() const
 //==============================================================================
 void Connection::disconnect() const
 {
-  std::shared_ptr<signal::detail::ConnectionBodyBase>
-      connectionBody(mWeakConnectionBody.lock());
+  std::shared_ptr<signal::detail::ConnectionBodyBase> connectionBody(
+      mWeakConnectionBody.lock());
 
   if (nullptr == connectionBody)
     return;
@@ -135,6 +135,5 @@ ScopedConnection::~ScopedConnection()
   disconnect();
 }
 
-}  // namespace common
-}  // namespace dart
-
+} // namespace common
+} // namespace dart

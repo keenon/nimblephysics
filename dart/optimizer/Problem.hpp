@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -47,7 +47,6 @@ namespace optimizer {
 class Problem
 {
 public:
-
   /// \brief Constructor
   explicit Problem(std::size_t _dim = 0);
 
@@ -189,4 +188,3 @@ protected:
 } // namespace dart
 
 #endif // #ifndef DART_OPTIMIZER_PROBLEM_HPP_
-

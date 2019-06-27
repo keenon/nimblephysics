@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -60,7 +60,8 @@ public:
   bool seek(ptrdiff_t _origin, SeekType _mode) override;
 
   // Documentation inherited.
-  std::size_t read(void* _buffer, std::size_t _size, std::size_t _count) override;
+  std::size_t read(
+      void* _buffer, std::size_t _size, std::size_t _count) override;
 
 private:
   std::FILE* mFile;

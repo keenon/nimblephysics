@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -50,7 +50,7 @@ constexpr double Contact::getNormalEpsilonSquared()
   return 1e-12;
 }
 
-}  // namespace collision
-}  // namespace dart
+} // namespace collision
+} // namespace dart
 
 #endif // DART_COLLISION_DETAIL_CONTACT_IMPL_HPP_

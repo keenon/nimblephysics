@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -62,11 +62,11 @@ void OdePlane::updateEngineData()
   const Eigen::Matrix3d rot = tf.linear();
 
   auto plane = static_cast<const dynamics::PlaneShape*>(
-        mParentCollisionObject->getShape().get());
+      mParentCollisionObject->getShape().get());
   const Eigen::Vector3d& normal = plane->getNormal();
   const double offset = plane->getOffset();
 
-  const Eigen::Vector3d& normal2 = rot*normal;
+  const Eigen::Vector3d& normal2 = rot * normal;
   const double offset2 = offset + pos.dot(normal2);
 
   dGeomPlaneSetParams(mGeomId, normal2.x(), normal2.y(), normal2.z(), offset2);

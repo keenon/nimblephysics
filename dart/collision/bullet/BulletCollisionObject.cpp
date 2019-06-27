@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -62,7 +62,7 @@ BulletCollisionObject::BulletCollisionObject(
   assert(bulletCollisionShape);
 
   mBulletCollisionObject->setCollisionShape(
-        mBulletCollisionShape->mCollisionShape.get());
+      mBulletCollisionShape->mCollisionShape.get());
 
   mBulletCollisionObject->setUserPointer(this);
 }
@@ -70,8 +70,8 @@ BulletCollisionObject::BulletCollisionObject(
 //==============================================================================
 void BulletCollisionObject::updateEngineData()
 {
-  btTransform worldTransform =
-    convertTransform(mShapeFrame->getWorldTransform());
+  btTransform worldTransform
+      = convertTransform(mShapeFrame->getWorldTransform());
 
   if (mBulletCollisionShape->mRelativeTransform)
     worldTransform *= (*mBulletCollisionShape->mRelativeTransform);
@@ -79,5 +79,5 @@ void BulletCollisionObject::updateEngineData()
   mBulletCollisionObject->setWorldTransform(worldTransform);
 }
 
-}  // namespace collision
-}  // namespace dart
+} // namespace collision
+} // namespace dart

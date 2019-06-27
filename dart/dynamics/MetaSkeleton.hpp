@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -33,17 +33,17 @@
 #ifndef DART_DYNAMICS_METASKELETON_HPP_
 #define DART_DYNAMICS_METASKELETON_HPP_
 
-#include <vector>
 #include <string>
+#include <vector>
 
 #include <Eigen/Dense>
 
 #include "dart/common/LockableReference.hpp"
 #include "dart/common/Signal.hpp"
 #include "dart/common/Subject.hpp"
-#include "dart/math/Geometry.hpp"
 #include "dart/dynamics/Frame.hpp"
 #include "dart/dynamics/InvalidIndex.hpp"
+#include "dart/math/Geometry.hpp"
 
 namespace dart {
 namespace dynamics {
@@ -61,21 +61,30 @@ class Marker;
 class MetaSkeleton : public common::Subject
 {
 public:
-  using NameChangedSignal
-      = common::Signal<void(std::shared_ptr<const MetaSkeleton> _skeleton,
-                            const std::string& _oldName,
-                            const std::string& _newName)>;
+  using NameChangedSignal = common::Signal<void(
+      std::shared_ptr<const MetaSkeleton> _skeleton,
+      const std::string& _oldName,
+      const std::string& _newName)>;
 
   MetaSkeleton(const MetaSkeleton&) = delete;
 
   /// Default destructor
   virtual ~MetaSkeleton() = default;
 
+  /// Creates an identical clone of this MetaSkeleton
+  virtual MetaSkeletonPtr cloneMetaSkeleton(
+      const std::string& cloneName) const = 0;
+  // TODO: In DART7, rename this to clone() and change the current
+  // Skeleton::clone() to override it.
+
+  /// Creates an identical clone of this MetaSkeleton
+  MetaSkeletonPtr cloneMetaSkeleton() const;
+
   /// Returns mutex.
   virtual std::unique_ptr<common::LockableReference> getLockableReference()
-  const = 0;
-  // TODO: Rename this to getMutex once the deprecated Skeleton::getMutex() is
-  // removed in DART 7.
+      const = 0;
+  // TODO: In DART7, rename this to getMutex() and change the current
+  // Skeleton::getMutex() to override it.
 
   //----------------------------------------------------------------------------
   /// \{ \name Name
@@ -138,7 +147,8 @@ public:
   /// Returns INVALID_INDEX if it is not held in this ReferentialSkeleton.
   /// When _warning is true, a warning message will be printed if the BodyNode
   /// is not in the MetaSkeleton.
-  virtual std::size_t getIndexOf(const BodyNode* _bn, bool _warning=true) const = 0;
+  virtual std::size_t getIndexOf(
+      const BodyNode* _bn, bool _warning = true) const = 0;
 
   /// Get number of Joints
   virtual std::size_t getNumJoints() const = 0;
@@ -191,7 +201,8 @@ public:
   /// INVALID_INDEX if it is not held in this ReferentialSkeleton.
   /// When _warning is true, a warning message will be printed if the Joint is
   /// not in the MetaSkeleton.
-  virtual std::size_t getIndexOf(const Joint* _joint, bool _warning=true) const = 0;
+  virtual std::size_t getIndexOf(
+      const Joint* _joint, bool _warning = true) const = 0;
 
   /// Return the number of degrees of freedom in this skeleton
   virtual std::size_t getNumDofs() const = 0;
@@ -212,8 +223,8 @@ public:
   /// ReferentialSkeleton. Returns INVALID_INDEX if it is not held in this
   /// ReferentialSkeleton. When _warning is true, a warning message will be
   /// printed if the DegreeOfFreedom is not in the MetaSkeleton.
-  virtual std::size_t getIndexOf(const DegreeOfFreedom* _dof,
-                            bool _warning=true) const = 0;
+  virtual std::size_t getIndexOf(
+      const DegreeOfFreedom* _dof, bool _warning = true) const = 0;
 
   /// \}
 
@@ -231,8 +242,9 @@ public:
   void setCommands(const Eigen::VectorXd& _commands);
 
   /// Set commands for a subset of the generalized coordinates
-  void setCommands(const std::vector<std::size_t>& _indices,
-                           const Eigen::VectorXd& _commands);
+  void setCommands(
+      const std::vector<std::size_t>& _indices,
+      const Eigen::VectorXd& _commands);
 
   /// Get commands for all generalized coordinates
   Eigen::VectorXd getCommands() const;
@@ -259,8 +271,9 @@ public:
   void setPositions(const Eigen::VectorXd& _positions);
 
   /// Set the positions for a subset of the generalized coordinates
-  void setPositions(const std::vector<std::size_t>& _indices,
-                    const Eigen::VectorXd& _positions);
+  void setPositions(
+      const std::vector<std::size_t>& _indices,
+      const Eigen::VectorXd& _positions);
 
   /// Get the positions for all generalized coordinates
   Eigen::VectorXd getPositions() const;
@@ -278,8 +291,9 @@ public:
   void setPositionLowerLimits(const Eigen::VectorXd& positions);
 
   /// Set the lower limits for a subset of the generalized coordinates
-  void setPositionLowerLimits(const std::vector<std::size_t>& indices,
-                              const Eigen::VectorXd& positions);
+  void setPositionLowerLimits(
+      const std::vector<std::size_t>& indices,
+      const Eigen::VectorXd& positions);
 
   /// Get the lower limit of a generalized coordinate's position
   double getPositionLowerLimit(std::size_t _index) const;
@@ -298,8 +312,9 @@ public:
   void setPositionUpperLimits(const Eigen::VectorXd& positions);
 
   /// Set the upper limits for a subset of the generalized coordinates
-  void setPositionUpperLimits(const std::vector<std::size_t>& indices,
-                              const Eigen::VectorXd& positions);
+  void setPositionUpperLimits(
+      const std::vector<std::size_t>& indices,
+      const Eigen::VectorXd& positions);
 
   /// Get the upper limit of a generalized coordinate's position
   double getPositionUpperLimit(std::size_t _index) const;
@@ -327,8 +342,9 @@ public:
   void setVelocities(const Eigen::VectorXd& _velocities);
 
   /// Set the velocities of a subset of the generalized coordinates
-  void setVelocities(const std::vector<std::size_t>& _indices,
-                     const Eigen::VectorXd& _velocities);
+  void setVelocities(
+      const std::vector<std::size_t>& _indices,
+      const Eigen::VectorXd& _velocities);
 
   /// Get the velocities for all generalized coordinates
   Eigen::VectorXd getVelocities() const;
@@ -347,8 +363,9 @@ public:
 
   /// Set the lower limits for a subset of the generalized coordinates's
   /// velocity
-  void setVelocityLowerLimits(const std::vector<std::size_t>& indices,
-                              const Eigen::VectorXd& velocities);
+  void setVelocityLowerLimits(
+      const std::vector<std::size_t>& indices,
+      const Eigen::VectorXd& velocities);
 
   /// Get the lower limit of a generalized coordinate's velocity
   double getVelocityLowerLimit(std::size_t _index);
@@ -369,8 +386,9 @@ public:
 
   /// Set the upper limits for a subset of the generalized coordinates's
   /// velocity
-  void setVelocityUpperLimits(const std::vector<std::size_t>& indices,
-                              const Eigen::VectorXd& velocities);
+  void setVelocityUpperLimits(
+      const std::vector<std::size_t>& indices,
+      const Eigen::VectorXd& velocities);
 
   /// Get the upper limit of a generalized coordinate's velocity
   double getVelocityUpperLimit(std::size_t _index);
@@ -399,14 +417,16 @@ public:
   void setAccelerations(const Eigen::VectorXd& _accelerations);
 
   /// Set the accelerations of a subset of the generalized coordinates
-  void setAccelerations(const std::vector<std::size_t>& _indices,
-                        const Eigen::VectorXd& _accelerations);
+  void setAccelerations(
+      const std::vector<std::size_t>& _indices,
+      const Eigen::VectorXd& _accelerations);
 
   /// Get the accelerations for all generalized coordinates
   Eigen::VectorXd getAccelerations() const;
 
   /// Get the accelerations for a subset of the generalized coordinates
-  Eigen::VectorXd getAccelerations(const std::vector<std::size_t>& _indices) const;
+  Eigen::VectorXd getAccelerations(
+      const std::vector<std::size_t>& _indices) const;
 
   /// Set all accelerations to zero
   void resetAccelerations();
@@ -419,8 +439,9 @@ public:
 
   /// Set the lower limits for a subset of the generalized coordinates's
   /// acceleration
-  void setAccelerationLowerLimits(const std::vector<std::size_t>& indices,
-                              const Eigen::VectorXd& accelerations);
+  void setAccelerationLowerLimits(
+      const std::vector<std::size_t>& indices,
+      const Eigen::VectorXd& accelerations);
 
   /// Get the lower limit of a generalized coordinate's acceleration
   double getAccelerationLowerLimit(std::size_t _index) const;
@@ -441,8 +462,9 @@ public:
 
   /// Set the upper limits for a subset of the generalized coordinates's
   /// acceleration
-  void setAccelerationUpperLimits(const std::vector<std::size_t>& indices,
-                              const Eigen::VectorXd& accelerations);
+  void setAccelerationUpperLimits(
+      const std::vector<std::size_t>& indices,
+      const Eigen::VectorXd& accelerations);
 
   /// Get the upper limit of a generalized coordinate's acceleration
   double getAccelerationUpperLimit(std::size_t _index) const;
@@ -471,8 +493,8 @@ public:
   void setForces(const Eigen::VectorXd& _forces);
 
   /// Set the forces of a subset of the generalized coordinates
-  void setForces(const std::vector<std::size_t>& _index,
-                 const Eigen::VectorXd& _forces);
+  void setForces(
+      const std::vector<std::size_t>& _index, const Eigen::VectorXd& _forces);
 
   /// Get the forces for all generalized coordinates
   Eigen::VectorXd getForces() const;
@@ -490,8 +512,8 @@ public:
   void setForceLowerLimits(const Eigen::VectorXd& forces);
 
   /// Set the lower limits for a subset of the generalized coordinates's force
-  void setForceLowerLimits(const std::vector<std::size_t>& indices,
-                           const Eigen::VectorXd& forces);
+  void setForceLowerLimits(
+      const std::vector<std::size_t>& indices, const Eigen::VectorXd& forces);
 
   /// Get the lower limit of a generalized coordinate's force
   double getForceLowerLimit(std::size_t _index) const;
@@ -510,8 +532,8 @@ public:
   void setForceUpperLimits(const Eigen::VectorXd& forces);
 
   /// Set the upper limits for a subset of the generalized coordinates's force
-  void setForceUpperLimits(const std::vector<std::size_t>& indices,
-                           const Eigen::VectorXd& forces);
+  void setForceUpperLimits(
+      const std::vector<std::size_t>& indices, const Eigen::VectorXd& forces);
 
   /// Get the upper limit of a generalized coordinate's force
   double getForceUpperLimit(std::size_t _index) const;
@@ -542,7 +564,6 @@ public:
   /// Get the constraint impulses for the generalized coordinates
   Eigen::VectorXd getJointConstraintImpulses() const;
 
-
   //----------------------------------------------------------------------------
   /// \{ \name Jacobians
   //----------------------------------------------------------------------------
@@ -554,8 +575,7 @@ public:
   /// Get the spatial Jacobian targeting the origin of a BodyNode. You can
   /// specify a coordinate Frame to express the Jacobian in.
   virtual math::Jacobian getJacobian(
-      const JacobianNode* _node,
-      const Frame* _inCoordinatesOf) const = 0;
+      const JacobianNode* _node, const Frame* _inCoordinatesOf) const = 0;
 
   /// Get the spatial Jacobian targeting the origin of a BodyNode relative to
   /// another BodyNode in the same Skeleton. You can specify a coordinate Frame
@@ -569,8 +589,7 @@ public:
   /// expected in coordinates of the BodyNode Frame. The Jacobian is expressed
   /// in the Frame of the BodyNode.
   virtual math::Jacobian getJacobian(
-      const JacobianNode* _node,
-      const Eigen::Vector3d& _localOffset) const = 0;
+      const JacobianNode* _node, const Eigen::Vector3d& _localOffset) const = 0;
 
   /// Get the spatial Jacobian targeting an offset in a BodyNode. The _offset is
   /// expected in coordinates of the BodyNode Frame. You can specify a
@@ -598,8 +617,7 @@ public:
   /// expected in coordinates of the BodyNode Frame. The Jacobian is expressed
   /// in the World Frame.
   virtual math::Jacobian getWorldJacobian(
-      const JacobianNode* _node,
-      const Eigen::Vector3d& _localOffset) const = 0;
+      const JacobianNode* _node, const Eigen::Vector3d& _localOffset) const = 0;
 
   /// Get the linear Jacobian targeting the origin of a BodyNode. You can
   /// specify a coordinate Frame to express the Jacobian in.
@@ -661,15 +679,13 @@ public:
   /// Get the spatial Jacobian time derivative targeting the origin of a
   /// BodyNode. You can specify a coordinate Frame to express the Jacobian in.
   virtual math::Jacobian getJacobianSpatialDeriv(
-      const JacobianNode* _node,
-      const Frame* _inCoordinatesOf) const = 0;
+      const JacobianNode* _node, const Frame* _inCoordinatesOf) const = 0;
 
   /// Get the spatial Jacobian time derivative targeting an offset in a
   /// BodyNode. The _offset is expected in coordinates of the BodyNode Frame.
   /// The Jacobian is expressed in the Frame of the BodyNode.
   virtual math::Jacobian getJacobianSpatialDeriv(
-      const JacobianNode* _node,
-      const Eigen::Vector3d& _localOffset) const = 0;
+      const JacobianNode* _node, const Eigen::Vector3d& _localOffset) const = 0;
 
   /// Get the spatial Jacobian time derivative targeting an offset in a
   /// BodyNode. The _offset is expected in coordinates of the BodyNode Frame.
@@ -706,8 +722,7 @@ public:
   /// a BodyNode. The _offset is expected in coordinates of the BodyNode Frame.
   /// You can specify a coordinate Frame to express the Jacobian in.
   virtual math::Jacobian getJacobianClassicDeriv(
-      const JacobianNode* _node,
-      const Frame* _inCoordinatesOf) const = 0;
+      const JacobianNode* _node, const Frame* _inCoordinatesOf) const = 0;
 
   /// Get the spatial Jacobian (classical) time derivative targeting an offset
   /// in a BodyNode. The _offset is expected in coordinates of the BodyNode
@@ -769,7 +784,8 @@ public:
   /// Get gravity force vector of the MetaSkeleton.
   virtual const Eigen::VectorXd& getGravityForces() const = 0;
 
-  /// Get combined vector of Coriolis force and gravity force of the MetaSkeleton.
+  /// Get combined vector of Coriolis force and gravity force of the
+  /// MetaSkeleton.
   virtual const Eigen::VectorXd& getCoriolisAndGravityForces() const = 0;
 
   /// Get external force vector of the MetaSkeleton.
@@ -845,8 +861,8 @@ public:
   virtual math::Jacobian getCOMJacobian(
       const Frame* _inCoordinatesOf = Frame::World()) const = 0;
 
-  /// Get the MetaSkeleton's COM Linear Jacobian in terms of any Frame (default is
-  /// World Frame)
+  /// Get the MetaSkeleton's COM Linear Jacobian in terms of any Frame (default
+  /// is World Frame)
   virtual math::LinearJacobian getCOMLinearJacobian(
       const Frame* _inCoordinatesOf = Frame::World()) const = 0;
 
@@ -871,7 +887,6 @@ public:
   /// \}
 
 protected:
-
   /// Default constructor
   MetaSkeleton();
 
@@ -881,7 +896,6 @@ protected:
   NameChangedSignal mNameChangedSignal;
 
 public:
-
   //--------------------------------------------------------------------------
   // Slot registers
   //--------------------------------------------------------------------------
@@ -890,6 +904,5 @@ public:
 
 } // namespace dynamics
 } // namespace dart
-
 
 #endif // DART_DYNAMICS_METASKELETON_HPP_

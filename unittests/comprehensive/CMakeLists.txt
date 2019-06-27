@@ -16,6 +16,11 @@ if(TARGET dart-collision-bullet)
   target_link_libraries(test_Distance dart-collision-bullet)
 endif()
 
+dart_add_test("comprehensive" test_Raycast)
+if(TARGET dart-collision-bullet)
+  target_link_libraries(test_Raycast dart-collision-bullet)
+endif()
+
 if(TARGET dart-utils)
 
   dart_add_test("comprehensive" test_Collision)
@@ -36,6 +41,9 @@ if(TARGET dart-utils)
   dart_add_test("comprehensive" test_Skeleton)
   target_link_libraries(test_Skeleton dart-utils)
 
+  dart_add_test("comprehensive" test_MetaSkeleton)
+  target_link_libraries(test_MetaSkeleton dart-utils)
+
   dart_add_test("comprehensive" test_SoftDynamics)
   target_link_libraries(test_SoftDynamics dart-utils)
 
@@ -51,7 +59,3 @@ if(TARGET dart-utils)
   endif()
 
 endif()
-
-dart_format_add(
-  test_MultiObjectiveOptimization.cpp
-)

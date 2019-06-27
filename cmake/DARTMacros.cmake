@@ -43,6 +43,8 @@ macro(dart_get_subdir_list var curdir)
 endmacro()
 
 #===============================================================================
+# DEPRECATED in 6.7 (see #1081)
+#
 # Generate header file list to a cached list.
 # Usage:
 #   dart_generate_include_header_list(_var _target_dir _cacheDesc [headers...])
@@ -56,6 +58,27 @@ macro(dart_generate_include_header_list _var _target_dir _cacheDesc)
       "#include \"${_target_dir}${header}\"\n"
     )
   endforeach()
+endmacro()
+
+#===============================================================================
+# Generate header file.
+# Usage:
+#   dart_generate_include_header_file(file_path target_dir [headers...])
+#===============================================================================
+macro(dart_generate_include_header_file file_path target_dir)
+  file(WRITE ${file_path} "// Automatically generated file by cmake\n\n")
+  foreach(header ${ARGN})
+    file(APPEND ${file_path} "#include \"${target_dir}${header}\"\n")
+  endforeach()
+endmacro()
+
+#===============================================================================
+# Add library and set target properties
+# Usage:
+#   dart_add_library(_libname source1 [source2 ...])
+#===============================================================================
+macro(dart_find_package _name)
+  include(DARTFind${_name})
 endmacro()
 
 #===============================================================================
@@ -92,6 +115,8 @@ endfunction()
 
 #===============================================================================
 function(dart_check_required_package variable dependency)
+  # TODO: Take version for the case that the version variable is not
+  # <package>_VERSION
   if(${${variable}_FOUND})
     if(DART_VERBOSE)
       message(STATUS "Looking for ${dependency} - version ${${variable}_VERSION}"
@@ -169,4 +194,80 @@ function(dart_format_add)
         " this file or modify 'CMAKE_CURRENT_LIST_DIR'")
     endif()
   endforeach()
+endfunction()
+
+#===============================================================================
+# dart_build_target_in_source(target
+#   [LINK_LIBRARIES library1 ...])
+#   [COMPILE_FEATURES feature1 ...]
+#   [COMPILE_OPTIONS option1 ...]
+# )
+function(dart_build_target_in_source target)
+  set(prefix example)
+  set(options )
+  set(oneValueArgs )
+  set(multiValueArgs LINK_LIBRARIES COMPILE_FEATURES COMPILE_OPTIONS)
+  cmake_parse_arguments("${prefix}" "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
+
+  if(example_LINK_LIBRARIES)
+    foreach(dep_target ${example_LINK_LIBRARIES})
+      if(NOT TARGET ${dep_target})
+        if(DART_VERBOSE)
+          message(WARNING "Skipping ${target} because required target '${dep_target}' not found")
+        endif()
+        return()
+      endif()
+    endforeach()
+  endif()
+
+  file(GLOB srcs "*.cpp" "*.hpp")
+
+  add_executable(${target} ${srcs})
+
+  if(example_LINK_LIBRARIES)
+    foreach(dep_target ${example_LINK_LIBRARIES})
+      target_link_libraries(${target} ${dep_target})
+    endforeach()
+  endif()
+
+  if(example_COMPILE_FEATURES)
+    foreach(comple_feature ${example_COMPILE_FEATURES})
+      target_compile_features(${target} PUBLIC ${comple_feature})
+    endforeach()
+  endif()
+
+  if(example_COMPILE_OPTIONS)
+    foreach(comple_option ${example_COMPILE_OPTIONS})
+      target_compile_options(${target} PUBLIC ${comple_option})
+    endforeach()
+  endif()
+
+  set_target_properties(${target}
+    PROPERTIES
+      RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+  )
+
+  dart_format_add(${srcs})
+endfunction()
+
+#===============================================================================
+# dart_build_example_in_source(target
+#   [LINK_LIBRARIES library1 ...])
+#   [COMPILE_FEATURES feature1 ...]
+#   [COMPILE_OPTIONS option1 ...]
+# )
+function(dart_build_example_in_source target)
+  dart_build_target_in_source(${target} ${ARGN})
+  dart_add_example(${target})
+endfunction()
+
+#===============================================================================
+# dart_build_tutorial_in_source(target
+#   [LINK_LIBRARIES library1 ...])
+#   [COMPILE_FEATURES feature1 ...]
+#   [COMPILE_OPTIONS option1 ...]
+# )
+function(dart_build_tutorial_in_source target)
+  dart_build_target_in_source(${target} ${ARGN})
+  dart_add_tutorial(${target})
 endfunction()

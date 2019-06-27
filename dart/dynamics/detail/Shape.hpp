@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -44,7 +44,7 @@ bool Shape::is() const
   return getType() == ShapeT::getStaticType();
 }
 
-}  // namespace dynamics
-}  // namespace dart
+} // namespace dynamics
+} // namespace dart
 
-#endif  // DART_DYNAMICS_DETAIL_SHAPE_HPP_
+#endif // DART_DYNAMICS_DETAIL_SHAPE_HPP_

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -33,8 +33,8 @@
 #ifndef DART_GUI_OSG_RENDER_SPHERESHAPENODE_HPP_
 #define DART_GUI_OSG_RENDER_SPHERESHAPENODE_HPP_
 
-#include <osg/ShapeDrawable>
 #include <osg/MatrixTransform>
+#include <osg/ShapeDrawable>
 
 #include "dart/gui/osg/render/ShapeNode.hpp"
 
@@ -54,7 +54,6 @@ class SphereShapeDrawable;
 class SphereShapeNode : public ShapeNode, public ::osg::MatrixTransform
 {
 public:
-
   SphereShapeNode(
       std::shared_ptr<dart::dynamics::SphereShape> shape,
       ShapeFrameNode* parent);
@@ -63,12 +62,10 @@ public:
   void extractData(bool firstTime);
 
 protected:
-
   virtual ~SphereShapeNode();
 
   std::shared_ptr<dart::dynamics::SphereShape> mSphereShape;
   SphereShapeGeode* mGeode;
-
 };
 
 } // namespace render

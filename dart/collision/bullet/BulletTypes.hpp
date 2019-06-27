@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -54,7 +54,7 @@ btMatrix3x3 convertMatrix3x3(const Eigen::Matrix3d& _R);
 /// @brief Convert Bullet transformation type to Eigen transformation type
 btTransform convertTransform(const Eigen::Isometry3d& _T);
 
-}  // namespace collision
-}  // namespace dart
+} // namespace collision
+} // namespace dart
 
-#endif  // DART_COLLISION_BULLET_BULLETTYPES_HPP_
+#endif // DART_COLLISION_BULLET_BULLETTYPES_HPP_

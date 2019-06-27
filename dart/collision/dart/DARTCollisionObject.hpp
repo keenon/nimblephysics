@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -44,21 +44,19 @@ class CollisionObject;
 class DARTCollisionObject : public CollisionObject
 {
 public:
-
   friend class DARTCollisionDetector;
 
 protected:
-
   /// Constructor
-  DARTCollisionObject(CollisionDetector* collisionDetector,
-                      const dynamics::ShapeFrame* shapeFrame);
+  DARTCollisionObject(
+      CollisionDetector* collisionDetector,
+      const dynamics::ShapeFrame* shapeFrame);
 
   // Documentation inherited
   void updateEngineData() override;
-
 };
 
-}  // namespace collision
-}  // namespace dart
+} // namespace collision
+} // namespace dart
 
-#endif  // DART_COLLISION_DART_DARTCOLLISIONOBJECT_HPP_
+#endif // DART_COLLISION_DART_DARTCOLLISIONOBJECT_HPP_

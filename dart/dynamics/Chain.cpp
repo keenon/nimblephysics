@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -37,11 +37,11 @@ namespace dart {
 namespace dynamics {
 
 //==============================================================================
-Chain::Criteria::Criteria(BodyNode* _start, BodyNode* _target,
-                          bool _includeBoth)
-  : mStart(_start),
-    mTarget(_target),
-    mIncludeBoth(_includeBoth)
+Chain::Criteria::Criteria(
+    BodyNode* start, BodyNode* target, bool includeUpstreamParentJoint)
+  : mStart(start),
+    mTarget(target),
+    mIncludeUpstreamParentJoint(includeUpstreamParentJoint)
 {
   // Do nothing
 }
@@ -64,16 +64,16 @@ Linkage::Criteria Chain::Criteria::convert() const
   target.mChain = true;
   target.mPolicy = Linkage::Criteria::INCLUDE;
 
-  if(!mIncludeBoth)
+  if (!mIncludeUpstreamParentJoint)
   {
-    if(target.mNode.lock() &&
-       target.mNode.lock()->descendsFrom(criteria.mStart.mNode.lock()))
+    if (target.mNode.lock()
+        && target.mNode.lock()->descendsFrom(criteria.mStart.mNode.lock()))
     {
       criteria.mStart.mPolicy = Linkage::Criteria::EXCLUDE;
     }
 
-    if(criteria.mStart.mNode.lock() &&
-       criteria.mStart.mNode.lock()->descendsFrom(target.mNode.lock()))
+    if (criteria.mStart.mNode.lock()
+        && criteria.mStart.mNode.lock()->descendsFrom(target.mNode.lock()))
     {
       target.mPolicy = Linkage::Criteria::EXCLUDE;
     }
@@ -85,14 +85,55 @@ Linkage::Criteria Chain::Criteria::convert() const
 }
 
 //==============================================================================
+Chain::Criteria Chain::Criteria::convert(const Linkage::Criteria& criteria)
+{
+  BodyNodePtr startBodyNode = criteria.mStart.mNode.lock();
+  if (!startBodyNode)
+  {
+    dtwarn << "[Chain::Criteria::convert] Failed in conversion because the "
+           << "start node of the input criteria is not valid anymore. Using "
+           << "the returning Criteria will lead to creating an empty Chain.\n";
+    return Chain::Criteria(nullptr, nullptr);
+  }
+
+  if (criteria.mTargets.size() != 1u)
+  {
+    dtwarn << "[Chain::Criteria::convert] Failed in conversion because the "
+           << "input criteria is not for Chain. The number of targets should "
+           << "be one while the input is " << criteria.mTargets.size() << ". "
+           << "Using the returning Criteria will lead to creating an empty "
+           << "Chain.\n";
+    return Chain::Criteria(nullptr, nullptr);
+  }
+  const Linkage::Criteria::Target& target = criteria.mTargets[0];
+  BodyNodePtr targetBodyNode = target.mNode.lock();
+  if (!targetBodyNode)
+  {
+    dtwarn << "[Chain::Criteria::convert] Failed in conversion because the "
+           << "end node of the input criteria is not valid anymore. Using the "
+           << "returning Criteria will lead to creating an empty Chain.\n";
+    return Chain::Criteria(nullptr, nullptr);
+  }
+
+  bool includeUpstreamParentJoint = true;
+  if (criteria.mStart.mPolicy != Linkage::Criteria::INCLUDE)
+    includeUpstreamParentJoint = false;
+  if (target.mPolicy != Linkage::Criteria::INCLUDE)
+    includeUpstreamParentJoint = false;
+
+  return Chain::Criteria(
+      startBodyNode.get(), targetBodyNode.get(), includeUpstreamParentJoint);
+}
+
+//==============================================================================
 Chain::Criteria::operator Linkage::Criteria() const
 {
   return convert();
 }
 
 //==============================================================================
-ChainPtr Chain::create(const Chain::Criteria& _criteria,
-                       const std::string& _name)
+ChainPtr Chain::create(
+    const Chain::Criteria& _criteria, const std::string& _name)
 {
   ChainPtr chain(new Chain(_criteria, _name));
   chain->mPtr = chain;
@@ -100,8 +141,8 @@ ChainPtr Chain::create(const Chain::Criteria& _criteria,
 }
 
 //==============================================================================
-ChainPtr Chain::create(BodyNode* _start, BodyNode* _target,
-                       const std::string& _name)
+ChainPtr Chain::create(
+    BodyNode* _start, BodyNode* _target, const std::string& _name)
 {
   ChainPtr chain(new Chain(_start, _target, _name));
   chain->mPtr = chain;
@@ -109,36 +150,80 @@ ChainPtr Chain::create(BodyNode* _start, BodyNode* _target,
 }
 
 //==============================================================================
-ChainPtr Chain::create(BodyNode* _start, BodyNode* _target,
-                       IncludeBothTag, const std::string& _name)
+ChainPtr Chain::create(
+    BodyNode* _start,
+    BodyNode* _target,
+    IncludeUpstreamParentJointTag,
+    const std::string& _name)
 {
-  ChainPtr chain(new Chain(_start, _target, IncludeBoth, _name));
+  ChainPtr chain(new Chain(_start, _target, IncludeUpstreamParentJoint, _name));
   chain->mPtr = chain;
   return chain;
 }
 
 //==============================================================================
+ChainPtr Chain::cloneChain() const
+{
+  return cloneChain(getName());
+}
+
+//==============================================================================
+ChainPtr Chain::cloneChain(const std::string& cloneName) const
+{
+  // Clone the skeleton (assuming one skeleton is involved)
+  BodyNodePtr bodyNode = mCriteria.mStart.mNode.lock();
+  if (!bodyNode)
+  {
+    dtwarn << "[Chain::cloneMetaSkeleton] Failed to clone because the "
+           << "start node of the criteria in this Chain is not valid anymore. "
+           << "Returning nullptr.\n";
+    return nullptr;
+  }
+  SkeletonPtr skelClone = bodyNode->getSkeleton()->cloneSkeleton();
+
+  // Create a Criteria
+  Criteria newCriteria = Criteria::convert(mCriteria);
+  assert(newCriteria.mStart.lock());
+  assert(newCriteria.mTarget.lock());
+  newCriteria.mStart
+      = skelClone->getBodyNode(newCriteria.mStart.lock()->getName());
+  newCriteria.mTarget
+      = skelClone->getBodyNode(newCriteria.mTarget.lock()->getName());
+
+  // Create a Chain clone with the Criteria
+  ChainPtr newChain = create(newCriteria, cloneName);
+
+  return newChain;
+}
+
+//==============================================================================
+MetaSkeletonPtr Chain::cloneMetaSkeleton(const std::string& cloneName) const
+{
+  return cloneChain(cloneName);
+}
+
+//==============================================================================
 bool Chain::isStillChain() const
 {
-  if(!isAssembled())
+  if (!isAssembled())
     return false;
 
   // Make sure there are no Branches and no parent FreeJoints on the BodyNodes
   // on the inside of the chain
-  for(std::size_t i=1; i<mBodyNodes.size()-1; ++i)
+  for (std::size_t i = 1; i < mBodyNodes.size() - 1; ++i)
   {
-    if(mBodyNodes[i]->getNumChildBodyNodes() > 1)
+    if (mBodyNodes[i]->getNumChildBodyNodes() > 1)
       return false;
 
-    if(dynamic_cast<FreeJoint*>(mBodyNodes[i]->getParentJoint()))
+    if (dynamic_cast<FreeJoint*>(mBodyNodes[i]->getParentJoint()))
       return false;
   }
 
   // Make sure there is not a FreeJoint at the final BodyNode (which was not
   // tested above)
-  if(mBodyNodes.size() > 1)
+  if (mBodyNodes.size() > 1)
   {
-    if(dynamic_cast<FreeJoint*>(mBodyNodes.back()->getParentJoint()))
+    if (dynamic_cast<FreeJoint*>(mBodyNodes.back()->getParentJoint()))
       return false;
   }
 
@@ -160,8 +245,11 @@ Chain::Chain(BodyNode* _start, BodyNode* _target, const std::string& _name)
 }
 
 //==============================================================================
-Chain::Chain(BodyNode* _start, BodyNode* _target,
-             IncludeBothTag, const std::string& _name)
+Chain::Chain(
+    BodyNode* _start,
+    BodyNode* _target,
+    IncludeUpstreamParentJointTag,
+    const std::string& _name)
   : Linkage(Chain::Criteria(_start, _target, true), _name)
 {
   // Do nothing
@@ -169,16 +257,3 @@ Chain::Chain(BodyNode* _start, BodyNode* _target,
 
 } // namespace dynamics
 } // namespace dart
-
-
-
-
-
-
-
-
-
-
-
-
-

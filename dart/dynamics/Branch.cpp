@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -37,8 +37,7 @@ namespace dart {
 namespace dynamics {
 
 //==============================================================================
-Branch::Criteria::Criteria(BodyNode* _start)
-  : mStart(_start)
+Branch::Criteria::Criteria(BodyNode* _start) : mStart(_start)
 {
   // Do nothing
 }
@@ -66,8 +65,23 @@ Branch::Criteria::operator Linkage::Criteria() const
 }
 
 //==============================================================================
-BranchPtr Branch::create(const Branch::Criteria& _criteria,
-                         const std::string& _name)
+Branch::Criteria Branch::Criteria::convert(const Linkage::Criteria& criteria)
+{
+  BodyNodePtr startBodyNode = criteria.mStart.mNode.lock();
+  if (!startBodyNode)
+  {
+    dtwarn << "[Chain::Criteria::convert] Failed in conversion because the "
+           << "start node of the input criteria is not valid anymore. Using "
+           << "the returning Criteria will lead to creating an empty Branch.\n";
+    return Branch::Criteria(nullptr);
+  }
+
+  return Branch::Criteria(startBodyNode.get());
+}
+
+//==============================================================================
+BranchPtr Branch::create(
+    const Branch::Criteria& _criteria, const std::string& _name)
 {
   BranchPtr branch(new Branch(_criteria, _name));
   branch->mPtr = branch;
@@ -75,15 +89,53 @@ BranchPtr Branch::create(const Branch::Criteria& _criteria,
 }
 
 //==============================================================================
+BranchPtr Branch::cloneBranch() const
+{
+  return cloneBranch(getName());
+}
+
+//==============================================================================
+BranchPtr Branch::cloneBranch(const std::string& cloneName) const
+{
+  // Clone the skeleton (assuming one skeleton is involved)
+  BodyNodePtr bodyNode = mCriteria.mStart.mNode.lock();
+  if (!bodyNode)
+  {
+    dtwarn << "[Branch::cloneMetaSkeleton] Failed to clone because the "
+           << "start node of the criteria in this Branch is not valid anymore. "
+           << "Returning nullptr.\n";
+    return nullptr;
+  }
+  SkeletonPtr skelClone = bodyNode->getSkeleton()->cloneSkeleton();
+
+  // Create a Criteria
+  Criteria newCriteria = Criteria::convert(mCriteria);
+  assert(newCriteria.mStart.lock());
+  newCriteria.mStart
+      = skelClone->getBodyNode(newCriteria.mStart.lock()->getName());
+
+  // Create a Branch clone with the Criteria
+  BranchPtr newBranch = create(newCriteria, cloneName);
+
+  return newBranch;
+}
+
+//==============================================================================
+MetaSkeletonPtr Branch::cloneMetaSkeleton(const std::string& cloneName) const
+{
+  return cloneBranch(cloneName);
+}
+
+//==============================================================================
 bool Branch::isStillBranch() const
 {
-  if(!isAssembled())
+  if (!isAssembled())
     return false;
 
-  for(std::size_t i=0; i<mBodyNodes.size(); ++i)
+  for (std::size_t i = 0; i < mBodyNodes.size(); ++i)
   {
     BodyNode* bn = mBodyNodes[i];
-    if(bn->getNumChildBodyNodes() != mNumChildNodes[i])
+    if (bn->getNumChildBodyNodes() != mNumChildNodes[i])
       return false;
   }
 
@@ -104,7 +156,7 @@ void Branch::update()
 
   mNumChildNodes.clear();
   mNumChildNodes.reserve(mBodyNodes.size());
-  for(std::size_t i=0; i<mBodyNodes.size(); ++i)
+  for (std::size_t i = 0; i < mBodyNodes.size(); ++i)
   {
     mNumChildNodes.push_back(mBodyNodes[i]->getNumChildBodyNodes());
   }

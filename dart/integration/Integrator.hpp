@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -67,12 +67,12 @@ public:
   virtual Eigen::VectorXd evalGenAccs() = 0;
 
   /// \brief Integrate configruations and store them in the system
-  virtual void integrateConfigs(const Eigen::VectorXd& _genVels,
-                                double _dt) = 0;
+  virtual void integrateConfigs(const Eigen::VectorXd& _genVels, double _dt)
+      = 0;
 
   /// \brief Integrate generalized velocities and store them in the system
-  virtual void integrateGenVels(const Eigen::VectorXd& _genVels,
-                                double _dt) = 0;
+  virtual void integrateGenVels(const Eigen::VectorXd& _genVels, double _dt)
+      = 0;
 };
 
 // TODO(kasiu): Consider templating the class (which currently only works on
@@ -98,7 +98,7 @@ public:
   virtual void integrateVel(IntegrableSystem* _system, double _dt) = 0;
 };
 
-}  // namespace integration
-}  // namespace dart
+} // namespace integration
+} // namespace dart
 
-#endif  // DART_INTEGRATION_INTEGRATOR_HPP_
+#endif // DART_INTEGRATION_INTEGRATOR_HPP_

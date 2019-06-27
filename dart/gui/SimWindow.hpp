@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -39,18 +39,19 @@
 #ifndef DART_GUI_SIMWINDOW_HPP_
 #define DART_GUI_SIMWINDOW_HPP_
 
-#pragma message("This header is deprecated as of DART 6.6. "\
-         "Please use dart/gui/glut/SimWindow.hpp instead.")
+#pragma message(                                                               \
+    "This header is deprecated as of DART 6.6. "                               \
+    "Please use dart/gui/glut/SimWindow.hpp instead.")
 
-#include "dart/gui/glut/SimWindow.hpp"
 #include "dart/common/Deprecated.hpp"
+#include "dart/gui/glut/SimWindow.hpp"
 
 namespace dart {
 namespace gui {
 
 using SimWindow DART_DEPRECATED(6.6) = ::dart::gui::glut::SimWindow;
 
-}  // namespace gui
-}  // namespace dart
+} // namespace gui
+} // namespace dart
 
-#endif  // DART_GUI_SIMWINDOW_HPP_
+#endif // DART_GUI_SIMWINDOW_HPP_

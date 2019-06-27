@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -33,20 +33,16 @@
 #ifndef DART_DYNAMICS_DETAIL_SHAPENODE_HPP_
 #define DART_DYNAMICS_DETAIL_SHAPENODE_HPP_
 
-#include "dart/dynamics/ShapeFrame.hpp"
-#include "dart/dynamics/FixedJacobianNode.hpp"
 #include "dart/dynamics/CompositeNode.hpp"
+#include "dart/dynamics/FixedJacobianNode.hpp"
+#include "dart/dynamics/ShapeFrame.hpp"
 
 namespace dart {
 namespace dynamics {
 namespace detail {
 
-using ShapeNodeCompositeBase = CompositeNode<
-    common::CompositeJoiner<
-        FixedJacobianNode,
-        ShapeFrame
-    >
->;
+using ShapeNodeCompositeBase
+    = CompositeNode<common::CompositeJoiner<FixedJacobianNode, ShapeFrame> >;
 
 } // namespace detail
 } // namespace dynamics

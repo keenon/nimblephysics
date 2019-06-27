@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -128,7 +128,8 @@ Eigen::Vector3d Recording::getContactForce(int _frameIdx, int _contactIdx) const
 }
 
 //==============================================================================
-void Recording::clear() {
+void Recording::clear()
+{
   mBakedStates.clear();
 }
 
@@ -147,6 +148,5 @@ void Recording::updateNumGenCoords(
     mNumGenCoordsForSkeletons.push_back(_skeletons[i]->getNumDofs());
 }
 
-}  // namespace simulation
-}  // namespace dart
-
+} // namespace simulation
+} // namespace dart

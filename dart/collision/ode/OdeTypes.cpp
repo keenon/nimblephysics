@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -41,5 +41,5 @@ Eigen::Vector3d OdeTypes::convertVector3(const dVector3& vec)
   return Eigen::Vector3d(vec[0], vec[1], vec[2]);
 }
 
-}  // namespace collision
-}  // namespace dart
+} // namespace collision
+} // namespace dart

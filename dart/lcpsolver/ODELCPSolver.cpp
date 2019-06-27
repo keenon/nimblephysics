@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018, The DART development contributors
+ * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
  *
  * The list of contributors can be found at:
@@ -115,7 +115,7 @@ bool ODELCPSolver::Solve(
       hi[_numContacts + i * 2 + 1] = _mu;
     }
     // dClearUpperTriangle (A,n);
-    dSolveLCP(n, A, x, b, w, 0, lo, hi, findex);
+    external::ode::dSolveLCP(n, A, x, b, w, 0, lo, hi, findex);
 
     //    for (int i = 0; i < n; i++) {
     //      if (w[i] < 0.0 && abs(x[i] - hi[i]) > 0.000001)
