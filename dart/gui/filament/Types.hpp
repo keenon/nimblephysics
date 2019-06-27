@@ -47,12 +47,12 @@ namespace flmt {
 class FilamentTypes
 {
 public:
-  static Eigen::Vector3d convertVector3d(const ::math::double3& vec3)
+  static Eigen::Vector3d convertVector3d(const filament::math::double3& vec3)
   {
     return Eigen::Map<const Eigen::Vector3d>(vec3.v, 3);
   }
 
-  static Eigen::Matrix3d convertMatrix3d(const ::math::mat3& mat3)
+  static Eigen::Matrix3d convertMatrix3d(const filament::math::mat3& mat3)
   {
     Eigen::Matrix3d ret;
     ret << mat3(0, 0), mat3(1, 0), mat3(2, 0), mat3(0, 1), mat3(1, 1),
@@ -61,7 +61,7 @@ public:
     return ret;
   }
 
-  static Eigen::Isometry3d convertIsometry3d(const ::math::mat4& mat4)
+  static Eigen::Isometry3d convertIsometry3d(const filament::math::mat4& mat4)
   {
     Eigen::Isometry3d tf = Eigen::Isometry3d::Identity();
     tf.linear() = convertMatrix3d(mat4.upperLeft());
@@ -70,28 +70,28 @@ public:
     return tf;
   }
 
-  static ::math::mat4f convertIsometry3d(const Eigen::Isometry3d& mat4)
+  static filament::math::mat4f convertIsometry3d(const Eigen::Isometry3d& mat4)
   {
-    ::math::mat4f tf(
+    filament::math::mat4f tf(
         mat4(0, 0),
         mat4(1, 0),
         mat4(2, 0),
-          0,
+        0,
         mat4(0, 1),
         mat4(1, 1),
         mat4(2, 1),
-          0,
+        0,
         mat4(0, 2),
         mat4(1, 2),
         mat4(2, 2),
-          0,
+        0,
         mat4(0, 3),
         mat4(1, 3),
         mat4(2, 3),
         1);
 
-//    std::cout << "mat4: \n" << mat4.matrix() << std::endl;
-//    std::cout << "tf: \n" << tf << std::endl << std::endl;
+    //    std::cout << "mat4: \n" << mat4.matrix() << std::endl;
+    //    std::cout << "tf: \n" << tf << std::endl << std::endl;
 
     return tf;
   }

@@ -54,14 +54,14 @@
 #include <sstream>
 
 #if defined(WIN32)
-#include <utils/compiler.h>
-#include <utils/win32/stdtypes.h>
-#define SEPARATOR '\\'
-#define SEPARATOR_STR "\\"
+#  include <utils/compiler.h>
+#  include <utils/win32/stdtypes.h>
+#  define SEPARATOR '\\'
+#  define SEPARATOR_STR "\\"
 #else
-#include <unistd.h>
-#define SEPARATOR '/'
-#define SEPARATOR_STR "/"
+#  include <unistd.h>
+#  define SEPARATOR '/'
+#  define SEPARATOR_STR "/"
 #endif
 
 #include <limits.h>

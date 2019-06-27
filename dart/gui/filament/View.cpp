@@ -64,6 +64,8 @@ namespace dart {
 namespace gui {
 namespace flmt {
 
+using namespace filament;
+
 CView::CView(filament::Renderer& renderer, std::string name)
   : engine(*renderer.getEngine()), mName(name)
 {

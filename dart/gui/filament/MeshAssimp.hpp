@@ -70,7 +70,7 @@ class IndexBuffer;
 class Material;
 class MaterialInstance;
 class Renderable;
-}
+} // namespace filament
 
 namespace dart {
 namespace gui {
@@ -79,10 +79,10 @@ namespace flmt {
 class MeshAssimp
 {
 public:
-  using mat4f = ::math::mat4f;
-  using half4 = ::math::half4;
-  using short4 = ::math::short4;
-  using half2 = ::math::half2;
+  using mat4f = filament::math::mat4f;
+  using half4 = filament::math::half4;
+  using short4 = filament::math::short4;
+  using half2 = filament::math::half2;
   explicit MeshAssimp(filament::Engine& engine);
   ~MeshAssimp();
 

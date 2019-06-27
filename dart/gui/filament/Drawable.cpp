@@ -36,21 +36,21 @@
 #include <filament/RenderableManager.h>
 #include <filament/TransformManager.h>
 
-#include "dart/gui/filament/WorldScene.hpp"
 #include "dart/gui/filament/Types.hpp"
+#include "dart/gui/filament/WorldScene.hpp"
 
 namespace dart {
 namespace gui {
 namespace flmt {
 
-Drawable::Drawable(filament::Engine& engine, filament::Scene& scene) : mEngine(engine), mScene(scene)
+Drawable::Drawable(filament::Engine& engine, filament::Scene& scene)
+  : mEngine(engine), mScene(scene)
 {
   // Do nothing
 }
 
 void Drawable::refresh()
 {
-
 }
 
 ::utils::Entity Drawable::getEntity() const
@@ -58,11 +58,14 @@ void Drawable::refresh()
   return mEntity;
 }
 
-BoxDrawable::BoxDrawable(filament::Engine& engine, filament::Scene& scene, dynamics::BoxShape* boxShape)
+BoxDrawable::BoxDrawable(
+    filament::Engine& engine,
+    filament::Scene& scene,
+    dynamics::BoxShape* boxShape)
   : Drawable(engine, scene), mBoxShape(boxShape)
 {
   mVB = filament::VertexBuffer::Builder()
-      .vertexCount(8)
+            .vertexCount(8)
             .bufferCount(1)
             .attribute(
                 filament::VertexAttribute::POSITION,
@@ -80,7 +83,10 @@ BoxDrawable::BoxDrawable(filament::Engine& engine, filament::Scene& scene, dynam
             .build(mEngine);
 }
 
-MeshDrawable::MeshDrawable(filament::Engine& engine, filament::Scene& scene, dynamics::MeshShape* meshShape)
+MeshDrawable::MeshDrawable(
+    filament::Engine& engine,
+    filament::Scene& scene,
+    dynamics::MeshShape* meshShape)
   : Drawable(engine, scene),
     mMeshShape(meshShape),
     mMeshConvertor(MeshAssimp(mEngine))

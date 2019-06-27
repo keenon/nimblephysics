@@ -82,17 +82,17 @@ public:
 
   void refresh(bool flag = true);
 
-//  void setEntity(::utils::Entity entity)
-//  {
-//    mEntity = entity;
-//  }
+  //  void setEntity(::utils::Entity entity)
+  //  {
+  //    mEntity = entity;
+  //  }
 
-//  ::utils::Entity getEntity() const
-//  {
-//    assert(mDrawable);
-//    if (mDrawable->hasEntity())
-//      return mDrawable->getEntity();
-//  }
+  //  ::utils::Entity getEntity() const
+  //  {
+  //    assert(mDrawable);
+  //    if (mDrawable->hasEntity())
+  //      return mDrawable->getEntity();
+  //  }
 
 protected:
   filament::Engine& mEngine;

@@ -69,7 +69,7 @@ class MaterialInstance;
 class Renderable;
 class Texture;
 class Skybox;
-}
+} // namespace filament
 
 namespace dart {
 namespace gui {

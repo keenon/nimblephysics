@@ -71,6 +71,8 @@ namespace flmt {
 
 namespace filagui {
 
+using namespace filament;
+
 static const uint8_t UI_BLIT_PACKAGE[] = {
 #include "generated/material/uiBlit.inc"
 };

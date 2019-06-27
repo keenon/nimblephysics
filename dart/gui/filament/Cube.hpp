@@ -67,7 +67,7 @@ public:
   Cube(
       filament::Engine& engine,
       filament::Material const* material,
-      ::math::float3 linearColor,
+      filament::math::float3 linearColor,
       bool culling = true);
 
   ::utils::Entity getSolidRenderable()
@@ -83,13 +83,14 @@ public:
   ~Cube();
 
   void mapFrustum(filament::Engine& engine, filament::Camera const* camera);
-  void mapFrustum(filament::Engine& engine, ::math::mat4 const& transform);
+  void mapFrustum(
+      filament::Engine& engine, filament::math::mat4 const& transform);
   void mapAabb(filament::Engine& engine, filament::Box const& box);
 
 private:
   static constexpr size_t WIREFRAME_OFFSET = 3 * 2 * 6;
   static const uint32_t mIndices[];
-  static const ::math::float3 mVertices[];
+  static const filament::math::float3 mVertices[];
 
   filament::Engine& mEngine;
   filament::VertexBuffer* mVertexBuffer = nullptr;

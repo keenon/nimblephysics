@@ -67,6 +67,8 @@ namespace dart {
 namespace gui {
 namespace flmt {
 
+using namespace filament;
+
 Window::Window(
     FilamentApp* filamentApp,
     const Config& config,

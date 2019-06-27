@@ -45,6 +45,13 @@ set(filament_LIBRARIES
   ${filament_bluevk_LIBRARY}
   ${filament_bluegl_LIBRARY}
 )
+message(STATUS "[DEBUG] filament_filabridge_LIBRARY: ${filament_filabridge_LIBRARY}")
+message(STATUS "[DEBUG] filament_filaflat_LIBRARY: ${filament_filaflat_LIBRARY}")
+message(STATUS "[DEBUG] filament_filamat_LIBRARY: ${filament_filamat_LIBRARY}")
+message(STATUS "[DEBUG] filament_utils_LIBRARY: ${filament_utils_LIBRARY}")
+message(STATUS "[DEBUG] filament_filament_LIBRARY: ${filament_filament_LIBRARY}")
+message(STATUS "[DEBUG] filament_bluevk_LIBRARY: ${filament_bluevk_LIBRARY}")
+message(STATUS "[DEBUG] filament_bluegl_LIBRARY: ${filament_bluegl_LIBRARY}")
 
 # Set (NAME)_FOUND if all the variables and the version are satisfied.
 include(FindPackageHandleStandardArgs)

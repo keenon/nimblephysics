@@ -94,7 +94,10 @@ protected:
 class BoxDrawable : public Drawable
 {
 public:
-  BoxDrawable(filament::Engine& engine, filament::Scene& scene, dynamics::BoxShape* boxShape);
+  BoxDrawable(
+      filament::Engine& engine,
+      filament::Scene& scene,
+      dynamics::BoxShape* boxShape);
 
 protected:
   dynamics::BoxShape* mBoxShape;
@@ -103,7 +106,10 @@ protected:
 class MeshDrawable : public Drawable
 {
 public:
-  MeshDrawable(filament::Engine& engine, filament::Scene& scene, dynamics::MeshShape* meshShape);
+  MeshDrawable(
+      filament::Engine& engine,
+      filament::Scene& scene,
+      dynamics::MeshShape* meshShape);
 
   ~MeshDrawable();
 

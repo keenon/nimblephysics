@@ -42,13 +42,10 @@
 #include <filament/IndirectLight.h>
 #include <filament/LightManager.h>
 #include <filament/Material.h>
-#include <filament/Material.h>
-#include <filament/MaterialInstance.h>
 #include <filament/MaterialInstance.h>
 #include <filament/RenderableManager.h>
 #include <filament/Renderer.h>
 #include <filament/Scene.h>
-#include <filament/Skybox.h>
 #include <filament/Skybox.h>
 #include <filament/Texture.h>
 #include <filament/TransformManager.h>
@@ -67,6 +64,8 @@
 namespace dart {
 namespace gui {
 namespace flmt {
+
+using namespace filament;
 
 static constexpr uint8_t AI_DEFAULT_MAT_PACKAGE[] = {
 #include "generated/material/aiDefaultMat.inc"
@@ -142,7 +141,7 @@ Viewer::Viewer(
   mViews.emplace_back(mUiView = new CView(*mRenderer, "UI View"));
 
   // set-up the camera manipulators
-  ::math::double3 at(0, 0, -4);
+  filament::math::double3 at(0, 0, -4);
   mMainCameraMan.setCamera(mMainCamera);
   mDebugCameraMan.setCamera(mDebugCamera);
   mMainView->setCamera(mMainCamera);
@@ -170,9 +169,9 @@ Viewer::Viewer(
   // configure the cameras
   configureCamerasForWindow();
 
-  mMainCameraMan.lookAt(at + ::math::double3{0, 0, 4}, at);
-  mDebugCameraMan.lookAt(at + ::math::double3{0, 0, 4}, at);
-  mOrthoCameraMan.lookAt(at + ::math::double3{0, 0, 4}, at);
+  mMainCameraMan.lookAt(at + filament::math::double3{0, 0, 4}, at);
+  mDebugCameraMan.lookAt(at + filament::math::double3{0, 0, 4}, at);
+  mOrthoCameraMan.lookAt(at + filament::math::double3{0, 0, 4}, at);
 
   mDepthMaterial = filament::Material::Builder()
                        .package(
@@ -231,16 +230,15 @@ Viewer::Viewer(
         rcm.getInstance(mLightmapCube->getWireFrameRenderable()), 0x3, 0x2);
 
     // Create the camera mesh
-    mMainCameraMan.setCameraChangedCallback([
-      this,
-      cameraCube = mCameraCube.get(),
-      lightmapCube = mLightmapCube.get(),
-      engine = mEngine
-    ](filament::Camera const* camera) {
-      cameraCube->mapFrustum(*engine, camera);
-      lightmapCube->mapFrustum(
-          *engine, mMainView->getView()->getDirectionalLightCamera());
-    });
+    mMainCameraMan.setCameraChangedCallback(
+        [this,
+         cameraCube = mCameraCube.get(),
+         lightmapCube = mLightmapCube.get(),
+         engine = mEngine](filament::Camera const* camera) {
+          cameraCube->mapFrustum(*engine, camera);
+          lightmapCube->mapFrustum(
+              *engine, mMainView->getView()->getDirectionalLightCamera());
+        });
 
     mScene->addEntity(mCameraCube->getWireFrameRenderable());
     mScene->addEntity(mCameraCube->getSolidRenderable());
@@ -278,7 +276,7 @@ Viewer::Viewer(
     if (view.get() != mUiView)
     {
       view->getView()->setScene(mScene);
-      view->getView()->setClearColor({0.5f,0.75f,1.0f,1.0f});
+      view->getView()->setClearColor({0.5f, 0.75f, 1.0f, 1.0f});
     }
   }
 
@@ -706,7 +704,7 @@ void Viewer::configureCamerasForWindow()
   float dpiScaleX = (float)w / virtualWidth;
   float dpiScaleY = (float)h / virtualHeight;
 
-  const ::math::float3 at(0, 0, -4);
+  const filament::math::float3 at(0, 0, -4);
   const double ratio = double(h) / double(w);
 
   double near = 0.1;
@@ -723,7 +721,7 @@ void Viewer::configureCamerasForWindow()
       3 * ratio,
       near,
       far);
-  mOrthoCamera->lookAt(at + ::math::float3{4, 0, 0}, at);
+  mOrthoCamera->lookAt(at + filament::math::float3{4, 0, 0}, at);
   mUiCamera->setProjection(
       filament::Camera::Projection::ORTHO,
       0.0,

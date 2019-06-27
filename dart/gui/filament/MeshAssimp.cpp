@@ -330,14 +330,10 @@ bool MeshAssimp::setFromFile(
       // normals and tangents
       aiProcess_GenSmoothNormals | aiProcess_CalcTangentSpace |
           // topology optimization
-          aiProcess_FindInstances
-          | aiProcess_OptimizeMeshes
-          | aiProcess_JoinIdenticalVertices
-          |
+          aiProcess_FindInstances | aiProcess_OptimizeMeshes
+          | aiProcess_JoinIdenticalVertices |
           // misc optimization
-          aiProcess_ImproveCacheLocality
-          | aiProcess_SortByPType
-          |
+          aiProcess_ImproveCacheLocality | aiProcess_SortByPType |
           // we only support triangles
           aiProcess_Triangulate);
 
@@ -348,9 +344,9 @@ bool MeshAssimp::setFromFile(
   const std::function<void(
       aiNode const* node, size_t& totalVertexCount, size_t& totalIndexCount)>
       countVertices = [scene, &countVertices](
-          aiNode const* node,
-          size_t& totalVertexCount,
-          size_t& totalIndexCount) {
+                          aiNode const* node,
+                          size_t& totalVertexCount,
+                          size_t& totalIndexCount) {
         for (size_t i = 0; i < node->mNumMeshes; i++)
         {
           aiMesh const* mesh = scene->mMeshes[node->mMeshes[i]];
@@ -381,7 +377,6 @@ bool MeshAssimp::setFromFile(
        &outTangents,
        &outTexCoords,
        &outMeshes](aiNode const* node, int parentIndex) {
-
         mat4f const& current = transpose(
             *reinterpret_cast<mat4f const*>(&node->mTransformation));
 
@@ -511,15 +506,14 @@ bool MeshAssimp::setFromFile(
                 }
               }
 
-              outMeshes.back().parts.push_back(
-                  {indexBufferOffset,
-                   indicesCount,
-                   materialName,
-                   baseColor,
-                   opacity,
-                   metallic,
-                   roughness,
-                   reflectance});
+              outMeshes.back().parts.push_back({indexBufferOffset,
+                                                indicesCount,
+                                                materialName,
+                                                baseColor,
+                                                opacity,
+                                                metallic,
+                                                roughness,
+                                                reflectance});
             }
           }
         }
@@ -559,7 +553,7 @@ bool MeshAssimp::setFromFile(
 
     processNode(node, -1);
 
-//    std::cout << "Hierarchy depth = " << depth << std::endl;
+    //    std::cout << "Hierarchy depth = " << depth << std::endl;
 
     // compute the aabb
     for (auto& mesh : outMeshes)

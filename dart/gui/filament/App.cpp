@@ -51,10 +51,10 @@
 #include <cassert>
 
 #if !defined(WIN32)
-#include <unistd.h>
+#  include <unistd.h>
 #else
-#include <SDL_syswm.h>
-#include <utils/unwindows.h>
+#  include <SDL_syswm.h>
+#  include <utils/unwindows.h>
 #endif
 
 //#include <imgui.h>
@@ -179,7 +179,7 @@ void FilamentApp::run(
 
     // Create the camera mesh
     window->mMainCameraMan.setCameraChangedCallback(
-        [&cameraCube, &lightmapCube, &window, engine = mEngine ](
+        [&cameraCube, &lightmapCube, &window, engine = mEngine](
             filament::Camera const* camera) {
           cameraCube->mapFrustum(*engine, camera);
           lightmapCube->mapFrustum(

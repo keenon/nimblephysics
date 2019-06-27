@@ -39,13 +39,10 @@
 #include <filament/IndirectLight.h>
 #include <filament/LightManager.h>
 #include <filament/Material.h>
-#include <filament/Material.h>
-#include <filament/MaterialInstance.h>
 #include <filament/MaterialInstance.h>
 #include <filament/RenderableManager.h>
 #include <filament/Renderer.h>
 #include <filament/Scene.h>
-#include <filament/Skybox.h>
 #include <filament/Skybox.h>
 #include <filament/Texture.h>
 #include <filament/TransformManager.h>
@@ -56,11 +53,16 @@
 #include <math/vec4.h>
 #include <utils/EntityManager.h>
 
+#include "resources/resources.h"
+
 #include "dart/dynamics/BodyNode.hpp"
 
 namespace dart {
 namespace gui {
 namespace flmt {
+
+using namespace filament;
+using namespace filament::math;
 
 namespace {
 
@@ -71,64 +73,62 @@ static constexpr uint8_t GROUND_SHADOW_PACKAGE[] = {
 
 static GroundPlane createGroundPlane(filament::Engine* engine)
 {
-  filament::Material* shadowMaterial
-      = filament::Material::Builder()
-            .package(
-                (void*)GROUND_SHADOW_PACKAGE, sizeof(GROUND_SHADOW_PACKAGE))
+  Material* shadowMaterial
+      = Material::Builder()
+            .package(RESOURCES_GROUNDSHADOW_DATA, RESOURCES_GROUNDSHADOW_SIZE)
             .build(*engine);
 
   const static uint32_t indices[]{0, 1, 2, 2, 3, 0};
-  const static ::math::float3 vertices[]{
-      {-10, 0, -10}, {-10, 0, 10}, {10, 0, 10}, {10, 0, -10},
+  const static float3 vertices[]{
+      {-10, 0, -10},
+      {-10, 0, 10},
+      {10, 0, 10},
+      {10, 0, -10},
   };
-  ::math::short4 tbn = ::math::packSnorm16(
-      normalize(
-          positive(
-              ::math::mat3f{::math::float3{1.0f, 0.0f, 0.0f},
-                            ::math::float3{0.0f, 0.0f, 1.0f},
-                            ::math::float3{0.0f, 1.0f, 0.0f}}
-                  .toQuaternion()))
-          .xyzw);
-  const static ::math::short4 normals[]{tbn, tbn, tbn, tbn};
-  filament::VertexBuffer* vertexBuffer
-      = filament::VertexBuffer::Builder()
-            .vertexCount(4)
-            .bufferCount(2)
-            .attribute(
-                filament::VertexAttribute::POSITION,
-                0,
-                filament::VertexBuffer::AttributeType::FLOAT3)
-            .attribute(
-                filament::VertexAttribute::TANGENTS,
-                1,
-                filament::VertexBuffer::AttributeType::SHORT4)
-            .normalized(filament::VertexAttribute::TANGENTS)
-            .build(*engine);
+  short4 tbn = packSnorm16(normalize(positive(mat3f{float3{1.0f, 0.0f, 0.0f},
+                                                    float3{0.0f, 0.0f, 1.0f},
+                                                    float3{0.0f, 1.0f, 0.0f}}
+                                                  .toQuaternion()))
+                               .xyzw);
+  const static short4 normals[]{tbn, tbn, tbn, tbn};
+  VertexBuffer* vertexBuffer = VertexBuffer::Builder()
+                                   .vertexCount(4)
+                                   .bufferCount(2)
+                                   .attribute(
+                                       VertexAttribute::POSITION,
+                                       0,
+                                       VertexBuffer::AttributeType::FLOAT3)
+                                   .attribute(
+                                       VertexAttribute::TANGENTS,
+                                       1,
+                                       VertexBuffer::AttributeType::SHORT4)
+                                   .normalized(VertexAttribute::TANGENTS)
+                                   .build(*engine);
   vertexBuffer->setBufferAt(
       *engine,
       0,
-      filament::VertexBuffer::BufferDescriptor(
+      VertexBuffer::BufferDescriptor(
           vertices, vertexBuffer->getVertexCount() * sizeof(vertices[0])));
   vertexBuffer->setBufferAt(
       *engine,
       1,
-      filament::VertexBuffer::BufferDescriptor(
+      VertexBuffer::BufferDescriptor(
           normals, vertexBuffer->getVertexCount() * sizeof(normals[0])));
-  filament::IndexBuffer* indexBuffer
-      = filament::IndexBuffer::Builder().indexCount(6).build(*engine);
+  IndexBuffer* indexBuffer
+      = IndexBuffer::Builder().indexCount(6).build(*engine);
   indexBuffer->setBuffer(
       *engine,
-      filament::IndexBuffer::BufferDescriptor(
+      IndexBuffer::BufferDescriptor(
           indices, indexBuffer->getIndexCount() * sizeof(uint32_t)));
 
   auto& em = ::utils::EntityManager::get();
   ::utils::Entity renderable = em.create();
-  filament::RenderableManager::Builder(1)
+  RenderableManager::Builder(1)
       .boundingBox({{0, 0, 0}, {10, 1e-4f, 10}})
       .material(0, shadowMaterial->getDefaultInstance())
       .geometry(
           0,
-          filament::RenderableManager::PrimitiveType::TRIANGLES,
+          RenderableManager::PrimitiveType::TRIANGLES,
           vertexBuffer,
           indexBuffer,
           0,
@@ -140,8 +140,7 @@ static GroundPlane createGroundPlane(filament::Engine* engine)
 
   auto& tcm = engine->getTransformManager();
   tcm.setTransform(
-      tcm.getInstance(renderable),
-      ::math::mat4f::translate(::math::float3{0, -1, -4}));
+      tcm.getInstance(renderable), mat4f::translation(float3{0, -1, -4}));
   return {
       .vb = vertexBuffer,
       .ib = indexBuffer,
@@ -150,7 +149,7 @@ static GroundPlane createGroundPlane(filament::Engine* engine)
   };
 }
 
-} // (anonymous) namespace
+} // namespace
 
 WorldScene::WorldScene(simulation::WorldPtr world) : mWorld(std::move(world))
 {
@@ -204,9 +203,8 @@ void WorldScene::setupScene()
   // Add light sources into the scene.
   mLight = em.create();
   filament::LightManager::Builder(filament::LightManager::Type::SUN)
-      .color(
-          filament::Color::toLinear<filament::ACCURATE>(
-              filament::sRGBColor(0.98f, 0.92f, 0.89f)))
+      .color(filament::Color::toLinear<filament::ACCURATE>(
+          filament::sRGBColor(0.98f, 0.92f, 0.89f)))
       .intensity(110000)
       .direction({0.7, -1, -0.8})
       .sunAngularRadius(1.9f)
@@ -288,13 +286,13 @@ void WorldScene::refreshShapeFrameNode(dynamics::Frame* frame)
   assert(mEngine);
   assert(mScene);
 
-  //auto entity = ::utils::EntityManager::get().create();
+  // auto entity = ::utils::EntityManager::get().create();
   std::unique_ptr<ShapeFrameEntity> sfEntity
       = common::make_unique<ShapeFrameEntity>(
           *mEngine, *mScene, frame->asShapeFrame());
 
   itr->second = std::move(sfEntity);
-  //mScene->addEntity(entity);
+  // mScene->addEntity(entity);
 }
 
 void WorldScene::clearUnusedNodes()

@@ -333,13 +333,13 @@ public:
   bool unlinkFile();
 
   /**
-  * Lists the contents of this directory, skipping hidden files.
-  *
-  * @return A vector of paths of the contents of the directory.  If the path
-  * points to a file,
-  *         nonexistent directory, or empty directory, an empty vector is
-  * returned.
-  */
+   * Lists the contents of this directory, skipping hidden files.
+   *
+   * @return A vector of paths of the contents of the directory.  If the path
+   * points to a file,
+   *         nonexistent directory, or empty directory, an empty vector is
+   * returned.
+   */
   std::vector<Path> listContents() const;
 
 private:

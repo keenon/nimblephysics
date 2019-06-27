@@ -66,7 +66,7 @@ class MaterialInstance;
 class Renderable;
 class Texture;
 class Skybox;
-}
+} // namespace filament
 
 namespace dart {
 namespace gui {
@@ -114,7 +114,7 @@ private:
   filament::Viewport mViewport;
   filament::View* view = nullptr;
   CameraManipulator* mCameraManipulator = nullptr;
-  ::math::double2 mLastMousePosition;
+  filament::math::double2 mLastMousePosition;
   Mode mMode = Mode::NONE;
   std::string mName;
 };

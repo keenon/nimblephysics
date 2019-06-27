@@ -64,7 +64,7 @@ namespace dart {
 namespace gui {
 namespace flmt {
 
-using namespace math;
+using namespace filament::math;
 
 template <typename T>
 static constexpr inline double radians(T deg)
@@ -74,8 +74,8 @@ static constexpr inline double radians(T deg)
 
 static inline double3 rotateVector(double rx, double ry, const double3& v)
 {
-  return (mat3::rotate(ry, double3{0, 1, 0})
-          * mat3::rotate(rx, double3{1, 0, 0}))
+  return (mat3::rotation(ry, double3{0, 1, 0})
+          * mat3::rotation(rx, double3{1, 0, 0}))
          * v;
 }
 
@@ -179,10 +179,10 @@ void CameraManipulator::updateCameraTransform()
 {
   if (mCamera)
   {
-    mat4 rotate_z = mat4::rotate(mRotation.z, double3(0, 0, 1));
-    mat4 rotate_x = mat4::rotate(mRotation.x, double3(1, 0, 0));
-    mat4 rotate_y = mat4::rotate(mRotation.y, double3(0, 1, 0));
-    mat4 translate = mat4::translate(mTranslation);
+    mat4 rotate_z = mat4::rotation(mRotation.z, double3(0, 0, 1));
+    mat4 rotate_x = mat4::rotation(mRotation.x, double3(1, 0, 0));
+    mat4 rotate_y = mat4::rotation(mRotation.y, double3(0, 1, 0));
+    mat4 translate = mat4::translation(mTranslation);
     mat4 view = translate * (rotate_y * rotate_x * rotate_z);
     mCamera->setModelMatrix(mat4f(view));
     if (mCameraChanged)

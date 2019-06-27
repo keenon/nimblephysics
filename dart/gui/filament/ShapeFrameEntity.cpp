@@ -34,8 +34,8 @@
 
 #include "stb_image.h"
 
-#include <memory>
 #include <fstream>
+#include <memory>
 #include <string>
 
 #include <filament/Engine.h>
@@ -71,14 +71,13 @@ std::shared_ptr<Drawable> createDrawable(
     scene.addEntity(drawable->getEntity());
   }
 
-//  assert(drawable); // TODO(JS): allow nullptr for now
+  //  assert(drawable); // TODO(JS): allow nullptr for now
 
   return drawable;
 }
 
 void destroyDrawable()
 {
-
 }
 
 } // namespace
@@ -96,14 +95,14 @@ void ShapeFrameEntity::refresh(bool flag)
     else
       mDrawable = createDrawable(mEngine, mScene, shape.get());
 
-//    assert(mDrawable);
+    //    assert(mDrawable);
 
     if (mDrawable)
     {
       auto& tcm = mEngine.getTransformManager();
       tcm.setTransform(
-            tcm.getInstance(mDrawable->getEntity()),
-            FilamentTypes::convertIsometry3d(mShapeFrame->getWorldTransform()));
+          tcm.getInstance(mDrawable->getEntity()),
+          FilamentTypes::convertIsometry3d(mShapeFrame->getWorldTransform()));
     }
   }
   //  else if (mRenderShapeEntity)

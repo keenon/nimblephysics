@@ -1,21 +1,21 @@
-cmake_minimum_required(VERSION 2.8.12)
+return()
+
+cmake_minimum_required(VERSION 3.5.1)
+
+get_filename_component(example_name ${CMAKE_CURRENT_LIST_DIR} NAME)
+
+project(${example_name})
+
+set(required_components utils-urdf gui-flmt)
+set(required_libraries dart dart-utils-urdf dart-gui-flmt)
 
 if(DART_IN_SOURCE_BUILD)
-  include(${CMAKE_CURRENT_SOURCE_DIR}/InSourceBuild.cmake)
+  dart_build_example_in_source(${example_name} LINK_LIBRARIES ${required_libraries})
   return()
 endif()
 
-project(flmtEmpty)
-
-find_package(DART 6.6.0 REQUIRED COMPONENTS utils-urdf gui-flmt CONFIG)
-
-add_compile_options(-std=c++11)
-
-include_directories(${DART_INCLUDE_DIRS})
+find_package(DART 6.6.0 REQUIRED COMPONENTS ${required_components} CONFIG)
 
 file(GLOB srcs "*.cpp" "*.hpp")
-add_executable(${PROJECT_NAME} ${srcs})
-
-target_link_libraries(${PROJECT_NAME} ${DART_LIBRARIES})
-
-dart_format_add(${srcs})
+add_executable(${example_name} ${srcs})
+target_link_libraries(${example_name} PUBLIC ${required_libraries})

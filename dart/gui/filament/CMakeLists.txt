@@ -68,8 +68,16 @@ target_link_libraries(
     ${SDL2_LIBRARIES}
     ${APP_LIBS}
 )
+message(STATUS "[DEBUG] filament_LIBRARIES: ${filament_LIBRARIES}")
 # TODO(JS): Check if C++14 is supported
 target_compile_options(${target_name} PUBLIC -std=c++14)
+
+if (LINUX)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++")
+    link_libraries("-static-libgcc -static-libstdc++")
+    link_libraries(libc++.a)
+    link_libraries(libc++abi.a)
+endif()
 
 # Thread
 if(THREADS_HAVE_PTHREAD_ARG)

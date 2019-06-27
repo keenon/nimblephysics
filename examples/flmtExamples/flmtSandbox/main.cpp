@@ -104,16 +104,19 @@ SkeletonPtr createGround(const Eigen::Vector3d& position)
   SkeletonPtr ground = Skeleton::create("ground");
   Eigen::Isometry3d tf(Eigen::Isometry3d::Identity());
   double thickness = 0.01;
-  tf.translation() = Eigen::Vector3d(0,0,-thickness/2.0);
+  tf.translation() = Eigen::Vector3d(0, 0, -thickness / 2.0);
   tf.translate(position);
   WeldJoint::Properties joint;
   joint.mT_ParentBodyToJoint = tf;
   ground->createJointAndBodyNodePair<WeldJoint>(nullptr, joint);
-  ShapePtr groundShape =
-      std::make_shared<BoxShape>(Eigen::Vector3d(10,10,thickness));
+  ShapePtr groundShape
+      = std::make_shared<BoxShape>(Eigen::Vector3d(10, 10, thickness));
 
-  auto shapeNode = ground->getBodyNode(0)->createShapeNodeWith<
-      VisualAspect, CollisionAspect, DynamicsAspect>(groundShape);
+  auto shapeNode = ground->getBodyNode(0)
+                       ->createShapeNodeWith<
+                           VisualAspect,
+                           CollisionAspect,
+                           DynamicsAspect>(groundShape);
   shapeNode->getVisualAspect()->setColor(dart::Color::Blue(0.2));
 
   return ground;
