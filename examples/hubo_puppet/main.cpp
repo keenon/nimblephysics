@@ -189,7 +189,7 @@ public:
   std::unique_ptr<GradientMethod> clone(
       InverseKinematics* _newIK) const override
   {
-    return dart::common::make_unique<HuboArmIK>(
+    return std::make_unique<HuboArmIK>(
         _newIK, mBaseLinkName, getAnalyticalProperties());
   }
 
@@ -481,7 +481,7 @@ public:
   std::unique_ptr<GradientMethod> clone(
       InverseKinematics* _newIK) const override
   {
-    return dart::common::make_unique<HuboLegIK>(
+    return std::make_unique<HuboLegIK>(
         _newIK, mBaseLinkName, getAnalyticalProperties());
   }
 
@@ -891,7 +891,7 @@ public:
     mMoveComponents.resize(TeleoperationWorld::NUM_MOVE, false);
   }
 
-  virtual bool handle(
+  bool handle(
       const ::osgGA::GUIEventAdapter& ea, ::osgGA::GUIActionAdapter&) override
   {
     if (nullptr == mHubo)

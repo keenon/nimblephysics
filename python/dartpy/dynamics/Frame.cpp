@@ -35,12 +35,27 @@
 #include "eigen_geometry_pybind.h"
 #include "eigen_pybind.h"
 
+namespace py = pybind11;
+
 namespace dart {
 namespace python {
 
-void Frame(pybind11::module& m)
+void Frame(py::module& m)
 {
-  ::pybind11::class_<dart::dynamics::Frame>(m, "Frame")
+  ::py::class_<
+      dart::dynamics::Frame,
+      dart::dynamics::Entity,
+      std::shared_ptr<dart::dynamics::Frame> >(m, "Frame")
+      .def(
+          "getRelativeTransform",
+          +[](const dart::dynamics::Frame* self) -> Eigen::Isometry3d {
+            return self->getRelativeTransform();
+          })
+      .def(
+          "getWorldTransform",
+          +[](const dart::dynamics::Frame* self) -> Eigen::Isometry3d {
+            return self->getWorldTransform();
+          })
       .def(
           "getTransform",
           +[](const dart::dynamics::Frame* self) -> Eigen::Isometry3d {
@@ -49,11 +64,10 @@ void Frame(pybind11::module& m)
       .def(
           "getTransform",
           +[](const dart::dynamics::Frame* self,
-              const dart::dynamics::Frame* _withRespectTo)
-              -> Eigen::Isometry3d {
-            return self->getTransform(_withRespectTo);
+              const dart::dynamics::Frame* withRespectTo) -> Eigen::Isometry3d {
+            return self->getTransform(withRespectTo);
           },
-          ::pybind11::arg("withRespectTo"))
+          ::py::arg("withRespectTo"))
       .def(
           "getTransform",
           +[](const dart::dynamics::Frame* self,
@@ -62,36 +76,39 @@ void Frame(pybind11::module& m)
               -> Eigen::Isometry3d {
             return self->getTransform(withRespectTo, inCoordinatesOf);
           },
-          ::pybind11::arg("withRespectTo"),
-          ::pybind11::arg("inCoordinatesOf"))
+          ::py::arg("withRespectTo"),
+          ::py::arg("inCoordinatesOf"))
+      .def(
+          "getSpatialVelocity",
+          +[](const dart::dynamics::Frame* self) -> Eigen::Vector6d {
+            return self->getSpatialVelocity();
+          })
       .def(
           "getSpatialVelocity",
           +[](const dart::dynamics::Frame* self,
-              const dart::dynamics::Frame* _relativeTo,
-              const dart::dynamics::Frame* _inCoordinatesOf)
-              -> Eigen::Vector6d {
-            return self->getSpatialVelocity(_relativeTo, _inCoordinatesOf);
+              const dart::dynamics::Frame* relativeTo,
+              const dart::dynamics::Frame* inCoordinatesOf) -> Eigen::Vector6d {
+            return self->getSpatialVelocity(relativeTo, inCoordinatesOf);
           },
-          ::pybind11::arg("relativeTo"),
-          ::pybind11::arg("inCoordinatesOf"))
+          ::py::arg("relativeTo"),
+          ::py::arg("inCoordinatesOf"))
       .def(
           "getSpatialVelocity",
-          +[](const dart::dynamics::Frame* self, const Eigen::Vector3d& _offset)
-              -> Eigen::Vector6d { return self->getSpatialVelocity(_offset); },
-          ::pybind11::arg("offset"))
+          +[](const dart::dynamics::Frame* self, const Eigen::Vector3d& offset)
+              -> Eigen::Vector6d { return self->getSpatialVelocity(offset); },
+          ::py::arg("offset"))
       .def(
           "getSpatialVelocity",
           +[](const dart::dynamics::Frame* self,
-              const Eigen::Vector3d& _offset,
-              const dart::dynamics::Frame* _relativeTo,
-              const dart::dynamics::Frame* _inCoordinatesOf)
-              -> Eigen::Vector6d {
+              const Eigen::Vector3d& offset,
+              const dart::dynamics::Frame* relativeTo,
+              const dart::dynamics::Frame* inCoordinatesOf) -> Eigen::Vector6d {
             return self->getSpatialVelocity(
-                _offset, _relativeTo, _inCoordinatesOf);
+                offset, relativeTo, inCoordinatesOf);
           },
-          ::pybind11::arg("offset"),
-          ::pybind11::arg("relativeTo"),
-          ::pybind11::arg("inCoordinatesOf"))
+          ::py::arg("offset"),
+          ::py::arg("relativeTo"),
+          ::py::arg("inCoordinatesOf"))
       .def(
           "getLinearVelocity",
           +[](const dart::dynamics::Frame* self) -> Eigen::Vector3d {
@@ -100,47 +117,44 @@ void Frame(pybind11::module& m)
       .def(
           "getLinearVelocity",
           +[](const dart::dynamics::Frame* self,
-              const dart::dynamics::Frame* _relativeTo) -> Eigen::Vector3d {
-            return self->getLinearVelocity(_relativeTo);
+              const dart::dynamics::Frame* relativeTo) -> Eigen::Vector3d {
+            return self->getLinearVelocity(relativeTo);
           },
-          ::pybind11::arg("relativeTo"))
+          ::py::arg("relativeTo"))
       .def(
           "getLinearVelocity",
           +[](const dart::dynamics::Frame* self,
-              const dart::dynamics::Frame* _relativeTo,
-              const dart::dynamics::Frame* _inCoordinatesOf)
-              -> Eigen::Vector3d {
-            return self->getLinearVelocity(_relativeTo, _inCoordinatesOf);
+              const dart::dynamics::Frame* relativeTo,
+              const dart::dynamics::Frame* inCoordinatesOf) -> Eigen::Vector3d {
+            return self->getLinearVelocity(relativeTo, inCoordinatesOf);
           },
-          ::pybind11::arg("relativeTo"),
-          ::pybind11::arg("inCoordinatesOf"))
+          ::py::arg("relativeTo"),
+          ::py::arg("inCoordinatesOf"))
       .def(
           "getLinearVelocity",
-          +[](const dart::dynamics::Frame* self, const Eigen::Vector3d& _offset)
-              -> Eigen::Vector3d { return self->getLinearVelocity(_offset); },
-          ::pybind11::arg("offset"))
-      .def(
-          "getLinearVelocity",
-          +[](const dart::dynamics::Frame* self,
-              const Eigen::Vector3d& _offset,
-              const dart::dynamics::Frame* _relativeTo) -> Eigen::Vector3d {
-            return self->getLinearVelocity(_offset, _relativeTo);
-          },
-          ::pybind11::arg("offset"),
-          ::pybind11::arg("relativeTo"))
+          +[](const dart::dynamics::Frame* self, const Eigen::Vector3d& offset)
+              -> Eigen::Vector3d { return self->getLinearVelocity(offset); },
+          ::py::arg("offset"))
       .def(
           "getLinearVelocity",
           +[](const dart::dynamics::Frame* self,
-              const Eigen::Vector3d& _offset,
-              const dart::dynamics::Frame* _relativeTo,
-              const dart::dynamics::Frame* _inCoordinatesOf)
-              -> Eigen::Vector3d {
-            return self->getLinearVelocity(
-                _offset, _relativeTo, _inCoordinatesOf);
+              const Eigen::Vector3d& offset,
+              const dart::dynamics::Frame* relativeTo) -> Eigen::Vector3d {
+            return self->getLinearVelocity(offset, relativeTo);
           },
-          ::pybind11::arg("offset"),
-          ::pybind11::arg("relativeTo"),
-          ::pybind11::arg("inCoordinatesOf"))
+          ::py::arg("offset"),
+          ::py::arg("relativeTo"))
+      .def(
+          "getLinearVelocity",
+          +[](const dart::dynamics::Frame* self,
+              const Eigen::Vector3d& offset,
+              const dart::dynamics::Frame* relativeTo,
+              const dart::dynamics::Frame* inCoordinatesOf) -> Eigen::Vector3d {
+            return self->getLinearVelocity(offset, relativeTo, inCoordinatesOf);
+          },
+          ::py::arg("offset"),
+          ::py::arg("relativeTo"),
+          ::py::arg("inCoordinatesOf"))
       .def(
           "getAngularVelocity",
           +[](const dart::dynamics::Frame* self) -> Eigen::Vector3d {
@@ -149,50 +163,52 @@ void Frame(pybind11::module& m)
       .def(
           "getAngularVelocity",
           +[](const dart::dynamics::Frame* self,
-              const dart::dynamics::Frame* _relativeTo) -> Eigen::Vector3d {
-            return self->getAngularVelocity(_relativeTo);
+              const dart::dynamics::Frame* relativeTo) -> Eigen::Vector3d {
+            return self->getAngularVelocity(relativeTo);
           },
-          ::pybind11::arg("relativeTo"))
+          ::py::arg("relativeTo"))
       .def(
           "getAngularVelocity",
           +[](const dart::dynamics::Frame* self,
-              const dart::dynamics::Frame* _relativeTo,
-              const dart::dynamics::Frame* _inCoordinatesOf)
-              -> Eigen::Vector3d {
-            return self->getAngularVelocity(_relativeTo, _inCoordinatesOf);
+              const dart::dynamics::Frame* relativeTo,
+              const dart::dynamics::Frame* inCoordinatesOf) -> Eigen::Vector3d {
+            return self->getAngularVelocity(relativeTo, inCoordinatesOf);
           },
-          ::pybind11::arg("relativeTo"),
-          ::pybind11::arg("inCoordinatesOf"))
+          ::py::arg("relativeTo"),
+          ::py::arg("inCoordinatesOf"))
+      .def(
+          "getSpatialAcceleration",
+          +[](const dart::dynamics::Frame* self) -> Eigen::Vector6d {
+            return self->getSpatialAcceleration();
+          })
       .def(
           "getSpatialAcceleration",
           +[](const dart::dynamics::Frame* self,
-              const dart::dynamics::Frame* _relativeTo,
-              const dart::dynamics::Frame* _inCoordinatesOf)
-              -> Eigen::Vector6d {
-            return self->getSpatialAcceleration(_relativeTo, _inCoordinatesOf);
+              const dart::dynamics::Frame* relativeTo,
+              const dart::dynamics::Frame* inCoordinatesOf) -> Eigen::Vector6d {
+            return self->getSpatialAcceleration(relativeTo, inCoordinatesOf);
           },
-          ::pybind11::arg("relativeTo"),
-          ::pybind11::arg("inCoordinatesOf"))
+          ::py::arg("relativeTo"),
+          ::py::arg("inCoordinatesOf"))
       .def(
           "getSpatialAcceleration",
           +[](const dart::dynamics::Frame* self,
-              const Eigen::Vector3d& _offset) -> Eigen::Vector6d {
-            return self->getSpatialAcceleration(_offset);
+              const Eigen::Vector3d& offset) -> Eigen::Vector6d {
+            return self->getSpatialAcceleration(offset);
           },
-          ::pybind11::arg("offset"))
+          ::py::arg("offset"))
       .def(
           "getSpatialAcceleration",
           +[](const dart::dynamics::Frame* self,
-              const Eigen::Vector3d& _offset,
-              const dart::dynamics::Frame* _relativeTo,
-              const dart::dynamics::Frame* _inCoordinatesOf)
-              -> Eigen::Vector6d {
+              const Eigen::Vector3d& offset,
+              const dart::dynamics::Frame* relativeTo,
+              const dart::dynamics::Frame* inCoordinatesOf) -> Eigen::Vector6d {
             return self->getSpatialAcceleration(
-                _offset, _relativeTo, _inCoordinatesOf);
+                offset, relativeTo, inCoordinatesOf);
           },
-          ::pybind11::arg("offset"),
-          ::pybind11::arg("relativeTo"),
-          ::pybind11::arg("inCoordinatesOf"))
+          ::py::arg("offset"),
+          ::py::arg("relativeTo"),
+          ::py::arg("inCoordinatesOf"))
       .def(
           "getLinearAcceleration",
           +[](const dart::dynamics::Frame* self) -> Eigen::Vector3d {
@@ -201,49 +217,47 @@ void Frame(pybind11::module& m)
       .def(
           "getLinearAcceleration",
           +[](const dart::dynamics::Frame* self,
-              const dart::dynamics::Frame* _relativeTo) -> Eigen::Vector3d {
-            return self->getLinearAcceleration(_relativeTo);
+              const dart::dynamics::Frame* relativeTo) -> Eigen::Vector3d {
+            return self->getLinearAcceleration(relativeTo);
           },
-          ::pybind11::arg("relativeTo"))
+          ::py::arg("relativeTo"))
       .def(
           "getLinearAcceleration",
           +[](const dart::dynamics::Frame* self,
-              const dart::dynamics::Frame* _relativeTo,
-              const dart::dynamics::Frame* _inCoordinatesOf)
-              -> Eigen::Vector3d {
-            return self->getLinearAcceleration(_relativeTo, _inCoordinatesOf);
+              const dart::dynamics::Frame* relativeTo,
+              const dart::dynamics::Frame* inCoordinatesOf) -> Eigen::Vector3d {
+            return self->getLinearAcceleration(relativeTo, inCoordinatesOf);
           },
-          ::pybind11::arg("relativeTo"),
-          ::pybind11::arg("inCoordinatesOf"))
+          ::py::arg("relativeTo"),
+          ::py::arg("inCoordinatesOf"))
       .def(
           "getLinearAcceleration",
           +[](const dart::dynamics::Frame* self,
-              const Eigen::Vector3d& _offset) -> Eigen::Vector3d {
-            return self->getLinearAcceleration(_offset);
+              const Eigen::Vector3d& offset) -> Eigen::Vector3d {
+            return self->getLinearAcceleration(offset);
           },
-          ::pybind11::arg("offset"))
+          ::py::arg("offset"))
       .def(
           "getLinearAcceleration",
           +[](const dart::dynamics::Frame* self,
-              const Eigen::Vector3d& _offset,
-              const dart::dynamics::Frame* _relativeTo) -> Eigen::Vector3d {
-            return self->getLinearAcceleration(_offset, _relativeTo);
+              const Eigen::Vector3d& offset,
+              const dart::dynamics::Frame* relativeTo) -> Eigen::Vector3d {
+            return self->getLinearAcceleration(offset, relativeTo);
           },
-          ::pybind11::arg("offset"),
-          ::pybind11::arg("relativeTo"))
+          ::py::arg("offset"),
+          ::py::arg("relativeTo"))
       .def(
           "getLinearAcceleration",
           +[](const dart::dynamics::Frame* self,
-              const Eigen::Vector3d& _offset,
-              const dart::dynamics::Frame* _relativeTo,
-              const dart::dynamics::Frame* _inCoordinatesOf)
-              -> Eigen::Vector3d {
+              const Eigen::Vector3d& offset,
+              const dart::dynamics::Frame* relativeTo,
+              const dart::dynamics::Frame* inCoordinatesOf) -> Eigen::Vector3d {
             return self->getLinearAcceleration(
-                _offset, _relativeTo, _inCoordinatesOf);
+                offset, relativeTo, inCoordinatesOf);
           },
-          ::pybind11::arg("offset"),
-          ::pybind11::arg("relativeTo"),
-          ::pybind11::arg("inCoordinatesOf"))
+          ::py::arg("offset"),
+          ::py::arg("relativeTo"),
+          ::py::arg("inCoordinatesOf"))
       .def(
           "getAngularAcceleration",
           +[](const dart::dynamics::Frame* self) -> Eigen::Vector3d {
@@ -252,20 +266,19 @@ void Frame(pybind11::module& m)
       .def(
           "getAngularAcceleration",
           +[](const dart::dynamics::Frame* self,
-              const dart::dynamics::Frame* _relativeTo) -> Eigen::Vector3d {
-            return self->getAngularAcceleration(_relativeTo);
+              const dart::dynamics::Frame* relativeTo) -> Eigen::Vector3d {
+            return self->getAngularAcceleration(relativeTo);
           },
-          ::pybind11::arg("relativeTo"))
+          ::py::arg("relativeTo"))
       .def(
           "getAngularAcceleration",
           +[](const dart::dynamics::Frame* self,
-              const dart::dynamics::Frame* _relativeTo,
-              const dart::dynamics::Frame* _inCoordinatesOf)
-              -> Eigen::Vector3d {
-            return self->getAngularAcceleration(_relativeTo, _inCoordinatesOf);
+              const dart::dynamics::Frame* relativeTo,
+              const dart::dynamics::Frame* inCoordinatesOf) -> Eigen::Vector3d {
+            return self->getAngularAcceleration(relativeTo, inCoordinatesOf);
           },
-          ::pybind11::arg("relativeTo"),
-          ::pybind11::arg("inCoordinatesOf"))
+          ::py::arg("relativeTo"),
+          ::py::arg("inCoordinatesOf"))
       .def(
           "getChildEntities",
           +[](const dart::dynamics::Frame* self)
@@ -304,8 +317,11 @@ void Frame(pybind11::module& m)
       .def(
           "dirtyVelocity",
           +[](dart::dynamics::Frame* self) { self->dirtyVelocity(); })
-      .def("dirtyAcceleration", +[](dart::dynamics::Frame* self) {
-        self->dirtyAcceleration();
+      .def(
+          "dirtyAcceleration",
+          +[](dart::dynamics::Frame* self) { self->dirtyAcceleration(); })
+      .def_static("World", +[]() -> std::shared_ptr<dart::dynamics::Frame> {
+        return dart::dynamics::Frame::WorldShared();
       });
 }
 

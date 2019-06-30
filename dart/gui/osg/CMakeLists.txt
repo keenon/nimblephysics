@@ -93,18 +93,12 @@ dart_generate_include_header_file(
 )
 
 # Install
-install(
-  FILES ${hdrs} ${CMAKE_CURRENT_BINARY_DIR}/osg.hpp
-  DESTINATION include/dart/gui/osg
-  COMPONENT headers
-)
+if(NOT DART_BUILD_DARTPY)
+  install(
+    FILES ${hdrs} ${CMAKE_CURRENT_BINARY_DIR}/osg.hpp
+    DESTINATION include/dart/gui/osg
+    COMPONENT headers
+  )
+endif()
 
-dart_format_add(
-  GridVisual.hpp
-  GridVisual.cpp
-  ImGuiHandler.hpp
-  ImGuiHandler.cpp
-  RealTimeWorldNode.hpp
-  RealTimeWorldNode.cpp
-  Utils.hpp
-)
+dart_format_add(${hdrs} ${srcs} ${dart_gui_osg_hdrs} ${dart_gui_osg_srcs})

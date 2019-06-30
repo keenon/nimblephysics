@@ -205,7 +205,20 @@ void eigen_geometry(pybind11::module& parent_m)
       }, ::pybind11::arg("position"))
       .def("inverse", [](const Class* self) {
         return self->inverse();
-      });
+      })
+      //========================
+      // Begin: added by dartpy
+      //========================
+      .def("translate", [](Class* self, const Eigen::Matrix<T, 3, 1>& other) {
+        self->translate(other);
+      }, ::pybind11::arg("other"))
+      .def("pretranslate", [](Class* self, const Eigen::Matrix<T, 3, 1>& other) {
+        self->pretranslate(other);
+      }, ::pybind11::arg("other"))
+      //========================
+      // End: added by dartpy
+      //========================
+      ;
     ::pybind11::implicitly_convertible<Eigen::Matrix<T, 4, 4>, Class>();
   }
 
@@ -293,7 +306,17 @@ void eigen_geometry(pybind11::module& parent_m)
       })
       .def("conjugate", [](const Class* self) {
         return self->conjugate();
-      });
+      })
+      //========================
+      // Begin: added by dartpy
+      //========================
+      .def("to_rotation_matrix", [](Class* self) -> Eigen::Matrix<T, 3, 3> {
+        return self->toRotationMatrix();
+      })
+      //========================
+      // End: added by dartpy
+      //========================
+      ;
   }
 
   // Angle-axis.
@@ -369,7 +392,17 @@ void eigen_geometry(pybind11::module& parent_m)
       })
       .def("inverse", [](const Class* self) {
         return self->inverse();
-      });
+      })
+      //========================
+      // Begin: added by dartpy
+      //========================
+      .def("to_rotation_matrix", [](Class* self) -> Eigen::Matrix<T, 3, 3> {
+        return self->toRotationMatrix();
+      })
+      //========================
+      // End: added by dartpy
+      //========================
+      ;
   }
 }
 
