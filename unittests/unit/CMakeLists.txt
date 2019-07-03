@@ -1,3 +1,5 @@
+dart_add_test("unit" test_ArrayFire)
+
 dart_add_test("unit" test_Aspect)
 dart_add_test("unit" test_CollisionGroups)
 dart_add_test("unit" test_ContactConstraint)

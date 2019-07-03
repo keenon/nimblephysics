@@ -126,6 +126,8 @@ else()
   endif()
 endif()
 
+find_package(ArrayFire REQUIRED)
+
 #--------------------
 # Misc. dependencies
 #--------------------
