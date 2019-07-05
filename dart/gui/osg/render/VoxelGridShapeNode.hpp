@@ -37,10 +37,10 @@
 
 #if HAVE_OCTOMAP
 
-#include <osg/MatrixTransform>
-#include <osg/ShapeDrawable>
+#  include <osg/MatrixTransform>
+#  include <osg/ShapeDrawable>
 
-#include "dart/gui/osg/render/ShapeNode.hpp"
+#  include "dart/gui/osg/render/ShapeNode.hpp"
 
 namespace dart {
 
@@ -53,8 +53,9 @@ namespace osg {
 namespace render {
 
 class VoxelGridShapeGeode;
+class VoxelNode;
 
-class VoxelGridShapeNode : public ShapeNode, public ::osg::MatrixTransform
+class VoxelGridShapeNode : public ShapeNode, public ::osg::Group
 {
 public:
   VoxelGridShapeNode(
@@ -68,6 +69,8 @@ protected:
 
   std::shared_ptr<dynamics::VoxelGridShape> mVoxelGridShape;
   VoxelGridShapeGeode* mGeode;
+  std::vector<::osg::ref_ptr<VoxelNode>> mVoxelNodes;
+  std::size_t mVoxelGridVersion;
 };
 
 } // namespace render
