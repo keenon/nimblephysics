@@ -52,8 +52,7 @@ install:
   - cmd: vcpkg install --recurse --triplet %VCPKG_ARCH% assimp boost-system boost-filesystem ccd eigen3 fcl
 
   # install optional dependencies
-  #- vcpkg install --recurse --triplet %VCPKG_ARCH% bullet3 flann freeglut nlopt ode opengl osg tinyxml2 urdfdom
-  #- vcpkg install ipopt:%VCPKG_ARCH%
+  - cmd: vcpkg install --recurse --triplet %VCPKG_ARCH% bullet3 flann freeglut libipopt nlopt ode opengl osg tinyxml2 urdfdom
 
   - cmd: vcpkg integrate install
   - cmd: cd "%APPVEYOR_BUILD_FOLDER%"
@@ -77,7 +76,8 @@ build_script:
   #------------------
   - cmd: mkdir build && cd build
   - cmd: cmake %CMAKE_GENERATOR% -DCMAKE_BUILD_TYPE=%configuration% -DDART_MSVC_DEFAULT_OPTIONS="%MSVC_DEFAULT_OPTIONS%" %CMAKE_TOOLCHAIN_FILE% %CMAKE_TOOLCHAIN% ..
-  - cmd: cmake --build . --target ALL_BUILD --config %configuration% -- /maxcpucount:4 /verbosity:quiet
+  # TODO: Build is disabled until AppVeyor update the Visual Studio version to 2019
+  # - cmd: cmake --build . --target ALL_BUILD --config %configuration% -- /maxcpucount:4 /verbosity:quiet
 
   #-------------------------------
   # Ubuntu 16.04 LTS && 18.04 LTS
