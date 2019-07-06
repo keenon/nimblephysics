@@ -137,8 +137,8 @@ jobs:
     VCPKG_INSTALL_ROOT: $(Build.SourcesDirectory)\vcpkg
     VCPKG_ARCH: 'x64-windows'
     VCPKG_PACKAGES: 'assimp boost-system boost-filesystem ccd eigen3 fcl'
-    VCPKG_OPTIONAL_PACKAGES: 'flann freeglut nlopt ode opengl tinyxml2 urdfdom'
-    VCPKG_OPTIONAL_PACKAGES_NOT_WORKING: 'bullet3 osg'
+    VCPKG_OPTIONAL_PACKAGES: 'flann freeglut nlopt ode opengl tinyxml2'
+    VCPKG_OPTIONAL_PACKAGES_NOT_WORKING: 'bullet3 osg urdfdom'
     BUILD_TOOLSET_VERSION: '142'
     CMAKE_GENERATOR: 'Visual Studio 16 2019'
   steps:
