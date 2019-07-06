@@ -155,7 +155,7 @@ jobs:
       cmake --version
       mkdir build
       cd build
-      cmake .. -G "$(CMAKE_GENERATOR)" -A x64 -DCMAKE_BUILD_TYPE=$(CONFIGURATION) -Wno-dev -T "v$(BUILD_TOOLSET_VERSION),host=x64" -DVCPKG_TARGET_TRIPLET=$(VCPKG_ARCH) -DCMAKE_TOOLCHAIN_FILE="$(VCPKG_INSTALL_ROOT)/scripts/buildsystems/vcpkg.cmake" -DCMAKE_INSTALL_PREFIX="$(Build.BinariesDirectory)/$(REPO_NAME)" -DDART_MSVC_DEFAULT_OPTIONS=ON
+      cmake .. -G "$(CMAKE_GENERATOR)" -A x64 -DCMAKE_BUILD_TYPE=$(CONFIGURATION) -Wno-dev -T "v$(BUILD_TOOLSET_VERSION),host=x64" -DVCPKG_TARGET_TRIPLET=$(VCPKG_ARCH) -DCMAKE_TOOLCHAIN_FILE="$(VCPKG_INSTALL_ROOT)/scripts/buildsystems/vcpkg.cmake" -DDART_MSVC_DEFAULT_OPTIONS=ON
       cmake --build . --target ALL_BUILD --config $(CONFIGURATION) -- /maxcpucount:4
     displayName: 'Build'
     workingDirectory: '$(Build.SourcesDirectory)'
