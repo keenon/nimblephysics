@@ -329,13 +329,13 @@ inline double IKatan2Simple(double fy, double fx)
 }
 inline double IKatan2(double fy, double fx)
 {
-  if (std::isnan(fy))
+  if (isnan(fy))
   {
-    IKFAST_ASSERT(!std::isnan(
+    IKFAST_ASSERT(!isnan(
         fx)); // if both are nan, probably wrong value will be returned
     return IKPI_2;
   }
-  else if (std::isnan(fx))
+  else if (isnan(fx))
   {
     return 0;
   }
@@ -355,7 +355,7 @@ inline CheckValue<T> IKatan2WithCheck(T fy, T fx, T epsilon)
   CheckValue<T> ret;
   ret.valid = false;
   ret.value = 0;
-  if (!std::isnan(fy) && !std::isnan(fx))
+  if (!isnan(fy) && !isnan(fx))
   {
     if (IKabs(fy) >= IKFAST_ATAN2_MAGTHRESH
         || IKabs(fx) > IKFAST_ATAN2_MAGTHRESH)
@@ -32374,7 +32374,7 @@ public:
           j11array[1] = -j11array[0];
           sj11array[1] = -sj11array[0];
         }
-        else if (std::isnan(cj11array[0]))
+        else if (isnan(cj11array[0]))
         {
           // probably any value will work
           j11valid[0] = true;
