@@ -331,8 +331,8 @@ inline double IKatan2(double fy, double fx)
 {
   if (isnan(fy))
   {
-    IKFAST_ASSERT(!isnan(
-        fx)); // if both are nan, probably wrong value will be returned
+    IKFAST_ASSERT(
+        !isnan(fx)); // if both are nan, probably wrong value will be returned
     return IKPI_2;
   }
   else if (isnan(fx))
