@@ -136,7 +136,7 @@ jobs:
   variables:
     VCPKG_INSTALL_ROOT: $(Build.SourcesDirectory)\vcpkg
     VCPKG_ARCH: 'x64-windows'
-    VCPKG_PACKAGES: 'assimp boost-system boost-filesystem ccd eigen3 fcl'
+    VCPKG_PACKAGES: 'assimp boost boost-system boost-filesystem ccd eigen3 fcl'
     VCPKG_OPTIONAL_PACKAGES: 'flann freeglut nlopt ode opengl tinyxml2 urdfdom'
     VCPKG_OPTIONAL_PACKAGES_NOT_WORKING: 'bullet3 osg'
     BUILD_TOOLSET_VERSION: '142'
