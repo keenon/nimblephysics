@@ -49,7 +49,7 @@ install:
   # - cmd: vcpkg remove --outdated --recurse
 
   # install required dependencies
-  - cmd: vcpkg install --recurse --triplet %VCPKG_ARCH% assimp boost boost-system boost-filesystem ccd eigen3 fcl
+  - cmd: vcpkg install --recurse --triplet %VCPKG_ARCH% assimp boost-algorithm boost-system boost-filesystem ccd eigen3 fcl
 
   # install optional dependencies
   - cmd: vcpkg install --recurse --triplet %VCPKG_ARCH% flann freeglut nlopt ode opengl tinyxml2 urdfdom
