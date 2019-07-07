@@ -8,6 +8,10 @@
 
 find_package(urdfdom QUIET CONFIG)
 
+message(STATUS "[DEBUG] CMAKE_INSTALL_PREFIX: ${CMAKE_INSTALL_PREFIX}")
+message(STATUS "[DEBUG] urdfdom_INCLUDE_DIRS: ${urdfdom_INCLUDE_DIRS}")
+message(STATUS "[DEBUG] urdfdom_LIBRARIES: ${urdfdom_LIBRARIES}")
+
 if(urdfdom_FOUND AND NOT TARGET urdfdom)
   add_library(urdfdom INTERFACE IMPORTED)
   set_target_properties(urdfdom PROPERTIES
