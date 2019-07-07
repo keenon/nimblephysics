@@ -9,7 +9,7 @@
 find_package(urdfdom QUIET CONFIG)
 
 if(MSVC)
-  list(FILTER urdfdom_INCLUDE_DIRS EXCLUDE REGEX "^/.*%")
+  list(FILTER urdfdom_INCLUDE_DIRS EXCLUDE REGEX "^\/.*")
 
   message(STATUS "[DEBUG] CMAKE_INSTALL_PREFIX: ${CMAKE_INSTALL_PREFIX}")
   message(STATUS "[DEBUG] urdfdom_INCLUDE_DIRS: ${urdfdom_INCLUDE_DIRS}")
