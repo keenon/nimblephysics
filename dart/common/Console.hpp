@@ -52,19 +52,45 @@ namespace dart {
 namespace common {
 
 /// \brief
-std::ostream& colorMsg(const std::string& _msg, int _color);
+::std::ostream& colorMsg(const ::std::string& _msg, int _color);
 
 /// \brief
-std::ostream& colorErr(
-    const std::string& _msg,
-    const std::string& _file,
+::std::ostream& colorErr(
+    const ::std::string& _msg,
+    const ::std::string& _file,
     unsigned int _line,
     int _color);
 
 } // namespace common
+} // namespace dart
 
-template <class T>
-auto operator<<(std::ostream& os, const T& t) -> decltype(t.print(os), os)
+namespace dart {
+
+namespace detail {
+
+template <class C>
+class HasPrint
+{
+  template <class T>
+  static std::true_type testSignature(void (T::*)(::std::ostream& os) const);
+
+  template <class T>
+  static auto test(std::nullptr_t) -> decltype(testSignature(&T::print));
+
+  template <class T>
+  static auto test(...) -> ::std::false_type;
+
+public:
+  using type = decltype(test<C>(nullptr));
+  static const bool value = type::value;
+};
+
+} // namespace detail
+
+template <
+    class T,
+    class Enable = typename ::std::enable_if<detail::HasPrint<T>::value>::type>
+::std::ostream& operator<<(::std::ostream& os, const T& t)
 {
   t.print(os);
   return os;
