@@ -10,7 +10,7 @@ find_package(urdfdom QUIET CONFIG)
 
 message(STATUS "[DEBUG] CMAKE_INSTALL_PREFIX: ${CMAKE_INSTALL_PREFIX}")
 message(STATUS "[DEBUG] urdfdom_INCLUDE_DIRS: ${urdfdom_INCLUDE_DIRS}")
-message(STATUS "[DEBUG] urdfdom_LIBRARIES: ${urdfdom_LIBRARIES}")
+message(STATUS "[DEBUG] TinyXML_INCLUDE_DIRS: ${TinyXML_INCLUDE_DIRS}")
 message(STATUS "[DEBUG] urdfdom_headers_INCLUDE_DIRS: ${urdfdom_headers_INCLUDE_DIRS}")
 message(STATUS "[DEBUG] console_bridge_INCLUDE_DIRS: ${console_bridge_INCLUDE_DIRS}")
 
