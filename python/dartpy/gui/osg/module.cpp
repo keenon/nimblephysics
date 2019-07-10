@@ -32,18 +32,52 @@
 
 #include <pybind11/pybind11.h>
 
+namespace py = pybind11;
+
 namespace dart {
 namespace python {
 
-void RealTimeWorldNode(pybind11::module& sm);
-void Viewer(pybind11::module& sm);
+void WorldNode(py::module& sm);
+void RealTimeWorldNode(py::module& sm);
 
-void dart_gui_osg(pybind11::module& m)
+void GUIEventHandler(py::module& sm);
+
+void InteractiveFrame(py::module& sm);
+
+void ImGuiHandler(py::module& sm);
+void ImGuiWidget(py::module& sm);
+
+void Viewer(py::module& sm);
+void ImGuiViewer(py::module& sm);
+void ViewerAttachment(py::module& sm);
+void GridVisual(py::module& sm);
+
+void DragAndDrop(py::module& sm);
+
+void ShadowTechnique(py::module& sm);
+
+void dart_gui_osg(py::module& m)
 {
   auto sm = m.def_submodule("osg");
 
+  WorldNode(sm);
   RealTimeWorldNode(sm);
+
+  GUIEventHandler(sm);
+
+  InteractiveFrame(sm);
+
+  ImGuiHandler(sm);
+  ImGuiWidget(sm);
+
   Viewer(sm);
+  ImGuiViewer(sm);
+  ViewerAttachment(sm);
+  GridVisual(sm);
+
+  DragAndDrop(sm);
+
+  ShadowTechnique(sm);
 }
 
 } // namespace python

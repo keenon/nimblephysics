@@ -32,24 +32,90 @@
 
 #include <pybind11/pybind11.h>
 
+namespace py = pybind11;
+
 namespace dart {
 namespace python {
 
-void Frame(pybind11::module& sm);
-void BodyNode(pybind11::module& sm);
-void Joint(pybind11::module& sm);
-void MetaSkeleton(pybind11::module& sm);
-void Skeleton(pybind11::module& sm);
+void Shape(py::module& sm);
 
-void dart_dynamics(pybind11::module& m)
+void Entity(py::module& sm);
+void Frame(py::module& sm);
+void ShapeFrame(py::module& sm);
+void SimpleFrame(py::module& sm);
+
+void Node(py::module& sm);
+void JacobianNode(py::module& sm);
+void ShapeNode(py::module& sm);
+
+void DegreeOfFreedom(py::module& sm);
+
+void BodyNode(py::module& sm);
+
+void Joint(py::module& sm);
+void ZeroDofJoint(py::module& sm);
+void WeldJoint(py::module& sm);
+void GenericJoint(py::module& sm);
+void RevoluteJoint(py::module& sm);
+void PrismaticJoint(py::module& sm);
+void ScrewJoint(py::module& sm);
+void UniversalJoint(py::module& sm);
+void TranslationalJoint2D(py::module& sm);
+void PlanarJoint(py::module& sm);
+void EulerJoint(py::module& sm);
+void BallJoint(py::module& sm);
+void TranslationalJoint(py::module& sm);
+void FreeJoint(py::module& sm);
+
+void MetaSkeleton(py::module& sm);
+void ReferentialSkeleton(py::module& sm);
+void Linkage(py::module& sm);
+void Chain(py::module& sm);
+void Skeleton(py::module& sm);
+
+void InverseKinematics(py::module& sm);
+
+void dart_dynamics(py::module& m)
 {
   auto sm = m.def_submodule("dynamics");
 
+  Shape(sm);
+
+  Entity(sm);
   Frame(sm);
+  ShapeFrame(sm);
+  SimpleFrame(sm);
+
+  Node(sm);
+  JacobianNode(sm);
+  ShapeNode(sm);
+
+  DegreeOfFreedom(sm);
+
   BodyNode(sm);
+
   Joint(sm);
+  ZeroDofJoint(sm);
+  WeldJoint(sm);
+  GenericJoint(sm);
+  RevoluteJoint(sm);
+  PrismaticJoint(sm);
+  ScrewJoint(sm);
+  UniversalJoint(sm);
+  TranslationalJoint2D(sm);
+  PlanarJoint(sm);
+  EulerJoint(sm);
+  BallJoint(sm);
+  TranslationalJoint(sm);
+  FreeJoint(sm);
+
   MetaSkeleton(sm);
+  ReferentialSkeleton(sm);
+  Linkage(sm);
+  Chain(sm);
   Skeleton(sm);
+
+  InverseKinematics(sm);
 }
 
 } // namespace python
