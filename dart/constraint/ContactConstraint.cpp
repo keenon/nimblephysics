@@ -104,8 +104,15 @@ ContactConstraint::ContactConstraint(
   // TODO(JS): Assume the frictional coefficient can be changed during
   //           simulation steps.
   // Update mFrictionalCoff
+  auto shapeNodeA(const_cast<dynamics::ShapeFrame*>(
+                   contact.collisionObject1->getShapeFrame())
+                   ->asShapeNode());
+  auto shapeNodeB(const_cast<dynamics::ShapeFrame*>(
+                   contact.collisionObject2->getShapeFrame())
+                   ->asShapeNode());
   mFrictionCoeff = std::min(
-      mBodyNodeA->getFrictionCoeff(), mBodyNodeB->getFrictionCoeff());
+      shapeNodeA->getDynamicsAspect()->getFrictionCoeff(),
+      shapeNodeB->getDynamicsAspect()->getFrictionCoeff());
   if (mFrictionCoeff > DART_FRICTION_COEFF_THRESHOLD)
   {
     mIsFrictionOn = true;
