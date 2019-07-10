@@ -35,6 +35,34 @@
 
 using namespace dart;
 
+//==============================================================================
+dynamics::SkeletonPtr createFloor()
+{
+  dynamics::SkeletonPtr floor = dynamics::Skeleton::create("floor");
+
+  // Give the floor a body
+  dynamics::BodyNodePtr body
+      = floor->createJointAndBodyNodePair<dynamics::WeldJoint>(nullptr).second;
+
+  // Give the body a shape
+  double floorWidth = 10.0;
+  double floorHeight = 0.01;
+  auto box = std::make_shared<dynamics::BoxShape>(
+      Eigen::Vector3d(floorWidth, floorWidth, floorHeight));
+  dynamics::ShapeNode* shapeNode = body->createShapeNodeWith<
+      dynamics::VisualAspect,
+      dynamics::CollisionAspect,
+      dynamics::DynamicsAspect>(box);
+  shapeNode->getVisualAspect()->setColor(dart::Color::LightGray());
+
+  // Put the body into position
+  Eigen::Isometry3d tf = Eigen::Isometry3d::Identity();
+  tf.translation() = Eigen::Vector3d(0.0, 0.0, -1.0 - floorHeight / 2.0);
+  body->getParentJoint()->setTransformFromParentBodyNode(tf);
+
+  return floor;
+}
+
 int main()
 {
   auto shape
@@ -45,13 +73,27 @@ int main()
   auto jointAndBody
       = skeleton->createJointAndBodyNodePair<dynamics::FreeJoint>();
   auto body = jointAndBody.second;
+  std::cerr << "body shape node count " << body->getNumShapeNodes() << std::endl;
   body->createShapeNodeWith<
       dynamics::VisualAspect,
       dynamics::CollisionAspect,
       dynamics::DynamicsAspect>(shape);
+  std::cerr << "body shape node count " << body->getNumShapeNodes() << std::endl;
+  std::cerr << "friction "
+            << body->getShapeNode(0)->getDynamicsAspect()->getFrictionCoeff()
+            << std::endl;
+  body->getShapeNode(0)->getDynamicsAspect()->setFrictionCoeff(0.0);
+  std::cerr << "friction "
+            << body->getShapeNode(0)->getDynamicsAspect()->getFrictionCoeff()
+            << std::endl;
 
   // Create a world and add the rigid body
   auto world = simulation::World::create();
+  std::cerr << "gravity " << world->getGravity() << std::endl;
+  world->setGravity(Eigen::Vector3d(0.0, -5.0, -9.81));
+  std::cerr << "gravity " << world->getGravity() << std::endl;
+
+  world->addSkeleton(createFloor());
   world->addSkeleton(skeleton);
 
   // Wrap a WorldNode around it
