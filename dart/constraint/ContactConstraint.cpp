@@ -113,9 +113,28 @@ ContactConstraint::ContactConstraint(
   mFrictionCoeff = std::min(
       shapeNodeA->getDynamicsAspect()->getFrictionCoeff(),
       shapeNodeB->getDynamicsAspect()->getFrictionCoeff());
-  if (mFrictionCoeff > DART_FRICTION_COEFF_THRESHOLD)
+  mSecondaryFrictionCoeff = std::min(
+      shapeNodeA->getDynamicsAspect()->getSecondaryFrictionCoeff(),
+      shapeNodeB->getDynamicsAspect()->getSecondaryFrictionCoeff());
+  if (mFrictionCoeff > DART_FRICTION_COEFF_THRESHOLD ||
+      mSecondaryFrictionCoeff > DART_FRICTION_COEFF_THRESHOLD)
   {
     mIsFrictionOn = true;
+
+    // Check shapeNodes for valid friction direction unit vectors
+    auto frictionDirA = shapeNodeA->getDynamicsAspect()->getFirstFrictionDirection();
+    auto frictionDirB = shapeNodeB->getDynamicsAspect()->getFirstFrictionDirection();
+
+    // resulting friction direction unit vector
+    Eigen::Vector3d frictionDir;
+
+    // start with frictionDirA if it is not all zeros
+    if (frictionDirA.squaredNorm() >= DART_CONTACT_CONSTRAINT_EPSILON_SQUARED)
+    {
+      // rotate frictionDirA using coordinates of friction direction frame
+      auto frameA = shapeNodeA->getDynamicsAspect()->getFirstFrictionDirectionFrame();
+      frictionDir = frictionDirA.normalized();
+    }
 
     // Update frictional direction
     updateFirstFrictionalDirection();
