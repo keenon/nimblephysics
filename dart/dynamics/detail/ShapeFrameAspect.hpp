@@ -94,9 +94,17 @@ struct DynamicsAspectProperties
   /// Coefficient of restitution
   double mRestitutionCoeff;
 
+  /// First friction direction frame
+  const Frame* mFirstFrictionDirectionFrame;
+
+  /// First friction direction frame
+  Eigen::Vector3d mFirstFrictionDirection;
+
   /// Constructor
   DynamicsAspectProperties(
-      const double frictionCoeff = 1.0, const double restitutionCoeff = 0.0);
+      const double frictionCoeff = 1.0, const double restitutionCoeff = 0.0,
+      const Frame* firstFrictionDirectionFrame = nullptr,
+      const Eigen::Vector3d& firstFrictionDirection = Eigen::Vector3d::Zero());
 
   /// Destructor
   virtual ~DynamicsAspectProperties() = default;
