@@ -88,11 +88,20 @@ struct CollisionAspectProperties
 
 struct DynamicsAspectProperties
 {
-  /// Coefficient of friction
+  /// Primary coefficient of friction
   double mFrictionCoeff;
 
   /// Coefficient of restitution
   double mRestitutionCoeff;
+
+  /// Secondary coefficient of friction
+  double mSecondaryFrictionCoeff;
+
+  /// Primary slip compliance coefficient
+  double mSlipCompliance;
+
+  /// Secondary slip compliance coefficient
+  double mSecondarySlipCompliance;
 
   /// First friction direction frame
   const Frame* mFirstFrictionDirectionFrame;
@@ -103,6 +112,9 @@ struct DynamicsAspectProperties
   /// Constructor
   DynamicsAspectProperties(
       const double frictionCoeff = 1.0, const double restitutionCoeff = 0.0,
+      const double secondaryFrictionCoeff = 1.0,
+      const double slipCompliance = 0.0,
+      const double secondarySlipCompliance = 0.0,
       const Frame* firstFrictionDirectionFrame = nullptr,
       const Eigen::Vector3d& firstFrictionDirection = Eigen::Vector3d::Zero());
 
