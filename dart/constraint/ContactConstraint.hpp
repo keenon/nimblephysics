@@ -169,8 +169,11 @@ private:
   /// First frictional direction
   Eigen::Vector3d mFirstFrictionalDirection;
 
-  /// Coefficient of Friction
+  /// Primary Coefficient of Friction
   double mFrictionCoeff;
+
+  /// Primary Coefficient of Friction
+  double mSecondaryFrictionCoeff;
 
   /// Coefficient of restitution
   double mRestitutionCoeff;
