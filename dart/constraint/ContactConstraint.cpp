@@ -64,6 +64,21 @@ double ContactConstraint::mMaxErrorReductionVelocity = DART_MAX_ERV;
 double ContactConstraint::mConstraintForceMixing = DART_CFM;
 
 //==============================================================================
+Eigen::Vector3d computeShapeNodeWorldFrictionDir(dynamics::ShapeNode* shapeNode)
+{
+  auto frame = shapeNode->getDynamicsAspect()->getFirstFrictionDirectionFrame();
+  Eigen::Vector3d frictionDir = shapeNode->getDynamicsAspect()->getFirstFrictionDirection();
+
+  // rotate using custom frame if it is specified
+  if (frame)
+  {
+    return frame->getWorldTransform().linear() * frictionDir.normalized();
+  }
+  // otherwise rotate using shapeNode
+  return shapeNode->getWorldTransform().linear() * frictionDir.normalized();
+}
+
+//==============================================================================
 ContactConstraint::ContactConstraint(
     collision::Contact& contact, double timeStep)
   : ConstraintBase(),
@@ -103,16 +118,16 @@ ContactConstraint::ContactConstraint(
   //----------------------------------------------
   // TODO(JS): Assume the frictional coefficient can be changed during
   //           simulation steps.
-  // Update mFrictionalCoff
+  // Update mFrictionalCoeff
   auto shapeNodeA(const_cast<dynamics::ShapeFrame*>(
                    contact.collisionObject1->getShapeFrame())
                    ->asShapeNode());
   auto shapeNodeB(const_cast<dynamics::ShapeFrame*>(
                    contact.collisionObject2->getShapeFrame())
                    ->asShapeNode());
-  mFrictionCoeff = std::min(
-      shapeNodeA->getDynamicsAspect()->getFrictionCoeff(),
-      shapeNodeB->getDynamicsAspect()->getFrictionCoeff());
+  auto frictionCoeffA = shapeNodeA->getDynamicsAspect()->getFrictionCoeff();
+  auto frictionCoeffB = shapeNodeB->getDynamicsAspect()->getFrictionCoeff();
+  mFrictionCoeff = std::min(frictionCoeffA, frictionCoeffB);
   mSecondaryFrictionCoeff = std::min(
       shapeNodeA->getDynamicsAspect()->getSecondaryFrictionCoeff(),
       shapeNodeB->getDynamicsAspect()->getSecondaryFrictionCoeff());
@@ -126,17 +141,37 @@ ContactConstraint::ContactConstraint(
     auto frictionDirB = shapeNodeB->getDynamicsAspect()->getFirstFrictionDirection();
 
     // resulting friction direction unit vector
-    Eigen::Vector3d frictionDir;
+    Eigen::Vector3d frictionDir(0, 0, 0);
+    bool nonzeroDirA = frictionDirA.squaredNorm() >= DART_CONTACT_CONSTRAINT_EPSILON_SQUARED;
+    bool nonzeroDirB = frictionDirB.squaredNorm() >= DART_CONTACT_CONSTRAINT_EPSILON_SQUARED;
 
-    // start with frictionDirA if it is not all zeros
-    if (frictionDirA.squaredNorm() >= DART_CONTACT_CONSTRAINT_EPSILON_SQUARED)
+    // only consider custom friction direction if one has nonzero length
+    if (nonzeroDirA || nonzeroDirB)
     {
-      // rotate frictionDirA using coordinates of friction direction frame
-      auto frameA = shapeNodeA->getDynamicsAspect()->getFirstFrictionDirectionFrame();
-      frictionDir = frictionDirA.normalized();
+      // if A and B are both set, choose one with larger friction coefficient
+      if (nonzeroDirA && nonzeroDirB)
+      {
+        if (frictionCoeffA >= frictionCoeffB)
+        {
+          frictionDir = computeShapeNodeWorldFrictionDir(shapeNodeA);
+        }
+        else
+        {
+          frictionDir = computeShapeNodeWorldFrictionDir(shapeNodeA);
+        }
+      }
+      else if (nonzeroDirA)
+      {
+        frictionDir = computeShapeNodeWorldFrictionDir(shapeNodeA);
+      }
+      else
+      {
+        frictionDir = computeShapeNodeWorldFrictionDir(shapeNodeB);
+      }
     }
 
     // Update frictional direction
+    mFirstFrictionalDirection = frictionDir.normalized();
     updateFirstFrictionalDirection();
   }
   else
@@ -397,8 +432,8 @@ void ContactConstraint::getInformation(ConstraintInfo* info)
     info->findex[1] = 0;
 
     // Upper and lower bounds of tangential direction-2 impulsive force
-    info->lo[2] = -mFrictionCoeff;
-    info->hi[2] = mFrictionCoeff;
+    info->lo[2] = -mSecondaryFrictionCoeff;
+    info->hi[2] = mSecondaryFrictionCoeff;
     info->findex[2] = 0;
 
     //------------------------------------------------------------------------

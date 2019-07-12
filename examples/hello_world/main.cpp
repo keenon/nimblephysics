@@ -81,16 +81,23 @@ int main()
   std::cerr << "body shape node count " << body->getNumShapeNodes() << std::endl;
   std::cerr << "friction "
             << body->getShapeNode(0)->getDynamicsAspect()->getFrictionCoeff()
+            << ", "
+            << body->getShapeNode(0)->getDynamicsAspect()->getSecondaryFrictionCoeff()
             << std::endl;
   body->getShapeNode(0)->getDynamicsAspect()->setFrictionCoeff(0.0);
+  body->getShapeNode(0)->getDynamicsAspect()->setSecondaryFrictionCoeff(1.0);
+  body->getShapeNode(0)->getDynamicsAspect()->setFirstFrictionDirection(
+      Eigen::Vector3d::UnitX());
   std::cerr << "friction "
             << body->getShapeNode(0)->getDynamicsAspect()->getFrictionCoeff()
+            << ", "
+            << body->getShapeNode(0)->getDynamicsAspect()->getSecondaryFrictionCoeff()
             << std::endl;
 
   // Create a world and add the rigid body
   auto world = simulation::World::create();
   std::cerr << "gravity " << world->getGravity() << std::endl;
-  world->setGravity(Eigen::Vector3d(0.0, -5.0, -9.81));
+  world->setGravity(Eigen::Vector3d(-5.0, -5.0, -9.81));
   std::cerr << "gravity " << world->getGravity() << std::endl;
 
   world->addSkeleton(createFloor());
