@@ -134,6 +134,8 @@ protected:
 
   static double computeFrictionCoefficient(
       const dynamics::ShapeNode* shapeNode);
+  static double computeSecondaryFrictionCoefficient(
+      const dynamics::ShapeNode* shapeNode);
   static double computeRestitutionCoefficient(
       const dynamics::ShapeNode* shapeNode);
 
