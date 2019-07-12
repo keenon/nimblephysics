@@ -168,10 +168,11 @@ ContactConstraint::ContactConstraint(
       {
         frictionDir = computeShapeNodeWorldFrictionDir(shapeNodeB);
       }
+
+      mFirstFrictionalDirection = frictionDir.normalized();
     }
 
     // Update frictional direction
-    mFirstFrictionalDirection = frictionDir.normalized();
     updateFirstFrictionalDirection();
   }
   else

@@ -70,29 +70,39 @@ int main()
 
   // Create a box-shaped rigid body
   auto skeleton = dynamics::Skeleton::create();
-  auto jointAndBody
-      = skeleton->createJointAndBodyNodePair<dynamics::FreeJoint>();
-  auto body = jointAndBody.second;
-  std::cerr << "body shape node count " << body->getNumShapeNodes() << std::endl;
-  body->createShapeNodeWith<
-      dynamics::VisualAspect,
-      dynamics::CollisionAspect,
-      dynamics::DynamicsAspect>(shape);
-  std::cerr << "body shape node count " << body->getNumShapeNodes() << std::endl;
-  std::cerr << "friction "
-            << body->getShapeNode(0)->getDynamicsAspect()->getFrictionCoeff()
-            << ", "
-            << body->getShapeNode(0)->getDynamicsAspect()->getSecondaryFrictionCoeff()
-            << std::endl;
-  body->getShapeNode(0)->getDynamicsAspect()->setFrictionCoeff(0.0);
-  body->getShapeNode(0)->getDynamicsAspect()->setSecondaryFrictionCoeff(1.0);
-  body->getShapeNode(0)->getDynamicsAspect()->setFirstFrictionDirection(
-      Eigen::Vector3d::UnitX());
-  std::cerr << "friction "
-            << body->getShapeNode(0)->getDynamicsAspect()->getFrictionCoeff()
-            << ", "
-            << body->getShapeNode(0)->getDynamicsAspect()->getSecondaryFrictionCoeff()
-            << std::endl;
+  for (int i = 0; i < 2; ++i)
+  {
+    auto jointAndBody
+        = skeleton->createJointAndBodyNodePair<dynamics::FreeJoint>();
+    auto body = jointAndBody.second;
+    std::cerr << "body shape node count " << body->getNumShapeNodes() << std::endl;
+    body->createShapeNodeWith<
+        dynamics::VisualAspect,
+        dynamics::CollisionAspect,
+        dynamics::DynamicsAspect>(shape);
+    std::cerr << "body shape node count " << body->getNumShapeNodes() << std::endl;
+    std::cerr << "friction "
+              << body->getShapeNode(0)->getDynamicsAspect()->getFrictionCoeff()
+              << ", "
+              << body->getShapeNode(0)->getDynamicsAspect()->getSecondaryFrictionCoeff()
+              << std::endl;
+    body->getShapeNode(0)->getDynamicsAspect()->setFrictionCoeff(0.0);
+    body->getShapeNode(0)->getDynamicsAspect()->setSecondaryFrictionCoeff(1.0);
+    if (i == 0)
+    {
+      body->getShapeNode(0)->getDynamicsAspect()->setFirstFrictionDirection(
+          Eigen::Vector3d(1, -1, 0).normalized());
+    }
+    Eigen::Isometry3d tf = Eigen::Isometry3d::Identity();
+    tf.translation() = Eigen::Vector3d(i, -i, 0.0);
+    body->getParentJoint()->setTransformFromParentBodyNode(tf);
+
+    std::cerr << "friction "
+              << body->getShapeNode(0)->getDynamicsAspect()->getFrictionCoeff()
+              << ", "
+              << body->getShapeNode(0)->getDynamicsAspect()->getSecondaryFrictionCoeff()
+              << std::endl;
+  }
 
   // Create a world and add the rigid body
   auto world = simulation::World::create();
