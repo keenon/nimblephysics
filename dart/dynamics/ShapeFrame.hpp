@@ -152,6 +152,12 @@ public:
   DART_COMMON_SET_GET_ASPECT_PROPERTY( double, SecondaryFrictionCoeff )
   // void setSecondaryFrictionCoeff(const double& value);
   // const double& getSecondaryFrictionCoeff() const;
+
+  /// Slip compliance parameters act as constraint force mixing (cfm)
+  /// for the friction constraints.
+  /// They start with a default value of -1.0 and will be ignored
+  /// in favor of the global default cfm value unless explicitly
+  /// set to a positive value.
   DART_COMMON_SET_GET_ASPECT_PROPERTY( double, SlipCompliance )
   // void setSlipCompliance(const double& value);
   // const double& getSlipCompliance() const;

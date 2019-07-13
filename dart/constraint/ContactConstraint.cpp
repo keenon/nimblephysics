@@ -65,6 +65,9 @@ double ContactConstraint::mConstraintForceMixing = DART_CFM;
 
 constexpr double DART_DEFAULT_FRICTION_COEFF = 1.0;
 constexpr double DART_DEFAULT_RESTITUTION_COEFF = 0.0;
+// slip compliance is combined through addition,
+// so set to half the global default value
+constexpr double DART_DEFAULT_SLIP_COMPLIANCE = 0.5*DART_CFM;
 const Eigen::Vector3d DART_DEFAULT_FRICTION_DIR =
     Eigen::Vector3d::UnitZ();
 
@@ -85,6 +88,8 @@ ContactConstraint::ContactConstraint(
                    .get()),
     mContact(contact),
     mFirstFrictionalDirection(DART_DEFAULT_FRICTION_DIR),
+    mSlipCompliance(DART_DEFAULT_SLIP_COMPLIANCE),
+    mSecondarySlipCompliance(DART_DEFAULT_SLIP_COMPLIANCE),
     mIsFrictionOn(true),
     mAppliedImpulseIndex(dynamics::INVALID_INDEX),
     mIsBounceOn(false),
@@ -133,6 +138,18 @@ ContactConstraint::ContactConstraint(
       mSecondaryFrictionCoeff > DART_FRICTION_COEFF_THRESHOLD)
   {
     mIsFrictionOn = true;
+
+    // Compute slip compliance
+    const double slipComplianceA = computeSlipCompliance(shapeNodeA);
+    const double slipComplianceB = computeSlipCompliance(shapeNodeB);
+    const double secondarySlipComplianceA =
+                         computeSecondarySlipCompliance(shapeNodeA);
+    const double secondarySlipComplianceB =
+                         computeSecondarySlipCompliance(shapeNodeB);
+    // Combine slip compliances through addition
+    mSlipCompliance = slipComplianceA + slipComplianceB;
+    mSecondarySlipCompliance =
+        secondarySlipComplianceA + secondarySlipComplianceB;
 
     // Check shapeNodes for valid friction direction unit vectors
     auto frictionDirA = computeWorldFirstFrictionDir(shapeNodeA);
@@ -363,13 +380,6 @@ void ContactConstraint::setConstraintForceMixing(double cfm)
            << "] is lower than 1e-9. "
            << "It is set to 1e-9." << std::endl;
     mConstraintForceMixing = 1e-9;
-  }
-  if (cfm > 1.0)
-  {
-    dtwarn << "Constraint force mixing parameter[" << cfm
-           << "] is greater than 1.0. "
-           << "It is set to 1.0." << std::endl;
-    mConstraintForceMixing = 1.0;
   }
 
   mConstraintForceMixing = cfm;
@@ -620,8 +630,22 @@ void ContactConstraint::getVelocityChange(double* vel, bool withCfm)
   // cfm variable in ODE
   if (withCfm)
   {
-    vel[mAppliedImpulseIndex]
-        += vel[mAppliedImpulseIndex] * mConstraintForceMixing;
+    switch (mAppliedImpulseIndex)
+    {
+      case 0:
+        vel[0] += vel[0] * mConstraintForceMixing;
+        break;
+      case 1:
+        vel[1] += vel[1] * mSlipCompliance;
+        break;
+      case 2:
+        vel[2] += vel[2] * mSecondarySlipCompliance;
+        break;
+      default:
+        vel[mAppliedImpulseIndex]
+            += vel[mAppliedImpulseIndex] * mConstraintForceMixing;
+        break;
+    }
   }
 }
 
@@ -749,7 +773,8 @@ double ContactConstraint::computeSecondaryFrictionCoefficient(
 
   if (dynamicAspect == nullptr)
   {
-    dtwarn << "[ContactConstraint] Attempt to extract friction coefficient "
+    dtwarn << "[ContactConstraint] Attempt to extract "
+           << "secondary friction coefficient "
            << "from a ShapeNode that doesn't have DynamicAspect. The default "
            << "value (" << DART_DEFAULT_FRICTION_COEFF << ") will be used "
            << "instead.\n";
@@ -757,6 +782,65 @@ double ContactConstraint::computeSecondaryFrictionCoefficient(
   }
 
   return dynamicAspect->getSecondaryFrictionCoeff();
+}
+
+//==============================================================================
+double ContactConstraint::computeSlipCompliance(
+    const dynamics::ShapeNode* shapeNode)
+{
+  assert(shapeNode);
+
+  auto dynamicAspect = shapeNode->getDynamicsAspect();
+
+  if (dynamicAspect == nullptr)
+  {
+    dtwarn << "[ContactConstraint] Attempt to extract slip compliance "
+           << "from a ShapeNode that doesn't have DynamicAspect. The default "
+           << "value (" << DART_DEFAULT_SLIP_COMPLIANCE << ") will be used "
+           << "instead.\n";
+    return DART_DEFAULT_SLIP_COMPLIANCE;
+  }
+
+  double slipCompliance = dynamicAspect->getSlipCompliance();
+  if (slipCompliance < 0)
+  {
+    return DART_DEFAULT_SLIP_COMPLIANCE;
+  }
+  else if (slipCompliance < 1e-9)
+  {
+    return 1e-9;
+  }
+  return slipCompliance;
+}
+
+//==============================================================================
+double ContactConstraint::computeSecondarySlipCompliance(
+    const dynamics::ShapeNode* shapeNode)
+{
+  assert(shapeNode);
+
+  auto dynamicAspect = shapeNode->getDynamicsAspect();
+
+  if (dynamicAspect == nullptr)
+  {
+    dtwarn << "[ContactConstraint] Attempt to extract "
+           << "secondary slip compliance "
+           << "from a ShapeNode that doesn't have DynamicAspect. The default "
+           << "value (" << DART_DEFAULT_SLIP_COMPLIANCE << ") will be used "
+           << "instead.\n";
+    return DART_DEFAULT_SLIP_COMPLIANCE;
+  }
+
+  double slipCompliance = dynamicAspect->getSecondarySlipCompliance();
+  if (slipCompliance < 0)
+  {
+    return DART_DEFAULT_SLIP_COMPLIANCE;
+  }
+  else if (slipCompliance < 1e-9)
+  {
+    return 1e-9;
+  }
+  return slipCompliance;
 }
 
 //==============================================================================
