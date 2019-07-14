@@ -1561,7 +1561,7 @@ TEST_F(ForwardKinematicsTest, TwoRolls)
 Eigen::MatrixXd finiteDifferenceJacobian(
     const SkeletonPtr& skeleton,
     const Eigen::VectorXd& q,
-    const std::vector<std::size_t>& active_indices,
+    const std::vector<std::size_t>& activeIndices,
     JacobianNode* node)
 {
   Eigen::MatrixXd J(3, q.size());
@@ -1575,13 +1575,13 @@ Eigen::MatrixXd finiteDifferenceJacobian(
     q_up[i] += 0.5 * dq;
     q_down[i] -= 0.5 * dq;
 
-    skeleton->setPositions(active_indices, q_up);
+    skeleton->setPositions(activeIndices, q_up);
     Eigen::Vector3d x_up = node->getTransform().translation();
 
-    skeleton->setPositions(active_indices, q_down);
+    skeleton->setPositions(activeIndices, q_down);
     Eigen::Vector3d x_down = node->getTransform().translation();
 
-    skeleton->setPositions(active_indices, q);
+    skeleton->setPositions(activeIndices, q);
     J.col(i)
         = node->getWorldTransform().linear().transpose() * (x_up - x_down) / dq;
   }
@@ -1602,7 +1602,7 @@ Eigen::MatrixXd standardJacobian(
 
   Eigen::MatrixXd reduced_J(3, q.size());
   for (int i = 0; i < q.size(); ++i)
-    reduced_J.col(i) = J.col(active_indices[i]);
+    reduced_J.col(i) = J.col(activeIndices[i]);
 
   return reduced_J;
 }
@@ -1633,39 +1633,39 @@ TEST_F(ForwardKinematicsTest, JacobianPartialChange)
 
   SkeletonPtr skeleton2 = skeleton1->cloneSkeleton();
 
-  std::vector<std::size_t> active_indices;
+  std::vector<std::size_t> activeIndices;
   for (std::size_t i = 0; i < 3; ++i)
-    active_indices.push_back(i);
+    activeIndices.push_back(i);
 
   Eigen::VectorXd q
-      = Eigen::VectorXd::Random(static_cast<int>(active_indices.size()));
+      = Eigen::VectorXd::Random(static_cast<int>(activeIndices.size()));
 
   Eigen::MatrixXd fd_J = finiteDifferenceJacobian(
       skeleton1,
       q,
-      active_indices,
+      activeIndices,
       skeleton1->getBodyNode(skeleton1->getNumBodyNodes() - 1));
 
   Eigen::MatrixXd J = standardJacobian(
       skeleton2,
       q,
-      active_indices,
+      activeIndices,
       skeleton2->getBodyNode(skeleton2->getNumBodyNodes() - 1));
 
   EXPECT_TRUE((fd_J - J).norm() < tolerance);
 
-  q = Eigen::VectorXd::Random(static_cast<int>(active_indices.size()));
+  q = Eigen::VectorXd::Random(static_cast<int>(activeIndices.size()));
 
   fd_J = finiteDifferenceJacobian(
       skeleton1,
       q,
-      active_indices,
+      activeIndices,
       skeleton1->getBodyNode(skeleton1->getNumBodyNodes() - 1));
 
   J = standardJacobian(
       skeleton2,
       q,
-      active_indices,
+      activeIndices,
       skeleton2->getBodyNode(skeleton2->getNumBodyNodes() - 1));
 
   EXPECT_TRUE((fd_J - J).norm() < tolerance);
@@ -1688,23 +1688,23 @@ TEST_F(ForwardKinematicsTest, JacobianEndEffectorChange)
   BodyNode* last_bn2 = skeleton2->getBodyNode(skeleton2->getNumBodyNodes() - 1);
   EndEffector* ee2 = last_bn2->createEndEffector();
 
-  std::vector<std::size_t> active_indices;
+  std::vector<std::size_t> activeIndices;
   for (std::size_t i = 0; i < 3; ++i)
-    active_indices.push_back(i);
+    activeIndices.push_back(i);
 
   Eigen::VectorXd q
-      = Eigen::VectorXd::Random(static_cast<int>(active_indices.size()));
+      = Eigen::VectorXd::Random(static_cast<int>(activeIndices.size()));
 
   Eigen::MatrixXd fd_J
-      = finiteDifferenceJacobian(skeleton1, q, active_indices, ee1);
+      = finiteDifferenceJacobian(skeleton1, q, activeIndices, ee1);
 
-  Eigen::MatrixXd J = standardJacobian(skeleton2, q, active_indices, ee2);
+  Eigen::MatrixXd J = standardJacobian(skeleton2, q, activeIndices, ee2);
 
   EXPECT_TRUE((fd_J - J).norm() < tolerance);
 
-  q = Eigen::VectorXd::Random(static_cast<int>(active_indices.size()));
-  fd_J = finiteDifferenceJacobian(skeleton1, q, active_indices, ee1);
-  J = standardJacobian(skeleton2, q, active_indices, ee2);
+  q = Eigen::VectorXd::Random(static_cast<int>(activeIndices.size()));
+  fd_J = finiteDifferenceJacobian(skeleton1, q, activeIndices, ee1);
+  J = standardJacobian(skeleton2, q, activeIndices, ee2);
 
   EXPECT_TRUE((fd_J - J).norm() < tolerance);
 }
