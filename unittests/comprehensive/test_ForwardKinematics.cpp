@@ -951,7 +951,6 @@ void ForwardKinematicsTest::testJacobians(const common::Uri& uri)
   }
 }
 
-
 //==============================================================================
 void ForwardKinematicsTest::testFiniteDifferenceGeneralizedCoordinates(
     const common::Uri& uri)
@@ -965,17 +964,17 @@ void ForwardKinematicsTest::testFiniteDifferenceGeneralizedCoordinates(
   using namespace utils;
 
   //----------------------------- Settings -------------------------------------
-#ifndef NDEBUG  // Debug mode
+#ifndef NDEBUG // Debug mode
   int nRandomItr = 2;
 #else
   int nRandomItr = 10;
 #endif
-  double qLB   = -0.5 * constantsd::pi();
-  double qUB   =  0.5 * constantsd::pi();
-  double dqLB  = -0.3 * constantsd::pi();
-  double dqUB  =  0.3 * constantsd::pi();
+  double qLB = -0.5 * constantsd::pi();
+  double qUB = 0.5 * constantsd::pi();
+  double dqLB = -0.3 * constantsd::pi();
+  double dqUB = 0.3 * constantsd::pi();
   double ddqLB = -0.1 * constantsd::pi();
-  double ddqUB =  0.1 * constantsd::pi();
+  double ddqUB = 0.1 * constantsd::pi();
   Vector3d gravity(0.0, -9.81, 0.0);
   double timeStep = 1e-3;
   double TOLERANCE = 5e-4;
@@ -996,13 +995,13 @@ void ForwardKinematicsTest::testFiniteDifferenceGeneralizedCoordinates(
     for (int j = 0; j < nRandomItr; ++j)
     {
       // Generate a random state and ddq
-      VectorXd q0   = VectorXd(dof);
-      VectorXd dq0  = VectorXd(dof);
+      VectorXd q0 = VectorXd(dof);
+      VectorXd dq0 = VectorXd(dof);
       VectorXd ddq0 = VectorXd(dof);
       for (int k = 0; k < dof; ++k)
       {
-        q0[k]   = math::Random::uniform(qLB,   qUB);
-        dq0[k]  = math::Random::uniform(dqLB,  dqUB);
+        q0[k] = math::Random::uniform(qLB, qUB);
+        dq0[k] = math::Random::uniform(dqLB, dqUB);
         ddq0[k] = math::Random::uniform(ddqLB, ddqUB);
       }
 
@@ -1022,7 +1021,8 @@ void ForwardKinematicsTest::testFiniteDifferenceGeneralizedCoordinates(
 
       VectorXd dq0FD = skeleton->getPositionDifferences(q1, q0) / timeStep;
       VectorXd dq1FD = skeleton->getPositionDifferences(q2, q1) / timeStep;
-      VectorXd ddqFD1 = skeleton->getVelocityDifferences(dq1FD, dq0FD) / timeStep;
+      VectorXd ddqFD1
+          = skeleton->getVelocityDifferences(dq1FD, dq0FD) / timeStep;
       VectorXd ddqFD2 = skeleton->getVelocityDifferences(dq2, dq1) / timeStep;
 
       EXPECT_TRUE(equals(dq0, dq0FD, TOLERANCE));
@@ -1055,7 +1055,8 @@ void ForwardKinematicsTest::testFiniteDifferenceGeneralizedCoordinates(
 }
 
 //==============================================================================
-void ForwardKinematicsTest::testFiniteDifferenceBodyNodeVelocity(const common::Uri& uri)
+void ForwardKinematicsTest::testFiniteDifferenceBodyNodeVelocity(
+    const common::Uri& uri)
 {
   using namespace std;
   using namespace Eigen;
@@ -1066,19 +1067,19 @@ void ForwardKinematicsTest::testFiniteDifferenceBodyNodeVelocity(const common::U
   using namespace utils;
 
   //----------------------------- Settings -------------------------------------
-#ifndef NDEBUG  // Debug mode
+#ifndef NDEBUG // Debug mode
   int nRandomItr = 2;
   std::size_t numSteps = 1e+1;
 #else
   int nRandomItr = 10;
   std::size_t numSteps = 1e+3;
 #endif
-  double qLB   = -0.5 * constantsd::pi();
-  double qUB   =  0.5 * constantsd::pi();
-  double dqLB  = -0.5 * constantsd::pi();
-  double dqUB  =  0.5 * constantsd::pi();
+  double qLB = -0.5 * constantsd::pi();
+  double qUB = 0.5 * constantsd::pi();
+  double dqLB = -0.5 * constantsd::pi();
+  double dqUB = 0.5 * constantsd::pi();
   double ddqLB = -0.5 * constantsd::pi();
-  double ddqUB =  0.5 * constantsd::pi();
+  double ddqUB = 0.5 * constantsd::pi();
   Vector3d gravity(0.0, -9.81, 0.0);
   double timeStep = 1.0e-6;
   const double tol = timeStep * 1e+2;
@@ -1097,12 +1098,12 @@ void ForwardKinematicsTest::testFiniteDifferenceBodyNodeVelocity(const common::U
       SkeletonPtr skeleton = world->getSkeleton(j);
       EXPECT_NE(skeleton, nullptr);
 
-      std::size_t dof       = skeleton->getNumDofs();
+      std::size_t dof = skeleton->getNumDofs();
       std::size_t numBodies = skeleton->getNumBodyNodes();
 
       // Generate random states
-      VectorXd   q = Random::uniform<Eigen::VectorXd>(dof,   qLB,   qUB);
-      VectorXd  dq = Random::uniform<Eigen::VectorXd>(dof,  dqLB,  dqUB);
+      VectorXd q = Random::uniform<Eigen::VectorXd>(dof, qLB, qUB);
+      VectorXd dq = Random::uniform<Eigen::VectorXd>(dof, dqLB, dqUB);
       VectorXd ddq = Random::uniform<Eigen::VectorXd>(dof, ddqLB, ddqUB);
 
       skeleton->setPositions(q);
@@ -1112,7 +1113,7 @@ void ForwardKinematicsTest::testFiniteDifferenceBodyNodeVelocity(const common::U
       common::aligned_map<dynamics::BodyNodePtr, Eigen::Isometry3d> Tmap;
       for (auto k = 0u; k < numBodies; ++k)
       {
-        auto body  = skeleton->getBodyNode(k);
+        auto body = skeleton->getBodyNode(k);
         Tmap[body] = body->getTransform();
       }
 
@@ -1123,7 +1124,7 @@ void ForwardKinematicsTest::testFiniteDifferenceBodyNodeVelocity(const common::U
 
         for (std::size_t l = 0; l < skeleton->getNumBodyNodes(); ++l)
         {
-          BodyNodePtr body  = skeleton->getBodyNode(l);
+          BodyNodePtr body = skeleton->getBodyNode(l);
 
           Isometry3d T1 = Tmap[body];
           Isometry3d T2 = body->getTransform();
@@ -1136,10 +1137,8 @@ void ForwardKinematicsTest::testFiniteDifferenceBodyNodeVelocity(const common::U
           if (!checkSpatialVelocity)
           {
             std::cout << "[" << body->getName() << "]" << std::endl;
-            std::cout << "V_diff  : "
-                      << V_diff.transpose() << std::endl;
-            std::cout << "V_actual  : "
-                      << V_actual.transpose() << std::endl;
+            std::cout << "V_diff  : " << V_diff.transpose() << std::endl;
+            std::cout << "V_actual  : " << V_actual.transpose() << std::endl;
             std::cout << std::endl;
           }
 
@@ -1164,17 +1163,17 @@ void ForwardKinematicsTest::testFiniteDifferenceBodyNodeAcceleration(
 
   //----------------------------- Settings -------------------------------------
   const double TOLERANCE = 1.0e-2;
-#ifndef NDEBUG  // Debug mode
+#ifndef NDEBUG // Debug mode
   int nRandomItr = 2;
 #else
   int nRandomItr = 10;
 #endif
-  double qLB   = -0.5 * constantsd::pi();
-  double qUB   =  0.5 * constantsd::pi();
-  double dqLB  = -0.5 * constantsd::pi();
-  double dqUB  =  0.5 * constantsd::pi();
+  double qLB = -0.5 * constantsd::pi();
+  double qUB = 0.5 * constantsd::pi();
+  double dqLB = -0.5 * constantsd::pi();
+  double dqUB = 0.5 * constantsd::pi();
   double ddqLB = -0.5 * constantsd::pi();
-  double ddqUB =  0.5 * constantsd::pi();
+  double ddqUB = 0.5 * constantsd::pi();
   Vector3d gravity(0.0, -9.81, 0.0);
   double timeStep = 1.0e-6;
 
@@ -1194,13 +1193,13 @@ void ForwardKinematicsTest::testFiniteDifferenceBodyNodeAcceleration(
     for (int j = 0; j < nRandomItr; ++j)
     {
       // Generate a random state and ddq
-      VectorXd q   = VectorXd(dof);
-      VectorXd dq  = VectorXd(dof);
+      VectorXd q = VectorXd(dof);
+      VectorXd dq = VectorXd(dof);
       VectorXd ddq = VectorXd(dof);
       for (int k = 0; k < dof; ++k)
       {
-        q[k]   = math::Random::uniform(qLB,   qUB);
-        dq[k]  = math::Random::uniform(dqLB,  dqUB);
+        q[k] = math::Random::uniform(qLB, qUB);
+        dq[k] = math::Random::uniform(dqLB, dqUB);
         ddq[k] = math::Random::uniform(ddqLB, ddqUB);
       }
 
@@ -1243,60 +1242,60 @@ void ForwardKinematicsTest::testFiniteDifferenceBodyNodeAcceleration(
         Vector3d WorldAngAcc2 = bn->getAngularAcceleration();
 
         // Calculation of approximated accelerations
-        Vector3d BodyLinAccApprox   = (BodyLinVel2  - BodyLinVel1)  / timeStep;
-        Vector3d BodyAngAccApprox   = (BodyAngVel2  - BodyAngVel1)  / timeStep;
-        Vector3d WorldLinAccApprox  = (WorldLinVel2 - WorldLinVel1) / timeStep;
-        Vector3d WorldAngAccApprox  = (WorldAngVel2 - WorldAngVel1) / timeStep;
+        Vector3d BodyLinAccApprox = (BodyLinVel2 - BodyLinVel1) / timeStep;
+        Vector3d BodyAngAccApprox = (BodyAngVel2 - BodyAngVel1) / timeStep;
+        Vector3d WorldLinAccApprox = (WorldLinVel2 - WorldLinVel1) / timeStep;
+        Vector3d WorldAngAccApprox = (WorldAngVel2 - WorldAngVel1) / timeStep;
 
         // Comparing two velocities
-        EXPECT_TRUE(equals(BodyLinAcc1,   BodyLinAccApprox,   TOLERANCE));
-        EXPECT_TRUE(equals(BodyAngAcc1,   BodyAngAccApprox,   TOLERANCE));
-        EXPECT_TRUE(equals(BodyLinAcc2,   BodyLinAccApprox,   TOLERANCE));
-        EXPECT_TRUE(equals(BodyAngAcc2,   BodyAngAccApprox,   TOLERANCE));
-        EXPECT_TRUE(equals(WorldLinAcc1,  WorldLinAccApprox,  TOLERANCE));
-        EXPECT_TRUE(equals(WorldAngAcc1,  WorldAngAccApprox,  TOLERANCE));
-        EXPECT_TRUE(equals(WorldLinAcc2,  WorldLinAccApprox,  TOLERANCE));
-        EXPECT_TRUE(equals(WorldAngAcc2,  WorldAngAccApprox,  TOLERANCE));
+        EXPECT_TRUE(equals(BodyLinAcc1, BodyLinAccApprox, TOLERANCE));
+        EXPECT_TRUE(equals(BodyAngAcc1, BodyAngAccApprox, TOLERANCE));
+        EXPECT_TRUE(equals(BodyLinAcc2, BodyLinAccApprox, TOLERANCE));
+        EXPECT_TRUE(equals(BodyAngAcc2, BodyAngAccApprox, TOLERANCE));
+        EXPECT_TRUE(equals(WorldLinAcc1, WorldLinAccApprox, TOLERANCE));
+        EXPECT_TRUE(equals(WorldAngAcc1, WorldAngAccApprox, TOLERANCE));
+        EXPECT_TRUE(equals(WorldLinAcc2, WorldLinAccApprox, TOLERANCE));
+        EXPECT_TRUE(equals(WorldAngAcc2, WorldAngAccApprox, TOLERANCE));
 
         // Debugging code
         if (!equals(BodyLinAcc1, BodyLinAccApprox, TOLERANCE))
         {
-          cout << "BodyLinAcc1     :" << BodyLinAcc1.transpose()      << endl;
+          cout << "BodyLinAcc1     :" << BodyLinAcc1.transpose() << endl;
           cout << "BodyLinAccApprox:" << BodyLinAccApprox.transpose() << endl;
         }
         if (!equals(BodyAngAcc1, BodyAngAccApprox, TOLERANCE))
         {
-          cout << "BodyAngAcc1     :" << BodyAngAcc1.transpose()      << endl;
+          cout << "BodyAngAcc1     :" << BodyAngAcc1.transpose() << endl;
           cout << "BodyAngAccApprox:" << BodyAngAccApprox.transpose() << endl;
         }
         if (!equals(BodyLinAcc2, BodyLinAccApprox, TOLERANCE))
         {
-          cout << "BodyLinAcc2     :" << BodyLinAcc2.transpose()      << endl;
+          cout << "BodyLinAcc2     :" << BodyLinAcc2.transpose() << endl;
           cout << "BodyLinAccApprox:" << BodyLinAccApprox.transpose() << endl;
         }
         if (!equals(BodyAngAcc2, BodyAngAccApprox, TOLERANCE))
         {
-          cout << "BodyAngAcc2     :" << BodyAngAcc2.transpose()      << endl;
+          cout << "BodyAngAcc2     :" << BodyAngAcc2.transpose() << endl;
           cout << "BodyAngAccApprox:" << BodyAngAccApprox.transpose() << endl;
         }
         if (!equals(WorldLinAcc1, WorldLinAccApprox, TOLERANCE))
         {
-          cout << "WorldLinAcc1     :" << WorldLinAcc1.transpose()      << endl;
+          cout << "WorldLinAcc1     :" << WorldLinAcc1.transpose() << endl;
           cout << "WorldLinAccApprox:" << WorldLinAccApprox.transpose() << endl;
         }
         if (!equals(WorldAngAcc1, WorldAngAccApprox, TOLERANCE))
         {
-          cout << "WorldAngAcc1     :" << WorldAngAcc1.transpose()      << endl;
+          cout << "WorldAngAcc1     :" << WorldAngAcc1.transpose() << endl;
           cout << "WorldAngAccApprox:" << WorldAngAccApprox.transpose() << endl;
         }
         if (!equals(WorldLinAcc2, WorldLinAccApprox, TOLERANCE))
         {
-          cout << "WorldLinAcc2     :" << WorldLinAcc2.transpose()      << endl;
+          cout << "WorldLinAcc2     :" << WorldLinAcc2.transpose() << endl;
           cout << "WorldLinAccApprox:" << WorldLinAccApprox.transpose() << endl;
         }
         if (!equals(WorldAngAcc2, WorldAngAccApprox, TOLERANCE))
         {
-          cout << "WorldAngAcc2     :" << WorldAngAcc2.transpose()      << endl;
+          cout << "WorldAngAcc2     :" << WorldAngAcc2.transpose() << endl;
           cout << "WorldAngAccApprox:" << WorldAngAccApprox.transpose() << endl;
         }
       }
@@ -1307,49 +1306,49 @@ void ForwardKinematicsTest::testFiniteDifferenceBodyNodeAcceleration(
 //==============================================================================
 void testForwardKinematicsSkeleton(const dynamics::SkeletonPtr& skel)
 {
-#ifndef NDEBUG  // Debug mode
+#ifndef NDEBUG // Debug mode
   std::size_t nRandomItr = 5;
   std::size_t numSteps = 5;
 #else
   std::size_t nRandomItr = 1e+2;
   std::size_t numSteps = 1e+2;
 #endif
-  double qLB   = -0.5 * constantsd::pi();
-  double qUB   =  0.5 * constantsd::pi();
-  double dqLB  = -0.3 * constantsd::pi();
-  double dqUB  =  0.3 * constantsd::pi();
+  double qLB = -0.5 * constantsd::pi();
+  double qUB = 0.5 * constantsd::pi();
+  double dqLB = -0.3 * constantsd::pi();
+  double dqUB = 0.3 * constantsd::pi();
   double ddqLB = -0.1 * constantsd::pi();
-  double ddqUB =  0.1 * constantsd::pi();
+  double ddqUB = 0.1 * constantsd::pi();
   double timeStep = 1e-6;
 
   EXPECT_NE(skel, nullptr);
 
   skel->setTimeStep(timeStep);
 
-  auto dof       = skel->getNumDofs();
+  auto dof = skel->getNumDofs();
   auto numBodies = skel->getNumBodyNodes();
 
   Eigen::VectorXd q;
   Eigen::VectorXd dq;
   Eigen::VectorXd ddq;
 
-  common::aligned_map<dynamics::BodyNodePtr, Eigen::Isometry3d>  Tmap;
-  common::aligned_map<dynamics::BodyNodePtr, Eigen::Vector6d>    Vmap;
-  common::aligned_map<dynamics::BodyNodePtr, Eigen::Vector6d>   dVmap;
+  common::aligned_map<dynamics::BodyNodePtr, Eigen::Isometry3d> Tmap;
+  common::aligned_map<dynamics::BodyNodePtr, Eigen::Vector6d> Vmap;
+  common::aligned_map<dynamics::BodyNodePtr, Eigen::Vector6d> dVmap;
 
   for (auto j = 0u; j < numBodies; ++j)
   {
-    auto body  = skel->getBodyNode(j);
+    auto body = skel->getBodyNode(j);
 
-     Tmap[body] = Eigen::Isometry3d::Identity();
-     Vmap[body] = Eigen::Vector6d::Zero();
+    Tmap[body] = Eigen::Isometry3d::Identity();
+    Vmap[body] = Eigen::Vector6d::Zero();
     dVmap[body] = Eigen::Vector6d::Zero();
   }
 
   for (auto i = 0u; i < nRandomItr; ++i)
   {
-    q   = Random::uniform<Eigen::VectorXd>(dof,   qLB,   qUB);
-    dq  = Random::uniform<Eigen::VectorXd>(dof,  dqLB,  dqUB);
+    q = Random::uniform<Eigen::VectorXd>(dof, qLB, qUB);
+    dq = Random::uniform<Eigen::VectorXd>(dof, dqLB, dqUB);
     ddq = Random::uniform<Eigen::VectorXd>(dof, ddqLB, ddqUB);
 
     skel->setPositions(q);
@@ -1360,26 +1359,25 @@ void testForwardKinematicsSkeleton(const dynamics::SkeletonPtr& skel)
     {
       for (auto k = 0u; k < numBodies; ++k)
       {
-        auto body       = skel->getBodyNode(k);
-        auto joint      = skel->getJoint(k);
+        auto body = skel->getBodyNode(k);
+        auto joint = skel->getJoint(k);
         auto parentBody = body->getParentBodyNode();
-        Eigen::MatrixXd S  = joint->getRelativeJacobian();
+        Eigen::MatrixXd S = joint->getRelativeJacobian();
         Eigen::MatrixXd dS = joint->getRelativeJacobianTimeDeriv();
-        Eigen::VectorXd jointQ   = joint->getPositions();
-        Eigen::VectorXd jointDQ  = joint->getVelocities();
+        Eigen::VectorXd jointQ = joint->getPositions();
+        Eigen::VectorXd jointDQ = joint->getVelocities();
         Eigen::VectorXd jointDDQ = joint->getAccelerations();
 
-        Eigen::Isometry3d relT  = body->getRelativeTransform();
-        Eigen::Vector6d   relV  =  S * jointDQ;
-        Eigen::Vector6d   relDV = dS * jointDQ + S * jointDDQ;
+        Eigen::Isometry3d relT = body->getRelativeTransform();
+        Eigen::Vector6d relV = S * jointDQ;
+        Eigen::Vector6d relDV = dS * jointDQ + S * jointDDQ;
 
         if (parentBody)
         {
           Tmap[body] = Tmap[parentBody] * relT;
-          Vmap[body] = math::AdInvT(relT,  Vmap[parentBody]) + relV;
+          Vmap[body] = math::AdInvT(relT, Vmap[parentBody]) + relV;
           dVmap[body] = math::AdInvT(relT, dVmap[parentBody])
-              + math::ad(Vmap[body], S * jointDQ)
-              + relDV;
+                        + math::ad(Vmap[body], S * jointDQ) + relDV;
         }
         else
         {
@@ -1388,8 +1386,9 @@ void testForwardKinematicsSkeleton(const dynamics::SkeletonPtr& skel)
           dVmap[body] = relDV;
         }
 
-        bool checkT  = equals(body->getTransform().matrix(), Tmap[body].matrix());
-        bool checkV  = equals(body->getSpatialVelocity(), Vmap[body]);
+        bool checkT
+            = equals(body->getTransform().matrix(), Tmap[body].matrix());
+        bool checkV = equals(body->getSpatialVelocity(), Vmap[body]);
         bool checkDV = equals(body->getSpatialAcceleration(), dVmap[body]);
 
         EXPECT_TRUE(checkT);
@@ -1409,10 +1408,9 @@ void testForwardKinematicsSkeleton(const dynamics::SkeletonPtr& skel)
         if (!checkV)
         {
           std::cout << "[" << body->getName() << "]" << std::endl;
-          std::cout << "actual V  : "
-                    << body->getSpatialVelocity().transpose() << std::endl;
-          std::cout << "expected V: "
-                    << Vmap[body].transpose() << std::endl;
+          std::cout << "actual V  : " << body->getSpatialVelocity().transpose()
+                    << std::endl;
+          std::cout << "expected V: " << Vmap[body].transpose() << std::endl;
           std::cout << std::endl;
         }
 
@@ -1421,8 +1419,7 @@ void testForwardKinematicsSkeleton(const dynamics::SkeletonPtr& skel)
           std::cout << "[" << body->getName() << "]" << std::endl;
           std::cout << "actual DV  : "
                     << body->getSpatialAcceleration().transpose() << std::endl;
-          std::cout << "expected DV: "
-                    << dVmap[body].transpose() << std::endl;
+          std::cout << "expected DV: " << dVmap[body].transpose() << std::endl;
           std::cout << std::endl;
         }
       }
@@ -1439,7 +1436,7 @@ void ForwardKinematicsTest::testForwardKinematics(const common::Uri& uri)
   auto numSkeletons = world->getNumSkeletons();
   for (auto i = 0u; i < numSkeletons; ++i)
   {
-    auto skeleton  = world->getSkeleton(i);
+    auto skeleton = world->getSkeleton(i);
     testForwardKinematicsSkeleton(skeleton);
   }
 }
@@ -1447,7 +1444,7 @@ void ForwardKinematicsTest::testForwardKinematics(const common::Uri& uri)
 //==============================================================================
 TEST_F(ForwardKinematicsTest, testFiniteDifference)
 {
-#ifndef NDEBUG  // Debug mode
+#ifndef NDEBUG // Debug mode
   const auto& list = getListForDebug();
 #else
   const auto& list = getList();
@@ -1464,7 +1461,7 @@ TEST_F(ForwardKinematicsTest, testFiniteDifference)
 //==============================================================================
 TEST_F(ForwardKinematicsTest, testForwardKinematics)
 {
-#ifndef NDEBUG  // Debug mode
+#ifndef NDEBUG // Debug mode
   const auto& list = getListForDebug();
 #else
   const auto& list = getList();

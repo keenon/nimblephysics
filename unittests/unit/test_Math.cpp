@@ -733,10 +733,10 @@ Matrix<double, 6, 6> Transform_Matrix4d(
 
 TEST(MATH, ARTICULATED_INERTIA_TRANSFORM)
 {
-#ifndef NDEBUG  // Debug mode
-    const int iterations = 1000;
+#ifndef NDEBUG // Debug mode
+  const int iterations = 1000;
 #else
-    const int iterations = 100000;
+  const int iterations = 100000;
 #endif
 
   Affine3d A1

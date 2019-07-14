@@ -52,7 +52,7 @@ using namespace utils;
 //==============================================================================
 TEST(FileInfoWorld, Basic)
 {
-#ifndef NDEBUG  // Debug mode
+#ifndef NDEBUG // Debug mode
   const std::size_t numFrames = 10;
 #else
   const std::size_t numFrames = 100;

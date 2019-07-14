@@ -692,7 +692,7 @@ TEST_F(JOINTS, JOINT_COULOMB_FRICTION)
   std::array<double, 3> timeSteps;
   timeSteps[0] = 1e-2;
   timeSteps[1] = 1e-3;
-#ifdef NDEBUG  // Release mode
+#ifdef NDEBUG // Release mode
   timeSteps[2] = 1e-4;
 #endif
 
@@ -1261,7 +1261,7 @@ TEST_F(JOINTS, CONVENIENCE_FUNCTIONS)
 //==============================================================================
 TEST_F(JOINTS, FREE_JOINT_RELATIVE_TRANSFORM_VELOCITY_ACCELERATION)
 {
-#ifndef NDEBUG  // Debug mode
+#ifndef NDEBUG // Debug mode
   const std::size_t numTests = 10;
 #else
   const std::size_t numTests = 50;

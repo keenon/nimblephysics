@@ -134,10 +134,14 @@ void DynamicsTest::SetUp()
   fileList.push_back("dart://sample/skel/test/tree_structure_ball_joint.skel");
   fileList.push_back("dart://sample/skel/fullbody1.skel");
 
-  fileListForDebug.push_back("dart://sample/skel/test/serial_chain_revolute_joint.skel");
-  fileListForDebug.push_back("dart://sample/skel/test/serial_chain_eulerxyz_joint.skel");
-  fileListForDebug.push_back("dart://sample/skel/test/serial_chain_ball_joint.skel");
-  fileListForDebug.push_back("dart://sample/skel/test/simple_tree_structure.skel");
+  fileListForDebug.push_back(
+      "dart://sample/skel/test/serial_chain_revolute_joint.skel");
+  fileListForDebug.push_back(
+      "dart://sample/skel/test/serial_chain_eulerxyz_joint.skel");
+  fileListForDebug.push_back(
+      "dart://sample/skel/test/serial_chain_ball_joint.skel");
+  fileListForDebug.push_back(
+      "dart://sample/skel/test/simple_tree_structure.skel");
   fileListForDebug.push_back("dart://sample/skel/fullbody1.skel");
 
   // Create a list of reference frames to use during tests
@@ -1934,7 +1938,7 @@ void DynamicsTest::testCenterOfMass(const common::Uri& uri)
 void compareCOMAccelerationToGravity(
     SkeletonPtr skel, const Eigen::Vector3d& gravity, double tolerance)
 {
-#ifndef NDEBUG  // Debug mode
+#ifndef NDEBUG // Debug mode
   const std::size_t numFrames = 1e+1;
 #else
   const std::size_t numFrames = 1e+2;
@@ -2124,7 +2128,7 @@ void DynamicsTest::testConstraintImpulse(const common::Uri& uri)
   {
     dynamics::SkeletonPtr skel = myWorld->getSkeleton(i);
 
-    std::size_t dof            = skel->getNumDofs();
+    std::size_t dof = skel->getNumDofs();
 
     if (dof == 0 || !skel->isMobile())
       continue;
@@ -2214,7 +2218,7 @@ void DynamicsTest::testImpulseBasedDynamics(const common::Uri& uri)
   {
     dynamics::SkeletonPtr skel = myWorld->getSkeleton(i);
 
-    int dof            = skel->getNumDofs();
+    int dof = skel->getNumDofs();
 
     if (dof == 0 || !skel->isMobile())
       continue;
@@ -2273,7 +2277,7 @@ void DynamicsTest::testImpulseBasedDynamics(const common::Uri& uri)
 //==============================================================================
 TEST_F(DynamicsTest, compareEquationsOfMotion)
 {
-#ifndef NDEBUG  // Debug mode
+#ifndef NDEBUG // Debug mode
   const auto& list = getListForDebug();
 #else
   const auto& list = getList();
@@ -2302,7 +2306,7 @@ TEST_F(DynamicsTest, compareEquationsOfMotion)
 //==============================================================================
 TEST_F(DynamicsTest, testCenterOfMass)
 {
-#ifndef NDEBUG  // Debug mode
+#ifndef NDEBUG // Debug mode
   const auto& list = getListForDebug();
 #else
   const auto& list = getList();
@@ -2317,7 +2321,7 @@ TEST_F(DynamicsTest, testCenterOfMass)
 //==============================================================================
 TEST_F(DynamicsTest, testCenterOfMassFreeFall)
 {
-#ifndef NDEBUG  // Debug mode
+#ifndef NDEBUG // Debug mode
   const auto& list = getListForDebug();
 #else
   const auto& list = getList();
@@ -2332,7 +2336,7 @@ TEST_F(DynamicsTest, testCenterOfMassFreeFall)
 //==============================================================================
 TEST_F(DynamicsTest, testConstraintImpulse)
 {
-#ifndef NDEBUG  // Debug mode
+#ifndef NDEBUG // Debug mode
   const auto& list = getListForDebug();
 #else
   const auto& list = getList();
@@ -2347,7 +2351,7 @@ TEST_F(DynamicsTest, testConstraintImpulse)
 //==============================================================================
 TEST_F(DynamicsTest, testImpulseBasedDynamics)
 {
-#ifndef NDEBUG  // Debug mode
+#ifndef NDEBUG // Debug mode
   const auto& list = getListForDebug();
 #else
   const auto& list = getList();
@@ -2362,10 +2366,10 @@ TEST_F(DynamicsTest, testImpulseBasedDynamics)
 //==============================================================================
 TEST_F(DynamicsTest, HybridDynamics)
 {
-  const double tol       = 1e-8;
-  const double timeStep  = 1e-3;
-#ifndef NDEBUG // Debug mode
-  const std::size_t numFrames = 20;  // 0.02 secs
+  const double tol = 1e-8;
+  const double timeStep = 1e-3;
+#ifndef NDEBUG                      // Debug mode
+  const std::size_t numFrames = 20; // 0.02 secs
 #else
   const std::size_t numFrames = 5e+3; // 5 secs
 #endif // ------- Debug mode
