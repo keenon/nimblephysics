@@ -1604,8 +1604,8 @@ Eigen::MatrixXd standardJacobian(
   Eigen::MatrixXd J = skeleton->getJacobian(node).bottomRows<3>();
 
   Eigen::MatrixXd reduced_J(3, q.size());
-  for (auto i = 0u; i < static_cast<std::size_t>(q.size()); ++i)
-    reduced_J.col(i) = J.col(static_cast<int>(activeIndices[i]));
+  for (int i = 0; i < q.size(); ++i)
+    reduced_J.col(i) = J.col(active_indices[i]);
 
   return reduced_J;
 }

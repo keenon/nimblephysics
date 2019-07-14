@@ -34,7 +34,7 @@
 #include "dart/collision/fcl/fcl.hpp"
 #include "dart/dart.hpp"
 #if HAVE_BULLET
-#include "dart/collision/bullet/bullet.hpp"
+#  include "dart/collision/bullet/bullet.hpp"
 #endif
 #include "TestHelpers.hpp"
 
@@ -60,7 +60,7 @@ TEST(Raycast, RaycastResultDefaultConstructor)
 //==============================================================================
 void testBasicInterface(const std::shared_ptr<CollisionDetector>& cd)
 {
-  if (cd->getType() != collision::BulletCollisionDetector::getStaticType())
+  if (cd->getType() != "bullet")
   {
     dtwarn << "Aborting test: distance check is not supported by "
            << cd->getType() << ".\n";
@@ -149,7 +149,7 @@ TEST(Raycast, testBasicInterface)
 //==============================================================================
 void testOptions(const std::shared_ptr<CollisionDetector>& cd)
 {
-  if (cd->getType() != collision::BulletCollisionDetector::getStaticType())
+  if (cd->getType() != "bullet")
   {
     dtwarn << "Aborting test: distance check is not supported by "
            << cd->getType() << ".\n";

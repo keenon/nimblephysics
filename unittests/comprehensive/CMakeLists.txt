@@ -3,6 +3,7 @@ dart_add_test("comprehensive" test_Common)
 dart_add_test("comprehensive" test_Concurrency)
 dart_add_test("comprehensive" test_Constraint)
 dart_add_test("comprehensive" test_Frames)
+dart_add_test("comprehensive" test_Friction)
 dart_add_test("comprehensive" test_InverseKinematics)
 dart_add_test("comprehensive" test_NameManagement)
 
@@ -59,10 +60,3 @@ if(TARGET dart-utils)
   endif()
 
 endif()
-
-dart_format_add(
-  test_ForwardKinematics.cpp
-  test_InverseKinematics.cpp
-  test_MultiObjectiveOptimization.cpp
-  test_Raycast.cpp
-)
