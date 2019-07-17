@@ -790,7 +790,8 @@ double ContactConstraint::computeSlipCompliance(
   if (dynamicAspect == nullptr)
   {
     dtwarn << "[ContactConstraint] Attempt to extract slip compliance "
-           << "from a ShapeNode that doesn't have DynamicAspect. The default "
+           << "from a ShapeNode (" << shapeNode->getName() << ") that doesn't "
+           << "have DynamicAspect. The default "
            << "value (" << DART_DEFAULT_SLIP_COMPLIANCE << ") will be used "
            << "instead.\n";
     return DART_DEFAULT_SLIP_COMPLIANCE;
@@ -820,7 +821,8 @@ double ContactConstraint::computeSecondarySlipCompliance(
   {
     dtwarn << "[ContactConstraint] Attempt to extract "
            << "secondary slip compliance "
-           << "from a ShapeNode that doesn't have DynamicAspect. The default "
+           << "from a ShapeNode (" << shapeNode->getName() << ") that doesn't "
+           << "have DynamicAspect. The default "
            << "value (" << DART_DEFAULT_SLIP_COMPLIANCE << ") will be used "
            << "instead.\n";
     return DART_DEFAULT_SLIP_COMPLIANCE;
@@ -849,7 +851,8 @@ Eigen::Vector3d ContactConstraint::computeWorldFirstFrictionDir(
   if (dynamicAspect == nullptr)
   {
     dtwarn << "[ContactConstraint] Attempt to extract friction direction "
-           << "from a ShapeNode that doesn't have DynamicAspect. The default "
+           << "from a ShapeNode (" << shapeNode->getName() << ") that doesn't "
+           << "have DynamicAspect. The default "
            << "value (" << DART_DEFAULT_FRICTION_DIR << ") will be used "
            << "instead.\n";
     return DART_DEFAULT_FRICTION_DIR;
@@ -878,7 +881,8 @@ double ContactConstraint::computeRestitutionCoefficient(
   if (dynamicAspect == nullptr)
   {
     dtwarn << "[ContactConstraint] Attempt to extract restitution coefficient "
-           << "from a ShapeNode that doesn't have DynamicAspect. The default "
+           << "from a ShapeNode (" << shapeNode->getName() << ") that doesn't "
+           << " have  DynamicAspect. The default "
            << "value (" << DART_DEFAULT_RESTITUTION_COEFF << ") will be used "
            << "instead.\n";
     return DART_DEFAULT_RESTITUTION_COEFF;
