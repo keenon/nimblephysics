@@ -67,6 +67,21 @@ constexpr double DART_DEFAULT_FRICTION_COEFF = 1.0;
 constexpr double DART_DEFAULT_RESTITUTION_COEFF = 0.0;
 
 //==============================================================================
+Eigen::Vector3d computeShapeNodeWorldFrictionDir(dynamics::ShapeNode* shapeNode)
+{
+  auto frame = shapeNode->getDynamicsAspect()->getFirstFrictionDirectionFrame();
+  Eigen::Vector3d frictionDir = shapeNode->getDynamicsAspect()->getFirstFrictionDirection();
+
+  // rotate using custom frame if it is specified
+  if (frame)
+  {
+    return frame->getWorldTransform().linear() * frictionDir.normalized();
+  }
+  // otherwise rotate using shapeNode
+  return shapeNode->getWorldTransform().linear() * frictionDir.normalized();
+}
+
+//==============================================================================
 ContactConstraint::ContactConstraint(
     collision::Contact& contact, double timeStep)
   : ConstraintBase(),
@@ -124,6 +139,42 @@ ContactConstraint::ContactConstraint(
   if (mFrictionCoeff > DART_FRICTION_COEFF_THRESHOLD)
   {
     mIsFrictionOn = true;
+
+    // Check shapeNodes for valid friction direction unit vectors
+    auto frictionDirA = shapeNodeA->getDynamicsAspect()->getFirstFrictionDirection();
+    auto frictionDirB = shapeNodeB->getDynamicsAspect()->getFirstFrictionDirection();
+
+    // resulting friction direction unit vector
+    Eigen::Vector3d frictionDir(0, 0, 0);
+    bool nonzeroDirA = frictionDirA.squaredNorm() >= DART_CONTACT_CONSTRAINT_EPSILON_SQUARED;
+    bool nonzeroDirB = frictionDirB.squaredNorm() >= DART_CONTACT_CONSTRAINT_EPSILON_SQUARED;
+
+    // only consider custom friction direction if one has nonzero length
+    if (nonzeroDirA || nonzeroDirB)
+    {
+      // if A and B are both set, choose one with larger friction coefficient
+      if (nonzeroDirA && nonzeroDirB)
+      {
+        if (frictionCoeffA >= frictionCoeffB)
+        {
+          frictionDir = computeShapeNodeWorldFrictionDir(shapeNodeA);
+        }
+        else
+        {
+          frictionDir = computeShapeNodeWorldFrictionDir(shapeNodeA);
+        }
+      }
+      else if (nonzeroDirA)
+      {
+        frictionDir = computeShapeNodeWorldFrictionDir(shapeNodeA);
+      }
+      else
+      {
+        frictionDir = computeShapeNodeWorldFrictionDir(shapeNodeB);
+      }
+
+      mFirstFrictionalDirection = frictionDir.normalized();
+    }
 
     // Update frictional direction
     updateFirstFrictionalDirection();
@@ -386,8 +437,8 @@ void ContactConstraint::getInformation(ConstraintInfo* info)
     info->findex[1] = 0;
 
     // Upper and lower bounds of tangential direction-2 impulsive force
-    info->lo[2] = -mFrictionCoeff;
-    info->hi[2] = mFrictionCoeff;
+    info->lo[2] = -mSecondaryFrictionCoeff;
+    info->hi[2] = mSecondaryFrictionCoeff;
     info->findex[2] = 0;
 
     //------------------------------------------------------------------------

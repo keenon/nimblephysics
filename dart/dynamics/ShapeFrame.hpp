@@ -149,6 +149,28 @@ public:
   DART_COMMON_SET_GET_ASPECT_PROPERTY(double, RestitutionCoeff)
   // void setRestitutionCoeff(const double& value);
   // const double& getRestitutionCoeff() const;
+  DART_COMMON_SET_GET_ASPECT_PROPERTY( double, SecondaryFrictionCoeff )
+  // void setSecondaryFrictionCoeff(const double& value);
+  // const double& getSecondaryFrictionCoeff() const;
+  DART_COMMON_SET_GET_ASPECT_PROPERTY( double, SlipCompliance )
+  // void setSlipCompliance(const double& value);
+  // const double& getSlipCompliance() const;
+  DART_COMMON_SET_GET_ASPECT_PROPERTY( double, SecondarySlipCompliance )
+  // void setSecondarySlipCompliance(const double& value);
+  // const double& getSecondarySlipCompliance() const;
+
+  /// Set the frame for interpreting the first friction direction vector.
+  /// The frame pointer defaults to nullptr, which is interpreted as this
+  /// ShapeFrame.
+  void setFirstFrictionDirectionFrame(const Frame* value);
+
+  /// Get the frame for the first friction direction vector.
+  const Frame* getFirstFrictionDirectionFrame() const;
+
+  DART_COMMON_SET_GET_ASPECT_PROPERTY( Eigen::Vector3d, FirstFrictionDirection )
+  // void setFirstFrictionDirection(const Eigen::Vector3d& value);
+  // const Eigen::Vector3d& getFirstFrictionDirection() const;
+
 };
 
 //==============================================================================
