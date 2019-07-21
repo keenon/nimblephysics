@@ -44,6 +44,7 @@ namespace dynamics {
 class VisualAspect;
 class CollisionAspect;
 class DynamicsAspect;
+class Frame;
 class ShapeFrame;
 
 namespace detail {
@@ -88,11 +89,11 @@ struct CollisionAspectProperties
 
 struct DynamicsAspectProperties
 {
-  /// Primary coefficient of friction
-  double mFrictionCoeff;
-
   /// Coefficient of restitution
   double mRestitutionCoeff;
+
+  /// Primary coefficient of friction
+  double mFrictionCoeff;
 
   /// Secondary coefficient of friction
   double mSecondaryFrictionCoeff;
@@ -107,16 +108,19 @@ struct DynamicsAspectProperties
   const Frame* mFirstFrictionDirectionFrame;
 
   /// First friction direction frame
-  Eigen::Vector3d mFirstFrictionDirection;
+  Eigen::Vector3d mLocalFirstFrictionDirection;
 
   /// Constructor
-  DynamicsAspectProperties(const double frictionCoeff = 1.0,
-                           const double restitutionCoeff = 0.0,
-                           const double secondaryFrictionCoeff = 1.0,
-                           const double slipCompliance = 0.0,
-                           const double secondarySlipCompliance = 0.0,
-                           const Frame* firstFrictionDirectionFrame = nullptr,
-                           const Eigen::Vector3d& firstFrictionDirection = Eigen::Vector3d::Zero());
+  DynamicsAspectProperties(
+      const double frictionCoeff = 1.0,
+      const double restitutionCoeff = 0.0,
+      const double secondaryFrictionCoeff = 1.0,
+      const double slipCompliance = 0.0,
+      const double secondarySlipCompliance = 0.0,
+      const Frame* firstFrictionDirectionFrame = nullptr,
+      const Eigen::Vector3d& firstFrictionDirection = Eigen::Vector3d::Zero());
+  // TODO(JS): In DART 7, reorder the arguments following the order of argument
+  // declared.
 
   /// Destructor
   virtual ~DynamicsAspectProperties() = default;

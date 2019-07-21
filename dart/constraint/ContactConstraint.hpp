@@ -161,20 +161,24 @@ private:
   /// Second body node
   dynamics::BodyNode* mBodyNodeB;
 
+  const dynamics::DynamicsAspect* mDynamicAspectA;
+
+  const dynamics::DynamicsAspect* mDynamicAspectB;
+
   /// Contact between mBodyNode1 and mBodyNode2
   collision::Contact& mContact;
 
   /// First frictional direction
   Eigen::Vector3d mFirstFrictionalDirection;
 
-  /// Primary Coefficient of Friction
-  double mFrictionCoeff;
-
-  /// Secondary Coefficient of Friction
-  double mSecondaryFrictionCoeff;
-
   /// Coefficient of restitution
   double mRestitutionCoeff;
+
+  /// Primary coefficient of friction
+  double mFrictionCoeff;
+
+  /// Secondary coefficient of friction
+  double mSecondaryFrictionCoeff;
 
   /// Whether this contact is self-collision.
   bool mIsSelfCollision;

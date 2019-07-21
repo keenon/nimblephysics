@@ -67,18 +67,22 @@ constexpr double DART_DEFAULT_FRICTION_COEFF = 1.0;
 constexpr double DART_DEFAULT_RESTITUTION_COEFF = 0.0;
 
 //==============================================================================
-Eigen::Vector3d computeShapeNodeWorldFrictionDir(dynamics::ShapeNode* shapeNode)
+Eigen::Vector3d computeShapeNodeWorldFrictionDir(
+    const dynamics::DynamicsAspect& dynamicsAspect)
 {
-  auto frame = shapeNode->getDynamicsAspect()->getFirstFrictionDirectionFrame();
-  Eigen::Vector3d frictionDir = shapeNode->getDynamicsAspect()->getFirstFrictionDirection();
+  const dynamics::Frame* frame
+      = dynamicsAspect.getFirstFrictionDirectionReferenceFrame();
+  const Eigen::Vector3d& frictionDir
+      = dynamicsAspect.getFirstFrictionDirection();
 
   // rotate using custom frame if it is specified
   if (frame)
   {
-    return frame->getWorldTransform().linear() * frictionDir.normalized();
+    return frame->getWorldTransform().linear() * frictionDir;
   }
   // otherwise rotate using shapeNode
-  return shapeNode->getWorldTransform().linear() * frictionDir.normalized();
+  return dynamicsAspect.getComposite()->getWorldTransform().linear()
+         * frictionDir;
 }
 
 //==============================================================================
@@ -113,6 +117,11 @@ ContactConstraint::ContactConstraint(
                                contact.collisionObject2->getShapeFrame())
                                ->asShapeNode();
 
+  mDynamicAspectA = shapeNodeA->getDynamicsAspect();
+  mDynamicAspectB = shapeNodeB->getDynamicsAspect();
+
+  // TODO(JS): What if mDynamicsAspectA is nullptr?
+
   //----------------------------------------------
   // Bounce
   //----------------------------------------------
@@ -141,36 +150,39 @@ ContactConstraint::ContactConstraint(
     mIsFrictionOn = true;
 
     // Check shapeNodes for valid friction direction unit vectors
-    auto frictionDirA = shapeNodeA->getDynamicsAspect()->getFirstFrictionDirection();
-    auto frictionDirB = shapeNodeB->getDynamicsAspect()->getFirstFrictionDirection();
+    Eigen::Vector3d frictionDirA = mDynamicAspectA->getFirstFrictionDirection();
+    Eigen::Vector3d frictionDirB = mDynamicAspectB->getFirstFrictionDirection();
 
-    // resulting friction direction unit vector
-    Eigen::Vector3d frictionDir(0, 0, 0);
-    bool nonzeroDirA = frictionDirA.squaredNorm() >= DART_CONTACT_CONSTRAINT_EPSILON_SQUARED;
-    bool nonzeroDirB = frictionDirB.squaredNorm() >= DART_CONTACT_CONSTRAINT_EPSILON_SQUARED;
+    // Resulting friction direction unit vector
+    Eigen::Vector3d frictionDir = Eigen::Vector3d::Zero();
+    const bool nonzeroDirA
+        = frictionDirA.squaredNorm() >= DART_CONTACT_CONSTRAINT_EPSILON_SQUARED;
+    const bool nonzeroDirB
+        = frictionDirB.squaredNorm() >= DART_CONTACT_CONSTRAINT_EPSILON_SQUARED;
 
-    // only consider custom friction direction if one has nonzero length
+    // Only consider custom friction direction if one has nonzero length
     if (nonzeroDirA || nonzeroDirB)
     {
-      // if A and B are both set, choose one with larger friction coefficient
+      // If A and B are both set, choose one with larger friction coefficient
       if (nonzeroDirA && nonzeroDirB)
       {
         if (frictionCoeffA >= frictionCoeffB)
         {
-          frictionDir = computeShapeNodeWorldFrictionDir(shapeNodeA);
+          frictionDir = computeShapeNodeWorldFrictionDir(*mDynamicAspectA);
         }
         else
         {
-          frictionDir = computeShapeNodeWorldFrictionDir(shapeNodeA);
+          frictionDir = computeShapeNodeWorldFrictionDir(*mDynamicAspectB);
         }
       }
       else if (nonzeroDirA)
       {
-        frictionDir = computeShapeNodeWorldFrictionDir(shapeNodeA);
+        frictionDir = computeShapeNodeWorldFrictionDir(*mDynamicAspectA);
       }
       else
       {
-        frictionDir = computeShapeNodeWorldFrictionDir(shapeNodeB);
+        assert(nonzeroDirB);
+        frictionDir = computeShapeNodeWorldFrictionDir(*mDynamicAspectB);
       }
 
       mFirstFrictionalDirection = frictionDir.normalized();

@@ -143,34 +143,53 @@ public:
 
   DynamicsAspect(const PropertiesData& properties = PropertiesData());
 
-  DART_COMMON_SET_GET_ASPECT_PROPERTY(double, FrictionCoeff)
-  // void setFrictionCoeff(const double& value);
-  // const double& getFrictionCoeff() const;
   DART_COMMON_SET_GET_ASPECT_PROPERTY(double, RestitutionCoeff)
-  // void setRestitutionCoeff(const double& value);
-  // const double& getRestitutionCoeff() const;
-  DART_COMMON_SET_GET_ASPECT_PROPERTY( double, SecondaryFrictionCoeff )
-  // void setSecondaryFrictionCoeff(const double& value);
-  // const double& getSecondaryFrictionCoeff() const;
-  DART_COMMON_SET_GET_ASPECT_PROPERTY( double, SlipCompliance )
-  // void setSlipCompliance(const double& value);
-  // const double& getSlipCompliance() const;
-  DART_COMMON_SET_GET_ASPECT_PROPERTY( double, SecondarySlipCompliance )
-  // void setSecondarySlipCompliance(const double& value);
-  // const double& getSecondarySlipCompliance() const;
+  // This macro defines:
+  // - void setRestitutionCoeff(const double& value);
+  // - const double& getRestitutionCoeff() const;
 
-  /// Set the frame for interpreting the first friction direction vector.
+  DART_COMMON_SET_GET_ASPECT_PROPERTY(double, FrictionCoeff)
+  // This macro defines:
+  // - void setFrictionCoeff(const double& value);
+  // - const double& getFrictionCoeff() const;
+
+  DART_COMMON_SET_GET_ASPECT_PROPERTY(double, SecondaryFrictionCoeff)
+  // This macro defines:
+  // - void setSecondaryFrictionCoeff(const double& value);
+  // - const double& getSecondaryFrictionCoeff() const;
+
+  DART_COMMON_SET_GET_ASPECT_PROPERTY(double, SlipCompliance)
+  // This macro defines:
+  // - void setSlipCompliance(const double& value);
+  // - const double& getSlipCompliance() const;
+
+  DART_COMMON_SET_GET_ASPECT_PROPERTY(double, SecondarySlipCompliance)
+  // This macro defines:
+  // - void setSecondarySlipCompliance(const double& value);
+  // - const double& getSecondarySlipCompliance() const;
+
+  /// Sets the frame for interpreting the first friction direction vector.
+  ///
   /// The frame pointer defaults to nullptr, which is interpreted as this
   /// ShapeFrame.
-  void setFirstFrictionDirectionFrame(const Frame* value);
+  void setLocalFirstFrictionDirectionReferenceFrame(const Frame* value);
 
-  /// Get the frame for the first friction direction vector.
-  const Frame* getFirstFrictionDirectionFrame() const;
+  /// Returns the frame for the first friction direction vector.
+  const Frame* getFirstFrictionDirectionReferenceFrame() const;
 
-  DART_COMMON_SET_GET_ASPECT_PROPERTY( Eigen::Vector3d, FirstFrictionDirection )
-  // void setFirstFrictionDirection(const Eigen::Vector3d& value);
-  // const Eigen::Vector3d& getFirstFrictionDirection() const;
+  /// Sets the first friction direction vector in the reference frame.
+  ///
+  /// The reference frame can be obtained from
+  /// getFirstFrictionDirectionReferenceFrame().
+  void setLocalFirstFrictionDirection(const Eigen::Vector3d& dir);
 
+  /// Returns the first friction direction vector.
+  ///
+  /// The friction direction vector is already normalized so don't need to
+  /// additionally normalized.
+  const Eigen::Vector3d& getLocalFirstFrictionDirection() const;
+
+  Eigen::Vector3d getFirstFrictionDirection() const;
 };
 
 //==============================================================================

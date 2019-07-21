@@ -61,14 +61,14 @@ DynamicsAspectProperties::DynamicsAspectProperties(
     const double secondarySlipCompliance,
     const Frame* firstFrictionDirectionFrame,
     const Eigen::Vector3d& firstFrictionDirection)
-  :
+  : mRestitutionCoeff(restitutionCoeff),
     mFrictionCoeff(frictionCoeff),
-    mRestitutionCoeff(restitutionCoeff),
+
     mSecondaryFrictionCoeff(secondaryFrictionCoeff),
     mSlipCompliance(slipCompliance),
     mSecondarySlipCompliance(secondarySlipCompliance),
     mFirstFrictionDirectionFrame(firstFrictionDirectionFrame),
-    mFirstFrictionDirection(firstFrictionDirection)
+    mLocalFirstFrictionDirection(firstFrictionDirection)
 {
   // Do nothing
 }
@@ -187,15 +187,47 @@ DynamicsAspect::DynamicsAspect(const PropertiesData& properties)
 }
 
 //==============================================================================
-void DynamicsAspect::setFirstFrictionDirectionFrame(const Frame* value)
+void DynamicsAspect::setLocalFirstFrictionDirectionReferenceFrame(
+    const Frame* frame)
 {
-  mProperties.mFirstFrictionDirectionFrame = value;
+  if (frame == mProperties.mFirstFrictionDirectionFrame)
+    return;
+
+  mProperties.mFirstFrictionDirectionFrame = frame;
+  notifyPropertiesUpdated();
 }
 
 //==============================================================================
-const Frame* DynamicsAspect::getFirstFrictionDirectionFrame() const
+const Frame* DynamicsAspect::getFirstFrictionDirectionReferenceFrame() const
 {
   return mProperties.mFirstFrictionDirectionFrame;
+}
+
+//==============================================================================
+void DynamicsAspect::setLocalFirstFrictionDirection(const Eigen::Vector3d& dir)
+{
+  mProperties.mLocalFirstFrictionDirection = dir.normalized();
+  notifyPropertiesUpdated();
+}
+
+//==============================================================================
+const Eigen::Vector3d& DynamicsAspect::getLocalFirstFrictionDirection() const
+{
+  return mProperties.mLocalFirstFrictionDirection;
+}
+
+//==============================================================================
+Eigen::Vector3d DynamicsAspect::getFirstFrictionDirection() const
+{
+  const dynamics::Frame* frame = mProperties.mFirstFrictionDirectionFrame;
+  const Eigen::Vector3d& dir = mProperties.mLocalFirstFrictionDirection;
+
+  // Rotate using custom frame if it is specified
+  if (frame)
+    return frame->getWorldTransform().linear() * dir;
+
+  // Otherwise rotate using the parent ShapeFrame
+  return getComposite()->getWorldTransform().linear() * dir;
 }
 
 //==============================================================================

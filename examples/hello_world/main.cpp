@@ -75,23 +75,29 @@ int main()
     auto jointAndBody
         = skeleton->createJointAndBodyNodePair<dynamics::FreeJoint>();
     auto body = jointAndBody.second;
-    std::cerr << "body shape node count " << body->getNumShapeNodes() << std::endl;
+    std::cerr << "body shape node count " << body->getNumShapeNodes()
+              << std::endl;
     body->createShapeNodeWith<
         dynamics::VisualAspect,
         dynamics::CollisionAspect,
         dynamics::DynamicsAspect>(shape);
-    std::cerr << "body shape node count " << body->getNumShapeNodes() << std::endl;
+    std::cerr << "body shape node count " << body->getNumShapeNodes()
+              << std::endl;
     std::cerr << "friction "
               << body->getShapeNode(0)->getDynamicsAspect()->getFrictionCoeff()
               << ", "
-              << body->getShapeNode(0)->getDynamicsAspect()->getSecondaryFrictionCoeff()
+              << body->getShapeNode(0)
+                     ->getDynamicsAspect()
+                     ->getSecondaryFrictionCoeff()
               << std::endl;
     body->getShapeNode(0)->getDynamicsAspect()->setFrictionCoeff(0.0);
     body->getShapeNode(0)->getDynamicsAspect()->setSecondaryFrictionCoeff(1.0);
     if (i == 0)
     {
-      body->getShapeNode(0)->getDynamicsAspect()->setFirstFrictionDirection(
-          Eigen::Vector3d(1, -1, 0).normalized());
+      body->getShapeNode(0)
+          ->getDynamicsAspect()
+          ->setLocalFirstFrictionDirection(
+              Eigen::Vector3d(1, -1, 0).normalized());
     }
     Eigen::Isometry3d tf = Eigen::Isometry3d::Identity();
     tf.translation() = Eigen::Vector3d(i, -i, 0.0);
@@ -100,7 +106,9 @@ int main()
     std::cerr << "friction "
               << body->getShapeNode(0)->getDynamicsAspect()->getFrictionCoeff()
               << ", "
-              << body->getShapeNode(0)->getDynamicsAspect()->getSecondaryFrictionCoeff()
+              << body->getShapeNode(0)
+                     ->getDynamicsAspect()
+                     ->getSecondaryFrictionCoeff()
               << std::endl;
   }
 
