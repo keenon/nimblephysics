@@ -42,6 +42,8 @@
 #include "dart/dynamics/Skeleton.hpp"
 #include "dart/math/Helpers.hpp"
 
+#include "ignition/common/Profiler.hh"
+
 #define DART_EPSILON 1e-6
 #define DART_ERROR_ALLOWANCE 0.0
 #define DART_ERP 0.01
@@ -95,6 +97,7 @@ ContactConstraint::ContactConstraint(
     mIsBounceOn(false),
     mActive(false)
 {
+  IGN_PROFILE("ContactConstraint::ContactConstraint");
   assert(
       contact.normal.squaredNorm() >= DART_CONTACT_CONSTRAINT_EPSILON_SQUARED);
 

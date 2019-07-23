@@ -101,6 +101,15 @@ if(DART_BUILD_DARTPY)
   set(BUILD_SHARED_LIBS OFF)
 endif()
 
+option(ENABLE_PROFILER "Enable Ignition Profiler" FALSE)
+
+if(ENABLE_PROFILER)
+  add_definitions("-DIGN_PROFILER_ENABLE=1")
+else()
+  add_definitions("-DIGN_PROFILER_ENABLE=0")
+endif()
+
+
 #===============================================================================
 # Print intro
 #===============================================================================
@@ -149,6 +158,8 @@ endif()
 # Find dependencies
 #===============================================================================
 include(DARTFindDependencies)
+
+
 
 #===============================================================================
 # Check for non-case-sensitive filesystems
@@ -277,6 +288,14 @@ endif(DART_VERBOSE)
 #===============================================================================
 # Add sub-directories
 #===============================================================================
+
+if(ENABLE_PROFILER)
+  find_package(ignition-cmake2 2.1.0 REQUIRED)
+  ign_find_package(ignition-common3
+    REQUIRED
+    COMPONENTS profiler)
+  set(IGN_COMMON_VER ${ignition-common3_VERSION_MAJOR})
+endif()
 
 add_subdirectory(dart)
 

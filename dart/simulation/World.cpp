@@ -49,6 +49,8 @@
 #include "dart/dynamics/Skeleton.hpp"
 #include "dart/integration/SemiImplicitEulerIntegrator.hpp"
 
+#include "ignition/common/Profiler.hh"
+
 namespace dart {
 namespace simulation {
 
@@ -166,14 +168,21 @@ void World::reset()
 //==============================================================================
 void World::step(bool _resetCommand)
 {
+  IGN_PROFILE("World::step");
   // Integrate velocity for unconstrained skeletons
   for (auto& skel : mSkeletons)
   {
     if (!skel->isMobile())
       continue;
 
-    skel->computeForwardDynamics();
-    skel->integrateVelocities(mTimeStep);
+    {
+      IGN_PROFILE("skel->computeForwardDynamics");
+      skel->computeForwardDynamics();
+    }
+    {
+      IGN_PROFILE("skel->integrateVelocities");
+      skel->integrateVelocities(mTimeStep);
+    }
   }
 
   // Detect activated constraints and compute constraint impulses
@@ -187,14 +196,19 @@ void World::step(bool _resetCommand)
 
     if (skel->isImpulseApplied())
     {
+      IGN_PROFILE("skel->computeImpulseForwardDynamics");
       skel->computeImpulseForwardDynamics();
       skel->setImpulseApplied(false);
     }
 
-    skel->integratePositions(mTimeStep);
+    {
+      IGN_PROFILE("skel->integratePositions");
+      skel->integratePositions(mTimeStep);
+    }
 
     if (_resetCommand)
     {
+      IGN_PROFILE("reset");
       skel->clearInternalForces();
       skel->clearExternalForces();
       skel->resetCommands();
@@ -288,6 +302,7 @@ std::size_t World::getNumSkeletons() const
 //==============================================================================
 std::string World::addSkeleton(const dynamics::SkeletonPtr& _skeleton)
 {
+  IGN_PROFILE("World::addSkeleton");
   if (nullptr == _skeleton)
   {
     dtwarn << "[World::addSkeleton] Attempting to add a nullptr Skeleton to "
@@ -329,6 +344,7 @@ std::string World::addSkeleton(const dynamics::SkeletonPtr& _skeleton)
 //==============================================================================
 void World::removeSkeleton(const dynamics::SkeletonPtr& _skeleton)
 {
+  IGN_PROFILE("World::removeSkeleton");
   assert(
       _skeleton != nullptr
       && "Attempted to remove nullptr Skeleton from world");
@@ -388,6 +404,7 @@ void World::removeSkeleton(const dynamics::SkeletonPtr& _skeleton)
 //==============================================================================
 std::set<dynamics::SkeletonPtr> World::removeAllSkeletons()
 {
+  IGN_PROFILE("World::removeAllSkeletons");
   std::set<dynamics::SkeletonPtr> ptrs;
   for (std::vector<dynamics::SkeletonPtr>::iterator it = mSkeletons.begin(),
                                                     end = mSkeletons.end();
@@ -438,6 +455,7 @@ std::size_t World::getNumSimpleFrames() const
 //==============================================================================
 std::string World::addSimpleFrame(const dynamics::SimpleFramePtr& _frame)
 {
+  IGN_PROFILE("World::addSimpleFrame");
   assert(_frame != nullptr && "Attempted to add nullptr SimpleFrame to world");
 
   if (nullptr == _frame)
@@ -472,6 +490,7 @@ std::string World::addSimpleFrame(const dynamics::SimpleFramePtr& _frame)
 //==============================================================================
 void World::removeSimpleFrame(const dynamics::SimpleFramePtr& _frame)
 {
+  IGN_PROFILE("World::removeSimpleFrame");
   assert(
       _frame != nullptr
       && "Attempted to remove nullptr SimpleFrame from world");
@@ -506,6 +525,7 @@ void World::removeSimpleFrame(const dynamics::SimpleFramePtr& _frame)
 //==============================================================================
 std::set<dynamics::SimpleFramePtr> World::removeAllSimpleFrames()
 {
+  IGN_PROFILE("World::removeAllSimpleFrames");
   std::set<dynamics::SimpleFramePtr> ptrs;
   for (std::vector<dynamics::SimpleFramePtr>::iterator it
        = mSimpleFrames.begin(),
@@ -523,6 +543,7 @@ std::set<dynamics::SimpleFramePtr> World::removeAllSimpleFrames()
 //==============================================================================
 bool World::checkCollision(bool checkAllCollisions)
 {
+  IGN_PROFILE("World::checkCollision");
   collision::CollisionOption option;
 
   if (checkAllCollisions)
@@ -579,6 +600,7 @@ const constraint::ConstraintSolver* World::getConstraintSolver() const
 //==============================================================================
 void World::bake()
 {
+  IGN_PROFILE("World::bake");
   const auto collisionResult = getConstraintSolver()->getLastCollisionResult();
   const auto nContacts = static_cast<int>(collisionResult.getNumContacts());
   const auto nSkeletons = getNumSkeletons();

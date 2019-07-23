@@ -46,6 +46,8 @@
 #include "dart/constraint/PgsBoxedLcpSolver.hpp"
 #include "dart/lcpsolver/Lemke.hpp"
 
+#include "ignition/common/Profiler.hh"
+
 namespace dart {
 namespace constraint {
 
@@ -147,6 +149,7 @@ ConstBoxedLcpSolverPtr BoxedLcpConstraintSolver::getSecondaryBoxedLcpSolver()
 //==============================================================================
 void BoxedLcpConstraintSolver::solveConstrainedGroup(ConstrainedGroup& group)
 {
+  IGN_PROFILE("BoxedLcpConstraintSolver::solveConstrainedGroup");
   // Build LCP terms by aggregating them from constraints
   const std::size_t numConstraints = group.getNumConstraints();
   const std::size_t n = group.getTotalDimension();

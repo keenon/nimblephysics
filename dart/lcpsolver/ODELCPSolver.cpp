@@ -40,6 +40,8 @@
 #include "dart/common/StlHelpers.hpp"
 #include "dart/lcpsolver/Lemke.hpp"
 
+#include "ignition/common/Profiler.hh"
+
 namespace dart {
 namespace lcpsolver {
 
@@ -65,6 +67,7 @@ bool ODELCPSolver::Solve(
     int _numDir,
     bool _bUseODESolver)
 {
+  IGN_PROFILE("ODELCPSolver::Solve");
   if (!_bUseODESolver)
   {
     int err = Lemke(_A, _b, _x);

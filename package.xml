@@ -34,6 +34,9 @@
   <depend>libxmu-dev</depend>
   <depend>tinyxml2</depend>
 
+  <depend>ignition-cmake2</depend>
+  <depend>ignition-common3</depend>
+
   <!-- The following tags are recommended by REP-136 -->
   <exec_depend>catkin</exec_depend>
   <buildtool_depend>cmake</buildtool_depend>

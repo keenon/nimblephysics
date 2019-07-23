@@ -52,6 +52,8 @@
 #include "dart/dynamics/Skeleton.hpp"
 #include "dart/dynamics/SoftBodyNode.hpp"
 
+#include "ignition/common/Profiler.hh"
+
 namespace dart {
 namespace constraint {
 
@@ -361,6 +363,7 @@ LCPSolver* ConstraintSolver::getLCPSolver() const
 //==============================================================================
 void ConstraintSolver::solve()
 {
+  IGN_PROFILE("ConstraintSolver::solve");
   for (auto& skeleton : mSkeletons)
   {
     skeleton->clearConstraintImpulses();
@@ -451,6 +454,7 @@ bool ConstraintSolver::checkAndAddConstraint(
 //==============================================================================
 void ConstraintSolver::updateConstraints()
 {
+  IGN_PROFILE("ConstaintSolver::updateConstraints");
   // Clear previous active constraint list
   mActiveConstraints.clear();
 
@@ -470,7 +474,10 @@ void ConstraintSolver::updateConstraints()
   //----------------------------------------------------------------------------
   mCollisionResult.clear();
 
-  mCollisionGroup->collide(mCollisionOption, &mCollisionResult);
+  {
+    IGN_PROFILE("mCollisionGroup->collide");
+    mCollisionGroup->collide(mCollisionOption, &mCollisionResult);
+  }
 
   // Destroy previous contact constraints
   mContactConstraints.clear();
@@ -630,6 +637,7 @@ void ConstraintSolver::updateConstraints()
 //==============================================================================
 void ConstraintSolver::buildConstrainedGroups()
 {
+  IGN_PROFILE("ConstraintSolver::buildConstrainedGroups");
   // Clear constrained groups
   mConstrainedGroups.clear();
 
@@ -686,6 +694,7 @@ void ConstraintSolver::buildConstrainedGroups()
 //==============================================================================
 void ConstraintSolver::solveConstrainedGroups()
 {
+  IGN_PROFILE("ConstraintSolver::solveConstrainedGroups");
   for (auto& constraintGroup : mConstrainedGroups)
     solveConstrainedGroup(constraintGroup);
 }

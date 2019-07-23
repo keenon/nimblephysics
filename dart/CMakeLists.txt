@@ -138,6 +138,13 @@ target_link_libraries(dart
     Boost::system
     Boost::filesystem
 )
+
+if(ENABLE_PROFILER)
+  target_link_libraries(dart
+    PUBLIC
+    ignition-common${IGN_COMMON_VER}::profiler)
+endif()
+
 if (TARGET octomap)
   target_link_libraries(dart PUBLIC octomap)
 endif()
