@@ -56,15 +56,14 @@ BallJointConstraint::BallJointConstraint(
   mOldX[2] = 0.0;
 
   Eigen::Matrix3d ssm1 = dart::math::makeSkewSymmetric(-mOffset1);
-  mJacobian1.leftCols<3>() = ssm1;
+  mJacobian1.leftCols<3>()  = ssm1;
   mJacobian1.rightCols<3>() = Eigen::Matrix3d::Identity();
 }
 
 //==============================================================================
-BallJointConstraint::BallJointConstraint(
-    dynamics::BodyNode* _body1,
-    dynamics::BodyNode* _body2,
-    const Eigen::Vector3d& _jointPos)
+BallJointConstraint::BallJointConstraint(dynamics::BodyNode* _body1,
+                                         dynamics::BodyNode* _body2,
+                                         const Eigen::Vector3d& _jointPos)
   : JointConstraint(_body1, _body2),
     mOffset1(_body1->getTransform().inverse() * _jointPos),
     mOffset2(_body2->getTransform().inverse() * _jointPos),
@@ -79,9 +78,9 @@ BallJointConstraint::BallJointConstraint(
 
   Eigen::Matrix3d ssm1 = dart::math::makeSkewSymmetric(-mOffset1);
   Eigen::Matrix3d ssm2 = dart::math::makeSkewSymmetric(-mOffset2);
-  mJacobian1.leftCols<3>() = ssm1;
+  mJacobian1.leftCols<3>()  = ssm1;
   mJacobian1.rightCols<3>() = Eigen::Matrix3d::Identity();
-  mJacobian2.leftCols<3>() = ssm2;
+  mJacobian2.leftCols<3>()  = ssm2;
   mJacobian2.rightCols<3>() = Eigen::Matrix3d::Identity();
 }
 
@@ -99,12 +98,12 @@ void BallJointConstraint::update()
   // Update Jacobian for body2
   if (mBodyNode2)
   {
-    Eigen::Isometry3d T12
-        = mBodyNode1->getTransform().inverse() * mBodyNode2->getTransform();
+    Eigen::Isometry3d T12 = mBodyNode1->getTransform().inverse()
+                            * mBodyNode2->getTransform();
     Eigen::Vector3d p2 = T12.inverse() * mOffset1;
 
     Eigen::Matrix<double, 3, 6> J2;
-    J2.leftCols<3>() = math::makeSkewSymmetric(-p2);
+    J2.leftCols<3>()  = math::makeSkewSymmetric(-p2);
     J2.rightCols<3>() = Eigen::Matrix3d::Identity();
 
     mJacobian2 = T12.linear() * J2;
@@ -113,9 +112,8 @@ void BallJointConstraint::update()
   // Update position constraint error
   if (mBodyNode2)
   {
-    mViolation = mOffset1
-                 - mBodyNode1->getTransform().inverse()
-                       * mBodyNode2->getTransform() * mOffset2;
+    mViolation = mOffset1 - mBodyNode1->getTransform().inverse()
+                            * mBodyNode2->getTransform() * mOffset2;
   }
   else
   {
@@ -173,15 +171,15 @@ void BallJointConstraint::applyUnitImpulse(std::size_t _index)
     assert(mBodyNode1->isReactive() || mBodyNode2->isReactive());
 
     // Self collision case
-    if (mBodyNode1->getSkeleton() == mBodyNode2->getSkeleton())
+    if (mBodyNode1->getRawSkeleton() == mBodyNode2->getRawSkeleton())
     {
-      mBodyNode1->getSkeleton()->clearConstraintImpulses();
+      mBodyNode1->getRawSkeleton()->clearConstraintImpulses();
 
       if (mBodyNode1->isReactive())
       {
         if (mBodyNode2->isReactive())
         {
-          mBodyNode1->getSkeleton()->updateBiasImpulse(
+          mBodyNode1->getRawSkeleton()->updateBiasImpulse(
               mBodyNode1,
               mJacobian1.row(_index),
               mBodyNode2,
@@ -189,7 +187,7 @@ void BallJointConstraint::applyUnitImpulse(std::size_t _index)
         }
         else
         {
-          mBodyNode1->getSkeleton()->updateBiasImpulse(
+          mBodyNode1->getRawSkeleton()->updateBiasImpulse(
               mBodyNode1, mJacobian1.row(_index));
         }
       }
@@ -197,7 +195,7 @@ void BallJointConstraint::applyUnitImpulse(std::size_t _index)
       {
         if (mBodyNode2->isReactive())
         {
-          mBodyNode2->getSkeleton()->updateBiasImpulse(
+          mBodyNode2->getRawSkeleton()->updateBiasImpulse(
               mBodyNode2, -mJacobian2.row(_index));
         }
         else
@@ -205,25 +203,25 @@ void BallJointConstraint::applyUnitImpulse(std::size_t _index)
           assert(0);
         }
       }
-      mBodyNode1->getSkeleton()->updateVelocityChange();
+      mBodyNode1->getRawSkeleton()->updateVelocityChange();
     }
     // Colliding two distinct skeletons
     else
     {
       if (mBodyNode1->isReactive())
       {
-        mBodyNode1->getSkeleton()->clearConstraintImpulses();
-        mBodyNode1->getSkeleton()->updateBiasImpulse(
+        mBodyNode1->getRawSkeleton()->clearConstraintImpulses();
+        mBodyNode1->getRawSkeleton()->updateBiasImpulse(
             mBodyNode1, mJacobian1.row(_index));
-        mBodyNode1->getSkeleton()->updateVelocityChange();
+        mBodyNode1->getRawSkeleton()->updateVelocityChange();
       }
 
       if (mBodyNode2->isReactive())
       {
-        mBodyNode2->getSkeleton()->clearConstraintImpulses();
-        mBodyNode2->getSkeleton()->updateBiasImpulse(
+        mBodyNode2->getRawSkeleton()->clearConstraintImpulses();
+        mBodyNode2->getRawSkeleton()->updateBiasImpulse(
             mBodyNode2, -mJacobian2.row(_index));
-        mBodyNode2->getSkeleton()->updateVelocityChange();
+        mBodyNode2->getRawSkeleton()->updateVelocityChange();
       }
     }
   }
@@ -231,10 +229,10 @@ void BallJointConstraint::applyUnitImpulse(std::size_t _index)
   {
     assert(mBodyNode1->isReactive());
 
-    mBodyNode1->getSkeleton()->clearConstraintImpulses();
-    mBodyNode1->getSkeleton()->updateBiasImpulse(
+    mBodyNode1->getRawSkeleton()->clearConstraintImpulses();
+    mBodyNode1->getRawSkeleton()->updateBiasImpulse(
         mBodyNode1, mJacobian1.row(_index));
-    mBodyNode1->getSkeleton()->updateVelocityChange();
+    mBodyNode1->getRawSkeleton()->updateVelocityChange();
   }
 
   mAppliedImpulseIndex = _index;
@@ -248,7 +246,7 @@ void BallJointConstraint::getVelocityChange(double* _vel, bool _withCfm)
   for (std::size_t i = 0; i < mDim; ++i)
     _vel[i] = 0.0;
 
-  if (mBodyNode1->getSkeleton()->isImpulseApplied() && mBodyNode1->isReactive())
+  if (mBodyNode1->getRawSkeleton()->isImpulseApplied() && mBodyNode1->isReactive())
   {
     Eigen::Vector3d v1 = mJacobian1 * mBodyNode1->getBodyVelocityChange();
     // std::cout << "velChange " << mBodyNode1->getBodyVelocityChange() <<
@@ -257,7 +255,7 @@ void BallJointConstraint::getVelocityChange(double* _vel, bool _withCfm)
       _vel[i] += v1[i];
   }
 
-  if (mBodyNode2 && mBodyNode2->getSkeleton()->isImpulseApplied()
+  if (mBodyNode2 && mBodyNode2->getRawSkeleton()->isImpulseApplied()
       && mBodyNode2->isReactive())
   {
     Eigen::Vector3d v2 = mJacobian2 * mBodyNode2->getBodyVelocityChange();
@@ -279,26 +277,26 @@ void BallJointConstraint::getVelocityChange(double* _vel, bool _withCfm)
 void BallJointConstraint::excite()
 {
   if (mBodyNode1->isReactive())
-    mBodyNode1->getSkeleton()->setImpulseApplied(true);
+    mBodyNode1->getRawSkeleton()->setImpulseApplied(true);
 
   if (mBodyNode2 == nullptr)
     return;
 
   if (mBodyNode2->isReactive())
-    mBodyNode2->getSkeleton()->setImpulseApplied(true);
+    mBodyNode2->getRawSkeleton()->setImpulseApplied(true);
 }
 
 //==============================================================================
 void BallJointConstraint::unexcite()
 {
   if (mBodyNode1->isReactive())
-    mBodyNode1->getSkeleton()->setImpulseApplied(false);
+    mBodyNode1->getRawSkeleton()->setImpulseApplied(false);
 
   if (mBodyNode2 == nullptr)
     return;
 
   if (mBodyNode2->isReactive())
-    mBodyNode2->getSkeleton()->setImpulseApplied(false);
+    mBodyNode2->getRawSkeleton()->setImpulseApplied(false);
 }
 
 //==============================================================================
@@ -323,13 +321,13 @@ void BallJointConstraint::applyImpulse(double* _lambda)
 dynamics::SkeletonPtr BallJointConstraint::getRootSkeleton() const
 {
   if (mBodyNode1->isReactive())
-    return mBodyNode1->getSkeleton()->mUnionRootSkeleton.lock();
+    return mBodyNode1->getRawSkeleton()->mUnionRootSkeleton.lock();
 
   if (mBodyNode2)
   {
     if (mBodyNode2->isReactive())
     {
-      return mBodyNode2->getSkeleton()->mUnionRootSkeleton.lock();
+      return mBodyNode2->getRawSkeleton()->mUnionRootSkeleton.lock();
     }
     else
     {
@@ -353,7 +351,7 @@ void BallJointConstraint::uniteSkeletons()
   if (!mBodyNode1->isReactive() || !mBodyNode2->isReactive())
     return;
 
-  if (mBodyNode1->getSkeleton() == mBodyNode2->getSkeleton())
+  if (mBodyNode1->getRawSkeleton() == mBodyNode2->getRawSkeleton())
     return;
 
   dynamics::SkeletonPtr unionId1
@@ -399,3 +397,4 @@ bool BallJointConstraint::isActive() const
 
 } // namespace constraint
 } // namespace dart
+

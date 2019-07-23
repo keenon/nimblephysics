@@ -165,7 +165,7 @@ ConstSkeletonPtr SkeletonRefCountingBase::getSkeleton() const
 /// overall
 #define SKEL_SET_FLAGS(X)                                                      \
   {                                                                            \
-    SkeletonPtr skel = getSkeleton();                                          \
+    Skeleton* skel = getRawSkeleton();                                         \
     if (skel)                                                                  \
     {                                                                          \
       skel->mTreeCache[mTreeIndex].mDirty.X = true;                            \
@@ -586,7 +586,7 @@ const Inertia& BodyNode::getInertia() const
 //==============================================================================
 const math::Inertia& BodyNode::getArticulatedInertia() const
 {
-  const ConstSkeletonPtr& skel = getSkeleton();
+  const Skeleton* const skel = getRawSkeleton();
   if (skel && CHECK_FLAG(mArticulatedInertia))
     skel->updateArticulatedInertia(mTreeIndex);
 
@@ -596,7 +596,7 @@ const math::Inertia& BodyNode::getArticulatedInertia() const
 //==============================================================================
 const math::Inertia& BodyNode::getArticulatedInertiaImplicit() const
 {
-  const ConstSkeletonPtr& skel = getSkeleton();
+  const Skeleton* const skel = getRawSkeleton();
   if (skel && CHECK_FLAG(mArticulatedInertia))
     skel->updateArticulatedInertia(mTreeIndex);
 
@@ -753,7 +753,7 @@ static bool checkSkeletonNodeAgreement(
     dterr << "[BodyNode::" << _function << "] Attempting to " << _operation
           << " a BodyNode tree starting "
           << "from [" << _bodyNode->getName() << "] in the Skeleton named ["
-          << _bodyNode->getSkeleton()->getName()
+          << _bodyNode->getRawSkeleton()->getName()
           << "] into a nullptr Skeleton.\n";
     return false;
   }
@@ -764,11 +764,11 @@ static bool checkSkeletonNodeAgreement(
           << "Skeleton [" << _newSkeleton->getName() << "] (" << _newSkeleton
           << ") and the specified new parent BodyNode ["
           << _newParent->getName() << "] whose actual Skeleton is named ["
-          << _newParent->getSkeleton()->getName() << "] ("
-          << _newParent->getSkeleton() << ") while attempting to " << _operation
+          << _newParent->getRawSkeleton()->getName() << "] ("
+          << _newParent->getRawSkeleton() << ") while attempting to " << _operation
           << " the BodyNode [" << _bodyNode->getName() << "] from the "
-          << "Skeleton named [" << _bodyNode->getSkeleton()->getName() << "] ("
-          << _bodyNode->getSkeleton() << ").\n";
+          << "Skeleton named [" << _bodyNode->getRawSkeleton()->getName() << "] ("
+          << _bodyNode->getRawSkeleton() << ").\n";
     return false;
   }
 
@@ -1370,6 +1370,7 @@ Node* BodyNode::cloneNode(BodyNode* /*bn*/) const
 void BodyNode::init(const SkeletonPtr& _skeleton)
 {
   mSkeleton = _skeleton;
+  mRawSkeleton = _skeleton.get();
   assert(_skeleton);
   if (mReferenceCount > 0)
   {
@@ -1512,7 +1513,7 @@ void BodyNode::dirtyTransform()
 
   mNeedTransformUpdate = true;
 
-  const SkeletonPtr& skel = getSkeleton();
+  const Skeleton* const skel = getRawSkeleton();
   if (skel)
   {
     // All of these depend on the world transform of this BodyNode, so they must
@@ -1545,7 +1546,7 @@ void BodyNode::dirtyVelocity()
   mNeedVelocityUpdate = true;
   mIsPartialAccelerationDirty = true;
 
-  const SkeletonPtr& skel = getSkeleton();
+  const Skeleton* const skel = getRawSkeleton();
   if (skel)
   {
     SET_FLAGS(mCoriolisForces);
@@ -1586,7 +1587,7 @@ void BodyNode::notifyArticulatedInertiaUpdate()
 //==============================================================================
 void BodyNode::dirtyArticulatedInertia()
 {
-  const SkeletonPtr& skel = getSkeleton();
+  Skeleton* const skel = getRawSkeleton();
   if (skel)
     skel->dirtyArticulatedInertia(mTreeIndex);
 }
@@ -2036,7 +2037,7 @@ Eigen::Vector3d BodyNode::getAngularMomentum(const Eigen::Vector3d& _pivot)
 //==============================================================================
 bool BodyNode::isReactive() const
 {
-  const ConstSkeletonPtr& skel = getSkeleton();
+  const Skeleton* const skel = getRawSkeleton();
   if (skel && skel->isMobile() && getNumDependentGenCoords() > 0)
   {
     // Check if all the ancestor joints are motion prescribed.

@@ -1038,7 +1038,7 @@ static std::size_t templatedGetIndexOf(
     return INVALID_INDEX;
   }
 
-  if (_skel == _obj->getSkeleton().get())
+  if (_skel == _obj->getRawSkeleton())
     return (_obj->*getIndexInSkeleton)();
 
   if (_warning)
@@ -3810,7 +3810,7 @@ void Skeleton::updateBiasImpulse(BodyNode* _bodyNode)
   assert(getNumDofs() > 0);
 
   // This skeleton should contain _bodyNode
-  assert(_bodyNode->getSkeleton().get() == this);
+  assert(_bodyNode->getRawSkeleton() == this);
 
 #ifndef NDEBUG
   // All the constraint impulse should be zero
@@ -3843,7 +3843,7 @@ void Skeleton::updateBiasImpulse(
   assert(getNumDofs() > 0);
 
   // This skeleton should contain _bodyNode
-  assert(_bodyNode->getSkeleton().get() == this);
+  assert(_bodyNode->getRawSkeleton() == this);
 
 #ifndef NDEBUG
   // All the constraint impulse should be zero
@@ -3892,8 +3892,8 @@ void Skeleton::updateBiasImpulse(
   assert(getNumDofs() > 0);
 
   // This skeleton should contain _bodyNode
-  assert(_bodyNode1->getSkeleton().get() == this);
-  assert(_bodyNode2->getSkeleton().get() == this);
+  assert(_bodyNode1->getRawSkeleton() == this);
+  assert(_bodyNode2->getRawSkeleton() == this);
 
 #ifndef NDEBUG
   // All the constraint impulse should be zero

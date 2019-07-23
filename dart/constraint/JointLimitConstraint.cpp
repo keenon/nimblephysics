@@ -163,13 +163,6 @@ void JointLimitConstraint::setConstraintForceMixing(double _cfm)
            << "It is set to 1e-9." << std::endl;
     mConstraintForceMixing = 1e-9;
   }
-  if (_cfm > 1.0)
-  {
-    dtwarn << "Constraint force mixing parameter[" << _cfm
-           << "] is greater than 1.0. "
-           << "It is set to 1.0." << std::endl;
-    mConstraintForceMixing = 1.0;
-  }
 
   mConstraintForceMixing = _cfm;
 }
@@ -294,7 +287,7 @@ void JointLimitConstraint::applyUnitImpulse(std::size_t _index)
   assert(_index < mDim && "Invalid Index.");
 
   std::size_t localIndex = 0;
-  const dynamics::SkeletonPtr& skeleton = mJoint->getSkeleton();
+  dynamics::Skeleton* const skeleton = mJoint->getRawSkeleton();
 
   std::size_t dof = mJoint->getNumDofs();
   for (std::size_t i = 0; i < dof; ++i)
@@ -329,7 +322,7 @@ void JointLimitConstraint::getVelocityChange(double* _delVel, bool _withCfm)
     if (mActive[i] == false)
       continue;
 
-    if (mJoint->getSkeleton()->isImpulseApplied())
+    if (mJoint->getRawSkeleton()->isImpulseApplied())
       _delVel[localIndex] = mJoint->getVelocityChange(i);
     else
       _delVel[localIndex] = 0.0;
@@ -351,13 +344,13 @@ void JointLimitConstraint::getVelocityChange(double* _delVel, bool _withCfm)
 //==============================================================================
 void JointLimitConstraint::excite()
 {
-  mJoint->getSkeleton()->setImpulseApplied(true);
+  mJoint->getRawSkeleton()->setImpulseApplied(true);
 }
 
 //==============================================================================
 void JointLimitConstraint::unexcite()
 {
-  mJoint->getSkeleton()->setImpulseApplied(false);
+  mJoint->getRawSkeleton()->setImpulseApplied(false);
 }
 
 //==============================================================================
@@ -382,7 +375,7 @@ void JointLimitConstraint::applyImpulse(double* _lambda)
 //==============================================================================
 dynamics::SkeletonPtr JointLimitConstraint::getRootSkeleton() const
 {
-  return mJoint->getSkeleton()->mUnionRootSkeleton.lock();
+  return mJoint->getRawSkeleton()->mUnionRootSkeleton.lock();
 }
 
 //==============================================================================
