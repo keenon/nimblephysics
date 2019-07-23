@@ -61,9 +61,10 @@ BallJointConstraint::BallJointConstraint(
 }
 
 //==============================================================================
-BallJointConstraint::BallJointConstraint(dynamics::BodyNode* _body1,
-                                         dynamics::BodyNode* _body2,
-                                         const Eigen::Vector3d& _jointPos)
+BallJointConstraint::BallJointConstraint(
+    dynamics::BodyNode* _body1,
+    dynamics::BodyNode* _body2,
+    const Eigen::Vector3d& _jointPos)
   : JointConstraint(_body1, _body2),
     mOffset1(_body1->getTransform().inverse() * _jointPos),
     mOffset2(_body2->getTransform().inverse() * _jointPos),
@@ -78,9 +79,9 @@ BallJointConstraint::BallJointConstraint(dynamics::BodyNode* _body1,
 
   Eigen::Matrix3d ssm1 = dart::math::makeSkewSymmetric(-mOffset1);
   Eigen::Matrix3d ssm2 = dart::math::makeSkewSymmetric(-mOffset2);
-  mJacobian1.leftCols<3>()  = ssm1;
+  mJacobian1.leftCols<3>() = ssm1;
   mJacobian1.rightCols<3>() = Eigen::Matrix3d::Identity();
-  mJacobian2.leftCols<3>()  = ssm2;
+  mJacobian2.leftCols<3>() = ssm2;
   mJacobian2.rightCols<3>() = Eigen::Matrix3d::Identity();
 }
 
@@ -98,12 +99,12 @@ void BallJointConstraint::update()
   // Update Jacobian for body2
   if (mBodyNode2)
   {
-    Eigen::Isometry3d T12 = mBodyNode1->getTransform().inverse()
-                            * mBodyNode2->getTransform();
+    Eigen::Isometry3d T12
+        = mBodyNode1->getTransform().inverse() * mBodyNode2->getTransform();
     Eigen::Vector3d p2 = T12.inverse() * mOffset1;
 
     Eigen::Matrix<double, 3, 6> J2;
-    J2.leftCols<3>()  = math::makeSkewSymmetric(-p2);
+    J2.leftCols<3>() = math::makeSkewSymmetric(-p2);
     J2.rightCols<3>() = Eigen::Matrix3d::Identity();
 
     mJacobian2 = T12.linear() * J2;
@@ -112,8 +113,9 @@ void BallJointConstraint::update()
   // Update position constraint error
   if (mBodyNode2)
   {
-    mViolation = mOffset1 - mBodyNode1->getTransform().inverse()
-                            * mBodyNode2->getTransform() * mOffset2;
+    mViolation = mOffset1
+                 - mBodyNode1->getTransform().inverse()
+                       * mBodyNode2->getTransform() * mOffset2;
   }
   else
   {
@@ -397,4 +399,3 @@ bool BallJointConstraint::isActive() const
 
 } // namespace constraint
 } // namespace dart
-
