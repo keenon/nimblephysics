@@ -4,10 +4,14 @@
 if(MSVC)
   cmake_minimum_required(VERSION 3.8.0)
 else()
-  cmake_minimum_required(VERSION 3.5.1)
+  cmake_minimum_required(VERSION 3.8.2)
 endif()
 
 project(dart)
+
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
 string(TOUPPER ${PROJECT_NAME} PROJECT_NAME_UPPERCASE)
 

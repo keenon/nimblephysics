@@ -36,6 +36,17 @@
 #include <dart/dart.hpp>
 #include "dart/utils/utils.hpp"
 
+#include <dart/collision/ode/OdeCollisionDetector.hpp>
+
+#include <tinyxml2.h>
+#include <dart/utils/sdf/SdfParser.hpp>
+
+#include <dart/gui/osg/Viewer.hpp>
+#include <dart/gui/osg/RealTimeWorldNode.hpp>
+#include <dart/gui/osg/DefaultEventHandler.hpp>
+
+#include <boost/filesystem.hpp>
+
 double testForwardKinematicSpeed(
     dart::dynamics::SkeletonPtr skel,
     bool position = true,
@@ -199,15 +210,154 @@ std::vector<std::string> getSceneFiles()
   return scenes;
 }
 
+//std::vector<dart::simulation::WorldPtr> getWorlds()
+//{
+//  std::vector<std::string> sceneFiles = getSceneFiles();
+//  std::vector<dart::simulation::WorldPtr> worlds;
+//  for (std::size_t i = 0; i < sceneFiles.size(); ++i)
+//    worlds.push_back(dart::utils::SkelParser::readWorld(sceneFiles[i]));
+
+//  for (auto& world : worlds)
+//    world->getConstraintSolver()->setCollisionDetector(
+//          dart::collision::OdeCollisionDetector::create());
+
+//  return worlds;
+//}
+
+std::string getModelName(const std::string& uri)
+{
+  const std::string model_uri_component = "openrobotics/models/";
+
+  const std::size_t i =
+      uri.find(model_uri_component) + model_uri_component.size();
+
+  std::string name = uri.substr(i);
+  name.erase(name.find_last_not_of(" \n\r\t")+1);
+
+  return name;
+}
+
+std::string getModelFile(const std::string& uri)
+{
+  const std::string fuel_model_path =
+      "/home/grey/.ignition/fuel/fuel.ignitionrobotics.org/openrobotics/models/";
+
+  const std::string& model_name = getModelName(uri);
+  if(model_name == "Rescue Randy Sitting")
+    return "";
+
+  const std::string dir = fuel_model_path + model_name;
+  for(const auto& f : boost::filesystem::recursive_directory_iterator(dir))
+  {
+    const std::string& path = f.path().string();
+    const std::string file_name = path.substr(path.find_last_of('/')+1);
+    if(file_name == "model.sdf")
+      return path;
+  }
+
+  std::cout << "Could not find a model file for: " << dir << std::endl;
+
+  return "";
+}
+
+Eigen::Isometry3d getTransform(const std::string& text)
+{
+  double x, y, z, r, p, yaw;
+  std::istringstream stream(text);
+  stream >> x >> y >> z >> r >> p >> yaw;
+  std::cout << "Setting pose: " << x << ", " << y << ", " << z << ", "
+            << r << ", " << p << ", " << yaw << std::endl;
+
+  Eigen::Isometry3d tf = Eigen::Isometry3d::Identity();
+  tf.translation() = Eigen::Vector3d(100.0*x, 100.0*y, 100.0*z);
+  tf.rotate(Eigen::AngleAxisd(r, Eigen::Vector3d::UnitX()));
+  tf.rotate(Eigen::AngleAxisd(p, Eigen::Vector3d::UnitY()));
+  tf.rotate(Eigen::AngleAxisd(yaw, Eigen::Vector3d::UnitZ()));
+
+  return tf;
+}
+
 std::vector<dart::simulation::WorldPtr> getWorlds()
 {
-  std::vector<std::string> sceneFiles = getSceneFiles();
-  std::vector<dart::simulation::WorldPtr> worlds;
-  for (std::size_t i = 0; i < sceneFiles.size(); ++i)
-    worlds.push_back(dart::utils::SkelParser::readWorld(sceneFiles[i]));
+  dart::simulation::WorldPtr world = dart::simulation::World::create();
 
-  return worlds;
+  tinyxml2::XMLDocument doc;
+  std::cout << "Loading xml file" << std::endl;
+  doc.LoadFile("/home/grey/projects/dartsim/tunnel_circuit_practice_01.sdf");
+  tinyxml2::XMLElement* root = doc.RootElement();
+
+  tinyxml2::XMLElement* world_elem = root->FirstChildElement("world");
+  tinyxml2::XMLElement* include_elem = world_elem->FirstChildElement("include");
+
+//  tinyxml2::XMLElement* include_elem = root->FirstChildElement("include");
+
+  std::size_t count = 0;
+  std::cout << "Iterating through includes" << std::endl;
+  while(include_elem)
+  {
+    std::cout << "Count: " << count++ << std::endl;
+    const std::string& uri = include_elem->FirstChildElement("uri")->GetText();
+    const std::string& model_file = getModelFile(uri);
+    if(model_file.empty())
+    {
+      std::cout << "could not find a model for: " << uri << std::endl;
+      include_elem = include_elem->NextSiblingElement("include");
+      continue;
+    }
+
+    const dart::dynamics::SkeletonPtr model =
+        dart::utils::SdfParser::readSkeleton(model_file);
+
+    const auto name_elem = include_elem->FirstChildElement("name");
+    if(name_elem)
+      model->setName(name_elem->GetText());
+
+    const auto pose_elem = include_elem->FirstChildElement("pose");
+    if(pose_elem)
+      model->getJoint(0)->setTransformFromChildBodyNode(
+            getTransform(pose_elem->GetText()));
+
+    std::cout << "About to add skeleton" << std::endl;
+    world->addSkeleton(model);
+    include_elem = include_elem->NextSiblingElement("include");
+
+//    if(count > 100)
+//      break;
+  }
+  if(count == 0)
+    std::cout << "NO INCLUDE ELEMENTS??" << std::endl;
+
+  std::cout << "Done gathering the includes" << std::endl;
+
+  return {world};
 }
+
+class InputHandler : public osgGA::GUIEventHandler
+{
+public:
+
+  dart::gui::osg::Viewer* mViewer;
+
+  InputHandler(dart::gui::osg::Viewer* viewer)
+    : mViewer(viewer)
+  {
+    // Do nothing
+  }
+
+  bool handle(const osgGA::GUIEventAdapter& ea, osgGA::GUIActionAdapter&) override
+  {
+    if(ea.getEventType() == osgGA::GUIEventAdapter::KEYDOWN)
+    {
+      if(ea.getKey() == osgGA::GUIEventAdapter::KEY_Tab)
+      {
+        mViewer->home();
+        return true;
+      }
+    }
+
+    return false;
+  }
+};
 
 int main(int argc, char* argv[])
 {
@@ -219,6 +369,18 @@ int main(int argc, char* argv[])
   }
 
   std::vector<dart::simulation::WorldPtr> worlds = getWorlds();
+  ::osg::ref_ptr<dart::gui::osg::WorldNode> node =
+      new dart::gui::osg::RealTimeWorldNode(worlds.front());
+  dart::gui::osg::Viewer viewer;
+
+  viewer.addWorldNode(node);
+
+  osg::ref_ptr<InputHandler> input = new InputHandler(&viewer);
+  viewer.addEventHandler(input);
+
+  std::cout << "About to run" << std::endl;
+  return viewer.run();
+
 
   if (test_kinematics)
   {

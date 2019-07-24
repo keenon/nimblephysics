@@ -284,14 +284,14 @@ simulation::WorldPtr readWorld(
   std::string version = getAttributeString(sdfElement, "version");
   // TODO: We need version aware SDF parser (see #264)
   // We support 1.4 only for now.
-  if (version != "1.4" && version != "1.5")
-  {
-    dtwarn << "[SdfParser::readSdfFile] The file format of ["
-           << uri.toString()
-           << "] was found to be [" << version << "], but we only support SDF "
-           << "1.4 and 1.5!\n";
-    return nullptr;
-  }
+//  if (version != "1.4" && version != "1.5")
+//  {
+//    dtwarn << "[SdfParser::readSdfFile] The file format of ["
+//           << uri.toString()
+//           << "] was found to be [" << version << "], but we only support SDF "
+//           << "1.4 and 1.5!\n";
+//    return nullptr;
+//  }
 
   //--------------------------------------------------------------------------
   // Load World
@@ -336,13 +336,13 @@ dynamics::SkeletonPtr readSkeleton(
   std::string version = getAttributeString(sdfElement, "version");
   // TODO: We need version aware SDF parser (see #264)
   // We support 1.4 only for now.
-  if (version != "1.4" && version != "1.5")
-  {
-    dtwarn << "[SdfParser::readSdfFile] The file format of ["
-           << uri.toString() << "] was found to be [" << version
-           << "], but we only support SDF 1.4 and 1.5!\n";
-    return nullptr;
-  }
+//  if (version != "1.4" && version != "1.5")
+//  {
+//    dtwarn << "[SdfParser::readSdfFile] The file format of ["
+//           << uri.toString() << "] was found to be [" << version
+//           << "], but we only support SDF 1.4 and 1.5!\n";
+//    return nullptr;
+//  }
   //--------------------------------------------------------------------------
   // Load skeleton
   tinyxml2::XMLElement* skelElement = nullptr;
