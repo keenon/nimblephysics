@@ -616,10 +616,10 @@ void ContactConstraint::getVelocityChange(double* vel, bool withCfm)
   velMap.setZero();
 
   if (mBodyNodeA->getRawSkeleton()->isImpulseApplied() && mBodyNodeA->isReactive())
-    velMap += mSpatialNormalA.transpose() * mBodyNodeA->getBodyVelocityChange();
+    velMap.noalias() += mSpatialNormalA.transpose() * mBodyNodeA->getBodyVelocityChange();
 
   if (mBodyNodeB->getRawSkeleton()->isImpulseApplied() && mBodyNodeB->isReactive())
-    velMap += mSpatialNormalB.transpose() * mBodyNodeB->getBodyVelocityChange();
+    velMap.noalias() += mSpatialNormalB.transpose() * mBodyNodeB->getBodyVelocityChange();
 
   // Add small values to the diagnal to keep it away from singular, similar to
   // cfm variable in ODE

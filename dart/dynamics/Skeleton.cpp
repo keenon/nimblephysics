@@ -800,6 +800,11 @@ bool Skeleton::isEnabledAdjacentBodyCheck() const
 void Skeleton::setMobile(bool _isMobile)
 {
   mAspectProperties.mIsMobile = _isMobile;
+
+  // Just tell the root node of each tree that its reactive flag is dirty.
+  // That will automatically inform every BodyNode in the Skeleton.
+  for (const auto& tree : mTreeCache)
+    tree.mBodyNodes[0]->dirtyReactive();
 }
 
 //==============================================================================

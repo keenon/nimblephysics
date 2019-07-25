@@ -894,6 +894,10 @@ public:
   /// Tell the Skeleton that the coriolis forces need to be update
   void dirtyCoriolisForces();
 
+  /// Tell this BodyNode and its children that their isReactive() trait needs to
+  /// be updated.
+  void dirtyReactive();
+
   //----------------------------------------------------------------------------
   // Friendship
   //----------------------------------------------------------------------------
@@ -952,6 +956,9 @@ protected:
   /// Update articulated body inertia for forward dynamics.
   /// \param[in] _timeStep Rquired for implicit joint stiffness and damping.
   virtual void updateArtInertia(double _timeStep) const;
+
+  /// Update whether this BodyNode is reactive
+  void updateReactive() const;
 
   /// Update bias force associated with the articulated body inertia for forward
   /// dynamics.
@@ -1173,6 +1180,16 @@ protected:
   ///
   /// DO not use directly! Use getArticulatedInertiaImplicit() to access this
   mutable math::Inertia mArtInertiaImplicit;
+
+  /// Stores whether or not this BodyNode is reactive. This needs to be computed
+  /// many times in each simulation step, and the cost of computing it grows
+  /// with the number of ancestor BodyNodes, so we'll store it in a cache
+  /// variable.
+  mutable bool mIsReactive;
+
+  /// Indicates whether or not the mIsReactive cache is dirty and needs to be
+  /// updated.
+  mutable bool mIsReactiveDirty;
 
   /// Bias force
   Eigen::Vector6d mBiasForce;

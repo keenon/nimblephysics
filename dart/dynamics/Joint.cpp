@@ -196,6 +196,8 @@ const std::string& Joint::getName() const
 void Joint::setActuatorType(Joint::ActuatorType _actuatorType)
 {
   mAspectProperties.mActuatorType = _actuatorType;
+  if (mChildBodyNode)
+    mChildBodyNode->dirtyReactive();
 }
 
 //==============================================================================

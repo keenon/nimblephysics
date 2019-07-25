@@ -47,6 +47,8 @@
 
 #include <boost/filesystem.hpp>
 
+#include <random>
+
 double testForwardKinematicSpeed(
     dart::dynamics::SkeletonPtr skel,
     bool position = true,
@@ -277,57 +279,155 @@ Eigen::Isometry3d getTransform(const std::string& text)
   return tf;
 }
 
+//std::vector<dart::simulation::WorldPtr> getWorlds()
+//{
+//  dart::simulation::WorldPtr world = dart::simulation::World::create();
+
+//  tinyxml2::XMLDocument doc;
+//  std::cout << "Loading xml file" << std::endl;
+//  doc.LoadFile("/home/grey/projects/dartsim/tunnel_circuit_practice_01.sdf");
+//  tinyxml2::XMLElement* root = doc.RootElement();
+
+//  tinyxml2::XMLElement* world_elem = root->FirstChildElement("world");
+//  tinyxml2::XMLElement* include_elem = world_elem->FirstChildElement("include");
+
+////  tinyxml2::XMLElement* include_elem = root->FirstChildElement("include");
+
+//  std::size_t count = 0;
+//  std::cout << "Iterating through includes" << std::endl;
+//  while(include_elem)
+//  {
+//    std::cout << "Count: " << count++ << std::endl;
+//    const std::string& uri = include_elem->FirstChildElement("uri")->GetText();
+//    const std::string& model_file = getModelFile(uri);
+//    if(model_file.empty())
+//    {
+//      std::cout << "could not find a model for: " << uri << std::endl;
+//      include_elem = include_elem->NextSiblingElement("include");
+//      continue;
+//    }
+
+//    const dart::dynamics::SkeletonPtr model =
+//        dart::utils::SdfParser::readSkeleton(model_file);
+
+//    const auto name_elem = include_elem->FirstChildElement("name");
+//    if(name_elem)
+//      model->setName(name_elem->GetText());
+
+//    const auto pose_elem = include_elem->FirstChildElement("pose");
+//    if(pose_elem)
+//      model->getJoint(0)->setTransformFromChildBodyNode(
+//            getTransform(pose_elem->GetText()));
+
+//    std::cout << "About to add skeleton" << std::endl;
+//    world->addSkeleton(model);
+//    include_elem = include_elem->NextSiblingElement("include");
+
+////    if(count > 100)
+////      break;
+//  }
+//  if(count == 0)
+//    std::cout << "NO INCLUDE ELEMENTS??" << std::endl;
+
+//  std::cout << "Done gathering the includes" << std::endl;
+
+//  return {world};
+//}
+
+const double Range = 1.0;
+
+Eigen::Isometry3d random_tf(std::mt19937& rng)
+{
+  Eigen::Isometry3d tf = Eigen::Isometry3d::Identity();
+
+  std::uniform_real_distribution<double> dist(-1.0, 1.0);
+  const Eigen::Vector3d scale(Range, Range, 1.0);
+  const Eigen::Vector3d offset(0.0, 0.0, 3.0);
+
+  Eigen::Vector3d v;
+  for(int i=0; i < 3; ++i)
+  {
+    v[i] = dist(rng)*scale[i] + offset[i];
+  }
+
+  tf.translation() = v;
+
+  for(int i=0; i < 3; ++i)
+  {
+    Eigen::Vector3d axis = Eigen::Vector3d::Zero();
+    axis[i] = 1.0;
+
+    const double angle = M_PI*dist(rng);
+
+    tf.rotate(Eigen::AngleAxisd(angle, axis));
+  }
+
+  return tf;
+}
+
+dart::dynamics::SkeletonPtr make_ground()
+{
+  dart::dynamics::SkeletonPtr model = dart::dynamics::Skeleton::create();
+  auto [joint, body] =
+      model->createJointAndBodyNodePair<dart::dynamics::WeldJoint>();
+
+  body->createShapeNodeWith<
+      dart::dynamics::VisualAspect,
+      dart::dynamics::CollisionAspect,
+      dart::dynamics::DynamicsAspect>(
+        std::make_shared<dart::dynamics::BoxShape>(
+          Eigen::Vector3d(4.0*Range, 4.0*Range, 0.1)));
+
+  return model;
+}
+
 std::vector<dart::simulation::WorldPtr> getWorlds()
 {
   dart::simulation::WorldPtr world = dart::simulation::World::create();
+  world->getConstraintSolver()->getCollisionOption().maxNumContacts = 10000;
 
-  tinyxml2::XMLDocument doc;
-  std::cout << "Loading xml file" << std::endl;
-  doc.LoadFile("/home/grey/projects/dartsim/tunnel_circuit_practice_01.sdf");
-  tinyxml2::XMLElement* root = doc.RootElement();
+  world->getConstraintSolver()->setCollisionDetector(
+        dart::collision::OdeCollisionDetector::create());
 
-  tinyxml2::XMLElement* world_elem = root->FirstChildElement("world");
-  tinyxml2::XMLElement* include_elem = world_elem->FirstChildElement("include");
+  const std::size_t N = 80;
 
-//  tinyxml2::XMLElement* include_elem = root->FirstChildElement("include");
-
+  std::random_device dev;
+  std::mt19937 rng(dev());
+  std::cout << "Arranging bunnies..." << std::endl;
   std::size_t count = 0;
-  std::cout << "Iterating through includes" << std::endl;
-  while(include_elem)
+  for(std::size_t i=0; i < N; ++i)
   {
-    std::cout << "Count: " << count++ << std::endl;
-    const std::string& uri = include_elem->FirstChildElement("uri")->GetText();
-    const std::string& model_file = getModelFile(uri);
-    if(model_file.empty())
-    {
-      std::cout << "could not find a model for: " << uri << std::endl;
-      include_elem = include_elem->NextSiblingElement("include");
-      continue;
-    }
+    dart::dynamics::SkeletonPtr model = dart::dynamics::Skeleton::create();
+    auto [joint, body] =
+        model->createJointAndBodyNodePair<dart::dynamics::FreeJoint>();
 
-    const dart::dynamics::SkeletonPtr model =
-        dart::utils::SdfParser::readSkeleton(model_file);
+    const auto raw_mesh = dart::dynamics::MeshShape::loadMesh(
+        "/home/grey/projects/dartsim/bunny.obj");
+//        "/home/grey/projects/dartsim/src/dart/data/sdf/atlas/pelvis.stl");
 
-    const auto name_elem = include_elem->FirstChildElement("name");
-    if(name_elem)
-      model->setName(name_elem->GetText());
+    dart::dynamics::MeshShapePtr mesh =
+        std::make_shared<dart::dynamics::MeshShape>(
+          Eigen::Vector3d::Ones(), raw_mesh);
 
-    const auto pose_elem = include_elem->FirstChildElement("pose");
-    if(pose_elem)
-      model->getJoint(0)->setTransformFromChildBodyNode(
-            getTransform(pose_elem->GetText()));
+    joint->setTransform(random_tf(rng));
+    body->createShapeNodeWith<
+        dart::dynamics::VisualAspect,
+        dart::dynamics::CollisionAspect,
+        dart::dynamics::DynamicsAspect>(mesh);
 
-    std::cout << "About to add skeleton" << std::endl;
     world->addSkeleton(model);
-    include_elem = include_elem->NextSiblingElement("include");
 
-//    if(count > 100)
-//      break;
+    std::cout << "Positioning " << ++count << "..." << std::endl;
+    while(world->checkCollision())
+    {
+      joint->setTransform(random_tf(rng));
+    }
+    std::cout << "   -- Positioned!" << std::endl;
   }
-  if(count == 0)
-    std::cout << "NO INCLUDE ELEMENTS??" << std::endl;
 
-  std::cout << "Done gathering the includes" << std::endl;
+  std::cout << "... Done!" << std::endl;
+
+  world->addSkeleton(make_ground());
 
   return {world};
 }
@@ -369,56 +469,67 @@ int main(int argc, char* argv[])
   }
 
   std::vector<dart::simulation::WorldPtr> worlds = getWorlds();
-  ::osg::ref_ptr<dart::gui::osg::WorldNode> node =
-      new dart::gui::osg::RealTimeWorldNode(worlds.front());
-  dart::gui::osg::Viewer viewer;
-
-  viewer.addWorldNode(node);
-
-  osg::ref_ptr<InputHandler> input = new InputHandler(&viewer);
-  viewer.addEventHandler(input);
-
-  std::cout << "About to run" << std::endl;
-  return viewer.run();
+  auto world = worlds.back();
 
 
-  if (test_kinematics)
+
+//  ::osg::ref_ptr<dart::gui::osg::WorldNode> node =
+//      new dart::gui::osg::RealTimeWorldNode(world);
+//  dart::gui::osg::Viewer viewer;
+
+//  viewer.addWorldNode(node);
+
+//  osg::ref_ptr<InputHandler> input = new InputHandler(&viewer);
+//  viewer.addEventHandler(input);
+
+//  std::cout << "About to run" << std::endl;
+//  return viewer.run();
+
+
+
+  for(std::size_t i=0; i < 150.0/world->getTimeStep(); ++i)
   {
-    std::cout << "Testing Kinematics" << std::endl;
-    std::vector<double> acceleration_results;
-    std::vector<double> velocity_results;
-    std::vector<double> position_results;
-
-    for (std::size_t i = 0; i < 10; ++i)
-    {
-      std::cout << "\nTrial #" << i + 1 << std::endl;
-      runKinematicsTest(acceleration_results, worlds, true, true, true);
-      runKinematicsTest(velocity_results, worlds, true, true, false);
-      runKinematicsTest(position_results, worlds, true, false, false);
-    }
-
-    std::cout << "\n\n --- Final Kinematics Results --- \n\n";
-
-    std::cout << "Position, Velocity, Acceleration\n";
-    print_results(acceleration_results);
-
-    std::cout << "\nPosition, Velocity\n";
-    print_results(velocity_results);
-
-    std::cout << "\nPosition\n";
-    print_results(position_results);
-
-    return 0;
+    world->step();
   }
 
-  std::cout << "Testing Dynamics" << std::endl;
-  std::vector<double> dynamics_results;
-  for (std::size_t i = 0; i < 10; ++i)
-  {
-    std::cout << "\nTrial #" << i + 1 << std::endl;
-    runDynamicsTest(dynamics_results, worlds);
-  }
 
-  std::cout << "\n\n --- Final Dynamics Results --- \n\n";
-  print_results(dynamics_results);
+//  if (test_kinematics)
+//  {
+//    std::cout << "Testing Kinematics" << std::endl;
+//    std::vector<double> acceleration_results;
+//    std::vector<double> velocity_results;
+//    std::vector<double> position_results;
+
+//    for (std::size_t i = 0; i < 10; ++i)
+//    {
+//      std::cout << "\nTrial #" << i + 1 << std::endl;
+//      runKinematicsTest(acceleration_results, worlds, true, true, true);
+//      runKinematicsTest(velocity_results, worlds, true, true, false);
+//      runKinematicsTest(position_results, worlds, true, false, false);
+//    }
+
+//    std::cout << "\n\n --- Final Kinematics Results --- \n\n";
+
+//    std::cout << "Position, Velocity, Acceleration\n";
+//    print_results(acceleration_results);
+
+//    std::cout << "\nPosition, Velocity\n";
+//    print_results(velocity_results);
+
+//    std::cout << "\nPosition\n";
+//    print_results(position_results);
+
+//    return 0;
+//  }
+
+//  std::cout << "Testing Dynamics" << std::endl;
+//  std::vector<double> dynamics_results;
+//  for (std::size_t i = 0; i < 10; ++i)
+//  {
+//    std::cout << "\nTrial #" << i + 1 << std::endl;
+//    runDynamicsTest(dynamics_results, worlds);
+//  }
+
+//  std::cout << "\n\n --- Final Dynamics Results --- \n\n";
+//  print_results(dynamics_results);
 }
