@@ -1,11 +1,11 @@
-cmake_minimum_required(VERSION 3.8.2)
+cmake_minimum_required(VERSION 3.5.1)
 
 get_filename_component(example_name ${CMAKE_CURRENT_LIST_DIR} NAME)
 
 project(${example_name})
 
 set(required_components utils-urdf gui)
-set(required_libraries dart dart-utils-urdf dart-gui-osg dart-collision-ode)
+set(required_libraries dart dart-utils-urdf dart-gui)
 
 if(DART_IN_SOURCE_BUILD)
   dart_build_example_in_source(${example_name} LINK_LIBRARIES ${required_libraries})
@@ -14,12 +14,6 @@ endif()
 
 find_package(DART 6.6.0 REQUIRED COMPONENTS ${required_components} CONFIG)
 
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_EXTENSIONS OFF)
-
-find_package(Boost COMPONENTS filesystem)
-
 file(GLOB srcs "*.cpp" "*.hpp")
 add_executable(${example_name} ${srcs})
-target_compile_features(${example_name} PUBLIC cxx_std_17)
-target_link_libraries(speed_test PUBLIC ${required_libraries} Boost::filesystem)
+target_link_libraries(${example_name} PUBLIC ${required_libraries})
