@@ -1626,7 +1626,6 @@ void BodyNode::dirtyCoriolisForces()
 //==============================================================================
 void BodyNode::dirtyReactive()
 {
-  std::cout << "Dirtying reactive" << std::endl;
   std::vector<BodyNode*> descendents;
   descendents.push_back(this);
 
@@ -1639,8 +1638,6 @@ void BodyNode::dirtyReactive()
     for(BodyNode* child : mChildBodyNodes)
       descendents.push_back(child);
   }
-
-  std::cout << "Reactives dirtied" << std::endl;
 }
 
 //==============================================================================
@@ -1753,7 +1750,6 @@ void BodyNode::updateArtInertia(double _timeStep) const
 //==============================================================================
 void BodyNode::updateReactive() const
 {
-  std::cout << "updating isReactive" << std::endl;
   const Skeleton* const skel = getRawSkeleton();
   if (skel && skel->isMobile() && getNumDependentGenCoords() > 0)
   {
@@ -2126,11 +2122,9 @@ Eigen::Vector3d BodyNode::getAngularMomentum(const Eigen::Vector3d& _pivot)
 //==============================================================================
 bool BodyNode::isReactive() const
 {
-  std::cout << "Calling isReactive" << std::endl;
   if (mIsReactiveDirty)
     updateReactive();
 
-  std::cout << "returning mIsReactive" << std::endl;
   return mIsReactive;
 }
 
