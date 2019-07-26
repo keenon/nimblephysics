@@ -141,7 +141,7 @@ target_link_libraries(dart
 
 if(ENABLE_PROFILER)
   target_link_libraries(dart
-    PUBLIC
+    PRIVATE
     ignition-common${IGN_COMMON_VER}::profiler)
 endif()
 
