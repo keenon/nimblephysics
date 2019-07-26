@@ -64,6 +64,18 @@ public:
   /// Return the (const) Skeleton this BodyNode belongs to
   std::shared_ptr<const Skeleton> getSkeleton() const;
 
+  /// Convenience function to get the raw skeleton pointer. This is used by
+  /// dartsim internally for better performance.
+  inline Skeleton* getRawSkeleton()
+  {
+    return mRawSkeleton;
+  }
+
+  inline const Skeleton* getRawSkeleton() const
+  {
+    return mRawSkeleton;
+  }
+
 private:
   //--------------------------------------------------------------------------
   // Reference counting
@@ -83,6 +95,10 @@ protected:
 
   /// Weak pointer to the Skeleton this BodyNode belongs to.
   std::weak_ptr<Skeleton> mSkeleton;
+
+  /// Raw pointer to the Skeleton this BodyNode belongs to. Used for better
+  /// performance when safety isn't a concern.
+  Skeleton* mRawSkeleton = nullptr;
 
   /// Reference count for the number of BodyNodePtrs that are referring to this
   /// BodyNode

@@ -100,14 +100,6 @@ void MimicMotorConstraint::setConstraintForceMixing(double cfm)
            << "It is set to 1e-9.\n";
     mConstraintForceMixing = 1e-9;
   }
-  if (cfm > 1.0)
-  {
-    dtwarn << "[MimicMotorConstraint::setConstraintForceMixing] "
-           << "Constraint force mixing parameter[" << cfm
-           << "] is greater than 1.0. "
-           << "It is set to 1.0.\n";
-    mConstraintForceMixing = 1.0;
-  }
 
   mConstraintForceMixing = cfm;
 }
@@ -127,7 +119,7 @@ void MimicMotorConstraint::update()
   std::size_t dof = mJoint->getNumDofs();
   for (std::size_t i = 0; i < dof; ++i)
   {
-    double timeStep = mJoint->getSkeleton()->getTimeStep();
+    double timeStep = mJoint->getRawSkeleton()->getTimeStep();
     double qError = mMimicJoint->getPosition(i) * mMultiplier + mOffset
                     - mJoint->getPosition(i);
     double desiredVelocity = math::clip(
@@ -195,7 +187,7 @@ void MimicMotorConstraint::applyUnitImpulse(std::size_t index)
   assert(index < mDim && "Invalid Index.");
 
   std::size_t localIndex = 0;
-  const dynamics::SkeletonPtr& skeleton = mJoint->getSkeleton();
+  dynamics::Skeleton* const skeleton = mJoint->getRawSkeleton();
 
   std::size_t dof = mJoint->getNumDofs();
   for (std::size_t i = 0; i < dof; ++i)
@@ -230,7 +222,7 @@ void MimicMotorConstraint::getVelocityChange(double* delVel, bool withCfm)
     if (mActive[i] == false)
       continue;
 
-    if (mJoint->getSkeleton()->isImpulseApplied())
+    if (mJoint->getRawSkeleton()->isImpulseApplied())
       delVel[localIndex] = mJoint->getVelocityChange(i);
     else
       delVel[localIndex] = 0.0;
@@ -252,13 +244,13 @@ void MimicMotorConstraint::getVelocityChange(double* delVel, bool withCfm)
 //==============================================================================
 void MimicMotorConstraint::excite()
 {
-  mJoint->getSkeleton()->setImpulseApplied(true);
+  mJoint->getRawSkeleton()->setImpulseApplied(true);
 }
 
 //==============================================================================
 void MimicMotorConstraint::unexcite()
 {
-  mJoint->getSkeleton()->setImpulseApplied(false);
+  mJoint->getRawSkeleton()->setImpulseApplied(false);
 }
 
 //==============================================================================
@@ -284,7 +276,7 @@ void MimicMotorConstraint::applyImpulse(double* lambda)
 //==============================================================================
 dynamics::SkeletonPtr MimicMotorConstraint::getRootSkeleton() const
 {
-  return mJoint->getSkeleton()->mUnionRootSkeleton.lock();
+  return mJoint->getRawSkeleton()->mUnionRootSkeleton.lock();
 }
 
 //==============================================================================

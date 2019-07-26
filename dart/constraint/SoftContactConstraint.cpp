@@ -399,13 +399,6 @@ void SoftContactConstraint::setConstraintForceMixing(double _cfm)
            << "It is set to 1e-9." << std::endl;
     mConstraintForceMixing = 1e-9;
   }
-  if (_cfm > 1.0)
-  {
-    dtwarn << "Constraint force mixing parameter[" << _cfm
-           << "] is greater than 1.0. "
-           << "It is set to 1.0." << std::endl;
-    mConstraintForceMixing = 1.0;
-  }
 
   mConstraintForceMixing = _cfm;
 }
@@ -605,76 +598,76 @@ void SoftContactConstraint::applyUnitImpulse(std::size_t _idx)
   assert(mBodyNode1->isReactive() || mBodyNode2->isReactive());
 
   // Self collision case
-  if (mBodyNode1->getSkeleton() == mBodyNode2->getSkeleton())
+  if (mBodyNode1->getRawSkeleton() == mBodyNode2->getRawSkeleton())
   {
-    mBodyNode1->getSkeleton()->clearConstraintImpulses();
+    mBodyNode1->getRawSkeleton()->clearConstraintImpulses();
 
     if (mPointMass1)
     {
-      mBodyNode1->getSkeleton()->updateBiasImpulse(
+      mBodyNode1->getRawSkeleton()->updateBiasImpulse(
           mSoftBodyNode1, mPointMass1, mJacobians1[_idx].tail<3>());
     }
     else
     {
       if (mBodyNode1->isReactive())
       {
-        mBodyNode1->getSkeleton()->updateBiasImpulse(
+        mBodyNode1->getRawSkeleton()->updateBiasImpulse(
             mBodyNode1, mJacobians1[_idx]);
       }
     }
 
     if (mPointMass2)
     {
-      mBodyNode2->getSkeleton()->updateBiasImpulse(
+      mBodyNode2->getRawSkeleton()->updateBiasImpulse(
           mSoftBodyNode2, mPointMass2, mJacobians2[_idx].tail<3>());
     }
     else
     {
       if (mBodyNode2->isReactive())
       {
-        mBodyNode2->getSkeleton()->updateBiasImpulse(
+        mBodyNode2->getRawSkeleton()->updateBiasImpulse(
             mBodyNode2, mJacobians2[_idx]);
       }
     }
 
-    mBodyNode1->getSkeleton()->updateVelocityChange();
+    mBodyNode1->getRawSkeleton()->updateVelocityChange();
   }
   // Colliding two distinct skeletons
   else
   {
     if (mPointMass1)
     {
-      mBodyNode1->getSkeleton()->clearConstraintImpulses();
-      mBodyNode1->getSkeleton()->updateBiasImpulse(
+      mBodyNode1->getRawSkeleton()->clearConstraintImpulses();
+      mBodyNode1->getRawSkeleton()->updateBiasImpulse(
           mSoftBodyNode1, mPointMass1, mJacobians1[_idx].tail<3>());
-      mBodyNode1->getSkeleton()->updateVelocityChange();
+      mBodyNode1->getRawSkeleton()->updateVelocityChange();
     }
     else
     {
       if (mBodyNode1->isReactive())
       {
-        mBodyNode1->getSkeleton()->clearConstraintImpulses();
-        mBodyNode1->getSkeleton()->updateBiasImpulse(
+        mBodyNode1->getRawSkeleton()->clearConstraintImpulses();
+        mBodyNode1->getRawSkeleton()->updateBiasImpulse(
             mBodyNode1, mJacobians1[_idx]);
-        mBodyNode1->getSkeleton()->updateVelocityChange();
+        mBodyNode1->getRawSkeleton()->updateVelocityChange();
       }
     }
 
     if (mPointMass2)
     {
-      mBodyNode2->getSkeleton()->clearConstraintImpulses();
-      mBodyNode2->getSkeleton()->updateBiasImpulse(
+      mBodyNode2->getRawSkeleton()->clearConstraintImpulses();
+      mBodyNode2->getRawSkeleton()->updateBiasImpulse(
           mSoftBodyNode2, mPointMass2, mJacobians2[_idx].tail<3>());
-      mBodyNode2->getSkeleton()->updateVelocityChange();
+      mBodyNode2->getRawSkeleton()->updateVelocityChange();
     }
     else
     {
       if (mBodyNode2->isReactive())
       {
-        mBodyNode2->getSkeleton()->clearConstraintImpulses();
-        mBodyNode2->getSkeleton()->updateBiasImpulse(
+        mBodyNode2->getRawSkeleton()->clearConstraintImpulses();
+        mBodyNode2->getRawSkeleton()->updateBiasImpulse(
             mBodyNode2, mJacobians2[_idx]);
-        mBodyNode2->getSkeleton()->updateVelocityChange();
+        mBodyNode2->getRawSkeleton()->updateVelocityChange();
       }
     }
   }
@@ -691,7 +684,7 @@ void SoftContactConstraint::getVelocityChange(double* _vel, bool _withCfm)
   {
     _vel[i] = 0.0;
 
-    if (mBodyNode1->getSkeleton()->isImpulseApplied())
+    if (mBodyNode1->getRawSkeleton()->isImpulseApplied())
     {
       if (mPointMass1)
       {
@@ -705,7 +698,7 @@ void SoftContactConstraint::getVelocityChange(double* _vel, bool _withCfm)
       }
     }
 
-    if (mBodyNode2->getSkeleton()->isImpulseApplied())
+    if (mBodyNode2->getRawSkeleton()->isImpulseApplied())
     {
       if (mPointMass2)
       {
@@ -733,20 +726,20 @@ void SoftContactConstraint::getVelocityChange(double* _vel, bool _withCfm)
 void SoftContactConstraint::excite()
 {
   if (mBodyNode1->isReactive())
-    mBodyNode1->getSkeleton()->setImpulseApplied(true);
+    mBodyNode1->getRawSkeleton()->setImpulseApplied(true);
 
   if (mBodyNode2->isReactive())
-    mBodyNode2->getSkeleton()->setImpulseApplied(true);
+    mBodyNode2->getRawSkeleton()->setImpulseApplied(true);
 }
 
 //==============================================================================
 void SoftContactConstraint::unexcite()
 {
   if (mBodyNode1->isReactive())
-    mBodyNode1->getSkeleton()->setImpulseApplied(false);
+    mBodyNode1->getRawSkeleton()->setImpulseApplied(false);
 
   if (mBodyNode2->isReactive())
-    mBodyNode2->getSkeleton()->setImpulseApplied(false);
+    mBodyNode2->getRawSkeleton()->setImpulseApplied(false);
 }
 
 //==============================================================================
@@ -978,9 +971,9 @@ double SoftContactConstraint::computeRestitutionCoefficient(
 dynamics::SkeletonPtr SoftContactConstraint::getRootSkeleton() const
 {
   if (mSoftBodyNode1 || mBodyNode1->isReactive())
-    return mBodyNode1->getSkeleton()->mUnionRootSkeleton.lock();
+    return mBodyNode1->getRawSkeleton()->mUnionRootSkeleton.lock();
   else
-    return mBodyNode2->getSkeleton()->mUnionRootSkeleton.lock();
+    return mBodyNode2->getRawSkeleton()->mUnionRootSkeleton.lock();
 }
 
 //==============================================================================
@@ -989,7 +982,7 @@ void SoftContactConstraint::uniteSkeletons()
   if (!mBodyNode1->isReactive() || !mBodyNode2->isReactive())
     return;
 
-  if (mBodyNode1->getSkeleton() == mBodyNode2->getSkeleton())
+  if (mBodyNode1->getRawSkeleton() == mBodyNode2->getRawSkeleton())
     return;
 
   const dynamics::SkeletonPtr& unionId1

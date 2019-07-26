@@ -501,6 +501,18 @@ ConstSkeletonPtr DegreeOfFreedom::getSkeleton() const
 }
 
 //==============================================================================
+Skeleton* DegreeOfFreedom::getRawSkeleton()
+{
+  return mJoint->getRawSkeleton();
+}
+
+//==============================================================================
+const Skeleton* DegreeOfFreedom::getRawSkeleton() const
+{
+  return mJoint->getRawSkeleton();
+}
+
+//==============================================================================
 BodyNode* DegreeOfFreedom::getChildBodyNode()
 {
   return mJoint->getChildBodyNode();
