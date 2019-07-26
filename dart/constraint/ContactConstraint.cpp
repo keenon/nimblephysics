@@ -728,8 +728,11 @@ void ContactConstraint::getRelVelocity(double* relVel)
 
   Eigen::Map<Eigen::VectorXd> relVelMap(relVel, static_cast<int>(mDim));
   relVelMap.setZero();
-  relVelMap -= mSpatialNormalA.transpose() * mBodyNodeA->getSpatialVelocity();
-  relVelMap -= mSpatialNormalB.transpose() * mBodyNodeB->getSpatialVelocity();
+  relVelMap.noalias()
+      -= mSpatialNormalA.transpose() * mBodyNodeA->getSpatialVelocity();
+
+  relVelMap.noalias()
+      -= mSpatialNormalB.transpose() * mBodyNodeB->getSpatialVelocity();
 }
 
 //==============================================================================

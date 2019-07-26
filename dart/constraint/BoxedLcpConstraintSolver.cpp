@@ -168,6 +168,12 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(ConstrainedGroup& group)
   mHi.resize(n);
   mFIndex.setConstant(n, -1); // set findex to -1
 
+  // TODO(MXG): There is potentially a lot of allocating and deallocating
+  // happening above. It seems that Eigen probably does not bother reusing
+  // buffers when resizing to a smaller matrix/vector for the above objects.
+  // It might be worth trying to use a double* buffer that we control and
+  // wrapping it in an Eigen::Map.
+
   // Compute offset indices
   mOffset.resize(n);
   mOffset[0] = 0;
