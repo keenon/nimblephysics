@@ -487,7 +487,7 @@ int main(int argc, char* argv[])
 
 
 
-  for(std::size_t i=0; i < 150.0/world->getTimeStep(); ++i)
+  for(std::size_t i=0; i < 100.0/world->getTimeStep(); ++i)
   {
     world->step();
   }
