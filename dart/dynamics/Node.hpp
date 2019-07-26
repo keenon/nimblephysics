@@ -171,6 +171,12 @@ public:
   /// Get a pointer to the BodyNode that this Node is associated with
   ConstBodyNodePtr getBodyNodePtr() const;
 
+  ///
+  BodyNode* getBodyNodeRawPtr();
+
+  ///
+  const BodyNode* getBodyNodeRawPtr() const;
+
   /// Returns true if this Node has been staged for removal from its BodyNode.
   /// It will be deleted once all strong references to it expire. If it is an
   /// AccessoryNode, you can call reattach() to prevent that from happening.
