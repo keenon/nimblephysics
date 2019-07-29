@@ -76,24 +76,7 @@ void OdeCollisionGroup::addCollisionObjectToEngine(CollisionObject* object)
 {
   auto casted = static_cast<OdeCollisionObject*>(object);
   auto geomId = casted->getOdeGeomId();
-
-  auto name = object->getShapeFrame()
-                  ->asShapeNode()
-                  ->getBodyNodePtr()
-                  ->getSkeleton()
-                  ->getName();
-  auto iter = mSpaces.find(name);
-
-  auto space = mSpaceId;
-  if (iter == mSpaces.end())
-  {
-    space = dSimpleSpaceCreate(mSpaceId);
-    mSpaces[name] = space;
-  }
-  else
-  {
-    space = iter->second;
-  }
+  auto space = getOrCreateObjectSpaceId(object);
 
   dSpaceAdd(space, geomId);
 
@@ -108,7 +91,9 @@ void OdeCollisionGroup::addCollisionObjectsToEngine(
   {
     auto casted = static_cast<OdeCollisionObject*>(collObj);
     auto geomId = casted->getOdeGeomId();
-    dSpaceAdd(mSpaceId, geomId);
+    auto space = getOrCreateObjectSpaceId(casted);
+
+    dSpaceAdd(space, geomId);
   }
 
   initializeEngineData();
@@ -119,7 +104,9 @@ void OdeCollisionGroup::removeCollisionObjectFromEngine(CollisionObject* object)
 {
   auto casted = static_cast<OdeCollisionObject*>(object);
   auto geomId = casted->getOdeGeomId();
-  dSpaceRemove(mSpaceId, geomId);
+  auto space = getOrCreateObjectSpaceId(object);
+
+  dSpaceRemove(space, geomId);
 
   initializeEngineData();
 }
@@ -142,6 +129,21 @@ void OdeCollisionGroup::updateCollisionGroupEngineData()
 dSpaceID OdeCollisionGroup::getOdeSpaceId() const
 {
   return mSpaceId;
+}
+
+dSpaceID OdeCollisionGroup::getOrCreateObjectSpaceId(CollisionObject* object)
+{
+  auto key = object->getShapeFrame()->asShapeNode()->getBodyNodePtr();
+
+  auto iter = mSpaces.find(key);
+  if (iter == mSpaces.end())
+  {
+    auto space = dSimpleSpaceCreate(mSpaceId);
+    mSpaces[key] = space;
+    return space;
+  }
+
+  return iter->second;
 }
 
 } // namespace collision

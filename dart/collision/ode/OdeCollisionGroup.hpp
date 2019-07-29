@@ -35,6 +35,7 @@
 
 #include <ode/ode.h>
 
+#include "dart/dynamics/SmartPointer.hpp"
 #include "dart/collision/CollisionGroup.hpp"
 
 namespace dart {
@@ -76,12 +77,14 @@ protected:
   /// Returns ODE space id associated with this collision group
   dSpaceID getOdeSpaceId() const;
 
+  dSpaceID getOrCreateObjectSpaceId(CollisionObject* object);
+
 protected:
   /// Top-level space for all sub-spaces/collisions
   dSpaceID mSpaceId;
 
   /// Map of collision subspaces
-  std::map<std::string, dSpaceID> mSpaces;
+  std::map<dynamics::ConstBodyNodePtr, dSpaceID> mSpaces;
 };
 
 } // namespace collision
