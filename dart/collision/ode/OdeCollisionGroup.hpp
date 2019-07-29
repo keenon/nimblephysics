@@ -79,6 +79,9 @@ protected:
 protected:
   /// Top-level space for all sub-spaces/collisions
   dSpaceID mSpaceId;
+
+  /// Map of collision subspaces
+  std::map<std::string, dSpaceID> mSpaces;
 };
 
 } // namespace collision

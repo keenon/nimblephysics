@@ -255,8 +255,12 @@ namespace {
 //==============================================================================
 void CollisionCallback(void* data, dGeomID o1, dGeomID o2)
 {
-  assert(!dGeomIsSpace(o1));
-  assert(!dGeomIsSpace(o2));
+  // Check if either are spaces
+  if (dGeomIsSpace(o1) || dGeomIsSpace(o2))
+  {
+    dSpaceCollide2(o1, o2, data, &CollisionCallback);
+    return;
+  }
 
   auto cdData = static_cast<OdeCollisionCallbackData*>(data);
 

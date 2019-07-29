@@ -76,7 +76,26 @@ void OdeCollisionGroup::addCollisionObjectToEngine(CollisionObject* object)
 {
   auto casted = static_cast<OdeCollisionObject*>(object);
   auto geomId = casted->getOdeGeomId();
-  dSpaceAdd(mSpaceId, geomId);
+
+  auto name = object->getShapeFrame()
+                  ->asShapeNode()
+                  ->getBodyNodePtr()
+                  ->getSkeleton()
+                  ->getName();
+  auto iter = mSpaces.find(name);
+
+  auto space = mSpaceId;
+  if (iter == mSpaces.end())
+  {
+    space = dSimpleSpaceCreate(mSpaceId);
+    mSpaces[name] = space;
+  }
+  else
+  {
+    space = iter->second;
+  }
+
+  dSpaceAdd(space, geomId);
 
   initializeEngineData();
 }
