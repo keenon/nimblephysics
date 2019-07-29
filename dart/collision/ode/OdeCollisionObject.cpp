@@ -105,6 +105,12 @@ OdeCollisionObject::OdeCollisionObject(
     dGeomSetOffsetPosition(geomId, geomRelPos[0], geomRelPos[1], geomRelPos[2]);
     dGeomSetOffsetQuaternion(geomId, geomRelRot);
   }
+
+  if (!(shapeFrame->asShapeNode()->getBodyNodePtr()->getSkeleton()->isMobile()))
+  {
+    dGeomSetCategoryBits(geomId, 0x1);
+    dGeomSetCollideBits(geomId, ~0x1);
+  }
 }
 
 //==============================================================================
