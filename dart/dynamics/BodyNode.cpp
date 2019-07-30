@@ -1634,12 +1634,9 @@ void BodyNode::dirtyReactive()
     BodyNode* current = descendents.back();
     descendents.pop_back();
 
-    if (!current->mIsReactiveDirty)
-    {
-      current->mIsReactiveDirty = true;
-      for(BodyNode* child : mChildBodyNodes)
-        descendents.push_back(child);
-    }
+    current->mIsReactiveDirty = true;
+    for (BodyNode* child : current->mChildBodyNodes)
+      descendents.push_back(child);
   }
 }
 
