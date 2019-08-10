@@ -46,12 +46,12 @@ const double minimum_start_v = 2.5; // m/s
 const double maximum_start_v = 4.0; // m/s
 const double default_start_v = 3.5; // m/s
 
-const double minimum_launch_angle = 30.0 * M_PI / 180.0; // rad
-const double maximum_launch_angle = 70.0 * M_PI / 180.0; // rad
-const double default_launch_angle = 45.0 * M_PI / 180.0; // rad
+const double minimum_launch_angle = dart::math::toRadian(30.0); // rad
+const double maximum_launch_angle = dart::math::toRadian(70.0); // rad
+const double default_launch_angle = dart::math::toRadian(45.0); // rad
 
-const double maximum_start_w = 6 * M_PI; // rad/s
-const double default_start_w = 3 * M_PI; // rad/s
+const double maximum_start_w = 6 * dart::math::constantsd::pi(); // rad/s
+const double default_start_w = 3 * dart::math::constantsd::pi(); // rad/s
 
 const double ring_spring_stiffness = 0.5;
 const double ring_damping_coefficient = 0.05;
@@ -83,7 +83,7 @@ void setupRing(const SkeletonPtr& ring)
 
   // Compute the joint angle needed to form a ring
   std::size_t numEdges = ring->getNumBodyNodes();
-  double angle = 2 * M_PI / numEdges;
+  double angle = 2 * dart::math::constantsd::pi() / numEdges;
 
   // Set the BallJoints so that they have the correct rest position angle
   for (std::size_t i = 1; i < ring->getNumJoints(); ++i)
@@ -392,7 +392,9 @@ BodyNode* addRigidBody(
         default_shape_height * Eigen::Vector3d::Ones());
   }
 
-  bn->createShapeNodeWith<VisualAspect, CollisionAspect, DynamicsAspect>(shape);
+  auto shapeNode
+      = bn->createShapeNodeWith<VisualAspect, CollisionAspect, DynamicsAspect>(
+          shape);
 
   // Setup the inertia for the body
   Inertia inertia;
@@ -402,7 +404,7 @@ BodyNode* addRigidBody(
   bn->setInertia(inertia);
 
   // Set the coefficient of restitution to make the body more bouncy
-  bn->setRestitutionCoeff(default_restitution);
+  shapeNode->getDynamicsAspect()->setRestitutionCoeff(default_restitution);
 
   // Set damping to make the simulation more stable
   if (parent)
@@ -466,11 +468,12 @@ BodyNode* addSoftBody(
            height = 2 * default_shape_width;
 
     // Mass of center
-    double mass = default_shape_density * height * 2 * M_PI * radius
+    double mass = default_shape_density * height * 2
+                  * dart::math::constantsd::pi() * radius
                   * default_skin_thickness;
     // Mass of top and bottom
-    mass += 2 * default_shape_density * M_PI * pow(radius, 2)
-            * default_skin_thickness;
+    mass += 2 * default_shape_density * dart::math::constantsd::pi()
+            * pow(radius, 2) * default_skin_thickness;
     soft_properties = SoftBodyNodeHelper::makeCylinderProperties(
         radius, height, 8, 3, 2, mass);
   }
@@ -478,8 +481,8 @@ BodyNode* addSoftBody(
   {
     double radius = default_shape_height / 2.0;
     Eigen::Vector3d dims = 2 * radius * Eigen::Vector3d::Ones();
-    double mass = default_shape_density * 4.0 * M_PI * pow(radius, 2)
-                  * default_skin_thickness;
+    double mass = default_shape_density * 4.0 * dart::math::constantsd::pi()
+                  * pow(radius, 2) * default_skin_thickness;
     soft_properties
         = SoftBodyNodeHelper::makeEllipsoidProperties(dims, 6, 6, mass);
   }
@@ -656,7 +659,7 @@ SkeletonPtr createWall()
       (default_wall_height - default_wall_thickness) / 2.0);
   bn->getParentJoint()->setTransformFromParentBodyNode(tf);
 
-  bn->setRestitutionCoeff(0.2);
+  shapeNode->getDynamicsAspect()->setRestitutionCoeff(0.2);
 
   return wall;
 }
