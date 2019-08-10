@@ -60,8 +60,7 @@ void ProjectExplorerWidget::render()
   if (!ImGui::Begin(
           "Project Explorer",
           &mIsVisible,
-          ImGuiWindowFlags_NoResize
-              | ImGuiWindowFlags_HorizontalScrollbar))
+          ImGuiWindowFlags_NoResize | ImGuiWindowFlags_HorizontalScrollbar))
   {
     // Early out if the window is collapsed, as an optimization.
     ImGui::End();

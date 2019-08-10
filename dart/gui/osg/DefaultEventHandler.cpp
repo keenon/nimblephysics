@@ -143,9 +143,8 @@ Eigen::Vector3d DefaultEventHandler::getDeltaCursor(
 }
 
 //==============================================================================
-void DefaultEventHandler::getNearAndFarPointUnderCursor(Eigen::Vector3d& near,
-                                                        Eigen::Vector3d& far,
-                                                        float distance) const
+void DefaultEventHandler::getNearAndFarPointUnderCursor(
+    Eigen::Vector3d& near, Eigen::Vector3d& far, float distance) const
 {
   ::osg::Camera* C = mViewer->getCamera();
   ::osg::Matrix VPW = C->getViewMatrix() * C->getProjectionMatrix()
@@ -155,8 +154,8 @@ void DefaultEventHandler::getNearAndFarPointUnderCursor(Eigen::Vector3d& near,
 
   float x = getWindowCursorX();
   float y = getWindowCursorY();
-  auto osgNear = ::osg::Vec3f(x,y,0.0) * invVPW;
-  auto osgFar = ::osg::Vec3f(x,y,distance) * invVPW;
+  auto osgNear = ::osg::Vec3f(x, y, 0.0) * invVPW;
+  auto osgFar = ::osg::Vec3f(x, y, distance) * invVPW;
 
   near = osgToEigVec3(osgNear).cast<double>();
   far = osgToEigVec3(osgFar).cast<double>();

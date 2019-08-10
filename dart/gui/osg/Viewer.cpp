@@ -383,11 +383,10 @@ void Viewer::removeWorldNode(WorldNode* oldWorldNode)
   auto it = std::find_if(
       mWorldNodes.begin(),
       mWorldNodes.end(),
-      [&oldWorldNode](const std::pair<::osg::ref_ptr<WorldNode>, bool>& pair)
-      {
+      [&oldWorldNode](const std::pair<::osg::ref_ptr<WorldNode>, bool>& pair) {
         return pair.first == oldWorldNode;
       });
-  if(it == mWorldNodes.end())
+  if (it == mWorldNodes.end())
     return;
 
   mRootGroup->removeChild(it->first);
@@ -416,7 +415,7 @@ WorldNode* Viewer::getWorldNode(
   for (; it != end; ++it)
   {
     WorldNode* checkNode = it->first.get();
-    if(checkNode->getWorld() == world)
+    if (checkNode->getWorld() == world)
     {
       node = checkNode;
       break;
@@ -541,11 +540,10 @@ void Viewer::setWorldNodeActive(WorldNode* node, bool active)
   auto it = std::find_if(
       mWorldNodes.begin(),
       mWorldNodes.end(),
-      [&node](const std::pair<::osg::ref_ptr<WorldNode>, bool>& pair)
-      {
+      [&node](const std::pair<::osg::ref_ptr<WorldNode>, bool>& pair) {
         return pair.first == node;
       });
-  if(it == mWorldNodes.end())
+  if (it == mWorldNodes.end())
     return;
 
   it->second = active;

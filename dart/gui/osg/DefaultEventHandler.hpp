@@ -141,9 +141,8 @@ public:
   /// Get two points that are under the current cursor position. The near point
   /// will be inside the plane of the camera. The far point will have the given
   /// distance from the plane of the camera (default is 1.0).
-  void getNearAndFarPointUnderCursor(Eigen::Vector3d& near,
-                                     Eigen::Vector3d& far,
-                                     float distance=1.0f) const;
+  void getNearAndFarPointUnderCursor(
+      Eigen::Vector3d& near, Eigen::Vector3d& far, float distance = 1.0f) const;
 
   /// Get the most recent picks for the specified button and event type
   const std::vector<PickInfo>& getButtonPicks(

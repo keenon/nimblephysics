@@ -396,15 +396,14 @@ public:
     {
       if (mViewer->isAllowingSimulation())
       {
+        // Point cloud settings
+        bool pcShow = !mNode->getPointCloudVisualAspect()->isHidden();
+        if (ImGui::Checkbox("Point Cloud", &pcShow))
         {
-          bool pcShow = !pointCloudVisualAspect->isHidden();
-          if (ImGui::Checkbox("Point Cloud", &pcShow))
-          {
-            if (pcShow)
-              pointCloudVisualAspect->show();
-            else
-              pointCloudVisualAspect->hide();
-          }
+          if (pcShow)
+            mNode->getPointCloudVisualAspect()->show();
+          else
+            mNode->getPointCloudVisualAspect()->hide();
         }
 
         if (pcShow)
