@@ -173,6 +173,8 @@ public:
   /// Remove the WorldNode associated with _oldWorld from this Viewer
   void removeWorldNode(std::shared_ptr<dart::simulation::World> _oldWorld);
 
+  void removeAllWorldNodes();
+
   /// Get the WorldNode associated with the given _world. Returns nullptr if
   /// this Viewer does not contain a WorldNode associated with _world.
   WorldNode* getWorldNode(

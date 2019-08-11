@@ -401,6 +401,13 @@ void Viewer::removeWorldNode(std::shared_ptr<dart::simulation::World> _oldWorld)
 }
 
 //==============================================================================
+void Viewer::removeAllWorldNodes()
+{
+  mRootGroup->removeChildren(0, mRootGroup->getNumChildren());
+  mWorldNodes.clear();
+}
+
+//==============================================================================
 WorldNode* Viewer::getWorldNode(
     std::shared_ptr<dart::simulation::World> _world) const
 {

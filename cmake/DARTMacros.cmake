@@ -220,7 +220,7 @@ function(dart_build_target_in_source target)
     endforeach()
   endif()
 
-  file(GLOB srcs "*.cpp" "*.hpp")
+  file(GLOB_RECURSE srcs "*.cpp" "*.hpp")
 
   add_executable(${target} ${srcs})
 
