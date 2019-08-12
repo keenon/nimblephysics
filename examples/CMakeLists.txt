@@ -24,5 +24,8 @@ add_subdirectory(soft_bodies)
 add_subdirectory(tinkertoy)
 add_subdirectory(wam_ikfast)
 
+# BSF renderer examples
+add_subdirectory(bsf_helloworld)
+
 # Deprecated examples
 add_subdirectory(deprecated_examples)

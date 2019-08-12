@@ -42,7 +42,7 @@
    else no check is done (which is less robust)
 */
 #define USE_EPSILON_TEST TRUE
-#define EPSILON 0.000001
+#define DART_COLLISION_FCL_EPSILON 0.000001
 
 #define NO_CONTACT 0
 #define COPLANAR_CONTACT -1
@@ -183,11 +183,11 @@ inline int tri_tri_intersect(
 
   /* coplanarity robustness check */
 #if USE_EPSILON_TEST == TRUE
-  if (fabs(du0) < EPSILON)
+  if (fabs(du0) < DART_COLLISION_FCL_EPSILON)
     du0 = 0.0;
-  if (fabs(du1) < EPSILON)
+  if (fabs(du1) < DART_COLLISION_FCL_EPSILON)
     du1 = 0.0;
-  if (fabs(du2) < EPSILON)
+  if (fabs(du2) < DART_COLLISION_FCL_EPSILON)
     du2 = 0.0;
   if (du1 == 0 && du2 == 0 && fabs(du0) < 1e-4)
     du0 = 0.0;
@@ -217,11 +217,11 @@ inline int tri_tri_intersect(
   dv2 = DOT(N2, V2) + d2;
 
 #if USE_EPSILON_TEST == TRUE
-  if (fabs(dv0) < EPSILON)
+  if (fabs(dv0) < DART_COLLISION_FCL_EPSILON)
     dv0 = 0.0;
-  if (fabs(dv1) < EPSILON)
+  if (fabs(dv1) < DART_COLLISION_FCL_EPSILON)
     dv1 = 0.0;
-  if (fabs(dv2) < EPSILON)
+  if (fabs(dv2) < DART_COLLISION_FCL_EPSILON)
     dv2 = 0.0;
   if (dv1 == 0 && dv2 == 0 && fabs(dv0) < 1e-5)
     dv0 = 0.0;
