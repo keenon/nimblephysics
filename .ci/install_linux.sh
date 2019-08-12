@@ -62,6 +62,16 @@ else
   exit 1
 fi
 
+# Install BSF
+git clone https://github.com/GameFoundry/bsf -b 'v1.1.0' --single-branch --depth 1
+cd bsf
+mkdir build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release -DBSF_ENABLE_EXCEPTIONS=ON -DBSF_ENABLE_RTTI=ON
+make -j4
+$SUDO make install
+cd ../..
+
 if [ "$BUILD_DARTPY" = "ON" ]; then
   $SUDO apt-get -y install python3-dev python3-numpy
   $SUDO apt-get -y install python3-pip -y
