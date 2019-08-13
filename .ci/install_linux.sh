@@ -59,11 +59,10 @@ else
 fi
 
 # Install BSF
-if [ $(lsb_release -sc) = "bionic" ] \
-  || [ $(lsb_release -sc) = "cosmic" ] \
+if [ $(lsb_release -sc) = "cosmic" ] \
   || [ $(lsb_release -sc) = "disco" ] \
   || [ $(lsb_release -sc) = "eoan" ]; then
-  $SUDO apt-get -y install uuid-dev
+  $SUDO apt-get -y install uuid-dev libxcursor-dev
   git clone https://github.com/GameFoundry/bsf -b 'v1.1.0' --single-branch --depth 1
   cd bsf
   mkdir build
