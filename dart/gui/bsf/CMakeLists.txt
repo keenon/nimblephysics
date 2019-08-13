@@ -5,7 +5,7 @@ endif()
 
 # OpenSceneGraph
 if(DART_BUILD_GUI_BSF)
-  find_package(bsf REQUIRED)
+  find_package(bsf QUIET)
   if (NOT bsf_FOUND)
     message(STATUS "Skipping BS::Framework because bsf is not found")
     return()
