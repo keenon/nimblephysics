@@ -6,8 +6,12 @@ endif()
 # OpenSceneGraph
 if(DART_BUILD_GUI_BSF)
   find_package(bsf REQUIRED)
+  if (NOT bsf_FOUND)
+    message(STATUS "Skipping BS::Framework because bsf is not found")
+    return()
+  endif()
 else()
-  message(STATUS "Skipping OpenSceneGraph (DART_BUILD_GUI_OSG == ${DART_BUILD_GUI_OSG})")
+  message(STATUS "Skipping BS::Framework (DART_BUILD_GUI_BSF == ${DART_BUILD_GUI_BSF})")
   return()
 endif()
 
