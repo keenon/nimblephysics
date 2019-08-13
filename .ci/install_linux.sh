@@ -68,7 +68,7 @@ if [ $(lsb_release -sc) = "cosmic" ] \
   mkdir build
   cd build
   cmake .. -DCMAKE_BUILD_TYPE=Release -DBSF_ENABLE_EXCEPTIONS=ON -DBSF_ENABLE_RTTI=ON
-  make -j4
+  make -j$(nproc)
   $SUDO make install
   cd ../..
 fi
@@ -85,7 +85,7 @@ if [ "$BUILD_DARTPY" = "ON" ]; then
     mkdir build
     cd build
     cmake .. -DCMAKE_BUILD_TYPE=Release -DPYBIND11_TEST=OFF
-    make -j4
+    make -j$(nproc)
     $SUDO make install
     cd ../..
   elif [ $(lsb_release -sc) = "cosmic" ] \
