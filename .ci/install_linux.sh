@@ -62,7 +62,7 @@ fi
 if [ $(lsb_release -sc) = "cosmic" ] \
   || [ $(lsb_release -sc) = "disco" ] \
   || [ $(lsb_release -sc) = "eoan" ]; then
-  $SUDO apt-get -y install uuid-dev libxcursor-dev
+  $SUDO apt-get -y install uuid-dev libxcursor-dev libxrandr-dev
   git clone https://github.com/GameFoundry/bsf -b 'v1.1.0' --single-branch --depth 1
   cd bsf
   mkdir build
