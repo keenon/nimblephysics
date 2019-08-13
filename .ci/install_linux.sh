@@ -48,13 +48,9 @@ elif [ $(lsb_release -sc) = "bionic" ]; then
   $SUDO apt-get -y install libnlopt-dev
   $SUDO apt-get -y install liboctomap-dev libode-dev
   $SUDO apt-get -y install clang-format-6.0
-elif [ $(lsb_release -sc) = "cosmic" ]; then
-  $SUDO apt-get -y install libnlopt-cxx-dev
-  $SUDO apt-get -y install liboctomap-dev libode-dev
-elif [ $(lsb_release -sc) = "disco" ]; then
-  $SUDO apt-get -y install libnlopt-cxx-dev
-  $SUDO apt-get -y install liboctomap-dev libode-dev
-elif [ $(lsb_release -sc) = "eoan" ]; then
+elif [ $(lsb_release -sc) = "cosmic" ] \
+  || [ $(lsb_release -sc) = "disco" ] \
+  || [ $(lsb_release -sc) = "eoan" ]; then
   $SUDO apt-get -y install libnlopt-cxx-dev
   $SUDO apt-get -y install liboctomap-dev libode-dev
 else
@@ -63,21 +59,28 @@ else
 fi
 
 # Install BSF
-git clone https://github.com/GameFoundry/bsf -b 'v1.1.0' --single-branch --depth 1
-cd bsf
-mkdir build
-cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release -DBSF_ENABLE_EXCEPTIONS=ON -DBSF_ENABLE_RTTI=ON
-make -j4
-$SUDO make install
-cd ../..
+if [ $(lsb_release -sc) = "bionic" ] \
+  || [ $(lsb_release -sc) = "cosmic" ] \
+  || [ $(lsb_release -sc) = "disco" ] \
+  || [ $(lsb_release -sc) = "eoan" ]; then
+  $SUDO apt-get -y install uuid-dev
+  git clone https://github.com/GameFoundry/bsf -b 'v1.1.0' --single-branch --depth 1
+  cd bsf
+  mkdir build
+  cd build
+  cmake .. -DCMAKE_BUILD_TYPE=Release -DBSF_ENABLE_EXCEPTIONS=ON -DBSF_ENABLE_RTTI=ON
+  make -j4
+  $SUDO make install
+  cd ../..
+fi
 
 if [ "$BUILD_DARTPY" = "ON" ]; then
   $SUDO apt-get -y install python3-dev python3-numpy
   $SUDO apt-get -y install python3-pip -y
   $SUDO pip3 install pytest -U
 
-  if [ $(lsb_release -sc) = "xenial" ]; then
+  if [ $(lsb_release -sc) = "xenial" ] \
+    || [ $(lsb_release -sc) = "bionic" ]; then
     git clone https://github.com/pybind/pybind11 -b 'v2.3.0' --single-branch --depth 1
     cd pybind11
     mkdir build
@@ -86,22 +89,9 @@ if [ "$BUILD_DARTPY" = "ON" ]; then
     make -j4
     $SUDO make install
     cd ../..
-  elif [ $(lsb_release -sc) = "bionic" ]; then
-    git clone https://github.com/pybind/pybind11 -b 'v2.3.0' --single-branch --depth 1
-    cd pybind11
-    mkdir build
-    cd build
-    cmake .. -DCMAKE_BUILD_TYPE=Release -DPYBIND11_TEST=OFF
-    make -j4
-    $SUDO make install
-    cd ../..
-  elif [ $(lsb_release -sc) = "cosmic" ]; then
-    $SUDO apt-get -y install pybind11-dev python3 libpython3-dev python3-pytest \
-      python3-distutils
-  elif [ $(lsb_release -sc) = "disco" ]; then
-    $SUDO apt-get -y install pybind11-dev python3 libpython3-dev python3-pytest \
-      python3-distutils
-  elif [ $(lsb_release -sc) = "eoan" ]; then
+  elif [ $(lsb_release -sc) = "cosmic" ] \
+    || [ $(lsb_release -sc) = "disco" ] \
+    || [ $(lsb_release -sc) = "eoan" ]; then
     $SUDO apt-get -y install pybind11-dev python3 libpython3-dev python3-pytest \
       python3-distutils
   else
