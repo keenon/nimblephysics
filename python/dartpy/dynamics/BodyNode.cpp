@@ -104,36 +104,10 @@ void BodyNode(py::module& m)
               const std::string&,
               const dart::dynamics::Inertia&,
               bool,
-              double>(),
-          ::py::arg("name"),
-          ::py::arg("inertia"),
-          ::py::arg("isCollidable"),
-          ::py::arg("frictionCoeff"))
-      .def(
-          ::py::init<
-              const std::string&,
-              const dart::dynamics::Inertia&,
-              bool,
-              double,
-              double>(),
-          ::py::arg("name"),
-          ::py::arg("inertia"),
-          ::py::arg("isCollidable"),
-          ::py::arg("frictionCoeff"),
-          ::py::arg("restitutionCoeff"))
-      .def(
-          ::py::init<
-              const std::string&,
-              const dart::dynamics::Inertia&,
-              bool,
-              double,
-              double,
               bool>(),
           ::py::arg("name"),
           ::py::arg("inertia"),
           ::py::arg("isCollidable"),
-          ::py::arg("frictionCoeff"),
-          ::py::arg("restitutionCoeff"),
           ::py::arg("gravityMode"))
       .def_readwrite(
           "mName", &dart::dynamics::detail::BodyNodeAspectProperties::mName)
@@ -143,12 +117,6 @@ void BodyNode(py::module& m)
       .def_readwrite(
           "mIsCollidable",
           &dart::dynamics::detail::BodyNodeAspectProperties::mIsCollidable)
-      .def_readwrite(
-          "mFrictionCoeff",
-          &dart::dynamics::detail::BodyNodeAspectProperties::mFrictionCoeff)
-      .def_readwrite(
-          "mRestitutionCoeff",
-          &dart::dynamics::detail::BodyNodeAspectProperties::mRestitutionCoeff)
       .def_readwrite(
           "mGravityMode",
           &dart::dynamics::detail::BodyNodeAspectProperties::mGravityMode);
@@ -654,6 +622,11 @@ void BodyNode(py::module& m)
           },
           ::py::arg("inertia"))
       .def(
+          "getInertia",
+          +[](const dart::dynamics::BodyNode* self)
+              -> const dart::dynamics::Inertia& { return self->getInertia(); },
+          ::py::return_value_policy::reference_internal)
+      .def(
           "setLocalCOM",
           +[](dart::dynamics::BodyNode* self, const Eigen::Vector3d& _com) {
             self->setLocalCOM(_com);
@@ -753,28 +726,6 @@ void BodyNode(py::module& m)
           },
           ::py::arg("relativeTo"),
           ::py::arg("inCoordinatesOf"))
-      .def(
-          "setFrictionCoeff",
-          +[](dart::dynamics::BodyNode* self, double _coeff) {
-            self->setFrictionCoeff(_coeff);
-          },
-          ::py::arg("coeff"))
-      .def(
-          "getFrictionCoeff",
-          +[](const dart::dynamics::BodyNode* self) -> double {
-            return self->getFrictionCoeff();
-          })
-      .def(
-          "setRestitutionCoeff",
-          +[](dart::dynamics::BodyNode* self, double _coeff) {
-            self->setRestitutionCoeff(_coeff);
-          },
-          ::py::arg("coeff"))
-      .def(
-          "getRestitutionCoeff",
-          +[](const dart::dynamics::BodyNode* self) -> double {
-            return self->getRestitutionCoeff();
-          })
       .def(
           "getIndexInSkeleton",
           +[](const dart::dynamics::BodyNode* self) -> std::size_t {
@@ -921,10 +872,24 @@ void BodyNode(py::module& m)
             return self->getNumChildBodyNodes();
           })
       .def(
+          "getChildBodyNode",
+          +[](dart::dynamics::BodyNode* self,
+              std::size_t index) -> dart::dynamics::BodyNode* {
+            return self->getChildBodyNode(index);
+          },
+          ::py::arg("index"),
+          ::py::return_value_policy::reference_internal)
+      .def(
           "getNumChildJoints",
           +[](const dart::dynamics::BodyNode* self) -> std::size_t {
             return self->getNumChildJoints();
           })
+      .def(
+          "getChildJoint",
+          +[](dart::dynamics::BodyNode* self, std::size_t index)
+              -> dart::dynamics::Joint* { return self->getChildJoint(index); },
+          ::py::arg("index"),
+          ::py::return_value_policy::reference_internal)
       .def(
           "getNumShapeNodes",
           +[](const dart::dynamics::BodyNode* self) -> std::size_t {
