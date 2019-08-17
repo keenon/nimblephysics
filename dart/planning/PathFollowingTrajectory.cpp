@@ -44,13 +44,10 @@ using namespace std;
 namespace dart {
 namespace planning {
 
-const double PathFollowingTrajectory::timeStep = 0.001;
-const double PathFollowingTrajectory::eps = 0.000001;
+const double PathFollowingTrajectory::timeStep = 1.0e-3;
+const double PathFollowingTrajectory::eps = 1.0e-6;
 
-// static double squared(double d) {
-// 	return d * d;
-// }
-
+//==============================================================================
 PathFollowingTrajectory::PathFollowingTrajectory(
     const Path& path,
     const VectorXd& maxVelocity,
@@ -83,7 +80,7 @@ PathFollowingTrajectory::PathFollowingTrajectory(
     double beforeAcceleration;
     TrajectoryStep switchingPoint;
     if (getNextSwitchingPoint(
-            startTrajectory.back().pathPos,
+            startTrajectory.back().mPathPos,
             switchingPoint,
             beforeAcceleration,
             afterAcceleration))
@@ -109,13 +106,13 @@ PathFollowingTrajectory::PathFollowingTrajectory(
   // calculate timing
   list<TrajectoryStep>::iterator previous = trajectory.begin();
   list<TrajectoryStep>::iterator it = previous;
-  it->time = 0.0;
+  it->mTime = 0.0;
   ++it;
   while (it != trajectory.end())
   {
-    it->time = previous->time
-               + (it->pathPos - previous->pathPos)
-                     / ((it->pathVel + previous->pathVel) / 2.0);
+    it->mTime = previous->mTime
+                + (it->mPathPos - previous->mPathPos)
+                      / ((it->mPathVel + previous->mPathVel) / 2.0);
     previous = it;
     ++it;
   }
@@ -123,16 +120,13 @@ PathFollowingTrajectory::PathFollowingTrajectory(
   // debug
   // ofstream file("trajectory.txt");
   // for(list<TrajectoryStep>::iterator it = trajectory.begin(); it !=
-  // trajectory.end(); it++) { 	file << it->pathPos << "  " << it->pathVel <<
+  // trajectory.end(); it++) { 	file << it->mPathPos << "  " << it->mPathVel <<
   // endl;
   //}
   // file.close();
 }
 
-PathFollowingTrajectory::~PathFollowingTrajectory(void)
-{
-}
-
+//==============================================================================
 // returns true if end of path is reached.
 bool PathFollowingTrajectory::getNextSwitchingPoint(
     double pathPos,
@@ -146,7 +140,7 @@ bool PathFollowingTrajectory::getNextSwitchingPoint(
   do
   {
     accelerationReachedEnd = getNextAccelerationSwitchingPoint(
-        accelerationSwitchingPoint.pathPos,
+        accelerationSwitchingPoint.mPathPos,
         accelerationSwitchingPoint,
         accelerationBeforeAcceleration,
         accelerationAfterAcceleration);
@@ -154,8 +148,8 @@ bool PathFollowingTrajectory::getNextSwitchingPoint(
     // getVelocityMaxPathVelocity(accelerationSwitchingPoint.pathPos);
   } while (
       !accelerationReachedEnd
-      && accelerationSwitchingPoint.pathVel
-             > getVelocityMaxPathVelocity(accelerationSwitchingPoint.pathPos));
+      && accelerationSwitchingPoint.mPathVel
+             > getVelocityMaxPathVelocity(accelerationSwitchingPoint.mPathPos));
 
   TrajectoryStep velocitySwitchingPoint(pathPos, 0.0);
   double velocityBeforeAcceleration, velocityAfterAcceleration;
@@ -163,19 +157,19 @@ bool PathFollowingTrajectory::getNextSwitchingPoint(
   do
   {
     velocityReachedEnd = getNextVelocitySwitchingPoint(
-        velocitySwitchingPoint.pathPos,
+        velocitySwitchingPoint.mPathPos,
         velocitySwitchingPoint,
         velocityBeforeAcceleration,
         velocityAfterAcceleration);
   } while (!velocityReachedEnd
-           && velocitySwitchingPoint.pathPos
-                  <= accelerationSwitchingPoint.pathPos
-           && (velocitySwitchingPoint.pathVel
+           && velocitySwitchingPoint.mPathPos
+                  <= accelerationSwitchingPoint.mPathPos
+           && (velocitySwitchingPoint.mPathVel
                    > getAccelerationMaxPathVelocity(
-                         velocitySwitchingPoint.pathPos - eps)
-               || velocitySwitchingPoint.pathVel
+                         velocitySwitchingPoint.mPathPos - eps)
+               || velocitySwitchingPoint.mPathVel
                       > getAccelerationMaxPathVelocity(
-                            velocitySwitchingPoint.pathPos + eps)));
+                            velocitySwitchingPoint.mPathPos + eps)));
 
   if (accelerationReachedEnd && velocityReachedEnd)
   {
@@ -184,8 +178,8 @@ bool PathFollowingTrajectory::getNextSwitchingPoint(
   else if (
       !accelerationReachedEnd
       && (velocityReachedEnd
-          || accelerationSwitchingPoint.pathPos
-                 <= velocitySwitchingPoint.pathPos))
+          || accelerationSwitchingPoint.mPathPos
+                 <= velocitySwitchingPoint.mPathPos))
   {
     nextSwitchingPoint = accelerationSwitchingPoint;
     beforeAcceleration = accelerationBeforeAcceleration;
@@ -201,6 +195,7 @@ bool PathFollowingTrajectory::getNextSwitchingPoint(
   }
 }
 
+//==============================================================================
 bool PathFollowingTrajectory::getNextAccelerationSwitchingPoint(
     double pathPos,
     TrajectoryStep& nextSwitchingPoint,
@@ -264,6 +259,7 @@ bool PathFollowingTrajectory::getNextAccelerationSwitchingPoint(
   return false;
 }
 
+//==============================================================================
 bool PathFollowingTrajectory::getNextVelocitySwitchingPoint(
     double pathPos,
     TrajectoryStep& nextSwitchingPoint,
@@ -320,12 +316,13 @@ bool PathFollowingTrajectory::getNextVelocitySwitchingPoint(
   return false;
 }
 
+//==============================================================================
 bool PathFollowingTrajectory::integrateForward(
     list<TrajectoryStep>& trajectory, double acceleration)
 {
 
-  double pathPos = trajectory.back().pathPos;
-  double pathVel = trajectory.back().pathVel;
+  double pathPos = trajectory.back().mPathPos;
+  double pathVel = trajectory.back().mPathVel;
 
   list<pair<double, bool> > switchingPoints = path.getSwitchingPoints();
   list<pair<double, bool> >::iterator nextDiscontinuity
@@ -396,14 +393,14 @@ bool PathFollowingTrajectory::integrateForward(
       TrajectoryStep overshoot = trajectory.back();
       trajectory.pop_back();
       double slope = getSlope(trajectory.back(), overshoot);
-      double before = trajectory.back().pathPos;
-      double after = overshoot.pathPos;
+      double before = trajectory.back().mPathPos;
+      double after = overshoot.mPathPos;
       while (after - before > 0.00001)
       {
         const double midpoint = 0.5 * (before + after);
         double midpointPathVel
-            = trajectory.back().pathVel
-              + slope * (midpoint - trajectory.back().pathPos);
+            = trajectory.back().mPathVel
+              + slope * (midpoint - trajectory.back().mPathPos);
 
         if (midpointPathVel > getVelocityMaxPathVelocity(midpoint)
             && getMinMaxPhaseSlope(
@@ -421,8 +418,8 @@ bool PathFollowingTrajectory::integrateForward(
       }
       trajectory.push_back(TrajectoryStep(
           before,
-          trajectory.back().pathVel
-              + slope * (before - trajectory.back().pathPos)));
+          trajectory.back().mPathVel
+              + slope * (before - trajectory.back().mPathPos)));
 
       if (getAccelerationMaxPathVelocity(after)
           < getVelocityMaxPathVelocity(after))
@@ -433,8 +430,8 @@ bool PathFollowingTrajectory::integrateForward(
         }
         else if (
             getMinMaxPhaseSlope(
-                trajectory.back().pathPos, trajectory.back().pathVel, true)
-            > getAccelerationMaxPathVelocityDeriv(trajectory.back().pathPos))
+                trajectory.back().mPathPos, trajectory.back().mPathVel, true)
+            > getAccelerationMaxPathVelocityDeriv(trajectory.back().mPathPos))
         {
           return false;
         }
@@ -442,8 +439,8 @@ bool PathFollowingTrajectory::integrateForward(
       else
       {
         if (getMinMaxPhaseSlope(
-                trajectory.back().pathPos, trajectory.back().pathVel, false)
-            > getVelocityMaxPathVelocityDeriv(trajectory.back().pathPos))
+                trajectory.back().mPathPos, trajectory.back().mPathVel, false)
+            > getVelocityMaxPathVelocityDeriv(trajectory.back().mPathPos))
         {
           return false;
         }
@@ -452,14 +449,15 @@ bool PathFollowingTrajectory::integrateForward(
   }
 }
 
+//==============================================================================
 void PathFollowingTrajectory::integrateBackward(
     list<TrajectoryStep>& trajectory,
     list<TrajectoryStep>& startTrajectory,
     double acceleration)
 {
   list<TrajectoryStep>::reverse_iterator before = startTrajectory.rbegin();
-  double pathPos = trajectory.front().pathPos;
-  double pathVel = trajectory.front().pathVel;
+  double pathPos = trajectory.front().mPathPos;
+  double pathVel = trajectory.front().mPathVel;
 
   while (true)
   {
@@ -480,7 +478,7 @@ void PathFollowingTrajectory::integrateBackward(
       return;
     }
 
-    while (before != startTrajectory.rend() && before->pathPos > pathPos)
+    while (before != startTrajectory.rend() && before->mPathPos > pathPos)
     {
       ++before;
     }
@@ -489,8 +487,8 @@ void PathFollowingTrajectory::integrateBackward(
 
     if (before != startTrajectory.rbegin()
         && pathVel
-               >= before->pathVel
-                      + getSlope(before.base()) * (pathPos - before->pathPos))
+               >= before->mPathVel
+                      + getSlope(before.base()) * (pathPos - before->mPathPos))
     {
       TrajectoryStep overshoot = trajectory.front();
       trajectory.pop_front();
@@ -518,13 +516,13 @@ void PathFollowingTrajectory::integrateBackward(
       TrajectoryStep overshoot = trajectory.front();
       trajectory.pop_front();
       double slope = getSlope(overshoot, trajectory.front());
-      double before = overshoot.pathPos;
-      double after = trajectory.front().pathPos;
+      double before = overshoot.mPathPos;
+      double after = trajectory.front().mPathPos;
       while (after - before > 0.00001)
       {
         const double midpoint = 0.5 * (before + after);
         double midpointPathVel
-            = overshoot.pathVel + slope * (midpoint - overshoot.pathPos);
+            = overshoot.mPathVel + slope * (midpoint - overshoot.mPathPos);
 
         if (midpointPathVel > getAccelerationMaxPathVelocity(midpoint)
             || midpointPathVel > getVelocityMaxPathVelocity(midpoint))
@@ -533,20 +531,20 @@ void PathFollowingTrajectory::integrateBackward(
           after = midpoint;
       }
       trajectory.push_front(TrajectoryStep(
-          after, overshoot.pathVel + slope * (after - overshoot.pathPos)));
+          after, overshoot.mPathVel + slope * (after - overshoot.mPathPos)));
 
       if (getAccelerationMaxPathVelocity(before)
           < getVelocityMaxPathVelocity(before))
       {
-        if (trajectory.front().pathVel
+        if (trajectory.front().mPathVel
             > getAccelerationMaxPathVelocity(before) + 0.0001)
         {
           error = true;
         }
         else if (
             getMinMaxPhaseSlope(
-                trajectory.front().pathPos, trajectory.front().pathVel, false)
-            < getAccelerationMaxPathVelocityDeriv(trajectory.front().pathPos))
+                trajectory.front().mPathPos, trajectory.front().mPathVel, false)
+            < getAccelerationMaxPathVelocityDeriv(trajectory.front().mPathPos))
         {
           error = true;
         }
@@ -554,8 +552,8 @@ void PathFollowingTrajectory::integrateBackward(
       else
       {
         if (getMinMaxPhaseSlope(
-                trajectory.back().pathPos, trajectory.back().pathVel, false)
-            < getVelocityMaxPathVelocityDeriv(trajectory.back().pathPos))
+                trajectory.back().mPathPos, trajectory.back().mPathVel, false)
+            < getVelocityMaxPathVelocityDeriv(trajectory.back().mPathPos))
         {
           error = true;
         }
@@ -569,13 +567,13 @@ void PathFollowingTrajectory::integrateBackward(
            it != startTrajectory.end();
            ++it)
       {
-        file << it->pathPos << "  " << it->pathVel << endl;
+        file << it->mPathPos << "  " << it->mPathVel << endl;
       }
       for (list<TrajectoryStep>::iterator it = trajectory.begin();
            it != trajectory.end();
            ++it)
       {
-        file << it->pathPos << "  " << it->pathVel << endl;
+        file << it->mPathPos << "  " << it->mPathVel << endl;
       }
       file.close();
       cout << "error" << endl;
@@ -585,13 +583,16 @@ void PathFollowingTrajectory::integrateBackward(
   }
 }
 
-inline double PathFollowingTrajectory::getSlope(
+//==============================================================================
+double PathFollowingTrajectory::getSlope(
     const TrajectoryStep& point1, const TrajectoryStep& point2)
 {
-  return (point2.pathVel - point1.pathVel) / (point2.pathPos - point1.pathPos);
+  return (point2.mPathVel - point1.mPathVel)
+         / (point2.mPathPos - point1.mPathPos);
 }
 
-inline double PathFollowingTrajectory::getSlope(
+//==============================================================================
+double PathFollowingTrajectory::getSlope(
     list<TrajectoryStep>::const_iterator lineEnd)
 {
   list<TrajectoryStep>::const_iterator lineStart = lineEnd;
@@ -599,6 +600,7 @@ inline double PathFollowingTrajectory::getSlope(
   return getSlope(*lineStart, *lineEnd);
 }
 
+//==============================================================================
 PathFollowingTrajectory::TrajectoryStep
 PathFollowingTrajectory::getIntersection(
     const list<TrajectoryStep>& trajectory,
@@ -606,21 +608,20 @@ PathFollowingTrajectory::getIntersection(
     const TrajectoryStep& linePoint1,
     const TrajectoryStep& linePoint2)
 {
-
   const double lineSlope = getSlope(linePoint1, linePoint2);
   it--;
 
   double factor = 1.0;
-  if (it->pathVel
-      > linePoint1.pathVel + lineSlope * (it->pathPos - linePoint1.pathPos))
+  if (it->mPathVel
+      > linePoint1.mPathVel + lineSlope * (it->mPathPos - linePoint1.mPathPos))
     factor = -1.0;
   it++;
 
   while (it != trajectory.end()
-         && factor * it->pathVel
+         && factor * it->mPathVel
                 < factor
-                      * (linePoint1.pathVel
-                         + lineSlope * (it->pathPos - linePoint1.pathPos)))
+                      * (linePoint1.mPathVel
+                         + lineSlope * (it->mPathPos - linePoint1.mPathPos)))
   {
     it++;
   }
@@ -633,16 +634,17 @@ PathFollowingTrajectory::getIntersection(
   {
     const double trajectorySlope = getSlope(it);
     const double intersectionPathPos
-        = (it->pathVel - linePoint1.pathVel + lineSlope * linePoint1.pathPos
-           - trajectorySlope * it->pathPos)
+        = (it->mPathVel - linePoint1.mPathVel + lineSlope * linePoint1.mPathPos
+           - trajectorySlope * it->mPathPos)
           / (lineSlope - trajectorySlope);
     const double intersectionPathVel
-        = linePoint1.pathVel
-          + lineSlope * (intersectionPathPos - linePoint1.pathPos);
+        = linePoint1.mPathVel
+          + lineSlope * (intersectionPathPos - linePoint1.mPathPos);
     return TrajectoryStep(intersectionPathPos, intersectionPathVel);
   }
 }
 
+//==============================================================================
 double PathFollowingTrajectory::getMinMaxPathAcceleration(
     double pathPos, double pathVel, bool max)
 {
@@ -663,12 +665,14 @@ double PathFollowingTrajectory::getMinMaxPathAcceleration(
   return factor * maxPathAcceleration;
 }
 
+//==============================================================================
 double PathFollowingTrajectory::getMinMaxPhaseSlope(
     double pathPos, double pathVel, bool max)
 {
   return getMinMaxPathAcceleration(pathPos, pathVel, max) / pathVel;
 }
 
+//==============================================================================
 double PathFollowingTrajectory::getAccelerationMaxPathVelocity(double pathPos)
 {
   double maxPathVelocity = numeric_limits<double>::infinity();
@@ -706,6 +710,7 @@ double PathFollowingTrajectory::getAccelerationMaxPathVelocity(double pathPos)
   return maxPathVelocity;
 }
 
+//==============================================================================
 double PathFollowingTrajectory::getVelocityMaxPathVelocity(double pathPos)
 {
   const VectorXd tangent = path.getTangent(pathPos);
@@ -718,6 +723,7 @@ double PathFollowingTrajectory::getVelocityMaxPathVelocity(double pathPos)
   return maxPathVelocity;
 }
 
+//==============================================================================
 double PathFollowingTrajectory::getAccelerationMaxPathVelocityDeriv(
     double pathPos)
 {
@@ -726,6 +732,7 @@ double PathFollowingTrajectory::getAccelerationMaxPathVelocityDeriv(
          / (2.0 * eps);
 }
 
+//==============================================================================
 double PathFollowingTrajectory::getVelocityMaxPathVelocityDeriv(double pathPos)
 {
   const VectorXd tangent = path.getTangent(pathPos);
@@ -745,20 +752,23 @@ double PathFollowingTrajectory::getVelocityMaxPathVelocityDeriv(double pathPos)
          / (tangent[activeConstraint] * std::abs(tangent[activeConstraint]));
 }
 
+//==============================================================================
 bool PathFollowingTrajectory::isValid() const
 {
   return valid;
 }
 
+//==============================================================================
 double PathFollowingTrajectory::getDuration() const
 {
-  return trajectory.back().time;
+  return trajectory.back().mTime;
 }
 
+//==============================================================================
 list<PathFollowingTrajectory::TrajectoryStep>::const_iterator
 PathFollowingTrajectory::getTrajectorySegment(double time) const
 {
-  if (time >= trajectory.back().time)
+  if (time >= trajectory.back().mTime)
   {
     list<TrajectoryStep>::const_iterator last = trajectory.end();
     --last;
@@ -770,7 +780,7 @@ PathFollowingTrajectory::getTrajectorySegment(double time) const
     {
       cachedTrajectorySegment = trajectory.begin();
     }
-    while (time >= cachedTrajectorySegment->time)
+    while (time >= cachedTrajectorySegment->mTime)
     {
       ++cachedTrajectorySegment;
     }
@@ -779,49 +789,52 @@ PathFollowingTrajectory::getTrajectorySegment(double time) const
   }
 }
 
+//==============================================================================
 VectorXd PathFollowingTrajectory::getPosition(double time) const
 {
   list<TrajectoryStep>::const_iterator it = getTrajectorySegment(time);
   list<TrajectoryStep>::const_iterator previous = it;
   --previous;
 
-  // const double pathPos = previous->pathPos + (time - previous->time) *
-  // (previous->pathVel + it->pathVel) / 2.0;
+  // const double pathPos = previous->mPathPos + (time - previous->mTime) *
+  // (previous->mPathVel + it->mPathVel) / 2.0;
 
-  double timeStep = it->time - previous->time;
+  double timeStep = it->mTime - previous->mTime;
   const double acceleration
-      = (it->pathPos - previous->pathPos - timeStep * previous->pathVel)
+      = (it->mPathPos - previous->mPathPos - timeStep * previous->mPathVel)
         / (timeStep * timeStep);
 
-  timeStep = time - previous->time;
-  const double pathPos = previous->pathPos + timeStep * previous->pathVel
+  timeStep = time - previous->mTime;
+  const double pathPos = previous->mPathPos + timeStep * previous->mPathVel
                          + timeStep * timeStep * acceleration;
 
   return path.getConfig(pathPos);
 }
 
+//==============================================================================
 VectorXd PathFollowingTrajectory::getVelocity(double time) const
 {
   list<TrajectoryStep>::const_iterator it = getTrajectorySegment(time);
   list<TrajectoryStep>::const_iterator previous = it;
   --previous;
 
-  // const double pathPos = previous->pathPos + (time - previous->time) *
-  // (previous->pathVel + it->pathVel) / 2.0;
+  // const double pathPos = previous->mPathPos + (time - previous->mTime) *
+  // (previous->mPathVel + it->mPathVel) / 2.0;
 
-  double timeStep = it->time - previous->time;
+  double timeStep = it->mTime - previous->mTime;
   const double acceleration
-      = (it->pathPos - previous->pathPos - timeStep * previous->pathVel)
+      = (it->mPathPos - previous->mPathPos - timeStep * previous->mPathVel)
         / (timeStep * timeStep);
 
-  timeStep = time - previous->time;
-  const double pathPos = previous->pathPos + timeStep * previous->pathVel
+  timeStep = time - previous->mTime;
+  const double pathPos = previous->mPathPos + timeStep * previous->mPathVel
                          + timeStep * timeStep * acceleration;
-  const double pathVel = previous->pathVel + timeStep * acceleration;
+  const double pathVel = previous->mPathVel + timeStep * acceleration;
 
   return path.getTangent(pathPos) * pathVel;
 }
 
+//==============================================================================
 double PathFollowingTrajectory::getMaxAccelerationError()
 {
   double maxAccelerationError = 0.0;
@@ -832,16 +845,16 @@ double PathFollowingTrajectory::getMaxAccelerationError()
     list<TrajectoryStep>::const_iterator previous = it;
     --previous;
 
-    double timeStep = it->time - previous->time;
+    double timeStep = it->mTime - previous->mTime;
     const double pathAcceleration
-        = (it->pathPos - previous->pathPos - timeStep * previous->pathVel)
+        = (it->mPathPos - previous->mPathPos - timeStep * previous->mPathVel)
           / (timeStep * timeStep);
 
-    timeStep = time - previous->time;
-    const double pathPos = previous->pathPos + timeStep * previous->pathVel
+    timeStep = time - previous->mTime;
+    const double pathPos = previous->mPathPos + timeStep * previous->mPathVel
                            + timeStep * timeStep * pathAcceleration;
 
-    const double pathVel = previous->pathVel + timeStep * pathAcceleration;
+    const double pathVel = previous->mPathVel + timeStep * pathAcceleration;
 
     VectorXd acceleration = path.getTangent(pathPos) * pathAcceleration
                             + path.getCurvature(pathPos) * pathVel * pathVel;

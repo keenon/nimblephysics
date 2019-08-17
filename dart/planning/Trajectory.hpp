@@ -43,6 +43,7 @@ namespace planning {
 class Trajectory
 {
 public:
+  virtual ~Trajectory() = default;
   virtual double getDuration() const = 0;
   virtual Eigen::VectorXd getPosition(double time) const = 0;
   virtual Eigen::VectorXd getVelocity(double time) const = 0;

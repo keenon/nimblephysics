@@ -38,11 +38,11 @@
 #include <cmath>
 #include <iostream>
 #include <vector>
-#include <Eigen/Geometry>
-#include "dart/math/Constants.hpp"
 
-using namespace std;
-using namespace Eigen;
+#include <Eigen/Geometry>
+
+#include "dart/common/Console.hpp"
+#include "dart/math/Constants.hpp"
 
 namespace dart {
 namespace planning {
@@ -51,40 +51,41 @@ class LinearPathSegment : public PathSegment
 {
 public:
   LinearPathSegment(const Eigen::VectorXd& start, const Eigen::VectorXd& end)
-    : PathSegment((end - start).norm()), start(start), end(end)
+    : PathSegment((end - start).norm()), mStart(start), mEnd(end)
   {
+    // Do nothing
   }
 
-  Eigen::VectorXd getConfig(double s) const
+  Eigen::VectorXd getConfig(double s) const override
   {
-    s /= length;
+    s /= mLength;
     s = std::max(0.0, std::min(1.0, s));
-    return (1.0 - s) * start + s * end;
+    return (1.0 - s) * mStart + s * mEnd;
   }
 
-  Eigen::VectorXd getTangent(double /* s */) const
+  Eigen::VectorXd getTangent(double /* s */) const override
   {
-    return (end - start) / length;
+    return (mEnd - mStart) / mLength;
   }
 
-  Eigen::VectorXd getCurvature(double /* s */) const
+  Eigen::VectorXd getCurvature(double /* s */) const override
   {
-    return Eigen::VectorXd::Zero(start.size());
+    return Eigen::VectorXd::Zero(mStart.size());
   }
 
-  list<double> getSwitchingPoints() const
+  std::list<double> getSwitchingPoints() const override
   {
-    return list<double>();
+    return std::list<double>();
   }
 
-  LinearPathSegment* clone() const
+  std::shared_ptr<PathSegment> clone() const override
   {
-    return new LinearPathSegment(*this);
+    return std::make_shared<LinearPathSegment>(*this);
   }
 
 private:
-  Eigen::VectorXd start;
-  Eigen::VectorXd end;
+  Eigen::VectorXd mStart;
+  Eigen::VectorXd mEnd;
 };
 
 class CircularPathSegment : public PathSegment
@@ -99,11 +100,11 @@ public:
     if ((intersection - start).norm() < 0.000001
         || (end - intersection).norm() < 0.000001)
     {
-      length = 0.0;
-      radius = 1.0;
-      center = intersection;
-      x = Eigen::VectorXd::Zero(start.size());
-      y = Eigen::VectorXd::Zero(start.size());
+      mLength = 0.0;
+      mRadius = 1.0;
+      mCenter = intersection;
+      mX = Eigen::VectorXd::Zero(start.size());
+      mY = Eigen::VectorXd::Zero(start.size());
       return;
     }
 
@@ -112,11 +113,11 @@ public:
 
     if ((startDirection - endDirection).norm() < 0.000001)
     {
-      length = 0.0;
-      radius = 1.0;
-      center = intersection;
-      x = Eigen::VectorXd::Zero(start.size());
-      y = Eigen::VectorXd::Zero(start.size());
+      mLength = 0.0;
+      mRadius = 1.0;
+      mCenter = intersection;
+      mX = Eigen::VectorXd::Zero(start.size());
+      mY = Eigen::VectorXd::Zero(start.size());
       return;
     }
 
@@ -132,58 +133,58 @@ public:
         maxDeviation * sin(0.5 * angle)
             / (1.0 - cos(0.5 * angle))); // enforce max deviation
 
-    radius = distance / tan(0.5 * angle);
-    length = angle * radius;
+    mRadius = distance / tan(0.5 * angle);
+    mLength = angle * mRadius;
 
-    center = intersection
-             + (endDirection - startDirection).normalized() * radius
-                   / cos(0.5 * angle);
-    x = (intersection - distance * startDirection - center).normalized();
-    y = startDirection;
+    mCenter = intersection
+              + (endDirection - startDirection).normalized() * mRadius
+                    / cos(0.5 * angle);
+    mX = (intersection - distance * startDirection - mCenter).normalized();
+    mY = startDirection;
 
     // debug
     double dotStart
         = startDirection.dot((intersection - getConfig(0.0)).normalized());
     double dotEnd
-        = endDirection.dot((getConfig(length) - intersection).normalized());
+        = endDirection.dot((getConfig(mLength) - intersection).normalized());
     if (std::abs(dotStart - 1.0) > 0.0001 || std::abs(dotEnd - 1.0) > 0.0001)
     {
       std::cout << "Error\n";
     }
   }
 
-  Eigen::VectorXd getConfig(double s) const
+  Eigen::VectorXd getConfig(double s) const override
   {
-    const double angle = s / radius;
-    return center + radius * (x * cos(angle) + y * sin(angle));
+    const double angle = s / mRadius;
+    return mCenter + mRadius * (mX * cos(angle) + mY * sin(angle));
   }
 
-  Eigen::VectorXd getTangent(double s) const
+  Eigen::VectorXd getTangent(double s) const override
   {
-    const double angle = s / radius;
-    return -x * sin(angle) + y * cos(angle);
+    const double angle = s / mRadius;
+    return -mX * sin(angle) + mY * cos(angle);
   }
 
-  Eigen::VectorXd getCurvature(double s) const
+  Eigen::VectorXd getCurvature(double s) const override
   {
-    const double angle = s / radius;
-    return -1.0 / radius * (x * cos(angle) + y * sin(angle));
+    const double angle = s / mRadius;
+    return -1.0 / mRadius * (mX * cos(angle) + mY * sin(angle));
   }
 
-  list<double> getSwitchingPoints() const
+  std::list<double> getSwitchingPoints() const override
   {
     const double pi = math::constantsd::pi();
-    list<double> switchingPoints;
-    const double dim = x.size();
+    std::list<double> switchingPoints;
+    const double dim = mX.size();
     for (unsigned int i = 0; i < dim; i++)
     {
-      double switchingAngle = atan2(y[i], x[i]);
+      double switchingAngle = atan2(mY[i], mX[i]);
       if (switchingAngle < 0.0)
       {
         switchingAngle += pi;
       }
-      const double switchingPoint = switchingAngle * radius;
-      if (switchingPoint < length)
+      const double switchingPoint = switchingAngle * mRadius;
+      if (switchingPoint < mLength)
       {
         switchingPoints.push_back(switchingPoint);
       }
@@ -192,71 +193,117 @@ public:
     return switchingPoints;
   }
 
-  CircularPathSegment* clone() const
+  std::shared_ptr<PathSegment> clone() const override
   {
-    return new CircularPathSegment(*this);
+    return std::make_shared<CircularPathSegment>(*this);
   }
 
 private:
-  double radius;
-  Eigen::VectorXd center;
-  Eigen::VectorXd x;
-  Eigen::VectorXd y;
+  double mRadius;
+  Eigen::VectorXd mCenter;
+  Eigen::VectorXd mX;
+  Eigen::VectorXd mY;
 };
 
-Path::Path(const list<VectorXd>& path, double maxDeviation) : length(0.0)
+//==============================================================================
+PathSegment::PathSegment(double length) : mPosition(0.0), mLength(length)
+{
+  // Do nothing
+}
+
+//==============================================================================
+void PathSegment::setPosition(double position)
+{
+  mPosition = position;
+}
+
+//==============================================================================
+double PathSegment::getPosition() const
+{
+  return mPosition;
+}
+
+//==============================================================================
+double PathSegment::getLength() const
+{
+  return mLength;
+}
+
+//==============================================================================
+bool validatePath(
+    const Eigen::VectorXd& startConfig,
+    const Eigen::VectorXd& endConfig,
+    const Eigen::VectorXd& config1,
+    const Eigen::VectorXd& config2,
+    const Eigen::VectorXd& config3)
+{
+  const double tol = 1.0e-6;
+
+  const auto distE1 = (endConfig - config1).norm();
+  const auto dist2E = (config2 - endConfig).norm();
+  const auto vecE1Norm = (endConfig - config1).normalized();
+  const auto vec2ENorm = (config2 - endConfig).normalized();
+  if (distE1 > tol && dist2E > tol
+      && std::abs(vecE1Norm.dot(vec2ENorm) - 1.0) > tol)
+  {
+    return false;
+  }
+
+  const auto distS2 = (startConfig - config2).norm();
+  const auto dist3S = (config2 - startConfig).norm();
+  const auto vecS2Norm = (startConfig - config2).normalized();
+  const auto vec3SNorm = (config3 - startConfig).normalized();
+  if (distS2 > tol && dist3S > tol
+      && std::abs(vecS2Norm.dot(vec3SNorm) - 1.0) > tol)
+  {
+    return false;
+  }
+
+  return true;
+}
+
+//==============================================================================
+Path::Path(const std::list<Eigen::VectorXd>& path, double maxDeviation)
+  : mLength(0.0)
 {
   if (path.size() < 2)
     return;
-  list<VectorXd>::const_iterator config1 = path.begin();
-  list<VectorXd>::const_iterator config2 = config1;
+
+  auto config1 = path.cbegin();
+  auto config2 = config1;
   ++config2;
-  list<VectorXd>::const_iterator config3;
-  VectorXd startConfig = *config1;
+  std::list<Eigen::VectorXd>::const_iterator config3;
+  Eigen::VectorXd startConfig = *config1;
   while (config2 != path.end())
   {
     config3 = config2;
     ++config3;
-    if (maxDeviation > 0.0 && config3 != path.end())
+    if (maxDeviation > 0.0 && config3 != path.cend())
     {
-      CircularPathSegment* blendSegment = new CircularPathSegment(
+      auto blendSegment = std::make_shared<CircularPathSegment>(
           0.5 * (*config1 + *config2),
           *config2,
           0.5 * (*config2 + *config3),
           maxDeviation);
-      VectorXd endConfig = blendSegment->getConfig(0.0);
+      Eigen::VectorXd endConfig = blendSegment->getConfig(0.0);
       if ((endConfig - startConfig).norm() > 0.000001)
       {
-        pathSegments.push_back(new LinearPathSegment(startConfig, endConfig));
+        mPathSegments.push_back(
+            std::make_shared<LinearPathSegment>(startConfig, endConfig));
       }
-      pathSegments.push_back(blendSegment);
+      mPathSegments.push_back(blendSegment);
 
       startConfig = blendSegment->getConfig(blendSegment->getLength());
 
-      // debug
-      if (((endConfig - *config1).norm() > 0.000001
-           && (*config2 - endConfig).norm() > 0.000001
-           && std::abs(
-                  (endConfig - *config1)
-                      .normalized()
-                      .dot((*config2 - endConfig).normalized())
-                  - 1.0)
-                  > 0.000001)
-          || ((startConfig - *config2).norm() > 0.000001
-              && (*config3 - startConfig).norm() > 0.000001
-              && std::abs(
-                     (startConfig - *config2)
-                         .normalized()
-                         .dot((*config3 - startConfig).normalized())
-                     - 1.0)
-                     > 0.000001))
+      if (!validatePath(startConfig, endConfig, *config1, *config2, *config3))
       {
-        cout << "error" << endl;
+        dterr << "[Path] The input path is not valid.\n";
       }
     }
     else
     {
-      pathSegments.push_back(new LinearPathSegment(startConfig, *config2));
+      mPathSegments.push_back(
+          std::make_shared<LinearPathSegment>(startConfig, *config2));
       startConfig = *config2;
     }
     config1 = config2;
@@ -265,93 +312,83 @@ Path::Path(const list<VectorXd>& path, double maxDeviation) : length(0.0)
 
   // create list of switching point candidates, calculate total path length and
   // absolute positions of path segments
-  for (list<PathSegment*>::iterator segment = pathSegments.begin();
-       segment != pathSegments.end();
-       ++segment)
+  for (auto& segment : mPathSegments)
   {
-    (*segment)->position = length;
-    list<double> localSwitchingPoints = (*segment)->getSwitchingPoints();
-    for (list<double>::const_iterator point = localSwitchingPoints.begin();
-         point != localSwitchingPoints.end();
-         ++point)
+    segment->setPosition(mLength);
+    std::list<double> localSwitchingPoints = segment->getSwitchingPoints();
+    for (const auto& point : localSwitchingPoints)
     {
-      switchingPoints.push_back(make_pair(length + *point, false));
+      mSwitchingPoints.push_back(std::make_pair(mLength + point, false));
     }
-    length += (*segment)->getLength();
-    switchingPoints.push_back(make_pair(length, true));
+    mLength += segment->getLength();
+    mSwitchingPoints.push_back(std::make_pair(mLength, true));
   }
-  switchingPoints.pop_back();
+  mSwitchingPoints.pop_back();
 }
 
-Path::Path(const Path& path)
-  : length(path.length), switchingPoints(path.switchingPoints)
+//==============================================================================
+Path::Path(const Path& other)
+  : mLength(other.mLength), mSwitchingPoints(other.mSwitchingPoints)
 {
-  for (list<PathSegment*>::const_iterator it = path.pathSegments.begin();
-       it != path.pathSegments.end();
-       ++it)
-  {
-    pathSegments.push_back((*it)->clone());
-  }
+  for (const auto& pathSegment : mPathSegments)
+    mPathSegments.push_back(pathSegment->clone());
 }
 
-Path::~Path()
-{
-  for (list<PathSegment*>::iterator it = pathSegments.begin();
-       it != pathSegments.end();
-       ++it)
-  {
-    delete *it;
-  }
-}
-
+//==============================================================================
 double Path::getLength() const
 {
-  return length;
+  return mLength;
 }
 
+//==============================================================================
 PathSegment* Path::getPathSegment(double& s) const
 {
-  list<PathSegment*>::const_iterator it = pathSegments.begin();
-  list<PathSegment*>::const_iterator next = it;
+  auto it = mPathSegments.cbegin();
+  auto next = it;
   ++next;
-  while (next != pathSegments.end() && s >= (*next)->position)
+  while (next != mPathSegments.cend() && s >= (*next)->getPosition())
   {
     it = next;
     ++next;
   }
-  s -= (*it)->position;
-  return *it;
+  s -= (*it)->getPosition();
+  return it->get();
 }
 
-VectorXd Path::getConfig(double s) const
+//==============================================================================
+Eigen::VectorXd Path::getConfig(double s) const
 {
   const PathSegment* pathSegment = getPathSegment(s);
   return pathSegment->getConfig(s);
 }
 
-VectorXd Path::getTangent(double s) const
+//==============================================================================
+Eigen::VectorXd Path::getTangent(double s) const
 {
   const PathSegment* pathSegment = getPathSegment(s);
   return pathSegment->getTangent(s);
 }
 
-VectorXd Path::getCurvature(double s) const
+//==============================================================================
+Eigen::VectorXd Path::getCurvature(double s) const
 {
   const PathSegment* pathSegment = getPathSegment(s);
   return pathSegment->getCurvature(s);
 }
 
+//==============================================================================
 double Path::getNextSwitchingPoint(double s, bool& discontinuity) const
 {
-  list<pair<double, bool> >::const_iterator it = switchingPoints.begin();
-  while (it != switchingPoints.end() && it->first <= s)
+  auto it = mSwitchingPoints.cbegin();
+  while (it != mSwitchingPoints.cend() && it->first <= s)
   {
     ++it;
   }
-  if (it == switchingPoints.end())
+
+  if (it == mSwitchingPoints.cend())
   {
     discontinuity = true;
-    return length;
+    return mLength;
   }
   else
   {
@@ -360,9 +397,10 @@ double Path::getNextSwitchingPoint(double s, bool& discontinuity) const
   }
 }
 
-list<pair<double, bool> > Path::getSwitchingPoints() const
+//==============================================================================
+std::list<std::pair<double, bool>> Path::getSwitchingPoints() const
 {
-  return switchingPoints;
+  return mSwitchingPoints;
 }
 
 } // namespace planning

@@ -49,27 +49,35 @@ public:
       const Path& path,
       const Eigen::VectorXd& maxVelocity,
       const Eigen::VectorXd& maxAcceleration);
-  ~PathFollowingTrajectory(void);
 
+  ~PathFollowingTrajectory() override = default;
+
+  /// Returns if the path is valid.
   bool isValid() const;
-  double getDuration() const;
-  Eigen::VectorXd getPosition(double time) const;
-  Eigen::VectorXd getVelocity(double time) const;
+
+  // Documentation inherited
+  double getDuration() const override;
+
+  // Documentation inherited
+  Eigen::VectorXd getPosition(double time) const override;
+
+  // Documentation inherited
+  Eigen::VectorXd getVelocity(double time) const override;
+
   double getMaxAccelerationError();
 
 private:
   struct TrajectoryStep
   {
-    TrajectoryStep()
-    {
-    }
+    TrajectoryStep() = default;
     TrajectoryStep(double pathPos, double pathVel)
-      : pathPos(pathPos), pathVel(pathVel), time(0.0)
+      : mPathPos(pathPos), mPathVel(pathVel), mTime(0.0)
     {
+      // Do nothing
     }
-    double pathPos;
-    double pathVel;
-    double time;
+    double mPathPos;
+    double mPathVel;
+    double mTime;
   };
 
   bool getNextSwitchingPoint(
@@ -107,9 +115,8 @@ private:
       std::list<TrajectoryStep>::iterator& it,
       const TrajectoryStep& linePoint1,
       const TrajectoryStep& linePoint2);
-  inline double getSlope(
-      const TrajectoryStep& point1, const TrajectoryStep& point2);
-  inline double getSlope(std::list<TrajectoryStep>::const_iterator lineEnd);
+  double getSlope(const TrajectoryStep& point1, const TrajectoryStep& point2);
+  double getSlope(std::list<TrajectoryStep>::const_iterator lineEnd);
 
   std::list<TrajectoryStep>::const_iterator getTrajectorySegment(
       double time) const;

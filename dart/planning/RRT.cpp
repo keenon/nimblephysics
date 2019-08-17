@@ -5,35 +5,29 @@
  * The list of contributors can be found at:
  *   https://github.com/dartsim/dart/blob/master/LICENSE
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *
- *     * Redistributions of source code must retain the above
- *       copyright notice, this list of conditions and the following
- *       disclaimer.
- *     * Redistributions in binary form must reproduce the above
- *       copyright notice, this list of conditions and the following
- *       disclaimer in the documentation and/or other materials
- *       provided with the distribution.
- *     * Neither the name of the Georgia Tech Research Corporation nor
- *       the names of its contributors may be used to endorse or
- *       promote products derived from this software without specific
- *       prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY GEORGIA TECH RESEARCH CORPORATION ''AS
- * IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
- * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL GEORGIA
- * TECH RESEARCH CORPORATION BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
- * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
- * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
- * OF THE POSSIBILITY OF SUCH DAMAGE.
- *
+ * This file is provided under the following "BSD-style" License:
+ *   Redistribution and use in source and binary forms, with or
+ *   without modification, are permitted provided that the following
+ *   conditions are met:
+ *   * Redistributions of source code must retain the above copyright
+ *     notice, this list of conditions and the following disclaimer.
+ *   * Redistributions in binary form must reproduce the above
+ *     copyright notice, this list of conditions and the following
+ *     disclaimer in the documentation and/or other materials provided
+ *     with the distribution.
+ *   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND
+ *   CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *   INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+ *   MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *   DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR
+ *   CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ *   SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+ *   LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF
+ *   USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *   AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ *   LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+ *   ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ *   POSSIBILITY OF SUCH DAMAGE.
  */
 
 /**
@@ -60,8 +54,7 @@ using namespace dynamics;
 namespace dart {
 namespace planning {
 
-/* *********************************************************************************************
- */
+//==============================================================================
 RRT::RRT(
     WorldPtr world,
     SkeletonPtr robot,
@@ -70,10 +63,10 @@ RRT::RRT(
     double stepSize)
   : ndim(dofs.size()),
     stepSize(stepSize),
-    world(world),
-    robot(robot),
-    dofs(dofs),
-    index(
+    mWorld(world),
+    mRobot(robot),
+    mDofs(dofs),
+    mIndex(
         new flann::Index<flann::L2<double> >(flann::KDTreeSingleIndexParams()))
 {
   // Reset the random number generator and add the given start configuration to
@@ -82,8 +75,7 @@ RRT::RRT(
   addNode(root, -1);
 }
 
-/* *********************************************************************************************
- */
+//==============================================================================
 RRT::RRT(
     WorldPtr world,
     SkeletonPtr robot,
@@ -92,10 +84,10 @@ RRT::RRT(
     double stepSize)
   : ndim(dofs.size()),
     stepSize(stepSize),
-    world(world),
-    robot(robot),
-    dofs(dofs),
-    index(
+    mWorld(world),
+    mRobot(robot),
+    mDofs(dofs),
+    mIndex(
         new flann::Index<flann::L2<double> >(flann::KDTreeSingleIndexParams()))
 {
   // Reset the random number generator and add the given start configurations to
@@ -107,16 +99,14 @@ RRT::RRT(
   }
 }
 
-/* *********************************************************************************************
- */
+//==============================================================================
 bool RRT::connect()
 {
   VectorXd qtry = getRandomConfig();
   return connect(qtry);
 }
 
-/* *********************************************************************************************
- */
+//==============================================================================
 bool RRT::connect(const VectorXd& target)
 {
 
@@ -133,27 +123,23 @@ bool RRT::connect(const VectorXd& target)
   return (result == STEP_REACHED);
 }
 
-/* *********************************************************************************************
- */
+//==============================================================================
 RRT::StepResult RRT::tryStep()
 {
   VectorXd qtry = getRandomConfig();
   return tryStep(qtry);
 }
 
-/* *********************************************************************************************
- */
+//==============================================================================
 RRT::StepResult RRT::tryStep(const VectorXd& qtry)
 {
   int NNidx = getNearestNeighbor(qtry);
   return tryStepFromNode(qtry, NNidx);
 }
 
-/* *********************************************************************************************
- */
+//==============================================================================
 RRT::StepResult RRT::tryStepFromNode(const VectorXd& qtry, int NNidx)
 {
-
   // Get the configuration of the nearest neighbor and check if already reached
   const VectorXd& qnear = *(configVector[NNidx]);
   if ((qtry - qnear).norm() < stepSize)
@@ -181,8 +167,7 @@ RRT::StepResult RRT::tryStepFromNode(const VectorXd& qtry, int NNidx)
   return STEP_PROGRESS;
 }
 
-/* *********************************************************************************************
- */
+//==============================================================================
 bool RRT::newConfig(
     list<VectorXd>& /*intermediatePoints*/,
     VectorXd& qnew,
@@ -192,8 +177,7 @@ bool RRT::newConfig(
   return !checkCollisions(qnew);
 }
 
-/* *********************************************************************************************
- */
+//==============================================================================
 int RRT::addNode(const VectorXd& qnew, int parentId)
 {
 
@@ -205,19 +189,18 @@ int RRT::addNode(const VectorXd& qnew, int parentId)
   // Update the underlying flann structure (the kdtree)
   unsigned int id = configVector.size() - 1;
   if (id == 0)
-    index->buildIndex(
+    mIndex->buildIndex(
         flann::Matrix<double>((double*)temp->data(), 1, temp->size()));
   else
-    index->addPoints(
+    mIndex->addPoints(
         flann::Matrix<double>((double*)temp->data(), 1, temp->size()));
 
   activeNode = id;
   return id;
 }
 
-/* *********************************************************************************************
- */
-inline int RRT::getNearestNeighbor(const VectorXd& qsamp)
+//==============================================================================
+int RRT::getNearestNeighbor(const VectorXd& qsamp)
 {
   int nearest;
   double distance;
@@ -225,7 +208,7 @@ inline int RRT::getNearestNeighbor(const VectorXd& qsamp)
       (double*)qsamp.data(), 1, qsamp.size());
   flann::Matrix<int> nearestMatrix(&nearest, 1, 1);
   flann::Matrix<double> distanceMatrix(flann::Matrix<double>(&distance, 1, 1));
-  index->knnSearch(
+  mIndex->knnSearch(
       queryMatrix,
       nearestMatrix,
       distanceMatrix,
@@ -235,10 +218,9 @@ inline int RRT::getNearestNeighbor(const VectorXd& qsamp)
   return nearest;
 }
 
-/* *********************************************************************************************
- */
+//==============================================================================
 // random # between min & max
-inline double RRT::randomInRange(double min, double max)
+double RRT::randomInRange(double min, double max)
 {
   assert(max - min >= 0.0);
   assert(max - min < numeric_limits<double>::infinity());
@@ -248,8 +230,7 @@ inline double RRT::randomInRange(double min, double max)
   return min + ((max - min) * ((double)rand() / ((double)RAND_MAX + 1)));
 }
 
-/* *********************************************************************************************
- */
+//==============================================================================
 VectorXd RRT::getRandomConfig()
 {
   // Samples a random point for qtmp in the configuration space, bounded by the
@@ -258,21 +239,19 @@ VectorXd RRT::getRandomConfig()
   for (int i = 0; i < ndim; ++i)
   {
     config[i] = randomInRange(
-        robot->getPositionLowerLimit(dofs[i]),
-        robot->getPositionUpperLimit(dofs[i]));
+        mRobot->getPositionLowerLimit(mDofs[i]),
+        mRobot->getPositionUpperLimit(mDofs[i]));
   }
   return config;
 }
 
-/* *********************************************************************************************
- */
+//==============================================================================
 double RRT::getGap(const VectorXd& target)
 {
   return (target - *(configVector[activeNode])).norm();
 }
 
-/* *********************************************************************************************
- */
+//==============================================================================
 void RRT::tracePath(int node, std::list<VectorXd>& path, bool reverse)
 {
 
@@ -288,17 +267,15 @@ void RRT::tracePath(int node, std::list<VectorXd>& path, bool reverse)
   }
 }
 
-/* *********************************************************************************************
- */
+//==============================================================================
 bool RRT::checkCollisions(const VectorXd& c)
 {
-  robot->setPositions(dofs, c);
-  return world->checkCollision();
+  mRobot->setPositions(mDofs, c);
+  return mWorld->checkCollision();
 }
 
-/* *********************************************************************************************
- */
-std::size_t RRT::getSize()
+//==============================================================================
+std::size_t RRT::getSize() const
 {
   return configVector.size();
 }

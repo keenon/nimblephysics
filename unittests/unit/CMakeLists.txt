@@ -15,6 +15,12 @@ dart_add_test("unit" test_Signal)
 dart_add_test("unit" test_Subscriptions)
 dart_add_test("unit" test_Uri)
 
+# Planning
+if(TARGET dart-planning)
+  dart_add_test("unit" test_Path)
+  target_link_libraries(test_Path dart-planning)
+endif()
+
 if(TARGET dart-optimizer-ipopt)
   target_link_libraries(test_Optimizer dart-optimizer-ipopt)
 endif()

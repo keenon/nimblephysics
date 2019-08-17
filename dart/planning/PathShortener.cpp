@@ -53,29 +53,27 @@ using namespace simulation;
 namespace dart {
 namespace planning {
 
-PathShortener::PathShortener()
-{
-}
-
+//==============================================================================
 PathShortener::PathShortener(
     WorldPtr world,
     dynamics::SkeletonPtr robot,
     const vector<std::size_t>& dofs,
     double stepSize)
-  : world(world), robot(robot), dofs(dofs), stepSize(stepSize)
+  : mWorld(std::move(world)),
+    mRobot(std::move(robot)),
+    mDofs(dofs),
+    mStepSize(stepSize)
 {
+  // Do nothing
 }
 
-PathShortener::~PathShortener()
-{
-}
-
+//==============================================================================
 void PathShortener::shortenPath(list<VectorXd>& path)
 {
   printf("--> Start Brute Force Shortener \n");
   srand(time(nullptr));
 
-  VectorXd savedDofs = robot->getPositions(dofs);
+  VectorXd savedDofs = mRobot->getPositions(mDofs);
 
   const int numShortcuts = path.size() * 5;
 
@@ -110,11 +108,12 @@ void PathShortener::shortenPath(list<VectorXd>& path)
     }
   }
   // TODO(JS): What kinematic values should be updated here?
-  robot->setPositions(dofs, savedDofs);
+  mRobot->setPositions(mDofs, savedDofs);
 
   printf("End Brute Force Shortener \n");
 }
 
+//==============================================================================
 bool PathShortener::localPlanner(
     list<VectorXd>& intermediatePoints,
     list<VectorXd>::const_iterator it1,
@@ -123,6 +122,7 @@ bool PathShortener::localPlanner(
   return segmentCollisionFree(intermediatePoints, *it1, *it2);
 }
 
+//==============================================================================
 // true iff collision-free
 // does not check endpoints
 // interemdiatePoints are only touched if collision-free
@@ -132,12 +132,13 @@ bool PathShortener::segmentCollisionFree(
     const VectorXd& config2)
 {
   const double length = (config1 - config2).norm();
-  if (length <= stepSize)
+  if (length <= mStepSize)
   {
     return true;
   }
 
-  const int n = (int)(length / stepSize) + 1; // number of intermediate segments
+  const int n
+      = (int)(length / mStepSize) + 1; // number of intermediate segments
   int n1 = n / 2;
   int n2 = n / 2;
   if (n % 2 == 1)
@@ -149,8 +150,8 @@ bool PathShortener::segmentCollisionFree(
       = (double)n2 / (double)n * config1 + (double)n1 / (double)n * config2;
   list<VectorXd> intermediatePoints1, intermediatePoints2;
   // TODO(JS): What kinematic values should be updated here?
-  robot->setPositions(dofs, midpoint);
-  if (!world->checkCollision()
+  mRobot->setPositions(mDofs, midpoint);
+  if (!mWorld->checkCollision()
       && segmentCollisionFree(intermediatePoints1, config1, midpoint)
       && segmentCollisionFree(intermediatePoints2, midpoint, config2))
   {
