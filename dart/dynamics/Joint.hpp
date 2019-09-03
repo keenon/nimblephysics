@@ -755,6 +755,7 @@ public:
   // Friendship
   //----------------------------------------------------------------------------
 
+  friend class CompositeJoint;
   friend class BodyNode;
   friend class SoftBodyNode;
   friend class Skeleton;

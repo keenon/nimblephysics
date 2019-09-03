@@ -2411,9 +2411,10 @@ void BodyNode::updateBodyJacobian() const
   if (nullptr == mParentJoint)
     return;
 
-  const std::size_t localDof = mParentJoint->getNumDofs();
-  assert(getNumDependentGenCoords() >= localDof);
-  const std::size_t ascendantDof = getNumDependentGenCoords() - localDof;
+  const int localDof = static_cast<int>(mParentJoint->getNumDofs());
+  const int ascendantDof
+      = static_cast<int>(getNumDependentGenCoords()) - localDof;
+  assert(ascendantDof >= 0);
 
   // Parent Jacobian
   if (mParentBodyNode)

@@ -43,6 +43,7 @@ class RevoluteJoint : public detail::RevoluteJointBase
 {
 public:
   friend class Skeleton;
+  friend class CompositeJoint;
   using UniqueProperties = detail::RevoluteJointUniqueProperties;
   using Properties = detail::RevoluteJointProperties;
   using Base = detail::RevoluteJointBase;

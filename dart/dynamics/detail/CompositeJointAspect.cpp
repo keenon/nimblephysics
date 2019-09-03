@@ -30,59 +30,30 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef DART_DYNAMICS_DETAIL_REVOLUTEJOINTASPECT_HPP_
-#define DART_DYNAMICS_DETAIL_REVOLUTEJOINTASPECT_HPP_
-
-#include <string>
-
-#include <Eigen/Dense>
-
-#include "dart/dynamics/GenericJoint.hpp"
+#include "dart/dynamics/PrismaticJoint.hpp"
 
 namespace dart {
 namespace dynamics {
-
-class RevoluteJoint;
-
 namespace detail {
 
 //==============================================================================
-struct RevoluteJointUniqueProperties
+PrismaticJointUniqueProperties::PrismaticJointUniqueProperties(
+    const Eigen::Vector3d& _axis)
+  : mAxis(_axis.normalized())
 {
-  Eigen::Vector3d mAxis;
-
-  RevoluteJointUniqueProperties(
-      const Eigen::Vector3d& _axis = Eigen::Vector3d::UnitZ());
-
-  virtual ~RevoluteJointUniqueProperties() = default;
-};
+  // Do nothing
+}
 
 //==============================================================================
-struct RevoluteJointProperties : GenericJoint<math::R1Space>::Properties,
-                                 RevoluteJointUniqueProperties
+PrismaticJointProperties::PrismaticJointProperties(
+    const GenericJoint<math::R1Space>::Properties& genericJointProperties,
+    const PrismaticJointUniqueProperties& prismaticProperties)
+  : GenericJoint<math::R1Space>::Properties(genericJointProperties),
+    PrismaticJointUniqueProperties(prismaticProperties)
 {
-  using JointType = RevoluteJoint;
-
-  DART_DEFINE_ALIGNED_SHARED_OBJECT_CREATOR(RevoluteJointProperties)
-
-  RevoluteJointProperties(
-      const GenericJoint<math::R1Space>::Properties& genericJointProperties
-      = GenericJoint<math::R1Space>::Properties(),
-      const RevoluteJointUniqueProperties& revoluteProperties
-      = RevoluteJointUniqueProperties());
-
-  virtual ~RevoluteJointProperties() = default;
-};
-
-//==============================================================================
-using RevoluteJointBase = common::EmbedPropertiesOnTopOf<
-    RevoluteJoint,
-    RevoluteJointUniqueProperties,
-    GenericJoint<math::R1Space> >;
+  // Do nothing
+}
 
 } // namespace detail
-
 } // namespace dynamics
 } // namespace dart
-
-#endif // DART_DYNAMICS_DETAIL_REVOLUTEJOINTASPECT_HPP_
