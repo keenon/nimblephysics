@@ -48,7 +48,6 @@ jobs:
         docker run -itd -v $GITHUB_WORKSPACE:$GITHUB_WORKSPACE --env-file ./.ci/docker/env.list --name dart-docker "${DOCKERFILE,,}";
         docker exec dart-docker /bin/sh -c "cd $GITHUB_WORKSPACE && ./.ci/install.sh";
     - name: Build
-      env:
       run: |
         docker exec dart-docker /bin/sh -c "cd $GITHUB_WORKSPACE && ./.ci/script.sh";
 
