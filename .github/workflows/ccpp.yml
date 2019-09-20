@@ -14,7 +14,7 @@ on:
     - cron: '0 2 * * 0-6'
 
 jobs:
-  ubuntu_16_04_release:
+  xenial_release:
     name: Ubuntu 16.04 | Release
     runs-on: ubuntu-16.04
     steps:
@@ -32,7 +32,7 @@ jobs:
         RUN_TESTS: ON
       run: '.ci/script.sh'
 
-  ubuntu_16_04_release:
+  xenial_release:
     name: Ubuntu 18.04 | Release
     runs-on: ubuntu-18.04
     steps:
@@ -41,7 +41,7 @@ jobs:
       env:
         OS_NAME: linux
         COMPILER: gcc
-        DOCKERFILE: Dockerfile.ubuntu-bionic
+        DOCKERFILE: Dockerfile.ubuntu-xenial
       run: |
         docker build -t "${DOCKERFILE,,}" -f ".ci/docker/$DOCKERFILE" .;
         docker run -itd -v $GITHUB_WORKSPACE:$GITHUB_WORKSPACE --env-file $GITHUB_WORKSPACE/.ci/docker/env.list --name dart-docker "${DOCKERFILE,,}";
@@ -56,7 +56,7 @@ jobs:
       run: |
         docker exec dart-docker /bin/sh -c "cd $GITHUB_WORKSPACE && ./.ci/script.sh";
 
-  ubuntu_16_04_32bit_release:
+  xenial_32bit_release:
     name: Ubuntu 18.04 32 Bit | Release
     runs-on: ubuntu-18.04
     steps:
@@ -65,7 +65,7 @@ jobs:
       env:
         OS_NAME: linux
         COMPILER: gcc
-        DOCKERFILE: Dockerfile.ubuntu-bionic
+        DOCKERFILE: Dockerfile.ubuntu-xenial-32bit
       run: |
         docker build -t "${DOCKERFILE,,}" -f ".ci/docker/$DOCKERFILE" .;
         docker run -itd -v $GITHUB_WORKSPACE:$GITHUB_WORKSPACE --env-file $GITHUB_WORKSPACE/.ci/docker/env.list --name dart-docker "${DOCKERFILE,,}";
@@ -80,7 +80,7 @@ jobs:
       run: |
         docker exec dart-docker /bin/sh -c "cd $GITHUB_WORKSPACE && ./.ci/script.sh";
 
-  ubuntu_18_04_release:
+  bionic_release:
     name: Ubuntu 18.04 | Release
     runs-on: ubuntu-18.04
     steps:
@@ -104,7 +104,7 @@ jobs:
       run: |
         docker exec dart-docker /bin/sh -c "cd $GITHUB_WORKSPACE && ./.ci/script.sh";
 
-  ubuntu_18_10_release:
+  disco_release:
     name: Ubuntu 18.10 | Release
     runs-on: ubuntu-18.04
     steps:
@@ -128,7 +128,7 @@ jobs:
       run: |
         docker exec dart-docker /bin/sh -c "cd $GITHUB_WORKSPACE && ./.ci/script.sh";
 
-  ubuntu_19_04_release:
+  eoan_release:
     name: Ubuntu 19.04 | Release
     runs-on: ubuntu-18.04
     steps:
@@ -137,7 +137,7 @@ jobs:
       env:
         OS_NAME: linux
         COMPILER: gcc
-        DOCKERFILE: Dockerfile.ubuntu-bionic
+        DOCKERFILE: Dockerfile.ubuntu-eoan
       run: |
         docker build -t "${DOCKERFILE,,}" -f ".ci/docker/$DOCKERFILE" .;
         docker run -itd -v $GITHUB_WORKSPACE:$GITHUB_WORKSPACE --env-file $GITHUB_WORKSPACE/.ci/docker/env.list --name dart-docker "${DOCKERFILE,,}";
@@ -152,7 +152,7 @@ jobs:
       run: |
         docker exec dart-docker /bin/sh -c "cd $GITHUB_WORKSPACE && ./.ci/script.sh";
 
-  macos_10_14:
+  mojav:
     name: macOS 10.14 | Release
     runs-on: macOS-10.14
     steps:
