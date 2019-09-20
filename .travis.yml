@@ -51,16 +51,6 @@ matrix:
         - COMPILER=GCC
       services: docker
 
-  allow_failures:
-    - os: linux
-      env:
-        - BUILD_NAME=EOAN_RELEASE
-        - DOCKERFILE="Dockerfile.ubuntu-eoan"
-        - BUILD_TYPE=Release
-        - COMPILER=GCC
-      services: docker
-
-
 install:
   - if [ -n "$DOCKERFILE" ]; then
       docker build -t "${DOCKERFILE,,}" -f ".ci/docker/$DOCKERFILE" .;
