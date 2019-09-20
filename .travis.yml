@@ -35,14 +35,6 @@ matrix:
         - COMPILER=GCC
       services: docker
 
-    - os: osx
-      osx_image: xcode10.2
-      compiler: gcc
-      env:
-        - BUILD_NAME=XCODE102_RELEASE
-        - BUILD_TYPE=Release
-        - COMPILER=GCC
-
     - os: linux
       env:
         - BUILD_DOCS=ON
