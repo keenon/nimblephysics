@@ -1,13 +1,36 @@
 #!/usr/bin/env bash
 set -ex
 
+# Sanity checks for required environment variables.
+if [ -z "$BUILD_DARTPY" ]; then
+  echo "Info: Environment variable BUILD_DARTPY is unset. Using OFF by default."
+  BUILD_DARTPY=OFF
+fi
+
+if [ -z "$BUILD_DOCS" ]; then
+  echo "Info: Environment variable BUILD_DOCS is unset. Using OFF by default."
+  BUILD_DOCS=OFF
+fi
+
+if [ -z "$SUDO" ]; then
+  if [ -z "${DOCKERFILE}"]; then
+    echo "Info: Environment variable SUDO is unset. Using sudo by default."
+    SUDO=sudo
+  fi
+fi
+
+if [ -z "$COMPILER" ]; then
+  echo "Info: Environment variable COMPILER is unset. Using gcc by default."
+  COMPILER=gcc
+fi
+
 $SUDO apt-get -qq update
 $SUDO apt-get -y install lsb-release software-properties-common
 $SUDO apt-add-repository -y ppa:dartsim/ppa
 $SUDO apt-get -qq update
 
 # Build tools
-$SUDO apt-get -y install \
+$SUDO apt-get install -y --no-install-recommends \
   sudo \
   build-essential \
   cmake \
@@ -19,17 +42,20 @@ if [ $COMPILER = clang ]; then
 fi
 
 # Required dependencies
-$SUDO apt-get -y install \
+$SUDO apt-get install -y --no-install-recommends \
   libassimp-dev \
   libboost-filesystem-dev \
-  libboost-regex-dev \
   libboost-system-dev \
   libccd-dev \
   libeigen3-dev \
   libfcl-dev
 
+# Required dependencies for building API documentation of DART < 6.10
+$SUDO apt-get install -y --no-install-recommends \
+  libboost-regex-dev
+
 # Optional dependencies
-$SUDO apt-get -y install \
+$SUDO apt-get install -y --no-install-recommends \
   freeglut3-dev \
   libxi-dev \
   libxmu-dev \
@@ -100,8 +126,8 @@ if [ "$BUILD_DARTPY" = "ON" ]; then
   fi
 fi
 
-$SUDO apt-get -y install lcov
+$SUDO apt-get install -y --no-install-recommends lcov
 
 if [ $BUILD_DOCS = "ON" ]; then
-  $SUDO apt-get -qq -y install doxygen
+  $SUDO apt-get install -y --no-install-recommends doxygen
 fi
