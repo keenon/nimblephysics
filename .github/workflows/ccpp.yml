@@ -15,7 +15,7 @@ on:
 
 jobs:
   xenial_release:
-    name: Ubuntu 16.04 | Release
+    name: Ubuntu 16.04 (native) | Release
     runs-on: ubuntu-16.04
     steps:
     - uses: actions/checkout@v1
@@ -33,7 +33,7 @@ jobs:
       run: '.ci/script.sh'
 
   xenial_release:
-    name: Ubuntu 18.04 | Release
+    name: Ubuntu 16.04 | Release
     runs-on: ubuntu-18.04
     steps:
     - uses: actions/checkout@v1
