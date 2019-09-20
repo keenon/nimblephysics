@@ -60,24 +60,6 @@ jobs:
       env:
         OS_NAME: linux
         COMPILER: gcc
-      run: '.ci/install.sh'
-    - name: Build
-      env:
-        OS_NAME: linux
-        COMPILER: gcc
-        BUILD_TYPE: Release
-        RUN_TESTS: ON
-      run: '.ci/script.sh'
-
-  ubuntu_18_04_docker_release:
-    name: Ubuntu 18.04 (Docker) | Release
-    runs-on: ubuntu-18.04
-    steps:
-    - uses: actions/checkout@v1
-    - name: Install Dependencies
-      env:
-        OS_NAME: linux
-        COMPILER: gcc
         DOCKERFILE: Dockerfile.ubuntu-bionic
       run: |
         docker build -t "${DOCKERFILE,,}" -f ".ci/docker/$DOCKERFILE" .;
