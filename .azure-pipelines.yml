@@ -106,4 +106,3 @@ jobs:
       cmake --build . --target ALL_BUILD --config $(CONFIGURATION) -- /maxcpucount:4
     displayName: 'Build'
     workingDirectory: '$(Build.SourcesDirectory)'
-
