@@ -54,7 +54,6 @@ jobs:
         BUILD_TYPE: Release
         RUN_TESTS: ON
       run: |
-        docker run -itd -v $GITHUB_WORKSPACE:$GITHUB_WORKSPACE --env-file $GITHUB_WORKSPACE/.ci/docker/env.list --name dart-docker "${DOCKERFILE,,}";
         docker exec dart-docker /bin/sh -c "cd $GITHUB_WORKSPACE && ./.ci/script.sh";
 
   xenial_32bit_release:
