@@ -29,13 +29,9 @@ find_path(TINYXML2_INCLUDE_DIRS
     PATHS "${CMAKE_INSTALL_PREFIX}/include")
 
 # Libraries
-if(MSVC)
-  set(TINYXML2_LIBRARIES "tinyxml2$<$<CONFIG:Debug>:d>")
-else()
-  find_library(TINYXML2_LIBRARIES
-      NAMES tinyxml2
-      HINTS ${PC_TINYXML2_LIBDIR})
-endif()
+find_library(TINYXML2_LIBRARIES
+    NAMES tinyxml2
+    HINTS ${PC_TINYXML2_LIBDIR})
 
 # Version
 set(TINYXML2_VERSION ${PC_TINYXML2_VERSION})

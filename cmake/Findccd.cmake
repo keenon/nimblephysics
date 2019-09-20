@@ -42,21 +42,17 @@ if(NOT CCD_FOUND AND NOT ccd_FOUND)
       PATHS "${CMAKE_INSTALL_PREFIX}/include")
 
   # Libraries
-  if(MSVC)
-    set(CCD_LIBRARIES "ccd$<$<CONFIG:Debug>:d>")
-  else()
-    # Give explicit precedence to ${PC_CCD_LIBDIR}
-    find_library(CCD_LIBRARIES
-        NAMES ccd
-        HINTS ${PC_CCD_LIBDIR}
-        NO_DEFAULT_PATH
-        NO_CMAKE_PATH
-        NO_CMAKE_ENVIRONMENT_PATH
-        NO_SYSTEM_ENVIRONMENT_PATH)
-    find_library(CCD_LIBRARIES
-        NAMES ccd
-        HINTS ${PC_CCD_LIBDIR})
-  endif()
+  # Give explicit precedence to ${PC_CCD_LIBDIR}
+  find_library(CCD_LIBRARIES
+      NAMES ccd
+      HINTS ${PC_CCD_LIBDIR}
+      NO_DEFAULT_PATH
+      NO_CMAKE_PATH
+      NO_CMAKE_ENVIRONMENT_PATH
+      NO_SYSTEM_ENVIRONMENT_PATH)
+  find_library(CCD_LIBRARIES
+      NAMES ccd
+      HINTS ${PC_CCD_LIBDIR})
 
   # Version
   set(CCD_VERSION ${PC_CCD_VERSION})
