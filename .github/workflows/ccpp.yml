@@ -32,25 +32,6 @@ jobs:
         RUN_TESTS: ON
       run: '.ci/script.sh'
 
-  ubuntu_16_04_release_codecov:
-    name: Ubuntu 16.04 | Release | Codecov
-    runs-on: ubuntu-16.04
-    steps:
-    - uses: actions/checkout@v1
-    - name: Install Dependencies
-      env:
-        OS_NAME: linux
-        COMPILER: gcc
-      run: '.ci/install.sh'
-    - name: Build
-      env:
-        OS_NAME: linux
-        COMPILER: gcc
-        BUILD_TYPE: Release
-        RUN_TESTS: ON
-        CODECOV: ON
-      run: '.ci/script.sh'
-
   ubuntu_18_04_release:
     name: Ubuntu 18.04 | Release
     runs-on: ubuntu-18.04
@@ -63,7 +44,7 @@ jobs:
         DOCKERFILE: Dockerfile.ubuntu-bionic
       run: |
         docker build -t "${DOCKERFILE,,}" -f ".ci/docker/$DOCKERFILE" .;
-        docker run -itd -v $GITHUB_WORKSPACE:$GITHUB_WORKSPACE --env-file .ci/docker/env.list --name dart-docker "${DOCKERFILE,,}";
+        docker run -itd -v $GITHUB_WORKSPACE:$GITHUB_WORKSPACE --env-file ./.ci/docker/env.list --name dart-docker "${DOCKERFILE,,}";
         docker exec dart-docker /bin/sh -c "cd $GITHUB_WORKSPACE && ./.ci/install.sh";
     - name: Build
       env:
