@@ -69,6 +69,30 @@ jobs:
         RUN_TESTS: ON
       run: '.ci/script.sh'
 
+  ubuntu_18_04:
+    name: Ubuntu 18.04 (Docker) | Release
+    runs-on: ubuntu-18.04
+    steps:
+    - uses: actions/checkout@v1
+    - name: Install Dependencies
+      env:
+        OS_NAME: linux
+        COMPILER: gcc
+        DOCKERFILE: Dockerfile.ubuntu-bionic
+      run: |
+        docker build -t "${DOCKERFILE,,}" -f ".ci/docker/$DOCKERFILE" .;
+        docker run -itd -v $TRAVIS_BUILD_DIR:$TRAVIS_BUILD_DIR --env-file .ci/docker/env.list --name dart-docker "${DOCKERFILE,,}";
+        docker exec dart-docker /bin/sh -c "cd $TRAVIS_BUILD_DIR && ./.ci/install.sh";
+    - name: Build
+      env:
+        OS_NAME: linux
+        COMPILER: gcc
+        DOCKERFILE: Dockerfile.ubuntu-bionic
+        BUILD_TYPE: Release
+        RUN_TESTS: ON
+      run: |
+        docker exec dart-docker /bin/sh -c "cd $TRAVIS_BUILD_DIR && ./.ci/script.sh";
+
   macos_10_14:
     name: macOS 10.14 | Release
     runs-on: macOS-10.14
