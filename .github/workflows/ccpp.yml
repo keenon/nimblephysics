@@ -217,9 +217,10 @@ jobs:
         COMPILER: gcc
         VCPKG_ROOT: 'C:\vcpkg'
         VCPKG_PACKAGES: 'assimp boost-system boost-filesystem ccd eigen3 fcl'
-        # utils needs tinyxml2 and boost algorithm/lexical-cast
+        # 'dart-utils' needs tinyxml2 and boost algorithm/lexical-cast
         #   and also boost-math to resolve a circular dependency with lexical-cast
         VCPKG_OPTIONAL_PACKAGES: 'boost-algorithm boost-lexical-cast boost-math bullet3 ode tinyxml2'
+        # VCPKG_MORE_OPTIONAL_PACKAGES: 'flann ipopt nlopt osg urdfdom'
       shell: cmd
       run: |
         vcpkg install --recurse --triplet x64-windows %VCPKG_PACKAGES%
