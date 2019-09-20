@@ -15,7 +15,7 @@ on:
 
 jobs:
   ubuntu_16_04:
-    name: Build on Ubuntu 16.04
+    name: Ubuntu 16.04 | Release
     runs-on: ubuntu-16.04
     steps:
     - uses: actions/checkout@v1
@@ -31,8 +31,42 @@ jobs:
         BUILD_TYPE: Release
         RUN_TESTS: ON
       run: '.ci/script.sh'
+  ubuntu_18_04:
+    name: Ubuntu 18.04 | Release
+    runs-on: ubuntu-18.04
+    steps:
+    - uses: actions/checkout@v1
+    - name: Install Dependencies
+      env:
+        OS_NAME: linux
+        COMPILER: gcc
+      run: '.ci/install.sh'
+    - name: Build
+      env:
+        OS_NAME: linux
+        COMPILER: gcc
+        BUILD_TYPE: Release
+        RUN_TESTS: ON
+      run: '.ci/script.sh'
+  macos_10_14:
+    name: macOS 10.14 | Release
+    runs-on: macOS-10.14
+    steps:
+    - uses: actions/checkout@v1
+    - name: Install Dependencies
+      env:
+        OS_NAME: osx
+        COMPILER: CLANG
+      run: '.ci/install.sh'
+    - name: Build
+      env:
+        OS_NAME: osx
+        COMPILER: CLANG
+        BUILD_TYPE: Release
+        RUN_TESTS: ON
+      run: '.ci/script.sh'
   windows_2019:
-    name: Build on Windows 2019
+    name: Windows | Release
     runs-on: windows-2019
     steps:
     - uses: actions/checkout@v1

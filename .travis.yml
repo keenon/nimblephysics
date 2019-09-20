@@ -33,7 +33,6 @@ matrix:
         - DOCKERFILE="Dockerfile.ubuntu-xenial-32bit"
         - BUILD_TYPE=Release  # TODO: Tests fail in debug mode
         - COMPILER=GCC
-        - CODECOV=ON
       services: docker
 
     - os: linux
