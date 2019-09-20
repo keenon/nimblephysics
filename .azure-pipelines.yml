@@ -2,14 +2,14 @@
 # Ref: https://docs.microsoft.com/en-us/azure/devops/pipelines
 
 jobs:
-- job: xenial_gcc_release
+- job: xenial_gcc_debug
   timeoutInMinutes: 120
   pool:
     vmImage: 'ubuntu-16.04'
   variables:
     OS_NAME: linux
     COMPILER: gcc
-    BUILD_TYPE: Release
+    BUILD_TYPE: Debug
     BUILD_DIR: $(Build.SourcesDirectory)
     DOCKERFILE: Dockerfile.ubuntu-xenial
   steps:
