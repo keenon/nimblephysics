@@ -25,9 +25,13 @@ find_path(ASSIMP_INCLUDE_DIRS assimp/scene.h
     PATHS "${CMAKE_INSTALL_PREFIX}/include")
 
 # Libraries
-find_library(ASSIMP_LIBRARIES
-    NAMES assimp
-    HINTS ${PC_ASSIMP_LIBDIR})
+if(MSVC)
+  set(ASSIMP_LIBRARIES assimp)
+else()
+  find_library(ASSIMP_LIBRARIES
+      NAMES assimp
+      HINTS ${PC_ASSIMP_LIBDIR})
+endif()
 
 # Version
 set(ASSIMP_VERSION ${PC_ASSIMP_VERSION})
