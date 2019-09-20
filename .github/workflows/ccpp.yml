@@ -32,6 +32,54 @@ jobs:
         RUN_TESTS: ON
       run: '.ci/script.sh'
 
+  ubuntu_16_04_release:
+    name: Ubuntu 18.04 | Release
+    runs-on: ubuntu-18.04
+    steps:
+    - uses: actions/checkout@v1
+    - name: Install Dependencies
+      env:
+        OS_NAME: linux
+        COMPILER: gcc
+        DOCKERFILE: Dockerfile.ubuntu-bionic
+      run: |
+        docker build -t "${DOCKERFILE,,}" -f ".ci/docker/$DOCKERFILE" .;
+        docker run -itd -v $GITHUB_WORKSPACE:$GITHUB_WORKSPACE --env-file $GITHUB_WORKSPACE/.ci/docker/env.list --name dart-docker "${DOCKERFILE,,}";
+        docker exec dart-docker /bin/sh -c "cd $GITHUB_WORKSPACE && ./.ci/install.sh";
+    - name: Build
+      env:
+        OS_NAME: linux
+        COMPILER: gcc
+        DOCKERFILE: Dockerfile.ubuntu-xenial
+        BUILD_TYPE: Release
+        RUN_TESTS: ON
+      run: |
+        docker exec dart-docker /bin/sh -c "cd $GITHUB_WORKSPACE && ./.ci/script.sh";
+
+  ubuntu_16_04_32bit_release:
+    name: Ubuntu 18.04 32 Bit | Release
+    runs-on: ubuntu-18.04
+    steps:
+    - uses: actions/checkout@v1
+    - name: Install Dependencies
+      env:
+        OS_NAME: linux
+        COMPILER: gcc
+        DOCKERFILE: Dockerfile.ubuntu-bionic
+      run: |
+        docker build -t "${DOCKERFILE,,}" -f ".ci/docker/$DOCKERFILE" .;
+        docker run -itd -v $GITHUB_WORKSPACE:$GITHUB_WORKSPACE --env-file $GITHUB_WORKSPACE/.ci/docker/env.list --name dart-docker "${DOCKERFILE,,}";
+        docker exec dart-docker /bin/sh -c "cd $GITHUB_WORKSPACE && ./.ci/install.sh";
+    - name: Build
+      env:
+        OS_NAME: linux
+        COMPILER: gcc
+        DOCKERFILE: Dockerfile.ubuntu-xenial-32bit
+        BUILD_TYPE: Release
+        RUN_TESTS: ON
+      run: |
+        docker exec dart-docker /bin/sh -c "cd $GITHUB_WORKSPACE && ./.ci/script.sh";
+
   ubuntu_18_04_release:
     name: Ubuntu 18.04 | Release
     runs-on: ubuntu-18.04
@@ -51,6 +99,54 @@ jobs:
         OS_NAME: linux
         COMPILER: gcc
         DOCKERFILE: Dockerfile.ubuntu-bionic
+        BUILD_TYPE: Release
+        RUN_TESTS: ON
+      run: |
+        docker exec dart-docker /bin/sh -c "cd $GITHUB_WORKSPACE && ./.ci/script.sh";
+
+  ubuntu_18_10_release:
+    name: Ubuntu 18.10 | Release
+    runs-on: ubuntu-18.04
+    steps:
+    - uses: actions/checkout@v1
+    - name: Install Dependencies
+      env:
+        OS_NAME: linux
+        COMPILER: gcc
+        DOCKERFILE: Dockerfile.ubuntu-bionic
+      run: |
+        docker build -t "${DOCKERFILE,,}" -f ".ci/docker/$DOCKERFILE" .;
+        docker run -itd -v $GITHUB_WORKSPACE:$GITHUB_WORKSPACE --env-file $GITHUB_WORKSPACE/.ci/docker/env.list --name dart-docker "${DOCKERFILE,,}";
+        docker exec dart-docker /bin/sh -c "cd $GITHUB_WORKSPACE && ./.ci/install.sh";
+    - name: Build
+      env:
+        OS_NAME: linux
+        COMPILER: gcc
+        DOCKERFILE: Dockerfile.ubuntu-disco
+        BUILD_TYPE: Release
+        RUN_TESTS: ON
+      run: |
+        docker exec dart-docker /bin/sh -c "cd $GITHUB_WORKSPACE && ./.ci/script.sh";
+
+  ubuntu_19_04_release:
+    name: Ubuntu 19.04 | Release
+    runs-on: ubuntu-18.04
+    steps:
+    - uses: actions/checkout@v1
+    - name: Install Dependencies
+      env:
+        OS_NAME: linux
+        COMPILER: gcc
+        DOCKERFILE: Dockerfile.ubuntu-bionic
+      run: |
+        docker build -t "${DOCKERFILE,,}" -f ".ci/docker/$DOCKERFILE" .;
+        docker run -itd -v $GITHUB_WORKSPACE:$GITHUB_WORKSPACE --env-file $GITHUB_WORKSPACE/.ci/docker/env.list --name dart-docker "${DOCKERFILE,,}";
+        docker exec dart-docker /bin/sh -c "cd $GITHUB_WORKSPACE && ./.ci/install.sh";
+    - name: Build
+      env:
+        OS_NAME: linux
+        COMPILER: gcc
+        DOCKERFILE: Dockerfile.ubuntu-eoan
         BUILD_TYPE: Release
         RUN_TESTS: ON
       run: |
