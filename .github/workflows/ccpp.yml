@@ -81,8 +81,8 @@ jobs:
         DOCKERFILE: Dockerfile.ubuntu-bionic
       run: |
         docker build -t "${DOCKERFILE,,}" -f ".ci/docker/$DOCKERFILE" .;
-        docker run -itd -v $TRAVIS_BUILD_DIR:$TRAVIS_BUILD_DIR --env-file .ci/docker/env.list --name dart-docker "${DOCKERFILE,,}";
-        docker exec dart-docker /bin/sh -c "cd $TRAVIS_BUILD_DIR && . ./.ci/install.sh";
+        docker run -itd -v $GITHUB_WORKSPACE:$GITHUB_WORKSPACE --env-file .ci/docker/env.list --name dart-docker "${DOCKERFILE,,}";
+        docker exec dart-docker /bin/sh -c "cd $GITHUB_WORKSPACE && ./.ci/install.sh";
     - name: Build
       env:
         OS_NAME: linux
@@ -91,7 +91,7 @@ jobs:
         BUILD_TYPE: Release
         RUN_TESTS: ON
       run: |
-        docker exec dart-docker /bin/sh -c "cd $TRAVIS_BUILD_DIR && . ./.ci/script.sh";
+        docker exec dart-docker /bin/sh -c "cd $GITHUB_WORKSPACE && ./.ci/script.sh";
 
   macos_10_14:
     name: macOS 10.14 | Release
