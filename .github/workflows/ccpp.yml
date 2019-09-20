@@ -14,7 +14,7 @@ on:
     - cron: '0 2 * * 0-6'
 
 jobs:
-  ubuntu_16_04:
+  ubuntu_16_04_release:
     name: Ubuntu 16.04 | Release
     runs-on: ubuntu-16.04
     steps:
@@ -32,7 +32,7 @@ jobs:
         RUN_TESTS: ON
       run: '.ci/script.sh'
 
-  ubuntu_16_04:
+  ubuntu_16_04_release_codecov:
     name: Ubuntu 16.04 | Release | Codecov
     runs-on: ubuntu-16.04
     steps:
@@ -51,7 +51,7 @@ jobs:
         CODECOV: ON
       run: '.ci/script.sh'
 
-  ubuntu_18_04:
+  ubuntu_18_04_release:
     name: Ubuntu 18.04 | Release
     runs-on: ubuntu-18.04
     steps:
@@ -69,7 +69,7 @@ jobs:
         RUN_TESTS: ON
       run: '.ci/script.sh'
 
-  ubuntu_18_04:
+  ubuntu_18_04_docker_release:
     name: Ubuntu 18.04 (Docker) | Release
     runs-on: ubuntu-18.04
     steps:
