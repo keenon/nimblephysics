@@ -217,5 +217,5 @@ jobs:
         mkdir build
         cd build
         cmake .. -G "Visual Studio 16 2019" -A x64 -DCMAKE_BUILD_TYPE=Release -DDART_MSVC_DEFAULT_OPTIONS=ON -DCMAKE_TOOLCHAIN_FILE="%VCPKG_ROOT%/scripts/buildsystems/vcpkg.cmake"
-        cmake --build .
+        cmake --build . --target ALL_BUILD --config %BUILD_TYPE%
         ctest --build-config %configuration% --output-on-failure
