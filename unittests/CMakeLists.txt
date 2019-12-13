@@ -81,6 +81,102 @@ function(dart_add_test test_type target_name) # ARGN for source files
 
 endfunction()
 
+#=========================================================================================
+# Build multiple tests. The target name will be
+# <test_type>_<prefix>_<directories_with_underscores>_<source_filename_without_extension>.
+#
+# Usage:
+#   dart_add_tests(
+#     TYPE <test_type>
+#     SOURCES <sources>
+#     [PREFIX <prefix>]
+#     [INCLUDE_DIRS <include_dependencies>]
+#     [LINK_LIBRARIES <library_dependencies>]
+#     [TEST_LIST <output_var>]
+#     [DEPENDENCIES <dependency targets>]
+#   )
+function(dart_add_tests)
+  set(prefix dart_add_tests)
+  set(options )
+  set(oneValueArgs TYPE TEST_LIST PREFIX)
+  set(multiValueArgs SOURCES INCLUDE_DIRS LINK_LIBRARIES DEPENDENCIES)
+  cmake_parse_arguments("${prefix}" "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
+
+  if(NOT dart_add_tests_TYPE)
+    message(FATAL_ERROR "DEVELOPER ERROR: You must specify a TYPE for your tests!")
+  endif()
+
+  set(test_type ${dart_add_tests_TYPE})
+
+  if(NOT DEFINED dart_add_tests_SOURCES)
+    message(STATUS "No tests have been specified for ${test_type}")
+  else()
+    if(dart_add_tests_SOURCES)
+      list(SORT dart_add_tests_SOURCES)
+    endif()
+    list(LENGTH dart_add_tests_SOURCES num_tests)
+    set(test_category ${test_type})
+    if(dart_add_tests_PREFIX)
+      set(test_category ${test_category}_${dart_add_tests_PREFIX})
+    endif()
+  endif()
+
+  if(dart_add_tests_TEST_LIST)
+    set(${dart_add_tests_TEST_LIST} "")
+  endif()
+
+  foreach(source ${dart_add_tests_SOURCES})
+    set(target_name ${test_type})
+
+    if(dart_add_tests_PREFIX)
+      set(target_name ${target_name}_${dart_add_tests_PREFIX})
+    endif()
+
+    get_filename_component(source_dir ${source} DIRECTORY)
+    if(source_dir)
+      string(REPLACE "/" "_" source_prefix ${source_dir})
+      set(target_name ${target_name}_${source_prefix})
+    endif()
+
+    get_filename_component(source_name ${source} NAME_WE)
+    set(target_name ${target_name}_${source_name})
+
+    add_executable(${target_name} ${source})
+    target_include_directories(${target_name} PRIVATE ${dart_add_tests_INCLUDE_DIRS})
+    add_test(NAME ${target_name} COMMAND ${target_name})
+
+    # Link gtest
+    if(MSVC)
+      target_link_libraries(${target_name}
+        optimized gtest debug gtestd
+        optimized gtest_main debug gtest_maind
+      )
+    else()
+      target_link_libraries(${target_name} gtest gtest_main)
+    endif()
+
+    target_link_libraries(${target_name} ${dart_add_tests_LINK_LIBRARIES})
+
+    if(dart_add_tests_DEPENDENCIES)
+      add_dependencies(${target_name} ${dart_add_tests_DEPENDENCIES})
+    endif()
+
+    if(dart_add_tests_TEST_LIST)
+      list(APPEND ${dart_add_tests_TEST_LIST} ${target_name})
+    endif()
+
+    dart_property_add(DART_${test_type}_TESTS ${target_name})
+
+  endforeach()
+
+  if(dart_add_tests_TEST_LIST)
+    set(${dart_add_tests_TEST_LIST} "${${dart_add_tests_TEST_LIST}}" PARENT_SCOPE)
+  endif()
+
+  dart_format_add(${dart_add_tests_SOURCES})
+
+endfunction()
+
 #===============================================================================
 # Usage:
 #   dart_get_tests("comprehensive" compreshensive_tests)
@@ -96,20 +192,20 @@ endfunction()
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
 # We categorize tests as:
-# - "comprehensive": high level tests to verify the combination of several
+# - "INTEGRATION": integration tests to verify the combination of several
 #   components are correctly performs together
-# - "regression": issue wise tests to verify that the GitHub issues are still
+# - "REGRESSION": issue wise tests to verify that the GitHub issues are still
 #   fixed even after further changes are made
-# - "unit": low level tests for one or few classes and functions to verify that
+# - "UNIT": low level tests for one or few classes and functions to verify that
 #   they performs correctly as expected
-add_subdirectory(comprehensive)
+add_subdirectory(integration)
 add_subdirectory(regression)
 add_subdirectory(unit)
 
 # Print tests
-dart_get_tests(comprehensive_tests "comprehensive")
-dart_get_tests(regression_tests "regression")
-dart_get_tests(unit_tests "unit")
+dart_get_tests(integration_tests "INTEGRATION")
+dart_get_tests(regression_tests "REGRESSION")
+dart_get_tests(unit_tests "UNIT")
 
 if(DART_VERBOSE)
   message(STATUS "")
@@ -142,5 +238,5 @@ endif()
 # Add custom target to build all the tests as a single target
 add_custom_target(
   tests
-  DEPENDS ${comprehensive_tests} ${regression_tests} ${unit_tests}
+  DEPENDS ${integration_tests} ${regression_tests} ${unit_tests}
 )

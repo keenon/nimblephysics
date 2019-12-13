@@ -1,35 +1,43 @@
-dart_add_test("regression" test_Issue000Template test_Issue000Template.cpp)
-
-dart_add_test("regression" test_Issue1243 test_Issue1243.cpp)
+dart_add_tests(
+  TYPE REGRESSION
+  SOURCES
+    test_Issue1243.cpp
+    test_Issue892.cpp
+    test_Issue895.cpp
+    test_Issue986.cpp
+    test_Issue1231.cpp
+  LINK_LIBRARIES
+    dart
+)
 
 if(TARGET dart-utils-urdf)
-
-  dart_add_test("regression" test_Issue838)
-  target_link_libraries(test_Issue838 dart-utils-urdf)
-
-  dart_add_test("regression" test_Issue892)
-
-  dart_add_test("regression" test_Issue895)
-
-  dart_add_test("regression" test_Issue986)
-
-  dart_add_test("regression" test_Issue1231)
-
+  dart_add_tests(
+    TYPE REGRESSION
+    SOURCES
+      test_Issue838.cpp
+    LINK_LIBRARIES
+      dart-utils-urdf
+  )
 endif()
 
 if(TARGET dart-collision-bullet)
-
-  dart_add_test("regression" test_Issue1184)
-  target_link_libraries(test_Issue1184 dart-collision-bullet)
-
+  dart_add_tests(
+    TYPE REGRESSION
+    SOURCES
+      test_Issue1184.cpp
+    LINK_LIBRARIES
+      dart-collision-bullet
+  )
 endif()
 
-if(TARGET dart-collision-bullet AND TARGET dart-collision-ode)
-
-  dart_add_test("regression" test_Issue1234)
-  target_link_libraries(test_Issue1234
-    dart-collision-bullet
-    dart-collision-ode
-    dart-utils)
-
+if(TARGET dart-collision-bullet AND TARGET dart-collision-ode AND TARGET dart-utils)
+  dart_add_tests(
+    TYPE REGRESSION
+    SOURCES
+      test_Issue1234.cpp
+    LINK_LIBRARIES
+      dart-collision-bullet
+      dart-collision-ode
+      dart-utils
+  )
 endif()
