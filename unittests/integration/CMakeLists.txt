@@ -1,5 +1,7 @@
+set(test_category integration)
+
 dart_add_tests(
-  TYPE INTEGRATION
+  TYPE ${test_category}
   SOURCES
     test_Building.cpp
     test_Common.cpp
@@ -13,19 +15,36 @@ dart_add_tests(
     dart
 )
 
-#if(TARGET dart-optimizer-pagmo)
-#  dart_add_tests(
-#    TYPE INTEGRATION
-#    SOURCES
-#      test_MultiObjectiveOptimization.cpp
-#    LINK_LIBRARIES
-#      dart-optimizer-pagmo
-#  )
-#endif()
+if(TARGET dart-optimizer-pagmo)
+  dart_add_tests(
+    TYPE ${test_category}
+    SOURCES
+      test_MultiObjectiveOptimization.cpp
+    LINK_LIBRARIES
+      dart-optimizer-pagmo
+  )
+endif()
+
+set(link_libraries dart-utils)
+if(TARGET dart-collision-bullet)
+  list(APPEND link_libraries dart-collision-bullet)
+endif()
+if(TARGET dart-collision-ode)
+  list(APPEND link_libraries dart-collision-ode)
+endif()
+if(TARGET dart-utils-urdf)
+  list(APPEND link_libraries dart-utils-urdf)
+endif()
+dart_add_tests(
+  TYPE ${test_category}
+  PREFIX optimizer
+  SOURCES ${test_sources}
+  LINK_LIBRARIES ${link_libraries}
+)
 
 if(TARGET dart-utils)
   dart_add_tests(
-    TYPE INTEGRATION
+    TYPE ${test_category}
     SOURCES
       test_Collision.cpp
       test_Distance.cpp
@@ -37,10 +56,7 @@ if(TARGET dart-utils)
       test_World.cpp
       test_ForwardKinematics.cpp
     LINK_LIBRARIES
-      dart-utils
-      $<$<TARGET_EXISTS:dart-collision-bullet>:dart-collision-bullet>
-      $<$<TARGET_EXISTS:dart-collision-ode>:dart-collision-ode>
-      $<$<TARGET_EXISTS:dart-utils-urdf>:dart-utils-urdf>
+      ${link_libraries}
   )
 endif()
 
@@ -57,7 +73,7 @@ if(TARGET dart-utils-urdf)
 
   if(BUILD_SHARED_LIBS)
     dart_add_tests(
-      TYPE INTEGRATION
+      TYPE ${test_category}
       SOURCES
         test_IkFast.cpp
       LINK_LIBRARIES

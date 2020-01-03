@@ -1,5 +1,3 @@
-return()
-
 # Dependency checks
 dart_find_package(pagmo)
 dart_check_optional_package(pagmo "dart-optimizer-pagmo" "pagmo" "2.8")

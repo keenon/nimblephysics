@@ -1,5 +1,7 @@
+set(test_category regression)
+
 dart_add_tests(
-  TYPE REGRESSION
+  TYPE ${test_category}
   SOURCES
     test_Issue1243.cpp
     test_Issue892.cpp
@@ -12,7 +14,7 @@ dart_add_tests(
 
 if(TARGET dart-utils-urdf)
   dart_add_tests(
-    TYPE REGRESSION
+    TYPE ${test_category}
     SOURCES
       test_Issue838.cpp
     LINK_LIBRARIES
@@ -22,7 +24,7 @@ endif()
 
 if(TARGET dart-collision-bullet)
   dart_add_tests(
-    TYPE REGRESSION
+    TYPE ${test_category}
     SOURCES
       test_Issue1184.cpp
     LINK_LIBRARIES
@@ -32,7 +34,7 @@ endif()
 
 if(TARGET dart-collision-bullet AND TARGET dart-collision-ode AND TARGET dart-utils)
   dart_add_tests(
-    TYPE REGRESSION
+    TYPE ${test_category}
     SOURCES
       test_Issue1234.cpp
     LINK_LIBRARIES

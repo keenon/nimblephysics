@@ -1,4 +1,4 @@
-set(test_category UNIT)
+set(test_category unit)
 
 add_subdirectory(common)
 add_subdirectory(constraint)
