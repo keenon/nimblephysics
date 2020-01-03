@@ -1,6 +1,7 @@
 dart_add_test("unit" test_Aspect)
 dart_add_test("unit" test_CollisionGroups)
 dart_add_test("unit" test_ContactConstraint)
+dart_add_test("unit" test_DantzigLcpSolver)
 dart_add_test("unit" test_Factory)
 dart_add_test("unit" test_GenericJoints)
 dart_add_test("unit" test_Geometry)

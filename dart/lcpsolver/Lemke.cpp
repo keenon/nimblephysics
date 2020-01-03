@@ -342,7 +342,7 @@ bool validate(
     const Eigen::VectorXd& _q)
 {
   const double threshold = 1e-4;
-  int n = _z.size();
+  auto n = _z.size();
 
   Eigen::VectorXd w = _M * _z + _q;
   for (int i = 0; i < n; ++i)
