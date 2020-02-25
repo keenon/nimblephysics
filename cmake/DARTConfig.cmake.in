@@ -5,6 +5,7 @@
 #   @PROJECT_NAME_UPPERCASE@_INCLUDE_DIRS - Directories containing the DART include files.
 #   @PROJECT_NAME_UPPERCASE@_LIBRARIES    - Libraries needed to use DART.
 #   @PROJECT_NAME_UPPERCASE@_VERSION      - DART version.
+#   @PROJECT_NAME_UPPERCASE@_DEFINITIONS  - DART definitions.
 #
 # and the following `IMPORTED` targets:
 #   dart     - Main target.
@@ -160,6 +161,8 @@ if(@PROJECT_NAME_UPPERCASE@_FIND_COMPONENTS)
 
   @PROJECT_NAME@_package_init(${@PROJECT_NAME_UPPERCASE@_FIND_COMPONENTS})
 endif()
+
+set(DART_DEFINITIONS -std=c++14)
 
 list(REMOVE_AT CMAKE_MODULE_PATH -1)
 
