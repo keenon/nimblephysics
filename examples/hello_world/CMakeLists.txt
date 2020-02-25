@@ -14,15 +14,6 @@ endif()
 
 find_package(DART 6.6.0 REQUIRED COMPONENTS ${required_components} CONFIG)
 
-message(STATUS "[DEBUG] DART_FOUND       : ${DART_FOUND}")
-message(STATUS "[DEBUG] DART_VERSION     : ${DART_VERSION}")
-message(STATUS "[DEBUG] DART_INCLUDE_DIRS: ${DART_INCLUDE_DIRS}")
-message(STATUS "[DEBUG] DART_LIBRARY_DIRS: ${DART_LIBRARY_DIRS}")
-message(STATUS "[DEBUG] DART_LIBRARIES   : ${DART_LIBRARIES}")
-message(STATUS "[DEBUG] DART_DEFINITIONS : ${DART_DEFINITIONS}")
-
 file(GLOB srcs "*.cpp" "*.hpp")
 add_executable(${example_name} ${srcs})
-# target_include_directories(${example_name} PUBLIC ${DART_INCLUDE_DIRS})
 target_link_libraries(${example_name} PUBLIC ${required_libraries})
-# target_link_libraries(${example_name} ${DART_LIBRARIES})
