@@ -125,7 +125,7 @@ if [ "$RUN_INSTALL_TEST" = "ON" ]; then
     fi
   else
     # Build an example using installed DART
-    cd $BUILD_DIR/examples/hello_world
+    cd $BUILD_DIR/gazebo
     mkdir build && cd build
     cmake ..
     make -j$num_threads
