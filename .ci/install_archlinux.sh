@@ -17,6 +17,8 @@ if [ -z "$COMPILER" ]; then
   COMPILER=gcc
 fi
 
+whoami
+
 # Build tools
 yay -S cmake
 
