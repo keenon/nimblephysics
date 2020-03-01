@@ -20,3 +20,6 @@ RUN git clone https://aur.archlinux.org/yay.git \
   && makepkg -sri --needed --noconfirm \
   && cd \
   && rm -rf .cache yay
+
+# Change the user to root
+USER root
