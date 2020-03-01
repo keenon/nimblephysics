@@ -14,6 +14,20 @@ jobs:
   steps:
   - template: .ci/azure-pipelines/docker.yml
 
+- job: xenial_gcc_dartpy_release
+  pool:
+    vmImage: 'ubuntu-16.04'
+  variables:
+    OS_NAME: linux
+    COMPILER: gcc
+    BUILD_TYPE: Release
+    BUILD_DARTPY: ON
+    BUILD_DIR: $(Build.SourcesDirectory)
+    DOCKERFILE: Dockerfile.ubuntu-xenial
+  steps:
+  - template: .ci/azure-pipelines/docker.yml
+  timeoutInMinutes: 0
+
 - job: bionic_gcc_debug
   pool:
     vmImage: 'ubuntu-16.04'
