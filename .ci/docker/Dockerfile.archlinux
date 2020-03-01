@@ -1,11 +1,3 @@
 FROM archlinux:latest
 
-RUN uname -a
-RUN uname -n
-RUN uname -r
-RUN uname -v
-RUN uname -m
-RUN uname -p
-RUN uname -i
-RUN uname -o
-RUN echo $OSTYPE
+RUN yes | pacman -Sy lsb-release

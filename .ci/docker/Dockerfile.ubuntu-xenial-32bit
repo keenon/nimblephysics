@@ -1,1 +1,3 @@
 FROM i386/ubuntu:xenial
+
+RUN apt-get update && apt-get install -y lsb-release && apt-get clean all
