@@ -1,4 +1,5 @@
-FROM archlinux:latest
+FROM niklasheer/arch-yay
+#FROM archlinux:latest
 
 # Install essential packages
 RUN pacman -Syu --needed --noconfirm \
@@ -8,18 +9,18 @@ RUN pacman -Syu --needed --noconfirm \
   sudo
 
 # makepkg user and workdir
-ARG user=makepkg
-RUN useradd -m $user
-RUN echo "$user ALL=(ALL:ALL) NOPASSWD:ALL" > /etc/sudoers.d/$user
-USER $user
-WORKDIR /home/$user
+#ARG user=makepkg
+#RUN useradd -m $user
+#RUN echo "$user ALL=(ALL:ALL) NOPASSWD:ALL" > /etc/sudoers.d/$user
+#USER $user
+#WORKDIR /home/$user
 
 # Install yay
-RUN git clone https://aur.archlinux.org/yay.git \
-  && cd yay \
-  && makepkg -sri --needed --noconfirm \
-  && cd \
-  && rm -rf .cache yay
+#RUN git clone https://aur.archlinux.org/yay.git \
+#  && cd yay \
+#  && makepkg -sri --needed --noconfirm \
+#  && cd \
+#  && rm -rf .cache yay
 
 # Change the user to root
 #USER root
