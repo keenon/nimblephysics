@@ -18,10 +18,10 @@ if [ -z "$COMPILER" ]; then
 fi
 
 # Build tools
-su docker -c 'yay -S cmake'
+yay -S cmake
 
 # Required dependencies
-su docker -c 'yay -S assimp boost eigen fcl freeglut libccd libgl'
+yay -S assimp boost eigen fcl freeglut libccd libgl
 
 # Optional dependencies
-su docker -c 'yay -S bullet coin-or-ipopt doxygen flann nlopt octomap ode openscenegraph pagmo tinyxml2 urdfdom'
+yay -S bullet coin-or-ipopt doxygen flann nlopt octomap ode openscenegraph pagmo tinyxml2 urdfdom

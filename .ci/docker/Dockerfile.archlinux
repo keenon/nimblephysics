@@ -1,4 +1,4 @@
-FROM greyltc/archlinux-aur
+FROM dmp1ce/archlinux-yay
 
 # Install essential packages
 RUN pacman -Syu --needed --noconfirm \
