@@ -1,7 +1,7 @@
 FROM dmp1ce/archlinux-yay
 
 # Install essential packages
-RUN pacman -Syu --needed --noconfirm \
+RUN sudo pacman -Syu --needed --noconfirm \
   lsb-release
 
 # Change user to 'docker', which is set by greyltc/archlinux-aur
