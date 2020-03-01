@@ -2,11 +2,13 @@ cmake_minimum_required(VERSION 2.8.6 FATAL_ERROR)
 
 project(gazebo)
 
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+
 # Find DART
-set(DART_MIN_REQUIRED_VERSION 6.6)
-find_package(DART ${DART_MIN_REQUIRED_VERSION} CONFIG)
+find_package(DART CONFIG)
 if(DART_FOUND)
   message(STATUS "Looking for DART - found")
+  message(STATUS "DART_LIBRARIES: ${DART_LIBRARIES}")
   set(HAVE_DART TRUE)
 else()
   message(STATUS "Looking for DART - not found")
