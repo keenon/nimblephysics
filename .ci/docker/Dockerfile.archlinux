@@ -7,3 +7,5 @@ RUN pacman -Syu --needed --noconfirm \
 # Change user to 'docker', which is set by greyltc/archlinux-aur
 # because yay prevent running with sudo/root.
 USER docker
+
+ENTRYPOINT bash
