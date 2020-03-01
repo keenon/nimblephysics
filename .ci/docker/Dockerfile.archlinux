@@ -1,7 +1,7 @@
 FROM archlinux:latest
 
 # Install essential packages
-RUN pacman -Syu \
+RUN pacman -Syu --needed --noconfirm \
   lsb-release \
   base-devel \
   git \
