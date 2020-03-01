@@ -1,3 +1,4 @@
 FROM archlinux
 
 RUN echo $OSTYPE
+RUN lsb_release -sc
