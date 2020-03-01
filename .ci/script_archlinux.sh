@@ -2,7 +2,7 @@
 set -ex
 
 pacman -Syu --needed --noconfirm base-devel
-pacman -S --needed --noconfirm cmake
+pacman -Syu --needed --noconfirm cmake
 
 if [ -z "$BUILD_DIR" ]; then
   echo "Error: Environment variable BUILD_DIR is unset. Using $PWD by default."
