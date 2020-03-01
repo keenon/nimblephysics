@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -ex
 
+pacman -Syu --needed --noconfirm base-devel
 pacman -S --needed --noconfirm cmake
 
 if [ -z "$BUILD_DIR" ]; then
