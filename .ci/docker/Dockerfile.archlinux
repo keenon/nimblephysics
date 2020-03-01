@@ -1,5 +1,7 @@
-FROM oblique/archlinux-yay
+FROM greyltc/archlinux-aur
 
 # Install essential packages
 RUN pacman -Syu --needed --noconfirm \
   lsb-release
+
+USER docker
