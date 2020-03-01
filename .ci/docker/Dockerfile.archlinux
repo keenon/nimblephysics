@@ -3,4 +3,3 @@ FROM archlinux:latest
 # Install essential packages
 RUN pacman -Syu --needed --noconfirm \
   lsb-release
-
