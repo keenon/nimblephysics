@@ -19,6 +19,11 @@ else()
 endif()
 
 add_executable(gazebo main.cpp)
+if(CMAKE_VERSION VERSION_LESS 3.8.2)
+  target_compile_options(gazebo PUBLIC -std=c++11)
+else()
+  target_compile_features(gazebo PUBLIC cxx_std_11)
+endif()
 
 # Link in DART support if present
 if(HAVE_DART)
