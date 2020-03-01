@@ -22,5 +22,5 @@ RUN git clone https://aur.archlinux.org/yay.git \
   && rm -rf .cache yay
 
 # Change the user to root
-USER root
-RUN whoami
+#USER root
+#RUN whoami
