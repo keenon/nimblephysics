@@ -18,6 +18,7 @@ if [ -z "$COMPILER" ]; then
 fi
 
 # Build tools
+yay -S cmake
 
 # Required dependencies
 yay -S assimp boost eigen fcl freeglut libccd libgl
