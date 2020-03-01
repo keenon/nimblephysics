@@ -1,4 +1,4 @@
-FROM dmp1ce/archlinux-yay
+FROM archlinux:latest
 
 # Install essential packages
 RUN sudo pacman -Syu --needed --noconfirm \
