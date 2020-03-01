@@ -4,4 +4,6 @@ FROM greyltc/archlinux-aur
 RUN pacman -Syu --needed --noconfirm \
   lsb-release
 
+# Change user to 'docker', which is set by greyltc/archlinux-aur
+# because yay prevent running with sudo/root.
 USER docker
