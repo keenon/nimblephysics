@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -ex
 
+pacman -S --needed --noconfirm cmake
+
 if [ -z "$BUILD_DIR" ]; then
   echo "Error: Environment variable BUILD_DIR is unset. Using $PWD by default."
   BUILD_DIR=$PWD
