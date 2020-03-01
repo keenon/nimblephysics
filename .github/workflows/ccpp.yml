@@ -14,15 +14,15 @@ on:
     - cron: '0 2 * * 0-6'
 
 jobs:
-  archilinux_gcc_release:
-    name: Ubuntu 16.04 [GCC|Release]
+  archlinux_gcc_release:
+    name: Archlinux [GCC|Release]
     runs-on: ubuntu-18.04
     steps:
     - uses: actions/checkout@v1
     - name: Install Dependencies
       env:
         COMPILER: gcc
-        DOCKERFILE: Dockerfile.archilinux
+        DOCKERFILE: Dockerfile.archlinux
         BUILD_TYPE: Release
       run: |
         docker build -t "${DOCKERFILE,,}" -f ".ci/docker/$DOCKERFILE" .;
