@@ -63,9 +63,17 @@ public:
   Frame(const Frame&) = delete;
 
   /// Destructor
-  virtual ~Frame();
+  ~Frame() override;
 
   static Frame* World();
+
+  // Shared pointer version for Pythong binding. In the current binding setting,
+  // Frame is always held in std::shared_ptr. This means it will double free
+  // when Frame* World() is used because Frame* World() returns a raw pointer of
+  // static instance. This workaround wouldn't heart the performance too much
+  // because it only creates one additional WorldFrame instance and one
+  // shared_ptr to hold it.
+  static std::shared_ptr<Frame> WorldShared();
 
   //--------------------------------------------------------------------------
   // Transform
@@ -83,8 +91,8 @@ public:
 
   /// Get the transform of this Frame with respect to some other Frame. It can
   /// be expressed in the coordinates of any Frame.
-  Eigen::Isometry3d getTransform(const Frame* withRespectTo,
-                                 const Frame* inCoordinatesOf) const;
+  Eigen::Isometry3d getTransform(
+      const Frame* withRespectTo, const Frame* inCoordinatesOf) const;
 
   //-------------------------------------------------------------------------
   // Velocity
@@ -144,12 +152,13 @@ public:
   /// acceleration which we refer to as the partial acceleration, accessible
   /// by getPartialAcceleration(). We save operations during our forward
   /// kinematics by computing and storing the partial acceleration separately
-  /// from the rest of the Frame's acceleration. getPrimaryRelativeAcceleration()
-  /// will return the portion of the relative spatial acceleration that is not
-  /// contained in the partial acceleration. To get the full spatial
-  /// acceleration of this Frame relative to its parent Frame, use
-  /// getRelativeSpatialAcceleration(). To get the full spatial acceleration
-  /// of this Frame relative to the World Frame, use getSpatialAcceleration().
+  /// from the rest of the Frame's acceleration.
+  /// getPrimaryRelativeAcceleration() will return the portion of the relative
+  /// spatial acceleration that is not contained in the partial acceleration. To
+  /// get the full spatial acceleration of this Frame relative to its parent
+  /// Frame, use getRelativeSpatialAcceleration(). To get the full spatial
+  /// acceleration of this Frame relative to the World Frame, use
+  /// getSpatialAcceleration().
   virtual const Eigen::Vector6d& getPrimaryRelativeAcceleration() const = 0;
 
   /// The Featherstone ABI algorithm exploits a component of the spatial
@@ -251,10 +260,12 @@ public:
   virtual void dirtyAcceleration() override;
 
 protected:
-
   /// Used when constructing a pure abstract class, because calling the Frame
   /// constructor is just a formality
-  enum ConstructAbstractTag { ConstructAbstract };
+  enum ConstructAbstractTag
+  {
+    ConstructAbstract
+  };
 
   /// Constructor for typical usage
   explicit Frame(Frame* _refFrame);
@@ -278,9 +289,11 @@ protected:
   virtual void processRemovedEntity(Entity* oldChildEntity);
 
 private:
-
   /// Used when constructing the World
-  enum ConstructWorldTag { ConstructWorld };
+  enum ConstructWorldTag
+  {
+    ConstructWorld
+  };
 
   /// Constructor only to be used by the WorldFrame class
   explicit Frame(ConstructWorldTag);
