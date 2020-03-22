@@ -1678,16 +1678,16 @@ void GenericJoint<ConfigSpaceT>::updateRelativePrimaryAcceleration() const
   //   A': The relative primary acceleration in world coordinates.
   //    S: The joint Jacobian in world coordinates.
   //  ddq: The joint accelerations.
-  this->mPrimaryAcceleration =
-      math::AdR(this->getRelativeTransform(),
-          this->getRelativeJacobianStatic() * this->getAccelerationsStatic());
+  this->mPrimaryAcceleration = math::AdR(
+      this->getRelativeTransform(),
+      this->getRelativeJacobianStatic() * this->getAccelerationsStatic());
 #else
   // A' = S * ddq
   // where
   //   A': The relative primary acceleration in world coordinates.
   //    S: The joint Jacobian in world coordinates.
-  this->mPrimaryAcceleration =
-      this->getRelativeJacobianStatic() * this->getAccelerationsStatic();
+  this->mPrimaryAcceleration
+      = this->getRelativeJacobianStatic() * this->getAccelerationsStatic();
 #endif
 }
 
@@ -1711,15 +1711,17 @@ void GenericJoint<ConfigSpaceT>::setPartialAccelerationTo(
   // ad(V, Ad([R 0; 0 1], S * dq)) + Ad([R 0; 0 1], dS * dq)
   const Eigen::Isometry3d& tf = this->getRelativeTransform();
   partialAcceleration
-      = math::ad(childVelocity, math::AdR(
-          tf, getRelativeJacobianStatic() * getVelocitiesStatic()))
-      + math::AdR(tf,
-          getRelativeJacobianTimeDerivStatic() * getVelocitiesStatic());
+      = math::ad(
+            childVelocity,
+            math::AdR(tf, getRelativeJacobianStatic() * getVelocitiesStatic()))
+        + math::AdR(
+              tf, getRelativeJacobianTimeDerivStatic() * getVelocitiesStatic());
 #else
   // ad(V, S * dq) + dS * dq
-  partialAcceleration = math::ad(childVelocity,
-                      getRelativeJacobianStatic() * getVelocitiesStatic())
-                    + getRelativeJacobianTimeDerivStatic() * getVelocitiesStatic();
+  partialAcceleration
+      = math::ad(
+            childVelocity, getRelativeJacobianStatic() * getVelocitiesStatic())
+        + getRelativeJacobianTimeDerivStatic() * getVelocitiesStatic();
 #endif
   // Verification
   assert(!math::isNan(partialAcceleration));

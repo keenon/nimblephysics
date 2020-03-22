@@ -2127,5 +2127,5 @@ BoundingBox::BoundingBox(const Eigen::Vector3d& min, const Eigen::Vector3d& max)
 {
 }
 
-}  // namespace math
-}  // namespace dart
+} // namespace math
+} // namespace dart

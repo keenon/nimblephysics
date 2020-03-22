@@ -108,17 +108,18 @@ public:
 
   /// Get the spatial velocity of this Frame relative to some other Frame. It
   /// can be expressed in the coordinates of any Frame.
-  Eigen::Vector6d getSpatialVelocity(const Frame* relativeTo,
-                                     const Frame* inCoordinatesOf) const;
+  Eigen::Vector6d getSpatialVelocity(
+      const Frame* relativeTo, const Frame* inCoordinatesOf) const;
 
   /// Get the spatial velocity of a fixed point in this Frame. The velocity is
   /// in coordinates of this Frame and is relative to the World Frame.
   Eigen::Vector6d getSpatialVelocity(const Eigen::Vector3d& offset) const;
 
   /// Get the spatial velocity of a fixed point in this Frame.
-  Eigen::Vector6d getSpatialVelocity(const Eigen::Vector3d& offset,
-                                     const Frame* relativeTo,
-                                     const Frame* inCoordinatesOf) const;
+  Eigen::Vector6d getSpatialVelocity(
+      const Eigen::Vector3d& offset,
+      const Frame* relativeTo,
+      const Frame* inCoordinatesOf) const;
 
   /// Get the linear portion of classical velocity of this Frame relative to
   /// some other Frame. It can be expressed in the coordinates of any Frame.
@@ -172,8 +173,8 @@ public:
 
   /// Get the spatial acceleration of this Frame relative to some other Frame.
   /// It can be expressed in the coordinates of any Frame.
-  Eigen::Vector6d getSpatialAcceleration(const Frame* relativeTo,
-                                         const Frame* inCoordinatesOf) const;
+  Eigen::Vector6d getSpatialAcceleration(
+      const Frame* relativeTo, const Frame* inCoordinatesOf) const;
 
   /// Get the spatial acceleration of a fixed point in this Frame. The
   /// acceleration is in coordinates of this Frame and is relative to the World
@@ -181,26 +182,27 @@ public:
   Eigen::Vector6d getSpatialAcceleration(const Eigen::Vector3d& offset) const;
 
   /// Get the spatial acceleration of a fixed point in this Frame
-  Eigen::Vector6d getSpatialAcceleration(const Eigen::Vector3d& offset,
-                                         const Frame* relativeTo,
-                                         const Frame* inCoordinatesOf) const;
+  Eigen::Vector6d getSpatialAcceleration(
+      const Eigen::Vector3d& offset,
+      const Frame* relativeTo,
+      const Frame* inCoordinatesOf) const;
 
   /// Get the linear portion of classical acceleration of this Frame relative to
   /// some other Frame. It can be expressed in the coordinates of any Frame.
   Eigen::Vector3d getLinearAcceleration(
-      const Frame* relativeTo=Frame::World(),
-      const Frame* inCoordinatesOf=Frame::World()) const;
+      const Frame* relativeTo = Frame::World(),
+      const Frame* inCoordinatesOf = Frame::World()) const;
 
   Eigen::Vector3d getLinearAcceleration(
       const Eigen::Vector3d& _offset,
-      const Frame* relativeTo=Frame::World(),
-      const Frame* inCoordinatesOf=Frame::World()) const;
+      const Frame* relativeTo = Frame::World(),
+      const Frame* inCoordinatesOf = Frame::World()) const;
 
   /// Get the angular portion of classical acceleration of this Frame relative
   /// to some other Frame. It can be expressed in the coordinates of any Frame.
   Eigen::Vector3d getAngularAcceleration(
-      const Frame* relativeTo=Frame::World(),
-      const Frame* inCoordinatesOf=Frame::World()) const;
+      const Frame* relativeTo = Frame::World(),
+      const Frame* inCoordinatesOf = Frame::World()) const;
 
   //--------------------------------------------------------------------------
   // Relationships
