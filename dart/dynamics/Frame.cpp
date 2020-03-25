@@ -412,17 +412,16 @@ Eigen::Vector6d Frame::getSpatialAcceleration(
     return math::AdR(getTransform(inCoordinatesOf), getSpatialAcceleration());
   }
 
-  const Eigen::Vector6d& result
-      = (getSpatialAcceleration()
-         - math::AdT(
-               relativeTo->getTransform(this),
-               relativeTo->getSpatialAcceleration())
-         + math::ad(
-               getSpatialVelocity(),
-               math::AdT(
-                   relativeTo->getTransform(this),
-                   relativeTo->getSpatialVelocity())))
-            .eval();
+  const Eigen::Vector6d& result = (getSpatialAcceleration()
+                                   - math::AdT(
+                                         relativeTo->getTransform(this),
+                                         relativeTo->getSpatialAcceleration())
+                                   + math::ad(
+                                         getSpatialVelocity(),
+                                         math::AdT(
+                                             relativeTo->getTransform(this),
+                                             relativeTo->getSpatialVelocity())))
+                                      .eval();
 
   if (this == inCoordinatesOf)
     return result;
