@@ -389,7 +389,7 @@ const Eigen::Vector6d& Frame::getSpatialAcceleration() const
 
 //==============================================================================
 Eigen::Vector6d Frame::getSpatialAcceleration(
-    const Frame* _relativeTo, const Frame* _inCoordinatesOf) const
+    const Frame* relativeTo, const Frame* inCoordinatesOf) const
 {
   // Frame 2: this, Frame 1: _relativeTo, Frame O: _inCoordinatesOf
   // Acceleration of Frame 2 relative to Frame 1 in coordinates of O: a_21[O]
@@ -398,36 +398,36 @@ Eigen::Vector6d Frame::getSpatialAcceleration(
 
   // a_21[O] = R_O2*( a_2[2] - X_21*a_1[1] - v_2[2] x v_21[2] )
 
-  if (this == _relativeTo)
+  if (this == relativeTo)
     return Eigen::Vector6d::Zero();
 
-  if (_relativeTo->isWorld())
+  if (relativeTo->isWorld())
   {
-    if (this == _inCoordinatesOf)
+    if (this == inCoordinatesOf)
       return getSpatialAcceleration();
 
-    if (_inCoordinatesOf->isWorld())
+    if (inCoordinatesOf->isWorld())
       return math::AdR(getWorldTransform(), getSpatialAcceleration());
 
-    return math::AdR(getTransform(_inCoordinatesOf), getSpatialAcceleration());
+    return math::AdR(getTransform(inCoordinatesOf), getSpatialAcceleration());
   }
 
   const Eigen::Vector6d& result
       = (getSpatialAcceleration()
          - math::AdT(
-               _relativeTo->getTransform(this),
-               _relativeTo->getSpatialAcceleration())
+               relativeTo->getTransform(this),
+               relativeTo->getSpatialAcceleration())
          + math::ad(
                getSpatialVelocity(),
                math::AdT(
-                   _relativeTo->getTransform(this),
-                   _relativeTo->getSpatialVelocity())))
+                   relativeTo->getTransform(this),
+                   relativeTo->getSpatialVelocity())))
             .eval();
 
-  if (this == _inCoordinatesOf)
+  if (this == inCoordinatesOf)
     return result;
 
-  return math::AdR(getTransform(_inCoordinatesOf), result);
+  return math::AdR(getTransform(inCoordinatesOf), result);
 }
 
 //==============================================================================
@@ -439,43 +439,43 @@ Eigen::Vector6d Frame::getSpatialAcceleration(
 
 //==============================================================================
 Eigen::Vector6d Frame::getSpatialAcceleration(
-    const Eigen::Vector3d& _offset,
-    const Frame* _relativeTo,
-    const Frame* _inCoordinatesOf) const
+    const Eigen::Vector3d& offset,
+    const Frame* relativeTo,
+    const Frame* inCoordinatesOf) const
 {
-  if (this == _relativeTo)
+  if (this == relativeTo)
     return Eigen::Vector6d::Zero();
 
   // Compute spatial acceleration of the point
   Eigen::Vector6d a = getSpatialAcceleration();
-  a.tail<3>().noalias() += a.head<3>().cross(_offset);
+  a.tail<3>().noalias() += a.head<3>().cross(offset);
 
-  if (_relativeTo->isWorld())
+  if (relativeTo->isWorld())
   {
-    if (this == _inCoordinatesOf)
+    if (this == inCoordinatesOf)
       return a;
 
-    return math::AdR(getTransform(_inCoordinatesOf), a);
+    return math::AdR(getTransform(inCoordinatesOf), a);
   }
 
   // Compute the spatial velocity of the point
   Eigen::Vector6d v = getSpatialVelocity();
-  v.tail<3>().noalias() += v.head<3>().cross(_offset);
+  v.tail<3>().noalias() += v.head<3>().cross(offset);
 
   // Compute the acceleration of the reference Frame
   Eigen::Vector6d a_ref = math::AdT(
-      _relativeTo->getTransform(this), _relativeTo->getSpatialAcceleration());
-  a_ref.tail<3>().noalias() += a_ref.head<3>().cross(_offset);
+      relativeTo->getTransform(this), relativeTo->getSpatialAcceleration());
+  a_ref.tail<3>().noalias() += a_ref.head<3>().cross(offset);
 
   // Compute the relative velocity of the point
-  const Eigen::Vector6d& v_rel = getSpatialVelocity(_offset, _relativeTo, this);
+  const Eigen::Vector6d& v_rel = getSpatialVelocity(offset, relativeTo, this);
 
   a = a - a_ref - math::ad(v, v_rel);
 
-  if (this == _inCoordinatesOf)
+  if (this == inCoordinatesOf)
     return a;
 
-  return math::AdR(getTransform(_inCoordinatesOf), a);
+  return math::AdR(getTransform(inCoordinatesOf), a);
 }
 
 //==============================================================================
