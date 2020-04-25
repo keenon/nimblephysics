@@ -2329,7 +2329,7 @@ void GenericJoint<ConfigSpaceT>::updateForceID(
   {
     const typename ConfigSpaceT::Vector dampingForces
         = -Base::mAspectProperties.mDampingCoefficients.cwiseProduct(
-            getVelocitiesStatic());
+            getVelocitiesStatic() + getAccelerationsStatic() * timeStep);
     this->mAspectState.mForces -= dampingForces;
   }
 
@@ -2339,7 +2339,8 @@ void GenericJoint<ConfigSpaceT>::updateForceID(
     const typename ConfigSpaceT::Vector springForces
         = -Base::mAspectProperties.mSpringStiffnesses.cwiseProduct(
             getPositionsStatic() - Base::mAspectProperties.mRestPositions
-            + getVelocitiesStatic() * timeStep);
+            + getVelocitiesStatic() * timeStep
+            + getAccelerationsStatic() * timeStep * timeStep);
     this->mAspectState.mForces -= springForces;
   }
 }
