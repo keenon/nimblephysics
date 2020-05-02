@@ -33,6 +33,13 @@ foreach(lib ${PC_urdfdom_LIBRARIES})
   list(APPEND urdfdom_LIBRARIES ${urdfdom_LIBRARY})
 endforeach()
 
+message("[DEBUG] PC_urdfdom_FOUND: ${PC_urdfdom_FOUND}")
+message("[DEBUG] PC_urdfdom_INCLUDEDIR: ${PC_urdfdom_INCLUDEDIR}")
+message("[DEBUG] PC_urdfdom_LIBRARIES: ${PC_urdfdom_LIBRARIES}")
+message("[DEBUG] PC_urdfdom_VERSION: ${PC_urdfdom_VERSION}")
+
+message("[DEBUG] urdfdom_LIBRARIES: ${urdfdom_LIBRARIES}")
+
 # Version
 set(urdfdom_VERSION ${PC_urdfdom_VERSION})
 
