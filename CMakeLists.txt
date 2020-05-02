@@ -199,6 +199,9 @@ if(MSVC)
   add_compile_options(/wd4305)
   add_compile_options(/wd4838)
   add_compile_options(/bigobj)
+
+  add_compile_options(/wd4005)  # TODO(JS): Check if necessary
+
   add_compile_definitions(_ENABLE_EXTENDED_ALIGNED_STORAGE)
 
 elseif(CMAKE_COMPILER_IS_GNUCXX)
