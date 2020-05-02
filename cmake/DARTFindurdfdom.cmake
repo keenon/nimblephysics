@@ -6,7 +6,11 @@
 #
 # This file is provided under the "BSD-style" License
 
-find_package(urdfdom QUIET CONFIG)
+# if(MSVC)
+  find_package(urdfdom QUIET MODULE)
+# else()
+  # find_package(urdfdom QUIET CONFIG)
+# endif()
 
 if(urdfdom_FOUND AND NOT TARGET urdfdom)
   add_library(urdfdom INTERFACE IMPORTED)
