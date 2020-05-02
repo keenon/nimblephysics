@@ -6,21 +6,20 @@
 #
 # This file is provided under the "BSD-style" License
 
-# if(MSVC)
-  # Use find module because urdfdom-config.cmake doesn't work on Windows:
-  # https://github.com/dartsim/dart/issues/1365
-  # TODO: Remove below line and Findurdfdom.cmake once #1365 is resolved in
-  # upstream
-  # find_package(urdfdom QUIET MODULE)
-# else()
-  find_package(urdfdom QUIET CONFIG)
-# endif()
+find_package(urdfdom QUIET CONFIG)
 
 if(MSVC)
-  # check if "/include" is in ${urdfdom_INCLUDE_DIRS}
+  # Remove invalid path (i.e., /include) from urdfdom_INCLUDE_DIRS. This happens
+  # when it's installed by vcpkg on Windows. See:
+  # - https://github.com/dartsim/dart/issues/1365
+  # - https://github.com/ros/urdfdom/issues/140
   if ("/include" IN_LIST urdfdom_INCLUDE_DIRS)
     list(REMOVE_ITEM urdfdom_INCLUDE_DIRS "/include")
-    find_package(TinyXML REQUIRED)
+    find_package(TinyXML REQUIRED MODULE)
+    message("[DEBUG] TinyXML_FOUND       : ${TinyXML_FOUND}")
+    message("[DEBUG] TinyXML_INCLUDE_DIRS: ${TinyXML_INCLUDE_DIRS}")
+    message("[DEBUG] TinyXML_LIBRARIES   : ${TinyXML_LIBRARIES}")
+    message("[DEBUG] TinyXML_VERSION     : ${TinyXML_VERSION}")
     list(APPEND urdfdom_INCLUDE_DIRS ${TinyXML_INCLUDE_DIRS})
   endif()
 endif()
