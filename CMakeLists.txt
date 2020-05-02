@@ -178,6 +178,12 @@ if(MSVC)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /WX")
   endif()
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHsc /permissive- /Zc:twoPhase-")
+  # /vd2 option is required (default is /vd1) because one of DART class has the
+  # case that the only virtual function in a virtual base is a destructor.
+  # See:
+  # - https://github.com/dartsim/dart/issues/1431
+  # - https://docs.microsoft.com/en-us/cpp/build/reference/vd-disable-construction-displacements?view=vs-2019
+  list(APPEND CMAKE_CXX_FLAGS "/vd2")
   set(CMAKE_EXE_LINKER_FLAGS_RELEASE "/LTCG /INCREMENTAL:NO")
   if(NOT DART_MSVC_DEFAULT_OPTIONS)
     set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} ${DART_RUNTIME_LIBRARY}d /Zi /Gy /W1 /EHsc")
