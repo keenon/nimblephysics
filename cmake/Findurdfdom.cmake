@@ -6,7 +6,7 @@
 #
 # This file is provided under the "BSD-style" License
 
-# Find 
+# Find urdfdom
 #
 # This sets the following variables:
 #   urdfdom_FOUND
@@ -17,7 +17,7 @@
 find_package(PkgConfig REQUIRED)
 
 # Check if the pkgconfig file is installed
-pkg_check_modules(PC_urdfdom urdfdom QUIET)
+pkg_check_modules(PC_urdfdom urdfdom REQUIRED)
 
 # Include directories
 find_path(urdfdom_INCLUDE_DIRS
@@ -27,17 +27,11 @@ find_path(urdfdom_INCLUDE_DIRS
 )
 
 # Libraries
-find_library(urdfdom_LIBRARIES
-  NAMES urdfdom
-  HINTS ${PC_urdfdom_LIBDIR}
-)
-
-message("[DEBUG] PC_urdfdom_FOUND: ${PC_urdfdom_FOUND}")
-message("[DEBUG] PC_urdfdom_INCLUDEDIR: ${PC_urdfdom_INCLUDEDIR}")
-message("[DEBUG] PC_urdfdom_LIBRARIES: ${PC_urdfdom_LIBRARIES}")
-message("[DEBUG] PC_urdfdom_VERSION: ${PC_urdfdom_VERSION}")
-
-set(urdfdom_LIBRARIES ${PC_urdfdom_LIBRARIES})
+set(urdfdom_LIBRARIES )
+foreach(lib ${PC_urdfdom_LIBRARIES})
+  find_library(urdfdom_LIBRARY NAMES ${lib} HINTS ${PC_urdfdom_LIBDIR})
+  list(APPEND urdfdom_LIBRARIES ${urdfdom_LIBRARY})
+endforeach()
 
 # Version
 set(urdfdom_VERSION ${PC_urdfdom_VERSION})
