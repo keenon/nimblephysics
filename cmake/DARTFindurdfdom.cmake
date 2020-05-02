@@ -16,7 +16,14 @@
   find_package(urdfdom QUIET CONFIG)
 # endif()
 
-@PKG_NAME@_INCLUDE_DIRS
+if(MSVC)
+  # check if "/include" is in ${urdfdom_INCLUDE_DIRS}
+  if ("/include" IN_LIST urdfdom_INCLUDE_DIRS)
+    list(REMOVE_ITEM urdfdom_INCLUDE_DIRS "/include")
+    find_package(TinyXML REQUIRED)
+    list(APPEND urdfdom_INCLUDE_DIRS ${TinyXML_INCLUDE_DIRS})
+  endif()
+endif()
 
 message("[DEBUG] urdfdom_FOUND       : ${urdfdom_FOUND}")
 message("[DEBUG] urdfdom_INCLUDE_DIRS: ${urdfdom_INCLUDE_DIRS}")
