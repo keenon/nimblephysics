@@ -8,6 +8,9 @@
 
 find_package(urdfdom QUIET CONFIG)
 
+message("[DEBUG] urdfdom_FOUND       : ${urdfdom_FOUND}")
+message("[DEBUG] urdfdom_INCLUDE_DIRS: ${urdfdom_INCLUDE_DIRS}")
+
 if(MSVC)
   # Remove invalid path (i.e., /include) from urdfdom_INCLUDE_DIRS. This happens
   # when it's installed by vcpkg on Windows. See:
