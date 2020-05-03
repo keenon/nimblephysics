@@ -56,9 +56,6 @@ public:
   /// \brief
   void draw() override;
 
-  /// \brief
-  void keyboard(unsigned char _key, int _x, int _y) override;
-
   void setData(Eigen::VectorXd _data);
 
 protected:
