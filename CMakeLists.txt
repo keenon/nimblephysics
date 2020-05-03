@@ -195,6 +195,7 @@ if(MSVC)
   add_compile_options(/bigobj)
   
   add_compile_options(/wd4005)  # TODO(JS): Check if necessary
+  add_compile_options(/wd4146)  # TODO(JS): Check if necessary
   
   # /vd2 option is required (default is /vd1) because one of DART class has the
   # case that the only virtual function in a virtual base is a destructor.
