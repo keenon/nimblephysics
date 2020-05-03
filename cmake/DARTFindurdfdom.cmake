@@ -8,9 +8,6 @@
 
 find_package(urdfdom QUIET CONFIG)
 
-message("[DEBUG] urdfdom_FOUND       : ${urdfdom_FOUND}")
-message("[DEBUG] urdfdom_INCLUDE_DIRS: ${urdfdom_INCLUDE_DIRS}")
-
 if(MSVC)
   # Remove invalid path (i.e., /include) from urdfdom_INCLUDE_DIRS. This happens
   # when it's installed by vcpkg on Windows. See:
@@ -19,18 +16,9 @@ if(MSVC)
   if ("/include" IN_LIST urdfdom_INCLUDE_DIRS)
     list(REMOVE_ITEM urdfdom_INCLUDE_DIRS "/include")
     find_package(TinyXML REQUIRED MODULE)
-    message("[DEBUG] TinyXML_FOUND       : ${TinyXML_FOUND}")
-    message("[DEBUG] TinyXML_INCLUDE_DIRS: ${TinyXML_INCLUDE_DIRS}")
-    message("[DEBUG] TinyXML_LIBRARIES   : ${TinyXML_LIBRARIES}")
-    message("[DEBUG] TinyXML_VERSION     : ${TinyXML_VERSION}")
     list(APPEND urdfdom_INCLUDE_DIRS ${TinyXML_INCLUDE_DIRS})
   endif()
 endif()
-
-message("[DEBUG] urdfdom_FOUND       : ${urdfdom_FOUND}")
-message("[DEBUG] urdfdom_INCLUDE_DIRS: ${urdfdom_INCLUDE_DIRS}")
-message("[DEBUG] urdfdom_LIBRARIES   : ${urdfdom_LIBRARIES}")
-message("[DEBUG] urdfdom_VERSION     : ${urdfdom_VERSION}")
 
 if(urdfdom_FOUND AND NOT TARGET urdfdom)
   add_library(urdfdom INTERFACE IMPORTED)
