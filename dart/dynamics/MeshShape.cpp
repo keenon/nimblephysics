@@ -46,6 +46,23 @@
 #include "dart/dynamics/AssimpInputResourceAdaptor.hpp"
 #include "dart/dynamics/BoxShape.hpp"
 
+#if !(ASSIMP_AINODE_DTOR_DEFINED)
+// We define our own constructor and destructor for aiNode, because it seems to
+// be missing from the standard assimp library (see #451)
+aiNode::~aiNode() {
+    // delete all children recursively
+    // to make sure we won't crash if the data is invalid ...
+    if (mNumChildren && mChildren)
+    {
+        for (unsigned int a = 0; a < mNumChildren; a++)
+            delete mChildren[a];
+    }
+    delete[] mChildren;
+    delete[] mMeshes;
+    delete mMetaData;
+}
+#endif // #if !(ASSIMP_AINODE_DTOR_DEFINED)
+
 #if !(ASSIMP_AISCENE_CTOR_DTOR_DEFINED)
 // We define our own constructor and destructor for aiScene, because it seems to
 // be missing from the standard assimp library (see #451)

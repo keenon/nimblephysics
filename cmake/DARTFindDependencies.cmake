@@ -41,6 +41,28 @@ if(ASSIMP_FOUND)
   #include <assimp/scene.h>
   int main()
   {
+    aiNode* node = new aiNode;
+    delete node;
+    return 1;
+  }
+  "
+  ASSIMP_AINODE_DTOR_DEFINED)
+
+  if(NOT ASSIMP_AINODE_DTOR_DEFINED)
+    if(DART_VERBOSE)
+      message(WARNING "The installed version of ASSIMP (${ASSIMP_VERSION}) is "
+                      "missing symbols for the constructor and/or destructor of "
+                      "aiNode. DART will use its own implementations of these "
+                      "functions. We recommend using a version of ASSIMP that "
+                      "does not have this issue, once one becomes available.")
+    endif()
+  endif(NOT ASSIMP_AINODE_DTOR_DEFINED)
+
+  check_cxx_source_compiles(
+  "
+  #include <assimp/scene.h>
+  int main()
+  {
     aiScene* scene = new aiScene;
     delete scene;
     return 1;
