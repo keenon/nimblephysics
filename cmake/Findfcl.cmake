@@ -27,21 +27,17 @@ find_path(FCL_INCLUDE_DIRS
     PATHS "${CMAKE_INSTALL_PREFIX}/include")
 
 # Libraries
-if(MSVC)
-  set(FCL_LIBRARIES "fcl$<$<CONFIG:Debug>:d>")
-else()
-  # Give explicit precedence to ${PC_FCL_LIBDIR}
-  find_library(FCL_LIBRARIES
-      NAMES fcl
-      HINTS ${PC_FCL_LIBDIR}
-      NO_DEFAULT_PATH
-      NO_CMAKE_PATH
-      NO_CMAKE_ENVIRONMENT_PATH
-      NO_SYSTEM_ENVIRONMENT_PATH)
-  find_library(FCL_LIBRARIES
-      NAMES fcl
-      HINTS ${PC_FCL_LIBDIR})
-endif()
+# Give explicit precedence to ${PC_FCL_LIBDIR}
+find_library(FCL_LIBRARIES
+    NAMES fcl
+    HINTS ${PC_FCL_LIBDIR}
+    NO_DEFAULT_PATH
+    NO_CMAKE_PATH
+    NO_CMAKE_ENVIRONMENT_PATH
+    NO_SYSTEM_ENVIRONMENT_PATH)
+find_library(FCL_LIBRARIES
+    NAMES fcl
+    HINTS ${PC_FCL_LIBDIR})
 
 # Version
 set(FCL_VERSION ${PC_FCL_VERSION})

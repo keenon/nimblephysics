@@ -29,13 +29,9 @@ find_path(ODE_INCLUDE_DIRS
     PATHS "${CMAKE_INSTALL_PREFIX}/include")
 
 # Libraries
-if(MSVC)
-  set(ODE_LIBRARIES "ode$<$<CONFIG:Debug>:d>")
-else()
-  find_library(ODE_LIBRARIES
-      NAMES ode
-      HINTS ${PC_ODE_LIBDIR})
-endif()
+find_library(ODE_LIBRARIES
+    NAMES ode
+    HINTS ${PC_ODE_LIBDIR})
 
 # Version
 set(ODE_VERSION ${PC_ODE_VERSION})
