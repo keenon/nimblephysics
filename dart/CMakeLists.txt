@@ -133,7 +133,7 @@ target_link_libraries(dart
     Eigen3::Eigen
     ccd
     fcl
-    assimp
+    assimp::assimp
     Boost::boost
     Boost::system
     Boost::filesystem
