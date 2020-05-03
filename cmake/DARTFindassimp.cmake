@@ -6,7 +6,7 @@
 #
 # This file is provided under the "BSD-style" License
 
-find_package(assimp REQUIRED MODULE)
+find_package(assimp REQUIRED CONFIG)
 
 # Manually check version because the upstream version compatibility policy
 # doesn't allow different major number while DART is compatible any version
