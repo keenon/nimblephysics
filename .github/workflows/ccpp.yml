@@ -203,5 +203,5 @@ jobs:
           -DCMAKE_TOOLCHAIN_FILE="%VCPKG_ROOT%/scripts/buildsystems/vcpkg.cmake" ^
           -DDART_MSVC_DEFAULT_OPTIONS=ON ^
           -DDART_VERBOSE=ON
-        cmake --build . --target ALL_BUILD -- /maxcpucount:4
+        cmake --build . --target ALL_BUILD
         ctest --output-on-fauilure
