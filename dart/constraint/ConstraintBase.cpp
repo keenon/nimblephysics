@@ -43,8 +43,7 @@ namespace dart {
 namespace constraint {
 
 //==============================================================================
-ConstraintBase::ConstraintBase()
-  : mDim(0)
+ConstraintBase::ConstraintBase() : mDim(0)
 {
 }
 
@@ -66,6 +65,14 @@ void ConstraintBase::uniteSkeletons()
 }
 
 //==============================================================================
+std::vector<dynamics::SkeletonPtr> ConstraintBase::getSkeletons() const
+{
+  std::vector<dynamics::SkeletonPtr> skeletons;
+  // Return an empty vector
+  return skeletons;
+}
+
+//==============================================================================
 dynamics::SkeletonPtr ConstraintBase::compressPath(
     dynamics::SkeletonPtr _skeleton)
 {
@@ -75,6 +82,21 @@ dynamics::SkeletonPtr ConstraintBase::compressPath(
         = _skeleton->mUnionRootSkeleton.lock()->mUnionRootSkeleton.lock();
     _skeleton = _skeleton->mUnionRootSkeleton.lock();
   }
+  // TODO(keenon): It's possible that mUnionRootSkeleton doesn't actually
+  // point to the root skeleton for every skeleton at this point in the code.
+  // Consider a chain of 4 nodes in a graph.
+  //
+  //    0  <--- 1 <--- 2 <--- 3
+  //
+  // After this code runs, we'd have
+  //
+  //            +-------------+
+  //            |             |
+  //            v             |
+  //    0  <--- 1 <--- 2      3
+  //
+  // Other code seems to assume that every node would point to 0 after this
+  // code. Perhaps we should change that if it's not intended behavior?
 
   return _skeleton;
 }
@@ -89,5 +111,5 @@ dynamics::SkeletonPtr ConstraintBase::getRootSkeleton(
   return _skeleton;
 }
 
-}  // namespace constraint
-}  // namespace dart
+} // namespace constraint
+} // namespace dart

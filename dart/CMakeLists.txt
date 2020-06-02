@@ -17,6 +17,7 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
 # math
 # integration
 # lcpsolver
+# neural
 # optimizer
 #   ipopt
 #   nlopt
@@ -79,6 +80,7 @@ add_subdirectory(common)
 add_subdirectory(math)
 add_subdirectory(integration)
 add_subdirectory(lcpsolver)
+add_subdirectory(neural)
 add_subdirectory(optimizer)
 add_subdirectory(dynamics)
 add_subdirectory(collision)

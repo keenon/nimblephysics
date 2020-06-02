@@ -33,17 +33,22 @@
 #ifndef DART_CONSTRAINT_CONSTRAINEDGROUP_HPP_
 #define DART_CONSTRAINT_CONSTRAINEDGROUP_HPP_
 
-#include <vector>
 #include <memory>
+#include <vector>
+
 #include <Eigen/Dense>
 
 #include "dart/constraint/SmartPointer.hpp"
 
 namespace dart {
 
+namespace neural {
+class ConstrainedGroupGradientMatrices;
+}
+
 namespace dynamics {
 class Skeleton;
-}  // namespace dynamics
+} // namespace dynamics
 
 namespace constraint {
 
@@ -92,6 +97,16 @@ public:
   /// Get total dimension of contraints in this group
   std::size_t getTotalDimension() const;
 
+  /// Set the constraint matrices associated with this ConstrainedGroup
+  void setGradientConstraintMatrices(
+      std::shared_ptr<neural::ConstrainedGroupGradientMatrices>
+          gradientConstraintMatrices);
+
+  /// This gets the gradient constraint matrices manager associated with this
+  /// ConstrainedGroup
+  std::shared_ptr<neural::ConstrainedGroupGradientMatrices>
+  getGradientConstraintMatrices();
+
   //----------------------------------------------------------------------------
   // Friendship
   //----------------------------------------------------------------------------
@@ -109,10 +124,13 @@ private:
 
   ///
   std::shared_ptr<dynamics::Skeleton> mRootSkeleton;
+
+  /// A set of constraint matrices associated with this constrainedGroup
+  std::shared_ptr<neural::ConstrainedGroupGradientMatrices>
+      mGradientConstraintMatrices;
 };
 
-}  // namespace constraint
-}  // namespace dart
+} // namespace constraint
+} // namespace dart
 
-#endif  // DART_CONSTRAINT_CONSTRAINEDGROUP_HPP_
-
+#endif // DART_CONSTRAINT_CONSTRAINEDGROUP_HPP_

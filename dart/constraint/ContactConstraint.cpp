@@ -34,12 +34,11 @@
 
 #include <iostream>
 
-#include "dart/external/odelcpsolver/lcp.h"
-
 #include "dart/collision/CollisionObject.hpp"
 #include "dart/common/Console.hpp"
 #include "dart/dynamics/BodyNode.hpp"
 #include "dart/dynamics/Skeleton.hpp"
+#include "dart/external/odelcpsolver/lcp.h"
 #include "dart/math/Helpers.hpp"
 
 #define DART_EPSILON 1e-6
@@ -771,6 +770,19 @@ void ContactConstraint::uniteSkeletons()
     unionIdB->mUnionRootSkeleton = unionIdA;
     unionIdA->mUnionSize += unionIdB->mUnionSize;
   }
+}
+
+//==============================================================================
+std::vector<dynamics::SkeletonPtr> ContactConstraint::getSkeletons() const
+{
+  std::vector<dynamics::SkeletonPtr> skeletons;
+
+  if (mBodyNodeA->isReactive())
+    skeletons.push_back(mBodyNodeA->getSkeleton());
+  if (mBodyNodeB->isReactive())
+    skeletons.push_back(mBodyNodeB->getSkeleton());
+
+  return skeletons;
 }
 
 } // namespace constraint

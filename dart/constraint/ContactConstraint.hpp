@@ -130,6 +130,9 @@ protected:
   void uniteSkeletons() override;
 
   // Documentation inherited
+  std::vector<dynamics::SkeletonPtr> getSkeletons() const override;
+
+  // Documentation inherited
   bool isActive() const override;
 
 private:

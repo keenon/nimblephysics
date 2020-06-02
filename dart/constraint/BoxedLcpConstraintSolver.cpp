@@ -38,13 +38,13 @@
 #include <iostream>
 #endif
 
-#include "dart/external/odelcpsolver/lcp.h"
-
 #include "dart/common/Console.hpp"
 #include "dart/constraint/ConstraintBase.hpp"
 #include "dart/constraint/DantzigBoxedLcpSolver.hpp"
 #include "dart/constraint/PgsBoxedLcpSolver.hpp"
+#include "dart/external/odelcpsolver/lcp.h"
 #include "dart/lcpsolver/Lemke.hpp"
+#include "dart/neural/ConstrainedGroupGradientMatrices.hpp"
 
 namespace dart {
 namespace constraint {
@@ -55,7 +55,7 @@ BoxedLcpConstraintSolver::BoxedLcpConstraintSolver(
     BoxedLcpSolverPtr boxedLcpSolver,
     BoxedLcpSolverPtr secondaryBoxedLcpSolver)
   : BoxedLcpConstraintSolver(
-        std::move(boxedLcpSolver), std::move(secondaryBoxedLcpSolver))
+      std::move(boxedLcpSolver), std::move(secondaryBoxedLcpSolver))
 {
   setTimeStep(timeStep);
 }
@@ -71,7 +71,7 @@ BoxedLcpConstraintSolver::BoxedLcpConstraintSolver()
 BoxedLcpConstraintSolver::BoxedLcpConstraintSolver(
     BoxedLcpSolverPtr boxedLcpSolver)
   : BoxedLcpConstraintSolver(
-        std::move(boxedLcpSolver), std::make_shared<PgsBoxedLcpSolver>())
+      std::move(boxedLcpSolver), std::make_shared<PgsBoxedLcpSolver>())
 {
   // Do nothing
 }
@@ -155,11 +155,11 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(ConstrainedGroup& group)
   if (0u == n)
     return;
 
-  const int nSkip = dPAD(n);
-#ifdef NDEBUG // release
+  const int nSkip = dPAD(n); // nSkip = n + (n % 4);
+#ifdef NDEBUG                // release
   mA.resize(n, nSkip);
 #else // debug
-  mA.setZero(n, nSkip);
+  mA.setZero(n, nSkip); // rows = n, cols = n + (n % 4)
 #endif
   mX.resize(n);
   mB.resize(n);
@@ -176,6 +176,34 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(ConstrainedGroup& group)
     const ConstraintBasePtr& constraint = group.getConstraint(i - 1);
     assert(constraint->getDimension() > 0);
     mOffset[i] = mOffset[i - 1] + constraint->getDimension();
+  }
+
+  // For gradient computations:
+  // Create the data structure to save our impules test results. The
+  // index into skeletonsImpulseTests[k] is a vector of Eigen::VectorXd
+  // for the k'th skeleton, corresponding to each dimension of the constraint
+  // group getting a unit impules applied.
+  std::vector<std::vector<Eigen::VectorXd> > skeletonsImpulseTorqueTests;
+  skeletonsImpulseTorqueTests.reserve(mSkeletons.size());
+  for (auto skeleton : mSkeletons)
+  {
+    std::vector<Eigen::VectorXd> skeletonImpulseTorqueTests;
+    skeletonImpulseTorqueTests.reserve(n);
+    skeletonsImpulseTorqueTests.push_back(skeletonImpulseTorqueTests);
+  }
+
+  // For gradient computations (massed formulation):
+  // Create the data structure to save our impules test results. The
+  // index into skeletonsImpulseTests[k] is a vector of Eigen::VectorXd
+  // for the k'th skeleton, corresponding to each dimension of the constraint
+  // group getting a unit impules applied.
+  std::vector<std::vector<Eigen::VectorXd> > skeletonsImpulseVelocityTests;
+  skeletonsImpulseVelocityTests.reserve(mSkeletons.size());
+  for (auto skeleton : mSkeletons)
+  {
+    std::vector<Eigen::VectorXd> skeletonImpulseVelocityTests;
+    skeletonImpulseVelocityTests.reserve(n);
+    skeletonsImpulseVelocityTests.push_back(skeletonImpulseVelocityTests);
   }
 
   // For each constraint
@@ -197,20 +225,95 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(ConstrainedGroup& group)
 
     // Fill a matrix by impulse tests: A
     constraint->excite();
+
+    double* impulses = new double[constraint->getDimension()];
     for (std::size_t j = 0; j < constraint->getDimension(); ++j)
     {
       // Adjust findex for global index
       if (mFIndex[mOffset[i] + j] >= 0)
         mFIndex[mOffset[i] + j] += mOffset[i];
 
+      //////////////////////////////////////////////////////////////
+      // Gradients - Classic formulation
+      //////////////////////////////////////////////////////////////
+
+      // For gradient comptutations: clear constraint impulses
+      for (std::size_t k = 0; k < mSkeletons.size(); k++)
+      {
+        mSkeletons[k]->clearConstraintImpulses();
+      }
+      for (std::size_t k = 0; k < constraint->getDimension(); ++k)
+        impulses[k] = (k == j) ? 1 : 0;
+      constraint->applyImpulse(impulses);
+      // For gradient computations: record the torque changes for each
+      // skeleton for the unit impulse on this constraint.
+      // TODO(keenon): In large scenes with many skeletons, most of these
+      // vectors will be 0 for any given constraint, so we should filter them
+      // out.
+      for (std::size_t k = 0; k < mSkeletons.size(); k++)
+      {
+        Eigen::VectorXd impulseTorqueChange
+            = mSkeletons[k]->getConstraintForces() * mTimeStep;
+        skeletonsImpulseTorqueTests[k].push_back(impulseTorqueChange);
+        mSkeletons[k]->clearConstraintImpulses();
+      }
+
+      //////////////////////////////////////////////////////////////
+      // END: Gradients - classic formulation
+      //////////////////////////////////////////////////////////////
+
       // Apply impulse for mipulse test
       constraint->applyUnitImpulse(j);
 
+      //////////////////////////////////////////////////////////////
+      // Gradients - Massed formulation
+      //////////////////////////////////////////////////////////////
+
+      for (std::size_t k = 0; k < mSkeletons.size(); k++)
+      {
+        // TODO(keenon): In large scenes with many skeletons, most of these
+        // vectors will be 0 for any given constraint, so we should filter them
+        // out.
+        skeletonsImpulseVelocityTests[k].push_back(
+            mSkeletons[k]->getVelocityChanges());
+      }
+
+      //////////////////////////////////////////////////////////////
+      // END Gradients - Massed formulation
+      //////////////////////////////////////////////////////////////
+
       // Fill upper triangle blocks of A matrix
+
+      // mA is row-major order, n rows by nSkip cols
+      // nSkip * (mOffset[i] + j) takes us to the (mOffset[i] + j)'th row
+      // mOffset[i] into that row
+      //
+      // -------------------------------
+      //                                |
+      //                   nSkip * (mOffset[i] + j)
+      //                                |
+      //                                v
+      // ------- mOffset[i] ----------> xxxxxxxxxx
+      //
+      // This whole loop fills the entire row (mOffset[i] + j) of A with
+      // the effect that the unit impluse on constraint for j for this
+      // constraint has on the relative velocities for each constraint
+      // force direction.
+      //
+      // As an efficiency tweak, since you know that A is symmetric, only
+      // bother to actually compute half of the velocity changes (upper
+      // triangle, arbitrarily) and then just copy that into the other half.
+
+      // Create a 3x3 square from A(mOffset[i], mOffset[i]) iterating over j
+      // This iteration fill in row j
       int index = nSkip * (mOffset[i] + j) + mOffset[i];
       constraint->getVelocityChange(mA.data() + index, true);
+
       for (std::size_t k = i + 1; k < numConstraints; ++k)
       {
+        // Create a 3x3 square from A(mOffset[i], mOffset[k]), iterating over j
+        // This iteration fill in row j
+        // Probably mostly 0s
         index = nSkip * (mOffset[i] + j) + mOffset[k];
         group.getConstraint(k)->getVelocityChange(mA.data() + index, false);
       }
@@ -222,10 +325,20 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(ConstrainedGroup& group)
         for (std::size_t l = 0; l < group.getConstraint(k)->getDimension(); ++l)
         {
           const int indexJ = mOffset[k] + l;
+          // We've already calculate the velocity of
+          // mA(column for this constraint, previous constraint row) =
+          //     mA(previous constraint row, column for this constraint)
           mA(indexI, indexJ) = mA(indexJ, indexI);
         }
       }
+
+      if (group.getGradientConstraintMatrices())
+      {
+        group.getGradientConstraintMatrices()->measureConstraintImpulse(
+            constraint, j);
+      }
     }
+    delete impulses;
 
     assert(isSymmetric(
         n, mA.data(), mOffset[i], mOffset[i] + constraint->getDimension() - 1));
@@ -236,9 +349,19 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(ConstrainedGroup& group)
   assert(isSymmetric(n, mA.data()));
 
   // Print LCP formulation
-  //  dtdbg << "Before solve:" << std::endl;
-  //  print(n, A, x, lo, hi, b, w, findex);
-  //  std::cout << std::endl;
+  /*
+  dtdbg << "Before solve:" << std::endl;
+  print(
+      n,
+      mA.data(),
+      mX.data(),
+      mLo.data(),
+      mHi.data(),
+      mB.data(),
+      mW.data(),
+      mFIndex.data());
+  std::cout << std::endl;
+  */
 
   // Solve LCP using the primary solver and fallback to secondary solver when
   // the parimary solver failed.
@@ -253,6 +376,12 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(ConstrainedGroup& group)
     mHiBackup = mHi;
     mFIndexBackup = mFIndex;
   }
+  // Always make backups of these variables, regardless of whether we're using
+  // a secondary solver, because we need them for gradients
+  Eigen::VectorXd loGradientBackup = mLo;
+  Eigen::VectorXd hiGradientBackup = mHi;
+  Eigen::VectorXi fIndexGradientBackup = mFIndex;
+
   const bool earlyTermination = (mSecondaryBoxedLcpSolver != nullptr);
   assert(mBoxedLcpSolver);
   bool success = mBoxedLcpSolver->solve(
@@ -308,6 +437,198 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(ConstrainedGroup& group)
     constraint->applyImpulse(mX.data() + mOffset[i]);
     constraint->excite();
   }
+
+  if (group.getGradientConstraintMatrices())
+  {
+    group.getGradientConstraintMatrices()->constructMatrices(
+        mX, hiGradientBackup, loGradientBackup, fIndexGradientBackup);
+  }
+
+  // For gradient computations:
+  // Group the constraints based on their solution values into three buckets:
+  //
+  // - "Clamping": These are constraints that have non-zero constraint forces
+  //               being applied, which means they have a zero constraint
+  //               velocity, and aren't dependent on any other forces (ie have
+  //               an fIndex = -1)
+  // - "Upper Bound": These are sliding-friction constraints that have hit their
+  //                  upper OR lower bounds, and so are tied to the strength of
+  //                  the corresponding force (fIndex != -1)
+  // - "Not Clamping": These are constraints with a zero constraint force. These
+  //                   don't actually get used anywhere in the gradient
+  //                   computation, and so can be safely ignored.
+
+  // Declare a shared array to re-use for mapping info for each skeleton.
+  // Semantics are as follows:
+  // - If mappings[j] >= 0, constraint "j" is "Upper Bound".
+  // - If mappings[j] == CLAMPING, constraint "j" is "Clamping".
+  // - If mappings[j] == NOT_CLAMPING, constraint "j" is "Not Clamping".
+  // - If mappings[j] == IRRELEVANT, constraint "j" is doesn't effect this
+  //   skeleton, and so can be safely ignored.
+
+  Eigen::VectorXi contactConstraintMappings = Eigen::VectorXi(n);
+  int* clampingIndex = new int[n];
+  int* upperBoundIndex = new int[n];
+
+  for (std::size_t i = 0; i < mSkeletons.size(); ++i)
+  {
+    int numClamping = 0;
+    int numUpperBound = 0;
+    // Fill in mappings[] with the correct values, overwriting previous data
+    for (std::size_t j = 0; j < n; j++)
+    {
+      // If the Eigen::VectorXd representing the impulse test is of length 0,
+      // that means that constraint "j" doesn't effect skeleton "i".
+      if (skeletonsImpulseTorqueTests[i][j].size() == 0
+          || skeletonsImpulseTorqueTests[i][j].isZero())
+      {
+        contactConstraintMappings(j) = neural::ConstraintMapping::IRRELEVANT;
+        continue;
+      }
+      const double constraintForce = mX(j);
+
+      // If constraintForce is zero, this means "j" is in "Not Clamping"
+      if (std::abs(constraintForce) < 1e-9)
+      {
+        contactConstraintMappings(j) = neural::ConstraintMapping::NOT_CLAMPING;
+        continue;
+      }
+
+      double upperBound = hiGradientBackup(j);
+      double lowerBound = loGradientBackup(j);
+      const int fIndex = fIndexGradientBackup(j);
+      if (fIndex != -1)
+      {
+        upperBound *= mX(fIndex);
+        lowerBound *= mX(fIndex);
+      }
+
+      // This means "j" is in "Clamping"
+      if (mX(j) > lowerBound && mX(j) < upperBound)
+      {
+        contactConstraintMappings(j) = neural::ConstraintMapping::CLAMPING;
+        clampingIndex[j] = numClamping;
+        numClamping++;
+      }
+      // Otherwise, if fIndex != -1, "j" is in "Upper Bound"
+      // Note, this could also mean "j" is at it's lower bound, but we call the
+      // group of all "j"'s that have reached their dependent bound "Upper
+      // Bound"
+      else if (fIndex != -1)
+      {
+        /*
+        std::cout << "Listing " << j << " as UB: mX=" << mX(j)
+                  << ", fIndex=" << fIndex << ", mX(fIndex)=" << mX(fIndex)
+                  << ", hiBackup=" << hiGradientBackup(j)
+                  << ", loBackup=" << loGradientBackup(j)
+                  << ", upperBound=" << upperBound
+                  << ", lowerBound=" << lowerBound << std::endl;
+        */
+        contactConstraintMappings(j) = fIndex;
+        upperBoundIndex[j] = numUpperBound;
+        numUpperBound++;
+      }
+      // If fIndex == -1, and we're at a bound, then we're actually "Not
+      // Clamping", cause the velocity can change freely without the force
+      // changing to compensate.
+      else
+      {
+        contactConstraintMappings(j) = neural::ConstraintMapping::NOT_CLAMPING;
+      }
+    }
+
+    int dofs = mSkeletons[i]->getNumDofs();
+    // Create the matrices we want to pass along for this skeleton:
+    Eigen::MatrixXd clampingConstraintMatrix(dofs, numClamping);
+    Eigen::MatrixXd upperBoundConstraintMatrix(dofs, numUpperBound);
+    Eigen::MatrixXd upperBoundMappingMatrix(numUpperBound, numClamping);
+    // Massed formulation
+    Eigen::MatrixXd massedClampingConstraintMatrix(dofs, numClamping);
+    Eigen::MatrixXd massedUpperBoundConstraintMatrix(dofs, numUpperBound);
+
+    // We only need to zero out the mapping matrix, the other two will get
+    // completely overwritten in the next loop
+    upperBoundMappingMatrix.setZero();
+
+    // Copy values into our new matrices
+    for (size_t j = 0; j < n; j++)
+    {
+      if (contactConstraintMappings(j) == neural::ConstraintMapping::CLAMPING)
+      {
+        assert(numClamping > clampingIndex[j]);
+        clampingConstraintMatrix.col(
+            clampingIndex[j]) // .block(0, clampingIndex[j], dofs, 1)
+            = skeletonsImpulseTorqueTests[i][j];
+        massedClampingConstraintMatrix.col(clampingIndex[j])
+            = skeletonsImpulseVelocityTests[i][j];
+      }
+      else if (contactConstraintMappings(j) >= 0) // means we're an UPPER_BOUND
+      {
+        assert(numUpperBound > upperBoundIndex[j]);
+        upperBoundConstraintMatrix.col(
+            upperBoundIndex[j]) // .block(0, upperBoundIndex[j], dofs, 1)
+            = skeletonsImpulseTorqueTests[i][j];
+        massedUpperBoundConstraintMatrix.col(upperBoundIndex[j])
+            = skeletonsImpulseVelocityTests[i][j];
+
+        // Figure out, and write the correct coefficient to E
+
+        const int fIndex = contactConstraintMappings(j);
+        const double upperBound = mX(fIndex) * hiGradientBackup(j);
+        const double lowerBound = mX(fIndex) * loGradientBackup(j);
+
+        // If we're clamped at the upper bound
+        if (std::abs(mX(j) - upperBound) < std::abs(mX(j) - lowerBound))
+        {
+          if (std::abs(mX(j) - upperBound) > 1e-5)
+          {
+            std::cout << "Lower bound: " << lowerBound << std::endl;
+            std::cout << "Upper bound: " << upperBound << std::endl;
+            std::cout << "mHi(j): " << hiGradientBackup(j) << std::endl;
+            std::cout << "mLo(j): " << loGradientBackup(j) << std::endl;
+            std::cout << "mX(j): " << mX(j) << std::endl;
+            std::cout << "fIndex: " << fIndex << std::endl;
+          }
+          assert(std::abs(mX(j) - upperBound) < 1e-5);
+          upperBoundMappingMatrix(upperBoundIndex[j], clampingIndex[fIndex])
+              = hiGradientBackup(j);
+        }
+        // If we're clamped at the lower bound
+        else
+        {
+          if (std::abs(mX(j) - lowerBound) > 1e-5)
+          {
+            std::cout << "Lower bound: " << lowerBound << std::endl;
+            std::cout << "Upper bound: " << upperBound << std::endl;
+            std::cout << "mHi(j): " << hiGradientBackup(j) << std::endl;
+            std::cout << "mLo(j): " << loGradientBackup(j) << std::endl;
+            std::cout << "mX(j): " << mX(j) << std::endl;
+            std::cout << "fIndex: " << fIndex << std::endl;
+          }
+          assert(std::abs(mX(j) - lowerBound) < 1e-5);
+          upperBoundMappingMatrix(upperBoundIndex[j], clampingIndex[fIndex])
+              = loGradientBackup(j);
+        }
+      }
+    }
+
+    mSkeletons[i]->setConstraintMatricesForGradient(
+        clampingConstraintMatrix,
+        upperBoundConstraintMatrix,
+        upperBoundMappingMatrix,
+        contactConstraintMappings,
+        mX);
+
+    mSkeletons[i]->setMassedConstraintMatricesForGradient(
+        massedClampingConstraintMatrix,
+        massedUpperBoundConstraintMatrix,
+        upperBoundMappingMatrix,
+        contactConstraintMappings,
+        mX);
+  }
+
+  delete clampingIndex;
+  delete upperBoundIndex;
 }
 
 //==============================================================================

@@ -37,18 +37,19 @@
 
 #include <Eigen/Dense>
 
+#include "dart/collision/CollisionDetector.hpp"
 #include "dart/common/Deprecated.hpp"
-#include "dart/constraint/SmartPointer.hpp"
 #include "dart/constraint/ConstrainedGroup.hpp"
 #include "dart/constraint/ConstraintBase.hpp"
-#include "dart/collision/CollisionDetector.hpp"
+#include "dart/constraint/SmartPointer.hpp"
+#include "dart/neural/NeuralUtils.hpp"
 
 namespace dart {
 
 namespace dynamics {
 class Skeleton;
 class ShapeNodeCollisionObject;
-}  // namespace dynamics
+} // namespace dynamics
 
 namespace constraint {
 
@@ -106,7 +107,8 @@ public:
   /// Remove all constraints
   void removeAllConstraints();
 
-  /// Returns the number of constraints that was manually added to this ConstraintSolver.
+  /// Returns the number of constraints that was manually added to this
+  /// ConstraintSolver.
   std::size_t getNumConstraints() const;
 
   /// Returns a constraint by index.
@@ -183,6 +185,11 @@ public:
   /// properties and registered skeletons and constraints will be copied over.
   virtual void setFromOtherConstraintSolver(const ConstraintSolver& other);
 
+  /// Sets the formulation used to compute the gradients.
+  void setGradientMode(neural::GradientMode gradientMode);
+
+  neural::GradientMode getGradientMode();
+
 protected:
   // TODO(JS): Docstring
   virtual void solveConstrainedGroup(ConstrainedGroup& group) = 0;
@@ -247,7 +254,8 @@ protected:
   std::vector<MimicMotorConstraintPtr> mMimicMotorConstraints;
 
   /// Joint Coulomb friction constraints those are automatically created
-  std::vector<JointCoulombFrictionConstraintPtr> mJointCoulombFrictionConstraints;
+  std::vector<JointCoulombFrictionConstraintPtr>
+      mJointCoulombFrictionConstraints;
 
   /// Constraints that manually added
   std::vector<ConstraintBasePtr> mManualConstraints;
@@ -257,9 +265,12 @@ protected:
 
   /// Constraint group list
   std::vector<ConstrainedGroup> mConstrainedGroups;
+
+  /// The type of gradients we want to use for backprop
+  neural::GradientMode mGradientMode;
 };
 
-}  // namespace constraint
-}  // namespace dart
+} // namespace constraint
+} // namespace dart
 
-#endif  // DART_CONSTRAINT_CONSTRAINTSOVER_HPP_
+#endif // DART_CONSTRAINT_CONSTRAINTSOVER_HPP_

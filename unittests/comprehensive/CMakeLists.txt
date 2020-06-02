@@ -5,6 +5,7 @@ dart_add_test("comprehensive" test_Constraint)
 dart_add_test("comprehensive" test_Frames)
 dart_add_test("comprehensive" test_InverseKinematics)
 dart_add_test("comprehensive" test_NameManagement)
+dart_add_test("comprehensive" test_Gradients)
 
 if(TARGET dart-optimizer-pagmo)
   dart_add_test("comprehensive" test_MultiObjectiveOptimization)

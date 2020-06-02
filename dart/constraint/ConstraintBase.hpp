@@ -34,6 +34,7 @@
 #define DART_CONSTRAINT_CONSTRAINTBASE_HPP_
 
 #include <cstddef>
+#include <vector>
 
 #include "dart/dynamics/SmartPointer.hpp"
 
@@ -41,7 +42,7 @@ namespace dart {
 
 namespace dynamics {
 class Skeleton;
-}  // namespace dynamics
+} // namespace dynamics
 
 namespace constraint {
 
@@ -107,7 +108,11 @@ public:
   ///
   virtual void uniteSkeletons();
 
-  ///
+  /// Returns the skeletons that this constraint touches
+  virtual std::vector<dynamics::SkeletonPtr> getSkeletons() const;
+
+  /// Returns the root union skeleton, even if there are multiple hops. Also
+  /// compresses the hops somewhat as it goes, though not completely.
   static dynamics::SkeletonPtr compressPath(dynamics::SkeletonPtr skeleton);
 
   ///
@@ -135,5 +140,4 @@ protected:
 } // namespace constraint
 } // namespace dart
 
-#endif  // DART_CONSTRAINT_CONSTRAINTBASE_HPP_
-
+#endif // DART_CONSTRAINT_CONSTRAINTBASE_HPP_
