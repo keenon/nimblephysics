@@ -78,7 +78,7 @@ ConstraintSolver::ConstraintSolver(double timeStep)
   // (see: https://github.com/flexible-collision-library/fcl/issues/106)
 
   // Default to no gradients
-  mGradientMode = neural::GradientMode::NONE;
+  mGradientEnabled = false;
 }
 
 //==============================================================================
@@ -396,15 +396,15 @@ void ConstraintSolver::setFromOtherConstraintSolver(
 }
 
 //==============================================================================
-neural::GradientMode ConstraintSolver::getGradientMode()
+bool ConstraintSolver::getGradientEnabled()
 {
-  return mGradientMode;
+  return mGradientEnabled;
 }
 
 //==============================================================================
-void ConstraintSolver::setGradientMode(neural::GradientMode gradientMode)
+void ConstraintSolver::setGradientEnabled(bool enabled)
 {
-  mGradientMode = gradientMode;
+  mGradientEnabled = enabled;
 }
 
 //==============================================================================
@@ -694,11 +694,13 @@ void ConstraintSolver::buildConstrainedGroups()
   }
 
   // Create the gradient matrices for this gradient mode
-  for (auto& constrainedGroup : mConstrainedGroups)
+  if (mGradientEnabled)
   {
-    auto m = neural::createGradientMatrices(
-        constrainedGroup, mTimeStep, mGradientMode);
-    constrainedGroup.setGradientConstraintMatrices(m);
+    for (auto& constrainedGroup : mConstrainedGroups)
+    {
+      auto m = neural::createGradientMatrices(constrainedGroup, mTimeStep);
+      constrainedGroup.setGradientConstraintMatrices(m);
+    }
   }
 
   //----------------------------------------------------------------------------

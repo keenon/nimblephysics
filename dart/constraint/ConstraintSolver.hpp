@@ -186,9 +186,9 @@ public:
   virtual void setFromOtherConstraintSolver(const ConstraintSolver& other);
 
   /// Sets the formulation used to compute the gradients.
-  void setGradientMode(neural::GradientMode gradientMode);
+  void setGradientEnabled(bool enabled);
 
-  neural::GradientMode getGradientMode();
+  bool getGradientEnabled();
 
 protected:
   // TODO(JS): Docstring
@@ -267,7 +267,7 @@ protected:
   std::vector<ConstrainedGroup> mConstrainedGroups;
 
   /// The type of gradients we want to use for backprop
-  neural::GradientMode mGradientMode;
+  bool mGradientEnabled;
 };
 
 } // namespace constraint

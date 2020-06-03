@@ -18,22 +18,13 @@ namespace neural {
 class ConstrainedGroupGradientMatrices;
 class BackpropSnapshot;
 
-enum GradientMode
-{
-  NONE,
-  MASSED,
-  CLASSIC
-};
-
 std::shared_ptr<ConstrainedGroupGradientMatrices> createGradientMatrices(
-    constraint::ConstrainedGroup& group, double timeStep, GradientMode mode);
+    constraint::ConstrainedGroup& group, double timeStep);
 
 /// Takes a step in the world, and returns a backprop snapshot which can be used
 /// to backpropagate gradients and compute Jacobians
 std::shared_ptr<BackpropSnapshot> forwardPass(
-    std::shared_ptr<simulation::World> world,
-    GradientMode mode,
-    bool idempotent = false);
+    std::shared_ptr<simulation::World> world, bool idempotent = false);
 
 } // namespace neural
 } // namespace dart

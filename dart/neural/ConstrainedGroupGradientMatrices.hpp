@@ -44,10 +44,9 @@ public:
   /// measured some velocity changes. This must be called before
   /// constructMatrices(), and must be called exactly once for each constraint's
   /// dimension.
-  virtual void measureConstraintImpulse(
+  void measureConstraintImpulse(
       const std::shared_ptr<constraint::ConstraintBase>& constraint,
-      std::size_t constraintIndex)
-      = 0;
+      std::size_t constraintIndex);
 
   /// This gets called during the setup of the ConstrainedGroupGradientMatrices
   /// after the LCP has run, with the result from the LCP solver. This can only
@@ -59,11 +58,11 @@ public:
       Eigen::VectorXd lo,
       Eigen::VectorXi fIndex);
 
-  virtual Eigen::MatrixXd getProjectionIntoClampsMatrix() = 0;
+  Eigen::MatrixXd getProjectionIntoClampsMatrix();
 
-  virtual Eigen::MatrixXd getForceVelJacobian() = 0;
+  Eigen::MatrixXd getForceVelJacobian();
 
-  virtual Eigen::MatrixXd getVelVelJacobian() = 0;
+  Eigen::MatrixXd getVelVelJacobian();
 
   /// This creates a block-diagonal matrix that concatenates the mass matrices
   /// of the skeletons that are part of this ConstrainedGroup.
@@ -75,7 +74,11 @@ public:
 
   const Eigen::MatrixXd& getClampingConstraintMatrix() const;
 
+  const Eigen::MatrixXd& getMassedClampingConstraintMatrix() const;
+
   const Eigen::MatrixXd& getUpperBoundConstraintMatrix() const;
+
+  const Eigen::MatrixXd& getMassedUpperBoundConstraintMatrix() const;
 
   const Eigen::MatrixXd& getUpperBoundMappingMatrix() const;
 
@@ -97,8 +100,14 @@ protected:
   /// Impulse test matrix for the clamping constraints
   Eigen::MatrixXd mClampingConstraintMatrix;
 
+  /// Massed impulse test matrix for the clamping constraints
+  Eigen::MatrixXd mMassedClampingConstraintMatrix;
+
   /// Impulse test matrix for the upper bound constraints
   Eigen::MatrixXd mUpperBoundConstraintMatrix;
+
+  /// Massed impulse test matrix for the upper bound constraints
+  Eigen::MatrixXd mMassedUpperBoundConstraintMatrix;
 
   /// Mapping matrix for upper bound constraints
   Eigen::MatrixXd mUpperBoundMappingMatrix;
@@ -133,6 +142,15 @@ protected:
   /// mImpulseTests[k] holds the k'th constraint's impulse test, which is
   /// a concatenated vector of the results for each skeleton in the group.
   std::vector<Eigen::VectorXd> mImpulseTests;
+
+  /// This holds the outputs of the impulse tests we run to create the
+  /// constraint matrices. We shuffle these vectors into the columns of
+  /// mClampingConstraintMatrix and mUpperBoundConstraintMatrix depending on the
+  /// values of the LCP solution. We also discard many of these vectors.
+  ///
+  /// mImpulseTests[k] holds the k'th constraint's impulse test, which is
+  /// a concatenated vector of the results for each skeleton in the group.
+  std::vector<Eigen::VectorXd> mMassedImpulseTests;
 };
 
 } // namespace neural

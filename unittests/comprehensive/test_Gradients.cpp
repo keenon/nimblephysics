@@ -54,113 +54,6 @@ using namespace dynamics;
 using namespace simulation;
 using namespace neural;
 
-class FullSnapshot
-{
-public:
-  FullSnapshot(WorldPtr world);
-  void restore();
-
-private:
-  WorldPtr mWorld;
-  std::vector<Skeleton::Configuration> mSkeletonConfigurations;
-};
-
-FullSnapshot::FullSnapshot(WorldPtr world)
-{
-  mWorld = world;
-  for (std::size_t i = 0; i < world->getNumSkeletons(); i++)
-  {
-    mSkeletonConfigurations.push_back(world->getSkeleton(i)->getConfiguration(
-        Skeleton::ConfigFlags::CONFIG_ALL));
-  }
-}
-
-void FullSnapshot::restore()
-{
-  for (std::size_t i = 0; i < mWorld->getNumSkeletons(); i++)
-  {
-    mWorld->getSkeleton(i)->setConfiguration(mSkeletonConfigurations[i]);
-  }
-}
-
-/**
- * Brute force compute a torque->accel Jacobian
- */
-MatrixXd finiteDifferenceForceVelJacobian(
-    SkeletonPtr skel, WorldPtr world, VectorXd velocities)
-{
-  FullSnapshot snapshot(world);
-
-  MatrixXd J(skel->getNumDofs(), skel->getNumDofs());
-
-  skel->setVelocities(velocities);
-  world->step(false);
-
-  VectorXd originalVel = skel->getVelocities();
-  VectorXd originalForces = skel->getForces();
-
-  std::cout << "skel: " << std::endl;
-  std::cout << "original vel:" << std::endl << originalVel << std::endl;
-
-  double EPSILON = 1e-7;
-  for (std::size_t i = 0; i < skel->getNumDofs(); i++)
-  {
-    snapshot.restore();
-
-    skel->setVelocities(velocities);
-
-    VectorXd tweakedForces = VectorXd(originalForces);
-    tweakedForces(i) += EPSILON;
-    skel->setForces(tweakedForces);
-
-    world->step(false);
-
-    std::cout << "vel(" << i << "):" << std::endl
-              << skel->getVelocities() << std::endl;
-
-    VectorXd velChange = (skel->getVelocities() - originalVel) / EPSILON;
-    J.col(i).noalias() = velChange;
-  }
-
-  snapshot.restore();
-
-  return J;
-}
-
-/**
- * Brute force computation of \dot{v}_{t} -> \dot{v}_{t+1}
- */
-MatrixXd finiteDifferenceVelVelJacobian(
-    SkeletonPtr skel, WorldPtr world, VectorXd velocities)
-{
-  FullSnapshot snapshot(world);
-
-  MatrixXd J(skel->getNumDofs(), skel->getNumDofs());
-
-  skel->setVelocities(velocities);
-  world->step(false);
-
-  VectorXd originalVel = skel->getVelocities();
-
-  double EPSILON = 1e-7;
-  for (auto i = 0; i < skel->getNumDofs(); i++)
-  {
-    snapshot.restore();
-
-    VectorXd tweakedVel = VectorXd(velocities);
-    tweakedVel(i) += EPSILON;
-    skel->setVelocities(tweakedVel);
-    world->step(false);
-
-    VectorXd velChange = (skel->getVelocities() - originalVel) / EPSILON;
-    J.col(i).noalias() = velChange;
-  }
-
-  snapshot.restore();
-
-  return J;
-}
-
 void debugDofs(SkeletonPtr skel)
 {
   std::cout << "DOFs for skeleton '" << skel->getName() << "'" << std::endl;
@@ -197,8 +90,7 @@ bool verifyWorldClassicClampingConstraintMatrix(
   // as the last argument says do this in an idempotent way, so leave the world
   // state unchanged in computing these backprop snapshots.
 
-  neural::BackpropSnapshotPtr classicPtr
-      = neural::forwardPass(world, neural::GradientMode::CLASSIC, true);
+  neural::BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
 
   if (!classicPtr)
   {
@@ -224,6 +116,7 @@ bool verifyWorldClassicClampingConstraintMatrix(
   world->setVelocities(cleanVelocities);
   // Populate the constraint matrices, without taking a time step or integrating
   // velocities
+  world->getConstraintSolver()->setGradientEnabled(true);
   world->getConstraintSolver()->solve();
 
   for (std::size_t i = 0; i < world->getNumSkeletons(); i++)
@@ -246,10 +139,17 @@ bool verifyWorldClassicClampingConstraintMatrix(
       std::cout << "clean Velocities:" << std::endl
                 << cleanVelocities << std::endl;
       std::cout << "Error skeleton " << world->getSkeleton(i)->getName()
+                << std::endl
                 << " pos: " << std::endl
                 << world->getSkeleton(i)->getPositions() << std::endl
                 << "vel: " << std::endl
                 << world->getSkeleton(i)->getVelocities() << std::endl;
+      debugDofs(skel);
+      for (Contact contact : world->getLastCollisionResult().getContacts())
+      {
+        std::cout << "Contact depth " << contact.penetrationDepth << std::endl
+                  << contact.point << std::endl;
+      }
       std::cout << "actual constraint forces:" << std::endl
                 << cleanContactImpulses << std::endl;
       return false;
@@ -268,45 +168,44 @@ bool verifyWorldMassedClampingConstraintMatrix(
 {
   world->setVelocities(proposedVelocities);
 
-  neural::BackpropSnapshotPtr classicPtr
-      = neural::forwardPass(world, neural::GradientMode::CLASSIC, true);
-  neural::BackpropSnapshotPtr massedPtr
-      = neural::forwardPass(world, neural::GradientMode::MASSED, true);
+  neural::BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
+  Eigen::MatrixXd A_c = classicPtr->getClampingConstraintMatrix();
+  Eigen::MatrixXd V_c = classicPtr->getMassedClampingConstraintMatrix();
+  Eigen::MatrixXd M = classicPtr->getMassMatrix();
+  Eigen::MatrixXd Minv = classicPtr->getInvMassMatrix();
 
-  if (!classicPtr)
+  Eigen::MatrixXd A_c_recovered = M * V_c;
+  Eigen::MatrixXd V_c_recovered = Minv * A_c;
+
+  if (!equals(A_c, A_c_recovered, 1e-3) || !equals(V_c, V_c_recovered, 1e-3))
   {
-    std::cout << "verifyWorldClampingConstraintMatrix forwardPass returned a "
-                 "null BackpropSnapshotPtr for GradientMode::CLASSIC!"
-              << std::endl;
     return false;
   }
 
-  if (!massedPtr)
+  return true;
+}
+
+/**
+ * This verifies the massed formulation by verifying its relationship to the
+ * classic formulation.
+ */
+bool verifyWorldMassedUpperBoundConstraintMatrix(
+    WorldPtr world, VectorXd proposedVelocities)
+{
+  world->setVelocities(proposedVelocities);
+
+  neural::BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
+  Eigen::MatrixXd A_ub = classicPtr->getUpperBoundConstraintMatrix();
+  Eigen::MatrixXd V_ub = classicPtr->getMassedUpperBoundConstraintMatrix();
+  Eigen::MatrixXd M = classicPtr->getMassMatrix();
+  Eigen::MatrixXd Minv = classicPtr->getInvMassMatrix();
+
+  Eigen::MatrixXd A_ub_recovered = M * V_ub;
+  Eigen::MatrixXd V_ub_recovered = Minv * A_ub;
+
+  if (!equals(A_ub, A_ub_recovered, 1e-3)
+      || !equals(V_ub, V_ub_recovered, 1e-3))
   {
-    std::cout << "verifyWorldClampingConstraintMatrix forwardPass returned a "
-                 "null BackpropSnapshotPtr for GradientMode::MASSED!"
-              << std::endl;
-    return false;
-  }
-
-  // Verify that the massed formulation and classic formulation relate as
-  // expected.
-
-  MatrixXd A_c = classicPtr->getClampingConstraintMatrix();
-  MatrixXd massedA_c = massedPtr->getClampingConstraintMatrix();
-  MatrixXd recoveredMassedA_c = classicPtr->getInvMassMatrix() * A_c;
-
-  bool success = equals(recoveredMassedA_c, massedA_c);
-  if (!success)
-  {
-    std::cout << "Classic Clamping Constraint Matrix: " << std::endl
-              << A_c << std::endl;
-    std::cout << "MInv: " << std::endl
-              << classicPtr->getInvMassMatrix() << std::endl;
-    std::cout << "MInv * Classic Clamping Constraint Matrix: " << std::endl
-              << recoveredMassedA_c << std::endl;
-    std::cout << "Massed Clamping Constraint Matrix: " << std::endl
-              << massedA_c << std::endl;
     return false;
   }
 
@@ -325,8 +224,7 @@ bool verifyWorldClassicProjectionIntoClampsMatrix(
   // as the last argument says do this in an idempotent way, so leave the world
   // state unchanged in computing these backprop snapshots.
 
-  neural::BackpropSnapshotPtr classicPtr
-      = neural::forwardPass(world, neural::GradientMode::CLASSIC, true);
+  neural::BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
 
   if (!classicPtr)
   {
@@ -468,14 +366,7 @@ bool verifyWorldMassedProjectionIntoClampsMatrix(
 {
   world->setVelocities(proposedVelocities);
 
-  // Compute classic and massed formulation of the backprop snapshot. The "true"
-  // as the last argument says do this in an idempotent way, so leave the world
-  // state unchanged in computing these backprop snapshots.
-
-  neural::BackpropSnapshotPtr classicPtr
-      = neural::forwardPass(world, neural::GradientMode::CLASSIC, true);
-  neural::BackpropSnapshotPtr massedPtr
-      = neural::forwardPass(world, neural::GradientMode::MASSED, true);
+  neural::BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
 
   if (!classicPtr)
   {
@@ -486,55 +377,24 @@ bool verifyWorldMassedProjectionIntoClampsMatrix(
     return false;
   }
 
-  if (!massedPtr)
+  Eigen::MatrixXd P_c = classicPtr->getProjectionIntoClampsMatrix();
+
+  // Reconstruct P_c without the massed shortcut
+  Eigen::MatrixXd A_c = classicPtr->getClampingConstraintMatrix();
+  Eigen::MatrixXd A_ub = classicPtr->getUpperBoundConstraintMatrix();
+  Eigen::MatrixXd E = classicPtr->getUpperBoundMappingMatrix();
+
+  Eigen::MatrixXd constraintForceToImpliedTorques = A_c + (A_ub * E);
+  Eigen::MatrixXd forceToVel = A_c.eval().transpose()
+                               * classicPtr->getInvMassMatrix()
+                               * constraintForceToImpliedTorques;
+  Eigen::MatrixXd velToForce
+      = forceToVel.completeOrthogonalDecomposition().pseudoInverse();
+  Eigen::MatrixXd P_c_recovered
+      = (1.0 / world->getTimeStep()) * velToForce * A_c.transpose();
+
+  if (!equals(P_c, P_c_recovered, 1e-3))
   {
-    std::cout
-        << "verifyWorldMassedProjectionIntoClampsMatrix forwardPass returned a "
-           "null BackpropSnapshotPtr for GradientMode::MASSED!"
-        << std::endl;
-    return false;
-  }
-
-  // Check the massed version
-
-  MatrixXd projectionIntoClampsMatrix
-      = classicPtr->getProjectionIntoClampsMatrix();
-  MatrixXd A_c = classicPtr->getClampingConstraintMatrix();
-  MatrixXd A_ub = classicPtr->getUpperBoundConstraintMatrix();
-  MatrixXd E = classicPtr->getUpperBoundMappingMatrix();
-  MatrixXd massedProjectionIntoClampsMatrix
-      = massedPtr->getProjectionIntoClampsMatrix();
-  MatrixXd recoveredMassedProjectionIntoClampsMatrix
-      = world->getInvMassMatrix() * (A_c + A_ub * E)
-        * projectionIntoClampsMatrix * world->getInvMassMatrix()
-        * world->getTimeStep();
-  MatrixXd clampingConstraintMatrixInv
-      = (A_c + A_ub * E).completeOrthogonalDecomposition().pseudoInverse();
-  MatrixXd recoveredProjectionIntoClampsMatrix
-      = clampingConstraintMatrixInv * world->getMassMatrix().eval()
-        * massedProjectionIntoClampsMatrix * world->getMassMatrix().eval()
-        * (1 / world->getTimeStep());
-
-  bool success
-      = equals(
-            recoveredMassedProjectionIntoClampsMatrix,
-            massedProjectionIntoClampsMatrix)
-        && equals(
-            recoveredProjectionIntoClampsMatrix, projectionIntoClampsMatrix);
-  if (!success)
-  {
-    std::cout << "Classic Projection Into Clamps Matrix: " << std::endl
-              << projectionIntoClampsMatrix << std::endl;
-    std::cout << "Minv: " << std::endl
-              << world->getInvMassMatrix() << std::endl;
-    std::cout << "Minv * Clamping Constraint Matrix * Classic Projection Into "
-                 "Clamps Matrix * Minv: "
-              << std::endl
-              << recoveredMassedProjectionIntoClampsMatrix << std::endl;
-    std::cout << "Massed Projection Into Clamps Matrix: " << std::endl
-              << massedProjectionIntoClampsMatrix << std::endl;
-    std::cout << "Recovered Projection Into Clamps Matrix: " << std::endl
-              << recoveredProjectionIntoClampsMatrix << std::endl;
     return false;
   }
 
@@ -546,8 +406,7 @@ bool verifyWorldClassicVelVelJacobian(
 {
   world->setVelocities(proposedVelocities);
 
-  neural::BackpropSnapshotPtr classicPtr
-      = neural::forwardPass(world, neural::GradientMode::CLASSIC, true);
+  neural::BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
 
   if (!classicPtr)
   {
@@ -577,8 +436,7 @@ bool verifyWorldClassicForceVelJacobian(
     WorldPtr world, VectorXd proposedVelocities)
 {
   world->setVelocities(proposedVelocities);
-  neural::BackpropSnapshotPtr classicPtr
-      = neural::forwardPass(world, neural::GradientMode::CLASSIC, true);
+  neural::BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
 
   if (!classicPtr)
   {
@@ -604,352 +462,20 @@ bool verifyWorldClassicForceVelJacobian(
   return true;
 }
 
-////////////////////////////////////////////////////////////////////////////////
-// Testing methods
-////////////////////////////////////////////////////////////////////////////////
-
-/**
- * This tests that A_c is being computed correctly, by checking that
- * mapper = A_c.pinv().transpose() * A_c.transpose() does the right thing to a
- * given set of joint velocities. Namely, it maps proposed joint velocities into
- * just the component of motion that's violating the constraints. If we subtract
- * out that components and re-run the solver, we should see no constraint
- * forces.
- */
-bool verifyClampingConstraintMatrix(
-    SkeletonPtr skel, WorldPtr world, VectorXd proposedVelocities)
+bool verifyWorldGradients(WorldPtr world, VectorXd worldVel)
 {
-  skel->setVelocities(proposedVelocities);
-  // Run a solver, to compute the constraint matrix as a byproduct
-  world->getConstraintSolver()->solve();
-  MatrixXd clampingConstraintMatrix = skel->getClampingConstraintMatrix();
-  MatrixXd clampingConstraintMatrixPinv
-      = clampingConstraintMatrix.completeOrthogonalDecomposition()
-            .pseudoInverse();
-  MatrixXd mapper = clampingConstraintMatrixPinv.eval().transpose()
-                    * clampingConstraintMatrix.transpose();
-  VectorXd violationVelocities = mapper * proposedVelocities;
-  VectorXd cleanVelocities = proposedVelocities - violationVelocities;
-  skel->setVelocities(cleanVelocities);
-  world->getConstraintSolver()->solve();
-  VectorXd cleanConstraintForces = skel->getConstraintForces();
-
-  VectorXd zero = VectorXd::Zero(cleanVelocities.size());
-  if (!equals(cleanConstraintForces, zero, 1e-3))
-  {
-    debugDofs(skel);
-    std::cout << "Original velocities: " << std::endl
-              << proposedVelocities << std::endl;
-    std::cout << "Original constraint forces: " << std::endl
-              << skel->getConstraintForces() << std::endl;
-    std::cout << "A_c: " << std::endl << clampingConstraintMatrix << std::endl;
-    std::cout << "A_c.pinv(): " << std::endl
-              << clampingConstraintMatrixPinv << std::endl;
-    std::cout << "A_c.pinv().transpose(): " << std::endl
-              << clampingConstraintMatrixPinv.eval().transpose() << std::endl;
-    std::cout << "A_c.transpose(): " << std::endl
-              << clampingConstraintMatrix.transpose() << std::endl;
-    std::cout << "Mapper: " << std::endl << mapper << std::endl;
-    std::cout << "Violation velocities: " << std::endl
-              << violationVelocities << std::endl;
-    std::cout << "Clean velocities: " << std::endl
-              << cleanVelocities << std::endl;
-    std::cout << "Clean velocity constraint forces (should be 0): " << std::endl
-              << cleanConstraintForces << std::endl;
-    std::cout << "Original velocities: " << std::endl
-              << proposedVelocities << std::endl;
-    std::cout << "Original constraint forces: " << std::endl
-              << skel->getConstraintForces() << std::endl;
-    std::cout << "A_c: " << std::endl << clampingConstraintMatrix << std::endl;
-    std::cout << "A_c.pinv(): " << std::endl
-              << clampingConstraintMatrixPinv << std::endl;
-    std::cout << "A_c.pinv().transpose(): " << std::endl
-              << clampingConstraintMatrixPinv.eval().transpose() << std::endl;
-    std::cout << "A_c.transpose(): " << std::endl
-              << clampingConstraintMatrix.transpose() << std::endl;
-    std::cout << "Mapper: " << std::endl << mapper << std::endl;
-    std::cout << "Violation velocities: " << std::endl
-              << violationVelocities << std::endl;
-    std::cout << "Clean velocities: " << std::endl
-              << cleanVelocities << std::endl;
-    std::cout << "Clean velocity constraint forces (should be 0): " << std::endl
-              << cleanConstraintForces << std::endl;
-    std::cout << "Zero: " << std::endl << zero << std::endl;
-    return false;
-  }
-
-  return true;
+  return (
+      verifyWorldClassicClampingConstraintMatrix(world, worldVel)
+      && verifyWorldMassedClampingConstraintMatrix(world, worldVel)
+      && verifyWorldMassedUpperBoundConstraintMatrix(world, worldVel)
+      && verifyWorldClassicProjectionIntoClampsMatrix(world, worldVel)
+      && verifyWorldMassedProjectionIntoClampsMatrix(world, worldVel)
+      && verifyWorldClassicVelVelJacobian(world, worldVel)
+      && verifyWorldClassicForceVelJacobian(world, worldVel));
 }
 
-bool verifyMassedClampingConstraintMatrix(
-    SkeletonPtr skel, WorldPtr world, VectorXd proposedVelocities)
-{
-  skel->setVelocities(proposedVelocities);
-  // Run a solver, to compute the constraint matrix as a byproduct
-  world->getConstraintSolver()->solve();
-  MatrixXd clampingConstraintMatrix = skel->getClampingConstraintMatrix();
-  MatrixXd massedClampingConstraintMatrix
-      = skel->getMassedClampingConstraintMatrix();
-  MatrixXd recoveredMassedClampingConstraintMatrix
-      = skel->getInvMassMatrix() * clampingConstraintMatrix;
-
-  bool success = equals(
-      recoveredMassedClampingConstraintMatrix, massedClampingConstraintMatrix);
-  if (!success)
-  {
-    std::cout << "Classic Clamping Constraint Matrix: " << std::endl
-              << clampingConstraintMatrix << std::endl;
-    std::cout << "MInv: " << std::endl << skel->getInvMassMatrix() << std::endl;
-    std::cout << "MInv * Classic Clamping Constraint Matrix: " << std::endl
-              << recoveredMassedClampingConstraintMatrix << std::endl;
-    std::cout << "Massed Clamping Constraint Matrix: " << std::endl
-              << massedClampingConstraintMatrix << std::endl;
-    return false;
-  }
-
-  return true;
-}
-
-bool verifyMassedProjectionIntoClampsMatrix(
-    SkeletonPtr skel, WorldPtr world, VectorXd proposedVelocities)
-{
-  skel->setVelocities(proposedVelocities);
-  // Run a solver, to compute the constraint matrix as a byproduct
-  world->getConstraintSolver()->solve();
-  MatrixXd projectionIntoClampsMatrix
-      = skel->getProjectionIntoClampsMatrix(world->getTimeStep());
-  MatrixXd A_c = skel->getClampingConstraintMatrix();
-  MatrixXd A_ub = skel->getUpperBoundConstraintMatrix();
-  MatrixXd E = skel->getUpperBoundMappingMatrix();
-  MatrixXd massedProjectionIntoClampsMatrix
-      = skel->getMassedProjectionIntoClampsMatrix();
-  MatrixXd recoveredMassedProjectionIntoClampsMatrix
-      = skel->getInvMassMatrix() * (A_c + A_ub * E) * projectionIntoClampsMatrix
-        * skel->getInvMassMatrix() * world->getTimeStep();
-  MatrixXd clampingConstraintMatrixInv
-      = (A_c + A_ub * E).completeOrthogonalDecomposition().pseudoInverse();
-  MatrixXd recoveredProjectionIntoClampsMatrix
-      = clampingConstraintMatrixInv * skel->getMassMatrix().eval()
-        * massedProjectionIntoClampsMatrix * skel->getMassMatrix().eval()
-        * (1 / world->getTimeStep());
-
-  bool success
-      = equals(
-            recoveredMassedProjectionIntoClampsMatrix,
-            massedProjectionIntoClampsMatrix)
-        && equals(
-            recoveredProjectionIntoClampsMatrix, projectionIntoClampsMatrix);
-  if (!success)
-  {
-    std::cout << "Classic Projection Into Clamps Matrix: " << std::endl
-              << projectionIntoClampsMatrix << std::endl;
-    std::cout << "Minv: " << std::endl << skel->getInvMassMatrix() << std::endl;
-    std::cout << "Minv * Clamping Constraint Matrix * Classic Projection Into "
-                 "Clamps Matrix * Minv: "
-              << std::endl
-              << recoveredMassedProjectionIntoClampsMatrix << std::endl;
-    std::cout << "Massed Projection Into Clamps Matrix: " << std::endl
-              << massedProjectionIntoClampsMatrix << std::endl;
-    std::cout << "Recovered Projection Into Clamps Matrix: " << std::endl
-              << recoveredProjectionIntoClampsMatrix << std::endl;
-    return false;
-  }
-
-  return true;
-}
-
-bool verifyProjectionIntoClampsMatrix(
-    SkeletonPtr skel, WorldPtr world, VectorXd proposedVelocities)
-{
-  skel->setVelocities(proposedVelocities);
-  // Run a solver, to compute the projection matrix as a byproduct
-  world->getConstraintSolver()->solve();
-  MatrixXd projectionIntoClamps
-      = skel->getProjectionIntoClampsMatrix(world->getTimeStep());
-  VectorXi mappings = skel->getContactConstraintMappings();
-  VectorXd contactConstraintForces
-      = skel->getContactConstraintImpluses() / world->getTimeStep();
-  VectorXd analyticalConstraintForces
-      = -(projectionIntoClamps * proposedVelocities);
-  VectorXd analyticalError = VectorXd(analyticalConstraintForces.size());
-
-  // TODO(keenon): This code smells. We should probably put this somewhere else?
-  std::size_t pointer = 0;
-  for (std::size_t i = 0; i < mappings.size(); i++)
-  {
-    if (mappings(i) == neural::ConstraintMapping::CLAMPING)
-    {
-      analyticalError(pointer)
-          = contactConstraintForces(i) - analyticalConstraintForces(pointer);
-      pointer++;
-    }
-  }
-
-  VectorXd zero = VectorXd::Zero(analyticalError.size());
-  if (!equals(analyticalError, zero, 1e-3))
-  {
-    debugDofs(skel);
-    std::cout << "Proposed velocities: " << std::endl
-              << proposedVelocities << std::endl;
-    std::cout << "P_c: " << std::endl << projectionIntoClamps << std::endl;
-    std::cout << "Constraint forces: " << std::endl
-              << contactConstraintForces << std::endl;
-    std::cout << "-(P_c * proposedVelocities) (should be the same as above): "
-              << std::endl
-              << analyticalConstraintForces << std::endl;
-    std::cout << "Analytical error (should be zero):" << std::endl
-              << analyticalError << std::endl;
-    std::cout << "Zero: " << std::endl << zero << std::endl;
-
-    // Recompute step by step
-
-    MatrixXd clampingConstraintMatrix = skel->getClampingConstraintMatrix();
-    MatrixXd clampingConstraintMatrixPinv
-        = clampingConstraintMatrix.completeOrthogonalDecomposition()
-              .pseudoInverse();
-    MatrixXd mapper = clampingConstraintMatrixPinv.eval().transpose()
-                      * clampingConstraintMatrix.transpose();
-    VectorXd violationVelocities = mapper * proposedVelocities;
-    VectorXd violationAccel = violationVelocities / world->getTimeStep();
-    VectorXd violationTorques = skel->getMassMatrix() * violationAccel;
-    VectorXd violationContactForces
-        = clampingConstraintMatrixPinv * violationTorques;
-
-    std::cout << "A_c: " << std::endl << clampingConstraintMatrix << std::endl;
-    std::cout << "A_c.pinv(): " << std::endl
-              << clampingConstraintMatrixPinv << std::endl;
-    std::cout << "A_c * A_c.pinv(): " << std::endl
-              << clampingConstraintMatrix * clampingConstraintMatrixPinv
-              << std::endl;
-    std::cout << "A_c.pinv().transpose(): " << std::endl
-              << clampingConstraintMatrixPinv.eval().transpose() << std::endl;
-    std::cout << "A_c.transpose(): " << std::endl
-              << clampingConstraintMatrix.transpose() << std::endl;
-    std::cout << "Mapper: " << std::endl << mapper << std::endl;
-    std::cout << "Violation velocities: " << std::endl
-              << violationVelocities << std::endl;
-    std::cout << "Violation accel: " << std::endl
-              << violationAccel << std::endl;
-    std::cout << "Violation torques: " << std::endl
-              << violationTorques << std::endl;
-    std::cout << "Violation contact forces: " << std::endl
-              << violationContactForces << std::endl;
-    return false;
-  }
-
-  return true;
-}
-
-bool verifyVelVelJacobian(
-    SkeletonPtr skel, WorldPtr world, VectorXd proposedVelocities)
-{
-  MatrixXd bruteForce
-      = finiteDifferenceVelVelJacobian(skel, world, proposedVelocities);
-
-  skel->setVelocities(proposedVelocities);
-  world->getConstraintSolver()->solve();
-  MatrixXd analytical = skel->getVelVelJacobian(world->getTimeStep());
-
-  if (!equals(analytical, bruteForce, 1e-1))
-  {
-    debugDofs(skel);
-    std::cout << "Brute force velVelJacobian:" << std::endl
-              << bruteForce << std::endl;
-    std::cout << "Analytical velVelJacobian (should be the same as above):"
-              << std::endl
-              << analytical << std::endl;
-    return false;
-  }
-
-  return true;
-}
-
-bool verifyMassedVelVelJacobian(
-    SkeletonPtr skel, WorldPtr world, VectorXd proposedVelocities)
-{
-  MatrixXd bruteForce
-      = finiteDifferenceVelVelJacobian(skel, world, proposedVelocities);
-
-  skel->setVelocities(proposedVelocities);
-  world->getConstraintSolver()->solve();
-  MatrixXd analytical = skel->getMassedVelVelJacobian();
-
-  if (!equals(analytical, bruteForce, 1e-1))
-  {
-    debugDofs(skel);
-    std::cout << "Brute force velVelJacobian:" << std::endl
-              << bruteForce << std::endl;
-    MatrixXd classicAnalytical = skel->getVelVelJacobian(world->getTimeStep());
-    std::cout
-        << "Classic Analytical velVelJacobian (should be the same as above):"
-        << std::endl
-        << classicAnalytical << std::endl;
-    std::cout << "Mass Analytical velVelJacobian (should be the same as above):"
-              << std::endl
-              << analytical << std::endl;
-    return false;
-  }
-
-  return true;
-}
-
-bool verifyForceVelJacobian(
-    SkeletonPtr skel, WorldPtr world, VectorXd proposedVelocities)
-{
-  MatrixXd bruteForce
-      = finiteDifferenceForceVelJacobian(skel, world, proposedVelocities);
-
-  skel->setVelocities(proposedVelocities);
-  world->getConstraintSolver()->solve();
-  MatrixXd analytical = skel->getForceVelJacobian(world->getTimeStep());
-
-  if (!equals(analytical, bruteForce, 1e-3))
-  {
-    debugDofs(skel);
-    std::cout << "Analytical forceVelJacobian (should be the same as above):"
-              << std::endl
-              << analytical << std::endl;
-    std::cout << "Brute force forceVelJacobian:" << std::endl
-              << bruteForce << std::endl;
-    return false;
-  }
-
-  return true;
-}
-
-bool verifyMassedForceVelJacobian(
-    SkeletonPtr skel, WorldPtr world, VectorXd proposedVelocities)
-{
-  MatrixXd bruteForce
-      = finiteDifferenceForceVelJacobian(skel, world, proposedVelocities);
-
-  skel->setVelocities(proposedVelocities);
-  world->getConstraintSolver()->solve();
-  MatrixXd analytical = skel->getMassedForceVelJacobian(world->getTimeStep());
-
-  if (!equals(analytical, bruteForce, 1e-3))
-  {
-    debugDofs(skel);
-    std::cout << "Brute force forceVelJacobian:" << std::endl
-              << bruteForce << std::endl;
-    MatrixXd classicAnalytical
-        = skel->getForceVelJacobian(world->getTimeStep());
-    std::cout
-        << "Classic Analytical forceVelJacobian (should be the same as above):"
-        << std::endl
-        << classicAnalytical << std::endl;
-    std::cout
-        << "Mass Analytical forceVelJacobian (should be the same as above):"
-        << std::endl
-        << analytical << std::endl;
-    return false;
-  }
-
-  return true;
-}
-
-// TODO(keenon): This test is broken, but also very difficult to interpret, so
-// leaving it for now. Should ensure this test passes eventually.
+// This test is ugly and difficult to interpret, but it broke our system early
+// on. It now passes, and is here to detect regression.
 /******************************************************************************
 
 This test sets up a configuration that looks like this:
@@ -966,7 +492,6 @@ There's a 3 link pendulum, with a force driving the middle link into a fixed
 block, creating a contact.
 
 */
-/*
 TEST(GRADIENTS, PENDULUM_BLOCK)
 {
   // World
@@ -1068,12 +593,10 @@ TEST(GRADIENTS, PENDULUM_BLOCK)
   pendulum->integrateVelocities(world->getTimeStep());
   VectorXd timestepVel = pendulum->getVelocities();
 
-  EXPECT_TRUE(verifyClampingConstraintMatrix(pendulum, world, timestepVel));
-  EXPECT_TRUE(verifyProjectionIntoClampsMatrix(pendulum, world, timestepVel));
-  EXPECT_TRUE(verifyVelVelJacobian(pendulum, world, timestepVel));
-  EXPECT_TRUE(verifyForceVelJacobian(pendulum, world, timestepVel));
+  VectorXd worldVel = world->getVelocities();
+  // Test the classic formulation
+  EXPECT_TRUE(verifyWorldGradients(world, worldVel));
 }
-*/
 
 /******************************************************************************
 
@@ -1154,27 +677,12 @@ void testBlockWithFrictionCoeff(double frictionCoeff, double mass)
 
   box->computeForwardDynamics();
   box->integrateVelocities(world->getTimeStep());
-  VectorXd worldVel = world->getVelocities();
   VectorXd timestepVel = box->getVelocities();
   VectorXd timestepWorldVel = world->getVelocities();
 
+  VectorXd worldVel = world->getVelocities();
   // Test the classic formulation
-  EXPECT_TRUE(verifyWorldClassicClampingConstraintMatrix(world, worldVel));
-  EXPECT_TRUE(verifyWorldClassicProjectionIntoClampsMatrix(world, worldVel));
-  EXPECT_TRUE(verifyWorldClassicVelVelJacobian(world, worldVel));
-  EXPECT_TRUE(verifyWorldClassicForceVelJacobian(world, worldVel));
-  /*
-  EXPECT_TRUE(verifyClampingConstraintMatrix(box, world, timestepVel));
-  EXPECT_TRUE(verifyProjectionIntoClampsMatrix(box, world, timestepVel));
-  EXPECT_TRUE(verifyVelVelJacobian(box, world, timestepVel));
-  EXPECT_TRUE(verifyForceVelJacobian(box, world, timestepVel));
-
-  // Test the massed formulation
-  EXPECT_TRUE(verifyMassedClampingConstraintMatrix(box, world, timestepVel));
-  EXPECT_TRUE(verifyMassedProjectionIntoClampsMatrix(box, world, timestepVel));
-  EXPECT_TRUE(verifyMassedVelVelJacobian(box, world, timestepVel));
-  EXPECT_TRUE(verifyMassedForceVelJacobian(box, world, timestepVel));
-  */
+  EXPECT_TRUE(verifyWorldGradients(world, worldVel));
 }
 
 TEST(GRADIENTS, BLOCK_ON_GROUND_NO_FRICTION_1_MASS)
@@ -1325,31 +833,10 @@ void testTwoBlocks(
 
   // Test the classic formulation
 
-  world->getConstraintSolver()->setGradientMode(neural::GradientMode::CLASSIC);
+  world->getConstraintSolver()->setGradientEnabled(true);
   world->getConstraintSolver()->solve();
 
-  EXPECT_TRUE(verifyWorldClassicClampingConstraintMatrix(world, worldVel));
-  EXPECT_TRUE(verifyWorldClassicProjectionIntoClampsMatrix(world, worldVel));
-  EXPECT_TRUE(verifyWorldClassicVelVelJacobian(world, worldVel));
-  EXPECT_TRUE(verifyWorldClassicForceVelJacobian(world, worldVel));
-  /*
-  EXPECT_TRUE(verifyWorldMassedClampingConstraintMatrix(world, worldVel));
-  EXPECT_TRUE(verifyWorldMassedProjectionIntoClampsMatrix(world, worldVel));
-  */
-  // EXPECT_TRUE(verifyClampingConstraintMatrix(leftBox, world, leftBoxVel));
-
-  /*
-  EXPECT_TRUE(verifyProjectionIntoClampsMatrix(leftBox, world, leftBoxVel));
-  EXPECT_TRUE(verifyVelVelJacobian(leftBox, world, leftBoxVel));
-  EXPECT_TRUE(verifyForceVelJacobian(leftBox, world, leftBoxVel));
-
-  // Test the massed formulation
-  EXPECT_TRUE(verifyMassedClampingConstraintMatrix(leftBox, world, leftBoxVel));
-  EXPECT_TRUE(
-      verifyMassedProjectionIntoClampsMatrix(leftBox, world, leftBoxVel));
-  EXPECT_TRUE(verifyMassedVelVelJacobian(leftBox, world, leftBoxVel));
-  EXPECT_TRUE(verifyMassedForceVelJacobian(leftBox, world, leftBoxVel));
-  */
+  EXPECT_TRUE(verifyWorldGradients(world, worldVel));
 }
 
 TEST(GRADIENTS, TWO_BLOCKS_1_1_MASS)
@@ -1450,19 +937,9 @@ void testBouncingBlockWithFrictionCoeff(double frictionCoeff, double mass)
 
   box->computeForwardDynamics();
   box->integrateVelocities(world->getTimeStep());
-  VectorXd timestepVel = box->getVelocities();
+  VectorXd worldVel = world->getVelocities();
 
-  // Test the classic formulation
-  EXPECT_TRUE(verifyClampingConstraintMatrix(box, world, timestepVel));
-  EXPECT_TRUE(verifyProjectionIntoClampsMatrix(box, world, timestepVel));
-  EXPECT_TRUE(verifyVelVelJacobian(box, world, timestepVel));
-  EXPECT_TRUE(verifyForceVelJacobian(box, world, timestepVel));
-
-  // Test the massed formulation
-  EXPECT_TRUE(verifyMassedClampingConstraintMatrix(box, world, timestepVel));
-  EXPECT_TRUE(verifyMassedProjectionIntoClampsMatrix(box, world, timestepVel));
-  EXPECT_TRUE(verifyMassedVelVelJacobian(box, world, timestepVel));
-  EXPECT_TRUE(verifyMassedForceVelJacobian(box, world, timestepVel));
+  EXPECT_TRUE(verifyWorldGradients(world, worldVel));
 }
 
 /*
@@ -1576,25 +1053,9 @@ void testReversePendulumSledWithFrictionCoeff(double frictionCoeff)
 
   reversePendulumSled->computeForwardDynamics();
   reversePendulumSled->integrateVelocities(world->getTimeStep());
-  VectorXd timestepVel = reversePendulumSled->getVelocities();
+  VectorXd worldVel = world->getVelocities();
 
-  // Test the classic formulation
-  EXPECT_TRUE(
-      verifyClampingConstraintMatrix(reversePendulumSled, world, timestepVel));
-  EXPECT_TRUE(verifyProjectionIntoClampsMatrix(
-      reversePendulumSled, world, timestepVel));
-  EXPECT_TRUE(verifyVelVelJacobian(reversePendulumSled, world, timestepVel));
-  EXPECT_TRUE(verifyForceVelJacobian(reversePendulumSled, world, timestepVel));
-
-  // Test the massed formulation
-  EXPECT_TRUE(verifyMassedClampingConstraintMatrix(
-      reversePendulumSled, world, timestepVel));
-  EXPECT_TRUE(verifyMassedProjectionIntoClampsMatrix(
-      reversePendulumSled, world, timestepVel));
-  EXPECT_TRUE(
-      verifyMassedVelVelJacobian(reversePendulumSled, world, timestepVel));
-  EXPECT_TRUE(
-      verifyMassedForceVelJacobian(reversePendulumSled, world, timestepVel));
+  EXPECT_TRUE(verifyWorldGradients(world, worldVel));
 }
 
 /*

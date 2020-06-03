@@ -14,15 +14,25 @@ namespace neural {
 class BackpropSnapshot
 {
 public:
+  /// This saves a snapshot from a forward pass, with all the info we need in
+  /// order to efficiently compute a backwards pass. Crucially, the positions
+  /// must all be snapshots from before the timestep, yet this constructor must
+  /// be called after the timestep.
+  BackpropSnapshot(
+      simulation::WorldPtr world,
+      Eigen::VectorXd forwardPassPosition,
+      Eigen::VectorXd forwardPassVelocity,
+      Eigen::VectorXd forwardPassTorques);
+
   /// This computes and returns the whole vel-vel jacobian. For backprop, you
   /// don't actually need this matrix, you can compute backprop directly. This
   /// is here if you want access to the full Jacobian for some reason.
-  virtual Eigen::MatrixXd getVelVelJacobian() = 0;
+  Eigen::MatrixXd getVelVelJacobian();
 
   /// This computes and returns the whole force-vel jacobian. For backprop, you
   /// don't actually need this matrix, you can compute backprop directly. This
   /// is here if you want access to the full Jacobian for some reason.
-  virtual Eigen::MatrixXd getForceVelJacobian() = 0;
+  Eigen::MatrixXd getForceVelJacobian();
 
   /// Returns a concatenated vector of all the Skeletons' position()'s in the
   /// World, in order in which the Skeletons appear in the World's
@@ -46,9 +56,17 @@ public:
   /// just here to enable testing.
   Eigen::MatrixXd getClampingConstraintMatrix();
 
+  /// This returns the V_c matrix. You shouldn't ever need this matrix, it's
+  /// just here to enable testing.
+  Eigen::MatrixXd getMassedClampingConstraintMatrix();
+
   /// This returns the A_ub matrix. You shouldn't ever need this matrix, it's
   /// just here to enable testing.
   Eigen::MatrixXd getUpperBoundConstraintMatrix();
+
+  /// This returns the V_c matrix. You shouldn't ever need this matrix, it's
+  /// just here to enable testing.
+  Eigen::MatrixXd getMassedUpperBoundConstraintMatrix();
 
   /// This returns the E matrix. You shouldn't ever need this matrix, it's
   /// just here to enable testing.
@@ -72,7 +90,7 @@ public:
 
   /// This returns the P_c matrix. You shouldn't ever need this matrix, it's
   /// just here to enable testing.
-  virtual Eigen::MatrixXd getProjectionIntoClampsMatrix() = 0;
+  Eigen::MatrixXd getProjectionIntoClampsMatrix();
 
   /// These was the mX() vector used to construct this. Pretty much only here
   /// for testing.
@@ -85,16 +103,6 @@ public:
   ~BackpropSnapshot();
 
 protected:
-  /// This saves a snapshot from a forward pass, with all the info we need in
-  /// order to efficiently compute a backwards pass. Crucially, the positions
-  /// must all be snapshots from before the timestep, yet this constructor must
-  /// be called after the timestep.
-  BackpropSnapshot(
-      simulation::WorldPtr world,
-      Eigen::VectorXd forwardPassPosition,
-      Eigen::VectorXd forwardPassVelocity,
-      Eigen::VectorXd forwardPassTorques);
-
   /// A handle to the world that we're taking a snapshot of. This world can
   /// change configurations underneath us, but this whole neural.* package
   /// assumes that no skeletons are added or removed once training begins.
@@ -130,6 +138,17 @@ protected:
 
   /// The torques on all the DOFs of the world, when this snapshot was created
   Eigen::VectorXd mForwardPassTorques;
+
+private:
+  enum MatrixToAssemble
+  {
+    CLAMPING,
+    MASSED_CLAMPING,
+    UPPER_BOUND,
+    MASSED_UPPER_BOUND
+  };
+
+  Eigen::MatrixXd assembleMatrix(MatrixToAssemble whichMatrix);
 };
 
 using BackpropSnapshotPtr = std::shared_ptr<BackpropSnapshot>;

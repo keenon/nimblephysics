@@ -4,11 +4,7 @@
 
 #include "dart/constraint/ConstraintSolver.hpp"
 #include "dart/neural/BackpropSnapshot.hpp"
-#include "dart/neural/ClassicBackpropSnapshot.hpp"
-#include "dart/neural/ClassicConstrainedGroupGradientMatrices.hpp"
 #include "dart/neural/ConstrainedGroupGradientMatrices.hpp"
-#include "dart/neural/MassedBackpropSnapshot.hpp"
-#include "dart/neural/MassedConstrainedGroupGradientMatrices.hpp"
 #include "dart/neural/RestorableSnapshot.hpp"
 #include "dart/simulation/World.hpp"
 
@@ -17,25 +13,14 @@ namespace neural {
 
 //==============================================================================
 std::shared_ptr<ConstrainedGroupGradientMatrices> createGradientMatrices(
-    constraint::ConstrainedGroup& group, double timeStep, GradientMode mode)
+    constraint::ConstrainedGroup& group, double timeStep)
 {
-  if (mode == GradientMode::MASSED)
-  {
-    return std::make_shared<MassedConstrainedGroupGradientMatrices>(
-        group, timeStep);
-  }
-  if (mode == GradientMode::CLASSIC)
-  {
-    return std::make_shared<ClassicConstrainedGroupGradientMatrices>(
-        group, timeStep);
-  }
-  // Default if GradientMode::NONE
-  return std::shared_ptr<ConstrainedGroupGradientMatrices>();
+  return std::make_shared<ConstrainedGroupGradientMatrices>(group, timeStep);
 }
 
 //==============================================================================
 std::shared_ptr<BackpropSnapshot> forwardPass(
-    simulation::WorldPtr world, GradientMode gradientMode, bool idempotent)
+    simulation::WorldPtr world, bool idempotent)
 {
   std::shared_ptr<RestorableSnapshot> restorableSnapshot;
   if (idempotent)
@@ -66,29 +51,20 @@ std::shared_ptr<BackpropSnapshot> forwardPass(
   }
 
   // Set the gradient mode we're going to use to calculate gradients
-  GradientMode oldGradientMode
-      = world->getConstraintSolver()->getGradientMode();
-  world->getConstraintSolver()->setGradientMode(gradientMode);
+  bool oldGradientEnabled = world->getConstraintSolver()->getGradientEnabled();
+  world->getConstraintSolver()->setGradientEnabled(true);
 
   // Actually take a world step. As a byproduct, this will generate gradients
   world->step(!idempotent);
 
   // Reset the old gradient mode, so we don't have any side effects other than
   // taking a timestep.
-  world->getConstraintSolver()->setGradientMode(oldGradientMode);
+  world->getConstraintSolver()->setGradientEnabled(oldGradientEnabled);
 
   // Actually construct and return the snapshot
-  std::shared_ptr<BackpropSnapshot> snapshot;
-  if (gradientMode == GradientMode::CLASSIC)
-  {
-    snapshot = std::make_shared<ClassicBackpropSnapshot>(
-        world, forwardPassPosition, forwardPassVelocity, forwardPassTorques);
-  }
-  else if (gradientMode == GradientMode::MASSED)
-  {
-    snapshot = std::make_shared<MassedBackpropSnapshot>(
-        world, forwardPassPosition, forwardPassVelocity, forwardPassTorques);
-  }
+  std::shared_ptr<BackpropSnapshot> snapshot
+      = std::make_shared<BackpropSnapshot>(
+          world, forwardPassPosition, forwardPassVelocity, forwardPassTorques);
 
   if (idempotent)
     restorableSnapshot->restore();
