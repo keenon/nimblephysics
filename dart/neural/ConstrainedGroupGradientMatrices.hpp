@@ -39,6 +39,12 @@ public:
   ~ConstrainedGroupGradientMatrices();
 
   /// This gets called during the setup of the ConstrainedGroupGradientMatrices
+  /// at each constraint. This must be called before constructMatrices(), and
+  /// must be called exactly once for each constraint.
+  void registerConstraint(
+      const std::shared_ptr<constraint::ConstraintBase>& constraint);
+
+  /// This gets called during the setup of the ConstrainedGroupGradientMatrices
   /// at each constraint's dimension. It gets called _after_ the system has
   /// already applied a measurement impulse to that constraint dimension, and
   /// measured some velocity changes. This must be called before
@@ -58,20 +64,6 @@ public:
       Eigen::VectorXd lo,
       Eigen::VectorXi fIndex);
 
-  Eigen::MatrixXd getProjectionIntoClampsMatrix();
-
-  Eigen::MatrixXd getForceVelJacobian();
-
-  Eigen::MatrixXd getVelVelJacobian();
-
-  /// This creates a block-diagonal matrix that concatenates the mass matrices
-  /// of the skeletons that are part of this ConstrainedGroup.
-  Eigen::MatrixXd getMassMatrix() const;
-
-  /// This creates a block-diagonal matrix that concatenates the inverse mass
-  /// matrices of the skeletons that are part of this ConstrainedGroup.
-  Eigen::MatrixXd getInvMassMatrix() const;
-
   const Eigen::MatrixXd& getClampingConstraintMatrix() const;
 
   const Eigen::MatrixXd& getMassedClampingConstraintMatrix() const;
@@ -89,6 +81,9 @@ public:
   /// These was the fIndex() vector used to construct this. Pretty much only
   /// here for testing.
   const Eigen::VectorXi& getContactConstraintMappings() const;
+
+  /// Returns the restitution coefficiennts at each contact point.
+  const Eigen::VectorXd& getBounceDiagonals() const;
 
   std::size_t getNumDOFs() const;
 
@@ -112,6 +107,10 @@ protected:
   /// Mapping matrix for upper bound constraints
   Eigen::MatrixXd mUpperBoundMappingMatrix;
 
+  /// This is the vector of the coefficients on the diagonal of the bounce
+  /// matrix. These are 1+restitutionCoeff[i]
+  Eigen::VectorXd mBounceDiagonals;
+
   /// This is just useful for testing the gradient computations
   Eigen::VectorXi mContactConstraintMappings;
 
@@ -133,6 +132,10 @@ protected:
 
   /// These are the offsets into the total degrees of freedom for each skeleton
   std::unordered_map<std::string, std::size_t> mSkeletonOffset;
+
+  /// This holds the coefficient of restitution for each constraint on this
+  /// group.
+  std::vector<double> mRestitutionCoeffs;
 
   /// This holds the outputs of the impulse tests we run to create the
   /// constraint matrices. We shuffle these vectors into the columns of

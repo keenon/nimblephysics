@@ -135,6 +135,10 @@ protected:
   // Documentation inherited
   bool isActive() const override;
 
+  /// Returns 0 if this constraint isn't bouncing, otherwise returns the
+  /// coefficient of restitution
+  std::vector<double> getCoefficientOfRestitution() override;
+
 private:
   using TangentBasisMatrix = Eigen::Matrix<double, 3, 2>;
 
@@ -170,6 +174,9 @@ private:
 
   /// Coefficient of restitution
   double mRestitutionCoeff;
+
+  /// True if we are going fast enough to bounce, used for gradient computation
+  bool mDidBounce;
 
   /// Whether this contact is self-collision.
   bool mIsSelfCollision;

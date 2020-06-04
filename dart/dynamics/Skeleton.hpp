@@ -571,54 +571,6 @@ public:
           gradientMatrices);
 
   //----------------------------------------------------------------------------
-  // Gradients - Original formulation
-  //----------------------------------------------------------------------------
-
-  void setConstraintMatricesForGradient(
-      Eigen::MatrixXd clampingConstraintMatrix,
-      Eigen::MatrixXd upperBoundConstraintMatrix,
-      Eigen::MatrixXd upperBoundMappingMatrix,
-      Eigen::VectorXi contactConstraintMappings,
-      Eigen::VectorXd contactConstraintImplulses);
-
-  Eigen::MatrixXd getClampingConstraintMatrix();
-
-  Eigen::MatrixXd getUpperBoundConstraintMatrix();
-
-  Eigen::MatrixXd getUpperBoundMappingMatrix();
-
-  Eigen::VectorXd getContactConstraintImpluses();
-
-  Eigen::VectorXi getContactConstraintMappings();
-
-  Eigen::MatrixXd getProjectionIntoClampsMatrix(double dt);
-
-  Eigen::MatrixXd getForceVelJacobian(double dt);
-
-  Eigen::MatrixXd getVelVelJacobian(double dt);
-
-  //----------------------------------------------------------------------------
-  // Gradients - Massed formulation
-  //----------------------------------------------------------------------------
-
-  void setMassedConstraintMatricesForGradient(
-      Eigen::MatrixXd massedClampingConstraintMatrix,
-      Eigen::MatrixXd massedUpperBoundConstraintMatrix,
-      Eigen::MatrixXd upperBoundMappingMatrix,
-      Eigen::VectorXi contactConstraintMappings,
-      Eigen::VectorXd contactConstraintImplulses);
-
-  Eigen::MatrixXd getMassedClampingConstraintMatrix();
-
-  Eigen::MatrixXd getMassedUpperBoundConstraintMatrix();
-
-  Eigen::MatrixXd getMassedProjectionIntoClampsMatrix();
-
-  Eigen::MatrixXd getMassedForceVelJacobian(double dt);
-
-  Eigen::MatrixXd getMassedVelVelJacobian();
-
-  //----------------------------------------------------------------------------
   // Integration and finite difference
   //----------------------------------------------------------------------------
 
@@ -1360,29 +1312,6 @@ protected:
 
     /// Centroid of the support polygon
     Eigen::Vector2d mSupportCentroid;
-
-    /// Gradients -- Impulse test matrix for the clamping constraints
-    Eigen::MatrixXd mClampingConstraintMatrix;
-
-    /// Gradients -- Impulse test matrix for the upper bound constraints
-    Eigen::MatrixXd mUpperBoundConstraintMatrix;
-
-    /// Gradients -- Mapping matrix for upper bound constraints
-    Eigen::MatrixXd mUpperBoundMappingMatrix;
-
-    /// Gradients -- This is just useful for testing the gradient computations
-    Eigen::VectorXi mContactConstraintMappings;
-
-    /// Gradients -- This is just useful for testing the gradient computations
-    Eigen::VectorXd mContactConstraintImpulses;
-
-    /// Gradients -- Massed formulation -- Impulse test matrix for the clamping
-    /// constraints
-    Eigen::MatrixXd mMassedClampingConstraintMatrix;
-
-    /// Gradients -- Massed formulation -- Impulse test matrix for the upper
-    /// bound constraints
-    Eigen::MatrixXd mMassedUpperBoundConstraintMatrix;
 
     /// A shared pointer to the saved gradient matrices for the ConstrainedGroup
     /// this skeleton was part of in the last LCP solve.

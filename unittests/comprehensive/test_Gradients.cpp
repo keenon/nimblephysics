@@ -179,6 +179,7 @@ bool verifyWorldMassedClampingConstraintMatrix(
 
   if (!equals(A_c, A_c_recovered, 1e-3) || !equals(V_c, V_c_recovered, 1e-3))
   {
+    std::cout << "A_c massed check failed" << std::endl;
     return false;
   }
 
@@ -206,6 +207,7 @@ bool verifyWorldMassedUpperBoundConstraintMatrix(
   if (!equals(A_ub, A_ub_recovered, 1e-3)
       || !equals(V_ub, V_ub_recovered, 1e-3))
   {
+    std::cout << "A_ub massed check failed" << std::endl;
     return false;
   }
 
@@ -235,11 +237,17 @@ bool verifyWorldClassicProjectionIntoClampsMatrix(
     return false;
   }
 
+  // Get the integrated velocities
+
+  world->integrateVelocities();
+  VectorXd integratedVelocities = world->getVelocities();
+  world->setVelocities(proposedVelocities);
+
   // Compute the analytical constraint forces, which should match our actual
   // constraint forces
 
   MatrixXd P_c = classicPtr->getProjectionIntoClampsMatrix();
-  VectorXd analyticalConstraintForces = -2 * (P_c * proposedVelocities);
+  VectorXd analyticalConstraintForces = -1 * P_c * integratedVelocities;
 
   // Get the actual constraint forces
 
@@ -271,87 +279,18 @@ bool verifyWorldClassicProjectionIntoClampsMatrix(
   {
     std::cout << "Proposed velocities: " << std::endl
               << proposedVelocities << std::endl;
+    std::cout << "Integrated velocities: " << std::endl
+              << integratedVelocities << std::endl;
     std::cout << "P_c: " << std::endl << P_c << std::endl;
     std::cout << "Constraint forces: " << std::endl
               << contactConstraintForces << std::endl;
+    std::cout << "bounce: " << std::endl
+              << classicPtr->getBounceDiagonals() << std::endl;
     std::cout << "-(P_c * proposedVelocities) (should be the same as above): "
               << std::endl
               << analyticalConstraintForces << std::endl;
     std::cout << "Analytical error (should be zero):" << std::endl
               << analyticalError << std::endl;
-    std::cout << "Zero: " << std::endl << zero << std::endl;
-
-    // Recompute step by step
-
-    /*
-    MatrixXd clampingConstraintMatrix
-        = classicPtr->getClampingConstraintMatrix();
-    MatrixXd clampingConstraintMatrixPinv
-        = clampingConstraintMatrix.completeOrthogonalDecomposition()
-              .pseudoInverse();
-    MatrixXd mapper = clampingConstraintMatrixPinv.eval().transpose()
-                      * clampingConstraintMatrix.transpose();
-    VectorXd violationVelocities = mapper * proposedVelocities;
-    VectorXd violationAccel = violationVelocities / world->getTimeStep();
-    VectorXd violationTorques = classicPtr->getMassMatrix() * violationAccel;
-    VectorXd violationContactForces
-        = clampingConstraintMatrixPinv * violationTorques;
-    VectorXd violationTorquesSum = VectorXd(violationTorques.size());
-    violationTorquesSum(0) = (violationTorques(0) - violationTorques(1)) / 2;
-    violationTorquesSum(1) = (violationTorques(1) - violationTorques(0)) / 2;
-    VectorXd violationContactForcesAlt
-        = clampingConstraintMatrixPinv * violationTorquesSum;
-
-    VectorXd violationTorquesRecovered
-        = clampingConstraintMatrix * violationContactForces;
-
-    std::cout << "A_c: " << std::endl << clampingConstraintMatrix << std::endl;
-    std::cout << "A_c.pinv(): " << std::endl
-              << clampingConstraintMatrixPinv << std::endl;
-    std::cout << "A_c * A_c.pinv(): " << std::endl
-              << clampingConstraintMatrix * clampingConstraintMatrixPinv
-              << std::endl;
-    std::cout << "A_c.pinv().transpose(): " << std::endl
-              << clampingConstraintMatrixPinv.eval().transpose() << std::endl;
-    std::cout << "A_c.transpose(): " << std::endl
-              << clampingConstraintMatrix.transpose() << std::endl;
-    std::cout << "Mapper: " << std::endl << mapper << std::endl;
-    std::cout << "Violation velocities: " << std::endl
-              << violationVelocities << std::endl;
-    std::cout << "Violation accel: " << std::endl
-              << violationAccel << std::endl;
-    std::cout << "M: " << std::endl << classicPtr->getMassMatrix() << std::endl;
-    std::cout << "Violation torques: " << std::endl
-              << violationTorques << std::endl;
-    std::cout << "Violation contact forces: " << std::endl
-              << violationContactForces << std::endl;
-    std::cout << "Violation torques sum: " << std::endl
-              << violationTorquesSum << std::endl;
-    std::cout << "Violation contact forces alt: " << std::endl
-              << violationContactForcesAlt << std::endl;
-    std::cout << "Violation torques recovered: " << std::endl
-              << violationTorquesRecovered << std::endl;
-
-    // Working the P_c steps backwards with the real constraint forces
-
-    std::cout << "Working backwards: " << std::endl;
-
-    std::cout << "Constraint forces: " << std::endl
-              << contactConstraintForces << std::endl;
-    violationTorquesRecovered
-        = clampingConstraintMatrix * contactConstraintForces;
-    std::cout << "Violation torques recovered: " << std::endl
-              << violationTorquesRecovered << std::endl;
-    VectorXd violationAccelRecovered
-        = classicPtr->getInvMassMatrix() * violationTorquesRecovered;
-    std::cout << "Violation accel recovered: " << std::endl
-              << violationAccelRecovered << std::endl;
-    VectorXd violationDeltaVRecovered
-        = violationAccelRecovered * world->getTimeStep();
-    std::cout << "Violation delta V recovered: " << std::endl
-              << violationAccelRecovered << std::endl;
-    */
-
     return false;
   }
 
@@ -390,11 +329,15 @@ bool verifyWorldMassedProjectionIntoClampsMatrix(
                                * constraintForceToImpliedTorques;
   Eigen::MatrixXd velToForce
       = forceToVel.completeOrthogonalDecomposition().pseudoInverse();
+  Eigen::MatrixXd bounce = classicPtr->getBounceDiagonals().asDiagonal();
   Eigen::MatrixXd P_c_recovered
-      = (1.0 / world->getTimeStep()) * velToForce * A_c.transpose();
+      = (1.0 / world->getTimeStep()) * velToForce * bounce * A_c.transpose();
 
   if (!equals(P_c, P_c_recovered, 1e-3))
   {
+    std::cout << "P_c massed check failed" << std::endl;
+    std::cout << "P_c:" << std::endl << P_c << std::endl;
+    std::cout << "P_c recovered:" << std::endl << P_c_recovered << std::endl;
     return false;
   }
 
@@ -492,6 +435,7 @@ There's a 3 link pendulum, with a force driving the middle link into a fixed
 block, creating a contact.
 
 */
+/*
 TEST(GRADIENTS, PENDULUM_BLOCK)
 {
   // World
@@ -597,6 +541,7 @@ TEST(GRADIENTS, PENDULUM_BLOCK)
   // Test the classic formulation
   EXPECT_TRUE(verifyWorldGradients(world, worldVel));
 }
+*/
 
 /******************************************************************************
 
@@ -899,11 +844,12 @@ void testBouncingBlockWithFrictionCoeff(double frictionCoeff, double mass)
   boxBody->setFrictionCoeff(frictionCoeff);
 
   // Add a force driving the box to the left
-  boxBody->addExtForce(Eigen::Vector3d(1, 0, 0));
+  boxBody->addExtForce(Eigen::Vector3d(1, -1, 0));
   // Prevent the mass matrix from being Identity
   boxBody->setMass(mass);
   boxBody->setRestitutionCoeff(0.5);
-  box->setVelocity(1, -10);
+  // Set the 1th joint index to -1.0
+  box->setVelocity(1, -1);
 
   world->addSkeleton(box);
 
@@ -927,7 +873,7 @@ void testBouncingBlockWithFrictionCoeff(double frictionCoeff, double mass)
       new BoxShape(Eigen::Vector3d(10.0, 1.0, 10.0)));
   floorBody->createShapeNodeWith<VisualAspect, CollisionAspect>(floorShape);
   floorBody->setFrictionCoeff(1);
-  floorBody->setRestitutionCoeff(0.5);
+  floorBody->setRestitutionCoeff(1.0);
 
   world->addSkeleton(floor);
 
@@ -942,12 +888,10 @@ void testBouncingBlockWithFrictionCoeff(double frictionCoeff, double mass)
   EXPECT_TRUE(verifyWorldGradients(world, worldVel));
 }
 
-/*
 TEST(GRADIENTS, BLOCK_BOUNCING_OFF_GROUND_NO_FRICTION_1_MASS)
 {
   testBouncingBlockWithFrictionCoeff(0, 1);
 }
-*/
 
 /******************************************************************************
 
@@ -1058,9 +1002,7 @@ void testReversePendulumSledWithFrictionCoeff(double frictionCoeff)
   EXPECT_TRUE(verifyWorldGradients(world, worldVel));
 }
 
-/*
 TEST(GRADIENTS, SLIDING_REVERSE_PENDULUM_NO_FRICTION)
 {
   testReversePendulumSledWithFrictionCoeff(0);
 }
-*/

@@ -28,27 +28,10 @@ std::shared_ptr<BackpropSnapshot> forwardPass(
     restorableSnapshot = std::make_shared<RestorableSnapshot>(world);
   }
 
-  // Record the current state of the world
-  std::size_t numDOFs = 0;
-  for (std::size_t i = 0; i < world->getNumSkeletons(); i++)
-  {
-    numDOFs += world->getSkeleton(i)->getNumDofs();
-  }
-  Eigen::VectorXd forwardPassPosition = Eigen::VectorXd(numDOFs);
-  Eigen::VectorXd forwardPassVelocity = Eigen::VectorXd(numDOFs);
-  Eigen::VectorXd forwardPassTorques = Eigen::VectorXd(numDOFs);
-
-  std::size_t cursor = 0;
-  for (std::size_t i = 0; i < world->getNumSkeletons(); i++)
-  {
-    std::size_t skelDOF = world->getSkeleton(i)->getNumDofs();
-    forwardPassPosition.segment(cursor, skelDOF)
-        = world->getSkeleton(i)->getPositions();
-    forwardPassVelocity.segment(cursor, skelDOF)
-        = world->getSkeleton(i)->getVelocities();
-    forwardPassTorques.segment(cursor, skelDOF)
-        = world->getSkeleton(i)->getForces();
-  }
+  // Record the current input vector
+  Eigen::VectorXd forwardPassPosition = world->getPositions();
+  Eigen::VectorXd forwardPassVelocity = world->getVelocities();
+  Eigen::VectorXd forwardPassTorques = world->getForces();
 
   // Set the gradient mode we're going to use to calculate gradients
   bool oldGradientEnabled = world->getConstraintSolver()->getGradientEnabled();

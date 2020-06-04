@@ -248,6 +248,23 @@ Eigen::VectorXi BackpropSnapshot::getContactConstraintMappings()
 }
 
 //==============================================================================
+Eigen::VectorXd BackpropSnapshot::getBounceDiagonals()
+{
+  if (mGradientMatrices.size() == 1)
+    return mGradientMatrices[0]->getBounceDiagonals();
+  Eigen::VectorXd restitutionCoeffs = Eigen::VectorXd(mNumConstraintDim);
+  std::size_t cursor = 0;
+  for (std::size_t i = 0; i < mGradientMatrices.size(); i++)
+  {
+    restitutionCoeffs.segment(
+        cursor, mGradientMatrices[i]->getNumConstraintDim())
+        = mGradientMatrices[i]->getBounceDiagonals();
+    cursor += mGradientMatrices[i]->getNumConstraintDim();
+  }
+  return restitutionCoeffs;
+}
+
+//==============================================================================
 Eigen::MatrixXd BackpropSnapshot::finiteDifferenceVelVelJacobian()
 {
   RestorableSnapshot snapshot(mWorld);
@@ -333,12 +350,13 @@ Eigen::MatrixXd BackpropSnapshot::getProjectionIntoClampsMatrix()
       = A_c.eval().transpose() * constraintForceToImpliedTorques;
   Eigen::MatrixXd velToForce
       = forceToVel.completeOrthogonalDecomposition().pseudoInverse();
+  Eigen::MatrixXd bounce = getBounceDiagonals().asDiagonal();
   /*
   std::cout << "forceToVel: " << std::endl << forceToVel << std::endl;
   std::cout << "forceToVel^-1: " << std::endl << velToForce << std::endl;
   std::cout << "mTimeStep: " << mTimeStep << std::endl;
   */
-  return (1.0 / mTimeStep) * velToForce * A_c.transpose();
+  return (1.0 / mTimeStep) * velToForce * bounce * A_c.transpose();
 }
 
 //==============================================================================

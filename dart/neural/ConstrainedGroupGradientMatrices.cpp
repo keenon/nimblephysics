@@ -58,6 +58,19 @@ ConstrainedGroupGradientMatrices::~ConstrainedGroupGradientMatrices()
 }
 
 /// This gets called during the setup of the ConstrainedGroupGradientMatrices
+/// at each constraint. This must be called before constructMatrices(), and
+/// must be called exactly once for each constraint.
+void ConstrainedGroupGradientMatrices::registerConstraint(
+    const std::shared_ptr<constraint::ConstraintBase>& constraint)
+{
+  std::vector<double> coeffs = constraint->getCoefficientOfRestitution();
+  for (double d : coeffs)
+  {
+    mRestitutionCoeffs.push_back(d);
+  }
+}
+
+/// This gets called during the setup of the ConstrainedGroupGradientMatrices
 /// at each constraint's dimension. It gets called _after_ the system has
 /// already applied a measurement impulse to that constraint dimension, and
 /// measured some velocity changes. This must be called before
@@ -110,135 +123,6 @@ void ConstrainedGroupGradientMatrices::measureConstraintImpulse(
   {
     skel->clearConstraintImpulses();
   }
-}
-
-Eigen::MatrixXd
-ConstrainedGroupGradientMatrices::getProjectionIntoClampsMatrix()
-{
-  Eigen::MatrixXd A_c = getClampingConstraintMatrix();
-
-  /*
-  std::cout << "Computing P_c:" << std::endl;
-  std::cout << "A_c size: " << A_c.size() << std::endl;
-  std::cout << "A_ub size: " << A_ub.size() << std::endl;
-  std::cout << "E size: " << E.size() << std::endl;
-  std::cout << "M size: " << getMassMatrix().size() << std::endl;
-  */
-
-  /*
-  if (A_ub.size() > 0 && E.size() > 0)
-  {
-    std::cout << "Doing P_c computation with A_ub and E" << std::endl;
-    std::cout << "A_c: " << std::endl << A_c << std::endl;
-    std::cout << "M: " << std::endl << getMassMatrix() << std::endl;
-    std::cout << "E: " << std::endl << E << std::endl;
-    std::cout << "A_ub: " << std::endl << A_ub << std::endl;
-    Eigen::MatrixXd A_cA_ub = (A_c + A_ub * E);
-    Eigen::MatrixXd A_cA_ubInv
-        = (A_c + A_ub * E).completeOrthogonalDecomposition().pseudoInverse();
-    Eigen::MatrixXd A_cInv
-        = A_c.completeOrthogonalDecomposition().pseudoInverse();
-    std::cout << "A_cInv: " << std::endl << A_cInv << std::endl;
-    std::cout << "A_c + A_ub*E: " << std::endl << A_cA_ub << std::endl;
-    std::cout << "(A_c + A_ub*E)Inv: " << std::endl << A_cA_ubInv << std::endl;
-    return (1.0 / dt) * A_cA_ubInv.eval() * getMassMatrix()
-           * A_cInv.eval().transpose() * A_c.transpose();
-  }
-  else
-  {
-  */
-  Eigen::MatrixXd A_cInv
-      = A_c.completeOrthogonalDecomposition().pseudoInverse();
-  /*
-  std::cout << "Doing P_c computation without A_ub and E" << std::endl;
-  std::cout << "A_c: " << A_c << std::endl;
-  std::cout << "M: " << getMassMatrix() << std::endl;
-  std::cout << "A_cInv: " << A_cInv << std::endl;
-  */
-  return (1.0 / mTimeStep) * A_cInv.eval() * getMassMatrix()
-         * A_cInv.eval().transpose() * A_c.eval().transpose();
-  //}
-}
-
-Eigen::MatrixXd ConstrainedGroupGradientMatrices::getForceVelJacobian()
-{
-  Eigen::MatrixXd A_c = getClampingConstraintMatrix();
-  Eigen::MatrixXd A_ub = getUpperBoundConstraintMatrix();
-  Eigen::MatrixXd E = getUpperBoundMappingMatrix();
-  Eigen::MatrixXd P_c = getProjectionIntoClampsMatrix();
-  Eigen::MatrixXd Minv = getInvMassMatrix();
-
-  if (A_ub.size() > 0 && E.size() > 0)
-  {
-    return mTimeStep * Minv
-           * (Eigen::MatrixXd::Identity(mNumDOFs, mNumDOFs)
-              - mTimeStep * (A_c + A_ub * E) * P_c * Minv);
-  }
-  else
-  {
-    return mTimeStep * Minv
-           * (Eigen::MatrixXd::Identity(mNumDOFs, mNumDOFs)
-              - mTimeStep * A_c * P_c * Minv);
-  }
-}
-
-Eigen::MatrixXd ConstrainedGroupGradientMatrices::getVelVelJacobian()
-{
-  Eigen::MatrixXd A_c = getClampingConstraintMatrix();
-  Eigen::MatrixXd A_ub = getUpperBoundConstraintMatrix();
-  Eigen::MatrixXd E = getUpperBoundMappingMatrix();
-  Eigen::MatrixXd P_c = getProjectionIntoClampsMatrix();
-  Eigen::MatrixXd Minv = getInvMassMatrix();
-  Eigen::MatrixXd B = Eigen::MatrixXd::Identity(
-      mNumDOFs, mNumDOFs); // TODO(keenon): B needs to be set properly.
-  if (A_ub.size() > 0 && E.size() > 0)
-  {
-    return (Eigen::MatrixXd::Identity(mNumDOFs, mNumDOFs)
-            - mTimeStep * Minv * (A_c + A_ub * E) * P_c)
-           * B;
-  }
-  else
-  {
-    return (Eigen::MatrixXd::Identity(mNumDOFs, mNumDOFs)
-            - mTimeStep * Minv * (A_c + A_ub * E) * P_c)
-           * B;
-  }
-}
-
-/// This creates a block-diagonal matrix that concatenates the mass matrices
-/// of the skeletons that are part of this ConstrainedGroup.
-Eigen::MatrixXd ConstrainedGroupGradientMatrices::getMassMatrix() const
-{
-  if (mSkeletons.size() == 1)
-    return mSkeletons[0]->getMassMatrix();
-  Eigen::MatrixXd massMatrix = Eigen::MatrixXd::Zero(mNumDOFs, mNumDOFs);
-  std::size_t offset = 0;
-  for (std::size_t i = 0; i < mSkeletons.size(); i++)
-  {
-    std::size_t dims = mSkeletons[i]->getNumDofs();
-    massMatrix.block(offset, offset, dims, dims)
-        = mSkeletons[i]->getMassMatrix();
-    offset += dims;
-  }
-  return massMatrix;
-}
-
-/// This creates a block-diagonal matrix that concatenates the inverse mass
-/// matrices of the skeletons that are part of this ConstrainedGroup.
-Eigen::MatrixXd ConstrainedGroupGradientMatrices::getInvMassMatrix() const
-{
-  if (mSkeletons.size() == 1)
-    return mSkeletons[0]->getMassMatrix();
-  Eigen::MatrixXd invMassMatrix = Eigen::MatrixXd::Zero(mNumDOFs, mNumDOFs);
-  std::size_t offset = 0;
-  for (std::size_t i = 0; i < mSkeletons.size(); i++)
-  {
-    std::size_t dims = mSkeletons[i]->getNumDofs();
-    invMassMatrix.block(offset, offset, dims, dims)
-        = mSkeletons[i]->getMassMatrix();
-    offset += dims;
-  }
-  return invMassMatrix;
 }
 
 /// This gets called during the setup of the ConstrainedGroupGradientMatrices
@@ -356,27 +240,25 @@ void ConstrainedGroupGradientMatrices::constructMatrices(
   mMassedUpperBoundConstraintMatrix
       = Eigen::MatrixXd::Zero(mNumDOFs, numUpperBound);
   mUpperBoundMappingMatrix = Eigen::MatrixXd::Zero(numUpperBound, numClamping);
+  mBounceDiagonals = Eigen::VectorXd(numClamping);
 
   // Copy impulse tests into the matrices
-  for (std::size_t i = 0; i < mSkeletons.size(); ++i)
+  for (size_t j = 0; j < mNumConstraintDim; j++)
   {
-    // Copy values into our new matrices
-    for (size_t j = 0; j < mNumConstraintDim; j++)
+    if (contactConstraintMappings(j) == neural::ConstraintMapping::CLAMPING)
     {
-      if (contactConstraintMappings(j) == neural::ConstraintMapping::CLAMPING)
-      {
-        assert(numClamping > clampingIndex[j]);
-        mClampingConstraintMatrix.col(clampingIndex[j]) = mImpulseTests[j];
-        mMassedClampingConstraintMatrix.col(clampingIndex[j])
-            = mMassedImpulseTests[j];
-      }
-      else if (contactConstraintMappings(j) >= 0) // means we're an UPPER_BOUND
-      {
-        assert(numUpperBound > upperBoundIndex[j]);
-        mUpperBoundConstraintMatrix.col(upperBoundIndex[j]) = mImpulseTests[j];
-        mMassedUpperBoundConstraintMatrix.col(upperBoundIndex[j])
-            = mMassedImpulseTests[j];
-      }
+      assert(numClamping > clampingIndex[j]);
+      mClampingConstraintMatrix.col(clampingIndex[j]) = mImpulseTests[j];
+      mMassedClampingConstraintMatrix.col(clampingIndex[j])
+          = mMassedImpulseTests[j];
+      mBounceDiagonals(clampingIndex[j]) = 1 + mRestitutionCoeffs[j];
+    }
+    else if (contactConstraintMappings(j) >= 0) // means we're an UPPER_BOUND
+    {
+      assert(numUpperBound > upperBoundIndex[j]);
+      mUpperBoundConstraintMatrix.col(upperBoundIndex[j]) = mImpulseTests[j];
+      mMassedUpperBoundConstraintMatrix.col(upperBoundIndex[j])
+          = mMassedImpulseTests[j];
     }
   }
 
@@ -463,6 +345,12 @@ const Eigen::VectorXd&
 ConstrainedGroupGradientMatrices::getContactConstraintImpluses() const
 {
   return mContactConstraintImpulses;
+}
+
+const Eigen::VectorXd& ConstrainedGroupGradientMatrices::getBounceDiagonals()
+    const
+{
+  return mBounceDiagonals;
 }
 
 /// These was the fIndex() vector used to construct this. Pretty much only

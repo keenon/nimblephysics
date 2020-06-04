@@ -253,6 +253,8 @@ public:
   /// command after simulation step.
   void step(bool _resetCommand = true);
 
+  void integrateVelocities();
+
   /// Set current time
   void setTime(double _time);
 

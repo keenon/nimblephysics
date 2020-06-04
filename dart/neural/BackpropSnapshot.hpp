@@ -100,6 +100,10 @@ public:
   /// here for testing.
   Eigen::VectorXi getContactConstraintMappings();
 
+  /// Returns the vector of the coefficients on the diagonal of the bounce
+  /// matrix. These are 1+restitutionCoeff[i].
+  Eigen::VectorXd getBounceDiagonals();
+
   ~BackpropSnapshot();
 
 protected:

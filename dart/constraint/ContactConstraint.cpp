@@ -82,6 +82,7 @@ ContactConstraint::ContactConstraint(
     mIsFrictionOn(true),
     mAppliedImpulseIndex(dynamics::INVALID_INDEX),
     mIsBounceOn(false),
+    mDidBounce(false),
     mActive(false)
 {
   assert(
@@ -396,7 +397,8 @@ void ContactConstraint::getInformation(ConstraintInfo* info)
       double& negativeRelativeVel = info->b[0];
       double restitutionVel = negativeRelativeVel * mRestitutionCoeff;
 
-      if (restitutionVel > DART_BOUNCING_VELOCITY_THRESHOLD)
+      mDidBounce = restitutionVel > DART_BOUNCING_VELOCITY_THRESHOLD;
+      if (mDidBounce)
       {
         if (restitutionVel > bouncingVelocity)
         {
@@ -453,7 +455,8 @@ void ContactConstraint::getInformation(ConstraintInfo* info)
       double& negativeRelativeVel = info->b[0];
       double restitutionVel = negativeRelativeVel * mRestitutionCoeff;
 
-      if (restitutionVel > DART_BOUNCING_VELOCITY_THRESHOLD)
+      mDidBounce = restitutionVel > DART_BOUNCING_VELOCITY_THRESHOLD;
+      if (mDidBounce)
       {
         if (restitutionVel > bouncingVelocity)
         {
@@ -783,6 +786,23 @@ std::vector<dynamics::SkeletonPtr> ContactConstraint::getSkeletons() const
     skeletons.push_back(mBodyNodeB->getSkeleton());
 
   return skeletons;
+}
+
+//==============================================================================
+std::vector<double> ContactConstraint::getCoefficientOfRestitution()
+{
+  std::vector<double> vec;
+  if (!mIsBounceOn || !mDidBounce)
+    vec.push_back(0);
+  else
+    vec.push_back(mRestitutionCoeff);
+  // Pad with 0s
+  if (mDim > 1)
+  {
+    for (std::size_t i = 1; i < mDim; i++)
+      vec.push_back(0);
+  }
+  return vec;
 }
 
 } // namespace constraint

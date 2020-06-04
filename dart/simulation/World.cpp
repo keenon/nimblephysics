@@ -165,6 +165,20 @@ void World::reset()
 }
 
 //==============================================================================
+void World::integrateVelocities()
+{
+  // Integrate velocity for unconstrained skeletons
+  for (auto& skel : mSkeletons)
+  {
+    if (!skel->isMobile())
+      continue;
+
+    skel->computeForwardDynamics();
+    skel->integrateVelocities(mTimeStep);
+  }
+}
+
+//==============================================================================
 void World::step(bool _resetCommand)
 {
   // Integrate velocity for unconstrained skeletons
