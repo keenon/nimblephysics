@@ -112,12 +112,9 @@ dynamics::SkeletonPtr ConstraintBase::getRootSkeleton(
 }
 
 //==============================================================================
-std::vector<double> ConstraintBase::getCoefficientOfRestitution()
+double ConstraintBase::getCoefficientOfRestitution()
 {
-  std::vector<double> vec;
-  for (std::size_t i = 0; i < mDim; i++)
-    vec.push_back(0);
-  return vec;
+  return 0;
 }
 
 } // namespace constraint

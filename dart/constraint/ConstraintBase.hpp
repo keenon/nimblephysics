@@ -104,7 +104,7 @@ public:
 
   /// Returns 0 if this constraint isn't bouncing, otherwise returns the
   /// coefficient of restitution
-  virtual std::vector<double> getCoefficientOfRestitution();
+  virtual double getCoefficientOfRestitution();
 
   ///
   virtual dynamics::SkeletonPtr getRootSkeleton() const = 0;

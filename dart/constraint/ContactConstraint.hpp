@@ -137,7 +137,7 @@ protected:
 
   /// Returns 0 if this constraint isn't bouncing, otherwise returns the
   /// coefficient of restitution
-  std::vector<double> getCoefficientOfRestitution() override;
+  double getCoefficientOfRestitution() override;
 
 private:
   using TangentBasisMatrix = Eigen::Matrix<double, 3, 2>;

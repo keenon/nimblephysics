@@ -789,20 +789,12 @@ std::vector<dynamics::SkeletonPtr> ContactConstraint::getSkeletons() const
 }
 
 //==============================================================================
-std::vector<double> ContactConstraint::getCoefficientOfRestitution()
+double ContactConstraint::getCoefficientOfRestitution()
 {
-  std::vector<double> vec;
   if (!mIsBounceOn || !mDidBounce)
-    vec.push_back(0);
+    return 0;
   else
-    vec.push_back(mRestitutionCoeff);
-  // Pad with 0s
-  if (mDim > 1)
-  {
-    for (std::size_t i = 1; i < mDim; i++)
-      vec.push_back(0);
-  }
-  return vec;
+    return mRestitutionCoeff;
 }
 
 } // namespace constraint

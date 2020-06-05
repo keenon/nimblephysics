@@ -74,6 +74,8 @@ public:
 
   const Eigen::MatrixXd& getUpperBoundMappingMatrix() const;
 
+  const Eigen::MatrixXd& getBouncingConstraintMatrix() const;
+
   /// These was the mX() vector used to construct this. Pretty much only here
   /// for testing.
   const Eigen::VectorXd& getContactConstraintImpluses() const;
@@ -82,8 +84,11 @@ public:
   /// here for testing.
   const Eigen::VectorXi& getContactConstraintMappings() const;
 
-  /// Returns the restitution coefficiennts at each contact point.
+  /// Returns the restitution coefficiennts at each clamping contact point.
   const Eigen::VectorXd& getBounceDiagonals() const;
+
+  /// Returns the contact distances at each clamping contact point.
+  const Eigen::VectorXd& getRestitutionDiagonals() const;
 
   std::size_t getNumDOFs() const;
 
@@ -107,9 +112,15 @@ protected:
   /// Mapping matrix for upper bound constraints
   Eigen::MatrixXd mUpperBoundMappingMatrix;
 
+  /// Impulse test matrix for the bouncing constraints
+  Eigen::MatrixXd mBouncingConstraintMatrix;
+
   /// This is the vector of the coefficients on the diagonal of the bounce
   /// matrix. These are 1+restitutionCoeff[i]
   Eigen::VectorXd mBounceDiagonals;
+
+  /// This is the vector of the coefficients sized for just the bounces.
+  Eigen::VectorXd mRestitutionDiagonals;
 
   /// This is just useful for testing the gradient computations
   Eigen::VectorXi mContactConstraintMappings;

@@ -81,7 +81,7 @@ void debugDofs(SkeletonPtr skel)
  * being locked along that axis, which (while correct) is too aggressive a
  * condition, and would break downstream computations.
  */
-bool verifyWorldClassicClampingConstraintMatrix(
+bool verifyClassicClampingConstraintMatrix(
     WorldPtr world, VectorXd proposedVelocities)
 {
   world->setVelocities(proposedVelocities);
@@ -163,7 +163,7 @@ bool verifyWorldClassicClampingConstraintMatrix(
  * This verifies the massed formulation by verifying its relationship to the
  * classic formulation.
  */
-bool verifyWorldMassedClampingConstraintMatrix(
+bool verifyMassedClampingConstraintMatrix(
     WorldPtr world, VectorXd proposedVelocities)
 {
   world->setVelocities(proposedVelocities);
@@ -190,7 +190,7 @@ bool verifyWorldMassedClampingConstraintMatrix(
  * This verifies the massed formulation by verifying its relationship to the
  * classic formulation.
  */
-bool verifyWorldMassedUpperBoundConstraintMatrix(
+bool verifyMassedUpperBoundConstraintMatrix(
     WorldPtr world, VectorXd proposedVelocities)
 {
   world->setVelocities(proposedVelocities);
@@ -217,7 +217,7 @@ bool verifyWorldMassedUpperBoundConstraintMatrix(
 /**
  * This tests that P_c is getting computed correctly.
  */
-bool verifyWorldClassicProjectionIntoClampsMatrix(
+bool verifyClassicProjectionIntoClampsMatrix(
     WorldPtr world, VectorXd proposedVelocities)
 {
   world->setVelocities(proposedVelocities);
@@ -300,7 +300,7 @@ bool verifyWorldClassicProjectionIntoClampsMatrix(
 /**
  * This tests that P_c is getting computed correctly.
  */
-bool verifyWorldMassedProjectionIntoClampsMatrix(
+bool verifyMassedProjectionIntoClampsMatrix(
     WorldPtr world, VectorXd proposedVelocities)
 {
   world->setVelocities(proposedVelocities);
@@ -344,8 +344,7 @@ bool verifyWorldMassedProjectionIntoClampsMatrix(
   return true;
 }
 
-bool verifyWorldClassicVelVelJacobian(
-    WorldPtr world, VectorXd proposedVelocities)
+bool verifyVelVelJacobian(WorldPtr world, VectorXd proposedVelocities)
 {
   world->setVelocities(proposedVelocities);
 
@@ -375,8 +374,7 @@ bool verifyWorldClassicVelVelJacobian(
   return true;
 }
 
-bool verifyWorldClassicForceVelJacobian(
-    WorldPtr world, VectorXd proposedVelocities)
+bool verifyForceVelJacobian(WorldPtr world, VectorXd proposedVelocities)
 {
   world->setVelocities(proposedVelocities);
   neural::BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
@@ -405,16 +403,77 @@ bool verifyWorldClassicForceVelJacobian(
   return true;
 }
 
-bool verifyWorldGradients(WorldPtr world, VectorXd worldVel)
+bool verifyVelGradients(WorldPtr world, VectorXd worldVel)
 {
   return (
-      verifyWorldClassicClampingConstraintMatrix(world, worldVel)
-      && verifyWorldMassedClampingConstraintMatrix(world, worldVel)
-      && verifyWorldMassedUpperBoundConstraintMatrix(world, worldVel)
-      && verifyWorldClassicProjectionIntoClampsMatrix(world, worldVel)
-      && verifyWorldMassedProjectionIntoClampsMatrix(world, worldVel)
-      && verifyWorldClassicVelVelJacobian(world, worldVel)
-      && verifyWorldClassicForceVelJacobian(world, worldVel));
+      verifyClassicClampingConstraintMatrix(world, worldVel)
+      && verifyMassedClampingConstraintMatrix(world, worldVel)
+      && verifyMassedUpperBoundConstraintMatrix(world, worldVel)
+      && verifyClassicProjectionIntoClampsMatrix(world, worldVel)
+      && verifyMassedProjectionIntoClampsMatrix(world, worldVel)
+      && verifyVelVelJacobian(world, worldVel)
+      && verifyForceVelJacobian(world, worldVel));
+}
+
+bool verifyPosPosJacobianApproximation(WorldPtr world, std::size_t subdivisions)
+{
+  neural::BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
+
+  if (!classicPtr)
+  {
+    std::cout << "verifyPosPosJacobianApproximation forwardPass returned a "
+                 "null BackpropSnapshotPtr!"
+              << std::endl;
+    return false;
+  }
+
+  MatrixXd analytical = classicPtr->getPosPosJacobian();
+  MatrixXd bruteForce
+      = classicPtr->finiteDifferencePosPosJacobian(subdivisions);
+
+  if (!equals(analytical, bruteForce, 1e-1))
+  {
+    std::cout << "Brute force pos-pos Jacobian: " << std::endl
+              << bruteForce << std::endl;
+    std::cout << "Analytical pos-pos Jacobian: " << std::endl
+              << analytical << std::endl;
+    return false;
+  }
+  return true;
+}
+
+bool verifyVelPosJacobianApproximation(WorldPtr world, std::size_t subdivisions)
+{
+  neural::BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
+
+  if (!classicPtr)
+  {
+    std::cout << "verifyVelPosJacobianApproximation forwardPass returned a "
+                 "null BackpropSnapshotPtr!"
+              << std::endl;
+    return false;
+  }
+
+  MatrixXd analytical = classicPtr->getVelPosJacobian();
+  MatrixXd bruteForce
+      = classicPtr->finiteDifferenceVelPosJacobian(subdivisions);
+
+  if (!equals(analytical, bruteForce, 1e-1))
+  {
+    std::cout << "Brute force vel-pos Jacobian: " << std::endl
+              << bruteForce << std::endl;
+    std::cout << "Analytical vel-pos Jacobian: " << std::endl
+              << analytical << std::endl;
+    return false;
+  }
+  return true;
+}
+
+bool verifyPosGradients(WorldPtr world, std::size_t subdivisions)
+{
+  return (
+      verifyPosPosJacobianApproximation(world, subdivisions)
+      && verifyVelPosJacobianApproximation(world, subdivisions));
 }
 
 // This test is ugly and difficult to interpret, but it broke our system early
@@ -627,9 +686,10 @@ void testBlockWithFrictionCoeff(double frictionCoeff, double mass)
 
   VectorXd worldVel = world->getVelocities();
   // Test the classic formulation
-  EXPECT_TRUE(verifyWorldGradients(world, worldVel));
+  EXPECT_TRUE(verifyVelGradients(world, worldVel));
 }
 
+/*
 TEST(GRADIENTS, BLOCK_ON_GROUND_NO_FRICTION_1_MASS)
 {
   testBlockWithFrictionCoeff(0, 1);
@@ -654,6 +714,7 @@ TEST(GRADIENTS, BLOCK_ON_GROUND_SLIPPING_FRICTION)
 {
   testBlockWithFrictionCoeff(0.5, 1);
 }
+*/
 
 /******************************************************************************
 
@@ -781,9 +842,10 @@ void testTwoBlocks(
   world->getConstraintSolver()->setGradientEnabled(true);
   world->getConstraintSolver()->solve();
 
-  EXPECT_TRUE(verifyWorldGradients(world, worldVel));
+  EXPECT_TRUE(verifyVelGradients(world, worldVel));
 }
 
+/*
 TEST(GRADIENTS, TWO_BLOCKS_1_1_MASS)
 {
   testTwoBlocks(1, 1, 0, 1, 1);
@@ -798,6 +860,7 @@ TEST(GRADIENTS, TWO_BLOCKS_3_5_MASS)
 {
   testTwoBlocks(2, 1, 0, 3, 5);
 }
+*/
 
 /******************************************************************************
 
@@ -885,13 +948,15 @@ void testBouncingBlockWithFrictionCoeff(double frictionCoeff, double mass)
   box->integrateVelocities(world->getTimeStep());
   VectorXd worldVel = world->getVelocities();
 
-  EXPECT_TRUE(verifyWorldGradients(world, worldVel));
+  EXPECT_TRUE(verifyVelGradients(world, worldVel));
 }
 
+/*
 TEST(GRADIENTS, BLOCK_BOUNCING_OFF_GROUND_NO_FRICTION_1_MASS)
 {
   testBouncingBlockWithFrictionCoeff(0, 1);
 }
+*/
 
 /******************************************************************************
 
@@ -999,10 +1064,103 @@ void testReversePendulumSledWithFrictionCoeff(double frictionCoeff)
   reversePendulumSled->integrateVelocities(world->getTimeStep());
   VectorXd worldVel = world->getVelocities();
 
-  EXPECT_TRUE(verifyWorldGradients(world, worldVel));
+  EXPECT_TRUE(verifyVelGradients(world, worldVel));
 }
 
+/*
 TEST(GRADIENTS, SLIDING_REVERSE_PENDULUM_NO_FRICTION)
 {
   testReversePendulumSledWithFrictionCoeff(0);
+}
+*/
+
+/******************************************************************************
+
+This test sets up a configuration that looks like this:
+
+      Large Velocity
+            |
+            v
+          +---+
+Force --> |   |
+          +---+
+              <-- some small air gap
+      -------------
+            ^
+       Fixed ground
+
+There's a box with two DOFs, x and y axis, with a force driving it into the
+ground. The ground and the block both have coefficients of restitution of 0.5.
+The ground has configurable friction in this setup.
+
+*/
+void testBouncingBlockPosGradients(double frictionCoeff, double mass)
+{
+  // World
+  WorldPtr world = World::create();
+
+  ///////////////////////////////////////////////
+  // Create the box
+  ///////////////////////////////////////////////
+
+  SkeletonPtr box = Skeleton::create("box");
+
+  std::pair<TranslationalJoint2D*, BodyNode*> pair
+      = box->createJointAndBodyNodePair<TranslationalJoint2D>(nullptr);
+  TranslationalJoint2D* boxJoint = pair.first;
+  BodyNode* boxBody = pair.second;
+
+  boxJoint->setXYPlane();
+  boxJoint->setTransformFromParentBodyNode(Eigen::Isometry3d::Identity());
+  boxJoint->setTransformFromChildBodyNode(Eigen::Isometry3d::Identity());
+
+  std::shared_ptr<BoxShape> boxShape(
+      new BoxShape(Eigen::Vector3d(1.0, 1.0, 1.0)));
+  boxBody->createShapeNodeWith<VisualAspect, CollisionAspect>(boxShape);
+  boxBody->setFrictionCoeff(frictionCoeff);
+
+  // Add a force driving the box to the left
+  boxBody->addExtForce(Eigen::Vector3d(1, -1, 0));
+  // Prevent the mass matrix from being Identity
+  boxBody->setMass(mass);
+  boxBody->setRestitutionCoeff(0.5);
+  // Set the 1th joint index to -1.0
+  box->setVelocity(1, -1);
+
+  world->addSkeleton(box);
+
+  ///////////////////////////////////////////////
+  // Create the floor
+  ///////////////////////////////////////////////
+
+  SkeletonPtr floor = Skeleton::create("floor");
+
+  std::pair<WeldJoint*, BodyNode*> floorPair
+      = floor->createJointAndBodyNodePair<WeldJoint>(nullptr);
+  WeldJoint* floorJoint = floorPair.first;
+  BodyNode* floorBody = floorPair.second;
+
+  Eigen::Isometry3d floorPosition = Eigen::Isometry3d::Identity();
+  floorPosition.translation() = Eigen::Vector3d(0, -1.0, 0);
+  floorJoint->setTransformFromParentBodyNode(floorPosition);
+  floorJoint->setTransformFromChildBodyNode(Eigen::Isometry3d::Identity());
+
+  std::shared_ptr<BoxShape> floorShape(
+      new BoxShape(Eigen::Vector3d(10.0, 1.0, 10.0)));
+  floorBody->createShapeNodeWith<VisualAspect, CollisionAspect>(floorShape);
+  floorBody->setFrictionCoeff(1);
+  floorBody->setRestitutionCoeff(1.0);
+
+  world->addSkeleton(floor);
+
+  ///////////////////////////////////////////////
+  // Run the tests
+  ///////////////////////////////////////////////
+
+  EXPECT_TRUE(verifyPosGradients(world, 100));
+}
+
+TEST(GRADIENTS, POS_BLOCK_BOUNCING_OFF_GROUND_NO_FRICTION_1_MASS)
+{
+  testBouncingBlockPosGradients(0, 1);
 }

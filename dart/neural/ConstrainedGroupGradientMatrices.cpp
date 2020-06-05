@@ -63,10 +63,13 @@ ConstrainedGroupGradientMatrices::~ConstrainedGroupGradientMatrices()
 void ConstrainedGroupGradientMatrices::registerConstraint(
     const std::shared_ptr<constraint::ConstraintBase>& constraint)
 {
-  std::vector<double> coeffs = constraint->getCoefficientOfRestitution();
-  for (double d : coeffs)
+  double coeff = constraint->getCoefficientOfRestitution();
+  mRestitutionCoeffs.push_back(coeff);
+  // Pad with 0s, since these values always apply to the first dimension of the
+  // constraint even if there are more (ex. friction) dimensions
+  for (std::size_t i = 1; i < constraint->getDimension(); i++)
   {
-    mRestitutionCoeffs.push_back(d);
+    mRestitutionCoeffs.push_back(0);
   }
 }
 
@@ -162,9 +165,11 @@ void ConstrainedGroupGradientMatrices::constructMatrices(
       = Eigen::VectorXi(mNumConstraintDim);
   int* clampingIndex = new int[mNumConstraintDim];
   int* upperBoundIndex = new int[mNumConstraintDim];
+  int* bouncingIndex = new int[mNumConstraintDim];
 
   int numClamping = 0;
   int numUpperBound = 0;
+  int numBouncing = 0;
   // Fill in mappings[] with the correct values, overwriting previous data
   for (std::size_t j = 0; j < mNumConstraintDim; j++)
   {
@@ -204,6 +209,11 @@ void ConstrainedGroupGradientMatrices::constructMatrices(
       contactConstraintMappings(j) = neural::ConstraintMapping::CLAMPING;
       clampingIndex[j] = numClamping;
       numClamping++;
+      if (mRestitutionCoeffs[j] > 0)
+      {
+        bouncingIndex[j] = numBouncing;
+        numBouncing++;
+      }
     }
     // Otherwise, if fIndex != -1, "j" is in "Upper Bound"
     // Note, this could also mean "j" is at it's lower bound, but we call the
@@ -241,6 +251,8 @@ void ConstrainedGroupGradientMatrices::constructMatrices(
       = Eigen::MatrixXd::Zero(mNumDOFs, numUpperBound);
   mUpperBoundMappingMatrix = Eigen::MatrixXd::Zero(numUpperBound, numClamping);
   mBounceDiagonals = Eigen::VectorXd(numClamping);
+  mBouncingConstraintMatrix = Eigen::MatrixXd::Zero(mNumDOFs, numBouncing);
+  mRestitutionDiagonals = Eigen::VectorXd(numBouncing);
 
   // Copy impulse tests into the matrices
   for (size_t j = 0; j < mNumConstraintDim; j++)
@@ -252,6 +264,11 @@ void ConstrainedGroupGradientMatrices::constructMatrices(
       mMassedClampingConstraintMatrix.col(clampingIndex[j])
           = mMassedImpulseTests[j];
       mBounceDiagonals(clampingIndex[j]) = 1 + mRestitutionCoeffs[j];
+      if (mRestitutionCoeffs[j] > 0)
+      {
+        mBouncingConstraintMatrix.col(bouncingIndex[j]) = mImpulseTests[j];
+        mRestitutionDiagonals(bouncingIndex[j]) = mRestitutionCoeffs[j];
+      }
     }
     else if (contactConstraintMappings(j) >= 0) // means we're an UPPER_BOUND
     {
@@ -339,6 +356,12 @@ ConstrainedGroupGradientMatrices::getUpperBoundMappingMatrix() const
   return mUpperBoundMappingMatrix;
 }
 
+const Eigen::MatrixXd&
+ConstrainedGroupGradientMatrices::getBouncingConstraintMatrix() const
+{
+  return mBouncingConstraintMatrix;
+}
+
 /// These was the mX() vector used to construct this. Pretty much only here
 /// for testing.
 const Eigen::VectorXd&
@@ -351,6 +374,12 @@ const Eigen::VectorXd& ConstrainedGroupGradientMatrices::getBounceDiagonals()
     const
 {
   return mBounceDiagonals;
+}
+
+const Eigen::VectorXd&
+ConstrainedGroupGradientMatrices::getRestitutionDiagonals() const
+{
+  return mRestitutionDiagonals;
 }
 
 /// These was the fIndex() vector used to construct this. Pretty much only

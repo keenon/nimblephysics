@@ -34,6 +34,16 @@ public:
   /// is here if you want access to the full Jacobian for some reason.
   Eigen::MatrixXd getForceVelJacobian();
 
+  /// This computes and returns the whole pos-pos jacobian. For backprop, you
+  /// don't actually need this matrix, you can compute backprop directly. This
+  /// is here if you want access to the full Jacobian for some reason.
+  Eigen::MatrixXd getPosPosJacobian();
+
+  /// This computes and returns the whole vel-pos jacobian. For backprop, you
+  /// don't actually need this matrix, you can compute backprop directly. This
+  /// is here if you want access to the full Jacobian for some reason.
+  Eigen::MatrixXd getVelPosJacobian();
+
   /// Returns a concatenated vector of all the Skeletons' position()'s in the
   /// World, in order in which the Skeletons appear in the World's
   /// getSkeleton(i) returns them.
@@ -72,6 +82,10 @@ public:
   /// just here to enable testing.
   Eigen::MatrixXd getUpperBoundMappingMatrix();
 
+  /// This returns the B matrix. You shouldn't ever need this matrix, it's
+  /// just here to enable testing.
+  Eigen::MatrixXd getBouncingConstraintMatrix();
+
   /// This returns the mass matrix for the whole world, a block diagonal
   /// concatenation of the skeleton mass matrices.
   Eigen::MatrixXd getMassMatrix();
@@ -88,6 +102,14 @@ public:
   /// differences. This is SUPER SLOW, and is only here for testing.
   Eigen::MatrixXd finiteDifferenceForceVelJacobian();
 
+  /// This computes and returns the whole vel-vel jacobian by finite
+  /// differences. This is SUPER SUPER SLOW, and is only here for testing.
+  Eigen::MatrixXd finiteDifferencePosPosJacobian(std::size_t subdivisions = 20);
+
+  /// This computes and returns the whole force-vel jacobian by finite
+  /// differences. This is SUPER SUPER SLOW, and is only here for testing.
+  Eigen::MatrixXd finiteDifferenceVelPosJacobian(std::size_t subdivisions = 20);
+
   /// This returns the P_c matrix. You shouldn't ever need this matrix, it's
   /// just here to enable testing.
   Eigen::MatrixXd getProjectionIntoClampsMatrix();
@@ -103,6 +125,10 @@ public:
   /// Returns the vector of the coefficients on the diagonal of the bounce
   /// matrix. These are 1+restitutionCoeff[i].
   Eigen::VectorXd getBounceDiagonals();
+
+  /// Returns the vector of the restitution coeffs, sized for the number of
+  /// bouncing collisions.
+  Eigen::VectorXd getRestitutionDiagonals();
 
   ~BackpropSnapshot();
 
@@ -125,6 +151,15 @@ protected:
   /// This is the number of total dimensions on all the constraints active in
   /// the world
   std::size_t mNumConstraintDim;
+
+  /// This is the number of total constraint dimensions that are clamping
+  std::size_t mNumClamping;
+
+  /// This is the number of total constraint dimensions that are upper bounded
+  std::size_t mNumUpperBound;
+
+  /// This is the number of total constraint dimensions that are upper bounded
+  std::size_t mNumBouncing;
 
   /// These are the offsets into the total degrees of freedom for each skeleton
   std::unordered_map<std::string, std::size_t> mSkeletonOffset;
@@ -149,7 +184,8 @@ private:
     CLAMPING,
     MASSED_CLAMPING,
     UPPER_BOUND,
-    MASSED_UPPER_BOUND
+    MASSED_UPPER_BOUND,
+    BOUNCING
   };
 
   Eigen::MatrixXd assembleMatrix(MatrixToAssemble whichMatrix);
