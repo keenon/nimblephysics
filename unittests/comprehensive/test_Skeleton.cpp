@@ -31,16 +31,18 @@
  */
 
 #include <iostream>
+
 #include <gtest/gtest.h>
-#include "TestHelpers.hpp"
 
 #include "dart/common/sub_ptr.hpp"
-#include "dart/math/Geometry.hpp"
-#include "dart/utils/SkelParser.hpp"
 #include "dart/dynamics/BodyNode.hpp"
 #include "dart/dynamics/RevoluteJoint.hpp"
 #include "dart/dynamics/Skeleton.hpp"
+#include "dart/math/Geometry.hpp"
 #include "dart/simulation/World.hpp"
+#include "dart/utils/SkelParser.hpp"
+
+#include "TestHelpers.hpp"
 
 using namespace dart;
 using namespace math;
@@ -52,19 +54,25 @@ std::vector<common::Uri> getFileList()
   std::vector<common::Uri> fileList;
   fileList.push_back("dart://sample/skel/test/chainwhipa.skel");
   fileList.push_back("dart://sample/skel/test/single_pendulum.skel");
-  fileList.push_back("dart://sample/skel/test/single_pendulum_euler_joint.skel");
+  fileList.push_back(
+      "dart://sample/skel/test/single_pendulum_euler_joint.skel");
   fileList.push_back("dart://sample/skel/test/single_pendulum_ball_joint.skel");
   fileList.push_back("dart://sample/skel/test/double_pendulum.skel");
-  fileList.push_back("dart://sample/skel/test/double_pendulum_euler_joint.skel");
+  fileList.push_back(
+      "dart://sample/skel/test/double_pendulum_euler_joint.skel");
   fileList.push_back("dart://sample/skel/test/double_pendulum_ball_joint.skel");
-  fileList.push_back("dart://sample/skel/test/serial_chain_revolute_joint.skel");
-  fileList.push_back("dart://sample/skel/test/serial_chain_eulerxyz_joint.skel");
+  fileList.push_back(
+      "dart://sample/skel/test/serial_chain_revolute_joint.skel");
+  fileList.push_back(
+      "dart://sample/skel/test/serial_chain_eulerxyz_joint.skel");
   fileList.push_back("dart://sample/skel/test/serial_chain_ball_joint.skel");
   fileList.push_back("dart://sample/skel/test/serial_chain_ball_joint_20.skel");
   fileList.push_back("dart://sample/skel/test/serial_chain_ball_joint_40.skel");
   fileList.push_back("dart://sample/skel/test/simple_tree_structure.skel");
-  fileList.push_back("dart://sample/skel/test/simple_tree_structure_euler_joint.skel");
-  fileList.push_back("dart://sample/skel/test/simple_tree_structure_ball_joint.skel");
+  fileList.push_back(
+      "dart://sample/skel/test/simple_tree_structure_euler_joint.skel");
+  fileList.push_back(
+      "dart://sample/skel/test/simple_tree_structure_ball_joint.skel");
   fileList.push_back("dart://sample/skel/test/tree_structure.skel");
   fileList.push_back("dart://sample/skel/test/tree_structure_euler_joint.skel");
   fileList.push_back("dart://sample/skel/test/tree_structure_ball_joint.skel");
@@ -78,14 +86,14 @@ std::vector<SkeletonPtr> getSkeletons()
   const auto fileList = getFileList();
 
   std::vector<WorldPtr> worlds;
-  for(std::size_t i=0; i<fileList.size(); ++i)
+  for (std::size_t i = 0; i < fileList.size(); ++i)
     worlds.push_back(utils::SkelParser::readWorld(fileList[i]));
 
   std::vector<SkeletonPtr> skeletons;
-  for(std::size_t i=0; i<worlds.size(); ++i)
+  for (std::size_t i = 0; i < worlds.size(); ++i)
   {
     WorldPtr world = worlds[i];
-    for(std::size_t j=0; j<world->getNumSkeletons(); ++j)
+    for (std::size_t j = 0; j < world->getNumSkeletons(); ++j)
       skeletons.push_back(world->getSkeleton(j));
   }
 
@@ -95,7 +103,7 @@ std::vector<SkeletonPtr> getSkeletons()
 void constructSubtree(std::vector<BodyNode*>& _tree, BodyNode* bn)
 {
   _tree.push_back(bn);
-  for(std::size_t i=0; i<bn->getNumChildBodyNodes(); ++i)
+  for (std::size_t i = 0; i < bn->getNumChildBodyNodes(); ++i)
     constructSubtree(_tree, bn->getChildBodyNode(i));
 }
 
@@ -106,47 +114,50 @@ TEST(Skeleton, Restructuring)
 #ifndef NDEBUG
   std::size_t numIterations = 10;
 #else
-  std::size_t numIterations = 2*skeletons.size();
+  std::size_t numIterations = 2 * skeletons.size();
 #endif
 
-  for(const auto& skeleton : skeletons)
+  for (const auto& skeleton : skeletons)
     EXPECT_TRUE(skeleton->checkIndexingConsistency());
 
   // Test moves within the current Skeleton
-  for(std::size_t i=0; i<numIterations; ++i)
+  for (std::size_t i = 0; i < numIterations; ++i)
   {
-    std::size_t index = math::Random::uniform<std::size_t>(0, skeletons.size() - 1);
-    index = std::min(index, skeletons.size()-1);
+    std::size_t index
+        = math::Random::uniform<std::size_t>(0, skeletons.size() - 1);
+    index = std::min(index, skeletons.size() - 1);
     SkeletonPtr skeleton = skeletons[index];
     EXPECT_TRUE(skeleton->checkIndexingConsistency());
     SkeletonPtr original = skeleton->cloneSkeleton();
     EXPECT_TRUE(original->checkIndexingConsistency());
 
-    std::size_t maxNode = skeleton->getNumBodyNodes()-1;
-    BodyNode* bn1 = skeleton->getBodyNode(math::Random::uniform<std::size_t>(0, maxNode));
-    BodyNode* bn2 = skeleton->getBodyNode(math::Random::uniform<std::size_t>(0, maxNode));
+    std::size_t maxNode = skeleton->getNumBodyNodes() - 1;
+    BodyNode* bn1
+        = skeleton->getBodyNode(math::Random::uniform<std::size_t>(0, maxNode));
+    BodyNode* bn2
+        = skeleton->getBodyNode(math::Random::uniform<std::size_t>(0, maxNode));
 
-    if(bn1 == bn2)
+    if (bn1 == bn2)
     {
       --i;
       continue;
     }
 
-    BodyNode* child = bn1->descendsFrom(bn2)? bn1 : bn2;
-    BodyNode* parent = child == bn1? bn2 : bn1;
+    BodyNode* child = bn1->descendsFrom(bn2) ? bn1 : bn2;
+    BodyNode* parent = child == bn1 ? bn2 : bn1;
 
     child->moveTo(parent);
 
     EXPECT_TRUE(skeleton->getNumBodyNodes() == original->getNumBodyNodes());
-    if(skeleton->getNumBodyNodes() == original->getNumBodyNodes())
+    if (skeleton->getNumBodyNodes() == original->getNumBodyNodes())
     {
-      for(std::size_t j=0; j<skeleton->getNumBodyNodes(); ++j)
+      for (std::size_t j = 0; j < skeleton->getNumBodyNodes(); ++j)
       {
         // Make sure no BodyNodes have been lost or gained in translation
         std::string name = original->getBodyNode(j)->getName();
         BodyNode* bn = skeleton->getBodyNode(name);
         EXPECT_FALSE(bn == nullptr);
-        if(bn)
+        if (bn)
         {
           EXPECT_TRUE(bn->getName() == name);
         }
@@ -154,7 +165,7 @@ TEST(Skeleton, Restructuring)
         name = skeleton->getBodyNode(j)->getName();
         bn = original->getBodyNode(name);
         EXPECT_FALSE(bn == nullptr);
-        if(bn)
+        if (bn)
         {
           EXPECT_TRUE(bn->getName() == name);
         }
@@ -163,7 +174,7 @@ TEST(Skeleton, Restructuring)
         name = original->getJoint(j)->getName();
         Joint* joint = skeleton->getJoint(name);
         EXPECT_FALSE(joint == nullptr);
-        if(joint)
+        if (joint)
         {
           EXPECT_TRUE(joint->getName() == name);
         }
@@ -171,7 +182,7 @@ TEST(Skeleton, Restructuring)
         name = skeleton->getJoint(j)->getName();
         joint = original->getJoint(name);
         EXPECT_FALSE(joint == nullptr);
-        if(joint)
+        if (joint)
         {
           EXPECT_TRUE(joint->getName() == name);
         }
@@ -179,12 +190,12 @@ TEST(Skeleton, Restructuring)
     }
 
     EXPECT_TRUE(skeleton->getNumDofs() == original->getNumDofs());
-    for(std::size_t j=0; j<skeleton->getNumDofs(); ++j)
+    for (std::size_t j = 0; j < skeleton->getNumDofs(); ++j)
     {
       std::string name = original->getDof(j)->getName();
       DegreeOfFreedom* dof = skeleton->getDof(name);
       EXPECT_FALSE(dof == nullptr);
-      if(dof)
+      if (dof)
       {
         EXPECT_TRUE(dof->getName() == name);
       }
@@ -192,7 +203,7 @@ TEST(Skeleton, Restructuring)
       name = skeleton->getDof(j)->getName();
       dof = original->getDof(name);
       EXPECT_FALSE(dof == nullptr);
-      if(dof)
+      if (dof)
       {
         EXPECT_TRUE(dof->getName() == name);
       }
@@ -200,42 +211,44 @@ TEST(Skeleton, Restructuring)
   }
 
   // Test moves between Skeletons
-  for(std::size_t i=0; i<numIterations; ++i)
+  for (std::size_t i = 0; i < numIterations; ++i)
   {
-    std::size_t fromIndex = math::Random::uniform<std::size_t>(0, skeletons.size()-1);
-    fromIndex = std::min(fromIndex, skeletons.size()-1);
+    std::size_t fromIndex
+        = math::Random::uniform<std::size_t>(0, skeletons.size() - 1);
+    fromIndex = std::min(fromIndex, skeletons.size() - 1);
     SkeletonPtr fromSkel = skeletons[fromIndex];
 
-    if(fromSkel->getNumBodyNodes() == 0)
+    if (fromSkel->getNumBodyNodes() == 0)
     {
       --i;
       continue;
     }
 
-    std::size_t toIndex = math::Random::uniform<std::size_t>(0, skeletons.size()-1);
-    toIndex = std::min(toIndex, skeletons.size()-1);
+    std::size_t toIndex
+        = math::Random::uniform<std::size_t>(0, skeletons.size() - 1);
+    toIndex = std::min(toIndex, skeletons.size() - 1);
     SkeletonPtr toSkel = skeletons[toIndex];
 
-    if(toSkel->getNumBodyNodes() == 0)
+    if (toSkel->getNumBodyNodes() == 0)
     {
       --i;
       continue;
     }
 
     BodyNode* childBn = fromSkel->getBodyNode(
-          math::Random::uniform<std::size_t>(0, fromSkel->getNumBodyNodes()-1));
+        math::Random::uniform<std::size_t>(0, fromSkel->getNumBodyNodes() - 1));
     BodyNode* parentBn = toSkel->getBodyNode(
-          math::Random::uniform<std::size_t>(0, toSkel->getNumBodyNodes()-1));
+        math::Random::uniform<std::size_t>(0, toSkel->getNumBodyNodes() - 1));
 
-    if(fromSkel == toSkel)
+    if (fromSkel == toSkel)
     {
-      if(childBn == parentBn)
+      if (childBn == parentBn)
       {
         --i;
         continue;
       }
 
-      if(parentBn->descendsFrom(childBn))
+      if (parentBn->descendsFrom(childBn))
       {
         BodyNode* tempBn = childBn;
         childBn = parentBn;
@@ -257,7 +270,7 @@ TEST(Skeleton, Restructuring)
     EXPECT_TRUE(parentBn->getSkeleton()->checkIndexingConsistency());
 
     // Make sure all the objects have moved
-    for(std::size_t j=0; j<subtree.size(); ++j)
+    for (std::size_t j = 0; j < subtree.size(); ++j)
     {
       BodyNode* bn = subtree[j];
       EXPECT_TRUE(bn->getSkeleton() == toSkel);
@@ -274,7 +287,7 @@ TEST(Skeleton, Restructuring)
     EXPECT_TRUE(childBn->getParentBodyNode() == nullptr);
 
     // The subtree should still be in the same Skeleton
-    for(std::size_t j=0; j<subtree.size(); ++j)
+    for (std::size_t j = 0; j < subtree.size(); ++j)
     {
       BodyNode* bn = subtree[j];
       EXPECT_TRUE(bn->getSkeleton() == toSkel);
@@ -285,31 +298,31 @@ TEST(Skeleton, Restructuring)
     childBn->copyTo<RevoluteJoint>(fromSkel, originalParent);
 
     SkeletonPtr temporary = childBn->split("temporary");
-    SkeletonPtr other_temporary =
-        childBn->split<PrismaticJoint>("other temporary");
+    SkeletonPtr other_temporary
+        = childBn->split<PrismaticJoint>("other temporary");
     SkeletonPtr another_temporary = childBn->copyAs("another temporary");
     SkeletonPtr last_temporary = childBn->copyAs<ScrewJoint>("last temporary");
 
     childBn->copyTo(another_temporary->getBodyNode(
-                      another_temporary->getNumBodyNodes()-1));
+        another_temporary->getNumBodyNodes() - 1));
     childBn->copyTo<PlanarJoint>(another_temporary->getBodyNode(0));
     childBn->copyTo<TranslationalJoint>(temporary, nullptr);
-    childBn->moveTo(last_temporary,
-        last_temporary->getBodyNode(last_temporary->getNumBodyNodes()-1));
+    childBn->moveTo(
+        last_temporary,
+        last_temporary->getBodyNode(last_temporary->getNumBodyNodes() - 1));
     childBn->moveTo<BallJoint>(last_temporary, nullptr);
-    childBn->moveTo<EulerJoint>(last_temporary,
-                                last_temporary->getBodyNode(0));
+    childBn->moveTo<EulerJoint>(last_temporary, last_temporary->getBodyNode(0));
     childBn->changeParentJointType<FreeJoint>();
 
     // Test the non-recursive copying
-    if(toSkel->getNumBodyNodes() > 1)
+    if (toSkel->getNumBodyNodes() > 1)
     {
-      SkeletonPtr singleBodyNode =
-          toSkel->getBodyNode(0)->copyAs("single", false);
+      SkeletonPtr singleBodyNode
+          = toSkel->getBodyNode(0)->copyAs("single", false);
       EXPECT_TRUE(singleBodyNode->getNumBodyNodes() == 1);
 
-      std::pair<Joint*, BodyNode*> singlePair =
-          toSkel->getBodyNode(0)->copyTo(nullptr, false);
+      std::pair<Joint*, BodyNode*> singlePair
+          = toSkel->getBodyNode(0)->copyTo(nullptr, false);
       EXPECT_TRUE(singlePair.second->getNumChildBodyNodes() == 0);
     }
 
@@ -334,9 +347,12 @@ TEST(Skeleton, Persistence)
     {
       {
         SkeletonPtr skeleton = createThreeLinkRobot(
-              Eigen::Vector3d(1.0, 1.0, 1.0), DOF_X,
-              Eigen::Vector3d(1.0, 1.0, 1.0), DOF_Y,
-              Eigen::Vector3d(1.0, 1.0, 1.0), DOF_Z);
+            Eigen::Vector3d(1.0, 1.0, 1.0),
+            DOF_X,
+            Eigen::Vector3d(1.0, 1.0, 1.0),
+            DOF_Y,
+            Eigen::Vector3d(1.0, 1.0, 1.0),
+            DOF_Z);
         weakSkelPtr = skeleton;
 
         // Test usability of the BodyNodePtr
@@ -344,30 +360,31 @@ TEST(Skeleton, Persistence)
         weakBnPtr = strongPtr;
         ConstBodyNodePtr constPtr = strongPtr;
 
-        EXPECT_FALSE( strongPtr == nullptr );
-        EXPECT_FALSE( nullptr == strongPtr );
+        EXPECT_FALSE(strongPtr == nullptr);
+        EXPECT_FALSE(nullptr == strongPtr);
 
-        EXPECT_TRUE( strongPtr == skeleton->getBodyNode(0) );
-        EXPECT_TRUE( skeleton->getBodyNode(0) == strongPtr );
-        EXPECT_TRUE( constPtr == strongPtr );
-        EXPECT_TRUE( weakBnPtr.lock() == strongPtr );
+        EXPECT_TRUE(strongPtr == skeleton->getBodyNode(0));
+        EXPECT_TRUE(skeleton->getBodyNode(0) == strongPtr);
+        EXPECT_TRUE(constPtr == strongPtr);
+        EXPECT_TRUE(weakBnPtr.lock() == strongPtr);
 
-        EXPECT_FALSE( strongPtr < constPtr );
-        EXPECT_FALSE( strongPtr < skeleton->getBodyNode(0) );
-        EXPECT_FALSE( strongPtr < weakBnPtr.lock() );
-        EXPECT_FALSE( skeleton->getBodyNode(0) < strongPtr );
-        EXPECT_FALSE( weakBnPtr.lock() < strongPtr);
+        EXPECT_FALSE(strongPtr < constPtr);
+        EXPECT_FALSE(strongPtr < skeleton->getBodyNode(0));
+        EXPECT_FALSE(strongPtr < weakBnPtr.lock());
+        EXPECT_FALSE(skeleton->getBodyNode(0) < strongPtr);
+        EXPECT_FALSE(weakBnPtr.lock() < strongPtr);
 
-        EXPECT_FALSE( strongPtr > constPtr );
-        EXPECT_FALSE( strongPtr > skeleton->getBodyNode(0) );
-        EXPECT_FALSE( strongPtr > weakBnPtr.lock() );
-        EXPECT_FALSE( skeleton->getBodyNode(0) > strongPtr );
-        EXPECT_FALSE( weakBnPtr.lock() > strongPtr );
+        EXPECT_FALSE(strongPtr > constPtr);
+        EXPECT_FALSE(strongPtr > skeleton->getBodyNode(0));
+        EXPECT_FALSE(strongPtr > weakBnPtr.lock());
+        EXPECT_FALSE(skeleton->getBodyNode(0) > strongPtr);
+        EXPECT_FALSE(weakBnPtr.lock() > strongPtr);
 
-        BodyNodePtr tail = skeleton->getBodyNode(skeleton->getNumBodyNodes()-1);
-        std::pair<Joint*, SoftBodyNode*> pair =
-            skeleton->createJointAndBodyNodePair<RevoluteJoint, SoftBodyNode>(
-              tail);
+        BodyNodePtr tail
+            = skeleton->getBodyNode(skeleton->getNumBodyNodes() - 1);
+        std::pair<Joint*, SoftBodyNode*> pair
+            = skeleton->createJointAndBodyNodePair<RevoluteJoint, SoftBodyNode>(
+                tail);
 
         softBnPtr = pair.second;
         weakSoftBnPtr = softBnPtr;
@@ -380,37 +397,37 @@ TEST(Skeleton, Persistence)
         WeakConstDegreeOfFreedomPtr const_weakdof = weakdof;
         const_weakdof = const_dof;
 
-        EXPECT_TRUE( dof == skeleton->getDof(1) );
-        EXPECT_TRUE( dof == const_dof );
-        EXPECT_TRUE( weakdof.lock() == const_weakdof.lock() );
-        EXPECT_TRUE( const_weakdof.lock() == skeleton->getDof(1) );
-        EXPECT_TRUE( skeleton->getDof(1) == const_weakdof.lock() );
+        EXPECT_TRUE(dof == skeleton->getDof(1));
+        EXPECT_TRUE(dof == const_dof);
+        EXPECT_TRUE(weakdof.lock() == const_weakdof.lock());
+        EXPECT_TRUE(const_weakdof.lock() == skeleton->getDof(1));
+        EXPECT_TRUE(skeleton->getDof(1) == const_weakdof.lock());
 
-        EXPECT_FALSE( dof < const_dof );
-        EXPECT_FALSE( dof < skeleton->getDof(1) );
-        EXPECT_FALSE( dof < weakdof.lock() );
-        EXPECT_FALSE( skeleton->getDof(1) < dof );
-        EXPECT_FALSE( weakdof.lock() < dof );
+        EXPECT_FALSE(dof < const_dof);
+        EXPECT_FALSE(dof < skeleton->getDof(1));
+        EXPECT_FALSE(dof < weakdof.lock());
+        EXPECT_FALSE(skeleton->getDof(1) < dof);
+        EXPECT_FALSE(weakdof.lock() < dof);
 
-        EXPECT_FALSE( dof > const_dof );
-        EXPECT_FALSE( dof > skeleton->getDof(1) );
-        EXPECT_FALSE( dof > weakdof.lock() );
-        EXPECT_FALSE( skeleton->getDof(1) > dof );
-        EXPECT_FALSE( weakdof.lock() > dof );
+        EXPECT_FALSE(dof > const_dof);
+        EXPECT_FALSE(dof > skeleton->getDof(1));
+        EXPECT_FALSE(dof > weakdof.lock());
+        EXPECT_FALSE(skeleton->getDof(1) > dof);
+        EXPECT_FALSE(weakdof.lock() > dof);
 
         dof = nullptr;
         weakdof = nullptr;
         const_dof = nullptr;
         const_weakdof = nullptr;
 
-        EXPECT_TRUE( dof == nullptr );
-        EXPECT_TRUE( nullptr == dof );
-        EXPECT_TRUE( weakdof.lock() == nullptr );
-        EXPECT_TRUE( nullptr == weakdof.lock() );
-        EXPECT_TRUE( const_dof == nullptr );
-        EXPECT_TRUE( const_weakdof.lock() == nullptr );
+        EXPECT_TRUE(dof == nullptr);
+        EXPECT_TRUE(nullptr == dof);
+        EXPECT_TRUE(weakdof.lock() == nullptr);
+        EXPECT_TRUE(nullptr == weakdof.lock());
+        EXPECT_TRUE(const_dof == nullptr);
+        EXPECT_TRUE(const_weakdof.lock() == nullptr);
 
-        EXPECT_FALSE( dof < const_dof );
+        EXPECT_FALSE(dof < const_dof);
 
         // Test usability of the JointPtr
         JointPtr joint = skeleton->getJoint(1);
@@ -418,32 +435,32 @@ TEST(Skeleton, Persistence)
         ConstJointPtr const_joint = joint;
         WeakConstJointPtr const_weakjoint = const_joint;
 
-        EXPECT_TRUE( joint == skeleton->getJoint(1) );
-        EXPECT_TRUE( joint == const_joint );
-        EXPECT_TRUE( weakjoint.lock() == const_weakjoint.lock() );
-        EXPECT_TRUE( const_weakjoint.lock() == skeleton->getJoint(1) );
+        EXPECT_TRUE(joint == skeleton->getJoint(1));
+        EXPECT_TRUE(joint == const_joint);
+        EXPECT_TRUE(weakjoint.lock() == const_weakjoint.lock());
+        EXPECT_TRUE(const_weakjoint.lock() == skeleton->getJoint(1));
 
-        EXPECT_FALSE( joint < const_joint );
-        EXPECT_FALSE( joint < skeleton->getJoint(1) );
-        EXPECT_FALSE( joint < weakjoint.lock() );
-        EXPECT_FALSE( skeleton->getJoint(1) < joint );
-        EXPECT_FALSE( weakjoint.lock() < joint );
+        EXPECT_FALSE(joint < const_joint);
+        EXPECT_FALSE(joint < skeleton->getJoint(1));
+        EXPECT_FALSE(joint < weakjoint.lock());
+        EXPECT_FALSE(skeleton->getJoint(1) < joint);
+        EXPECT_FALSE(weakjoint.lock() < joint);
 
-        EXPECT_FALSE( joint > const_joint );
-        EXPECT_FALSE( joint > skeleton->getJoint(1) );
-        EXPECT_FALSE( joint > weakjoint.lock() );
-        EXPECT_FALSE( skeleton->getJoint(1) > joint );
-        EXPECT_FALSE( weakjoint.lock() > joint );
+        EXPECT_FALSE(joint > const_joint);
+        EXPECT_FALSE(joint > skeleton->getJoint(1));
+        EXPECT_FALSE(joint > weakjoint.lock());
+        EXPECT_FALSE(skeleton->getJoint(1) > joint);
+        EXPECT_FALSE(weakjoint.lock() > joint);
 
         joint = nullptr;
         weakjoint = nullptr;
         const_joint = nullptr;
         const_weakjoint = nullptr;
 
-        EXPECT_TRUE( joint == nullptr );
-        EXPECT_TRUE( weakjoint.lock() == nullptr );
-        EXPECT_TRUE( const_joint == nullptr );
-        EXPECT_TRUE( const_weakjoint.lock() == nullptr );
+        EXPECT_TRUE(joint == nullptr);
+        EXPECT_TRUE(weakjoint.lock() == nullptr);
+        EXPECT_TRUE(const_joint == nullptr);
+        EXPECT_TRUE(const_weakjoint.lock() == nullptr);
       }
 
       // The BodyNode should still be alive, because a BodyNodePtr still
@@ -479,11 +496,14 @@ TEST(Skeleton, Persistence)
     }
 
     SkeletonPtr other_skeleton = createThreeLinkRobot(
-          Eigen::Vector3d(1.0, 1.0, 1.0), DOF_X,
-          Eigen::Vector3d(1.0, 1.0, 1.0), DOF_Y,
-          Eigen::Vector3d(1.0, 1.0, 1.0), DOF_Z);
-    BodyNode* tail = other_skeleton->getBodyNode(
-          other_skeleton->getNumBodyNodes()-1);
+        Eigen::Vector3d(1.0, 1.0, 1.0),
+        DOF_X,
+        Eigen::Vector3d(1.0, 1.0, 1.0),
+        DOF_Y,
+        Eigen::Vector3d(1.0, 1.0, 1.0),
+        DOF_Z);
+    BodyNode* tail
+        = other_skeleton->getBodyNode(other_skeleton->getNumBodyNodes() - 1);
 
     WeakConstBodyNodePtr weakParentPtr;
     {
@@ -551,9 +571,9 @@ class GenericNode final : public dart::dynamics::Node,
                           public AccessoryNode<GenericNode>
 {
 public:
-
-  GenericNode(BodyNode* bn, const std::string& name)
-    : Node(bn), mName(name) { }
+  GenericNode(BodyNode* bn, const std::string& name) : Node(bn), mName(name)
+  {
+  }
 
   const std::string& setName(const std::string& newName) override
   {
@@ -567,7 +587,6 @@ public:
   }
 
 protected:
-
   Node* cloneNode(BodyNode* bn) const override
   {
     return new GenericNode(bn, mName);
@@ -593,7 +612,7 @@ TEST(Skeleton, NodePersistence)
 
     EXPECT_EQ(skel->getEndEffector("manip"), manip);
     EXPECT_EQ(skel->getEndEffector(0), manip);
-//    EXPECT_EQ(skel->getBodyNode(0)->getEndEffector(0), manip);
+    //    EXPECT_EQ(skel->getBodyNode(0)->getEndEffector(0), manip);
 
     WeakEndEffectorPtr weakManip = manip;
 
@@ -605,7 +624,7 @@ TEST(Skeleton, NodePersistence)
     // should be gone from the Skeleton
     EXPECT_EQ(skel->getEndEffector("manip"), nullptr);
     EXPECT_EQ(skel->getNumEndEffectors(), 0u);
-//    EXPECT_EQ(skel->getBodyNode(0)->getNumEndEffectors(), 0u);
+    //    EXPECT_EQ(skel->getBodyNode(0)->getNumEndEffectors(), 0u);
 
     EXPECT_EQ(weakManip.lock(), nullptr);
   }
@@ -615,7 +634,7 @@ TEST(Skeleton, NodePersistence)
 
     EXPECT_EQ(skel->getEndEffector("manip"), manip);
     EXPECT_EQ(skel->getEndEffector(0), manip);
-//    EXPECT_EQ(skel->getBodyNode(0)->getEndEffector(0), manip);
+    //    EXPECT_EQ(skel->getBodyNode(0)->getEndEffector(0), manip);
 
     EndEffectorPtr strongManip = manip;
     WeakEndEffectorPtr weakManip = strongManip;
@@ -632,15 +651,15 @@ TEST(Skeleton, NodePersistence)
 
     EXPECT_NE(skel->getEndEffector(0), manip);
     EXPECT_EQ(skel->getEndEffector(0), nullptr);
-#endif        // Release Mode
+#endif // Release Mode
 
 #ifdef NDEBUG // Release Mode
-    // But it will not remain in the BodyNode's indexing.
+              // But it will not remain in the BodyNode's indexing.
     // Note: We should only run this test in release mode, because otherwise it
     // will trigger an assertion.
 //    EXPECT_NE(skel->getBodyNode(0)->getEndEffector(0), manip);
 //    EXPECT_EQ(skel->getBodyNode(0)->getEndEffector(0), nullptr);
-#endif        // Release Mode
+#endif // Release Mode
 
     EXPECT_NE(weakManip.lock(), nullptr);
 
@@ -650,7 +669,7 @@ TEST(Skeleton, NodePersistence)
     // longer, so it should be gone from the Skeleton
     EXPECT_EQ(skel->getEndEffector("manip"), nullptr);
     EXPECT_EQ(skel->getNumEndEffectors(), 0u);
-//    EXPECT_EQ(skel->getBodyNode(0)->getNumEndEffectors(), 0u);
+    //    EXPECT_EQ(skel->getBodyNode(0)->getNumEndEffectors(), 0u);
 
     EXPECT_EQ(weakManip.lock(), nullptr);
   }
@@ -661,8 +680,7 @@ TEST(Skeleton, NodePersistence)
   // Testing GenericNode, which is NOT a specialized Node type
   //--------------------------------------------------------------------------
   {
-    GenericNode* node =
-        skel->getBodyNode(0)->createNode<GenericNode>("node");
+    GenericNode* node = skel->getBodyNode(0)->createNode<GenericNode>("node");
 
     EXPECT_EQ(skel->getNode<GenericNode>("node"), node);
     EXPECT_EQ(skel->getNode<GenericNode>(0), node);
@@ -684,8 +702,7 @@ TEST(Skeleton, NodePersistence)
   }
 
   {
-    GenericNode* node =
-        skel->getBodyNode(0)->createNode<GenericNode>("node");
+    GenericNode* node = skel->getBodyNode(0)->createNode<GenericNode>("node");
 
     EXPECT_EQ(skel->getNode<GenericNode>("node"), node);
     EXPECT_EQ(skel->getNode<GenericNode>(0), node);
@@ -706,7 +723,7 @@ TEST(Skeleton, NodePersistence)
 
     EXPECT_NE(skel->getNode<GenericNode>(0), node);
     EXPECT_EQ(skel->getNode<GenericNode>(0), nullptr);
-#endif        // Release Mode
+#endif // Release Mode
 
 #ifdef NDEBUG // Release Mode
     // But it will not remain in the BodyNode's indexing.
@@ -714,7 +731,7 @@ TEST(Skeleton, NodePersistence)
     // will trigger an assertion.
     EXPECT_NE(skel->getBodyNode(0)->getNode<GenericNode>(0), node);
     EXPECT_EQ(skel->getBodyNode(0)->getNode<GenericNode>(0), nullptr);
-#endif        // Release Mode
+#endif // Release Mode
 
     EXPECT_NE(weakNode.lock(), nullptr);
 
@@ -742,9 +759,9 @@ TEST(Skeleton, CloneNodeOrdering)
 
   // Add Nodes in the reverse order, so that their indexing is different from
   // the BodyNodes they are attached to
-  for(int i=skel->getNumBodyNodes()-1; i > 0; --i)
+  for (int i = skel->getNumBodyNodes() - 1; i > 0; --i)
   {
-    skel->getBodyNode(i)->createEndEffector("manip_"+std::to_string(i));
+    skel->getBodyNode(i)->createEndEffector("manip_" + std::to_string(i));
   }
 
   skel->getBodyNode(1)->createEndEffector("other_manip");
@@ -753,10 +770,11 @@ TEST(Skeleton, CloneNodeOrdering)
 
   SkeletonPtr clone = skel->cloneSkeleton();
 
-  for(std::size_t i=0; i < skel->getNumEndEffectors(); ++i)
+  for (std::size_t i = 0; i < skel->getNumEndEffectors(); ++i)
   {
-    EXPECT_EQ(skel->getEndEffector(i)->getName(),
-              clone->getEndEffector(i)->getName());
+    EXPECT_EQ(
+        skel->getEndEffector(i)->getName(),
+        clone->getEndEffector(i)->getName());
   }
 }
 
@@ -799,12 +817,16 @@ TEST(Skeleton, ZeroDofJointConstraintForces)
 
 TEST(Skeleton, Configurations)
 {
-  SkeletonPtr twoLink = createTwoLinkRobot(Vector3d::Ones(), DOF_YAW,
-                                           Vector3d::Ones(), DOF_ROLL);
+  SkeletonPtr twoLink = createTwoLinkRobot(
+      Vector3d::Ones(), DOF_YAW, Vector3d::Ones(), DOF_ROLL);
 
-  SkeletonPtr threeLink = createThreeLinkRobot(Vector3d::Ones(), DOF_PITCH,
-                                               Vector3d::Ones(), DOF_ROLL,
-                                               Vector3d::Ones(), DOF_YAW);
+  SkeletonPtr threeLink = createThreeLinkRobot(
+      Vector3d::Ones(),
+      DOF_PITCH,
+      Vector3d::Ones(),
+      DOF_ROLL,
+      Vector3d::Ones(),
+      DOF_YAW);
 
   Skeleton::Configuration c2 = twoLink->getConfiguration();
   Skeleton::Configuration c3 = threeLink->getConfiguration();
@@ -830,9 +852,13 @@ TEST(Skeleton, LinearJacobianDerivOverload)
 {
   // Regression test for #626: Make sure that getLinearJacobianDeriv's overload
   // is working appropriately.
-  SkeletonPtr skeleton = createThreeLinkRobot(Vector3d::Ones(), DOF_PITCH,
-                                              Vector3d::Ones(), DOF_ROLL,
-                                              Vector3d::Ones(), DOF_YAW);
+  SkeletonPtr skeleton = createThreeLinkRobot(
+      Vector3d::Ones(),
+      DOF_PITCH,
+      Vector3d::Ones(),
+      DOF_ROLL,
+      Vector3d::Ones(),
+      DOF_YAW);
 
   skeleton->getLinearJacobianDeriv(skeleton->getBodyNode(0));
 
@@ -845,28 +871,28 @@ TEST(Skeleton, Updating)
   // Make sure that structural properties get automatically updated correctly
 
   // RevoluteJoint
-  SkeletonPtr skeleton = createTwoLinkRobot(Vector3d::Ones(), DOF_PITCH,
-                                            Vector3d::Ones(), DOF_ROLL);
+  SkeletonPtr skeleton = createTwoLinkRobot(
+      Vector3d::Ones(), DOF_PITCH, Vector3d::Ones(), DOF_ROLL);
 
   Joint* joint0 = skeleton->getJoint(0);
   Joint* joint1 = skeleton->getJoint(1);
 
   math::Jacobian J0i = joint0->getRelativeJacobian();
   joint0->get<RevoluteJoint::Aspect>()->setProperties(
-        joint1->get<RevoluteJoint::Aspect>()->getProperties());
+      joint1->get<RevoluteJoint::Aspect>()->getProperties());
 
   math::Jacobian J0f = joint0->getRelativeJacobian();
   EXPECT_FALSE(equals(J0i, J0f));
 
   // PrismaticJoint
-  skeleton = createTwoLinkRobot(Vector3d::Ones(), DOF_X,
-                                Vector3d::Ones(), DOF_Y);
+  skeleton
+      = createTwoLinkRobot(Vector3d::Ones(), DOF_X, Vector3d::Ones(), DOF_Y);
   joint0 = skeleton->getJoint(0);
   joint1 = skeleton->getJoint(1);
 
   J0i = joint0->getRelativeJacobian();
   joint0->get<PrismaticJoint::Aspect>()->setProperties(
-        joint1->get<PrismaticJoint::Aspect>()->getProperties());
+      joint1->get<PrismaticJoint::Aspect>()->getProperties());
   J0f = joint0->getRelativeJacobian();
   EXPECT_FALSE(equals(J0i, J0f));
 
@@ -888,11 +914,140 @@ TEST(Skeleton, Updating)
 
   // Regression test for Pull Request #731
   const double originalMass = skeleton->getMass();
-  BodyNode* lastBn = skeleton->getBodyNode(skeleton->getNumBodyNodes()-1);
+  BodyNode* lastBn = skeleton->getBodyNode(skeleton->getNumBodyNodes() - 1);
   const double removedMass = lastBn->getMass();
   EXPECT_FALSE(removedMass == 0.0);
   lastBn->remove();
   const double newMass = skeleton->getMass();
   EXPECT_FALSE(originalMass == newMass);
   EXPECT_TRUE(newMass == originalMass - removedMass);
+}
+
+bool verifyImplicitInvMassInstance(
+    SkeletonPtr skel, Eigen::MatrixXd Minv, Eigen::VectorXd x)
+{
+  VectorXd implicitMinvX = skel->multiplyByImplicitInvMassMatrix(x);
+  VectorXd explicitMinvX = Minv * x;
+  if (!equals(explicitMinvX, implicitMinvX, 1e-7))
+  {
+    std::cout << "Minv: " << std::endl << Minv << std::endl;
+    std::cout << "x: " << std::endl << x << std::endl;
+    std::cout << "Implicit Minv*x: " << std::endl << implicitMinvX << std::endl;
+    std::cout << "Explicit Minv*x: " << std::endl << explicitMinvX << std::endl;
+    return false;
+  }
+  return true;
+}
+
+bool verifyImplicitMassInstance(
+    SkeletonPtr skel, Eigen::MatrixXd M, Eigen::VectorXd x)
+{
+  VectorXd implicitMX = skel->multiplyByImplicitMassMatrix(x);
+  VectorXd explicitMX = M * x;
+  if (!equals(explicitMX, implicitMX, 1e-7))
+  {
+    std::cout << "M: " << std::endl << M << std::endl;
+    std::cout << "x: " << std::endl << x << std::endl;
+    std::cout << "Implicit M*x: " << std::endl << implicitMX << std::endl;
+    std::cout << "Explicit M*x: " << std::endl << explicitMX << std::endl;
+    return false;
+  }
+  return true;
+}
+
+bool verifyImplicitMass(SkeletonPtr skel)
+{
+  Eigen::MatrixXd Minv = skel->getInvMassMatrix();
+  Eigen::MatrixXd M = skel->getMassMatrix();
+
+  VectorXd x = VectorXd::Zero(skel->getNumDofs());
+
+  // Test a "1" in each dimension of the phase space separately
+  for (std::size_t i = 0; i < skel->getNumDofs(); i++)
+  {
+    x(i) = 1;
+    if (i > 0)
+      x(i - 1) = 0;
+    if (!verifyImplicitInvMassInstance(skel, Minv, x))
+      return false;
+    if (!verifyImplicitMassInstance(skel, M, x))
+      return false;
+  }
+
+  // Test all "0"s
+  x = VectorXd::Zero(skel->getNumDofs());
+  if (!verifyImplicitInvMassInstance(skel, Minv, x))
+    return false;
+  if (!verifyImplicitMassInstance(skel, M, x))
+    return false;
+
+  // Test all "1"s
+  x = VectorXd::Ones(skel->getNumDofs());
+  if (!verifyImplicitInvMassInstance(skel, Minv, x))
+    return false;
+  if (!verifyImplicitMassInstance(skel, M, x))
+    return false;
+
+  return true;
+}
+
+TEST(Skeleton, BoxImplicitMass)
+{
+  SkeletonPtr box = Skeleton::create("box");
+
+  std::pair<TranslationalJoint2D*, BodyNode*> pair
+      = box->createJointAndBodyNodePair<TranslationalJoint2D>(nullptr);
+  TranslationalJoint2D* boxJoint = pair.first;
+  BodyNode* boxBody = pair.second;
+
+  boxJoint->setXYPlane();
+  boxJoint->setTransformFromParentBodyNode(Eigen::Isometry3d::Identity());
+  boxJoint->setTransformFromChildBodyNode(Eigen::Isometry3d::Identity());
+  boxBody->setMass(2);
+
+  EXPECT_TRUE(verifyImplicitMass(box));
+}
+
+TEST(Skeleton, TwoLinkRobotImplicitMass)
+{
+  SkeletonPtr twoLink = createTwoLinkRobot(
+      Vector3d::Ones(), DOF_YAW, Vector3d::Ones(), DOF_ROLL);
+  EXPECT_TRUE(verifyImplicitMass(twoLink));
+}
+
+TEST(Skeleton, ThreeLinkRobotImplicitMass)
+{
+  SkeletonPtr threeLink = createThreeLinkRobot(
+      Vector3d::Ones(),
+      DOF_PITCH,
+      Vector3d::Ones(),
+      DOF_ROLL,
+      Vector3d::Ones(),
+      DOF_YAW);
+  EXPECT_TRUE(verifyImplicitMass(threeLink));
+}
+
+TEST(Skeleton, MultiTreeRobotImplicitMass)
+{
+  SkeletonPtr multiRootRobot = createThreeLinkRobot(
+      Vector3d::Ones(),
+      DOF_PITCH,
+      Vector3d::Ones(),
+      DOF_ROLL,
+      Vector3d::Ones(),
+      DOF_YAW);
+
+  // Create a box anchored to the world, which roots another tree
+
+  std::pair<TranslationalJoint2D*, BodyNode*> pair
+      = multiRootRobot->createJointAndBodyNodePair<TranslationalJoint2D>(
+          nullptr);
+  TranslationalJoint2D* boxJoint = pair.first;
+  BodyNode* boxBody = pair.second;
+  boxJoint->setXYPlane();
+  boxJoint->setTransformFromParentBodyNode(Eigen::Isometry3d::Identity());
+  boxJoint->setTransformFromChildBodyNode(Eigen::Isometry3d::Identity());
+  boxBody->setMass(2);
+
+  EXPECT_TRUE(verifyImplicitMass(multiRootRobot));
 }

@@ -2044,6 +2044,136 @@ const Eigen::MatrixXd& Skeleton::getInvAugMassMatrix() const
 }
 
 //==============================================================================
+Eigen::VectorXd Skeleton::multiplyByImplicitMassMatrix(Eigen::VectorXd x)
+{
+  // The trick here is to treat x as delta acceleration, and measure delta force
+  std::size_t dof = mSkelCache.mDofs.size();
+  if (dof == 0)
+  {
+    return x;
+  }
+
+  // Backup the original internal force
+  Eigen::VectorXd originalGenAcceleration = getAccelerations();
+
+  // Set the acceleration the DOFs to x, which will allow us to compute M*x
+  // through Featherstone
+  setAccelerations(x);
+
+  // We don't need to set this to 0 if the below is correct
+  Eigen::VectorXd finalResult = Eigen::VectorXd(dof);
+
+  for (std::size_t tree = 0; tree < mTreeCache.size(); ++tree)
+  {
+    DataCache& cache = mTreeCache[tree];
+    std::size_t dof = cache.mDofs.size();
+    if (dof == 0)
+    {
+      continue;
+    }
+
+    // Prepare cache data
+    for (std::vector<BodyNode*>::const_iterator it = cache.mBodyNodes.begin();
+         it != cache.mBodyNodes.end();
+         ++it)
+    {
+      (*it)->updateMassMatrix();
+    }
+
+    // Collect the result of (M * x) for this tree
+    Eigen::MatrixXd treeMulResult = Eigen::MatrixXd(cache.mDofs.size(), 1);
+    for (std::vector<BodyNode*>::const_reverse_iterator it
+         = cache.mBodyNodes.rbegin();
+         it != cache.mBodyNodes.rend();
+         ++it)
+    {
+      (*it)->aggregateMassMatrix(treeMulResult, 0);
+    }
+
+    const std::vector<DegreeOfFreedom*>& treeDofs = mTreeCache[tree].mDofs;
+    std::size_t nTreeDofs = treeDofs.size();
+    for (std::size_t i = 0; i < nTreeDofs; ++i)
+    {
+      std::size_t ki = treeDofs[i]->getIndexInSkeleton();
+
+      finalResult(ki) = treeMulResult(i, 0);
+    }
+  }
+
+  // Restore the original generalized accelerations
+  const_cast<Skeleton*>(this)->setAccelerations(originalGenAcceleration);
+
+  return finalResult;
+}
+
+//==============================================================================
+Eigen::VectorXd Skeleton::multiplyByImplicitInvMassMatrix(Eigen::VectorXd x)
+{
+  // The trick here is to treat x as delta force, and measure delta acceleration
+
+  std::size_t dof = mSkelCache.mDofs.size();
+  assert(
+      static_cast<std::size_t>(mSkelCache.mInvM.cols()) == dof
+      && static_cast<std::size_t>(mSkelCache.mInvM.rows()) == dof);
+  if (dof == 0)
+  {
+    return x;
+  }
+
+  // Backup the origianl internal force
+  Eigen::VectorXd originalInternalForce = getForces();
+
+  // Set the forces on the DOFs to x, which will allow us to compute Minv*x
+  // through Featherstone
+  setForces(x);
+
+  // We don't need to set this to 0 if the below is correct
+  Eigen::VectorXd finalResult = Eigen::VectorXd(dof);
+
+  for (std::size_t tree = 0; tree < mTreeCache.size(); ++tree)
+  {
+    DataCache& cache = mTreeCache[tree];
+    std::size_t dof = cache.mDofs.size();
+    if (dof == 0)
+    {
+      continue;
+    }
+
+    // Prepare cache data
+    for (std::vector<BodyNode*>::const_reverse_iterator it
+         = cache.mBodyNodes.rbegin();
+         it != cache.mBodyNodes.rend();
+         ++it)
+    {
+      (*it)->updateInvMassMatrix();
+    }
+
+    // Collect the result of (Minv * x) for this tree
+    Eigen::MatrixXd treeMulResult = Eigen::MatrixXd(cache.mDofs.size(), 1);
+    for (std::vector<BodyNode*>::const_iterator it = cache.mBodyNodes.begin();
+         it != cache.mBodyNodes.end();
+         ++it)
+    {
+      (*it)->aggregateInvMassMatrix(treeMulResult, 0);
+    }
+
+    const std::vector<DegreeOfFreedom*>& treeDofs = mTreeCache[tree].mDofs;
+    std::size_t nTreeDofs = treeDofs.size();
+    for (std::size_t i = 0; i < nTreeDofs; ++i)
+    {
+      std::size_t ki = treeDofs[i]->getIndexInSkeleton();
+
+      finalResult(ki) = treeMulResult(i, 0);
+    }
+  }
+
+  // Restore the original internal force
+  const_cast<Skeleton*>(this)->setForces(originalInternalForce);
+
+  return finalResult;
+}
+
+//==============================================================================
 const Eigen::VectorXd& Skeleton::getCoriolisForces(std::size_t _treeIdx) const
 {
   if (mTreeCache[_treeIdx].mDirty.mCoriolisForces)

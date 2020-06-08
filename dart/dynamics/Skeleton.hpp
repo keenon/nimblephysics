@@ -876,6 +876,16 @@ public:
   // Documentation inherited
   const Eigen::MatrixXd& getInvAugMassMatrix() const override;
 
+  // Returns the value of M*x, left multiplying x by the mass matrix. This is
+  // O(n) compared with O(n^2) to form the complete mass matrix and then
+  // multiply.
+  Eigen::VectorXd multiplyByImplicitMassMatrix(Eigen::VectorXd x);
+
+  // Returns the value of M_inv*x, left multiplying x by the inverse mass
+  // matrix. This is O(n) compared with O(n^2) to form the complete inverse mass
+  // matrix and then multiply.
+  Eigen::VectorXd multiplyByImplicitInvMassMatrix(Eigen::VectorXd x);
+
   /// Get the Coriolis force vector of a tree in this Skeleton
   const Eigen::VectorXd& getCoriolisForces(std::size_t _treeIdx) const;
 
