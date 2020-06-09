@@ -476,6 +476,109 @@ bool verifyPosGradients(WorldPtr world, std::size_t subdivisions)
       && verifyVelPosJacobianApproximation(world, subdivisions));
 }
 
+bool verifyBackpropInstance(
+    const neural::BackpropSnapshotPtr& classicPtr, const VectorXd& phaseSpace)
+{
+  LossGradient nextTimeStep;
+  nextTimeStep.lossWrtPosition = phaseSpace.segment(0, phaseSpace.size() / 2);
+  nextTimeStep.lossWrtVelocity
+      = phaseSpace.segment(phaseSpace.size() / 2, phaseSpace.size() / 2);
+
+  LossGradient thisTimeStep;
+  classicPtr->backprop(thisTimeStep, nextTimeStep);
+
+  // Compute "brute force" backprop using full Jacobians
+  /*
+  The forward computation graph looks like this:
+
+  p_t ---------------------> p_t+1 ---->
+                               ^
+                               |
+  v_t ------> v_t+i -----------+------->
+                ^
+                |
+  f_t ----------+
+  */
+
+  // p_t
+  VectorXd lossWrtThisPosition = classicPtr->getPosPosJacobian().transpose()
+                                 * nextTimeStep.lossWrtPosition;
+
+  // v_t+1
+  VectorXd lossWrtNextVelocity = nextTimeStep.lossWrtVelocity
+                                 + classicPtr->getVelPosJacobian().transpose()
+                                       * nextTimeStep.lossWrtPosition;
+
+  // v_t
+  VectorXd lossWrtThisVelocity = classicPtr->getVelVelJacobian().transpose()
+                                 * nextTimeStep.lossWrtVelocity;
+
+  // f_t
+  VectorXd lossWrtThisTorque = classicPtr->getForceVelJacobian().transpose()
+                               * nextTimeStep.lossWrtVelocity;
+
+  if (!equals(lossWrtThisPosition, thisTimeStep.lossWrtPosition, 1e-5)
+      || !equals(lossWrtThisVelocity, thisTimeStep.lossWrtVelocity, 1e-5)
+      || !equals(lossWrtThisTorque, thisTimeStep.lossWrtTorque, 1e-5))
+  {
+    std::cout << "Input: loss wrt position at time t + 1:" << std::endl
+              << nextTimeStep.lossWrtPosition << std::endl;
+    std::cout << "Input: loss wrt velocity at time t + 1:" << std::endl
+              << nextTimeStep.lossWrtVelocity << std::endl;
+    std::cout << "Brute force: loss wrt position at time t:" << std::endl
+              << lossWrtThisPosition << std::endl;
+    std::cout << "Analytical: loss wrt position at time t:" << std::endl
+              << thisTimeStep.lossWrtPosition << std::endl;
+    std::cout << "Brute force: loss wrt velocity at time t:" << std::endl
+              << lossWrtThisVelocity << std::endl;
+    std::cout << "Analytical: loss wrt velocity at time t:" << std::endl
+              << thisTimeStep.lossWrtVelocity << std::endl;
+    std::cout << "Brute force: loss wrt torque at time t:" << std::endl
+              << lossWrtThisTorque << std::endl;
+    std::cout << "Analytical: loss wrt torque at time t:" << std::endl
+              << thisTimeStep.lossWrtTorque << std::endl;
+    return false;
+  }
+  return true;
+}
+
+bool verifyBackprop(WorldPtr world)
+{
+  neural::BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
+
+  if (!classicPtr)
+  {
+    std::cout << "verifyVelPosJacobianApproximation forwardPass returned a "
+                 "null BackpropSnapshotPtr!"
+              << std::endl;
+    return false;
+  }
+
+  VectorXd phaseSpace = VectorXd::Zero(world->getNumDofs() * 2);
+
+  // Test a "1" in each dimension of the phase space separately
+  for (std::size_t i = 0; i < world->getNumDofs() * 2; i++)
+  {
+    phaseSpace(i) = 1;
+    if (i > 0)
+      phaseSpace(i - 1) = 0;
+    if (!verifyBackpropInstance(classicPtr, phaseSpace))
+      return false;
+  }
+
+  // Test all "0"s
+  phaseSpace = VectorXd::Zero(world->getNumDofs() * 2);
+  if (!verifyBackpropInstance(classicPtr, phaseSpace))
+    return false;
+
+  // Test all "1"s
+  phaseSpace = VectorXd::Ones(world->getNumDofs() * 2);
+  if (!verifyBackpropInstance(classicPtr, phaseSpace))
+    return false;
+
+  return true;
+}
+
 // This test is ugly and difficult to interpret, but it broke our system early
 // on. It now passes, and is here to detect regression.
 /******************************************************************************
@@ -687,9 +790,9 @@ void testBlockWithFrictionCoeff(double frictionCoeff, double mass)
   VectorXd worldVel = world->getVelocities();
   // Test the classic formulation
   EXPECT_TRUE(verifyVelGradients(world, worldVel));
+  EXPECT_TRUE(verifyBackprop(world));
 }
 
-/*
 TEST(GRADIENTS, BLOCK_ON_GROUND_NO_FRICTION_1_MASS)
 {
   testBlockWithFrictionCoeff(0, 1);
@@ -714,7 +817,6 @@ TEST(GRADIENTS, BLOCK_ON_GROUND_SLIPPING_FRICTION)
 {
   testBlockWithFrictionCoeff(0.5, 1);
 }
-*/
 
 /******************************************************************************
 
@@ -843,9 +945,9 @@ void testTwoBlocks(
   world->getConstraintSolver()->solve();
 
   EXPECT_TRUE(verifyVelGradients(world, worldVel));
+  EXPECT_TRUE(verifyBackprop(world));
 }
 
-/*
 TEST(GRADIENTS, TWO_BLOCKS_1_1_MASS)
 {
   testTwoBlocks(1, 1, 0, 1, 1);
@@ -860,7 +962,6 @@ TEST(GRADIENTS, TWO_BLOCKS_3_5_MASS)
 {
   testTwoBlocks(2, 1, 0, 3, 5);
 }
-*/
 
 /******************************************************************************
 
@@ -949,14 +1050,13 @@ void testBouncingBlockWithFrictionCoeff(double frictionCoeff, double mass)
   VectorXd worldVel = world->getVelocities();
 
   EXPECT_TRUE(verifyVelGradients(world, worldVel));
+  EXPECT_TRUE(verifyBackprop(world));
 }
 
-/*
 TEST(GRADIENTS, BLOCK_BOUNCING_OFF_GROUND_NO_FRICTION_1_MASS)
 {
   testBouncingBlockWithFrictionCoeff(0, 1);
 }
-*/
 
 /******************************************************************************
 
@@ -1065,14 +1165,13 @@ void testReversePendulumSledWithFrictionCoeff(double frictionCoeff)
   VectorXd worldVel = world->getVelocities();
 
   EXPECT_TRUE(verifyVelGradients(world, worldVel));
+  EXPECT_TRUE(verifyBackprop(world));
 }
 
-/*
 TEST(GRADIENTS, SLIDING_REVERSE_PENDULUM_NO_FRICTION)
 {
   testReversePendulumSledWithFrictionCoeff(0);
 }
-*/
 
 /******************************************************************************
 
@@ -1158,6 +1257,7 @@ void testBouncingBlockPosGradients(double frictionCoeff, double mass)
   ///////////////////////////////////////////////
 
   EXPECT_TRUE(verifyPosGradients(world, 100));
+  EXPECT_TRUE(verifyBackprop(world));
 }
 
 TEST(GRADIENTS, POS_BLOCK_BOUNCING_OFF_GROUND_NO_FRICTION_1_MASS)

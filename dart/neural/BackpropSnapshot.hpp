@@ -6,6 +6,7 @@
 
 #include <Eigen/Dense>
 
+#include "dart/neural/NeuralUtils.hpp"
 #include "dart/simulation/World.hpp"
 
 namespace dart {
@@ -23,6 +24,14 @@ public:
       Eigen::VectorXd forwardPassPosition,
       Eigen::VectorXd forwardPassVelocity,
       Eigen::VectorXd forwardPassTorques);
+
+  /// This computes the implicit backprop without forming intermediate
+  /// Jacobians. It takes a LossGradient with the position and velocity vectors
+  /// filled it, though the loss with respect to torque is ignored and can be
+  /// null. It returns a LossGradient with all three values filled in, position,
+  /// velocity, and torque.
+  void backprop(
+      LossGradient& thisTimestepLoss, const LossGradient& nextTimestepLoss);
 
   /// This computes and returns the whole vel-vel jacobian. For backprop, you
   /// don't actually need this matrix, you can compute backprop directly. This

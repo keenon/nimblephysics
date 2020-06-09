@@ -3,6 +3,8 @@
 
 #include <memory>
 
+#include <Eigen/Dense>
+
 namespace dart {
 namespace constraint {
 class ConstrainedGroup;
@@ -12,6 +14,13 @@ class World;
 }
 
 namespace neural {
+
+struct LossGradient
+{
+  Eigen::VectorXd lossWrtPosition;
+  Eigen::VectorXd lossWrtVelocity;
+  Eigen::VectorXd lossWrtTorque;
+};
 
 // We don't issue a full import here, because we want this file to be safe to
 // import from anywhere else in DART

@@ -64,6 +64,78 @@ BackpropSnapshot::BackpropSnapshot(
 }
 
 //==============================================================================
+void BackpropSnapshot::backprop(
+    LossGradient& thisTimestepLoss, const LossGradient& nextTimestepLoss)
+{
+  LossGradient groupThisTimestepLoss;
+  LossGradient groupNextTimestepLoss;
+
+  // Create the vectors for this timestep
+
+  thisTimestepLoss.lossWrtPosition = Eigen::VectorXd(mNumDOFs);
+  thisTimestepLoss.lossWrtVelocity = Eigen::VectorXd(mNumDOFs);
+  thisTimestepLoss.lossWrtTorque = Eigen::VectorXd(mNumDOFs);
+
+  // Actually run the backprop
+
+  for (std::shared_ptr<ConstrainedGroupGradientMatrices> group :
+       mGradientMatrices)
+  {
+    std::size_t groupDofs = group->getNumDOFs();
+
+    // Instantiate the vectors with plenty of DOFs
+
+    groupNextTimestepLoss.lossWrtPosition = Eigen::VectorXd(groupDofs);
+    groupNextTimestepLoss.lossWrtVelocity = Eigen::VectorXd(groupDofs);
+    groupThisTimestepLoss.lossWrtPosition = Eigen::VectorXd(groupDofs);
+    groupThisTimestepLoss.lossWrtVelocity = Eigen::VectorXd(groupDofs);
+    groupThisTimestepLoss.lossWrtTorque = Eigen::VectorXd(groupDofs);
+
+    // Set up next timestep loss as a map of the real values
+
+    std::size_t cursor = 0;
+    for (std::size_t j = 0; j < group->getSkeletons().size(); j++)
+    {
+      SkeletonPtr skel = group->getSkeletons()[j];
+      std::size_t dofCursorWorld
+          = mSkeletonOffset.find(skel->getName())->second;
+      std::size_t dofs = skel->getNumDofs();
+
+      groupNextTimestepLoss.lossWrtPosition.segment(cursor, dofs)
+          = nextTimestepLoss.lossWrtPosition.segment(dofCursorWorld, dofs);
+      groupNextTimestepLoss.lossWrtVelocity.segment(cursor, dofs)
+          = nextTimestepLoss.lossWrtVelocity.segment(dofCursorWorld, dofs);
+
+      cursor += dofs;
+    }
+
+    // Now actually run the backprop
+
+    group->backprop(groupThisTimestepLoss, groupNextTimestepLoss);
+
+    // Read the values back out of the group backprop
+
+    cursor = 0;
+    for (std::size_t j = 0; j < group->getSkeletons().size(); j++)
+    {
+      SkeletonPtr skel = group->getSkeletons()[j];
+      std::size_t dofCursorWorld
+          = mSkeletonOffset.find(skel->getName())->second;
+      std::size_t dofs = skel->getNumDofs();
+
+      thisTimestepLoss.lossWrtPosition.segment(cursor, dofs)
+          = groupThisTimestepLoss.lossWrtPosition.segment(dofCursorWorld, dofs);
+      thisTimestepLoss.lossWrtVelocity.segment(cursor, dofs)
+          = groupThisTimestepLoss.lossWrtVelocity.segment(dofCursorWorld, dofs);
+      thisTimestepLoss.lossWrtTorque.segment(cursor, dofs)
+          = groupThisTimestepLoss.lossWrtTorque.segment(dofCursorWorld, dofs);
+
+      cursor += dofs;
+    }
+  }
+}
+
+//==============================================================================
 Eigen::MatrixXd BackpropSnapshot::getForceVelJacobian()
 {
   Eigen::MatrixXd A_c = getClampingConstraintMatrix();
@@ -116,6 +188,10 @@ Eigen::MatrixXd BackpropSnapshot::getVelVelJacobian()
 Eigen::MatrixXd BackpropSnapshot::getPosPosJacobian()
 {
   Eigen::MatrixXd A_b = getBouncingConstraintMatrix();
+
+  // If there are no bounces, this is a simple identity
+  if (A_b.size() == 0)
+    return Eigen::MatrixXd::Identity(mNumDOFs, mNumDOFs);
 
   // Construct the W matrix we'll need to use to solve for our closest approx
   Eigen::MatrixXd W = Eigen::MatrixXd(A_b.cols(), A_b.rows() * A_b.rows());
