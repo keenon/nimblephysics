@@ -123,12 +123,12 @@ void BackpropSnapshot::backprop(
           = mSkeletonOffset.find(skel->getName())->second;
       std::size_t dofs = skel->getNumDofs();
 
-      thisTimestepLoss.lossWrtPosition.segment(cursor, dofs)
-          = groupThisTimestepLoss.lossWrtPosition.segment(dofCursorWorld, dofs);
-      thisTimestepLoss.lossWrtVelocity.segment(cursor, dofs)
-          = groupThisTimestepLoss.lossWrtVelocity.segment(dofCursorWorld, dofs);
-      thisTimestepLoss.lossWrtTorque.segment(cursor, dofs)
-          = groupThisTimestepLoss.lossWrtTorque.segment(dofCursorWorld, dofs);
+      thisTimestepLoss.lossWrtPosition.segment(dofCursorWorld, dofs)
+          = groupThisTimestepLoss.lossWrtPosition.segment(cursor, dofs);
+      thisTimestepLoss.lossWrtVelocity.segment(dofCursorWorld, dofs)
+          = groupThisTimestepLoss.lossWrtVelocity.segment(cursor, dofs);
+      thisTimestepLoss.lossWrtTorque.segment(dofCursorWorld, dofs)
+          = groupThisTimestepLoss.lossWrtTorque.segment(cursor, dofs);
 
       cursor += dofs;
     }
@@ -180,7 +180,7 @@ Eigen::MatrixXd BackpropSnapshot::getVelVelJacobian()
   std::cout << "A_c + A_ub * E: " << std::endl << parts1 << std::endl;
   std::cout << "mTimestep * Minv * (A_c + A_ub * E) * P_c: " << std::endl
             << parts2 << std::endl;
-            */
+  */
   return (Eigen::MatrixXd::Identity(mNumDOFs, mNumDOFs) - parts2) * B;
 }
 
@@ -195,10 +195,10 @@ Eigen::MatrixXd BackpropSnapshot::getPosPosJacobian()
 
   // Construct the W matrix we'll need to use to solve for our closest approx
   Eigen::MatrixXd W = Eigen::MatrixXd(A_b.cols(), A_b.rows() * A_b.rows());
-  for (std::size_t i = 0; i < A_b.cols(); i++)
+  for (int i = 0; i < A_b.cols(); i++)
   {
     Eigen::VectorXd a_i = A_b.col(i);
-    for (std::size_t j = 0; j < A_b.rows(); j++)
+    for (int j = 0; j < A_b.rows(); j++)
     {
       W.block(j * A_b.rows(), i, A_b.rows(), 1) = a_i(j) * a_i;
     }
@@ -352,67 +352,28 @@ Eigen::MatrixXd BackpropSnapshot::getInvMassMatrix()
 //==============================================================================
 Eigen::VectorXd BackpropSnapshot::getContactConstraintImpluses()
 {
-  if (mGradientMatrices.size() == 1)
-    return mGradientMatrices[0]->getContactConstraintImpluses();
-  Eigen::VectorXd mX = Eigen::VectorXd(mNumConstraintDim);
-  std::size_t cursor = 0;
-  for (std::size_t i = 0; i < mGradientMatrices.size(); i++)
-  {
-    mX.segment(cursor, mGradientMatrices[i]->getNumConstraintDim())
-        = mGradientMatrices[i]->getContactConstraintImpluses();
-    cursor += mGradientMatrices[i]->getNumConstraintDim();
-  }
-  return mX;
+  return assembleVector<Eigen::VectorXd>(
+      VectorToAssemble::CONTACT_CONSTRAINT_IMPULSES);
 }
 
 //==============================================================================
 Eigen::VectorXi BackpropSnapshot::getContactConstraintMappings()
 {
-  if (mGradientMatrices.size() == 1)
-    return mGradientMatrices[0]->getContactConstraintMappings();
-  Eigen::VectorXi fIndex = Eigen::VectorXi(mNumConstraintDim);
-  std::size_t cursor = 0;
-  for (std::size_t i = 0; i < mGradientMatrices.size(); i++)
-  {
-    fIndex.segment(cursor, mGradientMatrices[i]->getNumConstraintDim())
-        = mGradientMatrices[i]->getContactConstraintMappings();
-    cursor += mGradientMatrices[i]->getNumConstraintDim();
-  }
-  return fIndex;
+  return assembleVector<Eigen::VectorXi>(
+      VectorToAssemble::CONTACT_CONSTRAINT_MAPPINGS);
 }
 
 //==============================================================================
 Eigen::VectorXd BackpropSnapshot::getBounceDiagonals()
 {
-  if (mGradientMatrices.size() == 1)
-    return mGradientMatrices[0]->getBounceDiagonals();
-  Eigen::VectorXd restitutionCoeffs = Eigen::VectorXd(mNumClamping);
-  std::size_t cursor = 0;
-  for (std::size_t i = 0; i < mGradientMatrices.size(); i++)
-  {
-    restitutionCoeffs.segment(
-        cursor, mGradientMatrices[i]->getNumConstraintDim())
-        = mGradientMatrices[i]->getBounceDiagonals();
-    cursor += mGradientMatrices[i]->getNumConstraintDim();
-  }
-  return restitutionCoeffs;
+  return assembleVector<Eigen::VectorXd>(VectorToAssemble::BOUNCE_DIAGONALS);
 }
 
 //==============================================================================
 Eigen::VectorXd BackpropSnapshot::getRestitutionDiagonals()
 {
-  if (mGradientMatrices.size() == 1)
-    return mGradientMatrices[0]->getRestitutionDiagonals();
-  Eigen::VectorXd contactDistances = Eigen::VectorXd(mNumBouncing);
-  std::size_t cursor = 0;
-  for (std::size_t i = 0; i < mGradientMatrices.size(); i++)
-  {
-    contactDistances.segment(
-        cursor, mGradientMatrices[i]->getNumConstraintDim())
-        = mGradientMatrices[i]->getRestitutionDiagonals();
-    cursor += mGradientMatrices[i]->getNumConstraintDim();
-  }
-  return contactDistances;
+  return assembleVector<Eigen::VectorXd>(
+      VectorToAssemble::RESTITUTION_DIAGONALS);
 }
 
 //==============================================================================
@@ -421,6 +382,9 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceVelVelJacobian()
   RestorableSnapshot snapshot(mWorld);
 
   Eigen::MatrixXd J(mNumDOFs, mNumDOFs);
+
+  bool oldGradientEnabled = mWorld->getConstraintSolver()->getGradientEnabled();
+  mWorld->getConstraintSolver()->setGradientEnabled(false);
 
   mWorld->setVelocities(mForwardPassVelocity);
   mWorld->step(false);
@@ -443,6 +407,7 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceVelVelJacobian()
   }
 
   snapshot.restore();
+  mWorld->getConstraintSolver()->setGradientEnabled(oldGradientEnabled);
 
   return J;
 }
@@ -454,6 +419,9 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceForceVelJacobian()
 
   Eigen::MatrixXd J(mNumDOFs, mNumDOFs);
 
+  bool oldGradientEnabled = mWorld->getConstraintSolver()->getGradientEnabled();
+  mWorld->getConstraintSolver()->setGradientEnabled(false);
+
   mWorld->setVelocities(mForwardPassVelocity);
   mWorld->step(false);
 
@@ -461,7 +429,7 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceForceVelJacobian()
   Eigen::VectorXd originalVel = mWorld->getVelocities();
 
   double EPSILON = 1e-7;
-  for (auto i = 0; i < mWorld->getNumDofs(); i++)
+  for (std::size_t i = 0; i < mWorld->getNumDofs(); i++)
   {
     snapshot.restore();
 
@@ -478,6 +446,7 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceForceVelJacobian()
   }
 
   snapshot.restore();
+  mWorld->getConstraintSolver()->setGradientEnabled(oldGradientEnabled);
 
   return J;
 }
@@ -490,6 +459,8 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferencePosPosJacobian(
 
   double oldTimestep = mWorld->getTimeStep();
   mWorld->setTimeStep(oldTimestep / subdivisions);
+  bool oldGradientEnabled = mWorld->getConstraintSolver()->getGradientEnabled();
+  mWorld->getConstraintSolver()->setGradientEnabled(false);
 
   Eigen::MatrixXd J(mNumDOFs, mNumDOFs);
 
@@ -505,7 +476,7 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferencePosPosJacobian(
   // IMPORTANT: EPSILON must be larger than the distance traveled in a single
   // subdivided timestep. Ideally much larger.
   double EPSILON = 1e-1 / subdivisions;
-  for (auto i = 0; i < mWorld->getNumDofs(); i++)
+  for (std::size_t i = 0; i < mWorld->getNumDofs(); i++)
   {
     snapshot.restore();
 
@@ -525,6 +496,7 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferencePosPosJacobian(
   }
 
   mWorld->setTimeStep(oldTimestep);
+  mWorld->getConstraintSolver()->setGradientEnabled(oldGradientEnabled);
   snapshot.restore();
 
   return J;
@@ -538,6 +510,8 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceVelPosJacobian(
 
   double oldTimestep = mWorld->getTimeStep();
   mWorld->setTimeStep(oldTimestep / subdivisions);
+  bool oldGradientEnabled = mWorld->getConstraintSolver()->getGradientEnabled();
+  mWorld->getConstraintSolver()->setGradientEnabled(false);
 
   Eigen::MatrixXd J(mNumDOFs, mNumDOFs);
 
@@ -551,7 +525,7 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceVelPosJacobian(
   Eigen::VectorXd originalPosition = mWorld->getPositions();
 
   double EPSILON = 1e-3 / subdivisions;
-  for (auto i = 0; i < mWorld->getNumDofs(); i++)
+  for (std::size_t i = 0; i < mWorld->getNumDofs(); i++)
   {
     snapshot.restore();
 
@@ -571,6 +545,7 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceVelPosJacobian(
   }
 
   mWorld->setTimeStep(oldTimestep);
+  mWorld->getConstraintSolver()->setGradientEnabled(oldGradientEnabled);
   snapshot.restore();
 
   return J;
@@ -675,6 +650,67 @@ Eigen::MatrixXd BackpropSnapshot::assembleMatrix(MatrixToAssemble whichMatrix)
     constraintCursor += groupMatrix.cols();
   }
   return matrix;
+}
+
+//==============================================================================
+template <typename Vec>
+Vec BackpropSnapshot::assembleVector(VectorToAssemble whichVector)
+{
+  if (mGradientMatrices.size() == 1)
+  {
+    return getVectorToAssemble<Vec>(mGradientMatrices[0], whichVector);
+  }
+
+  std::size_t size = 0;
+  for (std::size_t i = 0; i < mGradientMatrices.size(); i++)
+  {
+    // BOUNCE_DIAGONALS: bounce size is number of clamping contacts for each
+    // group RESTITUTION_DIAGONALS: bounce size is number of bouncing contacts
+    // (which is usually less than the number of clamping contacts) for each
+    // group CONTACT_CONSTRAINT_IMPULSES: This is the total number of contacts,
+    // including non-clamping ones CONTACT_CONSTRAINT_MAPPINGS: This is the
+    // total number of contacts, including non-clamping ones
+    size += getVectorToAssemble<Vec>(mGradientMatrices[0], whichVector).size();
+  }
+
+  Vec collected = Vec(size);
+
+  std::size_t cursor = 0;
+  for (std::size_t i = 0; i < mGradientMatrices.size(); i++)
+  {
+    const Vec& vec
+        = getVectorToAssemble<Vec>(mGradientMatrices[i], whichVector);
+    collected.segment(cursor, vec.size()) = vec;
+    cursor += vec.size();
+  }
+  return collected;
+}
+
+//==============================================================================
+template <>
+const Eigen::VectorXd& BackpropSnapshot::getVectorToAssemble(
+    std::shared_ptr<ConstrainedGroupGradientMatrices> matrices,
+    VectorToAssemble whichVector)
+{
+  if (whichVector == VectorToAssemble::BOUNCE_DIAGONALS)
+    return matrices->getBounceDiagonals();
+  if (whichVector == VectorToAssemble::RESTITUTION_DIAGONALS)
+    return matrices->getRestitutionDiagonals();
+  if (whichVector == VectorToAssemble::CONTACT_CONSTRAINT_IMPULSES)
+    return matrices->getContactConstraintImpluses();
+
+  assert(whichVector != VectorToAssemble::CONTACT_CONSTRAINT_MAPPINGS);
+  // Control will never reach this point, but this removes a warning
+  return Eigen::VectorXd(0);
+}
+
+template <>
+const Eigen::VectorXi& BackpropSnapshot::getVectorToAssemble(
+    std::shared_ptr<ConstrainedGroupGradientMatrices> matrices,
+    VectorToAssemble whichVector)
+{
+  assert(whichVector == VectorToAssemble::CONTACT_CONSTRAINT_MAPPINGS);
+  return matrices->getContactConstraintMappings();
 }
 
 } // namespace neural

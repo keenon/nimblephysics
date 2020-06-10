@@ -198,6 +198,21 @@ private:
   };
 
   Eigen::MatrixXd assembleMatrix(MatrixToAssemble whichMatrix);
+
+  enum VectorToAssemble
+  {
+    CONTACT_CONSTRAINT_IMPULSES,
+    CONTACT_CONSTRAINT_MAPPINGS,
+    BOUNCE_DIAGONALS,
+    RESTITUTION_DIAGONALS
+  };
+  template <typename Vec>
+  Vec assembleVector(VectorToAssemble whichVector);
+
+  template <typename Vec>
+  const Vec& getVectorToAssemble(
+      std::shared_ptr<ConstrainedGroupGradientMatrices> matrices,
+      VectorToAssemble whichVector);
 };
 
 using BackpropSnapshotPtr = std::shared_ptr<BackpropSnapshot>;

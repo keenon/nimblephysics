@@ -64,7 +64,9 @@ public:
       Eigen::VectorXd mX,
       Eigen::VectorXd hi,
       Eigen::VectorXd lo,
-      Eigen::VectorXi fIndex);
+      Eigen::VectorXi fIndex,
+      Eigen::VectorXd b,
+      Eigen::VectorXd aColNorms);
 
   /// This computes and returns the whole vel-vel jacobian for this group. For
   /// backprop, you don't actually need this matrix, you can compute backprop

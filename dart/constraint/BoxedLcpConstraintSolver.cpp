@@ -315,6 +315,12 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(ConstrainedGroup& group)
   Eigen::VectorXd loGradientBackup = mLo;
   Eigen::VectorXd hiGradientBackup = mHi;
   Eigen::VectorXi fIndexGradientBackup = mFIndex;
+  Eigen::VectorXd bGradientBackup = mB;
+  Eigen::VectorXd aColNormGradientBackup = Eigen::VectorXd(n);
+  for (std::size_t i = 0; i < n; i++)
+  {
+    aColNormGradientBackup(i) = mA.col(i).squaredNorm();
+  }
 
   const bool earlyTermination = (mSecondaryBoxedLcpSolver != nullptr);
   assert(mBoxedLcpSolver);
@@ -385,7 +391,12 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(ConstrainedGroup& group)
   if (group.getGradientConstraintMatrices())
   {
     group.getGradientConstraintMatrices()->constructMatrices(
-        mX, hiGradientBackup, loGradientBackup, fIndexGradientBackup);
+        mX,
+        hiGradientBackup,
+        loGradientBackup,
+        fIndexGradientBackup,
+        bGradientBackup,
+        aColNormGradientBackup);
   }
 }
 

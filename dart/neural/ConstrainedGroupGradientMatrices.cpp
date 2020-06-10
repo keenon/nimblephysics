@@ -140,7 +140,9 @@ void ConstrainedGroupGradientMatrices::constructMatrices(
     Eigen::VectorXd mX,
     Eigen::VectorXd hi,
     Eigen::VectorXd lo,
-    Eigen::VectorXi fIndex)
+    Eigen::VectorXi fIndex,
+    Eigen::VectorXd b,
+    Eigen::VectorXd aColNorms)
 {
   mContactConstraintImpulses = mX;
   mContactConstraintMappings = fIndex;
@@ -156,6 +158,14 @@ void ConstrainedGroupGradientMatrices::constructMatrices(
   // - "Not Clamping": These are constraints with a zero constraint force. These
   //                   don't actually get used anywhere in the gradient
   //                   computation, and so can be safely ignored.
+  //
+  // There's a special case where the gradient technically doesn't exist, and
+  // we're going to break ties about which way we want the gradient to go. If
+  // relative velocity is 0, and so is relative force, then we're actually going
+  // to call that constraint "Clamping" rather than "Not Clamping", though both
+  // could apply. Our motivation is for when a contact is at rest, but has
+  // static friction, we don't want to discard the friction constraints just
+  // because they have 0 force and 0 velocity.
 
   // Declare a shared array to re-use for mapping info for each skeleton.
   // Semantics are as follows:
@@ -165,8 +175,6 @@ void ConstrainedGroupGradientMatrices::constructMatrices(
   // - If mappings[j] == IRRELEVANT, constraint "j" is doesn't effect this
   //   skeleton, and so can be safely ignored.
 
-  Eigen::VectorXi contactConstraintMappings
-      = Eigen::VectorXi(mNumConstraintDim);
   int* clampingIndex = new int[mNumConstraintDim];
   int* upperBoundIndex = new int[mNumConstraintDim];
   int* bouncingIndex = new int[mNumConstraintDim];
@@ -177,26 +185,26 @@ void ConstrainedGroupGradientMatrices::constructMatrices(
   // Fill in mappings[] with the correct values, overwriting previous data
   for (std::size_t j = 0; j < mNumConstraintDim; j++)
   {
-    // If the Eigen::VectorXd representing the impulse test is of length 0,
-    // that means that constraint "j" doesn't effect skeleton "i".
-    // TODO(keenon): This has gone away in the format where we're doing this
-    // across a whole constraint group.
-    /*
-    if (mSkeletonsImpulseTests[i][j].size() == 0
-        || mSkeletonsImpulseTests[i][j].isZero())
+    // This is the squared l2 norm of the column of A corresponding to this
+    // constraint. If it's too small, the optimizer will freely set the force on
+    // this constraint because it has negligible effect, which can lead to weird
+    // effects like calling a constraint force that's perpendicular to the
+    // degrees of freedom of the skeleton getting set to UPPER_BOUND or
+    // CLAMPING.
+    const double constraintActionNorm = aColNorms(j);
+    if (constraintActionNorm < 1e-9)
     {
-      contactConstraintMappings(j) = neural::ConstraintMapping::IRRELEVANT;
+      mContactConstraintMappings(j) = neural::ConstraintMapping::NOT_CLAMPING;
+      /*
+      std::cout << "Labeled " << j
+                << " as NOT_CLAMPING because constraintActionNorm is "
+                << constraintActionNorm << std::endl;
+                */
       continue;
     }
-    */
-    const double constraintForce = mX(j);
 
-    // If constraintForce is zero, this means "j" is in "Not Clamping"
-    if (std::abs(constraintForce) < 1e-9)
-    {
-      contactConstraintMappings(j) = neural::ConstraintMapping::NOT_CLAMPING;
-      continue;
-    }
+    const double constraintForce = mX(j);
+    const double relativeVelocity = b(j);
 
     double upperBound = hi(j);
     double lowerBound = lo(j);
@@ -207,10 +215,28 @@ void ConstrainedGroupGradientMatrices::constructMatrices(
       lowerBound *= mX(fIndexPointer);
     }
 
+    // If constraintForce is zero, this means "j" is in "Not Clamping" unless
+    // relative velocity is also zero
+    if (std::abs(constraintForce) < 1e-9)
+    {
+      if (std::abs(relativeVelocity) < 1e-9)
+      {
+        mContactConstraintMappings(j) = neural::ConstraintMapping::CLAMPING;
+        clampingIndex[j] = numClamping;
+        numClamping++;
+        // TODO: do we ever want to mark this as bouncing?
+      }
+      else
+      {
+        mContactConstraintMappings(j) = neural::ConstraintMapping::NOT_CLAMPING;
+      }
+      continue;
+    }
+
     // This means "j" is in "Clamping"
     if (mX(j) > lowerBound && mX(j) < upperBound)
     {
-      contactConstraintMappings(j) = neural::ConstraintMapping::CLAMPING;
+      mContactConstraintMappings(j) = neural::ConstraintMapping::CLAMPING;
       clampingIndex[j] = numClamping;
       numClamping++;
       if (mRestitutionCoeffs[j] > 0)
@@ -233,7 +259,7 @@ void ConstrainedGroupGradientMatrices::constructMatrices(
                 << ", upperBound=" << upperBound
                 << ", lowerBound=" << lowerBound << std::endl;
       */
-      contactConstraintMappings(j) = fIndexPointer;
+      mContactConstraintMappings(j) = fIndexPointer;
       upperBoundIndex[j] = numUpperBound;
       numUpperBound++;
     }
@@ -242,7 +268,7 @@ void ConstrainedGroupGradientMatrices::constructMatrices(
     // changing to compensate.
     else
     {
-      contactConstraintMappings(j) = neural::ConstraintMapping::NOT_CLAMPING;
+      mContactConstraintMappings(j) = neural::ConstraintMapping::NOT_CLAMPING;
     }
   }
 
@@ -258,10 +284,16 @@ void ConstrainedGroupGradientMatrices::constructMatrices(
   mBouncingConstraintMatrix = Eigen::MatrixXd::Zero(mNumDOFs, numBouncing);
   mRestitutionDiagonals = Eigen::VectorXd(numBouncing);
 
+  /*
+  std::cout << "numClamping: " << numClamping << std::endl;
+  std::cout << "numUpperBound: " << numUpperBound << std::endl;
+  std::cout << "numBouncing: " << numBouncing << std::endl;
+  */
+
   // Copy impulse tests into the matrices
   for (size_t j = 0; j < mNumConstraintDim; j++)
   {
-    if (contactConstraintMappings(j) == neural::ConstraintMapping::CLAMPING)
+    if (mContactConstraintMappings(j) == neural::ConstraintMapping::CLAMPING)
     {
       assert(numClamping > clampingIndex[j]);
       mClampingConstraintMatrix.col(clampingIndex[j]) = mImpulseTests[j];
@@ -274,7 +306,7 @@ void ConstrainedGroupGradientMatrices::constructMatrices(
         mRestitutionDiagonals(bouncingIndex[j]) = mRestitutionCoeffs[j];
       }
     }
-    else if (contactConstraintMappings(j) >= 0) // means we're an UPPER_BOUND
+    else if (mContactConstraintMappings(j) >= 0) // means we're an UPPER_BOUND
     {
       assert(numUpperBound > upperBoundIndex[j]);
       mUpperBoundConstraintMatrix.col(upperBoundIndex[j]) = mImpulseTests[j];
@@ -286,9 +318,9 @@ void ConstrainedGroupGradientMatrices::constructMatrices(
   // Set up mUpperboundMappingMatrix (aka E)
   for (size_t j = 0; j < mNumConstraintDim; j++)
   {
-    if (contactConstraintMappings(j) >= 0) // means we're an UPPER_BOUND
+    if (mContactConstraintMappings(j) >= 0) // means we're an UPPER_BOUND
     {
-      const int fIndexPointer = contactConstraintMappings(j);
+      const int fIndexPointer = mContactConstraintMappings(j);
       const double upperBound = mX(fIndexPointer) * hi(j);
       const double lowerBound = mX(fIndexPointer) * lo(j);
 
@@ -637,8 +669,8 @@ ConstrainedGroupGradientMatrices::getRestitutionDiagonals() const
 }
 
 //==============================================================================
-/// These was the fIndex() vector used to construct this. Pretty much only
-/// here for testing.
+/// These was the vector of neural::ConstraintMapping mappings used to construct
+/// this, where >= 0 indicates UPPER_BOUND. Pretty much only here for testing.
 const Eigen::VectorXi&
 ConstrainedGroupGradientMatrices::getContactConstraintMappings() const
 {
