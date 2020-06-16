@@ -391,6 +391,10 @@ void ContactConstraint::getInformation(ConstraintInfo* info)
         bouncingVelocity = mMaxErrorReductionVelocity;
     }
 
+    // At this point, the bouncing velocity is exactly due to the penetration
+    // correction hack saying "bouncing" should be non-zero.
+    mPenetrationCorrectionVelocity = bouncingVelocity;
+
     // B. Restitution
     if (mIsBounceOn)
     {
@@ -408,6 +412,10 @@ void ContactConstraint::getInformation(ConstraintInfo* info)
           {
             bouncingVelocity = DART_MAX_BOUNCING_VELOCITY;
           }
+
+          // If we are actually bouncing, then that overwrites the penetration
+          // correction hack.
+          mPenetrationCorrectionVelocity = 0.0;
         }
       }
     }
@@ -449,6 +457,10 @@ void ContactConstraint::getInformation(ConstraintInfo* info)
         bouncingVelocity = mMaxErrorReductionVelocity;
     }
 
+    // At this point, the bouncing velocity is exactly due to the penetration
+    // correction hack saying "bouncing" should be non-zero.
+    mPenetrationCorrectionVelocity = bouncingVelocity;
+
     // B. Restitution
     if (mIsBounceOn)
     {
@@ -464,6 +476,10 @@ void ContactConstraint::getInformation(ConstraintInfo* info)
 
           if (bouncingVelocity > DART_MAX_BOUNCING_VELOCITY)
             bouncingVelocity = DART_MAX_BOUNCING_VELOCITY;
+
+          // If we are actually bouncing, then that overwrites the penetration
+          // correction hack.
+          mPenetrationCorrectionVelocity = 0.0;
         }
       }
     }
@@ -795,6 +811,12 @@ double ContactConstraint::getCoefficientOfRestitution()
     return 0;
   else
     return mRestitutionCoeff;
+}
+
+//==============================================================================
+double ContactConstraint::getPenetrationCorrectionVelocity()
+{
+  return mPenetrationCorrectionVelocity;
 }
 
 } // namespace constraint

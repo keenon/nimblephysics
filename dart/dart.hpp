@@ -30,13 +30,14 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "dart/config.hpp"
-#include "dart/common/common.hpp"
-#include "dart/math/math.hpp"
-#include "dart/integration/integration.hpp"
 #include "dart/collision/collision.hpp"
-#include "dart/lcpsolver/lcpsolver.hpp"
+#include "dart/common/common.hpp"
+#include "dart/config.hpp"
 #include "dart/constraint/constraint.hpp"
-#include "dart/optimizer/optimizer.hpp"
 #include "dart/dynamics/dynamics.hpp"
+#include "dart/integration/integration.hpp"
+#include "dart/lcpsolver/lcpsolver.hpp"
+#include "dart/math/math.hpp"
+#include "dart/neural/neural.hpp"
+#include "dart/optimizer/optimizer.hpp"
 #include "dart/simulation/simulation.hpp"

@@ -139,6 +139,10 @@ public:
   /// bouncing collisions.
   Eigen::VectorXd getRestitutionDiagonals();
 
+  /// Returns the penetration correction hack "bounce" (or 0 if the contact is
+  /// not inter-penetrating or is actively bouncing) at each contact point.
+  Eigen::VectorXd getPenetrationCorrectionVelocities();
+
   ~BackpropSnapshot();
 
 protected:
@@ -204,7 +208,8 @@ private:
     CONTACT_CONSTRAINT_IMPULSES,
     CONTACT_CONSTRAINT_MAPPINGS,
     BOUNCE_DIAGONALS,
-    RESTITUTION_DIAGONALS
+    RESTITUTION_DIAGONALS,
+    PENETRATION_VELOCITY_HACK
   };
   template <typename Vec>
   Vec assembleVector(VectorToAssemble whichVector);

@@ -66,12 +66,15 @@ void ConstrainedGroupGradientMatrices::registerConstraint(
     const std::shared_ptr<constraint::ConstraintBase>& constraint)
 {
   double coeff = constraint->getCoefficientOfRestitution();
+  double penetrationHack = constraint->getPenetrationCorrectionVelocity();
   mRestitutionCoeffs.push_back(coeff);
+  mPenetrationCorrectionVelocities.push_back(penetrationHack);
   // Pad with 0s, since these values always apply to the first dimension of the
   // constraint even if there are more (ex. friction) dimensions
   for (std::size_t i = 1; i < constraint->getDimension(); i++)
   {
     mRestitutionCoeffs.push_back(0);
+    mPenetrationCorrectionVelocities.push_back(0);
   }
 }
 
@@ -248,8 +251,10 @@ void ConstrainedGroupGradientMatrices::constructMatrices(
     // Otherwise, if fIndex != -1, "j" is in "Upper Bound"
     // Note, this could also mean "j" is at it's lower bound, but we call the
     // group of all "j"'s that have reached their dependent bound "Upper
-    // Bound"
-    else if (fIndexPointer != -1)
+    // Bound". The only exception to this rule is if the fIndex pointer is
+    // pointing at an index that's not clamping, in which case this is also not
+    // clamping.
+    else if (fIndexPointer != -1 && std::abs(mX(fIndexPointer)) > 1e-9)
     {
       /*
       std::cout << "Listing " << j << " as UB: mX=" << mX(j)
@@ -281,6 +286,7 @@ void ConstrainedGroupGradientMatrices::constructMatrices(
       = Eigen::MatrixXd::Zero(mNumDOFs, numUpperBound);
   mUpperBoundMappingMatrix = Eigen::MatrixXd::Zero(numUpperBound, numClamping);
   mBounceDiagonals = Eigen::VectorXd(numClamping);
+  mPenetrationCorrectionVelocitiesVec = Eigen::VectorXd(numClamping);
   mBouncingConstraintMatrix = Eigen::MatrixXd::Zero(mNumDOFs, numBouncing);
   mRestitutionDiagonals = Eigen::VectorXd(numBouncing);
 
@@ -300,6 +306,8 @@ void ConstrainedGroupGradientMatrices::constructMatrices(
       mMassedClampingConstraintMatrix.col(clampingIndex[j])
           = mMassedImpulseTests[j];
       mBounceDiagonals(clampingIndex[j]) = 1 + mRestitutionCoeffs[j];
+      mPenetrationCorrectionVelocitiesVec(clampingIndex[j])
+          = mPenetrationCorrectionVelocities[j];
       if (mRestitutionCoeffs[j] > 0)
       {
         mBouncingConstraintMatrix.col(bouncingIndex[j]) = mImpulseTests[j];
@@ -324,19 +332,23 @@ void ConstrainedGroupGradientMatrices::constructMatrices(
       const double upperBound = mX(fIndexPointer) * hi(j);
       const double lowerBound = mX(fIndexPointer) * lo(j);
 
+      assert(
+          mContactConstraintMappings(fIndexPointer)
+          == neural::ConstraintMapping::CLAMPING);
+
       // If we're clamped at the upper bound
       if (std::abs(mX(j) - upperBound) < std::abs(mX(j) - lowerBound))
       {
-        if (std::abs(mX(j) - upperBound) > 1e-5)
+        if (std::abs(mX(j) - upperBound) > 1e-2)
         {
           std::cout << "Lower bound: " << lowerBound << std::endl;
           std::cout << "Upper bound: " << upperBound << std::endl;
-          std::cout << "mHi(j): " << hi(j) << std::endl;
-          std::cout << "mLo(j): " << lo(j) << std::endl;
-          std::cout << "mX(j): " << mX(j) << std::endl;
+          std::cout << "mHi(j = " << j << "): " << hi(j) << std::endl;
+          std::cout << "mLo(j = " << j << "): " << lo(j) << std::endl;
+          std::cout << "mX(j = " << j << "): " << mX(j) << std::endl;
           std::cout << "fIndex: " << fIndexPointer << std::endl;
         }
-        assert(std::abs(mX(j) - upperBound) < 1e-5);
+        assert(std::abs(mX(j) - upperBound) < 1e-2);
         mUpperBoundMappingMatrix(
             upperBoundIndex[j], clampingIndex[fIndexPointer])
             = hi(j);
@@ -344,16 +356,16 @@ void ConstrainedGroupGradientMatrices::constructMatrices(
       // If we're clamped at the lower bound
       else
       {
-        if (std::abs(mX(j) - lowerBound) > 1e-5)
+        if (std::abs(mX(j) - lowerBound) > 1e-2)
         {
           std::cout << "Lower bound: " << lowerBound << std::endl;
           std::cout << "Upper bound: " << upperBound << std::endl;
-          std::cout << "mHi(j): " << hi(j) << std::endl;
-          std::cout << "mLo(j): " << lo(j) << std::endl;
-          std::cout << "mX(j): " << mX(j) << std::endl;
+          std::cout << "mHi(j = " << j << "): " << hi(j) << std::endl;
+          std::cout << "mLo(j = " << j << "): " << lo(j) << std::endl;
+          std::cout << "mX(j = " << j << "): " << mX(j) << std::endl;
           std::cout << "fIndex: " << fIndexPointer << std::endl;
         }
-        assert(std::abs(mX(j) - lowerBound) < 1e-5);
+        assert(std::abs(mX(j) - lowerBound) < 1e-2);
         mUpperBoundMappingMatrix(
             upperBoundIndex[j], clampingIndex[fIndexPointer])
             = lo(j);
@@ -550,18 +562,20 @@ void ConstrainedGroupGradientMatrices::backprop(
     LossGradient& thisTimestepLoss, const LossGradient& nextTimestepLoss)
 {
   /*
+
   The forward computation graph looks like this:
 
-  p_t ---------------------> p_t+1 ---->
-                               ^
-                               |
-  v_t ------> v_t+1 -----------+------->
-                ^
-                |
-  f_t ----------+
+  -----------> p_t ---------> p_t+1 ---->
+                       ^
+                       |
+  v_t -----------------+----> v_t+1 ---->
+                                ^
+                                |
+  f_t --------------------------+
+
   */
 
-  // Compute loss wrt p_t:
+  // p_t --> p_t+1:
   if (mBouncingConstraintMatrix.size() == 0)
   {
     thisTimestepLoss.lossWrtPosition = nextTimestepLoss.lossWrtPosition;
@@ -572,35 +586,58 @@ void ConstrainedGroupGradientMatrices::backprop(
     thisTimestepLoss.lossWrtPosition = X * nextTimestepLoss.lossWrtPosition;
   }
 
-  // Compute loss wrt v_t+1: This is just p_t * mTimeStep
+  // v_t --> p_t+1:
+  // this is dT*X, which can be shortcut by just grabbing this timestep loss wrt
+  // position, since that's just X
   thisTimestepLoss.lossWrtVelocity
       = mTimeStep * thisTimestepLoss.lossWrtPosition;
 
   // Compute common precursor to loss wrt v_t and f_t:
   Eigen::MatrixXd A_c = getClampingConstraintMatrix();
-  Eigen::MatrixXd V_c = getMassedClampingConstraintMatrix();
-  Eigen::MatrixXd V_ub = getMassedUpperBoundConstraintMatrix();
-  Eigen::MatrixXd E = getUpperBoundMappingMatrix();
 
-  Eigen::MatrixXd constraintForceToImpliedTorques = V_c + (V_ub * E);
-  Eigen::MatrixXd forceToVelTranspose
-      = constraintForceToImpliedTorques.transpose() * A_c;
-  auto velToForceTranspose
-      = forceToVelTranspose.completeOrthogonalDecomposition();
+  // If there are no clamping constraints:
+  if (A_c.size() == 0)
+  {
+    // v_t --> v_t+1:
+    // vel-vel = I
+    thisTimestepLoss.lossWrtVelocity += nextTimestepLoss.lossWrtVelocity;
 
-  Eigen::VectorXd z = velToForceTranspose.solve(
-      constraintForceToImpliedTorques.transpose()
-      * nextTimestepLoss.lossWrtVelocity);
-  z = mBounceDiagonals.cwiseProduct(z);
+    // f_t --> v_t+1:
+    // force-vel = timeStep * Minv
+    thisTimestepLoss.lossWrtTorque = nextTimestepLoss.lossWrtVelocity;
+    implicitMultiplyByInvMassMatrix(thisTimestepLoss.lossWrtTorque);
+    thisTimestepLoss.lossWrtTorque *= mTimeStep;
+  }
+  else
+  {
+    Eigen::MatrixXd V_c = getMassedClampingConstraintMatrix();
+    Eigen::MatrixXd V_ub = getMassedUpperBoundConstraintMatrix();
+    Eigen::MatrixXd E = getUpperBoundMappingMatrix();
 
-  // Compute loss wrt v_t:
-  thisTimestepLoss.lossWrtVelocity = nextTimestepLoss.lossWrtVelocity - A_c * z;
+    Eigen::MatrixXd constraintForceToImpliedTorques = V_c + (V_ub * E);
+    Eigen::MatrixXd forceToVelTranspose
+        = constraintForceToImpliedTorques.transpose() * A_c;
+    auto velToForceTranspose
+        = forceToVelTranspose.completeOrthogonalDecomposition();
 
-  // Compute loss wrt f_t:
-  thisTimestepLoss.lossWrtTorque = nextTimestepLoss.lossWrtVelocity;
-  implicitMultiplyByInvMassMatrix(thisTimestepLoss.lossWrtTorque);
-  thisTimestepLoss.lossWrtTorque -= V_c * z;
-  thisTimestepLoss.lossWrtTorque *= mTimeStep;
+    // (V_c + (V_ub * E))^T * nextTimestepLoss.lossWrtVelocity
+    Eigen::VectorXd tmp = constraintForceToImpliedTorques.transpose()
+                          * nextTimestepLoss.lossWrtVelocity;
+    // (A_c^T(V_c + (V_ub * E))^T).pinv() * tmp
+    Eigen::VectorXd z = velToForceTranspose.solve(tmp);
+    // z = B * z
+    z = mBounceDiagonals.cwiseProduct(z);
+
+    // v_t --> v_t+1:
+    thisTimestepLoss.lossWrtVelocity
+        += nextTimestepLoss.lossWrtVelocity - A_c * z;
+
+    // f_t --> v_t+1:
+    thisTimestepLoss.lossWrtTorque = nextTimestepLoss.lossWrtVelocity;
+    implicitMultiplyByInvMassMatrix(thisTimestepLoss.lossWrtTorque);
+    thisTimestepLoss.lossWrtTorque -= V_c * z;
+    thisTimestepLoss.lossWrtTorque *= mTimeStep;
+  }
 }
 
 //==============================================================================
@@ -694,6 +731,13 @@ const std::vector<std::shared_ptr<dynamics::Skeleton>>&
 ConstrainedGroupGradientMatrices::getSkeletons() const
 {
   return mSkeletons;
+}
+
+//==============================================================================
+const Eigen::VectorXd&
+ConstrainedGroupGradientMatrices::getPenetrationCorrectionVelocities() const
+{
+  return mPenetrationCorrectionVelocitiesVec;
 }
 
 } // namespace neural

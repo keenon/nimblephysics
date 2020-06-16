@@ -139,6 +139,11 @@ protected:
   /// coefficient of restitution
   double getCoefficientOfRestitution() override;
 
+  /// Returns 0 if this constraint isn't using the "bouncing" hack to correct
+  /// penetration. Otherwise, this returns the velocity being used by the
+  /// penetration correction hack.
+  double getPenetrationCorrectionVelocity() override;
+
 private:
   using TangentBasisMatrix = Eigen::Matrix<double, 3, 2>;
 
@@ -174,6 +179,9 @@ private:
 
   /// Coefficient of restitution
   double mRestitutionCoeff;
+
+  /// This is the component of the contact force due to penetration correction
+  double mPenetrationCorrectionVelocity;
 
   /// True if we are going fast enough to bounce, used for gradient computation
   bool mDidBounce;

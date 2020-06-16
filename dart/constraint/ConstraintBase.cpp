@@ -117,5 +117,11 @@ double ConstraintBase::getCoefficientOfRestitution()
   return 0;
 }
 
+//==============================================================================
+double ConstraintBase::getPenetrationCorrectionVelocity()
+{
+  return 0;
+}
+
 } // namespace constraint
 } // namespace dart

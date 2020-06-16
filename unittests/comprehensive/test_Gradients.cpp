@@ -107,8 +107,15 @@ bool verifyClassicClampingConstraintMatrix(
   // should see no constraint forces.
 
   Eigen::MatrixXd A_c = classicPtr->getClampingConstraintMatrix();
+  if (A_c.size() == 0)
+  {
+    // this means that there's no clamping contacts
+    return true;
+  }
+
   Eigen::MatrixXd A_cInv
-      = A_c.completeOrthogonalDecomposition().pseudoInverse();
+      = A_c.size() > 0 ? A_c.completeOrthogonalDecomposition().pseudoInverse()
+                       : Eigen::MatrixXd(0, 0);
   MatrixXd mapper = A_cInv.eval().transpose() * A_c.transpose();
   VectorXd violationVelocities = mapper * proposedVelocities;
   VectorXd cleanVelocities = proposedVelocities - violationVelocities;
@@ -249,6 +256,29 @@ bool verifyClassicProjectionIntoClampsMatrix(
   MatrixXd P_c = classicPtr->getProjectionIntoClampsMatrix();
   VectorXd analyticalConstraintForces = -1 * P_c * integratedVelocities;
 
+  // Compute the offset required from the penetration correction velocities
+
+  VectorXd penetrationCorrectionVelocities
+      = classicPtr->getPenetrationCorrectionVelocities();
+  Eigen::MatrixXd A_c = classicPtr->getClampingConstraintMatrix();
+  Eigen::MatrixXd V_c = classicPtr->getMassedClampingConstraintMatrix();
+  Eigen::MatrixXd V_ub = classicPtr->getMassedUpperBoundConstraintMatrix();
+  Eigen::MatrixXd E = classicPtr->getUpperBoundMappingMatrix();
+  Eigen::MatrixXd constraintForceToImpliedTorques = V_c + (V_ub * E);
+  Eigen::MatrixXd forceToVel
+      = A_c.eval().transpose() * constraintForceToImpliedTorques;
+  Eigen::MatrixXd velToForce
+      = forceToVel.size() > 0
+            ? forceToVel.completeOrthogonalDecomposition().pseudoInverse()
+            : Eigen::MatrixXd(0, 0);
+  VectorXd penetrationOffset
+      = (velToForce * penetrationCorrectionVelocities) / world->getTimeStep();
+
+  // Sum the two constraints forces together
+
+  VectorXd analyticalConstraintForcesCorrected
+      = analyticalConstraintForces + penetrationOffset;
+
   // Get the actual constraint forces
 
   VectorXd contactConstraintForces
@@ -266,8 +296,8 @@ bool verifyClassicProjectionIntoClampsMatrix(
   {
     if (mappings(i) == neural::ConstraintMapping::CLAMPING)
     {
-      analyticalError(pointer)
-          = contactConstraintForces(i) - analyticalConstraintForces(pointer);
+      analyticalError(pointer) = contactConstraintForces(i)
+                                 - analyticalConstraintForcesCorrected(pointer);
       pointer++;
     }
   }
@@ -291,9 +321,20 @@ bool verifyClassicProjectionIntoClampsMatrix(
     }
     std::cout << "Constraint forces: " << std::endl
               << contactConstraintForces << std::endl;
-    std::cout << "-(P_c * proposedVelocities) (should be the same as above): "
+    std::cout << "-(P_c * proposedVelocities) (should be the roughly same as "
+                 "actual constraint forces): "
               << std::endl
               << analyticalConstraintForces << std::endl;
+    std::cout << "Penetration correction velocities: " << std::endl
+              << penetrationCorrectionVelocities << std::endl;
+    std::cout << "(A_c^T(V_c + V_ub*E)).pinv() * correction_vels (should "
+                 "account for any errors in above): "
+              << std::endl
+              << penetrationOffset << std::endl;
+    std::cout << "Corrected analytical constraint forces (should be the same "
+                 "as actual constraint forces): "
+              << std::endl
+              << analyticalConstraintForcesCorrected << std::endl;
     std::cout << "Analytical error (should be zero):" << std::endl
               << analyticalError << std::endl;
     return false;
@@ -333,7 +374,9 @@ bool verifyMassedProjectionIntoClampsMatrix(
                                * classicPtr->getInvMassMatrix()
                                * constraintForceToImpliedTorques;
   Eigen::MatrixXd velToForce
-      = forceToVel.completeOrthogonalDecomposition().pseudoInverse();
+      = forceToVel.size() > 0
+            ? forceToVel.completeOrthogonalDecomposition().pseudoInverse()
+            : Eigen::MatrixXd(0, 0);
   Eigen::MatrixXd bounce = classicPtr->getBounceDiagonals().asDiagonal();
   Eigen::MatrixXd P_c_recovered
       = (1.0 / world->getTimeStep()) * velToForce * bounce * A_c.transpose();
@@ -410,8 +453,6 @@ bool verifyForceVelJacobian(WorldPtr world, VectorXd proposedVelocities)
 
 bool verifyVelGradients(WorldPtr world, VectorXd worldVel)
 {
-  return verifyClassicProjectionIntoClampsMatrix(world, worldVel);
-  /*
   return (
       verifyClassicClampingConstraintMatrix(world, worldVel)
       && verifyMassedClampingConstraintMatrix(world, worldVel)
@@ -420,7 +461,6 @@ bool verifyVelGradients(WorldPtr world, VectorXd worldVel)
       && verifyMassedProjectionIntoClampsMatrix(world, worldVel)
       && verifyVelVelJacobian(world, worldVel)
       && verifyForceVelJacobian(world, worldVel));
-      */
 }
 
 bool verifyPosPosJacobianApproximation(WorldPtr world, std::size_t subdivisions)
@@ -499,31 +539,35 @@ bool verifyBackpropInstance(
   /*
   The forward computation graph looks like this:
 
-  p_t ---------------------> p_t+1 ---->
-                               ^
-                               |
-  v_t ------> v_t+i -----------+------->
-                ^
-                |
-  f_t ----------+
+  -----------> p_t ---------> p_t+1 ---->
+                       ^
+                       |
+  v_t -----------------+----> v_t+1 ---->
+                                ^
+                                |
+  f_t --------------------------+
   */
 
   // p_t
-  VectorXd lossWrtThisPosition = classicPtr->getPosPosJacobian().transpose()
-                                 * nextTimeStep.lossWrtPosition;
-
-  // v_t+1
-  VectorXd lossWrtNextVelocity = nextTimeStep.lossWrtVelocity
-                                 + classicPtr->getVelPosJacobian().transpose()
-                                       * nextTimeStep.lossWrtPosition;
+  VectorXd lossWrtThisPosition =
+      // p_t --> p_t+1
+      classicPtr->getPosPosJacobian().transpose()
+      * nextTimeStep.lossWrtPosition;
 
   // v_t
-  VectorXd lossWrtThisVelocity = classicPtr->getVelVelJacobian().transpose()
-                                 * nextTimeStep.lossWrtVelocity;
+  VectorXd lossWrtThisVelocity =
+      // v_t --> v_t+1
+      (classicPtr->getVelVelJacobian().transpose()
+       * nextTimeStep.lossWrtVelocity)
+      // v_t --> p_t+1
+      + (classicPtr->getVelPosJacobian().transpose()
+         * nextTimeStep.lossWrtPosition);
 
   // f_t
-  VectorXd lossWrtThisTorque = classicPtr->getForceVelJacobian().transpose()
-                               * nextTimeStep.lossWrtVelocity;
+  VectorXd lossWrtThisTorque =
+      // f_t --> v_t+1
+      classicPtr->getForceVelJacobian().transpose()
+      * nextTimeStep.lossWrtVelocity;
 
   if (!equals(lossWrtThisPosition, thisTimeStep.lossWrtPosition, 1e-5)
       || !equals(lossWrtThisVelocity, thisTimeStep.lossWrtVelocity, 1e-5)
@@ -537,6 +581,10 @@ bool verifyBackpropInstance(
               << lossWrtThisPosition << std::endl;
     std::cout << "Analytical: loss wrt position at time t:" << std::endl
               << thisTimeStep.lossWrtPosition << std::endl;
+    std::cout << "Brute force: pos-pos Jac:" << std::endl
+              << classicPtr->getPosPosJacobian() << std::endl;
+    std::cout << "Brute force: vel-pos Jac:" << std::endl
+              << classicPtr->getVelPosJacobian() << std::endl;
     std::cout << "Brute force: loss wrt velocity at time t:" << std::endl
               << lossWrtThisVelocity << std::endl;
     std::cout << "Analytical: loss wrt velocity at time t:" << std::endl
@@ -1385,3 +1433,145 @@ TEST(GRADIENTS, MULTIGROUP_4)
 {
   testMultigroup(4);
 }
+
+/******************************************************************************
+
+This test sets up a configuration that looks something like this:
+
+                        |
+                  _____ |
+                O _____O| < Fixed wall
+              / /       |
+             / /        |
+            / /         |
+            O           |
+           | |          |
+           | |          |
+           | |          |
+            O
+            ^             ^
+      Rotating base
+
+It's a robot arm, with a rotating base, with "numLinks" links and
+"rotationDegree" position at each link. There's also a fixed plane at the end of
+the robot arm that it intersects with.
+*/
+void testRobotArm(std::size_t numLinks, double rotationRadians)
+{
+  // World
+  WorldPtr world = World::create();
+
+  SkeletonPtr arm = Skeleton::create("arm");
+  BodyNode* parent = nullptr;
+
+  for (std::size_t i = 0; i < numLinks; i++)
+  {
+    RevoluteJoint::Properties jointProps;
+    jointProps.mName = "revolute_" + std::to_string(i);
+    BodyNode::Properties bodyProps;
+    bodyProps.mName = "arm_" + std::to_string(i);
+    std::pair<RevoluteJoint*, BodyNode*> jointPair
+        = arm->createJointAndBodyNodePair<RevoluteJoint>(
+            parent, jointProps, bodyProps);
+    if (parent != nullptr)
+    {
+      Eigen::Isometry3d armOffset = Eigen::Isometry3d::Identity();
+      armOffset.translation() = Eigen::Vector3d(0, 1.0, 0);
+      jointPair.first->setTransformFromParentBodyNode(armOffset);
+    }
+    jointPair.second->setMass(1.0);
+    parent = jointPair.second;
+  }
+
+  std::shared_ptr<SphereShape> endShape(new SphereShape(1.0));
+  ShapeNode* endNode
+      = parent->createShapeNodeWith<VisualAspect, CollisionAspect>(endShape);
+  parent->setFrictionCoeff(1);
+
+  arm->setPositions(Eigen::VectorXd::Ones(arm->getNumDofs()) * rotationRadians);
+  world->addSkeleton(arm);
+
+  SkeletonPtr wall = Skeleton::create("wall");
+  std::pair<WeldJoint*, BodyNode*> jointPair
+      = wall->createJointAndBodyNodePair<WeldJoint>(nullptr);
+  std::shared_ptr<BoxShape> wallShape(
+      new BoxShape(Eigen::Vector3d(1.0, 10.0, 10.0)));
+  ShapeNode* wallNode
+      = jointPair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(
+          wallShape);
+  world->addSkeleton(wall);
+  // jointPair.second->setFrictionCoeff(0.0);
+
+  Eigen::Isometry3d wallLocalOffset = Eigen::Isometry3d::Identity();
+  wallLocalOffset.translation() = parent->getWorldTransform().translation()
+                                  + Eigen::Vector3d(-(1.5 - 1e-7), 0.0, 0);
+  jointPair.first->setTransformFromParentBodyNode(wallLocalOffset);
+
+  /*
+  // Run collision detection
+  world->getConstraintSolver()->solve();
+
+  // Check
+  auto result = world->getLastCollisionResult();
+  if (result.getNumContacts() > 0)
+  {
+    std::cout << "Num contacts: " << result.getNumContacts() << std::endl;
+    std::cout << "end affector offset: " << std::endl
+              << endNode->getWorldTransform().matrix() << std::endl;
+    std::cout << "wall node position: " << std::endl
+              << wallNode->getWorldTransform().matrix() << std::endl;
+  }
+  */
+
+  // arm->computeForwardDynamics();
+  // arm->integrateVelocities(world->getTimeStep());
+  // -0.029 at 0.5
+  // -0.323 at 5.0
+  arm->setVelocities(Eigen::VectorXd::Ones(arm->getNumDofs()) * 0.001);
+
+  VectorXd worldVel = world->getVelocities();
+
+  EXPECT_TRUE(verifyVelGradients(world, worldVel));
+  EXPECT_TRUE(verifyBackprop(world));
+}
+
+TEST(GRADIENTS, ARM_3_LINK_30_DEG)
+{
+  testRobotArm(3, 30.0 / 180 * 3.1415);
+}
+
+TEST(GRADIENTS, ARM_5_LINK_30_DEG)
+{
+  // This test wraps an arm around, and it's actually breaking contact, so this
+  // tests unconstrained free-motion
+  testRobotArm(5, 30.0 / 180 * 3.1415);
+}
+
+TEST(GRADIENTS, ARM_6_LINK_15_DEG)
+{
+  testRobotArm(6, 15.0 / 180 * 3.1415);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// Just idiot checking that the code doesn't crash on silly edge cases.
+///////////////////////////////////////////////////////////////////////////////
+
+/*
+TEST(GRADIENTS, EMPTY_WORLD)
+{
+  WorldPtr world = World::create();
+  VectorXd worldVel = world->getVelocities();
+  EXPECT_TRUE(verifyVelGradients(world, worldVel));
+  EXPECT_TRUE(verifyBackprop(world));
+}
+
+TEST(GRADIENTS, EMPTY_SKELETON)
+{
+  WorldPtr world = World::create();
+  SkeletonPtr empty = Skeleton::create("empty");
+  world->addSkeleton(empty);
+  VectorXd worldVel = world->getVelocities();
+  EXPECT_TRUE(verifyVelGradients(world, worldVel));
+  EXPECT_TRUE(verifyBackprop(world));
+}
+*/

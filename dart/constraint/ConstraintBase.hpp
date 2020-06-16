@@ -106,6 +106,11 @@ public:
   /// coefficient of restitution
   virtual double getCoefficientOfRestitution();
 
+  /// Returns 0 if this constraint isn't using the "bouncing" hack to correct
+  /// penetration. Otherwise, this returns the velocity being used by the
+  /// penetration correction hack.
+  virtual double getPenetrationCorrectionVelocity();
+
   ///
   virtual dynamics::SkeletonPtr getRootSkeleton() const = 0;
 

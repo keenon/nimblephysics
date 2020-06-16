@@ -146,6 +146,10 @@ public:
   /// Returns the contact distances at each clamping contact point.
   const Eigen::VectorXd& getRestitutionDiagonals() const;
 
+  /// Returns the penetration correction hack "bounce" (or 0 if the contact is
+  /// not inter-penetrating or is actively bouncing) at each contact point.
+  const Eigen::VectorXd& getPenetrationCorrectionVelocities() const;
+
   std::size_t getNumDOFs() const;
 
   std::size_t getNumConstraintDim() const;
@@ -184,6 +188,9 @@ protected:
   /// This is just useful for testing the gradient computations
   Eigen::VectorXd mContactConstraintImpulses;
 
+  /// This is just useful for testing the gradient computations
+  Eigen::VectorXd mPenetrationCorrectionVelocitiesVec;
+
   /// These are the skeletons that are covered by this constraint group
   std::vector<std::shared_ptr<dynamics::Skeleton>> mSkeletons;
 
@@ -203,6 +210,10 @@ protected:
   /// This holds the coefficient of restitution for each constraint on this
   /// group.
   std::vector<double> mRestitutionCoeffs;
+
+  /// This holds the penetration correction velocities for each constraint in
+  /// this group.
+  std::vector<double> mPenetrationCorrectionVelocities;
 
   /// This holds the outputs of the impulse tests we run to create the
   /// constraint matrices. We shuffle these vectors into the columns of
