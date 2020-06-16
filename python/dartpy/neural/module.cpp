@@ -30,7 +30,6 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <dart/config.hpp>
 #include <pybind11/pybind11.h>
 
 namespace py = pybind11;
@@ -38,35 +37,22 @@ namespace py = pybind11;
 namespace dart {
 namespace python {
 
-void eigen_geometry(py::module& m);
+void NeuralUtils(py::module& sm);
+void BackpropSnapshot(py::module& sm);
 
-void dart_common(py::module& m);
-void dart_math(py::module& m);
-void dart_optimizer(py::module& m);
-void dart_dynamics(py::module& m);
-void dart_collision(py::module& m);
-void dart_constraint(py::module& m);
-void dart_simulation(py::module& m);
-void dart_utils(py::module& m);
-void dart_gui(py::module& m);
-void dart_neural(py::module& m);
-
-PYBIND11_MODULE(dartpy, m)
+void dart_neural(py::module& m)
 {
-  m.doc() = "dartpy: Python API of Dynamic Animation and Robotics Toolkit";
+  auto sm = m.def_submodule("neural");
 
-  eigen_geometry(m);
+  sm.doc() = "pybind11 example plugin"; // optional module docstring
 
-  dart_common(m);
-  dart_math(m);
-  dart_optimizer(m);
-  dart_dynamics(m);
-  dart_collision(m);
-  dart_constraint(m);
-  dart_simulation(m);
-  dart_utils(m);
-  dart_gui(m);
-  dart_neural(m);
+  NeuralUtils(sm);
+  BackpropSnapshot(sm);
+
+  sm.def(
+      "add",
+      [](int i, int j) { return i + j; },
+      "A function which adds two numbers");
 }
 
 } // namespace python

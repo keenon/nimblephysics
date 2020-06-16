@@ -30,43 +30,33 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <dart/config.hpp>
+#include <dart/dart.hpp>
+#include <pybind11/eigen.h>
 #include <pybind11/pybind11.h>
+
+#include "eigen_geometry_pybind.h"
+#include "eigen_pybind.h"
 
 namespace py = pybind11;
 
 namespace dart {
 namespace python {
 
-void eigen_geometry(py::module& m);
-
-void dart_common(py::module& m);
-void dart_math(py::module& m);
-void dart_optimizer(py::module& m);
-void dart_dynamics(py::module& m);
-void dart_collision(py::module& m);
-void dart_constraint(py::module& m);
-void dart_simulation(py::module& m);
-void dart_utils(py::module& m);
-void dart_gui(py::module& m);
-void dart_neural(py::module& m);
-
-PYBIND11_MODULE(dartpy, m)
+void NeuralUtils(py::module& m)
 {
-  m.doc() = "dartpy: Python API of Dynamic Animation and Robotics Toolkit";
+  ::py::class_<dart::neural::LossGradient>(m, "LossGradient")
+      .def_readonly(
+          "lossWrtPosition", &dart::neural::LossGradient::lossWrtPosition)
+      .def_readonly(
+          "lossWrtVelocity", &dart::neural::LossGradient::lossWrtVelocity)
+      .def_readonly(
+          "lossWrtTorque", &dart::neural::LossGradient::lossWrtTorque);
 
-  eigen_geometry(m);
-
-  dart_common(m);
-  dart_math(m);
-  dart_optimizer(m);
-  dart_dynamics(m);
-  dart_collision(m);
-  dart_constraint(m);
-  dart_simulation(m);
-  dart_utils(m);
-  dart_gui(m);
-  dart_neural(m);
+  m.def(
+      "forwardPass",
+      &dart::neural::forwardPass,
+      ::py::arg("world"),
+      ::py::arg("idempotent") = false);
 }
 
 } // namespace python
