@@ -824,7 +824,7 @@ const Eigen::VectorXd& BackpropSnapshot::getVectorToAssemble(
 
   assert(whichVector != VectorToAssemble::CONTACT_CONSTRAINT_MAPPINGS);
   // Control will never reach this point, but this removes a warning
-  return Eigen::VectorXd(0);
+  throw 1;
 }
 
 template <>

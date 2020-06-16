@@ -435,10 +435,10 @@ Eigen::MatrixXd ConstrainedGroupGradientMatrices::getPosPosJacobian()
 
   // Construct the W matrix we'll need to use to solve for our closest approx
   Eigen::MatrixXd W = Eigen::MatrixXd(A_b.cols(), A_b.rows() * A_b.rows());
-  for (std::size_t i = 0; i < A_b.cols(); i++)
+  for (int i = 0; i < A_b.cols(); i++)
   {
     Eigen::VectorXd a_i = A_b.col(i);
-    for (std::size_t j = 0; j < A_b.rows(); j++)
+    for (int j = 0; j < A_b.rows(); j++)
     {
       W.block(j * A_b.rows(), i, A_b.rows(), 1) = a_i(j) * a_i;
     }
