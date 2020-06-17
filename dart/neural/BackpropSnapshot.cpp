@@ -23,7 +23,6 @@ BackpropSnapshot::BackpropSnapshot(
     Eigen::VectorXd forwardPassVelocity,
     Eigen::VectorXd forwardPassTorques)
 {
-  mWorld = world;
   mTimeStep = world->getTimeStep();
   mForwardPassPosition = forwardPassPosition;
   mForwardPassVelocity = forwardPassVelocity;
@@ -33,16 +32,13 @@ BackpropSnapshot::BackpropSnapshot(
   mNumClamping = 0;
   mNumUpperBound = 0;
   mNumBouncing = 0;
-  mSkeletons = std::vector<SkeletonPtr>();
-  mSkeletons.reserve(world->getNumSkeletons());
 
   // Collect all the constraint groups attached to each skeleton
 
   for (std::size_t i = 0; i < world->getNumSkeletons(); i++)
   {
     SkeletonPtr skel = world->getSkeleton(i);
-    mSkeletons.push_back(skel);
-    mSkeletonOffset.insert(std::make_pair(skel->getName(), mNumDOFs));
+    mSkeletonOffset[skel->getName()] = mNumDOFs;
     mNumDOFs += skel->getNumDofs();
 
     std::shared_ptr<ConstrainedGroupGradientMatrices> gradientMatrix
@@ -65,7 +61,9 @@ BackpropSnapshot::BackpropSnapshot(
 
 //==============================================================================
 void BackpropSnapshot::backprop(
-    LossGradient& thisTimestepLoss, const LossGradient& nextTimestepLoss)
+    WorldPtr world,
+    LossGradient& thisTimestepLoss,
+    const LossGradient& nextTimestepLoss)
 {
   LossGradient groupThisTimestepLoss;
   LossGradient groupNextTimestepLoss;
@@ -73,10 +71,10 @@ void BackpropSnapshot::backprop(
   // Set the state of the world back to what it was during the forward pass, so
   // that implicit mass matrix computations work correctly.
 
-  Eigen::VectorXd oldPositions = mWorld->getPositions();
-  Eigen::VectorXd oldVelocities = mWorld->getVelocities();
-  mWorld->setPositions(mForwardPassPosition);
-  mWorld->setVelocities(mForwardPassVelocity);
+  Eigen::VectorXd oldPositions = world->getPositions();
+  Eigen::VectorXd oldVelocities = world->getVelocities();
+  world->setPositions(mForwardPassPosition);
+  world->setVelocities(mForwardPassVelocity);
 
   // Create the vectors for this timestep
 
@@ -106,16 +104,15 @@ void BackpropSnapshot::backprop(
     std::size_t cursor = 0;
     for (std::size_t j = 0; j < group->getSkeletons().size(); j++)
     {
-      SkeletonPtr skel = group->getSkeletons()[j];
-      std::size_t dofCursorWorld
-          = mSkeletonOffset.find(skel->getName())->second;
+      SkeletonPtr skel = world->getSkeleton(group->getSkeletons()[j]);
+      std::size_t dofCursorWorld = mSkeletonOffset[skel->getName()];
       std::size_t dofs = skel->getNumDofs();
 
       // Keep track of which skeletons have been covered by constraint groups
       bool skelAlreadyVisited
           = (skeletonsVisited.find(skel->getName()) != skeletonsVisited.end());
       assert(!skelAlreadyVisited);
-      skeletonsVisited.insert(std::make_pair(skel->getName(), true));
+      skeletonsVisited[skel->getName()] = true;
 
       groupNextTimestepLoss.lossWrtPosition.segment(cursor, dofs)
           = nextTimestepLoss.lossWrtPosition.segment(dofCursorWorld, dofs);
@@ -127,16 +124,15 @@ void BackpropSnapshot::backprop(
 
     // Now actually run the backprop
 
-    group->backprop(groupThisTimestepLoss, groupNextTimestepLoss);
+    group->backprop(world, groupThisTimestepLoss, groupNextTimestepLoss);
 
     // Read the values back out of the group backprop
 
     cursor = 0;
     for (std::size_t j = 0; j < group->getSkeletons().size(); j++)
     {
-      SkeletonPtr skel = group->getSkeletons()[j];
-      std::size_t dofCursorWorld
-          = mSkeletonOffset.find(skel->getName())->second;
+      SkeletonPtr skel = world->getSkeleton(group->getSkeletons()[j]);
+      std::size_t dofCursorWorld = mSkeletonOffset[skel->getName()];
       std::size_t dofs = skel->getNumDofs();
 
       thisTimestepLoss.lossWrtPosition.segment(dofCursorWorld, dofs)
@@ -155,14 +151,14 @@ void BackpropSnapshot::backprop(
   // these skeletons aren't part of a constrained group, their Jacobians are
   // quite simple.
 
-  for (SkeletonPtr skel : mSkeletons)
+  for (std::size_t i = 0; i < world->getNumSkeletons(); i++)
   {
+    SkeletonPtr skel = world->getSkeleton(i);
     bool skelAlreadyVisited
         = (skeletonsVisited.find(skel->getName()) != skeletonsVisited.end());
     if (!skelAlreadyVisited)
     {
-      std::size_t dofCursorWorld
-          = mSkeletonOffset.find(skel->getName())->second;
+      std::size_t dofCursorWorld = mSkeletonOffset[skel->getName()];
       std::size_t dofs = skel->getNumDofs();
       /*
 
@@ -204,24 +200,24 @@ void BackpropSnapshot::backprop(
   }
 
   // Restore the old position and velocity values before we ran backprop
-  mWorld->setPositions(oldPositions);
-  mWorld->setVelocities(oldVelocities);
+  world->setPositions(oldPositions);
+  world->setVelocities(oldVelocities);
 }
 
 //==============================================================================
-Eigen::MatrixXd BackpropSnapshot::getForceVelJacobian()
+Eigen::MatrixXd BackpropSnapshot::getForceVelJacobian(WorldPtr world)
 {
-  Eigen::MatrixXd A_c = getClampingConstraintMatrix();
-  Eigen::MatrixXd Minv = getInvMassMatrix();
+  Eigen::MatrixXd A_c = getClampingConstraintMatrix(world);
+  Eigen::MatrixXd Minv = getInvMassMatrix(world);
 
   // If there are no clamping constraints, then force-vel is just the mTimeStep
   // * Minv
   if (A_c.size() == 0)
     return mTimeStep * Minv;
 
-  Eigen::MatrixXd A_ub = getUpperBoundConstraintMatrix();
+  Eigen::MatrixXd A_ub = getUpperBoundConstraintMatrix(world);
   Eigen::MatrixXd E = getUpperBoundMappingMatrix();
-  Eigen::MatrixXd P_c = getProjectionIntoClampsMatrix();
+  Eigen::MatrixXd P_c = getProjectionIntoClampsMatrix(world);
 
   if (A_ub.size() > 0 && E.size() > 0)
   {
@@ -238,18 +234,18 @@ Eigen::MatrixXd BackpropSnapshot::getForceVelJacobian()
 }
 
 //==============================================================================
-Eigen::MatrixXd BackpropSnapshot::getVelVelJacobian()
+Eigen::MatrixXd BackpropSnapshot::getVelVelJacobian(WorldPtr world)
 {
-  Eigen::MatrixXd A_c = getClampingConstraintMatrix();
+  Eigen::MatrixXd A_c = getClampingConstraintMatrix(world);
 
   // If there are no clamping constraints, then vel-vel is just the identity
   if (A_c.size() == 0)
     return Eigen::MatrixXd::Identity(mNumDOFs, mNumDOFs);
 
-  Eigen::MatrixXd A_ub = getUpperBoundConstraintMatrix();
+  Eigen::MatrixXd A_ub = getUpperBoundConstraintMatrix(world);
   Eigen::MatrixXd E = getUpperBoundMappingMatrix();
-  Eigen::MatrixXd P_c = getProjectionIntoClampsMatrix();
-  Eigen::MatrixXd Minv = getInvMassMatrix();
+  Eigen::MatrixXd P_c = getProjectionIntoClampsMatrix(world);
+  Eigen::MatrixXd Minv = getInvMassMatrix(world);
   Eigen::MatrixXd parts1 = A_c + A_ub * E;
   Eigen::MatrixXd parts2 = mTimeStep * Minv * parts1 * P_c;
   /*
@@ -267,9 +263,9 @@ Eigen::MatrixXd BackpropSnapshot::getVelVelJacobian()
 }
 
 //==============================================================================
-Eigen::MatrixXd BackpropSnapshot::getPosPosJacobian()
+Eigen::MatrixXd BackpropSnapshot::getPosPosJacobian(WorldPtr world)
 {
-  Eigen::MatrixXd A_b = getBouncingConstraintMatrix();
+  Eigen::MatrixXd A_b = getBouncingConstraintMatrix(world);
 
   // If there are no bounces, pos-pos is a simple identity
   if (A_b.size() == 0)
@@ -311,9 +307,9 @@ Eigen::MatrixXd BackpropSnapshot::getPosPosJacobian()
 }
 
 //==============================================================================
-Eigen::MatrixXd BackpropSnapshot::getVelPosJacobian()
+Eigen::MatrixXd BackpropSnapshot::getVelPosJacobian(WorldPtr world)
 {
-  return mTimeStep * getPosPosJacobian();
+  return mTimeStep * getPosPosJacobian(world);
 }
 
 //==============================================================================
@@ -335,27 +331,29 @@ Eigen::VectorXd BackpropSnapshot::getForwardPassTorques()
 }
 
 //==============================================================================
-Eigen::MatrixXd BackpropSnapshot::getClampingConstraintMatrix()
+Eigen::MatrixXd BackpropSnapshot::getClampingConstraintMatrix(WorldPtr world)
 {
-  return assembleMatrix(MatrixToAssemble::CLAMPING);
+  return assembleMatrix(world, MatrixToAssemble::CLAMPING);
 }
 
 //==============================================================================
-Eigen::MatrixXd BackpropSnapshot::getMassedClampingConstraintMatrix()
+Eigen::MatrixXd BackpropSnapshot::getMassedClampingConstraintMatrix(
+    WorldPtr world)
 {
-  return assembleMatrix(MatrixToAssemble::MASSED_CLAMPING);
+  return assembleMatrix(world, MatrixToAssemble::MASSED_CLAMPING);
 }
 
 //==============================================================================
-Eigen::MatrixXd BackpropSnapshot::getUpperBoundConstraintMatrix()
+Eigen::MatrixXd BackpropSnapshot::getUpperBoundConstraintMatrix(WorldPtr world)
 {
-  return assembleMatrix(MatrixToAssemble::UPPER_BOUND);
+  return assembleMatrix(world, MatrixToAssemble::UPPER_BOUND);
 }
 
 //==============================================================================
-Eigen::MatrixXd BackpropSnapshot::getMassedUpperBoundConstraintMatrix()
+Eigen::MatrixXd BackpropSnapshot::getMassedUpperBoundConstraintMatrix(
+    WorldPtr world)
 {
-  return assembleMatrix(MatrixToAssemble::MASSED_UPPER_BOUND);
+  return assembleMatrix(world, MatrixToAssemble::MASSED_UPPER_BOUND);
 }
 
 //==============================================================================
@@ -394,13 +392,13 @@ Eigen::MatrixXd BackpropSnapshot::getUpperBoundMappingMatrix()
 }
 
 //==============================================================================
-Eigen::MatrixXd BackpropSnapshot::getBouncingConstraintMatrix()
+Eigen::MatrixXd BackpropSnapshot::getBouncingConstraintMatrix(WorldPtr world)
 {
-  return assembleMatrix(MatrixToAssemble::BOUNCING);
+  return assembleMatrix(world, MatrixToAssemble::BOUNCING);
 }
 
 //==============================================================================
-Eigen::MatrixXd BackpropSnapshot::getMassMatrix()
+Eigen::MatrixXd BackpropSnapshot::getMassMatrix(WorldPtr world)
 {
   Eigen::MatrixXd massMatrix = Eigen::MatrixXd(mNumDOFs, mNumDOFs);
   massMatrix.setZero();
@@ -408,30 +406,30 @@ Eigen::MatrixXd BackpropSnapshot::getMassMatrix()
   // Set the state of the world back to what it was during the forward pass, so
   // that implicit mass matrix computations work correctly.
 
-  Eigen::VectorXd oldPositions = mWorld->getPositions();
-  Eigen::VectorXd oldVelocities = mWorld->getVelocities();
-  mWorld->setPositions(mForwardPassPosition);
-  mWorld->setVelocities(mForwardPassVelocity);
+  Eigen::VectorXd oldPositions = world->getPositions();
+  Eigen::VectorXd oldVelocities = world->getVelocities();
+  world->setPositions(mForwardPassPosition);
+  world->setVelocities(mForwardPassVelocity);
 
   std::size_t cursor = 0;
-  for (std::size_t i = 0; i < mSkeletons.size(); i++)
+  for (std::size_t i = 0; i < world->getNumSkeletons(); i++)
   {
-    std::size_t skelDOF = mSkeletons[i]->getNumDofs();
+    std::size_t skelDOF = world->getSkeleton(i)->getNumDofs();
     massMatrix.block(cursor, cursor, skelDOF, skelDOF)
-        = mSkeletons[i]->getMassMatrix();
+        = world->getSkeleton(i)->getMassMatrix();
     cursor += skelDOF;
   }
 
   // Reset the position of the world to what it was before
 
-  mWorld->setPositions(oldPositions);
-  mWorld->setVelocities(oldVelocities);
+  world->setPositions(oldPositions);
+  world->setVelocities(oldVelocities);
 
   return massMatrix;
 }
 
 //==============================================================================
-Eigen::MatrixXd BackpropSnapshot::getInvMassMatrix()
+Eigen::MatrixXd BackpropSnapshot::getInvMassMatrix(WorldPtr world)
 {
   Eigen::MatrixXd invMassMatrix = Eigen::MatrixXd(mNumDOFs, mNumDOFs);
   invMassMatrix.setZero();
@@ -439,24 +437,24 @@ Eigen::MatrixXd BackpropSnapshot::getInvMassMatrix()
   // Set the state of the world back to what it was during the forward pass, so
   // that implicit mass matrix computations work correctly.
 
-  Eigen::VectorXd oldPositions = mWorld->getPositions();
-  Eigen::VectorXd oldVelocities = mWorld->getVelocities();
-  mWorld->setPositions(mForwardPassPosition);
-  mWorld->setVelocities(mForwardPassVelocity);
+  Eigen::VectorXd oldPositions = world->getPositions();
+  Eigen::VectorXd oldVelocities = world->getVelocities();
+  world->setPositions(mForwardPassPosition);
+  world->setVelocities(mForwardPassVelocity);
 
   std::size_t cursor = 0;
-  for (std::size_t i = 0; i < mSkeletons.size(); i++)
+  for (std::size_t i = 0; i < world->getNumSkeletons(); i++)
   {
-    std::size_t skelDOF = mSkeletons[i]->getNumDofs();
+    std::size_t skelDOF = world->getSkeleton(i)->getNumDofs();
     invMassMatrix.block(cursor, cursor, skelDOF, skelDOF)
-        = mSkeletons[i]->getInvMassMatrix();
+        = world->getSkeleton(i)->getInvMassMatrix();
     cursor += skelDOF;
   }
 
   // Reset the position of the world to what it was before
 
-  mWorld->setPositions(oldPositions);
-  mWorld->setVelocities(oldVelocities);
+  world->setPositions(oldPositions);
+  world->setVelocities(oldVelocities);
 
   return invMassMatrix;
 }
@@ -496,126 +494,127 @@ Eigen::VectorXd BackpropSnapshot::getPenetrationCorrectionVelocities()
 }
 
 //==============================================================================
-Eigen::MatrixXd BackpropSnapshot::finiteDifferenceVelVelJacobian()
+Eigen::MatrixXd BackpropSnapshot::finiteDifferenceVelVelJacobian(WorldPtr world)
 {
-  RestorableSnapshot snapshot(mWorld);
+  RestorableSnapshot snapshot(world);
 
   Eigen::MatrixXd J(mNumDOFs, mNumDOFs);
 
-  bool oldGradientEnabled = mWorld->getConstraintSolver()->getGradientEnabled();
-  mWorld->getConstraintSolver()->setGradientEnabled(false);
+  bool oldGradientEnabled = world->getConstraintSolver()->getGradientEnabled();
+  world->getConstraintSolver()->setGradientEnabled(false);
 
-  mWorld->setVelocities(mForwardPassVelocity);
-  mWorld->step(false);
+  world->setVelocities(mForwardPassVelocity);
+  world->step(false);
 
-  Eigen::VectorXd originalVel = mWorld->getVelocities();
+  Eigen::VectorXd originalVel = world->getVelocities();
 
   double EPSILON = 1e-7;
-  for (std::size_t i = 0; i < mWorld->getNumDofs(); i++)
+  for (std::size_t i = 0; i < world->getNumDofs(); i++)
   {
     snapshot.restore();
 
     Eigen::VectorXd tweakedVel = Eigen::VectorXd(mForwardPassVelocity);
     tweakedVel(i) += EPSILON;
-    mWorld->setVelocities(tweakedVel);
-    mWorld->step(false);
+    world->setVelocities(tweakedVel);
+    world->step(false);
 
     Eigen::VectorXd velChange
-        = (mWorld->getVelocities() - originalVel) / EPSILON;
+        = (world->getVelocities() - originalVel) / EPSILON;
     J.col(i).noalias() = velChange;
   }
 
   snapshot.restore();
-  mWorld->getConstraintSolver()->setGradientEnabled(oldGradientEnabled);
+  world->getConstraintSolver()->setGradientEnabled(oldGradientEnabled);
 
   return J;
 }
 
 //==============================================================================
-Eigen::MatrixXd BackpropSnapshot::finiteDifferenceForceVelJacobian()
+Eigen::MatrixXd BackpropSnapshot::finiteDifferenceForceVelJacobian(
+    WorldPtr world)
 {
-  RestorableSnapshot snapshot(mWorld);
+  RestorableSnapshot snapshot(world);
 
   Eigen::MatrixXd J(mNumDOFs, mNumDOFs);
 
-  bool oldGradientEnabled = mWorld->getConstraintSolver()->getGradientEnabled();
-  mWorld->getConstraintSolver()->setGradientEnabled(false);
+  bool oldGradientEnabled = world->getConstraintSolver()->getGradientEnabled();
+  world->getConstraintSolver()->setGradientEnabled(false);
 
-  mWorld->setVelocities(mForwardPassVelocity);
-  mWorld->step(false);
+  world->setVelocities(mForwardPassVelocity);
+  world->step(false);
 
-  Eigen::VectorXd originalForces = mWorld->getForces();
-  Eigen::VectorXd originalVel = mWorld->getVelocities();
+  Eigen::VectorXd originalForces = world->getForces();
+  Eigen::VectorXd originalVel = world->getVelocities();
 
   double EPSILON = 1e-7;
-  for (std::size_t i = 0; i < mWorld->getNumDofs(); i++)
+  for (std::size_t i = 0; i < world->getNumDofs(); i++)
   {
     snapshot.restore();
 
-    mWorld->setVelocities(mForwardPassVelocity);
+    world->setVelocities(mForwardPassVelocity);
     Eigen::VectorXd tweakedForces = Eigen::VectorXd(originalForces);
     tweakedForces(i) += EPSILON;
-    mWorld->setForces(tweakedForces);
+    world->setForces(tweakedForces);
 
-    mWorld->step(false);
+    world->step(false);
 
     Eigen::VectorXd velChange
-        = (mWorld->getVelocities() - originalVel) / EPSILON;
+        = (world->getVelocities() - originalVel) / EPSILON;
     J.col(i).noalias() = velChange;
   }
 
   snapshot.restore();
-  mWorld->getConstraintSolver()->setGradientEnabled(oldGradientEnabled);
+  world->getConstraintSolver()->setGradientEnabled(oldGradientEnabled);
 
   return J;
 }
 
 //==============================================================================
 Eigen::MatrixXd BackpropSnapshot::finiteDifferencePosPosJacobian(
-    std::size_t subdivisions)
+    WorldPtr world, std::size_t subdivisions)
 {
-  RestorableSnapshot snapshot(mWorld);
+  RestorableSnapshot snapshot(world);
 
-  double oldTimestep = mWorld->getTimeStep();
-  mWorld->setTimeStep(oldTimestep / subdivisions);
-  bool oldGradientEnabled = mWorld->getConstraintSolver()->getGradientEnabled();
-  mWorld->getConstraintSolver()->setGradientEnabled(false);
+  double oldTimestep = world->getTimeStep();
+  world->setTimeStep(oldTimestep / subdivisions);
+  bool oldGradientEnabled = world->getConstraintSolver()->getGradientEnabled();
+  world->getConstraintSolver()->setGradientEnabled(false);
 
   Eigen::MatrixXd J(mNumDOFs, mNumDOFs);
 
-  mWorld->setPositions(mForwardPassPosition);
-  mWorld->setVelocities(mForwardPassVelocity);
-  mWorld->setForces(mForwardPassTorques);
+  world->setPositions(mForwardPassPosition);
+  world->setVelocities(mForwardPassVelocity);
+  world->setForces(mForwardPassTorques);
 
   for (std::size_t j = 0; j < subdivisions; j++)
-    mWorld->step(false);
+    world->step(false);
 
-  Eigen::VectorXd originalPosition = mWorld->getPositions();
+  Eigen::VectorXd originalPosition = world->getPositions();
 
   // IMPORTANT: EPSILON must be larger than the distance traveled in a single
   // subdivided timestep. Ideally much larger.
   double EPSILON = 1e-1 / subdivisions;
-  for (std::size_t i = 0; i < mWorld->getNumDofs(); i++)
+  for (std::size_t i = 0; i < world->getNumDofs(); i++)
   {
     snapshot.restore();
 
-    mWorld->setVelocities(mForwardPassVelocity);
-    mWorld->setForces(mForwardPassTorques);
+    world->setVelocities(mForwardPassVelocity);
+    world->setForces(mForwardPassTorques);
 
     Eigen::VectorXd tweakedPositions = Eigen::VectorXd(mForwardPassPosition);
     tweakedPositions(i) += EPSILON;
-    mWorld->setPositions(tweakedPositions);
+    world->setPositions(tweakedPositions);
 
     for (std::size_t j = 0; j < subdivisions; j++)
-      mWorld->step(false);
+      world->step(false);
 
     Eigen::VectorXd posChange
-        = (mWorld->getPositions() - originalPosition) / EPSILON;
+        = (world->getPositions() - originalPosition) / EPSILON;
     J.col(i).noalias() = posChange;
   }
 
-  mWorld->setTimeStep(oldTimestep);
-  mWorld->getConstraintSolver()->setGradientEnabled(oldGradientEnabled);
+  world->setTimeStep(oldTimestep);
+  world->getConstraintSolver()->setGradientEnabled(oldGradientEnabled);
   snapshot.restore();
 
   return J;
@@ -623,59 +622,59 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferencePosPosJacobian(
 
 //==============================================================================
 Eigen::MatrixXd BackpropSnapshot::finiteDifferenceVelPosJacobian(
-    std::size_t subdivisions)
+    WorldPtr world, std::size_t subdivisions)
 {
-  RestorableSnapshot snapshot(mWorld);
+  RestorableSnapshot snapshot(world);
 
-  double oldTimestep = mWorld->getTimeStep();
-  mWorld->setTimeStep(oldTimestep / subdivisions);
-  bool oldGradientEnabled = mWorld->getConstraintSolver()->getGradientEnabled();
-  mWorld->getConstraintSolver()->setGradientEnabled(false);
+  double oldTimestep = world->getTimeStep();
+  world->setTimeStep(oldTimestep / subdivisions);
+  bool oldGradientEnabled = world->getConstraintSolver()->getGradientEnabled();
+  world->getConstraintSolver()->setGradientEnabled(false);
 
   Eigen::MatrixXd J(mNumDOFs, mNumDOFs);
 
-  mWorld->setPositions(mForwardPassPosition);
-  mWorld->setVelocities(mForwardPassVelocity);
-  mWorld->setForces(mForwardPassTorques);
+  world->setPositions(mForwardPassPosition);
+  world->setVelocities(mForwardPassVelocity);
+  world->setForces(mForwardPassTorques);
 
   for (std::size_t j = 0; j < subdivisions; j++)
-    mWorld->step(false);
+    world->step(false);
 
-  Eigen::VectorXd originalPosition = mWorld->getPositions();
+  Eigen::VectorXd originalPosition = world->getPositions();
 
   double EPSILON = 1e-3 / subdivisions;
-  for (std::size_t i = 0; i < mWorld->getNumDofs(); i++)
+  for (std::size_t i = 0; i < world->getNumDofs(); i++)
   {
     snapshot.restore();
 
-    mWorld->setPositions(mForwardPassPosition);
-    mWorld->setForces(mForwardPassTorques);
+    world->setPositions(mForwardPassPosition);
+    world->setForces(mForwardPassTorques);
 
     Eigen::VectorXd tweakedVelocity = Eigen::VectorXd(mForwardPassVelocity);
     tweakedVelocity(i) += EPSILON;
-    mWorld->setVelocities(tweakedVelocity);
+    world->setVelocities(tweakedVelocity);
 
     for (std::size_t j = 0; j < subdivisions; j++)
-      mWorld->step(false);
+      world->step(false);
 
     Eigen::VectorXd posChange
-        = (mWorld->getPositions() - originalPosition) / EPSILON;
+        = (world->getPositions() - originalPosition) / EPSILON;
     J.col(i).noalias() = posChange;
   }
 
-  mWorld->setTimeStep(oldTimestep);
-  mWorld->getConstraintSolver()->setGradientEnabled(oldGradientEnabled);
+  world->setTimeStep(oldTimestep);
+  world->getConstraintSolver()->setGradientEnabled(oldGradientEnabled);
   snapshot.restore();
 
   return J;
 }
 
 //==============================================================================
-Eigen::MatrixXd BackpropSnapshot::getProjectionIntoClampsMatrix()
+Eigen::MatrixXd BackpropSnapshot::getProjectionIntoClampsMatrix(WorldPtr world)
 {
-  Eigen::MatrixXd A_c = getClampingConstraintMatrix();
-  Eigen::MatrixXd V_c = getMassedClampingConstraintMatrix();
-  Eigen::MatrixXd V_ub = getMassedUpperBoundConstraintMatrix();
+  Eigen::MatrixXd A_c = getClampingConstraintMatrix(world);
+  Eigen::MatrixXd V_c = getMassedClampingConstraintMatrix(world);
+  Eigen::MatrixXd V_ub = getMassedUpperBoundConstraintMatrix(world);
   Eigen::MatrixXd E = getUpperBoundMappingMatrix();
 
   /*
@@ -701,12 +700,8 @@ Eigen::MatrixXd BackpropSnapshot::getProjectionIntoClampsMatrix()
 }
 
 //==============================================================================
-BackpropSnapshot::~BackpropSnapshot()
-{
-}
-
-//==============================================================================
-Eigen::MatrixXd BackpropSnapshot::assembleMatrix(MatrixToAssemble whichMatrix)
+Eigen::MatrixXd BackpropSnapshot::assembleMatrix(
+    WorldPtr world, MatrixToAssemble whichMatrix)
 {
   std::size_t numCols = 0;
   if (whichMatrix == MatrixToAssemble::CLAMPING
@@ -742,10 +737,10 @@ Eigen::MatrixXd BackpropSnapshot::assembleMatrix(MatrixToAssemble whichMatrix)
     for (std::size_t k = 0; k < mGradientMatrices[i]->getSkeletons().size();
          k++)
     {
-      SkeletonPtr skel = mGradientMatrices[i]->getSkeletons()[k];
+      SkeletonPtr skel
+          = world->getSkeleton(mGradientMatrices[i]->getSkeletons()[k]);
       // This maps to the row in the world matrix
-      std::size_t dofCursorWorld
-          = mSkeletonOffset.find(skel->getName())->second;
+      std::size_t dofCursorWorld = mSkeletonOffset[skel->getName()];
 
       // The source block in the groupClamps matrix is a row section at
       // (dofCursorGroup, 0) of full width (skel->getNumDOFs(),

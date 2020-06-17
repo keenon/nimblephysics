@@ -106,7 +106,7 @@ bool verifyClassicClampingConstraintMatrix(
   // constraints. If we subtract out that components and re-run the solver, we
   // should see no constraint forces.
 
-  Eigen::MatrixXd A_c = classicPtr->getClampingConstraintMatrix();
+  Eigen::MatrixXd A_c = classicPtr->getClampingConstraintMatrix(world);
   if (A_c.size() == 0)
   {
     // this means that there's no clamping contacts
@@ -176,10 +176,10 @@ bool verifyMassedClampingConstraintMatrix(
   world->setVelocities(proposedVelocities);
 
   neural::BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
-  Eigen::MatrixXd A_c = classicPtr->getClampingConstraintMatrix();
-  Eigen::MatrixXd V_c = classicPtr->getMassedClampingConstraintMatrix();
-  Eigen::MatrixXd M = classicPtr->getMassMatrix();
-  Eigen::MatrixXd Minv = classicPtr->getInvMassMatrix();
+  Eigen::MatrixXd A_c = classicPtr->getClampingConstraintMatrix(world);
+  Eigen::MatrixXd V_c = classicPtr->getMassedClampingConstraintMatrix(world);
+  Eigen::MatrixXd M = classicPtr->getMassMatrix(world);
+  Eigen::MatrixXd Minv = classicPtr->getInvMassMatrix(world);
 
   Eigen::MatrixXd A_c_recovered = M * V_c;
   Eigen::MatrixXd V_c_recovered = Minv * A_c;
@@ -203,10 +203,10 @@ bool verifyMassedUpperBoundConstraintMatrix(
   world->setVelocities(proposedVelocities);
 
   neural::BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
-  Eigen::MatrixXd A_ub = classicPtr->getUpperBoundConstraintMatrix();
-  Eigen::MatrixXd V_ub = classicPtr->getMassedUpperBoundConstraintMatrix();
-  Eigen::MatrixXd M = classicPtr->getMassMatrix();
-  Eigen::MatrixXd Minv = classicPtr->getInvMassMatrix();
+  Eigen::MatrixXd A_ub = classicPtr->getUpperBoundConstraintMatrix(world);
+  Eigen::MatrixXd V_ub = classicPtr->getMassedUpperBoundConstraintMatrix(world);
+  Eigen::MatrixXd M = classicPtr->getMassMatrix(world);
+  Eigen::MatrixXd Minv = classicPtr->getInvMassMatrix(world);
 
   Eigen::MatrixXd A_ub_recovered = M * V_ub;
   Eigen::MatrixXd V_ub_recovered = Minv * A_ub;
@@ -253,16 +253,16 @@ bool verifyClassicProjectionIntoClampsMatrix(
   // Compute the analytical constraint forces, which should match our actual
   // constraint forces
 
-  MatrixXd P_c = classicPtr->getProjectionIntoClampsMatrix();
+  MatrixXd P_c = classicPtr->getProjectionIntoClampsMatrix(world);
   VectorXd analyticalConstraintForces = -1 * P_c * integratedVelocities;
 
   // Compute the offset required from the penetration correction velocities
 
   VectorXd penetrationCorrectionVelocities
       = classicPtr->getPenetrationCorrectionVelocities();
-  Eigen::MatrixXd A_c = classicPtr->getClampingConstraintMatrix();
-  Eigen::MatrixXd V_c = classicPtr->getMassedClampingConstraintMatrix();
-  Eigen::MatrixXd V_ub = classicPtr->getMassedUpperBoundConstraintMatrix();
+  Eigen::MatrixXd A_c = classicPtr->getClampingConstraintMatrix(world);
+  Eigen::MatrixXd V_c = classicPtr->getMassedClampingConstraintMatrix(world);
+  Eigen::MatrixXd V_ub = classicPtr->getMassedUpperBoundConstraintMatrix(world);
   Eigen::MatrixXd E = classicPtr->getUpperBoundMappingMatrix();
   Eigen::MatrixXd constraintForceToImpliedTorques = V_c + (V_ub * E);
   Eigen::MatrixXd forceToVel
@@ -362,16 +362,16 @@ bool verifyMassedProjectionIntoClampsMatrix(
     return false;
   }
 
-  Eigen::MatrixXd P_c = classicPtr->getProjectionIntoClampsMatrix();
+  Eigen::MatrixXd P_c = classicPtr->getProjectionIntoClampsMatrix(world);
 
   // Reconstruct P_c without the massed shortcut
-  Eigen::MatrixXd A_c = classicPtr->getClampingConstraintMatrix();
-  Eigen::MatrixXd A_ub = classicPtr->getUpperBoundConstraintMatrix();
+  Eigen::MatrixXd A_c = classicPtr->getClampingConstraintMatrix(world);
+  Eigen::MatrixXd A_ub = classicPtr->getUpperBoundConstraintMatrix(world);
   Eigen::MatrixXd E = classicPtr->getUpperBoundMappingMatrix();
 
   Eigen::MatrixXd constraintForceToImpliedTorques = A_c + (A_ub * E);
   Eigen::MatrixXd forceToVel = A_c.eval().transpose()
-                               * classicPtr->getInvMassMatrix()
+                               * classicPtr->getInvMassMatrix(world)
                                * constraintForceToImpliedTorques;
   Eigen::MatrixXd velToForce
       = forceToVel.size() > 0
@@ -406,8 +406,8 @@ bool verifyVelVelJacobian(WorldPtr world, VectorXd proposedVelocities)
     return false;
   }
 
-  MatrixXd analytical = classicPtr->getVelVelJacobian();
-  MatrixXd bruteForce = classicPtr->finiteDifferenceVelVelJacobian();
+  MatrixXd analytical = classicPtr->getVelVelJacobian(world);
+  MatrixXd bruteForce = classicPtr->finiteDifferenceVelVelJacobian(world);
 
   if (!equals(analytical, bruteForce, 1e-1))
   {
@@ -435,8 +435,8 @@ bool verifyForceVelJacobian(WorldPtr world, VectorXd proposedVelocities)
     return false;
   }
 
-  MatrixXd analytical = classicPtr->getForceVelJacobian();
-  MatrixXd bruteForce = classicPtr->finiteDifferenceForceVelJacobian();
+  MatrixXd analytical = classicPtr->getForceVelJacobian(world);
+  MatrixXd bruteForce = classicPtr->finiteDifferenceForceVelJacobian(world);
 
   if (!equals(analytical, bruteForce, 1e-1))
   {
@@ -475,9 +475,9 @@ bool verifyPosPosJacobianApproximation(WorldPtr world, std::size_t subdivisions)
     return false;
   }
 
-  MatrixXd analytical = classicPtr->getPosPosJacobian();
+  MatrixXd analytical = classicPtr->getPosPosJacobian(world);
   MatrixXd bruteForce
-      = classicPtr->finiteDifferencePosPosJacobian(subdivisions);
+      = classicPtr->finiteDifferencePosPosJacobian(world, subdivisions);
 
   if (!equals(analytical, bruteForce, 1e-1))
   {
@@ -502,9 +502,9 @@ bool verifyVelPosJacobianApproximation(WorldPtr world, std::size_t subdivisions)
     return false;
   }
 
-  MatrixXd analytical = classicPtr->getVelPosJacobian();
+  MatrixXd analytical = classicPtr->getVelPosJacobian(world);
   MatrixXd bruteForce
-      = classicPtr->finiteDifferenceVelPosJacobian(subdivisions);
+      = classicPtr->finiteDifferenceVelPosJacobian(world, subdivisions);
 
   if (!equals(analytical, bruteForce, 1e-1))
   {
@@ -525,7 +525,9 @@ bool verifyPosGradients(WorldPtr world, std::size_t subdivisions)
 }
 
 bool verifyBackpropInstance(
-    const neural::BackpropSnapshotPtr& classicPtr, const VectorXd& phaseSpace)
+    WorldPtr world,
+    const neural::BackpropSnapshotPtr& classicPtr,
+    const VectorXd& phaseSpace)
 {
   LossGradient nextTimeStep;
   nextTimeStep.lossWrtPosition = phaseSpace.segment(0, phaseSpace.size() / 2);
@@ -533,7 +535,7 @@ bool verifyBackpropInstance(
       = phaseSpace.segment(phaseSpace.size() / 2, phaseSpace.size() / 2);
 
   LossGradient thisTimeStep;
-  classicPtr->backprop(thisTimeStep, nextTimeStep);
+  classicPtr->backprop(world, thisTimeStep, nextTimeStep);
 
   // Compute "brute force" backprop using full Jacobians
   /*
@@ -551,22 +553,22 @@ bool verifyBackpropInstance(
   // p_t
   VectorXd lossWrtThisPosition =
       // p_t --> p_t+1
-      classicPtr->getPosPosJacobian().transpose()
+      classicPtr->getPosPosJacobian(world).transpose()
       * nextTimeStep.lossWrtPosition;
 
   // v_t
   VectorXd lossWrtThisVelocity =
       // v_t --> v_t+1
-      (classicPtr->getVelVelJacobian().transpose()
+      (classicPtr->getVelVelJacobian(world).transpose()
        * nextTimeStep.lossWrtVelocity)
       // v_t --> p_t+1
-      + (classicPtr->getVelPosJacobian().transpose()
+      + (classicPtr->getVelPosJacobian(world).transpose()
          * nextTimeStep.lossWrtPosition);
 
   // f_t
   VectorXd lossWrtThisTorque =
       // f_t --> v_t+1
-      classicPtr->getForceVelJacobian().transpose()
+      classicPtr->getForceVelJacobian(world).transpose()
       * nextTimeStep.lossWrtVelocity;
 
   if (!equals(lossWrtThisPosition, thisTimeStep.lossWrtPosition, 1e-5)
@@ -582,9 +584,9 @@ bool verifyBackpropInstance(
     std::cout << "Analytical: loss wrt position at time t:" << std::endl
               << thisTimeStep.lossWrtPosition << std::endl;
     std::cout << "Brute force: pos-pos Jac:" << std::endl
-              << classicPtr->getPosPosJacobian() << std::endl;
+              << classicPtr->getPosPosJacobian(world) << std::endl;
     std::cout << "Brute force: vel-pos Jac:" << std::endl
-              << classicPtr->getVelPosJacobian() << std::endl;
+              << classicPtr->getVelPosJacobian(world) << std::endl;
     std::cout << "Brute force: loss wrt velocity at time t:" << std::endl
               << lossWrtThisVelocity << std::endl;
     std::cout << "Analytical: loss wrt velocity at time t:" << std::endl
@@ -618,18 +620,18 @@ bool verifyBackprop(WorldPtr world)
     phaseSpace(i) = 1;
     if (i > 0)
       phaseSpace(i - 1) = 0;
-    if (!verifyBackpropInstance(classicPtr, phaseSpace))
+    if (!verifyBackpropInstance(world, classicPtr, phaseSpace))
       return false;
   }
 
   // Test all "0"s
   phaseSpace = VectorXd::Zero(world->getNumDofs() * 2);
-  if (!verifyBackpropInstance(classicPtr, phaseSpace))
+  if (!verifyBackpropInstance(world, classicPtr, phaseSpace))
     return false;
 
   // Test all "1"s
   phaseSpace = VectorXd::Ones(world->getNumDofs() * 2);
-  if (!verifyBackpropInstance(classicPtr, phaseSpace))
+  if (!verifyBackpropInstance(world, classicPtr, phaseSpace))
     return false;
 
   return true;

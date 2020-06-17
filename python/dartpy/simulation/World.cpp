@@ -32,7 +32,6 @@
 
 #include <dart/dart.hpp>
 #include <dart/simulation/World.hpp>
-
 #include <pybind11/eigen.h>
 #include <pybind11/pybind11.h>
 
@@ -75,7 +74,7 @@ void World(py::module& m)
           ::py::return_value_policy::reference_internal)
       .def(
           "setGravity",
-          +[](dart::simulation::World* self, const Eigen::Vector3d& _gravity)
+          +[](dart::simulation::World* self, const Eigen::Vector3d _gravity)
               -> void { return self->setGravity(_gravity); },
           ::py::arg("gravity"))
       .def(

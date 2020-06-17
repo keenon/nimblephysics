@@ -31,27 +31,29 @@ public:
   /// null. It returns a LossGradient with all three values filled in, position,
   /// velocity, and torque.
   void backprop(
-      LossGradient& thisTimestepLoss, const LossGradient& nextTimestepLoss);
+      simulation::WorldPtr world,
+      LossGradient& thisTimestepLoss,
+      const LossGradient& nextTimestepLoss);
 
   /// This computes and returns the whole vel-vel jacobian. For backprop, you
   /// don't actually need this matrix, you can compute backprop directly. This
   /// is here if you want access to the full Jacobian for some reason.
-  Eigen::MatrixXd getVelVelJacobian();
+  Eigen::MatrixXd getVelVelJacobian(simulation::WorldPtr world);
 
   /// This computes and returns the whole force-vel jacobian. For backprop, you
   /// don't actually need this matrix, you can compute backprop directly. This
   /// is here if you want access to the full Jacobian for some reason.
-  Eigen::MatrixXd getForceVelJacobian();
+  Eigen::MatrixXd getForceVelJacobian(simulation::WorldPtr world);
 
   /// This computes and returns the whole pos-pos jacobian. For backprop, you
   /// don't actually need this matrix, you can compute backprop directly. This
   /// is here if you want access to the full Jacobian for some reason.
-  Eigen::MatrixXd getPosPosJacobian();
+  Eigen::MatrixXd getPosPosJacobian(simulation::WorldPtr world);
 
   /// This computes and returns the whole vel-pos jacobian. For backprop, you
   /// don't actually need this matrix, you can compute backprop directly. This
   /// is here if you want access to the full Jacobian for some reason.
-  Eigen::MatrixXd getVelPosJacobian();
+  Eigen::MatrixXd getVelPosJacobian(simulation::WorldPtr world);
 
   /// Returns a concatenated vector of all the Skeletons' position()'s in the
   /// World, in order in which the Skeletons appear in the World's
@@ -73,19 +75,20 @@ public:
 
   /// This returns the A_c matrix. You shouldn't ever need this matrix, it's
   /// just here to enable testing.
-  Eigen::MatrixXd getClampingConstraintMatrix();
+  Eigen::MatrixXd getClampingConstraintMatrix(simulation::WorldPtr world);
 
   /// This returns the V_c matrix. You shouldn't ever need this matrix, it's
   /// just here to enable testing.
-  Eigen::MatrixXd getMassedClampingConstraintMatrix();
+  Eigen::MatrixXd getMassedClampingConstraintMatrix(simulation::WorldPtr world);
 
   /// This returns the A_ub matrix. You shouldn't ever need this matrix, it's
   /// just here to enable testing.
-  Eigen::MatrixXd getUpperBoundConstraintMatrix();
+  Eigen::MatrixXd getUpperBoundConstraintMatrix(simulation::WorldPtr world);
 
   /// This returns the V_c matrix. You shouldn't ever need this matrix, it's
   /// just here to enable testing.
-  Eigen::MatrixXd getMassedUpperBoundConstraintMatrix();
+  Eigen::MatrixXd getMassedUpperBoundConstraintMatrix(
+      simulation::WorldPtr world);
 
   /// This returns the E matrix. You shouldn't ever need this matrix, it's
   /// just here to enable testing.
@@ -93,35 +96,37 @@ public:
 
   /// This returns the B matrix. You shouldn't ever need this matrix, it's
   /// just here to enable testing.
-  Eigen::MatrixXd getBouncingConstraintMatrix();
+  Eigen::MatrixXd getBouncingConstraintMatrix(simulation::WorldPtr world);
 
   /// This returns the mass matrix for the whole world, a block diagonal
   /// concatenation of the skeleton mass matrices.
-  Eigen::MatrixXd getMassMatrix();
+  Eigen::MatrixXd getMassMatrix(simulation::WorldPtr world);
 
   /// This returns the inverse mass matrix for the whole world, a block diagonal
   /// concatenation of the skeleton inverse mass matrices.
-  Eigen::MatrixXd getInvMassMatrix();
+  Eigen::MatrixXd getInvMassMatrix(simulation::WorldPtr world);
 
   /// This computes and returns the whole vel-vel jacobian by finite
   /// differences. This is SUPER SLOW, and is only here for testing.
-  Eigen::MatrixXd finiteDifferenceVelVelJacobian();
+  Eigen::MatrixXd finiteDifferenceVelVelJacobian(simulation::WorldPtr world);
 
   /// This computes and returns the whole force-vel jacobian by finite
   /// differences. This is SUPER SLOW, and is only here for testing.
-  Eigen::MatrixXd finiteDifferenceForceVelJacobian();
+  Eigen::MatrixXd finiteDifferenceForceVelJacobian(simulation::WorldPtr world);
 
   /// This computes and returns the whole vel-vel jacobian by finite
   /// differences. This is SUPER SUPER SLOW, and is only here for testing.
-  Eigen::MatrixXd finiteDifferencePosPosJacobian(std::size_t subdivisions = 20);
+  Eigen::MatrixXd finiteDifferencePosPosJacobian(
+      simulation::WorldPtr world, std::size_t subdivisions = 20);
 
   /// This computes and returns the whole force-vel jacobian by finite
   /// differences. This is SUPER SUPER SLOW, and is only here for testing.
-  Eigen::MatrixXd finiteDifferenceVelPosJacobian(std::size_t subdivisions = 20);
+  Eigen::MatrixXd finiteDifferenceVelPosJacobian(
+      simulation::WorldPtr world, std::size_t subdivisions = 20);
 
   /// This returns the P_c matrix. You shouldn't ever need this matrix, it's
   /// just here to enable testing.
-  Eigen::MatrixXd getProjectionIntoClampsMatrix();
+  Eigen::MatrixXd getProjectionIntoClampsMatrix(simulation::WorldPtr world);
 
   /// These was the mX() vector used to construct this. Pretty much only here
   /// for testing.
@@ -143,17 +148,7 @@ public:
   /// not inter-penetrating or is actively bouncing) at each contact point.
   Eigen::VectorXd getPenetrationCorrectionVelocities();
 
-  ~BackpropSnapshot();
-
 protected:
-  /// A handle to the world that we're taking a snapshot of. This world can
-  /// change configurations underneath us, but this whole neural.* package
-  /// assumes that no skeletons are added or removed once training begins.
-  simulation::WorldPtr mWorld;
-
-  /// These are the skeletons we're interested in.
-  std::vector<dynamics::SkeletonPtr> mSkeletons;
-
   /// This is the global timestep length. This is included here because it shows
   /// up as a constant in some of the matrices.
   double mTimeStep;
@@ -201,7 +196,8 @@ private:
     BOUNCING
   };
 
-  Eigen::MatrixXd assembleMatrix(MatrixToAssemble whichMatrix);
+  Eigen::MatrixXd assembleMatrix(
+      simulation::WorldPtr world, MatrixToAssemble whichMatrix);
 
   enum VectorToAssemble
   {

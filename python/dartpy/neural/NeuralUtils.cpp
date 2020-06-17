@@ -31,11 +31,9 @@
  */
 
 #include <dart/dart.hpp>
+#include <dart/neural/NeuralUtils.hpp>
 #include <pybind11/eigen.h>
 #include <pybind11/pybind11.h>
-
-#include "eigen_geometry_pybind.h"
-#include "eigen_pybind.h"
 
 namespace py = pybind11;
 

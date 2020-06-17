@@ -272,7 +272,7 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(ConstrainedGroup& group)
             constraint, j);
       }
     }
-    delete impulses;
+    delete[] impulses;
 
     assert(isSymmetric(
         n, mA.data(), mOffset[i], mOffset[i] + constraint->getDimension() - 1));

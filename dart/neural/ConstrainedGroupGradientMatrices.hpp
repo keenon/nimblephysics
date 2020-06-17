@@ -9,6 +9,7 @@
 #include <Eigen/Dense>
 
 #include "dart/neural/NeuralUtils.hpp"
+#include "dart/simulation/World.hpp"
 
 namespace dart {
 
@@ -38,7 +39,6 @@ class ConstrainedGroupGradientMatrices
 public:
   ConstrainedGroupGradientMatrices(
       constraint::ConstrainedGroup& group, double timeStep);
-  ~ConstrainedGroupGradientMatrices();
 
   /// This gets called during the setup of the ConstrainedGroupGradientMatrices
   /// at each constraint. This must be called before constructMatrices(), and
@@ -72,13 +72,13 @@ public:
   /// backprop, you don't actually need this matrix, you can compute backprop
   /// directly. This is here if you want access to the full Jacobian for some
   /// reason.
-  Eigen::MatrixXd getVelVelJacobian();
+  Eigen::MatrixXd getVelVelJacobian(simulation::WorldPtr world);
 
   /// This computes and returns the whole force-vel jacobian for this group. For
   /// backprop, you don't actually need this matrix, you can compute backprop
   /// directly. This is here if you want access to the full Jacobian for some
   /// reason.
-  Eigen::MatrixXd getForceVelJacobian();
+  Eigen::MatrixXd getForceVelJacobian(simulation::WorldPtr world);
 
   /// This computes and returns the whole pos-pos jacobian for this group. For
   /// backprop, you don't actually need this matrix, you can compute backprop
@@ -94,11 +94,11 @@ public:
 
   /// This returns the mass matrix for the group, a block diagonal
   /// concatenation of the skeleton mass matrices.
-  Eigen::MatrixXd getMassMatrix();
+  Eigen::MatrixXd getMassMatrix(simulation::WorldPtr world);
 
   /// This returns the inverse mass matrix for the group, a block diagonal
   /// concatenation of the skeleton inverse mass matrices.
-  Eigen::MatrixXd getInvMassMatrix();
+  Eigen::MatrixXd getInvMassMatrix(simulation::WorldPtr world);
 
   /// This returns the P_c matrix. You shouldn't ever need this matrix, it's
   /// just here to enable testing.
@@ -110,15 +110,19 @@ public:
   /// null. It returns a LossGradient with all three values filled in, position,
   /// velocity, and torque.
   void backprop(
-      LossGradient& thisTimestepLoss, const LossGradient& nextTimestepLoss);
+      simulation::WorldPtr world,
+      LossGradient& thisTimestepLoss,
+      const LossGradient& nextTimestepLoss);
 
   /// This replaces x with the result of M*x in place, without explicitly
   /// forming M
-  void implicitMultiplyByMassMatrix(Eigen::VectorXd& x);
+  void implicitMultiplyByMassMatrix(
+      simulation::WorldPtr world, Eigen::VectorXd& x);
 
   /// This replaces x with the result of Minv*x in place, without explicitly
   /// forming Minv
-  void implicitMultiplyByInvMassMatrix(Eigen::VectorXd& x);
+  void implicitMultiplyByInvMassMatrix(
+      simulation::WorldPtr world, Eigen::VectorXd& x);
 
   const Eigen::MatrixXd& getClampingConstraintMatrix() const;
 
@@ -154,7 +158,7 @@ public:
 
   std::size_t getNumConstraintDim() const;
 
-  const std::vector<std::shared_ptr<dynamics::Skeleton>>& getSkeletons() const;
+  const std::vector<std::string>& getSkeletons() const;
 
 protected:
   /// Impulse test matrix for the clamping constraints
@@ -191,8 +195,8 @@ protected:
   /// This is just useful for testing the gradient computations
   Eigen::VectorXd mPenetrationCorrectionVelocitiesVec;
 
-  /// These are the skeletons that are covered by this constraint group
-  std::vector<std::shared_ptr<dynamics::Skeleton>> mSkeletons;
+  /// These are the names of skeletons that are covered by this constraint group
+  std::vector<std::string> mSkeletons;
 
   /// This is the global timestep length. This is included here because it shows
   /// up as a constant in some of the matrices.

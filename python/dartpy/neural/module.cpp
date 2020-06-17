@@ -30,6 +30,8 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <Eigen/Dense>
+#include <pybind11/eigen.h>
 #include <pybind11/pybind11.h>
 
 namespace py = pybind11;
@@ -44,15 +46,13 @@ void dart_neural(py::module& m)
 {
   auto sm = m.def_submodule("neural");
 
-  sm.doc() = "pybind11 example plugin"; // optional module docstring
+  sm.doc()
+      = "This provides gradients to DART, with an eye on embedding DART as a "
+        "non-linearity in neural networks. We provide an optimized backprop "
+        "implementation.";
 
   NeuralUtils(sm);
   BackpropSnapshot(sm);
-
-  sm.def(
-      "add",
-      [](int i, int j) { return i + j; },
-      "A function which adds two numbers");
 }
 
 } // namespace python

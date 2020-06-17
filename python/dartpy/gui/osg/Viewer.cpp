@@ -349,6 +349,12 @@ void Viewer(py::module& m)
           "run",
           +[](dart::gui::osg::Viewer* self) -> int { return self->run(); })
       .def(
+          "realize",
+          +[](dart::gui::osg::Viewer* self) -> void { return self->realize(); })
+      .def(
+          "frame",
+          +[](dart::gui::osg::Viewer* self) -> void { return self->frame(); })
+      .def(
           "setUpViewInWindow",
           +[](dart::gui::osg::Viewer* self,
               int x,
@@ -358,9 +364,9 @@ void Viewer(py::module& m)
       .def(
           "setCameraHomePosition",
           +[](dart::gui::osg::Viewer* self,
-              const Eigen::Vector3d& eye,
-              const Eigen::Vector3d& center,
-              const Eigen::Vector3d& up) {
+              const Eigen::Vector3d eye,
+              const Eigen::Vector3d center,
+              const Eigen::Vector3d up) {
             self->getCameraManipulator()->setHomePosition(
                 eigToOsgVec3(eye), eigToOsgVec3(center), eigToOsgVec3(up));
 

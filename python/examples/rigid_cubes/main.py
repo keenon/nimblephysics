@@ -21,8 +21,17 @@ def main():
 
     viewer.setUpViewInWindow(0, 0, 640, 480)
     viewer.setCameraHomePosition([0.8, 0.0, 0.8], [0, -0.25, 0], [0, 0.5, 0])
-    viewer.run()
+    viewer.realize()
+
+    bps = []
+    steps = 1000
+    for i in range(steps):
+        print(str(i)+'/'+str(steps))
+        bps.append(dart.neural.forwardPass(world))
+        viewer.frame()
+
+    print('Done!')
 
 
-if __name__== "__main__":
+if __name__ == "__main__":
     main()

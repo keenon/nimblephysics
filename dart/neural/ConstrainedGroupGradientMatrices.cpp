@@ -39,23 +39,17 @@ ConstrainedGroupGradientMatrices::ConstrainedGroupGradientMatrices(
 
       // Only add this skeleton to our list if it's not already present
 
-      if (std::find(mSkeletons.begin(), mSkeletons.end(), skel)
+      if (std::find(mSkeletons.begin(), mSkeletons.end(), skel->getName())
           == mSkeletons.end())
       {
-        mSkeletons.push_back(skel);
-        mSkeletonOffset.insert(std::make_pair(skel->getName(), mNumDOFs));
+        mSkeletons.push_back(skel->getName());
+        mSkeletonOffset[skel->getName()] = mNumDOFs;
         mNumDOFs += skel->getNumDofs();
       }
     }
   }
 
   mImpulseTests.reserve(mNumConstraintDim);
-}
-
-//==============================================================================
-ConstrainedGroupGradientMatrices::~ConstrainedGroupGradientMatrices()
-{
-  // Do nothing, for now
 }
 
 //==============================================================================
@@ -96,7 +90,7 @@ void ConstrainedGroupGradientMatrices::measureConstraintImpulse(
   Eigen::VectorXd massedImpulseTest = Eigen::VectorXd::Zero(mNumDOFs);
   for (SkeletonPtr skel : constraint->getSkeletons())
   {
-    std::size_t offset = mSkeletonOffset.find(skel->getName())->second;
+    std::size_t offset = mSkeletonOffset[skel->getName()];
     std::size_t dofs = skel->getNumDofs();
 
     massedImpulseTest.segment(offset, dofs) = skel->getVelocityChanges();
@@ -113,14 +107,14 @@ void ConstrainedGroupGradientMatrices::measureConstraintImpulse(
   for (std::size_t k = 0; k < constraint->getDimension(); ++k)
     impulses[k] = (k == constraintIndex) ? 1 : 0;
   constraint->applyImpulse(impulses);
-  delete impulses;
+  delete[] impulses;
 
   // For gradient computations: record the torque changes for each
   // skeleton for the unit impulse on this constraint.
   Eigen::VectorXd impulseTest = Eigen::VectorXd::Zero(mNumDOFs);
   for (SkeletonPtr skel : constraint->getSkeletons())
   {
-    std::size_t offset = mSkeletonOffset.find(skel->getName())->second;
+    std::size_t offset = mSkeletonOffset[skel->getName()];
     std::size_t dofs = skel->getNumDofs();
 
     impulseTest.segment(offset, dofs) = skel->getConstraintForces() * mTimeStep;
@@ -375,13 +369,14 @@ void ConstrainedGroupGradientMatrices::constructMatrices(
 }
 
 //==============================================================================
-Eigen::MatrixXd ConstrainedGroupGradientMatrices::getForceVelJacobian()
+Eigen::MatrixXd ConstrainedGroupGradientMatrices::getForceVelJacobian(
+    WorldPtr world)
 {
   Eigen::MatrixXd A_c = getClampingConstraintMatrix();
   Eigen::MatrixXd A_ub = getUpperBoundConstraintMatrix();
   Eigen::MatrixXd E = getUpperBoundMappingMatrix();
   Eigen::MatrixXd P_c = getProjectionIntoClampsMatrix();
-  Eigen::MatrixXd Minv = getInvMassMatrix();
+  Eigen::MatrixXd Minv = getInvMassMatrix(world);
 
   if (A_ub.size() > 0 && E.size() > 0)
   {
@@ -398,13 +393,14 @@ Eigen::MatrixXd ConstrainedGroupGradientMatrices::getForceVelJacobian()
 }
 
 //==============================================================================
-Eigen::MatrixXd ConstrainedGroupGradientMatrices::getVelVelJacobian()
+Eigen::MatrixXd ConstrainedGroupGradientMatrices::getVelVelJacobian(
+    WorldPtr world)
 {
   Eigen::MatrixXd A_c = getClampingConstraintMatrix();
   Eigen::MatrixXd A_ub = getUpperBoundConstraintMatrix();
   Eigen::MatrixXd E = getUpperBoundMappingMatrix();
   Eigen::MatrixXd P_c = getProjectionIntoClampsMatrix();
-  Eigen::MatrixXd Minv = getInvMassMatrix();
+  Eigen::MatrixXd Minv = getInvMassMatrix(world);
   Eigen::MatrixXd parts1 = A_c + A_ub * E;
   Eigen::MatrixXd parts2 = mTimeStep * Minv * parts1 * P_c;
   /*
@@ -475,32 +471,34 @@ Eigen::MatrixXd ConstrainedGroupGradientMatrices::getVelPosJacobian()
 }
 
 //==============================================================================
-Eigen::MatrixXd ConstrainedGroupGradientMatrices::getMassMatrix()
+Eigen::MatrixXd ConstrainedGroupGradientMatrices::getMassMatrix(WorldPtr world)
 {
   Eigen::MatrixXd massMatrix = Eigen::MatrixXd(mNumDOFs, mNumDOFs);
   massMatrix.setZero();
   std::size_t cursor = 0;
   for (std::size_t i = 0; i < mSkeletons.size(); i++)
   {
-    std::size_t skelDOF = mSkeletons[i]->getNumDofs();
-    massMatrix.block(cursor, cursor, skelDOF, skelDOF)
-        = mSkeletons[i]->getMassMatrix();
+    SkeletonPtr skel = world->getSkeleton(mSkeletons[i]);
+    std::size_t skelDOF = skel->getNumDofs();
+    massMatrix.block(cursor, cursor, skelDOF, skelDOF) = skel->getMassMatrix();
     cursor += skelDOF;
   }
   return massMatrix;
 }
 
 //==============================================================================
-Eigen::MatrixXd ConstrainedGroupGradientMatrices::getInvMassMatrix()
+Eigen::MatrixXd ConstrainedGroupGradientMatrices::getInvMassMatrix(
+    WorldPtr world)
 {
   Eigen::MatrixXd invMassMatrix = Eigen::MatrixXd(mNumDOFs, mNumDOFs);
   invMassMatrix.setZero();
   std::size_t cursor = 0;
   for (std::size_t i = 0; i < mSkeletons.size(); i++)
   {
-    std::size_t skelDOF = mSkeletons[i]->getNumDofs();
+    SkeletonPtr skel = world->getSkeleton(mSkeletons[i]);
+    std::size_t skelDOF = skel->getNumDofs();
     invMassMatrix.block(cursor, cursor, skelDOF, skelDOF)
-        = mSkeletons[i]->getInvMassMatrix();
+        = skel->getInvMassMatrix();
     cursor += skelDOF;
   }
   return invMassMatrix;
@@ -528,14 +526,15 @@ ConstrainedGroupGradientMatrices::getProjectionIntoClampsMatrix()
 /// This replaces x with the result of M*x in place, without explicitly forming
 /// M
 void ConstrainedGroupGradientMatrices::implicitMultiplyByMassMatrix(
-    Eigen::VectorXd& x)
+    WorldPtr world, Eigen::VectorXd& x)
 {
   std::size_t cursor = 0;
   for (std::size_t i = 0; i < mSkeletons.size(); i++)
   {
-    std::size_t dofs = mSkeletons[i]->getNumDofs();
+    SkeletonPtr skel = world->getSkeleton(mSkeletons[i]);
+    std::size_t dofs = skel->getNumDofs();
     x.segment(cursor, dofs)
-        = mSkeletons[i]->multiplyByImplicitMassMatrix(x.segment(cursor, dofs));
+        = skel->multiplyByImplicitMassMatrix(x.segment(cursor, dofs));
     cursor += dofs;
   }
 }
@@ -544,14 +543,15 @@ void ConstrainedGroupGradientMatrices::implicitMultiplyByMassMatrix(
 /// This replaces x with the result of Minv*x in place, without explicitly
 /// forming Minv
 void ConstrainedGroupGradientMatrices::implicitMultiplyByInvMassMatrix(
-    Eigen::VectorXd& x)
+    WorldPtr world, Eigen::VectorXd& x)
 {
   std::size_t cursor = 0;
   for (std::size_t i = 0; i < mSkeletons.size(); i++)
   {
-    std::size_t dofs = mSkeletons[i]->getNumDofs();
-    x.segment(cursor, dofs) = mSkeletons[i]->multiplyByImplicitInvMassMatrix(
-        x.segment(cursor, dofs));
+    SkeletonPtr skel = world->getSkeleton(mSkeletons[i]);
+    std::size_t dofs = skel->getNumDofs();
+    x.segment(cursor, dofs)
+        = skel->multiplyByImplicitInvMassMatrix(x.segment(cursor, dofs));
     cursor += dofs;
   }
 }
@@ -559,7 +559,9 @@ void ConstrainedGroupGradientMatrices::implicitMultiplyByInvMassMatrix(
 //==============================================================================
 /// Multiply by the vel-vel jacobian, without forming it explicitly
 void ConstrainedGroupGradientMatrices::backprop(
-    LossGradient& thisTimestepLoss, const LossGradient& nextTimestepLoss)
+    WorldPtr world,
+    LossGradient& thisTimestepLoss,
+    const LossGradient& nextTimestepLoss)
 {
   /*
 
@@ -605,7 +607,7 @@ void ConstrainedGroupGradientMatrices::backprop(
     // f_t --> v_t+1:
     // force-vel = timeStep * Minv
     thisTimestepLoss.lossWrtTorque = nextTimestepLoss.lossWrtVelocity;
-    implicitMultiplyByInvMassMatrix(thisTimestepLoss.lossWrtTorque);
+    implicitMultiplyByInvMassMatrix(world, thisTimestepLoss.lossWrtTorque);
     thisTimestepLoss.lossWrtTorque *= mTimeStep;
   }
   else
@@ -634,7 +636,7 @@ void ConstrainedGroupGradientMatrices::backprop(
 
     // f_t --> v_t+1:
     thisTimestepLoss.lossWrtTorque = nextTimestepLoss.lossWrtVelocity;
-    implicitMultiplyByInvMassMatrix(thisTimestepLoss.lossWrtTorque);
+    implicitMultiplyByInvMassMatrix(world, thisTimestepLoss.lossWrtTorque);
     thisTimestepLoss.lossWrtTorque -= V_c * z;
     thisTimestepLoss.lossWrtTorque *= mTimeStep;
   }
@@ -727,8 +729,8 @@ std::size_t ConstrainedGroupGradientMatrices::getNumConstraintDim() const
 }
 
 //==============================================================================
-const std::vector<std::shared_ptr<dynamics::Skeleton>>&
-ConstrainedGroupGradientMatrices::getSkeletons() const
+const std::vector<std::string>& ConstrainedGroupGradientMatrices::getSkeletons()
+    const
 {
   return mSkeletons;
 }

@@ -31,11 +31,9 @@
  */
 
 #include <dart/dart.hpp>
+#include <dart/neural/BackpropSnapshot.hpp>
 #include <pybind11/eigen.h>
 #include <pybind11/pybind11.h>
-
-#include "eigen_geometry_pybind.h"
-#include "eigen_pybind.h"
 
 namespace py = pybind11;
 
@@ -44,9 +42,9 @@ namespace python {
 
 void BackpropSnapshot(py::module& m)
 {
-  ::py::class_<dart::neural::BackpropSnapshot>(m, "BackpropSnapshot")
-      // dart::neural::BackpropSnapshot,
-      // std::shared_ptr<dart::neural::BackpropSnapshot>>(m, "BackpropSnapshot")
+  ::py::class_<
+      dart::neural::BackpropSnapshot,
+      std::shared_ptr<dart::neural::BackpropSnapshot>>(m, "BackpropSnapshot")
       .def(
           ::py::init<
               dart::simulation::WorldPtr,
@@ -60,20 +58,25 @@ void BackpropSnapshot(py::module& m)
       .def(
           "backprop",
           &dart::neural::BackpropSnapshot::backprop,
+          ::py::arg("world"),
           ::py::arg("thisTimestepLoss"),
           ::py::arg("nextTimestepLoss"))
       .def(
           "getVelVelJacobian",
-          &dart::neural::BackpropSnapshot::getVelVelJacobian)
+          &dart::neural::BackpropSnapshot::getVelVelJacobian,
+          ::py::arg("world"))
       .def(
           "getForceVelJacobian",
-          &dart::neural::BackpropSnapshot::getForceVelJacobian)
+          &dart::neural::BackpropSnapshot::getForceVelJacobian,
+          ::py::arg("world"))
       .def(
           "getPosPosJacobian",
-          &dart::neural::BackpropSnapshot::getPosPosJacobian)
+          &dart::neural::BackpropSnapshot::getPosPosJacobian,
+          ::py::arg("world"))
       .def(
           "getVelPosJacobian",
-          &dart::neural::BackpropSnapshot::getVelPosJacobian)
+          &dart::neural::BackpropSnapshot::getVelPosJacobian,
+          ::py::arg("world"))
       .def(
           "getForwardPassPosition",
           &dart::neural::BackpropSnapshot::getForwardPassPosition)
@@ -85,16 +88,22 @@ void BackpropSnapshot(py::module& m)
           &dart::neural::BackpropSnapshot::getForwardPassTorques)
       .def(
           "finiteDifferenceVelVelJacobian",
-          &dart::neural::BackpropSnapshot::finiteDifferenceVelVelJacobian)
+          &dart::neural::BackpropSnapshot::finiteDifferenceVelVelJacobian,
+          ::py::arg("world"))
       .def(
           "finiteDifferenceForceVelJacobian",
-          &dart::neural::BackpropSnapshot::finiteDifferenceForceVelJacobian)
+          &dart::neural::BackpropSnapshot::finiteDifferenceForceVelJacobian,
+          ::py::arg("world"))
       .def(
           "finiteDifferencePosPosJacobian",
-          &dart::neural::BackpropSnapshot::finiteDifferencePosPosJacobian)
+          &dart::neural::BackpropSnapshot::finiteDifferencePosPosJacobian,
+          ::py::arg("world"),
+          ::py::arg("subdivisions"))
       .def(
           "finiteDifferenceVelPosJacobian",
-          &dart::neural::BackpropSnapshot::finiteDifferenceVelPosJacobian);
+          &dart::neural::BackpropSnapshot::finiteDifferenceVelPosJacobian,
+          ::py::arg("world"),
+          ::py::arg("subdivisions"));
 }
 
 } // namespace python
