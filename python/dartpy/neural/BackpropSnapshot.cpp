@@ -78,6 +78,10 @@ void BackpropSnapshot(py::module& m)
           &dart::neural::BackpropSnapshot::getVelPosJacobian,
           ::py::arg("world"))
       .def(
+          "getPosVelJacobian",
+          &dart::neural::BackpropSnapshot::getPosVelJacobian,
+          ::py::arg("world"))
+      .def(
           "getForwardPassPosition",
           &dart::neural::BackpropSnapshot::getForwardPassPosition)
       .def(
@@ -86,6 +90,9 @@ void BackpropSnapshot(py::module& m)
       .def(
           "getForwardPassTorques",
           &dart::neural::BackpropSnapshot::getForwardPassTorques)
+      .def("getMassMatrix", &dart::neural::BackpropSnapshot::getMassMatrix)
+      .def(
+          "getInvMassMatrix", &dart::neural::BackpropSnapshot::getInvMassMatrix)
       .def(
           "finiteDifferenceVelVelJacobian",
           &dart::neural::BackpropSnapshot::finiteDifferenceVelVelJacobian,

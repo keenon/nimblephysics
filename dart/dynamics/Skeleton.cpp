@@ -1563,6 +1563,76 @@ void Skeleton::setGradientConstraintMatrices(
 }
 
 //==============================================================================
+Eigen::MatrixXd Skeleton::getPosCJacobian()
+{
+  // TOOD(keenon): replace with the GEAR approach
+  return finiteDifferencePosCJacobian();
+}
+
+//==============================================================================
+Eigen::MatrixXd Skeleton::getVelCJacobian()
+{
+  // TOOD(keenon): replace with the GEAR approach
+  return finiteDifferenceVelCJacobian();
+}
+
+//==============================================================================
+Eigen::MatrixXd Skeleton::finiteDifferencePosCJacobian()
+{
+  std::size_t n = getNumDofs();
+  Eigen::MatrixXd J = Eigen::MatrixXd(n, n);
+  Eigen::VectorXd pos = getPositions();
+
+  // Get baseline C(pos, vel)
+  Eigen::VectorXd baseline = getCoriolisAndGravityForces();
+
+  float EPS = 1e-7;
+
+  for (std::size_t i = 0; i < n; i++)
+  {
+    Eigen::VectorXd tweakedPos = pos;
+    tweakedPos(i) += EPS;
+    setPositions(tweakedPos);
+    Eigen::VectorXd perturbed = getCoriolisAndGravityForces();
+
+    J.col(i) = (perturbed - baseline) / EPS;
+  }
+
+  // Reset everything how we left it
+  setPositions(pos);
+
+  return J;
+}
+
+//==============================================================================
+Eigen::MatrixXd Skeleton::finiteDifferenceVelCJacobian()
+{
+  std::size_t n = getNumDofs();
+  Eigen::MatrixXd J = Eigen::MatrixXd(n, n);
+  Eigen::VectorXd vel = getVelocities();
+
+  // Get baseline C(pos, vel)
+  Eigen::VectorXd baseline = getCoriolisAndGravityForces();
+
+  float EPS = 1e-7;
+
+  for (std::size_t i = 0; i < n; i++)
+  {
+    Eigen::VectorXd tweakedVel = vel;
+    tweakedVel(i) += EPS;
+    setVelocities(tweakedVel);
+    Eigen::VectorXd perturbed = getCoriolisAndGravityForces();
+
+    J.col(i) = (perturbed - baseline) / EPS;
+  }
+
+  // Reset everything how we left it
+  setVelocities(vel);
+
+  return J;
+}
+
+//==============================================================================
 void Skeleton::integratePositions(double _dt)
 {
   for (std::size_t i = 0; i < mSkelCache.mBodyNodes.size(); ++i)

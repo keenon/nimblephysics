@@ -249,6 +249,49 @@ void World(py::module& m)
       .def(
           "bake",
           +[](dart::simulation::World* self) -> void { return self->bake(); })
+      .def(
+          "getNumDofs",
+          +[](dart::simulation::World* self) -> std::size_t {
+            return self->getNumDofs();
+          })
+      .def(
+          "getPositions",
+          +[](dart::simulation::World* self) -> Eigen::VectorXd {
+            return self->getPositions();
+          })
+      .def(
+          "getVelocities",
+          +[](dart::simulation::World* self) -> Eigen::VectorXd {
+            return self->getVelocities();
+          })
+      .def(
+          "getForces",
+          +[](dart::simulation::World* self) -> Eigen::VectorXd {
+            return self->getForces();
+          })
+      .def(
+          "setPositions",
+          +[](dart::simulation::World* self, Eigen::VectorXd positions)
+              -> void { self->setPositions(positions); })
+      .def(
+          "setVelocities",
+          +[](dart::simulation::World* self, Eigen::VectorXd velocities)
+              -> void { self->setVelocities(velocities); })
+      .def(
+          "setForces",
+          +[](dart::simulation::World* self, Eigen::VectorXd forces) -> void {
+            self->setForces(forces);
+          })
+      .def(
+          "getMassMatrix",
+          +[](dart::simulation::World* self) -> Eigen::VectorXd {
+            self->getMassMatrix();
+          })
+      .def(
+          "getInvMassMatrix",
+          +[](dart::simulation::World* self) -> Eigen::VectorXd {
+            self->getInvMassMatrix();
+          })
       .def_readonly("onNameChanged", &dart::simulation::World::onNameChanged);
 }
 

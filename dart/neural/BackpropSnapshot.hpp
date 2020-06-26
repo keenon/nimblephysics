@@ -40,6 +40,11 @@ public:
   /// is here if you want access to the full Jacobian for some reason.
   Eigen::MatrixXd getVelVelJacobian(simulation::WorldPtr world);
 
+  /// This computes and returns the whole pos-vel jacobian. For backprop, you
+  /// don't actually need this matrix, you can compute backprop directly. This
+  /// is here if you want access to the full Jacobian for some reason.
+  Eigen::MatrixXd getPosVelJacobian(simulation::WorldPtr world);
+
   /// This computes and returns the whole force-vel jacobian. For backprop, you
   /// don't actually need this matrix, you can compute backprop directly. This
   /// is here if you want access to the full Jacobian for some reason.
@@ -106,9 +111,21 @@ public:
   /// concatenation of the skeleton inverse mass matrices.
   Eigen::MatrixXd getInvMassMatrix(simulation::WorldPtr world);
 
+  /// This returns the pos-C(pos,vel) Jacobian for the whole world, a block
+  /// diagonal concatenation of the skeleton pos-C(pos,vel) Jacobians.
+  Eigen::MatrixXd getPosCJacobian(simulation::WorldPtr world);
+
+  /// This returns the vel-C(pos,vel) Jacobian for the whole world, a block
+  /// diagonal concatenation of the skeleton vel-C(pos,vel) Jacobians.
+  Eigen::MatrixXd getVelCJacobian(simulation::WorldPtr world);
+
   /// This computes and returns the whole vel-vel jacobian by finite
   /// differences. This is SUPER SLOW, and is only here for testing.
   Eigen::MatrixXd finiteDifferenceVelVelJacobian(simulation::WorldPtr world);
+
+  /// This computes and returns the whole pos-C(pos,vel) jacobian by finite
+  /// differences. This is SUPER SUPER SLOW, and is only here for testing.
+  Eigen::MatrixXd finiteDifferencePosVelJacobian(simulation::WorldPtr world);
 
   /// This computes and returns the whole force-vel jacobian by finite
   /// differences. This is SUPER SLOW, and is only here for testing.
@@ -119,7 +136,7 @@ public:
   Eigen::MatrixXd finiteDifferencePosPosJacobian(
       simulation::WorldPtr world, std::size_t subdivisions = 20);
 
-  /// This computes and returns the whole force-vel jacobian by finite
+  /// This computes and returns the whole vel-pos jacobian by finite
   /// differences. This is SUPER SUPER SLOW, and is only here for testing.
   Eigen::MatrixXd finiteDifferenceVelPosJacobian(
       simulation::WorldPtr world, std::size_t subdivisions = 20);
@@ -198,6 +215,17 @@ private:
 
   Eigen::MatrixXd assembleMatrix(
       simulation::WorldPtr world, MatrixToAssemble whichMatrix);
+
+  enum BlockDiagonalMatrixToAssemble
+  {
+    MASS,
+    INV_MASS,
+    POS_C,
+    VEL_C
+  };
+
+  Eigen::MatrixXd assembleBlockDiagonalMatrix(
+      simulation::WorldPtr world, BlockDiagonalMatrixToAssemble whichMatrix);
 
   enum VectorToAssemble
   {

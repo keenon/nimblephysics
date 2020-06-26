@@ -43,11 +43,12 @@ namespace python {
 void NeuralUtils(py::module& m)
 {
   ::py::class_<dart::neural::LossGradient>(m, "LossGradient")
-      .def_readonly(
+      .def(::py::init<>())
+      .def_readwrite(
           "lossWrtPosition", &dart::neural::LossGradient::lossWrtPosition)
-      .def_readonly(
+      .def_readwrite(
           "lossWrtVelocity", &dart::neural::LossGradient::lossWrtVelocity)
-      .def_readonly(
+      .def_readwrite(
           "lossWrtTorque", &dart::neural::LossGradient::lossWrtTorque);
 
   m.def(

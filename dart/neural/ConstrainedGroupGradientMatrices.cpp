@@ -430,7 +430,7 @@ Eigen::MatrixXd ConstrainedGroupGradientMatrices::getPosPosJacobian()
   }
 
   // Construct the W matrix we'll need to use to solve for our closest approx
-  Eigen::MatrixXd W = Eigen::MatrixXd(A_b.cols(), A_b.rows() * A_b.rows());
+  Eigen::MatrixXd W = Eigen::MatrixXd(A_b.rows() * A_b.rows(), A_b.cols());
   for (int i = 0; i < A_b.cols(); i++)
   {
     Eigen::VectorXd a_i = A_b.col(i);
@@ -564,17 +564,15 @@ void ConstrainedGroupGradientMatrices::backprop(
     const LossGradient& nextTimestepLoss)
 {
   /*
-
   The forward computation graph looks like this:
 
-  -----------> p_t ---------> p_t+1 ---->
-                       ^
-                       |
-  v_t -----------------+----> v_t+1 ---->
-                                ^
-                                |
-  f_t --------------------------+
-
+  -------> p_t ----+-----------------------> p_t+1 ---->
+            /       \
+           /         \
+  v_t ----+-----------+----(LCP Solver)----> v_t+1 ---->
+                     /
+                    /
+  f_t -------------+
   */
 
   // p_t --> p_t+1:

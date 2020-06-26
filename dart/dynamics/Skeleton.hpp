@@ -570,6 +570,20 @@ public:
       std::shared_ptr<neural::ConstrainedGroupGradientMatrices>
           gradientMatrices);
 
+  /// This gives the unconstrained Jacobian giving the difference in C(pos, vel)
+  Eigen::MatrixXd getPosCJacobian();
+
+  /// This gives the unconstrained Jacobian giving the difference in C(pos, vel)
+  Eigen::MatrixXd getVelCJacobian();
+
+  /// VERY SLOW: Only for testing. This computes the unconstrained Jacobian
+  /// giving the difference in C(pos, vel) for finite changes in pos
+  Eigen::MatrixXd finiteDifferencePosCJacobian();
+
+  /// VERY SLOW: Only for testing. This computes the unconstrained Jacobian
+  /// giving the difference in C(pos, vel) for finite changes in vel
+  Eigen::MatrixXd finiteDifferenceVelCJacobian();
+
   //----------------------------------------------------------------------------
   // Integration and finite difference
   //----------------------------------------------------------------------------

@@ -65,6 +65,18 @@ void BackpropSnapshot::backprop(
     LossGradient& thisTimestepLoss,
     const LossGradient& nextTimestepLoss)
 {
+  /*
+  The forward computation graph looks like this:
+
+  -------> p_t ----+-----------------------> p_t+1 ---->
+            /       \
+           /         \
+  v_t ----+-----------+----(LCP Solver)----> v_t+1 ---->
+                     /
+                    /
+  f_t -------------+
+  */
+
   LossGradient groupThisTimestepLoss;
   LossGradient groupNextTimestepLoss;
 
@@ -164,38 +176,51 @@ void BackpropSnapshot::backprop(
 
       The forward computation graph looks like this:
 
-      -----------> p_t ---------> p_t+1 ---->
-                           ^
-                           |
-      v_t -----------------+----> v_t+1 ---->
-                                    ^
-                                    |
-      f_t --------------------------+
+      -------> p_t ----+-----------------------> p_t+1 ---->
+                /       \
+               /         \
+      v_t ----+-----------+----(LCP Solver)----> v_t+1 ---->
+                         /
+                        /
+      f_t -------------+
 
       */
 
-      // p_t --> p_t+1
+      // p_t
       // pos-pos = I
+      // pos-vel = dT * Minv * d/dpos C(pos,vel)
+      // pos-vel^T = dT * d/dpos C(pos,vel)^T * Minv
       thisTimestepLoss.lossWrtPosition.segment(dofCursorWorld, dofs)
-          = nextTimestepLoss.lossWrtPosition.segment(dofCursorWorld, dofs);
+          // p_t --> p_t+1
+          = nextTimestepLoss.lossWrtPosition.segment(dofCursorWorld, dofs)
+            // p_t --> v_t+1
+            - (mTimeStep * skel->getPosCJacobian().transpose()
+               * skel->multiplyByImplicitInvMassMatrix(
+                   nextTimestepLoss.lossWrtVelocity.segment(
+                       dofCursorWorld, dofs)));
 
-      // v_t --> p_t+1
-      // vel-pos = timeStep * I
+      // v_t
+      // vel-vel = I - dT * Minv * d/dvel C(pos,vel)
+      // vel-pos = dT * I
       thisTimestepLoss.lossWrtVelocity.segment(dofCursorWorld, dofs)
-          = mTimeStep
-            * nextTimestepLoss.lossWrtPosition.segment(dofCursorWorld, dofs);
+          // v_t --> v_t+1
+          = nextTimestepLoss.lossWrtVelocity.segment(dofCursorWorld, dofs)
+            - (mTimeStep * skel->getVelCJacobian().transpose()
+               * skel->multiplyByImplicitInvMassMatrix(
+                   nextTimestepLoss.lossWrtVelocity.segment(
+                       dofCursorWorld, dofs)))
+            // v_t --> p_t
+            + mTimeStep
+                  * thisTimestepLoss.lossWrtPosition.segment(
+                      dofCursorWorld, dofs);
 
-      // v_t --> v_t+1
-      // vel-vel = I
-      thisTimestepLoss.lossWrtVelocity.segment(dofCursorWorld, dofs)
-          += nextTimestepLoss.lossWrtVelocity.segment(dofCursorWorld, dofs);
-
-      // f_t --> v_t+1
-      // force-vel = timeStep * Minv
+      // f_t
+      // force-vel = dT * Minv
       thisTimestepLoss.lossWrtTorque.segment(dofCursorWorld, dofs)
-          = skel->multiplyByImplicitInvMassMatrix(
-              nextTimestepLoss.lossWrtVelocity.segment(dofCursorWorld, dofs));
-      thisTimestepLoss.lossWrtTorque.segment(dofCursorWorld, dofs) *= mTimeStep;
+          // f_t --> v_t+1
+          = mTimeStep
+            * skel->multiplyByImplicitInvMassMatrix(
+                nextTimestepLoss.lossWrtVelocity.segment(dofCursorWorld, dofs));
     }
   }
 
@@ -240,7 +265,8 @@ Eigen::MatrixXd BackpropSnapshot::getVelVelJacobian(WorldPtr world)
 
   // If there are no clamping constraints, then vel-vel is just the identity
   if (A_c.size() == 0)
-    return Eigen::MatrixXd::Identity(mNumDOFs, mNumDOFs);
+    return Eigen::MatrixXd::Identity(mNumDOFs, mNumDOFs)
+           - getForceVelJacobian(world) * getVelCJacobian(world);
 
   Eigen::MatrixXd A_ub = getUpperBoundConstraintMatrix(world);
   Eigen::MatrixXd E = getUpperBoundMappingMatrix();
@@ -259,7 +285,14 @@ Eigen::MatrixXd BackpropSnapshot::getVelVelJacobian(WorldPtr world)
   std::cout << "mTimestep * Minv * (A_c + A_ub * E) * P_c: " << std::endl
             << parts2 << std::endl;
   */
-  return (Eigen::MatrixXd::Identity(mNumDOFs, mNumDOFs) - parts2);
+  return (Eigen::MatrixXd::Identity(mNumDOFs, mNumDOFs) - parts2)
+         - getForceVelJacobian(world) * getVelCJacobian(world);
+}
+
+//==============================================================================
+Eigen::MatrixXd BackpropSnapshot::getPosVelJacobian(WorldPtr world)
+{
+  return -getForceVelJacobian(world) * getPosCJacobian(world);
 }
 
 //==============================================================================
@@ -400,63 +433,29 @@ Eigen::MatrixXd BackpropSnapshot::getBouncingConstraintMatrix(WorldPtr world)
 //==============================================================================
 Eigen::MatrixXd BackpropSnapshot::getMassMatrix(WorldPtr world)
 {
-  Eigen::MatrixXd massMatrix = Eigen::MatrixXd(mNumDOFs, mNumDOFs);
-  massMatrix.setZero();
-
-  // Set the state of the world back to what it was during the forward pass, so
-  // that implicit mass matrix computations work correctly.
-
-  Eigen::VectorXd oldPositions = world->getPositions();
-  Eigen::VectorXd oldVelocities = world->getVelocities();
-  world->setPositions(mForwardPassPosition);
-  world->setVelocities(mForwardPassVelocity);
-
-  std::size_t cursor = 0;
-  for (std::size_t i = 0; i < world->getNumSkeletons(); i++)
-  {
-    std::size_t skelDOF = world->getSkeleton(i)->getNumDofs();
-    massMatrix.block(cursor, cursor, skelDOF, skelDOF)
-        = world->getSkeleton(i)->getMassMatrix();
-    cursor += skelDOF;
-  }
-
-  // Reset the position of the world to what it was before
-
-  world->setPositions(oldPositions);
-  world->setVelocities(oldVelocities);
-
-  return massMatrix;
+  return assembleBlockDiagonalMatrix(
+      world, BackpropSnapshot::BlockDiagonalMatrixToAssemble::MASS);
 }
 
 //==============================================================================
 Eigen::MatrixXd BackpropSnapshot::getInvMassMatrix(WorldPtr world)
 {
-  Eigen::MatrixXd invMassMatrix = Eigen::MatrixXd(mNumDOFs, mNumDOFs);
-  invMassMatrix.setZero();
+  return assembleBlockDiagonalMatrix(
+      world, BackpropSnapshot::BlockDiagonalMatrixToAssemble::INV_MASS);
+}
 
-  // Set the state of the world back to what it was during the forward pass, so
-  // that implicit mass matrix computations work correctly.
+//==============================================================================
+Eigen::MatrixXd BackpropSnapshot::getPosCJacobian(simulation::WorldPtr world)
+{
+  return assembleBlockDiagonalMatrix(
+      world, BackpropSnapshot::BlockDiagonalMatrixToAssemble::POS_C);
+}
 
-  Eigen::VectorXd oldPositions = world->getPositions();
-  Eigen::VectorXd oldVelocities = world->getVelocities();
-  world->setPositions(mForwardPassPosition);
-  world->setVelocities(mForwardPassVelocity);
-
-  std::size_t cursor = 0;
-  for (std::size_t i = 0; i < world->getNumSkeletons(); i++)
-  {
-    std::size_t skelDOF = world->getSkeleton(i)->getNumDofs();
-    invMassMatrix.block(cursor, cursor, skelDOF, skelDOF)
-        = world->getSkeleton(i)->getInvMassMatrix();
-    cursor += skelDOF;
-  }
-
-  // Reset the position of the world to what it was before
-
-  world->setPositions(oldPositions);
-  world->setVelocities(oldVelocities);
-
-  return invMassMatrix;
+//==============================================================================
+Eigen::MatrixXd BackpropSnapshot::getVelCJacobian(simulation::WorldPtr world)
+{
+  return assembleBlockDiagonalMatrix(
+      world, BackpropSnapshot::BlockDiagonalMatrixToAssemble::VEL_C);
 }
 
 //==============================================================================
@@ -516,6 +515,46 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceVelVelJacobian(WorldPtr world)
     Eigen::VectorXd tweakedVel = Eigen::VectorXd(mForwardPassVelocity);
     tweakedVel(i) += EPSILON;
     world->setVelocities(tweakedVel);
+    world->step(false);
+
+    Eigen::VectorXd velChange
+        = (world->getVelocities() - originalVel) / EPSILON;
+    J.col(i).noalias() = velChange;
+  }
+
+  snapshot.restore();
+  world->getConstraintSolver()->setGradientEnabled(oldGradientEnabled);
+
+  return J;
+}
+
+//==============================================================================
+Eigen::MatrixXd BackpropSnapshot::finiteDifferencePosVelJacobian(
+    simulation::WorldPtr world)
+{
+  RestorableSnapshot snapshot(world);
+
+  Eigen::MatrixXd J(mNumDOFs, mNumDOFs);
+
+  bool oldGradientEnabled = world->getConstraintSolver()->getGradientEnabled();
+  world->getConstraintSolver()->setGradientEnabled(false);
+
+  world->setVelocities(mForwardPassVelocity);
+  world->step(false);
+
+  Eigen::VectorXd originalPos = world->getPositions();
+  Eigen::VectorXd originalVel = world->getVelocities();
+
+  double EPSILON = 1e-7;
+  for (std::size_t i = 0; i < world->getNumDofs(); i++)
+  {
+    snapshot.restore();
+
+    world->setVelocities(mForwardPassVelocity);
+    Eigen::VectorXd tweakedPos = Eigen::VectorXd(originalPos);
+    tweakedPos(i) += EPSILON;
+    world->setPositions(tweakedPos);
+
     world->step(false);
 
     Eigen::VectorXd velChange
@@ -766,6 +805,60 @@ Eigen::MatrixXd BackpropSnapshot::assembleMatrix(
     constraintCursor += groupMatrix.cols();
   }
   return matrix;
+}
+
+Eigen::MatrixXd BackpropSnapshot::assembleBlockDiagonalMatrix(
+    simulation::WorldPtr world,
+    BackpropSnapshot::BlockDiagonalMatrixToAssemble whichMatrix)
+{
+  Eigen::MatrixXd J = Eigen::MatrixXd(mNumDOFs, mNumDOFs);
+  J.setZero();
+
+  // Set the state of the world back to what it was during the forward pass, so
+  // that implicit mass matrix computations work correctly.
+
+  Eigen::VectorXd oldPositions = world->getPositions();
+  Eigen::VectorXd oldVelocities = world->getVelocities();
+  world->setPositions(mForwardPassPosition);
+  world->setVelocities(mForwardPassVelocity);
+
+  std::size_t cursor = 0;
+  for (std::size_t i = 0; i < world->getNumSkeletons(); i++)
+  {
+    std::size_t skelDOF = world->getSkeleton(i)->getNumDofs();
+    if (whichMatrix == BackpropSnapshot::BlockDiagonalMatrixToAssemble::MASS)
+    {
+      J.block(cursor, cursor, skelDOF, skelDOF)
+          = world->getSkeleton(i)->getMassMatrix();
+    }
+    else if (
+        whichMatrix
+        == BackpropSnapshot::BlockDiagonalMatrixToAssemble::INV_MASS)
+    {
+      J.block(cursor, cursor, skelDOF, skelDOF)
+          = world->getSkeleton(i)->getInvMassMatrix();
+    }
+    else if (
+        whichMatrix == BackpropSnapshot::BlockDiagonalMatrixToAssemble::POS_C)
+    {
+      J.block(cursor, cursor, skelDOF, skelDOF)
+          = world->getSkeleton(i)->getPosCJacobian();
+    }
+    else if (
+        whichMatrix == BackpropSnapshot::BlockDiagonalMatrixToAssemble::VEL_C)
+    {
+      J.block(cursor, cursor, skelDOF, skelDOF)
+          = world->getSkeleton(i)->getVelCJacobian();
+    }
+    cursor += skelDOF;
+  }
+
+  // Reset the position of the world to what it was before
+
+  world->setPositions(oldPositions);
+  world->setVelocities(oldVelocities);
+
+  return J;
 }
 
 //==============================================================================
