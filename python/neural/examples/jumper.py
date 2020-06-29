@@ -18,50 +18,13 @@ class MyWorldNode(dart.gui.osg.RealTimeWorldNode):
 
 def main():
     world = dart.simulation.World()
-    world.setGravity([0, -9.81, 0])
+    world.setGravity([0, 0, -9.81])
 
-    # Set up the 2D cartpole
+    loader = dart.utils.DartLoader()
+    loader.addPackageDirectory("main", "/home/keenon/Desktop/dev/dart/python/neural/examples/data/")
+    skel: dart.dynamics.Skeleton = loader.parseSkeleton("package://main/human_one_leg_inv.urdf")
 
-    cartpole = dart.dynamics.Skeleton()
-    cartRail, cart = cartpole.createPrismaticJointAndBodyNodePair()
-    cartRail.setAxis([1, 0, 0])
-    cartShape = cart.createShapeNode(dart.dynamics.BoxShape([.5, .1, .1]))
-    cartVisual = cartShape.createVisualAspect()
-    cartVisual.setColor([0, 0, 0])
-    cartRail.setForceUpperLimit(0, 1.0)
-    cartRail.setForceLowerLimit(0, -1.0)
-    cartRail.setVelocityUpperLimit(0, 1000.0)
-    cartRail.setVelocityLowerLimit(0, -1000.0)
-
-    poleJoint, pole = cartpole.createRevoluteJointAndBodyNodePair(cart)
-    poleJoint.setAxis([0, 0, 1])
-    poleShape = pole.createShapeNode(dart.dynamics.BoxShape([.1, 1.0, .1]))
-    poleVisual = poleShape.createVisualAspect()
-    poleVisual.setColor([0, 0, 0])
-    poleJoint.setForceUpperLimit(0, 0.0)
-    poleJoint.setForceLowerLimit(0, 0.0)
-    poleJoint.setVelocityUpperLimit(0, 10000.0)
-    poleJoint.setVelocityLowerLimit(0, -10000.0)
-
-    poleOffset = dart.math.Isometry3()
-    poleOffset.set_translation([0, -0.5, 0])
-    poleJoint.setTransformFromChildBodyNode(poleOffset)
-
-    world.addSkeleton(cartpole)
-
-    # Set up the force marker, cause I can't figure out how to draw a line
-
-    marker = dart.dynamics.Skeleton()
-    markerWeld, markerBody = cartpole.createWeldJointAndBodyNodePair()
-    markerShape = markerBody.createShapeNode(dart.dynamics.BoxShape([.1, .1, .1]))
-    markerVisual = markerShape.createVisualAspect()
-    markerVisual.setColor([255, 0, 0])
-
-    markerOffset = dart.math.Isometry3()
-    markerOffset.set_translation([0, -0.5, 0])
-    markerWeld.setTransformFromChildBodyNode(markerOffset)
-
-    world.addSkeleton(marker)
+    world.addSkeleton(skel)
 
     # Set up the view
 
@@ -69,17 +32,21 @@ def main():
     viewer = dart.gui.osg.Viewer()
     viewer.addWorldNode(node)
     viewer.setUpViewInWindow(0, 0, 640, 480)
-    viewer.setCameraHomePosition([0, 0, 5.0], [0, 0, 0], [0, 0.5, 0])
+    viewer.setCameraHomePosition([0, 5.0, 1.0], [0, 0, 1.0], [0, 0, 0.5])
     viewer.realize()
 
     # Make simulations repeatable
     random.seed(1234)
 
     # Make simulations and backprop run faster by using a bigger timestep
-    world.setTimeStep(world.getTimeStep()*10)
+    world.setTimeStep(1.0 / 240)
 
-    steps = 500
-    shooting_length = 5
+    while True:
+        viewer.frame()
+        time.sleep(0.003)
+
+    steps = 1000
+    shooting_length = 10
 
     # Set up initial conditions
     start_pos = torch.tensor(
@@ -93,7 +60,7 @@ def main():
 
     # Create the trajectory
     def step_loss(pos, vel, t, world):
-        return t[0]*t[0] + t[1]*t[1]  # torch.mul(pos, t).norm()
+        return 0  # t.norm()
 
     def final_loss(pos, vel, world):
         return torch.norm(pos) + torch.norm(vel)
@@ -130,8 +97,11 @@ def main():
         time.sleep(0.003)
 
     # Run cartpole simulations
+    """
     iteration = 0
-    for i in range(201):
+    for i in range(200):
+        # while True:
+
         loss, knot_loss = trajectory.unroll(
             after_step=(animate_step if iteration % 100 == 0 and iteration > 0 else None))
 
@@ -154,6 +124,7 @@ def main():
         scheduler.step()
 
         iteration += 1
+    """
 
     trajectory.ipopt()
 

@@ -43,9 +43,7 @@ class DartLayer(torch.autograd.Function):
         if snapshot_pointer is not None:
             snapshot_pointer.backprop_snapshot = backprop_snapshot
 
-        finalPosition = np.array(world.getPositions(), copy=True)
-        finalVelocity = np.array(world.getVelocities(), copy=True)
-        return (torch.from_numpy(finalPosition), torch.from_numpy(finalVelocity))
+        return (torch.tensor(world.getPositions()), torch.tensor(world.getVelocities()))
 
     @staticmethod
     def backward(ctx, grad_pos, grad_vel):
@@ -109,6 +107,7 @@ class DartLayer(torch.autograd.Function):
             torch.tensor(lossWrtPosition, dtype=torch.float64),
             torch.tensor(lossWrtVelocity, dtype=torch.float64),
             torch.tensor(lossWrtTorque, dtype=torch.float64),
+            None
         )
 
 

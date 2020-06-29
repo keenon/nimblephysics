@@ -197,6 +197,30 @@ public:
   /// as a single vector
   Eigen::VectorXd getForces();
 
+  // This gives the vector of force upper limits for all the DOFs in this
+  // world
+  Eigen::VectorXd getForceUpperLimits();
+
+  // This gives the vector of force lower limits for all the DOFs in this
+  // world
+  Eigen::VectorXd getForceLowerLimits();
+
+  // This gives the vector of position upper limits for all the DOFs in this
+  // world
+  Eigen::VectorXd getPositionUpperLimits();
+
+  // This gives the vector of position lower limits for all the DOFs in this
+  // world
+  Eigen::VectorXd getPositionLowerLimits();
+
+  // This gives the vector of position upper limits for all the DOFs in this
+  // world
+  Eigen::VectorXd getVelocityUpperLimits();
+
+  // This gives the vector of position lower limits for all the DOFs in this
+  // world
+  Eigen::VectorXd getVelocityLowerLimits();
+
   /// Sets the position of all the skeletons in the world from a single
   /// concatenated state vector
   void setPositions(Eigen::VectorXd position);
@@ -208,6 +232,24 @@ public:
   /// Sets the forces of all the skeletons in the world from a single
   /// concatenated state vector
   void setForces(Eigen::VectorXd torques);
+
+  // Sets the upper limits of all the joints from a single vector
+  void setForceUpperLimits(Eigen::VectorXd limits);
+
+  // Sets the lower limits of all the joints from a single vector
+  void setForceLowerLimits(Eigen::VectorXd limits);
+
+  // Sets the upper limits of all the joints from a single vector
+  void setPositionUpperLimits(Eigen::VectorXd limits);
+
+  // Sets the lower limits of all the joints from a single vector
+  void setPositionLowerLimits(Eigen::VectorXd limits);
+
+  // Sets the upper limits of all the joints from a single vector
+  void setVelocityUpperLimits(Eigen::VectorXd limits);
+
+  // Sets the lower limits of all the joints from a single vector
+  void setVelocityLowerLimits(Eigen::VectorXd limits);
 
   /// This constructs a mass matrix for the whole world, by creating a
   /// block-diagonal concatenation of each skeleton's mass matrix.

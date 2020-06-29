@@ -586,6 +586,90 @@ Eigen::VectorXd World::getForces()
 }
 
 //==============================================================================
+Eigen::VectorXd World::getForceUpperLimits()
+{
+  Eigen::VectorXd limits = Eigen::VectorXd(mDofs);
+  std::size_t cursor = 0;
+  for (std::size_t i = 0; i < mSkeletons.size(); i++)
+  {
+    std::size_t dofs = mSkeletons[i]->getNumDofs();
+    limits.segment(cursor, dofs) = mSkeletons[i]->getForceUpperLimits();
+    cursor += dofs;
+  }
+  return limits;
+}
+
+//==============================================================================
+Eigen::VectorXd World::getForceLowerLimits()
+{
+  Eigen::VectorXd limits = Eigen::VectorXd(mDofs);
+  std::size_t cursor = 0;
+  for (std::size_t i = 0; i < mSkeletons.size(); i++)
+  {
+    std::size_t dofs = mSkeletons[i]->getNumDofs();
+    limits.segment(cursor, dofs) = mSkeletons[i]->getForceLowerLimits();
+    cursor += dofs;
+  }
+  return limits;
+}
+
+//==============================================================================
+Eigen::VectorXd World::getPositionUpperLimits()
+{
+  Eigen::VectorXd limits = Eigen::VectorXd(mDofs);
+  std::size_t cursor = 0;
+  for (std::size_t i = 0; i < mSkeletons.size(); i++)
+  {
+    std::size_t dofs = mSkeletons[i]->getNumDofs();
+    limits.segment(cursor, dofs) = mSkeletons[i]->getPositionUpperLimits();
+    cursor += dofs;
+  }
+  return limits;
+}
+
+//==============================================================================
+Eigen::VectorXd World::getPositionLowerLimits()
+{
+  Eigen::VectorXd limits = Eigen::VectorXd(mDofs);
+  std::size_t cursor = 0;
+  for (std::size_t i = 0; i < mSkeletons.size(); i++)
+  {
+    std::size_t dofs = mSkeletons[i]->getNumDofs();
+    limits.segment(cursor, dofs) = mSkeletons[i]->getPositionLowerLimits();
+    cursor += dofs;
+  }
+  return limits;
+}
+
+//==============================================================================
+Eigen::VectorXd World::getVelocityUpperLimits()
+{
+  Eigen::VectorXd limits = Eigen::VectorXd(mDofs);
+  std::size_t cursor = 0;
+  for (std::size_t i = 0; i < mSkeletons.size(); i++)
+  {
+    std::size_t dofs = mSkeletons[i]->getNumDofs();
+    limits.segment(cursor, dofs) = mSkeletons[i]->getVelocityUpperLimits();
+    cursor += dofs;
+  }
+  return limits;
+}
+
+//==============================================================================
+Eigen::VectorXd World::getVelocityLowerLimits()
+{
+  Eigen::VectorXd limits = Eigen::VectorXd(mDofs);
+  std::size_t cursor = 0;
+  for (std::size_t i = 0; i < mSkeletons.size(); i++)
+  {
+    std::size_t dofs = mSkeletons[i]->getNumDofs();
+    limits.segment(cursor, dofs) = mSkeletons[i]->getVelocityLowerLimits();
+    cursor += dofs;
+  }
+  return limits;
+}
+
+//==============================================================================
 void World::setPositions(Eigen::VectorXd position)
 {
   std::size_t cursor = 0;
@@ -617,6 +701,78 @@ void World::setForces(Eigen::VectorXd forces)
   {
     std::size_t dofs = mSkeletons[i]->getNumDofs();
     mSkeletons[i]->setForces(forces.segment(cursor, dofs));
+    cursor += dofs;
+  }
+}
+
+//==============================================================================
+void World::setForceUpperLimits(Eigen::VectorXd limits)
+{
+  std::size_t cursor = 0;
+  for (std::size_t i = 0; i < mSkeletons.size(); i++)
+  {
+    std::size_t dofs = mSkeletons[i]->getNumDofs();
+    mSkeletons[i]->setForceUpperLimits(limits.segment(cursor, dofs));
+    cursor += dofs;
+  }
+}
+
+//==============================================================================
+void World::setForceLowerLimits(Eigen::VectorXd limits)
+{
+  std::size_t cursor = 0;
+  for (std::size_t i = 0; i < mSkeletons.size(); i++)
+  {
+    std::size_t dofs = mSkeletons[i]->getNumDofs();
+    mSkeletons[i]->setForceLowerLimits(limits.segment(cursor, dofs));
+    cursor += dofs;
+  }
+}
+
+//==============================================================================
+void World::setPositionUpperLimits(Eigen::VectorXd limits)
+{
+  std::size_t cursor = 0;
+  for (std::size_t i = 0; i < mSkeletons.size(); i++)
+  {
+    std::size_t dofs = mSkeletons[i]->getNumDofs();
+    mSkeletons[i]->setPositionUpperLimits(limits.segment(cursor, dofs));
+    cursor += dofs;
+  }
+}
+
+//==============================================================================
+void World::setPositionLowerLimits(Eigen::VectorXd limits)
+{
+  std::size_t cursor = 0;
+  for (std::size_t i = 0; i < mSkeletons.size(); i++)
+  {
+    std::size_t dofs = mSkeletons[i]->getNumDofs();
+    mSkeletons[i]->setPositionLowerLimits(limits.segment(cursor, dofs));
+    cursor += dofs;
+  }
+}
+
+//==============================================================================
+void World::setVelocityUpperLimits(Eigen::VectorXd limits)
+{
+  std::size_t cursor = 0;
+  for (std::size_t i = 0; i < mSkeletons.size(); i++)
+  {
+    std::size_t dofs = mSkeletons[i]->getNumDofs();
+    mSkeletons[i]->setVelocityUpperLimits(limits.segment(cursor, dofs));
+    cursor += dofs;
+  }
+}
+
+//==============================================================================
+void World::setVelocityLowerLimits(Eigen::VectorXd limits)
+{
+  std::size_t cursor = 0;
+  for (std::size_t i = 0; i < mSkeletons.size(); i++)
+  {
+    std::size_t dofs = mSkeletons[i]->getNumDofs();
+    mSkeletons[i]->setVelocityLowerLimits(limits.segment(cursor, dofs));
     cursor += dofs;
   }
 }

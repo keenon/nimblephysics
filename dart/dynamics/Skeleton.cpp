@@ -1586,7 +1586,7 @@ Eigen::MatrixXd Skeleton::finiteDifferencePosCJacobian()
   // Get baseline C(pos, vel)
   Eigen::VectorXd baseline = getCoriolisAndGravityForces();
 
-  float EPS = 1e-7;
+  double EPS = 1e-10;
 
   for (std::size_t i = 0; i < n; i++)
   {
@@ -1614,7 +1614,7 @@ Eigen::MatrixXd Skeleton::finiteDifferenceVelCJacobian()
   // Get baseline C(pos, vel)
   Eigen::VectorXd baseline = getCoriolisAndGravityForces();
 
-  float EPS = 1e-7;
+  double EPS = 1e-10;
 
   for (std::size_t i = 0; i < n; i++)
   {
@@ -1630,6 +1630,138 @@ Eigen::MatrixXd Skeleton::finiteDifferenceVelCJacobian()
   setVelocities(vel);
 
   return J;
+}
+
+//==============================================================================
+Eigen::VectorXd Skeleton::getForceUpperLimits()
+{
+  std::size_t n = getNumDofs();
+  Eigen::VectorXd limits(n);
+  for (std::size_t i = 0; i < n; i++)
+  {
+    auto dof = getDof(i);
+    limits[i] = dof->getForceUpperLimit();
+  }
+  return limits;
+}
+
+//==============================================================================
+Eigen::VectorXd Skeleton::getForceLowerLimits()
+{
+  std::size_t n = getNumDofs();
+  Eigen::VectorXd limits(n);
+  for (std::size_t i = 0; i < n; i++)
+  {
+    auto dof = getDof(i);
+    limits[i] = dof->getForceLowerLimit();
+  }
+  return limits;
+}
+
+//==============================================================================
+Eigen::VectorXd Skeleton::getPositionUpperLimits()
+{
+  std::size_t n = getNumDofs();
+  Eigen::VectorXd limits(n);
+  for (std::size_t i = 0; i < n; i++)
+  {
+    auto dof = getDof(i);
+    limits[i] = dof->getPositionUpperLimit();
+  }
+  return limits;
+}
+
+//==============================================================================
+Eigen::VectorXd Skeleton::getPositionLowerLimits()
+{
+  std::size_t n = getNumDofs();
+  Eigen::VectorXd limits(n);
+  for (std::size_t i = 0; i < n; i++)
+  {
+    auto dof = getDof(i);
+    limits[i] = dof->getPositionLowerLimit();
+  }
+  return limits;
+}
+
+//==============================================================================
+Eigen::VectorXd Skeleton::getVelocityUpperLimits()
+{
+  std::size_t n = getNumDofs();
+  Eigen::VectorXd limits(n);
+  for (std::size_t i = 0; i < n; i++)
+  {
+    auto dof = getDof(i);
+    limits[i] = dof->getVelocityUpperLimit();
+  }
+  return limits;
+}
+
+//==============================================================================
+Eigen::VectorXd Skeleton::getVelocityLowerLimits()
+{
+  std::size_t n = getNumDofs();
+  Eigen::VectorXd limits(n);
+  for (std::size_t i = 0; i < n; i++)
+  {
+    auto dof = getDof(i);
+    limits[i] = dof->getVelocityLowerLimit();
+  }
+  return limits;
+}
+
+//==============================================================================
+void Skeleton::setForceUpperLimits(Eigen::VectorXd limits)
+{
+  for (std::size_t i = 0; i < getNumDofs(); i++)
+  {
+    getDof(i)->setForceUpperLimit(limits[i]);
+  }
+}
+
+//==============================================================================
+void Skeleton::setForceLowerLimits(Eigen::VectorXd limits)
+{
+  for (std::size_t i = 0; i < getNumDofs(); i++)
+  {
+    getDof(i)->setForceLowerLimit(limits[i]);
+  }
+}
+
+//==============================================================================
+void Skeleton::setPositionUpperLimits(Eigen::VectorXd limits)
+{
+  for (std::size_t i = 0; i < getNumDofs(); i++)
+  {
+    getDof(i)->setPositionUpperLimit(limits[i]);
+  }
+}
+
+//==============================================================================
+void Skeleton::setPositionLowerLimits(Eigen::VectorXd limits)
+{
+  for (std::size_t i = 0; i < getNumDofs(); i++)
+  {
+    getDof(i)->setPositionLowerLimit(limits[i]);
+  }
+}
+
+//==============================================================================
+void Skeleton::setVelocityUpperLimits(Eigen::VectorXd limits)
+{
+  for (std::size_t i = 0; i < getNumDofs(); i++)
+  {
+    getDof(i)->setVelocityUpperLimit(limits[i]);
+  }
+}
+
+//==============================================================================
+void Skeleton::setVelocityLowerLimits(Eigen::VectorXd limits)
+{
+  for (std::size_t i = 0; i < getNumDofs(); i++)
+  {
+    getDof(i)->setVelocityLowerLimit(limits[i]);
+  }
 }
 
 //==============================================================================

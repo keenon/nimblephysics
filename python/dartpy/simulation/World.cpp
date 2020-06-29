@@ -270,6 +270,36 @@ void World(py::module& m)
             return self->getForces();
           })
       .def(
+          "getForceUpperLimits",
+          +[](dart::simulation::World* self) -> Eigen::VectorXd {
+            return self->getForceUpperLimits();
+          })
+      .def(
+          "getForceLowerLimits",
+          +[](dart::simulation::World* self) -> Eigen::VectorXd {
+            return self->getForceLowerLimits();
+          })
+      .def(
+          "getPositionLowerLimits",
+          +[](dart::simulation::World* self) -> Eigen::VectorXd {
+            return self->getPositionLowerLimits();
+          })
+      .def(
+          "getPositionUpperLimits",
+          +[](dart::simulation::World* self) -> Eigen::VectorXd {
+            return self->getPositionUpperLimits();
+          })
+      .def(
+          "getVelocityLowerLimits",
+          +[](dart::simulation::World* self) -> Eigen::VectorXd {
+            return self->getVelocityLowerLimits();
+          })
+      .def(
+          "getVelocityUpperLimits",
+          +[](dart::simulation::World* self) -> Eigen::VectorXd {
+            return self->getVelocityUpperLimits();
+          })
+      .def(
           "setPositions",
           +[](dart::simulation::World* self, Eigen::VectorXd positions)
               -> void { self->setPositions(positions); })
@@ -281,6 +311,36 @@ void World(py::module& m)
           "setForces",
           +[](dart::simulation::World* self, Eigen::VectorXd forces) -> void {
             self->setForces(forces);
+          })
+      .def(
+          "setForcesUpperLimits",
+          +[](dart::simulation::World* self, Eigen::VectorXd limits) -> void {
+            self->setForceUpperLimits(limits);
+          })
+      .def(
+          "setForcesLowerLimits",
+          +[](dart::simulation::World* self, Eigen::VectorXd limits) -> void {
+            self->setForceLowerLimits(limits);
+          })
+      .def(
+          "setPositionUpperLimits",
+          +[](dart::simulation::World* self, Eigen::VectorXd limits) -> void {
+            self->setPositionUpperLimits(limits);
+          })
+      .def(
+          "setPositionLowerLimits",
+          +[](dart::simulation::World* self, Eigen::VectorXd limits) -> void {
+            self->setPositionLowerLimits(limits);
+          })
+      .def(
+          "setVelocityUpperLimits",
+          +[](dart::simulation::World* self, Eigen::VectorXd limits) -> void {
+            self->setVelocityUpperLimits(limits);
+          })
+      .def(
+          "setVelocityLowerLimits",
+          +[](dart::simulation::World* self, Eigen::VectorXd limits) -> void {
+            self->setVelocityLowerLimits(limits);
           })
       .def(
           "getMassMatrix",

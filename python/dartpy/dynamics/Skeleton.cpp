@@ -33,6 +33,7 @@
 #include <dart/dart.hpp>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
+
 #include "eigen_geometry_pybind.h"
 #include "eigen_pybind.h"
 
@@ -576,6 +577,66 @@ void Skeleton(py::module& m)
           +[](const dart::dynamics::Skeleton* self, std::size_t treeIndex)
               -> std::size_t { return self->getNumEndEffectors(treeIndex); },
           ::py::arg("treeIndex"))
+      .def(
+          "getForceUpperLimits",
+          +[](dart::dynamics::Skeleton* self) -> Eigen::VectorXd {
+            return self->getForceUpperLimits();
+          })
+      .def(
+          "getForceLowerLimits",
+          +[](dart::dynamics::Skeleton* self) -> Eigen::VectorXd {
+            return self->getForceLowerLimits();
+          })
+      .def(
+          "getPositionLowerLimits",
+          +[](dart::dynamics::Skeleton* self) -> Eigen::VectorXd {
+            return self->getPositionLowerLimits();
+          })
+      .def(
+          "getPositionUpperLimits",
+          +[](dart::dynamics::Skeleton* self) -> Eigen::VectorXd {
+            return self->getPositionUpperLimits();
+          })
+      .def(
+          "getVelocityLowerLimits",
+          +[](dart::dynamics::Skeleton* self) -> Eigen::VectorXd {
+            return self->getVelocityLowerLimits();
+          })
+      .def(
+          "getVelocityUpperLimits",
+          +[](dart::dynamics::Skeleton* self) -> Eigen::VectorXd {
+            return self->getVelocityUpperLimits();
+          })
+      .def(
+          "setForcesUpperLimits",
+          +[](dart::dynamics::Skeleton* self, Eigen::VectorXd limits) -> void {
+            self->setForceUpperLimits(limits);
+          })
+      .def(
+          "setForcesLowerLimits",
+          +[](dart::dynamics::Skeleton* self, Eigen::VectorXd limits) -> void {
+            self->setForceLowerLimits(limits);
+          })
+      .def(
+          "setPositionUpperLimits",
+          +[](dart::dynamics::Skeleton* self, Eigen::VectorXd limits) -> void {
+            self->setPositionUpperLimits(limits);
+          })
+      .def(
+          "setPositionLowerLimits",
+          +[](dart::dynamics::Skeleton* self, Eigen::VectorXd limits) -> void {
+            self->setPositionLowerLimits(limits);
+          })
+      .def(
+          "setVelocityUpperLimits",
+          +[](dart::dynamics::Skeleton* self, Eigen::VectorXd limits) -> void {
+            self->setVelocityUpperLimits(limits);
+          })
+      .def(
+          "setVelocityLowerLimits",
+          +[](dart::dynamics::Skeleton* self, Eigen::VectorXd limits) -> void {
+            self->setVelocityLowerLimits(limits);
+          })
       .def(
           "integratePositions",
           +[](dart::dynamics::Skeleton* self, double _dt) -> void {

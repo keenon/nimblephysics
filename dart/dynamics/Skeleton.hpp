@@ -585,6 +585,52 @@ public:
   Eigen::MatrixXd finiteDifferenceVelCJacobian();
 
   //----------------------------------------------------------------------------
+  // Trajectory optimization
+  //----------------------------------------------------------------------------
+
+  // This gives the vector of force upper limits for all the DOFs in this
+  // skeleton
+  Eigen::VectorXd getForceUpperLimits();
+
+  // This gives the vector of force lower limits for all the DOFs in this
+  // skeleton
+  Eigen::VectorXd getForceLowerLimits();
+
+  // This gives the vector of position upper limits for all the DOFs in this
+  // skeleton
+  Eigen::VectorXd getPositionUpperLimits();
+
+  // This gives the vector of position lower limits for all the DOFs in this
+  // skeleton
+  Eigen::VectorXd getPositionLowerLimits();
+
+  // This gives the vector of velocity upper limits for all the DOFs in this
+  // skeleton
+  Eigen::VectorXd getVelocityUpperLimits();
+
+  // This gives the vector of velocity lower limits for all the DOFs in this
+  // skeleton
+  Eigen::VectorXd getVelocityLowerLimits();
+
+  // Sets the upper limits of all the joints from a single vector
+  void setForceUpperLimits(Eigen::VectorXd limits);
+
+  // Sets the lower limits of all the joints from a single vector
+  void setForceLowerLimits(Eigen::VectorXd limits);
+
+  // Sets the upper limits of all the joints from a single vector
+  void setPositionUpperLimits(Eigen::VectorXd limits);
+
+  // Sets the lower limits of all the joints from a single vector
+  void setPositionLowerLimits(Eigen::VectorXd limits);
+
+  // Sets the upper limits of all the joints from a single vector
+  void setVelocityUpperLimits(Eigen::VectorXd limits);
+
+  // Sets the lower limits of all the joints from a single vector
+  void setVelocityLowerLimits(Eigen::VectorXd limits);
+
+  //----------------------------------------------------------------------------
   // Integration and finite difference
   //----------------------------------------------------------------------------
 
