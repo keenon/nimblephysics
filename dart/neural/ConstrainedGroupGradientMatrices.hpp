@@ -92,6 +92,14 @@ public:
   /// reason.
   Eigen::MatrixXd getVelPosJacobian();
 
+  /// This returns the [dC(pos,vel)/dpos] for the group, a block diagonal
+  /// concatenation of the skeleton [dC(pos,vel)/dpos] matrices.
+  Eigen::MatrixXd getPosCJacobian(simulation::WorldPtr world);
+
+  /// This returns the [dC(pos,vel)/dvel] for the group, a block diagonal
+  /// concatenation of the skeleton [dC(pos,vel)/dvel] matrices.
+  Eigen::MatrixXd getVelCJacobian(simulation::WorldPtr world);
+
   /// This returns the mass matrix for the group, a block diagonal
   /// concatenation of the skeleton mass matrices.
   Eigen::MatrixXd getMassMatrix(simulation::WorldPtr world);

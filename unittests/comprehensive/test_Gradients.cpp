@@ -583,18 +583,23 @@ bool verifyAnalyticalBackpropInstance(
   LossGradient thisTimeStep;
   classicPtr->backprop(world, thisTimeStep, nextTimeStep);
 
-  // Compute "brute force" backprop using full Jacobians
-  /*
-  The forward computation graph looks like this:
+  RestorableSnapshot snapshot(world);
 
-  -------> p_t ----+-----------------------> p_t+1 ---->
-            /       \
-           /         \
-  v_t ----+-----------+----(LCP Solver)----> v_t+1 ---->
-                     /
-                    /
-  f_t -------------+
+  world->setPositions(classicPtr->getPreStepPosition());
+  world->setVelocities(classicPtr->getPreStepVelocity());
+
+  /*
+  std::cout << "Pre time step position: " << std::endl
+            << classicPtr->getPreStepPosition() << std::endl;
+  std::cout << "Post time step position: " << std::endl
+            << classicPtr->getPostStepPosition() << std::endl;
+  std::cout << "Pre time step velocity: " << std::endl
+            << classicPtr->getPreStepVelocity() << std::endl;
+  std::cout << "Post time step velocity: " << std::endl
+            << classicPtr->getPostStepVelocity() << std::endl;
   */
+
+  // Compute "brute force" backprop using full Jacobians
 
   // p_t
   VectorXd lossWrtThisPosition =
@@ -610,9 +615,9 @@ bool verifyAnalyticalBackpropInstance(
       // v_t --> v_t+1
       (classicPtr->getVelVelJacobian(world).transpose()
        * nextTimeStep.lossWrtVelocity)
-      // v_t --> p_t
+      // v_t --> p_t+1
       + (classicPtr->getVelPosJacobian(world).transpose()
-         * lossWrtThisPosition);
+         * nextTimeStep.lossWrtPosition);
 
   // f_t
   VectorXd lossWrtThisTorque =
@@ -629,48 +634,188 @@ bool verifyAnalyticalBackpropInstance(
     std::cout << "Input: loss wrt velocity at time t + 1:" << std::endl
               << nextTimeStep.lossWrtVelocity << std::endl;
 
-    std::cout << "-----" << std::endl;
+    if (!equals(lossWrtThisPosition, thisTimeStep.lossWrtPosition, 1e-5))
+    {
+      std::cout << "-----" << std::endl;
 
-    std::cout << "Brute force: loss wrt position at time t:" << std::endl
-              << lossWrtThisPosition << std::endl;
-    std::cout << "Analytical: loss wrt position at time t:" << std::endl
-              << thisTimeStep.lossWrtPosition << std::endl;
-    std::cout << "pos-vel Jacobian:" << std::endl
-              << classicPtr->getPosVelJacobian(world) << std::endl;
-    std::cout << "pos-C Jacobian:" << std::endl
-              << classicPtr->getPosCJacobian(world) << std::endl;
-    std::cout << "Brute force: pos-pos Jac:" << std::endl
-              << classicPtr->getPosPosJacobian(world) << std::endl;
+      std::cout << "Brute force: loss wrt position at time t:" << std::endl
+                << lossWrtThisPosition << std::endl;
+      std::cout << "Analytical: loss wrt position at time t:" << std::endl
+                << thisTimeStep.lossWrtPosition << std::endl;
+      std::cout << "pos-vel Jacobian:" << std::endl
+                << classicPtr->getPosVelJacobian(world) << std::endl;
+      std::cout << "pos-C Jacobian:" << std::endl
+                << classicPtr->getPosCJacobian(world) << std::endl;
+      std::cout << "Brute force: pos-pos Jac:" << std::endl
+                << classicPtr->getPosPosJacobian(world) << std::endl;
+    }
 
-    std::cout << "-----" << std::endl;
+    if (!equals(lossWrtThisVelocity, thisTimeStep.lossWrtVelocity, 1e-5))
+    {
+      std::cout << "-----" << std::endl;
 
-    std::cout << "Brute force: loss wrt velocity at time t:" << std::endl
-              << lossWrtThisVelocity << std::endl;
-    std::cout << "Analytical: loss wrt velocity at time t:" << std::endl
-              << thisTimeStep.lossWrtVelocity << std::endl;
-    std::cout << "vel-vel Jacobian:" << std::endl
-              << classicPtr->getVelVelJacobian(world) << std::endl;
-    std::cout << "vel-pos Jacobian:" << std::endl
-              << classicPtr->getVelPosJacobian(world) << std::endl;
-    std::cout << "vel-C Jacobian:" << std::endl
-              << classicPtr->getVelCJacobian(world) << std::endl;
-    std::cout << "v_t --> v_t+1:" << std::endl
-              << (classicPtr->getVelVelJacobian(world).transpose()
-                  * nextTimeStep.lossWrtVelocity)
-              << std::endl;
-    std::cout << "v_t --> p_t:" << std::endl
-              << (classicPtr->getVelPosJacobian(world).transpose()
-                  * lossWrtThisPosition)
-              << std::endl;
+      Eigen::MatrixXd velVelJac = classicPtr->getVelVelJacobian(world);
 
-    std::cout << "-----" << std::endl;
+      Eigen::MatrixXd A_c = classicPtr->getClampingConstraintMatrix(world);
+      Eigen::MatrixXd A_ub = classicPtr->getUpperBoundConstraintMatrix(world);
+      Eigen::MatrixXd V_c
+          = classicPtr->getMassedClampingConstraintMatrix(world);
+      Eigen::MatrixXd V_ub
+          = classicPtr->getMassedUpperBoundConstraintMatrix(world);
+      Eigen::MatrixXd B = classicPtr->getBounceDiagonals().asDiagonal();
+      Eigen::MatrixXd E = classicPtr->getUpperBoundMappingMatrix();
+      Eigen::MatrixXd P_c = classicPtr->getProjectionIntoClampsMatrix(world);
+      Eigen::MatrixXd Minv = classicPtr->getInvMassMatrix(world);
+      Eigen::MatrixXd parts1 = A_c + A_ub * E;
+      Eigen::MatrixXd parts2 = world->getTimeStep() * Minv * parts1 * P_c;
 
-    std::cout << "Brute force: loss wrt torque at time t:" << std::endl
-              << lossWrtThisTorque << std::endl;
-    std::cout << "Analytical: loss wrt torque at time t:" << std::endl
-              << thisTimeStep.lossWrtTorque << std::endl;
+      std::cout << "Brute force A_c*z:" << std::endl
+                << parts2.transpose() * nextTimeStep.lossWrtVelocity
+                << std::endl;
+
+      // Classic formulation
+
+      Eigen::MatrixXd classicInnerPart
+          = A_c.transpose().eval() * Minv * (A_c + A_ub * E);
+      Eigen::MatrixXd classicInnerPartInv
+          = classicInnerPart.completeOrthogonalDecomposition().pseudoInverse();
+      Eigen::MatrixXd classicRightPart = B * A_c.transpose().eval();
+      Eigen::MatrixXd classicLeftPart = Minv * (A_c + A_ub * E);
+      Eigen::MatrixXd classicComplete
+          = classicLeftPart * classicInnerPart * classicRightPart;
+
+      std::cout << "Classic brute force A_c*z:" << std::endl
+                << classicComplete.transpose() * nextTimeStep.lossWrtVelocity
+                << std::endl;
+
+      // Massed formulation
+
+      Eigen::MatrixXd massedInnerPart
+          = A_c.transpose().eval() * (V_c + V_ub * E);
+      Eigen::MatrixXd massedInnerPartInv
+          = massedInnerPart.completeOrthogonalDecomposition().pseudoInverse();
+      Eigen::MatrixXd massedRightPart = B * A_c.transpose().eval();
+      Eigen::MatrixXd massedLeftPart = V_c + V_ub * E;
+      Eigen::MatrixXd massedComplete
+          = massedLeftPart * massedInnerPart * massedRightPart;
+
+      std::cout << "Massed brute force A_c*z:" << std::endl
+                << massedComplete.transpose() * nextTimeStep.lossWrtVelocity
+                << std::endl;
+
+      if (!equals(massedInnerPart, classicInnerPart, 1e-8))
+      {
+        std::cout << "Mismatch at inner part!" << std::endl;
+        std::cout << "Classic inner part:" << std::endl
+                  << classicInnerPart << std::endl;
+        std::cout << "Massed inner part:" << std::endl
+                  << massedInnerPart << std::endl;
+      }
+      if (!equals(massedInnerPartInv, classicInnerPartInv, 1e-8))
+      {
+        std::cout << "Mismatch at inner part inv!" << std::endl;
+        std::cout << "Classic inner part inv:" << std::endl
+                  << classicInnerPartInv << std::endl;
+        std::cout << "Massed inner part inv:" << std::endl
+                  << massedInnerPartInv << std::endl;
+      }
+      if (!equals(massedLeftPart, classicLeftPart, 1e-8))
+      {
+        std::cout << "Mismatch at left part!" << std::endl;
+        std::cout << "Classic left part:" << std::endl
+                  << classicLeftPart << std::endl;
+        std::cout << "Massed left part:" << std::endl
+                  << massedLeftPart << std::endl;
+      }
+      if (!equals(massedRightPart, classicRightPart, 1e-8))
+      {
+        std::cout << "Mismatch at right part!" << std::endl;
+        std::cout << "Classic right part:" << std::endl
+                  << classicRightPart << std::endl;
+        std::cout << "Massed right part:" << std::endl
+                  << massedRightPart << std::endl;
+      }
+      Eigen::MatrixXd V_c_recovered = Minv * A_c;
+      if (!equals(V_c_recovered, V_c, 1e-8))
+      {
+        std::cout << "Mismatch at V_c == Minv * A_c!" << std::endl;
+        std::cout << "V_c:" << std::endl << V_c << std::endl;
+        std::cout << "A_c:" << std::endl << A_c << std::endl;
+        std::cout << "Minv:" << std::endl << Minv << std::endl;
+        std::cout << "Minv * A_c:" << std::endl << V_c_recovered << std::endl;
+      }
+      Eigen::MatrixXd V_ub_recovered = Minv * A_ub;
+      if (!equals(V_ub_recovered, V_ub, 1e-8))
+      {
+        std::cout << "Mismatch at V_ub == Minv * A_ub!" << std::endl;
+        std::cout << "V_ub:" << std::endl << V_ub << std::endl;
+        std::cout << "Minv * A_ub:" << std::endl << V_ub_recovered << std::endl;
+      }
+
+      /*
+      std::cout << "vel-vel Jacobian:" << std::endl << velVelJac << std::endl;
+      std::cout << "vel-pos Jacobian:" << std::endl
+                << classicPtr->getVelPosJacobian(world) << std::endl;
+      std::cout << "vel-C Jacobian:" << std::endl
+                << classicPtr->getVelCJacobian(world) << std::endl;
+      std::cout << "1: nextLossWrtVel:" << std::endl
+                << nextTimeStep.lossWrtVelocity << std::endl;
+      std::cout << "2: Intermediate:" << std::endl
+                << -parts2.transpose() * nextTimeStep.lossWrtVelocity
+                << std::endl;
+      */
+      std::cout << "2.5: (force-vel)^T * nextLossWrtVel:" << std::endl
+                << -classicPtr->getForceVelJacobian(world).transpose()
+                       * nextTimeStep.lossWrtVelocity
+                << std::endl;
+      std::cout << "3: -((force-vel) * (vel-C))^T * nextLossWrtVel:"
+                << std::endl
+                << -(classicPtr->getForceVelJacobian(world)
+                     * classicPtr->getVelCJacobian(world))
+                           .transpose()
+                       * nextTimeStep.lossWrtVelocity
+                << std::endl;
+      /*
+std::cout << "(v_t --> v_t+1) * v_t+1:" << std::endl
+      << (velVelJac.transpose() * nextTimeStep.lossWrtVelocity)
+      << std::endl;
+std::cout << "v_t --> p_t+1:" << std::endl
+      << (classicPtr->getVelPosJacobian(world).transpose()
+          * lossWrtThisPosition)
+      << std::endl;
+      */
+
+      std::cout << "Brute force: loss wrt velocity at time t:" << std::endl
+                << lossWrtThisVelocity << std::endl;
+      std::cout << "Analytical: loss wrt velocity at time t:" << std::endl
+                << thisTimeStep.lossWrtVelocity << std::endl;
+    }
+
+    if (!equals(lossWrtThisTorque, thisTimeStep.lossWrtTorque, 1e-5))
+    {
+      std::cout << "-----" << std::endl;
+
+      std::cout << "Brute force: loss wrt torque at time t:" << std::endl
+                << lossWrtThisTorque << std::endl;
+      std::cout << "Analytical: loss wrt torque at time t:" << std::endl
+                << thisTimeStep.lossWrtTorque << std::endl;
+      std::cout << "(f_t --> v_t+1)^T:" << std::endl
+                << (classicPtr->getForceVelJacobian(world).transpose())
+                << std::endl;
+      std::cout << "MInv:" << std::endl
+                << classicPtr->getInvMassMatrix(world) << std::endl;
+      std::cout << "v_t+1:" << std::endl
+                << nextTimeStep.lossWrtVelocity << std::endl;
+      std::cout << "MInv * v_t+1:" << std::endl
+                << (classicPtr->getInvMassMatrix(world))
+                       * nextTimeStep.lossWrtVelocity
+                << std::endl;
+    }
     return false;
   }
+
+  snapshot.restore();
+
   return true;
 }
 
@@ -689,7 +834,7 @@ bool verifyAnalyticalBackprop(WorldPtr world)
   VectorXd phaseSpace = VectorXd::Zero(world->getNumDofs() * 2);
 
   // Test a "1" in each dimension of the phase space separately
-  for (std::size_t i = 0; i < world->getNumDofs() * 2; i++)
+  for (int i = (world->getNumDofs() * 2) - 1; i >= 0; i--)
   {
     phaseSpace(i) = 1;
     if (i > 0)
@@ -770,10 +915,10 @@ LossGradient computeBruteForceGradient(
 bool verifyGradientBackprop(
     WorldPtr world, std::size_t timesteps, std::function<double(WorldPtr)> loss)
 {
+  RestorableSnapshot snapshot(world);
+
   // Get the brute force the compare against
   LossGradient bruteForce = computeBruteForceGradient(world, timesteps, loss);
-
-  RestorableSnapshot snapshot(world);
 
   std::vector<BackpropSnapshotPtr> snapshots;
   snapshots.reserve(timesteps);
@@ -782,16 +927,14 @@ bool verifyGradientBackprop(
     snapshots.push_back(forwardPass(world));
   }
 
-  // Get the loss gradient at the final timestep (by brute force)
+  // Get the loss gradient at the final timestep (by brute force) to initialize
+  // an analytical backwards pass
   LossGradient analytical = computeBruteForceGradient(world, 0, loss);
 
-  std::vector<LossGradient> gradients;
-  gradients.push_back(analytical);
   for (int i = timesteps - 1; i >= 0; i--)
   {
     LossGradient thisTimestep;
     snapshots[i]->backprop(world, thisTimestep, analytical);
-    gradients.push_back(thisTimestep);
     analytical = thisTimestep;
   }
 
@@ -814,6 +957,8 @@ bool verifyGradientBackprop(
               << bruteForce.lossWrtTorque << std::endl;
     return false;
   }
+
+  snapshot.restore();
 
   return true;
 }
@@ -1413,12 +1558,10 @@ void testReversePendulumSledWithFrictionCoeff(double frictionCoeff)
   EXPECT_TRUE(verifyAnalyticalBackprop(world));
 }
 
-/*
 TEST(GRADIENTS, SLIDING_REVERSE_PENDULUM_NO_FRICTION)
 {
   testReversePendulumSledWithFrictionCoeff(0);
 }
-*/
 
 /******************************************************************************
 
@@ -1731,7 +1874,6 @@ void testRobotArm(std::size_t numLinks, double rotationRadians)
   EXPECT_TRUE(verifyAnalyticalBackprop(world));
 }
 
-/*
 TEST(GRADIENTS, ARM_3_LINK_30_DEG)
 {
   testRobotArm(3, 30.0 / 180 * 3.1415);
@@ -1748,7 +1890,6 @@ TEST(GRADIENTS, ARM_6_LINK_15_DEG)
 {
   testRobotArm(6, 15.0 / 180 * 3.1415);
 }
-*/
 
 /******************************************************************************
 
@@ -1815,7 +1956,7 @@ void testCartpole(double rotationRadians)
 
   EXPECT_TRUE(verifyVelGradients(world, worldVel));
   EXPECT_TRUE(verifyAnalyticalBackprop(world));
-  EXPECT_TRUE(verifyGradientBackprop(world, 10, [](WorldPtr world) {
+  EXPECT_TRUE(verifyGradientBackprop(world, 50, [](WorldPtr world) {
     Eigen::Vector2d pos = world->getPositions();
     Eigen::Vector2d vel = world->getVelocities();
     return (pos[0] * pos[0]) + (pos[1] * pos[1]) + (vel[0] * vel[0])
@@ -1838,7 +1979,7 @@ TEST(GRADIENTS, EMPTY_WORLD)
   WorldPtr world = World::create();
   VectorXd worldVel = world->getVelocities();
   EXPECT_TRUE(verifyVelGradients(world, worldVel));
-  EXPECT_TRUE(verifyBackprop(world));
+  EXPECT_TRUE(verifyAnalyticalBackprop(world));
 }
 
 TEST(GRADIENTS, EMPTY_SKELETON)
@@ -1848,6 +1989,6 @@ TEST(GRADIENTS, EMPTY_SKELETON)
   world->addSkeleton(empty);
   VectorXd worldVel = world->getVelocities();
   EXPECT_TRUE(verifyVelGradients(world, worldVel));
-  EXPECT_TRUE(verifyBackprop(world));
+  EXPECT_TRUE(verifyAnalyticalBackprop(world));
 }
 */

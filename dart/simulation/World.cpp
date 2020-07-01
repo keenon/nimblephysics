@@ -179,8 +179,10 @@ void World::integrateVelocities()
 }
 
 //==============================================================================
-void World::step(bool _resetCommand)
+void World::step(bool _resetCommand, bool _integratePositionAfterVelocity)
 {
+  Eigen::VectorXd initialVelocity = getVelocities();
+
   // Integrate velocity for unconstrained skeletons
   for (auto& skel : mSkeletons)
   {
@@ -206,7 +208,10 @@ void World::step(bool _resetCommand)
       skel->setImpulseApplied(false);
     }
 
-    skel->integratePositions(mTimeStep);
+    // <DiffDART>: Integrate positions before velocity changes, instead of after
+    if (_integratePositionAfterVelocity)
+      skel->integratePositions(mTimeStep);
+    // </DiffDART>: Integrate positions before velocity changes
 
     if (_resetCommand)
     {
@@ -215,6 +220,15 @@ void World::step(bool _resetCommand)
       skel->resetCommands();
     }
   }
+
+  // <DiffDART>: Integrate positions before velocity changes, instead of after
+  if (!_integratePositionAfterVelocity)
+  {
+    Eigen::VectorXd pos = getPositions();
+    pos += initialVelocity * mTimeStep;
+    setPositions(pos);
+  }
+  // </DiffDART>: Integrate positions before velocity changes, instead of after
 
   mTime += mTimeStep;
   mFrame++;

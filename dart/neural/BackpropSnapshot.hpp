@@ -21,9 +21,9 @@ public:
   /// be called after the timestep.
   BackpropSnapshot(
       simulation::WorldPtr world,
-      Eigen::VectorXd forwardPassPosition,
-      Eigen::VectorXd forwardPassVelocity,
-      Eigen::VectorXd forwardPassTorques);
+      Eigen::VectorXd preStepPosition,
+      Eigen::VectorXd preStepVelocity,
+      Eigen::VectorXd preStepTorques);
 
   /// This computes the implicit backprop without forming intermediate
   /// Jacobians. It takes a LossGradient with the position and velocity vectors
@@ -62,17 +62,31 @@ public:
 
   /// Returns a concatenated vector of all the Skeletons' position()'s in the
   /// World, in order in which the Skeletons appear in the World's
-  /// getSkeleton(i) returns them.
-  Eigen::VectorXd getForwardPassPosition();
+  /// getSkeleton(i) returns them, BEFORE the timestep.
+  Eigen::VectorXd getPreStepPosition();
 
   /// Returns a concatenated vector of all the Skeletons' velocity()'s in the
   /// World, in order in which the Skeletons appear in the World's
-  /// getSkeleton(i) returns them.
-  Eigen::VectorXd getForwardPassVelocity();
+  /// getSkeleton(i) returns them, BEFORE the timestep.
+  Eigen::VectorXd getPreStepVelocity();
 
   /// Returns a concatenated vector of all the joint torques that were applied
-  /// during the forward pass.
-  Eigen::VectorXd getForwardPassTorques();
+  /// during the forward pass, BEFORE the timestep.
+  Eigen::VectorXd getPreStepTorques();
+
+  /// Returns a concatenated vector of all the Skeletons' position()'s in the
+  /// World, in order in which the Skeletons appear in the World's
+  /// getSkeleton(i) returns them, AFTER the timestep.
+  Eigen::VectorXd getPostStepPosition();
+
+  /// Returns a concatenated vector of all the Skeletons' velocity()'s in the
+  /// World, in order in which the Skeletons appear in the World's
+  /// getSkeleton(i) returns them, AFTER the timestep.
+  Eigen::VectorXd getPostStepVelocity();
+
+  /// Returns a concatenated vector of all the joint torques that were applied
+  /// during the forward pass, AFTER the timestep.
+  Eigen::VectorXd getPostStepTorques();
 
   /////////////////////////////////////////////////////////////////////////////
   /// Just public for testing
@@ -193,15 +207,24 @@ protected:
   std::vector<std::shared_ptr<ConstrainedGroupGradientMatrices>>
       mGradientMatrices;
 
-  /// The position of all the DOFs of the world, when this snapshot was created
-  Eigen::VectorXd mForwardPassPosition;
+  /// The position of all the DOFs of the world BEFORE the timestep
+  Eigen::VectorXd mPreStepPosition;
 
-  /// The velocities of all the DOFs of the world, when this snapshot was
+  /// The velocities of all the DOFs of the world BEFORE the timestep
+  Eigen::VectorXd mPreStepVelocity;
+
+  /// The torques on all the DOFs of the world BEFORE the timestep
+  Eigen::VectorXd mPreStepTorques;
+
+  /// The position of all the DOFs of the world AFTER the timestep
+  Eigen::VectorXd mPostStepPosition;
+
+  /// The velocities of all the DOFs of the world AFTER the timestep
   /// created
-  Eigen::VectorXd mForwardPassVelocity;
+  Eigen::VectorXd mPostStepVelocity;
 
-  /// The torques on all the DOFs of the world, when this snapshot was created
-  Eigen::VectorXd mForwardPassTorques;
+  /// The torques on all the DOFs of the world AFTER the timestep
+  Eigen::VectorXd mPostStepTorques;
 
 private:
   enum MatrixToAssemble

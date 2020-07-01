@@ -471,6 +471,40 @@ Eigen::MatrixXd ConstrainedGroupGradientMatrices::getVelPosJacobian()
 }
 
 //==============================================================================
+Eigen::MatrixXd ConstrainedGroupGradientMatrices::getPosCJacobian(
+    simulation::WorldPtr world)
+{
+  Eigen::MatrixXd posCJac = Eigen::MatrixXd(mNumDOFs, mNumDOFs);
+  posCJac.setZero();
+  std::size_t cursor = 0;
+  for (std::size_t i = 0; i < mSkeletons.size(); i++)
+  {
+    SkeletonPtr skel = world->getSkeleton(mSkeletons[i]);
+    std::size_t skelDOF = skel->getNumDofs();
+    posCJac.block(cursor, cursor, skelDOF, skelDOF) = skel->getPosCJacobian();
+    cursor += skelDOF;
+  }
+  return posCJac;
+}
+
+//==============================================================================
+Eigen::MatrixXd ConstrainedGroupGradientMatrices::getVelCJacobian(
+    simulation::WorldPtr world)
+{
+  Eigen::MatrixXd velCJac = Eigen::MatrixXd(mNumDOFs, mNumDOFs);
+  velCJac.setZero();
+  std::size_t cursor = 0;
+  for (std::size_t i = 0; i < mSkeletons.size(); i++)
+  {
+    SkeletonPtr skel = world->getSkeleton(mSkeletons[i]);
+    std::size_t skelDOF = skel->getNumDofs();
+    velCJac.block(cursor, cursor, skelDOF, skelDOF) = skel->getVelCJacobian();
+    cursor += skelDOF;
+  }
+  return velCJac;
+}
+
+//==============================================================================
 Eigen::MatrixXd ConstrainedGroupGradientMatrices::getMassMatrix(WorldPtr world)
 {
   Eigen::MatrixXd massMatrix = Eigen::MatrixXd(mNumDOFs, mNumDOFs);
@@ -563,53 +597,28 @@ void ConstrainedGroupGradientMatrices::backprop(
     LossGradient& thisTimestepLoss,
     const LossGradient& nextTimestepLoss)
 {
-  /*
-  The forward computation graph looks like this:
-
-  -------> p_t ----+-----------------------> p_t+1 ---->
-            /       \
-           /         \
-  v_t ----+-----------+----(LCP Solver)----> v_t+1 ---->
-                     /
-                    /
-  f_t -------------+
-  */
-
-  // p_t --> p_t+1:
-  if (mBouncingConstraintMatrix.size() == 0)
-  {
-    thisTimestepLoss.lossWrtPosition = nextTimestepLoss.lossWrtPosition;
-  }
-  else
+  // Compute intermediate variable "b", described in the doc
+  Eigen::VectorXd b = nextTimestepLoss.lossWrtPosition;
+  if (mBouncingConstraintMatrix.size() > 0)
   {
     Eigen::MatrixXd X = getPosPosJacobian().transpose();
-    thisTimestepLoss.lossWrtPosition = X * nextTimestepLoss.lossWrtPosition;
+    b = X * nextTimestepLoss.lossWrtPosition;
   }
 
-  // v_t --> p_t+1:
-  // this is dT*X, which can be shortcut by just grabbing this timestep loss wrt
-  // position, since that's just X
-  thisTimestepLoss.lossWrtVelocity
-      = mTimeStep * thisTimestepLoss.lossWrtPosition;
+  // Compute intermediate variable "x", described in the doc
+  Eigen::VectorXd x = nextTimestepLoss.lossWrtVelocity;
+  implicitMultiplyByInvMassMatrix(world, x);
 
-  // Compute common precursor to loss wrt v_t and f_t:
-  Eigen::MatrixXd A_c = getClampingConstraintMatrix();
+  // Get the massed clamping constraints
+  Eigen::MatrixXd V_c = getMassedClampingConstraintMatrix();
 
-  // If there are no clamping constraints:
-  if (A_c.size() == 0)
+  // Initialize the intermediate variable "A_c * z", described in the doc
+  Eigen::VectorXd A_c_z = Eigen::VectorXd::Zero(x.size());
+
+  // If there are clamping constraints:
+  if (V_c.size() > 0)
   {
-    // v_t --> v_t+1:
-    // vel-vel = I
-    thisTimestepLoss.lossWrtVelocity += nextTimestepLoss.lossWrtVelocity;
-
-    // f_t --> v_t+1:
-    // force-vel = timeStep * Minv
-    thisTimestepLoss.lossWrtTorque = nextTimestepLoss.lossWrtVelocity;
-    implicitMultiplyByInvMassMatrix(world, thisTimestepLoss.lossWrtTorque);
-    thisTimestepLoss.lossWrtTorque *= mTimeStep;
-  }
-  else
-  {
+    Eigen::MatrixXd A_c = getClampingConstraintMatrix();
     Eigen::MatrixXd V_c = getMassedClampingConstraintMatrix();
     Eigen::MatrixXd V_ub = getMassedUpperBoundConstraintMatrix();
     Eigen::MatrixXd E = getUpperBoundMappingMatrix();
@@ -628,16 +637,21 @@ void ConstrainedGroupGradientMatrices::backprop(
     // z = B * z
     z = mBounceDiagonals.cwiseProduct(z);
 
-    // v_t --> v_t+1:
-    thisTimestepLoss.lossWrtVelocity
-        += nextTimestepLoss.lossWrtVelocity - A_c * z;
+    x -= V_c * z;
 
-    // f_t --> v_t+1:
-    thisTimestepLoss.lossWrtTorque = nextTimestepLoss.lossWrtVelocity;
-    implicitMultiplyByInvMassMatrix(world, thisTimestepLoss.lossWrtTorque);
-    thisTimestepLoss.lossWrtTorque -= V_c * z;
-    thisTimestepLoss.lossWrtTorque *= mTimeStep;
+    // Cache the result of "A_c * z"
+    A_c_z = A_c * z;
   }
+  x *= mTimeStep;
+
+  Eigen::MatrixXd posCJacobianTranspose = getPosCJacobian(world).transpose();
+  Eigen::MatrixXd velCJacobianTranspose = getVelCJacobian(world).transpose();
+
+  thisTimestepLoss.lossWrtTorque = x;
+  thisTimestepLoss.lossWrtPosition = b - (posCJacobianTranspose * x);
+  thisTimestepLoss.lossWrtVelocity = (mTimeStep * b)
+                                     + nextTimestepLoss.lossWrtVelocity - A_c_z
+                                     - (velCJacobianTranspose * x);
 }
 
 //==============================================================================

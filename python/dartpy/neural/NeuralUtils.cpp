@@ -56,6 +56,14 @@ void NeuralUtils(py::module& m)
       &dart::neural::forwardPass,
       ::py::arg("world"),
       ::py::arg("idempotent") = false);
+  m.def(
+      "bulkForwardPass",
+      &dart::neural::bulkForwardPass,
+      ::py::arg("world"),
+      ::py::arg("torques"),
+      ::py::arg("shootingLength"),
+      ::py::arg("knotPoses"),
+      ::py::arg("knotVels"));
 }
 
 } // namespace python

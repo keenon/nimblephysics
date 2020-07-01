@@ -150,6 +150,11 @@ else()
   target_compile_features(dart PUBLIC cxx_std_14)
 endif()
 
+# Enable pthreads
+set(THREADS_PREFER_PTHREAD_FLAG ON)
+find_package(Threads REQUIRED)
+target_link_libraries(dart PRIVATE Threads::Threads)
+
 # Build DART with all available SIMD instructions
 if(DART_ENABLE_SIMD)
   if(MSVC)

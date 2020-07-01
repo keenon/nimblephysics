@@ -11,35 +11,30 @@ class BackpropSnapshotPointer:
         self.backprop_snapshot = None
 
 
-class DartLayer(torch.autograd.Function):
+class DartMultipleShootingLayer(torch.autograd.Function):
     """
-    This implements a single, differentiable timestep of DART as a PyTorch layer
+    This implements a batch version of DartLayer, for multiple-shooting trajectory optimization.
     """
 
     @staticmethod
-    def forward(ctx, world, pos, vel, torque, snapshot_pointer):
+    def forward(ctx, world, torques, shooting_length, knot_poses, knot_vels):
         """
         We can't put type annotations on this declaration, because the supertype
         doesn't have any type annotations and otherwise mypy will complain, so here
         are the types:
 
         world: dart.simulation.World
-        pos: torch.Tensor
-        vel: torch.Tensor
-        torque: torch.Tensor
-        snapshot_pointer: BackpropSnapshotPointer
+        torques: List[torch.Tensor]
+        shooting_length: int
+        knot_poses: List[torch.Tensor]
+        knot_vels: List[torch.Tensor]
         -> [torch.Tensor, torch.Tensor]
         """
 
-        world.setPositions(pos.detach().numpy())
-        world.setVelocities(vel.detach().numpy())
-        world.setForces(torque.detach().numpy())
-        backprop_snapshot: dart.neural.BackpropSnapshot = dart.neural.forwardPass(world)
-        ctx.backprop_snapshot = backprop_snapshot
+        backprop_snapshots: List[dart.neural.BackpropSnapshot] = dart.neural.bulkForwardPass(
+            world, torques, shooting_length, knot_poses, knot_vels)
+        ctx.backprop_snapshots = backprop_snapshots
         ctx.world = world
-
-        if snapshot_pointer is not None:
-            snapshot_pointer.backprop_snapshot = backprop_snapshot
 
         return (torch.tensor(world.getPositions()), torch.tensor(world.getVelocities()))
 
@@ -87,9 +82,9 @@ class DartLayer(torch.autograd.Function):
         )
 
 
-def dart_layer(world: dart.simulation.World, pos: torch.Tensor, vel: torch.Tensor,
-               torque: torch.Tensor, pointer: BackpropSnapshotPointer = None) -> Tuple[torch.Tensor,
-                                                                                       torch.Tensor]:
+def dart_multiple_shooting_layer(world: dart.simulation.World, pos: torch.Tensor, vel: torch.Tensor,
+                                 torque: torch.Tensor, pointer: BackpropSnapshotPointer = None) -> Tuple[torch.Tensor,
+                                                                                                         torch.Tensor]:
     """
     This does a forward pass on the `world` that gets passed in, storing information needed
     in order to do a backwards pass.

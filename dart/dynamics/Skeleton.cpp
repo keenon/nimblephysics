@@ -1586,7 +1586,7 @@ Eigen::MatrixXd Skeleton::finiteDifferencePosCJacobian()
   // Get baseline C(pos, vel)
   Eigen::VectorXd baseline = getCoriolisAndGravityForces();
 
-  double EPS = 1e-10;
+  double EPS = 1e-4;
 
   for (std::size_t i = 0; i < n; i++)
   {
@@ -1614,7 +1614,7 @@ Eigen::MatrixXd Skeleton::finiteDifferenceVelCJacobian()
   // Get baseline C(pos, vel)
   Eigen::VectorXd baseline = getCoriolisAndGravityForces();
 
-  double EPS = 1e-10;
+  double EPS = 1e-4;
 
   for (std::size_t i = 0; i < n; i++)
   {
