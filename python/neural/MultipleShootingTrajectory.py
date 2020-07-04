@@ -1,5 +1,6 @@
 import dartpy as dart
 from dart_layer import dart_layer, BackpropSnapshotPointer
+from dart_multiple_shooting_layer import dart_multiple_shooting_layer, BulkPassResultPointer
 import torch
 from typing import Tuple, Callable, List
 import numpy as np
@@ -16,10 +17,8 @@ class MultipleShootingTrajectory:
     def __init__(
             self,
             world: dart.simulation.World,
-            step_loss: Callable[[torch.Tensor, torch.Tensor, torch.Tensor, dart.simulation.World],
-                                float],
-            final_loss: Callable[[torch.Tensor, torch.Tensor, dart.simulation.World],
-                                 float],
+            eval_loss: Callable[[torch.Tensor, torch.Tensor, torch.Tensor, dart.simulation.World],
+                                torch.Tensor],
             steps: int = 1000,
             shooting_length: int = 50,
             tune_starting_point: bool = False,
@@ -30,8 +29,7 @@ class MultipleShootingTrajectory:
         Constructor
         """
         self.world = world
-        self.step_loss = step_loss
-        self.final_loss = final_loss
+        self.eval_loss = eval_loss
         self.steps = steps
         self.shooting_length = min(shooting_length, steps)
         self.disable_actuators = disable_actuators
@@ -46,8 +44,16 @@ class MultipleShootingTrajectory:
         self.num_shots = math.floor(steps / shooting_length)
 
         # Initialize the learnable torques
-        self.torques = [torch.zeros(world_dofs, dtype=torch.float64, requires_grad=True)
-                        for _ in range(steps)]
+        self.torques = torch.zeros((world_dofs, steps), dtype=torch.float64, requires_grad=True)
+        self.knot_poses = torch.zeros(
+            (world_dofs, self.num_shots),
+            dtype=torch.float64, requires_grad=True)
+        self.knot_poses.data[:, 0] = torch.from_numpy(world.getPositions())
+        self.knot_vels = torch.zeros(
+            (world_dofs, self.num_shots),
+            dtype=torch.float64, requires_grad=True)
+        self.knot_vels.data[:, 0] = torch.from_numpy(world.getVelocities())
+        """
         # Initialize knot points
         self.knot_poses = [
             # The first knot point is the starting point
@@ -65,6 +71,7 @@ class MultipleShootingTrajectory:
             # The other knot points
             torch.zeros(world_dofs, dtype=torch.float64, requires_grad=True)
             for _ in range(self.num_shots - 1)]
+        """
 
         self.mask = torch.tensor([1] * world.getNumDofs(), requires_grad=False)
         for j in disable_actuators:
@@ -73,55 +80,58 @@ class MultipleShootingTrajectory:
         self.last_x = np.ones(self.get_flat_problem_dim()) * 1e+19
         self.snapshots: List[dart.neural.BackpropSnapshot] = [None] * self.steps
         self.last_loss = torch.tensor([0], requires_grad=False)
-        self.last_preknot_poses = [torch.zeros(
-            world_dofs, dtype=torch.float64, requires_grad=False)] * self.num_shots
-        self.last_preknot_vels = [torch.zeros(
-            world_dofs, dtype=torch.float64, requires_grad=False)] * self.num_shots
-        self.last_terminal_pos = torch.zeros(
-            world_dofs, dtype=torch.float64, requires_grad=False)
-        self.last_terminal_vel = torch.zeros(
-            world_dofs, dtype=torch.float64, requires_grad=False)
+        self.already_run_backwards = False
+        self.last_preknot_poses = np.zeros((world_dofs, self.num_shots), dtype=np.float64)
+        self.last_preknot_vels = np.zeros((world_dofs, self.num_shots), dtype=np.float64)
+        self.last_terminal_pos = np.zeros(world_dofs, dtype=np.float64)
+        self.last_terminal_vel = np.zeros(world_dofs, dtype=np.float64)
 
         self.soft_knot_barrier_strength = 1
 
+        self.bulk_result_pointer: BulkPassResultPointer = None
+
+        # An option flag to turn off multithreading forward and backward passes
+        self.multithread = False
+
     def tensors(self):
-        t = self.torques + self.knot_vels[1:] + self.knot_poses[1:]
-        if self.tune_starting_point:
-            t = [self.knot_poses[0], self.knot_poses[0]] + t
-        return t
+        return [self.torques, self.knot_vels, self.knot_poses]
 
     def unroll(
             self,
             use_knots: bool = True,
             after_step: Callable[[torch.Tensor, torch.Tensor, torch.Tensor],
-                                 None] = None):
+                                 None] = None,
+            compute_knot_loss: bool = False):
         """
         Returns total loss
         """
-        pos = self.knot_poses[0]
-        vel = self.knot_vels[0]
+        pos = self.knot_poses[:, 0]
+        vel = self.knot_vels[:, 0]
 
-        loss = torch.tensor([0], dtype=torch.float, requires_grad=True)
+        post_step_poses = []
+        post_step_vels = []
+
         knot_loss = torch.tensor([0], dtype=torch.float, requires_grad=True)
 
         for i in range(self.steps):
-            t = self.torques[i] * self.mask
+            t = self.torques[:, i] * self.mask
 
             # We're at a knot point
             if i % self.shooting_length == 0 and i > 0 and use_knots:
                 knot_index = math.floor(i / self.shooting_length)
-                knot_pos = self.knot_poses[knot_index]
-                knot_vel = self.knot_vels[knot_index]
-
-                # Record the loss from the error at this knot
-                this_knot_loss = torch.exp(
-                    (knot_pos - pos).norm() * self.soft_knot_barrier_strength) + torch.exp(
-                    10 * (knot_vel - vel).norm() * self.soft_knot_barrier_strength)
-                knot_loss = knot_loss + this_knot_loss
+                knot_pos = self.knot_poses[:, knot_index]
+                knot_vel = self.knot_vels[:, knot_index]
 
                 # Record where we were, so we can calculate error terms later
-                self.last_preknot_poses[knot_index] = pos
-                self.last_preknot_vels[knot_index] = vel
+                self.last_preknot_poses[:, knot_index] = pos.detach().numpy()
+                self.last_preknot_vels[:, knot_index] = vel.detach().numpy()
+
+                if compute_knot_loss:
+                    # Record the loss from the error at this knot
+                    this_knot_loss = torch.exp(
+                        (knot_pos - pos).norm() * self.soft_knot_barrier_strength) + torch.exp(
+                        10 * (knot_vel - vel).norm() * self.soft_knot_barrier_strength)
+                    knot_loss = knot_loss + this_knot_loss
 
                 # Now reset to the actual knot position
                 pos = knot_pos
@@ -131,11 +141,11 @@ class MultipleShootingTrajectory:
                 if np.isnan(pos.detach().numpy()).any() or np.isnan(vel.detach().numpy()).any():
                     print('Caught a NaN being introduced at knot['+str(knot_index)+']')
 
-            loss = loss + self.step_loss(pos, vel, t, self.world)
-
             pointer = BackpropSnapshotPointer()
             next_pos, next_vel = dart_layer(self.world, pos, vel, t, pointer)
             self.snapshots[i] = pointer.backprop_snapshot
+            post_step_poses.append(next_pos)
+            post_step_vels.append(next_vel)
 
             # Check for NaNs being newly introduced
             if not(
@@ -156,14 +166,15 @@ class MultipleShootingTrajectory:
             if after_step is not None:
                 after_step(pos, vel, t)
 
-        loss = loss + self.final_loss(pos, vel, self.world)
+        loss = self.eval_loss(self.torques, torch.stack(
+            post_step_poses, dim=1), torch.stack(post_step_vels, dim=1), self.world)
 
-        self.last_terminal_pos = pos
-        self.last_terminal_vel = vel
+        self.last_terminal_pos = pos.detach().numpy()
+        self.last_terminal_vel = vel.detach().numpy()
 
         if self.enforce_loop:
-            start_pos = self.knot_poses[0]
-            start_vel = self.knot_vels[0]
+            start_pos = self.knot_poses[:, 0]
+            start_vel = self.knot_vels[:, 0]
             # Record the loss from the error at the final knot
             loop_loss = torch.exp((pos - start_pos).norm() * self.soft_knot_barrier_strength) + torch.exp(
                 10 * (vel - start_vel).norm() * self.soft_knot_barrier_strength)
@@ -177,6 +188,72 @@ class MultipleShootingTrajectory:
             knot_loss = knot_loss + loop_loss
 
         self.last_loss = loss
+        self.already_run_backwards = False
+
+        return loss, knot_loss
+
+    def parallel_unroll(self, compute_knot_loss=False):
+        """
+        This runs an unroll, parallelizing across knots during the forward and backward pass in native C++.
+        Because of this, it doesn't allow you to skip knots or to have a callback after each step.
+        """
+        self.bulk_result_pointer = BulkPassResultPointer()
+
+        post_step_poses, post_step_vels = dart_multiple_shooting_layer(
+            self.world, self.torques, self.shooting_length, self.knot_poses, self.knot_vels, self.bulk_result_pointer)
+
+        self.snapshots = self.bulk_result_pointer.forwardPassResult.snapshots
+
+        loss = self.eval_loss(self.torques, post_step_poses, post_step_vels, self.world)
+
+        # Handle knots, if required
+
+        knot_loss = torch.tensor([0], dtype=torch.float, requires_grad=True)
+
+        post_step_poses_detached = post_step_poses.detach().numpy()
+        post_step_vels_detached = post_step_vels.detach().numpy()
+
+        self.last_terminal_pos = post_step_poses_detached[:, self.steps-1]
+        self.last_terminal_vel = post_step_vels_detached[:, self.steps-1]
+
+        for knot_index in range(self.num_shots):
+            i = knot_index * self.shooting_length
+            if i == 0:
+                continue
+
+            # Record where we were, so we can calculate error terms later
+            self.last_preknot_poses[:, knot_index] = post_step_poses_detached[:, i-1]
+            self.last_preknot_vels[:, knot_index] = post_step_vels_detached[:, i-1]
+
+            # Record the loss from the error at this knot
+            if compute_knot_loss:
+                pos = post_step_poses[:, i-1]
+                vel = post_step_vels[:, i-1]
+                knot_pos = self.knot_poses[:, knot_index]
+                knot_vel = self.knot_vels[:, knot_index]
+                this_knot_loss = torch.exp(
+                    (knot_pos - pos).norm() * self.soft_knot_barrier_strength) + torch.exp(
+                    10 * (knot_vel - vel).norm() * self.soft_knot_barrier_strength)
+                knot_loss = knot_loss + this_knot_loss
+
+        if compute_knot_loss:
+            if self.enforce_loop:
+                start_pos = self.knot_poses[0]
+                start_vel = self.knot_vels[0]
+                # Record the loss from the error at the final knot
+                loop_loss = torch.exp((pos - start_pos).norm() * self.soft_knot_barrier_strength) + torch.exp(
+                    10 * (vel - start_vel).norm() * self.soft_knot_barrier_strength)
+                knot_loss = knot_loss + loop_loss
+            if self.enforce_final_state is not None:
+                goal_pos = self.enforce_final_state[:self.world.getNumDofs()]
+                goal_vel = self.enforce_final_state[self.world.getNumDofs():]
+                loop_loss = torch.exp(
+                    (pos - torch.from_numpy(goal_pos)).norm() * self.soft_knot_barrier_strength) + torch.exp(
+                    10 * (vel - torch.from_numpy(goal_vel)).norm() * self.soft_knot_barrier_strength)
+                knot_loss = knot_loss + loop_loss
+
+        self.last_loss = loss
+        self.already_run_backwards = False
 
         return loss, knot_loss
 
@@ -231,10 +308,10 @@ class MultipleShootingTrajectory:
             if i > 0 or self.tune_starting_point:
                 if which == 'grad':
                     out[flat_cursor:flat_cursor+world_dofs] = np.zeros(
-                        world_dofs) if self.knot_poses[i].grad is None else self.knot_poses[i].grad
+                        world_dofs) if self.knot_poses.grad is None else self.knot_poses.grad[:, i]
                     flat_cursor += world_dofs
                     out[flat_cursor:flat_cursor+world_dofs] = np.zeros(
-                        world_dofs) if self.knot_vels[i].grad is None else self.knot_vels[i].grad
+                        world_dofs) if self.knot_vels.grad is None else self.knot_vels.grad[:, i]
                     flat_cursor += world_dofs
                 elif which == 'upper_bound':
                     out[flat_cursor:flat_cursor+world_dofs] = self.world.getPositionUpperLimits()
@@ -248,23 +325,23 @@ class MultipleShootingTrajectory:
                     flat_cursor += world_dofs
                 else:
                     assert(which == 'state')
-                    out[flat_cursor:flat_cursor+world_dofs] = self.knot_poses[i].detach()
+                    out[flat_cursor:flat_cursor+world_dofs] = self.knot_poses[:, i].detach()
                     flat_cursor += world_dofs
-                    out[flat_cursor:flat_cursor+world_dofs] = self.knot_vels[i].detach()
+                    out[flat_cursor:flat_cursor+world_dofs] = self.knot_vels[:, i].detach()
                     flat_cursor += world_dofs
 
-            shot_length = min(self.shooting_length, len(self.torques) - torque_cursor)
+            shot_length = min(self.shooting_length, self.steps - torque_cursor)
             for j in range(shot_length):
                 if which == 'grad':
                     out[flat_cursor:flat_cursor+world_dofs] = np.zeros(
-                        world_dofs) if self.torques[torque_cursor].grad is None else self.torques[torque_cursor].grad
+                        world_dofs) if self.torques.grad is None else self.torques.grad[:, torque_cursor]
                 elif which == 'upper_bound':
                     out[flat_cursor:flat_cursor+world_dofs] = self.world.getForceUpperLimits()
                 elif which == 'lower_bound':
                     out[flat_cursor:flat_cursor+world_dofs] = self.world.getForceLowerLimits()
                 else:
                     assert(which == 'state')
-                    out[flat_cursor:flat_cursor+world_dofs] = self.torques[torque_cursor].detach()
+                    out[flat_cursor:flat_cursor+world_dofs] = self.torques[:, torque_cursor].detach()
                 flat_cursor += world_dofs
                 torque_cursor += 1
         return out
@@ -278,14 +355,14 @@ class MultipleShootingTrajectory:
         torque_cursor = 0
         for i in range(self.num_shots):
             if i > 0 or self.tune_starting_point:
-                self.knot_poses[i].data = torch.tensor(x[flat_cursor:flat_cursor+world_dofs])
+                self.knot_poses.data[:, i] = torch.from_numpy(x[flat_cursor:flat_cursor+world_dofs])
                 flat_cursor += world_dofs
-                self.knot_vels[i].data = torch.tensor(x[flat_cursor:flat_cursor+world_dofs])
+                self.knot_vels.data[:, i] = torch.from_numpy(x[flat_cursor:flat_cursor+world_dofs])
                 flat_cursor += world_dofs
 
-            shot_length = min(self.shooting_length, len(self.torques) - torque_cursor)
+            shot_length = min(self.shooting_length, self.steps - torque_cursor)
             for j in range(shot_length):
-                self.torques[torque_cursor].data = torch.tensor(
+                self.torques.data[:, torque_cursor] = torch.from_numpy(
                     x[flat_cursor: flat_cursor + world_dofs])
                 flat_cursor += world_dofs
                 torque_cursor += 1
@@ -307,7 +384,7 @@ class MultipleShootingTrajectory:
             else:
                 knot_offsets.append(None)
 
-            shot_length = min(self.shooting_length, len(self.torques) - torque_cursor)
+            shot_length = min(self.shooting_length, self.steps - torque_cursor)
             torque_cursor += shot_length
             flat_cursor += shot_length * world_dofs
 
@@ -338,11 +415,15 @@ class MultipleShootingTrajectory:
         This is a no-op if we've already rolled out for x. Otherwise, this runs an unroll()
         for the trajectory x encodes.
         """
-        if (x != self.last_x).any() or True:  # always unroll
-            # print('unrolling x='+str(x))
+        if (x != self.last_x).any():  # always unroll
             self.last_x = x.copy()
             self.unflatten(x)
-            self.unroll()
+            if self.multithread:
+                # print('parallel unrolling x='+str(x))
+                self.parallel_unroll()
+            else:
+                # print('unrolling x='+str(x))
+                self.unroll()
 
     def eval_f(self, x: np.ndarray):
         """
@@ -375,7 +456,9 @@ class MultipleShootingTrajectory:
             if tensor.grad is not None and tensor.grad.data is not None:
                 tensor.grad.data.zero_()
         # Run backprop through our last loss
-        self.last_loss.backward()
+        if not self.already_run_backwards:
+            self.last_loss.backward()
+            self.already_run_backwards = True
         # Flatten the gradient into a vector
         out = self.flatten(out, 'grad')
         assert not np.isnan(out).any()
@@ -398,24 +481,28 @@ class MultipleShootingTrajectory:
         cursor = 0
 
         if self.enforce_loop:
-            out[cursor:cursor+world_dofs] = self.last_terminal_pos.detach() - self.knot_poses[0].detach()
+            out[cursor:cursor+world_dofs] = self.last_terminal_pos - self.knot_poses[:,
+                                                                                     0].detach()
             cursor += world_dofs
-            out[cursor:cursor+world_dofs] = self.last_terminal_vel.detach() - self.knot_vels[0].detach()
+            out[cursor:cursor+world_dofs] = self.last_terminal_vel - self.knot_vels[:,
+                                                                                    0].detach()
             cursor += world_dofs
         elif self.enforce_final_state is not None:
             goal_pos = self.enforce_final_state[:self.world.getNumDofs()]
             goal_vel = self.enforce_final_state[self.world.getNumDofs():]
-            out[cursor:cursor+world_dofs] = self.last_terminal_pos.detach() - goal_pos
+            out[cursor:cursor+world_dofs] = self.last_terminal_pos - goal_pos
             cursor += world_dofs
-            out[cursor:cursor+world_dofs] = self.last_terminal_vel.detach() - goal_vel
+            out[cursor:cursor+world_dofs] = self.last_terminal_vel - goal_vel
             cursor += world_dofs
 
         for i in range(self.num_shots):
             if i == 0:
                 continue
-            out[cursor:cursor+world_dofs] = self.last_preknot_poses[i].detach() - self.knot_poses[i].detach()
+            out[cursor:cursor+world_dofs] = self.last_preknot_poses[:,
+                                                                    i] - self.knot_poses[:, i].detach().numpy()
             cursor += world_dofs
-            out[cursor:cursor+world_dofs] = self.last_preknot_vels[i].detach() - self.knot_vels[i].detach()
+            out[cursor:cursor+world_dofs] = self.last_preknot_vels[:,
+                                                                   i] - self.knot_vels[:, i].detach().numpy()
             cursor += world_dofs
 
         if np.isnan(out).any():
@@ -426,9 +513,9 @@ class MultipleShootingTrajectory:
                 if i == 0:
                     continue
                 print('knot['+str(i)+']:')
-                print('   pre-knot pose: '+str(self.last_preknot_poses[i].detach()))
+                print('   pre-knot pose: '+str(self.last_preknot_poses[i]))
                 print('   knot pose: '+str(self.knot_poses[i].detach()))
-                print('   pre-knot vel: '+str(self.last_preknot_vels[i].detach()))
+                print('   pre-knot vel: '+str(self.last_preknot_vels[i]))
                 print('   knot vel: '+str(self.knot_vels[i].detach()))
         assert(cursor == len(out))
         assert not np.isnan(out).any()
@@ -445,6 +532,10 @@ class MultipleShootingTrajectory:
         assert not np.isnan(x).any()
 
         self.ensure_fresh_rollout(x)
+        # Run backprop through our last loss
+        if self.multithread and self.bulk_result_pointer.backwardPassResult is None and not self.already_run_backwards:
+            self.last_loss.backward()
+            self.already_run_backwards = True
 
         world_dofs = self.world.getNumDofs()
         cursor = 0
@@ -465,105 +556,138 @@ class MultipleShootingTrajectory:
             """
             start_index = last_knot_index * self.shooting_length
             end_index_exclusive = (last_knot_index + 1) * self.shooting_length
-            """
-            For our purposes here (forward Jacobians), the forward computation 
-            graph looks like this:
+            if self.multithread and self.bulk_result_pointer is not None and len(
+                    self.bulk_result_pointer.backwardPassResult.knotJacobians) > 0:
+                # We can use the pre-computed Jacobians! Hooray :)
+                J: dart.neural.KnotJacobian = self.bulk_result_pointer.backwardPassResult.knotJacobians[
+                    last_knot_index]
+                for i in reversed(range(start_index, end_index_exclusive)):
+                    # shoot_len = end_index_exclusive - start_index - 1
+                    offset = i - start_index
+                    posend_force: np.ndarray = J.torquesEndPos[offset]
+                    velend_force: np.ndarray = J.torquesEndVel[offset]
+                    # Write our force_pos_end and force_vel_end into the output, row by row
+                    for row in range(world_dofs):
+                        for col in range(world_dofs):
+                            out[cursor] = posend_force[row][col]
+                            cursor += 1
+                    for row in range(world_dofs):
+                        for col in range(world_dofs):
+                            out[cursor] = velend_force[row][col]
+                            cursor += 1
+                if includePhasePhase:
+                    # Put these so the rows correspond to a whole phase vector
+                    posend_phase = np.concatenate([J.knotPosEndPos, J.knotVelEndPos], axis=1)
+                    velend_phase = np.concatenate([J.knotPosEndVel, J.knotVelEndVel], axis=1)
+                    for row in range(world_dofs):
+                        for col in range(world_dofs * 2):
+                            out[cursor] = posend_phase[row][col]
+                            cursor += 1
+                    for row in range(world_dofs):
+                        for col in range(world_dofs * 2):
+                            out[cursor] = velend_phase[row][col]
+                            cursor += 1
+            else:
+                # We'll have to compute the Jacobians ourselves
+                """
+                For our purposes here (forward Jacobians), the forward computation 
+                graph looks like this:
 
-            p_t -------------+--------------------------------> p_t+1 ---->
-                              \                                   /
-                               \                                 /
-            v_t ----------------+----(LCP Solver)----> v_t+1 ---+---->
-                               /
-                              /
-            f_t -------------+
-            """
+                p_t -------------+--------------------------------> p_t+1 ---->
+                                \                                   /
+                                \                                 /
+                v_t ----------------+----(LCP Solver)----> v_t+1 ---+---->
+                                /
+                                /
+                f_t -------------+
+                """
 
-            # p_end <-- p_t+1
-            posend_posnext = np.identity(world_dofs)
-            # p_end <-- v_t+1
-            # np.zeros((world_dofs, world_dofs))
-            # -dt * dt * np.identity(world_dofs)
-            posend_velnext = np.zeros((world_dofs, world_dofs))
-            # v_end <-- p_t+1
-            velend_posnext = np.zeros((world_dofs, world_dofs))
-            # v_end <-- v_t+1
-            velend_velnext = np.identity(world_dofs)
+                # p_end <-- p_t+1
+                posend_posnext = np.identity(world_dofs)
+                # p_end <-- v_t+1
+                # np.zeros((world_dofs, world_dofs))
+                # -dt * dt * np.identity(world_dofs)
+                posend_velnext = np.zeros((world_dofs, world_dofs))
+                # v_end <-- p_t+1
+                velend_posnext = np.zeros((world_dofs, world_dofs))
+                # v_end <-- v_t+1
+                velend_velnext = np.identity(world_dofs)
 
-            for i in reversed(range(start_index, end_index_exclusive)):
-                snapshot: dart.neural.BackpropSnapshot = self.snapshots[i]
+                for i in reversed(range(start_index, end_index_exclusive)):
+                    snapshot: dart.neural.BackpropSnapshot = self.snapshots[i]
 
-                # p_t+1 <-- v_t+1
-                posnext_velnext = dt
+                    # p_t+1 <-- v_t+1
+                    posnext_velnext = dt
 
-                # v_t+1 <-- p_t
-                velnext_pos = snapshot.getPosVelJacobian(self.world)
-                # v_t+1 <-- v_t
-                velnext_vel = snapshot.getVelVelJacobian(self.world)
-                # v_t+1 <-- f_t
-                velnext_force = snapshot.getForceVelJacobian(self.world)
+                    # v_t+1 <-- p_t
+                    velnext_pos = snapshot.getPosVelJacobian(self.world)
+                    # v_t+1 <-- v_t
+                    velnext_vel = snapshot.getVelVelJacobian(self.world)
+                    # v_t+1 <-- f_t
+                    velnext_force = snapshot.getForceVelJacobian(self.world)
 
-                # p_t+1 <-- p_t = (p_t+1 <-- p_t) + ((p_t+1 <-- v_t+1) * (v_t+1 <-- p_t))
-                posnext_pos = snapshot.getPosPosJacobian(
-                    self.world)  # + (posnext_velnext * velnext_pos)
-                # p_t+1 <-- v_t = (p_t+1 <-- v_t+1) * (v_t+1 <-- v_t)
-                posnext_vel = posnext_velnext * velnext_vel
-                # p_t+1 <-- f_t = (p_t+1 <-- v_t+1) * (v_t+1 <-- f_t)
-                posnext_force = posnext_velnext * velnext_force
+                    # p_t+1 <-- p_t = (p_t+1 <-- p_t) + ((p_t+1 <-- v_t+1) * (v_t+1 <-- p_t))
+                    posnext_pos = snapshot.getPosPosJacobian(
+                        self.world)  # + (posnext_velnext * velnext_pos)
+                    # p_t+1 <-- v_t = (p_t+1 <-- v_t+1) * (v_t+1 <-- v_t)
+                    posnext_vel = posnext_velnext * velnext_vel
+                    # p_t+1 <-- f_t = (p_t+1 <-- v_t+1) * (v_t+1 <-- f_t)
+                    posnext_force = posnext_velnext * velnext_force
 
-                # p_end <-- f_t = ((p_end <-- p_t+1) * (p_t+1 <-- f_t)) + ((p_end <-- v_t+1) * (v_t+1 <-- f_t))
-                posend_force = np.matmul(
-                    posend_posnext, posnext_force) + np.matmul(posend_velnext, velnext_force)
-                # v_end <-- f_t ...
-                velend_force = np.matmul(
-                    velend_posnext, posnext_force) + np.matmul(velend_velnext, velnext_force)
+                    # p_end <-- f_t = ((p_end <-- p_t+1) * (p_t+1 <-- f_t)) + ((p_end <-- v_t+1) * (v_t+1 <-- f_t))
+                    posend_force = np.matmul(
+                        posend_posnext, posnext_force) + np.matmul(posend_velnext, velnext_force)
+                    # v_end <-- f_t ...
+                    velend_force = np.matmul(
+                        velend_posnext, posnext_force) + np.matmul(velend_velnext, velnext_force)
 
-                # Write our force_pos_end and force_vel_end into the output, row by row
-                for row in range(world_dofs):
-                    for col in range(world_dofs):
-                        out[cursor] = posend_force[row][col]
-                        cursor += 1
-                for row in range(world_dofs):
-                    for col in range(world_dofs):
-                        out[cursor] = velend_force[row][col]
-                        cursor += 1
+                    # Write our force_pos_end and force_vel_end into the output, row by row
+                    for row in range(world_dofs):
+                        for col in range(world_dofs):
+                            out[cursor] = posend_force[row][col]
+                            cursor += 1
+                    for row in range(world_dofs):
+                        for col in range(world_dofs):
+                            out[cursor] = velend_force[row][col]
+                            cursor += 1
 
-                if i == end_index_exclusive - 1 and False:
-                    print('v_t+1 <-- p_t:\n'+str(velnext_pos))
-                    print('v_t+1 <-- v_t:\n'+str(velnext_vel))
-                    print('v_t+1 <-- f_t:\n'+str(velnext_force))
-                    print('(p_t+1 <-- v_t+1) * (v_t+1 <-- p_t):\n' +
-                          str(posnext_velnext * velnext_pos))
-                    print('p_t+1 <-- p_t:\n'+str(posnext_pos))
-                    print('p_t+1 <-- v_t:\n'+str(posnext_vel))
-                    print('p_t+1 <-- f_t:\n'+str(posnext_force))
-                    print('p_end <-- f_t:\n'+str(posend_force))
-                    print('v_end <-- f_t:\n'+str(velend_force))
+                    if i == end_index_exclusive - 1 and False:
+                        print('v_t+1 <-- p_t:\n'+str(velnext_pos))
+                        print('v_t+1 <-- v_t:\n'+str(velnext_vel))
+                        print('v_t+1 <-- f_t:\n'+str(velnext_force))
+                        print('(p_t+1 <-- v_t+1) * (v_t+1 <-- p_t):\n' +
+                              str(posnext_velnext * velnext_pos))
+                        print('p_t+1 <-- p_t:\n'+str(posnext_pos))
+                        print('p_t+1 <-- v_t:\n'+str(posnext_vel))
+                        print('p_t+1 <-- f_t:\n'+str(posnext_force))
+                        print('p_end <-- f_t:\n'+str(posend_force))
+                        print('v_end <-- f_t:\n'+str(velend_force))
 
-                # Update p_end <-- p_t+1 = ((p_end <-- p_t+1) * (p_t+1 <-- p_t)) + ((p_end <-- v_t+1) * (v_t+1 <-- p_t))
-                posend_posnext = np.matmul(
-                    posend_posnext, posnext_pos) + np.matmul(posend_velnext, velnext_pos)
-                # Update v_end <-- p_t+1 ...
-                velend_posnext = np.matmul(
-                    velend_posnext, posnext_pos) + np.matmul(velend_velnext, velnext_pos)
-                # Update v_t+1 --> p_end ...
-                posend_velnext = np.matmul(
-                    posend_posnext, posnext_vel) + np.matmul(posend_velnext, velnext_vel)
-                # Update v_t+1 --> v_end ...
-                velend_velnext = np.matmul(
-                    velend_posnext, posnext_vel) + np.matmul(velend_velnext, velnext_vel)
+                    # Update p_end <-- p_t+1 = ((p_end <-- p_t+1) * (p_t+1 <-- p_t)) + ((p_end <-- v_t+1) * (v_t+1 <-- p_t))
+                    posend_posnext = np.matmul(
+                        posend_posnext, posnext_pos) + np.matmul(posend_velnext, velnext_pos)
+                    # Update v_end <-- p_t+1 ...
+                    velend_posnext = np.matmul(
+                        velend_posnext, posnext_pos) + np.matmul(velend_velnext, velnext_pos)
+                    # Update v_t+1 --> p_end ...
+                    posend_velnext = np.matmul(
+                        posend_posnext, posnext_vel) + np.matmul(posend_velnext, velnext_vel)
+                    # Update v_t+1 --> v_end ...
+                    velend_velnext = np.matmul(
+                        velend_posnext, posnext_vel) + np.matmul(velend_velnext, velnext_vel)
 
-            if includePhasePhase:
-                # Put these so the rows correspond to a whole phase vector
-                posend_phase = np.concatenate([posend_posnext, posend_velnext], axis=1)
-                velend_phase = np.concatenate([velend_posnext, velend_velnext], axis=1)
-                for row in range(world_dofs):
-                    for col in range(world_dofs * 2):
-                        out[cursor] = posend_phase[row][col]
-                        cursor += 1
-                for row in range(world_dofs):
-                    for col in range(world_dofs * 2):
-                        out[cursor] = velend_phase[row][col]
-                        cursor += 1
+                if includePhasePhase:
+                    # Put these so the rows correspond to a whole phase vector
+                    posend_phase = np.concatenate([posend_posnext, posend_velnext], axis=1)
+                    velend_phase = np.concatenate([velend_posnext, velend_velnext], axis=1)
+                    for row in range(world_dofs):
+                        for col in range(world_dofs * 2):
+                            out[cursor] = posend_phase[row][col]
+                            cursor += 1
+                    for row in range(world_dofs):
+                        for col in range(world_dofs * 2):
+                            out[cursor] = velend_phase[row][col]
+                            cursor += 1
             return cursor
 
         if self.enforce_loop or (self.enforce_final_state is not None):
@@ -852,13 +976,13 @@ class MultipleShootingTrajectory:
                         str(self.last_preknot_poses[knot_index].detach().numpy()))
                     print(
                         '      (end-vel): ' +
-                        str(self.last_preknot_vels[knot_index].detach().numpy()))
+                        str(self.last_preknot_vels[knot_index]))
                 print('   knot '+str(knot_index)+' :')
                 print('      pos: '+str(self.knot_poses[knot_index].detach().numpy()))
                 print('      vel: '+str(self.knot_vels[knot_index].detach().numpy()))
             print('         f['+str(i)+']: '+str(self.torques[i].detach().numpy()))
-        print('   (end-pos): '+str(self.last_terminal_pos.detach().numpy()))
-        print('   (end-vel): '+str(self.last_terminal_vel.detach().numpy()))
+        print('   (end-pos): '+str(self.last_terminal_pos))
+        print('   (end-vel): '+str(self.last_terminal_vel))
         flat = self.flatten(np.zeros(n), 'state')
         print('flat: '+str(flat))
 

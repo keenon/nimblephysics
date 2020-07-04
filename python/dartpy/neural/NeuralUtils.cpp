@@ -34,6 +34,7 @@
 #include <dart/neural/NeuralUtils.hpp>
 #include <pybind11/eigen.h>
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 
 namespace py = pybind11;
 
@@ -51,6 +52,46 @@ void NeuralUtils(py::module& m)
       .def_readwrite(
           "lossWrtTorque", &dart::neural::LossGradient::lossWrtTorque);
 
+  ::py::class_<dart::neural::BulkForwardPassResult>(m, "BulkForwardPassResult")
+      .def(::py::init<>())
+      .def_readwrite(
+          "postStepPoses", &dart::neural::BulkForwardPassResult::postStepPoses)
+      .def_readwrite(
+          "postStepVels", &dart::neural::BulkForwardPassResult::postStepVels)
+      .def_readwrite(
+          "snapshots", &dart::neural::BulkForwardPassResult::snapshots);
+
+  ::py::class_<dart::neural::KnotJacobian>(m, "KnotJacobian")
+      .def(::py::init<>())
+      .def_readwrite(
+          "knotPosEndPos", &dart::neural::KnotJacobian::knotPosEndPos)
+      .def_readwrite(
+          "knotVelEndPos", &dart::neural::KnotJacobian::knotVelEndPos)
+      .def_readwrite(
+          "knotPosEndVel", &dart::neural::KnotJacobian::knotPosEndVel)
+      .def_readwrite(
+          "knotVelEndVel", &dart::neural::KnotJacobian::knotVelEndVel)
+      .def_readwrite(
+          "torquesEndPos", &dart::neural::KnotJacobian::torquesEndPos)
+      .def_readwrite(
+          "torquesEndVel", &dart::neural::KnotJacobian::torquesEndVel);
+
+  ::py::class_<dart::neural::BulkBackwardPassResult>(
+      m, "BulkBackwardPassResult")
+      .def(::py::init<>())
+      .def_readwrite(
+          "gradWrtPreStepKnotPoses",
+          &dart::neural::BulkBackwardPassResult::gradWrtPreStepKnotPoses)
+      .def_readwrite(
+          "gradWrtPreStepKnotVels",
+          &dart::neural::BulkBackwardPassResult::gradWrtPreStepKnotVels)
+      .def_readwrite(
+          "gradWrtPreStepTorques",
+          &dart::neural::BulkBackwardPassResult::gradWrtPreStepTorques)
+      .def_readwrite(
+          "knotJacobians",
+          &dart::neural::BulkBackwardPassResult::knotJacobians);
+
   m.def(
       "forwardPass",
       &dart::neural::forwardPass,
@@ -64,6 +105,15 @@ void NeuralUtils(py::module& m)
       ::py::arg("shootingLength"),
       ::py::arg("knotPoses"),
       ::py::arg("knotVels"));
+  m.def(
+      "bulkBackwardPass",
+      &dart::neural::bulkBackwardPass,
+      ::py::arg("world"),
+      ::py::arg("snapshots"),
+      ::py::arg("shootingLength"),
+      ::py::arg("gradWrtPoses"),
+      ::py::arg("gradWrtVels"),
+      ::py::arg("computeJacobians") = true);
 }
 
 } // namespace python

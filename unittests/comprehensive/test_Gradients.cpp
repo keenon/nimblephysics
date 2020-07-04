@@ -876,7 +876,7 @@ LossGradient computeBruteForceGradient(
   Eigen::VectorXd originalVel = world->getVelocities();
   Eigen::VectorXd originalForce = world->getForces();
 
-  double EPSILON = 1e-7;
+  double EPSILON = 1e-5;
 
   for (std::size_t i = 0; i < n; i++)
   {
@@ -939,9 +939,12 @@ bool verifyGradientBackprop(
   }
 
   // Assert that the results are the same
-  if (!equals(analytical.lossWrtPosition, bruteForce.lossWrtPosition, 1e-5)
-      || !equals(analytical.lossWrtVelocity, bruteForce.lossWrtVelocity, 1e-5)
-      || !equals(analytical.lossWrtTorque, bruteForce.lossWrtTorque, 1e-5))
+  // This has a larger error bound than normal, because doing finite
+  // differencing at the beginning of a physics run tends to accumulate position
+  // error over many timesteps.
+  if (!equals(analytical.lossWrtPosition, bruteForce.lossWrtPosition, 1e-3)
+      || !equals(analytical.lossWrtVelocity, bruteForce.lossWrtVelocity, 1e-3)
+      || !equals(analytical.lossWrtTorque, bruteForce.lossWrtTorque, 1e-3))
   {
     std::cout << "Analytical loss wrt position:" << std::endl
               << analytical.lossWrtPosition << std::endl;
@@ -960,6 +963,31 @@ bool verifyGradientBackprop(
 
   snapshot.restore();
 
+  return true;
+}
+
+bool verifyBulkPass(
+    WorldPtr world, std::size_t timesteps, std::size_t shootingLength)
+{
+  int dofs = world->getNumDofs();
+  int numKnotPoses = floor(static_cast<double>(timesteps) / shootingLength);
+
+  // Run a bulk forward pass
+
+  Eigen::MatrixXd torques = Eigen::MatrixXd::Random(dofs, timesteps);
+  Eigen::MatrixXd knotPoses = Eigen::MatrixXd::Random(dofs, numKnotPoses);
+  Eigen::MatrixXd knotVels = Eigen::MatrixXd::Random(dofs, numKnotPoses);
+  BulkForwardPassResult forward
+      = bulkForwardPass(world, torques, shootingLength, knotPoses, knotVels);
+
+  // Run a bulk backward pass
+
+  Eigen::MatrixXd lossWrtPoses = Eigen::MatrixXd::Random(dofs, timesteps);
+  Eigen::MatrixXd lossWrtVels = Eigen::MatrixXd::Random(dofs, timesteps);
+  BulkBackwardPassResult backward = bulkBackwardPass(
+      world, forward.snapshots, shootingLength, lossWrtPoses, lossWrtVels);
+
+  // This passes if it just doesn't crash
   return true;
 }
 
@@ -1962,6 +1990,11 @@ void testCartpole(double rotationRadians)
     return (pos[0] * pos[0]) + (pos[1] * pos[1]) + (vel[0] * vel[0])
            + (vel[1] * vel[1]);
   }));
+  // Run this a bunch to let us catch it on top
+  for (int i = 0; i < 1000; i++)
+  {
+    EXPECT_TRUE(verifyBulkPass(world, 1000, 50));
+  }
 }
 
 TEST(GRADIENTS, CARTPOLE_15_DEG)

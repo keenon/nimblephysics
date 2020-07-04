@@ -122,15 +122,15 @@ def main():
     # Make simulations repeatable
     random.seed(1234)
 
-    steps = 200
+    steps = 400
     shooting_length = 20
 
     # Create the trajectory
-    def step_loss(pos, vel, t, world):
-        return 0  # t[0]*t[0] + t[1]*t[1]  # torch.mul(pos, t).norm()
-
-    def final_loss(pos, vel, world):
-        return - pos[1]*pos[1] * torch.sign(pos[1])
+    def eval_loss(t, pos, vel, world):
+        # DOF x timestep
+        step_loss = 0  # torch.sum(t[0, :]*t[0, :]) + torch.sum(t[1, :]*t[1, :])
+        final_loss = - pos[1, steps-1]*pos[1, steps-1]*torch.sign(pos[1, steps-1])
+        return step_loss + final_loss
 
     """
     while True:
@@ -139,7 +139,7 @@ def main():
     """
 
     trajectory = dart_torch.MultipleShootingTrajectory(
-        world, step_loss, final_loss, steps=steps, shooting_length=shooting_length,
+        world, eval_loss, steps=steps, shooting_length=shooting_length,
         disable_actuators=[1],
         tune_starting_point=False)
 

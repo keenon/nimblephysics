@@ -30,17 +30,16 @@ def createCubeTrajectory(
     world.setGravity([0, 0, 0])
     addFreeCube(world, [0, 0, 0])
 
-    def step_loss(pos: torch.Tensor, vel: torch.Tensor, t: torch.Tensor,
-                  world: dart.simulation.World):
-        return t.norm()
-
-    def final_loss(pos: torch.Tensor, vel: torch.Tensor, world: dart.simulation.World):
-        return pos.norm() + vel.norm()
+    def eval_loss(t, pos, vel, world):
+        # DOF x timestep
+        step_loss = torch.sum(t[0, :]*t[0, :]) + torch.sum(t[1, :]*t[1, :])
+        final_loss = torch.norm(pos[:, steps-1]) + torch.norm(vel[:, steps-1])
+        return step_loss + final_loss
 
     world.setPositions(np.array([3, 3, 3]))
 
     trajectory = dart_torch.MultipleShootingTrajectory(
-        world, step_loss, final_loss, steps=steps, shooting_length=shooting_length,
+        world, eval_loss, steps=steps, shooting_length=shooting_length,
         tune_starting_point=tune_starting_point, enforce_loop=enforce_loop,
         enforce_final_state=enforce_final_state)
 
@@ -99,14 +98,14 @@ def createCartpoleTrajectory():
     world.setVelocities(start_vel)
 
     # Create the trajectory
-    def step_loss(pos, vel, t, world):
-        return 0  # t.norm()
-
-    def final_loss(pos, vel, world):
-        return torch.norm(pos) + torch.norm(vel)
+    def eval_loss(t, pos, vel, world):
+        # DOF x timestep
+        step_loss = torch.sum(t[0, :]*t[0, :]) + torch.sum(t[1, :]*t[1, :])
+        final_loss = torch.norm(pos[:, steps-1]) + torch.norm(vel[:, steps-1])
+        return step_loss + final_loss
 
     trajectory = dart_torch.MultipleShootingTrajectory(
-        world, step_loss, final_loss, steps=steps, shooting_length=shooting_length,
+        world, eval_loss, steps=steps, shooting_length=shooting_length,
         # disable_actuators=[1],
         tune_starting_point=False, enforce_final_state=np.zeros(4))
 
@@ -127,17 +126,17 @@ class TestMultipleShootingTrajectory(unittest.TestCase):
         dim = trajectory.get_flat_problem_dim()
         self.assertEqual(dim, 1 * world.getNumDofs())
 
-        trajectory.torques[0].data = torch.from_numpy(np.array([3, 2, 1]))
+        trajectory.torques.data[:, 0] = torch.from_numpy(np.array([3, 2, 1]))
 
         # This should just be the first torque
-        flattened = trajectory.flatten(np.zeros(dim))
+        flattened = trajectory.flatten(np.zeros(dim), 'state')
         self.assertTrue((flattened == np.array([3, 2, 1])).all())
 
         # Test reflating recovery
         for tensor in trajectory.tensors():
             tensor.data.zero_()
         trajectory.unflatten(flattened)
-        self.assertTrue((trajectory.torques[0].data.numpy() == np.array([3, 2, 1])).all())
+        self.assertTrue((trajectory.torques.data.numpy()[:, 0] == np.array([3, 2, 1])).all())
 
         # Test offsets for computing Jac g(x)
         knot_x_offsets = trajectory.get_knot_x_offsets()
@@ -153,9 +152,9 @@ class TestMultipleShootingTrajectory(unittest.TestCase):
         dim = trajectory.get_flat_problem_dim()
         self.assertEqual(dim, 3 * world.getNumDofs())
 
-        trajectory.torques[0].data = torch.from_numpy(np.array([3, 2, 1]))
-        trajectory.knot_poses[0].data = torch.from_numpy(np.array([4, 5, 6]))
-        trajectory.knot_vels[0].data = torch.from_numpy(np.array([7, 8, 9]))
+        trajectory.torques.data[:, 0] = torch.from_numpy(np.array([3, 2, 1]))
+        trajectory.knot_poses.data[:, 0] = torch.from_numpy(np.array([4, 5, 6]))
+        trajectory.knot_vels.data[:, 0] = torch.from_numpy(np.array([7, 8, 9]))
 
         # This should just be the first torque + first pos + first vel
         flattened = trajectory.flatten(np.zeros(dim))
@@ -165,15 +164,15 @@ class TestMultipleShootingTrajectory(unittest.TestCase):
         for tensor in trajectory.tensors():
             tensor.data.zero_()
         trajectory.unflatten(flattened)
-        self.assertTrue((trajectory.torques[0].data.numpy() == np.array([3, 2, 1])).all())
-        self.assertTrue((trajectory.knot_poses[0].data.numpy() == np.array([4, 5, 6])).all())
-        self.assertTrue((trajectory.knot_vels[0].data.numpy() == np.array([7, 8, 9])).all())
+        self.assertTrue((trajectory.torques.data.numpy()[:, 0] == np.array([3, 2, 1])).all())
+        self.assertTrue((trajectory.knot_poses.data.numpy()[:, 0] == np.array([4, 5, 6])).all())
+        self.assertTrue((trajectory.knot_vels.data.numpy()[:, 0] == np.array([7, 8, 9])).all())
 
         # Test offsets for computing Jac g(x)
         knot_x_offsets = trajectory.get_knot_x_offsets()
         self.assertEqual([0], knot_x_offsets)
         knot_g_offsets = trajectory.get_knot_g_offsets()
-        self.assertEqual([0], knot_g_offsets)
+        self.assertEqual([None], knot_g_offsets)
 
     def test_two_step_with_no_knots(self):
         trajectory, world = createCubeTrajectory(
@@ -183,8 +182,8 @@ class TestMultipleShootingTrajectory(unittest.TestCase):
         dim = trajectory.get_flat_problem_dim()
         self.assertEqual(dim, 2 * world.getNumDofs())
 
-        trajectory.torques[0].data = torch.from_numpy(np.array([3, 2, 1]))
-        trajectory.torques[1].data = torch.from_numpy(np.array([4, 5, 6]))
+        trajectory.torques.data[:, 0] = torch.from_numpy(np.array([3, 2, 1]))
+        trajectory.torques.data[:, 1] = torch.from_numpy(np.array([4, 5, 6]))
 
         # This should just be the first torque + second torque
         flattened = trajectory.flatten(np.zeros(dim))
@@ -194,8 +193,8 @@ class TestMultipleShootingTrajectory(unittest.TestCase):
         for tensor in trajectory.tensors():
             tensor.data.zero_()
         trajectory.unflatten(flattened)
-        self.assertTrue((trajectory.torques[0].data.numpy() == np.array([3, 2, 1])).all())
-        self.assertTrue((trajectory.torques[1].data.numpy() == np.array([4, 5, 6])).all())
+        self.assertTrue((trajectory.torques.data.numpy()[:, 0] == np.array([3, 2, 1])).all())
+        self.assertTrue((trajectory.torques.data.numpy()[:, 1] == np.array([4, 5, 6])).all())
 
         # Test offsets for computing Jac g(x)
         knot_x_offsets = trajectory.get_knot_x_offsets()
@@ -211,10 +210,10 @@ class TestMultipleShootingTrajectory(unittest.TestCase):
         dim = trajectory.get_flat_problem_dim()
         self.assertEqual(dim, 4 * world.getNumDofs())
 
-        trajectory.torques[0].data = torch.from_numpy(np.array([3, 2, 1]))
-        trajectory.knot_poses[0].data = torch.from_numpy(np.array([4, 5, 6]))
-        trajectory.knot_vels[0].data = torch.from_numpy(np.array([7, 8, 9]))
-        trajectory.torques[1].data = torch.from_numpy(np.array([10, 11, 12]))
+        trajectory.torques.data[:, 0] = torch.from_numpy(np.array([3, 2, 1]))
+        trajectory.knot_poses.data[:, 0] = torch.from_numpy(np.array([4, 5, 6]))
+        trajectory.knot_vels.data[:, 0] = torch.from_numpy(np.array([7, 8, 9]))
+        trajectory.torques.data[:, 1] = torch.from_numpy(np.array([10, 11, 12]))
 
         # This should be the first pos + first vel + first torque + second torque
         flattened = trajectory.flatten(np.zeros(dim))
@@ -224,16 +223,16 @@ class TestMultipleShootingTrajectory(unittest.TestCase):
         for tensor in trajectory.tensors():
             tensor.data.zero_()
         trajectory.unflatten(flattened)
-        self.assertTrue((trajectory.torques[0].data.numpy() == np.array([3, 2, 1])).all())
-        self.assertTrue((trajectory.knot_poses[0].data.numpy() == np.array([4, 5, 6])).all())
-        self.assertTrue((trajectory.knot_vels[0].data.numpy() == np.array([7, 8, 9])).all())
-        self.assertTrue((trajectory.torques[1].data.numpy() == np.array([10, 11, 12])).all())
+        self.assertTrue((trajectory.torques.data.numpy()[:, 0] == np.array([3, 2, 1])).all())
+        self.assertTrue((trajectory.knot_poses.data.numpy()[:, 0] == np.array([4, 5, 6])).all())
+        self.assertTrue((trajectory.knot_vels.data.numpy()[:, 0] == np.array([7, 8, 9])).all())
+        self.assertTrue((trajectory.torques.data.numpy()[:, 1] == np.array([10, 11, 12])).all())
 
         # Test offsets for computing Jac g(x)
         knot_x_offsets = trajectory.get_knot_x_offsets()
         self.assertEqual([0], knot_x_offsets)
         knot_g_offsets = trajectory.get_knot_g_offsets()
-        self.assertEqual([0], knot_g_offsets)
+        self.assertEqual([None], knot_g_offsets)
 
     def test_two_step_with_two_knots(self):
         trajectory, world = createCubeTrajectory(
@@ -243,12 +242,12 @@ class TestMultipleShootingTrajectory(unittest.TestCase):
         dim = trajectory.get_flat_problem_dim()
         self.assertEqual(dim, 6 * world.getNumDofs())
 
-        trajectory.knot_poses[0].data = torch.from_numpy(np.array([4, 5, 6]))
-        trajectory.knot_vels[0].data = torch.from_numpy(np.array([7, 8, 9]))
-        trajectory.torques[0].data = torch.from_numpy(np.array([3, 2, 1]))
-        trajectory.knot_poses[1].data = torch.from_numpy(np.array([14, 15, 16]))
-        trajectory.knot_vels[1].data = torch.from_numpy(np.array([17, 18, 19]))
-        trajectory.torques[1].data = torch.from_numpy(np.array([10, 11, 12]))
+        trajectory.knot_poses.data[:, 0] = torch.from_numpy(np.array([4, 5, 6]))
+        trajectory.knot_vels.data[:, 0] = torch.from_numpy(np.array([7, 8, 9]))
+        trajectory.torques.data[:, 0] = torch.from_numpy(np.array([3, 2, 1]))
+        trajectory.knot_poses.data[:, 1] = torch.from_numpy(np.array([14, 15, 16]))
+        trajectory.knot_vels.data[:, 1] = torch.from_numpy(np.array([17, 18, 19]))
+        trajectory.torques.data[:, 1] = torch.from_numpy(np.array([10, 11, 12]))
 
         # This should be the first pos + first vel + first torque + second pos + second vel + second torque
         flattened = trajectory.flatten(np.zeros(dim))
@@ -259,18 +258,18 @@ class TestMultipleShootingTrajectory(unittest.TestCase):
         for tensor in trajectory.tensors():
             tensor.data.zero_()
         trajectory.unflatten(flattened)
-        self.assertTrue((trajectory.knot_poses[0].data.numpy() == np.array([4, 5, 6])).all())
-        self.assertTrue((trajectory.knot_vels[0].data.numpy() == np.array([7, 8, 9])).all())
-        self.assertTrue((trajectory.torques[0].data.numpy() == np.array([3, 2, 1])).all())
-        self.assertTrue((trajectory.knot_poses[1].data.numpy() == np.array([14, 15, 16])).all())
-        self.assertTrue((trajectory.knot_vels[1].data.numpy() == np.array([17, 18, 19])).all())
-        self.assertTrue((trajectory.torques[1].data.numpy() == np.array([10, 11, 12])).all())
+        self.assertTrue((trajectory.knot_poses.data.numpy()[:, 0] == np.array([4, 5, 6])).all())
+        self.assertTrue((trajectory.knot_vels.data.numpy()[:, 0] == np.array([7, 8, 9])).all())
+        self.assertTrue((trajectory.torques.data.numpy()[:, 0] == np.array([3, 2, 1])).all())
+        self.assertTrue((trajectory.knot_poses.data.numpy()[:, 1] == np.array([14, 15, 16])).all())
+        self.assertTrue((trajectory.knot_vels.data.numpy()[:, 1] == np.array([17, 18, 19])).all())
+        self.assertTrue((trajectory.torques.data.numpy()[:, 1] == np.array([10, 11, 12])).all())
 
         # Test offsets for computing Jac g(x)
         knot_x_offsets = trajectory.get_knot_x_offsets()
         self.assertEqual([0, 3 * world.getNumDofs()], knot_x_offsets)
         knot_g_offsets = trajectory.get_knot_g_offsets()
-        self.assertEqual([0, 2 * world.getNumDofs()], knot_g_offsets)
+        self.assertEqual([None, 0], knot_g_offsets)
 
     def test_two_step_with_one_knot_no_start(self):
         trajectory, world = createCubeTrajectory(
@@ -280,10 +279,10 @@ class TestMultipleShootingTrajectory(unittest.TestCase):
         dim = trajectory.get_flat_problem_dim()
         self.assertEqual(dim, 4 * world.getNumDofs())
 
-        trajectory.torques[0].data = torch.from_numpy(np.array([3, 2, 1]))
-        trajectory.knot_poses[1].data = torch.from_numpy(np.array([14, 15, 16]))
-        trajectory.knot_vels[1].data = torch.from_numpy(np.array([17, 18, 19]))
-        trajectory.torques[1].data = torch.from_numpy(np.array([10, 11, 12]))
+        trajectory.torques.data[:, 0] = torch.from_numpy(np.array([3, 2, 1]))
+        trajectory.knot_poses.data[:, 1] = torch.from_numpy(np.array([14, 15, 16]))
+        trajectory.knot_vels.data[:, 1] = torch.from_numpy(np.array([17, 18, 19]))
+        trajectory.torques.data[:, 1] = torch.from_numpy(np.array([10, 11, 12]))
 
         # This should be the first torque + second pos + second vel + second torque
         flattened = trajectory.flatten(np.zeros(dim))
@@ -294,10 +293,10 @@ class TestMultipleShootingTrajectory(unittest.TestCase):
         for tensor in trajectory.tensors():
             tensor.data.zero_()
         trajectory.unflatten(flattened)
-        self.assertTrue((trajectory.torques[0].data.numpy() == np.array([3, 2, 1])).all())
-        self.assertTrue((trajectory.knot_poses[1].data.numpy() == np.array([14, 15, 16])).all())
-        self.assertTrue((trajectory.knot_vels[1].data.numpy() == np.array([17, 18, 19])).all())
-        self.assertTrue((trajectory.torques[1].data.numpy() == np.array([10, 11, 12])).all())
+        self.assertTrue((trajectory.torques.data.numpy()[:, 0] == np.array([3, 2, 1])).all())
+        self.assertTrue((trajectory.knot_poses.data.numpy()[:, 1] == np.array([14, 15, 16])).all())
+        self.assertTrue((trajectory.knot_vels.data.numpy()[:, 1] == np.array([17, 18, 19])).all())
+        self.assertTrue((trajectory.torques.data.numpy()[:, 1] == np.array([10, 11, 12])).all())
 
         # Test offsets for computing Jac g(x)
         knot_x_offsets = trajectory.get_knot_x_offsets()
@@ -310,7 +309,6 @@ class TestMultipleShootingTrajectory(unittest.TestCase):
             steps=2, shooting_length=1, tune_starting_point=True, enforce_loop=True)
 
         # TODO: test
-    """
 
     def test_unflatten(self):
         trajectory, world = createCubeTrajectory(
@@ -318,10 +316,49 @@ class TestMultipleShootingTrajectory(unittest.TestCase):
         x0 = trajectory.flatten(np.zeros(trajectory.get_flat_problem_dim()))
         x0[7] = 1.0  # this should be the second axis of the first torque
         trajectory.unflatten(x0)
-        self.assertEqual(world.getNumDofs(), trajectory.torques[0].size()[0])
-        torques = trajectory.torques[0].detach().numpy()
+        self.assertEqual(world.getNumDofs(), trajectory.torques.shape[0])
+        torques = trajectory.torques.detach().numpy()[:, 0]
         self.assertTrue((np.array([0, 1, 0]) == torques).all())
+    """
 
+    def test_box_jac_parallel(self):
+        trajectory, world = createCubeTrajectory(
+            steps=6, shooting_length=3, tune_starting_point=False, enforce_loop=False,
+            enforce_final_state=np.zeros(6))
+        x0 = trajectory.flatten(np.zeros(trajectory.get_flat_problem_dim()))
+
+        # Turn on multithreading
+        trajectory.multithread = True
+
+        # Check the Jacobian
+        dense_jac_g_par = trajectory._test_get_dense_jac_g(x0)
+        grad_f_par = trajectory.eval_grad_f(x0, np.zeros(len(x0)))
+
+        # Force a recomputation single threaded
+        trajectory.last_x[0] = -1000
+        trajectory.multithread = False
+
+        dense_jac_g_serial = trajectory._test_get_dense_jac_g(x0)
+        grad_f_serial = trajectory.eval_grad_f(x0, np.zeros(len(x0)))
+
+        grad_equals = np.abs(grad_f_par, grad_f_serial) < 1e-7
+        if not grad_equals.all():
+            print('grad f(x) par: '+str(grad_f_par))
+            print('grad f(x) serial: '+str(grad_f_serial))
+
+        jac_equals = np.abs(dense_jac_g_par - dense_jac_g_serial) < 1e-7
+
+        if not jac_equals.all():
+            print('jac g(x) par: '+str(dense_jac_g_par))
+            print('jac g(x) serial: '+str(dense_jac_g_serial))
+            os.remove('./parallel.csv')
+            os.remove('./serial.csv')
+
+            np.savetxt("parallel.csv", dense_jac_g_par, delimiter=",")
+            np.savetxt("serial.csv", dense_jac_g_serial, delimiter=",")
+        self.assertTrue(jac_equals.all())
+
+    """
     def test_box_jac(self):
         trajectory, world = createCubeTrajectory(
             steps=10, shooting_length=2, tune_starting_point=False, enforce_loop=False,
@@ -335,19 +372,18 @@ class TestMultipleShootingTrajectory(unittest.TestCase):
 
         # Check the gradient
 
-        """
-        brute_force_grad_f = trajectory._eval_brute_force_grad_f(x0, np.zeros_like(x0))
-        grad_diff = np.abs(grad_f - brute_force_grad_f)
-        grad_equals = np.abs(grad_f - brute_force_grad_f) < 1e-10
+        if False:
+            brute_force_grad_f = trajectory._eval_brute_force_grad_f(x0, np.zeros_like(x0))
+            grad_diff = np.abs(grad_f - brute_force_grad_f)
+            grad_equals = np.abs(grad_f - brute_force_grad_f) < 1e-10
 
-        if not grad_equals.all():
-            print('grad f(x): '+str(grad_f))
-            print('brute force grad f(x): '+str(brute_force_grad_f))
-            print('grad diff: '+str(grad_diff))
-            print('grad equals: '+str(grad_equals))
-            trajectory.debug()
-        self.assertTrue(grad_equals.all())
-        """
+            if not grad_equals.all():
+                print('grad f(x): '+str(grad_f))
+                print('brute force grad f(x): '+str(brute_force_grad_f))
+                print('grad diff: '+str(grad_diff))
+                print('grad equals: '+str(grad_equals))
+                trajectory.debug()
+            self.assertTrue(grad_equals.all())
 
         # Check the Jacobian
 
@@ -377,19 +413,18 @@ class TestMultipleShootingTrajectory(unittest.TestCase):
 
         # Check the gradient
 
-        """
-        brute_force_grad_f = trajectory._eval_brute_force_grad_f(x0, np.zeros_like(x0))
-        grad_diff = np.abs(grad_f - brute_force_grad_f)
-        grad_equals = np.abs(grad_f - brute_force_grad_f) < 1e-10
+        if False:
+            brute_force_grad_f = trajectory._eval_brute_force_grad_f(x0, np.zeros_like(x0))
+            grad_diff = np.abs(grad_f - brute_force_grad_f)
+            grad_equals = np.abs(grad_f - brute_force_grad_f) < 1e-10
 
-        if not grad_equals.all():
-            print('grad f(x): '+str(grad_f))
-            print('brute force grad f(x): '+str(brute_force_grad_f))
-            print('grad diff: '+str(grad_diff))
-            print('grad equals: '+str(grad_equals))
-            trajectory.debug()
-        self.assertTrue(grad_equals.all())
-        """
+            if not grad_equals.all():
+                print('grad f(x): '+str(grad_f))
+                print('brute force grad f(x): '+str(brute_force_grad_f))
+                print('grad diff: '+str(grad_diff))
+                print('grad equals: '+str(grad_equals))
+                trajectory.debug()
+            self.assertTrue(grad_equals.all())
 
         # Check the Jacobian
 
@@ -410,7 +445,9 @@ class TestMultipleShootingTrajectory(unittest.TestCase):
                 "diff.csv", (dense_jac_g - brute_force_jac_g) / (brute_force_jac_g + 1e-15),
                 delimiter=",")
         self.assertTrue(jac_equals.all())
+    """
 
+    """
     def t_full_opt(self):
         trajectory, world = createCubeTrajectory(
             steps=10, shooting_length=2, tune_starting_point=False, enforce_loop=False,
@@ -424,19 +461,18 @@ class TestMultipleShootingTrajectory(unittest.TestCase):
 
         # Check the gradient
 
-        """
-        brute_force_grad_f = trajectory._eval_brute_force_grad_f(x0, np.zeros_like(x0))
-        grad_diff = np.abs(grad_f - brute_force_grad_f)
-        grad_equals = np.abs(grad_f - brute_force_grad_f) < 1e-10
+        if False:
+            brute_force_grad_f = trajectory._eval_brute_force_grad_f(x0, np.zeros_like(x0))
+            grad_diff = np.abs(grad_f - brute_force_grad_f)
+            grad_equals = np.abs(grad_f - brute_force_grad_f) < 1e-10
 
-        if not grad_equals.all():
-            print('grad f(x): '+str(grad_f))
-            print('brute force grad f(x): '+str(brute_force_grad_f))
-            print('grad diff: '+str(grad_diff))
-            print('grad equals: '+str(grad_equals))
-            trajectory.debug()
-        self.assertTrue(grad_equals.all())
-        """
+            if not grad_equals.all():
+                print('grad f(x): '+str(grad_f))
+                print('brute force grad f(x): '+str(brute_force_grad_f))
+                print('grad diff: '+str(grad_diff))
+                print('grad equals: '+str(grad_equals))
+                trajectory.debug()
+            self.assertTrue(grad_equals.all())
 
         # Check the Jacobian
 
@@ -460,6 +496,31 @@ class TestMultipleShootingTrajectory(unittest.TestCase):
 
         # trajectory.ipopt()
         # trajectory.debug()
+
+    def test_cartpole_parallel(self):
+        trajectory, world = createCartpoleTrajectory()
+        par_loss, par_knot_loss = trajectory.parallel_unroll()
+        loss, knot_loss = trajectory.unroll()
+        print('par loss: '+str(par_loss))
+        print('loss: '+str(loss))
+        par_loss.backward()
+        par_grads = [None if t.grad == None else t.grad.numpy() for t in trajectory.tensors()]
+        print(par_grads)
+
+    def test_cube_parallel(self):
+        trajectory, world = createCubeTrajectory(
+            steps=10, shooting_length=2, tune_starting_point=False, enforce_loop=False,
+            enforce_final_state=np.zeros(6))
+        par_loss, par_knot_loss = trajectory.parallel_unroll()
+        loss, knot_loss = trajectory.unroll()
+        print('par loss: '+str(par_loss))
+        print('loss: '+str(loss))
+        par_loss.backward()
+        par_grads = [None if t.grad == None else t.grad.numpy() for t in trajectory.tensors()]
+        loss.backward()
+        grads = [None if t.grad == None else t.grad.numpy() for t in trajectory.tensors()]
+        print(grads)
+    """
 
 
 if __name__ == '__main__':

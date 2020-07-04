@@ -6,6 +6,7 @@ import torch.nn.functional as F
 import random
 import math
 import time
+import cProfile
 
 
 class MyWorldNode(dart.gui.osg.RealTimeWorldNode):
@@ -92,14 +93,14 @@ def main():
     world.setVelocities(start_vel)
 
     # Create the trajectory
-    def step_loss(pos, vel, t, world):
-        return t[0]*t[0] + t[1]*t[1]  # torch.mul(pos, t).norm()
-
-    def final_loss(pos, vel, world):
-        return torch.norm(pos) + torch.norm(vel)
+    def eval_loss(t, pos, vel, world):
+        # DOF x timestep
+        step_loss = torch.sum(t[0, :]*t[0, :]) + torch.sum(t[1, :]*t[1, :])
+        final_loss = torch.norm(pos[:, steps-1]) + torch.norm(vel[:, steps-1])
+        return step_loss + final_loss
 
     trajectory = dart_torch.MultipleShootingTrajectory(
-        world, step_loss, final_loss, steps=steps, shooting_length=shooting_length,
+        world, eval_loss, steps=steps, shooting_length=shooting_length,
         disable_actuators=[1],
         tune_starting_point=False, enforce_final_state=np.zeros(4))
 
@@ -130,13 +131,14 @@ def main():
         time.sleep(0.003)
 
     # Run cartpole simulations
+    """
     iteration = 0
     for i in range(201):
-        loss, knot_loss = trajectory.unroll(
-            after_step=(animate_step if iteration % 100 == 0 and iteration > 0 else None))
+        loss, knot_loss = trajectory.parallel_unroll(compute_knot_loss=True)
 
         # Show a trajectory without the knot points
         if iteration % 100 == 0 and iteration > 0:
+            trajectory.unroll(use_knots=True, after_step=animate_step)
             trajectory.unroll(use_knots=False, after_step=animate_step)
             knot_weight *= 10
 
@@ -154,8 +156,9 @@ def main():
         scheduler.step()
 
         iteration += 1
+    """
 
-    trajectory.ipopt()
+    trajectory.ipopt(100)
 
     print('Optimization complete! Playing trajectories over and over...')
     while True:
@@ -164,4 +167,5 @@ def main():
 
 
 if __name__ == "__main__":
+    # cProfile.run('main()')
     main()
