@@ -129,6 +129,8 @@ def main():
     def eval_loss(t, pos, vel, world):
         # DOF x timestep
         step_loss = 0  # torch.sum(t[0, :]*t[0, :]) + torch.sum(t[1, :]*t[1, :])
+        # world_vel = dart_torch.convert_to_world_space_velocities(world, vel)
+        # world_pos = dart_torch.convert_to_world_space_positions(world, pos)
         final_loss = - pos[1, steps-1]*pos[1, steps-1]*torch.sign(pos[1, steps-1])
         return step_loss + final_loss
 

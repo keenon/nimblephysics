@@ -114,6 +114,81 @@ void NeuralUtils(py::module& m)
       ::py::arg("gradWrtPoses"),
       ::py::arg("gradWrtVels"),
       ::py::arg("computeJacobians") = true);
+  m.def(
+      "convertJointSpacePositionsToWorldSpatial",
+      &dart::neural::convertJointSpacePositionsToWorldSpatial,
+      ::py::arg("world"),
+      ::py::arg("jointPositions"));
+  m.def(
+      "convertJointSpaceVelocitiesToWorldSpatial",
+      &dart::neural::convertJointSpaceVelocitiesToWorldSpatial,
+      ::py::arg("world"),
+      ::py::arg("jointVelocities"));
+  m.def(
+      "backpropWorldSpatialToJointSpace",
+      &dart::neural::backpropWorldSpatialToJointSpace,
+      ::py::arg("world"),
+      ::py::arg("lossWrtWorldSpatial"),
+      ::py::arg("useTranspose") = false);
+  m.def(
+      "convertJointSpacePositionsToWorldLinear",
+      &dart::neural::convertJointSpacePositionsToWorldLinear,
+      ::py::arg("world"),
+      ::py::arg("jointPositions"));
+  m.def(
+      "convertJointSpaceVelocitiesToWorldLinear",
+      &dart::neural::convertJointSpaceVelocitiesToWorldLinear,
+      ::py::arg("world"),
+      ::py::arg("jointVelocities"));
+  m.def(
+      "backpropWorldLinearToJointSpace",
+      &dart::neural::backpropWorldLinearToJointSpace,
+      ::py::arg("world"),
+      ::py::arg("lossWrtWorldLinear"),
+      ::py::arg("useTranspose") = false);
+  m.def(
+      "convertJointSpacePositionsToWorldCOM",
+      &dart::neural::convertJointSpacePositionsToWorldCOM,
+      ::py::arg("world"),
+      ::py::arg("jointPositions"));
+  m.def(
+      "convertJointSpaceVelocitiesToWorldCOMLinear",
+      &dart::neural::convertJointSpaceVelocitiesToWorldCOMLinear,
+      ::py::arg("world"),
+      ::py::arg("jointVelocities"));
+  m.def(
+      "backpropWorldCOMLinearToJointSpace",
+      &dart::neural::backpropWorldCOMLinearToJointSpace,
+      ::py::arg("world"),
+      ::py::arg("lossWrtWorldCOM"),
+      ::py::arg("useTranspose") = false);
+  m.def(
+      "convertJointSpaceVelocitiesToWorldCOMSpatial",
+      &dart::neural::convertJointSpaceVelocitiesToWorldCOMSpatial,
+      ::py::arg("world"),
+      ::py::arg("jointVelocities"));
+  m.def(
+      "backpropWorldCOMSpatialToJointSpace",
+      &dart::neural::backpropWorldCOMSpatialToJointSpace,
+      ::py::arg("world"),
+      ::py::arg("lossWrtWorldCOM"),
+      ::py::arg("useTranspose") = false);
+  /*
+/// This converts a batch of joint space positions (one per column) to a batch
+/// of body positions (one per column).
+Eigen::MatrixXd convertJointSpacePositionsToWorldSpace(
+std::shared_ptr<simulation::World> world, Eigen::MatrixXd jointPositions);
+
+/// This converts a batch of joint space velocities (one per column) to a batch
+/// of body velocities (one per column).
+Eigen::MatrixXd convertJointSpaceVelocitiesToWorldSpace(
+std::shared_ptr<simulation::World> world, Eigen::MatrixXd jointVelocity);
+
+/// This turns a batch of losses in body space into a batch of losses in joint
+/// space.
+Eigen::MatrixXd backpropWorldSpaceToJointSpace(
+std::shared_ptr<simulation::World> world, Eigen::MatrixXd bodySpaceLoss);
+*/
 }
 
 } // namespace python
