@@ -92,68 +92,27 @@ BulkBackwardPassResult bulkBackwardPass(
 // Geometry helpers
 //////////////////////////////////////////////////////////////////////////////
 
-/// This converts a batch of joint space positions (one per column) to a batch
-/// of world screws (one per column).
-Eigen::MatrixXd convertJointSpacePositionsToWorldSpatial(
-    std::shared_ptr<simulation::World> world, Eigen::MatrixXd jointPositions);
+enum ConvertToSpace
+{
+  POS_SPATIAL,
+  POS_LINEAR,
+  VEL_SPATIAL,
+  VEL_LINEAR,
+  COM_POS,
+  COM_VEL_SPATIAL,
+  COM_VEL_LINEAR
+};
 
-/// This converts a batch of joint space velocities (one per column) to a batch
-/// of world screws (one per column).
-Eigen::MatrixXd convertJointSpaceVelocitiesToWorldSpatial(
-    std::shared_ptr<simulation::World> world, Eigen::MatrixXd jointVelocity);
-
-/// This turns a batch of losses in world screws into a batch of losses in joint
-/// space.
-Eigen::MatrixXd backpropWorldSpatialToJointSpace(
-    std::shared_ptr<simulation::World> world,
-    Eigen::MatrixXd bodySpaceLoss,
-    bool useTranspose = false);
-
-/// This converts a batch of joint space positions (one per column) to a batch
-/// of world positions (one per column).
-Eigen::MatrixXd convertJointSpacePositionsToWorldLinear(
-    std::shared_ptr<simulation::World> world, Eigen::MatrixXd jointPositions);
-
-/// This converts a batch of joint space velocities (one per column) to a batch
-/// of world velocities (one per column).
-Eigen::MatrixXd convertJointSpaceVelocitiesToWorldLinear(
-    std::shared_ptr<simulation::World> world, Eigen::MatrixXd jointVelocity);
-
-/// This turns a batch of losses in world space into a batch of losses in joint
-/// space.
-Eigen::MatrixXd backpropWorldLinearToJointSpace(
-    std::shared_ptr<simulation::World> world,
-    Eigen::MatrixXd lossWrtWorldLinear,
-    bool useTranspose = false);
-
-/// This converts a batch of joint space positions (one per column) to the
-/// center of mass positions in world coordinates.
-Eigen::MatrixXd convertJointSpacePositionsToWorldCOM(
-    std::shared_ptr<simulation::World> world, Eigen::MatrixXd jointPositions);
-
-/// This converts a batch of joint space positions (one per column) to the
-/// center of mass positions in world coordinates.
-Eigen::MatrixXd convertJointSpaceVelocitiesToWorldCOMLinear(
-    std::shared_ptr<simulation::World> world, Eigen::MatrixXd jointVelocities);
-
-/// This turns a batch of losses in world space wrt center of masses into a
-/// batch of losses in joint space.
-Eigen::MatrixXd backpropWorldCOMLinearToJointSpace(
-    std::shared_ptr<simulation::World> world,
-    Eigen::MatrixXd lossWrtWorldCOM,
-    bool useTranspose = false);
-
-/// This converts a batch of joint space positions (one per column) to the
-/// center of mass positions in world coordinates.
-Eigen::MatrixXd convertJointSpaceVelocitiesToWorldCOMSpatial(
-    std::shared_ptr<simulation::World> world, Eigen::MatrixXd jointVelocities);
-
-/// This turns a batch of losses in world space wrt center of masses into a
-/// batch of losses in joint space.
-Eigen::MatrixXd backpropWorldCOMSpatialToJointSpace(
-    std::shared_ptr<simulation::World> world,
-    Eigen::MatrixXd lossWrtWorldCOM,
-    bool useTranspose = false);
+/// Convert a set of joint positions to a vector of body positions in world
+/// space (expressed in log space).
+Eigen::MatrixXd convertJointSpaceToWorldSpace(
+    const std::shared_ptr<simulation::World>& world,
+    const Eigen::MatrixXd& in, /* These can be velocities or positions,
+                                    depending on the value of `space` */
+    const std::vector<dynamics::BodyNode*>& nodes,
+    ConvertToSpace space,
+    bool backprop = false,
+    bool useIK = true /* Only relevant for backprop */);
 
 //////////////////////////////////////////////
 // Similar to above, but just for Skeletons //
@@ -162,73 +121,31 @@ Eigen::MatrixXd backpropWorldCOMSpatialToJointSpace(
 /// Computes a Jacobian that transforms changes in joint angle to changes in
 /// body positions (expressed in log space).
 Eigen::MatrixXd jointToWorldSpatialJacobian(
-    std::shared_ptr<dynamics::Skeleton> skel);
+    const std::shared_ptr<dynamics::Skeleton>& skel,
+    const std::vector<dynamics::BodyNode*>& nodes);
 
 /// Computes a Jacobian that transforms changes in joint angle to changes in
 /// body positions (expressed in linear space).
 Eigen::MatrixXd jointToWorldLinearJacobian(
-    std::shared_ptr<dynamics::Skeleton> skel);
+    const std::shared_ptr<dynamics::Skeleton>& skel,
+    const std::vector<dynamics::BodyNode*>& nodes);
 
 /// Convert a set of joint positions to a vector of body positions in world
 /// space (expressed in log space).
-Eigen::VectorXd skelConvertJointSpacePositionsToWorldSpatial(
-    std::shared_ptr<dynamics::Skeleton> skel, Eigen::VectorXd jointPositions);
-
-/// Convert a set of joint velocities to a vector of body velocities in world
-/// space (expressed in log space).
-Eigen::VectorXd skelConvertJointSpaceVelocitiesToWorldSpatial(
-    std::shared_ptr<dynamics::Skeleton> skel, Eigen::VectorXd jointPositions);
-
-/// Turns losses in terms of body space into losses in terms of joint space
-Eigen::VectorXd skelBackpropWorldSpatialToJointSpace(
-    std::shared_ptr<dynamics::Skeleton> skel,
-    Eigen::VectorXd bodySpace,
-    bool useTranspose = false);
-
-/// Convert a set of joint positions to a vector of body positions in world
-/// space (expressed in log space).
-Eigen::VectorXd skelConvertJointSpacePositionsToWorldLinear(
-    std::shared_ptr<dynamics::Skeleton> skel, Eigen::VectorXd jointPositions);
-
-/// Convert a set of joint velocities to a vector of body velocities in world
-/// space (expressed in log space).
-Eigen::VectorXd skelConvertJointSpaceVelocitiesToWorldLinear(
-    std::shared_ptr<dynamics::Skeleton> skel, Eigen::VectorXd jointPositions);
+Eigen::VectorXd skelConvertJointSpaceToWorldSpace(
+    const std::shared_ptr<dynamics::Skeleton>& skel,
+    const Eigen::VectorXd& jointValues, /* These can be velocities or positions,
+                                    depending on the value of `space` */
+    const std::vector<dynamics::BodyNode*>& nodes,
+    ConvertToSpace space);
 
 /// Turns losses in terms of body space into losses in terms of joint space
-Eigen::VectorXd skelBackpropWorldLinearToJointSpace(
-    std::shared_ptr<dynamics::Skeleton> skel,
-    Eigen::VectorXd lossWrtWorldLinear,
-    bool useTranspose = false);
-
-/// This converts a batch of joint space positions (one per column) to the
-/// center of mass positions in world coordinates.
-Eigen::Vector3d skelConvertJointSpacePositionsToWorldCOM(
-    std::shared_ptr<dynamics::Skeleton> skel, Eigen::VectorXd jointPositions);
-
-/// This turns a batch of losses in world space wrt center of masses into a
-/// batch of losses in joint space.
-Eigen::VectorXd skelBackpropWorldCOMLinearToJointSpace(
-    std::shared_ptr<dynamics::Skeleton> skel,
-    Eigen::Vector3d lossWrtWorldCOM,
-    bool useTranspose = false);
-
-/// This converts a batch of joint space positions (one per column) to the
-/// center of mass positions in world coordinates.
-Eigen::Vector3d skelConvertJointSpaceVelocitiesToWorldCOMLinear(
-    std::shared_ptr<dynamics::Skeleton> skel, Eigen::VectorXd jointVelocities);
-
-/// This converts a batch of joint space positions (one per column) to the
-/// center of mass positions in world coordinates.
-Eigen::Vector6d skelConvertJointSpaceVelocitiesToWorldCOMSpatial(
-    std::shared_ptr<dynamics::Skeleton> skel, Eigen::VectorXd jointVelocities);
-
-/// This turns a batch of losses in world space wrt center of masses into a
-/// batch of losses in joint space.
-Eigen::VectorXd skelBackpropWorldCOMSpatialToJointSpace(
-    std::shared_ptr<dynamics::Skeleton> skel,
-    Eigen::Vector6d lossWrtWorldCOM,
-    bool useTranspose = false);
+Eigen::VectorXd skelBackpropWorldSpaceToJointSpace(
+    const std::shared_ptr<dynamics::Skeleton>& skel,
+    const Eigen::VectorXd& bodySpace, /* This is the gradient in body space */
+    const std::vector<dynamics::BodyNode*>& nodes,
+    ConvertToSpace space, /* This is the source space for our gradient */
+    bool useIK = true);
 
 } // namespace neural
 } // namespace dart

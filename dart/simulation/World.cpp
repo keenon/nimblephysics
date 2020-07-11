@@ -309,6 +309,34 @@ dynamics::SkeletonPtr World::getSkeleton(const std::string& _name) const
 }
 
 //==============================================================================
+std::size_t World::getSkeletonDofOffset(
+    const dynamics::SkeletonPtr& _skeleton) const
+{
+  std::size_t dofCursor = 0;
+  for (dynamics::SkeletonPtr skel : mSkeletons)
+  {
+    if (skel == _skeleton)
+      return dofCursor;
+    dofCursor += skel->getNumDofs();
+  }
+  assert(false && "You asked for an world DOF offset for a skeleton that isn't in the world");
+}
+
+//==============================================================================
+std::vector<dynamics::BodyNode*> World::getAllBodyNodes()
+{
+  std::vector<dynamics::BodyNode*> nodes;
+  for (dynamics::SkeletonPtr skel : mSkeletons)
+  {
+    for (dynamics::BodyNode* body : skel->getBodyNodes())
+    {
+      nodes.push_back(body);
+    }
+  }
+  return nodes;
+}
+
+//==============================================================================
 std::size_t World::getNumSkeletons() const
 {
   return mSkeletons.size();

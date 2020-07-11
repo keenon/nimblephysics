@@ -998,8 +998,9 @@ bool verifyWorldSpaceToVelocitySpatial(
   world->setPositions(position);
   world->setVelocities(velocity);
 
-  Eigen::MatrixXd worldVelMatrix
-      = convertJointSpaceVelocitiesToWorldSpatial(world, velocity);
+  std::vector<dynamics::BodyNode*> bodyNodes = world->getAllBodyNodes();
+  Eigen::MatrixXd worldVelMatrix = convertJointSpaceToWorldSpace(
+      world, velocity, bodyNodes, ConvertToSpace::VEL_SPATIAL, false);
   if (worldVelMatrix.cols() != 1)
     return false;
   Eigen::VectorXd worldVel = worldVelMatrix.col(0);
@@ -1012,7 +1013,7 @@ bool verifyWorldSpaceToVelocitySpatial(
     // std::cout << "Vels: " << std::endl << skel->getVelocities() << std::endl;
     for (std::size_t k = 0; k < skel->getNumBodyNodes(); k++)
     {
-      BodyNodePtr node = skel->getBodyNode(k);
+      BodyNode* node = skel->getBodyNode(k);
       Eigen::Vector6d bruteVel
           = math::AdR(node->getWorldTransform(), node->getSpatialVelocity());
       Eigen::Vector6d analyticalVel = worldVel.segment(cursor, 6);
@@ -1046,8 +1047,9 @@ bool verifyWorldSpaceToLinearVelocity(
   world->setPositions(position);
   world->setVelocities(velocity);
 
-  Eigen::MatrixXd worldVelMatrix
-      = convertJointSpaceVelocitiesToWorldLinear(world, velocity);
+  std::vector<dynamics::BodyNode*> bodyNodes = world->getAllBodyNodes();
+  Eigen::MatrixXd worldVelMatrix = convertJointSpaceToWorldSpace(
+      world, velocity, bodyNodes, ConvertToSpace::VEL_LINEAR, false);
   if (worldVelMatrix.cols() != 1)
     return false;
   Eigen::VectorXd worldVel = worldVelMatrix.col(0);
@@ -1060,7 +1062,7 @@ bool verifyWorldSpaceToLinearVelocity(
     // std::cout << "Vels: " << std::endl << skel->getVelocities() << std::endl;
     for (std::size_t k = 0; k < skel->getNumBodyNodes(); k++)
     {
-      BodyNodePtr node = skel->getBodyNode(k);
+      BodyNode* node = skel->getBodyNode(k);
       Eigen::Vector3d bruteVel
           = math::AdR(node->getWorldTransform(), node->getSpatialVelocity())
                 .tail<3>();
@@ -1095,8 +1097,9 @@ bool verifyWorldSpaceToPositionCOM(
   world->setPositions(position);
   world->setVelocities(velocity);
 
-  Eigen::MatrixXd worldPosMatrix
-      = convertJointSpacePositionsToWorldCOM(world, position);
+  std::vector<dynamics::BodyNode*> bodyNodes = world->getAllBodyNodes();
+  Eigen::MatrixXd worldPosMatrix = convertJointSpaceToWorldSpace(
+      world, position, bodyNodes, ConvertToSpace::COM_POS, false);
   if (worldPosMatrix.cols() != 1)
     return false;
   Eigen::VectorXd worldPos = worldPosMatrix.col(0);
@@ -1138,8 +1141,9 @@ bool verifyWorldSpaceToVelocityCOMLinear(
   world->setPositions(position);
   world->setVelocities(velocity);
 
-  Eigen::MatrixXd worldVelMatrix
-      = convertJointSpaceVelocitiesToWorldCOMLinear(world, velocity);
+  std::vector<dynamics::BodyNode*> bodyNodes = world->getAllBodyNodes();
+  Eigen::MatrixXd worldVelMatrix = convertJointSpaceToWorldSpace(
+      world, velocity, bodyNodes, ConvertToSpace::COM_VEL_LINEAR, false);
   if (worldVelMatrix.cols() != 1)
     return false;
   Eigen::VectorXd worldVel = worldVelMatrix.col(0);
@@ -1154,7 +1158,7 @@ bool verifyWorldSpaceToVelocityCOMLinear(
     double totalMass = 0.0;
     for (std::size_t k = 0; k < skel->getNumBodyNodes(); k++)
     {
-      BodyNodePtr node = skel->getBodyNode(k);
+      BodyNode* node = skel->getBodyNode(k);
       Eigen::Vector3d bruteVel
           = math::AdR(node->getWorldTransform(), node->getSpatialVelocity())
                 .tail<3>();
@@ -1192,8 +1196,9 @@ bool verifyWorldSpaceToVelocityCOMSpatial(
   world->setPositions(position);
   world->setVelocities(velocity);
 
-  Eigen::MatrixXd worldVelMatrix
-      = convertJointSpaceVelocitiesToWorldCOMSpatial(world, velocity);
+  std::vector<dynamics::BodyNode*> bodyNodes = world->getAllBodyNodes();
+  Eigen::MatrixXd worldVelMatrix = convertJointSpaceToWorldSpace(
+      world, velocity, bodyNodes, ConvertToSpace::COM_VEL_SPATIAL, false);
   if (worldVelMatrix.cols() != 1)
     return false;
   Eigen::VectorXd worldVel = worldVelMatrix.col(0);
@@ -1208,7 +1213,7 @@ bool verifyWorldSpaceToVelocityCOMSpatial(
     double totalMass = 0.0;
     for (std::size_t k = 0; k < skel->getNumBodyNodes(); k++)
     {
-      BodyNodePtr node = skel->getBodyNode(k);
+      BodyNode* node = skel->getBodyNode(k);
       Eigen::Vector6d bruteVel
           = math::AdR(node->getWorldTransform(), node->getSpatialVelocity());
       bruteCOMVel += bruteVel * node->getMass();
@@ -1245,17 +1250,25 @@ bool verifyBackpropWorldSpacePositionToSpatial(
   world->setPositions(position);
   world->setVelocities(velocity);
 
-  Eigen::VectorXd originalWorldPos
-      = convertJointSpaceVelocitiesToWorldSpatial(world, position);
+  std::vector<dynamics::BodyNode*> bodyNodes
+      = world->getSkeleton(0)->getBodyNodes();
+
+  // Delete the 2nd body node, arbitrarily, to force some shuffling
+  bodyNodes.erase(bodyNodes.begin()++);
+  // Shuffle the remaining elements
+  std::random_shuffle(bodyNodes.begin(), bodyNodes.end());
+
+  Eigen::VectorXd originalWorldPos = convertJointSpaceToWorldSpace(
+      world, position, bodyNodes, ConvertToSpace::POS_SPATIAL, false);
 
   Eigen::VectorXd perturbation
       = Eigen::VectorXd::Random(position.size()) * 1e-6;
   Eigen::VectorXd perturbedPos = position + perturbation;
 
-  Eigen::VectorXd perturbedWorldPos
-      = convertJointSpaceVelocitiesToWorldSpatial(world, perturbedPos);
+  Eigen::VectorXd perturbedWorldPos = convertJointSpaceToWorldSpace(
+      world, perturbedPos, bodyNodes, ConvertToSpace::POS_SPATIAL, false);
   Eigen::MatrixXd skelSpatialJac
-      = jointToWorldSpatialJacobian(world->getSkeleton(0));
+      = jointToWorldSpatialJacobian(world->getSkeleton(0), bodyNodes);
   Eigen::VectorXd expectedPerturbation = skelSpatialJac * perturbation;
 
   /*
@@ -1266,20 +1279,18 @@ bool verifyBackpropWorldSpacePositionToSpatial(
             */
 
   Eigen::VectorXd worldPerturbation = perturbedWorldPos - originalWorldPos;
-  Eigen::VectorXd recoveredPerturbation
-      = backpropWorldSpatialToJointSpace(world, worldPerturbation);
+  Eigen::VectorXd recoveredPerturbation = convertJointSpaceToWorldSpace(
+      world, worldPerturbation, bodyNodes, ConvertToSpace::POS_SPATIAL, true);
 
   if (!equals(perturbation, recoveredPerturbation, 1e-8))
   {
-    std::cout << "backpropWorldSpatialToJointSpace() failed!" << std::endl;
-    std::cout << "Original pos: " << std::endl << velocity << std::endl;
-    std::cout << "Perturbed pos: " << std::endl << perturbedPos << std::endl;
-    std::cout << "Original world pos: " << std::endl
-              << originalWorldPos << std::endl;
-    std::cout << "Perturbed world pos: " << std::endl
-              << perturbedWorldPos << std::endl;
-    std::cout << "World perturbation: " << std::endl
-              << worldPerturbation << std::endl;
+    std::cout << "backprop() POS_SPATIAL failed!" << std::endl;
+    Eigen::MatrixXd skelSpatialJac2 = jointToWorldSpatialJacobian(
+        world->getSkeleton(0), world->getSkeleton(0)->getBodyNodes());
+    Eigen::MatrixXd perturbations(worldPerturbation.size(), 2);
+    perturbations << worldPerturbation, expectedPerturbation;
+    std::cout << "World perturbation | expected perturbation: " << std::endl
+              << perturbations << std::endl;
     std::cout << "Recovered perturbation: " << std::endl
               << recoveredPerturbation << std::endl;
     std::cout << "Original perturbation: " << std::endl
@@ -1296,23 +1307,30 @@ bool verifyBackpropWorldSpaceVelocityToSpatial(
   world->setPositions(position);
   world->setVelocities(velocity);
 
-  Eigen::VectorXd originalWorldVel
-      = convertJointSpaceVelocitiesToWorldSpatial(world, velocity);
+  std::vector<dynamics::BodyNode*> bodyNodes = world->getAllBodyNodes();
+
+  // Delete the 2nd body node, arbitrarily, to force some shuffling
+  bodyNodes.erase(bodyNodes.begin()++);
+  // Shuffle the remaining elements
+  std::random_shuffle(bodyNodes.begin(), bodyNodes.end());
+
+  Eigen::VectorXd originalWorldVel = convertJointSpaceToWorldSpace(
+      world, velocity, bodyNodes, ConvertToSpace::VEL_SPATIAL, false);
 
   Eigen::VectorXd perturbation
       = Eigen::VectorXd::Random(position.size()) * 1e-6;
   Eigen::VectorXd perturbedVel = velocity + perturbation;
 
-  Eigen::VectorXd perturbedWorldVel
-      = convertJointSpaceVelocitiesToWorldSpatial(world, perturbedVel);
+  Eigen::VectorXd perturbedWorldVel = convertJointSpaceToWorldSpace(
+      world, perturbedVel, bodyNodes, ConvertToSpace::VEL_SPATIAL, false);
 
   Eigen::VectorXd worldPerturbation = perturbedWorldVel - originalWorldVel;
-  Eigen::VectorXd recoveredPerturbation
-      = backpropWorldSpatialToJointSpace(world, worldPerturbation);
+  Eigen::VectorXd recoveredPerturbation = convertJointSpaceToWorldSpace(
+      world, worldPerturbation, bodyNodes, ConvertToSpace::VEL_SPATIAL, true);
 
   if (!equals(perturbation, recoveredPerturbation, 1e-8))
   {
-    std::cout << "backpropWorldSpatialToJointSpace() failed!" << std::endl;
+    std::cout << "backprop() VEL_SPATIAL failed!" << std::endl;
     std::cout << "Original vel: " << std::endl << velocity << std::endl;
     std::cout << "Perturbed vel: " << std::endl << perturbedVel << std::endl;
     std::cout << "Original world vel: " << std::endl
@@ -1338,15 +1356,21 @@ bool verifyLinearJacobian(
   for (int i = 0; i < world->getNumSkeletons(); i++)
   {
     auto skel = world->getSkeleton(i);
-    Eigen::MatrixXd analytical = jointToWorldLinearJacobian(skel);
+
+    std::vector<dynamics::BodyNode*> bodyNodes
+        = world->getSkeleton(i)->getBodyNodes();
+    // Shuffle the elements
+    std::random_shuffle(bodyNodes.begin(), bodyNodes.end());
+
+    Eigen::MatrixXd analytical = jointToWorldLinearJacobian(skel, bodyNodes);
 
     // Compute a brute force version
     Eigen::VectorXd originalPos = skel->getPositions();
     Eigen::VectorXd originalVel = skel->getVelocities();
-    Eigen::VectorXd originalWorldPos
-        = skelConvertJointSpacePositionsToWorldLinear(skel, originalPos);
-    Eigen::VectorXd originalWorldVel
-        = skelConvertJointSpaceVelocitiesToWorldLinear(skel, originalVel);
+    Eigen::VectorXd originalWorldPos = skelConvertJointSpaceToWorldSpace(
+        skel, originalPos, bodyNodes, ConvertToSpace::POS_LINEAR);
+    Eigen::VectorXd originalWorldVel = skelConvertJointSpaceToWorldSpace(
+        skel, originalVel, bodyNodes, ConvertToSpace::VEL_LINEAR);
     Eigen::MatrixXd bruteForce
         = Eigen::MatrixXd(analytical.rows(), analytical.cols());
     const double EPS = 1e-7;
@@ -1357,11 +1381,13 @@ bool verifyLinearJacobian(
       Eigen::VectorXd perturbedVel = originalVel;
       perturbedVel(j) += EPS;
       Eigen::VectorXd posColumn
-          = (skelConvertJointSpacePositionsToWorldLinear(skel, perturbedPos)
+          = (skelConvertJointSpaceToWorldSpace(
+                 skel, perturbedPos, bodyNodes, ConvertToSpace::POS_LINEAR)
              - originalWorldPos)
             / EPS;
       Eigen::VectorXd velColumn
-          = (skelConvertJointSpaceVelocitiesToWorldLinear(skel, perturbedVel)
+          = (skelConvertJointSpaceToWorldSpace(
+                 skel, perturbedVel, bodyNodes, ConvertToSpace::VEL_LINEAR)
              - originalWorldVel)
             / EPS;
 
@@ -1374,7 +1400,8 @@ bool verifyLinearJacobian(
         // return false;
       }
       bruteForce.block(0, j, bruteForce.rows(), 1)
-          = (skelConvertJointSpacePositionsToWorldLinear(skel, perturbedPos)
+          = (skelConvertJointSpaceToWorldSpace(
+                 skel, perturbedPos, bodyNodes, ConvertToSpace::POS_LINEAR)
              - originalWorldPos)
             / EPS;
     }
@@ -1392,6 +1419,77 @@ bool verifyLinearJacobian(
   return true;
 }
 
+bool verifySpatialJacobian(
+    WorldPtr world, Eigen::VectorXd position, Eigen::VectorXd velocity)
+{
+  world->setPositions(position);
+  world->setVelocities(velocity);
+  for (int i = 0; i < world->getNumSkeletons(); i++)
+  {
+    auto skel = world->getSkeleton(i);
+
+    std::vector<dynamics::BodyNode*> bodyNodes
+        = world->getSkeleton(i)->getBodyNodes();
+    // Shuffle the elements
+    std::random_shuffle(bodyNodes.begin(), bodyNodes.end());
+
+    Eigen::MatrixXd analytical = jointToWorldSpatialJacobian(skel, bodyNodes);
+
+    // Compute a brute force version
+    Eigen::VectorXd originalPos = skel->getPositions();
+    Eigen::VectorXd originalVel = skel->getVelocities();
+    Eigen::VectorXd originalWorldPos = skelConvertJointSpaceToWorldSpace(
+        skel, originalPos, bodyNodes, ConvertToSpace::POS_SPATIAL);
+    Eigen::VectorXd originalWorldVel = skelConvertJointSpaceToWorldSpace(
+        skel, originalVel, bodyNodes, ConvertToSpace::VEL_SPATIAL);
+    Eigen::MatrixXd bruteForce
+        = Eigen::MatrixXd(analytical.rows(), analytical.cols());
+    const double EPS = 1e-7;
+    for (int j = 0; j < skel->getNumDofs(); j++)
+    {
+      Eigen::VectorXd perturbedPos = originalPos;
+      perturbedPos(j) += EPS;
+      Eigen::VectorXd perturbedVel = originalVel;
+      perturbedVel(j) += EPS;
+      Eigen::VectorXd posColumn
+          = (skelConvertJointSpaceToWorldSpace(
+                 skel, perturbedPos, bodyNodes, ConvertToSpace::POS_SPATIAL)
+             - originalWorldPos)
+            / EPS;
+      Eigen::VectorXd velColumn
+          = (skelConvertJointSpaceToWorldSpace(
+                 skel, perturbedVel, bodyNodes, ConvertToSpace::VEL_SPATIAL)
+             - originalWorldVel)
+            / EPS;
+
+      if (!equals(posColumn, velColumn, 1e-4))
+      {
+        std::cout << "Check your assumptions! Column " << j << " pos:\n"
+                  << posColumn << "\nvel:\n"
+                  << velColumn << "\nanalytical:\n"
+                  << analytical.col(j) << "\n";
+        // return false;
+      }
+      bruteForce.block(0, j, bruteForce.rows(), 1)
+          = (skelConvertJointSpaceToWorldSpace(
+                 skel, perturbedPos, bodyNodes, ConvertToSpace::POS_SPATIAL)
+             - originalWorldPos)
+            / EPS;
+    }
+
+    if (!equals(bruteForce, analytical, 1e-6))
+    {
+      std::cout << "jointToWorldSpatialJacobian() is wrong!" << std::endl;
+      std::cout << "Analytical Jac: " << std::endl << analytical << std::endl;
+      std::cout << "Brute force Jac: " << std::endl << bruteForce << std::endl;
+      std::cout << "Diff: " << std::endl
+                << (analytical - bruteForce) << std::endl;
+      return false;
+    }
+  }
+  return true;
+}
+
 bool verifyBackpropWorldSpacePositionToPosition(
     WorldPtr world, Eigen::VectorXd position, Eigen::VectorXd velocity)
 {
@@ -1399,34 +1497,36 @@ bool verifyBackpropWorldSpacePositionToPosition(
   world->setPositions(position);
   world->setVelocities(velocity);
 
-  Eigen::VectorXd originalWorldPos
-      = convertJointSpacePositionsToWorldLinear(world, position);
-  Eigen::VectorXd originalWorldSpatial
-      = convertJointSpacePositionsToWorldSpatial(world, position);
+  std::vector<dynamics::BodyNode*> bodyNodes
+      = world->getSkeleton(0)->getBodyNodes();
+  Eigen::VectorXd originalWorldPos = convertJointSpaceToWorldSpace(
+      world, position, bodyNodes, ConvertToSpace::POS_LINEAR, false);
+  Eigen::VectorXd originalWorldSpatial = convertJointSpaceToWorldSpace(
+      world, position, bodyNodes, ConvertToSpace::POS_SPATIAL, false);
 
   Eigen::VectorXd perturbation
       = Eigen::VectorXd::Random(position.size()) * 1e-4;
   Eigen::VectorXd perturbedPos = position + perturbation;
 
-  Eigen::MatrixXd skelLinearJac
-      = jointToWorldLinearJacobian(world->getSkeleton(0));
+  Eigen::MatrixXd skelLinearJac = jointToWorldLinearJacobian(
+      world->getSkeleton(0), world->getSkeleton(0)->getBodyNodes());
   Eigen::VectorXd expectedPerturbation = skelLinearJac * perturbation;
 
-  Eigen::MatrixXd skelSpatialJac
-      = jointToWorldSpatialJacobian(world->getSkeleton(0));
+  Eigen::MatrixXd skelSpatialJac = jointToWorldSpatialJacobian(
+      world->getSkeleton(0), world->getSkeleton(0)->getBodyNodes());
   Eigen::VectorXd expectedPerturbationSpatial = skelSpatialJac * perturbation;
 
-  Eigen::VectorXd perturbedWorldPos
-      = convertJointSpacePositionsToWorldLinear(world, perturbedPos);
-  Eigen::VectorXd perturbedWorldSpatial
-      = convertJointSpacePositionsToWorldSpatial(world, perturbedPos);
+  Eigen::VectorXd perturbedWorldPos = convertJointSpaceToWorldSpace(
+      world, perturbedPos, bodyNodes, ConvertToSpace::POS_LINEAR, false);
+  Eigen::VectorXd perturbedWorldSpatial = convertJointSpaceToWorldSpace(
+      world, perturbedPos, bodyNodes, ConvertToSpace::POS_SPATIAL, false);
 
   Eigen::VectorXd worldPerturbation = perturbedWorldPos - originalWorldPos;
   Eigen::VectorXd worldPerturbationSpatial
       = perturbedWorldSpatial - originalWorldSpatial;
 
-  Eigen::VectorXd recoveredPerturbation
-      = backpropWorldLinearToJointSpace(world, worldPerturbation);
+  Eigen::VectorXd recoveredPerturbation = convertJointSpaceToWorldSpace(
+      world, worldPerturbation, bodyNodes, ConvertToSpace::POS_LINEAR, true);
 
   Eigen::VectorXd expectedPerturbationFromSpatial
       = Eigen::VectorXd(expectedPerturbationSpatial.size() / 2);
@@ -1453,7 +1553,7 @@ bool verifyBackpropWorldSpacePositionToPosition(
 
   if (!equals(worldPerturbation, expectedPerturbation, 1e-5))
   {
-    std::cout << "backpropWorldSpatialToJointSpace() failed!" << std::endl;
+    std::cout << "backprop() POS_LINEAR failed!" << std::endl;
     std::cout << "Original pos: " << std::endl << position << std::endl;
     std::cout << "Perturbed pos: " << std::endl << perturbedPos << std::endl;
     std::cout << "Original world pos: " << std::endl
@@ -1486,34 +1586,36 @@ bool verifyBackpropWorldSpaceVelocityToPosition(
   world->setPositions(position);
   world->setVelocities(velocity);
 
-  Eigen::VectorXd originalWorldVel
-      = convertJointSpaceVelocitiesToWorldLinear(world, velocity);
-  Eigen::VectorXd originalWorldSpatial
-      = convertJointSpaceVelocitiesToWorldSpatial(world, velocity);
+  std::vector<dynamics::BodyNode*> bodyNodes
+      = world->getSkeleton(0)->getBodyNodes();
+  Eigen::VectorXd originalWorldVel = convertJointSpaceToWorldSpace(
+      world, velocity, bodyNodes, ConvertToSpace::VEL_LINEAR, false);
+  Eigen::VectorXd originalWorldSpatial = convertJointSpaceToWorldSpace(
+      world, velocity, bodyNodes, ConvertToSpace::VEL_SPATIAL, false);
 
   Eigen::VectorXd perturbation
       = Eigen::VectorXd::Random(velocity.size()) * 1e-4;
   Eigen::VectorXd perturbedVel = velocity + perturbation;
 
-  Eigen::MatrixXd skelLinearJac
-      = jointToWorldLinearJacobian(world->getSkeleton(0));
+  Eigen::MatrixXd skelLinearJac = jointToWorldLinearJacobian(
+      world->getSkeleton(0), world->getSkeleton(0)->getBodyNodes());
   Eigen::VectorXd expectedPerturbation = skelLinearJac * perturbation;
 
-  Eigen::MatrixXd skelSpatialJac
-      = jointToWorldSpatialJacobian(world->getSkeleton(0));
+  Eigen::MatrixXd skelSpatialJac = jointToWorldSpatialJacobian(
+      world->getSkeleton(0), world->getSkeleton(0)->getBodyNodes());
   Eigen::VectorXd expectedPerturbationSpatial = skelSpatialJac * perturbation;
 
-  Eigen::VectorXd perturbedWorldVel
-      = convertJointSpaceVelocitiesToWorldLinear(world, perturbedVel);
-  Eigen::VectorXd perturbedWorldSpatial
-      = convertJointSpaceVelocitiesToWorldSpatial(world, perturbedVel);
+  Eigen::VectorXd perturbedWorldVel = convertJointSpaceToWorldSpace(
+      world, perturbedVel, bodyNodes, ConvertToSpace::VEL_LINEAR, false);
+  Eigen::VectorXd perturbedWorldSpatial = convertJointSpaceToWorldSpace(
+      world, perturbedVel, bodyNodes, ConvertToSpace::VEL_SPATIAL, false);
 
   Eigen::VectorXd worldPerturbation = perturbedWorldVel - originalWorldVel;
   Eigen::VectorXd worldPerturbationSpatial
       = perturbedWorldSpatial - originalWorldSpatial;
 
-  Eigen::VectorXd recoveredPerturbation
-      = backpropWorldLinearToJointSpace(world, worldPerturbation);
+  Eigen::VectorXd recoveredPerturbation = convertJointSpaceToWorldSpace(
+      world, worldPerturbation, bodyNodes, ConvertToSpace::VEL_LINEAR, true);
 
   Eigen::VectorXd expectedPerturbationFromSpatial
       = Eigen::VectorXd(expectedPerturbationSpatial.size() / 2);
@@ -1534,7 +1636,7 @@ bool verifyBackpropWorldSpaceVelocityToPosition(
 
   if (!equals(worldPerturbation, expectedPerturbation, 1e-5))
   {
-    std::cout << "backpropWorldSpatialToJointSpace() failed!" << std::endl;
+    std::cout << "backprop() VEL_LINEAR failed!" << std::endl;
     std::cout << "Original vel: " << std::endl << velocity << std::endl;
     std::cout << "Perturbed vel: " << std::endl << perturbedVel << std::endl;
     std::cout << "Original world vel: " << std::endl
@@ -1567,8 +1669,10 @@ bool verifyBackpropWorldSpacePositionToCOM(
   world->setPositions(position);
   world->setVelocities(velocity);
 
-  Eigen::VectorXd originalWorldPos
-      = convertJointSpacePositionsToWorldCOM(world, position);
+  std::vector<dynamics::BodyNode*> bodyNodes
+      = world->getSkeleton(0)->getBodyNodes();
+  Eigen::VectorXd originalWorldPos = convertJointSpaceToWorldSpace(
+      world, position, bodyNodes, ConvertToSpace::COM_POS, false);
 
   Eigen::VectorXd perturbation
       = Eigen::VectorXd::Random(velocity.size()) * 1e-4;
@@ -1577,8 +1681,8 @@ bool verifyBackpropWorldSpacePositionToCOM(
   Eigen::MatrixXd skelLinearJac = world->getSkeleton(0)->getCOMLinearJacobian();
   Eigen::VectorXd expectedPerturbation = skelLinearJac * perturbation;
 
-  Eigen::VectorXd perturbedWorldPos
-      = convertJointSpacePositionsToWorldCOM(world, perturbedPos);
+  Eigen::VectorXd perturbedWorldPos = convertJointSpaceToWorldSpace(
+      world, perturbedPos, bodyNodes, ConvertToSpace::COM_POS, false);
 
   Eigen::VectorXd worldPerturbation = perturbedWorldPos - originalWorldPos;
 
@@ -1610,8 +1714,10 @@ bool verifyBackpropWorldSpaceVelocityToCOMLinear(
   world->setPositions(position);
   world->setVelocities(velocity);
 
-  Eigen::VectorXd originalWorldVel
-      = convertJointSpaceVelocitiesToWorldCOMLinear(world, velocity);
+  std::vector<dynamics::BodyNode*> bodyNodes
+      = world->getSkeleton(0)->getBodyNodes();
+  Eigen::VectorXd originalWorldVel = convertJointSpaceToWorldSpace(
+      world, velocity, bodyNodes, ConvertToSpace::COM_VEL_LINEAR, false);
 
   Eigen::VectorXd perturbation
       = Eigen::VectorXd::Random(velocity.size()) * 1e-4;
@@ -1620,8 +1726,8 @@ bool verifyBackpropWorldSpaceVelocityToCOMLinear(
   Eigen::MatrixXd skelLinearJac = world->getSkeleton(0)->getCOMLinearJacobian();
   Eigen::VectorXd expectedPerturbation = skelLinearJac * perturbation;
 
-  Eigen::VectorXd perturbedWorldVel
-      = convertJointSpaceVelocitiesToWorldCOMLinear(world, perturbedVel);
+  Eigen::VectorXd perturbedWorldVel = convertJointSpaceToWorldSpace(
+      world, perturbedVel, bodyNodes, ConvertToSpace::COM_VEL_LINEAR, false);
 
   Eigen::VectorXd worldPerturbation = perturbedWorldVel - originalWorldVel;
 
@@ -1653,8 +1759,10 @@ bool verifyBackpropWorldSpaceVelocityToCOMSpatial(
   world->setPositions(position);
   world->setVelocities(velocity);
 
-  Eigen::VectorXd originalWorldVel
-      = convertJointSpaceVelocitiesToWorldCOMSpatial(world, velocity);
+  std::vector<dynamics::BodyNode*> bodyNodes
+      = world->getSkeleton(0)->getBodyNodes();
+  Eigen::VectorXd originalWorldVel = convertJointSpaceToWorldSpace(
+      world, velocity, bodyNodes, ConvertToSpace::COM_VEL_SPATIAL, false);
 
   Eigen::VectorXd perturbation
       = Eigen::VectorXd::Random(velocity.size()) * 1e-4;
@@ -1663,8 +1771,8 @@ bool verifyBackpropWorldSpaceVelocityToCOMSpatial(
   Eigen::MatrixXd skelLinearJac = world->getSkeleton(0)->getCOMJacobian();
   Eigen::VectorXd expectedPerturbation = skelLinearJac * perturbation;
 
-  Eigen::VectorXd perturbedWorldVel
-      = convertJointSpaceVelocitiesToWorldCOMSpatial(world, perturbedVel);
+  Eigen::VectorXd perturbedWorldVel = convertJointSpaceToWorldSpace(
+      world, perturbedVel, bodyNodes, ConvertToSpace::COM_VEL_SPATIAL, false);
 
   Eigen::VectorXd worldPerturbation = perturbedWorldVel - originalWorldVel;
 
@@ -1693,6 +1801,8 @@ bool verifyWorldSpaceTransformInstance(
     WorldPtr world, Eigen::VectorXd position, Eigen::VectorXd velocity)
 {
   if (!verifyLinearJacobian(world, position, velocity))
+    return false;
+  if (!verifySpatialJacobian(world, position, velocity))
     return false;
   if (!verifyWorldSpaceToVelocitySpatial(world, position, velocity))
     return false;
@@ -1723,7 +1833,6 @@ bool verifyWorldSpaceTransformInstance(
 
 bool verifyWorldSpaceTransform(WorldPtr world)
 {
-  // Verify that nothing crashes when we run a batch
   int timesteps = 7;
   Eigen::MatrixXd jointPoses
       = Eigen::MatrixXd::Random(world->getNumDofs(), timesteps);
@@ -1737,13 +1846,15 @@ bool verifyWorldSpaceTransform(WorldPtr world)
       return false;
   }
 
-  Eigen::MatrixXd worldPos
-      = convertJointSpacePositionsToWorldLinear(world, jointPoses);
-  Eigen::MatrixXd worldVel
-      = convertJointSpaceVelocitiesToWorldLinear(world, jointVels);
+  // Verify that nothing crashes when we run a batch
+  std::vector<dynamics::BodyNode*> bodyNodes = world->getAllBodyNodes();
+  Eigen::MatrixXd worldPos = convertJointSpaceToWorldSpace(
+      world, jointPoses, bodyNodes, ConvertToSpace::POS_LINEAR, false);
+  Eigen::MatrixXd worldVel = convertJointSpaceToWorldSpace(
+      world, jointVels, bodyNodes, ConvertToSpace::VEL_LINEAR, false);
 
-  Eigen::MatrixXd backprop
-      = backpropWorldLinearToJointSpace(world, worldPos * 5);
+  Eigen::MatrixXd backprop = convertJointSpaceToWorldSpace(
+      world, worldPos * 5, bodyNodes, ConvertToSpace::POS_LINEAR, false, true);
 
   return true;
 }
@@ -2789,6 +2900,11 @@ void testWorldSpace(std::size_t numLinks)
 
   world->addSkeleton(arm);
 
+  SkeletonPtr floor = Skeleton::create("floor");
+  std::pair<WeldJoint*, BodyNode*> floorJointPair
+      = floor->createJointAndBodyNodePair<WeldJoint>(nullptr);
+  world->addSkeleton(floor);
+
   EXPECT_TRUE(verifyWorldSpaceTransform(world));
 }
 
@@ -2847,7 +2963,8 @@ void testSimple3Link()
       /* Body 2 Z */ 0, 0, 0,
       /* Body 3 X */ 0, -1, -1, /* Body 3 Y */ -1, -1, 0,
       /* Body 3 Z */ 0, 0, 0;
-  Eigen::MatrixXd analyticalJac = jointToWorldLinearJacobian(arm);
+  Eigen::MatrixXd analyticalJac
+      = jointToWorldLinearJacobian(arm, arm->getBodyNodes());
 
   if (!equals(analyticalJac, expectedJac, 1e-5))
   {
@@ -2861,6 +2978,8 @@ void testSimple3Link()
   world->addSkeleton(arm);
 
   EXPECT_TRUE(verifyLinearJacobian(
+      world, Eigen::Vector3d::Zero(), Eigen::Vector3d::Zero()));
+  EXPECT_TRUE(verifySpatialJacobian(
       world, Eigen::Vector3d::Zero(), Eigen::Vector3d::Zero()));
 }
 

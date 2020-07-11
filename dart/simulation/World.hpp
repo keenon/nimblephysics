@@ -140,6 +140,13 @@ public:
   /// \return If the skeleton does not exist then return nullptr.
   dynamics::SkeletonPtr getSkeleton(const std::string& _name) const;
 
+  /// Get the index into the total DOFs of the world for this skeleton
+  std::size_t getSkeletonDofOffset(
+      const dynamics::SkeletonPtr& _skeleton) const;
+
+  /// Get all the bodies attached to all the skeletons in this world
+  std::vector<dynamics::BodyNode*> getAllBodyNodes();
+
   /// Get the number of skeletons
   std::size_t getNumSkeletons() const;
 
