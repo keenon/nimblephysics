@@ -1,7 +1,7 @@
 import numpy as np
 import dartpy as dart
 import torch
-from dart_torch import dart_layer, DartTimestepLearnTorque
+from context import dart_torch
 
 
 class MyWorldNode(dart.gui.osg.RealTimeWorldNode):
@@ -12,11 +12,12 @@ class MyWorldNode(dart.gui.osg.RealTimeWorldNode):
         pass
 
 
-def addFreeSphere(world: dart.simulation.World, startPos: np.ndarray, color: np.ndarray):
+def addFreeCube(world: dart.simulation.World, startPos: np.ndarray, color: np.ndarray):
     skel = dart.dynamics.Skeleton()
     joint, body = skel.createTranslationalJoint2DAndBodyNodePair()
     body.setRestitutionCoeff(0.8)
-    shapeNode = body.createShapeNode(dart.dynamics.SphereShape(.1))
+    body.setFrictionCoeff(0)
+    shapeNode = body.createShapeNode(dart.dynamics.BoxShape([.1, .1, .1]))
     shapeNode.createCollisionAspect()
     visual = shapeNode.createVisualAspect()
     visual.setColor(color)
@@ -41,19 +42,10 @@ def main():
     world.setGravity([0, 0, 0])
 
     # Add our main character
-    addFreeSphere(world, [0, 0], [255, 0, 255])
-
-    """
-    # Add blockers
-    addFreeSphere(world, [1, 0], [0, 0, 255])
-    addFreeSphere(world, [1.2, 0.15], [0, 0, 255])
-    addFreeSphere(world, [1.2, -0.15], [0, 0, 255])
-    addFreeSphere(world, [1.4, 0], [0, 0, 255])
-    addFreeSphere(world, [1.4, -0.3], [0, 0, 255])
-    """
+    addFreeCube(world, [0, 0], [255, 0, 255])
 
     # Add our goal
-    addFreeSphere(world, [1.4, 0.05], [0, 255, 0])
+    addFreeCube(world, [1.4, 0.0], [0, 0, 128])
 
     # Set up the view
 
@@ -74,7 +66,7 @@ def main():
 
     start_vel.data[0] = 2.0
 
-    goal_pos = torch.tensor([3.0, 0.8], dtype=torch.float64)
+    goal_pos = torch.tensor([3.0, 0.0], dtype=torch.float64)
     addMarker(world, goal_pos.numpy())
 
     BALL_DOFS = 2
@@ -90,7 +82,7 @@ def main():
         print('Running forward:')
         positions = []
         for i in range(1000):
-            pos, vel = dart_layer(world, pos, vel, zero_torques)
+            pos, vel = dart_torch.dart_layer(world, pos, vel, zero_torques)
             viewer.frame()
 
         if start_vel.grad is not None:

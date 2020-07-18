@@ -23,8 +23,24 @@ def main():
     loader = dart.utils.DartLoader()
     loader.addPackageDirectory("main", "/home/keenon/Desktop/dev/dart/python/neural/examples/data/")
     skel: dart.dynamics.Skeleton = loader.parseSkeleton("package://main/human_one_leg_inv.urdf")
-
     world.addSkeleton(skel)
+
+    """
+    world: dart.simulation.World = loader.parseWorld("package://main/human_one_leg_inv.urdf")
+    world.setGravity([0, 0, -9.81])
+    skel = world.getSkeleton(0)
+    """
+
+    ll = np.array([-0.05, -1.1, -0.05, -1.5])
+    skel.setPositionLowerLimits(ll)
+    ul = np.array([0.6, 1.1, 2.8, 2.2])
+    skel.setPositionUpperLimits(ul)
+    vb = np.array([20.0, 15, 15, 5])
+    skel.setVelocityUpperLimits(vb)
+    skel.setVelocityLowerLimits(-vb)
+    max_forces = np.array([30, 250, 250, 200])
+    skel.setForceUpperLimits(max_forces)
+    skel.setForceLowerLimits(-max_forces)
 
     # Set up the view
 
@@ -39,36 +55,63 @@ def main():
     random.seed(1234)
 
     # Make simulations and backprop run faster by using a bigger timestep
-    world.setTimeStep(1.0 / 240)
+    dt = 1.0 / 240
+    world.setTimeStep(dt)
 
-    while True:
-        viewer.frame()
-        time.sleep(0.003)
-
-    steps = 1000
+    steps = 240
     shooting_length = 10
 
     # Set up initial conditions
-    start_pos = torch.tensor(
-        [random.uniform(-0.3, 0.3),
-            random.uniform(-15, 15) * (3.141 / 180)],
-        dtype=torch.float, requires_grad=False)
-    start_vel = torch.tensor([0, 0], dtype=torch.float, requires_grad=False)
+    start_pos = np.array([0.0, -48.158, 94.737, 77.895]) / 180 * 3.1415
+    start_vel = np.zeros(skel.getNumDofs())
 
     world.setPositions(start_pos)
     world.setVelocities(start_vel)
 
-    # Create the trajectory
-    def step_loss(pos, vel, t, world):
-        return 0  # t.norm()
+    nodes = skel.getBodyNodes()
+    head = skel.getBodyNode(7)
 
-    def final_loss(pos, vel, world):
-        return torch.norm(pos) + torch.norm(vel)
+    # Create the trajectory
+    def eval_loss(tau, pos, vel, world):
+        com_pos = dart_torch.convert_to_world_space_center_of_mass(
+            world, head, pos[:, steps-1])
+        com_vel = dart_torch.convert_to_world_space_center_of_mass_vel_linear(
+            world, head, vel[:, steps-1])
+
+        # Step Loss, as a soft constraint
+        """
+        com_dzs = com_vels[2, :]
+        # Want z_t+1 - z_t >= -g * DT * shooting_length
+        com_next_dzs = torch.roll(com_dzs, 1, 0)
+        diff = com_next_dzs - com_dzs
+        diff -= 9.81 * dt * shooting_length
+        step_loss = torch.sum(torch.exp(diff))
+        """
+
+        # Final Loss
+        com_z = com_pos[2]
+        com_dz = com_vel[2]
+        sign = com_dz.item() / abs(com_dz.item())
+        final_loss = -100 * com_z  # + sign * com_dz * com_dz / (2 * 9.81))
+
+        return final_loss
 
     trajectory = dart_torch.MultipleShootingTrajectory(
-        world, step_loss, final_loss, steps=steps, shooting_length=shooting_length,
-        disable_actuators=[1],
-        tune_starting_point=False, enforce_final_state=np.zeros(4))
+        world, eval_loss, steps=steps, shooting_length=shooting_length,
+        tune_starting_point=False)
+
+    trajectory.create_gui()
+    """
+    while True:
+        trajectory.display_trajectory()
+        time.sleep(0.003)
+    """
+
+    trajectory.compute_hessian = False
+    for i in range(10):
+        trajectory.ipopt(20)
+        trajectory.playback_trajectory()
+        trajectory.display_trajectory()
 
     """
     # Initialize the learnable torques
@@ -130,8 +173,7 @@ def main():
 
     print('Optimization complete! Playing trajectories over and over...')
     while True:
-        trajectory.unroll(use_knots=True, after_step=animate_step)
-        trajectory.unroll(use_knots=False, after_step=animate_step)
+        trajectory.playback_trajectory()
 
 
 if __name__ == "__main__":

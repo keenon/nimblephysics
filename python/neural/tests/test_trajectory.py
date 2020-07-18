@@ -32,8 +32,22 @@ def createCubeTrajectory(
 
     def eval_loss(t, pos, vel, world):
         # DOF x timestep
-        step_loss = torch.sum(t[0, :]*t[0, :]) + torch.sum(t[1, :]*t[1, :])
-        final_loss = torch.norm(pos[:, steps-1]) + torch.norm(vel[:, steps-1])
+        step_loss = 0  # torch.sum(t[0, :]*t[0, :]) + torch.sum(t[1, :]*t[1, :])
+        # final_loss = torch.norm(vel[:, steps-1])  # torch.norm(pos[:, steps-1]) +
+        """
+        final_loss = torch.sum(pos[:, steps-1] * pos[:, steps-1]
+                               ) + torch.sum(vel[:, steps-1] * vel[:, steps-1])
+        """
+        final_loss = pos[0, steps-1] * pos[0, steps-1] + vel[0, steps-1] * vel[0, steps-1]
+        # final_loss = torch.sum(vel[:, steps-1] * vel[:, steps-1])
+        # final_loss = vel[2, steps-1]*vel[2, steps-1]
+        """
+        final_loss = pos[0, steps-1]*pos[0, steps-1]
+        final_loss = pos[0, steps-1]*pos[0, steps-1] + pos[1,
+                                                           steps-1]*pos[1, steps-1] + pos[2, steps-1]*pos[2, steps-1]
+        final_loss = vel[0, steps-1]*vel[0, steps-1] + vel[1,
+                                                           steps-1]*vel[1, steps-1] + vel[2, steps-1]*vel[2, steps-1]
+        """
         return step_loss + final_loss
 
     world.setPositions(np.array([3, 3, 3]))
@@ -42,6 +56,8 @@ def createCubeTrajectory(
         world, eval_loss, steps=steps, shooting_length=shooting_length,
         tune_starting_point=tune_starting_point, enforce_loop=enforce_loop,
         enforce_final_state=enforce_final_state)
+
+    trajectory.knot_poses.data[:, 1] = torch.from_numpy(np.array([1.5, 1.5, 1.5]))
 
     return trajectory, world
 
@@ -321,6 +337,7 @@ class TestMultipleShootingTrajectory(unittest.TestCase):
         self.assertTrue((np.array([0, 1, 0]) == torques).all())
     """
 
+    """
     def test_box_jac_parallel(self):
         trajectory, world = createCubeTrajectory(
             steps=6, shooting_length=3, tune_starting_point=False, enforce_loop=False,
@@ -357,6 +374,115 @@ class TestMultipleShootingTrajectory(unittest.TestCase):
             np.savetxt("parallel.csv", dense_jac_g_par, delimiter=",")
             np.savetxt("serial.csv", dense_jac_g_serial, delimiter=",")
         self.assertTrue(jac_equals.all())
+    """
+
+    """
+    def test_box_grad(self):
+        trajectory, world = createCubeTrajectory(
+            steps=6, shooting_length=3, tune_starting_point=False, enforce_loop=False,
+            enforce_final_state=np.zeros(6))
+        x0 = trajectory.flatten(np.zeros(trajectory.get_flat_problem_dim()))
+
+        n = trajectory.get_flat_problem_dim()
+        m = trajectory.get_constraint_dim()
+
+        grad_f = trajectory.eval_grad_f(x0, np.zeros(n))
+        brute_grad_f = trajectory._eval_brute_force_grad_f(x0, np.zeros(n))
+        grad_l = trajectory._eval_grad_lagrange(x0, np.zeros(m), 1.0)
+
+        grad_equals = np.abs(grad_f - brute_grad_f) < 1e-7
+        if not grad_equals.all():
+            print('grad f(x):\n'+str(grad_f))
+            print('grad l(x):\n'+str(grad_l))
+            print('brute grad f(x):\n'+str(brute_grad_f))
+        self.assertTrue(grad_equals.all())
+    """
+
+    def test_box_h(self):
+        trajectory, world = createCubeTrajectory(
+            steps=6, shooting_length=3, tune_starting_point=False, enforce_loop=False,
+            enforce_final_state=np.zeros(6))
+        x0 = trajectory.flatten(np.zeros(trajectory.get_flat_problem_dim()))
+
+        # Turn on multithreading
+        trajectory.multithread = False
+
+        n = trajectory.get_flat_problem_dim()
+        m = trajectory.get_constraint_dim()
+
+        # Test the Hessian for just the objective function
+
+        # raw_h = trajectory._eval_h_lagrange(x0, np.zeros(m), 1.0)
+        dense_h = trajectory._test_brute_force_h(x0, np.zeros(m), 1.0)
+        main_h = trajectory._test_get_dense_h(x0, np.zeros(m), 1.0)
+
+        threshold = 1e-7
+
+        hess_equals = np.abs(main_h - dense_h) < threshold
+
+        if not hess_equals.all():
+
+            """
+            # Check the individual columns one by one to see where a mismatch happened.
+
+            grad_f = trajectory.eval_grad_f(x0, np.zeros(n))
+            grad_l = trajectory._eval_grad_lagrange(x0, np.zeros(m), 1.0)
+            grad_equals = np.abs(grad_f - grad_l) < threshold
+            if not grad_equals.all():
+                print('grad f(x) vs l(x):')
+                trajectory.debug_flat_compare([grad_f, grad_l], 0)
+            self.assertTrue(grad_equals.all())
+            eps = 1e-8
+            for i in range(n):
+                x_prime = x0.copy()
+                x_prime[i] += eps
+                grad_f_prime = trajectory.eval_grad_f(x_prime, np.zeros(n))
+                grad_l_prime = trajectory._eval_grad_lagrange(x_prime, np.zeros(m), 1.0)
+                grad_prime_equals = np.abs(grad_f_prime - grad_l_prime) < threshold
+                if not grad_prime_equals.all():
+                    print('grad '+str(i)+' f(x) vs l(x):')
+                    trajectory.debug_flat_compare([grad_f_prime, grad_l_prime], threshold)
+
+            # Print the full matrix
+
+            for i in range(n):
+                raw_col = raw_h[:, i]
+                dense_col = dense_h[:, i]
+                col_equals = np.abs(raw_col - dense_col) < threshold
+                if not col_equals.all():
+                    print('col '+str(i)+' fd H(x) vs analytic H(x):')
+                    trajectory.debug_flat_compare([raw_col, dense_col], threshold)
+
+            # print('raw f(x) hess: \n'+str(raw_h))
+            # print('dense f(x) hess: \n'+str(dense_h))
+            # os.remove('./raw_hess.csv')
+            """
+            os.remove('./main_hess.csv')
+            os.remove('./dense_hess.csv')
+
+            np.savetxt("main_hess.csv", main_h, delimiter=",")
+            np.savetxt("dense_hess.csv", dense_h, delimiter=",")
+        self.assertTrue(hess_equals.all())
+
+        # Test the Hessian for each of the individual constraints
+
+        for i in range(m):
+            print('Testing lagrange hessian '+str(i)+'/'+str(m))
+            lagrange = np.zeros(m)
+            lagrange[i] = 1.0
+            # raw_h = trajectory._eval_h_lagrange(x0, lagrange, obj_factor)
+            dense_h = trajectory._test_brute_force_h(x0, lagrange, 0.0)
+            main_h = trajectory._test_get_dense_h(x0, np.zeros(m), 0.0)
+
+            hess_equals = np.abs(main_h - dense_h) < threshold
+
+            if not hess_equals.all():
+                os.remove('./main_hess.csv')
+                os.remove('./dense_hess.csv')
+
+                np.savetxt("main_hess.csv", main_h, delimiter=",")
+                np.savetxt("dense_hess.csv", dense_h, delimiter=",")
+            self.assertTrue(hess_equals.all())
 
     """
     def test_box_jac(self):

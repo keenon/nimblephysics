@@ -24,20 +24,19 @@ def main():
 
     jumpworm = dart.dynamics.Skeleton()
 
-    rootJoint, root = jumpworm.createTranslationalJoint2DAndBodyNodePair()
-    rootJoint.setXYPlane()
+    rootJoint, root = jumpworm.createWeldJointAndBodyNodePair()
     rootShape = root.createShapeNode(dart.dynamics.BoxShape([.1, .1, .1]))
     rootVisual = rootShape.createVisualAspect()
     rootShape.createCollisionAspect()
     rootVisual.setColor([0, 0, 0])
     rootJoint.setForceUpperLimit(0, 0)
     rootJoint.setForceLowerLimit(0, 0)
-    rootJoint.setForceUpperLimit(1, 0)
-    rootJoint.setForceLowerLimit(1, 0)
     rootJoint.setVelocityUpperLimit(0, 1000.0)
     rootJoint.setVelocityLowerLimit(0, -1000.0)
-    rootJoint.setVelocityUpperLimit(1, 1000.0)
-    rootJoint.setVelocityLowerLimit(1, -1000.0)
+
+    rootOffset = dart.math.Isometry3()
+    rootOffset.set_translation([0, -0.525, 0])
+    rootJoint.setTransformFromParentBodyNode(rootOffset)
 
     def createTailSegment(parent, color):
         poleJoint, pole = jumpworm.createRevoluteJointAndBodyNodePair(parent)
@@ -91,7 +90,7 @@ def main():
     tail3 = createTailSegment(tail2, [221.0/255, 193.0/255, 121.0/255])
     # tail4 = createTailSegment(tail3, [226.0/255, 137.0/255, 79.0/255])
 
-    jumpworm.setPositions(np.array([0, 0, 90, 90, 45]) * 3.1415 / 180)
+    jumpworm.setPositions(np.array([-45, 45, 90]) * 3.1415 / 180)
 
     world.addSkeleton(jumpworm)
 
@@ -134,11 +133,10 @@ def main():
         # world_vel = dart_torch.convert_to_world_space_velocities(world, vel)
         # world_pos = dart_torch.convert_to_world_space_positions(world, pos)
 
-        """
-        root_poses = dart_torch.convert_to_world_space_positions_linear(
-            world, root, pos)
-        """
-        loss = - torch.sum(pos[1, :] * pos[1, :] * torch.sign(pos[1, :]))
+        com_vel = dart_torch.convert_to_world_space_center_of_mass_vel_linear(
+            world, tail3, vel[:, steps-1])
+        print(com_vel)
+        loss = - torch.sum(com_vel[1] * com_vel[1] * torch.sign(com_vel[1]))
         return loss
         """
         final_loss = - last_segment_pos[1] * last_segment_pos[1] * torch.sign(last_segment_pos[1])
@@ -154,6 +152,12 @@ def main():
     trajectory = dart_torch.MultipleShootingTrajectory(
         world, eval_loss, steps=steps, shooting_length=shooting_length,
         tune_starting_point=False)
+
+    """
+    trajectory.create_gui()
+    while True:
+        trajectory.display_trajectory()
+    """
 
     """
     # Initialize the learnable torques
@@ -210,7 +214,8 @@ def main():
     trajectory.create_gui()
     trajectory.compute_hessian = False
     for i in range(10):
-        trajectory.ipopt(20)
+        trajectory.ipopt(100)
+        trajectory.playback_trajectory()
         trajectory.display_trajectory()
 
     print('Optimization complete! Playing best found trajectory '+str(trajectory.best_loss)+' over and over...')

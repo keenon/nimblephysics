@@ -22,78 +22,26 @@ def main():
 
     # Set up the 2D cartpole
 
-    jumpworm = dart.dynamics.Skeleton()
+    puck = dart.dynamics.Skeleton()
 
-    rootJoint, root = jumpworm.createTranslationalJoint2DAndBodyNodePair()
-    rootJoint.setXYPlane()
-    rootShape = root.createShapeNode(dart.dynamics.BoxShape([.1, .1, .1]))
-    rootVisual = rootShape.createVisualAspect()
-    rootShape.createCollisionAspect()
-    rootVisual.setColor([0, 0, 0])
-    rootJoint.setForceUpperLimit(0, 0)
-    rootJoint.setForceLowerLimit(0, 0)
-    rootJoint.setForceUpperLimit(1, 0)
-    rootJoint.setForceLowerLimit(1, 0)
+    rootJoint, root = puck.createTranslationalJointAndBodyNodePair()
+    rootJoint.setForceUpperLimit(0, 100)
+    rootJoint.setForceLowerLimit(0, -100)
+    rootJoint.setForceUpperLimit(1, 100)
+    rootJoint.setForceLowerLimit(1, -100)
+    rootJoint.setForceUpperLimit(2, 100)
+    rootJoint.setForceLowerLimit(2, -100)
     rootJoint.setVelocityUpperLimit(0, 1000.0)
     rootJoint.setVelocityLowerLimit(0, -1000.0)
     rootJoint.setVelocityUpperLimit(1, 1000.0)
     rootJoint.setVelocityLowerLimit(1, -1000.0)
 
-    def createTailSegment(parent, color):
-        poleJoint, pole = jumpworm.createRevoluteJointAndBodyNodePair(parent)
-        poleJoint.setAxis([0, 0, 1])
-        poleShape = pole.createShapeNode(dart.dynamics.BoxShape([.05, 0.25, .05]))
-        poleVisual = poleShape.createVisualAspect()
-        poleVisual.setColor(color)
-        poleJoint.setForceUpperLimit(0, 100.0)
-        poleJoint.setForceLowerLimit(0, -100.0)
-        poleJoint.setVelocityUpperLimit(0, 10000.0)
-        poleJoint.setVelocityLowerLimit(0, -10000.0)
+    rootShape = root.createShapeNode(dart.dynamics.BoxShape([.1, .1, .1]))
+    rootVisual = rootShape.createVisualAspect()
+    rootShape.createCollisionAspect()
+    rootVisual.setColor([0, 0, 0])
 
-        poleOffset = dart.math.Isometry3()
-        poleOffset.set_translation([0, -0.125, 0])
-        poleJoint.setTransformFromChildBodyNode(poleOffset)
-
-        poleJoint.setPosition(0, 90 * 3.1415 / 180)
-
-        poleShape.createCollisionAspect()
-
-        if parent != root:
-            childOffset = dart.math.Isometry3()
-            childOffset.set_translation([0, 0.125, 0])
-            poleJoint.setTransformFromParentBodyNode(childOffset)
-        return pole
-
-    """
-/* Color Theme Swatches in Hex */
-.April-Picnic-1-hex { color: #323743; }
-.April-Picnic-2-hex { color: #B6E091; }
-.April-Picnic-3-hex { color: #DFE4A3; }
-.April-Picnic-4-hex { color: #DEC179; }
-.April-Picnic-5-hex { color: #E3894F; }
-
-/* Color Theme Swatches in RGBA */
-.April-Picnic-1-rgba { color: rgba(49, 54, 66, 1); }
-.April-Picnic-2-rgba { color: rgba(182, 223, 144, 1); }
-.April-Picnic-3-rgba { color: rgba(223, 228, 163, 1); }
-.April-Picnic-4-rgba { color: rgba(221, 193, 121, 1); }
-.April-Picnic-5-rgba { color: rgba(226, 137, 79, 1); }
-
-/* Color Theme Swatches in HSLA */
-.April-Picnic-1-hsla { color: hsla(222, 14, 22, 1); }
-.April-Picnic-2-hsla { color: hsla(91, 56, 72, 1); }
-.April-Picnic-3-hsla { color: hsla(64, 54, 76, 1); }
-.April-Picnic-4-hsla { color: hsla(42, 60, 67, 1); }
-.April-Picnic-5-hsla { color: hsla(23, 72, 60, 1); }
-    """
-    tail1 = createTailSegment(root, [182.0/255, 223.0/255, 144.0/255])
-    tail2 = createTailSegment(tail1, [223.0/255, 228.0/255, 163.0/255])
-    tail3 = createTailSegment(tail2, [221.0/255, 193.0/255, 121.0/255])
-    # tail4 = createTailSegment(tail3, [226.0/255, 137.0/255, 79.0/255])
-
-    jumpworm.setPositions(np.array([0, 0, 90, 90, 45]) * 3.1415 / 180)
-
-    world.addSkeleton(jumpworm)
+    world.addSkeleton(puck)
 
     # Floor
 
@@ -101,9 +49,9 @@ def main():
 
     floorJoint, floorBody = floor.createWeldJointAndBodyNodePair()
     floorOffset = dart.math.Isometry3()
-    floorOffset.set_translation([0, -0.7, 0])
+    floorOffset.set_translation([0, -0.125 - 0.05, 0])
     floorJoint.setTransformFromParentBodyNode(floorOffset)
-    floorShape = floorBody.createShapeNode(dart.dynamics.BoxShape([2.5, 0.25, .5]))
+    floorShape = floorBody.createShapeNode(dart.dynamics.BoxShape([2.5, 0.25, 2.5]))
     floorVisual = floorShape.createVisualAspect()
     floorShape.createCollisionAspect()
     floorBody.setFrictionCoeff(0)
@@ -124,8 +72,8 @@ def main():
     # Make simulations repeatable
     random.seed(1234)
 
-    steps = 500
-    shooting_length = 5
+    steps = 1000
+    shooting_length = 10
 
     # Create the trajectory
     def eval_loss(t, pos, vel, world):
@@ -134,16 +82,18 @@ def main():
         # world_vel = dart_torch.convert_to_world_space_velocities(world, vel)
         # world_pos = dart_torch.convert_to_world_space_positions(world, pos)
 
-        """
-        root_poses = dart_torch.convert_to_world_space_positions_linear(
-            world, root, pos)
-        """
-        loss = - torch.sum(pos[1, :] * pos[1, :] * torch.sign(pos[1, :]))
-        return loss
-        """
-        final_loss = - last_segment_pos[1] * last_segment_pos[1] * torch.sign(last_segment_pos[1])
+        last_segment_pos = pos[:, steps-1]
+        """dart_torch.convert_to_world_space_positions_linear(
+            world, root, pos[:, steps-1])"""
+        last_segment_vel = vel[:, steps-1]
+        """dart_torch.convert_to_world_space_velocities_linear(
+            world, root, vel[:, steps-1])"""
+
+        x_offset = 1 - last_segment_pos[0]
+        z_offset = 1 - last_segment_pos[2]
+        final_loss = (x_offset * x_offset) + (z_offset * z_offset) + (
+            last_segment_vel[0] * last_segment_vel[0]) + (last_segment_vel[2] * last_segment_vel[2])
         return step_loss + final_loss
-        """
 
     """
     while True:
@@ -153,6 +103,7 @@ def main():
 
     trajectory = dart_torch.MultipleShootingTrajectory(
         world, eval_loss, steps=steps, shooting_length=shooting_length,
+        disable_actuators=[1],
         tune_starting_point=False)
 
     """
@@ -207,11 +158,20 @@ def main():
         iteration += 1
     """
 
+    """
     trajectory.create_gui()
-    trajectory.compute_hessian = False
-    for i in range(10):
+    trajectory.ipopt(700)
+    """
+
+    trajectory.create_gui()
+    for i in range(40):
         trajectory.ipopt(20)
         trajectory.display_trajectory()
+
+    """
+    for i in range(40):
+        trajectory.display_trajectory()
+    """
 
     print('Optimization complete! Playing best found trajectory '+str(trajectory.best_loss)+' over and over...')
     # trajectory.restore_best_loss()

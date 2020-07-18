@@ -7,6 +7,15 @@ import numpy as np
 import math
 import ipyopt
 from concurrent.futures import ThreadPoolExecutor
+import time
+
+
+class TrajectorWorldNode(dart.gui.osg.RealTimeWorldNode):
+    def __init__(self, world):
+        super(TrajectorWorldNode, self).__init__(world)
+
+    def customPreStep(self):
+        pass
 
 
 class MultipleShootingTrajectory:
@@ -41,18 +50,18 @@ class MultipleShootingTrajectory:
 
         world_dofs = world.getNumDofs()
 
-        self.num_shots = math.floor(steps / shooting_length)
+        self.num_shots = math.ceil(steps / shooting_length)
 
         # Initialize the learnable torques
         self.torques = torch.zeros((world_dofs, steps), dtype=torch.float64, requires_grad=True)
         self.knot_poses = torch.zeros(
             (world_dofs, self.num_shots),
             dtype=torch.float64, requires_grad=True)
-        self.knot_poses.data[:, 0] = torch.from_numpy(world.getPositions())
+        self.knot_poses.data[:, :] = torch.unsqueeze(torch.from_numpy(world.getPositions()), dim=1)
         self.knot_vels = torch.zeros(
             (world_dofs, self.num_shots),
             dtype=torch.float64, requires_grad=True)
-        self.knot_vels.data[:, 0] = torch.from_numpy(world.getVelocities())
+        self.knot_vels.data[:, :] = torch.unsqueeze(torch.from_numpy(world.getVelocities()), dim=1)
         """
         # Initialize knot points
         self.knot_poses = [
@@ -91,7 +100,24 @@ class MultipleShootingTrajectory:
         self.bulk_result_pointer: BulkPassResultPointer = None
 
         # An option flag to turn off multithreading forward and backward passes
-        self.multithread = False
+        self.multithread = True
+
+        # Create a viewer
+        self.viewer: dart.gui.osg.Viewer = None
+        self.keyframe_worlds: List[dart.simulation.World] = []
+
+        # Create a place to store the lagrange mulipliers for IPOPT, so we can restart cleanly
+        self.lower_bound_multipliers = np.zeros(self.get_flat_problem_dim())
+        self.upper_bound_multipliers = np.zeros(self.get_flat_problem_dim())
+        self.constraint_multipliers = np.zeros(self.get_constraint_dim())
+
+        self.best_loss = 10e15
+        self.best_torques = torch.zeros_like(self.torques)
+        self.best_knot_poses = torch.zeros_like(self.knot_poses)
+        self.best_knot_vels = torch.zeros_like(self.knot_vels)
+
+        # An option to compute the Hessian explicitly
+        self.compute_hessian = True
 
     def tensors(self):
         return [self.torques, self.knot_vels, self.knot_poses]
@@ -190,6 +216,12 @@ class MultipleShootingTrajectory:
         self.last_loss = loss
         self.already_run_backwards = False
 
+        if loss.item() < self.best_loss:
+            self.best_loss = loss.item()
+            self.best_torques.copy_(self.torques)  # type: ignore
+            self.best_knot_poses.copy_(self.knot_poses)  # type: ignore
+            self.best_knot_vels.copy_(self.knot_vels)  # type: ignore
+
         return loss, knot_loss
 
     def parallel_unroll(self, compute_knot_loss=False):
@@ -255,7 +287,78 @@ class MultipleShootingTrajectory:
         self.last_loss = loss
         self.already_run_backwards = False
 
+        if loss.item() < self.best_loss:
+            self.best_loss = loss.item()
+            self.best_torques.copy_(self.torques)
+            self.best_knot_poses.copy_(self.knot_poses)
+            self.best_knot_vels.copy_(self.knot_vels)
+
         return loss, knot_loss
+
+    ##############################################################################
+    # Displaying GUI
+    ##############################################################################
+
+    def restore_best_loss(self):
+        self.torques.data.copy_(self.best_torques)
+        self.knot_poses.data.copy_(self.best_knot_poses)
+        self.knot_vels.data.copy_(self.best_knot_vels)
+
+    def create_gui(self):
+        self.viewer = dart.gui.osg.Viewer()
+        self.viewer.setUpViewInWindow(0, 0, 640, 480)
+        self.viewer.setCameraHomePosition([0, 0, 5.0], [0, 0, 0], [0, 0.5, 0])
+        self.viewer.realize()
+
+    def playback_trajectory(self):
+        # Clear out any other stuff we may have in the world
+        for keyframe_world in self.keyframe_worlds:
+            self.viewer.removeWorldNode(keyframe_world)
+        self.viewer.removeWorldNode(self.world)
+
+        # Add our world in
+        self.playback_node = TrajectorWorldNode(self.world)
+        self.viewer.addWorldNode(self.playback_node)
+
+        def animate_step(pos, vel, t):
+            self.viewer.frame()
+            time.sleep(0.003)
+
+        self.unroll(use_knots=True, after_step=animate_step)
+        # self.unroll(use_knots=False, after_step=animate_step)
+
+    def display_trajectory(self):
+        # Clear out any other stuff we may have in the world
+        for keyframe_world in self.keyframe_worlds:
+            self.viewer.removeWorldNode(keyframe_world)
+        self.viewer.removeWorldNode(self.world)
+
+        self.keyframe_worlds = []
+        for i in range(self.num_shots):
+            keyframe_world: dart.simulation.World = self.world.clone()
+
+            # Set the alpha of everything to something lower
+            time_percentage = float(i) / self.num_shots
+            alpha = 0.7 - (time_percentage / 2.0)
+
+            for j in range(keyframe_world.getNumSkeletons()):
+                skel: dart.dynamics.Skeleton = keyframe_world.getSkeleton(j)
+                for k in range(skel.getNumBodyNodes()):
+                    body: dart.dynamics.BodyNode = skel.getBodyNode(k)
+                    for shape in body.getShapeNodes():
+                        if shape.hasVisualAspect():
+                            visualAspect: dart.dynamics.VisualAspect = shape.getVisualAspect()
+                            visualAspect.setAlpha(visualAspect.getAlpha() * alpha)
+
+            keyframe_world.setPositions(self.knot_poses[:, i].detach().numpy())
+            keyframe_world.setVelocities(self.knot_vels[:, i].detach().numpy())
+
+            keyframe_node = TrajectorWorldNode(keyframe_world)
+            self.viewer.addWorldNode(keyframe_node)
+
+            self.keyframe_worlds.append(keyframe_world)
+
+        self.viewer.frame()
 
     ##############################################################################
     # IPOPT logic
@@ -277,7 +380,10 @@ class MultipleShootingTrajectory:
             dims -= 2 * world_dofs
 
         # Remove any variables at the end of the last shot that get cut off because of problem length
-        dims -= (self.steps % self.shooting_length) * world_dofs
+        last_shot_steps = (self.steps % self.shooting_length)
+        if last_shot_steps > 0:
+            dead_steps = self.shooting_length - last_shot_steps
+            dims -= dead_steps * world_dofs
 
         return dims
 
@@ -367,6 +473,38 @@ class MultipleShootingTrajectory:
                 flat_cursor += world_dofs
                 torque_cursor += 1
 
+    def debug_flat_compare(self, xs: List[np.ndarray], threshold=1e-10):
+        """
+        This prints the values of several different flat vectors, labeling each component
+        """
+        world_dofs = self.world.getNumDofs()
+        flat_cursor = 0
+        torque_cursor = 0
+        for i in range(self.num_shots):
+            if i > 0 or self.tune_starting_point:
+                for q in range(world_dofs):
+                    values = [x[flat_cursor + q] for x in xs]
+                    if max(values) - min(values) > threshold:
+                        print(
+                            str(flat_cursor + q)+': knot_pos['+str(i * self.shooting_length)+']['+str(q)+']: '+str(values))
+                flat_cursor += world_dofs
+                for q in range(world_dofs):
+                    values = [x[flat_cursor + q] for x in xs]
+                    if max(values) - min(values) > threshold:
+                        print(
+                            str(flat_cursor + q)+': knot_vel['+str(i * self.shooting_length)+']['+str(q)+']: '+str(values))
+                flat_cursor += world_dofs
+
+            shot_length = min(self.shooting_length, self.steps - torque_cursor)
+            for j in range(shot_length):
+                for q in range(world_dofs):
+                    values = [x[flat_cursor + q] for x in xs]
+                    if max(values) - min(values) > threshold:
+                        print(
+                            str(flat_cursor + q)+': torques['+str(torque_cursor)+']['+str(q)+']: '+str(values))
+                flat_cursor += world_dofs
+                torque_cursor += 1
+
     def get_knot_x_offsets(self):
         """
         This returns a set of offset pointers into the x vector for each knot
@@ -389,6 +527,22 @@ class MultipleShootingTrajectory:
             flat_cursor += shot_length * world_dofs
 
         return knot_offsets
+
+    def get_knot_x_lengths(self):
+        n = self.get_flat_problem_dim()
+        knot_offsets = self.get_knot_x_offsets()
+        lengths = []
+        for i in range(len(knot_offsets)):
+            if knot_offsets[i] is None or i == 0:
+                lengths.append(0)
+            else:
+                next_offset = 0
+                if i+1 < len(knot_offsets):
+                    next_offset = knot_offsets[i+1]
+                else:
+                    next_offset = n
+                lengths.append(next_offset - knot_offsets[i])
+        return lengths
 
     def get_knot_g_offsets(self):
         """
@@ -555,7 +709,7 @@ class MultipleShootingTrajectory:
             This computes a full Jacobian relating the whole shot to the error at this knot-point (last_knot_index + 1)
             """
             start_index = last_knot_index * self.shooting_length
-            end_index_exclusive = (last_knot_index + 1) * self.shooting_length
+            end_index_exclusive = min((last_knot_index + 1) * self.shooting_length, self.steps)
             if self.multithread and self.bulk_result_pointer is not None and len(
                     self.bulk_result_pointer.backwardPassResult.knotJacobians) > 0:
                 # We can use the pre-computed Jacobians! Hooray :)
@@ -812,6 +966,108 @@ class MultipleShootingTrajectory:
 
         return (np.array(row), np.array(col))
 
+    def get_h_sparsity_indices(self):
+        """
+        Returns the array of indices for the sparse Hessian. This is just block-diagonal with each
+        shot getting its own independent Hessian.
+        """
+        rows: List[int] = []
+        cols: List[int] = []
+
+        world_dofs = self.world.getNumDofs()
+        n = self.get_flat_problem_dim()
+
+        knot_x_offsets = self.get_knot_x_offsets()
+        knot_x_length = self.get_knot_x_lengths()
+
+        for i in range(self.num_shots):
+            shot_length = knot_x_length[i]
+            if shot_length == 0:
+                continue
+            # Organize as column-major to make finite-differencing easier
+            for col in range(knot_x_offsets[i], knot_x_offsets[i] + shot_length):
+                for row in range(knot_x_offsets[i], knot_x_offsets[i] + shot_length):
+                    rows.append(row)
+                    cols.append(col)
+
+        return (np.array(rows), np.array(cols))
+
+    def eval_h(self, x: np.ndarray, lagrange: np.ndarray, obj_factor: float, out: np.ndarray):
+        """
+        This evaluates the Hessian, in the block diagonal sparsity structure
+        """
+        rows: List[int] = []
+        cols: List[int] = []
+
+        world_dofs = self.world.getNumDofs()
+        n = self.get_flat_problem_dim()
+
+        knot_x_offsets = self.get_knot_x_offsets()
+        knot_x_length = self.get_knot_x_lengths()
+        hess_offsets = []
+        hess_cursor = 0
+        for i in range(self.num_shots):
+            hess_offsets.append(hess_cursor)
+            hess_cursor += knot_x_length[i] * knot_x_length[i]
+        jac_rows, jac_cols = self.get_jac_g_sparsity_indices()
+
+        block_size = max(knot_x_length)
+
+        eps = 1e-12
+
+        grad_f = self.eval_grad_f(x, np.zeros(n))
+        jac_g = self.eval_jac_g(x, np.zeros(len(jac_rows)))
+
+        # We do all the shots in parallel, so our outer iteration is just over the point into the knots
+        # that we're going to perturb. Each knot is independent for the Hessian, so we can finite
+        # difference all the knots in the same place at the same time, and get meaningful results.
+        for q in range(block_size):
+            diff = np.zeros_like(x)
+            for i in range(self.num_shots):
+                if knot_x_offsets[i] is None:
+                    continue
+                offset = knot_x_offsets[i] + q
+                if offset < n:
+                    diff[offset] = eps
+
+            x_prime = x + diff
+            x_prime_minus = x - diff
+
+            # Compute the gradients in two passes, with cacheing
+
+            grad_f_prime = self.eval_grad_f(x_prime, np.zeros(n))
+            jac_g_prime = self.eval_jac_g(x_prime, np.zeros(len(jac_rows)))
+            grad_f_prime_minus = self.eval_grad_f(x_prime_minus, np.zeros(n))
+            jac_g_prime_minus = self.eval_jac_g(x_prime_minus, np.zeros(len(jac_rows)))
+
+            # Compute Hess(f(x)) with finite-differencing
+
+            grad_diff = obj_factor * (grad_f_prime - grad_f_prime_minus) / (2 * eps)
+
+            # Compute Hess(g(x)) with finite-differencing
+
+            jac_g_diff = np.zeros(n)
+            for j in range(len(jac_rows)):
+                row = jac_rows[j]
+                col = jac_cols[j]
+                # row -> variable in g (sum over these)
+                # col -> variable in x
+                grad_g_elem = (jac_g_prime[j] - jac_g_prime_minus[j]) / (2 * eps)
+                jac_g_diff[col] += grad_g_elem * lagrange[row]
+
+            # Reassemble our vector into the sparse output
+
+            for i in range(self.num_shots):
+                if knot_x_offsets[i] is None:
+                    continue
+                col_len = knot_x_length[i]
+                hess_col_offset = hess_offsets[i] + (q * col_len)
+                grad_f_col = grad_diff[knot_x_offsets[i]:knot_x_offsets[i]+col_len]
+                jac_g_col = jac_g_diff[knot_x_offsets[i]:knot_x_offsets[i]+col_len]
+                out[hess_col_offset:hess_col_offset+col_len] = grad_f_col + jac_g_col
+
+        return out
+
     def _test_get_dense_jac_g(self, x: np.ndarray):
         """
         This computes the dense version of the Jac of g(x).
@@ -823,6 +1079,21 @@ class MultipleShootingTrajectory:
         dense = np.zeros((m, n))
         rows, cols = self.get_jac_g_sparsity_indices()
         values = self.eval_jac_g(x, np.zeros(len(rows)))
+        for i in range(len(values)):
+            dense[rows[i]][cols[i]] = values[i]
+        return dense
+
+    def _test_get_dense_h(
+            self, x: np.ndarray, lagrange: np.ndarray, obj_factor: float):
+        """
+        This computes the dense version of the Jac of g(x).
+
+        You shouldn't need this, except for testing.
+        """
+        n = self.get_flat_problem_dim()
+        dense = np.zeros((n, n))
+        rows, cols = self.get_h_sparsity_indices()
+        values = self.eval_h(x, lagrange, obj_factor, np.zeros(len(rows)))
         for i in range(len(values)):
             dense[rows[i]][cols[i]] = values[i]
         return dense
@@ -880,14 +1151,119 @@ class MultipleShootingTrajectory:
 
     def _eval_brute_force_grad_f(self, x: np.ndarray, out: np.ndarray):
         n = self.get_flat_problem_dim()
-        eps = 1e-6
+        eps = 1e-7
         f = self.eval_f(x)
         for i in range(n):
             x_prime = x.copy()
             x_prime[i] += eps
             f_prime = self.eval_f(x_prime)
-            f_diff = (f_prime - f) / eps
+            x_prime_minus = x.copy()
+            x_prime_minus[i] -= eps
+            f_prime_minus = self.eval_f(x_prime_minus)
+            f_diff = (f_prime - f_prime_minus) / (2 * eps)
             out[i] = f_diff
+        self.unflatten(x)
+        return out
+
+    def _brute_force_h_sparsity(self):
+        n = self.get_flat_problem_dim()
+
+        rows = []
+        cols = []
+        for row in range(n):
+            for col in range(n):
+                rows.append(row)
+                cols.append(col)
+
+        return (np.array(rows), np.array(cols))
+
+    def _eval_brute_force_h(
+            self, x: np.ndarray, lagrange: np.ndarray, obj_factor: float, out: np.ndarray):
+        rows, cols = self._brute_force_h_sparsity()
+        brute = self._test_brute_force_h(x, lagrange, obj_factor)
+        assert len(out) == len(rows)
+        for i in range(len(out)):
+            out[i] = brute[rows[i]][cols[i]]
+        assert not np.isnan(out).any()
+        return out
+
+    def _test_brute_force_h(self, x: np.ndarray, lagrange: np.ndarray, obj_factor: float):
+        n = self.get_flat_problem_dim()
+        eps = 1e-6
+        jac_rows, jac_cols = self.get_jac_g_sparsity_indices()
+        grad_f = self.eval_grad_f(x, np.zeros(n))
+        jac_g = self.eval_jac_g(x, np.zeros(len(jac_rows)))
+        out = np.ndarray((n, n))
+        print('attempting to brute force H:')
+        for i in range(n):
+            if i % 250 == 0:
+                print('  test '+str(i)+'/'+str(n)+'')
+            x_prime = x.copy()
+            x_prime[i] += eps
+            grad_f_prime = self.eval_grad_f(x_prime, np.zeros(n))
+            jac_g_prime = self.eval_jac_g(x_prime, np.zeros(len(jac_rows)))
+            x_prime_minus = x.copy()
+            x_prime_minus[i] -= eps
+            grad_f_prime_minus = self.eval_grad_f(x_prime_minus, np.zeros(n))
+            jac_g_prime_minus = self.eval_jac_g(x_prime_minus, np.zeros(len(jac_rows)))
+            grad_f_diff = obj_factor * (grad_f_prime - grad_f_prime_minus) / (2 * eps)
+            # grad_f_diff = obj_factor * (grad_f_prime - grad_f) / eps
+            jac_g_diff = np.zeros(n)
+            for j in range(len(jac_rows)):
+                row = jac_rows[j]
+                col = jac_cols[j]
+                # row -> variable in g (sum over these)
+                # col -> variable in x
+                grad_g_elem = (jac_g_prime[j] - jac_g_prime_minus[j]) / (2 * eps)
+                jac_g_diff[col] += grad_g_elem * lagrange[row]
+            out[:, i] = grad_f_diff + jac_g_diff
+
+        """
+        # Add small values to the diagonal to prevent singular-ness
+        for i in range(n):
+            out[i, i] += 1e-6
+        """
+
+        self.unflatten(x)
+
+        return out
+
+    def _eval_lagrange(self, x: np.ndarray, lagrange: np.ndarray, obj_factor: float):
+        m = self.get_constraint_dim()
+        f = self.eval_f(x)
+        g = self.eval_g(x, np.zeros(m))
+        return (obj_factor * f) + sum([lagrange[i] * g[i] for i in range(m)])
+
+    def _eval_grad_lagrange(self, x: np.ndarray, lagrange: np.ndarray, obj_factor: float):
+        n = self.get_flat_problem_dim()
+        eps = 1e-6
+        out = np.ndarray(n)
+        dual = self._eval_lagrange(x, lagrange, obj_factor)
+        for i in range(n):
+            x_prime = x.copy()
+            x_prime[i] += eps
+            dual_prime = self._eval_lagrange(x_prime, lagrange, obj_factor)
+            # out[i] = (dual_prime - dual) / eps
+            x_prime_minus = x.copy()
+            x_prime_minus[i] -= eps
+            dual_prime_minus = self._eval_lagrange(x_prime_minus, lagrange, obj_factor)
+            out[i] = (dual_prime - dual_prime_minus) / (eps * 2)
+        self.unflatten(x)
+        return out
+
+    def _eval_h_lagrange(self, x: np.ndarray, lagrange: np.ndarray, obj_factor: float):
+        n = self.get_flat_problem_dim()
+        eps = 1e-6
+        grad_l = self._eval_grad_lagrange(x, lagrange, obj_factor)
+        out = np.ndarray((n, n))
+        for i in range(n):
+            x_prime = x.copy()
+            x_prime[i] += eps
+            grad_l_prime = self._eval_grad_lagrange(x_prime, lagrange, obj_factor)
+            x_prime_minus = x.copy()
+            x_prime_minus[i] -= eps
+            grad_l_prime_minus = self._eval_grad_lagrange(x_prime_minus, lagrange, obj_factor)
+            out[:, i] = (grad_l_prime - grad_l_prime_minus) / (2 * eps)
         self.unflatten(x)
         return out
 
@@ -896,7 +1272,7 @@ class MultipleShootingTrajectory:
         This uses IPOPT to try to get the bounds really tight on the knot points
         """
         n = self.get_flat_problem_dim()
-        eps = 0  # 1e-6
+        eps = 0  # 1e-8
 
         lower_bounds = self.flatten(np.zeros(n), 'lower_bound')
         upper_bounds = self.flatten(np.zeros(n), 'upper_bound')
@@ -910,6 +1286,7 @@ class MultipleShootingTrajectory:
         constraint_lower_bounds = np.array([-eps] * num_constraints)
 
         jac_g_sparsity_indices = self.get_jac_g_sparsity_indices()
+        h_sparsity_indices = self.get_h_sparsity_indices()
 
         def eval_f(x: np.ndarray):
             try:
@@ -939,17 +1316,37 @@ class MultipleShootingTrajectory:
                 print('ERROR when IPOPT was evaluating our Jacobian of g(x)!')
                 print(e)
 
-        nlp = ipyopt.Problem(
-            n, lower_bounds, upper_bounds, num_constraints, constraint_lower_bounds,
-            constraint_upper_bounds, jac_g_sparsity_indices, 0,
-            eval_f, eval_grad_f, eval_g, eval_jac_g)
+        def eval_h(x: np.ndarray, lagrange: np.ndarray, obj_factor: float, out: np.ndarray):
+            try:
+                return self.eval_h(x, lagrange, obj_factor, out)
+            except Exception as e:
+                print('ERROR when IPOPT was evaluating our Hessian of f(x)!')
+                print(e)
+
+        if self.compute_hessian:
+            nlp = ipyopt.Problem(
+                n, lower_bounds, upper_bounds, num_constraints, constraint_lower_bounds,
+                constraint_upper_bounds, jac_g_sparsity_indices, h_sparsity_indices,
+                eval_f, eval_grad_f, eval_g, eval_jac_g, eval_h)
+            # nlp.set(print_level=7)
+        else:
+            nlp = ipyopt.Problem(
+                n, lower_bounds, upper_bounds, num_constraints, constraint_lower_bounds,
+                constraint_upper_bounds, jac_g_sparsity_indices, 0,
+                eval_f, eval_grad_f, eval_g, eval_jac_g)
         nlp.set(max_iter=max_iter)
+        # nlp.set(halt_on_ampl_error='yes')
 
         x0 = self.flatten(np.zeros(n), 'state')
         eval_jac_g(x0, np.zeros(len(jac_g_sparsity_indices[0])))
 
         print("Going to call IPOPT solve")
-        _x, loss, status = nlp.solve(x0)
+        if self.compute_hessian:
+            _x, loss, status = nlp.solve(x0, mult_g=self.constraint_multipliers,
+                                         mult_x_L=self.lower_bound_multipliers,
+                                         mult_x_U=self.upper_bound_multipliers)
+        else:
+            _x, loss, status = nlp.solve(x0)
         print("IPOPT finished with final loss "+str(loss)+", "+str(status))
         self.unflatten(_x)
 

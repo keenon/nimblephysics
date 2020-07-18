@@ -113,6 +113,14 @@
 		</visual>
 	</link>
 
+	<link name="world">
+	</link>
+
+	<joint name="right_toe_root" type="fixed">
+		<parent link="world"/>
+		<child link="right_toe"/>
+	</joint>
+
 	<joint name="right_toe" type="continuous">
 		<parent link="right_toe"/>
 		<child link="right_foot"/>

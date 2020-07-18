@@ -20,13 +20,15 @@ def main():
     world = dart.simulation.World()
     world.setGravity([0, -9.81, 0])
 
+    box = dart.dynamics.BoxShape(np.array([.1, .1, .1]))
+
     # Set up the 2D cartpole
 
     jumpworm = dart.dynamics.Skeleton()
 
     rootJoint, root = jumpworm.createTranslationalJoint2DAndBodyNodePair()
     rootJoint.setXYPlane()
-    rootShape = root.createShapeNode(dart.dynamics.BoxShape([.1, .1, .1]))
+    rootShape = root.createShapeNode(dart.dynamics.BoxShape(np.array([.1, .1, .1])))
     rootVisual = rootShape.createVisualAspect()
     rootShape.createCollisionAspect()
     rootVisual.setColor([0, 0, 0])
@@ -42,9 +44,6 @@ def main():
     def createTailSegment(parent, color):
         poleJoint, pole = jumpworm.createRevoluteJointAndBodyNodePair(parent)
         poleJoint.setAxis([0, 0, 1])
-        poleShape = pole.createShapeNode(dart.dynamics.BoxShape([.05, 0.25, .05]))
-        poleVisual = poleShape.createVisualAspect()
-        poleVisual.setColor(color)
         poleJoint.setForceUpperLimit(0, 100.0)
         poleJoint.setForceLowerLimit(0, -100.0)
         poleJoint.setVelocityUpperLimit(0, 10000.0)
@@ -56,6 +55,9 @@ def main():
 
         poleJoint.setPosition(0, 90 * 3.1415 / 180)
 
+        poleShape = pole.createShapeNode(dart.dynamics.BoxShape([.05, 0.25, .05]))
+        poleVisual = poleShape.createVisualAspect()
+        poleVisual.setColor(color)
         poleShape.createCollisionAspect()
 
         if parent != root:
@@ -101,126 +103,48 @@ def main():
 
     floorJoint, floorBody = floor.createWeldJointAndBodyNodePair()
     floorOffset = dart.math.Isometry3()
-    floorOffset.set_translation([0, -0.7, 0])
+    floorOffset.set_translation([0, -0.6, 0])
     floorJoint.setTransformFromParentBodyNode(floorOffset)
+
     floorShape = floorBody.createShapeNode(dart.dynamics.BoxShape([2.5, 0.25, .5]))
     floorVisual = floorShape.createVisualAspect()
     floorShape.createCollisionAspect()
+
     floorBody.setFrictionCoeff(0)
 
     world.addSkeleton(floor)
 
     # Set up the view
 
-    """
     node = MyWorldNode(world)
     viewer = dart.gui.osg.Viewer()
     viewer.addWorldNode(node)
     viewer.setUpViewInWindow(0, 0, 640, 480)
     viewer.setCameraHomePosition([0, 0, 5.0], [0, 0, 0], [0, 0.5, 0])
     viewer.realize()
-    """
 
-    # Make simulations repeatable
-    random.seed(1234)
+    positions = torch.zeros(world.getNumDofs(), requires_grad=True)
 
-    steps = 500
-    shooting_length = 5
+    optimizer = torch.optim.SGD([positions], lr=0.05)
 
-    # Create the trajectory
-    def eval_loss(t, pos, vel, world):
-        # DOF x timestep
-        step_loss = 0  # torch.sum(t[0, :]*t[0, :]) + torch.sum(t[1, :]*t[1, :])
-        # world_vel = dart_torch.convert_to_world_space_velocities(world, vel)
-        # world_pos = dart_torch.convert_to_world_space_positions(world, pos)
-
-        """
-        root_poses = dart_torch.convert_to_world_space_positions_linear(
-            world, root, pos)
-        """
-        loss = - torch.sum(pos[1, :] * pos[1, :] * torch.sign(pos[1, :]))
-        return loss
-        """
-        final_loss = - last_segment_pos[1] * last_segment_pos[1] * torch.sign(last_segment_pos[1])
-        return step_loss + final_loss
-        """
-
-    """
+    dt = 1.0 / 50
+    clock = 0
     while True:
-        viewer.frame()
-        time.sleep(0.003)
-    """
-
-    trajectory = dart_torch.MultipleShootingTrajectory(
-        world, eval_loss, steps=steps, shooting_length=shooting_length,
-        tune_starting_point=False)
-
-    """
-    # Initialize the learnable torques
-    torques = [torch.tensor([0], dtype=torch.float, requires_grad=True)
-               for _ in range(steps)]
-    # Initialize knot points
-    knot_point_vel = [torch.tensor([0, 0], dtype=torch.float, requires_grad=True)
-                      for _ in range(num_shots)]
-    knot_point_pos = [torch.tensor([0, 0], dtype=torch.float, requires_grad=True)
-                      for _ in range(num_shots)]
-
-    optimizer = torch.optim.Adam(torques + knot_point_vel + knot_point_pos, lr=0.1)
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=50, gamma=0.5)
-    stepped = False
-    """
-
-    """
-    optimizer = torch.optim.Adam(trajectory.tensors(), lr=0.1)
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=50, gamma=0.5)
-
-    knot_weight = 100
-
-    def animate_step(pos, vel, t):
-        viewer.frame()
-        time.sleep(0.003)
-
-    # Run cartpole simulations
-    iteration = 0
-    for i in range(201):
-        loss, knot_loss = trajectory.unroll(
-            after_step=(animate_step if iteration % 100 == 0 and iteration > 0 else None))
-
-        # Show a trajectory without the knot points
-        if iteration % 100 == 0 and iteration > 0:
-            trajectory.unroll(use_knots=False, after_step=animate_step)
-            knot_weight *= 10
-
-        # Zero the accumulated grad
         optimizer.zero_grad()
+        last_segment_pos = dart_torch.convert_to_world_space_positions_linear(
+            world, tail3, positions)
 
-        # Run the backprop
-        print('Iteration '+str(iteration)+' loss: '+str(loss.item())+', knot loss: '+str(knot_loss.item()))
-
-        l = loss + (knot_loss * iteration)
+        diff = last_segment_pos[0] - math.sin(clock) * 2
+        l = diff * diff + (last_segment_pos[1] * last_segment_pos[1])
 
         l.backward()
 
         optimizer.step()
-        scheduler.step()
 
-        iteration += 1
-    """
-
-    trajectory.create_gui()
-    trajectory.compute_hessian = False
-    for i in range(10):
-        trajectory.ipopt(20)
-        trajectory.display_trajectory()
-
-    print('Optimization complete! Playing best found trajectory '+str(trajectory.best_loss)+' over and over...')
-    # trajectory.restore_best_loss()
-    while True:
-        trajectory.playback_trajectory()
-        """
-        trajectory.unroll(use_knots=True, after_step=animate_step)
-        trajectory.unroll(use_knots=False, after_step=animate_step)
-        """
+        world.setPositions(positions.detach().numpy())
+        viewer.frame()
+        time.sleep(dt)
+        clock += dt
 
 
 if __name__ == "__main__":
