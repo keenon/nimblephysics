@@ -586,6 +586,92 @@ std::size_t World::getNumDofs()
 }
 
 //==============================================================================
+std::size_t World::getLinkCOMDims()
+{
+  std::size_t count = 0;
+  for (dynamics::SkeletonPtr skel : mSkeletons)
+  {
+    count += skel->getLinkCOMDims();
+  }
+  return count;
+}
+
+//==============================================================================
+std::size_t World::getLinkMOIDims()
+{
+  std::size_t count = 0;
+  for (dynamics::SkeletonPtr skel : mSkeletons)
+  {
+    count += skel->getLinkMOIDims();
+  }
+  return count;
+}
+
+//==============================================================================
+std::size_t World::getLinkMassesDims()
+{
+  std::size_t count = 0;
+  for (dynamics::SkeletonPtr skel : mSkeletons)
+  {
+    count += skel->getLinkMassesDims();
+  }
+  return count;
+}
+
+//==============================================================================
+std::size_t World::getNumBodyNodes()
+{
+  std::size_t count = 0;
+  for (dynamics::SkeletonPtr skel : mSkeletons)
+  {
+    count += skel->getNumBodyNodes();
+  }
+  return count;
+}
+
+//==============================================================================
+Eigen::VectorXd World::getLinkCOMs()
+{
+  Eigen::VectorXd coms = Eigen::VectorXd(getLinkCOMDims());
+  std::size_t cursor = 0;
+  for (std::size_t i = 0; i < mSkeletons.size(); i++)
+  {
+    std::size_t dims = mSkeletons[i]->getLinkCOMDims();
+    coms.segment(cursor, dims) = mSkeletons[i]->getLinkCOMs();
+    cursor += dims;
+  }
+  return coms;
+}
+
+//==============================================================================
+Eigen::VectorXd World::getLinkMOIs()
+{
+  Eigen::VectorXd mois = Eigen::VectorXd(getLinkMOIDims());
+  std::size_t cursor = 0;
+  for (std::size_t i = 0; i < mSkeletons.size(); i++)
+  {
+    std::size_t dims = mSkeletons[i]->getLinkMOIDims();
+    mois.segment(cursor, dims) = mSkeletons[i]->getLinkMOIs();
+    cursor += dims;
+  }
+  return mois;
+}
+
+//==============================================================================
+Eigen::VectorXd World::getLinkMasses()
+{
+  Eigen::VectorXd inertias = Eigen::VectorXd(getLinkMassesDims());
+  std::size_t cursor = 0;
+  for (std::size_t i = 0; i < mSkeletons.size(); i++)
+  {
+    std::size_t dims = mSkeletons[i]->getLinkMassesDims();
+    inertias.segment(cursor, dims) = mSkeletons[i]->getLinkMasses();
+    cursor += dims;
+  }
+  return inertias;
+}
+
+//==============================================================================
 Eigen::VectorXd World::getPositions()
 {
   Eigen::VectorXd positions = Eigen::VectorXd(mDofs);
@@ -608,6 +694,20 @@ Eigen::VectorXd World::getVelocities()
   {
     std::size_t dofs = mSkeletons[i]->getNumDofs();
     velocities.segment(cursor, dofs) = mSkeletons[i]->getVelocities();
+    cursor += dofs;
+  }
+  return velocities;
+}
+
+//==============================================================================
+Eigen::VectorXd World::getAccelerations()
+{
+  Eigen::VectorXd velocities = Eigen::VectorXd(mDofs);
+  std::size_t cursor = 0;
+  for (std::size_t i = 0; i < mSkeletons.size(); i++)
+  {
+    std::size_t dofs = mSkeletons[i]->getNumDofs();
+    velocities.segment(cursor, dofs) = mSkeletons[i]->getAccelerations();
     cursor += dofs;
   }
   return velocities;
@@ -736,6 +836,18 @@ void World::setVelocities(Eigen::VectorXd velocity)
 }
 
 //==============================================================================
+void World::setAccelerations(Eigen::VectorXd accelerations)
+{
+  std::size_t cursor = 0;
+  for (std::size_t i = 0; i < mSkeletons.size(); i++)
+  {
+    std::size_t dofs = mSkeletons[i]->getNumDofs();
+    mSkeletons[i]->setAccelerations(accelerations.segment(cursor, dofs));
+    cursor += dofs;
+  }
+}
+
+//==============================================================================
 void World::setForces(Eigen::VectorXd forces)
 {
   std::size_t cursor = 0;
@@ -817,6 +929,58 @@ void World::setVelocityLowerLimits(Eigen::VectorXd limits)
     mSkeletons[i]->setVelocityLowerLimits(limits.segment(cursor, dofs));
     cursor += dofs;
   }
+}
+
+//==============================================================================
+void World::setLinkCOMs(Eigen::VectorXd coms)
+{
+  std::size_t cursor = 0;
+  for (std::size_t i = 0; i < mSkeletons.size(); i++)
+  {
+    std::size_t dims = mSkeletons[i]->getLinkCOMDims();
+    mSkeletons[i]->setLinkCOMs(coms.segment(cursor, dims));
+    cursor += dims;
+  }
+}
+
+//==============================================================================
+void World::setLinkMOIs(Eigen::VectorXd mois)
+{
+  std::size_t cursor = 0;
+  for (std::size_t i = 0; i < mSkeletons.size(); i++)
+  {
+    std::size_t dims = mSkeletons[i]->getLinkMOIDims();
+    mSkeletons[i]->setLinkMOIs(mois.segment(cursor, dims));
+    cursor += dims;
+  }
+}
+
+//==============================================================================
+void World::setLinkMasses(Eigen::VectorXd masses)
+{
+  std::size_t cursor = 0;
+  for (std::size_t i = 0; i < mSkeletons.size(); i++)
+  {
+    std::size_t dims = mSkeletons[i]->getLinkMassesDims();
+    mSkeletons[i]->setLinkMasses(masses.segment(cursor, dims));
+    cursor += dims;
+  }
+}
+
+//==============================================================================
+Eigen::VectorXd World::getCoriolisAndGravityAndExternalForces()
+{
+  Eigen::VectorXd result = Eigen::VectorXd::Zero(getNumDofs());
+  std::size_t cursor = 0;
+  for (std::size_t i = 0; i < getNumSkeletons(); i++)
+  {
+    std::shared_ptr<dynamics::Skeleton> skel = getSkeleton(i);
+    std::size_t dofs = skel->getNumDofs();
+    result.segment(cursor, dofs)
+        = skel->getCoriolisAndGravityForces() - skel->getExternalForces();
+    cursor += dofs;
+  }
+  return result;
 }
 
 //==============================================================================

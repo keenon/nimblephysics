@@ -612,6 +612,27 @@ public:
   // skeleton
   Eigen::VectorXd getVelocityLowerLimits();
 
+  /// Returns the size of the getLinkCOMs() vector
+  std::size_t getLinkCOMDims();
+
+  /// Returns the size of the getLinkMOIs() vector
+  std::size_t getLinkMOIDims();
+
+  /// Returns the size of the getMasses() vector
+  std::size_t getLinkMassesDims();
+
+  // This gets all the inertia center-of-mass vectors for all the links in this
+  // skeleton concatenated together
+  Eigen::VectorXd getLinkCOMs();
+
+  // This gets all the inertia moment-of-inertia paremeters for all the links in
+  // this skeleton concatenated together
+  Eigen::VectorXd getLinkMOIs();
+
+  // This returns a vector of all the link masses for all the links in this
+  // skeleton concatenated into a flat vector.
+  Eigen::VectorXd getLinkMasses();
+
   // Sets the upper limits of all the joints from a single vector
   void setForceUpperLimits(Eigen::VectorXd limits);
 
@@ -629,6 +650,18 @@ public:
 
   // Sets the lower limits of all the joints from a single vector
   void setVelocityLowerLimits(Eigen::VectorXd limits);
+
+  // This sets all the inertia center-of-mass vectors for all the links in this
+  // skeleton concatenated together
+  void setLinkCOMs(Eigen::VectorXd coms);
+
+  // This sets all the inertia moment-of-inertia paremeters for all the links in
+  // this skeleton concatenated together
+  void setLinkMOIs(Eigen::VectorXd mois);
+
+  // This returns a vector of all the link masses for all the links in this
+  // skeleton concatenated into a flat vector.
+  void setLinkMasses(Eigen::VectorXd masses);
 
   //----------------------------------------------------------------------------
   // Integration and finite difference

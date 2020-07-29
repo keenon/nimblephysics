@@ -65,7 +65,9 @@ ConstraintSolver::ConstraintSolver(double timeStep)
     mCollisionGroup(mCollisionDetector->createCollisionGroupAsSharedPtr()),
     mCollisionOption(collision::CollisionOption(
         true, 1000u, std::make_shared<collision::BodyNodeCollisionFilter>())),
-    mTimeStep(timeStep)
+    mTimeStep(timeStep),
+    mGradientEnabled(false), // Default to no gradients
+    mPenetrationCorrectionEnabled(true)
 {
   assert(timeStep > 0.0);
 
@@ -76,9 +78,6 @@ ConstraintSolver::ConstraintSolver(double timeStep)
   // TODO(JS): Consider using FCL's primitive shapes once FCL addresses
   // incorrect contact point computation.
   // (see: https://github.com/flexible-collision-library/fcl/issues/106)
-
-  // Default to no gradients
-  mGradientEnabled = false;
 }
 
 //==============================================================================
@@ -408,6 +407,18 @@ void ConstraintSolver::setGradientEnabled(bool enabled)
 }
 
 //==============================================================================
+void ConstraintSolver::setPenetrationCorrectionEnabled(bool enable)
+{
+  mPenetrationCorrectionEnabled = enable;
+}
+
+//==============================================================================
+bool ConstraintSolver::getPenetrationCorrectionEnabled()
+{
+  return mPenetrationCorrectionEnabled;
+}
+
+//==============================================================================
 bool ConstraintSolver::containSkeleton(const ConstSkeletonPtr& _skeleton) const
 {
   assert(
@@ -532,8 +543,8 @@ void ConstraintSolver::updateConstraints()
     }
     else
     {
-      mContactConstraints.push_back(
-          std::make_shared<ContactConstraint>(contact, mTimeStep));
+      mContactConstraints.push_back(std::make_shared<ContactConstraint>(
+          contact, mTimeStep, mPenetrationCorrectionEnabled));
     }
   }
 

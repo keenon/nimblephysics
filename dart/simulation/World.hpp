@@ -192,6 +192,18 @@ public:
   /// Returns the sum of all the dofs of all the skeletons in this world
   std::size_t getNumDofs();
 
+  /// Returns the size of the getLinkCOMs() vector
+  std::size_t getLinkCOMDims();
+
+  /// Returns the size of the getLinkMoments() vector
+  std::size_t getLinkMOIDims();
+
+  /// Returns the size of the getMasses() vector
+  std::size_t getLinkMassesDims();
+
+  /// Returns the size of the getLinkMasses() vector
+  std::size_t getNumBodyNodes();
+
   /// Gets the position of all the skeletons in the world concatenated together
   /// as a single vector
   Eigen::VectorXd getPositions();
@@ -199,6 +211,10 @@ public:
   /// Gets the velocity of all the skeletons in the world concatenated together
   /// as a single vector
   Eigen::VectorXd getVelocities();
+
+  /// Gets the acceleration of all the skeletons in the world concatenated
+  /// together as a single vector
+  Eigen::VectorXd getAccelerations();
 
   /// Gets the torques of all the skeletons in the world concatenated together
   /// as a single vector
@@ -228,6 +244,18 @@ public:
   // world
   Eigen::VectorXd getVelocityLowerLimits();
 
+  // This gets all the inertia matrices for all the links in all the skeletons
+  // in the world mapped into a flat vector.
+  Eigen::VectorXd getLinkCOMs();
+
+  // This gets all the inertia moment-of-inertia paremeters for all the links in
+  // all the skeletons in this world concatenated together
+  Eigen::VectorXd getLinkMOIs();
+
+  // This returns a vector of all the link masses for all the skeletons in the
+  // world concatenated into a flat vector.
+  Eigen::VectorXd getLinkMasses();
+
   /// Sets the position of all the skeletons in the world from a single
   /// concatenated state vector
   void setPositions(Eigen::VectorXd position);
@@ -235,6 +263,10 @@ public:
   /// Sets the velocities of all the skeletons in the world from a single
   /// concatenated state vector
   void setVelocities(Eigen::VectorXd velocity);
+
+  /// Sets the accelerations of all the skeletons in the world from a single
+  /// concatenated state vector
+  void setAccelerations(Eigen::VectorXd acceleration);
 
   /// Sets the forces of all the skeletons in the world from a single
   /// concatenated state vector
@@ -257,6 +289,21 @@ public:
 
   // Sets the lower limits of all the joints from a single vector
   void setVelocityLowerLimits(Eigen::VectorXd limits);
+
+  // This sets all the inertia matrices for all the links in all the skeletons
+  // in the world mapped into a flat vector.
+  void setLinkCOMs(Eigen::VectorXd coms);
+
+  // This sets all the inertia moment-of-inertia paremeters for all the links in
+  // all the skeletons in this world concatenated together
+  void setLinkMOIs(Eigen::VectorXd mois);
+
+  // This returns a vector of all the link masses for all the skeletons in the
+  // world concatenated into a flat vector.
+  void setLinkMasses(Eigen::VectorXd masses);
+
+  /// This gives the C(pos, vel) vector for all the skeletons in the world
+  Eigen::VectorXd getCoriolisAndGravityAndExternalForces();
 
   /// This constructs a mass matrix for the whole world, by creating a
   /// block-diagonal concatenation of each skeleton's mass matrix.

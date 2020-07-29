@@ -40,11 +40,19 @@ public:
   ConstrainedGroupGradientMatrices(
       constraint::ConstrainedGroup& group, double timeStep);
 
+  /// This is a constructor for test mocks
+  ConstrainedGroupGradientMatrices(
+      int numDofs, int numConstraintDim, double timeStep);
+
   /// This gets called during the setup of the ConstrainedGroupGradientMatrices
   /// at each constraint. This must be called before constructMatrices(), and
   /// must be called exactly once for each constraint.
   void registerConstraint(
       const std::shared_ptr<constraint::ConstraintBase>& constraint);
+
+  /// This mocks registering a constaint. Useful for testing.
+  void mockRegisterConstraint(
+      double restitutionCoeff, double penetrationHackVel);
 
   /// This gets called during the setup of the ConstrainedGroupGradientMatrices
   /// at each constraint's dimension. It gets called _after_ the system has
@@ -56,17 +64,28 @@ public:
       const std::shared_ptr<constraint::ConstraintBase>& constraint,
       std::size_t constraintIndex);
 
+  /// This mocks measuring a constraint impulse. Useful for testing.
+  void mockMeasureConstraintImpulse(
+      Eigen::VectorXd impulseTest, Eigen::VectorXd massedImpulseTest);
+
   /// This gets called during the setup of the ConstrainedGroupGradientMatrices
-  /// after the LCP has run, with the result from the LCP solver. This can only
-  /// be called once, and after this is called you cannot call
-  /// measureConstraintImpulse() again!
-  void constructMatrices(
+  /// after the LCP has run, with the result from the LCP solver.
+  void registerLCPResults(
       Eigen::VectorXd mX,
       Eigen::VectorXd hi,
       Eigen::VectorXd lo,
       Eigen::VectorXi fIndex,
       Eigen::VectorXd b,
       Eigen::VectorXd aColNorms);
+
+  /// This gets called by constructMatrices()
+  void deduplicateConstraints();
+
+  /// This gets called during the setup of the ConstrainedGroupGradientMatrices
+  /// after registerLCPResults(). This can only
+  /// be called once, and after this is called you cannot call
+  /// measureConstraintImpulse() again!
+  void constructMatrices();
 
   /// This computes and returns the whole vel-vel jacobian for this group. For
   /// backprop, you don't actually need this matrix, you can compute backprop
@@ -219,6 +238,8 @@ protected:
   /// These are the offsets into the total degrees of freedom for each skeleton
   std::unordered_map<std::string, std::size_t> mSkeletonOffset;
 
+  /// These are public to enable unit testing
+public:
   /// This holds the coefficient of restitution for each constraint on this
   /// group.
   std::vector<double> mRestitutionCoeffs;
@@ -226,6 +247,14 @@ protected:
   /// This holds the penetration correction velocities for each constraint in
   /// this group.
   std::vector<double> mPenetrationCorrectionVelocities;
+
+  /// These are all the values from the LCP
+  Eigen::VectorXd mX;
+  Eigen::VectorXd mHi;
+  Eigen::VectorXd mLo;
+  Eigen::VectorXi mFIndex;
+  Eigen::VectorXd mB;
+  Eigen::VectorXd mAColNorms;
 
   /// This holds the outputs of the impulse tests we run to create the
   /// constraint matrices. We shuffle these vectors into the columns of

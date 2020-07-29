@@ -390,13 +390,14 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(ConstrainedGroup& group)
 
   if (group.getGradientConstraintMatrices())
   {
-    group.getGradientConstraintMatrices()->constructMatrices(
+    group.getGradientConstraintMatrices()->registerLCPResults(
         mX,
         hiGradientBackup,
         loGradientBackup,
         fIndexGradientBackup,
         bGradientBackup,
         aColNormGradientBackup);
+    group.getGradientConstraintMatrices()->constructMatrices();
   }
 }
 

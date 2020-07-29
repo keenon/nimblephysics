@@ -1711,6 +1711,68 @@ Eigen::VectorXd Skeleton::getVelocityLowerLimits()
 }
 
 //==============================================================================
+std::size_t Skeleton::getLinkCOMDims()
+{
+  return 3 * getNumBodyNodes();
+}
+
+//==============================================================================
+std::size_t Skeleton::getLinkMOIDims()
+{
+  return 6 * getNumBodyNodes();
+}
+
+//==============================================================================
+std::size_t Skeleton::getLinkMassesDims()
+{
+  return getNumBodyNodes();
+}
+
+//==============================================================================
+Eigen::VectorXd Skeleton::getLinkCOMs()
+{
+  Eigen::VectorXd inertias = Eigen::VectorXd::Zero(getLinkCOMDims());
+  std::size_t cursor = 0;
+  for (std::size_t i = 0; i < getNumBodyNodes(); i++)
+  {
+    const Inertia& inertia = getBodyNode(i)->getInertia();
+    inertias(cursor++) = inertia.COM_X;
+    inertias(cursor++) = inertia.COM_Y;
+    inertias(cursor++) = inertia.COM_Z;
+  }
+  return inertias;
+}
+
+//==============================================================================
+Eigen::VectorXd Skeleton::getLinkMOIs()
+{
+  Eigen::VectorXd inertias = Eigen::VectorXd::Zero(getLinkMOIDims());
+  std::size_t cursor = 0;
+  for (std::size_t i = 0; i < getNumBodyNodes(); i++)
+  {
+    const Inertia& inertia = getBodyNode(i)->getInertia();
+    inertias(cursor++) = inertia.I_XX;
+    inertias(cursor++) = inertia.I_YY;
+    inertias(cursor++) = inertia.I_ZZ;
+    inertias(cursor++) = inertia.I_XY;
+    inertias(cursor++) = inertia.I_XZ;
+    inertias(cursor++) = inertia.I_YZ;
+  }
+  return inertias;
+}
+
+//==============================================================================
+Eigen::VectorXd Skeleton::getLinkMasses()
+{
+  Eigen::VectorXd masses = Eigen::VectorXd::Zero(getLinkMassesDims());
+  for (std::size_t i = 0; i < getNumBodyNodes(); i++)
+  {
+    masses(i) = getBodyNode(i)->getMass();
+  }
+  return masses;
+}
+
+//==============================================================================
 void Skeleton::setForceUpperLimits(Eigen::VectorXd limits)
 {
   for (std::size_t i = 0; i < getNumDofs(); i++)
@@ -1761,6 +1823,68 @@ void Skeleton::setVelocityLowerLimits(Eigen::VectorXd limits)
   for (std::size_t i = 0; i < getNumDofs(); i++)
   {
     getDof(i)->setVelocityLowerLimit(limits[i]);
+  }
+}
+
+//==============================================================================
+void Skeleton::setLinkCOMs(Eigen::VectorXd coms)
+{
+  std::size_t cursor = 0;
+  for (std::size_t i = 0; i < getNumBodyNodes(); i++)
+  {
+    const Inertia& inertia = getBodyNode(i)->getInertia();
+    double COM_X = coms(cursor++);
+    double COM_Y = coms(cursor++);
+    double COM_Z = coms(cursor++);
+    Inertia newInertia(
+        inertia.MASS,
+        COM_X,
+        COM_Y,
+        COM_Z,
+        inertia.I_XX,
+        inertia.I_YY,
+        inertia.I_ZZ,
+        inertia.I_XY,
+        inertia.I_XZ,
+        inertia.I_YZ);
+    getBodyNode(i)->setInertia(newInertia);
+  }
+}
+
+//==============================================================================
+void Skeleton::setLinkMOIs(Eigen::VectorXd mois)
+{
+  std::size_t cursor = 0;
+  for (std::size_t i = 0; i < getNumBodyNodes(); i++)
+  {
+    const Inertia& inertia = getBodyNode(i)->getInertia();
+    double I_XX = mois(cursor++);
+    double I_YY = mois(cursor++);
+    double I_ZZ = mois(cursor++);
+    double I_XY = mois(cursor++);
+    double I_XZ = mois(cursor++);
+    double I_YZ = mois(cursor++);
+    Inertia newInertia(
+        inertia.MASS,
+        inertia.COM_X,
+        inertia.COM_Y,
+        inertia.COM_Z,
+        I_XX,
+        I_YY,
+        I_ZZ,
+        I_XY,
+        I_XZ,
+        I_YZ);
+    getBodyNode(i)->setInertia(newInertia);
+  }
+}
+
+//==============================================================================
+void Skeleton::setLinkMasses(Eigen::VectorXd masses)
+{
+  for (std::size_t i = 0; i < getNumBodyNodes(); i++)
+  {
+    getBodyNode(i)->setMass(masses(i));
   }
 }
 

@@ -190,6 +190,12 @@ public:
 
   bool getGradientEnabled();
 
+  /// True by default. Sets whether or not to apply artifical "penetration
+  /// correction" forces to objects that inter-penetrate.
+  void setPenetrationCorrectionEnabled(bool enable);
+
+  bool getPenetrationCorrectionEnabled();
+
 protected:
   // TODO(JS): Docstring
   virtual void solveConstrainedGroup(ConstrainedGroup& group) = 0;
@@ -268,6 +274,9 @@ protected:
 
   /// The type of gradients we want to use for backprop
   bool mGradientEnabled;
+
+  /// True if we want to enable artificial penetration correction forces
+  bool mPenetrationCorrectionEnabled;
 };
 
 } // namespace constraint

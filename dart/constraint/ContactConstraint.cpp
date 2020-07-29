@@ -64,9 +64,12 @@ double ContactConstraint::mConstraintForceMixing = DART_CFM;
 
 //==============================================================================
 ContactConstraint::ContactConstraint(
-    collision::Contact& contact, double timeStep)
+    collision::Contact& contact,
+    double timeStep,
+    bool penetrationCorrectionEnabled)
   : ConstraintBase(),
     mTimeStep(timeStep),
+    mPenetrationCorrectionEnabled(penetrationCorrectionEnabled),
     mBodyNodeA(const_cast<dynamics::ShapeFrame*>(
                    contact.collisionObject1->getShapeFrame())
                    ->asShapeNode()
@@ -391,6 +394,12 @@ void ContactConstraint::getInformation(ConstraintInfo* info)
         bouncingVelocity = mMaxErrorReductionVelocity;
     }
 
+    // Penetration correction can be disabled here
+    if (!mPenetrationCorrectionEnabled)
+    {
+      bouncingVelocity = 0;
+    }
+
     // At this point, the bouncing velocity is exactly due to the penetration
     // correction hack saying "bouncing" should be non-zero.
     mPenetrationCorrectionVelocity = bouncingVelocity;
@@ -455,6 +464,12 @@ void ContactConstraint::getInformation(ConstraintInfo* info)
       bouncingVelocity *= mErrorReductionParameter * info->invTimeStep;
       if (bouncingVelocity > mMaxErrorReductionVelocity)
         bouncingVelocity = mMaxErrorReductionVelocity;
+    }
+
+    // Penetration correction can be disabled here
+    if (!mPenetrationCorrectionEnabled)
+    {
+      bouncingVelocity = 0;
     }
 
     // At this point, the bouncing velocity is exactly due to the penetration

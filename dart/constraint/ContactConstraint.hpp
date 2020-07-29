@@ -51,7 +51,10 @@ class ContactConstraint : public ConstraintBase
 {
 public:
   /// Constructor
-  ContactConstraint(collision::Contact& contact, double timeStep);
+  ContactConstraint(
+      collision::Contact& contact,
+      double timeStep,
+      bool penetrationCorrectionEnabled);
 
   /// Destructor
   ~ContactConstraint() override = default;
@@ -188,6 +191,9 @@ private:
 
   /// Whether this contact is self-collision.
   bool mIsSelfCollision;
+
+  /// Whether to enable penetration correction forces.
+  bool mPenetrationCorrectionEnabled;
 
   /// Local body jacobians for mBodyNode1
   Eigen::Matrix<double, 6, Eigen::Dynamic> mSpatialNormalA;

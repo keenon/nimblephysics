@@ -50,6 +50,19 @@ ConstrainedGroupGradientMatrices::ConstrainedGroupGradientMatrices(
   }
 
   mImpulseTests.reserve(mNumConstraintDim);
+  mMassedImpulseTests.reserve(mNumConstraintDim);
+}
+
+//==============================================================================
+ConstrainedGroupGradientMatrices::ConstrainedGroupGradientMatrices(
+    int numDofs, int numConstraintDim, double timeStep)
+{
+  mNumDOFs = numDofs;
+  mNumConstraintDim = numConstraintDim;
+  mTimeStep = timeStep;
+
+  mImpulseTests.reserve(mNumConstraintDim);
+  mMassedImpulseTests.reserve(mNumConstraintDim);
 }
 
 //==============================================================================
@@ -70,6 +83,14 @@ void ConstrainedGroupGradientMatrices::registerConstraint(
     mRestitutionCoeffs.push_back(0);
     mPenetrationCorrectionVelocities.push_back(0);
   }
+}
+
+//==============================================================================
+void ConstrainedGroupGradientMatrices::mockRegisterConstraint(
+    double restitutionCoeff, double penetrationHackVel)
+{
+  mRestitutionCoeffs.push_back(restitutionCoeff);
+  mPenetrationCorrectionVelocities.push_back(penetrationHackVel);
 }
 
 //==============================================================================
@@ -129,20 +150,172 @@ void ConstrainedGroupGradientMatrices::measureConstraintImpulse(
 }
 
 //==============================================================================
-/// This gets called during the setup of the ConstrainedGroupGradientMatrices
-/// after the LCP has run, with the result from the LCP solver. This can only
-/// be called once, and after this is called you cannot call
-/// measureConstraintImpulse() again!
-void ConstrainedGroupGradientMatrices::constructMatrices(
-    Eigen::VectorXd mX,
+void ConstrainedGroupGradientMatrices::mockMeasureConstraintImpulse(
+    Eigen::VectorXd impulseTest, Eigen::VectorXd massedImpulseTest)
+{
+  mMassedImpulseTests.push_back(massedImpulseTest);
+  mImpulseTests.push_back(impulseTest);
+}
+
+//==============================================================================
+void ConstrainedGroupGradientMatrices::registerLCPResults(
+    Eigen::VectorXd X,
     Eigen::VectorXd hi,
     Eigen::VectorXd lo,
     Eigen::VectorXi fIndex,
     Eigen::VectorXd b,
     Eigen::VectorXd aColNorms)
 {
+  mX = X;
+  mHi = hi;
+  mLo = lo;
+  mFIndex = fIndex;
+  mB = b;
+  mAColNorms = aColNorms;
+}
+
+//==============================================================================
+void ConstrainedGroupGradientMatrices::deduplicateConstraints()
+{
+  // Build the merge groups
+
+  const double MERGE_THRESHOLD = 0.01;
+
+  int* mergeGroup = new int[mNumConstraintDim];
+  for (int i = 0; i < mNumConstraintDim; i++)
+  {
+    mergeGroup[i] = -1;
+  }
+
+  int groupCursor = 0;
+
+  for (int i = 0; i < mNumConstraintDim; i++)
+  {
+    // Merge with the first neighbor who is near enough
+    for (int j = 0; j < i; j++)
+    {
+      double distance = (mImpulseTests[i] - mImpulseTests[j]).squaredNorm();
+      if (distance < MERGE_THRESHOLD)
+      {
+        mergeGroup[i] = mergeGroup[j];
+        break;
+      }
+    }
+
+    // If we didn't find a group to merge into, then form a new group
+
+    if (mergeGroup[i] == -1)
+    {
+      mergeGroup[i] = groupCursor;
+      groupCursor++;
+    }
+  }
+
+  // We have:
+  //
+  // mNumConstraintDim - the number of constraints we currently have
+  //
+  // mX - impulses at each constraint
+  // mHi - upper bound at each constraint
+  // mLo - lower bound at each constraint
+  // mFIndex - pointer for each constraint for friction bound, or -1
+  // mB - offset at each constraint
+  // mAColNorms - norms of each constraints' col of A
+  //
+  // mImpulseTests - impulse test for each constraint
+  // mMassedImpulseTests - Minv * impulse test for each constraint
+  // mPenetrationCorrectionVelocities - Penetration hack val for each constraint
+  // mRestitutionCoeffs - Restitution coefficients for each constraint
+
+  int newNumConstraintDim = groupCursor;
+  Eigen::VectorXd newX = Eigen::VectorXd::Zero(newNumConstraintDim);
+  Eigen::VectorXd newHi = Eigen::VectorXd::Zero(newNumConstraintDim);
+  Eigen::VectorXd newLo = Eigen::VectorXd::Zero(newNumConstraintDim);
+  Eigen::VectorXd newB = Eigen::VectorXd::Zero(newNumConstraintDim);
+  Eigen::VectorXd newAColNorms = Eigen::VectorXd::Zero(newNumConstraintDim);
+
+  Eigen::VectorXi newFIndex = Eigen::VectorXi::Zero(newNumConstraintDim);
+
+  std::vector<Eigen::VectorXd> newImpulseTests;
+  std::vector<Eigen::VectorXd> newMassedImpulseTests;
+  std::vector<double> newPenetrationCorrectionVelocities;
+  std::vector<double> newRestitutionCoeffs;
+
+  for (int i = 0; i < newNumConstraintDim; i++)
+  {
+    int groupCount = 0;
+
+    Eigen::VectorXd impulseTest = Eigen::VectorXd::Zero(mNumDOFs);
+    Eigen::VectorXd massedImpulseTest = Eigen::VectorXd::Zero(mNumDOFs);
+    double penetrationCorrectionVelocity = 0.0;
+    double restitutionCoeff = 0.0;
+
+    for (int j = 0; j < mNumConstraintDim; j++)
+    {
+      if (mergeGroup[j] == i)
+      {
+        groupCount++;
+        newX(i) += mX(j);
+        newHi(i) += mHi(j);
+        newLo(i) += mLo(j);
+        newB(i) += mB(j);
+        newAColNorms(i) += mAColNorms(j);
+
+        newFIndex(i) = mFIndex(j);
+        if (newFIndex(i) >= 0)
+        {
+          newFIndex(i) = mergeGroup[newFIndex(i)];
+        }
+
+        impulseTest += mImpulseTests[j];
+        massedImpulseTest += mMassedImpulseTests[j];
+
+        penetrationCorrectionVelocity += mPenetrationCorrectionVelocities[j];
+        restitutionCoeff += mRestitutionCoeffs[j];
+      }
+    }
+
+    newHi(i) /= groupCount;
+    newLo(i) /= groupCount;
+    newAColNorms(i) /= groupCount;
+    impulseTest /= groupCount;
+    massedImpulseTest /= groupCount;
+    penetrationCorrectionVelocity /= groupCount;
+    restitutionCoeff /= groupCount;
+
+    newImpulseTests.push_back(impulseTest);
+    newMassedImpulseTests.push_back(massedImpulseTest);
+    newPenetrationCorrectionVelocities.push_back(penetrationCorrectionVelocity);
+    newRestitutionCoeffs.push_back(restitutionCoeff);
+  }
+
+  // Set our new values
+
+  mNumConstraintDim = newNumConstraintDim;
+  mX = newX;
+  mHi = newHi;
+  mLo = newLo;
+  mB = newB;
+  mAColNorms = newAColNorms;
+  mFIndex = newFIndex;
+  mImpulseTests = newImpulseTests;
+  mMassedImpulseTests = newMassedImpulseTests;
+  mPenetrationCorrectionVelocities = newPenetrationCorrectionVelocities;
+  mRestitutionCoeffs = newRestitutionCoeffs;
+
+  delete mergeGroup;
+}
+
+//==============================================================================
+/// This gets called during the setup of the ConstrainedGroupGradientMatrices
+/// after the LCP has run, with the result from the LCP solver. This can only
+/// be called once, and after this is called you cannot call
+/// measureConstraintImpulse() again!
+void ConstrainedGroupGradientMatrices::constructMatrices()
+{
+  deduplicateConstraints();
   mContactConstraintImpulses = mX;
-  mContactConstraintMappings = fIndex;
+  mContactConstraintMappings = mFIndex;
   // Group the constraints based on their solution values into three buckets:
   //
   // - "Clamping": These are constraints that have non-zero constraint forces
@@ -188,7 +361,7 @@ void ConstrainedGroupGradientMatrices::constructMatrices(
     // effects like calling a constraint force that's perpendicular to the
     // degrees of freedom of the skeleton getting set to UPPER_BOUND or
     // CLAMPING.
-    const double constraintActionNorm = aColNorms(j);
+    const double constraintActionNorm = mAColNorms(j);
     if (constraintActionNorm < 1e-9)
     {
       mContactConstraintMappings(j) = neural::ConstraintMapping::NOT_CLAMPING;
@@ -201,11 +374,11 @@ void ConstrainedGroupGradientMatrices::constructMatrices(
     }
 
     const double constraintForce = mX(j);
-    const double relativeVelocity = b(j);
+    const double relativeVelocity = mB(j);
 
-    double upperBound = hi(j);
-    double lowerBound = lo(j);
-    const int fIndexPointer = fIndex(j);
+    double upperBound = mHi(j);
+    double lowerBound = mLo(j);
+    const int fIndexPointer = mFIndex(j);
     if (fIndexPointer != -1)
     {
       upperBound *= mX(fIndexPointer);
@@ -323,8 +496,8 @@ void ConstrainedGroupGradientMatrices::constructMatrices(
     if (mContactConstraintMappings(j) >= 0) // means we're an UPPER_BOUND
     {
       const int fIndexPointer = mContactConstraintMappings(j);
-      const double upperBound = mX(fIndexPointer) * hi(j);
-      const double lowerBound = mX(fIndexPointer) * lo(j);
+      const double upperBound = mX(fIndexPointer) * mHi(j);
+      const double lowerBound = mX(fIndexPointer) * mLo(j);
 
       assert(
           mContactConstraintMappings(fIndexPointer)
@@ -337,15 +510,15 @@ void ConstrainedGroupGradientMatrices::constructMatrices(
         {
           std::cout << "Lower bound: " << lowerBound << std::endl;
           std::cout << "Upper bound: " << upperBound << std::endl;
-          std::cout << "mHi(j = " << j << "): " << hi(j) << std::endl;
-          std::cout << "mLo(j = " << j << "): " << lo(j) << std::endl;
+          std::cout << "mHi(j = " << j << "): " << mHi(j) << std::endl;
+          std::cout << "mLo(j = " << j << "): " << mLo(j) << std::endl;
           std::cout << "mX(j = " << j << "): " << mX(j) << std::endl;
           std::cout << "fIndex: " << fIndexPointer << std::endl;
         }
         assert(std::abs(mX(j) - upperBound) < 1e-2);
         mUpperBoundMappingMatrix(
             upperBoundIndex[j], clampingIndex[fIndexPointer])
-            = hi(j);
+            = mHi(j);
       }
       // If we're clamped at the lower bound
       else
@@ -354,18 +527,22 @@ void ConstrainedGroupGradientMatrices::constructMatrices(
         {
           std::cout << "Lower bound: " << lowerBound << std::endl;
           std::cout << "Upper bound: " << upperBound << std::endl;
-          std::cout << "mHi(j = " << j << "): " << hi(j) << std::endl;
-          std::cout << "mLo(j = " << j << "): " << lo(j) << std::endl;
+          std::cout << "mHi(j = " << j << "): " << mHi(j) << std::endl;
+          std::cout << "mLo(j = " << j << "): " << mLo(j) << std::endl;
           std::cout << "mX(j = " << j << "): " << mX(j) << std::endl;
           std::cout << "fIndex: " << fIndexPointer << std::endl;
         }
         assert(std::abs(mX(j) - lowerBound) < 1e-2);
         mUpperBoundMappingMatrix(
             upperBoundIndex[j], clampingIndex[fIndexPointer])
-            = lo(j);
+            = mLo(j);
       }
     }
   }
+
+  delete clampingIndex;
+  delete upperBoundIndex;
+  delete bouncingIndex;
 }
 
 //==============================================================================

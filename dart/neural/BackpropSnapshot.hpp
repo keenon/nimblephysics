@@ -119,11 +119,13 @@ public:
 
   /// This returns the mass matrix for the whole world, a block diagonal
   /// concatenation of the skeleton mass matrices.
-  Eigen::MatrixXd getMassMatrix(simulation::WorldPtr world);
+  Eigen::MatrixXd getMassMatrix(
+      simulation::WorldPtr world, bool forFiniteDifferencing = false);
 
   /// This returns the inverse mass matrix for the whole world, a block diagonal
   /// concatenation of the skeleton inverse mass matrices.
-  Eigen::MatrixXd getInvMassMatrix(simulation::WorldPtr world);
+  Eigen::MatrixXd getInvMassMatrix(
+      simulation::WorldPtr world, bool forFiniteDifferencing = false);
 
   /// This returns the pos-C(pos,vel) Jacobian for the whole world, a block
   /// diagonal concatenation of the skeleton pos-C(pos,vel) Jacobians.
@@ -157,7 +159,72 @@ public:
 
   /// This returns the P_c matrix. You shouldn't ever need this matrix, it's
   /// just here to enable testing.
-  Eigen::MatrixXd getProjectionIntoClampsMatrix(simulation::WorldPtr world);
+  Eigen::MatrixXd getProjectionIntoClampsMatrix(
+      simulation::WorldPtr world, bool forFiniteDifferencing = false);
+
+  /// This replaces x with the result of M*x in place, without explicitly
+  /// forming M
+  Eigen::VectorXd implicitMultiplyByMassMatrix(
+      simulation::WorldPtr world, const Eigen::VectorXd& x);
+
+  /// This replaces x with the result of Minv*x in place, without explicitly
+  /// forming Minv
+  Eigen::VectorXd implicitMultiplyByInvMassMatrix(
+      simulation::WorldPtr world, const Eigen::VectorXd& x);
+
+  enum WithRespectTo
+  {
+    POSITION,
+    LINK_MASSES,
+    LINK_COMS,
+    LINK_MOIS
+  };
+
+  /// TODO(keenon): Remove me
+  Eigen::MatrixXd getScratchAnalytical(simulation::WorldPtr world);
+
+  /// TODO(keenon): Remove me
+  Eigen::MatrixXd getScratchFiniteDifference(simulation::WorldPtr world);
+
+  /// This predicts what the next velocity will be using our linear algebra
+  /// formula. This is only here for testing, to compare it against the actual
+  /// result of a timestep.
+  Eigen::VectorXd getAnalyticalNextV(simulation::WorldPtr world);
+
+  /// This computes and returns the whole pos-vel jacobian. For backprop, you
+  /// don't actually need this matrix, you can compute backprop directly. This
+  /// is here if you want access to the full Jacobian for some reason.
+  Eigen::MatrixXd getVelJacobianWrt(
+      simulation::WorldPtr world, WithRespectTo wrt);
+
+  /// This returns the jacobian of P_c * v, holding everyhing constant except
+  /// the value of WithRespectTo
+  Eigen::MatrixXd getJacobianOfProjectionIntoClampsMatrix(
+      simulation::WorldPtr world, Eigen::VectorXd v, WithRespectTo wrt);
+
+  /// This returns the jacobian of M^{-1}(pos, inertia) * tau, holding
+  /// everything constant except the value of WithRespectTo
+  Eigen::MatrixXd getJacobianOfMinv(
+      simulation::WorldPtr world, Eigen::VectorXd tau, WithRespectTo wrt);
+
+  /// This returns the jacobian of C(pos, inertia, vel), holding everything
+  /// constant except the value of WithRespectTo
+  Eigen::MatrixXd getJacobianOfC(simulation::WorldPtr world, WithRespectTo wrt);
+
+  /// This computes and returns the jacobian of P_c * v by finite
+  /// differences. This is SUPER SLOW, and is only here for testing.
+  Eigen::MatrixXd finiteDifferenceJacobianOfProjectionIntoClampsMatrix(
+      simulation::WorldPtr world, Eigen::VectorXd v, WithRespectTo wrt);
+
+  /// This computes and returns the jacobian of M^{-1}(pos, inertia) * tau by
+  /// finite differences. This is SUPER SLOW, and is only here for testing.
+  Eigen::MatrixXd finiteDifferenceJacobianOfMinv(
+      simulation::WorldPtr world, Eigen::VectorXd tau, WithRespectTo wrt);
+
+  /// This computes and returns the jacobian of C(pos, inertia, vel) by finite
+  /// differences. This is SUPER SLOW, and is only here for testing.
+  Eigen::MatrixXd finiteDifferenceJacobianOfC(
+      simulation::WorldPtr world, WithRespectTo wrt);
 
   /// These was the mX() vector used to construct this. Pretty much only here
   /// for testing.
@@ -178,6 +245,12 @@ public:
   /// Returns the penetration correction hack "bounce" (or 0 if the contact is
   /// not inter-penetrating or is actively bouncing) at each contact point.
   Eigen::VectorXd getPenetrationCorrectionVelocities();
+
+  /// Returns true if there were any bounces in this snapshot.
+  bool hasBounces();
+
+  /// Returns the number of clamping contacts in this snapshot.
+  std::size_t getNumClamping();
 
 protected:
   /// This is the global timestep length. This is included here because it shows
@@ -227,6 +300,14 @@ protected:
   Eigen::VectorXd mPostStepTorques;
 
 private:
+  Eigen::VectorXd scratch(simulation::WorldPtr world);
+
+  std::size_t getWrtDim(simulation::WorldPtr world, WithRespectTo wrt);
+
+  Eigen::VectorXd getWrt(simulation::WorldPtr world, WithRespectTo wrt);
+
+  void setWrt(simulation::WorldPtr world, WithRespectTo wrt, Eigen::VectorXd v);
+
   enum MatrixToAssemble
   {
     CLAMPING,
@@ -248,7 +329,9 @@ private:
   };
 
   Eigen::MatrixXd assembleBlockDiagonalMatrix(
-      simulation::WorldPtr world, BlockDiagonalMatrixToAssemble whichMatrix);
+      simulation::WorldPtr world,
+      BlockDiagonalMatrixToAssemble whichMatrix,
+      bool forFiniteDifferencing = false);
 
   enum VectorToAssemble
   {
