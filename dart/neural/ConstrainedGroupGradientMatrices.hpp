@@ -28,7 +28,8 @@ enum ConstraintMapping
 {
   CLAMPING = -1,
   NOT_CLAMPING = -2,
-  IRRELEVANT = -3
+  ILLEGAL = -3,
+  IRRELEVANT = -4
 };
 
 /// This class pairs with a ConstrainedGroup, to save all the constraint
@@ -76,7 +77,8 @@ public:
       Eigen::VectorXd lo,
       Eigen::VectorXi fIndex,
       Eigen::VectorXd b,
-      Eigen::VectorXd aColNorms);
+      Eigen::VectorXd aColNorms,
+      Eigen::MatrixXd A);
 
   /// This gets called by constructMatrices()
   void deduplicateConstraints();
@@ -181,11 +183,23 @@ public:
   /// not inter-penetrating or is actively bouncing) at each contact point.
   const Eigen::VectorXd& getPenetrationCorrectionVelocities() const;
 
+  /// Returns the constraint impulses along the clamping constraints
+  const Eigen::VectorXd& getClampingConstraintImpulses() const;
+
+  /// Returns the relative velocities along the clamping constraints
+  const Eigen::VectorXd& getClampingConstraintRelativeVels() const;
+
+  /// Returns the velocity change caused by the illegal impulses from the LCP
+  const Eigen::VectorXd& getVelocityDueToIllegalImpulses() const;
+
   std::size_t getNumDOFs() const;
 
   std::size_t getNumConstraintDim() const;
 
   const std::vector<std::string>& getSkeletons() const;
+
+  const std::vector<std::shared_ptr<constraint::ConstraintBase>>&
+  getClampingConstraints() const;
 
 protected:
   /// Impulse test matrix for the clamping constraints
@@ -213,6 +227,18 @@ protected:
   /// This is the vector of the coefficients sized for just the bounces.
   Eigen::VectorXd mRestitutionDiagonals;
 
+  /// This is the vector of velocity changes due to any impulses from the LCP
+  /// solver that are illegal (out of their legal bounds).
+  Eigen::VectorXd mVelocityDueToIllegalImpulses;
+
+  /// This is the vector of constraint impulses for all the clamping
+  /// constraints. It's key for computing Jacobians through quantities that
+  /// change the mass matrix.
+  Eigen::VectorXd mClampingConstraintImpulses;
+
+  /// This is just useful for testing the gradient computations
+  Eigen::VectorXd mClampingConstraintRelativeVels;
+
   /// This is just useful for testing the gradient computations
   Eigen::VectorXi mContactConstraintMappings;
 
@@ -238,6 +264,12 @@ protected:
   /// These are the offsets into the total degrees of freedom for each skeleton
   std::unordered_map<std::string, std::size_t> mSkeletonOffset;
 
+  /// This is all the constraints, in order that they were registered
+  std::vector<std::shared_ptr<constraint::ConstraintBase>> mConstraints;
+
+  /// These are just the clamping constraints
+  std::vector<std::shared_ptr<constraint::ConstraintBase>> mClampingConstraints;
+
   /// These are public to enable unit testing
 public:
   /// This holds the coefficient of restitution for each constraint on this
@@ -248,13 +280,14 @@ public:
   /// this group.
   std::vector<double> mPenetrationCorrectionVelocities;
 
-  /// These are all the values from the LCP
+  /// These are all the values from the original LCP
   Eigen::VectorXd mX;
   Eigen::VectorXd mHi;
   Eigen::VectorXd mLo;
   Eigen::VectorXi mFIndex;
   Eigen::VectorXd mB;
   Eigen::VectorXd mAColNorms;
+  Eigen::MatrixXd mA;
 
   /// This holds the outputs of the impulse tests we run to create the
   /// constraint matrices. We shuffle these vectors into the columns of

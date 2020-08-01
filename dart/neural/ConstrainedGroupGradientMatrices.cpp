@@ -83,6 +83,7 @@ void ConstrainedGroupGradientMatrices::registerConstraint(
     mRestitutionCoeffs.push_back(0);
     mPenetrationCorrectionVelocities.push_back(0);
   }
+  mConstraints.push_back(constraint);
 }
 
 //==============================================================================
@@ -91,6 +92,7 @@ void ConstrainedGroupGradientMatrices::mockRegisterConstraint(
 {
   mRestitutionCoeffs.push_back(restitutionCoeff);
   mPenetrationCorrectionVelocities.push_back(penetrationHackVel);
+  mConstraints.push_back(nullptr);
 }
 
 //==============================================================================
@@ -164,7 +166,8 @@ void ConstrainedGroupGradientMatrices::registerLCPResults(
     Eigen::VectorXd lo,
     Eigen::VectorXi fIndex,
     Eigen::VectorXd b,
-    Eigen::VectorXd aColNorms)
+    Eigen::VectorXd aColNorms,
+    Eigen::MatrixXd A)
 {
   mX = X;
   mHi = hi;
@@ -172,6 +175,7 @@ void ConstrainedGroupGradientMatrices::registerLCPResults(
   mFIndex = fIndex;
   mB = b;
   mAColNorms = aColNorms;
+  mA = A;
 }
 
 //==============================================================================
@@ -275,6 +279,7 @@ void ConstrainedGroupGradientMatrices::deduplicateConstraints()
       }
     }
 
+    newB(i) /= groupCount;
     newHi(i) /= groupCount;
     newLo(i) /= groupCount;
     newAColNorms(i) /= groupCount;
@@ -352,6 +357,7 @@ void ConstrainedGroupGradientMatrices::constructMatrices()
   int numClamping = 0;
   int numUpperBound = 0;
   int numBouncing = 0;
+  int numIllegal = 0;
   // Fill in mappings[] with the correct values, overwriting previous data
   for (std::size_t j = 0; j < mNumConstraintDim; j++)
   {
@@ -415,6 +421,13 @@ void ConstrainedGroupGradientMatrices::constructMatrices()
         numBouncing++;
       }
     }
+    // This means we're out of bounds. This actually happens depressingly often
+    // with the current LCP solver, and it means we just have to handle it.
+    else if (lowerBound - mX(j) > 1e-2 || mX(j) - upperBound > 1e-2)
+    {
+      mContactConstraintMappings(j) = neural::ConstraintMapping::ILLEGAL;
+      numIllegal++;
+    }
     // Otherwise, if fIndex != -1, "j" is in "Upper Bound"
     // Note, this could also mean "j" is at it's lower bound, but we call the
     // group of all "j"'s that have reached their dependent bound "Upper
@@ -456,6 +469,10 @@ void ConstrainedGroupGradientMatrices::constructMatrices()
   mPenetrationCorrectionVelocitiesVec = Eigen::VectorXd(numClamping);
   mBouncingConstraintMatrix = Eigen::MatrixXd::Zero(mNumDOFs, numBouncing);
   mRestitutionDiagonals = Eigen::VectorXd(numBouncing);
+  mClampingConstraintImpulses = Eigen::VectorXd(numClamping);
+  mClampingConstraintRelativeVels = Eigen::VectorXd(numClamping);
+  mClampingConstraints.reserve(numClamping);
+  mVelocityDueToIllegalImpulses = Eigen::VectorXd(mNumDOFs);
 
   /*
   std::cout << "numClamping: " << numClamping << std::endl;
@@ -480,6 +497,16 @@ void ConstrainedGroupGradientMatrices::constructMatrices()
         mBouncingConstraintMatrix.col(bouncingIndex[j]) = mImpulseTests[j];
         mRestitutionDiagonals(bouncingIndex[j]) = mRestitutionCoeffs[j];
       }
+      mClampingConstraintImpulses(clampingIndex[j]) = mX(j);
+      mClampingConstraintRelativeVels(clampingIndex[j]) = mB(j);
+      // TODO: reinstate me while accounting for the fact that constraints have
+      // multiple dimensions
+      // mClampingConstraints.push_back(mConstraints[j]);
+    }
+    else if (
+        mContactConstraintMappings(j) == neural::ConstraintMapping::ILLEGAL)
+    {
+      mVelocityDueToIllegalImpulses += mX(j) * mMassedImpulseTests[j];
     }
     else if (mContactConstraintMappings(j) >= 0) // means we're an UPPER_BOUND
     {
@@ -925,10 +952,40 @@ const std::vector<std::string>& ConstrainedGroupGradientMatrices::getSkeletons()
 }
 
 //==============================================================================
+const std::vector<std::shared_ptr<constraint::ConstraintBase>>&
+ConstrainedGroupGradientMatrices::getClampingConstraints() const
+{
+  return mClampingConstraints;
+}
+
+//==============================================================================
 const Eigen::VectorXd&
 ConstrainedGroupGradientMatrices::getPenetrationCorrectionVelocities() const
 {
   return mPenetrationCorrectionVelocitiesVec;
+}
+
+//==============================================================================
+const Eigen::VectorXd&
+ConstrainedGroupGradientMatrices::getClampingConstraintImpulses() const
+{
+  return mClampingConstraintImpulses;
+}
+
+//==============================================================================
+/// Returns the relative velocities along the clamping constraints
+const Eigen::VectorXd&
+ConstrainedGroupGradientMatrices::getClampingConstraintRelativeVels() const
+{
+  return mClampingConstraintRelativeVels;
+}
+
+//==============================================================================
+/// Returns the velocity change caused by the illegal impulses from the LCP
+const Eigen::VectorXd&
+ConstrainedGroupGradientMatrices::getVelocityDueToIllegalImpulses() const
+{
+  return mVelocityDueToIllegalImpulses;
 }
 
 } // namespace neural

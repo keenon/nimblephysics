@@ -197,6 +197,33 @@ public:
   Eigen::MatrixXd getVelJacobianWrt(
       simulation::WorldPtr world, WithRespectTo wrt);
 
+  /// This returns the jacobian of constraint force, holding everyhing constant
+  /// except the value of WithRespectTo
+  Eigen::MatrixXd getJacobianOfConstraintForce(
+      simulation::WorldPtr world, WithRespectTo wrt);
+
+  /// This returns the subset of the A matrix used by the original LCP for just
+  /// the clamping constraints. It relates constraint force to constraint
+  /// acceleration. It's a mass matrix, just in a weird frame.
+  void computeLCPConstraintMatrixClampingSubset(
+      simulation::WorldPtr world,
+      Eigen::MatrixXd& Q,
+      const Eigen::MatrixXd& A_c);
+
+  /// This returns the subset of the b vector used by the original LCP for just
+  /// the clamping constraints. It's just the relative velocity at the clamping
+  /// contact points.
+  void computeLCPOffsetClampingSubset(
+      simulation::WorldPtr world,
+      Eigen::VectorXd& b,
+      const Eigen::MatrixXd& A_c);
+
+  /// This computes and returns an estimate of the constraint impulses for the
+  /// clamping constraints. This is based on a linear approximation of the
+  /// constraint impulses.
+  Eigen::VectorXd estimateClampingConstraintImpulses(
+      simulation::WorldPtr world);
+
   /// This returns the jacobian of P_c * v, holding everyhing constant except
   /// the value of WithRespectTo
   Eigen::MatrixXd getJacobianOfProjectionIntoClampsMatrix(
@@ -210,6 +237,28 @@ public:
   /// This returns the jacobian of C(pos, inertia, vel), holding everything
   /// constant except the value of WithRespectTo
   Eigen::MatrixXd getJacobianOfC(simulation::WorldPtr world, WithRespectTo wrt);
+
+  /// This returns a fast approximation to A_c in the neighborhood of the
+  /// original
+  Eigen::MatrixXd estimateClampingConstraintMatrixAt(
+      simulation::WorldPtr world, Eigen::VectorXd pos);
+
+  /// This computes the Jacobian of A_c*f0 with respect to position using
+  /// impulse tests.
+  Eigen::MatrixXd getJacobianOfClampingConstraints(
+      simulation::WorldPtr world, Eigen::VectorXd f0);
+
+  /// This measures a vector of contact impulses (measured at the clamping
+  /// constraints) on the world, to see what total velocity change results. This
+  /// is a fast way to get A_c * f0.
+  Eigen::VectorXd getClampingImpulseVelChange(
+      simulation::WorldPtr world, Eigen::VectorXd f0);
+
+  /// This computes the finite difference Jacobian of A_c*f0 with respect to
+  /// position. This is AS SLOW AS FINITE DIFFERENCING THE WHOLE ENGINE, which
+  /// is way too slow to use in practice.
+  Eigen::MatrixXd finiteDifferenceJacobianOfClampingConstraints(
+      simulation::WorldPtr world, Eigen::VectorXd f0);
 
   /// This computes and returns the jacobian of P_c * v by finite
   /// differences. This is SUPER SLOW, and is only here for testing.
@@ -246,11 +295,30 @@ public:
   /// not inter-penetrating or is actively bouncing) at each contact point.
   Eigen::VectorXd getPenetrationCorrectionVelocities();
 
+  /// Returns the constraint impulses along the clamping constraints
+  Eigen::VectorXd getClampingConstraintImpulses();
+
+  /// Returns the relative velocities along the clamping constraints
+  Eigen::VectorXd getClampingConstraintRelativeVels();
+
+  /// Returns the velocity change caused by illegal impulses in the LCP this
+  /// timestep
+  Eigen::VectorXd getVelocityDueToIllegalImpulses();
+
   /// Returns true if there were any bounces in this snapshot.
   bool hasBounces();
 
   /// Returns the number of clamping contacts in this snapshot.
   std::size_t getNumClamping();
+
+  /// These are the gradient constraint matrices from the LCP solver
+  std::vector<std::shared_ptr<ConstrainedGroupGradientMatrices>>
+      mGradientMatrices;
+
+  /// This is the clamping constraints from all the constrained
+  /// groups,concatenated together
+  std::vector<std::shared_ptr<constraint::ConstraintBase>>
+  getClampingConstraints();
 
 protected:
   /// This is the global timestep length. This is included here because it shows
@@ -275,10 +343,6 @@ protected:
 
   /// These are the offsets into the total degrees of freedom for each skeleton
   std::unordered_map<std::string, std::size_t> mSkeletonOffset;
-
-  /// These are the gradient constraint matrices from the LCP solver
-  std::vector<std::shared_ptr<ConstrainedGroupGradientMatrices>>
-      mGradientMatrices;
 
   /// The position of all the DOFs of the world BEFORE the timestep
   Eigen::VectorXd mPreStepPosition;
@@ -339,7 +403,10 @@ private:
     CONTACT_CONSTRAINT_MAPPINGS,
     BOUNCE_DIAGONALS,
     RESTITUTION_DIAGONALS,
-    PENETRATION_VELOCITY_HACK
+    PENETRATION_VELOCITY_HACK,
+    CLAMPING_CONSTRAINT_IMPULSES,
+    CLAMPING_CONSTRAINT_RELATIVE_VELS,
+    VEL_DUE_TO_ILLEGAL
   };
   template <typename Vec>
   Vec assembleVector(VectorToAssemble whichVector);
