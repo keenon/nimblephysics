@@ -49,7 +49,11 @@ std::shared_ptr<BackpropSnapshot> forwardPass(
   // Actually construct and return the snapshot
   std::shared_ptr<BackpropSnapshot> snapshot
       = std::make_shared<BackpropSnapshot>(
-          world, preStepPosition, preStepVelocity, preStepTorques);
+          world,
+          preStepPosition,
+          preStepVelocity,
+          preStepTorques,
+          world->getLastPreConstraintVelocity());
 
   if (idempotent)
     restorableSnapshot->restore();

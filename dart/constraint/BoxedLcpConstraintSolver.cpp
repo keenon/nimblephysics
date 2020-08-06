@@ -41,6 +41,7 @@
 #include "dart/common/Console.hpp"
 #include "dart/constraint/ConstraintBase.hpp"
 #include "dart/constraint/DantzigBoxedLcpSolver.hpp"
+#include "dart/constraint/LCPUtils.hpp"
 #include "dart/constraint/PgsBoxedLcpSolver.hpp"
 #include "dart/external/odelcpsolver/lcp.h"
 #include "dart/lcpsolver/Lemke.hpp"
@@ -380,6 +381,16 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(ConstrainedGroup& group)
       mFIndex.data());
   std::cout << std::endl;
   */
+
+  // Clean up the results, this will clean up the mX vector to remove obvious
+  // blemishes on the clamping indices
+  LCPUtils::cleanUpResults(
+      aGradientBackup,
+      mX,
+      bGradientBackup,
+      hiGradientBackup,
+      loGradientBackup,
+      fIndexGradientBackup);
 
   // Apply constraint impulses
   for (std::size_t i = 0; i < numConstraints; ++i)

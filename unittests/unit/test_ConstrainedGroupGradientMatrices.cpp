@@ -84,7 +84,10 @@ TEST(ConstrainedGroupGradientMatrices, SIMPLE_MERGE)
   b << 0.0, 0.0, 0.0, 0.0;
   Eigen::VectorXd aColNorms(4);
   aColNorms << 1.0, 1.0, 1.0, 1.0;
-  matrices.registerLCPResults(X, lo, hi, fIndex, b, aColNorms);
+  Eigen::MatrixXd A(4, 4);
+  A << 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+      1.0, 1.0;
+  matrices.registerLCPResults(X, hi, lo, fIndex, b, aColNorms, A);
 
   // Cut down the number of constraints
   matrices.deduplicateConstraints();

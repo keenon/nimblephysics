@@ -313,7 +313,8 @@ bool verifyClassicProjectionIntoClampsMatrix(
   // Check that the analytical error is zero
 
   VectorXd zero = VectorXd::Zero(analyticalError.size());
-  if (!equals(analyticalError, zero, 1e-3))
+  double constraintForces = contactConstraintForces.norm();
+  if (!equals(analyticalError, zero, constraintForces * 2e-3))
   {
     std::cout << "Proposed velocities: " << std::endl
               << proposedVelocities << std::endl;
@@ -443,14 +444,53 @@ bool verifyF_c(WorldPtr world)
   RestorableSnapshot snapshot(world);
 
   neural::BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
+  Eigen::MatrixXd A_c = classicPtr->getClampingConstraintMatrix(world);
 
-  Eigen::VectorXd analytical
-      = classicPtr->estimateClampingConstraintImpulses(world);
-  Eigen::VectorXd real = classicPtr->getClampingConstraintImpulses();
-  if (!equals(analytical, real, 1e-6))
+  Eigen::MatrixXd realQ = classicPtr->getClampingAMatrix();
+  Eigen::VectorXd realB = classicPtr->getClampingConstraintRelativeVels();
+
+  Eigen::MatrixXd analyticalQ = Eigen::MatrixXd(A_c.cols(), A_c.cols());
+  classicPtr->computeLCPConstraintMatrixClampingSubset(world, analyticalQ, A_c);
+  Eigen::VectorXd analyticalB = Eigen::VectorXd(A_c.cols());
+  classicPtr->computeLCPOffsetClampingSubset(world, analyticalB, A_c);
+
+  if (!equals(realB, analyticalB, 1e-7) || !equals(realQ, analyticalQ, 2e-5))
   {
-    std::cout << "Real f_c:" << std::endl << real << std::endl;
-    std::cout << "Analytical f_c:" << std::endl << analytical << std::endl;
+    std::cout << "Real Q:" << std::endl << realQ << std::endl;
+    std::cout << "Analytical Q:" << std::endl << analyticalQ << std::endl;
+    std::cout << "Diff Q:" << std::endl << (realQ - analyticalQ) << std::endl;
+    std::cout << "Real B:" << std::endl << realB << std::endl;
+    std::cout << "Analytical B:" << std::endl << analyticalB << std::endl;
+    classicPtr->computeLCPOffsetClampingSubset(world, analyticalB, A_c);
+    std::cout << "Diff B:" << std::endl << (realB - analyticalB) << std::endl;
+    return false;
+  }
+
+  Eigen::VectorXd analyticalF_c
+      = classicPtr->estimateClampingConstraintImpulses(world);
+  Eigen::VectorXd realF_c = classicPtr->getClampingConstraintImpulses();
+  if (!equals(analyticalF_c, realF_c, 2e-5))
+  {
+    std::cout << "Real f_c:" << std::endl << realF_c << std::endl;
+    std::cout << "Analytical f_c:" << std::endl << analyticalF_c << std::endl;
+    std::cout << "Diff f_c:" << std::endl
+              << (realF_c - analyticalF_c) << std::endl;
+    return false;
+  }
+
+  Eigen::MatrixXd bruteForceJac
+      = classicPtr->finiteDifferenceJacobianOfConstraintForce(
+          world, BackpropSnapshot::WithRespectTo::POSITION);
+  Eigen::MatrixXd analyticalJac = classicPtr->getJacobianOfConstraintForce(
+      world, BackpropSnapshot::WithRespectTo::POSITION);
+  if (!equals(analyticalJac, bruteForceJac, 2e-5))
+  {
+    std::cout << "Brute force f_c Jacobian:" << std::endl
+              << bruteForceJac << std::endl;
+    std::cout << "Analytical f_c Jacobian:" << std::endl
+              << analyticalJac << std::endl;
+    std::cout << "Diff Jac:" << std::endl
+              << (bruteForceJac - analyticalJac) << std::endl;
     return false;
   }
 
@@ -513,31 +553,22 @@ VelocityTest runVelocityTest(WorldPtr world)
   */
 
   Eigen::VectorXd allRealImpulses = classicPtr->getContactConstraintImpluses();
-  std::cout << "All f:" << std::endl << allRealImpulses << std::endl;
   Eigen::VectorXd velChange = Eigen::VectorXd::Zero(world->getNumDofs());
   for (int i = 0; i < allRealImpulses.size(); i++)
   {
     velChange += allRealImpulses(i)
                  * classicPtr->mGradientMatrices[0]->mMassedImpulseTests[i];
   }
-  std::cout << "Net vel change:" << std::endl << velChange << std::endl;
   Eigen::VectorXd velDueToIllegal
       = classicPtr->getVelocityDueToIllegalImpulses();
-  std::cout << "Vel due to illegal:" << std::endl
-            << velDueToIllegal << std::endl;
 
   Eigen::VectorXd realImpulses = classicPtr->getClampingConstraintImpulses();
-  std::cout << "Real f_c:" << std::endl << realImpulses << std::endl;
-  std::cout << "Analytical f_c:" << std::endl << f_c << std::endl;
 
   Eigen::VectorXd preSolveV = preStepVelocity + dt * Minv * (tau - C);
   Eigen::VectorXd f_cDeltaV
       = Minv * A_c_ub_E * f_c + classicPtr->getVelocityDueToIllegalImpulses();
   Eigen::VectorXd realF_cDeltaV = Minv * A_c_ub_E * realImpulses;
   Eigen::VectorXd postSolveV = preSolveV + f_cDeltaV;
-
-  std::cout << "Minv * (A_c + A_ub*E): " << std::endl
-            << Minv * A_c_ub_E << std::endl;
 
   /*
 std::cout << "Real f_c delta V:" << std::endl << realF_cDeltaV << std::endl;
@@ -569,7 +600,7 @@ bool verifyNextV(WorldPtr world)
 
   // VelocityTest originalTest = runVelocityTest(world);
 
-  const double EPSILON = 1e-2;
+  const double EPSILON = 1e-3;
 
   for (std::size_t i = 0; i < world->getNumDofs(); i++)
   {
@@ -585,8 +616,8 @@ bool verifyNextV(WorldPtr world)
             perturbedTest.predictedNextVel,
             perturbedTest.realNextVel,
             classicPtr->hasBounces()
-                ? 1e-10 // things get sloppy when bouncing, increase tol
-                : 1e-15))
+                ? 1e-4 // things get sloppy when bouncing, increase tol
+                : 2e-6))
     {
       /*
       std::cout << "Real v_t+1:" << std::endl
@@ -602,6 +633,10 @@ bool verifyNextV(WorldPtr world)
                 << perturbedTest.predictedNextVelDeltaVFromF << std::endl;
       std::cout << "Real delta V from f_c v_t+1:" << std::endl
                 << perturbedTest.realNextVelDeltaVFromF << std::endl;
+      std::cout << "Diff:" << std::endl
+                << (perturbedTest.realNextVelDeltaVFromF
+                    - perturbedTest.predictedNextVelDeltaVFromF)
+                << std::endl;
       return false;
     }
   }
@@ -630,6 +665,61 @@ bool verifyScratch(WorldPtr world)
     return false;
   }
 
+  return true;
+}
+
+Eigen::Vector6d getLinearScratchScrew()
+{
+  Eigen::Vector6d linearScratchScrew;
+  linearScratchScrew << 0.1, 0.2, 0.3, 0.4, 0.5, 0.6;
+  return linearScratchScrew;
+}
+
+Eigen::Vector6d getLinearScratchForce()
+{
+  Eigen::Vector6d linearScratchForce;
+  linearScratchForce << 0.1, 0.2, 0.3, 0.4, 0.5, 0.6;
+  return linearScratchForce;
+}
+
+double linearScratch(double input)
+{
+  Eigen::Isometry3d transform = math::expMap(getLinearScratchScrew() * input);
+  Eigen::Vector6d forceInFrame
+      = math::dAdInvT(transform, getLinearScratchForce());
+  std::cout << "Force in frame: " << std::endl << forceInFrame << std::endl;
+  std::cout << "screw: " << std::endl << getLinearScratchScrew() << std::endl;
+  std::cout << "dotted with screw: " << std::endl
+            << forceInFrame.dot(getLinearScratchScrew()) << std::endl;
+  return forceInFrame.dot(getLinearScratchScrew());
+}
+
+double bruteForceLinearScratch(double startingPoint)
+{
+  const double EPS = 1e-6;
+  return (linearScratch(startingPoint + EPS) - linearScratch(startingPoint))
+         / EPS;
+}
+
+double analyticalLinearScratch(double point)
+{
+  return 1.0;
+}
+
+bool verifyLinearScratch()
+{
+  double point = 0.76;
+  double bruteForce = bruteForceLinearScratch(point);
+  double analytical = analyticalLinearScratch(point);
+  if (abs(bruteForce - analytical) > 1e-12)
+  {
+    std::cout << "Brute force linear scratch:" << std::endl
+              << bruteForce << std::endl;
+    std::cout << "Analytical linear scratch (should be the same as above):"
+              << std::endl
+              << analytical << std::endl;
+    return false;
+  }
   return true;
 }
 
@@ -772,8 +862,10 @@ bool verifyRecoveredLCPConstraints(WorldPtr world, VectorXd proposedVelocities)
 
 bool verifyVelGradients(WorldPtr world, VectorXd worldVel)
 {
+  // return verifyScratch(world);
+  // return verifyF_c(world);
+  // return verifyLinearScratch();
   // return verifyNextV(world);
-  return verifyScratch(world);
   return (
       verifyClassicClampingConstraintMatrix(world, worldVel)
       && verifyMassedClampingConstraintMatrix(world, worldVel)
@@ -2984,6 +3076,15 @@ void testRobotArm(std::size_t numLinks, double rotationRadians)
 {
   // World
   WorldPtr world = World::create();
+  /*
+  for (auto key : collision::CollisionDetector::getFactory()->getKeys())
+  {
+    std::cout << "Option: " << key << std::endl;
+  }
+  */
+  auto collision_detector
+      = collision::CollisionDetector::getFactory()->create("dart");
+  world->getConstraintSolver()->setCollisionDetector(collision_detector);
   world->setGravity(Eigen::Vector3d(0, -9.81, 0));
 
   SkeletonPtr arm = Skeleton::create("arm");
@@ -3072,7 +3173,6 @@ TEST(GRADIENTS, ARM_3_LINK_30_DEG)
   testRobotArm(3, 30.0 / 180 * 3.1415);
 }
 
-/*
 TEST(GRADIENTS, ARM_5_LINK_30_DEG)
 {
   // This test wraps an arm around, and it's actually breaking contact, so this
@@ -3084,7 +3184,6 @@ TEST(GRADIENTS, ARM_6_LINK_15_DEG)
 {
   testRobotArm(6, 15.0 / 180 * 3.1415);
 }
-*/
 
 /******************************************************************************
 

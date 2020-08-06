@@ -183,6 +183,10 @@ public:
   /// not inter-penetrating or is actively bouncing) at each contact point.
   const Eigen::VectorXd& getPenetrationCorrectionVelocities() const;
 
+  /// This is the subset of the A matrix from the original LCP that corresponds
+  /// to clamping indices.
+  const Eigen::MatrixXd& getClampingAMatrix() const;
+
   /// Returns the constraint impulses along the clamping constraints
   const Eigen::VectorXd& getClampingConstraintImpulses() const;
 
@@ -247,6 +251,10 @@ protected:
 
   /// This is just useful for testing the gradient computations
   Eigen::VectorXd mPenetrationCorrectionVelocitiesVec;
+
+  /// This is the subset of the A matrix from the original LCP that corresponds
+  /// to clamping indices.
+  Eigen::MatrixXd mClampingAMatrix;
 
   /// These are the names of skeletons that are covered by this constraint group
   std::vector<std::string> mSkeletons;

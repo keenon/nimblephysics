@@ -473,6 +473,7 @@ void ConstrainedGroupGradientMatrices::constructMatrices()
   mClampingConstraintRelativeVels = Eigen::VectorXd(numClamping);
   mClampingConstraints.reserve(numClamping);
   mVelocityDueToIllegalImpulses = Eigen::VectorXd(mNumDOFs);
+  mClampingAMatrix = Eigen::MatrixXd(numClamping, numClamping);
 
   /*
   std::cout << "numClamping: " << numClamping << std::endl;
@@ -563,6 +564,24 @@ void ConstrainedGroupGradientMatrices::constructMatrices()
         mUpperBoundMappingMatrix(
             upperBoundIndex[j], clampingIndex[fIndexPointer])
             = mLo(j);
+      }
+    }
+  }
+
+  // Fill in the clamping A matrix
+  for (size_t row = 0; row < mNumConstraintDim; row++)
+  {
+    if (mContactConstraintMappings(row) == neural::ConstraintMapping::CLAMPING)
+    {
+      int clampingRow = clampingIndex[row];
+      for (size_t col = 0; col < mNumConstraintDim; col++)
+      {
+        if (mContactConstraintMappings(col)
+            == neural::ConstraintMapping::CLAMPING)
+        {
+          int clampingCol = clampingIndex[col];
+          mClampingAMatrix(clampingRow, clampingCol) = mA(row, col);
+        }
       }
     }
   }
@@ -963,6 +982,15 @@ const Eigen::VectorXd&
 ConstrainedGroupGradientMatrices::getPenetrationCorrectionVelocities() const
 {
   return mPenetrationCorrectionVelocitiesVec;
+}
+
+//==============================================================================
+/// This is the subset of the A matrix from the original LCP that corresponds
+/// to clamping indices.
+const Eigen::MatrixXd& ConstrainedGroupGradientMatrices::getClampingAMatrix()
+    const
+{
+  return mClampingAMatrix;
 }
 
 //==============================================================================

@@ -23,7 +23,8 @@ public:
       simulation::WorldPtr world,
       Eigen::VectorXd preStepPosition,
       Eigen::VectorXd preStepVelocity,
-      Eigen::VectorXd preStepTorques);
+      Eigen::VectorXd preStepTorques,
+      Eigen::VectorXd preConstraintVelocities);
 
   /// This computes the implicit backprop without forming intermediate
   /// Jacobians. It takes a LossGradient with the position and velocity vectors
@@ -73,6 +74,12 @@ public:
   /// Returns a concatenated vector of all the joint torques that were applied
   /// during the forward pass, BEFORE the timestep.
   Eigen::VectorXd getPreStepTorques();
+
+  /// Returns a concatenated vector of all the Skeletons' velocity()'s in the
+  /// World, in order in which the Skeletons appear in the World's
+  /// getSkeleton(i) returns them, AFTER integrating forward dynamics but BEFORE
+  /// running the LCP.
+  Eigen::VectorXd getPreConstraintVelocity();
 
   /// Returns a concatenated vector of all the Skeletons' position()'s in the
   /// World, in order in which the Skeletons appear in the World's
@@ -126,6 +133,10 @@ public:
   /// concatenation of the skeleton inverse mass matrices.
   Eigen::MatrixXd getInvMassMatrix(
       simulation::WorldPtr world, bool forFiniteDifferencing = false);
+
+  /// This is the subset of the A matrix from the original LCP that corresponds
+  /// to clamping indices.
+  Eigen::MatrixXd getClampingAMatrix();
 
   /// This returns the pos-C(pos,vel) Jacobian for the whole world, a block
   /// diagonal concatenation of the skeleton pos-C(pos,vel) Jacobians.
@@ -202,6 +213,15 @@ public:
   Eigen::MatrixXd getJacobianOfConstraintForce(
       simulation::WorldPtr world, WithRespectTo wrt);
 
+  /// This returns the jacobian of Q^{-1}b, holding b constant, with respect to
+  /// wrt
+  Eigen::MatrixXd getJacobianOfLCPConstraintMatrixClampingSubset(
+      simulation::WorldPtr world, Eigen::VectorXd b, WithRespectTo wrt);
+
+  /// This returns the jacobian of b (from Q^{-1}b) with respect to wrt
+  Eigen::MatrixXd getJacobianOfLCPOffsetClampingSubset(
+      simulation::WorldPtr world, WithRespectTo wrt);
+
   /// This returns the subset of the A matrix used by the original LCP for just
   /// the clamping constraints. It relates constraint force to constraint
   /// acceleration. It's a mass matrix, just in a weird frame.
@@ -243,9 +263,24 @@ public:
   Eigen::MatrixXd estimateClampingConstraintMatrixAt(
       simulation::WorldPtr world, Eigen::VectorXd pos);
 
+  /// This returns a fast approximation to A_ub in the neighborhood of the
+  /// original
+  Eigen::MatrixXd estimateUpperBoundConstraintMatrixAt(
+      simulation::WorldPtr world, Eigen::VectorXd pos);
+
   /// This computes the Jacobian of A_c*f0 with respect to position using
   /// impulse tests.
   Eigen::MatrixXd getJacobianOfClampingConstraints(
+      simulation::WorldPtr world, Eigen::VectorXd f0);
+
+  /// This computes the Jacobian of A_c^T*v0 with respect to position using
+  /// impulse tests.
+  Eigen::MatrixXd getJacobianOfClampingConstraintsTranspose(
+      simulation::WorldPtr world, Eigen::VectorXd v0);
+
+  /// This computes the Jacobian of A_ub*E*f0 with respect to position using
+  /// impulse tests.
+  Eigen::MatrixXd getJacobianOfUpperBoundConstraints(
       simulation::WorldPtr world, Eigen::VectorXd f0);
 
   /// This measures a vector of contact impulses (measured at the clamping
@@ -258,6 +293,18 @@ public:
   /// position. This is AS SLOW AS FINITE DIFFERENCING THE WHOLE ENGINE, which
   /// is way too slow to use in practice.
   Eigen::MatrixXd finiteDifferenceJacobianOfClampingConstraints(
+      simulation::WorldPtr world, Eigen::VectorXd f0);
+
+  /// This computes the finite difference Jacobian of A_c^T*v0 with respect to
+  /// position. This is AS SLOW AS FINITE DIFFERENCING THE WHOLE ENGINE, which
+  /// is way too slow to use in practice.
+  Eigen::MatrixXd finiteDifferenceJacobianOfClampingConstraintsTranspose(
+      simulation::WorldPtr world, Eigen::VectorXd v0);
+
+  /// This computes the finite difference Jacobian of A_ub*E*f0 with respect to
+  /// position. This is AS SLOW AS FINITE DIFFERENCING THE WHOLE ENGINE, which
+  /// is way too slow to use in practice.
+  Eigen::MatrixXd finiteDifferenceJacobianOfUpperBoundConstraints(
       simulation::WorldPtr world, Eigen::VectorXd f0);
 
   /// This computes and returns the jacobian of P_c * v by finite
@@ -273,6 +320,11 @@ public:
   /// This computes and returns the jacobian of C(pos, inertia, vel) by finite
   /// differences. This is SUPER SLOW, and is only here for testing.
   Eigen::MatrixXd finiteDifferenceJacobianOfC(
+      simulation::WorldPtr world, WithRespectTo wrt);
+
+  /// This returns the jacobian of constraint force, holding everyhing constant
+  /// except the value of WithRespectTo
+  Eigen::MatrixXd finiteDifferenceJacobianOfConstraintForce(
       simulation::WorldPtr world, WithRespectTo wrt);
 
   /// These was the mX() vector used to construct this. Pretty much only here
@@ -352,6 +404,10 @@ protected:
 
   /// The torques on all the DOFs of the world BEFORE the timestep
   Eigen::VectorXd mPreStepTorques;
+
+  /// The velocities of all the DOFs of the world AFTER an unconstrained forward
+  /// step, but BEFORE the LCP runs
+  Eigen::VectorXd mPreConstraintVelocities;
 
   /// The position of all the DOFs of the world AFTER the timestep
   Eigen::VectorXd mPostStepPosition;

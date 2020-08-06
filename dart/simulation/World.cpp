@@ -193,6 +193,12 @@ void World::step(bool _resetCommand, bool _integratePositionAfterVelocity)
     skel->integrateVelocities(mTimeStep);
   }
 
+  // Record the unconstrained velocities, cause we need them for backprop
+  if (mConstraintSolver->getGradientEnabled())
+  {
+    mLastPreConstraintVelocity = getVelocities();
+  }
+
   // Detect activated constraints and compute constraint impulses
   mConstraintSolver->solve();
 
@@ -1097,6 +1103,12 @@ void World::bake()
 Recording* World::getRecording()
 {
   return mRecording;
+}
+
+//==============================================================================
+const Eigen::VectorXd& World::getLastPreConstraintVelocity() const
+{
+  return mLastPreConstraintVelocity;
 }
 
 //==============================================================================

@@ -386,6 +386,10 @@ public:
   /// Get recording
   Recording* getRecording();
 
+  /// Get the unconstrained velocities that we found in the last timestep,
+  /// before we solved the LCP for constraints
+  const Eigen::VectorXd& getLastPreConstraintVelocity() const;
+
 protected:
   /// Register when a Skeleton's name is changed
   void handleSkeletonNameChange(
@@ -450,6 +454,10 @@ protected:
 
   ///
   Recording* mRecording;
+
+  /// This holds the unconstrained velocities that we found in the last
+  /// timestep, before we solved the LCP for constraints
+  Eigen::VectorXd mLastPreConstraintVelocity;
 
   //--------------------------------------------------------------------------
   // Signals
