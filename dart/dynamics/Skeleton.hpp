@@ -48,6 +48,7 @@
 #include "dart/dynamics/SpecializedNodeManager.hpp"
 #include "dart/dynamics/detail/BodyNodeAspect.hpp"
 #include "dart/dynamics/detail/SkeletonAspect.hpp"
+#include "dart/neural/NeuralConstants.hpp"
 
 namespace dart {
 
@@ -571,18 +572,33 @@ public:
           gradientMatrices);
 
   /// This gives the unconstrained Jacobian giving the difference in C(pos, vel)
-  Eigen::MatrixXd getPosCJacobian();
-
-  /// This gives the unconstrained Jacobian giving the difference in C(pos, vel)
   Eigen::MatrixXd getVelCJacobian();
 
+  /// This gives the unconstrained Jacobian of C(pos, vel)
+  Eigen::MatrixXd getJacobianOfC(neural::WithRespectTo wrt);
+
+  /// This gives the unconstrained Jacobian of M^{-1}f
+  Eigen::MatrixXd getJacobionOfMinv(
+      Eigen::VectorXd f, neural::WithRespectTo wrt);
+
   /// VERY SLOW: Only for testing. This computes the unconstrained Jacobian
-  /// giving the difference in C(pos, vel) for finite changes in pos
-  Eigen::MatrixXd finiteDifferencePosCJacobian();
+  /// giving the difference in C(pos, vel) for finite changes
+  Eigen::MatrixXd finiteDifferenceJacobianOfC(neural::WithRespectTo wrt);
+
+  /// VERY SLOW: Only for testing. This computes the unconstrained Jacobian
+  /// giving the difference in M^{-1}f for finite changes
+  Eigen::MatrixXd finiteDifferenceJacobianOfMinv(
+      Eigen::VectorXd f, neural::WithRespectTo wrt);
 
   /// VERY SLOW: Only for testing. This computes the unconstrained Jacobian
   /// giving the difference in C(pos, vel) for finite changes in vel
   Eigen::MatrixXd finiteDifferenceVelCJacobian();
+
+  std::size_t getWrtDim(neural::WithRespectTo wrt);
+
+  Eigen::VectorXd getWrt(neural::WithRespectTo wrt);
+
+  void setWrt(neural::WithRespectTo wrt, Eigen::VectorXd v);
 
   //----------------------------------------------------------------------------
   // Trajectory optimization

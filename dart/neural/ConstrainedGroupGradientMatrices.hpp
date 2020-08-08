@@ -8,6 +8,8 @@
 
 #include <Eigen/Dense>
 
+#include "dart/neural/DifferentiableConstraint.hpp"
+#include "dart/neural/NeuralConstants.hpp"
 #include "dart/neural/NeuralUtils.hpp"
 #include "dart/simulation/World.hpp"
 
@@ -133,6 +135,50 @@ public:
   /// just here to enable testing.
   Eigen::MatrixXd getProjectionIntoClampsMatrix();
 
+  /// This computes and returns the whole pos-vel jacobian. For backprop, you
+  /// don't actually need this matrix, you can compute backprop directly. This
+  /// is here if you want access to the full Jacobian for some reason.
+  Eigen::MatrixXd getVelJacobianWrt(
+      simulation::WorldPtr world, WithRespectTo wrt);
+
+  /// This returns the jacobian of constraint force, holding everyhing constant
+  /// except the value of WithRespectTo
+  Eigen::MatrixXd getJacobianOfConstraintForce(
+      simulation::WorldPtr world, WithRespectTo wrt);
+
+  /// This returns the jacobian of Q^{-1}b, holding b constant, with respect to
+  /// wrt
+  Eigen::MatrixXd getJacobianOfLCPConstraintMatrixClampingSubset(
+      simulation::WorldPtr world, Eigen::VectorXd b, WithRespectTo wrt);
+
+  /// This returns the jacobian of b (from Q^{-1}b) with respect to wrt
+  Eigen::MatrixXd getJacobianOfLCPOffsetClampingSubset(
+      simulation::WorldPtr world, WithRespectTo wrt);
+
+  /// This returns the jacobian of M^{-1}(pos, inertia) * tau, holding
+  /// everything constant except the value of WithRespectTo
+  Eigen::MatrixXd getJacobianOfMinv(
+      simulation::WorldPtr world, Eigen::VectorXd tau, WithRespectTo wrt);
+
+  /// This returns the jacobian of C(pos, inertia, vel), holding everything
+  /// constant except the value of WithRespectTo
+  Eigen::MatrixXd getJacobianOfC(simulation::WorldPtr world, WithRespectTo wrt);
+
+  /// This computes the Jacobian of A_c*f0 with respect to position using
+  /// impulse tests.
+  Eigen::MatrixXd getJacobianOfClampingConstraints(
+      simulation::WorldPtr world, Eigen::VectorXd f0);
+
+  /// This computes the Jacobian of A_c^T*v0 with respect to position using
+  /// impulse tests.
+  Eigen::MatrixXd getJacobianOfClampingConstraintsTranspose(
+      simulation::WorldPtr world, Eigen::VectorXd v0);
+
+  /// This computes the Jacobian of A_ub*E*f0 with respect to position using
+  /// impulse tests.
+  Eigen::MatrixXd getJacobianOfUpperBoundConstraints(
+      simulation::WorldPtr world, Eigen::VectorXd f0);
+
   /// This computes the implicit backprop without forming intermediate
   /// Jacobians. It takes a LossGradient with the position and velocity vectors
   /// filled it, though the loss with respect to torque is ignored and can be
@@ -145,13 +191,13 @@ public:
 
   /// This replaces x with the result of M*x in place, without explicitly
   /// forming M
-  void implicitMultiplyByMassMatrix(
-      simulation::WorldPtr world, Eigen::VectorXd& x);
+  Eigen::VectorXd implicitMultiplyByMassMatrix(
+      simulation::WorldPtr world, const Eigen::VectorXd& x);
 
   /// This replaces x with the result of Minv*x in place, without explicitly
   /// forming Minv
-  void implicitMultiplyByInvMassMatrix(
-      simulation::WorldPtr world, Eigen::VectorXd& x);
+  Eigen::VectorXd implicitMultiplyByInvMassMatrix(
+      simulation::WorldPtr world, const Eigen::VectorXd& x);
 
   const Eigen::MatrixXd& getClampingConstraintMatrix() const;
 
@@ -196,14 +242,44 @@ public:
   /// Returns the velocity change caused by the illegal impulses from the LCP
   const Eigen::VectorXd& getVelocityDueToIllegalImpulses() const;
 
+  /// Returns the coriolis and gravity forces pre-step
+  const Eigen::VectorXd& getCoriolisAndGravityForces() const;
+
+  /// Returns the torques applied pre-step
+  const Eigen::VectorXd& getPreStepTorques() const;
+
+  /// Returns the velocity pre-step
+  const Eigen::VectorXd& getPreStepVelocity() const;
+
+  /// Returns the velocity pre-LCP
+  const Eigen::VectorXd& getPreLCPVelocity() const;
+
+  /// Returns the M^{-1} matrix from pre-step
+  const Eigen::VectorXd& getMinv() const;
+
   std::size_t getNumDOFs() const;
 
   std::size_t getNumConstraintDim() const;
 
   const std::vector<std::string>& getSkeletons() const;
 
-  const std::vector<std::shared_ptr<constraint::ConstraintBase>>&
+  const std::vector<std::shared_ptr<DifferentiableConstraint>>&
   getClampingConstraints() const;
+
+  const std::vector<std::shared_ptr<DifferentiableConstraint>>&
+  getUpperBoundConstraints() const;
+
+  /// This computes and returns the jacobian of M^{-1}(pos, inertia) * tau by
+  /// finite differences. This is SUPER SLOW, and is only here for testing.
+  Eigen::MatrixXd finiteDifferenceJacobianOfMinv(
+      simulation::WorldPtr world, Eigen::VectorXd tau, WithRespectTo wrt);
+
+private:
+  std::size_t getWrtDim(simulation::WorldPtr world, WithRespectTo wrt);
+
+  Eigen::VectorXd getWrt(simulation::WorldPtr world, WithRespectTo wrt);
+
+  void setWrt(simulation::WorldPtr world, WithRespectTo wrt, Eigen::VectorXd v);
 
 protected:
   /// Impulse test matrix for the clamping constraints
@@ -256,6 +332,21 @@ protected:
   /// to clamping indices.
   Eigen::MatrixXd mClampingAMatrix;
 
+  /// This is the inverse mass matrix computed in the constuctor
+  Eigen::MatrixXd mMinv;
+
+  /// These are the coriolis and gravity forces, computed in the constuctor
+  Eigen::VectorXd mCoriolisAndGravityForces;
+
+  /// These are the torques being applied, computed in the constuctor
+  Eigen::VectorXd mPreStepTorques;
+
+  /// These are the pre-step velocities, computed in the constuctor
+  Eigen::VectorXd mPreStepVelocities;
+
+  /// These are the pre-LCP velocities, computed in the constuctor
+  Eigen::VectorXd mPreLCPVelocities;
+
   /// These are the names of skeletons that are covered by this constraint group
   std::vector<std::string> mSkeletons;
 
@@ -275,8 +366,15 @@ protected:
   /// This is all the constraints, in order that they were registered
   std::vector<std::shared_ptr<constraint::ConstraintBase>> mConstraints;
 
+  /// This gives the index into the constraint at mConstraints[i] that
+  /// constraint i represents
+  std::vector<int> mConstraintIndices;
+
   /// These are just the clamping constraints
-  std::vector<std::shared_ptr<constraint::ConstraintBase>> mClampingConstraints;
+  std::vector<std::shared_ptr<DifferentiableConstraint>> mClampingConstraints;
+
+  /// These are just the upper bound constraints
+  std::vector<std::shared_ptr<DifferentiableConstraint>> mUpperBoundConstraints;
 
   /// These are public to enable unit testing
 public:

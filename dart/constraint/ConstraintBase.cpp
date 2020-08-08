@@ -112,6 +112,12 @@ dynamics::SkeletonPtr ConstraintBase::getRootSkeleton(
 }
 
 //==============================================================================
+bool ConstraintBase::isContactConstraint() const
+{
+  return false;
+}
+
+//==============================================================================
 double ConstraintBase::getCoefficientOfRestitution()
 {
   return 0;

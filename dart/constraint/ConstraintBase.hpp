@@ -102,6 +102,9 @@ public:
   /// Return true if this constraint is active
   virtual bool isActive() const = 0;
 
+  /// Return true if this constraint is a contact constraint
+  virtual bool isContactConstraint() const;
+
   /// Returns 0 if this constraint isn't bouncing, otherwise returns the
   /// coefficient of restitution
   virtual double getCoefficientOfRestitution();

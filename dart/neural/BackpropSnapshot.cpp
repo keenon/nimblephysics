@@ -5,6 +5,7 @@
 #include "dart/constraint/ConstraintSolver.hpp"
 #include "dart/dynamics/Skeleton.hpp"
 #include "dart/neural/ConstrainedGroupGradientMatrices.hpp"
+#include "dart/neural/DifferentiableConstraint.hpp"
 #include "dart/neural/RestorableSnapshot.hpp"
 #include "dart/simulation/World.hpp"
 
@@ -181,7 +182,7 @@ void BackpropSnapshot::backprop(
           // p_t --> p_t+1
           = nextTimestepLoss.lossWrtPosition.segment(dofCursorWorld, dofs)
             // p_t --> v_t+1
-            - (skel->getPosCJacobian().transpose()
+            - (skel->getJacobianOfC(WithRespectTo::POSITION).transpose()
                * thisTimestepLoss.lossWrtTorque.segment(dofCursorWorld, dofs));
 
       // v_t
@@ -382,10 +383,12 @@ Eigen::MatrixXd BackpropSnapshot::getScratchAnalytical(
   Eigen::MatrixXd dA_c_f
       = getJacobianOfClampingConstraintsTranspose(world, v_f);
 
-  Eigen::MatrixXd Q = Eigen::MatrixXd(A_c.cols(), A_c.cols());
-  computeLCPConstraintMatrixClampingSubset(world, Q, A_c);
-  Eigen::VectorXd b = Eigen::VectorXd::Ones(A_c.cols());
-  computeLCPOffsetClampingSubset(world, b, A_c);
+  Eigen::MatrixXd Q
+      = getClampingAMatrix(); // Eigen::MatrixXd(A_c.cols(), A_c.cols());
+  // computeLCPConstraintMatrixClampingSubset(world, Q, A_c);
+  Eigen::VectorXd b
+      = getClampingConstraintRelativeVels(); // Eigen::VectorXd::Ones(A_c.cols());
+  // computeLCPOffsetClampingSubset(world, b, A_c);
   Eigen::MatrixXd dQ_b = getJacobianOfLCPConstraintMatrixClampingSubset(
       world, b, WithRespectTo::POSITION);
   Eigen::MatrixXd dB
@@ -647,13 +650,15 @@ Eigen::VectorXd BackpropSnapshot::getPreStepPosition()
 //==============================================================================
 Eigen::VectorXd BackpropSnapshot::getPreStepVelocity()
 {
-  return mPreStepVelocity;
+  return assembleVector<Eigen::VectorXd>(VectorToAssemble::PRE_STEP_VEL);
+  // return mPreStepVelocity;
 }
 
 //==============================================================================
 Eigen::VectorXd BackpropSnapshot::getPreStepTorques()
 {
-  return mPreStepTorques;
+  return assembleVector<Eigen::VectorXd>(VectorToAssemble::PRE_STEP_TAU);
+  // return mPreStepTorques;
 }
 
 //==============================================================================
@@ -855,6 +860,21 @@ Eigen::VectorXd BackpropSnapshot::getVelocityDueToIllegalImpulses()
 }
 
 //==============================================================================
+/// Returns the coriolis and gravity forces pre-step
+Eigen::VectorXd BackpropSnapshot::getCoriolisAndGravityForces()
+{
+  return assembleVector<Eigen::VectorXd>(
+      VectorToAssemble::CORIOLIS_AND_GRAVITY);
+}
+
+//==============================================================================
+/// Returns the velocity pre-LCP
+Eigen::VectorXd BackpropSnapshot::getPreLCPVelocity()
+{
+  return assembleVector<Eigen::VectorXd>(VectorToAssemble::PRE_LCP_VEL);
+}
+
+//==============================================================================
 bool BackpropSnapshot::hasBounces()
 {
   return mNumBouncing > 0;
@@ -867,11 +887,27 @@ std::size_t BackpropSnapshot::getNumClamping()
 }
 
 //==============================================================================
-std::vector<std::shared_ptr<constraint::ConstraintBase>>
+std::vector<std::shared_ptr<DifferentiableConstraint>>
 BackpropSnapshot::getClampingConstraints()
 {
-  std::vector<std::shared_ptr<constraint::ConstraintBase>> vec;
+  std::vector<std::shared_ptr<DifferentiableConstraint>> vec;
   vec.reserve(mNumClamping);
+  for (auto gradientMatrices : mGradientMatrices)
+  {
+    for (auto constraint : gradientMatrices->getClampingConstraints())
+    {
+      vec.push_back(constraint);
+    }
+  }
+  return vec;
+}
+
+//==============================================================================
+std::vector<std::shared_ptr<DifferentiableConstraint>>
+BackpropSnapshot::getUpperBoundConstraints()
+{
+  std::vector<std::shared_ptr<DifferentiableConstraint>> vec;
+  vec.reserve(mNumUpperBound);
   for (auto gradientMatrices : mGradientMatrices)
   {
     for (auto constraint : gradientMatrices->getClampingConstraints())
@@ -1276,18 +1312,15 @@ Eigen::MatrixXd BackpropSnapshot::getJacobianOfConstraintForce(
     return Eigen::MatrixXd::Zero(0, wrtDim);
   }
 
-  RestorableSnapshot snapshot(world);
-  world->setPositions(mPreStepPosition);
-  world->setVelocities(mPreStepVelocity);
-  world->setForces(mPreStepTorques);
+  /*
+    RestorableSnapshot snapshot(world);
+    world->setPositions(mPreStepPosition);
+    world->setVelocities(mPreStepVelocity);
+    world->setForces(mPreStepTorques);
+    */
 
-  Eigen::MatrixXd Minv = getInvMassMatrix(world);
-
-  Eigen::MatrixXd Q = getClampingAMatrix(); //
-  Eigen::VectorXd b
-      = getClampingConstraintRelativeVels(); // -A_c.transpose() * v;
-  Eigen::VectorXd reverseEngineeredV
-      = -A_c.transpose().completeOrthogonalDecomposition().solve(b);
+  Eigen::MatrixXd Q = getClampingAMatrix();
+  Eigen::VectorXd b = getClampingConstraintRelativeVels();
 
   Eigen::MatrixXd dQ_b
       = getJacobianOfLCPConstraintMatrixClampingSubset(world, b, wrt);
@@ -1297,7 +1330,7 @@ Eigen::MatrixXd BackpropSnapshot::getJacobianOfConstraintForce(
 
   Eigen::MatrixXd dB = getJacobianOfLCPOffsetClampingSubset(world, wrt);
 
-  snapshot.restore();
+  // snapshot.restore();
 
   return dQ_b + Qfac.solve(dB);
 }
@@ -1314,7 +1347,7 @@ BackpropSnapshot::getJacobianOfLCPConstraintMatrixClampingSubset(
   }
 
   Eigen::MatrixXd Minv = getInvMassMatrix(world);
-  Eigen::MatrixXd Q = A_c.transpose() * Minv * A_c;
+  Eigen::MatrixXd Q = getClampingAMatrix(); // A_c.transpose() * Minv * A_c;
   Eigen::CompleteOrthogonalDecomposition<Eigen::MatrixXd> Qfactored
       = Q.completeOrthogonalDecomposition();
 
@@ -1350,8 +1383,8 @@ Eigen::MatrixXd BackpropSnapshot::getJacobianOfLCPOffsetClampingSubset(
   Eigen::MatrixXd Minv = getInvMassMatrix(world);
   Eigen::MatrixXd A_c = getClampingConstraintMatrix(world);
   Eigen::MatrixXd dC = getJacobianOfC(world, wrt);
-  Eigen::VectorXd C = world->getCoriolisAndGravityAndExternalForces();
-  Eigen::VectorXd f = world->getForces() - C;
+  Eigen::VectorXd C = getCoriolisAndGravityForces();
+  Eigen::VectorXd f = getPreStepTorques() - C;
   Eigen::MatrixXd dMinv_f = getJacobianOfMinv(world, f, wrt);
   Eigen::VectorXd v_f = world->getVelocities()
                         // + getVelocityDueToIllegalImpulses()
@@ -1585,7 +1618,7 @@ Eigen::MatrixXd BackpropSnapshot::getJacobianOfUpperBoundConstraints(
 Eigen::VectorXd BackpropSnapshot::getClampingImpulseVelChange(
     simulation::WorldPtr world, Eigen::VectorXd f0)
 {
-  std::vector<std::shared_ptr<constraint::ConstraintBase>> clampingConstraints
+  std::vector<std::shared_ptr<DifferentiableConstraint>> clampingConstraints
       = getClampingConstraints();
   assert(
       clampingConstraints.size() == f0.size()
@@ -2056,7 +2089,7 @@ Eigen::MatrixXd BackpropSnapshot::assembleBlockDiagonalMatrix(
         whichMatrix == BackpropSnapshot::BlockDiagonalMatrixToAssemble::POS_C)
     {
       J.block(cursor, cursor, skelDOF, skelDOF)
-          = world->getSkeleton(i)->getPosCJacobian();
+          = world->getSkeleton(i)->getJacobianOfC(WithRespectTo::POSITION);
     }
     else if (
         whichMatrix == BackpropSnapshot::BlockDiagonalMatrixToAssemble::VEL_C)
@@ -2133,6 +2166,14 @@ const Eigen::VectorXd& BackpropSnapshot::getVectorToAssemble(
     return matrices->getClampingConstraintRelativeVels();
   if (whichVector == VectorToAssemble::VEL_DUE_TO_ILLEGAL)
     return matrices->getVelocityDueToIllegalImpulses();
+  if (whichVector == VectorToAssemble::PRE_STEP_VEL)
+    return matrices->getPreStepVelocity();
+  if (whichVector == VectorToAssemble::PRE_STEP_TAU)
+    return matrices->getPreStepTorques();
+  if (whichVector == VectorToAssemble::PRE_LCP_VEL)
+    return matrices->getPreLCPVelocity();
+  if (whichVector == VectorToAssemble::CORIOLIS_AND_GRAVITY)
+    return matrices->getCoriolisAndGravityForces();
 
   assert(whichVector != VectorToAssemble::CONTACT_CONSTRAINT_MAPPINGS);
   // Control will never reach this point, but this removes a warning

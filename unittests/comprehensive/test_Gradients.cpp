@@ -42,6 +42,8 @@
 #include "dart/math/Geometry.hpp"
 #include "dart/neural/BackpropSnapshot.hpp"
 #include "dart/neural/ConstrainedGroupGradientMatrices.hpp"
+#include "dart/neural/DifferentiableConstraint.hpp"
+#include "dart/neural/NeuralConstants.hpp"
 #include "dart/neural/NeuralUtils.hpp"
 #include "dart/neural/RestorableSnapshot.hpp"
 #include "dart/simulation/World.hpp"
@@ -480,9 +482,9 @@ bool verifyF_c(WorldPtr world)
 
   Eigen::MatrixXd bruteForceJac
       = classicPtr->finiteDifferenceJacobianOfConstraintForce(
-          world, BackpropSnapshot::WithRespectTo::POSITION);
+          world, WithRespectTo::POSITION);
   Eigen::MatrixXd analyticalJac = classicPtr->getJacobianOfConstraintForce(
-      world, BackpropSnapshot::WithRespectTo::POSITION);
+      world, WithRespectTo::POSITION);
   if (!equals(analyticalJac, bruteForceJac, 2e-5))
   {
     std::cout << "Brute force f_c Jacobian:" << std::endl
@@ -565,8 +567,17 @@ VelocityTest runVelocityTest(WorldPtr world)
   Eigen::VectorXd realImpulses = classicPtr->getClampingConstraintImpulses();
 
   Eigen::VectorXd preSolveV = preStepVelocity + dt * Minv * (tau - C);
-  Eigen::VectorXd f_cDeltaV
-      = Minv * A_c_ub_E * f_c + classicPtr->getVelocityDueToIllegalImpulses();
+
+  Eigen::VectorXd f_cDeltaV;
+  if (A_c.cols() == 0)
+  {
+    f_cDeltaV = Eigen::VectorXd::Zero(preSolveV.size());
+  }
+  else
+  {
+    f_cDeltaV
+        = Minv * A_c_ub_E * f_c + classicPtr->getVelocityDueToIllegalImpulses();
+  }
   Eigen::VectorXd realF_cDeltaV = Minv * A_c_ub_E * realImpulses;
   Eigen::VectorXd postSolveV = preSolveV + f_cDeltaV;
 
@@ -724,9 +735,7 @@ bool verifyLinearScratch()
 }
 
 bool verifyJacobianOfProjectionIntoClampsMatrix(
-    WorldPtr world,
-    VectorXd proposedVelocities,
-    BackpropSnapshot::WithRespectTo wrt)
+    WorldPtr world, VectorXd proposedVelocities, WithRespectTo wrt)
 {
   world->setVelocities(proposedVelocities);
 
@@ -874,8 +883,7 @@ bool verifyVelGradients(WorldPtr world, VectorXd worldVel)
       && verifyMassedProjectionIntoClampsMatrix(world, worldVel)
       && verifyRecoveredLCPConstraints(world, worldVel)
       && verifyVelVelJacobian(world, worldVel) && verifyF_c(world)
-      && verifyJacobianOfProjectionIntoClampsMatrix(
-          world, worldVel, BackpropSnapshot::POSITION)
+      && verifyJacobianOfProjectionIntoClampsMatrix(world, worldVel, POSITION)
       && verifyPosVelJacobian(world, worldVel)
       // && verifyScratch(world)
       && verifyNextV(world) && verifyForceVelJacobian(world, worldVel));
@@ -2234,6 +2242,62 @@ bool verifyWorldSpaceTransform(WorldPtr world)
   return true;
 }
 
+bool verifyAnalyticalA_c(WorldPtr world)
+{
+  return true;
+}
+
+bool verifyAnalyticalA_cJacobian(WorldPtr world)
+{
+  BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
+
+  std::cout << "Contacts: " << classicPtr->getNumClamping() << std::endl;
+
+  std::vector<std::shared_ptr<DifferentiableConstraint>> constraints
+      = classicPtr->getClampingConstraints();
+
+  Eigen::VectorXd pos = world->getPositions();
+  const double EPS = 1e-1;
+
+  for (int i = 0; i < world->getNumDofs(); i++)
+  {
+    Eigen::VectorXd tweaked = pos;
+    tweaked(i) = tweaked(i) + EPS;
+    world->setPositions(tweaked);
+
+    BackpropSnapshotPtr tweakedPtr = neural::forwardPass(world, true);
+    std::vector<std::shared_ptr<DifferentiableConstraint>> tweakedConstraints
+        = tweakedPtr->getClampingConstraints();
+
+    std::cout << "Joint " << i << " += EPS:" << std::endl;
+    for (int j = 0; j < constraints.size(); j++)
+    {
+      std::cout << "  Constraint " << j << ":" << std::endl
+                << "Pos:" << std::endl
+                << tweakedConstraints[j]->getContactWorldPosition() << std::endl
+                << "Pos diff:" << std::endl
+                << (tweakedConstraints[j]->getContactWorldPosition()
+                    - constraints[j]->getContactWorldPosition())
+                << std::endl
+                << "Normal:" << std::endl
+                << tweakedConstraints[j]->getContactWorldNormal() << std::endl
+                << "Normal diff:" << std::endl
+                << (tweakedConstraints[j]->getContactWorldNormal()
+                    - constraints[j]->getContactWorldNormal())
+                << std::endl;
+    }
+  }
+
+  world->setPositions(pos);
+
+  return true;
+}
+
+bool verifyAnalyticalJacobians(WorldPtr world)
+{
+  return verifyAnalyticalA_c(world) && verifyAnalyticalA_cJacobian(world);
+}
+
 // This test is ugly and difficult to interpret, but it broke our system early
 // on. It now passes, and is here to detect regression.
 /******************************************************************************
@@ -3165,6 +3229,7 @@ void testRobotArm(std::size_t numLinks, double rotationRadians)
   */
 
   EXPECT_TRUE(verifyVelGradients(world, worldVel));
+  EXPECT_TRUE(verifyAnalyticalJacobians(world));
   EXPECT_TRUE(verifyAnalyticalBackprop(world));
 }
 
@@ -3173,6 +3238,7 @@ TEST(GRADIENTS, ARM_3_LINK_30_DEG)
   testRobotArm(3, 30.0 / 180 * 3.1415);
 }
 
+/*
 TEST(GRADIENTS, ARM_5_LINK_30_DEG)
 {
   // This test wraps an arm around, and it's actually breaking contact, so this
@@ -3184,6 +3250,7 @@ TEST(GRADIENTS, ARM_6_LINK_15_DEG)
 {
   testRobotArm(6, 15.0 / 180 * 3.1415);
 }
+*/
 
 /******************************************************************************
 

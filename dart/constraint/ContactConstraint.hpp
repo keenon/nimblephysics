@@ -93,6 +93,9 @@ public:
   /// Get first frictional direction
   const Eigen::Vector3d& getFrictionDirection1() const;
 
+  // Returns the contact
+  const collision::Contact& getContact() const;
+
   //----------------------------------------------------------------------------
   // Friendship
   //----------------------------------------------------------------------------
@@ -138,6 +141,10 @@ protected:
   // Documentation inherited
   bool isActive() const override;
 
+public:
+  /// Returns true
+  bool isContactConstraint() const override;
+
   /// Returns 0 if this constraint isn't bouncing, otherwise returns the
   /// coefficient of restitution
   double getCoefficientOfRestitution() override;
@@ -147,7 +154,6 @@ protected:
   /// penetration correction hack.
   double getPenetrationCorrectionVelocity() override;
 
-private:
   using TangentBasisMatrix = Eigen::Matrix<double, 3, 2>;
 
   /// Get change in relative velocity at contact point due to external impulse

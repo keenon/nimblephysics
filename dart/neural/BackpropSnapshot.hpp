@@ -6,6 +6,8 @@
 
 #include <Eigen/Dense>
 
+#include "dart/neural/DifferentiableConstraint.hpp"
+#include "dart/neural/NeuralConstants.hpp"
 #include "dart/neural/NeuralUtils.hpp"
 #include "dart/simulation/World.hpp"
 
@@ -183,14 +185,6 @@ public:
   Eigen::VectorXd implicitMultiplyByInvMassMatrix(
       simulation::WorldPtr world, const Eigen::VectorXd& x);
 
-  enum WithRespectTo
-  {
-    POSITION,
-    LINK_MASSES,
-    LINK_COMS,
-    LINK_MOIS
-  };
-
   /// TODO(keenon): Remove me
   Eigen::MatrixXd getScratchAnalytical(simulation::WorldPtr world);
 
@@ -357,6 +351,12 @@ public:
   /// timestep
   Eigen::VectorXd getVelocityDueToIllegalImpulses();
 
+  /// Returns the coriolis and gravity forces pre-step
+  Eigen::VectorXd getCoriolisAndGravityForces();
+
+  /// Returns the velocity pre-LCP
+  Eigen::VectorXd getPreLCPVelocity();
+
   /// Returns true if there were any bounces in this snapshot.
   bool hasBounces();
 
@@ -368,9 +368,14 @@ public:
       mGradientMatrices;
 
   /// This is the clamping constraints from all the constrained
-  /// groups,concatenated together
-  std::vector<std::shared_ptr<constraint::ConstraintBase>>
+  /// groups, concatenated together
+  std::vector<std::shared_ptr<DifferentiableConstraint>>
   getClampingConstraints();
+
+  /// This is the upper bound constraints from all the constrained
+  /// groups, concatenated together
+  std::vector<std::shared_ptr<DifferentiableConstraint>>
+  getUpperBoundConstraints();
 
 protected:
   /// This is the global timestep length. This is included here because it shows
@@ -462,7 +467,11 @@ private:
     PENETRATION_VELOCITY_HACK,
     CLAMPING_CONSTRAINT_IMPULSES,
     CLAMPING_CONSTRAINT_RELATIVE_VELS,
-    VEL_DUE_TO_ILLEGAL
+    VEL_DUE_TO_ILLEGAL,
+    CORIOLIS_AND_GRAVITY,
+    PRE_STEP_VEL,
+    PRE_STEP_TAU,
+    PRE_LCP_VEL
   };
   template <typename Vec>
   Vec assembleVector(VectorToAssemble whichVector);

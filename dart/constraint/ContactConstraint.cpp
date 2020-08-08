@@ -820,6 +820,18 @@ std::vector<dynamics::SkeletonPtr> ContactConstraint::getSkeletons() const
 }
 
 //==============================================================================
+const collision::Contact& ContactConstraint::getContact() const
+{
+  return mContact;
+}
+
+//==============================================================================
+bool ContactConstraint::isContactConstraint() const
+{
+  return true;
+}
+
+//==============================================================================
 double ContactConstraint::getCoefficientOfRestitution()
 {
   if (!mIsBounceOn || !mDidBounce)

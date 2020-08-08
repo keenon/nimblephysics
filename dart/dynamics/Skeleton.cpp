@@ -1563,10 +1563,19 @@ void Skeleton::setGradientConstraintMatrices(
 }
 
 //==============================================================================
-Eigen::MatrixXd Skeleton::getPosCJacobian()
+Eigen::MatrixXd Skeleton::getJacobianOfC(neural::WithRespectTo wrt)
 {
   // TOOD(keenon): replace with the GEAR approach
-  return finiteDifferencePosCJacobian();
+  return finiteDifferenceJacobianOfC(wrt);
+}
+
+//==============================================================================
+/// This gives the unconstrained Jacobian of M^{-1}f
+Eigen::MatrixXd Skeleton::getJacobionOfMinv(
+    Eigen::VectorXd f, neural::WithRespectTo wrt)
+{
+  // TOOD(keenon): replace with the GEAR approach
+  return finiteDifferenceJacobianOfMinv(f, wrt);
 }
 
 //==============================================================================
@@ -1577,29 +1586,60 @@ Eigen::MatrixXd Skeleton::getVelCJacobian()
 }
 
 //==============================================================================
-Eigen::MatrixXd Skeleton::finiteDifferencePosCJacobian()
+Eigen::MatrixXd Skeleton::finiteDifferenceJacobianOfC(neural::WithRespectTo wrt)
 {
   std::size_t n = getNumDofs();
-  Eigen::MatrixXd J = Eigen::MatrixXd(n, n);
-  Eigen::VectorXd pos = getPositions();
+  std::size_t m = getWrtDim(wrt);
+  Eigen::MatrixXd J = Eigen::MatrixXd(n, m);
+  Eigen::VectorXd start = getWrt(wrt);
 
   // Get baseline C(pos, vel)
   Eigen::VectorXd baseline = getCoriolisAndGravityForces();
 
   double EPS = 1e-4;
 
-  for (std::size_t i = 0; i < n; i++)
+  for (std::size_t i = 0; i < m; i++)
   {
-    Eigen::VectorXd tweakedPos = pos;
-    tweakedPos(i) += EPS;
-    setPositions(tweakedPos);
+    Eigen::VectorXd tweaked = start;
+    tweaked(i) += EPS;
+    setWrt(wrt, tweaked);
     Eigen::VectorXd perturbed = getCoriolisAndGravityForces();
 
     J.col(i) = (perturbed - baseline) / EPS;
   }
 
   // Reset everything how we left it
-  setPositions(pos);
+  setWrt(wrt, start);
+
+  return J;
+}
+
+//==============================================================================
+Eigen::MatrixXd Skeleton::finiteDifferenceJacobianOfMinv(
+    Eigen::VectorXd f, neural::WithRespectTo wrt)
+{
+  std::size_t n = getNumDofs();
+  std::size_t m = getWrtDim(wrt);
+  Eigen::MatrixXd J = Eigen::MatrixXd(n, m);
+  Eigen::VectorXd start = getWrt(wrt);
+
+  // Get baseline C(pos, vel)
+  Eigen::VectorXd baseline = multiplyByImplicitInvMassMatrix(f);
+
+  double EPS = 1e-4;
+
+  for (std::size_t i = 0; i < m; i++)
+  {
+    Eigen::VectorXd tweaked = start;
+    tweaked(i) += EPS;
+    setWrt(wrt, tweaked);
+    Eigen::VectorXd perturbed = multiplyByImplicitInvMassMatrix(f);
+
+    J.col(i) = (perturbed - baseline) / EPS;
+  }
+
+  // Reset everything how we left it
+  setWrt(wrt, start);
 
   return J;
 }
@@ -1630,6 +1670,74 @@ Eigen::MatrixXd Skeleton::finiteDifferenceVelCJacobian()
   setVelocities(vel);
 
   return J;
+}
+
+std::size_t Skeleton::getWrtDim(neural::WithRespectTo wrt)
+{
+  if (wrt == neural::WithRespectTo::POSITION)
+  {
+    return getNumDofs();
+  }
+  else if (wrt == neural::WithRespectTo::LINK_MASSES)
+  {
+    return getLinkMassesDims();
+  }
+  else if (wrt == neural::WithRespectTo::LINK_COMS)
+  {
+    return getLinkCOMDims();
+  }
+  else if (wrt == neural::WithRespectTo::LINK_MOIS)
+  {
+    return getLinkMOIDims();
+  }
+  else
+  {
+    assert(false && "Unrecognized wrt passed to getWrtDim()");
+    return 0;
+  }
+}
+
+//==============================================================================
+Eigen::VectorXd Skeleton::getWrt(neural::WithRespectTo wrt)
+{
+  if (wrt == neural::WithRespectTo::POSITION)
+  {
+    return getPositions();
+  }
+  else if (wrt == neural::WithRespectTo::LINK_MASSES)
+  {
+    return getLinkMasses();
+  }
+  else if (wrt == neural::WithRespectTo::LINK_COMS)
+  {
+    return getLinkCOMs();
+  }
+  else if (wrt == neural::WithRespectTo::LINK_MOIS)
+  {
+    return getLinkMOIs();
+  }
+  return Eigen::VectorXd::Zero(0);
+}
+
+//==============================================================================
+void Skeleton::setWrt(neural::WithRespectTo wrt, Eigen::VectorXd v)
+{
+  if (wrt == neural::WithRespectTo::POSITION)
+  {
+    setPositions(v);
+  }
+  else if (wrt == neural::WithRespectTo::LINK_MASSES)
+  {
+    setLinkMasses(v);
+  }
+  else if (wrt == neural::WithRespectTo::LINK_COMS)
+  {
+    setLinkCOMs(v);
+  }
+  else if (wrt == neural::WithRespectTo::LINK_MOIS)
+  {
+    setLinkMOIs(v);
+  }
 }
 
 //==============================================================================
