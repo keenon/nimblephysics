@@ -2369,9 +2369,10 @@ bool verifyPerturbedContactPositions(WorldPtr world)
                 world, skel, j, EPS);
         if (!equals(analytical, bruteForce, 1e-7))
         {
-          std::cout << "Skel:" << std::endl << skel->getName() << std::endl;
+          std::cout << "Skel:" << std::endl
+                    << skel->getName() << " - " << j << std::endl;
           std::cout << "Contact Type:" << std::endl
-                    << constraints[k]->getSkeletonContactType(skel)
+                    << constraints[k]->getDofContactType(skel->getDof(j))
                     << std::endl;
           std::cout << "Contact Normal:" << std::endl << normal << std::endl;
           std::cout << "Original Contact Pos:" << std::endl << pos << std::endl;
@@ -2384,14 +2385,15 @@ bool verifyPerturbedContactPositions(WorldPtr world)
           return false;
         }
 
-        Eigen::Vector3d finiteDifferenceGradient = (analytical - pos) / EPS;
+        Eigen::Vector3d finiteDifferenceGradient = (bruteForce - pos) / EPS;
         Eigen::Vector3d analyticalGradient
             = constraints[k]->getContactPositionGradient(skel->getDof(j));
         if (!equals(analyticalGradient, finiteDifferenceGradient, EPS * 10))
         {
-          std::cout << "Skel:" << std::endl << skel->getName() << std::endl;
+          std::cout << "Skel:" << std::endl
+                    << skel->getName() << " - " << j << std::endl;
           std::cout << "Contact Type:" << std::endl
-                    << constraints[k]->getSkeletonContactType(skel)
+                    << constraints[k]->getDofContactType(skel->getDof(j))
                     << std::endl;
           std::cout << "Contact Normal:" << std::endl << normal << std::endl;
           std::cout << "Contact Pos:" << std::endl << pos << std::endl;
@@ -2430,7 +2432,7 @@ bool verifyPerturbedContactNormals(WorldPtr world)
         {
           std::cout << "Skel:" << std::endl << skel->getName() << std::endl;
           std::cout << "Contact Type:" << std::endl
-                    << constraints[k]->getSkeletonContactType(skel)
+                    << constraints[k]->getDofContactType(skel->getDof(j))
                     << std::endl;
           std::cout << "Original Contact Normal:" << std::endl
                     << normal << std::endl;
@@ -2450,7 +2452,7 @@ bool verifyPerturbedContactNormals(WorldPtr world)
         {
           std::cout << "Skel:" << std::endl << skel->getName() << std::endl;
           std::cout << "Contact Type:" << std::endl
-                    << constraints[k]->getSkeletonContactType(skel)
+                    << constraints[k]->getDofContactType(skel->getDof(j))
                     << std::endl;
           std::cout << "Contact Normal:" << std::endl << normal << std::endl;
           std::cout << "Analytical Contact Normal Gradient:" << std::endl
@@ -2504,7 +2506,7 @@ bool verifyPerturbedContactForceDirections(WorldPtr world)
           std::cout << "world twist:" << std::endl << worldTwist << std::endl;
 
           std::cout << "Contact type:" << std::endl
-                    << constraints[k]->getSkeletonContactType(skel)
+                    << constraints[k]->getDofContactType(skel->getDof(j))
                     << std::endl;
           std::cout << "Index:" << std::endl
                     << constraints[k]->getIndexInConstraint() << std::endl;
@@ -2528,7 +2530,7 @@ bool verifyPerturbedContactForceDirections(WorldPtr world)
               = constraints[k]->getContactForceGradient(skel->getDof(j));
           std::cout << "Skel:" << std::endl << skel->getName() << std::endl;
           std::cout << "Contact Type:" << std::endl
-                    << constraints[k]->getSkeletonContactType(skel)
+                    << constraints[k]->getDofContactType(skel->getDof(j))
                     << std::endl;
           std::cout << "Contact Normal:" << std::endl << normal << std::endl;
           std::cout << "Contact Force Direction:" << std::endl
@@ -2568,19 +2570,15 @@ bool verifyPerturbedScrewAxis(WorldPtr world)
 
         if (!equals(analytical, bruteForce, 1e-7))
         {
-          std::cout << "Axis:" << std::endl
-                    << axis->getSkeleton()->getName() << " - "
+          std::cout << "Axis: " << axis->getSkeleton()->getName() << " - "
                     << axis->getIndexInSkeleton() << std::endl;
-          std::cout << "Rotate:" << std::endl
-                    << wrt->getSkeleton()->getName() << " - "
+          std::cout << "Rotate: " << wrt->getSkeleton()->getName() << " - "
                     << wrt->getIndexInSkeleton() << std::endl;
-          std::cout << "Axis Contact Type:" << std::endl
-                    << constraints[q]->getSkeletonContactType(
-                           axis->getSkeleton())
-                    << std::endl;
-          std::cout << "Rotate Contact Type:" << std::endl
-                    << constraints[q]->getSkeletonContactType(
-                           wrt->getSkeleton())
+          std::cout << "Axis Contact Type: "
+                    << constraints[q]->getDofContactType(axis) << std::endl;
+          std::cout << "Rotate Contact Type: "
+                    << constraints[q]->getDofContactType(wrt) << std::endl;
+          std::cout << "Is parent: " << constraints[q]->isParent(wrt, axis)
                     << std::endl;
           std::cout << "Analytical World Screw:" << std::endl
                     << analytical << std::endl;
@@ -2604,13 +2602,9 @@ bool verifyPerturbedScrewAxis(WorldPtr world)
                     << wrt->getSkeleton()->getName() << " - "
                     << wrt->getIndexInSkeleton() << std::endl;
           std::cout << "Axis Contact Type:" << std::endl
-                    << constraints[q]->getSkeletonContactType(
-                           axis->getSkeleton())
-                    << std::endl;
+                    << constraints[q]->getDofContactType(axis) << std::endl;
           std::cout << "Rotate Contact Type:" << std::endl
-                    << constraints[q]->getSkeletonContactType(
-                           wrt->getSkeleton())
-                    << std::endl;
+                    << constraints[q]->getDofContactType(wrt) << std::endl;
           std::cout << "Analytical World Screw Gradient:" << std::endl
                     << analyticalGradient << std::endl;
           std::cout << "Finite Difference World Screw Gradient:" << std::endl
@@ -3748,7 +3742,6 @@ void testVertexFaceCollision(bool isSelfCollision)
   ShapeNode* box1Node
       = box1Pair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(
           box1Shape);
-  world->addSkeleton(box1);
 
   // This box is rotated by 45 degrees on the X and Y axis, so that it's sqrt(3)
   // along the X axis.
@@ -3781,6 +3774,7 @@ void testVertexFaceCollision(bool isSelfCollision)
       = box2Position.linear() * Eigen::Vector3d(1.0 - 1e-2, 0, 0);
   box2Joint->setTransformFromChildBodyNode(box2Position);
 
+  world->addSkeleton(box1);
   if (!isSelfCollision)
   {
     world->addSkeleton(box2);
@@ -3795,12 +3789,10 @@ TEST(GRADIENTS, VERTEX_FACE_COLLISION)
   testVertexFaceCollision(false);
 }
 
-/*
 TEST(GRADIENTS, VERTEX_FACE_SELF_COLLISION)
 {
   testVertexFaceCollision(true);
 }
-*/
 
 /******************************************************************************
 

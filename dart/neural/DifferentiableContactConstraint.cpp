@@ -95,41 +95,63 @@ collision::ContactType DifferentiableContactConstraint::getContactType()
 
 //==============================================================================
 /// This figures out what type of contact this skeleton is involved in.
-SkeletonContactType DifferentiableContactConstraint::getSkeletonContactType(
-    std::shared_ptr<dynamics::Skeleton> skel)
+DofContactType DifferentiableContactConstraint::getDofContactType(
+    dynamics::DegreeOfFreedom* dof)
 {
-  if (skel->getName()
-      == mContactConstraint->getBodyNodeA()->getSkeleton()->getName())
+  bool isParentA = isParent(dof, mContactConstraint->getBodyNodeA());
+  bool isParentB = isParent(dof, mContactConstraint->getBodyNodeB());
+  // If we're a parent of both contact points, it's a self-contact down the tree
+  if (isParentA && isParentB)
   {
     switch (getContactType())
     {
       case collision::ContactType::FACE_VERTEX:
-        return SkeletonContactType::FACE;
       case collision::ContactType::VERTEX_FACE:
-        return SkeletonContactType::VERTEX;
+        return DofContactType::VERTEX_FACE_SELF_COLLISION;
       case collision::ContactType::EDGE_EDGE:
-        return SkeletonContactType::EDGE;
+        return DofContactType::EDGE_EDGE_SELF_COLLISION;
       default:
-        return SkeletonContactType::UNSUPPORTED;
+        return DofContactType::UNSUPPORTED;
     }
   }
-  else if (
-      skel->getName()
-      == mContactConstraint->getBodyNodeB()->getSkeleton()->getName())
+  // If we're not a parent of either point, it's not an issue
+  else if (!isParentA && !isParentB)
+  {
+    return DofContactType::NONE;
+  }
+  // If we're just a parent of A
+  else if (isParentA)
   {
     switch (getContactType())
     {
       case collision::ContactType::FACE_VERTEX:
-        return SkeletonContactType::VERTEX;
+        return DofContactType::FACE;
       case collision::ContactType::VERTEX_FACE:
-        return SkeletonContactType::FACE;
+        return DofContactType::VERTEX;
       case collision::ContactType::EDGE_EDGE:
-        return SkeletonContactType::EDGE;
+        return DofContactType::EDGE;
       default:
-        return SkeletonContactType::UNSUPPORTED;
+        return DofContactType::UNSUPPORTED;
     }
   }
-  return SkeletonContactType::NONE;
+  // If we're just a parent of B
+  else if (isParentB)
+  {
+    switch (getContactType())
+    {
+      case collision::ContactType::FACE_VERTEX:
+        return DofContactType::VERTEX;
+      case collision::ContactType::VERTEX_FACE:
+        return DofContactType::FACE;
+      case collision::ContactType::EDGE_EDGE:
+        return DofContactType::EDGE;
+      default:
+        return DofContactType::UNSUPPORTED;
+    }
+  }
+
+  // Control should never reach this point
+  return DofContactType::NONE;
 }
 
 //==============================================================================
@@ -187,9 +209,9 @@ Eigen::Vector3d DifferentiableContactConstraint::getContactPositionGradient(
     dynamics::DegreeOfFreedom* dof)
 {
   Eigen::Vector3d contactPos = getContactWorldPosition();
-  SkeletonContactType type = getSkeletonContactType(dof->getSkeleton());
+  DofContactType type = getDofContactType(dof);
 
-  if (type == VERTEX)
+  if (type == VERTEX || type == VERTEX_FACE_SELF_COLLISION)
   {
     int jointIndex = dof->getIndexInJoint();
     dynamics::BodyNode* childNode = dof->getChildBodyNode();
@@ -223,12 +245,12 @@ Eigen::Vector3d DifferentiableContactConstraint::getContactNormalGradient(
     dynamics::DegreeOfFreedom* dof)
 {
   Eigen::Vector3d normal = getContactWorldNormal();
-  SkeletonContactType type = getSkeletonContactType(dof->getSkeleton());
+  DofContactType type = getDofContactType(dof);
   if (type == VERTEX)
   {
     return Eigen::Vector3d::Zero();
   }
-  else if (type == FACE)
+  else if (type == FACE || type == VERTEX_FACE_SELF_COLLISION)
   {
     int jointIndex = dof->getIndexInJoint();
     math::Jacobian relativeJac = dof->getJoint()->getRelativeJacobian();
@@ -256,12 +278,12 @@ Eigen::Vector3d DifferentiableContactConstraint::getContactNormalGradient(
 Eigen::Vector3d DifferentiableContactConstraint::getContactForceGradient(
     dynamics::DegreeOfFreedom* dof)
 {
-  SkeletonContactType type = getSkeletonContactType(dof->getSkeleton());
+  DofContactType type = getDofContactType(dof);
   if (type == VERTEX)
   {
     return Eigen::Vector3d::Zero();
   }
-  else if (type == FACE)
+  else if (type == FACE || type == VERTEX_FACE_SELF_COLLISION)
   {
     Eigen::Vector3d contactNormal = getContactWorldNormal();
     Eigen::Vector3d normalGradient = getContactNormalGradient(dof);
@@ -308,7 +330,7 @@ Eigen::Vector6d DifferentiableContactConstraint::getContactWorldForceGradient(
 Eigen::Vector6d DifferentiableContactConstraint::getScrewAxisGradient(
     dynamics::DegreeOfFreedom* screwDof, dynamics::DegreeOfFreedom* rotateDof)
 {
-  if (screwDof->getSkeleton()->getName() != rotateDof->getSkeleton()->getName())
+  if (!isParent(rotateDof, screwDof))
     return Eigen::Vector6d::Zero();
 
   Eigen::Vector6d axisWorldTwist = getWorldScrewAxis(screwDof);
@@ -581,9 +603,9 @@ DifferentiableContactConstraint::estimatePerturbedContactPosition(
     std::shared_ptr<dynamics::Skeleton> skel, int dofIndex, double eps)
 {
   Eigen::Vector3d contactPos = getContactWorldPosition();
-  SkeletonContactType type = getSkeletonContactType(skel);
+  DofContactType type = getDofContactType(skel->getDof(dofIndex));
 
-  if (type == VERTEX)
+  if (type == VERTEX || type == VERTEX_FACE_SELF_COLLISION)
   {
     Eigen::Vector6d worldTwist = getWorldScrewAxis(skel, dofIndex);
     Eigen::Isometry3d rotation = math::expMap(worldTwist * eps);
@@ -611,12 +633,12 @@ Eigen::Vector3d DifferentiableContactConstraint::estimatePerturbedContactNormal(
     std::shared_ptr<dynamics::Skeleton> skel, int dofIndex, double eps)
 {
   Eigen::Vector3d normal = getContactWorldNormal();
-  SkeletonContactType type = getSkeletonContactType(skel);
+  DofContactType type = getDofContactType(skel->getDof(dofIndex));
   if (type == VERTEX)
   {
     return normal;
   }
-  else if (type == FACE)
+  else if (type == FACE || type == VERTEX_FACE_SELF_COLLISION)
   {
     Eigen::Vector6d worldTwist = getWorldScrewAxis(skel, dofIndex);
     Eigen::Isometry3d rotation = math::expMap(worldTwist * eps);
@@ -642,12 +664,12 @@ DifferentiableContactConstraint::estimatePerturbedContactForceDirection(
     std::shared_ptr<dynamics::Skeleton> skel, int dofIndex, double eps)
 {
   Eigen::Vector3d forceDir = getContactWorldForceDirection();
-  SkeletonContactType type = getSkeletonContactType(skel);
+  DofContactType type = getDofContactType(skel->getDof(dofIndex));
   if (type == VERTEX)
   {
     return forceDir;
   }
-  else if (type == FACE)
+  else if (type == FACE || type == VERTEX_FACE_SELF_COLLISION)
   {
     Eigen::Vector3d contactNormal
         = estimatePerturbedContactNormal(skel, dofIndex, eps);
@@ -680,7 +702,7 @@ Eigen::Vector6d DifferentiableContactConstraint::estimatePerturbedScrewAxis(
     double eps)
 {
   Eigen::Vector6d axisWorldTwist = getWorldScrewAxis(axis);
-  if (axis->getSkeleton()->getName() != rotate->getSkeleton()->getName())
+  if (!isParent(rotate, axis))
     return axisWorldTwist;
   Eigen::Vector6d rotateWorldTwist = getWorldScrewAxis(rotate);
   Eigen::Isometry3d transform = math::expMap(rotateWorldTwist * eps);
@@ -798,33 +820,89 @@ double DifferentiableContactConstraint::getForceMultiple(
   if (!mConstraint->isContactConstraint())
     return 1.0;
 
-  // If we're in skel A
-  if (dof->getSkeleton()->getName()
-      == mContactConstraint->getBodyNodeA()->getSkeleton()->getName())
+  bool isParentA = isParent(dof, mContactConstraint->getBodyNodeA());
+  bool isParentB = isParent(dof, mContactConstraint->getBodyNodeB());
+
+  // This means it's a self-collision, and we're up stream, so the net effect is
+  // 0
+  if (isParentA && isParentB)
   {
-    if (mContactConstraint->getBodyNodeA()->getTreeIndex()
-            == dof->getTreeIndex()
-        && mContactConstraint->getBodyNodeA()->getIndexInTree()
-               >= dof->getChildBodyNode()->getIndexInTree())
-    {
-      return 1.0;
-    }
+    return 0.0;
+  }
+  // If we're in skel A
+  if (isParentA)
+  {
+    return 1.0;
   }
   // If we're in skel B
-  else if (
-      dof->getSkeleton()->getName()
-      == mContactConstraint->getBodyNodeB()->getSkeleton()->getName())
+  if (isParentB)
   {
-    if (mContactConstraint->getBodyNodeB()->getTreeIndex()
-            == dof->getTreeIndex()
-        && mContactConstraint->getBodyNodeB()->getIndexInTree()
-               >= dof->getChildBodyNode()->getIndexInTree())
-    {
-      return -1.0;
-    }
+    return -1.0;
   }
 
   return 0.0;
+}
+
+//==============================================================================
+bool DifferentiableContactConstraint::isParent(
+    const dynamics::DegreeOfFreedom* dof, const dynamics::BodyNode* node)
+{
+  const dynamics::Joint* dofJoint = dof->getJoint();
+  const dynamics::Joint* nodeParentJoint = node->getParentJoint();
+  // If these joints aren't in the same skeleton, or aren't in the same tree
+  // within that skeleton, this is trivially false
+  if (dofJoint->getSkeleton()->getName()
+          != nodeParentJoint->getSkeleton()->getName()
+      || dofJoint->getTreeIndex() != nodeParentJoint->getTreeIndex())
+    return false;
+  // If the dof joint is after the node parent joint in the skeleton, this is
+  // also false
+  if (dofJoint->getIndexInTree(0) > nodeParentJoint->getIndexInTree(0))
+    return false;
+  // Now this may be true, if the node is a direct child of the dof
+  while (true)
+  {
+    if (nodeParentJoint == dofJoint)
+      return true;
+    if (nodeParentJoint->getParentBodyNode() == nullptr
+        || nodeParentJoint->getParentBodyNode()->getParentJoint() == nullptr)
+      return false;
+    nodeParentJoint = nodeParentJoint->getParentBodyNode()->getParentJoint();
+  }
+}
+
+//==============================================================================
+bool DifferentiableContactConstraint::isParent(
+    const dynamics::DegreeOfFreedom* parent,
+    const dynamics::DegreeOfFreedom* child)
+{
+  const dynamics::Joint* parentJoint = parent->getJoint();
+  const dynamics::Joint* childJoint = child->getJoint();
+  if (parentJoint == childJoint)
+  {
+    // For multi-DOF joints, each axis affects all the others.
+    return parent->getIndexInJoint() != child->getIndexInJoint();
+  }
+  // If these joints aren't in the same skeleton, or aren't in the same tree
+  // within that skeleton, this is trivially false
+  if (parentJoint->getSkeleton()->getName()
+          != childJoint->getSkeleton()->getName()
+      || parentJoint->getTreeIndex() != childJoint->getTreeIndex())
+    return false;
+  // If the dof joint is after the node parent joint in the skeleton, this is
+  // also false
+  if (parentJoint->getIndexInTree(0) > childJoint->getIndexInTree(0))
+    return false;
+  // Now this may be true, if the node is a direct child of the dof
+  while (true)
+  {
+    if (parentJoint == childJoint)
+      return true;
+    if (childJoint->getParentBodyNode() == nullptr
+        || childJoint->getParentBodyNode()->getParentJoint() == nullptr)
+      return false;
+    childJoint = childJoint->getParentBodyNode()->getParentJoint();
+  }
 }
 
 //==============================================================================

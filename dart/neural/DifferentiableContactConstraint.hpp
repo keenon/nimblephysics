@@ -32,13 +32,15 @@ class World;
 namespace neural {
 class BackpropSnapshot;
 
-enum SkeletonContactType
+enum DofContactType
 {
   UNSUPPORTED = 0,
   NONE = 1,
   VERTEX = 2,
   FACE = 3,
   EDGE = 4,
+  VERTEX_FACE_SELF_COLLISION = 5,
+  EDGE_EDGE_SELF_COLLISION = 6,
 };
 
 class DifferentiableContactConstraint
@@ -69,8 +71,7 @@ public:
   collision::ContactType getContactType();
 
   /// This figures out what type of contact this skeleton is involved in.
-  SkeletonContactType getSkeletonContactType(
-      std::shared_ptr<dynamics::Skeleton> skel);
+  DofContactType getDofContactType(dynamics::DegreeOfFreedom* dof);
 
   /// This analytically computes a column of the A_c matrix just for this
   /// skeleton.
@@ -236,6 +237,16 @@ protected:
   /// This returns 1.0 by default, 0.0 if this constraint doesn't effect the
   /// specified DOF, and -1.0 if the constraint effects this dof negatively.
   double getForceMultiple(dynamics::DegreeOfFreedom* dof);
+
+public:
+  /// Returns true if this dof moves this body node
+  bool isParent(
+      const dynamics::DegreeOfFreedom* dof, const dynamics::BodyNode* node);
+
+  /// Returns true if this dof moves the other dof's screw axis
+  bool isParent(
+      const dynamics::DegreeOfFreedom* parent,
+      const dynamics::DegreeOfFreedom* child);
 
 protected:
   std::shared_ptr<constraint::ConstraintBase> mConstraint;
