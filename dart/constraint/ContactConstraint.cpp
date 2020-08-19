@@ -771,7 +771,72 @@ ContactConstraint::getTangentBasisMatrixODE(const Eigen::Vector3d& n)
   // Each basis and its opposite belong in the matrix, so we iterate half as
   // many times
   T.col(0) = tangent;
-  T.col(1) = Eigen::Quaterniond(Eigen::AngleAxisd(0.5_pi, n)) * tangent;
+  T.col(1) = n.cross(
+      tangent); // Eigen::Quaterniond(Eigen::AngleAxisd(0.5_pi, n)) * tangent;
+  return T;
+}
+
+//==============================================================================
+/// This returns the gradient of each element of the Tangent basis matrix, if
+/// `g` is the gradient of `n` with respect to whatever scalar we care about.
+ContactConstraint::TangentBasisMatrix
+ContactConstraint::getTangentBasisMatrixODEGradient(
+    const Eigen::Vector3d& n, const Eigen::Vector3d& g)
+{
+  using namespace math::suffixes;
+
+  // TODO(JS): Use mNumFrictionConeBases
+  // Check if the number of bases is even number.
+  //  bool isEvenNumBases = mNumFrictionConeBases % 2 ? true : false;
+
+  // Pick an arbitrary vector to take the cross product of (in this case,
+  // Z-axis)
+  Eigen::Vector3d cross = mFirstFrictionalDirection;
+  Eigen::Vector3d tangent = cross.cross(n);
+
+  // TODO(JS): Modify following lines once _updateFirstFrictionalDirection() is
+  //           implemented.
+  // If they're too close (or opposing directions, or one of the vectors 0),
+  // pick another tangent (use X-axis as arbitrary vector)
+  if (tangent.squaredNorm() < DART_CONTACT_CONSTRAINT_EPSILON_SQUARED)
+  {
+    cross = Eigen::Vector3d::UnitX();
+    tangent = cross.cross(n);
+
+    // Make sure this is not zero length, otherwise normalization will lead to
+    // NaN values.
+    if (tangent.squaredNorm() < DART_CONTACT_CONSTRAINT_EPSILON_SQUARED)
+    {
+      cross = Eigen::Vector3d::UnitY();
+      tangent = cross.cross(n);
+      if (tangent.squaredNorm() < DART_CONTACT_CONSTRAINT_EPSILON_SQUARED)
+      {
+        cross = Eigen::Vector3d::UnitZ();
+        tangent = cross.cross(n);
+
+        // Now tangent shouldn't be zero-length unless the normal is
+        // zero-length, which shouldn't the case because ConstraintSolver
+        // shouldn't create a ContactConstraint for a contact with zero-length
+        // normal.
+        assert(
+            tangent.squaredNorm() >= DART_CONTACT_CONSTRAINT_EPSILON_SQUARED);
+      }
+    }
+  }
+
+  assert(tangent.norm() > 1e-06);
+  tangent.normalize();
+
+  assert(!dart::math::isNan(tangent));
+
+  TangentBasisMatrix T;
+
+  // Rotate the tangent around the normal to compute bases.
+  // Note: a possible speedup is in place for mNumDir % 2 = 0
+  // Each basis and its opposite belong in the matrix, so we iterate half as
+  // many times
+  T.col(0) = cross.cross(g);
+  T.col(1) = g.cross(tangent) + n.cross(cross.cross(g));
   return T;
 }
 
@@ -823,6 +888,18 @@ std::vector<dynamics::SkeletonPtr> ContactConstraint::getSkeletons() const
 const collision::Contact& ContactConstraint::getContact() const
 {
   return mContact;
+}
+
+//==============================================================================
+const dynamics::BodyNode* ContactConstraint::getBodyNodeA() const
+{
+  return mBodyNodeA;
+}
+
+//==============================================================================
+const dynamics::BodyNode* ContactConstraint::getBodyNodeB() const
+{
+  return mBodyNodeB;
 }
 
 //==============================================================================

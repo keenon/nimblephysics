@@ -32,6 +32,7 @@
 
 #include <iostream>
 
+#include <dart/gui/gui.hpp>
 #include <gtest/gtest.h>
 
 #include "dart/collision/CollisionObject.hpp"
@@ -42,7 +43,7 @@
 #include "dart/math/Geometry.hpp"
 #include "dart/neural/BackpropSnapshot.hpp"
 #include "dart/neural/ConstrainedGroupGradientMatrices.hpp"
-#include "dart/neural/DifferentiableConstraint.hpp"
+#include "dart/neural/DifferentiableContactConstraint.hpp"
 #include "dart/neural/NeuralConstants.hpp"
 #include "dart/neural/NeuralUtils.hpp"
 #include "dart/neural/RestorableSnapshot.hpp"
@@ -2244,6 +2245,441 @@ bool verifyWorldSpaceTransform(WorldPtr world)
 
 bool verifyAnalyticalA_c(WorldPtr world)
 {
+  BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
+
+  std::vector<std::shared_ptr<DifferentiableContactConstraint>> constraints
+      = classicPtr->getClampingConstraints();
+  Eigen::MatrixXd A_c = classicPtr->getClampingConstraintMatrix(world);
+  for (int i = 0; i < classicPtr->getNumClamping(); i++)
+  {
+    Eigen::VectorXd trueCol = A_c.col(i);
+    Eigen::VectorXd analyticalCol = constraints[i]->getConstraintForces(world);
+    if (!equals(trueCol, analyticalCol, 1e-7))
+    {
+      std::cout << "True A_c col: " << std::endl << trueCol << std::endl;
+      std::cout << "Analytical A_c col: " << std::endl
+                << analyticalCol << std::endl;
+      return false;
+    }
+  }
+
+  return true;
+}
+
+bool verifyAnalyticalContactPositionJacobians(WorldPtr world)
+{
+  BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
+
+  std::vector<std::shared_ptr<DifferentiableContactConstraint>> constraints
+      = classicPtr->getClampingConstraints();
+
+  for (int i = 0; i < constraints.size(); i++)
+  {
+    math::LinearJacobian analyticalJac
+        = constraints[i]->getContactPositionJacobian(world);
+    math::LinearJacobian bruteForceJac
+        = constraints[i]->bruteForceContactPositionJacobian(world);
+
+    if (!equals(analyticalJac, bruteForceJac, 1e-5))
+    {
+      std::cout << "Analytical Contact Pos Jac:" << std::endl
+                << analyticalJac << std::endl;
+      std::cout << "Brute Force Contact Pos Jac:" << std::endl
+                << bruteForceJac << std::endl;
+      return false;
+    }
+  }
+
+  return true;
+}
+
+bool verifyAnalyticalContactNormalJacobians(WorldPtr world)
+{
+  BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
+
+  std::vector<std::shared_ptr<DifferentiableContactConstraint>> constraints
+      = classicPtr->getClampingConstraints();
+
+  for (int i = 0; i < constraints.size(); i++)
+  {
+    math::LinearJacobian analyticalJac
+        = constraints[i]->getContactForceDirectionJacobian(world);
+    math::LinearJacobian bruteForceJac
+        = constraints[i]->bruteForceContactForceDirectionJacobian(world);
+
+    if (!equals(analyticalJac, bruteForceJac, 1e-5))
+    {
+      std::cout << "Analytical Contact Force Direction Jac:" << std::endl
+                << analyticalJac << std::endl;
+      std::cout << "Brute Force Contact Force Direction Jac:" << std::endl
+                << bruteForceJac << std::endl;
+      return false;
+    }
+  }
+
+  return true;
+}
+
+bool verifyAnalyticalContactForceJacobians(WorldPtr world)
+{
+  BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
+
+  std::vector<std::shared_ptr<DifferentiableContactConstraint>> constraints
+      = classicPtr->getClampingConstraints();
+
+  for (int i = 0; i < constraints.size(); i++)
+  {
+    math::Jacobian analyticalJac
+        = constraints[i]->getContactForceJacobian(world);
+    math::Jacobian bruteForceJac
+        = constraints[i]->bruteForceContactForceJacobian(world);
+
+    if (!equals(analyticalJac, bruteForceJac, 1e-5))
+    {
+      std::cout << "Analytical Contact Force Jac:" << std::endl
+                << analyticalJac << std::endl;
+      std::cout << "Brute Force Contact Force Jac:" << std::endl
+                << bruteForceJac << std::endl;
+      return false;
+    }
+  }
+
+  return true;
+}
+
+bool verifyPerturbedContactPositions(WorldPtr world)
+{
+  BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
+  std::vector<std::shared_ptr<DifferentiableContactConstraint>> constraints
+      = classicPtr->getClampingConstraints();
+  const double EPS = 1e-6;
+  for (int i = 0; i < world->getNumSkeletons(); i++)
+  {
+    auto skel = world->getSkeleton(i);
+    for (int j = 0; j < skel->getNumDofs(); j++)
+    {
+      for (int k = 0; k < constraints.size(); k++)
+      {
+        Eigen::Vector3d pos = constraints[k]->getContactWorldPosition();
+        Eigen::Vector3d normal = constraints[k]->getContactWorldNormal();
+        Eigen::Vector3d analytical
+            = constraints[k]->estimatePerturbedContactPosition(skel, j, EPS);
+        Eigen::Vector3d bruteForce
+            = constraints[k]->bruteForcePerturbedContactPosition(
+                world, skel, j, EPS);
+        if (!equals(analytical, bruteForce, 1e-7))
+        {
+          std::cout << "Skel:" << std::endl << skel->getName() << std::endl;
+          std::cout << "Contact Type:" << std::endl
+                    << constraints[k]->getSkeletonContactType(skel)
+                    << std::endl;
+          std::cout << "Contact Normal:" << std::endl << normal << std::endl;
+          std::cout << "Original Contact Pos:" << std::endl << pos << std::endl;
+          std::cout << "Analytical Contact Pos:" << std::endl
+                    << analytical << std::endl;
+          std::cout << "Analytical Contact Pos Diff:" << std::endl
+                    << (analytical - pos) << std::endl;
+          std::cout << "Brute Force Contact Pos Diff:" << std::endl
+                    << (bruteForce - pos) << std::endl;
+          return false;
+        }
+
+        Eigen::Vector3d finiteDifferenceGradient = (analytical - pos) / EPS;
+        Eigen::Vector3d analyticalGradient
+            = constraints[k]->getContactPositionGradient(skel->getDof(j));
+        if (!equals(analyticalGradient, finiteDifferenceGradient, EPS * 10))
+        {
+          std::cout << "Skel:" << std::endl << skel->getName() << std::endl;
+          std::cout << "Contact Type:" << std::endl
+                    << constraints[k]->getSkeletonContactType(skel)
+                    << std::endl;
+          std::cout << "Contact Normal:" << std::endl << normal << std::endl;
+          std::cout << "Contact Pos:" << std::endl << pos << std::endl;
+          std::cout << "Analytical Contact Pos Gradient:" << std::endl
+                    << analyticalGradient << std::endl;
+          std::cout << "Finite Difference Contact Pos Gradient:" << std::endl
+                    << finiteDifferenceGradient << std::endl;
+          return false;
+        }
+      }
+    }
+  }
+  return true;
+}
+
+bool verifyPerturbedContactNormals(WorldPtr world)
+{
+  BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
+  std::vector<std::shared_ptr<DifferentiableContactConstraint>> constraints
+      = classicPtr->getClampingConstraints();
+  const double EPS = 1e-5;
+  for (int i = 0; i < world->getNumSkeletons(); i++)
+  {
+    auto skel = world->getSkeleton(i);
+    for (int j = 0; j < skel->getNumDofs(); j++)
+    {
+      for (int k = 0; k < constraints.size(); k++)
+      {
+        Eigen::Vector3d normal = constraints[k]->getContactWorldNormal();
+        Eigen::Vector3d analytical
+            = constraints[k]->estimatePerturbedContactNormal(skel, j, EPS);
+        Eigen::Vector3d bruteForce
+            = constraints[k]->bruteForcePerturbedContactNormal(
+                world, skel, j, EPS);
+        if (!equals(analytical, bruteForce, 1e-7))
+        {
+          std::cout << "Skel:" << std::endl << skel->getName() << std::endl;
+          std::cout << "Contact Type:" << std::endl
+                    << constraints[k]->getSkeletonContactType(skel)
+                    << std::endl;
+          std::cout << "Original Contact Normal:" << std::endl
+                    << normal << std::endl;
+          std::cout << "Analytical Contact Normal:" << std::endl
+                    << analytical << std::endl;
+          std::cout << "Analytical Contact Normal Diff:" << std::endl
+                    << (analytical - normal) << std::endl;
+          std::cout << "Brute Force Contact Normal Diff:" << std::endl
+                    << (bruteForce - normal) << std::endl;
+          return false;
+        }
+
+        Eigen::Vector3d finiteDifferenceGradient = (analytical - normal) / EPS;
+        Eigen::Vector3d analyticalGradient
+            = constraints[k]->getContactNormalGradient(skel->getDof(j));
+        if (!equals(analyticalGradient, finiteDifferenceGradient, EPS * 10))
+        {
+          std::cout << "Skel:" << std::endl << skel->getName() << std::endl;
+          std::cout << "Contact Type:" << std::endl
+                    << constraints[k]->getSkeletonContactType(skel)
+                    << std::endl;
+          std::cout << "Contact Normal:" << std::endl << normal << std::endl;
+          std::cout << "Analytical Contact Normal Gradient:" << std::endl
+                    << analyticalGradient << std::endl;
+          std::cout << "Finite Difference Contact Normal Gradient:" << std::endl
+                    << finiteDifferenceGradient << std::endl;
+          return false;
+        }
+      }
+    }
+  }
+  return true;
+}
+
+bool verifyPerturbedContactForceDirections(WorldPtr world)
+{
+  BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
+  std::vector<std::shared_ptr<DifferentiableContactConstraint>> constraints
+      = classicPtr->getClampingConstraints();
+  const double EPS = 1e-5;
+  for (int i = 0; i < world->getNumSkeletons(); i++)
+  {
+    auto skel = world->getSkeleton(i);
+    for (int j = 0; j < skel->getNumDofs(); j++)
+    {
+      for (int k = 0; k < constraints.size(); k++)
+      {
+        Eigen::Vector3d normal = constraints[k]->getContactWorldNormal();
+        Eigen::Vector3d dir = constraints[k]->getContactWorldForceDirection();
+        Eigen::Vector3d analytical
+            = constraints[k]->estimatePerturbedContactForceDirection(
+                skel, j, EPS);
+        Eigen::Vector3d bruteForce
+            = constraints[k]->bruteForcePerturbedContactForceDirection(
+                world, skel, j, EPS);
+        if (!equals(analytical, bruteForce, 1e-7))
+        {
+          std::cout << "Constraint index:" << std::endl << k << std::endl;
+          std::cout << "Skel:" << std::endl << skel->getName() << std::endl;
+          std::cout << "Diff wrt index:" << std::endl << j << std::endl;
+
+          auto dof = skel->getDof(j);
+          int jointIndex = dof->getIndexInJoint();
+          math::Jacobian relativeJac = dof->getJoint()->getRelativeJacobian();
+          dynamics::BodyNode* childNode = dof->getChildBodyNode();
+          Eigen::Isometry3d transform = childNode->getWorldTransform();
+          Eigen::Vector6d localTwist = relativeJac.col(jointIndex);
+          Eigen::Vector6d worldTwist = math::AdT(transform, localTwist);
+
+          std::cout << "local twist:" << std::endl << localTwist << std::endl;
+          std::cout << "world twist:" << std::endl << worldTwist << std::endl;
+
+          std::cout << "Contact type:" << std::endl
+                    << constraints[k]->getSkeletonContactType(skel)
+                    << std::endl;
+          std::cout << "Index:" << std::endl
+                    << constraints[k]->getIndexInConstraint() << std::endl;
+          std::cout << "Original Contact Normal:" << std::endl
+                    << normal << std::endl;
+          std::cout << "Original Contact Force Direction:" << std::endl
+                    << dir << std::endl;
+          std::cout << "Analytical Contact Force Direction Diff:" << std::endl
+                    << (analytical - dir) << std::endl;
+          std::cout << "Brute Force Contact Force Direction Diff:" << std::endl
+                    << (bruteForce - dir) << std::endl;
+          return false;
+        }
+
+        Eigen::Vector3d finiteDifferenceGradient = (analytical - dir) / EPS;
+        Eigen::Vector3d analyticalGradient
+            = constraints[k]->getContactForceGradient(skel->getDof(j));
+        if (!equals(analyticalGradient, finiteDifferenceGradient, EPS * 10))
+        {
+          Eigen::Vector3d analyticalGradient
+              = constraints[k]->getContactForceGradient(skel->getDof(j));
+          std::cout << "Skel:" << std::endl << skel->getName() << std::endl;
+          std::cout << "Contact Type:" << std::endl
+                    << constraints[k]->getSkeletonContactType(skel)
+                    << std::endl;
+          std::cout << "Contact Normal:" << std::endl << normal << std::endl;
+          std::cout << "Contact Force Direction:" << std::endl
+                    << dir << std::endl;
+          std::cout << "Analytical Contact Force Gradient:" << std::endl
+                    << analyticalGradient << std::endl;
+          std::cout << "Finite Difference Contact Force Gradient:" << std::endl
+                    << finiteDifferenceGradient << std::endl;
+          return false;
+        }
+      }
+    }
+  }
+  return true;
+}
+
+bool verifyPerturbedScrewAxis(WorldPtr world)
+{
+  BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
+  std::vector<std::shared_ptr<DifferentiableContactConstraint>> constraints
+      = classicPtr->getClampingConstraints();
+  const double EPS = 1e-6;
+  std::vector<DegreeOfFreedom*> dofs = world->getDofs();
+  for (int j = 0; j < dofs.size(); j++)
+  {
+    DegreeOfFreedom* axis = dofs[j];
+    for (int k = 0; k < dofs.size(); k++)
+    {
+      DegreeOfFreedom* wrt = dofs[k];
+      for (int q = 0; q < constraints.size(); q++)
+      {
+        Eigen::Vector6d original = constraints[q]->getWorldScrewAxis(axis);
+        Eigen::Vector6d analytical
+            = constraints[q]->estimatePerturbedScrewAxis(axis, wrt, EPS);
+        Eigen::Vector6d bruteForce
+            = constraints[q]->bruteForceScrewAxis(axis, wrt, EPS);
+
+        if (!equals(analytical, bruteForce, 1e-7))
+        {
+          std::cout << "Axis:" << std::endl
+                    << axis->getSkeleton()->getName() << " - "
+                    << axis->getIndexInSkeleton() << std::endl;
+          std::cout << "Rotate:" << std::endl
+                    << wrt->getSkeleton()->getName() << " - "
+                    << wrt->getIndexInSkeleton() << std::endl;
+          std::cout << "Axis Contact Type:" << std::endl
+                    << constraints[q]->getSkeletonContactType(
+                           axis->getSkeleton())
+                    << std::endl;
+          std::cout << "Rotate Contact Type:" << std::endl
+                    << constraints[q]->getSkeletonContactType(
+                           wrt->getSkeleton())
+                    << std::endl;
+          std::cout << "Analytical World Screw:" << std::endl
+                    << analytical << std::endl;
+          std::cout << "Analytical World Screw Diff:" << std::endl
+                    << (analytical - original) << std::endl;
+          std::cout << "Brute Force World Screw Diff:" << std::endl
+                    << (bruteForce - original) << std::endl;
+          return false;
+        }
+
+        Eigen::Vector6d finiteDifferenceGradient
+            = (bruteForce - original) / EPS;
+        Eigen::Vector6d analyticalGradient
+            = constraints[q]->getScrewAxisGradient(axis, wrt);
+        if (!equals(analyticalGradient, finiteDifferenceGradient, EPS))
+        {
+          std::cout << "Axis:" << std::endl
+                    << axis->getSkeleton()->getName() << " - "
+                    << axis->getIndexInSkeleton() << std::endl;
+          std::cout << "Rotate:" << std::endl
+                    << wrt->getSkeleton()->getName() << " - "
+                    << wrt->getIndexInSkeleton() << std::endl;
+          std::cout << "Axis Contact Type:" << std::endl
+                    << constraints[q]->getSkeletonContactType(
+                           axis->getSkeleton())
+                    << std::endl;
+          std::cout << "Rotate Contact Type:" << std::endl
+                    << constraints[q]->getSkeletonContactType(
+                           wrt->getSkeleton())
+                    << std::endl;
+          std::cout << "Analytical World Screw Gradient:" << std::endl
+                    << analyticalGradient << std::endl;
+          std::cout << "Finite Difference World Screw Gradient:" << std::endl
+                    << finiteDifferenceGradient << std::endl;
+          return false;
+        }
+      }
+    }
+  }
+  return true;
+}
+
+bool verifyAnalyticalConstraintDerivatives(WorldPtr world)
+{
+  BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
+
+  const double EPS = 1e-7;
+
+  std::vector<DegreeOfFreedom*> dofs = world->getDofs();
+  std::vector<std::shared_ptr<DifferentiableContactConstraint>> constraints
+      = classicPtr->getClampingConstraints();
+  for (int i = 0; i < constraints.size(); i++)
+  {
+    for (int j = 0; j < dofs.size(); j++)
+    {
+      for (int k = 0; k < dofs.size(); k++)
+      {
+        DegreeOfFreedom* rotate = dofs[j];
+        DegreeOfFreedom* axis = dofs[k];
+        double originalValue = constraints[i]->getConstraintForce(axis);
+
+        double analytical
+            = constraints[i]->getConstraintForceDerivative(axis, rotate);
+
+        double originalPosition = rotate->getPosition();
+        rotate->setPosition(originalPosition + EPS);
+        BackpropSnapshotPtr newPtr = neural::forwardPass(world, true);
+        double newValue
+            = constraints[i]->getPeerConstraint(newPtr)->getConstraintForce(
+                axis);
+
+        Eigen::Vector6d gradientOfWorldForce
+            = constraints[i]->getContactWorldForceGradient(rotate);
+        Eigen::Vector6d worldTwist = constraints[i]->getWorldScrewAxis(axis);
+
+        rotate->setPosition(originalPosition);
+
+        double bruteForce = (newValue - originalValue) / EPS;
+
+        if (abs(analytical - bruteForce) > 1e-7)
+        {
+          std::cout << "Rotate:" << k << " - "
+                    << rotate->getSkeleton()->getName() << " - "
+                    << rotate->getIndexInSkeleton() << std::endl;
+          std::cout << "Axis:" << j << " - " << axis->getSkeleton()->getName()
+                    << " - " << axis->getIndexInSkeleton() << std::endl;
+          std::cout << "Original:" << std::endl << originalValue << std::endl;
+          std::cout << "Analytical:" << std::endl << analytical << std::endl;
+          std::cout << "Brute Force:" << std::endl << bruteForce << std::endl;
+          std::cout << "Gradient of world force:" << std::endl
+                    << gradientOfWorldForce << std::endl;
+          std::cout << "World twist:" << std::endl << worldTwist << std::endl;
+          double analytical
+              = constraints[i]->getConstraintForceDerivative(axis, rotate);
+          return false;
+        }
+      }
+    }
+  }
   return true;
 }
 
@@ -2251,51 +2687,63 @@ bool verifyAnalyticalA_cJacobian(WorldPtr world)
 {
   BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
 
-  std::cout << "Contacts: " << classicPtr->getNumClamping() << std::endl;
-
-  std::vector<std::shared_ptr<DifferentiableConstraint>> constraints
+  std::vector<std::shared_ptr<DifferentiableContactConstraint>> constraints
       = classicPtr->getClampingConstraints();
-
-  Eigen::VectorXd pos = world->getPositions();
-  const double EPS = 1e-1;
-
-  for (int i = 0; i < world->getNumDofs(); i++)
+  for (int i = 0; i < constraints.size(); i++)
   {
-    Eigen::VectorXd tweaked = pos;
-    tweaked(i) = tweaked(i) + EPS;
-    world->setPositions(tweaked);
-
-    BackpropSnapshotPtr tweakedPtr = neural::forwardPass(world, true);
-    std::vector<std::shared_ptr<DifferentiableConstraint>> tweakedConstraints
-        = tweakedPtr->getClampingConstraints();
-
-    std::cout << "Joint " << i << " += EPS:" << std::endl;
-    for (int j = 0; j < constraints.size(); j++)
+    Eigen::MatrixXd analytical
+        = constraints[i]->getConstraintForcesJacobian(world);
+    Eigen::MatrixXd bruteForce
+        = constraints[i]->bruteForceConstraintForcesJacobian(world);
+    Eigen::VectorXd A_cCol = constraints[i]->getConstraintForces(world);
+    if (!equals(analytical, bruteForce, 1e-7))
     {
-      std::cout << "  Constraint " << j << ":" << std::endl
-                << "Pos:" << std::endl
-                << tweakedConstraints[j]->getContactWorldPosition() << std::endl
-                << "Pos diff:" << std::endl
-                << (tweakedConstraints[j]->getContactWorldPosition()
-                    - constraints[j]->getContactWorldPosition())
-                << std::endl
-                << "Normal:" << std::endl
-                << tweakedConstraints[j]->getContactWorldNormal() << std::endl
-                << "Normal diff:" << std::endl
-                << (tweakedConstraints[j]->getContactWorldNormal()
-                    - constraints[j]->getContactWorldNormal())
-                << std::endl;
+      std::cout << "A_c col:" << std::endl << A_cCol << std::endl;
+      std::cout << "Analytical constraint forces Jac:" << std::endl
+                << analytical << std::endl;
+      std::cout << "Brute force constraint forces Jac:" << std::endl
+                << bruteForce << std::endl;
+      std::cout << "Constraint forces Jac diff:" << std::endl
+                << (analytical - bruteForce) << std::endl;
     }
   }
-
-  world->setPositions(pos);
 
   return true;
 }
 
 bool verifyAnalyticalJacobians(WorldPtr world)
 {
-  return verifyAnalyticalA_c(world) && verifyAnalyticalA_cJacobian(world);
+  return verifyPerturbedContactPositions(world)
+         && verifyPerturbedContactNormals(world)
+         && verifyPerturbedContactForceDirections(world)
+         && verifyPerturbedScrewAxis(world)
+         && verifyAnalyticalContactPositionJacobians(world)
+         && verifyAnalyticalContactNormalJacobians(world)
+         && verifyAnalyticalContactForceJacobians(world)
+         && verifyAnalyticalA_c(world)
+         && verifyAnalyticalConstraintDerivatives(world)
+         && verifyAnalyticalA_cJacobian(world);
+}
+
+class MyWindow : public dart::gui::glut::SimWindow
+{
+public:
+  /// Constructor
+  MyWindow(WorldPtr world)
+  {
+    setWorld(world);
+  }
+};
+
+void renderWorld(WorldPtr world)
+{
+  // Create a window for rendering the world and handling user input
+  MyWindow window(world);
+  // Initialize glut, initialize the window, and begin the glut event loop
+  int argc = 0;
+  glutInit(&argc, nullptr);
+  window.initWindow(640, 480, "Test");
+  glutMainLoop();
 }
 
 // This test is ugly and difficult to interpret, but it broke our system early
@@ -3136,7 +3584,8 @@ It's a robot arm, with a rotating base, with "numLinks" links and
 "rotationDegree" position at each link. There's also a fixed plane at the end of
 the robot arm that it intersects with.
 */
-void testRobotArm(std::size_t numLinks, double rotationRadians)
+void testRobotArm(
+    std::size_t numLinks, double rotationRadians, int attachPoint = -1)
 {
   // World
   WorldPtr world = World::create();
@@ -3154,6 +3603,11 @@ void testRobotArm(std::size_t numLinks, double rotationRadians)
   SkeletonPtr arm = Skeleton::create("arm");
   BodyNode* parent = nullptr;
 
+  std::shared_ptr<BoxShape> boxShape(
+      new BoxShape(Eigen::Vector3d(1.0, 1.0, 1.0)));
+
+  std::vector<BodyNode*> nodes;
+
   for (std::size_t i = 0; i < numLinks; i++)
   {
     RevoluteJoint::Properties jointProps;
@@ -3163,6 +3617,7 @@ void testRobotArm(std::size_t numLinks, double rotationRadians)
     std::pair<RevoluteJoint*, BodyNode*> jointPair
         = arm->createJointAndBodyNodePair<RevoluteJoint>(
             parent, jointProps, bodyProps);
+    nodes.push_back(jointPair.second);
     if (parent != nullptr)
     {
       Eigen::Isometry3d armOffset = Eigen::Isometry3d::Identity();
@@ -3171,6 +3626,12 @@ void testRobotArm(std::size_t numLinks, double rotationRadians)
     }
     jointPair.second->setMass(1.0);
     parent = jointPair.second;
+    ShapeNode* visual = parent->createShapeNodeWith<VisualAspect>(boxShape);
+  }
+
+  if (attachPoint != -1)
+  {
+    parent = nodes[attachPoint];
   }
 
   std::shared_ptr<SphereShape> endShape(new SphereShape(1.0));
@@ -3228,17 +3689,18 @@ void testRobotArm(std::size_t numLinks, double rotationRadians)
   world->setPositions(pos);
   */
 
+  // TODO!!!: this breaks when we do a middle attach
   EXPECT_TRUE(verifyVelGradients(world, worldVel));
   EXPECT_TRUE(verifyAnalyticalJacobians(world));
   EXPECT_TRUE(verifyAnalyticalBackprop(world));
 }
 
+/*
 TEST(GRADIENTS, ARM_3_LINK_30_DEG)
 {
   testRobotArm(3, 30.0 / 180 * 3.1415);
 }
 
-/*
 TEST(GRADIENTS, ARM_5_LINK_30_DEG)
 {
   // This test wraps an arm around, and it's actually breaking contact, so this
@@ -3249,6 +3711,94 @@ TEST(GRADIENTS, ARM_5_LINK_30_DEG)
 TEST(GRADIENTS, ARM_6_LINK_15_DEG)
 {
   testRobotArm(6, 15.0 / 180 * 3.1415);
+}
+
+//// TODO: this is mysteriously broken!!!
+TEST(GRADIENTS, ARM_3_LINK_30_DEG_MIDDLE_ATTACH)
+{
+  testRobotArm(3, 30.0 / 180 * 3.1415, 1);
+}
+*/
+
+/**
+ * This sets up two boxes colliding with each other. Each can rotate and
+ * translate freely. We set it up so that the one box's corner is contacting the
+ * other box's face.
+ *
+ *  /\ +---+
+ * /  \|   |
+ * \  /|   |
+ *  \/ +---+
+ */
+void testVertexFaceCollision(bool isSelfCollision)
+{
+  // World
+  WorldPtr world = World::create();
+  auto collision_detector
+      = collision::CollisionDetector::getFactory()->create("dart");
+  world->getConstraintSolver()->setCollisionDetector(collision_detector);
+  world->setGravity(Eigen::Vector3d(0, -9.81, 0));
+
+  // This box is centered at (0,0,0), and extends to [-0.5, 0.5] on every axis
+  SkeletonPtr box1 = Skeleton::create("face box");
+  std::pair<FreeJoint*, BodyNode*> box1Pair
+      = box1->createJointAndBodyNodePair<FreeJoint>();
+  std::shared_ptr<BoxShape> box1Shape(
+      new BoxShape(Eigen::Vector3d(1.0, 1.0, 1.0)));
+  ShapeNode* box1Node
+      = box1Pair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(
+          box1Shape);
+  world->addSkeleton(box1);
+
+  // This box is rotated by 45 degrees on the X and Y axis, so that it's sqrt(3)
+  // along the X axis.
+  SkeletonPtr box2 = Skeleton::create("vertex box");
+  std::pair<FreeJoint*, BodyNode*> box2Pair;
+
+  if (isSelfCollision)
+  {
+    box1->enableSelfCollision(true);
+    box2Pair = box1Pair.second->createChildJointAndBodyNodePair<FreeJoint>();
+  }
+  else
+  {
+    box2Pair = box2->createJointAndBodyNodePair<FreeJoint>();
+  }
+
+  double box2EdgeSize = sqrt(1.0 / 3);
+  std::shared_ptr<BoxShape> box2Shape(
+      new BoxShape(Eigen::Vector3d(1.0, 1.0, 1.0) * box2EdgeSize));
+  ShapeNode* box2Node
+      = box2Pair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(
+          box2Shape);
+  FreeJoint* box2Joint = box2Pair.first;
+  Eigen::Matrix3d rotation = Eigen::Matrix3d::Identity();
+
+  Eigen::Isometry3d box2Position = Eigen::Isometry3d::Identity();
+  box2Position.linear()
+      = math::eulerXYZToMatrix(Eigen::Vector3d(0, 45, -45) * 3.1415 / 180);
+  box2Position.translation()
+      = box2Position.linear() * Eigen::Vector3d(1.0 - 1e-2, 0, 0);
+  box2Joint->setTransformFromChildBodyNode(box2Position);
+
+  if (!isSelfCollision)
+  {
+    world->addSkeleton(box2);
+  }
+
+  EXPECT_TRUE(verifyAnalyticalJacobians(world));
+  // renderWorld(world);
+}
+
+TEST(GRADIENTS, VERTEX_FACE_COLLISION)
+{
+  testVertexFaceCollision(false);
+}
+
+/*
+TEST(GRADIENTS, VERTEX_FACE_SELF_COLLISION)
+{
+  testVertexFaceCollision(true);
 }
 */
 

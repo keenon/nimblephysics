@@ -544,8 +544,9 @@ void ConstrainedGroupGradientMatrices::constructMatrices()
       mClampingConstraintImpulses(clampingIndex[j]) = mX(j);
       mClampingConstraintRelativeVels(clampingIndex[j]) = mB(j);
 
-      mClampingConstraints.push_back(std::make_shared<DifferentiableConstraint>(
-          mConstraints[j], mConstraintIndices[j]));
+      mClampingConstraints.push_back(
+          std::make_shared<DifferentiableContactConstraint>(
+              mConstraints[j], mConstraintIndices[j]));
     }
     else if (
         mContactConstraintMappings(j) == neural::ConstraintMapping::ILLEGAL)
@@ -559,7 +560,7 @@ void ConstrainedGroupGradientMatrices::constructMatrices()
       mMassedUpperBoundConstraintMatrix.col(upperBoundIndex[j])
           = mMassedImpulseTests[j];
       mUpperBoundConstraints.push_back(
-          std::make_shared<DifferentiableConstraint>(
+          std::make_shared<DifferentiableContactConstraint>(
               mConstraints[j], mConstraintIndices[j]));
     }
   }
@@ -1197,14 +1198,14 @@ const std::vector<std::string>& ConstrainedGroupGradientMatrices::getSkeletons()
 }
 
 //==============================================================================
-const std::vector<std::shared_ptr<DifferentiableConstraint>>&
+const std::vector<std::shared_ptr<DifferentiableContactConstraint>>&
 ConstrainedGroupGradientMatrices::getClampingConstraints() const
 {
   return mClampingConstraints;
 }
 
 //==============================================================================
-const std::vector<std::shared_ptr<DifferentiableConstraint>>&
+const std::vector<std::shared_ptr<DifferentiableContactConstraint>>&
 ConstrainedGroupGradientMatrices::getUpperBoundConstraints() const
 {
   return mUpperBoundConstraints;

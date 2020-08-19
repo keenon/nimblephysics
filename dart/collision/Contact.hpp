@@ -34,11 +34,22 @@
 #define DART_COLLISION_CONTACT_HPP_
 
 #include <Eigen/Dense>
+
 #include "dart/collision/SmartPointer.hpp"
 #include "dart/dynamics/SmartPointer.hpp"
 
 namespace dart {
 namespace collision {
+
+enum ContactType
+{
+  UNSUPPORTED
+  = 0, // This is the default, and means that gradients won't attempt to model
+       // how the contact point changes as we move the skeletons.
+  VERTEX_FACE = 1,
+  FACE_VERTEX = 2,
+  EDGE_EDGE = 3
+};
 
 /// Contact information
 struct Contact
@@ -79,6 +90,10 @@ struct Contact
   /// \brief User data.
   void* userData;
 
+  /// This is necessary for computing gradients. This tells us what type of
+  /// contact generated these contacts.
+  ContactType type;
+
   /// Returns the epsilon to be used for determination of zero-length normal.
   constexpr static double getNormalEpsilon();
 
@@ -93,9 +108,9 @@ struct Contact
   static bool isNonZeroNormal(const Eigen::Vector3d& normal);
 };
 
-}  // namespace collision
-}  // namespace dart
+} // namespace collision
+} // namespace dart
 
 #include "dart/collision/detail/Contact-impl.hpp"
 
-#endif  // DART_COLLISION_CONTACT_HPP_
+#endif // DART_COLLISION_CONTACT_HPP_

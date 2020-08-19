@@ -5,7 +5,7 @@
 #include "dart/constraint/ConstraintSolver.hpp"
 #include "dart/dynamics/Skeleton.hpp"
 #include "dart/neural/ConstrainedGroupGradientMatrices.hpp"
-#include "dart/neural/DifferentiableConstraint.hpp"
+#include "dart/neural/DifferentiableContactConstraint.hpp"
 #include "dart/neural/RestorableSnapshot.hpp"
 #include "dart/simulation/World.hpp"
 
@@ -887,15 +887,16 @@ std::size_t BackpropSnapshot::getNumClamping()
 }
 
 //==============================================================================
-std::vector<std::shared_ptr<DifferentiableConstraint>>
+std::vector<std::shared_ptr<DifferentiableContactConstraint>>
 BackpropSnapshot::getClampingConstraints()
 {
-  std::vector<std::shared_ptr<DifferentiableConstraint>> vec;
+  std::vector<std::shared_ptr<DifferentiableContactConstraint>> vec;
   vec.reserve(mNumClamping);
   for (auto gradientMatrices : mGradientMatrices)
   {
     for (auto constraint : gradientMatrices->getClampingConstraints())
     {
+      constraint->setOffsetIntoWorld(vec.size(), false);
       vec.push_back(constraint);
     }
   }
@@ -903,15 +904,16 @@ BackpropSnapshot::getClampingConstraints()
 }
 
 //==============================================================================
-std::vector<std::shared_ptr<DifferentiableConstraint>>
+std::vector<std::shared_ptr<DifferentiableContactConstraint>>
 BackpropSnapshot::getUpperBoundConstraints()
 {
-  std::vector<std::shared_ptr<DifferentiableConstraint>> vec;
+  std::vector<std::shared_ptr<DifferentiableContactConstraint>> vec;
   vec.reserve(mNumUpperBound);
   for (auto gradientMatrices : mGradientMatrices)
   {
-    for (auto constraint : gradientMatrices->getClampingConstraints())
+    for (auto constraint : gradientMatrices->getUpperBoundConstraints())
     {
+      constraint->setOffsetIntoWorld(vec.size(), true);
       vec.push_back(constraint);
     }
   }
@@ -1618,8 +1620,8 @@ Eigen::MatrixXd BackpropSnapshot::getJacobianOfUpperBoundConstraints(
 Eigen::VectorXd BackpropSnapshot::getClampingImpulseVelChange(
     simulation::WorldPtr world, Eigen::VectorXd f0)
 {
-  std::vector<std::shared_ptr<DifferentiableConstraint>> clampingConstraints
-      = getClampingConstraints();
+  std::vector<std::shared_ptr<DifferentiableContactConstraint>>
+      clampingConstraints = getClampingConstraints();
   assert(
       clampingConstraints.size() == f0.size()
       && "f0 must have exactly one entry per clamping constraint");

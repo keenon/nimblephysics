@@ -592,6 +592,22 @@ std::size_t World::getNumDofs()
 }
 
 //==============================================================================
+std::vector<dynamics::DegreeOfFreedom*> World::getDofs()
+{
+  std::vector<dynamics::DegreeOfFreedom*> vec;
+  vec.reserve(mDofs);
+  for (dynamics::SkeletonPtr skel : mSkeletons)
+  {
+    for (int i = 0; i < skel->getNumDofs(); i++)
+    {
+      vec.push_back(skel->getDof(i));
+    }
+  }
+  assert(vec.size() == mDofs);
+  return vec;
+}
+
+//==============================================================================
 std::size_t World::getLinkCOMDims()
 {
   std::size_t count = 0;

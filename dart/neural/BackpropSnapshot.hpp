@@ -6,7 +6,7 @@
 
 #include <Eigen/Dense>
 
-#include "dart/neural/DifferentiableConstraint.hpp"
+#include "dart/neural/DifferentiableContactConstraint.hpp"
 #include "dart/neural/NeuralConstants.hpp"
 #include "dart/neural/NeuralUtils.hpp"
 #include "dart/simulation/World.hpp"
@@ -369,12 +369,12 @@ public:
 
   /// This is the clamping constraints from all the constrained
   /// groups, concatenated together
-  std::vector<std::shared_ptr<DifferentiableConstraint>>
+  std::vector<std::shared_ptr<DifferentiableContactConstraint>>
   getClampingConstraints();
 
   /// This is the upper bound constraints from all the constrained
   /// groups, concatenated together
-  std::vector<std::shared_ptr<DifferentiableConstraint>>
+  std::vector<std::shared_ptr<DifferentiableContactConstraint>>
   getUpperBoundConstraints();
 
 protected:

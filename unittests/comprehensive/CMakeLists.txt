@@ -7,6 +7,10 @@ dart_add_test("comprehensive" test_InverseKinematics)
 dart_add_test("comprehensive" test_NameManagement)
 dart_add_test("comprehensive" test_Gradients)
 
+target_link_libraries(test_Gradients dart-collision-bullet)
+target_link_libraries(test_Gradients dart-collision-ode)
+target_link_libraries(test_Gradients dart-gui)
+
 if(TARGET dart-optimizer-pagmo)
   dart_add_test("comprehensive" test_MultiObjectiveOptimization)
   target_link_libraries(test_MultiObjectiveOptimization dart-optimizer-pagmo)

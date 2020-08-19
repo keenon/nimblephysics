@@ -8,7 +8,7 @@
 
 #include <Eigen/Dense>
 
-#include "dart/neural/DifferentiableConstraint.hpp"
+#include "dart/neural/DifferentiableContactConstraint.hpp"
 #include "dart/neural/NeuralConstants.hpp"
 #include "dart/neural/NeuralUtils.hpp"
 #include "dart/simulation/World.hpp"
@@ -263,10 +263,10 @@ public:
 
   const std::vector<std::string>& getSkeletons() const;
 
-  const std::vector<std::shared_ptr<DifferentiableConstraint>>&
+  const std::vector<std::shared_ptr<DifferentiableContactConstraint>>&
   getClampingConstraints() const;
 
-  const std::vector<std::shared_ptr<DifferentiableConstraint>>&
+  const std::vector<std::shared_ptr<DifferentiableContactConstraint>>&
   getUpperBoundConstraints() const;
 
   /// This computes and returns the jacobian of M^{-1}(pos, inertia) * tau by
@@ -371,10 +371,12 @@ protected:
   std::vector<int> mConstraintIndices;
 
   /// These are just the clamping constraints
-  std::vector<std::shared_ptr<DifferentiableConstraint>> mClampingConstraints;
+  std::vector<std::shared_ptr<DifferentiableContactConstraint>>
+      mClampingConstraints;
 
   /// These are just the upper bound constraints
-  std::vector<std::shared_ptr<DifferentiableConstraint>> mUpperBoundConstraints;
+  std::vector<std::shared_ptr<DifferentiableContactConstraint>>
+      mUpperBoundConstraints;
 
   /// These are public to enable unit testing
 public:

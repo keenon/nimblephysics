@@ -96,6 +96,12 @@ public:
   // Returns the contact
   const collision::Contact& getContact() const;
 
+  // Returns body node A
+  const dynamics::BodyNode* getBodyNodeA() const;
+
+  // Returns body node B
+  const dynamics::BodyNode* getBodyNodeB() const;
+
   //----------------------------------------------------------------------------
   // Friendship
   //----------------------------------------------------------------------------
@@ -166,6 +172,11 @@ public:
 
   ///
   TangentBasisMatrix getTangentBasisMatrixODE(const Eigen::Vector3d& n);
+
+  /// This returns the gradient of each element of the Tangent basis matrix, if
+  /// `g` is the gradient of `n` with respect to whatever scalar we care about.
+  TangentBasisMatrix getTangentBasisMatrixODEGradient(
+      const Eigen::Vector3d& n, const Eigen::Vector3d& g);
 
 private:
   /// Time step

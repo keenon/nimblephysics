@@ -587,6 +587,7 @@ int dBoxBox(CollisionObject* o1, CollisionObject* o2,
       contact.point = point_vec;
       contact.normal = normal;
       contact.penetrationDepth = penetration;
+      contact.type = ContactType::EDGE_EDGE;
       result.addContact(contact);
     }
     return 1;
@@ -598,6 +599,7 @@ int dBoxBox(CollisionObject* o1, CollisionObject* o2,
   // the incident face (the closest face of the other box).
 
   const double *Ra,*Rb,*pa,*pb,*Sa,*Sb;
+  ContactType type;
   if (code <= 3) {
     Ra = R1;
     Rb = R2;
@@ -605,6 +607,7 @@ int dBoxBox(CollisionObject* o1, CollisionObject* o2,
     pb = p2;
     Sa = A;
     Sb = B;
+    type = ContactType::VERTEX_FACE;
   }
   else {
     Ra = R2;
@@ -613,6 +616,7 @@ int dBoxBox(CollisionObject* o1, CollisionObject* o2,
     pb = p1;
     Sa = B;
     Sb = A;
+    type = ContactType::FACE_VERTEX;
   }
 
   // nr = normal vector of reference face dotted with axes of incident box.
@@ -770,6 +774,7 @@ int dBoxBox(CollisionObject* o1, CollisionObject* o2,
       contact.point = point_vec;
       contact.normal = normal;
       contact.penetrationDepth = dep[j];
+      contact.type = type;
       result.addContact(contact);
     }
   }
@@ -799,6 +804,7 @@ int dBoxBox(CollisionObject* o1, CollisionObject* o2,
       contact.point = point_vec;
       contact.normal = normal;
       contact.penetrationDepth = dep[iret[j]];
+      contact.type = type;
       result.addContact(contact);
     }
   }

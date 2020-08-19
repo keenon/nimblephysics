@@ -64,6 +64,7 @@ class Integrator;
 
 namespace dynamics {
 class Skeleton;
+class DegreeOfFreedom;
 } // namespace dynamics
 
 namespace constraint {
@@ -191,6 +192,10 @@ public:
 
   /// Returns the sum of all the dofs of all the skeletons in this world
   std::size_t getNumDofs();
+
+  /// Returns a vector of all the degrees of freedom of all the skeletons in the
+  /// world concatenated
+  std::vector<dynamics::DegreeOfFreedom*> getDofs();
 
   /// Returns the size of the getLinkCOMs() vector
   std::size_t getLinkCOMDims();
