@@ -94,6 +94,30 @@ struct Contact
   /// contact generated these contacts.
   ContactType type;
 
+  /// This is only filled for (type == EDGE_EDGE) contacts. This is the closest
+  /// point on edge A to edge B.
+  Eigen::Vector3d edgeAClosestPoint;
+
+  /// This is only filled for (type == EDGE_EDGE) contacts. This is an arbitrary
+  /// fixed point on edge A.
+  Eigen::Vector3d edgeAFixedPoint;
+
+  /// This is only filled for (type == EDGE_EDGE) contacts. This is the
+  /// direction of edge A
+  Eigen::Vector3d edgeADir;
+
+  /// This is only filled for (type == EDGE_EDGE) contacts. This is the closest
+  /// point on edge B to edge A.
+  Eigen::Vector3d edgeBClosestPoint;
+
+  /// This is only filled for (type == EDGE_EDGE) contacts. This is an arbitrary
+  /// fixed point on edge B.
+  Eigen::Vector3d edgeBFixedPoint;
+
+  /// This is only filled for (type == EDGE_EDGE) contacts. This is the
+  /// direction of edge B
+  Eigen::Vector3d edgeBDir;
+
   /// Returns the epsilon to be used for determination of zero-length normal.
   constexpr static double getNormalEpsilon();
 

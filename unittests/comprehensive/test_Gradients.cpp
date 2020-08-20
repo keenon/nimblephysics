@@ -2347,6 +2347,275 @@ bool verifyAnalyticalContactForceJacobians(WorldPtr world)
   return true;
 }
 
+bool equals(EdgeData e1, EdgeData e2, double threshold)
+{
+  return equals(e1.edgeAPos, e2.edgeAPos, threshold)
+         && equals(e1.edgeADir, e2.edgeADir, threshold)
+         && equals(e1.edgeBPos, e2.edgeBPos, threshold)
+         && equals(e1.edgeBDir, e2.edgeBDir, threshold);
+}
+
+/// Looks for any edge-edge contacts, and makes sure our analytical models of
+/// them are correct
+bool verifyPerturbedContactEdges(WorldPtr world)
+{
+  BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
+  std::vector<std::shared_ptr<DifferentiableContactConstraint>> constraints
+      = classicPtr->getClampingConstraints();
+  const double EPS = 1e-6;
+  for (int k = 0; k < constraints.size(); k++)
+  {
+    if (constraints[k]->getContactType() == EDGE_EDGE)
+    {
+      EdgeData original = constraints[k]->getEdges();
+      Eigen::Vector3d originalIntersectionPoint = math::getContactPoint(
+          original.edgeAPos,
+          original.edgeADir,
+          original.edgeBPos,
+          original.edgeBDir);
+
+      for (int i = 0; i < world->getNumSkeletons(); i++)
+      {
+        auto skel = world->getSkeleton(i);
+        for (int j = 0; j < skel->getNumDofs(); j++)
+        {
+          EdgeData bruteForce
+              = constraints[k]->bruteForceEdges(world, skel, j, EPS);
+          EdgeData analytical
+              = constraints[k]->estimatePerturbedEdges(skel, j, EPS);
+
+          Eigen::Vector3d bruteIntersection = math::getContactPoint(
+              bruteForce.edgeAPos,
+              bruteForce.edgeADir,
+              bruteForce.edgeBPos,
+              bruteForce.edgeBDir);
+          Eigen::Vector3d analyticalIntersection = math::getContactPoint(
+              bruteForce.edgeAPos,
+              bruteForce.edgeADir,
+              bruteForce.edgeBPos,
+              bruteForce.edgeBDir);
+
+          double estimateThreshold = 1e-7;
+
+          // Check the intersection point first, because the actual input points
+          // can be different if the collision detector decided to use a
+          // different vertex on either of the edges, which will screw
+          // everything up. Even if it does this, though, the intersection
+          // points will remain unchanged, so check those first.
+          if (!equals(
+                  bruteIntersection, analyticalIntersection, estimateThreshold))
+          {
+            std::cout << "Got intersection wrong!" << std::endl;
+            std::cout << "Skel:" << std::endl
+                      << skel->getName() << " - " << j << std::endl;
+            std::cout << "Contact Type:" << std::endl
+                      << constraints[k]->getDofContactType(skel->getDof(j))
+                      << std::endl;
+            std::cout << "Brute force intersection:" << std::endl
+                      << bruteIntersection << std::endl;
+            std::cout << "Analytical intersection:" << std::endl
+                      << analyticalIntersection << std::endl;
+
+            // Only check the actual edge parameters if the intersections are
+            // materially different, because it is valid to have the edges pick
+            // different corners when finding a collision.
+            if (!equals(bruteForce, analytical, estimateThreshold))
+            {
+              std::cout << "Got edge wrong!" << std::endl;
+              std::cout << "Skel:" << std::endl
+                        << skel->getName() << " - " << j << std::endl;
+              std::cout << "Contact Type:" << std::endl
+                        << constraints[k]->getDofContactType(skel->getDof(j))
+                        << std::endl;
+              if (equals(
+                      bruteForce.edgeAPos,
+                      analytical.edgeAPos,
+                      estimateThreshold))
+              {
+                std::cout << "Edge A Pos correct!" << std::endl;
+              }
+              else
+              {
+                std::cout << "Edge A Pos analytical: " << std::endl
+                          << analytical.edgeAPos << std::endl;
+                std::cout << "Edge A Pos brute force: " << std::endl
+                          << bruteForce.edgeAPos << std::endl;
+              }
+              if (equals(
+                      bruteForce.edgeADir,
+                      analytical.edgeADir,
+                      estimateThreshold))
+              {
+                std::cout << "Edge A Dir correct!" << std::endl;
+              }
+              else
+              {
+                std::cout << "Edge A Dir analytical: " << std::endl
+                          << analytical.edgeADir << std::endl;
+                std::cout << "Edge A Dir brute force: " << std::endl
+                          << bruteForce.edgeADir << std::endl;
+              }
+              if (equals(
+                      bruteForce.edgeBPos,
+                      analytical.edgeBPos,
+                      estimateThreshold))
+              {
+                std::cout << "Edge B Pos correct!" << std::endl;
+              }
+              else
+              {
+                std::cout << "Edge B Pos analytical: " << std::endl
+                          << analytical.edgeBPos << std::endl;
+                std::cout << "Edge B Pos brute force: " << std::endl
+                          << bruteForce.edgeBPos << std::endl;
+              }
+              if (equals(
+                      bruteForce.edgeBDir,
+                      analytical.edgeBDir,
+                      estimateThreshold))
+              {
+                std::cout << "Edge B Dir correct!" << std::endl;
+              }
+              else
+              {
+                std::cout << "Edge B Dir analytical: " << std::endl
+                          << analytical.edgeBDir << std::endl;
+                std::cout << "Edge B Dir brute force: " << std::endl
+                          << bruteForce.edgeBDir << std::endl;
+              }
+              return false;
+            }
+          }
+
+          EdgeData analyticalGradient
+              = constraints[k]->getEdgeGradient(skel->getDof(j));
+          EdgeData finiteDifferenceGradient;
+          finiteDifferenceGradient.edgeAPos
+              = (bruteForce.edgeAPos - original.edgeAPos) / EPS;
+          finiteDifferenceGradient.edgeADir
+              = (bruteForce.edgeADir - original.edgeADir) / EPS;
+          finiteDifferenceGradient.edgeBPos
+              = (bruteForce.edgeBPos - original.edgeBPos) / EPS;
+          finiteDifferenceGradient.edgeBDir
+              = (bruteForce.edgeBDir - original.edgeBDir) / EPS;
+
+          Eigen::Vector3d analyticalIntersectionGradient
+              = math::getContactPointGradient(
+                  original.edgeAPos,
+                  analyticalGradient.edgeAPos,
+                  original.edgeADir,
+                  analyticalGradient.edgeADir,
+                  original.edgeBPos,
+                  analyticalGradient.edgeBPos,
+                  original.edgeBDir,
+                  analyticalGradient.edgeBDir);
+
+          Eigen::Vector3d finiteDifferenceIntersectionGradient
+              = (bruteIntersection - originalIntersectionPoint) / EPS;
+
+          estimateThreshold = 1e-6;
+
+          // Check the intersection point first, because the actual input points
+          // can be different if the collision detector decided to use a
+          // different vertex on either of the edges, which will screw
+          // everything up. Even if it does this, though, the intersection
+          // points will remain unchanged, so check those first.
+          if (!equals(
+                  finiteDifferenceIntersectionGradient,
+                  analyticalIntersectionGradient,
+                  estimateThreshold))
+          {
+            std::cout << "Got intersection gradient wrong!" << std::endl;
+            std::cout << "Skel:" << std::endl
+                      << skel->getName() << " - " << j << std::endl;
+            std::cout << "Contact Type:" << std::endl
+                      << constraints[k]->getDofContactType(skel->getDof(j))
+                      << std::endl;
+            std::cout << "Brute force intersection gradient:" << std::endl
+                      << finiteDifferenceIntersectionGradient << std::endl;
+            std::cout << "Analytical intersection gradient:" << std::endl
+                      << analyticalIntersectionGradient << std::endl;
+
+            if (!equals(
+                    analyticalGradient,
+                    finiteDifferenceGradient,
+                    estimateThreshold))
+            {
+              std::cout << "Got edge gradient wrong!" << std::endl;
+              std::cout << "Skel:" << std::endl
+                        << skel->getName() << " - " << j << std::endl;
+              std::cout << "Contact Type:" << std::endl
+                        << constraints[k]->getDofContactType(skel->getDof(j))
+                        << std::endl;
+              // TODO: dirty hack to save retyping
+              bruteForce = finiteDifferenceGradient;
+              analytical = analyticalGradient;
+              if (equals(
+                      bruteForce.edgeAPos,
+                      analytical.edgeAPos,
+                      estimateThreshold))
+              {
+                std::cout << "Edge A Pos correct!" << std::endl;
+              }
+              else
+              {
+                std::cout << "Edge A Pos analytical: " << std::endl
+                          << analytical.edgeAPos << std::endl;
+                std::cout << "Edge A Pos brute force: " << std::endl
+                          << bruteForce.edgeAPos << std::endl;
+              }
+              if (equals(
+                      bruteForce.edgeADir,
+                      analytical.edgeADir,
+                      estimateThreshold))
+              {
+                std::cout << "Edge A Dir correct!" << std::endl;
+              }
+              else
+              {
+                std::cout << "Edge A Dir analytical: " << std::endl
+                          << analytical.edgeADir << std::endl;
+                std::cout << "Edge A Dir brute force: " << std::endl
+                          << bruteForce.edgeADir << std::endl;
+              }
+              if (equals(
+                      bruteForce.edgeBPos,
+                      analytical.edgeBPos,
+                      estimateThreshold))
+              {
+                std::cout << "Edge B Pos correct!" << std::endl;
+              }
+              else
+              {
+                std::cout << "Edge B Pos analytical: " << std::endl
+                          << analytical.edgeBPos << std::endl;
+                std::cout << "Edge B Pos brute force: " << std::endl
+                          << bruteForce.edgeBPos << std::endl;
+              }
+              if (equals(
+                      bruteForce.edgeBDir,
+                      analytical.edgeBDir,
+                      estimateThreshold))
+              {
+                std::cout << "Edge B Dir correct!" << std::endl;
+              }
+              else
+              {
+                std::cout << "Edge B Dir analytical: " << std::endl
+                          << analytical.edgeBDir << std::endl;
+                std::cout << "Edge B Dir brute force: " << std::endl
+                          << bruteForce.edgeBDir << std::endl;
+              }
+              return false;
+            }
+          }
+        }
+      }
+    }
+  }
+  return true;
+}
+
 bool verifyPerturbedContactPositions(WorldPtr world)
 {
   BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
@@ -2707,7 +2976,8 @@ bool verifyAnalyticalA_cJacobian(WorldPtr world)
 
 bool verifyAnalyticalJacobians(WorldPtr world)
 {
-  return verifyPerturbedContactPositions(world)
+  return verifyPerturbedContactEdges(world)
+         && verifyPerturbedContactPositions(world)
          && verifyPerturbedContactNormals(world)
          && verifyPerturbedContactForceDirections(world)
          && verifyPerturbedScrewAxis(world)
@@ -2995,8 +3265,8 @@ Force --> |   | |   | <-- Force
           +---+ |   |
                 +---+
 
-There are two blocks, each with two DOFs (X, Y). The force pushing them together
-(or apart, if negative) is configurable.
+There are two blocks, each with two DOFs (X, Y). The force pushing them
+together (or apart, if negative) is configurable.
 
 The right box is larger, to prevent exact vertex-vertex collisions, which are
 hard for the engine to handle.
@@ -3092,13 +3362,15 @@ void testTwoBlocks(
 
   /*
   world->getConstraintSolver()->solve();
-  std::cout << "Contacts: " << world->getLastCollisionResult().getNumContacts()
+  std::cout << "Contacts: " <<
+  world->getLastCollisionResult().getNumContacts()
             << std::endl;
-  for (std::size_t i = 0; i < world->getLastCollisionResult().getNumContacts();
-       i++)
+  for (std::size_t i = 0; i <
+  world->getLastCollisionResult().getNumContacts(); i++)
   {
-    collision::Contact contact = world->getLastCollisionResult().getContact(i);
-    std::cout << "Contact " << i << " "
+    collision::Contact contact =
+  world->getLastCollisionResult().getContact(i); std::cout << "Contact " << i
+  << " "
               << contact.collisionObject1->getShapeFrame()->getName() << "<->"
               << contact.collisionObject2->getShapeFrame()->getName() << ": "
               << contact.point << " at depth " << contact.penetrationDepth
@@ -3245,8 +3517,8 @@ Force --> | O |
             ^
        Fixed ground
 
-There's a reverse pendulum sled with three DOFs, x and y axis, and angle of the
-reverse pendulum, with a force driving it into the ground. The ground has
+There's a reverse pendulum sled with three DOFs, x and y axis, and angle of
+the reverse pendulum, with a force driving it into the ground. The ground has
 configurable friction in this setup.
 
 */
@@ -3531,8 +3803,8 @@ void testMultigroup(int numGroups)
   }
 
   // Add all the top boxes first, then all the bottom boxes. This ensures that
-  // our constraint group ordering doesn't match our world ordering, which will
-  // help us catch bugs in matrix layout.
+  // our constraint group ordering doesn't match our world ordering, which
+  // will help us catch bugs in matrix layout.
   for (SkeletonPtr topBox : topBoxes)
     world->addSkeleton(topBox);
   for (SkeletonPtr bottomBox : bottomBoxes)
@@ -3575,8 +3847,8 @@ This test sets up a configuration that looks something like this:
       Rotating base
 
 It's a robot arm, with a rotating base, with "numLinks" links and
-"rotationDegree" position at each link. There's also a fixed plane at the end of
-the robot arm that it intersects with.
+"rotationDegree" position at each link. There's also a fixed plane at the end
+of the robot arm that it intersects with.
 */
 void testRobotArm(
     std::size_t numLinks, double rotationRadians, int attachPoint = -1)
@@ -3697,7 +3969,8 @@ TEST(GRADIENTS, ARM_3_LINK_30_DEG)
 
 TEST(GRADIENTS, ARM_5_LINK_30_DEG)
 {
-  // This test wraps an arm around, and it's actually breaking contact, so this
+  // This test wraps an arm around, and it's actually breaking contact, so
+this
   // tests unconstrained free-motion
   testRobotArm(5, 30.0 / 180 * 3.1415);
 }
@@ -3716,8 +3989,8 @@ TEST(GRADIENTS, ARM_3_LINK_30_DEG_MIDDLE_ATTACH)
 
 /**
  * This sets up two boxes colliding with each other. Each can rotate and
- * translate freely. We set it up so that the one box's corner is contacting the
- * other box's face.
+ * translate freely. We set it up so that the one box's corner is contacting
+ * the other box's face.
  *
  *  /\ +---+
  * /  \|   |
@@ -3743,8 +4016,8 @@ void testVertexFaceCollision(bool isSelfCollision)
       = box1Pair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(
           box1Shape);
 
-  // This box is rotated by 45 degrees on the X and Y axis, so that it's sqrt(3)
-  // along the X axis.
+  // This box is rotated by 45 degrees on the X and Y axis, so that it's
+  // sqrt(3) along the X axis.
   SkeletonPtr box2 = Skeleton::create("vertex box");
   std::pair<FreeJoint*, BodyNode*> box2Pair;
 
@@ -3794,6 +4067,86 @@ TEST(GRADIENTS, VERTEX_FACE_SELF_COLLISION)
   testVertexFaceCollision(true);
 }
 
+/**
+ * This sets up two boxes colliding with each other. Each can rotate and
+ * translate freely. We set it up so that the one box's edge is contacting the
+ * other box's edge
+ *
+ *  /\
+ * /  \
+ * \  /+---+
+ *  \/ |   |
+ *     +---+
+ */
+void testEdgeEdgeCollision(bool isSelfCollision)
+{
+  // World
+  WorldPtr world = World::create();
+  auto collision_detector
+      = collision::CollisionDetector::getFactory()->create("dart");
+  world->getConstraintSolver()->setCollisionDetector(collision_detector);
+  world->setGravity(Eigen::Vector3d(0, -9.81, 0));
+
+  // This box is centered at (0,0,0), and extends to [-0.5, 0.5] on every axis
+  SkeletonPtr box1 = Skeleton::create("face box");
+  std::pair<FreeJoint*, BodyNode*> box1Pair
+      = box1->createJointAndBodyNodePair<FreeJoint>();
+  std::shared_ptr<BoxShape> box1Shape(
+      new BoxShape(Eigen::Vector3d(1.0, 1.0, 1.0)));
+  ShapeNode* box1Node
+      = box1Pair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(
+          box1Shape);
+
+  // This box is rotated by 45 degrees on the X and Y axis, so that it's
+  // sqrt(3) along the X axis.
+  SkeletonPtr box2 = Skeleton::create("vertex box");
+  std::pair<FreeJoint*, BodyNode*> box2Pair;
+
+  if (isSelfCollision)
+  {
+    box1->enableSelfCollision(true);
+    box2Pair = box1Pair.second->createChildJointAndBodyNodePair<FreeJoint>();
+  }
+  else
+  {
+    box2Pair = box2->createJointAndBodyNodePair<FreeJoint>();
+  }
+
+  std::shared_ptr<BoxShape> box2Shape(
+      new BoxShape(Eigen::Vector3d(1.0, 1.0, 1.0)));
+  ShapeNode* box2Node
+      = box2Pair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(
+          box2Shape);
+  FreeJoint* box2Joint = box2Pair.first;
+  Eigen::Matrix3d rotation = Eigen::Matrix3d::Identity();
+
+  Eigen::Isometry3d box2Position = Eigen::Isometry3d::Identity();
+  box2Position.linear()
+      = math::eulerXYZToMatrix(Eigen::Vector3d(0, 45, 45) * 3.1415 / 180);
+  box2Position.translation() = box2Position.linear() * Eigen::Vector3d(1, -1, 0)
+                               * ((2 * sqrt(0.5) / sqrt(2)) - 1e-2);
+  box2Joint->setTransformFromChildBodyNode(box2Position);
+
+  world->addSkeleton(box1);
+  if (!isSelfCollision)
+  {
+    world->addSkeleton(box2);
+  }
+
+  EXPECT_TRUE(verifyAnalyticalJacobians(world));
+  // renderWorld(world);
+}
+
+TEST(GRADIENTS, EDGE_EDGE_COLLISION)
+{
+  testEdgeEdgeCollision(false);
+}
+
+TEST(GRADIENTS, EDGE_EDGE_SELF_COLLISION)
+{
+  testEdgeEdgeCollision(true);
+}
+
 /******************************************************************************
 
 This test sets up a configuration that looks something like this:
@@ -3806,8 +4159,8 @@ This test sets up a configuration that looks something like this:
       Rotating base
 
 It's a robot arm, with a rotating base, with "numLinks" links and
-"rotationDegree" position at each link. There's also a fixed plane at the end of
-the robot arm that it intersects with.
+"rotationDegree" position at each link. There's also a fixed plane at the end
+of the robot arm that it intersects with.
 */
 void testCartpole(double rotationRadians)
 {

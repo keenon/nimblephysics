@@ -38,9 +38,18 @@ enum DofContactType
   NONE = 1,
   VERTEX = 2,
   FACE = 3,
-  EDGE = 4,
-  VERTEX_FACE_SELF_COLLISION = 5,
-  EDGE_EDGE_SELF_COLLISION = 6,
+  EDGE_A = 4,
+  EDGE_B = 5,
+  VERTEX_FACE_SELF_COLLISION = 6,
+  EDGE_EDGE_SELF_COLLISION = 7,
+};
+
+struct EdgeData
+{
+  Eigen::Vector3d edgeAPos;
+  Eigen::Vector3d edgeADir;
+  Eigen::Vector3d edgeBPos;
+  Eigen::Vector3d edgeBDir;
 };
 
 class DifferentiableContactConstraint
@@ -168,6 +177,19 @@ public:
   Eigen::Vector3d estimatePerturbedContactForceDirection(
       std::shared_ptr<dynamics::Skeleton> skel, int dofIndex, double eps);
 
+  /// Just for testing: This analytically estimates how edges will move under a
+  /// perturbation
+  EdgeData estimatePerturbedEdges(
+      std::shared_ptr<dynamics::Skeleton> skel, int dofIndex, double eps);
+
+  /// Just for testing: returns the edges, if this is an edge-edge collision,
+  /// otherwise 0s
+  EdgeData getEdges();
+
+  /// Just for testing: Returns the gradient of the edge data for this collision
+  /// (0s if this isn't an edge-edge collision)
+  EdgeData getEdgeGradient(dynamics::DegreeOfFreedom* dof);
+
   /// Just for testing: This analytically estimates how a screw axis will move
   /// when rotated by another screw.
   Eigen::Vector6d estimatePerturbedScrewAxis(
@@ -212,6 +234,14 @@ public:
   Eigen::Vector6d bruteForceScrewAxis(
       dynamics::DegreeOfFreedom* axis,
       dynamics::DegreeOfFreedom* rotate,
+      double eps);
+
+  /// Just for testing: This perturbs the world position of a skeleton  to read
+  /// how edges will move.
+  EdgeData bruteForceEdges(
+      std::shared_ptr<simulation::World> world,
+      std::shared_ptr<dynamics::Skeleton> skel,
+      int dofIndex,
       double eps);
 
   /// Return the index into the contact that this constraint represents. If it's

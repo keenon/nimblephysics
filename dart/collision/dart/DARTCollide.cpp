@@ -573,11 +573,16 @@ int dBoxBox(CollisionObject* o1, CollisionObject* o2,
     for (i=0; i<3; i++) ub[i] = R2[((code)-7)%3 + i*4];
 
     dLineClosestApproach (pa,ua,pb,ub,&alpha,&beta);
+    Eigen::Vector3d edgeAFixedPoint = Eigen::Vector3d(pa[0], pa[1], pa[2]);
+    Eigen::Vector3d edgeBFixedPoint = Eigen::Vector3d(pb[0], pb[1], pb[2]);
+
+    // After this, pa and pb represent the closest point
     for (i=0; i<3; i++) pa[i] += ua[i]*alpha;
     for (i=0; i<3; i++) pb[i] += ub[i]*beta;
 
 
     {
+      // This is the average of the closest point on the A edge and the B edge
       point_vec << 0.5*(pa[0]+pb[0]), 0.5*(pa[1]+pb[1]), 0.5*(pa[2]+pb[2]);
       penetration = -s;
 
@@ -588,6 +593,12 @@ int dBoxBox(CollisionObject* o1, CollisionObject* o2,
       contact.normal = normal;
       contact.penetrationDepth = penetration;
       contact.type = ContactType::EDGE_EDGE;
+      contact.edgeAClosestPoint = Eigen::Vector3d(pa[0], pa[1], pa[2]);
+      contact.edgeAFixedPoint = edgeAFixedPoint;
+      contact.edgeADir = Eigen::Vector3d(ua[0], ua[1], ua[2]);
+      contact.edgeBClosestPoint = Eigen::Vector3d(pb[0], pb[1], pb[2]);
+      contact.edgeBFixedPoint = edgeBFixedPoint;
+      contact.edgeBDir = Eigen::Vector3d(ub[0], ub[1], ub[2]);
       result.addContact(contact);
     }
     return 1;
