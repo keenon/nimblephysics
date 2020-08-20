@@ -711,6 +711,145 @@ Eigen::Vector3d gradientWrtThetaPureRotation(
   return cos_t * wp + sin_t * wwp;
 }
 
+//==============================================================================
+/// This returns the average of the points on edge A and edge B closest to each
+/// other.
+Eigen::Vector3d getContactPoint(
+    const Eigen::Vector3d& edgeAPoint,
+    const Eigen::Vector3d& edgeADir,
+    const Eigen::Vector3d& edgeBPoint,
+    const Eigen::Vector3d& edgeBDir)
+{
+  Eigen::Vector3d p = edgeBPoint - edgeAPoint;
+  double uaub = edgeADir.dot(edgeBDir);
+  double q1 = edgeADir.dot(p);
+  double q2 = -edgeBDir.dot(p);
+  double d = 1 - uaub * uaub;
+  if (d <= 0)
+  {
+    // Comment from original code in DARTCollide.cpp: "@@@ this needs to be made
+    // more robust" Don't try to find the nearest point, just average the points
+    return edgeAPoint + edgeBPoint / 2;
+  }
+  else
+  {
+    d = 1.0 / d;
+    double alpha = (q1 + uaub * q2) * d;
+    double beta = (uaub * q1 + q2) * d;
+    return ((edgeAPoint + alpha * edgeADir) + (edgeBPoint + beta * edgeBDir))
+           / 2;
+  }
+}
+
+/// This returns gradient of the average of the points on edge A and edge B
+/// closest to each other, allowing all the inputs to change.
+Eigen::Vector3d getContactPointGradient(
+    const Eigen::Vector3d& edgeAPoint,
+    const Eigen::Vector3d& edgeAPointGradient,
+    const Eigen::Vector3d& edgeADir,
+    const Eigen::Vector3d& edgeADirGradient,
+    const Eigen::Vector3d& edgeBPoint,
+    const Eigen::Vector3d& edgeBPointGradient,
+    const Eigen::Vector3d& edgeBDir,
+    const Eigen::Vector3d& edgeBDirGradient)
+{
+  const double EPS = 1e-7;
+  Eigen::Vector3d p = edgeBPoint - edgeAPoint;
+  Eigen::Vector3d d_p = edgeBPointGradient - edgeAPointGradient;
+
+  /*
+  Eigen::Vector3d p_prime = (edgeBPoint + edgeBPointGradient * EPS)
+                            - (edgeAPoint + edgeAPointGradient * EPS);
+  */
+
+  double uaub = edgeADir.dot(edgeBDir);
+  double d_uaub
+      = edgeADirGradient.dot(edgeBDir) + edgeADir.dot(edgeBDirGradient);
+
+  /*
+  double uaub_prime = (edgeADir + edgeADirGradient * EPS)
+                          .dot(edgeBDir + edgeBDirGradient * EPS);
+  double d_uaub_brute = (uaub_prime - uaub) / EPS;
+  */
+
+  double q1 = edgeADir.dot(p);
+  double d_q1 = edgeADirGradient.dot(p) + edgeADir.dot(d_p);
+
+  /*
+  double q1_prime = (edgeADir + edgeADirGradient * EPS).dot(p_prime);
+  double d_q1_brute = (q1_prime - q1) / EPS;
+  */
+
+  double q2 = -edgeBDir.dot(p);
+  double d_q2 = -edgeBDirGradient.dot(p) - edgeBDir.dot(d_p);
+
+  /*
+  double q2_prime = -(edgeBDir + edgeBDirGradient * EPS).dot(p_prime);
+  double d_q2_brute = (q2_prime - q2) / EPS;
+  */
+
+  double d = 1 - uaub * uaub;
+  double d_d = -2 * d_uaub * uaub;
+
+  /*
+  double d_prime = 1 - uaub_prime * uaub_prime;
+  double d_d_brute = (d_prime - d) / EPS;
+  */
+
+  if (d <= 0)
+  {
+    // Comment from original code in DARTCollide.cpp: "@@@ this needs to be made
+    // more robust" Don't try to find the nearest point, just average the points
+    return edgeAPointGradient + edgeBPointGradient / 2;
+  }
+  else
+  {
+    double e = 1.0 / d;
+    double d_e = -(1.0 / (d * d)) * d_d;
+
+    /*
+    double e_prime = 1.0 / d_prime;
+    double d_e_brute = (e_prime - e) / EPS;
+    */
+
+    double alpha = (q1 + uaub * q2) * e;
+    double d_alpha
+        = (q1 + uaub * q2) * d_e + (d_q1 + d_uaub * q2 + uaub * d_q2) * e;
+
+    /*
+    double alpha_prime = (q1_prime + uaub_prime * q2_prime) * e_prime;
+    double d_alpha_brute = (alpha_prime - alpha) / EPS;
+    */
+
+    double beta = (uaub * q1 + q2) * e;
+    double d_beta
+        = (uaub * q1 + q2) * d_e + (d_uaub * q1 + uaub * d_q1 + d_q2) * e;
+
+    /*
+    double beta_prime = (uaub_prime * q1_prime + q2_prime) * e_prime;
+    double d_beta_brute = (beta_prime - beta) / EPS;
+    */
+
+    /*
+     Eigen::Vector3d d_offsetA = alpha * edgeADirGradient + d_alpha * edgeADir;
+     Eigen::Vector3d offsetA = alpha * edgeADir;
+     Eigen::Vector3d offsetA_prime
+         = alpha_prime * (edgeADir + edgeADirGradient * EPS);
+     Eigen::Vector3d d_offsetA_brute = (offsetA_prime - offsetA) / EPS;
+
+     Eigen::Vector3d d_offsetB = beta * edgeBDirGradient + d_beta * edgeBDir;
+     Eigen::Vector3d offsetB = beta * edgeBDir;
+     Eigen::Vector3d offsetB_prime
+         = beta_prime * (edgeBDir + edgeBDirGradient * EPS);
+     Eigen::Vector3d d_offsetB_brute = (offsetB_prime - offsetB) / EPS;
+     */
+
+    return (edgeAPointGradient + edgeBPointGradient + alpha * edgeADirGradient
+            + d_alpha * edgeADir + beta * edgeBDirGradient + d_beta * edgeBDir)
+           / 2;
+  }
+}
+
 // res = T * s * Inv(T)
 Eigen::Vector6d AdT(const Eigen::Isometry3d& _T, const Eigen::Vector6d& _V)
 {

@@ -460,6 +460,235 @@ TEST(LIE_GROUP_OPERATORS, RANDOM_ROTATIONS)
 }
 
 /******************************************************************************/
+bool verifyContactPoint(
+    const Eigen::Vector3d& edgeAPoint,
+    const Eigen::Vector3d& edgeAPointGradient,
+    const Eigen::Vector3d& edgeADir,
+    const Eigen::Vector3d& edgeADirGradient,
+    const Eigen::Vector3d& edgeBPoint,
+    const Eigen::Vector3d& edgeBPointGradient,
+    const Eigen::Vector3d& edgeBDir,
+    const Eigen::Vector3d& edgeBDirGradient)
+{
+  const double EPS = 1e-8;
+  Eigen::Vector3d original
+      = getContactPoint(edgeAPoint, edgeADir, edgeBPoint, edgeBDir);
+  Eigen::Vector3d perturbed = getContactPoint(
+      edgeAPoint + edgeAPointGradient * EPS,
+      edgeADir + edgeADirGradient * EPS,
+      edgeBPoint + edgeBPointGradient * EPS,
+      edgeBDir + edgeBDirGradient * EPS);
+  Eigen::Vector3d finiteDiff = (perturbed - original) / EPS;
+  Eigen::Vector3d analytical = getContactPointGradient(
+      edgeAPoint,
+      edgeAPointGradient,
+      edgeADir,
+      edgeADirGradient,
+      edgeBPoint,
+      edgeBPointGradient,
+      edgeBDir,
+      edgeBDirGradient);
+  if (!equals(analytical, finiteDiff, analytical.norm() * 1e-5))
+  {
+    std::cout << "Edge-edge contact point derivatives failed!" << std::endl;
+    std::cout << "Analytical Gradient:" << std::endl << analytical << std::endl;
+    std::cout << "Finite Difference Gradient:" << std::endl
+              << finiteDiff << std::endl;
+    std::cout << "Original Point:" << std::endl << original << std::endl;
+    std::cout << "Edge A Point:" << std::endl << edgeAPoint << std::endl;
+    std::cout << "Edge A Point Gradient:" << std::endl
+              << edgeAPointGradient << std::endl;
+    std::cout << "Edge A Dir:" << std::endl << edgeADir << std::endl;
+    std::cout << "Edge A Dir Gradient:" << std::endl
+              << edgeADirGradient << std::endl;
+    std::cout << "Edge B Point:" << std::endl << edgeBPoint << std::endl;
+    std::cout << "Edge B Point Gradient:" << std::endl
+              << edgeBPointGradient << std::endl;
+    std::cout << "Edge B Dir:" << std::endl << edgeBDir << std::endl;
+    std::cout << "Edge B Dir Gradient:" << std::endl
+              << edgeBDirGradient << std::endl;
+    return false;
+  }
+  return true;
+}
+
+TEST(COLLISION_GEOM, CONTACT_POINT_GRADIENT)
+{
+  Eigen::Vector3d edgeAPoint = Eigen::Vector3d(1, 0, 0);
+  Eigen::Vector3d edgeAPointGradient = Eigen::Vector3d::Zero();
+  Eigen::Vector3d edgeADir = Eigen::Vector3d(-1, 0, 0);
+  Eigen::Vector3d edgeADirGradient = Eigen::Vector3d::Zero();
+  Eigen::Vector3d edgeBPoint = Eigen::Vector3d(0, 1, 0);
+  Eigen::Vector3d edgeBPointGradient = Eigen::Vector3d::Zero();
+  Eigen::Vector3d edgeBDir = Eigen::Vector3d(0, -1, 0);
+  Eigen::Vector3d edgeBDirGradient = Eigen::Vector3d::Zero();
+
+  Eigen::Vector3d expectedContactPoint = Eigen::Vector3d::Zero();
+
+  EXPECT_TRUE(equals(
+      getContactPoint(edgeAPoint, edgeADir, edgeBPoint, edgeBDir),
+      expectedContactPoint,
+      1e-8));
+
+  // Start with the trivial case, 0 -> 0
+
+  Eigen::Vector3d expectedGradient = Eigen::Vector3d::Zero();
+  EXPECT_TRUE(equals(
+      getContactPointGradient(
+          edgeAPoint,
+          edgeAPointGradient,
+          edgeADir,
+          edgeADirGradient,
+          edgeBPoint,
+          edgeBPointGradient,
+          edgeBDir,
+          edgeBDirGradient),
+      expectedGradient,
+      1e-8));
+
+  // If the edge A point is moving parallel to the A line, we should still see 0
+  // gradient
+
+  edgeAPointGradient = edgeADir;
+
+  EXPECT_TRUE(equals(
+      getContactPointGradient(
+          edgeAPoint,
+          edgeAPointGradient,
+          edgeADir,
+          edgeADirGradient,
+          edgeBPoint,
+          edgeBPointGradient,
+          edgeBDir,
+          edgeBDirGradient),
+      expectedGradient,
+      1e-8));
+
+  // If edge A point is moving parallel to the B line, we should see the
+  // gradient is the same as the edgeAPointGradient
+
+  edgeAPointGradient = edgeBDir;
+  expectedGradient = edgeAPointGradient;
+
+  EXPECT_TRUE(equals(
+      getContactPointGradient(
+          edgeAPoint,
+          edgeAPointGradient,
+          edgeADir,
+          edgeADirGradient,
+          edgeBPoint,
+          edgeBPointGradient,
+          edgeBDir,
+          edgeBDirGradient),
+      expectedGradient,
+      1e-8));
+
+  // If edge A point is moving parallel to the B line, and edge B point is
+  // moving parallel to the A line, gradient is the sum of both
+
+  edgeAPointGradient = edgeBDir;
+  edgeBPointGradient = edgeADir;
+  expectedGradient = edgeAPointGradient + edgeBPointGradient;
+
+  EXPECT_TRUE(equals(
+      getContactPointGradient(
+          edgeAPoint,
+          edgeAPointGradient,
+          edgeADir,
+          edgeADirGradient,
+          edgeBPoint,
+          edgeBPointGradient,
+          edgeBDir,
+          edgeBDirGradient),
+      expectedGradient,
+      1e-8));
+
+  // If the direction of A is moving, then the overall gradient should move in
+  // the same direction
+
+  edgeAPointGradient = Eigen::Vector3d::Zero();
+  edgeBPointGradient = Eigen::Vector3d::Zero();
+  edgeADirGradient = Eigen::Vector3d(0, 0, 1);
+  // It's divided by 2 because we're only moving half the average, the B point
+  // doesn't move
+  expectedGradient = edgeADirGradient / 2;
+
+  Eigen::Vector3d result = getContactPointGradient(
+      edgeAPoint,
+      edgeAPointGradient,
+      edgeADir,
+      edgeADirGradient,
+      edgeBPoint,
+      edgeBPointGradient,
+      edgeBDir,
+      edgeBDirGradient);
+
+  EXPECT_TRUE(equals(result, expectedGradient, 1e-8));
+}
+
+TEST(COLLISION_GEOM, RANDOM_CONTACT_POINTS)
+{
+  for (int i = 0; i < 700; i++)
+  {
+    Eigen::Vector3d edgeAPoint = Eigen::Vector3d::Random();
+    Eigen::Vector3d edgeAPointGradient = Eigen::Vector3d::Zero();
+    Eigen::Vector3d edgeADir = Eigen::Vector3d::Random();
+    Eigen::Vector3d edgeADirGradient = Eigen::Vector3d::Zero();
+    Eigen::Vector3d edgeBPoint = Eigen::Vector3d::Random();
+    Eigen::Vector3d edgeBPointGradient = Eigen::Vector3d::Zero();
+    Eigen::Vector3d edgeBDir = Eigen::Vector3d::Random();
+    Eigen::Vector3d edgeBDirGradient = Eigen::Vector3d::Zero();
+
+    if (i < 100)
+    {
+      edgeAPointGradient = Eigen::Vector3d::Random();
+    }
+    else if (i < 200)
+    {
+      edgeBPointGradient = Eigen::Vector3d::Random();
+    }
+    else if (i < 300)
+    {
+      edgeADirGradient = Eigen::Vector3d::Random();
+    }
+    else if (i < 400)
+    {
+      edgeBDirGradient = Eigen::Vector3d::Random();
+    }
+    else if (i < 500)
+    {
+      edgeAPointGradient = Eigen::Vector3d::Random();
+      edgeADirGradient = Eigen::Vector3d::Random();
+    }
+    else if (i < 600)
+    {
+      edgeBPointGradient = Eigen::Vector3d::Random();
+      edgeBDirGradient = Eigen::Vector3d::Random();
+    }
+    else if (i < 700)
+    {
+      edgeAPointGradient = Eigen::Vector3d::Random();
+      edgeADirGradient = Eigen::Vector3d::Random();
+      edgeBPointGradient = Eigen::Vector3d::Random();
+      edgeBDirGradient = Eigen::Vector3d::Random();
+    }
+
+    bool result = verifyContactPoint(
+        edgeAPoint,
+        edgeAPointGradient,
+        edgeADir,
+        edgeADirGradient,
+        edgeBPoint,
+        edgeBPointGradient,
+        edgeBDir,
+        edgeBDirGradient);
+    EXPECT_TRUE(result);
+    if (!result)
+      return;
+  }
+}
+
+/******************************************************************************/
 TEST(LIE_GROUP_OPERATORS, EULER_ANGLES)
 {
   // TODO: Special angles such as (PI, 0, 0)

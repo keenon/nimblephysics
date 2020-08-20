@@ -202,6 +202,26 @@ Eigen::Vector3d gradientWrtTheta(
 Eigen::Vector3d gradientWrtThetaPureRotation(
     const Eigen::Vector3d& omega, const Eigen::Vector3d& point, double theta);
 
+/// This returns the average of the points on edge A and edge B closest to each
+/// other.
+Eigen::Vector3d getContactPoint(
+    const Eigen::Vector3d& edgeAPoint,
+    const Eigen::Vector3d& edgeADir,
+    const Eigen::Vector3d& edgeBPoint,
+    const Eigen::Vector3d& edgeBDir);
+
+/// This returns gradient of the average of the points on edge A and edge B
+/// closest to each other, allowing all the inputs to change.
+Eigen::Vector3d getContactPointGradient(
+    const Eigen::Vector3d& edgeAPoint,
+    const Eigen::Vector3d& edgeAPointGradient,
+    const Eigen::Vector3d& edgeADir,
+    const Eigen::Vector3d& edgeADirGradient,
+    const Eigen::Vector3d& edgeBPoint,
+    const Eigen::Vector3d& edgeBPointGradient,
+    const Eigen::Vector3d& edgeBDir,
+    const Eigen::Vector3d& edgeBDirGradient);
+
 //------------------------------------------------------------------------------
 /// \brief Rectify the rotation part so as that it satifies the orthogonality
 /// condition.
