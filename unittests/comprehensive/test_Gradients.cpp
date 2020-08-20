@@ -2969,6 +2969,66 @@ bool verifyAnalyticalA_cJacobian(WorldPtr world)
       std::cout << "Constraint forces Jac diff:" << std::endl
                 << (analytical - bruteForce) << std::endl;
     }
+
+    // Check that the skeleton-by-skeleton computation works
+
+    int col = 0;
+    for (int j = 0; j < world->getNumSkeletons(); j++)
+    {
+      auto wrt = world->getSkeleton(j);
+
+      // Go skeleton-by-skeleton
+
+      int row = 0;
+      for (int k = 0; k < world->getNumSkeletons(); k++)
+      {
+        auto skel = world->getSkeleton(k);
+        Eigen::MatrixXd gold
+            = analytical.block(row, col, skel->getNumDofs(), wrt->getNumDofs());
+        Eigen::MatrixXd chunk
+            = constraints[i]->getConstraintForcesJacobian(skel, wrt);
+        if (!equals(gold, chunk, 1e-7))
+        {
+          std::cout << "Analytical constraint forces Jac of " << skel->getName()
+                    << " wrt " << wrt->getName() << " incorrect!" << std::endl;
+          std::cout << "Analytical constraint forces Jac chunk of world:"
+                    << std::endl
+                    << gold << std::endl;
+          std::cout << "Analytical constraint forces Jac skel-by-skel:"
+                    << std::endl
+                    << chunk << std::endl;
+        }
+
+        row += skel->getNumDofs();
+      }
+
+      // Try a group of skeletons
+
+      std::vector<std::shared_ptr<dynamics::Skeleton>> skels;
+      for (int k = 0; k < world->getNumSkeletons(); k++)
+      {
+        skels.push_back(world->getSkeleton(k));
+      }
+
+      Eigen::MatrixXd gold
+          = analytical.block(0, col, world->getNumDofs(), wrt->getNumDofs());
+      Eigen::MatrixXd chunk
+          = constraints[i]->getConstraintForcesJacobian(skels, wrt);
+      if (!equals(gold, chunk, 1e-7))
+      {
+        std::cout << "Analytical constraint forces Jac of "
+                  << "all skeletons"
+                  << " wrt " << wrt->getName() << " incorrect!" << std::endl;
+        std::cout << "Analytical constraint forces Jac chunk of world:"
+                  << std::endl
+                  << gold << std::endl;
+        std::cout << "Analytical constraint forces Jac skel-by-skel:"
+                  << std::endl
+                  << chunk << std::endl;
+      }
+
+      col += wrt->getNumDofs();
+    }
   }
 
   return true;

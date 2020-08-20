@@ -454,6 +454,22 @@ DifferentiableContactConstraint::getContactPositionJacobian(
 }
 
 //==============================================================================
+/// This is the analytical Jacobian for the contact position
+math::LinearJacobian
+DifferentiableContactConstraint::getContactPositionJacobian(
+    std::shared_ptr<dynamics::Skeleton> skel)
+{
+  math::LinearJacobian jac = math::LinearJacobian::Zero(3, skel->getNumDofs());
+  int i = 0;
+  for (auto dof : skel->getDofs())
+  {
+    jac.col(i) = getContactPositionGradient(dof);
+    i++;
+  }
+  return jac;
+}
+
+//==============================================================================
 /// This is the analytical Jacobian for the contact normal
 math::LinearJacobian
 DifferentiableContactConstraint::getContactForceDirectionJacobian(
@@ -462,6 +478,22 @@ DifferentiableContactConstraint::getContactForceDirectionJacobian(
   math::LinearJacobian jac = math::LinearJacobian::Zero(3, world->getNumDofs());
   int i = 0;
   for (auto dof : world->getDofs())
+  {
+    jac.col(i) = getContactForceGradient(dof);
+    i++;
+  }
+  return jac;
+}
+
+//==============================================================================
+/// This is the analytical Jacobian for the contact normal
+math::LinearJacobian
+DifferentiableContactConstraint::getContactForceDirectionJacobian(
+    std::shared_ptr<dynamics::Skeleton> skel)
+{
+  math::LinearJacobian jac = math::LinearJacobian::Zero(3, skel->getNumDofs());
+  int i = 0;
+  for (auto dof : skel->getDofs())
   {
     jac.col(i) = getContactForceGradient(dof);
     i++;
@@ -486,6 +518,27 @@ math::Jacobian DifferentiableContactConstraint::getContactForceJacobian(
   }
   // f = dir
   jac.block(3, 0, 3, world->getNumDofs()) = dirJac;
+
+  return jac;
+}
+
+//==============================================================================
+math::Jacobian DifferentiableContactConstraint::getContactForceJacobian(
+    std::shared_ptr<dynamics::Skeleton> skel)
+{
+  Eigen::Vector3d pos = getContactWorldPosition();
+  Eigen::Vector3d dir = getContactWorldForceDirection();
+  math::LinearJacobian posJac = getContactPositionJacobian(skel);
+  math::LinearJacobian dirJac = getContactForceDirectionJacobian(skel);
+  math::Jacobian jac = math::Jacobian::Zero(6, skel->getNumDofs());
+
+  // tau = pos cross dir
+  for (int i = 0; i < skel->getNumDofs(); i++)
+  {
+    jac.block<3, 1>(0, i) = pos.cross(dirJac.col(i)) + posJac.col(i).cross(dir);
+  }
+  // f = dir
+  jac.block(3, 0, 3, skel->getNumDofs()) = dirJac;
 
   return jac;
 }
@@ -544,6 +597,75 @@ Eigen::MatrixXd DifferentiableContactConstraint::getConstraintForcesJacobian(
       double multiple = getForceMultiple(dofs[row]);
       result(row, wrt)
           = multiple * (screwAxisGradient.dot(force) + axis.dot(forceGradient));
+    }
+  }
+
+  return result;
+}
+
+//==============================================================================
+/// This computes and returns the analytical Jacobian relating how changes in
+/// the positions of wrt's DOFs changes the constraint forces on skel.
+Eigen::MatrixXd DifferentiableContactConstraint::getConstraintForcesJacobian(
+    std::shared_ptr<dynamics::Skeleton> skel,
+    std::shared_ptr<dynamics::Skeleton> wrt)
+{
+  math::Jacobian forceJac = getContactForceJacobian(wrt);
+  Eigen::Vector6d force = getWorldForce();
+
+  Eigen::MatrixXd result
+      = Eigen::MatrixXd::Zero(skel->getNumDofs(), wrt->getNumDofs());
+  for (int row = 0; row < skel->getNumDofs(); row++)
+  {
+    Eigen::Vector6d axis = getWorldScrewAxis(skel->getDof(row));
+    for (int col = 0; col < wrt->getNumDofs(); col++)
+    {
+      Eigen::Vector6d screwAxisGradient
+          = getScrewAxisGradient(skel->getDof(row), wrt->getDof(col));
+      Eigen::Vector6d forceGradient = forceJac.col(col);
+      double multiple = getForceMultiple(skel->getDof(row));
+      result(row, col)
+          = multiple * (screwAxisGradient.dot(force) + axis.dot(forceGradient));
+    }
+  }
+
+  return result;
+}
+
+//==============================================================================
+/// This computes and returns the analytical Jacobian relating how changes in
+/// the positions of wrt's DOFs changes the constraint forces on all the
+/// skels.
+Eigen::MatrixXd DifferentiableContactConstraint::getConstraintForcesJacobian(
+    std::vector<std::shared_ptr<dynamics::Skeleton>> skels,
+    std::shared_ptr<dynamics::Skeleton> wrt)
+{
+  math::Jacobian forceJac = getContactForceJacobian(wrt);
+  Eigen::Vector6d force = getWorldForce();
+
+  int numRows = 0;
+  for (auto skel : skels)
+    numRows += skel->getNumDofs();
+
+  Eigen::MatrixXd result = Eigen::MatrixXd::Zero(numRows, wrt->getNumDofs());
+
+  int row = 0;
+  for (auto skel : skels)
+  {
+    for (int i = 0; i < skel->getNumDofs(); i++)
+    {
+      Eigen::Vector6d axis = getWorldScrewAxis(skel->getDof(i));
+      for (int col = 0; col < wrt->getNumDofs(); col++)
+      {
+        Eigen::Vector6d screwAxisGradient
+            = getScrewAxisGradient(skel->getDof(i), wrt->getDof(col));
+        Eigen::Vector6d forceGradient = forceJac.col(col);
+        double multiple = getForceMultiple(skel->getDof(i));
+        result(row, col)
+            = multiple
+              * (screwAxisGradient.dot(force) + axis.dot(forceGradient));
+      }
+      row++;
     }
   }
 
