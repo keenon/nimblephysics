@@ -363,6 +363,9 @@ public:
   /// Returns the number of clamping contacts in this snapshot.
   std::size_t getNumClamping();
 
+  /// Returns the number of upper bound contacts in this snapshot.
+  std::size_t getNumUpperBound();
+
   /// These are the gradient constraint matrices from the LCP solver
   std::vector<std::shared_ptr<ConstrainedGroupGradientMatrices>>
       mGradientMatrices;

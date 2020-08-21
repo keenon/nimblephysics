@@ -673,6 +673,30 @@ Eigen::MatrixXd DifferentiableContactConstraint::getConstraintForcesJacobian(
 }
 
 //==============================================================================
+/// This computes and returns the analytical Jacobian relating how changes in
+/// the positions of any of the DOFs changes the constraint forces on all the
+/// skels.
+Eigen::MatrixXd DifferentiableContactConstraint::getConstraintForcesJacobian(
+    std::vector<std::shared_ptr<dynamics::Skeleton>> skels)
+{
+  int dofs = 0;
+  for (auto skel : skels)
+    dofs += skel->getNumDofs();
+
+  Eigen::MatrixXd result = Eigen::MatrixXd::Zero(dofs, dofs);
+
+  int cursor = 0;
+  for (auto skel : skels)
+  {
+    result.block(0, cursor, dofs, skel->getNumDofs())
+        = getConstraintForcesJacobian(skels, skel);
+    cursor += skel->getNumDofs();
+  }
+
+  return result;
+}
+
+//==============================================================================
 /// The linear Jacobian for the contact position
 math::LinearJacobian
 DifferentiableContactConstraint::bruteForceContactPositionJacobian(

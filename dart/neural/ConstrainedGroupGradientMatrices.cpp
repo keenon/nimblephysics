@@ -507,16 +507,16 @@ void ConstrainedGroupGradientMatrices::constructMatrices()
   mMassedUpperBoundConstraintMatrix
       = Eigen::MatrixXd::Zero(mNumDOFs, numUpperBound);
   mUpperBoundMappingMatrix = Eigen::MatrixXd::Zero(numUpperBound, numClamping);
-  mBounceDiagonals = Eigen::VectorXd(numClamping);
-  mPenetrationCorrectionVelocitiesVec = Eigen::VectorXd(numClamping);
+  mBounceDiagonals = Eigen::VectorXd::Zero(numClamping);
+  mPenetrationCorrectionVelocitiesVec = Eigen::VectorXd::Zero(numClamping);
   mBouncingConstraintMatrix = Eigen::MatrixXd::Zero(mNumDOFs, numBouncing);
-  mRestitutionDiagonals = Eigen::VectorXd(numBouncing);
-  mClampingConstraintImpulses = Eigen::VectorXd(numClamping);
-  mClampingConstraintRelativeVels = Eigen::VectorXd(numClamping);
+  mRestitutionDiagonals = Eigen::VectorXd::Zero(numBouncing);
+  mClampingConstraintImpulses = Eigen::VectorXd::Zero(numClamping);
+  mClampingConstraintRelativeVels = Eigen::VectorXd::Zero(numClamping);
   mClampingConstraints.reserve(numClamping);
   mUpperBoundConstraints.reserve(numUpperBound);
-  mVelocityDueToIllegalImpulses = Eigen::VectorXd(mNumDOFs);
-  mClampingAMatrix = Eigen::MatrixXd(numClamping, numClamping);
+  mVelocityDueToIllegalImpulses = Eigen::VectorXd::Zero(mNumDOFs);
+  mClampingAMatrix = Eigen::MatrixXd::Zero(numClamping, numClamping);
 
   /*
   std::cout << "numClamping: " << numClamping << std::endl;
@@ -964,6 +964,7 @@ ConstrainedGroupGradientMatrices::getJacobianOfLCPOffsetClampingSubset(
 Eigen::MatrixXd ConstrainedGroupGradientMatrices::getJacobianOfMinv(
     simulation::WorldPtr world, Eigen::VectorXd tau, WithRespectTo wrt)
 {
+  return finiteDifferenceJacobianOfMinv(world, tau, wrt);
 }
 
 //==============================================================================
@@ -972,6 +973,7 @@ Eigen::MatrixXd ConstrainedGroupGradientMatrices::getJacobianOfMinv(
 Eigen::MatrixXd ConstrainedGroupGradientMatrices::getJacobianOfC(
     simulation::WorldPtr world, WithRespectTo wrt)
 {
+  return finiteDifferenceJacobianOfC(world, wrt);
 }
 
 //==============================================================================
@@ -981,6 +983,18 @@ Eigen::MatrixXd
 ConstrainedGroupGradientMatrices::getJacobianOfClampingConstraints(
     simulation::WorldPtr world, Eigen::VectorXd f0)
 {
+  std::vector<std::shared_ptr<dynamics::Skeleton>> skels = getSkeletons(world);
+
+  std::vector<std::shared_ptr<DifferentiableContactConstraint>> constraints
+      = getClampingConstraints();
+  Eigen::MatrixXd result = Eigen::MatrixXd::Zero(mNumDOFs, mNumDOFs);
+  assert(constraints.size() == f0.size());
+  for (int i = 0; i < constraints.size(); i++)
+  {
+    result += f0(i) * constraints[i]->getConstraintForcesJacobian(skels);
+  }
+
+  return result;
 }
 
 //==============================================================================
@@ -990,6 +1004,18 @@ Eigen::MatrixXd
 ConstrainedGroupGradientMatrices::getJacobianOfClampingConstraintsTranspose(
     simulation::WorldPtr world, Eigen::VectorXd v0)
 {
+  std::vector<std::shared_ptr<dynamics::Skeleton>> skels = getSkeletons(world);
+
+  std::vector<std::shared_ptr<DifferentiableContactConstraint>> constraints
+      = getClampingConstraints();
+  Eigen::MatrixXd result = Eigen::MatrixXd::Zero(constraints.size(), mNumDOFs);
+  for (int i = 0; i < constraints.size(); i++)
+  {
+    result.row(i)
+        = constraints[i]->getConstraintForcesJacobian(world).transpose() * v0;
+  }
+
+  return result;
 }
 
 //==============================================================================
@@ -999,6 +1025,17 @@ Eigen::MatrixXd
 ConstrainedGroupGradientMatrices::getJacobianOfUpperBoundConstraints(
     simulation::WorldPtr world, Eigen::VectorXd f0)
 {
+  std::vector<std::shared_ptr<dynamics::Skeleton>> skels = getSkeletons(world);
+
+  std::vector<std::shared_ptr<DifferentiableContactConstraint>> constraints
+      = getUpperBoundConstraints();
+  Eigen::MatrixXd result = Eigen::MatrixXd::Zero(mNumDOFs, mNumDOFs);
+  assert(constraints.size() == f0.size());
+  for (int i = 0; i < constraints.size(); i++)
+  {
+    result += f0(i) * constraints[i]->getConstraintForcesJacobian(skels);
+  }
+  return result;
 }
 
 //==============================================================================
@@ -1286,6 +1323,25 @@ const Eigen::VectorXd& ConstrainedGroupGradientMatrices::getPreLCPVelocity()
 /// Returns the M^{-1} matrix from pre-step
 const Eigen::VectorXd& ConstrainedGroupGradientMatrices::getMinv() const
 {
+  return mMinv;
+}
+
+//==============================================================================
+/// Get the coriolis and gravity forces
+const Eigen::VectorXd
+ConstrainedGroupGradientMatrices::getCoriolisAndGravityAndExternalForces(
+    simulation::WorldPtr world) const
+{
+  Eigen::VectorXd result = Eigen::VectorXd(mNumDOFs);
+  int cursor = 0;
+  for (std::string skelName : mSkeletons)
+  {
+    std::shared_ptr<dynamics::Skeleton> skel = world->getSkeleton(skelName);
+    int dofs = skel->getNumDofs();
+    result.segment(cursor, dofs) = skel->getCoriolisAndGravityForces();
+    cursor += dofs;
+  }
+  return result;
 }
 
 //==============================================================================
@@ -1318,6 +1374,38 @@ ConstrainedGroupGradientMatrices::finiteDifferenceJacobianOfMinv(
     Eigen::MatrixXd newVMinus = implicitMultiplyByInvMassMatrix(world, tau);
     Eigen::VectorXd diff = newVPlus - newVMinus;
     result.col(i) = diff / (2 * EPS);
+  }
+
+  setWrt(world, wrt, before);
+
+  return result;
+}
+
+//==============================================================================
+/// This computes and returns the jacobian of C(pos, inertia, vel) by finite
+/// differences.
+Eigen::MatrixXd ConstrainedGroupGradientMatrices::finiteDifferenceJacobianOfC(
+    simulation::WorldPtr world, WithRespectTo wrt)
+{
+  std::size_t innerDim = getWrtDim(world, wrt);
+
+  // These are predicted contact forces at the clamping contacts
+  Eigen::VectorXd original = getCoriolisAndGravityAndExternalForces(world);
+
+  Eigen::MatrixXd result = Eigen::MatrixXd::Zero(original.size(), innerDim);
+
+  Eigen::VectorXd before = getWrt(world, wrt);
+
+  const double EPS = 1e-6;
+
+  for (std::size_t i = 0; i < innerDim; i++)
+  {
+    Eigen::VectorXd perturbed = before;
+    perturbed(i) += EPS;
+    setWrt(world, wrt, perturbed);
+    Eigen::MatrixXd newTau = getCoriolisAndGravityAndExternalForces(world);
+    Eigen::VectorXd diff = newTau - original;
+    result.col(i) = diff / EPS;
   }
 
   setWrt(world, wrt, before);
@@ -1365,6 +1453,19 @@ void ConstrainedGroupGradientMatrices::setWrt(
     skel->setWrt(wrt, v.segment(cursor, dims));
     cursor += dims;
   }
+}
+
+//==============================================================================
+/// Gets the skeletons associated with this constrained group in vector form
+std::vector<std::shared_ptr<dynamics::Skeleton>>
+ConstrainedGroupGradientMatrices::getSkeletons(simulation::WorldPtr world)
+{
+  std::vector<std::shared_ptr<dynamics::Skeleton>> skels;
+  for (auto skelName : mSkeletons)
+  {
+    skels.push_back(world->getSkeleton(skelName));
+  }
+  return skels;
 }
 
 } // namespace neural

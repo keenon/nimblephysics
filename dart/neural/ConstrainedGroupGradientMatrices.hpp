@@ -257,6 +257,10 @@ public:
   /// Returns the M^{-1} matrix from pre-step
   const Eigen::VectorXd& getMinv() const;
 
+  /// Get the coriolis and gravity forces
+  const Eigen::VectorXd getCoriolisAndGravityAndExternalForces(
+      simulation::WorldPtr world) const;
+
   std::size_t getNumDOFs() const;
 
   std::size_t getNumConstraintDim() const;
@@ -274,12 +278,21 @@ public:
   Eigen::MatrixXd finiteDifferenceJacobianOfMinv(
       simulation::WorldPtr world, Eigen::VectorXd tau, WithRespectTo wrt);
 
+  /// This computes and returns the jacobian of C(pos, inertia, vel) by finite
+  /// differences. This is SUPER SLOW, and is only here for testing.
+  Eigen::MatrixXd finiteDifferenceJacobianOfC(
+      simulation::WorldPtr world, WithRespectTo wrt);
+
 private:
   std::size_t getWrtDim(simulation::WorldPtr world, WithRespectTo wrt);
 
   Eigen::VectorXd getWrt(simulation::WorldPtr world, WithRespectTo wrt);
 
   void setWrt(simulation::WorldPtr world, WithRespectTo wrt, Eigen::VectorXd v);
+
+  /// Gets the skeletons associated with this constrained group in vector form
+  std::vector<std::shared_ptr<dynamics::Skeleton>> getSkeletons(
+      simulation::WorldPtr world);
 
 protected:
   /// Impulse test matrix for the clamping constraints

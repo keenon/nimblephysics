@@ -344,7 +344,7 @@ Eigen::MatrixXd BackpropSnapshot::getScratchAnalytical(
   Eigen::MatrixXd dC = getJacobianOfC(world, WithRespectTo::POSITION);
 
   Eigen::MatrixXd dA_c = getJacobianOfClampingConstraints(world, f_c);
-  Eigen::MatrixXd dA_ubE = getJacobianOfUpperBoundConstraints(world, f_c);
+  Eigen::MatrixXd dA_ubE = getJacobianOfUpperBoundConstraints(world, E * f_c);
 
   Eigen::VectorXd c = Eigen::VectorXd::Ones(mNumDOFs);
   Eigen::VectorXd Minv_c = Minv.completeOrthogonalDecomposition().solve(c);
@@ -541,7 +541,7 @@ Eigen::MatrixXd BackpropSnapshot::getVelJacobianWrt(
   if (wrt == WithRespectTo::POSITION)
   {
     Eigen::MatrixXd dA_c = getJacobianOfClampingConstraints(world, f_c);
-    Eigen::MatrixXd dA_ubE = getJacobianOfUpperBoundConstraints(world, f_c);
+    Eigen::MatrixXd dA_ubE = getJacobianOfUpperBoundConstraints(world, E * f_c);
     snapshot.restore();
     return dM + Minv * (A_c_ub_E * dF_c + dA_c + dA_ubE - dt * dC);
   }
@@ -884,6 +884,12 @@ bool BackpropSnapshot::hasBounces()
 std::size_t BackpropSnapshot::getNumClamping()
 {
   return mNumClamping;
+}
+
+//==============================================================================
+std::size_t BackpropSnapshot::getNumUpperBound()
+{
+  return mNumUpperBound;
 }
 
 //==============================================================================
@@ -1592,7 +1598,16 @@ Eigen::MatrixXd BackpropSnapshot::estimateUpperBoundConstraintMatrixAt(
 Eigen::MatrixXd BackpropSnapshot::getJacobianOfClampingConstraints(
     simulation::WorldPtr world, Eigen::VectorXd f0)
 {
-  return finiteDifferenceJacobianOfClampingConstraints(world, f0);
+  std::vector<std::shared_ptr<DifferentiableContactConstraint>> constraints
+      = getClampingConstraints();
+  int dofs = world->getNumDofs();
+  Eigen::MatrixXd result = Eigen::MatrixXd::Zero(dofs, dofs);
+  assert(constraints.size() == f0.size());
+  for (int i = 0; i < constraints.size(); i++)
+  {
+    result += f0(i) * constraints[i]->getConstraintForcesJacobian(world);
+  }
+  return result;
 }
 
 //==============================================================================
@@ -1601,7 +1616,17 @@ Eigen::MatrixXd BackpropSnapshot::getJacobianOfClampingConstraints(
 Eigen::MatrixXd BackpropSnapshot::getJacobianOfClampingConstraintsTranspose(
     simulation::WorldPtr world, Eigen::VectorXd v0)
 {
-  return finiteDifferenceJacobianOfClampingConstraintsTranspose(world, v0);
+  std::vector<std::shared_ptr<DifferentiableContactConstraint>> constraints
+      = getClampingConstraints();
+  int dofs = world->getNumDofs();
+  Eigen::MatrixXd result = Eigen::MatrixXd::Zero(mNumClamping, dofs);
+  for (int i = 0; i < constraints.size(); i++)
+  {
+    result.row(i)
+        = constraints[i]->getConstraintForcesJacobian(world).transpose() * v0;
+  }
+
+  return result;
 }
 
 //==============================================================================
@@ -1610,7 +1635,16 @@ Eigen::MatrixXd BackpropSnapshot::getJacobianOfClampingConstraintsTranspose(
 Eigen::MatrixXd BackpropSnapshot::getJacobianOfUpperBoundConstraints(
     simulation::WorldPtr world, Eigen::VectorXd f0)
 {
-  return finiteDifferenceJacobianOfUpperBoundConstraints(world, f0);
+  std::vector<std::shared_ptr<DifferentiableContactConstraint>> constraints
+      = getUpperBoundConstraints();
+  int dofs = world->getNumDofs();
+  Eigen::MatrixXd result = Eigen::MatrixXd::Zero(dofs, dofs);
+  assert(constraints.size() == f0.size());
+  for (int i = 0; i < constraints.size(); i++)
+  {
+    result += f0(i) * constraints[i]->getConstraintForcesJacobian(world);
+  }
+  return result;
 }
 
 //==============================================================================
@@ -1657,17 +1691,30 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceJacobianOfClampingConstraints(
 
   for (std::size_t i = 0; i < mNumDOFs; i++)
   {
-    snapshot.restore();
-    Eigen::VectorXd perturbed = mPreStepPosition;
-    perturbed(i) += EPS;
-    world->setPositions(perturbed);
-    world->setVelocities(mPreStepVelocity);
-    world->setForces(mPreStepTorques);
+    double useEPS = EPS;
 
-    BackpropSnapshotPtr ptr = neural::forwardPass(world, true);
-    Eigen::VectorXd perturbedResult
-        = ptr->getClampingConstraintMatrix(world) * f0;
-    result.col(i) = (perturbedResult - original) / EPS;
+    // Keep scaling down the EPS until it no longer results in a different
+    // number of columns
+    for (int j = 0; j < 10; j++)
+    {
+      snapshot.restore();
+      Eigen::VectorXd perturbed = mPreStepPosition;
+      perturbed(i) += useEPS;
+      world->setPositions(perturbed);
+      world->setVelocities(mPreStepVelocity);
+      world->setForces(mPreStepTorques);
+
+      BackpropSnapshotPtr ptr = neural::forwardPass(world, true);
+      Eigen::MatrixXd perturbedA_c = ptr->getClampingConstraintMatrix(world);
+      if (perturbedA_c.cols() != f0.size())
+      {
+        useEPS /= 2;
+        continue;
+      }
+      Eigen::VectorXd perturbedResult = perturbedA_c * f0;
+      result.col(i) = (perturbedResult - original) / useEPS;
+      break;
+    }
   }
 
   snapshot.restore();
@@ -1698,17 +1745,29 @@ BackpropSnapshot::finiteDifferenceJacobianOfClampingConstraintsTranspose(
 
   for (std::size_t i = 0; i < mNumDOFs; i++)
   {
-    snapshot.restore();
-    Eigen::VectorXd perturbed = mPreStepPosition;
-    perturbed(i) += EPS;
-    world->setPositions(perturbed);
-    world->setVelocities(mPreStepVelocity);
-    world->setForces(mPreStepTorques);
+    double useEPS = EPS;
 
-    BackpropSnapshotPtr ptr = neural::forwardPass(world, true);
-    Eigen::VectorXd perturbedResult
-        = ptr->getClampingConstraintMatrix(world).transpose() * v0;
-    result.col(i) = (perturbedResult - original) / EPS;
+    // Keep scaling down the EPS until it no longer results in a different
+    // number of columns
+    for (int j = 0; j < 10; j++)
+    {
+      snapshot.restore();
+      Eigen::VectorXd perturbed = mPreStepPosition;
+      perturbed(i) += useEPS;
+      world->setPositions(perturbed);
+      world->setVelocities(mPreStepVelocity);
+      world->setForces(mPreStepTorques);
+
+      BackpropSnapshotPtr ptr = neural::forwardPass(world, true);
+      Eigen::VectorXd perturbedResult
+          = ptr->getClampingConstraintMatrix(world).transpose() * v0;
+      if (perturbedResult.size() != original.size())
+      {
+        useEPS /= 2;
+        continue;
+      }
+      result.col(i) = (perturbedResult - original) / useEPS;
+    }
   }
 
   snapshot.restore();
@@ -1723,6 +1782,11 @@ Eigen::MatrixXd
 BackpropSnapshot::finiteDifferenceJacobianOfUpperBoundConstraints(
     simulation::WorldPtr world, Eigen::VectorXd f0)
 {
+  if (mNumUpperBound == 0)
+  {
+    return Eigen::MatrixXd::Zero(mNumDOFs, mNumDOFs);
+  }
+
   RestorableSnapshot snapshot(world);
 
   world->setPositions(mPreStepPosition);
@@ -1733,7 +1797,7 @@ BackpropSnapshot::finiteDifferenceJacobianOfUpperBoundConstraints(
 
   Eigen::VectorXd original = getUpperBoundConstraintMatrix(world) * E * f0;
 
-  Eigen::MatrixXd result = Eigen::MatrixXd::Zero(original.size(), mNumDOFs);
+  Eigen::MatrixXd result = Eigen::MatrixXd::Zero(mNumUpperBound, mNumDOFs);
 
   const double EPS = 1e-8;
 

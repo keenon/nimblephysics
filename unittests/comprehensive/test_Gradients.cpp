@@ -317,7 +317,7 @@ bool verifyClassicProjectionIntoClampsMatrix(
 
   VectorXd zero = VectorXd::Zero(analyticalError.size());
   double constraintForces = contactConstraintForces.norm();
-  if (!equals(analyticalError, zero, constraintForces * 2e-3))
+  if (!equals(analyticalError, zero, std::max(constraintForces, 1e-2) * 2e-3))
   {
     std::cout << "Proposed velocities: " << std::endl
               << proposedVelocities << std::endl;
@@ -425,17 +425,17 @@ bool verifyVelVelJacobian(WorldPtr world, VectorXd proposedVelocities)
   {
     std::cout << "Brute force velVelJacobian:" << std::endl
               << bruteForce << std::endl;
+    std::cout << "Analytical velVelJacobian (should be the same as above):"
+              << std::endl
+              << analytical << std::endl;
     std::cout << "Brute force velCJacobian:" << std::endl
               << classicPtr->getVelCJacobian(world) << std::endl;
     std::cout << "Brute force forceVelJacobian:" << std::endl
               << classicPtr->getForceVelJacobian(world) << std::endl;
-    std::cout << "Brute force velCJacobian * forceVelJacobian:" << std::endl
-              << classicPtr->getVelCJacobian(world)
-                     * classicPtr->getForceVelJacobian(world)
+    std::cout << "Brute force forceVelJacobian * velCJacobian:" << std::endl
+              << classicPtr->getForceVelJacobian(world)
+                     * classicPtr->getVelCJacobian(world)
               << std::endl;
-    std::cout << "Analytical velVelJacobian (should be the same as above):"
-              << std::endl
-              << analytical << std::endl;
     return false;
   }
 
@@ -631,7 +631,6 @@ bool verifyNextV(WorldPtr world)
                 ? 1e-4 // things get sloppy when bouncing, increase tol
                 : 2e-6))
     {
-      /*
       std::cout << "Real v_t+1:" << std::endl
                 << perturbedTest.realNextVel << std::endl;
       std::cout << "Analytical v_t+1:" << std::endl
@@ -640,7 +639,6 @@ bool verifyNextV(WorldPtr world)
                 << perturbedTest.predictedNextVelPreSolve << std::endl;
       std::cout << "Real pre-solve v_t+1:" << std::endl
                 << perturbedTest.realNextVelPreSolve << std::endl;
-                */
       std::cout << "Analytical delta V from f_c v_t+1:" << std::endl
                 << perturbedTest.predictedNextVelDeltaVFromF << std::endl;
       std::cout << "Real delta V from f_c v_t+1:" << std::endl
@@ -743,10 +741,10 @@ bool verifyJacobianOfProjectionIntoClampsMatrix(
   neural::BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
 
   MatrixXd analytical = classicPtr->getJacobianOfProjectionIntoClampsMatrix(
-      world, proposedVelocities * 1000, wrt);
+      world, proposedVelocities * 10, wrt);
   MatrixXd bruteForce
       = classicPtr->finiteDifferenceJacobianOfProjectionIntoClampsMatrix(
-          world, proposedVelocities * 1000, wrt);
+          world, proposedVelocities * 10, wrt);
 
   if (!equals(analytical, bruteForce, 1e-6))
   {
@@ -876,18 +874,18 @@ bool verifyVelGradients(WorldPtr world, VectorXd worldVel)
   // return verifyF_c(world);
   // return verifyLinearScratch();
   // return verifyNextV(world);
-  return (
-      verifyClassicClampingConstraintMatrix(world, worldVel)
-      && verifyMassedClampingConstraintMatrix(world, worldVel)
-      && verifyMassedUpperBoundConstraintMatrix(world, worldVel)
-      && verifyClassicProjectionIntoClampsMatrix(world, worldVel)
-      && verifyMassedProjectionIntoClampsMatrix(world, worldVel)
-      && verifyRecoveredLCPConstraints(world, worldVel)
-      && verifyVelVelJacobian(world, worldVel) && verifyF_c(world)
-      && verifyJacobianOfProjectionIntoClampsMatrix(world, worldVel, POSITION)
-      && verifyPosVelJacobian(world, worldVel)
-      // && verifyScratch(world)
-      && verifyNextV(world) && verifyForceVelJacobian(world, worldVel));
+  return (verifyClassicClampingConstraintMatrix(world, worldVel)
+          && verifyMassedClampingConstraintMatrix(world, worldVel)
+          && verifyMassedUpperBoundConstraintMatrix(world, worldVel)
+          && verifyClassicProjectionIntoClampsMatrix(world, worldVel)
+          && verifyMassedProjectionIntoClampsMatrix(world, worldVel)
+          && verifyRecoveredLCPConstraints(world, worldVel) && verifyF_c(world)
+          && verifyJacobianOfProjectionIntoClampsMatrix(
+              world, worldVel, POSITION)
+          && verifyPosVelJacobian(world, worldVel)
+          // && verifyScratch(world)
+          && verifyNextV(world) && verifyForceVelJacobian(world, worldVel))
+         && verifyVelVelJacobian(world, worldVel);
 }
 
 bool verifyPosPosJacobianApproximation(WorldPtr world, std::size_t subdivisions)
@@ -3029,8 +3027,97 @@ bool verifyAnalyticalA_cJacobian(WorldPtr world)
 
       col += wrt->getNumDofs();
     }
+
+    std::vector<std::shared_ptr<dynamics::Skeleton>> skels;
+    for (int j = 0; j < world->getNumSkeletons(); j++)
+    {
+      skels.push_back(world->getSkeleton(j));
+    }
+
+    Eigen::MatrixXd skelAnalytical
+        = constraints[i]->getConstraintForcesJacobian(skels);
+    if (!equals(analytical, skelAnalytical, 1e-7))
+    {
+      std::cout << "Analytical constraint forces Jac of "
+                << "all skeletons"
+                << " wrt "
+                << "all skeletons"
+                << " incorrect!" << std::endl;
+      std::cout << "Analytical constraint forces Jac of world:" << std::endl
+                << analytical << std::endl;
+      std::cout << "Analytical constraint forces Jac skel-by-skel:" << std::endl
+                << skelAnalytical << std::endl;
+    }
   }
 
+  return true;
+}
+
+bool verifyJacobianOfClampingConstraints(WorldPtr world)
+{
+  BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
+
+  Eigen::VectorXd f0 = Eigen::VectorXd::Random(classicPtr->getNumClamping());
+
+  Eigen::MatrixXd analytical
+      = classicPtr->getJacobianOfClampingConstraints(world, f0);
+  Eigen::MatrixXd bruteForce
+      = classicPtr->finiteDifferenceJacobianOfClampingConstraints(world, f0);
+
+  if (!equals(analytical, bruteForce, 1e-5))
+  {
+    std::cout << "getJacobianOfClampingConstraints error:" << std::endl;
+    std::cout << "f0:" << std::endl << f0 << std::endl;
+    std::cout << "Analytical:" << std::endl << analytical << std::endl;
+    std::cout << "Brute Force:" << std::endl << bruteForce << std::endl;
+    return false;
+  }
+  return true;
+}
+
+bool verifyJacobianOfClampingConstraintsTranspose(WorldPtr world)
+{
+  BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
+
+  Eigen::VectorXd v0 = Eigen::VectorXd::Random(world->getNumDofs());
+
+  Eigen::MatrixXd analytical
+      = classicPtr->getJacobianOfClampingConstraintsTranspose(world, v0);
+  Eigen::MatrixXd bruteForce
+      = classicPtr->finiteDifferenceJacobianOfClampingConstraintsTranspose(
+          world, v0);
+
+  if (!equals(analytical, bruteForce, 1e-5))
+  {
+    std::cout << "getJacobianOfClampingConstraintsTranspose error:"
+              << std::endl;
+    std::cout << "v0:" << std::endl << v0 << std::endl;
+    std::cout << "Analytical:" << std::endl << analytical << std::endl;
+    std::cout << "Brute Force:" << std::endl << bruteForce << std::endl;
+    return false;
+  }
+  return true;
+}
+
+bool verifyJacobianOfUpperBoundConstraints(WorldPtr world)
+{
+  BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
+
+  Eigen::VectorXd f0 = Eigen::VectorXd::Random(classicPtr->getNumUpperBound());
+
+  Eigen::MatrixXd analytical
+      = classicPtr->getJacobianOfUpperBoundConstraints(world, f0);
+  Eigen::MatrixXd bruteForce
+      = classicPtr->finiteDifferenceJacobianOfUpperBoundConstraints(world, f0);
+
+  if (!equals(analytical, bruteForce, 1e-5))
+  {
+    std::cout << "getJacobianOfUpperBoundConstraints error:" << std::endl;
+    std::cout << "f0:" << std::endl << f0 << std::endl;
+    std::cout << "Analytical:" << std::endl << analytical << std::endl;
+    std::cout << "Brute Force:" << std::endl << bruteForce << std::endl;
+    return false;
+  }
   return true;
 }
 
@@ -3046,7 +3133,10 @@ bool verifyAnalyticalJacobians(WorldPtr world)
          && verifyAnalyticalContactForceJacobians(world)
          && verifyAnalyticalA_c(world)
          && verifyAnalyticalConstraintDerivatives(world)
-         && verifyAnalyticalA_cJacobian(world);
+         && verifyAnalyticalA_cJacobian(world)
+         && verifyJacobianOfClampingConstraints(world)
+         && verifyJacobianOfClampingConstraintsTranspose(world)
+         && verifyJacobianOfUpperBoundConstraints(world);
 }
 
 class MyWindow : public dart::gui::glut::SimWindow
@@ -4104,7 +4194,7 @@ void testVertexFaceCollision(bool isSelfCollision)
   box2Position.linear()
       = math::eulerXYZToMatrix(Eigen::Vector3d(0, 45, -45) * 3.1415 / 180);
   box2Position.translation()
-      = box2Position.linear() * Eigen::Vector3d(1.0 - 1e-2, 0, 0);
+      = box2Position.linear() * Eigen::Vector3d(1.0 - 2e-2, 0, 0);
   box2Joint->setTransformFromChildBodyNode(box2Position);
 
   world->addSkeleton(box1);
@@ -4113,8 +4203,13 @@ void testVertexFaceCollision(bool isSelfCollision)
     world->addSkeleton(box2);
   }
 
-  EXPECT_TRUE(verifyAnalyticalJacobians(world));
+  Eigen::VectorXd vels = Eigen::VectorXd::Zero(world->getNumDofs());
+  // Set the vel of the X translation of the 2nd box
+  vels(9) = 0.1;
+
   // renderWorld(world);
+  EXPECT_TRUE(verifyAnalyticalJacobians(world));
+  EXPECT_TRUE(verifyVelGradients(world, vels));
 }
 
 TEST(GRADIENTS, VERTEX_FACE_COLLISION)
@@ -4184,7 +4279,7 @@ void testEdgeEdgeCollision(bool isSelfCollision)
   box2Position.linear()
       = math::eulerXYZToMatrix(Eigen::Vector3d(0, 45, 45) * 3.1415 / 180);
   box2Position.translation() = box2Position.linear() * Eigen::Vector3d(1, -1, 0)
-                               * ((2 * sqrt(0.5) / sqrt(2)) - 1e-2);
+                               * ((2 * sqrt(0.5) / sqrt(2)) - 2e-2);
   box2Joint->setTransformFromChildBodyNode(box2Position);
 
   world->addSkeleton(box1);
@@ -4193,8 +4288,13 @@ void testEdgeEdgeCollision(bool isSelfCollision)
     world->addSkeleton(box2);
   }
 
-  EXPECT_TRUE(verifyAnalyticalJacobians(world));
+  Eigen::VectorXd vels = Eigen::VectorXd::Zero(world->getNumDofs());
+  vels(9) += 0.1;  // +x
+  vels(10) -= 0.1; // -y
+
   // renderWorld(world);
+  EXPECT_TRUE(verifyAnalyticalJacobians(world));
+  EXPECT_TRUE(verifyVelGradients(world, vels));
 }
 
 TEST(GRADIENTS, EDGE_EDGE_COLLISION)

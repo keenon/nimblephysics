@@ -167,6 +167,12 @@ public:
       std::vector<std::shared_ptr<dynamics::Skeleton>> skels,
       std::shared_ptr<dynamics::Skeleton> wrt);
 
+  /// This computes and returns the analytical Jacobian relating how changes in
+  /// the positions of any of the DOFs changes the constraint forces on all the
+  /// skels.
+  Eigen::MatrixXd getConstraintForcesJacobian(
+      std::vector<std::shared_ptr<dynamics::Skeleton>> skels);
+
   /// This returns the skeletons that this contact constraint interacts with.
   const std::vector<std::shared_ptr<dynamics::Skeleton>>& getSkeletons();
 
