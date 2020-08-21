@@ -452,7 +452,9 @@ void ConstrainedGroupGradientMatrices::constructMatrices()
     }
 
     // This means "j" is in "Clamping"
-    if (mX(j) > lowerBound && mX(j) < upperBound)
+    if ((mX(j) > lowerBound && mX(j) < upperBound)                  // Clamping
+        || (lowerBound - mX(j) > 1e-2 || mX(j) - upperBound > 1e-2) // Illegal
+    )
     {
       mContactConstraintMappings(j) = neural::ConstraintMapping::CLAMPING;
       clampingIndex[j] = numClamping;

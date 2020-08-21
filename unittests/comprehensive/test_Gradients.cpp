@@ -478,6 +478,11 @@ bool verifyF_c(WorldPtr world)
     std::cout << "Analytical f_c:" << std::endl << analyticalF_c << std::endl;
     std::cout << "Diff f_c:" << std::endl
               << (realF_c - analyticalF_c) << std::endl;
+    std::cout << "Real Q:" << std::endl << realQ << std::endl;
+    std::cout << "Real B:" << std::endl << realB << std::endl;
+    std::cout << "Real Qinv*B:" << std::endl
+              << realQ.completeOrthogonalDecomposition().solve(realB)
+              << std::endl;
     return false;
   }
 
@@ -629,7 +634,7 @@ bool verifyNextV(WorldPtr world)
             perturbedTest.realNextVel,
             classicPtr->hasBounces()
                 ? 1e-4 // things get sloppy when bouncing, increase tol
-                : 2e-6))
+                : 3e-6))
     {
       std::cout << "Real v_t+1:" << std::endl
                 << perturbedTest.realNextVel << std::endl;
@@ -2860,7 +2865,7 @@ bool verifyPerturbedScrewAxis(WorldPtr world)
             = (bruteForce - original) / EPS;
         Eigen::Vector6d analyticalGradient
             = constraints[q]->getScrewAxisGradient(axis, wrt);
-        if (!equals(analyticalGradient, finiteDifferenceGradient, EPS))
+        if (!equals(analyticalGradient, finiteDifferenceGradient, EPS * 2))
         {
           std::cout << "Axis:" << std::endl
                     << axis->getSkeleton()->getName() << " - "
@@ -2921,7 +2926,7 @@ bool verifyAnalyticalConstraintDerivatives(WorldPtr world)
 
         double bruteForce = (newValue - originalValue) / EPS;
 
-        if (abs(analytical - bruteForce) > 1e-7)
+        if (abs(analytical - bruteForce) > 1e-6)
         {
           std::cout << "Rotate:" << k << " - "
                     << rotate->getSkeleton()->getName() << " - "
@@ -2957,7 +2962,7 @@ bool verifyAnalyticalA_cJacobian(WorldPtr world)
     Eigen::MatrixXd bruteForce
         = constraints[i]->bruteForceConstraintForcesJacobian(world);
     Eigen::VectorXd A_cCol = constraints[i]->getConstraintForces(world);
-    if (!equals(analytical, bruteForce, 1e-7))
+    if (!equals(analytical, bruteForce, 1e-6))
     {
       std::cout << "A_c col:" << std::endl << A_cCol << std::endl;
       std::cout << "Analytical constraint forces Jac:" << std::endl
@@ -3288,7 +3293,7 @@ TEST(GRADIENTS, PENDULUM_BLOCK)
 
 // This is the margin so that finite-differencing over position doesn't break
 // contacts
-const double CONTACT_MARGIN = 1e-6;
+const double CONTACT_MARGIN = 1e-5;
 
 /******************************************************************************
 
@@ -4042,7 +4047,10 @@ void testRobotArm(
     }
     jointPair.second->setMass(1.0);
     parent = jointPair.second;
-    ShapeNode* visual = parent->createShapeNodeWith<VisualAspect>(boxShape);
+    if ((attachPoint == -1 && i < numLinks - 1) || i != attachPoint)
+    {
+      ShapeNode* visual = parent->createShapeNodeWith<VisualAspect>(boxShape);
+    }
   }
 
   if (attachPoint != -1)
@@ -4050,13 +4058,20 @@ void testRobotArm(
     parent = nodes[attachPoint];
   }
 
-  std::shared_ptr<SphereShape> endShape(new SphereShape(1.0));
+  std::shared_ptr<BoxShape> endShape(
+      new BoxShape(Eigen::Vector3d(1.0, 1.0, 1.0) * sqrt(1.0 / 3.0)));
   ShapeNode* endNode
       = parent->createShapeNodeWith<VisualAspect, CollisionAspect>(endShape);
   parent->setFrictionCoeff(1);
 
   arm->setPositions(Eigen::VectorXd::Ones(arm->getNumDofs()) * rotationRadians);
   world->addSkeleton(arm);
+
+  Eigen::Isometry3d worldTransform = parent->getWorldTransform();
+  Eigen::Matrix3d rotation
+      = math::eulerXYZToMatrix(Eigen::Vector3d(0, 45, -45) * 3.1415 / 180)
+        * worldTransform.linear().transpose();
+  endNode->setRelativeRotation(rotation);
 
   SkeletonPtr wall = Skeleton::create("wall");
   std::pair<WeldJoint*, BodyNode*> jointPair
@@ -4070,9 +4085,8 @@ void testRobotArm(
   // jointPair.second->setFrictionCoeff(0.0);
 
   Eigen::Isometry3d wallLocalOffset = Eigen::Isometry3d::Identity();
-  wallLocalOffset.translation()
-      = parent->getWorldTransform().translation()
-        + Eigen::Vector3d(-(1.5 - CONTACT_MARGIN), 0.0, 0);
+  wallLocalOffset.translation() = parent->getWorldTransform().translation()
+                                  + Eigen::Vector3d(-(1.0 - 1e-2), 0.0, 0);
   jointPair.first->setTransformFromParentBodyNode(wallLocalOffset);
 
   /*
@@ -4105,13 +4119,13 @@ void testRobotArm(
   world->setPositions(pos);
   */
 
+  // renderWorld(world);
   // TODO!!!: this breaks when we do a middle attach
   EXPECT_TRUE(verifyVelGradients(world, worldVel));
   EXPECT_TRUE(verifyAnalyticalJacobians(world));
   EXPECT_TRUE(verifyAnalyticalBackprop(world));
 }
 
-/*
 TEST(GRADIENTS, ARM_3_LINK_30_DEG)
 {
   testRobotArm(3, 30.0 / 180 * 3.1415);
@@ -4119,8 +4133,7 @@ TEST(GRADIENTS, ARM_3_LINK_30_DEG)
 
 TEST(GRADIENTS, ARM_5_LINK_30_DEG)
 {
-  // This test wraps an arm around, and it's actually breaking contact, so
-this
+  // This test wraps an arm around, and it's actually breaking contact, so this
   // tests unconstrained free-motion
   testRobotArm(5, 30.0 / 180 * 3.1415);
 }
@@ -4135,7 +4148,6 @@ TEST(GRADIENTS, ARM_3_LINK_30_DEG_MIDDLE_ATTACH)
 {
   testRobotArm(3, 30.0 / 180 * 3.1415, 1);
 }
-*/
 
 /**
  * This sets up two boxes colliding with each other. Each can rotate and
