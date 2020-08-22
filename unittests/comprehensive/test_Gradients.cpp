@@ -117,9 +117,15 @@ bool verifyClassicClampingConstraintMatrix(
     return true;
   }
 
-  Eigen::MatrixXd A_cInv
-      = A_c.size() > 0 ? A_c.completeOrthogonalDecomposition().pseudoInverse()
-                       : Eigen::MatrixXd(0, 0);
+  Eigen::MatrixXd A_cInv;
+  if (A_c.size() > 0)
+  {
+    A_cInv = A_c.completeOrthogonalDecomposition().pseudoInverse();
+  }
+  else
+  {
+    A_cInv = Eigen::MatrixXd::Zero(0, 0);
+  }
   MatrixXd mapper = A_cInv.eval().transpose() * A_c.transpose();
   VectorXd violationVelocities = mapper * proposedVelocities;
   VectorXd cleanVelocities = proposedVelocities - violationVelocities;
@@ -278,10 +284,11 @@ bool verifyClassicProjectionIntoClampsMatrix(
   Eigen::MatrixXd constraintForceToImpliedTorques = V_c + (V_ub * E);
   Eigen::MatrixXd forceToVel
       = A_c.eval().transpose() * constraintForceToImpliedTorques;
-  Eigen::MatrixXd velToForce
-      = forceToVel.size() > 0
-            ? forceToVel.completeOrthogonalDecomposition().pseudoInverse()
-            : Eigen::MatrixXd(0, 0);
+  Eigen::MatrixXd velToForce = Eigen::MatrixXd::Zero(0, 0);
+  if (forceToVel.size() > 0)
+  {
+    velToForce = forceToVel.completeOrthogonalDecomposition().pseudoInverse();
+  }
   VectorXd penetrationOffset
       = (velToForce * penetrationCorrectionVelocities) / world->getTimeStep();
 
@@ -385,10 +392,11 @@ bool verifyMassedProjectionIntoClampsMatrix(
   Eigen::MatrixXd forceToVel = A_c.eval().transpose()
                                * classicPtr->getInvMassMatrix(world)
                                * constraintForceToImpliedTorques;
-  Eigen::MatrixXd velToForce
-      = forceToVel.size() > 0
-            ? forceToVel.completeOrthogonalDecomposition().pseudoInverse()
-            : Eigen::MatrixXd(0, 0);
+  Eigen::MatrixXd velToForce = Eigen::MatrixXd::Zero(0, 0);
+  if (forceToVel.size() > 0)
+  {
+    velToForce = forceToVel.completeOrthogonalDecomposition().pseudoInverse();
+  }
   Eigen::MatrixXd bounce = classicPtr->getBounceDiagonals().asDiagonal();
   Eigen::MatrixXd P_c_recovered
       = (1.0 / world->getTimeStep()) * velToForce * bounce * A_c.transpose();
@@ -442,6 +450,44 @@ bool verifyVelVelJacobian(WorldPtr world, VectorXd proposedVelocities)
   return true;
 }
 
+bool verifyAnalyticalConstraintMatrixEstimates(WorldPtr world)
+{
+  neural::BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
+
+  Eigen::MatrixXd original = classicPtr->getClampingConstraintMatrix(world);
+
+  double EPS = 1e-5;
+
+  for (int i = 0; i < 100; i++)
+  {
+    Eigen::VectorXd diff = Eigen::VectorXd::Random(world->getNumDofs()) * EPS;
+    Eigen::VectorXd pos = world->getPositions() + diff;
+
+    Eigen::MatrixXd analytical
+        = classicPtr->estimateClampingConstraintMatrixAt(world, pos);
+    Eigen::MatrixXd bruteForce
+        = classicPtr->getClampingConstraintMatrixAt(world, pos);
+
+    Eigen::MatrixXd analyticalDiff = (analytical - original) / EPS;
+    Eigen::MatrixXd bruteForceDiff = (bruteForce - original) / EPS;
+
+    // I'm surprised by how quickly the gradient can change
+    if (!equals(analyticalDiff, bruteForceDiff, 2e-3))
+    {
+      std::cout << "Error in analytical A_c estimates:" << std::endl;
+      std::cout << "Analytical Diff:" << std::endl
+                << analyticalDiff << std::endl;
+      std::cout << "Brute Force Diff:" << std::endl
+                << bruteForceDiff << std::endl;
+      std::cout << "Estimate Diff Error (2nd+ order effects):" << std::endl
+                << analyticalDiff - bruteForceDiff << std::endl;
+      std::cout << "Position Diff:" << std::endl << diff << std::endl;
+      return false;
+    }
+  }
+  return true;
+}
+
 bool verifyF_c(WorldPtr world)
 {
   RestorableSnapshot snapshot(world);
@@ -452,7 +498,7 @@ bool verifyF_c(WorldPtr world)
   Eigen::MatrixXd realQ = classicPtr->getClampingAMatrix();
   Eigen::VectorXd realB = classicPtr->getClampingConstraintRelativeVels();
 
-  Eigen::MatrixXd analyticalQ = Eigen::MatrixXd(A_c.cols(), A_c.cols());
+  Eigen::MatrixXd analyticalQ = Eigen::MatrixXd::Zero(A_c.cols(), A_c.cols());
   classicPtr->computeLCPConstraintMatrixClampingSubset(world, analyticalQ, A_c);
   Eigen::VectorXd analyticalB = Eigen::VectorXd(A_c.cols());
   classicPtr->computeLCPOffsetClampingSubset(world, analyticalB, A_c);
@@ -470,7 +516,7 @@ bool verifyF_c(WorldPtr world)
   }
 
   Eigen::VectorXd analyticalF_c
-      = classicPtr->estimateClampingConstraintImpulses(world);
+      = classicPtr->estimateClampingConstraintImpulses(world, A_c);
   Eigen::VectorXd realF_c = classicPtr->getClampingConstraintImpulses();
   if (!equals(analyticalF_c, realF_c, 2e-5))
   {
@@ -545,11 +591,12 @@ VelocityTest runVelocityTest(WorldPtr world)
 
   Eigen::MatrixXd Minv = world->getInvMassMatrix();
   Eigen::VectorXd C = world->getCoriolisAndGravityAndExternalForces();
-  Eigen::VectorXd f_c = classicPtr->estimateClampingConstraintImpulses(world);
+  Eigen::VectorXd f_c
+      = classicPtr->estimateClampingConstraintImpulses(world, A_c);
 
   /*
   Eigen::VectorXd b = Eigen::VectorXd(A_c.cols());
-  Eigen::MatrixXd Q = Eigen::MatrixXd(A_c.cols(), A_c.cols());
+  Eigen::MatrixXd Q = Eigen::MatrixXd::Zero(A_c.cols(), A_c.cols());
   classicPtr->computeLCPOffsetClampingSubset(world, b, A_c);
   classicPtr->computeLCPConstraintMatrixClampingSubset(world, Q, A_c);
   std::cout << "Real B: " << std::endl
@@ -561,12 +608,14 @@ VelocityTest runVelocityTest(WorldPtr world)
   */
 
   Eigen::VectorXd allRealImpulses = classicPtr->getContactConstraintImpluses();
+  /*
   Eigen::VectorXd velChange = Eigen::VectorXd::Zero(world->getNumDofs());
   for (int i = 0; i < allRealImpulses.size(); i++)
   {
     velChange += allRealImpulses(i)
                  * classicPtr->mGradientMatrices[0]->mMassedImpulseTests[i];
   }
+  */
   Eigen::VectorXd velDueToIllegal
       = classicPtr->getVelocityDueToIllegalImpulses();
 
@@ -840,7 +889,7 @@ bool verifyRecoveredLCPConstraints(WorldPtr world, VectorXd proposedVelocities)
 
   MatrixXd A_c = classicPtr->getClampingConstraintMatrix(world);
 
-  MatrixXd Q = Eigen::MatrixXd(A_c.cols(), A_c.cols());
+  MatrixXd Q = Eigen::MatrixXd::Zero(A_c.cols(), A_c.cols());
   classicPtr->computeLCPConstraintMatrixClampingSubset(world, Q, A_c);
 
   Eigen::VectorXd b = Eigen::VectorXd::Zero(A_c.cols());
@@ -879,6 +928,7 @@ bool verifyVelGradients(WorldPtr world, VectorXd worldVel)
   // return verifyF_c(world);
   // return verifyLinearScratch();
   // return verifyNextV(world);
+  return verifyPosVelJacobian(world, worldVel);
   return (verifyClassicClampingConstraintMatrix(world, worldVel)
           && verifyMassedClampingConstraintMatrix(world, worldVel)
           && verifyMassedUpperBoundConstraintMatrix(world, worldVel)
@@ -1759,7 +1809,7 @@ bool verifyLinearJacobian(
     Eigen::VectorXd originalWorldVel = skelConvertJointSpaceToWorldSpace(
         skel, originalVel, bodyNodes, ConvertToSpace::VEL_LINEAR);
     Eigen::MatrixXd bruteForce
-        = Eigen::MatrixXd(analytical.rows(), analytical.cols());
+        = Eigen::MatrixXd::Zero(analytical.rows(), analytical.cols());
     const double EPS = 1e-7;
     for (int j = 0; j < skel->getNumDofs(); j++)
     {
@@ -1830,7 +1880,7 @@ bool verifySpatialJacobian(
     Eigen::VectorXd originalWorldVel = skelConvertJointSpaceToWorldSpace(
         skel, originalVel, bodyNodes, ConvertToSpace::VEL_SPATIAL);
     Eigen::MatrixXd bruteForce
-        = Eigen::MatrixXd(analytical.rows(), analytical.cols());
+        = Eigen::MatrixXd::Zero(analytical.rows(), analytical.cols());
     const double EPS = 1e-7;
     for (int j = 0; j < skel->getNumDofs(); j++)
     {
@@ -1930,12 +1980,13 @@ bool verifyBackpropWorldSpacePositionToPosition(
               .translation();
   }
 
-  Eigen::MatrixXd perturbations = Eigen::MatrixXd(worldPerturbation.size(), 3);
+  Eigen::MatrixXd perturbations
+      = Eigen::MatrixXd::Zero(worldPerturbation.size(), 3);
   perturbations << worldPerturbation, expectedPerturbation,
       expectedPerturbationFromSpatial;
 
   Eigen::MatrixXd perturbationsSpatial
-      = Eigen::MatrixXd(worldPerturbationSpatial.size(), 2);
+      = Eigen::MatrixXd::Zero(worldPerturbationSpatial.size(), 2);
   perturbationsSpatial << worldPerturbationSpatial, expectedPerturbationSpatial;
 
   if (!equals(worldPerturbation, expectedPerturbation, 1e-5))
@@ -2013,12 +2064,13 @@ bool verifyBackpropWorldSpaceVelocityToPosition(
               .translation();
   }
 
-  Eigen::MatrixXd perturbations = Eigen::MatrixXd(worldPerturbation.size(), 3);
+  Eigen::MatrixXd perturbations
+      = Eigen::MatrixXd::Zero(worldPerturbation.size(), 3);
   perturbations << worldPerturbation, expectedPerturbation,
       expectedPerturbationFromSpatial;
 
   Eigen::MatrixXd perturbationsSpatial
-      = Eigen::MatrixXd(worldPerturbationSpatial.size(), 2);
+      = Eigen::MatrixXd::Zero(worldPerturbationSpatial.size(), 2);
   perturbationsSpatial << worldPerturbationSpatial, expectedPerturbationSpatial;
 
   if (!equals(worldPerturbation, expectedPerturbation, 1e-5))
@@ -3139,6 +3191,7 @@ bool verifyAnalyticalJacobians(WorldPtr world)
          && verifyAnalyticalA_c(world)
          && verifyAnalyticalConstraintDerivatives(world)
          && verifyAnalyticalA_cJacobian(world)
+         && verifyAnalyticalConstraintMatrixEstimates(world)
          && verifyJacobianOfClampingConstraints(world)
          && verifyJacobianOfClampingConstraintsTranspose(world)
          && verifyJacobianOfUpperBoundConstraints(world);
@@ -3383,7 +3436,6 @@ void testBlockWithFrictionCoeff(double frictionCoeff, double mass)
   EXPECT_TRUE(verifyAnalyticalBackprop(world));
 }
 
-/*
 TEST(GRADIENTS, BLOCK_ON_GROUND_NO_FRICTION_1_MASS)
 {
   testBlockWithFrictionCoeff(0, 1);
@@ -3408,7 +3460,6 @@ TEST(GRADIENTS, BLOCK_ON_GROUND_SLIPPING_FRICTION)
 {
   testBlockWithFrictionCoeff(0.5, 1);
 }
-*/
 
 /******************************************************************************
 
@@ -3542,7 +3593,6 @@ void testTwoBlocks(
   EXPECT_TRUE(verifyAnalyticalBackprop(world));
 }
 
-/*
 TEST(GRADIENTS, TWO_BLOCKS_1_1_MASS)
 {
   testTwoBlocks(1, 1, 0, 1, 1);
@@ -3557,7 +3607,6 @@ TEST(GRADIENTS, TWO_BLOCKS_3_5_MASS)
 {
   testTwoBlocks(2, 1, 0, 3, 5);
 }
-*/
 
 /******************************************************************************
 
@@ -3649,12 +3698,10 @@ void testBouncingBlockWithFrictionCoeff(double frictionCoeff, double mass)
   EXPECT_TRUE(verifyAnalyticalBackprop(world));
 }
 
-/*
 TEST(GRADIENTS, BLOCK_BOUNCING_OFF_GROUND_NO_FRICTION_1_MASS)
 {
   testBouncingBlockWithFrictionCoeff(0, 1);
 }
-*/
 
 /******************************************************************************
 
@@ -3766,12 +3813,10 @@ void testReversePendulumSledWithFrictionCoeff(double frictionCoeff)
   EXPECT_TRUE(verifyAnalyticalBackprop(world));
 }
 
-/*
 TEST(GRADIENTS, SLIDING_REVERSE_PENDULUM_NO_FRICTION)
 {
   testReversePendulumSledWithFrictionCoeff(0);
 }
-*/
 
 /******************************************************************************
 
@@ -3860,12 +3905,10 @@ void testBouncingBlockPosGradients(double frictionCoeff, double mass)
   EXPECT_TRUE(verifyAnalyticalBackprop(world));
 }
 
-/*
 TEST(GRADIENTS, POS_BLOCK_BOUNCING_OFF_GROUND_NO_FRICTION_1_MASS)
 {
   testBouncingBlockPosGradients(0, 1);
 }
-*/
 
 /******************************************************************************
 
@@ -3971,7 +4014,6 @@ void testMultigroup(int numGroups)
   EXPECT_TRUE(verifyAnalyticalBackprop(world));
 }
 
-/*
 TEST(GRADIENTS, MULTIGROUP_2)
 {
   testMultigroup(2);
@@ -3981,7 +4023,6 @@ TEST(GRADIENTS, MULTIGROUP_4)
 {
   testMultigroup(4);
 }
-*/
 
 /******************************************************************************
 
@@ -4120,7 +4161,6 @@ void testRobotArm(
   */
 
   // renderWorld(world);
-  // TODO!!!: this breaks when we do a middle attach
   EXPECT_TRUE(verifyVelGradients(world, worldVel));
   EXPECT_TRUE(verifyAnalyticalJacobians(world));
   EXPECT_TRUE(verifyAnalyticalBackprop(world));
@@ -4143,7 +4183,6 @@ TEST(GRADIENTS, ARM_6_LINK_15_DEG)
   testRobotArm(6, 15.0 / 180 * 3.1415);
 }
 
-//// TODO: this is mysteriously broken!!!
 TEST(GRADIENTS, ARM_3_LINK_30_DEG_MIDDLE_ATTACH)
 {
   testRobotArm(3, 30.0 / 180 * 3.1415, 1);
@@ -4394,12 +4433,10 @@ void testCartpole(double rotationRadians)
   EXPECT_TRUE(verifyBulkPass(world, 1000, 50));
 }
 
-/*
 TEST(GRADIENTS, CARTPOLE_15_DEG)
 {
   testCartpole(15.0 / 180.0 * 3.1415);
 }
-*/
 
 void testWorldSpace(std::size_t numLinks)
 {
@@ -4452,12 +4489,10 @@ void testWorldSpace(std::size_t numLinks)
   EXPECT_TRUE(verifyWorldSpaceTransform(world));
 }
 
-/*
 TEST(GRADIENTS, WORLD_SPACE_5_LINK_ROBOT)
 {
   testWorldSpace(5);
 }
-*/
 
 /******************************************************************************
 
@@ -4500,7 +4535,7 @@ void testSimple3Link()
   secondOffset.translation() = Eigen::Vector3d(0, -1.0, 0);
   secondJointPair.first->setTransformFromChildBodyNode(secondOffset);
 
-  Eigen::MatrixXd expectedJac = Eigen::MatrixXd(9, 3);
+  Eigen::MatrixXd expectedJac = Eigen::MatrixXd::Zero(9, 3);
   expectedJac <<
       /* Body 1 X */
       1,
@@ -4529,12 +4564,10 @@ void testSimple3Link()
       world, Eigen::Vector3d::Zero(), Eigen::Vector3d::Zero()));
 }
 
-/*
 TEST(GRADIENTS, WORLD_SPACE_SIMPLE_LINK)
 {
   testSimple3Link();
 }
-*/
 
 void testWorldSpaceWithBoxes()
 {
@@ -4567,18 +4600,15 @@ void testWorldSpaceWithBoxes()
   EXPECT_TRUE(verifyWorldSpaceTransform(world));
 }
 
-/*
 TEST(GRADIENTS, WORLD_SPACE_BOXES)
 {
   testWorldSpaceWithBoxes();
 }
-*/
 
 ///////////////////////////////////////////////////////////////////////////////
 // Just idiot checking that the code doesn't crash on silly edge cases.
 ///////////////////////////////////////////////////////////////////////////////
 
-/*
 TEST(GRADIENTS, EMPTY_WORLD)
 {
   WorldPtr world = World::create();
@@ -4596,4 +4626,3 @@ TEST(GRADIENTS, EMPTY_SKELETON)
   EXPECT_TRUE(verifyVelGradients(world, worldVel));
   EXPECT_TRUE(verifyAnalyticalBackprop(world));
 }
-*/

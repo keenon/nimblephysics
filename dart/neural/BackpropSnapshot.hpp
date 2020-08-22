@@ -194,7 +194,14 @@ public:
   /// This predicts what the next velocity will be using our linear algebra
   /// formula. This is only here for testing, to compare it against the actual
   /// result of a timestep.
-  Eigen::VectorXd getAnalyticalNextV(simulation::WorldPtr world);
+  ///
+  /// The `morePreciseButSlower` flag tells this function to do brute force
+  /// steps to get constraint matrices A_c and A_ub, rather than use 1st order
+  /// approximations. This is important because when we're doing
+  /// finite-differencing over tiny EPS (1e-9) then tiny errors in the 1st order
+  /// approximations blow up to become huge errors in gradients.
+  Eigen::VectorXd getAnalyticalNextV(
+      simulation::WorldPtr world, bool morePreciseButSlower = false);
 
   /// This computes and returns the whole pos-vel jacobian. For backprop, you
   /// don't actually need this matrix, you can compute backprop directly. This
@@ -236,7 +243,7 @@ public:
   /// clamping constraints. This is based on a linear approximation of the
   /// constraint impulses.
   Eigen::VectorXd estimateClampingConstraintImpulses(
-      simulation::WorldPtr world);
+      simulation::WorldPtr world, const Eigen::MatrixXd& A_c);
 
   /// This returns the jacobian of P_c * v, holding everyhing constant except
   /// the value of WithRespectTo
@@ -260,6 +267,16 @@ public:
   /// This returns a fast approximation to A_ub in the neighborhood of the
   /// original
   Eigen::MatrixXd estimateUpperBoundConstraintMatrixAt(
+      simulation::WorldPtr world, Eigen::VectorXd pos);
+
+  /// Only for testing: VERY SLOW. This returns the actual value of A_c at the
+  /// desired position.
+  Eigen::MatrixXd getClampingConstraintMatrixAt(
+      simulation::WorldPtr world, Eigen::VectorXd pos);
+
+  /// Only for testing: VERY SLOW. This returns the actual value of A_ub at the
+  /// desired position.
+  Eigen::MatrixXd getUpperBoundConstraintMatrixAt(
       simulation::WorldPtr world, Eigen::VectorXd pos);
 
   /// This computes the Jacobian of A_c*f0 with respect to position using

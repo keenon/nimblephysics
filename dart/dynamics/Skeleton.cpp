@@ -1590,7 +1590,7 @@ Eigen::MatrixXd Skeleton::finiteDifferenceJacobianOfC(neural::WithRespectTo wrt)
 {
   std::size_t n = getNumDofs();
   std::size_t m = getWrtDim(wrt);
-  Eigen::MatrixXd J = Eigen::MatrixXd(n, m);
+  Eigen::MatrixXd J = Eigen::MatrixXd::Zero(n, m);
   Eigen::VectorXd start = getWrt(wrt);
 
   // Get baseline C(pos, vel)
@@ -1620,7 +1620,7 @@ Eigen::MatrixXd Skeleton::finiteDifferenceJacobianOfMinv(
 {
   std::size_t n = getNumDofs();
   std::size_t m = getWrtDim(wrt);
-  Eigen::MatrixXd J = Eigen::MatrixXd(n, m);
+  Eigen::MatrixXd J = Eigen::MatrixXd::Zero(n, m);
   Eigen::VectorXd start = getWrt(wrt);
 
   // Get baseline C(pos, vel)
@@ -1648,7 +1648,7 @@ Eigen::MatrixXd Skeleton::finiteDifferenceJacobianOfMinv(
 Eigen::MatrixXd Skeleton::finiteDifferenceVelCJacobian()
 {
   std::size_t n = getNumDofs();
-  Eigen::MatrixXd J = Eigen::MatrixXd(n, n);
+  Eigen::MatrixXd J = Eigen::MatrixXd::Zero(n, n);
   Eigen::VectorXd vel = getVelocities();
 
   // Get baseline C(pos, vel)
@@ -2515,7 +2515,8 @@ Eigen::VectorXd Skeleton::multiplyByImplicitMassMatrix(Eigen::VectorXd x)
     }
 
     // Collect the result of (M * x) for this tree
-    Eigen::MatrixXd treeMulResult = Eigen::MatrixXd(cache.mDofs.size(), 1);
+    Eigen::MatrixXd treeMulResult
+        = Eigen::MatrixXd::Zero(cache.mDofs.size(), 1);
     for (std::vector<BodyNode*>::const_reverse_iterator it
          = cache.mBodyNodes.rbegin();
          it != cache.mBodyNodes.rend();
@@ -2583,7 +2584,8 @@ Eigen::VectorXd Skeleton::multiplyByImplicitInvMassMatrix(Eigen::VectorXd x)
     }
 
     // Collect the result of (Minv * x) for this tree
-    Eigen::MatrixXd treeMulResult = Eigen::MatrixXd(cache.mDofs.size(), 1);
+    Eigen::MatrixXd treeMulResult
+        = Eigen::MatrixXd::Zero(cache.mDofs.size(), 1);
     for (std::vector<BodyNode*>::const_iterator it = cache.mBodyNodes.begin();
          it != cache.mBodyNodes.end();
          ++it)

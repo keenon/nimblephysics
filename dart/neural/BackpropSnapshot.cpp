@@ -284,12 +284,18 @@ Eigen::MatrixXd BackpropSnapshot::getPosVelJacobian(WorldPtr world)
 }
 
 //==============================================================================
-Eigen::VectorXd BackpropSnapshot::getAnalyticalNextV(simulation::WorldPtr world)
+Eigen::VectorXd BackpropSnapshot::getAnalyticalNextV(
+    simulation::WorldPtr world, bool morePreciseButSlower)
 {
   Eigen::MatrixXd A_c
-      = estimateClampingConstraintMatrixAt(world, world->getPositions());
+      = morePreciseButSlower
+            ? getClampingConstraintMatrixAt(world, world->getPositions())
+            : estimateClampingConstraintMatrixAt(world, world->getPositions());
   Eigen::MatrixXd A_ub
-      = estimateUpperBoundConstraintMatrixAt(world, world->getPositions());
+      = morePreciseButSlower
+            ? getUpperBoundConstraintMatrixAt(world, world->getPositions())
+            : estimateUpperBoundConstraintMatrixAt(
+                world, world->getPositions());
   Eigen::MatrixXd E = getUpperBoundMappingMatrix();
   Eigen::MatrixXd A_c_ub_E = A_c + A_ub * E;
   Eigen::MatrixXd P_c = getProjectionIntoClampsMatrix(world, true);
@@ -298,7 +304,7 @@ Eigen::VectorXd BackpropSnapshot::getAnalyticalNextV(simulation::WorldPtr world)
   Eigen::VectorXd tau = world->getForces();
   Eigen::VectorXd C = world->getCoriolisAndGravityAndExternalForces();
   double dt = world->getTimeStep();
-  Eigen::VectorXd f_c = estimateClampingConstraintImpulses(world);
+  Eigen::VectorXd f_c = estimateClampingConstraintImpulses(world, A_c);
 
   Eigen::VectorXd preSolveV = mPreStepVelocity + dt * Minv * (tau - C);
   Eigen::VectorXd f_cDeltaV = Minv * A_c_ub_E * f_c;
@@ -330,7 +336,7 @@ Eigen::MatrixXd BackpropSnapshot::getScratchAnalytical(
   Eigen::VectorXd tau = world->getForces();
   Eigen::VectorXd C = world->getCoriolisAndGravityAndExternalForces();
   Eigen::VectorXd f_c = estimateClampingConstraintImpulses(
-      world); // getClampingConstraintImpulses();
+      world, A_c); // getClampingConstraintImpulses();
   /*
   Eigen::VectorXd f_cReal = getClampingConstraintImpulses();
   std::cout << "f_c estimate: " << std::endl << f_c << std::endl;
@@ -442,7 +448,7 @@ Eigen::VectorXd BackpropSnapshot::scratch(simulation::WorldPtr world)
   Eigen::VectorXd tau = world->getForces();
   Eigen::VectorXd C = world->getCoriolisAndGravityAndExternalForces();
   double dt = world->getTimeStep();
-  Eigen::VectorXd f_c = estimateClampingConstraintImpulses(world);
+  Eigen::VectorXd f_c = estimateClampingConstraintImpulses(world, A_c);
 
   Eigen::MatrixXd Q = Eigen::MatrixXd(A_c.cols(), A_c.cols());
   computeLCPConstraintMatrixClampingSubset(world, Q, A_c);
@@ -986,7 +992,7 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferencePosVelJacobian(
   world->setVelocities(mPreStepVelocity);
   world->setForces(mPreStepTorques);
 
-  Eigen::VectorXd originalExpectedNextVel = getAnalyticalNextV(world);
+  Eigen::VectorXd originalExpectedNextVel = getAnalyticalNextV(world, true);
   Eigen::VectorXd originalExpectedAccel
       = (originalExpectedNextVel - mPreStepVelocity) / dt;
 
@@ -1042,7 +1048,7 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferencePosVelJacobian(
     Eigen::VectorXd tweakedPos = Eigen::VectorXd(mPreStepPosition);
     tweakedPos(i) += EPSILON;
     world->setPositions(tweakedPos);
-    Eigen::VectorXd expectedNextVel = getAnalyticalNextV(world);
+    Eigen::VectorXd expectedNextVel = getAnalyticalNextV(world, true);
 
     Eigen::VectorXd velChange = avgChange / 20;
     Eigen::VectorXd predictedVelChange
@@ -1461,10 +1467,8 @@ void BackpropSnapshot::computeLCPOffsetClampingSubset(
 /// clamping constraints. This is based on a linear approximation of the
 /// constraint impulses.
 Eigen::VectorXd BackpropSnapshot::estimateClampingConstraintImpulses(
-    simulation::WorldPtr world)
+    simulation::WorldPtr world, const Eigen::MatrixXd& A_c)
 {
-  Eigen::MatrixXd A_c = estimateClampingConstraintMatrixAt(
-      world, world->getPositions()); // getClampingConstraintMatrix(world);
   if (A_c.cols() == 0)
   {
     return Eigen::VectorXd::Zero(0);
@@ -1474,8 +1478,6 @@ Eigen::VectorXd BackpropSnapshot::estimateClampingConstraintImpulses(
   Eigen::MatrixXd Q = Eigen::MatrixXd(A_c.cols(), A_c.cols());
   computeLCPOffsetClampingSubset(world, b, A_c);
   computeLCPConstraintMatrixClampingSubset(world, Q, A_c);
-
-  // Solve to find constraint forces
 
   return Q.completeOrthogonalDecomposition().solve(b);
 }
@@ -1562,6 +1564,50 @@ Eigen::MatrixXd BackpropSnapshot::getJacobianOfC(
 Eigen::MatrixXd BackpropSnapshot::estimateClampingConstraintMatrixAt(
     simulation::WorldPtr world, Eigen::VectorXd pos)
 {
+  Eigen::VectorXd posDiff = pos - mPreStepPosition;
+  if (posDiff.squaredNorm() == 0)
+  {
+    return getClampingConstraintMatrix(world);
+  }
+  auto clampingConstraints = getClampingConstraints();
+  Eigen::MatrixXd result = Eigen::MatrixXd::Zero(mNumDOFs, mNumClamping);
+  for (int i = 0; i < clampingConstraints.size(); i++)
+  {
+    auto constraint = clampingConstraints[i];
+    result.col(i) = constraint->getConstraintForces(world)
+                    + constraint->getConstraintForcesJacobian(world) * posDiff;
+  }
+  return result;
+}
+
+//==============================================================================
+/// This returns a fast approximation to A_ub in the neighborhood of the
+/// original
+Eigen::MatrixXd BackpropSnapshot::estimateUpperBoundConstraintMatrixAt(
+    simulation::WorldPtr world, Eigen::VectorXd pos)
+{
+  Eigen::VectorXd posDiff = pos - mPreStepPosition;
+  if (posDiff.squaredNorm() == 0)
+  {
+    return getUpperBoundConstraintMatrix(world);
+  }
+  auto upperBoundConstraints = getUpperBoundConstraints();
+  Eigen::MatrixXd result = Eigen::MatrixXd::Zero(mNumDOFs, mNumUpperBound);
+  for (int i = 0; i < upperBoundConstraints.size(); i++)
+  {
+    auto constraint = upperBoundConstraints[i];
+    result.col(i) = constraint->getConstraintForces(world)
+                    + constraint->getConstraintForcesJacobian(world) * posDiff;
+  }
+  return result;
+}
+
+//==============================================================================
+/// Only for testing: VERY SLOW. This returns the actual value of A_c at the
+/// desired position.
+Eigen::MatrixXd BackpropSnapshot::getClampingConstraintMatrixAt(
+    simulation::WorldPtr world, Eigen::VectorXd pos)
+{
   RestorableSnapshot snapshot(world);
   world->setPositions(pos);
   world->setVelocities(mPreStepVelocity);
@@ -1571,13 +1617,14 @@ Eigen::MatrixXd BackpropSnapshot::estimateClampingConstraintMatrixAt(
 
   snapshot.restore();
 
-  return ptr->getClampingConstraintMatrix(world);
+  Eigen::MatrixXd bruteResult = ptr->getClampingConstraintMatrix(world);
+  return bruteResult;
 }
 
 //==============================================================================
-/// This returns a fast approximation to A_ub in the neighborhood of the
-/// original
-Eigen::MatrixXd BackpropSnapshot::estimateUpperBoundConstraintMatrixAt(
+/// Only for testing: VERY SLOW. This returns the actual value of A_ub at the
+/// desired position.
+Eigen::MatrixXd BackpropSnapshot::getUpperBoundConstraintMatrixAt(
     simulation::WorldPtr world, Eigen::VectorXd pos)
 {
   RestorableSnapshot snapshot(world);

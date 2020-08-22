@@ -45,7 +45,7 @@ void LCPUtils::cleanUpResults(
   if (numClamping == 0)
     return;
 
-  Eigen::MatrixXd reducedA = Eigen::MatrixXd(numClamping, numClamping);
+  Eigen::MatrixXd reducedA = Eigen::MatrixXd::Zero(numClamping, numClamping);
   Eigen::VectorXd reducedB = Eigen::VectorXd(numClamping);
 
   for (int row = 0; row < numClamping; row++)

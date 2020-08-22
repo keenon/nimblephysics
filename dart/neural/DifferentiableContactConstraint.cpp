@@ -167,7 +167,7 @@ Eigen::VectorXd DifferentiableContactConstraint::getConstraintForces(
 
   Eigen::Vector6d worldForce = getWorldForce();
 
-  Eigen::VectorXd taus = Eigen::VectorXd(skel->getNumDofs());
+  Eigen::VectorXd taus = Eigen::VectorXd::Zero(skel->getNumDofs());
   for (int i = 0; i < skel->getNumDofs(); i++)
   {
     auto dof = skel->getDof(i);
@@ -190,7 +190,7 @@ Eigen::VectorXd DifferentiableContactConstraint::getConstraintForces(
 Eigen::VectorXd DifferentiableContactConstraint::getConstraintForces(
     std::shared_ptr<simulation::World> world)
 {
-  Eigen::VectorXd taus = Eigen::VectorXd(world->getNumDofs());
+  Eigen::VectorXd taus = Eigen::VectorXd::Zero(world->getNumDofs());
   int cursor = 0;
   for (int i = 0; i < world->getNumSkeletons(); i++)
   {

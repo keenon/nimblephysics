@@ -72,8 +72,8 @@ BulkForwardPassResult bulkForwardPass(
   int dofs = world->getNumDofs();
 
   BulkForwardPassResult result;
-  result.postStepPoses = Eigen::MatrixXd(dofs, torques.size());
-  result.postStepVels = Eigen::MatrixXd(dofs, torques.size());
+  result.postStepPoses = Eigen::MatrixXd::Zero(dofs, torques.size());
+  result.postStepVels = Eigen::MatrixXd::Zero(dofs, torques.size());
   result.snapshots.reserve(torques.cols());
   for (int i = 0; i < torques.cols(); i++)
   {
@@ -158,9 +158,9 @@ BulkBackwardPassResult bulkBackwardPass(
       = floor(static_cast<double>(snapshots.size()) / shootingLength);
 
   BulkBackwardPassResult result;
-  result.gradWrtPreStepKnotPoses = Eigen::MatrixXd(dofs, numKnots);
-  result.gradWrtPreStepKnotVels = Eigen::MatrixXd(dofs, numKnots);
-  result.gradWrtPreStepTorques = Eigen::MatrixXd(dofs, snapshots.size());
+  result.gradWrtPreStepKnotPoses = Eigen::MatrixXd::Zero(dofs, numKnots);
+  result.gradWrtPreStepKnotVels = Eigen::MatrixXd::Zero(dofs, numKnots);
+  result.gradWrtPreStepTorques = Eigen::MatrixXd::Zero(dofs, snapshots.size());
   if (computeJacobians)
   {
     // Initialize enough Jacobians to handle all the knots
@@ -532,7 +532,7 @@ Eigen::VectorXd skelBackpropWorldSpaceToJointSpace(
   // Short circuit if we're being asked to map through an empty matrix
   if (jac.size() == 0)
   {
-    return Eigen::VectorXd(0);
+    return Eigen::VectorXd::Zero(0);
   }
 
   if (useIK)
@@ -641,7 +641,7 @@ Eigen::MatrixXd convertJointSpaceToWorldSpace(
         if (backprop)
         {
           Eigen::VectorXd skelIn
-              = Eigen::VectorXd(skelNodes.size() * data_size);
+              = Eigen::VectorXd::Zero(skelNodes.size() * data_size);
           for (int k = 0; k < skelNodes.size(); k++)
           {
             skelIn.segment(k * data_size, data_size)

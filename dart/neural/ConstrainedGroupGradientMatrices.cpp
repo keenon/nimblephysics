@@ -702,7 +702,8 @@ Eigen::MatrixXd ConstrainedGroupGradientMatrices::getPosPosJacobian()
   }
 
   // Construct the W matrix we'll need to use to solve for our closest approx
-  Eigen::MatrixXd W = Eigen::MatrixXd(A_b.rows() * A_b.rows(), A_b.cols());
+  Eigen::MatrixXd W
+      = Eigen::MatrixXd::Zero(A_b.rows() * A_b.rows(), A_b.cols());
   for (int i = 0; i < A_b.cols(); i++)
   {
     Eigen::VectorXd a_i = A_b.col(i);
@@ -727,7 +728,7 @@ Eigen::MatrixXd ConstrainedGroupGradientMatrices::getPosPosJacobian()
             getRestitutionDiagonals() + (W.eval().transpose() * center));
 
   // Recover X from the q vector
-  Eigen::MatrixXd X = Eigen::MatrixXd(mNumDOFs, mNumDOFs);
+  Eigen::MatrixXd X = Eigen::MatrixXd::Zero(mNumDOFs, mNumDOFs);
   for (std::size_t i = 0; i < mNumDOFs; i++)
   {
     X.col(i) = q.segment(i * mNumDOFs, mNumDOFs);
@@ -746,7 +747,7 @@ Eigen::MatrixXd ConstrainedGroupGradientMatrices::getVelPosJacobian()
 Eigen::MatrixXd ConstrainedGroupGradientMatrices::getPosCJacobian(
     simulation::WorldPtr world)
 {
-  Eigen::MatrixXd posCJac = Eigen::MatrixXd(mNumDOFs, mNumDOFs);
+  Eigen::MatrixXd posCJac = Eigen::MatrixXd::Zero(mNumDOFs, mNumDOFs);
   posCJac.setZero();
   std::size_t cursor = 0;
   for (std::size_t i = 0; i < mSkeletons.size(); i++)
@@ -764,7 +765,7 @@ Eigen::MatrixXd ConstrainedGroupGradientMatrices::getPosCJacobian(
 Eigen::MatrixXd ConstrainedGroupGradientMatrices::getVelCJacobian(
     simulation::WorldPtr world)
 {
-  Eigen::MatrixXd velCJac = Eigen::MatrixXd(mNumDOFs, mNumDOFs);
+  Eigen::MatrixXd velCJac = Eigen::MatrixXd::Zero(mNumDOFs, mNumDOFs);
   velCJac.setZero();
   std::size_t cursor = 0;
   for (std::size_t i = 0; i < mSkeletons.size(); i++)
@@ -780,7 +781,7 @@ Eigen::MatrixXd ConstrainedGroupGradientMatrices::getVelCJacobian(
 //==============================================================================
 Eigen::MatrixXd ConstrainedGroupGradientMatrices::getMassMatrix(WorldPtr world)
 {
-  Eigen::MatrixXd massMatrix = Eigen::MatrixXd(mNumDOFs, mNumDOFs);
+  Eigen::MatrixXd massMatrix = Eigen::MatrixXd::Zero(mNumDOFs, mNumDOFs);
   massMatrix.setZero();
   std::size_t cursor = 0;
   for (std::size_t i = 0; i < mSkeletons.size(); i++)
@@ -797,7 +798,7 @@ Eigen::MatrixXd ConstrainedGroupGradientMatrices::getMassMatrix(WorldPtr world)
 Eigen::MatrixXd ConstrainedGroupGradientMatrices::getInvMassMatrix(
     WorldPtr world)
 {
-  Eigen::MatrixXd invMassMatrix = Eigen::MatrixXd(mNumDOFs, mNumDOFs);
+  Eigen::MatrixXd invMassMatrix = Eigen::MatrixXd::Zero(mNumDOFs, mNumDOFs);
   invMassMatrix.setZero();
   std::size_t cursor = 0;
   for (std::size_t i = 0; i < mSkeletons.size(); i++)
@@ -958,6 +959,58 @@ ConstrainedGroupGradientMatrices::getJacobianOfLCPOffsetClampingSubset(
   {
     return -(A_c.transpose() * dt * (dMinv_f - mMinv * dC));
   }
+}
+
+//==============================================================================
+/// This returns the subset of the A matrix used by the original LCP for just
+/// the clamping constraints. It relates constraint force to constraint
+/// acceleration. It's a mass matrix, just in a weird frame.
+void ConstrainedGroupGradientMatrices::computeLCPConstraintMatrixClampingSubset(
+    simulation::WorldPtr world, Eigen::MatrixXd& Q, const Eigen::MatrixXd& A_c)
+{
+  int numClamping = A_c.cols();
+  for (int i = 0; i < numClamping; i++)
+  {
+    Q.col(i)
+        = A_c.transpose() * implicitMultiplyByInvMassMatrix(world, A_c.col(i));
+  }
+}
+
+//==============================================================================
+/// This returns the subset of the b vector used by the original LCP for just
+/// the clamping constraints. It's just the relative velocity at the clamping
+/// contact points.
+void ConstrainedGroupGradientMatrices::computeLCPOffsetClampingSubset(
+    simulation::WorldPtr world, Eigen::VectorXd& b, const Eigen::MatrixXd& A_c)
+{
+  b = -A_c.transpose()
+      * (world->getVelocities()
+         + (world->getTimeStep()
+            * implicitMultiplyByInvMassMatrix(
+                world,
+                world->getForces()
+                    - world->getCoriolisAndGravityAndExternalForces())));
+}
+
+//==============================================================================
+/// This computes and returns an estimate of the constraint impulses for the
+/// clamping constraints. This is based on a linear approximation of the
+/// constraint impulses.
+Eigen::VectorXd
+ConstrainedGroupGradientMatrices::estimateClampingConstraintImpulses(
+    simulation::WorldPtr world, const Eigen::MatrixXd& A_c)
+{
+  if (A_c.cols() == 0)
+  {
+    return Eigen::VectorXd::Zero(0);
+  }
+
+  Eigen::VectorXd b = Eigen::VectorXd(A_c.cols());
+  Eigen::MatrixXd Q = Eigen::MatrixXd(A_c.cols(), A_c.cols());
+  computeLCPOffsetClampingSubset(world, b, A_c);
+  computeLCPConstraintMatrixClampingSubset(world, Q, A_c);
+
+  return Q.completeOrthogonalDecomposition().solve(b);
 }
 
 //==============================================================================

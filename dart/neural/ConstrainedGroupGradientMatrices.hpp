@@ -155,6 +155,28 @@ public:
   Eigen::MatrixXd getJacobianOfLCPOffsetClampingSubset(
       simulation::WorldPtr world, WithRespectTo wrt);
 
+  /// This returns the subset of the A matrix used by the original LCP for just
+  /// the clamping constraints. It relates constraint force to constraint
+  /// acceleration. It's a mass matrix, just in a weird frame.
+  void computeLCPConstraintMatrixClampingSubset(
+      simulation::WorldPtr world,
+      Eigen::MatrixXd& Q,
+      const Eigen::MatrixXd& A_c);
+
+  /// This returns the subset of the b vector used by the original LCP for just
+  /// the clamping constraints. It's just the relative velocity at the clamping
+  /// contact points.
+  void computeLCPOffsetClampingSubset(
+      simulation::WorldPtr world,
+      Eigen::VectorXd& b,
+      const Eigen::MatrixXd& A_c);
+
+  /// This computes and returns an estimate of the constraint impulses for the
+  /// clamping constraints. This is based on a linear approximation of the
+  /// constraint impulses.
+  Eigen::VectorXd estimateClampingConstraintImpulses(
+      simulation::WorldPtr world, const Eigen::MatrixXd& A_c);
+
   /// This returns the jacobian of M^{-1}(pos, inertia) * tau, holding
   /// everything constant except the value of WithRespectTo
   Eigen::MatrixXd getJacobianOfMinv(
