@@ -97,6 +97,11 @@ public:
   /// reason.
   Eigen::MatrixXd getVelVelJacobian(simulation::WorldPtr world);
 
+  /// This computes and returns the whole pos-vel jacobian. For backprop, you
+  /// don't actually need this matrix, you can compute backprop directly. This
+  /// is here if you want access to the full Jacobian for some reason.
+  Eigen::MatrixXd getPosVelJacobian(simulation::WorldPtr world);
+
   /// This computes and returns the whole force-vel jacobian for this group. For
   /// backprop, you don't actually need this matrix, you can compute backprop
   /// directly. This is here if you want access to the full Jacobian for some

@@ -1226,6 +1226,12 @@ bool DifferentiableContactConstraint::isParent(
 {
   const dynamics::Joint* dofJoint = dof->getJoint();
   const dynamics::Joint* nodeParentJoint = node->getParentJoint();
+  // Edge cases
+  if (nodeParentJoint == nullptr || dofJoint->getSkeleton() == nullptr
+      || nodeParentJoint->getSkeleton() == nullptr)
+  {
+    return false;
+  }
   // If these joints aren't in the same skeleton, or aren't in the same tree
   // within that skeleton, this is trivially false
   if (dofJoint->getSkeleton()->getName()

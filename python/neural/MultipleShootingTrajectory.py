@@ -324,8 +324,8 @@ class MultipleShootingTrajectory:
             self.viewer.frame()
             time.sleep(0.003)
 
-        self.unroll(use_knots=True, after_step=animate_step)
-        # self.unroll(use_knots=False, after_step=animate_step)
+        # self.unroll(use_knots=True, after_step=animate_step)
+        self.unroll(use_knots=False, after_step=animate_step)
 
     def display_trajectory(self):
         # Clear out any other stuff we may have in the world

@@ -1571,11 +1571,26 @@ Eigen::MatrixXd Skeleton::getJacobianOfC(neural::WithRespectTo wrt)
 
 //==============================================================================
 /// This gives the unconstrained Jacobian of M^{-1}f
-Eigen::MatrixXd Skeleton::getJacobionOfMinv(
+Eigen::MatrixXd Skeleton::getJacobianOfMinv(
     Eigen::VectorXd f, neural::WithRespectTo wrt)
 {
   // TOOD(keenon): replace with the GEAR approach
   return finiteDifferenceJacobianOfMinv(f, wrt);
+}
+
+//==============================================================================
+Eigen::MatrixXd Skeleton::getUnconstrainedVelJacobianWrt(
+    double dt, neural::WithRespectTo wrt)
+{
+  Eigen::VectorXd tau = getForces();
+  Eigen::VectorXd C = getCoriolisAndGravityForces() + getExternalForces();
+
+  Eigen::MatrixXd dM = getJacobianOfMinv(dt * (tau - C), wrt);
+
+  Eigen::MatrixXd Minv = getInvMassMatrix();
+  Eigen::MatrixXd dC = getJacobianOfC(wrt);
+
+  return dM - Minv * dt * dC;
 }
 
 //==============================================================================

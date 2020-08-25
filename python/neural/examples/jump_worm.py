@@ -124,8 +124,8 @@ def main():
     # Make simulations repeatable
     random.seed(1234)
 
-    steps = 500
-    shooting_length = 5
+    steps = 400
+    shooting_length = 50
 
     # Create the trajectory
     def eval_loss(t, pos, vel, world):
@@ -209,9 +209,17 @@ def main():
 
     trajectory.create_gui()
     trajectory.compute_hessian = False
+
+    trajectory.ipopt(300)
+    while True:
+        trajectory.playback_trajectory()
+    # trajectory.display_trajectory()
+    """
     for i in range(10):
-        trajectory.ipopt(20)
+        trajectory.ipopt(50)
+        trajectory.playback_trajectory()
         trajectory.display_trajectory()
+    """
 
     print('Optimization complete! Playing best found trajectory '+str(trajectory.best_loss)+' over and over...')
     # trajectory.restore_best_loss()

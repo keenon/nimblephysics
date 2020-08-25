@@ -183,10 +183,10 @@ private:
   double mTimeStep;
 
   /// Fircst body node
-  dynamics::BodyNode* mBodyNodeA;
+  dynamics::BodyNodePtr mBodyNodeA;
 
   /// Second body node
-  dynamics::BodyNode* mBodyNodeB;
+  dynamics::BodyNodePtr mBodyNodeB;
 
   /// Contact between mBodyNode1 and mBodyNode2
   collision::Contact& mContact;

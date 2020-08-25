@@ -174,16 +174,21 @@ void BackpropSnapshot::backprop(
             * skel->multiplyByImplicitInvMassMatrix(
                 nextTimestepLoss.lossWrtVelocity.segment(dofCursorWorld, dofs));
 
+      // skel->getJacobionOfMinv();
+      // getUnconstrainedVelJacobianWrt
       // p_t
       // pos-pos = I
-      // pos-vel = dT * Minv * d/dpos C(pos,vel)
-      // pos-vel^T = dT * d/dpos C(pos,vel)^T * Minv
+      // pos-vel = dT * Minv * d/dpos C(pos,vel) + dT * d/dpos Minv * C(pos,
+      // vel) pos-vel^T = dT * d/dpos C(pos,vel)^T * Minv
       thisTimestepLoss.lossWrtPosition.segment(dofCursorWorld, dofs)
           // p_t --> p_t+1
           = nextTimestepLoss.lossWrtPosition.segment(dofCursorWorld, dofs)
             // p_t --> v_t+1
-            - (skel->getJacobianOfC(WithRespectTo::POSITION).transpose()
-               * thisTimestepLoss.lossWrtTorque.segment(dofCursorWorld, dofs));
+            + (skel->getUnconstrainedVelJacobianWrt(
+                       world->getTimeStep(), WithRespectTo::POSITION)
+                   .transpose()
+               * nextTimestepLoss.lossWrtVelocity.segment(
+                   dofCursorWorld, dofs));
 
       // v_t
       // vel-vel = I - dT * Minv * d/dvel C(pos,vel)
@@ -656,15 +661,15 @@ Eigen::VectorXd BackpropSnapshot::getPreStepPosition()
 //==============================================================================
 Eigen::VectorXd BackpropSnapshot::getPreStepVelocity()
 {
-  return assembleVector<Eigen::VectorXd>(VectorToAssemble::PRE_STEP_VEL);
-  // return mPreStepVelocity;
+  // return assembleVector<Eigen::VectorXd>(VectorToAssemble::PRE_STEP_VEL);
+  return mPreStepVelocity;
 }
 
 //==============================================================================
 Eigen::VectorXd BackpropSnapshot::getPreStepTorques()
 {
-  return assembleVector<Eigen::VectorXd>(VectorToAssemble::PRE_STEP_TAU);
-  // return mPreStepTorques;
+  // return assembleVector<Eigen::VectorXd>(VectorToAssemble::PRE_STEP_TAU);
+  return mPreStepTorques;
 }
 
 //==============================================================================
@@ -1404,6 +1409,15 @@ Eigen::MatrixXd BackpropSnapshot::getJacobianOfLCPOffsetClampingSubset(
                         // + getVelocityDueToIllegalImpulses()
                         + (world->getTimeStep() * Minv * f);
 
+  /*
+  std::cout << "Minv: " << std::endl << Minv << std::endl;
+  std::cout << "dC: " << std::endl << dC << std::endl;
+  std::cout << "Minv * dC: " << std::endl << Minv * dC << std::endl;
+  std::cout << "A_c.transpose(): " << std::endl << A_c.transpose() << std::endl;
+  std::cout << "A_c.transpose() * Minv * dC: " << std::endl
+            << A_c.transpose() * Minv * dC << std::endl;
+  */
+
   if (wrt == WithRespectTo::POSITION)
   {
     Eigen::MatrixXd dA_c_f
@@ -1924,7 +1938,7 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceJacobianOfMinv(
 
   Eigen::VectorXd before = getWrt(world, wrt);
 
-  const double EPS = 1e-6;
+  const double EPS = 1e-5;
 
   for (std::size_t i = 0; i < innerDim; i++)
   {
@@ -1960,7 +1974,7 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceJacobianOfC(
 
   Eigen::VectorXd before = getWrt(world, wrt);
 
-  const double EPS = 1e-6;
+  const double EPS = 1e-4;
 
   for (std::size_t i = 0; i < innerDim; i++)
   {
@@ -1981,6 +1995,10 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceJacobianOfC(
 Eigen::MatrixXd BackpropSnapshot::finiteDifferenceJacobianOfConstraintForce(
     simulation::WorldPtr world, WithRespectTo wrt)
 {
+  bool oldPenetrationCorrection
+      = world->getConstraintSolver()->getPenetrationCorrectionEnabled();
+  world->getConstraintSolver()->setPenetrationCorrectionEnabled(false);
+
   Eigen::VectorXd f0
       = neural::forwardPass(world, true)->getClampingConstraintImpulses();
 
@@ -2009,6 +2027,8 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceJacobianOfConstraintForce(
   }
 
   setWrt(world, wrt, before);
+  world->getConstraintSolver()->setPenetrationCorrectionEnabled(
+      oldPenetrationCorrection);
 
   return result;
 }

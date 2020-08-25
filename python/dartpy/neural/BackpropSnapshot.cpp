@@ -50,11 +50,13 @@ void BackpropSnapshot(py::module& m)
               dart::simulation::WorldPtr,
               Eigen::VectorXd,
               Eigen::VectorXd,
+              Eigen::VectorXd,
               Eigen::VectorXd>(),
           ::py::arg("world"),
-          ::py::arg("forwardPassPosition"),
-          ::py::arg("forwardPassVelocity"),
-          ::py::arg("forwardPassTorques"))
+          ::py::arg("preStepPosition"),
+          ::py::arg("preStepVelocity"),
+          ::py::arg("preStepTorques"),
+          ::py::arg("preConstraintVelocities"))
       .def(
           "backprop",
           &dart::neural::BackpropSnapshot::backprop,

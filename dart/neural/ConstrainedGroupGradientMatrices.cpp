@@ -656,11 +656,15 @@ Eigen::MatrixXd ConstrainedGroupGradientMatrices::getForceVelJacobian(
            * (Eigen::MatrixXd::Identity(mNumDOFs, mNumDOFs)
               - mTimeStep * (A_c + A_ub * E) * P_c * Minv);
   }
-  else
+  else if (A_c.size() > 0)
   {
     return mTimeStep * Minv
            * (Eigen::MatrixXd::Identity(mNumDOFs, mNumDOFs)
               - mTimeStep * A_c * P_c * Minv);
+  }
+  else
+  {
+    return mTimeStep * Minv;
   }
 }
 
@@ -670,6 +674,10 @@ Eigen::MatrixXd ConstrainedGroupGradientMatrices::getVelVelJacobian(
 {
   Eigen::MatrixXd A_c = getClampingConstraintMatrix();
   Eigen::MatrixXd A_ub = getUpperBoundConstraintMatrix();
+  if (A_c.cols() == 0 && A_ub.cols() == 0)
+  {
+    return Eigen::MatrixXd::Identity(mNumDOFs, mNumDOFs);
+  }
   Eigen::MatrixXd E = getUpperBoundMappingMatrix();
   Eigen::MatrixXd P_c = getProjectionIntoClampsMatrix();
   Eigen::MatrixXd Minv = getInvMassMatrix(world);
@@ -687,6 +695,13 @@ Eigen::MatrixXd ConstrainedGroupGradientMatrices::getVelVelJacobian(
             << parts2 << std::endl;
             */
   return (Eigen::MatrixXd::Identity(mNumDOFs, mNumDOFs) - parts2);
+}
+
+//==============================================================================
+Eigen::MatrixXd ConstrainedGroupGradientMatrices::getPosVelJacobian(
+    simulation::WorldPtr world)
+{
+  return getVelJacobianWrt(world, WithRespectTo::POSITION);
 }
 
 //==============================================================================
@@ -819,6 +834,12 @@ ConstrainedGroupGradientMatrices::getProjectionIntoClampsMatrix()
   Eigen::MatrixXd A_c = getClampingConstraintMatrix();
   Eigen::MatrixXd V_c = getMassedClampingConstraintMatrix();
   Eigen::MatrixXd V_ub = getMassedUpperBoundConstraintMatrix();
+
+  if (A_c.cols() == 0 && V_ub.cols() == 0)
+  {
+    return Eigen::MatrixXd::Zero(mNumDOFs, mNumDOFs);
+  }
+
   Eigen::MatrixXd E = getUpperBoundMappingMatrix();
 
   Eigen::MatrixXd constraintForceToImpliedTorques = V_c + (V_ub * E);
@@ -858,7 +879,7 @@ Eigen::MatrixXd ConstrainedGroupGradientMatrices::getVelJacobianWrt(
   if (wrt == WithRespectTo::POSITION)
   {
     Eigen::MatrixXd dA_c = getJacobianOfClampingConstraints(world, f_c);
-    Eigen::MatrixXd dA_ubE = getJacobianOfUpperBoundConstraints(world, f_c);
+    Eigen::MatrixXd dA_ubE = getJacobianOfUpperBoundConstraints(world, E * f_c);
     return dM + Minv * (A_c_ub_E * dF_c + dA_c + dA_ubE - dt * dC);
   }
   else
@@ -1139,6 +1160,22 @@ void ConstrainedGroupGradientMatrices::backprop(
     LossGradient& thisTimestepLoss,
     const LossGradient& nextTimestepLoss)
 {
+  Eigen::MatrixXd forceVelJacobian = getForceVelJacobian(world);
+  Eigen::MatrixXd posVelJacobian = getPosVelJacobian(world);
+  Eigen::MatrixXd velVelJacobian = getVelVelJacobian(world);
+  Eigen::MatrixXd velPosJacobian = getVelPosJacobian();
+  Eigen::MatrixXd posPosJacobian = getPosPosJacobian();
+
+  thisTimestepLoss.lossWrtPosition
+      = posVelJacobian.transpose() * nextTimestepLoss.lossWrtVelocity
+        + posPosJacobian.transpose() * nextTimestepLoss.lossWrtPosition;
+  thisTimestepLoss.lossWrtVelocity
+      = velVelJacobian.transpose() * nextTimestepLoss.lossWrtVelocity
+        + velPosJacobian.transpose() * nextTimestepLoss.lossWrtPosition;
+  thisTimestepLoss.lossWrtTorque
+      = forceVelJacobian.transpose() * nextTimestepLoss.lossWrtVelocity;
+
+  /*
   // Compute intermediate variable "b", described in the doc
   Eigen::VectorXd b = nextTimestepLoss.lossWrtPosition;
   if (mBouncingConstraintMatrix.size() > 0)
@@ -1194,6 +1231,7 @@ void ConstrainedGroupGradientMatrices::backprop(
   thisTimestepLoss.lossWrtVelocity = (mTimeStep * b)
                                      + nextTimestepLoss.lossWrtVelocity - A_c_z
                                      - (velCJacobianTranspose * x);
+                                     */
 }
 
 //==============================================================================

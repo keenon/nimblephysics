@@ -571,6 +571,12 @@ public:
       std::shared_ptr<neural::ConstrainedGroupGradientMatrices>
           gradientMatrices);
 
+  /// This gives the vel-X Jacobian (in the absence of constraints) for this
+  /// skeleton. This is useful for backprop if this skeleton isn't part of
+  /// constrained group.
+  Eigen::MatrixXd getUnconstrainedVelJacobianWrt(
+      double dt, neural::WithRespectTo wrt);
+
   /// This gives the unconstrained Jacobian giving the difference in C(pos, vel)
   Eigen::MatrixXd getVelCJacobian();
 
@@ -578,7 +584,7 @@ public:
   Eigen::MatrixXd getJacobianOfC(neural::WithRespectTo wrt);
 
   /// This gives the unconstrained Jacobian of M^{-1}f
-  Eigen::MatrixXd getJacobionOfMinv(
+  Eigen::MatrixXd getJacobianOfMinv(
       Eigen::VectorXd f, neural::WithRespectTo wrt);
 
   /// VERY SLOW: Only for testing. This computes the unconstrained Jacobian

@@ -928,7 +928,6 @@ bool verifyVelGradients(WorldPtr world, VectorXd worldVel)
   // return verifyF_c(world);
   // return verifyLinearScratch();
   // return verifyNextV(world);
-  return verifyPosVelJacobian(world, worldVel);
   return (verifyClassicClampingConstraintMatrix(world, worldVel)
           && verifyMassedClampingConstraintMatrix(world, worldVel)
           && verifyMassedUpperBoundConstraintMatrix(world, worldVel)
@@ -1255,9 +1254,6 @@ std::cout << "v_t --> p_t+1:" << std::endl
 
 bool verifyAnalyticalBackprop(WorldPtr world)
 {
-  // TODO(keenon): re-enable me
-  return true;
-
   neural::BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
 
   if (!classicPtr)
@@ -3436,6 +3432,7 @@ void testBlockWithFrictionCoeff(double frictionCoeff, double mass)
   EXPECT_TRUE(verifyAnalyticalBackprop(world));
 }
 
+/*
 TEST(GRADIENTS, BLOCK_ON_GROUND_NO_FRICTION_1_MASS)
 {
   testBlockWithFrictionCoeff(0, 1);
@@ -3460,6 +3457,7 @@ TEST(GRADIENTS, BLOCK_ON_GROUND_SLIPPING_FRICTION)
 {
   testBlockWithFrictionCoeff(0.5, 1);
 }
+*/
 
 /******************************************************************************
 
@@ -3593,6 +3591,7 @@ void testTwoBlocks(
   EXPECT_TRUE(verifyAnalyticalBackprop(world));
 }
 
+/*
 TEST(GRADIENTS, TWO_BLOCKS_1_1_MASS)
 {
   testTwoBlocks(1, 1, 0, 1, 1);
@@ -3607,6 +3606,7 @@ TEST(GRADIENTS, TWO_BLOCKS_3_5_MASS)
 {
   testTwoBlocks(2, 1, 0, 3, 5);
 }
+*/
 
 /******************************************************************************
 
@@ -3698,10 +3698,12 @@ void testBouncingBlockWithFrictionCoeff(double frictionCoeff, double mass)
   EXPECT_TRUE(verifyAnalyticalBackprop(world));
 }
 
+/*
 TEST(GRADIENTS, BLOCK_BOUNCING_OFF_GROUND_NO_FRICTION_1_MASS)
 {
   testBouncingBlockWithFrictionCoeff(0, 1);
 }
+*/
 
 /******************************************************************************
 
@@ -3809,14 +3811,17 @@ void testReversePendulumSledWithFrictionCoeff(double frictionCoeff)
   reversePendulumSled->integrateVelocities(world->getTimeStep());
   VectorXd worldVel = world->getVelocities();
 
+  EXPECT_TRUE(verifyAnalyticalJacobians(world));
   EXPECT_TRUE(verifyVelGradients(world, worldVel));
   EXPECT_TRUE(verifyAnalyticalBackprop(world));
 }
 
+/*
 TEST(GRADIENTS, SLIDING_REVERSE_PENDULUM_NO_FRICTION)
 {
   testReversePendulumSledWithFrictionCoeff(0);
 }
+*/
 
 /******************************************************************************
 
@@ -3905,10 +3910,12 @@ void testBouncingBlockPosGradients(double frictionCoeff, double mass)
   EXPECT_TRUE(verifyAnalyticalBackprop(world));
 }
 
+/*
 TEST(GRADIENTS, POS_BLOCK_BOUNCING_OFF_GROUND_NO_FRICTION_1_MASS)
 {
   testBouncingBlockPosGradients(0, 1);
 }
+*/
 
 /******************************************************************************
 
@@ -4014,6 +4021,7 @@ void testMultigroup(int numGroups)
   EXPECT_TRUE(verifyAnalyticalBackprop(world));
 }
 
+/*
 TEST(GRADIENTS, MULTIGROUP_2)
 {
   testMultigroup(2);
@@ -4023,6 +4031,7 @@ TEST(GRADIENTS, MULTIGROUP_4)
 {
   testMultigroup(4);
 }
+*/
 
 /******************************************************************************
 
@@ -4166,6 +4175,7 @@ void testRobotArm(
   EXPECT_TRUE(verifyAnalyticalBackprop(world));
 }
 
+/*
 TEST(GRADIENTS, ARM_3_LINK_30_DEG)
 {
   testRobotArm(3, 30.0 / 180 * 3.1415);
@@ -4187,6 +4197,7 @@ TEST(GRADIENTS, ARM_3_LINK_30_DEG_MIDDLE_ATTACH)
 {
   testRobotArm(3, 30.0 / 180 * 3.1415, 1);
 }
+*/
 
 /**
  * This sets up two boxes colliding with each other. Each can rotate and
@@ -4263,6 +4274,7 @@ void testVertexFaceCollision(bool isSelfCollision)
   EXPECT_TRUE(verifyVelGradients(world, vels));
 }
 
+/*
 TEST(GRADIENTS, VERTEX_FACE_COLLISION)
 {
   testVertexFaceCollision(false);
@@ -4272,6 +4284,7 @@ TEST(GRADIENTS, VERTEX_FACE_SELF_COLLISION)
 {
   testVertexFaceCollision(true);
 }
+*/
 
 /**
  * This sets up two boxes colliding with each other. Each can rotate and
@@ -4348,6 +4361,7 @@ void testEdgeEdgeCollision(bool isSelfCollision)
   EXPECT_TRUE(verifyVelGradients(world, vels));
 }
 
+/*
 TEST(GRADIENTS, EDGE_EDGE_COLLISION)
 {
   testEdgeEdgeCollision(false);
@@ -4357,6 +4371,7 @@ TEST(GRADIENTS, EDGE_EDGE_SELF_COLLISION)
 {
   testEdgeEdgeCollision(true);
 }
+*/
 
 /******************************************************************************
 
@@ -4424,8 +4439,8 @@ void testCartpole(double rotationRadians)
   EXPECT_TRUE(verifyVelGradients(world, worldVel));
   EXPECT_TRUE(verifyAnalyticalBackprop(world));
   EXPECT_TRUE(verifyGradientBackprop(world, 50, [](WorldPtr world) {
-    Eigen::Vector2d pos = world->getPositions();
-    Eigen::Vector2d vel = world->getVelocities();
+    Eigen::VectorXd pos = world->getPositions();
+    Eigen::VectorXd vel = world->getVelocities();
     return (pos[0] * pos[0]) + (pos[1] * pos[1]) + (vel[0] * vel[0])
            + (vel[1] * vel[1]);
   }));
@@ -4433,10 +4448,12 @@ void testCartpole(double rotationRadians)
   EXPECT_TRUE(verifyBulkPass(world, 1000, 50));
 }
 
+/*
 TEST(GRADIENTS, CARTPOLE_15_DEG)
 {
   testCartpole(15.0 / 180.0 * 3.1415);
 }
+*/
 
 void testWorldSpace(std::size_t numLinks)
 {
@@ -4489,10 +4506,12 @@ void testWorldSpace(std::size_t numLinks)
   EXPECT_TRUE(verifyWorldSpaceTransform(world));
 }
 
+/*
 TEST(GRADIENTS, WORLD_SPACE_5_LINK_ROBOT)
 {
   testWorldSpace(5);
 }
+*/
 
 /******************************************************************************
 
@@ -4564,10 +4583,12 @@ void testSimple3Link()
       world, Eigen::Vector3d::Zero(), Eigen::Vector3d::Zero()));
 }
 
+/*
 TEST(GRADIENTS, WORLD_SPACE_SIMPLE_LINK)
 {
   testSimple3Link();
 }
+*/
 
 void testWorldSpaceWithBoxes()
 {
@@ -4600,15 +4621,18 @@ void testWorldSpaceWithBoxes()
   EXPECT_TRUE(verifyWorldSpaceTransform(world));
 }
 
+/*
 TEST(GRADIENTS, WORLD_SPACE_BOXES)
 {
   testWorldSpaceWithBoxes();
 }
+*/
 
 ///////////////////////////////////////////////////////////////////////////////
 // Just idiot checking that the code doesn't crash on silly edge cases.
 ///////////////////////////////////////////////////////////////////////////////
 
+/*
 TEST(GRADIENTS, EMPTY_WORLD)
 {
   WorldPtr world = World::create();
@@ -4625,4 +4649,133 @@ TEST(GRADIENTS, EMPTY_SKELETON)
   VectorXd worldVel = world->getVelocities();
   EXPECT_TRUE(verifyVelGradients(world, worldVel));
   EXPECT_TRUE(verifyAnalyticalBackprop(world));
+}
+*/
+
+///////////////////////////////////////////////////////////////////////////////
+// Checking the trajectory optimizations
+///////////////////////////////////////////////////////////////////////////////
+
+BodyNode* createTailSegment(BodyNode* parent, Eigen::Vector3d color)
+{
+  std::pair<RevoluteJoint*, BodyNode*> poleJointPair
+      = parent->createChildJointAndBodyNodePair<RevoluteJoint>();
+  RevoluteJoint* poleJoint = poleJointPair.first;
+  BodyNode* pole = poleJointPair.second;
+  poleJoint->setAxis(Eigen::Vector3d::UnitZ());
+
+  std::shared_ptr<BoxShape> shape(
+      new BoxShape(Eigen::Vector3d(0.05, 0.25, 0.05)));
+  ShapeNode* poleShape
+      = pole->createShapeNodeWith<VisualAspect, CollisionAspect>(shape);
+  poleShape->getVisualAspect()->setColor(color);
+  poleJoint->setForceUpperLimit(0, 100.0);
+  poleJoint->setForceLowerLimit(0, -100.0);
+  poleJoint->setVelocityUpperLimit(0, 10000.0);
+  poleJoint->setVelocityLowerLimit(0, -10000.0);
+
+  Eigen::Isometry3d poleOffset = Eigen::Isometry3d::Identity();
+  poleOffset.translation() = Eigen::Vector3d(0, -0.125, 0);
+  poleJoint->setTransformFromChildBodyNode(poleOffset);
+  poleJoint->setPosition(0, 90 * 3.1415 / 180);
+
+  if (parent->getParentBodyNode() != nullptr)
+  {
+    Eigen::Isometry3d childOffset = Eigen::Isometry3d::Identity();
+    childOffset.translation() = Eigen::Vector3d(0, 0.125, 0);
+    poleJoint->setTransformFromParentBodyNode(childOffset);
+  }
+
+  return pole;
+}
+
+void testJumpWorm(bool offGround)
+{
+  // World
+  WorldPtr world = World::create();
+  world->setGravity(Eigen::Vector3d(0, -9.81, 0));
+
+  SkeletonPtr jumpworm = Skeleton::create("jumpworm");
+
+  std::pair<TranslationalJoint2D*, BodyNode*> rootJointPair
+      = jumpworm->createJointAndBodyNodePair<TranslationalJoint2D>(nullptr);
+  TranslationalJoint2D* rootJoint = rootJointPair.first;
+  BodyNode* root = rootJointPair.second;
+
+  std::shared_ptr<BoxShape> shape(new BoxShape(Eigen::Vector3d(0.1, 0.1, 0.1)));
+  ShapeNode* rootVisual
+      = root->createShapeNodeWith<VisualAspect, CollisionAspect>(shape);
+  Eigen::Vector3d black = Eigen::Vector3d::Zero();
+  rootVisual->getVisualAspect()->setColor(black);
+  rootJoint->setForceUpperLimit(0, 0);
+  rootJoint->setForceLowerLimit(0, 0);
+  rootJoint->setForceUpperLimit(1, 0);
+  rootJoint->setForceLowerLimit(1, 0);
+  rootJoint->setVelocityUpperLimit(0, 1000.0);
+  rootJoint->setVelocityLowerLimit(0, -1000.0);
+  rootJoint->setVelocityUpperLimit(1, 1000.0);
+  rootJoint->setVelocityLowerLimit(1, -1000.0);
+
+  BodyNode* tail1 = createTailSegment(
+      root, Eigen::Vector3d(182.0 / 255, 223.0 / 255, 144.0 / 255));
+  BodyNode* tail2 = createTailSegment(
+      tail1, Eigen::Vector3d(223.0 / 255, 228.0 / 255, 163.0 / 255));
+  BodyNode* tail3 = createTailSegment(
+      tail2, Eigen::Vector3d(221.0 / 255, 193.0 / 255, 121.0 / 255));
+
+  Eigen::VectorXd pos = Eigen::VectorXd(5);
+  pos << 0, 0, 90, 90, 45;
+  jumpworm->setPositions(pos * 3.1415 / 180);
+
+  world->addSkeleton(jumpworm);
+
+  // Floor
+
+  SkeletonPtr floor = Skeleton::create("floor");
+
+  std::pair<WeldJoint*, BodyNode*> floorJointPair
+      = floor->createJointAndBodyNodePair<WeldJoint>(nullptr);
+  WeldJoint* floorJoint = floorJointPair.first;
+  BodyNode* floorBody = floorJointPair.second;
+  Eigen::Isometry3d floorOffset = Eigen::Isometry3d::Identity();
+  floorOffset.translation() = Eigen::Vector3d(0, offGround ? -0.7 : -0.56, 0);
+  floorJoint->setTransformFromParentBodyNode(floorOffset);
+  std::shared_ptr<BoxShape> floorShape(
+      new BoxShape(Eigen::Vector3d(2.5, 0.25, 0.5)));
+  ShapeNode* floorVisual
+      = floorBody->createShapeNodeWith<VisualAspect, CollisionAspect>(
+          floorShape);
+  floorBody->setFrictionCoeff(0);
+
+  world->addSkeleton(floor);
+
+  rootJoint->setVelocity(1, -0.1);
+  Eigen::VectorXd vels = world->getVelocities();
+
+  // renderWorld(world);
+
+  EXPECT_TRUE(verifyAnalyticalJacobians(world));
+  EXPECT_TRUE(verifyVelGradients(world, vels));
+  EXPECT_TRUE(verifyAnalyticalBackprop(world));
+
+  std::function<double(WorldPtr)> loss = [](WorldPtr world) {
+    Eigen::VectorXd pos = world->getPositions();
+    Eigen::VectorXd vel = world->getVelocities();
+    return (pos[0] * pos[0]) + (pos[1] * pos[1]) + (vel[0] * vel[0])
+           + (vel[1] * vel[1]);
+  };
+  // Test to make sure the loss lambda doesn't crash
+  double l = loss(world);
+  EXPECT_TRUE(verifyGradientBackprop(world, 50, loss));
+  EXPECT_TRUE(verifyBulkPass(world, 1000, 50));
+}
+
+TEST(GRADIENTS, JUMP_WORM)
+{
+  testJumpWorm(false);
+}
+
+TEST(GRADIENTS, JUMP_WORM_OFF_GROUND)
+{
+  testJumpWorm(true);
 }

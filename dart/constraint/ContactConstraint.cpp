@@ -73,13 +73,11 @@ ContactConstraint::ContactConstraint(
     mBodyNodeA(const_cast<dynamics::ShapeFrame*>(
                    contact.collisionObject1->getShapeFrame())
                    ->asShapeNode()
-                   ->getBodyNodePtr()
-                   .get()),
+                   ->getBodyNodePtr()),
     mBodyNodeB(const_cast<dynamics::ShapeFrame*>(
                    contact.collisionObject2->getShapeFrame())
                    ->asShapeNode()
-                   ->getBodyNodePtr()
-                   .get()),
+                   ->getBodyNodePtr()),
     mContact(contact),
     mFirstFrictionalDirection(Eigen::Vector3d::UnitZ()),
     mIsFrictionOn(true),
