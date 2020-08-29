@@ -1161,9 +1161,13 @@ void ConstrainedGroupGradientMatrices::backprop(
     const LossGradient& nextTimestepLoss)
 {
   Eigen::MatrixXd forceVelJacobian = getForceVelJacobian(world);
+  // p_t+1 <-- v_t
   Eigen::MatrixXd posVelJacobian = getPosVelJacobian(world);
+  // v_t+1 <-- v_t
   Eigen::MatrixXd velVelJacobian = getVelVelJacobian(world);
+  // v_t+1 <-- p_t
   Eigen::MatrixXd velPosJacobian = getVelPosJacobian();
+  // p_t+1 <-- p_t
   Eigen::MatrixXd posPosJacobian = getPosPosJacobian();
 
   thisTimestepLoss.lossWrtPosition
@@ -1453,7 +1457,7 @@ ConstrainedGroupGradientMatrices::finiteDifferenceJacobianOfMinv(
 
   Eigen::VectorXd before = getWrt(world, wrt);
 
-  const double EPS = 1e-6;
+  const double EPS = 1e-8;
 
   for (std::size_t i = 0; i < innerDim; i++)
   {
@@ -1489,16 +1493,20 @@ Eigen::MatrixXd ConstrainedGroupGradientMatrices::finiteDifferenceJacobianOfC(
 
   Eigen::VectorXd before = getWrt(world, wrt);
 
-  const double EPS = 1e-6;
+  const double EPS = 1e-8;
 
   for (std::size_t i = 0; i < innerDim; i++)
   {
     Eigen::VectorXd perturbed = before;
     perturbed(i) += EPS;
     setWrt(world, wrt, perturbed);
-    Eigen::MatrixXd newTau = getCoriolisAndGravityAndExternalForces(world);
-    Eigen::VectorXd diff = newTau - original;
-    result.col(i) = diff / EPS;
+    Eigen::MatrixXd tauPos = getCoriolisAndGravityAndExternalForces(world);
+    perturbed = before;
+    perturbed(i) -= EPS;
+    setWrt(world, wrt, perturbed);
+    Eigen::MatrixXd tauNeg = getCoriolisAndGravityAndExternalForces(world);
+    Eigen::VectorXd diff = tauPos - tauNeg;
+    result.col(i) = diff / (2 * EPS);
   }
 
   setWrt(world, wrt, before);

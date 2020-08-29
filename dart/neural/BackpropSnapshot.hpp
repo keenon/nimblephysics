@@ -41,27 +41,27 @@ public:
   /// This computes and returns the whole vel-vel jacobian. For backprop, you
   /// don't actually need this matrix, you can compute backprop directly. This
   /// is here if you want access to the full Jacobian for some reason.
-  Eigen::MatrixXd getVelVelJacobian(simulation::WorldPtr world);
+  const Eigen::MatrixXd& getVelVelJacobian(simulation::WorldPtr world);
 
   /// This computes and returns the whole pos-vel jacobian. For backprop, you
   /// don't actually need this matrix, you can compute backprop directly. This
   /// is here if you want access to the full Jacobian for some reason.
-  Eigen::MatrixXd getPosVelJacobian(simulation::WorldPtr world);
+  const Eigen::MatrixXd& getPosVelJacobian(simulation::WorldPtr world);
 
   /// This computes and returns the whole force-vel jacobian. For backprop, you
   /// don't actually need this matrix, you can compute backprop directly. This
   /// is here if you want access to the full Jacobian for some reason.
-  Eigen::MatrixXd getForceVelJacobian(simulation::WorldPtr world);
+  const Eigen::MatrixXd& getForceVelJacobian(simulation::WorldPtr world);
 
   /// This computes and returns the whole pos-pos jacobian. For backprop, you
   /// don't actually need this matrix, you can compute backprop directly. This
   /// is here if you want access to the full Jacobian for some reason.
-  Eigen::MatrixXd getPosPosJacobian(simulation::WorldPtr world);
+  const Eigen::MatrixXd& getPosPosJacobian(simulation::WorldPtr world);
 
   /// This computes and returns the whole vel-pos jacobian. For backprop, you
   /// don't actually need this matrix, you can compute backprop directly. This
   /// is here if you want access to the full Jacobian for some reason.
-  Eigen::MatrixXd getVelPosJacobian(simulation::WorldPtr world);
+  const Eigen::MatrixXd& getVelPosJacobian(simulation::WorldPtr world);
 
   /// Returns a concatenated vector of all the Skeletons' position()'s in the
   /// World, in order in which the Skeletons appear in the World's
@@ -445,6 +445,21 @@ protected:
   Eigen::VectorXd mPostStepTorques;
 
 private:
+  /// These are mCached versions of the various Jacobians
+
+  bool mCachedPosPosDirty;
+  Eigen::MatrixXd mCachedPosPos;
+  bool mCachedPosVelDirty;
+  Eigen::MatrixXd mCachedPosVel;
+  bool mCachedVelPosDirty;
+  Eigen::MatrixXd mCachedVelPos;
+  bool mCachedVelVelDirty;
+  Eigen::MatrixXd mCachedVelVel;
+  bool mCachedForcePosDirty;
+  Eigen::MatrixXd mCachedForcePos;
+  bool mCachedForceVelDirty;
+  Eigen::MatrixXd mCachedForceVel;
+
   Eigen::VectorXd scratch(simulation::WorldPtr world);
 
   std::size_t getWrtDim(simulation::WorldPtr world, WithRespectTo wrt);

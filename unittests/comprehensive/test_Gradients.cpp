@@ -146,7 +146,7 @@ bool verifyClassicClampingConstraintMatrix(
 
     VectorXd cleanContactImpulses = grad->getContactConstraintImpluses();
     VectorXd zero = VectorXd::Zero(cleanContactImpulses.size());
-    if (!equals(cleanContactImpulses, zero, 1e-3))
+    if (!equals(cleanContactImpulses, zero, 1e-9))
     {
       std::cout << "world A_c: " << std::endl << A_c << std::endl;
       std::cout << "world A_cInv: " << std::endl << A_cInv << std::endl;
@@ -194,7 +194,7 @@ bool verifyMassedClampingConstraintMatrix(
   Eigen::MatrixXd A_c_recovered = M * V_c;
   Eigen::MatrixXd V_c_recovered = Minv * A_c;
 
-  if (!equals(A_c, A_c_recovered, 1e-3) || !equals(V_c, V_c_recovered, 1e-3))
+  if (!equals(A_c, A_c_recovered, 1e-8) || !equals(V_c, V_c_recovered, 1e-8))
   {
     std::cout << "A_c massed check failed" << std::endl;
     return false;
@@ -221,8 +221,8 @@ bool verifyMassedUpperBoundConstraintMatrix(
   Eigen::MatrixXd A_ub_recovered = M * V_ub;
   Eigen::MatrixXd V_ub_recovered = Minv * A_ub;
 
-  if (!equals(A_ub, A_ub_recovered, 1e-3)
-      || !equals(V_ub, V_ub_recovered, 1e-3))
+  if (!equals(A_ub, A_ub_recovered, 1e-8)
+      || !equals(V_ub, V_ub_recovered, 1e-8))
   {
     std::cout << "A_ub massed check failed" << std::endl;
     return false;
@@ -324,7 +324,7 @@ bool verifyClassicProjectionIntoClampsMatrix(
 
   VectorXd zero = VectorXd::Zero(analyticalError.size());
   double constraintForces = contactConstraintForces.norm();
-  if (!equals(analyticalError, zero, std::max(constraintForces, 1e-2) * 2e-3))
+  if (!equals(analyticalError, zero, 1e-8))
   {
     std::cout << "Proposed velocities: " << std::endl
               << proposedVelocities << std::endl;
@@ -401,7 +401,7 @@ bool verifyMassedProjectionIntoClampsMatrix(
   Eigen::MatrixXd P_c_recovered
       = (1.0 / world->getTimeStep()) * velToForce * bounce * A_c.transpose();
 
-  if (!equals(P_c, P_c_recovered, 1e-4))
+  if (!equals(P_c, P_c_recovered, 1e-8))
   {
     std::cout << "P_c massed check failed" << std::endl;
     std::cout << "P_c:" << std::endl << P_c << std::endl;
@@ -429,7 +429,7 @@ bool verifyVelVelJacobian(WorldPtr world, VectorXd proposedVelocities)
   MatrixXd analytical = classicPtr->getVelVelJacobian(world);
   MatrixXd bruteForce = classicPtr->finiteDifferenceVelVelJacobian(world);
 
-  if (!equals(analytical, bruteForce, 1e-4))
+  if (!equals(analytical, bruteForce, 1e-8))
   {
     std::cout << "Brute force velVelJacobian:" << std::endl
               << bruteForce << std::endl;
@@ -683,7 +683,7 @@ bool verifyNextV(WorldPtr world)
             perturbedTest.realNextVel,
             classicPtr->hasBounces()
                 ? 1e-4 // things get sloppy when bouncing, increase tol
-                : 3e-6))
+                : 1e-8))
     {
       std::cout << "Real v_t+1:" << std::endl
                 << perturbedTest.realNextVel << std::endl;
@@ -800,7 +800,7 @@ bool verifyJacobianOfProjectionIntoClampsMatrix(
       = classicPtr->finiteDifferenceJacobianOfProjectionIntoClampsMatrix(
           world, proposedVelocities * 10, wrt);
 
-  if (!equals(analytical, bruteForce, 1e-6))
+  if (!equals(analytical, bruteForce, 1e-8))
   {
     std::cout << "Brute force P_c Jacobian:" << std::endl
               << bruteForce << std::endl;
@@ -830,7 +830,7 @@ bool verifyPosVelJacobian(WorldPtr world, VectorXd proposedVelocities)
   MatrixXd analytical = classicPtr->getPosVelJacobian(world);
   MatrixXd bruteForce = classicPtr->finiteDifferencePosVelJacobian(world);
 
-  if (!equals(analytical, bruteForce, 1e-5))
+  if (!equals(analytical, bruteForce, 1e-8))
   {
     std::cout << "Brute force posVelJacobian:" << std::endl
               << bruteForce << std::endl;
@@ -859,7 +859,7 @@ bool verifyForceVelJacobian(WorldPtr world, VectorXd proposedVelocities)
   MatrixXd analytical = classicPtr->getForceVelJacobian(world);
   MatrixXd bruteForce = classicPtr->finiteDifferenceForceVelJacobian(world);
 
-  if (!equals(analytical, bruteForce, 1e-4))
+  if (!equals(analytical, bruteForce, 1e-8))
   {
     std::cout << "Brute force forceVelJacobian:" << std::endl
               << bruteForce << std::endl;
@@ -874,12 +874,6 @@ bool verifyForceVelJacobian(WorldPtr world, VectorXd proposedVelocities)
 
 bool verifyRecoveredLCPConstraints(WorldPtr world, VectorXd proposedVelocities)
 {
-  // This test doesn't make sense in the context of the LCP solver being really
-  // unstable, and not producing robust follow-up results.
-
-  return true;
-
-  /*
   world->setVelocities(proposedVelocities);
   world->getConstraintSolver()->setPenetrationCorrectionEnabled(false);
   neural::BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
@@ -888,6 +882,9 @@ bool verifyRecoveredLCPConstraints(WorldPtr world, VectorXd proposedVelocities)
     return true;
 
   MatrixXd A_c = classicPtr->getClampingConstraintMatrix(world);
+
+  if (A_c.cols() == 0)
+    return true;
 
   MatrixXd Q = Eigen::MatrixXd::Zero(A_c.cols(), A_c.cols());
   classicPtr->computeLCPConstraintMatrixClampingSubset(world, Q, A_c);
@@ -900,7 +897,7 @@ bool verifyRecoveredLCPConstraints(WorldPtr world, VectorXd proposedVelocities)
   Eigen::VectorXd X = Q.completeOrthogonalDecomposition().solve(b);
   Eigen::VectorXd realX = classicPtr->getClampingConstraintImpulses();
 
-  if (!equals(b, realB, 1e-6))
+  if (!equals(b, realB, 1e-8))
   {
     std::cout << "Error in verifyRecoveredLCPConstraints():" << std::endl;
     std::cout << "analytical B:" << std::endl << b << std::endl;
@@ -910,7 +907,7 @@ bool verifyRecoveredLCPConstraints(WorldPtr world, VectorXd proposedVelocities)
     // return false;
   }
 
-  if (!equals(X, realX, 1e-6))
+  if (!equals(X, realX, 1e-8))
   {
     std::cout << "Error in verifyRecoveredLCPConstraints():" << std::endl;
     std::cout << "analytical X:" << std::endl << X << std::endl;
@@ -919,7 +916,6 @@ bool verifyRecoveredLCPConstraints(WorldPtr world, VectorXd proposedVelocities)
   }
 
   return true;
-  */
 }
 
 bool verifyVelGradients(WorldPtr world, VectorXd worldVel)
@@ -1309,7 +1305,7 @@ LossGradient computeBruteForceGradient(
   Eigen::VectorXd originalVel = world->getVelocities();
   Eigen::VectorXd originalForce = world->getForces();
 
-  double EPSILON = 1e-5;
+  double EPSILON = 1e-7;
 
   for (std::size_t i = 0; i < n; i++)
   {
@@ -1319,7 +1315,7 @@ LossGradient computeBruteForceGradient(
     snapshot.restore();
     world->setPositions(tweakedPos);
     for (std::size_t k = 0; k < timesteps; k++)
-      world->step();
+      world->step(true, false);
     grad.lossWrtPosition(i) = (loss(world) - defaultLoss) / EPSILON;
 
     Eigen::VectorXd tweakedVel = originalVel;
@@ -1328,7 +1324,7 @@ LossGradient computeBruteForceGradient(
     snapshot.restore();
     world->setVelocities(tweakedVel);
     for (std::size_t k = 0; k < timesteps; k++)
-      world->step();
+      world->step(true, false);
     grad.lossWrtVelocity(i) = (loss(world) - defaultLoss) / EPSILON;
 
     Eigen::VectorXd tweakedForce = originalForce;
@@ -1337,7 +1333,7 @@ LossGradient computeBruteForceGradient(
     snapshot.restore();
     world->setForces(tweakedForce);
     for (std::size_t k = 0; k < timesteps; k++)
-      world->step();
+      world->step(true, false);
     grad.lossWrtTorque(i) = (loss(world) - defaultLoss) / EPSILON;
   }
 
@@ -1350,48 +1346,128 @@ bool verifyGradientBackprop(
 {
   RestorableSnapshot snapshot(world);
 
-  // Get the brute force the compare against
-  LossGradient bruteForce = computeBruteForceGradient(world, timesteps, loss);
-
-  std::vector<BackpropSnapshotPtr> snapshots;
-  snapshots.reserve(timesteps);
+  std::vector<BackpropSnapshotPtr> backpropSnapshots;
+  std::vector<RestorableSnapshot> restorableSnapshots;
+  backpropSnapshots.reserve(timesteps);
   for (std::size_t i = 0; i < timesteps; i++)
   {
-    snapshots.push_back(forwardPass(world));
+    restorableSnapshots.push_back(RestorableSnapshot(world));
+    backpropSnapshots.push_back(forwardPass(world, false, false));
   }
 
   // Get the loss gradient at the final timestep (by brute force) to initialize
   // an analytical backwards pass
   LossGradient analytical = computeBruteForceGradient(world, 0, loss);
 
+  LossGradient bruteForce = analytical;
+
+  snapshot.restore();
   for (int i = timesteps - 1; i >= 0; i--)
   {
     LossGradient thisTimestep;
-    snapshots[i]->backprop(world, thisTimestep, analytical);
+    backpropSnapshots[i]->backprop(world, thisTimestep, analytical);
     analytical = thisTimestep;
-  }
 
-  // Assert that the results are the same
-  // This has a larger error bound than normal, because doing finite
-  // differencing at the beginning of a physics run tends to accumulate position
-  // error over many timesteps.
-  if (!equals(analytical.lossWrtPosition, bruteForce.lossWrtPosition, 1e-3)
-      || !equals(analytical.lossWrtVelocity, bruteForce.lossWrtVelocity, 1e-3)
-      || !equals(analytical.lossWrtTorque, bruteForce.lossWrtTorque, 1e-3))
-  {
-    std::cout << "Analytical loss wrt position:" << std::endl
-              << analytical.lossWrtPosition << std::endl;
-    std::cout << "Brute force loss wrt position:" << std::endl
-              << bruteForce.lossWrtPosition << std::endl;
-    std::cout << "Analytical loss wrt velocity:" << std::endl
-              << analytical.lossWrtVelocity << std::endl;
-    std::cout << "Brute force loss wrt velocity:" << std::endl
-              << bruteForce.lossWrtVelocity << std::endl;
-    std::cout << "Analytical loss wrt torque:" << std::endl
-              << analytical.lossWrtTorque << std::endl;
-    std::cout << "Brute force loss wrt torque:" << std::endl
-              << bruteForce.lossWrtTorque << std::endl;
-    return false;
+    int numSteps = timesteps - i;
+    restorableSnapshots[i].restore();
+    LossGradient bruteForceThisTimestep
+        = computeBruteForceGradient(world, numSteps, loss);
+
+    // p_t+1 <-- p_t
+    Eigen::MatrixXd posPos = backpropSnapshots[i]->getPosPosJacobian(world);
+    // v_t+1 <-- p_t
+    Eigen::MatrixXd posVel = backpropSnapshots[i]->getPosVelJacobian(world);
+    // p_t+1 <-- v_t
+    Eigen::MatrixXd velPos = backpropSnapshots[i]->getVelPosJacobian(world);
+    // v_t+1 <-- v_t
+    Eigen::MatrixXd velVel = backpropSnapshots[i]->getVelVelJacobian(world);
+
+    // p_t+1 <-- p_t
+    Eigen::MatrixXd posPosFD
+        = backpropSnapshots[i]->finiteDifferencePosPosJacobian(world, 1);
+    // v_t+1 <-- p_t
+    Eigen::MatrixXd posVelFD
+        = backpropSnapshots[i]->finiteDifferencePosVelJacobian(world);
+    // p_t+1 <-- v_t
+    Eigen::MatrixXd velPosFD
+        = backpropSnapshots[i]->finiteDifferenceVelPosJacobian(world, 1);
+    // v_t+1 <-- v_t
+    Eigen::MatrixXd velVelFD
+        = backpropSnapshots[i]->finiteDifferenceVelVelJacobian(world);
+
+    double diffPosPos = (posPos - posPosFD).norm();
+    double diffPosVel = (posVel - posVelFD).norm();
+    double diffVelPos = (velPos - velPosFD).norm();
+    double diffVelVel = (velVel - velVelFD).norm();
+
+    std::cout << "Jacobian error at step:" << numSteps << ": " << diffPosPos
+              << ", " << diffPosVel << ", " << diffVelPos << ", " << diffVelVel
+              << std::endl;
+
+    LossGradient analyticalWithBruteForce;
+    analyticalWithBruteForce.lossWrtPosition
+        = posPos.transpose() * bruteForce.lossWrtPosition
+          + posVel.transpose() * bruteForce.lossWrtVelocity;
+    analyticalWithBruteForce.lossWrtVelocity
+        = velPos.transpose() * bruteForce.lossWrtPosition
+          + velVel.transpose() * bruteForce.lossWrtVelocity;
+
+    bruteForce = bruteForceThisTimestep;
+
+    std::cout
+        << "Backprop error at step:" << numSteps << ": "
+        << (analytical.lossWrtPosition - bruteForce.lossWrtPosition).norm()
+        << ", "
+        << (analytical.lossWrtVelocity - bruteForce.lossWrtVelocity).norm()
+        << ", " << (analytical.lossWrtTorque - bruteForce.lossWrtTorque).norm()
+        << std::endl;
+
+    // Assert that the results are the same
+    if (!equals(analytical.lossWrtPosition, bruteForce.lossWrtPosition, 1e-8)
+        || !equals(analytical.lossWrtVelocity, bruteForce.lossWrtVelocity, 1e-8)
+        || !equals(analytical.lossWrtTorque, bruteForce.lossWrtTorque, 1e-8))
+    {
+      std::cout << "Diverged at backprop steps:" << numSteps << std::endl;
+      std::cout << "Analytical loss wrt position:" << std::endl
+                << analytical.lossWrtPosition << std::endl;
+      std::cout << "Brute force loss wrt position:" << std::endl
+                << bruteForce.lossWrtPosition << std::endl;
+      std::cout << "Analytical off Brute force loss wrt position:" << std::endl
+                << analyticalWithBruteForce.lossWrtPosition << std::endl;
+      std::cout << "Diff loss gradient wrt position:" << std::endl
+                << bruteForce.lossWrtPosition - analytical.lossWrtPosition
+                << std::endl;
+      std::cout << "Diff analytical loss gradient wrt position:" << std::endl
+                << bruteForce.lossWrtPosition
+                       - analyticalWithBruteForce.lossWrtPosition
+                << std::endl;
+      std::cout << "Analytical loss wrt velocity:" << std::endl
+                << analytical.lossWrtVelocity << std::endl;
+      std::cout << "Brute force loss wrt velocity:" << std::endl
+                << bruteForce.lossWrtVelocity << std::endl;
+      std::cout << "Analytical off Brute force loss wrt velocity:" << std::endl
+                << analyticalWithBruteForce.lossWrtVelocity << std::endl;
+      std::cout << "Diff loss gradient wrt velocity:" << std::endl
+                << bruteForce.lossWrtVelocity - analytical.lossWrtVelocity
+                << std::endl;
+      std::cout << "Diff loss analytical off brute force gradient wrt velocity:"
+                << std::endl
+                << bruteForce.lossWrtVelocity
+                       - analyticalWithBruteForce.lossWrtVelocity
+                << std::endl;
+      std::cout << "Diff analytical loss gradient wrt velocity:" << std::endl
+                << bruteForce.lossWrtVelocity
+                       - analyticalWithBruteForce.lossWrtVelocity
+                << std::endl;
+      std::cout << "Analytical loss wrt torque:" << std::endl
+                << analytical.lossWrtTorque << std::endl;
+      std::cout << "Brute force loss wrt torque:" << std::endl
+                << bruteForce.lossWrtTorque << std::endl;
+      std::cout << "Diff loss gradient wrt torque:" << std::endl
+                << bruteForce.lossWrtTorque - analytical.lossWrtTorque
+                << std::endl;
+      return false;
+    }
   }
 
   snapshot.restore();
@@ -4448,12 +4524,10 @@ void testCartpole(double rotationRadians)
   EXPECT_TRUE(verifyBulkPass(world, 1000, 50));
 }
 
-/*
 TEST(GRADIENTS, CARTPOLE_15_DEG)
 {
   testCartpole(15.0 / 180.0 * 3.1415);
 }
-*/
 
 void testWorldSpace(std::size_t numLinks)
 {
@@ -4770,6 +4844,7 @@ void testJumpWorm(bool offGround)
   EXPECT_TRUE(verifyBulkPass(world, 1000, 50));
 }
 
+/*
 TEST(GRADIENTS, JUMP_WORM)
 {
   testJumpWorm(false);
@@ -4779,3 +4854,4 @@ TEST(GRADIENTS, JUMP_WORM_OFF_GROUND)
 {
   testJumpWorm(true);
 }
+*/

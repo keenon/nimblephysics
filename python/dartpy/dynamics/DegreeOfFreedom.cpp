@@ -32,6 +32,7 @@
 
 #include <dart/dart.hpp>
 #include <pybind11/pybind11.h>
+
 #include "eigen_geometry_pybind.h"
 #include "eigen_pybind.h"
 
@@ -245,6 +246,28 @@ void DegreeOfFreedom(py::module& m)
           "getVelocityUpperLimit",
           +[](const dart::dynamics::DegreeOfFreedom* self) -> double {
             return self->getVelocityUpperLimit();
+          })
+      .def(
+          "setPositionUpperLimit",
+          +[](dart::dynamics::DegreeOfFreedom* self, double _limit) {
+            self->setPositionUpperLimit(_limit);
+          },
+          ::py::arg("limit"))
+      .def(
+          "getPositionUpperLimit",
+          +[](const dart::dynamics::DegreeOfFreedom* self) -> double {
+            return self->getPositionUpperLimit();
+          })
+      .def(
+          "setPositionLowerLimit",
+          +[](dart::dynamics::DegreeOfFreedom* self, double _limit) {
+            self->setPositionLowerLimit(_limit);
+          },
+          ::py::arg("limit"))
+      .def(
+          "getPositionLowerLimit",
+          +[](const dart::dynamics::DegreeOfFreedom* self) -> double {
+            return self->getPositionLowerLimit();
           })
       .def(
           "resetVelocity",

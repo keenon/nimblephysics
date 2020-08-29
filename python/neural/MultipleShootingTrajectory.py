@@ -100,7 +100,7 @@ class MultipleShootingTrajectory:
         self.bulk_result_pointer: BulkPassResultPointer = None
 
         # An option flag to turn off multithreading forward and backward passes
-        self.multithread = True
+        self.multithread = False
 
         # Create a viewer
         self.viewer: dart.gui.osg.Viewer = None
@@ -117,10 +117,30 @@ class MultipleShootingTrajectory:
         self.best_knot_vels = torch.zeros_like(self.knot_vels)
 
         # An option to compute the Hessian explicitly
-        self.compute_hessian = True
+        self.compute_hessian = False
 
     def tensors(self):
         return [self.torques, self.knot_vels, self.knot_poses]
+
+    def postprocess_grad(self):
+        """
+        This is useful for basic SGD. It removes gradients for anything we're not allowed to learn.
+        """
+        if not self.tune_starting_point:
+            self.knot_poses.grad[:, 0] = 0
+            self.knot_vels.grad[:, 0] = 0
+
+    def enforce_limits(self):
+        """
+        This is useful for basic SGD. It clamps the trajectory to be at only legal points.
+        """
+        n = self.get_flat_problem_dim()
+        state = self.flatten(np.zeros(n), 'state')
+        ub = self.flatten(np.zeros(n), 'upper_bound')
+        lb = self.flatten(np.zeros(n), 'lower_bound')
+        state = np.maximum(state, lb)
+        state = np.minimum(state, ub)
+        self.unflatten(state)
 
     def unroll(
             self,
@@ -473,6 +493,34 @@ class MultipleShootingTrajectory:
                 flat_cursor += world_dofs
                 torque_cursor += 1
 
+    def get_flat_dim_name(self, dim):
+        """
+        This gets the name of a flat dimension of the problem
+        """
+        world_dofs = self.world.getNumDofs()
+        flat_cursor = 0
+        torque_cursor = 0
+        for i in range(self.num_shots):
+            if i > 0 or self.tune_starting_point:
+                # poses
+                if flat_cursor <= dim and flat_cursor + world_dofs >= dim:
+                    dof = dim - flat_cursor
+                    return "knot "+str(i)+" pos of dof "+str(dof)
+                flat_cursor += world_dofs
+                # vels
+                if flat_cursor <= dim and flat_cursor + world_dofs >= dim:
+                    dof = dim - flat_cursor
+                    return "knot "+str(i)+" vel of dof "+str(dof)
+                flat_cursor += world_dofs
+
+            shot_length = min(self.shooting_length, self.steps - torque_cursor)
+            for j in range(shot_length):
+                if flat_cursor <= dim and flat_cursor + world_dofs >= dim:
+                    dof = dim - flat_cursor
+                    return "knot "+str(i)+" offset "+str(j)+" torque of dof "+str(dof)
+                flat_cursor += world_dofs
+                torque_cursor += 1
+
     def debug_flat_compare(self, xs: List[np.ndarray], threshold=1e-10):
         """
         This prints the values of several different flat vectors, labeling each component
@@ -745,23 +793,28 @@ class MultipleShootingTrajectory:
                 # We'll have to compute the Jacobians ourselves
                 """
                 For our purposes here (forward Jacobians), the forward computation 
-                graph looks like this:
+                graph looks like these two separate processes:
 
-                p_t -------------+--------------------------------> p_t+1 ---->
-                                \                                   /
-                                \                                 /
-                v_t ----------------+----(LCP Solver)----> v_t+1 ---+---->
-                                /
-                                /
+                p_t -------------+
+                                  \ 
+                                   \                               
+                v_t ----------------+----(LCP Solver)----> v_t+1 ---->
+                                   /
+                                  /
                 f_t -------------+
-                """
 
+                v_t -------------+
+                                  \ 
+                                   \                               
+                p_t ----------------+--------------------> p_t+1 ---->
+                """
                 # p_end <-- p_t+1
                 posend_posnext = np.identity(world_dofs)
                 # p_end <-- v_t+1
                 # np.zeros((world_dofs, world_dofs))
                 # -dt * dt * np.identity(world_dofs)
                 posend_velnext = np.zeros((world_dofs, world_dofs))
+
                 # v_end <-- p_t+1
                 velend_posnext = np.zeros((world_dofs, world_dofs))
                 # v_end <-- v_t+1
@@ -770,9 +823,6 @@ class MultipleShootingTrajectory:
                 for i in reversed(range(start_index, end_index_exclusive)):
                     snapshot: dart.neural.BackpropSnapshot = self.snapshots[i]
 
-                    # p_t+1 <-- v_t+1
-                    posnext_velnext = dt
-
                     # v_t+1 <-- p_t
                     velnext_pos = snapshot.getPosVelJacobian(self.world)
                     # v_t+1 <-- v_t
@@ -780,20 +830,16 @@ class MultipleShootingTrajectory:
                     # v_t+1 <-- f_t
                     velnext_force = snapshot.getForceVelJacobian(self.world)
 
-                    # p_t+1 <-- p_t = (p_t+1 <-- p_t) + ((p_t+1 <-- v_t+1) * (v_t+1 <-- p_t))
-                    posnext_pos = snapshot.getPosPosJacobian(
-                        self.world)  # + (posnext_velnext * velnext_pos)
-                    # p_t+1 <-- v_t = (p_t+1 <-- v_t+1) * (v_t+1 <-- v_t)
-                    posnext_vel = posnext_velnext * velnext_vel
-                    # p_t+1 <-- f_t = (p_t+1 <-- v_t+1) * (v_t+1 <-- f_t)
-                    posnext_force = posnext_velnext * velnext_force
+                    # p_t+1 <-- p_t
+                    # This isn't always Identity, because of bounces
+                    posnext_pos = snapshot.getPosPosJacobian(self.world)
+                    # p_t+1 <-- v_t
+                    posnext_vel = snapshot.getVelPosJacobian(self.world)
 
-                    # p_end <-- f_t = ((p_end <-- p_t+1) * (p_t+1 <-- f_t)) + ((p_end <-- v_t+1) * (v_t+1 <-- f_t))
-                    posend_force = np.matmul(
-                        posend_posnext, posnext_force) + np.matmul(posend_velnext, velnext_force)
-                    # v_end <-- f_t ...
-                    velend_force = np.matmul(
-                        velend_posnext, posnext_force) + np.matmul(velend_velnext, velnext_force)
+                    # p_end <-- f_t = (p_end <-- v_t+1) * (v_t+1 <-- f_t)
+                    posend_force = np.matmul(posend_velnext, velnext_force)
+                    # v_end <-- f_t = (v_end <-- v_t+1) * (v_t+1 <-- f_t)
+                    velend_force = np.matmul(velend_velnext, velnext_force)
 
                     # Write our force_pos_end and force_vel_end into the output, row by row
                     for row in range(world_dofs):
@@ -809,11 +855,8 @@ class MultipleShootingTrajectory:
                         print('v_t+1 <-- p_t:\n'+str(velnext_pos))
                         print('v_t+1 <-- v_t:\n'+str(velnext_vel))
                         print('v_t+1 <-- f_t:\n'+str(velnext_force))
-                        print('(p_t+1 <-- v_t+1) * (v_t+1 <-- p_t):\n' +
-                              str(posnext_velnext * velnext_pos))
                         print('p_t+1 <-- p_t:\n'+str(posnext_pos))
                         print('p_t+1 <-- v_t:\n'+str(posnext_vel))
-                        print('p_t+1 <-- f_t:\n'+str(posnext_force))
                         print('p_end <-- f_t:\n'+str(posend_force))
                         print('v_end <-- f_t:\n'+str(velend_force))
 
@@ -1335,7 +1378,9 @@ class MultipleShootingTrajectory:
                 constraint_upper_bounds, jac_g_sparsity_indices, 0,
                 eval_f, eval_grad_f, eval_g, eval_jac_g)
         nlp.set(max_iter=max_iter)
-        # nlp.set(halt_on_ampl_error='yes')
+        nlp.set(
+            print_info_string='yes', check_derivatives_for_naninf='yes',
+            derivative_test='first-order')
 
         x0 = self.flatten(np.zeros(n), 'state')
         eval_jac_g(x0, np.zeros(len(jac_g_sparsity_indices[0])))
@@ -1350,7 +1395,7 @@ class MultipleShootingTrajectory:
         print("IPOPT finished with final loss "+str(loss)+", "+str(status))
         self.unflatten(_x)
 
-    def debug(self):
+    def debug(self, fd=None, error=None):
         """
         This prints the current trajectory parameters
         """
@@ -1370,14 +1415,14 @@ class MultipleShootingTrajectory:
                 if (knot_index > 0):
                     print(
                         '      (end-pos): ' +
-                        str(self.last_preknot_poses[knot_index].detach().numpy()))
+                        str(self.last_preknot_poses[knot_index]))
                     print(
                         '      (end-vel): ' +
                         str(self.last_preknot_vels[knot_index]))
                 print('   knot '+str(knot_index)+' :')
                 print('      pos: '+str(self.knot_poses[knot_index].detach().numpy()))
                 print('      vel: '+str(self.knot_vels[knot_index].detach().numpy()))
-            print('         f['+str(i)+']: '+str(self.torques[i].detach().numpy()))
+            print('         f['+str(i)+']: '+str(self.torques[:, i].detach().numpy()))
         print('   (end-pos): '+str(self.last_terminal_pos))
         print('   (end-vel): '+str(self.last_terminal_vel))
         flat = self.flatten(np.zeros(n), 'state')
@@ -1407,7 +1452,7 @@ class MultipleShootingTrajectory:
                 knot_index = math.floor(i / self.shooting_length)
                 print('   knot '+str(knot_index)+':')
                 print('      pos: '+str(np.zeros(world_dofs)
-                                        if self.knot_poses[knot_index].grad is None else self.knot_poses[knot_index].grad.numpy()))
+                                        if self.knot_poses.grad is None else self.knot_poses.grad.numpy()[:, knot_index]))
                 print(
                     '      vel: ' +
                     str(
@@ -1415,6 +1460,38 @@ class MultipleShootingTrajectory:
                         if self.knot_vels[knot_index].grad is None else self.knot_vels
                         [knot_index].grad.detach().numpy()))
             print('         f['+str(i)+']: '+str(np.zeros(world_dofs)
-                                                 if self.torques[i].grad is None else self.torques[i].grad.detach().numpy()))
+                                                 if self.torques.grad is None else self.torques.grad.detach().numpy()[:, i]))
         flat_grad = self.flatten(np.zeros(n), 'grad')
         print('flat grad: '+str(flat_grad))
+
+        if fd is not None:
+            self.unflatten(fd)
+            print('****************')
+            print('Finite Difference Gradient:')
+            print('****************')
+            for i in range(self.steps):
+                if i % self.shooting_length == 0:
+                    knot_index = math.floor(i / self.shooting_length)
+                    print('   knot '+str(knot_index)+' :')
+                    if i > 0 or self.tune_starting_point:
+                        print('      pos: '+str(self.knot_poses[:, knot_index].detach().numpy()))
+                        print('      vel: '+str(self.knot_vels[:, knot_index].detach().numpy()))
+                print('         f['+str(i)+']: '+str(self.torques[:, i].detach().numpy()))
+            print('flat grad: '+str(fd))
+
+        if error is not None:
+            self.unflatten(error)
+            print('****************')
+            print('Error Data:')
+            print('****************')
+            for i in range(self.steps):
+                if i % self.shooting_length == 0:
+                    knot_index = math.floor(i / self.shooting_length)
+                    print('   knot '+str(knot_index)+' :')
+                    if i > 0 or self.tune_starting_point:
+                        print('      pos: '+str(self.knot_poses[:, knot_index].detach().numpy()))
+                        print('      vel: '+str(self.knot_vels[:, knot_index].detach().numpy()))
+                print('         f['+str(i)+']: '+str(self.torques[:, i].detach().numpy()))
+            print('flat grad: '+str(error))
+
+        self.unflatten(flat)

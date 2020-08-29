@@ -22,7 +22,9 @@ std::shared_ptr<ConstrainedGroupGradientMatrices> createGradientMatrices(
 
 //==============================================================================
 std::shared_ptr<BackpropSnapshot> forwardPass(
-    simulation::WorldPtr world, bool idempotent)
+    simulation::WorldPtr world,
+    bool idempotent,
+    bool parallelVelocityAndPositionUpdates)
 {
   std::shared_ptr<RestorableSnapshot> restorableSnapshot;
   if (idempotent)
@@ -40,7 +42,7 @@ std::shared_ptr<BackpropSnapshot> forwardPass(
   world->getConstraintSolver()->setGradientEnabled(true);
 
   // Actually take a world step. As a byproduct, this will generate gradients
-  world->step(!idempotent);
+  world->step(!idempotent, parallelVelocityAndPositionUpdates);
 
   // Reset the old gradient mode, so we don't have any side effects other than
   // taking a timestep.
@@ -194,18 +196,23 @@ BulkBackwardPassResult bulkBackwardPass(
     For reference during implementation in C++:
 
     This computes a full Jacobian relating the whole shot to the error at this
-knot-point (last_knot_index + 1)
+    knot-point (last_knot_index + 1)
 
     For our purposes here (forward Jacobians), the forward computation
-    graph looks like this:
+    graph looks like two separate processes:
 
-    p_t -------------+--------------------------------> p_t+1 ---->
-                      \                                   /
-                        \                                 /
-    v_t ----------------+----(LCP Solver)----> v_t+1 ---+---->
-                        /
+    p_t -------------+
+                      \
+                       \
+    v_t ----------------+----(LCP Solver)----> v_t+1 ---->
+                       /
                       /
     f_t -------------+
+
+    v_t -------------+
+                      \
+                       \
+    p_t ----------------+--------------------> p_t+1 ---->
     */
 
     Eigen::VectorXd gradWrtNextStepPos = Eigen::VectorXd::Zero(dofs);
@@ -260,10 +267,6 @@ knot-point (last_knot_index + 1)
 
       if (computeJacobians)
       {
-        // p_t+1 <-- v_t+1
-        Eigen::MatrixXd posnext_velnext = Eigen::MatrixXd::Identity(dofs, dofs)
-                                          * threadWorld->getTimeStep();
-
         // v_t+1 <-- p_t
         Eigen::MatrixXd velnext_pos
             = snapshots[i]->getPosVelJacobian(threadWorld);
@@ -274,20 +277,18 @@ knot-point (last_knot_index + 1)
         Eigen::MatrixXd velnext_force
             = snapshots[i]->getForceVelJacobian(threadWorld);
         // p_t+1 <-- p_t
+        // This is not always identity, because of bounces
         Eigen::MatrixXd posnext_pos
             = snapshots[i]->getPosPosJacobian(threadWorld);
-        // p_t+1 <-- v_t = (p_t+1 <-- v_t+1) * (v_t+1 <-- v_t)
-        Eigen::MatrixXd posnext_vel = posnext_velnext * velnext_vel;
-        // p_t+1 <-- f_t = (p_t+1 <-- v_t+1) * (v_t+1 <-- f_t)
-        Eigen::MatrixXd posnext_force = posnext_velnext * velnext_force;
+        // p_t+1 <-- v_t
+        // This is not always dt * identity, because of bounces
+        Eigen::MatrixXd posnext_vel
+            = snapshots[i]->getVelPosJacobian(threadWorld);
 
-        // p_end <-- f_t = ((p_end <-- p_t+1) * (p_t+1 <-- f_t)) + ((p_end <--
-        // v_t+1) * (v_t+1 <-- f_t))
-        Eigen::MatrixXd posend_force = (posend_posnext * posnext_force)
-                                       + (posend_velnext * velnext_force);
-        // v_end <-- f_t ...
-        Eigen::MatrixXd velend_force = (velend_posnext * posnext_force)
-                                       + (velend_velnext * velnext_force);
+        // p_end <-- f_t = (p_end <-- v_t+1) * (v_t+1 <-- f_t)
+        Eigen::MatrixXd posend_force = (posend_velnext * velnext_force);
+        // v_end <-- f_t = (v_end <-- v_t+1) * (v_t+1 <-- f_t)
+        Eigen::MatrixXd velend_force = (velend_velnext * velnext_force);
 
         // Write our torques into the appropriate spot in the torques block
         J.torquesEndPos.push_back(posend_force);

@@ -55,6 +55,8 @@ def main():
         poleJoint.setTransformFromChildBodyNode(poleOffset)
 
         poleJoint.setPosition(0, 90 * 3.1415 / 180)
+        poleJoint.setPositionUpperLimit(0, 180 * 3.1415 / 180)
+        poleJoint.setPositionLowerLimit(0, 0 * 3.1415 / 180)
 
         poleShape.createCollisionAspect()
 
@@ -125,25 +127,26 @@ def main():
     random.seed(1234)
 
     steps = 400
-    shooting_length = 50
+    shooting_length = 20
 
     # Create the trajectory
     def eval_loss(t, pos, vel, world):
         # DOF x timestep
-        step_loss = 0  # torch.sum(t[0, :]*t[0, :]) + torch.sum(t[1, :]*t[1, :])
+        # step_loss = 0  # torch.sum(t[0, :]*t[0, :]) + torch.sum(t[1, :]*t[1, :])
         # world_vel = dart_torch.convert_to_world_space_velocities(world, vel)
         # world_pos = dart_torch.convert_to_world_space_positions(world, pos)
-
         """
         root_poses = dart_torch.convert_to_world_space_positions_linear(
             world, root, pos)
         """
-        loss = - torch.sum(pos[1, :] * pos[1, :] * torch.sign(pos[1, :]))
+        step_loss = - torch.sum(pos[1, :] * pos[1, :] * torch.sign(pos[1, :]))
+        """
         return loss
         """
-        final_loss = - last_segment_pos[1] * last_segment_pos[1] * torch.sign(last_segment_pos[1])
+        last_segment_pos = pos[-1, :]
+        final_loss = - 100 * last_segment_pos[1] * \
+            last_segment_pos[1] * torch.sign(last_segment_pos[1])
         return step_loss + final_loss
-        """
 
     """
     while True:
@@ -170,53 +173,61 @@ def main():
     stepped = False
     """
 
-    """
-    optimizer = torch.optim.Adam(trajectory.tensors(), lr=0.1)
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=50, gamma=0.5)
+    optimizer = torch.optim.SGD(trajectory.tensors(), lr=1e3)
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=30, gamma=0.5)
 
     knot_weight = 100
 
-    def animate_step(pos, vel, t):
-        viewer.frame()
-        time.sleep(0.003)
+    """
+    print('errors:')
+    dims = [252, 253, 254, 257]
+    for dim in dims:
+        print(str(dim)+': '+trajectory.get_flat_dim_name(dim))
+    return
+    """
+
+    trajectory.create_gui()
 
     # Run cartpole simulations
+    """
     iteration = 0
-    for i in range(201):
-        loss, knot_loss = trajectory.unroll(
-            after_step=(animate_step if iteration % 100 == 0 and iteration > 0 else None))
+    for i in range(401):
+        loss, knot_loss = trajectory.unroll(use_knots=False)
 
         # Show a trajectory without the knot points
         if iteration % 100 == 0 and iteration > 0:
-            trajectory.unroll(use_knots=False, after_step=animate_step)
-            knot_weight *= 10
+            trajectory.playback_trajectory()
 
         # Zero the accumulated grad
         optimizer.zero_grad()
 
         # Run the backprop
-        print('Iteration '+str(iteration)+' loss: '+str(loss.item())+', knot loss: '+str(knot_loss.item()))
+        print('Iteration '+str(iteration)+' loss: '+str(loss.item()))
 
-        l = loss + (knot_loss * iteration)
+        loss.backward()
 
-        l.backward()
+        trajectory.postprocess_grad()
 
         optimizer.step()
         scheduler.step()
 
+        trajectory.enforce_limits()
+
+        if i % 10 == 0:
+            trajectory.playback_trajectory()
+        # time.sleep(1)
+
         iteration += 1
     """
 
-    trajectory.create_gui()
     trajectory.compute_hessian = False
 
     trajectory.ipopt(300)
-    while True:
-        trajectory.playback_trajectory()
-    # trajectory.display_trajectory()
+
     """
+    # trajectory.display_trajectory()
     for i in range(10):
-        trajectory.ipopt(50)
+        trajectory.ipopt(10)
         trajectory.playback_trajectory()
         trajectory.display_trajectory()
     """

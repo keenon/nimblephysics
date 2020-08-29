@@ -600,6 +600,8 @@ public:
   /// giving the difference in C(pos, vel) for finite changes in vel
   Eigen::MatrixXd finiteDifferenceVelCJacobian();
 
+  Eigen::VectorXd getDynamicsForces();
+
   std::size_t getWrtDim(neural::WithRespectTo wrt);
 
   Eigen::VectorXd getWrt(neural::WithRespectTo wrt);

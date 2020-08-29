@@ -41,3 +41,4 @@
 #include "dart/neural/neural.hpp"
 #include "dart/optimizer/optimizer.hpp"
 #include "dart/simulation/simulation.hpp"
+#include "dart/trajectory/trajectory.hpp"

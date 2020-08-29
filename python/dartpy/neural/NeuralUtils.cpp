@@ -106,7 +106,8 @@ void NeuralUtils(py::module& m)
       "forwardPass",
       &dart::neural::forwardPass,
       ::py::arg("world"),
-      ::py::arg("idempotent") = false);
+      ::py::arg("idempotent") = false,
+      ::py::arg("parallelVelocityAndPositionUpdates") = false);
   m.def(
       "bulkForwardPass",
       &dart::neural::bulkForwardPass,

@@ -63,6 +63,12 @@ BackpropSnapshot::BackpropSnapshot(
       mNumBouncing += gradientMatrix->getBouncingConstraintMatrix().cols();
     }
   }
+  mCachedPosPosDirty = true;
+  mCachedPosVelDirty = true;
+  mCachedVelPosDirty = true;
+  mCachedVelVelDirty = true;
+  mCachedForcePosDirty = true;
+  mCachedForceVelDirty = true;
 }
 
 //==============================================================================
@@ -87,6 +93,26 @@ void BackpropSnapshot::backprop(
   thisTimestepLoss.lossWrtPosition = Eigen::VectorXd(mNumDOFs);
   thisTimestepLoss.lossWrtVelocity = Eigen::VectorXd(mNumDOFs);
   thisTimestepLoss.lossWrtTorque = Eigen::VectorXd(mNumDOFs);
+
+  // TODO: <remove me>
+
+  const Eigen::MatrixXd& posPos = getPosPosJacobian(world);
+  const Eigen::MatrixXd& posVel = getPosVelJacobian(world);
+  const Eigen::MatrixXd& velPos = getVelPosJacobian(world);
+  const Eigen::MatrixXd& velVel = getVelVelJacobian(world);
+  const Eigen::MatrixXd& forceVel = getForceVelJacobian(world);
+
+  thisTimestepLoss.lossWrtPosition
+      = posPos.transpose() * nextTimestepLoss.lossWrtPosition
+        + posVel.transpose() * nextTimestepLoss.lossWrtVelocity;
+  thisTimestepLoss.lossWrtVelocity
+      = velPos.transpose() * nextTimestepLoss.lossWrtPosition
+        + velVel.transpose() * nextTimestepLoss.lossWrtVelocity;
+  thisTimestepLoss.lossWrtTorque
+      = forceVel.transpose() * nextTimestepLoss.lossWrtVelocity;
+
+  return;
+  // TODO: </remove me>
 
   // Actually run the backprop
 
@@ -211,81 +237,105 @@ void BackpropSnapshot::backprop(
 }
 
 //==============================================================================
-Eigen::MatrixXd BackpropSnapshot::getForceVelJacobian(WorldPtr world)
+const Eigen::MatrixXd& BackpropSnapshot::getForceVelJacobian(WorldPtr world)
 {
-  Eigen::MatrixXd A_c = getClampingConstraintMatrix(world);
-  Eigen::MatrixXd Minv = getInvMassMatrix(world);
-
-  // If there are no clamping constraints, then force-vel is just the mTimeStep
-  // * Minv
-  if (A_c.size() == 0)
-    return mTimeStep * Minv;
-
-  Eigen::MatrixXd A_ub = getUpperBoundConstraintMatrix(world);
-  Eigen::MatrixXd E = getUpperBoundMappingMatrix();
-  Eigen::MatrixXd P_c = getProjectionIntoClampsMatrix(world);
-
-  if (A_ub.size() > 0 && E.size() > 0)
+  if (mCachedForceVelDirty)
   {
-    return mTimeStep * Minv
-           * (Eigen::MatrixXd::Identity(mNumDOFs, mNumDOFs)
-              - mTimeStep * (A_c + A_ub * E) * P_c * Minv);
+    Eigen::MatrixXd A_c = getClampingConstraintMatrix(world);
+    Eigen::MatrixXd Minv = getInvMassMatrix(world);
+
+    // If there are no clamping constraints, then force-vel is just the
+    // mTimeStep
+    // * Minv
+    if (A_c.size() == 0)
+    {
+      mCachedForceVel = mTimeStep * Minv;
+    }
+    else
+    {
+      Eigen::MatrixXd A_ub = getUpperBoundConstraintMatrix(world);
+      Eigen::MatrixXd E = getUpperBoundMappingMatrix();
+      Eigen::MatrixXd P_c = getProjectionIntoClampsMatrix(world);
+
+      if (A_ub.size() > 0 && E.size() > 0)
+      {
+        mCachedForceVel = mTimeStep * Minv
+                          * (Eigen::MatrixXd::Identity(mNumDOFs, mNumDOFs)
+                             - mTimeStep * (A_c + A_ub * E) * P_c * Minv);
+      }
+      else
+      {
+        mCachedForceVel = mTimeStep * Minv
+                          * (Eigen::MatrixXd::Identity(mNumDOFs, mNumDOFs)
+                             - mTimeStep * A_c * P_c * Minv);
+      }
+    }
+    mCachedForceVelDirty = false;
   }
-  else
-  {
-    return mTimeStep * Minv
-           * (Eigen::MatrixXd::Identity(mNumDOFs, mNumDOFs)
-              - mTimeStep * A_c * P_c * Minv);
-  }
+  return mCachedForceVel;
 }
 
 //==============================================================================
-Eigen::MatrixXd BackpropSnapshot::getVelVelJacobian(WorldPtr world)
+const Eigen::MatrixXd& BackpropSnapshot::getVelVelJacobian(WorldPtr world)
 {
-  Eigen::MatrixXd A_c = getClampingConstraintMatrix(world);
+  if (mCachedVelVelDirty)
+  {
+    Eigen::MatrixXd A_c = getClampingConstraintMatrix(world);
 
-  // If there are no clamping constraints, then vel-vel is just the identity
-  if (A_c.size() == 0)
-    return Eigen::MatrixXd::Identity(mNumDOFs, mNumDOFs)
-           - getForceVelJacobian(world) * getVelCJacobian(world);
+    // If there are no clamping constraints, then vel-vel is just the identity
+    if (A_c.size() == 0)
+    {
+      mCachedVelVel = Eigen::MatrixXd::Identity(mNumDOFs, mNumDOFs)
+                      - getForceVelJacobian(world) * getVelCJacobian(world);
+    }
+    else
+    {
+      Eigen::MatrixXd A_ub = getUpperBoundConstraintMatrix(world);
+      Eigen::MatrixXd E = getUpperBoundMappingMatrix();
+      Eigen::MatrixXd P_c = getProjectionIntoClampsMatrix(world);
+      Eigen::MatrixXd Minv = getInvMassMatrix(world);
+      Eigen::MatrixXd parts1 = A_c + A_ub * E;
+      Eigen::MatrixXd parts2 = mTimeStep * Minv * parts1 * P_c;
 
-  Eigen::MatrixXd A_ub = getUpperBoundConstraintMatrix(world);
-  Eigen::MatrixXd E = getUpperBoundMappingMatrix();
-  Eigen::MatrixXd P_c = getProjectionIntoClampsMatrix(world);
-  Eigen::MatrixXd Minv = getInvMassMatrix(world);
-  Eigen::MatrixXd parts1 = A_c + A_ub * E;
-  Eigen::MatrixXd parts2 = mTimeStep * Minv * parts1 * P_c;
+      /*
+      std::cout << "A_c: " << std::endl << A_c << std::endl;
+      std::cout << "A_ub: " << std::endl << A_ub << std::endl;
+      std::cout << "E: " << std::endl << E << std::endl;
+      std::cout << "P_c: " << std::endl << P_c << std::endl;
+      std::cout << "Minv: " << std::endl << Minv << std::endl;
+      std::cout << "mTimestep: " << mTimeStep << std::endl;
+      std::cout << "A_c + A_ub * E: " << std::endl << parts1 << std::endl;
+      */
+      /*
+       std::cout << "Vel-vel construction pieces: " << std::endl;
+       std::cout << "1: I " << std::endl
+                 << Eigen::MatrixXd::Identity(mNumDOFs, mNumDOFs) << std::endl;
+       std::cout << "2: - mTimestep * Minv * (A_c + A_ub * E) * P_c" <<
+       std::endl
+                 << -parts2 << std::endl;
+       std::cout << "2.5: velC" << std::endl << getVelCJacobian(world) <<
+       std::endl; std::cout << "3: - forceVel * velC" << std::endl
+                 << -getForceVelJacobian(world) * getVelCJacobian(world)
+                 << std::endl;
+       */
 
-  /*
-  std::cout << "A_c: " << std::endl << A_c << std::endl;
-  std::cout << "A_ub: " << std::endl << A_ub << std::endl;
-  std::cout << "E: " << std::endl << E << std::endl;
-  std::cout << "P_c: " << std::endl << P_c << std::endl;
-  std::cout << "Minv: " << std::endl << Minv << std::endl;
-  std::cout << "mTimestep: " << mTimeStep << std::endl;
-  std::cout << "A_c + A_ub * E: " << std::endl << parts1 << std::endl;
-  */
-  /*
-   std::cout << "Vel-vel construction pieces: " << std::endl;
-   std::cout << "1: I " << std::endl
-             << Eigen::MatrixXd::Identity(mNumDOFs, mNumDOFs) << std::endl;
-   std::cout << "2: - mTimestep * Minv * (A_c + A_ub * E) * P_c" << std::endl
-             << -parts2 << std::endl;
-   std::cout << "2.5: velC" << std::endl << getVelCJacobian(world) << std::endl;
-   std::cout << "3: - forceVel * velC" << std::endl
-             << -getForceVelJacobian(world) * getVelCJacobian(world)
-             << std::endl;
-   */
-
-  return (Eigen::MatrixXd::Identity(mNumDOFs, mNumDOFs) - parts2)
-         - getForceVelJacobian(world) * getVelCJacobian(world);
+      mCachedVelVel = (Eigen::MatrixXd::Identity(mNumDOFs, mNumDOFs) - parts2)
+                      - getForceVelJacobian(world) * getVelCJacobian(world);
+    }
+    mCachedVelVelDirty = false;
+  }
+  return mCachedVelVel;
 }
 
 //==============================================================================
-Eigen::MatrixXd BackpropSnapshot::getPosVelJacobian(WorldPtr world)
+const Eigen::MatrixXd& BackpropSnapshot::getPosVelJacobian(WorldPtr world)
 {
-  return getVelJacobianWrt(world, WithRespectTo::POSITION);
-  // return -getForceVelJacobian(world) * getPosCJacobian(world);
+  if (mCachedPosVelDirty)
+  {
+    mCachedPosVel = getVelJacobianWrt(world, WithRespectTo::POSITION);
+    mCachedPosVelDirty = false;
+  }
+  return mCachedPosVel;
 }
 
 //==============================================================================
@@ -603,53 +653,69 @@ Eigen::MatrixXd BackpropSnapshot::getVelJacobianWrt(
 }
 
 //==============================================================================
-Eigen::MatrixXd BackpropSnapshot::getPosPosJacobian(WorldPtr world)
+const Eigen::MatrixXd& BackpropSnapshot::getPosPosJacobian(WorldPtr world)
 {
-  Eigen::MatrixXd A_b = getBouncingConstraintMatrix(world);
-
-  // If there are no bounces, pos-pos is a simple identity
-  if (A_b.size() == 0)
-    return Eigen::MatrixXd::Identity(mNumDOFs, mNumDOFs);
-
-  // Construct the W matrix we'll need to use to solve for our closest approx
-  Eigen::MatrixXd W = Eigen::MatrixXd(A_b.rows() * A_b.rows(), A_b.cols());
-  for (int i = 0; i < A_b.cols(); i++)
+  if (mCachedPosPosDirty)
   {
-    Eigen::VectorXd a_i = A_b.col(i);
-    for (int j = 0; j < A_b.rows(); j++)
+    Eigen::MatrixXd A_b = getBouncingConstraintMatrix(world);
+
+    // If there are no bounces, pos-pos is a simple identity
+    if (A_b.size() == 0)
     {
-      W.block(j * A_b.rows(), i, A_b.rows(), 1) = a_i(j) * a_i;
+      mCachedPosPos = Eigen::MatrixXd::Identity(mNumDOFs, mNumDOFs);
     }
+    else
+    {
+      // Construct the W matrix we'll need to use to solve for our closest
+      // approx
+      Eigen::MatrixXd W = Eigen::MatrixXd(A_b.rows() * A_b.rows(), A_b.cols());
+      for (int i = 0; i < A_b.cols(); i++)
+      {
+        Eigen::VectorXd a_i = A_b.col(i);
+        for (int j = 0; j < A_b.rows(); j++)
+        {
+          W.block(j * A_b.rows(), i, A_b.rows(), 1) = a_i(j) * a_i;
+        }
+      }
+
+      // We want to center the solution around the identity matrix, and find the
+      // least-squares deviation along the diagonals that gets us there.
+      Eigen::VectorXd center = Eigen::VectorXd::Zero(mNumDOFs * mNumDOFs);
+      for (std::size_t i = 0; i < mNumDOFs; i++)
+      {
+        center((i * mNumDOFs) + i) = 1;
+      }
+
+      // Solve the linear system
+      Eigen::VectorXd q
+          = center
+            - W.transpose().completeOrthogonalDecomposition().solve(
+                getRestitutionDiagonals() + (W.eval().transpose() * center));
+
+      // Recover X from the q vector
+      Eigen::MatrixXd X = Eigen::MatrixXd(mNumDOFs, mNumDOFs);
+      for (std::size_t i = 0; i < mNumDOFs; i++)
+      {
+        X.col(i) = q.segment(i * mNumDOFs, mNumDOFs);
+      }
+
+      mCachedPosPos = X;
+    }
+    mCachedPosPosDirty = false;
   }
-
-  // We want to center the solution around the identity matrix, and find the
-  // least-squares deviation along the diagonals that gets us there.
-  Eigen::VectorXd center = Eigen::VectorXd::Zero(mNumDOFs * mNumDOFs);
-  for (std::size_t i = 0; i < mNumDOFs; i++)
-  {
-    center((i * mNumDOFs) + i) = 1;
-  }
-
-  // Solve the linear system
-  Eigen::VectorXd q
-      = center
-        - W.transpose().completeOrthogonalDecomposition().solve(
-            getRestitutionDiagonals() + (W.eval().transpose() * center));
-
-  // Recover X from the q vector
-  Eigen::MatrixXd X = Eigen::MatrixXd(mNumDOFs, mNumDOFs);
-  for (std::size_t i = 0; i < mNumDOFs; i++)
-  {
-    X.col(i) = q.segment(i * mNumDOFs, mNumDOFs);
-  }
-
-  return X;
+  return mCachedPosPos;
 }
 
 //==============================================================================
-Eigen::MatrixXd BackpropSnapshot::getVelPosJacobian(WorldPtr world)
+const Eigen::MatrixXd& BackpropSnapshot::getVelPosJacobian(WorldPtr world)
 {
-  return mTimeStep * getPosPosJacobian(world);
+  if (mCachedVelPosDirty)
+  {
+    const Eigen::MatrixXd& posPos = getPosPosJacobian(world);
+    mCachedVelPos = mTimeStep * posPos;
+    mCachedVelPosDirty = false;
+  }
+  return mCachedVelPos;
 }
 
 //==============================================================================
@@ -1171,7 +1237,7 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferencePosPosJacobian(
 
   // IMPORTANT: EPSILON must be larger than the distance traveled in a single
   // subdivided timestep. Ideally much larger.
-  double EPSILON = 1e-1 / subdivisions;
+  double EPSILON = 1e-2 / subdivisions;
   for (std::size_t i = 0; i < world->getNumDofs(); i++)
   {
     snapshot.restore();
@@ -1938,7 +2004,7 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceJacobianOfMinv(
 
   Eigen::VectorXd before = getWrt(world, wrt);
 
-  const double EPS = 1e-5;
+  const double EPS = 1e-8;
 
   for (std::size_t i = 0; i < innerDim; i++)
   {
@@ -1974,16 +2040,20 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceJacobianOfC(
 
   Eigen::VectorXd before = getWrt(world, wrt);
 
-  const double EPS = 1e-4;
+  const double EPS = 1e-8;
 
   for (std::size_t i = 0; i < innerDim; i++)
   {
     Eigen::VectorXd perturbed = before;
     perturbed(i) += EPS;
     setWrt(world, wrt, perturbed);
-    Eigen::MatrixXd newTau = world->getCoriolisAndGravityAndExternalForces();
-    Eigen::VectorXd diff = newTau - original;
-    result.col(i) = diff / EPS;
+    Eigen::MatrixXd tauPos = world->getCoriolisAndGravityAndExternalForces();
+    perturbed = before;
+    perturbed(i) -= EPS;
+    setWrt(world, wrt, perturbed);
+    Eigen::MatrixXd tauNeg = world->getCoriolisAndGravityAndExternalForces();
+    Eigen::VectorXd diff = tauPos - tauNeg;
+    result.col(i) = diff / (2 * EPS);
   }
 
   setWrt(world, wrt, before);

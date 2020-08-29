@@ -64,23 +64,14 @@ def main():
 
     world.addSkeleton(marker)
 
-    # Set up the view
-
-    node = MyWorldNode(world)
-    viewer = dart.gui.osg.Viewer()
-    viewer.addWorldNode(node)
-    viewer.setUpViewInWindow(0, 0, 640, 480)
-    viewer.setCameraHomePosition([0, 0, 5.0], [0, 0, 0], [0, 0.5, 0])
-    viewer.realize()
-
     # Make simulations repeatable
     random.seed(1234)
 
     # Make simulations and backprop run faster by using a bigger timestep
     world.setTimeStep(world.getTimeStep()*10)
 
-    steps = 500
-    shooting_length = 5
+    steps = 400
+    shooting_length = 50
 
     # Set up initial conditions
     start_pos = torch.tensor(
@@ -95,14 +86,14 @@ def main():
     # Create the trajectory
     def eval_loss(t, pos, vel, world):
         # DOF x timestep
-        step_loss = torch.sum(t[0, :]*t[0, :]) + torch.sum(t[1, :]*t[1, :])
-        final_loss = torch.norm(pos[:, steps-1]) + torch.norm(vel[:, steps-1])
+        step_loss = 0  # torch.sum(t[0, :]*t[0, :]) + torch.sum(t[1, :]*t[1, :])
+        final_loss = 100 * torch.sum(pos[:, -1] * pos[:, -1]) + torch.sum(vel[:, -1] * vel[:, -1])
         return step_loss + final_loss
 
     trajectory = dart_torch.MultipleShootingTrajectory(
         world, eval_loss, steps=steps, shooting_length=shooting_length,
         disable_actuators=[1],
-        tune_starting_point=False, enforce_final_state=np.zeros(4))
+        tune_starting_point=False)  # , enforce_final_state=np.zeros(4))
 
     """
     # Initialize the learnable torques
@@ -124,12 +115,6 @@ def main():
 
     knot_weight = 100
 
-    def animate_step(pos, vel, t):
-        markerOffset.set_translation([-pos[0] - t[0], 0.1, 0])
-        markerWeld.setTransformFromChildBodyNode(markerOffset)
-        viewer.frame()
-        time.sleep(0.003)
-
     # Run cartpole simulations
     """
     iteration = 0
@@ -138,8 +123,8 @@ def main():
 
         # Show a trajectory without the knot points
         if iteration % 100 == 0 and iteration > 0:
-            trajectory.unroll(use_knots=True, after_step=animate_step)
-            trajectory.unroll(use_knots=False, after_step=animate_step)
+            trajectory.unroll(use_knots=True)
+            trajectory.unroll(use_knots=False)
             knot_weight *= 10
 
         # Zero the accumulated grad
@@ -158,12 +143,12 @@ def main():
         iteration += 1
     """
 
-    trajectory.ipopt(100)
+    trajectory.ipopt(600)
 
     print('Optimization complete! Playing trajectories over and over...')
+    trajectory.create_gui()
     while True:
-        trajectory.unroll(use_knots=True, after_step=animate_step)
-        trajectory.unroll(use_knots=False, after_step=animate_step)
+        trajectory.playback_trajectory()
 
 
 if __name__ == "__main__":

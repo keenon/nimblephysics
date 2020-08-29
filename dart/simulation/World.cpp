@@ -179,9 +179,11 @@ void World::integrateVelocities()
 }
 
 //==============================================================================
-void World::step(bool _resetCommand, bool _integratePositionAfterVelocity)
+void World::step(bool _resetCommand, bool _parallelVelocityAndPositionUpdates)
 {
   Eigen::VectorXd initialVelocity = getVelocities();
+  // TODO: remove me
+  _parallelVelocityAndPositionUpdates = true;
 
   // Integrate velocity for unconstrained skeletons
   for (auto& skel : mSkeletons)
@@ -214,10 +216,11 @@ void World::step(bool _resetCommand, bool _integratePositionAfterVelocity)
       skel->setImpulseApplied(false);
     }
 
-    // <DiffDART>: Integrate positions before velocity changes, instead of after
-    if (_integratePositionAfterVelocity)
+    // <DiffDART>: This is the original way integration happened, right after
+    // velocity updates
+    if (!_parallelVelocityAndPositionUpdates)
       skel->integratePositions(mTimeStep);
-    // </DiffDART>: Integrate positions before velocity changes
+    // </DiffDART>
 
     if (_resetCommand)
     {
@@ -227,8 +230,9 @@ void World::step(bool _resetCommand, bool _integratePositionAfterVelocity)
     }
   }
 
-  // <DiffDART>: Integrate positions before velocity changes, instead of after
-  if (!_integratePositionAfterVelocity)
+  // <DiffDART>: This is an easier way to compute gradients for. We update p_t+1
+  // using v_t, instead of v_t+1
+  if (_parallelVelocityAndPositionUpdates)
   {
     Eigen::VectorXd pos = getPositions();
     pos += initialVelocity * mTimeStep;

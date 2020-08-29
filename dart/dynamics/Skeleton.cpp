@@ -1660,6 +1660,26 @@ Eigen::MatrixXd Skeleton::finiteDifferenceJacobianOfMinv(
 }
 
 //==============================================================================
+Eigen::VectorXd Skeleton::getDynamicsForces()
+{
+  computeForwardDynamics();
+  std::size_t n = getNumDofs();
+  Eigen::VectorXd forces = Eigen::VectorXd(n);
+  int cursor = 0;
+  for (std::size_t i = 0; i < mSkelCache.mBodyNodes.size(); ++i)
+  {
+    Eigen::VectorXd jointForces = mSkelCache.mBodyNodes[i]
+                                      ->getParentJoint()
+                                      ->getLocalJacobian()
+                                      .transpose()
+                                  * mSkelCache.mBodyNodes[i]->getBodyForce();
+    forces.segment(cursor, jointForces.size()) = jointForces;
+    cursor += jointForces.size();
+  }
+  return forces;
+}
+
+//==============================================================================
 Eigen::MatrixXd Skeleton::finiteDifferenceVelCJacobian()
 {
   std::size_t n = getNumDofs();
@@ -1667,18 +1687,23 @@ Eigen::MatrixXd Skeleton::finiteDifferenceVelCJacobian()
   Eigen::VectorXd vel = getVelocities();
 
   // Get baseline C(pos, vel)
-  Eigen::VectorXd baseline = getCoriolisAndGravityForces();
+  Eigen::VectorXd baseline = getCoriolisForces();
 
-  double EPS = 1e-4;
+  double EPS = 1e-6;
 
   for (std::size_t i = 0; i < n; i++)
   {
     Eigen::VectorXd tweakedVel = vel;
     tweakedVel(i) += EPS;
     setVelocities(tweakedVel);
-    Eigen::VectorXd perturbed = getCoriolisAndGravityForces();
+    Eigen::VectorXd perturbedPos = getCoriolisForces();
 
-    J.col(i) = (perturbed - baseline) / EPS;
+    tweakedVel = vel;
+    tweakedVel(i) -= EPS;
+    setVelocities(tweakedVel);
+    Eigen::VectorXd perturbedNeg = getCoriolisForces();
+
+    J.col(i) = (perturbedPos - perturbedNeg) / (2 * EPS);
   }
 
   // Reset everything how we left it

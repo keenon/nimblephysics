@@ -353,7 +353,8 @@ public:
   /// \param[in] _resetCommand True if you want to reset to zero the joint
   /// command after simulation step.
   void step(
-      bool _resetCommand = true, bool _integratePositionAfterVelocity = false);
+      bool _resetCommand = true,
+      bool _parallelVelocityAndPositionUpdates = false);
 
   void integrateVelocities();
 

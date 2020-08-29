@@ -57,7 +57,7 @@ def createCubeTrajectory(
         tune_starting_point=tune_starting_point, enforce_loop=enforce_loop,
         enforce_final_state=enforce_final_state)
 
-    trajectory.knot_poses.data[:, 1] = torch.from_numpy(np.array([1.5, 1.5, 1.5]))
+    # trajectory.knot_poses.data[:, 1] = torch.from_numpy(np.array([1.5, 1.5, 1.5]))
 
     return trajectory, world
 
@@ -101,8 +101,8 @@ def createCartpoleTrajectory():
     # Make simulations and backprop run faster by using a bigger timestep
     world.setTimeStep(world.getTimeStep()*10)
 
-    steps = 10
-    shooting_length = 5
+    steps = 4
+    shooting_length = 2
 
     # Set up initial conditions
     start_pos = torch.tensor(
@@ -116,7 +116,7 @@ def createCartpoleTrajectory():
     # Create the trajectory
     def eval_loss(t, pos, vel, world):
         # DOF x timestep
-        step_loss = torch.sum(t[0, :]*t[0, :]) + torch.sum(t[1, :]*t[1, :])
+        step_loss = 0  # torch.sum(t[0, :]*t[0, :]) + torch.sum(t[1, :]*t[1, :])
         final_loss = torch.norm(pos[:, steps-1]) + torch.norm(vel[:, steps-1])
         return step_loss + final_loss
 
@@ -374,9 +374,7 @@ class TestMultipleShootingTrajectory(unittest.TestCase):
             np.savetxt("parallel.csv", dense_jac_g_par, delimiter=",")
             np.savetxt("serial.csv", dense_jac_g_serial, delimiter=",")
         self.assertTrue(jac_equals.all())
-    """
 
-    """
     def test_box_grad(self):
         trajectory, world = createCubeTrajectory(
             steps=6, shooting_length=3, tune_starting_point=False, enforce_loop=False,
@@ -398,6 +396,7 @@ class TestMultipleShootingTrajectory(unittest.TestCase):
         self.assertTrue(grad_equals.all())
     """
 
+    """
     def test_box_h(self):
         trajectory, world = createCubeTrajectory(
             steps=6, shooting_length=3, tune_starting_point=False, enforce_loop=False,
@@ -422,7 +421,6 @@ class TestMultipleShootingTrajectory(unittest.TestCase):
 
         if not hess_equals.all():
 
-            """
             # Check the individual columns one by one to see where a mismatch happened.
 
             grad_f = trajectory.eval_grad_f(x0, np.zeros(n))
@@ -456,7 +454,6 @@ class TestMultipleShootingTrajectory(unittest.TestCase):
             # print('raw f(x) hess: \n'+str(raw_h))
             # print('dense f(x) hess: \n'+str(dense_h))
             # os.remove('./raw_hess.csv')
-            """
             os.remove('./main_hess.csv')
             os.remove('./dense_hess.csv')
 
@@ -483,6 +480,7 @@ class TestMultipleShootingTrajectory(unittest.TestCase):
                 np.savetxt("main_hess.csv", main_h, delimiter=",")
                 np.savetxt("dense_hess.csv", dense_h, delimiter=",")
             self.assertTrue(hess_equals.all())
+    """
 
     """
     def test_box_jac(self):
@@ -498,10 +496,10 @@ class TestMultipleShootingTrajectory(unittest.TestCase):
 
         # Check the gradient
 
-        if False:
+        if True:
             brute_force_grad_f = trajectory._eval_brute_force_grad_f(x0, np.zeros_like(x0))
             grad_diff = np.abs(grad_f - brute_force_grad_f)
-            grad_equals = np.abs(grad_f - brute_force_grad_f) < 1e-10
+            grad_equals = np.abs(grad_f - brute_force_grad_f) < 1e-7
 
             if not grad_equals.all():
                 print('grad f(x): '+str(grad_f))
@@ -527,9 +525,13 @@ class TestMultipleShootingTrajectory(unittest.TestCase):
             np.savetxt("dense.csv", dense_jac_g, delimiter=",")
             np.savetxt("brute.csv", brute_force_jac_g, delimiter=",")
         self.assertTrue(jac_equals.all())
+    """
 
     def test_cartpole_jac(self):
         trajectory, world = createCartpoleTrajectory()
+
+        trajectory.multithread = False
+
         x0 = trajectory.flatten(np.zeros(trajectory.get_flat_problem_dim()))
         l = trajectory.eval_f(x0)
         g = trajectory.eval_g(x0, np.zeros(trajectory.get_constraint_dim()))
@@ -539,17 +541,17 @@ class TestMultipleShootingTrajectory(unittest.TestCase):
 
         # Check the gradient
 
-        if False:
+        if True:
             brute_force_grad_f = trajectory._eval_brute_force_grad_f(x0, np.zeros_like(x0))
             grad_diff = np.abs(grad_f - brute_force_grad_f)
-            grad_equals = np.abs(grad_f - brute_force_grad_f) < 1e-10
+            grad_equals = np.abs(grad_f - brute_force_grad_f) < 1e-7
 
             if not grad_equals.all():
                 print('grad f(x): '+str(grad_f))
                 print('brute force grad f(x): '+str(brute_force_grad_f))
                 print('grad diff: '+str(grad_diff))
                 print('grad equals: '+str(grad_equals))
-                trajectory.debug()
+                trajectory.debug(brute_force_grad_f, grad_diff)
             self.assertTrue(grad_equals.all())
 
         # Check the Jacobian
@@ -561,6 +563,27 @@ class TestMultipleShootingTrajectory(unittest.TestCase):
         if not jac_equals.all():
             print('jac g(x): '+str(dense_jac_g))
             print('brute force jac g(x): '+str(brute_force_jac_g))
+
+            for i in range(dense_jac_g.shape[0]):
+                row_equals = jac_equals[i, :].all()
+                if not row_equals:
+                    print('############ g(x) row '+str(i)+' ##############')
+                    print('analytical: '+str(dense_jac_g[i, :]))
+                    print('brute force: '+str(brute_force_jac_g[i, :]))
+                    row_equality = jac_equals[i, :]
+                    for j in range(len(row_equality)):
+                        if not row_equality[j]:
+                            print('error at ['+str(j)+'] '+trajectory.get_flat_dim_name(j) +
+                                  ': '+str(dense_jac_g[i, j])+', '+str(brute_force_jac_g[i, j]))
+
+                    """
+                    dense = dense_jac_g[i, :]
+                    brute = brute_force_jac_g[i, :]
+                    error = dense - brute
+                    trajectory.debug(brute, error)
+                    """
+                    # print('row: '+str(dense_jac_g[i, :]))
+
             # a = numpy.asarray([ [1,2,3], [4,5,6], [7,8,9] ])
             os.remove('./dense.csv')
             os.remove('./brute.csv')
@@ -571,7 +594,6 @@ class TestMultipleShootingTrajectory(unittest.TestCase):
                 "diff.csv", (dense_jac_g - brute_force_jac_g) / (brute_force_jac_g + 1e-15),
                 delimiter=",")
         self.assertTrue(jac_equals.all())
-    """
 
     """
     def t_full_opt(self):
@@ -622,7 +644,9 @@ class TestMultipleShootingTrajectory(unittest.TestCase):
 
         # trajectory.ipopt()
         # trajectory.debug()
+    """
 
+    """
     def test_cartpole_parallel(self):
         trajectory, world = createCartpoleTrajectory()
         par_loss, par_knot_loss = trajectory.parallel_unroll()

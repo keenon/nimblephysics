@@ -37,7 +37,9 @@ std::shared_ptr<ConstrainedGroupGradientMatrices> createGradientMatrices(
 /// Takes a step in the world, and returns a backprop snapshot which can be used
 /// to backpropagate gradients and compute Jacobians
 std::shared_ptr<BackpropSnapshot> forwardPass(
-    std::shared_ptr<simulation::World> world, bool idempotent = false);
+    std::shared_ptr<simulation::World> world,
+    bool idempotent = false,
+    bool parallelVelocityAndPositionUpdates = false);
 
 struct BulkForwardPassResult
 {
