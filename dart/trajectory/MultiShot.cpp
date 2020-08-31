@@ -22,6 +22,7 @@ MultiShot::MultiShot(
     int steps,
     int shotLength,
     bool tuneStartingState)
+  : AbstractShot(world)
 {
   mSteps = steps;
   mShotLength = shotLength;
@@ -33,10 +34,17 @@ MultiShot::MultiShot(
   while (stepsRemaining > 0)
   {
     int shot = std::min(shotLength, stepsRemaining);
-    mShots.push_back(SingleShot(world, shot, !isFirst || tuneStartingState));
+    mShots.push_back(std::make_shared<SingleShot>(
+        world, shot, !isFirst || tuneStartingState));
     stepsRemaining -= shot;
     isFirst = false;
   }
+}
+
+//==============================================================================
+MultiShot::~MultiShot()
+{
+  std::cout << "Freeing MultiShot: " << this << std::endl;
 }
 
 //==============================================================================
@@ -44,9 +52,9 @@ MultiShot::MultiShot(
 int MultiShot::getFlatProblemDim() const
 {
   int sum = 0;
-  for (const SingleShot& shot : mShots)
+  for (const std::shared_ptr<SingleShot> shot : mShots)
   {
-    sum += shot.getFlatProblemDim();
+    sum += shot->getFlatProblemDim();
   }
   return sum;
 }
@@ -68,7 +76,7 @@ void MultiShot::computeConstraints(
   for (int i = 1; i < mShots.size(); i++)
   {
     constraints.segment(cursor, mNumDofs * 2)
-        = mShots[i - 1].getFinalState(world) - mShots[i].getStartState();
+        = mShots[i - 1]->getFinalState(world) - mShots[i]->getStartState();
     cursor += mNumDofs * 2;
   }
 }
@@ -78,10 +86,10 @@ void MultiShot::computeConstraints(
 void MultiShot::flatten(/* OUT */ Eigen::Ref<Eigen::VectorXd> flat) const
 {
   int cursor = 0;
-  for (const SingleShot& shot : mShots)
+  for (const std::shared_ptr<SingleShot>& shot : mShots)
   {
-    int dim = shot.getFlatProblemDim();
-    shot.flatten(flat.segment(cursor, dim));
+    int dim = shot->getFlatProblemDim();
+    shot->flatten(flat.segment(cursor, dim));
     cursor += dim;
   }
 }
@@ -91,10 +99,79 @@ void MultiShot::flatten(/* OUT */ Eigen::Ref<Eigen::VectorXd> flat) const
 void MultiShot::unflatten(const Eigen::Ref<const Eigen::VectorXd>& flat)
 {
   int cursor = 0;
-  for (SingleShot& shot : mShots)
+  for (std::shared_ptr<SingleShot>& shot : mShots)
   {
-    int dim = shot.getFlatProblemDim();
-    shot.unflatten(flat.segment(cursor, dim));
+    int dim = shot->getFlatProblemDim();
+    shot->unflatten(flat.segment(cursor, dim));
+    cursor += dim;
+  }
+}
+
+//==============================================================================
+/// This runs the shot out, and writes the positions, velocities, and forces
+void MultiShot::unroll(
+    std::shared_ptr<simulation::World> world,
+    /* OUT */ Eigen::Ref<Eigen::MatrixXd> poses,
+    /* OUT */ Eigen::Ref<Eigen::MatrixXd> vels,
+    /* OUT */ Eigen::Ref<Eigen::MatrixXd> forces)
+{
+  int cursor = 0;
+  for (std::shared_ptr<SingleShot>& shot : mShots)
+  {
+    int dim = shot->getNumSteps();
+    shot->unroll(
+        world,
+        poses.block(0, cursor, mNumDofs, dim),
+        vels.block(0, cursor, mNumDofs, dim),
+        forces.block(0, cursor, mNumDofs, dim));
+    cursor += dim;
+  }
+}
+
+//==============================================================================
+/// This gets the fixed upper bounds for a flat vector, used during
+/// optimization
+void MultiShot::getUpperBounds(
+    std::shared_ptr<simulation::World> world,
+    /* OUT */ Eigen::Ref<Eigen::VectorXd> flat) const
+{
+  int cursor = 0;
+  for (const std::shared_ptr<SingleShot>& shot : mShots)
+  {
+    int dim = shot->getFlatProblemDim();
+    shot->getUpperBounds(world, flat.segment(cursor, dim));
+    cursor += dim;
+  }
+}
+
+//==============================================================================
+/// This gets the fixed lower bounds for a flat vector, used during
+/// optimization
+void MultiShot::getLowerBounds(
+    std::shared_ptr<simulation::World> world,
+    /* OUT */ Eigen::Ref<Eigen::VectorXd> flat) const
+{
+  int cursor = 0;
+  for (const std::shared_ptr<SingleShot>& shot : mShots)
+  {
+    int dim = shot->getFlatProblemDim();
+    shot->getLowerBounds(world, flat.segment(cursor, dim));
+    cursor += dim;
+  }
+}
+
+//==============================================================================
+/// This returns the initial guess for the values of X when running an
+/// optimization
+void MultiShot::getInitialGuess(
+    std::shared_ptr<simulation::World> world,
+    /* OUT */ Eigen::Ref<Eigen::VectorXd> flat) const
+{
+  int cursor = 0;
+  for (const std::shared_ptr<SingleShot>& shot : mShots)
+  {
+    int dim = shot->getFlatProblemDim();
+    shot->getInitialGuess(world, flat.segment(cursor, dim));
     cursor += dim;
   }
 }
@@ -114,8 +191,8 @@ void MultiShot::backpropJacobian(
   int colCursor = 0;
   for (int i = 1; i < mShots.size(); i++)
   {
-    int dim = mShots[i - 1].getFlatProblemDim();
-    mShots[i - 1].backpropJacobianOfFinalState(
+    int dim = mShots[i - 1]->getFlatProblemDim();
+    mShots[i - 1]->backpropJacobianOfFinalState(
         world, jac.block(rowCursor, colCursor, 2 * mNumDofs, dim));
     colCursor += dim;
     jac.block(rowCursor, colCursor, 2 * mNumDofs, 2 * mNumDofs)
@@ -126,7 +203,7 @@ void MultiShot::backpropJacobian(
   // We don't include the last shot in the constraints, cause it doesn't end in
   // a knot point
   assert(
-      colCursor == jac.cols() - mShots[mShots.size() - 1].getFlatProblemDim());
+      colCursor == jac.cols() - mShots[mShots.size() - 1]->getFlatProblemDim());
   assert(rowCursor == jac.rows());
 }
 
@@ -138,11 +215,17 @@ void MultiShot::getStates(
     /* OUT */ Eigen::Ref<Eigen::MatrixXd> vels,
     /* OUT */ Eigen::Ref<Eigen::MatrixXd> forces)
 {
+  assert(poses.cols() == mSteps);
+  assert(poses.rows() == mNumDofs);
+  assert(vels.cols() == mSteps);
+  assert(vels.rows() == mNumDofs);
+  assert(forces.cols() == mSteps);
+  assert(forces.rows() == mNumDofs);
   int cursor = 0;
   for (int i = 0; i < mShots.size(); i++)
   {
-    int steps = mShots[i].getNumSteps();
-    mShots[i].getStates(
+    int steps = mShots[i]->getNumSteps();
+    mShots[i]->getStates(
         world,
         poses.block(0, cursor, mNumDofs, steps),
         vels.block(0, cursor, mNumDofs, steps),
@@ -155,7 +238,7 @@ void MultiShot::getStates(
 /// This returns the concatenation of (start pos, start vel) for convenience
 Eigen::VectorXd MultiShot::getStartState()
 {
-  mShots[0].getStartState();
+  return mShots[0]->getStartState();
 }
 
 //==============================================================================
@@ -164,7 +247,7 @@ Eigen::VectorXd MultiShot::getStartState()
 Eigen::VectorXd MultiShot::getFinalState(
     std::shared_ptr<simulation::World> world)
 {
-  mShots[mShots.size() - 1].getFinalState(world);
+  return mShots[mShots.size() - 1]->getFinalState(world);
 }
 
 //==============================================================================
@@ -181,9 +264,9 @@ void MultiShot::backpropGradient(
   int cursorSteps = 0;
   for (int i = 0; i < mShots.size(); i++)
   {
-    int steps = mShots[i].getNumSteps();
-    int dim = mShots[i].getFlatProblemDim();
-    mShots[i].backpropGradient(
+    int steps = mShots[i]->getNumSteps();
+    int dim = mShots[i]->getFlatProblemDim();
+    mShots[i]->backpropGradient(
         world,
         gradWrtPoses.block(0, cursorSteps, mNumDofs, steps),
         gradWrtVels.block(0, cursorSteps, mNumDofs, steps),

@@ -30,6 +30,9 @@ public:
       int shotLength,
       bool tuneStartingState = true);
 
+  /// Destructor
+  virtual ~MultiShot() override;
+
   /// Returns the length of the flattened problem stat
   int getFlatProblemDim() const override;
 
@@ -41,6 +44,31 @@ public:
 
   /// This gets the parameters out of a flat vector
   void unflatten(const Eigen::Ref<const Eigen::VectorXd>& flat) override;
+
+  /// This runs the shot out, and writes the positions, velocities, and forces
+  void unroll(
+      std::shared_ptr<simulation::World> world,
+      /* OUT */ Eigen::Ref<Eigen::MatrixXd> poses,
+      /* OUT */ Eigen::Ref<Eigen::MatrixXd> vels,
+      /* OUT */ Eigen::Ref<Eigen::MatrixXd> forces) override;
+
+  /// This gets the fixed upper bounds for a flat vector, used during
+  /// optimization
+  void getUpperBounds(
+      std::shared_ptr<simulation::World> world,
+      /* OUT */ Eigen::Ref<Eigen::VectorXd> flat) const override;
+
+  /// This gets the fixed lower bounds for a flat vector, used during
+  /// optimization
+  void getLowerBounds(
+      std::shared_ptr<simulation::World> world,
+      /* OUT */ Eigen::Ref<Eigen::VectorXd> flat) const override;
+
+  /// This returns the initial guess for the values of X when running an
+  /// optimization
+  void getInitialGuess(
+      std::shared_ptr<simulation::World> world,
+      /* OUT */ Eigen::Ref<Eigen::VectorXd> flat) const override;
 
   /// This computes the values of the constraints
   void computeConstraints(
@@ -83,7 +111,7 @@ public:
   //////////////////////////////////////////////////////////////////////////////
 
 private:
-  std::vector<SingleShot> mShots;
+  std::vector<std::shared_ptr<SingleShot>> mShots;
   int mShotLength;
 };
 

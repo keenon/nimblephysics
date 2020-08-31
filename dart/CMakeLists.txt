@@ -139,6 +139,7 @@ target_link_libraries(dart
     Boost::boost
     Boost::system
     Boost::filesystem
+    ipopt
 )
 if (TARGET octomap)
   target_link_libraries(dart PUBLIC octomap)

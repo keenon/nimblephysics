@@ -17,10 +17,19 @@ struct TimestepJacobians
 };
 
 typedef std::function<double(
-    Eigen::Ref<Eigen::MatrixXd>,
-    Eigen::Ref<Eigen::MatrixXd>,
-    Eigen::Ref<Eigen::MatrixXd>)>
+    const Eigen::Ref<const Eigen::MatrixXd>& poses,
+    const Eigen::Ref<const Eigen::MatrixXd>& vels,
+    const Eigen::Ref<const Eigen::MatrixXd>& forces)>
     TrajectoryLossFn;
+
+typedef std::function<double(
+    const Eigen::Ref<const Eigen::MatrixXd>& poses,
+    const Eigen::Ref<const Eigen::MatrixXd>& vels,
+    const Eigen::Ref<const Eigen::MatrixXd>& forces,
+    /* OUT */ Eigen::Ref<Eigen::MatrixXd> gradWrtPoses,
+    /* OUT */ Eigen::Ref<Eigen::MatrixXd> gradWrtVels,
+    /* OUT */ Eigen::Ref<Eigen::MatrixXd> gradWrtForces)>
+    TrajectoryLossFnGrad;
 
 } // namespace trajectory
 } // namespace dart

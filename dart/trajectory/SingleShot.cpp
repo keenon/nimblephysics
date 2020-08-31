@@ -19,8 +19,8 @@ namespace trajectory {
 //==============================================================================
 SingleShot::SingleShot(
     std::shared_ptr<simulation::World> world, int steps, bool tuneStartingState)
+  : AbstractShot(world)
 {
-  mNumDofs = world->getNumDofs();
   mTuneStartingState = tuneStartingState;
   mSteps = steps;
   mStartPos = world->getPositions();
@@ -28,6 +28,12 @@ SingleShot::SingleShot(
   assert(steps > 0);
   mForces = Eigen::MatrixXd::Zero(world->getNumDofs(), steps);
   mSnapshotsCacheDirty = true;
+}
+
+//==============================================================================
+SingleShot::~SingleShot()
+{
+  std::cout << "Freeing SingleShot: " << this << std::endl;
 }
 
 //==============================================================================
@@ -82,6 +88,84 @@ void SingleShot::unflatten(const Eigen::Ref<const Eigen::VectorXd>& flat)
     cursor += mNumDofs;
   }
   assert(cursor == flat.size());
+}
+
+//==============================================================================
+/// This runs the shot out, and writes the positions, velocities, and forces
+void SingleShot::unroll(
+    std::shared_ptr<simulation::World> world,
+    /* OUT */ Eigen::Ref<Eigen::MatrixXd> poses,
+    /* OUT */ Eigen::Ref<Eigen::MatrixXd> vels,
+    /* OUT */ Eigen::Ref<Eigen::MatrixXd> forces)
+{
+  std::vector<BackpropSnapshotPtr> snapshots = getSnapshots(world);
+  for (int i = 0; i < mSteps; i++)
+  {
+    poses.col(i) = snapshots[i]->getPostStepPosition();
+    vels.col(i) = snapshots[i]->getPostStepVelocity();
+    forces.col(i) = snapshots[i]->getPostStepTorques();
+  }
+}
+
+//==============================================================================
+/// This gets the fixed upper bounds for a flat vector, used during
+/// optimization
+void SingleShot::getUpperBounds(
+    std::shared_ptr<simulation::World> world,
+    /* OUT */ Eigen::Ref<Eigen::VectorXd> flat) const
+{
+  int cursor = 0;
+  if (mTuneStartingState)
+  {
+    flat.segment(0, mNumDofs) = world->getPositionUpperLimits();
+    flat.segment(mNumDofs, mNumDofs) = world->getVelocityUpperLimits();
+    cursor = 2 * mNumDofs;
+  }
+  Eigen::VectorXd forceUpperLimits = world->getForceUpperLimits();
+  for (int i = 0; i < mSteps; i++)
+  {
+    flat.segment(cursor, mNumDofs) = forceUpperLimits;
+    cursor += mNumDofs;
+  }
+  assert(cursor == flat.size());
+}
+
+//==============================================================================
+/// This gets the fixed lower bounds for a flat vector, used during
+/// optimization
+void SingleShot::getLowerBounds(
+    std::shared_ptr<simulation::World> world,
+    /* OUT */ Eigen::Ref<Eigen::VectorXd> flat) const
+{
+  int cursor = 0;
+  if (mTuneStartingState)
+  {
+    flat.segment(0, mNumDofs) = world->getPositionLowerLimits();
+    flat.segment(mNumDofs, mNumDofs) = world->getVelocityLowerLimits();
+    cursor = 2 * mNumDofs;
+  }
+  Eigen::VectorXd forceUpperLimits = world->getForceLowerLimits();
+  for (int i = 0; i < mSteps; i++)
+  {
+    flat.segment(cursor, mNumDofs) = forceUpperLimits;
+    cursor += mNumDofs;
+  }
+  assert(cursor == flat.size());
+}
+
+//==============================================================================
+/// This returns the initial guess for the values of X when running an
+/// optimization
+void SingleShot::getInitialGuess(
+    std::shared_ptr<simulation::World> world,
+    /* OUT */ Eigen::Ref<Eigen::VectorXd> flat) const
+{
+  flat.setZero();
+  if (mTuneStartingState)
+  {
+    flat.segment(0, mNumDofs) = mStartPos;
+    flat.segment(mNumDofs, mNumDofs) = mStartVel;
+  }
 }
 
 //==============================================================================

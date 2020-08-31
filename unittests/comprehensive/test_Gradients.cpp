@@ -4826,7 +4826,7 @@ void testJumpWorm(bool offGround)
   rootJoint->setVelocity(1, -0.1);
   Eigen::VectorXd vels = world->getVelocities();
 
-  // renderWorld(world);
+  renderWorld(world);
 
   EXPECT_TRUE(verifyAnalyticalJacobians(world));
   EXPECT_TRUE(verifyVelGradients(world, vels));

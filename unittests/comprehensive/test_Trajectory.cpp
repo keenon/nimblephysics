@@ -326,6 +326,56 @@ bool verifyMultiShotGradient(
   return true;
 }
 
+//==============================================================================
+class AbstractShotWindow : public dart::gui::glut::SimWindow
+{
+public:
+  /// Constructor
+  AbstractShotWindow(
+      std::shared_ptr<simulation::World> world, Eigen::MatrixXd poses)
+  {
+    mPoses = poses;
+    mCounter = 0;
+    setWorld(world);
+  }
+
+  void timeStepping() override
+  {
+    mWorld->setPositions(mPoses.col(mCounter));
+    mCounter++;
+    if (mCounter >= mPoses.cols())
+      mCounter = 0;
+  }
+
+private:
+  int mCounter = 0;
+  Eigen::MatrixXd mPoses;
+};
+
+bool verifyMultiShotOptimization(
+    WorldPtr world, int steps, int shotLength, TrajectoryLossFn loss)
+{
+  MultiShot shot(world, steps, shotLength, false);
+  shot.setLossFunction(loss);
+  shot.optimize();
+
+  // Playback the trajectory
+
+  Eigen::MatrixXd poses = Eigen::MatrixXd::Zero(world->getNumDofs(), steps);
+  Eigen::MatrixXd vels = Eigen::MatrixXd::Zero(world->getNumDofs(), steps);
+  Eigen::MatrixXd forces = Eigen::MatrixXd::Zero(world->getNumDofs(), steps);
+  shot.getStates(world, poses, vels, forces);
+
+  // Create a window for rendering the world and handling user input
+  AbstractShotWindow window(world, poses);
+
+  // Initialize glut, initialize the window, and begin the glut event loop
+  int argc = 0;
+  glutInit(&argc, nullptr);
+  window.initWindow(640, 480, "Test");
+  glutMainLoop();
+}
+
 /*
 TEST(TRAJECTORY, UNCONSTRAINED_BOX)
 {
@@ -465,21 +515,40 @@ TEST(TRAJECTORY, CARTPOLE)
 
   world->addSkeleton(cartpole);
 
+  cartpole->setForceUpperLimit(0, 0);
+  cartpole->setForceLowerLimit(0, 0);
+  cartpole->setVelocityUpperLimit(0, 1000);
+  cartpole->setVelocityLowerLimit(0, -1000);
+  cartpole->setPositionUpperLimit(0, 10);
+  cartpole->setPositionLowerLimit(0, -10);
+
+  cartpole->setForceLowerLimit(1, -1000);
+  cartpole->setForceUpperLimit(1, 1000);
+  cartpole->setVelocityUpperLimit(1, 1000);
+  cartpole->setVelocityLowerLimit(1, -1000);
+  cartpole->setPositionUpperLimit(1, 10);
+  cartpole->setPositionLowerLimit(1, -10);
+
   cartpole->setPosition(0, 0);
   cartpole->setPosition(1, 15.0 / 180.0 * 3.1415);
   cartpole->computeForwardDynamics();
   cartpole->integrateVelocities(world->getTimeStep());
 
+  TrajectoryLossFn loss = [](const Eigen::Ref<const Eigen::MatrixXd>& poses,
+                             const Eigen::Ref<const Eigen::MatrixXd>& vels,
+                             const Eigen::Ref<const Eigen::MatrixXd>& forces) {
+    Eigen::VectorXd lastPos = poses.col(poses.cols() - 1);
+    return vels.col(vels.cols() - 1).squaredNorm() + lastPos.squaredNorm()
+           + forces.squaredNorm();
+  };
+
+  /*
   EXPECT_TRUE(verifySingleStep(world));
   EXPECT_TRUE(verifySingleShot(world, 40));
   EXPECT_TRUE(verifyShotJacobian(world, 40));
-  TrajectoryLossFn loss = [](Eigen::Ref<Eigen::MatrixXd> poses,
-                             Eigen::Ref<Eigen::MatrixXd> vels,
-                             Eigen::Ref<Eigen::MatrixXd> forces) {
-    return vels.col(vels.cols() - 1).squaredNorm()
-           + poses.col(poses.cols() - 1).squaredNorm() + forces.squaredNorm();
-  };
   EXPECT_TRUE(verifyShotGradient(world, 7, loss));
   EXPECT_TRUE(verifyMultiShotJacobian(world, 8, 2));
   EXPECT_TRUE(verifyMultiShotGradient(world, 8, 4, loss));
+  */
+  EXPECT_TRUE(verifyMultiShotOptimization(world, 50, 10, loss));
 }
