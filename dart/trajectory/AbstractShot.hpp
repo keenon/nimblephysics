@@ -148,7 +148,7 @@ public:
   /// This computes finite difference Jacobians analagous to
   /// backpropStartStateJacobians()
   TimestepJacobians finiteDifferenceStartStateJacobians(
-      std::shared_ptr<simulation::World> world);
+      std::shared_ptr<simulation::World> world, double EPS);
 
   //------------------------- Ipopt::TNLP --------------------------------------
   /// \brief Method to return some info about the nlp

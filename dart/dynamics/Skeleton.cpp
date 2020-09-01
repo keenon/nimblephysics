@@ -1611,16 +1611,20 @@ Eigen::MatrixXd Skeleton::finiteDifferenceJacobianOfC(neural::WithRespectTo wrt)
   // Get baseline C(pos, vel)
   Eigen::VectorXd baseline = getCoriolisAndGravityForces();
 
-  double EPS = 1e-4;
+  double EPS = 1e-7;
 
   for (std::size_t i = 0; i < m; i++)
   {
     Eigen::VectorXd tweaked = start;
     tweaked(i) += EPS;
     setWrt(wrt, tweaked);
-    Eigen::VectorXd perturbed = getCoriolisAndGravityForces();
+    Eigen::VectorXd perturbedPos = getCoriolisAndGravityForces();
+    tweaked = start;
+    tweaked(i) -= EPS;
+    setWrt(wrt, tweaked);
+    Eigen::VectorXd perturbedNeg = getCoriolisAndGravityForces();
 
-    J.col(i) = (perturbed - baseline) / EPS;
+    J.col(i) = (perturbedPos - perturbedNeg) / (2 * EPS);
   }
 
   // Reset everything how we left it
@@ -1641,7 +1645,7 @@ Eigen::MatrixXd Skeleton::finiteDifferenceJacobianOfMinv(
   // Get baseline C(pos, vel)
   Eigen::VectorXd baseline = multiplyByImplicitInvMassMatrix(f);
 
-  double EPS = 1e-4;
+  double EPS = 1e-7;
 
   for (std::size_t i = 0; i < m; i++)
   {
@@ -1718,6 +1722,14 @@ std::size_t Skeleton::getWrtDim(neural::WithRespectTo wrt)
   {
     return getNumDofs();
   }
+  else if (wrt == neural::WithRespectTo::VELOCITY)
+  {
+    return getNumDofs();
+  }
+  else if (wrt == neural::WithRespectTo::FORCE)
+  {
+    return getNumDofs();
+  }
   else if (wrt == neural::WithRespectTo::LINK_MASSES)
   {
     return getLinkMassesDims();
@@ -1744,6 +1756,14 @@ Eigen::VectorXd Skeleton::getWrt(neural::WithRespectTo wrt)
   {
     return getPositions();
   }
+  else if (wrt == neural::WithRespectTo::VELOCITY)
+  {
+    return getVelocities();
+  }
+  else if (wrt == neural::WithRespectTo::FORCE)
+  {
+    return getForces();
+  }
   else if (wrt == neural::WithRespectTo::LINK_MASSES)
   {
     return getLinkMasses();
@@ -1765,6 +1785,14 @@ void Skeleton::setWrt(neural::WithRespectTo wrt, Eigen::VectorXd v)
   if (wrt == neural::WithRespectTo::POSITION)
   {
     setPositions(v);
+  }
+  else if (wrt == neural::WithRespectTo::VELOCITY)
+  {
+    setVelocities(v);
+  }
+  else if (wrt == neural::WithRespectTo::FORCE)
+  {
+    setForces(v);
   }
   else if (wrt == neural::WithRespectTo::LINK_MASSES)
   {

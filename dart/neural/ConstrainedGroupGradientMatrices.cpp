@@ -54,7 +54,6 @@ ConstrainedGroupGradientMatrices::ConstrainedGroupGradientMatrices(
     }
   }
 
-  mImpulseTests.reserve(mNumConstraintDim);
   mMassedImpulseTests.reserve(mNumConstraintDim);
 
   // Cache an inverse mass matrix for later use
@@ -86,7 +85,6 @@ ConstrainedGroupGradientMatrices::ConstrainedGroupGradientMatrices(
   mNumConstraintDim = numConstraintDim;
   mTimeStep = timeStep;
 
-  mImpulseTests.reserve(mNumConstraintDim);
   mMassedImpulseTests.reserve(mNumConstraintDim);
 }
 
@@ -150,36 +148,6 @@ void ConstrainedGroupGradientMatrices::measureConstraintImpulse(
     massedImpulseTest.segment(offset, dofs) = skel->getVelocityChanges();
   }
   mMassedImpulseTests.push_back(massedImpulseTest);
-
-  // For gradient comptutations: clear constraint impulses
-  for (SkeletonPtr skel : constraint->getSkeletons())
-  {
-    skel->clearConstraintImpulses();
-  }
-
-  double* impulses = new double[constraint->getDimension()];
-  for (std::size_t k = 0; k < constraint->getDimension(); ++k)
-    impulses[k] = (k == constraintIndex) ? 1 : 0;
-  constraint->applyImpulse(impulses);
-  delete[] impulses;
-
-  // For gradient computations: record the torque changes for each
-  // skeleton for the unit impulse on this constraint.
-  Eigen::VectorXd impulseTest = Eigen::VectorXd::Zero(mNumDOFs);
-  for (SkeletonPtr skel : constraint->getSkeletons())
-  {
-    std::size_t offset = mSkeletonOffset[skel->getName()];
-    std::size_t dofs = skel->getNumDofs();
-
-    impulseTest.segment(offset, dofs) = skel->getConstraintForces() * mTimeStep;
-  }
-
-  mImpulseTests.push_back(impulseTest);
-
-  for (SkeletonPtr skel : constraint->getSkeletons())
-  {
-    skel->clearConstraintImpulses();
-  }
 }
 
 //==============================================================================
@@ -187,7 +155,6 @@ void ConstrainedGroupGradientMatrices::mockMeasureConstraintImpulse(
     Eigen::VectorXd impulseTest, Eigen::VectorXd massedImpulseTest)
 {
   mMassedImpulseTests.push_back(massedImpulseTest);
-  mImpulseTests.push_back(impulseTest);
 }
 
 //==============================================================================
@@ -229,7 +196,8 @@ void ConstrainedGroupGradientMatrices::deduplicateConstraints()
     // Merge with the first neighbor who is near enough
     for (int j = 0; j < i; j++)
     {
-      double distance = (mImpulseTests[i] - mImpulseTests[j]).squaredNorm();
+      double distance
+          = (mMassedImpulseTests[i] - mMassedImpulseTests[j]).squaredNorm();
       if (distance < MERGE_THRESHOLD)
       {
         mergeGroup[i] = mergeGroup[j];
@@ -257,7 +225,6 @@ void ConstrainedGroupGradientMatrices::deduplicateConstraints()
   // mB - offset at each constraint
   // mAColNorms - norms of each constraints' col of A
   //
-  // mImpulseTests - impulse test for each constraint
   // mMassedImpulseTests - Minv * impulse test for each constraint
   // mPenetrationCorrectionVelocities - Penetration hack val for each constraint
   // mRestitutionCoeffs - Restitution coefficients for each constraint
@@ -271,7 +238,6 @@ void ConstrainedGroupGradientMatrices::deduplicateConstraints()
 
   Eigen::VectorXi newFIndex = Eigen::VectorXi::Zero(newNumConstraintDim);
 
-  std::vector<Eigen::VectorXd> newImpulseTests;
   std::vector<Eigen::VectorXd> newMassedImpulseTests;
   std::vector<double> newPenetrationCorrectionVelocities;
   std::vector<double> newRestitutionCoeffs;
@@ -282,7 +248,6 @@ void ConstrainedGroupGradientMatrices::deduplicateConstraints()
   {
     int groupCount = 0;
 
-    Eigen::VectorXd impulseTest = Eigen::VectorXd::Zero(mNumDOFs);
     Eigen::VectorXd massedImpulseTest = Eigen::VectorXd::Zero(mNumDOFs);
     double penetrationCorrectionVelocity = 0.0;
     double restitutionCoeff = 0.0;
@@ -306,7 +271,6 @@ void ConstrainedGroupGradientMatrices::deduplicateConstraints()
           newFIndex(i) = mergeGroup[newFIndex(i)];
         }
 
-        impulseTest += mImpulseTests[j];
         massedImpulseTest += mMassedImpulseTests[j];
 
         penetrationCorrectionVelocity += mPenetrationCorrectionVelocities[j];
@@ -321,12 +285,10 @@ void ConstrainedGroupGradientMatrices::deduplicateConstraints()
     newHi(i) /= groupCount;
     newLo(i) /= groupCount;
     newAColNorms(i) /= groupCount;
-    impulseTest /= groupCount;
     massedImpulseTest /= groupCount;
     penetrationCorrectionVelocity /= groupCount;
     restitutionCoeff /= groupCount;
 
-    newImpulseTests.push_back(impulseTest);
     newMassedImpulseTests.push_back(massedImpulseTest);
     newPenetrationCorrectionVelocities.push_back(penetrationCorrectionVelocity);
     newRestitutionCoeffs.push_back(restitutionCoeff);
@@ -343,7 +305,6 @@ void ConstrainedGroupGradientMatrices::deduplicateConstraints()
   mB = newB;
   mAColNorms = newAColNorms;
   mFIndex = newFIndex;
-  mImpulseTests = newImpulseTests;
   mMassedImpulseTests = newMassedImpulseTests;
   mPenetrationCorrectionVelocities = newPenetrationCorrectionVelocities;
   mRestitutionCoeffs = newRestitutionCoeffs;
@@ -358,7 +319,8 @@ void ConstrainedGroupGradientMatrices::deduplicateConstraints()
 /// after the LCP has run, with the result from the LCP solver. This can only
 /// be called once, and after this is called you cannot call
 /// measureConstraintImpulse() again!
-void ConstrainedGroupGradientMatrices::constructMatrices()
+void ConstrainedGroupGradientMatrices::constructMatrices(
+    simulation::WorldPtr world)
 {
   deduplicateConstraints();
   mContactConstraintImpulses = mX;
@@ -532,7 +494,17 @@ void ConstrainedGroupGradientMatrices::constructMatrices()
     if (mContactConstraintMappings(j) == neural::ConstraintMapping::CLAMPING)
     {
       assert(numClamping > clampingIndex[j]);
-      mClampingConstraintMatrix.col(clampingIndex[j]) = mImpulseTests[j];
+
+      std::shared_ptr<DifferentiableContactConstraint> constraint
+          = std::make_shared<DifferentiableContactConstraint>(
+              mConstraints[j], mConstraintIndices[j]);
+
+      mClampingConstraints.push_back(constraint);
+
+      Eigen::VectorXd analyticalImpulse
+          = constraint->getConstraintForces(world);
+
+      mClampingConstraintMatrix.col(clampingIndex[j]) = analyticalImpulse;
       mMassedClampingConstraintMatrix.col(clampingIndex[j])
           = mMassedImpulseTests[j];
       mBounceDiagonals(clampingIndex[j]) = 1 + mRestitutionCoeffs[j];
@@ -540,15 +512,11 @@ void ConstrainedGroupGradientMatrices::constructMatrices()
           = mPenetrationCorrectionVelocities[j];
       if (mRestitutionCoeffs[j] > 0)
       {
-        mBouncingConstraintMatrix.col(bouncingIndex[j]) = mImpulseTests[j];
+        mBouncingConstraintMatrix.col(bouncingIndex[j]) = analyticalImpulse;
         mRestitutionDiagonals(bouncingIndex[j]) = mRestitutionCoeffs[j];
       }
       mClampingConstraintImpulses(clampingIndex[j]) = mX(j);
       mClampingConstraintRelativeVels(clampingIndex[j]) = mB(j);
-
-      mClampingConstraints.push_back(
-          std::make_shared<DifferentiableContactConstraint>(
-              mConstraints[j], mConstraintIndices[j]));
     }
     else if (
         mContactConstraintMappings(j) == neural::ConstraintMapping::ILLEGAL)
@@ -558,12 +526,16 @@ void ConstrainedGroupGradientMatrices::constructMatrices()
     else if (mContactConstraintMappings(j) >= 0) // means we're an UPPER_BOUND
     {
       assert(numUpperBound > upperBoundIndex[j]);
-      mUpperBoundConstraintMatrix.col(upperBoundIndex[j]) = mImpulseTests[j];
+
+      std::shared_ptr<DifferentiableContactConstraint> constraint
+          = std::make_shared<DifferentiableContactConstraint>(
+              mConstraints[j], mConstraintIndices[j]);
+
+      mUpperBoundConstraints.push_back(constraint);
+      mUpperBoundConstraintMatrix.col(upperBoundIndex[j])
+          = constraint->getConstraintForces(world);
       mMassedUpperBoundConstraintMatrix.col(upperBoundIndex[j])
           = mMassedImpulseTests[j];
-      mUpperBoundConstraints.push_back(
-          std::make_shared<DifferentiableContactConstraint>(
-              mConstraints[j], mConstraintIndices[j]));
     }
   }
 
@@ -927,6 +899,10 @@ Eigen::MatrixXd ConstrainedGroupGradientMatrices::
   {
     return Eigen::MatrixXd::Zero(0, 0);
   }
+  if (wrt == VELOCITY || wrt == FORCE)
+  {
+    return Eigen::MatrixXd::Zero(A_c.cols(), A_c.cols());
+  }
 
   Eigen::MatrixXd Q = getClampingAMatrix(); // A_c.transpose() * Minv * A_c;
   Eigen::CompleteOrthogonalDecomposition<Eigen::MatrixXd> Qfactored
@@ -964,6 +940,16 @@ ConstrainedGroupGradientMatrices::getJacobianOfLCPOffsetClampingSubset(
   double dt = world->getTimeStep();
   const Eigen::MatrixXd& A_c = mClampingConstraintMatrix;
   Eigen::MatrixXd dC = getJacobianOfC(world, wrt);
+  if (wrt == WithRespectTo::VELOCITY)
+  {
+    return -A_c.transpose()
+           * (Eigen::MatrixXd::Identity(mNumDOFs, mNumDOFs) + dt * mMinv * dC);
+  }
+  else if (wrt == WithRespectTo::FORCE)
+  {
+    return -A_c.transpose() * dt * mMinv;
+  }
+
   const Eigen::VectorXd& C = mCoriolisAndGravityForces;
   Eigen::VectorXd f = mPreStepTorques - C;
   Eigen::MatrixXd dMinv_f = getJacobianOfMinv(world, f, wrt);

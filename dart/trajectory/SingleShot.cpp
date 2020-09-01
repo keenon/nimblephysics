@@ -33,7 +33,7 @@ SingleShot::SingleShot(
 //==============================================================================
 SingleShot::~SingleShot()
 {
-  std::cout << "Freeing SingleShot: " << this << std::endl;
+  // std::cout << "Freeing SingleShot: " << this << std::endl;
 }
 
 //==============================================================================
@@ -454,7 +454,7 @@ TimestepJacobians SingleShot::backpropStartStateJacobians(
 //==============================================================================
 /// This computes finite difference Jacobians analagous to backpropJacobians()
 TimestepJacobians SingleShot::finiteDifferenceStartStateJacobians(
-    std::shared_ptr<simulation::World> world)
+    std::shared_ptr<simulation::World> world, double EPS)
 {
   RestorableSnapshot snapshot(world);
 
@@ -468,8 +468,6 @@ TimestepJacobians SingleShot::finiteDifferenceStartStateJacobians(
 
   Eigen::VectorXd originalEndPos = world->getPositions();
   Eigen::VectorXd originalEndVel = world->getVelocities();
-
-  const double EPS = 1e-7;
 
   TimestepJacobians result;
 

@@ -44,7 +44,7 @@ MultiShot::MultiShot(
 //==============================================================================
 MultiShot::~MultiShot()
 {
-  std::cout << "Freeing MultiShot: " << this << std::endl;
+  // std::cout << "Freeing MultiShot: " << this << std::endl;
 }
 
 //==============================================================================

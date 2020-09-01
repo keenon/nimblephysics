@@ -242,7 +242,7 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(ConstrainedGroup& group)
       // Create a 3x3 square from A(mOffset[i], mOffset[i]) iterating over j
       // This iteration fill in row j
       int index = nSkip * (mOffset[i] + j) + mOffset[i];
-      constraint->getVelocityChange(mA.data() + index, true);
+      constraint->getVelocityChange(mA.data() + index, false /* TODO: this flag increases stability if it's true here, but messes with our gradients */);
 
       for (std::size_t k = i + 1; k < numConstraints; ++k)
       {
@@ -410,7 +410,6 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(ConstrainedGroup& group)
         bGradientBackup,
         aColNormGradientBackup,
         aGradientBackup);
-    group.getGradientConstraintMatrices()->constructMatrices();
   }
 }
 

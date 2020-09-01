@@ -26,7 +26,7 @@ AbstractShot::AbstractShot(std::shared_ptr<simulation::World> world)
 //==============================================================================
 AbstractShot::~AbstractShot()
 {
-  std::cout << "Freeing AbstractShot: " << this << std::endl;
+  // std::cout << "Freeing AbstractShot: " << this << std::endl;
 }
 
 //==============================================================================

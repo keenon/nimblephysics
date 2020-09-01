@@ -88,13 +88,13 @@ void debugMatrices(
   }
 }
 
-bool verifySingleStep(WorldPtr world)
+bool verifySingleStep(WorldPtr world, double EPS)
 {
   SingleShot shot(world, 1);
   TimestepJacobians analyticalJacobians
       = shot.backpropStartStateJacobians(world);
   TimestepJacobians bruteForceJacobians
-      = shot.finiteDifferenceStartStateJacobians(world);
+      = shot.finiteDifferenceStartStateJacobians(world, EPS);
   BackpropSnapshotPtr ptr = neural::forwardPass(world);
   Eigen::MatrixXd velVelAnalytical = ptr->getVelVelJacobian(world);
   Eigen::MatrixXd velVelFD = ptr->finiteDifferenceVelVelJacobian(world);
@@ -135,7 +135,7 @@ bool verifySingleStep(WorldPtr world)
   return true;
 }
 
-bool verifySingleShot(WorldPtr world, int maxSteps)
+bool verifySingleShot(WorldPtr world, int maxSteps, double EPS)
 {
   for (int i = 1; i < maxSteps; i++)
   {
@@ -143,7 +143,7 @@ bool verifySingleShot(WorldPtr world, int maxSteps)
     TimestepJacobians analyticalJacobians
         = shot.backpropStartStateJacobians(world);
     TimestepJacobians bruteForceJacobians
-        = shot.finiteDifferenceStartStateJacobians(world);
+        = shot.finiteDifferenceStartStateJacobians(world, EPS);
     double threshold = 1e-8;
     if (!equals(analyticalJacobians, bruteForceJacobians, threshold))
     {
@@ -493,6 +493,7 @@ TEST(TRAJECTORY, PRISMATIC)
 }
 */
 
+/*
 TEST(TRAJECTORY, CARTPOLE)
 {
   // World
@@ -542,13 +543,129 @@ TEST(TRAJECTORY, CARTPOLE)
            + forces.squaredNorm();
   };
 
-  /*
-  EXPECT_TRUE(verifySingleStep(world));
-  EXPECT_TRUE(verifySingleShot(world, 40));
-  EXPECT_TRUE(verifyShotJacobian(world, 40));
-  EXPECT_TRUE(verifyShotGradient(world, 7, loss));
-  EXPECT_TRUE(verifyMultiShotJacobian(world, 8, 2));
-  EXPECT_TRUE(verifyMultiShotGradient(world, 8, 4, loss));
-  */
-  EXPECT_TRUE(verifyMultiShotOptimization(world, 50, 10, loss));
+  EXPECT_TRUE(verifySingleStep(world, 1e-7));
+  // EXPECT_TRUE(verifySingleShot(world, 40, 1e-7));
+  // EXPECT_TRUE(verifyShotJacobian(world, 40));
+  // EXPECT_TRUE(verifyShotGradient(world, 7, loss));
+  // EXPECT_TRUE(verifyMultiShotJacobian(world, 8, 2));
+  // EXPECT_TRUE(verifyMultiShotGradient(world, 8, 4, loss));
+  // EXPECT_TRUE(verifyMultiShotOptimization(world, 50, 10, loss));
+}
+*/
+
+BodyNode* createTailSegment(BodyNode* parent, Eigen::Vector3d color)
+{
+  std::pair<RevoluteJoint*, BodyNode*> poleJointPair
+      = parent->createChildJointAndBodyNodePair<RevoluteJoint>();
+  RevoluteJoint* poleJoint = poleJointPair.first;
+  BodyNode* pole = poleJointPair.second;
+  poleJoint->setAxis(Eigen::Vector3d::UnitZ());
+
+  std::shared_ptr<BoxShape> shape(
+      new BoxShape(Eigen::Vector3d(0.05, 0.25, 0.05)));
+  ShapeNode* poleShape
+      = pole->createShapeNodeWith<VisualAspect, CollisionAspect>(shape);
+  poleShape->getVisualAspect()->setColor(color);
+  poleJoint->setForceUpperLimit(0, 100.0);
+  poleJoint->setForceLowerLimit(0, -100.0);
+  poleJoint->setVelocityUpperLimit(0, 10000.0);
+  poleJoint->setVelocityLowerLimit(0, -10000.0);
+
+  Eigen::Isometry3d poleOffset = Eigen::Isometry3d::Identity();
+  poleOffset.translation() = Eigen::Vector3d(0, -0.125, 0);
+  poleJoint->setTransformFromChildBodyNode(poleOffset);
+  poleJoint->setPosition(0, 90 * 3.1415 / 180);
+
+  if (parent->getParentBodyNode() != nullptr)
+  {
+    Eigen::Isometry3d childOffset = Eigen::Isometry3d::Identity();
+    childOffset.translation() = Eigen::Vector3d(0, 0.125, 0);
+    poleJoint->setTransformFromParentBodyNode(childOffset);
+  }
+
+  return pole;
+}
+
+TEST(TRAJECTORY, JUMP_WORM)
+{
+  bool offGround = false;
+
+  // World
+  WorldPtr world = World::create();
+  world->setGravity(Eigen::Vector3d(0, -9.81, 0));
+
+  world->getConstraintSolver()->setPenetrationCorrectionEnabled(false);
+
+  SkeletonPtr jumpworm = Skeleton::create("jumpworm");
+
+  std::pair<TranslationalJoint2D*, BodyNode*> rootJointPair
+      = jumpworm->createJointAndBodyNodePair<TranslationalJoint2D>(nullptr);
+  TranslationalJoint2D* rootJoint = rootJointPair.first;
+  BodyNode* root = rootJointPair.second;
+
+  std::shared_ptr<BoxShape> shape(new BoxShape(Eigen::Vector3d(0.1, 0.1, 0.1)));
+  ShapeNode* rootVisual
+      = root->createShapeNodeWith<VisualAspect, CollisionAspect>(shape);
+  Eigen::Vector3d black = Eigen::Vector3d::Zero();
+  rootVisual->getVisualAspect()->setColor(black);
+  rootJoint->setForceUpperLimit(0, 0);
+  rootJoint->setForceLowerLimit(0, 0);
+  rootJoint->setForceUpperLimit(1, 0);
+  rootJoint->setForceLowerLimit(1, 0);
+  rootJoint->setVelocityUpperLimit(0, 1000.0);
+  rootJoint->setVelocityLowerLimit(0, -1000.0);
+  rootJoint->setVelocityUpperLimit(1, 1000.0);
+  rootJoint->setVelocityLowerLimit(1, -1000.0);
+
+  BodyNode* tail1 = createTailSegment(
+      root, Eigen::Vector3d(182.0 / 255, 223.0 / 255, 144.0 / 255));
+  BodyNode* tail2 = createTailSegment(
+      tail1, Eigen::Vector3d(223.0 / 255, 228.0 / 255, 163.0 / 255));
+  BodyNode* tail3 = createTailSegment(
+      tail2, Eigen::Vector3d(221.0 / 255, 193.0 / 255, 121.0 / 255));
+
+  Eigen::VectorXd pos = Eigen::VectorXd(5);
+  pos << 0, 0, 90, 90, 45;
+  jumpworm->setPositions(pos * 3.1415 / 180);
+
+  world->addSkeleton(jumpworm);
+
+  // Floor
+
+  SkeletonPtr floor = Skeleton::create("floor");
+
+  std::pair<WeldJoint*, BodyNode*> floorJointPair
+      = floor->createJointAndBodyNodePair<WeldJoint>(nullptr);
+  WeldJoint* floorJoint = floorJointPair.first;
+  BodyNode* floorBody = floorJointPair.second;
+  Eigen::Isometry3d floorOffset = Eigen::Isometry3d::Identity();
+  floorOffset.translation() = Eigen::Vector3d(0, offGround ? -0.7 : -0.56, 0);
+  floorJoint->setTransformFromParentBodyNode(floorOffset);
+  std::shared_ptr<BoxShape> floorShape(
+      new BoxShape(Eigen::Vector3d(2.5, 0.25, 0.5)));
+  ShapeNode* floorVisual
+      = floorBody->createShapeNodeWith<VisualAspect, CollisionAspect>(
+          floorShape);
+  floorBody->setFrictionCoeff(0);
+
+  world->addSkeleton(floor);
+
+  rootJoint->setVelocity(1, -0.1);
+  Eigen::VectorXd vels = world->getVelocities();
+
+  TrajectoryLossFn loss = [](const Eigen::Ref<const Eigen::MatrixXd>& poses,
+                             const Eigen::Ref<const Eigen::MatrixXd>& vels,
+                             const Eigen::Ref<const Eigen::MatrixXd>& forces) {
+    Eigen::VectorXd pos = poses.col(poses.cols() - 1);
+    Eigen::VectorXd vel = vels.col(vels.cols() - 1);
+    return (pos[0] * pos[0]) + (pos[1] * pos[1]) + (vel[0] * vel[0])
+           + (vel[1] * vel[1]);
+  };
+
+  EXPECT_TRUE(verifySingleStep(world, 1e-6));
+  // EXPECT_TRUE(verifySingleShot(world, 40, 1e-6));
+  // EXPECT_TRUE(verifyShotJacobian(world, 40));
+  // EXPECT_TRUE(verifyShotGradient(world, 7, loss));
+  // EXPECT_TRUE(verifyMultiShotJacobian(world, 8, 2));
+  // EXPECT_TRUE(verifyMultiShotGradient(world, 8, 4, loss));
 }

@@ -16,6 +16,8 @@ namespace neural {
 enum WithRespectTo
 {
   POSITION,
+  VELOCITY,
+  FORCE,
   LINK_MASSES,
   LINK_COMS,
   LINK_MOIS

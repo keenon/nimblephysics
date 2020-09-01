@@ -89,7 +89,7 @@ public:
   /// after registerLCPResults(). This can only
   /// be called once, and after this is called you cannot call
   /// measureConstraintImpulse() again!
-  void constructMatrices();
+  void constructMatrices(simulation::WorldPtr world);
 
   /// This computes and returns the whole vel-vel jacobian for this group. For
   /// backprop, you don't actually need this matrix, you can compute backprop
@@ -436,15 +436,6 @@ public:
   Eigen::VectorXd mB;
   Eigen::VectorXd mAColNorms;
   Eigen::MatrixXd mA;
-
-  /// This holds the outputs of the impulse tests we run to create the
-  /// constraint matrices. We shuffle these vectors into the columns of
-  /// mClampingConstraintMatrix and mUpperBoundConstraintMatrix depending on the
-  /// values of the LCP solution. We also discard many of these vectors.
-  ///
-  /// mImpulseTests[k] holds the k'th constraint's impulse test, which is
-  /// a concatenated vector of the results for each skeleton in the group.
-  std::vector<Eigen::VectorXd> mImpulseTests;
 
   /// This holds the outputs of the impulse tests we run to create the
   /// constraint matrices. We shuffle these vectors into the columns of
