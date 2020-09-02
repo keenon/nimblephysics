@@ -53,6 +53,7 @@
 #include "dart/trajectory/SingleShot.hpp"
 #include "dart/trajectory/TrajectoryConstants.hpp"
 
+#include "GradientTestUtils.hpp"
 #include "TestHelpers.hpp"
 #include "stdio.h"
 
@@ -103,19 +104,13 @@ bool verifySingleStep(WorldPtr world, double EPS)
   Eigen::MatrixXd forceVelFD = ptr->finiteDifferenceForceVelJacobian(world);
 
   Eigen::MatrixXd velCJacobian = ptr->getVelCJacobian(world);
-  Eigen::MatrixXd velVelCore = ptr->getForceVelJacobian(world) * velCJacobian;
-  Eigen::MatrixXd velVelCoreFD
-      = Eigen::MatrixXd::Identity(world->getNumDofs(), world->getNumDofs())
-        - velVelFD;
 
   double threshold = 1e-8;
 
   if (!equals(analyticalJacobians.velVel, bruteForceJacobians.velVel, threshold)
       || !equals(velVelAnalytical, velVelFD, threshold)
-      || !equals(velVelCore, velVelCoreFD, threshold)
       || !equals(forceVel, forceVelFD, threshold))
   {
-
     std::cout << "Time series: " << std::endl;
     debugMatrices(
         analyticalJacobians.velVel,
@@ -125,7 +120,6 @@ bool verifySingleStep(WorldPtr world, double EPS)
 
     std::cout << "Jacobians: " << std::endl;
     debugMatrices(velVelAnalytical, velVelFD, threshold, "v_t -> v_end");
-    debugMatrices(velVelCore, velVelCoreFD, threshold, "v_t -> v_end core");
     debugMatrices(forceVel, forceVelFD, threshold, "f_t -> v_end");
     std::cout << "Vel-C: " << std::endl
               << ptr->getVelCJacobian(world) << std::endl;
@@ -135,16 +129,79 @@ bool verifySingleStep(WorldPtr world, double EPS)
   return true;
 }
 
-bool verifySingleShot(WorldPtr world, int maxSteps, double EPS)
+bool verifySingleShot(WorldPtr world, int maxSteps, double EPS, bool useFdJacs)
 {
   for (int i = 1; i < maxSteps; i++)
   {
     SingleShot shot(world, i);
+
+    double threshold = 1e-7;
+    std::vector<BackpropSnapshotPtr> ptrs = shot.getSnapshots(world);
+    for (int j = 0; j < ptrs.size(); j++)
+    {
+      if (!useFdJacs
+          && (!equals(
+                  ptrs[j]->getPosPosJacobian(world),
+                  ptrs[j]->finiteDifferencePosPosJacobian(world, 1),
+                  threshold)
+              || !equals(
+                  ptrs[j]->getVelPosJacobian(world),
+                  ptrs[j]->finiteDifferenceVelPosJacobian(world, 1),
+                  threshold)
+              || !equals(
+                  ptrs[j]->getPosVelJacobian(world),
+                  ptrs[j]->finiteDifferencePosVelJacobian(world),
+                  threshold)
+              || !equals(
+                  ptrs[j]->getVelVelJacobian(world),
+                  ptrs[j]->finiteDifferenceVelVelJacobian(world),
+                  threshold)
+              || !equals(
+                  ptrs[j]->getForceVelJacobian(world),
+                  ptrs[j]->finiteDifferenceForceVelJacobian(world),
+                  threshold)))
+      {
+        std::cout << "Detected Jac imprecision at step " << (j + 1) << "/" << i
+                  << std::endl;
+        debugMatrices(
+            ptrs[j]->getPosPosJacobian(world),
+            ptrs[j]->finiteDifferencePosPosJacobian(world, 1),
+            threshold,
+            "pos-pos jac");
+        debugMatrices(
+            ptrs[j]->getVelPosJacobian(world),
+            ptrs[j]->finiteDifferenceVelPosJacobian(world, 1),
+            threshold,
+            "vel-pos jac");
+        debugMatrices(
+            ptrs[j]->getPosVelJacobian(world),
+            ptrs[j]->finiteDifferencePosVelJacobian(world),
+            threshold,
+            "pos-vel jac");
+        debugMatrices(
+            ptrs[j]->getVelVelJacobian(world),
+            ptrs[j]->finiteDifferenceVelVelJacobian(world),
+            threshold,
+            "vel-vel jac");
+        debugMatrices(
+            ptrs[j]->getForceVelJacobian(world),
+            ptrs[j]->finiteDifferenceForceVelJacobian(world),
+            threshold,
+            "force-vel jac");
+
+        world->setPositions(ptrs[j]->getPreStepPosition());
+        world->setVelocities(ptrs[j]->getPreStepVelocity());
+        world->setForces(ptrs[j]->getPreStepTorques());
+        verifyVelGradients(world, ptrs[j]->getPreStepVelocity());
+
+        return false;
+      }
+    }
+
     TimestepJacobians analyticalJacobians
-        = shot.backpropStartStateJacobians(world);
+        = shot.backpropStartStateJacobians(world, useFdJacs);
     TimestepJacobians bruteForceJacobians
-        = shot.finiteDifferenceStartStateJacobians(world, EPS);
-    double threshold = 1e-8;
+        = shot.finiteDifferenceStartStateJacobians(world, 1e-7);
     if (!equals(analyticalJacobians, bruteForceJacobians, threshold))
     {
       std::cout << "Trajectory broke at timestep " << i << ":" << std::endl;
@@ -190,9 +247,11 @@ bool verifyShotJacobian(WorldPtr world, int steps)
   int dim = shot.getFlatProblemDim();
 
   // Random initialization
+  /*
   srand(42);
   Eigen::VectorXd randomInit = Eigen::VectorXd::Random(dim);
   shot.unflatten(randomInit);
+  */
 
   Eigen::MatrixXd analyticalJacobian
       = Eigen::MatrixXd::Zero(world->getNumDofs() * 2, dim);
@@ -219,9 +278,11 @@ bool verifyShotGradient(WorldPtr world, int steps, TrajectoryLossFn loss)
   int dim = shot.getFlatProblemDim();
 
   // Random initialization
+  /*
   srand(42);
   Eigen::VectorXd randomInit = Eigen::VectorXd::Random(dim);
   shot.unflatten(randomInit);
+  */
 
   Eigen::MatrixXd gradWrtPoses
       = Eigen::MatrixXd::Zero(world->getNumDofs(), steps);
@@ -662,9 +723,13 @@ TEST(TRAJECTORY, JUMP_WORM)
            + (vel[1] * vel[1]);
   };
 
-  EXPECT_TRUE(verifySingleStep(world, 1e-6));
-  // EXPECT_TRUE(verifySingleShot(world, 40, 1e-6));
-  // EXPECT_TRUE(verifyShotJacobian(world, 40));
+  // Make a huge timestep, to try to make the gradients easier to get exactly
+  // for finite differencing
+  // world->setTimeStep(1e-1);
+
+  // EXPECT_TRUE(verifySingleStep(world, 1e-6));
+  EXPECT_TRUE(verifySingleShot(world, 40, 5e-7, false));
+  // EXPECT_TRUE(verifyShotJacobian(world, 5));
   // EXPECT_TRUE(verifyShotGradient(world, 7, loss));
   // EXPECT_TRUE(verifyMultiShotJacobian(world, 8, 2));
   // EXPECT_TRUE(verifyMultiShotGradient(world, 8, 4, loss));

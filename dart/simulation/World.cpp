@@ -48,6 +48,7 @@
 #include "dart/constraint/ConstrainedGroup.hpp"
 #include "dart/dynamics/Skeleton.hpp"
 #include "dart/integration/SemiImplicitEulerIntegrator.hpp"
+#include "dart/neural/ConstrainedGroupGradientMatrices.hpp"
 
 namespace dart {
 namespace simulation {

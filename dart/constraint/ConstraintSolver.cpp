@@ -664,6 +664,13 @@ void ConstraintSolver::buildConstrainedGroups()
 {
   // Clear constrained groups
   mConstrainedGroups.clear();
+  if (mGradientEnabled)
+  {
+    for (const auto& skel : mSkeletons)
+    {
+      skel->clearGradientConstraintMatrices();
+    }
+  }
 
   // Exit if there is no active constraint
   if (mActiveConstraints.empty())

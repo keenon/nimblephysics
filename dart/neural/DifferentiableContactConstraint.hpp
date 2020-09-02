@@ -317,6 +317,8 @@ protected:
   std::shared_ptr<constraint::ContactConstraint> mContactConstraint;
   std::shared_ptr<collision::Contact> mContact;
   std::vector<std::string> mSkeletons;
+  std::vector<Eigen::VectorXd> mSkeletonOriginalPositions;
+
   int mIndex;
 
   /// This allows us to locate this constraint in the world arrays. This value

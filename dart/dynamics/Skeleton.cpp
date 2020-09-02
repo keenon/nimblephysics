@@ -1549,6 +1549,12 @@ DART_BAKE_SPECIALIZED_NODE_SKEL_DEFINITIONS(Skeleton, ShapeNode)
 DART_BAKE_SPECIALIZED_NODE_SKEL_DEFINITIONS(Skeleton, EndEffector)
 
 //==============================================================================
+void Skeleton::clearGradientConstraintMatrices()
+{
+  mSkelCache.mGradientConstraintMatrices = nullptr;
+}
+
+//==============================================================================
 std::shared_ptr<neural::ConstrainedGroupGradientMatrices>
 Skeleton::getGradientConstraintMatrices()
 {

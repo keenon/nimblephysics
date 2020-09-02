@@ -562,6 +562,9 @@ public:
   // Gradients
   //----------------------------------------------------------------------------
 
+  /// This resets the gradient constraint matrices
+  void clearGradientConstraintMatrices();
+
   /// Get a shared pointer to the saved gradient matrices for the constrained
   /// group this Skeleton was part of in the last LCP solve.
   std::shared_ptr<neural::ConstrainedGroupGradientMatrices>

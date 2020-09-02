@@ -406,7 +406,7 @@ Eigen::VectorXd SingleShot::getFinalState(
 /// the trajectory. For a timestep at time t, this will relate quantities like
 /// v_t -> p_end, for example.
 TimestepJacobians SingleShot::backpropStartStateJacobians(
-    std::shared_ptr<simulation::World> world)
+    std::shared_ptr<simulation::World> world, bool useFdJacs)
 {
   std::vector<BackpropSnapshotPtr> snapshots = getSnapshots(world);
 
@@ -422,11 +422,21 @@ TimestepJacobians SingleShot::backpropStartStateJacobians(
   {
     BackpropSnapshotPtr ptr = snapshots[i];
     TimestepJacobians thisTimestep;
-    Eigen::MatrixXd forceVel = ptr->getForceVelJacobian(world);
-    Eigen::MatrixXd posPos = ptr->getPosPosJacobian(world);
-    Eigen::MatrixXd posVel = ptr->getPosVelJacobian(world);
-    Eigen::MatrixXd velPos = ptr->getVelPosJacobian(world);
-    Eigen::MatrixXd velVel = ptr->getVelVelJacobian(world);
+    Eigen::MatrixXd forceVel
+        = useFdJacs ? ptr->finiteDifferenceForceVelJacobian(world)
+                    : ptr->getForceVelJacobian(world);
+    Eigen::MatrixXd posPos = useFdJacs
+                                 ? ptr->finiteDifferencePosPosJacobian(world, 1)
+                                 : ptr->getPosPosJacobian(world);
+    Eigen::MatrixXd posVel = useFdJacs
+                                 ? ptr->finiteDifferencePosVelJacobian(world)
+                                 : ptr->getPosVelJacobian(world);
+    Eigen::MatrixXd velPos = useFdJacs
+                                 ? ptr->finiteDifferenceVelPosJacobian(world, 1)
+                                 : ptr->getVelPosJacobian(world);
+    Eigen::MatrixXd velVel = useFdJacs
+                                 ? ptr->finiteDifferenceVelVelJacobian(world)
+                                 : ptr->getVelVelJacobian(world);
 
     // v_end <- f_t = v_end <- v_t+1 * v_t+1 <- f_t
     thisTimestep.forceVel = last.velVel * forceVel;
@@ -487,8 +497,24 @@ TimestepJacobians SingleShot::finiteDifferenceStartStateJacobians(
       world->step();
     }
 
-    result.posPos.col(j) = (world->getPositions() - originalEndPos) / EPS;
-    result.posVel.col(j) = (world->getVelocities() - originalEndVel) / EPS;
+    Eigen::VectorXd perturbedEndPos = world->getPositions();
+    Eigen::VectorXd perturbedEndVel = world->getVelocities();
+
+    perturbedStartPos = mStartPos;
+    perturbedStartPos(j) -= EPS;
+    world->setPositions(perturbedStartPos);
+    world->setVelocities(mStartVel);
+    for (int i = 0; i < mSteps; i++)
+    {
+      world->setForces(mForces.col(i));
+      world->step();
+    }
+
+    Eigen::VectorXd perturbedEndPosNeg = world->getPositions();
+    Eigen::VectorXd perturbedEndVelNeg = world->getVelocities();
+
+    result.posPos.col(j) = (perturbedEndPos - perturbedEndPosNeg) / (2 * EPS);
+    result.posVel.col(j) = (perturbedEndVel - perturbedEndVelNeg) / (2 * EPS);
   }
 
   // Perturb starting velocity
@@ -507,8 +533,24 @@ TimestepJacobians SingleShot::finiteDifferenceStartStateJacobians(
       world->step();
     }
 
-    result.velPos.col(j) = (world->getPositions() - originalEndPos) / EPS;
-    result.velVel.col(j) = (world->getVelocities() - originalEndVel) / EPS;
+    Eigen::VectorXd perturbedEndPos = world->getPositions();
+    Eigen::VectorXd perturbedEndVel = world->getVelocities();
+
+    perturbedStartVel = mStartVel;
+    perturbedStartVel(j) -= EPS;
+    world->setPositions(mStartPos);
+    world->setVelocities(perturbedStartVel);
+    for (int i = 0; i < mSteps; i++)
+    {
+      world->setForces(mForces.col(i));
+      world->step();
+    }
+
+    Eigen::VectorXd perturbedEndPosNeg = world->getPositions();
+    Eigen::VectorXd perturbedEndVelNeg = world->getVelocities();
+
+    result.velPos.col(j) = (perturbedEndPos - perturbedEndPosNeg) / (2 * EPS);
+    result.velVel.col(j) = (perturbedEndVel - perturbedEndVelNeg) / (2 * EPS);
   }
 
   // Perturb starting force
@@ -527,8 +569,24 @@ TimestepJacobians SingleShot::finiteDifferenceStartStateJacobians(
       world->step();
     }
 
-    result.forcePos.col(j) = (world->getPositions() - originalEndPos) / EPS;
-    result.forceVel.col(j) = (world->getVelocities() - originalEndVel) / EPS;
+    Eigen::VectorXd perturbedEndPos = world->getPositions();
+    Eigen::VectorXd perturbedEndVel = world->getVelocities();
+
+    perturbedStartForce = mForces.col(0);
+    perturbedStartForce(j) -= EPS;
+    world->setPositions(mStartPos);
+    world->setVelocities(mStartVel);
+    for (int i = 0; i < mSteps; i++)
+    {
+      world->setForces(i == 0 ? perturbedStartForce : mForces.col(i));
+      world->step();
+    }
+
+    Eigen::VectorXd perturbedEndPosNeg = world->getPositions();
+    Eigen::VectorXd perturbedEndVelNeg = world->getVelocities();
+
+    result.forcePos.col(j) = (perturbedEndPos - perturbedEndPosNeg) / (2 * EPS);
+    result.forceVel.col(j) = (perturbedEndVel - perturbedEndVelNeg) / (2 * EPS);
   }
 
   snapshot.restore();

@@ -23,8 +23,11 @@ namespace neural {
 //==============================================================================
 ConstrainedGroupGradientMatrices::ConstrainedGroupGradientMatrices(
     constraint::ConstrainedGroup& group, double timeStep)
+  : mFinalized(false)
 {
   mTimeStep = timeStep;
+  assert(mClampingConstraints.size() == 0);
+  assert(mUpperBoundConstraints.size() == 0);
 
   // Collect all the skeletons attached to the constraints
 
@@ -322,6 +325,9 @@ void ConstrainedGroupGradientMatrices::deduplicateConstraints()
 void ConstrainedGroupGradientMatrices::constructMatrices(
     simulation::WorldPtr world)
 {
+  assert(!mFinalized);
+  mFinalized = true;
+
   deduplicateConstraints();
   mContactConstraintImpulses = mX;
   mContactConstraintMappings = mFIndex;
@@ -478,7 +484,9 @@ void ConstrainedGroupGradientMatrices::constructMatrices(
   mClampingConstraintImpulses = Eigen::VectorXd::Zero(numClamping);
   mClampingConstraintRelativeVels = Eigen::VectorXd::Zero(numClamping);
   mClampingConstraints.reserve(numClamping);
+  assert(mClampingConstraints.size() == 0);
   mUpperBoundConstraints.reserve(numUpperBound);
+  assert(mUpperBoundConstraints.size() == 0);
   mVelocityDueToIllegalImpulses = Eigen::VectorXd::Zero(mNumDOFs);
   mClampingAMatrix = Eigen::MatrixXd::Zero(numClamping, numClamping);
 
@@ -538,6 +546,9 @@ void ConstrainedGroupGradientMatrices::constructMatrices(
           = mMassedImpulseTests[j];
     }
   }
+
+  assert(mClampingConstraints.size() == numClamping);
+  assert(mUpperBoundConstraints.size() == numUpperBound);
 
   // Set up mUpperboundMappingMatrix (aka E)
   for (size_t j = 0; j < mNumConstraintDim; j++)

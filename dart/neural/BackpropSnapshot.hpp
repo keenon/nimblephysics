@@ -259,6 +259,10 @@ public:
   /// constant except the value of WithRespectTo
   Eigen::MatrixXd getJacobianOfC(simulation::WorldPtr world, WithRespectTo wrt);
 
+  /// This returns the jacobian of M^{-1}(pos, inertia) * (C(pos, inertia, vel) + mPreStepTorques),
+  /// holding everything constant except the value of WithRespectTo
+  Eigen::MatrixXd getJacobianOfMinvC(simulation::WorldPtr world, WithRespectTo wrt);
+
   /// This returns a fast approximation to A_c in the neighborhood of the
   /// original
   Eigen::MatrixXd estimateClampingConstraintMatrixAt(
@@ -331,6 +335,12 @@ public:
   /// This computes and returns the jacobian of C(pos, inertia, vel) by finite
   /// differences. This is SUPER SLOW, and is only here for testing.
   Eigen::MatrixXd finiteDifferenceJacobianOfC(
+      simulation::WorldPtr world, WithRespectTo wrt);
+
+  /// This computes and returns the jacobian of M^{-1}(pos, inertia) * C(pos,
+  /// inertia, vel) by finite differences. This is SUPER SLOW, and is only here
+  /// for testing.
+  Eigen::MatrixXd finiteDifferenceJacobianOfMinvC(
       simulation::WorldPtr world, WithRespectTo wrt);
 
   /// This returns the jacobian of constraint force, holding everyhing constant

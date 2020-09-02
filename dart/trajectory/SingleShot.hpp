@@ -126,7 +126,7 @@ public:
   /// the trajectory. For a timestep at time t, this will relate quantities like
   /// v_t -> p_end, for example.
   TimestepJacobians backpropStartStateJacobians(
-      std::shared_ptr<simulation::World> world);
+      std::shared_ptr<simulation::World> world, bool useFdJacs = false);
 
   /// This computes finite difference Jacobians analagous to
   /// backpropStartStateJacobians()

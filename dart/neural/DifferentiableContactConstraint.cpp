@@ -30,6 +30,7 @@ DifferentiableContactConstraint::DifferentiableContactConstraint(
   for (auto skel : constraint->getSkeletons())
   {
     mSkeletons.push_back(skel->getName());
+    mSkeletonOriginalPositions.push_back(skel->getPositions());
   }
 }
 
@@ -159,11 +160,19 @@ Eigen::VectorXd DifferentiableContactConstraint::getConstraintForces(
     std::shared_ptr<dynamics::Skeleton> skel)
 {
   // If this constraint doesn't touch this skeleton, then return all 0s
-  if (std::find(mSkeletons.begin(), mSkeletons.end(), skel->getName())
-      == mSkeletons.end())
+  auto skelNameCursor
+      = std::find(mSkeletons.begin(), mSkeletons.end(), skel->getName());
+  if (skelNameCursor == mSkeletons.end())
   {
     return Eigen::VectorXd::Zero(skel->getNumDofs());
   }
+  // Check that the skeletons are where we left them, otherwise these
+  // computations will be wrong
+  int index = std::distance(mSkeletons.begin(), skelNameCursor);
+  Eigen::VectorXd oldPositions = skel->getPositions();
+  // assert((oldPositions - mSkeletonOriginalPositions[index]).squaredNorm() ==
+  // 0.0);
+  skel->setPositions(mSkeletonOriginalPositions[index]);
 
   Eigen::Vector6d worldForce = getWorldForce();
 
@@ -182,6 +191,8 @@ Eigen::VectorXd DifferentiableContactConstraint::getConstraintForces(
       taus(i) = worldTwist.dot(worldForce) * multiple;
     }
   }
+
+  skel->setPositions(oldPositions);
 
   return taus;
 }
