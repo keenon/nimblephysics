@@ -135,7 +135,7 @@ bool verifySingleShot(WorldPtr world, int maxSteps, double EPS, bool useFdJacs)
   {
     SingleShot shot(world, i);
 
-    double threshold = 1e-7;
+    double threshold = 1e-8;
     std::vector<BackpropSnapshotPtr> ptrs = shot.getSnapshots(world);
     for (int j = 0; j < ptrs.size(); j++)
     {
@@ -728,9 +728,9 @@ TEST(TRAJECTORY, JUMP_WORM)
   // world->setTimeStep(1e-1);
 
   // EXPECT_TRUE(verifySingleStep(world, 1e-6));
-  EXPECT_TRUE(verifySingleShot(world, 40, 5e-7, false));
-  // EXPECT_TRUE(verifyShotJacobian(world, 5));
-  // EXPECT_TRUE(verifyShotGradient(world, 7, loss));
+  // EXPECT_TRUE(verifySingleShot(world, 40, 5e-7, false));
+  EXPECT_TRUE(verifyShotJacobian(world, 8));
+  EXPECT_TRUE(verifyShotGradient(world, 7, loss));
   // EXPECT_TRUE(verifyMultiShotJacobian(world, 8, 2));
   // EXPECT_TRUE(verifyMultiShotGradient(world, 8, 4, loss));
 }

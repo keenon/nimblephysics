@@ -969,10 +969,9 @@ bool verifyVelGradients(WorldPtr world, VectorXd worldVel)
       // && verifyScratch(world)
       && verifyMassedUpperBoundConstraintMatrix(world, worldVel)
       // These no longer matter, because we bypass P_c in the new formulation
-      // && verifyClassicProjectionIntoClampsMatrix(world, worldVel)
-      // && verifyMassedProjectionIntoClampsMatrix(world, worldVel)
-      // && verifyJacobianOfProjectionIntoClampsMatrix(world, worldVel,
-      // POSITION)
+      && verifyClassicProjectionIntoClampsMatrix(world, worldVel)
+      && verifyMassedProjectionIntoClampsMatrix(world, worldVel)
+      && verifyJacobianOfProjectionIntoClampsMatrix(world, worldVel, POSITION)
       && verifyRecoveredLCPConstraints(world, worldVel) && verifyF_c(world)
       && verifyVelVelJacobian(world, worldVel)
       && verifyPosVelJacobian(world, worldVel) && verifyNextV(world)

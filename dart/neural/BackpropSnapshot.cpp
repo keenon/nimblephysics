@@ -254,7 +254,6 @@ const Eigen::MatrixXd& BackpropSnapshot::getForceVelJacobian(WorldPtr world)
 {
   if (mCachedForceVelDirty)
   {
-    /*
     Eigen::MatrixXd A_c = getClampingConstraintMatrix(world);
     Eigen::MatrixXd Minv = getInvMassMatrix(world);
 
@@ -284,8 +283,7 @@ const Eigen::MatrixXd& BackpropSnapshot::getForceVelJacobian(WorldPtr world)
                              - mTimeStep * A_c * P_c * Minv);
       }
     }
-    */
-    mCachedForceVel = getVelJacobianWrt(world, WithRespectTo::FORCE);
+    // mCachedForceVel = getVelJacobianWrt(world, WithRespectTo::FORCE);
     mCachedForceVelDirty = false;
   }
   return mCachedForceVel;
@@ -306,9 +304,8 @@ const Eigen::MatrixXd& BackpropSnapshot::getVelVelJacobian(WorldPtr world)
     }
     else
     {
-      mCachedVelVel = getVelJacobianWrt(world, WithRespectTo::VELOCITY);
+      // mCachedVelVel = getVelJacobianWrt(world, WithRespectTo::VELOCITY);
 
-      /*
       Eigen::MatrixXd A_ub = getUpperBoundConstraintMatrix(world);
       Eigen::MatrixXd E = getUpperBoundMappingMatrix();
       Eigen::MatrixXd P_c = getProjectionIntoClampsMatrix(world);
@@ -318,7 +315,6 @@ const Eigen::MatrixXd& BackpropSnapshot::getVelVelJacobian(WorldPtr world)
 
       mCachedVelVel = (Eigen::MatrixXd::Identity(mNumDOFs, mNumDOFs) - parts2)
                       - getForceVelJacobian(world) * getVelCJacobian(world);
-      */
 
       /*
       std::cout << "A_c: " << std::endl << A_c << std::endl;
