@@ -113,6 +113,9 @@ public:
   Eigen::VectorXd getFinalState(
       std::shared_ptr<simulation::World> world) override;
 
+  /// This returns the debugging name of a given DOF
+  std::string getFlatDimName(int dim) override;
+
   //////////////////////////////////////////////////////////////////////////////
   // For Testing
   //////////////////////////////////////////////////////////////////////////////

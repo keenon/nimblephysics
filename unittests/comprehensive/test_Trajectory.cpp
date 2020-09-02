@@ -30,7 +30,9 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <chrono>
 #include <iostream>
+#include <thread>
 
 #include <dart/gui/gui.hpp>
 #include <gtest/gtest.h>
@@ -49,6 +51,7 @@
 #include "dart/neural/RestorableSnapshot.hpp"
 #include "dart/simulation/World.hpp"
 #include "dart/trajectory/AbstractShot.hpp"
+#include "dart/trajectory/IPOptOptimizer.hpp"
 #include "dart/trajectory/MultiShot.hpp"
 #include "dart/trajectory/SingleShot.hpp"
 #include "dart/trajectory/TrajectoryConstants.hpp"
@@ -322,9 +325,11 @@ bool verifyMultiShotJacobian(WorldPtr world, int steps, int shotLength)
   int numConstraints = shot.getConstraintDim();
 
   // Random initialization
+  /*
   srand(42);
   Eigen::VectorXd randomInit = Eigen::VectorXd::Random(dim);
   shot.unflatten(randomInit);
+  */
 
   Eigen::MatrixXd analyticalJacobian
       = Eigen::MatrixXd::Zero(numConstraints, dim);
@@ -336,10 +341,28 @@ bool verifyMultiShotJacobian(WorldPtr world, int steps, int shotLength)
   if (!equals(analyticalJacobian, bruteForceJacobian, threshold))
   {
     std::cout << "Jacobians don't match!" << std::endl;
-    std::cout << "Analytical:" << std::endl << analyticalJacobian << std::endl;
-    std::cout << "Brute Force:" << std::endl << bruteForceJacobian << std::endl;
-    std::cout << "Diff:" << std::endl
-              << (analyticalJacobian - bruteForceJacobian) << std::endl;
+    for (int i = 0; i < dim; i++)
+    {
+      Eigen::VectorXd analyticalCol = analyticalJacobian.col(i);
+      Eigen::VectorXd bruteForceCol = bruteForceJacobian.col(i);
+      if (!equals(analyticalCol, bruteForceCol, threshold))
+      {
+        std::cout << "ERROR at col " << shot.getFlatDimName(i) << " (" << i
+                  << ") by " << (analyticalCol - bruteForceCol).norm()
+                  << std::endl;
+        /*
+        std::cout << "Analytical:" << std::endl << analyticalCol << std::endl;
+        std::cout << "Brute Force:" << std::endl << bruteForceCol << std::endl;
+        std::cout << "Diff:" << std::endl
+                  << (analyticalCol - bruteForceCol) << std::endl;
+        */
+      }
+      else
+      {
+        std::cout << "Match at col " << shot.getFlatDimName(i) << " (" << i
+                  << ")" << std::endl;
+      }
+    }
     return false;
   }
   return true;
@@ -352,9 +375,11 @@ bool verifyMultiShotGradient(
   int dim = shot.getFlatProblemDim();
 
   // Random initialization
+  /*
   srand(42);
   Eigen::VectorXd randomInit = Eigen::VectorXd::Random(dim);
   shot.unflatten(randomInit);
+  */
 
   Eigen::MatrixXd gradWrtPoses
       = Eigen::MatrixXd::Zero(world->getNumDofs(), steps);
@@ -402,10 +427,15 @@ public:
 
   void timeStepping() override
   {
+    // std::cout << "Time stepping " << mCounter << std::endl;
     mWorld->setPositions(mPoses.col(mCounter));
     mCounter++;
     if (mCounter >= mPoses.cols())
       mCounter = 0;
+
+    // Step the simulation forward
+    SimWindow::draw();
+    // SimWindow::timeStepping();
   }
 
 private:
@@ -418,7 +448,9 @@ bool verifyMultiShotOptimization(
 {
   MultiShot shot(world, steps, shotLength, false);
   shot.setLossFunction(loss);
-  shot.optimize();
+  IPOptOptimizer optimizer;
+
+  optimizer.optimize(&shot);
 
   // Playback the trajectory
 
@@ -719,8 +751,11 @@ TEST(TRAJECTORY, JUMP_WORM)
                              const Eigen::Ref<const Eigen::MatrixXd>& forces) {
     Eigen::VectorXd pos = poses.col(poses.cols() - 1);
     Eigen::VectorXd vel = vels.col(vels.cols() - 1);
+    /*
     return (pos[0] * pos[0]) + (pos[1] * pos[1]) + (vel[0] * vel[0])
            + (vel[1] * vel[1]);
+    */
+    return -(pos[1] * pos[1]) * (pos[1] > 0 ? 1.0 : -1.0);
   };
 
   // Make a huge timestep, to try to make the gradients easier to get exactly
@@ -729,8 +764,9 @@ TEST(TRAJECTORY, JUMP_WORM)
 
   // EXPECT_TRUE(verifySingleStep(world, 1e-6));
   // EXPECT_TRUE(verifySingleShot(world, 40, 5e-7, false));
-  EXPECT_TRUE(verifyShotJacobian(world, 8));
-  EXPECT_TRUE(verifyShotGradient(world, 7, loss));
+  // EXPECT_TRUE(verifyShotJacobian(world, 2));
+  // EXPECT_TRUE(verifyShotGradient(world, 7, loss));
   // EXPECT_TRUE(verifyMultiShotJacobian(world, 8, 2));
   // EXPECT_TRUE(verifyMultiShotGradient(world, 8, 4, loss));
+  EXPECT_TRUE(verifyMultiShotOptimization(world, 500, 10, loss));
 }

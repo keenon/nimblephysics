@@ -186,10 +186,10 @@ void ConstrainedGroupGradientMatrices::deduplicateConstraints()
 
   const double MERGE_THRESHOLD = 0.01;
 
-  int* mergeGroup = new int[mNumConstraintDim];
+  std::vector<int> mergeGroup;
   for (int i = 0; i < mNumConstraintDim; i++)
   {
-    mergeGroup[i] = -1;
+    mergeGroup.push_back(-1);
   }
 
   int groupCursor = 0;
@@ -313,8 +313,6 @@ void ConstrainedGroupGradientMatrices::deduplicateConstraints()
   mRestitutionCoeffs = newRestitutionCoeffs;
   mConstraints = newConstraints;
   mConstraintIndices = newConstraintIndices;
-
-  delete mergeGroup;
 }
 
 //==============================================================================
@@ -360,9 +358,15 @@ void ConstrainedGroupGradientMatrices::constructMatrices(
   // - If mappings[j] == IRRELEVANT, constraint "j" is doesn't effect this
   //   skeleton, and so can be safely ignored.
 
-  int* clampingIndex = new int[mNumConstraintDim];
-  int* upperBoundIndex = new int[mNumConstraintDim];
-  int* bouncingIndex = new int[mNumConstraintDim];
+  std::vector<int> clampingIndex;
+  std::vector<int> upperBoundIndex;
+  std::vector<int> bouncingIndex;
+  for (int i = 0; i < mNumConstraintDim; i++)
+  {
+    clampingIndex.push_back(-1);
+    upperBoundIndex.push_back(-1);
+    bouncingIndex.push_back(-1);
+  }
 
   int numClamping = 0;
   int numUpperBound = 0;
@@ -617,10 +621,6 @@ void ConstrainedGroupGradientMatrices::constructMatrices(
       }
     }
   }
-
-  delete clampingIndex;
-  delete upperBoundIndex;
-  delete bouncingIndex;
 }
 
 //==============================================================================

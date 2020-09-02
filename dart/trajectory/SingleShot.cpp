@@ -402,6 +402,34 @@ Eigen::VectorXd SingleShot::getFinalState(
 }
 
 //==============================================================================
+/// This returns the debugging name of a given DOF
+std::string SingleShot::getFlatDimName(int dim)
+{
+  if (mTuneStartingState)
+  {
+    if (dim < mNumDofs)
+    {
+      return "Start Pos " + std::to_string(dim);
+    }
+    dim -= mNumDofs;
+    if (dim < mNumDofs)
+    {
+      return "Start Vel " + std::to_string(dim);
+    }
+    dim -= mNumDofs;
+  }
+  for (int i = 0; i < mSteps; i++)
+  {
+    if (dim < mNumDofs)
+    {
+      return "Force[" + std::to_string(i) + "] " + std::to_string(dim);
+    }
+    dim -= mNumDofs;
+  }
+  return "Error OOB";
+}
+
+//==============================================================================
 /// This computes the Jacobians that relate each timestep to the endpoint of
 /// the trajectory. For a timestep at time t, this will relate quantities like
 /// v_t -> p_end, for example.

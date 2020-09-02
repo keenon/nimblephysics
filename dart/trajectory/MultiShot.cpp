@@ -251,6 +251,22 @@ Eigen::VectorXd MultiShot::getFinalState(
 }
 
 //==============================================================================
+/// This returns the debugging name of a given DOF
+std::string MultiShot::getFlatDimName(int dim)
+{
+  for (int i = 0; i < mShots.size(); i++)
+  {
+    int shotDim = mShots[i]->getFlatProblemDim();
+    if (dim < shotDim)
+    {
+      return "Shot " + std::to_string(i) + " " + mShots[i]->getFlatDimName(dim);
+    }
+    dim -= shotDim;
+  }
+  return "Error OOB";
+}
+
+//==============================================================================
 /// This computes the gradient in the flat problem space, taking into accounts
 /// incoming gradients with respect to any of the shot's values.
 void MultiShot::backpropGradient(

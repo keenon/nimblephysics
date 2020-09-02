@@ -1380,7 +1380,7 @@ class MultipleShootingTrajectory:
         nlp.set(max_iter=max_iter)
         nlp.set(
             print_info_string='yes', check_derivatives_for_naninf='yes',
-            derivative_test='first-order')
+            derivative_test='first-order', derivative_test_perturbation=1e-6)
 
         x0 = self.flatten(np.zeros(n), 'state')
         eval_jac_g(x0, np.zeros(len(jac_g_sparsity_indices[0])))
