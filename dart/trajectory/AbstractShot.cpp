@@ -61,6 +61,7 @@ void AbstractShot::bruteForceGradOfLossInputs(
 
   for (int row = 0; row < mNumDofs; row++)
   {
+    // Only test the last step
     for (int col = 0; col < mSteps; col++)
     {
       poses(row, col) += EPS;

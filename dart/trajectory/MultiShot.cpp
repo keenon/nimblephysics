@@ -208,12 +208,88 @@ void MultiShot::backpropJacobian(
 }
 
 //==============================================================================
+/// This gets the number of non-zero entries in the Jacobian
+int MultiShot::getNumberNonZeroJacobian()
+{
+  int nnzj = 0;
+  for (int i = 0; i < mShots.size() - 1; i++)
+  {
+    int shotDim = mShots[i]->getFlatProblemDim();
+    // The main Jacobian block
+    nnzj += shotDim * 2 * mNumDofs;
+    // The -I at the end
+    nnzj += 2 * mNumDofs;
+  }
+
+  return nnzj;
+}
+
+//==============================================================================
+/// This gets the structure of the non-zero entries in the Jacobian
+void MultiShot::getJacobianSparsityStructure(
+    Eigen::Ref<Eigen::VectorXi> rows, Eigen::Ref<Eigen::VectorXi> cols)
+{
+  int sparseCursor = 0;
+  int rowCursor = 0;
+  int colCursor = 0;
+  for (int i = 1; i < mShots.size(); i++)
+  {
+    int dim = mShots[i - 1]->getFlatProblemDim();
+    // This is the main Jacobian
+    for (int col = colCursor; col < colCursor + dim; col++)
+    {
+      for (int row = rowCursor; row < rowCursor + 2 * mNumDofs; row++)
+      {
+        rows(sparseCursor) = row;
+        cols(sparseCursor) = col;
+        sparseCursor++;
+      }
+    }
+    colCursor += dim;
+    // This is the negative identity at the end
+    for (int q = 0; q < 2 * mNumDofs; q++)
+    {
+      rows(sparseCursor) = rowCursor + q;
+      cols(sparseCursor) = colCursor + q;
+      sparseCursor++;
+    }
+    rowCursor += 2 * mNumDofs;
+  }
+}
+
+//==============================================================================
+/// This writes the Jacobian to a sparse vector
+void MultiShot::getSparseJacobian(
+    std::shared_ptr<simulation::World> world,
+    Eigen::Ref<Eigen::VectorXd> sparse)
+{
+  int sparseCursor = 0;
+  Eigen::VectorXd neg = Eigen::VectorXd::Ones(2 * mNumDofs) * -1;
+  for (int i = 1; i < mShots.size(); i++)
+  {
+    int dim = mShots[i - 1]->getFlatProblemDim();
+    // This is the main Jacobian
+    Eigen::MatrixXd jac = Eigen::MatrixXd::Zero(2 * mNumDofs, dim);
+    mShots[i - 1]->backpropJacobianOfFinalState(world, jac);
+    for (int col = 0; col < dim; col++)
+    {
+      sparse.segment(sparseCursor, 2 * mNumDofs) = jac.col(col);
+      sparseCursor += 2 * mNumDofs;
+    }
+    // This is the negative identity at the end
+    sparse.segment(sparseCursor, 2 * mNumDofs) = neg;
+    sparseCursor += 2 * mNumDofs;
+  }
+}
+
+//==============================================================================
 /// This populates the passed in matrices with the values from this trajectory
 void MultiShot::getStates(
     std::shared_ptr<simulation::World> world,
     /* OUT */ Eigen::Ref<Eigen::MatrixXd> poses,
     /* OUT */ Eigen::Ref<Eigen::MatrixXd> vels,
-    /* OUT */ Eigen::Ref<Eigen::MatrixXd> forces)
+    /* OUT */ Eigen::Ref<Eigen::MatrixXd> forces,
+    bool useKnots)
 {
   assert(poses.cols() == mSteps);
   assert(poses.rows() == mNumDofs);
@@ -222,16 +298,39 @@ void MultiShot::getStates(
   assert(forces.cols() == mSteps);
   assert(forces.rows() == mNumDofs);
   int cursor = 0;
-  for (int i = 0; i < mShots.size(); i++)
+  if (useKnots)
   {
-    int steps = mShots[i]->getNumSteps();
-    mShots[i]->getStates(
-        world,
-        poses.block(0, cursor, mNumDofs, steps),
-        vels.block(0, cursor, mNumDofs, steps),
-        forces.block(0, cursor, mNumDofs, steps));
-    cursor += steps;
+    for (int i = 0; i < mShots.size(); i++)
+    {
+      int steps = mShots[i]->getNumSteps();
+      mShots[i]->getStates(
+          world,
+          poses.block(0, cursor, mNumDofs, steps),
+          vels.block(0, cursor, mNumDofs, steps),
+          forces.block(0, cursor, mNumDofs, steps),
+          true);
+      cursor += steps;
+    }
   }
+  else
+  {
+    RestorableSnapshot snapshot(world);
+    world->setPositions(mShots[0]->mStartPos);
+    world->setVelocities(mShots[0]->mStartVel);
+    for (int i = 0; i < mShots.size(); i++)
+    {
+      for (int j = 0; j < mShots[i]->mSteps; j++)
+      {
+        world->setForces(mShots[i]->mForces.col(j));
+        world->step();
+        poses.col(cursor) = world->getPositions();
+        vels.col(cursor) = world->getVelocities();
+        forces.col(cursor) = mShots[i]->mForces.col(j);
+        cursor++;
+      }
+    }
+  }
+  assert(cursor == mSteps);
 }
 
 //==============================================================================

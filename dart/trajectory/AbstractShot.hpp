@@ -106,7 +106,8 @@ public:
       std::shared_ptr<simulation::World> world,
       /* OUT */ Eigen::Ref<Eigen::MatrixXd> poses,
       /* OUT */ Eigen::Ref<Eigen::MatrixXd> vels,
-      /* OUT */ Eigen::Ref<Eigen::MatrixXd> forces)
+      /* OUT */ Eigen::Ref<Eigen::MatrixXd> forces,
+      bool useKnots = true)
       = 0;
 
   /// This returns the concatenation of (start pos, start vel) for convenience
@@ -123,14 +124,19 @@ public:
   /// This returns the debugging name of a given DOF
   virtual std::string getFlatDimName(int dim) = 0;
 
-  /*
   /// This gets the number of non-zero entries in the Jacobian
-  virtual int getNumberNonZeroJacobian();
+  virtual int getNumberNonZeroJacobian() = 0;
 
   /// This gets the structure of the non-zero entries in the Jacobian
   virtual void getJacobianSparsityStructure(
-      Eigen::VectorXd& rows, Eigen::VectorXd& cols);
-      */
+      Eigen::Ref<Eigen::VectorXi> rows, Eigen::Ref<Eigen::VectorXi> cols)
+      = 0;
+
+  /// This writes the Jacobian to a sparse vector
+  virtual void getSparseJacobian(
+      std::shared_ptr<simulation::World> world,
+      Eigen::Ref<Eigen::VectorXd> sparse)
+      = 0;
 
   //////////////////////////////////////////////////////////////////////////////
   // For Testing

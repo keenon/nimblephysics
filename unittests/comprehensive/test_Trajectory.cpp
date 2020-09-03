@@ -368,11 +368,9 @@ bool verifyMultiShotJacobian(WorldPtr world, int steps, int shotLength)
   return true;
 }
 
-bool verifyMultiShotGradient(
-    WorldPtr world, int steps, int shotLength, TrajectoryLossFn loss)
+bool verifySparseJacobian(WorldPtr world, int steps, int shotLength)
 {
   MultiShot shot(world, steps, shotLength, true);
-  int dim = shot.getFlatProblemDim();
 
   // Random initialization
   /*
@@ -381,6 +379,69 @@ bool verifyMultiShotGradient(
   shot.unflatten(randomInit);
   */
 
+  int dim = shot.getFlatProblemDim();
+  int numConstraints = shot.getConstraintDim();
+  Eigen::MatrixXd analyticalJacobian
+      = Eigen::MatrixXd::Zero(numConstraints, dim);
+  shot.backpropJacobian(world, analyticalJacobian);
+  Eigen::MatrixXd sparseRecoveredJacobian
+      = Eigen::MatrixXd::Zero(numConstraints, dim);
+
+  int numSparse = shot.getNumberNonZeroJacobian();
+  Eigen::VectorXi rows = Eigen::VectorXi::Zero(numSparse);
+  Eigen::VectorXi cols = Eigen::VectorXi::Zero(numSparse);
+  shot.getJacobianSparsityStructure(rows, cols);
+  Eigen::VectorXd sparseValues = Eigen::VectorXd::Zero(numSparse);
+  shot.getSparseJacobian(world, sparseValues);
+  for (int i = 0; i < numSparse; i++)
+  {
+    sparseRecoveredJacobian(rows(i), cols(i)) = sparseValues(i);
+  }
+
+  double threshold = 1e-8;
+  if (!equals(analyticalJacobian, sparseRecoveredJacobian, threshold))
+  {
+    std::cout << "Jacobians don't match!" << std::endl;
+    for (int i = 0; i < dim; i++)
+    {
+      Eigen::VectorXd analyticalCol = analyticalJacobian.col(i);
+      Eigen::VectorXd sparseRecoveredCol = sparseRecoveredJacobian.col(i);
+      if (!equals(analyticalCol, sparseRecoveredCol, threshold))
+      {
+        std::cout << "ERROR at col " << shot.getFlatDimName(i) << " (" << i
+                  << ") by " << (analyticalCol - sparseRecoveredCol).norm()
+                  << std::endl;
+        /*
+        std::cout << "Dense:" << std::endl << analyticalCol << std::endl;
+        std::cout << "Sparse:" << std::endl << sparseRecoveredCol << std::endl;
+        std::cout << "Diff:" << std::endl
+                  << (analyticalCol - bruteForceCol) << std::endl;
+        */
+      }
+      else
+      {
+        std::cout << "Match at col " << shot.getFlatDimName(i) << " (" << i
+                  << ")" << std::endl;
+      }
+    }
+    return false;
+  }
+  return true;
+}
+
+bool verifyMultiShotGradient(
+    WorldPtr world, int steps, int shotLength, TrajectoryLossFn loss)
+{
+  MultiShot shot(world, steps, shotLength, true);
+
+  // Random initialization
+  /*
+  srand(42);
+  Eigen::VectorXd randomInit = Eigen::VectorXd::Random(dim);
+  shot.unflatten(randomInit);
+  */
+
+  int dim = shot.getFlatProblemDim();
   Eigen::MatrixXd gradWrtPoses
       = Eigen::MatrixXd::Zero(world->getNumDofs(), steps);
   Eigen::MatrixXd gradWrtVels
@@ -418,9 +479,12 @@ class AbstractShotWindow : public dart::gui::glut::SimWindow
 public:
   /// Constructor
   AbstractShotWindow(
-      std::shared_ptr<simulation::World> world, Eigen::MatrixXd poses)
+      std::shared_ptr<simulation::World> world,
+      Eigen::MatrixXd posesWithKnots,
+      Eigen::MatrixXd posesWithoutKnots)
   {
-    mPoses = poses;
+    mPosesWithKnots = posesWithKnots;
+    mPosesWithoutKnots = posesWithoutKnots;
     mCounter = 0;
     setWorld(world);
   }
@@ -428,9 +492,13 @@ public:
   void timeStepping() override
   {
     // std::cout << "Time stepping " << mCounter << std::endl;
-    mWorld->setPositions(mPoses.col(mCounter));
     mCounter++;
-    if (mCounter >= mPoses.cols())
+    int cols = mPosesWithKnots.cols();
+    if (mCounter < cols)
+      mWorld->setPositions(mPosesWithKnots.col(mCounter));
+    if (mCounter >= 2 * cols && mCounter < 3 * cols)
+      mWorld->setPositions(mPosesWithoutKnots.col(mCounter - 2 * cols));
+    if (mCounter >= 4 * cols)
       mCounter = 0;
 
     // Step the simulation forward
@@ -440,7 +508,8 @@ public:
 
 private:
   int mCounter = 0;
-  Eigen::MatrixXd mPoses;
+  Eigen::MatrixXd mPosesWithKnots;
+  Eigen::MatrixXd mPosesWithoutKnots;
 };
 
 bool verifyMultiShotOptimization(
@@ -454,13 +523,20 @@ bool verifyMultiShotOptimization(
 
   // Playback the trajectory
 
-  Eigen::MatrixXd poses = Eigen::MatrixXd::Zero(world->getNumDofs(), steps);
+  Eigen::MatrixXd posesWithKnots
+      = Eigen::MatrixXd::Zero(world->getNumDofs(), steps);
+  Eigen::MatrixXd posesWithoutKnots
+      = Eigen::MatrixXd::Zero(world->getNumDofs(), steps);
   Eigen::MatrixXd vels = Eigen::MatrixXd::Zero(world->getNumDofs(), steps);
   Eigen::MatrixXd forces = Eigen::MatrixXd::Zero(world->getNumDofs(), steps);
-  shot.getStates(world, poses, vels, forces);
+
+  // Get the version with knots
+  shot.getStates(world, posesWithKnots, vels, forces, true);
+  // Get the version without knots next, so that they can play in a loop
+  shot.getStates(world, posesWithoutKnots, vels, forces, false);
 
   // Create a window for rendering the world and handling user input
-  AbstractShotWindow window(world, poses);
+  AbstractShotWindow window(world, posesWithKnots, posesWithoutKnots);
 
   // Initialize glut, initialize the window, and begin the glut event loop
   int argc = 0;
@@ -661,8 +737,10 @@ BodyNode* createTailSegment(BodyNode* parent, Eigen::Vector3d color)
   poleShape->getVisualAspect()->setColor(color);
   poleJoint->setForceUpperLimit(0, 100.0);
   poleJoint->setForceLowerLimit(0, -100.0);
-  poleJoint->setVelocityUpperLimit(0, 10000.0);
-  poleJoint->setVelocityLowerLimit(0, -10000.0);
+  poleJoint->setVelocityUpperLimit(0, 100.0);
+  poleJoint->setVelocityLowerLimit(0, -100.0);
+  poleJoint->setPositionUpperLimit(0, 270 * 3.1415 / 180);
+  poleJoint->setPositionLowerLimit(0, -270 * 3.1415 / 180);
 
   Eigen::Isometry3d poleOffset = Eigen::Isometry3d::Identity();
   poleOffset.translation() = Eigen::Vector3d(0, -0.125, 0);
@@ -709,6 +787,10 @@ TEST(TRAJECTORY, JUMP_WORM)
   rootJoint->setVelocityLowerLimit(0, -1000.0);
   rootJoint->setVelocityUpperLimit(1, 1000.0);
   rootJoint->setVelocityLowerLimit(1, -1000.0);
+  rootJoint->setPositionUpperLimit(0, 5);
+  rootJoint->setPositionLowerLimit(0, -5);
+  rootJoint->setPositionUpperLimit(1, 5);
+  rootJoint->setPositionLowerLimit(1, -5);
 
   BodyNode* tail1 = createTailSegment(
       root, Eigen::Vector3d(182.0 / 255, 223.0 / 255, 144.0 / 255));
@@ -749,24 +831,49 @@ TEST(TRAJECTORY, JUMP_WORM)
   TrajectoryLossFn loss = [](const Eigen::Ref<const Eigen::MatrixXd>& poses,
                              const Eigen::Ref<const Eigen::MatrixXd>& vels,
                              const Eigen::Ref<const Eigen::MatrixXd>& forces) {
-    Eigen::VectorXd pos = poses.col(poses.cols() - 1);
-    Eigen::VectorXd vel = vels.col(vels.cols() - 1);
+    double maxPos = -1000;
+    double minPos = 1000;
+    for (int i = 0; i < poses.cols(); i++)
+    {
+      if (poses(1, i) > maxPos)
+      {
+        maxPos = poses(1, i);
+      }
+      if (poses(1, i) < minPos)
+      {
+        minPos = poses(1, i);
+      }
+    }
+    double peakPosLoss = -(maxPos * maxPos) * (maxPos > 0 ? 1.0 : -1.0);
+    double minPosLoss = -(minPos * minPos) * (minPos > 0 ? 1.0 : -1.0);
+    double endPos = poses(1, poses.cols() - 1);
+    double endPosLoss = -(endPos * endPos) * (endPos > 0 ? 1.0 : -1.0);
+
+    return (100 * peakPosLoss) + (20 * minPosLoss) + endPosLoss;
+
+    /*
+    Eigen::VectorXd midVel = vels.col(vels.cols() / 2);
+    double midVelSquaredSigned
+        = -(midVel[1] * midVel[1]) * (midVel[1] > 0 ? 1.0 : -1.0);
+
+    return posSquaredSigned + midVelSquaredSigned;
+    */
     /*
     return (pos[0] * pos[0]) + (pos[1] * pos[1]) + (vel[0] * vel[0])
            + (vel[1] * vel[1]);
     */
-    return -(pos[1] * pos[1]) * (pos[1] > 0 ? 1.0 : -1.0);
   };
 
   // Make a huge timestep, to try to make the gradients easier to get exactly
   // for finite differencing
-  // world->setTimeStep(1e-1);
+  world->setTimeStep(1e-3);
 
+  EXPECT_TRUE(verifyMultiShotOptimization(world, 1000, 200, loss));
   // EXPECT_TRUE(verifySingleStep(world, 1e-6));
   // EXPECT_TRUE(verifySingleShot(world, 40, 5e-7, false));
-  // EXPECT_TRUE(verifyShotJacobian(world, 2));
+  // EXPECT_TRUE(verifyShotJacobian(world, 4));
   // EXPECT_TRUE(verifyShotGradient(world, 7, loss));
-  // EXPECT_TRUE(verifyMultiShotJacobian(world, 8, 2));
+  // EXPECT_TRUE(verifyMultiShotJacobian(world, 20, 10));
+  // EXPECT_TRUE(verifySparseJacobian(world, 8, 2));
   // EXPECT_TRUE(verifyMultiShotGradient(world, 8, 4, loss));
-  EXPECT_TRUE(verifyMultiShotOptimization(world, 500, 10, loss));
 }

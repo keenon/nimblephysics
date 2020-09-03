@@ -39,7 +39,13 @@ bool IPOptOptimizer::optimize(AbstractShot* shot)
   app->Options()->SetStringValue(
       "hessian_approximation", "limited-memory"); // limited-memory, exacty
 
-  app->Options()->SetIntegerValue("max_iter", 40);
+  app->Options()->SetStringValue(
+      "scaling_method", "none"); // none, gradient-based
+
+  app->Options()->SetIntegerValue("max_iter", 500);
+
+  // Disable LBFGS history
+  app->Options()->SetIntegerValue("limited_memory_max_history", 1);
 
   // Just for debugging
   /*
@@ -127,7 +133,7 @@ bool IPOptShotWrapper::get_nlp_info(
   m = mWrapped->getConstraintDim();
 
   // Set the number of entries in the constraint Jacobian
-  nnz_jac_g = n * m;
+  nnz_jac_g = mWrapped->getNumberNonZeroJacobian();
 
   // Set the number of entries in the Hessian
   nnz_h_lag = n * n;
@@ -308,7 +314,7 @@ bool IPOptShotWrapper::eval_jac_g(
     const Ipopt::Number* _x,
     bool _new_x,
     Ipopt::Index _m,
-    Ipopt::Index /*_nele_jac*/,
+    Ipopt::Index _nnzj,
     Ipopt::Index* _iRow,
     Ipopt::Index* _jCol,
     Ipopt::Number* _values)
@@ -323,7 +329,14 @@ bool IPOptShotWrapper::eval_jac_g(
     // return the structure of the Jacobian
     assert(_n == mWrapped->getFlatProblemDim());
     assert(_m == mWrapped->getConstraintDim());
+    assert(_nnzj == mWrapped->getNumberNonZeroJacobian());
 
+    Eigen::Map<Eigen::VectorXi> rows(_iRow, _nnzj);
+    Eigen::Map<Eigen::VectorXi> cols(_jCol, _nnzj);
+
+    mWrapped->getJacobianSparsityStructure(rows, cols);
+
+    /*
     // Assume the gradient is dense
     std::size_t idx = 0;
     for (int i = 0; i < _m; ++i)
@@ -335,6 +348,7 @@ bool IPOptShotWrapper::eval_jac_g(
         ++idx;
       }
     }
+    */
   }
   else
   {
@@ -343,6 +357,10 @@ bool IPOptShotWrapper::eval_jac_g(
       Eigen::Map<const Eigen::VectorXd> flat(_x, _n);
       mWrapped->unflatten(flat);
     }
+    Eigen::Map<Eigen::VectorXd> sparse(_values, _nnzj);
+    mWrapped->getSparseJacobian(mWrapped->mWorld, sparse);
+
+    /*
     Eigen::MatrixXd jac = Eigen::MatrixXd::Zero(_m, _n);
     mWrapped->backpropJacobian(mWrapped->mWorld, jac);
 
@@ -355,6 +373,7 @@ bool IPOptShotWrapper::eval_jac_g(
         idx++;
       }
     }
+    */
   }
 
   return true;
