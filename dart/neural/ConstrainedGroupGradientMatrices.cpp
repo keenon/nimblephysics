@@ -326,7 +326,9 @@ void ConstrainedGroupGradientMatrices::constructMatrices(
   assert(!mFinalized);
   mFinalized = true;
 
-  deduplicateConstraints();
+  // TODO: this actually results in very wrong values when we've got deep
+  // inter-penetration, so we're leaving it disabled.
+  // deduplicateConstraints();
   mContactConstraintImpulses = mX;
   mContactConstraintMappings = mFIndex;
   // Group the constraints based on their solution values into three buckets:

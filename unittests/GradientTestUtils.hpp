@@ -197,6 +197,47 @@ bool verifyMassedClampingConstraintMatrix(
   if (!equals(A_c, A_c_recovered, 1e-8) || !equals(V_c, V_c_recovered, 1e-8))
   {
     std::cout << "A_c massed check failed" << std::endl;
+    std::cout << "A_c: " << std::endl << A_c << std::endl;
+    std::cout << "A_c recovered = M * V_c: " << std::endl
+              << A_c_recovered << std::endl;
+    Eigen::MatrixXd diff = A_c - A_c_recovered;
+    std::vector<std::shared_ptr<DifferentiableContactConstraint>> constraints
+        = classicPtr->getClampingConstraints();
+    for (int i = 0; i < diff.cols(); i++)
+    {
+      Eigen::VectorXd diffCol = diff.col(i);
+      if (diffCol.norm() > 1e-8)
+      {
+        std::cout << "Disagreement on column " << i << std::endl;
+        std::cout << "Diff: " << std::endl << diffCol << std::endl;
+        std::shared_ptr<DifferentiableContactConstraint> constraint
+            = constraints[i];
+        std::cout << "Contact type: " << constraint->getContactType()
+                  << std::endl;
+        Eigen::VectorXd worldPos = constraint->getContactWorldPosition();
+        std::cout << "Contact pos: " << std::endl << worldPos << std::endl;
+        Eigen::VectorXd worldNormal = constraint->getContactWorldNormal();
+        std::cout << "Contact normal: " << std::endl
+                  << worldNormal << std::endl;
+
+        assert(diffCol.size() == world->getNumDofs());
+        for (int j = 0; j < world->getNumDofs(); j++)
+        {
+          if (std::abs(diffCol(j)) > 1e-8)
+          {
+            std::cout << "Error at DOF " << j << " ("
+                      << world->getDofs()[j]->getName() << "): " << diffCol(j)
+                      << std::endl;
+          }
+        }
+      }
+    }
+    /*
+    std::cout << "V_c: " << std::endl << V_c << std::endl;
+    std::cout << "V_c recovered = Minv * A_c: " << std::endl
+              << V_c_recovered << std::endl;
+    std::cout << "Diff: " << std::endl << V_c - V_c_recovered << std::endl;
+    */
     return false;
   }
 
@@ -822,13 +863,22 @@ bool verifyJacobianOfProjectionIntoClampsMatrix(
       = classicPtr->finiteDifferenceJacobianOfProjectionIntoClampsMatrix(
           world, proposedVelocities * 10, wrt);
 
-  if (!equals(analytical, bruteForce, 1e-8))
+  // These individual values can be quite large, on the order of 1e+4, so we
+  // normalize by size before checking for error, because 1e-8 on a 1e+4 value
+  // (12 digits of precision) may be unattainable
+  MatrixXd zero = MatrixXd::Zero(analytical.rows(), analytical.cols());
+  MatrixXd normalizedDiff
+      = (analytical - bruteForce) / (0.001 + analytical.norm());
+
+  if (!equals(normalizedDiff, zero, 1e-8))
   {
     std::cout << "Brute force P_c Jacobian:" << std::endl
               << bruteForce << std::endl;
     std::cout << "Analytical P_c Jacobian (should be the same as above):"
               << std::endl
               << analytical << std::endl;
+    std::cout << "Diff:" << std::endl << bruteForce - analytical << std::endl;
+    std::cout << "Normalized Diff:" << std::endl << normalizedDiff << std::endl;
     return false;
   }
 
@@ -959,6 +1009,7 @@ bool verifyRecoveredLCPConstraints(WorldPtr world, VectorXd proposedVelocities)
 
 bool verifyVelGradients(WorldPtr world, VectorXd worldVel)
 {
+  return verifyJacobianOfProjectionIntoClampsMatrix(world, worldVel, POSITION);
   // return verifyScratch(world);
   // return verifyF_c(world);
   // return verifyLinearScratch();
@@ -966,9 +1017,7 @@ bool verifyVelGradients(WorldPtr world, VectorXd worldVel)
   return (
       verifyClassicClampingConstraintMatrix(world, worldVel)
       && verifyMassedClampingConstraintMatrix(world, worldVel)
-      // && verifyScratch(world)
       && verifyMassedUpperBoundConstraintMatrix(world, worldVel)
-      // These no longer matter, because we bypass P_c in the new formulation
       && verifyClassicProjectionIntoClampsMatrix(world, worldVel)
       && verifyMassedProjectionIntoClampsMatrix(world, worldVel)
       && verifyJacobianOfProjectionIntoClampsMatrix(world, worldVel, POSITION)
@@ -2804,7 +2853,7 @@ bool verifyPerturbedContactPositions(WorldPtr world)
   BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
   std::vector<std::shared_ptr<DifferentiableContactConstraint>> constraints
       = classicPtr->getClampingConstraints();
-  const double EPS = 1e-8;
+  const double EPS = 1e-7;
   for (int i = 0; i < world->getNumSkeletons(); i++)
   {
     auto skel = world->getSkeleton(i);

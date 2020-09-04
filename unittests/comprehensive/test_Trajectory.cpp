@@ -325,11 +325,15 @@ bool verifyMultiShotJacobian(WorldPtr world, int steps, int shotLength)
   int numConstraints = shot.getConstraintDim();
 
   // Random initialization
-  /*
   srand(42);
   Eigen::VectorXd randomInit = Eigen::VectorXd::Random(dim);
   shot.unflatten(randomInit);
-  */
+
+  Eigen::VectorXd pos = randomInit.segment(20, 5);
+  Eigen::VectorXd vel = randomInit.segment(25, 5);
+
+  std::cout << "Pos: " << std::endl << pos << std::endl;
+  std::cout << "Vel: " << std::endl << vel << std::endl;
 
   Eigen::MatrixXd analyticalJacobian
       = Eigen::MatrixXd::Zero(numConstraints, dim);
@@ -849,7 +853,10 @@ TEST(TRAJECTORY, JUMP_WORM)
     double endPos = poses(1, poses.cols() - 1);
     double endPosLoss = -(endPos * endPos) * (endPos > 0 ? 1.0 : -1.0);
 
-    return (100 * peakPosLoss) + (20 * minPosLoss) + endPosLoss;
+    double forceLoss = forces.squaredNorm();
+
+    return endPosLoss * 100 + forceLoss * 1e-3;
+    // return (100 * peakPosLoss) + (20 * minPosLoss) + endPosLoss;
 
     /*
     Eigen::VectorXd midVel = vels.col(vels.cols() / 2);
@@ -868,12 +875,31 @@ TEST(TRAJECTORY, JUMP_WORM)
   // for finite differencing
   world->setTimeStep(1e-3);
 
-  EXPECT_TRUE(verifyMultiShotOptimization(world, 1000, 200, loss));
-  // EXPECT_TRUE(verifySingleStep(world, 1e-6));
+  world->getConstraintSolver()->setPenetrationCorrectionEnabled(false);
+
+  // Initial pos that creates deep inter-penetration and generates larger
+  // gradient errors
+  Eigen::VectorXd initialPos = Eigen::VectorXd(5);
+  initialPos << 0.96352, -0.5623, -0.0912082, 0.037308, 0.147683;
+  // Initial vel
+  Eigen::VectorXd initialVel = Eigen::VectorXd(5);
+  initialVel << 0.110462, 0.457093, 0.257748, 0.592256, 0.167432;
+
+  world->setPositions(initialPos);
+  world->setVelocities(initialVel);
+
+  EXPECT_TRUE(verifyVelGradients(world, initialVel));
+  EXPECT_TRUE(verifyNoMultistepIntereference(world, 10));
+  EXPECT_TRUE(verifyAnalyticalJacobians(world));
+  EXPECT_TRUE(verifyAnalyticalBackprop(world));
+  // renderWorld(world);
+
+  // EXPECT_TRUE(verifyMultiShotOptimization(world, 600, 20, loss));
+  EXPECT_TRUE(verifySingleStep(world, 5e-7));
   // EXPECT_TRUE(verifySingleShot(world, 40, 5e-7, false));
-  // EXPECT_TRUE(verifyShotJacobian(world, 4));
-  // EXPECT_TRUE(verifyShotGradient(world, 7, loss));
-  // EXPECT_TRUE(verifyMultiShotJacobian(world, 20, 10));
-  // EXPECT_TRUE(verifySparseJacobian(world, 8, 2));
-  // EXPECT_TRUE(verifyMultiShotGradient(world, 8, 4, loss));
+  EXPECT_TRUE(verifyShotJacobian(world, 4));
+  EXPECT_TRUE(verifyShotGradient(world, 7, loss));
+  EXPECT_TRUE(verifyMultiShotJacobian(world, 6, 2));
+  EXPECT_TRUE(verifySparseJacobian(world, 8, 2));
+  EXPECT_TRUE(verifyMultiShotGradient(world, 8, 4, loss));
 }

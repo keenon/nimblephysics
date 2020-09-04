@@ -42,7 +42,7 @@ bool IPOptOptimizer::optimize(AbstractShot* shot)
   app->Options()->SetStringValue(
       "scaling_method", "none"); // none, gradient-based
 
-  app->Options()->SetIntegerValue("max_iter", 500);
+  app->Options()->SetIntegerValue("max_iter", 10000);
 
   // Disable LBFGS history
   app->Options()->SetIntegerValue("limited_memory_max_history", 1);
@@ -108,8 +108,9 @@ bool IPOptOptimizer::optimize(AbstractShot* shot)
 
 //==============================================================================
 IPOptShotWrapper::IPOptShotWrapper(AbstractShot* wrapped)
+  : mBestFeasibleObjectiveValue(1e20), mWrapped(wrapped), mBestIter(0)
 {
-  mWrapped = wrapped;
+  mBestFeasibleState = Eigen::VectorXd(mWrapped->getFlatProblemDim());
 }
 
 //==============================================================================
@@ -428,7 +429,11 @@ void IPOptShotWrapper::finalize_solution(
     Ipopt::IpoptCalculatedQuantities* /*_ip_cq*/)
 {
   Eigen::Map<const Eigen::VectorXd> flat(_x, _n);
-  mWrapped->unflatten(flat);
+
+  // TODO: we may not actually want to do this
+  std::cout << "Recovering best discovered state from iter " << mBestIter
+            << " with loss " << mBestFeasibleObjectiveValue << std::endl;
+  mWrapped->unflatten(mBestFeasibleState);
   /*
   const std::shared_ptr<Problem>& problem = mSolver->getProblem();
 
@@ -439,6 +444,33 @@ void IPOptShotWrapper::finalize_solution(
     x[i] = _x[i];
   problem->setOptimalSolution(x);
   */
+}
+
+//==============================================================================
+bool IPOptShotWrapper::intermediate_callback(
+    Ipopt::AlgorithmMode mode,
+    Ipopt::Index iter,
+    Ipopt::Number obj_value,
+    Ipopt::Number inf_pr,
+    Ipopt::Number inf_du,
+    Ipopt::Number mu,
+    Ipopt::Number d_norm,
+    Ipopt::Number regularization_size,
+    Ipopt::Number alpha_du,
+    Ipopt::Number alpha_pr,
+    Ipopt::Index ls_trials,
+    const Ipopt::IpoptData* ip_data,
+    Ipopt::IpoptCalculatedQuantities* ip_cq)
+{
+  if (obj_value < mBestFeasibleObjectiveValue && inf_pr < 5e-4)
+  {
+    // std::cout << "Found new best feasible loss!" << std::endl;
+    mBestIter = iter;
+    // Found new best feasible objective
+    mBestFeasibleObjectiveValue = obj_value;
+    mWrapped->flatten(mBestFeasibleState);
+  }
+  return true;
 }
 
 } // namespace trajectory
