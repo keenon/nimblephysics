@@ -751,14 +751,23 @@ DifferentiableContactConstraint::bruteForceContactPositionJacobian(
     Eigen::VectorXd perturbedPositions = positions;
     perturbedPositions(i) += EPS;
     world->setPositions(perturbedPositions);
-
     std::shared_ptr<BackpropSnapshot> backpropSnapshot
         = neural::forwardPass(world, true);
-    std::shared_ptr<DifferentiableContactConstraint> peerConstraint
+    std::shared_ptr<DifferentiableContactConstraint> peerConstraintPos
         = getPeerConstraint(backpropSnapshot);
-    jac.col(i) = (peerConstraint->getContactWorldPosition()
-                  - getContactWorldPosition())
-                 / EPS;
+
+    snapshot.restore();
+    perturbedPositions = positions;
+    perturbedPositions(i) -= EPS;
+    world->setPositions(perturbedPositions);
+    std::shared_ptr<BackpropSnapshot> backpropSnapshotNeg
+        = neural::forwardPass(world, true);
+    std::shared_ptr<DifferentiableContactConstraint> peerConstraintNeg
+        = getPeerConstraint(backpropSnapshotNeg);
+
+    jac.col(i) = (peerConstraintPos->getContactWorldPosition()
+                  - peerConstraintNeg->getContactWorldPosition())
+                 / (2 * EPS);
   }
 
   snapshot.restore();
@@ -787,14 +796,23 @@ DifferentiableContactConstraint::bruteForceContactForceDirectionJacobian(
     Eigen::VectorXd perturbedPositions = positions;
     perturbedPositions(i) += EPS;
     world->setPositions(perturbedPositions);
-
-    std::shared_ptr<BackpropSnapshot> backpropSnapshot
+    std::shared_ptr<BackpropSnapshot> backpropSnapshotPos
         = neural::forwardPass(world, true);
-    std::shared_ptr<DifferentiableContactConstraint> peerConstraint
-        = getPeerConstraint(backpropSnapshot);
-    jac.col(i) = (peerConstraint->getContactWorldForceDirection()
-                  - getContactWorldForceDirection())
-                 / EPS;
+    std::shared_ptr<DifferentiableContactConstraint> peerConstraintPos
+        = getPeerConstraint(backpropSnapshotPos);
+
+    snapshot.restore();
+    perturbedPositions = positions;
+    perturbedPositions(i) -= EPS;
+    world->setPositions(perturbedPositions);
+    std::shared_ptr<BackpropSnapshot> backpropSnapshotNeg
+        = neural::forwardPass(world, true);
+    std::shared_ptr<DifferentiableContactConstraint> peerConstraintNeg
+        = getPeerConstraint(backpropSnapshotNeg);
+
+    jac.col(i) = (peerConstraintPos->getContactWorldForceDirection()
+                  - peerConstraintNeg->getContactWorldForceDirection())
+                 / (2 * EPS);
   }
 
   snapshot.restore();
@@ -822,12 +840,23 @@ math::Jacobian DifferentiableContactConstraint::bruteForceContactForceJacobian(
     Eigen::VectorXd perturbedPositions = positions;
     perturbedPositions(i) += EPS;
     world->setPositions(perturbedPositions);
-
     std::shared_ptr<BackpropSnapshot> backpropSnapshot
         = neural::forwardPass(world, true);
     std::shared_ptr<DifferentiableContactConstraint> peerConstraint
         = getPeerConstraint(backpropSnapshot);
-    jac.col(i) = (peerConstraint->getWorldForce() - getWorldForce()) / EPS;
+
+    snapshot.restore();
+    perturbedPositions = positions;
+    perturbedPositions(i) -= EPS;
+    world->setPositions(perturbedPositions);
+    std::shared_ptr<BackpropSnapshot> backpropSnapshotNeg
+        = neural::forwardPass(world, true);
+    std::shared_ptr<DifferentiableContactConstraint> peerConstraintNeg
+        = getPeerConstraint(backpropSnapshotNeg);
+
+    jac.col(i)
+        = (peerConstraint->getWorldForce() - peerConstraintNeg->getWorldForce())
+          / (2 * EPS);
   }
 
   snapshot.restore();
@@ -861,14 +890,22 @@ DifferentiableContactConstraint::bruteForceConstraintForcesJacobian(
     Eigen::VectorXd tweakedPosition = originalPosition;
     tweakedPosition(i) += EPS;
     world->setPositions(tweakedPosition);
-
     std::shared_ptr<BackpropSnapshot> backpropSnapshot
         = neural::forwardPass(world, true);
     std::shared_ptr<DifferentiableContactConstraint> peerConstraint
         = getPeerConstraint(backpropSnapshot);
     Eigen::VectorXd newOut = peerConstraint->getConstraintForces(world);
 
-    result.col(i) = (newOut - originalOut) / EPS;
+    tweakedPosition = originalPosition;
+    tweakedPosition(i) -= EPS;
+    world->setPositions(tweakedPosition);
+    std::shared_ptr<BackpropSnapshot> backpropSnapshotNeg
+        = neural::forwardPass(world, true);
+    std::shared_ptr<DifferentiableContactConstraint> peerConstraintNeg
+        = getPeerConstraint(backpropSnapshotNeg);
+    Eigen::VectorXd newOutNeg = peerConstraintNeg->getConstraintForces(world);
+
+    result.col(i) = (newOut - newOutNeg) / (2 * EPS);
   }
 
   snapshot.restore();

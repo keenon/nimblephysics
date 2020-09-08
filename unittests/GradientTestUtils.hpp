@@ -601,6 +601,10 @@ bool verifyF_c(WorldPtr world)
               << analyticalJac << std::endl;
     std::cout << "Diff Jac:" << std::endl
               << (bruteForceJac - analyticalJac) << std::endl;
+    bruteForceJac = classicPtr->finiteDifferenceJacobianOfConstraintForce(
+        world, WithRespectTo::POSITION);
+    analyticalJac = classicPtr->getJacobianOfConstraintForce(
+        world, WithRespectTo::POSITION);
     return false;
   }
 
@@ -1506,9 +1510,11 @@ bool verifyGradientBackprop(
     double diffVelPos = (velPos - velPosFD).norm();
     double diffVelVel = (velVel - velVelFD).norm();
 
+    /*
     std::cout << "Jacobian error at step:" << numSteps << ": " << diffPosPos
               << ", " << diffPosVel << ", " << diffVelPos << ", " << diffVelVel
               << std::endl;
+    */
 
     LossGradient analyticalWithBruteForce;
     analyticalWithBruteForce.lossWrtPosition
@@ -1520,6 +1526,7 @@ bool verifyGradientBackprop(
 
     bruteForce = bruteForceThisTimestep;
 
+    /*
     std::cout
         << "Backprop error at step:" << numSteps << ": "
         << (analytical.lossWrtPosition - bruteForce.lossWrtPosition).norm()
@@ -1527,6 +1534,7 @@ bool verifyGradientBackprop(
         << (analytical.lossWrtVelocity - bruteForce.lossWrtVelocity).norm()
         << ", " << (analytical.lossWrtTorque - bruteForce.lossWrtTorque).norm()
         << std::endl;
+    */
 
     // Assert that the results are the same
     if (!equals(analytical.lossWrtPosition, bruteForce.lossWrtPosition, 1e-8)
@@ -2552,7 +2560,7 @@ bool verifyAnalyticalContactNormalJacobians(WorldPtr world)
     math::LinearJacobian bruteForceJac
         = constraints[i]->bruteForceContactForceDirectionJacobian(world);
 
-    if (!equals(analyticalJac, bruteForceJac, 1e-8))
+    if (!equals(analyticalJac, bruteForceJac, 5e-8))
     {
       std::cout << "Analytical Contact Force Direction Jac:" << std::endl
                 << analyticalJac << std::endl;
@@ -2581,7 +2589,7 @@ bool verifyAnalyticalContactForceJacobians(WorldPtr world)
     math::Jacobian bruteForceJac
         = constraints[i]->bruteForceContactForceJacobian(world);
 
-    if (!equals(analyticalJac, bruteForceJac, 1e-8))
+    if (!equals(analyticalJac, bruteForceJac, 3e-8))
     {
       std::cout << "Analytical Contact Force Jac:" << std::endl
                 << analyticalJac << std::endl;
@@ -2630,6 +2638,8 @@ bool verifyPerturbedContactEdges(WorldPtr world)
         {
           EdgeData bruteForce
               = constraints[k]->bruteForceEdges(world, skel, j, EPS);
+          EdgeData bruteForceNeg
+              = constraints[k]->bruteForceEdges(world, skel, j, -EPS);
           EdgeData analytical
               = constraints[k]->estimatePerturbedEdges(skel, j, EPS);
 
@@ -2638,6 +2648,11 @@ bool verifyPerturbedContactEdges(WorldPtr world)
               bruteForce.edgeADir,
               bruteForce.edgeBPos,
               bruteForce.edgeBDir);
+          Eigen::Vector3d bruteIntersectionNeg = math::getContactPoint(
+              bruteForceNeg.edgeAPos,
+              bruteForceNeg.edgeADir,
+              bruteForceNeg.edgeBPos,
+              bruteForceNeg.edgeBDir);
           Eigen::Vector3d analyticalIntersection = math::getContactPoint(
               bruteForce.edgeAPos,
               bruteForce.edgeADir,
@@ -2760,7 +2775,7 @@ bool verifyPerturbedContactEdges(WorldPtr world)
                   analyticalGradient.edgeBDir);
 
           Eigen::Vector3d finiteDifferenceIntersectionGradient
-              = (bruteIntersection - originalIntersectionPoint) / EPS;
+              = (bruteIntersection - bruteIntersectionNeg) / (2 * EPS);
 
           estimateThreshold = 1e-8;
 
@@ -2903,7 +2918,12 @@ bool verifyPerturbedContactPositions(WorldPtr world)
           return false;
         }
 
-        Eigen::Vector3d finiteDifferenceGradient = (bruteForce - pos) / EPS;
+        Eigen::Vector3d bruteForceNeg
+            = constraints[k]->bruteForcePerturbedContactPosition(
+                world, skel, j, -EPS);
+
+        Eigen::Vector3d finiteDifferenceGradient
+            = (bruteForce - bruteForceNeg) / (2 * EPS);
         Eigen::Vector3d analyticalGradient
             = constraints[k]->getContactPositionGradient(skel->getDof(j));
         if (!equals(analyticalGradient, finiteDifferenceGradient, 1e-8))
@@ -2966,7 +2986,12 @@ bool verifyPerturbedContactNormals(WorldPtr world)
           return false;
         }
 
-        Eigen::Vector3d finiteDifferenceGradient = (analytical - normal) / EPS;
+        Eigen::Vector3d bruteForceNeg
+            = constraints[k]->bruteForcePerturbedContactNormal(
+                world, skel, j, -EPS);
+
+        Eigen::Vector3d finiteDifferenceGradient
+            = (analytical - bruteForceNeg) / (2 * EPS);
         Eigen::Vector3d analyticalGradient
             = constraints[k]->getContactNormalGradient(skel->getDof(j));
         if (!equals(analyticalGradient, finiteDifferenceGradient, 1e-8))
@@ -3042,7 +3067,11 @@ bool verifyPerturbedContactForceDirections(WorldPtr world)
           return false;
         }
 
-        Eigen::Vector3d finiteDifferenceGradient = (analytical - dir) / EPS;
+        Eigen::Vector3d bruteForceNeg
+            = constraints[k]->bruteForcePerturbedContactForceDirection(
+                world, skel, j, -EPS);
+        Eigen::Vector3d finiteDifferenceGradient
+            = (bruteForce - bruteForceNeg) / (2 * EPS);
         Eigen::Vector3d analyticalGradient
             = constraints[k]->getContactForceGradient(skel->getDof(j));
         if (!equals(analyticalGradient, finiteDifferenceGradient, 1e-8))
@@ -3167,13 +3196,19 @@ bool verifyAnalyticalConstraintDerivatives(WorldPtr world)
             = constraints[i]->getPeerConstraint(newPtr)->getConstraintForce(
                 axis);
 
+        rotate->setPosition(originalPosition - EPS);
+        BackpropSnapshotPtr newPtrNeg = neural::forwardPass(world, true);
+        double newValueNeg
+            = constraints[i]->getPeerConstraint(newPtrNeg)->getConstraintForce(
+                axis);
+
+        rotate->setPosition(originalPosition);
+
         Eigen::Vector6d gradientOfWorldForce
             = constraints[i]->getContactWorldForceGradient(rotate);
         Eigen::Vector6d worldTwist = constraints[i]->getWorldScrewAxis(axis);
 
-        rotate->setPosition(originalPosition);
-
-        double bruteForce = (newValue - originalValue) / EPS;
+        double bruteForce = (newValue - newValueNeg) / (2 * EPS);
 
         if (abs(analytical - bruteForce) > 1e-8)
         {
@@ -3318,7 +3353,7 @@ bool verifyJacobianOfClampingConstraints(WorldPtr world)
   Eigen::MatrixXd bruteForce
       = classicPtr->finiteDifferenceJacobianOfClampingConstraints(world, f0);
 
-  if (!equals(analytical, bruteForce, 1e-8))
+  if (!equals(analytical, bruteForce, 3e-8))
   {
     std::cout << "getJacobianOfClampingConstraints error:" << std::endl;
     std::cout << "f0:" << std::endl << f0 << std::endl;
@@ -3342,13 +3377,14 @@ bool verifyJacobianOfClampingConstraintsTranspose(WorldPtr world)
       = classicPtr->finiteDifferenceJacobianOfClampingConstraintsTranspose(
           world, v0);
 
-  if (!equals(analytical, bruteForce, 1e-8))
+  if (!equals(analytical, bruteForce, 3e-8))
   {
     std::cout << "getJacobianOfClampingConstraintsTranspose error:"
               << std::endl;
     std::cout << "v0:" << std::endl << v0 << std::endl;
     std::cout << "Analytical:" << std::endl << analytical << std::endl;
     std::cout << "Brute Force:" << std::endl << bruteForce << std::endl;
+    std::cout << "Diff:" << std::endl << analytical - bruteForce << std::endl;
     return false;
   }
   return true;

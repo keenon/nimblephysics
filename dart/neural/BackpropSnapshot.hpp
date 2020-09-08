@@ -457,6 +457,9 @@ protected:
   /// These are the offsets into the total degrees of freedom for each skeleton
   std::unordered_map<std::string, std::size_t> mSkeletonOffset;
 
+  /// These are the number of degrees of freedom for each skeleton
+  std::unordered_map<std::string, std::size_t> mSkeletonDofs;
+
   /// The position of all the DOFs of the world BEFORE the timestep
   Eigen::VectorXd mPreStepPosition;
 

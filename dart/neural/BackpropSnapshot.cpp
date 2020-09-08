@@ -63,6 +63,7 @@ BackpropSnapshot::BackpropSnapshot(
   {
     SkeletonPtr skel = world->getSkeleton(i);
     mSkeletonOffset[skel->getName()] = mNumDOFs;
+    mSkeletonDofs[skel->getName()] = skel->getNumDofs();
     mNumDOFs += skel->getNumDofs();
 
     std::shared_ptr<ConstrainedGroupGradientMatrices> gradientMatrix
@@ -1103,7 +1104,7 @@ Eigen::MatrixXd BackpropSnapshot::getInvMassMatrix(
 //==============================================================================
 Eigen::MatrixXd BackpropSnapshot::getClampingAMatrix()
 {
-  Eigen::MatrixXd result = Eigen::MatrixXd(mNumClamping, mNumClamping);
+  Eigen::MatrixXd result = Eigen::MatrixXd::Zero(mNumClamping, mNumClamping);
   int cursor = 0;
   for (int i = 0; i < mGradientMatrices.size(); i++)
   {
@@ -2265,30 +2266,54 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceJacobianOfClampingConstraints(
 
   for (std::size_t i = 0; i < mNumDOFs; i++)
   {
-    double useEPS = EPS;
-
+    double posEPS = EPS;
+    Eigen::VectorXd perturbedResultPos;
     // Keep scaling down the EPS until it no longer results in a different
     // number of columns
     for (int j = 0; j < 10; j++)
     {
       snapshot.restore();
       Eigen::VectorXd perturbed = mPreStepPosition;
-      perturbed(i) += useEPS;
+      perturbed(i) += posEPS;
       world->setPositions(perturbed);
       world->setVelocities(mPreStepVelocity);
       world->setForces(mPreStepTorques);
 
       BackpropSnapshotPtr ptr = neural::forwardPass(world, true);
       Eigen::MatrixXd perturbedA_c = ptr->getClampingConstraintMatrix(world);
-      if (perturbedA_c.cols() != f0.size())
+      if (perturbedA_c.cols() == f0.size())
       {
-        useEPS /= 2;
-        continue;
+        perturbedResultPos = perturbedA_c * f0;
+        break;
       }
-      Eigen::VectorXd perturbedResult = perturbedA_c * f0;
-      result.col(i) = (perturbedResult - original) / useEPS;
-      break;
+      posEPS /= 2;
     }
+
+    double negEPS = EPS;
+    Eigen::VectorXd perturbedResultNeg;
+    // Keep scaling down the EPS until it no longer results in a different
+    // number of columns
+    for (int j = 0; j < 10; j++)
+    {
+      snapshot.restore();
+      Eigen::VectorXd perturbed = mPreStepPosition;
+      perturbed(i) -= negEPS;
+      world->setPositions(perturbed);
+      world->setVelocities(mPreStepVelocity);
+      world->setForces(mPreStepTorques);
+
+      BackpropSnapshotPtr ptr = neural::forwardPass(world, true);
+      Eigen::MatrixXd perturbedA_c = ptr->getClampingConstraintMatrix(world);
+      if (perturbedA_c.cols() == f0.size())
+      {
+        perturbedResultNeg = perturbedA_c * f0;
+        break;
+      }
+      negEPS /= 2;
+    }
+
+    result.col(i)
+        = (perturbedResultPos - perturbedResultNeg) / (posEPS + negEPS);
   }
 
   snapshot.restore();
@@ -2319,7 +2344,8 @@ BackpropSnapshot::finiteDifferenceJacobianOfClampingConstraintsTranspose(
 
   for (std::size_t i = 0; i < mNumDOFs; i++)
   {
-    double useEPS = EPS;
+    double posEPS = EPS;
+    Eigen::VectorXd perturbedResultPos;
 
     // Keep scaling down the EPS until it no longer results in a different
     // number of columns
@@ -2327,21 +2353,47 @@ BackpropSnapshot::finiteDifferenceJacobianOfClampingConstraintsTranspose(
     {
       snapshot.restore();
       Eigen::VectorXd perturbed = mPreStepPosition;
-      perturbed(i) += useEPS;
+      perturbed(i) += posEPS;
       world->setPositions(perturbed);
       world->setVelocities(mPreStepVelocity);
       world->setForces(mPreStepTorques);
 
       BackpropSnapshotPtr ptr = neural::forwardPass(world, true);
-      Eigen::VectorXd perturbedResult
+      perturbedResultPos
           = ptr->getClampingConstraintMatrix(world).transpose() * v0;
-      if (perturbedResult.size() != original.size())
+      if (perturbedResultPos.size() == original.size())
       {
-        useEPS /= 2;
-        continue;
+        break;
       }
-      result.col(i) = (perturbedResult - original) / useEPS;
+      posEPS /= 2;
     }
+
+    double negEPS = EPS;
+    Eigen::VectorXd perturbedResultNeg;
+
+    // Keep scaling down the EPS until it no longer results in a different
+    // number of columns
+    for (int j = 0; j < 10; j++)
+    {
+      snapshot.restore();
+      Eigen::VectorXd perturbed = mPreStepPosition;
+      perturbed(i) -= negEPS;
+      world->setPositions(perturbed);
+      world->setVelocities(mPreStepVelocity);
+      world->setForces(mPreStepTorques);
+
+      BackpropSnapshotPtr ptr = neural::forwardPass(world, true);
+      perturbedResultNeg
+          = ptr->getClampingConstraintMatrix(world).transpose() * v0;
+      if (perturbedResultNeg.size() == original.size())
+      {
+        break;
+      }
+      negEPS /= 2;
+    }
+
+    result.col(i)
+        = (perturbedResultPos - perturbedResultNeg) / (posEPS + negEPS);
   }
 
   snapshot.restore();
@@ -2883,34 +2935,66 @@ Eigen::MatrixXd BackpropSnapshot::assembleBlockDiagonalMatrix(
 template <typename Vec>
 Vec BackpropSnapshot::assembleVector(VectorToAssemble whichVector)
 {
-  if (mGradientMatrices.size() == 1)
+  // When we're assembling vectors related to contact constraints, we can put
+  // them in order of constraint groups
+  if (whichVector == BOUNCE_DIAGONALS || whichVector == RESTITUTION_DIAGONALS
+      || whichVector == CONTACT_CONSTRAINT_IMPULSES
+      || whichVector == CONTACT_CONSTRAINT_MAPPINGS
+      || whichVector == PENETRATION_VELOCITY_HACK
+      || whichVector == CLAMPING_CONSTRAINT_IMPULSES
+      || whichVector == CLAMPING_CONSTRAINT_RELATIVE_VELS)
   {
-    return getVectorToAssemble<Vec>(mGradientMatrices[0], whichVector);
-  }
+    if (mGradientMatrices.size() == 1)
+    {
+      return getVectorToAssemble<Vec>(mGradientMatrices[0], whichVector);
+    }
 
-  std::size_t size = 0;
-  for (std::size_t i = 0; i < mGradientMatrices.size(); i++)
+    std::size_t size = 0;
+    for (std::size_t i = 0; i < mGradientMatrices.size(); i++)
+    {
+      // BOUNCE_DIAGONALS: bounce size is number of clamping contacts for each
+      // group RESTITUTION_DIAGONALS: bounce size is number of bouncing contacts
+      // (which is usually less than the number of clamping contacts) for each
+      // group CONTACT_CONSTRAINT_IMPULSES: This is the total number of
+      // contacts, including non-clamping ones CONTACT_CONSTRAINT_MAPPINGS: This
+      // is the total number of contacts, including non-clamping ones
+      size
+          += getVectorToAssemble<Vec>(mGradientMatrices[i], whichVector).size();
+    }
+
+    Vec collected = Vec(size);
+
+    std::size_t cursor = 0;
+    for (std::size_t i = 0; i < mGradientMatrices.size(); i++)
+    {
+      const Vec& vec
+          = getVectorToAssemble<Vec>(mGradientMatrices[i], whichVector);
+      collected.segment(cursor, vec.size()) = vec;
+      cursor += vec.size();
+    }
+    return collected;
+  }
+  // The other types of vectors need to go in order of skeletons
+  else
   {
-    // BOUNCE_DIAGONALS: bounce size is number of clamping contacts for each
-    // group RESTITUTION_DIAGONALS: bounce size is number of bouncing contacts
-    // (which is usually less than the number of clamping contacts) for each
-    // group CONTACT_CONSTRAINT_IMPULSES: This is the total number of contacts,
-    // including non-clamping ones CONTACT_CONSTRAINT_MAPPINGS: This is the
-    // total number of contacts, including non-clamping ones
-    size += getVectorToAssemble<Vec>(mGradientMatrices[i], whichVector).size();
-  }
+    Vec collected = Vec(mNumDOFs);
+    collected.setZero();
 
-  Vec collected = Vec(size);
-
-  std::size_t cursor = 0;
-  for (std::size_t i = 0; i < mGradientMatrices.size(); i++)
-  {
-    const Vec& vec
-        = getVectorToAssemble<Vec>(mGradientMatrices[i], whichVector);
-    collected.segment(cursor, vec.size()) = vec;
-    cursor += vec.size();
+    for (std::size_t i = 0; i < mGradientMatrices.size(); i++)
+    {
+      const Vec& vec
+          = getVectorToAssemble<Vec>(mGradientMatrices[i], whichVector);
+      int groupCursor = 0;
+      for (auto skelName : mGradientMatrices[i]->getSkeletons())
+      {
+        int dofs = mSkeletonDofs[skelName];
+        int worldOffset = mSkeletonOffset[skelName];
+        collected.segment(worldOffset, dofs) = vec.segment(groupCursor, dofs);
+        groupCursor += dofs;
+      }
+    }
+    return collected;
   }
-  return collected;
 }
 
 //==============================================================================

@@ -612,10 +612,13 @@ void testReversePendulumSledWithFrictionCoeff(double frictionCoeff)
 
   pendulumJoint->setTransformFromParentBodyNode(Eigen::Isometry3d::Identity());
   Eigen::Isometry3d pendulumBodyPosition = Eigen::Isometry3d::Identity();
-  pendulumBodyPosition.translation() = Eigen::Vector3d(0, 1, 0);
+  pendulumBodyPosition.translation() = Eigen::Vector3d(0, -1, 0);
   pendulumJoint->setTransformFromChildBodyNode(pendulumBodyPosition);
   pendulumJoint->setAxis(Eigen::Vector3d(0, 0, 1.0));
   pendulumBody->setMass(200);
+  std::shared_ptr<BoxShape> pendulumBodyShape(
+      new BoxShape(Eigen::Vector3d(0.5, 2.0, 0.5)));
+  pendulumBody->createShapeNodeWith<VisualAspect>(pendulumBodyShape);
 
   world->addSkeleton(reversePendulumSled);
 
@@ -646,6 +649,7 @@ void testReversePendulumSledWithFrictionCoeff(double frictionCoeff)
   // Run the tests
   ///////////////////////////////////////////////
 
+  pendulumJoint->setPosition(0, 30 * 3.1415 / 180);
   reversePendulumSled->computeForwardDynamics();
   reversePendulumSled->integrateVelocities(world->getTimeStep());
   VectorXd worldVel = world->getVelocities();
@@ -1002,7 +1006,6 @@ void testRobotArm(
   world->setPositions(pos);
   */
 
-  // renderWorld(world);
   EXPECT_TRUE(verifyVelGradients(world, worldVel));
   EXPECT_TRUE(verifyAnalyticalJacobians(world));
   EXPECT_TRUE(verifyAnalyticalBackprop(world));
@@ -1013,11 +1016,11 @@ TEST(GRADIENTS, ARM_3_LINK_30_DEG)
   testRobotArm(3, 30.0 / 180 * 3.1415);
 }
 
-TEST(GRADIENTS, ARM_5_LINK_30_DEG)
+TEST(GRADIENTS, ARM_5_LINK_40_DEG)
 {
   // This test wraps an arm around, and it's actually breaking contact, so this
   // tests unconstrained free-motion
-  testRobotArm(5, 30.0 / 180 * 3.1415);
+  testRobotArm(5, 40.0 / 180 * 3.1415);
 }
 
 TEST(GRADIENTS, ARM_6_LINK_15_DEG)
@@ -1265,7 +1268,7 @@ void testCartpole(double rotationRadians)
 
   EXPECT_TRUE(verifyVelGradients(world, worldVel));
   EXPECT_TRUE(verifyAnalyticalBackprop(world));
-  EXPECT_TRUE(verifyGradientBackprop(world, 50, [](WorldPtr world) {
+  EXPECT_TRUE(verifyGradientBackprop(world, 20, [](WorldPtr world) {
     Eigen::VectorXd pos = world->getPositions();
     Eigen::VectorXd vel = world->getVelocities();
     return (pos[0] * pos[0]) + (pos[1] * pos[1]) + (vel[0] * vel[0])
