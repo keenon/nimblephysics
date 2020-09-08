@@ -295,6 +295,9 @@ public:
   const std::vector<std::string>& getSkeletons() const;
 
   const std::vector<std::shared_ptr<DifferentiableContactConstraint>>&
+  getDifferentiableConstraints() const;
+
+  const std::vector<std::shared_ptr<DifferentiableContactConstraint>>&
   getClampingConstraints() const;
 
   const std::vector<std::shared_ptr<DifferentiableContactConstraint>>&
@@ -413,6 +416,10 @@ protected:
   /// This gives the index into the constraint at mConstraints[i] that
   /// constraint i represents
   std::vector<int> mConstraintIndices;
+
+  /// These are all the constraints
+  std::vector<std::shared_ptr<DifferentiableContactConstraint>>
+      mDifferentiableConstraints;
 
   /// These are just the clamping constraints
   std::vector<std::shared_ptr<DifferentiableContactConstraint>>

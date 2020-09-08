@@ -15,10 +15,13 @@ namespace neural {
 
 //==============================================================================
 DifferentiableContactConstraint::DifferentiableContactConstraint(
-    std::shared_ptr<constraint::ConstraintBase> constraint, int index)
+    std::shared_ptr<constraint::ConstraintBase> constraint,
+    int index,
+    double constraintForce)
 {
   mConstraint = constraint;
   mIndex = index;
+  mConstraintForce = constraintForce;
   if (mConstraint->isContactConstraint())
   {
     mContactConstraint
@@ -194,6 +197,26 @@ Eigen::VectorXd DifferentiableContactConstraint::getConstraintForces(
 
   skel->setPositions(oldPositions);
 
+  return taus;
+}
+
+//==============================================================================
+Eigen::VectorXd DifferentiableContactConstraint::getConstraintForces(
+    std::shared_ptr<simulation::World> world,
+    std::vector<std::string> skelNames)
+{
+  int totalDofs = 0;
+  for (auto name : skelNames)
+    totalDofs += world->getSkeleton(name)->getNumDofs();
+  Eigen::VectorXd taus = Eigen::VectorXd::Zero(totalDofs);
+  int cursor = 0;
+  for (auto name : skelNames)
+  {
+    auto skel = world->getSkeleton(name);
+    int dofs = skel->getNumDofs();
+    taus.segment(cursor, dofs) = getConstraintForces(skel);
+    cursor += dofs;
+  }
   return taus;
 }
 

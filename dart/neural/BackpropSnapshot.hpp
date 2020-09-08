@@ -259,9 +259,11 @@ public:
   /// constant except the value of WithRespectTo
   Eigen::MatrixXd getJacobianOfC(simulation::WorldPtr world, WithRespectTo wrt);
 
-  /// This returns the jacobian of M^{-1}(pos, inertia) * (C(pos, inertia, vel) + mPreStepTorques),
-  /// holding everything constant except the value of WithRespectTo
-  Eigen::MatrixXd getJacobianOfMinvC(simulation::WorldPtr world, WithRespectTo wrt);
+  /// This returns the jacobian of M^{-1}(pos, inertia) * (C(pos, inertia, vel)
+  /// + mPreStepTorques), holding everything constant except the value of
+  /// WithRespectTo
+  Eigen::MatrixXd getJacobianOfMinvC(
+      simulation::WorldPtr world, WithRespectTo wrt);
 
   /// This returns a fast approximation to A_c in the neighborhood of the
   /// original
@@ -281,6 +283,16 @@ public:
   /// Only for testing: VERY SLOW. This returns the actual value of A_ub at the
   /// desired position.
   Eigen::MatrixXd getUpperBoundConstraintMatrixAt(
+      simulation::WorldPtr world, Eigen::VectorXd pos);
+
+  /// Only for testing: VERY SLOW. This returns the actual value of E at the
+  /// desired position.
+  Eigen::MatrixXd getUpperBoundMappingMatrixAt(
+      simulation::WorldPtr world, Eigen::VectorXd pos);
+
+  /// Only for testing: VERY SLOW. This returns the actual value of the bounce
+  /// diagonals at the desired position.
+  Eigen::VectorXd getBounceDiagonalsAt(
       simulation::WorldPtr world, Eigen::VectorXd pos);
 
   /// This computes the Jacobian of A_c*f0 with respect to position using
@@ -400,12 +412,26 @@ public:
   /// This is the clamping constraints from all the constrained
   /// groups, concatenated together
   std::vector<std::shared_ptr<DifferentiableContactConstraint>>
+  getDifferentiableConstraints();
+
+  /// This is the clamping constraints from all the constrained
+  /// groups, concatenated together
+  std::vector<std::shared_ptr<DifferentiableContactConstraint>>
   getClampingConstraints();
 
   /// This is the upper bound constraints from all the constrained
   /// groups, concatenated together
   std::vector<std::shared_ptr<DifferentiableContactConstraint>>
   getUpperBoundConstraints();
+
+  /// This verifies that the two matrices are equal to some tolerance, and if
+  /// they're not it prints the information needed to replicated this scenario
+  /// and it exits the program.
+  void equalsOrCrash(
+      std::shared_ptr<simulation::World> world,
+      Eigen::MatrixXd analytical,
+      Eigen::MatrixXd bruteForce,
+      std::string name);
 
 protected:
   /// This is the global timestep length. This is included here because it shows

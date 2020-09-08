@@ -384,6 +384,7 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(ConstrainedGroup& group)
 
   // Clean up the results, this will clean up the mX vector to remove obvious
   // blemishes on the clamping indices
+  /*
   LCPUtils::cleanUpResults(
       aGradientBackup,
       mX,
@@ -391,6 +392,7 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(ConstrainedGroup& group)
       hiGradientBackup,
       loGradientBackup,
       fIndexGradientBackup);
+  */
 
   // Apply constraint impulses
   for (std::size_t i = 0; i < numConstraints; ++i)

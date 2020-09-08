@@ -307,7 +307,6 @@ void SingleShot::backpropGradient(
   {
     nextTimestep.lossWrtPosition += gradWrtPoses.col(i);
     nextTimestep.lossWrtVelocity += gradWrtVels.col(i);
-    nextTimestep.lossWrtTorque += gradWrtForces.col(i);
     LossGradient thisTimestep;
     snapshots[i]->backprop(world, thisTimestep, nextTimestep);
     cursor -= mNumDofs;
@@ -320,6 +319,7 @@ void SingleShot::backpropGradient(
       cursor -= mNumDofs;
       grad.segment(cursor, mNumDofs) = thisTimestep.lossWrtPosition;
     }
+    thisTimestep.lossWrtTorque += gradWrtForces.col(i);
     nextTimestep = thisTimestep;
   }
   assert(cursor == 0);
@@ -372,7 +372,7 @@ void SingleShot::getStates(
   {
     poses.col(i) = snapshots[i]->getPostStepPosition();
     vels.col(i) = snapshots[i]->getPostStepVelocity();
-    forces.col(i) = snapshots[i]->getPostStepTorques();
+    forces.col(i) = snapshots[i]->getPreStepTorques();
   }
 }
 

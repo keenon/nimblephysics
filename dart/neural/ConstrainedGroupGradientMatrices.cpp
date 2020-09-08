@@ -329,6 +329,7 @@ void ConstrainedGroupGradientMatrices::constructMatrices(
   // TODO: this actually results in very wrong values when we've got deep
   // inter-penetration, so we're leaving it disabled.
   // deduplicateConstraints();
+
   mContactConstraintImpulses = mX;
   mContactConstraintMappings = mFIndex;
   // Group the constraints based on their solution values into three buckets:
@@ -489,6 +490,8 @@ void ConstrainedGroupGradientMatrices::constructMatrices(
   mRestitutionDiagonals = Eigen::VectorXd::Zero(numBouncing);
   mClampingConstraintImpulses = Eigen::VectorXd::Zero(numClamping);
   mClampingConstraintRelativeVels = Eigen::VectorXd::Zero(numClamping);
+  mDifferentiableConstraints.reserve(mNumConstraintDim);
+  assert(mDifferentiableConstraints.size() == 0);
   mClampingConstraints.reserve(numClamping);
   assert(mClampingConstraints.size() == 0);
   mUpperBoundConstraints.reserve(numUpperBound);
@@ -505,18 +508,19 @@ void ConstrainedGroupGradientMatrices::constructMatrices(
   // Copy impulse tests into the matrices
   for (size_t j = 0; j < mNumConstraintDim; j++)
   {
+    std::shared_ptr<DifferentiableContactConstraint> constraint
+        = std::make_shared<DifferentiableContactConstraint>(
+            mConstraints[j], mConstraintIndices[j], mX(j));
+    mDifferentiableConstraints.push_back(constraint);
+
     if (mContactConstraintMappings(j) == neural::ConstraintMapping::CLAMPING)
     {
       assert(numClamping > clampingIndex[j]);
 
-      std::shared_ptr<DifferentiableContactConstraint> constraint
-          = std::make_shared<DifferentiableContactConstraint>(
-              mConstraints[j], mConstraintIndices[j]);
-
       mClampingConstraints.push_back(constraint);
 
       Eigen::VectorXd analyticalImpulse
-          = constraint->getConstraintForces(world);
+          = constraint->getConstraintForces(world, mSkeletons);
 
       mClampingConstraintMatrix.col(clampingIndex[j]) = analyticalImpulse;
       mMassedClampingConstraintMatrix.col(clampingIndex[j])
@@ -540,10 +544,6 @@ void ConstrainedGroupGradientMatrices::constructMatrices(
     else if (mContactConstraintMappings(j) >= 0) // means we're an UPPER_BOUND
     {
       assert(numUpperBound > upperBoundIndex[j]);
-
-      std::shared_ptr<DifferentiableContactConstraint> constraint
-          = std::make_shared<DifferentiableContactConstraint>(
-              mConstraints[j], mConstraintIndices[j]);
 
       mUpperBoundConstraints.push_back(constraint);
       mUpperBoundConstraintMatrix.col(upperBoundIndex[j])
@@ -1328,6 +1328,13 @@ const std::vector<std::string>& ConstrainedGroupGradientMatrices::getSkeletons()
     const
 {
   return mSkeletons;
+}
+
+//==============================================================================
+const std::vector<std::shared_ptr<DifferentiableContactConstraint>>&
+ConstrainedGroupGradientMatrices::getDifferentiableConstraints() const
+{
+  return mDifferentiableConstraints;
 }
 
 //==============================================================================

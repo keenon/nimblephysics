@@ -470,7 +470,7 @@ bool verifyVelVelJacobian(WorldPtr world, VectorXd proposedVelocities)
   MatrixXd analytical = classicPtr->getVelVelJacobian(world);
   MatrixXd bruteForce = classicPtr->finiteDifferenceVelVelJacobian(world);
 
-  if (!equals(analytical, bruteForce, 1e-9))
+  if (!equals(analytical, bruteForce, 1e-8))
   {
     std::cout << "Brute force velVelJacobian:" << std::endl
               << bruteForce << std::endl;
@@ -502,16 +502,30 @@ bool verifyAnalyticalConstraintMatrixEstimates(WorldPtr world)
 
   for (int i = 0; i < 100; i++)
   {
-    Eigen::VectorXd diff = Eigen::VectorXd::Random(world->getNumDofs()) * EPS;
-    Eigen::VectorXd pos = world->getPositions() + diff;
+    Eigen::VectorXd diff = Eigen::VectorXd::Random(world->getNumDofs());
 
-    Eigen::MatrixXd analytical
-        = classicPtr->estimateClampingConstraintMatrixAt(world, pos);
-    Eigen::MatrixXd bruteForce
-        = classicPtr->getClampingConstraintMatrixAt(world, pos);
+    Eigen::MatrixXd analyticalDiff;
+    Eigen::MatrixXd bruteForceDiff;
 
-    Eigen::MatrixXd analyticalDiff = (analytical - original) / EPS;
-    Eigen::MatrixXd bruteForceDiff = (bruteForce - original) / EPS;
+    double eps = EPS;
+    while (true)
+    {
+      Eigen::VectorXd pos = world->getPositions() + diff * eps;
+
+      Eigen::MatrixXd analytical
+          = classicPtr->estimateClampingConstraintMatrixAt(world, pos);
+      Eigen::MatrixXd bruteForce
+          = classicPtr->getClampingConstraintMatrixAt(world, pos);
+
+      if (bruteForce.cols() == original.cols()
+          && bruteForce.rows() == original.rows())
+      {
+        analyticalDiff = (analytical - original) / EPS;
+        bruteForceDiff = (bruteForce - original) / EPS;
+        break;
+      }
+      eps *= 0.5;
+    }
 
     // I'm surprised by how quickly the gradient can change
     if (!equals(analyticalDiff, bruteForceDiff, 2e-3))
@@ -902,7 +916,7 @@ bool verifyPosVelJacobian(WorldPtr world, VectorXd proposedVelocities)
   MatrixXd analytical = classicPtr->getPosVelJacobian(world);
   MatrixXd bruteForce = classicPtr->finiteDifferencePosVelJacobian(world);
 
-  if (!equals(analytical, bruteForce, 1e-9))
+  if (!equals(analytical, bruteForce, 1e-8))
   {
     std::cout << "Brute force posVelJacobian:" << std::endl
               << bruteForce << std::endl;
@@ -1009,25 +1023,26 @@ bool verifyRecoveredLCPConstraints(WorldPtr world, VectorXd proposedVelocities)
 
 bool verifyVelGradients(WorldPtr world, VectorXd worldVel)
 {
-  return verifyJacobianOfProjectionIntoClampsMatrix(world, worldVel, POSITION);
-  // return verifyScratch(world);
-  // return verifyF_c(world);
-  // return verifyLinearScratch();
-  // return verifyNextV(world);
+  // return verifyJacobianOfProjectionIntoClampsMatrix(world, worldVel,
+  // POSITION); return verifyScratch(world); return verifyF_c(world); return
+  // verifyLinearScratch(); return verifyNextV(world);
   return (
       verifyClassicClampingConstraintMatrix(world, worldVel)
       && verifyMassedClampingConstraintMatrix(world, worldVel)
       && verifyMassedUpperBoundConstraintMatrix(world, worldVel)
       && verifyClassicProjectionIntoClampsMatrix(world, worldVel)
       && verifyMassedProjectionIntoClampsMatrix(world, worldVel)
-      && verifyJacobianOfProjectionIntoClampsMatrix(world, worldVel, POSITION)
+      // We no longer use the Jacobian of P_c anywhere
+      // && verifyJacobianOfProjectionIntoClampsMatrix(world, worldVel,
+      // POSITION)
       && verifyRecoveredLCPConstraints(world, worldVel) && verifyF_c(world)
       && verifyVelVelJacobian(world, worldVel)
-      && verifyPosVelJacobian(world, worldVel) && verifyNextV(world)
-      && verifyForceVelJacobian(world, worldVel));
+      && verifyForceVelJacobian(world, worldVel)
+      && verifyPosVelJacobian(world, worldVel) && verifyNextV(world));
 }
 
-bool verifyPosPosJacobianApproximation(WorldPtr world, std::size_t subdivisions)
+bool verifyPosPosJacobianApproximation(
+    WorldPtr world, std::size_t subdivisions, double tolerance)
 {
   neural::BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
 
@@ -1043,7 +1058,7 @@ bool verifyPosPosJacobianApproximation(WorldPtr world, std::size_t subdivisions)
   MatrixXd bruteForce
       = classicPtr->finiteDifferencePosPosJacobian(world, subdivisions);
 
-  if (!equals(analytical, bruteForce, 1e-4))
+  if (!equals(analytical, bruteForce, tolerance))
   {
     std::cout << "Brute force pos-pos Jacobian: " << std::endl
               << bruteForce << std::endl;
@@ -1054,7 +1069,8 @@ bool verifyPosPosJacobianApproximation(WorldPtr world, std::size_t subdivisions)
   return true;
 }
 
-bool verifyVelPosJacobianApproximation(WorldPtr world, std::size_t subdivisions)
+bool verifyVelPosJacobianApproximation(
+    WorldPtr world, std::size_t subdivisions, double tolerance)
 {
   neural::BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
 
@@ -1070,7 +1086,7 @@ bool verifyVelPosJacobianApproximation(WorldPtr world, std::size_t subdivisions)
   MatrixXd bruteForce
       = classicPtr->finiteDifferenceVelPosJacobian(world, subdivisions);
 
-  if (!equals(analytical, bruteForce, 1e-6))
+  if (!equals(analytical, bruteForce, tolerance))
   {
     std::cout << "Brute force vel-pos Jacobian: " << std::endl
               << bruteForce << std::endl;
@@ -1081,11 +1097,12 @@ bool verifyVelPosJacobianApproximation(WorldPtr world, std::size_t subdivisions)
   return true;
 }
 
-bool verifyPosGradients(WorldPtr world, std::size_t subdivisions)
+bool verifyPosGradients(
+    WorldPtr world, std::size_t subdivisions, double tolerance)
 {
   return (
-      verifyPosPosJacobianApproximation(world, subdivisions)
-      && verifyVelPosJacobianApproximation(world, subdivisions));
+      verifyPosPosJacobianApproximation(world, subdivisions, tolerance)
+      && verifyVelPosJacobianApproximation(world, subdivisions, tolerance));
 }
 
 bool verifyAnalyticalBackpropInstance(

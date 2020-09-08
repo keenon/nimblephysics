@@ -22,7 +22,7 @@ typedef std::function<double(
     const Eigen::Ref<const Eigen::MatrixXd>& forces)>
     TrajectoryLossFn;
 
-typedef std::function<double(
+typedef std::function<void(
     const Eigen::Ref<const Eigen::MatrixXd>& poses,
     const Eigen::Ref<const Eigen::MatrixXd>& vels,
     const Eigen::Ref<const Eigen::MatrixXd>& forces,

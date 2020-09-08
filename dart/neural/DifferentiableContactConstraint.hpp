@@ -57,7 +57,9 @@ class DifferentiableContactConstraint
 
 public:
   DifferentiableContactConstraint(
-      std::shared_ptr<constraint::ConstraintBase> constraint, int index);
+      std::shared_ptr<constraint::ConstraintBase> constraint,
+      int index,
+      double constraintForce);
 
   Eigen::Vector3d getContactWorldPosition();
 
@@ -85,6 +87,12 @@ public:
   /// This analytically computes a column of the A_c matrix just for this
   /// skeleton.
   Eigen::VectorXd getConstraintForces(std::shared_ptr<dynamics::Skeleton> skel);
+
+  /// This analytically computes a column of the A_c matrix for this set of
+  /// skeletons.
+  Eigen::VectorXd getConstraintForces(
+      std::shared_ptr<simulation::World> world,
+      std::vector<std::string> skelNames);
 
   /// This analytically computes a column of the A_c matrix, for this contact
   /// constraint, across the whole world by concatenating the result for each
@@ -318,6 +326,7 @@ protected:
   std::shared_ptr<collision::Contact> mContact;
   std::vector<std::string> mSkeletons;
   std::vector<Eigen::VectorXd> mSkeletonOriginalPositions;
+  double mConstraintForce;
 
   int mIndex;
 

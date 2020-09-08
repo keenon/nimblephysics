@@ -277,7 +277,6 @@ void testBlockWithFrictionCoeff(double frictionCoeff, double mass)
   EXPECT_TRUE(verifyAnalyticalBackprop(world));
 }
 
-/*
 TEST(GRADIENTS, BLOCK_ON_GROUND_NO_FRICTION_1_MASS)
 {
   testBlockWithFrictionCoeff(0, 1);
@@ -302,7 +301,6 @@ TEST(GRADIENTS, BLOCK_ON_GROUND_SLIPPING_FRICTION)
 {
   testBlockWithFrictionCoeff(0.5, 1);
 }
-*/
 
 /******************************************************************************
 
@@ -436,7 +434,6 @@ void testTwoBlocks(
   EXPECT_TRUE(verifyAnalyticalBackprop(world));
 }
 
-/*
 TEST(GRADIENTS, TWO_BLOCKS_1_1_MASS)
 {
   testTwoBlocks(1, 1, 0, 1, 1);
@@ -451,7 +448,6 @@ TEST(GRADIENTS, TWO_BLOCKS_3_5_MASS)
 {
   testTwoBlocks(2, 1, 0, 3, 5);
 }
-*/
 
 /******************************************************************************
 
@@ -543,12 +539,10 @@ void testBouncingBlockWithFrictionCoeff(double frictionCoeff, double mass)
   EXPECT_TRUE(verifyAnalyticalBackprop(world));
 }
 
-/*
 TEST(GRADIENTS, BLOCK_BOUNCING_OFF_GROUND_NO_FRICTION_1_MASS)
 {
   testBouncingBlockWithFrictionCoeff(0, 1);
 }
-*/
 
 /******************************************************************************
 
@@ -661,12 +655,10 @@ void testReversePendulumSledWithFrictionCoeff(double frictionCoeff)
   EXPECT_TRUE(verifyAnalyticalBackprop(world));
 }
 
-/*
 TEST(GRADIENTS, SLIDING_REVERSE_PENDULUM_NO_FRICTION)
 {
   testReversePendulumSledWithFrictionCoeff(0);
 }
-*/
 
 /******************************************************************************
 
@@ -751,16 +743,14 @@ void testBouncingBlockPosGradients(double frictionCoeff, double mass)
   // Run the tests
   ///////////////////////////////////////////////
 
-  EXPECT_TRUE(verifyPosGradients(world, 100));
+  EXPECT_TRUE(verifyPosGradients(world, 300, 5e-3));
   EXPECT_TRUE(verifyAnalyticalBackprop(world));
 }
 
-/*
 TEST(GRADIENTS, POS_BLOCK_BOUNCING_OFF_GROUND_NO_FRICTION_1_MASS)
 {
   testBouncingBlockPosGradients(0, 1);
 }
-*/
 
 /******************************************************************************
 
@@ -866,7 +856,6 @@ void testMultigroup(int numGroups)
   EXPECT_TRUE(verifyAnalyticalBackprop(world));
 }
 
-/*
 TEST(GRADIENTS, MULTIGROUP_2)
 {
   testMultigroup(2);
@@ -876,7 +865,6 @@ TEST(GRADIENTS, MULTIGROUP_4)
 {
   testMultigroup(4);
 }
-*/
 
 /******************************************************************************
 
@@ -1020,7 +1008,6 @@ void testRobotArm(
   EXPECT_TRUE(verifyAnalyticalBackprop(world));
 }
 
-/*
 TEST(GRADIENTS, ARM_3_LINK_30_DEG)
 {
   testRobotArm(3, 30.0 / 180 * 3.1415);
@@ -1042,7 +1029,6 @@ TEST(GRADIENTS, ARM_3_LINK_30_DEG_MIDDLE_ATTACH)
 {
   testRobotArm(3, 30.0 / 180 * 3.1415, 1);
 }
-*/
 
 /**
  * This sets up two boxes colliding with each other. Each can rotate and
@@ -1119,7 +1105,6 @@ void testVertexFaceCollision(bool isSelfCollision)
   EXPECT_TRUE(verifyVelGradients(world, vels));
 }
 
-/*
 TEST(GRADIENTS, VERTEX_FACE_COLLISION)
 {
   testVertexFaceCollision(false);
@@ -1129,7 +1114,6 @@ TEST(GRADIENTS, VERTEX_FACE_SELF_COLLISION)
 {
   testVertexFaceCollision(true);
 }
-*/
 
 /**
  * This sets up two boxes colliding with each other. Each can rotate and
@@ -1206,7 +1190,6 @@ void testEdgeEdgeCollision(bool isSelfCollision)
   EXPECT_TRUE(verifyVelGradients(world, vels));
 }
 
-/*
 TEST(GRADIENTS, EDGE_EDGE_COLLISION)
 {
   testEdgeEdgeCollision(false);
@@ -1216,7 +1199,6 @@ TEST(GRADIENTS, EDGE_EDGE_SELF_COLLISION)
 {
   testEdgeEdgeCollision(true);
 }
-*/
 
 /******************************************************************************
 
@@ -1293,12 +1275,10 @@ void testCartpole(double rotationRadians)
   EXPECT_TRUE(verifyBulkPass(world, 1000, 50));
 }
 
-/*
 TEST(GRADIENTS, CARTPOLE_15_DEG)
 {
   testCartpole(15.0 / 180.0 * 3.1415);
 }
-*/
 
 void testWorldSpace(std::size_t numLinks)
 {
@@ -1351,12 +1331,10 @@ void testWorldSpace(std::size_t numLinks)
   EXPECT_TRUE(verifyWorldSpaceTransform(world));
 }
 
-/*
 TEST(GRADIENTS, WORLD_SPACE_5_LINK_ROBOT)
 {
   testWorldSpace(5);
 }
-*/
 
 /******************************************************************************
 
@@ -1428,12 +1406,10 @@ void testSimple3Link()
       world, Eigen::Vector3d::Zero(), Eigen::Vector3d::Zero()));
 }
 
-/*
 TEST(GRADIENTS, WORLD_SPACE_SIMPLE_LINK)
 {
   testSimple3Link();
 }
-*/
 
 void testWorldSpaceWithBoxes()
 {
@@ -1466,18 +1442,15 @@ void testWorldSpaceWithBoxes()
   EXPECT_TRUE(verifyWorldSpaceTransform(world));
 }
 
-/*
 TEST(GRADIENTS, WORLD_SPACE_BOXES)
 {
   testWorldSpaceWithBoxes();
 }
-*/
 
 ///////////////////////////////////////////////////////////////////////////////
 // Just idiot checking that the code doesn't crash on silly edge cases.
 ///////////////////////////////////////////////////////////////////////////////
 
-/*
 TEST(GRADIENTS, EMPTY_WORLD)
 {
   WorldPtr world = World::create();
@@ -1495,7 +1468,6 @@ TEST(GRADIENTS, EMPTY_SKELETON)
   EXPECT_TRUE(verifyVelGradients(world, worldVel));
   EXPECT_TRUE(verifyAnalyticalBackprop(world));
 }
-*/
 
 ///////////////////////////////////////////////////////////////////////////////
 // Checking the trajectory optimizations
@@ -1610,9 +1582,23 @@ void testJumpWorm(bool offGround, bool interpenetration)
 
     world->setPositions(initialPos);
     world->setVelocities(initialVel);
+
+    /*
+    Eigen::VectorXd brokenPos = Eigen::VectorXd::Zero(5);
+    brokenPos << -0.0223332, -0.345524, 1.15215, 1.99026, 1.49591;
+    Eigen::VectorXd brokenVel = Eigen::VectorXd::Zero(5);
+    brokenVel << -0.0635003, -2.1615, -1.19201, 1.19774, 2.11499;
+    Eigen::VectorXd brokenForce = Eigen::VectorXd::Zero(5);
+    brokenForce << 0, 0, 0.00564396, -0.0037863, -0.00587224;
+    world->setPositions(brokenPos);
+    world->setVelocities(brokenVel);
+    world->setForces(brokenForce);
+    */
   }
 
   Eigen::VectorXd vels = world->getVelocities();
+
+  // renderWorld(world);
 
   EXPECT_TRUE(verifyVelGradients(world, vels));
   // EXPECT_TRUE(verifyAnalyticalJacobians(world));
@@ -1633,7 +1619,6 @@ void testJumpWorm(bool offGround, bool interpenetration)
   */
 }
 
-/*
 TEST(GRADIENTS, JUMP_WORM)
 {
   testJumpWorm(false, false);
@@ -1643,9 +1628,10 @@ TEST(GRADIENTS, JUMP_WORM_OFF_GROUND)
 {
   testJumpWorm(true, false);
 }
-*/
 
+/*
 TEST(GRADIENTS, JUMP_WORM_INTER_PENETRATE)
 {
   testJumpWorm(false, true);
 }
+*/

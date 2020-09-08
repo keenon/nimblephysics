@@ -57,7 +57,7 @@ void AbstractShot::bruteForceGradOfLossInputs(
   getStates(world, poses, vels, forces);
   double originalLoss = loss(poses, vels, forces);
 
-  const double EPS = 1e-8;
+  const double EPS = 1e-7;
 
   for (int row = 0; row < mNumDofs; row++)
   {

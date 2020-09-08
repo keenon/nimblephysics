@@ -275,7 +275,11 @@ bool verifyShotJacobian(WorldPtr world, int steps)
   return true;
 }
 
-bool verifyShotGradient(WorldPtr world, int steps, TrajectoryLossFn loss)
+bool verifyShotGradient(
+    WorldPtr world,
+    int steps,
+    TrajectoryLossFn loss,
+    TrajectoryLossFnGrad lossGrad)
 {
   SingleShot shot(world, steps, true);
   int dim = shot.getFlatProblemDim();
@@ -287,15 +291,22 @@ bool verifyShotGradient(WorldPtr world, int steps, TrajectoryLossFn loss)
   shot.unflatten(randomInit);
   */
 
+  Eigen::MatrixXd poses = Eigen::MatrixXd::Zero(world->getNumDofs(), steps);
+  Eigen::MatrixXd vels = Eigen::MatrixXd::Zero(world->getNumDofs(), steps);
+  Eigen::MatrixXd forces = Eigen::MatrixXd::Zero(world->getNumDofs(), steps);
+  shot.getStates(world, poses, vels, forces, true);
+
   Eigen::MatrixXd gradWrtPoses
       = Eigen::MatrixXd::Zero(world->getNumDofs(), steps);
   Eigen::MatrixXd gradWrtVels
       = Eigen::MatrixXd::Zero(world->getNumDofs(), steps);
   Eigen::MatrixXd gradWrtForces
       = Eigen::MatrixXd::Zero(world->getNumDofs(), steps);
+  /*
   shot.bruteForceGradOfLossInputs(
-      world, loss, gradWrtPoses, gradWrtVels, gradWrtForces);
-
+    world, loss, gradWrtPoses, gradWrtVels, gradWrtForces);
+  */
+  lossGrad(poses, vels, forces, gradWrtPoses, gradWrtVels, gradWrtForces);
   Eigen::VectorXd analyticalGrad = Eigen::VectorXd::Zero(dim);
   shot.backpropGradient(
       world, gradWrtPoses, gradWrtVels, gradWrtForces, analyticalGrad);
@@ -325,15 +336,16 @@ bool verifyMultiShotJacobian(WorldPtr world, int steps, int shotLength)
   int numConstraints = shot.getConstraintDim();
 
   // Random initialization
+  /*
   srand(42);
   Eigen::VectorXd randomInit = Eigen::VectorXd::Random(dim);
   shot.unflatten(randomInit);
+  */
 
+  /*
   Eigen::VectorXd pos = randomInit.segment(20, 5);
   Eigen::VectorXd vel = randomInit.segment(25, 5);
-
-  std::cout << "Pos: " << std::endl << pos << std::endl;
-  std::cout << "Vel: " << std::endl << vel << std::endl;
+  */
 
   Eigen::MatrixXd analyticalJacobian
       = Eigen::MatrixXd::Zero(numConstraints, dim);
@@ -434,7 +446,11 @@ bool verifySparseJacobian(WorldPtr world, int steps, int shotLength)
 }
 
 bool verifyMultiShotGradient(
-    WorldPtr world, int steps, int shotLength, TrajectoryLossFn loss)
+    WorldPtr world,
+    int steps,
+    int shotLength,
+    TrajectoryLossFn loss,
+    TrajectoryLossFnGrad lossGrad)
 {
   MultiShot shot(world, steps, shotLength, true);
 
@@ -445,6 +461,11 @@ bool verifyMultiShotGradient(
   shot.unflatten(randomInit);
   */
 
+  Eigen::MatrixXd poses = Eigen::MatrixXd::Zero(world->getNumDofs(), steps);
+  Eigen::MatrixXd vels = Eigen::MatrixXd::Zero(world->getNumDofs(), steps);
+  Eigen::MatrixXd forces = Eigen::MatrixXd::Zero(world->getNumDofs(), steps);
+  shot.getStates(world, poses, vels, forces, true);
+
   int dim = shot.getFlatProblemDim();
   Eigen::MatrixXd gradWrtPoses
       = Eigen::MatrixXd::Zero(world->getNumDofs(), steps);
@@ -452,8 +473,11 @@ bool verifyMultiShotGradient(
       = Eigen::MatrixXd::Zero(world->getNumDofs(), steps);
   Eigen::MatrixXd gradWrtForces
       = Eigen::MatrixXd::Zero(world->getNumDofs(), steps);
+  /*
   shot.bruteForceGradOfLossInputs(
       world, loss, gradWrtPoses, gradWrtVels, gradWrtForces);
+  */
+  lossGrad(poses, vels, forces, gradWrtPoses, gradWrtVels, gradWrtForces);
 
   Eigen::VectorXd analyticalGrad = Eigen::VectorXd::Zero(dim);
   shot.backpropGradient(
@@ -549,7 +573,6 @@ bool verifyMultiShotOptimization(
   glutMainLoop();
 }
 
-/*
 TEST(TRAJECTORY, UNCONSTRAINED_BOX)
 {
   // World
@@ -587,7 +610,10 @@ TEST(TRAJECTORY, UNCONSTRAINED_BOX)
   world->addSkeleton(box);
 
   // Passes
-  // EXPECT_TRUE(verifySingleShot(world, 100));
+  EXPECT_TRUE(verifySingleStep(world, 1e-7));
+  EXPECT_TRUE(verifySingleShot(world, 40, 1e-7, false));
+  EXPECT_TRUE(verifyShotJacobian(world, 40));
+  EXPECT_TRUE(verifyMultiShotJacobian(world, 8, 2));
 }
 
 TEST(TRAJECTORY, REVOLUTE_JOINT)
@@ -609,7 +635,10 @@ TEST(TRAJECTORY, REVOLUTE_JOINT)
   spinner->integrateVelocities(world->getTimeStep());
 
   // Passes
-  // EXPECT_TRUE(verifySingleShot(world, 100));
+  EXPECT_TRUE(verifySingleStep(world, 1e-7));
+  EXPECT_TRUE(verifySingleShot(world, 40, 1e-7, false));
+  EXPECT_TRUE(verifyShotJacobian(world, 40));
+  EXPECT_TRUE(verifyMultiShotJacobian(world, 8, 2));
 }
 
 TEST(TRAJECTORY, TWO_LINK)
@@ -639,7 +668,10 @@ TEST(TRAJECTORY, TWO_LINK)
   arm->integrateVelocities(world->getTimeStep());
 
   // Passes
-  // EXPECT_TRUE(verifySingleShot(world, 100));
+  EXPECT_TRUE(verifySingleStep(world, 1e-7));
+  EXPECT_TRUE(verifySingleShot(world, 40, 1e-7, false));
+  EXPECT_TRUE(verifyShotJacobian(world, 40));
+  EXPECT_TRUE(verifyMultiShotJacobian(world, 8, 2));
 }
 
 TEST(TRAJECTORY, PRISMATIC)
@@ -662,11 +694,14 @@ TEST(TRAJECTORY, PRISMATIC)
   cartpole->integrateVelocities(world->getTimeStep());
 
   // Passes
-  // EXPECT_TRUE(verifySingleShot(world, 100));
+  EXPECT_TRUE(verifySingleStep(world, 1e-7));
+  EXPECT_TRUE(verifySingleShot(world, 40, 1e-7, false));
+  EXPECT_TRUE(verifyShotJacobian(world, 40));
+  EXPECT_TRUE(verifyMultiShotJacobian(world, 8, 2));
+  // EXPECT_TRUE(verifyShotGradient(world, 7, loss));
+  // EXPECT_TRUE(verifyMultiShotGradient(world, 8, 4, loss));
 }
-*/
 
-/*
 TEST(TRAJECTORY, CARTPOLE)
 {
   // World
@@ -716,15 +751,32 @@ TEST(TRAJECTORY, CARTPOLE)
            + forces.squaredNorm();
   };
 
+  TrajectoryLossFnGrad lossGrad
+      = [](const Eigen::Ref<const Eigen::MatrixXd>& poses,
+           const Eigen::Ref<const Eigen::MatrixXd>& vels,
+           const Eigen::Ref<const Eigen::MatrixXd>& forces,
+           /* OUT */ Eigen::Ref<Eigen::MatrixXd> gradWrtPoses,
+           /* OUT */ Eigen::Ref<Eigen::MatrixXd> gradWrtVels,
+           /* OUT */ Eigen::Ref<Eigen::MatrixXd> gradWrtForces) {
+          gradWrtPoses.setZero();
+          gradWrtVels.setZero();
+          gradWrtForces.setZero();
+          gradWrtPoses.col(poses.cols() - 1) = 2 * poses.col(poses.cols() - 1);
+          gradWrtVels.col(vels.cols() - 1) = 2 * vels.col(vels.cols() - 1);
+          for (int i = 0; i < forces.cols(); i++)
+          {
+            gradWrtForces.col(i) = 2 * forces.col(i);
+          }
+        };
+
   EXPECT_TRUE(verifySingleStep(world, 1e-7));
-  // EXPECT_TRUE(verifySingleShot(world, 40, 1e-7));
-  // EXPECT_TRUE(verifyShotJacobian(world, 40));
-  // EXPECT_TRUE(verifyShotGradient(world, 7, loss));
-  // EXPECT_TRUE(verifyMultiShotJacobian(world, 8, 2));
-  // EXPECT_TRUE(verifyMultiShotGradient(world, 8, 4, loss));
+  EXPECT_TRUE(verifySingleShot(world, 40, 1e-7, false));
+  EXPECT_TRUE(verifyShotJacobian(world, 40));
+  EXPECT_TRUE(verifyShotGradient(world, 7, loss, lossGrad));
+  EXPECT_TRUE(verifyMultiShotJacobian(world, 8, 2));
+  EXPECT_TRUE(verifyMultiShotGradient(world, 8, 4, loss, lossGrad));
   // EXPECT_TRUE(verifyMultiShotOptimization(world, 50, 10, loss));
 }
-*/
 
 BodyNode* createTailSegment(BodyNode* parent, Eigen::Vector3d color)
 {
@@ -855,7 +907,9 @@ TEST(TRAJECTORY, JUMP_WORM)
 
     double forceLoss = forces.squaredNorm();
 
-    return endPosLoss * 100 + forceLoss * 1e-3;
+    // return endPosLoss * 100 + forceLoss * 1e-3;
+    // return forceLoss;
+    return endPosLoss; // + forceLoss;
     // return (100 * peakPosLoss) + (20 * minPosLoss) + endPosLoss;
 
     /*
@@ -871,12 +925,26 @@ TEST(TRAJECTORY, JUMP_WORM)
     */
   };
 
+  TrajectoryLossFnGrad lossGrad
+      = [](const Eigen::Ref<const Eigen::MatrixXd>& poses,
+           const Eigen::Ref<const Eigen::MatrixXd>& vels,
+           const Eigen::Ref<const Eigen::MatrixXd>& forces,
+           /* OUT */ Eigen::Ref<Eigen::MatrixXd> gradWrtPoses,
+           /* OUT */ Eigen::Ref<Eigen::MatrixXd> gradWrtVels,
+           /* OUT */ Eigen::Ref<Eigen::MatrixXd> gradWrtForces) {
+          gradWrtPoses.setZero();
+          gradWrtVels.setZero();
+          gradWrtForces.setZero();
+          gradWrtPoses(1, poses.cols() - 1) = 2 * poses(1, poses.cols() - 1);
+        };
+
   // Make a huge timestep, to try to make the gradients easier to get exactly
   // for finite differencing
   world->setTimeStep(1e-3);
 
   world->getConstraintSolver()->setPenetrationCorrectionEnabled(false);
 
+  /*
   // Initial pos that creates deep inter-penetration and generates larger
   // gradient errors
   Eigen::VectorXd initialPos = Eigen::VectorXd(5);
@@ -887,19 +955,22 @@ TEST(TRAJECTORY, JUMP_WORM)
 
   world->setPositions(initialPos);
   world->setVelocities(initialVel);
+  */
 
-  EXPECT_TRUE(verifyVelGradients(world, initialVel));
+  /*
+  EXPECT_TRUE(verifyVelGradients(world, world->getVelocities()));
   EXPECT_TRUE(verifyNoMultistepIntereference(world, 10));
   EXPECT_TRUE(verifyAnalyticalJacobians(world));
   EXPECT_TRUE(verifyAnalyticalBackprop(world));
+  */
   // renderWorld(world);
 
   // EXPECT_TRUE(verifyMultiShotOptimization(world, 600, 20, loss));
   EXPECT_TRUE(verifySingleStep(world, 5e-7));
   // EXPECT_TRUE(verifySingleShot(world, 40, 5e-7, false));
   EXPECT_TRUE(verifyShotJacobian(world, 4));
-  EXPECT_TRUE(verifyShotGradient(world, 7, loss));
+  EXPECT_TRUE(verifyShotGradient(world, 7, loss, lossGrad));
   EXPECT_TRUE(verifyMultiShotJacobian(world, 6, 2));
   EXPECT_TRUE(verifySparseJacobian(world, 8, 2));
-  EXPECT_TRUE(verifyMultiShotGradient(world, 8, 4, loss));
+  EXPECT_TRUE(verifyMultiShotGradient(world, 8, 4, loss, lossGrad));
 }
