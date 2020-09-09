@@ -174,19 +174,10 @@ bool IPOptShotWrapper::get_bounds_info(
   */
 
   // Add inequality constraint functions
-  for (std::size_t i = 0; i < mWrapped->getConstraintDim(); ++i)
-  {
-    g_l[i] = g_u[i] = 0.0;
-
-    // Ipopt interprets any number greater than nlp_upper_bound_inf as
-    // infinity. The default value of nlp_upper_bound_inf and
-    // nlp_lower_bound_inf is 1e+19 and can be changed through ipopt options.
-    //
-    // If we wanted to set an inequality constraint, we could say:
-    //
-    // g_l[i] = -std::numeric_limits<double>::infinity();
-    // g_u[i] = 0;
-  }
+  Eigen::Map<Eigen::VectorXd> constraintUpperBounds(g_u, m);
+  mWrapped->getConstraintUpperBounds(constraintUpperBounds);
+  Eigen::Map<Eigen::VectorXd> constraintLowerBounds(g_l, m);
+  mWrapped->getConstraintLowerBounds(constraintLowerBounds);
 
   return true;
 }
@@ -249,7 +240,7 @@ bool IPOptShotWrapper::eval_f(
   Eigen::MatrixXd forces
       = Eigen::MatrixXd(mWrapped->mNumDofs, mWrapped->mSteps);
   mWrapped->unroll(mWrapped->mWorld, poses, vels, forces);
-  _obj_value = mWrapped->mLoss(poses, vels, forces);
+  _obj_value = mWrapped->mLoss.getLoss(poses, vels, forces);
 
   return true;
 }
@@ -267,23 +258,8 @@ bool IPOptShotWrapper::eval_grad_f(
     Eigen::Map<const Eigen::VectorXd> flat(_x, _n);
     mWrapped->unflatten(flat);
   }
-  Eigen::MatrixXd gradWrtPoses
-      = Eigen::MatrixXd::Zero(mWrapped->mNumDofs, mWrapped->mSteps);
-  Eigen::MatrixXd gradWrtVels
-      = Eigen::MatrixXd::Zero(mWrapped->mNumDofs, mWrapped->mSteps);
-  Eigen::MatrixXd gradWrtForces
-      = Eigen::MatrixXd::Zero(mWrapped->mNumDofs, mWrapped->mSteps);
-
-  mWrapped->bruteForceGradOfLossInputs(
-      mWrapped->mWorld,
-      mWrapped->mLoss,
-      gradWrtPoses,
-      gradWrtVels,
-      gradWrtForces);
-
   Eigen::Map<Eigen::VectorXd> grad(_grad_f, _n);
-  mWrapped->backpropGradient(
-      mWrapped->mWorld, gradWrtPoses, gradWrtVels, gradWrtForces, grad);
+  mWrapped->backpropGradient(mWrapped->mWorld, grad);
 
   return true;
 }

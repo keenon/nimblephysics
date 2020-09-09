@@ -18,11 +18,13 @@ namespace trajectory {
 
 //==============================================================================
 SingleShot::SingleShot(
-    std::shared_ptr<simulation::World> world, int steps, bool tuneStartingState)
-  : AbstractShot(world)
+    std::shared_ptr<simulation::World> world,
+    LossFn loss,
+    int steps,
+    bool tuneStartingState)
+  : AbstractShot(world, loss, steps)
 {
   mTuneStartingState = tuneStartingState;
-  mSteps = steps;
   mStartPos = world->getPositions();
   mStartVel = world->getVelocities();
   assert(steps > 0);
@@ -166,24 +168,6 @@ void SingleShot::getInitialGuess(
     flat.segment(0, mNumDofs) = mStartPos;
     flat.segment(mNumDofs, mNumDofs) = mStartVel;
   }
-}
-
-//==============================================================================
-/// This computes the values of the constraints
-void SingleShot::computeConstraints(
-    std::shared_ptr<simulation::World> world,
-    /* OUT */ Eigen::Ref<Eigen::VectorXd> constraints)
-{
-}
-
-//==============================================================================
-/// This computes the Jacobian that relates the flat problem to the
-/// constraints. This returns a matrix that's (getConstraintDim(),
-/// getFlatProblemDim()).
-void SingleShot::backpropJacobian(
-    std::shared_ptr<simulation::World> world,
-    /* OUT */ Eigen::Ref<Eigen::MatrixXd> jac)
-{
 }
 
 //==============================================================================
@@ -428,28 +412,6 @@ std::string SingleShot::getFlatDimName(int dim)
     dim -= mNumDofs;
   }
   return "Error OOB";
-}
-
-//==============================================================================
-/// This gets the number of non-zero entries in the Jacobian
-int SingleShot::getNumberNonZeroJacobian()
-{
-  return 0;
-}
-
-//==============================================================================
-/// This gets the structure of the non-zero entries in the Jacobian
-void SingleShot::getJacobianSparsityStructure(
-    Eigen::Ref<Eigen::VectorXi> rows, Eigen::Ref<Eigen::VectorXi> cols)
-{
-}
-
-//==============================================================================
-/// This writes the Jacobian to a sparse vector
-void SingleShot::getSparseJacobian(
-    std::shared_ptr<simulation::World> world,
-    Eigen::Ref<Eigen::VectorXd> sparse)
-{
 }
 
 //==============================================================================

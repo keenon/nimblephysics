@@ -26,6 +26,7 @@ class MultiShot : public AbstractShot
 public:
   MultiShot(
       std::shared_ptr<simulation::World> world,
+      LossFn loss,
       int steps,
       int shotLength,
       bool tuneStartingState = true);
@@ -62,6 +63,16 @@ public:
   /// optimization
   void getLowerBounds(
       std::shared_ptr<simulation::World> world,
+      /* OUT */ Eigen::Ref<Eigen::VectorXd> flat) const override;
+
+  /// This gets the bounds on the constraint functions (both knot points and any
+  /// custom constraints)
+  void getConstraintUpperBounds(
+      /* OUT */ Eigen::Ref<Eigen::VectorXd> flat) const override;
+
+  /// This gets the bounds on the constraint functions (both knot points and any
+  /// custom constraints)
+  void getConstraintLowerBounds(
       /* OUT */ Eigen::Ref<Eigen::VectorXd> flat) const override;
 
   /// This returns the initial guess for the values of X when running an

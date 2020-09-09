@@ -19,23 +19,23 @@ namespace trajectory {
 //==============================================================================
 MultiShot::MultiShot(
     std::shared_ptr<simulation::World> world,
+    LossFn loss,
     int steps,
     int shotLength,
     bool tuneStartingState)
-  : AbstractShot(world)
+  : AbstractShot(world, loss, steps)
 {
-  mSteps = steps;
   mShotLength = shotLength;
   mTuneStartingState = tuneStartingState;
-  mNumDofs = world->getNumDofs();
 
   int stepsRemaining = steps;
   bool isFirst = true;
+  LossFn zeroLoss = LossFn();
   while (stepsRemaining > 0)
   {
     int shot = std::min(shotLength, stepsRemaining);
     mShots.push_back(std::make_shared<SingleShot>(
-        world, shot, !isFirst || tuneStartingState));
+        world, zeroLoss, shot, !isFirst || tuneStartingState));
     stepsRemaining -= shot;
     isFirst = false;
   }
@@ -63,7 +63,8 @@ int MultiShot::getFlatProblemDim() const
 /// Returns the length of the knot-point constraint vector
 int MultiShot::getConstraintDim() const
 {
-  return (2 * mNumDofs) * (mShots.size() - 1);
+  return AbstractShot::getConstraintDim()
+         + (2 * mNumDofs) * (mShots.size() - 1);
 }
 
 //==============================================================================
@@ -73,6 +74,10 @@ void MultiShot::computeConstraints(
     /* OUT */ Eigen::Ref<Eigen::VectorXd> constraints)
 {
   int cursor = 0;
+  int numParentConstraints = AbstractShot::getConstraintDim();
+  AbstractShot::computeConstraints(
+      world, constraints.segment(0, numParentConstraints));
+  cursor += numParentConstraints;
   for (int i = 1; i < mShots.size(); i++)
   {
     constraints.segment(cursor, mNumDofs * 2)
@@ -161,6 +166,28 @@ void MultiShot::getLowerBounds(
 }
 
 //==============================================================================
+/// This gets the bounds on the constraint functions (both knot points and any
+/// custom constraints)
+void MultiShot::getConstraintUpperBounds(
+    /* OUT */ Eigen::Ref<Eigen::VectorXd> flat) const
+{
+  flat.setZero();
+  AbstractShot::getConstraintUpperBounds(
+      flat.segment(0, AbstractShot::getConstraintDim()));
+}
+
+//==============================================================================
+/// This gets the bounds on the constraint functions (both knot points and any
+/// custom constraints)
+void MultiShot::getConstraintLowerBounds(
+    /* OUT */ Eigen::Ref<Eigen::VectorXd> flat) const
+{
+  flat.setZero();
+  AbstractShot::getConstraintLowerBounds(
+      flat.segment(0, AbstractShot::getConstraintDim()));
+}
+
+//==============================================================================
 /// This returns the initial guess for the values of X when running an
 /// optimization
 void MultiShot::getInitialGuess(
@@ -189,6 +216,17 @@ void MultiShot::backpropJacobian(
 
   int rowCursor = 0;
   int colCursor = 0;
+
+  jac.setZero();
+
+  // Handle custom constraints
+  int numParentConstraints = AbstractShot::getConstraintDim();
+  int n = getFlatProblemDim();
+  AbstractShot::backpropJacobian(
+      world, jac.block(0, 0, numParentConstraints, n));
+  rowCursor += numParentConstraints;
+
+  // Add in knot point constraints
   for (int i = 1; i < mShots.size(); i++)
   {
     int dim = mShots[i - 1]->getFlatProblemDim();
@@ -211,7 +249,7 @@ void MultiShot::backpropJacobian(
 /// This gets the number of non-zero entries in the Jacobian
 int MultiShot::getNumberNonZeroJacobian()
 {
-  int nnzj = 0;
+  int nnzj = AbstractShot::getNumberNonZeroJacobian();
   for (int i = 0; i < mShots.size() - 1; i++)
   {
     int shotDim = mShots[i]->getFlatProblemDim();
@@ -232,6 +270,16 @@ void MultiShot::getJacobianSparsityStructure(
   int sparseCursor = 0;
   int rowCursor = 0;
   int colCursor = 0;
+
+  // Handle custom constraints
+  int numParentConstraints = AbstractShot::getConstraintDim();
+  int n = getFlatProblemDim();
+  AbstractShot::getJacobianSparsityStructure(
+      rows.segment(0, n * numParentConstraints),
+      cols.segment(0, n * numParentConstraints));
+  rowCursor += numParentConstraints;
+
+  // Handle knot point constraints
   for (int i = 1; i < mShots.size(); i++)
   {
     int dim = mShots[i - 1]->getFlatProblemDim();
@@ -263,7 +311,7 @@ void MultiShot::getSparseJacobian(
     std::shared_ptr<simulation::World> world,
     Eigen::Ref<Eigen::VectorXd> sparse)
 {
-  int sparseCursor = 0;
+  int sparseCursor = AbstractShot::getNumberNonZeroJacobian();
   Eigen::VectorXd neg = Eigen::VectorXd::Ones(2 * mNumDofs) * -1;
   for (int i = 1; i < mShots.size(); i++)
   {

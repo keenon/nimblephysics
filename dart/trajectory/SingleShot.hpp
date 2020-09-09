@@ -25,6 +25,7 @@ class SingleShot : public AbstractShot
 public:
   SingleShot(
       std::shared_ptr<simulation::World> world,
+      LossFn loss,
       int steps,
       bool tuneStartingState = true);
 
@@ -70,17 +71,6 @@ public:
       std::shared_ptr<simulation::World> world,
       /* OUT */ Eigen::Ref<Eigen::VectorXd> flat) const override;
 
-  /// This computes the values of the constraints
-  void computeConstraints(
-      std::shared_ptr<simulation::World> world,
-      /* OUT */ Eigen::Ref<Eigen::VectorXd> constraints);
-
-  /// This computes the Jacobian that relates the flat problem to the end state.
-  /// This returns a matrix that's (2 * mNumDofs, getFlatProblemDim()).
-  void backpropJacobian(
-      std::shared_ptr<simulation::World> world,
-      /* OUT */ Eigen::Ref<Eigen::MatrixXd> jac) override;
-
   /// This computes the Jacobian that relates the flat problem to the end state.
   /// This returns a matrix that's (2 * mNumDofs, getFlatProblemDim()).
   void backpropJacobianOfFinalState(
@@ -118,19 +108,6 @@ public:
 
   /// This returns the debugging name of a given DOF
   std::string getFlatDimName(int dim) override;
-
-  /// This gets the number of non-zero entries in the Jacobian
-  int getNumberNonZeroJacobian() override;
-
-  /// This gets the structure of the non-zero entries in the Jacobian
-  void getJacobianSparsityStructure(
-      Eigen::Ref<Eigen::VectorXi> rows,
-      Eigen::Ref<Eigen::VectorXi> cols) override;
-
-  /// This writes the Jacobian to a sparse vector
-  void getSparseJacobian(
-      std::shared_ptr<simulation::World> world,
-      Eigen::Ref<Eigen::VectorXd> sparse) override;
 
   //////////////////////////////////////////////////////////////////////////////
   // For Testing
