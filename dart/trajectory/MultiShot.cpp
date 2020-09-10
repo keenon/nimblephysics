@@ -433,7 +433,7 @@ void MultiShot::backpropGradient(
         world,
         gradWrtPoses.block(0, cursorSteps, mNumDofs, steps),
         gradWrtVels.block(0, cursorSteps, mNumDofs, steps),
-        gradWrtVels.block(0, cursorSteps, mNumDofs, steps),
+        gradWrtForces.block(0, cursorSteps, mNumDofs, steps),
         grad.segment(cursorDims, dim));
     cursorSteps += steps;
     cursorDims += dim;
