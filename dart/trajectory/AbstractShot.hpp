@@ -171,11 +171,11 @@ public:
       std::shared_ptr<simulation::World> world, double EPS);
 
 protected:
+  LossFn mLoss;
   int mSteps;
   int mNumDofs;
   bool mTuneStartingState;
   std::shared_ptr<simulation::World> mWorld;
-  LossFn mLoss;
   std::vector<LossFn> mConstraints;
   // We need these matrices a lot, so rather than allocate and free them all the
   // time, we have dedicated scratch space

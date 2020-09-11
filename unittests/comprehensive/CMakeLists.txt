@@ -6,12 +6,13 @@ dart_add_test("comprehensive" test_Frames)
 dart_add_test("comprehensive" test_InverseKinematics)
 dart_add_test("comprehensive" test_NameManagement)
 dart_add_test("comprehensive" test_Gradients)
+dart_add_test("comprehensive" test_Mappings)
 dart_add_test("comprehensive" test_Trajectory)
 
-target_link_libraries(test_Gradients dart-collision-bullet)
-target_link_libraries(test_Gradients dart-collision-ode)
+# target_link_libraries(test_Gradients dart-collision-bullet)
+# target_link_libraries(test_Gradients dart-collision-ode)
 target_link_libraries(test_Gradients dart-gui)
-
+target_link_libraries(test_Mappings dart-gui)
 target_link_libraries(test_Trajectory dart-gui)
 
 if(TARGET dart-optimizer-pagmo)

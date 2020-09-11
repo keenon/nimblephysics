@@ -1025,7 +1025,7 @@ TEST(TRAJECTORY, JUMP_WORM)
           gradWrtPoses(1, poses.cols() - 1) = 2 * poses(1, poses.cols() - 1);
           double endPos = poses(1, poses.cols() - 1);
           double endPosLoss = -(endPos * endPos) * (endPos > 0 ? 1.0 : -1.0);
-          return endPos;
+          return endPosLoss;
         };
 
   // Make a huge timestep, to try to make the gradients easier to get exactly

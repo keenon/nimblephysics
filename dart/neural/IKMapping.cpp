@@ -1,0 +1,349 @@
+#include "dart/neural/IKMapping.hpp"
+
+#include "dart/dynamics/BodyNode.hpp"
+#include "dart/dynamics/Frame.hpp"
+#include "dart/dynamics/Skeleton.hpp"
+#include "dart/simulation/World.hpp"
+
+using namespace dart;
+
+namespace dart {
+namespace neural {
+
+//==============================================================================
+IKMapping::IKMapping(std::shared_ptr<simulation::World> world)
+{
+}
+
+//==============================================================================
+void IKMapping::addSpatialBodyNode(dynamics::BodyNode* node)
+{
+  mEntries.push_back(IKMappingEntry(IKMappingEntryType::NODE_SPATIAL, node));
+}
+
+//==============================================================================
+void IKMapping::addLinearBodyNode(dynamics::BodyNode* node)
+{
+  mEntries.push_back(IKMappingEntry(IKMappingEntryType::NODE_LINEAR, node));
+}
+
+//==============================================================================
+void IKMapping::addAngularBodyNode(dynamics::BodyNode* node)
+{
+  mEntries.push_back(IKMappingEntry(IKMappingEntryType::NODE_ANGULAR, node));
+}
+
+//==============================================================================
+int IKMapping::getPosDim()
+{
+  return getDim();
+}
+
+//==============================================================================
+int IKMapping::getVelDim()
+{
+  return getDim();
+}
+
+//==============================================================================
+int IKMapping::getForceDim()
+{
+  return getDim();
+}
+
+//==============================================================================
+// #define DART_NEURAL_LOG_IK_OUTPUT
+void IKMapping::setPositions(
+    std::shared_ptr<simulation::World> world,
+    const Eigen::Ref<Eigen::VectorXd>& positions)
+{
+  // Run simple IK to try to get as close as possible. Completely possible that
+  // the requested positions are infeasible, in which case we'll just do a best
+  // guess.
+  double error = std::numeric_limits<double>::infinity();
+  double lr = 1.0;
+  for (int i = 0; i < 20; i++)
+  {
+    Eigen::VectorXd diff = positions - getPositions(world);
+    double newError = diff.squaredNorm();
+    double errorChange = newError - error;
+    error = newError;
+#ifdef DART_NEURAL_LOG_IK_OUTPUT
+    std::cout << "IK iteration " << i << " loss: " << error
+              << " change: " << errorChange << std::endl;
+#endif
+    if (error < 1e-11)
+    {
+#ifdef DART_NEURAL_LOG_IK_OUTPUT
+      std::cout << "Terminating IK search after " << i
+                << " iterations with loss: " << error << std::endl;
+#endif
+      break;
+    }
+    if (errorChange > 0)
+    {
+      lr *= 0.5;
+    }
+    else if (errorChange > -1e-11)
+    {
+#ifdef DART_NEURAL_LOG_IK_OUTPUT
+      std::cout << "Terminating IK search after " << i
+                << " iterations with optimal loss: " << error << std::endl;
+#endif
+      break;
+    }
+    Eigen::VectorXd delta
+        = getJacobian(world).completeOrthogonalDecomposition().solve(diff);
+    world->setPositions(world->getPositions() + (lr * delta));
+  }
+#ifdef DART_NEURAL_LOG_IK_OUTPUT
+  std::cout << "Finished IK search with loss: " << error << std::endl;
+#endif
+}
+
+//==============================================================================
+void IKMapping::setVelocities(
+    std::shared_ptr<simulation::World> world,
+    const Eigen::Ref<Eigen::VectorXd>& velocities)
+{
+  world->setVelocities(getMappedVelToRealVel(world) * velocities);
+}
+
+//==============================================================================
+void IKMapping::setForces(
+    std::shared_ptr<simulation::World> world,
+    const Eigen::Ref<Eigen::VectorXd>& forces)
+{
+  world->setForces(getMappedForceToRealForce(world) * forces);
+}
+
+//==============================================================================
+void IKMapping::getPositionsInPlace(
+    std::shared_ptr<simulation::World> world,
+    /* OUT */ Eigen::Ref<Eigen::VectorXd> positions)
+{
+  assert(positions.size() == getPosDim());
+  int cursor = 0;
+  for (IKMappingEntry& entry : mEntries)
+  {
+    auto skel = world->getSkeleton(entry.skelName);
+
+    if (entry.type == NODE_SPATIAL || entry.type == NODE_LINEAR
+        || entry.type == NODE_ANGULAR)
+    {
+      // Get the body node in this world
+      dynamics::BodyNode* node = skel->getBodyNode(entry.bodyNodeOffset);
+      if (entry.type == NODE_ANGULAR || entry.type == NODE_SPATIAL)
+      {
+        positions.segment<3>(cursor)
+            = math::logMap(node->getWorldTransform()).head<3>();
+        cursor += 3;
+      }
+      if (entry.type == NODE_LINEAR || entry.type == NODE_SPATIAL)
+      {
+        positions.segment<3>(cursor) = node->getWorldTransform().translation();
+        cursor += 3;
+      }
+    }
+    else if (entry.type == COM)
+    {
+      positions.segment(cursor, 3) = skel->getCOM();
+      cursor += 3;
+    }
+  }
+  assert(cursor == getPosDim());
+}
+
+//==============================================================================
+void IKMapping::getVelocitiesInPlace(
+    std::shared_ptr<simulation::World> world,
+    /* OUT */ Eigen::Ref<Eigen::VectorXd> velocities)
+{
+  assert(velocities.size() == getVelDim());
+  int cursor = 0;
+  for (IKMappingEntry& entry : mEntries)
+  {
+    auto skel = world->getSkeleton(entry.skelName);
+
+    if (entry.type == NODE_SPATIAL || entry.type == NODE_LINEAR
+        || entry.type == NODE_ANGULAR)
+    {
+      // Get the body node in this world
+      dynamics::BodyNode* node = skel->getBodyNode(entry.bodyNodeOffset);
+      if (entry.type == NODE_SPATIAL)
+      {
+        /*
+        velocities.segment<6>(cursor)
+            = skel->getWorldJacobian(node) * skel->getVelocities();
+            */
+        velocities.segment<6>(cursor) = node->getSpatialVelocity(
+            dynamics::Frame::World(), dynamics::Frame::World());
+        cursor += 6;
+      }
+      else if (entry.type == NODE_ANGULAR)
+      {
+        velocities.segment<3>(cursor) = node->getAngularVelocity(
+            dynamics::Frame::World(), dynamics::Frame::World());
+        cursor += 3;
+      }
+      else if (entry.type == NODE_LINEAR)
+      {
+        velocities.segment<3>(cursor) = node->getLinearVelocity(
+            dynamics::Frame::World(), dynamics::Frame::World());
+        cursor += 3;
+      }
+      else
+      {
+        assert(false && "Execution should never reach here");
+      }
+    }
+    else if (entry.type == COM)
+    {
+      velocities.segment<3>(cursor) = skel->getCOMLinearVelocity();
+      cursor += 3;
+    }
+    else
+    {
+      assert(false && "Unrecognized entry type");
+    }
+  }
+  assert(cursor == getVelDim());
+}
+
+//==============================================================================
+void IKMapping::getForcesInPlace(
+    std::shared_ptr<simulation::World> world,
+    /* OUT */ Eigen::Ref<Eigen::VectorXd> forces)
+{
+  assert(forces.size() == getForceDim());
+  forces = getRealForceToMappedForce(world) * world->getForces();
+}
+
+//==============================================================================
+/// This gets a Jacobian relating the changes in the outer positions (the
+/// "mapped" positions) to inner positions (the "real" positions)
+Eigen::MatrixXd IKMapping::getMappedPosToRealPos(
+    std::shared_ptr<simulation::World> world)
+{
+  return getJacobianInverse(world);
+}
+
+//==============================================================================
+/// This gets a Jacobian relating the changes in the inner positions (the
+/// "real" positions) to the corresponding outer positions (the "mapped"
+/// positions)
+Eigen::MatrixXd IKMapping::getRealPosToMappedPos(
+    std::shared_ptr<simulation::World> world)
+{
+  return getJacobian(world);
+}
+
+//==============================================================================
+/// This gets a Jacobian relating the changes in the outer velocity (the
+/// "mapped" velocity) to inner velocity (the "real" velocity)
+Eigen::MatrixXd IKMapping::getMappedVelToRealVel(
+    std::shared_ptr<simulation::World> world)
+{
+  return getJacobianInverse(world);
+}
+
+//==============================================================================
+/// This gets a Jacobian relating the changes in the inner velocity (the
+/// "real" velocity) to the corresponding outer velocity (the "mapped"
+/// velocity)
+Eigen::MatrixXd IKMapping::getRealVelToMappedVel(
+    std::shared_ptr<simulation::World> world)
+{
+  return getJacobian(world);
+}
+
+//==============================================================================
+/// This gets a Jacobian relating the changes in the outer force (the
+/// "mapped" force) to inner force (the "real" force)
+Eigen::MatrixXd IKMapping::getMappedForceToRealForce(
+    std::shared_ptr<simulation::World> world)
+{
+  return getJacobian(world).transpose();
+}
+
+//==============================================================================
+/// This gets a Jacobian relating the changes in the inner force (the
+/// "real" force) to the corresponding outer force (the "mapped"
+/// force)
+Eigen::MatrixXd IKMapping::getRealForceToMappedForce(
+    std::shared_ptr<simulation::World> world)
+{
+  return getJacobianInverse(world).transpose();
+}
+
+//==============================================================================
+int IKMapping::getDim()
+{
+  int dim = 0;
+  for (IKMappingEntry& entry : mEntries)
+  {
+    if (entry.type == NODE_SPATIAL)
+      dim += 6;
+    else
+      dim += 3;
+  }
+  return dim;
+}
+
+//==============================================================================
+/// Computes a Jacobian that transforms changes in joint angle to changes in
+/// IK body positions (expressed in log space).
+Eigen::MatrixXd IKMapping::getJacobian(std::shared_ptr<simulation::World> world)
+{
+  int rows = getDim();
+  int cols = world->getNumDofs();
+  Eigen::MatrixXd jac = Eigen::MatrixXd::Zero(rows, cols);
+  int cursor = 0;
+  for (IKMappingEntry& entry : mEntries)
+  {
+    auto skel = world->getSkeleton(entry.skelName);
+    int offset = world->getSkeletonDofOffset(skel);
+    int dofs = skel->getNumDofs();
+
+    if (entry.type == NODE_SPATIAL || entry.type == NODE_LINEAR
+        || entry.type == NODE_ANGULAR)
+    {
+      // Get the body node in this world
+      dynamics::BodyNode* node = skel->getBodyNode(entry.bodyNodeOffset);
+
+      if (entry.type == NODE_SPATIAL)
+      {
+        jac.block(cursor, offset, 6, dofs) = skel->getWorldJacobian(node);
+        cursor += 6;
+      }
+      if (entry.type == NODE_ANGULAR)
+      {
+        jac.block(cursor, offset, 3, dofs)
+            = skel->getWorldJacobian(node).block(0, 0, 3, dofs);
+        cursor += 3;
+      }
+      if (entry.type == NODE_LINEAR)
+      {
+        jac.block(cursor, offset, 3, dofs)
+            = skel->getWorldJacobian(node).block(3, 0, 3, dofs);
+        cursor += 3;
+      }
+    }
+    else if (entry.type == COM)
+    {
+      jac.block(cursor, offset, 3, dofs) = skel->getCOMLinearJacobian();
+      cursor += 3;
+    }
+  }
+  return jac;
+}
+
+/// Computes the pseudo-inverse of the Jacobian
+Eigen::MatrixXd IKMapping::getJacobianInverse(
+    std::shared_ptr<simulation::World> world)
+{
+  return getJacobian(world).completeOrthogonalDecomposition().pseudoInverse();
+}
+
+} // namespace neural
+} // namespace dart
