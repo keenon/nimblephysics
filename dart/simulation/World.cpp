@@ -180,11 +180,10 @@ void World::integrateVelocities()
 }
 
 //==============================================================================
-void World::step(bool _resetCommand, bool _parallelVelocityAndPositionUpdates)
+void World::step(bool _resetCommand)
 {
   Eigen::VectorXd initialVelocity = getVelocities();
-  // TODO: remove me
-  _parallelVelocityAndPositionUpdates = true;
+  bool _parallelVelocityAndPositionUpdates = true;
 
   // Integrate velocity for unconstrained skeletons
   for (auto& skel : mSkeletons)

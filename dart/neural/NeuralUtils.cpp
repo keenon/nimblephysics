@@ -7,6 +7,8 @@
 #include "dart/math/Geometry.hpp"
 #include "dart/neural/BackpropSnapshot.hpp"
 #include "dart/neural/ConstrainedGroupGradientMatrices.hpp"
+#include "dart/neural/MappedBackpropSnapshot.hpp"
+#include "dart/neural/Mapping.hpp"
 #include "dart/neural/RestorableSnapshot.hpp"
 #include "dart/simulation/World.hpp"
 
@@ -22,9 +24,7 @@ std::shared_ptr<ConstrainedGroupGradientMatrices> createGradientMatrices(
 
 //==============================================================================
 std::shared_ptr<BackpropSnapshot> forwardPass(
-    simulation::WorldPtr world,
-    bool idempotent,
-    bool parallelVelocityAndPositionUpdates)
+    simulation::WorldPtr world, bool idempotent)
 {
   std::shared_ptr<RestorableSnapshot> restorableSnapshot;
   if (idempotent)
@@ -42,7 +42,7 @@ std::shared_ptr<BackpropSnapshot> forwardPass(
   world->getConstraintSolver()->setGradientEnabled(true);
 
   // Actually take a world step. As a byproduct, this will generate gradients
-  world->step(!idempotent, parallelVelocityAndPositionUpdates);
+  world->step(!idempotent);
 
   // Reset the old gradient mode, so we don't have any side effects other than
   // taking a timestep.
@@ -61,6 +61,79 @@ std::shared_ptr<BackpropSnapshot> forwardPass(
     restorableSnapshot->restore();
 
   return snapshot;
+}
+
+//==============================================================================
+/// Takes a step in the world, and returns a mapped snapshot which can be used
+/// to backpropagate gradients and compute Jacobians in the mapped space
+std::shared_ptr<MappedBackpropSnapshot> forwardPass(
+    std::shared_ptr<simulation::World> world,
+    std::shared_ptr<Mapping> representationMapping,
+    std::unordered_map<std::string, std::shared_ptr<Mapping>> lossMappings,
+    bool idempotent)
+{
+  std::shared_ptr<RestorableSnapshot> restorableSnapshot;
+  if (idempotent)
+  {
+    restorableSnapshot = std::make_shared<RestorableSnapshot>(world);
+  }
+
+  // Record the current input vector in mapped space
+  Eigen::VectorXd preStepPosition = world->getPositions();
+  Eigen::VectorXd preStepVelocity = world->getVelocities();
+  Eigen::VectorXd preStepTorques = world->getForces();
+
+  // Record the Jacobians for mapping out from mapped space to world space
+  // pre-step
+  PreStepMapping preStepRepresentation
+      = PreStepMapping(world, representationMapping);
+  std::unordered_map<std::string, PreStepMapping> preStepLosses;
+  for (std::pair<std::string, std::shared_ptr<Mapping>> lossMap : lossMappings)
+  {
+    PreStepMapping pre(world, lossMap.second);
+    preStepLosses[lossMap.first] = pre;
+  }
+
+  // Set the gradient mode we're going to use to calculate gradients
+  bool oldGradientEnabled = world->getConstraintSolver()->getGradientEnabled();
+  world->getConstraintSolver()->setGradientEnabled(true);
+
+  // Actually take a world step. As a byproduct, this will generate gradients
+  world->step(!idempotent);
+
+  // Reset the old gradient mode, so we don't have any side effects other than
+  // taking a timestep.
+  world->getConstraintSolver()->setGradientEnabled(oldGradientEnabled);
+
+  // Actually construct and return the snapshot
+  std::shared_ptr<BackpropSnapshot> snapshot
+      = std::make_shared<BackpropSnapshot>(
+          world,
+          preStepPosition,
+          preStepVelocity,
+          preStepTorques,
+          world->getLastPreConstraintVelocity());
+
+  // Record the Jacobians for mapping out from mapped space to world space
+  // pre-step
+  PostStepMapping postStepRepresentation
+      = PostStepMapping(world, representationMapping);
+  std::unordered_map<std::string, PostStepMapping> postStepLosses;
+  for (std::pair<std::string, std::shared_ptr<Mapping>> lossMap : lossMappings)
+  {
+    PostStepMapping post(world, lossMap.second);
+    postStepLosses[lossMap.first] = post;
+  }
+
+  if (idempotent)
+    restorableSnapshot->restore();
+
+  return std::make_shared<MappedBackpropSnapshot>(
+      snapshot,
+      preStepRepresentation,
+      postStepRepresentation,
+      preStepLosses,
+      postStepLosses);
 }
 
 //==============================================================================

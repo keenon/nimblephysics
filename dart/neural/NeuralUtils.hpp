@@ -30,6 +30,8 @@ struct LossGradient
 // import from anywhere else in DART
 class ConstrainedGroupGradientMatrices;
 class BackpropSnapshot;
+class Mapping;
+class MappedBackpropSnapshot;
 
 std::shared_ptr<ConstrainedGroupGradientMatrices> createGradientMatrices(
     constraint::ConstrainedGroup& group, double timeStep);
@@ -37,9 +39,15 @@ std::shared_ptr<ConstrainedGroupGradientMatrices> createGradientMatrices(
 /// Takes a step in the world, and returns a backprop snapshot which can be used
 /// to backpropagate gradients and compute Jacobians
 std::shared_ptr<BackpropSnapshot> forwardPass(
+    std::shared_ptr<simulation::World> world, bool idempotent = false);
+
+/// Takes a step in the world, and returns a mapped snapshot which can be used
+/// to backpropagate gradients and compute Jacobians in the mapped space
+std::shared_ptr<MappedBackpropSnapshot> forwardPass(
     std::shared_ptr<simulation::World> world,
-    bool idempotent = false,
-    bool parallelVelocityAndPositionUpdates = false);
+    std::shared_ptr<Mapping> representationMapping,
+    std::unordered_map<std::string, std::shared_ptr<Mapping>> lossMappings,
+    bool idempotent = false);
 
 struct BulkForwardPassResult
 {

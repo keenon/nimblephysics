@@ -2,10 +2,12 @@
 #define DART_TRAJECTORY_ABSTRACT_SHOT_HPP_
 
 #include <memory>
+#include <unordered_map>
 #include <vector>
 
 #include <Eigen/Dense>
 
+#include "dart/neural/Mapping.hpp"
 #include "dart/trajectory/LossFn.hpp"
 #include "dart/trajectory/TrajectoryConstants.hpp"
 
@@ -33,6 +35,39 @@ public:
 
   /// Add a custom constraint function to the trajectory
   void addConstraint(LossFn loss);
+
+  /// This sets the mapping we're using to store the representation of the Shot.
+  /// WARNING: THIS IS A POTENTIALLY DESTRUCTIVE OPERATION! This will rewrite
+  /// the internal representation of the Shot to use the new mapping, and if the
+  /// new mapping is underspecified compared to the old mapping, you may lose
+  /// information. It's not guaranteed that you'll get back the same trajectory
+  /// if you switch to a different mapping, and then switch back.
+  ///
+  /// This will affect the values you get back from getStates() - they'll now be
+  /// returned in the view given by `mapping`. That's also the represenation
+  /// that'll be passed to IPOPT, and updated on each gradient step. Therein
+  /// lies the power of changing the representation mapping: There will almost
+  /// certainly be mapped spaces that are easier to optimize in than native
+  /// joint space, at least initially.
+  virtual void switchRepresentationMapping(
+      std::shared_ptr<simulation::World> world,
+      std::shared_ptr<neural::Mapping> mapping);
+
+  /// This adds a mapping through which the loss function can interpret the
+  /// output. We can have multiple loss mappings at the same time, and loss can
+  /// use arbitrary combinations of multiple views, as long as it can provide
+  /// gradients.
+  void addLossMapping(
+      std::string key, std::shared_ptr<neural::Mapping> mapping);
+
+  /// This returns true if there is a loss mapping at the specified key
+  bool hasLossMapping(std::string key);
+
+  /// This returns the loss mapping at the specified key
+  std::shared_ptr<neural::Mapping> getLossMapping(std::string key);
+
+  /// This removes the loss mapping at a particular key
+  void removeLossMapping(std::string key);
 
   /// Returns the length of the flattened problem state
   virtual int getFlatProblemDim() const = 0;
@@ -177,6 +212,9 @@ protected:
   bool mTuneStartingState;
   std::shared_ptr<simulation::World> mWorld;
   std::vector<LossFn> mConstraints;
+  std::shared_ptr<neural::Mapping> mRepresentationMapping;
+  std::unordered_map<std::string, std::shared_ptr<neural::Mapping>>
+      mLossMappings;
   // We need these matrices a lot, so rather than allocate and free them all the
   // time, we have dedicated scratch space
   Eigen::MatrixXd mScratchPoses;

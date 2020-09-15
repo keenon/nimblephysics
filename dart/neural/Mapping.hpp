@@ -57,40 +57,54 @@ public:
 
   /// This gets a Jacobian relating the changes in the outer positions (the
   /// "mapped" positions) to inner positions (the "real" positions)
-  virtual Eigen::MatrixXd getMappedPosToRealPos(
+  virtual Eigen::MatrixXd getMappedPosToRealPosJac(
       std::shared_ptr<simulation::World> world)
       = 0;
 
   /// This gets a Jacobian relating the changes in the inner positions (the
   /// "real" positions) to the corresponding outer positions (the "mapped"
   /// positions)
-  virtual Eigen::MatrixXd getRealPosToMappedPos(
+  virtual Eigen::MatrixXd getRealPosToMappedPosJac(
+      std::shared_ptr<simulation::World> world)
+      = 0;
+
+  /// This gets a Jacobian relating the changes in the inner velocities (the
+  /// "real" velocities) to the corresponding outer positions (the "mapped"
+  /// positions)
+  virtual Eigen::MatrixXd getRealVelToMappedPosJac(
       std::shared_ptr<simulation::World> world)
       = 0;
 
   /// This gets a Jacobian relating the changes in the outer velocity (the
   /// "mapped" velocity) to inner velocity (the "real" velocity)
-  virtual Eigen::MatrixXd getMappedVelToRealVel(
+  virtual Eigen::MatrixXd getMappedVelToRealVelJac(
       std::shared_ptr<simulation::World> world)
       = 0;
 
   /// This gets a Jacobian relating the changes in the inner velocity (the
   /// "real" velocity) to the corresponding outer velocity (the "mapped"
   /// velocity)
-  virtual Eigen::MatrixXd getRealVelToMappedVel(
+  virtual Eigen::MatrixXd getRealVelToMappedVelJac(
+      std::shared_ptr<simulation::World> world)
+      = 0;
+
+  /// This gets a Jacobian relating the changes in the inner position (the
+  /// "real" position) to the corresponding outer velocity (the "mapped"
+  /// velocity)
+  virtual Eigen::MatrixXd getRealPosToMappedVelJac(
       std::shared_ptr<simulation::World> world)
       = 0;
 
   /// This gets a Jacobian relating the changes in the outer force (the
   /// "mapped" force) to inner force (the "real" force)
-  virtual Eigen::MatrixXd getMappedForceToRealForce(
+  virtual Eigen::MatrixXd getMappedForceToRealForceJac(
       std::shared_ptr<simulation::World> world)
       = 0;
 
   /// This gets a Jacobian relating the changes in the inner force (the
   /// "real" force) to the corresponding outer force (the "mapped"
   /// force)
-  virtual Eigen::MatrixXd getRealForceToMappedForce(
+  virtual Eigen::MatrixXd getRealForceToMappedForceJac(
       std::shared_ptr<simulation::World> world)
       = 0;
 };

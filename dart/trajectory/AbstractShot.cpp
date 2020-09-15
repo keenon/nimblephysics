@@ -51,6 +51,60 @@ void AbstractShot::addConstraint(LossFn loss)
 }
 
 //==============================================================================
+/// This sets the mapping we're using to store the representation of the Shot.
+/// WARNING: THIS IS A POTENTIALLY DESTRUCTIVE OPERATION! This will rewrite
+/// the internal representation of the Shot to use the new mapping, and if the
+/// new mapping is underspecified compared to the old mapping, you may lose
+/// information. It's not guaranteed that you'll get back the same trajectory
+/// if you switch to a different mapping, and then switch back.
+///
+/// This will affect the values you get back from getStates() - they'll now be
+/// returned in the view given by `mapping`. That's also the represenation
+/// that'll be passed to IPOPT, and updated on each gradient step. Therein
+/// lies the power of changing the representation mapping: There will almost
+/// certainly be mapped spaces that are easier to optimize in than native
+/// joint space, at least initially.
+void AbstractShot::switchRepresentationMapping(
+    std::shared_ptr<simulation::World> world,
+    std::shared_ptr<neural::Mapping> mapping)
+{
+  // TODO: actually do the switch
+  mRepresentationMapping = mapping;
+}
+
+//==============================================================================
+/// This adds a mapping through which the loss function can interpret the
+/// output. We can have multiple loss mappings at the same time, and loss can
+/// use arbitrary combinations of multiple views, as long as it can provide
+/// gradients.
+void AbstractShot::addLossMapping(
+    std::string key, std::shared_ptr<neural::Mapping> mapping)
+{
+  mLossMappings[key] = mapping;
+}
+
+//==============================================================================
+/// This returns true if there is a loss mapping at the specified key
+bool AbstractShot::hasLossMapping(std::string key)
+{
+  return mLossMappings.find(key) != mLossMappings.end();
+}
+
+//==============================================================================
+/// This returns the loss mapping at the specified key
+std::shared_ptr<neural::Mapping> AbstractShot::getLossMapping(std::string key)
+{
+  return mLossMappings[key];
+}
+
+//==============================================================================
+/// This removes the loss mapping at a particular key
+void AbstractShot::removeLossMapping(std::string key)
+{
+  mLossMappings.erase(key);
+}
+
+//==============================================================================
 /// This gets the bounds on the constraint functions (both knot points and any
 /// custom constraints)
 void AbstractShot::getConstraintUpperBounds(

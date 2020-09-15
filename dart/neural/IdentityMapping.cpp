@@ -82,7 +82,7 @@ void IdentityMapping::getForcesInPlace(
 //==============================================================================
 /// This gets a Jacobian relating the changes in the outer positions (the
 /// "mapped" positions) to inner positions (the "real" positions)
-Eigen::MatrixXd IdentityMapping::getMappedPosToRealPos(
+Eigen::MatrixXd IdentityMapping::getMappedPosToRealPosJac(
     std::shared_ptr<simulation::World> world)
 {
   return Eigen::MatrixXd::Identity(mNumDofs, mNumDofs);
@@ -92,16 +92,26 @@ Eigen::MatrixXd IdentityMapping::getMappedPosToRealPos(
 /// This gets a Jacobian relating the changes in the inner positions (the
 /// "real" positions) to the corresponding outer positions (the "mapped"
 /// positions)
-Eigen::MatrixXd IdentityMapping::getRealPosToMappedPos(
+Eigen::MatrixXd IdentityMapping::getRealPosToMappedPosJac(
     std::shared_ptr<simulation::World> world)
 {
   return Eigen::MatrixXd::Identity(mNumDofs, mNumDofs);
 }
 
 //==============================================================================
+/// This gets a Jacobian relating the changes in the inner velocities (the
+/// "real" velocities) to the corresponding outer positions (the "mapped"
+/// positions)
+Eigen::MatrixXd IdentityMapping::getRealVelToMappedPosJac(
+    std::shared_ptr<simulation::World> world)
+{
+  return Eigen::MatrixXd::Zero(mNumDofs, mNumDofs);
+}
+
+//==============================================================================
 /// This gets a Jacobian relating the changes in the outer velocity (the
 /// "mapped" velocity) to inner velocity (the "real" velocity)
-Eigen::MatrixXd IdentityMapping::getMappedVelToRealVel(
+Eigen::MatrixXd IdentityMapping::getMappedVelToRealVelJac(
     std::shared_ptr<simulation::World> world)
 {
   return Eigen::MatrixXd::Identity(mNumDofs, mNumDofs);
@@ -111,16 +121,26 @@ Eigen::MatrixXd IdentityMapping::getMappedVelToRealVel(
 /// This gets a Jacobian relating the changes in the inner velocity (the
 /// "real" velocity) to the corresponding outer velocity (the "mapped"
 /// velocity)
-Eigen::MatrixXd IdentityMapping::getRealVelToMappedVel(
+Eigen::MatrixXd IdentityMapping::getRealVelToMappedVelJac(
     std::shared_ptr<simulation::World> world)
 {
   return Eigen::MatrixXd::Identity(mNumDofs, mNumDofs);
 }
 
 //==============================================================================
+/// This gets a Jacobian relating the changes in the inner position (the
+/// "real" position) to the corresponding outer velocity (the "mapped"
+/// velocity)
+Eigen::MatrixXd IdentityMapping::getRealPosToMappedVelJac(
+    std::shared_ptr<simulation::World> world)
+{
+  return Eigen::MatrixXd::Zero(mNumDofs, mNumDofs);
+}
+
+//==============================================================================
 /// This gets a Jacobian relating the changes in the outer force (the
 /// "mapped" force) to inner force (the "real" force)
-Eigen::MatrixXd IdentityMapping::getMappedForceToRealForce(
+Eigen::MatrixXd IdentityMapping::getMappedForceToRealForceJac(
     std::shared_ptr<simulation::World> world)
 {
   return Eigen::MatrixXd::Identity(mNumDofs, mNumDofs);
@@ -130,7 +150,7 @@ Eigen::MatrixXd IdentityMapping::getMappedForceToRealForce(
 /// This gets a Jacobian relating the changes in the inner force (the
 /// "real" force) to the corresponding outer force (the "mapped"
 /// force)
-Eigen::MatrixXd IdentityMapping::getRealForceToMappedForce(
+Eigen::MatrixXd IdentityMapping::getRealForceToMappedForceJac(
     std::shared_ptr<simulation::World> world)
 {
   return Eigen::MatrixXd::Identity(mNumDofs, mNumDofs);
