@@ -107,6 +107,19 @@ public:
   virtual Eigen::MatrixXd getRealForceToMappedForceJac(
       std::shared_ptr<simulation::World> world)
       = 0;
+
+  virtual Eigen::VectorXd getPositionLowerLimits(
+      std::shared_ptr<simulation::World> world);
+  virtual Eigen::VectorXd getPositionUpperLimits(
+      std::shared_ptr<simulation::World> world);
+  virtual Eigen::VectorXd getVelocityLowerLimits(
+      std::shared_ptr<simulation::World> world);
+  virtual Eigen::VectorXd getVelocityUpperLimits(
+      std::shared_ptr<simulation::World> world);
+  virtual Eigen::VectorXd getForceLowerLimits(
+      std::shared_ptr<simulation::World> world);
+  virtual Eigen::VectorXd getForceUpperLimits(
+      std::shared_ptr<simulation::World> world);
 };
 
 } // namespace neural

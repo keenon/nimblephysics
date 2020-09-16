@@ -58,6 +58,9 @@ void IKMapping::setPositions(
     std::shared_ptr<simulation::World> world,
     const Eigen::Ref<Eigen::VectorXd>& positions)
 {
+  // Reset to 0, so that solutions are always deterministic even if IK is
+  // under/over specified
+  world->setPositions(Eigen::VectorXd::Zero(world->getNumDofs()));
   // Run simple IK to try to get as close as possible. Completely possible that
   // the requested positions are infeasible, in which case we'll just do a best
   // guess.
@@ -406,6 +409,54 @@ Eigen::MatrixXd IKMapping::bruteForceJacobianOfJacVelWrtPosition(
 
   snapshot.restore();
   return jac;
+}
+
+//==============================================================================
+Eigen::VectorXd IKMapping::getPositionLowerLimits(
+    std::shared_ptr<simulation::World> world)
+{
+  return Eigen::VectorXd::Ones(getPosDim())
+         * -std::numeric_limits<double>::infinity();
+}
+
+//==============================================================================
+Eigen::VectorXd IKMapping::getPositionUpperLimits(
+    std::shared_ptr<simulation::World> world)
+{
+  return Eigen::VectorXd::Ones(getPosDim())
+         * std::numeric_limits<double>::infinity();
+}
+
+//==============================================================================
+Eigen::VectorXd IKMapping::getVelocityLowerLimits(
+    std::shared_ptr<simulation::World> world)
+{
+  return Eigen::VectorXd::Ones(getVelDim())
+         * -std::numeric_limits<double>::infinity();
+}
+
+//==============================================================================
+Eigen::VectorXd IKMapping::getVelocityUpperLimits(
+    std::shared_ptr<simulation::World> world)
+{
+  return Eigen::VectorXd::Ones(getVelDim())
+         * std::numeric_limits<double>::infinity();
+}
+
+//==============================================================================
+Eigen::VectorXd IKMapping::getForceLowerLimits(
+    std::shared_ptr<simulation::World> world)
+{
+  return Eigen::VectorXd::Ones(getForceDim())
+         * -std::numeric_limits<double>::infinity();
+}
+
+//==============================================================================
+Eigen::VectorXd IKMapping::getForceUpperLimits(
+    std::shared_ptr<simulation::World> world)
+{
+  return Eigen::VectorXd::Ones(getForceDim())
+         * std::numeric_limits<double>::infinity();
 }
 
 } // namespace neural

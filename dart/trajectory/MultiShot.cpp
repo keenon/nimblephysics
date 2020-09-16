@@ -48,6 +48,31 @@ MultiShot::~MultiShot()
 }
 
 //==============================================================================
+/// This sets the mapping we're using to store the representation of the Shot.
+/// WARNING: THIS IS A POTENTIALLY DESTRUCTIVE OPERATION! This will rewrite
+/// the internal representation of the Shot to use the new mapping, and if the
+/// new mapping is underspecified compared to the old mapping, you may lose
+/// information. It's not guaranteed that you'll get back the same trajectory
+/// if you switch to a different mapping, and then switch back.
+///
+/// This will affect the values you get back from getStates() - they'll now be
+/// returned in the view given by `mapping`. That's also the represenation
+/// that'll be passed to IPOPT, and updated on each gradient step. Therein
+/// lies the power of changing the representation mapping: There will almost
+/// certainly be mapped spaces that are easier to optimize in than native
+/// joint space, at least initially.
+void MultiShot::switchRepresentationMapping(
+    std::shared_ptr<simulation::World> world,
+    std::shared_ptr<neural::Mapping> mapping)
+{
+  for (auto shot : mShots)
+  {
+    shot->switchRepresentationMapping(world, mapping);
+  }
+  AbstractShot::switchRepresentationMapping(world, mapping);
+}
+
+//==============================================================================
 /// Returns the length of the flattened problem state
 int MultiShot::getFlatProblemDim() const
 {
@@ -64,7 +89,9 @@ int MultiShot::getFlatProblemDim() const
 int MultiShot::getConstraintDim() const
 {
   return AbstractShot::getConstraintDim()
-         + (2 * mNumDofs) * (mShots.size() - 1);
+         + (mRepresentationMapping->getPosDim()
+            + mRepresentationMapping->getVelDim())
+               * (mShots.size() - 1);
 }
 
 //==============================================================================
@@ -80,9 +107,13 @@ void MultiShot::computeConstraints(
   cursor += numParentConstraints;
   for (int i = 1; i < mShots.size(); i++)
   {
-    constraints.segment(cursor, mNumDofs * 2)
+    constraints.segment(
+        cursor,
+        mRepresentationMapping->getPosDim()
+            + mRepresentationMapping->getVelDim())
         = mShots[i - 1]->getFinalState(world) - mShots[i]->getStartState();
-    cursor += mNumDofs * 2;
+    cursor += mRepresentationMapping->getPosDim()
+              + mRepresentationMapping->getVelDim();
   }
 }
 
@@ -126,9 +157,9 @@ void MultiShot::unroll(
     int dim = shot->getNumSteps();
     shot->unroll(
         world,
-        poses.block(0, cursor, mNumDofs, dim),
-        vels.block(0, cursor, mNumDofs, dim),
-        forces.block(0, cursor, mNumDofs, dim));
+        poses.block(0, cursor, mRepresentationMapping->getPosDim(), dim),
+        vels.block(0, cursor, mRepresentationMapping->getVelDim(), dim),
+        forces.block(0, cursor, mRepresentationMapping->getForceDim(), dim));
     cursor += dim;
   }
 }
@@ -227,15 +258,17 @@ void MultiShot::backpropJacobian(
   rowCursor += numParentConstraints;
 
   // Add in knot point constraints
+  int stateDim = mRepresentationMapping->getPosDim()
+                 + mRepresentationMapping->getVelDim();
   for (int i = 1; i < mShots.size(); i++)
   {
     int dim = mShots[i - 1]->getFlatProblemDim();
     mShots[i - 1]->backpropJacobianOfFinalState(
-        world, jac.block(rowCursor, colCursor, 2 * mNumDofs, dim));
+        world, jac.block(rowCursor, colCursor, stateDim, dim));
     colCursor += dim;
-    jac.block(rowCursor, colCursor, 2 * mNumDofs, 2 * mNumDofs)
-        = -1 * Eigen::MatrixXd::Identity(2 * mNumDofs, 2 * mNumDofs);
-    rowCursor += 2 * mNumDofs;
+    jac.block(rowCursor, colCursor, stateDim, stateDim)
+        = -1 * Eigen::MatrixXd::Identity(stateDim, stateDim);
+    rowCursor += stateDim;
   }
 
   // We don't include the last shot in the constraints, cause it doesn't end in
@@ -250,13 +283,15 @@ void MultiShot::backpropJacobian(
 int MultiShot::getNumberNonZeroJacobian()
 {
   int nnzj = AbstractShot::getNumberNonZeroJacobian();
+  int stateDim = mRepresentationMapping->getPosDim()
+                 + mRepresentationMapping->getVelDim();
   for (int i = 0; i < mShots.size() - 1; i++)
   {
     int shotDim = mShots[i]->getFlatProblemDim();
     // The main Jacobian block
-    nnzj += shotDim * 2 * mNumDofs;
+    nnzj += shotDim * stateDim;
     // The -I at the end
-    nnzj += 2 * mNumDofs;
+    nnzj += stateDim;
   }
 
   return nnzj;
@@ -279,6 +314,8 @@ void MultiShot::getJacobianSparsityStructure(
       cols.segment(0, n * numParentConstraints));
   rowCursor += numParentConstraints;
 
+  int stateDim = mRepresentationMapping->getPosDim()
+                 + mRepresentationMapping->getVelDim();
   // Handle knot point constraints
   for (int i = 1; i < mShots.size(); i++)
   {
@@ -286,7 +323,7 @@ void MultiShot::getJacobianSparsityStructure(
     // This is the main Jacobian
     for (int col = colCursor; col < colCursor + dim; col++)
     {
-      for (int row = rowCursor; row < rowCursor + 2 * mNumDofs; row++)
+      for (int row = rowCursor; row < rowCursor + stateDim; row++)
       {
         rows(sparseCursor) = row;
         cols(sparseCursor) = col;
@@ -295,13 +332,13 @@ void MultiShot::getJacobianSparsityStructure(
     }
     colCursor += dim;
     // This is the negative identity at the end
-    for (int q = 0; q < 2 * mNumDofs; q++)
+    for (int q = 0; q < stateDim; q++)
     {
       rows(sparseCursor) = rowCursor + q;
       cols(sparseCursor) = colCursor + q;
       sparseCursor++;
     }
-    rowCursor += 2 * mNumDofs;
+    rowCursor += stateDim;
   }
 }
 
@@ -312,21 +349,23 @@ void MultiShot::getSparseJacobian(
     Eigen::Ref<Eigen::VectorXd> sparse)
 {
   int sparseCursor = AbstractShot::getNumberNonZeroJacobian();
-  Eigen::VectorXd neg = Eigen::VectorXd::Ones(2 * mNumDofs) * -1;
+  int stateDim = mRepresentationMapping->getPosDim()
+                 + mRepresentationMapping->getVelDim();
+  Eigen::VectorXd neg = Eigen::VectorXd::Ones(stateDim) * -1;
   for (int i = 1; i < mShots.size(); i++)
   {
     int dim = mShots[i - 1]->getFlatProblemDim();
     // This is the main Jacobian
-    Eigen::MatrixXd jac = Eigen::MatrixXd::Zero(2 * mNumDofs, dim);
+    Eigen::MatrixXd jac = Eigen::MatrixXd::Zero(stateDim, dim);
     mShots[i - 1]->backpropJacobianOfFinalState(world, jac);
     for (int col = 0; col < dim; col++)
     {
-      sparse.segment(sparseCursor, 2 * mNumDofs) = jac.col(col);
-      sparseCursor += 2 * mNumDofs;
+      sparse.segment(sparseCursor, stateDim) = jac.col(col);
+      sparseCursor += stateDim;
     }
     // This is the negative identity at the end
-    sparse.segment(sparseCursor, 2 * mNumDofs) = neg;
-    sparseCursor += 2 * mNumDofs;
+    sparse.segment(sparseCursor, stateDim) = neg;
+    sparseCursor += stateDim;
   }
 }
 
@@ -339,12 +378,15 @@ void MultiShot::getStates(
     /* OUT */ Eigen::Ref<Eigen::MatrixXd> forces,
     bool useKnots)
 {
+  int posDim = mRepresentationMapping->getPosDim();
+  int velDim = mRepresentationMapping->getVelDim();
+  int forceDim = mRepresentationMapping->getForceDim();
   assert(poses.cols() == mSteps);
-  assert(poses.rows() == mNumDofs);
+  assert(poses.rows() == posDim);
   assert(vels.cols() == mSteps);
-  assert(vels.rows() == mNumDofs);
+  assert(vels.rows() == velDim);
   assert(forces.cols() == mSteps);
-  assert(forces.rows() == mNumDofs);
+  assert(forces.rows() == forceDim);
   int cursor = 0;
   if (useKnots)
   {
@@ -353,9 +395,9 @@ void MultiShot::getStates(
       int steps = mShots[i]->getNumSteps();
       mShots[i]->getStates(
           world,
-          poses.block(0, cursor, mNumDofs, steps),
-          vels.block(0, cursor, mNumDofs, steps),
-          forces.block(0, cursor, mNumDofs, steps),
+          poses.block(0, cursor, posDim, steps),
+          vels.block(0, cursor, velDim, steps),
+          forces.block(0, cursor, forceDim, steps),
           true);
       cursor += steps;
     }
@@ -425,15 +467,18 @@ void MultiShot::backpropGradient(
 {
   int cursorDims = 0;
   int cursorSteps = 0;
+  int posDim = mRepresentationMapping->getPosDim();
+  int velDim = mRepresentationMapping->getVelDim();
+  int forceDim = mRepresentationMapping->getForceDim();
   for (int i = 0; i < mShots.size(); i++)
   {
     int steps = mShots[i]->getNumSteps();
     int dim = mShots[i]->getFlatProblemDim();
     mShots[i]->backpropGradient(
         world,
-        gradWrtPoses.block(0, cursorSteps, mNumDofs, steps),
-        gradWrtVels.block(0, cursorSteps, mNumDofs, steps),
-        gradWrtForces.block(0, cursorSteps, mNumDofs, steps),
+        gradWrtPoses.block(0, cursorSteps, posDim, steps),
+        gradWrtVels.block(0, cursorSteps, velDim, steps),
+        gradWrtForces.block(0, cursorSteps, forceDim, steps),
         grad.segment(cursorDims, dim));
     cursorSteps += steps;
     cursorDims += dim;

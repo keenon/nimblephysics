@@ -156,5 +156,47 @@ Eigen::MatrixXd IdentityMapping::getRealForceToMappedForceJac(
   return Eigen::MatrixXd::Identity(mNumDofs, mNumDofs);
 }
 
+//==============================================================================
+Eigen::VectorXd IdentityMapping::getPositionLowerLimits(
+    std::shared_ptr<simulation::World> world)
+{
+  return world->getPositionLowerLimits();
+}
+
+//==============================================================================
+Eigen::VectorXd IdentityMapping::getPositionUpperLimits(
+    std::shared_ptr<simulation::World> world)
+{
+  return world->getPositionUpperLimits();
+}
+
+//==============================================================================
+Eigen::VectorXd IdentityMapping::getVelocityLowerLimits(
+    std::shared_ptr<simulation::World> world)
+{
+  return world->getVelocityLowerLimits();
+}
+
+//==============================================================================
+Eigen::VectorXd IdentityMapping::getVelocityUpperLimits(
+    std::shared_ptr<simulation::World> world)
+{
+  return world->getVelocityUpperLimits();
+}
+
+//==============================================================================
+Eigen::VectorXd IdentityMapping::getForceLowerLimits(
+    std::shared_ptr<simulation::World> world)
+{
+  return world->getForceLowerLimits();
+}
+
+//==============================================================================
+Eigen::VectorXd IdentityMapping::getForceUpperLimits(
+    std::shared_ptr<simulation::World> world)
+{
+  return world->getForceUpperLimits();
+}
+
 } // namespace neural
 } // namespace dart

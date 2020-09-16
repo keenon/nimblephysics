@@ -7,6 +7,7 @@
 
 #include <Eigen/Dense>
 
+#include "dart/neural/BackpropSnapshot.hpp"
 #include "dart/neural/Mapping.hpp"
 
 namespace dart {
@@ -96,6 +97,44 @@ public:
   Eigen::MatrixXd getVelVelJacobian(std::shared_ptr<simulation::World> world);
   Eigen::MatrixXd getForceVelJacobian(std::shared_ptr<simulation::World> world);
 
+  /// This computes the implicit backprop without forming intermediate
+  /// Jacobians. It takes a LossGradient with the position and velocity vectors
+  /// filled it, though the loss with respect to torque is ignored and can be
+  /// null. It returns a LossGradient with all three values filled in, position,
+  /// velocity, and torque.
+  void backprop(
+      simulation::WorldPtr world,
+      LossGradient& thisTimestepLoss,
+      const LossGradient& nextTimestepLoss);
+
+  /// Returns a concatenated vector of all the Skeletons' position()'s in the
+  /// World, in order in which the Skeletons appear in the World's
+  /// getSkeleton(i) returns them, BEFORE the timestep.
+  const Eigen::VectorXd& getPreStepPosition();
+
+  /// Returns a concatenated vector of all the Skeletons' velocity()'s in the
+  /// World, in order in which the Skeletons appear in the World's
+  /// getSkeleton(i) returns them, BEFORE the timestep.
+  const Eigen::VectorXd& getPreStepVelocity();
+
+  /// Returns a concatenated vector of all the joint torques that were applied
+  /// during the forward pass, BEFORE the timestep.
+  const Eigen::VectorXd& getPreStepTorques();
+
+  /// Returns a concatenated vector of all the Skeletons' position()'s in the
+  /// World, in order in which the Skeletons appear in the World's
+  /// getSkeleton(i) returns them, AFTER the timestep.
+  const Eigen::VectorXd& getPostStepPosition();
+
+  /// Returns a concatenated vector of all the Skeletons' velocity()'s in the
+  /// World, in order in which the Skeletons appear in the World's
+  /// getSkeleton(i) returns them, AFTER the timestep.
+  const Eigen::VectorXd& getPostStepVelocity();
+
+  /// Returns a concatenated vector of all the joint torques that were applied
+  /// during the forward pass, AFTER the timestep.
+  const Eigen::VectorXd& getPostStepTorques();
+
 protected:
   std::shared_ptr<BackpropSnapshot> mBackpropSnapshot;
   PreStepMapping mPreStepRepresentation;
@@ -103,6 +142,8 @@ protected:
   std::unordered_map<std::string, PreStepMapping> mPreStepLosses;
   std::unordered_map<std::string, PostStepMapping> mPostStepLosses;
 };
+
+using MappedBackpropSnapshotPtr = std::shared_ptr<MappedBackpropSnapshot>;
 
 } // namespace neural
 } // namespace dart

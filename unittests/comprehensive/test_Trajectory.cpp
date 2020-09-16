@@ -46,6 +46,9 @@
 #include "dart/neural/BackpropSnapshot.hpp"
 #include "dart/neural/ConstrainedGroupGradientMatrices.hpp"
 #include "dart/neural/DifferentiableContactConstraint.hpp"
+#include "dart/neural/IKMapping.hpp"
+#include "dart/neural/IdentityMapping.hpp"
+#include "dart/neural/Mapping.hpp"
 #include "dart/neural/NeuralConstants.hpp"
 #include "dart/neural/NeuralUtils.hpp"
 #include "dart/neural/RestorableSnapshot.hpp"
@@ -133,15 +136,25 @@ bool verifySingleStep(WorldPtr world, double EPS)
   return true;
 }
 
-bool verifySingleShot(WorldPtr world, int maxSteps, double EPS, bool useFdJacs)
+bool verifySingleShot(
+    WorldPtr world,
+    int maxSteps,
+    double EPS,
+    bool useFdJacs,
+    std::shared_ptr<Mapping> mapping)
 {
   for (int i = 1; i < maxSteps; i++)
   {
     LossFn lossFn = LossFn();
     SingleShot shot(world, lossFn, i);
+    if (mapping != nullptr)
+    {
+      shot.switchRepresentationMapping(world, mapping);
+    }
 
     double threshold = 1e-8;
-    std::vector<BackpropSnapshotPtr> ptrs = shot.getSnapshots(world);
+    std::vector<MappedBackpropSnapshotPtr> ptrs = shot.getSnapshots(world);
+    /*
     for (int j = 0; j < ptrs.size(); j++)
     {
       if (!useFdJacs
@@ -202,6 +215,7 @@ bool verifySingleShot(WorldPtr world, int maxSteps, double EPS, bool useFdJacs)
         return false;
       }
     }
+    */
 
     TimestepJacobians analyticalJacobians
         = shot.backpropStartStateJacobians(world, useFdJacs);
@@ -246,10 +260,18 @@ bool verifySingleShot(WorldPtr world, int maxSteps, double EPS, bool useFdJacs)
   return true;
 }
 
-bool verifyShotJacobian(WorldPtr world, int steps)
+bool verifyShotJacobian(
+    WorldPtr world, int steps, std::shared_ptr<Mapping> mapping)
 {
   LossFn lossFn = LossFn();
   SingleShot shot(world, lossFn, steps, true);
+  int stateSize = world->getNumDofs() * 2;
+  if (mapping != nullptr)
+  {
+    shot.switchRepresentationMapping(world, mapping);
+    stateSize = mapping->getPosDim() + mapping->getVelDim();
+  }
+
   int dim = shot.getFlatProblemDim();
 
   // Random initialization
@@ -259,11 +281,9 @@ bool verifyShotJacobian(WorldPtr world, int steps)
   shot.unflatten(randomInit);
   */
 
-  Eigen::MatrixXd analyticalJacobian
-      = Eigen::MatrixXd::Zero(world->getNumDofs() * 2, dim);
+  Eigen::MatrixXd analyticalJacobian = Eigen::MatrixXd::Zero(stateSize, dim);
   shot.backpropJacobianOfFinalState(world, analyticalJacobian);
-  Eigen::MatrixXd bruteForceJacobian
-      = Eigen::MatrixXd::Zero(world->getNumDofs() * 2, dim);
+  Eigen::MatrixXd bruteForceJacobian = Eigen::MatrixXd::Zero(stateSize, dim);
   shot.finiteDifferenceJacobianOfFinalState(world, bruteForceJacobian);
   double threshold = 1e-8;
   if (!equals(analyticalJacobian, bruteForceJacobian, threshold))
@@ -333,10 +353,16 @@ bool verifyShotGradient(
   return true;
 }
 
-bool verifyMultiShotJacobian(WorldPtr world, int steps, int shotLength)
+bool verifyMultiShotJacobian(
+    WorldPtr world, int steps, int shotLength, std::shared_ptr<Mapping> mapping)
 {
   LossFn lossFn = LossFn();
   MultiShot shot(world, lossFn, steps, shotLength, true);
+  if (mapping != nullptr)
+  {
+    shot.switchRepresentationMapping(world, mapping);
+  }
+
   int dim = shot.getFlatProblemDim();
   int numConstraints = shot.getConstraintDim();
 
@@ -389,10 +415,15 @@ bool verifyMultiShotJacobian(WorldPtr world, int steps, int shotLength)
   return true;
 }
 
-bool verifySparseJacobian(WorldPtr world, int steps, int shotLength)
+bool verifySparseJacobian(
+    WorldPtr world, int steps, int shotLength, std::shared_ptr<Mapping> mapping)
 {
   LossFn lossFn = LossFn();
   MultiShot shot(world, lossFn, steps, shotLength, true);
+  if (mapping != nullptr)
+  {
+    shot.switchRepresentationMapping(world, mapping);
+  }
 
   // Random initialization
   /*
@@ -576,6 +607,155 @@ bool verifyMultiShotJacobianCustomConstraint(
   return true;
 }
 
+bool verifyChangeRepresentationToIK(
+    WorldPtr world,
+    int steps,
+    int shotLength,
+    std::shared_ptr<IKMapping> newRepresentation,
+    bool shouldBeLosslessInto,
+    bool shouldBeLosslessOut)
+{
+  LossFn lossFn = LossFn();
+  MultiShot shot(world, lossFn, steps, shotLength, true);
+
+  // Get the initial state
+  Eigen::MatrixXd initialIdentityPoses
+      = Eigen::MatrixXd::Zero(world->getNumDofs(), steps);
+  Eigen::MatrixXd initialIdentityVels
+      = Eigen::MatrixXd::Zero(world->getNumDofs(), steps);
+  Eigen::MatrixXd initialIdentityForces
+      = Eigen::MatrixXd::Zero(world->getNumDofs(), steps);
+  shot.getStates(
+      world,
+      initialIdentityPoses,
+      initialIdentityVels,
+      initialIdentityForces,
+      true);
+
+  // Switch to a mapped state, and get the problem state
+  shot.switchRepresentationMapping(world, newRepresentation);
+  Eigen::MatrixXd mappedPoses
+      = Eigen::MatrixXd::Zero(newRepresentation->getPosDim(), steps);
+  Eigen::MatrixXd mappedVels
+      = Eigen::MatrixXd::Zero(newRepresentation->getVelDim(), steps);
+  Eigen::MatrixXd mappedForces
+      = Eigen::MatrixXd::Zero(newRepresentation->getForceDim(), steps);
+  shot.getStates(world, mappedPoses, mappedVels, mappedForces, true);
+
+  // Go back to identity maps
+  shot.clearRepresentationMapping(world);
+  Eigen::MatrixXd recoveredIdentityPoses
+      = Eigen::MatrixXd::Zero(world->getNumDofs(), steps);
+  Eigen::MatrixXd recoveredIdentityVels
+      = Eigen::MatrixXd::Zero(world->getNumDofs(), steps);
+  Eigen::MatrixXd recoveredIdentityForces
+      = Eigen::MatrixXd::Zero(world->getNumDofs(), steps);
+  shot.getStates(
+      world,
+      recoveredIdentityPoses,
+      recoveredIdentityVels,
+      recoveredIdentityForces,
+      true);
+
+  double threshold = 1e-8;
+
+  if (shouldBeLosslessInto)
+  {
+    for (int i = 0; i < steps; i++)
+    {
+      world->setPositions(initialIdentityPoses.col(i));
+      world->setVelocities(initialIdentityVels.col(i));
+      world->setForces(initialIdentityForces.col(i));
+
+      Eigen::VectorXd manualMappedPos = newRepresentation->getPositions(world);
+      Eigen::VectorXd manualMappedVel = newRepresentation->getVelocities(world);
+      Eigen::VectorXd manualMappedForce = newRepresentation->getForces(world);
+      Eigen::VectorXd mappedPos = mappedPoses.col(i);
+      Eigen::VectorXd mappedVel = mappedVels.col(i);
+      Eigen::VectorXd mappedForce = mappedForces.col(i);
+
+      if (!equals(mappedPos, manualMappedPos, threshold)
+          || !equals(mappedVel, manualMappedVel, threshold)
+          || !equals(mappedForce, manualMappedForce, threshold))
+      {
+        std::cout << "verifyChangeRepresentationToIK() failed to be lossloss "
+                     "in the into mapping "
+                     "when shouldBeLosslessInto=true"
+                  << std::endl;
+        return false;
+      }
+    }
+  }
+
+  if (shouldBeLosslessOut)
+  {
+    for (int i = 0; i < steps; i++)
+    {
+      Eigen::VectorXd mappedPos = mappedPoses.col(i);
+      Eigen::VectorXd mappedVel = mappedVels.col(i);
+      Eigen::VectorXd mappedForce = mappedForces.col(i);
+      newRepresentation->setPositions(world, mappedPos);
+      newRepresentation->setVelocities(world, mappedVel);
+      newRepresentation->setForces(world, mappedForce);
+
+      Eigen::VectorXd recoveredPos = recoveredIdentityPoses.col(i);
+      Eigen::VectorXd recoveredVel = recoveredIdentityVels.col(i);
+      Eigen::VectorXd recoveredForce = recoveredIdentityForces.col(i);
+      Eigen::VectorXd manualRecoveredPos = world->getPositions();
+      Eigen::VectorXd manualRecoveredVel = world->getVelocities();
+      Eigen::VectorXd manualRecoveredForce = world->getForces();
+
+      if (!equals(recoveredPos, manualRecoveredPos, threshold)
+          || !equals(recoveredVel, manualRecoveredVel, threshold)
+          || !equals(recoveredForce, manualRecoveredForce, threshold))
+      {
+        std::cout << "verifyChangeRepresentationToIK() failed to be lossloss "
+                     "in the out mapping "
+                     "when shouldBeLosslessOut=true"
+                  << std::endl;
+        std::cout << "Step " << i << ":" << std::endl;
+        if (!equals(recoveredPos, manualRecoveredPos, threshold))
+        {
+          std::cout << "Recovered pos:" << std::endl
+                    << recoveredPos << std::endl;
+          std::cout << "Manually recovered pos:" << std::endl
+                    << manualRecoveredPos << std::endl;
+        }
+        if (!equals(recoveredVel, manualRecoveredVel, threshold))
+        {
+          std::cout << "Recovered vel:" << std::endl
+                    << recoveredVel << std::endl;
+          std::cout << "Manually recovered vel:" << std::endl
+                    << manualRecoveredVel << std::endl;
+        }
+        if (!equals(recoveredForce, manualRecoveredForce, threshold))
+        {
+          std::cout << "Recovered force:" << std::endl
+                    << recoveredForce << std::endl;
+          std::cout << "Manually recovered force:" << std::endl
+                    << manualRecoveredForce << std::endl;
+        }
+        return false;
+      }
+    }
+  }
+
+  if (shouldBeLosslessInto && shouldBeLosslessOut)
+  {
+    if (!equals(initialIdentityPoses, recoveredIdentityPoses, threshold)
+        || !equals(initialIdentityVels, recoveredIdentityVels, threshold)
+        || !equals(initialIdentityForces, recoveredIdentityForces, threshold))
+    {
+      std::cout << "verifyChangeRepresentationToIK() failed to be lossloss "
+                   "when shouldBeLosslessInto=true and shouldBeLosslessOut=true"
+                << std::endl;
+      return false;
+    }
+  }
+
+  return true;
+}
+
 //==============================================================================
 class AbstractShotWindow : public dart::gui::glut::SimWindow
 {
@@ -687,9 +867,17 @@ TEST(TRAJECTORY, UNCONSTRAINED_BOX)
 
   // Passes
   EXPECT_TRUE(verifySingleStep(world, 1e-7));
-  EXPECT_TRUE(verifySingleShot(world, 40, 1e-7, false));
-  EXPECT_TRUE(verifyShotJacobian(world, 40));
-  EXPECT_TRUE(verifyMultiShotJacobian(world, 8, 2));
+  EXPECT_TRUE(verifySingleShot(world, 40, 1e-7, false, nullptr));
+  EXPECT_TRUE(verifyShotJacobian(world, 40, nullptr));
+  EXPECT_TRUE(verifyMultiShotJacobian(world, 8, 2, nullptr));
+
+  // Verify using the IK mapping as the representation
+  std::shared_ptr<IKMapping> ikMap = std::make_shared<IKMapping>(world);
+  ikMap->addLinearBodyNode(boxBody);
+  EXPECT_TRUE(verifyChangeRepresentationToIK(world, 10, 5, ikMap, true, true));
+  EXPECT_TRUE(verifySingleShot(world, 40, 1e-7, false, ikMap));
+  EXPECT_TRUE(verifyShotJacobian(world, 40, ikMap));
+  EXPECT_TRUE(verifyMultiShotJacobian(world, 8, 2, ikMap));
 }
 
 TEST(TRAJECTORY, REVOLUTE_JOINT)
@@ -712,9 +900,17 @@ TEST(TRAJECTORY, REVOLUTE_JOINT)
 
   // Passes
   EXPECT_TRUE(verifySingleStep(world, 1e-7));
-  EXPECT_TRUE(verifySingleShot(world, 40, 1e-7, false));
-  EXPECT_TRUE(verifyShotJacobian(world, 40));
-  EXPECT_TRUE(verifyMultiShotJacobian(world, 8, 2));
+  EXPECT_TRUE(verifySingleShot(world, 40, 1e-7, false, nullptr));
+  EXPECT_TRUE(verifyShotJacobian(world, 40, nullptr));
+  EXPECT_TRUE(verifyMultiShotJacobian(world, 8, 2, nullptr));
+
+  // Verify using the IK mapping as the representation
+  std::shared_ptr<IKMapping> ikMap = std::make_shared<IKMapping>(world);
+  ikMap->addAngularBodyNode(armPair.second);
+  EXPECT_TRUE(verifyChangeRepresentationToIK(world, 10, 5, ikMap, true, true));
+  EXPECT_TRUE(verifySingleShot(world, 40, 1e-7, false, ikMap));
+  EXPECT_TRUE(verifyShotJacobian(world, 40, ikMap));
+  EXPECT_TRUE(verifyMultiShotJacobian(world, 8, 2, ikMap));
 }
 
 TEST(TRAJECTORY, TWO_LINK)
@@ -746,8 +942,16 @@ TEST(TRAJECTORY, TWO_LINK)
   EXPECT_TRUE(verifySingleStep(world, 1e-7));
   // This passes, but is very slow, so we'll skip it for now
   // EXPECT_TRUE(verifySingleShot(world, 40, 1e-7, false));
-  EXPECT_TRUE(verifyShotJacobian(world, 40));
-  EXPECT_TRUE(verifyMultiShotJacobian(world, 8, 2));
+  EXPECT_TRUE(verifyShotJacobian(world, 40, nullptr));
+  EXPECT_TRUE(verifyMultiShotJacobian(world, 8, 2, nullptr));
+
+  // Verify using the IK mapping as the representation
+  std::shared_ptr<IKMapping> ikMap = std::make_shared<IKMapping>(world);
+  ikMap->addSpatialBodyNode(armPair.second);
+  ikMap->addSpatialBodyNode(elbowPair.second);
+  EXPECT_TRUE(verifyChangeRepresentationToIK(world, 10, 5, ikMap, true, true));
+  EXPECT_TRUE(verifyShotJacobian(world, 40, ikMap));
+  EXPECT_TRUE(verifyMultiShotJacobian(world, 8, 2, ikMap));
 }
 
 TEST(TRAJECTORY, PRISMATIC)
@@ -771,9 +975,9 @@ TEST(TRAJECTORY, PRISMATIC)
 
   // Passes
   EXPECT_TRUE(verifySingleStep(world, 1e-7));
-  EXPECT_TRUE(verifySingleShot(world, 40, 1e-7, false));
-  EXPECT_TRUE(verifyShotJacobian(world, 40));
-  EXPECT_TRUE(verifyMultiShotJacobian(world, 8, 2));
+  EXPECT_TRUE(verifySingleShot(world, 40, 1e-7, false, nullptr));
+  EXPECT_TRUE(verifyShotJacobian(world, 40, nullptr));
+  EXPECT_TRUE(verifyMultiShotJacobian(world, 8, 2, nullptr));
 
   /*
   EXPECT_TRUE(verifyShotGradient(world, 7, loss));
@@ -781,6 +985,13 @@ TEST(TRAJECTORY, PRISMATIC)
   EXPECT_TRUE(verifyMultiShotJacobianCustomConstraint(
       world, 8, 4, loss, lossGrad, 3.0));
   */
+
+  // Verify using the IK mapping as the representation
+  std::shared_ptr<IKMapping> ikMap = std::make_shared<IKMapping>(world);
+  ikMap->addSpatialBodyNode(sledPair.second);
+  EXPECT_TRUE(verifyChangeRepresentationToIK(world, 10, 5, ikMap, true, true));
+  EXPECT_TRUE(verifyShotJacobian(world, 40, ikMap));
+  EXPECT_TRUE(verifyMultiShotJacobian(world, 8, 2, ikMap));
 }
 
 TEST(TRAJECTORY, CARTPOLE)
@@ -855,14 +1066,22 @@ TEST(TRAJECTORY, CARTPOLE)
         };
 
   EXPECT_TRUE(verifySingleStep(world, 1e-7));
-  EXPECT_TRUE(verifySingleShot(world, 40, 1e-7, false));
-  EXPECT_TRUE(verifyShotJacobian(world, 40));
+  EXPECT_TRUE(verifySingleShot(world, 40, 1e-7, false, nullptr));
+  EXPECT_TRUE(verifyShotJacobian(world, 40, nullptr));
   EXPECT_TRUE(verifyShotGradient(world, 7, loss, lossGrad));
-  EXPECT_TRUE(verifyMultiShotJacobian(world, 8, 2));
+  EXPECT_TRUE(verifyMultiShotJacobian(world, 8, 2, nullptr));
   EXPECT_TRUE(verifyMultiShotGradient(world, 8, 4, loss, lossGrad));
   EXPECT_TRUE(verifyMultiShotJacobianCustomConstraint(
       world, 8, 4, loss, lossGrad, 3.0));
   // EXPECT_TRUE(verifyMultiShotOptimization(world, 50, 10, loss));
+
+  // Verify using the IK mapping as the representation
+  std::shared_ptr<IKMapping> ikMap = std::make_shared<IKMapping>(world);
+  ikMap->addSpatialBodyNode(sledPair.second);
+  ikMap->addSpatialBodyNode(armPair.second);
+  EXPECT_TRUE(verifyChangeRepresentationToIK(world, 10, 5, ikMap, true, true));
+  // EXPECT_TRUE(verifyShotJacobian(world, 40, ikMap));
+  // EXPECT_TRUE(verifyMultiShotJacobian(world, 8, 2, ikMap));
 }
 
 BodyNode* createTailSegment(BodyNode* parent, Eigen::Vector3d color)
@@ -1058,10 +1277,10 @@ TEST(TRAJECTORY, JUMP_WORM)
   // EXPECT_TRUE(verifyMultiShotOptimization(world, 600, 20, loss));
   EXPECT_TRUE(verifySingleStep(world, 5e-7));
   // EXPECT_TRUE(verifySingleShot(world, 40, 5e-7, false));
-  EXPECT_TRUE(verifyShotJacobian(world, 4));
+  EXPECT_TRUE(verifyShotJacobian(world, 4, nullptr));
   EXPECT_TRUE(verifyShotGradient(world, 7, loss, lossGrad));
-  EXPECT_TRUE(verifyMultiShotJacobian(world, 6, 2));
-  EXPECT_TRUE(verifySparseJacobian(world, 8, 2));
+  EXPECT_TRUE(verifyMultiShotJacobian(world, 6, 2, nullptr));
+  EXPECT_TRUE(verifySparseJacobian(world, 8, 2, nullptr));
   EXPECT_TRUE(verifyMultiShotGradient(world, 8, 4, loss, lossGrad));
   EXPECT_TRUE(verifyMultiShotJacobianCustomConstraint(
       world, 8, 4, loss, lossGrad, 3.0));

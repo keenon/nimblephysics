@@ -7,6 +7,8 @@
 #include <coin/IpSolveStatistics.hpp>
 #include <dart/gui/gui.hpp>
 
+#include "dart/neural/IdentityMapping.hpp"
+#include "dart/neural/Mapping.hpp"
 #include "dart/optimizer/ipopt/ipopt.hpp"
 #include "dart/simulation/World.hpp"
 
@@ -17,8 +19,7 @@ namespace trajectory {
 /// Default constructor
 AbstractShot::AbstractShot(
     std::shared_ptr<simulation::World> world, LossFn loss, int steps)
-  : mNumDofs(world->getNumDofs()),
-    mWorld(world),
+  : mWorld(world),
     mLoss(loss),
     mSteps(steps),
     mScratchPoses(Eigen::MatrixXd::Zero(world->getNumDofs(), steps)),
@@ -28,6 +29,7 @@ AbstractShot::AbstractShot(
     mScratchGradWrtVels(Eigen::MatrixXd::Zero(world->getNumDofs(), steps)),
     mScratchGradWrtForces(Eigen::MatrixXd::Zero(world->getNumDofs(), steps))
 {
+  mRepresentationMapping = std::make_shared<neural::IdentityMapping>(world);
 }
 
 //==============================================================================
@@ -50,7 +52,6 @@ void AbstractShot::addConstraint(LossFn loss)
   mConstraints.push_back(loss);
 }
 
-//==============================================================================
 /// This sets the mapping we're using to store the representation of the Shot.
 /// WARNING: THIS IS A POTENTIALLY DESTRUCTIVE OPERATION! This will rewrite
 /// the internal representation of the Shot to use the new mapping, and if the
@@ -68,8 +69,28 @@ void AbstractShot::switchRepresentationMapping(
     std::shared_ptr<simulation::World> world,
     std::shared_ptr<neural::Mapping> mapping)
 {
-  // TODO: actually do the switch
+  // Resize our scratch spaces
+  mScratchPoses.resize(mapping->getPosDim(), mSteps);
+  mScratchVels.resize(mapping->getVelDim(), mSteps);
+  mScratchForces.resize(mapping->getForceDim(), mSteps);
+  mScratchGradWrtPoses.resize(mapping->getPosDim(), mSteps);
+  mScratchGradWrtVels.resize(mapping->getVelDim(), mSteps);
+  mScratchGradWrtForces.resize(mapping->getForceDim(), mSteps);
+  // Reset the main representation mapping
   mRepresentationMapping = mapping;
+}
+
+//==============================================================================
+/// This removes any mapping on the representation, meaning the representation
+/// space goes back to the native joint-space.
+void AbstractShot::clearRepresentationMapping(
+    std::shared_ptr<simulation::World> world)
+{
+  // Just set the mapping to an Identity map, effectively the same as clearing
+  // the mapping.
+  std::shared_ptr<neural::IdentityMapping> identity
+      = std::make_shared<neural::IdentityMapping>(world);
+  switchRepresentationMapping(world, identity);
 }
 
 //==============================================================================
@@ -295,9 +316,12 @@ void AbstractShot::finiteDifferenceGradient(
     std::shared_ptr<simulation::World> world,
     /* OUT */ Eigen::Ref<Eigen::VectorXd> grad)
 {
-  Eigen::MatrixXd poses = Eigen::MatrixXd::Zero(mNumDofs, mSteps);
-  Eigen::MatrixXd vels = Eigen::MatrixXd::Zero(mNumDofs, mSteps);
-  Eigen::MatrixXd forces = Eigen::MatrixXd::Zero(mNumDofs, mSteps);
+  Eigen::MatrixXd poses
+      = Eigen::MatrixXd::Zero(mRepresentationMapping->getPosDim(), mSteps);
+  Eigen::MatrixXd vels
+      = Eigen::MatrixXd::Zero(mRepresentationMapping->getVelDim(), mSteps);
+  Eigen::MatrixXd forces
+      = Eigen::MatrixXd::Zero(mRepresentationMapping->getForceDim(), mSteps);
   getStates(world, poses, vels, forces);
   double originalLoss = mLoss.getLoss(poses, vels, forces);
 

@@ -67,7 +67,9 @@ ConstraintSolver::ConstraintSolver(double timeStep)
         true, 1000u, std::make_shared<collision::BodyNodeCollisionFilter>())),
     mTimeStep(timeStep),
     mGradientEnabled(false), // Default to no gradients
-    mPenetrationCorrectionEnabled(true)
+    mPenetrationCorrectionEnabled(
+        false) // Default to no penetration correction, because it breaks our
+               // gradients
 {
   assert(timeStep > 0.0);
 

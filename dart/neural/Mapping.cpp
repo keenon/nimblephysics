@@ -39,5 +39,53 @@ Eigen::VectorXd Mapping::getForces(std::shared_ptr<simulation::World> world)
   return forces;
 }
 
+//==============================================================================
+Eigen::VectorXd Mapping::getPositionLowerLimits(
+    std::shared_ptr<simulation::World> world)
+{
+  return Eigen::VectorXd::Ones(getPosDim())
+         * -std::numeric_limits<double>::infinity();
+}
+
+//==============================================================================
+Eigen::VectorXd Mapping::getPositionUpperLimits(
+    std::shared_ptr<simulation::World> world)
+{
+  return Eigen::VectorXd::Ones(getPosDim())
+         * std::numeric_limits<double>::infinity();
+}
+
+//==============================================================================
+Eigen::VectorXd Mapping::getVelocityLowerLimits(
+    std::shared_ptr<simulation::World> world)
+{
+  return Eigen::VectorXd::Ones(getVelDim())
+         * -std::numeric_limits<double>::infinity();
+}
+
+//==============================================================================
+Eigen::VectorXd Mapping::getVelocityUpperLimits(
+    std::shared_ptr<simulation::World> world)
+{
+  return Eigen::VectorXd::Ones(getVelDim())
+         * std::numeric_limits<double>::infinity();
+}
+
+//==============================================================================
+Eigen::VectorXd Mapping::getForceLowerLimits(
+    std::shared_ptr<simulation::World> world)
+{
+  return Eigen::VectorXd::Ones(getForceDim())
+         * -std::numeric_limits<double>::infinity();
+}
+
+//==============================================================================
+Eigen::VectorXd Mapping::getForceUpperLimits(
+    std::shared_ptr<simulation::World> world)
+{
+  return Eigen::VectorXd::Ones(getForceDim())
+         * std::numeric_limits<double>::infinity();
+}
+
 } // namespace neural
 } // namespace dart

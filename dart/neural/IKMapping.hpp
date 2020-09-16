@@ -124,6 +124,19 @@ public:
   Eigen::MatrixXd getRealForceToMappedForceJac(
       std::shared_ptr<simulation::World> world) override;
 
+  Eigen::VectorXd getPositionLowerLimits(
+      std::shared_ptr<simulation::World> world) override;
+  Eigen::VectorXd getPositionUpperLimits(
+      std::shared_ptr<simulation::World> world) override;
+  Eigen::VectorXd getVelocityLowerLimits(
+      std::shared_ptr<simulation::World> world) override;
+  Eigen::VectorXd getVelocityUpperLimits(
+      std::shared_ptr<simulation::World> world) override;
+  Eigen::VectorXd getForceLowerLimits(
+      std::shared_ptr<simulation::World> world) override;
+  Eigen::VectorXd getForceUpperLimits(
+      std::shared_ptr<simulation::World> world) override;
+
 protected:
   /// This returns the number of dimensions that the IK mapping represents.
   int getDim();

@@ -235,10 +235,12 @@ bool IPOptShotWrapper::eval_f(
     Eigen::Map<const Eigen::VectorXd> flat(_x, _n);
     mWrapped->unflatten(flat);
   }
-  Eigen::MatrixXd poses = Eigen::MatrixXd(mWrapped->mNumDofs, mWrapped->mSteps);
-  Eigen::MatrixXd vels = Eigen::MatrixXd(mWrapped->mNumDofs, mWrapped->mSteps);
-  Eigen::MatrixXd forces
-      = Eigen::MatrixXd(mWrapped->mNumDofs, mWrapped->mSteps);
+  Eigen::MatrixXd poses = Eigen::MatrixXd(
+      mWrapped->mRepresentationMapping->getPosDim(), mWrapped->mSteps);
+  Eigen::MatrixXd vels = Eigen::MatrixXd(
+      mWrapped->mRepresentationMapping->getVelDim(), mWrapped->mSteps);
+  Eigen::MatrixXd forces = Eigen::MatrixXd(
+      mWrapped->mRepresentationMapping->getForceDim(), mWrapped->mSteps);
   mWrapped->unroll(mWrapped->mWorld, poses, vels, forces);
   _obj_value = mWrapped->mLoss.getLoss(poses, vels, forces);
 

@@ -53,6 +53,10 @@ public:
       std::shared_ptr<simulation::World> world,
       std::shared_ptr<neural::Mapping> mapping);
 
+  /// This removes any mapping on the representation, meaning the representation
+  /// space goes back to the native joint-space.
+  void clearRepresentationMapping(std::shared_ptr<simulation::World> world);
+
   /// This adds a mapping through which the loss function can interpret the
   /// output. We can have multiple loss mappings at the same time, and loss can
   /// use arbitrary combinations of multiple views, as long as it can provide
@@ -208,7 +212,6 @@ public:
 protected:
   LossFn mLoss;
   int mSteps;
-  int mNumDofs;
   bool mTuneStartingState;
   std::shared_ptr<simulation::World> mWorld;
   std::vector<LossFn> mConstraints;
