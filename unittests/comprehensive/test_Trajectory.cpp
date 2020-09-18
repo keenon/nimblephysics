@@ -58,6 +58,7 @@
 #include "dart/trajectory/MultiShot.hpp"
 #include "dart/trajectory/SingleShot.hpp"
 #include "dart/trajectory/TrajectoryConstants.hpp"
+#include "dart/trajectory/TrajectoryRollout.hpp"
 
 #include "GradientTestUtils.hpp"
 #include "TestHelpers.hpp"
@@ -149,7 +150,8 @@ bool verifySingleShot(
     SingleShot shot(world, lossFn, i);
     if (mapping != nullptr)
     {
-      shot.switchRepresentationMapping(world, mapping);
+      shot.addMapping("custom", mapping);
+      shot.switchRepresentationMapping(world, "custom");
     }
 
     double threshold = 1e-8;
@@ -268,7 +270,8 @@ bool verifyShotJacobian(
   int stateSize = world->getNumDofs() * 2;
   if (mapping != nullptr)
   {
-    shot.switchRepresentationMapping(world, mapping);
+    shot.addMapping("custom", mapping);
+    shot.switchRepresentationMapping(world, "custom");
     stateSize = mapping->getPosDim() + mapping->getVelDim();
   }
 
@@ -315,25 +318,8 @@ bool verifyShotGradient(
   shot.unflatten(randomInit);
   */
 
-  Eigen::MatrixXd poses = Eigen::MatrixXd::Zero(world->getNumDofs(), steps);
-  Eigen::MatrixXd vels = Eigen::MatrixXd::Zero(world->getNumDofs(), steps);
-  Eigen::MatrixXd forces = Eigen::MatrixXd::Zero(world->getNumDofs(), steps);
-  shot.getStates(world, poses, vels, forces, true);
-
-  Eigen::MatrixXd gradWrtPoses
-      = Eigen::MatrixXd::Zero(world->getNumDofs(), steps);
-  Eigen::MatrixXd gradWrtVels
-      = Eigen::MatrixXd::Zero(world->getNumDofs(), steps);
-  Eigen::MatrixXd gradWrtForces
-      = Eigen::MatrixXd::Zero(world->getNumDofs(), steps);
-  /*
-  shot.bruteForceGradOfLossInputs(
-    world, loss, gradWrtPoses, gradWrtVels, gradWrtForces);
-  */
-  lossGrad(poses, vels, forces, gradWrtPoses, gradWrtVels, gradWrtForces);
   Eigen::VectorXd analyticalGrad = Eigen::VectorXd::Zero(dim);
-  shot.backpropGradient(
-      world, gradWrtPoses, gradWrtVels, gradWrtForces, analyticalGrad);
+  shot.backpropGradient(world, analyticalGrad);
   Eigen::VectorXd bruteForceGrad = Eigen::VectorXd::Zero(dim);
   shot.finiteDifferenceGradient(world, bruteForceGrad);
 
@@ -360,7 +346,8 @@ bool verifyMultiShotJacobian(
   MultiShot shot(world, lossFn, steps, shotLength, true);
   if (mapping != nullptr)
   {
-    shot.switchRepresentationMapping(world, mapping);
+    shot.addMapping("custom", mapping);
+    shot.switchRepresentationMapping(world, "custom");
   }
 
   int dim = shot.getFlatProblemDim();
@@ -422,7 +409,8 @@ bool verifySparseJacobian(
   MultiShot shot(world, lossFn, steps, shotLength, true);
   if (mapping != nullptr)
   {
-    shot.switchRepresentationMapping(world, mapping);
+    shot.addMapping("custom", mapping);
+    shot.switchRepresentationMapping(world, "custom");
   }
 
   // Random initialization
@@ -499,27 +487,10 @@ bool verifyMultiShotGradient(
   shot.unflatten(randomInit);
   */
 
-  Eigen::MatrixXd poses = Eigen::MatrixXd::Zero(world->getNumDofs(), steps);
-  Eigen::MatrixXd vels = Eigen::MatrixXd::Zero(world->getNumDofs(), steps);
-  Eigen::MatrixXd forces = Eigen::MatrixXd::Zero(world->getNumDofs(), steps);
-  shot.getStates(world, poses, vels, forces, true);
-
   int dim = shot.getFlatProblemDim();
-  Eigen::MatrixXd gradWrtPoses
-      = Eigen::MatrixXd::Zero(world->getNumDofs(), steps);
-  Eigen::MatrixXd gradWrtVels
-      = Eigen::MatrixXd::Zero(world->getNumDofs(), steps);
-  Eigen::MatrixXd gradWrtForces
-      = Eigen::MatrixXd::Zero(world->getNumDofs(), steps);
-  /*
-  shot.bruteForceGradOfLossInputs(
-      world, loss, gradWrtPoses, gradWrtVels, gradWrtForces);
-  */
-  lossGrad(poses, vels, forces, gradWrtPoses, gradWrtVels, gradWrtForces);
 
   Eigen::VectorXd analyticalGrad = Eigen::VectorXd::Zero(dim);
-  shot.backpropGradient(
-      world, gradWrtPoses, gradWrtVels, gradWrtForces, analyticalGrad);
+  shot.backpropGradient(world, analyticalGrad);
   Eigen::VectorXd bruteForceGrad = Eigen::VectorXd::Zero(dim);
   shot.finiteDifferenceGradient(world, bruteForceGrad);
 
@@ -619,43 +590,21 @@ bool verifyChangeRepresentationToIK(
   MultiShot shot(world, lossFn, steps, shotLength, true);
 
   // Get the initial state
-  Eigen::MatrixXd initialIdentityPoses
-      = Eigen::MatrixXd::Zero(world->getNumDofs(), steps);
-  Eigen::MatrixXd initialIdentityVels
-      = Eigen::MatrixXd::Zero(world->getNumDofs(), steps);
-  Eigen::MatrixXd initialIdentityForces
-      = Eigen::MatrixXd::Zero(world->getNumDofs(), steps);
-  shot.getStates(
-      world,
-      initialIdentityPoses,
-      initialIdentityVels,
-      initialIdentityForces,
-      true);
+  TrajectoryRolloutReal initialIdentityRollout = TrajectoryRolloutReal(&shot);
+  shot.getStates(world, initialIdentityRollout, true);
 
+  shot.addMapping("custom", newRepresentation);
   // Switch to a mapped state, and get the problem state
-  shot.switchRepresentationMapping(world, newRepresentation);
-  Eigen::MatrixXd mappedPoses
-      = Eigen::MatrixXd::Zero(newRepresentation->getPosDim(), steps);
-  Eigen::MatrixXd mappedVels
-      = Eigen::MatrixXd::Zero(newRepresentation->getVelDim(), steps);
-  Eigen::MatrixXd mappedForces
-      = Eigen::MatrixXd::Zero(newRepresentation->getForceDim(), steps);
-  shot.getStates(world, mappedPoses, mappedVels, mappedForces, true);
+  shot.switchRepresentationMapping(world, "custom");
+
+  TrajectoryRolloutReal mappedRollout = TrajectoryRolloutReal(&shot);
+  shot.getStates(world, mappedRollout, true);
 
   // Go back to identity maps
-  shot.clearRepresentationMapping(world);
-  Eigen::MatrixXd recoveredIdentityPoses
-      = Eigen::MatrixXd::Zero(world->getNumDofs(), steps);
-  Eigen::MatrixXd recoveredIdentityVels
-      = Eigen::MatrixXd::Zero(world->getNumDofs(), steps);
-  Eigen::MatrixXd recoveredIdentityForces
-      = Eigen::MatrixXd::Zero(world->getNumDofs(), steps);
-  shot.getStates(
-      world,
-      recoveredIdentityPoses,
-      recoveredIdentityVels,
-      recoveredIdentityForces,
-      true);
+  shot.switchRepresentationMapping(world, "identity");
+
+  TrajectoryRolloutReal recoveredIdentityRollout = TrajectoryRolloutReal(&shot);
+  shot.getStates(world, recoveredIdentityRollout, true);
 
   double threshold = 1e-8;
 
@@ -663,16 +612,16 @@ bool verifyChangeRepresentationToIK(
   {
     for (int i = 0; i < steps; i++)
     {
-      world->setPositions(initialIdentityPoses.col(i));
-      world->setVelocities(initialIdentityVels.col(i));
-      world->setForces(initialIdentityForces.col(i));
+      world->setPositions(initialIdentityRollout.getPoses("identity").col(i));
+      world->setVelocities(initialIdentityRollout.getVels("identity").col(i));
+      world->setForces(initialIdentityRollout.getForces("identity").col(i));
 
       Eigen::VectorXd manualMappedPos = newRepresentation->getPositions(world);
       Eigen::VectorXd manualMappedVel = newRepresentation->getVelocities(world);
       Eigen::VectorXd manualMappedForce = newRepresentation->getForces(world);
-      Eigen::VectorXd mappedPos = mappedPoses.col(i);
-      Eigen::VectorXd mappedVel = mappedVels.col(i);
-      Eigen::VectorXd mappedForce = mappedForces.col(i);
+      Eigen::VectorXd mappedPos = mappedRollout.getPoses("custom").col(i);
+      Eigen::VectorXd mappedVel = mappedRollout.getVels("custom").col(i);
+      Eigen::VectorXd mappedForce = mappedRollout.getForces("custom").col(i);
 
       if (!equals(mappedPos, manualMappedPos, threshold)
           || !equals(mappedVel, manualMappedVel, threshold)
@@ -691,16 +640,19 @@ bool verifyChangeRepresentationToIK(
   {
     for (int i = 0; i < steps; i++)
     {
-      Eigen::VectorXd mappedPos = mappedPoses.col(i);
-      Eigen::VectorXd mappedVel = mappedVels.col(i);
-      Eigen::VectorXd mappedForce = mappedForces.col(i);
+      Eigen::VectorXd mappedPos = mappedRollout.getPoses("custom").col(i);
+      Eigen::VectorXd mappedVel = mappedRollout.getVels("custom").col(i);
+      Eigen::VectorXd mappedForce = mappedRollout.getForces("custom").col(i);
       newRepresentation->setPositions(world, mappedPos);
       newRepresentation->setVelocities(world, mappedVel);
       newRepresentation->setForces(world, mappedForce);
 
-      Eigen::VectorXd recoveredPos = recoveredIdentityPoses.col(i);
-      Eigen::VectorXd recoveredVel = recoveredIdentityVels.col(i);
-      Eigen::VectorXd recoveredForce = recoveredIdentityForces.col(i);
+      Eigen::VectorXd recoveredPos
+          = recoveredIdentityRollout.getPoses("identity").col(i);
+      Eigen::VectorXd recoveredVel
+          = recoveredIdentityRollout.getVels("identity").col(i);
+      Eigen::VectorXd recoveredForce
+          = recoveredIdentityRollout.getForces("identity").col(i);
       Eigen::VectorXd manualRecoveredPos = world->getPositions();
       Eigen::VectorXd manualRecoveredVel = world->getVelocities();
       Eigen::VectorXd manualRecoveredForce = world->getForces();
@@ -742,9 +694,18 @@ bool verifyChangeRepresentationToIK(
 
   if (shouldBeLosslessInto && shouldBeLosslessOut)
   {
-    if (!equals(initialIdentityPoses, recoveredIdentityPoses, threshold)
-        || !equals(initialIdentityVels, recoveredIdentityVels, threshold)
-        || !equals(initialIdentityForces, recoveredIdentityForces, threshold))
+    if (!equals(
+            initialIdentityRollout.getPoses("identity"),
+            recoveredIdentityRollout.getPoses("identity"),
+            threshold)
+        || !equals(
+            initialIdentityRollout.getVels("identity"),
+            recoveredIdentityRollout.getVels("identity"),
+            threshold)
+        || !equals(
+            initialIdentityRollout.getForces("identity"),
+            recoveredIdentityRollout.getForces("identity"),
+            threshold))
     {
       std::cout << "verifyChangeRepresentationToIK() failed to be lossloss "
                    "when shouldBeLosslessInto=true and shouldBeLosslessOut=true"
@@ -807,20 +768,17 @@ bool verifyMultiShotOptimization(
 
   // Playback the trajectory
 
-  Eigen::MatrixXd posesWithKnots
-      = Eigen::MatrixXd::Zero(world->getNumDofs(), steps);
-  Eigen::MatrixXd posesWithoutKnots
-      = Eigen::MatrixXd::Zero(world->getNumDofs(), steps);
-  Eigen::MatrixXd vels = Eigen::MatrixXd::Zero(world->getNumDofs(), steps);
-  Eigen::MatrixXd forces = Eigen::MatrixXd::Zero(world->getNumDofs(), steps);
+  TrajectoryRolloutReal withKnots = TrajectoryRolloutReal(&shot);
+  TrajectoryRolloutReal withoutKnots = TrajectoryRolloutReal(&shot);
 
   // Get the version with knots
-  shot.getStates(world, posesWithKnots, vels, forces, true);
+  shot.getStates(world, withKnots, true);
   // Get the version without knots next, so that they can play in a loop
-  shot.getStates(world, posesWithoutKnots, vels, forces, false);
+  shot.getStates(world, withoutKnots, false);
 
   // Create a window for rendering the world and handling user input
-  AbstractShotWindow window(world, posesWithKnots, posesWithoutKnots);
+  AbstractShotWindow window(
+      world, withKnots.getPoses("identity"), withoutKnots.getPoses("identity"));
 
   // Initialize glut, initialize the window, and begin the glut event loop
   int argc = 0;
@@ -979,12 +937,10 @@ TEST(TRAJECTORY, PRISMATIC)
   EXPECT_TRUE(verifyShotJacobian(world, 40, nullptr));
   EXPECT_TRUE(verifyMultiShotJacobian(world, 8, 2, nullptr));
 
-  /*
-  EXPECT_TRUE(verifyShotGradient(world, 7, loss));
-  EXPECT_TRUE(verifyMultiShotGradient(world, 8, 4, loss));
-  EXPECT_TRUE(verifyMultiShotJacobianCustomConstraint(
-      world, 8, 4, loss, lossGrad, 3.0));
-  */
+  // EXPECT_TRUE(verifyShotGradient(world, 7, loss));
+  // EXPECT_TRUE(verifyMultiShotGradient(world, 8, 4, loss));
+  // EXPECT_TRUE(verifyMultiShotJacobianCustomConstraint(
+  // world, 8, 4, loss, lossGrad, 3.0));
 
   // Verify using the IK mapping as the representation
   std::shared_ptr<IKMapping> ikMap = std::make_shared<IKMapping>(world);
@@ -1035,35 +991,35 @@ TEST(TRAJECTORY, CARTPOLE)
   cartpole->computeForwardDynamics();
   cartpole->integrateVelocities(world->getTimeStep());
 
-  TrajectoryLossFn loss = [](const Eigen::Ref<const Eigen::MatrixXd>& poses,
-                             const Eigen::Ref<const Eigen::MatrixXd>& vels,
-                             const Eigen::Ref<const Eigen::MatrixXd>& forces) {
-    Eigen::VectorXd lastPos = poses.col(poses.cols() - 1);
-    return vels.col(vels.cols() - 1).squaredNorm() + lastPos.squaredNorm()
-           + forces.squaredNorm();
+  TrajectoryLossFn loss = [](const TrajectoryRollout& rollout) {
+    int steps = rollout.getPosesConst("identity").cols();
+    Eigen::VectorXd lastPos = rollout.getPosesConst("identity").col(steps - 1);
+    return rollout.getVelsConst("identity").col(steps - 1).squaredNorm()
+           + lastPos.squaredNorm()
+           + rollout.getForcesConst("identity").squaredNorm();
   };
 
-  TrajectoryLossFnAndGrad lossGrad
-      = [](const Eigen::Ref<const Eigen::MatrixXd>& poses,
-           const Eigen::Ref<const Eigen::MatrixXd>& vels,
-           const Eigen::Ref<const Eigen::MatrixXd>& forces,
-           Eigen::Ref<Eigen::MatrixXd> gradWrtPoses, // OUT
-           Eigen::Ref<Eigen::MatrixXd> gradWrtVels,  // OUT
-           Eigen::Ref<Eigen::MatrixXd> gradWrtForces // OUT
-        ) {
-          gradWrtPoses.setZero();
-          gradWrtVels.setZero();
-          gradWrtForces.setZero();
-          gradWrtPoses.col(poses.cols() - 1) = 2 * poses.col(poses.cols() - 1);
-          gradWrtVels.col(vels.cols() - 1) = 2 * vels.col(vels.cols() - 1);
-          for (int i = 0; i < forces.cols(); i++)
-          {
-            gradWrtForces.col(i) = 2 * forces.col(i);
-          }
-          Eigen::VectorXd lastPos = poses.col(poses.cols() - 1);
-          return vels.col(vels.cols() - 1).squaredNorm() + lastPos.squaredNorm()
-                 + forces.squaredNorm();
-        };
+  TrajectoryLossFnAndGrad lossGrad = [](const TrajectoryRollout& rollout,
+                                        TrajectoryRollout& gradWrtRollout // OUT
+                                     ) {
+    gradWrtRollout.getPoses("identity").setZero();
+    gradWrtRollout.getVels("identity").setZero();
+    gradWrtRollout.getForces("identity").setZero();
+    int steps = rollout.getPosesConst("identity").cols();
+    gradWrtRollout.getPoses("identity").col(steps - 1)
+        = 2 * rollout.getPosesConst("identity").col(steps - 1);
+    gradWrtRollout.getVels("identity").col(steps - 1)
+        = 2 * rollout.getVelsConst("identity").col(steps - 1);
+    for (int i = 0; i < steps; i++)
+    {
+      gradWrtRollout.getForces("identity").col(i)
+          = 2 * rollout.getForcesConst("identity").col(i);
+    }
+    Eigen::VectorXd lastPos = rollout.getPosesConst("identity").col(steps - 1);
+    return rollout.getVelsConst("identity").col(steps - 1).squaredNorm()
+           + lastPos.squaredNorm()
+           + rollout.getForcesConst("identity").squaredNorm();
+  };
 
   EXPECT_TRUE(verifySingleStep(world, 1e-7));
   EXPECT_TRUE(verifySingleShot(world, 40, 1e-7, false, nullptr));
@@ -1190,9 +1146,14 @@ TEST(TRAJECTORY, JUMP_WORM)
   rootJoint->setVelocity(1, -0.1);
   Eigen::VectorXd vels = world->getVelocities();
 
-  TrajectoryLossFn loss = [](const Eigen::Ref<const Eigen::MatrixXd>& poses,
-                             const Eigen::Ref<const Eigen::MatrixXd>& vels,
-                             const Eigen::Ref<const Eigen::MatrixXd>& forces) {
+  TrajectoryLossFn loss = [](const TrajectoryRollout& rollout) {
+    const Eigen::Ref<const Eigen::MatrixXd> poses
+        = rollout.getPosesConst("identity");
+    const Eigen::Ref<const Eigen::MatrixXd> vels
+        = rollout.getVelsConst("identity");
+    const Eigen::Ref<const Eigen::MatrixXd> forces
+        = rollout.getForcesConst("identity");
+
     double maxPos = -1000;
     double minPos = 1000;
     for (int i = 0; i < poses.cols(); i++)
@@ -1232,16 +1193,20 @@ TEST(TRAJECTORY, JUMP_WORM)
   };
 
   TrajectoryLossFnAndGrad lossGrad
-      = [](const Eigen::Ref<const Eigen::MatrixXd>& poses,
-           const Eigen::Ref<const Eigen::MatrixXd>& vels,
-           const Eigen::Ref<const Eigen::MatrixXd>& forces,
-           /* OUT */ Eigen::Ref<Eigen::MatrixXd> gradWrtPoses,
-           /* OUT */ Eigen::Ref<Eigen::MatrixXd> gradWrtVels,
-           /* OUT */ Eigen::Ref<Eigen::MatrixXd> gradWrtForces) {
-          gradWrtPoses.setZero();
-          gradWrtVels.setZero();
-          gradWrtForces.setZero();
-          gradWrtPoses(1, poses.cols() - 1) = 2 * poses(1, poses.cols() - 1);
+      = [](const TrajectoryRollout& rollout,
+           /* OUT */ TrajectoryRollout& gradWrtRollout) {
+          gradWrtRollout.getPoses("identity").setZero();
+          gradWrtRollout.getVels("identity").setZero();
+          gradWrtRollout.getForces("identity").setZero();
+          const Eigen::Ref<const Eigen::MatrixXd> poses
+              = rollout.getPosesConst("identity");
+          const Eigen::Ref<const Eigen::MatrixXd> vels
+              = rollout.getVelsConst("identity");
+          const Eigen::Ref<const Eigen::MatrixXd> forces
+              = rollout.getForcesConst("identity");
+
+          gradWrtRollout.getPoses("identity")(1, poses.cols() - 1)
+              = 2 * poses(1, poses.cols() - 1);
           double endPos = poses(1, poses.cols() - 1);
           double endPosLoss = -(endPos * endPos) * (endPos > 0 ? 1.0 : -1.0);
           return endPosLoss;

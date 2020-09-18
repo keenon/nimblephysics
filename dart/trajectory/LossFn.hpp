@@ -7,24 +7,18 @@
 #include <Eigen/Dense>
 
 #include "dart/trajectory/TrajectoryConstants.hpp"
+#include "dart/trajectory/TrajectoryRollout.hpp"
 
 namespace dart {
 
 namespace trajectory {
 
-typedef std::function<double(
-    const Eigen::Ref<const Eigen::MatrixXd>& poses,
-    const Eigen::Ref<const Eigen::MatrixXd>& vels,
-    const Eigen::Ref<const Eigen::MatrixXd>& forces)>
+typedef std::function<double(const TrajectoryRollout& rollout)>
     TrajectoryLossFn;
 
 typedef std::function<double(
-    const Eigen::Ref<const Eigen::MatrixXd>& poses,
-    const Eigen::Ref<const Eigen::MatrixXd>& vels,
-    const Eigen::Ref<const Eigen::MatrixXd>& forces,
-    /* OUT */ Eigen::Ref<Eigen::MatrixXd> gradWrtPoses,
-    /* OUT */ Eigen::Ref<Eigen::MatrixXd> gradWrtVels,
-    /* OUT */ Eigen::Ref<Eigen::MatrixXd> gradWrtForces)>
+    const TrajectoryRollout& rollout,
+    /* OUT */ TrajectoryRollout& gradWrtRollout)>
     TrajectoryLossFnAndGrad;
 
 class LossFn
@@ -38,18 +32,11 @@ public:
 
   virtual ~LossFn();
 
-  virtual double getLoss(
-      const Eigen::Ref<const Eigen::MatrixXd>& poses,
-      const Eigen::Ref<const Eigen::MatrixXd>& vels,
-      const Eigen::Ref<const Eigen::MatrixXd>& forces);
+  virtual double getLoss(const TrajectoryRollout& rollout);
 
   virtual double getLossAndGradient(
-      const Eigen::Ref<const Eigen::MatrixXd>& poses,
-      const Eigen::Ref<const Eigen::MatrixXd>& vels,
-      const Eigen::Ref<const Eigen::MatrixXd>& forces,
-      /* OUT */ Eigen::Ref<Eigen::MatrixXd> gradWrtPoses,
-      /* OUT */ Eigen::Ref<Eigen::MatrixXd> gradWrtVels,
-      /* OUT */ Eigen::Ref<Eigen::MatrixXd> gradWrtForces);
+      const TrajectoryRollout& rollout,
+      /* OUT */ TrajectoryRollout& gradWrtRollout);
 
   /// If this LossFn is being used as a constraint, this gets the lower bound
   /// it's allowed to reach

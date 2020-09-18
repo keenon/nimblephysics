@@ -53,38 +53,41 @@ SingleShot::~SingleShot()
 /// certainly be mapped spaces that are easier to optimize in than native
 /// joint space, at least initially.
 void SingleShot::switchRepresentationMapping(
-    std::shared_ptr<simulation::World> world,
-    std::shared_ptr<neural::Mapping> mapping)
+    std::shared_ptr<simulation::World> world, const std::string& mapping)
 {
   RestorableSnapshot snapshot(world);
 
   // Rewrite the forces in the new mapping
-  Eigen::MatrixXd newForces
-      = Eigen::MatrixXd::Zero(mapping->getForceDim(), mForces.cols());
+  Eigen::MatrixXd newForces = Eigen::MatrixXd::Zero(
+      mMappings[mapping]->getForceDim(), mForces.cols());
   std::vector<MappedBackpropSnapshotPtr> snapshots = getSnapshots(world);
   for (int i = 0; i < snapshots.size(); i++)
   {
     // Set the state in the old mapping
     // TODO:optimize
-    Eigen::VectorXd posCopy = snapshots[i]->getPreStepPosition();
-    Eigen::VectorXd velCopy = snapshots[i]->getPreStepVelocity();
-    Eigen::VectorXd forceCopy = snapshots[i]->getPreStepTorques();
-    mRepresentationMapping->setPositions(world, posCopy);
-    mRepresentationMapping->setVelocities(world, velCopy);
-    mRepresentationMapping->setForces(world, forceCopy);
+    Eigen::VectorXd posCopy
+        = snapshots[i]->getPreStepPosition(mRepresentationMapping);
+    Eigen::VectorXd velCopy
+        = snapshots[i]->getPreStepVelocity(mRepresentationMapping);
+    Eigen::VectorXd forceCopy
+        = snapshots[i]->getPreStepTorques(mRepresentationMapping);
+    getRepresentation()->setPositions(world, posCopy);
+    getRepresentation()->setVelocities(world, velCopy);
+    getRepresentation()->setForces(world, forceCopy);
 
     // Read back the forces in the new mapping
-    newForces.col(i) = mapping->getForces(world);
+    newForces.col(i) = mMappings[mapping]->getForces(world);
   }
   mForces = newForces;
 
   // Rewrite the start state in the new mapping
-  mRepresentationMapping->setPositions(world, mStartPos);
-  mRepresentationMapping->setVelocities(world, mStartVel);
-  Eigen::VectorXd forceCopy = snapshots[0]->getPreStepTorques();
-  mRepresentationMapping->setForces(world, forceCopy);
-  mStartPos = mapping->getPositions(world);
-  mStartVel = mapping->getVelocities(world);
+  getRepresentation()->setPositions(world, mStartPos);
+  getRepresentation()->setVelocities(world, mStartVel);
+  Eigen::VectorXd forceCopy
+      = snapshots[0]->getPreStepTorques(mRepresentationMapping);
+  getRepresentation()->setForces(world, forceCopy);
+  mStartPos = mMappings[mapping]->getPositions(world);
+  mStartVel = mMappings[mapping]->getVelocities(world);
 
   mSnapshotsCacheDirty = true;
   AbstractShot::switchRepresentationMapping(world, mapping);
@@ -96,10 +99,10 @@ void SingleShot::switchRepresentationMapping(
 int SingleShot::getFlatProblemDim() const
 {
   if (mTuneStartingState)
-    return (mRepresentationMapping->getPosDim()
-            + mRepresentationMapping->getVelDim()) // Initial state
-           + (mSteps * mRepresentationMapping->getForceDim());
-  return mSteps * mRepresentationMapping->getForceDim();
+    return (getRepresentation()->getPosDim()
+            + getRepresentation()->getVelDim()) // Initial state
+           + (mSteps * getRepresentation()->getForceDim());
+  return mSteps * getRepresentation()->getForceDim();
 }
 
 //==============================================================================
@@ -115,12 +118,12 @@ void SingleShot::flatten(Eigen::Ref<Eigen::VectorXd> flat) const
   int cursor = 0;
   if (mTuneStartingState)
   {
-    flat.segment(0, mRepresentationMapping->getPosDim()) = mStartPos;
-    cursor += mRepresentationMapping->getPosDim();
-    flat.segment(cursor, mRepresentationMapping->getVelDim()) = mStartVel;
-    cursor += mRepresentationMapping->getVelDim();
+    flat.segment(0, getRepresentation()->getPosDim()) = mStartPos;
+    cursor += getRepresentation()->getPosDim();
+    flat.segment(cursor, getRepresentation()->getVelDim()) = mStartVel;
+    cursor += getRepresentation()->getVelDim();
   }
-  int forceDim = mRepresentationMapping->getForceDim();
+  int forceDim = getRepresentation()->getForceDim();
   for (int i = 0; i < mSteps; i++)
   {
     flat.segment(cursor, forceDim) = mForces.col(i);
@@ -133,39 +136,23 @@ void SingleShot::flatten(Eigen::Ref<Eigen::VectorXd> flat) const
 /// This gets the parameters out of a flat vector
 void SingleShot::unflatten(const Eigen::Ref<const Eigen::VectorXd>& flat)
 {
+  mRolloutCacheDirty = true;
   mSnapshotsCacheDirty = true;
   int cursor = 0;
   if (mTuneStartingState)
   {
-    mStartPos = flat.segment(0, mRepresentationMapping->getPosDim());
-    cursor += mRepresentationMapping->getPosDim();
-    mStartVel = flat.segment(cursor, mRepresentationMapping->getVelDim());
-    cursor += mRepresentationMapping->getVelDim();
+    mStartPos = flat.segment(0, getRepresentation()->getPosDim());
+    cursor += getRepresentation()->getPosDim();
+    mStartVel = flat.segment(cursor, getRepresentation()->getVelDim());
+    cursor += getRepresentation()->getVelDim();
   }
-  int forceDim = mRepresentationMapping->getForceDim();
+  int forceDim = getRepresentation()->getForceDim();
   for (int i = 0; i < mSteps; i++)
   {
     mForces.col(i) = flat.segment(cursor, forceDim);
     cursor += forceDim;
   }
   assert(cursor == flat.size());
-}
-
-//==============================================================================
-/// This runs the shot out, and writes the positions, velocities, and forces
-void SingleShot::unroll(
-    std::shared_ptr<simulation::World> world,
-    /* OUT */ Eigen::Ref<Eigen::MatrixXd> poses,
-    /* OUT */ Eigen::Ref<Eigen::MatrixXd> vels,
-    /* OUT */ Eigen::Ref<Eigen::MatrixXd> forces)
-{
-  std::vector<MappedBackpropSnapshotPtr> snapshots = getSnapshots(world);
-  for (int i = 0; i < mSteps; i++)
-  {
-    poses.col(i) = snapshots[i]->getPostStepPosition();
-    vels.col(i) = snapshots[i]->getPostStepVelocity();
-    forces.col(i) = snapshots[i]->getPostStepTorques();
-  }
 }
 
 //==============================================================================
@@ -178,15 +165,15 @@ void SingleShot::getUpperBounds(
   int cursor = 0;
   if (mTuneStartingState)
   {
-    int posDim = mRepresentationMapping->getPosDim();
-    int velDim = mRepresentationMapping->getVelDim();
+    int posDim = getRepresentation()->getPosDim();
+    int velDim = getRepresentation()->getVelDim();
     flat.segment(0, posDim)
-        = mRepresentationMapping->getPositionUpperLimits(world);
+        = getRepresentation()->getPositionUpperLimits(world);
     flat.segment(posDim, velDim)
-        = mRepresentationMapping->getVelocityUpperLimits(world);
+        = getRepresentation()->getVelocityUpperLimits(world);
     cursor = posDim + velDim;
   }
-  int forceDim = mRepresentationMapping->getForceDim();
+  int forceDim = getRepresentation()->getForceDim();
   Eigen::VectorXd forceUpperLimits = world->getForceUpperLimits();
   assert(forceDim == forceUpperLimits.size());
   for (int i = 0; i < mSteps; i++)
@@ -207,17 +194,17 @@ void SingleShot::getLowerBounds(
   int cursor = 0;
   if (mTuneStartingState)
   {
-    int posDim = mRepresentationMapping->getPosDim();
-    int velDim = mRepresentationMapping->getVelDim();
+    int posDim = getRepresentation()->getPosDim();
+    int velDim = getRepresentation()->getVelDim();
     flat.segment(0, posDim)
-        = mRepresentationMapping->getPositionLowerLimits(world);
+        = getRepresentation()->getPositionLowerLimits(world);
     flat.segment(posDim, velDim)
-        = mRepresentationMapping->getVelocityLowerLimits(world);
+        = getRepresentation()->getVelocityLowerLimits(world);
     cursor = posDim + velDim;
   }
-  int forceDim = mRepresentationMapping->getForceDim();
+  int forceDim = getRepresentation()->getForceDim();
   Eigen::VectorXd forceLowerLimits
-      = mRepresentationMapping->getForceLowerLimits(world);
+      = getRepresentation()->getForceLowerLimits(world);
   assert(forceDim == forceLowerLimits.size());
   for (int i = 0; i < mSteps; i++)
   {
@@ -234,15 +221,7 @@ void SingleShot::getInitialGuess(
     std::shared_ptr<simulation::World> world,
     /* OUT */ Eigen::Ref<Eigen::VectorXd> flat) const
 {
-  flat.setZero();
-  if (mTuneStartingState)
-  {
-    flat.segment(0, mRepresentationMapping->getPosDim()) = mStartPos;
-    flat.segment(
-        mRepresentationMapping->getPosDim(),
-        mRepresentationMapping->getVelDim())
-        = mStartVel;
-  }
+  flatten(flat);
 }
 
 //==============================================================================
@@ -253,9 +232,9 @@ void SingleShot::backpropJacobianOfFinalState(
 {
   std::vector<MappedBackpropSnapshotPtr> snapshots = getSnapshots(world);
 
-  int posDim = mRepresentationMapping->getPosDim();
-  int velDim = mRepresentationMapping->getVelDim();
-  int forceDim = mRepresentationMapping->getForceDim();
+  int posDim = getRepresentation()->getPosDim();
+  int velDim = getRepresentation()->getVelDim();
+  int forceDim = getRepresentation()->getForceDim();
 
   TimestepJacobians last;
   last.forceVel = Eigen::MatrixXd::Zero(velDim, forceDim);
@@ -270,11 +249,16 @@ void SingleShot::backpropJacobianOfFinalState(
   {
     MappedBackpropSnapshotPtr ptr = snapshots[i];
     TimestepJacobians thisTimestep;
-    Eigen::MatrixXd forceVel = ptr->getForceVelJacobian(world);
-    Eigen::MatrixXd posPos = ptr->getPosPosJacobian(world);
-    Eigen::MatrixXd posVel = ptr->getPosVelJacobian(world);
-    Eigen::MatrixXd velPos = ptr->getVelPosJacobian(world);
-    Eigen::MatrixXd velVel = ptr->getVelVelJacobian(world);
+    Eigen::MatrixXd forceVel
+        = ptr->getForceVelJacobian(world, mRepresentationMapping);
+    Eigen::MatrixXd posPos
+        = ptr->getPosPosJacobian(world, mRepresentationMapping);
+    Eigen::MatrixXd posVel
+        = ptr->getPosVelJacobian(world, mRepresentationMapping);
+    Eigen::MatrixXd velPos
+        = ptr->getVelPosJacobian(world, mRepresentationMapping);
+    Eigen::MatrixXd velVel
+        = ptr->getVelVelJacobian(world, mRepresentationMapping);
 
     // p_end <- f_t = p_end <- v_t+1 * v_t+1 <- f_t
     thisTimestep.forcePos = last.velPos * forceVel;
@@ -349,49 +333,67 @@ void SingleShot::finiteDifferenceJacobianOfFinalState(
 //==============================================================================
 /// This computes the gradient in the flat problem space, taking into accounts
 /// incoming gradients with respect to any of the shot's values.
-void SingleShot::backpropGradient(
+void SingleShot::backpropGradientWrt(
     std::shared_ptr<simulation::World> world,
-    const Eigen::Ref<const Eigen::MatrixXd>& gradWrtPoses,
-    const Eigen::Ref<const Eigen::MatrixXd>& gradWrtVels,
-    const Eigen::Ref<const Eigen::MatrixXd>& gradWrtForces,
+    const TrajectoryRollout& gradWrtRollout,
     /* OUT */ Eigen::Ref<Eigen::VectorXd> grad)
 {
   int dims = getFlatProblemDim();
   assert(grad.size() == dims);
   std::vector<MappedBackpropSnapshotPtr> snapshots = getSnapshots(world);
   assert(snapshots.size() == mSteps);
+
   LossGradient nextTimestep;
   nextTimestep.lossWrtPosition
-      = Eigen::VectorXd::Zero(mRepresentationMapping->getPosDim());
+      = Eigen::VectorXd::Zero(mMappings[mRepresentationMapping]->getPosDim());
   nextTimestep.lossWrtVelocity
-      = Eigen::VectorXd::Zero(mRepresentationMapping->getVelDim());
+      = Eigen::VectorXd::Zero(mMappings[mRepresentationMapping]->getVelDim());
   nextTimestep.lossWrtTorque
-      = Eigen::VectorXd::Zero(mRepresentationMapping->getForceDim());
+      = Eigen::VectorXd::Zero(mMappings[mRepresentationMapping]->getForceDim());
 
   int cursor = dims;
-  int forceDim = mRepresentationMapping->getForceDim();
+  int forceDim = mMappings[mRepresentationMapping]->getForceDim();
   for (int i = mSteps - 1; i >= 0; i--)
   {
-    nextTimestep.lossWrtPosition += gradWrtPoses.col(i);
-    nextTimestep.lossWrtVelocity += gradWrtVels.col(i);
+    std::unordered_map<std::string, LossGradient> mappedLosses;
+    for (auto pair : mMappings)
+    {
+      LossGradient mappedGrad;
+      mappedGrad.lossWrtPosition
+          = gradWrtRollout.getPosesConst(pair.first).col(i);
+      mappedGrad.lossWrtVelocity
+          = gradWrtRollout.getVelsConst(pair.first).col(i);
+      mappedGrad.lossWrtTorque
+          = gradWrtRollout.getForcesConst(pair.first).col(i);
+      mappedLosses[pair.first] = mappedGrad;
+    }
+    mappedLosses[mRepresentationMapping].lossWrtPosition
+        += nextTimestep.lossWrtPosition;
+    mappedLosses[mRepresentationMapping].lossWrtVelocity
+        += nextTimestep.lossWrtVelocity;
+
     LossGradient thisTimestep;
-    snapshots[i]->backprop(world, thisTimestep, nextTimestep);
+    snapshots[i]->backprop(world, thisTimestep, mappedLosses);
     cursor -= forceDim;
     grad.segment(cursor, forceDim) = thisTimestep.lossWrtTorque;
     if (i == 0 && mTuneStartingState)
     {
       assert(
           cursor
-          == mRepresentationMapping->getPosDim()
-                 + mRepresentationMapping->getVelDim());
-      cursor -= mRepresentationMapping->getVelDim();
-      grad.segment(cursor, mRepresentationMapping->getVelDim())
+          == mMappings[mRepresentationMapping]->getPosDim()
+                 + mMappings[mRepresentationMapping]->getVelDim());
+      cursor -= mMappings[mRepresentationMapping]->getVelDim();
+      grad.segment(cursor, mMappings[mRepresentationMapping]->getVelDim())
           = thisTimestep.lossWrtVelocity;
-      cursor -= mRepresentationMapping->getPosDim();
-      grad.segment(cursor, mRepresentationMapping->getPosDim())
+      cursor -= mMappings[mRepresentationMapping]->getPosDim();
+      grad.segment(cursor, mMappings[mRepresentationMapping]->getPosDim())
           = thisTimestep.lossWrtPosition;
     }
-    thisTimestep.lossWrtTorque += gradWrtForces.col(i);
+    thisTimestep.lossWrtTorque
+        += gradWrtRollout
+               .getForcesConst(gradWrtRollout.getRepresentationMapping())
+               .col(i);
+
     nextTimestep = thisTimestep;
   }
   assert(cursor == 0);
@@ -409,14 +411,14 @@ std::vector<MappedBackpropSnapshotPtr> SingleShot::getSnapshots(
     mSnapshotsCache.clear();
     mSnapshotsCache.reserve(mSteps);
 
-    mRepresentationMapping->setPositions(world, mStartPos);
-    mRepresentationMapping->setVelocities(world, mStartVel);
+    getRepresentation()->setPositions(world, mStartPos);
+    getRepresentation()->setVelocities(world, mStartVel);
 
     for (int i = 0; i < mSteps; i++)
     {
-      mRepresentationMapping->setForces(world, mForces.col(i));
+      getRepresentation()->setForces(world, mForces.col(i));
       mSnapshotsCache.push_back(
-          forwardPass(world, mRepresentationMapping, mLossMappings));
+          forwardPass(world, mRepresentationMapping, mMappings));
     }
 
     snapshot.restore();
@@ -429,35 +431,36 @@ std::vector<MappedBackpropSnapshotPtr> SingleShot::getSnapshots(
 /// This populates the passed in matrices with the values from this trajectory
 void SingleShot::getStates(
     std::shared_ptr<simulation::World> world,
-    /* OUT */ Eigen::Ref<Eigen::MatrixXd> poses,
-    /* OUT */ Eigen::Ref<Eigen::MatrixXd> vels,
-    /* OUT */ Eigen::Ref<Eigen::MatrixXd> forces,
+    /* OUT */ TrajectoryRollout& rollout,
     bool /* useKnots */)
 {
   std::vector<MappedBackpropSnapshotPtr> snapshots = getSnapshots(world);
-  assert(poses.cols() == mSteps);
-  assert(poses.rows() == mRepresentationMapping->getPosDim());
-  assert(vels.cols() == mSteps);
-  assert(vels.rows() == mRepresentationMapping->getVelDim());
-  assert(forces.cols() == mSteps);
-  assert(forces.rows() == mRepresentationMapping->getForceDim());
-  for (int i = 0; i < mSteps; i++)
+
+  for (std::string key : rollout.getMappings())
   {
-    poses.col(i) = snapshots[i]->getPostStepPosition();
-    vels.col(i) = snapshots[i]->getPostStepVelocity();
-    forces.col(i) = snapshots[i]->getPreStepTorques();
+    assert(rollout.getPoses(key).cols() == mSteps);
+    assert(rollout.getPoses(key).rows() == mMappings[key]->getPosDim());
+    assert(rollout.getVels(key).cols() == mSteps);
+    assert(rollout.getVels(key).rows() == mMappings[key]->getVelDim());
+    assert(rollout.getForces(key).cols() == mSteps);
+    assert(rollout.getForces(key).rows() == mMappings[key]->getForceDim());
+    for (int i = 0; i < mSteps; i++)
+    {
+      rollout.getPoses(key).col(i) = snapshots[i]->getPostStepPosition(key);
+      rollout.getVels(key).col(i) = snapshots[i]->getPostStepVelocity(key);
+      rollout.getForces(key).col(i) = snapshots[i]->getPreStepTorques(key);
+    }
   }
 }
 
 //==============================================================================
 Eigen::VectorXd SingleShot::getStartState()
 {
-  Eigen::VectorXd state = Eigen::VectorXd::Zero(
-      mRepresentationMapping->getPosDim()
-      + mRepresentationMapping->getVelDim());
-  state.segment(0, mRepresentationMapping->getPosDim()) = mStartPos;
+  Eigen::VectorXd state = Eigen::VectorXd::Zero(getRepresentationStateSize());
+  state.segment(0, mMappings[mRepresentationMapping]->getPosDim()) = mStartPos;
   state.segment(
-      mRepresentationMapping->getPosDim(), mRepresentationMapping->getVelDim())
+      mMappings[mRepresentationMapping]->getPosDim(),
+      mMappings[mRepresentationMapping]->getVelDim())
       = mStartVel;
   return state;
 }
@@ -470,14 +473,14 @@ Eigen::VectorXd SingleShot::getFinalState(
 {
   std::vector<MappedBackpropSnapshotPtr> snapshots = getSnapshots(world);
 
-  Eigen::VectorXd state = Eigen::VectorXd::Zero(
-      mRepresentationMapping->getPosDim()
-      + mRepresentationMapping->getVelDim());
-  state.segment(0, mRepresentationMapping->getPosDim())
-      = snapshots[snapshots.size() - 1]->getPostStepPosition();
+  Eigen::VectorXd state = Eigen::VectorXd::Zero(getRepresentationStateSize());
+  state.segment(0, getRepresentation()->getPosDim())
+      = snapshots[snapshots.size() - 1]->getPostStepPosition(
+          mRepresentationMapping);
   state.segment(
-      mRepresentationMapping->getPosDim(), mRepresentationMapping->getVelDim())
-      = snapshots[snapshots.size() - 1]->getPostStepVelocity();
+      getRepresentation()->getPosDim(), getRepresentation()->getVelDim())
+      = snapshots[snapshots.size() - 1]->getPostStepVelocity(
+          mRepresentationMapping);
 
   return state;
 }
@@ -488,18 +491,18 @@ std::string SingleShot::getFlatDimName(int dim)
 {
   if (mTuneStartingState)
   {
-    if (dim < mRepresentationMapping->getPosDim())
+    if (dim < getRepresentation()->getPosDim())
     {
       return "Start Pos " + std::to_string(dim);
     }
-    dim -= mRepresentationMapping->getPosDim();
-    if (dim < mRepresentationMapping->getVelDim())
+    dim -= getRepresentation()->getPosDim();
+    if (dim < getRepresentation()->getVelDim())
     {
       return "Start Vel " + std::to_string(dim);
     }
-    dim -= mRepresentationMapping->getVelDim();
+    dim -= getRepresentation()->getVelDim();
   }
-  int forceDim = mRepresentationMapping->getForceDim();
+  int forceDim = getRepresentation()->getForceDim();
   for (int i = 0; i < mSteps; i++)
   {
     if (dim < forceDim)
@@ -520,31 +523,32 @@ TimestepJacobians SingleShot::backpropStartStateJacobians(
 {
   std::vector<MappedBackpropSnapshotPtr> snapshots = getSnapshots(world);
 
+  int posDim = getRepresentation()->getPosDim();
+  int velDim = getRepresentation()->getVelDim();
+  int forceDim = getRepresentation()->getForceDim();
+
   TimestepJacobians last;
-  last.forceVel = Eigen::MatrixXd::Zero(
-      mRepresentationMapping->getVelDim(),
-      mRepresentationMapping->getForceDim());
-  last.forcePos = Eigen::MatrixXd::Zero(
-      mRepresentationMapping->getPosDim(),
-      mRepresentationMapping->getForceDim());
-  last.posVel = Eigen::MatrixXd::Zero(
-      mRepresentationMapping->getVelDim(), mRepresentationMapping->getPosDim());
-  last.posPos = Eigen::MatrixXd::Identity(
-      mRepresentationMapping->getPosDim(), mRepresentationMapping->getPosDim());
-  last.velVel = Eigen::MatrixXd::Identity(
-      mRepresentationMapping->getVelDim(), mRepresentationMapping->getVelDim());
-  last.velPos = Eigen::MatrixXd::Zero(
-      mRepresentationMapping->getPosDim(), mRepresentationMapping->getVelDim());
+  last.forceVel = Eigen::MatrixXd::Zero(velDim, forceDim);
+  last.forcePos = Eigen::MatrixXd::Zero(posDim, forceDim);
+  last.posVel = Eigen::MatrixXd::Zero(velDim, posDim);
+  last.posPos = Eigen::MatrixXd::Identity(posDim, posDim);
+  last.velVel = Eigen::MatrixXd::Identity(velDim, velDim);
+  last.velPos = Eigen::MatrixXd::Zero(posDim, velDim);
 
   for (int i = mSteps - 1; i >= 0; i--)
   {
     MappedBackpropSnapshotPtr ptr = snapshots[i];
     TimestepJacobians thisTimestep;
-    Eigen::MatrixXd forceVel = ptr->getForceVelJacobian(world);
-    Eigen::MatrixXd posPos = ptr->getPosPosJacobian(world);
-    Eigen::MatrixXd posVel = ptr->getPosVelJacobian(world);
-    Eigen::MatrixXd velPos = ptr->getVelPosJacobian(world);
-    Eigen::MatrixXd velVel = ptr->getVelVelJacobian(world);
+    Eigen::MatrixXd forceVel
+        = ptr->getForceVelJacobian(world, mRepresentationMapping);
+    Eigen::MatrixXd posPos
+        = ptr->getPosPosJacobian(world, mRepresentationMapping);
+    Eigen::MatrixXd posVel
+        = ptr->getPosVelJacobian(world, mRepresentationMapping);
+    Eigen::MatrixXd velPos
+        = ptr->getVelPosJacobian(world, mRepresentationMapping);
+    Eigen::MatrixXd velVel
+        = ptr->getVelVelJacobian(world, mRepresentationMapping);
 
     // v_end <- f_t = v_end <- v_t+1 * v_t+1 <- f_t
     thisTimestep.forceVel = last.velVel * forceVel;
@@ -576,22 +580,22 @@ TimestepJacobians SingleShot::finiteDifferenceStartStateJacobians(
 {
   RestorableSnapshot snapshot(world);
 
-  mRepresentationMapping->setPositions(world, mStartPos);
-  mRepresentationMapping->setVelocities(world, mStartVel);
+  getRepresentation()->setPositions(world, mStartPos);
+  getRepresentation()->setVelocities(world, mStartVel);
   for (int i = 0; i < mSteps; i++)
   {
-    mRepresentationMapping->setForces(world, mForces.col(i));
+    getRepresentation()->setForces(world, mForces.col(i));
     world->step();
   }
 
-  Eigen::VectorXd originalEndPos = mRepresentationMapping->getPositions(world);
-  Eigen::VectorXd originalEndVel = mRepresentationMapping->getVelocities(world);
+  Eigen::VectorXd originalEndPos = getRepresentation()->getPositions(world);
+  Eigen::VectorXd originalEndVel = getRepresentation()->getVelocities(world);
 
   TimestepJacobians result;
 
-  int posDim = mRepresentationMapping->getPosDim();
-  int velDim = mRepresentationMapping->getVelDim();
-  int forceDim = mRepresentationMapping->getForceDim();
+  int posDim = getRepresentation()->getPosDim();
+  int velDim = getRepresentation()->getVelDim();
+  int forceDim = getRepresentation()->getForceDim();
 
   // Perturb starting position
 
@@ -601,33 +605,31 @@ TimestepJacobians SingleShot::finiteDifferenceStartStateJacobians(
   {
     Eigen::VectorXd perturbedStartPos = mStartPos;
     perturbedStartPos(j) += EPS;
-    mRepresentationMapping->setPositions(world, perturbedStartPos);
-    mRepresentationMapping->setVelocities(world, mStartVel);
+    getRepresentation()->setPositions(world, perturbedStartPos);
+    getRepresentation()->setVelocities(world, mStartVel);
     for (int i = 0; i < mSteps; i++)
     {
-      mRepresentationMapping->setForces(world, mForces.col(i));
+      getRepresentation()->setForces(world, mForces.col(i));
       world->step();
     }
 
-    Eigen::VectorXd perturbedEndPos
-        = mRepresentationMapping->getPositions(world);
-    Eigen::VectorXd perturbedEndVel
-        = mRepresentationMapping->getVelocities(world);
+    Eigen::VectorXd perturbedEndPos = getRepresentation()->getPositions(world);
+    Eigen::VectorXd perturbedEndVel = getRepresentation()->getVelocities(world);
 
     perturbedStartPos = mStartPos;
     perturbedStartPos(j) -= EPS;
-    mRepresentationMapping->setPositions(world, perturbedStartPos);
-    mRepresentationMapping->setVelocities(world, mStartVel);
+    getRepresentation()->setPositions(world, perturbedStartPos);
+    getRepresentation()->setVelocities(world, mStartVel);
     for (int i = 0; i < mSteps; i++)
     {
-      mRepresentationMapping->setForces(world, mForces.col(i));
+      getRepresentation()->setForces(world, mForces.col(i));
       world->step();
     }
 
     Eigen::VectorXd perturbedEndPosNeg
-        = mRepresentationMapping->getPositions(world);
+        = getRepresentation()->getPositions(world);
     Eigen::VectorXd perturbedEndVelNeg
-        = mRepresentationMapping->getVelocities(world);
+        = getRepresentation()->getVelocities(world);
 
     result.posPos.col(j) = (perturbedEndPos - perturbedEndPosNeg) / (2 * EPS);
     result.posVel.col(j) = (perturbedEndVel - perturbedEndVelNeg) / (2 * EPS);
@@ -641,33 +643,31 @@ TimestepJacobians SingleShot::finiteDifferenceStartStateJacobians(
   {
     Eigen::VectorXd perturbedStartVel = mStartVel;
     perturbedStartVel(j) += EPS;
-    mRepresentationMapping->setPositions(world, mStartPos);
-    mRepresentationMapping->setVelocities(world, perturbedStartVel);
+    getRepresentation()->setPositions(world, mStartPos);
+    getRepresentation()->setVelocities(world, perturbedStartVel);
     for (int i = 0; i < mSteps; i++)
     {
-      mRepresentationMapping->setForces(world, mForces.col(i));
+      getRepresentation()->setForces(world, mForces.col(i));
       world->step();
     }
 
-    Eigen::VectorXd perturbedEndPos
-        = mRepresentationMapping->getPositions(world);
-    Eigen::VectorXd perturbedEndVel
-        = mRepresentationMapping->getVelocities(world);
+    Eigen::VectorXd perturbedEndPos = getRepresentation()->getPositions(world);
+    Eigen::VectorXd perturbedEndVel = getRepresentation()->getVelocities(world);
 
     perturbedStartVel = mStartVel;
     perturbedStartVel(j) -= EPS;
-    mRepresentationMapping->setPositions(world, mStartPos);
-    mRepresentationMapping->setVelocities(world, perturbedStartVel);
+    getRepresentation()->setPositions(world, mStartPos);
+    getRepresentation()->setVelocities(world, perturbedStartVel);
     for (int i = 0; i < mSteps; i++)
     {
-      mRepresentationMapping->setForces(world, mForces.col(i));
+      getRepresentation()->setForces(world, mForces.col(i));
       world->step();
     }
 
     Eigen::VectorXd perturbedEndPosNeg
-        = mRepresentationMapping->getPositions(world);
+        = getRepresentation()->getPositions(world);
     Eigen::VectorXd perturbedEndVelNeg
-        = mRepresentationMapping->getVelocities(world);
+        = getRepresentation()->getVelocities(world);
 
     result.velPos.col(j) = (perturbedEndPos - perturbedEndPosNeg) / (2 * EPS);
     result.velVel.col(j) = (perturbedEndVel - perturbedEndVelNeg) / (2 * EPS);
@@ -681,35 +681,33 @@ TimestepJacobians SingleShot::finiteDifferenceStartStateJacobians(
   {
     Eigen::VectorXd perturbedStartForce = mForces.col(0);
     perturbedStartForce(j) += EPS;
-    mRepresentationMapping->setPositions(world, mStartPos);
-    mRepresentationMapping->setVelocities(world, mStartVel);
+    getRepresentation()->setPositions(world, mStartPos);
+    getRepresentation()->setVelocities(world, mStartVel);
     for (int i = 0; i < mSteps; i++)
     {
       Eigen::VectorXd force = i == 0 ? perturbedStartForce : mForces.col(i);
-      mRepresentationMapping->setForces(world, force);
+      getRepresentation()->setForces(world, force);
       world->step();
     }
 
-    Eigen::VectorXd perturbedEndPos
-        = mRepresentationMapping->getPositions(world);
-    Eigen::VectorXd perturbedEndVel
-        = mRepresentationMapping->getVelocities(world);
+    Eigen::VectorXd perturbedEndPos = getRepresentation()->getPositions(world);
+    Eigen::VectorXd perturbedEndVel = getRepresentation()->getVelocities(world);
 
     perturbedStartForce = mForces.col(0);
     perturbedStartForce(j) -= EPS;
-    mRepresentationMapping->setPositions(world, mStartPos);
-    mRepresentationMapping->setVelocities(world, mStartVel);
+    getRepresentation()->setPositions(world, mStartPos);
+    getRepresentation()->setVelocities(world, mStartVel);
     for (int i = 0; i < mSteps; i++)
     {
       Eigen::VectorXd force = i == 0 ? perturbedStartForce : mForces.col(i);
-      mRepresentationMapping->setForces(world, force);
+      getRepresentation()->setForces(world, force);
       world->step();
     }
 
     Eigen::VectorXd perturbedEndPosNeg
-        = mRepresentationMapping->getPositions(world);
+        = getRepresentation()->getPositions(world);
     Eigen::VectorXd perturbedEndVelNeg
-        = mRepresentationMapping->getVelocities(world);
+        = getRepresentation()->getVelocities(world);
 
     result.forcePos.col(j) = (perturbedEndPos - perturbedEndPosNeg) / (2 * EPS);
     result.forceVel.col(j) = (perturbedEndVel - perturbedEndVelNeg) / (2 * EPS);

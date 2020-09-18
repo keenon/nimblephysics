@@ -10,70 +10,88 @@ namespace neural {
 //==============================================================================
 MappedBackpropSnapshot::MappedBackpropSnapshot(
     std::shared_ptr<BackpropSnapshot> backpropSnapshot,
-    PreStepMapping preStepRepresentation,
-    PostStepMapping postStepRepresentation,
-    std::unordered_map<std::string, PreStepMapping> preStepLosses,
-    std::unordered_map<std::string, PostStepMapping> postStepLosses)
+    std::string representation,
+    std::unordered_map<std::string, PreStepMapping> preStepMappings,
+    std::unordered_map<std::string, PostStepMapping> postStepMappings)
   : mBackpropSnapshot(backpropSnapshot),
-    mPreStepRepresentation(preStepRepresentation),
-    mPostStepRepresentation(postStepRepresentation),
-    mPreStepLosses(preStepLosses),
-    mPostStepLosses(postStepLosses)
+    mRepresentation(representation),
+    mPreStepMappings(preStepMappings),
+    mPostStepMappings(postStepMappings)
 {
+  for (auto pair : postStepMappings)
+    mMappings.push_back(pair.first);
 }
 
+//==============================================================================
+const std::vector<std::string>& MappedBackpropSnapshot::getMappings()
+{
+  return mMappings;
+}
+
+//==============================================================================
+const std::string& MappedBackpropSnapshot::getRepresentation()
+{
+  return mRepresentation;
+}
+
+//==============================================================================
 Eigen::MatrixXd MappedBackpropSnapshot::getPosPosJacobian(
-    std::shared_ptr<simulation::World> world)
+    std::shared_ptr<simulation::World> world, const std::string& mapping)
 {
-  return mPostStepRepresentation.posInJacWrtPos
+  return mPostStepMappings[mapping].posInJacWrtPos
              * mBackpropSnapshot->getPosPosJacobian(world)
-             * mPreStepRepresentation.posOutJac
-         + mPostStepRepresentation.posInJacWrtVel
+             * mPreStepMappings[mapping].posOutJac
+         + mPostStepMappings[mapping].posInJacWrtVel
                * mBackpropSnapshot->getPosVelJacobian(world)
-               * mPreStepRepresentation.posOutJac;
+               * mPreStepMappings[mapping].posOutJac;
 }
 
+//==============================================================================
 Eigen::MatrixXd MappedBackpropSnapshot::getPosVelJacobian(
-    std::shared_ptr<simulation::World> world)
+    std::shared_ptr<simulation::World> world, const std::string& mapping)
 {
-  return mPostStepRepresentation.velInJacWrtVel
+  return mPostStepMappings[mapping].velInJacWrtVel
              * mBackpropSnapshot->getPosVelJacobian(world)
-             * mPreStepRepresentation.posOutJac
-         + mPostStepRepresentation.velInJacWrtPos
+             * mPreStepMappings[mapping].posOutJac
+         + mPostStepMappings[mapping].velInJacWrtPos
                * mBackpropSnapshot->getPosPosJacobian(world)
-               * mPreStepRepresentation.posOutJac;
+               * mPreStepMappings[mapping].posOutJac;
 }
 
+//==============================================================================
 Eigen::MatrixXd MappedBackpropSnapshot::getVelPosJacobian(
-    std::shared_ptr<simulation::World> world)
+    std::shared_ptr<simulation::World> world, const std::string& mapping)
 {
-  return mPostStepRepresentation.posInJacWrtPos
+  return mPostStepMappings[mapping].posInJacWrtPos
              * mBackpropSnapshot->getVelPosJacobian(world)
-             * mPreStepRepresentation.velOutJac
-         + mPostStepRepresentation.posInJacWrtVel
+             * mPreStepMappings[mapping].velOutJac
+         + mPostStepMappings[mapping].posInJacWrtVel
                * mBackpropSnapshot->getVelVelJacobian(world)
-               * mPreStepRepresentation.velOutJac;
+               * mPreStepMappings[mapping].velOutJac;
 }
 
+//==============================================================================
 Eigen::MatrixXd MappedBackpropSnapshot::getVelVelJacobian(
-    std::shared_ptr<simulation::World> world)
+    std::shared_ptr<simulation::World> world, const std::string& mapping)
 {
-  return mPostStepRepresentation.velInJacWrtVel
+  return mPostStepMappings[mapping].velInJacWrtVel
              * mBackpropSnapshot->getVelVelJacobian(world)
-             * mPreStepRepresentation.velOutJac
-         + mPostStepRepresentation.velInJacWrtPos
+             * mPreStepMappings[mapping].velOutJac
+         + mPostStepMappings[mapping].velInJacWrtPos
                * mBackpropSnapshot->getVelPosJacobian(world)
-               * mPreStepRepresentation.velOutJac;
+               * mPreStepMappings[mapping].velOutJac;
 }
 
+//==============================================================================
 Eigen::MatrixXd MappedBackpropSnapshot::getForceVelJacobian(
-    std::shared_ptr<simulation::World> world)
+    std::shared_ptr<simulation::World> world, const std::string& mapping)
 {
-  return mPostStepRepresentation.velInJacWrtVel
+  return mPostStepMappings[mapping].velInJacWrtVel
          * mBackpropSnapshot->getForceVelJacobian(world)
-         * mPreStepRepresentation.forceOutJac;
+         * mPreStepMappings[mapping].forceOutJac;
 }
 
+//==============================================================================
 /// This computes the implicit backprop without forming intermediate
 /// Jacobians. It takes a LossGradient with the position and velocity vectors
 /// filled it, though the loss with respect to torque is ignored and can be
@@ -82,79 +100,99 @@ Eigen::MatrixXd MappedBackpropSnapshot::getForceVelJacobian(
 void MappedBackpropSnapshot::backprop(
     simulation::WorldPtr world,
     LossGradient& thisTimestepLoss,
-    const LossGradient& nextTimestepLoss)
+    const std::unordered_map<std::string, LossGradient> nextTimestepLosses)
 {
+  LossGradient nextTimestepRealLoss;
+  nextTimestepRealLoss.lossWrtPosition
+      = Eigen::VectorXd::Zero(world->getNumDofs());
+  nextTimestepRealLoss.lossWrtVelocity
+      = Eigen::VectorXd::Zero(world->getNumDofs());
+  for (auto pair : nextTimestepLosses)
+  {
+    nextTimestepRealLoss.lossWrtPosition
+        += mPostStepMappings[pair.first].posInJacWrtPos.transpose()
+               * pair.second.lossWrtPosition
+           + mPostStepMappings[pair.first].velInJacWrtPos.transpose()
+                 * pair.second.lossWrtVelocity;
+    nextTimestepRealLoss.lossWrtVelocity
+        = mPostStepMappings[pair.first].posInJacWrtVel.transpose()
+              * pair.second.lossWrtPosition
+          + mPostStepMappings[pair.first].velInJacWrtVel.transpose()
+                * pair.second.lossWrtVelocity;
+  }
+  LossGradient thisTimestepRealLoss;
+  mBackpropSnapshot->backprop(
+      world, thisTimestepRealLoss, nextTimestepRealLoss);
+
   thisTimestepLoss.lossWrtPosition
-      = Eigen::VectorXd(mPreStepRepresentation.pos.size());
+      = mPreStepMappings[mRepresentation].posOutJac.transpose()
+        * thisTimestepRealLoss.lossWrtPosition;
   thisTimestepLoss.lossWrtVelocity
-      = Eigen::VectorXd(mPreStepRepresentation.vel.size());
+      = mPreStepMappings[mRepresentation].posOutJac.transpose()
+        * thisTimestepRealLoss.lossWrtVelocity;
   thisTimestepLoss.lossWrtTorque
-      = Eigen::VectorXd(mPreStepRepresentation.force.size());
-
-  // TODO: replace with a factored view that passes down to backprop()
-
-  const Eigen::MatrixXd& posPos = getPosPosJacobian(world);
-  const Eigen::MatrixXd& posVel = getPosVelJacobian(world);
-  const Eigen::MatrixXd& velPos = getVelPosJacobian(world);
-  const Eigen::MatrixXd& velVel = getVelVelJacobian(world);
-  const Eigen::MatrixXd& forceVel = getForceVelJacobian(world);
-
-  thisTimestepLoss.lossWrtPosition
-      = posPos.transpose() * nextTimestepLoss.lossWrtPosition
-        + posVel.transpose() * nextTimestepLoss.lossWrtVelocity;
-  thisTimestepLoss.lossWrtVelocity
-      = velPos.transpose() * nextTimestepLoss.lossWrtPosition
-        + velVel.transpose() * nextTimestepLoss.lossWrtVelocity;
-  thisTimestepLoss.lossWrtTorque
-      = forceVel.transpose() * nextTimestepLoss.lossWrtVelocity;
+      = mPreStepMappings[mRepresentation].forceOutJac.transpose()
+        * thisTimestepRealLoss.lossWrtTorque;
 }
 
+//==============================================================================
 /// Returns a concatenated vector of all the Skeletons' position()'s in the
 /// World, in order in which the Skeletons appear in the World's
 /// getSkeleton(i) returns them, BEFORE the timestep.
-const Eigen::VectorXd& MappedBackpropSnapshot::getPreStepPosition()
+const Eigen::VectorXd& MappedBackpropSnapshot::getPreStepPosition(
+    const std::string& mapping)
 {
-  return mPreStepRepresentation.pos;
+  return mPreStepMappings[mapping].pos;
 }
 
+//==============================================================================
 /// Returns a concatenated vector of all the Skeletons' velocity()'s in the
 /// World, in order in which the Skeletons appear in the World's
 /// getSkeleton(i) returns them, BEFORE the timestep.
-const Eigen::VectorXd& MappedBackpropSnapshot::getPreStepVelocity()
+const Eigen::VectorXd& MappedBackpropSnapshot::getPreStepVelocity(
+    const std::string& mapping)
 {
-  return mPreStepRepresentation.vel;
+  return mPreStepMappings[mapping].vel;
 }
 
+//==============================================================================
 /// Returns a concatenated vector of all the joint torques that were applied
 /// during the forward pass, BEFORE the timestep.
-const Eigen::VectorXd& MappedBackpropSnapshot::getPreStepTorques()
+const Eigen::VectorXd& MappedBackpropSnapshot::getPreStepTorques(
+    const std::string& mapping)
 {
-  return mPreStepRepresentation.force;
+  return mPreStepMappings[mapping].force;
 }
 
+//==============================================================================
 /// Returns a concatenated vector of all the Skeletons' position()'s in the
 /// World, in order in which the Skeletons appear in the World's
 /// getSkeleton(i) returns them, AFTER the timestep.
-const Eigen::VectorXd& MappedBackpropSnapshot::getPostStepPosition()
+const Eigen::VectorXd& MappedBackpropSnapshot::getPostStepPosition(
+    const std::string& mapping)
 {
-  return mPostStepRepresentation.pos;
+  return mPostStepMappings[mapping].pos;
 }
 
+//==============================================================================
 /// Returns a concatenated vector of all the Skeletons' velocity()'s in the
 /// World, in order in which the Skeletons appear in the World's
 /// getSkeleton(i) returns them, AFTER the timestep.
-const Eigen::VectorXd& MappedBackpropSnapshot::getPostStepVelocity()
+const Eigen::VectorXd& MappedBackpropSnapshot::getPostStepVelocity(
+    const std::string& mapping)
 {
-  return mPostStepRepresentation.vel;
+  return mPostStepMappings[mapping].vel;
 }
 
+//==============================================================================
 /// Returns a concatenated vector of all the joint torques that were applied
 /// during the forward pass, AFTER the timestep. This is necessarily identical
 /// to getPreStepTorques(), since the timestep doesn't change the applied
 /// forces.
-const Eigen::VectorXd& MappedBackpropSnapshot::getPostStepTorques()
+const Eigen::VectorXd& MappedBackpropSnapshot::getPostStepTorques(
+    const std::string& mapping)
 {
-  return getPreStepTorques();
+  return getPreStepTorques(mapping);
 }
 
 } // namespace neural

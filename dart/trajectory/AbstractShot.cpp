@@ -19,17 +19,12 @@ namespace trajectory {
 /// Default constructor
 AbstractShot::AbstractShot(
     std::shared_ptr<simulation::World> world, LossFn loss, int steps)
-  : mWorld(world),
-    mLoss(loss),
-    mSteps(steps),
-    mScratchPoses(Eigen::MatrixXd::Zero(world->getNumDofs(), steps)),
-    mScratchVels(Eigen::MatrixXd::Zero(world->getNumDofs(), steps)),
-    mScratchForces(Eigen::MatrixXd::Zero(world->getNumDofs(), steps)),
-    mScratchGradWrtPoses(Eigen::MatrixXd::Zero(world->getNumDofs(), steps)),
-    mScratchGradWrtVels(Eigen::MatrixXd::Zero(world->getNumDofs(), steps)),
-    mScratchGradWrtForces(Eigen::MatrixXd::Zero(world->getNumDofs(), steps))
+  : mWorld(world), mLoss(loss), mSteps(steps), mRolloutCacheDirty(true)
 {
-  mRepresentationMapping = std::make_shared<neural::IdentityMapping>(world);
+  std::shared_ptr<neural::Mapping> identityMapping
+      = std::make_shared<neural::IdentityMapping>(world);
+  mRepresentationMapping = "identity";
+  mMappings[mRepresentationMapping] = identityMapping;
 }
 
 //==============================================================================
@@ -66,31 +61,12 @@ void AbstractShot::addConstraint(LossFn loss)
 /// certainly be mapped spaces that are easier to optimize in than native
 /// joint space, at least initially.
 void AbstractShot::switchRepresentationMapping(
-    std::shared_ptr<simulation::World> world,
-    std::shared_ptr<neural::Mapping> mapping)
+    std::shared_ptr<simulation::World> world, const std::string& mapping)
 {
-  // Resize our scratch spaces
-  mScratchPoses.resize(mapping->getPosDim(), mSteps);
-  mScratchVels.resize(mapping->getVelDim(), mSteps);
-  mScratchForces.resize(mapping->getForceDim(), mSteps);
-  mScratchGradWrtPoses.resize(mapping->getPosDim(), mSteps);
-  mScratchGradWrtVels.resize(mapping->getVelDim(), mSteps);
-  mScratchGradWrtForces.resize(mapping->getForceDim(), mSteps);
   // Reset the main representation mapping
   mRepresentationMapping = mapping;
-}
-
-//==============================================================================
-/// This removes any mapping on the representation, meaning the representation
-/// space goes back to the native joint-space.
-void AbstractShot::clearRepresentationMapping(
-    std::shared_ptr<simulation::World> world)
-{
-  // Just set the mapping to an Identity map, effectively the same as clearing
-  // the mapping.
-  std::shared_ptr<neural::IdentityMapping> identity
-      = std::make_shared<neural::IdentityMapping>(world);
-  switchRepresentationMapping(world, identity);
+  // Clear our cached trajectory
+  mRolloutCacheDirty = true;
 }
 
 //==============================================================================
@@ -98,31 +74,65 @@ void AbstractShot::clearRepresentationMapping(
 /// output. We can have multiple loss mappings at the same time, and loss can
 /// use arbitrary combinations of multiple views, as long as it can provide
 /// gradients.
-void AbstractShot::addLossMapping(
-    std::string key, std::shared_ptr<neural::Mapping> mapping)
+void AbstractShot::addMapping(
+    const std::string& key, std::shared_ptr<neural::Mapping> mapping)
 {
-  mLossMappings[key] = mapping;
+  mMappings[key] = mapping;
+  // Clear our cached trajectory
+  mRolloutCacheDirty = true;
 }
 
 //==============================================================================
 /// This returns true if there is a loss mapping at the specified key
-bool AbstractShot::hasLossMapping(std::string key)
+bool AbstractShot::hasMapping(const std::string& key)
 {
-  return mLossMappings.find(key) != mLossMappings.end();
+  return mMappings.find(key) != mMappings.end();
 }
 
 //==============================================================================
 /// This returns the loss mapping at the specified key
-std::shared_ptr<neural::Mapping> AbstractShot::getLossMapping(std::string key)
+std::shared_ptr<neural::Mapping> AbstractShot::getMapping(
+    const std::string& key)
 {
-  return mLossMappings[key];
+  return mMappings[key];
+}
+
+//==============================================================================
+/// This returns a reference to all the mappings in this shot
+std::unordered_map<std::string, std::shared_ptr<neural::Mapping>>&
+AbstractShot::getMappings()
+{
+  return mMappings;
 }
 
 //==============================================================================
 /// This removes the loss mapping at a particular key
-void AbstractShot::removeLossMapping(std::string key)
+void AbstractShot::removeMapping(const std::string& key)
 {
-  mLossMappings.erase(key);
+  mMappings.erase(key);
+  // Clear our cached trajectory
+  mRolloutCacheDirty = true;
+}
+
+//==============================================================================
+/// Returns the sum of posDim() + velDim() for the current representation
+/// mapping
+int AbstractShot::getRepresentationStateSize() const
+{
+  return getRepresentation()->getPosDim() + getRepresentation()->getVelDim();
+}
+
+//==============================================================================
+const std::string& AbstractShot::getRepresentationName() const
+{
+  return mRepresentationMapping;
+}
+
+//==============================================================================
+/// Returns the representation currently being used
+const std::shared_ptr<neural::Mapping> AbstractShot::getRepresentation() const
+{
+  return mMappings.at(mRepresentationMapping);
 }
 
 //==============================================================================
@@ -166,15 +176,9 @@ void AbstractShot::computeConstraints(
 {
   assert(constraints.size() == mConstraints.size());
 
-  getStates(
-      world,
-      /* OUT */ mScratchPoses,
-      /* OUT */ mScratchVels,
-      /* OUT */ mScratchForces);
   for (int i = 0; i < mConstraints.size(); i++)
   {
-    constraints(i)
-        = mConstraints[i].getLoss(mScratchPoses, mScratchVels, mScratchForces);
+    constraints(i) = mConstraints[i].getLoss(getRolloutCache(world));
   }
 }
 
@@ -188,28 +192,16 @@ void AbstractShot::backpropJacobian(
   assert(jac.rows() == mConstraints.size());
   assert(jac.cols() == getFlatProblemDim());
 
-  getStates(
-      world,
-      /* OUT */ mScratchPoses,
-      /* OUT */ mScratchVels,
-      /* OUT */ mScratchForces);
-
   Eigen::VectorXd grad = Eigen::VectorXd::Zero(getFlatProblemDim());
   for (int i = 0; i < mConstraints.size(); i++)
   {
     mConstraints[i].getLossAndGradient(
-        mScratchPoses,
-        mScratchVels,
-        mScratchForces,
-        /* OUT */ mScratchGradWrtPoses,
-        /* OUT */ mScratchGradWrtVels,
-        /* OUT */ mScratchGradWrtForces);
+        getRolloutCache(world),
+        /* OUT */ getGradientWrtRolloutCache(world));
     grad.setZero();
-    backpropGradient(
+    backpropGradientWrt(
         world,
-        mScratchGradWrtPoses,
-        mScratchGradWrtVels,
-        mScratchGradWrtForces,
+        getGradientWrtRolloutCache(world),
         /* OUT */ grad);
     jac.row(i) = grad;
   }
@@ -251,12 +243,6 @@ void AbstractShot::getSparseJacobian(
 {
   assert(sparse.size() == AbstractShot::getNumberNonZeroJacobian());
 
-  getStates(
-      world,
-      /* OUT */ mScratchPoses,
-      /* OUT */ mScratchVels,
-      /* OUT */ mScratchForces);
-
   sparse.setZero();
 
   int cursor = 0;
@@ -264,17 +250,11 @@ void AbstractShot::getSparseJacobian(
   for (int i = 0; i < mConstraints.size(); i++)
   {
     mConstraints[i].getLossAndGradient(
-        mScratchPoses,
-        mScratchVels,
-        mScratchForces,
-        /* OUT */ mScratchGradWrtPoses,
-        /* OUT */ mScratchGradWrtVels,
-        /* OUT */ mScratchGradWrtForces);
-    backpropGradient(
+        getRolloutCache(world),
+        /* OUT */ getGradientWrtRolloutCache(world));
+    backpropGradientWrt(
         world,
-        mScratchGradWrtPoses,
-        mScratchGradWrtVels,
-        mScratchGradWrtForces,
+        getGradientWrtRolloutCache(world),
         /* OUT */ sparse.segment(cursor, n));
     cursor += n;
   }
@@ -289,24 +269,52 @@ void AbstractShot::backpropGradient(
     std::shared_ptr<simulation::World> world,
     /* OUT */ Eigen::Ref<Eigen::VectorXd> grad)
 {
-  getStates(
-      world,
-      /* OUT */ mScratchPoses,
-      /* OUT */ mScratchVels,
-      /* OUT */ mScratchForces);
   mLoss.getLossAndGradient(
-      mScratchPoses,
-      mScratchVels,
-      mScratchForces,
-      /* OUT */ mScratchGradWrtPoses,
-      /* OUT */ mScratchGradWrtVels,
-      /* OUT */ mScratchGradWrtForces);
-  backpropGradient(
+      getRolloutCache(world),
+      /* OUT */ getGradientWrtRolloutCache(world));
+  backpropGradientWrt(
       world,
-      mScratchGradWrtPoses,
-      mScratchGradWrtVels,
-      mScratchGradWrtForces,
+      getGradientWrtRolloutCache(world),
       /* OUT */ grad);
+}
+
+//==============================================================================
+/// Get the loss for the rollout
+double AbstractShot::getLoss(std::shared_ptr<simulation::World> world)
+{
+  return mLoss.getLoss(getRolloutCache(world));
+}
+
+//==============================================================================
+const TrajectoryRollout& AbstractShot::getRolloutCache(
+    std::shared_ptr<simulation::World> world, bool useKnots)
+{
+  if (mRolloutCacheDirty)
+  {
+    mRolloutCache = std::make_shared<TrajectoryRolloutReal>(this);
+    getStates(
+        world,
+        /* OUT */ *mRolloutCache.get());
+    mGradWrtRolloutCache = std::make_shared<TrajectoryRolloutReal>(this);
+    mRolloutCacheDirty = false;
+  }
+  return *mRolloutCache.get();
+}
+
+//==============================================================================
+TrajectoryRollout& AbstractShot::getGradientWrtRolloutCache(
+    std::shared_ptr<simulation::World> world, bool useKnots)
+{
+  if (mRolloutCacheDirty)
+  {
+    mRolloutCache = std::make_shared<TrajectoryRolloutReal>(this);
+    getStates(
+        world,
+        /* OUT */ *mRolloutCache.get());
+    mGradWrtRolloutCache = std::make_shared<TrajectoryRolloutReal>(this);
+    mRolloutCacheDirty = false;
+  }
+  return *mGradWrtRolloutCache.get();
 }
 
 //==============================================================================
@@ -316,14 +324,7 @@ void AbstractShot::finiteDifferenceGradient(
     std::shared_ptr<simulation::World> world,
     /* OUT */ Eigen::Ref<Eigen::VectorXd> grad)
 {
-  Eigen::MatrixXd poses
-      = Eigen::MatrixXd::Zero(mRepresentationMapping->getPosDim(), mSteps);
-  Eigen::MatrixXd vels
-      = Eigen::MatrixXd::Zero(mRepresentationMapping->getVelDim(), mSteps);
-  Eigen::MatrixXd forces
-      = Eigen::MatrixXd::Zero(mRepresentationMapping->getForceDim(), mSteps);
-  getStates(world, poses, vels, forces);
-  double originalLoss = mLoss.getLoss(poses, vels, forces);
+  double originalLoss = mLoss.getLoss(getRolloutCache(world));
 
   int dims = getFlatProblemDim();
   Eigen::VectorXd flat = Eigen::VectorXd::Zero(dims);
@@ -337,14 +338,12 @@ void AbstractShot::finiteDifferenceGradient(
   {
     flat(i) += EPS;
     unflatten(flat);
-    getStates(world, poses, vels, forces);
-    double posLoss = mLoss.getLoss(poses, vels, forces);
+    double posLoss = mLoss.getLoss(getRolloutCache(world));
     flat(i) -= EPS;
 
     flat(i) -= EPS;
     unflatten(flat);
-    getStates(world, poses, vels, forces);
-    double negLoss = mLoss.getLoss(poses, vels, forces);
+    double negLoss = mLoss.getLoss(getRolloutCache(world));
     flat(i) += EPS;
 
     grad(i) = (posLoss - negLoss) / (2 * EPS);

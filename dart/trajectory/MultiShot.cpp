@@ -62,14 +62,39 @@ MultiShot::~MultiShot()
 /// certainly be mapped spaces that are easier to optimize in than native
 /// joint space, at least initially.
 void MultiShot::switchRepresentationMapping(
-    std::shared_ptr<simulation::World> world,
-    std::shared_ptr<neural::Mapping> mapping)
+    std::shared_ptr<simulation::World> world, const std::string& mapping)
 {
   for (auto shot : mShots)
   {
     shot->switchRepresentationMapping(world, mapping);
   }
   AbstractShot::switchRepresentationMapping(world, mapping);
+}
+
+//==============================================================================
+/// This adds a mapping through which the loss function can interpret the
+/// output. We can have multiple loss mappings at the same time, and loss can
+/// use arbitrary combinations of multiple views, as long as it can provide
+/// gradients.
+void MultiShot::addMapping(
+    const std::string& key, std::shared_ptr<neural::Mapping> mapping)
+{
+  AbstractShot::addMapping(key, mapping);
+  for (const std::shared_ptr<SingleShot> shot : mShots)
+  {
+    shot->addMapping(key, mapping);
+  }
+}
+
+//==============================================================================
+/// This removes the loss mapping at a particular key
+void MultiShot::removeMapping(const std::string& key)
+{
+  AbstractShot::removeMapping(key);
+  for (const std::shared_ptr<SingleShot> shot : mShots)
+  {
+    shot->removeMapping(key);
+  }
 }
 
 //==============================================================================
@@ -89,9 +114,7 @@ int MultiShot::getFlatProblemDim() const
 int MultiShot::getConstraintDim() const
 {
   return AbstractShot::getConstraintDim()
-         + (mRepresentationMapping->getPosDim()
-            + mRepresentationMapping->getVelDim())
-               * (mShots.size() - 1);
+         + getRepresentationStateSize() * (mShots.size() - 1);
 }
 
 //==============================================================================
@@ -107,13 +130,9 @@ void MultiShot::computeConstraints(
   cursor += numParentConstraints;
   for (int i = 1; i < mShots.size(); i++)
   {
-    constraints.segment(
-        cursor,
-        mRepresentationMapping->getPosDim()
-            + mRepresentationMapping->getVelDim())
+    constraints.segment(cursor, getRepresentationStateSize())
         = mShots[i - 1]->getFinalState(world) - mShots[i]->getStartState();
-    cursor += mRepresentationMapping->getPosDim()
-              + mRepresentationMapping->getVelDim();
+    cursor += getRepresentationStateSize();
   }
 }
 
@@ -134,32 +153,12 @@ void MultiShot::flatten(/* OUT */ Eigen::Ref<Eigen::VectorXd> flat) const
 /// This gets the parameters out of a flat vector
 void MultiShot::unflatten(const Eigen::Ref<const Eigen::VectorXd>& flat)
 {
+  mRolloutCacheDirty = true;
   int cursor = 0;
   for (std::shared_ptr<SingleShot>& shot : mShots)
   {
     int dim = shot->getFlatProblemDim();
     shot->unflatten(flat.segment(cursor, dim));
-    cursor += dim;
-  }
-}
-
-//==============================================================================
-/// This runs the shot out, and writes the positions, velocities, and forces
-void MultiShot::unroll(
-    std::shared_ptr<simulation::World> world,
-    /* OUT */ Eigen::Ref<Eigen::MatrixXd> poses,
-    /* OUT */ Eigen::Ref<Eigen::MatrixXd> vels,
-    /* OUT */ Eigen::Ref<Eigen::MatrixXd> forces)
-{
-  int cursor = 0;
-  for (std::shared_ptr<SingleShot>& shot : mShots)
-  {
-    int dim = shot->getNumSteps();
-    shot->unroll(
-        world,
-        poses.block(0, cursor, mRepresentationMapping->getPosDim(), dim),
-        vels.block(0, cursor, mRepresentationMapping->getVelDim(), dim),
-        forces.block(0, cursor, mRepresentationMapping->getForceDim(), dim));
     cursor += dim;
   }
 }
@@ -258,8 +257,7 @@ void MultiShot::backpropJacobian(
   rowCursor += numParentConstraints;
 
   // Add in knot point constraints
-  int stateDim = mRepresentationMapping->getPosDim()
-                 + mRepresentationMapping->getVelDim();
+  int stateDim = getRepresentationStateSize();
   for (int i = 1; i < mShots.size(); i++)
   {
     int dim = mShots[i - 1]->getFlatProblemDim();
@@ -283,8 +281,7 @@ void MultiShot::backpropJacobian(
 int MultiShot::getNumberNonZeroJacobian()
 {
   int nnzj = AbstractShot::getNumberNonZeroJacobian();
-  int stateDim = mRepresentationMapping->getPosDim()
-                 + mRepresentationMapping->getVelDim();
+  int stateDim = getRepresentationStateSize();
   for (int i = 0; i < mShots.size() - 1; i++)
   {
     int shotDim = mShots[i]->getFlatProblemDim();
@@ -314,8 +311,7 @@ void MultiShot::getJacobianSparsityStructure(
       cols.segment(0, n * numParentConstraints));
   rowCursor += numParentConstraints;
 
-  int stateDim = mRepresentationMapping->getPosDim()
-                 + mRepresentationMapping->getVelDim();
+  int stateDim = getRepresentationStateSize();
   // Handle knot point constraints
   for (int i = 1; i < mShots.size(); i++)
   {
@@ -349,8 +345,7 @@ void MultiShot::getSparseJacobian(
     Eigen::Ref<Eigen::VectorXd> sparse)
 {
   int sparseCursor = AbstractShot::getNumberNonZeroJacobian();
-  int stateDim = mRepresentationMapping->getPosDim()
-                 + mRepresentationMapping->getVelDim();
+  int stateDim = getRepresentationStateSize();
   Eigen::VectorXd neg = Eigen::VectorXd::Ones(stateDim) * -1;
   for (int i = 1; i < mShots.size(); i++)
   {
@@ -373,50 +368,50 @@ void MultiShot::getSparseJacobian(
 /// This populates the passed in matrices with the values from this trajectory
 void MultiShot::getStates(
     std::shared_ptr<simulation::World> world,
-    /* OUT */ Eigen::Ref<Eigen::MatrixXd> poses,
-    /* OUT */ Eigen::Ref<Eigen::MatrixXd> vels,
-    /* OUT */ Eigen::Ref<Eigen::MatrixXd> forces,
+    /* OUT */ TrajectoryRollout& rollout,
     bool useKnots)
 {
-  int posDim = mRepresentationMapping->getPosDim();
-  int velDim = mRepresentationMapping->getVelDim();
-  int forceDim = mRepresentationMapping->getForceDim();
-  assert(poses.cols() == mSteps);
-  assert(poses.rows() == posDim);
-  assert(vels.cols() == mSteps);
-  assert(vels.rows() == velDim);
-  assert(forces.cols() == mSteps);
-  assert(forces.rows() == forceDim);
+  int posDim = getRepresentation()->getPosDim();
+  int velDim = getRepresentation()->getVelDim();
+  int forceDim = getRepresentation()->getForceDim();
+  assert(rollout.getPoses(mRepresentationMapping).cols() == mSteps);
+  assert(rollout.getPoses(mRepresentationMapping).rows() == posDim);
+  assert(rollout.getVels(mRepresentationMapping).cols() == mSteps);
+  assert(rollout.getVels(mRepresentationMapping).rows() == velDim);
+  assert(rollout.getForces(mRepresentationMapping).cols() == mSteps);
+  assert(rollout.getForces(mRepresentationMapping).rows() == forceDim);
   int cursor = 0;
   if (useKnots)
   {
     for (int i = 0; i < mShots.size(); i++)
     {
       int steps = mShots[i]->getNumSteps();
-      mShots[i]->getStates(
-          world,
-          poses.block(0, cursor, posDim, steps),
-          vels.block(0, cursor, velDim, steps),
-          forces.block(0, cursor, forceDim, steps),
-          true);
+      TrajectoryRolloutRef slice = rollout.slice(cursor, steps);
+      mShots[i]->getStates(world, slice, true);
       cursor += steps;
     }
   }
   else
   {
     RestorableSnapshot snapshot(world);
-    world->setPositions(mShots[0]->mStartPos);
-    world->setVelocities(mShots[0]->mStartVel);
+    getRepresentation()->setPositions(world, mShots[0]->mStartPos);
+    getRepresentation()->setVelocities(world, mShots[0]->mStartVel);
     for (int i = 0; i < mShots.size(); i++)
     {
       for (int j = 0; j < mShots[i]->mSteps; j++)
       {
-        world->setForces(mShots[i]->mForces.col(j));
+        getRepresentation()->setForces(world, mShots[i]->mForces.col(j));
         world->step();
-        poses.col(cursor) = world->getPositions();
-        vels.col(cursor) = world->getVelocities();
-        forces.col(cursor) = mShots[i]->mForces.col(j);
-        cursor++;
+        for (auto pair : mMappings)
+        {
+          rollout.getPoses(pair.first).col(cursor)
+              = pair.second->getPositions(world);
+          rollout.getVels(pair.first).col(cursor)
+              = pair.second->getVelocities(world);
+          rollout.getForces(pair.first).col(cursor)
+              = pair.second->getForces(world);
+          cursor++;
+        }
       }
     }
   }
@@ -458,28 +453,20 @@ std::string MultiShot::getFlatDimName(int dim)
 //==============================================================================
 /// This computes the gradient in the flat problem space, taking into accounts
 /// incoming gradients with respect to any of the shot's values.
-void MultiShot::backpropGradient(
+void MultiShot::backpropGradientWrt(
     std::shared_ptr<simulation::World> world,
-    const Eigen::Ref<const Eigen::MatrixXd>& gradWrtPoses,
-    const Eigen::Ref<const Eigen::MatrixXd>& gradWrtVels,
-    const Eigen::Ref<const Eigen::MatrixXd>& gradWrtForces,
+    const TrajectoryRollout& gradWrtForces,
     /* OUT */ Eigen::Ref<Eigen::VectorXd> grad)
 {
   int cursorDims = 0;
   int cursorSteps = 0;
-  int posDim = mRepresentationMapping->getPosDim();
-  int velDim = mRepresentationMapping->getVelDim();
-  int forceDim = mRepresentationMapping->getForceDim();
   for (int i = 0; i < mShots.size(); i++)
   {
     int steps = mShots[i]->getNumSteps();
     int dim = mShots[i]->getFlatProblemDim();
-    mShots[i]->backpropGradient(
-        world,
-        gradWrtPoses.block(0, cursorSteps, posDim, steps),
-        gradWrtVels.block(0, cursorSteps, velDim, steps),
-        gradWrtForces.block(0, cursorSteps, forceDim, steps),
-        grad.segment(cursorDims, dim));
+    const TrajectoryRolloutConstRef slice
+        = gradWrtForces.sliceConst(cursorSteps, steps);
+    mShots[i]->backpropGradientWrt(world, slice, grad.segment(cursorDims, dim));
     cursorSteps += steps;
     cursorDims += dim;
   }

@@ -10,6 +10,7 @@
 #include "dart/neural/Mapping.hpp"
 #include "dart/trajectory/LossFn.hpp"
 #include "dart/trajectory/TrajectoryConstants.hpp"
+#include "dart/trajectory/TrajectoryRollout.hpp"
 
 namespace dart {
 namespace simulation {
@@ -50,28 +51,36 @@ public:
   /// certainly be mapped spaces that are easier to optimize in than native
   /// joint space, at least initially.
   virtual void switchRepresentationMapping(
-      std::shared_ptr<simulation::World> world,
-      std::shared_ptr<neural::Mapping> mapping);
-
-  /// This removes any mapping on the representation, meaning the representation
-  /// space goes back to the native joint-space.
-  void clearRepresentationMapping(std::shared_ptr<simulation::World> world);
+      std::shared_ptr<simulation::World> world, const std::string& mapping);
 
   /// This adds a mapping through which the loss function can interpret the
   /// output. We can have multiple loss mappings at the same time, and loss can
   /// use arbitrary combinations of multiple views, as long as it can provide
   /// gradients.
-  void addLossMapping(
-      std::string key, std::shared_ptr<neural::Mapping> mapping);
+  virtual void addMapping(
+      const std::string& key, std::shared_ptr<neural::Mapping> mapping);
 
   /// This returns true if there is a loss mapping at the specified key
-  bool hasLossMapping(std::string key);
+  bool hasMapping(const std::string& key);
 
   /// This returns the loss mapping at the specified key
-  std::shared_ptr<neural::Mapping> getLossMapping(std::string key);
+  std::shared_ptr<neural::Mapping> getMapping(const std::string& key);
+
+  /// This returns a reference to all the mappings in this shot
+  std::unordered_map<std::string, std::shared_ptr<neural::Mapping>>&
+  getMappings();
 
   /// This removes the loss mapping at a particular key
-  void removeLossMapping(std::string key);
+  virtual void removeMapping(const std::string& key);
+
+  /// Returns the sum of posDim() + velDim() for the current representation
+  /// mapping
+  int getRepresentationStateSize() const;
+
+  const std::string& getRepresentationName() const;
+
+  /// Returns the representation currently being used
+  const std::shared_ptr<neural::Mapping> getRepresentation() const;
 
   /// Returns the length of the flattened problem state
   virtual int getFlatProblemDim() const = 0;
@@ -84,14 +93,6 @@ public:
 
   /// This gets the parameters out of a flat vector
   virtual void unflatten(const Eigen::Ref<const Eigen::VectorXd>& flat) = 0;
-
-  /// This runs the shot out, and writes the positions, velocities, and forces
-  virtual void unroll(
-      std::shared_ptr<simulation::World> world,
-      /* OUT */ Eigen::Ref<Eigen::MatrixXd> poses,
-      /* OUT */ Eigen::Ref<Eigen::MatrixXd> vels,
-      /* OUT */ Eigen::Ref<Eigen::MatrixXd> forces)
-      = 0;
 
   /// This gets the fixed upper bounds for a flat vector, used during
   /// optimization
@@ -138,24 +139,29 @@ public:
       std::shared_ptr<simulation::World> world,
       /* OUT */ Eigen::Ref<Eigen::VectorXd> grad);
 
+  /// Get the loss for the rollout
+  double getLoss(std::shared_ptr<simulation::World> world);
+
   /// This computes the gradient in the flat problem space, taking into accounts
   /// incoming gradients with respect to any of the shot's values.
-  virtual void backpropGradient(
+  virtual void backpropGradientWrt(
       std::shared_ptr<simulation::World> world,
-      const Eigen::Ref<const Eigen::MatrixXd>& gradWrtPoses,
-      const Eigen::Ref<const Eigen::MatrixXd>& gradWrtVels,
-      const Eigen::Ref<const Eigen::MatrixXd>& gradWrtForces,
+      const TrajectoryRollout& gradWrtRollout,
       /* OUT */ Eigen::Ref<Eigen::VectorXd> grad)
       = 0;
 
   /// This populates the passed in matrices with the values from this trajectory
   virtual void getStates(
       std::shared_ptr<simulation::World> world,
-      /* OUT */ Eigen::Ref<Eigen::MatrixXd> poses,
-      /* OUT */ Eigen::Ref<Eigen::MatrixXd> vels,
-      /* OUT */ Eigen::Ref<Eigen::MatrixXd> forces,
+      /* OUT */ TrajectoryRollout& rollout,
       bool useKnots = true)
       = 0;
+
+  const TrajectoryRollout& getRolloutCache(
+      std::shared_ptr<simulation::World> world, bool useKnots = true);
+
+  TrajectoryRollout& getGradientWrtRolloutCache(
+      std::shared_ptr<simulation::World> world, bool useKnots = true);
 
   /// This returns the concatenation of (start pos, start vel) for convenience
   virtual Eigen::VectorXd getStartState() = 0;
@@ -215,17 +221,11 @@ protected:
   bool mTuneStartingState;
   std::shared_ptr<simulation::World> mWorld;
   std::vector<LossFn> mConstraints;
-  std::shared_ptr<neural::Mapping> mRepresentationMapping;
-  std::unordered_map<std::string, std::shared_ptr<neural::Mapping>>
-      mLossMappings;
-  // We need these matrices a lot, so rather than allocate and free them all the
-  // time, we have dedicated scratch space
-  Eigen::MatrixXd mScratchPoses;
-  Eigen::MatrixXd mScratchVels;
-  Eigen::MatrixXd mScratchForces;
-  Eigen::MatrixXd mScratchGradWrtPoses;
-  Eigen::MatrixXd mScratchGradWrtVels;
-  Eigen::MatrixXd mScratchGradWrtForces;
+  std::string mRepresentationMapping;
+  std::unordered_map<std::string, std::shared_ptr<neural::Mapping>> mMappings;
+  bool mRolloutCacheDirty;
+  std::shared_ptr<TrajectoryRolloutReal> mRolloutCache;
+  std::shared_ptr<TrajectoryRolloutReal> mGradWrtRolloutCache;
 };
 
 } // namespace trajectory

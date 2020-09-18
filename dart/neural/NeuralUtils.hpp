@@ -45,8 +45,8 @@ std::shared_ptr<BackpropSnapshot> forwardPass(
 /// to backpropagate gradients and compute Jacobians in the mapped space
 std::shared_ptr<MappedBackpropSnapshot> forwardPass(
     std::shared_ptr<simulation::World> world,
-    std::shared_ptr<Mapping> representationMapping,
-    std::unordered_map<std::string, std::shared_ptr<Mapping>> lossMappings,
+    std::string representation,
+    std::unordered_map<std::string, std::shared_ptr<Mapping>> mappings,
     bool idempotent = false);
 
 struct BulkForwardPassResult

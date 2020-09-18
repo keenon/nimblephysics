@@ -2260,31 +2260,31 @@ Eigen::MatrixXd getTimestepJacobian(
   if (inComponent == MappingTestComponent::POSITION
       && outComponent == MappingTestComponent::POSITION)
   {
-    return snapshot->getPosPosJacobian(world);
+    return snapshot->getPosPosJacobian(world, snapshot->getRepresentation());
   }
   else if (
       inComponent == MappingTestComponent::POSITION
       && outComponent == MappingTestComponent::VELOCITY)
   {
-    return snapshot->getPosVelJacobian(world);
+    return snapshot->getPosVelJacobian(world, snapshot->getRepresentation());
   }
   else if (
       inComponent == MappingTestComponent::VELOCITY
       && outComponent == MappingTestComponent::POSITION)
   {
-    return snapshot->getVelPosJacobian(world);
+    return snapshot->getVelPosJacobian(world, snapshot->getRepresentation());
   }
   else if (
       inComponent == MappingTestComponent::VELOCITY
       && outComponent == MappingTestComponent::VELOCITY)
   {
-    return snapshot->getVelVelJacobian(world);
+    return snapshot->getVelVelJacobian(world, snapshot->getRepresentation());
   }
   else if (
       inComponent == MappingTestComponent::FORCE
       && outComponent == MappingTestComponent::VELOCITY)
   {
-    return snapshot->getForceVelJacobian(world);
+    return snapshot->getForceVelJacobian(world, snapshot->getRepresentation());
   }
   assert(false && "Unsupported combination of inComponent and outComponent in getTimestepJacobian()!");
 }
@@ -2297,9 +2297,10 @@ bool verifyMappedStepJacobian(
 {
   RestorableSnapshot snapshot(world);
 
-  std::unordered_map<std::string, std::shared_ptr<Mapping>> lossMaps;
+  std::unordered_map<std::string, std::shared_ptr<Mapping>> mappings;
+  mappings["identity"] = mapping;
   std::shared_ptr<MappedBackpropSnapshot> mappedSnapshot
-      = neural::forwardPass(world, mapping, lossMaps, true);
+      = neural::forwardPass(world, "identity", mappings, true);
 
   Eigen::MatrixXd analytical
       = getTimestepJacobian(world, mappedSnapshot, inComponent, outComponent);

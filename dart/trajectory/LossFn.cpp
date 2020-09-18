@@ -38,14 +38,11 @@ LossFn::~LossFn()
 }
 
 //==============================================================================
-double LossFn::getLoss(
-    const Eigen::Ref<const Eigen::MatrixXd>& poses,
-    const Eigen::Ref<const Eigen::MatrixXd>& vels,
-    const Eigen::Ref<const Eigen::MatrixXd>& forces)
+double LossFn::getLoss(const TrajectoryRollout& rollout)
 {
   if (mLoss)
   {
-    return mLoss.value()(poses, vels, forces);
+    return mLoss.value()(rollout);
   }
   // Default to 0
   return 0.0;
@@ -53,46 +50,54 @@ double LossFn::getLoss(
 
 //==============================================================================
 double LossFn::getLossAndGradient(
-    const Eigen::Ref<const Eigen::MatrixXd>& poses,
-    const Eigen::Ref<const Eigen::MatrixXd>& vels,
-    const Eigen::Ref<const Eigen::MatrixXd>& forces,
-    /* OUT */ Eigen::Ref<Eigen::MatrixXd> gradWrtPoses,
-    /* OUT */ Eigen::Ref<Eigen::MatrixXd> gradWrtVels,
-    /* OUT */ Eigen::Ref<Eigen::MatrixXd> gradWrtForces)
+    const TrajectoryRollout& rollout,
+    /* OUT */ TrajectoryRollout& gradWrtRollout)
 {
   if (mLossAndGrad)
   {
-    return mLossAndGrad.value()(
-        poses, vels, forces, gradWrtPoses, gradWrtVels, gradWrtForces);
+    return mLossAndGrad.value()(rollout, gradWrtRollout);
   }
   else if (mLoss)
   {
-    Eigen::MatrixXd posesCopy = poses;
-    Eigen::MatrixXd velsCopy = vels;
-    Eigen::MatrixXd forcesCopy = forces;
-    double originalLoss = mLoss.value()(poses, vels, forces);
+    TrajectoryRolloutReal rolloutCopy = TrajectoryRolloutReal(&rollout);
+    double originalLoss = mLoss.value()(rolloutCopy);
 
     const double EPS = 1e-7;
 
-    for (int row = 0; row < posesCopy.rows(); row++)
+    for (std::string key : rolloutCopy.getMappings())
     {
-      // Only test the last step
-      for (int col = 0; col < posesCopy.cols(); col++)
+      for (int row = 0; row < rolloutCopy.getPoses(key).rows(); row++)
       {
-        posesCopy(row, col) += EPS;
-        double lossPos = mLoss.value()(posesCopy, vels, forces);
-        posesCopy(row, col) -= EPS;
-        gradWrtPoses(row, col) = (lossPos - originalLoss) / EPS;
-
-        velsCopy(row, col) += EPS;
-        double lossVel = mLoss.value()(poses, velsCopy, forces);
-        velsCopy(row, col) -= EPS;
-        gradWrtVels(row, col) = (lossVel - originalLoss) / EPS;
-
-        forcesCopy(row, col) += EPS;
-        double lossForce = mLoss.value()(poses, vels, forcesCopy);
-        forcesCopy(row, col) -= EPS;
-        gradWrtForces(row, col) = (lossForce - originalLoss) / EPS;
+        for (int col = 0; col < rolloutCopy.getPoses(key).cols(); col++)
+        {
+          rolloutCopy.getPoses(key)(row, col) += EPS;
+          double lossPos = mLoss.value()(rolloutCopy);
+          rolloutCopy.getPoses(key)(row, col) -= EPS;
+          gradWrtRollout.getPoses(key)(row, col)
+              = (lossPos - originalLoss) / EPS;
+        }
+      }
+      for (int row = 0; row < rolloutCopy.getVels(key).rows(); row++)
+      {
+        for (int col = 0; col < rolloutCopy.getVels(key).cols(); col++)
+        {
+          rolloutCopy.getVels(key)(row, col) += EPS;
+          double lossVel = mLoss.value()(rolloutCopy);
+          rolloutCopy.getVels(key)(row, col) -= EPS;
+          gradWrtRollout.getVels(key)(row, col)
+              = (lossVel - originalLoss) / EPS;
+        }
+      }
+      for (int row = 0; row < rolloutCopy.getForces(key).rows(); row++)
+      {
+        for (int col = 0; col < rolloutCopy.getForces(key).cols(); col++)
+        {
+          rolloutCopy.getForces(key)(row, col) += EPS;
+          double lossForce = mLoss.value()(rolloutCopy);
+          rolloutCopy.getForces(key)(row, col) -= EPS;
+          gradWrtRollout.getForces(key)(row, col)
+              = (lossForce - originalLoss) / EPS;
+        }
       }
     }
 
@@ -100,9 +105,12 @@ double LossFn::getLossAndGradient(
   }
 
   // Default to 0
-  gradWrtPoses.setZero();
-  gradWrtVels.setZero();
-  gradWrtForces.setZero();
+  for (std::string key : gradWrtRollout.getMappings())
+  {
+    gradWrtRollout.getPoses(key).setZero();
+    gradWrtRollout.getVels(key).setZero();
+    gradWrtRollout.getForces(key).setZero();
+  }
   return 0.0;
 }
 

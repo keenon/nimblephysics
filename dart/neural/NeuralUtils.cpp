@@ -68,8 +68,8 @@ std::shared_ptr<BackpropSnapshot> forwardPass(
 /// to backpropagate gradients and compute Jacobians in the mapped space
 std::shared_ptr<MappedBackpropSnapshot> forwardPass(
     std::shared_ptr<simulation::World> world,
-    std::shared_ptr<Mapping> representationMapping,
-    std::unordered_map<std::string, std::shared_ptr<Mapping>> lossMappings,
+    std::string representation,
+    std::unordered_map<std::string, std::shared_ptr<Mapping>> mappings,
     bool idempotent)
 {
   std::shared_ptr<RestorableSnapshot> restorableSnapshot;
@@ -85,13 +85,11 @@ std::shared_ptr<MappedBackpropSnapshot> forwardPass(
 
   // Record the Jacobians for mapping out from mapped space to world space
   // pre-step
-  PreStepMapping preStepRepresentation
-      = PreStepMapping(world, representationMapping);
-  std::unordered_map<std::string, PreStepMapping> preStepLosses;
-  for (std::pair<std::string, std::shared_ptr<Mapping>> lossMap : lossMappings)
+  std::unordered_map<std::string, PreStepMapping> preStepMappings;
+  for (std::pair<std::string, std::shared_ptr<Mapping>> lossMap : mappings)
   {
     PreStepMapping pre(world, lossMap.second);
-    preStepLosses[lossMap.first] = pre;
+    preStepMappings[lossMap.first] = pre;
   }
 
   // Set the gradient mode we're going to use to calculate gradients
@@ -116,24 +114,18 @@ std::shared_ptr<MappedBackpropSnapshot> forwardPass(
 
   // Record the Jacobians for mapping out from mapped space to world space
   // pre-step
-  PostStepMapping postStepRepresentation
-      = PostStepMapping(world, representationMapping);
-  std::unordered_map<std::string, PostStepMapping> postStepLosses;
-  for (std::pair<std::string, std::shared_ptr<Mapping>> lossMap : lossMappings)
+  std::unordered_map<std::string, PostStepMapping> postStepMappings;
+  for (std::pair<std::string, std::shared_ptr<Mapping>> lossMap : mappings)
   {
     PostStepMapping post(world, lossMap.second);
-    postStepLosses[lossMap.first] = post;
+    postStepMappings[lossMap.first] = post;
   }
 
   if (idempotent)
     restorableSnapshot->restore();
 
   return std::make_shared<MappedBackpropSnapshot>(
-      snapshot,
-      preStepRepresentation,
-      postStepRepresentation,
-      preStepLosses,
-      postStepLosses);
+      snapshot, representation, preStepMappings, postStepMappings);
 }
 
 //==============================================================================

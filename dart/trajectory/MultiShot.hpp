@@ -49,7 +49,18 @@ public:
   /// joint space, at least initially.
   void switchRepresentationMapping(
       std::shared_ptr<simulation::World> world,
+      const std::string& mapping) override;
+
+  /// This adds a mapping through which the loss function can interpret the
+  /// output. We can have multiple loss mappings at the same time, and loss can
+  /// use arbitrary combinations of multiple views, as long as it can provide
+  /// gradients.
+  void addMapping(
+      const std::string& key,
       std::shared_ptr<neural::Mapping> mapping) override;
+
+  /// This removes the loss mapping at a particular key
+  void removeMapping(const std::string& key) override;
 
   /// Returns the length of the flattened problem stat
   int getFlatProblemDim() const override;
@@ -62,13 +73,6 @@ public:
 
   /// This gets the parameters out of a flat vector
   void unflatten(const Eigen::Ref<const Eigen::VectorXd>& flat) override;
-
-  /// This runs the shot out, and writes the positions, velocities, and forces
-  void unroll(
-      std::shared_ptr<simulation::World> world,
-      /* OUT */ Eigen::Ref<Eigen::MatrixXd> poses,
-      /* OUT */ Eigen::Ref<Eigen::MatrixXd> vels,
-      /* OUT */ Eigen::Ref<Eigen::MatrixXd> forces) override;
 
   /// This gets the fixed upper bounds for a flat vector, used during
   /// optimization
@@ -112,19 +116,15 @@ public:
 
   /// This computes the gradient in the flat problem space, taking into accounts
   /// incoming gradients with respect to any of the shot's values.
-  void backpropGradient(
+  void backpropGradientWrt(
       std::shared_ptr<simulation::World> world,
-      const Eigen::Ref<const Eigen::MatrixXd>& gradWrtPoses,
-      const Eigen::Ref<const Eigen::MatrixXd>& gradWrtVels,
-      const Eigen::Ref<const Eigen::MatrixXd>& gradWrtForces,
+      const TrajectoryRollout& gradWrtRollout,
       /* OUT */ Eigen::Ref<Eigen::VectorXd> grad) override;
 
   /// This populates the passed in matrices with the values from this trajectory
   void getStates(
       std::shared_ptr<simulation::World> world,
-      /* OUT */ Eigen::Ref<Eigen::MatrixXd> poses,
-      /* OUT */ Eigen::Ref<Eigen::MatrixXd> vels,
-      /* OUT */ Eigen::Ref<Eigen::MatrixXd> forces,
+      /* OUT */ TrajectoryRollout& rollout,
       bool useKnots) override;
 
   /// This returns the concatenation of (start pos, start vel) for convenience

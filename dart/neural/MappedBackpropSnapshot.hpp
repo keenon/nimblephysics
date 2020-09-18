@@ -4,6 +4,7 @@
 #include <memory>
 #include <optional>
 #include <unordered_map>
+#include <vector>
 
 #include <Eigen/Dense>
 
@@ -86,16 +87,23 @@ class MappedBackpropSnapshot
 public:
   MappedBackpropSnapshot(
       std::shared_ptr<BackpropSnapshot> backpropSnapshot,
-      PreStepMapping preStepRepresentation,
-      PostStepMapping postStepRepresentation,
-      std::unordered_map<std::string, PreStepMapping> preStepLosses,
-      std::unordered_map<std::string, PostStepMapping> postStepLosses);
+      std::string representation,
+      std::unordered_map<std::string, PreStepMapping> preStepMappings,
+      std::unordered_map<std::string, PostStepMapping> postStepMappings);
 
-  Eigen::MatrixXd getPosPosJacobian(std::shared_ptr<simulation::World> world);
-  Eigen::MatrixXd getPosVelJacobian(std::shared_ptr<simulation::World> world);
-  Eigen::MatrixXd getVelPosJacobian(std::shared_ptr<simulation::World> world);
-  Eigen::MatrixXd getVelVelJacobian(std::shared_ptr<simulation::World> world);
-  Eigen::MatrixXd getForceVelJacobian(std::shared_ptr<simulation::World> world);
+  const std::vector<std::string>& getMappings();
+  const std::string& getRepresentation();
+
+  Eigen::MatrixXd getPosPosJacobian(
+      std::shared_ptr<simulation::World> world, const std::string& mapping);
+  Eigen::MatrixXd getPosVelJacobian(
+      std::shared_ptr<simulation::World> world, const std::string& mapping);
+  Eigen::MatrixXd getVelPosJacobian(
+      std::shared_ptr<simulation::World> world, const std::string& mapping);
+  Eigen::MatrixXd getVelVelJacobian(
+      std::shared_ptr<simulation::World> world, const std::string& mapping);
+  Eigen::MatrixXd getForceVelJacobian(
+      std::shared_ptr<simulation::World> world, const std::string& mapping);
 
   /// This computes the implicit backprop without forming intermediate
   /// Jacobians. It takes a LossGradient with the position and velocity vectors
@@ -105,42 +113,42 @@ public:
   void backprop(
       simulation::WorldPtr world,
       LossGradient& thisTimestepLoss,
-      const LossGradient& nextTimestepLoss);
+      const std::unordered_map<std::string, LossGradient> nextTimestepLosses);
 
   /// Returns a concatenated vector of all the Skeletons' position()'s in the
   /// World, in order in which the Skeletons appear in the World's
   /// getSkeleton(i) returns them, BEFORE the timestep.
-  const Eigen::VectorXd& getPreStepPosition();
+  const Eigen::VectorXd& getPreStepPosition(const std::string& mapping);
 
   /// Returns a concatenated vector of all the Skeletons' velocity()'s in the
   /// World, in order in which the Skeletons appear in the World's
   /// getSkeleton(i) returns them, BEFORE the timestep.
-  const Eigen::VectorXd& getPreStepVelocity();
+  const Eigen::VectorXd& getPreStepVelocity(const std::string& mapping);
 
   /// Returns a concatenated vector of all the joint torques that were applied
   /// during the forward pass, BEFORE the timestep.
-  const Eigen::VectorXd& getPreStepTorques();
+  const Eigen::VectorXd& getPreStepTorques(const std::string& mapping);
 
   /// Returns a concatenated vector of all the Skeletons' position()'s in the
   /// World, in order in which the Skeletons appear in the World's
   /// getSkeleton(i) returns them, AFTER the timestep.
-  const Eigen::VectorXd& getPostStepPosition();
+  const Eigen::VectorXd& getPostStepPosition(const std::string& mapping);
 
   /// Returns a concatenated vector of all the Skeletons' velocity()'s in the
   /// World, in order in which the Skeletons appear in the World's
   /// getSkeleton(i) returns them, AFTER the timestep.
-  const Eigen::VectorXd& getPostStepVelocity();
+  const Eigen::VectorXd& getPostStepVelocity(const std::string& mapping);
 
   /// Returns a concatenated vector of all the joint torques that were applied
   /// during the forward pass, AFTER the timestep.
-  const Eigen::VectorXd& getPostStepTorques();
+  const Eigen::VectorXd& getPostStepTorques(const std::string& mapping);
 
 protected:
   std::shared_ptr<BackpropSnapshot> mBackpropSnapshot;
-  PreStepMapping mPreStepRepresentation;
-  PostStepMapping mPostStepRepresentation;
-  std::unordered_map<std::string, PreStepMapping> mPreStepLosses;
-  std::unordered_map<std::string, PostStepMapping> mPostStepLosses;
+  std::string mRepresentation;
+  std::vector<std::string> mMappings;
+  std::unordered_map<std::string, PreStepMapping> mPreStepMappings;
+  std::unordered_map<std::string, PostStepMapping> mPostStepMappings;
 };
 
 using MappedBackpropSnapshotPtr = std::shared_ptr<MappedBackpropSnapshot>;
