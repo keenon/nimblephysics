@@ -146,21 +146,21 @@ public:
   /// incoming gradients with respect to any of the shot's values.
   virtual void backpropGradientWrt(
       std::shared_ptr<simulation::World> world,
-      const TrajectoryRollout& gradWrtRollout,
+      const TrajectoryRollout* gradWrtRollout,
       /* OUT */ Eigen::Ref<Eigen::VectorXd> grad)
       = 0;
 
   /// This populates the passed in matrices with the values from this trajectory
   virtual void getStates(
       std::shared_ptr<simulation::World> world,
-      /* OUT */ TrajectoryRollout& rollout,
+      /* OUT */ TrajectoryRollout* rollout,
       bool useKnots = true)
       = 0;
 
-  const TrajectoryRollout& getRolloutCache(
+  const TrajectoryRollout* getRolloutCache(
       std::shared_ptr<simulation::World> world, bool useKnots = true);
 
-  TrajectoryRollout& getGradientWrtRolloutCache(
+  TrajectoryRollout* getGradientWrtRolloutCache(
       std::shared_ptr<simulation::World> world, bool useKnots = true);
 
   /// This returns the concatenation of (start pos, start vel) for convenience

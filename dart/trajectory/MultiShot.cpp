@@ -368,26 +368,26 @@ void MultiShot::getSparseJacobian(
 /// This populates the passed in matrices with the values from this trajectory
 void MultiShot::getStates(
     std::shared_ptr<simulation::World> world,
-    /* OUT */ TrajectoryRollout& rollout,
+    /* OUT */ TrajectoryRollout* rollout,
     bool useKnots)
 {
   int posDim = getRepresentation()->getPosDim();
   int velDim = getRepresentation()->getVelDim();
   int forceDim = getRepresentation()->getForceDim();
-  assert(rollout.getPoses(mRepresentationMapping).cols() == mSteps);
-  assert(rollout.getPoses(mRepresentationMapping).rows() == posDim);
-  assert(rollout.getVels(mRepresentationMapping).cols() == mSteps);
-  assert(rollout.getVels(mRepresentationMapping).rows() == velDim);
-  assert(rollout.getForces(mRepresentationMapping).cols() == mSteps);
-  assert(rollout.getForces(mRepresentationMapping).rows() == forceDim);
+  assert(rollout->getPoses(mRepresentationMapping).cols() == mSteps);
+  assert(rollout->getPoses(mRepresentationMapping).rows() == posDim);
+  assert(rollout->getVels(mRepresentationMapping).cols() == mSteps);
+  assert(rollout->getVels(mRepresentationMapping).rows() == velDim);
+  assert(rollout->getForces(mRepresentationMapping).cols() == mSteps);
+  assert(rollout->getForces(mRepresentationMapping).rows() == forceDim);
   int cursor = 0;
   if (useKnots)
   {
     for (int i = 0; i < mShots.size(); i++)
     {
       int steps = mShots[i]->getNumSteps();
-      TrajectoryRolloutRef slice = rollout.slice(cursor, steps);
-      mShots[i]->getStates(world, slice, true);
+      TrajectoryRolloutRef slice = rollout->slice(cursor, steps);
+      mShots[i]->getStates(world, &slice, true);
       cursor += steps;
     }
   }
@@ -404,11 +404,11 @@ void MultiShot::getStates(
         world->step();
         for (auto pair : mMappings)
         {
-          rollout.getPoses(pair.first).col(cursor)
+          rollout->getPoses(pair.first).col(cursor)
               = pair.second->getPositions(world);
-          rollout.getVels(pair.first).col(cursor)
+          rollout->getVels(pair.first).col(cursor)
               = pair.second->getVelocities(world);
-          rollout.getForces(pair.first).col(cursor)
+          rollout->getForces(pair.first).col(cursor)
               = pair.second->getForces(world);
           cursor++;
         }
@@ -455,7 +455,7 @@ std::string MultiShot::getFlatDimName(int dim)
 /// incoming gradients with respect to any of the shot's values.
 void MultiShot::backpropGradientWrt(
     std::shared_ptr<simulation::World> world,
-    const TrajectoryRollout& gradWrtForces,
+    const TrajectoryRollout* gradWrtForces,
     /* OUT */ Eigen::Ref<Eigen::VectorXd> grad)
 {
   int cursorDims = 0;
@@ -465,8 +465,9 @@ void MultiShot::backpropGradientWrt(
     int steps = mShots[i]->getNumSteps();
     int dim = mShots[i]->getFlatProblemDim();
     const TrajectoryRolloutConstRef slice
-        = gradWrtForces.sliceConst(cursorSteps, steps);
-    mShots[i]->backpropGradientWrt(world, slice, grad.segment(cursorDims, dim));
+        = gradWrtForces->sliceConst(cursorSteps, steps);
+    mShots[i]->backpropGradientWrt(
+        world, &slice, grad.segment(cursorDims, dim));
     cursorSteps += steps;
     cursorDims += dim;
   }

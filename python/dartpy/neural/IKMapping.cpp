@@ -30,6 +30,11 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <dart/dart.hpp>
+#include <dart/neural/IKMapping.hpp>
+#include <dart/neural/IdentityMapping.hpp>
+#include <dart/neural/Mapping.hpp>
+#include <pybind11/eigen.h>
 #include <pybind11/pybind11.h>
 
 namespace py = pybind11;
@@ -37,15 +42,28 @@ namespace py = pybind11;
 namespace dart {
 namespace python {
 
-void dart_gui_osg(py::module& m);
-void dart_gui_glut(py::module& m);
-
-void dart_gui(py::module& m)
+void IKMapping(py::module& m)
 {
-  auto sm = m.def_submodule("gui");
-
-  dart_gui_osg(sm);
-  dart_gui_glut(sm);
+  ::py::class_<
+      dart::neural::IKMapping,
+      dart::neural::Mapping,
+      std::shared_ptr<dart::neural::IKMapping>>(m, "IKMapping")
+      .def(::py::init<std::shared_ptr<simulation::World>>())
+      .def(
+          "addSpatialBodyNode",
+          &dart::neural::IKMapping::addSpatialBodyNode,
+          "This adds the spatial (6D) coordinates of a body node to the "
+          "mapping, increasing the dimension of the mapped space by 6")
+      .def(
+          "addLinearBodyNode",
+          &dart::neural::IKMapping::addLinearBodyNode,
+          "This adds the linear (3D) coordinates of a body node to the "
+          "mapping, increasing the dimension of the mapped space by 3")
+      .def(
+          "addAngularBodyNode",
+          &dart::neural::IKMapping::addAngularBodyNode,
+          "This adds the angular (3D) coordinates of a body node to the "
+          "mapping, increasing the dimension of the mapped space by 3");
 }
 
 } // namespace python

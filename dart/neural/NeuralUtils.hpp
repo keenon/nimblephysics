@@ -2,6 +2,8 @@
 #define DART_NEURAL_UTILS_HPP_
 
 #include <memory>
+#include <string>
+#include <unordered_map>
 #include <vector>
 
 #include <Eigen/Dense>
@@ -43,7 +45,7 @@ std::shared_ptr<BackpropSnapshot> forwardPass(
 
 /// Takes a step in the world, and returns a mapped snapshot which can be used
 /// to backpropagate gradients and compute Jacobians in the mapped space
-std::shared_ptr<MappedBackpropSnapshot> forwardPass(
+std::shared_ptr<MappedBackpropSnapshot> mappedForwardPass(
     std::shared_ptr<simulation::World> world,
     std::string representation,
     std::unordered_map<std::string, std::shared_ptr<Mapping>> mappings,

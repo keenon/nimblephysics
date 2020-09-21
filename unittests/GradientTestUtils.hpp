@@ -2300,7 +2300,7 @@ bool verifyMappedStepJacobian(
   std::unordered_map<std::string, std::shared_ptr<Mapping>> mappings;
   mappings["identity"] = mapping;
   std::shared_ptr<MappedBackpropSnapshot> mappedSnapshot
-      = neural::forwardPass(world, "identity", mappings, true);
+      = neural::mappedForwardPass(world, "identity", mappings, true);
 
   Eigen::MatrixXd analytical
       = getTimestepJacobian(world, mappedSnapshot, inComponent, outComponent);

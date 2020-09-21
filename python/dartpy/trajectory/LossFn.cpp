@@ -30,6 +30,12 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <dart/dart.hpp>
+#include <dart/trajectory/AbstractShot.hpp>
+#include <dart/trajectory/MultiShot.hpp>
+#include <dart/trajectory/TrajectoryConstants.hpp>
+#include <pybind11/eigen.h>
+#include <pybind11/functional.h>
 #include <pybind11/pybind11.h>
 
 namespace py = pybind11;
@@ -37,15 +43,33 @@ namespace py = pybind11;
 namespace dart {
 namespace python {
 
-void dart_gui_osg(py::module& m);
-void dart_gui_glut(py::module& m);
-
-void dart_gui(py::module& m)
+void LossFn(py::module& m)
 {
-  auto sm = m.def_submodule("gui");
-
-  dart_gui_osg(sm);
-  dart_gui_glut(sm);
+  ::py::class_<dart::trajectory::LossFn>(m, "LossFn")
+      .def(::py::init<>())
+      .def(::py::init<dart::trajectory::TrajectoryLossFn>(), ::py::arg("loss"))
+      .def(
+          ::py::init<
+              dart::trajectory::TrajectoryLossFn,
+              dart::trajectory::TrajectoryLossFnAndGrad>(),
+          ::py::arg("loss"),
+          ::py::arg("lossFnAndGrad"))
+      .def("getLoss", &dart::trajectory::LossFn::getLoss, ::py::arg("rollout"))
+      .def(
+          "getLossAndGradient",
+          &dart::trajectory::LossFn::getLossAndGradient,
+          ::py::arg("rollout"),
+          ::py::arg("gradWrtRollout"))
+      .def(
+          "setUpperBound",
+          &dart::trajectory::LossFn::setUpperBound,
+          ::py::arg("upperBound"))
+      .def("getUpperBound", &dart::trajectory::LossFn::getUpperBound)
+      .def(
+          "setLowerBound",
+          &dart::trajectory::LossFn::setLowerBound,
+          ::py::arg("lowerBound"))
+      .def("getLowerBound", &dart::trajectory::LossFn::getLowerBound);
 }
 
 } // namespace python

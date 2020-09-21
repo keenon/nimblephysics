@@ -30,6 +30,8 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <dart/dart.hpp>
+#include <dart/gui/glut/TrajectoryReplayWindow.hpp>
 #include <pybind11/pybind11.h>
 
 namespace py = pybind11;
@@ -37,15 +39,15 @@ namespace py = pybind11;
 namespace dart {
 namespace python {
 
-void dart_gui_osg(py::module& m);
-void dart_gui_glut(py::module& m);
-
-void dart_gui(py::module& m)
+void dart_gui_glut(py::module& m)
 {
-  auto sm = m.def_submodule("gui");
+  auto sm = m.def_submodule("glut");
 
-  dart_gui_osg(sm);
-  dart_gui_glut(sm);
+  sm.def(
+      "displayTrajectoryInGUI",
+      &dart::gui::glut::displayTrajectoryInGUI,
+      ::py::arg("world"),
+      ::py::arg("shot"));
 }
 
 } // namespace python

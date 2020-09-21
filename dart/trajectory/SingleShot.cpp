@@ -335,7 +335,7 @@ void SingleShot::finiteDifferenceJacobianOfFinalState(
 /// incoming gradients with respect to any of the shot's values.
 void SingleShot::backpropGradientWrt(
     std::shared_ptr<simulation::World> world,
-    const TrajectoryRollout& gradWrtRollout,
+    const TrajectoryRollout* gradWrtRollout,
     /* OUT */ Eigen::Ref<Eigen::VectorXd> grad)
 {
   int dims = getFlatProblemDim();
@@ -360,11 +360,11 @@ void SingleShot::backpropGradientWrt(
     {
       LossGradient mappedGrad;
       mappedGrad.lossWrtPosition
-          = gradWrtRollout.getPosesConst(pair.first).col(i);
+          = gradWrtRollout->getPosesConst(pair.first).col(i);
       mappedGrad.lossWrtVelocity
-          = gradWrtRollout.getVelsConst(pair.first).col(i);
+          = gradWrtRollout->getVelsConst(pair.first).col(i);
       mappedGrad.lossWrtTorque
-          = gradWrtRollout.getForcesConst(pair.first).col(i);
+          = gradWrtRollout->getForcesConst(pair.first).col(i);
       mappedLosses[pair.first] = mappedGrad;
     }
     mappedLosses[mRepresentationMapping].lossWrtPosition
@@ -391,7 +391,7 @@ void SingleShot::backpropGradientWrt(
     }
     thisTimestep.lossWrtTorque
         += gradWrtRollout
-               .getForcesConst(gradWrtRollout.getRepresentationMapping())
+               ->getForcesConst(gradWrtRollout->getRepresentationMapping())
                .col(i);
 
     nextTimestep = thisTimestep;
@@ -418,7 +418,7 @@ std::vector<MappedBackpropSnapshotPtr> SingleShot::getSnapshots(
     {
       getRepresentation()->setForces(world, mForces.col(i));
       mSnapshotsCache.push_back(
-          forwardPass(world, mRepresentationMapping, mMappings));
+          mappedForwardPass(world, mRepresentationMapping, mMappings));
     }
 
     snapshot.restore();
@@ -431,24 +431,24 @@ std::vector<MappedBackpropSnapshotPtr> SingleShot::getSnapshots(
 /// This populates the passed in matrices with the values from this trajectory
 void SingleShot::getStates(
     std::shared_ptr<simulation::World> world,
-    /* OUT */ TrajectoryRollout& rollout,
+    /* OUT */ TrajectoryRollout* rollout,
     bool /* useKnots */)
 {
   std::vector<MappedBackpropSnapshotPtr> snapshots = getSnapshots(world);
 
-  for (std::string key : rollout.getMappings())
+  for (std::string key : rollout->getMappings())
   {
-    assert(rollout.getPoses(key).cols() == mSteps);
-    assert(rollout.getPoses(key).rows() == mMappings[key]->getPosDim());
-    assert(rollout.getVels(key).cols() == mSteps);
-    assert(rollout.getVels(key).rows() == mMappings[key]->getVelDim());
-    assert(rollout.getForces(key).cols() == mSteps);
-    assert(rollout.getForces(key).rows() == mMappings[key]->getForceDim());
+    assert(rollout->getPoses(key).cols() == mSteps);
+    assert(rollout->getPoses(key).rows() == mMappings[key]->getPosDim());
+    assert(rollout->getVels(key).cols() == mSteps);
+    assert(rollout->getVels(key).rows() == mMappings[key]->getVelDim());
+    assert(rollout->getForces(key).cols() == mSteps);
+    assert(rollout->getForces(key).rows() == mMappings[key]->getForceDim());
     for (int i = 0; i < mSteps; i++)
     {
-      rollout.getPoses(key).col(i) = snapshots[i]->getPostStepPosition(key);
-      rollout.getVels(key).col(i) = snapshots[i]->getPostStepVelocity(key);
-      rollout.getForces(key).col(i) = snapshots[i]->getPreStepTorques(key);
+      rollout->getPoses(key).col(i) = snapshots[i]->getPostStepPosition(key);
+      rollout->getVels(key).col(i) = snapshots[i]->getPostStepVelocity(key);
+      rollout->getForces(key).col(i) = snapshots[i]->getPreStepTorques(key);
     }
   }
 }

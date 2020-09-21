@@ -286,7 +286,7 @@ double AbstractShot::getLoss(std::shared_ptr<simulation::World> world)
 }
 
 //==============================================================================
-const TrajectoryRollout& AbstractShot::getRolloutCache(
+const TrajectoryRollout* AbstractShot::getRolloutCache(
     std::shared_ptr<simulation::World> world, bool useKnots)
 {
   if (mRolloutCacheDirty)
@@ -294,15 +294,15 @@ const TrajectoryRollout& AbstractShot::getRolloutCache(
     mRolloutCache = std::make_shared<TrajectoryRolloutReal>(this);
     getStates(
         world,
-        /* OUT */ *mRolloutCache.get());
+        /* OUT */ mRolloutCache.get());
     mGradWrtRolloutCache = std::make_shared<TrajectoryRolloutReal>(this);
     mRolloutCacheDirty = false;
   }
-  return *mRolloutCache.get();
+  return mRolloutCache.get();
 }
 
 //==============================================================================
-TrajectoryRollout& AbstractShot::getGradientWrtRolloutCache(
+TrajectoryRollout* AbstractShot::getGradientWrtRolloutCache(
     std::shared_ptr<simulation::World> world, bool useKnots)
 {
   if (mRolloutCacheDirty)
@@ -310,11 +310,11 @@ TrajectoryRollout& AbstractShot::getGradientWrtRolloutCache(
     mRolloutCache = std::make_shared<TrajectoryRolloutReal>(this);
     getStates(
         world,
-        /* OUT */ *mRolloutCache.get());
+        /* OUT */ mRolloutCache.get());
     mGradWrtRolloutCache = std::make_shared<TrajectoryRolloutReal>(this);
     mRolloutCacheDirty = false;
   }
-  return *mGradWrtRolloutCache.get();
+  return mGradWrtRolloutCache.get();
 }
 
 //==============================================================================

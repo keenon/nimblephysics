@@ -30,22 +30,49 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <dart/dart.hpp>
+#include <dart/trajectory/TrajectoryConstants.hpp>
+#include <dart/trajectory/TrajectoryRollout.hpp>
+#include <pybind11/eigen.h>
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 
 namespace py = pybind11;
 
 namespace dart {
 namespace python {
+/*
+  virtual const std::string& getRepresentationMapping() const = 0;
+  virtual const std::vector<std::string>& getMappings() const = 0;
 
-void dart_gui_osg(py::module& m);
-void dart_gui_glut(py::module& m);
+  virtual Eigen::Ref<Eigen::MatrixXd> getPoses(const std::string& mapping) = 0;
+  virtual Eigen::Ref<Eigen::MatrixXd> getVels(const std::string& mapping) = 0;
+  virtual Eigen::Ref<Eigen::MatrixXd> getForces(const std::string& mapping) = 0;
+  */
 
-void dart_gui(py::module& m)
+void TrajectoryRollout(py::module& m)
 {
-  auto sm = m.def_submodule("gui");
-
-  dart_gui_osg(sm);
-  dart_gui_glut(sm);
+  ::py::class_<dart::trajectory::TrajectoryRollout>(m, "TrajectoryRollout")
+      .def(
+          "getRepresentationMapping",
+          &dart::trajectory::TrajectoryRollout::getRepresentationMapping)
+      .def("getMappings", &dart::trajectory::TrajectoryRollout::getMappings)
+      .def(
+          "getPoses",
+          &dart::trajectory::TrajectoryRollout::getPoses,
+          ::py::arg("mapping"))
+      .def(
+          "getVels",
+          &dart::trajectory::TrajectoryRollout::getVels,
+          ::py::arg("mapping"))
+      .def(
+          "getForces",
+          &dart::trajectory::TrajectoryRollout::getForces,
+          ::py::arg("mapping"))
+      .def(
+          "copy",
+          &dart::trajectory::TrajectoryRollout::copy,
+          ::py::return_value_policy::automatic);
 }
 
 } // namespace python

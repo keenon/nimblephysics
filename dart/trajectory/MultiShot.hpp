@@ -118,13 +118,13 @@ public:
   /// incoming gradients with respect to any of the shot's values.
   void backpropGradientWrt(
       std::shared_ptr<simulation::World> world,
-      const TrajectoryRollout& gradWrtRollout,
+      const TrajectoryRollout* gradWrtRollout,
       /* OUT */ Eigen::Ref<Eigen::VectorXd> grad) override;
 
   /// This populates the passed in matrices with the values from this trajectory
   void getStates(
       std::shared_ptr<simulation::World> world,
-      /* OUT */ TrajectoryRollout& rollout,
+      /* OUT */ TrajectoryRollout* rollout,
       bool useKnots) override;
 
   /// This returns the concatenation of (start pos, start vel) for convenience

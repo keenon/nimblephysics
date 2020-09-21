@@ -2,23 +2,23 @@
 #define DART_TRAJECTORY_LOSS_FUNCTION_HPP_
 
 #include <memory>
-#include <optional>
 
 #include <Eigen/Dense>
 
 #include "dart/trajectory/TrajectoryConstants.hpp"
 #include "dart/trajectory/TrajectoryRollout.hpp"
+#include "dart/utils/tl_optional.hpp"
 
 namespace dart {
 
 namespace trajectory {
 
-typedef std::function<double(const TrajectoryRollout& rollout)>
+typedef std::function<double(const TrajectoryRollout* rollout)>
     TrajectoryLossFn;
 
 typedef std::function<double(
-    const TrajectoryRollout& rollout,
-    /* OUT */ TrajectoryRollout& gradWrtRollout)>
+    const TrajectoryRollout* rollout,
+    /* OUT */ TrajectoryRollout* gradWrtRollout)>
     TrajectoryLossFnAndGrad;
 
 class LossFn
@@ -32,11 +32,11 @@ public:
 
   virtual ~LossFn();
 
-  virtual double getLoss(const TrajectoryRollout& rollout);
+  virtual double getLoss(const TrajectoryRollout* rollout);
 
   virtual double getLossAndGradient(
-      const TrajectoryRollout& rollout,
-      /* OUT */ TrajectoryRollout& gradWrtRollout);
+      const TrajectoryRollout* rollout,
+      /* OUT */ TrajectoryRollout* gradWrtRollout);
 
   /// If this LossFn is being used as a constraint, this gets the lower bound
   /// it's allowed to reach
@@ -55,8 +55,8 @@ public:
   void setUpperBound(double upperBound);
 
 protected:
-  std::optional<TrajectoryLossFn> mLoss;
-  std::optional<TrajectoryLossFnAndGrad> mLossAndGrad;
+  tl::optional<TrajectoryLossFn> mLoss;
+  tl::optional<TrajectoryLossFnAndGrad> mLossAndGrad;
   // If this loss function is being used as a constraint, this is the lower
   // bound it's allowed to reach
   double mLowerBound;

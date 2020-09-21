@@ -30,6 +30,23 @@ public:
   IPOptOptimizer();
 
   bool optimize(AbstractShot* shot);
+
+  void setIterationLimit(int iterationLimit);
+
+  void setTolerance(double tolerance);
+
+  void setLBFGSHistoryLength(int historyLen);
+
+  void setCheckDerivatives(bool checkDerivatives);
+
+  void setPrintFrequency(int frequency);
+
+protected:
+  int mIterationLimit;
+  double mTolerance;
+  int mLBFGSHistoryLength;
+  bool mCheckDerivatives;
+  int mPrintFrequency;
 };
 
 /*

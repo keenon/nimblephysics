@@ -40,7 +40,11 @@ namespace dart {
 namespace python {
 
 void NeuralUtils(py::module& sm);
+void Mapping(py::module& sm);
+void IKMapping(py::module& sm);
+void IdentityMapping(py::module& sm);
 void BackpropSnapshot(py::module& sm);
+void MappedBackpropSnapshot(py::module& sm);
 
 void dart_neural(py::module& m)
 {
@@ -48,11 +52,14 @@ void dart_neural(py::module& m)
 
   sm.doc()
       = "This provides gradients to DART, with an eye on embedding DART as a "
-        "non-linearity in neural networks. We provide an optimized backprop "
-        "implementation.";
+        "non-linearity in neural networks.";
 
   NeuralUtils(sm);
+  Mapping(sm);
+  IKMapping(sm);
+  IdentityMapping(sm);
   BackpropSnapshot(sm);
+  MappedBackpropSnapshot(sm);
 }
 
 } // namespace python

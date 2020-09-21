@@ -42,6 +42,7 @@
 #include "dart/dynamics/BodyNode.hpp"
 #include "dart/dynamics/RevoluteJoint.hpp"
 #include "dart/dynamics/Skeleton.hpp"
+#include "dart/gui/glut/TrajectoryReplayWindow.hpp"
 #include "dart/math/Geometry.hpp"
 #include "dart/neural/BackpropSnapshot.hpp"
 #include "dart/neural/ConstrainedGroupGradientMatrices.hpp"
@@ -591,20 +592,20 @@ bool verifyChangeRepresentationToIK(
 
   // Get the initial state
   TrajectoryRolloutReal initialIdentityRollout = TrajectoryRolloutReal(&shot);
-  shot.getStates(world, initialIdentityRollout, true);
+  shot.getStates(world, &initialIdentityRollout, true);
 
   shot.addMapping("custom", newRepresentation);
   // Switch to a mapped state, and get the problem state
   shot.switchRepresentationMapping(world, "custom");
 
   TrajectoryRolloutReal mappedRollout = TrajectoryRolloutReal(&shot);
-  shot.getStates(world, mappedRollout, true);
+  shot.getStates(world, &mappedRollout, true);
 
   // Go back to identity maps
   shot.switchRepresentationMapping(world, "identity");
 
   TrajectoryRolloutReal recoveredIdentityRollout = TrajectoryRolloutReal(&shot);
-  shot.getStates(world, recoveredIdentityRollout, true);
+  shot.getStates(world, &recoveredIdentityRollout, true);
 
   double threshold = 1e-8;
 
@@ -764,6 +765,7 @@ bool verifyMultiShotOptimization(
 
   IPOptOptimizer optimizer;
 
+  optimizer.setIterationLimit(10);
   optimizer.optimize(&shot);
 
   // Playback the trajectory
@@ -772,21 +774,15 @@ bool verifyMultiShotOptimization(
   TrajectoryRolloutReal withoutKnots = TrajectoryRolloutReal(&shot);
 
   // Get the version with knots
-  shot.getStates(world, withKnots, true);
+  shot.getStates(world, &withKnots, true);
   // Get the version without knots next, so that they can play in a loop
-  shot.getStates(world, withoutKnots, false);
+  shot.getStates(world, &withoutKnots, false);
 
   // Create a window for rendering the world and handling user input
-  AbstractShotWindow window(
-      world, withKnots.getPoses("identity"), withoutKnots.getPoses("identity"));
-
-  // Initialize glut, initialize the window, and begin the glut event loop
-  int argc = 0;
-  glutInit(&argc, nullptr);
-  window.initWindow(640, 480, "Test");
-  glutMainLoop();
+  dart::gui::glut::displayTrajectoryInGUI(world, &shot);
 }
 
+/*
 TEST(TRAJECTORY, UNCONSTRAINED_BOX)
 {
   // World
@@ -949,6 +945,7 @@ TEST(TRAJECTORY, PRISMATIC)
   EXPECT_TRUE(verifyShotJacobian(world, 40, ikMap));
   EXPECT_TRUE(verifyMultiShotJacobian(world, 8, 2, ikMap));
 }
+*/
 
 TEST(TRAJECTORY, CARTPOLE)
 {
@@ -961,10 +958,18 @@ TEST(TRAJECTORY, CARTPOLE)
   std::pair<PrismaticJoint*, BodyNode*> sledPair
       = cartpole->createJointAndBodyNodePair<PrismaticJoint>(nullptr);
   sledPair.first->setAxis(Eigen::Vector3d(1, 0, 0));
+  std::shared_ptr<BoxShape> sledShapeBox(
+      new BoxShape(Eigen::Vector3d(0.05, 0.25, 0.05)));
+  ShapeNode* sledShape
+      = sledPair.second->createShapeNodeWith<VisualAspect>(sledShapeBox);
 
   std::pair<RevoluteJoint*, BodyNode*> armPair
       = cartpole->createJointAndBodyNodePair<RevoluteJoint>(sledPair.second);
   armPair.first->setAxis(Eigen::Vector3d(0, 0, 1));
+  std::shared_ptr<BoxShape> armShapeBox(
+      new BoxShape(Eigen::Vector3d(0.05, 0.25, 0.05)));
+  ShapeNode* armShape
+      = armPair.second->createShapeNodeWith<VisualAspect>(armShapeBox);
 
   Eigen::Isometry3d armOffset = Eigen::Isometry3d::Identity();
   armOffset.translation() = Eigen::Vector3d(0, -0.5, 0);
@@ -991,34 +996,34 @@ TEST(TRAJECTORY, CARTPOLE)
   cartpole->computeForwardDynamics();
   cartpole->integrateVelocities(world->getTimeStep());
 
-  TrajectoryLossFn loss = [](const TrajectoryRollout& rollout) {
-    int steps = rollout.getPosesConst("identity").cols();
-    Eigen::VectorXd lastPos = rollout.getPosesConst("identity").col(steps - 1);
-    return rollout.getVelsConst("identity").col(steps - 1).squaredNorm()
+  TrajectoryLossFn loss = [](const TrajectoryRollout* rollout) {
+    int steps = rollout->getPosesConst("identity").cols();
+    Eigen::VectorXd lastPos = rollout->getPosesConst("identity").col(steps - 1);
+    return rollout->getVelsConst("identity").col(steps - 1).squaredNorm()
            + lastPos.squaredNorm()
-           + rollout.getForcesConst("identity").squaredNorm();
+           + rollout->getForcesConst("identity").squaredNorm();
   };
 
-  TrajectoryLossFnAndGrad lossGrad = [](const TrajectoryRollout& rollout,
-                                        TrajectoryRollout& gradWrtRollout // OUT
+  TrajectoryLossFnAndGrad lossGrad = [](const TrajectoryRollout* rollout,
+                                        TrajectoryRollout* gradWrtRollout // OUT
                                      ) {
-    gradWrtRollout.getPoses("identity").setZero();
-    gradWrtRollout.getVels("identity").setZero();
-    gradWrtRollout.getForces("identity").setZero();
-    int steps = rollout.getPosesConst("identity").cols();
-    gradWrtRollout.getPoses("identity").col(steps - 1)
-        = 2 * rollout.getPosesConst("identity").col(steps - 1);
-    gradWrtRollout.getVels("identity").col(steps - 1)
-        = 2 * rollout.getVelsConst("identity").col(steps - 1);
+    gradWrtRollout->getPoses("identity").setZero();
+    gradWrtRollout->getVels("identity").setZero();
+    gradWrtRollout->getForces("identity").setZero();
+    int steps = rollout->getPosesConst("identity").cols();
+    gradWrtRollout->getPoses("identity").col(steps - 1)
+        = 2 * rollout->getPosesConst("identity").col(steps - 1);
+    gradWrtRollout->getVels("identity").col(steps - 1)
+        = 2 * rollout->getVelsConst("identity").col(steps - 1);
     for (int i = 0; i < steps; i++)
     {
-      gradWrtRollout.getForces("identity").col(i)
-          = 2 * rollout.getForcesConst("identity").col(i);
+      gradWrtRollout->getForces("identity").col(i)
+          = 2 * rollout->getForcesConst("identity").col(i);
     }
-    Eigen::VectorXd lastPos = rollout.getPosesConst("identity").col(steps - 1);
-    return rollout.getVelsConst("identity").col(steps - 1).squaredNorm()
+    Eigen::VectorXd lastPos = rollout->getPosesConst("identity").col(steps - 1);
+    return rollout->getVelsConst("identity").col(steps - 1).squaredNorm()
            + lastPos.squaredNorm()
-           + rollout.getForcesConst("identity").squaredNorm();
+           + rollout->getForcesConst("identity").squaredNorm();
   };
 
   EXPECT_TRUE(verifySingleStep(world, 1e-7));
@@ -1029,7 +1034,7 @@ TEST(TRAJECTORY, CARTPOLE)
   EXPECT_TRUE(verifyMultiShotGradient(world, 8, 4, loss, lossGrad));
   EXPECT_TRUE(verifyMultiShotJacobianCustomConstraint(
       world, 8, 4, loss, lossGrad, 3.0));
-  // EXPECT_TRUE(verifyMultiShotOptimization(world, 50, 10, loss));
+  EXPECT_TRUE(verifyMultiShotOptimization(world, 50, 10, loss));
 
   // Verify using the IK mapping as the representation
   std::shared_ptr<IKMapping> ikMap = std::make_shared<IKMapping>(world);
@@ -1146,13 +1151,13 @@ TEST(TRAJECTORY, JUMP_WORM)
   rootJoint->setVelocity(1, -0.1);
   Eigen::VectorXd vels = world->getVelocities();
 
-  TrajectoryLossFn loss = [](const TrajectoryRollout& rollout) {
+  TrajectoryLossFn loss = [](const TrajectoryRollout* rollout) {
     const Eigen::Ref<const Eigen::MatrixXd> poses
-        = rollout.getPosesConst("identity");
+        = rollout->getPosesConst("identity");
     const Eigen::Ref<const Eigen::MatrixXd> vels
-        = rollout.getVelsConst("identity");
+        = rollout->getVelsConst("identity");
     const Eigen::Ref<const Eigen::MatrixXd> forces
-        = rollout.getForcesConst("identity");
+        = rollout->getForcesConst("identity");
 
     double maxPos = -1000;
     double minPos = 1000;
@@ -1193,19 +1198,19 @@ TEST(TRAJECTORY, JUMP_WORM)
   };
 
   TrajectoryLossFnAndGrad lossGrad
-      = [](const TrajectoryRollout& rollout,
-           /* OUT */ TrajectoryRollout& gradWrtRollout) {
-          gradWrtRollout.getPoses("identity").setZero();
-          gradWrtRollout.getVels("identity").setZero();
-          gradWrtRollout.getForces("identity").setZero();
+      = [](const TrajectoryRollout* rollout,
+           /* OUT */ TrajectoryRollout* gradWrtRollout) {
+          gradWrtRollout->getPoses("identity").setZero();
+          gradWrtRollout->getVels("identity").setZero();
+          gradWrtRollout->getForces("identity").setZero();
           const Eigen::Ref<const Eigen::MatrixXd> poses
-              = rollout.getPosesConst("identity");
+              = rollout->getPosesConst("identity");
           const Eigen::Ref<const Eigen::MatrixXd> vels
-              = rollout.getVelsConst("identity");
+              = rollout->getVelsConst("identity");
           const Eigen::Ref<const Eigen::MatrixXd> forces
-              = rollout.getForcesConst("identity");
+              = rollout->getForcesConst("identity");
 
-          gradWrtRollout.getPoses("identity")(1, poses.cols() - 1)
+          gradWrtRollout->getPoses("identity")(1, poses.cols() - 1)
               = 2 * poses(1, poses.cols() - 1);
           double endPos = poses(1, poses.cols() - 1);
           double endPosLoss = -(endPos * endPos) * (endPos > 0 ? 1.0 : -1.0);

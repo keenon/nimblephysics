@@ -16,6 +16,11 @@ namespace trajectory {
 
 //==============================================================================
 IPOptOptimizer::IPOptOptimizer()
+  : mTolerance(1e-7),
+    mLBFGSHistoryLength(1),
+    mPrintFrequency(1),
+    mIterationLimit(100),
+    mCheckDerivatives(false)
 {
 }
 
@@ -31,7 +36,7 @@ bool IPOptOptimizer::optimize(AbstractShot* shot)
   // Change some options
   // Note: The following choices are only examples, they might not be
   //       suitable for your optimization problem.
-  app->Options()->SetNumericValue("tol", 1e-7);
+  app->Options()->SetNumericValue("tol", mTolerance);
   app->Options()->SetStringValue(
       "linear_solver",
       "mumps"); // ma27, ma55, ma77, ma86, ma97, parsido, wsmp, mumps, custom
@@ -42,22 +47,23 @@ bool IPOptOptimizer::optimize(AbstractShot* shot)
   app->Options()->SetStringValue(
       "scaling_method", "none"); // none, gradient-based
 
-  app->Options()->SetIntegerValue("max_iter", 10000);
+  app->Options()->SetIntegerValue("max_iter", mIterationLimit);
 
   // Disable LBFGS history
-  app->Options()->SetIntegerValue("limited_memory_max_history", 1);
+  app->Options()->SetIntegerValue(
+      "limited_memory_max_history", mLBFGSHistoryLength);
 
   // Just for debugging
-  /*
-  app->Options()->SetStringValue("check_derivatives_for_naninf", "yes");
-  app->Options()->SetStringValue("derivative_test", "first-order");
-  app->Options()->SetNumericValue("derivative_test_perturbation", 1e-6);
-  */
-
-  int freq = 1;
-  if (freq > 0)
+  if (mCheckDerivatives)
   {
-    app->Options()->SetNumericValue("print_frequency_iter", freq);
+    app->Options()->SetStringValue("check_derivatives_for_naninf", "yes");
+    app->Options()->SetStringValue("derivative_test", "first-order");
+    app->Options()->SetNumericValue("derivative_test_perturbation", 1e-6);
+  }
+
+  if (mPrintFrequency > 0)
+  {
+    app->Options()->SetNumericValue("print_frequency_iter", mPrintFrequency);
   }
   else
   {
@@ -104,6 +110,36 @@ bool IPOptOptimizer::optimize(AbstractShot* shot)
     return true;
   else
     return false;
+}
+
+//==============================================================================
+void IPOptOptimizer::setIterationLimit(int iterationLimit)
+{
+  mIterationLimit = iterationLimit;
+}
+
+//==============================================================================
+void IPOptOptimizer::setTolerance(double tolerance)
+{
+  mTolerance = tolerance;
+}
+
+//==============================================================================
+void IPOptOptimizer::setLBFGSHistoryLength(int historyLen)
+{
+  mLBFGSHistoryLength = historyLen;
+}
+
+//==============================================================================
+void IPOptOptimizer::setCheckDerivatives(bool checkDerivatives)
+{
+  mCheckDerivatives = checkDerivatives;
+}
+
+//==============================================================================
+void IPOptOptimizer::setPrintFrequency(int frequency)
+{
+  mPrintFrequency = frequency;
 }
 
 //==============================================================================

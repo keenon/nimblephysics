@@ -1,5 +1,7 @@
 #include "dart/trajectory/LossFn.hpp"
 
+#include "dart/utils/tl_optional.hpp"
+
 using namespace dart;
 
 namespace dart {
@@ -7,8 +9,8 @@ namespace trajectory {
 
 //==============================================================================
 LossFn::LossFn()
-  : mLoss(std::nullopt),
-    mLossAndGrad(std::nullopt),
+  : mLoss(tl::nullopt),
+    mLossAndGrad(tl::nullopt),
     mLowerBound(-std::numeric_limits<double>::infinity()),
     mUpperBound(std::numeric_limits<double>::infinity())
 {
@@ -17,7 +19,7 @@ LossFn::LossFn()
 //==============================================================================
 LossFn::LossFn(TrajectoryLossFn loss)
   : mLoss(loss),
-    mLossAndGrad(std::nullopt),
+    mLossAndGrad(tl::nullopt),
     mLowerBound(-std::numeric_limits<double>::infinity()),
     mUpperBound(std::numeric_limits<double>::infinity())
 {
@@ -38,7 +40,7 @@ LossFn::~LossFn()
 }
 
 //==============================================================================
-double LossFn::getLoss(const TrajectoryRollout& rollout)
+double LossFn::getLoss(const TrajectoryRollout* rollout)
 {
   if (mLoss)
   {
@@ -50,8 +52,8 @@ double LossFn::getLoss(const TrajectoryRollout& rollout)
 
 //==============================================================================
 double LossFn::getLossAndGradient(
-    const TrajectoryRollout& rollout,
-    /* OUT */ TrajectoryRollout& gradWrtRollout)
+    const TrajectoryRollout* rollout,
+    /* OUT */ TrajectoryRollout* gradWrtRollout)
 {
   if (mLossAndGrad)
   {
@@ -59,8 +61,8 @@ double LossFn::getLossAndGradient(
   }
   else if (mLoss)
   {
-    TrajectoryRolloutReal rolloutCopy = TrajectoryRolloutReal(&rollout);
-    double originalLoss = mLoss.value()(rolloutCopy);
+    TrajectoryRolloutReal rolloutCopy = TrajectoryRolloutReal(rollout);
+    double originalLoss = mLoss.value()(&rolloutCopy);
 
     const double EPS = 1e-7;
 
@@ -71,9 +73,9 @@ double LossFn::getLossAndGradient(
         for (int col = 0; col < rolloutCopy.getPoses(key).cols(); col++)
         {
           rolloutCopy.getPoses(key)(row, col) += EPS;
-          double lossPos = mLoss.value()(rolloutCopy);
+          double lossPos = mLoss.value()(&rolloutCopy);
           rolloutCopy.getPoses(key)(row, col) -= EPS;
-          gradWrtRollout.getPoses(key)(row, col)
+          gradWrtRollout->getPoses(key)(row, col)
               = (lossPos - originalLoss) / EPS;
         }
       }
@@ -82,9 +84,9 @@ double LossFn::getLossAndGradient(
         for (int col = 0; col < rolloutCopy.getVels(key).cols(); col++)
         {
           rolloutCopy.getVels(key)(row, col) += EPS;
-          double lossVel = mLoss.value()(rolloutCopy);
+          double lossVel = mLoss.value()(&rolloutCopy);
           rolloutCopy.getVels(key)(row, col) -= EPS;
-          gradWrtRollout.getVels(key)(row, col)
+          gradWrtRollout->getVels(key)(row, col)
               = (lossVel - originalLoss) / EPS;
         }
       }
@@ -93,9 +95,9 @@ double LossFn::getLossAndGradient(
         for (int col = 0; col < rolloutCopy.getForces(key).cols(); col++)
         {
           rolloutCopy.getForces(key)(row, col) += EPS;
-          double lossForce = mLoss.value()(rolloutCopy);
+          double lossForce = mLoss.value()(&rolloutCopy);
           rolloutCopy.getForces(key)(row, col) -= EPS;
-          gradWrtRollout.getForces(key)(row, col)
+          gradWrtRollout->getForces(key)(row, col)
               = (lossForce - originalLoss) / EPS;
         }
       }
@@ -105,11 +107,11 @@ double LossFn::getLossAndGradient(
   }
 
   // Default to 0
-  for (std::string key : gradWrtRollout.getMappings())
+  for (std::string key : gradWrtRollout->getMappings())
   {
-    gradWrtRollout.getPoses(key).setZero();
-    gradWrtRollout.getVels(key).setZero();
-    gradWrtRollout.getForces(key).setZero();
+    gradWrtRollout->getPoses(key).setZero();
+    gradWrtRollout->getVels(key).setZero();
+    gradWrtRollout->getForces(key).setZero();
   }
   return 0.0;
 }

@@ -30,23 +30,43 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <pybind11/pybind11.h>
+#ifndef DART_GUI_GLUT_TRAJECTORYWINDOW_HPP_
+#define DART_GUI_GLUT_TRAJECTORYWINDOW_HPP_
 
-namespace py = pybind11;
+#include <vector>
+
+#include <Eigen/Dense>
+
+#include "dart/gui/glut/SimWindow.hpp"
+#include "dart/simulation/World.hpp"
+#include "dart/trajectory/AbstractShot.hpp"
+#include "dart/trajectory/TrajectoryRollout.hpp"
 
 namespace dart {
-namespace python {
+namespace gui {
+namespace glut {
 
-void dart_gui_osg(py::module& m);
-void dart_gui_glut(py::module& m);
-
-void dart_gui(py::module& m)
+class TrajectoryReplayWindow : public SimWindow
 {
-  auto sm = m.def_submodule("gui");
+public:
+  /// Constructor
+  TrajectoryReplayWindow(
+      std::shared_ptr<simulation::World> world, trajectory::AbstractShot* shot);
 
-  dart_gui_osg(sm);
-  dart_gui_glut(sm);
-}
+  void timeStepping() override;
 
-} // namespace python
+private:
+  int mCounter;
+  trajectory::AbstractShot* mShot;
+  trajectory::TrajectoryRollout* mRollout;
+  bool mUseKnots;
+};
+
+void displayTrajectoryInGUI(
+    std::shared_ptr<simulation::World> world, trajectory::AbstractShot* shot);
+
+} // namespace glut
+} // namespace gui
 } // namespace dart
+
+#endif // DART_GUI_GLUT_SIMWINDOW_HPP_

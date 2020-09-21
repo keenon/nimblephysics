@@ -48,7 +48,7 @@ public:
   const TrajectoryRolloutConstRef sliceConst(int start, int len) const;
 
   /// This returns a copy of the trajectory rollout
-  TrajectoryRolloutReal copy() const;
+  TrajectoryRollout* copy() const;
 };
 
 class TrajectoryRolloutReal : public TrajectoryRollout

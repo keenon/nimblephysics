@@ -29,9 +29,9 @@ const TrajectoryRolloutConstRef TrajectoryRollout::sliceConst(
 
 //==============================================================================
 /// This returns a copy of the trajectory rollout
-TrajectoryRolloutReal TrajectoryRollout::copy() const
+TrajectoryRollout* TrajectoryRollout::copy() const
 {
-  return TrajectoryRolloutReal(this);
+  return new TrajectoryRolloutReal(this);
 }
 
 //==============================================================================

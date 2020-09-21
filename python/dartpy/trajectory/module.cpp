@@ -30,6 +30,8 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <Eigen/Dense>
+#include <pybind11/eigen.h>
 #include <pybind11/pybind11.h>
 
 namespace py = pybind11;
@@ -37,15 +39,27 @@ namespace py = pybind11;
 namespace dart {
 namespace python {
 
-void dart_gui_osg(py::module& m);
-void dart_gui_glut(py::module& m);
+void IPOptOptimizer(py::module& sm);
+void LossFn(py::module& sm);
+void AbstractShot(py::module& sm);
+void MultiShot(py::module& sm);
+void SingleShot(py::module& sm);
+void TrajectoryRollout(py::module& sm);
 
-void dart_gui(py::module& m)
+void dart_trajectory(py::module& m)
 {
-  auto sm = m.def_submodule("gui");
+  auto sm = m.def_submodule("trajectory");
 
-  dart_gui_osg(sm);
-  dart_gui_glut(sm);
+  sm.doc()
+      = "This provides a native trajectory optimization framework to DART, "
+        "transcribing DART trajectory problems into IPOPT for solutions.";
+
+  IPOptOptimizer(sm);
+  LossFn(sm);
+  AbstractShot(sm);
+  MultiShot(sm);
+  SingleShot(sm);
+  TrajectoryRollout(sm);
 }
 
 } // namespace python

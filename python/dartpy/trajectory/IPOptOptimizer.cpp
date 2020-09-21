@@ -30,6 +30,9 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <dart/dart.hpp>
+#include <dart/trajectory/IPOptOptimizer.hpp>
+#include <pybind11/eigen.h>
 #include <pybind11/pybind11.h>
 
 namespace py = pybind11;
@@ -37,15 +40,36 @@ namespace py = pybind11;
 namespace dart {
 namespace python {
 
-void dart_gui_osg(py::module& m);
-void dart_gui_glut(py::module& m);
-
-void dart_gui(py::module& m)
+void IPOptOptimizer(py::module& m)
 {
-  auto sm = m.def_submodule("gui");
-
-  dart_gui_osg(sm);
-  dart_gui_glut(sm);
+  ::py::class_<
+      dart::trajectory::IPOptOptimizer,
+      std::shared_ptr<dart::trajectory::IPOptOptimizer>>(m, "IPOptOptimizer")
+      .def(::py::init<>())
+      .def(
+          "optimize",
+          &dart::trajectory::IPOptOptimizer::optimize,
+          ::py::arg("shot"))
+      .def(
+          "setIterationLimit",
+          &dart::trajectory::IPOptOptimizer::setIterationLimit,
+          ::py::arg("iterationLimit") = 500)
+      .def(
+          "setTolerance",
+          &dart::trajectory::IPOptOptimizer::setTolerance,
+          ::py::arg("tol") = 1e-7)
+      .def(
+          "setLBFGSHistoryLength",
+          &dart::trajectory::IPOptOptimizer::setLBFGSHistoryLength,
+          ::py::arg("historyLen") = 1)
+      .def(
+          "setCheckDerivatives",
+          &dart::trajectory::IPOptOptimizer::setCheckDerivatives,
+          ::py::arg("checkDerivatives") = true)
+      .def(
+          "setPrintFrequency",
+          &dart::trajectory::IPOptOptimizer::setPrintFrequency,
+          ::py::arg("printFrequency") = 1);
 }
 
 } // namespace python

@@ -1,5 +1,5 @@
-#ifndef DART_NEURAL_IDENTITY_MAPPING_HPP_
-#define DART_NEURAL_IDENTITY_MAPPING_HPP_
+#ifndef DART_NEURAL_IK_MAPPING_HPP_
+#define DART_NEURAL_IK_MAPPING_HPP_
 
 #include <memory>
 #include <optional>
