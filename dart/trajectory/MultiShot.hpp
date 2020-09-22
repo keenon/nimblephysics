@@ -34,6 +34,10 @@ public:
   /// Destructor
   virtual ~MultiShot() override;
 
+  /// If TRUE, this will use multiple independent threads to compute each
+  /// SingleShot's values internally. Currently defaults to FALSE
+  void setParallelOperationsEnabled(bool enabled);
+
   /// This sets the mapping we're using to store the representation of the Shot.
   /// WARNING: THIS IS A POTENTIALLY DESTRUCTIVE OPERATION! This will rewrite
   /// the internal representation of the Shot to use the new mapping, and if the
@@ -158,6 +162,7 @@ public:
 private:
   std::vector<std::shared_ptr<SingleShot>> mShots;
   int mShotLength;
+  bool mParallelOperationsEnabled;
 };
 
 } // namespace trajectory

@@ -49,13 +49,12 @@ def main():
     def loss(rollout: DartTorchTrajectoryRollout):
         posLoss = rollout.getPoses('identity')[:, -1].square().sum()
         velLoss = rollout.getVels('identity')[:, -1].square().sum()
-        forceLoss = rollout.getForces('identity')[0, :].square().sum()
         return posLoss + velLoss
     dartLoss: dart.trajectory.LossFn = DartTorchLossFn(loss)
 
     world.setPositions([1, 1])
 
-    trajectory = dart.trajectory.MultiShot(world, dartLoss, 500, 10, False)
+    trajectory = dart.trajectory.MultiShot(world, dartLoss, 500, 50, False)
 
     optimizer = dart.trajectory.IPOptOptimizer()
     optimizer.setLBFGSHistoryLength(5)

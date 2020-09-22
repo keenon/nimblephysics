@@ -48,6 +48,18 @@ MultiShot::~MultiShot()
 }
 
 //==============================================================================
+void MultiShot::setParallelOperationsEnabled(bool enabled)
+{
+  mParallelOperationsEnabled = enabled;
+  if (enabled)
+  {
+    // Before using Eigen in a multi-threaded environment, we need to explicitly
+    // call this (at least prior to Eigen 3.3)
+    Eigen::initParallel();
+  }
+}
+
+//==============================================================================
 /// This sets the mapping we're using to store the representation of the Shot.
 /// WARNING: THIS IS A POTENTIALLY DESTRUCTIVE OPERATION! This will rewrite
 /// the internal representation of the Shot to use the new mapping, and if the
@@ -400,7 +412,8 @@ void MultiShot::getStates(
     {
       for (int j = 0; j < mShots[i]->mSteps; j++)
       {
-        getRepresentation()->setForces(world, mShots[i]->mForces.col(j));
+        Eigen::VectorXd forces = mShots[i]->mForces.col(j);
+        getRepresentation()->setForces(world, forces);
         world->step();
         for (auto pair : mMappings)
         {
@@ -410,8 +423,8 @@ void MultiShot::getStates(
               = pair.second->getVelocities(world);
           rollout->getForces(pair.first).col(cursor)
               = pair.second->getForces(world);
-          cursor++;
         }
+        cursor++;
       }
     }
   }

@@ -757,15 +757,11 @@ private:
   Eigen::MatrixXd mPosesWithoutKnots;
 };
 
-bool verifyMultiShotOptimization(
-    WorldPtr world, int steps, int shotLength, TrajectoryLossFn loss)
+bool verifyMultiShotOptimization(WorldPtr world, MultiShot shot)
 {
-  LossFn lossFn(loss);
-  MultiShot shot(world, lossFn, steps, shotLength, false);
-
   IPOptOptimizer optimizer;
 
-  optimizer.setIterationLimit(10);
+  optimizer.setIterationLimit(1);
   optimizer.optimize(&shot);
 
   // Playback the trajectory
@@ -782,7 +778,6 @@ bool verifyMultiShotOptimization(
   dart::gui::glut::displayTrajectoryInGUI(world, &shot);
 }
 
-/*
 TEST(TRAJECTORY, UNCONSTRAINED_BOX)
 {
   // World
@@ -945,7 +940,6 @@ TEST(TRAJECTORY, PRISMATIC)
   EXPECT_TRUE(verifyShotJacobian(world, 40, ikMap));
   EXPECT_TRUE(verifyMultiShotJacobian(world, 8, 2, ikMap));
 }
-*/
 
 TEST(TRAJECTORY, CARTPOLE)
 {
@@ -1034,7 +1028,11 @@ TEST(TRAJECTORY, CARTPOLE)
   EXPECT_TRUE(verifyMultiShotGradient(world, 8, 4, loss, lossGrad));
   EXPECT_TRUE(verifyMultiShotJacobianCustomConstraint(
       world, 8, 4, loss, lossGrad, 3.0));
-  EXPECT_TRUE(verifyMultiShotOptimization(world, 50, 10, loss));
+  /*
+  LossFn lossFn(loss);
+  MultiShot shot(world, lossFn, 50, 10, false);
+  EXPECT_TRUE(verifyMultiShotOptimization(world, shot));
+  */
 
   // Verify using the IK mapping as the representation
   std::shared_ptr<IKMapping> ikMap = std::make_shared<IKMapping>(world);
@@ -1244,7 +1242,15 @@ TEST(TRAJECTORY, JUMP_WORM)
   */
   // renderWorld(world);
 
-  // EXPECT_TRUE(verifyMultiShotOptimization(world, 600, 20, loss));
+  /*
+  LossFn lossFn(loss);
+  MultiShot shot(world, lossFn, 100, 20, false);
+  std::shared_ptr<IKMapping> ikMap = std::make_shared<IKMapping>(world);
+  ikMap->addLinearBodyNode(root);
+  shot.addMapping("ik", ikMap);
+  EXPECT_TRUE(verifyMultiShotOptimization(world, shot));
+  */
+
   EXPECT_TRUE(verifySingleStep(world, 5e-7));
   // EXPECT_TRUE(verifySingleShot(world, 40, 5e-7, false));
   EXPECT_TRUE(verifyShotJacobian(world, 4, nullptr));
