@@ -52,9 +52,9 @@ void dart_gui(py::module& m);
 void dart_neural(py::module& m);
 void dart_trajectory(py::module& m);
 
-PYBIND11_MODULE(dartpy, m)
+PYBIND11_MODULE(_diffdart, m)
 {
-  m.doc() = "dartpy: Python API of Dynamic Animation and Robotics Toolkit";
+  m.doc() = "diffdart: Python API of DiffDART";
 
   eigen_geometry(m);
 

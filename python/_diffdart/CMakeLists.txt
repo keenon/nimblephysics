@@ -11,7 +11,7 @@ execute_process(COMMAND ${PYTHON_EXECUTABLE} -c
 )
 if(NOT PythonInterp_FOUND)
   message(STATUS "DART_BUILD_DARTPY is ON, but failed to find PythonInterp. "
-    "Disabling dartpy."
+    "Disabling _diffdart."
   )
   return()
 endif()
@@ -19,7 +19,7 @@ endif()
 find_package(PythonLibs ${DARTPY_PYTHON_VERSION} QUIET)
 if(NOT PythonLibs_FOUND)
   message(STATUS "DART_BUILD_DARTPY is ON, but failed to find PythonLibs. "
-    "Disabling dartpy."
+    "Disabling _diffdart."
   )
   return()
 endif()
@@ -30,25 +30,25 @@ set(PYBIND11_PYTHON_VERSION ${DARTPY_PYTHON_VERSION})
 find_package(pybind11 2.2.0 QUIET)
 if(NOT pybind11_FOUND)
   message(STATUS "DART_BUILD_DARTPY is ON, but failed to find pybind11 >= "
-    "2.2.0. Disabling dartpy."
+    "2.2.0. Disabling _diffdart."
   )
   return()
 endif()
 
-file(GLOB_RECURSE dartpy_headers "*.h" "*.hpp")
-file(GLOB_RECURSE dartpy_sources "*.cpp")
+file(GLOB_RECURSE _diffdart_headers "*.h" "*.hpp")
+file(GLOB_RECURSE _diffdart_sources "*.cpp")
 
 # Build a Python extension module:
 # pybind11_add_module(<name> [MODULE | SHARED] [EXCLUDE_FROM_ALL]
 #                     [NO_EXTRAS] [SYSTEM] [THIN_LTO] source1 [source2 ...])
 #
-pybind11_add_module(dartpy
+pybind11_add_module(_diffdart
   MODULE
-  ${dartpy_headers}
-  ${dartpy_sources}
+  ${_diffdart_headers}
+  ${_diffdart_sources}
 )
 
-target_include_directories(dartpy
+target_include_directories(_diffdart
   SYSTEM PUBLIC
     ${PYTHON_INCLUDE_DIRS}
     ${pybind11_INCLUDE_DIRS}
@@ -56,7 +56,7 @@ target_include_directories(dartpy
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
-target_link_libraries(dartpy
+target_link_libraries(_diffdart
   PUBLIC
     dart
     dart-utils
@@ -66,31 +66,31 @@ target_link_libraries(dartpy
     ${PYTHON_LIBRARIES}
 )
 if(TARGET dart-optimizer-nlopt)
-  target_link_libraries(dartpy PUBLIC dart-optimizer-nlopt)
+  target_link_libraries(_diffdart PUBLIC dart-optimizer-nlopt)
 endif()
 if(TARGET dart-collision-bullet)
-  target_link_libraries(dartpy PUBLIC dart-collision-bullet)
+  target_link_libraries(_diffdart PUBLIC dart-collision-bullet)
 endif()
 if(TARGET dart-collision-ode)
-  target_link_libraries(dartpy PUBLIC dart-collision-ode)
+  target_link_libraries(_diffdart PUBLIC dart-collision-ode)
 endif()
 
-set_target_properties(dartpy
+set_target_properties(_diffdart
   PROPERTIES
     PREFIX ""
     SUFFIX ".so"  # python uses '.so' extension even on macOS
     DEBUG_POSTFIX ""
 )
 
-install(TARGETS dartpy
+install(TARGETS _diffdart
   LIBRARY DESTINATION "${PYTHON_SITE_PACKAGES}"
 )
 
-list(REMOVE_ITEM dartpy_headers
+list(REMOVE_ITEM _diffdart_headers
   ${CMAKE_CURRENT_LIST_DIR}/eigen_geometry_pybind.h
   ${CMAKE_CURRENT_LIST_DIR}/eigen_pybind.h
 )
-list(REMOVE_ITEM dartpy_sources
+list(REMOVE_ITEM _diffdart_sources
   ${CMAKE_CURRENT_LIST_DIR}/eigen_geometry_pybind.cpp
 )
-dart_format_add(${dartpy_headers} ${dartpy_sources})
+dart_format_add(${_diffdart_headers} ${_diffdart_sources})

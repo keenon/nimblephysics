@@ -1,0 +1,7 @@
+README.md
+setup.py
+python/diffdart/diffdart.egg-info/PKG-INFO
+python/diffdart/diffdart.egg-info/SOURCES.txt
+python/diffdart/diffdart.egg-info/dependency_links.txt
+python/diffdart/diffdart.egg-info/not-zip-safe
+python/diffdart/diffdart.egg-info/top_level.txt

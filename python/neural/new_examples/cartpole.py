@@ -1,12 +1,11 @@
 import numpy as np
-import dartpy as dart
 import torch
 import torch.nn.functional as F
 import random
 import math
 import time
-from context import dart_torch
-from dart_torch import DartTorchLossFn, DartTorchTrajectoryRollout
+import diffdart as dart
+from diffdart import DartTorchLossFn, DartTorchTrajectoryRollout
 
 
 def main():
