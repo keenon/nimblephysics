@@ -48,6 +48,9 @@ pybind11_add_module(_diffdart
   ${_diffdart_sources}
 )
 
+# Add C++14 support
+set_property(TARGET _diffdart PROPERTY CXX_STANDARD 14)
+
 target_include_directories(_diffdart
   SYSTEM PUBLIC
     ${PYTHON_INCLUDE_DIRS}

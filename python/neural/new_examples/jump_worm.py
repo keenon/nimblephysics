@@ -101,8 +101,8 @@ def main():
     trajectory.addMapping('ik', ikMap)
 
     optimizer = dart.trajectory.IPOptOptimizer()
-    optimizer.setLBFGSHistoryLength(2)
-    optimizer.setTolerance(1e-6)
+    optimizer.setLBFGSHistoryLength(6)
+    optimizer.setTolerance(1e-5)
     optimizer.setCheckDerivatives(False)
     optimizer.setIterationLimit(500)
     optimizer.optimize(trajectory)

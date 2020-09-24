@@ -5,11 +5,9 @@
 #include <coin/IpIpoptApplication.hpp>
 #include <coin/IpReturnCodes.hpp>
 #include <coin/IpSolveStatistics.hpp>
-#include <dart/gui/gui.hpp>
 
 #include "dart/neural/IdentityMapping.hpp"
 #include "dart/neural/Mapping.hpp"
-#include "dart/optimizer/ipopt/ipopt.hpp"
 #include "dart/simulation/World.hpp"
 
 namespace dart {
