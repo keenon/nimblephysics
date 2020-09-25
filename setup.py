@@ -7,6 +7,7 @@ import subprocess
 from setuptools import setup, Extension
 from setuptools.command.build_ext import build_ext
 from distutils.version import LooseVersion
+from pathlib import Path
 
 
 class CMakeExtension(Extension):
@@ -61,9 +62,12 @@ class CMakeBuild(build_ext):
         if not os.path.exists(self.build_temp):
             os.makedirs(self.build_temp)
         subprocess.check_call(['cmake', ext.sourcedir] + cmake_args, cwd=self.build_temp, env=env)
-        # TODO: hardcoding "../.." is brittle, should get relative path from ext.sourcedir to cwd
-        subprocess.check_call(['cmake', '--build', '../..'] + build_args,
+        # TODO: we need "../.." on manylinux builds, "." everywhere else
+        subprocess.check_call(['cmake', '--build', '.'] + build_args,
                               cwd=self.build_temp, env=env)
+        # Create the __init__.py in the library folder, so that delocate-wheel works properly
+        Path(extdir+"/__init__.py").touch()
+
 
 
 setup(
@@ -73,8 +77,8 @@ setup(
     author_email='keenonwerling@gmail.com',
     description='A differentiable fully featured physics engine',
     long_description='',
-    package_dir={'': 'python'},
-    packages=['diffdart'],
+    package_dir={'': 'python/diffdart'},
+    packages=[''],
     ext_package='diffdart_libs',
     ext_modules=[CMakeExtension('cmake_example', target='_diffdart')],
     install_requires=[

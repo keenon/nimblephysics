@@ -27,3 +27,4 @@ TAGS
 docs/readthedocs/site
 data/screencap/*
 dist/
+wheelhouse/
