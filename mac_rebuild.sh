@@ -1,0 +1,39 @@
+#!/bin/bash
+
+rm -rf dist/*
+rm -rf build/*
+# rm -rf wheelhouse/*
+
+# Actually build the code
+python3 setup.py sdist bdist_wheel
+
+# Install delocate, to bundle dependencies into the wheel
+pushd dist
+DYLD_LIBRARY_PATH="/usr/local/lib:$DYLD_LIBRARY_PATH" delocate-wheel -w ../wheelhouse -v diffdart-0.0.1-cp36-cp36m-macosx_10_6_intel.whl
+popd
+
+# Replace the ABI tag with a more general version
+mv wheelhouse/diffdart-0.0.1-cp36-cp36m-macosx_10_6_intel.whl wheelhouse/diffdart-0.0.1-6-cp36-abi3-macosx_10_6_x86_64.whl
+
+# Fix symlinks for ICU4
+# pushd wheelhouse
+# unzip
+# wheel unpack diffdart-0.0.1-4-cp36-abi3-macosx_10_6_x86_64.whl
+# pushd diffdart-0.0.1
+# pushd diffdart_libs
+# pushd .dylibs
+# Add symlinks
+# ln -s ./libicudata.67.1.dylib ./libicudata.67.dylib 
+# ln -s ./libicuuc.67.1.dylib ./libicuuc.67.dylib 
+# ln -s ./libicui18n.67.1.dylib ./libicui18n.67.dylib 
+# popd
+# popd
+# popd
+# re-zip
+# mv diffdart-0.0.1-4-cp36-abi3-macosx_10_6_x86_64.whl diffdart-0.0.1-4-cp36-abi3-macosx_10_6_x86_64.tmp.whl
+# wheel pack diffdart-0.0.1
+# rm -rf diffdart-0.0.1
+# popd
+
+# Actually push the wheel to PyPI
+# python3.6 -m twine upload --repository pypi wheelhouse/*

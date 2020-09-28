@@ -203,8 +203,30 @@ install_name_tool -id /usr/local/lib/libosgDB.161.dylib /usr/local/lib/libosgDB.
 install_name_tool -id /usr/local/lib/libosgShadow.161.dylib /usr/local/lib/libosgShadow.161.dylib
 install_name_tool -id /usr/local/lib/libOpenThreads.21.dylib /usr/local/lib/libOpenThreads.21.dylib
 
+# Fix "icu4c" installed by Brew
+pushd /usr/local/Cellar/icu4c/67.1/lib/
+sudo install_name_tool -change "@loader_path/libicuuc.67.dylib" "@loader_path/libicuuc.67.1.dylib" libicui18n.67.1.dylib
+sudo install_name_tool -change "@loader_path/libicudata.67.dylib" "@loader_path/libicudata.67.1.dylib" libicui18n.67.1.dylib
+
+sudo install_name_tool -change "@loader_path/libicuuc.67.dylib" "@loader_path/libicuuc.67.1.dylib" libicuio.67.1.dylib
+sudo install_name_tool -change "@loader_path/libicudata.67.dylib" "@loader_path/libicudata.67.1.dylib" libicuio.67.1.dylib
+sudo install_name_tool -change "@loader_path/libicui18n.67.dylib" "@loader_path/libicui18n.67.dylib" libicuio.67.1.dylib
+
+sudo install_name_tool -change "@loader_path/libicutu.67.dylib" "@loader_path/libicutu.67.1.dylib" libicutest.67.1.dylib
+sudo install_name_tool -change "@loader_path/libicui18n.67.dylib" "@loader_path/libicui18n.67.dylib" libicutest.67.1.dylib
+sudo install_name_tool -change "@loader_path/libicuuc.67.dylib" "@loader_path/libicuuc.67.1.dylib" libicutest.67.1.dylib
+sudo install_name_tool -change "@loader_path/libicudata.67.dylib" "@loader_path/libicudata.67.1.dylib" libicutest.67.1.dylib
+
+sudo install_name_tool -change "@loader_path/libicuuc.67.dylib" "@loader_path/libicuuc.67.1.dylib" libicutu.67.1.dylib
+sudo install_name_tool -change "@loader_path/libicudata.67.dylib" "@loader_path/libicudata.67.1.dylib" libicutu.67.1.dylib
+sudo install_name_tool -change "@loader_path/libicui18n.67.dylib" "@loader_path/libicui18n.67.dylib" libicutu.67.1.dylib
+
+sudo install_name_tool -change "@loader_path/libicudata.67.dylib" "@loader_path/libicudata.67.1.dylib" libicuuc.67.1.dylib 
+
+popd
+
 # Actually build the code
-python3 setup.py sdist bdist_wheel
+python3.6 setup.py sdist bdist_wheel
 
 # Get ready to bundle the links
 sudo mv /usr/local/lib/libjpeg.dylib /usr/local/lib/libjpeg.old.dylib
@@ -221,3 +243,18 @@ pip install delocate
 pushd dist
 DYLD_LIBRARY_PATH="/usr/local/lib:$DYLD_LIBRARY_PATH" delocate-wheel -w ../wheelhouse -v diffdart-0.0.1-cp36-cp36m-macosx_10_6_intel.whl
 popd
+
+# Replace the ABI tag with a more general version
+mv wheelhouse/diffdart-0.0.1-cp36-cp36m-macosx_10_6_intel.whl wheelhouse/diffdart-0.0.1-4-cp36-abi3-macosx_10_6_x86_64.whl
+
+# Fix symlinks for ICU4
+# TODO: unzip
+ln -s libicudata.67.dylib ./libicudata.67.1.dylib 
+ln -s ./libicudata.67.1.dylib ./libicudata.67.dylib 
+ln -s ./libicuuc.67.1.dylib ./libicuuc.67.dylib 
+ln -s ./libicui18n.67.1.dylib ./libicui18n.67.dylib 
+# TODO: re-zip
+
+# Install twine, to handle uploading to PyPI
+python3 -m pip install --user --upgrade twine
+python3 -m twine upload --repository pypi wheelhouse/*

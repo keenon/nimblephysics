@@ -1,5 +1,5 @@
 import torch
-import ._diffdart as dart
+import diffdart_libs._diffdart as dart
 from typing import Dict, Callable
 import numpy as np
 

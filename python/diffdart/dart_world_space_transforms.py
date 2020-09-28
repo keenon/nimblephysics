@@ -1,4 +1,4 @@
-import ._diffdart as dart
+import diffdart_libs._diffdart as dart
 import torch
 import numpy as np
 from typing import List

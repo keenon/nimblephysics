@@ -1,4 +1,4 @@
-from ._diffdart import *
+from diffdart_libs._diffdart import *
 from .dart_layer import dart_layer
 from .dart_torch_loss_fn import DartTorchLossFn, DartTorchTrajectoryRollout
 from .dart_world_space_transforms import convert_to_world_space_positions_linear, convert_to_world_space_positions_spatial, convert_to_world_space_velocities_linear, convert_to_world_space_velocities_spatial, convert_to_world_space_center_of_mass, convert_to_world_space_center_of_mass_vel_linear, convert_to_world_space_center_of_mass_vel_spatial

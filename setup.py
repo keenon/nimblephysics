@@ -62,7 +62,6 @@ class CMakeBuild(build_ext):
         if not os.path.exists(self.build_temp):
             os.makedirs(self.build_temp)
         subprocess.check_call(['cmake', ext.sourcedir] + cmake_args, cwd=self.build_temp, env=env)
-        # TODO: we need "../.." on manylinux builds, "." everywhere else
         subprocess.check_call(['cmake', '--build', '.'] + build_args,
                               cwd=self.build_temp, env=env)
         # Create the __init__.py in the library folder, so that delocate-wheel works properly
@@ -77,8 +76,9 @@ setup(
     author_email='keenonwerling@gmail.com',
     description='A differentiable fully featured physics engine',
     long_description='',
-    package_dir={'': 'python/diffdart'},
-    packages=[''],
+    license='MIT',
+    package_dir={'': 'python'},
+    packages=['diffdart'],
     ext_package='diffdart_libs',
     ext_modules=[CMakeExtension('cmake_example', target='_diffdart')],
     install_requires=[
