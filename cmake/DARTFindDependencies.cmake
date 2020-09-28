@@ -89,7 +89,7 @@ endif()
 dart_find_package(Boost)
 
 # IPOPT
-dart_find_package(Ipopt)
+dart_find_package(IPOPT)
 dart_check_required_package(IPOPT "ipopt")
 
 # octomap
