@@ -3,7 +3,6 @@ import torch
 from typing import Tuple, Callable, List
 import numpy as np
 import math
-import ipyopt
 
 
 class BackpropSnapshotPointer:
