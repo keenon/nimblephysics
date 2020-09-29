@@ -9,11 +9,11 @@ python3 setup.py sdist bdist_wheel
 
 # Install delocate, to bundle dependencies into the wheel
 pushd dist
-DYLD_LIBRARY_PATH="/usr/local/lib:$DYLD_LIBRARY_PATH" delocate-wheel -w ../wheelhouse -v diffdart-0.0.1-cp36-cp36m-macosx_10_6_intel.whl
+DYLD_LIBRARY_PATH="$DYLD_LIBRARY_PATH:/usr/local/lib" delocate-wheel -w ../wheelhouse -v diffdart-0.0.1-cp38-cp38-macosx_10_14_x86_64.whl
 popd
 
 # Replace the ABI tag with a more general version
-mv wheelhouse/diffdart-0.0.1-cp36-cp36m-macosx_10_6_intel.whl wheelhouse/diffdart-0.0.1-6-cp36-abi3-macosx_10_6_x86_64.whl
+mv wheelhouse/diffdart-0.0.1-cp38-cp38-macosx_10_14_x86_64.wh wheelhouse/diffdart-0.0.1-7-cp38-abi3-macosx_10_14_x86_64.wh
 
 # Fix symlinks for ICU4
 # pushd wheelhouse
