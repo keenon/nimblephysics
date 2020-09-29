@@ -54,6 +54,7 @@ class CMakeBuild(build_ext):
             build_args += ['--', '/m']
         else:
             cmake_args += ['-DCMAKE_BUILD_TYPE=' + cfg]
+            # We need this on the manylinux2010 Docker images to find the correct Python
             if platform.system() == 'Linux':
                 cmake_args += ['-DPYTHON_INCLUDE_DIR=/opt/python/cp38-cp38/include/python3.8/']
                 cmake_args += ['-DPYTHON_LIBRARY=/opt/python/cp38-cp38/lib/python3.8/']
@@ -73,7 +74,7 @@ class CMakeBuild(build_ext):
 
 setup(
     name='diffdart',
-    version='0.0.1',
+    version='0.0.2',
     author='Keenon Werling',
     author_email='keenonwerling@gmail.com',
     description='A differentiable fully featured physics engine',

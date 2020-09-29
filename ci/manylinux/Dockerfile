@@ -205,8 +205,12 @@ RUN cd diffdart && \
     git checkout keenon/diff && \
     git pull
 
-# RUN cd diffdart && \
-    # /opt/python/cp38-cp38/bin/python3.8 setup.py sdist bdist_wheel && \
-    # /opt/python/cp38-cp38/bin/python3.8 -m auditwheel repair dist/diffdart-0.0.1-cp38-cp38-linux_x86_64.whl
+# This is allowed to be empty string, but if it's not it must be prefixed by
+ENV VERSION="0.0.2"
+
+RUN cd diffdart && \
+    git pull && \
+    /opt/python/cp38-cp38/bin/python3.8 setup.py sdist bdist_wheel && \
+    /opt/python/cp38-cp38/bin/python3.8 -m auditwheel repair dist/diffdart-${VERSION}-cp38-cp38-linux_x86_64.whl
 # Ensure we have the ABI3 tag, so that pip interpreters will accept us
-# RUN mv wheelhouse/diffdart-0.0.1-cp38-cp38-manylinux2010_x86_64.whl wheelhouse/diffdart-0.0.1-cp38-abi3-manylinux2010_x86_64.whl
+RUN mv diffdart/wheelhouse/diffdart-${VERSION}-cp38-cp38-manylinux2010_x86_64.whl diffdart/wheelhouse/diffdart-${VERSION}-cp38-abi3-manylinux2010_x86_64.whl
