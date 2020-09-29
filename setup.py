@@ -54,6 +54,9 @@ class CMakeBuild(build_ext):
             build_args += ['--', '/m']
         else:
             cmake_args += ['-DCMAKE_BUILD_TYPE=' + cfg]
+            if platform.system() == 'Linux':
+                cmake_args += ['-DPYTHON_INCLUDE_DIR=/opt/python/cp38-cp38/include/python3.8/']
+                cmake_args += ['-DPYTHON_LIBRARY=/opt/python/cp38-cp38/lib/python3.8/']
             build_args += ['--', '-j14']
 
         env = os.environ.copy()
@@ -66,7 +69,6 @@ class CMakeBuild(build_ext):
                               cwd=self.build_temp, env=env)
         # Create the __init__.py in the library folder, so that delocate-wheel works properly
         Path(extdir+"/__init__.py").touch()
-
 
 
 setup(
