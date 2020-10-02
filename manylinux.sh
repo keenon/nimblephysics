@@ -1,11 +1,5 @@
 #!/bin/bash
 
-# Upgrade to python3
-yum install -y rh-python36
-scl enable rh-python36 bash
-yum install -y python3-devel.x86_64
-pip install --user --upgrade -y setuptools wheel
-
 # Update the pkgconfig path
 export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:/usr/local/lib64/pkgconfig/
 
@@ -199,6 +193,7 @@ popd
 popd
 rm -rf urdfdom
 
+/opt/python/cp38-cp38/bin/python3.8
 # Actually build the code
 python3 setup.py sdist bdist_wheel
 auditwheel repair dist/diffdart-0.0.1-cp36-cp36m-linux_x86_64.whl
