@@ -1,6 +1,16 @@
 #!/bin/bash
 
-brew install boost
+# Install Boost from source
+curl https://dl.bintray.com/boostorg/release/1.74.0/source/boost_1_74_0.tar.gz > boost.tar.gz
+tar -zxf boost.tar.gz
+pushd boost_1_74_0
+./bootstrap.sh
+./b2
+./b2 install
+popd
+popd
+rm -rf boost.tar.gz
+rm -rf boost_1_74_0
 
 # Install Eigen
 curl https://gitlab.com/libeigen/eigen/-/archive/3.3.7/eigen-3.3.7.tar.gz > eigen.tar.gz
@@ -13,6 +23,7 @@ make install -j14
 popd
 popd
 rm -rf eigen-3.3.7
+rm -rf eigen.tar.gz
 
 # Install CCD
 git clone https://github.com/danfis/libccd.git
@@ -109,31 +120,32 @@ popd
 rm -rf tinyxml2
 
 # Install freeglut
-yum install -y libXi-devel
-yum install -y mesa-libGLU-devel
-curl https://managedway.dl.sourceforge.net/project/freeglut/freeglut/3.2.1/freeglut-3.2.1.tar.gz > freeglut.tar.gz
-tar -zxf freeglut.tar.gz
-rm freeglut.tar.gz
-pushd freeglut-3.2.1
-mkdir build
-pushd build
-cmake ..
-make install -j10
-popd
-popd
-rm -rf freeglut-3.2.1
+brew install freeglut
+# brew cask install xquartz
+# curl https://managedway.dl.sourceforge.net/project/freeglut/freeglut/3.2.1/freeglut-3.2.1.tar.gz > freeglut.tar.gz
+# tar -zxf freeglut.tar.gz
+# rm freeglut.tar.gz
+# pushd freeglut-3.2.1
+# mkdir build
+# pushd build
+# cmake ..
+# make install -j10
+# popd
+# popd
+# rm -rf freeglut-3.2.1
 
 # Install Open Scene Graph
-git clone https://github.com/openscenegraph/OpenSceneGraph.git
-pushd OpenSceneGraph
-git checkout OpenSceneGraph-3.6.5
-mkdir build
-pushd build
-cmake ..
-make install -j10
-popd
-popd
-rm -rf OpenSceneGraph
+brew install open-scene-graph
+# git clone https://github.com/openscenegraph/OpenSceneGraph.git
+# pushd OpenSceneGraph
+# git checkout OpenSceneGraph-3.6.5
+# mkdir build
+# pushd build
+# cmake ..
+# make install -j10
+# popd
+# popd
+# rm -rf OpenSceneGraph
 
 # Install pytest
 pip3 install pytest
@@ -220,6 +232,13 @@ sudo install_name_tool -change "@loader_path/libicui18n.67.dylib" "@loader_path/
 sudo install_name_tool -change "@loader_path/libicudata.67.dylib" "@loader_path/libicudata.67.1.dylib" libicuuc.67.1.dylib 
 
 popd
+
+# Install optool
+ git clone git@github.com:alexzielenski/optool.git --recursive
+ pushd optool
+ xcodebuild
+ cp build/Release/optool /usr/local/bin
+ popd
 
 # Actually build the code
 python3.6 setup.py sdist bdist_wheel

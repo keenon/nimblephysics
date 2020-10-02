@@ -66,7 +66,6 @@ target_link_libraries(_diffdart
     dart-utils-urdf
     dart-gui
     dart-gui-osg
-    ${PYTHON_LIBRARIES}
 )
 if(TARGET dart-optimizer-nlopt)
   target_link_libraries(_diffdart PUBLIC dart-optimizer-nlopt)
