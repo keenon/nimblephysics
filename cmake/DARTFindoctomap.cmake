@@ -8,6 +8,8 @@
 
 find_package(octomap 1.6.8 QUIET CONFIG)
 
+message(STATUS "${OCTOMAP_INCLUDE_DIRS}")
+message(STATUS "${OCTOMAP_LIBRARIES}")
 if(octomap_FOUND AND NOT TARGET octomap)
   add_library(octomap INTERFACE IMPORTED)
   set_target_properties(octomap PROPERTIES

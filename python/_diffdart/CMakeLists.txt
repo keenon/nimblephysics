@@ -64,8 +64,6 @@ target_link_libraries(_diffdart
     dart
     dart-utils
     dart-utils-urdf
-    dart-gui
-    dart-gui-osg
 )
 if(TARGET dart-optimizer-nlopt)
   target_link_libraries(_diffdart PUBLIC dart-optimizer-nlopt)

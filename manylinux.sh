@@ -193,6 +193,19 @@ popd
 popd
 rm -rf urdfdom
 
+# Install pistache
+git clone https://github.com/oktal/pistache.git
+pushd pistache
+git submodule update --init
+mkdir build
+pushd build
+cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release ..
+make
+make install
+popd
+popd
+rm -rf pistache
+
 /opt/python/cp38-cp38/bin/python3.8
 # Actually build the code
 python3 setup.py sdist bdist_wheel

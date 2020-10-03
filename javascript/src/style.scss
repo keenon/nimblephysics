@@ -1,0 +1,71 @@
+@import url("https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@500&display=swap");
+
+body {
+  background-color: #aaaaaa;
+  overscroll-behavior: none;
+  margin: 0px;
+  width: 100vw;
+  font-family: "Roboto Mono", monospace;
+}
+
+.GUI_title {
+  position: fixed;
+  top: 10px;
+  left: 0;
+  width: 100vw;
+  user-select: none;
+  text-align: center;
+  font-size: 14px;
+  z-index: 1;
+}
+
+.GUI_show-paths {
+  position: fixed;
+  top: 10px;
+  right: 20px;
+  user-select: none;
+  font-size: 14px;
+  z-index: 1;
+}
+
+.View__container {
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.Timeline__timeline {
+  position: fixed;
+  bottom: 20px;
+  left: 20px;
+  width: calc(100vw - 40px);
+  height: 30px;
+  box-shadow: 0px 0px 15px 0px rgba(0, 0, 0, 0.05);
+  border-radius: 0.25rem;
+  border: 1px solid #222222;
+  background: #333333;
+  z-index: 2;
+}
+
+.Timeline__timeline-tick {
+  position: absolute;
+  z-index: 3;
+  height: 100%;
+  width: 5px;
+  background-color: #ee4c2c;
+  border: none;
+  user-select: none;
+}
+
+.Timeline__timeline-text {
+  position: fixed;
+  bottom: 60px;
+  left: 20px;
+  font-size: 12px;
+  z-index: 1;
+}
+
+canvas {
+  outline: none;
+  -webkit-tap-highlight-color: rgba(255, 255, 255, 0); /* mobile webkit */
+}

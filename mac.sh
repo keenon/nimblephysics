@@ -195,6 +195,19 @@ popd
 popd
 rm -rf urdfdom
 
+# Install pistache
+git clone https://github.com/oktal/pistache.git
+pushd pistache
+git submodule update --init
+mkdir build
+pushd build
+cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release ..
+make
+make install
+popd
+popd
+rm -rf pistache
+
 # Reset the IDs for our libraries to absolute paths
 install_name_tool -id /usr/local/lib/liburdfdom_sensor.dylib /usr/local/lib/liburdfdom_sensor.dylib
 install_name_tool -id /usr/local/lib/liburdfdom_model_state.dylib /usr/local/lib/liburdfdom_model_state.dylib
@@ -230,15 +243,14 @@ sudo install_name_tool -change "@loader_path/libicuuc.67.dylib" "@loader_path/li
 sudo install_name_tool -change "@loader_path/libicudata.67.dylib" "@loader_path/libicudata.67.1.dylib" libicutu.67.1.dylib
 sudo install_name_tool -change "@loader_path/libicui18n.67.dylib" "@loader_path/libicui18n.67.dylib" libicutu.67.1.dylib
 sudo install_name_tool -change "@loader_path/libicudata.67.dylib" "@loader_path/libicudata.67.1.dylib" libicuuc.67.1.dylib 
-
 popd
 
 # Install optool
- git clone git@github.com:alexzielenski/optool.git --recursive
- pushd optool
- xcodebuild
- cp build/Release/optool /usr/local/bin
- popd
+ # git clone git@github.com:alexzielenski/optool.git --recursive
+ # pushd optool
+ # xcodebuild
+ # cp build/Release/optool /usr/local/bin
+ # popd
 
 # Actually build the code
 python3.6 setup.py sdist bdist_wheel

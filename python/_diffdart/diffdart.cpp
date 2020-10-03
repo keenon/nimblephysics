@@ -48,7 +48,6 @@ void dart_collision(py::module& m);
 void dart_constraint(py::module& m);
 void dart_simulation(py::module& m);
 void dart_utils(py::module& m);
-void dart_gui(py::module& m);
 void dart_neural(py::module& m);
 void dart_trajectory(py::module& m);
 
@@ -66,7 +65,6 @@ PYBIND11_MODULE(_diffdart, m)
   dart_constraint(m);
   dart_simulation(m);
   dart_utils(m);
-  dart_gui(m);
   dart_neural(m);
   dart_trajectory(m);
 }
