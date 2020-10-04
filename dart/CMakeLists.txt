@@ -89,7 +89,6 @@ add_subdirectory(constraint)
 add_subdirectory(simulation)
 add_subdirectory(planning) # flann
 add_subdirectory(utils) # tinyxml2, bullet
-add_subdirectory(web)
 add_subdirectory(gui) # opengl, glut, bullet
 
 set(DART_CONFIG_HPP_IN ${CMAKE_SOURCE_DIR}/dart/config.hpp.in)
@@ -140,7 +139,6 @@ target_link_libraries(dart
     Boost::system
     Boost::filesystem
     IPOPT::ipopt
-    Pistache::Pistache
 )
 if (TARGET octomap)
   target_link_libraries(dart PUBLIC octomap)

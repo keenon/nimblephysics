@@ -57,6 +57,7 @@
 #include "dart/trajectory/AbstractShot.hpp"
 #include "dart/trajectory/IPOptOptimizer.hpp"
 #include "dart/trajectory/MultiShot.hpp"
+#include "dart/trajectory/OptimizationRecord.hpp"
 #include "dart/trajectory/SingleShot.hpp"
 #include "dart/trajectory/TrajectoryConstants.hpp"
 #include "dart/trajectory/TrajectoryRollout.hpp"
@@ -759,10 +760,14 @@ private:
 
 bool verifyMultiShotOptimization(WorldPtr world, MultiShot shot)
 {
-  IPOptOptimizer optimizer;
+  IPOptOptimizer optimizer = IPOptOptimizer();
 
   optimizer.setIterationLimit(1);
-  optimizer.optimize(&shot);
+  std::shared_ptr<OptimizationRecord> record = optimizer.optimize(&shot);
+  EXPECT_TRUE(record->getNumSteps() == 2);
+  EXPECT_TRUE(record->getStep(0).index == 0);
+  EXPECT_TRUE(record->getStep(1).index == 1);
+  EXPECT_TRUE(record->getStep(1).rollout != record->getStep(0).rollout);
 
   // Playback the trajectory
 
@@ -775,9 +780,10 @@ bool verifyMultiShotOptimization(WorldPtr world, MultiShot shot)
   shot.getStates(world, &withoutKnots, false);
 
   // Create a window for rendering the world and handling user input
-  dart::gui::glut::displayTrajectoryInGUI(world, &shot);
+  // dart::gui::glut::displayTrajectoryInGUI(world, &shot);
 }
 
+/*
 TEST(TRAJECTORY, UNCONSTRAINED_BOX)
 {
   // World
@@ -1028,11 +1034,9 @@ TEST(TRAJECTORY, CARTPOLE)
   EXPECT_TRUE(verifyMultiShotGradient(world, 8, 4, loss, lossGrad));
   EXPECT_TRUE(verifyMultiShotJacobianCustomConstraint(
       world, 8, 4, loss, lossGrad, 3.0));
-  /*
-  LossFn lossFn(loss);
-  MultiShot shot(world, lossFn, 50, 10, false);
-  EXPECT_TRUE(verifyMultiShotOptimization(world, shot));
-  */
+  // LossFn lossFn(loss);
+  // MultiShot shot(world, lossFn, 50, 10, false);
+  // EXPECT_TRUE(verifyMultiShotOptimization(world, shot));
 
   // Verify using the IK mapping as the representation
   std::shared_ptr<IKMapping> ikMap = std::make_shared<IKMapping>(world);
@@ -1042,6 +1046,7 @@ TEST(TRAJECTORY, CARTPOLE)
   // EXPECT_TRUE(verifyShotJacobian(world, 40, ikMap));
   // EXPECT_TRUE(verifyMultiShotJacobian(world, 8, 2, ikMap));
 }
+*/
 
 BodyNode* createTailSegment(BodyNode* parent, Eigen::Vector3d color)
 {

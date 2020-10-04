@@ -195,19 +195,6 @@ popd
 popd
 rm -rf urdfdom
 
-# Install pistache
-git clone https://github.com/oktal/pistache.git
-pushd pistache
-git submodule update --init
-mkdir build
-pushd build
-cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release ..
-make
-make install
-popd
-popd
-rm -rf pistache
-
 # Reset the IDs for our libraries to absolute paths
 install_name_tool -id /usr/local/lib/liburdfdom_sensor.dylib /usr/local/lib/liburdfdom_sensor.dylib
 install_name_tool -id /usr/local/lib/liburdfdom_model_state.dylib /usr/local/lib/liburdfdom_model_state.dylib

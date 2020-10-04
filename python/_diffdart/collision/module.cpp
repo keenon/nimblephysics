@@ -44,22 +44,10 @@ void CollisionOption(py::module& sm);
 void CollisionResult(py::module& sm);
 
 void CollisionDetector(py::module& sm);
-void FCLCollisionDetector(py::module& sm);
 void DARTCollisionDetector(py::module& sm);
 
 void CollisionGroup(py::module& sm);
-void FCLCollisionGroup(py::module& sm);
 void DARTCollisionGroup(py::module& sm);
-
-#if HAVE_BULLET
-void BulletCollisionDetector(py::module& sm);
-void BulletCollisionGroup(py::module& sm);
-#endif // HAVE_BULLET
-
-#if HAVE_ODE
-void OdeCollisionDetector(py::module& sm);
-void OdeCollisionGroup(py::module& sm);
-#endif // HAVE_ODE
 
 void dart_collision(py::module& m)
 {
@@ -71,22 +59,10 @@ void dart_collision(py::module& m)
   CollisionResult(sm);
 
   CollisionDetector(sm);
-  FCLCollisionDetector(sm);
   DARTCollisionDetector(sm);
 
   CollisionGroup(sm);
-  FCLCollisionGroup(sm);
   DARTCollisionGroup(sm);
-
-#if HAVE_BULLET
-  BulletCollisionDetector(sm);
-  BulletCollisionGroup(sm);
-#endif // HAVE_BULLET
-
-#if HAVE_ODE
-  OdeCollisionDetector(sm);
-  OdeCollisionGroup(sm);
-#endif // HAVE_ODE
 }
 
 } // namespace python

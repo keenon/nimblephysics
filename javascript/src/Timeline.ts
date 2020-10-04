@@ -9,6 +9,10 @@ class Timeline {
   timelineTick: HTMLDivElement;
   timelineText: HTMLDivElement;
 
+  logline: HTMLDivElement;
+  loglineTick: HTMLDivElement;
+  loglineText: HTMLDivElement;
+
   constructor(world: WorldDisplay) {
     this.world = world;
     this.playing = false;
@@ -25,7 +29,21 @@ class Timeline {
     this.timelineText.className = "Timeline__timeline-text";
     document.body.appendChild(this.timelineText);
 
-    this.updateTick();
+    this.logline = document.createElement("div");
+    this.logline.className = "Timeline__logline";
+    document.body.appendChild(this.logline);
+
+    this.loglineTick = document.createElement("div");
+    this.loglineTick.className = "Timeline__logline-tick";
+    this.logline.appendChild(this.loglineTick);
+
+    this.loglineText = document.createElement("div");
+    this.loglineText.className = "Timeline__logline-text";
+    document.body.appendChild(this.loglineText);
+    this.loglineText.innerHTML = "iter: 0/100<br>loss: 1.23e-7<br>infeas: 1e-3";
+
+    this.updateTimelineTick();
+    this.updateLoglineTick();
 
     addEventListener("keydown", (e: KeyboardEvent) => {
       if (e.key === " ") {
@@ -37,8 +55,16 @@ class Timeline {
       }
     });
 
-    window.addEventListener("resize", this.updateTick, false);
+    window.addEventListener(
+      "resize",
+      () => {
+        this.updateTimelineTick();
+        this.updateLoglineTick();
+      },
+      false
+    );
 
+    // Make the timeline draggable
     this.timeline.addEventListener("mousedown", (e: MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
@@ -56,7 +82,7 @@ class Timeline {
           t = timesteps - 1;
         }
         this.world.setTimestep(t);
-        this.updateTick();
+        this.updateTimelineTick();
       };
 
       setTickByMouse(e.clientX);
@@ -72,14 +98,84 @@ class Timeline {
       window.addEventListener("mousemove", moveListener);
       window.addEventListener("mouseup", upListener);
     });
+
+    // Make the logline draggable
+    this.logline.addEventListener("mousedown", (e: MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.playing = false;
+
+      const setLoglineTickByMouse = (mouseY: number) => {
+        const loglineRect = this.logline.getBoundingClientRect();
+        let percentage = 1.0 - (mouseY - loglineRect.top) / loglineRect.height;
+        if (percentage < 0) percentage = 0;
+        if (percentage > 1) percentage = 1;
+
+        const iteration = this.world.getNumIterations();
+        let i = Math.round(iteration * percentage);
+        if (i >= this.world.getNumIterations()) {
+          i = this.world.getNumIterations() - 1;
+        }
+        this.world.setIteration(i);
+        this.updateLoglineTick();
+      };
+
+      setLoglineTickByMouse(e.clientY);
+
+      const moveListener = (e: MouseEvent) => {
+        setLoglineTickByMouse(e.clientY);
+      };
+      const upListener = (e: MouseEvent) => {
+        window.removeEventListener("mousemove", moveListener);
+        window.removeEventListener("mouseup", upListener);
+      };
+
+      window.addEventListener("mousemove", moveListener);
+      window.addEventListener("mouseup", upListener);
+    });
   }
 
-  updateTick = () => {
-    const percentage = this.world.getTimestep() / this.world.getTimesteps();
-    const timelineWidth = this.timeline.getBoundingClientRect().width;
+  updateTimelineTick = () => {
+    let percentage = this.world.getTimestep() / (this.world.getTimesteps() - 1);
+    if (this.world.getTimesteps() === 1) percentage = 0.5;
+    const timelineWidth =
+      this.timeline.getBoundingClientRect().width -
+      this.timelineTick.getBoundingClientRect().width -
+      2;
     this.timelineTick.style.left = percentage * timelineWidth + "px";
     this.timelineText.innerHTML =
-      "step " + this.world.getTimestep() + "/" + this.world.getTimesteps();
+      "step " +
+      (this.world.getTimestep() + 1) +
+      "/" +
+      this.world.getTimesteps();
+  };
+
+  updateLoglineTick = () => {
+    let percentage =
+      this.world.getIteration() / (this.world.getNumIterations() - 1);
+    if (this.world.getNumIterations() === 1) percentage = 0.5;
+    const loglineHeight =
+      this.logline.getBoundingClientRect().height -
+      this.loglineTick.getBoundingClientRect().height -
+      2;
+    this.loglineTick.style.bottom = percentage * loglineHeight + "px";
+    const text = `<table>
+  <tbody>
+    <tr>
+      <td>iter:</td>
+      <td>${this.world.getIteration() + 1}/${this.world.getNumIterations()}</td>
+    </tr>
+    <tr>
+      <td>loss:</td>
+      <td>${this.world.getLoss().toExponential(5)}</td>
+    </tr>
+    <tr>
+      <td>constraints:</td>
+      <td>${this.world.getConstraintViolation().toExponential(5)}</td>
+    </tr>
+  </tbody>
+</table>`;
+    this.loglineText.innerHTML = text;
   };
 
   update = () => {
@@ -90,7 +186,7 @@ class Timeline {
       const timestep =
         (this.playStartTimestep + advanceTimesteps) % this.world.getTimesteps();
       this.world.setTimestep(timestep);
-      this.updateTick();
+      this.updateTimelineTick();
     }
   };
 }

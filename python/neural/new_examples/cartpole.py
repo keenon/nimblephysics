@@ -19,7 +19,7 @@ def main():
     cartRail.setAxis([1, 0, 0])
     cartShape = cart.createShapeNode(dart.dynamics.BoxShape([.5, .1, .1]))
     cartVisual = cartShape.createVisualAspect()
-    cartVisual.setColor([0, 0, 0])
+    cartVisual.setColor([0.2, 0.2, 0.2])
     cartRail.setPositionUpperLimit(0, 10)
     cartRail.setPositionLowerLimit(0, -10)
     cartRail.setForceUpperLimit(0, 10)
@@ -29,7 +29,7 @@ def main():
     poleJoint.setAxis([0, 0, 1])
     poleShape = pole.createShapeNode(dart.dynamics.BoxShape([.1, 1.0, .1]))
     poleVisual = poleShape.createVisualAspect()
-    poleVisual.setColor([0, 0, 0])
+    poleVisual.setColor([0.3, 0.3, 0.3])
     poleJoint.setForceUpperLimit(0, 0)
     poleJoint.setForceLowerLimit(0, 0)
 
@@ -60,9 +60,12 @@ def main():
     optimizer.setTolerance(1e-6)
     optimizer.setCheckDerivatives(False)
     optimizer.setIterationLimit(500)
-    optimizer.optimize(trajectory)
+    result = optimizer.optimize(trajectory)
 
-    dart.gui.glut.displayTrajectoryInGUI(world, trajectory)
+    json = result.toJson(world)
+    text_file = open("cartpole.txt", "w")
+    n = text_file.write(json)
+    text_file.close()
 
 
 if __name__ == "__main__":

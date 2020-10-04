@@ -45,6 +45,7 @@ void AbstractShot(py::module& sm);
 void MultiShot(py::module& sm);
 void SingleShot(py::module& sm);
 void TrajectoryRollout(py::module& sm);
+void OptimizationRecord(py::module& sm);
 
 void dart_trajectory(py::module& m)
 {
@@ -60,6 +61,7 @@ void dart_trajectory(py::module& m)
   MultiShot(sm);
   SingleShot(sm);
   TrajectoryRollout(sm);
+  OptimizationRecord(sm);
 }
 
 } // namespace python

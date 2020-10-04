@@ -21,6 +21,7 @@
     "css-loader": "^4.3.0",
     "html-webpack-plugin": "^4.5.0",
     "path": "^0.12.7",
+    "raw-loader": "^4.0.1",
     "sass": "^1.26.11",
     "sass-loader": "^10.0.2",
     "style-loader": "^1.2.1",

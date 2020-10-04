@@ -25,7 +25,7 @@ IPOptOptimizer::IPOptOptimizer()
 }
 
 //==============================================================================
-bool IPOptOptimizer::optimize(AbstractShot* shot)
+std::shared_ptr<OptimizationRecord> IPOptOptimizer::optimize(AbstractShot* shot)
 {
   // Create an instance of the IpoptApplication
   //
@@ -71,6 +71,9 @@ bool IPOptOptimizer::optimize(AbstractShot* shot)
         "print_frequency_iter", std::numeric_limits<int>::infinity());
   }
 
+  std::shared_ptr<OptimizationRecord> record
+      = std::make_shared<OptimizationRecord>();
+
   // Initialize the IpoptApplication and process the options
   ApplicationReturnStatus status;
   status = app->Initialize();
@@ -79,14 +82,14 @@ bool IPOptOptimizer::optimize(AbstractShot* shot)
     std::cout << std::endl
               << std::endl
               << "*** Error during initialization!" << std::endl;
-    return (int)status;
+    return record;
   }
 
   // This will automatically free the problem object when finished,
   // through `problemPtr`. `problem` NEEDS TO BE ON THE HEAP or it will crash.
   // If you try to leave `problem` on the stack, you'll get invalid free
   // exceptions when IPOpt attempts to free it.
-  IPOptShotWrapper* problem = new IPOptShotWrapper(shot);
+  IPOptShotWrapper* problem = new IPOptShotWrapper(shot, record);
   SmartPtr<IPOptShotWrapper> problemPtr(problem);
   status = app->OptimizeTNLP(problemPtr);
 
@@ -106,10 +109,9 @@ bool IPOptOptimizer::optimize(AbstractShot* shot)
               << final_obj << '.' << std::endl;
   }
 
-  if (status == Ipopt::Solve_Succeeded)
-    return true;
-  else
-    return false;
+  record->setSuccess(status == Ipopt::Solve_Succeeded);
+
+  return record;
 }
 
 //==============================================================================
@@ -143,8 +145,12 @@ void IPOptOptimizer::setPrintFrequency(int frequency)
 }
 
 //==============================================================================
-IPOptShotWrapper::IPOptShotWrapper(AbstractShot* wrapped)
-  : mBestFeasibleObjectiveValue(1e20), mWrapped(wrapped), mBestIter(0)
+IPOptShotWrapper::IPOptShotWrapper(
+    AbstractShot* wrapped, std::shared_ptr<OptimizationRecord> record)
+  : mBestFeasibleObjectiveValue(1e20),
+    mWrapped(wrapped),
+    mBestIter(0),
+    mRecord(record)
 {
   mBestFeasibleState = Eigen::VectorXd(mWrapped->getFlatProblemDim());
 }
@@ -469,6 +475,9 @@ bool IPOptShotWrapper::intermediate_callback(
     const Ipopt::IpoptData* ip_data,
     Ipopt::IpoptCalculatedQuantities* ip_cq)
 {
+  // Always record the iteration
+  mRecord->registerIteration(
+      iter, mWrapped->getRolloutCache(mWrapped->mWorld), obj_value, inf_pr);
   if (obj_value < mBestFeasibleObjectiveValue && inf_pr < 5e-4)
   {
     // std::cout << "Found new best feasible loss!" << std::endl;

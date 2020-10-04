@@ -1,7 +1,9 @@
 import * as THREE from "three";
 
+const SCALE_FACTOR = 100;
+
 class MeshTrajectory {
-  mesh: THREE.Mesh;
+  mesh: THREE.Group;
   path: THREE.Line;
   pos_xs: number[];
   pos_ys: number[];
@@ -11,13 +13,14 @@ class MeshTrajectory {
   rot_zs: number[];
 
   constructor(
-    mesh: THREE.Mesh,
+    mesh: THREE.Group,
     pos_xs: number[],
     pos_ys: number[],
     pos_zs: number[],
     rot_xs: number[],
     rot_ys: number[],
-    rot_zs: number[]
+    rot_zs: number[],
+    color: THREE.Color
   ) {
     this.mesh = mesh;
     this.pos_xs = pos_xs;
@@ -27,7 +30,6 @@ class MeshTrajectory {
     this.rot_ys = rot_ys;
     this.rot_zs = rot_zs;
 
-    const color: THREE.Color = (this.mesh.material as any).color;
     const pathMaterial = new THREE.LineBasicMaterial({
       color: color,
       linewidth: 2,
@@ -66,73 +68,38 @@ class MeshTrajectory {
 
 class WorldDisplay {
   scene: THREE.Scene;
+  report: FullReport;
   objects: Map<string, MeshTrajectory>;
+  // The iteration of gradient descent we're showing
+  i: number;
+  // The timestep we're showing
   t: number;
+
   timesteps: number;
   showPaths: boolean;
 
-  constructor(scene: THREE.Scene) {
+  constructor(scene: THREE.Scene, report: FullReport) {
     this.scene = scene;
+    this.report = report;
     this.objects = new Map();
     this.t = 0;
-    this.timesteps = 1;
     this.showPaths = true;
+
+    this.timesteps = report.record[0].timesteps;
+    this.setIteration(0);
   }
 
-  randomCubes = () => {
-    var geometry = new THREE.BoxBufferGeometry(10, 10, 10);
+  setData = (report: FullReport) => {
+    this.objects.forEach((v) => {
+      v.removeFromScene(this.scene);
+    });
+    this.report = report;
+    this.t = 0;
+    this.timesteps = report.record[0].timesteps;
 
-    const interpolate = (start: number, end: number) => {
-      if (this.timesteps == 1) return [(start + end) / 2];
-
-      let arr: number[] = [];
-      let diff: number = (end - start) / (this.timesteps - 1);
-      let cursor: number = start;
-      for (let i = 0; i < this.timesteps; i++) {
-        arr.push(cursor);
-        cursor += diff;
-      }
-      return arr;
-    };
-
-    for (let i = 0; i < 10; i++) {
-      var material = new THREE.MeshLambertMaterial({
-        color: Math.random() * 0xffffff,
-      });
-
-      const mesh = new THREE.Mesh(geometry, material);
-      mesh.castShadow = true;
-      mesh.receiveShadow = true;
-      const pos_xs = interpolate(
-        Math.random() * 400 - 200,
-        Math.random() * 400 - 200
-      );
-      const pos_ys = interpolate(
-        Math.random() * 400 - 200,
-        Math.random() * 400 - 200
-      );
-      const pos_zs = interpolate(
-        Math.random() * 400 - 200,
-        Math.random() * 400 - 200
-      );
-      const rot_xs = interpolate(Math.random(), Math.random());
-      const rot_ys = interpolate(Math.random(), Math.random());
-      const rot_zs = interpolate(Math.random(), Math.random());
-
-      mesh.scale.setScalar(Math.random() * 10 + 2);
-
-      const trajectory = new MeshTrajectory(
-        mesh,
-        pos_xs,
-        pos_ys,
-        pos_zs,
-        rot_xs,
-        rot_ys,
-        rot_zs
-      );
-
-      this.setMesh(i.toString(), trajectory);
-    }
+    // Force setIteration to run
+    this.i = -1;
+    this.setIteration(0);
   };
 
   setShowPaths = (showPaths: boolean) => {
@@ -161,12 +128,88 @@ class WorldDisplay {
   };
 
   setTimestep = (t: number) => {
+    if (this.t === t) return;
     this.t = t;
     this.objects.forEach((v) => v.setTimestep(t));
   };
 
-  setTimesteps = (timesteps: number) => {
-    this.timesteps = timesteps;
+  getIteration = () => {
+    return this.i;
+  };
+
+  getNumIterations = () => {
+    return this.report.record.length;
+  };
+
+  getLoss = () => {
+    return this.report.record[this.i].loss;
+  };
+
+  getConstraintViolation = () => {
+    return this.report.record[this.i].constraintViolation;
+  };
+
+  setIteration = (i: number) => {
+    if (i < 0 || i >= this.report.record.length) return;
+    if (this.i === i) return;
+    this.i = i;
+
+    const record = this.report.record[i];
+
+    for (const body of this.report.world) {
+      const bodyGroup = new THREE.Group();
+      // default to black
+      let color = new THREE.Color(0, 0, 0);
+      body.shapes.forEach((shape) => {
+        let shapeColor = new THREE.Color(
+          shape.color[0],
+          shape.color[1],
+          shape.color[2]
+        );
+        color = shapeColor;
+        const material = new THREE.MeshLambertMaterial({
+          color: shapeColor,
+        });
+        const geometry = new THREE.BoxBufferGeometry(
+          shape.size[0] * SCALE_FACTOR,
+          shape.size[1] * SCALE_FACTOR,
+          shape.size[2] * SCALE_FACTOR
+        );
+        const mesh = new THREE.Mesh(geometry, material);
+        if (body.name.toLowerCase().includes("floor")) {
+          mesh.receiveShadow = true;
+        } else {
+          mesh.castShadow = true;
+        }
+        bodyGroup.add(mesh);
+        mesh.position.x = shape.pos[0] * SCALE_FACTOR;
+        mesh.position.y = shape.pos[1] * SCALE_FACTOR;
+        mesh.position.z = shape.pos[2] * SCALE_FACTOR;
+        mesh.rotation.x = shape.angle[0];
+        mesh.rotation.y = shape.angle[1];
+        mesh.rotation.z = shape.angle[2];
+      });
+      bodyGroup.position.x = body.pos[0] * SCALE_FACTOR;
+      bodyGroup.position.y = body.pos[1] * SCALE_FACTOR;
+      bodyGroup.position.z = body.pos[2] * SCALE_FACTOR;
+      bodyGroup.rotation.x = body.angle[0];
+      bodyGroup.rotation.y = body.angle[1];
+      bodyGroup.rotation.z = body.angle[2];
+
+      const trajectory = record.trajectory[body.name];
+
+      const bodyMeshTrajectory = new MeshTrajectory(
+        bodyGroup,
+        trajectory.pos_x.map((x) => x * SCALE_FACTOR),
+        trajectory.pos_y.map((y) => y * SCALE_FACTOR),
+        trajectory.pos_z.map((z) => z * SCALE_FACTOR),
+        trajectory.rot_x,
+        trajectory.rot_y,
+        trajectory.rot_z,
+        color
+      );
+      this.setMesh(body.name, bodyMeshTrajectory);
+    }
   };
 }
 

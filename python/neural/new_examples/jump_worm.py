@@ -70,6 +70,7 @@ def main():
     # Floor
 
     floor = dart.dynamics.Skeleton()
+    floor.setName('floor')  # important for rendering shadows
 
     floorJoint, floorBody = floor.createWeldJointAndBodyNodePair()
     floorOffset = dart.math.Isometry3()
@@ -78,7 +79,7 @@ def main():
     floorShape = floorBody.createShapeNode(dart.dynamics.BoxShape([2.5, 0.25, .5]))
     floorVisual = floorShape.createVisualAspect()
     floorShape.createCollisionAspect()
-    floorBody.setFrictionCoeff(0)
+    # floorBody.setFrictionCoeff(0)
 
     world.addSkeleton(floor)
 
@@ -101,13 +102,18 @@ def main():
     trajectory.addMapping('ik', ikMap)
 
     optimizer = dart.trajectory.IPOptOptimizer()
-    optimizer.setLBFGSHistoryLength(6)
+    # optimizer.setLBFGSHistoryLength(5)
     optimizer.setTolerance(1e-5)
     optimizer.setCheckDerivatives(False)
-    optimizer.setIterationLimit(500)
-    optimizer.optimize(trajectory)
+    optimizer.setIterationLimit(400)
+    result = optimizer.optimize(trajectory)
 
-    dart.gui.glut.displayTrajectoryInGUI(world, trajectory)
+    json = result.toJson(world)
+    text_file = open("worm.txt", "w")
+    n = text_file.write(json)
+    text_file.close()
+
+    # dart.gui.glut.displayTrajectoryInGUI(world, trajectory)
 
 
 if __name__ == "__main__":

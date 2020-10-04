@@ -21,6 +21,10 @@ module.exports = {
           "sass-loader",
         ],
       },
+      {
+        test: /\.(txt|json)$/i,
+        use: "raw-loader",
+      },
     ],
   },
   resolve: {

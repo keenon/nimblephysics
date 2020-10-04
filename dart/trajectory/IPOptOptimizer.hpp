@@ -9,6 +9,7 @@
 #include <coin/IpTNLP.hpp>
 
 #include "dart/trajectory/AbstractShot.hpp"
+#include "dart/trajectory/OptimizationRecord.hpp"
 #include "dart/trajectory/TrajectoryConstants.hpp"
 
 namespace dart {
@@ -29,7 +30,7 @@ class IPOptOptimizer
 public:
   IPOptOptimizer();
 
-  bool optimize(AbstractShot* shot);
+  std::shared_ptr<OptimizationRecord> optimize(AbstractShot* shot);
 
   void setIterationLimit(int iterationLimit);
 
@@ -57,7 +58,8 @@ protected:
 class IPOptShotWrapper : public Ipopt::TNLP
 {
 public:
-  IPOptShotWrapper(AbstractShot* wrapped);
+  IPOptShotWrapper(
+      AbstractShot* wrapped, std::shared_ptr<OptimizationRecord> record);
 
   /// Destructor
   ~IPOptShotWrapper();
@@ -177,6 +179,7 @@ public:
 
 private:
   AbstractShot* mWrapped;
+  std::shared_ptr<OptimizationRecord> mRecord;
   int mBestIter;
   double mBestFeasibleObjectiveValue;
   Eigen::VectorXd mBestFeasibleState;

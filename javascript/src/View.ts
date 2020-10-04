@@ -39,9 +39,9 @@ class View {
     this.composer = new EffectComposer(this.renderer);
 
     var ssaoPass = new SSAOPass(scene, this.camera, this.width, this.height);
-    ssaoPass.kernelRadius = 16;
-    ssaoPass.minDistance = 0.001;
-    ssaoPass.maxDistance = 0.2;
+    ssaoPass.kernelRadius = 5;
+    ssaoPass.minDistance = 0.00001;
+    ssaoPass.maxDistance = 0.00006;
     this.composer.addPass(ssaoPass);
     ssaoPass.output = SSAOPass.OUTPUT.Default;
 

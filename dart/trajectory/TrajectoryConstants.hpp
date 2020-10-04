@@ -3,6 +3,8 @@
 
 #include <functional>
 
+#include <Eigen/Dense>
+
 namespace dart {
 namespace trajectory {
 

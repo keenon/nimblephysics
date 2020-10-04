@@ -4,6 +4,13 @@ import "./style.scss";
 import View from "./View";
 import WorldDisplay from "./WorldDisplay";
 import Timeline from "./Timeline";
+import DataSelector from "./DataSelector";
+
+import worm_data from "./data/worm.txt";
+import cart_data from "./data/cartpole.txt";
+
+const worm = JSON.parse(worm_data);
+const cart = JSON.parse(cart_data);
 
 var scene = new THREE.Scene();
 scene.background = new THREE.Color(0xaaaaaa);
@@ -12,6 +19,7 @@ const light = new THREE.DirectionalLight();
 light.castShadow = true;
 light.position.set(0, 1000, 0);
 light.target.position.set(0, 0, 0);
+light.intensity = 0.2;
 
 scene.add(light);
 scene.add(new THREE.HemisphereLight());
@@ -43,17 +51,18 @@ function updateCamera() {
 updateCamera();
 */
 
-const world = new WorldDisplay(scene);
-world.setTimesteps(300);
-world.randomCubes();
+const world = new WorldDisplay(scene, cart);
 
 const view = new View(scene);
 
 const timeline = new Timeline(world);
 
+const dataSelector = new DataSelector(world, timeline);
+dataSelector.registerData("Cartpole", cart);
+dataSelector.registerData("Jumpworm", worm);
+
 addEventListener("keydown", (e: KeyboardEvent) => {
   if (e.key === "r") {
-    world.randomCubes();
   }
 });
 
@@ -85,8 +94,10 @@ showPathsButton.onclick = function () {
   showPathsButton.blur();
 };
 
+/*
 fetch("http://localhost:9080")
   .then((res) => res.json())
   .then((res) => {
     console.log(res);
   });
+  */

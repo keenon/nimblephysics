@@ -87,7 +87,7 @@ endif()
 # errors.
 option(DART_ENABLE_SIMD
   "Build DART with all SIMD instructions on the current local machine" OFF)
-option(DART_BUILD_GUI_OSG "Build osgDart library" ON)
+option(DART_BUILD_GUI_OSG "Build osgDart library" OFF)
 option(DART_BUILD_EXTRAS "Build extra projects" OFF)
 option(DART_CODECOV "Turn on codecov support" OFF)
 option(DART_TREAT_WARNINGS_AS_ERRORS "Treat warnings as errors" OFF)
@@ -331,10 +331,6 @@ if(TARGET dart)
 
 endif()
 
-if (DART_BUILD_DARTPY)
-  add_subdirectory(python)
-endif()
-
 if(DART_BUILD_EXTRAS)
   add_subdirectory(extras)
 endif()
@@ -424,7 +420,9 @@ install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/tutorials"
 # Python bindings
 #===============================================================================
 
-add_subdirectory(python)
+if (DART_BUILD_DARTPY)
+  add_subdirectory(python)
+endif()
 
 #===============================================================================
 # Uninstall

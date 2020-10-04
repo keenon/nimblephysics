@@ -65,6 +65,44 @@ body {
   z-index: 1;
 }
 
+.Timeline__logline {
+  position: fixed;
+  bottom: 90px;
+  right: 20px;
+  width: 30px;
+  height: calc(100vh - 150px);
+  box-shadow: 0px 0px 15px 0px rgba(0, 0, 0, 0.05);
+  border-radius: 0.25rem;
+  border: 1px solid #222222;
+  background: #333333;
+  z-index: 2;
+}
+
+.Timeline__logline-tick {
+  position: absolute;
+  z-index: 3;
+  width: 100%;
+  height: 5px;
+  background-color: #ee4c2c;
+  border: none;
+  user-select: none;
+}
+
+.Timeline__logline-text {
+  position: fixed;
+  top: 60px;
+  right: 70px;
+  text-align: right;
+  font-size: 12px;
+  z-index: 1;
+}
+
+.DataSelector__holder {
+  position: fixed;
+  top: 20px;
+  left: 20px;
+}
+
 canvas {
   outline: none;
   -webkit-tap-highlight-color: rgba(255, 255, 255, 0); /* mobile webkit */
