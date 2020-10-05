@@ -86,20 +86,21 @@ class WorldDisplay {
     this.showPaths = true;
 
     this.timesteps = report.record[0].timesteps;
-    this.setIteration(0);
+    this.setIteration(this.report.record.length - 1);
   }
 
   setData = (report: FullReport) => {
     this.objects.forEach((v) => {
       v.removeFromScene(this.scene);
     });
+    this.objects.clear();
     this.report = report;
     this.t = 0;
     this.timesteps = report.record[0].timesteps;
 
     // Force setIteration to run
     this.i = -1;
-    this.setIteration(0);
+    this.setIteration(this.report.record.length - 1);
   };
 
   setShowPaths = (showPaths: boolean) => {

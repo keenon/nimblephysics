@@ -21,7 +21,7 @@ def main():
     rootShape = root.createShapeNode(dart.dynamics.BoxShape([.1, .1, .1]))
     rootVisual = rootShape.createVisualAspect()
     rootShape.createCollisionAspect()
-    rootVisual.setColor([0, 0, 0])
+    rootVisual.setColor([0.7, 0.7, 0.7])
     rootJoint.setForceUpperLimit(0, 0)
     rootJoint.setForceLowerLimit(0, 0)
     rootJoint.setForceUpperLimit(1, 0)
@@ -78,6 +78,7 @@ def main():
     floorJoint.setTransformFromParentBodyNode(floorOffset)
     floorShape = floorBody.createShapeNode(dart.dynamics.BoxShape([2.5, 0.25, .5]))
     floorVisual = floorShape.createVisualAspect()
+    floorVisual.setColor([0.5, 0.5, 0.5])
     floorShape.createCollisionAspect()
     # floorBody.setFrictionCoeff(0)
 

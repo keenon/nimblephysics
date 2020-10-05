@@ -19,7 +19,7 @@ def main():
     cartRail.setAxis([1, 0, 0])
     cartShape = cart.createShapeNode(dart.dynamics.BoxShape([.5, .1, .1]))
     cartVisual = cartShape.createVisualAspect()
-    cartVisual.setColor([0.2, 0.2, 0.2])
+    cartVisual.setColor([0.5, 0.5, 0.5])
     cartRail.setPositionUpperLimit(0, 10)
     cartRail.setPositionLowerLimit(0, -10)
     cartRail.setForceUpperLimit(0, 10)
@@ -29,7 +29,7 @@ def main():
     poleJoint.setAxis([0, 0, 1])
     poleShape = pole.createShapeNode(dart.dynamics.BoxShape([.1, 1.0, .1]))
     poleVisual = poleShape.createVisualAspect()
-    poleVisual.setColor([0.3, 0.3, 0.3])
+    poleVisual.setColor([0.7, 0.7, 0.7])
     poleJoint.setForceUpperLimit(0, 0)
     poleJoint.setForceLowerLimit(0, 0)
 

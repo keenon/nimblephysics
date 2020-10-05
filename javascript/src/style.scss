@@ -34,16 +34,21 @@ body {
   overflow: hidden;
 }
 
+$slider-box-shadow: 0px 0px 15px 0px rgba(0, 0, 0, 0.05);
+$slider-border-radius: 0.25rem;
+$slider-border: 1px solid #e5e5e5;
+$slider-background: white;
+
 .Timeline__timeline {
   position: fixed;
   bottom: 20px;
   left: 20px;
   width: calc(100vw - 40px);
   height: 30px;
-  box-shadow: 0px 0px 15px 0px rgba(0, 0, 0, 0.05);
-  border-radius: 0.25rem;
-  border: 1px solid #222222;
-  background: #333333;
+  box-shadow: $slider-box-shadow;
+  border-radius: $slider-border-radius;
+  border: $slider-border;
+  background: $slider-background;
   z-index: 2;
 }
 
@@ -52,7 +57,7 @@ body {
   z-index: 3;
   height: 100%;
   width: 5px;
-  background-color: #ee4c2c;
+  background-color: rgb(0, 119, 170);
   border: none;
   user-select: none;
 }
@@ -71,10 +76,10 @@ body {
   right: 20px;
   width: 30px;
   height: calc(100vh - 150px);
-  box-shadow: 0px 0px 15px 0px rgba(0, 0, 0, 0.05);
-  border-radius: 0.25rem;
-  border: 1px solid #222222;
-  background: #333333;
+  box-shadow: $slider-box-shadow;
+  border-radius: $slider-border-radius;
+  border: $slider-border;
+  background: $slider-background;
   z-index: 2;
 }
 
@@ -83,7 +88,7 @@ body {
   z-index: 3;
   width: 100%;
   height: 5px;
-  background-color: #ee4c2c;
+  background-color: rgb(0, 119, 170);
   border: none;
   user-select: none;
 }
@@ -95,6 +100,34 @@ body {
   text-align: right;
   font-size: 12px;
   z-index: 1;
+}
+
+.Timeline__play-pause-holder {
+  position: fixed;
+  bottom: 65px;
+  left: 80px;
+  width: calc(100vw - 160px);
+  text-align: center;
+}
+
+.Timeline__play-pause-button {
+  font-size: 30px;
+  font-family: "Roboto Mono", monospace;
+  width: 120px;
+  border-radius: 10px;
+  border: none;
+  outline: none;
+  background-color: rgb(0, 119, 170);
+  color: white;
+}
+
+.Timeline__big-constraint-violation {
+  color: red;
+  font-weight: bold;
+}
+
+.Timeline__constraint-violation {
+  color: red;
 }
 
 .DataSelector__holder {

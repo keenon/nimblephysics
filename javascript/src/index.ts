@@ -13,7 +13,7 @@ const worm = JSON.parse(worm_data);
 const cart = JSON.parse(cart_data);
 
 var scene = new THREE.Scene();
-scene.background = new THREE.Color(0xaaaaaa);
+scene.background = new THREE.Color(0xf8f8f8);
 
 const light = new THREE.DirectionalLight();
 light.castShadow = true;

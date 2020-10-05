@@ -5,6 +5,9 @@ class Timeline {
   playing: boolean;
   playStartTime: number;
   playStartTimestep: number;
+
+  playPauseButton: HTMLButtonElement;
+
   timeline: HTMLDivElement;
   timelineTick: HTMLDivElement;
   timelineText: HTMLDivElement;
@@ -16,6 +19,15 @@ class Timeline {
   constructor(world: WorldDisplay) {
     this.world = world;
     this.playing = false;
+
+    const playPauseButtonHolder = document.createElement("div");
+    playPauseButtonHolder.className = "Timeline__play-pause-holder";
+    document.body.appendChild(playPauseButtonHolder);
+    this.playPauseButton = document.createElement("button");
+    this.playPauseButton.className = "Timeline__play-pause-button";
+    this.playPauseButton.innerHTML = "Play";
+    playPauseButtonHolder.appendChild(this.playPauseButton);
+    this.playPauseButton.onclick = this.playPauseToggle;
 
     this.timeline = document.createElement("div");
     this.timeline.className = "Timeline__timeline";
@@ -47,11 +59,7 @@ class Timeline {
 
     addEventListener("keydown", (e: KeyboardEvent) => {
       if (e.key === " ") {
-        this.playing = !this.playing;
-        if (this.playing) {
-          this.playStartTime = new Date().getTime();
-          this.playStartTimestep = this.world.getTimestep();
-        }
+        this.playPauseToggle();
       }
     });
 
@@ -135,6 +143,17 @@ class Timeline {
     });
   }
 
+  playPauseToggle = () => {
+    this.playing = !this.playing;
+    if (this.playing) {
+      this.playPauseButton.innerHTML = "Pause";
+      this.playStartTime = new Date().getTime();
+      this.playStartTimestep = this.world.getTimestep();
+    } else {
+      this.playPauseButton.innerHTML = "Play";
+    }
+  };
+
   updateTimelineTick = () => {
     let percentage = this.world.getTimestep() / (this.world.getTimesteps() - 1);
     if (this.world.getTimesteps() === 1) percentage = 0.5;
@@ -171,11 +190,51 @@ class Timeline {
     </tr>
     <tr>
       <td>constraints:</td>
-      <td>${this.world.getConstraintViolation().toExponential(5)}</td>
+      <td class="${
+        this.world.getConstraintViolation() > 1.0e-1
+          ? "Timeline__big-constraint-violation"
+          : this.world.getConstraintViolation() > 1.0e-2
+          ? "Timeline__constraint-violation"
+          : ""
+      }">${this.world.getConstraintViolation().toExponential(5)}</td>
+    </tr>
+    <tr>
+      <td colspan="2" id="next-step-holder">
+      </td>
+    </tr>
+    <tr>
+      <td colspan="2" id="prev-step-holder">
+      </td>
     </tr>
   </tbody>
 </table>`;
     this.loglineText.innerHTML = text;
+    const nextStepHolder = document.getElementById("next-step-holder");
+    const prevStepHolder = document.getElementById("prev-step-holder");
+
+    const nextStepButton = document.createElement("button");
+    nextStepButton.innerHTML = "Show next learning step";
+    nextStepHolder.appendChild(nextStepButton);
+    if (this.world.getIteration() < this.world.getNumIterations() - 1) {
+      nextStepButton.onclick = () => {
+        this.world.setIteration(this.world.getIteration() + 1);
+        this.updateLoglineTick();
+      };
+    } else {
+      nextStepButton.disabled = true;
+    }
+
+    const prevStepButton = document.createElement("button");
+    prevStepButton.innerHTML = "Show prev learning step";
+    prevStepHolder.appendChild(prevStepButton);
+    if (this.world.getIteration() > 0) {
+      prevStepButton.onclick = () => {
+        this.world.setIteration(this.world.getIteration() - 1);
+        this.updateLoglineTick();
+      };
+    } else {
+      prevStepButton.disabled = true;
+    }
   };
 
   update = () => {
