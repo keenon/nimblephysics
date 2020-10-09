@@ -9,11 +9,11 @@ python3 setup.py sdist bdist_wheel
 
 # Install delocate, to bundle dependencies into the wheel
 pushd dist
-DYLD_LIBRARY_PATH="$DYLD_LIBRARY_PATH:/usr/local/lib" delocate-wheel -w ../wheelhouse -v diffdart-0.0.2-cp38-cp38-macosx_10_14_x86_64.whl
+DYLD_LIBRARY_PATH="$DYLD_LIBRARY_PATH:/usr/local/lib" delocate-wheel -w ../wheelhouse -v diffdart-0.0.3-cp38-cp38-macosx_10_14_x86_64.whl
 popd
 
 # Replace the ABI tag with a more general version
-mv wheelhouse/diffdart-0.0.2-cp38-cp38-macosx_10_14_x86_64.whl wheelhouse/diffdart-0.0.2-cp38-abi3-macosx_10_14_x86_64.whl
+# mv wheelhouse/diffdart-0.0.2-cp38-cp38-macosx_10_14_x86_64.whl wheelhouse/diffdart-0.0.2-cp38-abi3-macosx_10_14_x86_64.whl
 
 # install_name_tool -change "@loader_path/.dylibs/Python" "/usr/local/opt/python@3.8/Frameworks/Python.framework/Versions/3.8/Python" _diffdart.so
 # install_name_tool -change "/usr/local/opt/python@3.8/Frameworks/Python.framework/Versions/3.8/Python" "Python" _diffdart.so
