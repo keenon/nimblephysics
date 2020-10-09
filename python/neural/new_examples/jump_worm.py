@@ -114,7 +114,7 @@ def main():
     n = text_file.write(json)
     text_file.close()
 
-    # dart.gui.glut.displayTrajectoryInGUI(world, trajectory)
+    dart.dart_serve_web_gui(json)
 
 
 if __name__ == "__main__":

@@ -5,7 +5,7 @@ import { SSAOPass } from "./threejs_lib/postprocessing/SSAOPass.js";
 import { OrbitControls } from "./threejs_lib/controls/OrbitControls.js";
 
 class View {
-  container: any;
+  container: HTMLDivElement;
   scene: THREE.Scene;
   renderer: THREE.Renderer;
   camera: THREE.Camera;
@@ -14,19 +14,19 @@ class View {
   height: number;
   controls: OrbitControls;
 
-  constructor(scene: THREE.Scene) {
-    this.refreshSize();
+  constructor(scene: THREE.Scene, parent: HTMLElement) {
+    this.container = document.createElement("div");
+    this.container.className = "View__container";
+    parent.appendChild(this.container);
 
-    const container: any = document.createElement("div");
-    container.className = "View__container";
-    document.body.appendChild(container);
+    this.refreshSize();
 
     this.renderer = new THREE.WebGLRenderer();
     this.renderer.setSize(this.width, this.height);
     (this.renderer as any).shadowMap.enabled = true;
     (this.renderer as any).shadowMapType = THREE.PCFSoftShadowMap;
 
-    container.appendChild(this.renderer.domElement);
+    this.container.appendChild(this.renderer.domElement);
 
     this.camera = new THREE.PerspectiveCamera(
       65,

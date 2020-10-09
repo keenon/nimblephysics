@@ -1,0 +1,19 @@
+<html>
+  <body>
+    Loading...
+    <script src="./bundle.js"></script>
+    <script>
+      var xhttp = new XMLHttpRequest();
+      xhttp.onreadystatechange = function () {
+        if (this.readyState == 4 && this.status == 200) {
+          document.body.innerHTML = "";
+          const blobJson = JSON.parse(this.responseText);
+          const dartWindow = new document.DARTWindow(document.body);
+          dartWindow.setData(blobJson);
+        }
+      };
+      xhttp.open("GET", "/json", true);
+      xhttp.send();
+    </script>
+  </body>
+</html>

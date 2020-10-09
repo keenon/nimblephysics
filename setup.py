@@ -74,7 +74,7 @@ class CMakeBuild(build_ext):
 
 setup(
     name='diffdart',
-    version='0.0.2',
+    version='0.0.3',
     author='Keenon Werling',
     author_email='keenonwerling@gmail.com',
     description='A differentiable fully featured physics engine',
@@ -82,6 +82,7 @@ setup(
     license='MIT',
     package_dir={'': 'python'},
     packages=['diffdart'],
+    package_data={'diffdart': ['web_gui/*']},
     ext_package='diffdart_libs',
     ext_modules=[CMakeExtension('cmake_example', target='_diffdart')],
     install_requires=[
