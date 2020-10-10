@@ -206,7 +206,7 @@ RUN cd diffdart && \
     git pull
 
 # This is allowed to be empty string, but if it's not it must be prefixed by
-ENV VERSION="0.0.2"
+ENV VERSION="0.0.3"
 
 RUN cd diffdart && \
     git pull && \
