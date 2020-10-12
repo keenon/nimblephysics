@@ -7,13 +7,13 @@ class DataSelector {
   data: Map<string, FullReport>;
   holder: HTMLDivElement;
 
-  constructor(world: WorldDisplay, timeline: Timeline) {
+  constructor(world: WorldDisplay, timeline: Timeline, container: HTMLElement) {
     this.world = world;
     this.timeline = timeline;
     this.data = new Map();
     this.holder = document.createElement("div");
     this.holder.className = "DataSelector__holder";
-    document.body.appendChild(this.holder);
+    container.appendChild(this.holder);
   }
 
   registerData = (name: string, data: FullReport) => {

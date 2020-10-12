@@ -1,0 +1,24 @@
+//
+// 404
+//
+//
+
+.error-type {
+  display: inline-block;
+  margin-bottom: 0;
+  font-size: 15rem;
+  font-weight: $font-weight-bold;
+  line-height: .8em;
+
+  @include media-breakpoint-down(md) {
+    font-size: 10rem;
+  }
+
+  @include media-breakpoint-down(sm) {
+    font-size: 8rem;
+  }
+}
+
+.error-text {
+  display: inline-block;
+}

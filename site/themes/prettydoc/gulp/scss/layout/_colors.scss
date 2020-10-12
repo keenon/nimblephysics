@@ -1,0 +1,22 @@
+//
+// colors
+//
+//
+
+// background
+@each $color, $value in $colors {
+  @include bg-variant(".bg-#{$color}", $value);
+}
+
+@each $color, $value in $grays {
+  @include bg-variant(".bg-#{$color}", $value);
+}
+
+// text
+@each $color, $value in $colors {
+	@include text-emphasis-variant(".text-#{$color}", $value);
+}
+
+@each $color, $value in $socials {
+	@include text-emphasis-variant(".text-#{$color}", $value);
+}

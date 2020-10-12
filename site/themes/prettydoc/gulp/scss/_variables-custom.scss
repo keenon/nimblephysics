@@ -1,0 +1,52 @@
+// Custom Variables
+//
+// Variables should follow the `$component-state-property-size` formula for
+// consistent naming. Ex: $nav-link-disabled-color and $modal-content-box-shadow-xs.
+
+// Typogrpahy
+$font-size-list:           ( 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40, 50, 60, 70, 80, 90, 100 );
+$letter-spacing:           0.05em;
+$letter-spacing-sm:        ($letter-spacing / 2);
+$letter-spacing-lg:        ($letter-spacing * 2);
+
+
+// Layout
+$section-padding:          6.25rem;
+
+
+// Colors
+$facebook:                 #3b5998;
+$google-plus:              #dd4b39;
+$twitter:                  #00aced;
+$linkedin:                 #007bb6;
+$pinterest:                #cb2027;
+$git:                      #666666;
+$tumblr:                   #32506d;
+$vimeo:                    #aad450;
+$youtube:                  #bb0000;
+$flickr:                   #ff0084;
+$reddit:                   #ff4500;
+$dribbble:                 #ea4c89;
+$skype:                    #00aff0;
+$instagram:                #517fa4;
+$behance:                  #1769ff;
+$rss:                      #f26522;
+
+$socials: ();
+$socials: map-merge((
+  "facebook": $facebook,
+  "google-plus": $google-plus,
+  "twitter": $twitter,
+  "linkedin": $linkedin,
+  "pinterest": $pinterest,
+  "git": $git,
+  "tumblr": $tumblr,
+  "vimeo": $vimeo,
+  "flickr": $flickr,
+  "reddit": $reddit,
+  "dribbble": $dribbble,
+  "skype": $skype,
+  "instagram": $instagram,
+  "behance": $behance,
+  "rss": $rss
+), $socials);

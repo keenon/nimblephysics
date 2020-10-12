@@ -1,0 +1,43 @@
+// Maps
+//
+//
+//
+
+.map {
+	> [class*="container"] {
+		position: static;
+		visibility: hidden;
+
+		[class*="col"] {
+			visibility: visible;
+			position: relative;
+			z-index: 20;
+		}
+	}
+}
+
+.map-area {
+	position: absolute;
+	top: 0;
+	right: 0;
+	bottom: 0;
+	left: 0;
+	z-index: 10;
+}
+
+.map-box {
+	@extend %boxed;
+	@extend %equal;
+	position: relative;
+}
+
+
+// Responsive
+//
+//
+// responsive styles for maps
+@include media-breakpoint-down(md) {
+	.map {
+		padding-bottom: 50vh;
+	}
+}

@@ -1,0 +1,47 @@
+//
+// helpers
+//
+//
+
+// boxes
+[class*="circle"] {
+  border-radius: 50%;
+}
+
+// typography
+.font-weight-semibold {
+  font-weight: 600;
+}
+
+.crossfade {
+  position: relative;
+  margin: 0 auto;
+}
+
+.crossfade-dataflow {
+  width: 769px;
+  height: 288px;
+}
+
+$crossfade-time: 300ms;
+
+.crossfade img {
+  position: absolute;
+  left: 0;
+  -webkit-transition: opacity $crossfade-time ease-in-out;
+  -moz-transition: opacity $crossfade-time ease-in-out;
+  -o-transition: opacity $crossfade-time ease-in-out;
+  transition: opacity $crossfade-time ease-in-out;
+}
+
+.crossfade img.bottom {
+  opacity: 0;
+}
+
+.crossfade:hover img.top {
+  opacity: 0;
+}
+
+.crossfade:hover img.bottom {
+  opacity: 1;
+}

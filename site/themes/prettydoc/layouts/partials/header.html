@@ -1,0 +1,50 @@
+<header class="header header-sticky {{ if .IsHome }} header-transparent {{else}} header-minimal-light {{end}}">
+    <div class="container">
+    <div class="row">
+        <nav class="navbar navbar-expand-lg {{ if .IsHome }} navbar-dark {{ else }} navbar-light {{end}}">
+        <a href="/" class="navbar-brand"><img src="{{ if .IsHome }} /assets/images/logo-white.svg {{ else }} /assets/images/logo.svg {{end}}" alt="Logo"></a>
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="collapse navbar-collapse" id="navbarSupportedContent">
+            <ul class="navbar-nav mr-auto">
+                {{ $currentPage := . }}
+                {{ range .Site.Menus.main }}
+                    {{ if .HasChildren }}
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle {{ if $currentPage.HasMenuCurrent "main" . }}active{{ end }}" href="{{ .URL }}" id="dropdown-1" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                {{ .Pre }}
+                                <span>{{ .Name }}</span>
+                            </a>
+                            <div class="dropdown-menu" aria-labelledby="dropdown-1">
+                                {{ range .Children }}
+                                    <a class="dropdown-item {{ if $currentPage.IsMenuCurrent "main" . }}active{{ end }}" href="{{ .URL }}">{{ .Name }}</a>
+                                {{ end }}
+                            </div>
+                        </li>
+                    {{ else }}
+                        <li class="nav-item">
+                            <a class="nav-link {{ if $currentPage.IsMenuCurrent "main" . }}active{{ end }}" href="{{ .URL }}">
+                                {{ .Pre }}
+                                <span>{{ .Name }}</span>
+                            </a>
+                        </li>
+                    {{ end }}
+                {{ end }}
+            </ul>
+            <ul class="navbar-nav">
+                <li class="nav-item">
+                    <a class="nav-link" href="https://github.com/keenon/diffdart">Github</a>
+                </li>
+                <!--
+                <li class="nav-item">
+                    <a class="nav-link" href="documentation/changelog.html">Changelog</a>
+                </li>
+                -->
+            </ul>
+        </div>
+        </nav>
+    </div>
+    </div>
+</header>

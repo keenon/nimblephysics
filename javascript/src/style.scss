@@ -1,142 +1,143 @@
 @import url("https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@500&display=swap");
 
-body {
+.DARTWindow {
   background-color: #aaaaaa;
   overscroll-behavior: none;
   margin: 0px;
-  width: 100vw;
+  /* width: 100vw; */
   font-family: "Roboto Mono", monospace;
-}
+  position: relative;
 
-.GUI_title {
-  position: fixed;
-  top: 10px;
-  left: 0;
-  width: 100vw;
-  user-select: none;
-  text-align: center;
-  font-size: 14px;
-  z-index: 1;
-}
+  .GUI_title {
+    position: absolute;
+    top: 10px;
+    left: 0;
+    width: 100%;
+    user-select: none;
+    text-align: center;
+    font-size: 14px;
+    z-index: 1;
+  }
 
-.GUI_show-paths {
-  position: fixed;
-  top: 10px;
-  right: 20px;
-  user-select: none;
-  font-size: 14px;
-  z-index: 1;
-}
+  .GUI_show-paths {
+    position: absolute;
+    top: 10px;
+    right: 20px;
+    user-select: none;
+    font-size: 14px;
+    z-index: 1;
+  }
 
-.View__container {
-  width: 100vw;
-  height: 100vh;
-  overflow: hidden;
-}
+  .View__container {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+  }
 
-$slider-box-shadow: 0px 0px 15px 0px rgba(0, 0, 0, 0.05);
-$slider-border-radius: 0.25rem;
-$slider-border: 1px solid #e5e5e5;
-$slider-background: white;
+  $slider-box-shadow: 0px 0px 15px 0px rgba(0, 0, 0, 0.05);
+  $slider-border-radius: 0.25rem;
+  $slider-border: 1px solid #e5e5e5;
+  $slider-background: white;
 
-.Timeline__timeline {
-  position: fixed;
-  bottom: 20px;
-  left: 20px;
-  width: calc(100vw - 40px);
-  height: 30px;
-  box-shadow: $slider-box-shadow;
-  border-radius: $slider-border-radius;
-  border: $slider-border;
-  background: $slider-background;
-  z-index: 2;
-}
+  .Timeline__timeline {
+    position: absolute;
+    bottom: 20px;
+    left: 20px;
+    width: calc(100% - 40px);
+    height: 30px;
+    box-shadow: $slider-box-shadow;
+    border-radius: $slider-border-radius;
+    border: $slider-border;
+    background: $slider-background;
+    z-index: 2;
+  }
 
-.Timeline__timeline-tick {
-  position: absolute;
-  z-index: 3;
-  height: 100%;
-  width: 5px;
-  background-color: rgb(0, 119, 170);
-  border: none;
-  user-select: none;
-}
+  .Timeline__timeline-tick {
+    position: absolute;
+    z-index: 3;
+    height: 100%;
+    width: 5px;
+    background-color: rgb(0, 119, 170);
+    border: none;
+    user-select: none;
+  }
 
-.Timeline__timeline-text {
-  position: fixed;
-  bottom: 60px;
-  left: 20px;
-  font-size: 12px;
-  z-index: 1;
-}
+  .Timeline__timeline-text {
+    position: absolute;
+    bottom: 60px;
+    left: 20px;
+    font-size: 12px;
+    z-index: 1;
+  }
 
-.Timeline__logline {
-  position: fixed;
-  bottom: 90px;
-  right: 20px;
-  width: 30px;
-  height: calc(100vh - 150px);
-  box-shadow: $slider-box-shadow;
-  border-radius: $slider-border-radius;
-  border: $slider-border;
-  background: $slider-background;
-  z-index: 2;
-}
+  .Timeline__logline {
+    position: absolute;
+    bottom: 90px;
+    right: 20px;
+    width: 30px;
+    height: calc(100% - 150px);
+    box-shadow: $slider-box-shadow;
+    border-radius: $slider-border-radius;
+    border: $slider-border;
+    background: $slider-background;
+    z-index: 2;
+  }
 
-.Timeline__logline-tick {
-  position: absolute;
-  z-index: 3;
-  width: 100%;
-  height: 5px;
-  background-color: rgb(0, 119, 170);
-  border: none;
-  user-select: none;
-}
+  .Timeline__logline-tick {
+    position: absolute;
+    z-index: 3;
+    width: 100%;
+    height: 5px;
+    background-color: rgb(0, 119, 170);
+    border: none;
+    user-select: none;
+  }
 
-.Timeline__logline-text {
-  position: fixed;
-  top: 60px;
-  right: 70px;
-  text-align: right;
-  font-size: 12px;
-  z-index: 1;
-}
+  .Timeline__logline-text {
+    position: absolute;
+    top: 60px;
+    right: 70px;
+    text-align: right;
+    font-size: 12px;
+    z-index: 1;
+  }
 
-.Timeline__play-pause-holder {
-  position: fixed;
-  bottom: 65px;
-  left: 80px;
-  width: calc(100vw - 160px);
-  text-align: center;
-}
+  .Timeline__play-pause-holder {
+    position: absolute;
+    bottom: 65px;
+    left: 80px;
+    width: calc(100% - 160px);
+    text-align: center;
+  }
 
-.Timeline__play-pause-button {
-  font-size: 30px;
-  font-family: "Roboto Mono", monospace;
-  width: 120px;
-  border-radius: 10px;
-  border: none;
-  outline: none;
-  background-color: rgb(0, 119, 170);
-  color: white;
-}
+  .Timeline__play-pause-button {
+    font-size: 30px;
+    font-family: "Roboto Mono", monospace;
+    width: 120px;
+    border-radius: 10px;
+    border: none;
+    outline: none;
+    background-color: rgb(0, 119, 170);
+    color: white;
+  }
 
-.Timeline__big-constraint-violation {
-  color: red;
-  font-weight: bold;
-}
+  .Timeline__big-constraint-violation {
+    color: red;
+    font-weight: bold;
+  }
 
-.Timeline__constraint-violation {
-  color: red;
-}
+  .Timeline__constraint-violation {
+    color: red;
+  }
 
-.DataSelector__holder {
-  position: fixed;
-  top: 20px;
-  left: 20px;
-}
+  .DataSelector__holder {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+  }
 
-canvas {
-  outline: none;
-  -webkit-tap-highlight-color: rgba(255, 255, 255, 0); /* mobile webkit */
+  canvas {
+    outline: none;
+    -webkit-tap-highlight-color: rgba(255, 255, 255, 0); /* mobile webkit */
+  }
 }

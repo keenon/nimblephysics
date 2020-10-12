@@ -1,0 +1,100 @@
+//
+// List Group
+//
+//
+
+
+// minimal
+.list-group-minimal {
+	.list-group-item {
+		margin-bottom: ($card-spacer-x / 2);
+		padding: 0;
+		background: transparent;
+		border: 0;
+
+		a {
+			color: inherit;
+		}
+	}
+}
+
+
+// lines
+.list-group-lines {
+	.list-group-item {
+		@include border-radius;
+		background: transparent;
+		padding: $card-spacer-y;
+		margin-bottom: ($card-spacer-x / 2);
+
+		&.boxed {
+			background: $white;
+		}
+
+		.badge {
+			@include translate(0,-50%);
+			position: absolute;
+			top: 50%;
+			right: -($card-spacer-x / 2);
+		}
+	}
+}
+
+
+
+// contacts {
+.list-group-contacts {
+	.list-group-item {
+		background: transparent;
+		padding: 0;
+		border: 0;
+		font-size: $font-size-sm;
+		color: $gray-600;
+
+	 	+ .list-group-item {
+	 		margin-top: 1rem;
+	 	}
+
+		span {
+			display: block;
+			margin-top: .25em;
+			font-size: $font-size-lg;
+			color: $black;
+		}
+	}
+}
+
+// related
+.list-group-related {
+	margin-left: -$card-spacer-x;
+	margin-right: -$card-spacer-x;
+
+	.list-group-item {
+		@include transition;
+		background: transparent;
+		border: 0;
+		border-radius: 0;
+		padding: ($card-spacer-x / 2) $card-spacer-x;
+		color: #999;
+		font-size: $font-size-sm;
+
+		&:hover {
+			background: rgba($black, .05);
+		}
+
+		&.active {
+			color: $body-color;
+			
+			&::before,
+			&:hover::before {
+				opacity: 1;
+			}
+		}
+
+		&:hover {
+			&::before {
+				opacity: .25;
+			}
+		}
+	}
+}

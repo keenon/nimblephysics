@@ -1,0 +1,62 @@
+//
+// gallery
+//
+//
+
+.photo {
+    @include transition;
+    @include border-radius;
+    position: relative;
+    overflow: hidden;
+    -webkit-mask-image: -webkit-radial-gradient(white, black);
+
+    img {
+        width: 100%;
+    }
+
+    a { 
+        display: block;
+        margin: 0;
+        background-size: cover;
+        background-position: center;
+
+        &::before { 
+            @include border-radius;
+            @include transition;
+            opacity: 0;
+            content: "";
+            position: absolute;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            left: 0;
+            background: rgba($black, .2);
+        }
+    }
+
+    &:hover {
+        a {
+            &:before {
+                opacity: 0.75;
+            }
+        }
+
+        .photo-caption {
+            @include translate(0,0);
+            opacity: 1;
+        }
+    }
+
+}
+
+.photo-caption {
+    @include translate(0,100%);
+    @include transition;
+    @include text-shadow();
+    position: absolute;
+    bottom: .625rem;
+    left: .625rem;
+    padding: .5rem;
+    opacity: 0;
+    color: $white;
+}

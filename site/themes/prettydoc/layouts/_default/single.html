@@ -1,0 +1,240 @@
+{{ define "main" }}
+<section>
+    <div class="container">
+        <div class="row justify-content-between">
+          <!-- toc -->
+          <aside class="col-lg-3">
+            <div class="sticky sticky-with-header">
+              <button class="overlay-menu-open"></button>
+              <div class="overlay-menu boxed bg-dark text-white mb-3 mb-lg-0">
+                <ul class="nav flex-column nav-vertical" id="toc-container">
+                  <!--
+                  <li class="nav-item active">
+                    <a
+                      class="nav-link"
+                      data-toggle="collapse"
+                      href="#menu-1"
+                      role="button"
+                      aria-expanded="true"
+                      aria-controls="menu-1"
+                      >Table of Contents</a
+                    >
+                    <div
+                      class="collapse show"
+                      id="menu-1"
+                      data-parent="#page-nav"
+                    >
+                      <ul class="nav flex-column" id="toc-container">
+                        <li class="nav-item">
+                          <a class="nav-link active" href="#installation"
+                            >Installation</a
+                          >
+                        </li>
+                        <li class="nav-item">
+                          <a class="nav-link" href="#world-building">Building a World</a>
+                        </li>
+                      </ul>
+                    </div>
+                  </li>
+                  <li class="nav-item">
+                    <a
+                      class="nav-link"
+                      href="#menu-2"
+                      >Content</a
+                    >
+                  </li>
+                  -->
+                  <!--
+                  <li class="nav-item">
+                    <a
+                      class="nav-link"
+                      data-toggle="collapse"
+                      href="#menu-2"
+                      role="button"
+                      aria-expanded="false"
+                      aria-controls="menu-2"
+                      >Content</a
+                    >
+                    <div class="collapse" id="menu-2" data-parent="#page-nav">
+                      <div>
+                        <ul class="nav flex-column">
+                          <li class="nav-item">
+                            <a class="nav-link" href="#">Typography</a>
+                          </li>
+                          <li class="nav-item">
+                            <a class="nav-link" href="#">Tables</a>
+                          </li>
+                          <li class="nav-item">
+                            <a class="nav-link" href="#">Images</a>
+                          </li>
+                        </ul>
+                      </div>
+                    </div>
+                  </li>
+                  <li class="nav-item">
+                    <a
+                      class="nav-link"
+                      data-toggle="collapse"
+                      href="#menu-3"
+                      role="button"
+                      aria-expanded="false"
+                      aria-controls="menu-3"
+                      >Components</a
+                    >
+                    <div class="collapse" id="menu-3" data-parent="#page-nav">
+                      <div>
+                        <ul class="nav flex-column">
+                          <li class="nav-item">
+                            <a class="nav-link" href="#">Accordions</a>
+                          </li>
+                          <li class="nav-item">
+                            <a class="nav-link" href="#">Alerts</a>
+                          </li>
+                          <li class="nav-item">
+                            <a class="nav-link" href="#">Boxes</a>
+                          </li>
+                          <li class="nav-item">
+                            <a class="nav-link" href="#">Buttons</a>
+                          </li>
+                          <li class="nav-item">
+                            <a class="nav-link" href="#">Cards</a>
+                          </li>
+                          <li class="nav-item">
+                            <a class="nav-link" href="#">Carousels</a>
+                          </li>
+                          <li class="nav-item">
+                            <a class="nav-link" href="#">Code</a>
+                          </li>
+                          <li class="nav-item">
+                            <a class="nav-link" href="#">Forms</a>
+                          </li>
+                          <li class="nav-item">
+                            <a class="nav-link" href="#">List Groups</a>
+                          </li>
+                          <li class="nav-item">
+                            <a class="nav-link" href="#">Steps</a>
+                          </li>
+                          <li class="nav-item">
+                            <a class="nav-link" href="#">Tabs</a>
+                          </li>
+                          <li class="nav-item">
+                            <a class="nav-link" href="#">Widgets</a>
+                          </li>
+                          <li class="nav-item">
+                            <a class="nav-link" href="#">Mixed</a>
+                          </li>
+                        </ul>
+                      </div>
+                    </div>
+                  </li>
+                  -->
+                </ul>
+              </div>
+            </div>
+          </aside>
+          <script type="text/javascript">
+            function onload() {
+              if (document.readyState !== 'complete') {
+                return;
+              }
+              var headers = document.getElementsByClassName("section-title");
+              var tocContainer = document.getElementById("toc-container");
+              tocContainer.innerHTML = "";
+
+              var headerLinks = [];
+              for (var i = 0; i < headers.length; i++) {
+                var name = headers[i].innerText;
+                var href = headers[i].getElementsByTagName("a")[0].getAttribute("href");
+               var li = document.createElement("li");
+               li.className = "nav-item";
+               var a = document.createElement("a");
+               a.className = "nav-link" + (i == 0 ? " active" : "");
+               a.href = "#"+href;
+               a.innerHTML = name;
+
+               a.onclick = (function(header) {
+                 return function(e) {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  window.scrollTo({
+                    top: (header.getBoundingClientRect().top - document.body.getBoundingClientRect().top) - 100,
+                    behavior: "smooth"
+                  });
+                  }
+                })(headers[i]);
+               headerLinks.push(a);
+               li.appendChild(a);
+               tocContainer.appendChild(li);
+              }
+
+              window.addEventListener("scroll", function() {
+                var active = 0;
+                for (var i = 0; i < headerLinks.length; i++) {
+                  var rect = headers[i].getBoundingClientRect();
+                  if (rect.top < 300)
+                  {
+                    active = i;
+                  }
+                }
+                for (var i = 0; i < headerLinks.length; i++) {
+                  headerLinks[i].className = i == active ? "nav-link active" : "nav-link";
+                }
+              });
+            }
+
+            if (document.readyState == 'complete') {
+              onload();
+            }
+            else {
+              document.addEventListener("readystatechange", onload);
+            }
+          </script>
+          <!-- / toc -->
+
+          <!-- content -->
+          <article id="content" class="col-lg-7">
+            {{ .Content }}
+          </article>
+          <!-- /content -->
+
+          <!-- scroll indicator -->
+          <div class="col-lg-1 d-none d-lg-block">
+            <div class="sticky sticky-with-header text-right">
+              <div
+                id="pageProgress"
+                class="page-progress"
+                data-anchor-target="#content"
+              >
+                <div
+                  data-anchor-target="#content"
+                  data-top-top="height:0%;"
+                  data-bottom-bottom="height:100%;"
+                ></div>
+              </div>
+            </div>
+          </div>
+          <!-- / scroll indicator -->
+        </div>
+    </div>
+</section>
+
+<!-- go top -->
+<div class="half">
+    <span class="half-bg bg-dark"></span>
+    <div class="container">
+    <div class="row">
+        <div class="col text-center">
+        <div class="btn-frame">
+            <a
+            data-scroll
+            href="#top"
+            class="btn btn-top btn-primary btn-ico btn-lg btn-rounded"
+            ><i class="icon-arrow-up2 fs-22"></i
+            ></a>
+        </div>
+        </div>
+    </div>
+    </div>
+</div>
+<!-- / go top -->
+{{ end }}

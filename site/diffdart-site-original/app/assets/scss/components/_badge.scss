@@ -1,0 +1,36 @@
+//
+// badge
+//
+//
+
+.badge {
+	text-transform: uppercase;
+	font-size: .75rem;
+	font-weight: 600;
+	padding: .5rem 1rem;
+	letter-spacing: $letter-spacing;
+
+	&[class*="-lg"] {
+		min-width: 80px;
+	}
+}
+
+
+// badges
+@each $color, $value in $colors {
+  .badge-#{$color} {
+    @include badge-variant($value);
+  }
+}
+
+@each $color, $value in $socials {
+  .badge-#{$color} {
+    @include badge-variant($value);
+  }
+}
+
+@each $color, $value in $grays {
+  .badge-#{$color} {
+    @include badge-variant($value);
+  }
+}

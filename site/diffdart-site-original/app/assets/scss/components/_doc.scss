@@ -1,0 +1,62 @@
+//
+// doc
+//
+//
+
+.doc-sidebar {
+	padding: $card-spacer-x;
+	border-right: $border-width solid $border-color;
+}
+
+.doc-content-header {
+	margin-left: -($card-spacer-x / 2);
+	margin-right: -($card-spacer-x / 2);
+	margin-bottom: $grid-gutter-width;
+	padding: $grid-gutter-width / 2;
+	border-bottom: $border-width solid $border-color;
+
+	@include media-breakpoint-up(lg) {
+		margin-bottom: 0;
+		padding: $card-spacer-x 3.125rem;
+	}
+
+	@include media-breakpoint-down(md) {
+		border-top: $border-width solid $border-color;
+		background: $white;
+	}
+
+	.breadcrumb {
+		margin: 0;
+		padding: 0;
+		border: 0;
+	}
+}
+
+
+.doc-content-body {
+	margin-top: 0!important;
+
+	> article {
+		padding: $grid-gutter-width / 2;
+	}
+
+	> aside {
+		padding: $grid-gutter-width / 2;
+		border-left: $border-width solid $border-color;
+	}
+
+	@include media-breakpoint-up(lg) {
+		> article {
+			padding: 3.125rem;
+		}
+
+		> aside {
+			padding: 3.125rem $card-spacer-x;
+		}
+	}
+
+	.toc {
+		margin-left: -$card-spacer-x;
+		margin-right: -$card-spacer-x;
+	}
+}

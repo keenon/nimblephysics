@@ -1,0 +1,200 @@
+//
+// Boxes
+//
+//
+
+%boxed {
+	@include shadow;
+	border-radius: $border-radius;
+	border: $border-width solid $border-color;
+	background: white;
+}
+
+%bordered {
+	@include border-radius;
+	border: $border-width solid $border-color;
+}
+
+
+.no-border {
+	border-color: transparent;
+}
+
+
+// boxed
+.boxed {
+	@extend %boxed;
+
+	> .row {
+		margin-left: 0;
+		margin-right: 0;
+	}
+}
+
+.bordered {
+	@extend %bordered;
+}
+
+%stacked {
+	@include transition;
+	position: relative;
+	background: $white;
+
+	&::before {
+		@include transition;
+		@include border-radius;
+		opacity: .75;
+		content: "";
+		position: absolute;
+		left: 4px;
+		right: 4px;
+		bottom: -8px;
+		display: block;
+		height: 100%;
+		background: $white;
+		border: $border-width solid $border-color;
+		z-index: -1;
+	}
+
+	&:hover {
+		&::before {
+			bottom: -12px;
+		}
+	}
+}
+
+.stacked {
+	@extend %stacked;
+}
+
+
+// Equal
+//
+// equalise width and height of a box
+%equal {
+	position: relative;
+	// overflow: hidden;
+
+	&::before {
+		display: block;
+		content: "";
+		width: 100%;
+		padding-top: 100%;
+	}
+
+	> * {
+		position: absolute;
+		top: 0;
+		right: 0;
+		bottom: 0;
+		left: 0;
+		display: flex;
+	}
+
+	> a {
+		color: inherit;
+
+		&:hover {
+			color: inherit;
+		}
+	}
+
+	&[class*="-short"] {
+		&::before {
+			padding-top: 75%;
+		}
+	}	
+
+	&[class*="-long"] {
+		&::before {
+			padding-top: 125%;
+		}
+	}
+}
+
+
+
+// lift up
+%lift {
+	@include transition();
+
+	&:hover {
+		@include translate(0,-10px);
+		position: relative;
+		z-index: 50;
+		-webkit-box-shadow: 0px 10px 15px 0 rgba($black,0.1);
+		   -moz-box-shadow: 0px 10px 15px 0 rgba($black,0.1);
+				box-shadow: 0px 10px 15px 0 rgba($black,0.1);
+	}
+}
+
+.lift { @extend %lift; }
+
+.scale {
+	@include transition;
+
+	&:hover {
+		@include scale;
+		@include shadow;
+		background: $white;
+	}
+}
+
+.equal {
+	@extend %equal;
+
+	.equal-header,
+	.equal-footer {
+		position: absolute;
+		right: 0;
+		left: 0;
+	}
+
+	.equal-header { top: 0; }
+	.equal-footer { bottom: 0; }
+
+	.image {
+		z-index: 0;
+	}
+
+	.row {
+		height: 100%;
+	}
+}
+
+%highlight {
+	@include transition;
+	
+	&:hover {
+		border-color: $primary;
+		color: $primary;
+	}
+}
+
+.highlight {
+	@extend %highlight;
+}
+
+
+//
+// separated items
+//
+.separated {
+	overflow: hidden;
+
+	> * {
+		@include prefix(box-shadow, -1px -1px 0px 0px $border-color, webkit moz);
+
+		&:not(:last-child) {
+			margin-bottom: 0!important;
+		}
+	}
+}
+
+.text-white {
+	.separated {
+		> * {
+			@include prefix(box-shadow, -1px -1px 0px 0px rgba($white, .1), webkit moz);
+		}
+	}
+}

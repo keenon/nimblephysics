@@ -1,0 +1,16 @@
+//
+// alert
+//
+//
+
+.alert {
+	overflow: hidden;
+	
+	[class*="icon-"] {
+		position: absolute;
+		top: -2rem;
+		left: -2rem;
+		font-size: 10rem;
+		color: rgba($black, .05);
+	}
+}

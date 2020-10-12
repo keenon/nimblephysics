@@ -1,0 +1,82 @@
+//
+// Header
+//
+
+.header {
+	@include selection(none);
+	position: static;
+	width: 100%;
+	z-index: 100;
+
+	+ section {
+		padding-top: ($section-padding * 2);
+	}
+
+	nav {
+		width: 100%;
+	}
+}
+
+
+.header-sticky {
+	@include translate(0,0);
+	@include transition(.4s);
+	position: fixed;
+	top: 0;
+	right: 0;
+	bottom: auto;
+	left: 0;
+}
+
+.headroom--unpinned {
+	.header-sticky {
+		@include translate(0,-100%);
+		opacity: 0;
+	}
+}
+
+
+// header types
+.header-transparent { background: rgba($black, .25); }
+.header-white { 
+	@include shadow;
+	background: $white; 
+}
+
+.header-transparent,
+.header-minimal-dark {
+	@include media-breakpoint-down(md) {
+		background: $dark;
+	}
+}
+
+.header-minimal-light,
+.header-white {
+	.nav-link.active {
+		border-color: $primary!important;
+	}
+
+	@include media-breakpoint-down(md) {
+		background: $white;
+
+		.burger span {
+			background-color: $black;
+			
+			&::before,
+			&::after {
+				background-color: $black;
+			}
+		}
+	}
+}
+
+.headroom--not-top.headroom--pinned {
+	.header-transparent { background: $dark; }
+
+	.header-minimal-dark { background: $dark; }
+
+	.header-minimal-light {
+		@include shadow;
+		background: $white;
+	}
+}

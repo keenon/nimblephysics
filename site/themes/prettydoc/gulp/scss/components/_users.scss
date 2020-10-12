@@ -1,0 +1,66 @@
+//
+// users
+//
+//
+
+.user {
+	display: inline-block;
+	position: relative;
+
+	&.status {
+		&::after {
+			content: "";
+			position: absolute;
+			right: 1px;
+			bottom: 1px;
+			display: block;
+			width: 12px;
+			height: 12px;
+			border-radius: 50%;
+			background: $gray-200;
+		}
+
+		&.online::after {
+			background: $green;
+		}
+	}
+}
+
+.avatar {
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	vertical-align: top;
+	width: 3.75rem;
+	height: 3.75rem;
+	border-radius: 50%;
+	font-size: $font-size-sm;
+	text-transform: uppercase;
+	letter-spacing: $letter-spacing;
+	font-weight: $font-weight-bold;
+
+	> i {
+		font-size: $font-size-lg;
+	}
+
+	&[class*="-sm"] {
+		width: 2.5rem;
+		height: 2.5rem;
+		font-size: 0.875rem;
+
+		> i {
+			font-size: 1rem;
+		}
+	}
+
+	&[class*="-lg"] {
+		width: 5rem;
+		height: 5rem;
+		font-size: 1.125rem;
+
+		> i {
+			font-size: 1.375rem;
+		}
+	}
+}

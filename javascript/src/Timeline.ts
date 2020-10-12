@@ -16,13 +16,13 @@ class Timeline {
   loglineTick: HTMLDivElement;
   loglineText: HTMLDivElement;
 
-  constructor(world: WorldDisplay) {
+  constructor(world: WorldDisplay, container: HTMLElement) {
     this.world = world;
     this.playing = false;
 
     const playPauseButtonHolder = document.createElement("div");
     playPauseButtonHolder.className = "Timeline__play-pause-holder";
-    document.body.appendChild(playPauseButtonHolder);
+    container.appendChild(playPauseButtonHolder);
     this.playPauseButton = document.createElement("button");
     this.playPauseButton.className = "Timeline__play-pause-button";
     this.playPauseButton.innerHTML = "Play";
@@ -31,7 +31,7 @@ class Timeline {
 
     this.timeline = document.createElement("div");
     this.timeline.className = "Timeline__timeline";
-    document.body.appendChild(this.timeline);
+    container.appendChild(this.timeline);
 
     this.timelineTick = document.createElement("div");
     this.timelineTick.className = "Timeline__timeline-tick";
@@ -39,11 +39,11 @@ class Timeline {
 
     this.timelineText = document.createElement("div");
     this.timelineText.className = "Timeline__timeline-text";
-    document.body.appendChild(this.timelineText);
+    container.appendChild(this.timelineText);
 
     this.logline = document.createElement("div");
     this.logline.className = "Timeline__logline";
-    document.body.appendChild(this.logline);
+    container.appendChild(this.logline);
 
     this.loglineTick = document.createElement("div");
     this.loglineTick.className = "Timeline__logline-tick";
@@ -51,13 +51,13 @@ class Timeline {
 
     this.loglineText = document.createElement("div");
     this.loglineText.className = "Timeline__logline-text";
-    document.body.appendChild(this.loglineText);
+    container.appendChild(this.loglineText);
     this.loglineText.innerHTML = "iter: 0/100<br>loss: 1.23e-7<br>infeas: 1e-3";
 
     this.updateTimelineTick();
     this.updateLoglineTick();
 
-    addEventListener("keydown", (e: KeyboardEvent) => {
+    container.addEventListener("keydown", (e: KeyboardEvent) => {
       if (e.key === " ") {
         this.playPauseToggle();
       }
@@ -240,7 +240,7 @@ class Timeline {
   update = () => {
     if (this.playing) {
       const msElapsed = new Date().getTime() - this.playStartTime;
-      const FPS = 100;
+      const FPS = 150;
       const advanceTimesteps = Math.round(msElapsed * (FPS / 1000));
       const timestep =
         (this.playStartTimestep + advanceTimesteps) % this.world.getTimesteps();

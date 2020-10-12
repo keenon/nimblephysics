@@ -1,0 +1,21 @@
+<div class="row justify-content-center">
+  <div style="height: 550px; width: 750px; box-shadow: 0 0 10px 0 rgba(0,0,0,0.2);" id="{{ .Get 0 }}-3d-viewer">
+  </div>
+</div>
+<script type="text/javascript">
+function onload() {
+  if (document.readyState !== 'complete') {
+    return;
+  }
+  var viewer = document.getElementById("{{ .Get 0 }}-3d-viewer");
+  var window = new document.DARTWindow(viewer);
+  window.registerRemoteData("{{ .Get 0 }}", "{{ .Get 1 }}");
+}
+
+if (document.readyState == 'complete') {
+  onload();
+}
+else {
+  document.addEventListener("readystatechange", onload);
+}
+</script>

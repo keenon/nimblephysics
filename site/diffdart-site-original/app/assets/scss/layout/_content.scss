@@ -1,0 +1,158 @@
+//
+// Content
+//
+
+body {
+	position: relative;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+}
+
+
+// page
+body {
+	> section,
+	> footer {
+		position: relative;
+		margin: 0 auto;
+		padding: 6.25rem 0;
+		overflow: hidden;
+	}
+}
+
+.row {
+	+ .row {
+		margin-top: 2.5rem;
+	}
+}
+
+.container-fluid { max-width: 1600px; }
+.container-full {
+	padding-right: ($grid-gutter-width / 2);
+	padding-left: ($grid-gutter-width / 2);
+}
+
+
+// article
+article {
+	> section {
+		&:not(:first-child) {
+			margin-top: ($section-padding / 2);
+		}
+
+		> .row {
+			margin-top: $grid-gutter-width;
+			margin-bottom: $grid-gutter-width;
+		}
+	}
+}
+
+
+// text white
+.text-white {
+	
+	[class*="separator"],
+	&[class*="separator"] {
+		border-color: rgba($white, .1);
+	}
+}
+
+// page Progress
+.page-progress {
+	display: inline-block;
+	height: 100px;
+	width: 4px;
+	background: $gray-300;
+	border-radius: 2px;
+
+	div {
+		width: 4px;
+		border-radius: 2px;
+		background: $gray-800;
+	}
+}
+
+
+// content
+.content-body {
+	padding: ($grid-gutter-width * 1.5);
+
+	@include media-breakpoint-down(md) {
+		padding: $card-spacer-y;
+	}
+
+	> section {
+		&:not(:first-of-type) {
+			margin-top: ($section-padding / 2);
+		}
+	}
+}
+
+.content-aside {
+	padding: 0;
+}
+
+.content-header {
+	margin: -($card-spacer-x * 1.5);
+	margin-bottom: ($card-spacer-x * 1.5);
+	padding: ($card-spacer-x * 1.5);
+	border-bottom: $border-width solid $border-color;
+}
+
+.content-footer {
+	margin: -($card-spacer-x * 1.5);
+	margin-top: ($card-spacer-x * 1.5);
+	padding: ($card-spacer-x * 1.5);
+	border-top: $border-width solid $border-color;
+}
+
+
+//
+// separator
+//
+[class*="separator"] {
+	border-width: 0;
+	border-color: $border-color;
+	border-style: solid;
+
+	&[class*="-top"] { border-top-width: $border-width; }
+	&[class*="-right"] { border-right-width: $border-width; }
+	&[class*="-bottom"] { border-bottom-width: $border-width; }
+	&[class*="-left"] { border-left-width: $border-width; }
+}
+
+
+// half
+.half {
+	position: relative;
+	padding: 10px 0;
+
+	.half-bg {
+		position: absolute;
+		content: "";
+		top: 50%;
+		width: 100%;
+		height: 50%;
+
+		.image {
+			z-index: 1;
+		}
+	}
+}
+
+
+
+// sticky
+.sticky {
+	@include transition(.4s);
+
+	&.is_stuck {
+		@include translate(0,($card-spacer-x / 2));
+	}
+}
+
+.headroom--pinned {
+	.sticky-with-header.is_stuck {
+		@include translate(0, $section-padding); // header height
+	}
+}

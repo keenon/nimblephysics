@@ -1,0 +1,37 @@
+//
+// Icons
+//
+//
+
+.icon-boxed {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	vertical-align: top;
+	width: 3.125rem;
+	height: 3.125rem;
+	background: $gray-200;
+	color: #222;
+	border-radius: 50%;
+	font-size: $font-size-lg;
+
+	&[class*="-sm"] {
+		width: 2.5rem;
+		height: 2.5rem;
+	}
+
+	&[class*="-lg"] {
+		width: 5rem;
+		height: 5rem;
+		font-size: 1.75rem;
+	}
+
+}
+
+.icon-background {
+	position: absolute;
+	top: -15%;
+	right: -10%;
+	opacity: .1;
+	font-size: 12.5rem;
+}

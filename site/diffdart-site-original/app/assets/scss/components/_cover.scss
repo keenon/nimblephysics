@@ -1,0 +1,51 @@
+//
+// Cover
+//
+//
+
+.image {
+	position: absolute;
+	top: 0;
+	right: 0;
+	bottom: 0;
+	left: 0;
+	background-size: cover;
+	background-position: center;
+	z-index: -1;
+
+	&[class*="-gradient-vertical"] {
+		-webkit-mask-image: -webkit-gradient(linear, left top, left bottom, 
+		from(rgba(0,0,0,.2)), to(rgba(0,0,0,0)));
+	}
+
+	&[class*="-gradient-vertical-invert"] {
+		-webkit-mask-image: -webkit-gradient(linear, left top, left bottom, 
+		from(rgba(0,0,0,0)), to(rgba(0,0,0,0.2)));
+	}
+
+	&[class*="-overlay"] {
+		&::after {
+			position: absolute;
+			top: 0;
+			right: 0;
+			bottom: 0;
+			left: 0;
+			content: "";
+			background: rgba($black, .55);
+		}
+	}
+}
+
+.no-cssmask {
+	.image {
+		&[class*="-gradient-vertical"],
+		&[class*="-gradient-vertical-invert"] {
+			display: none;
+		}
+	}
+}
+
+.scroll-spy {
+	height: 100vh;
+	overflow-y: scroll;
+}

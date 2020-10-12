@@ -8,12 +8,16 @@ import DataSelector from "./DataSelector";
 
 class DARTWindow {
   scene: THREE.Scene;
+  container: HTMLElement;
   view: View;
   timeline: Timeline | null;
   world: WorldDisplay | null;
   dataSelector: DataSelector | null;
 
   constructor(container: HTMLElement) {
+    container.className += " DARTWindow";
+    this.container = container;
+
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0xf8f8f8);
 
@@ -55,8 +59,9 @@ class DARTWindow {
 
     this.view = new View(this.scene, container);
 
-    addEventListener("keydown", (e: KeyboardEvent) => {
-      if (e.key === "r") {
+    container.addEventListener("keydown", (e: KeyboardEvent) => {
+      if (e.key === " ") {
+        e.preventDefault();
       }
     });
 
@@ -75,12 +80,12 @@ class DARTWindow {
     const title = document.createElement("div");
     title.innerHTML = "DiffDART Visualizer - v0.0.1";
     title.className = "GUI_title";
-    document.body.appendChild(title);
+    container.appendChild(title);
 
     const showPathsContainer = document.createElement("div");
     showPathsContainer.className = "GUI_show-paths";
     showPathsContainer.innerHTML = "Show paths: ";
-    document.body.appendChild(showPathsContainer);
+    container.appendChild(showPathsContainer);
     const showPathsButton = document.createElement("input");
     showPathsButton.type = "checkbox";
     showPathsContainer.appendChild(showPathsButton);
@@ -94,6 +99,20 @@ class DARTWindow {
   }
 
   /**
+   * This loads some data remotely and registers it
+   *
+   * @param name
+   * @param url
+   */
+  registerRemoteData = (name: string, url: string) => {
+    return fetch(url)
+      .then((result) => result.json())
+      .then((json) => {
+        this.registerData(name, json);
+      });
+  };
+
+  /**
    * This adds a FullReport as an option with a button for users to be able to select.
    *
    * @param name The human readable name for this data, to add to our chooser menu
@@ -102,10 +121,14 @@ class DARTWindow {
   registerData = (name: string, data: FullReport) => {
     if (this.world == null) {
       this.world = new WorldDisplay(this.scene, data);
-      this.timeline = new Timeline(this.world);
+      this.timeline = new Timeline(this.world, this.container);
     }
     if (this.dataSelector == null) {
-      this.dataSelector = new DataSelector(this.world, this.timeline);
+      this.dataSelector = new DataSelector(
+        this.world,
+        this.timeline,
+        this.container
+      );
     }
     this.dataSelector.registerData(name, data);
   };
@@ -118,7 +141,7 @@ class DARTWindow {
   setData = (data: FullReport) => {
     if (this.world == null) {
       this.world = new WorldDisplay(this.scene, data);
-      this.timeline = new Timeline(this.world);
+      this.timeline = new Timeline(this.world, this.container);
     } else {
       this.world.setData(data);
     }

@@ -1,0 +1,338 @@
+//
+// accordions
+//
+//
+
+.accordion {
+
+	.card {
+		@include transition;
+		overflow: visible;
+
+		.card-header {
+			padding: 0;
+			border: 0;
+			background: transparent;
+
+			> * {
+				font-family: $font-family-sans-serif;
+				font-weight: $font-weight-normal;
+			}
+
+			button {
+				@include transition;
+				position: relative;
+				width: 100%;
+				padding: $card-spacer-y $card-spacer-x;
+				text-align: left;
+				text-transform: none;
+				font-weight: $font-weight-normal;
+				font-size: 1rem;
+				letter-spacing: 0;
+				color: inherit;
+				white-space: normal;
+
+				&:hover {
+					text-decoration: none;
+				}
+
+				&::before {
+					position: absolute;
+				    content: "\ebfa";
+				    width: 1em;
+				    line-height: 1em;
+				    right: $card-spacer-x;
+				    top: 50%;
+				    font-family: 'icomoon' !important;
+				    font-size: 1.5rem;
+				    margin-top: -0.5em;
+				    color: $secondary;
+				    @include transition(0.2s);
+				}
+
+				&[aria-expanded="true"] {
+					&::before {
+						@include rotate(180deg);
+					}
+				}
+			}
+		}
+
+		.card-body {
+			padding-top: 0;
+		}
+	}
+
+}
+
+
+.accordion-boxed {
+	@include shadow;
+
+	.card {
+		@include no-shadow;
+
+		.card-header {
+			button {
+				padding: $card-spacer-y ($card-spacer-x * 2) $card-spacer-y $card-spacer-x;
+			}
+		}
+	}
+}
+
+.accordion-bordered {
+	@include no-shadow;
+	background: transparent;
+
+	.card {
+		@include no-shadow;
+		background: transparent;
+
+		.card-header {
+			button {
+				padding: $card-spacer-y ($card-spacer-x * 2) $card-spacer-y $card-spacer-x;
+			}
+		}
+	}
+}
+
+
+// fluid
+.accordion-fluid {
+
+	.card {
+		@include no-shadow;
+		@include transition;
+		border-color: transparent;
+		background: transparent;
+
+		&::before,
+		&::after {
+			@include transition;
+			content: "";
+			position: absolute;
+			display: block;
+			top: -1px;
+			bottom: -$border-width;
+			width: 100vw;
+		}
+
+		&::before { right: 100%; }
+		&::after { left: 100%; }
+
+		&:not(:first-of-type):not(:last-of-type), &:first-of-type {
+			border-bottom: $border-width solid $border-color;
+
+			&::before,
+			&::after {
+				border-bottom: $border-width solid $border-color;
+			}
+		}
+
+		.card-header {
+			button {
+				padding: ($section-padding / 2) ($card-spacer-x * 2) ($section-padding / 2) 0;
+				font-size: 1.25rem;
+			}
+		}
+
+		.card-body {
+			padding: 0 0 ($card-spacer-x * 2) 0;
+		}
+
+		&.active {
+			background: $white;
+
+			&::before,
+			&::after {
+				background: $white;
+			}
+		}
+	}
+
+}
+
+
+// stacks
+.accordion-stack {
+	@include no-shadow;
+	background: transparent;
+
+	.card {
+		@extend %stacked;
+
+		&.active {
+			&::before {
+				bottom: 0;
+			}
+		}
+
+		&:not(:first-of-type):not(:last-of-type),
+		&:first-of-type {
+			@include border-radius;
+			border-bottom: $border-width solid $border-color;
+		}
+
+		&:last-of-type {
+			@include border-radius;
+		}
+
+		.card-header {
+
+			button {
+				position: relative;
+				width: 100%;
+				text-align: left;
+				font-size: $font-size-lg;
+
+				&::before {
+					position: static;
+				    content: "\ec7d";
+				    display: inline-flex;
+				    align-items: center;
+				    justify-content: center;
+				    vertical-align: middle;
+				    width: 2.5rem;
+				    height: 2.5rem;
+				    margin-right: $card-spacer-y;
+				    border-radius: 50%;
+				    font-family: 'icomoon' !important;
+				    margin-top: 0;
+				    background: $primary;
+				    color: $white;
+				}
+
+				&[aria-expanded="true"] {
+					&::before {
+						content: "\ec62";
+						@include rotate(0deg);
+					}
+				}
+			}
+		}
+
+		+ .card {
+			margin-top: ($card-spacer-x / 2);
+		}
+	}
+}
+
+
+// changelog
+.accordion-changelog {
+	.card {
+		.card-header {
+			button {
+				padding: $card-spacer-x ($card-spacer-x * 2 + 10px); 
+			}
+		}
+
+		&:hover {
+			.label {
+				@include scale(1.5);
+			}
+		}
+
+		&:last-of-type {
+			border-bottom: $border-width solid $border-color;
+			border-bottom-left-radius: $border-radius;
+			border-bottom-right-radius: $border-radius;
+		}
+	}
+
+	.label {
+		@include transition;
+		position: absolute;
+		top: 50%;
+		left: $card-spacer-x;
+		display: block;
+		width: 10px;
+		height: 10px;
+		margin-top: -5px;
+		border-radius: 50%;
+		background: $gray-100;
+	}
+
+}
+
+
+
+.accordion-list {
+	background: transparent;
+
+	.card {
+		@include transition;
+		box-shadow: none;
+		border-radius: $border-radius;
+		padding-left: 3.125rem;
+		background: transparent;
+		border-color: transparent;
+		counter-increment: accordion;
+
+		&:not(:first-of-type):not(:last-of-type),
+		&:first-of-type {
+			border-bottom: $border-width solid transparent;
+			border-radius: $border-radius;
+		}
+
+		&:not(:first-child) {
+			margin-top: 10px;
+		}
+
+		&:hover {
+			@extend %boxed;
+
+			&:not(:first-of-type):not(:last-of-type),
+			&:first-of-type {
+				border-bottom-color: $border-color;
+			}
+		}
+
+		&::before {
+			@include translate(0,-50%);
+		    @include transition;
+		    content: counter(accordion, decimal);
+		    position: absolute;
+		    display: block;
+		    top: 50%;
+		    left: 10px;
+		    width: 3.125rem;
+		    height: 3.125rem;
+		    color: $white;
+		    line-height: 3.125rem;
+		    text-align: center;
+		    z-index: 20;
+		    border-radius: $border-radius;
+		    background: $secondary;
+		    font-size: $font-size-base;
+		    font-weight: 600;
+		}
+
+		&.active {
+			@extend %boxed;
+
+			&:not(:first-of-type):not(:last-of-type),
+			&:first-of-type {
+				border-bottom-color: $border-color;
+			}
+
+			&::before {
+				@include translate(-20px,-50%);
+				background: $primary;
+				color: $white;
+			}
+		}
+
+		.card-header {
+			button {
+				line-height: 30px;
+				padding-top: 20px;
+				padding-bottom: 20px;
+
+				&::before {
+					display: none;
+				} 
+			}
+		}
+	}
+}

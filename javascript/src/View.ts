@@ -13,11 +13,13 @@ class View {
   width: number;
   height: number;
   controls: OrbitControls;
+  parent: HTMLElement;
 
   constructor(scene: THREE.Scene, parent: HTMLElement) {
     this.container = document.createElement("div");
     this.container.className = "View__container";
     parent.appendChild(this.container);
+    this.parent = parent;
 
     this.refreshSize();
 
@@ -51,8 +53,8 @@ class View {
   }
 
   refreshSize = () => {
-    this.width = window.innerWidth;
-    this.height = window.innerHeight;
+    this.width = this.parent.getBoundingClientRect().width;
+    this.height = this.parent.getBoundingClientRect().height;
   };
 
   onWindowResize = () => {

@@ -1,0 +1,32 @@
+//
+// Tables
+//
+//
+
+.table {
+	border-radius: $border-radius;
+
+	th {
+		font-weight: 400;
+		color: $gray-600;
+	}
+
+	th,
+	td {
+		padding: $table-cell-padding-sm $table-cell-padding;
+	}
+
+	thead {
+		th {
+			border-bottom: 0;
+			border-top: 0;
+		}
+	}
+
+	&.boxed {
+		th,
+		td {
+			border-top: 0;
+		}
+	}
+}

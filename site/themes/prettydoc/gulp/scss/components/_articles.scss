@@ -1,0 +1,198 @@
+//
+// articles
+//
+//
+
+.topic {
+	@include transition;
+	position: relative;
+	display: block;
+	padding: $card-spacer-y $card-spacer-x $card-spacer-y ($card-spacer-x * 2);
+	color: #222;
+
+	&:hover {
+		color: inherit;
+		background: $gray-100;
+	}
+
+	&:not(.topic-vertical) {
+		&:hover {
+			.topic-label {
+				@include scale(1.5);
+			}
+		}
+	}
+
+	+ .topic {
+		margin-top: .5rem;
+	}
+
+	> .row {
+		min-height: 2.5rem;
+	}
+}
+
+.topic-label {
+	@include transition;
+	position: absolute;
+	top: 50%;
+	left: $card-spacer-x;
+	display: block;
+	width: 10px;
+	height: 10px;
+	margin-top: -5px;
+	border-radius: 50%;
+	background: $gray-100;
+}
+
+.topic-title {
+	font-family: $font-family-base;
+	font-size: $font-size-base;
+	font-weight: $font-weight-normal;
+}
+
+.topic-vertical {
+	padding: $card-spacer-x $card-spacer-x $card-spacer-x ($card-spacer-x + 8px);
+
+	.topic-title {
+		margin-bottom: $card-spacer-x;
+		font-size: $font-size-lg;
+	}
+
+	.topic-label {
+		top: 4px;
+		bottom: 4px;
+		left: 4px;
+		width: 8px;
+		height: auto;
+		margin-top: 0;
+		border-radius: $border-radius;
+	}
+}
+
+
+// topic inside a card
+.card {
+	.topic {
+		margin-right: -$card-spacer-x;
+		margin-left: -$card-spacer-x;
+		padding-left: $card-spacer-x;
+
+		+ .topic {
+			margin-top: 0;
+			border-top: $border-width solid $border-color;
+		}
+	}
+}
+
+
+
+// activity
+.activity {
+	@include transition;
+	position: relative;
+	display: block;
+	color: $body-color;
+	margin-left: -$card-spacer-x;
+	margin-right: -$card-spacer-x;
+	padding: ($card-spacer-x / 2) $card-spacer-x;
+
+	+ .activity {
+		border-top: $border-width solid $border-color;
+	}
+
+	&:hover {
+		color: inherit;
+		background: $gray-100;
+	}
+
+	> .row {
+		min-height: 3.125rem;
+	}
+}
+
+.activity-label {
+	display: block;
+	width: .625rem;
+	height: .625rem;
+	border-radius: 50%;
+}
+
+
+
+// intersite
+.interpost {
+	font-size: $font-size-lg;
+	font-family: $font-family-base;
+	font-weight: 400;
+
+	a {
+		position: relative;
+		@include transition;
+		display: block;
+		color: $white;
+		padding: ($section-padding / 2) 0;	
+
+		&:hover {
+			background: rgba($white, .1);
+
+			&::before { background: rgba($white, .1); }
+		}
+
+		&::before {
+			@include transition;
+			content: "";
+			position: absolute;
+			top: 0;
+			display: block;
+			width: 50vw;
+			height: 100%;
+		}
+	}
+
+	// previous button
+	&[class*="-prev"] {
+		border-right: $border-width solid rgba($white, .1);
+
+		a {
+			padding-left: ($card-spacer-x * 2);
+			padding-right: $card-spacer-x;
+
+			&::before { right: 100%; }
+
+			&::after {
+				position: absolute;
+				left: 0;
+			    content: "\ebdc";
+			    width: 1em;
+			    line-height: 1em;
+			    top: 50%;
+			    font-family: 'icomoon' !important;
+			    font-size: 1.5rem;
+			    margin-top: -0.5em;
+			}
+		}
+	}
+
+	// next button
+	&[class*="-next"] {
+		a {
+			padding-left: $card-spacer-x;
+			padding-right: ($card-spacer-x * 2);
+
+			&::before { left: 100%; }
+
+			&::after {
+				position: absolute;
+				right: 0;
+			    content: "\ebde";
+			    width: 1em;
+			    line-height: 1em;
+			    top: 50%;
+			    font-family: 'icomoon' !important;
+			    font-size: 1.5rem;
+			    margin-top: -0.5em;
+			}
+		}
+	}
+}

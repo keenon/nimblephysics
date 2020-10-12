@@ -1,0 +1,33 @@
+// forms
+//
+//
+//
+
+
+// select
+.bootstrap-select {
+  position: relative;
+
+	.btn {
+    @include shadow(5px, $border-width, rgba($border-color, .5));
+    background: $white;
+
+    &:focus {
+      outline: none!important;
+      box-shadow: none;
+    }
+	}
+
+	&.form-control {
+		.btn { padding: $btn-padding-y; }
+	}
+
+	&.form-control-sm {
+		.btn { padding: $btn-padding-y-sm; }
+	}
+
+	&.form-control-lg {
+		.btn { padding: $btn-padding-y-lg; }
+	}
+
+}

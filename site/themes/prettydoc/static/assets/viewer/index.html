@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<body>
+  <div style="height: 100vh; width: 100vw" id="3d-viewer">
+  </div>
+  <script src="/assets/js/bundle.js"></script>
+  <script>
+function onload() {
+  if (document.readyState !== 'complete') {
+    return;
+  }
+  document.body.style = "padding: 0; margin: 0; overscroll-behavior: none;";
+  var viewer = document.getElementById("3d-viewer");
+  var window = new document.DARTWindow(viewer);
+  window.registerRemoteData("Catapult", "/data/catapult.txt").then(function() {
+    window.registerRemoteData("Cartpole", "/data/cartpole.txt").then(function() {
+      window.registerRemoteData("Jumping Worm", "/data/worm.txt");
+    });
+  });
+}
+
+if (document.readyState == 'complete') {
+  onload();
+}
+else {
+  document.addEventListener("readystatechange", onload);
+}
+  </script>
+</body>

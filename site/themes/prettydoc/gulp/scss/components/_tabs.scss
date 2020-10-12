@@ -1,0 +1,18 @@
+//
+// tabs
+//
+//
+
+.section-tabs {
+	margin-top: -$section-padding;
+	margin-bottom: ($section-padding / 2);
+	border-bottom: $border-width solid $border-color;
+
+	.nav {
+		margin-bottom: -$border-width;
+	}
+
+	.nav-item a {
+		padding: $card-spacer-x ($card-spacer-x * 2);
+	}
+}

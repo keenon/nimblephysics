@@ -1,0 +1,469 @@
+//
+// Nav
+//
+//
+
+.nav {
+	position: relative;
+
+	.nav-item {
+		display: inline-block;
+	}
+
+	.nav-link {
+		@include transition;
+		display: inline-block;
+		color: $gray-600;
+
+		&.active {
+			color: $gray-900;
+		}
+	}
+
+	.lavalamp-object {
+		display: none;
+		z-index: 1;
+	}
+}
+
+
+
+// pills
+.nav-pills {
+	display: inline-flex;
+	background: $border-color;
+	border-radius: $border-radius;
+	padding: 2px;
+
+	.nav-link {
+		text-transform: uppercase;
+		font-size: $font-size-sm;
+		font-weight: 600;
+		color: #999;
+
+		&.active {
+			background: transparent;
+		}
+	}
+
+	.lavalamp-object {
+		display: block;
+		position: absolute;
+		top: 0;
+		left: 0;
+		background: $white;
+		border-radius: $border-radius;
+	}
+}
+
+// tabs
+.nav-tabs {
+	.nav-link {
+		border: 0;
+	}
+
+	.nav-link.active,
+	.nav-item.show .nav-link {
+	  background-color: transparent;
+	}
+
+	.lavalamp-object {
+		display: block;
+		position: absolute;
+		top: 0;
+		left: 0;
+		background: transparent;
+		border-bottom: 2px solid $primary;
+		border-radius: 0;
+	}
+}
+
+
+
+// card variations
+//
+
+.card-header-tabs {
+	margin: -$card-spacer-x;
+	margin-bottom: -$card-spacer-x!important;
+
+	&:not(.nav-justified) {
+		margin-left: 0;
+		margin-right: 0;
+	}
+
+	.nav-item a {
+		display: block;
+		line-height: 1.875rem;
+		padding-top: $card-spacer-y;
+		padding-bottom: $card-spacer-y;
+	}
+}
+
+.card-header-pills {
+	margin-top: 10px;
+	margin-right: 0;
+	margin-left: 0;
+}
+
+
+// toc page
+.nav-toc-page {
+	position: relative;
+	margin-top: 40px;
+	padding: ($card-spacer-x / 2);
+	border: $border-width solid $border-color;
+	border-radius: $border-radius;
+	border-top-left-radius: 0;
+
+	&::before {
+		@extend %eyebrow;
+		position: absolute;
+		top: -40px;
+		left: -$border-width;
+		content: "Table of Contents";
+		padding: 0 $card-spacer-x;
+		line-height: 40px;
+		color: $gray-500;
+		font-size: .75rem;
+		background: $border-color;
+		border-top-left-radius: $border-radius;
+		border-top-right-radius: $border-radius;
+	}
+
+	&.boxed {
+		&::before {
+			background: $white;
+			border-top: $border-width solid $border-color;
+			border-right: $border-width solid $border-color;
+			border-left: $border-width solid $border-color;
+		}
+	}
+
+	.nav-item {
+		counter-increment: item;
+	}
+
+	.nav-link {
+		position: relative;
+		width: 100%;
+		font-size: .9375rem;
+		color: $gray-700;
+		border-radius: $border-radius;
+		padding: ($card-spacer-x / 2);
+
+		&::before {
+			position: absolute;
+			right: $card-spacer-x / 2;
+			color: $gray-600;
+			content: "0" counter(item);
+		}
+
+		&::after {
+			@include transition;
+			opacity: 0;
+			margin-left: 1rem;
+			content: "view now";
+			text-transform: uppercase;
+			letter-spacing: $letter-spacing;
+			font-size: 12px;
+			color: #999;
+		}
+
+		&:hover {
+			background: $border-color;
+			color: $black;
+
+			&::after {
+				opacity: 1;
+			}
+		}
+	}
+}
+
+
+// vertical nav
+.nav-vertical {
+	width: 100%;
+  border-radius: $border-radius;
+  padding: .625rem;
+
+  .nav-item {
+    &:not(:first-child) { margin-top: 2px; }
+  }
+
+  .nav-link {
+    border-radius: $border-radius;
+    display: block;
+    padding: 1.25rem;
+
+    &:hover,
+    &.active {
+    	color: $body-color;
+      background: rgba($black, .05);
+    }
+
+    &[aria-expanded] {
+      position: relative;
+
+      &::after {
+        position: absolute;
+        content: "\ebfa";
+        width: 1em;
+        line-height: 1em;
+        right: 1rem;
+        top: 50%;
+        font-family: 'icomoon' !important;
+        font-size: 1.2rem;
+        margin-top: -0.5em;
+        color: $secondary;
+        @include transition(0.2s);
+      }
+    }
+
+    &[aria-expanded="true"] { 
+      &::after {
+        @include rotate(180deg);
+      }
+    }
+  }
+
+  .nav {
+  	margin-top: 2px;
+
+    .nav-link {
+      padding: .5rem 1.25rem .5rem 1.875rem;
+      font-size: $font-size-sm;
+    }
+  }
+}
+
+// vertical nav 2
+.nav-vertical-2 {
+	width: 100%;
+
+  .nav-item {
+  	@include transition;
+
+    &.active {
+    	padding-bottom: ($card-spacer-x / 2);
+    }
+  }
+
+  .nav-link {
+  	color: $black;
+    display: block;
+    border-right: 2px solid transparent;
+    padding: ($card-spacer-x / 2) $card-spacer-x;
+
+    &:hover {
+    	background: rgba($black, .05);
+    }
+
+    &.active {
+    	color: $primary;
+			border-color: $primary;
+    }
+
+    &[aria-expanded] {
+      position: relative;
+
+      &::after {
+        position: absolute;
+        content: "\ebfa";
+        width: 1em;
+        line-height: 1em;
+        right: $card-spacer-x;
+        top: 50%;
+        font-family: 'icomoon' !important;
+        font-size: 1.2rem;
+        margin-top: -0.5em;
+        color: $secondary;
+        @include transition(0.2s);
+      }
+    }
+
+    &[aria-expanded="true"] { 
+      &::after {
+        @include rotate(180deg);
+      }
+    }
+  }
+
+  .nav {
+  	margin-top: 2px;
+
+    .nav-link {
+      padding: .5rem 1.25rem .5rem 1.875rem;
+      font-size: $font-size-sm;
+      color: $gray-700;
+
+      &.active {
+      	color: $primary;
+      }
+    }
+  }
+}
+
+
+// dots
+.nav-dots {
+	@include translate(0,-50%);
+	position: fixed;
+	top: 50%;
+	right: ($grid-gutter-width * 2);
+	z-index: 50;
+	width: .75rem;
+
+	@include media-breakpoint-down(sm) {
+		display: none;
+	}
+
+	.nav-item {
+		display: block;
+
+		+ .nav-item {
+			margin-top: 1rem;
+		}
+	}
+
+	.nav-link {
+		position: relative;
+		display: block;
+		width: .75rem;
+		height: .75rem;
+		border-radius: 50%;
+		padding: 0;
+		text-align: center;
+		line-height: 50px;
+		color: $white;
+		box-shadow: inset 0 0 0 10px rgba($black, .25);
+
+		&:hover {
+			box-shadow: inset 0 0 0 10px rgba($black, .5);
+		}
+
+		&.active {
+			@include scale(1.4);
+			box-shadow: inset 0 0 0 2px rgba($black, .5);
+		}
+	}
+}
+
+
+
+// inverted colors
+.text-white {
+	.nav {
+		.nav-link {
+			color: rgba($white, .5);
+
+			&:hover,
+			&.active {
+				color: $white;
+				background: rgba($white, .1);
+			}
+
+			&[aria-expanded] {
+			  position: relative;
+
+			  &::after {
+			    color: rgba($white, .5);
+			  }
+			}
+		}
+	}
+}
+
+
+
+// scroll
+.scroll {
+	max-height: 100vh;
+	overflow-y: scroll;
+}
+
+
+
+// overlay menu for layout-1 on mobile
+html.active,
+html.active > body {
+	overflow: hidden;
+}
+
+.overlay-menu-open { display: none; }
+
+@include media-breakpoint-down(md) {
+	.overlay-menu-open {
+		@include transition;
+		position: fixed;
+		bottom: ($grid-gutter-width / 2);
+		left: ($grid-gutter-width / 2);
+		right: ($grid-gutter-width / 2);
+		display: block;
+		height: 60px;
+		text-align: center;
+		line-height: 60px;
+		background: $primary;
+		color: $white;
+		border-radius: $border-radius;
+		cursor: pointer;
+		z-index: 120;
+
+		&:focus {
+			background: darken($primary, 7.5%);
+		}
+
+		&:before {
+			content: "Table of Contents";
+			position: absolute;
+			top: 0;
+			left: 0;
+			right: 0;
+			text-align: center;
+			line-height: 60px;
+			text-transform: uppercase;
+			font-size: $font-size-sm;
+			letter-spacing: $letter-spacing;
+			font-weight: 600;
+		}
+
+		&.active {
+			bottom: ($grid-gutter-width / 2)!important;
+
+			&::before {
+				content: "Close";
+			}
+		}
+	}
+
+	.overlay-menu {
+		@include transition;
+		position: fixed;
+		top: 100%;
+		left: 0;
+		bottom: 0;
+		right: 0;
+		z-index: 100;
+		margin: 0!important;
+		padding: 0;
+		border: 0;
+		border-radius: 0;
+		overflow-x: scroll;
+
+		.nav-vertical {
+			margin-bottom: 80px;
+		}
+
+		&.active {
+			top: 0;
+		}
+	}
+
+	.headroom--unpinned {
+		.overlay-menu-open {
+			top: auto;
+			bottom: -($grid-gutter-width / 2 + 60px);
+		}
+	}
+}

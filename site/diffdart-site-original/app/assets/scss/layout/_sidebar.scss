@@ -1,0 +1,21 @@
+//
+// sidebar
+//
+//
+
+.widget {
+	padding: $card-spacer-x;
+	
+	&:not(:first-child) {
+		margin-top: ($grid-gutter-width / 2);
+	}
+}
+
+.widget-title {
+	margin-bottom: $card-spacer-y;
+	font-size: $font-size-sm;
+	text-transform: uppercase;
+	letter-spacing: $letter-spacing;
+	font-weight: 600;
+	color: $body-color;
+}

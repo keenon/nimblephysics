@@ -1,0 +1,110 @@
+//
+// code
+//
+//
+
+
+// code highlight
+code[class*="language-"], 
+pre[class*="language-"] {
+	font-family: $font-family-monospace;
+	text-shadow: none;
+}
+
+
+div.code-toolbar {
+
+	&:hover {
+		.toolbar {
+			opacity: 1;
+		}
+	}
+
+  > .toolbar {
+    opacity: 0;
+    top: 0;
+    right: 0;
+
+    .toolbar-item {
+      display: block;
+    }
+
+    a {
+      @include transition;
+      @include no-shadow;
+      @include border-radius;
+      background: $primary;
+      color: $white;
+      display: block;
+      margin: 10px -10px 0 0;
+      padding: .5rem 1rem;
+      font-size: .75rem;
+      text-transform: uppercase;
+      font-weight: 600;
+
+      &:hover {
+        color: $white;
+        background: darken($primary, 7.5%);
+      }
+    }
+  }
+}
+
+pre[class*="language-"] {
+	border-radius: $border-radius;
+	margin: 0 0 1rem 0;
+	padding: $card-spacer-x;
+	@extend %boxed;
+}
+
+.text-white {
+  pre[class*="language-"] {
+    @include no-shadow;
+    background: rgba($black, .2);
+    border-color: rgba($white, .1);
+  }
+}
+
+
+// card
+.card {
+  pre[class*="language-"] {
+    @include no-shadow;
+    padding: 0;
+    border: 0;
+  }
+}
+
+
+
+// component
+.component {
+  > .tab-content {
+    margin-top: $card-spacer-y;
+
+    > .tab-pane:last-child {
+      pre[class*="language-"] {
+        @include no-shadow;
+        background: $border-color;
+        max-height: 50vh;
+      }
+    }
+  }
+
+}
+
+.component-info {
+  margin-top: $card-spacer-y;
+  background: $gray-300;
+  border-radius: $border-radius;
+  overflow: hidden;
+
+  p {
+    padding: $card-spacer-x;
+    font-size: $font-size-sm;
+  }
+
+  table {
+    margin: 0;
+  }
+}

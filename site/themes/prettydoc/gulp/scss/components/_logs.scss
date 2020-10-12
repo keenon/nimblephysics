@@ -1,0 +1,59 @@
+//
+// Logs
+//
+//
+
+.log-list {
+	list-style: none;
+	padding: 0;
+}
+
+.log-info {
+	@include transition;
+	position: relative;
+	display: inline-block;
+	border: $border-width solid $border-color;
+	border-radius: $border-radius;
+	background: $gray-100;
+	margin-bottom: $grid-gutter-width;
+	padding: ($card-spacer-x / 2) $card-spacer-x;
+
+	time {
+		display: inline-block;
+		vertical-align: middle;
+	}
+
+	.badge {
+		margin-right: -($card-spacer-x * 1.5);
+		margin-left: $card-spacer-y;
+	}
+}
+
+.log {
+	position: relative;
+	text-align: center;
+
+	&::before {
+		position: absolute;
+		content: "";
+		display: block;
+		width: $border-width;
+		height: 100%;
+		left: 50%;
+		background: $border-color;
+		z-index: -1;
+	}
+
+	&:not(:first-child) {
+		margin-top: $grid-gutter-width;
+
+		&::before {
+			height: calc(100% + $grid-gutter-width);
+			top: -$grid-gutter-width;
+		}
+	}
+
+	.accordion {
+		text-align: left;
+	}
+}

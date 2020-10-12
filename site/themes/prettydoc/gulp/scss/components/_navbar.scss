@@ -1,0 +1,188 @@
+//
+// navbar
+//
+//
+
+.navbar {
+	@include media-breakpoint-up(lg) {
+		padding-top: 0;
+		padding-bottom: 0;
+	}
+}
+
+.navbar-nav {
+
+	.nav-item {
+		@include media-breakpoint-up(lg) {
+			+ .nav-item {
+				margin-left: .5rem;
+			}
+		}
+	}
+
+	.nav-link {
+		@include transition;
+		font-size: $font-size-sm;
+		text-transform: uppercase;
+
+		@include media-breakpoint-up(lg) {
+			padding: .9375rem;
+			line-height: 2.375rem;
+			border-top: $border-width solid transparent;
+
+            &:hover {
+                border-color: $border-color;
+            }
+
+			&.active {
+				border-color: $white;
+			}
+		}
+	}
+
+	@include media-breakpoint-down(md) {
+		margin-top: $grid-gutter-width;
+	}
+}
+
+.navbar-brand {
+	margin-right: $grid-gutter-width;
+	padding: 0;
+
+	img {
+		max-height: 2.375rem;
+	}
+}
+
+.navbar-toggler {
+	padding: 0;
+	border: 0;
+}
+
+
+
+
+// vertical
+.navbar-vertical {
+	display: block;	
+	padding: 0;
+
+
+    .navbar-collapse {
+        margin-top: $card-spacer-x;
+        margin-right: -$card-spacer-x;
+        margin-left: -$card-spacer-x;
+    }
+
+    .nav-vertical {
+        padding: 0;
+    }
+}
+
+
+// Vendor prefixes
+$sass-burger-add-vendor-prefixes: true !default;
+
+// Burger
+@mixin burger($width: 30px, $height: 5px, $gutter: 3px, $color: $white, $border-radius: 0, $transition-duration: .3s) {
+    $burger-height: $height !global;
+    $burger-gutter: $gutter !global;
+
+    position: relative;
+    margin-top: $height + $gutter;
+    margin-bottom: $height + $gutter;
+
+    @if $sass-burger-add-vendor-prefixes {
+        @include prefix(user-select, none, webkit moz ms);
+    }
+    user-select: none;
+
+    // 1. Fixes jagged edges in Firefox, see issue #10.
+    &, &::before, &::after {
+        display: block;
+        width: $width;
+        height: $height;
+        background-color: $white;
+        outline: 1px solid transparent; // 1
+        @if $border-radius != 0 {
+            border-radius: $border-radius;
+        }
+
+        @if $sass-burger-add-vendor-prefixes {
+            @include prefix(transition-property, background-color, webkit moz o);
+        }
+        transition-property: background-color, transform;
+
+        @if $sass-burger-add-vendor-prefixes {
+            @include prefix(transition-duration, $transition-duration, webkit moz o);
+        }
+        transition-duration: $transition-duration;
+    }
+
+    &::before, &::after {
+        position: absolute;
+        content: "";
+    }
+
+    &::before {
+        top: -($height + $gutter);
+    }
+
+    &::after {
+        top: $height + $gutter;
+    }
+}
+
+
+// Burger animations
+@mixin burger-to-cross($color: auto) {
+    & {
+        background-color: transparent;
+    }
+    @if ($color != auto) {
+        &::before, &::after {
+            background-color: $color;
+        }
+    }
+    &::before {
+        @if $sass-burger-add-vendor-prefixes {
+            @include prefix(transform, translateY($burger-gutter + $burger-height) rotate(45deg), webkit moz ms o);
+        }
+        transform: translateY($burger-gutter + $burger-height) rotate(45deg);
+    }
+    &::after {
+        @if $sass-burger-add-vendor-prefixes {
+            @include prefix(transform, translateY(-($burger-gutter + $burger-height)) rotate(-45deg), webkit moz ms o);
+        }
+        transform: translateY(-($burger-gutter + $burger-height)) rotate(-45deg);
+    }
+}
+
+.burger {
+	display: inline-block;
+	position: relative;
+	width: 2.375rem;
+	height: 2.375rem;
+	z-index: 100;
+  
+  span {
+    @include burger(20px, 2px, 4px, $black);
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    margin-left: -10px;
+    margin-top: -1.5px;
+  }
+  
+  &:hover {
+    cursor: pointer;
+  }
+}
+
+.navbar.active {
+	.burger {
+		span {
+		  @include burger-to-cross();
+		}
+	}
+}

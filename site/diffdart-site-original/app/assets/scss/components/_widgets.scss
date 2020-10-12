@@ -1,0 +1,383 @@
+//
+// widgets
+//
+//
+
+
+
+// tags
+.tags {
+  margin: -.25rem;
+  overflow: hidden;
+
+  a {
+    @include transition;
+    @include shadow(0, $border-width, $border-color);
+    float: left;
+    display: block;
+    margin: .25rem;
+    padding: .5rem .75rem;
+    font-size: $font-size-sm;
+    color: $gray-700;
+    border-radius: $border-radius;
+
+    &:hover {
+      @extend %boxed;
+      border: 0;
+    }
+  }
+}
+
+
+// numbers
+.number {
+  text-align: center;
+
+  span {
+    font-size: 3rem;
+    text-transform: uppercase;
+    color: $black;
+  }
+
+  p {
+    font-size: $font-size-sm;
+  }
+
+  @include media-breakpoint-down(sm) {
+    padding-top: $card-spacer-x;
+    padding-bottom: $card-spacer-x;
+  }
+}
+
+
+// type component
+.type {  
+  @extend %equal;
+
+  > * { 
+    padding: $card-spacer-x; 
+
+    @include media-breakpoint-down(sm) {
+      padding: $card-spacer-y;
+    }
+  }
+
+  .badge {
+    position: absolute;
+    top: $card-spacer-y;
+    right: -$card-spacer-y;
+  }
+}
+
+.type-title {
+  font-family: $font-family-sans-serif;
+  font-weight: $font-weight-normal;
+  font-size: $font-size-sm;
+  color: $body-color;
+}
+
+.type-example {
+  position: absolute;
+  left: $card-spacer-x;
+  bottom: $card-spacer-x;
+
+  @include media-breakpoint-down(sm) {
+    left: $card-spacer-y;
+    bottom: $card-spacer-y;
+  }
+
+  span {
+    font-size: 3.125rem;
+    line-height: 1em;
+    color: $black;
+  }
+}
+
+
+// color component
+.color {
+  display: flex;
+  align-items: center;
+  padding: 10px;
+  border-radius: 10rem;
+
+  .color-example {
+    width: 80px;
+    height: 80px;
+    margin-right: 20px;
+    border-radius: 50%;
+  }
+
+  .color-info {
+    flex: 1;
+
+    span {
+      font-size: $font-size-sm;
+      color: $gray-600;
+      text-transform: uppercase;
+    }
+  }
+
+  .color-title {
+    font-family: $font-family-sans-serif;
+    font-size: $font-size-lg;
+    font-weight: 500;
+    margin-bottom: 0;
+  }
+}
+
+
+// page meta
+.page-meta-stat {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+
+  b {
+    color: $white;
+    margin-right: .625rem;
+    font-weight: 700;
+  }
+
+  span {
+    font-size: $font-size-sm;
+    text-transform: uppercase;
+    letter-spacing: $letter-spacing;
+    color: rgba($white, .75);
+  }
+}
+
+
+// file tree
+.file-tree {
+  margin-bottom: 0;
+  padding-left: 20px;
+  list-style: none;
+  overflow: hidden;
+
+  ul {
+    list-style: none;
+    display: none;
+    padding-left: $card-spacer-x;
+  }
+  
+  li {
+    position: relative;
+    padding: 5px 0;
+    border-radius: $border-radius;
+    cursor: auto;
+    white-space: nowrap;
+    font-size: $font-size-sm;
+    font-weight: 600;
+
+    &::before {
+      content: "\f15b";
+      display: inline-block;
+      text-align: center;
+      width: $card-spacer-x;
+      margin-right: .25rem;
+      vertical-align: middle;
+      font-family: 'icomoon' !important;
+      font-size: 1rem;
+      color: $secondary;
+    }
+
+    span {
+      color: $gray-600;
+      font-weight: $font-weight-normal;
+      font-size: .75rem;
+    }
+  }
+
+  .file-tree-folder {
+    @include transition;
+    cursor: pointer;
+
+    &::before {
+      content: "\f07b";
+      font-size: 1.25rem;
+    }
+
+    &.open {
+      &::after {
+        @include rotate(180deg);
+      }
+
+      > ul {
+        display: block;
+      }
+    }
+
+    &::after {
+      @include transition;
+      position: absolute;
+      top: .8rem;
+      left: -1em;
+      content: "\ebfa";
+      display: block;
+      text-align: center;
+      width: 1em;
+      line-height: 1em;
+      font-family: 'icomoon' !important;
+      font-size: 1rem;
+      color: $secondary;
+    }
+
+    &.open {
+      &::before { content: "\f07c"; }
+    }
+
+    &.empty {
+      &::after {
+        display: none;
+      }
+    }
+  }
+}
+
+
+// toc
+.toc {
+
+  .nav-link {
+    @include transition;
+    position: relative;
+    width: 100%;
+    color: $gray-600;
+    font-size: $font-size-sm;
+    border-left: 2px solid transparent;
+    padding: .5rem $card-spacer-x;
+
+    &:hover {
+      color: $black;
+      border-color: $gray-500;
+    }
+
+    &.active {
+      color: $primary; 
+      border-color: $primary;
+
+      + ul {
+        display: block;
+      }
+    }
+  }
+
+  ul {
+    border-left: 2px solid $primary;
+    display: none;
+    padding-left: $card-spacer-x;
+
+    .nav-link {
+      font-size: $font-size-sm;
+      border-color: $border-color;
+    }
+  }
+
+}
+
+
+
+.step-list {
+  list-style: none;
+  margin-top: 40px;
+  margin-bottom: 40px;
+  padding-left: 55px;
+
+  li {
+    position: relative;
+    min-height: 40px;
+    counter-increment: item;
+
+    &:not(:first-child) {
+      margin-top: 20px;
+    }
+
+    &::before {
+      @include translate(0,-50%);
+      position: absolute;
+      top: .9em;
+      left: -55px;
+      content: counter(item);
+      color: $white;
+      font-weight: 600;
+      line-height: 36px;
+      text-align: center;
+      display: block;
+      width: 40px;
+      height: 40px;
+      background: $secondary;
+      border-radius: 50%;
+      border: 2px solid $secondary;
+    }
+
+    li {
+
+      &::before {
+        color: $secondary;
+        background: transparent;
+        border-color: $secondary;
+      }
+
+      &:not(:first-child) {
+        margin-top: .5rem;
+      }
+    }
+  }
+
+  ul, ol {
+    padding-left: 45px;
+    margin-top: 20px;
+    margin-bottom: 20px;
+    list-style: none;
+    counter-reset: item;
+  }
+
+  // p {
+  //   &:not(:last-child) {
+  //     margin-bottom: 10px;
+  //   }
+  // }
+}
+
+
+
+// figure
+.figure {
+  position: relative;
+
+  .figure-img {
+    margin-bottom: 0;
+  }
+
+  .figure-caption {
+    @extend %boxed;
+    @include translate(0,50%);
+    position: absolute;
+    left: ($card-spacer-x / 2);
+    bottom: 0;
+    max-width: 90%;
+    padding: 5px 15px;
+    font-size: $font-size-sm;
+
+    &.text-right {
+      left: auto;
+      right: ($card-spacer-x / 2);
+    }
+  }
+}
+
+
+
+// cta
+.cta {
+  position: relative;
+  overflow: hidden;
+
+  .icon-background {
+    top: -2.5%;
+    right: -2.5%;
+    opacity: .25;
+    z-index: 5;
+  }
+}

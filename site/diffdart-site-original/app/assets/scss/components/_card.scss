@@ -1,0 +1,266 @@
+//
+// Cards
+//
+//
+
+.card {
+	@extend %boxed;
+
+	.card-body {
+		position: relative;
+		overflow: hidden;
+	}
+
+	.card-header,
+	.card-footer {
+		padding: $card-spacer-x;
+	}
+
+	&.bordered {
+		box-shadow: none;
+		background: transparent;
+
+		.card-header { border-bottom: $border-width solid $border-color; }
+
+		.card-footer { border-top: $border-width solid $border-color; }
+
+		&.lift { @extend %lift; }
+	}
+}
+
+
+.card-body,
+.card-header,
+.card-footer {
+	&.action {
+		display: block;
+		padding-right: ($card-spacer-x * 2);
+
+		&::after {
+		  @include transition;
+		  @include translate(0,-50%);
+		  position: absolute;
+		  right: $card-spacer-x * 1.5;
+		  top: 50%;
+		  content: "\ebde";
+		  display: block;
+		  font-family: 'icomoon' !important;
+		  font-size: 1em;
+		  width: 10px;
+		  line-height: 1em;
+		}
+
+		&:hover {
+		  &::after {
+		    right: $card-spacer-x;
+		  }
+		}
+	}
+}
+
+
+
+// footer link
+.card {
+	a.card-footer {
+		@include transition;
+		padding: $card-spacer-y $card-spacer-x;
+		text-transform: uppercase;
+		text-align: center;
+		font-size: $font-size-sm;
+		letter-spacing: $letter-spacing;
+		color: $body-color;
+
+		&:hover {
+			background: $border-color;
+		}
+	}
+}
+
+
+// card link
+a.card {
+	display: block;
+}
+
+
+
+
+// card with background
+.card-background {
+	overflow: hidden;
+
+	&:hover {
+		.image::after {
+			background: rgba($primary, .75);
+		}
+	}
+
+	> * {
+		z-index: 10;
+	}
+
+	.image {
+		z-index: 5;
+
+		&::after {
+			@include transition;
+			position: absolute;
+			top: 0;
+			right: 0;
+			bottom: 0;
+			left: 0;
+			content: "";
+			background: rgba($black, .5);
+		}
+	}
+
+	.card-title {
+		color: $white;
+	}
+
+	.card-text {
+		color: rgba($white, .75);
+	}
+
+	.card-footer {
+		background: transparent;
+		color: $white;
+		border-color: rgba($white, .25);
+		
+		&:hover {
+			background: rgba($white, .25);
+			border-color: transparent;
+		}
+	}
+}
+
+
+// card price
+.card-price {
+	@extend %boxed;
+	@include transition;
+	color: $black;
+	display: block;
+	width: 6.25rem;
+	height: 6.25rem;
+	margin-top: -$card-spacer-x;
+	border-radius: $border-radius;
+	text-align: center;
+	line-height: 6.25rem;
+	font-size: 1.875rem;
+}
+
+.card:hover {
+	.card-price {
+		@include translate(0, -10px);
+	}
+}
+
+
+
+// card entry
+.card-entry {
+	@include no-shadow;
+	background: transparent;
+	border-color: transparent;
+
+	.card-img-top {
+		@include shadow;
+		border-radius: $border-radius;
+	}
+
+	.card-body {
+		padding: $card-spacer-y 0 0 0;
+	}
+
+	.card-video {
+		position: relative;
+
+		&::after {
+			position: absolute;
+			content: "";
+			top: 0;
+			right: 0;
+			bottom: 0;
+			left: 0;
+			display: block;
+			background: rgba($black,.2);
+			border-radius: $border-radius;
+		}
+
+		&::before {
+			@include transition;
+			@include shadow;
+			position: absolute;
+		    content: "\f04b";
+		    display: block;
+		    width: 5rem;
+		    height: 5rem;
+		    margin-top: -2.5rem;
+		    margin-left: -2.5rem;
+		    line-height: 5rem;
+		    border-radius: 50%;
+		    top: 50%;
+		    left: 50%;
+		    background: $white;
+		    font-family: 'icomoon' !important;
+		    font-size: $font-size-lg;
+		    text-align: center;
+		    color: $black;
+		    z-index: 5;
+		}
+
+		&:hover {
+			&::before {
+				@include scale(1.2);
+			}
+		}
+	}
+
+	.card-title {
+		font-family: $font-family-sans-serif;
+		font-size: $font-size-lg;
+
+		a {
+			color: $black;
+		}
+	}
+}
+
+
+// showcase
+.card-showcase {
+	@include shadow;
+	display: block;
+	background: transparent;
+	border: 0;
+
+	a {
+		display: block;
+	}
+
+	img {
+		border-radius: $border-radius;
+	}
+}
+
+
+// card component
+.card-component {
+	background: transparent;
+	box-shadow: none;
+
+	.card-footer {
+		@include shadow;
+		border: 0;
+		background: $white;
+		border-radius: $border-radius;
+
+		pre[class*="language-"] {
+			@include no-shadow;
+			background: transparent;
+			margin: 0;
+		}
+	}
+}

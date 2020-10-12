@@ -1,0 +1,27 @@
+baseURL = "http://example.org/"
+languageCode = "en-us"
+title = "My New Hugo Site"
+theme = "prettydoc"
+
+[markup.goldmark.renderer]
+unsafe= true
+
+[markup]
+  [markup.tableOfContents]
+    endLevel = 3
+    ordered = false
+    startLevel = 2
+
+[menu]
+
+[[menu.main]]
+    identifier = "tutorials"
+    name = "Tutorials"
+    url = "/tuts/"
+    weight = 1
+
+[[menu.main]]
+    identifier = "discussion"
+    name = "Discussion"
+    url = "/discussion/"
+    weight = 2

@@ -1,0 +1,36 @@
+//
+// sizing
+//
+//
+
+
+// Vertical Height
+$height-list: ( 10, 20, 25, 30, 40, 50, 60, 70, 75, 80, 90, 100);
+
+@each $value in $height-list {
+	.vh-#{$value} {
+    height: #{$value}vh;
+		min-height: #{$value}vh;
+	}
+}
+
+@each $value in $height-list {
+  .vh-max-#{$value} {
+    max-height: #{$value}vh;
+  }
+}
+
+@include media-breakpoint-down(sm) { 
+  [class*="vh-"] {
+    height: auto;
+  }
+}
+
+
+// Flex Width
+@each $size, $length in $sizes {
+  .fw-#{$size} {
+    flex: 0 0 $length!important;
+    width: $length!important;
+  }
+}

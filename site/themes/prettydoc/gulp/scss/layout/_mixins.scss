@@ -1,0 +1,107 @@
+//
+// Mixins & Functions
+//
+
+
+//
+// Rem Calculator
+//
+@function rem($size) {
+  $rem: $size / 16;
+  @return #{$rem}rem;
+}
+
+@function px($size) {
+  $px: strip-units($size) * 16;
+  @return #{$px}px;
+}
+
+// removing "px" or "rem" from variable
+@function strip-units($number) {
+  @return $number / ($number * 0 + 1);
+}
+
+
+//
+// vendor prefixes
+//
+@mixin prefix($property, $value, $prefixes: ()) {
+  @each $prefix in $prefixes {
+    #{'-' + $prefix + '-' + $property}: $value;
+  }
+ 
+  // Output standard non-prefixed declaration
+  #{$property}: $value;
+}
+
+
+
+//
+// Font Size
+//
+@each $size in $font-size-list {
+	.fs-#{$size} {
+		font-size: rem($size)!important;
+		line-height: 1.4em;
+	}
+}
+
+
+
+// Helpers
+@mixin text-shadow($size: 25px) {
+	text-shadow: 0px 0px $size rgba($black, 0.4);
+}
+
+@mixin translate($vertical, $horizontal) {
+	@include prefix(transform, translate($vertical, $horizontal), webkit moz);
+}
+
+@mixin transition($time: 0.2s, $type: all, $delay: 0s) {
+	@include prefix(transition, $type $time, webkit moz);
+	@include prefix(transition-delay, $delay, webkit moz);
+}
+
+@mixin selection($type) {
+	@include prefix(user-select, $type, webkit moz ms);
+}
+
+@mixin shadow($size: 15px, $size-2: 0px, $color: rgba($black,0.05)) {
+	@include prefix(box-shadow , 0px 0px $size $size-2 $color, webkit moz);
+}
+
+@mixin scale($ratio: 1.05) {
+	@include prefix(transform , scale($ratio), webkit moz);
+}
+
+@mixin rotate($grade: 90deg) {
+	@include prefix(transform , rotate($grade), webkit moz);
+}
+
+
+// remove ?
+@mixin no-shadow() {
+	@include prefix(box-shadow , none!important, webkit moz);
+}
+
+
+@mixin animation($duration, $mode) {
+	@include prefix(animation-duration , $duration, webkit moz);
+	@include prefix(animation-fill-mode , $mode, webkit moz);
+}
+
+
+// placeholder
+@mixin placeholder {
+	&::-webkit-input-placeholder {@content}
+	&:-moz-placeholder           {@content}
+	&::-moz-placeholder          {@content}
+	&:-ms-input-placeholder      {@content}  
+}
+
+
+@mixin input-hover {
+	&:hover,
+	&:focus,
+	&:active {@content}
+}

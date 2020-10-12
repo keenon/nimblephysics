@@ -1,0 +1,60 @@
+//
+// dropdowns
+//
+//
+
+.dropdown {
+	
+	.nav-link {
+		outline: 0;
+	}
+
+	.dropdown-menu {
+		@include shadow(30px,0px,rgba($black, .2));
+		background: $white;
+		border-radius: $border-radius;
+		overflow: hidden;
+		margin: 0;
+		padding: 0;
+		border: 0;
+
+		.dropdown-item {
+			@include transition;
+			position: relative;
+			padding: .5rem 1rem;
+			font-size: $font-size-sm;
+			color: $body-color;
+
+			&:hover {
+				background-color: rgba($black, .1);
+				color: $black;
+			}
+
+			&.active {
+				color: $white;
+				background: $secondary;
+
+				&:hover {
+					background-color: $secondary;
+				}
+			}
+		}
+	}
+}
+
+
+// navbar dropdown - animation
+.navbar {
+	@include media-breakpoint-up(lg) {
+		.dropdown-menu {
+			&.show {
+				animation: dropdown .2s ease forwards;
+			}
+		}
+	}
+}
+
+@keyframes dropdown {
+  0%{ opacity: 0; transform: translateY(1rem); }
+  100%{ opacity: 1; transform: translateY(0); }
+}

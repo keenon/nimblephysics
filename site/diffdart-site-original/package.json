@@ -1,0 +1,41 @@
+{
+  "name": "docs",
+  "version": "1.0.0",
+  "description": "Documentation / Help Center Template",
+  "main": "index.html",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Jenia Stratila",
+  "devDependencies": {
+    "browser-sync": "^2.26.3",
+    "gulp": "^4.0.1",
+    "gulp-concat": "^2.6.1",
+    "gulp-concat-sourcemap": "^1.3.1",
+    "gulp-rename": "^1.2.2",
+    "gulp-sass": "^4.0.2",
+    "gulp-sourcemaps": "^2.6.4",
+    "gulp-uglify": "^3.0.0"
+  },
+  "dependencies": {
+    "bootstrap": "^4.3.1",
+    "bootstrap-select": "^1.13.2",
+    "clipboard": "^2.0.1",
+    "gulp-minify": "^3.1.0",
+    "headroom.js": "^0.9.4",
+    "jquery": "^3.3.1",
+    "lavalamp": "^1.1.0",
+    "magnific-popup": "^1.1.0",
+    "masonry": "0.0.2",
+    "masonry-layout": "^4.2.2",
+    "owl.carousel": "^2.3.4",
+    "prismjs": "^1.15.0",
+    "skrollr": "^0.6.26",
+    "smooth-scroll": "^16.0.3",
+    "smoothscroll": "^0.4.0",
+    "sticky-kit": "^1.1.3",
+    "swiper": "^4.3.5",
+    "video.js": "^7.2.4",
+    "videojs-youtube": "^2.6.0"
+  }
+}
