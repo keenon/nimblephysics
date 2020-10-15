@@ -62,27 +62,33 @@ void BackpropSnapshot(py::module& m)
           &dart::neural::BackpropSnapshot::backprop,
           ::py::arg("world"),
           ::py::arg("thisTimestepLoss"),
-          ::py::arg("nextTimestepLoss"))
+          ::py::arg("nextTimestepLoss"),
+          ::py::arg("perfLog") = nullptr)
       .def(
           "getVelVelJacobian",
           &dart::neural::BackpropSnapshot::getVelVelJacobian,
-          ::py::arg("world"))
+          ::py::arg("world"),
+          ::py::arg("perfLog") = nullptr)
       .def(
           "getForceVelJacobian",
           &dart::neural::BackpropSnapshot::getForceVelJacobian,
-          ::py::arg("world"))
+          ::py::arg("world"),
+          ::py::arg("perfLog") = nullptr)
       .def(
           "getPosPosJacobian",
           &dart::neural::BackpropSnapshot::getPosPosJacobian,
-          ::py::arg("world"))
+          ::py::arg("world"),
+          ::py::arg("perfLog") = nullptr)
       .def(
           "getVelPosJacobian",
           &dart::neural::BackpropSnapshot::getVelPosJacobian,
-          ::py::arg("world"))
+          ::py::arg("world"),
+          ::py::arg("perfLog") = nullptr)
       .def(
           "getPosVelJacobian",
           &dart::neural::BackpropSnapshot::getPosVelJacobian,
-          ::py::arg("world"))
+          ::py::arg("world"),
+          ::py::arg("perfLog") = nullptr)
       .def(
           "getPreStepPosition",
           &dart::neural::BackpropSnapshot::getPreStepPosition)

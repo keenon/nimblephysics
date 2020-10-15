@@ -2,6 +2,8 @@
 
 #include "dart/utils/tl_optional.hpp"
 
+#define LOG_PERFORMANCE_LOSS_FN
+
 using namespace dart;
 
 namespace dart {
@@ -40,24 +42,53 @@ LossFn::~LossFn()
 }
 
 //==============================================================================
-double LossFn::getLoss(const TrajectoryRollout* rollout)
+double LossFn::getLoss(
+    const TrajectoryRollout* rollout, PerformanceLog* perflog)
 {
+  PerformanceLog* thisLog = nullptr;
+#ifdef LOG_PERFORMANCE_LOSS_FN
+  if (perflog != nullptr)
+  {
+    thisLog = perflog->startRun("LossFn.getLoss");
+  }
+#endif
+
+  double loss = 0.0;
+
   if (mLoss)
   {
-    return mLoss.value()(rollout);
+    loss = mLoss.value()(rollout);
   }
-  // Default to 0
-  return 0.0;
+
+#ifdef LOG_PERFORMANCE_LOSS_FN
+  if (thisLog != nullptr)
+  {
+    thisLog->end();
+  }
+#endif
+
+  return loss;
 }
 
 //==============================================================================
 double LossFn::getLossAndGradient(
     const TrajectoryRollout* rollout,
-    /* OUT */ TrajectoryRollout* gradWrtRollout)
+    /* OUT */ TrajectoryRollout* gradWrtRollout,
+    PerformanceLog* perflog)
 {
+  PerformanceLog* thisLog = nullptr;
+#ifdef LOG_PERFORMANCE_LOSS_FN
+  if (perflog != nullptr)
+  {
+    thisLog = perflog->startRun("LossFn.getLossAndGradient");
+  }
+#endif
+
+  double loss = 0.0;
+
   if (mLossAndGrad)
   {
-    return mLossAndGrad.value()(rollout, gradWrtRollout);
+    loss = mLossAndGrad.value()(rollout, gradWrtRollout);
   }
   else if (mLoss)
   {
@@ -103,17 +134,28 @@ double LossFn::getLossAndGradient(
       }
     }
 
-    return originalLoss;
+    loss = originalLoss;
+  }
+  else
+  {
+    // Default to 0
+    for (std::string key : gradWrtRollout->getMappings())
+    {
+      gradWrtRollout->getPoses(key).setZero();
+      gradWrtRollout->getVels(key).setZero();
+      gradWrtRollout->getForces(key).setZero();
+    }
+    loss = 0.0;
   }
 
-  // Default to 0
-  for (std::string key : gradWrtRollout->getMappings())
+#ifdef LOG_PERFORMANCE_LOSS_FN
+  if (thisLog != nullptr)
   {
-    gradWrtRollout->getPoses(key).setZero();
-    gradWrtRollout->getVels(key).setZero();
-    gradWrtRollout->getForces(key).setZero();
+    thisLog->end();
   }
-  return 0.0;
+#endif
+
+  return loss;
 }
 
 //==============================================================================

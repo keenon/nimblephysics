@@ -219,7 +219,8 @@ void AbstractShot::computeConstraints(
 
   for (int i = 0; i < mConstraints.size(); i++)
   {
-    constraints(i) = mConstraints[i].getLoss(getRolloutCache(world, thisLog));
+    constraints(i)
+        = mConstraints[i].getLoss(getRolloutCache(world, thisLog), thisLog);
   }
 
 #ifdef LOG_PERFORMANCE_ABSTRACT_SHOT
@@ -254,7 +255,8 @@ void AbstractShot::backpropJacobian(
   {
     mConstraints[i].getLossAndGradient(
         getRolloutCache(world, thisLog),
-        /* OUT */ getGradientWrtRolloutCache(world, thisLog));
+        /* OUT */ getGradientWrtRolloutCache(world, thisLog),
+        thisLog);
     grad.setZero();
     backpropGradientWrt(
         world,
@@ -342,7 +344,8 @@ void AbstractShot::getSparseJacobian(
   {
     mConstraints[i].getLossAndGradient(
         getRolloutCache(world, thisLog),
-        /* OUT */ getGradientWrtRolloutCache(world, thisLog));
+        /* OUT */ getGradientWrtRolloutCache(world, thisLog),
+        thisLog);
     backpropGradientWrt(
         world,
         getGradientWrtRolloutCache(world, thisLog),
@@ -379,7 +382,8 @@ void AbstractShot::backpropGradient(
 
   mLoss.getLossAndGradient(
       getRolloutCache(world, thisLog),
-      /* OUT */ getGradientWrtRolloutCache(world, thisLog));
+      /* OUT */ getGradientWrtRolloutCache(world, thisLog),
+      thisLog);
   backpropGradientWrt(
       world,
       getGradientWrtRolloutCache(world, thisLog),
@@ -407,7 +411,7 @@ double AbstractShot::getLoss(
   }
 #endif
 
-  double val = mLoss.getLoss(getRolloutCache(world, thisLog));
+  double val = mLoss.getLoss(getRolloutCache(world, thisLog), thisLog);
 
 #ifdef LOG_PERFORMANCE_ABSTRACT_SHOT
   if (thisLog != nullptr)
@@ -496,7 +500,7 @@ void AbstractShot::finiteDifferenceGradient(
     std::shared_ptr<simulation::World> world,
     /* OUT */ Eigen::Ref<Eigen::VectorXd> grad)
 {
-  double originalLoss = mLoss.getLoss(getRolloutCache(world, nullptr));
+  double originalLoss = mLoss.getLoss(getRolloutCache(world, nullptr), nullptr);
 
   int dims = getFlatProblemDim();
   Eigen::VectorXd flat = Eigen::VectorXd::Zero(dims);
@@ -510,12 +514,12 @@ void AbstractShot::finiteDifferenceGradient(
   {
     flat(i) += EPS;
     unflatten(flat, nullptr);
-    double posLoss = mLoss.getLoss(getRolloutCache(world, nullptr));
+    double posLoss = mLoss.getLoss(getRolloutCache(world, nullptr), nullptr);
     flat(i) -= EPS;
 
     flat(i) -= EPS;
     unflatten(flat, nullptr);
-    double negLoss = mLoss.getLoss(getRolloutCache(world, nullptr));
+    double negLoss = mLoss.getLoss(getRolloutCache(world, nullptr), nullptr);
     flat(i) += EPS;
 
     grad(i) = (posLoss - negLoss) / (2 * EPS);

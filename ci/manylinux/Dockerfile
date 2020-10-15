@@ -194,21 +194,37 @@ RUN git clone https://github.com/ros/urdfdom.git && \
     rm -rf urdfdom
 
 # This is allowed to be empty string, but if it's not it must be prefixed by
-ENV VERSION="0.0.3"
+ENV VERSION="0.0.4"
 
 ENV PYTHON35="/opt/python/cp35-cp35m/bin/python3.5"
 ENV PYTHON35_VERSION="cp35-cp35m"
+ENV PYTHON35_INCLUDE="/opt/python/cp35-cp35m/include/python3.5"
+ENV PYTHON35_LIB="/opt/python/cp35-cp35m/lib/python3.5"
+
 ENV PYTHON36="/opt/python/cp36-cp36m/bin/python3.6"
 ENV PYTHON36_VERSION="cp36-cp36m"
+ENV PYTHON36_INCLUDE="/opt/python/cp36-cp36m/include/python3.6"
+ENV PYTHON36_LIB="/opt/python/cp36-cp36m/lib/python3.6"
+
 ENV PYTHON37="/opt/python/cp37-cp37m/bin/python3.7"
 ENV PYTHON37_VERSION="cp37-cp37m"
+ENV PYTHON37_INCLUDE="/opt/python/cp37-cp37m/include/python3.7"
+ENV PYTHON37_LIB="/opt/python/cp37-cp37m/lib/python3.7"
+
 ENV PYTHON38="/opt/python/cp38-cp38/bin/python3.8"
 ENV PYTHON38_VERSION="cp38-cp38"
+ENV PYTHON38_INCLUDE="/opt/python/cp38-cp38/include/python3.8"
+ENV PYTHON38_LIB="/opt/python/cp38-cp38/lib/python3.8"
+
 ENV PYTHON39="/opt/python/cp39-cp39/bin/python3.9"
 ENV PYTHON39_VERSION="cp39-cp39"
+ENV PYTHON39_INCLUDE="/opt/python/cp39-cp39/include/python3.9"
+ENV PYTHON39_LIB="/opt/python/cp39-cp39/lib/python3.9"
 
 ENV PYTHON=$PYTHON37
 ENV PYTHON_VERSION=$PYTHON37_VERSION
+ENV PYTHON_INCLUDE=$PYTHON37_INCLUDE
+ENV PYTHON_LIB=$PYTHON37_LIB
 
 # Install pytest
 RUN ${PYTHON} -m pip install pytest

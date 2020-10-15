@@ -1,32 +1,34 @@
-if(NOT DARTPY_PYTHON_VERSION)
-  set(DARTPY_PYTHON_VERSION 3.4 CACHE STRING "Choose the target Python version (e.g., 3.4, 2.7)" FORCE)
-endif()
+# if(NOT DARTPY_PYTHON_VERSION)
+#  set(DARTPY_PYTHON_VERSION 3.4 CACHE STRING "Choose the target Python version (e.g., 3.4, 2.7)" FORCE)
+# endif()
 
-find_package(PythonInterp ${DARTPY_PYTHON_VERSION} QUIET)
-execute_process(COMMAND ${PYTHON_EXECUTABLE} -c
-  "from distutils.sysconfig import get_python_lib;\
-  print(get_python_lib(plat_specific=True, prefix=''))"
-  OUTPUT_VARIABLE PYTHON_SITE_PACKAGES
-  OUTPUT_STRIP_TRAILING_WHITESPACE
-)
-if(NOT PythonInterp_FOUND)
-  message(STATUS "DART_BUILD_DARTPY is ON, but failed to find PythonInterp. "
-    "Disabling _diffdart."
-  )
-  return()
-endif()
+# find_package(PythonInterp ${DARTPY_PYTHON_VERSION} QUIET)
+# execute_process(COMMAND ${PYTHON_EXECUTABLE} -c
+#   "from distutils.sysconfig import get_python_lib;\
+#   print(get_python_lib(plat_specific=True, prefix=''))"
+#   OUTPUT_VARIABLE PYTHON_SITE_PACKAGES
+#   OUTPUT_STRIP_TRAILING_WHITESPACE
+# )
+# if(NOT PythonInterp_FOUND)
+#   message(STATUS "DART_BUILD_DARTPY is ON, but failed to find PythonInterp. "
+#     "Disabling _diffdart."
+#   )
+#   return()
+# endif()
 
-find_package(PythonLibs ${DARTPY_PYTHON_VERSION} QUIET)
-if(NOT PythonLibs_FOUND)
-  message(STATUS "DART_BUILD_DARTPY is ON, but failed to find PythonLibs. "
-    "Disabling _diffdart."
-  )
-  return()
-endif()
+# find_package(PythonLibs ${DARTPY_PYTHON_VERSION} QUIET)
+# if(NOT PythonLibs_FOUND)
+#   message(STATUS "DART_BUILD_DARTPY is ON, but failed to find PythonLibs. "
+#     "Disabling _diffdart."
+#   )
+#   return()
+# endif()
+
+find_package(Python COMPONENTS Interpreter Development)
 
 # Find pybind11
-# Needs to set PYBIND11_PYTHON_VERSION before finding pybind11
-set(PYBIND11_PYTHON_VERSION ${DARTPY_PYTHON_VERSION})
+# Old note: Needs to set PYBIND11_PYTHON_VERSION before finding pybind11
+# set(PYBIND11_PYTHON_VERSION ${DARTPY_PYTHON_VERSION})
 find_package(pybind11 2.2.0 QUIET)
 if(NOT pybind11_FOUND)
   message(STATUS "DART_BUILD_DARTPY is ON, but failed to find pybind11 >= "
@@ -34,6 +36,9 @@ if(NOT pybind11_FOUND)
   )
   return()
 endif()
+
+message(STATUS "PYTHON_INCLUDE_DIRS: ${PYTHON_INCLUDE_DIRS}")
+message(STATUS "pybind11_INCLUDE_DIRS: ${pybind11_INCLUDE_DIRS}")
 
 file(GLOB_RECURSE _diffdart_headers "*.h" "*.hpp")
 file(GLOB_RECURSE _diffdart_sources "*.cpp")

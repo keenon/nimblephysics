@@ -40,7 +40,12 @@ class CMakeBuild(build_ext):
             extdir += os.path.sep
 
         cmake_args = ['-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=' + extdir,
-                      '-DPYTHON_EXECUTABLE=' + sys.executable]
+                      '-DPYTHON_EXECUTABLE:FILEPATH=' + sys.executable]
+        # Set our Python version, default to 3.8
+        cmake_args += ['-DDARTPY_PYTHON_VERSION:STRING=' +
+                       os.getenv('PYTHON_VERSION_NUMBER', '3.8')]
+        cmake_args += ['-DPYBIND11_PYTHON_VERSION:STRING=' +
+                       os.getenv('PYTHON_VERSION_NUMBER', '3.8')]
 
         cfg = 'Debug' if self.debug else 'Release'
         build_args = ['--config', cfg]
@@ -56,8 +61,14 @@ class CMakeBuild(build_ext):
             cmake_args += ['-DCMAKE_BUILD_TYPE=' + cfg]
             # We need this on the manylinux2010 Docker images to find the correct Python
             if platform.system() == 'Linux':
-                cmake_args += ['-DPYTHON_INCLUDE_DIR=/opt/python/cp38-cp38/include/python3.8/']
-                cmake_args += ['-DPYTHON_LIBRARY=/opt/python/cp38-cp38/lib/python3.8/']
+                # Use ENV vars, and default to 3.8 if we don't specify
+                PYTHON_INCLUDE_DIR = os.getenv(
+                    'PYTHON_INCLUDE', '/opt/python/cp38-cp38/include/python3.8/')
+                PYTHON_LIBRARY = os.getenv('PYTHON_LIB', '/opt/python/cp38-cp38/lib/python3.8/')
+                print('Using PYTHON_INCLUDE_DIR='+PYTHON_INCLUDE_DIR)
+                print('Using PYTHON_LIBRARY='+PYTHON_LIBRARY)
+                cmake_args += ['-DPYTHON_INCLUDE_DIR:PATH='+PYTHON_INCLUDE_DIR]
+                cmake_args += ['-DPYTHON_LIBRARY:FILEPATH='+PYTHON_LIBRARY]
             build_args += ['--', '-j14']
 
         env = os.environ.copy()
@@ -65,6 +76,7 @@ class CMakeBuild(build_ext):
                                                               self.distribution.get_version())
         if not os.path.exists(self.build_temp):
             os.makedirs(self.build_temp)
+        print('Using CMake Args: '+str(cmake_args))
         subprocess.check_call(['cmake', ext.sourcedir] + cmake_args, cwd=self.build_temp, env=env)
         subprocess.check_call(['cmake', '--build', '.'] + build_args,
                               cwd=self.build_temp, env=env)
@@ -74,7 +86,7 @@ class CMakeBuild(build_ext):
 
 setup(
     name='diffdart',
-    version='0.0.3',
+    version='0.0.4',
     author='Keenon Werling',
     author_email='keenonwerling@gmail.com',
     description='A differentiable fully featured physics engine',

@@ -90,6 +90,7 @@ bool verifyMultiShotOptimization(WorldPtr world, MultiShot shot)
   IPOptOptimizer optimizer = IPOptOptimizer();
 
   optimizer.setIterationLimit(100);
+  optimizer.setRecordPerformanceLog(true);
   std::shared_ptr<OptimizationRecord> record = optimizer.optimize(&shot);
   EXPECT_TRUE(record->getNumSteps() == 101);
   EXPECT_TRUE(record->getStep(0).index == 0);

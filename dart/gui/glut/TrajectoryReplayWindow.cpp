@@ -68,7 +68,7 @@ void TrajectoryReplayWindow::timeStepping()
   if (mRollout == nullptr)
   {
     mRollout = new trajectory::TrajectoryRolloutReal(mShot);
-    mShot->getStates(mWorld, mRollout, mUseKnots);
+    mShot->getStates(mWorld, mRollout, nullptr, mUseKnots);
   }
   // std::cout << "Time stepping " << mCounter << std::endl;
   int cols = mShot->getNumSteps();

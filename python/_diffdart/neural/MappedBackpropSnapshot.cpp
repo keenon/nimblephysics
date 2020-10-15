@@ -51,7 +51,8 @@ void MappedBackpropSnapshot(py::module& m)
           &dart::neural::MappedBackpropSnapshot::backprop,
           ::py::arg("world"),
           ::py::arg("thisTimestepLoss"),
-          ::py::arg("nextTimestepLosses"))
+          ::py::arg("nextTimestepLosses"),
+          ::py::arg("perfLog") = nullptr)
       .def(
           "getRepresentation",
           &dart::neural::MappedBackpropSnapshot::getRepresentation)
@@ -60,27 +61,32 @@ void MappedBackpropSnapshot(py::module& m)
           "getVelVelJacobian",
           &dart::neural::MappedBackpropSnapshot::getVelVelJacobian,
           ::py::arg("world"),
-          ::py::arg("mapping"))
+          ::py::arg("mapping"),
+          ::py::arg("perfLog") = nullptr)
       .def(
           "getForceVelJacobian",
           &dart::neural::MappedBackpropSnapshot::getForceVelJacobian,
           ::py::arg("world"),
-          ::py::arg("mapping"))
+          ::py::arg("mapping"),
+          ::py::arg("perfLog") = nullptr)
       .def(
           "getPosPosJacobian",
           &dart::neural::MappedBackpropSnapshot::getPosPosJacobian,
           ::py::arg("world"),
-          ::py::arg("mapping"))
+          ::py::arg("mapping"),
+          ::py::arg("perfLog") = nullptr)
       .def(
           "getVelPosJacobian",
           &dart::neural::MappedBackpropSnapshot::getVelPosJacobian,
           ::py::arg("world"),
-          ::py::arg("mapping"))
+          ::py::arg("mapping"),
+          ::py::arg("perfLog") = nullptr)
       .def(
           "getPosVelJacobian",
           &dart::neural::MappedBackpropSnapshot::getPosVelJacobian,
           ::py::arg("world"),
-          ::py::arg("mapping"))
+          ::py::arg("mapping"),
+          ::py::arg("perfLog") = nullptr)
       .def(
           "getPreStepPosition",
           &dart::neural::MappedBackpropSnapshot::getPreStepPosition,

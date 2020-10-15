@@ -54,12 +54,17 @@ void LossFn(py::module& m)
               dart::trajectory::TrajectoryLossFnAndGrad>(),
           ::py::arg("loss"),
           ::py::arg("lossFnAndGrad"))
-      .def("getLoss", &dart::trajectory::LossFn::getLoss, ::py::arg("rollout"))
+      .def(
+          "getLoss",
+          &dart::trajectory::LossFn::getLoss,
+          ::py::arg("rollout"),
+          ::py::arg("perfLog") = nullptr)
       .def(
           "getLossAndGradient",
           &dart::trajectory::LossFn::getLossAndGradient,
           ::py::arg("rollout"),
-          ::py::arg("gradWrtRollout"))
+          ::py::arg("gradWrtRollout"),
+          ::py::arg("perfLog") = nullptr)
       .def(
           "setUpperBound",
           &dart::trajectory::LossFn::setUpperBound,

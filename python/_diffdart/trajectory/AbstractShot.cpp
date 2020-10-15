@@ -239,7 +239,8 @@ void AbstractShot(py::module& m)
           "switchRepresentationMapping",
           &dart::trajectory::AbstractShot::switchRepresentationMapping,
           ::py::arg("world"),
-          ::py::arg("representation"))
+          ::py::arg("representation"),
+          ::py::arg("perfLog") = nullptr)
       .def(
           "addMapping",
           &dart::trajectory::AbstractShot::addMapping,
@@ -273,7 +274,8 @@ void AbstractShot(py::module& m)
       .def(
           "getFinalState",
           &dart::trajectory::AbstractShot::getFinalState,
-          ::py::arg("world"))
+          ::py::arg("world"),
+          ::py::arg("perfLog") = nullptr)
       .def("getNumSteps", &dart::trajectory::AbstractShot::getNumSteps)
       .def(
           "getFlatDimName",
@@ -282,11 +284,13 @@ void AbstractShot(py::module& m)
       .def(
           "getLoss",
           &dart::trajectory::AbstractShot::getLoss,
-          ::py::arg("world"))
+          ::py::arg("world"),
+          ::py::arg("perfLog") = nullptr)
       .def(
           "getRolloutCache",
           &dart::trajectory::AbstractShot::getRolloutCache,
           ::py::arg("world"),
+          ::py::arg("perfLog") = nullptr,
           ::py::arg("useKnots") = true,
           ::py::return_value_policy::reference);
   /*

@@ -593,20 +593,20 @@ bool verifyChangeRepresentationToIK(
 
   // Get the initial state
   TrajectoryRolloutReal initialIdentityRollout = TrajectoryRolloutReal(&shot);
-  shot.getStates(world, &initialIdentityRollout, true);
+  shot.getStates(world, &initialIdentityRollout, nullptr, true);
 
   shot.addMapping("custom", newRepresentation);
   // Switch to a mapped state, and get the problem state
   shot.switchRepresentationMapping(world, "custom");
 
   TrajectoryRolloutReal mappedRollout = TrajectoryRolloutReal(&shot);
-  shot.getStates(world, &mappedRollout, true);
+  shot.getStates(world, &mappedRollout, nullptr, true);
 
   // Go back to identity maps
   shot.switchRepresentationMapping(world, "identity");
 
   TrajectoryRolloutReal recoveredIdentityRollout = TrajectoryRolloutReal(&shot);
-  shot.getStates(world, &recoveredIdentityRollout, true);
+  shot.getStates(world, &recoveredIdentityRollout, nullptr, true);
 
   double threshold = 1e-8;
 
@@ -775,9 +775,9 @@ bool verifyMultiShotOptimization(WorldPtr world, MultiShot shot)
   TrajectoryRolloutReal withoutKnots = TrajectoryRolloutReal(&shot);
 
   // Get the version with knots
-  shot.getStates(world, &withKnots, true);
+  shot.getStates(world, &withKnots, nullptr, true);
   // Get the version without knots next, so that they can play in a loop
-  shot.getStates(world, &withoutKnots, false);
+  shot.getStates(world, &withoutKnots, nullptr, false);
 
   // Create a window for rendering the world and handling user input
   // dart::gui::glut::displayTrajectoryInGUI(world, &shot);
@@ -1256,6 +1256,7 @@ TEST(TRAJECTORY, JUMP_WORM)
   EXPECT_TRUE(verifyMultiShotOptimization(world, shot));
   */
 
+  /*
   EXPECT_TRUE(verifySingleStep(world, 5e-7));
   // EXPECT_TRUE(verifySingleShot(world, 40, 5e-7, false));
   EXPECT_TRUE(verifyShotJacobian(world, 4, nullptr));
@@ -1263,6 +1264,7 @@ TEST(TRAJECTORY, JUMP_WORM)
   EXPECT_TRUE(verifyMultiShotJacobian(world, 6, 2, nullptr));
   EXPECT_TRUE(verifySparseJacobian(world, 8, 2, nullptr));
   EXPECT_TRUE(verifyMultiShotGradient(world, 8, 4, loss, lossGrad));
+  */
   EXPECT_TRUE(verifyMultiShotJacobianCustomConstraint(
       world, 8, 4, loss, lossGrad, 3.0));
 }

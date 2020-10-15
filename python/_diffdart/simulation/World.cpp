@@ -345,12 +345,12 @@ void World(py::module& m)
       .def(
           "getMassMatrix",
           +[](dart::simulation::World* self) -> Eigen::VectorXd {
-            self->getMassMatrix();
+            return self->getMassMatrix();
           })
       .def(
           "getInvMassMatrix",
           +[](dart::simulation::World* self) -> Eigen::VectorXd {
-            self->getInvMassMatrix();
+            return self->getInvMassMatrix();
           })
       .def_readonly("onNameChanged", &dart::simulation::World::onNameChanged);
 }

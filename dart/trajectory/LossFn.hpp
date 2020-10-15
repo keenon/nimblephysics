@@ -5,11 +5,14 @@
 
 #include <Eigen/Dense>
 
+#include "dart/performance/PerformanceLog.hpp"
 #include "dart/trajectory/TrajectoryConstants.hpp"
 #include "dart/trajectory/TrajectoryRollout.hpp"
 #include "dart/utils/tl_optional.hpp"
 
 namespace dart {
+
+using namespace performance;
 
 namespace trajectory {
 
@@ -32,11 +35,13 @@ public:
 
   virtual ~LossFn();
 
-  virtual double getLoss(const TrajectoryRollout* rollout);
+  virtual double getLoss(
+      const TrajectoryRollout* rollout, PerformanceLog* perflog = nullptr);
 
   virtual double getLossAndGradient(
       const TrajectoryRollout* rollout,
-      /* OUT */ TrajectoryRollout* gradWrtRollout);
+      /* OUT */ TrajectoryRollout* gradWrtRollout,
+      PerformanceLog* perflog = nullptr);
 
   /// If this LossFn is being used as a constraint, this gets the lower bound
   /// it's allowed to reach

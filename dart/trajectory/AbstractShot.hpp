@@ -57,7 +57,7 @@ public:
   virtual void switchRepresentationMapping(
       std::shared_ptr<simulation::World> world,
       const std::string& mapping,
-      PerformanceLog* log);
+      PerformanceLog* log = nullptr);
 
   /// This adds a mapping through which the loss function can interpret the
   /// output. We can have multiple loss mappings at the same time, and loss can
@@ -97,11 +97,12 @@ public:
   /// This copies a shot down into a single flat vector
   virtual void flatten(
       /* OUT */ Eigen::Ref<Eigen::VectorXd> flat,
-      PerformanceLog* log) const = 0;
+      PerformanceLog* log = nullptr) const = 0;
 
   /// This gets the parameters out of a flat vector
   virtual void unflatten(
-      const Eigen::Ref<const Eigen::VectorXd>& flat, PerformanceLog* log)
+      const Eigen::Ref<const Eigen::VectorXd>& flat,
+      PerformanceLog* log = nullptr)
       = 0;
 
   /// This gets the fixed upper bounds for a flat vector, used during
@@ -109,54 +110,57 @@ public:
   virtual void getUpperBounds(
       std::shared_ptr<simulation::World> world,
       /* OUT */ Eigen::Ref<Eigen::VectorXd> flat,
-      PerformanceLog* log) const = 0;
+      PerformanceLog* log = nullptr) const = 0;
 
   /// This gets the fixed lower bounds for a flat vector, used during
   /// optimization
   virtual void getLowerBounds(
       std::shared_ptr<simulation::World> world,
       /* OUT */ Eigen::Ref<Eigen::VectorXd> flat,
-      PerformanceLog* log) const = 0;
+      PerformanceLog* log = nullptr) const = 0;
 
   /// This gets the bounds on the constraint functions (both knot points and any
   /// custom constraints)
   virtual void getConstraintUpperBounds(
-      /* OUT */ Eigen::Ref<Eigen::VectorXd> flat, PerformanceLog* log) const;
+      /* OUT */ Eigen::Ref<Eigen::VectorXd> flat,
+      PerformanceLog* log = nullptr) const;
 
   /// This gets the bounds on the constraint functions (both knot points and any
   /// custom constraints)
   virtual void getConstraintLowerBounds(
-      /* OUT */ Eigen::Ref<Eigen::VectorXd> flat, PerformanceLog* log) const;
+      /* OUT */ Eigen::Ref<Eigen::VectorXd> flat,
+      PerformanceLog* log = nullptr) const;
 
   /// This returns the initial guess for the values of X when running an
   /// optimization
   virtual void getInitialGuess(
       std::shared_ptr<simulation::World> world,
       /* OUT */ Eigen::Ref<Eigen::VectorXd> flat,
-      PerformanceLog* log) const = 0;
+      PerformanceLog* log = nullptr) const = 0;
 
   /// This computes the values of the constraints
   virtual void computeConstraints(
       std::shared_ptr<simulation::World> world,
       /* OUT */ Eigen::Ref<Eigen::VectorXd> constraints,
-      PerformanceLog* log);
+      PerformanceLog* log = nullptr);
 
   /// This computes the Jacobian that relates the flat problem to the end state.
   /// This returns a matrix that's (getConstraintDim(), getFlatProblemDim()).
   virtual void backpropJacobian(
       std::shared_ptr<simulation::World> world,
       /* OUT */ Eigen::Ref<Eigen::MatrixXd> jac,
-      PerformanceLog* log);
+      PerformanceLog* log = nullptr);
 
   /// This computes the gradient in the flat problem space, automatically
   /// computing the gradients of the loss function as part of the call
   void backpropGradient(
       std::shared_ptr<simulation::World> world,
       /* OUT */ Eigen::Ref<Eigen::VectorXd> grad,
-      PerformanceLog* log);
+      PerformanceLog* log = nullptr);
 
   /// Get the loss for the rollout
-  double getLoss(std::shared_ptr<simulation::World> world, PerformanceLog* log);
+  double getLoss(
+      std::shared_ptr<simulation::World> world, PerformanceLog* log = nullptr);
 
   /// This computes the gradient in the flat problem space, taking into accounts
   /// incoming gradients with respect to any of the shot's values.
@@ -164,25 +168,25 @@ public:
       std::shared_ptr<simulation::World> world,
       const TrajectoryRollout* gradWrtRollout,
       /* OUT */ Eigen::Ref<Eigen::VectorXd> grad,
-      PerformanceLog* log)
+      PerformanceLog* log = nullptr)
       = 0;
 
   /// This populates the passed in matrices with the values from this trajectory
   virtual void getStates(
       std::shared_ptr<simulation::World> world,
       /* OUT */ TrajectoryRollout* rollout,
-      PerformanceLog* log,
+      PerformanceLog* log = nullptr,
       bool useKnots = true)
       = 0;
 
   const TrajectoryRollout* getRolloutCache(
       std::shared_ptr<simulation::World> world,
-      PerformanceLog* log,
+      PerformanceLog* log = nullptr,
       bool useKnots = true);
 
   TrajectoryRollout* getGradientWrtRolloutCache(
       std::shared_ptr<simulation::World> world,
-      PerformanceLog* log,
+      PerformanceLog* log = nullptr,
       bool useKnots = true);
 
   /// This returns the concatenation of (start pos, start vel) for convenience
@@ -191,7 +195,7 @@ public:
   /// This unrolls the shot, and returns the (pos, vel) state concatenated at
   /// the end of the shot
   virtual Eigen::VectorXd getFinalState(
-      std::shared_ptr<simulation::World> world, PerformanceLog* log)
+      std::shared_ptr<simulation::World> world, PerformanceLog* log = nullptr)
       = 0;
 
   int getNumSteps();
@@ -206,13 +210,13 @@ public:
   virtual void getJacobianSparsityStructure(
       Eigen::Ref<Eigen::VectorXi> rows,
       Eigen::Ref<Eigen::VectorXi> cols,
-      PerformanceLog* log);
+      PerformanceLog* log = nullptr);
 
   /// This writes the Jacobian to a sparse vector
   virtual void getSparseJacobian(
       std::shared_ptr<simulation::World> world,
       Eigen::Ref<Eigen::VectorXd> sparse,
-      PerformanceLog* log);
+      PerformanceLog* log = nullptr);
 
   //////////////////////////////////////////////////////////////////////////////
   // For Testing

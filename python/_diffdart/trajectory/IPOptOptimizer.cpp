@@ -69,7 +69,11 @@ void IPOptOptimizer(py::module& m)
       .def(
           "setPrintFrequency",
           &dart::trajectory::IPOptOptimizer::setPrintFrequency,
-          ::py::arg("printFrequency") = 1);
+          ::py::arg("printFrequency") = 1)
+      .def(
+          "setRecordPerformanceLog",
+          &dart::trajectory::IPOptOptimizer::setRecordPerformanceLog,
+          ::py::arg("recordPerfLog") = true);
 }
 
 } // namespace python
