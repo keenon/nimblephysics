@@ -16,6 +16,7 @@ dart_add_test("unit" test_Subscriptions)
 dart_add_test("unit" test_Uri)
 dart_add_test("unit" test_ConstrainedGroupGradientMatrices)
 dart_add_test("unit" test_LCPUtils)
+dart_add_test("unit" test_PerformanceLog)
 
 if(TARGET dart-optimizer-ipopt)
   target_link_libraries(test_Optimizer dart-optimizer-ipopt)

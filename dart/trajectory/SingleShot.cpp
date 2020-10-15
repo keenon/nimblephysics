@@ -13,6 +13,8 @@ using namespace dynamics;
 using namespace simulation;
 using namespace neural;
 
+#define LOG_PERFORMANCE_SINGLE_SHOT
+
 namespace dart {
 namespace trajectory {
 
@@ -53,14 +55,25 @@ SingleShot::~SingleShot()
 /// certainly be mapped spaces that are easier to optimize in than native
 /// joint space, at least initially.
 void SingleShot::switchRepresentationMapping(
-    std::shared_ptr<simulation::World> world, const std::string& mapping)
+    std::shared_ptr<simulation::World> world,
+    const std::string& mapping,
+    PerformanceLog* log)
 {
+  PerformanceLog* thisLog = nullptr;
+#ifdef LOG_PERFORMANCE_SINGLE_SHOT
+  if (log != nullptr)
+  {
+    thisLog = log->startRun("SingleShot.switchRepresentationMapping");
+  }
+#endif
+
   RestorableSnapshot snapshot(world);
 
   // Rewrite the forces in the new mapping
   Eigen::MatrixXd newForces = Eigen::MatrixXd::Zero(
       mMappings[mapping]->getForceDim(), mForces.cols());
-  std::vector<MappedBackpropSnapshotPtr> snapshots = getSnapshots(world);
+  std::vector<MappedBackpropSnapshotPtr> snapshots
+      = getSnapshots(world, thisLog);
   for (int i = 0; i < snapshots.size(); i++)
   {
     // Set the state in the old mapping
@@ -90,8 +103,15 @@ void SingleShot::switchRepresentationMapping(
   mStartVel = mMappings[mapping]->getVelocities(world);
 
   mSnapshotsCacheDirty = true;
-  AbstractShot::switchRepresentationMapping(world, mapping);
+  AbstractShot::switchRepresentationMapping(world, mapping, thisLog);
   snapshot.restore();
+
+#ifdef LOG_PERFORMANCE_SINGLE_SHOT
+  if (thisLog != nullptr)
+  {
+    thisLog->end();
+  }
+#endif
 }
 
 //==============================================================================
@@ -113,8 +133,17 @@ int SingleShot::getConstraintDim() const
 
 //==============================================================================
 /// This copies a shot down into a single flat vector
-void SingleShot::flatten(Eigen::Ref<Eigen::VectorXd> flat) const
+void SingleShot::flatten(
+    Eigen::Ref<Eigen::VectorXd> flat, PerformanceLog* log) const
 {
+  PerformanceLog* thisLog = nullptr;
+#ifdef LOG_PERFORMANCE_SINGLE_SHOT
+  if (log != nullptr)
+  {
+    thisLog = log->startRun("SingleShot.flatten");
+  }
+#endif
+
   int cursor = 0;
   if (mTuneStartingState)
   {
@@ -130,12 +159,28 @@ void SingleShot::flatten(Eigen::Ref<Eigen::VectorXd> flat) const
     cursor += forceDim;
   }
   assert(cursor == flat.size());
+
+#ifdef LOG_PERFORMANCE_SINGLE_SHOT
+  if (thisLog != nullptr)
+  {
+    thisLog->end();
+  }
+#endif
 }
 
 //==============================================================================
 /// This gets the parameters out of a flat vector
-void SingleShot::unflatten(const Eigen::Ref<const Eigen::VectorXd>& flat)
+void SingleShot::unflatten(
+    const Eigen::Ref<const Eigen::VectorXd>& flat, PerformanceLog* log)
 {
+  PerformanceLog* thisLog = nullptr;
+#ifdef LOG_PERFORMANCE_SINGLE_SHOT
+  if (log != nullptr)
+  {
+    thisLog = log->startRun("SingleShot.unflatten");
+  }
+#endif
+
   mRolloutCacheDirty = true;
   mSnapshotsCacheDirty = true;
   int cursor = 0;
@@ -153,6 +198,13 @@ void SingleShot::unflatten(const Eigen::Ref<const Eigen::VectorXd>& flat)
     cursor += forceDim;
   }
   assert(cursor == flat.size());
+
+#ifdef LOG_PERFORMANCE_SINGLE_SHOT
+  if (thisLog != nullptr)
+  {
+    thisLog->end();
+  }
+#endif
 }
 
 //==============================================================================
@@ -160,8 +212,17 @@ void SingleShot::unflatten(const Eigen::Ref<const Eigen::VectorXd>& flat)
 /// optimization
 void SingleShot::getUpperBounds(
     std::shared_ptr<simulation::World> world,
-    /* OUT */ Eigen::Ref<Eigen::VectorXd> flat) const
+    /* OUT */ Eigen::Ref<Eigen::VectorXd> flat,
+    PerformanceLog* log) const
 {
+  PerformanceLog* thisLog = nullptr;
+#ifdef LOG_PERFORMANCE_SINGLE_SHOT
+  if (log != nullptr)
+  {
+    thisLog = log->startRun("SingleShot.getUpperBounds");
+  }
+#endif
+
   int cursor = 0;
   if (mTuneStartingState)
   {
@@ -182,6 +243,13 @@ void SingleShot::getUpperBounds(
     cursor += forceDim;
   }
   assert(cursor == flat.size());
+
+#ifdef LOG_PERFORMANCE_SINGLE_SHOT
+  if (thisLog != nullptr)
+  {
+    thisLog->end();
+  }
+#endif
 }
 
 //==============================================================================
@@ -189,8 +257,17 @@ void SingleShot::getUpperBounds(
 /// optimization
 void SingleShot::getLowerBounds(
     std::shared_ptr<simulation::World> world,
-    /* OUT */ Eigen::Ref<Eigen::VectorXd> flat) const
+    /* OUT */ Eigen::Ref<Eigen::VectorXd> flat,
+    PerformanceLog* log) const
 {
+  PerformanceLog* thisLog = nullptr;
+#ifdef LOG_PERFORMANCE_SINGLE_SHOT
+  if (log != nullptr)
+  {
+    thisLog = log->startRun("SingleShot.getLowerBounds");
+  }
+#endif
+
   int cursor = 0;
   if (mTuneStartingState)
   {
@@ -212,6 +289,13 @@ void SingleShot::getLowerBounds(
     cursor += forceDim;
   }
   assert(cursor == flat.size());
+
+#ifdef LOG_PERFORMANCE_SINGLE_SHOT
+  if (thisLog != nullptr)
+  {
+    thisLog->end();
+  }
+#endif
 }
 
 //==============================================================================
@@ -219,18 +303,45 @@ void SingleShot::getLowerBounds(
 /// optimization
 void SingleShot::getInitialGuess(
     std::shared_ptr<simulation::World> world,
-    /* OUT */ Eigen::Ref<Eigen::VectorXd> flat) const
+    /* OUT */ Eigen::Ref<Eigen::VectorXd> flat,
+    PerformanceLog* log) const
 {
-  flatten(flat);
+  PerformanceLog* thisLog = nullptr;
+#ifdef LOG_PERFORMANCE_SINGLE_SHOT
+  if (log != nullptr)
+  {
+    thisLog = log->startRun("SingleShot.getInitialGuess");
+  }
+#endif
+
+  flatten(flat, thisLog);
+
+#ifdef LOG_PERFORMANCE_SINGLE_SHOT
+  if (thisLog != nullptr)
+  {
+    thisLog->end();
+  }
+#endif
 }
 
 //==============================================================================
 /// This computes the Jacobian that relates the flat problem to the end state.
 /// This returns a matrix that's (2 * mNumDofs, getFlatProblemDim()).
 void SingleShot::backpropJacobianOfFinalState(
-    std::shared_ptr<simulation::World> world, Eigen::Ref<Eigen::MatrixXd> jac)
+    std::shared_ptr<simulation::World> world,
+    Eigen::Ref<Eigen::MatrixXd> jac,
+    PerformanceLog* log)
 {
-  std::vector<MappedBackpropSnapshotPtr> snapshots = getSnapshots(world);
+  PerformanceLog* thisLog = nullptr;
+#ifdef LOG_PERFORMANCE_SINGLE_SHOT
+  if (log != nullptr)
+  {
+    thisLog = log->startRun("SingleShot.backpropJacobianOfFinalState");
+  }
+#endif
+
+  std::vector<MappedBackpropSnapshotPtr> snapshots
+      = getSnapshots(world, thisLog);
 
   int posDim = getRepresentation()->getPosDim();
   int velDim = getRepresentation()->getVelDim();
@@ -250,15 +361,15 @@ void SingleShot::backpropJacobianOfFinalState(
     MappedBackpropSnapshotPtr ptr = snapshots[i];
     TimestepJacobians thisTimestep;
     Eigen::MatrixXd forceVel
-        = ptr->getForceVelJacobian(world, mRepresentationMapping);
+        = ptr->getForceVelJacobian(world, mRepresentationMapping, thisLog);
     Eigen::MatrixXd posPos
-        = ptr->getPosPosJacobian(world, mRepresentationMapping);
+        = ptr->getPosPosJacobian(world, mRepresentationMapping, thisLog);
     Eigen::MatrixXd posVel
-        = ptr->getPosVelJacobian(world, mRepresentationMapping);
+        = ptr->getPosVelJacobian(world, mRepresentationMapping, thisLog);
     Eigen::MatrixXd velPos
-        = ptr->getVelPosJacobian(world, mRepresentationMapping);
+        = ptr->getVelPosJacobian(world, mRepresentationMapping, thisLog);
     Eigen::MatrixXd velVel
-        = ptr->getVelVelJacobian(world, mRepresentationMapping);
+        = ptr->getVelVelJacobian(world, mRepresentationMapping, thisLog);
 
     // p_end <- f_t = p_end <- v_t+1 * v_t+1 <- f_t
     thisTimestep.forcePos = last.velPos * forceVel;
@@ -296,6 +407,13 @@ void SingleShot::backpropJacobianOfFinalState(
     last = thisTimestep;
   }
   assert(cursor == 0);
+
+#ifdef LOG_PERFORMANCE_SINGLE_SHOT
+  if (thisLog != nullptr)
+  {
+    thisLog->end();
+  }
+#endif
 }
 
 //==============================================================================
@@ -303,31 +421,31 @@ void SingleShot::backpropJacobianOfFinalState(
 void SingleShot::finiteDifferenceJacobianOfFinalState(
     std::shared_ptr<simulation::World> world, Eigen::Ref<Eigen::MatrixXd> jac)
 {
-  Eigen::VectorXd originalEndPos = getFinalState(world);
+  Eigen::VectorXd originalEndPos = getFinalState(world, nullptr);
 
   int dim = getFlatProblemDim();
   Eigen::VectorXd flat = Eigen::VectorXd(dim);
-  flatten(flat);
+  flatten(flat, nullptr);
 
   double EPS = 1e-7;
 
   for (int i = 0; i < dim; i++)
   {
     flat(i) += EPS;
-    unflatten(flat);
+    unflatten(flat, nullptr);
     flat(i) -= EPS;
-    Eigen::VectorXd perturbedEndStatePos = getFinalState(world);
+    Eigen::VectorXd perturbedEndStatePos = getFinalState(world, nullptr);
 
     flat(i) -= EPS;
-    unflatten(flat);
+    unflatten(flat, nullptr);
     flat(i) += EPS;
-    Eigen::VectorXd perturbedEndStateNeg = getFinalState(world);
+    Eigen::VectorXd perturbedEndStateNeg = getFinalState(world, nullptr);
 
     jac.col(i) = (perturbedEndStatePos - perturbedEndStateNeg) / (2 * EPS);
   }
 
   // Restore original value
-  unflatten(flat);
+  unflatten(flat, nullptr);
 }
 
 //==============================================================================
@@ -336,11 +454,21 @@ void SingleShot::finiteDifferenceJacobianOfFinalState(
 void SingleShot::backpropGradientWrt(
     std::shared_ptr<simulation::World> world,
     const TrajectoryRollout* gradWrtRollout,
-    /* OUT */ Eigen::Ref<Eigen::VectorXd> grad)
+    /* OUT */ Eigen::Ref<Eigen::VectorXd> grad,
+    PerformanceLog* log)
 {
+  PerformanceLog* thisLog = nullptr;
+#ifdef LOG_PERFORMANCE_SINGLE_SHOT
+  if (log != nullptr)
+  {
+    thisLog = log->startRun("SingleShot.backpropGradientWrt");
+  }
+#endif
+
   int dims = getFlatProblemDim();
   assert(grad.size() == dims);
-  std::vector<MappedBackpropSnapshotPtr> snapshots = getSnapshots(world);
+  std::vector<MappedBackpropSnapshotPtr> snapshots
+      = getSnapshots(world, thisLog);
   assert(snapshots.size() == mSteps);
 
   LossGradient nextTimestep;
@@ -373,7 +501,7 @@ void SingleShot::backpropGradientWrt(
         += nextTimestep.lossWrtVelocity;
 
     LossGradient thisTimestep;
-    snapshots[i]->backprop(world, thisTimestep, mappedLosses);
+    snapshots[i]->backprop(world, thisTimestep, mappedLosses, thisLog);
     cursor -= forceDim;
     grad.segment(cursor, forceDim) = thisTimestep.lossWrtTorque;
     if (i == 0 && mTuneStartingState)
@@ -397,15 +525,37 @@ void SingleShot::backpropGradientWrt(
     nextTimestep = thisTimestep;
   }
   assert(cursor == 0);
+
+#ifdef LOG_PERFORMANCE_SINGLE_SHOT
+  if (thisLog != nullptr)
+  {
+    thisLog->end();
+  }
+#endif
 }
 
 //==============================================================================
 /// This returns the snapshots from a fresh unroll
 std::vector<MappedBackpropSnapshotPtr> SingleShot::getSnapshots(
-    std::shared_ptr<simulation::World> world)
+    std::shared_ptr<simulation::World> world, PerformanceLog* log)
 {
+  PerformanceLog* thisLog = nullptr;
+#ifdef LOG_PERFORMANCE_SINGLE_SHOT
+  if (log != nullptr)
+  {
+    thisLog = log->startRun("SingleShot.getSnapshots");
+  }
+#endif
+
   if (mSnapshotsCacheDirty)
   {
+    PerformanceLog* refreshLog = nullptr;
+#ifdef LOG_PERFORMANCE_SINGLE_SHOT
+    if (thisLog != nullptr)
+    {
+      refreshLog = thisLog->startRun("SingleShot.getSnapshots#refreshCache");
+    }
+#endif
     RestorableSnapshot snapshot(world);
 
     mSnapshotsCache.clear();
@@ -423,7 +573,20 @@ std::vector<MappedBackpropSnapshotPtr> SingleShot::getSnapshots(
 
     snapshot.restore();
     mSnapshotsCacheDirty = false;
+#ifdef LOG_PERFORMANCE_SINGLE_SHOT
+    if (refreshLog != nullptr)
+    {
+      refreshLog->end();
+    }
+#endif
   }
+
+#ifdef LOG_PERFORMANCE_SINGLE_SHOT
+  if (thisLog != nullptr)
+  {
+    thisLog->end();
+  }
+#endif
   return mSnapshotsCache;
 }
 
@@ -432,9 +595,19 @@ std::vector<MappedBackpropSnapshotPtr> SingleShot::getSnapshots(
 void SingleShot::getStates(
     std::shared_ptr<simulation::World> world,
     /* OUT */ TrajectoryRollout* rollout,
+    PerformanceLog* log,
     bool /* useKnots */)
 {
-  std::vector<MappedBackpropSnapshotPtr> snapshots = getSnapshots(world);
+  PerformanceLog* thisLog = nullptr;
+#ifdef LOG_PERFORMANCE_SINGLE_SHOT
+  if (log != nullptr)
+  {
+    thisLog = log->startRun("SingleShot.getStates");
+  }
+#endif
+
+  std::vector<MappedBackpropSnapshotPtr> snapshots
+      = getSnapshots(world, thisLog);
 
   for (std::string key : rollout->getMappings())
   {
@@ -451,6 +624,13 @@ void SingleShot::getStates(
       rollout->getForces(key).col(i) = snapshots[i]->getPreStepTorques(key);
     }
   }
+
+#ifdef LOG_PERFORMANCE_SINGLE_SHOT
+  if (thisLog != nullptr)
+  {
+    thisLog->end();
+  }
+#endif
 }
 
 //==============================================================================
@@ -469,9 +649,18 @@ Eigen::VectorXd SingleShot::getStartState()
 /// This unrolls the shot, and returns the (pos, vel) state concatenated at
 /// the end of the shot
 Eigen::VectorXd SingleShot::getFinalState(
-    std::shared_ptr<simulation::World> world)
+    std::shared_ptr<simulation::World> world, PerformanceLog* log)
 {
-  std::vector<MappedBackpropSnapshotPtr> snapshots = getSnapshots(world);
+  PerformanceLog* thisLog = nullptr;
+#ifdef LOG_PERFORMANCE_SINGLE_SHOT
+  if (log != nullptr)
+  {
+    thisLog = log->startRun("SingleShot.getFinalState");
+  }
+#endif
+
+  std::vector<MappedBackpropSnapshotPtr> snapshots
+      = getSnapshots(world, thisLog);
 
   Eigen::VectorXd state = Eigen::VectorXd::Zero(getRepresentationStateSize());
   state.segment(0, getRepresentation()->getPosDim())
@@ -482,6 +671,12 @@ Eigen::VectorXd SingleShot::getFinalState(
       = snapshots[snapshots.size() - 1]->getPostStepVelocity(
           mRepresentationMapping);
 
+#ifdef LOG_PERFORMANCE_SINGLE_SHOT
+  if (thisLog != nullptr)
+  {
+    thisLog->end();
+  }
+#endif
   return state;
 }
 
@@ -521,7 +716,8 @@ std::string SingleShot::getFlatDimName(int dim)
 TimestepJacobians SingleShot::backpropStartStateJacobians(
     std::shared_ptr<simulation::World> world, bool useFdJacs)
 {
-  std::vector<MappedBackpropSnapshotPtr> snapshots = getSnapshots(world);
+  std::vector<MappedBackpropSnapshotPtr> snapshots
+      = getSnapshots(world, nullptr);
 
   int posDim = getRepresentation()->getPosDim();
   int velDim = getRepresentation()->getVelDim();

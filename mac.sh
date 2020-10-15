@@ -195,6 +195,17 @@ popd
 popd
 rm -rf urdfdom
 
+# Install perfutils
+git clone https://github.com/PlatformLab/PerfUtils.git
+pushd PerfUtils
+mkdir build
+pushd build
+cmake ..
+make install
+popd
+popd
+rm -rf PerfUtils
+
 # Reset the IDs for our libraries to absolute paths
 install_name_tool -id /usr/local/lib/liburdfdom_sensor.dylib /usr/local/lib/liburdfdom_sensor.dylib
 install_name_tool -id /usr/local/lib/liburdfdom_model_state.dylib /usr/local/lib/liburdfdom_model_state.dylib

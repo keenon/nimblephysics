@@ -16,13 +16,31 @@ namespace dart {
 namespace trajectory {
 
 //==============================================================================
-OptimizationRecord::OptimizationRecord() : mSuccess(false)
+OptimizationRecord::OptimizationRecord() : mSuccess(false), mPerfLog(nullptr)
 {
+}
+
+//==============================================================================
+/// This returns a reference to the PerformanceLog for this Optimization
+void OptimizationRecord::startPerfLog()
+{
+  mPerfLog = performance::PerformanceLog::startRoot("IPOptOptimizer.optimize");
+}
+
+//==============================================================================
+/// This returns a reference to the PerformanceLog for this Optimization
+performance::PerformanceLog* OptimizationRecord::getPerfLog()
+{
+  return mPerfLog;
 }
 
 //==============================================================================
 void OptimizationRecord::setSuccess(bool success)
 {
+  if (mPerfLog != nullptr)
+  {
+    mPerfLog->end();
+  }
   mSuccess = success;
 }
 

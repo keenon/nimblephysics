@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "dart/performance/PerformanceLog.hpp"
 #include "dart/trajectory/TrajectoryConstants.hpp"
 #include "dart/trajectory/TrajectoryRollout.hpp"
 
@@ -61,9 +62,17 @@ public:
   /// our web GUI
   std::string toJson(std::shared_ptr<simulation::World> world);
 
+  /// This gets called by the optimizer, if we're recording performance per
+  /// optimization
+  void startPerfLog();
+
+  /// This returns a reference to the PerformanceLog for this Optimization
+  performance::PerformanceLog* getPerfLog();
+
 protected:
   bool mSuccess;
   std::vector<OptimizationStep> mSteps;
+  performance::PerformanceLog* mPerfLog;
 };
 
 } // namespace trajectory

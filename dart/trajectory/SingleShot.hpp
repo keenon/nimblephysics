@@ -50,7 +50,8 @@ public:
   /// joint space, at least initially.
   void switchRepresentationMapping(
       std::shared_ptr<simulation::World> world,
-      const std::string& mapping) override;
+      const std::string& mapping,
+      PerformanceLog* log) override;
 
   /// Returns the length of the flattened problem state
   int getFlatProblemDim() const override;
@@ -59,50 +60,60 @@ public:
   int getConstraintDim() const override;
 
   /// This copies a shot down into a single flat vector
-  void flatten(/* OUT */ Eigen::Ref<Eigen::VectorXd> flat) const override;
+  void flatten(
+      /* OUT */ Eigen::Ref<Eigen::VectorXd> flat,
+      PerformanceLog* log) const override;
 
   /// This gets the parameters out of a flat vector
-  void unflatten(const Eigen::Ref<const Eigen::VectorXd>& flat) override;
+  void unflatten(
+      const Eigen::Ref<const Eigen::VectorXd>& flat,
+      PerformanceLog* log) override;
 
   /// This gets the fixed upper bounds for a flat vector, used during
   /// optimization
   void getUpperBounds(
       std::shared_ptr<simulation::World> world,
-      /* OUT */ Eigen::Ref<Eigen::VectorXd> flat) const override;
+      /* OUT */ Eigen::Ref<Eigen::VectorXd> flat,
+      PerformanceLog* log) const override;
 
   /// This gets the fixed lower bounds for a flat vector, used during
   /// optimization
   void getLowerBounds(
       std::shared_ptr<simulation::World> world,
-      /* OUT */ Eigen::Ref<Eigen::VectorXd> flat) const override;
+      /* OUT */ Eigen::Ref<Eigen::VectorXd> flat,
+      PerformanceLog* log) const override;
 
   /// This returns the initial guess for the values of X when running an
   /// optimization
   void getInitialGuess(
       std::shared_ptr<simulation::World> world,
-      /* OUT */ Eigen::Ref<Eigen::VectorXd> flat) const override;
+      /* OUT */ Eigen::Ref<Eigen::VectorXd> flat,
+      PerformanceLog* log) const override;
 
   /// This computes the Jacobian that relates the flat problem to the end state.
   /// This returns a matrix that's (2 * mNumDofs, getFlatProblemDim()).
   void backpropJacobianOfFinalState(
       std::shared_ptr<simulation::World> world,
-      /* OUT */ Eigen::Ref<Eigen::MatrixXd> jac);
+      /* OUT */ Eigen::Ref<Eigen::MatrixXd> jac,
+      PerformanceLog* log);
 
   /// This computes the gradient in the flat problem space, taking into accounts
   /// incoming gradients with respect to any of the shot's values.
   void backpropGradientWrt(
       std::shared_ptr<simulation::World> world,
       const TrajectoryRollout* gradWrtRollout,
-      /* OUT */ Eigen::Ref<Eigen::VectorXd> grad) override;
+      /* OUT */ Eigen::Ref<Eigen::VectorXd> grad,
+      PerformanceLog* log) override;
 
   /// This returns the snapshots from a fresh unroll
   std::vector<neural::MappedBackpropSnapshotPtr> getSnapshots(
-      std::shared_ptr<simulation::World> world);
+      std::shared_ptr<simulation::World> world, PerformanceLog* log);
 
   /// This populates the passed in matrices with the values from this trajectory
   void getStates(
       std::shared_ptr<simulation::World> world,
       /* OUT */ TrajectoryRollout* rollout,
+      PerformanceLog* log,
       bool useKnots) override;
 
   /// This returns the concatenation of (start pos, start vel) for convenience
@@ -111,7 +122,7 @@ public:
   /// This unrolls the shot, and returns the (pos, vel) state concatenated at
   /// the end of the shot
   Eigen::VectorXd getFinalState(
-      std::shared_ptr<simulation::World> world) override;
+      std::shared_ptr<simulation::World> world, PerformanceLog* log) override;
 
   /// This returns the debugging name of a given DOF
   std::string getFlatDimName(int dim) override;

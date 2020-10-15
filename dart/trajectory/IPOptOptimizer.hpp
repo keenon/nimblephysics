@@ -42,12 +42,15 @@ public:
 
   void setPrintFrequency(int frequency);
 
+  void setRecordPerformanceLog(bool recordPerfLog);
+
 protected:
   int mIterationLimit;
   double mTolerance;
   int mLBFGSHistoryLength;
   bool mCheckDerivatives;
   int mPrintFrequency;
+  bool mRecordPerfLog;
 };
 
 /*

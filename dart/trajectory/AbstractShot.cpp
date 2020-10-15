@@ -10,6 +10,8 @@
 #include "dart/neural/Mapping.hpp"
 #include "dart/simulation/World.hpp"
 
+#define LOG_PERFORMANCE_ABSTRACT_SHOT
+
 namespace dart {
 namespace trajectory {
 
@@ -59,7 +61,9 @@ void AbstractShot::addConstraint(LossFn loss)
 /// certainly be mapped spaces that are easier to optimize in than native
 /// joint space, at least initially.
 void AbstractShot::switchRepresentationMapping(
-    std::shared_ptr<simulation::World> world, const std::string& mapping)
+    std::shared_ptr<simulation::World> world,
+    const std::string& mapping,
+    PerformanceLog* log)
 {
   // Reset the main representation mapping
   mRepresentationMapping = mapping;
@@ -137,26 +141,56 @@ const std::shared_ptr<neural::Mapping> AbstractShot::getRepresentation() const
 /// This gets the bounds on the constraint functions (both knot points and any
 /// custom constraints)
 void AbstractShot::getConstraintUpperBounds(
-    /* OUT */ Eigen::Ref<Eigen::VectorXd> flat) const
+    /* OUT */ Eigen::Ref<Eigen::VectorXd> flat, PerformanceLog* log) const
 {
+  PerformanceLog* thisLog = nullptr;
+#ifdef LOG_PERFORMANCE_ABSTRACT_SHOT
+  if (log != nullptr)
+  {
+    thisLog = log->startRun("AbstractShot.getConstraintUpperBounds");
+  }
+#endif
+
   assert(flat.size() == mConstraints.size());
   for (int i = 0; i < mConstraints.size(); i++)
   {
     flat(i) = mConstraints[i].getUpperBound();
   }
+
+#ifdef LOG_PERFORMANCE_ABSTRACT_SHOT
+  if (thisLog != nullptr)
+  {
+    thisLog->end();
+  }
+#endif
 }
 
 //==============================================================================
 /// This gets the bounds on the constraint functions (both knot points and any
 /// custom constraints)
 void AbstractShot::getConstraintLowerBounds(
-    /* OUT */ Eigen::Ref<Eigen::VectorXd> flat) const
+    /* OUT */ Eigen::Ref<Eigen::VectorXd> flat, PerformanceLog* log) const
 {
+  PerformanceLog* thisLog = nullptr;
+#ifdef LOG_PERFORMANCE_ABSTRACT_SHOT
+  if (log != nullptr)
+  {
+    thisLog = log->startRun("AbstractShot.getConstraintLowerBounds");
+  }
+#endif
+
   assert(flat.size() == mConstraints.size());
   for (int i = 0; i < mConstraints.size(); i++)
   {
     flat(i) = mConstraints[i].getLowerBound();
   }
+
+#ifdef LOG_PERFORMANCE_ABSTRACT_SHOT
+  if (thisLog != nullptr)
+  {
+    thisLog->end();
+  }
+#endif
 }
 
 //==============================================================================
@@ -170,14 +204,30 @@ int AbstractShot::getConstraintDim() const
 /// vector being passed in is only the size of mConstraints
 void AbstractShot::computeConstraints(
     std::shared_ptr<simulation::World> world,
-    /* OUT */ Eigen::Ref<Eigen::VectorXd> constraints)
+    /* OUT */ Eigen::Ref<Eigen::VectorXd> constraints,
+    PerformanceLog* log)
 {
+  PerformanceLog* thisLog = nullptr;
+#ifdef LOG_PERFORMANCE_ABSTRACT_SHOT
+  if (log != nullptr)
+  {
+    thisLog = log->startRun("AbstractShot.computeConstraints");
+  }
+#endif
+
   assert(constraints.size() == mConstraints.size());
 
   for (int i = 0; i < mConstraints.size(); i++)
   {
-    constraints(i) = mConstraints[i].getLoss(getRolloutCache(world));
+    constraints(i) = mConstraints[i].getLoss(getRolloutCache(world, thisLog));
   }
+
+#ifdef LOG_PERFORMANCE_ABSTRACT_SHOT
+  if (thisLog != nullptr)
+  {
+    thisLog->end();
+  }
+#endif
 }
 
 //==============================================================================
@@ -185,8 +235,17 @@ void AbstractShot::computeConstraints(
 /// This returns a matrix that's (getConstraintDim(), getFlatProblemDim()).
 void AbstractShot::backpropJacobian(
     std::shared_ptr<simulation::World> world,
-    /* OUT */ Eigen::Ref<Eigen::MatrixXd> jac)
+    /* OUT */ Eigen::Ref<Eigen::MatrixXd> jac,
+    PerformanceLog* log)
 {
+  PerformanceLog* thisLog = nullptr;
+#ifdef LOG_PERFORMANCE_ABSTRACT_SHOT
+  if (log != nullptr)
+  {
+    thisLog = log->startRun("AbstractShot.backpropJacobian");
+  }
+#endif
+
   assert(jac.rows() == mConstraints.size());
   assert(jac.cols() == getFlatProblemDim());
 
@@ -194,15 +253,23 @@ void AbstractShot::backpropJacobian(
   for (int i = 0; i < mConstraints.size(); i++)
   {
     mConstraints[i].getLossAndGradient(
-        getRolloutCache(world),
-        /* OUT */ getGradientWrtRolloutCache(world));
+        getRolloutCache(world, thisLog),
+        /* OUT */ getGradientWrtRolloutCache(world, thisLog));
     grad.setZero();
     backpropGradientWrt(
         world,
-        getGradientWrtRolloutCache(world),
-        /* OUT */ grad);
+        getGradientWrtRolloutCache(world, thisLog),
+        /* OUT */ grad,
+        thisLog);
     jac.row(i) = grad;
   }
+
+#ifdef LOG_PERFORMANCE_ABSTRACT_SHOT
+  if (thisLog != nullptr)
+  {
+    thisLog->end();
+  }
+#endif
 }
 
 //==============================================================================
@@ -215,8 +282,18 @@ int AbstractShot::getNumberNonZeroJacobian()
 //==============================================================================
 /// This gets the structure of the non-zero entries in the Jacobian
 void AbstractShot::getJacobianSparsityStructure(
-    Eigen::Ref<Eigen::VectorXi> rows, Eigen::Ref<Eigen::VectorXi> cols)
+    Eigen::Ref<Eigen::VectorXi> rows,
+    Eigen::Ref<Eigen::VectorXi> cols,
+    PerformanceLog* log)
 {
+  PerformanceLog* thisLog = nullptr;
+#ifdef LOG_PERFORMANCE_ABSTRACT_SHOT
+  if (log != nullptr)
+  {
+    thisLog = log->startRun("AbstractShot.getJacobianSparsityStructure");
+  }
+#endif
+
   assert(rows.size() == AbstractShot::getNumberNonZeroJacobian());
   assert(cols.size() == AbstractShot::getNumberNonZeroJacobian());
   int cursor = 0;
@@ -231,14 +308,30 @@ void AbstractShot::getJacobianSparsityStructure(
     }
   }
   assert(cursor == AbstractShot::getNumberNonZeroJacobian());
+
+#ifdef LOG_PERFORMANCE_ABSTRACT_SHOT
+  if (thisLog != nullptr)
+  {
+    thisLog->end();
+  }
+#endif
 }
 
 //==============================================================================
 /// This writes the Jacobian to a sparse vector
 void AbstractShot::getSparseJacobian(
     std::shared_ptr<simulation::World> world,
-    Eigen::Ref<Eigen::VectorXd> sparse)
+    Eigen::Ref<Eigen::VectorXd> sparse,
+    PerformanceLog* log)
 {
+  PerformanceLog* thisLog = nullptr;
+#ifdef LOG_PERFORMANCE_ABSTRACT_SHOT
+  if (log != nullptr)
+  {
+    thisLog = log->startRun("AbstractShot.getSparseJacobian");
+  }
+#endif
+
   assert(sparse.size() == AbstractShot::getNumberNonZeroJacobian());
 
   sparse.setZero();
@@ -248,16 +341,24 @@ void AbstractShot::getSparseJacobian(
   for (int i = 0; i < mConstraints.size(); i++)
   {
     mConstraints[i].getLossAndGradient(
-        getRolloutCache(world),
-        /* OUT */ getGradientWrtRolloutCache(world));
+        getRolloutCache(world, thisLog),
+        /* OUT */ getGradientWrtRolloutCache(world, thisLog));
     backpropGradientWrt(
         world,
-        getGradientWrtRolloutCache(world),
-        /* OUT */ sparse.segment(cursor, n));
+        getGradientWrtRolloutCache(world, thisLog),
+        /* OUT */ sparse.segment(cursor, n),
+        thisLog);
     cursor += n;
   }
 
   assert(cursor == sparse.size());
+
+#ifdef LOG_PERFORMANCE_ABSTRACT_SHOT
+  if (thisLog != nullptr)
+  {
+    thisLog->end();
+  }
+#endif
 }
 
 //==============================================================================
@@ -265,53 +366,126 @@ void AbstractShot::getSparseJacobian(
 /// computing the gradients of the loss function as part of the call
 void AbstractShot::backpropGradient(
     std::shared_ptr<simulation::World> world,
-    /* OUT */ Eigen::Ref<Eigen::VectorXd> grad)
+    /* OUT */ Eigen::Ref<Eigen::VectorXd> grad,
+    PerformanceLog* log)
 {
+  PerformanceLog* thisLog = nullptr;
+#ifdef LOG_PERFORMANCE_ABSTRACT_SHOT
+  if (log != nullptr)
+  {
+    thisLog = log->startRun("AbstractShot.backpropGradient");
+  }
+#endif
+
   mLoss.getLossAndGradient(
-      getRolloutCache(world),
-      /* OUT */ getGradientWrtRolloutCache(world));
+      getRolloutCache(world, thisLog),
+      /* OUT */ getGradientWrtRolloutCache(world, thisLog));
   backpropGradientWrt(
       world,
-      getGradientWrtRolloutCache(world),
-      /* OUT */ grad);
+      getGradientWrtRolloutCache(world, thisLog),
+      /* OUT */ grad,
+      thisLog);
+
+#ifdef LOG_PERFORMANCE_ABSTRACT_SHOT
+  if (thisLog != nullptr)
+  {
+    thisLog->end();
+  }
+#endif
 }
 
 //==============================================================================
 /// Get the loss for the rollout
-double AbstractShot::getLoss(std::shared_ptr<simulation::World> world)
+double AbstractShot::getLoss(
+    std::shared_ptr<simulation::World> world, PerformanceLog* log)
 {
-  return mLoss.getLoss(getRolloutCache(world));
+  PerformanceLog* thisLog = nullptr;
+#ifdef LOG_PERFORMANCE_ABSTRACT_SHOT
+  if (log != nullptr)
+  {
+    thisLog = log->startRun("AbstractShot.getLoss");
+  }
+#endif
+
+  double val = mLoss.getLoss(getRolloutCache(world, thisLog));
+
+#ifdef LOG_PERFORMANCE_ABSTRACT_SHOT
+  if (thisLog != nullptr)
+  {
+    thisLog->end();
+  }
+#endif
+
+  return val;
 }
 
 //==============================================================================
 const TrajectoryRollout* AbstractShot::getRolloutCache(
-    std::shared_ptr<simulation::World> world, bool useKnots)
+    std::shared_ptr<simulation::World> world,
+    PerformanceLog* log,
+    bool useKnots)
 {
+  PerformanceLog* thisLog = nullptr;
+#ifdef LOG_PERFORMANCE_ABSTRACT_SHOT
+  if (log != nullptr)
+  {
+    thisLog = log->startRun("AbstractShot.getRolloutCache");
+  }
+#endif
+
   if (mRolloutCacheDirty)
   {
     mRolloutCache = std::make_shared<TrajectoryRolloutReal>(this);
     getStates(
         world,
-        /* OUT */ mRolloutCache.get());
+        /* OUT */ mRolloutCache.get(),
+        thisLog);
     mGradWrtRolloutCache = std::make_shared<TrajectoryRolloutReal>(this);
     mRolloutCacheDirty = false;
   }
+
+#ifdef LOG_PERFORMANCE_ABSTRACT_SHOT
+  if (thisLog != nullptr)
+  {
+    thisLog->end();
+  }
+#endif
+
   return mRolloutCache.get();
 }
 
 //==============================================================================
 TrajectoryRollout* AbstractShot::getGradientWrtRolloutCache(
-    std::shared_ptr<simulation::World> world, bool useKnots)
+    std::shared_ptr<simulation::World> world,
+    PerformanceLog* log,
+    bool useKnots)
 {
+  PerformanceLog* thisLog = nullptr;
+#ifdef LOG_PERFORMANCE_ABSTRACT_SHOT
+  if (log != nullptr)
+  {
+    thisLog = log->startRun("AbstractShot.getGradientWrtRolloutCache");
+  }
+#endif
+
   if (mRolloutCacheDirty)
   {
     mRolloutCache = std::make_shared<TrajectoryRolloutReal>(this);
     getStates(
         world,
-        /* OUT */ mRolloutCache.get());
+        /* OUT */ mRolloutCache.get(),
+        thisLog);
     mGradWrtRolloutCache = std::make_shared<TrajectoryRolloutReal>(this);
     mRolloutCacheDirty = false;
   }
+
+#ifdef LOG_PERFORMANCE_ABSTRACT_SHOT
+  if (thisLog != nullptr)
+  {
+    thisLog->end();
+  }
+#endif
+
   return mGradWrtRolloutCache.get();
 }
 
@@ -322,11 +496,11 @@ void AbstractShot::finiteDifferenceGradient(
     std::shared_ptr<simulation::World> world,
     /* OUT */ Eigen::Ref<Eigen::VectorXd> grad)
 {
-  double originalLoss = mLoss.getLoss(getRolloutCache(world));
+  double originalLoss = mLoss.getLoss(getRolloutCache(world, nullptr));
 
   int dims = getFlatProblemDim();
   Eigen::VectorXd flat = Eigen::VectorXd::Zero(dims);
-  flatten(flat);
+  flatten(flat, nullptr);
 
   assert(grad.size() == dims);
 
@@ -335,13 +509,13 @@ void AbstractShot::finiteDifferenceGradient(
   for (int i = 0; i < dims; i++)
   {
     flat(i) += EPS;
-    unflatten(flat);
-    double posLoss = mLoss.getLoss(getRolloutCache(world));
+    unflatten(flat, nullptr);
+    double posLoss = mLoss.getLoss(getRolloutCache(world, nullptr));
     flat(i) -= EPS;
 
     flat(i) -= EPS;
-    unflatten(flat);
-    double negLoss = mLoss.getLoss(getRolloutCache(world));
+    unflatten(flat, nullptr);
+    double negLoss = mLoss.getLoss(getRolloutCache(world, nullptr));
     flat(i) += EPS;
 
     grad(i) = (posLoss - negLoss) / (2 * EPS);
@@ -365,9 +539,9 @@ void AbstractShot::finiteDifferenceJacobian(
   assert(jac.rows() == numConstraints);
 
   Eigen::VectorXd originalConstraints = Eigen::VectorXd::Zero(numConstraints);
-  computeConstraints(world, originalConstraints);
+  computeConstraints(world, originalConstraints, nullptr);
   Eigen::VectorXd flat = Eigen::VectorXd::Zero(dim);
-  flatten(flat);
+  flatten(flat, nullptr);
 
   const double EPS = 1e-7;
 
@@ -376,13 +550,13 @@ void AbstractShot::finiteDifferenceJacobian(
   for (int i = 0; i < dim; i++)
   {
     flat(i) += EPS;
-    unflatten(flat);
-    computeConstraints(world, positiveConstraints);
+    unflatten(flat, nullptr);
+    computeConstraints(world, positiveConstraints, nullptr);
     flat(i) -= EPS;
 
     flat(i) -= EPS;
-    unflatten(flat);
-    computeConstraints(world, negativeConstraints);
+    unflatten(flat, nullptr);
+    computeConstraints(world, negativeConstraints, nullptr);
     flat(i) += EPS;
 
     jac.col(i) = (positiveConstraints - negativeConstraints) / (2 * EPS);

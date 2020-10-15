@@ -92,6 +92,9 @@ dart_find_package(Boost)
 dart_find_package(IPOPT)
 dart_check_required_package(IPOPT "ipopt")
 
+# PerfUtils
+dart_find_package(PerfUtils)
+
 # octomap
 dart_find_package(octomap)
 if(MSVC)

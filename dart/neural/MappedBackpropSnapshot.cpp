@@ -2,7 +2,10 @@
 
 #include "dart/neural/BackpropSnapshot.hpp"
 
+#define LOG_PERFORMANCE_MAPPED_BACKPROP_SNAPSHOT ;
+
 using namespace dart;
+using namespace performance;
 
 namespace dart {
 namespace neural {
@@ -36,58 +39,68 @@ const std::string& MappedBackpropSnapshot::getRepresentation()
 
 //==============================================================================
 Eigen::MatrixXd MappedBackpropSnapshot::getPosPosJacobian(
-    std::shared_ptr<simulation::World> world, const std::string& mapping)
+    std::shared_ptr<simulation::World> world,
+    const std::string& mapping,
+    PerformanceLog* perfLog)
 {
   return mPostStepMappings[mapping].posInJacWrtPos
-             * mBackpropSnapshot->getPosPosJacobian(world)
+             * mBackpropSnapshot->getPosPosJacobian(world, perfLog)
              * mPreStepMappings[mapping].posOutJac
          + mPostStepMappings[mapping].posInJacWrtVel
-               * mBackpropSnapshot->getPosVelJacobian(world)
+               * mBackpropSnapshot->getPosVelJacobian(world, perfLog)
                * mPreStepMappings[mapping].posOutJac;
 }
 
 //==============================================================================
 Eigen::MatrixXd MappedBackpropSnapshot::getPosVelJacobian(
-    std::shared_ptr<simulation::World> world, const std::string& mapping)
+    std::shared_ptr<simulation::World> world,
+    const std::string& mapping,
+    PerformanceLog* perfLog)
 {
   return mPostStepMappings[mapping].velInJacWrtVel
-             * mBackpropSnapshot->getPosVelJacobian(world)
+             * mBackpropSnapshot->getPosVelJacobian(world, perfLog)
              * mPreStepMappings[mapping].posOutJac
          + mPostStepMappings[mapping].velInJacWrtPos
-               * mBackpropSnapshot->getPosPosJacobian(world)
+               * mBackpropSnapshot->getPosPosJacobian(world, perfLog)
                * mPreStepMappings[mapping].posOutJac;
 }
 
 //==============================================================================
 Eigen::MatrixXd MappedBackpropSnapshot::getVelPosJacobian(
-    std::shared_ptr<simulation::World> world, const std::string& mapping)
+    std::shared_ptr<simulation::World> world,
+    const std::string& mapping,
+    PerformanceLog* perfLog)
 {
   return mPostStepMappings[mapping].posInJacWrtPos
-             * mBackpropSnapshot->getVelPosJacobian(world)
+             * mBackpropSnapshot->getVelPosJacobian(world, perfLog)
              * mPreStepMappings[mapping].velOutJac
          + mPostStepMappings[mapping].posInJacWrtVel
-               * mBackpropSnapshot->getVelVelJacobian(world)
+               * mBackpropSnapshot->getVelVelJacobian(world, perfLog)
                * mPreStepMappings[mapping].velOutJac;
 }
 
 //==============================================================================
 Eigen::MatrixXd MappedBackpropSnapshot::getVelVelJacobian(
-    std::shared_ptr<simulation::World> world, const std::string& mapping)
+    std::shared_ptr<simulation::World> world,
+    const std::string& mapping,
+    PerformanceLog* perfLog)
 {
   return mPostStepMappings[mapping].velInJacWrtVel
-             * mBackpropSnapshot->getVelVelJacobian(world)
+             * mBackpropSnapshot->getVelVelJacobian(world, perfLog)
              * mPreStepMappings[mapping].velOutJac
          + mPostStepMappings[mapping].velInJacWrtPos
-               * mBackpropSnapshot->getVelPosJacobian(world)
+               * mBackpropSnapshot->getVelPosJacobian(world, perfLog)
                * mPreStepMappings[mapping].velOutJac;
 }
 
 //==============================================================================
 Eigen::MatrixXd MappedBackpropSnapshot::getForceVelJacobian(
-    std::shared_ptr<simulation::World> world, const std::string& mapping)
+    std::shared_ptr<simulation::World> world,
+    const std::string& mapping,
+    PerformanceLog* perfLog)
 {
   return mPostStepMappings[mapping].velInJacWrtVel
-         * mBackpropSnapshot->getForceVelJacobian(world)
+         * mBackpropSnapshot->getForceVelJacobian(world, perfLog)
          * mPreStepMappings[mapping].forceOutJac;
 }
 
@@ -100,8 +113,17 @@ Eigen::MatrixXd MappedBackpropSnapshot::getForceVelJacobian(
 void MappedBackpropSnapshot::backprop(
     simulation::WorldPtr world,
     LossGradient& thisTimestepLoss,
-    const std::unordered_map<std::string, LossGradient> nextTimestepLosses)
+    const std::unordered_map<std::string, LossGradient> nextTimestepLosses,
+    PerformanceLog* perfLog)
 {
+  PerformanceLog* thisLog = nullptr;
+#ifdef LOG_PERFORMANCE_MAPPED_BACKPROP_SNAPSHOT
+  if (perfLog != nullptr)
+  {
+    thisLog = perfLog->startRun("MappedBackpropSnapshot.backprop");
+  }
+#endif
+
   LossGradient nextTimestepRealLoss;
   nextTimestepRealLoss.lossWrtPosition
       = Eigen::VectorXd::Zero(world->getNumDofs());
@@ -122,7 +144,7 @@ void MappedBackpropSnapshot::backprop(
   }
   LossGradient thisTimestepRealLoss;
   mBackpropSnapshot->backprop(
-      world, thisTimestepRealLoss, nextTimestepRealLoss);
+      world, thisTimestepRealLoss, nextTimestepRealLoss, thisLog);
 
   thisTimestepLoss.lossWrtPosition
       = mPreStepMappings[mRepresentation].posOutJac.transpose()
@@ -133,6 +155,13 @@ void MappedBackpropSnapshot::backprop(
   thisTimestepLoss.lossWrtTorque
       = mPreStepMappings[mRepresentation].forceOutJac.transpose()
         * thisTimestepRealLoss.lossWrtTorque;
+
+#ifdef LOG_PERFORMANCE_MAPPED_BACKPROP_SNAPSHOT
+  if (thisLog != nullptr)
+  {
+    thisLog->end();
+  }
+#endif
 }
 
 //==============================================================================

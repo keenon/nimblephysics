@@ -4138,6 +4138,7 @@ bool verifyNoMultistepIntereference(WorldPtr world, int steps)
   return true;
 }
 
+/*
 class MyWindow : public dart::gui::glut::SimWindow
 {
 public:
@@ -4158,3 +4159,4 @@ void renderWorld(WorldPtr world)
   window.initWindow(640, 480, "Test");
   glutMainLoop();
 }
+*/

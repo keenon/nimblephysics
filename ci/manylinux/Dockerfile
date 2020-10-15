@@ -193,11 +193,28 @@ RUN git clone https://github.com/ros/urdfdom.git && \
     popd && \
     rm -rf urdfdom
 
+# This is allowed to be empty string, but if it's not it must be prefixed by
+ENV VERSION="0.0.3"
+
+ENV PYTHON35="/opt/python/cp35-cp35m/bin/python3.5"
+ENV PYTHON35_VERSION="cp35-cp35m"
+ENV PYTHON36="/opt/python/cp36-cp36m/bin/python3.6"
+ENV PYTHON36_VERSION="cp36-cp36m"
+ENV PYTHON37="/opt/python/cp37-cp37m/bin/python3.7"
+ENV PYTHON37_VERSION="cp37-cp37m"
+ENV PYTHON38="/opt/python/cp38-cp38/bin/python3.8"
+ENV PYTHON38_VERSION="cp38-cp38"
+ENV PYTHON39="/opt/python/cp39-cp39/bin/python3.9"
+ENV PYTHON39_VERSION="cp39-cp39"
+
+ENV PYTHON=$PYTHON37
+ENV PYTHON_VERSION=$PYTHON37_VERSION
+
 # Install pytest
-RUN /opt/python/cp38-cp38/bin/python3.8 -m pip install pytest
+RUN ${PYTHON} -m pip install pytest
 
 # Install auditwheel
-RUN /opt/python/cp38-cp38/bin/python3.8 -m pip install auditwheel
+RUN ${PYTHON} -m pip install auditwheel
 
 # Actually build the code
 RUN git clone https://github.com/keenon/diffdart
@@ -205,12 +222,9 @@ RUN cd diffdart && \
     git checkout keenon/diff && \
     git pull
 
-# This is allowed to be empty string, but if it's not it must be prefixed by
-ENV VERSION="0.0.3"
-
 RUN cd diffdart && \
     git pull && \
-    /opt/python/cp38-cp38/bin/python3.8 setup.py sdist bdist_wheel && \
-    /opt/python/cp38-cp38/bin/python3.8 -m auditwheel repair dist/diffdart-${VERSION}-cp38-cp38-linux_x86_64.whl
+    ${PYTHON} setup.py sdist bdist_wheel && \
+    ${PYTHON} -m auditwheel repair dist/diffdart-${VERSION}-${PYTHON_VERSION}-linux_x86_64.whl
 # Ensure we have the ABI3 tag, so that pip interpreters will accept us
-RUN mv diffdart/wheelhouse/diffdart-${VERSION}-cp38-cp38-manylinux2010_x86_64.whl diffdart/wheelhouse/diffdart-${VERSION}-cp38-abi3-manylinux2010_x86_64.whl
+# RUN mv diffdart/wheelhouse/diffdart-${VERSION}-${PYTHON_VERSION}-manylinux2010_x86_64.whl diffdart/wheelhouse/diffdart-${VERSION}-cp38-abi3-manylinux2010_x86_64.whl

@@ -82,6 +82,7 @@ add_subdirectory(integration)
 add_subdirectory(lcpsolver)
 add_subdirectory(neural)
 add_subdirectory(trajectory)
+add_subdirectory(performance)
 add_subdirectory(optimizer)
 add_subdirectory(dynamics)
 add_subdirectory(collision)
@@ -139,6 +140,7 @@ target_link_libraries(dart
     Boost::system
     Boost::filesystem
     IPOPT::ipopt
+    PerfUtils
 )
 if (TARGET octomap)
   target_link_libraries(dart PUBLIC octomap)

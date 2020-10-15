@@ -10,8 +10,11 @@
 
 #include "dart/neural/BackpropSnapshot.hpp"
 #include "dart/neural/Mapping.hpp"
+#include "dart/performance/PerformanceLog.hpp"
 
 namespace dart {
+
+using namespace performance;
 
 namespace simulation {
 class World;
@@ -95,15 +98,25 @@ public:
   const std::string& getRepresentation();
 
   Eigen::MatrixXd getPosPosJacobian(
-      std::shared_ptr<simulation::World> world, const std::string& mapping);
+      std::shared_ptr<simulation::World> world,
+      const std::string& mapping,
+      PerformanceLog* perfLog = nullptr);
   Eigen::MatrixXd getPosVelJacobian(
-      std::shared_ptr<simulation::World> world, const std::string& mapping);
+      std::shared_ptr<simulation::World> world,
+      const std::string& mapping,
+      PerformanceLog* perfLog = nullptr);
   Eigen::MatrixXd getVelPosJacobian(
-      std::shared_ptr<simulation::World> world, const std::string& mapping);
+      std::shared_ptr<simulation::World> world,
+      const std::string& mapping,
+      PerformanceLog* perfLog = nullptr);
   Eigen::MatrixXd getVelVelJacobian(
-      std::shared_ptr<simulation::World> world, const std::string& mapping);
+      std::shared_ptr<simulation::World> world,
+      const std::string& mapping,
+      PerformanceLog* perfLog = nullptr);
   Eigen::MatrixXd getForceVelJacobian(
-      std::shared_ptr<simulation::World> world, const std::string& mapping);
+      std::shared_ptr<simulation::World> world,
+      const std::string& mapping,
+      PerformanceLog* perfLog = nullptr);
 
   /// This computes the implicit backprop without forming intermediate
   /// Jacobians. It takes a LossGradient with the position and velocity vectors
@@ -113,7 +126,8 @@ public:
   void backprop(
       simulation::WorldPtr world,
       LossGradient& thisTimestepLoss,
-      const std::unordered_map<std::string, LossGradient> nextTimestepLosses);
+      const std::unordered_map<std::string, LossGradient> nextTimestepLosses,
+      PerformanceLog* perfLog = nullptr);
 
   /// Returns a concatenated vector of all the Skeletons' position()'s in the
   /// World, in order in which the Skeletons appear in the World's

@@ -193,6 +193,17 @@ popd
 popd
 rm -rf urdfdom
 
+# Install perfutils
+git clone https://github.com/PlatformLab/PerfUtils.git
+pushd PerfUtils
+mkdir build
+pushd build
+cmake ..
+make install
+popd
+popd
+rm -rf PerfUtils
+
 /opt/python/cp38-cp38/bin/python3.8
 # Actually build the code
 python3 setup.py sdist bdist_wheel

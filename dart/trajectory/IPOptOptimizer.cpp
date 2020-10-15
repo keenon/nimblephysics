@@ -6,8 +6,13 @@
 #include <coin/IpSolveStatistics.hpp>
 #include <coin/IpTNLP.hpp>
 
+#include "dart/performance/PerformanceLog.hpp"
+
+#define LOG_PERFORMANCE_IPOPT
+
 using namespace dart;
 using namespace simulation;
+using namespace performance;
 
 using namespace Ipopt;
 
@@ -20,7 +25,8 @@ IPOptOptimizer::IPOptOptimizer()
     mLBFGSHistoryLength(1),
     mPrintFrequency(1),
     mIterationLimit(100),
-    mCheckDerivatives(false)
+    mCheckDerivatives(false),
+    mRecordPerfLog(false)
 {
 }
 
@@ -73,6 +79,8 @@ std::shared_ptr<OptimizationRecord> IPOptOptimizer::optimize(AbstractShot* shot)
 
   std::shared_ptr<OptimizationRecord> record
       = std::make_shared<OptimizationRecord>();
+  if (mRecordPerfLog)
+    record->startPerfLog();
 
   // Initialize the IpoptApplication and process the options
   ApplicationReturnStatus status;
@@ -144,6 +152,11 @@ void IPOptOptimizer::setPrintFrequency(int frequency)
   mPrintFrequency = frequency;
 }
 
+void IPOptOptimizer::setRecordPerformanceLog(bool recordPerfLog)
+{
+  mRecordPerfLog = recordPerfLog;
+}
+
 //==============================================================================
 IPOptShotWrapper::IPOptShotWrapper(
     AbstractShot* wrapped, std::shared_ptr<OptimizationRecord> record)
@@ -196,6 +209,15 @@ bool IPOptShotWrapper::get_bounds_info(
     Ipopt::Number* g_l,
     Ipopt::Number* g_u)
 {
+  PerformanceLog* perflog = nullptr;
+#ifdef LOG_PERFORMANCE_IPOPT
+  if (mRecord->getPerfLog() != nullptr)
+  {
+    perflog
+        = mRecord->getPerfLog()->startRun("IPOptShotWrapper.get_bound_info");
+  }
+#endif
+
   // here, the n and m we gave IPOPT in get_nlp_info are passed back to us.
   // If desired, we could assert to make sure they are what we think they are.
   assert(static_cast<std::size_t>(n) == mWrapped->getFlatProblemDim());
@@ -203,9 +225,9 @@ bool IPOptShotWrapper::get_bounds_info(
 
   // lower and upper bounds
   Eigen::Map<Eigen::VectorXd> upperBounds(x_u, n);
-  mWrapped->getUpperBounds(mWrapped->mWorld, upperBounds);
+  mWrapped->getUpperBounds(mWrapped->mWorld, upperBounds, perflog);
   Eigen::Map<Eigen::VectorXd> lowerBounds(x_l, n);
-  mWrapped->getLowerBounds(mWrapped->mWorld, lowerBounds);
+  mWrapped->getLowerBounds(mWrapped->mWorld, lowerBounds, perflog);
 
   /*
   for (Ipopt::Index i = 0; i < n; i++)
@@ -217,10 +239,16 @@ bool IPOptShotWrapper::get_bounds_info(
 
   // Add inequality constraint functions
   Eigen::Map<Eigen::VectorXd> constraintUpperBounds(g_u, m);
-  mWrapped->getConstraintUpperBounds(constraintUpperBounds);
+  mWrapped->getConstraintUpperBounds(constraintUpperBounds, perflog);
   Eigen::Map<Eigen::VectorXd> constraintLowerBounds(g_l, m);
-  mWrapped->getConstraintLowerBounds(constraintLowerBounds);
+  mWrapped->getConstraintLowerBounds(constraintLowerBounds, perflog);
 
+#ifdef LOG_PERFORMANCE_IPOPT
+  if (perflog != nullptr)
+  {
+    perflog->end();
+  }
+#endif
   return true;
 }
 
@@ -236,11 +264,20 @@ bool IPOptShotWrapper::get_starting_point(
     bool init_lambda,
     Ipopt::Number* /*lambda*/)
 {
+  PerformanceLog* perflog = nullptr;
+#ifdef LOG_PERFORMANCE_IPOPT
+  if (mRecord->getPerfLog() != nullptr)
+  {
+    perflog = mRecord->getPerfLog()->startRun(
+        "IPOptShotWrapper.get_starting_point");
+  }
+#endif
+
   // If init_x is true, this method must provide an initial value for x.
   if (init_x)
   {
     Eigen::Map<Eigen::VectorXd> x_vec(x, n);
-    mWrapped->getInitialGuess(mWrapped->mWorld, x_vec);
+    mWrapped->getInitialGuess(mWrapped->mWorld, x_vec, perflog);
   }
 
   // If init_z is true, this method must provide an initial value for the bound
@@ -261,6 +298,12 @@ bool IPOptShotWrapper::get_starting_point(
               << "Ignored here.\n";
   }
 
+#ifdef LOG_PERFORMANCE_IPOPT
+  if (perflog != nullptr)
+  {
+    perflog->end();
+  }
+#endif
   return true;
 }
 
@@ -271,14 +314,28 @@ bool IPOptShotWrapper::eval_f(
     bool _new_x,
     Ipopt::Number& _obj_value)
 {
+  PerformanceLog* perflog = nullptr;
+#ifdef LOG_PERFORMANCE_IPOPT
+  if (mRecord->getPerfLog() != nullptr)
+  {
+    perflog = mRecord->getPerfLog()->startRun("IPOptShotWrapper.eval_f");
+  }
+#endif
+
   assert(_n == mWrapped->getFlatProblemDim());
   if (_new_x && _n > 0)
   {
     Eigen::Map<const Eigen::VectorXd> flat(_x, _n);
-    mWrapped->unflatten(flat);
+    mWrapped->unflatten(flat, perflog);
   }
-  _obj_value = mWrapped->getLoss(mWrapped->mWorld);
+  _obj_value = mWrapped->getLoss(mWrapped->mWorld, perflog);
 
+#ifdef LOG_PERFORMANCE_IPOPT
+  if (perflog != nullptr)
+  {
+    perflog->end();
+  }
+#endif
   return true;
 }
 
@@ -289,15 +346,29 @@ bool IPOptShotWrapper::eval_grad_f(
     bool _new_x,
     Ipopt::Number* _grad_f)
 {
+  PerformanceLog* perflog = nullptr;
+#ifdef LOG_PERFORMANCE_IPOPT
+  if (mRecord->getPerfLog() != nullptr)
+  {
+    perflog = mRecord->getPerfLog()->startRun("IPOptShotWrapper.eval_grad_f");
+  }
+#endif
+
   assert(_n == mWrapped->getFlatProblemDim());
   if (_new_x && _n > 0)
   {
     Eigen::Map<const Eigen::VectorXd> flat(_x, _n);
-    mWrapped->unflatten(flat);
+    mWrapped->unflatten(flat, perflog);
   }
   Eigen::Map<Eigen::VectorXd> grad(_grad_f, _n);
-  mWrapped->backpropGradient(mWrapped->mWorld, grad);
+  mWrapped->backpropGradient(mWrapped->mWorld, grad, perflog);
 
+#ifdef LOG_PERFORMANCE_IPOPT
+  if (perflog != nullptr)
+  {
+    perflog->end();
+  }
+#endif
   return true;
 }
 
@@ -309,16 +380,30 @@ bool IPOptShotWrapper::eval_g(
     Ipopt::Index _m,
     Ipopt::Number* _g)
 {
+  PerformanceLog* perflog = nullptr;
+#ifdef LOG_PERFORMANCE_IPOPT
+  if (mRecord->getPerfLog() != nullptr)
+  {
+    perflog = mRecord->getPerfLog()->startRun("IPOptShotWrapper.eval_g");
+  }
+#endif
+
   assert(_n == mWrapped->getFlatProblemDim());
   assert(_m == mWrapped->getConstraintDim());
   if (_new_x && _n > 0)
   {
     Eigen::Map<const Eigen::VectorXd> flat(_x, _n);
-    mWrapped->unflatten(flat);
+    mWrapped->unflatten(flat, perflog);
   }
   Eigen::Map<Eigen::VectorXd> constraints(_g, _m);
-  mWrapped->computeConstraints(mWrapped->mWorld, constraints);
+  mWrapped->computeConstraints(mWrapped->mWorld, constraints, perflog);
 
+#ifdef LOG_PERFORMANCE_IPOPT
+  if (perflog != nullptr)
+  {
+    perflog->end();
+  }
+#endif
   return true;
 }
 
@@ -333,6 +418,14 @@ bool IPOptShotWrapper::eval_jac_g(
     Ipopt::Index* _jCol,
     Ipopt::Number* _values)
 {
+  PerformanceLog* perflog = nullptr;
+#ifdef LOG_PERFORMANCE_IPOPT
+  if (mRecord->getPerfLog() != nullptr)
+  {
+    perflog = mRecord->getPerfLog()->startRun("IPOptShotWrapper.eval_jac_g");
+  }
+#endif
+
   // If the iRow and jCol arguments are not nullptr, then IPOPT wants you to
   // fill in the sparsity structure of the Jacobian (the row and column indices
   // only). At this time, the x argument and the values argument will be
@@ -348,7 +441,7 @@ bool IPOptShotWrapper::eval_jac_g(
     Eigen::Map<Eigen::VectorXi> rows(_iRow, _nnzj);
     Eigen::Map<Eigen::VectorXi> cols(_jCol, _nnzj);
 
-    mWrapped->getJacobianSparsityStructure(rows, cols);
+    mWrapped->getJacobianSparsityStructure(rows, cols, perflog);
 
     /*
     // Assume the gradient is dense
@@ -369,10 +462,10 @@ bool IPOptShotWrapper::eval_jac_g(
     if (_new_x && _n > 0)
     {
       Eigen::Map<const Eigen::VectorXd> flat(_x, _n);
-      mWrapped->unflatten(flat);
+      mWrapped->unflatten(flat, perflog);
     }
     Eigen::Map<Eigen::VectorXd> sparse(_values, _nnzj);
-    mWrapped->getSparseJacobian(mWrapped->mWorld, sparse);
+    mWrapped->getSparseJacobian(mWrapped->mWorld, sparse, perflog);
 
     /*
     Eigen::MatrixXd jac = Eigen::MatrixXd::Zero(_m, _n);
@@ -390,6 +483,12 @@ bool IPOptShotWrapper::eval_jac_g(
     */
   }
 
+#ifdef LOG_PERFORMANCE_IPOPT
+  if (perflog != nullptr)
+  {
+    perflog->end();
+  }
+#endif
   return true;
 }
 
@@ -441,12 +540,21 @@ void IPOptShotWrapper::finalize_solution(
     const Ipopt::IpoptData* /*_ip_data*/,
     Ipopt::IpoptCalculatedQuantities* /*_ip_cq*/)
 {
+  PerformanceLog* perflog = nullptr;
+#ifdef LOG_PERFORMANCE_IPOPT
+  if (mRecord->getPerfLog() != nullptr)
+  {
+    perflog
+        = mRecord->getPerfLog()->startRun("IPOptShotWrapper.finalize_solution");
+  }
+#endif
+
   Eigen::Map<const Eigen::VectorXd> flat(_x, _n);
 
   // TODO: we may not actually want to do this
   std::cout << "Recovering best discovered state from iter " << mBestIter
             << " with loss " << mBestFeasibleObjectiveValue << std::endl;
-  mWrapped->unflatten(mBestFeasibleState);
+  mWrapped->unflatten(mBestFeasibleState, perflog);
   /*
   const std::shared_ptr<Problem>& problem = mSolver->getProblem();
 
@@ -457,6 +565,13 @@ void IPOptShotWrapper::finalize_solution(
     x[i] = _x[i];
   problem->setOptimalSolution(x);
   */
+
+#ifdef LOG_PERFORMANCE_IPOPT
+  if (perflog != nullptr)
+  {
+    perflog->end();
+  }
+#endif
 }
 
 //==============================================================================
@@ -475,17 +590,36 @@ bool IPOptShotWrapper::intermediate_callback(
     const Ipopt::IpoptData* ip_data,
     Ipopt::IpoptCalculatedQuantities* ip_cq)
 {
+  PerformanceLog* perflog = nullptr;
+#ifdef LOG_PERFORMANCE_IPOPT
+  if (mRecord->getPerfLog() != nullptr)
+  {
+    perflog = mRecord->getPerfLog()->startRun(
+        "IPOptShotWrapper.intermediate_callback");
+  }
+#endif
+
   // Always record the iteration
   mRecord->registerIteration(
-      iter, mWrapped->getRolloutCache(mWrapped->mWorld), obj_value, inf_pr);
+      iter,
+      mWrapped->getRolloutCache(mWrapped->mWorld, perflog),
+      obj_value,
+      inf_pr);
   if (obj_value < mBestFeasibleObjectiveValue && inf_pr < 5e-4)
   {
     // std::cout << "Found new best feasible loss!" << std::endl;
     mBestIter = iter;
     // Found new best feasible objective
     mBestFeasibleObjectiveValue = obj_value;
-    mWrapped->flatten(mBestFeasibleState);
+    mWrapped->flatten(mBestFeasibleState, perflog);
   }
+
+#ifdef LOG_PERFORMANCE_IPOPT
+  if (perflog != nullptr)
+  {
+    perflog->end();
+  }
+#endif
   return true;
 }
 

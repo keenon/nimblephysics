@@ -19,10 +19,13 @@
 //
 // #define SLOW_FD_CHECK_EVERYTHING
 
+#define LOG_PERFORMANCE_BACKPROP_SNAPSHOT ;
+
 using namespace dart;
 using namespace math;
 using namespace dynamics;
 using namespace simulation;
+using namespace performance;
 
 namespace dart {
 namespace neural {
@@ -99,8 +102,17 @@ BackpropSnapshot::BackpropSnapshot(
 void BackpropSnapshot::backprop(
     WorldPtr world,
     LossGradient& thisTimestepLoss,
-    const LossGradient& nextTimestepLoss)
+    const LossGradient& nextTimestepLoss,
+    PerformanceLog* perfLog)
 {
+  PerformanceLog* thisLog = nullptr;
+#ifdef LOG_PERFORMANCE_BACKPROP_SNAPSHOT
+  if (perfLog != nullptr)
+  {
+    thisLog = perfLog->startRun("BackpropSnapshot.backprop");
+  }
+#endif
+
   LossGradient groupThisTimestepLoss;
   LossGradient groupNextTimestepLoss;
 
@@ -118,13 +130,14 @@ void BackpropSnapshot::backprop(
   thisTimestepLoss.lossWrtVelocity = Eigen::VectorXd(mNumDOFs);
   thisTimestepLoss.lossWrtTorque = Eigen::VectorXd(mNumDOFs);
 
+  //////////////////////////////////////////////////////////
   // TODO: <remove me>
 
-  const Eigen::MatrixXd& posPos = getPosPosJacobian(world);
-  const Eigen::MatrixXd& posVel = getPosVelJacobian(world);
-  const Eigen::MatrixXd& velPos = getVelPosJacobian(world);
-  const Eigen::MatrixXd& velVel = getVelVelJacobian(world);
-  const Eigen::MatrixXd& forceVel = getForceVelJacobian(world);
+  const Eigen::MatrixXd& posPos = getPosPosJacobian(world, thisLog);
+  const Eigen::MatrixXd& posVel = getPosVelJacobian(world, thisLog);
+  const Eigen::MatrixXd& velPos = getVelPosJacobian(world, thisLog);
+  const Eigen::MatrixXd& velVel = getVelVelJacobian(world, thisLog);
+  const Eigen::MatrixXd& forceVel = getForceVelJacobian(world, thisLog);
 
   thisTimestepLoss.lossWrtPosition
       = posPos.transpose() * nextTimestepLoss.lossWrtPosition
@@ -135,9 +148,16 @@ void BackpropSnapshot::backprop(
   thisTimestepLoss.lossWrtTorque
       = forceVel.transpose() * nextTimestepLoss.lossWrtVelocity;
 
+#ifdef LOG_PERFORMANCE_BACKPROP_SNAPSHOT
+  if (thisLog != nullptr)
+  {
+    thisLog->end();
+  }
+#endif
   return;
 
   // TODO: </remove me>
+  //////////////////////////////////////////////////////////
 
   // Actually run the backprop
 
@@ -259,13 +279,37 @@ void BackpropSnapshot::backprop(
   // Restore the old position and velocity values before we ran backprop
   world->setPositions(oldPositions);
   world->setVelocities(oldVelocities);
+
+#ifdef LOG_PERFORMANCE_BACKPROP_SNAPSHOT
+  if (thisLog != nullptr)
+  {
+    thisLog->end();
+  }
+#endif
 }
 
 //==============================================================================
-const Eigen::MatrixXd& BackpropSnapshot::getForceVelJacobian(WorldPtr world)
+const Eigen::MatrixXd& BackpropSnapshot::getForceVelJacobian(
+    WorldPtr world, PerformanceLog* perfLog)
 {
+  PerformanceLog* thisLog = nullptr;
+#ifdef LOG_PERFORMANCE_BACKPROP_SNAPSHOT
+  if (perfLog != nullptr)
+  {
+    thisLog = perfLog->startRun("BackpropSnapshot.getForceVelJacobian");
+  }
+#endif
+
   if (mCachedForceVelDirty)
   {
+    PerformanceLog* refreshLog = nullptr;
+#ifdef LOG_PERFORMANCE_BACKPROP_SNAPSHOT
+    if (thisLog != nullptr)
+    {
+      refreshLog = thisLog->startRun(
+          "BackpropSnapshot.getForceVelJacobian#refreshCache");
+    }
+#endif
 #ifdef USE_FD_OVERRIDE
     mCachedForceVel = finiteDifferenceForceVelJacobian(world);
 #else
@@ -307,15 +351,47 @@ const Eigen::MatrixXd& BackpropSnapshot::getForceVelJacobian(WorldPtr world)
 
     // mCachedForceVel = getVelJacobianWrt(world, WithRespectTo::FORCE);
     mCachedForceVelDirty = false;
+
+#ifdef LOG_PERFORMANCE_BACKPROP_SNAPSHOT
+    if (refreshLog != nullptr)
+    {
+      refreshLog->end();
+    }
+#endif
   }
+
+#ifdef LOG_PERFORMANCE_BACKPROP_SNAPSHOT
+  if (thisLog != nullptr)
+  {
+    thisLog->end();
+  }
+#endif
   return mCachedForceVel;
 }
 
 //==============================================================================
-const Eigen::MatrixXd& BackpropSnapshot::getVelVelJacobian(WorldPtr world)
+const Eigen::MatrixXd& BackpropSnapshot::getVelVelJacobian(
+    WorldPtr world, PerformanceLog* perfLog)
 {
+  PerformanceLog* thisLog = nullptr;
+#ifdef LOG_PERFORMANCE_BACKPROP_SNAPSHOT
+  if (perfLog != nullptr)
+  {
+    thisLog = perfLog->startRun("BackpropSnapshot.getVelVelJacobian");
+  }
+#endif
+
   if (mCachedVelVelDirty)
   {
+    PerformanceLog* refreshLog = nullptr;
+#ifdef LOG_PERFORMANCE_BACKPROP_SNAPSHOT
+    if (thisLog != nullptr)
+    {
+      refreshLog = thisLog->startRun(
+          "BackpropSnapshot.getVelVelJacobian#refreshCache");
+    }
+#endif
+
 #ifdef USE_FD_OVERRIDE
     mCachedVelVel = finiteDifferenceVelVelJacobian(world);
 #else
@@ -371,15 +447,46 @@ const Eigen::MatrixXd& BackpropSnapshot::getVelVelJacobian(WorldPtr world)
 #endif
 
     mCachedVelVelDirty = false;
+#ifdef LOG_PERFORMANCE_BACKPROP_SNAPSHOT
+    if (refreshLog != nullptr)
+    {
+      refreshLog->end();
+    }
+#endif
   }
+
+#ifdef LOG_PERFORMANCE_BACKPROP_SNAPSHOT
+  if (thisLog != nullptr)
+  {
+    thisLog->end();
+  }
+#endif
   return mCachedVelVel;
 }
 
 //==============================================================================
-const Eigen::MatrixXd& BackpropSnapshot::getPosVelJacobian(WorldPtr world)
+const Eigen::MatrixXd& BackpropSnapshot::getPosVelJacobian(
+    WorldPtr world, PerformanceLog* perfLog)
 {
+  PerformanceLog* thisLog = nullptr;
+#ifdef LOG_PERFORMANCE_BACKPROP_SNAPSHOT
+  if (perfLog != nullptr)
+  {
+    thisLog = perfLog->startRun("BackpropSnapshot.getPosVelJacobian");
+  }
+#endif
+
   if (mCachedPosVelDirty)
   {
+    PerformanceLog* refreshLog = nullptr;
+#ifdef LOG_PERFORMANCE_BACKPROP_SNAPSHOT
+    if (thisLog != nullptr)
+    {
+      refreshLog = thisLog->startRun(
+          "BackpropSnapshot.getPosVelJacobian#refreshCache");
+    }
+#endif
+
 #ifdef USE_FD_OVERRIDE
     mCachedPosVel = finiteDifferencePosVelJacobian(world);
 #else
@@ -392,7 +499,20 @@ const Eigen::MatrixXd& BackpropSnapshot::getPosVelJacobian(WorldPtr world)
 #endif
 
     mCachedPosVelDirty = false;
+#ifdef LOG_PERFORMANCE_BACKPROP_SNAPSHOT
+    if (refreshLog != nullptr)
+    {
+      refreshLog->end();
+    }
+#endif
   }
+
+#ifdef LOG_PERFORMANCE_BACKPROP_SNAPSHOT
+  if (thisLog != nullptr)
+  {
+    thisLog->end();
+  }
+#endif
   return mCachedPosVel;
 }
 
@@ -874,10 +994,27 @@ Eigen::MatrixXd BackpropSnapshot::getVelJacobianWrt(
 }
 
 //==============================================================================
-const Eigen::MatrixXd& BackpropSnapshot::getPosPosJacobian(WorldPtr world)
+const Eigen::MatrixXd& BackpropSnapshot::getPosPosJacobian(
+    WorldPtr world, PerformanceLog* perfLog)
 {
+  PerformanceLog* thisLog = nullptr;
+#ifdef LOG_PERFORMANCE_BACKPROP_SNAPSHOT
+  if (perfLog != nullptr)
+  {
+    thisLog = perfLog->startRun("BackpropSnapshot.getPosPosJacobian");
+  }
+#endif
+
   if (mCachedPosPosDirty)
   {
+    PerformanceLog* refreshLog = nullptr;
+#ifdef LOG_PERFORMANCE_BACKPROP_SNAPSHOT
+    if (thisLog != nullptr)
+    {
+      refreshLog = thisLog->startRun(
+          "BackpropSnapshot.getPosPosJacobian#refreshCache");
+    }
+#endif
 
 #ifdef USE_FD_OVERRIDE
     mCachedPosPos = finiteDifferencePosPosJacobian(world, 1);
@@ -942,15 +1079,46 @@ const Eigen::MatrixXd& BackpropSnapshot::getPosPosJacobian(WorldPtr world)
 #endif
 
     mCachedPosPosDirty = false;
+#ifdef LOG_PERFORMANCE_BACKPROP_SNAPSHOT
+    if (refreshLog != nullptr)
+    {
+      refreshLog->end();
+    }
+#endif
   }
+
+#ifdef LOG_PERFORMANCE_BACKPROP_SNAPSHOT
+  if (thisLog != nullptr)
+  {
+    thisLog->end();
+  }
+#endif
   return mCachedPosPos;
 }
 
 //==============================================================================
-const Eigen::MatrixXd& BackpropSnapshot::getVelPosJacobian(WorldPtr world)
+const Eigen::MatrixXd& BackpropSnapshot::getVelPosJacobian(
+    WorldPtr world, PerformanceLog* perfLog)
 {
+  PerformanceLog* thisLog = nullptr;
+#ifdef LOG_PERFORMANCE_BACKPROP_SNAPSHOT
+  if (perfLog != nullptr)
+  {
+    thisLog = perfLog->startRun("BackpropSnapshot.getVelPosJacobian");
+  }
+#endif
+
   if (mCachedVelPosDirty)
   {
+    PerformanceLog* refreshLog = nullptr;
+#ifdef LOG_PERFORMANCE_BACKPROP_SNAPSHOT
+    if (thisLog != nullptr)
+    {
+      refreshLog = thisLog->startRun(
+          "BackpropSnapshot.getVelPosJacobian#refreshCache");
+    }
+#endif
+
 #ifdef USE_FD_OVERRIDE
     mCachedVelPos = finiteDifferenceVelPosJacobian(world, 1);
 #else
@@ -966,7 +1134,20 @@ const Eigen::MatrixXd& BackpropSnapshot::getVelPosJacobian(WorldPtr world)
 #endif
 
     mCachedVelPosDirty = false;
+#ifdef LOG_PERFORMANCE_BACKPROP_SNAPSHOT
+    if (refreshLog != nullptr)
+    {
+      refreshLog->end();
+    }
+#endif
   }
+
+#ifdef LOG_PERFORMANCE_BACKPROP_SNAPSHOT
+  if (thisLog != nullptr)
+  {
+    thisLog->end();
+  }
+#endif
   return mCachedVelPos;
 }
 

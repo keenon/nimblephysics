@@ -9,9 +9,13 @@
 #include "dart/neural/DifferentiableContactConstraint.hpp"
 #include "dart/neural/NeuralConstants.hpp"
 #include "dart/neural/NeuralUtils.hpp"
+#include "dart/performance/PerformanceLog.hpp"
 #include "dart/simulation/World.hpp"
 
 namespace dart {
+
+using namespace performance;
+
 namespace neural {
 
 class BackpropSnapshot
@@ -36,32 +40,38 @@ public:
   void backprop(
       simulation::WorldPtr world,
       LossGradient& thisTimestepLoss,
-      const LossGradient& nextTimestepLoss);
+      const LossGradient& nextTimestepLoss,
+      PerformanceLog* perfLog = nullptr);
 
   /// This computes and returns the whole vel-vel jacobian. For backprop, you
   /// don't actually need this matrix, you can compute backprop directly. This
   /// is here if you want access to the full Jacobian for some reason.
-  const Eigen::MatrixXd& getVelVelJacobian(simulation::WorldPtr world);
+  const Eigen::MatrixXd& getVelVelJacobian(
+      simulation::WorldPtr world, PerformanceLog* perfLog = nullptr);
 
   /// This computes and returns the whole pos-vel jacobian. For backprop, you
   /// don't actually need this matrix, you can compute backprop directly. This
   /// is here if you want access to the full Jacobian for some reason.
-  const Eigen::MatrixXd& getPosVelJacobian(simulation::WorldPtr world);
+  const Eigen::MatrixXd& getPosVelJacobian(
+      simulation::WorldPtr world, PerformanceLog* perfLog = nullptr);
 
   /// This computes and returns the whole force-vel jacobian. For backprop, you
   /// don't actually need this matrix, you can compute backprop directly. This
   /// is here if you want access to the full Jacobian for some reason.
-  const Eigen::MatrixXd& getForceVelJacobian(simulation::WorldPtr world);
+  const Eigen::MatrixXd& getForceVelJacobian(
+      simulation::WorldPtr world, PerformanceLog* perfLog = nullptr);
 
   /// This computes and returns the whole pos-pos jacobian. For backprop, you
   /// don't actually need this matrix, you can compute backprop directly. This
   /// is here if you want access to the full Jacobian for some reason.
-  const Eigen::MatrixXd& getPosPosJacobian(simulation::WorldPtr world);
+  const Eigen::MatrixXd& getPosPosJacobian(
+      simulation::WorldPtr world, PerformanceLog* perfLog = nullptr);
 
   /// This computes and returns the whole vel-pos jacobian. For backprop, you
   /// don't actually need this matrix, you can compute backprop directly. This
   /// is here if you want access to the full Jacobian for some reason.
-  const Eigen::MatrixXd& getVelPosJacobian(simulation::WorldPtr world);
+  const Eigen::MatrixXd& getVelPosJacobian(
+      simulation::WorldPtr world, PerformanceLog* perfLog = nullptr);
 
   /// Returns a concatenated vector of all the Skeletons' position()'s in the
   /// World, in order in which the Skeletons appear in the World's

@@ -13,6 +13,8 @@ using namespace dynamics;
 using namespace simulation;
 using namespace neural;
 
+#define LOG_PERFORMANCE_MULTI_SHOT
+
 namespace dart {
 namespace trajectory {
 
@@ -74,13 +76,30 @@ void MultiShot::setParallelOperationsEnabled(bool enabled)
 /// certainly be mapped spaces that are easier to optimize in than native
 /// joint space, at least initially.
 void MultiShot::switchRepresentationMapping(
-    std::shared_ptr<simulation::World> world, const std::string& mapping)
+    std::shared_ptr<simulation::World> world,
+    const std::string& mapping,
+    PerformanceLog* log)
 {
+  PerformanceLog* thisLog = nullptr;
+#ifdef LOG_PERFORMANCE_MULTI_SHOT
+  if (log != nullptr)
+  {
+    thisLog = log->startRun("MultiShot.switchRepresentationMapping");
+  }
+#endif
+
   for (auto shot : mShots)
   {
-    shot->switchRepresentationMapping(world, mapping);
+    shot->switchRepresentationMapping(world, mapping, thisLog);
   }
-  AbstractShot::switchRepresentationMapping(world, mapping);
+  AbstractShot::switchRepresentationMapping(world, mapping, thisLog);
+
+#ifdef LOG_PERFORMANCE_MULTI_SHOT
+  if (thisLog != nullptr)
+  {
+    thisLog->end();
+  }
+#endif
 }
 
 //==============================================================================
@@ -133,46 +152,95 @@ int MultiShot::getConstraintDim() const
 /// This computes the values of the constraints
 void MultiShot::computeConstraints(
     std::shared_ptr<simulation::World> world,
-    /* OUT */ Eigen::Ref<Eigen::VectorXd> constraints)
+    /* OUT */ Eigen::Ref<Eigen::VectorXd> constraints,
+    PerformanceLog* log)
 {
+  PerformanceLog* thisLog = nullptr;
+#ifdef LOG_PERFORMANCE_MULTI_SHOT
+  if (log != nullptr)
+  {
+    thisLog = log->startRun("MultiShot.computeConstraints");
+  }
+#endif
+
   int cursor = 0;
   int numParentConstraints = AbstractShot::getConstraintDim();
   AbstractShot::computeConstraints(
-      world, constraints.segment(0, numParentConstraints));
+      world, constraints.segment(0, numParentConstraints), thisLog);
   cursor += numParentConstraints;
   for (int i = 1; i < mShots.size(); i++)
   {
     constraints.segment(cursor, getRepresentationStateSize())
-        = mShots[i - 1]->getFinalState(world) - mShots[i]->getStartState();
+        = mShots[i - 1]->getFinalState(world, thisLog)
+          - mShots[i]->getStartState();
     cursor += getRepresentationStateSize();
   }
+
+#ifdef LOG_PERFORMANCE_MULTI_SHOT
+  if (thisLog != nullptr)
+  {
+    thisLog->end();
+  }
+#endif
 }
 
 //==============================================================================
 /// This copies a shot down into a single flat vector
-void MultiShot::flatten(/* OUT */ Eigen::Ref<Eigen::VectorXd> flat) const
+void MultiShot::flatten(
+    /* OUT */ Eigen::Ref<Eigen::VectorXd> flat, PerformanceLog* log) const
 {
+  PerformanceLog* thisLog = nullptr;
+#ifdef LOG_PERFORMANCE_MULTI_SHOT
+  if (log != nullptr)
+  {
+    thisLog = log->startRun("MultiShot.flatten");
+  }
+#endif
+
   int cursor = 0;
   for (const std::shared_ptr<SingleShot>& shot : mShots)
   {
     int dim = shot->getFlatProblemDim();
-    shot->flatten(flat.segment(cursor, dim));
+    shot->flatten(flat.segment(cursor, dim), thisLog);
     cursor += dim;
   }
+
+#ifdef LOG_PERFORMANCE_MULTI_SHOT
+  if (thisLog != nullptr)
+  {
+    thisLog->end();
+  }
+#endif
 }
 
 //==============================================================================
 /// This gets the parameters out of a flat vector
-void MultiShot::unflatten(const Eigen::Ref<const Eigen::VectorXd>& flat)
+void MultiShot::unflatten(
+    const Eigen::Ref<const Eigen::VectorXd>& flat, PerformanceLog* log)
 {
+  PerformanceLog* thisLog = nullptr;
+#ifdef LOG_PERFORMANCE_MULTI_SHOT
+  if (log != nullptr)
+  {
+    thisLog = log->startRun("MultiShot.unflatten");
+  }
+#endif
+
   mRolloutCacheDirty = true;
   int cursor = 0;
   for (std::shared_ptr<SingleShot>& shot : mShots)
   {
     int dim = shot->getFlatProblemDim();
-    shot->unflatten(flat.segment(cursor, dim));
+    shot->unflatten(flat.segment(cursor, dim), thisLog);
     cursor += dim;
   }
+
+#ifdef LOG_PERFORMANCE_MULTI_SHOT
+  if (thisLog != nullptr)
+  {
+    thisLog->end();
+  }
+#endif
 }
 
 //==============================================================================
@@ -180,15 +248,31 @@ void MultiShot::unflatten(const Eigen::Ref<const Eigen::VectorXd>& flat)
 /// optimization
 void MultiShot::getUpperBounds(
     std::shared_ptr<simulation::World> world,
-    /* OUT */ Eigen::Ref<Eigen::VectorXd> flat) const
+    /* OUT */ Eigen::Ref<Eigen::VectorXd> flat,
+    PerformanceLog* log) const
 {
+  PerformanceLog* thisLog = nullptr;
+#ifdef LOG_PERFORMANCE_MULTI_SHOT
+  if (log != nullptr)
+  {
+    thisLog = log->startRun("MultiShot.getUpperBounds");
+  }
+#endif
+
   int cursor = 0;
   for (const std::shared_ptr<SingleShot>& shot : mShots)
   {
     int dim = shot->getFlatProblemDim();
-    shot->getUpperBounds(world, flat.segment(cursor, dim));
+    shot->getUpperBounds(world, flat.segment(cursor, dim), thisLog);
     cursor += dim;
   }
+
+#ifdef LOG_PERFORMANCE_MULTI_SHOT
+  if (thisLog != nullptr)
+  {
+    thisLog->end();
+  }
+#endif
 }
 
 //==============================================================================
@@ -196,37 +280,83 @@ void MultiShot::getUpperBounds(
 /// optimization
 void MultiShot::getLowerBounds(
     std::shared_ptr<simulation::World> world,
-    /* OUT */ Eigen::Ref<Eigen::VectorXd> flat) const
+    /* OUT */ Eigen::Ref<Eigen::VectorXd> flat,
+    PerformanceLog* log) const
 {
+  PerformanceLog* thisLog = nullptr;
+#ifdef LOG_PERFORMANCE_MULTI_SHOT
+  if (log != nullptr)
+  {
+    thisLog = log->startRun("MultiShot.getLowerBounds");
+  }
+#endif
+
   int cursor = 0;
   for (const std::shared_ptr<SingleShot>& shot : mShots)
   {
     int dim = shot->getFlatProblemDim();
-    shot->getLowerBounds(world, flat.segment(cursor, dim));
+    shot->getLowerBounds(world, flat.segment(cursor, dim), thisLog);
     cursor += dim;
   }
+
+#ifdef LOG_PERFORMANCE_MULTI_SHOT
+  if (thisLog != nullptr)
+  {
+    thisLog->end();
+  }
+#endif
 }
 
 //==============================================================================
 /// This gets the bounds on the constraint functions (both knot points and any
 /// custom constraints)
 void MultiShot::getConstraintUpperBounds(
-    /* OUT */ Eigen::Ref<Eigen::VectorXd> flat) const
+    /* OUT */ Eigen::Ref<Eigen::VectorXd> flat, PerformanceLog* log) const
 {
+  PerformanceLog* thisLog = nullptr;
+#ifdef LOG_PERFORMANCE_MULTI_SHOT
+  if (log != nullptr)
+  {
+    thisLog = log->startRun("MultiShot.getConstraintUpperBounds");
+  }
+#endif
+
   flat.setZero();
   AbstractShot::getConstraintUpperBounds(
-      flat.segment(0, AbstractShot::getConstraintDim()));
+      flat.segment(0, AbstractShot::getConstraintDim()), thisLog);
+
+#ifdef LOG_PERFORMANCE_MULTI_SHOT
+  if (thisLog != nullptr)
+  {
+    thisLog->end();
+  }
+#endif
 }
 
 //==============================================================================
 /// This gets the bounds on the constraint functions (both knot points and any
 /// custom constraints)
 void MultiShot::getConstraintLowerBounds(
-    /* OUT */ Eigen::Ref<Eigen::VectorXd> flat) const
+    /* OUT */ Eigen::Ref<Eigen::VectorXd> flat, PerformanceLog* log) const
 {
+  PerformanceLog* thisLog = nullptr;
+#ifdef LOG_PERFORMANCE_MULTI_SHOT
+  if (log != nullptr)
+  {
+    thisLog = log->startRun("MultiShot.getConstraintLowerBounds");
+  }
+#endif
+
   flat.setZero();
   AbstractShot::getConstraintLowerBounds(
-      flat.segment(0, AbstractShot::getConstraintDim()));
+      flat.segment(0, AbstractShot::getConstraintDim()), thisLog);
+
+#ifdef LOG_PERFORMANCE_MULTI_SHOT
+  if (thisLog != nullptr)
+  {
+    thisLog->end();
+  }
+#endif
 }
 
 //==============================================================================
@@ -234,15 +364,31 @@ void MultiShot::getConstraintLowerBounds(
 /// optimization
 void MultiShot::getInitialGuess(
     std::shared_ptr<simulation::World> world,
-    /* OUT */ Eigen::Ref<Eigen::VectorXd> flat) const
+    /* OUT */ Eigen::Ref<Eigen::VectorXd> flat,
+    PerformanceLog* log) const
 {
+  PerformanceLog* thisLog = nullptr;
+#ifdef LOG_PERFORMANCE_MULTI_SHOT
+  if (log != nullptr)
+  {
+    thisLog = log->startRun("MultiShot.getInitialGuess");
+  }
+#endif
+
   int cursor = 0;
   for (const std::shared_ptr<SingleShot>& shot : mShots)
   {
     int dim = shot->getFlatProblemDim();
-    shot->getInitialGuess(world, flat.segment(cursor, dim));
+    shot->getInitialGuess(world, flat.segment(cursor, dim), thisLog);
     cursor += dim;
   }
+
+#ifdef LOG_PERFORMANCE_MULTI_SHOT
+  if (thisLog != nullptr)
+  {
+    thisLog->end();
+  }
+#endif
 }
 
 //==============================================================================
@@ -251,8 +397,17 @@ void MultiShot::getInitialGuess(
 /// getFlatProblemDim()).
 void MultiShot::backpropJacobian(
     std::shared_ptr<simulation::World> world,
-    /* OUT */ Eigen::Ref<Eigen::MatrixXd> jac)
+    /* OUT */ Eigen::Ref<Eigen::MatrixXd> jac,
+    PerformanceLog* log)
 {
+  PerformanceLog* thisLog = nullptr;
+#ifdef LOG_PERFORMANCE_MULTI_SHOT
+  if (log != nullptr)
+  {
+    thisLog = log->startRun("MultiShot.backpropJacobian");
+  }
+#endif
+
   assert(jac.cols() == getFlatProblemDim());
   assert(jac.rows() == getConstraintDim());
 
@@ -265,7 +420,7 @@ void MultiShot::backpropJacobian(
   int numParentConstraints = AbstractShot::getConstraintDim();
   int n = getFlatProblemDim();
   AbstractShot::backpropJacobian(
-      world, jac.block(0, 0, numParentConstraints, n));
+      world, jac.block(0, 0, numParentConstraints, n), thisLog);
   rowCursor += numParentConstraints;
 
   // Add in knot point constraints
@@ -274,7 +429,7 @@ void MultiShot::backpropJacobian(
   {
     int dim = mShots[i - 1]->getFlatProblemDim();
     mShots[i - 1]->backpropJacobianOfFinalState(
-        world, jac.block(rowCursor, colCursor, stateDim, dim));
+        world, jac.block(rowCursor, colCursor, stateDim, dim), thisLog);
     colCursor += dim;
     jac.block(rowCursor, colCursor, stateDim, stateDim)
         = -1 * Eigen::MatrixXd::Identity(stateDim, stateDim);
@@ -286,6 +441,13 @@ void MultiShot::backpropJacobian(
   assert(
       colCursor == jac.cols() - mShots[mShots.size() - 1]->getFlatProblemDim());
   assert(rowCursor == jac.rows());
+
+#ifdef LOG_PERFORMANCE_MULTI_SHOT
+  if (thisLog != nullptr)
+  {
+    thisLog->end();
+  }
+#endif
 }
 
 //==============================================================================
@@ -309,8 +471,18 @@ int MultiShot::getNumberNonZeroJacobian()
 //==============================================================================
 /// This gets the structure of the non-zero entries in the Jacobian
 void MultiShot::getJacobianSparsityStructure(
-    Eigen::Ref<Eigen::VectorXi> rows, Eigen::Ref<Eigen::VectorXi> cols)
+    Eigen::Ref<Eigen::VectorXi> rows,
+    Eigen::Ref<Eigen::VectorXi> cols,
+    PerformanceLog* log)
 {
+  PerformanceLog* thisLog = nullptr;
+#ifdef LOG_PERFORMANCE_MULTI_SHOT
+  if (log != nullptr)
+  {
+    thisLog = log->startRun("MultiShot.getJacobianSparsityStructure");
+  }
+#endif
+
   int sparseCursor = 0;
   int rowCursor = 0;
   int colCursor = 0;
@@ -320,7 +492,8 @@ void MultiShot::getJacobianSparsityStructure(
   int n = getFlatProblemDim();
   AbstractShot::getJacobianSparsityStructure(
       rows.segment(0, n * numParentConstraints),
-      cols.segment(0, n * numParentConstraints));
+      cols.segment(0, n * numParentConstraints),
+      thisLog);
   rowCursor += numParentConstraints;
 
   int stateDim = getRepresentationStateSize();
@@ -348,14 +521,30 @@ void MultiShot::getJacobianSparsityStructure(
     }
     rowCursor += stateDim;
   }
+
+#ifdef LOG_PERFORMANCE_MULTI_SHOT
+  if (thisLog != nullptr)
+  {
+    thisLog->end();
+  }
+#endif
 }
 
 //==============================================================================
 /// This writes the Jacobian to a sparse vector
 void MultiShot::getSparseJacobian(
     std::shared_ptr<simulation::World> world,
-    Eigen::Ref<Eigen::VectorXd> sparse)
+    Eigen::Ref<Eigen::VectorXd> sparse,
+    PerformanceLog* log)
 {
+  PerformanceLog* thisLog = nullptr;
+#ifdef LOG_PERFORMANCE_MULTI_SHOT
+  if (log != nullptr)
+  {
+    thisLog = log->startRun("MultiShot.getSparseJacobian");
+  }
+#endif
+
   int sparseCursor = AbstractShot::getNumberNonZeroJacobian();
   int stateDim = getRepresentationStateSize();
   Eigen::VectorXd neg = Eigen::VectorXd::Ones(stateDim) * -1;
@@ -364,7 +553,7 @@ void MultiShot::getSparseJacobian(
     int dim = mShots[i - 1]->getFlatProblemDim();
     // This is the main Jacobian
     Eigen::MatrixXd jac = Eigen::MatrixXd::Zero(stateDim, dim);
-    mShots[i - 1]->backpropJacobianOfFinalState(world, jac);
+    mShots[i - 1]->backpropJacobianOfFinalState(world, jac, thisLog);
     for (int col = 0; col < dim; col++)
     {
       sparse.segment(sparseCursor, stateDim) = jac.col(col);
@@ -374,6 +563,13 @@ void MultiShot::getSparseJacobian(
     sparse.segment(sparseCursor, stateDim) = neg;
     sparseCursor += stateDim;
   }
+
+#ifdef LOG_PERFORMANCE_MULTI_SHOT
+  if (thisLog != nullptr)
+  {
+    thisLog->end();
+  }
+#endif
 }
 
 //==============================================================================
@@ -381,8 +577,17 @@ void MultiShot::getSparseJacobian(
 void MultiShot::getStates(
     std::shared_ptr<simulation::World> world,
     /* OUT */ TrajectoryRollout* rollout,
+    PerformanceLog* log,
     bool useKnots)
 {
+  PerformanceLog* thisLog = nullptr;
+#ifdef LOG_PERFORMANCE_MULTI_SHOT
+  if (log != nullptr)
+  {
+    thisLog = log->startRun("MultiShot.getStates");
+  }
+#endif
+
   int posDim = getRepresentation()->getPosDim();
   int velDim = getRepresentation()->getVelDim();
   int forceDim = getRepresentation()->getForceDim();
@@ -399,7 +604,7 @@ void MultiShot::getStates(
     {
       int steps = mShots[i]->getNumSteps();
       TrajectoryRolloutRef slice = rollout->slice(cursor, steps);
-      mShots[i]->getStates(world, &slice, true);
+      mShots[i]->getStates(world, &slice, thisLog, true);
       cursor += steps;
     }
   }
@@ -429,6 +634,13 @@ void MultiShot::getStates(
     }
   }
   assert(cursor == mSteps);
+
+#ifdef LOG_PERFORMANCE_MULTI_SHOT
+  if (thisLog != nullptr)
+  {
+    thisLog->end();
+  }
+#endif
 }
 
 //==============================================================================
@@ -442,9 +654,27 @@ Eigen::VectorXd MultiShot::getStartState()
 /// This unrolls the shot, and returns the (pos, vel) state concatenated at
 /// the end of the shot
 Eigen::VectorXd MultiShot::getFinalState(
-    std::shared_ptr<simulation::World> world)
+    std::shared_ptr<simulation::World> world, PerformanceLog* log)
 {
-  return mShots[mShots.size() - 1]->getFinalState(world);
+  PerformanceLog* thisLog = nullptr;
+#ifdef LOG_PERFORMANCE_MULTI_SHOT
+  if (log != nullptr)
+  {
+    thisLog = log->startRun("MultiShot.getFinalState");
+  }
+#endif
+
+  Eigen::VectorXd ret
+      = mShots[mShots.size() - 1]->getFinalState(world, thisLog);
+
+#ifdef LOG_PERFORMANCE_MULTI_SHOT
+  if (thisLog != nullptr)
+  {
+    thisLog->end();
+  }
+#endif
+
+  return ret;
 }
 
 //==============================================================================
@@ -469,8 +699,17 @@ std::string MultiShot::getFlatDimName(int dim)
 void MultiShot::backpropGradientWrt(
     std::shared_ptr<simulation::World> world,
     const TrajectoryRollout* gradWrtForces,
-    /* OUT */ Eigen::Ref<Eigen::VectorXd> grad)
+    /* OUT */ Eigen::Ref<Eigen::VectorXd> grad,
+    PerformanceLog* log)
 {
+  PerformanceLog* thisLog = nullptr;
+#ifdef LOG_PERFORMANCE_MULTI_SHOT
+  if (log != nullptr)
+  {
+    thisLog = log->startRun("MultiShot.backpropGradientWrt");
+  }
+#endif
+
   int cursorDims = 0;
   int cursorSteps = 0;
   for (int i = 0; i < mShots.size(); i++)
@@ -480,10 +719,17 @@ void MultiShot::backpropGradientWrt(
     const TrajectoryRolloutConstRef slice
         = gradWrtForces->sliceConst(cursorSteps, steps);
     mShots[i]->backpropGradientWrt(
-        world, &slice, grad.segment(cursorDims, dim));
+        world, &slice, grad.segment(cursorDims, dim), thisLog);
     cursorSteps += steps;
     cursorDims += dim;
   }
+
+#ifdef LOG_PERFORMANCE_MULTI_SHOT
+  if (thisLog != nullptr)
+  {
+    thisLog->end();
+  }
+#endif
 }
 
 } // namespace trajectory
