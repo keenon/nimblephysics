@@ -1,5 +1,9 @@
 #!/bin/bash
 
+VERSION=0.0.4
+
+pushd ../..
+
 rm -rf dist/*
 rm -rf build/*
 # rm -rf wheelhouse/*
@@ -9,7 +13,7 @@ python3 setup.py sdist bdist_wheel
 
 # Install delocate, to bundle dependencies into the wheel
 pushd dist
-DYLD_LIBRARY_PATH="$DYLD_LIBRARY_PATH:/usr/local/lib" delocate-wheel -w ../wheelhouse -v diffdart-0.0.3-cp38-cp38-macosx_10_14_x86_64.whl
+DYLD_LIBRARY_PATH="$DYLD_LIBRARY_PATH:/usr/local/lib" delocate-wheel -w ../wheelhouse -v diffdart-${VERSION}-cp38-cp38-macosx_10_14_x86_64.whl
 popd
 
 # Replace the ABI tag with a more general version
