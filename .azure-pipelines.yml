@@ -2,13 +2,53 @@
 # Ref: https://docs.microsoft.com/en-us/azure/devops/pipelines
 
 jobs:
-  - job: linux
+  - job: linux_35
     pool: { vmImage: "Ubuntu-16.04" }
     steps:
       - task: UsePythonVersion@0
       - bash: |
-          cd ci/manylinux
-          ./build_wheels.sh
+          cd ci/manylinux/3.6
+          ./build_wheel.sh
+      - task: PublishBuildArtifacts@1
+        inputs: { pathtoPublish: "wheelhouse" }
+
+  - job: linux_36
+    pool: { vmImage: "Ubuntu-16.04" }
+    steps:
+      - task: UsePythonVersion@0
+      - bash: |
+          cd ci/manylinux/3.6
+          ./build_wheel.sh
+      - task: PublishBuildArtifacts@1
+        inputs: { pathtoPublish: "wheelhouse" }
+
+  - job: linux_37
+    pool: { vmImage: "Ubuntu-16.04" }
+    steps:
+      - task: UsePythonVersion@0
+      - bash: |
+          cd ci/manylinux/3.7
+          ./build_wheel.sh
+      - task: PublishBuildArtifacts@1
+        inputs: { pathtoPublish: "wheelhouse" }
+
+  - job: linux_38
+    pool: { vmImage: "Ubuntu-16.04" }
+    steps:
+      - task: UsePythonVersion@0
+      - bash: |
+          cd ci/manylinux/3.8
+          ./build_wheel.sh
+      - task: PublishBuildArtifacts@1
+        inputs: { pathtoPublish: "wheelhouse" }
+
+  - job: linux_39
+    pool: { vmImage: "Ubuntu-16.04" }
+    steps:
+      - task: UsePythonVersion@0
+      - bash: |
+          cd ci/manylinux/3.9
+          ./build_wheel.sh
       - task: PublishBuildArtifacts@1
         inputs: { pathtoPublish: "wheelhouse" }
 

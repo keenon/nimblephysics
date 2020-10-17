@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 # Install Boost from source
 curl https://dl.bintray.com/boostorg/release/1.74.0/source/boost_1_74_0.tar.gz > boost.tar.gz
