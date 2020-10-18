@@ -204,7 +204,7 @@ popd
 popd
 rm -rf PerfUtils
 
-/opt/python/cp38-cp38/bin/python3.8
+# /opt/python/cp38-cp38/bin/python3.8
 # Actually build the code
 python3 setup.py sdist bdist_wheel
 auditwheel repair dist/diffdart-0.0.1-cp36-cp36m-linux_x86_64.whl

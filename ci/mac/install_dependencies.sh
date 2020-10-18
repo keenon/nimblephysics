@@ -1,30 +1,21 @@
 #!/bin/bash
 set -e
 
-# Install Boost from source
-curl https://dl.bintray.com/boostorg/release/1.74.0/source/boost_1_74_0.tar.gz > boost.tar.gz
-tar -zxf boost.tar.gz
-pushd boost_1_74_0
-./bootstrap.sh
-./b2
-./b2 install
-popd
-popd
-rm -rf boost.tar.gz
-rm -rf boost_1_74_0
+# brew install gnu-sed
 
-# Install Eigen
-curl https://gitlab.com/libeigen/eigen/-/archive/3.3.7/eigen-3.3.7.tar.gz > eigen.tar.gz
-tar -zxf eigen.tar.gz
-pushd eigen-3.3.7
+# Install perfutils - Keenon's fork, compatible with Mac OSX
+git clone https://github.com/keenon/PerfUtils.git
+pushd PerfUtils
 mkdir build
 pushd build
 cmake ..
-make install -j14
+make install
 popd
 popd
-rm -rf eigen-3.3.7
-rm -rf eigen.tar.gz
+rm -rf PerfUtils
+
+brew install boost@1.73
+brew install eigen
 
 # Install CCD
 git clone https://github.com/danfis/libccd.git
@@ -76,7 +67,7 @@ git clone https://github.com/pybind/pybind11.git
 pushd pybind11
 mkdir build
 pushd build
-cmake ..
+cmake .. -DPYTHON_EXECUTABLE:FILEPATH=$(which python)
 make install -j10
 popd
 popd
@@ -87,15 +78,13 @@ rm -rf pybind11
 git clone https://github.com/flexible-collision-library/fcl.git
 pushd fcl
 git checkout 0.3.4
-# vi include/fcl/narrowphase/detail/convexity_based_algorithm/gjk_libccd-inl.h:1696 # "std::max(1.0, v0_dist)" -> "std::max(1.0, (double)v0_dist)"
-# sed -i '1696s/v0_dist/(double)v0_dist/' include/fcl/narrowphase/detail/convexity_based_algorithm/gjk_libccd-inl.h
 mkdir build
 pushd build
 cmake .. -DFCL_WITH_OCTOMAP=OFF
 make install -j14
 popd
 popd
-# rm -rf fcl
+rm -rf fcl
 
 # Install octomap
 git clone https://github.com/OctoMap/octomap.git
@@ -121,32 +110,11 @@ popd
 rm -rf tinyxml2
 
 # Install freeglut
-brew install freeglut
 # brew cask install xquartz
-# curl https://managedway.dl.sourceforge.net/project/freeglut/freeglut/3.2.1/freeglut-3.2.1.tar.gz > freeglut.tar.gz
-# tar -zxf freeglut.tar.gz
-# rm freeglut.tar.gz
-# pushd freeglut-3.2.1
-# mkdir build
-# pushd build
-# cmake ..
-# make install -j10
-# popd
-# popd
-# rm -rf freeglut-3.2.1
+# brew install freeglut
 
 # Install Open Scene Graph
-brew install open-scene-graph
-# git clone https://github.com/openscenegraph/OpenSceneGraph.git
-# pushd OpenSceneGraph
-# git checkout OpenSceneGraph-3.6.5
-# mkdir build
-# pushd build
-# cmake ..
-# make install -j10
-# popd
-# popd
-# rm -rf OpenSceneGraph
+# brew install open-scene-graph
 
 # Install pytest
 pip3 install pytest
@@ -196,17 +164,6 @@ popd
 popd
 rm -rf urdfdom
 
-# Install perfutils
-git clone https://github.com/PlatformLab/PerfUtils.git
-pushd PerfUtils
-mkdir build
-pushd build
-cmake ..
-make install
-popd
-popd
-rm -rf PerfUtils
-
 # Reset the IDs for our libraries to absolute paths
 install_name_tool -id /usr/local/lib/liburdfdom_sensor.dylib /usr/local/lib/liburdfdom_sensor.dylib
 install_name_tool -id /usr/local/lib/liburdfdom_model_state.dylib /usr/local/lib/liburdfdom_model_state.dylib
@@ -219,13 +176,14 @@ install_name_tool -id /usr/local/lib/liboctomath.1.8.dylib /usr/local/lib/liboct
 install_name_tool -id /usr/local/lib/libccd.2.dylib /usr/local/lib/libccd.2.dylib
 install_name_tool -id /usr/local/lib/libfcl.dylib /usr/local/lib/libfcl.dylib
 install_name_tool -id /usr/local/lib/libassimp.5.dylib /usr/local/lib/libassimp.5.dylib
-install_name_tool -id /usr/local/lib/libosg.161.dylib /usr/local/lib/libosg.161.dylib
-install_name_tool -id /usr/local/lib/libosgViewer.161.dylib /usr/local/lib/libosgViewer.161.dylib
-install_name_tool -id /usr/local/lib/libosgManipulator.161.dylib /usr/local/lib/libosgManipulator.161.dylib
-install_name_tool -id /usr/local/lib/libosgGA.161.dylib /usr/local/lib/libosgGA.161.dylib
-install_name_tool -id /usr/local/lib/libosgDB.161.dylib /usr/local/lib/libosgDB.161.dylib
-install_name_tool -id /usr/local/lib/libosgShadow.161.dylib /usr/local/lib/libosgShadow.161.dylib
-install_name_tool -id /usr/local/lib/libOpenThreads.21.dylib /usr/local/lib/libOpenThreads.21.dylib
+# We're not installing Open Scene Graph, so these aren't necessary
+# install_name_tool -id /usr/local/lib/libosg.161.dylib /usr/local/lib/libosg.161.dylib
+# install_name_tool -id /usr/local/lib/libosgViewer.161.dylib /usr/local/lib/libosgViewer.161.dylib
+# install_name_tool -id /usr/local/lib/libosgManipulator.161.dylib /usr/local/lib/libosgManipulator.161.dylib
+# install_name_tool -id /usr/local/lib/libosgGA.161.dylib /usr/local/lib/libosgGA.161.dylib
+# install_name_tool -id /usr/local/lib/libosgDB.161.dylib /usr/local/lib/libosgDB.161.dylib
+# install_name_tool -id /usr/local/lib/libosgShadow.161.dylib /usr/local/lib/libosgShadow.161.dylib
+# install_name_tool -id /usr/local/lib/libOpenThreads.21.dylib /usr/local/lib/libOpenThreads.21.dylib
 
 # Fix "icu4c" installed by Brew
 pushd /usr/local/Cellar/icu4c/67.1/lib/
@@ -244,35 +202,16 @@ sudo install_name_tool -change "@loader_path/libicui18n.67.dylib" "@loader_path/
 sudo install_name_tool -change "@loader_path/libicudata.67.dylib" "@loader_path/libicudata.67.1.dylib" libicuuc.67.1.dylib 
 popd
 
-# Install optool
- # git clone git@github.com:alexzielenski/optool.git --recursive
- # pushd optool
- # xcodebuild
- # cp build/Release/optool /usr/local/bin
- # popd
-
-# Actually build the code
-python3.6 setup.py sdist bdist_wheel
-
 # Get ready to bundle the links
+ls /usr/local/lib/
 sudo mv /usr/local/lib/libjpeg.dylib /usr/local/lib/libjpeg.old.dylib
 ln -s /System/Library/Frameworks/ApplicationServices.framework/Versions/A/Frameworks/ImageIO.framework/Versions/A/Resources/libJPEG.dylib /usr/local/lib/libjpeg.lib
-sudo mv /usr/local/lib/libGIF.dylib /usr/local/lib/libGIF.old.dylib
-ln -s /System/Library/Frameworks/ApplicationServices.framework/Versions/A/Frameworks/ImageIO.framework/Versions/A/Resources/libGIF.dylib /usr/local/lib/libGIF.lib
+# sudo mv /usr/local/lib/libGIF.dylib /usr/local/lib/libGIF.old.dylib
+# ln -s /System/Library/Frameworks/ApplicationServices.framework/Versions/A/Frameworks/ImageIO.framework/Versions/A/Resources/libGIF.dylib /usr/local/lib/libGIF.lib
 sudo mv /usr/local/lib/libTIFF.dylib /usr/local/lib/libTIFF.old.dylib
 ln -s /System/Library/Frameworks/ApplicationServices.framework/Versions/A/Frameworks/ImageIO.framework/Versions/A/Resources/libTIFF.dylib /usr/local/lib/libTIFF.lib
 sudo mv /usr/local/lib/libPng.dylib /usr/local/lib/libPng.old.dylib
 ln -s /System/Library/Frameworks/ApplicationServices.framework/Versions/A/Frameworks/ImageIO.framework/Versions/A/Resources/libPng.dylib /usr/local/lib/libPng.lib
 
-# Install delocate, to bundle dependencies into the wheel
-pip install delocate
-pushd dist
-DYLD_LIBRARY_PATH="/usr/local/lib:$DYLD_LIBRARY_PATH" delocate-wheel -w ../wheelhouse -v diffdart-0.0.1-cp36-cp36m-macosx_10_6_intel.whl
-popd
-
-# Replace the ABI tag with a more general version
-mv wheelhouse/diffdart-0.0.1-cp36-cp36m-macosx_10_6_intel.whl wheelhouse/diffdart-0.0.1-4-cp36-abi3-macosx_10_6_x86_64.whl
-
-# Install twine, to handle uploading to PyPI
-python3 -m pip install --user --upgrade twine
-python3 -m twine upload --repository pypi wheelhouse/*
+# Install our build tools
+python -m pip install pytest delocate

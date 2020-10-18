@@ -87,9 +87,9 @@ set_target_properties(_diffdart
     DEBUG_POSTFIX ""
 )
 
-install(TARGETS _diffdart
-  LIBRARY DESTINATION "${PYTHON_SITE_PACKAGES}"
-)
+# install(TARGETS _diffdart
+#   LIBRARY DESTINATION "${PYTHON_SITE_PACKAGES}"
+# )
 
 list(REMOVE_ITEM _diffdart_headers
   ${CMAKE_CURRENT_LIST_DIR}/eigen_geometry_pybind.h
