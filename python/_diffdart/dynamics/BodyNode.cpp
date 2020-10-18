@@ -30,9 +30,21 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <dart/dart.hpp>
+#include <dart/dynamics/BallJoint.hpp>
+#include <dart/dynamics/BodyNode.hpp>
+#include <dart/dynamics/EulerJoint.hpp>
+#include <dart/dynamics/FreeJoint.hpp>
+#include <dart/dynamics/PlanarJoint.hpp>
+#include <dart/dynamics/PrismaticJoint.hpp>
+#include <dart/dynamics/RevoluteJoint.hpp>
+#include <dart/dynamics/ScrewJoint.hpp>
+#include <dart/dynamics/TranslationalJoint.hpp>
+#include <dart/dynamics/TranslationalJoint2D.hpp>
+#include <dart/dynamics/UniversalJoint.hpp>
+#include <dart/dynamics/WeldJoint.hpp>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
+
 #include "eigen_geometry_pybind.h"
 #include "eigen_pybind.h"
 
@@ -1225,9 +1237,9 @@ void BodyNode(py::module& m)
       .def(
           "dirtyExternalForces",
           +[](dart::dynamics::BodyNode* self) { self->dirtyExternalForces(); })
-      .def("dirtyCoriolisForces", +[](dart::dynamics::BodyNode* self) {
-        self->dirtyCoriolisForces();
-      });
+      .def(
+          "dirtyCoriolisForces",
+          +[](dart::dynamics::BodyNode* self) { self->dirtyCoriolisForces(); });
 }
 
 } // namespace python

@@ -30,7 +30,10 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <dart/dart.hpp>
+#include <dart/collision/CollisionDetector.hpp>
+#include <dart/collision/CollisionGroup.hpp>
+#include <dart/constraint/ConstraintSolver.hpp>
+#include <dart/dynamics/Skeleton.hpp>
 #include <pybind11/pybind11.h>
 
 namespace py = pybind11;
@@ -144,9 +147,9 @@ void ConstraintSolver(py::module& m)
               -> dart::collision::ConstCollisionGroupPtr {
             return self->getCollisionGroup();
           })
-      .def("solve", +[](dart::constraint::ConstraintSolver* self) {
-        self->solve();
-      });
+      .def(
+          "solve",
+          +[](dart::constraint::ConstraintSolver* self) { self->solve(); });
 }
 
 } // namespace python

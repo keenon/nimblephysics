@@ -30,7 +30,8 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <dart/dart.hpp>
+#include <dart/dynamics/DegreeOfFreedom.hpp>
+#include <dart/dynamics/Skeleton.hpp>
 #include <pybind11/pybind11.h>
 
 #include "eigen_geometry_pybind.h"

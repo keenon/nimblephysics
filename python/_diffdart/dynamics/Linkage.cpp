@@ -30,8 +30,10 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <dart/dart.hpp>
+#include <dart/dynamics/BodyNode.hpp>
+#include <dart/dynamics/Linkage.hpp>
 #include <pybind11/pybind11.h>
+
 #include "eigen_geometry_pybind.h"
 #include "eigen_pybind.h"
 
@@ -87,9 +89,9 @@ void Linkage(py::module& m)
       .def(
           "reassemble",
           +[](dart::dynamics::Linkage* self) { self->reassemble(); })
-      .def("satisfyCriteria", +[](dart::dynamics::Linkage* self) {
-        self->satisfyCriteria();
-      });
+      .def(
+          "satisfyCriteria",
+          +[](dart::dynamics::Linkage* self) { self->satisfyCriteria(); });
 
   ::py::class_<dart::dynamics::Linkage::Criteria>(m, "LinkageCriteria")
       .def(

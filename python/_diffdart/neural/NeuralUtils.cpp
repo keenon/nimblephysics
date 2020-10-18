@@ -30,7 +30,10 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <dart/dart.hpp>
+#include <dart/dynamics/BodyNode.hpp>
+#include <dart/neural/BackpropSnapshot.hpp>
+#include <dart/neural/MappedBackpropSnapshot.hpp>
+#include <dart/neural/Mapping.hpp>
 #include <dart/neural/NeuralUtils.hpp>
 #include <pybind11/eigen.h>
 #include <pybind11/pybind11.h>

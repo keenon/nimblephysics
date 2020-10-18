@@ -30,7 +30,11 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <dart/dart.hpp>
+#include <dart/constraint/BallJointConstraint.hpp>
+#include <dart/constraint/ConstraintBase.hpp>
+#include <dart/constraint/JointConstraint.hpp>
+#include <dart/constraint/WeldJointConstraint.hpp>
+#include <dart/dynamics/BodyNode.hpp>
 #include <pybind11/eigen.h>
 #include <pybind11/pybind11.h>
 
@@ -87,9 +91,11 @@ void JointConstraint(py::module& m)
             dart::constraint::JointConstraint::setConstraintForceMixing(_cfm);
           },
           ::py::arg("cfm"))
-      .def_static("getConstraintForceMixing", +[]() -> double {
-        return dart::constraint::JointConstraint::getConstraintForceMixing();
-      });
+      .def_static(
+          "getConstraintForceMixing", +[]() -> double {
+            return dart::constraint::JointConstraint::
+                getConstraintForceMixing();
+          });
 
   ::py::class_<
       dart::constraint::BallJointConstraint,

@@ -30,7 +30,6 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <dart/dart.hpp>
 #include <dart/utils/urdf/urdf.hpp>
 #include <pybind11/pybind11.h>
 

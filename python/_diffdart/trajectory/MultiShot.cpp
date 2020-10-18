@@ -30,7 +30,7 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <dart/dart.hpp>
+#include <dart/simulation/World.hpp>
 #include <dart/trajectory/AbstractShot.hpp>
 #include <dart/trajectory/MultiShot.hpp>
 #include <pybind11/eigen.h>

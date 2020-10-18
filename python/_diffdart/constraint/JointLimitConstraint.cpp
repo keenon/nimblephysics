@@ -30,7 +30,9 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <dart/dart.hpp>
+#include <dart/constraint/ConstraintBase.hpp>
+#include <dart/constraint/JointLimitConstraint.hpp>
+#include <dart/dynamics/Joint.hpp>
 #include <pybind11/pybind11.h>
 
 namespace py = pybind11;
@@ -91,10 +93,11 @@ void JointLimitConstraint(py::module& m)
                 _cfm);
           },
           ::py::arg("cfm"))
-      .def_static("getConstraintForceMixing", +[]() -> double {
-        return dart::constraint::JointLimitConstraint::
-            getConstraintForceMixing();
-      });
+      .def_static(
+          "getConstraintForceMixing", +[]() -> double {
+            return dart::constraint::JointLimitConstraint::
+                getConstraintForceMixing();
+          });
 }
 
 } // namespace python

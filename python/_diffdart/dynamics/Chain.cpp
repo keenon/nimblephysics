@@ -30,8 +30,11 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <dart/dart.hpp>
+#include <dart/dynamics/BodyNode.hpp>
+#include <dart/dynamics/Chain.hpp>
+#include <dart/dynamics/Linkage.hpp>
 #include <pybind11/pybind11.h>
+
 #include "eigen_geometry_pybind.h"
 #include "eigen_pybind.h"
 
@@ -134,9 +137,10 @@ void Chain(py::module& m)
             return self->cloneMetaSkeleton(cloneName);
           },
           ::py::arg("cloneName"))
-      .def("isStillChain", +[](const dart::dynamics::Chain* self) -> bool {
-        return self->isStillChain();
-      });
+      .def(
+          "isStillChain", +[](const dart::dynamics::Chain* self) -> bool {
+            return self->isStillChain();
+          });
 
   ::py::class_<dart::dynamics::Chain::Criteria>(m, "ChainCriteria")
       .def(

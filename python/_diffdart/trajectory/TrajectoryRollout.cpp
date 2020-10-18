@@ -30,7 +30,6 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <dart/dart.hpp>
 #include <dart/trajectory/TrajectoryConstants.hpp>
 #include <dart/trajectory/TrajectoryRollout.hpp>
 #include <pybind11/eigen.h>

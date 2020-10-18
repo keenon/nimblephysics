@@ -30,8 +30,9 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <dart/dart.hpp>
+#include <dart/dynamics/ShapeFrame.hpp>
 #include <pybind11/pybind11.h>
+
 #include "eigen_geometry_pybind.h"
 #include "eigen_pybind.h"
 
@@ -134,9 +135,10 @@ void ShapeFrame(py::module& m)
       DARTPY_DEFINE_SPECIALIZED_ASPECT(CollisionAspect)
       DARTPY_DEFINE_SPECIALIZED_ASPECT(DynamicsAspect)
       // clang-format on
-      .def("isShapeNode", +[](const dart::dynamics::ShapeFrame* self) -> bool {
-        return self->isShapeNode();
-      });
+      .def(
+          "isShapeNode", +[](const dart::dynamics::ShapeFrame* self) -> bool {
+            return self->isShapeNode();
+          });
 
   ::py::class_<dart::dynamics::VisualAspect>(m, "VisualAspect")
       .def(::py::init<>())
@@ -217,11 +219,14 @@ void ShapeFrame(py::module& m)
           +[](const dart::dynamics::VisualAspect* self) -> double {
             return self->getAlpha();
           })
-      .def("hide", +[](dart::dynamics::VisualAspect* self) { self->hide(); })
-      .def("show", +[](dart::dynamics::VisualAspect* self) { self->show(); })
-      .def("isHidden", +[](const dart::dynamics::VisualAspect* self) -> bool {
-        return self->isHidden();
-      });
+      .def(
+          "hide", +[](dart::dynamics::VisualAspect* self) { self->hide(); })
+      .def(
+          "show", +[](dart::dynamics::VisualAspect* self) { self->show(); })
+      .def(
+          "isHidden", +[](const dart::dynamics::VisualAspect* self) -> bool {
+            return self->isHidden();
+          });
 
   ::py::class_<dart::dynamics::CollisionAspect>(m, "CollisionAspect")
       .def(::py::init<>())

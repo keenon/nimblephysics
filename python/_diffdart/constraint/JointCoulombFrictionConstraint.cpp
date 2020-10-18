@@ -30,7 +30,9 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <dart/dart.hpp>
+#include <dart/constraint/ConstraintBase.hpp>
+#include <dart/constraint/JointCoulombFrictionConstraint.hpp>
+#include <dart/dynamics/Joint.hpp>
 #include <pybind11/pybind11.h>
 
 namespace py = pybind11;
@@ -53,10 +55,11 @@ void JointCoulombFrictionConstraint(py::module& m)
                 setConstraintForceMixing(_cfm);
           },
           ::py::arg("cfm"))
-      .def_static("getConstraintForceMixing", +[]() -> double {
-        return dart::constraint::JointCoulombFrictionConstraint::
-            getConstraintForceMixing();
-      });
+      .def_static(
+          "getConstraintForceMixing", +[]() -> double {
+            return dart::constraint::JointCoulombFrictionConstraint::
+                getConstraintForceMixing();
+          });
 }
 
 } // namespace python

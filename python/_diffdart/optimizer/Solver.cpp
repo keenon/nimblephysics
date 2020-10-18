@@ -30,8 +30,10 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <dart/dart.hpp>
+#include <dart/optimizer/Problem.hpp>
+#include <dart/optimizer/Solver.hpp>
 #include <pybind11/pybind11.h>
+
 #include "eigen_pybind.h"
 
 namespace py = pybind11;

@@ -30,10 +30,11 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <dart/dart.hpp>
+#include <dart/dynamics/ZeroDofJoint.hpp>
 #include <eigen_geometry_pybind.h>
 #include <pybind11/eigen.h>
 #include <pybind11/pybind11.h>
+
 #include "Joint.hpp"
 
 namespace py = pybind11;

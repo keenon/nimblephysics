@@ -30,7 +30,9 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <dart/dart.hpp>
+#include <dart/collision/CollisionResult.hpp>
+#include <dart/dynamics/BodyNode.hpp>
+#include <dart/dynamics/ShapeFrame.hpp>
 #include <pybind11/pybind11.h>
 
 namespace py = pybind11;
@@ -66,9 +68,9 @@ void CollisionResult(py::module& m)
           +[](const dart::collision::CollisionResult* self) -> bool {
             return self->isCollision();
           })
-      .def("clear", +[](dart::collision::CollisionResult* self) {
-        self->clear();
-      });
+      .def(
+          "clear",
+          +[](dart::collision::CollisionResult* self) { self->clear(); });
 }
 
 } // namespace python

@@ -30,7 +30,6 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <dart/dart.hpp>
 #include <dart/trajectory/AbstractShot.hpp>
 #include <dart/trajectory/MultiShot.hpp>
 #include <dart/trajectory/TrajectoryConstants.hpp>

@@ -30,7 +30,9 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <dart/dart.hpp>
+#include <dart/collision/CollisionResult.hpp>
+#include <dart/constraint/ConstraintSolver.hpp>
+#include <dart/dynamics/Skeleton.hpp>
 #include <dart/simulation/World.hpp>
 #include <pybind11/eigen.h>
 #include <pybind11/pybind11.h>

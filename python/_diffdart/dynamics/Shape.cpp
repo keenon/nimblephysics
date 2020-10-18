@@ -30,8 +30,22 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <dart/dart.hpp>
+#include <dart/dynamics/ArrowShape.hpp>
+#include <dart/dynamics/BoxShape.hpp>
+#include <dart/dynamics/CapsuleShape.hpp>
+#include <dart/dynamics/ConeShape.hpp>
+#include <dart/dynamics/CylinderShape.hpp>
+#include <dart/dynamics/EllipsoidShape.hpp>
+#include <dart/dynamics/LineSegmentShape.hpp>
+#include <dart/dynamics/MeshShape.hpp>
+#include <dart/dynamics/MultiSphereConvexHullShape.hpp>
+#include <dart/dynamics/PlaneShape.hpp>
+#include <dart/dynamics/Shape.hpp>
+#include <dart/dynamics/SoftBodyNode.hpp>
+#include <dart/dynamics/SoftMeshShape.hpp>
+#include <dart/dynamics/SphereShape.hpp>
 #include <pybind11/pybind11.h>
+
 #include "eigen_geometry_pybind.h"
 #include "eigen_pybind.h"
 
@@ -283,7 +297,8 @@ void Shape(py::module& m)
             return self->getType();
           },
           ::py::return_value_policy::reference_internal)
-      .def("update", +[](dart::dynamics::MeshShape* self) { self->update(); })
+      .def(
+          "update", +[](dart::dynamics::MeshShape* self) { self->update(); })
       .def(
           "notifyAlphaUpdated",
           +[](dart::dynamics::MeshShape* self, double alpha) {

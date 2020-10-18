@@ -30,10 +30,10 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <dart/dart.hpp>
 #include <dart/neural/IKMapping.hpp>
 #include <dart/neural/IdentityMapping.hpp>
 #include <dart/neural/Mapping.hpp>
+#include <dart/simulation/World.hpp>
 #include <pybind11/eigen.h>
 #include <pybind11/pybind11.h>
 
