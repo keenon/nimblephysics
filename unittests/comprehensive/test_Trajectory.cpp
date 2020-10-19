@@ -404,17 +404,8 @@ bool verifyMultiShotJacobian(
   return true;
 }
 
-bool verifySparseJacobian(
-    WorldPtr world, int steps, int shotLength, std::shared_ptr<Mapping> mapping)
+bool verifySparseJacobian(WorldPtr world, MultiShot& shot)
 {
-  LossFn lossFn = LossFn();
-  MultiShot shot(world, lossFn, steps, shotLength, true);
-  if (mapping != nullptr)
-  {
-    shot.addMapping("custom", mapping);
-    shot.switchRepresentationMapping(world, "custom");
-  }
-
   // Random initialization
   /*
   srand(42);
@@ -470,6 +461,19 @@ bool verifySparseJacobian(
     return false;
   }
   return true;
+}
+
+bool verifySparseJacobian(
+    WorldPtr world, int steps, int shotLength, std::shared_ptr<Mapping> mapping)
+{
+  LossFn lossFn = LossFn();
+  MultiShot shot(world, lossFn, steps, shotLength, true);
+  if (mapping != nullptr)
+  {
+    shot.addMapping("custom", mapping);
+    shot.switchRepresentationMapping(world, "custom");
+  }
+  return verifySparseJacobian(world, shot);
 }
 
 bool verifyMultiShotGradient(
@@ -530,18 +534,6 @@ bool verifyMultiShotJacobianCustomConstraint(
 
   int dim = shot.getFlatProblemDim();
   int numConstraints = shot.getConstraintDim();
-
-  // Random initialization
-  /*
-  srand(42);
-  Eigen::VectorXd randomInit = Eigen::VectorXd::Random(dim);
-  shot.unflatten(randomInit);
-  */
-
-  /*
-  Eigen::VectorXd pos = randomInit.segment(20, 5);
-  Eigen::VectorXd vel = randomInit.segment(25, 5);
-  */
 
   Eigen::MatrixXd analyticalJacobian
       = Eigen::MatrixXd::Zero(numConstraints, dim);
@@ -1083,6 +1075,146 @@ BodyNode* createTailSegment(BodyNode* parent, Eigen::Vector3d color)
   return pole;
 }
 
+TEST(TRAJECTORY, CONSTRAINED_CYCLE)
+{
+  // World
+  WorldPtr world = World::create();
+  world->setGravity(Eigen::Vector3d(0, -9.81, 0));
+
+  world->getConstraintSolver()->setPenetrationCorrectionEnabled(false);
+
+  /////////////////////////////////////////////////////////////////////
+  // Create the skeleton with a single revolute joint
+  /////////////////////////////////////////////////////////////////////
+
+  SkeletonPtr loop = Skeleton::create("loop");
+
+  std::pair<RevoluteJoint*, BodyNode*> poleJointPair
+      = loop->createJointAndBodyNodePair<RevoluteJoint>();
+  RevoluteJoint* poleJoint = poleJointPair.first;
+  BodyNode* pole = poleJointPair.second;
+  poleJoint->setAxis(Eigen::Vector3d::UnitZ());
+
+  std::shared_ptr<BoxShape> shape(
+      new BoxShape(Eigen::Vector3d(0.05, 0.25, 0.05)));
+  ShapeNode* poleShape
+      = pole->createShapeNodeWith<VisualAspect, CollisionAspect>(shape);
+  poleJoint->setForceUpperLimit(0, 100.0);
+  poleJoint->setForceLowerLimit(0, -100.0);
+  poleJoint->setVelocityUpperLimit(0, 100.0);
+  poleJoint->setVelocityLowerLimit(0, -100.0);
+  poleJoint->setPositionUpperLimit(0, 270 * 3.1415 / 180);
+  poleJoint->setPositionLowerLimit(0, -270 * 3.1415 / 180);
+
+  Eigen::Isometry3d poleOffset = Eigen::Isometry3d::Identity();
+  poleOffset.translation() = Eigen::Vector3d(0, -0.125, 0);
+  poleJoint->setTransformFromChildBodyNode(poleOffset);
+  poleJoint->setPosition(0, 90 * 3.1415 / 180);
+
+  world->addSkeleton(loop);
+
+  assert(world->getNumDofs() == 1);
+
+  /////////////////////////////////////////////////////////////////////
+  // Define straightforward loss
+  /////////////////////////////////////////////////////////////////////
+
+  int STEPS = 12;
+  int SHOT_LENGTH = 3;
+  int GOAL_STEP = 6;
+  double GOAL_AT_STEP = 0.1;
+
+  // Get the GOAL_STEP pose as close to GOAL_AT_STEP
+  TrajectoryLossFn loss
+      = [GOAL_STEP, GOAL_AT_STEP](const TrajectoryRollout* rollout) {
+          const Eigen::Ref<const Eigen::MatrixXd> poses
+              = rollout->getPosesConst("identity");
+          double poseFive = poses(0, GOAL_STEP);
+          return (poseFive - GOAL_AT_STEP) * (poseFive - GOAL_AT_STEP);
+        };
+
+  // Get the initial pose and final pose as close to each other as possible
+  TrajectoryLossFn loopConstraint = [](const TrajectoryRollout* rollout) {
+    const Eigen::Ref<const Eigen::MatrixXd> poses
+        = rollout->getPosesConst("identity");
+    double firstPose = poses(0, 0);
+    double lastPose = poses(0, poses.cols() - 1);
+    return (firstPose - lastPose) * (firstPose - lastPose);
+  };
+
+  /////////////////////////////////////////////////////////////////////
+  // Build a trajectory optimization problem
+  /////////////////////////////////////////////////////////////////////
+
+  LossFn lossFn = LossFn(loss);
+  MultiShot shot(world, lossFn, STEPS, SHOT_LENGTH, true);
+
+  LossFn constraintFn = LossFn(loopConstraint);
+  constraintFn.setLowerBound(0);
+  constraintFn.setUpperBound(0);
+  shot.addConstraint(constraintFn);
+
+  /////////////////////////////////////////////////////////////////////
+  // Check Jacobians
+  /////////////////////////////////////////////////////////////////////
+
+  /*
+  int dim = shot.getFlatProblemDim();
+  int numConstraints = shot.getConstraintDim();
+  std::cout << "numConstraints: " << numConstraints << std::endl;
+
+  Eigen::MatrixXd analyticalJacobian
+      = Eigen::MatrixXd::Zero(numConstraints, dim);
+  shot.backpropJacobian(world, analyticalJacobian);
+  Eigen::MatrixXd bruteForceJacobian
+      = Eigen::MatrixXd::Zero(numConstraints, dim);
+  shot.finiteDifferenceJacobian(world, bruteForceJacobian);
+  double threshold = 1e-8;
+  if (!equals(analyticalJacobian, bruteForceJacobian, threshold))
+  {
+    std::cout << "Jacobians don't match!" << std::endl;
+    for (int i = 0; i < dim; i++)
+    {
+      Eigen::VectorXd analyticalCol = analyticalJacobian.col(i);
+      Eigen::VectorXd bruteForceCol = bruteForceJacobian.col(i);
+      if (!equals(analyticalCol, bruteForceCol, threshold))
+      {
+        std::cout << "ERROR at col " << shot.getFlatDimName(i) << " (" << i
+                  << ") by " << (analyticalCol - bruteForceCol).norm()
+                  << std::endl;
+        std::cout << "Analytical:" << std::endl << analyticalCol << std::endl;
+        std::cout << "Brute Force:" << std::endl << bruteForceCol << std::endl;
+        std::cout << "Diff:" << std::endl
+                  << (analyticalCol - bruteForceCol) << std::endl;
+      }
+      else
+      {
+        // std::cout << "Match at col " << shot.getFlatDimName(i) << " (" << i
+        //          << ")" << std::endl;
+      }
+    }
+    EXPECT_TRUE(false);
+  }
+  */
+
+  EXPECT_TRUE(verifySparseJacobian(world, shot));
+
+  /////////////////////////////////////////////////////////////////////
+  // Actually run the optimization
+  /////////////////////////////////////////////////////////////////////
+
+  IPOptOptimizer optimizer = IPOptOptimizer();
+  optimizer.setIterationLimit(100);
+  optimizer.setCheckDerivatives(true);
+
+  // Actually do the optimization
+  std::shared_ptr<OptimizationRecord> record = optimizer.optimize(&shot);
+
+  // Playback the trajectory
+  TrajectoryRolloutReal withKnots = TrajectoryRolloutReal(&shot);
+  shot.getStates(world, &withKnots, nullptr, true);
+}
+
 TEST(TRAJECTORY, JUMP_WORM)
 {
   bool offGround = false;
@@ -1186,39 +1318,27 @@ TEST(TRAJECTORY, JUMP_WORM)
     // return forceLoss;
     return endPosLoss; // + forceLoss;
     // return (100 * peakPosLoss) + (20 * minPosLoss) + endPosLoss;
-
-    /*
-    Eigen::VectorXd midVel = vels.col(vels.cols() / 2);
-    double midVelSquaredSigned
-        = -(midVel[1] * midVel[1]) * (midVel[1] > 0 ? 1.0 : -1.0);
-
-    return posSquaredSigned + midVelSquaredSigned;
-    */
-    /*
-    return (pos[0] * pos[0]) + (pos[1] * pos[1]) + (vel[0] * vel[0])
-           + (vel[1] * vel[1]);
-    */
   };
 
-  TrajectoryLossFnAndGrad lossGrad
-      = [](const TrajectoryRollout* rollout,
-           /* OUT */ TrajectoryRollout* gradWrtRollout) {
-          gradWrtRollout->getPoses("identity").setZero();
-          gradWrtRollout->getVels("identity").setZero();
-          gradWrtRollout->getForces("identity").setZero();
-          const Eigen::Ref<const Eigen::MatrixXd> poses
-              = rollout->getPosesConst("identity");
-          const Eigen::Ref<const Eigen::MatrixXd> vels
-              = rollout->getVelsConst("identity");
-          const Eigen::Ref<const Eigen::MatrixXd> forces
-              = rollout->getForcesConst("identity");
+  TrajectoryLossFnAndGrad lossGrad = [](const TrajectoryRollout* rollout,
+                                        TrajectoryRollout* gradWrtRollout // OUT
+                                     ) {
+    gradWrtRollout->getPoses("identity").setZero();
+    gradWrtRollout->getVels("identity").setZero();
+    gradWrtRollout->getForces("identity").setZero();
+    const Eigen::Ref<const Eigen::MatrixXd> poses
+        = rollout->getPosesConst("identity");
+    const Eigen::Ref<const Eigen::MatrixXd> vels
+        = rollout->getVelsConst("identity");
+    const Eigen::Ref<const Eigen::MatrixXd> forces
+        = rollout->getForcesConst("identity");
 
-          gradWrtRollout->getPoses("identity")(1, poses.cols() - 1)
-              = 2 * poses(1, poses.cols() - 1);
-          double endPos = poses(1, poses.cols() - 1);
-          double endPosLoss = -(endPos * endPos) * (endPos > 0 ? 1.0 : -1.0);
-          return endPosLoss;
-        };
+    gradWrtRollout->getPoses("identity")(1, poses.cols() - 1)
+        = 2 * poses(1, poses.cols() - 1);
+    double endPos = poses(1, poses.cols() - 1);
+    double endPosLoss = -(endPos * endPos) * (endPos > 0 ? 1.0 : -1.0);
+    return endPosLoss;
+  };
 
   // Make a huge timestep, to try to make the gradients easier to get exactly
   // for finite differencing
@@ -1226,37 +1346,18 @@ TEST(TRAJECTORY, JUMP_WORM)
 
   world->getConstraintSolver()->setPenetrationCorrectionEnabled(false);
 
-  /*
-  // Initial pos that creates deep inter-penetration and generates larger
-  // gradient errors
-  Eigen::VectorXd initialPos = Eigen::VectorXd(5);
-  initialPos << 0.96352, -0.5623, -0.0912082, 0.037308, 0.147683;
-  // Initial vel
-  Eigen::VectorXd initialVel = Eigen::VectorXd(5);
-  initialVel << 0.110462, 0.457093, 0.257748, 0.592256, 0.167432;
+  // EXPECT_TRUE(verifyVelGradients(world, world->getVelocities()));
+  // EXPECT_TRUE(verifyNoMultistepIntereference(world, 10));
+  // EXPECT_TRUE(verifyAnalyticalJacobians(world));
+  // EXPECT_TRUE(verifyAnalyticalBackprop(world));
 
-  world->setPositions(initialPos);
-  world->setVelocities(initialVel);
-  */
+  // LossFn lossFn(loss);
+  // MultiShot shot(world, lossFn, 100, 20, false);
+  // std::shared_ptr<IKMapping> ikMap = std::make_shared<IKMapping>(world);
+  // ikMap->addLinearBodyNode(root);
+  // shot.addMapping("ik", ikMap);
+  // EXPECT_TRUE(verifyMultiShotOptimization(world, shot));
 
-  /*
-  EXPECT_TRUE(verifyVelGradients(world, world->getVelocities()));
-  EXPECT_TRUE(verifyNoMultistepIntereference(world, 10));
-  EXPECT_TRUE(verifyAnalyticalJacobians(world));
-  EXPECT_TRUE(verifyAnalyticalBackprop(world));
-  */
-  // renderWorld(world);
-
-  /*
-  LossFn lossFn(loss);
-  MultiShot shot(world, lossFn, 100, 20, false);
-  std::shared_ptr<IKMapping> ikMap = std::make_shared<IKMapping>(world);
-  ikMap->addLinearBodyNode(root);
-  shot.addMapping("ik", ikMap);
-  EXPECT_TRUE(verifyMultiShotOptimization(world, shot));
-  */
-
-  /*
   EXPECT_TRUE(verifySingleStep(world, 5e-7));
   // EXPECT_TRUE(verifySingleShot(world, 40, 5e-7, false));
   EXPECT_TRUE(verifyShotJacobian(world, 4, nullptr));
@@ -1264,7 +1365,6 @@ TEST(TRAJECTORY, JUMP_WORM)
   EXPECT_TRUE(verifyMultiShotJacobian(world, 6, 2, nullptr));
   EXPECT_TRUE(verifySparseJacobian(world, 8, 2, nullptr));
   EXPECT_TRUE(verifyMultiShotGradient(world, 8, 4, loss, lossGrad));
-  */
   EXPECT_TRUE(verifyMultiShotJacobianCustomConstraint(
       world, 8, 4, loss, lossGrad, 3.0));
 }

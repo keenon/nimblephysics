@@ -495,6 +495,7 @@ void MultiShot::getJacobianSparsityStructure(
       cols.segment(0, n * numParentConstraints),
       thisLog);
   rowCursor += numParentConstraints;
+  sparseCursor += n * numParentConstraints;
 
   int stateDim = getRepresentationStateSize();
   // Handle knot point constraints
@@ -546,6 +547,8 @@ void MultiShot::getSparseJacobian(
 #endif
 
   int sparseCursor = AbstractShot::getNumberNonZeroJacobian();
+  AbstractShot::getSparseJacobian(
+      world, sparse.segment(0, sparseCursor), thisLog);
   int stateDim = getRepresentationStateSize();
   Eigen::VectorXd neg = Eigen::VectorXd::Ones(stateDim) * -1;
   for (int i = 1; i < mShots.size(); i++)
