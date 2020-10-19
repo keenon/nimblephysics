@@ -196,6 +196,15 @@ public:
 
   bool getPenetrationCorrectionEnabled();
 
+  /// This adds tiny positive values to the diagonal before solving the LCP,
+  /// which makes our gradients slightly inaccurate, but does increase stability
+  /// of our solutions.
+  ///
+  /// Defaults to false
+  void setConstraintForceMixingEnabled(bool enable);
+
+  bool getConstraintForceMixingEnabled();
+
 protected:
   // TODO(JS): Docstring
   virtual void solveConstrainedGroup(ConstrainedGroup& group) = 0;
@@ -277,6 +286,10 @@ protected:
 
   /// True if we want to enable artificial penetration correction forces
   bool mPenetrationCorrectionEnabled;
+
+  /// True if we want to enable adding tiny positive values to the diagonal
+  /// of the A matrix before solving our LCP.
+  bool mConstraintForceMixingEnabled;
 };
 
 } // namespace constraint

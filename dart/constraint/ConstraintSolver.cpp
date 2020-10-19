@@ -68,8 +68,11 @@ ConstraintSolver::ConstraintSolver(double timeStep)
     mTimeStep(timeStep),
     mGradientEnabled(false), // Default to no gradients
     mPenetrationCorrectionEnabled(
-        false) // Default to no penetration correction, because it breaks our
-               // gradients
+        false), // Default to no penetration correction, because it breaks our
+                // gradients
+    mConstraintForceMixingEnabled(
+        false) // Default to no CFM, decreasing stability but increasing the
+               // accuracy of our gradients
 {
   assert(timeStep > 0.0);
 
@@ -422,6 +425,18 @@ void ConstraintSolver::setPenetrationCorrectionEnabled(bool enable)
 bool ConstraintSolver::getPenetrationCorrectionEnabled()
 {
   return mPenetrationCorrectionEnabled;
+}
+
+//==============================================================================
+void ConstraintSolver::setConstraintForceMixingEnabled(bool enable)
+{
+  mConstraintForceMixingEnabled = enable;
+}
+
+//==============================================================================
+bool ConstraintSolver::getConstraintForceMixingEnabled()
+{
+  return mConstraintForceMixingEnabled;
 }
 
 //==============================================================================
