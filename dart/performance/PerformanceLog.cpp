@@ -1,8 +1,10 @@
 #include "dart/performance/PerformanceLog.hpp"
 
 #include <ctime>
+#include <deque>
 #include <iomanip>
 #include <iostream>
+#include <mutex>
 #include <random>
 #include <unordered_map>
 #include <unordered_set>
@@ -15,15 +17,16 @@ namespace dart {
 namespace performance {
 
 std::unordered_map<std::string, int> PerformanceLog::globalPerfStringIndex;
-std::vector<PerformanceLog*> PerformanceLog::globalPerfLogsList;
+std::deque<PerformanceLog*> PerformanceLog::globalPerfLogsList;
 std::unordered_map<int, std::string>
     PerformanceLog::globalPerfStringReverseIndex;
+std::mutex PerformanceLog::globalPerfLogListMutex;
 
 //==============================================================================
 void PerformanceLog::initialize()
 {
   globalPerfStringIndex = std::unordered_map<std::string, int>(30);
-  globalPerfLogsList = std::vector<PerformanceLog*>();
+  globalPerfLogsList = std::deque<PerformanceLog*>();
   globalPerfStringReverseIndex = std::unordered_map<int, std::string>(30);
 }
 
@@ -66,6 +69,8 @@ PerformanceLog::PerformanceLog(int nameIndex, int parentId)
 PerformanceLog* PerformanceLog::startRoot(char const* name)
 {
   PerformanceLog* newRoot = new PerformanceLog(mapStringToIndex(name), -1);
+  // Serialize our access to the log list
+  const std::lock_guard<std::mutex> lock(globalPerfLogListMutex);
   globalPerfLogsList.push_back(newRoot);
   return newRoot;
 }
@@ -138,6 +143,8 @@ bool PerformanceLog::matches(std::vector<int> nameIdStack)
 PerformanceLog* PerformanceLog::startRun(char const* name)
 {
   PerformanceLog* log = new PerformanceLog(mapStringToIndex(name), mId);
+  // Serialize our access to the log list
+  const std::lock_guard<std::mutex> lock(globalPerfLogListMutex);
   globalPerfLogsList.push_back(log);
   return log;
 }

@@ -56,7 +56,11 @@ void MultiShot(py::module& m)
           ::py::arg("loss"),
           ::py::arg("steps"),
           ::py::arg("shotLength"),
-          ::py::arg("tuneStartingState") = false);
+          ::py::arg("tuneStartingState") = false)
+      .def(
+          "setParallelOperationsEnabled",
+          &dart::trajectory::MultiShot::setParallelOperationsEnabled,
+          ::py::arg("enabled"));
 }
 
 } // namespace python

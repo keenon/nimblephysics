@@ -35,7 +35,8 @@ public:
   virtual ~MultiShot() override;
 
   /// If TRUE, this will use multiple independent threads to compute each
-  /// SingleShot's values internally. Currently defaults to FALSE
+  /// SingleShot's values internally. Currently defaults to FALSE. This should
+  /// be considered EXPERIMENTAL! Expect bugs.
   void setParallelOperationsEnabled(bool enabled);
 
   /// This sets the mapping we're using to store the representation of the Shot.
@@ -122,6 +123,15 @@ public:
       /* OUT */ Eigen::Ref<Eigen::VectorXd> constraints,
       PerformanceLog* log = nullptr) override;
 
+  /// This is a single async call for computing constraints in parallel, if
+  /// we're using multithreading
+  void asyncPartComputeConstraints(
+      int index,
+      std::shared_ptr<simulation::World> world,
+      /* OUT */ Eigen::Ref<Eigen::VectorXd> constraints,
+      int cursor,
+      PerformanceLog* log = nullptr);
+
   /// This computes the Jacobian that relates the flat problem to the
   /// constraints. This returns a matrix that's (getConstraintDim(),
   /// getFlatProblemDim()).
@@ -129,6 +139,16 @@ public:
       std::shared_ptr<simulation::World> world,
       /* OUT */ Eigen::Ref<Eigen::MatrixXd> jac,
       PerformanceLog* log = nullptr) override;
+
+  /// This is a single async call for computing constraints in parallel, if
+  /// we're using multithreading
+  void asyncPartBackpropJacobian(
+      int index,
+      std::shared_ptr<simulation::World> world,
+      /* OUT */ Eigen::Ref<Eigen::MatrixXd> jac,
+      int rowCursor,
+      int colCursor,
+      PerformanceLog* log = nullptr);
 
   /// This computes the gradient in the flat problem space, taking into accounts
   /// incoming gradients with respect to any of the shot's values.
@@ -138,6 +158,17 @@ public:
       /* OUT */ Eigen::Ref<Eigen::VectorXd> grad,
       PerformanceLog* log = nullptr) override;
 
+  /// This computes the gradient in the flat problem space, taking into accounts
+  /// incoming gradients with respect to any of the shot's values.
+  void asyncPartBackpropGradientWrt(
+      int index,
+      std::shared_ptr<simulation::World> world,
+      const TrajectoryRollout* gradWrtRollout,
+      /* OUT */ Eigen::Ref<Eigen::VectorXd> grad,
+      int cursorDims,
+      int cursorSteps,
+      PerformanceLog* log = nullptr);
+
   /// This populates the passed in matrices with the values from this trajectory
   void getStates(
       std::shared_ptr<simulation::World> world,
@@ -145,7 +176,16 @@ public:
       PerformanceLog* log = nullptr,
       bool useKnots = true) override;
 
-  /// This returns the concatenation of (start pos, start vel) for convenience
+  void asyncPartGetStates(
+      int index,
+      std::shared_ptr<simulation::World> world,
+      /* OUT */ TrajectoryRollout* rollout,
+      int cursor,
+      int steps,
+      PerformanceLog* log = nullptr);
+
+  /// This returns the concatenation of (start pos, start vel) for
+  /// convenience
   Eigen::VectorXd getStartState() override;
 
   /// This unrolls the shot, and returns the (pos, vel) state concatenated at
@@ -172,12 +212,21 @@ public:
       Eigen::Ref<Eigen::VectorXd> sparse,
       PerformanceLog* log = nullptr) override;
 
+  /// This writes the Jacobian to a sparse vector
+  void asyncPartGetSparseJacobian(
+      int index,
+      std::shared_ptr<simulation::World> world,
+      Eigen::Ref<Eigen::VectorXd> sparse,
+      int sparseCursor,
+      PerformanceLog* log = nullptr);
+
   //////////////////////////////////////////////////////////////////////////////
   // For Testing
   //////////////////////////////////////////////////////////////////////////////
 
 private:
   std::vector<std::shared_ptr<SingleShot>> mShots;
+  std::vector<simulation::WorldPtr> mParallelWorlds;
   int mShotLength;
   bool mParallelOperationsEnabled;
 };

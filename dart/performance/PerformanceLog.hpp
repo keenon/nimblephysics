@@ -1,7 +1,9 @@
 #ifndef DART_PERFORMANCE_LOG_HPP_
 #define DART_PERFORMANCE_LOG_HPP_
 
+#include <deque>
 #include <memory>
+#include <mutex>
 #include <sstream>
 #include <string>
 #include <unordered_map>
@@ -115,8 +117,9 @@ protected:
   static int mapStringToIndex(const char* str);
 
   static std::unordered_map<std::string, int> globalPerfStringIndex;
-  static std::vector<PerformanceLog*> globalPerfLogsList;
+  static std::deque<PerformanceLog*> globalPerfLogsList;
   static std::unordered_map<int, std::string> globalPerfStringReverseIndex;
+  static std::mutex globalPerfLogListMutex;
 };
 
 } // namespace performance

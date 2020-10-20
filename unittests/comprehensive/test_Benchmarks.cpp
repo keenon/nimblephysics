@@ -570,5 +570,8 @@ TEST(TRAJECTORY, JUMP_WORM)
   std::shared_ptr<IKMapping> ikMap = std::make_shared<IKMapping>(world);
   ikMap->addLinearBodyNode(root);
   shot.addMapping("ik", ikMap);
+
+  shot.setParallelOperationsEnabled(true);
+
   EXPECT_TRUE(verifyMultiShotOptimization(world, shot));
 }
