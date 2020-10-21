@@ -394,6 +394,21 @@ public:
   /// before we solved the LCP for constraints
   const Eigen::VectorXd& getLastPreConstraintVelocity() const;
 
+  /// True by default. Sets whether or not to apply artifical "penetration
+  /// correction" forces to objects that inter-penetrate.
+  void setPenetrationCorrectionEnabled(bool enable);
+
+  bool getPenetrationCorrectionEnabled();
+
+  /// This adds tiny positive values to the diagonal before solving the LCP,
+  /// which makes our gradients slightly inaccurate, but does increase stability
+  /// of our solutions.
+  ///
+  /// Defaults to false
+  void setConstraintForceMixingEnabled(bool enable);
+
+  bool getConstraintForceMixingEnabled();
+
 protected:
   /// Register when a Skeleton's name is changed
   void handleSkeletonNameChange(
@@ -462,6 +477,13 @@ protected:
   /// This holds the unconstrained velocities that we found in the last
   /// timestep, before we solved the LCP for constraints
   Eigen::VectorXd mLastPreConstraintVelocity;
+
+  /// True if we want to enable artificial penetration correction forces
+  bool mPenetrationCorrectionEnabled;
+
+  /// True if we want to enable adding tiny positive values to the diagonal
+  /// of the A matrix before solving our LCP.
+  bool mConstraintForceMixingEnabled;
 
   //--------------------------------------------------------------------------
   // Signals

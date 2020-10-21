@@ -107,7 +107,8 @@ public:
 
   /// This returns the snapshots from a fresh unroll
   std::vector<neural::MappedBackpropSnapshotPtr> getSnapshots(
-      std::shared_ptr<simulation::World> world, PerformanceLog* log = nullptr);
+      std::shared_ptr<simulation::World> world,
+      PerformanceLog* log = nullptr) override;
 
   /// This populates the passed in matrices with the values from this trajectory
   void getStates(

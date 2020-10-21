@@ -1081,7 +1081,8 @@ TEST(TRAJECTORY, CONSTRAINED_CYCLE)
   WorldPtr world = World::create();
   world->setGravity(Eigen::Vector3d(0, -9.81, 0));
 
-  world->getConstraintSolver()->setPenetrationCorrectionEnabled(false);
+  world->setPenetrationCorrectionEnabled(false);
+  world->setConstraintForceMixingEnabled(false);
 
   /////////////////////////////////////////////////////////////////////
   // Create the skeleton with a single revolute joint
@@ -1223,7 +1224,8 @@ TEST(TRAJECTORY, JUMP_WORM)
   WorldPtr world = World::create();
   world->setGravity(Eigen::Vector3d(0, -9.81, 0));
 
-  world->getConstraintSolver()->setPenetrationCorrectionEnabled(false);
+  world->setPenetrationCorrectionEnabled(false);
+  world->setConstraintForceMixingEnabled(false);
 
   SkeletonPtr jumpworm = Skeleton::create("jumpworm");
 
@@ -1344,7 +1346,8 @@ TEST(TRAJECTORY, JUMP_WORM)
   // for finite differencing
   world->setTimeStep(1e-3);
 
-  world->getConstraintSolver()->setPenetrationCorrectionEnabled(false);
+  world->setPenetrationCorrectionEnabled(false);
+  world->setConstraintForceMixingEnabled(false);
 
   // EXPECT_TRUE(verifyVelGradients(world, world->getVelocities()));
   // EXPECT_TRUE(verifyNoMultistepIntereference(world, 10));

@@ -157,6 +157,9 @@ public:
   /// during the forward pass, AFTER the timestep.
   const Eigen::VectorXd& getPostStepTorques(const std::string& mapping);
 
+  /// Returns the underlying BackpropSnapshot, without the mappings
+  std::shared_ptr<BackpropSnapshot> getUnderlyingSnapshot();
+
 protected:
   std::shared_ptr<BackpropSnapshot> mBackpropSnapshot;
   std::string mRepresentation;

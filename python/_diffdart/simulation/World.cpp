@@ -354,6 +354,20 @@ void World(py::module& m)
           +[](dart::simulation::World* self) -> Eigen::VectorXd {
             return self->getInvMassMatrix();
           })
+      .def(
+          "getPenetrationCorrectionEnabled",
+          &dart::simulation::World::getPenetrationCorrectionEnabled)
+      .def(
+          "setPenetrationCorrectionEnabled",
+          &dart::simulation::World::setPenetrationCorrectionEnabled,
+          ::py::arg("enabled"))
+      .def(
+          "getConstraintForceMixingEnabled",
+          &dart::simulation::World::getConstraintForceMixingEnabled)
+      .def(
+          "setConstraintForceMixingEnabled",
+          &dart::simulation::World::setConstraintForceMixingEnabled,
+          ::py::arg("enabled"))
       .def_readonly("onNameChanged", &dart::simulation::World::onNameChanged);
 }
 

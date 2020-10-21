@@ -7,6 +7,7 @@
 
 #include <Eigen/Dense>
 
+#include "dart/neural/MappedBackpropSnapshot.hpp"
 #include "dart/neural/Mapping.hpp"
 #include "dart/performance/PerformanceLog.hpp"
 #include "dart/trajectory/LossFn.hpp"
@@ -217,6 +218,11 @@ public:
       std::shared_ptr<simulation::World> world,
       Eigen::Ref<Eigen::VectorXd> sparse,
       PerformanceLog* log = nullptr);
+
+  /// This returns the snapshots from a fresh unroll
+  virtual std::vector<neural::MappedBackpropSnapshotPtr> getSnapshots(
+      std::shared_ptr<simulation::World> world, PerformanceLog* log = nullptr)
+      = 0;
 
   //////////////////////////////////////////////////////////////////////////////
   // For Testing

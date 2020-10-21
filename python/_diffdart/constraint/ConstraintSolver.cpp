@@ -148,20 +148,6 @@ void ConstraintSolver(py::module& m)
             return self->getCollisionGroup();
           })
       .def(
-          "getPenetrationCorrectionEnabled",
-          &dart::constraint::ConstraintSolver::getPenetrationCorrectionEnabled)
-      .def(
-          "setPenetrationCorrectionEnabled",
-          &dart::constraint::ConstraintSolver::setPenetrationCorrectionEnabled,
-          ::py::arg("enabled"))
-      .def(
-          "getConstraintForceMixingEnabled",
-          &dart::constraint::ConstraintSolver::getConstraintForceMixingEnabled)
-      .def(
-          "setConstraintForceMixingEnabled",
-          &dart::constraint::ConstraintSolver::setConstraintForceMixingEnabled,
-          ::py::arg("enabled"))
-      .def(
           "solve",
           +[](dart::constraint::ConstraintSolver* self) { self->solve(); });
 }

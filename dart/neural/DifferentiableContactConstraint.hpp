@@ -305,9 +305,9 @@ public:
   std::shared_ptr<DifferentiableContactConstraint> getPeerConstraint(
       std::shared_ptr<neural::BackpropSnapshot> snapshot);
 
-protected:
   /// This returns 1.0 by default, 0.0 if this constraint doesn't effect the
   /// specified DOF, and -1.0 if the constraint effects this dof negatively.
+  /// Pretty much only public for testing
   double getForceMultiple(dynamics::DegreeOfFreedom* dof);
 
 public:

@@ -224,5 +224,13 @@ const Eigen::VectorXd& MappedBackpropSnapshot::getPostStepTorques(
   return getPreStepTorques(mapping);
 }
 
+//==============================================================================
+/// Returns the underlying BackpropSnapshot, without the mappings
+std::shared_ptr<BackpropSnapshot>
+MappedBackpropSnapshot::getUnderlyingSnapshot()
+{
+  return mBackpropSnapshot;
+}
+
 } // namespace neural
 } // namespace dart

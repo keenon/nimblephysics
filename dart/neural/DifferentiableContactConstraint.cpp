@@ -1316,7 +1316,7 @@ bool DifferentiableContactConstraint::isParent(
   // Now this may be true, if the node is a direct child of the dof
   while (true)
   {
-    if (nodeParentJoint == dofJoint)
+    if (nodeParentJoint->getName() == dofJoint->getName())
       return true;
     if (nodeParentJoint->getParentBodyNode() == nullptr
         || nodeParentJoint->getParentBodyNode()->getParentJoint() == nullptr)

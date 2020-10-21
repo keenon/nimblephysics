@@ -124,6 +124,7 @@ def main():
     dartLoss: dart.trajectory.LossFn = DartTorchLossFn(loss)
 
     trajectory = dart.trajectory.MultiShot(world, dartLoss, 500, 20, False)
+    # trajectory.setParallelOperationsEnabled(True)
 
     optimizer = dart.trajectory.IPOptOptimizer()
     optimizer.setLBFGSHistoryLength(5)

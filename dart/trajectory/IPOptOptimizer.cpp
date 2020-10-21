@@ -258,9 +258,9 @@ bool IPOptShotWrapper::get_starting_point(
     bool init_x,
     Ipopt::Number* x,
     bool init_z,
-    Ipopt::Number* /*z_L*/,
-    Ipopt::Number* /*z_U*/,
-    Ipopt::Index /*m*/,
+    Ipopt::Number* z_L,
+    Ipopt::Number* z_U,
+    Ipopt::Index m,
     bool init_lambda,
     Ipopt::Number* /*lambda*/)
 {
@@ -285,6 +285,8 @@ bool IPOptShotWrapper::get_starting_point(
   if (init_z)
   {
     // TODO(JS): Not implemented yet.
+    Eigen::Map<Eigen::VectorXd> zU_vec(z_U, m);
+    Eigen::Map<Eigen::VectorXd> zL_vec(z_L, m);
     std::cout << "Initializing lower/upper bounds for z is not supported yet. "
               << "Ignored here.\n";
   }

@@ -70,7 +70,9 @@ World::World(const std::string& _name)
     mFrame(0),
     mDofs(0),
     mRecording(new Recording(mSkeletons)),
-    onNameChanged(mNameChangedSignal)
+    onNameChanged(mNameChangedSignal),
+    mConstraintForceMixingEnabled(false),
+    mPenetrationCorrectionEnabled(false)
 {
   mIndices.push_back(0);
 
@@ -97,6 +99,8 @@ WorldPtr World::clone() const
 
   worldClone->setGravity(mGravity);
   worldClone->setTimeStep(mTimeStep);
+  worldClone->setConstraintForceMixingEnabled(mConstraintForceMixingEnabled);
+  worldClone->setPenetrationCorrectionEnabled(mPenetrationCorrectionEnabled);
 
   auto cd = getConstraintSolver()->getCollisionDetector();
   worldClone->getConstraintSolver()->setCollisionDetector(
@@ -203,6 +207,10 @@ void World::step(bool _resetCommand)
 
   // Detect activated constraints and compute constraint impulses
   mConstraintSolver->solve();
+  mConstraintSolver->setPenetrationCorrectionEnabled(
+      mPenetrationCorrectionEnabled);
+  mConstraintSolver->setConstraintForceMixingEnabled(
+      mConstraintForceMixingEnabled);
 
   // Compute velocity changes given constraint impulses
   for (auto& skel : mSkeletons)
@@ -254,6 +262,30 @@ void World::setTime(double _time)
 double World::getTime() const
 {
   return mTime;
+}
+
+//==============================================================================
+void World::setPenetrationCorrectionEnabled(bool enable)
+{
+  mPenetrationCorrectionEnabled = enable;
+}
+
+//==============================================================================
+bool World::getPenetrationCorrectionEnabled()
+{
+  return mPenetrationCorrectionEnabled;
+}
+
+//==============================================================================
+void World::setConstraintForceMixingEnabled(bool enable)
+{
+  mConstraintForceMixingEnabled = enable;
+}
+
+//==============================================================================
+bool World::getConstraintForceMixingEnabled()
+{
+  return mConstraintForceMixingEnabled;
 }
 
 //==============================================================================

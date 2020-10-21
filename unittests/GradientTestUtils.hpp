@@ -287,14 +287,15 @@ bool verifyClassicProjectionIntoClampsMatrix(
   // as the last argument says do this in an idempotent way, so leave the world
   // state unchanged in computing these backprop snapshots.
 
-  bool oldPenetrationCorrection
-      = world->getConstraintSolver()->getPenetrationCorrectionEnabled();
-  world->getConstraintSolver()->setPenetrationCorrectionEnabled(false);
+  bool oldPenetrationCorrection = world->getPenetrationCorrectionEnabled();
+  world->setPenetrationCorrectionEnabled(false);
+  bool oldCFM = world->getConstraintForceMixingEnabled();
+  world->setConstraintForceMixingEnabled(false);
 
   neural::BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
 
-  world->getConstraintSolver()->setPenetrationCorrectionEnabled(
-      oldPenetrationCorrection);
+  world->setPenetrationCorrectionEnabled(oldPenetrationCorrection);
+  world->setConstraintForceMixingEnabled(oldCFM);
 
   if (!classicPtr)
   {
@@ -722,8 +723,10 @@ bool verifyNextV(WorldPtr world)
   RestorableSnapshot snapshot(world);
 
   bool oldPenetrationCorrectionEnabled
-      = world->getConstraintSolver()->getPenetrationCorrectionEnabled();
-  world->getConstraintSolver()->setPenetrationCorrectionEnabled(false);
+      = world->getPenetrationCorrectionEnabled();
+  world->setPenetrationCorrectionEnabled(false);
+  bool oldCFM = world->getConstraintForceMixingEnabled();
+  world->setConstraintForceMixingEnabled(false);
 
   neural::BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
 
@@ -768,8 +771,8 @@ bool verifyNextV(WorldPtr world)
     }
   }
 
-  world->getConstraintSolver()->setPenetrationCorrectionEnabled(
-      oldPenetrationCorrectionEnabled);
+  world->setPenetrationCorrectionEnabled(oldPenetrationCorrectionEnabled);
+  world->setConstraintForceMixingEnabled(oldCFM);
 
   snapshot.restore();
   return true;
@@ -969,8 +972,15 @@ bool verifyForceVelJacobian(WorldPtr world, VectorXd proposedVelocities)
 bool verifyRecoveredLCPConstraints(WorldPtr world, VectorXd proposedVelocities)
 {
   world->setVelocities(proposedVelocities);
-  world->getConstraintSolver()->setPenetrationCorrectionEnabled(false);
+  bool oldPenetrationCorrection = world->getPenetrationCorrectionEnabled();
+  world->setPenetrationCorrectionEnabled(false);
+  bool oldCFM = world->getConstraintForceMixingEnabled();
+  world->setConstraintForceMixingEnabled(false);
+
   neural::BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
+
+  world->setPenetrationCorrectionEnabled(oldPenetrationCorrection);
+  world->setConstraintForceMixingEnabled(oldCFM);
 
   if (classicPtr->mGradientMatrices.size() > 1)
     return true;

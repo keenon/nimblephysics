@@ -719,6 +719,22 @@ void MultiShot::asyncPartGetSparseJacobian(
 }
 
 //==============================================================================
+/// This returns the snapshots from a fresh unroll
+std::vector<neural::MappedBackpropSnapshotPtr> MultiShot::getSnapshots(
+    std::shared_ptr<simulation::World> world, PerformanceLog* log)
+{
+  std::vector<neural::MappedBackpropSnapshotPtr> vec;
+  for (std::shared_ptr<SingleShot> shot : mShots)
+  {
+    for (neural::MappedBackpropSnapshotPtr ptr : shot->getSnapshots(world, log))
+    {
+      vec.push_back(ptr);
+    }
+  }
+  return vec;
+}
+
+//==============================================================================
 /// This populates the passed in matrices with the values from this trajectory
 void MultiShot::getStates(
     std::shared_ptr<simulation::World> world,

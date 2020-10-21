@@ -409,7 +409,8 @@ TEST(TRAJECTORY, JUMP_WORM)
   WorldPtr world = World::create();
   world->setGravity(Eigen::Vector3d(0, -9.81, 0));
 
-  world->getConstraintSolver()->setPenetrationCorrectionEnabled(false);
+  world->setPenetrationCorrectionEnabled(false);
+  world->setConstraintForceMixingEnabled(false);
 
   SkeletonPtr jumpworm = Skeleton::create("jumpworm");
 
@@ -542,7 +543,8 @@ TEST(TRAJECTORY, JUMP_WORM)
   // for finite differencing
   world->setTimeStep(1e-3);
 
-  world->getConstraintSolver()->setPenetrationCorrectionEnabled(false);
+  world->setPenetrationCorrectionEnabled(false);
+  world->setConstraintForceMixingEnabled(false);
 
   /*
   // Initial pos that creates deep inter-penetration and generates larger

@@ -97,13 +97,14 @@ def main():
     dartLoss: dart.trajectory.LossFn = DartTorchLossFn(loss)
 
     trajectory = dart.trajectory.MultiShot(world, dartLoss, 400, 20, False)
+    trajectory.setParallelOperationsEnabled(True)
 
     ikMap: dart.neural.IKMapping = dart.neural.IKMapping(world)
     ikMap.addLinearBodyNode(root)
     trajectory.addMapping('ik', ikMap)
 
     optimizer = dart.trajectory.IPOptOptimizer()
-    # optimizer.setLBFGSHistoryLength(5)
+    optimizer.setLBFGSHistoryLength(1)
     optimizer.setTolerance(1e-5)
     optimizer.setCheckDerivatives(False)
     optimizer.setIterationLimit(400)

@@ -220,6 +220,11 @@ public:
       int sparseCursor,
       PerformanceLog* log = nullptr);
 
+  /// This returns the snapshots from a fresh unroll
+  std::vector<neural::MappedBackpropSnapshotPtr> getSnapshots(
+      std::shared_ptr<simulation::World> world,
+      PerformanceLog* log = nullptr) override;
+
   //////////////////////////////////////////////////////////////////////////////
   // For Testing
   //////////////////////////////////////////////////////////////////////////////

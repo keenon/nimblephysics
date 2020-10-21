@@ -10,6 +10,7 @@ dart_add_test("comprehensive" test_Mappings)
 dart_add_test("comprehensive" test_Trajectory)
 dart_add_test("comprehensive" test_Web)
 dart_add_test("comprehensive" test_Benchmarks)
+dart_add_test("comprehensive" test_ParallelOps)
 
 # target_link_libraries(test_Gradients dart-collision-bullet)
 # target_link_libraries(test_Gradients dart-collision-ode)

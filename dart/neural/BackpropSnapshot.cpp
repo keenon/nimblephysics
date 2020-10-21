@@ -861,9 +861,11 @@ Eigen::MatrixXd BackpropSnapshot::getScratchFiniteDifference(
 
   bool oldGradientEnabled = world->getConstraintSolver()->getGradientEnabled();
   bool oldPenetrationCorrectionEnabled
-      = world->getConstraintSolver()->getPenetrationCorrectionEnabled();
+      = world->getPenetrationCorrectionEnabled();
+  bool oldCFM = world->getConstraintForceMixingEnabled();
   world->getConstraintSolver()->setGradientEnabled(false);
-  world->getConstraintSolver()->setPenetrationCorrectionEnabled(false);
+  world->setPenetrationCorrectionEnabled(false);
+  world->setConstraintForceMixingEnabled(false);
 
   world->setPositions(mPreStepPosition);
   world->setVelocities(mPreStepVelocity);
@@ -892,8 +894,8 @@ Eigen::MatrixXd BackpropSnapshot::getScratchFiniteDifference(
 
   snapshot.restore();
   world->getConstraintSolver()->setGradientEnabled(oldGradientEnabled);
-  world->getConstraintSolver()->setPenetrationCorrectionEnabled(
-      oldPenetrationCorrectionEnabled);
+  world->setPenetrationCorrectionEnabled(oldPenetrationCorrectionEnabled);
+  world->setConstraintForceMixingEnabled(oldCFM);
 
   return J;
 }
@@ -1592,8 +1594,10 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferencePosVelJacobian(
   bool oldGradientEnabled = world->getConstraintSolver()->getGradientEnabled();
   // world->getConstraintSolver()->setGradientEnabled(false);
   bool oldPenetrationCorrectionEnabled
-      = world->getConstraintSolver()->getPenetrationCorrectionEnabled();
-  world->getConstraintSolver()->setPenetrationCorrectionEnabled(false);
+      = world->getPenetrationCorrectionEnabled();
+  world->setPenetrationCorrectionEnabled(false);
+  bool oldCFM = world->getConstraintForceMixingEnabled();
+  world->setConstraintForceMixingEnabled(false);
 
   double dt = world->getTimeStep();
 
@@ -1634,8 +1638,8 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferencePosVelJacobian(
 
   snapshot.restore();
   world->getConstraintSolver()->setGradientEnabled(oldGradientEnabled);
-  world->getConstraintSolver()->setPenetrationCorrectionEnabled(
-      oldPenetrationCorrectionEnabled);
+  world->setPenetrationCorrectionEnabled(oldPenetrationCorrectionEnabled);
+  world->setConstraintForceMixingEnabled(oldCFM);
 
   return J;
 }
@@ -2375,6 +2379,7 @@ Eigen::MatrixXd BackpropSnapshot::getJacobianOfClampingConstraintsTranspose(
   std::vector<std::shared_ptr<DifferentiableContactConstraint>> constraints
       = getClampingConstraints();
   int dofs = world->getNumDofs();
+  assert(constraints.size() == mNumClamping);
   Eigen::MatrixXd result = Eigen::MatrixXd::Zero(mNumClamping, dofs);
   for (int i = 0; i < constraints.size(); i++)
   {
@@ -2822,9 +2827,10 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceJacobianOfMinvC(
 Eigen::MatrixXd BackpropSnapshot::finiteDifferenceJacobianOfConstraintForce(
     simulation::WorldPtr world, WithRespectTo wrt)
 {
-  bool oldPenetrationCorrection
-      = world->getConstraintSolver()->getPenetrationCorrectionEnabled();
-  world->getConstraintSolver()->setPenetrationCorrectionEnabled(false);
+  bool oldPenetrationCorrection = world->getPenetrationCorrectionEnabled();
+  world->setPenetrationCorrectionEnabled(false);
+  bool oldCFM = world->getConstraintForceMixingEnabled();
+  world->setConstraintForceMixingEnabled(false);
 
   Eigen::VectorXd f0
       = neural::forwardPass(world, true)->getClampingConstraintImpulses();
@@ -2877,8 +2883,8 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceJacobianOfConstraintForce(
   }
 
   setWrt(world, wrt, before);
-  world->getConstraintSolver()->setPenetrationCorrectionEnabled(
-      oldPenetrationCorrection);
+  world->setPenetrationCorrectionEnabled(oldPenetrationCorrection);
+  world->setConstraintForceMixingEnabled(oldCFM);
 
   return result;
 }
