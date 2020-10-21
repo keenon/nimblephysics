@@ -30,7 +30,8 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <dart/config.hpp>
+#include <Eigen/Dense>
+#include <pybind11/eigen.h>
 #include <pybind11/pybind11.h>
 
 namespace py = pybind11;
@@ -38,37 +39,17 @@ namespace py = pybind11;
 namespace dart {
 namespace python {
 
-void eigen_geometry(py::module& m);
+void PerformanceLog(py::module& sm);
 
-void dart_common(py::module& m);
-void dart_math(py::module& m);
-void dart_optimizer(py::module& m);
-void dart_dynamics(py::module& m);
-void dart_collision(py::module& m);
-void dart_constraint(py::module& m);
-void dart_simulation(py::module& m);
-void dart_utils(py::module& m);
-void dart_neural(py::module& m);
-void dart_trajectory(py::module& m);
-void dart_performance(py::module& m);
-
-PYBIND11_MODULE(_diffdart, m)
+void dart_performance(py::module& m)
 {
-  m.doc() = "diffdart: Python API of DiffDART";
+  auto sm = m.def_submodule("performance");
 
-  eigen_geometry(m);
+  sm.doc()
+      = "This provides performance measurement utilities, to aid performance "
+        "optimization work.";
 
-  dart_common(m);
-  dart_math(m);
-  dart_optimizer(m);
-  dart_dynamics(m);
-  dart_collision(m);
-  dart_constraint(m);
-  dart_simulation(m);
-  dart_utils(m);
-  dart_neural(m);
-  dart_trajectory(m);
-  dart_performance(m);
+  PerformanceLog(sm);
 }
 
 } // namespace python

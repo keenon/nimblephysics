@@ -49,13 +49,11 @@ void OptimizationRecord(py::module& m)
       .def(
           "toJson",
           &dart::trajectory::OptimizationRecord::toJson,
-          ::py::arg("world"));
-  /*
-.def(
-  "getStep",
-  &dart::trajectory::OptimizationRecord::getStep,
-  ::py::arg("step"));
-  */
+          ::py::arg("world"))
+      .def(
+          "getPerfLog",
+          &dart::trajectory::OptimizationRecord::getPerfLog,
+          ::py::return_value_policy::reference);
 }
 
 } // namespace python
