@@ -1,0 +1,264 @@
+#include "dart/neural/WithRespectToMass.hpp"
+
+#include "dart/dynamics/BodyNode.hpp"
+#include "dart/dynamics/Skeleton.hpp"
+#include "dart/simulation/World.hpp"
+
+namespace dart {
+namespace neural {
+
+//==============================================================================
+/// Basic constructor
+WithRespectToMass::WithRespectToMass()
+{
+}
+
+//==============================================================================
+WrtMassBodyNodyEntry::WrtMassBodyNodyEntry(
+    std::string linkName, WrtMassBodyNodeEntryType type)
+  : linkName(linkName), type(type)
+{
+}
+
+//==============================================================================
+int WrtMassBodyNodyEntry::dim()
+{
+  if (type == INERTIA_MASS)
+    return 1;
+  if (type == INERTIA_COM)
+    return 3;
+  if (type == INERTIA_DIAGONAL)
+    return 3;
+  if (type == INERTIA_OFF_DIAGONAL)
+    return 3;
+  if (type == INERTIA_FULL)
+    return 10;
+  assert(false);
+}
+
+//==============================================================================
+void WrtMassBodyNodyEntry::set(
+    dynamics::Skeleton* skel, const Eigen::Ref<Eigen::VectorXd>& value)
+{
+  dynamics::BodyNode* node = skel->getBodyNode(linkName);
+  if (type == INERTIA_MASS)
+  {
+    node->setMass(value(0));
+    return;
+  }
+
+  const dynamics::Inertia& inertia = node->getInertia();
+  if (type == INERTIA_COM)
+  {
+    dynamics::Inertia newInertia(
+        inertia.MASS,
+        value(0), // COM_X
+        value(1), // COM_Y
+        value(2), // COM_Z
+        inertia.I_XX,
+        inertia.I_YY,
+        inertia.I_ZZ,
+        inertia.I_XY,
+        inertia.I_XZ,
+        inertia.I_YZ);
+    node->setInertia(newInertia);
+  }
+  else if (type == INERTIA_DIAGONAL)
+  {
+    dynamics::Inertia newInertia(
+        inertia.MASS,
+        inertia.COM_X,
+        inertia.COM_Y,
+        inertia.COM_Z,
+        value(0), // I_XX
+        value(1), // I_YY
+        value(2), // I_ZZ
+        inertia.I_XY,
+        inertia.I_XZ,
+        inertia.I_YZ);
+    node->setInertia(newInertia);
+  }
+  else if (type == INERTIA_OFF_DIAGONAL)
+  {
+    dynamics::Inertia newInertia(
+        inertia.MASS,
+        inertia.COM_X,
+        inertia.COM_Y,
+        inertia.COM_Z,
+        inertia.I_XX,
+        inertia.I_YY,
+        inertia.I_ZZ,
+        value(0), // I_XY
+        value(1), // I_XZ
+        value(2)  // I_YZ
+    );
+    node->setInertia(newInertia);
+  }
+  else if (type == INERTIA_FULL)
+  {
+    dynamics::Inertia newInertia(
+        value(0), // MASS,
+        value(1), // COM_X,
+        value(2), // COM_Y,
+        value(3), // COM_Z,
+        value(4), // I_XX,
+        value(5), // I_YY,
+        value(6), // I_ZZ,
+        value(7), // I_XY
+        value(8), // I_XZ
+        value(9)  // I_YZ
+    );
+    node->setInertia(newInertia);
+  }
+}
+
+//==============================================================================
+void WrtMassBodyNodyEntry::get(
+    dynamics::Skeleton* skel, Eigen::Ref<Eigen::VectorXd> out)
+{
+  dynamics::BodyNode* node = skel->getBodyNode(linkName);
+  if (type == INERTIA_MASS)
+  {
+    out(0) = node->getMass();
+    return;
+  }
+
+  if (type == INERTIA_COM)
+  {
+    out = node->getInertia().getLocalCOM();
+    return;
+  }
+
+  Eigen::MatrixXd moment = node->getInertia().getMoment();
+  if (type == INERTIA_DIAGONAL)
+  {
+    out(0) = moment(0, 0); // I_XX
+    out(1) = moment(1, 1); // I_YY
+    out(2) = moment(2, 2); // I_ZZ
+  }
+  else if (type == INERTIA_OFF_DIAGONAL)
+  {
+    out(0) = moment(0, 1); // I_XY
+    out(1) = moment(0, 2); // I_XZ
+    out(2) = moment(1, 2); // I_YZ
+  }
+  else if (type == INERTIA_FULL)
+  {
+    out(0) = node->getMass();
+    out.segment(1, 3) = node->getInertia().getLocalCOM();
+    out(4) = moment(0, 0); // I_XX
+    out(5) = moment(1, 1); // I_YY
+    out(6) = moment(2, 2); // I_ZZ
+    out(7) = moment(0, 1); // I_XY
+    out(8) = moment(0, 2); // I_XZ
+    out(9) = moment(1, 2); // I_YZ
+  }
+}
+
+//==============================================================================
+/// This registers that we'd like to keep track of this node's mass in this
+/// way in this differentiation
+void WithRespectToMass::registerNode(
+    dynamics::BodyNode* node, WrtMassBodyNodeEntryType type)
+{
+  std::string skelName = node->getSkeleton()->getName();
+  std::vector<WrtMassBodyNodyEntry>& skelEntries = mEntries[skelName];
+  skelEntries.emplace_back(node->getName(), type);
+}
+
+//==============================================================================
+/// This returns this WRT from the world as a vector
+Eigen::VectorXd WithRespectToMass::get(std::shared_ptr<simulation::World> world)
+{
+  int worldDim = dim(world);
+  Eigen::VectorXd result = Eigen::VectorXd::Zero(worldDim);
+  int cursor = 0;
+  for (int i = 0; i < world->getNumSkeletons(); i++)
+  {
+    dynamics::Skeleton* skel = world->getSkeleton(i).get();
+    int skelDim = dim(skel);
+    result.segment(cursor, skelDim) = get(skel);
+    cursor += skelDim;
+  }
+  assert(cursor == worldDim);
+  return result;
+}
+
+//==============================================================================
+/// This returns this WRT from this skeleton as a vector
+Eigen::VectorXd WithRespectToMass::get(dynamics::Skeleton* skel)
+{
+  std::vector<WrtMassBodyNodyEntry>& skelEntries = mEntries[skel->getName()];
+  if (skelEntries.size() == 0)
+    return Eigen::VectorXd::Zero(0);
+  int cursor = 0;
+  int skelDim = dim(skel);
+  Eigen::VectorXd result = Eigen::VectorXd(skelDim);
+  for (WrtMassBodyNodyEntry& entry : skelEntries)
+  {
+    entry.get(skel, result.segment(cursor, entry.dim()));
+    cursor += entry.dim();
+  }
+  assert(cursor == skelDim);
+  return result;
+}
+
+//==============================================================================
+/// This sets the world's state based on our WRT
+void WithRespectToMass::set(
+    std::shared_ptr<simulation::World> world, Eigen::VectorXd value)
+{
+  int cursor = 0;
+  for (int i = 0; i < world->getNumSkeletons(); i++)
+  {
+    dynamics::Skeleton* skel = world->getSkeleton(i).get();
+    int skel_dim = dim(skel);
+    set(skel, value.segment(cursor, skel_dim));
+    cursor += skel_dim;
+  }
+  assert(cursor == value.size());
+}
+
+//==============================================================================
+/// This sets the skeleton's state based on our WRT
+void WithRespectToMass::set(dynamics::Skeleton* skel, Eigen::VectorXd value)
+{
+  std::vector<WrtMassBodyNodyEntry>& skelEntries = mEntries[skel->getName()];
+  if (skelEntries.size() == 0)
+    return;
+  int cursor = 0;
+  for (WrtMassBodyNodyEntry& entry : skelEntries)
+  {
+    entry.set(skel, value.segment(cursor, entry.dim()));
+    cursor += entry.dim();
+  }
+  assert(cursor == value.size());
+}
+
+//==============================================================================
+/// This gives the dimensions of the WRT
+int WithRespectToMass::dim(std::shared_ptr<simulation::World> world)
+{
+  int worldDim = 0;
+  for (int i = 0; i < world->getNumSkeletons(); i++)
+  {
+    worldDim += dim(world->getSkeleton(i).get());
+  }
+  return worldDim;
+}
+
+//==============================================================================
+/// This gives the dimensions of the WRT
+int WithRespectToMass::dim(dynamics::Skeleton* skel)
+{
+  std::vector<WrtMassBodyNodyEntry>& skelEntries = mEntries[skel->getName()];
+  int skelDim = 0;
+  for (WrtMassBodyNodyEntry& entry : skelEntries)
+  {
+    skelDim += entry.dim();
+  }
+  return skelDim;
+}
+
+} // namespace neural
+} // namespace dart

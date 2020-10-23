@@ -47,6 +47,7 @@
 #include "dart/neural/NeuralConstants.hpp"
 #include "dart/neural/NeuralUtils.hpp"
 #include "dart/neural/RestorableSnapshot.hpp"
+#include "dart/neural/WithRespectToMass.hpp"
 #include "dart/simulation/World.hpp"
 
 #include "GradientTestUtils.hpp"
@@ -275,6 +276,7 @@ void testBlockWithFrictionCoeff(double frictionCoeff, double mass)
   // Test the classic formulation
   EXPECT_TRUE(verifyVelGradients(world, worldVel));
   EXPECT_TRUE(verifyAnalyticalBackprop(world));
+  EXPECT_TRUE(verifyWrtMass(world));
 }
 
 TEST(GRADIENTS, BLOCK_ON_GROUND_NO_FRICTION_1_MASS)
@@ -432,6 +434,7 @@ void testTwoBlocks(
 
   EXPECT_TRUE(verifyVelGradients(world, worldVel));
   EXPECT_TRUE(verifyAnalyticalBackprop(world));
+  EXPECT_TRUE(verifyWrtMass(world));
 }
 
 TEST(GRADIENTS, TWO_BLOCKS_1_1_MASS)
@@ -657,6 +660,7 @@ void testReversePendulumSledWithFrictionCoeff(double frictionCoeff)
   EXPECT_TRUE(verifyAnalyticalJacobians(world));
   EXPECT_TRUE(verifyVelGradients(world, worldVel));
   EXPECT_TRUE(verifyAnalyticalBackprop(world));
+  EXPECT_TRUE(verifyWrtMass(world));
 }
 
 TEST(GRADIENTS, SLIDING_REVERSE_PENDULUM_NO_FRICTION)
@@ -1009,6 +1013,7 @@ void testRobotArm(
   EXPECT_TRUE(verifyVelGradients(world, worldVel));
   EXPECT_TRUE(verifyAnalyticalJacobians(world));
   EXPECT_TRUE(verifyAnalyticalBackprop(world));
+  EXPECT_TRUE(verifyWrtMass(world));
 }
 
 TEST(GRADIENTS, ARM_3_LINK_30_DEG)
@@ -1106,6 +1111,7 @@ void testVertexFaceCollision(bool isSelfCollision)
   // renderWorld(world);
   EXPECT_TRUE(verifyAnalyticalJacobians(world));
   EXPECT_TRUE(verifyVelGradients(world, vels));
+  EXPECT_TRUE(verifyWrtMass(world));
 }
 
 TEST(GRADIENTS, VERTEX_FACE_COLLISION)
@@ -1191,6 +1197,7 @@ void testEdgeEdgeCollision(bool isSelfCollision)
   // renderWorld(world);
   EXPECT_TRUE(verifyAnalyticalJacobians(world));
   EXPECT_TRUE(verifyVelGradients(world, vels));
+  EXPECT_TRUE(verifyWrtMass(world));
 }
 
 TEST(GRADIENTS, EDGE_EDGE_COLLISION)
@@ -1267,6 +1274,7 @@ void testCartpole(double rotationRadians)
   VectorXd worldVel = world->getVelocities();
 
   EXPECT_TRUE(verifyVelGradients(world, worldVel));
+  EXPECT_TRUE(verifyWrtMass(world));
   EXPECT_TRUE(verifyAnalyticalBackprop(world));
   EXPECT_TRUE(verifyGradientBackprop(world, 20, [](WorldPtr world) {
     Eigen::VectorXd pos = world->getPositions();
@@ -1437,6 +1445,7 @@ void testJumpWorm(bool offGround, bool interpenetration)
   // renderWorld(world);
 
   EXPECT_TRUE(verifyVelGradients(world, vels));
+  EXPECT_TRUE(verifyWrtMass(world));
   // EXPECT_TRUE(verifyAnalyticalJacobians(world));
   // EXPECT_TRUE(verifyNoMultistepIntereference(world, 10));
   // EXPECT_TRUE(verifyAnalyticalBackprop(world));

@@ -48,7 +48,7 @@
 #include "dart/dynamics/SpecializedNodeManager.hpp"
 #include "dart/dynamics/detail/BodyNodeAspect.hpp"
 #include "dart/dynamics/detail/SkeletonAspect.hpp"
-#include "dart/neural/NeuralConstants.hpp"
+#include "dart/neural/WithRespectTo.hpp"
 
 namespace dart {
 
@@ -578,38 +578,32 @@ public:
   /// skeleton. This is useful for backprop if this skeleton isn't part of
   /// constrained group.
   Eigen::MatrixXd getUnconstrainedVelJacobianWrt(
-      double dt, neural::WithRespectTo wrt);
+      double dt, neural::WithRespectTo* wrt);
 
   /// This gives the unconstrained Jacobian giving the difference in C(pos, vel)
   Eigen::MatrixXd getVelCJacobian();
 
   /// This gives the unconstrained Jacobian of C(pos, vel)
-  Eigen::MatrixXd getJacobianOfC(neural::WithRespectTo wrt);
+  Eigen::MatrixXd getJacobianOfC(neural::WithRespectTo* wrt);
 
   /// This gives the unconstrained Jacobian of M^{-1}f
   Eigen::MatrixXd getJacobianOfMinv(
-      Eigen::VectorXd f, neural::WithRespectTo wrt);
+      Eigen::VectorXd f, neural::WithRespectTo* wrt);
 
   /// VERY SLOW: Only for testing. This computes the unconstrained Jacobian
   /// giving the difference in C(pos, vel) for finite changes
-  Eigen::MatrixXd finiteDifferenceJacobianOfC(neural::WithRespectTo wrt);
+  Eigen::MatrixXd finiteDifferenceJacobianOfC(neural::WithRespectTo* wrt);
 
   /// VERY SLOW: Only for testing. This computes the unconstrained Jacobian
   /// giving the difference in M^{-1}f for finite changes
   Eigen::MatrixXd finiteDifferenceJacobianOfMinv(
-      Eigen::VectorXd f, neural::WithRespectTo wrt);
+      Eigen::VectorXd f, neural::WithRespectTo* wrt);
 
   /// VERY SLOW: Only for testing. This computes the unconstrained Jacobian
   /// giving the difference in C(pos, vel) for finite changes in vel
   Eigen::MatrixXd finiteDifferenceVelCJacobian();
 
   Eigen::VectorXd getDynamicsForces();
-
-  std::size_t getWrtDim(neural::WithRespectTo wrt);
-
-  Eigen::VectorXd getWrt(neural::WithRespectTo wrt);
-
-  void setWrt(neural::WithRespectTo wrt, Eigen::VectorXd v);
 
   //----------------------------------------------------------------------------
   // Trajectory optimization

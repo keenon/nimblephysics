@@ -1569,7 +1569,7 @@ void Skeleton::setGradientConstraintMatrices(
 }
 
 //==============================================================================
-Eigen::MatrixXd Skeleton::getJacobianOfC(neural::WithRespectTo wrt)
+Eigen::MatrixXd Skeleton::getJacobianOfC(neural::WithRespectTo* wrt)
 {
   // TOOD(keenon): replace with the GEAR approach
   return finiteDifferenceJacobianOfC(wrt);
@@ -1578,7 +1578,7 @@ Eigen::MatrixXd Skeleton::getJacobianOfC(neural::WithRespectTo wrt)
 //==============================================================================
 /// This gives the unconstrained Jacobian of M^{-1}f
 Eigen::MatrixXd Skeleton::getJacobianOfMinv(
-    Eigen::VectorXd f, neural::WithRespectTo wrt)
+    Eigen::VectorXd f, neural::WithRespectTo* wrt)
 {
   // TOOD(keenon): replace with the GEAR approach
   return finiteDifferenceJacobianOfMinv(f, wrt);
@@ -1586,7 +1586,7 @@ Eigen::MatrixXd Skeleton::getJacobianOfMinv(
 
 //==============================================================================
 Eigen::MatrixXd Skeleton::getUnconstrainedVelJacobianWrt(
-    double dt, neural::WithRespectTo wrt)
+    double dt, neural::WithRespectTo* wrt)
 {
   Eigen::VectorXd tau = getForces();
   Eigen::VectorXd C = getCoriolisAndGravityForces() + getExternalForces();
@@ -1607,12 +1607,13 @@ Eigen::MatrixXd Skeleton::getVelCJacobian()
 }
 
 //==============================================================================
-Eigen::MatrixXd Skeleton::finiteDifferenceJacobianOfC(neural::WithRespectTo wrt)
+Eigen::MatrixXd Skeleton::finiteDifferenceJacobianOfC(
+    neural::WithRespectTo* wrt)
 {
   std::size_t n = getNumDofs();
-  std::size_t m = getWrtDim(wrt);
+  std::size_t m = wrt->dim(this);
   Eigen::MatrixXd J = Eigen::MatrixXd::Zero(n, m);
-  Eigen::VectorXd start = getWrt(wrt);
+  Eigen::VectorXd start = wrt->get(this);
 
   // Get baseline C(pos, vel)
   Eigen::VectorXd baseline = getCoriolisAndGravityForces();
@@ -1623,30 +1624,30 @@ Eigen::MatrixXd Skeleton::finiteDifferenceJacobianOfC(neural::WithRespectTo wrt)
   {
     Eigen::VectorXd tweaked = start;
     tweaked(i) += EPS;
-    setWrt(wrt, tweaked);
+    wrt->set(this, tweaked);
     Eigen::VectorXd perturbedPos = getCoriolisAndGravityForces();
     tweaked = start;
     tweaked(i) -= EPS;
-    setWrt(wrt, tweaked);
+    wrt->set(this, tweaked);
     Eigen::VectorXd perturbedNeg = getCoriolisAndGravityForces();
 
     J.col(i) = (perturbedPos - perturbedNeg) / (2 * EPS);
   }
 
   // Reset everything how we left it
-  setWrt(wrt, start);
+  wrt->set(this, start);
 
   return J;
 }
 
 //==============================================================================
 Eigen::MatrixXd Skeleton::finiteDifferenceJacobianOfMinv(
-    Eigen::VectorXd f, neural::WithRespectTo wrt)
+    Eigen::VectorXd f, neural::WithRespectTo* wrt)
 {
   std::size_t n = getNumDofs();
-  std::size_t m = getWrtDim(wrt);
+  std::size_t m = wrt->dim(this);
   Eigen::MatrixXd J = Eigen::MatrixXd::Zero(n, m);
-  Eigen::VectorXd start = getWrt(wrt);
+  Eigen::VectorXd start = wrt->get(this);
 
   // Get baseline C(pos, vel)
   Eigen::VectorXd baseline = multiplyByImplicitInvMassMatrix(f);
@@ -1657,14 +1658,14 @@ Eigen::MatrixXd Skeleton::finiteDifferenceJacobianOfMinv(
   {
     Eigen::VectorXd tweaked = start;
     tweaked(i) += EPS;
-    setWrt(wrt, tweaked);
+    wrt->set(this, tweaked);
     Eigen::VectorXd perturbed = multiplyByImplicitInvMassMatrix(f);
 
     J.col(i) = (perturbed - baseline) / EPS;
   }
 
   // Reset everything how we left it
-  setWrt(wrt, start);
+  wrt->set(this, start);
 
   return J;
 }
@@ -1720,98 +1721,6 @@ Eigen::MatrixXd Skeleton::finiteDifferenceVelCJacobian()
   setVelocities(vel);
 
   return J;
-}
-
-std::size_t Skeleton::getWrtDim(neural::WithRespectTo wrt)
-{
-  if (wrt == neural::WithRespectTo::POSITION)
-  {
-    return getNumDofs();
-  }
-  else if (wrt == neural::WithRespectTo::VELOCITY)
-  {
-    return getNumDofs();
-  }
-  else if (wrt == neural::WithRespectTo::FORCE)
-  {
-    return getNumDofs();
-  }
-  else if (wrt == neural::WithRespectTo::LINK_MASSES)
-  {
-    return getLinkMassesDims();
-  }
-  else if (wrt == neural::WithRespectTo::LINK_COMS)
-  {
-    return getLinkCOMDims();
-  }
-  else if (wrt == neural::WithRespectTo::LINK_MOIS)
-  {
-    return getLinkMOIDims();
-  }
-  else
-  {
-    assert(false && "Unrecognized wrt passed to getWrtDim()");
-    return 0;
-  }
-}
-
-//==============================================================================
-Eigen::VectorXd Skeleton::getWrt(neural::WithRespectTo wrt)
-{
-  if (wrt == neural::WithRespectTo::POSITION)
-  {
-    return getPositions();
-  }
-  else if (wrt == neural::WithRespectTo::VELOCITY)
-  {
-    return getVelocities();
-  }
-  else if (wrt == neural::WithRespectTo::FORCE)
-  {
-    return getForces();
-  }
-  else if (wrt == neural::WithRespectTo::LINK_MASSES)
-  {
-    return getLinkMasses();
-  }
-  else if (wrt == neural::WithRespectTo::LINK_COMS)
-  {
-    return getLinkCOMs();
-  }
-  else if (wrt == neural::WithRespectTo::LINK_MOIS)
-  {
-    return getLinkMOIs();
-  }
-  return Eigen::VectorXd::Zero(0);
-}
-
-//==============================================================================
-void Skeleton::setWrt(neural::WithRespectTo wrt, Eigen::VectorXd v)
-{
-  if (wrt == neural::WithRespectTo::POSITION)
-  {
-    setPositions(v);
-  }
-  else if (wrt == neural::WithRespectTo::VELOCITY)
-  {
-    setVelocities(v);
-  }
-  else if (wrt == neural::WithRespectTo::FORCE)
-  {
-    setForces(v);
-  }
-  else if (wrt == neural::WithRespectTo::LINK_MASSES)
-  {
-    setLinkMasses(v);
-  }
-  else if (wrt == neural::WithRespectTo::LINK_COMS)
-  {
-    setLinkCOMs(v);
-  }
-  else if (wrt == neural::WithRespectTo::LINK_MOIS)
-  {
-    setLinkMOIs(v);
-  }
 }
 
 //==============================================================================

@@ -9,6 +9,7 @@
 #include "dart/neural/DifferentiableContactConstraint.hpp"
 #include "dart/neural/NeuralConstants.hpp"
 #include "dart/neural/NeuralUtils.hpp"
+#include "dart/neural/WithRespectTo.hpp"
 #include "dart/performance/PerformanceLog.hpp"
 #include "dart/simulation/World.hpp"
 
@@ -180,6 +181,16 @@ public:
   Eigen::MatrixXd finiteDifferenceVelPosJacobian(
       simulation::WorldPtr world, std::size_t subdivisions = 20);
 
+  /// This computes and returns the whole wrt-vel jacobian by finite
+  /// differences. This is SUPER SUPER SLOW, and is only here for testing.
+  Eigen::MatrixXd finiteDifferenceVelJacobianWrt(
+      simulation::WorldPtr world, WithRespectTo* wrt);
+
+  /// This computes and returns the whole wrt-pos jacobian by finite
+  /// differences. This is SUPER SUPER SLOW, and is only here for testing.
+  Eigen::MatrixXd finiteDifferencePosJacobianWrt(
+      simulation::WorldPtr world, WithRespectTo* wrt);
+
   /// This returns the P_c matrix. You shouldn't ever need this matrix, it's
   /// just here to enable testing.
   Eigen::MatrixXd getProjectionIntoClampsMatrix(
@@ -213,25 +224,31 @@ public:
   Eigen::VectorXd getAnalyticalNextV(
       simulation::WorldPtr world, bool morePreciseButSlower = false);
 
-  /// This computes and returns the whole pos-vel jacobian. For backprop, you
+  /// This computes and returns the whole wrt-vel jacobian. For backprop, you
   /// don't actually need this matrix, you can compute backprop directly. This
   /// is here if you want access to the full Jacobian for some reason.
   Eigen::MatrixXd getVelJacobianWrt(
-      simulation::WorldPtr world, WithRespectTo wrt);
+      simulation::WorldPtr world, WithRespectTo* wrt);
+
+  /// This computes and returns the whole wrt-pos jacobian. For backprop, you
+  /// don't actually need this matrix, you can compute backprop directly. This
+  /// is here if you want access to the full Jacobian for some reason.
+  Eigen::MatrixXd getPosJacobianWrt(
+      simulation::WorldPtr world, WithRespectTo* wrt);
 
   /// This returns the jacobian of constraint force, holding everyhing constant
   /// except the value of WithRespectTo
   Eigen::MatrixXd getJacobianOfConstraintForce(
-      simulation::WorldPtr world, WithRespectTo wrt);
+      simulation::WorldPtr world, WithRespectTo* wrt);
 
   /// This returns the jacobian of Q^{-1}b, holding b constant, with respect to
   /// wrt
   Eigen::MatrixXd getJacobianOfLCPConstraintMatrixClampingSubset(
-      simulation::WorldPtr world, Eigen::VectorXd b, WithRespectTo wrt);
+      simulation::WorldPtr world, Eigen::VectorXd b, WithRespectTo* wrt);
 
   /// This returns the jacobian of b (from Q^{-1}b) with respect to wrt
   Eigen::MatrixXd getJacobianOfLCPOffsetClampingSubset(
-      simulation::WorldPtr world, WithRespectTo wrt);
+      simulation::WorldPtr world, WithRespectTo* wrt);
 
   /// This returns the subset of the A matrix used by the original LCP for just
   /// the clamping constraints. It relates constraint force to constraint
@@ -258,22 +275,23 @@ public:
   /// This returns the jacobian of P_c * v, holding everyhing constant except
   /// the value of WithRespectTo
   Eigen::MatrixXd getJacobianOfProjectionIntoClampsMatrix(
-      simulation::WorldPtr world, Eigen::VectorXd v, WithRespectTo wrt);
+      simulation::WorldPtr world, Eigen::VectorXd v, WithRespectTo* wrt);
 
   /// This returns the jacobian of M^{-1}(pos, inertia) * tau, holding
   /// everything constant except the value of WithRespectTo
   Eigen::MatrixXd getJacobianOfMinv(
-      simulation::WorldPtr world, Eigen::VectorXd tau, WithRespectTo wrt);
+      simulation::WorldPtr world, Eigen::VectorXd tau, WithRespectTo* wrt);
 
   /// This returns the jacobian of C(pos, inertia, vel), holding everything
   /// constant except the value of WithRespectTo
-  Eigen::MatrixXd getJacobianOfC(simulation::WorldPtr world, WithRespectTo wrt);
+  Eigen::MatrixXd getJacobianOfC(
+      simulation::WorldPtr world, WithRespectTo* wrt);
 
   /// This returns the jacobian of M^{-1}(pos, inertia) * (C(pos, inertia, vel)
   /// + mPreStepTorques), holding everything constant except the value of
   /// WithRespectTo
   Eigen::MatrixXd getJacobianOfMinvC(
-      simulation::WorldPtr world, WithRespectTo wrt);
+      simulation::WorldPtr world, WithRespectTo* wrt);
 
   /// This returns a fast approximation to A_c in the neighborhood of the
   /// original
@@ -347,28 +365,28 @@ public:
   /// This computes and returns the jacobian of P_c * v by finite
   /// differences. This is SUPER SLOW, and is only here for testing.
   Eigen::MatrixXd finiteDifferenceJacobianOfProjectionIntoClampsMatrix(
-      simulation::WorldPtr world, Eigen::VectorXd v, WithRespectTo wrt);
+      simulation::WorldPtr world, Eigen::VectorXd v, WithRespectTo* wrt);
 
   /// This computes and returns the jacobian of M^{-1}(pos, inertia) * tau by
   /// finite differences. This is SUPER SLOW, and is only here for testing.
   Eigen::MatrixXd finiteDifferenceJacobianOfMinv(
-      simulation::WorldPtr world, Eigen::VectorXd tau, WithRespectTo wrt);
+      simulation::WorldPtr world, Eigen::VectorXd tau, WithRespectTo* wrt);
 
   /// This computes and returns the jacobian of C(pos, inertia, vel) by finite
   /// differences. This is SUPER SLOW, and is only here for testing.
   Eigen::MatrixXd finiteDifferenceJacobianOfC(
-      simulation::WorldPtr world, WithRespectTo wrt);
+      simulation::WorldPtr world, WithRespectTo* wrt);
 
   /// This computes and returns the jacobian of M^{-1}(pos, inertia) * C(pos,
   /// inertia, vel) by finite differences. This is SUPER SLOW, and is only here
   /// for testing.
   Eigen::MatrixXd finiteDifferenceJacobianOfMinvC(
-      simulation::WorldPtr world, WithRespectTo wrt);
+      simulation::WorldPtr world, WithRespectTo* wrt);
 
   /// This returns the jacobian of constraint force, holding everyhing constant
   /// except the value of WithRespectTo
   Eigen::MatrixXd finiteDifferenceJacobianOfConstraintForce(
-      simulation::WorldPtr world, WithRespectTo wrt);
+      simulation::WorldPtr world, WithRespectTo* wrt);
 
   /// These was the mX() vector used to construct this. Pretty much only here
   /// for testing.
@@ -510,12 +528,6 @@ private:
   Eigen::MatrixXd mCachedForceVel;
 
   Eigen::VectorXd scratch(simulation::WorldPtr world);
-
-  std::size_t getWrtDim(simulation::WorldPtr world, WithRespectTo wrt);
-
-  Eigen::VectorXd getWrt(simulation::WorldPtr world, WithRespectTo wrt);
-
-  void setWrt(simulation::WorldPtr world, WithRespectTo wrt, Eigen::VectorXd v);
 
   enum MatrixToAssemble
   {

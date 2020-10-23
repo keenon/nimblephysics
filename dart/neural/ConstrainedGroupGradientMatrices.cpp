@@ -841,7 +841,7 @@ ConstrainedGroupGradientMatrices::getProjectionIntoClampsMatrix()
 /// don't actually need this matrix, you can compute backprop directly. This
 /// is here if you want access to the full Jacobian for some reason.
 Eigen::MatrixXd ConstrainedGroupGradientMatrices::getVelJacobianWrt(
-    simulation::WorldPtr world, WithRespectTo wrt)
+    simulation::WorldPtr world, WithRespectTo* wrt)
 {
   const Eigen::MatrixXd& A_c = getClampingConstraintMatrix();
   const Eigen::MatrixXd& A_ub = getUpperBoundConstraintMatrix();
@@ -877,7 +877,7 @@ Eigen::MatrixXd ConstrainedGroupGradientMatrices::getVelJacobianWrt(
 /// This returns the jacobian of constraint force, holding everyhing constant
 /// except the value of WithRespectTo
 Eigen::MatrixXd ConstrainedGroupGradientMatrices::getJacobianOfConstraintForce(
-    simulation::WorldPtr world, WithRespectTo wrt)
+    simulation::WorldPtr world, WithRespectTo* wrt)
 {
   Eigen::MatrixXd A_c = getClampingConstraintMatrix();
   if (A_c.cols() == 0)
@@ -905,14 +905,14 @@ Eigen::MatrixXd ConstrainedGroupGradientMatrices::getJacobianOfConstraintForce(
 /// wrt
 Eigen::MatrixXd ConstrainedGroupGradientMatrices::
     getJacobianOfLCPConstraintMatrixClampingSubset(
-        simulation::WorldPtr world, Eigen::VectorXd b, WithRespectTo wrt)
+        simulation::WorldPtr world, Eigen::VectorXd b, WithRespectTo* wrt)
 {
   const Eigen::MatrixXd& A_c = mClampingConstraintMatrix;
   if (A_c.cols() == 0)
   {
     return Eigen::MatrixXd::Zero(0, 0);
   }
-  if (wrt == VELOCITY || wrt == FORCE)
+  if (wrt == WithRespectTo::VELOCITY || wrt == WithRespectTo::FORCE)
   {
     return Eigen::MatrixXd::Zero(A_c.cols(), A_c.cols());
   }
@@ -923,7 +923,7 @@ Eigen::MatrixXd ConstrainedGroupGradientMatrices::
 
   Eigen::VectorXd Qinv_b = Qfactored.solve(b);
 
-  if (wrt == POSITION)
+  if (wrt == WithRespectTo::POSITION)
   {
     // Position is the only term that affects A_c
     Eigen::MatrixXd innerTerms
@@ -948,7 +948,7 @@ Eigen::MatrixXd ConstrainedGroupGradientMatrices::
 /// This returns the jacobian of b (from Q^{-1}b) with respect to wrt
 Eigen::MatrixXd
 ConstrainedGroupGradientMatrices::getJacobianOfLCPOffsetClampingSubset(
-    simulation::WorldPtr world, WithRespectTo wrt)
+    simulation::WorldPtr world, WithRespectTo* wrt)
 {
   double dt = world->getTimeStep();
   const Eigen::MatrixXd& A_c = mClampingConstraintMatrix;
@@ -1037,7 +1037,7 @@ ConstrainedGroupGradientMatrices::estimateClampingConstraintImpulses(
 /// This returns the jacobian of M^{-1}(pos, inertia) * tau, holding
 /// everything constant except the value of WithRespectTo
 Eigen::MatrixXd ConstrainedGroupGradientMatrices::getJacobianOfMinv(
-    simulation::WorldPtr world, Eigen::VectorXd tau, WithRespectTo wrt)
+    simulation::WorldPtr world, Eigen::VectorXd tau, WithRespectTo* wrt)
 {
   return finiteDifferenceJacobianOfMinv(world, tau, wrt);
 }
@@ -1046,7 +1046,7 @@ Eigen::MatrixXd ConstrainedGroupGradientMatrices::getJacobianOfMinv(
 /// This returns the jacobian of C(pos, inertia, vel), holding everything
 /// constant except the value of WithRespectTo
 Eigen::MatrixXd ConstrainedGroupGradientMatrices::getJacobianOfC(
-    simulation::WorldPtr world, WithRespectTo wrt)
+    simulation::WorldPtr world, WithRespectTo* wrt)
 {
   return finiteDifferenceJacobianOfC(world, wrt);
 }
@@ -1452,7 +1452,7 @@ ConstrainedGroupGradientMatrices::getCoriolisAndGravityAndExternalForces(
 /// finite differences. This is SUPER SLOW, and is only here for testing.
 Eigen::MatrixXd
 ConstrainedGroupGradientMatrices::finiteDifferenceJacobianOfMinv(
-    simulation::WorldPtr world, Eigen::VectorXd tau, WithRespectTo wrt)
+    simulation::WorldPtr world, Eigen::VectorXd tau, WithRespectTo* wrt)
 {
   std::size_t innerDim = getWrtDim(world, wrt);
 
@@ -1488,7 +1488,7 @@ ConstrainedGroupGradientMatrices::finiteDifferenceJacobianOfMinv(
 /// This computes and returns the jacobian of C(pos, inertia, vel) by finite
 /// differences.
 Eigen::MatrixXd ConstrainedGroupGradientMatrices::finiteDifferenceJacobianOfC(
-    simulation::WorldPtr world, WithRespectTo wrt)
+    simulation::WorldPtr world, WithRespectTo* wrt)
 {
   std::size_t innerDim = getWrtDim(world, wrt);
 
@@ -1522,27 +1522,27 @@ Eigen::MatrixXd ConstrainedGroupGradientMatrices::finiteDifferenceJacobianOfC(
 
 //==============================================================================
 std::size_t ConstrainedGroupGradientMatrices::getWrtDim(
-    simulation::WorldPtr world, WithRespectTo wrt)
+    simulation::WorldPtr world, WithRespectTo* wrt)
 {
   int sum = 0;
   for (auto skel : mSkeletons)
   {
-    sum += world->getSkeleton(skel)->getWrtDim(wrt);
+    sum += wrt->dim(world->getSkeleton(skel).get());
   }
   return sum;
 }
 
 //==============================================================================
 Eigen::VectorXd ConstrainedGroupGradientMatrices::getWrt(
-    simulation::WorldPtr world, WithRespectTo wrt)
+    simulation::WorldPtr world, WithRespectTo* wrt)
 {
   Eigen::VectorXd result = Eigen::VectorXd(getWrtDim(world, wrt));
   int cursor = 0;
   for (auto skelName : mSkeletons)
   {
-    auto skel = world->getSkeleton(skelName);
-    int dims = skel->getWrtDim(wrt);
-    result.segment(cursor, dims) = skel->getWrt(wrt);
+    dynamics::Skeleton* skel = world->getSkeleton(skelName).get();
+    int dims = wrt->dim(skel);
+    result.segment(cursor, dims) = wrt->get(skel);
     cursor += dims;
   }
   return result;
@@ -1550,14 +1550,14 @@ Eigen::VectorXd ConstrainedGroupGradientMatrices::getWrt(
 
 //==============================================================================
 void ConstrainedGroupGradientMatrices::setWrt(
-    simulation::WorldPtr world, WithRespectTo wrt, Eigen::VectorXd v)
+    simulation::WorldPtr world, WithRespectTo* wrt, Eigen::VectorXd v)
 {
   int cursor = 0;
   for (auto skelName : mSkeletons)
   {
-    auto skel = world->getSkeleton(skelName);
-    int dims = skel->getWrtDim(wrt);
-    skel->setWrt(wrt, v.segment(cursor, dims));
+    dynamics::Skeleton* skel = world->getSkeleton(skelName).get();
+    int dims = wrt->dim(skel);
+    wrt->set(skel, v.segment(cursor, dims));
     cursor += dims;
   }
 }

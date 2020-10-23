@@ -144,21 +144,21 @@ public:
   /// don't actually need this matrix, you can compute backprop directly. This
   /// is here if you want access to the full Jacobian for some reason.
   Eigen::MatrixXd getVelJacobianWrt(
-      simulation::WorldPtr world, WithRespectTo wrt);
+      simulation::WorldPtr world, WithRespectTo* wrt);
 
   /// This returns the jacobian of constraint force, holding everyhing constant
   /// except the value of WithRespectTo
   Eigen::MatrixXd getJacobianOfConstraintForce(
-      simulation::WorldPtr world, WithRespectTo wrt);
+      simulation::WorldPtr world, WithRespectTo* wrt);
 
   /// This returns the jacobian of Q^{-1}b, holding b constant, with respect to
   /// wrt
   Eigen::MatrixXd getJacobianOfLCPConstraintMatrixClampingSubset(
-      simulation::WorldPtr world, Eigen::VectorXd b, WithRespectTo wrt);
+      simulation::WorldPtr world, Eigen::VectorXd b, WithRespectTo* wrt);
 
   /// This returns the jacobian of b (from Q^{-1}b) with respect to wrt
   Eigen::MatrixXd getJacobianOfLCPOffsetClampingSubset(
-      simulation::WorldPtr world, WithRespectTo wrt);
+      simulation::WorldPtr world, WithRespectTo* wrt);
 
   /// This returns the subset of the A matrix used by the original LCP for just
   /// the clamping constraints. It relates constraint force to constraint
@@ -185,11 +185,12 @@ public:
   /// This returns the jacobian of M^{-1}(pos, inertia) * tau, holding
   /// everything constant except the value of WithRespectTo
   Eigen::MatrixXd getJacobianOfMinv(
-      simulation::WorldPtr world, Eigen::VectorXd tau, WithRespectTo wrt);
+      simulation::WorldPtr world, Eigen::VectorXd tau, WithRespectTo* wrt);
 
   /// This returns the jacobian of C(pos, inertia, vel), holding everything
   /// constant except the value of WithRespectTo
-  Eigen::MatrixXd getJacobianOfC(simulation::WorldPtr world, WithRespectTo wrt);
+  Eigen::MatrixXd getJacobianOfC(
+      simulation::WorldPtr world, WithRespectTo* wrt);
 
   /// This computes the Jacobian of A_c*f0 with respect to position using
   /// impulse tests.
@@ -306,19 +307,20 @@ public:
   /// This computes and returns the jacobian of M^{-1}(pos, inertia) * tau by
   /// finite differences. This is SUPER SLOW, and is only here for testing.
   Eigen::MatrixXd finiteDifferenceJacobianOfMinv(
-      simulation::WorldPtr world, Eigen::VectorXd tau, WithRespectTo wrt);
+      simulation::WorldPtr world, Eigen::VectorXd tau, WithRespectTo* wrt);
 
   /// This computes and returns the jacobian of C(pos, inertia, vel) by finite
   /// differences. This is SUPER SLOW, and is only here for testing.
   Eigen::MatrixXd finiteDifferenceJacobianOfC(
-      simulation::WorldPtr world, WithRespectTo wrt);
+      simulation::WorldPtr world, WithRespectTo* wrt);
 
 private:
-  std::size_t getWrtDim(simulation::WorldPtr world, WithRespectTo wrt);
+  std::size_t getWrtDim(simulation::WorldPtr world, WithRespectTo* wrt);
 
-  Eigen::VectorXd getWrt(simulation::WorldPtr world, WithRespectTo wrt);
+  Eigen::VectorXd getWrt(simulation::WorldPtr world, WithRespectTo* wrt);
 
-  void setWrt(simulation::WorldPtr world, WithRespectTo wrt, Eigen::VectorXd v);
+  void setWrt(
+      simulation::WorldPtr world, WithRespectTo* wrt, Eigen::VectorXd v);
 
   /// Gets the skeletons associated with this constrained group in vector form
   std::vector<std::shared_ptr<dynamics::Skeleton>> getSkeletons(

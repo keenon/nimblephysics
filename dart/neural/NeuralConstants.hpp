@@ -13,6 +13,7 @@ class BodyNode;
 
 namespace neural {
 
+/*
 enum WithRespectTo
 {
   POSITION,
@@ -22,6 +23,7 @@ enum WithRespectTo
   LINK_COMS,
   LINK_MOIS
 };
+*/
 
 } // namespace neural
 } // namespace dart

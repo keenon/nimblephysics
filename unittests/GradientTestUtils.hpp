@@ -50,6 +50,7 @@
 #include "dart/neural/NeuralConstants.hpp"
 #include "dart/neural/NeuralUtils.hpp"
 #include "dart/neural/RestorableSnapshot.hpp"
+#include "dart/neural/WithRespectToMass.hpp"
 #include "dart/simulation/World.hpp"
 
 #include "TestHelpers.hpp"
@@ -875,7 +876,7 @@ bool verifyLinearScratch()
 }
 
 bool verifyJacobianOfProjectionIntoClampsMatrix(
-    WorldPtr world, VectorXd proposedVelocities, WithRespectTo wrt)
+    WorldPtr world, VectorXd proposedVelocities, WithRespectTo* wrt)
 {
   world->setVelocities(proposedVelocities);
 
@@ -4145,6 +4146,120 @@ bool verifyNoMultistepIntereference(WorldPtr world, int steps)
   }
 
   snapshot.restore();
+  return true;
+}
+
+bool verifyVelJacobianWrt(WorldPtr world, WithRespectTo* wrt)
+{
+  neural::BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
+
+  MatrixXd analytical = classicPtr->getVelJacobianWrt(world, wrt);
+  MatrixXd bruteForce = classicPtr->finiteDifferenceVelJacobianWrt(world, wrt);
+
+  if (!equals(analytical, bruteForce, 5e-7))
+  {
+    std::cout << "Brute force wrt-vel Jacobian: " << std::endl
+              << bruteForce << std::endl;
+    std::cout << "Analytical wrt-vel Jacobian: " << std::endl
+              << analytical << std::endl;
+    std::cout << "Diff Jacobian: " << std::endl
+              << (bruteForce - analytical) << std::endl;
+    return false;
+  }
+  return true;
+}
+
+bool verifyPosJacobianWrt(WorldPtr world, WithRespectTo* wrt)
+{
+  neural::BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
+
+  MatrixXd analytical = classicPtr->getPosJacobianWrt(world, wrt);
+  MatrixXd bruteForce = classicPtr->finiteDifferencePosJacobianWrt(world, wrt);
+
+  if (!equals(analytical, bruteForce, 1e-8))
+  {
+    std::cout << "Brute force wrt-pos Jacobian: " << std::endl
+              << bruteForce << std::endl;
+    std::cout << "Analytical wrt-pos Jacobian: " << std::endl
+              << analytical << std::endl;
+    std::cout << "Diff Jacobian: " << std::endl
+              << (bruteForce - analytical) << std::endl;
+    return false;
+  }
+  return true;
+}
+
+bool verifyWrtMapping(WorldPtr world, WithRespectTo* wrt)
+{
+  RestorableSnapshot snapshot(world);
+
+  int dim = wrt->dim(world);
+  if (dim == 0)
+  {
+    std::cout << "Got an empty WRT mapping!" << std::endl;
+    return false;
+  }
+
+  for (int i = 0; i < 10; i++)
+  {
+    Eigen::VectorXd randMapping = Eigen::VectorXd::Random(dim).cwiseAbs();
+    wrt->set(world, randMapping);
+    Eigen::VectorXd recoveredMapping = wrt->get(world);
+    if (!equals(randMapping, recoveredMapping))
+    {
+      std::cout << "Didn't recover WRT mapping" << std::endl;
+      std::cout << "Original mapping: " << std::endl
+                << randMapping << std::endl;
+      std::cout << "Recovered mapping: " << std::endl
+                << recoveredMapping << std::endl;
+      return false;
+    }
+  }
+
+  snapshot.restore();
+
+  return true;
+}
+
+bool verifyJacobiansWrt(WorldPtr world, WithRespectTo* wrt)
+{
+  return verifyWrtMapping(world, wrt) && verifyVelJacobianWrt(world, wrt)
+         && verifyPosJacobianWrt(world, wrt);
+}
+
+bool verifyWrtMass(WorldPtr world)
+{
+  WithRespectToMass massMapping = WithRespectToMass();
+  for (int i = 0; i < world->getNumSkeletons(); i++)
+  {
+    auto skel = world->getSkeleton(i);
+    for (int j = 0; j < skel->getNumBodyNodes(); j++)
+    {
+      massMapping.registerNode(skel->getBodyNode(j), INERTIA_MASS);
+    }
+  }
+  if (!verifyJacobiansWrt(world, &massMapping))
+  {
+    std::cout << "Error with Jacobians on mass" << std::endl;
+    return false;
+  }
+
+  WithRespectToMass inertiaMapping = WithRespectToMass();
+  for (int i = 0; i < world->getNumSkeletons(); i++)
+  {
+    auto skel = world->getSkeleton(i);
+    for (int j = 0; j < skel->getNumBodyNodes(); j++)
+    {
+      inertiaMapping.registerNode(skel->getBodyNode(j), INERTIA_FULL);
+    }
+  }
+  verifyJacobiansWrt(world, &inertiaMapping);
+  if (!verifyJacobiansWrt(world, &inertiaMapping))
+  {
+    std::cout << "Error with Jacobians on full" << std::endl;
+    return false;
+  }
+
   return true;
 }
 
