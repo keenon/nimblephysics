@@ -70,8 +70,9 @@ ConstrainedGroupGradientMatrices::ConstrainedGroupGradientMatrices(
   {
     int dofs = skel->getNumDofs();
     mMinv.block(cursor, cursor, dofs, dofs) = skel->getInvMassMatrix();
+    // TODO: does this break everything?
     mCoriolisAndGravityForces.segment(cursor, dofs)
-        = skel->getCoriolisAndGravityForces();
+        = skel->getCoriolisAndGravityForces() - skel->getExternalForces();
     mPreStepTorques.segment(cursor, dofs) = skel->getForces();
     mPreLCPVelocities.segment(cursor, dofs) = skel->getVelocities();
     mPreStepVelocities.segment(cursor, dofs)

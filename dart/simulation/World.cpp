@@ -1026,6 +1026,23 @@ void World::setLinkMasses(Eigen::VectorXd masses)
 }
 
 //==============================================================================
+/// This gives the C(pos, vel) vector for all the skeletons in the world,
+/// without accounting for the external forces
+Eigen::VectorXd World::getCoriolisAndGravityForces()
+{
+  Eigen::VectorXd result = Eigen::VectorXd::Zero(getNumDofs());
+  std::size_t cursor = 0;
+  for (std::size_t i = 0; i < getNumSkeletons(); i++)
+  {
+    std::shared_ptr<dynamics::Skeleton> skel = getSkeleton(i);
+    std::size_t dofs = skel->getNumDofs();
+    result.segment(cursor, dofs) = skel->getCoriolisAndGravityForces();
+    cursor += dofs;
+  }
+  return result;
+}
+
+//==============================================================================
 Eigen::VectorXd World::getCoriolisAndGravityAndExternalForces()
 {
   Eigen::VectorXd result = Eigen::VectorXd::Zero(getNumDofs());

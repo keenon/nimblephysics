@@ -554,19 +554,84 @@ Eigen::VectorXd BackpropSnapshot::getAnalyticalNextV(
 
 //==============================================================================
 Eigen::MatrixXd BackpropSnapshot::getScratchAnalytical(
-    simulation::WorldPtr world)
+    simulation::WorldPtr world, WithRespectTo* wrt)
 {
   RestorableSnapshot snapshot(world);
   world->setPositions(mPreStepPosition);
   world->setVelocities(mPreStepVelocity);
   world->setForces(mPreStepTorques);
 
+  /////////////////////////////////////////////////////////////////
+  // Compute next_v
+  /////////////////////////////////////////////////////////////////
+
   Eigen::MatrixXd A_c = getClampingConstraintMatrix(world);
-  if (A_c.size() == 0)
-    return Eigen::MatrixXd::Zero(0, world->getNumDofs());
   Eigen::MatrixXd A_ub = getUpperBoundConstraintMatrix(world);
   Eigen::MatrixXd E = getUpperBoundMappingMatrix();
+  Eigen::MatrixXd A_c_ub_E = A_c + A_ub * E;
 
+  Eigen::VectorXd tau = world->getForces();
+  Eigen::VectorXd C = world->getCoriolisAndGravityAndExternalForces();
+  Eigen::VectorXd C_only = world->getCoriolisAndGravityForces();
+  Eigen::VectorXd C_orig = getCoriolisAndGravityForces();
+
+  Eigen::VectorXd f_c = getClampingConstraintImpulses();
+  double dt = world->getTimeStep();
+
+  Eigen::MatrixXd dM
+      = getJacobianOfMinv(world, dt * (tau - C) + A_c_ub_E * f_c, wrt);
+
+  Eigen::MatrixXd Minv = world->getInvMassMatrix();
+  Eigen::MatrixXd dC = getJacobianOfC(world, wrt);
+
+  Eigen::MatrixXd dF_c = getJacobianOfConstraintForce(world, wrt);
+
+  snapshot.restore();
+  return dM + Minv * (A_c_ub_E * dF_c - dt * dC);
+
+  /////////////////////////////////////////////////////////////////
+  // Compute dF_c
+  /////////////////////////////////////////////////////////////////
+
+  Eigen::MatrixXd Q = getClampingAMatrix();
+
+  Eigen::CompleteOrthogonalDecomposition<Eigen::MatrixXd> Qfac
+      = Q.completeOrthogonalDecomposition();
+
+  Eigen::MatrixXd dB = getJacobianOfLCPOffsetClampingSubset(world, wrt);
+
+  if (wrt == WithRespectTo::VELOCITY || wrt == WithRespectTo::FORCE)
+  {
+    // dQ_b is 0, so don't compute it
+    return Qfac.solve(dB);
+  }
+
+  Eigen::VectorXd b = getClampingConstraintRelativeVels();
+  Eigen::MatrixXd dQ_b
+      = getJacobianOfLCPConstraintMatrixClampingSubset(world, b, wrt);
+
+  // snapshot.restore();
+  // return dQ_b + Qfac.solve(dB);
+
+  /////////////////////////////////////////////////////////////////
+  // Compute dB
+  /////////////////////////////////////////////////////////////////
+
+  // double dt = world->getTimeStep();
+  // Eigen::MatrixXd Minv = getInvMassMatrix(world);
+  // Eigen::MatrixXd A_c = getClampingConstraintMatrix(world);
+  // Eigen::MatrixXd dC = getJacobianOfC(world, wrt);
+  // Eigen::VectorXd C = getCoriolisAndGravityForces();
+  Eigen::VectorXd f = getPreStepTorques() - C;
+  Eigen::MatrixXd dMinv_f = getJacobianOfMinv(world, f, wrt);
+  Eigen::VectorXd v_f = getPreConstraintVelocity();
+
+  snapshot.restore();
+  Eigen::MatrixXd dB_analytic = -(A_c.transpose() * dt * (dMinv_f - Minv * dC));
+
+  return dB;
+
+  /*
   Eigen::MatrixXd Minv = getInvMassMatrix(world, false);
   Eigen::MatrixXd A_c_ub_E = A_c + (A_ub * E);
   Eigen::MatrixXd constraintForceToImpliedTorques = Minv * A_c_ub_E;
@@ -594,6 +659,7 @@ Eigen::MatrixXd BackpropSnapshot::getScratchAnalytical(
                  + Minv * getJacobianOfClampingConstraints(world, Qinv_v));
 
   return (1 / world->getTimeStep()) * (XFactor.solve(dRhs) - XFactor.solve(dQ));
+  */
 
   // Approximate the pseudo-inverse as just a plain inverse for the purposes of
   // derivation
@@ -734,6 +800,7 @@ Eigen::MatrixXd BackpropSnapshot::getScratchAnalytical(
 //==============================================================================
 Eigen::VectorXd BackpropSnapshot::scratch(simulation::WorldPtr world)
 {
+  /*
   Eigen::MatrixXd newP_c;
 
   Eigen::MatrixXd A_c
@@ -762,11 +829,6 @@ Eigen::VectorXd BackpropSnapshot::scratch(simulation::WorldPtr world)
       = A_c.eval().transpose() * constraintForceToImpliedTorques;
   Eigen::MatrixXd bounce = getBounceDiagonals().asDiagonal();
   Eigen::MatrixXd rightHandSide = bounce * A_c.transpose();
-  /*
-  std::cout << "forceToVel: " << std::endl << forceToVel << std::endl;
-  std::cout << "forceToVel^-1: " << std::endl << velToForce << std::endl;
-  std::cout << "mTimeStep: " << mTimeStep << std::endl;
-  */
   newP_c = (1.0 / mTimeStep)
            * forceToVel.completeOrthogonalDecomposition().solve(rightHandSide);
 
@@ -774,18 +836,25 @@ Eigen::VectorXd BackpropSnapshot::scratch(simulation::WorldPtr world)
   Eigen::MatrixXd Qinv
       = forceToVel.completeOrthogonalDecomposition().pseudoInverse();
 
+  Eigen::VectorXd taus = Eigen::VectorXd::Ones(world->getNumDofs());
+  Eigen::MatrixXd Minv = getInvMassMatrix(world, forFiniteDifferencing);
+
   // return Qinv * v;
   // return Qinv * rightHandSide * v;
-  return newP_c * v;
+  return Minv * taus;
+  */
 
-  /*
+  /////////////////////////////////////////////////////////////////////////
+  // Compute NextV
+  /////////////////////////////////////////////////////////////////////////
+
   Eigen::MatrixXd A_c = getClampingConstraintMatrix(world);
   Eigen::MatrixXd A_ub = getUpperBoundConstraintMatrix(world);
   Eigen::MatrixXd E = getUpperBoundMappingMatrix();
   Eigen::MatrixXd A_c_ub_E = A_c + A_ub * E;
 
   Eigen::MatrixXd Minv = world->getInvMassMatrix();
-  Eigen::VectorXd f_c = estimateClampingConstraintImpulses(world);
+  Eigen::VectorXd f_c = estimateClampingConstraintImpulses(world, A_c);
   Eigen::VectorXd tau = world->getForces();
   Eigen::VectorXd C = world->getCoriolisAndGravityAndExternalForces();
   double dt = world->getTimeStep();
@@ -793,7 +862,32 @@ Eigen::VectorXd BackpropSnapshot::scratch(simulation::WorldPtr world)
       = world->getVelocities() + Minv * (dt * (tau - C) + A_c_ub_E * f_c);
 
   return nextV;
-  */
+
+  /////////////////////////////////////////////////////////////////////////
+  // Compute f_c
+  /////////////////////////////////////////////////////////////////////////
+
+  Eigen::VectorXd b = Eigen::VectorXd(A_c.cols());
+  Eigen::MatrixXd Q = Eigen::MatrixXd(A_c.cols(), A_c.cols());
+  computeLCPOffsetClampingSubset(world, b, A_c);
+  computeLCPConstraintMatrixClampingSubset(world, Q, A_c);
+
+  // return Q.completeOrthogonalDecomposition().solve(b);
+  // return b;
+
+  /////////////////////////////////////////////////////////////////////////
+  // Compute b
+  /////////////////////////////////////////////////////////////////////////
+
+  b = -getBounceDiagonals().cwiseProduct(
+      A_c.transpose()
+      * (world->getVelocities()
+         + (world->getTimeStep()
+            * implicitMultiplyByInvMassMatrix(
+                world,
+                world->getForces()
+                    - world->getCoriolisAndGravityAndExternalForces()))));
+  return b;
 
   /*
   // Eigen::MatrixXd A_c = getClampingConstraintMatrix(world);
@@ -856,7 +950,7 @@ Eigen::VectorXd BackpropSnapshot::scratch(simulation::WorldPtr world)
 }
 
 Eigen::MatrixXd BackpropSnapshot::getScratchFiniteDifference(
-    simulation::WorldPtr world)
+    simulation::WorldPtr world, WithRespectTo* wrt)
 {
   RestorableSnapshot snapshot(world);
 
@@ -874,19 +968,22 @@ Eigen::MatrixXd BackpropSnapshot::getScratchFiniteDifference(
 
   Eigen::VectorXd original = scratch(world);
 
-  Eigen::MatrixXd J = Eigen::MatrixXd(original.size(), world->getNumDofs());
+  int worldDim = wrt->dim(world);
+  Eigen::MatrixXd J = Eigen::MatrixXd(original.size(), worldDim);
+
+  Eigen::VectorXd preStepWrt = wrt->get(world);
 
   double EPSILON = 1e-7;
-  for (std::size_t i = 0; i < world->getNumDofs(); i++)
+  for (std::size_t i = 0; i < worldDim; i++)
   {
-    Eigen::VectorXd tweakedPos = mPreStepPosition;
-    tweakedPos(i) += EPSILON;
-    world->setPositions(tweakedPos);
+    Eigen::VectorXd tweakedWrt = preStepWrt;
+    tweakedWrt(i) += EPSILON;
+    wrt->set(world, tweakedWrt);
     Eigen::VectorXd perturbedPos = scratch(world);
 
-    tweakedPos = mPreStepPosition;
-    tweakedPos(i) -= EPSILON;
-    world->setPositions(tweakedPos);
+    tweakedWrt = preStepWrt;
+    tweakedWrt(i) -= EPSILON;
+    wrt->set(world, tweakedWrt);
     Eigen::VectorXd perturbedNeg = scratch(world);
 
     Eigen::VectorXd change = (perturbedPos - perturbedNeg) / (2 * EPSILON);
@@ -2143,15 +2240,6 @@ Eigen::MatrixXd BackpropSnapshot::getJacobianOfLCPOffsetClampingSubset(
   Eigen::VectorXd f = getPreStepTorques() - C;
   Eigen::MatrixXd dMinv_f = getJacobianOfMinv(world, f, wrt);
   Eigen::VectorXd v_f = getPreConstraintVelocity();
-
-  /*
-  std::cout << "Minv: " << std::endl << Minv << std::endl;
-  std::cout << "dC: " << std::endl << dC << std::endl;
-  std::cout << "Minv * dC: " << std::endl << Minv * dC << std::endl;
-  std::cout << "A_c.transpose(): " << std::endl << A_c.transpose() << std::endl;
-  std::cout << "A_c.transpose() * Minv * dC: " << std::endl
-            << A_c.transpose() * Minv * dC << std::endl;
-  */
 
   if (wrt == WithRespectTo::POSITION)
   {

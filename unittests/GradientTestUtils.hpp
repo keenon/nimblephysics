@@ -779,15 +779,17 @@ bool verifyNextV(WorldPtr world)
   return true;
 }
 
-bool verifyScratch(WorldPtr world)
+bool verifyScratch(WorldPtr world, WithRespectTo* wrt)
 {
   neural::BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
 
-  MatrixXd analytical = classicPtr->getScratchAnalytical(world);
-  MatrixXd bruteForce = classicPtr->getScratchFiniteDifference(world);
+  MatrixXd analytical = classicPtr->getScratchAnalytical(world, wrt);
+  MatrixXd bruteForce = classicPtr->getScratchFiniteDifference(world, wrt);
 
+  /*
   MatrixXd posVelAnalytical = classicPtr->getPosVelJacobian(world);
   MatrixXd posVelFd = classicPtr->finiteDifferencePosVelJacobian(world);
+  */
   if (!equals(world->getPositions(), classicPtr->getPreStepPosition()))
   {
     std::cout << "Position not preserved!" << std::endl;
@@ -801,7 +803,7 @@ bool verifyScratch(WorldPtr world)
     std::cout << "Force not preserved!" << std::endl;
   }
 
-  if (!equals(analytical, bruteForce, 1e-8) || true)
+  if (!equals(analytical, bruteForce, 1e-8))
   {
     std::cout << "Brute force Scratch Jacobian:" << std::endl
               << bruteForce << std::endl;
@@ -4233,11 +4235,17 @@ bool verifyWrtMass(WorldPtr world)
   for (int i = 0; i < world->getNumSkeletons(); i++)
   {
     auto skel = world->getSkeleton(i);
-    for (int j = 0; j < skel->getNumBodyNodes(); j++)
+    if (skel->isMobile() && skel->getNumDofs() > 0)
     {
-      massMapping.registerNode(skel->getBodyNode(j), INERTIA_MASS);
+      for (int j = 0; j < skel->getNumBodyNodes(); j++)
+      {
+        massMapping.registerNode(skel->getBodyNode(j), INERTIA_MASS);
+      }
     }
   }
+
+  return verifyScratch(world, &massMapping);
+
   if (!verifyJacobiansWrt(world, &massMapping))
   {
     std::cout << "Error with Jacobians on mass" << std::endl;

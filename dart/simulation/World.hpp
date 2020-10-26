@@ -307,6 +307,10 @@ public:
   // world concatenated into a flat vector.
   void setLinkMasses(Eigen::VectorXd masses);
 
+  /// This gives the C(pos, vel) vector for all the skeletons in the world,
+  /// without accounting for the external forces
+  Eigen::VectorXd getCoriolisAndGravityForces();
+
   /// This gives the C(pos, vel) vector for all the skeletons in the world
   Eigen::VectorXd getCoriolisAndGravityAndExternalForces();
 

@@ -54,6 +54,8 @@
 #include "TestHelpers.hpp"
 #include "stdio.h"
 
+#define ALL_TESTS
+
 using namespace dart;
 using namespace math;
 using namespace dynamics;
@@ -284,6 +286,7 @@ TEST(GRADIENTS, BLOCK_ON_GROUND_NO_FRICTION_1_MASS)
   testBlockWithFrictionCoeff(0, 1);
 }
 
+#ifdef ALL_TESTS
 TEST(GRADIENTS, BLOCK_ON_GROUND_NO_FRICTION_2_MASS)
 {
   testBlockWithFrictionCoeff(0, 2);
@@ -303,6 +306,7 @@ TEST(GRADIENTS, BLOCK_ON_GROUND_SLIPPING_FRICTION)
 {
   testBlockWithFrictionCoeff(0.5, 1);
 }
+#endif
 
 /******************************************************************************
 
@@ -437,6 +441,7 @@ void testTwoBlocks(
   EXPECT_TRUE(verifyWrtMass(world));
 }
 
+#ifdef ALL_TESTS
 TEST(GRADIENTS, TWO_BLOCKS_1_1_MASS)
 {
   testTwoBlocks(1, 1, 0, 1, 1);
@@ -451,6 +456,7 @@ TEST(GRADIENTS, TWO_BLOCKS_3_5_MASS)
 {
   testTwoBlocks(2, 1, 0, 3, 5);
 }
+#endif
 
 /******************************************************************************
 
@@ -542,10 +548,12 @@ void testBouncingBlockWithFrictionCoeff(double frictionCoeff, double mass)
   EXPECT_TRUE(verifyAnalyticalBackprop(world));
 }
 
+#ifdef ALL_TESTS
 TEST(GRADIENTS, BLOCK_BOUNCING_OFF_GROUND_NO_FRICTION_1_MASS)
 {
   testBouncingBlockWithFrictionCoeff(0, 1);
 }
+#endif
 
 /******************************************************************************
 
@@ -663,10 +671,12 @@ void testReversePendulumSledWithFrictionCoeff(double frictionCoeff)
   EXPECT_TRUE(verifyWrtMass(world));
 }
 
+#ifdef ALL_TESTS
 TEST(GRADIENTS, SLIDING_REVERSE_PENDULUM_NO_FRICTION)
 {
   testReversePendulumSledWithFrictionCoeff(0);
 }
+#endif
 
 /******************************************************************************
 
@@ -755,10 +765,12 @@ void testBouncingBlockPosGradients(double frictionCoeff, double mass)
   EXPECT_TRUE(verifyAnalyticalBackprop(world));
 }
 
+#ifdef ALL_TESTS
 TEST(GRADIENTS, POS_BLOCK_BOUNCING_OFF_GROUND_NO_FRICTION_1_MASS)
 {
   testBouncingBlockPosGradients(0, 1);
 }
+#endif
 
 /******************************************************************************
 
@@ -864,6 +876,7 @@ void testMultigroup(int numGroups)
   EXPECT_TRUE(verifyAnalyticalBackprop(world));
 }
 
+#ifdef ALL_TESTS
 TEST(GRADIENTS, MULTIGROUP_2)
 {
   testMultigroup(2);
@@ -873,6 +886,7 @@ TEST(GRADIENTS, MULTIGROUP_4)
 {
   testMultigroup(4);
 }
+#endif
 
 /******************************************************************************
 
@@ -1016,6 +1030,7 @@ void testRobotArm(
   EXPECT_TRUE(verifyWrtMass(world));
 }
 
+#ifdef ALL_TESTS
 TEST(GRADIENTS, ARM_3_LINK_30_DEG)
 {
   testRobotArm(3, 30.0 / 180 * 3.1415);
@@ -1037,6 +1052,7 @@ TEST(GRADIENTS, ARM_3_LINK_30_DEG_MIDDLE_ATTACH)
 {
   testRobotArm(3, 30.0 / 180 * 3.1415, 1);
 }
+#endif
 
 /**
  * This sets up two boxes colliding with each other. Each can rotate and
@@ -1114,6 +1130,7 @@ void testVertexFaceCollision(bool isSelfCollision)
   EXPECT_TRUE(verifyWrtMass(world));
 }
 
+#ifdef ALL_TESTS
 TEST(GRADIENTS, VERTEX_FACE_COLLISION)
 {
   testVertexFaceCollision(false);
@@ -1123,6 +1140,7 @@ TEST(GRADIENTS, VERTEX_FACE_SELF_COLLISION)
 {
   testVertexFaceCollision(true);
 }
+#endif
 
 /**
  * This sets up two boxes colliding with each other. Each can rotate and
@@ -1200,6 +1218,7 @@ void testEdgeEdgeCollision(bool isSelfCollision)
   EXPECT_TRUE(verifyWrtMass(world));
 }
 
+#ifdef ALL_TESTS
 TEST(GRADIENTS, EDGE_EDGE_COLLISION)
 {
   testEdgeEdgeCollision(false);
@@ -1209,6 +1228,7 @@ TEST(GRADIENTS, EDGE_EDGE_SELF_COLLISION)
 {
   testEdgeEdgeCollision(true);
 }
+#endif
 
 /******************************************************************************
 
@@ -1286,15 +1306,18 @@ void testCartpole(double rotationRadians)
   EXPECT_TRUE(verifyBulkPass(world, 1000, 50));
 }
 
+#ifdef ALL_TESTS
 TEST(GRADIENTS, CARTPOLE_15_DEG)
 {
   testCartpole(15.0 / 180.0 * 3.1415);
 }
+#endif
 
 ///////////////////////////////////////////////////////////////////////////////
 // Just idiot checking that the code doesn't crash on silly edge cases.
 ///////////////////////////////////////////////////////////////////////////////
 
+#ifdef ALL_TESTS
 TEST(GRADIENTS, EMPTY_WORLD)
 {
   WorldPtr world = World::create();
@@ -1312,6 +1335,7 @@ TEST(GRADIENTS, EMPTY_SKELETON)
   EXPECT_TRUE(verifyVelGradients(world, worldVel));
   EXPECT_TRUE(verifyAnalyticalBackprop(world));
 }
+#endif
 
 ///////////////////////////////////////////////////////////////////////////////
 // Checking the trajectory optimizations
@@ -1464,6 +1488,7 @@ void testJumpWorm(bool offGround, bool interpenetration)
   */
 }
 
+#ifdef ALL_TESTS
 TEST(GRADIENTS, JUMP_WORM)
 {
   testJumpWorm(false, false);
@@ -1473,6 +1498,7 @@ TEST(GRADIENTS, JUMP_WORM_OFF_GROUND)
 {
   testJumpWorm(true, false);
 }
+#endif
 
 /*
 TEST(GRADIENTS, JUMP_WORM_INTER_PENETRATE)

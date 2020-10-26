@@ -207,10 +207,12 @@ public:
       simulation::WorldPtr world, const Eigen::VectorXd& x);
 
   /// TODO(keenon): Remove me
-  Eigen::MatrixXd getScratchAnalytical(simulation::WorldPtr world);
+  Eigen::MatrixXd getScratchAnalytical(
+      simulation::WorldPtr world, WithRespectTo* wrt);
 
   /// TODO(keenon): Remove me
-  Eigen::MatrixXd getScratchFiniteDifference(simulation::WorldPtr world);
+  Eigen::MatrixXd getScratchFiniteDifference(
+      simulation::WorldPtr world, WithRespectTo* wrt);
 
   /// This predicts what the next velocity will be using our linear algebra
   /// formula. This is only here for testing, to compare it against the actual
