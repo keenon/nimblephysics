@@ -58,6 +58,22 @@ int WithRespectToPosition::dim(dynamics::Skeleton* skel)
   return skel->getNumDofs();
 }
 
+/// This gives a vector of upper bound values for this WRT, given state in the
+/// world
+Eigen::VectorXd WithRespectToPosition::upperBound(
+    std::shared_ptr<simulation::World> world)
+{
+  return world->getPositionUpperLimits();
+}
+
+/// This gives a vector of lower bound values for this WRT, given state in the
+/// world
+Eigen::VectorXd WithRespectToPosition::lowerBound(
+    std::shared_ptr<simulation::World> world)
+{
+  return world->getPositionLowerLimits();
+}
+
 /// Basic constructor
 WithRespectToVelocity::WithRespectToVelocity()
 {
@@ -101,6 +117,22 @@ int WithRespectToVelocity::dim(dynamics::Skeleton* skel)
   return skel->getNumDofs();
 }
 
+/// This gives a vector of upper bound values for this WRT, given state in the
+/// world
+Eigen::VectorXd WithRespectToVelocity::upperBound(
+    std::shared_ptr<simulation::World> world)
+{
+  return world->getVelocityUpperLimits();
+}
+
+/// This gives a vector of lower bound values for this WRT, given state in the
+/// world
+Eigen::VectorXd WithRespectToVelocity::lowerBound(
+    std::shared_ptr<simulation::World> world)
+{
+  return world->getVelocityLowerLimits();
+}
+
 /// Basic constructor
 WithRespectToForce::WithRespectToForce()
 {
@@ -142,6 +174,22 @@ int WithRespectToForce::dim(std::shared_ptr<simulation::World> world)
 int WithRespectToForce::dim(dynamics::Skeleton* skel)
 {
   return skel->getNumDofs();
+}
+
+/// This gives a vector of upper bound values for this WRT, given state in the
+/// world
+Eigen::VectorXd WithRespectToForce::upperBound(
+    std::shared_ptr<simulation::World> world)
+{
+  return world->getForceUpperLimits();
+}
+
+/// This gives a vector of lower bound values for this WRT, given state in the
+/// world
+Eigen::VectorXd WithRespectToForce::lowerBound(
+    std::shared_ptr<simulation::World> world)
+{
+  return world->getForceLowerLimits();
 }
 
 } // namespace neural

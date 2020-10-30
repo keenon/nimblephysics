@@ -1302,8 +1302,6 @@ void testCartpole(double rotationRadians)
     return (pos[0] * pos[0]) + (pos[1] * pos[1]) + (vel[0] * vel[0])
            + (vel[1] * vel[1]);
   }));
-  // Run this a bunch to let us catch it on top
-  EXPECT_TRUE(verifyBulkPass(world, 1000, 50));
 }
 
 #ifdef ALL_TESTS
@@ -1484,7 +1482,6 @@ void testJumpWorm(bool offGround, bool interpenetration)
   // Test to make sure the loss lambda doesn't crash
   double l = loss(world);
   EXPECT_TRUE(verifyGradientBackprop(world, 50, loss));
-  EXPECT_TRUE(verifyBulkPass(world, 1000, 50));
   */
 }
 

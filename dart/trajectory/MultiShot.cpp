@@ -26,7 +26,7 @@ MultiShot::MultiShot(
     int steps,
     int shotLength,
     bool tuneStartingState)
-  : AbstractShot(world, loss, steps)
+  : AbstractShot(world, loss, steps), mParallelOperationsEnabled(false)
 {
   mShotLength = shotLength;
   mTuneStartingState = tuneStartingState;
@@ -137,12 +137,13 @@ void MultiShot::removeMapping(const std::string& key)
 
 //==============================================================================
 /// Returns the length of the flattened problem state
-int MultiShot::getFlatProblemDim() const
+int MultiShot::getFlatDynamicProblemDim(
+    std::shared_ptr<simulation::World> world) const
 {
   int sum = 0;
   for (const std::shared_ptr<SingleShot> shot : mShots)
   {
-    sum += shot->getFlatProblemDim();
+    sum += shot->getFlatDynamicProblemDim(world);
   }
   return sum;
 }
@@ -233,7 +234,10 @@ void MultiShot::asyncPartComputeConstraints(
 //==============================================================================
 /// This copies a shot down into a single flat vector
 void MultiShot::flatten(
-    /* OUT */ Eigen::Ref<Eigen::VectorXd> flat, PerformanceLog* log) const
+    std::shared_ptr<simulation::World> world,
+    /* OUT */ Eigen::Ref<Eigen::VectorXd> flatStatic,
+    /* OUT */ Eigen::Ref<Eigen::VectorXd> flatDynamic,
+    PerformanceLog* log) const
 {
   PerformanceLog* thisLog = nullptr;
 #ifdef LOG_PERFORMANCE_MULTI_SHOT
@@ -246,8 +250,8 @@ void MultiShot::flatten(
   int cursor = 0;
   for (const std::shared_ptr<SingleShot>& shot : mShots)
   {
-    int dim = shot->getFlatProblemDim();
-    shot->flatten(flat.segment(cursor, dim), thisLog);
+    int dim = shot->getFlatDynamicProblemDim(world);
+    shot->flatten(world, flatStatic, flatDynamic.segment(cursor, dim), thisLog);
     cursor += dim;
   }
 
@@ -262,7 +266,10 @@ void MultiShot::flatten(
 //==============================================================================
 /// This gets the parameters out of a flat vector
 void MultiShot::unflatten(
-    const Eigen::Ref<const Eigen::VectorXd>& flat, PerformanceLog* log)
+    std::shared_ptr<simulation::World> world,
+    const Eigen::Ref<const Eigen::VectorXd>& flatStatic,
+    const Eigen::Ref<const Eigen::VectorXd>& flatDynamic,
+    PerformanceLog* log)
 {
   PerformanceLog* thisLog = nullptr;
 #ifdef LOG_PERFORMANCE_MULTI_SHOT
@@ -276,8 +283,9 @@ void MultiShot::unflatten(
   int cursor = 0;
   for (std::shared_ptr<SingleShot>& shot : mShots)
   {
-    int dim = shot->getFlatProblemDim();
-    shot->unflatten(flat.segment(cursor, dim), thisLog);
+    int dim = shot->getFlatDynamicProblemDim(world);
+    shot->unflatten(
+        world, flatStatic, flatDynamic.segment(cursor, dim), thisLog);
     cursor += dim;
   }
 
@@ -294,7 +302,8 @@ void MultiShot::unflatten(
 /// optimization
 void MultiShot::getUpperBounds(
     std::shared_ptr<simulation::World> world,
-    /* OUT */ Eigen::Ref<Eigen::VectorXd> flat,
+    /* OUT */ Eigen::Ref<Eigen::VectorXd> flatStatic,
+    /* OUT */ Eigen::Ref<Eigen::VectorXd> flatDynamic,
     PerformanceLog* log) const
 {
   PerformanceLog* thisLog = nullptr;
@@ -308,8 +317,9 @@ void MultiShot::getUpperBounds(
   int cursor = 0;
   for (const std::shared_ptr<SingleShot>& shot : mShots)
   {
-    int dim = shot->getFlatProblemDim();
-    shot->getUpperBounds(world, flat.segment(cursor, dim), thisLog);
+    int dim = shot->getFlatDynamicProblemDim(world);
+    shot->getUpperBounds(
+        world, flatStatic, flatDynamic.segment(cursor, dim), thisLog);
     cursor += dim;
   }
 
@@ -326,7 +336,8 @@ void MultiShot::getUpperBounds(
 /// optimization
 void MultiShot::getLowerBounds(
     std::shared_ptr<simulation::World> world,
-    /* OUT */ Eigen::Ref<Eigen::VectorXd> flat,
+    /* OUT */ Eigen::Ref<Eigen::VectorXd> flatStatic,
+    /* OUT */ Eigen::Ref<Eigen::VectorXd> flatDynamic,
     PerformanceLog* log) const
 {
   PerformanceLog* thisLog = nullptr;
@@ -340,8 +351,9 @@ void MultiShot::getLowerBounds(
   int cursor = 0;
   for (const std::shared_ptr<SingleShot>& shot : mShots)
   {
-    int dim = shot->getFlatProblemDim();
-    shot->getLowerBounds(world, flat.segment(cursor, dim), thisLog);
+    int dim = shot->getFlatDynamicProblemDim(world);
+    shot->getLowerBounds(
+        world, flatStatic, flatDynamic.segment(cursor, dim), thisLog);
     cursor += dim;
   }
 
@@ -410,7 +422,8 @@ void MultiShot::getConstraintLowerBounds(
 /// optimization
 void MultiShot::getInitialGuess(
     std::shared_ptr<simulation::World> world,
-    /* OUT */ Eigen::Ref<Eigen::VectorXd> flat,
+    /* OUT */ Eigen::Ref<Eigen::VectorXd> flatStatic,
+    /* OUT */ Eigen::Ref<Eigen::VectorXd> flatDynamic,
     PerformanceLog* log) const
 {
   PerformanceLog* thisLog = nullptr;
@@ -424,8 +437,9 @@ void MultiShot::getInitialGuess(
   int cursor = 0;
   for (const std::shared_ptr<SingleShot>& shot : mShots)
   {
-    int dim = shot->getFlatProblemDim();
-    shot->getInitialGuess(world, flat.segment(cursor, dim), thisLog);
+    int dim = shot->getFlatDynamicProblemDim(world);
+    shot->getInitialGuess(
+        world, flatStatic, flatDynamic.segment(cursor, dim), thisLog);
     cursor += dim;
   }
 
@@ -443,7 +457,8 @@ void MultiShot::getInitialGuess(
 /// getFlatProblemDim()).
 void MultiShot::backpropJacobian(
     std::shared_ptr<simulation::World> world,
-    /* OUT */ Eigen::Ref<Eigen::MatrixXd> jac,
+    /* OUT */ Eigen::Ref<Eigen::MatrixXd> jacStatic,
+    /* OUT */ Eigen::Ref<Eigen::MatrixXd> jacDynamic,
     PerformanceLog* log)
 {
   PerformanceLog* thisLog = nullptr;
@@ -454,19 +469,26 @@ void MultiShot::backpropJacobian(
   }
 #endif
 
-  assert(jac.cols() == getFlatProblemDim());
-  assert(jac.rows() == getConstraintDim());
+  assert(jacStatic.cols() == getFlatStaticProblemDim(world));
+  assert(jacStatic.rows() == getConstraintDim());
+  assert(jacDynamic.cols() == getFlatDynamicProblemDim(world));
+  assert(jacDynamic.rows() == getConstraintDim());
 
   int rowCursor = 0;
   int colCursor = 0;
 
-  jac.setZero();
+  jacStatic.setZero();
+  jacDynamic.setZero();
 
   // Handle custom constraints
   int numParentConstraints = AbstractShot::getConstraintDim();
-  int n = getFlatProblemDim();
+  int staticDim = getFlatStaticProblemDim(world);
+  int dynamicDim = getFlatDynamicProblemDim(world);
   AbstractShot::backpropJacobian(
-      world, jac.block(0, 0, numParentConstraints, n), thisLog);
+      world,
+      jacStatic.block(0, 0, numParentConstraints, staticDim),
+      jacDynamic.block(0, 0, numParentConstraints, dynamicDim),
+      thisLog);
   rowCursor += numParentConstraints;
 
   // Add in knot point constraints
@@ -474,36 +496,57 @@ void MultiShot::backpropJacobian(
   if (mParallelOperationsEnabled)
   {
     std::vector<std::future<void>> futures;
+    Eigen::MatrixXd jacStaticCopies = Eigen::MatrixXd::Zero(
+        jacStatic.rows(), jacStatic.cols() * (mShots.size() - 1));
     for (int i = 1; i < mShots.size(); i++)
     {
-      int dim = mShots[i - 1]->getFlatProblemDim();
+      int dynamicDim = mShots[i - 1]->getFlatDynamicProblemDim(world);
       futures.push_back(std::async(
           &MultiShot::asyncPartBackpropJacobian,
           this,
           i,
           mParallelWorlds[i],
-          jac,
+          jacStaticCopies.block(
+              0,
+              (i - 1) * jacStatic.cols(),
+              jacStatic.rows(),
+              jacStatic.cols()),
+          jacDynamic,
           rowCursor,
           colCursor,
           thisLog));
-      colCursor += dim;
+      colCursor += dynamicDim;
       rowCursor += stateDim;
     }
+    jacStatic.setZero();
     for (int i = 0; i < futures.size(); i++)
     {
       futures[i].wait();
+      jacStatic += jacStaticCopies.block(
+          0, i * jacStatic.cols(), jacStatic.rows(), jacStatic.cols());
     }
   }
   else
   {
+    // We need a copy of the jacStatic matrix, or else every SingleShot will
+    // clear it and redo the sum over time. Instead, we give every SingleShot a
+    // scratch matrix to use, which it can safely zero, and then sum the
+    // results.
+    Eigen::MatrixXd jacStaticScratch
+        = Eigen::MatrixXd::Zero(stateDim, jacStatic.cols());
+
     for (int i = 1; i < mShots.size(); i++)
     {
-      int dim = mShots[i - 1]->getFlatProblemDim();
+      int dim = mShots[i - 1]->getFlatDynamicProblemDim(world);
       mShots[i - 1]->backpropJacobianOfFinalState(
-          world, jac.block(rowCursor, colCursor, stateDim, dim), thisLog);
+          world,
+          jacStaticScratch,
+          jacDynamic.block(rowCursor, colCursor, stateDim, dim),
+          thisLog);
       colCursor += dim;
-      jac.block(rowCursor, colCursor, stateDim, stateDim)
+      jacDynamic.block(rowCursor, colCursor, stateDim, stateDim)
           = -1 * Eigen::MatrixXd::Identity(stateDim, stateDim);
+      jacStatic.block(rowCursor, 0, stateDim, staticDim) += jacStaticScratch;
       rowCursor += stateDim;
     }
   }
@@ -511,8 +554,10 @@ void MultiShot::backpropJacobian(
   // We don't include the last shot in the constraints, cause it doesn't end in
   // a knot point
   assert(
-      colCursor == jac.cols() - mShots[mShots.size() - 1]->getFlatProblemDim());
-  assert(rowCursor == jac.rows());
+      colCursor
+      == jacDynamic.cols()
+             - mShots[mShots.size() - 1]->getFlatDynamicProblemDim(world));
+  assert(rowCursor == jacDynamic.rows());
 
 #ifdef LOG_PERFORMANCE_MULTI_SHOT
   if (thisLog != nullptr)
@@ -528,30 +573,52 @@ void MultiShot::backpropJacobian(
 void MultiShot::asyncPartBackpropJacobian(
     int index,
     std::shared_ptr<simulation::World> world,
-    /* OUT */ Eigen::Ref<Eigen::MatrixXd> jac,
+    /* OUT */ Eigen::Ref<Eigen::MatrixXd> jacStatic,
+    /* OUT */ Eigen::Ref<Eigen::MatrixXd> jacDynamic,
     int rowCursor,
     int colCursor,
     PerformanceLog* log)
 {
   int stateDim = getRepresentationStateSize();
-  int dim = mShots[index - 1]->getFlatProblemDim();
+  int dim = mShots[index - 1]->getFlatProblemDim(world);
   mShots[index - 1]->backpropJacobianOfFinalState(
-      world, jac.block(rowCursor, colCursor, stateDim, dim), log);
+      world,
+      jacStatic,
+      jacDynamic.block(rowCursor, colCursor, stateDim, dim),
+      log);
   colCursor += dim;
-  jac.block(rowCursor, colCursor, stateDim, stateDim)
+  jacDynamic.block(rowCursor, colCursor, stateDim, stateDim)
       = -1 * Eigen::MatrixXd::Identity(stateDim, stateDim);
   rowCursor += stateDim;
 }
 
 //==============================================================================
 /// This gets the number of non-zero entries in the Jacobian
-int MultiShot::getNumberNonZeroJacobian()
+int MultiShot::getNumberNonZeroJacobianStatic(
+    std::shared_ptr<simulation::World> world)
 {
-  int nnzj = AbstractShot::getNumberNonZeroJacobian();
+  int nnzj = AbstractShot::getNumberNonZeroJacobianStatic(world);
+
   int stateDim = getRepresentationStateSize();
+  int staticDim = getFlatStaticProblemDim(world);
+  nnzj += staticDim * (stateDim * (mShots.size() - 1));
+
+  return nnzj;
+}
+
+//==============================================================================
+/// This gets the number of non-zero entries in the Jacobian
+int MultiShot::getNumberNonZeroJacobianDynamic(
+    std::shared_ptr<simulation::World> world)
+{
+  int nnzj = AbstractShot::getNumberNonZeroJacobianDynamic(world);
+
+  int stateDim = getRepresentationStateSize();
+  int staticDim = getFlatStaticProblemDim(world);
+
   for (int i = 0; i < mShots.size() - 1; i++)
   {
-    int shotDim = mShots[i]->getFlatProblemDim();
+    int shotDim = mShots[i]->getFlatDynamicProblemDim(world);
     // The main Jacobian block
     nnzj += shotDim * stateDim;
     // The -I at the end
@@ -563,7 +630,54 @@ int MultiShot::getNumberNonZeroJacobian()
 
 //==============================================================================
 /// This gets the structure of the non-zero entries in the Jacobian
-void MultiShot::getJacobianSparsityStructure(
+void MultiShot::getJacobianSparsityStructureStatic(
+    std::shared_ptr<simulation::World> world,
+    Eigen::Ref<Eigen::VectorXi> rows,
+    Eigen::Ref<Eigen::VectorXi> cols,
+    PerformanceLog* log)
+{
+  PerformanceLog* thisLog = nullptr;
+#ifdef LOG_PERFORMANCE_MULTI_SHOT
+  if (log != nullptr)
+  {
+    thisLog = log->startRun("MultiShot.getJacobianSparsityStructure");
+  }
+#endif
+
+  int sparseCursor = 0;
+  int rowCursor = 0;
+  int colCursor = 0;
+  int stateDim = getRepresentationStateSize();
+
+  // Handle custom constraints
+  int abstractNnzj = AbstractShot::getNumberNonZeroJacobianStatic(world);
+  AbstractShot::getJacobianSparsityStructureStatic(
+      world,
+      rows.segment(0, abstractNnzj),
+      cols.segment(0, abstractNnzj),
+      thisLog);
+  rowCursor += AbstractShot::getConstraintDim();
+  sparseCursor += abstractNnzj;
+
+  // Handle the static data, in row-major order
+  int staticDim = getFlatStaticProblemDim(world);
+  for (int row = rowCursor; row < rowCursor + (stateDim * (mShots.size() - 1));
+       row++)
+  {
+    for (int col = colCursor; col < colCursor + staticDim; col++)
+    {
+      rows(sparseCursor) = row;
+      cols(sparseCursor) = col;
+      sparseCursor++;
+    }
+  }
+  colCursor += staticDim;
+}
+
+//==============================================================================
+/// This gets the structure of the non-zero entries in the Jacobian
+void MultiShot::getJacobianSparsityStructureDynamic(
+    std::shared_ptr<simulation::World> world,
     Eigen::Ref<Eigen::VectorXi> rows,
     Eigen::Ref<Eigen::VectorXi> cols,
     PerformanceLog* log)
@@ -580,21 +694,22 @@ void MultiShot::getJacobianSparsityStructure(
   int rowCursor = 0;
   int colCursor = 0;
 
-  // Handle custom constraints
-  int numParentConstraints = AbstractShot::getConstraintDim();
-  int n = getFlatProblemDim();
-  AbstractShot::getJacobianSparsityStructure(
-      rows.segment(0, n * numParentConstraints),
-      cols.segment(0, n * numParentConstraints),
-      thisLog);
-  rowCursor += numParentConstraints;
-  sparseCursor += n * numParentConstraints;
-
   int stateDim = getRepresentationStateSize();
+
+  // Handle custom constraints
+  int abstractNnzj = AbstractShot::getNumberNonZeroJacobianDynamic(world);
+  AbstractShot::getJacobianSparsityStructureDynamic(
+      world,
+      rows.segment(0, abstractNnzj),
+      cols.segment(0, abstractNnzj),
+      thisLog);
+  rowCursor += AbstractShot::getConstraintDim();
+  sparseCursor += abstractNnzj;
+
   // Handle knot point constraints
   for (int i = 1; i < mShots.size(); i++)
   {
-    int dim = mShots[i - 1]->getFlatProblemDim();
+    int dim = mShots[i - 1]->getFlatDynamicProblemDim(world);
     // This is the main Jacobian
     for (int col = colCursor; col < colCursor + dim; col++)
     {
@@ -628,7 +743,8 @@ void MultiShot::getJacobianSparsityStructure(
 /// This writes the Jacobian to a sparse vector
 void MultiShot::getSparseJacobian(
     std::shared_ptr<simulation::World> world,
-    Eigen::Ref<Eigen::VectorXd> sparse,
+    Eigen::Ref<Eigen::VectorXd> sparseStatic,
+    Eigen::Ref<Eigen::VectorXd> sparseDynamic,
     PerformanceLog* log)
 {
   PerformanceLog* thisLog = nullptr;
@@ -639,9 +755,15 @@ void MultiShot::getSparseJacobian(
   }
 #endif
 
-  int sparseCursor = AbstractShot::getNumberNonZeroJacobian();
+  int cursorStatic = AbstractShot::getNumberNonZeroJacobianStatic(world);
+  int cursorDynamic = AbstractShot::getNumberNonZeroJacobianDynamic(world);
+
   AbstractShot::getSparseJacobian(
-      world, sparse.segment(0, sparseCursor), thisLog);
+      world,
+      sparseStatic.segment(0, cursorStatic),
+      sparseDynamic.segment(0, cursorDynamic),
+      thisLog);
+
   int stateDim = getRepresentationStateSize();
 
   if (mParallelOperationsEnabled)
@@ -649,16 +771,21 @@ void MultiShot::getSparseJacobian(
     std::vector<std::future<void>> futures;
     for (int i = 1; i < mShots.size(); i++)
     {
-      int dim = mShots[i - 1]->getFlatProblemDim();
+      int dimStatic = mShots[i - 1]->getFlatStaticProblemDim(world);
+      int dimDynamic = mShots[i - 1]->getFlatDynamicProblemDim(world);
+
       futures.push_back(std::async(
           &MultiShot::asyncPartGetSparseJacobian,
           this,
           i,
           mParallelWorlds[i],
-          sparse,
-          sparseCursor,
+          sparseStatic,
+          sparseDynamic,
+          cursorStatic,
+          cursorDynamic,
           thisLog));
-      sparseCursor += (dim + 1) * stateDim;
+
+      cursorDynamic += (dimDynamic + 1) * stateDim;
     }
     for (int i = 0; i < futures.size(); i++)
     {
@@ -670,18 +797,36 @@ void MultiShot::getSparseJacobian(
     Eigen::VectorXd neg = Eigen::VectorXd::Ones(stateDim) * -1;
     for (int i = 1; i < mShots.size(); i++)
     {
-      int dim = mShots[i - 1]->getFlatProblemDim();
-      // This is the main Jacobian
-      Eigen::MatrixXd jac = Eigen::MatrixXd::Zero(stateDim, dim);
-      mShots[i - 1]->backpropJacobianOfFinalState(world, jac, thisLog);
-      for (int col = 0; col < dim; col++)
+      int dimStatic = mShots[i - 1]->getFlatStaticProblemDim(world);
+      int dimDynamic = mShots[i - 1]->getFlatDynamicProblemDim(world);
+
+      // Get the dense Jacobians for static and dynamic regions
+      Eigen::MatrixXd jacStatic = Eigen::MatrixXd::Zero(stateDim, dimStatic);
+      Eigen::MatrixXd jacDynamic = Eigen::MatrixXd::Zero(stateDim, dimDynamic);
+      mShots[i - 1]->backpropJacobianOfFinalState(
+          world, jacStatic, jacDynamic, thisLog);
+
+      // Copy over the static Jacobian to the global static region (this will
+      // overwrite the same region a bunch of times)
+
+      for (int row = 0; row < stateDim; row++)
       {
-        sparse.segment(sparseCursor, stateDim) = jac.col(col);
-        sparseCursor += stateDim;
+        sparseStatic.segment(cursorStatic, dimStatic) = jacStatic.row(row);
+        cursorStatic += dimStatic;
       }
-      // This is the negative identity at the end
-      sparse.segment(sparseCursor, stateDim) = neg;
-      sparseCursor += stateDim;
+
+      // Copy over the dynamic Jacobian to a unique spot in the dynamic region
+
+      for (int col = 0; col < dimDynamic; col++)
+      {
+        sparseDynamic.segment(cursorDynamic, stateDim) = jacDynamic.col(col);
+        cursorDynamic += stateDim;
+      }
+      // This is the negative identity at the end of our segment in the dynamic
+      // region
+      sparseDynamic.segment(cursorDynamic, stateDim) = neg;
+
+      cursorDynamic += stateDim;
     }
   }
 
@@ -698,24 +843,42 @@ void MultiShot::getSparseJacobian(
 void MultiShot::asyncPartGetSparseJacobian(
     int index,
     std::shared_ptr<simulation::World> world,
-    Eigen::Ref<Eigen::VectorXd> sparse,
-    int sparseCursor,
+    Eigen::Ref<Eigen::VectorXd> sparseStatic,
+    Eigen::Ref<Eigen::VectorXd> sparseDynamic,
+    int cursorStatic,
+    int cursorDynamic,
     PerformanceLog* log)
 {
   int stateDim = getRepresentationStateSize();
-  int dim = mShots[index - 1]->getFlatProblemDim();
-  // This is the main Jacobian
-  Eigen::MatrixXd jac = Eigen::MatrixXd::Zero(stateDim, dim);
-  mShots[index - 1]->backpropJacobianOfFinalState(world, jac, log);
-  for (int col = 0; col < dim; col++)
+
+  int dimStatic = mShots[index - 1]->getFlatStaticProblemDim(world);
+  int dimDynamic = mShots[index - 1]->getFlatDynamicProblemDim(world);
+
+  // Get the dense Jacobians for static and dynamic regions
+  Eigen::MatrixXd jacStatic = Eigen::MatrixXd::Zero(stateDim, dimStatic);
+  Eigen::MatrixXd jacDynamic = Eigen::MatrixXd::Zero(stateDim, dimDynamic);
+  mShots[index - 1]->backpropJacobianOfFinalState(
+      world, jacStatic, jacDynamic, log);
+
+  // Copy over the static Jacobian
+
+  for (int col = 0; col < dimStatic; col++)
   {
-    sparse.segment(sparseCursor, stateDim) = jac.col(col);
-    sparseCursor += stateDim;
+    sparseStatic.segment(cursorStatic + (col * stateDim), stateDim)
+        = jacStatic.col(col);
+  }
+
+  // Copy over the dynamic Jacobian
+
+  for (int col = 0; col < dimDynamic; col++)
+  {
+    sparseDynamic.segment(cursorDynamic, stateDim) = jacDynamic.col(col);
+    cursorDynamic += stateDim;
   }
   // This is the negative identity at the end
   Eigen::VectorXd neg = Eigen::VectorXd::Ones(stateDim) * -1;
-  sparse.segment(sparseCursor, stateDim) = neg;
-  sparseCursor += stateDim;
+  sparseDynamic.segment(cursorDynamic, stateDim) = neg;
+  cursorDynamic += stateDim;
 }
 
 //==============================================================================
@@ -879,17 +1042,28 @@ Eigen::VectorXd MultiShot::getFinalState(
 
 //==============================================================================
 /// This returns the debugging name of a given DOF
-std::string MultiShot::getFlatDimName(int dim)
+std::string MultiShot::getFlatDimName(
+    std::shared_ptr<simulation::World> world, int dim)
 {
+  int staticDim = getFlatStaticProblemDim(world);
   for (int i = 0; i < mShots.size(); i++)
   {
-    int shotDim = mShots[i]->getFlatProblemDim();
+    int shotDim = mShots[i]->getFlatDynamicProblemDim(world);
     if (dim < shotDim)
     {
-      return "Shot " + std::to_string(i) + " " + mShots[i]->getFlatDimName(dim);
+      // Using (dim + staticDim) as the value we pass to getFlatDimName() is
+      // crucial here, because our SingleShot children each assume they own the
+      // static region themselves, which isn't true in multiple shooting.
+      return "Shot " + std::to_string(i) + " "
+             + mShots[i]->getFlatDimName(world, dim + staticDim);
     }
     dim -= shotDim;
   }
+  if (dim < staticDim)
+  {
+    return "Static Dim " + std::to_string(dim);
+  }
+  dim -= staticDim;
   return "Error OOB";
 }
 
@@ -899,7 +1073,8 @@ std::string MultiShot::getFlatDimName(int dim)
 void MultiShot::backpropGradientWrt(
     std::shared_ptr<simulation::World> world,
     const TrajectoryRollout* gradWrtRollout,
-    /* OUT */ Eigen::Ref<Eigen::VectorXd> grad,
+    /* OUT */ Eigen::Ref<Eigen::VectorXd> gradStatic,
+    /* OUT */ Eigen::Ref<Eigen::VectorXd> gradDynamic,
     PerformanceLog* log)
 {
   PerformanceLog* thisLog = nullptr;
@@ -910,7 +1085,7 @@ void MultiShot::backpropGradientWrt(
   }
 #endif
 
-  int cursorDims = 0;
+  int cursorDynamicDims = 0;
   int cursorSteps = 0;
   if (mParallelOperationsEnabled)
   {
@@ -918,19 +1093,20 @@ void MultiShot::backpropGradientWrt(
     for (int i = 0; i < mShots.size(); i++)
     {
       int steps = mShots[i]->getNumSteps();
-      int dim = mShots[i]->getFlatProblemDim();
+      int dynamicDim = mShots[i]->getFlatDynamicProblemDim(world);
       futures.push_back(std::async(
           &MultiShot::asyncPartBackpropGradientWrt,
           this,
           i,
           mParallelWorlds[i],
           gradWrtRollout,
-          grad,
-          cursorDims,
+          gradStatic,
+          gradDynamic,
+          cursorDynamicDims,
           cursorSteps,
           thisLog));
       cursorSteps += steps;
-      cursorDims += dim;
+      cursorDynamicDims += dynamicDim;
     }
     for (int i = 0; i < futures.size(); i++)
     {
@@ -942,13 +1118,17 @@ void MultiShot::backpropGradientWrt(
     for (int i = 0; i < mShots.size(); i++)
     {
       int steps = mShots[i]->getNumSteps();
-      int dim = mShots[i]->getFlatProblemDim();
+      int dynamicDim = mShots[i]->getFlatDynamicProblemDim(world);
       const TrajectoryRolloutConstRef slice
           = gradWrtRollout->sliceConst(cursorSteps, steps);
       mShots[i]->backpropGradientWrt(
-          world, &slice, grad.segment(cursorDims, dim), thisLog);
+          world,
+          &slice,
+          gradStatic,
+          gradDynamic.segment(cursorDynamicDims, dynamicDim),
+          thisLog);
       cursorSteps += steps;
-      cursorDims += dim;
+      cursorDynamicDims += dynamicDim;
     }
   }
 
@@ -967,17 +1147,22 @@ void MultiShot::asyncPartBackpropGradientWrt(
     int index,
     std::shared_ptr<simulation::World> world,
     const TrajectoryRollout* gradWrtRollout,
-    /* OUT */ Eigen::Ref<Eigen::VectorXd> grad,
+    /* OUT */ Eigen::Ref<Eigen::VectorXd> gradStatic,
+    /* OUT */ Eigen::Ref<Eigen::VectorXd> gradDynamic,
     int cursorDims,
     int cursorSteps,
     PerformanceLog* log)
 {
   int steps = mShots[index]->getNumSteps();
-  int dim = mShots[index]->getFlatProblemDim();
+  int dynamicDim = mShots[index]->getFlatDynamicProblemDim(world);
   const TrajectoryRolloutConstRef slice
       = gradWrtRollout->sliceConst(cursorSteps, steps);
   mShots[index]->backpropGradientWrt(
-      world, &slice, grad.segment(cursorDims, dim), log);
+      world,
+      &slice,
+      gradStatic,
+      gradDynamic.segment(cursorDims, dynamicDim),
+      log);
 }
 
 } // namespace trajectory

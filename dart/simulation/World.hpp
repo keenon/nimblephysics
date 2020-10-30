@@ -75,6 +75,10 @@ namespace collision {
 class CollisionResult;
 } // namespace collision
 
+namespace neural {
+class WithRespectToMass;
+}
+
 namespace simulation {
 
 DART_COMMON_DECLARE_SHARED_WEAK(World)
@@ -394,6 +398,10 @@ public:
   /// Get recording
   Recording* getRecording();
 
+  //--------------------------------------------------------------------------
+  // Gradients
+  //--------------------------------------------------------------------------
+
   /// Get the unconstrained velocities that we found in the last timestep,
   /// before we solved the LCP for constraints
   const Eigen::VectorXd& getLastPreConstraintVelocity() const;
@@ -412,6 +420,10 @@ public:
   void setConstraintForceMixingEnabled(bool enable);
 
   bool getConstraintForceMixingEnabled();
+
+  /// This returns the object that we're using to keep track of which objects in
+  /// the world need gradients through which kinds of mass.
+  std::shared_ptr<neural::WithRespectToMass> getWrtMass();
 
 protected:
   /// Register when a Skeleton's name is changed
@@ -493,6 +505,12 @@ protected:
   // Signals
   //--------------------------------------------------------------------------
   NameChangedSignal mNameChangedSignal;
+
+  //--------------------------------------------------------------------------
+  // Gradients
+  //--------------------------------------------------------------------------
+
+  std::shared_ptr<neural::WithRespectToMass> mWrtMass;
 
 public:
   //--------------------------------------------------------------------------

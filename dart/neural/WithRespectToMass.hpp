@@ -52,7 +52,15 @@ public:
 
   /// This registers that we'd like to keep track of this node's mass in this
   /// way in this differentiation
-  void registerNode(dynamics::BodyNode* node, WrtMassBodyNodeEntryType type);
+  WrtMassBodyNodyEntry& registerNode(
+      dynamics::BodyNode* node,
+      WrtMassBodyNodeEntryType type,
+      Eigen::VectorXd upperBound,
+      Eigen::VectorXd lowerBound);
+
+  /// This returns the entry object corresponding to this node. Throws an
+  /// assertion if this node doesn't exist
+  WrtMassBodyNodyEntry& getNode(dynamics::BodyNode* node);
 
   //////////////////////////////////////////////////////////////
   // Implement all the methods we need
@@ -77,8 +85,18 @@ public:
   /// This gives the dimensions of the WRT in a single skeleton
   int dim(dynamics::Skeleton* skel) override;
 
+  /// This gives a vector of upper bound values for this WRT, given state in the
+  /// world
+  Eigen::VectorXd upperBound(std::shared_ptr<simulation::World> world) override;
+
+  /// This gives a vector of lower bound values for this WRT, given state in the
+  /// world
+  Eigen::VectorXd lowerBound(std::shared_ptr<simulation::World> world) override;
+
 protected:
   std::unordered_map<std::string, std::vector<WrtMassBodyNodyEntry>> mEntries;
+  Eigen::VectorXd mUpperBounds;
+  Eigen::VectorXd mLowerBounds;
 };
 
 } // namespace neural

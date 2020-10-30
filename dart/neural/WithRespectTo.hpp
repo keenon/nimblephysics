@@ -45,6 +45,16 @@ public:
   /// This gives the dimensions of the WRT in a single skeleton
   virtual int dim(dynamics::Skeleton* skel) = 0;
 
+  /// This gives a vector of upper bound values for this WRT, given state in the
+  /// world
+  virtual Eigen::VectorXd upperBound(std::shared_ptr<simulation::World> world)
+      = 0;
+
+  /// This gives a vector of lower bound values for this WRT, given state in the
+  /// world
+  virtual Eigen::VectorXd lowerBound(std::shared_ptr<simulation::World> world)
+      = 0;
+
   static WithRespectToPosition* POSITION;
   static WithRespectToVelocity* VELOCITY;
   static WithRespectToForce* FORCE;
@@ -73,6 +83,14 @@ public:
 
   /// This gives the dimensions of the WRT in a single skeleton
   int dim(dynamics::Skeleton* skel) override;
+
+  /// This gives a vector of upper bound values for this WRT, given state in the
+  /// world
+  Eigen::VectorXd upperBound(std::shared_ptr<simulation::World> world) override;
+
+  /// This gives a vector of lower bound values for this WRT, given state in the
+  /// world
+  Eigen::VectorXd lowerBound(std::shared_ptr<simulation::World> world) override;
 };
 
 class WithRespectToVelocity : public WithRespectTo
@@ -98,6 +116,14 @@ public:
 
   /// This gives the dimensions of the WRT in a single skeleton
   int dim(dynamics::Skeleton* skel) override;
+
+  /// This gives a vector of upper bound values for this WRT, given state in the
+  /// world
+  Eigen::VectorXd upperBound(std::shared_ptr<simulation::World> world) override;
+
+  /// This gives a vector of lower bound values for this WRT, given state in the
+  /// world
+  Eigen::VectorXd lowerBound(std::shared_ptr<simulation::World> world) override;
 };
 
 class WithRespectToForce : public WithRespectTo
@@ -123,6 +149,14 @@ public:
 
   /// This gives the dimensions of the WRT in a single skeleton
   int dim(dynamics::Skeleton* skel) override;
+
+  /// This gives a vector of upper bound values for this WRT, given state in the
+  /// world
+  Eigen::VectorXd upperBound(std::shared_ptr<simulation::World> world) override;
+
+  /// This gives a vector of lower bound values for this WRT, given state in the
+  /// world
+  Eigen::VectorXd lowerBound(std::shared_ptr<simulation::World> world) override;
 };
 
 } // namespace neural

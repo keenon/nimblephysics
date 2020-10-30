@@ -7,6 +7,7 @@
 #include "dart/neural/ConstrainedGroupGradientMatrices.hpp"
 #include "dart/neural/DifferentiableContactConstraint.hpp"
 #include "dart/neural/RestorableSnapshot.hpp"
+#include "dart/neural/WithRespectToMass.hpp"
 #include "dart/simulation/World.hpp"
 
 // This replaces all analytical Jacobian calculations with finite differencing.
@@ -96,6 +97,7 @@ BackpropSnapshot::BackpropSnapshot(
   mCachedVelVelDirty = true;
   mCachedForcePosDirty = true;
   mCachedForceVelDirty = true;
+  mCachedMassVelDirty = true;
 }
 
 //==============================================================================
@@ -130,14 +132,12 @@ void BackpropSnapshot::backprop(
   thisTimestepLoss.lossWrtVelocity = Eigen::VectorXd(mNumDOFs);
   thisTimestepLoss.lossWrtTorque = Eigen::VectorXd(mNumDOFs);
 
-  //////////////////////////////////////////////////////////
-  // TODO: <remove me>
-
   const Eigen::MatrixXd& posPos = getPosPosJacobian(world, thisLog);
   const Eigen::MatrixXd& posVel = getPosVelJacobian(world, thisLog);
   const Eigen::MatrixXd& velPos = getVelPosJacobian(world, thisLog);
   const Eigen::MatrixXd& velVel = getVelVelJacobian(world, thisLog);
   const Eigen::MatrixXd& forceVel = getForceVelJacobian(world, thisLog);
+  const Eigen::MatrixXd& massVel = getMassVelJacobian(world, thisLog);
 
   thisTimestepLoss.lossWrtPosition
       = posPos.transpose() * nextTimestepLoss.lossWrtPosition
@@ -147,6 +147,8 @@ void BackpropSnapshot::backprop(
         + velVel.transpose() * nextTimestepLoss.lossWrtVelocity;
   thisTimestepLoss.lossWrtTorque
       = forceVel.transpose() * nextTimestepLoss.lossWrtVelocity;
+  thisTimestepLoss.lossWrtMass
+      = massVel.transpose() * nextTimestepLoss.lossWrtVelocity;
 
 #ifdef LOG_PERFORMANCE_BACKPROP_SNAPSHOT
   if (thisLog != nullptr)
@@ -156,9 +158,11 @@ void BackpropSnapshot::backprop(
 #endif
   return;
 
-  // TODO: </remove me>
   //////////////////////////////////////////////////////////
+  // TODO: this is the older, potentially more efficient way to do it. We should
+  // measure and verify that during optimization.
 
+  /*
   // Actually run the backprop
 
   std::unordered_map<std::string, bool> skeletonsVisited;
@@ -286,6 +290,7 @@ void BackpropSnapshot::backprop(
     thisLog->end();
   }
 #endif
+  */
 }
 
 //==============================================================================
@@ -367,6 +372,62 @@ const Eigen::MatrixXd& BackpropSnapshot::getForceVelJacobian(
   }
 #endif
   return mCachedForceVel;
+}
+
+//==============================================================================
+/// This computes and returns the whole mass-vel jacobian. For backprop, you
+/// don't actually need this matrix, you can compute backprop directly. This
+/// is here if you want access to the full Jacobian for some reason.
+const Eigen::MatrixXd& BackpropSnapshot::getMassVelJacobian(
+    simulation::WorldPtr world, PerformanceLog* perfLog)
+{
+  PerformanceLog* thisLog = nullptr;
+#ifdef LOG_PERFORMANCE_BACKPROP_SNAPSHOT
+  if (perfLog != nullptr)
+  {
+    thisLog = perfLog->startRun("BackpropSnapshot.getMassVelJacobian");
+  }
+#endif
+
+  if (mCachedMassVelDirty)
+  {
+    PerformanceLog* refreshLog = nullptr;
+#ifdef LOG_PERFORMANCE_BACKPROP_SNAPSHOT
+    if (thisLog != nullptr)
+    {
+      refreshLog = thisLog->startRun(
+          "BackpropSnapshot.getMassVelJacobian#refreshCache");
+    }
+#endif
+
+#ifdef USE_FD_OVERRIDE
+    mCachedVelVel = finiteDifferenceMassVelJacobian(world);
+#else
+    mCachedMassVel = getVelJacobianWrt(world, world->getWrtMass().get());
+#endif
+
+#ifdef SLOW_FD_CHECK_EVERYTHING
+    Eigen::MatrixXd bruteForce = finiteDifferenceMassVelJacobian(world);
+    equalsOrCrash(world, mCachedForceVel, bruteForce, "mass-vel");
+#endif
+
+    mCachedMassVelDirty = false;
+
+#ifdef LOG_PERFORMANCE_BACKPROP_SNAPSHOT
+    if (refreshLog != nullptr)
+    {
+      refreshLog->end();
+    }
+#endif
+  }
+
+#ifdef LOG_PERFORMANCE_BACKPROP_SNAPSHOT
+  if (thisLog != nullptr)
+  {
+    thisLog->end();
+  }
+#endif
+  return mCachedMassVel;
 }
 
 //==============================================================================
@@ -1002,6 +1063,11 @@ Eigen::MatrixXd BackpropSnapshot::getScratchFiniteDifference(
 Eigen::MatrixXd BackpropSnapshot::getVelJacobianWrt(
     simulation::WorldPtr world, WithRespectTo* wrt)
 {
+  int wrtDim = wrt->dim(world);
+  if (wrtDim == 0)
+  {
+    return Eigen::MatrixXd::Zero(world->getNumDofs(), 0);
+  }
   RestorableSnapshot snapshot(world);
   world->setPositions(mPreStepPosition);
   world->setVelocities(mPreStepVelocity);
@@ -1792,6 +1858,49 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceForceVelJacobian(
     Eigen::VectorXd tweakedForces = Eigen::VectorXd(originalForces);
     tweakedForces(i) += EPSILON;
     world->setForces(tweakedForces);
+
+    world->step(false);
+
+    Eigen::VectorXd velChange
+        = (world->getVelocities() - originalVel) / EPSILON;
+    J.col(i).noalias() = velChange;
+  }
+
+  snapshot.restore();
+  world->getConstraintSolver()->setGradientEnabled(oldGradientEnabled);
+
+  return J;
+}
+
+//==============================================================================
+Eigen::MatrixXd BackpropSnapshot::finiteDifferenceMassVelJacobian(
+    simulation::WorldPtr world)
+{
+  RestorableSnapshot snapshot(world);
+
+  Eigen::MatrixXd J(mNumDOFs, mNumDOFs);
+
+  bool oldGradientEnabled = world->getConstraintSolver()->getGradientEnabled();
+  world->getConstraintSolver()->setGradientEnabled(false);
+
+  world->setPositions(mPreStepPosition);
+  world->setVelocities(mPreStepVelocity);
+  world->setForces(mPreStepTorques);
+  world->step(false);
+
+  Eigen::VectorXd originalMass = world->getWrtMass()->get(world);
+  Eigen::VectorXd originalVel = world->getVelocities();
+
+  double EPSILON = 1e-7;
+  for (std::size_t i = 0; i < world->getNumDofs(); i++)
+  {
+    snapshot.restore();
+
+    world->setPositions(mPreStepPosition);
+    world->setVelocities(mPreStepVelocity);
+    Eigen::VectorXd tweakedMass = Eigen::VectorXd(originalMass);
+    tweakedMass(i) += EPSILON;
+    world->getWrtMass()->set(world, tweakedMass);
 
     world->step(false);
 

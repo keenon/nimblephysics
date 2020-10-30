@@ -49,6 +49,7 @@
 #include "dart/dynamics/Skeleton.hpp"
 #include "dart/integration/SemiImplicitEulerIntegrator.hpp"
 #include "dart/neural/ConstrainedGroupGradientMatrices.hpp"
+#include "dart/neural/WithRespectToMass.hpp"
 
 namespace dart {
 namespace simulation {
@@ -72,7 +73,8 @@ World::World(const std::string& _name)
     mRecording(new Recording(mSkeletons)),
     onNameChanged(mNameChangedSignal),
     mConstraintForceMixingEnabled(false),
-    mPenetrationCorrectionEnabled(false)
+    mPenetrationCorrectionEnabled(false),
+    mWrtMass(std::make_shared<neural::WithRespectToMass>())
 {
   mIndices.push_back(0);
 
@@ -101,6 +103,9 @@ WorldPtr World::clone() const
   worldClone->setTimeStep(mTimeStep);
   worldClone->setConstraintForceMixingEnabled(mConstraintForceMixingEnabled);
   worldClone->setPenetrationCorrectionEnabled(mPenetrationCorrectionEnabled);
+
+  // Copy the WithRespectToMass pointer, so we have the same object
+  worldClone->mWrtMass = mWrtMass;
 
   auto cd = getConstraintSolver()->getCollisionDetector();
   worldClone->getConstraintSolver()->setCollisionDetector(
@@ -286,6 +291,12 @@ void World::setConstraintForceMixingEnabled(bool enable)
 bool World::getConstraintForceMixingEnabled()
 {
   return mConstraintForceMixingEnabled;
+}
+
+//==============================================================================
+std::shared_ptr<neural::WithRespectToMass> World::getWrtMass()
+{
+  return mWrtMass;
 }
 
 //==============================================================================

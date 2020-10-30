@@ -24,6 +24,7 @@ public:
   virtual int getPosDim() = 0;
   virtual int getVelDim() = 0;
   virtual int getForceDim() = 0;
+  virtual int getMassDim() = 0;
 
   virtual void setPositions(
       std::shared_ptr<simulation::World> world,
@@ -36,6 +37,10 @@ public:
   virtual void setForces(
       std::shared_ptr<simulation::World> world,
       const Eigen::Ref<Eigen::VectorXd>& forces)
+      = 0;
+  virtual void setMasses(
+      std::shared_ptr<simulation::World> world,
+      const Eigen::Ref<Eigen::VectorXd>& masses)
       = 0;
 
   virtual void getPositionsInPlace(
@@ -50,10 +55,15 @@ public:
       std::shared_ptr<simulation::World> world,
       /* OUT */ Eigen::Ref<Eigen::VectorXd> forces)
       = 0;
+  virtual void getMassesInPlace(
+      std::shared_ptr<simulation::World> world,
+      /* OUT */ Eigen::Ref<Eigen::VectorXd> masses)
+      = 0;
 
   Eigen::VectorXd getPositions(std::shared_ptr<simulation::World> world);
   Eigen::VectorXd getVelocities(std::shared_ptr<simulation::World> world);
   Eigen::VectorXd getForces(std::shared_ptr<simulation::World> world);
+  Eigen::VectorXd getMasses(std::shared_ptr<simulation::World> world);
 
   /// This gets a Jacobian relating the changes in the outer positions (the
   /// "mapped" positions) to inner positions (the "real" positions)
@@ -108,6 +118,19 @@ public:
       std::shared_ptr<simulation::World> world)
       = 0;
 
+  /// This gets a Jacobian relating the changes in the outer mass (the
+  /// "mapped" mass) to inner mass (the "real" mass)
+  virtual Eigen::MatrixXd getMappedMassToRealMassJac(
+      std::shared_ptr<simulation::World> world)
+      = 0;
+
+  /// This gets a Jacobian relating the changes in the inner mass (the
+  /// "real" mass) to the corresponding outer mass (the "mapped"
+  /// mass)
+  virtual Eigen::MatrixXd getRealMassToMappedMassJac(
+      std::shared_ptr<simulation::World> world)
+      = 0;
+
   virtual Eigen::VectorXd getPositionLowerLimits(
       std::shared_ptr<simulation::World> world);
   virtual Eigen::VectorXd getPositionUpperLimits(
@@ -119,6 +142,10 @@ public:
   virtual Eigen::VectorXd getForceLowerLimits(
       std::shared_ptr<simulation::World> world);
   virtual Eigen::VectorXd getForceUpperLimits(
+      std::shared_ptr<simulation::World> world);
+  virtual Eigen::VectorXd getMassLowerLimits(
+      std::shared_ptr<simulation::World> world);
+  virtual Eigen::VectorXd getMassUpperLimits(
       std::shared_ptr<simulation::World> world);
 };
 

@@ -69,7 +69,8 @@ set(DART_PKG_EXTERNAL_DEPS "eigen, ccd, fcl, assimp, boost")
 #===============================================================================
 # Build options
 #===============================================================================
-option(DART_VERBOSE "Whether print detailed information in CMake process" OFF)
+option(DART_VERBOSE "Whether print detailed information in CMake process" ON)
+message(STATUS "DART_VERBOSE = ${DART_VERBOSE}")
 option(ENABLE_OPENMP "Build with OpenMP parallaization enabled" ON)
 if(MSVC)
   set(DART_RUNTIME_LIBRARY "/MD" CACHE STRING "BaseName chosen by the user at CMake configure time")
@@ -91,7 +92,7 @@ option(DART_BUILD_GUI_OSG "Build osgDart library" OFF)
 option(DART_BUILD_EXTRAS "Build extra projects" OFF)
 option(DART_CODECOV "Turn on codecov support" OFF)
 option(DART_TREAT_WARNINGS_AS_ERRORS "Treat warnings as errors" OFF)
-option(DART_FAST_DEBUG "Add -O1 option for DEBUG mode build" ON)
+option(DART_FAST_DEBUG "Add -O1 option for DEBUG mode build" OFF)
 option(DART_BUILD_DARTPY "Build dartpy (the python binding)" ON)
 
 if(DART_BUILD_DARTPY)

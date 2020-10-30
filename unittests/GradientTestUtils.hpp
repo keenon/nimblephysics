@@ -1605,31 +1605,6 @@ bool verifyGradientBackprop(
   return true;
 }
 
-bool verifyBulkPass(
-    WorldPtr world, std::size_t timesteps, std::size_t shootingLength)
-{
-  int dofs = world->getNumDofs();
-  int numKnotPoses = floor(static_cast<double>(timesteps) / shootingLength);
-
-  // Run a bulk forward pass
-
-  Eigen::MatrixXd torques = Eigen::MatrixXd::Random(dofs, timesteps);
-  Eigen::MatrixXd knotPoses = Eigen::MatrixXd::Random(dofs, numKnotPoses);
-  Eigen::MatrixXd knotVels = Eigen::MatrixXd::Random(dofs, numKnotPoses);
-  BulkForwardPassResult forward
-      = bulkForwardPass(world, torques, shootingLength, knotPoses, knotVels);
-
-  // Run a bulk backward pass
-
-  Eigen::MatrixXd lossWrtPoses = Eigen::MatrixXd::Random(dofs, timesteps);
-  Eigen::MatrixXd lossWrtVels = Eigen::MatrixXd::Random(dofs, timesteps);
-  BulkBackwardPassResult backward = bulkBackwardPass(
-      world, forward.snapshots, shootingLength, lossWrtPoses, lossWrtVels);
-
-  // This passes if it just doesn't crash
-  return true;
-}
-
 bool verifyWorldSpaceToVelocitySpatial(
     WorldPtr world, Eigen::VectorXd position, Eigen::VectorXd velocity)
 {
@@ -4239,7 +4214,10 @@ bool verifyWrtMass(WorldPtr world)
     {
       for (int j = 0; j < skel->getNumBodyNodes(); j++)
       {
-        massMapping.registerNode(skel->getBodyNode(j), INERTIA_MASS);
+        Eigen::VectorXd lowerBound = Eigen::VectorXd::Ones(1) * 0.1;
+        Eigen::VectorXd upperBound = Eigen::VectorXd::Ones(1) * 1000;
+        massMapping.registerNode(
+            skel->getBodyNode(j), INERTIA_MASS, upperBound, lowerBound);
       }
     }
   }
@@ -4258,7 +4236,10 @@ bool verifyWrtMass(WorldPtr world)
     auto skel = world->getSkeleton(i);
     for (int j = 0; j < skel->getNumBodyNodes(); j++)
     {
-      inertiaMapping.registerNode(skel->getBodyNode(j), INERTIA_FULL);
+      Eigen::VectorXd lowerBound = Eigen::VectorXd::Ones(6) * 0.1;
+      Eigen::VectorXd upperBound = Eigen::VectorXd::Ones(6) * 1000;
+      inertiaMapping.registerNode(
+          skel->getBodyNode(j), INERTIA_FULL, upperBound, lowerBound);
     }
   }
   verifyJacobiansWrt(world, &inertiaMapping);

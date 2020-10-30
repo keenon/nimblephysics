@@ -116,7 +116,8 @@ void SingleShot::switchRepresentationMapping(
 
 //==============================================================================
 /// Returns the length of the flattened problem state
-int SingleShot::getFlatProblemDim() const
+int SingleShot::getFlatDynamicProblemDim(
+    std::shared_ptr<simulation::World> /* ignored */) const
 {
   if (mTuneStartingState)
     return (getRepresentation()->getPosDim()
@@ -134,7 +135,10 @@ int SingleShot::getConstraintDim() const
 //==============================================================================
 /// This copies a shot down into a single flat vector
 void SingleShot::flatten(
-    Eigen::Ref<Eigen::VectorXd> flat, PerformanceLog* log) const
+    std::shared_ptr<simulation::World> world,
+    Eigen::Ref<Eigen::VectorXd> flatStatic,
+    Eigen::Ref<Eigen::VectorXd> flatDynamic,
+    PerformanceLog* log) const
 {
   PerformanceLog* thisLog = nullptr;
 #ifdef LOG_PERFORMANCE_SINGLE_SHOT
@@ -144,21 +148,33 @@ void SingleShot::flatten(
   }
 #endif
 
-  int cursor = 0;
+  // Run the AbstractShot flattening, and set our cursors forward to ignore
+  // anything flattened already
+  int cursorStatic = AbstractShot::getFlatStaticProblemDim(world);
+  int cursorDynamic = AbstractShot::getFlatDynamicProblemDim(world);
+  AbstractShot::flatten(
+      world,
+      flatStatic.segment(0, cursorStatic),
+      flatDynamic.segment(0, cursorDynamic),
+      thisLog);
+
   if (mTuneStartingState)
   {
-    flat.segment(0, getRepresentation()->getPosDim()) = mStartPos;
-    cursor += getRepresentation()->getPosDim();
-    flat.segment(cursor, getRepresentation()->getVelDim()) = mStartVel;
-    cursor += getRepresentation()->getVelDim();
+    flatDynamic.segment(cursorDynamic, getRepresentation()->getPosDim())
+        = mStartPos;
+    cursorDynamic += getRepresentation()->getPosDim();
+    flatDynamic.segment(cursorDynamic, getRepresentation()->getVelDim())
+        = mStartVel;
+    cursorDynamic += getRepresentation()->getVelDim();
   }
   int forceDim = getRepresentation()->getForceDim();
   for (int i = 0; i < mSteps; i++)
   {
-    flat.segment(cursor, forceDim) = mForces.col(i);
-    cursor += forceDim;
+    flatDynamic.segment(cursorDynamic, forceDim) = mForces.col(i);
+    cursorDynamic += forceDim;
   }
-  assert(cursor == flat.size());
+  assert(cursorDynamic == flatDynamic.size());
+  assert(cursorStatic == flatStatic.size());
 
 #ifdef LOG_PERFORMANCE_SINGLE_SHOT
   if (thisLog != nullptr)
@@ -171,7 +187,10 @@ void SingleShot::flatten(
 //==============================================================================
 /// This gets the parameters out of a flat vector
 void SingleShot::unflatten(
-    const Eigen::Ref<const Eigen::VectorXd>& flat, PerformanceLog* log)
+    std::shared_ptr<simulation::World> world,
+    const Eigen::Ref<const Eigen::VectorXd>& flatStatic,
+    const Eigen::Ref<const Eigen::VectorXd>& flatDynamic,
+    PerformanceLog* log)
 {
   PerformanceLog* thisLog = nullptr;
 #ifdef LOG_PERFORMANCE_SINGLE_SHOT
@@ -183,21 +202,32 @@ void SingleShot::unflatten(
 
   mRolloutCacheDirty = true;
   mSnapshotsCacheDirty = true;
-  int cursor = 0;
+
+  int cursorDynamic = AbstractShot::getFlatDynamicProblemDim(world);
+  int cursorStatic = AbstractShot::getFlatStaticProblemDim(world);
+  AbstractShot::unflatten(
+      world,
+      flatStatic.segment(0, cursorStatic),
+      flatDynamic.segment(0, cursorDynamic),
+      thisLog);
+
   if (mTuneStartingState)
   {
-    mStartPos = flat.segment(0, getRepresentation()->getPosDim());
-    cursor += getRepresentation()->getPosDim();
-    mStartVel = flat.segment(cursor, getRepresentation()->getVelDim());
-    cursor += getRepresentation()->getVelDim();
+    mStartPos = flatDynamic.segment(0, getRepresentation()->getPosDim());
+    cursorDynamic += getRepresentation()->getPosDim();
+    mStartVel
+        = flatDynamic.segment(cursorDynamic, getRepresentation()->getVelDim());
+    cursorDynamic += getRepresentation()->getVelDim();
   }
   int forceDim = getRepresentation()->getForceDim();
   for (int i = 0; i < mSteps; i++)
   {
-    mForces.col(i) = flat.segment(cursor, forceDim);
-    cursor += forceDim;
+    mForces.col(i) = flatDynamic.segment(cursorDynamic, forceDim);
+    cursorDynamic += forceDim;
   }
-  assert(cursor == flat.size());
+
+  assert(cursorDynamic == flatDynamic.size());
+  assert(cursorStatic == flatStatic.size());
 
 #ifdef LOG_PERFORMANCE_SINGLE_SHOT
   if (thisLog != nullptr)
@@ -212,7 +242,8 @@ void SingleShot::unflatten(
 /// optimization
 void SingleShot::getUpperBounds(
     std::shared_ptr<simulation::World> world,
-    /* OUT */ Eigen::Ref<Eigen::VectorXd> flat,
+    /* OUT */ Eigen::Ref<Eigen::VectorXd> flatStatic,
+    /* OUT */ Eigen::Ref<Eigen::VectorXd> flatDynamic,
     PerformanceLog* log) const
 {
   PerformanceLog* thisLog = nullptr;
@@ -223,26 +254,34 @@ void SingleShot::getUpperBounds(
   }
 #endif
 
-  int cursor = 0;
+  int cursorDynamic = AbstractShot::getFlatDynamicProblemDim(world);
+  int cursorStatic = AbstractShot::getFlatStaticProblemDim(world);
+  AbstractShot::getUpperBounds(
+      world,
+      flatStatic.segment(0, cursorStatic),
+      flatDynamic.segment(0, cursorDynamic),
+      thisLog);
+
   if (mTuneStartingState)
   {
     int posDim = getRepresentation()->getPosDim();
     int velDim = getRepresentation()->getVelDim();
-    flat.segment(0, posDim)
+    flatDynamic.segment(0, posDim)
         = getRepresentation()->getPositionUpperLimits(world);
-    flat.segment(posDim, velDim)
+    flatDynamic.segment(posDim, velDim)
         = getRepresentation()->getVelocityUpperLimits(world);
-    cursor = posDim + velDim;
+    cursorDynamic = posDim + velDim;
   }
   int forceDim = getRepresentation()->getForceDim();
   Eigen::VectorXd forceUpperLimits = world->getForceUpperLimits();
   assert(forceDim == forceUpperLimits.size());
   for (int i = 0; i < mSteps; i++)
   {
-    flat.segment(cursor, forceDim) = forceUpperLimits;
-    cursor += forceDim;
+    flatDynamic.segment(cursorDynamic, forceDim) = forceUpperLimits;
+    cursorDynamic += forceDim;
   }
-  assert(cursor == flat.size());
+  assert(cursorDynamic == flatDynamic.size());
+  assert(cursorStatic == flatStatic.size());
 
 #ifdef LOG_PERFORMANCE_SINGLE_SHOT
   if (thisLog != nullptr)
@@ -257,7 +296,8 @@ void SingleShot::getUpperBounds(
 /// optimization
 void SingleShot::getLowerBounds(
     std::shared_ptr<simulation::World> world,
-    /* OUT */ Eigen::Ref<Eigen::VectorXd> flat,
+    /* OUT */ Eigen::Ref<Eigen::VectorXd> flatStatic,
+    /* OUT */ Eigen::Ref<Eigen::VectorXd> flatDynamic,
     PerformanceLog* log) const
 {
   PerformanceLog* thisLog = nullptr;
@@ -268,16 +308,23 @@ void SingleShot::getLowerBounds(
   }
 #endif
 
-  int cursor = 0;
+  int cursorDynamic = AbstractShot::getFlatDynamicProblemDim(world);
+  int cursorStatic = AbstractShot::getFlatStaticProblemDim(world);
+  AbstractShot::getLowerBounds(
+      world,
+      flatStatic.segment(0, cursorStatic),
+      flatDynamic.segment(0, cursorDynamic),
+      thisLog);
+
   if (mTuneStartingState)
   {
     int posDim = getRepresentation()->getPosDim();
     int velDim = getRepresentation()->getVelDim();
-    flat.segment(0, posDim)
+    flatDynamic.segment(0, posDim)
         = getRepresentation()->getPositionLowerLimits(world);
-    flat.segment(posDim, velDim)
+    flatDynamic.segment(posDim, velDim)
         = getRepresentation()->getVelocityLowerLimits(world);
-    cursor = posDim + velDim;
+    cursorDynamic = posDim + velDim;
   }
   int forceDim = getRepresentation()->getForceDim();
   Eigen::VectorXd forceLowerLimits
@@ -285,10 +332,11 @@ void SingleShot::getLowerBounds(
   assert(forceDim == forceLowerLimits.size());
   for (int i = 0; i < mSteps; i++)
   {
-    flat.segment(cursor, forceDim) = forceLowerLimits;
-    cursor += forceDim;
+    flatDynamic.segment(cursorDynamic, forceDim) = forceLowerLimits;
+    cursorDynamic += forceDim;
   }
-  assert(cursor == flat.size());
+  assert(cursorDynamic == flatDynamic.size());
+  assert(cursorStatic == flatStatic.size());
 
 #ifdef LOG_PERFORMANCE_SINGLE_SHOT
   if (thisLog != nullptr)
@@ -303,7 +351,8 @@ void SingleShot::getLowerBounds(
 /// optimization
 void SingleShot::getInitialGuess(
     std::shared_ptr<simulation::World> world,
-    /* OUT */ Eigen::Ref<Eigen::VectorXd> flat,
+    /* OUT */ Eigen::Ref<Eigen::VectorXd> flatStatic,
+    /* OUT */ Eigen::Ref<Eigen::VectorXd> flatDynamic,
     PerformanceLog* log) const
 {
   PerformanceLog* thisLog = nullptr;
@@ -314,7 +363,7 @@ void SingleShot::getInitialGuess(
   }
 #endif
 
-  flatten(flat, thisLog);
+  flatten(world, flatStatic, flatDynamic, thisLog);
 
 #ifdef LOG_PERFORMANCE_SINGLE_SHOT
   if (thisLog != nullptr)
@@ -329,7 +378,25 @@ void SingleShot::getInitialGuess(
 /// This returns a matrix that's (2 * mNumDofs, getFlatProblemDim()).
 void SingleShot::backpropJacobianOfFinalState(
     std::shared_ptr<simulation::World> world,
-    Eigen::Ref<Eigen::MatrixXd> jac,
+    /* OUT */ Eigen::Ref<Eigen::MatrixXd> jac,
+    PerformanceLog* log)
+{
+  int staticDim = getFlatStaticProblemDim(world);
+  int dynamicDim = getFlatDynamicProblemDim(world);
+  backpropJacobianOfFinalState(
+      world,
+      jac.block(0, 0, jac.rows(), staticDim),
+      jac.block(0, staticDim, jac.rows(), dynamicDim),
+      log);
+}
+
+//==============================================================================
+/// This computes the Jacobian that relates the flat problem to the end state.
+/// This returns a matrix that's (2 * mNumDofs, getFlatProblemDim()).
+void SingleShot::backpropJacobianOfFinalState(
+    std::shared_ptr<simulation::World> world,
+    Eigen::Ref<Eigen::MatrixXd> jacStatic,
+    Eigen::Ref<Eigen::MatrixXd> jacDynamic,
     PerformanceLog* log)
 {
   PerformanceLog* thisLog = nullptr;
@@ -339,6 +406,8 @@ void SingleShot::backpropJacobianOfFinalState(
     thisLog = log->startRun("SingleShot.backpropJacobianOfFinalState");
   }
 #endif
+
+  AbstractShot::initializeStaticJacobianOfFinalState(world, jacStatic, thisLog);
 
   std::vector<MappedBackpropSnapshotPtr> snapshots
       = getSnapshots(world, thisLog);
@@ -355,13 +424,24 @@ void SingleShot::backpropJacobianOfFinalState(
   last.velVel = Eigen::MatrixXd::Identity(velDim, velDim);
   last.velPos = Eigen::MatrixXd::Zero(posDim, velDim);
 
-  int cursor = getFlatProblemDim();
+  /*
+  std::cout << "Jac dynamic: " << jacDynamic.rows() << "x" << jacDynamic.cols()
+            << std::endl;
+  std::cout << "Jac static: " << jacStatic.rows() << "x" << jacStatic.cols()
+            << std::endl;
+  */
+  assert(jacDynamic.rows() == posDim + velDim);
+  assert(jacStatic.rows() == posDim + velDim);
+
+  int cursorDynamic = getFlatDynamicProblemDim(world);
   for (int i = mSteps - 1; i >= 0; i--)
   {
     MappedBackpropSnapshotPtr ptr = snapshots[i];
     TimestepJacobians thisTimestep;
     Eigen::MatrixXd forceVel
         = ptr->getForceVelJacobian(world, mRepresentationMapping, thisLog);
+    Eigen::MatrixXd massVel
+        = ptr->getMassVelJacobian(world, mRepresentationMapping, thisLog);
     Eigen::MatrixXd posPos
         = ptr->getPosPosJacobian(world, mRepresentationMapping, thisLog);
     Eigen::MatrixXd posVel
@@ -375,6 +455,10 @@ void SingleShot::backpropJacobianOfFinalState(
     thisTimestep.forcePos = last.velPos * forceVel;
     // v_end <- f_t = v_end <- v_t+1 * v_t+1 <- f_t
     thisTimestep.forceVel = last.velVel * forceVel;
+    // p_end <- m_t = p_end <- v_t+1 * v_t+1 <- m_t
+    thisTimestep.massPos = last.velPos * massVel;
+    // v_end <- m_t = v_end <- v_t+1 * v_t+1 <- m_t
+    thisTimestep.massVel = last.velVel * massVel;
     // p_end <- v_t = (p_end <- p_t+1 * p_t+1 <- v_t) + (p_end <- v_t+1 * v_t+1
     // <- v_t)
     thisTimestep.velPos = last.posPos * velPos + last.velPos * velVel;
@@ -388,25 +472,32 @@ void SingleShot::backpropJacobianOfFinalState(
     // <- p_t)
     thisTimestep.posVel = last.posVel * posPos + last.velVel * posVel;
 
-    cursor -= forceDim;
-    jac.block(0, cursor, posDim, forceDim) = thisTimestep.forcePos;
-    jac.block(posDim, cursor, velDim, forceDim) = thisTimestep.forceVel;
+    cursorDynamic -= forceDim;
+    jacDynamic.block(0, cursorDynamic, posDim, forceDim)
+        = thisTimestep.forcePos;
+    jacDynamic.block(posDim, cursorDynamic, velDim, forceDim)
+        = thisTimestep.forceVel;
 
     if (i == 0 && mTuneStartingState)
     {
-      cursor -= velDim;
-      assert(cursor == posDim);
-      jac.block(0, cursor, posDim, velDim) = thisTimestep.velPos;
-      jac.block(posDim, cursor, velDim, velDim) = thisTimestep.velVel;
-      cursor -= posDim;
-      assert(cursor == 0);
-      jac.block(0, cursor, posDim, posDim) = thisTimestep.posPos;
-      jac.block(posDim, cursor, velDim, posDim) = thisTimestep.posVel;
+      cursorDynamic -= velDim;
+      assert(cursorDynamic == posDim);
+      jacDynamic.block(0, cursorDynamic, posDim, velDim) = thisTimestep.velPos;
+      jacDynamic.block(posDim, cursorDynamic, velDim, velDim)
+          = thisTimestep.velVel;
+      cursorDynamic -= posDim;
+      assert(cursorDynamic == 0);
+      jacDynamic.block(0, cursorDynamic, posDim, posDim) = thisTimestep.posPos;
+      jacDynamic.block(posDim, cursorDynamic, velDim, posDim)
+          = thisTimestep.posVel;
     }
+
+    AbstractShot::accumulateStaticJacobianOfFinalState(
+        world, jacStatic, thisTimestep, thisLog);
 
     last = thisTimestep;
   }
-  assert(cursor == 0);
+  assert(cursorDynamic == 0);
 
 #ifdef LOG_PERFORMANCE_SINGLE_SHOT
   if (thisLog != nullptr)
@@ -423,21 +514,35 @@ void SingleShot::finiteDifferenceJacobianOfFinalState(
 {
   Eigen::VectorXd originalEndPos = getFinalState(world, nullptr);
 
-  int dim = getFlatProblemDim();
+  int dim = getFlatProblemDim(world);
+  int staticDim = getFlatStaticProblemDim(world);
+  int dynamicDim = getFlatDynamicProblemDim(world);
   Eigen::VectorXd flat = Eigen::VectorXd(dim);
-  flatten(flat, nullptr);
+  flatten(
+      world,
+      flat.segment(0, staticDim),
+      flat.segment(staticDim, dynamicDim),
+      nullptr);
 
   double EPS = 1e-7;
 
   for (int i = 0; i < dim; i++)
   {
     flat(i) += EPS;
-    unflatten(flat, nullptr);
+    unflatten(
+        world,
+        flat.segment(0, staticDim),
+        flat.segment(staticDim, dynamicDim),
+        nullptr);
     flat(i) -= EPS;
     Eigen::VectorXd perturbedEndStatePos = getFinalState(world, nullptr);
 
     flat(i) -= EPS;
-    unflatten(flat, nullptr);
+    unflatten(
+        world,
+        flat.segment(0, staticDim),
+        flat.segment(staticDim, dynamicDim),
+        nullptr);
     flat(i) += EPS;
     Eigen::VectorXd perturbedEndStateNeg = getFinalState(world, nullptr);
 
@@ -445,7 +550,11 @@ void SingleShot::finiteDifferenceJacobianOfFinalState(
   }
 
   // Restore original value
-  unflatten(flat, nullptr);
+  unflatten(
+      world,
+      flat.segment(0, staticDim),
+      flat.segment(staticDim, dynamicDim),
+      nullptr);
 }
 
 //==============================================================================
@@ -454,7 +563,8 @@ void SingleShot::finiteDifferenceJacobianOfFinalState(
 void SingleShot::backpropGradientWrt(
     std::shared_ptr<simulation::World> world,
     const TrajectoryRollout* gradWrtRollout,
-    /* OUT */ Eigen::Ref<Eigen::VectorXd> grad,
+    /* OUT */ Eigen::Ref<Eigen::VectorXd> gradStatic,
+    /* OUT */ Eigen::Ref<Eigen::VectorXd> gradDynamic,
     PerformanceLog* log)
 {
   PerformanceLog* thisLog = nullptr;
@@ -465,8 +575,16 @@ void SingleShot::backpropGradientWrt(
   }
 #endif
 
-  int dims = getFlatProblemDim();
-  assert(grad.size() == dims);
+  AbstractShot::initializeStaticGradient(
+      world,
+      gradStatic.segment(0, AbstractShot::getFlatStaticProblemDim(world)),
+      thisLog);
+
+  int staticDims = getFlatStaticProblemDim(world);
+  int dynamicDims = getFlatDynamicProblemDim(world);
+  assert(gradStatic.size() == staticDims);
+  assert(gradDynamic.size() == dynamicDims);
+
   std::vector<MappedBackpropSnapshotPtr> snapshots
       = getSnapshots(world, thisLog);
   assert(snapshots.size() == mSteps);
@@ -479,7 +597,7 @@ void SingleShot::backpropGradientWrt(
   nextTimestep.lossWrtTorque
       = Eigen::VectorXd::Zero(mMappings[mRepresentationMapping]->getForceDim());
 
-  int cursor = dims;
+  int cursorDynamic = dynamicDims;
   int forceDim = mMappings[mRepresentationMapping]->getForceDim();
   for (int i = mSteps - 1; i >= 0; i--)
   {
@@ -491,6 +609,7 @@ void SingleShot::backpropGradientWrt(
           = gradWrtRollout->getPosesConst(pair.first).col(i);
       mappedGrad.lossWrtVelocity
           = gradWrtRollout->getVelsConst(pair.first).col(i);
+      // This value is currently ignored
       mappedGrad.lossWrtTorque
           = gradWrtRollout->getForcesConst(pair.first).col(i);
       mappedLosses[pair.first] = mappedGrad;
@@ -502,19 +621,28 @@ void SingleShot::backpropGradientWrt(
 
     LossGradient thisTimestep;
     snapshots[i]->backprop(world, thisTimestep, mappedLosses, thisLog);
-    cursor -= forceDim;
-    grad.segment(cursor, forceDim) = thisTimestep.lossWrtTorque;
+
+    AbstractShot::accumulateStaticGradient(
+        world,
+        gradStatic.segment(0, AbstractShot::getFlatStaticProblemDim(world)),
+        thisTimestep,
+        thisLog);
+
+    cursorDynamic -= forceDim;
+    gradDynamic.segment(cursorDynamic, forceDim) = thisTimestep.lossWrtTorque;
     if (i == 0 && mTuneStartingState)
     {
       assert(
-          cursor
+          cursorDynamic
           == mMappings[mRepresentationMapping]->getPosDim()
                  + mMappings[mRepresentationMapping]->getVelDim());
-      cursor -= mMappings[mRepresentationMapping]->getVelDim();
-      grad.segment(cursor, mMappings[mRepresentationMapping]->getVelDim())
+      cursorDynamic -= mMappings[mRepresentationMapping]->getVelDim();
+      gradDynamic.segment(
+          cursorDynamic, mMappings[mRepresentationMapping]->getVelDim())
           = thisTimestep.lossWrtVelocity;
-      cursor -= mMappings[mRepresentationMapping]->getPosDim();
-      grad.segment(cursor, mMappings[mRepresentationMapping]->getPosDim())
+      cursorDynamic -= mMappings[mRepresentationMapping]->getPosDim();
+      gradDynamic.segment(
+          cursorDynamic, mMappings[mRepresentationMapping]->getPosDim())
           = thisTimestep.lossWrtPosition;
     }
     thisTimestep.lossWrtTorque
@@ -524,7 +652,7 @@ void SingleShot::backpropGradientWrt(
 
     nextTimestep = thisTimestep;
   }
-  assert(cursor == 0);
+  assert(cursorDynamic == 0);
 
 #ifdef LOG_PERFORMANCE_SINGLE_SHOT
   if (thisLog != nullptr)
@@ -682,7 +810,8 @@ Eigen::VectorXd SingleShot::getFinalState(
 
 //==============================================================================
 /// This returns the debugging name of a given DOF
-std::string SingleShot::getFlatDimName(int dim)
+std::string SingleShot::getFlatDimName(
+    std::shared_ptr<simulation::World> world, int dim)
 {
   if (mTuneStartingState)
   {
@@ -706,7 +835,13 @@ std::string SingleShot::getFlatDimName(int dim)
     }
     dim -= forceDim;
   }
-  return "Error OOB";
+  int staticDim = getFlatStaticProblemDim(world);
+  if (dim < staticDim)
+  {
+    return "Static " + std::to_string(dim);
+  }
+  dim -= staticDim;
+  return "Error OOB by " + std::to_string(dim);
 }
 
 //==============================================================================

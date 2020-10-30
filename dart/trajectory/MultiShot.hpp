@@ -69,33 +69,40 @@ public:
   void removeMapping(const std::string& key) override;
 
   /// Returns the length of the flattened problem stat
-  int getFlatProblemDim() const override;
+  int getFlatDynamicProblemDim(
+      std::shared_ptr<simulation::World> world) const override;
 
   /// Returns the length of the knot-point constraint vector
   int getConstraintDim() const override;
 
   /// This copies a shot down into a single flat vector
   void flatten(
-      /* OUT */ Eigen::Ref<Eigen::VectorXd> flat,
+      std::shared_ptr<simulation::World> world,
+      /* OUT */ Eigen::Ref<Eigen::VectorXd> flatStatic,
+      /* OUT */ Eigen::Ref<Eigen::VectorXd> flatDynamic,
       PerformanceLog* log = nullptr) const override;
 
   /// This gets the parameters out of a flat vector
   void unflatten(
-      const Eigen::Ref<const Eigen::VectorXd>& flat,
+      std::shared_ptr<simulation::World> world,
+      const Eigen::Ref<const Eigen::VectorXd>& flatStatic,
+      const Eigen::Ref<const Eigen::VectorXd>& flatDynamic,
       PerformanceLog* log = nullptr) override;
 
   /// This gets the fixed upper bounds for a flat vector, used during
   /// optimization
   void getUpperBounds(
       std::shared_ptr<simulation::World> world,
-      /* OUT */ Eigen::Ref<Eigen::VectorXd> flat,
+      /* OUT */ Eigen::Ref<Eigen::VectorXd> flatStatic,
+      /* OUT */ Eigen::Ref<Eigen::VectorXd> flatDynamic,
       PerformanceLog* log = nullptr) const override;
 
   /// This gets the fixed lower bounds for a flat vector, used during
   /// optimization
   void getLowerBounds(
       std::shared_ptr<simulation::World> world,
-      /* OUT */ Eigen::Ref<Eigen::VectorXd> flat,
+      /* OUT */ Eigen::Ref<Eigen::VectorXd> flatStatic,
+      /* OUT */ Eigen::Ref<Eigen::VectorXd> flatDynamic,
       PerformanceLog* log = nullptr) const override;
 
   /// This gets the bounds on the constraint functions (both knot points and any
@@ -114,7 +121,8 @@ public:
   /// optimization
   void getInitialGuess(
       std::shared_ptr<simulation::World> world,
-      /* OUT */ Eigen::Ref<Eigen::VectorXd> flat,
+      /* OUT */ Eigen::Ref<Eigen::VectorXd> flatStatic,
+      /* OUT */ Eigen::Ref<Eigen::VectorXd> flatDynamic,
       PerformanceLog* log = nullptr) const override;
 
   /// This computes the values of the constraints
@@ -137,7 +145,8 @@ public:
   /// getFlatProblemDim()).
   void backpropJacobian(
       std::shared_ptr<simulation::World> world,
-      /* OUT */ Eigen::Ref<Eigen::MatrixXd> jac,
+      /* OUT */ Eigen::Ref<Eigen::MatrixXd> jacStatic,
+      /* OUT */ Eigen::Ref<Eigen::MatrixXd> jacDynamic,
       PerformanceLog* log = nullptr) override;
 
   /// This is a single async call for computing constraints in parallel, if
@@ -145,7 +154,8 @@ public:
   void asyncPartBackpropJacobian(
       int index,
       std::shared_ptr<simulation::World> world,
-      /* OUT */ Eigen::Ref<Eigen::MatrixXd> jac,
+      /* OUT */ Eigen::Ref<Eigen::MatrixXd> jacStatic,
+      /* OUT */ Eigen::Ref<Eigen::MatrixXd> jacDynamic,
       int rowCursor,
       int colCursor,
       PerformanceLog* log = nullptr);
@@ -155,7 +165,8 @@ public:
   void backpropGradientWrt(
       std::shared_ptr<simulation::World> world,
       const TrajectoryRollout* gradWrtRollout,
-      /* OUT */ Eigen::Ref<Eigen::VectorXd> grad,
+      /* OUT */ Eigen::Ref<Eigen::VectorXd> gradStatic,
+      /* OUT */ Eigen::Ref<Eigen::VectorXd> gradDynamic,
       PerformanceLog* log = nullptr) override;
 
   /// This computes the gradient in the flat problem space, taking into accounts
@@ -164,7 +175,8 @@ public:
       int index,
       std::shared_ptr<simulation::World> world,
       const TrajectoryRollout* gradWrtRollout,
-      /* OUT */ Eigen::Ref<Eigen::VectorXd> grad,
+      /* OUT */ Eigen::Ref<Eigen::VectorXd> gradStatic,
+      /* OUT */ Eigen::Ref<Eigen::VectorXd> gradDynamic,
       int cursorDims,
       int cursorSteps,
       PerformanceLog* log = nullptr);
@@ -195,13 +207,27 @@ public:
       PerformanceLog* log = nullptr) override;
 
   /// This returns the debugging name of a given DOF
-  std::string getFlatDimName(int dim) override;
+  std::string getFlatDimName(
+      std::shared_ptr<simulation::World> world, int dim) override;
 
   /// This gets the number of non-zero entries in the Jacobian
-  int getNumberNonZeroJacobian() override;
+  int getNumberNonZeroJacobianDynamic(
+      std::shared_ptr<simulation::World> world) override;
+
+  /// This gets the number of non-zero entries in the Jacobian
+  int getNumberNonZeroJacobianStatic(
+      std::shared_ptr<simulation::World> world) override;
 
   /// This gets the structure of the non-zero entries in the Jacobian
-  void getJacobianSparsityStructure(
+  void getJacobianSparsityStructureDynamic(
+      std::shared_ptr<simulation::World> world,
+      Eigen::Ref<Eigen::VectorXi> rows,
+      Eigen::Ref<Eigen::VectorXi> cols,
+      PerformanceLog* log = nullptr) override;
+
+  /// This gets the structure of the non-zero entries in the Jacobian
+  void getJacobianSparsityStructureStatic(
+      std::shared_ptr<simulation::World> world,
       Eigen::Ref<Eigen::VectorXi> rows,
       Eigen::Ref<Eigen::VectorXi> cols,
       PerformanceLog* log = nullptr) override;
@@ -209,15 +235,18 @@ public:
   /// This writes the Jacobian to a sparse vector
   void getSparseJacobian(
       std::shared_ptr<simulation::World> world,
-      Eigen::Ref<Eigen::VectorXd> sparse,
+      Eigen::Ref<Eigen::VectorXd> sparseStatic,
+      Eigen::Ref<Eigen::VectorXd> sparseDynamic,
       PerformanceLog* log = nullptr) override;
 
   /// This writes the Jacobian to a sparse vector
   void asyncPartGetSparseJacobian(
       int index,
       std::shared_ptr<simulation::World> world,
-      Eigen::Ref<Eigen::VectorXd> sparse,
-      int sparseCursor,
+      Eigen::Ref<Eigen::VectorXd> sparseStatic,
+      Eigen::Ref<Eigen::VectorXd> sparseDynamic,
+      int cursorStatic,
+      int cursorDynamic,
       PerformanceLog* log = nullptr);
 
   /// This returns the snapshots from a fresh unroll

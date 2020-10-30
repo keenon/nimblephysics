@@ -165,7 +165,8 @@ IPOptShotWrapper::IPOptShotWrapper(
     mBestIter(0),
     mRecord(record)
 {
-  mBestFeasibleState = Eigen::VectorXd(mWrapped->getFlatProblemDim());
+  mBestFeasibleState
+      = Eigen::VectorXd(mWrapped->getFlatProblemDim(mWrapped->mWorld));
 }
 
 //==============================================================================
@@ -183,13 +184,13 @@ bool IPOptShotWrapper::get_nlp_info(
     Ipopt::TNLP::IndexStyleEnum& index_style)
 {
   // Set the number of decision variables
-  n = mWrapped->getFlatProblemDim();
+  n = mWrapped->getFlatProblemDim(mWrapped->mWorld);
 
   // Set the total number of constraints
   m = mWrapped->getConstraintDim();
 
   // Set the number of entries in the constraint Jacobian
-  nnz_jac_g = mWrapped->getNumberNonZeroJacobian();
+  nnz_jac_g = mWrapped->getNumberNonZeroJacobian(mWrapped->mWorld);
 
   // Set the number of entries in the Hessian
   nnz_h_lag = n * n;
@@ -220,7 +221,9 @@ bool IPOptShotWrapper::get_bounds_info(
 
   // here, the n and m we gave IPOPT in get_nlp_info are passed back to us.
   // If desired, we could assert to make sure they are what we think they are.
-  assert(static_cast<std::size_t>(n) == mWrapped->getFlatProblemDim());
+  assert(
+      static_cast<std::size_t>(n)
+      == mWrapped->getFlatProblemDim(mWrapped->mWorld));
   assert(static_cast<std::size_t>(m) == mWrapped->getConstraintDim());
 
   // lower and upper bounds
@@ -324,11 +327,11 @@ bool IPOptShotWrapper::eval_f(
   }
 #endif
 
-  assert(_n == mWrapped->getFlatProblemDim());
+  assert(_n == mWrapped->getFlatProblemDim(mWrapped->mWorld));
   if (_new_x && _n > 0)
   {
     Eigen::Map<const Eigen::VectorXd> flat(_x, _n);
-    mWrapped->unflatten(flat, perflog);
+    mWrapped->unflatten(mWrapped->mWorld, flat, perflog);
   }
   _obj_value = mWrapped->getLoss(mWrapped->mWorld, perflog);
 
@@ -356,11 +359,11 @@ bool IPOptShotWrapper::eval_grad_f(
   }
 #endif
 
-  assert(_n == mWrapped->getFlatProblemDim());
+  assert(_n == mWrapped->getFlatProblemDim(mWrapped->mWorld));
   if (_new_x && _n > 0)
   {
     Eigen::Map<const Eigen::VectorXd> flat(_x, _n);
-    mWrapped->unflatten(flat, perflog);
+    mWrapped->unflatten(mWrapped->mWorld, flat, perflog);
   }
   Eigen::Map<Eigen::VectorXd> grad(_grad_f, _n);
   mWrapped->backpropGradient(mWrapped->mWorld, grad, perflog);
@@ -390,12 +393,12 @@ bool IPOptShotWrapper::eval_g(
   }
 #endif
 
-  assert(_n == mWrapped->getFlatProblemDim());
+  assert(_n == mWrapped->getFlatProblemDim(mWrapped->mWorld));
   assert(_m == mWrapped->getConstraintDim());
   if (_new_x && _n > 0)
   {
     Eigen::Map<const Eigen::VectorXd> flat(_x, _n);
-    mWrapped->unflatten(flat, perflog);
+    mWrapped->unflatten(mWrapped->mWorld, flat, perflog);
   }
   Eigen::Map<Eigen::VectorXd> constraints(_g, _m);
   mWrapped->computeConstraints(mWrapped->mWorld, constraints, perflog);
@@ -436,14 +439,15 @@ bool IPOptShotWrapper::eval_jac_g(
   if (nullptr == _values)
   {
     // return the structure of the Jacobian
-    assert(_n == mWrapped->getFlatProblemDim());
+    assert(_n == mWrapped->getFlatProblemDim(mWrapped->mWorld));
     assert(_m == mWrapped->getConstraintDim());
-    assert(_nnzj == mWrapped->getNumberNonZeroJacobian());
+    assert(_nnzj == mWrapped->getNumberNonZeroJacobian(mWrapped->mWorld));
 
     Eigen::Map<Eigen::VectorXi> rows(_iRow, _nnzj);
     Eigen::Map<Eigen::VectorXi> cols(_jCol, _nnzj);
 
-    mWrapped->getJacobianSparsityStructure(rows, cols, perflog);
+    mWrapped->getJacobianSparsityStructure(
+        mWrapped->mWorld, rows, cols, perflog);
 
     /*
     // Assume the gradient is dense
@@ -464,7 +468,7 @@ bool IPOptShotWrapper::eval_jac_g(
     if (_new_x && _n > 0)
     {
       Eigen::Map<const Eigen::VectorXd> flat(_x, _n);
-      mWrapped->unflatten(flat, perflog);
+      mWrapped->unflatten(mWrapped->mWorld, flat, perflog);
     }
     Eigen::Map<Eigen::VectorXd> sparse(_values, _nnzj);
     mWrapped->getSparseJacobian(mWrapped->mWorld, sparse, perflog);
@@ -556,7 +560,7 @@ void IPOptShotWrapper::finalize_solution(
   // TODO: we may not actually want to do this
   std::cout << "Recovering best discovered state from iter " << mBestIter
             << " with loss " << mBestFeasibleObjectiveValue << std::endl;
-  mWrapped->unflatten(mBestFeasibleState, perflog);
+  mWrapped->unflatten(mWrapped->mWorld, mBestFeasibleState, perflog);
   /*
   const std::shared_ptr<Problem>& problem = mSolver->getProblem();
 
@@ -613,7 +617,7 @@ bool IPOptShotWrapper::intermediate_callback(
     mBestIter = iter;
     // Found new best feasible objective
     mBestFeasibleObjectiveValue = obj_value;
-    mWrapped->flatten(mBestFeasibleState, perflog);
+    mWrapped->flatten(mWrapped->mWorld, mBestFeasibleState, perflog);
   }
 
 #ifdef LOG_PERFORMANCE_IPOPT

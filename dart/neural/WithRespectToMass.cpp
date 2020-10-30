@@ -51,43 +51,43 @@ void WrtMassBodyNodyEntry::set(
   if (type == INERTIA_COM)
   {
     dynamics::Inertia newInertia(
-        inertia.MASS,
+        inertia.getParameter(dynamics::Inertia::Param::MASS),
         value(0), // COM_X
         value(1), // COM_Y
         value(2), // COM_Z
-        inertia.I_XX,
-        inertia.I_YY,
-        inertia.I_ZZ,
-        inertia.I_XY,
-        inertia.I_XZ,
-        inertia.I_YZ);
+        inertia.getParameter(dynamics::Inertia::Param::I_XX),
+        inertia.getParameter(dynamics::Inertia::Param::I_YY),
+        inertia.getParameter(dynamics::Inertia::Param::I_ZZ),
+        inertia.getParameter(dynamics::Inertia::Param::I_XY),
+        inertia.getParameter(dynamics::Inertia::Param::I_XZ),
+        inertia.getParameter(dynamics::Inertia::Param::I_YZ));
     node->setInertia(newInertia);
   }
   else if (type == INERTIA_DIAGONAL)
   {
     dynamics::Inertia newInertia(
-        inertia.MASS,
-        inertia.COM_X,
-        inertia.COM_Y,
-        inertia.COM_Z,
+        inertia.getParameter(dynamics::Inertia::Param::MASS),
+        inertia.getParameter(dynamics::Inertia::Param::COM_X),
+        inertia.getParameter(dynamics::Inertia::Param::COM_Y),
+        inertia.getParameter(dynamics::Inertia::Param::COM_Z),
         value(0), // I_XX
         value(1), // I_YY
         value(2), // I_ZZ
-        inertia.I_XY,
-        inertia.I_XZ,
-        inertia.I_YZ);
+        inertia.getParameter(dynamics::Inertia::Param::I_XY),
+        inertia.getParameter(dynamics::Inertia::Param::I_XZ),
+        inertia.getParameter(dynamics::Inertia::Param::I_YZ));
     node->setInertia(newInertia);
   }
   else if (type == INERTIA_OFF_DIAGONAL)
   {
     dynamics::Inertia newInertia(
-        inertia.MASS,
-        inertia.COM_X,
-        inertia.COM_Y,
-        inertia.COM_Z,
-        inertia.I_XX,
-        inertia.I_YY,
-        inertia.I_ZZ,
+        inertia.getParameter(dynamics::Inertia::Param::MASS),
+        inertia.getParameter(dynamics::Inertia::Param::COM_X),
+        inertia.getParameter(dynamics::Inertia::Param::COM_Y),
+        inertia.getParameter(dynamics::Inertia::Param::COM_Z),
+        inertia.getParameter(dynamics::Inertia::Param::I_XX),
+        inertia.getParameter(dynamics::Inertia::Param::I_YY),
+        inertia.getParameter(dynamics::Inertia::Param::I_ZZ),
         value(0), // I_XY
         value(1), // I_XZ
         value(2)  // I_YZ
@@ -158,12 +158,61 @@ void WrtMassBodyNodyEntry::get(
 //==============================================================================
 /// This registers that we'd like to keep track of this node's mass in this
 /// way in this differentiation
-void WithRespectToMass::registerNode(
-    dynamics::BodyNode* node, WrtMassBodyNodeEntryType type)
+WrtMassBodyNodyEntry& WithRespectToMass::registerNode(
+    dynamics::BodyNode* node,
+    WrtMassBodyNodeEntryType type,
+    Eigen::VectorXd upperBound,
+    Eigen::VectorXd lowerBound)
 {
   std::string skelName = node->getSkeleton()->getName();
   std::vector<WrtMassBodyNodyEntry>& skelEntries = mEntries[skelName];
   skelEntries.emplace_back(node->getName(), type);
+
+  WrtMassBodyNodyEntry& entry = skelEntries[skelEntries.size() - 1];
+
+  int dim = entry.dim();
+  assert(
+      dim == lowerBound.size()
+      && "Lower bound must be same size as requested type would imply");
+  assert(
+      dim == upperBound.size()
+      && "Upper bound must be same size as requested type would imply");
+
+  assert(mUpperBounds.size() == mLowerBounds.size());
+
+  // Append to the lower bound vector
+  Eigen::VectorXd newMassLowerBound
+      = Eigen::VectorXd::Zero(mLowerBounds.size() + dim);
+  newMassLowerBound.segment(0, mLowerBounds.size()) = mLowerBounds;
+  newMassLowerBound.segment(mLowerBounds.size(), dim) = lowerBound;
+  mLowerBounds = newMassLowerBound;
+
+  // Append to the upper bound vector
+  Eigen::VectorXd newMassUpperBound
+      = Eigen::VectorXd::Zero(mUpperBounds.size() + dim);
+  newMassUpperBound.segment(0, mUpperBounds.size()) = mUpperBounds;
+  newMassUpperBound.segment(mUpperBounds.size(), dim) = upperBound;
+  mUpperBounds = newMassUpperBound;
+
+  assert(mUpperBounds.size() == mLowerBounds.size());
+
+  return entry;
+}
+
+//==============================================================================
+/// This returns the entry object corresponding to this node
+WrtMassBodyNodyEntry& WithRespectToMass::getNode(dynamics::BodyNode* node)
+{
+  std::string skelName = node->getSkeleton()->getName();
+  std::vector<WrtMassBodyNodyEntry>& skelEntries = mEntries[skelName];
+  for (WrtMassBodyNodyEntry& entry : skelEntries)
+  {
+    if (entry.linkName == node->getName())
+    {
+      return entry;
+    }
+  }
+  assert(false);
 }
 
 //==============================================================================
@@ -258,6 +307,22 @@ int WithRespectToMass::dim(dynamics::Skeleton* skel)
     skelDim += entry.dim();
   }
   return skelDim;
+}
+
+/// This gives a vector of upper bound values for this WRT, given state in the
+/// world
+Eigen::VectorXd WithRespectToMass::upperBound(
+    std::shared_ptr<simulation::World> world)
+{
+  return mUpperBounds;
+}
+
+/// This gives a vector of lower bound values for this WRT, given state in the
+/// world
+Eigen::VectorXd WithRespectToMass::lowerBound(
+    std::shared_ptr<simulation::World> world)
+{
+  return mLowerBounds;
 }
 
 } // namespace neural

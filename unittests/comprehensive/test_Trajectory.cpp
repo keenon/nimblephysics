@@ -53,6 +53,7 @@
 #include "dart/neural/NeuralConstants.hpp"
 #include "dart/neural/NeuralUtils.hpp"
 #include "dart/neural/RestorableSnapshot.hpp"
+#include "dart/neural/WithRespectToMass.hpp"
 #include "dart/simulation/World.hpp"
 #include "dart/trajectory/AbstractShot.hpp"
 #include "dart/trajectory/IPOptOptimizer.hpp"
@@ -65,6 +66,8 @@
 #include "GradientTestUtils.hpp"
 #include "TestHelpers.hpp"
 #include "stdio.h"
+
+// #define ALL_TESTS
 
 using namespace dart;
 using namespace math;
@@ -277,7 +280,7 @@ bool verifyShotJacobian(
     stateSize = mapping->getPosDim() + mapping->getVelDim();
   }
 
-  int dim = shot.getFlatProblemDim();
+  int dim = shot.getFlatProblemDim(world);
 
   // Random initialization
   /*
@@ -311,7 +314,7 @@ bool verifyShotGradient(
 {
   LossFn lossFn = LossFn(loss, lossGrad);
   SingleShot shot(world, lossFn, steps, true);
-  int dim = shot.getFlatProblemDim();
+  int dim = shot.getFlatProblemDim(world);
 
   // Random initialization
   /*
@@ -352,7 +355,7 @@ bool verifyMultiShotJacobian(
     shot.switchRepresentationMapping(world, "custom");
   }
 
-  int dim = shot.getFlatProblemDim();
+  int dim = shot.getFlatProblemDim(world);
   int numConstraints = shot.getConstraintDim();
 
   // Random initialization
@@ -369,7 +372,7 @@ bool verifyMultiShotJacobian(
 
   Eigen::MatrixXd analyticalJacobian
       = Eigen::MatrixXd::Zero(numConstraints, dim);
-  shot.backpropJacobian(world, analyticalJacobian);
+  shot.AbstractShot::backpropJacobian(world, analyticalJacobian);
   Eigen::MatrixXd bruteForceJacobian
       = Eigen::MatrixXd::Zero(numConstraints, dim);
   shot.finiteDifferenceJacobian(world, bruteForceJacobian);
@@ -383,8 +386,8 @@ bool verifyMultiShotJacobian(
       Eigen::VectorXd bruteForceCol = bruteForceJacobian.col(i);
       if (!equals(analyticalCol, bruteForceCol, threshold))
       {
-        std::cout << "ERROR at col " << shot.getFlatDimName(i) << " (" << i
-                  << ") by " << (analyticalCol - bruteForceCol).norm()
+        std::cout << "ERROR at col " << shot.getFlatDimName(world, i) << " ("
+                  << i << ") by " << (analyticalCol - bruteForceCol).norm()
                   << std::endl;
         /*
         std::cout << "Analytical:" << std::endl << analyticalCol << std::endl;
@@ -395,8 +398,8 @@ bool verifyMultiShotJacobian(
       }
       else
       {
-        std::cout << "Match at col " << shot.getFlatDimName(i) << " (" << i
-                  << ")" << std::endl;
+        std::cout << "Match at col " << shot.getFlatDimName(world, i) << " ("
+                  << i << ")" << std::endl;
       }
     }
     return false;
@@ -413,20 +416,20 @@ bool verifySparseJacobian(WorldPtr world, MultiShot& shot)
   shot.unflatten(randomInit);
   */
 
-  int dim = shot.getFlatProblemDim();
+  int dim = shot.getFlatProblemDim(world);
   int numConstraints = shot.getConstraintDim();
   Eigen::MatrixXd analyticalJacobian
       = Eigen::MatrixXd::Zero(numConstraints, dim);
-  shot.backpropJacobian(world, analyticalJacobian);
+  shot.AbstractShot::backpropJacobian(world, analyticalJacobian);
   Eigen::MatrixXd sparseRecoveredJacobian
       = Eigen::MatrixXd::Zero(numConstraints, dim);
 
-  int numSparse = shot.getNumberNonZeroJacobian();
+  int numSparse = shot.getNumberNonZeroJacobian(world);
   Eigen::VectorXi rows = Eigen::VectorXi::Zero(numSparse);
   Eigen::VectorXi cols = Eigen::VectorXi::Zero(numSparse);
-  shot.getJacobianSparsityStructure(rows, cols);
+  shot.getJacobianSparsityStructure(world, rows, cols);
   Eigen::VectorXd sparseValues = Eigen::VectorXd::Zero(numSparse);
-  shot.getSparseJacobian(world, sparseValues);
+  shot.AbstractShot::getSparseJacobian(world, sparseValues);
   for (int i = 0; i < numSparse; i++)
   {
     sparseRecoveredJacobian(rows(i), cols(i)) = sparseValues(i);
@@ -436,14 +439,25 @@ bool verifySparseJacobian(WorldPtr world, MultiShot& shot)
   if (!equals(analyticalJacobian, sparseRecoveredJacobian, threshold))
   {
     std::cout << "Jacobians don't match!" << std::endl;
+    int staticDim = shot.getFlatStaticProblemDim(world);
+    std::cout << "Static region size: " << shot.getFlatStaticProblemDim(world)
+              << std::endl;
+    std::cout << "Analytical first region: " << std::endl
+              << analyticalJacobian.block(0, 0, analyticalJacobian.rows(), 10)
+              << std::endl;
+    std::cout << "Sparse recovered region: " << std::endl
+              << sparseRecoveredJacobian.block(
+                     0, 0, analyticalJacobian.rows(), 10)
+              << std::endl;
+
     for (int i = 0; i < dim; i++)
     {
       Eigen::VectorXd analyticalCol = analyticalJacobian.col(i);
       Eigen::VectorXd sparseRecoveredCol = sparseRecoveredJacobian.col(i);
       if (!equals(analyticalCol, sparseRecoveredCol, threshold))
       {
-        std::cout << "ERROR at col " << shot.getFlatDimName(i) << " (" << i
-                  << ") by " << (analyticalCol - sparseRecoveredCol).norm()
+        std::cout << "ERROR at col " << shot.getFlatDimName(world, i) << " ("
+                  << i << ") by " << (analyticalCol - sparseRecoveredCol).norm()
                   << std::endl;
         /*
         std::cout << "Dense:" << std::endl << analyticalCol << std::endl;
@@ -454,8 +468,8 @@ bool verifySparseJacobian(WorldPtr world, MultiShot& shot)
       }
       else
       {
-        std::cout << "Match at col " << shot.getFlatDimName(i) << " (" << i
-                  << ")" << std::endl;
+        std::cout << "Match at col " << shot.getFlatDimName(world, i) << " ("
+                  << i << ")" << std::endl;
       }
     }
     return false;
@@ -493,7 +507,7 @@ bool verifyMultiShotGradient(
   shot.unflatten(randomInit);
   */
 
-  int dim = shot.getFlatProblemDim();
+  int dim = shot.getFlatProblemDim(world);
 
   Eigen::VectorXd analyticalGrad = Eigen::VectorXd::Zero(dim);
   shot.backpropGradient(world, analyticalGrad);
@@ -532,12 +546,12 @@ bool verifyMultiShotJacobianCustomConstraint(
   constraintFn.setUpperBound(constraintValue);
   shot.addConstraint(constraintFn);
 
-  int dim = shot.getFlatProblemDim();
+  int dim = shot.getFlatProblemDim(world);
   int numConstraints = shot.getConstraintDim();
 
   Eigen::MatrixXd analyticalJacobian
       = Eigen::MatrixXd::Zero(numConstraints, dim);
-  shot.backpropJacobian(world, analyticalJacobian);
+  shot.AbstractShot::backpropJacobian(world, analyticalJacobian);
   Eigen::MatrixXd bruteForceJacobian
       = Eigen::MatrixXd::Zero(numConstraints, dim);
   shot.finiteDifferenceJacobian(world, bruteForceJacobian);
@@ -551,8 +565,8 @@ bool verifyMultiShotJacobianCustomConstraint(
       Eigen::VectorXd bruteForceCol = bruteForceJacobian.col(i);
       if (!equals(analyticalCol, bruteForceCol, threshold))
       {
-        std::cout << "ERROR at col " << shot.getFlatDimName(i) << " (" << i
-                  << ") by " << (analyticalCol - bruteForceCol).norm()
+        std::cout << "ERROR at col " << shot.getFlatDimName(world, i) << " ("
+                  << i << ") by " << (analyticalCol - bruteForceCol).norm()
                   << std::endl;
         /*
         std::cout << "Analytical:" << std::endl << analyticalCol << std::endl;
@@ -563,8 +577,8 @@ bool verifyMultiShotJacobianCustomConstraint(
       }
       else
       {
-        std::cout << "Match at col " << shot.getFlatDimName(i) << " (" << i
-                  << ")" << std::endl;
+        std::cout << "Match at col " << shot.getFlatDimName(world, i) << " ("
+                  << i << ")" << std::endl;
       }
     }
     return false;
@@ -775,7 +789,7 @@ bool verifyMultiShotOptimization(WorldPtr world, MultiShot shot)
   // dart::gui::glut::displayTrajectoryInGUI(world, &shot);
 }
 
-/*
+#ifdef ALL_TESTS
 TEST(TRAJECTORY, UNCONSTRAINED_BOX)
 {
   // World
@@ -826,7 +840,9 @@ TEST(TRAJECTORY, UNCONSTRAINED_BOX)
   EXPECT_TRUE(verifyShotJacobian(world, 40, ikMap));
   EXPECT_TRUE(verifyMultiShotJacobian(world, 8, 2, ikMap));
 }
+#endif
 
+#ifdef ALL_TESTS
 TEST(TRAJECTORY, REVOLUTE_JOINT)
 {
   // World
@@ -859,7 +875,9 @@ TEST(TRAJECTORY, REVOLUTE_JOINT)
   EXPECT_TRUE(verifyShotJacobian(world, 40, ikMap));
   EXPECT_TRUE(verifyMultiShotJacobian(world, 8, 2, ikMap));
 }
+#endif
 
+#ifdef ALL_TESTS
 TEST(TRAJECTORY, TWO_LINK)
 {
   // World
@@ -900,7 +918,9 @@ TEST(TRAJECTORY, TWO_LINK)
   EXPECT_TRUE(verifyShotJacobian(world, 40, ikMap));
   EXPECT_TRUE(verifyMultiShotJacobian(world, 8, 2, ikMap));
 }
+#endif
 
+#ifdef ALL_TESTS
 TEST(TRAJECTORY, PRISMATIC)
 {
 
@@ -938,7 +958,9 @@ TEST(TRAJECTORY, PRISMATIC)
   EXPECT_TRUE(verifyShotJacobian(world, 40, ikMap));
   EXPECT_TRUE(verifyMultiShotJacobian(world, 8, 2, ikMap));
 }
+#endif
 
+#ifdef ALL_TESTS
 TEST(TRAJECTORY, CARTPOLE)
 {
   // World
@@ -1038,7 +1060,7 @@ TEST(TRAJECTORY, CARTPOLE)
   // EXPECT_TRUE(verifyShotJacobian(world, 40, ikMap));
   // EXPECT_TRUE(verifyMultiShotJacobian(world, 8, 2, ikMap));
 }
-*/
+#endif
 
 BodyNode* createTailSegment(BodyNode* parent, Eigen::Vector3d color)
 {
@@ -1075,6 +1097,170 @@ BodyNode* createTailSegment(BodyNode* parent, Eigen::Vector3d color)
   return pole;
 }
 
+// #ifdef ALL_TESTS
+TEST(TRAJECTORY, TUNE_SIMPLE_MASS)
+{
+  // World
+  WorldPtr world = World::create();
+  world->setGravity(Eigen::Vector3d(0, -9.81, 0));
+
+  world->setPenetrationCorrectionEnabled(false);
+  world->setConstraintForceMixingEnabled(false);
+
+  /////////////////////////////////////////////////////////////////////
+  // Create the skeleton with a single revolute joint
+  /////////////////////////////////////////////////////////////////////
+
+  SkeletonPtr swing = Skeleton::create("swing");
+
+  std::pair<RevoluteJoint*, BodyNode*> poleJointPair
+      = swing->createJointAndBodyNodePair<RevoluteJoint>();
+  RevoluteJoint* poleJoint = poleJointPair.first;
+  BodyNode* pole = poleJointPair.second;
+  poleJoint->setAxis(Eigen::Vector3d::UnitZ());
+
+  std::shared_ptr<BoxShape> shape(
+      new BoxShape(Eigen::Vector3d(0.05, 0.25, 0.05)));
+  ShapeNode* poleShape
+      = pole->createShapeNodeWith<VisualAspect, CollisionAspect>(shape);
+  poleJoint->setForceUpperLimit(0, 100.0);
+  poleJoint->setForceLowerLimit(0, -100.0);
+  poleJoint->setVelocityUpperLimit(0, 100.0);
+  poleJoint->setVelocityLowerLimit(0, -100.0);
+  poleJoint->setPositionUpperLimit(0, 270 * 3.1415 / 180);
+  poleJoint->setPositionLowerLimit(0, -270 * 3.1415 / 180);
+
+  // We're going to tune the full inertia properties of the swinging object
+  Eigen::VectorXd upperBounds = Eigen::VectorXd::Ones(3) * 2.0;
+  Eigen::VectorXd lowerBounds = Eigen::VectorXd::Ones(3) * -2.0;
+  world->getWrtMass()->registerNode(
+      pole,
+      neural::WrtMassBodyNodeEntryType::INERTIA_COM,
+      upperBounds,
+      lowerBounds);
+
+  Eigen::Isometry3d poleOffset = Eigen::Isometry3d::Identity();
+  poleOffset.translation() = Eigen::Vector3d(0, -0.125, 0);
+  poleJoint->setTransformFromChildBodyNode(poleOffset);
+  poleJoint->setPosition(0, 90 * 3.1415 / 180);
+
+  world->addSkeleton(swing);
+
+  assert(world->getNumDofs() == 1);
+
+  /////////////////////////////////////////////////////////////////////
+  // Define straightforward loss
+  /////////////////////////////////////////////////////////////////////
+
+  int STEPS = 12;
+  int SHOT_LENGTH = 3;
+  int GOAL_STEP = 6;
+  double GOAL_AT_STEP = 0.1;
+
+  // Get the GOAL_STEP pose as close to GOAL_AT_STEP
+  TrajectoryLossFn loss
+      = [GOAL_STEP, GOAL_AT_STEP](const TrajectoryRollout* rollout) {
+          const Eigen::Ref<const Eigen::MatrixXd> poses
+              = rollout->getPosesConst("identity");
+          double poseFive = poses(0, GOAL_STEP);
+          return (poseFive - GOAL_AT_STEP) * (poseFive - GOAL_AT_STEP);
+        };
+
+  // Get the initial pose and final pose as close to each other as possible
+  TrajectoryLossFn loopConstraint = [](const TrajectoryRollout* rollout) {
+    const Eigen::Ref<const Eigen::MatrixXd> poses
+        = rollout->getPosesConst("identity");
+    double firstPose = poses(0, 0);
+    double lastPose = poses(0, poses.cols() - 1);
+    return (firstPose - lastPose) * (firstPose - lastPose);
+  };
+
+  /////////////////////////////////////////////////////////////////////
+  // Build a trajectory optimization problem
+  /////////////////////////////////////////////////////////////////////
+
+  LossFn lossFn = LossFn(loss);
+  MultiShot shot(world, lossFn, STEPS, SHOT_LENGTH, true);
+
+  LossFn constraintFn = LossFn(loopConstraint);
+  constraintFn.setLowerBound(0);
+  constraintFn.setUpperBound(0);
+  shot.addConstraint(constraintFn);
+
+  /////////////////////////////////////////////////////////////////////
+  // Check Jacobians
+  /////////////////////////////////////////////////////////////////////
+
+  int dim = shot.getFlatProblemDim(world);
+  int numConstraints = shot.getConstraintDim();
+  std::cout << "numConstraints: " << numConstraints << std::endl;
+
+  Eigen::MatrixXd analyticalJacobian
+      = Eigen::MatrixXd::Zero(numConstraints, dim);
+  shot.AbstractShot::backpropJacobian(world, analyticalJacobian);
+  Eigen::MatrixXd bruteForceJacobian
+      = Eigen::MatrixXd::Zero(numConstraints, dim);
+  shot.finiteDifferenceJacobian(world, bruteForceJacobian);
+  double threshold = 1e-8;
+  if (!equals(analyticalJacobian, bruteForceJacobian, threshold))
+  {
+    std::cout << "Jacobians don't match!" << std::endl;
+    int staticDim = shot.getFlatStaticProblemDim(world);
+    std::cout << "Static region size: " << shot.getFlatStaticProblemDim(world)
+              << std::endl;
+    std::cout << "Analytical first region: " << std::endl
+              << analyticalJacobian.block(0, 0, analyticalJacobian.rows(), 10)
+              << std::endl;
+    std::cout << "Brute force first region: " << std::endl
+              << bruteForceJacobian.block(0, 0, analyticalJacobian.rows(), 10)
+              << std::endl;
+    /*
+    for (int i = 0; i < dim; i++)
+    {
+      Eigen::VectorXd analyticalCol = analyticalJacobian.col(i);
+      Eigen::VectorXd bruteForceCol = bruteForceJacobian.col(i);
+      if (!equals(analyticalCol, bruteForceCol, threshold))
+      {
+        std::cout << "ERROR at col " << shot.getFlatDimName(world, i) << " ("
+                  << i << ") by " << (analyticalCol - bruteForceCol).norm()
+                  << std::endl;
+        std::cout << "Analytical:" << std::endl << analyticalCol << std::endl;
+        std::cout << "Brute Force:" << std::endl << bruteForceCol << std::endl;
+        std::cout << "Diff:" << std::endl
+                  << (analyticalCol - bruteForceCol) << std::endl;
+      }
+      else
+      {
+        // std::cout << "Match at col " << shot.getFlatDimName(world, i) << " ("
+        // << i
+        //          << ")" << std::endl;
+      }
+    }
+    */
+    EXPECT_TRUE(false);
+    return;
+  }
+
+  EXPECT_TRUE(verifySparseJacobian(world, shot));
+
+  /////////////////////////////////////////////////////////////////////
+  // Actually run the optimization
+  /////////////////////////////////////////////////////////////////////
+
+  IPOptOptimizer optimizer = IPOptOptimizer();
+  optimizer.setIterationLimit(100);
+  optimizer.setCheckDerivatives(true);
+
+  // Actually do the optimization
+  std::shared_ptr<OptimizationRecord> record = optimizer.optimize(&shot);
+
+  // Playback the trajectory
+  TrajectoryRolloutReal withKnots = TrajectoryRolloutReal(&shot);
+  shot.getStates(world, &withKnots, nullptr, true);
+}
+// #endif
+
+#ifdef ALL_TESTS
 TEST(TRAJECTORY, CONSTRAINED_CYCLE)
 {
   // World
@@ -1159,14 +1345,13 @@ TEST(TRAJECTORY, CONSTRAINED_CYCLE)
   // Check Jacobians
   /////////////////////////////////////////////////////////////////////
 
-  /*
-  int dim = shot.getFlatProblemDim();
+  int dim = shot.getFlatProblemDim(world);
   int numConstraints = shot.getConstraintDim();
   std::cout << "numConstraints: " << numConstraints << std::endl;
 
   Eigen::MatrixXd analyticalJacobian
       = Eigen::MatrixXd::Zero(numConstraints, dim);
-  shot.backpropJacobian(world, analyticalJacobian);
+  shot.AbstractShot::backpropJacobian(world, analyticalJacobian);
   Eigen::MatrixXd bruteForceJacobian
       = Eigen::MatrixXd::Zero(numConstraints, dim);
   shot.finiteDifferenceJacobian(world, bruteForceJacobian);
@@ -1180,8 +1365,8 @@ TEST(TRAJECTORY, CONSTRAINED_CYCLE)
       Eigen::VectorXd bruteForceCol = bruteForceJacobian.col(i);
       if (!equals(analyticalCol, bruteForceCol, threshold))
       {
-        std::cout << "ERROR at col " << shot.getFlatDimName(i) << " (" << i
-                  << ") by " << (analyticalCol - bruteForceCol).norm()
+        std::cout << "ERROR at col " << shot.getFlatDimName(world, i) << " ("
+                  << i << ") by " << (analyticalCol - bruteForceCol).norm()
                   << std::endl;
         std::cout << "Analytical:" << std::endl << analyticalCol << std::endl;
         std::cout << "Brute Force:" << std::endl << bruteForceCol << std::endl;
@@ -1190,13 +1375,13 @@ TEST(TRAJECTORY, CONSTRAINED_CYCLE)
       }
       else
       {
-        // std::cout << "Match at col " << shot.getFlatDimName(i) << " (" << i
+        // std::cout << "Match at col " << shot.getFlatDimName(world, i) << " ("
+        // << i
         //          << ")" << std::endl;
       }
     }
     EXPECT_TRUE(false);
   }
-  */
 
   EXPECT_TRUE(verifySparseJacobian(world, shot));
 
@@ -1215,7 +1400,9 @@ TEST(TRAJECTORY, CONSTRAINED_CYCLE)
   TrajectoryRolloutReal withKnots = TrajectoryRolloutReal(&shot);
   shot.getStates(world, &withKnots, nullptr, true);
 }
+#endif
 
+#ifdef ALL_TESTS
 TEST(TRAJECTORY, JUMP_WORM)
 {
   bool offGround = false;
@@ -1371,3 +1558,4 @@ TEST(TRAJECTORY, JUMP_WORM)
   EXPECT_TRUE(verifyMultiShotJacobianCustomConstraint(
       world, 8, 4, loss, lossGrad, 3.0));
 }
+#endif

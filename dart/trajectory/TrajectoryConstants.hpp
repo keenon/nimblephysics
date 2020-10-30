@@ -13,9 +13,11 @@ struct TimestepJacobians
   Eigen::MatrixXd posPos;
   Eigen::MatrixXd velPos;
   Eigen::MatrixXd forcePos;
+  Eigen::MatrixXd massPos;
   Eigen::MatrixXd posVel;
   Eigen::MatrixXd velVel;
   Eigen::MatrixXd forceVel;
+  Eigen::MatrixXd massVel;
 };
 
 } // namespace trajectory

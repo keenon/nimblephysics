@@ -62,6 +62,12 @@ public:
   const Eigen::MatrixXd& getForceVelJacobian(
       simulation::WorldPtr world, PerformanceLog* perfLog = nullptr);
 
+  /// This computes and returns the whole mass-vel jacobian. For backprop, you
+  /// don't actually need this matrix, you can compute backprop directly. This
+  /// is here if you want access to the full Jacobian for some reason.
+  const Eigen::MatrixXd& getMassVelJacobian(
+      simulation::WorldPtr world, PerformanceLog* perfLog = nullptr);
+
   /// This computes and returns the whole pos-pos jacobian. For backprop, you
   /// don't actually need this matrix, you can compute backprop directly. This
   /// is here if you want access to the full Jacobian for some reason.
@@ -170,6 +176,10 @@ public:
   /// This computes and returns the whole force-vel jacobian by finite
   /// differences. This is SUPER SLOW, and is only here for testing.
   Eigen::MatrixXd finiteDifferenceForceVelJacobian(simulation::WorldPtr world);
+
+  /// This computes and returns the whole mass-vel jacobian by finite
+  /// differences. This is SUPER SLOW, and is only here for testing.
+  Eigen::MatrixXd finiteDifferenceMassVelJacobian(simulation::WorldPtr world);
 
   /// This computes and returns the whole vel-vel jacobian by finite
   /// differences. This is SUPER SUPER SLOW, and is only here for testing.
@@ -528,6 +538,8 @@ private:
   Eigen::MatrixXd mCachedForcePos;
   bool mCachedForceVelDirty;
   Eigen::MatrixXd mCachedForceVel;
+  bool mCachedMassVelDirty;
+  Eigen::MatrixXd mCachedMassVel;
 
   Eigen::VectorXd scratch(simulation::WorldPtr world);
 

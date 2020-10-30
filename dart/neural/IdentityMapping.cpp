@@ -1,5 +1,6 @@
 #include "dart/neural/IdentityMapping.hpp"
 
+#include "dart/neural/WithRespectToMass.hpp"
 #include "dart/simulation/World.hpp"
 
 using namespace dart;
@@ -11,6 +12,7 @@ namespace neural {
 IdentityMapping::IdentityMapping(std::shared_ptr<simulation::World> world)
 {
   mNumDofs = world->getNumDofs();
+  mMassDim = world->getWrtMass()->dim(world);
 }
 
 //==============================================================================
@@ -29,6 +31,12 @@ int IdentityMapping::getVelDim()
 int IdentityMapping::getForceDim()
 {
   return mNumDofs;
+}
+
+//==============================================================================
+int IdentityMapping::getMassDim()
+{
+  return mMassDim;
 }
 
 //==============================================================================
@@ -56,6 +64,14 @@ void IdentityMapping::setForces(
 }
 
 //==============================================================================
+void IdentityMapping::setMasses(
+    std::shared_ptr<simulation::World> world,
+    const Eigen::Ref<Eigen::VectorXd>& masses)
+{
+  world->getWrtMass()->set(world, masses);
+}
+
+//==============================================================================
 void IdentityMapping::getPositionsInPlace(
     std::shared_ptr<simulation::World> world,
     /* OUT */ Eigen::Ref<Eigen::VectorXd> positions)
@@ -77,6 +93,14 @@ void IdentityMapping::getForcesInPlace(
     /* OUT */ Eigen::Ref<Eigen::VectorXd> forces)
 {
   forces = world->getForces();
+}
+
+//==============================================================================
+void IdentityMapping::getMassesInPlace(
+    std::shared_ptr<simulation::World> world,
+    /* OUT */ Eigen::Ref<Eigen::VectorXd> masses)
+{
+  masses = world->getWrtMass()->get(world);
 }
 
 //==============================================================================
@@ -157,6 +181,25 @@ Eigen::MatrixXd IdentityMapping::getRealForceToMappedForceJac(
 }
 
 //==============================================================================
+/// This gets a Jacobian relating the changes in the outer force (the
+/// "mapped" force) to inner force (the "real" force)
+Eigen::MatrixXd IdentityMapping::getMappedMassToRealMassJac(
+    std::shared_ptr<simulation::World> world)
+{
+  return Eigen::MatrixXd::Identity(mMassDim, mMassDim);
+}
+
+//==============================================================================
+/// This gets a Jacobian relating the changes in the inner force (the
+/// "real" force) to the corresponding outer force (the "mapped"
+/// force)
+Eigen::MatrixXd IdentityMapping::getRealMassToMappedMassJac(
+    std::shared_ptr<simulation::World> world)
+{
+  return Eigen::MatrixXd::Identity(mMassDim, mMassDim);
+}
+
+//==============================================================================
 Eigen::VectorXd IdentityMapping::getPositionLowerLimits(
     std::shared_ptr<simulation::World> world)
 {
@@ -196,6 +239,20 @@ Eigen::VectorXd IdentityMapping::getForceUpperLimits(
     std::shared_ptr<simulation::World> world)
 {
   return world->getForceUpperLimits();
+}
+
+//==============================================================================
+Eigen::VectorXd IdentityMapping::getMassLowerLimits(
+    std::shared_ptr<simulation::World> world)
+{
+  return world->getWrtMass()->lowerBound(world);
+}
+
+//==============================================================================
+Eigen::VectorXd IdentityMapping::getMassUpperLimits(
+    std::shared_ptr<simulation::World> world)
+{
+  return world->getWrtMass()->upperBound(world);
 }
 
 } // namespace neural

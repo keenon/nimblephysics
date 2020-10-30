@@ -26,6 +26,7 @@ struct LossGradient
   Eigen::VectorXd lossWrtPosition;
   Eigen::VectorXd lossWrtVelocity;
   Eigen::VectorXd lossWrtTorque;
+  Eigen::VectorXd lossWrtMass;
 };
 
 // We don't issue a full import here, because we want this file to be safe to
@@ -51,24 +52,6 @@ std::shared_ptr<MappedBackpropSnapshot> mappedForwardPass(
     std::unordered_map<std::string, std::shared_ptr<Mapping>> mappings,
     bool idempotent = false);
 
-struct BulkForwardPassResult
-{
-  std::vector<std::shared_ptr<BackpropSnapshot>> snapshots;
-  Eigen::MatrixXd postStepPoses;
-  Eigen::MatrixXd postStepVels;
-};
-
-/// This unrolls a trajectory with multiple knot points by exploiting the
-/// available parallelism by running each knot on its own thread.
-/// This is implemented in C++ with the explicit purpose of calling it from
-/// Python.
-BulkForwardPassResult bulkForwardPass(
-    std::shared_ptr<simulation::World> world,
-    Eigen::MatrixXd torques,
-    std::size_t shootingLength,
-    Eigen::MatrixXd knotPoses,
-    Eigen::MatrixXd knotVels);
-
 struct KnotJacobian
 {
   Eigen::MatrixXd knotPosEndPos;
@@ -78,27 +61,6 @@ struct KnotJacobian
   std::vector<Eigen::MatrixXd> torquesEndPos;
   std::vector<Eigen::MatrixXd> torquesEndVel;
 };
-
-struct BulkBackwardPassResult
-{
-  Eigen::MatrixXd gradWrtPreStepKnotPoses;
-  Eigen::MatrixXd gradWrtPreStepKnotVels;
-  Eigen::MatrixXd gradWrtPreStepTorques;
-  std::vector<KnotJacobian> knotJacobians;
-};
-
-/// This is the companion to bulkForwardPass(), and runs the gradients back
-/// up the stack in parallel, by exploiting the fact that gradients across
-/// knots are independent.
-/// This is implemented in C++ with the explicit purpose of calling it from
-/// Python.
-BulkBackwardPassResult bulkBackwardPass(
-    std::shared_ptr<simulation::World> world,
-    std::vector<std::shared_ptr<BackpropSnapshot>> snapshots,
-    std::size_t shootingLength,
-    Eigen::MatrixXd gradWrtPoses,
-    Eigen::MatrixXd gradWrtVels,
-    bool computeJacobians = true);
 
 //////////////////////////////////////////////////////////////////////////////
 // Geometry helpers

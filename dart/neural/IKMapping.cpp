@@ -4,6 +4,7 @@
 #include "dart/dynamics/Frame.hpp"
 #include "dart/dynamics/Skeleton.hpp"
 #include "dart/neural/RestorableSnapshot.hpp"
+#include "dart/neural/WithRespectToMass.hpp"
 #include "dart/simulation/World.hpp"
 
 using namespace dart;
@@ -14,6 +15,7 @@ namespace neural {
 //==============================================================================
 IKMapping::IKMapping(std::shared_ptr<simulation::World> world)
 {
+  mMassDim = world->getWrtMass()->dim(world);
 }
 
 //==============================================================================
@@ -50,6 +52,12 @@ int IKMapping::getVelDim()
 int IKMapping::getForceDim()
 {
   return getDim();
+}
+
+//==============================================================================
+int IKMapping::getMassDim()
+{
+  return mMassDim;
 }
 
 //==============================================================================
@@ -119,6 +127,14 @@ void IKMapping::setForces(
     const Eigen::Ref<Eigen::VectorXd>& forces)
 {
   world->setForces(getMappedForceToRealForceJac(world) * forces);
+}
+
+//==============================================================================
+void IKMapping::setMasses(
+    std::shared_ptr<simulation::World> world,
+    const Eigen::Ref<Eigen::VectorXd>& masses)
+{
+  world->getWrtMass()->set(world, masses);
 }
 
 //==============================================================================
@@ -224,6 +240,15 @@ void IKMapping::getForcesInPlace(
 }
 
 //==============================================================================
+void IKMapping::getMassesInPlace(
+    std::shared_ptr<simulation::World> world,
+    /* OUT */ Eigen::Ref<Eigen::VectorXd> masses)
+{
+  assert(masses.size() == getMassDim());
+  masses = world->getWrtMass()->get(world);
+}
+
+//==============================================================================
 /// This gets a Jacobian relating the changes in the outer positions (the
 /// "mapped" positions) to inner positions (the "real" positions)
 Eigen::MatrixXd IKMapping::getMappedPosToRealPosJac(
@@ -300,6 +325,25 @@ Eigen::MatrixXd IKMapping::getRealForceToMappedForceJac(
     std::shared_ptr<simulation::World> world)
 {
   return getJacobianInverse(world).transpose();
+}
+
+//==============================================================================
+/// This gets a Jacobian relating the changes in the outer mass (the
+/// "mapped" mass) to inner mass (the "real" mass)
+Eigen::MatrixXd IKMapping::getMappedMassToRealMassJac(
+    std::shared_ptr<simulation::World> world)
+{
+  return Eigen::MatrixXd::Identity(mMassDim, mMassDim);
+}
+
+//==============================================================================
+/// This gets a Jacobian relating the changes in the inner mass (the
+/// "real" mass) to the corresponding outer mass (the "mapped"
+/// mass)
+Eigen::MatrixXd IKMapping::getRealMassToMappedMassJac(
+    std::shared_ptr<simulation::World> world)
+{
+  return Eigen::MatrixXd::Identity(mMassDim, mMassDim);
 }
 
 //==============================================================================
@@ -457,6 +501,20 @@ Eigen::VectorXd IKMapping::getForceUpperLimits(
 {
   return Eigen::VectorXd::Ones(getForceDim())
          * std::numeric_limits<double>::infinity();
+}
+
+//==============================================================================
+Eigen::VectorXd IKMapping::getMassLowerLimits(
+    std::shared_ptr<simulation::World> world)
+{
+  return world->getWrtMass()->lowerBound(world);
+}
+
+//==============================================================================
+Eigen::VectorXd IKMapping::getMassUpperLimits(
+    std::shared_ptr<simulation::World> world)
+{
+  return world->getWrtMass()->upperBound(world);
 }
 
 } // namespace neural

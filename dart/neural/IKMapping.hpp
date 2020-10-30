@@ -58,6 +58,7 @@ public:
   int getPosDim() override;
   int getVelDim() override;
   int getForceDim() override;
+  int getMassDim() override;
 
   void setPositions(
       std::shared_ptr<simulation::World> world,
@@ -68,6 +69,9 @@ public:
   void setForces(
       std::shared_ptr<simulation::World> world,
       const Eigen::Ref<Eigen::VectorXd>& forces) override;
+  void setMasses(
+      std::shared_ptr<simulation::World> world,
+      const Eigen::Ref<Eigen::VectorXd>& masses) override;
 
   void getPositionsInPlace(
       std::shared_ptr<simulation::World> world,
@@ -78,6 +82,9 @@ public:
   void getForcesInPlace(
       std::shared_ptr<simulation::World> world,
       /* OUT */ Eigen::Ref<Eigen::VectorXd> forces) override;
+  void getMassesInPlace(
+      std::shared_ptr<simulation::World> world,
+      /* OUT */ Eigen::Ref<Eigen::VectorXd> masses) override;
 
   /// This gets a Jacobian relating the changes in the outer positions (the
   /// "mapped" positions) to inner positions (the "real" positions)
@@ -124,6 +131,17 @@ public:
   Eigen::MatrixXd getRealForceToMappedForceJac(
       std::shared_ptr<simulation::World> world) override;
 
+  /// This gets a Jacobian relating the changes in the outer mass (the
+  /// "mapped" mass) to inner mass (the "real" mass)
+  Eigen::MatrixXd getMappedMassToRealMassJac(
+      std::shared_ptr<simulation::World> world) override;
+
+  /// This gets a Jacobian relating the changes in the inner mass (the
+  /// "real" mass) to the corresponding outer mass (the "mapped"
+  /// mass)
+  Eigen::MatrixXd getRealMassToMappedMassJac(
+      std::shared_ptr<simulation::World> world) override;
+
   Eigen::VectorXd getPositionLowerLimits(
       std::shared_ptr<simulation::World> world) override;
   Eigen::VectorXd getPositionUpperLimits(
@@ -135,6 +153,10 @@ public:
   Eigen::VectorXd getForceLowerLimits(
       std::shared_ptr<simulation::World> world) override;
   Eigen::VectorXd getForceUpperLimits(
+      std::shared_ptr<simulation::World> world) override;
+  Eigen::VectorXd getMassLowerLimits(
+      std::shared_ptr<simulation::World> world) override;
+  Eigen::VectorXd getMassUpperLimits(
       std::shared_ptr<simulation::World> world) override;
 
 protected:
@@ -157,6 +179,8 @@ protected:
       std::shared_ptr<simulation::World> world);
 
   std::vector<IKMappingEntry> mEntries;
+
+  int mMassDim;
 };
 
 } // namespace neural

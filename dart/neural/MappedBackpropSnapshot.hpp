@@ -39,6 +39,9 @@ struct PreStepMapping
   Eigen::MatrixXd forceOutJac;
   Eigen::MatrixXd forceInJac;
 
+  Eigen::VectorXd mass;
+  Eigen::MatrixXd massOutJac;
+
   PreStepMapping(
       std::shared_ptr<simulation::World> world,
       std::shared_ptr<Mapping> mapping)
@@ -52,6 +55,9 @@ struct PreStepMapping
     force = mapping->getForces(world);
     forceOutJac = mapping->getMappedForceToRealForceJac(world);
     forceInJac = mapping->getRealForceToMappedForceJac(world);
+
+    mass = mapping->getMasses(world);
+    massOutJac = mapping->getMappedMassToRealMassJac(world);
   }
 
   PreStepMapping(){};
@@ -114,6 +120,10 @@ public:
       const std::string& mapping,
       PerformanceLog* perfLog = nullptr);
   Eigen::MatrixXd getForceVelJacobian(
+      std::shared_ptr<simulation::World> world,
+      const std::string& mapping,
+      PerformanceLog* perfLog = nullptr);
+  Eigen::MatrixXd getMassVelJacobian(
       std::shared_ptr<simulation::World> world,
       const std::string& mapping,
       PerformanceLog* perfLog = nullptr);

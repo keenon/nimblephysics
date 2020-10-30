@@ -1,6 +1,7 @@
 #include "dart/neural/MappedBackpropSnapshot.hpp"
 
 #include "dart/neural/BackpropSnapshot.hpp"
+#include "dart/neural/WithRespectToMass.hpp"
 
 #define LOG_PERFORMANCE_MAPPED_BACKPROP_SNAPSHOT ;
 
@@ -105,6 +106,23 @@ Eigen::MatrixXd MappedBackpropSnapshot::getForceVelJacobian(
 }
 
 //==============================================================================
+Eigen::MatrixXd MappedBackpropSnapshot::getMassVelJacobian(
+    std::shared_ptr<simulation::World> world,
+    const std::string& mapping,
+    PerformanceLog* perfLog)
+{
+  // No pre-step mapping necessary, because mass doesn't support mappings
+  int massDim = world->getWrtMass()->dim(world);
+  if (massDim == 0)
+  {
+    int velDim = mPostStepMappings[mapping].velInJacWrtVel.rows();
+    return Eigen::MatrixXd::Zero(velDim, 0);
+  }
+  return mPostStepMappings[mapping].velInJacWrtVel
+         * mBackpropSnapshot->getMassVelJacobian(world);
+}
+
+//==============================================================================
 /// This computes the implicit backprop without forming intermediate
 /// Jacobians. It takes a LossGradient with the position and velocity vectors
 /// filled it, though the loss with respect to torque is ignored and can be
@@ -150,11 +168,14 @@ void MappedBackpropSnapshot::backprop(
       = mPreStepMappings[mRepresentation].posOutJac.transpose()
         * thisTimestepRealLoss.lossWrtPosition;
   thisTimestepLoss.lossWrtVelocity
-      = mPreStepMappings[mRepresentation].posOutJac.transpose()
+      = mPreStepMappings[mRepresentation].velOutJac.transpose()
         * thisTimestepRealLoss.lossWrtVelocity;
   thisTimestepLoss.lossWrtTorque
       = mPreStepMappings[mRepresentation].forceOutJac.transpose()
         * thisTimestepRealLoss.lossWrtTorque;
+  thisTimestepLoss.lossWrtMass
+      = mPreStepMappings[mRepresentation].massOutJac.transpose()
+        * thisTimestepRealLoss.lossWrtMass;
 
 #ifdef LOG_PERFORMANCE_MAPPED_BACKPROP_SNAPSHOT
   if (thisLog != nullptr)
