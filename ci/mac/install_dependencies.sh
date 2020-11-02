@@ -14,7 +14,7 @@ popd
 popd
 rm -rf PerfUtils
 
-brew install boost@1.73
+brew install boost # @1.73
 brew install eigen
 
 # Install CCD
