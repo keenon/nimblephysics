@@ -1018,6 +1018,9 @@ void AbstractShot::finiteDifferenceJacobian(
 
     jac.col(i) = (positiveConstraints - negativeConstraints) / (2 * EPS);
   }
+
+  // Reset to original state
+  unflatten(world, flat, nullptr);
 }
 
 } // namespace trajectory

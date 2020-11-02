@@ -35,6 +35,46 @@ performance::PerformanceLog* OptimizationRecord::getPerfLog()
 }
 
 //==============================================================================
+/// This gets the x's we've recorded. This will be empty unless we've
+/// called optimizer.setRecordFullDebugInfo(true)
+std::vector<Eigen::VectorXd>& OptimizationRecord::getXs()
+{
+  return mXs;
+}
+
+//==============================================================================
+/// This gets the losses we've recorded. This will be empty unless we've
+/// called optimizer.setRecordFullDebugInfo(true)
+std::vector<double>& OptimizationRecord::getLosses()
+{
+  return mLosses;
+}
+
+//==============================================================================
+/// This gets the gradients we've recorded. This will be empty unless we've
+/// called optimizer.setRecordFullDebugInfo(true)
+std::vector<Eigen::VectorXd>& OptimizationRecord::getGradients()
+{
+  return mGradients;
+}
+
+//==============================================================================
+/// This gets the gradients we've recorded. This will be empty unless we've
+/// called optimizer.setRecordFullDebugInfo(true)
+std::vector<Eigen::VectorXd>& OptimizationRecord::getConstraintValues()
+{
+  return mConstraintValues;
+}
+
+//==============================================================================
+/// This gets the gradients we've recorded. This will be empty unless we've
+/// called optimizer.setRecordFullDebugInfo(true)
+std::vector<Eigen::VectorXd>& OptimizationRecord::getSparseJacobians()
+{
+  return mSparseJacobians;
+}
+
+//==============================================================================
 void OptimizationRecord::setSuccess(bool success)
 {
   if (mPerfLog != nullptr)
@@ -52,6 +92,46 @@ void OptimizationRecord::registerIteration(
     double constraintViolation)
 {
   mSteps.emplace_back(index, rollout, loss, constraintViolation);
+}
+
+//==============================================================================
+/// This only gets called if we're saving full debug info, but it stores every
+/// x that we receive during optimization
+void OptimizationRecord::registerX(Eigen::VectorXd x)
+{
+  mXs.push_back(x);
+}
+
+//==============================================================================
+/// This only gets called if we're saving full debug info, but it stores every
+/// loss evaluation that we produce during optimization
+void OptimizationRecord::registerLoss(double loss)
+{
+  mLosses.push_back(loss);
+}
+
+//==============================================================================
+/// This only gets called if we're saving full debug info, but it stores every
+/// gradient that we produce during optimization
+void OptimizationRecord::registerGradient(Eigen::VectorXd grad)
+{
+  mGradients.push_back(grad);
+}
+
+//==============================================================================
+/// This only gets called if we're saving full debug info, but it stores every
+/// constraint value that we produce during optimization
+void OptimizationRecord::registerConstraintValues(Eigen::VectorXd g)
+{
+  mConstraintValues.push_back(g);
+}
+
+//==============================================================================
+/// This only gets called if we're saving full debug info, but it stores every
+/// jacobian that we produce during optimization
+void OptimizationRecord::registerSparseJac(Eigen::VectorXd jac)
+{
+  mSparseJacobians.push_back(jac);
 }
 
 //==============================================================================

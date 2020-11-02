@@ -72,7 +72,11 @@ void IPOptOptimizer(py::module& m)
       .def(
           "setRecordPerformanceLog",
           &dart::trajectory::IPOptOptimizer::setRecordPerformanceLog,
-          ::py::arg("recordPerfLog") = true);
+          ::py::arg("recordPerfLog") = true)
+      .def(
+          "setRecoverBest",
+          &dart::trajectory::IPOptOptimizer::setRecoverBest,
+          ::py::arg("recoverBest") = true);
 }
 
 } // namespace python

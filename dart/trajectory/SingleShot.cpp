@@ -575,10 +575,7 @@ void SingleShot::backpropGradientWrt(
   }
 #endif
 
-  AbstractShot::initializeStaticGradient(
-      world,
-      gradStatic.segment(0, AbstractShot::getFlatStaticProblemDim(world)),
-      thisLog);
+  AbstractShot::initializeStaticGradient(world, gradStatic, thisLog);
 
   int staticDims = getFlatStaticProblemDim(world);
   int dynamicDims = getFlatDynamicProblemDim(world);
@@ -623,10 +620,7 @@ void SingleShot::backpropGradientWrt(
     snapshots[i]->backprop(world, thisTimestep, mappedLosses, thisLog);
 
     AbstractShot::accumulateStaticGradient(
-        world,
-        gradStatic.segment(0, AbstractShot::getFlatStaticProblemDim(world)),
-        thisTimestep,
-        thisLog);
+        world, gradStatic, thisTimestep, thisLog);
 
     cursorDynamic -= forceDim;
     gradDynamic.segment(cursorDynamic, forceDim) = thisTimestep.lossWrtTorque;
@@ -813,6 +807,12 @@ Eigen::VectorXd SingleShot::getFinalState(
 std::string SingleShot::getFlatDimName(
     std::shared_ptr<simulation::World> world, int dim)
 {
+  int staticDim = getFlatStaticProblemDim(world);
+  if (dim < staticDim)
+  {
+    return "Static " + std::to_string(dim);
+  }
+  dim -= staticDim;
   if (mTuneStartingState)
   {
     if (dim < getRepresentation()->getPosDim())
@@ -835,12 +835,6 @@ std::string SingleShot::getFlatDimName(
     }
     dim -= forceDim;
   }
-  int staticDim = getFlatStaticProblemDim(world);
-  if (dim < staticDim)
-  {
-    return "Static " + std::to_string(dim);
-  }
-  dim -= staticDim;
   return "Error OOB by " + std::to_string(dim);
 }
 

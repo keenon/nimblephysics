@@ -52,6 +52,26 @@ public:
       double loss,
       double constraintViolation);
 
+  /// This only gets called if we're saving full debug info, but it stores every
+  /// x that we receive during optimization
+  void registerX(Eigen::VectorXd x);
+
+  /// This only gets called if we're saving full debug info, but it stores every
+  /// loss evaluation that we produce during optimization
+  void registerLoss(double loss);
+
+  /// This only gets called if we're saving full debug info, but it stores every
+  /// gradient that we produce during optimization
+  void registerGradient(Eigen::VectorXd grad);
+
+  /// This only gets called if we're saving full debug info, but it stores every
+  /// constraint value that we produce during optimization
+  void registerConstraintValues(Eigen::VectorXd g);
+
+  /// This only gets called if we're saving full debug info, but it stores every
+  /// jacobian that we produce during optimization
+  void registerSparseJac(Eigen::VectorXd jac);
+
   /// Returns the number of steps that were registered
   int getNumSteps();
 
@@ -69,10 +89,35 @@ public:
   /// This returns a reference to the PerformanceLog for this Optimization
   performance::PerformanceLog* getPerfLog();
 
+  /// This gets the x's we've recorded. This will be empty unless we've
+  /// called optimizer.setRecordFullDebugInfo(true)
+  std::vector<Eigen::VectorXd>& getXs();
+
+  /// This gets the losses we've recorded. This will be empty unless we've
+  /// called optimizer.setRecordFullDebugInfo(true)
+  std::vector<double>& getLosses();
+
+  /// This gets the gradients we've recorded. This will be empty unless we've
+  /// called optimizer.setRecordFullDebugInfo(true)
+  std::vector<Eigen::VectorXd>& getGradients();
+
+  /// This gets the gradients we've recorded. This will be empty unless we've
+  /// called optimizer.setRecordFullDebugInfo(true)
+  std::vector<Eigen::VectorXd>& getConstraintValues();
+
+  /// This gets the gradients we've recorded. This will be empty unless we've
+  /// called optimizer.setRecordFullDebugInfo(true)
+  std::vector<Eigen::VectorXd>& getSparseJacobians();
+
 protected:
   bool mSuccess;
   std::vector<OptimizationStep> mSteps;
   performance::PerformanceLog* mPerfLog;
+  std::vector<Eigen::VectorXd> mXs;
+  std::vector<double> mLosses;
+  std::vector<Eigen::VectorXd> mGradients;
+  std::vector<Eigen::VectorXd> mConstraintValues;
+  std::vector<Eigen::VectorXd> mSparseJacobians;
 };
 
 } // namespace trajectory

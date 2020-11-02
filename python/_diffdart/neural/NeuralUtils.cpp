@@ -55,15 +55,6 @@ void NeuralUtils(py::module& m)
       .def_readwrite(
           "lossWrtTorque", &dart::neural::LossGradient::lossWrtTorque);
 
-  ::py::class_<dart::neural::BulkForwardPassResult>(m, "BulkForwardPassResult")
-      .def(::py::init<>())
-      .def_readwrite(
-          "postStepPoses", &dart::neural::BulkForwardPassResult::postStepPoses)
-      .def_readwrite(
-          "postStepVels", &dart::neural::BulkForwardPassResult::postStepVels)
-      .def_readwrite(
-          "snapshots", &dart::neural::BulkForwardPassResult::snapshots);
-
   ::py::class_<dart::neural::KnotJacobian>(m, "KnotJacobian")
       .def(::py::init<>())
       .def_readwrite(
@@ -78,22 +69,6 @@ void NeuralUtils(py::module& m)
           "torquesEndPos", &dart::neural::KnotJacobian::torquesEndPos)
       .def_readwrite(
           "torquesEndVel", &dart::neural::KnotJacobian::torquesEndVel);
-
-  ::py::class_<dart::neural::BulkBackwardPassResult>(
-      m, "BulkBackwardPassResult")
-      .def(::py::init<>())
-      .def_readwrite(
-          "gradWrtPreStepKnotPoses",
-          &dart::neural::BulkBackwardPassResult::gradWrtPreStepKnotPoses)
-      .def_readwrite(
-          "gradWrtPreStepKnotVels",
-          &dart::neural::BulkBackwardPassResult::gradWrtPreStepKnotVels)
-      .def_readwrite(
-          "gradWrtPreStepTorques",
-          &dart::neural::BulkBackwardPassResult::gradWrtPreStepTorques)
-      .def_readwrite(
-          "knotJacobians",
-          &dart::neural::BulkBackwardPassResult::knotJacobians);
 
   ::py::enum_<dart::neural::ConvertToSpace>(m, "ConvertToSpace")
       .value("COM_POS", dart::neural::ConvertToSpace::COM_POS)
@@ -117,23 +92,6 @@ void NeuralUtils(py::module& m)
       ::py::arg("representation") = "identity",
       ::py::arg("mappings"),
       ::py::arg("idempotent") = false);
-  m.def(
-      "bulkForwardPass",
-      &dart::neural::bulkForwardPass,
-      ::py::arg("world"),
-      ::py::arg("torques"),
-      ::py::arg("shootingLength"),
-      ::py::arg("knotPoses"),
-      ::py::arg("knotVels"));
-  m.def(
-      "bulkBackwardPass",
-      &dart::neural::bulkBackwardPass,
-      ::py::arg("world"),
-      ::py::arg("snapshots"),
-      ::py::arg("shootingLength"),
-      ::py::arg("gradWrtPoses"),
-      ::py::arg("gradWrtVels"),
-      ::py::arg("computeJacobians") = true);
   m.def(
       "convertJointSpaceToWorldSpace",
       &dart::neural::convertJointSpaceToWorldSpace,

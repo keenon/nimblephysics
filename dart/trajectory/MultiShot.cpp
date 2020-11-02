@@ -279,13 +279,27 @@ void MultiShot::unflatten(
   }
 #endif
 
+  // Set any static values on the main world that's been passed in
+  int abstractNumDynamic = AbstractShot::getFlatDynamicProblemDim(world);
+  int abstractNumStatic = AbstractShot::getFlatStaticProblemDim(world);
+  AbstractShot::unflatten(
+      world,
+      flatStatic.segment(0, abstractNumStatic),
+      flatDynamic.segment(0, abstractNumDynamic),
+      thisLog);
+
+  // Now set the values for all the parallel world objects
   mRolloutCacheDirty = true;
   int cursor = 0;
-  for (std::shared_ptr<SingleShot>& shot : mShots)
+  for (int i = 0; i < mShots.size(); i++)
   {
+    std::shared_ptr<SingleShot>& shot = mShots[i];
     int dim = shot->getFlatDynamicProblemDim(world);
     shot->unflatten(
-        world, flatStatic, flatDynamic.segment(cursor, dim), thisLog);
+        mParallelOperationsEnabled ? mParallelWorlds[i] : world,
+        flatStatic,
+        flatDynamic.segment(cursor, dim),
+        thisLog);
     cursor += dim;
   }
 
@@ -496,8 +510,6 @@ void MultiShot::backpropJacobian(
   if (mParallelOperationsEnabled)
   {
     std::vector<std::future<void>> futures;
-    Eigen::MatrixXd jacStaticCopies = Eigen::MatrixXd::Zero(
-        jacStatic.rows(), jacStatic.cols() * (mShots.size() - 1));
     for (int i = 1; i < mShots.size(); i++)
     {
       int dynamicDim = mShots[i - 1]->getFlatDynamicProblemDim(world);
@@ -506,24 +518,13 @@ void MultiShot::backpropJacobian(
           this,
           i,
           mParallelWorlds[i],
-          jacStaticCopies.block(
-              0,
-              (i - 1) * jacStatic.cols(),
-              jacStatic.rows(),
-              jacStatic.cols()),
+          jacStatic,
           jacDynamic,
           rowCursor,
           colCursor,
           thisLog));
       colCursor += dynamicDim;
       rowCursor += stateDim;
-    }
-    jacStatic.setZero();
-    for (int i = 0; i < futures.size(); i++)
-    {
-      futures[i].wait();
-      jacStatic += jacStaticCopies.block(
-          0, i * jacStatic.cols(), jacStatic.rows(), jacStatic.cols());
     }
   }
   else
@@ -532,21 +533,17 @@ void MultiShot::backpropJacobian(
     // clear it and redo the sum over time. Instead, we give every SingleShot a
     // scratch matrix to use, which it can safely zero, and then sum the
     // results.
-    Eigen::MatrixXd jacStaticScratch
-        = Eigen::MatrixXd::Zero(stateDim, jacStatic.cols());
-
     for (int i = 1; i < mShots.size(); i++)
     {
       int dim = mShots[i - 1]->getFlatDynamicProblemDim(world);
       mShots[i - 1]->backpropJacobianOfFinalState(
           world,
-          jacStaticScratch,
+          jacStatic.block(rowCursor, 0, stateDim, staticDim),
           jacDynamic.block(rowCursor, colCursor, stateDim, dim),
           thisLog);
       colCursor += dim;
       jacDynamic.block(rowCursor, colCursor, stateDim, stateDim)
           = -1 * Eigen::MatrixXd::Identity(stateDim, stateDim);
-      jacStatic.block(rowCursor, 0, stateDim, staticDim) += jacStaticScratch;
       rowCursor += stateDim;
     }
   }
@@ -580,13 +577,13 @@ void MultiShot::asyncPartBackpropJacobian(
     PerformanceLog* log)
 {
   int stateDim = getRepresentationStateSize();
-  int dim = mShots[index - 1]->getFlatProblemDim(world);
+  int dynamicDim = mShots[index - 1]->getFlatDynamicProblemDim(world);
   mShots[index - 1]->backpropJacobianOfFinalState(
       world,
-      jacStatic,
-      jacDynamic.block(rowCursor, colCursor, stateDim, dim),
+      jacStatic.block(rowCursor, 0, stateDim, jacStatic.cols()),
+      jacDynamic.block(rowCursor, colCursor, stateDim, dynamicDim),
       log);
-  colCursor += dim;
+  colCursor += dynamicDim;
   jacDynamic.block(rowCursor, colCursor, stateDim, stateDim)
       = -1 * Eigen::MatrixXd::Identity(stateDim, stateDim);
   rowCursor += stateDim;
@@ -786,6 +783,7 @@ void MultiShot::getSparseJacobian(
           thisLog));
 
       cursorDynamic += (dimDynamic + 1) * stateDim;
+      cursorStatic += dimStatic * stateDim;
     }
     for (int i = 0; i < futures.size(); i++)
     {
@@ -862,10 +860,10 @@ void MultiShot::asyncPartGetSparseJacobian(
 
   // Copy over the static Jacobian
 
-  for (int col = 0; col < dimStatic; col++)
+  for (int row = 0; row < stateDim; row++)
   {
-    sparseStatic.segment(cursorStatic + (col * stateDim), stateDim)
-        = jacStatic.col(col);
+    sparseStatic.segment(cursorStatic, dimStatic) = jacStatic.row(row);
+    cursorStatic += dimStatic;
   }
 
   // Copy over the dynamic Jacobian
@@ -1046,6 +1044,11 @@ std::string MultiShot::getFlatDimName(
     std::shared_ptr<simulation::World> world, int dim)
 {
   int staticDim = getFlatStaticProblemDim(world);
+  if (dim < staticDim)
+  {
+    return "Static Dim " + std::to_string(dim);
+  }
+  dim -= staticDim;
   for (int i = 0; i < mShots.size(); i++)
   {
     int shotDim = mShots[i]->getFlatDynamicProblemDim(world);
@@ -1059,11 +1062,6 @@ std::string MultiShot::getFlatDimName(
     }
     dim -= shotDim;
   }
-  if (dim < staticDim)
-  {
-    return "Static Dim " + std::to_string(dim);
-  }
-  dim -= staticDim;
   return "Error OOB";
 }
 
@@ -1090,6 +1088,8 @@ void MultiShot::backpropGradientWrt(
   if (mParallelOperationsEnabled)
   {
     std::vector<std::future<void>> futures;
+    Eigen::VectorXd gradStaticScratch
+        = Eigen::VectorXd::Zero(gradStatic.size() * mShots.size());
     for (int i = 0; i < mShots.size(); i++)
     {
       int steps = mShots[i]->getNumSteps();
@@ -1100,7 +1100,7 @@ void MultiShot::backpropGradientWrt(
           i,
           mParallelWorlds[i],
           gradWrtRollout,
-          gradStatic,
+          gradStaticScratch.segment(i * gradStatic.size(), gradStatic.size()),
           gradDynamic,
           cursorDynamicDims,
           cursorSteps,
@@ -1108,13 +1108,19 @@ void MultiShot::backpropGradientWrt(
       cursorSteps += steps;
       cursorDynamicDims += dynamicDim;
     }
+    gradStatic.setZero();
     for (int i = 0; i < futures.size(); i++)
     {
       futures[i].wait();
+      gradStatic += gradStaticScratch.segment(
+          i * gradStatic.size(), gradStatic.size());
     }
   }
   else
   {
+    gradStatic.setZero();
+    Eigen::VectorXd gradStaticScratch
+        = Eigen::VectorXd::Zero(gradStatic.size());
     for (int i = 0; i < mShots.size(); i++)
     {
       int steps = mShots[i]->getNumSteps();
@@ -1124,9 +1130,10 @@ void MultiShot::backpropGradientWrt(
       mShots[i]->backpropGradientWrt(
           world,
           &slice,
-          gradStatic,
+          gradStaticScratch,
           gradDynamic.segment(cursorDynamicDims, dynamicDim),
           thisLog);
+      gradStatic += gradStaticScratch;
       cursorSteps += steps;
       cursorDynamicDims += dynamicDim;
     }

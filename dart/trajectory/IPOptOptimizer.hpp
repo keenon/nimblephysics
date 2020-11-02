@@ -44,6 +44,10 @@ public:
 
   void setRecordPerformanceLog(bool recordPerfLog);
 
+  void setRecoverBest(bool recoverBest);
+
+  void setRecordFullDebugInfo(bool recordFullDebugInfo);
+
 protected:
   int mIterationLimit;
   double mTolerance;
@@ -51,6 +55,8 @@ protected:
   bool mCheckDerivatives;
   int mPrintFrequency;
   bool mRecordPerfLog;
+  bool mRecoverBest;
+  bool mRecordFullDebugInfo;
 };
 
 /*
@@ -62,7 +68,10 @@ class IPOptShotWrapper : public Ipopt::TNLP
 {
 public:
   IPOptShotWrapper(
-      AbstractShot* wrapped, std::shared_ptr<OptimizationRecord> record);
+      AbstractShot* wrapped,
+      std::shared_ptr<OptimizationRecord> record,
+      bool recoverBest = true,
+      bool recordFullDebugInfo = false);
 
   /// Destructor
   ~IPOptShotWrapper();
@@ -183,6 +192,8 @@ public:
 private:
   AbstractShot* mWrapped;
   std::shared_ptr<OptimizationRecord> mRecord;
+  bool mRecoverBest;
+  bool mRecordFullDebugInfo;
   int mBestIter;
   double mBestFeasibleObjectiveValue;
   Eigen::VectorXd mBestFeasibleState;

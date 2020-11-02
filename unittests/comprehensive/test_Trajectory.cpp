@@ -67,7 +67,7 @@
 #include "TestHelpers.hpp"
 #include "stdio.h"
 
-// #define ALL_TESTS
+#define ALL_TESTS
 
 using namespace dart;
 using namespace math;
@@ -435,10 +435,10 @@ bool verifySparseJacobian(WorldPtr world, MultiShot& shot)
     sparseRecoveredJacobian(rows(i), cols(i)) = sparseValues(i);
   }
 
-  double threshold = 1e-8;
+  double threshold = 0;
   if (!equals(analyticalJacobian, sparseRecoveredJacobian, threshold))
   {
-    std::cout << "Jacobians don't match!" << std::endl;
+    std::cout << "Sparse jacobians don't match!" << std::endl;
     int staticDim = shot.getFlatStaticProblemDim(world);
     std::cout << "Static region size: " << shot.getFlatStaticProblemDim(world)
               << std::endl;
@@ -1097,7 +1097,7 @@ BodyNode* createTailSegment(BodyNode* parent, Eigen::Vector3d color)
   return pole;
 }
 
-// #ifdef ALL_TESTS
+#ifdef ALL_TESTS
 TEST(TRAJECTORY, TUNE_SIMPLE_MASS)
 {
   // World
@@ -1180,83 +1180,369 @@ TEST(TRAJECTORY, TUNE_SIMPLE_MASS)
   /////////////////////////////////////////////////////////////////////
 
   LossFn lossFn = LossFn(loss);
-  MultiShot shot(world, lossFn, STEPS, SHOT_LENGTH, true);
 
   LossFn constraintFn = LossFn(loopConstraint);
   constraintFn.setLowerBound(0);
   constraintFn.setUpperBound(0);
+
+  WorldPtr worldPar = world->clone();
+
+  MultiShot shot(world, lossFn, STEPS, SHOT_LENGTH, true);
   shot.addConstraint(constraintFn);
+
+  MultiShot shotPar(worldPar, lossFn, STEPS, SHOT_LENGTH, true);
+  shotPar.addConstraint(constraintFn);
+  shotPar.setParallelOperationsEnabled(true);
+
+  int n = shot.getFlatProblemDim(world);
+  int constraintDim = shot.getConstraintDim();
+  /*
+  Eigen::VectorXd flat = Eigen::VectorXd::Zero(n);
+  shot.AbstractShot::flatten(world, flat);
+  srand(2);
+  flat += Eigen::VectorXd::Random(n) * 0.01;
+  std::cout << flat << std::endl;
+  shot.AbstractShot::unflatten(world, flat);
+  shotPar.AbstractShot::unflatten(world, flat);
+  */
+
+  /////////////////////////////////////////////////////////////////////
+  // Check Bounds
+  /////////////////////////////////////////////////////////////////////
+
+  if (true)
+  {
+    Eigen::VectorXd upperBound = Eigen::VectorXd::Zero(n);
+    Eigen::VectorXd lowerBound = Eigen::VectorXd::Zero(n);
+    shot.AbstractShot::getUpperBounds(world, upperBound);
+    shot.AbstractShot::getLowerBounds(world, lowerBound);
+
+    Eigen::VectorXd upperBoundPar = Eigen::VectorXd::Zero(n);
+    Eigen::VectorXd lowerBoundPar = Eigen::VectorXd::Zero(n);
+    shotPar.AbstractShot::getUpperBounds(worldPar, upperBoundPar);
+    shotPar.AbstractShot::getLowerBounds(worldPar, lowerBoundPar);
+
+    if (!equals(upperBound, upperBoundPar, 0))
+    {
+      std::cout << "Upper Bounds aren't exactly the same!" << std::endl;
+      std::cout << "Serial first segment:" << std::endl
+                << upperBound.segment(0, 10) << std::endl;
+      std::cout << "Parallel first segment:" << std::endl
+                << upperBoundPar.segment(0, 10) << std::endl;
+      EXPECT_TRUE(false);
+      return;
+    }
+
+    if (!equals(lowerBound, lowerBoundPar, 0))
+    {
+      std::cout << "Lower Bounds aren't exactly the same!" << std::endl;
+      std::cout << "Serial first segment:" << std::endl
+                << lowerBound.segment(0, 10) << std::endl;
+      std::cout << "Parallel first segment:" << std::endl
+                << lowerBoundPar.segment(0, 10) << std::endl;
+      EXPECT_TRUE(false);
+      return;
+    }
+
+    Eigen::VectorXd constraintUpperBound = Eigen::VectorXd::Zero(constraintDim);
+    Eigen::VectorXd constraintLowerBound = Eigen::VectorXd::Zero(constraintDim);
+    shot.getConstraintUpperBounds(constraintUpperBound);
+    shot.getConstraintLowerBounds(constraintLowerBound);
+
+    Eigen::VectorXd constraintUpperBoundPar
+        = Eigen::VectorXd::Zero(constraintDim);
+    Eigen::VectorXd constraintLowerBoundPar
+        = Eigen::VectorXd::Zero(constraintDim);
+    shotPar.getConstraintUpperBounds(constraintUpperBoundPar);
+    shotPar.getConstraintLowerBounds(constraintLowerBoundPar);
+
+    if (!equals(constraintUpperBound, constraintUpperBoundPar, 0))
+    {
+      std::cout << "Constraint Upper Bounds aren't exactly the same!"
+                << std::endl;
+      std::cout << "Serial first segment:" << std::endl
+                << constraintUpperBound.segment(0, 10) << std::endl;
+      std::cout << "Parallel first segment:" << std::endl
+                << constraintUpperBoundPar.segment(0, 10) << std::endl;
+      EXPECT_TRUE(false);
+      return;
+    }
+
+    if (!equals(constraintLowerBound, constraintLowerBoundPar, 0))
+    {
+      std::cout << "Constraint Lower Bounds aren't exactly the same!"
+                << std::endl;
+      std::cout << "Serial first segment:" << std::endl
+                << constraintLowerBound.segment(0, 10) << std::endl;
+      std::cout << "Parallel first segment:" << std::endl
+                << constraintLowerBoundPar.segment(0, 10) << std::endl;
+      EXPECT_TRUE(false);
+      return;
+    }
+  }
+
+  /////////////////////////////////////////////////////////////////////
+  // Check Gradients
+  /////////////////////////////////////////////////////////////////////
+
+  if (true)
+  {
+    Eigen::VectorXd grad = Eigen::VectorXd::Zero(n);
+    shot.backpropGradient(world, grad);
+    Eigen::VectorXd gradPar = Eigen::VectorXd::Zero(n);
+    shotPar.backpropGradient(worldPar, gradPar);
+
+    if (!equals(grad, gradPar, 0))
+    {
+      std::cout << "Gradients aren't exactly the same!" << std::endl;
+      std::cout << "Serial first segment:" << std::endl
+                << grad.segment(0, 10) << std::endl;
+      std::cout << "Parallel first segment:" << std::endl
+                << gradPar.segment(0, 10) << std::endl;
+      EXPECT_TRUE(false);
+      return;
+    }
+
+    int m = shot.getNumberNonZeroJacobian(world);
+
+    Eigen::VectorXd sparseJac = Eigen::VectorXd::Zero(m);
+    shot.AbstractShot::getSparseJacobian(world, sparseJac);
+    Eigen::VectorXd sparseJacPar = Eigen::VectorXd::Zero(m);
+    shotPar.AbstractShot::getSparseJacobian(worldPar, sparseJacPar);
+
+    if (!equals(sparseJac, sparseJacPar, 0))
+    {
+      std::cout << "Gradients aren't exactly the same!" << std::endl;
+      std::cout << "Serial first segment:" << std::endl
+                << sparseJac.segment(0, 10) << std::endl;
+      std::cout << "Parallel first segment:" << std::endl
+                << sparseJacPar.segment(0, 10) << std::endl;
+      EXPECT_TRUE(false);
+      return;
+    }
+  }
 
   /////////////////////////////////////////////////////////////////////
   // Check Jacobians
   /////////////////////////////////////////////////////////////////////
 
-  int dim = shot.getFlatProblemDim(world);
-  int numConstraints = shot.getConstraintDim();
-  std::cout << "numConstraints: " << numConstraints << std::endl;
-
-  Eigen::MatrixXd analyticalJacobian
-      = Eigen::MatrixXd::Zero(numConstraints, dim);
-  shot.AbstractShot::backpropJacobian(world, analyticalJacobian);
-  Eigen::MatrixXd bruteForceJacobian
-      = Eigen::MatrixXd::Zero(numConstraints, dim);
-  shot.finiteDifferenceJacobian(world, bruteForceJacobian);
-  double threshold = 1e-8;
-  if (!equals(analyticalJacobian, bruteForceJacobian, threshold))
+  if (true)
   {
-    std::cout << "Jacobians don't match!" << std::endl;
-    int staticDim = shot.getFlatStaticProblemDim(world);
-    std::cout << "Static region size: " << shot.getFlatStaticProblemDim(world)
-              << std::endl;
-    std::cout << "Analytical first region: " << std::endl
-              << analyticalJacobian.block(0, 0, analyticalJacobian.rows(), 10)
-              << std::endl;
-    std::cout << "Brute force first region: " << std::endl
-              << bruteForceJacobian.block(0, 0, analyticalJacobian.rows(), 10)
-              << std::endl;
-    /*
-    for (int i = 0; i < dim; i++)
+    int dim = shot.getFlatProblemDim(world);
+    int numConstraints = shot.getConstraintDim();
+    std::cout << "numConstraints: " << numConstraints << std::endl;
+
+    Eigen::MatrixXd analyticalJacobian
+        = Eigen::MatrixXd::Zero(numConstraints, dim);
+    shot.AbstractShot::backpropJacobian(world, analyticalJacobian);
+    Eigen::MatrixXd bruteForceJacobian
+        = Eigen::MatrixXd::Zero(numConstraints, dim);
+    shot.finiteDifferenceJacobian(world, bruteForceJacobian);
+    double threshold = 1e-8;
+    if (!equals(analyticalJacobian, bruteForceJacobian, threshold))
     {
-      Eigen::VectorXd analyticalCol = analyticalJacobian.col(i);
-      Eigen::VectorXd bruteForceCol = bruteForceJacobian.col(i);
-      if (!equals(analyticalCol, bruteForceCol, threshold))
+      std::cout << "Jacobians don't match!" << std::endl;
+      int staticDim = shot.getFlatStaticProblemDim(world);
+      std::cout << "Static region size: " << shot.getFlatStaticProblemDim(world)
+                << std::endl;
+      std::cout << "Analytical first region: " << std::endl
+                << analyticalJacobian.block(0, 0, analyticalJacobian.rows(), 10)
+                << std::endl;
+      std::cout << "Brute force first region: " << std::endl
+                << bruteForceJacobian.block(0, 0, analyticalJacobian.rows(), 10)
+                << std::endl;
+      /*
+      for (int i = 0; i < dim; i++)
       {
-        std::cout << "ERROR at col " << shot.getFlatDimName(world, i) << " ("
-                  << i << ") by " << (analyticalCol - bruteForceCol).norm()
-                  << std::endl;
-        std::cout << "Analytical:" << std::endl << analyticalCol << std::endl;
-        std::cout << "Brute Force:" << std::endl << bruteForceCol << std::endl;
-        std::cout << "Diff:" << std::endl
-                  << (analyticalCol - bruteForceCol) << std::endl;
+        Eigen::VectorXd analyticalCol = analyticalJacobian.col(i);
+        Eigen::VectorXd bruteForceCol = bruteForceJacobian.col(i);
+        if (!equals(analyticalCol, bruteForceCol, threshold))
+        {
+          std::cout << "ERROR at col " << shot.getFlatDimName(world, i) << " ("
+                    << i << ") by " << (analyticalCol - bruteForceCol).norm()
+                    << std::endl;
+          std::cout << "Analytical:" << std::endl << analyticalCol << std::endl;
+          std::cout << "Brute Force:" << std::endl << bruteForceCol <<
+      std::endl; std::cout << "Diff:" << std::endl
+                    << (analyticalCol - bruteForceCol) << std::endl;
+        }
+        else
+        {
+          // std::cout << "Match at col " << shot.getFlatDimName(world, i) << "
+      ("
+          // << i
+          //          << ")" << std::endl;
+        }
       }
-      else
+      */
+      EXPECT_TRUE(false);
+      return;
+    }
+
+    EXPECT_TRUE(verifySparseJacobian(world, shot));
+  }
+
+  /////////////////////////////////////////////////////////////////////
+  // Verify flat results
+  /////////////////////////////////////////////////////////////////////
+
+  Eigen::VectorXd preFlat = Eigen::VectorXd::Zero(n);
+  Eigen::VectorXd preFlatPar = Eigen::VectorXd::Zero(n);
+  shot.AbstractShot::flatten(world, preFlat);
+  shotPar.AbstractShot::flatten(world, preFlatPar);
+  if (!equals(preFlat, preFlatPar, 0))
+  {
+    std::cout << "Pre-optimization flattening doesn't match!" << std::endl;
+    std::cout << "Serial pre-flat: " << std::endl << preFlat << std::endl;
+    std::cout << "Parallel pre-flat: " << std::endl << preFlatPar << std::endl;
+    for (int i = 0; i < preFlat.size(); i++)
+    {
+      if (preFlat(i) != preFlatPar(i))
       {
-        // std::cout << "Match at col " << shot.getFlatDimName(world, i) << " ("
-        // << i
-        //          << ")" << std::endl;
+        std::cout << "  Mismatch at index " << i << " ("
+                  << shot.getFlatDimName(world, i) << ") by "
+                  << preFlat(i) - preFlatPar(i) << ": " << preFlat(i) << " vs "
+                  << preFlatPar(i) << std::endl;
       }
     }
-    */
     EXPECT_TRUE(false);
     return;
   }
-
-  EXPECT_TRUE(verifySparseJacobian(world, shot));
 
   /////////////////////////////////////////////////////////////////////
   // Actually run the optimization
   /////////////////////////////////////////////////////////////////////
 
-  IPOptOptimizer optimizer = IPOptOptimizer();
-  optimizer.setIterationLimit(100);
-  optimizer.setCheckDerivatives(true);
-
   // Actually do the optimization
+
+  int iterationLimit = 10;
+
+  IPOptOptimizer optimizer = IPOptOptimizer();
+  optimizer.setIterationLimit(iterationLimit);
+  optimizer.setCheckDerivatives(true);
+  optimizer.setRecoverBest(false);
+  // optimizer.setRecordFullDebugInfo(true);
   std::shared_ptr<OptimizationRecord> record = optimizer.optimize(&shot);
+
+  std::shared_ptr<OptimizationRecord> recordPar = optimizer.optimize(&shotPar);
+
+  Eigen::VectorXd endFlat = Eigen::VectorXd::Zero(n);
+  Eigen::VectorXd endFlatPar = Eigen::VectorXd::Zero(n);
+  shot.AbstractShot::flatten(world, endFlat);
+  shotPar.AbstractShot::flatten(worldPar, endFlatPar);
+  if (!equals(endFlat, endFlatPar, 0))
+  {
+    std::cout << "Results after " << iterationLimit << " steps don't match!"
+              << std::endl;
+    for (int i = 0; i < endFlat.size(); i++)
+    {
+      if (endFlat(i) != endFlatPar(i))
+      {
+        std::cout << "  Mismatch at index " << i << " ("
+                  << shot.getFlatDimName(world, i) << ") by "
+                  << endFlat(i) - endFlatPar(i) << ": " << endFlat(i) << " vs "
+                  << endFlatPar(i) << std::endl;
+      }
+    }
+  }
+
+  for (int i = 0; i < record->getXs().size(); i++)
+  {
+    Eigen::VectorXd x0 = record->getXs()[i];
+    Eigen::VectorXd x0Par = recordPar->getXs()[i];
+    if (!equals(x0, x0Par, 0))
+    {
+      std::cout << "Xs at eval " << i << " don't match!" << std::endl;
+      for (int j = 0; j < x0.size(); j++)
+      {
+        if (x0(j) != x0Par(j))
+        {
+          std::cout << "  Mismatch at index " << j << " ("
+                    << shot.getFlatDimName(world, j) << ") by "
+                    << x0(j) - x0Par(j) << ": " << x0(j) << " vs " << x0Par(j)
+                    << std::endl;
+        }
+      }
+    }
+  }
+
+  for (int i = 0; i < record->getLosses().size(); i++)
+  {
+    double loss0 = record->getLosses()[i];
+    double loss0Par = recordPar->getLosses()[i];
+    if (loss0 != loss0Par)
+    {
+      std::cout << "Losses at eval " << i << " don't match by "
+                << loss0 - loss0Par << std::endl;
+    }
+  }
+
+  for (int i = 0; i < record->getGradients().size(); i++)
+  {
+    Eigen::VectorXd grad0 = record->getGradients()[i];
+    Eigen::VectorXd grad0Par = recordPar->getGradients()[i];
+    if (!equals(grad0, grad0Par, 0))
+    {
+      std::cout << "Gradients at eval " << i << " don't match!" << std::endl;
+      for (int j = 0; j < grad0.size(); j++)
+      {
+        if (grad0(j) != grad0Par(j))
+        {
+          std::cout << "  Mismatch at index " << j << " ("
+                    << shot.getFlatDimName(world, j) << ") by "
+                    << grad0(j) - grad0Par(j) << ": " << grad0(j) << " vs "
+                    << grad0Par(j) << std::endl;
+        }
+      }
+    }
+  }
+
+  for (int i = 0; i < record->getSparseJacobians().size(); i++)
+  {
+    Eigen::VectorXd jac0 = record->getSparseJacobians()[i];
+    Eigen::VectorXd jac0Par = recordPar->getSparseJacobians()[i];
+
+    Eigen::VectorXi jacRows = Eigen::VectorXi::Zero(jac0.size());
+    Eigen::VectorXi jacCols = Eigen::VectorXi::Zero(jac0.size());
+    shot.getJacobianSparsityStructure(world, jacRows, jacCols);
+
+    if (!equals(jac0, jac0Par, 0))
+    {
+      std::cout << "Jacobians at eval " << i << " don't match!" << std::endl;
+      for (int j = 0; j < jac0.size(); j++)
+      {
+        double serial = jac0(j);
+        double parallel = jac0Par(j);
+        if (serial != parallel)
+        {
+          std::cout << "  Mismatch at " << jacRows(j) << "," << jacCols(j)
+                    << " (" << shot.getFlatDimName(world, jacCols(j)) << ") by "
+                    << serial - parallel << ": " << serial << " vs " << parallel
+                    << std::endl;
+        }
+      }
+    }
+  }
+
+  for (int i = 0; i < record->getConstraintValues().size(); i++)
+  {
+    Eigen::VectorXd con0 = record->getConstraintValues()[i];
+    Eigen::VectorXd con0Par = recordPar->getConstraintValues()[i];
+    if (!equals(con0, con0Par, 0))
+    {
+      std::cout << "Constraints at eval " << i << " don't match!" << std::endl;
+    }
+  }
 
   // Playback the trajectory
   TrajectoryRolloutReal withKnots = TrajectoryRolloutReal(&shot);
   shot.getStates(world, &withKnots, nullptr, true);
+}
+#endif
+
+// #ifdef ALL_TESTS
+TEST(TRAJECTORY, RECOVER_MASS)
+{
 }
 // #endif
 

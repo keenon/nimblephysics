@@ -26,7 +26,9 @@ IPOptOptimizer::IPOptOptimizer()
     mPrintFrequency(1),
     mIterationLimit(100),
     mCheckDerivatives(false),
-    mRecordPerfLog(false)
+    mRecordPerfLog(false),
+    mRecoverBest(true),
+    mRecordFullDebugInfo(false)
 {
 }
 
@@ -97,7 +99,8 @@ std::shared_ptr<OptimizationRecord> IPOptOptimizer::optimize(AbstractShot* shot)
   // through `problemPtr`. `problem` NEEDS TO BE ON THE HEAP or it will crash.
   // If you try to leave `problem` on the stack, you'll get invalid free
   // exceptions when IPOpt attempts to free it.
-  IPOptShotWrapper* problem = new IPOptShotWrapper(shot, record);
+  IPOptShotWrapper* problem
+      = new IPOptShotWrapper(shot, record, mRecoverBest, mRecordFullDebugInfo);
   SmartPtr<IPOptShotWrapper> problemPtr(problem);
   status = app->OptimizeTNLP(problemPtr);
 
@@ -152,21 +155,42 @@ void IPOptOptimizer::setPrintFrequency(int frequency)
   mPrintFrequency = frequency;
 }
 
+//==============================================================================
 void IPOptOptimizer::setRecordPerformanceLog(bool recordPerfLog)
 {
   mRecordPerfLog = recordPerfLog;
 }
 
 //==============================================================================
+void IPOptOptimizer::setRecoverBest(bool recoverBest)
+{
+  mRecoverBest = recoverBest;
+}
+
+//==============================================================================
+void IPOptOptimizer::setRecordFullDebugInfo(bool recordFullDebugInfo)
+{
+  mRecordFullDebugInfo = recordFullDebugInfo;
+}
+
+//==============================================================================
 IPOptShotWrapper::IPOptShotWrapper(
-    AbstractShot* wrapped, std::shared_ptr<OptimizationRecord> record)
+    AbstractShot* wrapped,
+    std::shared_ptr<OptimizationRecord> record,
+    bool recoverBest,
+    bool recordFullDebugInfo)
   : mBestFeasibleObjectiveValue(1e20),
     mWrapped(wrapped),
     mBestIter(0),
-    mRecord(record)
+    mRecord(record),
+    mRecoverBest(recoverBest),
+    mRecordFullDebugInfo(recordFullDebugInfo)
 {
-  mBestFeasibleState
-      = Eigen::VectorXd(mWrapped->getFlatProblemDim(mWrapped->mWorld));
+  if (mRecoverBest)
+  {
+    mBestFeasibleState
+        = Eigen::VectorXd(mWrapped->getFlatProblemDim(mWrapped->mWorld));
+  }
 }
 
 //==============================================================================
@@ -335,6 +359,18 @@ bool IPOptShotWrapper::eval_f(
   }
   _obj_value = mWrapped->getLoss(mWrapped->mWorld, perflog);
 
+  if (mRecordFullDebugInfo)
+  {
+    if (_new_x)
+    {
+      std::cout << "  New X" << std::endl;
+      Eigen::Map<const Eigen::VectorXd> flat(_x, _n);
+      mRecord->registerX(flat);
+    }
+    std::cout << "Loss eval " << mRecord->getLosses().size() << std::endl;
+    mRecord->registerLoss(_obj_value);
+  }
+
 #ifdef LOG_PERFORMANCE_IPOPT
   if (perflog != nullptr)
   {
@@ -367,6 +403,19 @@ bool IPOptShotWrapper::eval_grad_f(
   }
   Eigen::Map<Eigen::VectorXd> grad(_grad_f, _n);
   mWrapped->backpropGradient(mWrapped->mWorld, grad, perflog);
+
+  if (mRecordFullDebugInfo)
+  {
+    if (_new_x)
+    {
+      std::cout << "  New X" << std::endl;
+      Eigen::Map<const Eigen::VectorXd> flat(_x, _n);
+      mRecord->registerX(flat);
+    }
+    std::cout << "Gradient eval " << mRecord->getGradients().size()
+              << std::endl;
+    mRecord->registerGradient(grad);
+  }
 
 #ifdef LOG_PERFORMANCE_IPOPT
   if (perflog != nullptr)
@@ -402,6 +451,19 @@ bool IPOptShotWrapper::eval_g(
   }
   Eigen::Map<Eigen::VectorXd> constraints(_g, _m);
   mWrapped->computeConstraints(mWrapped->mWorld, constraints, perflog);
+
+  if (mRecordFullDebugInfo)
+  {
+    if (_new_x)
+    {
+      std::cout << "  New X" << std::endl;
+      Eigen::Map<const Eigen::VectorXd> flat(_x, _n);
+      mRecord->registerX(flat);
+    }
+    std::cout << "Constraint eval " << mRecord->getConstraintValues().size()
+              << std::endl;
+    mRecord->registerConstraintValues(constraints);
+  }
 
 #ifdef LOG_PERFORMANCE_IPOPT
   if (perflog != nullptr)
@@ -472,6 +534,19 @@ bool IPOptShotWrapper::eval_jac_g(
     }
     Eigen::Map<Eigen::VectorXd> sparse(_values, _nnzj);
     mWrapped->getSparseJacobian(mWrapped->mWorld, sparse, perflog);
+
+    if (mRecordFullDebugInfo)
+    {
+      if (_new_x)
+      {
+        std::cout << "  New X" << std::endl;
+        Eigen::Map<const Eigen::VectorXd> flat(_x, _n);
+        mRecord->registerX(flat);
+      }
+      std::cout << "Jac eval " << mRecord->getSparseJacobians().size()
+                << std::endl;
+      mRecord->registerSparseJac(sparse);
+    }
 
     /*
     Eigen::MatrixXd jac = Eigen::MatrixXd::Zero(_m, _n);
@@ -557,10 +632,12 @@ void IPOptShotWrapper::finalize_solution(
 
   Eigen::Map<const Eigen::VectorXd> flat(_x, _n);
 
-  // TODO: we may not actually want to do this
-  std::cout << "Recovering best discovered state from iter " << mBestIter
-            << " with loss " << mBestFeasibleObjectiveValue << std::endl;
-  mWrapped->unflatten(mWrapped->mWorld, mBestFeasibleState, perflog);
+  if (mRecoverBest)
+  {
+    std::cout << "Recovering best discovered state from iter " << mBestIter
+              << " with loss " << mBestFeasibleObjectiveValue << std::endl;
+    mWrapped->unflatten(mWrapped->mWorld, mBestFeasibleState, perflog);
+  }
   /*
   const std::shared_ptr<Problem>& problem = mSolver->getProblem();
 
@@ -611,7 +688,7 @@ bool IPOptShotWrapper::intermediate_callback(
       mWrapped->getRolloutCache(mWrapped->mWorld, perflog),
       obj_value,
       inf_pr);
-  if (obj_value < mBestFeasibleObjectiveValue && inf_pr < 5e-4)
+  if (mRecoverBest && obj_value < mBestFeasibleObjectiveValue && inf_pr < 5e-4)
   {
     // std::cout << "Found new best feasible loss!" << std::endl;
     mBestIter = iter;
