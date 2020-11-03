@@ -32,6 +32,11 @@ SingleShot::SingleShot(
   assert(steps > 0);
   mForces = Eigen::MatrixXd::Zero(world->getNumDofs(), steps);
   mSnapshotsCacheDirty = true;
+  mPinnedForces = Eigen::MatrixXd::Zero(world->getNumDofs(), steps);
+  for (int i = 0; i < steps; i++)
+  {
+    mForcesPinned.push_back(false);
+  }
 }
 
 //==============================================================================
@@ -92,6 +97,8 @@ void SingleShot::switchRepresentationMapping(
     newForces.col(i) = mMappings[mapping]->getForces(world);
   }
   mForces = newForces;
+  // Any pinned forces must also show up in the main forces list
+  mPinnedForces = newForces;
 
   // Rewrite the start state in the new mapping
   getRepresentation()->setPositions(world, mStartPos);
@@ -112,6 +119,22 @@ void SingleShot::switchRepresentationMapping(
     thisLog->end();
   }
 #endif
+}
+
+//==============================================================================
+/// This prevents a force from changing in optimization, keeping it fixed at a
+/// specified value.
+void SingleShot::pinForce(int time, Eigen::VectorXd value)
+{
+  mPinnedForces.col(time) = value;
+  mForcesPinned[time] = true;
+}
+
+//==============================================================================
+/// This returns the pinned force value at this timestep.
+Eigen::Ref<Eigen::VectorXd> SingleShot::getPinnedForce(int time)
+{
+  return mPinnedForces.col(time);
 }
 
 //==============================================================================
@@ -170,7 +193,14 @@ void SingleShot::flatten(
   int forceDim = getRepresentation()->getForceDim();
   for (int i = 0; i < mSteps; i++)
   {
-    flatDynamic.segment(cursorDynamic, forceDim) = mForces.col(i);
+    if (mForcesPinned[i])
+    {
+      flatDynamic.segment(cursorDynamic, forceDim) = mPinnedForces.col(i);
+    }
+    else
+    {
+      flatDynamic.segment(cursorDynamic, forceDim) = mForces.col(i);
+    }
     cursorDynamic += forceDim;
   }
   assert(cursorDynamic == flatDynamic.size());
@@ -277,7 +307,14 @@ void SingleShot::getUpperBounds(
   assert(forceDim == forceUpperLimits.size());
   for (int i = 0; i < mSteps; i++)
   {
-    flatDynamic.segment(cursorDynamic, forceDim) = forceUpperLimits;
+    if (mForcesPinned[i])
+    {
+      flatDynamic.segment(cursorDynamic, forceDim) = mPinnedForces.col(i);
+    }
+    else
+    {
+      flatDynamic.segment(cursorDynamic, forceDim) = forceUpperLimits;
+    }
     cursorDynamic += forceDim;
   }
   assert(cursorDynamic == flatDynamic.size());
@@ -332,7 +369,14 @@ void SingleShot::getLowerBounds(
   assert(forceDim == forceLowerLimits.size());
   for (int i = 0; i < mSteps; i++)
   {
-    flatDynamic.segment(cursorDynamic, forceDim) = forceLowerLimits;
+    if (mForcesPinned[i])
+    {
+      flatDynamic.segment(cursorDynamic, forceDim) = mPinnedForces.col(i);
+    }
+    else
+    {
+      flatDynamic.segment(cursorDynamic, forceDim) = forceLowerLimits;
+    }
     cursorDynamic += forceDim;
   }
   assert(cursorDynamic == flatDynamic.size());

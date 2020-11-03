@@ -1540,11 +1540,142 @@ TEST(TRAJECTORY, TUNE_SIMPLE_MASS)
 }
 #endif
 
-// #ifdef ALL_TESTS
+#ifdef ALL_TESTS
 TEST(TRAJECTORY, RECOVER_MASS)
 {
+  // World
+  WorldPtr world = World::create();
+  world->setGravity(Eigen::Vector3d(0, -9.81, 0));
+
+  world->setPenetrationCorrectionEnabled(false);
+  world->setConstraintForceMixingEnabled(false);
+
+  /////////////////////////////////////////////////////////////////////
+  // Create the skeleton with a single revolute joint
+  /////////////////////////////////////////////////////////////////////
+
+  SkeletonPtr box = Skeleton::create("box");
+
+  std::pair<PrismaticJoint*, BodyNode*> boxJointPair
+      = box->createJointAndBodyNodePair<PrismaticJoint>();
+  PrismaticJoint* boxJoint = boxJointPair.first;
+  BodyNode* boxBody = boxJointPair.second;
+
+  std::shared_ptr<BoxShape> shape(
+      new BoxShape(Eigen::Vector3d(0.05, 0.25, 0.05)));
+  ShapeNode* boxShape
+      = boxBody->createShapeNodeWith<VisualAspect, CollisionAspect>(shape);
+
+  // We're going to tune the full inertia properties of the swinging object
+  Eigen::VectorXd upperBounds = Eigen::VectorXd::Ones(1) * 5.0;
+  Eigen::VectorXd lowerBounds = Eigen::VectorXd::Ones(1) * 0.1;
+  world->getWrtMass()->registerNode(
+      boxBody,
+      neural::WrtMassBodyNodeEntryType::INERTIA_MASS,
+      upperBounds,
+      lowerBounds);
+
+  world->addSkeleton(box);
+
+  assert(world->getNumDofs() == 1);
+
+  /////////////////////////////////////////////////////////////////////
+  // Run one simulation forward to provide the raw material for our loss to try
+  // to recover
+  /////////////////////////////////////////////////////////////////////
+
+  double TRUE_MASS = 2.5;
+  int STEPS = 12;
+  int SHOT_LENGTH = 3;
+  int GOAL_STEP = 6;
+  double GOAL_AT_STEP = 0.1;
+
+  boxBody->setMass(TRUE_MASS);
+  Eigen::VectorXd knownForce = Eigen::VectorXd::Ones(1) * 0.1;
+  world->setPositions(Eigen::VectorXd::Zero(1));
+  world->setVelocities(Eigen::VectorXd::Zero(1));
+  world->setTimeStep(1e-1);
+
+  Eigen::VectorXd originalPoses = Eigen::VectorXd::Zero(STEPS);
+  for (int i = 0; i < STEPS; i++)
+  {
+    world->setForces(knownForce);
+    world->step();
+    originalPoses(i) = world->getPositions()[0];
+  }
+
+  // Reset position, scramble mass
+
+  world->setPositions(Eigen::VectorXd::Zero(1));
+  world->setVelocities(Eigen::VectorXd::Zero(1));
+  boxBody->setMass(0.5);
+
+  /////////////////////////////////////////////////////////////////////
+  // Define a loss
+  /////////////////////////////////////////////////////////////////////
+
+  // Get the GOAL_STEP pose as close to GOAL_AT_STEP
+  TrajectoryLossFn loss
+      = [originalPoses, STEPS](const TrajectoryRollout* rollout) {
+          const Eigen::Ref<const Eigen::MatrixXd> poses
+              = rollout->getPosesConst("identity");
+          double sum = 0.0;
+          for (int i = 0; i < STEPS; i++)
+          {
+            double diff = 1e2 * (poses(0, i) - originalPoses(i));
+            sum += diff * diff;
+          }
+          return sum;
+        };
+
+  /////////////////////////////////////////////////////////////////////
+  // Build a trajectory optimization problem
+  /////////////////////////////////////////////////////////////////////
+
+  LossFn lossFn = LossFn(loss);
+
+  MultiShot shot(world, lossFn, STEPS, SHOT_LENGTH, false);
+
+  /////////////////////////////////////////////////////////////////////
+  // Pin the forces
+  /////////////////////////////////////////////////////////////////////
+
+  for (int i = 0; i < STEPS; i++)
+  {
+    shot.pinForce(i, knownForce);
+  }
+
+  /////////////////////////////////////////////////////////////////////
+  // Run optimization
+  /////////////////////////////////////////////////////////////////////
+
+  IPOptOptimizer optimizer = IPOptOptimizer();
+  optimizer.setIterationLimit(50);
+  optimizer.setCheckDerivatives(true);
+  optimizer.setTolerance(1e-9);
+  // optimizer.setRecordFullDebugInfo(true);
+  std::shared_ptr<OptimizationRecord> record = optimizer.optimize(&shot);
+
+  // We should have recovered the mass
+  double error = abs(boxBody->getMass() - TRUE_MASS);
+  if (error > 1e-7)
+  {
+    std::cout << "Recovered mass: " << boxBody->getMass() << std::endl;
+    std::cout << "Error: " << error << std::endl;
+    // Get the trajectory
+    TrajectoryRolloutReal withKnots = TrajectoryRolloutReal(&shot);
+    shot.getStates(world, &withKnots, nullptr, true);
+    std::cout << "Original: " << std::endl
+              << originalPoses.transpose() << std::endl;
+    std::cout << "Forces: " << std::endl
+              << withKnots.getForces("identity") << std::endl;
+    std::cout << "Positions: " << std::endl
+              << withKnots.getPoses("identity") << std::endl;
+
+    EXPECT_TRUE(error < 1e-7);
+  }
 }
-// #endif
+#endif
 
 #ifdef ALL_TESTS
 TEST(TRAJECTORY, CONSTRAINED_CYCLE)

@@ -53,6 +53,13 @@ public:
       const std::string& mapping,
       PerformanceLog* log = nullptr) override;
 
+  /// This prevents a force from changing in optimization, keeping it fixed at a
+  /// specified value.
+  void pinForce(int time, Eigen::VectorXd value) override;
+
+  /// This returns the pinned force value at this timestep.
+  Eigen::Ref<Eigen::VectorXd> getPinnedForce(int time) override;
+
   /// Returns the length of the flattened problem state
   int getFlatDynamicProblemDim(
       std::shared_ptr<simulation::World> world) const override;
@@ -171,6 +178,8 @@ private:
   Eigen::VectorXd mStartPos;
   Eigen::VectorXd mStartVel;
   Eigen::MatrixXd mForces;
+  std::vector<bool> mForcesPinned;
+  Eigen::MatrixXd mPinnedForces;
 
   bool mSnapshotsCacheDirty;
   std::vector<neural::MappedBackpropSnapshotPtr> mSnapshotsCache;

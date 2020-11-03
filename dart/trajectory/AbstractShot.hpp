@@ -37,6 +37,13 @@ public:
   /// Abstract destructor
   virtual ~AbstractShot();
 
+  /// This prevents a force from changing in optimization, keeping it fixed at a
+  /// specified value.
+  virtual void pinForce(int time, Eigen::VectorXd value) = 0;
+
+  /// This returns the pinned force value at this timestep.
+  virtual Eigen::Ref<Eigen::VectorXd> getPinnedForce(int time) = 0;
+
   /// This updates the loss function for this trajectory
   void setLoss(LossFn loss);
 

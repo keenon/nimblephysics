@@ -136,6 +136,43 @@ void MultiShot::removeMapping(const std::string& key)
 }
 
 //==============================================================================
+/// This prevents a force from changing in optimization, keeping it fixed at a
+/// specified value.
+void MultiShot::pinForce(int time, Eigen::VectorXd value)
+{
+  for (int i = 0; i < mShots.size(); i++)
+  {
+    int steps = mShots[i]->getNumSteps();
+    if (time < steps)
+    {
+      mShots[i]->pinForce(time, value);
+      return;
+    }
+    else
+      time -= steps;
+  }
+  std::cout << "WARNING: Attempted to pin OOB timestep" << std::endl;
+}
+
+//==============================================================================
+/// This returns the pinned force value at this timestep.
+Eigen::Ref<Eigen::VectorXd> MultiShot::getPinnedForce(int time)
+{
+  for (int i = 0; i < mShots.size(); i++)
+  {
+    int steps = mShots[i]->getNumSteps();
+    if (time < steps)
+    {
+      return mShots[i]->getPinnedForce(time);
+    }
+    else
+      time -= steps;
+  }
+  std::cout << "WARNING: Attempted to get pinned force for OOB timestep"
+            << std::endl;
+}
+
+//==============================================================================
 /// Returns the length of the flattened problem state
 int MultiShot::getFlatDynamicProblemDim(
     std::shared_ptr<simulation::World> world) const

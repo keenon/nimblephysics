@@ -68,6 +68,13 @@ public:
   /// This removes the loss mapping at a particular key
   void removeMapping(const std::string& key) override;
 
+  /// This prevents a force from changing in optimization, keeping it fixed at a
+  /// specified value.
+  void pinForce(int time, Eigen::VectorXd value) override;
+
+  /// This returns the pinned force value at this timestep.
+  Eigen::Ref<Eigen::VectorXd> getPinnedForce(int time) override;
+
   /// Returns the length of the flattened problem stat
   int getFlatDynamicProblemDim(
       std::shared_ptr<simulation::World> world) const override;
