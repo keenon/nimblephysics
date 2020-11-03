@@ -33,6 +33,7 @@
 #include <dart/collision/CollisionResult.hpp>
 #include <dart/constraint/ConstraintSolver.hpp>
 #include <dart/dynamics/Skeleton.hpp>
+#include <dart/neural/WithRespectToMass.hpp>
 #include <dart/simulation/World.hpp>
 #include <pybind11/eigen.h>
 #include <pybind11/pybind11.h>
@@ -368,6 +369,7 @@ void World(py::module& m)
           "setConstraintForceMixingEnabled",
           &dart::simulation::World::setConstraintForceMixingEnabled,
           ::py::arg("enabled"))
+      .def("getWrtMass", &dart::simulation::World::getWrtMass)
       .def_readonly("onNameChanged", &dart::simulation::World::onNameChanged);
 }
 

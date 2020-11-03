@@ -236,6 +236,15 @@ void AbstractShot(py::module& m)
           &dart::trajectory::AbstractShot::addConstraint,
           ::py::arg("constraint"))
       .def(
+          "pinForce",
+          &dart::trajectory::AbstractShot::pinForce,
+          ::py::arg("time"),
+          ::py::arg("value"))
+      .def(
+          "getPinnedForce",
+          &dart::trajectory::AbstractShot::getPinnedForce,
+          ::py::arg("time"))
+      .def(
           "switchRepresentationMapping",
           &dart::trajectory::AbstractShot::switchRepresentationMapping,
           ::py::arg("world"),
@@ -267,7 +276,8 @@ void AbstractShot(py::module& m)
           &dart::trajectory::AbstractShot::getRepresentationName)
       .def(
           "getFlatProblemDim",
-          &dart::trajectory::AbstractShot::getFlatProblemDim)
+          &dart::trajectory::AbstractShot::getFlatProblemDim,
+          ::py::arg("world"))
       .def(
           "getConstraintDim", &dart::trajectory::AbstractShot::getConstraintDim)
       .def("getStartState", &dart::trajectory::AbstractShot::getStartState)
@@ -280,6 +290,7 @@ void AbstractShot(py::module& m)
       .def(
           "getFlatDimName",
           &dart::trajectory::AbstractShot::getFlatDimName,
+          ::py::arg("world"),
           ::py::arg("dim"))
       .def(
           "getLoss",

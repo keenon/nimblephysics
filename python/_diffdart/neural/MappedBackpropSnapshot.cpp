@@ -87,6 +87,12 @@ void MappedBackpropSnapshot(py::module& m)
           ::py::arg("mapping"),
           ::py::arg("perfLog") = nullptr)
       .def(
+          "getMassVelJacobian",
+          &dart::neural::MappedBackpropSnapshot::getMassVelJacobian,
+          ::py::arg("world"),
+          ::py::arg("mapping"),
+          ::py::arg("perfLog") = nullptr)
+      .def(
           "getPreStepPosition",
           &dart::neural::MappedBackpropSnapshot::getPreStepPosition,
           ::py::arg("mapping"))

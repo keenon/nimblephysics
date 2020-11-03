@@ -30,38 +30,53 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <Eigen/Dense>
+#include <dart/dynamics/BodyNode.hpp>
+#include <dart/neural/WithRespectToMass.hpp>
 #include <pybind11/eigen.h>
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 
 namespace py = pybind11;
 
 namespace dart {
 namespace python {
 
-void NeuralUtils(py::module& sm);
-void Mapping(py::module& sm);
-void IKMapping(py::module& sm);
-void IdentityMapping(py::module& sm);
-void BackpropSnapshot(py::module& sm);
-void MappedBackpropSnapshot(py::module& sm);
-void WithRespectToMass(py::module& sm);
-
-void dart_neural(py::module& m)
+void WithRespectToMass(py::module& m)
 {
-  auto sm = m.def_submodule("neural");
+  ::py::class_<
+      dart::neural::WithRespectToMass,
+      std::shared_ptr<dart::neural::WithRespectToMass>>(m, "WithRespectToMass")
+      .def(
+          "registerNode",
+          &dart::neural::WithRespectToMass::registerNode,
+          ::py::arg("node"),
+          ::py::arg("type"),
+          ::py::arg("upperBound"),
+          ::py::arg("lowerBound"));
 
-  sm.doc()
-      = "This provides gradients to DART, with an eye on embedding DART as a "
-        "non-linearity in neural networks.";
-
-  NeuralUtils(sm);
-  Mapping(sm);
-  IKMapping(sm);
-  IdentityMapping(sm);
-  BackpropSnapshot(sm);
-  MappedBackpropSnapshot(sm);
-  WithRespectToMass(sm);
+  ::py::enum_<dart::neural::WithRespectToMass::WrtMassBodyNodeEntryType>(
+      m, "WrtMassBodyNodeEntryType")
+      .value(
+          "MASS",
+          dart::neural::WithRespectToMass::WrtMassBodyNodeEntryType::
+              INERTIA_MASS)
+      .value(
+          "COM",
+          dart::neural::WithRespectToMass::WrtMassBodyNodeEntryType::
+              INERTIA_COM)
+      .value(
+          "INERTIA_DIAGONAL",
+          dart::neural::WithRespectToMass::WrtMassBodyNodeEntryType::
+              INERTIA_DIAGONAL)
+      .value(
+          "INERTIA_OFF_DIAGONAL",
+          dart::neural::WithRespectToMass::WrtMassBodyNodeEntryType::
+              INERTIA_OFF_DIAGONAL)
+      .value(
+          "INERTIA_FULL",
+          dart::neural::WithRespectToMass::WrtMassBodyNodeEntryType::
+              INERTIA_FULL)
+      .export_values();
 }
 
 } // namespace python
