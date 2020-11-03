@@ -84,9 +84,13 @@ class CMakeBuild(build_ext):
         Path(extdir+"/__init__.py").touch()
 
 
+with open('VERSION.txt', 'r') as file:
+    VERSION = file.read().replace('\n', '')
+print("VERSION: "+VERSION)
+
 setup(
     name='diffdart',
-    version='0.0.4',
+    version=VERSION,
     author='Keenon Werling',
     author_email='keenonwerling@gmail.com',
     description='A differentiable fully featured physics engine',

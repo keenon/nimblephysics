@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-VERSION=0.0.4
+VERSION=$(cat ../../VERSION.txt)
 
 # Find our python paths
 PYTHON_INCLUDE=$(python-config --includes)
