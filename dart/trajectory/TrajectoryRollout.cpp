@@ -38,7 +38,9 @@ TrajectoryRollout* TrajectoryRollout::copy() const
 TrajectoryRolloutReal::TrajectoryRolloutReal(
     std::unordered_map<std::string, std::shared_ptr<neural::Mapping>> mappings,
     int steps,
-    std::string representationMapping)
+    std::string representationMapping,
+    int massDim)
+  : mMasses(Eigen::VectorXd::Zero(massDim))
 {
   mRepresentationMapping = representationMapping;
   for (auto pair : mappings)
@@ -54,7 +56,10 @@ TrajectoryRolloutReal::TrajectoryRolloutReal(
 //==============================================================================
 TrajectoryRolloutReal::TrajectoryRolloutReal(AbstractShot* shot)
   : TrajectoryRolloutReal(
-      shot->getMappings(), shot->getNumSteps(), shot->getRepresentationName())
+      shot->getMappings(),
+      shot->getNumSteps(),
+      shot->getRepresentationName(),
+      shot->getMassDims())
 {
 }
 
@@ -82,6 +87,7 @@ TrajectoryRolloutReal::TrajectoryRolloutReal(const TrajectoryRollout* copy)
     mVels[key] = copy->getVelsConst(key);
     mForces[key] = copy->getForcesConst(key);
   }
+  mMasses = copy->getMassesConst();
 }
 
 //==============================================================================
@@ -106,6 +112,12 @@ Eigen::Ref<Eigen::MatrixXd> TrajectoryRolloutReal::getForces(
 }
 
 //==============================================================================
+Eigen::Ref<Eigen::VectorXd> TrajectoryRolloutReal::getMasses()
+{
+  return mMasses;
+}
+
+//==============================================================================
 const Eigen::Ref<const Eigen::MatrixXd> TrajectoryRolloutReal::getPosesConst(
     const std::string& mapping) const
 {
@@ -124,6 +136,13 @@ const Eigen::Ref<const Eigen::MatrixXd> TrajectoryRolloutReal::getForcesConst(
     const std::string& mapping) const
 {
   return mForces.at(mapping);
+}
+
+//==============================================================================
+const Eigen::Ref<const Eigen::VectorXd> TrajectoryRolloutReal::getMassesConst()
+    const
+{
+  return mMasses;
 }
 
 //==============================================================================
@@ -171,6 +190,12 @@ Eigen::Ref<Eigen::MatrixXd> TrajectoryRolloutRef::getForces(
 }
 
 //==============================================================================
+Eigen::Ref<Eigen::VectorXd> TrajectoryRolloutRef::getMasses()
+{
+  return mToSlice->getMasses();
+}
+
+//==============================================================================
 const Eigen::Ref<const Eigen::MatrixXd> TrajectoryRolloutRef::getPosesConst(
     const std::string& mapping) const
 {
@@ -192,6 +217,13 @@ const Eigen::Ref<const Eigen::MatrixXd> TrajectoryRolloutRef::getForcesConst(
 {
   return mToSlice->getForcesConst(mapping).block(
       0, mStart, mToSlice->getForcesConst(mapping).rows(), mLen);
+}
+
+//==============================================================================
+const Eigen::Ref<const Eigen::VectorXd> TrajectoryRolloutRef::getMassesConst()
+    const
+{
+  return mToSlice->getMassesConst();
 }
 
 //==============================================================================
@@ -236,6 +268,12 @@ Eigen::Ref<Eigen::MatrixXd> TrajectoryRolloutConstRef::getForces(
 }
 
 //==============================================================================
+Eigen::Ref<Eigen::VectorXd> TrajectoryRolloutConstRef::getMasses()
+{
+  assert(false && "It should be impossible to get a mutable reference from a TrajectorRolloutConstRef");
+}
+
+//==============================================================================
 const Eigen::Ref<const Eigen::MatrixXd>
 TrajectoryRolloutConstRef::getPosesConst(const std::string& mapping) const
 {
@@ -257,6 +295,13 @@ TrajectoryRolloutConstRef::getForcesConst(const std::string& mapping) const
 {
   return mToSlice->getForcesConst(mapping).block(
       0, mStart, mToSlice->getForcesConst(mapping).rows(), mLen);
+}
+
+//==============================================================================
+const Eigen::Ref<const Eigen::VectorXd>
+TrajectoryRolloutConstRef::getMassesConst() const
+{
+  return mToSlice->getMassesConst();
 }
 
 } // namespace trajectory

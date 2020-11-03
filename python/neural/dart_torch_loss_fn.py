@@ -19,6 +19,8 @@ class DartTorchTrajectoryRollout:
             self.forceTensors[mapping] = torch.tensor(
                 rollout.getForces(mapping), requires_grad=True)
 
+        self.massTensor: torch.Tensor = torch.tensor(rollout.getMasses(), requires_grad=True)
+
     def getPoses(self, mapping: str) -> torch.Tensor:
         return self.posTensors[mapping]
 
@@ -27,6 +29,9 @@ class DartTorchTrajectoryRollout:
 
     def getForces(self, mapping: str) -> torch.Tensor:
         return self.forceTensors[mapping]
+
+    def getMasses(self) -> torch.Tensor:
+        return self.massTensor
 
     def fill_gradients(self, gradWrtRollout: dart.trajectory.TrajectoryRollout):
         for mapping in gradWrtRollout.getMappings():
@@ -39,6 +44,9 @@ class DartTorchTrajectoryRollout:
             forceGrad = self.getForces(mapping).grad
             if forceGrad is not None:
                 np.copyto(gradWrtRollout.getForces(mapping), forceGrad.numpy())
+        massGrad = self.getMasses().grad
+        if massGrad is not None:
+            np.copyto(gradWrtRollout.getMasses(), massGrad.numpy())
 
 
 def DartTorchLossFn(fn: Callable[[DartTorchTrajectoryRollout], torch.Tensor]):

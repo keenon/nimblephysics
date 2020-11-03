@@ -253,6 +253,15 @@ void World(py::module& m)
           "bake",
           +[](dart::simulation::World* self) -> void { return self->bake(); })
       .def(
+          "tuneMass",
+          +[](dart::simulation::World* self,
+              dynamics::BodyNode* node,
+              neural::WrtMassBodyNodeEntryType type,
+              Eigen::VectorXd upperBound,
+              Eigen::VectorXd lowerBound) -> void {
+            self->tuneMass(node, type, upperBound, lowerBound);
+          })
+      .def(
           "getNumDofs",
           +[](dart::simulation::World* self) -> std::size_t {
             return self->getNumDofs();
@@ -271,6 +280,11 @@ void World(py::module& m)
           "getForces",
           +[](dart::simulation::World* self) -> Eigen::VectorXd {
             return self->getForces();
+          })
+      .def(
+          "getMasses",
+          +[](dart::simulation::World* self) -> Eigen::VectorXd {
+            return self->getMasses();
           })
       .def(
           "getForceUpperLimits",
@@ -303,6 +317,16 @@ void World(py::module& m)
             return self->getVelocityUpperLimits();
           })
       .def(
+          "getMassLowerLimits",
+          +[](dart::simulation::World* self) -> Eigen::VectorXd {
+            return self->getMassLowerLimits();
+          })
+      .def(
+          "getMassUpperLimits",
+          +[](dart::simulation::World* self) -> Eigen::VectorXd {
+            return self->getMassUpperLimits();
+          })
+      .def(
           "setPositions",
           +[](dart::simulation::World* self, Eigen::VectorXd positions)
               -> void { self->setPositions(positions); })
@@ -314,6 +338,11 @@ void World(py::module& m)
           "setForces",
           +[](dart::simulation::World* self, Eigen::VectorXd forces) -> void {
             self->setForces(forces);
+          })
+      .def(
+          "setMasses",
+          +[](dart::simulation::World* self, Eigen::VectorXd forces) -> void {
+            self->setMasses(forces);
           })
       .def(
           "setForcesUpperLimits",

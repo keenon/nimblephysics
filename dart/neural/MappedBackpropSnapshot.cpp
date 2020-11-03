@@ -112,7 +112,7 @@ Eigen::MatrixXd MappedBackpropSnapshot::getMassVelJacobian(
     PerformanceLog* perfLog)
 {
   // No pre-step mapping necessary, because mass doesn't support mappings
-  int massDim = world->getWrtMass()->dim(world);
+  int massDim = world->getMassDims();
   if (massDim == 0)
   {
     int velDim = mPostStepMappings[mapping].velInJacWrtVel.rows();

@@ -67,31 +67,30 @@ public:
   //////////////////////////////////////////////////////////////
 
   /// This returns this WRT from the world as a vector
-  Eigen::VectorXd get(std::shared_ptr<simulation::World> world) override;
+  Eigen::VectorXd get(simulation::World* world) override;
 
   /// This returns this WRT from a skeleton as a vector
   Eigen::VectorXd get(dynamics::Skeleton* skel) override;
 
   /// This sets the world's state based on our WRT
-  void set(
-      std::shared_ptr<simulation::World> world, Eigen::VectorXd value) override;
+  void set(simulation::World* world, Eigen::VectorXd value) override;
 
   /// This sets the skeleton's state based on our WRT
   void set(dynamics::Skeleton* skel, Eigen::VectorXd value) override;
 
   /// This gives the dimensions of the WRT
-  int dim(std::shared_ptr<simulation::World> world) override;
+  int dim(simulation::World* world) override;
 
   /// This gives the dimensions of the WRT in a single skeleton
   int dim(dynamics::Skeleton* skel) override;
 
   /// This gives a vector of upper bound values for this WRT, given state in the
   /// world
-  Eigen::VectorXd upperBound(std::shared_ptr<simulation::World> world) override;
+  Eigen::VectorXd upperBound(simulation::World* world) override;
 
   /// This gives a vector of lower bound values for this WRT, given state in the
   /// world
-  Eigen::VectorXd lowerBound(std::shared_ptr<simulation::World> world) override;
+  Eigen::VectorXd lowerBound(simulation::World* world) override;
 
 protected:
   std::unordered_map<std::string, std::vector<WrtMassBodyNodyEntry>> mEntries;

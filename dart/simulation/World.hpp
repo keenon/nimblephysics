@@ -53,6 +53,7 @@
 #include "dart/constraint/SmartPointer.hpp"
 #include "dart/dynamics/SimpleFrame.hpp"
 #include "dart/dynamics/Skeleton.hpp"
+#include "dart/neural/WithRespectToMass.hpp"
 #include "dart/simulation/Recording.hpp"
 #include "dart/simulation/SmartPointer.hpp"
 
@@ -201,14 +202,16 @@ public:
   /// world concatenated
   std::vector<dynamics::DegreeOfFreedom*> getDofs();
 
-  /// Returns the size of the getLinkCOMs() vector
-  std::size_t getLinkCOMDims();
-
-  /// Returns the size of the getLinkMoments() vector
-  std::size_t getLinkMOIDims();
-
   /// Returns the size of the getMasses() vector
-  std::size_t getLinkMassesDims();
+  std::size_t getMassDims();
+
+  /// This registers that we'd like to keep track of this BodyNode's mass in a
+  /// specified way in differentiation
+  void tuneMass(
+      dynamics::BodyNode* node,
+      neural::WrtMassBodyNodeEntryType type,
+      Eigen::VectorXd upperBound,
+      Eigen::VectorXd lowerBound);
 
   /// Returns the size of the getLinkMasses() vector
   std::size_t getNumBodyNodes();
@@ -228,6 +231,10 @@ public:
   /// Gets the torques of all the skeletons in the world concatenated together
   /// as a single vector
   Eigen::VectorXd getForces();
+
+  /// Gets the masses of all the nodes in the world concatenated together as a
+  /// single vector
+  Eigen::VectorXd getMasses();
 
   // This gives the vector of force upper limits for all the DOFs in this
   // world
@@ -252,6 +259,14 @@ public:
   // This gives the vector of position lower limits for all the DOFs in this
   // world
   Eigen::VectorXd getVelocityLowerLimits();
+
+  // This gives the vector of mass upper limits for all the registered bodies in
+  // this world
+  Eigen::VectorXd getMassUpperLimits();
+
+  // This gives the vector of mass lower limits for all the registered bodies in
+  // this world
+  Eigen::VectorXd getMassLowerLimits();
 
   // This gets all the inertia matrices for all the links in all the skeletons
   // in the world mapped into a flat vector.
@@ -299,17 +314,8 @@ public:
   // Sets the lower limits of all the joints from a single vector
   void setVelocityLowerLimits(Eigen::VectorXd limits);
 
-  // This sets all the inertia matrices for all the links in all the skeletons
-  // in the world mapped into a flat vector.
-  void setLinkCOMs(Eigen::VectorXd coms);
-
-  // This sets all the inertia moment-of-inertia paremeters for all the links in
-  // all the skeletons in this world concatenated together
-  void setLinkMOIs(Eigen::VectorXd mois);
-
-  // This returns a vector of all the link masses for all the skeletons in the
-  // world concatenated into a flat vector.
-  void setLinkMasses(Eigen::VectorXd masses);
+  // This sets all the masses for all the registered bodies in the world
+  void setMasses(Eigen::VectorXd masses);
 
   /// This gives the C(pos, vel) vector for all the skeletons in the world,
   /// without accounting for the external forces

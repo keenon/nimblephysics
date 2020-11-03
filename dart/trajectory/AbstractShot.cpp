@@ -150,7 +150,7 @@ int AbstractShot::getFlatProblemDim(
 int AbstractShot::getFlatStaticProblemDim(
     std::shared_ptr<simulation::World> world) const
 {
-  return mWorld->getWrtMass()->dim(mWorld);
+  return mWorld->getMassDims();
 }
 
 //==============================================================================
@@ -176,8 +176,7 @@ void AbstractShot::flatten(
   }
 #endif
 
-  flatStatic.segment(0, world->getWrtMass()->dim(world))
-      = world->getWrtMass()->get(world);
+  flatStatic.segment(0, world->getMassDims()) = world->getMasses();
 
 #ifdef LOG_PERFORMANCE_ABSTRACT_SHOT
   if (thisLog != nullptr)
@@ -219,8 +218,7 @@ void AbstractShot::unflatten(
   }
 #endif
 
-  world->getWrtMass()->set(
-      world, flatStatic.segment(0, world->getWrtMass()->dim(world)));
+  world->setMasses(flatStatic.segment(0, world->getMassDims()));
 
 #ifdef LOG_PERFORMANCE_ABSTRACT_SHOT
   if (thisLog != nullptr)
@@ -297,8 +295,7 @@ void AbstractShot::getUpperBounds(
   }
 #endif
 
-  flatStatic.segment(0, world->getWrtMass()->dim(world))
-      = world->getWrtMass()->upperBound(world);
+  flatStatic.segment(0, world->getMassDims()) = world->getMassUpperLimits();
 
 #ifdef LOG_PERFORMANCE_ABSTRACT_SHOT
   if (thisLog != nullptr)
@@ -325,8 +322,7 @@ void AbstractShot::getLowerBounds(
   }
 #endif
 
-  flatStatic.segment(0, world->getWrtMass()->dim(world))
-      = world->getWrtMass()->lowerBound(world);
+  flatStatic.segment(0, world->getMassDims()) = world->getMassLowerLimits();
 
 #ifdef LOG_PERFORMANCE_ABSTRACT_SHOT
   if (thisLog != nullptr)
@@ -345,8 +341,7 @@ void AbstractShot::getInitialGuess(
     /* OUT */ Eigen::Ref<Eigen::VectorXd> flatDynamic,
     PerformanceLog* log) const
 {
-  flatStatic.segment(0, world->getWrtMass()->dim(world))
-      = world->getWrtMass()->get(world);
+  flatStatic.segment(0, world->getMassDims()) = world->getMasses();
 }
 
 //==============================================================================
@@ -818,7 +813,7 @@ void AbstractShot::initializeStaticGradient(
     Eigen::Ref<Eigen::VectorXd> gradStatic,
     PerformanceLog* log)
 {
-  gradStatic.segment(0, world->getWrtMass()->dim(world)).setZero();
+  gradStatic.segment(0, world->getMassDims()).setZero();
 }
 
 //==============================================================================
@@ -830,8 +825,7 @@ void AbstractShot::accumulateStaticGradient(
     neural::LossGradient& thisTimestep,
     PerformanceLog* log)
 {
-  gradStatic.segment(0, world->getWrtMass()->dim(world))
-      += thisTimestep.lossWrtMass;
+  gradStatic.segment(0, world->getMassDims()) += thisTimestep.lossWrtMass;
 }
 
 //==============================================================================
@@ -974,6 +968,13 @@ void AbstractShot::finiteDifferenceGradient(
 int AbstractShot::getNumSteps()
 {
   return mSteps;
+}
+
+//==============================================================================
+/// Returns the dimension of the mass vector
+int AbstractShot::getMassDims()
+{
+  return mWorld->getMassDims();
 }
 
 //==============================================================================

@@ -12,7 +12,7 @@ namespace neural {
 IdentityMapping::IdentityMapping(std::shared_ptr<simulation::World> world)
 {
   mNumDofs = world->getNumDofs();
-  mMassDim = world->getWrtMass()->dim(world);
+  mMassDim = world->getMassDims();
 }
 
 //==============================================================================
@@ -68,7 +68,7 @@ void IdentityMapping::setMasses(
     std::shared_ptr<simulation::World> world,
     const Eigen::Ref<Eigen::VectorXd>& masses)
 {
-  world->getWrtMass()->set(world, masses);
+  world->setMasses(masses);
 }
 
 //==============================================================================
@@ -100,7 +100,7 @@ void IdentityMapping::getMassesInPlace(
     std::shared_ptr<simulation::World> world,
     /* OUT */ Eigen::Ref<Eigen::VectorXd> masses)
 {
-  masses = world->getWrtMass()->get(world);
+  masses = world->getMasses();
 }
 
 //==============================================================================
@@ -245,14 +245,14 @@ Eigen::VectorXd IdentityMapping::getForceUpperLimits(
 Eigen::VectorXd IdentityMapping::getMassLowerLimits(
     std::shared_ptr<simulation::World> world)
 {
-  return world->getWrtMass()->lowerBound(world);
+  return world->getMassLowerLimits();
 }
 
 //==============================================================================
 Eigen::VectorXd IdentityMapping::getMassUpperLimits(
     std::shared_ptr<simulation::World> world)
 {
-  return world->getWrtMass()->upperBound(world);
+  return world->getMassUpperLimits();
 }
 
 } // namespace neural

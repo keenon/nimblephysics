@@ -219,6 +219,9 @@ public:
 
   int getNumSteps();
 
+  /// Returns the dimension of the mass vector
+  int getMassDims();
+
   /// This returns the debugging name of a given DOF
   virtual std::string getFlatDimName(
       std::shared_ptr<simulation::World> world, int dim)

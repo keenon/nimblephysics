@@ -11,6 +11,8 @@ class DartTorchTrajectoryRollout:
         self.posTensors: Dict[str, torch.Tensor] = {}
         self.velTensors: Dict[str, torch.Tensor] = {}
         self.forceTensors: Dict[str, torch.Tensor] = {}
+        self.massTensor: torch.Tensor = torch.tensor(
+            rollout.getMasses(), requires_grad=True)
 
         for mapping in rollout.getMappings():
             self.posTensors[mapping] = torch.tensor(
@@ -19,14 +21,17 @@ class DartTorchTrajectoryRollout:
             self.forceTensors[mapping] = torch.tensor(
                 rollout.getForces(mapping), requires_grad=True)
 
-    def getPoses(self, mapping: str) -> torch.Tensor:
+    def getPoses(self, mapping: str = "identity") -> torch.Tensor:
         return self.posTensors[mapping]
 
-    def getVels(self, mapping: str) -> torch.Tensor:
+    def getVels(self, mapping: str = "identity") -> torch.Tensor:
         return self.velTensors[mapping]
 
-    def getForces(self, mapping: str) -> torch.Tensor:
+    def getForces(self, mapping: str = "identity") -> torch.Tensor:
         return self.forceTensors[mapping]
+
+    def getMasses(self) -> torch.Tensor:
+        return self.massTensor
 
     def fill_gradients(self, gradWrtRollout: dart.trajectory.TrajectoryRollout):
         for mapping in gradWrtRollout.getMappings():
@@ -39,6 +44,9 @@ class DartTorchTrajectoryRollout:
             forceGrad = self.getForces(mapping).grad
             if forceGrad is not None:
                 np.copyto(gradWrtRollout.getForces(mapping), forceGrad.numpy())
+        massGrad = self.getMasses().grad
+        if massGrad is not None:
+            np.copyto(gradWrtRollout.getMasses(), massGrad.numpy())
 
 
 def DartTorchLossFn(fn: Callable[[DartTorchTrajectoryRollout], torch.Tensor]):

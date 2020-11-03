@@ -59,15 +59,16 @@ void TrajectoryRollout(py::module& m)
       .def(
           "getPoses",
           &dart::trajectory::TrajectoryRollout::getPoses,
-          ::py::arg("mapping"))
+          ::py::arg("mapping") = "identity")
       .def(
           "getVels",
           &dart::trajectory::TrajectoryRollout::getVels,
-          ::py::arg("mapping"))
+          ::py::arg("mapping") = "identity")
       .def(
           "getForces",
           &dart::trajectory::TrajectoryRollout::getForces,
-          ::py::arg("mapping"))
+          ::py::arg("mapping") = "identity")
+      .def("getMasses", &dart::trajectory::TrajectoryRollout::getMasses)
       .def(
           "copy",
           &dart::trajectory::TrajectoryRollout::copy,

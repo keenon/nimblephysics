@@ -655,36 +655,22 @@ std::vector<dynamics::DegreeOfFreedom*> World::getDofs()
 }
 
 //==============================================================================
-std::size_t World::getLinkCOMDims()
+/// Returns the size of the getMasses() vector
+std::size_t World::getMassDims()
 {
-  std::size_t count = 0;
-  for (dynamics::SkeletonPtr skel : mSkeletons)
-  {
-    count += skel->getLinkCOMDims();
-  }
-  return count;
+  return mWrtMass->dim(this);
 }
 
 //==============================================================================
-std::size_t World::getLinkMOIDims()
+/// This registers that we'd like to keep track of this BodyNode's mass in a
+/// specified way in differentiation
+void World::tuneMass(
+    dynamics::BodyNode* node,
+    neural::WrtMassBodyNodeEntryType type,
+    Eigen::VectorXd upperBound,
+    Eigen::VectorXd lowerBound)
 {
-  std::size_t count = 0;
-  for (dynamics::SkeletonPtr skel : mSkeletons)
-  {
-    count += skel->getLinkMOIDims();
-  }
-  return count;
-}
-
-//==============================================================================
-std::size_t World::getLinkMassesDims()
-{
-  std::size_t count = 0;
-  for (dynamics::SkeletonPtr skel : mSkeletons)
-  {
-    count += skel->getLinkMassesDims();
-  }
-  return count;
+  mWrtMass->registerNode(node, type, upperBound, lowerBound);
 }
 
 //==============================================================================
@@ -699,45 +685,9 @@ std::size_t World::getNumBodyNodes()
 }
 
 //==============================================================================
-Eigen::VectorXd World::getLinkCOMs()
+Eigen::VectorXd World::getMasses()
 {
-  Eigen::VectorXd coms = Eigen::VectorXd(getLinkCOMDims());
-  std::size_t cursor = 0;
-  for (std::size_t i = 0; i < mSkeletons.size(); i++)
-  {
-    std::size_t dims = mSkeletons[i]->getLinkCOMDims();
-    coms.segment(cursor, dims) = mSkeletons[i]->getLinkCOMs();
-    cursor += dims;
-  }
-  return coms;
-}
-
-//==============================================================================
-Eigen::VectorXd World::getLinkMOIs()
-{
-  Eigen::VectorXd mois = Eigen::VectorXd(getLinkMOIDims());
-  std::size_t cursor = 0;
-  for (std::size_t i = 0; i < mSkeletons.size(); i++)
-  {
-    std::size_t dims = mSkeletons[i]->getLinkMOIDims();
-    mois.segment(cursor, dims) = mSkeletons[i]->getLinkMOIs();
-    cursor += dims;
-  }
-  return mois;
-}
-
-//==============================================================================
-Eigen::VectorXd World::getLinkMasses()
-{
-  Eigen::VectorXd inertias = Eigen::VectorXd(getLinkMassesDims());
-  std::size_t cursor = 0;
-  for (std::size_t i = 0; i < mSkeletons.size(); i++)
-  {
-    std::size_t dims = mSkeletons[i]->getLinkMassesDims();
-    inertias.segment(cursor, dims) = mSkeletons[i]->getLinkMasses();
-    cursor += dims;
-  }
-  return inertias;
+  return mWrtMass->get(this);
 }
 
 //==============================================================================
@@ -881,6 +831,22 @@ Eigen::VectorXd World::getVelocityLowerLimits()
 }
 
 //==============================================================================
+// This gives the vector of mass upper limits for all the registered bodies in
+// this world
+Eigen::VectorXd World::getMassUpperLimits()
+{
+  return mWrtMass->upperBound(this);
+}
+
+//==============================================================================
+// This gives the vector of mass lower limits for all the registered bodies in
+// this world
+Eigen::VectorXd World::getMassLowerLimits()
+{
+  return mWrtMass->lowerBound(this);
+}
+
+//==============================================================================
 void World::setPositions(Eigen::VectorXd position)
 {
   std::size_t cursor = 0;
@@ -1001,39 +967,10 @@ void World::setVelocityLowerLimits(Eigen::VectorXd limits)
 }
 
 //==============================================================================
-void World::setLinkCOMs(Eigen::VectorXd coms)
+// This sets all the masses for all the registered bodies in the world
+void World::setMasses(Eigen::VectorXd masses)
 {
-  std::size_t cursor = 0;
-  for (std::size_t i = 0; i < mSkeletons.size(); i++)
-  {
-    std::size_t dims = mSkeletons[i]->getLinkCOMDims();
-    mSkeletons[i]->setLinkCOMs(coms.segment(cursor, dims));
-    cursor += dims;
-  }
-}
-
-//==============================================================================
-void World::setLinkMOIs(Eigen::VectorXd mois)
-{
-  std::size_t cursor = 0;
-  for (std::size_t i = 0; i < mSkeletons.size(); i++)
-  {
-    std::size_t dims = mSkeletons[i]->getLinkMOIDims();
-    mSkeletons[i]->setLinkMOIs(mois.segment(cursor, dims));
-    cursor += dims;
-  }
-}
-
-//==============================================================================
-void World::setLinkMasses(Eigen::VectorXd masses)
-{
-  std::size_t cursor = 0;
-  for (std::size_t i = 0; i < mSkeletons.size(); i++)
-  {
-    std::size_t dims = mSkeletons[i]->getLinkMassesDims();
-    mSkeletons[i]->setLinkMasses(masses.segment(cursor, dims));
-    cursor += dims;
-  }
+  mWrtMass->set(this, masses);
 }
 
 //==============================================================================

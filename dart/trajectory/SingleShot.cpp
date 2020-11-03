@@ -620,6 +620,9 @@ void SingleShot::backpropGradientWrt(
 #endif
 
   AbstractShot::initializeStaticGradient(world, gradStatic, thisLog);
+  // Add any gradient we have from the loss wrt mass directly into our gradient,
+  // cause we don't need to do any extra processing on that.
+  gradStatic += gradWrtRollout->getMassesConst();
 
   int staticDims = getFlatStaticProblemDim(world);
   int dynamicDims = getFlatDynamicProblemDim(world);
@@ -650,9 +653,12 @@ void SingleShot::backpropGradientWrt(
           = gradWrtRollout->getPosesConst(pair.first).col(i);
       mappedGrad.lossWrtVelocity
           = gradWrtRollout->getVelsConst(pair.first).col(i);
-      // This value is currently ignored
+
+      // Both these values are currently ignored
       mappedGrad.lossWrtTorque
           = gradWrtRollout->getForcesConst(pair.first).col(i);
+      mappedGrad.lossWrtMass = gradWrtRollout->getMassesConst();
+
       mappedLosses[pair.first] = mappedGrad;
     }
     mappedLosses[mRepresentationMapping].lossWrtPosition
@@ -790,6 +796,8 @@ void SingleShot::getStates(
       rollout->getForces(key).col(i) = snapshots[i]->getPreStepTorques(key);
     }
   }
+  assert(rollout->getMasses().size() == world->getMassDims());
+  rollout->getMasses() = world->getMasses();
 
 #ifdef LOG_PERFORMANCE_SINGLE_SHOT
   if (thisLog != nullptr)

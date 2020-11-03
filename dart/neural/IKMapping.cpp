@@ -15,7 +15,7 @@ namespace neural {
 //==============================================================================
 IKMapping::IKMapping(std::shared_ptr<simulation::World> world)
 {
-  mMassDim = world->getWrtMass()->dim(world);
+  mMassDim = world->getMassDims();
 }
 
 //==============================================================================
@@ -134,7 +134,7 @@ void IKMapping::setMasses(
     std::shared_ptr<simulation::World> world,
     const Eigen::Ref<Eigen::VectorXd>& masses)
 {
-  world->getWrtMass()->set(world, masses);
+  world->getMasses();
 }
 
 //==============================================================================
@@ -245,7 +245,7 @@ void IKMapping::getMassesInPlace(
     /* OUT */ Eigen::Ref<Eigen::VectorXd> masses)
 {
   assert(masses.size() == getMassDim());
-  masses = world->getWrtMass()->get(world);
+  masses = world->getMasses();
 }
 
 //==============================================================================
@@ -507,14 +507,14 @@ Eigen::VectorXd IKMapping::getForceUpperLimits(
 Eigen::VectorXd IKMapping::getMassLowerLimits(
     std::shared_ptr<simulation::World> world)
 {
-  return world->getWrtMass()->lowerBound(world);
+  return world->getMassLowerLimits();
 }
 
 //==============================================================================
 Eigen::VectorXd IKMapping::getMassUpperLimits(
     std::shared_ptr<simulation::World> world)
 {
-  return world->getWrtMass()->upperBound(world);
+  return world->getMassUpperLimits();
 }
 
 } // namespace neural

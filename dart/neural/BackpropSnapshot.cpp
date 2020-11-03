@@ -1029,22 +1029,22 @@ Eigen::MatrixXd BackpropSnapshot::getScratchFiniteDifference(
 
   Eigen::VectorXd original = scratch(world);
 
-  int worldDim = wrt->dim(world);
+  int worldDim = wrt->dim(world.get());
   Eigen::MatrixXd J = Eigen::MatrixXd(original.size(), worldDim);
 
-  Eigen::VectorXd preStepWrt = wrt->get(world);
+  Eigen::VectorXd preStepWrt = wrt->get(world.get());
 
   double EPSILON = 1e-7;
   for (std::size_t i = 0; i < worldDim; i++)
   {
     Eigen::VectorXd tweakedWrt = preStepWrt;
     tweakedWrt(i) += EPSILON;
-    wrt->set(world, tweakedWrt);
+    wrt->set(world.get(), tweakedWrt);
     Eigen::VectorXd perturbedPos = scratch(world);
 
     tweakedWrt = preStepWrt;
     tweakedWrt(i) -= EPSILON;
-    wrt->set(world, tweakedWrt);
+    wrt->set(world.get(), tweakedWrt);
     Eigen::VectorXd perturbedNeg = scratch(world);
 
     Eigen::VectorXd change = (perturbedPos - perturbedNeg) / (2 * EPSILON);
@@ -1063,7 +1063,7 @@ Eigen::MatrixXd BackpropSnapshot::getScratchFiniteDifference(
 Eigen::MatrixXd BackpropSnapshot::getVelJacobianWrt(
     simulation::WorldPtr world, WithRespectTo* wrt)
 {
-  int wrtDim = wrt->dim(world);
+  int wrtDim = wrt->dim(world.get());
   if (wrtDim == 0)
   {
     return Eigen::MatrixXd::Zero(world->getNumDofs(), 0);
@@ -1176,7 +1176,7 @@ Eigen::MatrixXd BackpropSnapshot::getPosJacobianWrt(
   }
   else
   {
-    return Eigen::MatrixXd::Zero(mNumDOFs, wrt->dim(world));
+    return Eigen::MatrixXd::Zero(mNumDOFs, wrt->dim(world.get()));
   }
 }
 
@@ -1888,7 +1888,7 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceMassVelJacobian(
   world->setForces(mPreStepTorques);
   world->step(false);
 
-  Eigen::VectorXd originalMass = world->getWrtMass()->get(world);
+  Eigen::VectorXd originalMass = world->getWrtMass()->get(world.get());
   Eigen::VectorXd originalVel = world->getVelocities();
 
   double EPSILON = 1e-7;
@@ -1900,7 +1900,7 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceMassVelJacobian(
     world->setVelocities(mPreStepVelocity);
     Eigen::VectorXd tweakedMass = Eigen::VectorXd(originalMass);
     tweakedMass(i) += EPSILON;
-    world->getWrtMass()->set(world, tweakedMass);
+    world->getWrtMass()->set(world.get(), tweakedMass);
 
     world->step(false);
 
@@ -2023,13 +2023,13 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceVelJacobianWrt(
 {
   RestorableSnapshot snapshot(world);
 
-  int wrtDim = wrt->dim(world);
+  int wrtDim = wrt->dim(world.get());
   Eigen::MatrixXd J(mNumDOFs, wrtDim);
 
   bool oldGradientEnabled = world->getConstraintSolver()->getGradientEnabled();
   world->getConstraintSolver()->setGradientEnabled(false);
 
-  Eigen::VectorXd originalWrt = wrt->get(world);
+  Eigen::VectorXd originalWrt = wrt->get(world.get());
 
   world->setPositions(mPreStepPosition);
   world->setVelocities(mPreStepVelocity);
@@ -2047,7 +2047,7 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceVelJacobianWrt(
     world->setVelocities(mPreStepVelocity);
     Eigen::VectorXd tweakedWrt = Eigen::VectorXd(originalWrt);
     tweakedWrt(i) += EPSILON;
-    wrt->set(world, tweakedWrt);
+    wrt->set(world.get(), tweakedWrt);
 
     world->step(false);
 
@@ -2070,13 +2070,13 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferencePosJacobianWrt(
 {
   RestorableSnapshot snapshot(world);
 
-  int wrtDim = wrt->dim(world);
+  int wrtDim = wrt->dim(world.get());
   Eigen::MatrixXd J(mNumDOFs, wrtDim);
 
   bool oldGradientEnabled = world->getConstraintSolver()->getGradientEnabled();
   world->getConstraintSolver()->setGradientEnabled(false);
 
-  Eigen::VectorXd originalWrt = wrt->get(world);
+  Eigen::VectorXd originalWrt = wrt->get(world.get());
 
   world->setPositions(mPreStepPosition);
   world->setVelocities(mPreStepVelocity);
@@ -2094,7 +2094,7 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferencePosJacobianWrt(
     world->setVelocities(mPreStepVelocity);
     Eigen::VectorXd tweakedWrt = Eigen::VectorXd(originalWrt);
     tweakedWrt(i) += EPSILON;
-    wrt->set(world, tweakedWrt);
+    wrt->set(world.get(), tweakedWrt);
 
     world->step(false);
 
@@ -2248,7 +2248,7 @@ Eigen::MatrixXd BackpropSnapshot::getJacobianOfConstraintForce(
   Eigen::MatrixXd A_c = getClampingConstraintMatrix(world);
   if (A_c.cols() == 0)
   {
-    int wrtDim = wrt->dim(world);
+    int wrtDim = wrt->dim(world.get());
     return Eigen::MatrixXd::Zero(0, wrtDim);
   }
 
@@ -2952,9 +2952,9 @@ Eigen::MatrixXd
 BackpropSnapshot::finiteDifferenceJacobianOfProjectionIntoClampsMatrix(
     simulation::WorldPtr world, Eigen::VectorXd v, WithRespectTo* wrt)
 {
-  std::size_t innerDim = wrt->dim(world);
+  std::size_t innerDim = wrt->dim(world.get());
 
-  Eigen::VectorXd before = wrt->get(world);
+  Eigen::VectorXd before = wrt->get(world.get());
 
   // These are predicted contact forces at the clamping contacts
   Eigen::VectorXd original = getProjectionIntoClampsMatrix(world, true) * v;
@@ -2980,7 +2980,7 @@ BackpropSnapshot::finiteDifferenceJacobianOfProjectionIntoClampsMatrix(
     {
       perturbed = before;
       perturbed(i) += posEps;
-      wrt->set(world, perturbed);
+      wrt->set(world.get(), perturbed);
 
       BackpropSnapshotPtr plusBackptr = neural::forwardPass(world, true);
       Eigen::MatrixXd newP_c
@@ -2999,7 +2999,7 @@ BackpropSnapshot::finiteDifferenceJacobianOfProjectionIntoClampsMatrix(
     {
       perturbed = before;
       perturbed(i) -= negEps;
-      wrt->set(world, perturbed);
+      wrt->set(world.get(), perturbed);
 
       BackpropSnapshotPtr negBackptr = neural::forwardPass(world, true);
 
@@ -3016,7 +3016,7 @@ BackpropSnapshot::finiteDifferenceJacobianOfProjectionIntoClampsMatrix(
     result.col(i) = diff / (posEps + negEps);
   }
 
-  wrt->set(world, before);
+  wrt->set(world.get(), before);
 
   return result;
 }
@@ -3027,14 +3027,14 @@ BackpropSnapshot::finiteDifferenceJacobianOfProjectionIntoClampsMatrix(
 Eigen::MatrixXd BackpropSnapshot::finiteDifferenceJacobianOfMinv(
     simulation::WorldPtr world, Eigen::VectorXd tau, WithRespectTo* wrt)
 {
-  std::size_t innerDim = wrt->dim(world);
+  std::size_t innerDim = wrt->dim(world.get());
 
   // These are predicted contact forces at the clamping contacts
   Eigen::VectorXd original = implicitMultiplyByInvMassMatrix(world, tau);
 
   Eigen::MatrixXd result = Eigen::MatrixXd::Zero(original.size(), innerDim);
 
-  Eigen::VectorXd before = wrt->get(world);
+  Eigen::VectorXd before = wrt->get(world.get());
 
   const double EPS = 1e-7;
 
@@ -3042,17 +3042,17 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceJacobianOfMinv(
   {
     Eigen::VectorXd perturbed = before;
     perturbed(i) += EPS;
-    wrt->set(world, perturbed);
+    wrt->set(world.get(), perturbed);
     Eigen::MatrixXd newVPlus = implicitMultiplyByInvMassMatrix(world, tau);
     perturbed = before;
     perturbed(i) -= EPS;
-    wrt->set(world, perturbed);
+    wrt->set(world.get(), perturbed);
     Eigen::MatrixXd newVMinus = implicitMultiplyByInvMassMatrix(world, tau);
     Eigen::VectorXd diff = newVPlus - newVMinus;
     result.col(i) = diff / (2 * EPS);
   }
 
-  wrt->set(world, before);
+  wrt->set(world.get(), before);
 
   return result;
 }
@@ -3063,14 +3063,14 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceJacobianOfMinv(
 Eigen::MatrixXd BackpropSnapshot::finiteDifferenceJacobianOfC(
     simulation::WorldPtr world, WithRespectTo* wrt)
 {
-  std::size_t innerDim = wrt->dim(world);
+  std::size_t innerDim = wrt->dim(world.get());
 
   // These are predicted contact forces at the clamping contacts
   Eigen::VectorXd original = world->getCoriolisAndGravityAndExternalForces();
 
   Eigen::MatrixXd result = Eigen::MatrixXd::Zero(original.size(), innerDim);
 
-  Eigen::VectorXd before = wrt->get(world);
+  Eigen::VectorXd before = wrt->get(world.get());
 
   const double EPS = 1e-7;
 
@@ -3078,17 +3078,17 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceJacobianOfC(
   {
     Eigen::VectorXd perturbed = before;
     perturbed(i) += EPS;
-    wrt->set(world, perturbed);
+    wrt->set(world.get(), perturbed);
     Eigen::MatrixXd tauPos = world->getCoriolisAndGravityAndExternalForces();
     perturbed = before;
     perturbed(i) -= EPS;
-    wrt->set(world, perturbed);
+    wrt->set(world.get(), perturbed);
     Eigen::MatrixXd tauNeg = world->getCoriolisAndGravityAndExternalForces();
     Eigen::VectorXd diff = tauPos - tauNeg;
     result.col(i) = diff / (2 * EPS);
   }
 
-  wrt->set(world, before);
+  wrt->set(world.get(), before);
 
   return result;
 }
@@ -3100,7 +3100,7 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceJacobianOfC(
 Eigen::MatrixXd BackpropSnapshot::finiteDifferenceJacobianOfMinvC(
     simulation::WorldPtr world, WithRespectTo* wrt)
 {
-  std::size_t innerDim = wrt->dim(world);
+  std::size_t innerDim = wrt->dim(world.get());
 
   // These are predicted contact forces at the clamping contacts
   Eigen::VectorXd original = implicitMultiplyByInvMassMatrix(
@@ -3108,7 +3108,7 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceJacobianOfMinvC(
 
   Eigen::MatrixXd result = Eigen::MatrixXd::Zero(original.size(), innerDim);
 
-  Eigen::VectorXd before = wrt->get(world);
+  Eigen::VectorXd before = wrt->get(world.get());
 
   const double EPS = 1e-7;
 
@@ -3116,13 +3116,13 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceJacobianOfMinvC(
   {
     Eigen::VectorXd perturbed = before;
     perturbed(i) += EPS;
-    wrt->set(world, perturbed);
+    wrt->set(world.get(), perturbed);
     Eigen::MatrixXd tauPos = implicitMultiplyByInvMassMatrix(
         world,
         mPreStepTorques - world->getCoriolisAndGravityAndExternalForces());
     perturbed = before;
     perturbed(i) -= EPS;
-    wrt->set(world, perturbed);
+    wrt->set(world.get(), perturbed);
     Eigen::MatrixXd tauNeg = implicitMultiplyByInvMassMatrix(
         world,
         mPreStepTorques - world->getCoriolisAndGravityAndExternalForces());
@@ -3130,7 +3130,7 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceJacobianOfMinvC(
     result.col(i) = diff / (2 * EPS);
   }
 
-  wrt->set(world, before);
+  wrt->set(world.get(), before);
 
   return result;
 }
@@ -3147,9 +3147,9 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceJacobianOfConstraintForce(
   Eigen::VectorXd f0
       = neural::forwardPass(world, true)->getClampingConstraintImpulses();
 
-  std::size_t innerDim = wrt->dim(world);
+  std::size_t innerDim = wrt->dim(world.get());
 
-  Eigen::VectorXd before = wrt->get(world);
+  Eigen::VectorXd before = wrt->get(world.get());
 
   Eigen::MatrixXd result = Eigen::MatrixXd::Zero(f0.size(), innerDim);
 
@@ -3166,7 +3166,7 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceJacobianOfConstraintForce(
     {
       perturbed = before;
       perturbed(i) += epsPos;
-      wrt->set(world, perturbed);
+      wrt->set(world.get(), perturbed);
       BackpropSnapshotPtr perturbedPtr = neural::forwardPass(world, true);
       if (perturbedPtr->getNumClamping() == f0.size())
       {
@@ -3181,7 +3181,7 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceJacobianOfConstraintForce(
     {
       perturbed = before;
       perturbed(i) -= epsNeg;
-      wrt->set(world, perturbed);
+      wrt->set(world.get(), perturbed);
       BackpropSnapshotPtr perturbedPtr = neural::forwardPass(world, true);
       if (perturbedPtr->getNumClamping() == f0.size())
       {
@@ -3194,7 +3194,7 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceJacobianOfConstraintForce(
     result.col(i) = diff / (epsPos + epsNeg);
   }
 
-  wrt->set(world, before);
+  wrt->set(world.get(), before);
   world->setPenetrationCorrectionEnabled(oldPenetrationCorrection);
   world->setConstraintForceMixingEnabled(oldCFM);
 

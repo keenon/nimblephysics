@@ -97,6 +97,19 @@ double LossFn::getLossAndGradient(
 
     const double EPS = 1e-7;
 
+    for (int i = 0; i < rolloutCopy.getMasses().size(); i++)
+    {
+      rolloutCopy.getMasses()(i) += EPS;
+      double lossPos = mLoss.value()(&rolloutCopy);
+      rolloutCopy.getMasses()(i) -= EPS;
+
+      rolloutCopy.getMasses()(i) -= EPS;
+      double lossNeg = mLoss.value()(&rolloutCopy);
+      rolloutCopy.getMasses()(i) += EPS;
+
+      gradWrtRollout->getMasses()(i) = (lossPos - lossNeg) / (2 * EPS);
+    }
+
     for (std::string key : rolloutCopy.getMappings())
     {
       for (int row = 0; row < rolloutCopy.getPoses(key).rows(); row++)

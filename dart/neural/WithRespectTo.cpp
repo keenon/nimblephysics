@@ -21,8 +21,7 @@ WithRespectToPosition::WithRespectToPosition()
 }
 
 /// This returns this WRT from the world as a vector
-Eigen::VectorXd WithRespectToPosition::get(
-    std::shared_ptr<simulation::World> world)
+Eigen::VectorXd WithRespectToPosition::get(simulation::World* world)
 {
   return world->getPositions();
 }
@@ -34,8 +33,7 @@ Eigen::VectorXd WithRespectToPosition::get(dynamics::Skeleton* skel)
 }
 
 /// This sets the world's state based on our WRT
-void WithRespectToPosition::set(
-    std::shared_ptr<simulation::World> world, Eigen::VectorXd value)
+void WithRespectToPosition::set(simulation::World* world, Eigen::VectorXd value)
 {
   world->setPositions(value);
 }
@@ -47,7 +45,7 @@ void WithRespectToPosition::set(dynamics::Skeleton* skel, Eigen::VectorXd value)
 }
 
 /// This gives the dimensions of the WRT
-int WithRespectToPosition::dim(std::shared_ptr<simulation::World> world)
+int WithRespectToPosition::dim(simulation::World* world)
 {
   return world->getNumDofs();
 }
@@ -60,16 +58,14 @@ int WithRespectToPosition::dim(dynamics::Skeleton* skel)
 
 /// This gives a vector of upper bound values for this WRT, given state in the
 /// world
-Eigen::VectorXd WithRespectToPosition::upperBound(
-    std::shared_ptr<simulation::World> world)
+Eigen::VectorXd WithRespectToPosition::upperBound(simulation::World* world)
 {
   return world->getPositionUpperLimits();
 }
 
 /// This gives a vector of lower bound values for this WRT, given state in the
 /// world
-Eigen::VectorXd WithRespectToPosition::lowerBound(
-    std::shared_ptr<simulation::World> world)
+Eigen::VectorXd WithRespectToPosition::lowerBound(simulation::World* world)
 {
   return world->getPositionLowerLimits();
 }
@@ -80,8 +76,7 @@ WithRespectToVelocity::WithRespectToVelocity()
 }
 
 /// This returns this WRT from the world as a vector
-Eigen::VectorXd WithRespectToVelocity::get(
-    std::shared_ptr<simulation::World> world)
+Eigen::VectorXd WithRespectToVelocity::get(simulation::World* world)
 {
   return world->getVelocities();
 }
@@ -93,8 +88,7 @@ Eigen::VectorXd WithRespectToVelocity::get(dynamics::Skeleton* skel)
 }
 
 /// This sets the world's state based on our WRT
-void WithRespectToVelocity::set(
-    std::shared_ptr<simulation::World> world, Eigen::VectorXd value)
+void WithRespectToVelocity::set(simulation::World* world, Eigen::VectorXd value)
 {
   world->setVelocities(value);
 }
@@ -106,7 +100,7 @@ void WithRespectToVelocity::set(dynamics::Skeleton* skel, Eigen::VectorXd value)
 }
 
 /// This gives the dimensions of the WRT
-int WithRespectToVelocity::dim(std::shared_ptr<simulation::World> world)
+int WithRespectToVelocity::dim(simulation::World* world)
 {
   return world->getNumDofs();
 }
@@ -119,16 +113,14 @@ int WithRespectToVelocity::dim(dynamics::Skeleton* skel)
 
 /// This gives a vector of upper bound values for this WRT, given state in the
 /// world
-Eigen::VectorXd WithRespectToVelocity::upperBound(
-    std::shared_ptr<simulation::World> world)
+Eigen::VectorXd WithRespectToVelocity::upperBound(simulation::World* world)
 {
   return world->getVelocityUpperLimits();
 }
 
 /// This gives a vector of lower bound values for this WRT, given state in the
 /// world
-Eigen::VectorXd WithRespectToVelocity::lowerBound(
-    std::shared_ptr<simulation::World> world)
+Eigen::VectorXd WithRespectToVelocity::lowerBound(simulation::World* world)
 {
   return world->getVelocityLowerLimits();
 }
@@ -139,8 +131,7 @@ WithRespectToForce::WithRespectToForce()
 }
 
 /// This returns this WRT from the world as a vector
-Eigen::VectorXd WithRespectToForce::get(
-    std::shared_ptr<simulation::World> world)
+Eigen::VectorXd WithRespectToForce::get(simulation::World* world)
 {
   return world->getForces();
 }
@@ -152,8 +143,7 @@ Eigen::VectorXd WithRespectToForce::get(dynamics::Skeleton* skel)
 }
 
 /// This sets the world's state based on our WRT
-void WithRespectToForce::set(
-    std::shared_ptr<simulation::World> world, Eigen::VectorXd value)
+void WithRespectToForce::set(simulation::World* world, Eigen::VectorXd value)
 {
   world->setForces(value);
 }
@@ -165,7 +155,7 @@ void WithRespectToForce::set(dynamics::Skeleton* skel, Eigen::VectorXd value)
 }
 
 /// This gives the dimensions of the WRT
-int WithRespectToForce::dim(std::shared_ptr<simulation::World> world)
+int WithRespectToForce::dim(simulation::World* world)
 {
   return world->getNumDofs();
 }
@@ -178,16 +168,14 @@ int WithRespectToForce::dim(dynamics::Skeleton* skel)
 
 /// This gives a vector of upper bound values for this WRT, given state in the
 /// world
-Eigen::VectorXd WithRespectToForce::upperBound(
-    std::shared_ptr<simulation::World> world)
+Eigen::VectorXd WithRespectToForce::upperBound(simulation::World* world)
 {
   return world->getForceUpperLimits();
 }
 
 /// This gives a vector of lower bound values for this WRT, given state in the
 /// world
-Eigen::VectorXd WithRespectToForce::lowerBound(
-    std::shared_ptr<simulation::World> world)
+Eigen::VectorXd WithRespectToForce::lowerBound(simulation::World* world)
 {
   return world->getForceLowerLimits();
 }

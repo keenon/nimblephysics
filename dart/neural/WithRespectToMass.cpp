@@ -217,7 +217,7 @@ WrtMassBodyNodyEntry& WithRespectToMass::getNode(dynamics::BodyNode* node)
 
 //==============================================================================
 /// This returns this WRT from the world as a vector
-Eigen::VectorXd WithRespectToMass::get(std::shared_ptr<simulation::World> world)
+Eigen::VectorXd WithRespectToMass::get(simulation::World* world)
 {
   int worldDim = dim(world);
   Eigen::VectorXd result = Eigen::VectorXd::Zero(worldDim);
@@ -254,8 +254,7 @@ Eigen::VectorXd WithRespectToMass::get(dynamics::Skeleton* skel)
 
 //==============================================================================
 /// This sets the world's state based on our WRT
-void WithRespectToMass::set(
-    std::shared_ptr<simulation::World> world, Eigen::VectorXd value)
+void WithRespectToMass::set(simulation::World* world, Eigen::VectorXd value)
 {
   int cursor = 0;
   for (int i = 0; i < world->getNumSkeletons(); i++)
@@ -286,7 +285,7 @@ void WithRespectToMass::set(dynamics::Skeleton* skel, Eigen::VectorXd value)
 
 //==============================================================================
 /// This gives the dimensions of the WRT
-int WithRespectToMass::dim(std::shared_ptr<simulation::World> world)
+int WithRespectToMass::dim(simulation::World* world)
 {
   int worldDim = 0;
   for (int i = 0; i < world->getNumSkeletons(); i++)
@@ -311,16 +310,14 @@ int WithRespectToMass::dim(dynamics::Skeleton* skel)
 
 /// This gives a vector of upper bound values for this WRT, given state in the
 /// world
-Eigen::VectorXd WithRespectToMass::upperBound(
-    std::shared_ptr<simulation::World> world)
+Eigen::VectorXd WithRespectToMass::upperBound(simulation::World* world)
 {
   return mUpperBounds;
 }
 
 /// This gives a vector of lower bound values for this WRT, given state in the
 /// world
-Eigen::VectorXd WithRespectToMass::lowerBound(
-    std::shared_ptr<simulation::World> world)
+Eigen::VectorXd WithRespectToMass::lowerBound(simulation::World* world)
 {
   return mLowerBounds;
 }

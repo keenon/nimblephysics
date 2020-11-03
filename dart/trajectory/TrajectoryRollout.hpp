@@ -31,6 +31,7 @@ public:
   virtual Eigen::Ref<Eigen::MatrixXd> getPoses(const std::string& mapping) = 0;
   virtual Eigen::Ref<Eigen::MatrixXd> getVels(const std::string& mapping) = 0;
   virtual Eigen::Ref<Eigen::MatrixXd> getForces(const std::string& mapping) = 0;
+  virtual Eigen::Ref<Eigen::VectorXd> getMasses() = 0;
 
   virtual const Eigen::Ref<const Eigen::MatrixXd> getPosesConst(
       const std::string& mapping) const = 0;
@@ -38,6 +39,7 @@ public:
       const std::string& mapping) const = 0;
   virtual const Eigen::Ref<const Eigen::MatrixXd> getForcesConst(
       const std::string& mapping) const = 0;
+  virtual const Eigen::Ref<const Eigen::VectorXd> getMassesConst() const = 0;
 
   /// This returns a trajectory rollout ref, corresponding to a slice
   /// of this trajectory rollout
@@ -59,7 +61,8 @@ public:
       std::unordered_map<std::string, std::shared_ptr<neural::Mapping>>
           mappings,
       int steps,
-      std::string representationMapping);
+      std::string representationMapping,
+      int massDim);
 
   /// Create a fresh trajector rollout for a shot
   TrajectoryRolloutReal(AbstractShot* shot);
@@ -72,17 +75,20 @@ public:
   Eigen::Ref<Eigen::MatrixXd> getPoses(const std::string& mapping) override;
   Eigen::Ref<Eigen::MatrixXd> getVels(const std::string& mapping) override;
   Eigen::Ref<Eigen::MatrixXd> getForces(const std::string& mapping) override;
+  Eigen::Ref<Eigen::VectorXd> getMasses() override;
   const Eigen::Ref<const Eigen::MatrixXd> getPosesConst(
       const std::string& mapping) const override;
   const Eigen::Ref<const Eigen::MatrixXd> getVelsConst(
       const std::string& mapping) const override;
   const Eigen::Ref<const Eigen::MatrixXd> getForcesConst(
       const std::string& mapping) const override;
+  const Eigen::Ref<const Eigen::VectorXd> getMassesConst() const override;
 
 protected:
   std::unordered_map<std::string, Eigen::MatrixXd> mPoses;
   std::unordered_map<std::string, Eigen::MatrixXd> mVels;
   std::unordered_map<std::string, Eigen::MatrixXd> mForces;
+  Eigen::VectorXd mMasses;
   std::string mRepresentationMapping;
   std::vector<std::string> mMappings;
 };
@@ -98,12 +104,14 @@ public:
   Eigen::Ref<Eigen::MatrixXd> getPoses(const std::string& mapping) override;
   Eigen::Ref<Eigen::MatrixXd> getVels(const std::string& mapping) override;
   Eigen::Ref<Eigen::MatrixXd> getForces(const std::string& mapping) override;
+  Eigen::Ref<Eigen::VectorXd> getMasses() override;
   const Eigen::Ref<const Eigen::MatrixXd> getPosesConst(
       const std::string& mapping) const override;
   const Eigen::Ref<const Eigen::MatrixXd> getVelsConst(
       const std::string& mapping) const override;
   const Eigen::Ref<const Eigen::MatrixXd> getForcesConst(
       const std::string& mapping) const override;
+  const Eigen::Ref<const Eigen::VectorXd> getMassesConst() const override;
 
 protected:
   TrajectoryRollout* mToSlice;
@@ -123,12 +131,14 @@ public:
   Eigen::Ref<Eigen::MatrixXd> getPoses(const std::string& mapping) override;
   Eigen::Ref<Eigen::MatrixXd> getVels(const std::string& mapping) override;
   Eigen::Ref<Eigen::MatrixXd> getForces(const std::string& mapping) override;
+  Eigen::Ref<Eigen::VectorXd> getMasses() override;
   const Eigen::Ref<const Eigen::MatrixXd> getPosesConst(
       const std::string& mapping) const override;
   const Eigen::Ref<const Eigen::MatrixXd> getVelsConst(
       const std::string& mapping) const override;
   const Eigen::Ref<const Eigen::MatrixXd> getForcesConst(
       const std::string& mapping) const override;
+  const Eigen::Ref<const Eigen::VectorXd> getMassesConst() const override;
 
 protected:
   const TrajectoryRollout* mToSlice;

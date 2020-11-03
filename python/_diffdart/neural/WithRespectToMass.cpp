@@ -54,28 +54,18 @@ void WithRespectToMass(py::module& m)
           ::py::arg("upperBound"),
           ::py::arg("lowerBound"));
 
-  ::py::enum_<dart::neural::WithRespectToMass::WrtMassBodyNodeEntryType>(
+  ::py::enum_<dart::neural::WrtMassBodyNodeEntryType>(
       m, "WrtMassBodyNodeEntryType")
-      .value(
-          "MASS",
-          dart::neural::WithRespectToMass::WrtMassBodyNodeEntryType::
-              INERTIA_MASS)
-      .value(
-          "COM",
-          dart::neural::WithRespectToMass::WrtMassBodyNodeEntryType::
-              INERTIA_COM)
+      .value("MASS", dart::neural::WrtMassBodyNodeEntryType::INERTIA_MASS)
+      .value("COM", dart::neural::WrtMassBodyNodeEntryType::INERTIA_COM)
       .value(
           "INERTIA_DIAGONAL",
-          dart::neural::WithRespectToMass::WrtMassBodyNodeEntryType::
-              INERTIA_DIAGONAL)
+          dart::neural::WrtMassBodyNodeEntryType::INERTIA_DIAGONAL)
       .value(
           "INERTIA_OFF_DIAGONAL",
-          dart::neural::WithRespectToMass::WrtMassBodyNodeEntryType::
-              INERTIA_OFF_DIAGONAL)
+          dart::neural::WrtMassBodyNodeEntryType::INERTIA_OFF_DIAGONAL)
       .value(
-          "INERTIA_FULL",
-          dart::neural::WithRespectToMass::WrtMassBodyNodeEntryType::
-              INERTIA_FULL)
+          "INERTIA_FULL", dart::neural::WrtMassBodyNodeEntryType::INERTIA_FULL)
       .export_values();
 }
 

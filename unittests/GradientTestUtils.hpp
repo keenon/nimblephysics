@@ -4170,7 +4170,7 @@ bool verifyWrtMapping(WorldPtr world, WithRespectTo* wrt)
 {
   RestorableSnapshot snapshot(world);
 
-  int dim = wrt->dim(world);
+  int dim = wrt->dim(world.get());
   if (dim == 0)
   {
     std::cout << "Got an empty WRT mapping!" << std::endl;
@@ -4180,8 +4180,8 @@ bool verifyWrtMapping(WorldPtr world, WithRespectTo* wrt)
   for (int i = 0; i < 10; i++)
   {
     Eigen::VectorXd randMapping = Eigen::VectorXd::Random(dim).cwiseAbs();
-    wrt->set(world, randMapping);
-    Eigen::VectorXd recoveredMapping = wrt->get(world);
+    wrt->set(world.get(), randMapping);
+    Eigen::VectorXd recoveredMapping = wrt->get(world.get());
     if (!equals(randMapping, recoveredMapping))
     {
       std::cout << "Didn't recover WRT mapping" << std::endl;
