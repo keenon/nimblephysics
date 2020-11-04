@@ -85,7 +85,7 @@ def main():
     optimizer.setTolerance(1e-6)
     optimizer.setCheckDerivatives(False)
     optimizer.setIterationLimit(500)
-    optimizer.optimize(trajectory)
+    result = optimizer.optimize(trajectory)
 
     json = result.toJson(world)
     text_file = open("cartpole.txt", "w")
