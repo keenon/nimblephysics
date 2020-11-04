@@ -1,7 +1,7 @@
 FROM keenon/diffdart:base
 
 # This is allowed to be empty string, but if it's not it must be prefixed by
-ENV VERSION="0.0.4"
+ARG VERSION
 
 RUN mkdir /wheelhouse
 
