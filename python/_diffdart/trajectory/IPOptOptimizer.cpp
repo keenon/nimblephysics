@@ -76,7 +76,11 @@ void IPOptOptimizer(py::module& m)
       .def(
           "setRecoverBest",
           &dart::trajectory::IPOptOptimizer::setRecoverBest,
-          ::py::arg("recoverBest") = true);
+          ::py::arg("recoverBest") = true)
+      .def(
+          "setSuppressOutput",
+          &dart::trajectory::IPOptOptimizer::setSuppressOutput,
+          ::py::arg("suppressOutput") = true);
 }
 
 } // namespace python

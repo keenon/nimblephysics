@@ -808,6 +808,41 @@ void SingleShot::getStates(
 }
 
 //==============================================================================
+/// This fills our trajectory with the values from the rollout being passed in
+void SingleShot::setStates(
+    std::shared_ptr<simulation::World> world,
+    const TrajectoryRollout* rollout,
+    PerformanceLog* log)
+{
+  PerformanceLog* thisLog = nullptr;
+#ifdef LOG_PERFORMANCE_SINGLE_SHOT
+  if (log != nullptr)
+  {
+    thisLog = log->startRun("SingleShot.setStates");
+  }
+#endif
+
+  mStartPos = rollout->getPosesConst(mRepresentationMapping).col(0);
+  mStartVel = rollout->getVelsConst(mRepresentationMapping).col(0);
+  mForces = rollout->getForcesConst(mRepresentationMapping);
+  world->setMasses(rollout->getMassesConst());
+
+#ifdef LOG_PERFORMANCE_SINGLE_SHOT
+  if (thisLog != nullptr)
+  {
+    thisLog->end();
+  }
+#endif
+}
+
+//==============================================================================
+/// This sets the forces in this trajectory from the passed in matrix
+void SingleShot::setForces(Eigen::MatrixXd forces, PerformanceLog* log)
+{
+  mForces = forces;
+}
+
+//==============================================================================
 Eigen::VectorXd SingleShot::getStartState()
 {
   Eigen::VectorXd state = Eigen::VectorXd::Zero(getRepresentationStateSize());

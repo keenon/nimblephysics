@@ -28,17 +28,23 @@ public:
   virtual const std::string& getRepresentationMapping() const = 0;
   virtual const std::vector<std::string>& getMappings() const = 0;
 
-  virtual Eigen::Ref<Eigen::MatrixXd> getPoses(const std::string& mapping) = 0;
-  virtual Eigen::Ref<Eigen::MatrixXd> getVels(const std::string& mapping) = 0;
-  virtual Eigen::Ref<Eigen::MatrixXd> getForces(const std::string& mapping) = 0;
+  virtual Eigen::Ref<Eigen::MatrixXd> getPoses(
+      const std::string& mapping = "identity")
+      = 0;
+  virtual Eigen::Ref<Eigen::MatrixXd> getVels(
+      const std::string& mapping = "identity")
+      = 0;
+  virtual Eigen::Ref<Eigen::MatrixXd> getForces(
+      const std::string& mapping = "identity")
+      = 0;
   virtual Eigen::Ref<Eigen::VectorXd> getMasses() = 0;
 
   virtual const Eigen::Ref<const Eigen::MatrixXd> getPosesConst(
-      const std::string& mapping) const = 0;
+      const std::string& mapping = "identity") const = 0;
   virtual const Eigen::Ref<const Eigen::MatrixXd> getVelsConst(
-      const std::string& mapping) const = 0;
+      const std::string& mapping = "identity") const = 0;
   virtual const Eigen::Ref<const Eigen::MatrixXd> getForcesConst(
-      const std::string& mapping) const = 0;
+      const std::string& mapping = "identity") const = 0;
   virtual const Eigen::Ref<const Eigen::VectorXd> getMassesConst() const = 0;
 
   /// This returns a trajectory rollout ref, corresponding to a slice
@@ -72,16 +78,19 @@ public:
 
   const std::string& getRepresentationMapping() const override;
   const std::vector<std::string>& getMappings() const override;
-  Eigen::Ref<Eigen::MatrixXd> getPoses(const std::string& mapping) override;
-  Eigen::Ref<Eigen::MatrixXd> getVels(const std::string& mapping) override;
-  Eigen::Ref<Eigen::MatrixXd> getForces(const std::string& mapping) override;
+  Eigen::Ref<Eigen::MatrixXd> getPoses(
+      const std::string& mapping = "identity") override;
+  Eigen::Ref<Eigen::MatrixXd> getVels(
+      const std::string& mapping = "identity") override;
+  Eigen::Ref<Eigen::MatrixXd> getForces(
+      const std::string& mapping = "identity") override;
   Eigen::Ref<Eigen::VectorXd> getMasses() override;
   const Eigen::Ref<const Eigen::MatrixXd> getPosesConst(
-      const std::string& mapping) const override;
+      const std::string& mapping = "identity") const override;
   const Eigen::Ref<const Eigen::MatrixXd> getVelsConst(
-      const std::string& mapping) const override;
+      const std::string& mapping = "identity") const override;
   const Eigen::Ref<const Eigen::MatrixXd> getForcesConst(
-      const std::string& mapping) const override;
+      const std::string& mapping = "identity") const override;
   const Eigen::Ref<const Eigen::VectorXd> getMassesConst() const override;
 
 protected:
@@ -101,16 +110,19 @@ public:
 
   const std::string& getRepresentationMapping() const override;
   const std::vector<std::string>& getMappings() const override;
-  Eigen::Ref<Eigen::MatrixXd> getPoses(const std::string& mapping) override;
-  Eigen::Ref<Eigen::MatrixXd> getVels(const std::string& mapping) override;
-  Eigen::Ref<Eigen::MatrixXd> getForces(const std::string& mapping) override;
+  Eigen::Ref<Eigen::MatrixXd> getPoses(
+      const std::string& mapping = "identity") override;
+  Eigen::Ref<Eigen::MatrixXd> getVels(
+      const std::string& mapping = "identity") override;
+  Eigen::Ref<Eigen::MatrixXd> getForces(
+      const std::string& mapping = "identity") override;
   Eigen::Ref<Eigen::VectorXd> getMasses() override;
   const Eigen::Ref<const Eigen::MatrixXd> getPosesConst(
-      const std::string& mapping) const override;
+      const std::string& mapping = "identity") const override;
   const Eigen::Ref<const Eigen::MatrixXd> getVelsConst(
-      const std::string& mapping) const override;
+      const std::string& mapping = "identity") const override;
   const Eigen::Ref<const Eigen::MatrixXd> getForcesConst(
-      const std::string& mapping) const override;
+      const std::string& mapping = "identity") const override;
   const Eigen::Ref<const Eigen::VectorXd> getMassesConst() const override;
 
 protected:
@@ -128,16 +140,19 @@ public:
 
   const std::string& getRepresentationMapping() const override;
   const std::vector<std::string>& getMappings() const override;
-  Eigen::Ref<Eigen::MatrixXd> getPoses(const std::string& mapping) override;
-  Eigen::Ref<Eigen::MatrixXd> getVels(const std::string& mapping) override;
-  Eigen::Ref<Eigen::MatrixXd> getForces(const std::string& mapping) override;
+  Eigen::Ref<Eigen::MatrixXd> getPoses(
+      const std::string& mapping = "identity") override;
+  Eigen::Ref<Eigen::MatrixXd> getVels(
+      const std::string& mapping = "identity") override;
+  Eigen::Ref<Eigen::MatrixXd> getForces(
+      const std::string& mapping = "identity") override;
   Eigen::Ref<Eigen::VectorXd> getMasses() override;
   const Eigen::Ref<const Eigen::MatrixXd> getPosesConst(
-      const std::string& mapping) const override;
+      const std::string& mapping = "identity") const override;
   const Eigen::Ref<const Eigen::MatrixXd> getVelsConst(
-      const std::string& mapping) const override;
+      const std::string& mapping = "identity") const override;
   const Eigen::Ref<const Eigen::MatrixXd> getForcesConst(
-      const std::string& mapping) const override;
+      const std::string& mapping = "identity") const override;
   const Eigen::Ref<const Eigen::VectorXd> getMassesConst() const override;
 
 protected:

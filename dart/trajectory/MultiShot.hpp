@@ -203,6 +203,16 @@ public:
       int steps,
       PerformanceLog* log = nullptr);
 
+  /// This fills our trajectory with the values from the rollout being passed in
+  void setStates(
+      std::shared_ptr<simulation::World> world,
+      const TrajectoryRollout* rollout,
+      PerformanceLog* log = nullptr) override;
+
+  /// This sets the forces in this trajectory from the passed in matrix
+  void setForces(
+      Eigen::MatrixXd forces, PerformanceLog* log = nullptr) override;
+
   /// This returns the concatenation of (start pos, start vel) for
   /// convenience
   Eigen::VectorXd getStartState() override;

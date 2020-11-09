@@ -198,6 +198,17 @@ public:
       bool useKnots = true)
       = 0;
 
+  /// This fills our trajectory with the values from the rollout being passed in
+  virtual void setStates(
+      std::shared_ptr<simulation::World> world,
+      const TrajectoryRollout* rollout,
+      PerformanceLog* log = nullptr)
+      = 0;
+
+  /// This sets the forces in this trajectory from the passed in matrix
+  virtual void setForces(Eigen::MatrixXd forces, PerformanceLog* log = nullptr)
+      = 0;
+
   const TrajectoryRollout* getRolloutCache(
       std::shared_ptr<simulation::World> world,
       PerformanceLog* log = nullptr,

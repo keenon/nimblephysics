@@ -5,9 +5,16 @@
 #include <string>
 #include <vector>
 
+#include <coin/IpIpoptApplication.hpp>
+#include <coin/IpSolveStatistics.hpp>
+#include <coin/IpTNLP.hpp>
+
 #include "dart/performance/PerformanceLog.hpp"
+#include "dart/trajectory/IPOptShotWrapper.hpp"
 #include "dart/trajectory/TrajectoryConstants.hpp"
 #include "dart/trajectory/TrajectoryRollout.hpp"
+
+using namespace Ipopt;
 
 namespace dart {
 
@@ -109,6 +116,15 @@ public:
   /// called optimizer.setRecordFullDebugInfo(true)
   std::vector<Eigen::VectorXd>& getSparseJacobians();
 
+  /// This registers all the pieces we need in order to be able to re-optimize
+  /// this problem efficiently.
+  void registerForReoptimization(
+      SmartPtr<Ipopt::IpoptApplication> ipopt,
+      SmartPtr<trajectory::IPOptShotWrapper> ipoptProblem);
+
+  /// This will attempt to run another round of optimization.
+  std::shared_ptr<OptimizationRecord> reoptimize();
+
 protected:
   bool mSuccess;
   std::vector<OptimizationStep> mSteps;
@@ -118,6 +134,9 @@ protected:
   std::vector<Eigen::VectorXd> mGradients;
   std::vector<Eigen::VectorXd> mConstraintValues;
   std::vector<Eigen::VectorXd> mSparseJacobians;
+  // In order to re-optimize
+  SmartPtr<Ipopt::IpoptApplication> mIpopt;
+  SmartPtr<trajectory::IPOptShotWrapper> mIpoptProblem;
 };
 
 } // namespace trajectory

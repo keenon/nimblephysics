@@ -67,7 +67,7 @@
 #include "TestHelpers.hpp"
 #include "stdio.h"
 
-#define ALL_TESTS
+// #define ALL_TESTS
 
 using namespace dart;
 using namespace math;
@@ -1976,3 +1976,167 @@ TEST(TRAJECTORY, JUMP_WORM)
       world, 8, 4, loss, lossGrad, 3.0));
 }
 #endif
+
+// #ifdef ALL_TESTS
+TEST(TRAJECTORY, REOPTIMIZATION)
+{
+  bool offGround = false;
+
+  // World
+  WorldPtr world = World::create();
+  world->setGravity(Eigen::Vector3d(0, -9.81, 0));
+
+  world->setPenetrationCorrectionEnabled(false);
+  world->setConstraintForceMixingEnabled(false);
+
+  SkeletonPtr jumpworm = Skeleton::create("jumpworm");
+
+  std::pair<TranslationalJoint2D*, BodyNode*> rootJointPair
+      = jumpworm->createJointAndBodyNodePair<TranslationalJoint2D>(nullptr);
+  TranslationalJoint2D* rootJoint = rootJointPair.first;
+  BodyNode* root = rootJointPair.second;
+
+  std::shared_ptr<BoxShape> shape(new BoxShape(Eigen::Vector3d(0.1, 0.1, 0.1)));
+  ShapeNode* rootVisual
+      = root->createShapeNodeWith<VisualAspect, CollisionAspect>(shape);
+  Eigen::Vector3d black = Eigen::Vector3d::Zero();
+  rootVisual->getVisualAspect()->setColor(black);
+  rootJoint->setForceUpperLimit(0, 0);
+  rootJoint->setForceLowerLimit(0, 0);
+  rootJoint->setForceUpperLimit(1, 0);
+  rootJoint->setForceLowerLimit(1, 0);
+  rootJoint->setVelocityUpperLimit(0, 1000.0);
+  rootJoint->setVelocityLowerLimit(0, -1000.0);
+  rootJoint->setVelocityUpperLimit(1, 1000.0);
+  rootJoint->setVelocityLowerLimit(1, -1000.0);
+  rootJoint->setPositionUpperLimit(0, 5);
+  rootJoint->setPositionLowerLimit(0, -5);
+  rootJoint->setPositionUpperLimit(1, 5);
+  rootJoint->setPositionLowerLimit(1, -5);
+
+  BodyNode* tail1 = createTailSegment(
+      root, Eigen::Vector3d(182.0 / 255, 223.0 / 255, 144.0 / 255));
+  BodyNode* tail2 = createTailSegment(
+      tail1, Eigen::Vector3d(223.0 / 255, 228.0 / 255, 163.0 / 255));
+  BodyNode* tail3 = createTailSegment(
+      tail2, Eigen::Vector3d(221.0 / 255, 193.0 / 255, 121.0 / 255));
+
+  Eigen::VectorXd pos = Eigen::VectorXd(5);
+  pos << 0, 0, 90, 90, 45;
+  jumpworm->setPositions(pos * 3.1415 / 180);
+
+  world->addSkeleton(jumpworm);
+
+  // Floor
+
+  SkeletonPtr floor = Skeleton::create("floor");
+
+  std::pair<WeldJoint*, BodyNode*> floorJointPair
+      = floor->createJointAndBodyNodePair<WeldJoint>(nullptr);
+  WeldJoint* floorJoint = floorJointPair.first;
+  BodyNode* floorBody = floorJointPair.second;
+  Eigen::Isometry3d floorOffset = Eigen::Isometry3d::Identity();
+  floorOffset.translation() = Eigen::Vector3d(0, offGround ? -0.7 : -0.56, 0);
+  floorJoint->setTransformFromParentBodyNode(floorOffset);
+  std::shared_ptr<BoxShape> floorShape(
+      new BoxShape(Eigen::Vector3d(2.5, 0.25, 0.5)));
+  ShapeNode* floorVisual
+      = floorBody->createShapeNodeWith<VisualAspect, CollisionAspect>(
+          floorShape);
+  floorBody->setFrictionCoeff(0);
+
+  world->addSkeleton(floor);
+
+  rootJoint->setVelocity(1, -0.1);
+  Eigen::VectorXd vels = world->getVelocities();
+
+  TrajectoryLossFn loss = [](const TrajectoryRollout* rollout) {
+    const Eigen::Ref<const Eigen::MatrixXd> poses
+        = rollout->getPosesConst("identity");
+    const Eigen::Ref<const Eigen::MatrixXd> vels
+        = rollout->getVelsConst("identity");
+    const Eigen::Ref<const Eigen::MatrixXd> forces
+        = rollout->getForcesConst("identity");
+
+    double maxPos = -1000;
+    double minPos = 1000;
+    for (int i = 0; i < poses.cols(); i++)
+    {
+      if (poses(1, i) > maxPos)
+      {
+        maxPos = poses(1, i);
+      }
+      if (poses(1, i) < minPos)
+      {
+        minPos = poses(1, i);
+      }
+    }
+    double peakPosLoss = -(maxPos * maxPos) * (maxPos > 0 ? 1.0 : -1.0);
+    double minPosLoss = -(minPos * minPos) * (minPos > 0 ? 1.0 : -1.0);
+    double endPos = poses(1, poses.cols() - 1);
+    double endPosLoss = -(endPos * endPos) * (endPos > 0 ? 1.0 : -1.0);
+
+    double forceLoss = forces.squaredNorm();
+
+    // return endPosLoss * 100 + forceLoss * 1e-3;
+    // return forceLoss;
+    return endPosLoss; // + forceLoss;
+    // return (100 * peakPosLoss) + (20 * minPosLoss) + endPosLoss;
+  };
+
+  TrajectoryLossFnAndGrad lossGrad = [](const TrajectoryRollout* rollout,
+                                        TrajectoryRollout* gradWrtRollout // OUT
+                                     ) {
+    gradWrtRollout->getPoses("identity").setZero();
+    gradWrtRollout->getVels("identity").setZero();
+    gradWrtRollout->getForces("identity").setZero();
+    const Eigen::Ref<const Eigen::MatrixXd> poses
+        = rollout->getPosesConst("identity");
+    const Eigen::Ref<const Eigen::MatrixXd> vels
+        = rollout->getVelsConst("identity");
+    const Eigen::Ref<const Eigen::MatrixXd> forces
+        = rollout->getForcesConst("identity");
+
+    gradWrtRollout->getPoses("identity")(1, poses.cols() - 1)
+        = 2 * poses(1, poses.cols() - 1);
+    double endPos = poses(1, poses.cols() - 1);
+    double endPosLoss = -(endPos * endPos) * (endPos > 0 ? 1.0 : -1.0);
+    return endPosLoss;
+  };
+
+  // Make a huge timestep, to try to make the gradients easier to get exactly
+  // for finite differencing
+  world->setTimeStep(1e-3);
+
+  world->setPenetrationCorrectionEnabled(false);
+  world->setConstraintForceMixingEnabled(false);
+
+  // EXPECT_TRUE(verifyVelGradients(world, world->getVelocities()));
+  // EXPECT_TRUE(verifyNoMultistepIntereference(world, 10));
+  // EXPECT_TRUE(verifyAnalyticalJacobians(world));
+  // EXPECT_TRUE(verifyAnalyticalBackprop(world));
+
+  LossFn lossFn(loss);
+  MultiShot shot(world, lossFn, 100, 20, false);
+  std::shared_ptr<IKMapping> ikMap = std::make_shared<IKMapping>(world);
+  ikMap->addLinearBodyNode(root);
+  shot.addMapping("ik", ikMap);
+
+  IPOptOptimizer optimizer = IPOptOptimizer();
+
+  optimizer.setIterationLimit(5);
+  optimizer.setSuppressOutput(true);
+  optimizer.setRecoverBest(false);
+  std::shared_ptr<OptimizationRecord> record = optimizer.optimize(&shot);
+  EXPECT_TRUE(record->getNumSteps() == 2);
+  EXPECT_TRUE(record->getStep(0).index == 0);
+  EXPECT_TRUE(record->getStep(1).index == 1);
+  EXPECT_TRUE(record->getStep(1).rollout != record->getStep(0).rollout);
+
+  for (int i = 0; i < 10; i++)
+  {
+    std::cout << "Step " << i << std::endl;
+    record = record->reoptimize();
+  }
+}
+// #endif

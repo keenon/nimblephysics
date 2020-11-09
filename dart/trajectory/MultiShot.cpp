@@ -1030,6 +1030,51 @@ void MultiShot::getStates(
 }
 
 //==============================================================================
+/// This fills our trajectory with the values from the rollout being passed in
+void MultiShot::setStates(
+    std::shared_ptr<simulation::World> world,
+    const TrajectoryRollout* rollout,
+    PerformanceLog* log)
+{
+  PerformanceLog* thisLog = nullptr;
+#ifdef LOG_PERFORMANCE_MULTI_SHOT
+  if (log != nullptr)
+  {
+    thisLog = log->startRun("MultiShot.setStates");
+  }
+#endif
+
+  int cursor = 0;
+  for (int i = 0; i < mShots.size(); i++)
+  {
+    int steps = mShots[i]->getNumSteps();
+    TrajectoryRolloutConstRef slice = rollout->sliceConst(cursor, steps);
+    mShots[i]->setStates(world, &slice, thisLog);
+    cursor += steps;
+  }
+
+#ifdef LOG_PERFORMANCE_MULTI_SHOT
+  if (thisLog != nullptr)
+  {
+    thisLog->end();
+  }
+#endif
+}
+
+//==============================================================================
+/// This sets the forces in this trajectory from the passed in matrix
+void MultiShot::setForces(Eigen::MatrixXd forces, PerformanceLog* log)
+{
+  int cursor = 0;
+  for (int i = 0; i < mShots.size(); i++)
+  {
+    int len = mShots[i]->getNumSteps();
+    mShots[i]->setForces(forces.block(0, cursor, forces.rows(), len));
+    cursor += len;
+  }
+}
+
+//==============================================================================
 void MultiShot::asyncPartGetStates(
     int index,
     std::shared_ptr<simulation::World> world,

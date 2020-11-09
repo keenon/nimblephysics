@@ -53,7 +53,8 @@ void OptimizationRecord(py::module& m)
       .def(
           "getPerfLog",
           &dart::trajectory::OptimizationRecord::getPerfLog,
-          ::py::return_value_policy::reference);
+          ::py::return_value_policy::reference)
+      .def("reoptimize", &dart::trajectory::OptimizationRecord::reoptimize);
 }
 
 } // namespace python

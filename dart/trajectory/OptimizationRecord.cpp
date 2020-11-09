@@ -10,6 +10,8 @@
 #include "dart/dynamics/Skeleton.hpp"
 #include "dart/simulation/World.hpp"
 
+using namespace Ipopt;
+
 using namespace dart;
 
 namespace dart {
@@ -72,6 +74,41 @@ std::vector<Eigen::VectorXd>& OptimizationRecord::getConstraintValues()
 std::vector<Eigen::VectorXd>& OptimizationRecord::getSparseJacobians()
 {
   return mSparseJacobians;
+}
+
+//==============================================================================
+/// This registers all the pieces we need in order to be able to re-optimize
+/// this problem efficiently.
+void OptimizationRecord::registerForReoptimization(
+    SmartPtr<Ipopt::IpoptApplication> ipopt,
+    SmartPtr<IPOptShotWrapper> ipoptProblem)
+{
+  mIpopt = ipopt;
+  mIpoptProblem = ipoptProblem;
+}
+
+//==============================================================================
+/// This will attempt to run another round of optimization.
+std::shared_ptr<OptimizationRecord> OptimizationRecord::reoptimize()
+{
+  std::shared_ptr<OptimizationRecord> record
+      = std::make_shared<OptimizationRecord>();
+  if (mPerfLog != nullptr)
+    record->startPerfLog();
+
+  ApplicationReturnStatus status = mIpopt->ReOptimizeTNLP(mIpoptProblem);
+
+  if (status == Solve_Succeeded)
+  {
+    // Retrieve some statistics about the solve
+    Index iter_count = mIpopt->Statistics()->IterationCount();
+    Number final_obj = mIpopt->Statistics()->FinalObjective();
+  }
+
+  record->setSuccess(status == Ipopt::Solve_Succeeded);
+  record->registerForReoptimization(mIpopt, mIpoptProblem);
+
+  return record;
 }
 
 //==============================================================================
