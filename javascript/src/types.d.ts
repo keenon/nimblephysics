@@ -48,12 +48,17 @@ interface SetPositions {
   [key: string]: ObjectPosition;
 }
 
+interface SetColors {
+  [key: string]: number[][];
+}
+
 type RealtimeUpdate = {
   type: "init" | "update" | "new_plan";
   // for type: "init"
   world?: BodyNode[];
   // for type: "update"
   positions?: SetPositions;
+  colors?: SetColors;
   timestep?: number;
   // for type: "new_plan"
   plan?: WorldTrajectory;

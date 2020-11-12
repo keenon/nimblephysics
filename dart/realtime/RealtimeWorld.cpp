@@ -207,7 +207,8 @@ void RealtimeWorld::mainLoop()
     {
       mServer->broadcast(
           "{\"type\": \"update\", \"timestep\": " + std::to_string(mIterCount)
-          + ", \"positions\": " + mWorld->positionsToJson() + "}");
+          + ", \"positions\": " + mWorld->positionsToJson()
+          + ", \"colors\": " + mWorld->colorsToJson() + "}");
     }
 
     std::this_thread::sleep_until(x);

@@ -56,6 +56,19 @@ class RealtimeWorldDisplay {
     }
   };
 
+  setColors = (colors: SetColors) => {
+    for (let key in colors) {
+      const colorData = colors[key];
+      const group = this.objects.get(key);
+      for (let i = 0; i < group.children.length; i++) {
+        const color: number[] = colorData[i];
+        (group.children[i] as any).material.color.r = color[0];
+        (group.children[i] as any).material.color.g = color[1];
+        (group.children[i] as any).material.color.b = color[2];
+      }
+    }
+  };
+
   displayMPCPlan = (trajectory: WorldTrajectory) => {
     for (let key in trajectory) {
       if (this.lines.has(key)) {

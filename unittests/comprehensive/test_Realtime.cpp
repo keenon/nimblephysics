@@ -96,8 +96,8 @@ TEST(REALTIME, REALTIME_CARTPOLE)
 
   world->addSkeleton(cartpole);
 
-  cartpole->setForceUpperLimit(0, 10);
-  cartpole->setForceLowerLimit(0, -10);
+  cartpole->setForceUpperLimit(0, 15);
+  cartpole->setForceLowerLimit(0, -15);
   cartpole->setVelocityUpperLimit(0, 1000);
   cartpole->setVelocityLowerLimit(0, -1000);
   cartpole->setPositionUpperLimit(0, 10);
@@ -245,6 +245,7 @@ TEST(REALTIME, REALTIME_CARTPOLE)
       = advanceSteps * world->getTimeStep() * 1000; // timesteps to millis
   for (int i = 0; i < 50; i++)
   {
+    std::cout << "Reoptimize" << std::endl;
     mpc.optimizePlan(i * stepSize);
     // Read forces up to the next iteration, so that they get used in projecting
     // the future
@@ -283,21 +284,33 @@ TEST(REALTIME, REALTIME_CARTPOLE)
     mpc.start();
   });
 
+  auto sledBodyVisual = realtimeUnderlyingWorld->getSkeleton("cartpole")
+                            ->getBodyNodes()[0]
+                            ->getShapeNodesWith<VisualAspect>()[0]
+                            ->getVisualAspect();
+  Eigen::Vector3d originalColor = sledBodyVisual->getColor();
   realtimeWorld.registerPreStepListener(
-      [](int step,
-         std::shared_ptr<simulation::World> world,
-         std::unordered_set<std::string> keysDown) {
+      [sledBodyVisual, originalColor](
+          int step,
+          std::shared_ptr<simulation::World> world,
+          std::unordered_set<std::string> keysDown) {
         if (keysDown.count("a"))
         {
-          Eigen::VectorXd perturbedVelocities = world->getVelocities();
-          perturbedVelocities(0) = -2.0;
-          world->setVelocities(perturbedVelocities);
+          Eigen::VectorXd perturbedForces = world->getForces();
+          perturbedForces(0) = -15.0;
+          world->setForces(perturbedForces);
+          sledBodyVisual->setColor(Eigen::Vector3d(1, 0, 0));
         }
-        if (keysDown.count("e"))
+        else if (keysDown.count("e"))
         {
-          Eigen::VectorXd perturbedVelocities = world->getVelocities();
-          perturbedVelocities(0) = 2.0;
-          world->setVelocities(perturbedVelocities);
+          Eigen::VectorXd perturbedForces = world->getForces();
+          perturbedForces(0) = 15.0;
+          world->setForces(perturbedForces);
+          sledBodyVisual->setColor(Eigen::Vector3d(0, 1, 0));
+        }
+        else
+        {
+          sledBodyVisual->setColor(originalColor);
         }
       });
 

@@ -56,6 +56,8 @@ public:
 
   void setDisableLinesearch(bool disableLinesearch);
 
+  void setRecordIterations(bool recordIterations);
+
 protected:
   int mIterationLimit;
   double mTolerance;
@@ -68,6 +70,7 @@ protected:
   bool mSuppressOutput;
   bool mSilenceOutput;
   bool mDisableLinesearch;
+  bool mRecordIterations;
 };
 
 } // namespace trajectory

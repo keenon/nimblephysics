@@ -119,7 +119,12 @@ class DARTWindow {
       if (data.type == "init") {
         this.realtimeWorld.initWorld(data.world);
       } else if (data.type == "update") {
-        this.realtimeWorld.setPositions(data.timestep, data.positions);
+        if (data.positions != null) {
+          this.realtimeWorld.setPositions(data.timestep, data.positions);
+        }
+        if (data.colors != null) {
+          this.realtimeWorld.setColors(data.colors);
+        }
       } else if (data.type == "new_plan") {
         this.realtimeWorld.displayMPCPlan(data.plan);
       }

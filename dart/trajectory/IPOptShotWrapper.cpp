@@ -28,15 +28,22 @@ IPOptShotWrapper::IPOptShotWrapper(
     std::shared_ptr<OptimizationRecord> record,
     bool recoverBest,
     bool recordFullDebugInfo,
-    bool printIterations)
-  : mBestFeasibleObjectiveValue(1e20),
+    bool printIterations,
+    bool recordIterations)
+  : mBestFeasibleObjectiveValue(std::numeric_limits<double>::infinity()),
     mWrapped(wrapped),
-    mBestIter(0),
+    mBestIter(-1),
     mRecord(record),
     mRecoverBest(recoverBest),
     mRecordFullDebugInfo(recordFullDebugInfo),
     mPrintIterations(printIterations),
-    mLastTimestep(timeSinceEpochMillis())
+    mRecordIterations(recordIterations),
+    mLastTimestep(timeSinceEpochMillis()),
+    mFCalls(0),
+    mGradFCalls(0),
+    mGCalls(0),
+    mJacGCalls(0),
+    mNewXs(0)
 {
   if (mRecoverBest)
   {
@@ -201,6 +208,11 @@ bool IPOptShotWrapper::eval_f(
     bool _new_x,
     Ipopt::Number& _obj_value)
 {
+  if (!can_eval_f(_new_x))
+  {
+    return false;
+  }
+
   PerformanceLog* perflog = nullptr;
 #ifdef LOG_PERFORMANCE_IPOPT
   if (mRecord->getPerfLog() != nullptr)
@@ -245,6 +257,11 @@ bool IPOptShotWrapper::eval_grad_f(
     bool _new_x,
     Ipopt::Number* _grad_f)
 {
+  if (!can_eval_grad_f(_new_x))
+  {
+    return false;
+  }
+
   PerformanceLog* perflog = nullptr;
 #ifdef LOG_PERFORMANCE_IPOPT
   if (mRecord->getPerfLog() != nullptr)
@@ -292,6 +309,11 @@ bool IPOptShotWrapper::eval_g(
     Ipopt::Index _m,
     Ipopt::Number* _g)
 {
+  if (!can_eval_g(_new_x))
+  {
+    return false;
+  }
+
   PerformanceLog* perflog = nullptr;
 #ifdef LOG_PERFORMANCE_IPOPT
   if (mRecord->getPerfLog() != nullptr)
@@ -343,6 +365,11 @@ bool IPOptShotWrapper::eval_jac_g(
     Ipopt::Index* _jCol,
     Ipopt::Number* _values)
 {
+  if (!can_eval_jac_g(_new_x))
+  {
+    return false;
+  }
+
   PerformanceLog* perflog = nullptr;
 #ifdef LOG_PERFORMANCE_IPOPT
   if (mRecord->getPerfLog() != nullptr)
@@ -497,10 +524,10 @@ void IPOptShotWrapper::finalize_solution(
   mSaved_zL = zL_vec;
   mSaved_lambda = lambda_vec;
 
-  if (mRecoverBest)
+  if (mRecoverBest && mBestIter != -1)
   {
-    std::cout << "Recovering best discovered state from iter " << mBestIter
-              << " with loss " << mBestFeasibleObjectiveValue << std::endl;
+    // std::cout << "Recovering best discovered state from iter " << mBestIter
+    // << " with loss " << mBestFeasibleObjectiveValue << std::endl;
     mWrapped->unflatten(mWrapped->mWorld, mBestFeasibleState, perflog);
   }
   /*
@@ -538,6 +565,9 @@ bool IPOptShotWrapper::intermediate_callback(
     const Ipopt::IpoptData* ip_data,
     Ipopt::IpoptCalculatedQuantities* ip_cq)
 {
+  // Reset call counts
+  reset_iteration();
+
   PerformanceLog* perflog = nullptr;
 #ifdef LOG_PERFORMANCE_IPOPT
   if (mRecord->getPerfLog() != nullptr)
@@ -548,11 +578,15 @@ bool IPOptShotWrapper::intermediate_callback(
 #endif
 
   // Always record the iteration
-  mRecord->registerIteration(
-      iter,
-      mWrapped->getRolloutCache(mWrapped->mWorld, perflog),
-      obj_value,
-      inf_pr);
+  if (mRecordIterations)
+  {
+    mRecord->registerIteration(
+        iter,
+        mWrapped->getRolloutCache(mWrapped->mWorld, perflog),
+        obj_value,
+        inf_pr);
+  }
+
   if (mPrintIterations)
   {
     uint64_t now = timeSinceEpochMillis();
@@ -579,6 +613,71 @@ bool IPOptShotWrapper::intermediate_callback(
   }
 #endif
   return true;
+}
+
+/// This gets called when we're about to repoptimize, to let us reset values.
+void IPOptShotWrapper::prep_for_reoptimize()
+{
+  // Reset the objective value, so we recover properly
+  mBestFeasibleObjectiveValue = std::numeric_limits<double>::infinity();
+  mBestIter = -1;
+}
+
+/// This records a single call of eval_f(). If this returns false, then we
+/// need to terminate this call to eval_f().
+bool IPOptShotWrapper::can_eval_f(bool new_x)
+{
+  if (new_x)
+    mNewXs++;
+  mFCalls++;
+  return can_continue();
+}
+
+/// This records a single call of eval_grad_f(). If this returns false, then
+/// we need to terminate this call to eval_grad_f().
+bool IPOptShotWrapper::can_eval_grad_f(bool new_x)
+{
+  if (new_x)
+    mNewXs++;
+  mGradFCalls++;
+  return can_continue();
+}
+
+/// This records a single call of eval_g(). If this returns false, then
+/// we need to terminate this call to eval_g().
+bool IPOptShotWrapper::can_eval_g(bool new_x)
+{
+  if (new_x)
+    mNewXs++;
+  mGCalls++;
+  return can_continue();
+}
+
+/// This records a single call of eval_jac_g(). If this returns false, then
+/// we need to terminate this call to eval_jac_g().
+bool IPOptShotWrapper::can_eval_jac_g(bool new_x)
+{
+  if (new_x)
+    mNewXs++;
+  mJacGCalls++;
+  return can_continue();
+}
+
+/// This is a central method that evaluates if we can continue the
+/// optimization
+bool IPOptShotWrapper::can_continue()
+{
+  return true;
+}
+
+/// This resets the stored data from this iteration
+void IPOptShotWrapper::reset_iteration()
+{
+  mFCalls = 0;
+  mGradFCalls = 0;
+  mGCalls = 0;
+  mJacGCalls = 0;
+  mNewXs = 0;
 }
 
 } // namespace trajectory

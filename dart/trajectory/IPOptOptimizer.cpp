@@ -32,7 +32,8 @@ IPOptOptimizer::IPOptOptimizer()
     mRecordFullDebugInfo(false),
     mSuppressOutput(false),
     mSilenceOutput(false),
-    mDisableLinesearch(false)
+    mDisableLinesearch(false),
+    mRecordIterations(true)
 {
 }
 
@@ -119,7 +120,8 @@ std::shared_ptr<OptimizationRecord> IPOptOptimizer::optimize(
       record,
       mRecoverBest,
       mRecordFullDebugInfo,
-      mSuppressOutput && !mSilenceOutput);
+      mSuppressOutput && !mSilenceOutput,
+      mRecordIterations);
   SmartPtr<IPOptShotWrapper> problemPtr(problem);
   status = app->OptimizeTNLP(problemPtr);
 
@@ -209,6 +211,12 @@ void IPOptOptimizer::setSilenceOutput(bool silenceOutput)
 void IPOptOptimizer::setDisableLinesearch(bool disableLinesearch)
 {
   mDisableLinesearch = disableLinesearch;
+}
+
+//==============================================================================
+void IPOptOptimizer::setRecordIterations(bool recordIterations)
+{
+  mRecordIterations = recordIterations;
 }
 
 } // namespace trajectory

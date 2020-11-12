@@ -34,7 +34,8 @@ public:
       std::shared_ptr<OptimizationRecord> record,
       bool recoverBest = true,
       bool recordFullDebugInfo = false,
-      bool printIterations = false);
+      bool printIterations = false,
+      bool recordIterations = true);
 
   /// Destructor
   ~IPOptShotWrapper();
@@ -152,16 +153,49 @@ public:
       const Ipopt::IpoptData* ip_data,
       Ipopt::IpoptCalculatedQuantities* ip_cq) override;
 
+  /// This gets called when we're about to repoptimize, to let us reset values.
+  void prep_for_reoptimize();
+
+  /// This records a single call of eval_f(). If this returns false, then we
+  /// need to terminate this call to eval_f().
+  bool can_eval_f(bool new_x);
+
+  /// This records a single call of eval_grad_f(). If this returns false, then
+  /// we need to terminate this call to eval_grad_f().
+  bool can_eval_grad_f(bool new_x);
+
+  /// This records a single call of eval_g(). If this returns false, then
+  /// we need to terminate this call to eval_g().
+  bool can_eval_g(bool new_x);
+
+  /// This records a single call of eval_jac_g(). If this returns false, then
+  /// we need to terminate this call to eval_jac_g().
+  bool can_eval_jac_g(bool new_x);
+
+  /// This is a central method that evaluates if we can continue the
+  /// optimization
+  bool can_continue();
+
+  /// This resets the stored data from this iteration
+  void reset_iteration();
+
 private:
   AbstractShot* mWrapped;
   std::shared_ptr<OptimizationRecord> mRecord;
   bool mRecoverBest;
   bool mRecordFullDebugInfo;
+  bool mRecordIterations;
   int mBestIter;
   double mBestFeasibleObjectiveValue;
   Eigen::VectorXd mBestFeasibleState;
   bool mPrintIterations;
   long mLastTimestep;
+
+  int mNewXs;
+  int mFCalls;
+  int mGradFCalls;
+  int mGCalls;
+  int mJacGCalls;
 
   Eigen::VectorXd mSaved_zU;
   Eigen::VectorXd mSaved_zL;

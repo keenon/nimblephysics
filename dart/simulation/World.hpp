@@ -438,6 +438,10 @@ public:
   /// already have the original world loaded. Good for real-time viewing.
   std::string positionsToJson();
 
+  /// This returns the colors as a JSON blob that can be rendered if we
+  /// already have the original world loaded. Good for real-time viewing.
+  std::string colorsToJson();
+
 protected:
   /// Register when a Skeleton's name is changed
   void handleSkeletonNameChange(

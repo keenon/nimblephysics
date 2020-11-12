@@ -400,6 +400,7 @@ std::string World::positionsToJson()
   std::stringstream json;
 
   json << "{";
+
   std::vector<dynamics::BodyNode*> bodies = getAllBodyNodes();
   for (int i = 0; i < bodies.size(); i++)
   {
@@ -422,6 +423,56 @@ std::string World::positionsToJson()
     json << "\"angle\":";
     vec3ToJson(json, math::matrixToEulerXYZ(bodyTransform.linear()));
     json << "}";
+    if (i < bodies.size() - 1)
+    {
+      json << ",";
+    }
+  }
+
+  json << "}";
+
+  return json.str();
+}
+
+//==============================================================================
+/// This returns the colors as a JSON blob that can be rendered if we
+/// already have the original world loaded. Good for real-time viewing.
+std::string World::colorsToJson()
+{
+  std::stringstream json;
+
+  json << "{";
+
+  std::vector<dynamics::BodyNode*> bodies = getAllBodyNodes();
+  for (int i = 0; i < bodies.size(); i++)
+  {
+    auto bodyNode = bodies[i];
+    auto skel = bodyNode->getSkeleton();
+    /*
+    // A BodyNode with two child shapes gets rendered like this:
+    {
+      "skel.node1": [
+        [0, 0, 0],
+        [1, 1, 1]
+      ]
+    }
+    */
+    std::string name = skel->getName() + "." + bodyNode->getName();
+    json << "\"" << name << "\": [";
+
+    const std::vector<dynamics::ShapeNode*> visualShapeNodes
+        = bodyNode->getShapeNodesWith<dynamics::VisualAspect>();
+    for (int j = 0; j < visualShapeNodes.size(); j++)
+    {
+      auto shape = visualShapeNodes[j];
+      dynamics::VisualAspect* visual = shape->getVisualAspect(false);
+      if (j > 0)
+        json << ",";
+      vec3ToJson(json, visual->getColor());
+    }
+
+    json << "]";
+
     if (i < bodies.size() - 1)
     {
       json << ",";

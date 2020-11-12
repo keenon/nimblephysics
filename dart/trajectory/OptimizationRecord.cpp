@@ -93,6 +93,7 @@ void OptimizationRecord::registerForReoptimization(
 void OptimizationRecord::reoptimize()
 {
   std::string oldWarmStart;
+  mIpoptProblem->prep_for_reoptimize();
   // mIpopt->Options()->GetStringValue("warm_start_init_point", oldWarmStart,
   // ""); mIpopt->Options()->SetStringValue("warm_start_init_point", "yes");
   ApplicationReturnStatus status = mIpopt->ReOptimizeTNLP(mIpoptProblem);

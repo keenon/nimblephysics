@@ -33,7 +33,11 @@ MPC::MPC(
         world->getVelocities(),
         world->getMasses()),
     mLastOptimizedTime(0L),
-    mSilent(false)
+    mSilent(false),
+    mMaxIterations(5),
+    mEnableLinesearch(true),
+    mEnableOptimizationGuards(false),
+    mRecordIterations(false)
 {
 }
 
@@ -49,7 +53,11 @@ MPC::MPC(const MPC& mpc)
     mRunning(mpc.mRunning),
     mObservationLog(mpc.mObservationLog),
     mLastOptimizedTime(mpc.mLastOptimizedTime),
-    mSilent(mpc.mSilent)
+    mSilent(mpc.mSilent),
+    mMaxIterations(mpc.mMaxIterations),
+    mEnableLinesearch(mpc.mEnableLinesearch),
+    mEnableOptimizationGuards(mpc.mEnableOptimizationGuards),
+    mRecordIterations(mpc.mRecordIterations)
 {
 }
 
@@ -79,6 +87,47 @@ Eigen::VectorXd MPC::getForceNow()
 void MPC::setSilent(bool silent)
 {
   mSilent = silent;
+}
+
+/// This enables linesearch on the IPOPT sub-problems. Defaults to true. This
+/// increases the stability of solutions, but can lead to spikes in solution
+/// times.
+void MPC::setEnableLineSearch(bool enabled)
+{
+  mEnableLinesearch = enabled;
+}
+
+/// This enables "guards" on the IPOPT sub-problems. Defaults to false. This
+/// means that every IPOPT sub-problem always returns the best explored
+/// trajectory, even if it subsequently explored other states. This increases
+/// the stability of solutions, but can lead to getting stuck in local minima.
+void MPC::setEnableOptimizationGuards(bool enabled)
+{
+  mEnableOptimizationGuards = enabled;
+}
+
+/// Defaults to false. This records every iteration of IPOPT in the log, so we
+/// can debug it. This should only be used on MPC that's running for a short
+/// time. Otherwise the log will grow without bound.
+void MPC::setRecordIterations(bool enabled)
+{
+  mRecordIterations = enabled;
+}
+
+/// This gets the current maximum number of iterations that IPOPT will be
+/// allowed to run during an optimization.
+int MPC::getMaxIterations()
+{
+  return mMaxIterations;
+}
+
+/// This sets the current maximum number of iterations that IPOPT will be
+/// allowed to run during an optimization. MPC reserves the right to change
+/// this value during runtime depending on timing and performance values
+/// observed during running.
+void MPC::setMaxIterations(int maxIters)
+{
+  mMaxIterations = maxIters;
 }
 
 /// This records the current state of the world based on some external sensing
@@ -111,11 +160,12 @@ void MPC::optimizePlan(long startTime)
     IPOptOptimizer optimizer = IPOptOptimizer();
     optimizer.setCheckDerivatives(false);
     optimizer.setSuppressOutput(true);
-    optimizer.setRecoverBest(false);
+    optimizer.setRecoverBest(mEnableOptimizationGuards);
     optimizer.setTolerance(1e-3);
-    optimizer.setIterationLimit(10);
+    optimizer.setIterationLimit(mMaxIterations);
+    optimizer.setDisableLinesearch(!mEnableLinesearch);
     optimizer.setRecordFullDebugInfo(false);
-    // optimizer.setDisableLinesearch(true);
+    optimizer.setRecordIterations(false);
     if (mSilent)
     {
       optimizer.setSilenceOutput(true);

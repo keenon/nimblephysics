@@ -48,6 +48,32 @@ public:
   /// This can completely silence log output
   void setSilent(bool silent);
 
+  /// This enables linesearch on the IPOPT sub-problems. Defaults to true. This
+  /// increases the stability of solutions, but can lead to spikes in solution
+  /// times.
+  void setEnableLineSearch(bool enabled);
+
+  /// This enables "guards" on the IPOPT sub-problems. Defaults to false. This
+  /// means that every IPOPT sub-problem always returns the best explored
+  /// trajectory, even if it subsequently explored other states. This increases
+  /// the stability of solutions, but can lead to getting stuck in local minima.
+  void setEnableOptimizationGuards(bool enabled);
+
+  /// Defaults to false. This records every iteration of IPOPT in the log, so we
+  /// can debug it. This should only be used on MPC that's running for a short
+  /// time. Otherwise the log will grow without bound.
+  void setRecordIterations(bool enabled);
+
+  /// This gets the current maximum number of iterations that IPOPT will be
+  /// allowed to run during an optimization.
+  int getMaxIterations();
+
+  /// This sets the current maximum number of iterations that IPOPT will be
+  /// allowed to run during an optimization. MPC reserves the right to change
+  /// this value during runtime depending on timing and performance values
+  /// observed during running.
+  void setMaxIterations(int maxIters);
+
   /// This records the current state of the world based on some external sensing
   /// and inference. This resets the error in our model just assuming the world
   /// is exactly following our simulation.
@@ -95,10 +121,17 @@ protected:
   std::shared_ptr<simulation::World> mWorld;
   std::shared_ptr<trajectory::LossFn> mLoss;
   ObservationLog mObservationLog;
+
+  // Meta config
+  bool mEnableLinesearch;
+  bool mEnableOptimizationGuards;
+  bool mRecordIterations;
+
   int mPlanningHorizonMillis;
   int mMillisPerStep;
   int mSteps;
   int mShotLength;
+  int mMaxIterations;
   long mLastOptimizedTime;
   RealTimeControlBuffer mBuffer;
   std::thread mOptimizationThread;
