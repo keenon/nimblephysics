@@ -30,12 +30,15 @@ IPOptOptimizer::IPOptOptimizer()
     mRecordPerfLog(false),
     mRecoverBest(true),
     mRecordFullDebugInfo(false),
-    mSuppressOutput(false)
+    mSuppressOutput(false),
+    mSilenceOutput(false),
+    mDisableLinesearch(false)
 {
 }
 
 //==============================================================================
-std::shared_ptr<OptimizationRecord> IPOptOptimizer::optimize(AbstractShot* shot)
+std::shared_ptr<OptimizationRecord> IPOptOptimizer::optimize(
+    AbstractShot* shot, std::shared_ptr<OptimizationRecord> reuseRecord)
 {
   // Create an instance of the IpoptApplication
   //
@@ -80,13 +83,19 @@ std::shared_ptr<OptimizationRecord> IPOptOptimizer::optimize(AbstractShot* shot)
     app->Options()->SetIntegerValue(
         "print_frequency_iter", std::numeric_limits<int>::infinity());
   }
-  if (mSuppressOutput)
+  if (mSuppressOutput || mSilenceOutput)
   {
     app->Options()->SetIntegerValue("print_level", 0);
   }
+  if (mDisableLinesearch)
+  {
+    app->Options()->SetIntegerValue("max_soc", 0);
+    app->Options()->SetStringValue("accept_every_trial_step", "yes");
+  }
+  app->Options()->SetIntegerValue("watchdog_shortened_iter_trigger", 0);
 
   std::shared_ptr<OptimizationRecord> record
-      = std::make_shared<OptimizationRecord>();
+      = reuseRecord ? reuseRecord : std::make_shared<OptimizationRecord>();
   if (mRecordPerfLog)
     record->startPerfLog();
 
@@ -106,7 +115,11 @@ std::shared_ptr<OptimizationRecord> IPOptOptimizer::optimize(AbstractShot* shot)
   // If you try to leave `problem` on the stack, you'll get invalid free
   // exceptions when IPOpt attempts to free it.
   IPOptShotWrapper* problem = new IPOptShotWrapper(
-      shot, record, mRecoverBest, mRecordFullDebugInfo, mSuppressOutput);
+      shot,
+      record,
+      mRecoverBest,
+      mRecordFullDebugInfo,
+      mSuppressOutput && !mSilenceOutput);
   SmartPtr<IPOptShotWrapper> problemPtr(problem);
   status = app->OptimizeTNLP(problemPtr);
 
@@ -184,6 +197,18 @@ void IPOptOptimizer::setRecordFullDebugInfo(bool recordFullDebugInfo)
 void IPOptOptimizer::setSuppressOutput(bool suppressOutput)
 {
   mSuppressOutput = suppressOutput;
+}
+
+//==============================================================================
+void IPOptOptimizer::setSilenceOutput(bool silenceOutput)
+{
+  mSilenceOutput = silenceOutput;
+}
+
+//==============================================================================
+void IPOptOptimizer::setDisableLinesearch(bool disableLinesearch)
+{
+  mDisableLinesearch = disableLinesearch;
 }
 
 } // namespace trajectory

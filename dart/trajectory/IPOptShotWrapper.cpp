@@ -141,7 +141,7 @@ bool IPOptShotWrapper::get_starting_point(
     Ipopt::Number* z_U,
     Ipopt::Index m,
     bool init_lambda,
-    Ipopt::Number* /*lambda*/)
+    Ipopt::Number* lambda)
 {
   PerformanceLog* perflog = nullptr;
 #ifdef LOG_PERFORMANCE_IPOPT
@@ -163,20 +163,26 @@ bool IPOptShotWrapper::get_starting_point(
   // multipliers z^L and z^U
   if (init_z)
   {
-    // TODO(JS): Not implemented yet.
-    Eigen::Map<Eigen::VectorXd> zU_vec(z_U, m);
-    Eigen::Map<Eigen::VectorXd> zL_vec(z_L, m);
+    Eigen::Map<Eigen::VectorXd> zU_vec(z_U, n);
+    Eigen::Map<Eigen::VectorXd> zL_vec(z_L, n);
+    zU_vec = mSaved_zU;
+    zL_vec = mSaved_zL;
+    /*
     std::cout << "Initializing lower/upper bounds for z is not supported yet. "
               << "Ignored here.\n";
+              */
   }
 
   // If init_lambda is true, this method must provide an initial value for the
   // constraint multipliers, lambda.
   if (init_lambda)
   {
-    // TODO(JS): Not implemented yet.
+    Eigen::Map<Eigen::VectorXd> lambda_vec(lambda, m);
+    lambda_vec = mSaved_lambda;
+    /*
     std::cout << "Initializing lambda is not supported yet. "
               << "Ignored here.\n";
+              */
   }
 
 #ifdef LOG_PERFORMANCE_IPOPT
@@ -464,11 +470,11 @@ void IPOptShotWrapper::finalize_solution(
     Ipopt::SolverReturn /*_status*/,
     Ipopt::Index _n,
     const Ipopt::Number* _x,
-    const Ipopt::Number* /*_z_L*/,
-    const Ipopt::Number* /*_z_U*/,
-    Ipopt::Index /*_m*/,
+    const Ipopt::Number* _z_L,
+    const Ipopt::Number* _z_U,
+    Ipopt::Index _m,
     const Ipopt::Number* /*_g*/,
-    const Ipopt::Number* /*_lambda*/,
+    const Ipopt::Number* _lambda,
     Ipopt::Number _obj_value,
     const Ipopt::IpoptData* /*_ip_data*/,
     Ipopt::IpoptCalculatedQuantities* /*_ip_cq*/)
@@ -483,6 +489,13 @@ void IPOptShotWrapper::finalize_solution(
 #endif
 
   Eigen::Map<const Eigen::VectorXd> flat(_x, _n);
+
+  Eigen::Map<const Eigen::VectorXd> zU_vec(_z_U, _n);
+  Eigen::Map<const Eigen::VectorXd> zL_vec(_z_L, _n);
+  Eigen::Map<const Eigen::VectorXd> lambda_vec(_lambda, _m);
+  mSaved_zU = zU_vec;
+  mSaved_zL = zL_vec;
+  mSaved_lambda = lambda_vec;
 
   if (mRecoverBest)
   {

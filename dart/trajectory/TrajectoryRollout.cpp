@@ -1,5 +1,12 @@
 #include "dart/trajectory/TrajectoryRollout.hpp"
 
+#include <sstream>
+
+#include "dart/dynamics/BodyNode.hpp"
+#include "dart/dynamics/Skeleton.hpp"
+#include "dart/neural/RestorableSnapshot.hpp"
+#include "dart/server/RawJsonUtils.hpp"
+#include "dart/simulation/World.hpp"
 #include "dart/trajectory/AbstractShot.hpp"
 
 using namespace dart;
@@ -35,12 +42,86 @@ TrajectoryRollout* TrajectoryRollout::copy() const
 }
 
 //==============================================================================
+/// This formats the rollout as JSON, which can be sent to the frontend to be
+/// parsed and displayed.
+std::string TrajectoryRollout::toJson(
+    std::shared_ptr<simulation::World> world) const
+{
+  neural::RestorableSnapshot snapshot(world);
+  std::stringstream json;
+  json << "{";
+
+  int timesteps = getPosesConst().cols();
+
+  std::vector<dynamics::BodyNode*> bodies = world->getAllBodyNodes();
+
+  // Initialize a map to hold everything
+  std::unordered_map<std::string, Eigen::MatrixXd> map;
+  for (int i = 0; i < bodies.size(); i++)
+  {
+    auto bodyNode = bodies[i];
+    std::string name
+        = bodyNode->getSkeleton()->getName() + "." + bodyNode->getName();
+    // 6 rows: pos_x, pos_y, pos_z, rot_x, rot_y, rot_z
+    map[name] = Eigen::MatrixXd::Zero(6, timesteps);
+  }
+
+  // Fill the map with every timestep
+  for (int t = 0; t < timesteps; t++)
+  {
+    world->setPositions(getPosesConst("identity").col(t));
+    for (int i = 0; i < bodies.size(); i++)
+    {
+      auto bodyNode = bodies[i];
+      std::string name
+          = bodyNode->getSkeleton()->getName() + "." + bodyNode->getName();
+      const Eigen::Isometry3d& bodyTransform = bodyNode->getWorldTransform();
+
+      // 6 rows: pos_x, pos_y, pos_z, rot_x, rot_y, rot_z
+      Eigen::Vector6d state = Eigen::Vector6d::Zero();
+      state.head<3>() = bodyTransform.translation();
+      state.tail<3>() = math::matrixToEulerXYZ(bodyTransform.linear());
+      map[name].col(t) = state;
+    }
+  }
+
+  // Print the map
+  bool isFirst = true;
+  for (const auto& pair : map)
+  {
+    if (isFirst)
+      isFirst = false;
+    else
+      json << ",";
+    json << "\"" << pair.first << "\": {";
+    json << "\"pos_x\": ";
+    vecXToJson(json, pair.second.row(0));
+    json << ",\"pos_y\": ";
+    vecXToJson(json, pair.second.row(1));
+    json << ",\"pos_z\": ";
+    vecXToJson(json, pair.second.row(2));
+    json << ",\"rot_x\": ";
+    vecXToJson(json, pair.second.row(3));
+    json << ",\"rot_y\": ";
+    vecXToJson(json, pair.second.row(4));
+    json << ",\"rot_z\": ";
+    vecXToJson(json, pair.second.row(5));
+    json << "}";
+  }
+
+  json << "}";
+
+  snapshot.restore();
+
+  return json.str();
+}
+
+//==============================================================================
 TrajectoryRolloutReal::TrajectoryRolloutReal(
     std::unordered_map<std::string, std::shared_ptr<neural::Mapping>> mappings,
     int steps,
     std::string representationMapping,
     int massDim)
-  : mMasses(Eigen::VectorXd::Zero(massDim))
 {
   mRepresentationMapping = representationMapping;
   for (auto pair : mappings)
@@ -51,6 +132,7 @@ TrajectoryRolloutReal::TrajectoryRolloutReal(
         = Eigen::MatrixXd::Zero(pair.second->getForceDim(), steps);
     mMappings.push_back(pair.first);
   }
+  mMasses = Eigen::VectorXd::Zero(massDim);
 }
 
 //==============================================================================

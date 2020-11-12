@@ -1063,15 +1063,73 @@ void MultiShot::setStates(
 
 //==============================================================================
 /// This sets the forces in this trajectory from the passed in matrix
-void MultiShot::setForces(Eigen::MatrixXd forces, PerformanceLog* log)
+void MultiShot::setForcesRaw(Eigen::MatrixXd forces, PerformanceLog* log)
 {
   int cursor = 0;
   for (int i = 0; i < mShots.size(); i++)
   {
     int len = mShots[i]->getNumSteps();
-    mShots[i]->setForces(forces.block(0, cursor, forces.rows(), len));
+    mShots[i]->setForcesRaw(forces.block(0, cursor, forces.rows(), len));
     cursor += len;
   }
+}
+
+//==============================================================================
+/// This moves the trajectory forward in time, setting the starting point to
+/// the new given starting point, and shifting the forces over by `steps`,
+/// padding the remainder with 0s
+Eigen::VectorXi MultiShot::advanceSteps(
+    std::shared_ptr<simulation::World> world,
+    Eigen::VectorXd startPos,
+    Eigen::VectorXd startVel,
+    int steps)
+{
+  Eigen::VectorXi mapping = Eigen::VectorXi::Zero(getFlatProblemDim(world));
+
+  RestorableSnapshot snapshot(world);
+
+  const TrajectoryRollout* rollout = getRolloutCache(world);
+
+  int cursor = 0;
+  for (int i = 0; i < mShots.size(); i++)
+  {
+    int len = mShots[i]->getNumSteps();
+
+    // The first shot is a special case, we assume that it's getting its
+    // projection of current state from a more reliable source than our
+    // simulator. For all subsequent shots, though, simulate forward from the
+    // old knot point to find the new knot point.
+
+    if (i == 0)
+    {
+      mShots[i]->advanceSteps(world, startPos, startVel, steps);
+    }
+    else
+    {
+      world->setPositions(mShots[i]->mStartPos);
+      world->setVelocities(mShots[i]->mStartVel);
+      for (int j = 0; j < steps; j++)
+      {
+        int t = cursor + j;
+        if (t < rollout->getForcesConst().cols())
+        {
+          world->setForces(rollout->getForcesConst().col(t));
+        }
+        else
+        {
+          world->setForces(Eigen::VectorXd::Zero(world->getNumDofs()));
+        }
+        world->step();
+      }
+      mShots[i]->advanceSteps(
+          world, world->getPositions(), world->getVelocities(), steps);
+    }
+
+    cursor += len;
+  }
+  snapshot.restore();
+
+  return mapping;
 }
 
 //==============================================================================
@@ -1092,6 +1150,20 @@ void MultiShot::asyncPartGetStates(
 Eigen::VectorXd MultiShot::getStartState()
 {
   return mShots[0]->getStartState();
+}
+
+//==============================================================================
+/// This returns start pos
+Eigen::VectorXd MultiShot::getStartPos()
+{
+  return mShots[0]->getStartPos();
+}
+
+//==============================================================================
+/// This returns start vel
+Eigen::VectorXd MultiShot::getStartVel()
+{
+  return mShots[0]->getStartVel();
 }
 
 //==============================================================================

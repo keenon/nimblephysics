@@ -148,11 +148,26 @@ public:
       PerformanceLog* log = nullptr) override;
 
   /// This sets the forces in this trajectory from the passed in matrix
-  void setForces(
+  void setForcesRaw(
       Eigen::MatrixXd forces, PerformanceLog* log = nullptr) override;
+
+  /// This moves the trajectory forward in time, setting the starting point to
+  /// the new given starting point, and shifting the forces over by `steps`,
+  /// padding the remainder with 0s
+  Eigen::VectorXi advanceSteps(
+      std::shared_ptr<simulation::World> world,
+      Eigen::VectorXd startPos,
+      Eigen::VectorXd startVel,
+      int steps) override;
 
   /// This returns the concatenation of (start pos, start vel) for convenience
   Eigen::VectorXd getStartState() override;
+
+  /// This returns start pos
+  Eigen::VectorXd getStartPos() override;
+
+  /// This returns start vel
+  Eigen::VectorXd getStartVel() override;
 
   /// This unrolls the shot, and returns the (pos, vel) state concatenated at
   /// the end of the shot

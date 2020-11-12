@@ -8,6 +8,7 @@
 
 #include "dart/neural/IdentityMapping.hpp"
 #include "dart/neural/Mapping.hpp"
+#include "dart/neural/RestorableSnapshot.hpp"
 #include "dart/simulation/World.hpp"
 
 #define LOG_PERFORMANCE_ABSTRACT_SHOT
@@ -859,6 +860,59 @@ void AbstractShot::accumulateStaticJacobianOfFinalState(
       thisTimestep.massVel.rows(),
       thisTimestep.massVel.cols())
       += thisTimestep.massVel;
+}
+
+//==============================================================================
+/// This sets the forces in this trajectory from the passed in matrix. This
+/// updates the knot points as part of the update, and returns a mapping of
+/// where indices moved around to, so that we can update lagrange multipliers
+/// etc.
+Eigen::VectorXi AbstractShot::updateWithForces(
+    std::shared_ptr<simulation::World> world,
+    Eigen::MatrixXd forces,
+    PerformanceLog* log)
+{
+  PerformanceLog* thisLog = nullptr;
+#ifdef LOG_PERFORMANCE_ABSTRACT_SHOT
+  if (log != nullptr)
+  {
+    thisLog = log->startRun("AbstractShot.updateWithForces");
+  }
+#endif
+
+  Eigen::VectorXi mapping = Eigen::VectorXi::Zero(getFlatProblemDim(world));
+
+  neural::RestorableSnapshot snapshot(world);
+  TrajectoryRollout* rollout = getRolloutCache(world, thisLog)->copy();
+
+  for (int i = 0; i < mSteps; i++)
+  {
+    mMappings[mRepresentationMapping]->setForces(world, forces.col(i));
+    for (std::string mapping : rollout->getMappings())
+    {
+      mMappings[mapping]->getPositionsInPlace(
+          world, rollout->getPoses(mapping).col(i));
+      mMappings[mapping]->getVelocitiesInPlace(
+          world, rollout->getVels(mapping).col(i));
+      mMappings[mapping]->getForcesInPlace(
+          world, rollout->getForces(mapping).col(i));
+    }
+    world->step();
+  }
+
+  setStates(world, rollout, thisLog);
+
+  snapshot.restore();
+  delete rollout;
+
+#ifdef LOG_PERFORMANCE_ABSTRACT_SHOT
+  if (thisLog != nullptr)
+  {
+    thisLog->end();
+  }
+#endif
+
+  return mapping;
 }
 
 //==============================================================================

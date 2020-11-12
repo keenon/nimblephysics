@@ -2136,7 +2136,7 @@ TEST(TRAJECTORY, REOPTIMIZATION)
   for (int i = 0; i < 10; i++)
   {
     std::cout << "Step " << i << std::endl;
-    record = record->reoptimize();
+    record->reoptimize();
   }
 }
 // #endif

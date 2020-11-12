@@ -38,3 +38,28 @@ type FullReport = {
   world: BodyNode[];
   record: OptRecord[];
 };
+
+type ObjectPosition = {
+  pos: number[];
+  angle: number[];
+};
+
+interface SetPositions {
+  [key: string]: ObjectPosition;
+}
+
+type RealtimeUpdate = {
+  type: "init" | "update" | "new_plan";
+  // for type: "init"
+  world?: BodyNode[];
+  // for type: "update"
+  positions?: SetPositions;
+  timestep?: number;
+  // for type: "new_plan"
+  plan?: WorldTrajectory;
+};
+
+type BodyGroupAndColor = {
+  group: THREE.Group;
+  color: THREE.Color;
+};

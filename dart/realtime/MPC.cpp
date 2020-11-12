@@ -25,13 +25,15 @@ MPC::MPC(
     mMillisPerStep(1000 * world->getTimeStep()),
     mSteps((int)ceil((double)planningHorizonMillis / mMillisPerStep)),
     mBuffer(RealTimeControlBuffer(world->getNumDofs(), mSteps, mMillisPerStep)),
-    mShotLength(ceil((double)mSteps / 16)),
+    mShotLength(50),
     mRunning(false),
     mObservationLog(
         timeSinceEpochMillis(),
         world->getPositions(),
         world->getVelocities(),
-        world->getMasses())
+        world->getMasses()),
+    mLastOptimizedTime(0L),
+    mSilent(false)
 {
 }
 
@@ -45,7 +47,9 @@ MPC::MPC(const MPC& mpc)
     mBuffer(mpc.mBuffer),
     mShotLength(mpc.mShotLength),
     mRunning(mpc.mRunning),
-    mObservationLog(mpc.mObservationLog)
+    mObservationLog(mpc.mObservationLog),
+    mLastOptimizedTime(mpc.mLastOptimizedTime),
+    mSilent(mpc.mSilent)
 {
 }
 
@@ -69,6 +73,12 @@ Eigen::VectorXd MPC::getForce(long now)
 Eigen::VectorXd MPC::getForceNow()
 {
   return getForce(timeSinceEpochMillis());
+}
+
+/// This can completely silence log output
+void MPC::setSilent(bool silent)
+{
+  mSilent = silent;
 }
 
 /// This records the current state of the world based on some external sensing
@@ -102,12 +112,18 @@ void MPC::optimizePlan(long startTime)
     optimizer.setCheckDerivatives(false);
     optimizer.setSuppressOutput(true);
     optimizer.setRecoverBest(false);
-    optimizer.setIterationLimit(4);
+    optimizer.setTolerance(1e-3);
+    optimizer.setIterationLimit(10);
+    optimizer.setRecordFullDebugInfo(false);
+    // optimizer.setDisableLinesearch(true);
+    if (mSilent)
+    {
+      optimizer.setSilenceOutput(true);
+    }
 
     createOpt->end();
 
     PerformanceLog* estimateState = log->startRun("Estimate State");
-    mObservationLog.discardBefore(startTime);
     std::shared_ptr<simulation::World> worldClone = mWorld->clone();
     mBuffer.estimateWorldStateAt(worldClone, &mObservationLog, startTime);
     estimateState->end();
@@ -115,12 +131,12 @@ void MPC::optimizePlan(long startTime)
     PerformanceLog* optimizeTrack = log->startRun("Optimize");
     mShot = std::make_shared<MultiShot>(
         worldClone, *mLoss.get(), mSteps, mShotLength, false);
-    Eigen::MatrixXd forces
-        = Eigen::MatrixXd::Zero(worldClone->getNumDofs(), mSteps);
-    mBuffer.getPlannedForcesStartingAt(startTime, forces);
-    mShot->setForces(forces);
+    mShot->setParallelOperationsEnabled(true);
+
     mOptimizationRecord = optimizer.optimize(mShot.get());
     optimizeTrack->end();
+
+    mLastOptimizedTime = startTime;
 
     mBuffer.setForcePlan(
         startTime, mShot->getRolloutCache(worldClone)->getForcesConst());
@@ -133,14 +149,58 @@ void MPC::optimizePlan(long startTime)
   else
   {
     std::shared_ptr<simulation::World> worldClone = mWorld->clone();
-    mBuffer.estimateWorldStateAt(worldClone, &mObservationLog, startTime);
-    Eigen::MatrixXd forces
-        = Eigen::MatrixXd::Zero(worldClone->getNumDofs(), mSteps);
-    mBuffer.getPlannedForcesStartingAt(startTime, forces);
-    mShot->setForces(forces);
+
+    int diff = startTime - mLastOptimizedTime;
+    int steps = floor((double)diff / mMillisPerStep);
+    int roundedDiff = steps * mMillisPerStep;
+    long roundedStartTime = mLastOptimizedTime + roundedDiff;
+    long totalPlanTime = mSteps * mMillisPerStep;
+    double percentage = (double)roundedDiff * 100.0 / totalPlanTime;
+
+    if (!mSilent)
+    {
+      std::cout << "Advancing plan by " << roundedDiff << "ms = " << steps
+                << " steps, " << (percentage) << "% of total " << totalPlanTime
+                << "ms plan time" << std::endl;
+    }
+
+    long startComputeWallTime = timeSinceEpochMillis();
+
+    mBuffer.estimateWorldStateAt(
+        worldClone, &mObservationLog, roundedStartTime);
+
+    mShot->advanceSteps(
+        worldClone,
+        worldClone->getPositions(),
+        worldClone->getVelocities(),
+        steps);
+
     mOptimizationRecord->reoptimize();
+
     mBuffer.setForcePlan(
         startTime, mShot->getRolloutCache(worldClone)->getForcesConst());
+
+    // Call any listeners that might be waiting on us
+    for (auto listener : mReplannedListeners)
+    {
+      listener(mShot->getRolloutCache(worldClone));
+    }
+
+    long computeDurationWallTime
+        = timeSinceEpochMillis() - startComputeWallTime;
+
+    if (!mSilent)
+    {
+      double factorOfSafety = 0.5;
+      std::cout << " -> We were allowed "
+                << (int)floor(roundedDiff * factorOfSafety)
+                << "ms to solve this problem (" << roundedDiff
+                << "ms new planning * " << factorOfSafety
+                << " factor of safety), and it took us "
+                << computeDurationWallTime << "ms" << std::endl;
+    }
+
+    mLastOptimizedTime = roundedStartTime;
   }
 }
 
@@ -186,6 +246,20 @@ void MPC::stop()
     return;
   mRunning = false;
   mOptimizationThread.join();
+}
+
+/// This returns the main record we've been keeping of our optimization up to
+/// this point
+std::shared_ptr<trajectory::OptimizationRecord> MPC::getOptimizationRecord()
+{
+  return mOptimizationRecord;
+}
+
+/// This registers a listener to get called when we finish replanning
+void MPC::registerReplanningListener(
+    std::function<void(const trajectory::TrajectoryRollout*)> replanListener)
+{
+  mReplannedListeners.push_back(replanListener);
 }
 
 /// This is the function for the optimization thread to run when we're live

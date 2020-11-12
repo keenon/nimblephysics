@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { bodyToGroup } from "./ThreeJSUtils";
 
 const SCALE_FACTOR = 100;
 
@@ -158,44 +159,9 @@ class WorldDisplay {
     const record = this.report.record[i];
 
     for (const body of this.report.world) {
-      const bodyGroup = new THREE.Group();
-      // default to black
-      let color = new THREE.Color(0, 0, 0);
-      body.shapes.forEach((shape) => {
-        let shapeColor = new THREE.Color(
-          shape.color[0],
-          shape.color[1],
-          shape.color[2]
-        );
-        color = shapeColor;
-        const material = new THREE.MeshLambertMaterial({
-          color: shapeColor,
-        });
-        const geometry = new THREE.BoxBufferGeometry(
-          shape.size[0] * SCALE_FACTOR,
-          shape.size[1] * SCALE_FACTOR,
-          shape.size[2] * SCALE_FACTOR
-        );
-        const mesh = new THREE.Mesh(geometry, material);
-        if (body.name.toLowerCase().includes("floor")) {
-          mesh.receiveShadow = true;
-        } else {
-          mesh.castShadow = true;
-        }
-        bodyGroup.add(mesh);
-        mesh.position.x = shape.pos[0] * SCALE_FACTOR;
-        mesh.position.y = shape.pos[1] * SCALE_FACTOR;
-        mesh.position.z = shape.pos[2] * SCALE_FACTOR;
-        mesh.rotation.x = shape.angle[0];
-        mesh.rotation.y = shape.angle[1];
-        mesh.rotation.z = shape.angle[2];
-      });
-      bodyGroup.position.x = body.pos[0] * SCALE_FACTOR;
-      bodyGroup.position.y = body.pos[1] * SCALE_FACTOR;
-      bodyGroup.position.z = body.pos[2] * SCALE_FACTOR;
-      bodyGroup.rotation.x = body.angle[0];
-      bodyGroup.rotation.y = body.angle[1];
-      bodyGroup.rotation.z = body.angle[2];
+      const groupAndColor = bodyToGroup(body, SCALE_FACTOR);
+      const bodyGroup = groupAndColor.group;
+      const color = groupAndColor.color;
 
       const trajectory = record.trajectory[body.name];
 

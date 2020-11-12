@@ -52,7 +52,7 @@ Eigen::VectorXd RealTimeControlBuffer::getPlannedForce(long time)
   }
   else
   {
-    std::cout << "WARNING: MPC isn't keeping up!" << std::endl;
+    // std::cout << "WARNING: MPC isn't keeping up!" << std::endl;
     Eigen::VectorXd oob = Eigen::VectorXd::Zero(mForceDim);
     mControlLog.record(time, oob);
     return oob;
@@ -100,7 +100,7 @@ void RealTimeControlBuffer::getPlannedForcesStartingAt(
   }
   else
   {
-    std::cout << "WARNING: MPC isn't keeping up!" << std::endl;
+    // std::cout << "WARNING: MPC isn't keeping up!" << std::endl;
     forcesOut.setZero();
   }
 }
@@ -152,7 +152,8 @@ void RealTimeControlBuffer::estimateWorldStateAt(
   world->setMasses(log->getMass());
   for (int i = 0; i < stepsSinceObservation; i++)
   {
-    long at = time + i * mMillisPerStep;
+    long at = obs.time + i * mMillisPerStep;
+    Eigen::VectorXd forces = mControlLog.get(at);
     world->setForces(mControlLog.get(at));
     world->step();
   }

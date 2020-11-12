@@ -13,6 +13,10 @@
 
 namespace dart {
 
+namespace simulation {
+class World;
+}
+
 namespace trajectory {
 
 class AbstractShot;
@@ -57,6 +61,10 @@ public:
 
   /// This returns a copy of the trajectory rollout
   TrajectoryRollout* copy() const;
+
+  /// This formats the rollout as JSON, which can be sent to the frontend to be
+  /// parsed and displayed.
+  std::string toJson(std::shared_ptr<simulation::World> world) const;
 };
 
 class TrajectoryRolloutReal : public TrajectoryRollout

@@ -123,7 +123,7 @@ public:
       SmartPtr<trajectory::IPOptShotWrapper> ipoptProblem);
 
   /// This will attempt to run another round of optimization.
-  std::shared_ptr<OptimizationRecord> reoptimize();
+  void reoptimize();
 
 protected:
   bool mSuccess;

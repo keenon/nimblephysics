@@ -30,7 +30,7 @@ Observation ObservationLog::getClosestObservationBefore(long time)
 {
   for (int i = mObservations.size() - 1; i >= 0; i--)
   {
-    if (mObservations[i].time < time)
+    if (mObservations[i].time <= time)
       return mObservations[i];
   }
   std::cout << "WARNING: Asked for an observation before our initialization. "

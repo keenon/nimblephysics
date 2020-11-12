@@ -54,6 +54,9 @@ if(WIN32)
   set(CMAKE_INSTALL_PREFIX "C:/Golems" CACHE PATH "Install prefix" FORCE)
 endif()
 
+
+include_directories(SYSTEM "${CMAKE_SOURCE_DIR}/dart/server/external/")
+
 #===============================================================================
 # Project settings
 #===============================================================================

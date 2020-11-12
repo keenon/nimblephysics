@@ -205,9 +205,31 @@ public:
       PerformanceLog* log = nullptr)
       = 0;
 
-  /// This sets the forces in this trajectory from the passed in matrix
-  virtual void setForces(Eigen::MatrixXd forces, PerformanceLog* log = nullptr)
+  /// This sets the forces in this trajectory from the passed in matrix. This
+  /// doesn't update the knot points, or change the starting position. If you'd
+  /// like to do that, use `updateWithForces()` instead.
+  virtual void setForcesRaw(
+      Eigen::MatrixXd forces, PerformanceLog* log = nullptr)
       = 0;
+
+  /// This moves the trajectory forward in time, setting the starting point to
+  /// the new given starting point, and shifting the forces over by `steps`,
+  /// padding the remainder with 0s
+  virtual Eigen::VectorXi advanceSteps(
+      std::shared_ptr<simulation::World> world,
+      Eigen::VectorXd startPos,
+      Eigen::VectorXd startVel,
+      int steps)
+      = 0;
+
+  /// This sets the forces in this trajectory from the passed in matrix. This
+  /// updates the knot points as part of the update, and returns a mapping of
+  /// where indices moved around to, so that we can update lagrange multipliers
+  /// etc.
+  virtual Eigen::VectorXi updateWithForces(
+      std::shared_ptr<simulation::World> world,
+      Eigen::MatrixXd forces,
+      PerformanceLog* log = nullptr);
 
   const TrajectoryRollout* getRolloutCache(
       std::shared_ptr<simulation::World> world,
@@ -221,6 +243,12 @@ public:
 
   /// This returns the concatenation of (start pos, start vel) for convenience
   virtual Eigen::VectorXd getStartState() = 0;
+
+  /// This returns start pos
+  virtual Eigen::VectorXd getStartPos() = 0;
+
+  /// This returns start vel
+  virtual Eigen::VectorXd getStartVel() = 0;
 
   /// This unrolls the shot, and returns the (pos, vel) state concatenated at
   /// the end of the shot

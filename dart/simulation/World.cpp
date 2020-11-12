@@ -39,6 +39,7 @@
 #include "dart/simulation/World.hpp"
 
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -46,10 +47,12 @@
 #include "dart/common/Console.hpp"
 #include "dart/constraint/BoxedLcpConstraintSolver.hpp"
 #include "dart/constraint/ConstrainedGroup.hpp"
+#include "dart/dynamics/BoxShape.hpp"
 #include "dart/dynamics/Skeleton.hpp"
 #include "dart/integration/SemiImplicitEulerIntegrator.hpp"
 #include "dart/neural/ConstrainedGroupGradientMatrices.hpp"
 #include "dart/neural/WithRespectToMass.hpp"
+#include "dart/server/RawJsonUtils.hpp"
 
 namespace dart {
 namespace simulation {
@@ -297,6 +300,137 @@ bool World::getConstraintForceMixingEnabled()
 std::shared_ptr<neural::WithRespectToMass> World::getWrtMass()
 {
   return mWrtMass;
+}
+
+//==============================================================================
+/// This returns the world state as a JSON blob that we can render
+std::string World::toJson()
+{
+  std::stringstream json;
+
+  json << "[";
+  std::vector<dynamics::BodyNode*> bodies = getAllBodyNodes();
+  for (int i = 0; i < bodies.size(); i++)
+  {
+    auto bodyNode = bodies[i];
+    auto skel = bodyNode->getSkeleton();
+    /*
+    {
+      name: "skel.node1",
+      shapes: [
+        {
+          type: "box",
+          size: [1, 2, 3],
+          color: [1, 2, 3],
+          pos: [0, 0, 0],
+          angle: [0, 0, 0]
+        }
+      ],
+      pos: [0, 0, 0],
+      angle: [0, 0, 0]
+    }
+    */
+    json << "{";
+    std::string name = skel->getName() + "." + bodyNode->getName();
+    json << "\"name\": \"" << name << "\",";
+    json << "\"shapes\": [";
+    const std::vector<dynamics::ShapeNode*> visualShapeNodes
+        = bodyNode->getShapeNodesWith<dynamics::VisualAspect>();
+    for (int j = 0; j < visualShapeNodes.size(); j++)
+    {
+      json << "{";
+      auto shape = visualShapeNodes[j];
+      dynamics::ShapePtr shapePtr = shape->getShape();
+
+      if (shapePtr->is<dynamics::BoxShape>())
+      {
+        const auto box = static_cast<const dynamics::BoxShape*>(shapePtr.get());
+        json << "\"type\": \"box\",";
+        const Eigen::Vector3d& size = box->getSize();
+        json << "\"size\": ";
+        vec3ToJson(json, size);
+        json << ",";
+      }
+
+      dynamics::VisualAspect* visual = shape->getVisualAspect(false);
+      json << "\"color\": ";
+      vec3ToJson(json, visual->getColor());
+      json << ",";
+
+      Eigen::Vector3d relativePos = shape->getRelativeTranslation();
+      json << "\"pos\": ";
+      vec3ToJson(json, relativePos);
+      json << ",";
+
+      Eigen::Vector3d relativeAngle
+          = math::matrixToEulerXYZ(shape->getRelativeRotation());
+      json << "\"angle\": ";
+      vec3ToJson(json, relativeAngle);
+
+      json << "}";
+      if (j < visualShapeNodes.size() - 1)
+      {
+        json << ",";
+      }
+    }
+    json << "],";
+    const Eigen::Isometry3d& bodyTransform = bodyNode->getWorldTransform();
+    json << "\"pos\":";
+    vec3ToJson(json, bodyTransform.translation());
+    json << ",";
+    json << "\"angle\":";
+    vec3ToJson(json, math::matrixToEulerXYZ(bodyTransform.linear()));
+    json << "}";
+    if (i < bodies.size() - 1)
+    {
+      json << ",";
+    }
+  }
+
+  json << "]";
+
+  return json.str();
+}
+
+//==============================================================================
+/// This returns just the positions as a JSON blob that can be rendered if we
+/// already have the original world loaded. Good for real-time viewing.
+std::string World::positionsToJson()
+{
+  std::stringstream json;
+
+  json << "{";
+  std::vector<dynamics::BodyNode*> bodies = getAllBodyNodes();
+  for (int i = 0; i < bodies.size(); i++)
+  {
+    auto bodyNode = bodies[i];
+    auto skel = bodyNode->getSkeleton();
+    /*
+    {
+      "skel.node1": {
+        pos: [0, 0, 0],
+        angle: [0, 0, 0]
+      }
+    }
+    */
+    std::string name = skel->getName() + "." + bodyNode->getName();
+    json << "\"" << name << "\": {";
+    const Eigen::Isometry3d& bodyTransform = bodyNode->getWorldTransform();
+    json << "\"pos\":";
+    vec3ToJson(json, bodyTransform.translation());
+    json << ",";
+    json << "\"angle\":";
+    vec3ToJson(json, math::matrixToEulerXYZ(bodyTransform.linear()));
+    json << "}";
+    if (i < bodies.size() - 1)
+    {
+      json << ",";
+    }
+  }
+
+  json << "}";
+
+  return json.str();
 }
 
 //==============================================================================

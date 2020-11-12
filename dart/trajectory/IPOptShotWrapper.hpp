@@ -162,6 +162,10 @@ private:
   Eigen::VectorXd mBestFeasibleState;
   bool mPrintIterations;
   long mLastTimestep;
+
+  Eigen::VectorXd mSaved_zU;
+  Eigen::VectorXd mSaved_zL;
+  Eigen::VectorXd mSaved_lambda;
 };
 
 } // namespace trajectory

@@ -837,9 +837,35 @@ void SingleShot::setStates(
 
 //==============================================================================
 /// This sets the forces in this trajectory from the passed in matrix
-void SingleShot::setForces(Eigen::MatrixXd forces, PerformanceLog* log)
+void SingleShot::setForcesRaw(Eigen::MatrixXd forces, PerformanceLog* log)
 {
   mForces = forces;
+}
+
+//==============================================================================
+/// This moves the trajectory forward in time, setting the starting point to
+/// the new given starting point, and shifting the forces over by `steps`,
+/// padding the remainder with 0s
+Eigen::VectorXi SingleShot::advanceSteps(
+    std::shared_ptr<simulation::World> world,
+    Eigen::VectorXd startPos,
+    Eigen::VectorXd startVel,
+    int steps)
+{
+  Eigen::VectorXi mapping = Eigen::VectorXi::Zero(getFlatProblemDim(world));
+
+  mStartPos = startPos;
+  mStartVel = startVel;
+
+  Eigen::MatrixXd newForces = Eigen::MatrixXd::Zero(mForces.rows(), mSteps);
+  if (steps < mSteps)
+  {
+    newForces.block(0, 0, mForces.rows(), mSteps - steps)
+        = mForces.block(0, steps, mForces.rows(), mSteps - steps);
+  }
+  mForces = newForces;
+
+  return mapping;
 }
 
 //==============================================================================
@@ -852,6 +878,20 @@ Eigen::VectorXd SingleShot::getStartState()
       mMappings[mRepresentationMapping]->getVelDim())
       = mStartVel;
   return state;
+}
+
+//==============================================================================
+/// This returns start pos
+Eigen::VectorXd SingleShot::getStartPos()
+{
+  return mStartPos;
+}
+
+//==============================================================================
+/// This returns start vel
+Eigen::VectorXd SingleShot::getStartVel()
+{
+  return mStartVel;
 }
 
 //==============================================================================

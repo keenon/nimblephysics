@@ -17,6 +17,7 @@ namespace trajectory {
 class LossFn;
 class OptimizationRecord;
 class MultiShot;
+class TrajectoryRollout;
 } // namespace trajectory
 
 namespace realtime {
@@ -43,6 +44,9 @@ public:
 
   /// This calls getForce() with the current system clock as the time parameter
   Eigen::VectorXd getForceNow();
+
+  /// This can completely silence log output
+  void setSilent(bool silent);
 
   /// This records the current state of the world based on some external sensing
   /// and inference. This resets the error in our model just assuming the world
@@ -75,6 +79,14 @@ public:
   /// This stops our main thread, waits for it to finish, and then returns
   void stop();
 
+  /// This returns the main record we've been keeping of our optimization up to
+  /// this point
+  std::shared_ptr<trajectory::OptimizationRecord> getOptimizationRecord();
+
+  /// This registers a listener to get called when we finish replanning
+  void registerReplanningListener(
+      std::function<void(const trajectory::TrajectoryRollout*)> replanListener);
+
 protected:
   /// This is the function for the optimization thread to run when we're live
   void optimizationThreadLoop();
@@ -87,12 +99,17 @@ protected:
   int mMillisPerStep;
   int mSteps;
   int mShotLength;
+  long mLastOptimizedTime;
   RealTimeControlBuffer mBuffer;
   std::thread mOptimizationThread;
+  bool mSilent;
   // This is saved info so that we can reoptimize rather than create a fresh
   // problem each time
   std::shared_ptr<trajectory::OptimizationRecord> mOptimizationRecord;
   std::shared_ptr<trajectory::MultiShot> mShot;
+  // These are listeners that get called when we finish replanning
+  std::vector<std::function<void(const trajectory::TrajectoryRollout*)>>
+      mReplannedListeners;
 };
 
 } // namespace realtime

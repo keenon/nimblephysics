@@ -5,6 +5,7 @@ import View from "./View";
 import WorldDisplay from "./WorldDisplay";
 import Timeline from "./Timeline";
 import DataSelector from "./DataSelector";
+import RealtimeWorldDisplay from "./RealtimeWorldDisplay";
 
 class DARTWindow {
   scene: THREE.Scene;
@@ -13,6 +14,7 @@ class DARTWindow {
   timeline: Timeline | null;
   world: WorldDisplay | null;
   dataSelector: DataSelector | null;
+  realtimeWorld: RealtimeWorldDisplay | null;
 
   constructor(container: HTMLElement) {
     container.className += " DARTWindow";
@@ -97,6 +99,52 @@ class DARTWindow {
       }
     };
   }
+
+  /**
+   * This connects a websocket to the provided remote, so that we can get a live view of what is going on.
+   *
+   * @param url The WebsocketURL to connect to, for example "ws://localhost:8080"
+   */
+  connectLiveRemote = (url: string) => {
+    const socket = new WebSocket(url);
+
+    // Connection opened
+    socket.addEventListener("open", (event) => {
+      this.realtimeWorld = new RealtimeWorldDisplay(this.scene);
+    });
+
+    // Listen for messages
+    socket.addEventListener("message", (event) => {
+      const data: RealtimeUpdate = JSON.parse(event.data);
+      if (data.type == "init") {
+        this.realtimeWorld.initWorld(data.world);
+      } else if (data.type == "update") {
+        this.realtimeWorld.setPositions(data.timestep, data.positions);
+      } else if (data.type == "new_plan") {
+        this.realtimeWorld.displayMPCPlan(data.plan);
+      }
+    });
+
+    window.addEventListener("keydown", (e: KeyboardEvent) => {
+      const message = JSON.stringify({
+        type: "keydown",
+        key: e.key.toString(),
+      });
+      if (socket.readyState == WebSocket.OPEN) {
+        socket.send(message);
+      }
+    });
+
+    window.addEventListener("keyup", (e: KeyboardEvent) => {
+      const message = JSON.stringify({
+        type: "keyup",
+        key: e.key.toString(),
+      });
+      if (socket.readyState == WebSocket.OPEN) {
+        socket.send(message);
+      }
+    });
+  };
 
   /**
    * This loads some data remotely and registers it

@@ -30,7 +30,9 @@ class IPOptOptimizer
 public:
   IPOptOptimizer();
 
-  std::shared_ptr<OptimizationRecord> optimize(AbstractShot* shot);
+  std::shared_ptr<OptimizationRecord> optimize(
+      AbstractShot* shot,
+      std::shared_ptr<OptimizationRecord> reuseRecord = nullptr);
 
   void setIterationLimit(int iterationLimit);
 
@@ -50,6 +52,10 @@ public:
 
   void setSuppressOutput(bool suppressOutput);
 
+  void setSilenceOutput(bool silenceOutput);
+
+  void setDisableLinesearch(bool disableLinesearch);
+
 protected:
   int mIterationLimit;
   double mTolerance;
@@ -60,6 +66,8 @@ protected:
   bool mRecoverBest;
   bool mRecordFullDebugInfo;
   bool mSuppressOutput;
+  bool mSilenceOutput;
+  bool mDisableLinesearch;
 };
 
 } // namespace trajectory

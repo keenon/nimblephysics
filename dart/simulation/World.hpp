@@ -431,6 +431,13 @@ public:
   /// the world need gradients through which kinds of mass.
   std::shared_ptr<neural::WithRespectToMass> getWrtMass();
 
+  /// This returns the world state as a JSON blob that we can render
+  std::string toJson();
+
+  /// This returns just the positions as a JSON blob that can be rendered if we
+  /// already have the original world loaded. Good for real-time viewing.
+  std::string positionsToJson();
+
 protected:
   /// Register when a Skeleton's name is changed
   void handleSkeletonNameChange(
