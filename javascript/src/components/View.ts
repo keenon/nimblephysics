@@ -1,8 +1,8 @@
 import * as THREE from "three";
 
-import { EffectComposer } from "./threejs_lib/postprocessing/EffectComposer.js";
-import { SSAOPass } from "./threejs_lib/postprocessing/SSAOPass.js";
-import { OrbitControls } from "./threejs_lib/controls/OrbitControls.js";
+import { EffectComposer } from "../threejs_lib/postprocessing/EffectComposer.js";
+import { SSAOPass } from "../threejs_lib/postprocessing/SSAOPass.js";
+import { OrbitControls } from "../threejs_lib/controls/OrbitControls.js";
 
 class View {
   container: HTMLDivElement;

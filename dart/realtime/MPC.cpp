@@ -37,7 +37,8 @@ MPC::MPC(
     mMaxIterations(5),
     mEnableLinesearch(true),
     mEnableOptimizationGuards(false),
-    mRecordIterations(false)
+    mRecordIterations(false),
+    mMillisInAdvanceToPlan(0)
 {
 }
 
@@ -81,6 +82,13 @@ Eigen::VectorXd MPC::getForce(long now)
 Eigen::VectorXd MPC::getForceNow()
 {
   return getForce(timeSinceEpochMillis());
+}
+
+/// This returns how many millis we have left until we've run out of plan.
+/// This can be a negative number, if we've run past our plan.
+long MPC::getRemainingPlanBufferMillis()
+{
+  return mBuffer.getPlanBufferMillisAfter(timeSinceEpochMillis());
 }
 
 /// This can completely silence log output
@@ -150,6 +158,16 @@ void MPC::recordGroundTruthStateNow(
 /// This optimizes a block of the plan, starting at `startTime`
 void MPC::optimizePlan(long startTime)
 {
+  // We don't allow time to go backwards, because that leads to all sorts of
+  // issues. We can get called for a time before a time we already optimized
+  // for, because of dilating buffers in front of our current time. If that
+  // happens, just pretent like we were asked for the latest time we were
+  // optimizing for.
+  if (startTime < mLastOptimizedTime)
+  {
+    startTime = mLastOptimizedTime;
+  }
+
   if (mOptimizationRecord == nullptr)
   {
     PerformanceLog::initialize();
@@ -189,7 +207,9 @@ void MPC::optimizePlan(long startTime)
     mLastOptimizedTime = startTime;
 
     mBuffer.setForcePlan(
-        startTime, mShot->getRolloutCache(worldClone)->getForcesConst());
+        startTime,
+        timeSinceEpochMillis(),
+        mShot->getRolloutCache(worldClone)->getForcesConst());
 
     log->end();
 
@@ -228,16 +248,18 @@ void MPC::optimizePlan(long startTime)
     mOptimizationRecord->reoptimize();
 
     mBuffer.setForcePlan(
-        startTime, mShot->getRolloutCache(worldClone)->getForcesConst());
+        startTime,
+        timeSinceEpochMillis(),
+        mShot->getRolloutCache(worldClone)->getForcesConst());
+
+    long computeDurationWallTime
+        = timeSinceEpochMillis() - startComputeWallTime;
 
     // Call any listeners that might be waiting on us
     for (auto listener : mReplannedListeners)
     {
-      listener(mShot->getRolloutCache(worldClone));
+      listener(mShot->getRolloutCache(worldClone), computeDurationWallTime);
     }
-
-    long computeDurationWallTime
-        = timeSinceEpochMillis() - startComputeWallTime;
 
     if (!mSilent)
     {
@@ -262,6 +284,17 @@ void MPC::optimizePlan(long startTime)
 /// world in fewer steps.
 void MPC::adjustPerformance(long lastOptimizeTimeMillis)
 {
+  // This ensures that we don't "optimize our way out of sync", by letting the
+  // optimizer change forces that already happened by the time the optimization
+  // finishes, leading to us getting out of sync. Better to make our plans start
+  // into the future.
+  mMillisInAdvanceToPlan = 0.5 * lastOptimizeTimeMillis;
+  // Don't go more than 200ms into the future, cause then errors have a chance
+  // to propagate
+  if (mMillisInAdvanceToPlan > 200)
+    mMillisInAdvanceToPlan = 200;
+
+  /*
   double millisToComputeEachStep = (double)lastOptimizeTimeMillis / mSteps;
   // Our safety margin is 3x, we want to be at least 3 times as fast as real
   // time
@@ -278,6 +311,7 @@ void MPC::adjustPerformance(long lastOptimizeTimeMillis)
     mBuffer.setMillisPerStep(mMillisPerStep);
     mMillisPerStep = desiredMillisPerStep;
   }
+  */
 }
 
 /// This starts our main thread and begins running optimizations
@@ -307,7 +341,8 @@ std::shared_ptr<trajectory::OptimizationRecord> MPC::getOptimizationRecord()
 
 /// This registers a listener to get called when we finish replanning
 void MPC::registerReplanningListener(
-    std::function<void(const trajectory::TrajectoryRollout*)> replanListener)
+    std::function<void(const trajectory::TrajectoryRollout*, long)>
+        replanListener)
 {
   mReplannedListeners.push_back(replanListener);
 }
@@ -318,7 +353,7 @@ void MPC::optimizationThreadLoop()
   while (mRunning)
   {
     long startTime = timeSinceEpochMillis();
-    optimizePlan(startTime);
+    optimizePlan(startTime + mMillisInAdvanceToPlan);
     long endTime = timeSinceEpochMillis();
     adjustPerformance(endTime - startTime);
   }

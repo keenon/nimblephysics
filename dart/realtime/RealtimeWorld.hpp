@@ -4,6 +4,7 @@
 #include <functional>
 #include <memory>
 #include <thread>
+#include <unordered_map>
 #include <unordered_set>
 
 #include <Eigen/Dense>
@@ -68,6 +69,13 @@ public:
   /// they can render the MPC plan as it evolves.
   void displayMPCPlan(const trajectory::TrajectoryRollout* rollout);
 
+  /// This records a timing value, to be sent out at the next update
+  void registerTiming(
+      const std::string& key, double value, const std::string& units);
+
+  /// This generates JSON representing our current timing values
+  std::string timingsToJson();
+
 protected:
   void mainLoop();
 
@@ -90,6 +98,7 @@ protected:
   // This is a scratch world copy to use when writing MPC plans to JSON
   std::shared_ptr<simulation::World> mMPCPlanWorld;
 
+  // These handle keyboard input
   std::vector<std::function<void(std::string)>> mKeydownListeners;
   std::vector<std::function<void(std::string)>> mKeyupListeners;
   std::unordered_set<std::string> mKeysDown;
@@ -98,6 +107,10 @@ protected:
       std::shared_ptr<simulation::World>,
       std::unordered_set<std::string>)>>
       mPreStepListeners;
+
+  // This is for displaying timing graphs to the frontend
+  std::unordered_map<std::string, double> mTimings;
+  std::unordered_map<std::string, std::string> mTimingUnits;
 };
 
 } // namespace realtime

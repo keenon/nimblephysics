@@ -45,6 +45,10 @@ public:
   /// This calls getForce() with the current system clock as the time parameter
   Eigen::VectorXd getForceNow();
 
+  /// This returns how many millis we have left until we've run out of plan.
+  /// This can be a negative number, if we've run past our plan.
+  long getRemainingPlanBufferMillis();
+
   /// This can completely silence log output
   void setSilent(bool silent);
 
@@ -111,7 +115,8 @@ public:
 
   /// This registers a listener to get called when we finish replanning
   void registerReplanningListener(
-      std::function<void(const trajectory::TrajectoryRollout*)> replanListener);
+      std::function<void(const trajectory::TrajectoryRollout*, long)>
+          replanListener);
 
 protected:
   /// This is the function for the optimization thread to run when we're live
@@ -132,6 +137,7 @@ protected:
   int mSteps;
   int mShotLength;
   int mMaxIterations;
+  int mMillisInAdvanceToPlan;
   long mLastOptimizedTime;
   RealTimeControlBuffer mBuffer;
   std::thread mOptimizationThread;
@@ -141,7 +147,7 @@ protected:
   std::shared_ptr<trajectory::OptimizationRecord> mOptimizationRecord;
   std::shared_ptr<trajectory::MultiShot> mShot;
   // These are listeners that get called when we finish replanning
-  std::vector<std::function<void(const trajectory::TrajectoryRollout*)>>
+  std::vector<std::function<void(const trajectory::TrajectoryRollout*, long)>>
       mReplannedListeners;
 };
 

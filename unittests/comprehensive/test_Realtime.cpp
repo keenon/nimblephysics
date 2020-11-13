@@ -170,8 +170,8 @@ TEST(REALTIME, REALTIME_CARTPOLE)
   // 100 fps
   world->setTimeStep(1.0 / 100);
 
-  // 300 timesteps
-  int planningHorizonMillis = 300 * world->getTimeStep() * 1000;
+  // 250 timesteps
+  int planningHorizonMillis = 250 * world->getTimeStep() * 1000;
   int advanceSteps = 70;
 
   /*
@@ -272,9 +272,12 @@ TEST(REALTIME, REALTIME_CARTPOLE)
       = RealtimeWorld(realtimeUnderlyingWorld, getForces, recordState);
 
   mpc.registerReplanningListener(
-      [&](const trajectory::TrajectoryRollout* rollout) {
+      [&](const trajectory::TrajectoryRollout* rollout, long duration) {
         realtimeWorld.displayMPCPlan(rollout);
+        realtimeWorld.registerTiming("replanning", duration, "ms");
       });
+
+  mpc.setMaxIterations(10);
 
   realtimeWorld.serve(8070);
 
@@ -290,10 +293,12 @@ TEST(REALTIME, REALTIME_CARTPOLE)
                             ->getVisualAspect();
   Eigen::Vector3d originalColor = sledBodyVisual->getColor();
   realtimeWorld.registerPreStepListener(
-      [sledBodyVisual, originalColor](
+      [sledBodyVisual, originalColor, &realtimeWorld, &mpc](
           int step,
           std::shared_ptr<simulation::World> world,
           std::unordered_set<std::string> keysDown) {
+        realtimeWorld.registerTiming(
+            "buffer", mpc.getRemainingPlanBufferMillis(), "ms");
         if (keysDown.count("a"))
         {
           Eigen::VectorXd perturbedForces = world->getForces();

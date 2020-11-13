@@ -53,7 +53,7 @@ interface SetColors {
 }
 
 type RealtimeUpdate = {
-  type: "init" | "update" | "new_plan";
+  type: "init" | "update" | "new_plan" | "timings";
   // for type: "init"
   world?: BodyNode[];
   // for type: "update"
@@ -62,9 +62,20 @@ type RealtimeUpdate = {
   timestep?: number;
   // for type: "new_plan"
   plan?: WorldTrajectory;
+  // for type: "timings"
+  timings?: Timings;
 };
 
 type BodyGroupAndColor = {
   group: THREE.Group;
   color: THREE.Color;
 };
+
+type TimingValue = {
+  units: string;
+  value: number;
+};
+
+interface Timings {
+  [key: string]: TimingValue;
+}

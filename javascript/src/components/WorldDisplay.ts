@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { bodyToGroup } from "./ThreeJSUtils";
+import { bodyToGroup } from "../ThreeJSUtils";
 
 const SCALE_FACTOR = 100;
 

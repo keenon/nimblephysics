@@ -107,24 +107,82 @@ void RealTimeControlBuffer::getPlannedForcesStartingAt(
 
 /// This swaps in a new buffer of forces. The assumption is that "startAt" is
 /// before "now", because we'll erase old data in this process.
-void RealTimeControlBuffer::setForcePlan(long startAt, Eigen::MatrixXd forces)
+void RealTimeControlBuffer::setForcePlan(
+    long startAt, long now, Eigen::MatrixXd forces)
 {
-  mLastWroteBufferAt = startAt;
-  if (mActiveBuffer == UNINITIALIZED || mActiveBuffer == BUF_B)
+  if (startAt > now)
   {
-    mBufA = forces;
-    // Crucial for lock-free behavior: copy the buffer BEFORE setting the active
-    // buffer. Not a huge deal if we're a bit off here in the optimizer, but not
-    // ideal.
-    mActiveBuffer = BUF_A;
+    long padMillis = startAt - now;
+    int padSteps = (int)floor((double)padMillis / mMillisPerStep);
+    // If we're trying to set the force plan too far out in the future, this
+    // whole exercise is a no-op
+    if (padSteps >= mNumSteps)
+    {
+      return;
+    }
+    // Otherwise, we're going to copy part of the existing plan
+    int currentStep
+        = (int)floor((double)(now - mLastWroteBufferAt) / mMillisPerStep);
+    int remainingSteps = mNumSteps - currentStep;
+    mLastWroteBufferAt = now;
+
+    int copySteps = padSteps;
+    int zeroSteps = 0;
+    int useSteps = mNumSteps - padSteps;
+    if (padSteps > remainingSteps)
+    {
+      copySteps = remainingSteps;
+      zeroSteps = padSteps - remainingSteps;
+      useSteps = mNumSteps - padSteps;
+    }
+    assert(copySteps + zeroSteps + useSteps == mNumSteps);
+
+    if (mActiveBuffer == UNINITIALIZED)
+    {
+      mBufA.block(0, 0, mForceDim, copySteps).setZero();
+      mBufA.block(0, copySteps, mForceDim, zeroSteps).setZero();
+      mBufA.block(0, copySteps + zeroSteps, mForceDim, useSteps)
+          = forces.block(0, 0, mForceDim, useSteps);
+      mActiveBuffer = BUF_A;
+    }
+    else if (mActiveBuffer == BUF_B)
+    {
+      mBufA.block(0, 0, mForceDim, copySteps)
+          = mBufB.block(0, mNumSteps - copySteps, mForceDim, copySteps);
+      mBufA.block(0, copySteps, mForceDim, zeroSteps).setZero();
+      mBufA.block(0, copySteps + zeroSteps, mForceDim, useSteps)
+          = forces.block(0, 0, mForceDim, useSteps);
+      mActiveBuffer = BUF_A;
+    }
+    else if (mActiveBuffer == BUF_A)
+    {
+      mBufB.block(0, 0, mForceDim, copySteps)
+          = mBufA.block(0, mNumSteps - copySteps, mForceDim, copySteps);
+      mBufB.block(0, copySteps, mForceDim, zeroSteps).setZero();
+      mBufB.block(0, copySteps + zeroSteps, mForceDim, useSteps)
+          = forces.block(0, 0, mForceDim, useSteps);
+      mActiveBuffer = BUF_B;
+    }
   }
   else
   {
-    mBufB = forces;
-    // Crucial for lock-free behavior: copy the buffer BEFORE setting the active
-    // buffer. Not a huge deal if we're a bit off here in the optimizer, but not
-    // ideal.
-    mActiveBuffer = BUF_B;
+    mLastWroteBufferAt = startAt;
+    if (mActiveBuffer == UNINITIALIZED || mActiveBuffer == BUF_B)
+    {
+      mBufA = forces;
+      // Crucial for lock-free behavior: copy the buffer BEFORE setting the
+      // active buffer. Not a huge deal if we're a bit off here in the
+      // optimizer, but not ideal.
+      mActiveBuffer = BUF_A;
+    }
+    else
+    {
+      mBufB = forces;
+      // Crucial for lock-free behavior: copy the buffer BEFORE setting the
+      // active buffer. Not a huge deal if we're a bit off here in the
+      // optimizer, but not ideal.
+      mActiveBuffer = BUF_B;
+    }
   }
 }
 
@@ -200,6 +258,14 @@ void RealTimeControlBuffer::setNumSteps(int newNumSteps)
 
   mBufA = newBuf;
   mBufB = newBuf;
+}
+
+/// This returns the number of millis we have left in the plan after `time`.
+/// This can be a negative number.
+long RealTimeControlBuffer::getPlanBufferMillisAfter(long time)
+{
+  long planEnd = mLastWroteBufferAt + (mNumSteps * mMillisPerStep);
+  return planEnd - time;
 }
 
 /// This is a helper to rescale the timestep size of a buffer while leaving

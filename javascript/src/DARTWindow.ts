@@ -1,11 +1,12 @@
 import * as THREE from "three";
 import "./style.scss";
 
-import View from "./View";
-import WorldDisplay from "./WorldDisplay";
-import Timeline from "./Timeline";
-import DataSelector from "./DataSelector";
-import RealtimeWorldDisplay from "./RealtimeWorldDisplay";
+import View from "./components/View";
+import WorldDisplay from "./components/WorldDisplay";
+import Timeline from "./components/Timeline";
+import DataSelector from "./components/DataSelector";
+import RealtimeWorldDisplay from "./components/RealtimeWorldDisplay";
+import TimingScreen from "./components/TimingScreen";
 
 class DARTWindow {
   scene: THREE.Scene;
@@ -15,6 +16,7 @@ class DARTWindow {
   world: WorldDisplay | null;
   dataSelector: DataSelector | null;
   realtimeWorld: RealtimeWorldDisplay | null;
+  timingScreen: TimingScreen | null;
 
   constructor(container: HTMLElement) {
     container.className += " DARTWindow";
@@ -106,6 +108,8 @@ class DARTWindow {
    * @param url The WebsocketURL to connect to, for example "ws://localhost:8080"
    */
   connectLiveRemote = (url: string) => {
+    this.timingScreen = new TimingScreen(this.container);
+
     const socket = new WebSocket(url);
 
     // Connection opened
@@ -125,9 +129,18 @@ class DARTWindow {
         if (data.colors != null) {
           this.realtimeWorld.setColors(data.colors);
         }
+        if (data.timings != null) {
+          this.timingScreen.registerTimings(data.timings);
+        }
       } else if (data.type == "new_plan") {
         this.realtimeWorld.displayMPCPlan(data.plan);
+      } else if (data.type == "timings") {
+        this.timingScreen.registerTimings(data.timings);
       }
+    });
+
+    socket.addEventListener("close", () => {
+      this.timingScreen.stop();
     });
 
     window.addEventListener("keydown", (e: KeyboardEvent) => {

@@ -1,8 +1,8 @@
 import Window from "./DARTWindow";
 
-import worm_data from "./data/worm.txt";
-import cart_data from "./data/cartpole.txt";
-import realtime_data from "./data/realtime.txt";
+// import worm_data from "./data/worm.txt";
+// import cart_data from "./data/cartpole.txt";
+// import realtime_data from "./data/realtime.txt";
 
 const container = document.createElement("div");
 container.style.height = "100vh";

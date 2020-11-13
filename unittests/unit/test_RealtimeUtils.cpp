@@ -38,6 +38,7 @@
 #include <gtest/gtest.h>
 
 #include "dart/realtime/ControlLog.hpp"
+#include "dart/realtime/ObservationLog.hpp"
 #include "dart/realtime/RealTimeControlBuffer.hpp"
 #include "dart/simulation/World.hpp"
 
@@ -134,7 +135,7 @@ TEST(REALTIME, CONTROL_BUFFER)
   int dt = 5;
   RealTimeControlBuffer buffer = RealTimeControlBuffer(forceDim, steps, dt);
 
-  buffer.setForcePlan(0L, Eigen::MatrixXd::Ones(forceDim, steps) * 2);
+  buffer.setForcePlan(0L, 0L, Eigen::MatrixXd::Ones(forceDim, steps) * 2);
   EXPECT_DOUBLE_EQ(buffer.getPlannedForce(25L)(0), 2.0);
   EXPECT_DOUBLE_EQ(buffer.getPlannedForce(49L)(0), 2.0);
 }
@@ -148,7 +149,7 @@ TEST(REALTIME, CONTROL_BUFFER_OOB)
   int dt = 5;
   RealTimeControlBuffer buffer = RealTimeControlBuffer(forceDim, steps, dt);
 
-  buffer.setForcePlan(0L, Eigen::MatrixXd::Ones(forceDim, steps) * 2);
+  buffer.setForcePlan(0L, 0L, Eigen::MatrixXd::Ones(forceDim, steps) * 2);
   // This reads off the end, should print a warning and return 0s
   EXPECT_DOUBLE_EQ(buffer.getPlannedForce(50L)(0), 0.0);
 }
@@ -167,7 +168,7 @@ TEST(REALTIME, CONTROL_BUFFER_SCALE_DOWN)
   {
     plan.col(i) *= i;
   }
-  buffer.setForcePlan(0L, plan);
+  buffer.setForcePlan(0L, 0L, plan);
   buffer.setMillisPerStep(10);
   buffer.setNumSteps(5);
 
@@ -194,7 +195,7 @@ TEST(REALTIME, CONTROL_BUFFER_SCALE_UP)
   {
     plan.col(i) *= i;
   }
-  buffer.setForcePlan(0L, plan);
+  buffer.setForcePlan(0L, 0L, plan);
   buffer.setMillisPerStep(1);
 
   // Read off the lower resolution, should now jump by whole numbers
@@ -215,6 +216,134 @@ TEST(REALTIME, CONTROL_BUFFER_SCALE_UP)
 #endif
 
 #ifdef ALL_TESTS
+TEST(REALTIME, CONTROL_BUFFER_MIX)
+{
+  int forceDim = 3;
+  int steps = 10;
+  int dt = 5;
+  RealTimeControlBuffer buffer = RealTimeControlBuffer(forceDim, steps, dt);
+
+  Eigen::MatrixXd plan = Eigen::MatrixXd::Ones(forceDim, steps);
+  for (int i = 0; i < steps; i++)
+  {
+    plan.col(i) *= i;
+  }
+  buffer.setForcePlan(0L, 0L, plan);
+
+  Eigen::MatrixXd plan2 = Eigen::MatrixXd::Ones(forceDim, steps) * 2;
+  for (int i = 0; i < steps; i++)
+  {
+    plan2.col(i) *= i;
+  }
+  buffer.setForcePlan(25L, 0L, plan2);
+
+  Eigen::MatrixXd planOut = Eigen::MatrixXd::Random(forceDim, steps);
+  buffer.getPlannedForcesStartingAt(0L, planOut);
+
+  Eigen::MatrixXd expectedPlan = Eigen::MatrixXd::Ones(forceDim, steps);
+  for (int i = 0; i < 5; i++)
+  {
+    expectedPlan.col(i) *= (i + 5);
+  }
+  for (int i = 5; i < 10; i++)
+  {
+    expectedPlan.col(i) *= (i - 5) * 2;
+  }
+
+  if (!equals(planOut, expectedPlan))
+  {
+    std::cout << "Expected plan: " << std::endl << expectedPlan << std::endl;
+    std::cout << "Actual plan: " << std::endl << planOut << std::endl;
+  }
+  EXPECT_TRUE(equals(planOut, expectedPlan));
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(REALTIME, CONTROL_BUFFER_GAP)
+{
+  int forceDim = 3;
+  int steps = 10;
+  int dt = 5;
+  RealTimeControlBuffer buffer = RealTimeControlBuffer(forceDim, steps, dt);
+
+  Eigen::MatrixXd plan = Eigen::MatrixXd::Ones(forceDim, steps);
+  for (int i = 0; i < steps; i++)
+  {
+    plan.col(i) *= i;
+  }
+  buffer.setForcePlan(0L, 0L, plan);
+
+  Eigen::MatrixXd plan2 = Eigen::MatrixXd::Ones(forceDim, steps) * 2;
+  for (int i = 0; i < steps; i++)
+  {
+    plan2.col(i) *= i;
+  }
+  buffer.setForcePlan(12 * dt, 8 * dt, plan2);
+
+  Eigen::MatrixXd planOut = Eigen::MatrixXd::Random(forceDim, steps);
+  buffer.getPlannedForcesStartingAt(8 * dt, planOut);
+
+  Eigen::MatrixXd expectedPlan = Eigen::MatrixXd::Ones(forceDim, steps);
+  for (int i = 0; i < 2; i++)
+  {
+    expectedPlan.col(i) *= (i + 8);
+  }
+  for (int i = 2; i < 4; i++)
+  {
+    expectedPlan.col(i) *= 0;
+  }
+  for (int i = 4; i < 10; i++)
+  {
+    expectedPlan.col(i) *= (i - 4) * 2;
+  }
+
+  if (!equals(planOut, expectedPlan))
+  {
+    std::cout << "Expected plan: " << std::endl << expectedPlan << std::endl;
+    std::cout << "Actual plan: " << std::endl << planOut << std::endl;
+  }
+  EXPECT_TRUE(equals(planOut, expectedPlan));
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(REALTIME, CONTROL_BUFFER_MERGE_OOB)
+{
+  int forceDim = 3;
+  int steps = 10;
+  int dt = 5;
+  RealTimeControlBuffer buffer = RealTimeControlBuffer(forceDim, steps, dt);
+
+  Eigen::MatrixXd plan = Eigen::MatrixXd::Ones(forceDim, steps);
+  for (int i = 0; i < steps; i++)
+  {
+    plan.col(i) *= i;
+  }
+  buffer.setForcePlan(0L, 0L, plan);
+
+  Eigen::MatrixXd plan2 = Eigen::MatrixXd::Ones(forceDim, steps) * 2;
+  for (int i = 0; i < steps; i++)
+  {
+    plan2.col(i) *= i;
+  }
+
+  // This is out of bounds, so should be discarded
+  buffer.setForcePlan(12 * dt, 0L, plan2);
+
+  Eigen::MatrixXd planOut = Eigen::MatrixXd::Random(forceDim, steps);
+  buffer.getPlannedForcesStartingAt(0L, planOut);
+
+  if (!equals(planOut, plan))
+  {
+    std::cout << "Expected plan: " << std::endl << plan << std::endl;
+    std::cout << "Actual plan: " << std::endl << planOut << std::endl;
+  }
+  EXPECT_TRUE(equals(planOut, plan));
+}
+#endif
+
+#ifdef ALL_TESTS
 TEST(REALTIME, CONTROL_BUFFER_PLAN)
 {
   int forceDim = 3;
@@ -222,7 +351,7 @@ TEST(REALTIME, CONTROL_BUFFER_PLAN)
   int dt = 5;
   RealTimeControlBuffer buffer = RealTimeControlBuffer(forceDim, steps, dt);
 
-  buffer.setForcePlan(0L, Eigen::MatrixXd::Ones(forceDim, steps) * 2);
+  buffer.setForcePlan(0L, 0L, Eigen::MatrixXd::Ones(forceDim, steps) * 2);
 
   Eigen::MatrixXd plan = Eigen::MatrixXd::Random(forceDim, steps);
   buffer.getPlannedForcesStartingAt(25L, plan);
@@ -287,10 +416,12 @@ TEST(REALTIME, CONTROL_BUFFER_ESTIMATE)
   int steps = 100;
   int dt = world->getTimeStep() * 1000;
   RealTimeControlBuffer buffer = RealTimeControlBuffer(forceDim, steps, dt);
+  ObservationLog log = ObservationLog(
+      0L, world->getPositions(), world->getVelocities(), world->getMasses());
 
-  buffer.setForcePlan(0L, Eigen::MatrixXd::Ones(forceDim, steps) * 2);
+  buffer.setForcePlan(0L, 0L, Eigen::MatrixXd::Ones(forceDim, steps) * 2);
 
-  buffer.recordGroundTruthState(
+  log.observe(
       0L,
       Eigen::VectorXd::Zero(1),
       Eigen::VectorXd::Zero(1),
@@ -316,7 +447,7 @@ TEST(REALTIME, CONTROL_BUFFER_ESTIMATE)
   world->setPositions(Eigen::VectorXd::Random(1));
   world->setVelocities(Eigen::VectorXd::Random(1));
   // Estimate state
-  buffer.estimateWorldStateAt(world, steps * dt);
+  buffer.estimateWorldStateAt(world, &log, steps * dt);
 
   EXPECT_TRUE(equals(truePos, world->getPositions()));
   EXPECT_TRUE(equals(trueVel, world->getVelocities()));

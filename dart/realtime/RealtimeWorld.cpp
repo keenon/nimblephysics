@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <cstdlib>
+#include <sstream>
 
 #include <json/json.h>
 
@@ -181,6 +182,40 @@ void RealtimeWorld::displayMPCPlan(const trajectory::TrajectoryRollout* rollout)
   }
 }
 
+/// This records a timing value, to be sent out at the next update
+void RealtimeWorld::registerTiming(
+    const std::string& key, double value, const std::string& units)
+{
+  mTimings[key] = value;
+  mTimingUnits[key] = units;
+}
+
+/// This generates JSON representing our current timing values
+std::string RealtimeWorld::timingsToJson()
+{
+  std::stringstream json;
+
+  json << "{";
+
+  bool isFirst = true;
+  for (auto pair : mTimings)
+  {
+    if (isFirst)
+      isFirst = false;
+    else
+      json << ",";
+
+    json << "\"" << pair.first << "\": {";
+    json << "\"value\": " << pair.second << ",";
+    json << "\"units\": \"" << mTimingUnits[pair.first] << "\"";
+    json << "}";
+  }
+
+  json << "}";
+
+  return json.str();
+}
+
 void RealtimeWorld::mainLoop()
 {
   while (mRunning)
@@ -207,8 +242,8 @@ void RealtimeWorld::mainLoop()
     {
       mServer->broadcast(
           "{\"type\": \"update\", \"timestep\": " + std::to_string(mIterCount)
-          + ", \"positions\": " + mWorld->positionsToJson()
-          + ", \"colors\": " + mWorld->colorsToJson() + "}");
+          + ", \"positions\": " + mWorld->positionsToJson() + ", \"colors\": "
+          + mWorld->colorsToJson() + ", \"timings\": " + timingsToJson() + "}");
     }
 
     std::this_thread::sleep_until(x);

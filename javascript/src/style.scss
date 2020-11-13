@@ -140,4 +140,19 @@
     outline: none;
     -webkit-tap-highlight-color: rgba(255, 255, 255, 0); /* mobile webkit */
   }
+
+  .TimingScreen {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+  }
+
+  .LiveGraph__title {
+    font-size: 10px;
+    margin-bottom: 5px;
+  }
+
+  .LiveGraph__canvas {
+    background-color: rgba(125, 125, 125, 0.5);
+  }
 }

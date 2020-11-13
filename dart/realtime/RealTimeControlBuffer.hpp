@@ -40,9 +40,10 @@ public:
   void getPlannedForcesStartingAt(
       long start, Eigen::Ref<Eigen::MatrixXd> forcesOut);
 
-  /// This swaps in a new buffer of forces. The assumption is that "startAt" is
-  /// before "now", because we'll erase old data in this process.
-  void setForcePlan(long startAt, Eigen::MatrixXd forces);
+  /// This swaps in a new buffer of forces. If "startAt" is after "now", this
+  /// will copy enough of the current buffer into our updated buffer to keep the
+  /// current trajectory.
+  void setForcePlan(long startAt, long now, Eigen::MatrixXd forces);
 
   /// This retrieves the state of the world at a given time, assuming that we've
   /// been applying forces from the buffer since the last state that we fully
@@ -59,6 +60,10 @@ public:
   /// faster, but it also means we have less time to compute the buffer. This
   /// probably has a nonlinear effect on runtime.
   void setNumSteps(int numSteps);
+
+  /// This returns the number of millis we have left in the plan after `time`.
+  /// This can be a negative number.
+  long getPlanBufferMillisAfter(long time);
 
 protected:
   int mForceDim;
