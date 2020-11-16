@@ -14,7 +14,6 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
 #===============================================================================
 # common
 # math
-# integration
 # lcpsolver
 # neural
 # trajectory
@@ -34,7 +33,6 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
 # gui
 #   osg
 #     render
-# planning
 
 #===============================================================================
 # Targets - {dependency targets}, source directories, [external dependency libs]
@@ -78,7 +76,6 @@ endfunction(dart_add_core_sources)
 # Add subdirectories
 add_subdirectory(common)
 add_subdirectory(math)
-add_subdirectory(integration)
 add_subdirectory(lcpsolver)
 add_subdirectory(neural)
 add_subdirectory(trajectory)
@@ -90,7 +87,6 @@ add_subdirectory(dynamics)
 add_subdirectory(collision)
 add_subdirectory(constraint)
 add_subdirectory(simulation)
-add_subdirectory(planning) # flann
 add_subdirectory(utils) # tinyxml2, bullet
 add_subdirectory(gui) # opengl, glut, bullet
 
