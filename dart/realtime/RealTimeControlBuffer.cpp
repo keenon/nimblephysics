@@ -217,12 +217,12 @@ void RealTimeControlBuffer::estimateWorldStateAt(
     // In the future, project assuming planned forces
     if (at > mControlLog.last())
     {
-      world->setForces(getPlannedForce(at, true));
+      world->setExternalForces(getPlannedForce(at, true));
     }
     // In the past, project using known forces read from the buffer
     else
     {
-      world->setForces(mControlLog.get(at));
+      world->setExternalForces(mControlLog.get(at));
     }
     world->step();
   }

@@ -9,7 +9,7 @@
 #include "dart/dynamics/Skeleton.hpp"
 #include "dart/neural/BackpropSnapshot.hpp"
 #include "dart/neural/NeuralUtils.hpp"
-#include "dart/trajectory/AbstractShot.hpp"
+#include "dart/trajectory/Problem.hpp"
 #include "dart/trajectory/SingleShot.hpp"
 #include "dart/trajectory/TrajectoryConstants.hpp"
 
@@ -21,7 +21,7 @@ class World;
 
 namespace trajectory {
 
-class MultiShot : public AbstractShot
+class MultiShot : public Problem
 {
 public:
   MultiShot(

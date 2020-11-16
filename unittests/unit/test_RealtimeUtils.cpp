@@ -433,7 +433,7 @@ TEST(REALTIME, CONTROL_BUFFER_ESTIMATE)
 
   for (int i = 0; i < steps; i++)
   {
-    world->setForces(buffer.getPlannedForce(i * dt));
+    world->setExternalForces(buffer.getPlannedForce(i * dt));
     world->step();
   }
   Eigen::VectorXd truePos = world->getPositions();

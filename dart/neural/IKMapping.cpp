@@ -126,7 +126,7 @@ void IKMapping::setForces(
     std::shared_ptr<simulation::World> world,
     const Eigen::Ref<Eigen::VectorXd>& forces)
 {
-  world->setForces(getMappedForceToRealForceJac(world) * forces);
+  world->setExternalForces(getMappedForceToRealForceJac(world) * forces);
 }
 
 //==============================================================================
@@ -236,7 +236,7 @@ void IKMapping::getForcesInPlace(
     /* OUT */ Eigen::Ref<Eigen::VectorXd> forces)
 {
   assert(forces.size() == getForceDim());
-  forces = getRealForceToMappedForceJac(world) * world->getForces();
+  forces = getRealForceToMappedForceJac(world) * world->getExternalForces();
 }
 
 //==============================================================================

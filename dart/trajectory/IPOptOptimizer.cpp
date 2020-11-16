@@ -38,8 +38,8 @@ IPOptOptimizer::IPOptOptimizer()
 }
 
 //==============================================================================
-std::shared_ptr<OptimizationRecord> IPOptOptimizer::optimize(
-    AbstractShot* shot, std::shared_ptr<OptimizationRecord> reuseRecord)
+std::shared_ptr<Solution> IPOptOptimizer::optimize(
+    Problem* shot, std::shared_ptr<Solution> reuseRecord)
 {
   // Create an instance of the IpoptApplication
   //
@@ -95,8 +95,8 @@ std::shared_ptr<OptimizationRecord> IPOptOptimizer::optimize(
   }
   app->Options()->SetIntegerValue("watchdog_shortened_iter_trigger", 0);
 
-  std::shared_ptr<OptimizationRecord> record
-      = reuseRecord ? reuseRecord : std::make_shared<OptimizationRecord>();
+  std::shared_ptr<Solution> record
+      = reuseRecord ? reuseRecord : std::make_shared<Solution>();
   if (mRecordPerfLog)
     record->startPerfLog();
 

@@ -1009,7 +1009,7 @@ void ConstrainedGroupGradientMatrices::computeLCPOffsetClampingSubset(
          + (world->getTimeStep()
             * implicitMultiplyByInvMassMatrix(
                 world,
-                world->getForces()
+                world->getExternalForces()
                     - world->getCoriolisAndGravityAndExternalForces())));
 }
 

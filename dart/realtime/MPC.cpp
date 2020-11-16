@@ -7,7 +7,7 @@
 #include "dart/trajectory/IPOptOptimizer.hpp"
 #include "dart/trajectory/LossFn.hpp"
 #include "dart/trajectory/MultiShot.hpp"
-#include "dart/trajectory/OptimizationRecord.hpp"
+#include "dart/trajectory/Solution.hpp"
 
 namespace dart {
 
@@ -168,7 +168,7 @@ void MPC::optimizePlan(long startTime)
     startTime = mLastOptimizedTime;
   }
 
-  if (mOptimizationRecord == nullptr)
+  if (mSolution == nullptr)
   {
     PerformanceLog::initialize();
     PerformanceLog* log = PerformanceLog::startRoot("MPC loop");
@@ -201,7 +201,7 @@ void MPC::optimizePlan(long startTime)
         worldClone, *mLoss.get(), mSteps, mShotLength, false);
     mShot->setParallelOperationsEnabled(true);
 
-    mOptimizationRecord = optimizer.optimize(mShot.get());
+    mSolution = optimizer.optimize(mShot.get());
     optimizeTrack->end();
 
     mLastOptimizedTime = startTime;
@@ -245,7 +245,7 @@ void MPC::optimizePlan(long startTime)
         worldClone->getVelocities(),
         steps);
 
-    mOptimizationRecord->reoptimize();
+    mSolution->reoptimize();
 
     mBuffer.setForcePlan(
         startTime,
@@ -334,9 +334,9 @@ void MPC::stop()
 
 /// This returns the main record we've been keeping of our optimization up to
 /// this point
-std::shared_ptr<trajectory::OptimizationRecord> MPC::getOptimizationRecord()
+std::shared_ptr<trajectory::Solution> MPC::getCurrentSolution()
 {
-  return mOptimizationRecord;
+  return mSolution;
 }
 
 /// This registers a listener to get called when we finish replanning

@@ -15,7 +15,7 @@ class World;
 
 namespace trajectory {
 class LossFn;
-class OptimizationRecord;
+class Solution;
 class MultiShot;
 class TrajectoryRollout;
 } // namespace trajectory
@@ -111,7 +111,7 @@ public:
 
   /// This returns the main record we've been keeping of our optimization up to
   /// this point
-  std::shared_ptr<trajectory::OptimizationRecord> getOptimizationRecord();
+  std::shared_ptr<trajectory::Solution> getCurrentSolution();
 
   /// This registers a listener to get called when we finish replanning
   void registerReplanningListener(
@@ -144,7 +144,7 @@ protected:
   bool mSilent;
   // This is saved info so that we can reoptimize rather than create a fresh
   // problem each time
-  std::shared_ptr<trajectory::OptimizationRecord> mOptimizationRecord;
+  std::shared_ptr<trajectory::Solution> mSolution;
   std::shared_ptr<trajectory::MultiShot> mShot;
   // These are listeners that get called when we finish replanning
   std::vector<std::function<void(const trajectory::TrajectoryRollout*, long)>>

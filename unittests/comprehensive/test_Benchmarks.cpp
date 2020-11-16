@@ -55,11 +55,11 @@
 #include "dart/neural/RestorableSnapshot.hpp"
 #include "dart/performance/PerformanceLog.hpp"
 #include "dart/simulation/World.hpp"
-#include "dart/trajectory/AbstractShot.hpp"
 #include "dart/trajectory/IPOptOptimizer.hpp"
 #include "dart/trajectory/MultiShot.hpp"
-#include "dart/trajectory/OptimizationRecord.hpp"
+#include "dart/trajectory/Problem.hpp"
 #include "dart/trajectory/SingleShot.hpp"
+#include "dart/trajectory/Solution.hpp"
 #include "dart/trajectory/TrajectoryConstants.hpp"
 #include "dart/trajectory/TrajectoryRollout.hpp"
 
@@ -91,7 +91,7 @@ bool verifyMultiShotOptimization(WorldPtr world, MultiShot shot)
 
   optimizer.setIterationLimit(100);
   optimizer.setRecordPerformanceLog(true);
-  std::shared_ptr<OptimizationRecord> record = optimizer.optimize(&shot);
+  std::shared_ptr<Solution> record = optimizer.optimize(&shot);
   EXPECT_TRUE(record->getNumSteps() == 101);
   EXPECT_TRUE(record->getStep(0).index == 0);
   EXPECT_TRUE(record->getStep(1).index == 1);

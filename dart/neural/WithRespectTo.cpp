@@ -133,7 +133,7 @@ WithRespectToForce::WithRespectToForce()
 /// This returns this WRT from the world as a vector
 Eigen::VectorXd WithRespectToForce::get(simulation::World* world)
 {
-  return world->getForces();
+  return world->getExternalForces();
 }
 
 /// This returns this WRT from the world as a vector
@@ -145,7 +145,7 @@ Eigen::VectorXd WithRespectToForce::get(dynamics::Skeleton* skel)
 /// This sets the world's state based on our WRT
 void WithRespectToForce::set(simulation::World* world, Eigen::VectorXd value)
 {
-  world->setForces(value);
+  world->setExternalForces(value);
 }
 
 /// This sets the world's state based on our WRT
@@ -170,14 +170,14 @@ int WithRespectToForce::dim(dynamics::Skeleton* skel)
 /// world
 Eigen::VectorXd WithRespectToForce::upperBound(simulation::World* world)
 {
-  return world->getForceUpperLimits();
+  return world->getExternalForceUpperLimits();
 }
 
 /// This gives a vector of lower bound values for this WRT, given state in the
 /// world
 Eigen::VectorXd WithRespectToForce::lowerBound(simulation::World* world)
 {
-  return world->getForceLowerLimits();
+  return world->getExternalForceLowerLimits();
 }
 
 } // namespace neural

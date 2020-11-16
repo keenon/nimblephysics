@@ -30,7 +30,7 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <dart/trajectory/AbstractShot.hpp>
+#include <dart/trajectory/Problem.hpp>
 #include <dart/trajectory/MultiShot.hpp>
 #include <dart/trajectory/TrajectoryConstants.hpp>
 #include <pybind11/eigen.h>

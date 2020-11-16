@@ -31,7 +31,7 @@
  */
 
 #include <dart/simulation/World.hpp>
-#include <dart/trajectory/AbstractShot.hpp>
+#include <dart/trajectory/Problem.hpp>
 #include <pybind11/eigen.h>
 #include <pybind11/pybind11.h>
 
@@ -226,80 +226,76 @@ TimestepJacobians finiteDifferenceStartStateJacobians(
 
 void AbstractShot(py::module& m)
 {
-  ::py::class_<dart::trajectory::AbstractShot>(m, "AbstractShot")
-      .def(
-          "setLoss",
-          &dart::trajectory::AbstractShot::setLoss,
-          ::py::arg("loss"))
+  ::py::class_<dart::trajectory::Problem>(m, "AbstractShot")
+      .def("setLoss", &dart::trajectory::Problem::setLoss, ::py::arg("loss"))
       .def(
           "addConstraint",
-          &dart::trajectory::AbstractShot::addConstraint,
+          &dart::trajectory::Problem::addConstraint,
           ::py::arg("constraint"))
       .def(
           "pinForce",
-          &dart::trajectory::AbstractShot::pinForce,
+          &dart::trajectory::Problem::pinForce,
           ::py::arg("time"),
           ::py::arg("value"))
       .def(
           "getPinnedForce",
-          &dart::trajectory::AbstractShot::getPinnedForce,
+          &dart::trajectory::Problem::getPinnedForce,
           ::py::arg("time"))
       .def(
           "switchRepresentationMapping",
-          &dart::trajectory::AbstractShot::switchRepresentationMapping,
+          &dart::trajectory::Problem::switchRepresentationMapping,
           ::py::arg("world"),
           ::py::arg("representation"),
           ::py::arg("perfLog") = nullptr)
       .def(
           "addMapping",
-          &dart::trajectory::AbstractShot::addMapping,
+          &dart::trajectory::Problem::addMapping,
           ::py::arg("key"),
           ::py::arg("mapping"))
       .def(
           "hasMapping",
-          &dart::trajectory::AbstractShot::hasMapping,
+          &dart::trajectory::Problem::hasMapping,
           ::py::arg("key"))
       .def(
           "getMapping",
-          &dart::trajectory::AbstractShot::getMapping,
+          &dart::trajectory::Problem::getMapping,
           ::py::arg("key"))
-      .def("getMappings", &dart::trajectory::AbstractShot::getMappings)
+      .def("getMappings", &dart::trajectory::Problem::getMappings)
       .def(
           "removeMapping",
-          &dart::trajectory::AbstractShot::removeMapping,
+          &dart::trajectory::Problem::removeMapping,
           ::py::arg("key"))
       .def(
           "getRepresentationStateSize",
-          &dart::trajectory::AbstractShot::getRepresentationStateSize)
+          &dart::trajectory::Problem::getRepresentationStateSize)
       .def(
           "getRepresentationName",
-          &dart::trajectory::AbstractShot::getRepresentationName)
+          &dart::trajectory::Problem::getRepresentationName)
       .def(
           "getFlatProblemDim",
-          &dart::trajectory::AbstractShot::getFlatProblemDim,
+          &dart::trajectory::Problem::getFlatProblemDim,
           ::py::arg("world"))
-      .def(
-          "getConstraintDim", &dart::trajectory::AbstractShot::getConstraintDim)
-      .def("getStartState", &dart::trajectory::AbstractShot::getStartState)
+      .def("getConstraintDim", &dart::trajectory::Problem::getConstraintDim)
+      .def("getStartState", &dart::trajectory::Problem::getStartState)
       .def(
           "getFinalState",
-          &dart::trajectory::AbstractShot::getFinalState,
+          &dart::trajectory::Problem::getFinalState,
           ::py::arg("world"),
           ::py::arg("perfLog") = nullptr)
-      .def("getNumSteps", &dart::trajectory::AbstractShot::getNumSteps)
+      .def("getNumSteps", &dart::trajectory::Problem::getNumSteps)
       .def(
           "getFlatDimName",
-          &dart::trajectory::AbstractShot::getFlatDimName,
+          &dart::trajectory::Problem::getFlatDimName,
           ::py::arg("world"),
           ::py::arg("dim"))
       .def(
           "getLoss",
-          &dart::trajectory::AbstractShot::getLoss,
+          &dart::trajectory::Problem::getLoss,
           ::py::arg("world"),
           ::py::arg("perfLog") = nullptr)
       .def(
           "getRolloutCache",
-          &dart::trajectory::AbstractShot::getRolloutCache,
+          &dart::trajectory::Problem::getRolloutCache,
           ::py::arg("world"),
           ::py::arg("perfLog") = nullptr,
           ::py::arg("useKnots") = true,

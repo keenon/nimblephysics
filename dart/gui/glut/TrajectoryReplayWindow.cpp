@@ -44,7 +44,7 @@
 
 #include "dart/gui/glut/glut.hpp"
 #include "dart/simulation/World.hpp"
-#include "dart/trajectory/AbstractShot.hpp"
+#include "dart/trajectory/Problem.hpp"
 #include "dart/trajectory/TrajectoryRollout.hpp"
 
 namespace dart {
@@ -52,7 +52,7 @@ namespace gui {
 namespace glut {
 
 TrajectoryReplayWindow::TrajectoryReplayWindow(
-    std::shared_ptr<simulation::World> world, trajectory::AbstractShot* shot)
+    std::shared_ptr<simulation::World> world, trajectory::Problem* shot)
   : SimWindow()
 {
   mCounter = 0;
@@ -94,7 +94,7 @@ void TrajectoryReplayWindow::timeStepping()
 
 //==============================================================================
 void displayTrajectoryInGUI(
-    std::shared_ptr<simulation::World> world, trajectory::AbstractShot* shot)
+    std::shared_ptr<simulation::World> world, trajectory::Problem* shot)
 {
   // Create a window for rendering the world and handling user input
   TrajectoryReplayWindow window(world, shot);

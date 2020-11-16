@@ -26,7 +26,7 @@ MultiShot::MultiShot(
     int steps,
     int shotLength,
     bool tuneStartingState)
-  : AbstractShot(world, loss, steps), mParallelOperationsEnabled(false)
+  : Problem(world, loss, steps), mParallelOperationsEnabled(false)
 {
   mShotLength = shotLength;
   mTuneStartingState = tuneStartingState;
@@ -99,7 +99,7 @@ void MultiShot::switchRepresentationMapping(
   {
     shot->switchRepresentationMapping(world, mapping, thisLog);
   }
-  AbstractShot::switchRepresentationMapping(world, mapping, thisLog);
+  Problem::switchRepresentationMapping(world, mapping, thisLog);
 
 #ifdef LOG_PERFORMANCE_MULTI_SHOT
   if (thisLog != nullptr)
@@ -117,7 +117,7 @@ void MultiShot::switchRepresentationMapping(
 void MultiShot::addMapping(
     const std::string& key, std::shared_ptr<neural::Mapping> mapping)
 {
-  AbstractShot::addMapping(key, mapping);
+  Problem::addMapping(key, mapping);
   for (const std::shared_ptr<SingleShot> shot : mShots)
   {
     shot->addMapping(key, mapping);
@@ -128,7 +128,7 @@ void MultiShot::addMapping(
 /// This removes the loss mapping at a particular key
 void MultiShot::removeMapping(const std::string& key)
 {
-  AbstractShot::removeMapping(key);
+  Problem::removeMapping(key);
   for (const std::shared_ptr<SingleShot> shot : mShots)
   {
     shot->removeMapping(key);
@@ -189,7 +189,7 @@ int MultiShot::getFlatDynamicProblemDim(
 /// Returns the length of the knot-point constraint vector
 int MultiShot::getConstraintDim() const
 {
-  return AbstractShot::getConstraintDim()
+  return Problem::getConstraintDim()
          + getRepresentationStateSize() * (mShots.size() - 1);
 }
 
@@ -209,8 +209,8 @@ void MultiShot::computeConstraints(
 #endif
 
   int cursor = 0;
-  int numParentConstraints = AbstractShot::getConstraintDim();
-  AbstractShot::computeConstraints(
+  int numParentConstraints = Problem::getConstraintDim();
+  Problem::computeConstraints(
       world, constraints.segment(0, numParentConstraints), thisLog);
   cursor += numParentConstraints;
 
@@ -317,9 +317,9 @@ void MultiShot::unflatten(
 #endif
 
   // Set any static values on the main world that's been passed in
-  int abstractNumDynamic = AbstractShot::getFlatDynamicProblemDim(world);
-  int abstractNumStatic = AbstractShot::getFlatStaticProblemDim(world);
-  AbstractShot::unflatten(
+  int abstractNumDynamic = Problem::getFlatDynamicProblemDim(world);
+  int abstractNumStatic = Problem::getFlatStaticProblemDim(world);
+  Problem::unflatten(
       world,
       flatStatic.segment(0, abstractNumStatic),
       flatDynamic.segment(0, abstractNumDynamic),
@@ -431,8 +431,8 @@ void MultiShot::getConstraintUpperBounds(
 #endif
 
   flat.setZero();
-  AbstractShot::getConstraintUpperBounds(
-      flat.segment(0, AbstractShot::getConstraintDim()), thisLog);
+  Problem::getConstraintUpperBounds(
+      flat.segment(0, Problem::getConstraintDim()), thisLog);
 
 #ifdef LOG_PERFORMANCE_MULTI_SHOT
   if (thisLog != nullptr)
@@ -457,8 +457,8 @@ void MultiShot::getConstraintLowerBounds(
 #endif
 
   flat.setZero();
-  AbstractShot::getConstraintLowerBounds(
-      flat.segment(0, AbstractShot::getConstraintDim()), thisLog);
+  Problem::getConstraintLowerBounds(
+      flat.segment(0, Problem::getConstraintDim()), thisLog);
 
 #ifdef LOG_PERFORMANCE_MULTI_SHOT
   if (thisLog != nullptr)
@@ -532,10 +532,10 @@ void MultiShot::backpropJacobian(
   jacDynamic.setZero();
 
   // Handle custom constraints
-  int numParentConstraints = AbstractShot::getConstraintDim();
+  int numParentConstraints = Problem::getConstraintDim();
   int staticDim = getFlatStaticProblemDim(world);
   int dynamicDim = getFlatDynamicProblemDim(world);
-  AbstractShot::backpropJacobian(
+  Problem::backpropJacobian(
       world,
       jacStatic.block(0, 0, numParentConstraints, staticDim),
       jacDynamic.block(0, 0, numParentConstraints, dynamicDim),
@@ -631,7 +631,7 @@ void MultiShot::asyncPartBackpropJacobian(
 int MultiShot::getNumberNonZeroJacobianStatic(
     std::shared_ptr<simulation::World> world)
 {
-  int nnzj = AbstractShot::getNumberNonZeroJacobianStatic(world);
+  int nnzj = Problem::getNumberNonZeroJacobianStatic(world);
 
   int stateDim = getRepresentationStateSize();
   int staticDim = getFlatStaticProblemDim(world);
@@ -645,7 +645,7 @@ int MultiShot::getNumberNonZeroJacobianStatic(
 int MultiShot::getNumberNonZeroJacobianDynamic(
     std::shared_ptr<simulation::World> world)
 {
-  int nnzj = AbstractShot::getNumberNonZeroJacobianDynamic(world);
+  int nnzj = Problem::getNumberNonZeroJacobianDynamic(world);
 
   int stateDim = getRepresentationStateSize();
   int staticDim = getFlatStaticProblemDim(world);
@@ -684,13 +684,13 @@ void MultiShot::getJacobianSparsityStructureStatic(
   int stateDim = getRepresentationStateSize();
 
   // Handle custom constraints
-  int abstractNnzj = AbstractShot::getNumberNonZeroJacobianStatic(world);
-  AbstractShot::getJacobianSparsityStructureStatic(
+  int abstractNnzj = Problem::getNumberNonZeroJacobianStatic(world);
+  Problem::getJacobianSparsityStructureStatic(
       world,
       rows.segment(0, abstractNnzj),
       cols.segment(0, abstractNnzj),
       thisLog);
-  rowCursor += AbstractShot::getConstraintDim();
+  rowCursor += Problem::getConstraintDim();
   sparseCursor += abstractNnzj;
 
   // Handle the static data, in row-major order
@@ -731,13 +731,13 @@ void MultiShot::getJacobianSparsityStructureDynamic(
   int stateDim = getRepresentationStateSize();
 
   // Handle custom constraints
-  int abstractNnzj = AbstractShot::getNumberNonZeroJacobianDynamic(world);
-  AbstractShot::getJacobianSparsityStructureDynamic(
+  int abstractNnzj = Problem::getNumberNonZeroJacobianDynamic(world);
+  Problem::getJacobianSparsityStructureDynamic(
       world,
       rows.segment(0, abstractNnzj),
       cols.segment(0, abstractNnzj),
       thisLog);
-  rowCursor += AbstractShot::getConstraintDim();
+  rowCursor += Problem::getConstraintDim();
   sparseCursor += abstractNnzj;
 
   // Handle knot point constraints
@@ -789,10 +789,10 @@ void MultiShot::getSparseJacobian(
   }
 #endif
 
-  int cursorStatic = AbstractShot::getNumberNonZeroJacobianStatic(world);
-  int cursorDynamic = AbstractShot::getNumberNonZeroJacobianDynamic(world);
+  int cursorStatic = Problem::getNumberNonZeroJacobianStatic(world);
+  int cursorDynamic = Problem::getNumberNonZeroJacobianDynamic(world);
 
-  AbstractShot::getSparseJacobian(
+  Problem::getSparseJacobian(
       world,
       sparseStatic.segment(0, cursorStatic),
       sparseDynamic.segment(0, cursorDynamic),
@@ -1113,11 +1113,11 @@ Eigen::VectorXi MultiShot::advanceSteps(
         int t = cursor + j;
         if (t < rollout->getForcesConst().cols())
         {
-          world->setForces(rollout->getForcesConst().col(t));
+          world->setExternalForces(rollout->getForcesConst().col(t));
         }
         else
         {
-          world->setForces(Eigen::VectorXd::Zero(world->getNumDofs()));
+          world->setExternalForces(Eigen::VectorXd::Zero(world->getNumDofs()));
         }
         world->step();
       }

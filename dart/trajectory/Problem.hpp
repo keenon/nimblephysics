@@ -25,17 +25,16 @@ class World;
 
 namespace trajectory {
 
-class AbstractShot
+class Problem
 {
 public:
   friend class IPOptShotWrapper;
 
   /// Default constructor
-  AbstractShot(
-      std::shared_ptr<simulation::World> world, LossFn loss, int steps);
+  Problem(std::shared_ptr<simulation::World> world, LossFn loss, int steps);
 
   /// Abstract destructor
-  virtual ~AbstractShot();
+  virtual ~Problem();
 
   /// This prevents a force from changing in optimization, keeping it fixed at a
   /// specified value.

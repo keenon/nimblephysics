@@ -7,7 +7,7 @@
 #include "dart/neural/RestorableSnapshot.hpp"
 #include "dart/server/RawJsonUtils.hpp"
 #include "dart/simulation/World.hpp"
-#include "dart/trajectory/AbstractShot.hpp"
+#include "dart/trajectory/Problem.hpp"
 
 using namespace dart;
 
@@ -136,7 +136,7 @@ TrajectoryRolloutReal::TrajectoryRolloutReal(
 }
 
 //==============================================================================
-TrajectoryRolloutReal::TrajectoryRolloutReal(AbstractShot* shot)
+TrajectoryRolloutReal::TrajectoryRolloutReal(Problem* shot)
   : TrajectoryRolloutReal(
       shot->getMappings(),
       shot->getNumSteps(),

@@ -304,16 +304,16 @@ TEST(REALTIME, REALTIME_CARTPOLE)
             "buffer", mpc.getRemainingPlanBufferMillis(), "ms");
         if (keysDown.count("a"))
         {
-          Eigen::VectorXd perturbedForces = world->getForces();
+          Eigen::VectorXd perturbedForces = world->getExternalForces();
           perturbedForces(0) = -15.0;
-          world->setForces(perturbedForces);
+          world->setExternalForces(perturbedForces);
           sledBodyVisual->setColor(Eigen::Vector3d(1, 0, 0));
         }
         else if (keysDown.count("e"))
         {
-          Eigen::VectorXd perturbedForces = world->getForces();
+          Eigen::VectorXd perturbedForces = world->getExternalForces();
           perturbedForces(0) = 15.0;
-          world->setForces(perturbedForces);
+          world->setExternalForces(perturbedForces);
           sledBodyVisual->setColor(Eigen::Vector3d(0, 1, 0));
         }
         else

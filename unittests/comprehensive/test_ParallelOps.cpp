@@ -53,9 +53,9 @@
 #include "dart/neural/NeuralUtils.hpp"
 #include "dart/neural/RestorableSnapshot.hpp"
 #include "dart/simulation/World.hpp"
-#include "dart/trajectory/AbstractShot.hpp"
 #include "dart/trajectory/IPOptOptimizer.hpp"
 #include "dart/trajectory/MultiShot.hpp"
+#include "dart/trajectory/Problem.hpp"
 #include "dart/trajectory/SingleShot.hpp"
 #include "dart/trajectory/TrajectoryConstants.hpp"
 #include "dart/trajectory/TrajectoryRollout.hpp"
@@ -388,10 +388,10 @@ TEST(TRAJECTORY, JUMP_WORM)
   IPOptOptimizer optimizer = IPOptOptimizer();
 
   optimizer.setIterationLimit(50);
-  std::shared_ptr<OptimizationRecord> record = optimizer.optimize(&shot);
+  std::shared_ptr<Solution> record = optimizer.optimize(&shot);
 
   // shot.setParallelOperationsEnabled(true);
-  std::shared_ptr<OptimizationRecord> record2 = optimizer.optimize(&shot2);
+  std::shared_ptr<Solution> record2 = optimizer.optimize(&shot2);
 
   double loss1 = shot.getLoss(world);
   double loss2 = shot2.getLoss(world);
@@ -457,7 +457,7 @@ TEST(TRAJECTORY, JUMP_WORM)
       RestorableSnapshot snapshot(world);
       world->setPositions(b1->getPreStepPosition());
       world->setVelocities(b1->getPreStepVelocity());
-      world->setForces(b1->getPreStepTorques());
+      world->setExternalForces(b1->getPreStepTorques());
 
       Eigen::MatrixXd A_c1 = b1->getClampingConstraintMatrix(world);
       Eigen::MatrixXd A_ub1 = b1->getUpperBoundConstraintMatrix(world);
@@ -474,7 +474,7 @@ TEST(TRAJECTORY, JUMP_WORM)
         std::cout << "   A_c_ub_E off" << std::endl;
       }
 
-      Eigen::VectorXd tau = world->getForces();
+      Eigen::VectorXd tau = world->getExternalForces();
       Eigen::VectorXd C = world->getCoriolisAndGravityAndExternalForces();
       Eigen::VectorXd f_c1 = b1->getClampingConstraintImpulses();
       Eigen::VectorXd f_c2 = b2->getClampingConstraintImpulses();

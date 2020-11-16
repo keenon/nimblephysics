@@ -8,8 +8,9 @@
 #include <coin/IpIpoptApplication.hpp>
 #include <coin/IpTNLP.hpp>
 
-#include "dart/trajectory/AbstractShot.hpp"
-#include "dart/trajectory/OptimizationRecord.hpp"
+#include "dart/trajectory/Optimizer.hpp"
+#include "dart/trajectory/Problem.hpp"
+#include "dart/trajectory/Solution.hpp"
 #include "dart/trajectory/TrajectoryConstants.hpp"
 
 namespace dart {
@@ -25,14 +26,13 @@ namespace trajectory {
  * to create a buffer that's possible for IPOPT to own without freeing the
  * underlying trajectory when it's done.
  */
-class IPOptOptimizer
+class IPOptOptimizer : Optimizer
 {
 public:
   IPOptOptimizer();
 
-  std::shared_ptr<OptimizationRecord> optimize(
-      AbstractShot* shot,
-      std::shared_ptr<OptimizationRecord> reuseRecord = nullptr);
+  std::shared_ptr<Solution> optimize(
+      Problem* shot, std::shared_ptr<Solution> warmStart = nullptr) override;
 
   void setIterationLimit(int iterationLimit);
 

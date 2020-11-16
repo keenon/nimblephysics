@@ -651,7 +651,7 @@ VelocityTest runVelocityTest(WorldPtr world)
   Eigen::MatrixXd A_ub = classicPtr->getUpperBoundConstraintMatrix(world);
   Eigen::MatrixXd E = classicPtr->getUpperBoundMappingMatrix();
   Eigen::MatrixXd A_c_ub_E = A_c + A_ub * E;
-  Eigen::VectorXd tau = world->getForces();
+  Eigen::VectorXd tau = world->getExternalForces();
   double dt = world->getTimeStep();
 
   Eigen::MatrixXd Minv = world->getInvMassMatrix();
@@ -798,7 +798,7 @@ bool verifyScratch(WorldPtr world, WithRespectTo* wrt)
   {
     std::cout << "Velocity not preserved!" << std::endl;
   }
-  if (!equals(world->getForces(), classicPtr->getPreStepTorques()))
+  if (!equals(world->getExternalForces(), classicPtr->getPreStepTorques()))
   {
     std::cout << "Force not preserved!" << std::endl;
   }
@@ -1429,7 +1429,7 @@ LossGradient computeBruteForceGradient(
 
   Eigen::VectorXd originalPos = world->getPositions();
   Eigen::VectorXd originalVel = world->getVelocities();
-  Eigen::VectorXd originalForce = world->getForces();
+  Eigen::VectorXd originalForce = world->getExternalForces();
 
   double EPSILON = 1e-7;
 
@@ -1457,7 +1457,7 @@ LossGradient computeBruteForceGradient(
     tweakedForce(i) += EPSILON;
 
     snapshot.restore();
-    world->setForces(tweakedForce);
+    world->setExternalForces(tweakedForce);
     for (std::size_t k = 0; k < timesteps; k++)
       world->step(true);
     grad.lossWrtTorque(i) = (loss(world) - defaultLoss) / EPSILON;
@@ -1977,7 +1977,7 @@ Eigen::VectorXd getTestComponentWorld(
   else if (component == MappingTestComponent::VELOCITY)
     return world->getVelocities();
   else if (component == MappingTestComponent::FORCE)
-    return world->getForces();
+    return world->getExternalForces();
   else
     assert(false && "Unrecognized component value in getTestComponent()");
 }
@@ -1990,7 +1990,7 @@ void setTestComponentWorld(
   else if (component == MappingTestComponent::VELOCITY)
     world->setVelocities(val);
   else if (component == MappingTestComponent::FORCE)
-    world->setForces(val);
+    world->setExternalForces(val);
   else
     assert(false && "Unrecognized component value in getTestComponent()");
 }
@@ -4093,7 +4093,7 @@ bool verifyNoMultistepIntereference(WorldPtr world, int steps)
 
   clean->setPositions(world->getPositions());
   clean->setVelocities(world->getVelocities());
-  clean->setForces(world->getForces());
+  clean->setExternalForces(world->getExternalForces());
 
   BackpropSnapshotPtr dirtyPtr = neural::forwardPass(world);
   BackpropSnapshotPtr cleanPtr = neural::forwardPass(clean);

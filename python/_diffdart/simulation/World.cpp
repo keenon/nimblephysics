@@ -277,9 +277,9 @@ void World(py::module& m)
             return self->getVelocities();
           })
       .def(
-          "getForces",
+          "getExternalForces",
           +[](dart::simulation::World* self) -> Eigen::VectorXd {
-            return self->getForces();
+            return self->getExternalForces();
           })
       .def(
           "getMasses",
@@ -289,12 +289,12 @@ void World(py::module& m)
       .def(
           "getForceUpperLimits",
           +[](dart::simulation::World* self) -> Eigen::VectorXd {
-            return self->getForceUpperLimits();
+            return self->getExternalForceUpperLimits();
           })
       .def(
-          "getForceLowerLimits",
+          "getExternalForceLowerLimits",
           +[](dart::simulation::World* self) -> Eigen::VectorXd {
-            return self->getForceLowerLimits();
+            return self->getExternalForceLowerLimits();
           })
       .def(
           "getPositionLowerLimits",
@@ -335,9 +335,9 @@ void World(py::module& m)
           +[](dart::simulation::World* self, Eigen::VectorXd velocities)
               -> void { self->setVelocities(velocities); })
       .def(
-          "setForces",
+          "setExternalForces",
           +[](dart::simulation::World* self, Eigen::VectorXd forces) -> void {
-            self->setForces(forces);
+            self->setExternalForces(forces);
           })
       .def(
           "setMasses",
@@ -345,14 +345,14 @@ void World(py::module& m)
             self->setMasses(forces);
           })
       .def(
-          "setForcesUpperLimits",
+          "setExternalForcesUpperLimits",
           +[](dart::simulation::World* self, Eigen::VectorXd limits) -> void {
-            self->setForceUpperLimits(limits);
+            self->setExternalForceUpperLimits(limits);
           })
       .def(
-          "setForcesLowerLimits",
+          "setExternalForcesLowerLimits",
           +[](dart::simulation::World* self, Eigen::VectorXd limits) -> void {
-            self->setForceLowerLimits(limits);
+            self->setExternalForceLowerLimits(limits);
           })
       .def(
           "setPositionUpperLimits",

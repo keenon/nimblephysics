@@ -8,7 +8,7 @@
 #include <coin/IpIpoptApplication.hpp>
 #include <coin/IpTNLP.hpp>
 
-#include "dart/trajectory/AbstractShot.hpp"
+#include "dart/trajectory/Problem.hpp"
 #include "dart/trajectory/TrajectoryConstants.hpp"
 
 namespace dart {
@@ -19,7 +19,7 @@ class World;
 
 namespace trajectory {
 
-class OptimizationRecord;
+class Solution;
 
 /*
  * IPOPT wants to own the trajectories it's trying to optimize, so we need a way
@@ -30,8 +30,8 @@ class IPOptShotWrapper : public Ipopt::TNLP
 {
 public:
   IPOptShotWrapper(
-      AbstractShot* wrapped,
-      std::shared_ptr<OptimizationRecord> record,
+      Problem* wrapped,
+      std::shared_ptr<Solution> record,
       bool recoverBest = true,
       bool recordFullDebugInfo = false,
       bool printIterations = false,
@@ -180,8 +180,8 @@ public:
   void reset_iteration();
 
 private:
-  AbstractShot* mWrapped;
-  std::shared_ptr<OptimizationRecord> mRecord;
+  Problem* mWrapped;
+  std::shared_ptr<Solution> mRecord;
   bool mRecoverBest;
   bool mRecordFullDebugInfo;
   bool mRecordIterations;

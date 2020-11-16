@@ -1,4 +1,4 @@
-#include "dart/trajectory/OptimizationRecord.hpp"
+#include "dart/trajectory/Solution.hpp"
 
 #include <sstream>
 #include <unordered_map>
@@ -19,20 +19,20 @@ namespace dart {
 namespace trajectory {
 
 //==============================================================================
-OptimizationRecord::OptimizationRecord() : mSuccess(false), mPerfLog(nullptr)
+Solution::Solution() : mSuccess(false), mPerfLog(nullptr)
 {
 }
 
 //==============================================================================
 /// This returns a reference to the PerformanceLog for this Optimization
-void OptimizationRecord::startPerfLog()
+void Solution::startPerfLog()
 {
   mPerfLog = performance::PerformanceLog::startRoot("IPOptOptimizer.optimize");
 }
 
 //==============================================================================
 /// This returns a reference to the PerformanceLog for this Optimization
-performance::PerformanceLog* OptimizationRecord::getPerfLog()
+performance::PerformanceLog* Solution::getPerfLog()
 {
   return mPerfLog;
 }
@@ -40,7 +40,7 @@ performance::PerformanceLog* OptimizationRecord::getPerfLog()
 //==============================================================================
 /// This gets the x's we've recorded. This will be empty unless we've
 /// called optimizer.setRecordFullDebugInfo(true)
-std::vector<Eigen::VectorXd>& OptimizationRecord::getXs()
+std::vector<Eigen::VectorXd>& Solution::getXs()
 {
   return mXs;
 }
@@ -48,7 +48,7 @@ std::vector<Eigen::VectorXd>& OptimizationRecord::getXs()
 //==============================================================================
 /// This gets the losses we've recorded. This will be empty unless we've
 /// called optimizer.setRecordFullDebugInfo(true)
-std::vector<double>& OptimizationRecord::getLosses()
+std::vector<double>& Solution::getLosses()
 {
   return mLosses;
 }
@@ -56,7 +56,7 @@ std::vector<double>& OptimizationRecord::getLosses()
 //==============================================================================
 /// This gets the gradients we've recorded. This will be empty unless we've
 /// called optimizer.setRecordFullDebugInfo(true)
-std::vector<Eigen::VectorXd>& OptimizationRecord::getGradients()
+std::vector<Eigen::VectorXd>& Solution::getGradients()
 {
   return mGradients;
 }
@@ -64,7 +64,7 @@ std::vector<Eigen::VectorXd>& OptimizationRecord::getGradients()
 //==============================================================================
 /// This gets the gradients we've recorded. This will be empty unless we've
 /// called optimizer.setRecordFullDebugInfo(true)
-std::vector<Eigen::VectorXd>& OptimizationRecord::getConstraintValues()
+std::vector<Eigen::VectorXd>& Solution::getConstraintValues()
 {
   return mConstraintValues;
 }
@@ -72,7 +72,7 @@ std::vector<Eigen::VectorXd>& OptimizationRecord::getConstraintValues()
 //==============================================================================
 /// This gets the gradients we've recorded. This will be empty unless we've
 /// called optimizer.setRecordFullDebugInfo(true)
-std::vector<Eigen::VectorXd>& OptimizationRecord::getSparseJacobians()
+std::vector<Eigen::VectorXd>& Solution::getSparseJacobians()
 {
   return mSparseJacobians;
 }
@@ -80,7 +80,7 @@ std::vector<Eigen::VectorXd>& OptimizationRecord::getSparseJacobians()
 //==============================================================================
 /// This registers all the pieces we need in order to be able to re-optimize
 /// this problem efficiently.
-void OptimizationRecord::registerForReoptimization(
+void Solution::registerForReoptimization(
     SmartPtr<Ipopt::IpoptApplication> ipopt,
     SmartPtr<IPOptShotWrapper> ipoptProblem)
 {
@@ -90,7 +90,7 @@ void OptimizationRecord::registerForReoptimization(
 
 //==============================================================================
 /// This will attempt to run another round of optimization.
-void OptimizationRecord::reoptimize()
+void Solution::reoptimize()
 {
   std::string oldWarmStart;
   mIpoptProblem->prep_for_reoptimize();
@@ -111,7 +111,7 @@ void OptimizationRecord::reoptimize()
 }
 
 //==============================================================================
-void OptimizationRecord::setSuccess(bool success)
+void Solution::setSuccess(bool success)
 {
   if (mPerfLog != nullptr)
   {
@@ -121,7 +121,7 @@ void OptimizationRecord::setSuccess(bool success)
 }
 
 //==============================================================================
-void OptimizationRecord::registerIteration(
+void Solution::registerIteration(
     int index,
     const TrajectoryRollout* rollout,
     double loss,
@@ -133,7 +133,7 @@ void OptimizationRecord::registerIteration(
 //==============================================================================
 /// This only gets called if we're saving full debug info, but it stores every
 /// x that we receive during optimization
-void OptimizationRecord::registerX(Eigen::VectorXd x)
+void Solution::registerX(Eigen::VectorXd x)
 {
   mXs.push_back(x);
 }
@@ -141,7 +141,7 @@ void OptimizationRecord::registerX(Eigen::VectorXd x)
 //==============================================================================
 /// This only gets called if we're saving full debug info, but it stores every
 /// loss evaluation that we produce during optimization
-void OptimizationRecord::registerLoss(double loss)
+void Solution::registerLoss(double loss)
 {
   mLosses.push_back(loss);
 }
@@ -149,7 +149,7 @@ void OptimizationRecord::registerLoss(double loss)
 //==============================================================================
 /// This only gets called if we're saving full debug info, but it stores every
 /// gradient that we produce during optimization
-void OptimizationRecord::registerGradient(Eigen::VectorXd grad)
+void Solution::registerGradient(Eigen::VectorXd grad)
 {
   mGradients.push_back(grad);
 }
@@ -157,7 +157,7 @@ void OptimizationRecord::registerGradient(Eigen::VectorXd grad)
 //==============================================================================
 /// This only gets called if we're saving full debug info, but it stores every
 /// constraint value that we produce during optimization
-void OptimizationRecord::registerConstraintValues(Eigen::VectorXd g)
+void Solution::registerConstraintValues(Eigen::VectorXd g)
 {
   mConstraintValues.push_back(g);
 }
@@ -165,21 +165,21 @@ void OptimizationRecord::registerConstraintValues(Eigen::VectorXd g)
 //==============================================================================
 /// This only gets called if we're saving full debug info, but it stores every
 /// jacobian that we produce during optimization
-void OptimizationRecord::registerSparseJac(Eigen::VectorXd jac)
+void Solution::registerSparseJac(Eigen::VectorXd jac)
 {
   mSparseJacobians.push_back(jac);
 }
 
 //==============================================================================
 /// Returns the number of steps that were registered
-int OptimizationRecord::getNumSteps()
+int Solution::getNumSteps()
 {
   return mSteps.size();
 }
 
 //==============================================================================
 /// This returns the step record for this index
-const OptimizationStep& OptimizationRecord::getStep(int index)
+const OptimizationStep& Solution::getStep(int index)
 {
   return mSteps.at(index);
 }
@@ -187,7 +187,7 @@ const OptimizationStep& OptimizationRecord::getStep(int index)
 //==============================================================================
 /// This converts this optimization record into a JSON blob we can display on
 /// our web GUI
-std::string OptimizationRecord::toJson(std::shared_ptr<simulation::World> world)
+std::string Solution::toJson(std::shared_ptr<simulation::World> world)
 {
   std::stringstream json;
 

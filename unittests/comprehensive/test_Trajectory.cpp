@@ -55,11 +55,11 @@
 #include "dart/neural/RestorableSnapshot.hpp"
 #include "dart/neural/WithRespectToMass.hpp"
 #include "dart/simulation/World.hpp"
-#include "dart/trajectory/AbstractShot.hpp"
 #include "dart/trajectory/IPOptOptimizer.hpp"
 #include "dart/trajectory/MultiShot.hpp"
-#include "dart/trajectory/OptimizationRecord.hpp"
+#include "dart/trajectory/Problem.hpp"
 #include "dart/trajectory/SingleShot.hpp"
+#include "dart/trajectory/Solution.hpp"
 #include "dart/trajectory/TrajectoryConstants.hpp"
 #include "dart/trajectory/TrajectoryRollout.hpp"
 
@@ -372,7 +372,7 @@ bool verifyMultiShotJacobian(
 
   Eigen::MatrixXd analyticalJacobian
       = Eigen::MatrixXd::Zero(numConstraints, dim);
-  shot.AbstractShot::backpropJacobian(world, analyticalJacobian);
+  shot.Problem::backpropJacobian(world, analyticalJacobian);
   Eigen::MatrixXd bruteForceJacobian
       = Eigen::MatrixXd::Zero(numConstraints, dim);
   shot.finiteDifferenceJacobian(world, bruteForceJacobian);
@@ -420,7 +420,7 @@ bool verifySparseJacobian(WorldPtr world, MultiShot& shot)
   int numConstraints = shot.getConstraintDim();
   Eigen::MatrixXd analyticalJacobian
       = Eigen::MatrixXd::Zero(numConstraints, dim);
-  shot.AbstractShot::backpropJacobian(world, analyticalJacobian);
+  shot.Problem::backpropJacobian(world, analyticalJacobian);
   Eigen::MatrixXd sparseRecoveredJacobian
       = Eigen::MatrixXd::Zero(numConstraints, dim);
 
@@ -429,7 +429,7 @@ bool verifySparseJacobian(WorldPtr world, MultiShot& shot)
   Eigen::VectorXi cols = Eigen::VectorXi::Zero(numSparse);
   shot.getJacobianSparsityStructure(world, rows, cols);
   Eigen::VectorXd sparseValues = Eigen::VectorXd::Zero(numSparse);
-  shot.AbstractShot::getSparseJacobian(world, sparseValues);
+  shot.Problem::getSparseJacobian(world, sparseValues);
   for (int i = 0; i < numSparse; i++)
   {
     sparseRecoveredJacobian(rows(i), cols(i)) = sparseValues(i);
@@ -551,7 +551,7 @@ bool verifyMultiShotJacobianCustomConstraint(
 
   Eigen::MatrixXd analyticalJacobian
       = Eigen::MatrixXd::Zero(numConstraints, dim);
-  shot.AbstractShot::backpropJacobian(world, analyticalJacobian);
+  shot.Problem::backpropJacobian(world, analyticalJacobian);
   Eigen::MatrixXd bruteForceJacobian
       = Eigen::MatrixXd::Zero(numConstraints, dim);
   shot.finiteDifferenceJacobian(world, bruteForceJacobian);
@@ -622,7 +622,8 @@ bool verifyChangeRepresentationToIK(
     {
       world->setPositions(initialIdentityRollout.getPoses("identity").col(i));
       world->setVelocities(initialIdentityRollout.getVels("identity").col(i));
-      world->setForces(initialIdentityRollout.getForces("identity").col(i));
+      world->setExternalForces(
+          initialIdentityRollout.getForces("identity").col(i));
 
       Eigen::VectorXd manualMappedPos = newRepresentation->getPositions(world);
       Eigen::VectorXd manualMappedVel = newRepresentation->getVelocities(world);
@@ -663,7 +664,7 @@ bool verifyChangeRepresentationToIK(
           = recoveredIdentityRollout.getForces("identity").col(i);
       Eigen::VectorXd manualRecoveredPos = world->getPositions();
       Eigen::VectorXd manualRecoveredVel = world->getVelocities();
-      Eigen::VectorXd manualRecoveredForce = world->getForces();
+      Eigen::VectorXd manualRecoveredForce = world->getExternalForces();
 
       if (!equals(recoveredPos, manualRecoveredPos, threshold)
           || !equals(recoveredVel, manualRecoveredVel, threshold)
@@ -769,7 +770,7 @@ bool verifyMultiShotOptimization(WorldPtr world, MultiShot shot)
   IPOptOptimizer optimizer = IPOptOptimizer();
 
   optimizer.setIterationLimit(1);
-  std::shared_ptr<OptimizationRecord> record = optimizer.optimize(&shot);
+  std::shared_ptr<Solution> record = optimizer.optimize(&shot);
   EXPECT_TRUE(record->getNumSteps() == 2);
   EXPECT_TRUE(record->getStep(0).index == 0);
   EXPECT_TRUE(record->getStep(1).index == 1);
@@ -2127,7 +2128,7 @@ TEST(TRAJECTORY, REOPTIMIZATION)
   optimizer.setIterationLimit(5);
   optimizer.setSuppressOutput(true);
   optimizer.setRecoverBest(false);
-  std::shared_ptr<OptimizationRecord> record = optimizer.optimize(&shot);
+  std::shared_ptr<Solution> record = optimizer.optimize(&shot);
   EXPECT_TRUE(record->getNumSteps() == 2);
   EXPECT_TRUE(record->getStep(0).index == 0);
   EXPECT_TRUE(record->getStep(1).index == 1);

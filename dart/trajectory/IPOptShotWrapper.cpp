@@ -9,7 +9,7 @@
 
 #include "dart/performance/PerformanceLog.hpp"
 #include "dart/realtime/Millis.hpp"
-#include "dart/trajectory/OptimizationRecord.hpp"
+#include "dart/trajectory/Solution.hpp"
 
 #define LOG_PERFORMANCE_IPOPT
 
@@ -24,8 +24,8 @@ namespace trajectory {
 
 //==============================================================================
 IPOptShotWrapper::IPOptShotWrapper(
-    AbstractShot* wrapped,
-    std::shared_ptr<OptimizationRecord> record,
+    Problem* wrapped,
+    std::shared_ptr<Solution> record,
     bool recoverBest,
     bool recordFullDebugInfo,
     bool printIterations,

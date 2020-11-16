@@ -925,7 +925,7 @@ Eigen::VectorXd World::getAccelerations()
 }
 
 //==============================================================================
-Eigen::VectorXd World::getForces()
+Eigen::VectorXd World::getExternalForces()
 {
   Eigen::VectorXd forces = Eigen::VectorXd(mDofs);
   std::size_t cursor = 0;
@@ -939,7 +939,7 @@ Eigen::VectorXd World::getForces()
 }
 
 //==============================================================================
-Eigen::VectorXd World::getForceUpperLimits()
+Eigen::VectorXd World::getExternalForceUpperLimits()
 {
   Eigen::VectorXd limits = Eigen::VectorXd(mDofs);
   std::size_t cursor = 0;
@@ -953,7 +953,7 @@ Eigen::VectorXd World::getForceUpperLimits()
 }
 
 //==============================================================================
-Eigen::VectorXd World::getForceLowerLimits()
+Eigen::VectorXd World::getExternalForceLowerLimits()
 {
   Eigen::VectorXd limits = Eigen::VectorXd(mDofs);
   std::size_t cursor = 0;
@@ -1075,7 +1075,7 @@ void World::setAccelerations(Eigen::VectorXd accelerations)
 }
 
 //==============================================================================
-void World::setForces(Eigen::VectorXd forces)
+void World::setExternalForces(Eigen::VectorXd forces)
 {
   std::size_t cursor = 0;
   for (std::size_t i = 0; i < mSkeletons.size(); i++)
@@ -1087,7 +1087,7 @@ void World::setForces(Eigen::VectorXd forces)
 }
 
 //==============================================================================
-void World::setForceUpperLimits(Eigen::VectorXd limits)
+void World::setExternalForceUpperLimits(Eigen::VectorXd limits)
 {
   std::size_t cursor = 0;
   for (std::size_t i = 0; i < mSkeletons.size(); i++)
@@ -1099,7 +1099,7 @@ void World::setForceUpperLimits(Eigen::VectorXd limits)
 }
 
 //==============================================================================
-void World::setForceLowerLimits(Eigen::VectorXd limits)
+void World::setExternalForceLowerLimits(Eigen::VectorXd limits)
 {
   std::size_t cursor = 0;
   for (std::size_t i = 0; i < mSkeletons.size(); i++)

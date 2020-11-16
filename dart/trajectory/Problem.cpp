@@ -1,4 +1,4 @@
-#include "dart/trajectory/AbstractShot.hpp"
+#include "dart/trajectory/Problem.hpp"
 
 #include <iostream>
 
@@ -18,7 +18,7 @@ namespace trajectory {
 
 //==============================================================================
 /// Default constructor
-AbstractShot::AbstractShot(
+Problem::Problem(
     std::shared_ptr<simulation::World> world, LossFn loss, int steps)
   : mWorld(world), mLoss(loss), mSteps(steps), mRolloutCacheDirty(true)
 {
@@ -29,21 +29,21 @@ AbstractShot::AbstractShot(
 }
 
 //==============================================================================
-AbstractShot::~AbstractShot()
+Problem::~Problem()
 {
   // std::cout << "Freeing AbstractShot: " << this << std::endl;
 }
 
 //==============================================================================
 /// This updates the loss function for this trajectory
-void AbstractShot::setLoss(LossFn loss)
+void Problem::setLoss(LossFn loss)
 {
   mLoss = loss;
 }
 
 //==============================================================================
 /// Add a custom constraint function to the trajectory
-void AbstractShot::addConstraint(LossFn loss)
+void Problem::addConstraint(LossFn loss)
 {
   mConstraints.push_back(loss);
 }
@@ -62,7 +62,7 @@ void AbstractShot::addConstraint(LossFn loss)
 /// lies the power of changing the representation mapping: There will almost
 /// certainly be mapped spaces that are easier to optimize in than native
 /// joint space, at least initially.
-void AbstractShot::switchRepresentationMapping(
+void Problem::switchRepresentationMapping(
     std::shared_ptr<simulation::World> world,
     const std::string& mapping,
     PerformanceLog* log)
@@ -78,7 +78,7 @@ void AbstractShot::switchRepresentationMapping(
 /// output. We can have multiple loss mappings at the same time, and loss can
 /// use arbitrary combinations of multiple views, as long as it can provide
 /// gradients.
-void AbstractShot::addMapping(
+void Problem::addMapping(
     const std::string& key, std::shared_ptr<neural::Mapping> mapping)
 {
   mMappings[key] = mapping;
@@ -88,15 +88,14 @@ void AbstractShot::addMapping(
 
 //==============================================================================
 /// This returns true if there is a loss mapping at the specified key
-bool AbstractShot::hasMapping(const std::string& key)
+bool Problem::hasMapping(const std::string& key)
 {
   return mMappings.find(key) != mMappings.end();
 }
 
 //==============================================================================
 /// This returns the loss mapping at the specified key
-std::shared_ptr<neural::Mapping> AbstractShot::getMapping(
-    const std::string& key)
+std::shared_ptr<neural::Mapping> Problem::getMapping(const std::string& key)
 {
   return mMappings[key];
 }
@@ -104,14 +103,14 @@ std::shared_ptr<neural::Mapping> AbstractShot::getMapping(
 //==============================================================================
 /// This returns a reference to all the mappings in this shot
 std::unordered_map<std::string, std::shared_ptr<neural::Mapping>>&
-AbstractShot::getMappings()
+Problem::getMappings()
 {
   return mMappings;
 }
 
 //==============================================================================
 /// This removes the loss mapping at a particular key
-void AbstractShot::removeMapping(const std::string& key)
+void Problem::removeMapping(const std::string& key)
 {
   mMappings.erase(key);
   // Clear our cached trajectory
@@ -121,41 +120,40 @@ void AbstractShot::removeMapping(const std::string& key)
 //==============================================================================
 /// Returns the sum of posDim() + velDim() for the current representation
 /// mapping
-int AbstractShot::getRepresentationStateSize() const
+int Problem::getRepresentationStateSize() const
 {
   return getRepresentation()->getPosDim() + getRepresentation()->getVelDim();
 }
 
 //==============================================================================
-const std::string& AbstractShot::getRepresentationName() const
+const std::string& Problem::getRepresentationName() const
 {
   return mRepresentationMapping;
 }
 
 //==============================================================================
 /// Returns the representation currently being used
-const std::shared_ptr<neural::Mapping> AbstractShot::getRepresentation() const
+const std::shared_ptr<neural::Mapping> Problem::getRepresentation() const
 {
   return mMappings.at(mRepresentationMapping);
 }
 
 //==============================================================================
 /// Returns the length of the flattened problem state
-int AbstractShot::getFlatProblemDim(
-    std::shared_ptr<simulation::World> world) const
+int Problem::getFlatProblemDim(std::shared_ptr<simulation::World> world) const
 {
   return getFlatStaticProblemDim(world) + getFlatDynamicProblemDim(world);
 }
 
 //==============================================================================
-int AbstractShot::getFlatStaticProblemDim(
+int Problem::getFlatStaticProblemDim(
     std::shared_ptr<simulation::World> world) const
 {
   return mWorld->getMassDims();
 }
 
 //==============================================================================
-int AbstractShot::getFlatDynamicProblemDim(
+int Problem::getFlatDynamicProblemDim(
     std::shared_ptr<simulation::World> world) const
 {
   return 0;
@@ -163,7 +161,7 @@ int AbstractShot::getFlatDynamicProblemDim(
 
 //==============================================================================
 /// This copies a shot down into a single flat vector
-void AbstractShot::flatten(
+void Problem::flatten(
     std::shared_ptr<simulation::World> world,
     /* OUT */ Eigen::Ref<Eigen::VectorXd> flatStatic,
     /* OUT */ Eigen::Ref<Eigen::VectorXd> flatDynamic,
@@ -189,7 +187,7 @@ void AbstractShot::flatten(
 
 //==============================================================================
 /// This copies a shot down into a single flat vector
-void AbstractShot::flatten(
+void Problem::flatten(
     std::shared_ptr<simulation::World> world,
     /* OUT */ Eigen::Ref<Eigen::VectorXd> flat,
     PerformanceLog* log) const
@@ -205,7 +203,7 @@ void AbstractShot::flatten(
 
 //==============================================================================
 /// This gets the parameters out of a flat vector
-void AbstractShot::unflatten(
+void Problem::unflatten(
     std::shared_ptr<simulation::World> world,
     const Eigen::Ref<const Eigen::VectorXd>& flatStatic,
     const Eigen::Ref<const Eigen::VectorXd>& flatDynamic,
@@ -231,7 +229,7 @@ void AbstractShot::unflatten(
 
 //==============================================================================
 /// This gets the parameters out of a flat vector
-void AbstractShot::unflatten(
+void Problem::unflatten(
     std::shared_ptr<simulation::World> world,
     const Eigen::Ref<const Eigen::VectorXd>& flat,
     PerformanceLog* log)
@@ -248,7 +246,7 @@ void AbstractShot::unflatten(
 //==============================================================================
 /// This gets the fixed upper bounds for a flat vector, used during
 /// optimization
-void AbstractShot::getUpperBounds(
+void Problem::getUpperBounds(
     std::shared_ptr<simulation::World> world,
     /* OUT */ Eigen::Ref<Eigen::VectorXd> flat,
     PerformanceLog* log) const
@@ -265,7 +263,7 @@ void AbstractShot::getUpperBounds(
 //==============================================================================
 /// This gets the fixed lower bounds for a flat vector, used during
 /// optimization
-void AbstractShot::getLowerBounds(
+void Problem::getLowerBounds(
     std::shared_ptr<simulation::World> world,
     /* OUT */ Eigen::Ref<Eigen::VectorXd> flat,
     PerformanceLog* log) const
@@ -282,7 +280,7 @@ void AbstractShot::getLowerBounds(
 //==============================================================================
 /// This gets the fixed upper bounds for a flat vector, used during
 /// optimization
-void AbstractShot::getUpperBounds(
+void Problem::getUpperBounds(
     std::shared_ptr<simulation::World> world,
     /* OUT */ Eigen::Ref<Eigen::VectorXd> flatStatic,
     /* OUT */ Eigen::Ref<Eigen::VectorXd> flatDynamic,
@@ -309,7 +307,7 @@ void AbstractShot::getUpperBounds(
 //==============================================================================
 /// This gets the fixed lower bounds for a flat vector, used during
 /// optimization
-void AbstractShot::getLowerBounds(
+void Problem::getLowerBounds(
     std::shared_ptr<simulation::World> world,
     /* OUT */ Eigen::Ref<Eigen::VectorXd> flatStatic,
     /* OUT */ Eigen::Ref<Eigen::VectorXd> flatDynamic,
@@ -336,7 +334,7 @@ void AbstractShot::getLowerBounds(
 //==============================================================================
 /// This returns the initial guess for the values of X when running an
 /// optimization
-void AbstractShot::getInitialGuess(
+void Problem::getInitialGuess(
     std::shared_ptr<simulation::World> world,
     /* OUT */ Eigen::Ref<Eigen::VectorXd> flatStatic,
     /* OUT */ Eigen::Ref<Eigen::VectorXd> flatDynamic,
@@ -348,7 +346,7 @@ void AbstractShot::getInitialGuess(
 //==============================================================================
 /// This gets the bounds on the constraint functions (both knot points and any
 /// custom constraints)
-void AbstractShot::getConstraintUpperBounds(
+void Problem::getConstraintUpperBounds(
     /* OUT */ Eigen::Ref<Eigen::VectorXd> flat, PerformanceLog* log) const
 {
   PerformanceLog* thisLog = nullptr;
@@ -376,7 +374,7 @@ void AbstractShot::getConstraintUpperBounds(
 //==============================================================================
 /// This gets the bounds on the constraint functions (both knot points and any
 /// custom constraints)
-void AbstractShot::getConstraintLowerBounds(
+void Problem::getConstraintLowerBounds(
     /* OUT */ Eigen::Ref<Eigen::VectorXd> flat, PerformanceLog* log) const
 {
   PerformanceLog* thisLog = nullptr;
@@ -404,7 +402,7 @@ void AbstractShot::getConstraintLowerBounds(
 //==============================================================================
 /// This returns the initial guess for the values of X when running an
 /// optimization
-void AbstractShot::getInitialGuess(
+void Problem::getInitialGuess(
     std::shared_ptr<simulation::World> world,
     /* OUT */ Eigen::Ref<Eigen::VectorXd> flat,
     PerformanceLog* log) const
@@ -419,7 +417,7 @@ void AbstractShot::getInitialGuess(
 }
 
 //==============================================================================
-int AbstractShot::getConstraintDim() const
+int Problem::getConstraintDim() const
 {
   return mConstraints.size();
 }
@@ -427,7 +425,7 @@ int AbstractShot::getConstraintDim() const
 //==============================================================================
 /// This computes the values of the constraints, assuming that the constraint
 /// vector being passed in is only the size of mConstraints
-void AbstractShot::computeConstraints(
+void Problem::computeConstraints(
     std::shared_ptr<simulation::World> world,
     /* OUT */ Eigen::Ref<Eigen::VectorXd> constraints,
     PerformanceLog* log)
@@ -459,7 +457,7 @@ void AbstractShot::computeConstraints(
 //==============================================================================
 /// This computes the Jacobian that relates the flat problem to the end state.
 /// This returns a matrix that's (getConstraintDim(), getFlatProblemDim()).
-void AbstractShot::backpropJacobian(
+void Problem::backpropJacobian(
     std::shared_ptr<simulation::World> world,
     /* OUT */ Eigen::Ref<Eigen::MatrixXd> jac,
     PerformanceLog* log)
@@ -479,7 +477,7 @@ void AbstractShot::backpropJacobian(
 //==============================================================================
 /// This computes the Jacobian that relates the flat problem to the end state.
 /// This returns a matrix that's (getConstraintDim(), getFlatProblemDim()).
-void AbstractShot::backpropJacobian(
+void Problem::backpropJacobian(
     std::shared_ptr<simulation::World> world,
     /* OUT */ Eigen::Ref<Eigen::MatrixXd> jacStatic,
     /* OUT */ Eigen::Ref<Eigen::MatrixXd> jacDynamic,
@@ -530,7 +528,7 @@ void AbstractShot::backpropJacobian(
 
 //==============================================================================
 /// This gets the number of non-zero entries in the Jacobian
-int AbstractShot::getNumberNonZeroJacobianStatic(
+int Problem::getNumberNonZeroJacobianStatic(
     std::shared_ptr<simulation::World> world)
 {
   return mConstraints.size() * getFlatStaticProblemDim(world);
@@ -538,7 +536,7 @@ int AbstractShot::getNumberNonZeroJacobianStatic(
 
 //==============================================================================
 /// This gets the number of non-zero entries in the Jacobian
-int AbstractShot::getNumberNonZeroJacobianDynamic(
+int Problem::getNumberNonZeroJacobianDynamic(
     std::shared_ptr<simulation::World> world)
 {
   return mConstraints.size() * getFlatDynamicProblemDim(world);
@@ -546,7 +544,7 @@ int AbstractShot::getNumberNonZeroJacobianDynamic(
 
 //==============================================================================
 /// This gets the structure of the non-zero entries in the Jacobian
-void AbstractShot::getJacobianSparsityStructure(
+void Problem::getJacobianSparsityStructure(
     std::shared_ptr<simulation::World> world,
     Eigen::Ref<Eigen::VectorXi> rows,
     Eigen::Ref<Eigen::VectorXi> cols,
@@ -572,7 +570,7 @@ void AbstractShot::getJacobianSparsityStructure(
 
 //==============================================================================
 /// This gets the structure of the non-zero entries in the Jacobian
-void AbstractShot::getJacobianSparsityStructureDynamic(
+void Problem::getJacobianSparsityStructureDynamic(
     std::shared_ptr<simulation::World> world,
     Eigen::Ref<Eigen::VectorXi> rows,
     Eigen::Ref<Eigen::VectorXi> cols,
@@ -586,8 +584,8 @@ void AbstractShot::getJacobianSparsityStructureDynamic(
   }
 #endif
 
-  assert(rows.size() == AbstractShot::getNumberNonZeroJacobianDynamic(world));
-  assert(cols.size() == AbstractShot::getNumberNonZeroJacobianDynamic(world));
+  assert(rows.size() == Problem::getNumberNonZeroJacobianDynamic(world));
+  assert(cols.size() == Problem::getNumberNonZeroJacobianDynamic(world));
   int cursor = 0;
   // Do row-major ordering
   for (int j = 0; j < mConstraints.size(); j++)
@@ -599,7 +597,7 @@ void AbstractShot::getJacobianSparsityStructureDynamic(
       cursor++;
     }
   }
-  assert(cursor == AbstractShot::getNumberNonZeroJacobianDynamic(world));
+  assert(cursor == Problem::getNumberNonZeroJacobianDynamic(world));
 
 #ifdef LOG_PERFORMANCE_ABSTRACT_SHOT
   if (thisLog != nullptr)
@@ -611,7 +609,7 @@ void AbstractShot::getJacobianSparsityStructureDynamic(
 
 //==============================================================================
 /// This gets the structure of the non-zero entries in the Jacobian
-void AbstractShot::getJacobianSparsityStructureStatic(
+void Problem::getJacobianSparsityStructureStatic(
     std::shared_ptr<simulation::World> world,
     Eigen::Ref<Eigen::VectorXi> rows,
     Eigen::Ref<Eigen::VectorXi> cols,
@@ -625,8 +623,8 @@ void AbstractShot::getJacobianSparsityStructureStatic(
   }
 #endif
 
-  assert(rows.size() == AbstractShot::getNumberNonZeroJacobianStatic(world));
-  assert(cols.size() == AbstractShot::getNumberNonZeroJacobianStatic(world));
+  assert(rows.size() == Problem::getNumberNonZeroJacobianStatic(world));
+  assert(cols.size() == Problem::getNumberNonZeroJacobianStatic(world));
   int cursor = 0;
   // Do row-major ordering
   for (int j = 0; j < mConstraints.size(); j++)
@@ -638,7 +636,7 @@ void AbstractShot::getJacobianSparsityStructureStatic(
       cursor++;
     }
   }
-  assert(cursor == AbstractShot::getNumberNonZeroJacobianStatic(world));
+  assert(cursor == Problem::getNumberNonZeroJacobianStatic(world));
 
 #ifdef LOG_PERFORMANCE_ABSTRACT_SHOT
   if (thisLog != nullptr)
@@ -651,7 +649,7 @@ void AbstractShot::getJacobianSparsityStructureStatic(
 //==============================================================================
 /// This writes the Jacobian to a pair of sparse vectors, separating out the
 /// static and dynamic regions.
-void AbstractShot::getSparseJacobian(
+void Problem::getSparseJacobian(
     std::shared_ptr<simulation::World> world,
     Eigen::Ref<Eigen::VectorXd> sparseStatic,
     Eigen::Ref<Eigen::VectorXd> sparseDynamic,
@@ -665,12 +663,9 @@ void AbstractShot::getSparseJacobian(
   }
 #endif
 
+  assert(sparseStatic.size() == Problem::getNumberNonZeroJacobianStatic(world));
   assert(
-      sparseStatic.size()
-      == AbstractShot::getNumberNonZeroJacobianStatic(world));
-  assert(
-      sparseDynamic.size()
-      == AbstractShot::getNumberNonZeroJacobianDynamic(world));
+      sparseDynamic.size() == Problem::getNumberNonZeroJacobianDynamic(world));
 
   sparseStatic.setZero();
   sparseDynamic.setZero();
@@ -708,7 +703,7 @@ void AbstractShot::getSparseJacobian(
 
 //==============================================================================
 /// This writes the Jacobian to a sparse vector
-void AbstractShot::getSparseJacobian(
+void Problem::getSparseJacobian(
     std::shared_ptr<simulation::World> world,
     Eigen::Ref<Eigen::VectorXd> sparse,
     PerformanceLog* log)
@@ -726,7 +721,7 @@ void AbstractShot::getSparseJacobian(
 //==============================================================================
 /// This computes the gradient in the flat problem space, automatically
 /// computing the gradients of the loss function as part of the call
-void AbstractShot::backpropGradient(
+void Problem::backpropGradient(
     std::shared_ptr<simulation::World> world,
     /* OUT */ Eigen::Ref<Eigen::VectorXd> grad,
     PerformanceLog* log)
@@ -764,7 +759,7 @@ void AbstractShot::backpropGradient(
 //==============================================================================
 /// This computes the gradient in the flat problem space, taking into accounts
 /// incoming gradients with respect to any of the shot's values.
-void AbstractShot::backpropGradientWrt(
+void Problem::backpropGradientWrt(
     std::shared_ptr<simulation::World> world,
     const TrajectoryRollout* gradWrtRollout,
     /* OUT */ Eigen::Ref<Eigen::VectorXd> grad,
@@ -782,7 +777,7 @@ void AbstractShot::backpropGradientWrt(
 
 //==============================================================================
 /// Get the loss for the rollout
-double AbstractShot::getLoss(
+double Problem::getLoss(
     std::shared_ptr<simulation::World> world, PerformanceLog* log)
 {
   PerformanceLog* thisLog = nullptr;
@@ -809,7 +804,7 @@ double AbstractShot::getLoss(
 /// This gets called at the beginning of backpropGradientWrt(), as an
 /// opportunity to zero out any static gradient values being managed by
 /// AbstractShot.
-void AbstractShot::initializeStaticGradient(
+void Problem::initializeStaticGradient(
     std::shared_ptr<simulation::World> world,
     Eigen::Ref<Eigen::VectorXd> gradStatic,
     PerformanceLog* log)
@@ -820,7 +815,7 @@ void AbstractShot::initializeStaticGradient(
 //==============================================================================
 /// This adds anything to the static gradient that we need to. It needs to be
 /// called for every timestep during backpropGradientWrt().
-void AbstractShot::accumulateStaticGradient(
+void Problem::accumulateStaticGradient(
     std::shared_ptr<simulation::World> world,
     Eigen::Ref<Eigen::VectorXd> gradStatic,
     neural::LossGradient& thisTimestep,
@@ -833,7 +828,7 @@ void AbstractShot::accumulateStaticGradient(
 /// This gets called at the beginning of backpropJacobianOfFinalState() in
 /// SingleShot, as an opportunity to zero out any static jacobian values being
 /// managed by AbstractShot.
-void AbstractShot::initializeStaticJacobianOfFinalState(
+void Problem::initializeStaticJacobianOfFinalState(
     std::shared_ptr<simulation::World> world,
     Eigen::Ref<Eigen::MatrixXd> jacStatic,
     PerformanceLog* log)
@@ -845,7 +840,7 @@ void AbstractShot::initializeStaticJacobianOfFinalState(
 /// This adds anything to the static gradient that we need to. It needs to be
 /// called for every timestep during backpropJacobianOfFinalState() in
 /// SingleShot.
-void AbstractShot::accumulateStaticJacobianOfFinalState(
+void Problem::accumulateStaticJacobianOfFinalState(
     std::shared_ptr<simulation::World> world,
     Eigen::Ref<Eigen::MatrixXd> jacStatic,
     TimestepJacobians& thisTimestep,
@@ -867,7 +862,7 @@ void AbstractShot::accumulateStaticJacobianOfFinalState(
 /// updates the knot points as part of the update, and returns a mapping of
 /// where indices moved around to, so that we can update lagrange multipliers
 /// etc.
-Eigen::VectorXi AbstractShot::updateWithForces(
+Eigen::VectorXi Problem::updateWithForces(
     std::shared_ptr<simulation::World> world,
     Eigen::MatrixXd forces,
     PerformanceLog* log)
@@ -916,7 +911,7 @@ Eigen::VectorXi AbstractShot::updateWithForces(
 }
 
 //==============================================================================
-const TrajectoryRollout* AbstractShot::getRolloutCache(
+const TrajectoryRollout* Problem::getRolloutCache(
     std::shared_ptr<simulation::World> world,
     PerformanceLog* log,
     bool useKnots)
@@ -951,7 +946,7 @@ const TrajectoryRollout* AbstractShot::getRolloutCache(
 }
 
 //==============================================================================
-TrajectoryRollout* AbstractShot::getGradientWrtRolloutCache(
+TrajectoryRollout* Problem::getGradientWrtRolloutCache(
     std::shared_ptr<simulation::World> world,
     PerformanceLog* log,
     bool useKnots)
@@ -988,7 +983,7 @@ TrajectoryRollout* AbstractShot::getGradientWrtRolloutCache(
 //==============================================================================
 /// This computes finite difference Jacobians analagous to
 /// backpropGradient()
-void AbstractShot::finiteDifferenceGradient(
+void Problem::finiteDifferenceGradient(
     std::shared_ptr<simulation::World> world,
     /* OUT */ Eigen::Ref<Eigen::VectorXd> grad)
 {
@@ -1019,22 +1014,21 @@ void AbstractShot::finiteDifferenceGradient(
 }
 
 //==============================================================================
-int AbstractShot::getNumSteps()
+int Problem::getNumSteps()
 {
   return mSteps;
 }
 
 //==============================================================================
 /// Returns the dimension of the mass vector
-int AbstractShot::getMassDims()
+int Problem::getMassDims()
 {
   return mWorld->getMassDims();
 }
 
 //==============================================================================
 /// This gets the total number of non-zero entries in the Jacobian
-int AbstractShot::getNumberNonZeroJacobian(
-    std::shared_ptr<simulation::World> world)
+int Problem::getNumberNonZeroJacobian(std::shared_ptr<simulation::World> world)
 {
   return getNumberNonZeroJacobianStatic(world)
          + getNumberNonZeroJacobianDynamic(world);
@@ -1042,7 +1036,7 @@ int AbstractShot::getNumberNonZeroJacobian(
 
 //==============================================================================
 /// This computes finite difference Jacobians analagous to backpropJacobians()
-void AbstractShot::finiteDifferenceJacobian(
+void Problem::finiteDifferenceJacobian(
     std::shared_ptr<simulation::World> world, Eigen::Ref<Eigen::MatrixXd> jac)
 {
   int dim = getFlatProblemDim(world);

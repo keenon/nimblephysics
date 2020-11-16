@@ -39,7 +39,7 @@
 
 #include "dart/gui/glut/SimWindow.hpp"
 #include "dart/simulation/World.hpp"
-#include "dart/trajectory/AbstractShot.hpp"
+#include "dart/trajectory/Problem.hpp"
 #include "dart/trajectory/TrajectoryRollout.hpp"
 
 namespace dart {
@@ -51,19 +51,19 @@ class TrajectoryReplayWindow : public SimWindow
 public:
   /// Constructor
   TrajectoryReplayWindow(
-      std::shared_ptr<simulation::World> world, trajectory::AbstractShot* shot);
+      std::shared_ptr<simulation::World> world, trajectory::Problem* shot);
 
   void timeStepping() override;
 
 private:
   int mCounter;
-  trajectory::AbstractShot* mShot;
+  trajectory::Problem* mShot;
   trajectory::TrajectoryRollout* mRollout;
   bool mUseKnots;
 };
 
 void displayTrajectoryInGUI(
-    std::shared_ptr<simulation::World> world, trajectory::AbstractShot* shot);
+    std::shared_ptr<simulation::World> world, trajectory::Problem* shot);
 
 } // namespace glut
 } // namespace gui

@@ -24,7 +24,7 @@ SingleShot::SingleShot(
     LossFn loss,
     int steps,
     bool tuneStartingState)
-  : AbstractShot(world, loss, steps)
+  : Problem(world, loss, steps)
 {
   mTuneStartingState = tuneStartingState;
   mStartPos = world->getPositions();
@@ -110,7 +110,7 @@ void SingleShot::switchRepresentationMapping(
   mStartVel = mMappings[mapping]->getVelocities(world);
 
   mSnapshotsCacheDirty = true;
-  AbstractShot::switchRepresentationMapping(world, mapping, thisLog);
+  Problem::switchRepresentationMapping(world, mapping, thisLog);
   snapshot.restore();
 
 #ifdef LOG_PERFORMANCE_SINGLE_SHOT
@@ -173,9 +173,9 @@ void SingleShot::flatten(
 
   // Run the AbstractShot flattening, and set our cursors forward to ignore
   // anything flattened already
-  int cursorStatic = AbstractShot::getFlatStaticProblemDim(world);
-  int cursorDynamic = AbstractShot::getFlatDynamicProblemDim(world);
-  AbstractShot::flatten(
+  int cursorStatic = Problem::getFlatStaticProblemDim(world);
+  int cursorDynamic = Problem::getFlatDynamicProblemDim(world);
+  Problem::flatten(
       world,
       flatStatic.segment(0, cursorStatic),
       flatDynamic.segment(0, cursorDynamic),
@@ -233,9 +233,9 @@ void SingleShot::unflatten(
   mRolloutCacheDirty = true;
   mSnapshotsCacheDirty = true;
 
-  int cursorDynamic = AbstractShot::getFlatDynamicProblemDim(world);
-  int cursorStatic = AbstractShot::getFlatStaticProblemDim(world);
-  AbstractShot::unflatten(
+  int cursorDynamic = Problem::getFlatDynamicProblemDim(world);
+  int cursorStatic = Problem::getFlatStaticProblemDim(world);
+  Problem::unflatten(
       world,
       flatStatic.segment(0, cursorStatic),
       flatDynamic.segment(0, cursorDynamic),
@@ -284,9 +284,9 @@ void SingleShot::getUpperBounds(
   }
 #endif
 
-  int cursorDynamic = AbstractShot::getFlatDynamicProblemDim(world);
-  int cursorStatic = AbstractShot::getFlatStaticProblemDim(world);
-  AbstractShot::getUpperBounds(
+  int cursorDynamic = Problem::getFlatDynamicProblemDim(world);
+  int cursorStatic = Problem::getFlatStaticProblemDim(world);
+  Problem::getUpperBounds(
       world,
       flatStatic.segment(0, cursorStatic),
       flatDynamic.segment(0, cursorDynamic),
@@ -303,7 +303,7 @@ void SingleShot::getUpperBounds(
     cursorDynamic = posDim + velDim;
   }
   int forceDim = getRepresentation()->getForceDim();
-  Eigen::VectorXd forceUpperLimits = world->getForceUpperLimits();
+  Eigen::VectorXd forceUpperLimits = world->getExternalForceUpperLimits();
   assert(forceDim == forceUpperLimits.size());
   for (int i = 0; i < mSteps; i++)
   {
@@ -345,9 +345,9 @@ void SingleShot::getLowerBounds(
   }
 #endif
 
-  int cursorDynamic = AbstractShot::getFlatDynamicProblemDim(world);
-  int cursorStatic = AbstractShot::getFlatStaticProblemDim(world);
-  AbstractShot::getLowerBounds(
+  int cursorDynamic = Problem::getFlatDynamicProblemDim(world);
+  int cursorStatic = Problem::getFlatStaticProblemDim(world);
+  Problem::getLowerBounds(
       world,
       flatStatic.segment(0, cursorStatic),
       flatDynamic.segment(0, cursorDynamic),
@@ -451,7 +451,7 @@ void SingleShot::backpropJacobianOfFinalState(
   }
 #endif
 
-  AbstractShot::initializeStaticJacobianOfFinalState(world, jacStatic, thisLog);
+  Problem::initializeStaticJacobianOfFinalState(world, jacStatic, thisLog);
 
   std::vector<MappedBackpropSnapshotPtr> snapshots
       = getSnapshots(world, thisLog);
@@ -536,7 +536,7 @@ void SingleShot::backpropJacobianOfFinalState(
           = thisTimestep.posVel;
     }
 
-    AbstractShot::accumulateStaticJacobianOfFinalState(
+    Problem::accumulateStaticJacobianOfFinalState(
         world, jacStatic, thisTimestep, thisLog);
 
     last = thisTimestep;
@@ -619,7 +619,7 @@ void SingleShot::backpropGradientWrt(
   }
 #endif
 
-  AbstractShot::initializeStaticGradient(world, gradStatic, thisLog);
+  Problem::initializeStaticGradient(world, gradStatic, thisLog);
   // Add any gradient we have from the loss wrt mass directly into our gradient,
   // cause we don't need to do any extra processing on that.
   gradStatic += gradWrtRollout->getMassesConst();
@@ -669,8 +669,7 @@ void SingleShot::backpropGradientWrt(
     LossGradient thisTimestep;
     snapshots[i]->backprop(world, thisTimestep, mappedLosses, thisLog);
 
-    AbstractShot::accumulateStaticGradient(
-        world, gradStatic, thisTimestep, thisLog);
+    Problem::accumulateStaticGradient(world, gradStatic, thisTimestep, thisLog);
 
     cursorDynamic -= forceDim;
     gradDynamic.segment(cursorDynamic, forceDim) = thisTimestep.lossWrtTorque;

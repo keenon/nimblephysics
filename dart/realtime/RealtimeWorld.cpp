@@ -226,7 +226,7 @@ void RealtimeWorld::mainLoop()
     auto x = std::chrono::steady_clock::now()
              + std::chrono::milliseconds(interval);
 
-    mWorld->setForces(mGetForces());
+    mWorld->setExternalForces(mGetForces());
 
     for (auto listener : mPreStepListeners)
     {

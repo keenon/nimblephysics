@@ -31,7 +31,7 @@
  */
 
 #include <dart/simulation/World.hpp>
-#include <dart/trajectory/AbstractShot.hpp>
+#include <dart/trajectory/Problem.hpp>
 #include <dart/trajectory/MultiShot.hpp>
 #include <pybind11/eigen.h>
 #include <pybind11/pybind11.h>
@@ -43,7 +43,7 @@ namespace python {
 
 void MultiShot(py::module& m)
 {
-  ::py::class_<dart::trajectory::MultiShot, dart::trajectory::AbstractShot>(
+  ::py::class_<dart::trajectory::MultiShot, dart::trajectory::Problem>(
       m, "MultiShot")
       .def(
           ::py::init<

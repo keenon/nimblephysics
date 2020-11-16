@@ -19,7 +19,7 @@ class World;
 
 namespace trajectory {
 
-class AbstractShot;
+class Problem;
 class TrajectoryRolloutReal;
 class TrajectoryRolloutRef;
 class TrajectoryRolloutConstRef;
@@ -79,7 +79,7 @@ public:
       int massDim);
 
   /// Create a fresh trajector rollout for a shot
-  TrajectoryRolloutReal(AbstractShot* shot);
+  TrajectoryRolloutReal(Problem* shot);
 
   /// Deep copy constructor
   TrajectoryRolloutReal(const TrajectoryRollout* copy);

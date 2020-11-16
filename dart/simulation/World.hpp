@@ -233,7 +233,7 @@ public:
 
   /// Gets the torques of all the skeletons in the world concatenated together
   /// as a single vector
-  Eigen::VectorXd getForces();
+  Eigen::VectorXd getExternalForces();
 
   /// Gets the masses of all the nodes in the world concatenated together as a
   /// single vector
@@ -241,11 +241,11 @@ public:
 
   // This gives the vector of force upper limits for all the DOFs in this
   // world
-  Eigen::VectorXd getForceUpperLimits();
+  Eigen::VectorXd getExternalForceUpperLimits();
 
   // This gives the vector of force lower limits for all the DOFs in this
   // world
-  Eigen::VectorXd getForceLowerLimits();
+  Eigen::VectorXd getExternalForceLowerLimits();
 
   // This gives the vector of position upper limits for all the DOFs in this
   // world
@@ -297,13 +297,13 @@ public:
 
   /// Sets the forces of all the skeletons in the world from a single
   /// concatenated state vector
-  void setForces(Eigen::VectorXd torques);
+  void setExternalForces(Eigen::VectorXd torques);
 
   // Sets the upper limits of all the joints from a single vector
-  void setForceUpperLimits(Eigen::VectorXd limits);
+  void setExternalForceUpperLimits(Eigen::VectorXd limits);
 
   // Sets the lower limits of all the joints from a single vector
-  void setForceLowerLimits(Eigen::VectorXd limits);
+  void setExternalForceLowerLimits(Eigen::VectorXd limits);
 
   // Sets the upper limits of all the joints from a single vector
   void setPositionUpperLimits(Eigen::VectorXd limits);

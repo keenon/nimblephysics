@@ -60,7 +60,7 @@ void IdentityMapping::setForces(
     std::shared_ptr<simulation::World> world,
     const Eigen::Ref<Eigen::VectorXd>& forces)
 {
-  world->setForces(forces);
+  world->setExternalForces(forces);
 }
 
 //==============================================================================
@@ -92,7 +92,7 @@ void IdentityMapping::getForcesInPlace(
     std::shared_ptr<simulation::World> world,
     /* OUT */ Eigen::Ref<Eigen::VectorXd> forces)
 {
-  forces = world->getForces();
+  forces = world->getExternalForces();
 }
 
 //==============================================================================
@@ -231,14 +231,14 @@ Eigen::VectorXd IdentityMapping::getVelocityUpperLimits(
 Eigen::VectorXd IdentityMapping::getForceLowerLimits(
     std::shared_ptr<simulation::World> world)
 {
-  return world->getForceLowerLimits();
+  return world->getExternalForceLowerLimits();
 }
 
 //==============================================================================
 Eigen::VectorXd IdentityMapping::getForceUpperLimits(
     std::shared_ptr<simulation::World> world)
 {
-  return world->getForceUpperLimits();
+  return world->getExternalForceUpperLimits();
 }
 
 //==============================================================================

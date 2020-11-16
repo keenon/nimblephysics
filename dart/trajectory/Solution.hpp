@@ -44,10 +44,10 @@ struct OptimizationStep
   }
 };
 
-class OptimizationRecord
+class Solution
 {
 public:
-  OptimizationRecord();
+  Solution();
 
   /// After optimization, register whether IPOPT thought it was a success
   void setSuccess(bool success);
