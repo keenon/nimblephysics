@@ -15,6 +15,8 @@ public:
 
   void record(long time, Eigen::VectorXd control);
 
+  long last();
+
   Eigen::VectorXd get(long time);
 
   void discardBefore(long time);
@@ -25,6 +27,7 @@ protected:
   int mDim;
   int mMillisPerStep;
   long mLogStart;
+  long mLogEnd;
   std::vector<Eigen::VectorXd> mLog;
 };
 

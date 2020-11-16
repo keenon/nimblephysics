@@ -288,7 +288,7 @@ void MPC::adjustPerformance(long lastOptimizeTimeMillis)
   // optimizer change forces that already happened by the time the optimization
   // finishes, leading to us getting out of sync. Better to make our plans start
   // into the future.
-  mMillisInAdvanceToPlan = 0.5 * lastOptimizeTimeMillis;
+  mMillisInAdvanceToPlan = 1.2 * lastOptimizeTimeMillis;
   // Don't go more than 200ms into the future, cause then errors have a chance
   // to propagate
   if (mMillisInAdvanceToPlan > 200)

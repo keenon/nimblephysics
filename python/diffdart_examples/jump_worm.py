@@ -7,6 +7,7 @@ import time
 import diffdart as dart
 from typing import Dict
 from diffdart import DartTorchLossFn, DartTorchTrajectoryRollout
+import dart_map_pos
 
 
 def main():

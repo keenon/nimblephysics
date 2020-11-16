@@ -205,6 +205,9 @@ public:
   /// Returns the size of the getMasses() vector
   std::size_t getMassDims();
 
+  /// This will prevent mass from being tuned
+  void clearTunableMassThisInstance();
+
   /// This registers that we'd like to keep track of this BodyNode's mass in a
   /// specified way in differentiation
   void tuneMass(

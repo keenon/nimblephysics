@@ -31,7 +31,7 @@ public:
   /// Gets the force at a given timestep. This HAS SIDE EFFECTS! We actually
   /// keep track of what forces were read, and assume that they're "immediately"
   /// applied to the real world after they're read.
-  Eigen::VectorXd getPlannedForce(long time);
+  Eigen::VectorXd getPlannedForce(long time, bool dontLog = false);
 
   /// This gets planned forces starting at `start`, and continuing for the
   /// length of our buffer size `mSteps`. This is useful for initializing MPC

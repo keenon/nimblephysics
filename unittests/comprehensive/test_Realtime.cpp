@@ -170,8 +170,8 @@ TEST(REALTIME, REALTIME_CARTPOLE)
   // 100 fps
   world->setTimeStep(1.0 / 100);
 
-  // 250 timesteps
-  int planningHorizonMillis = 250 * world->getTimeStep() * 1000;
+  // 300 timesteps
+  int planningHorizonMillis = 300 * world->getTimeStep() * 1000;
   int advanceSteps = 70;
 
   /*
@@ -277,7 +277,10 @@ TEST(REALTIME, REALTIME_CARTPOLE)
         realtimeWorld.registerTiming("replanning", duration, "ms");
       });
 
-  mpc.setMaxIterations(10);
+  mpc.setMaxIterations(7);
+
+  mpc.setEnableLineSearch(false);
+  mpc.setEnableOptimizationGuards(true);
 
   realtimeWorld.serve(8070);
 

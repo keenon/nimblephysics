@@ -847,6 +847,13 @@ std::size_t World::getMassDims()
 }
 
 //==============================================================================
+/// This will prevent mass from being tuned
+void World::clearTunableMassThisInstance()
+{
+  mWrtMass = std::make_shared<neural::WithRespectToMass>();
+}
+
+//==============================================================================
 /// This registers that we'd like to keep track of this BodyNode's mass in a
 /// specified way in differentiation
 void World::tuneMass(

@@ -4,12 +4,14 @@ namespace dart {
 namespace realtime {
 
 ControlLog::ControlLog(int dim, int millisPerStep)
-  : mDim(dim), mMillisPerStep(millisPerStep)
+  : mDim(dim), mMillisPerStep(millisPerStep), mLogEnd(0L)
 {
 }
 
 void ControlLog::record(long time, Eigen::VectorXd control)
 {
+  if (time > mLogEnd)
+    mLogEnd = time;
   if (mLog.size() == 0)
   {
     mLogStart = time;
@@ -44,6 +46,11 @@ void ControlLog::record(long time, Eigen::VectorXd control)
     }
     mLog.push_back(control);
   }
+}
+
+long ControlLog::last()
+{
+  return mLogEnd;
 }
 
 Eigen::VectorXd ControlLog::get(long time)

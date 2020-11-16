@@ -20,7 +20,7 @@ RealTimeControlBuffer::RealTimeControlBuffer(
 }
 
 /// Gets the force at a given timestep
-Eigen::VectorXd RealTimeControlBuffer::getPlannedForce(long time)
+Eigen::VectorXd RealTimeControlBuffer::getPlannedForce(long time, bool dontLog)
 {
   if (mActiveBuffer == UNINITIALIZED)
   {
@@ -39,12 +39,14 @@ Eigen::VectorXd RealTimeControlBuffer::getPlannedForce(long time)
   {
     if (mActiveBuffer == BUF_A)
     {
-      mControlLog.record(time, mBufA.col(step));
+      if (!dontLog)
+        mControlLog.record(time, mBufA.col(step));
       return mBufA.col(step);
     }
     else if (mActiveBuffer == BUF_B)
     {
-      mControlLog.record(time, mBufB.col(step));
+      if (!dontLog)
+        mControlLog.record(time, mBufB.col(step));
       return mBufB.col(step);
     }
     else
@@ -54,7 +56,8 @@ Eigen::VectorXd RealTimeControlBuffer::getPlannedForce(long time)
   {
     // std::cout << "WARNING: MPC isn't keeping up!" << std::endl;
     Eigen::VectorXd oob = Eigen::VectorXd::Zero(mForceDim);
-    mControlLog.record(time, oob);
+    if (!dontLog)
+      mControlLog.record(time, oob);
     return oob;
   }
 }
@@ -211,8 +214,16 @@ void RealTimeControlBuffer::estimateWorldStateAt(
   for (int i = 0; i < stepsSinceObservation; i++)
   {
     long at = obs.time + i * mMillisPerStep;
-    Eigen::VectorXd forces = mControlLog.get(at);
-    world->setForces(mControlLog.get(at));
+    // In the future, project assuming planned forces
+    if (at > mControlLog.last())
+    {
+      world->setForces(getPlannedForce(at, true));
+    }
+    // In the past, project using known forces read from the buffer
+    else
+    {
+      world->setForces(mControlLog.get(at));
+    }
     world->step();
   }
 }
