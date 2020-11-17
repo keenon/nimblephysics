@@ -63,6 +63,10 @@ void RealtimeWorld(py::module& m)
           &dart::realtime::RealtimeWorld::registerConnectionListener,
           ::py::arg("listener"))
       .def(
+          "registerShutdownListener",
+          &dart::realtime::RealtimeWorld::registerShutdownListener,
+          ::py::arg("listener"))
+      .def(
           "registerKeydownListener",
           &dart::realtime::RealtimeWorld::registerKeydownListener,
           ::py::arg("listener"))

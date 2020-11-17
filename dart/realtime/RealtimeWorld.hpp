@@ -46,9 +46,15 @@ public:
   /// This kills the server, if one was running
   void stopServing();
 
+  /// Returns true if we're serving
+  bool isServing();
+
   /// This adds a listener that will get called when someone connects to the
   /// server
   void registerConnectionListener(std::function<void()> listener);
+
+  /// This adds a listener that will get called when ctrl+C is pressed
+  void registerShutdownListener(std::function<void()> listener);
 
   /// This adds a listener that will get called when there is a key-down event
   /// on the web client
@@ -87,13 +93,11 @@ protected:
       mRecordState;
   std::thread* mMainThread;
   std::vector<std::function<void()>> mConnectionListeners;
+  std::vector<std::function<void()>> mShutdownListeners;
 
   bool mServing;
-  asio::io_service* mServerEventLoop;
   std::thread* mServerThread;
   WebsocketServer* mServer;
-  asio::io_service::work* mServerWork;
-  std::thread* mServerMainThread;
 
   // This is a scratch world copy to use when writing MPC plans to JSON
   std::shared_ptr<simulation::World> mMPCPlanWorld;

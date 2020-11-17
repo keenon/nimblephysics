@@ -260,8 +260,6 @@ TEST(REALTIME, CARTPOLE_MPC)
   mpc.setEnableLineSearch(false);
   mpc.setEnableOptimizationGuards(true);
 
-  realtimeWorld.serve(8070);
-
   // Start everything up when someone connects for the first time
   realtimeWorld.registerConnectionListener([&]() {
     realtimeWorld.start();
@@ -275,6 +273,8 @@ TEST(REALTIME, CARTPOLE_MPC)
 
     // ssid.start();
   });
+
+  realtimeWorld.registerShutdownListener([&]() { mpc.stop(); });
 
   auto sledBodyVisual = realtimeUnderlyingWorld->getSkeleton("cartpole")
                             ->getBodyNodes()[0]
@@ -317,7 +317,8 @@ TEST(REALTIME, CARTPOLE_MPC)
         }
       });
 
-  while (true)
+  realtimeWorld.serve(8070);
+  while (realtimeWorld.isServing())
   {
     // spin
     // cartpole->setPosition(0, 0.0);

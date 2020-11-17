@@ -62,12 +62,12 @@ void RealtimeWorld::serve(int port)
   }
   mServing = true;
   mServer = new WebsocketServer();
-  mServerEventLoop = new asio::io_service();
+  asio::io_service serverEventLoop;
 
   // Register our network callbacks, ensuring the logic is run on the main
   // thread's event loop
   mServer->connect([&](ClientConnection conn) {
-    mServerEventLoop->post([&]() {
+    serverEventLoop.post([&]() {
       std::clog << "Connection opened." << std::endl;
       std::clog << "There are now " << mServer->numConnections()
                 << " open connections." << std::endl;
@@ -82,14 +82,14 @@ void RealtimeWorld::serve(int port)
     });
   });
   mServer->disconnect([&](ClientConnection /* conn */) {
-    mServerEventLoop->post([&]() {
+    serverEventLoop.post([&]() {
       std::clog << "Connection closed." << std::endl;
       std::clog << "There are now " << mServer->numConnections()
                 << " open connections." << std::endl;
     });
   });
   mServer->message([&](ClientConnection /* conn */, const Json::Value& args) {
-    mServerEventLoop->post([args, this]() {
+    serverEventLoop.post([args, this]() {
       if (args["type"].asString() == "keydown")
       {
         std::string key = args["key"].asString();
@@ -112,11 +112,53 @@ void RealtimeWorld::serve(int port)
   });
 
   // Start the networking thread
-  mServerThread = new std::thread([&]() { mServer->run(port); });
+  mServerThread = new std::thread([&]() {
+    // block signals in this thread and subsequently
+    // spawned threads so they're guaranteed to go to the main thread
+    sigset_t sigset;
+    sigemptyset(&sigset);
+    sigaddset(&sigset, SIGINT);
+    sigaddset(&sigset, SIGTERM);
+    pthread_sigmask(SIG_BLOCK, &sigset, nullptr);
+
+    mServer->run(port);
+  });
 
   // Start the event loop for the main thread
-  mServerWork = new asio::io_service::work(*mServerEventLoop);
-  mServerMainThread = new std::thread([&]() { mServerEventLoop->run(); });
+  asio::io_service::work serverWork(serverEventLoop);
+
+  // unblock signals in this thread
+  sigset_t sigset;
+  sigemptyset(&sigset);
+  sigaddset(&sigset, SIGINT);
+  sigaddset(&sigset, SIGTERM);
+  pthread_sigmask(SIG_UNBLOCK, &sigset, nullptr);
+
+  // The signal set is used to register termination notifications
+  asio::signal_set signalSet(serverEventLoop, SIGINT, SIGTERM);
+
+  // register the handle_stop callback
+  signalSet.async_wait([&](asio::error_code const& error, int signal_number) {
+    if (error == asio::error::operation_aborted)
+    {
+      std::cout << "Signal listener was terminated by asio" << std::endl;
+    }
+    else if (error)
+    {
+      std::cout << "Got an error registering termination signals: " << error
+                << std::endl;
+    }
+    else if (
+        signal_number == SIGINT || signal_number == SIGTERM
+        || signal_number == SIGQUIT)
+    {
+      std::cout << "Shutting down the server..." << std::endl;
+      stopServing();
+      serverEventLoop.stop();
+    }
+  });
+
+  serverEventLoop.run();
 }
 
 /// This kills the server, if one was running
@@ -124,16 +166,21 @@ void RealtimeWorld::stopServing()
 {
   if (!mServing)
     return;
-  mServing = false;
-  mServerWork->get_io_service().stop();
   mServer->stop();
   mServerThread->join();
-  mServerMainThread->join();
   delete mServer;
   delete mServerThread;
-  delete mServerEventLoop;
-  delete mServerWork;
-  delete mServerMainThread;
+  for (auto listener : mShutdownListeners)
+  {
+    listener();
+  }
+  mServing = false;
+}
+
+/// Returns true if we're serving
+bool RealtimeWorld::isServing()
+{
+  return mServing;
 }
 
 /// This adds a listener that will get called when someone connects to the
@@ -141,6 +188,12 @@ void RealtimeWorld::stopServing()
 void RealtimeWorld::registerConnectionListener(std::function<void()> listener)
 {
   mConnectionListeners.push_back(listener);
+}
+
+/// This adds a listener that will get called when ctrl+C is pressed
+void RealtimeWorld::registerShutdownListener(std::function<void()> listener)
+{
+  mShutdownListeners.push_back(listener);
 }
 
 /// This adds a listener that will get called when there is a key-down event

@@ -77,6 +77,11 @@ public:
   // Broadcast a raw text message to all clients
   void broadcast(const string& message);
 
+  // This sets up shutdown hooks to terminate the server (and optionally a
+  // io_service::work object) on ctrl+C
+  void setupShutdownHooks(
+      asio::io_service* io_service, asio::io_service::work* mainWork);
+
 protected:
   static Json::Value parseJson(const string& json);
   static string stringifyJson(const Json::Value& val);
@@ -89,6 +94,7 @@ protected:
   WebsocketEndpoint endpoint;
   vector<ClientConnection> openConnections;
   std::mutex connectionListMutex;
+  asio::signal_set* mSignalSet;
 
   vector<std::function<void(ClientConnection)>> connectHandlers;
   vector<std::function<void(ClientConnection)>> disconnectHandlers;

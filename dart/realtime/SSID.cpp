@@ -8,6 +8,8 @@
 #include "dart/trajectory/MultiShot.hpp"
 #include "dart/trajectory/TrajectoryRollout.hpp"
 
+#include "signal.h"
+
 namespace dart {
 
 using namespace trajectory;
@@ -196,6 +198,14 @@ void SSID::registerInferListener(
 /// This is the function for the optimization thread to run when we're live
 void SSID::optimizationThreadLoop()
 {
+  // block signals in this thread and subsequently
+  // spawned threads, so they're guaranteed to go to the server thread
+  sigset_t sigset;
+  sigemptyset(&sigset);
+  sigaddset(&sigset, SIGINT);
+  sigaddset(&sigset, SIGTERM);
+  pthread_sigmask(SIG_BLOCK, &sigset, nullptr);
+
   while (mRunning)
   {
     long startTime = timeSinceEpochMillis();

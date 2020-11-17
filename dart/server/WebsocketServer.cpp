@@ -205,3 +205,10 @@ void WebsocketServer::onMessage(
     }
   }
 }
+
+// This sets up shutdown hooks to terminate the server (and optionally a
+// io_service::work object) on ctrl+C
+void WebsocketServer::setupShutdownHooks(
+    asio::io_service* io_service, asio::io_service::work* mainWork)
+{
+}
