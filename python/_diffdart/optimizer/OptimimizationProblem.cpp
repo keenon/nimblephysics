@@ -42,7 +42,7 @@ namespace py = pybind11;
 namespace dart {
 namespace python {
 
-void Problem(py::module& m)
+void OptimizationProblem(py::module& m)
 {
   ::py::class_<
       dart::optimizer::Problem,

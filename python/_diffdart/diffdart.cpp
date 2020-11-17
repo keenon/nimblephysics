@@ -51,6 +51,7 @@ void dart_utils(py::module& m);
 void dart_neural(py::module& m);
 void dart_trajectory(py::module& m);
 void dart_performance(py::module& m);
+void dart_realtime(py::module& m);
 
 PYBIND11_MODULE(_diffdart, m)
 {
@@ -69,6 +70,7 @@ PYBIND11_MODULE(_diffdart, m)
   dart_neural(m);
   dart_trajectory(m);
   dart_performance(m);
+  dart_realtime(m);
 }
 
 } // namespace python

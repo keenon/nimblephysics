@@ -41,11 +41,11 @@ namespace python {
 
 void IPOptOptimizer(py::module& sm);
 void LossFn(py::module& sm);
-void AbstractShot(py::module& sm);
+void Problem(py::module& sm);
 void MultiShot(py::module& sm);
 void SingleShot(py::module& sm);
 void TrajectoryRollout(py::module& sm);
-void OptimizationRecord(py::module& sm);
+void Solution(py::module& sm);
 
 void dart_trajectory(py::module& m)
 {
@@ -57,11 +57,11 @@ void dart_trajectory(py::module& m)
 
   IPOptOptimizer(sm);
   LossFn(sm);
-  AbstractShot(sm);
+  Problem(sm);
   MultiShot(sm);
   SingleShot(sm);
   TrajectoryRollout(sm);
-  OptimizationRecord(sm);
+  Solution(sm);
 }
 
 } // namespace python

@@ -48,7 +48,8 @@ void IPOptOptimizer(py::module& m)
       .def(
           "optimize",
           &dart::trajectory::IPOptOptimizer::optimize,
-          ::py::arg("shot"))
+          ::py::arg("shot"),
+          ::py::arg("reuseRecord") = nullptr)
       .def(
           "setIterationLimit",
           &dart::trajectory::IPOptOptimizer::setIterationLimit,
@@ -80,7 +81,19 @@ void IPOptOptimizer(py::module& m)
       .def(
           "setSuppressOutput",
           &dart::trajectory::IPOptOptimizer::setSuppressOutput,
-          ::py::arg("suppressOutput") = true);
+          ::py::arg("suppressOutput") = true)
+      .def(
+          "setSilenceOutput",
+          &dart::trajectory::IPOptOptimizer::setSilenceOutput,
+          ::py::arg("silenceOutput") = true)
+      .def(
+          "setDisableLinesearch",
+          &dart::trajectory::IPOptOptimizer::setDisableLinesearch,
+          ::py::arg("disableLinesearch") = true)
+      .def(
+          "setRecordIterations",
+          &dart::trajectory::IPOptOptimizer::setRecordIterations,
+          ::py::arg("recordIterations") = true);
 }
 
 } // namespace python

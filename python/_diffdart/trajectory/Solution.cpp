@@ -30,31 +30,27 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <dart/config.hpp>
+#include <dart/simulation/World.hpp>
+#include <dart/trajectory/Solution.hpp>
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 
 namespace py = pybind11;
 
 namespace dart {
 namespace python {
 
-void Solver(py::module& sm);
-void GradientDescentSolver(py::module& sm);
-
-void Function(py::module& sm);
-
-void OptimizationProblem(py::module& sm);
-
-void dart_optimizer(py::module& m)
+void Solution(py::module& m)
 {
-  auto sm = m.def_submodule("optimizer");
-
-  Solver(sm);
-  GradientDescentSolver(sm);
-
-  Function(sm);
-
-  OptimizationProblem(sm);
+  ::py::class_<
+      dart::trajectory::Solution,
+      std::shared_ptr<dart::trajectory::Solution>>(m, "Solution")
+      .def("toJson", &dart::trajectory::Solution::toJson, ::py::arg("world"))
+      .def(
+          "getPerfLog",
+          &dart::trajectory::Solution::getPerfLog,
+          ::py::return_value_policy::reference)
+      .def("reoptimize", &dart::trajectory::Solution::reoptimize);
 }
 
 } // namespace python

@@ -224,9 +224,9 @@ TimestepJacobians finiteDifferenceStartStateJacobians(
     std::shared_ptr<simulation::World> world, double EPS);
 */
 
-void AbstractShot(py::module& m)
+void Problem(py::module& m)
 {
-  ::py::class_<dart::trajectory::Problem>(m, "AbstractShot")
+  ::py::class_<dart::trajectory::Problem>(m, "Problem")
       .def("setLoss", &dart::trajectory::Problem::setLoss, ::py::arg("loss"))
       .def(
           "addConstraint",
@@ -303,108 +303,108 @@ void AbstractShot(py::module& m)
   /*
 .def(
   "getRepresentation",
-  &dart::trajectory::AbstractShot::getRepresentation)
+  &dart::trajectory::Problem::getRepresentation)
 .def(
   "flatten",
-  &dart::trajectory::AbstractShot::flatten,
+  &dart::trajectory::Problem::flatten,
   ::py::arg("flat"))
 .def(
   "unflatten",
-  &dart::trajectory::AbstractShot::unflatten,
+  &dart::trajectory::Problem::unflatten,
   ::py::arg("flat"))
 .def(
   "getUpperBounds",
-  &dart::trajectory::AbstractShot::getUpperBounds,
+  &dart::trajectory::Problem::getUpperBounds,
   ::py::arg("world"),
   ::py::arg("flat"))
 .def(
   "getLowerBounds",
-  &dart::trajectory::AbstractShot::getLowerBounds,
+  &dart::trajectory::Problem::getLowerBounds,
   ::py::arg("world"),
   ::py::arg("flat"))
 .def(
   "getConstraintUpperBounds",
-  &dart::trajectory::AbstractShot::getConstraintUpperBounds,
+  &dart::trajectory::Problem::getConstraintUpperBounds,
   ::py::arg("flat"))
 .def(
   "getConstraintLowerBounds",
-  &dart::trajectory::AbstractShot::getConstraintLowerBounds,
+  &dart::trajectory::Problem::getConstraintLowerBounds,
   ::py::arg("flat"))
 .def(
   "getInitialGuess",
-  &dart::trajectory::AbstractShot::getInitialGuess,
+  &dart::trajectory::Problem::getInitialGuess,
   ::py::arg("world"),
   ::py::arg("flat"))
 .def(
   "computeConstraints",
-  &dart::trajectory::AbstractShot::computeConstraints,
+  &dart::trajectory::Problem::computeConstraints,
   ::py::arg("world"),
   ::py::arg("constraints"))
 .def(
   "backpropJacobian",
-  &dart::trajectory::AbstractShot::backpropJacobian,
+  &dart::trajectory::Problem::backpropJacobian,
   ::py::arg("world"),
   ::py::arg("jac"))
 .def(
   "backpropGradient",
-  &dart::trajectory::AbstractShot::backpropGradient,
+  &dart::trajectory::Problem::backpropGradient,
   ::py::arg("world"),
   ::py::arg("grad"))
 .def(
   "getLoss",
-  &dart::trajectory::AbstractShot::getLoss,
+  &dart::trajectory::Problem::getLoss,
   ::py::arg("world"))
 .def(
   "backpropGradientWrt",
-  &dart::trajectory::AbstractShot::backpropGradientWrt,
+  &dart::trajectory::Problem::backpropGradientWrt,
   ::py::arg("world"),
   ::py::arg("gradWrtRollout"),
   ::py::arg("grad"))
 .def(
   "getStates",
-  &dart::trajectory::AbstractShot::getStates,
+  &dart::trajectory::Problem::getStates,
   ::py::arg("world"),
   ::py::arg("rollout"),
   ::py::arg("useKnots") = true)
 .def(
   "getRolloutCache",
-  &dart::trajectory::AbstractShot::getRolloutCache,
+  &dart::trajectory::Problem::getRolloutCache,
   ::py::arg("world"),
   ::py::arg("useKnots") = true)
 .def(
   "getGradientWrtRolloutCache",
-  &dart::trajectory::AbstractShot::getGradientWrtRolloutCache,
+  &dart::trajectory::Problem::getGradientWrtRolloutCache,
   ::py::arg("world"),
   ::py::arg("useKnots") = true)
 .def(
   "getNumberNonZeroJacobian",
-  &dart::trajectory::AbstractShot::getNumberNonZeroJacobian)
+  &dart::trajectory::Problem::getNumberNonZeroJacobian)
 .def(
   "getJacobianSparsityStructure",
-  &dart::trajectory::AbstractShot::getJacobianSparsityStructure,
+  &dart::trajectory::Problem::getJacobianSparsityStructure,
   ::py::arg("rows"),
   ::py::arg("cols"))
 .def(
   "getSparseJacobian",
-  &dart::trajectory::AbstractShot::getSparseJacobian,
+  &dart::trajectory::Problem::getSparseJacobian,
   ::py::arg("sparse"))
 .def(
   "finiteDifferenceJacobian",
-  &dart::trajectory::AbstractShot::finiteDifferenceJacobian,
+  &dart::trajectory::Problem::finiteDifferenceJacobian,
   ::py::arg("world"),
   ::py::arg("jac"))
 .def(
   "finiteDifferenceGradient",
-  &dart::trajectory::AbstractShot::finiteDifferenceGradient,
+  &dart::trajectory::Problem::finiteDifferenceGradient,
   ::py::arg("world"),
   ::py::arg("grad"))
 .def(
   "backpropStartStateJacobians",
-  &dart::trajectory::AbstractShot::backpropStartStateJacobians,
+  &dart::trajectory::Problem::backpropStartStateJacobians,
   ::py::arg("world"))
 .def(
   "finiteDifferenceStartStateJacobians",
-  &dart::trajectory::AbstractShot::finiteDifferenceStartStateJacobians,
+  &dart::trajectory::Problem::finiteDifferenceStartStateJacobians,
   ::py::arg("world"),
   ::py::arg("EPS"));
   */

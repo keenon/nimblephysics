@@ -30,27 +30,28 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <dart/simulation/World.hpp>
-#include <dart/trajectory/Solution.hpp>
+#include <Eigen/Dense>
+#include <pybind11/eigen.h>
 #include <pybind11/pybind11.h>
-#include <pybind11/stl.h>
 
 namespace py = pybind11;
 
 namespace dart {
 namespace python {
 
-void OptimizationRecord(py::module& m)
+void MPC(py::module& sm);
+void RealtimeWorld(py::module& sm);
+
+void dart_realtime(py::module& m)
 {
-  ::py::class_<
-      dart::trajectory::Solution,
-      std::shared_ptr<dart::trajectory::Solution>>(m, "OptimizationRecord")
-      .def("toJson", &dart::trajectory::Solution::toJson, ::py::arg("world"))
-      .def(
-          "getPerfLog",
-          &dart::trajectory::Solution::getPerfLog,
-          ::py::return_value_policy::reference)
-      .def("reoptimize", &dart::trajectory::Solution::reoptimize);
+  auto sm = m.def_submodule("realtime");
+
+  sm.doc()
+      = "This provides a native realtime MPC and SSID framework to DART, "
+        "utilizing the trajectory folder.";
+
+  MPC(sm);
+  RealtimeWorld(sm);
 }
 
 } // namespace python

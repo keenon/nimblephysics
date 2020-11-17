@@ -49,7 +49,6 @@
 #include "dart/constraint/ConstrainedGroup.hpp"
 #include "dart/dynamics/BoxShape.hpp"
 #include "dart/dynamics/Skeleton.hpp"
-#include "dart/integration/SemiImplicitEulerIntegrator.hpp"
 #include "dart/neural/ConstrainedGroupGradientMatrices.hpp"
 #include "dart/neural/WithRespectToMass.hpp"
 #include "dart/server/RawJsonUtils.hpp"
