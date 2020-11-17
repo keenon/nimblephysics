@@ -1,5 +1,7 @@
 # ![Stanford DiffDART](http://www.diffdart.org/assets/images/logos.svg)
 
+[![Build Status](https://dev.azure.com/keenonwerling/diffdart/_apis/build/status/keenon.diffdart?branchName=master)](https://dev.azure.com/keenonwerling/diffdart/_build/latest?definitionId=1&branchName=master)
+
 # Stanford DiffDART
 
 `pip3 install diffdart`
