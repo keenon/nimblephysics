@@ -199,8 +199,6 @@ void RealTimeControlBuffer::estimateWorldStateAt(
   int elapsedSinceObservation = time - obs.time;
   if (elapsedSinceObservation < 0)
   {
-    std::cout << "Observation time: " << obs.time << std::endl;
-    std::cout << "Requested time: " << time << std::endl;
     assert(
         elapsedSinceObservation < 0
         && "estimateWorldStateAt() cannot ask far a time before the earliest available observation.");

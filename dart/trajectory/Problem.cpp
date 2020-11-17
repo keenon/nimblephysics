@@ -49,6 +49,21 @@ void Problem::addConstraint(LossFn loss)
 }
 
 //==============================================================================
+/// Register constant metadata, which will be passed along to the loss
+/// function, but will not be backpropagated into.
+void Problem::setMetadata(std::string key, Eigen::MatrixXd value)
+{
+  mMetadata[key] = value;
+}
+
+//==============================================================================
+/// This returns the whole map for metadata
+std::unordered_map<std::string, Eigen::MatrixXd>& Problem::getMetadataMap()
+{
+  return mMetadata;
+}
+
+//==============================================================================
 /// This sets the mapping we're using to store the representation of the Shot.
 /// WARNING: THIS IS A POTENTIALLY DESTRUCTIVE OPERATION! This will rewrite
 /// the internal representation of the Shot to use the new mapping, and if the

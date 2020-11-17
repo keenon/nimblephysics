@@ -16,7 +16,8 @@ class World;
 namespace trajectory {
 class LossFn;
 class Solution;
-class MultiShot;
+class Problem;
+class Optimizer;
 class TrajectoryRollout;
 } // namespace trajectory
 
@@ -37,6 +38,20 @@ public:
   /// function is to track a mouse pointer in a simulated environment, we may
   /// reset the loss function every time the mouse moves.
   void setLoss(std::shared_ptr<trajectory::LossFn> loss);
+
+  /// This sets the optimizer that MPC will use. This will override the default
+  /// optimizer. This should be called before start().
+  void setOptimizer(std::shared_ptr<trajectory::Optimizer> optimizer);
+
+  /// This returns the current optimizer that MPC is using
+  std::shared_ptr<trajectory::Optimizer> getOptimizer();
+
+  /// This sets the problem that MPC will use. This will override the default
+  /// problem. This should be called before start().
+  void setProblem(std::shared_ptr<trajectory::Problem> problem);
+
+  /// This returns the current problem definition that MPC is using
+  std::shared_ptr<trajectory::Problem> getProblem();
 
   /// This gets the force to apply to the world at this instant. If we haven't
   /// computed anything for this instant yet, this just returns 0s.
@@ -142,10 +157,11 @@ protected:
   RealTimeControlBuffer mBuffer;
   std::thread mOptimizationThread;
   bool mSilent;
-  // This is saved info so that we can reoptimize rather than create a fresh
-  // problem each time
+
+  std::shared_ptr<trajectory::Optimizer> mOptimizer;
   std::shared_ptr<trajectory::Solution> mSolution;
-  std::shared_ptr<trajectory::MultiShot> mShot;
+  std::shared_ptr<trajectory::Problem> mProblem;
+
   // These are listeners that get called when we finish replanning
   std::vector<std::function<void(const trajectory::TrajectoryRollout*, long)>>
       mReplannedListeners;

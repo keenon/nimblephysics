@@ -169,6 +169,12 @@ public:
   /// This returns start vel
   Eigen::VectorXd getStartVel() override;
 
+  /// This sets the start pos
+  void setStartPos(Eigen::VectorXd startPos) override;
+
+  /// This sets the start vel
+  void setStartVel(Eigen::VectorXd startVel) override;
+
   /// This unrolls the shot, and returns the (pos, vel) state concatenated at
   /// the end of the shot
   Eigen::VectorXd getFinalState(

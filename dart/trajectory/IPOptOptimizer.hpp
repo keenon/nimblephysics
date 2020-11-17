@@ -26,7 +26,7 @@ namespace trajectory {
  * to create a buffer that's possible for IPOPT to own without freeing the
  * underlying trajectory when it's done.
  */
-class IPOptOptimizer : Optimizer
+class IPOptOptimizer : public Optimizer
 {
 public:
   IPOptOptimizer();

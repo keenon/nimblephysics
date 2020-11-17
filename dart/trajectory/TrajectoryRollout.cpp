@@ -118,10 +118,13 @@ std::string TrajectoryRollout::toJson(
 
 //==============================================================================
 TrajectoryRolloutReal::TrajectoryRolloutReal(
-    std::unordered_map<std::string, std::shared_ptr<neural::Mapping>> mappings,
+    const std::unordered_map<std::string, std::shared_ptr<neural::Mapping>>
+        mappings,
     int steps,
     std::string representationMapping,
-    int massDim)
+    int massDim,
+    const std::unordered_map<std::string, Eigen::MatrixXd> metadata)
+  : mMetadata(metadata)
 {
   mRepresentationMapping = representationMapping;
   for (auto pair : mappings)
@@ -141,7 +144,8 @@ TrajectoryRolloutReal::TrajectoryRolloutReal(Problem* shot)
       shot->getMappings(),
       shot->getNumSteps(),
       shot->getRepresentationName(),
-      shot->getMassDims())
+      shot->getMassDims(),
+      shot->getMetadataMap())
 {
 }
 
@@ -170,6 +174,7 @@ TrajectoryRolloutReal::TrajectoryRolloutReal(const TrajectoryRollout* copy)
     mForces[key] = copy->getForcesConst(key);
   }
   mMasses = copy->getMassesConst();
+  mMetadata = copy->getMetadataMap();
 }
 
 //==============================================================================
@@ -225,6 +230,36 @@ const Eigen::Ref<const Eigen::VectorXd> TrajectoryRolloutReal::getMassesConst()
     const
 {
   return mMasses;
+}
+
+//==============================================================================
+const std::unordered_map<std::string, Eigen::MatrixXd>&
+TrajectoryRolloutReal::getMetadataMap() const
+{
+  return mMetadata;
+}
+
+//==============================================================================
+Eigen::MatrixXd TrajectoryRolloutReal::getMetadata(const std::string& key) const
+{
+  if (mMetadata.find(key) == mMetadata.end())
+  {
+    std::cout << "Warning: Asking TrajectoryRollout for metadata key \"" << key
+              << "\" that doesn't exist! Keys that do exist:" << std::endl;
+    for (auto pair : mMetadata)
+    {
+      std::cout << "   - \"" << pair.first << "\"" << std::endl;
+    }
+    return Eigen::MatrixXd::Zero(0, 0);
+  }
+  return mMetadata.at(key);
+}
+
+//==============================================================================
+void TrajectoryRolloutReal::setMetadata(
+    const std::string& key, Eigen::MatrixXd value)
+{
+  mMetadata[key] = value;
 }
 
 //==============================================================================
@@ -309,6 +344,26 @@ const Eigen::Ref<const Eigen::VectorXd> TrajectoryRolloutRef::getMassesConst()
 }
 
 //==============================================================================
+const std::unordered_map<std::string, Eigen::MatrixXd>&
+TrajectoryRolloutRef::getMetadataMap() const
+{
+  return mToSlice->getMetadataMap();
+}
+
+//==============================================================================
+Eigen::MatrixXd TrajectoryRolloutRef::getMetadata(const std::string& key) const
+{
+  return mToSlice->getMetadata(key);
+}
+
+//==============================================================================
+void TrajectoryRolloutRef::setMetadata(
+    const std::string& key, Eigen::MatrixXd value)
+{
+  mToSlice->setMetadata(key, value);
+}
+
+//==============================================================================
 /// Slice constructor
 TrajectoryRolloutConstRef::TrajectoryRolloutConstRef(
     const TrajectoryRollout* toSlice, int start, int len)
@@ -384,6 +439,27 @@ const Eigen::Ref<const Eigen::VectorXd>
 TrajectoryRolloutConstRef::getMassesConst() const
 {
   return mToSlice->getMassesConst();
+}
+
+//==============================================================================
+const std::unordered_map<std::string, Eigen::MatrixXd>&
+TrajectoryRolloutConstRef::getMetadataMap() const
+{
+  return mToSlice->getMetadataMap();
+}
+
+//==============================================================================
+Eigen::MatrixXd TrajectoryRolloutConstRef::getMetadata(
+    const std::string& key) const
+{
+  return mToSlice->getMetadata(key);
+}
+
+//==============================================================================
+void TrajectoryRolloutConstRef::setMetadata(
+    const std::string& key, Eigen::MatrixXd value)
+{
+  assert(false && "It should be impossible to get a mutable reference from a TrajectorRolloutConstRef");
 }
 
 } // namespace trajectory

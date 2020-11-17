@@ -797,6 +797,10 @@ void SingleShot::getStates(
   }
   assert(rollout->getMasses().size() == world->getMassDims());
   rollout->getMasses() = world->getMasses();
+  for (auto pair : mMetadata)
+  {
+    rollout->setMetadata(pair.first, pair.second);
+  }
 
 #ifdef LOG_PERFORMANCE_SINGLE_SHOT
   if (thisLog != nullptr)
@@ -891,6 +895,20 @@ Eigen::VectorXd SingleShot::getStartPos()
 Eigen::VectorXd SingleShot::getStartVel()
 {
   return mStartVel;
+}
+
+//==============================================================================
+/// This sets the start pos
+void SingleShot::setStartPos(Eigen::VectorXd startPos)
+{
+  mStartPos = startPos;
+}
+
+//==============================================================================
+/// This sets the start vel
+void SingleShot::setStartVel(Eigen::VectorXd startVel)
+{
+  mStartVel = startVel;
 }
 
 //==============================================================================

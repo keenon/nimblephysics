@@ -58,8 +58,10 @@ std::shared_ptr<Solution> IPOptOptimizer::optimize(
   app->Options()->SetStringValue(
       "hessian_approximation", "limited-memory"); // limited-memory, exacty
 
+  /*
   app->Options()->SetStringValue(
       "scaling_method", "none"); // none, gradient-based
+  */
 
   app->Options()->SetIntegerValue("max_iter", mIterationLimit);
 
@@ -77,7 +79,7 @@ std::shared_ptr<Solution> IPOptOptimizer::optimize(
 
   if (mPrintFrequency > 0)
   {
-    app->Options()->SetNumericValue("print_frequency_iter", mPrintFrequency);
+    app->Options()->SetIntegerValue("print_frequency_iter", mPrintFrequency);
   }
   else
   {

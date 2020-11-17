@@ -49,6 +49,13 @@ public:
   /// Add a custom constraint function to the trajectory
   void addConstraint(LossFn loss);
 
+  /// Register constant metadata, which will be passed along to the loss
+  /// function, but will not be backpropagated into.
+  void setMetadata(std::string key, Eigen::MatrixXd value);
+
+  /// This returns the whole map for metadata
+  std::unordered_map<std::string, Eigen::MatrixXd>& getMetadataMap();
+
   /// This sets the mapping we're using to store the representation of the Shot.
   /// WARNING: THIS IS A POTENTIALLY DESTRUCTIVE OPERATION! This will rewrite
   /// the internal representation of the Shot to use the new mapping, and if the
@@ -249,6 +256,12 @@ public:
   /// This returns start vel
   virtual Eigen::VectorXd getStartVel() = 0;
 
+  /// This sets the start pos
+  virtual void setStartPos(Eigen::VectorXd startPos) = 0;
+
+  /// This sets the start vel
+  virtual void setStartVel(Eigen::VectorXd startVel) = 0;
+
   /// This unrolls the shot, and returns the (pos, vel) state concatenated at
   /// the end of the shot
   virtual Eigen::VectorXd getFinalState(
@@ -447,6 +460,7 @@ protected:
   bool mRolloutCacheDirty;
   std::shared_ptr<TrajectoryRolloutReal> mRolloutCache;
   std::shared_ptr<TrajectoryRolloutReal> mGradWrtRolloutCache;
+  std::unordered_map<std::string, Eigen::MatrixXd> mMetadata;
 };
 
 } // namespace trajectory

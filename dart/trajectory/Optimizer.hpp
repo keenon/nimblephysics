@@ -11,6 +11,7 @@ class Solution;
 
 class Optimizer
 {
+public:
   virtual std::shared_ptr<Solution> optimize(
       Problem* shot, std::shared_ptr<Solution> warmStart = nullptr)
       = 0;

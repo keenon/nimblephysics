@@ -71,6 +71,32 @@ void MPC::setLoss(std::shared_ptr<trajectory::LossFn> loss)
   mLoss = loss;
 }
 
+/// This sets the optimizer that MPC will use. This will override the default
+/// optimizer. This should be called before start().
+void MPC::setOptimizer(std::shared_ptr<trajectory::Optimizer> optimizer)
+{
+  mOptimizer = optimizer;
+}
+
+/// This returns the current optimizer that MPC is using
+std::shared_ptr<trajectory::Optimizer> MPC::getOptimizer()
+{
+  return mOptimizer;
+}
+
+/// This sets the problem that MPC will use. This will override the default
+/// problem. This should be called before start().
+void MPC::setProblem(std::shared_ptr<trajectory::Problem> problem)
+{
+  mProblem = problem;
+}
+
+/// This returns the current problem definition that MPC is using
+std::shared_ptr<trajectory::Problem> MPC::getProblem()
+{
+  return mProblem;
+}
+
 /// This gets the force to apply to the world at this instant. If we haven't
 /// computed anything for this instant yet, this just returns 0s.
 Eigen::VectorXd MPC::getForce(long now)
@@ -173,35 +199,45 @@ void MPC::optimizePlan(long startTime)
     PerformanceLog::initialize();
     PerformanceLog* log = PerformanceLog::startRoot("MPC loop");
 
-    PerformanceLog* createOpt = log->startRun("Create IPOPT");
-
-    IPOptOptimizer optimizer = IPOptOptimizer();
-    optimizer.setCheckDerivatives(false);
-    optimizer.setSuppressOutput(true);
-    optimizer.setRecoverBest(mEnableOptimizationGuards);
-    optimizer.setTolerance(1e-3);
-    optimizer.setIterationLimit(mMaxIterations);
-    optimizer.setDisableLinesearch(!mEnableLinesearch);
-    optimizer.setRecordFullDebugInfo(false);
-    optimizer.setRecordIterations(false);
-    if (mSilent)
-    {
-      optimizer.setSilenceOutput(true);
-    }
-
-    createOpt->end();
-
-    PerformanceLog* estimateState = log->startRun("Estimate State");
     std::shared_ptr<simulation::World> worldClone = mWorld->clone();
+    PerformanceLog* estimateState = log->startRun("Estimate State");
     mBuffer.estimateWorldStateAt(worldClone, &mObservationLog, startTime);
     estimateState->end();
 
-    PerformanceLog* optimizeTrack = log->startRun("Optimize");
-    mShot = std::make_shared<MultiShot>(
-        worldClone, *mLoss.get(), mSteps, mShotLength, false);
-    mShot->setParallelOperationsEnabled(true);
+    if (!mOptimizer)
+    {
+      PerformanceLog* createOpt = log->startRun("Create Default IPOPT");
 
-    mSolution = optimizer.optimize(mShot.get());
+      std::shared_ptr<IPOptOptimizer> ipoptOptimizer
+          = std::make_shared<IPOptOptimizer>();
+      ipoptOptimizer->setCheckDerivatives(false);
+      ipoptOptimizer->setSuppressOutput(true);
+      ipoptOptimizer->setRecoverBest(mEnableOptimizationGuards);
+      ipoptOptimizer->setTolerance(1e-3);
+      ipoptOptimizer->setIterationLimit(mMaxIterations);
+      ipoptOptimizer->setDisableLinesearch(!mEnableLinesearch);
+      ipoptOptimizer->setRecordFullDebugInfo(false);
+      ipoptOptimizer->setRecordIterations(false);
+      if (mSilent)
+      {
+        ipoptOptimizer->setSilenceOutput(true);
+      }
+      mOptimizer = ipoptOptimizer;
+
+      createOpt->end();
+    }
+
+    if (!mProblem)
+    {
+      std::shared_ptr<MultiShot> multishot = std::make_shared<MultiShot>(
+          worldClone, *mLoss.get(), mSteps, mShotLength, false);
+      multishot->setParallelOperationsEnabled(true);
+      mProblem = multishot;
+    }
+
+    PerformanceLog* optimizeTrack = log->startRun("Optimize");
+
+    mSolution = mOptimizer->optimize(mProblem.get());
     optimizeTrack->end();
 
     mLastOptimizedTime = startTime;
@@ -209,7 +245,7 @@ void MPC::optimizePlan(long startTime)
     mBuffer.setForcePlan(
         startTime,
         timeSinceEpochMillis(),
-        mShot->getRolloutCache(worldClone)->getForcesConst());
+        mProblem->getRolloutCache(worldClone)->getForcesConst());
 
     log->end();
 
@@ -239,7 +275,7 @@ void MPC::optimizePlan(long startTime)
     mBuffer.estimateWorldStateAt(
         worldClone, &mObservationLog, roundedStartTime);
 
-    mShot->advanceSteps(
+    mProblem->advanceSteps(
         worldClone,
         worldClone->getPositions(),
         worldClone->getVelocities(),
@@ -250,7 +286,7 @@ void MPC::optimizePlan(long startTime)
     mBuffer.setForcePlan(
         startTime,
         timeSinceEpochMillis(),
-        mShot->getRolloutCache(worldClone)->getForcesConst());
+        mProblem->getRolloutCache(worldClone)->getForcesConst());
 
     long computeDurationWallTime
         = timeSinceEpochMillis() - startComputeWallTime;
@@ -258,7 +294,7 @@ void MPC::optimizePlan(long startTime)
     // Call any listeners that might be waiting on us
     for (auto listener : mReplannedListeners)
     {
-      listener(mShot->getRolloutCache(worldClone), computeDurationWallTime);
+      listener(mProblem->getRolloutCache(worldClone), computeDurationWallTime);
     }
 
     if (!mSilent)

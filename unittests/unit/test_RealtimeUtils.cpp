@@ -40,6 +40,7 @@
 #include "dart/realtime/ControlLog.hpp"
 #include "dart/realtime/ObservationLog.hpp"
 #include "dart/realtime/RealTimeControlBuffer.hpp"
+#include "dart/realtime/VectorLog.hpp"
 #include "dart/simulation/World.hpp"
 
 #include "TestHelpers.hpp"
@@ -53,6 +54,75 @@ using namespace dynamics;
 using namespace simulation;
 using namespace neural;
 using namespace realtime;
+
+#ifdef ALL_TESTS
+TEST(REALTIME, VECTOR_LOG)
+{
+  int dim = 2;
+  VectorLog log = VectorLog(dim);
+
+  log.record(0L, Eigen::VectorXd::Ones(dim) * 1);
+  log.record(10L, Eigen::VectorXd::Ones(dim) * 2);
+
+  Eigen::MatrixXd expected = Eigen::MatrixXd::Ones(dim, 20);
+  expected.block(0, 10, 2, 10) *= 2;
+  Eigen::MatrixXd actual = log.getValues(0L, 20, 1L);
+
+  if (!equals(expected, actual))
+  {
+    std::cout << "Expected: " << std::endl << expected << std::endl;
+    std::cout << "Actual: " << std::endl << actual << std::endl;
+  }
+
+  EXPECT_TRUE(equals(expected, actual));
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(REALTIME, VECTOR_LOG_EXTEND)
+{
+  int dim = 2;
+  VectorLog log = VectorLog(dim);
+
+  log.record(0L, Eigen::VectorXd::Ones(dim) * 1);
+  log.record(10L, Eigen::VectorXd::Ones(dim) * 2);
+
+  Eigen::MatrixXd expected = Eigen::MatrixXd::Ones(dim, 20);
+  expected.block(0, 2, 2, 18) *= 2;
+  Eigen::MatrixXd actual = log.getValues(8L, 20, 1L);
+
+  if (!equals(expected, actual))
+  {
+    std::cout << "Expected: " << std::endl << expected << std::endl;
+    std::cout << "Actual: " << std::endl << actual << std::endl;
+  }
+
+  EXPECT_TRUE(equals(expected, actual));
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(REALTIME, VECTOR_LOG_AFTER)
+{
+  int dim = 2;
+  VectorLog log = VectorLog(dim);
+
+  log.record(0L, Eigen::VectorXd::Ones(dim) * 1);
+  log.record(10L, Eigen::VectorXd::Ones(dim) * 2);
+
+  Eigen::MatrixXd expected = Eigen::MatrixXd::Ones(dim, 20);
+  expected *= 2;
+  Eigen::MatrixXd actual = log.getValues(18L, 20, 1L);
+
+  if (!equals(expected, actual))
+  {
+    std::cout << "Expected: " << std::endl << expected << std::endl;
+    std::cout << "Actual: " << std::endl << actual << std::endl;
+  }
+
+  EXPECT_TRUE(equals(expected, actual));
+}
+#endif
 
 #ifdef ALL_TESTS
 TEST(REALTIME, CONTROL_LOG)

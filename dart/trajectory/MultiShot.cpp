@@ -1020,6 +1020,10 @@ void MultiShot::getStates(
   }
   assert(cursor == mSteps);
   rollout->getMasses() = world->getMasses();
+  for (auto pair : mMetadata)
+  {
+    rollout->setMetadata(pair.first, pair.second);
+  }
 
 #ifdef LOG_PERFORMANCE_MULTI_SHOT
   if (thisLog != nullptr)
@@ -1164,6 +1168,20 @@ Eigen::VectorXd MultiShot::getStartPos()
 Eigen::VectorXd MultiShot::getStartVel()
 {
   return mShots[0]->getStartVel();
+}
+
+//==============================================================================
+/// This sets the start pos
+void MultiShot::setStartPos(Eigen::VectorXd startPos)
+{
+  mShots[0]->setStartPos(startPos);
+}
+
+//==============================================================================
+/// This sets the start vel
+void MultiShot::setStartVel(Eigen::VectorXd startVel)
+{
+  mShots[0]->setStartVel(startVel);
 }
 
 //==============================================================================

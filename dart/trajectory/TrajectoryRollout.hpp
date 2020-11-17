@@ -51,6 +51,11 @@ public:
       const std::string& mapping = "identity") const = 0;
   virtual const Eigen::Ref<const Eigen::VectorXd> getMassesConst() const = 0;
 
+  virtual const std::unordered_map<std::string, Eigen::MatrixXd>&
+  getMetadataMap() const = 0;
+  virtual Eigen::MatrixXd getMetadata(const std::string& key) const = 0;
+  virtual void setMetadata(const std::string& key, Eigen::MatrixXd value) = 0;
+
   /// This returns a trajectory rollout ref, corresponding to a slice
   /// of this trajectory rollout
   TrajectoryRolloutRef slice(int start, int len);
@@ -72,11 +77,12 @@ class TrajectoryRolloutReal : public TrajectoryRollout
 public:
   /// Fresh copy constructior
   TrajectoryRolloutReal(
-      std::unordered_map<std::string, std::shared_ptr<neural::Mapping>>
+      const std::unordered_map<std::string, std::shared_ptr<neural::Mapping>>
           mappings,
       int steps,
       std::string representationMapping,
-      int massDim);
+      int massDim,
+      const std::unordered_map<std::string, Eigen::MatrixXd> metadata);
 
   /// Create a fresh trajector rollout for a shot
   TrajectoryRolloutReal(Problem* shot);
@@ -101,11 +107,18 @@ public:
       const std::string& mapping = "identity") const override;
   const Eigen::Ref<const Eigen::VectorXd> getMassesConst() const override;
 
+  virtual const std::unordered_map<std::string, Eigen::MatrixXd>&
+  getMetadataMap() const override;
+  virtual Eigen::MatrixXd getMetadata(const std::string& key) const override;
+  virtual void setMetadata(
+      const std::string& key, Eigen::MatrixXd value) override;
+
 protected:
   std::unordered_map<std::string, Eigen::MatrixXd> mPoses;
   std::unordered_map<std::string, Eigen::MatrixXd> mVels;
   std::unordered_map<std::string, Eigen::MatrixXd> mForces;
   Eigen::VectorXd mMasses;
+  std::unordered_map<std::string, Eigen::MatrixXd> mMetadata;
   std::string mRepresentationMapping;
   std::vector<std::string> mMappings;
 };
@@ -132,6 +145,12 @@ public:
   const Eigen::Ref<const Eigen::MatrixXd> getForcesConst(
       const std::string& mapping = "identity") const override;
   const Eigen::Ref<const Eigen::VectorXd> getMassesConst() const override;
+
+  virtual const std::unordered_map<std::string, Eigen::MatrixXd>&
+  getMetadataMap() const override;
+  virtual Eigen::MatrixXd getMetadata(const std::string& key) const override;
+  virtual void setMetadata(
+      const std::string& key, Eigen::MatrixXd value) override;
 
 protected:
   TrajectoryRollout* mToSlice;
@@ -162,6 +181,12 @@ public:
   const Eigen::Ref<const Eigen::MatrixXd> getForcesConst(
       const std::string& mapping = "identity") const override;
   const Eigen::Ref<const Eigen::VectorXd> getMassesConst() const override;
+
+  virtual const std::unordered_map<std::string, Eigen::MatrixXd>&
+  getMetadataMap() const override;
+  virtual Eigen::MatrixXd getMetadata(const std::string& key) const override;
+  virtual void setMetadata(
+      const std::string& key, Eigen::MatrixXd value) override;
 
 protected:
   const TrajectoryRollout* mToSlice;
