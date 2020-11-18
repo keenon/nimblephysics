@@ -198,3 +198,18 @@ RUN git clone https://github.com/PlatformLab/PerfUtils.git && \
     popd && \
     popd && \
     rm -rf PerfUtils
+
+ENV PROTOBUF_VERSION="3.14.0"
+
+RUN yum install -y wget
+
+RUN wget https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOBUF_VERSION}/protobuf-all-${PROTOBUF_VERSION}.tar.gz && \
+    tar -xvzf protobuf-all-${PROTOBUF_VERSION}.tar.gz && \
+    rm protobuf-all-${PROTOBUF_VERSION}.tar.gz && \
+    pushd protobuf-${PROTOBUF_VERSION} && \
+    ./configure && \
+    make -j16 && \
+    make check -j16 && \
+    make install && \ 
+    popd && \
+    rm -rf protobuf-${PROTOBUF_VERSION}

@@ -95,6 +95,9 @@ dart_check_required_package(IPOPT "ipopt")
 # PerfUtils
 dart_find_package(PerfUtils)
 
+# protobuf
+dart_find_package(protobuf)
+
 # octomap
 dart_find_package(octomap)
 if(MSVC)

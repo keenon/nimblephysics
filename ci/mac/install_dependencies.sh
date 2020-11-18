@@ -164,6 +164,18 @@ popd
 popd
 rm -rf urdfdom
 
+# Install protobuf
+PROTOBUF_VERSION="3.14.0"
+wget https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOBUF_VERSION}/protobuf-all-${PROTOBUF_VERSION}.tar.gz
+tar -xvzf protobuf-all-${PROTOBUF_VERSION}.tar.gz
+rm protobuf-all-${PROTOBUF_VERSION}.tar.gz
+pushd protobuf-${PROTOBUF_VERSION}
+./configure
+make -j10
+make install
+popd
+rm -rf protobuf-${PROTOBUF_VERSION}
+
 # Reset the IDs for our libraries to absolute paths
 install_name_tool -id /usr/local/lib/liburdfdom_sensor.dylib /usr/local/lib/liburdfdom_sensor.dylib
 install_name_tool -id /usr/local/lib/liburdfdom_model_state.dylib /usr/local/lib/liburdfdom_model_state.dylib
