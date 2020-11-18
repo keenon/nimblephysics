@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+package dart.proto;
+
+message MPCRequest {
+  oneof message {
+    MPCRequestStart start = 1;
+    MPCRequestObserveState state = 2;
+    MPCRequestObserveForce force = 3;
+    MPCRequestStop stop = 4;
+  }
+}
+
+message MPCRequestStart {
+  uint64 clientClock = 1;
+}
+
+message MPCRequestObserveState {
+  uint64 time = 1;
+  repeated double pos = 2;
+  repeated double vel = 3;
+}
+
+message MPCRequestObserveForce {
+  uint64 time = 1;
+  repeated double force = 2;
+}
+
+message MPCRequestStop {
+  uint64 clientClock = 1;
+}
+
+message MPCResponse {
+  oneof message {
+    MPCPlan plan = 1;
+  }
+}
+
+message MPCPlan {
+  uint64 startTime = 1;
+  repeated double forces = 2;
+}

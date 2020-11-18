@@ -89,6 +89,7 @@ add_subdirectory(constraint)
 add_subdirectory(simulation)
 add_subdirectory(utils) # tinyxml2, bullet
 add_subdirectory(gui) # opengl, glut, bullet
+add_subdirectory(proto)
 
 set(DART_CONFIG_HPP_IN ${CMAKE_SOURCE_DIR}/dart/config.hpp.in)
 set(DART_CONFIG_HPP_OUT ${CMAKE_BINARY_DIR}/dart/config.hpp)
@@ -122,6 +123,7 @@ get_property(dart_core_sources GLOBAL PROPERTY DART_CORE_SOURCES)
 dart_add_library(dart ${dart_core_headers} ${dart_core_sources})
 target_include_directories(dart BEFORE
   PUBLIC
+    ${Protobuf_INCLUDE_DIRS}
     $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}>
     $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}>
     $<INSTALL_INTERFACE:include>
@@ -139,7 +141,7 @@ target_link_libraries(dart
     Boost::filesystem
     IPOPT::ipopt
     PerfUtils
-    protobuf
+    protobuf::libprotobuf
 )
 if (TARGET octomap)
   target_link_libraries(dart PUBLIC octomap)
