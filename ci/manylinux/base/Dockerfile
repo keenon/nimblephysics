@@ -214,8 +214,21 @@ RUN wget https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOB
     popd && \
     rm -rf protobuf-${PROTOBUF_VERSION}
 
-RUN git clone --recurse-submodules -b v1.33.2 https://github.com/grpc/grpc && \
-    pushd grpc && \
+# Upgrade to the latest CMake version
+
+RUN yum install -y openssl-devel
+
+RUN wget https://github.com/Kitware/CMake/releases/download/v3.19.0/cmake-3.19.0.tar.gz
+RUN tar -xvzf cmake-3.19.0.tar.gz
+RUN pushd cmake-3.19.0 && \
+    ./bootstrap && \
+    make && \
+    make install
+RUN rm -rf cmake-3.19.0
+RUN rm cmake-3.19.0.tar.gz
+
+RUN git clone --recurse-submodules -b v1.33.2 https://github.com/grpc/grpc
+RUN pushd grpc && \
     # This fixes the boringssl build on the ancient CentOS we have to use by adding "rt" as an explicit dependency
     sed -i '642s/.*/target_link_libraries(bssl ssl crypto rt)/' third_party/boringssl-with-bazel/CMakeLists.txt && \
     mkdir -p cmake/build && \
@@ -226,5 +239,5 @@ RUN git clone --recurse-submodules -b v1.33.2 https://github.com/grpc/grpc && \
     make -j && \
     make install && \
     popd && \
-    popd && \
-    rm -rf grpc
+    popd
+RUN rm -rf grpc
