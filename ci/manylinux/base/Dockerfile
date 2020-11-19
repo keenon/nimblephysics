@@ -213,3 +213,18 @@ RUN wget https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOB
     make install && \ 
     popd && \
     rm -rf protobuf-${PROTOBUF_VERSION}
+
+RUN git clone --recurse-submodules -b v1.33.2 https://github.com/grpc/grpc && \
+    pushd grpc && \
+    # This fixes the boringssl build on the ancient CentOS we have to use by adding "rt" as an explicit dependency
+    sed -i '642s/.*/target_link_libraries(bssl ssl crypto rt)/' third_party/boringssl-with-bazel/CMakeLists.txt && \
+    mkdir -p cmake/build && \
+    pushd cmake/build && \
+    cmake -DgRPC_INSTALL=ON \
+          -DgRPC_BUILD_TESTS=OFF \
+          ../.. && \
+    make -j && \
+    make install && \
+    popd && \
+    popd && \
+    rm -rf grpc

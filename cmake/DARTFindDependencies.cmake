@@ -95,8 +95,9 @@ dart_check_required_package(IPOPT "ipopt")
 # PerfUtils
 dart_find_package(PerfUtils)
 
-# Protobuf
+# Protobuf + gRPC
 dart_find_package(Protobuf)
+dart_find_package(gRPC)
 
 # octomap
 dart_find_package(octomap)

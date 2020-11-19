@@ -40,3 +40,9 @@ message MPCPlan {
   uint64 startTime = 1;
   repeated double forces = 2;
 }
+
+// The main service definition
+service MPCService {
+  // Sends a greeting
+  rpc Request (MPCRequest) returns (MPCResponse) {}
+}

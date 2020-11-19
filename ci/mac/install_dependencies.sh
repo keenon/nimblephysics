@@ -176,6 +176,20 @@ make install
 popd
 rm -rf protobuf-${PROTOBUF_VERSION}
 
+# Install grpc
+git clone --recurse-submodules -b v1.33.2 https://github.com/grpc/grpc
+pushd grpc
+mkdir -p cmake/build
+pushd cmake/build
+cmake -DgRPC_INSTALL=ON \
+      -DgRPC_BUILD_TESTS=OFF \
+      ../..
+make -j
+make install
+popd
+popd
+rm -rf grpc
+
 # Reset the IDs for our libraries to absolute paths
 install_name_tool -id /usr/local/lib/liburdfdom_sensor.dylib /usr/local/lib/liburdfdom_sensor.dylib
 install_name_tool -id /usr/local/lib/liburdfdom_model_state.dylib /usr/local/lib/liburdfdom_model_state.dylib
