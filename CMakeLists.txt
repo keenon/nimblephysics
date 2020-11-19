@@ -72,6 +72,7 @@ set(DART_PKG_EXTERNAL_DEPS "eigen, ccd, fcl, assimp, boost")
 #===============================================================================
 # Build options
 #===============================================================================
+set(CMAKE_VERBOSE_MAKEFILE on)
 option(DART_VERBOSE "Whether print detailed information in CMake process" ON)
 message(STATUS "DART_VERBOSE = ${DART_VERBOSE}")
 option(ENABLE_OPENMP "Build with OpenMP parallaization enabled" ON)

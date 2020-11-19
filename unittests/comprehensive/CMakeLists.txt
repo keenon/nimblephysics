@@ -14,6 +14,7 @@ dart_add_test("comprehensive" test_ParallelOps)
 dart_add_test("comprehensive" test_DiffNode)
 dart_add_test("comprehensive" test_Realtime)
 dart_add_test("comprehensive" test_Server)
+dart_add_test("comprehensive" test_Proto)
 
 # target_link_libraries(test_Gradients dart-collision-bullet)
 # target_link_libraries(test_Gradients dart-collision-ode)

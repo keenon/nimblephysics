@@ -1,6 +1,7 @@
 #ifndef DART_MPC_SERVER
 #define DART_MPC_SERVER
 
+#include <google/protobuf/arena_impl.h>
 #include <grpcpp/ext/proto_server_reflection_plugin.h>
 #include <grpcpp/grpcpp.h>
 #include <grpcpp/health_check_service_interface.h>
@@ -12,6 +13,9 @@ namespace proto {
 
 class MPCServer final : public MPCService::Service
 {
+public:
+  void serve(int ports);
+
   ::grpc::Status Request(
       ::grpc::ServerContext* context,
       const ::dart::proto::MPCRequest* request,
