@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package dart.proto;
+
+import "Eigen.proto";
+
+message TrajectoryRollout {
+  string representationMapping = 1;
+  map<string, MatrixXd> pos = 2;
+  map<string, MatrixXd> vel = 3;
+  map<string, MatrixXd> force = 4;
+  VectorXd mass = 5;
+  map<string, MatrixXd> metadata = 6;
+}

@@ -65,6 +65,10 @@ public:
   /// This can be a negative number.
   long getPlanBufferMillisAfter(long time);
 
+  /// This is useful when we're replicating a log across a network boundary,
+  /// which comes up in distributed MPC.
+  void manuallyRecordObservedForce(long time, Eigen::VectorXd observation);
+
 protected:
   int mForceDim;
   int mNumSteps;

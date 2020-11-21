@@ -72,8 +72,10 @@ void RealtimeWorld::serve(int port)
       std::clog << "There are now " << mServer->numConnections()
                 << " open connections." << std::endl;
       // Send a hello message to the client
-      mServer->send(
-          conn, "{\"type\": \"init\", \"world\": " + mWorld->toJson() + "}");
+      // mServer->send(conn) seems to break, cause conn appears to get cleaned
+      // up in race conditions (it's a weak pointer)
+      mServer->broadcast(
+          "{\"type\": \"init\", \"world\": " + mWorld->toJson() + "}");
 
       for (auto listener : mConnectionListeners)
       {
