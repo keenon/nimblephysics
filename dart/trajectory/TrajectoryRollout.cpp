@@ -5,6 +5,7 @@
 #include "dart/dynamics/BodyNode.hpp"
 #include "dart/dynamics/Skeleton.hpp"
 #include "dart/neural/RestorableSnapshot.hpp"
+#include "dart/proto/SerializeEigen.hpp"
 #include "dart/server/RawJsonUtils.hpp"
 #include "dart/simulation/World.hpp"
 #include "dart/trajectory/Problem.hpp"
@@ -117,6 +118,61 @@ std::string TrajectoryRollout::toJson(
 }
 
 //==============================================================================
+/// This writes us out to a protobuf
+void TrajectoryRollout::serialize(proto::TrajectoryRollout& proto) const
+{
+  proto.set_representationmapping(getRepresentationMapping());
+  for (const std::string& mapping : getMappings())
+  {
+    proto::serializeMatrix(
+        (*proto.mutable_pos())[mapping], getPosesConst(mapping));
+    proto::serializeMatrix(
+        (*proto.mutable_vel())[mapping], getVelsConst(mapping));
+    proto::serializeMatrix(
+        (*proto.mutable_force())[mapping], getForcesConst(mapping));
+  }
+  proto::serializeVector(*proto.mutable_mass(), getMassesConst());
+  for (auto pair : getMetadataMap())
+  {
+    proto::serializeMatrix(
+        (*proto.mutable_metadata())[pair.first], pair.second);
+  }
+}
+
+//==============================================================================
+/// This decodes a protobuf
+TrajectoryRolloutReal TrajectoryRollout::deserialize(
+    const proto::TrajectoryRollout& proto)
+{
+  std::string representationMapping = proto.representationmapping();
+  std::unordered_map<std::string, Eigen::MatrixXd> pos;
+  for (auto pair : proto.pos())
+  {
+    pos[pair.first] = proto::deserializeMatrix(pair.second);
+  }
+  std::unordered_map<std::string, Eigen::MatrixXd> vel;
+  for (auto pair : proto.vel())
+  {
+    vel[pair.first] = proto::deserializeMatrix(pair.second);
+  }
+  std::unordered_map<std::string, Eigen::MatrixXd> force;
+  for (auto pair : proto.force())
+  {
+    force[pair.first] = proto::deserializeMatrix(pair.second);
+  }
+  Eigen::VectorXd mass = proto::deserializeVector(proto.mass());
+  std::unordered_map<std::string, Eigen::MatrixXd> metadata;
+  for (auto pair : proto.metadata())
+  {
+    metadata[pair.first] = proto::deserializeMatrix(pair.second);
+  }
+
+  TrajectoryRolloutReal recovered = TrajectoryRolloutReal(
+      representationMapping, pos, vel, force, mass, metadata);
+  return recovered;
+}
+
+//==============================================================================
 TrajectoryRolloutReal::TrajectoryRolloutReal(
     const std::unordered_map<std::string, std::shared_ptr<neural::Mapping>>
         mappings,
@@ -147,6 +203,33 @@ TrajectoryRolloutReal::TrajectoryRolloutReal(Problem* shot)
       shot->getMassDims(),
       shot->getMetadataMap())
 {
+}
+
+//==============================================================================
+/// Raw constructor
+TrajectoryRolloutReal::TrajectoryRolloutReal(
+    std::string representationMapping,
+    const std::unordered_map<std::string, Eigen::MatrixXd> pos,
+    const std::unordered_map<std::string, Eigen::MatrixXd> vel,
+    const std::unordered_map<std::string, Eigen::MatrixXd> force,
+    const Eigen::VectorXd mass,
+    const std::unordered_map<std::string, Eigen::MatrixXd> metadata)
+  : mRepresentationMapping(representationMapping), mMasses(mass)
+{
+  for (auto pair : pos)
+  {
+    mMappings.push_back(pair.first);
+  }
+  for (const std::string& mapping : mMappings)
+  {
+    mPoses[mapping] = pos.at(mapping);
+    mVels[mapping] = vel.at(mapping);
+    mForces[mapping] = force.at(mapping);
+  }
+  for (auto pair : metadata)
+  {
+    mMetadata[pair.first] = pair.second;
+  }
 }
 
 //==============================================================================
