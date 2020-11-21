@@ -10,6 +10,7 @@
 #include <Eigen/Dense>
 
 #include "dart/neural/Mapping.hpp"
+#include "dart/proto/TrajectoryRollout.pb.h"
 
 namespace dart {
 
@@ -70,6 +71,13 @@ public:
   /// This formats the rollout as JSON, which can be sent to the frontend to be
   /// parsed and displayed.
   std::string toJson(std::shared_ptr<simulation::World> world) const;
+
+  /// This writes us out to a protobuf
+  void serialize(proto::TrajectoryRollout& proto) const;
+
+  /// This decodes a protobuf
+  static TrajectoryRolloutReal deserialize(
+      const proto::TrajectoryRollout& proto);
 };
 
 class TrajectoryRolloutReal : public TrajectoryRollout
@@ -89,6 +97,15 @@ public:
 
   /// Deep copy constructor
   TrajectoryRolloutReal(const TrajectoryRollout* copy);
+
+  /// Raw constructor
+  TrajectoryRolloutReal(
+      std::string representationMapping,
+      const std::unordered_map<std::string, Eigen::MatrixXd> pos,
+      const std::unordered_map<std::string, Eigen::MatrixXd> vel,
+      const std::unordered_map<std::string, Eigen::MatrixXd> force,
+      const Eigen::VectorXd mass,
+      const std::unordered_map<std::string, Eigen::MatrixXd> metadata);
 
   const std::string& getRepresentationMapping() const override;
   const std::vector<std::string>& getMappings() const override;

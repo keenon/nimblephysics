@@ -54,7 +54,9 @@
 #include "dart/neural/NeuralUtils.hpp"
 #include "dart/neural/RestorableSnapshot.hpp"
 #include "dart/performance/PerformanceLog.hpp"
-#include "dart/proto/MPCServer.hpp"
+#include "dart/proto/SerializeEigen.hpp"
+#include "dart/realtime/MPCLocal.hpp"
+#include "dart/realtime/MPCRemote.hpp"
 #include "dart/simulation/World.hpp"
 #include "dart/trajectory/IPOptOptimizer.hpp"
 #include "dart/trajectory/MultiShot.hpp"
@@ -77,8 +79,85 @@ using namespace trajectory;
 using namespace performance;
 using namespace proto;
 
-TEST(PROTO, SIMPLE_SERVER)
+TEST(PROTO, SERIALIZE_VECTOR)
 {
-  MPCServer server;
-  server.serve(2345);
+  Eigen::VectorXd original = Eigen::VectorXd::Random(10);
+  proto::VectorXd proto;
+  serializeVector(proto, original);
+  Eigen::VectorXd recovered = deserializeVector(proto);
+
+  EXPECT_TRUE(equals(original, recovered, 0.0));
+}
+
+TEST(PROTO, SERIALIZE_MATRIX)
+{
+  Eigen::MatrixXd original = Eigen::MatrixXd::Random(10, 5);
+  proto::MatrixXd proto;
+  serializeMatrix(proto, original);
+  Eigen::MatrixXd recovered = deserializeMatrix(proto);
+
+  EXPECT_TRUE(equals(original, recovered, 0.0));
+}
+
+TEST(PROTO, SERIALIZE_ROLLOUT)
+{
+  int dofs = 5;
+  int steps = 10;
+
+  std::string representationMapping = "identity";
+  std::unordered_map<std::string, Eigen::MatrixXd> pos;
+  std::unordered_map<std::string, Eigen::MatrixXd> vel;
+  std::unordered_map<std::string, Eigen::MatrixXd> force;
+  Eigen::VectorXd mass = Eigen::VectorXd::Random(dofs);
+  std::unordered_map<std::string, Eigen::MatrixXd> metadata;
+
+  pos["identity"] = Eigen::MatrixXd::Random(dofs, steps);
+  pos["mapped"] = Eigen::MatrixXd::Random(dofs, steps);
+  vel["identity"] = Eigen::MatrixXd::Random(dofs, steps);
+  vel["mapped"] = Eigen::MatrixXd::Random(dofs, steps);
+  force["identity"] = Eigen::MatrixXd::Random(dofs, steps);
+  force["mapped"] = Eigen::MatrixXd::Random(dofs, steps);
+
+  metadata["1"] = Eigen::MatrixXd::Random(dofs, steps);
+  metadata["2"] = Eigen::MatrixXd::Random(dofs, steps);
+  metadata["3"] = Eigen::MatrixXd::Random(dofs, steps);
+
+  TrajectoryRolloutReal rollout = TrajectoryRolloutReal(
+      representationMapping, pos, vel, force, mass, metadata);
+
+  proto::TrajectoryRollout proto;
+  rollout.serialize(proto);
+
+  TrajectoryRolloutReal recovered
+      = trajectory::TrajectoryRollout::deserialize(proto);
+
+  EXPECT_EQ(
+      rollout.getRepresentationMapping(), recovered.getRepresentationMapping());
+  EXPECT_TRUE(equals(rollout.getMassesConst(), recovered.getMassesConst()));
+  EXPECT_TRUE(equals(
+      rollout.getPosesConst("identity"),
+      recovered.getPosesConst("identity"),
+      0.0));
+  EXPECT_TRUE(equals(
+      rollout.getPosesConst("mapped"), recovered.getPosesConst("mapped"), 0.0));
+  EXPECT_TRUE(equals(
+      rollout.getVelsConst("identity"),
+      recovered.getVelsConst("identity"),
+      0.0));
+  EXPECT_TRUE(equals(
+      rollout.getVelsConst("mapped"), recovered.getVelsConst("mapped"), 0.0));
+  EXPECT_TRUE(equals(
+      rollout.getForcesConst("identity"),
+      recovered.getForcesConst("identity"),
+      0.0));
+  EXPECT_TRUE(equals(
+      rollout.getForcesConst("mapped"),
+      recovered.getForcesConst("mapped"),
+      0.0));
+  EXPECT_TRUE(
+      equals(rollout.getMetadata("1"), recovered.getMetadata("1"), 0.0));
+  EXPECT_TRUE(
+      equals(rollout.getMetadata("2"), recovered.getMetadata("2"), 0.0));
+  EXPECT_TRUE(
+      equals(rollout.getMetadata("3"), recovered.getMetadata("3"), 0.0));
 }

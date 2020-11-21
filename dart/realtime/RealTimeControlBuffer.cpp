@@ -277,6 +277,14 @@ long RealTimeControlBuffer::getPlanBufferMillisAfter(long time)
   return planEnd - time;
 }
 
+/// This is useful when we're replicating a log across a network boundary,
+/// which comes up in distributed MPC.
+void RealTimeControlBuffer::manuallyRecordObservedForce(
+    long time, Eigen::VectorXd observation)
+{
+  mControlLog.record(time, observation);
+}
+
 /// This is a helper to rescale the timestep size of a buffer while leaving
 /// the data otherwise unchanged.
 void RealTimeControlBuffer::rescaleBuffer(
