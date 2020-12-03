@@ -100,9 +100,11 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 #   fixed even after further changes are made
 # - "unit": low level tests for one or few classes and functions to verify that
 #   they performs correctly as expected
+# - "benchmarks": speed tests to verify large blocks of code operate quickly
 add_subdirectory(comprehensive)
 add_subdirectory(regression)
 add_subdirectory(unit)
+add_subdirectory(benchmarks)
 
 # Print tests
 dart_get_tests(comprehensive_tests "comprehensive")
