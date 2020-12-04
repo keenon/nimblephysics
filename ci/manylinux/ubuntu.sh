@@ -4,15 +4,8 @@ set -e
 # Update the pkgconfig path
 export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:/usr/local/lib64/pkgconfig/
 
-# Install CMake3
-yum install -y cmake3
-rm /usr/bin/cmake
-ln -s /usr/bin/cmake3 /usr/bin/cmake
-
-# Install Boost
-yum install epel-release
-rpm -ivh http://repo.okay.com.mx/centos/6/x86_64/release/okay-release-1-3.el6.noarch.rpm?
-yum install -y boost-devel-1.55.0-25.el6.x86_64
+# Install LAPACK
+apt-get install libblas-dev liblapack-dev libboost-all-dev
 
 # Install Eigen
 curl https://gitlab.com/libeigen/eigen/-/archive/3.3.7/eigen-3.3.7.tar.gz > eigen.tar.gz
@@ -47,9 +40,6 @@ make install -j10
 popd
 popd
 rm -rf assimp
-
-# Install LAPACK
-yum install -y lapack-devel
 
 # Install MUMPS
 git clone https://github.com/coin-or-tools/ThirdParty-Mumps.git
@@ -121,8 +111,6 @@ popd
 rm -rf tinyxml2
 
 # Install freeglut
-yum install -y libXi-devel
-yum install -y mesa-libGLU-devel
 curl https://managedway.dl.sourceforge.net/project/freeglut/freeglut/3.2.1/freeglut-3.2.1.tar.gz > freeglut.tar.gz
 tar -zxf freeglut.tar.gz
 rm freeglut.tar.gz
@@ -243,10 +231,3 @@ make install
 popd
 popd
 rm -rf benchmark
-
-# /opt/python/cp38-cp38/bin/python3.8
-# Actually build the code
-python3 setup.py sdist bdist_wheel
-auditwheel repair dist/diffdart-0.0.1-cp36-cp36m-linux_x86_64.whl
-# Ensure we have the ABI3 tag, so that pip interpreters will accept us
-mv wheelhouse/diffdart-0.0.1-cp36-cp36m-manylinux2010_x86_64.whl wheelhouse/diffdart-0.0.1-cp36-abi3-manylinux2010_x86_64.whl
