@@ -15,9 +15,13 @@ message(STATUS "Using gRPC ${gRPC_VERSION}")
 # Find the GRPC executable
 find_program(_GRPC_CPP_PLUGIN_EXECUTABLE grpc_cpp_plugin)
 
+find_program(_PROTOC_EXECUTABLE protoc
+             HINTS ${CMAKE_INSTALL_PREFIX}/bin
+             REQUIRED)
+
 message(STATUS "Attempting to generate the proto")
 message(STATUS "_GRPC_CPP_PLUGIN_EXECUTABLE=${_GRPC_CPP_PLUGIN_EXECUTABLE}")
-execute_process(COMMAND "protoc" "--proto_path=${CMAKE_CURRENT_SOURCE_DIR}" "--grpc_out=." "--plugin=protoc-gen-grpc=${_GRPC_CPP_PLUGIN_EXECUTABLE}" "--cpp_out=." "${PROTOBUF_FILELIST}" WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+execute_process(COMMAND "${_PROTOC_EXECUTABLE}" "--proto_path=${CMAKE_CURRENT_SOURCE_DIR}" "--grpc_out=." "--plugin=protoc-gen-grpc=${_GRPC_CPP_PLUGIN_EXECUTABLE}" "--cpp_out=." "${PROTOBUF_FILELIST}" WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
 # Search all header and source files
 file(GLOB hdrs "*.hpp" "*.pb.h")
