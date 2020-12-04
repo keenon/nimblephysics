@@ -241,3 +241,15 @@ RUN pushd grpc && \
     popd && \
     popd
 RUN rm -rf grpc
+
+# Install Google benchmark
+RUN git clone https://github.com/google/benchmark.git
+RUN git clone https://github.com/google/googletest.git benchmark/googletest
+RUN pushd benchmark && \
+    mkdir build && \
+    pushd build && \
+    cmake -DCMAKE_BUILD_TYPE=Release .. && \
+    make install && \
+    popd && \
+    popd
+RUN rm -rf benchmark

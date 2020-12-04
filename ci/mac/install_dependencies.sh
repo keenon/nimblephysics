@@ -190,6 +190,18 @@ popd
 popd
 rm -rf grpc
 
+# Install Google benchmark
+git clone https://github.com/google/benchmark.git
+git clone https://github.com/google/googletest.git benchmark/googletest
+pushd benchmark
+mkdir build
+pushd build
+cmake -DCMAKE_BUILD_TYPE=Release ..
+sudo make install
+popd
+popd
+rm -rf benchmark
+
 # Reset the IDs for our libraries to absolute paths
 install_name_tool -id /usr/local/lib/liburdfdom_sensor.dylib /usr/local/lib/liburdfdom_sensor.dylib
 install_name_tool -id /usr/local/lib/liburdfdom_model_state.dylib /usr/local/lib/liburdfdom_model_state.dylib
