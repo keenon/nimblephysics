@@ -878,6 +878,9 @@ public:
   /// Tell the Skeleton that the coriolis forces need to be update
   void dirtyCoriolisForces();
 
+  /// Returns the bias force used in Featherstone
+  const Eigen::Vector6d& getBiasForce() const;
+
   //----------------------------------------------------------------------------
   // Friendship
   //----------------------------------------------------------------------------

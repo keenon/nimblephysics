@@ -44,29 +44,9 @@ using namespace neural;
 using namespace trajectory;
 using namespace performance;
 
-static void BM_Cartpole_Featherstone(benchmark::State& state)
+static void BM_Cartpole_DART_Featherstone(benchmark::State& state)
 {
-  SkeletonPtr cartpole = Skeleton::create("cartpole");
-
-  std::pair<PrismaticJoint*, BodyNode*> sledPair
-      = cartpole->createJointAndBodyNodePair<PrismaticJoint>(nullptr);
-  sledPair.first->setAxis(Eigen::Vector3d(1, 0, 0));
-  std::shared_ptr<BoxShape> sledShapeBox(
-      new BoxShape(Eigen::Vector3d(0.05, 0.25, 0.05)));
-  ShapeNode* sledShape
-      = sledPair.second->createShapeNodeWith<VisualAspect>(sledShapeBox);
-
-  std::pair<RevoluteJoint*, BodyNode*> armPair
-      = cartpole->createJointAndBodyNodePair<RevoluteJoint>(sledPair.second);
-  armPair.first->setAxis(Eigen::Vector3d(0, 0, 1));
-  std::shared_ptr<BoxShape> armShapeBox(
-      new BoxShape(Eigen::Vector3d(0.05, 0.25, 0.05)));
-  ShapeNode* armShape
-      = armPair.second->createShapeNodeWith<VisualAspect>(armShapeBox);
-
-  Eigen::Isometry3d armOffset = Eigen::Isometry3d::Identity();
-  armOffset.translation() = Eigen::Vector3d(0, -0.5, 0);
-  armPair.first->setTransformFromChildBodyNode(armOffset);
+  SkeletonPtr cartpole = createCartpole();
 
   double dt = 0.001;
   for (auto _ : state)
@@ -76,104 +56,92 @@ static void BM_Cartpole_Featherstone(benchmark::State& state)
     cartpole->integratePositions(dt);
   }
 }
-// Register the function as a benchmark
-BENCHMARK(BM_Cartpole_Featherstone);
+BENCHMARK(BM_Cartpole_DART_Featherstone);
 
-static void BM_Cartpole_Jacobians(benchmark::State& state)
+static void BM_Cartpole_Simple_Featherstone(benchmark::State& state)
 {
-  // World
-  WorldPtr world = World::create();
-  world->setGravity(Eigen::Vector3d(0, -9.81, 0));
+  SkeletonPtr cartpole = createCartpole();
+  SimpleFeatherstone simple;
+  simple.populateFromSkeleton(cartpole);
 
-  SkeletonPtr cartpole = Skeleton::create("cartpole");
+  double* pos = (double*)malloc(simple.len() * sizeof(double));
+  double* vel = (double*)malloc(simple.len() * sizeof(double));
+  double* force = (double*)malloc(simple.len() * sizeof(double));
+  double* accel = (double*)malloc(simple.len() * sizeof(double));
 
-  std::pair<PrismaticJoint*, BodyNode*> sledPair
-      = cartpole->createJointAndBodyNodePair<PrismaticJoint>(nullptr);
-  sledPair.first->setAxis(Eigen::Vector3d(1, 0, 0));
-  std::shared_ptr<BoxShape> sledShapeBox(
-      new BoxShape(Eigen::Vector3d(0.05, 0.25, 0.05)));
-  ShapeNode* sledShape
-      = sledPair.second->createShapeNodeWith<VisualAspect>(sledShapeBox);
+  for (int i = 0; i < simple.len(); i++)
+  {
+    pos[i] = cartpole->getPosition(i);
+    vel[i] = cartpole->getVelocity(i);
+    force[i] = cartpole->getForce(i);
+  }
 
-  std::pair<RevoluteJoint*, BodyNode*> armPair
-      = cartpole->createJointAndBodyNodePair<RevoluteJoint>(sledPair.second);
-  armPair.first->setAxis(Eigen::Vector3d(0, 0, 1));
-  std::shared_ptr<BoxShape> armShapeBox(
-      new BoxShape(Eigen::Vector3d(0.05, 0.25, 0.05)));
-  ShapeNode* armShape
-      = armPair.second->createShapeNodeWith<VisualAspect>(armShapeBox);
-
-  Eigen::Isometry3d armOffset = Eigen::Isometry3d::Identity();
-  armOffset.translation() = Eigen::Vector3d(0, -0.5, 0);
-  armPair.first->setTransformFromChildBodyNode(armOffset);
-
-  world->addSkeleton(cartpole);
-
-  cartpole->setForceUpperLimit(0, 0);
-  cartpole->setForceLowerLimit(0, 0);
-  cartpole->setVelocityUpperLimit(0, 1000);
-  cartpole->setVelocityLowerLimit(0, -1000);
-  cartpole->setPositionUpperLimit(0, 10);
-  cartpole->setPositionLowerLimit(0, -10);
-
-  cartpole->setForceLowerLimit(1, -1000);
-  cartpole->setForceUpperLimit(1, 1000);
-  cartpole->setVelocityUpperLimit(1, 1000);
-  cartpole->setVelocityLowerLimit(1, -1000);
-  cartpole->setPositionUpperLimit(1, 10);
-  cartpole->setPositionLowerLimit(1, -10);
-
-  cartpole->setPosition(0, 0);
-  cartpole->setPosition(1, 15.0 / 180.0 * 3.1415);
-  cartpole->computeForwardDynamics();
-  cartpole->integrateVelocities(world->getTimeStep());
-
-  /*
-  TrajectoryLossFn loss = [](const TrajectoryRollout* rollout) {
-    int steps = rollout->getPosesConst("identity").cols();
-    Eigen::VectorXd lastPos = rollout->getPosesConst("identity").col(steps - 1);
-    return rollout->getVelsConst("identity").col(steps - 1).squaredNorm()
-           + lastPos.squaredNorm()
-           + rollout->getForcesConst("identity").squaredNorm();
-  };
-
-  TrajectoryLossFnAndGrad lossGrad = [](const TrajectoryRollout* rollout,
-                                        TrajectoryRollout* gradWrtRollout // OUT
-                                     ) {
-    gradWrtRollout->getPoses("identity").setZero();
-    gradWrtRollout->getVels("identity").setZero();
-    gradWrtRollout->getForces("identity").setZero();
-    int steps = rollout->getPosesConst("identity").cols();
-    gradWrtRollout->getPoses("identity").col(steps - 1)
-        = 2 * rollout->getPosesConst("identity").col(steps - 1);
-    gradWrtRollout->getVels("identity").col(steps - 1)
-        = 2 * rollout->getVelsConst("identity").col(steps - 1);
-    for (int i = 0; i < steps; i++)
-    {
-      gradWrtRollout->getForces("identity").col(i)
-          = 2 * rollout->getForcesConst("identity").col(i);
-    }
-    Eigen::VectorXd lastPos = rollout->getPosesConst("identity").col(steps - 1);
-    return rollout->getVelsConst("identity").col(steps - 1).squaredNorm()
-           + lastPos.squaredNorm()
-           + rollout->getForcesConst("identity").squaredNorm();
-  };
-
-  LossFn lossFn(loss);
-  MultiShot shot(world, lossFn, 50, 10, false);
-  */
-
+  double dt = 0.001;
   for (auto _ : state)
   {
-    std::shared_ptr<BackpropSnapshot> snapshot = neural::forwardPass(world);
-    snapshot->getPosPosJacobian(world);
-    snapshot->getPosVelJacobian(world);
-    snapshot->getVelVelJacobian(world);
-    snapshot->getVelPosJacobian(world);
-    snapshot->getForceVelJacobian(world);
+    simple.forwardDynamics(pos, vel, force, accel);
+    for (int i = 0; i < simple.len(); i++)
+    {
+      pos[i] += vel[i] * dt;
+      vel[i] += accel[i] * dt;
+    }
+  }
+
+  free(pos);
+  free(vel);
+  free(force);
+  free(accel);
+}
+BENCHMARK(BM_Cartpole_Simple_Featherstone);
+
+static void BM_20_Joint_DART_Featherstone(benchmark::State& state)
+{
+  SkeletonPtr arm = createMultiarmRobot(20, 0.2);
+
+  double dt = 0.001;
+  for (auto _ : state)
+  {
+    arm->computeForwardDynamics();
+    arm->integrateVelocities(dt);
+    arm->integratePositions(dt);
   }
 }
-// Register the function as a benchmark
-BENCHMARK(BM_Cartpole_Jacobians);
+BENCHMARK(BM_20_Joint_DART_Featherstone);
+
+static void BM_20_Joint_Simple_Featherstone(benchmark::State& state)
+{
+  SkeletonPtr arm = createMultiarmRobot(20, 0.2);
+  SimpleFeatherstone simple;
+  simple.populateFromSkeleton(arm);
+
+  double* pos = (double*)malloc(simple.len() * sizeof(double));
+  double* vel = (double*)malloc(simple.len() * sizeof(double));
+  double* force = (double*)malloc(simple.len() * sizeof(double));
+  double* accel = (double*)malloc(simple.len() * sizeof(double));
+
+  for (int i = 0; i < simple.len(); i++)
+  {
+    pos[i] = arm->getPosition(i);
+    vel[i] = arm->getVelocity(i);
+    force[i] = arm->getForce(i);
+  }
+
+  double dt = 0.001;
+  for (auto _ : state)
+  {
+    simple.forwardDynamics(pos, vel, force, accel);
+    for (int i = 0; i < simple.len(); i++)
+    {
+      pos[i] += vel[i] * dt;
+      vel[i] += accel[i] * dt;
+    }
+  }
+
+  free(pos);
+  free(vel);
+  free(force);
+  free(accel);
+}
+BENCHMARK(BM_20_Joint_Simple_Featherstone);
 
 BENCHMARK_MAIN();
