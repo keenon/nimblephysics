@@ -40,6 +40,8 @@
 
 #include "dart/neural/RestorableSnapshot.hpp"
 #include "dart/realtime/MPC.hpp"
+#include "dart/realtime/MPCLocal.hpp"
+#include "dart/realtime/MPCRemote.hpp"
 #include "dart/realtime/RealtimeWorld.hpp"
 #include "dart/realtime/SSID.hpp"
 #include "dart/simulation/World.hpp"
@@ -216,25 +218,31 @@ TEST(REALTIME, CARTPOLE_MPC)
   int planningHorizonMillis = 300 * millisPerTimestep;
   int advanceSteps = 70;
 
-  MPC mpc = MPC(world, getMPCLoss(), planningHorizonMillis);
-  mpc.recordGroundTruthState(
-      0L, world->getPositions(), world->getVelocities(), world->getMasses());
-  mpc.setSilent(true);
+  MPCLocal mpcLocal = MPCLocal(world, getMPCLoss(), planningHorizonMillis);
+  mpcLocal.setSilent(true);
 
   int inferenceHistoryMillis = 10 * millisPerTimestep;
   std::shared_ptr<simulation::World> ssidWorld = world->clone();
   SSID ssid = SSID(
       ssidWorld, getSSIDLoss(), inferenceHistoryMillis, world->getNumDofs());
 
+  mpcLocal.setMaxIterations(7);
+
+  mpcLocal.setEnableLineSearch(false);
+  mpcLocal.setEnableOptimizationGuards(true);
+
+  // This should fork off mpcLocal to another process
+  MPCRemote mpcRemote = MPCRemote(mpcLocal);
+
   std::function<Eigen::VectorXd()> getForces = [&]() {
-    Eigen::VectorXd forces = mpc.getForceNow();
+    Eigen::VectorXd forces = mpcRemote.getForceNow();
     // ssid.registerControlsNow(forces);
     return forces;
   };
   std::function<void(Eigen::VectorXd, Eigen::VectorXd, Eigen::VectorXd)>
       recordState
       = [&](Eigen::VectorXd pos, Eigen::VectorXd vel, Eigen::VectorXd mass) {
-          mpc.recordGroundTruthStateNow(pos, vel, mass);
+          mpcRemote.recordGroundTruthStateNow(pos, vel, mass);
           // ssid.registerSensorsNow(pos);
         };
   ssid.registerInferListener([&](long time,
@@ -242,28 +250,25 @@ TEST(REALTIME, CARTPOLE_MPC)
                                  Eigen::VectorXd vel,
                                  Eigen::VectorXd mass,
                                  long duration) {
-    mpc.recordGroundTruthState(time, pos, vel, mass);
+    mpcRemote.recordGroundTruthState(time, pos, vel, mass);
     world->setMasses(mass);
   });
   std::shared_ptr<simulation::World> realtimeUnderlyingWorld = world->clone();
   RealtimeWorld realtimeWorld
       = RealtimeWorld(realtimeUnderlyingWorld, getForces, recordState);
 
-  mpc.registerReplanningListener(
-      [&](const trajectory::TrajectoryRollout* rollout, long duration) {
+  mpcRemote.registerReplanningListener(
+      [&](long time,
+          const trajectory::TrajectoryRollout* rollout,
+          long duration) {
         realtimeWorld.displayMPCPlan(rollout);
         realtimeWorld.registerTiming("replanning", duration, "ms");
       });
 
-  mpc.setMaxIterations(7);
-
-  mpc.setEnableLineSearch(false);
-  mpc.setEnableOptimizationGuards(true);
-
   // Start everything up when someone connects for the first time
   realtimeWorld.registerConnectionListener([&]() {
     realtimeWorld.start();
-    mpc.start();
+    mpcRemote.start();
 
     // TODO: turns out IPOPT isn't threadsafe to run in multiple instances in
     // parallel, because MUMPS isn't threadsafe. So we need to spawn child
@@ -274,7 +279,7 @@ TEST(REALTIME, CARTPOLE_MPC)
     // ssid.start();
   });
 
-  realtimeWorld.registerShutdownListener([&]() { mpc.stop(); });
+  realtimeWorld.registerShutdownListener([&]() { mpcRemote.stop(); });
 
   auto sledBodyVisual = realtimeUnderlyingWorld->getSkeleton("cartpole")
                             ->getBodyNodes()[0]
@@ -282,12 +287,12 @@ TEST(REALTIME, CARTPOLE_MPC)
                             ->getVisualAspect();
   Eigen::Vector3d originalColor = sledBodyVisual->getColor();
   realtimeWorld.registerPreStepListener(
-      [sledBodyVisual, originalColor, &realtimeWorld, &mpc](
+      [sledBodyVisual, originalColor, &realtimeWorld, &mpcRemote](
           int step,
           std::shared_ptr<simulation::World> world,
           std::unordered_set<std::string> keysDown) {
         realtimeWorld.registerTiming(
-            "buffer", mpc.getRemainingPlanBufferMillis(), "ms");
+            "buffer", mpcRemote.getRemainingPlanBufferMillis(), "ms");
         if (keysDown.count("a"))
         {
           Eigen::VectorXd perturbedForces = world->getExternalForces();

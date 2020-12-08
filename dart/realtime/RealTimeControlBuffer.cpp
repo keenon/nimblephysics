@@ -129,6 +129,16 @@ void RealTimeControlBuffer::setForcePlan(
     int remainingSteps = mNumSteps - currentStep;
     mLastWroteBufferAt = now;
 
+    // If we've overflowed our old buffer, this is bad, but recoverable. We'll
+    // just not copy anything from our old plan, since it's all in the past now
+    // anyways.
+    if (remainingSteps < 0)
+    {
+      mBufA = forces;
+      mActiveBuffer = BUF_A;
+      return;
+    }
+
     int copySteps = padSteps;
     int zeroSteps = 0;
     int useSteps = mNumSteps - padSteps;
@@ -200,11 +210,19 @@ void RealTimeControlBuffer::estimateWorldStateAt(
   if (elapsedSinceObservation < 0)
   {
     assert(
-        elapsedSinceObservation < 0
+        elapsedSinceObservation >= 0
         && "estimateWorldStateAt() cannot ask far a time before the earliest available observation.");
   }
   int stepsSinceObservation
       = (int)floor((double)elapsedSinceObservation / mMillisPerStep);
+  /*
+  std::cout << "RealTimeControlBuffer time: " << time << std::endl;
+  std::cout << "RealTimeControlBuffer obs.time: " << obs.time << std::endl;
+  std::cout << "RealTimeControlBuffer elapsedSinceObservation: "
+            << elapsedSinceObservation << std::endl;
+  std::cout << "RealTimeControlBuffer stepsSinceObservation: "
+            << stepsSinceObservation << std::endl;
+  */
 
   world->setPositions(obs.pos);
   world->setVelocities(obs.vel);
@@ -275,6 +293,14 @@ long RealTimeControlBuffer::getPlanBufferMillisAfter(long time)
 {
   long planEnd = mLastWroteBufferAt + (mNumSteps * mMillisPerStep);
   return planEnd - time;
+}
+
+/// This is useful when we're replicating a log across a network boundary,
+/// which comes up in distributed MPC.
+void RealTimeControlBuffer::manuallyRecordObservedForce(
+    long time, Eigen::VectorXd observation)
+{
+  mControlLog.record(time, observation);
 }
 
 /// This is a helper to rescale the timestep size of a buffer while leaving

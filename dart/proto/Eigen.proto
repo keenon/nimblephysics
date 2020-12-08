@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package dart.proto;
+
+message VectorXd {
+  int32 size = 1;
+  repeated double values = 2;
+}
+
+message MatrixXd {
+  int32 rows = 1;
+  int32 cols = 2;
+  repeated double values = 3;
+}
