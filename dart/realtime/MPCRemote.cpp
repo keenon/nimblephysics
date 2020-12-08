@@ -105,9 +105,6 @@ void MPCRemote::recordGroundTruthState(
 
   proto::MPCRecordGroundTruthStateReply reply;
 
-  // TODO:remove me
-  return;
-
   // The actual RPC.
   grpc::Status status
       = mStub->RecordGroundTruthState(&context, request, &reply);

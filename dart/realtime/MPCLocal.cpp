@@ -188,10 +188,6 @@ void MPCLocal::optimizePlan(long startTime)
     startTime = mLastOptimizedTime;
   }
 
-  std::cout << "MPCLocal::optimizePlan()" << std::endl;
-  std::cout << "MPCLocal::optimizePlan() mSolution == nullptr: "
-            << (mSolution == nullptr) << std::endl;
-
   if (mSolution == nullptr)
   {
     PerformanceLog::initialize();
@@ -199,15 +195,12 @@ void MPCLocal::optimizePlan(long startTime)
 
     std::shared_ptr<simulation::World> worldClone = mWorld->clone();
     PerformanceLog* estimateState = log->startRun("Estimate State");
-    std::cout << "MPCLocal::optimizePlan() estimate state" << std::endl;
 
     mBuffer.estimateWorldStateAt(worldClone, &mObservationLog, startTime);
     estimateState->end();
 
     if (!mOptimizer)
     {
-      std::cout << "MPCLocal::optimizePlan() Create mOptimizer" << std::endl;
-
       PerformanceLog* createOpt = log->startRun("Create Default IPOPT");
 
       std::shared_ptr<IPOptOptimizer> ipoptOptimizer
@@ -231,8 +224,6 @@ void MPCLocal::optimizePlan(long startTime)
 
     if (!mProblem)
     {
-      std::cout << "MPCLocal::optimizePlan() Create mProblem" << std::endl;
-
       std::shared_ptr<MultiShot> multishot = std::make_shared<MultiShot>(
           worldClone, *mLoss.get(), mSteps, mShotLength, false);
       multishot->setParallelOperationsEnabled(true);
@@ -241,14 +232,10 @@ void MPCLocal::optimizePlan(long startTime)
 
     PerformanceLog* optimizeTrack = log->startRun("Optimize");
 
-    std::cout << "MPCLocal::optimizePlan() mOptimizer->optimize()" << std::endl;
-
     mSolution = mOptimizer->optimize(mProblem.get());
     optimizeTrack->end();
 
     mLastOptimizedTime = startTime;
-
-    std::cout << "MPCLocal::optimizePlan() mBuffer.setForcePlan()" << std::endl;
 
     mBuffer.setForcePlan(
         startTime,
@@ -289,12 +276,10 @@ void MPCLocal::optimizePlan(long startTime)
         worldClone->getVelocities(),
         steps);
 
-    std::cout << "MPCLocal::optimizePlan() mSolution->reoptimize()"
-              << std::endl;
-
     mSolution->reoptimize();
 
-    std::cout << "MPCLocal::optimizePlan() mBuffer.setForcePlan()" << std::endl;
+    // std::cout << "MPCLocal::optimizePlan() mBuffer.setForcePlan()" <<
+    // std::endl;
 
     mBuffer.setForcePlan(
         startTime,
@@ -437,7 +422,6 @@ grpc::Status RPCWrapperMPCLocal::Start(
     const proto::MPCStartRequest* request,
     proto::MPCStartReply* response)
 {
-  std::cout << "gRPC server: Start" << std::endl;
   mLocal.start();
   return grpc::Status::OK;
 }
@@ -448,7 +432,6 @@ grpc::Status RPCWrapperMPCLocal::Stop(
     const proto::MPCStopRequest* request,
     proto::MPCStopReply* response)
 {
-  std::cout << "gRPC server: Stop" << std::endl;
   mLocal.stop();
   return grpc::Status::OK;
 }
@@ -464,7 +447,7 @@ grpc::Status RPCWrapperMPCLocal::ListenForUpdates(
       [&](long startTime,
           const trajectory::TrajectoryRollout* rollout,
           long duration) {
-        std::cout << "gRPC server sending update to listeners" << std::endl;
+        reply.mutable_rollout()->Clear();
         rollout->serialize(*reply.mutable_rollout());
         reply.set_starttime(startTime);
         reply.set_replandurationmillis(duration);
@@ -483,7 +466,7 @@ grpc::Status RPCWrapperMPCLocal::RecordGroundTruthState(
     const proto::MPCRecordGroundTruthStateRequest* request,
     proto::MPCRecordGroundTruthStateReply* reply)
 {
-  std::cout << "gRPC server: RecordGroundTruthState" << std::endl;
+  // std::cout << "gRPC server: RecordGroundTruthState" << std::endl;
   mLocal.recordGroundTruthState(
       request->time(),
       deserializeVector(request->pos()),
@@ -498,7 +481,7 @@ grpc::Status RPCWrapperMPCLocal::ObserveForce(
     const proto::MPCObserveForceRequest* request,
     proto::MPCObserveForceReply* reply)
 {
-  std::cout << "gRPC server: ObserveForce" << std::endl;
+  // std::cout << "gRPC server: ObserveForce" << std::endl;
   mLocal.mBuffer.manuallyRecordObservedForce(
       request->time(), deserializeVector(request->force()));
   return grpc::Status::OK;
@@ -515,19 +498,13 @@ void MPCLocal::optimizationThreadLoop()
   sigaddset(&sigset, SIGTERM);
   pthread_sigmask(SIG_BLOCK, &sigset, nullptr);
 
-  std::cout << "gRPC server: optimizationThreadLoop() started" << std::endl;
-
   while (mRunning)
   {
     long startTime = timeSinceEpochMillis();
-    std::cout << "gRPC server: optimizePlan()" << std::endl;
     optimizePlan(startTime + mMillisInAdvanceToPlan);
     long endTime = timeSinceEpochMillis();
-    std::cout << "gRPC server: adjustPerformance()" << std::endl;
     adjustPerformance(endTime - startTime);
   }
-
-  std::cout << "gRPC server: optimizationThreadLoop() terminated" << std::endl;
 }
 
 } // namespace realtime

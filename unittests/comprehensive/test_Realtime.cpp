@@ -219,9 +219,7 @@ TEST(REALTIME, CARTPOLE_MPC)
   int advanceSteps = 70;
 
   MPCLocal mpcLocal = MPCLocal(world, getMPCLoss(), planningHorizonMillis);
-  mpcLocal.recordGroundTruthState(
-      0L, world->getPositions(), world->getVelocities(), world->getMasses());
-  mpcLocal.setSilent(false);
+  mpcLocal.setSilent(true);
 
   int inferenceHistoryMillis = 10 * millisPerTimestep;
   std::shared_ptr<simulation::World> ssidWorld = world->clone();

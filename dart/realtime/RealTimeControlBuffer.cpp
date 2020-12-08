@@ -129,6 +129,16 @@ void RealTimeControlBuffer::setForcePlan(
     int remainingSteps = mNumSteps - currentStep;
     mLastWroteBufferAt = now;
 
+    // If we've overflowed our old buffer, this is bad, but recoverable. We'll
+    // just not copy anything from our old plan, since it's all in the past now
+    // anyways.
+    if (remainingSteps < 0)
+    {
+      mBufA = forces;
+      mActiveBuffer = BUF_A;
+      return;
+    }
+
     int copySteps = padSteps;
     int zeroSteps = 0;
     int useSteps = mNumSteps - padSteps;
@@ -205,12 +215,14 @@ void RealTimeControlBuffer::estimateWorldStateAt(
   }
   int stepsSinceObservation
       = (int)floor((double)elapsedSinceObservation / mMillisPerStep);
+  /*
   std::cout << "RealTimeControlBuffer time: " << time << std::endl;
   std::cout << "RealTimeControlBuffer obs.time: " << obs.time << std::endl;
   std::cout << "RealTimeControlBuffer elapsedSinceObservation: "
             << elapsedSinceObservation << std::endl;
   std::cout << "RealTimeControlBuffer stepsSinceObservation: "
             << stepsSinceObservation << std::endl;
+  */
 
   world->setPositions(obs.pos);
   world->setVelocities(obs.vel);
