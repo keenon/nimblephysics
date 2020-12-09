@@ -40,8 +40,11 @@ enum DofContactType
   FACE = 3,
   EDGE_A = 4,
   EDGE_B = 5,
-  VERTEX_FACE_SELF_COLLISION = 6,
-  EDGE_EDGE_SELF_COLLISION = 7,
+  SELF_COLLISION = 7,
+  SPHERE_TO_BOX = 8,
+  BOX_TO_SPHERE = 9,
+  SPHERE_A = 10,
+  SPHERE_B = 11
 };
 
 struct EdgeData

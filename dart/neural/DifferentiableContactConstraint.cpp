@@ -107,16 +107,7 @@ DofContactType DifferentiableContactConstraint::getDofContactType(
   // If we're a parent of both contact points, it's a self-contact down the tree
   if (isParentA && isParentB)
   {
-    switch (getContactType())
-    {
-      case collision::ContactType::FACE_VERTEX:
-      case collision::ContactType::VERTEX_FACE:
-        return DofContactType::VERTEX_FACE_SELF_COLLISION;
-      case collision::ContactType::EDGE_EDGE:
-        return DofContactType::EDGE_EDGE_SELF_COLLISION;
-      default:
-        return DofContactType::UNSUPPORTED;
-    }
+    return DofContactType::SELF_COLLISION;
   }
   // If we're not a parent of either point, it's not an issue
   else if (!isParentA && !isParentB)
@@ -134,6 +125,12 @@ DofContactType DifferentiableContactConstraint::getDofContactType(
         return DofContactType::VERTEX;
       case collision::ContactType::EDGE_EDGE:
         return DofContactType::EDGE_B;
+      case collision::ContactType::SPHERE_BOX:
+        return DofContactType::SPHERE_TO_BOX;
+      case collision::ContactType::BOX_SPHERE:
+        return DofContactType::BOX_TO_SPHERE;
+      case collision::ContactType::SPHERE_SPHERE:
+        return DofContactType::SPHERE_A;
       default:
         return DofContactType::UNSUPPORTED;
     }
@@ -149,6 +146,12 @@ DofContactType DifferentiableContactConstraint::getDofContactType(
         return DofContactType::FACE;
       case collision::ContactType::EDGE_EDGE:
         return DofContactType::EDGE_A;
+      case collision::ContactType::SPHERE_BOX:
+        return DofContactType::BOX_TO_SPHERE;
+      case collision::ContactType::BOX_SPHERE:
+        return DofContactType::SPHERE_TO_BOX;
+      case collision::ContactType::SPHERE_SPHERE:
+        return DofContactType::SPHERE_B;
       default:
         return DofContactType::UNSUPPORTED;
     }
@@ -249,63 +252,109 @@ Eigen::Vector3d DifferentiableContactConstraint::getContactPositionGradient(
   {
     return Eigen::Vector3d::Zero();
   }
-  else if (
-      type == VERTEX || type == VERTEX_FACE_SELF_COLLISION
-      || type == EDGE_EDGE_SELF_COLLISION || type == EDGE_A || type == EDGE_B)
+
+  int jointIndex = dof->getIndexInJoint();
+  dynamics::BodyNode* childNode = dof->getChildBodyNode();
+  // TODO:opt getRelativeJacobian() creates a whole matrix, when we only want
+  // a single column.
+  Eigen::Vector6d worldTwist = math::AdT(
+      childNode->getWorldTransform(),
+      dof->getJoint()->getRelativeJacobian().col(jointIndex));
+
+  if (type == SPHERE_TO_BOX)
   {
-    int jointIndex = dof->getIndexInJoint();
-    dynamics::BodyNode* childNode = dof->getChildBodyNode();
-    // TODO:opt getRelativeJacobian() creates a whole matrix, when we only want
-    // a single column.
-    Eigen::Vector6d worldTwist = math::AdT(
-        childNode->getWorldTransform(),
-        dof->getJoint()->getRelativeJacobian().col(jointIndex));
-    if (type == VERTEX || type == VERTEX_FACE_SELF_COLLISION
-        || type == EDGE_EDGE_SELF_COLLISION)
+    Eigen::Vector3d sphereGrad
+        = math::gradientWrtTheta(worldTwist, mContact->sphereCenter, 0.0);
+    if (mContact->face1Locked)
     {
-      return math::gradientWrtTheta(worldTwist, contactPos, 0.0);
+      sphereGrad
+          = sphereGrad
+            - mContact->face1Normal * mContact->face1Normal.dot(sphereGrad);
     }
-    else if (type == EDGE_A)
+    if (mContact->face2Locked)
     {
-      Eigen::Vector3d edgeAPosGradient
-          = math::gradientWrtTheta(worldTwist, mContact->edgeAFixedPoint, 0.0);
-      Eigen::Vector3d edgeADirGradient = math::gradientWrtThetaPureRotation(
-          worldTwist.head<3>(), mContact->edgeADir, 0.0);
+      sphereGrad
+          = sphereGrad
+            - mContact->face2Normal * mContact->face2Normal.dot(sphereGrad);
+    }
+    if (mContact->face3Locked)
+    {
+      sphereGrad
+          = sphereGrad
+            - mContact->face3Normal * mContact->face3Normal.dot(sphereGrad);
+    }
+    return sphereGrad;
+  }
+  else if (type == BOX_TO_SPHERE)
+  {
+    Eigen::Vector3d negSphereGrad
+        = -math::gradientWrtTheta(worldTwist, mContact->sphereCenter, 0.0);
+    if (mContact->face1Locked)
+    {
+      negSphereGrad
+          = negSphereGrad
+            - mContact->face1Normal * mContact->face1Normal.dot(negSphereGrad);
+    }
+    if (mContact->face2Locked)
+    {
+      negSphereGrad
+          = negSphereGrad
+            - mContact->face2Normal * mContact->face2Normal.dot(negSphereGrad);
+    }
+    if (mContact->face3Locked)
+    {
+      negSphereGrad
+          = negSphereGrad
+            - mContact->face3Normal * mContact->face3Normal.dot(negSphereGrad);
+    }
+    // Step 2. Now reverse the result by moving the point by the box
+    // transform, which undoes the sphere "movement" but leaves helpful
+    // clipping effects in place.
+    Eigen::Vector3d contactPosGrad
+        = math::gradientWrtTheta(worldTwist, contactPos, 0.0);
+    return contactPosGrad + negSphereGrad;
+  }
+  else if (type == VERTEX || type == SELF_COLLISION)
+  {
+    return math::gradientWrtTheta(worldTwist, contactPos, 0.0);
+  }
+  else if (type == EDGE_A)
+  {
+    Eigen::Vector3d edgeAPosGradient
+        = math::gradientWrtTheta(worldTwist, mContact->edgeAFixedPoint, 0.0);
+    Eigen::Vector3d edgeADirGradient = math::gradientWrtThetaPureRotation(
+        worldTwist.head<3>(), mContact->edgeADir, 0.0);
 
-      return math::getContactPointGradient(
-          mContact->edgeAFixedPoint,
-          edgeAPosGradient,
-          mContact->edgeADir,
-          edgeADirGradient,
-          mContact->edgeBFixedPoint,
-          Eigen::Vector3d::Zero(),
-          mContact->edgeBDir,
-          Eigen::Vector3d::Zero());
-    }
-    else if (type == EDGE_B)
-    {
-      Eigen::Vector3d edgeBPosGradient
-          = math::gradientWrtTheta(worldTwist, mContact->edgeBFixedPoint, 0.0);
-      Eigen::Vector3d edgeBDirGradient = math::gradientWrtThetaPureRotation(
-          worldTwist.head<3>(), mContact->edgeBDir, 0.0);
+    return math::getContactPointGradient(
+        mContact->edgeAFixedPoint,
+        edgeAPosGradient,
+        mContact->edgeADir,
+        edgeADirGradient,
+        mContact->edgeBFixedPoint,
+        Eigen::Vector3d::Zero(),
+        mContact->edgeBDir,
+        Eigen::Vector3d::Zero());
+  }
+  else if (type == EDGE_B)
+  {
+    Eigen::Vector3d edgeBPosGradient
+        = math::gradientWrtTheta(worldTwist, mContact->edgeBFixedPoint, 0.0);
+    Eigen::Vector3d edgeBDirGradient = math::gradientWrtThetaPureRotation(
+        worldTwist.head<3>(), mContact->edgeBDir, 0.0);
 
-      return math::getContactPointGradient(
-          mContact->edgeAFixedPoint,
-          Eigen::Vector3d::Zero(),
-          mContact->edgeADir,
-          Eigen::Vector3d::Zero(),
-          mContact->edgeBFixedPoint,
-          edgeBPosGradient,
-          mContact->edgeBDir,
-          edgeBDirGradient);
-    }
+    return math::getContactPointGradient(
+        mContact->edgeAFixedPoint,
+        Eigen::Vector3d::Zero(),
+        mContact->edgeADir,
+        Eigen::Vector3d::Zero(),
+        mContact->edgeBFixedPoint,
+        edgeBPosGradient,
+        mContact->edgeBDir,
+        edgeBDirGradient);
   }
 
-  else
-  {
-    // Default case
-    return Eigen::Vector3d::Zero();
-  }
+  // Default case
+  return Eigen::Vector3d::Zero();
 }
 
 //==============================================================================
@@ -320,44 +369,88 @@ Eigen::Vector3d DifferentiableContactConstraint::getContactNormalGradient(
   {
     return Eigen::Vector3d::Zero();
   }
-  else if (
-      type == FACE || type == VERTEX_FACE_SELF_COLLISION || type == EDGE_A
-      || type == EDGE_B || type == EDGE_EDGE_SELF_COLLISION)
+  int jointIndex = dof->getIndexInJoint();
+  dynamics::BodyNode* childNode = dof->getChildBodyNode();
+  // TODO:opt getRelativeJacobian() creates a whole matrix, when we only want
+  // a single column.
+  Eigen::Vector6d worldTwist = math::AdT(
+      childNode->getWorldTransform(),
+      dof->getJoint()->getRelativeJacobian().col(jointIndex));
+
+  if (type == SPHERE_TO_BOX)
   {
-    int jointIndex = dof->getIndexInJoint();
-    dynamics::BodyNode* childNode = dof->getChildBodyNode();
-    // TODO:opt getRelativeJacobian() creates a whole matrix, when we only want
-    // a single column.
-    Eigen::Vector6d worldTwist = math::AdT(
-        childNode->getWorldTransform(),
-        dof->getJoint()->getRelativeJacobian().col(jointIndex));
-
-    if (type == FACE || type == VERTEX_FACE_SELF_COLLISION
-        || type == EDGE_EDGE_SELF_COLLISION)
+    double norm = (mContact->sphereCenter - mContact->point).norm();
+    Eigen::Vector3d contactPosGrad = getContactPositionGradient(dof);
+    Eigen::Vector3d spherePosGrad
+        = math::gradientWrtTheta(worldTwist, mContact->sphereCenter, 0.0);
+    if (norm > 1e-5)
     {
-      return math::gradientWrtThetaPureRotation(
-          worldTwist.head<3>(), normal, 0);
+      contactPosGrad /= norm;
+      spherePosGrad /= norm;
     }
-    else if (type == EDGE_A)
+    Eigen::Vector3d totalGrad;
+    // The normal flips direction depending on which order the contact detection
+    // was called in :(
+    if (mContact->type == collision::BOX_SPHERE)
     {
-      Eigen::Vector3d edgeADirGradient = math::gradientWrtThetaPureRotation(
-          worldTwist.head<3>(), mContact->edgeADir, 0.0);
-
-      return edgeADirGradient.cross(mContact->edgeBDir);
+      // normal = contact_pt - sphereCenter
+      totalGrad = contactPosGrad - spherePosGrad;
     }
-    else if (type == EDGE_B)
+    else if (mContact->type == collision::SPHERE_BOX)
     {
-      Eigen::Vector3d edgeBDirGradient = math::gradientWrtThetaPureRotation(
-          worldTwist.head<3>(), mContact->edgeBDir, 0.0);
-
-      return mContact->edgeADir.cross(edgeBDirGradient);
+      // normal = sphereCenter - contact_pt
+      totalGrad += spherePosGrad - contactPosGrad;
     }
+    totalGrad -= totalGrad.dot(normal) * normal;
+    return totalGrad;
   }
-  else
+  else if (type == BOX_TO_SPHERE)
   {
-    // Default case
-    return Eigen::Vector3d::Zero();
+    double norm = (mContact->sphereCenter - mContact->point).norm();
+    Eigen::Vector3d contactPosGrad = getContactPositionGradient(dof);
+    // spherePosGrad = 0 here, because we don't move the sphere when we move the
+    // box
+    if (norm > 1e-5)
+    {
+      contactPosGrad /= norm;
+    }
+    Eigen::Vector3d totalGrad;
+    // The normal flips direction depending on which order the contact detection
+    // was called in :(
+    if (mContact->type == collision::BOX_SPHERE)
+    {
+      // normal = contact_pt - sphereCenter
+      totalGrad = contactPosGrad;
+    }
+    else if (mContact->type == collision::SPHERE_BOX)
+    {
+      // normal = sphereCenter - contact_pt
+      totalGrad += -contactPosGrad;
+    }
+    totalGrad -= totalGrad.dot(normal) * normal;
+    return totalGrad;
   }
+  else if (type == FACE || type == SELF_COLLISION)
+  {
+    return math::gradientWrtThetaPureRotation(worldTwist.head<3>(), normal, 0);
+  }
+  else if (type == EDGE_A)
+  {
+    Eigen::Vector3d edgeADirGradient = math::gradientWrtThetaPureRotation(
+        worldTwist.head<3>(), mContact->edgeADir, 0.0);
+
+    return edgeADirGradient.cross(mContact->edgeBDir);
+  }
+  else if (type == EDGE_B)
+  {
+    Eigen::Vector3d edgeBDirGradient = math::gradientWrtThetaPureRotation(
+        worldTwist.head<3>(), mContact->edgeBDir, 0.0);
+
+    return mContact->edgeADir.cross(edgeBDirGradient);
+  }
+
+  // Default case
+  return Eigen::Vector3d::Zero();
 }
 
 //==============================================================================
@@ -367,29 +460,20 @@ Eigen::Vector3d DifferentiableContactConstraint::getContactForceGradient(
     dynamics::DegreeOfFreedom* dof)
 {
   DofContactType type = getDofContactType(dof);
-  if (type == VERTEX)
+  if (type == VERTEX || type == NONE)
   {
     return Eigen::Vector3d::Zero();
   }
-  else if (
-      type == FACE || type == VERTEX_FACE_SELF_COLLISION || type == EDGE_A
-      || type == EDGE_B || type == EDGE_EDGE_SELF_COLLISION)
-  {
-    Eigen::Vector3d contactNormal = getContactWorldNormal();
-    Eigen::Vector3d normalGradient = getContactNormalGradient(dof);
-    if (mIndex == 0 || normalGradient.squaredNorm() <= 1e-12)
-      return normalGradient;
-    else
-    {
-      return mContactConstraint
-          ->getTangentBasisMatrixODEGradient(contactNormal, normalGradient)
-          .col(mIndex - 1);
-    }
-  }
+
+  Eigen::Vector3d contactNormal = getContactWorldNormal();
+  Eigen::Vector3d normalGradient = getContactNormalGradient(dof);
+  if (mIndex == 0 || normalGradient.squaredNorm() <= 1e-12)
+    return normalGradient;
   else
   {
-    // Default case
-    return Eigen::Vector3d::Zero();
+    return mContactConstraint
+        ->getTangentBasisMatrixODEGradient(contactNormal, normalGradient)
+        .col(mIndex - 1);
   }
 }
 
@@ -443,7 +527,7 @@ EdgeData DifferentiableContactConstraint::getEdgeGradient(
     data.edgeBDir = math::gradientWrtThetaPureRotation(
         worldTwist.head<3>(), mContact->edgeBDir, 0.0);
   }
-  else if (type == EDGE_EDGE_SELF_COLLISION)
+  else if (type == SELF_COLLISION)
   {
     data.edgeAPos
         = math::gradientWrtTheta(worldTwist, mContact->edgeAFixedPoint, 0.0);
@@ -921,8 +1005,55 @@ DifferentiableContactConstraint::estimatePerturbedContactPosition(
   Eigen::Vector3d contactPos = getContactWorldPosition();
   DofContactType type = getDofContactType(skel->getDof(dofIndex));
 
-  if (type == VERTEX || type == VERTEX_FACE_SELF_COLLISION
-      || type == EDGE_EDGE_SELF_COLLISION)
+  if (type == SPHERE_TO_BOX)
+  {
+    Eigen::Vector6d worldTwist = getWorldScrewAxis(skel, dofIndex);
+    Eigen::Isometry3d rotation = math::expMap(worldTwist * eps);
+    Eigen::Vector3d perturbedSphereCenter = rotation * mContact->sphereCenter;
+    Eigen::Vector3d diff = perturbedSphereCenter - mContact->sphereCenter;
+    if (mContact->face1Locked)
+    {
+      diff = diff - mContact->face1Normal * mContact->face1Normal.dot(diff);
+    }
+    if (mContact->face2Locked)
+    {
+      diff = diff - mContact->face2Normal * mContact->face2Normal.dot(diff);
+    }
+    if (mContact->face3Locked)
+    {
+      diff = diff - mContact->face3Normal * mContact->face3Normal.dot(diff);
+    }
+    return contactPos + diff;
+  }
+  else if (type == BOX_TO_SPHERE)
+  {
+    Eigen::Vector6d worldTwist = getWorldScrewAxis(skel, dofIndex);
+    Eigen::Isometry3d rotation = math::expMap(worldTwist * eps);
+    // Step 1. First pretend the sphere is moving relative to the box, by the
+    // inverse of the box transform
+    Eigen::Vector3d inversePerturbedSphereCenter
+        = rotation.inverse() * mContact->sphereCenter;
+    Eigen::Vector3d diff
+        = inversePerturbedSphereCenter - mContact->sphereCenter;
+    if (mContact->face1Locked)
+    {
+      diff = diff - mContact->face1Normal * mContact->face1Normal.dot(diff);
+    }
+    if (mContact->face2Locked)
+    {
+      diff = diff - mContact->face2Normal * mContact->face2Normal.dot(diff);
+    }
+    if (mContact->face3Locked)
+    {
+      diff = diff - mContact->face3Normal * mContact->face3Normal.dot(diff);
+    }
+    // Step 2. Now reverse the result by moving the point by the box transform,
+    // which undoes the sphere "movement" but leaves helpful clipping effects in
+    // place.
+    Eigen::Vector3d inverseSphereMovement = contactPos + diff;
+    return rotation * inverseSphereMovement;
+  }
+  else if (type == VERTEX || type == SELF_COLLISION)
   {
     Eigen::Vector6d worldTwist = getWorldScrewAxis(skel, dofIndex);
     Eigen::Isometry3d rotation = math::expMap(worldTwist * eps);
@@ -959,11 +1090,9 @@ DifferentiableContactConstraint::estimatePerturbedContactPosition(
         rotation * mContact->edgeBDir);
     return contactPoint;
   }
-  else
-  {
-    // Default case
-    return contactPos;
-  }
+
+  // Default case
+  return contactPos;
 }
 
 //==============================================================================
@@ -976,37 +1105,87 @@ Eigen::Vector3d DifferentiableContactConstraint::estimatePerturbedContactNormal(
   {
     return normal;
   }
-  else if (
-      type == FACE || type == VERTEX_FACE_SELF_COLLISION || type == EDGE_A
-      || type == EDGE_B || type == EDGE_EDGE_SELF_COLLISION)
+
+  Eigen::Vector6d worldTwist = getWorldScrewAxis(skel, dofIndex);
+  Eigen::Isometry3d rotation = math::expMap(worldTwist * eps);
+  if (type == SPHERE_TO_BOX)
   {
-    Eigen::Vector6d worldTwist = getWorldScrewAxis(skel, dofIndex);
-    Eigen::Isometry3d rotation = math::expMap(worldTwist * eps);
-    rotation.translation().setZero();
-    if (type == FACE || type == VERTEX_FACE_SELF_COLLISION
-        || type == EDGE_EDGE_SELF_COLLISION)
+    double norm = (mContact->sphereCenter - mContact->point).norm();
+    Eigen::Vector3d newContactPos
+        = estimatePerturbedContactPosition(skel, dofIndex, eps);
+    Eigen::Vector3d contactDiff = newContactPos - mContact->point;
+    Eigen::Vector3d sphereDiff
+        = (rotation * mContact->sphereCenter) - mContact->sphereCenter;
+    if (norm > 1e-5)
     {
-      Eigen::Vector3d perturbedNormal = rotation * normal;
-      return perturbedNormal;
+      contactDiff /= norm;
+      sphereDiff /= norm;
     }
-    else if (type == EDGE_A)
+    Eigen::Vector3d perturbedNormal = normal;
+    // The normal flips direction depending on which order the contact detection
+    // was called in :(
+    if (mContact->type == collision::BOX_SPHERE)
     {
-      Eigen::Vector3d normal
-          = (rotation * mContact->edgeADir).cross(mContact->edgeBDir);
-      return normal;
+      // normal = contact_pt - sphereCenter
+      perturbedNormal += contactDiff - sphereDiff;
     }
-    else if (type == EDGE_B)
+    else if (mContact->type == collision::SPHERE_BOX)
     {
-      Eigen::Vector3d normal
-          = mContact->edgeADir.cross(rotation * mContact->edgeBDir);
-      return normal;
+      // normal = sphereCenter - contact_pt
+      perturbedNormal += sphereDiff - contactDiff;
     }
+    return perturbedNormal.normalized();
   }
-  else
+  else if (type == BOX_TO_SPHERE)
   {
-    // Default case
+    double norm = (mContact->sphereCenter - mContact->point).norm();
+    Eigen::Vector3d newContactPos
+        = estimatePerturbedContactPosition(skel, dofIndex, eps);
+    Eigen::Vector3d contactDiff = newContactPos - mContact->point;
+    if (norm > 1e-5)
+    {
+      contactDiff /= norm;
+    }
+    // sphereDiff = 0 here, because the sphere doesn't move when we perturb the
+    // box, because they're on different skeleton branches
+    Eigen::Vector3d perturbedNormal = normal;
+    // The normal flips direction depending on which order the contact detection
+    // was called in :(
+    if (mContact->type == collision::BOX_SPHERE)
+    {
+      // normal = contact_pt - sphereCenter
+      perturbedNormal += contactDiff;
+    }
+    else if (mContact->type == collision::SPHERE_BOX)
+    {
+      // normal = sphereCenter - contact_pt
+      perturbedNormal -= contactDiff;
+    }
+    return perturbedNormal.normalized();
+  }
+  else if (type == FACE || type == SELF_COLLISION)
+  {
+    rotation.translation().setZero();
+    Eigen::Vector3d perturbedNormal = rotation * normal;
+    return perturbedNormal;
+  }
+  else if (type == EDGE_A)
+  {
+    rotation.translation().setZero();
+    Eigen::Vector3d normal
+        = (rotation * mContact->edgeADir).cross(mContact->edgeBDir);
     return normal;
   }
+  else if (type == EDGE_B)
+  {
+    rotation.translation().setZero();
+    Eigen::Vector3d normal
+        = mContact->edgeADir.cross(rotation * mContact->edgeBDir);
+    return normal;
+  }
+
+  // Default case
+  return normal;
 }
 
 //==============================================================================
@@ -1016,28 +1195,18 @@ DifferentiableContactConstraint::estimatePerturbedContactForceDirection(
 {
   Eigen::Vector3d forceDir = getContactWorldForceDirection();
   DofContactType type = getDofContactType(skel->getDof(dofIndex));
-  if (type == VERTEX)
+  if (type == VERTEX || type == NONE)
   {
     return forceDir;
   }
-  else if (
-      type == FACE || type == VERTEX_FACE_SELF_COLLISION || type == EDGE_A
-      || type == EDGE_B || type == EDGE_EDGE_SELF_COLLISION)
-  {
-    Eigen::Vector3d contactNormal
-        = estimatePerturbedContactNormal(skel, dofIndex, eps);
-    if (mIndex == 0)
-      return contactNormal;
-    else
-    {
-      return mContactConstraint->getTangentBasisMatrixODE(contactNormal)
-          .col(mIndex - 1);
-    }
-  }
+  Eigen::Vector3d contactNormal
+      = estimatePerturbedContactNormal(skel, dofIndex, eps);
+  if (mIndex == 0)
+    return contactNormal;
   else
   {
-    // Default case
-    return forceDir;
+    return mContactConstraint->getTangentBasisMatrixODE(contactNormal)
+        .col(mIndex - 1);
   }
 }
 
@@ -1075,7 +1244,7 @@ EdgeData DifferentiableContactConstraint::estimatePerturbedEdges(
     data.edgeBPos = translation * mContact->edgeBFixedPoint;
     data.edgeBDir = rotation * mContact->edgeBDir;
   }
-  else if (type == EDGE_EDGE_SELF_COLLISION)
+  else if (type == SELF_COLLISION)
   {
     data.edgeAPos = translation * mContact->edgeAFixedPoint;
     data.edgeADir = rotation * mContact->edgeADir;

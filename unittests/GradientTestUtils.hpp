@@ -3548,6 +3548,7 @@ bool verifyPerturbedContactPositions(WorldPtr world)
                 world, skel, j, EPS);
         if (!equals(analytical, bruteForce, 1e-8))
         {
+          std::cout << "Failed perturbed contact pos!" << std::endl;
           std::cout << "Skel:" << std::endl
                     << skel->getName() << " - " << j << std::endl;
           std::cout << "Contact Type:" << std::endl
@@ -3574,6 +3575,7 @@ bool verifyPerturbedContactPositions(WorldPtr world)
             = constraints[k]->getContactPositionGradient(skel->getDof(j));
         if (!equals(analyticalGradient, finiteDifferenceGradient, 1e-8))
         {
+          std::cout << "Failed contact pos gradient!" << std::endl;
           std::cout << "Skel:" << std::endl
                     << skel->getName() << " - " << j << std::endl;
           std::cout << "Contact Type:" << std::endl
@@ -3609,6 +3611,7 @@ bool verifyPerturbedContactNormals(WorldPtr world)
     {
       for (int k = 0; k < constraints.size(); k++)
       {
+        Eigen::Vector3d pos = constraints[k]->getContactWorldPosition();
         Eigen::Vector3d normal = constraints[k]->getContactWorldNormal();
         Eigen::Vector3d analytical
             = constraints[k]->estimatePerturbedContactNormal(skel, j, EPS);
@@ -3617,12 +3620,20 @@ bool verifyPerturbedContactNormals(WorldPtr world)
                 world, skel, j, EPS);
         if (!equals(analytical, bruteForce, 1e-8))
         {
+          analytical
+              = constraints[k]->estimatePerturbedContactNormal(skel, j, EPS);
+          bruteForce = constraints[k]->bruteForcePerturbedContactNormal(
+              world, skel, j, EPS);
+          std::cout << "Failed perturbed contact normal!" << std::endl;
           std::cout << "Skel:" << std::endl << skel->getName() << std::endl;
+          std::cout << "DOF:" << std::endl << j << std::endl;
+          std::cout << "Contact:" << std::endl << k << std::endl;
           std::cout << "Contact Type:" << std::endl
                     << constraints[k]->getDofContactType(skel->getDof(j))
                     << std::endl;
           std::cout << "Original Contact Normal:" << std::endl
                     << normal << std::endl;
+          std::cout << "Original Contact Pos:" << std::endl << pos << std::endl;
           std::cout << "Analytical Contact Normal:" << std::endl
                     << analytical << std::endl;
           std::cout << "Analytical Contact Normal Diff:" << std::endl
@@ -3642,11 +3653,13 @@ bool verifyPerturbedContactNormals(WorldPtr world)
             = constraints[k]->getContactNormalGradient(skel->getDof(j));
         if (!equals(analyticalGradient, finiteDifferenceGradient, 1e-8))
         {
+          std::cout << "Failed contact normal gradient!" << std::endl;
           std::cout << "Skel:" << std::endl << skel->getName() << std::endl;
           std::cout << "Contact Type:" << std::endl
                     << constraints[k]->getDofContactType(skel->getDof(j))
                     << std::endl;
           std::cout << "Contact Normal:" << std::endl << normal << std::endl;
+          std::cout << "Contact Pos:" << std::endl << pos << std::endl;
           std::cout << "Analytical Contact Normal Gradient:" << std::endl
                     << analyticalGradient << std::endl;
           std::cout << "Finite Difference Contact Normal Gradient:" << std::endl
@@ -3682,6 +3695,7 @@ bool verifyPerturbedContactForceDirections(WorldPtr world)
                 world, skel, j, EPS);
         if (!equals(analytical, bruteForce, 1e-8))
         {
+          std::cout << "Failed analytical force dir estimate!" << std::endl;
           std::cout << "Constraint index:" << std::endl << k << std::endl;
           std::cout << "Skel:" << std::endl << skel->getName() << std::endl;
           std::cout << "Diff wrt index:" << std::endl << j << std::endl;
@@ -3722,9 +3736,15 @@ bool verifyPerturbedContactForceDirections(WorldPtr world)
             = constraints[k]->getContactForceGradient(skel->getDof(j));
         if (!equals(analyticalGradient, finiteDifferenceGradient, 1e-8))
         {
-          Eigen::Vector3d analyticalGradient
+          analyticalGradient
               = constraints[k]->getContactForceGradient(skel->getDof(j));
+          bruteForceNeg
+              = constraints[k]->bruteForcePerturbedContactForceDirection(
+                  world, skel, j, -EPS);
+          std::cout << "Failed analytical force gradient!" << std::endl;
+          std::cout << "Constraint index:" << std::endl << k << std::endl;
           std::cout << "Skel:" << std::endl << skel->getName() << std::endl;
+          std::cout << "Diff wrt index:" << std::endl << j << std::endl;
           std::cout << "Contact Type:" << std::endl
                     << constraints[k]->getDofContactType(skel->getDof(j))
                     << std::endl;
@@ -4023,7 +4043,7 @@ bool verifyJacobianOfClampingConstraintsTranspose(WorldPtr world)
       = classicPtr->finiteDifferenceJacobianOfClampingConstraintsTranspose(
           world, v0);
 
-  if (!equals(analytical, bruteForce, 3e-8))
+  if (!equals(analytical, bruteForce, 5e-8))
   {
     std::cout << "getJacobianOfClampingConstraintsTranspose error:"
               << std::endl;

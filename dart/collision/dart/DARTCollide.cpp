@@ -860,15 +860,50 @@ int	collideBoxSphere(CollisionObject* o1, CollisionObject* o2,
   Eigen::Vector3d c0 = T1.translation();
   Eigen::Vector3d p = T0.inverse() * c0;
 
-  if (p[0] < -halfSize[0]) { p[0] = -halfSize[0]; inside_box = false; }
-  if (p[0] >  halfSize[0]) { p[0] =  halfSize[0]; inside_box = false; }
+  Contact contact;
+  contact.sphereCenter = c0;
+  contact.collisionObject1 = o1;
+  contact.collisionObject2 = o2;
+  contact.type = BOX_SPHERE;
 
-  if (p[1] < -halfSize[1]) { p[1] = -halfSize[1]; inside_box = false; }
-  if (p[1] >  halfSize[1]) { p[1] =  halfSize[1]; inside_box = false; }
+  if (p[0] < -halfSize[0]) { 
+    contact.face1Normal = T0.rotation().col(0);
+    contact.face1Locked = true;
+    p[0] = -halfSize[0]; 
+    inside_box = false; 
+  }
+  if (p[0] >  halfSize[0]) { 
+    contact.face1Normal = T0.rotation().col(0);
+    contact.face1Locked = true;
+    p[0] = halfSize[0]; 
+    inside_box = false; 
+  }
 
-  if (p[2] < -halfSize[2]) { p[2] = -halfSize[2]; inside_box = false; }
-  if (p[2] >  halfSize[2]) { p[2] =  halfSize[2]; inside_box = false; }
+  if (p[1] < -halfSize[1]) {
+    contact.face2Normal = T0.rotation().col(1);
+    contact.face2Locked = true;
+    p[1] = -halfSize[1];
+    inside_box = false;
+  }
+  if (p[1] >  halfSize[1]) {
+    contact.face2Normal = T0.rotation().col(1);
+    contact.face2Locked = true;
+    p[1] = halfSize[1];
+    inside_box = false;
+  }
 
+  if (p[2] < -halfSize[2]) {
+    contact.face3Normal = T0.rotation().col(2);
+    contact.face3Locked = true;
+    p[2] = -halfSize[2];
+    inside_box = false;
+  }
+  if (p[2] >  halfSize[2]) {
+    contact.face3Normal = T0.rotation().col(2);
+    contact.face3Locked = true;
+    p[2] =  halfSize[2];
+    inside_box = false;
+  }
 
   Eigen::Vector3d normal(0.0, 0.0, 0.0);
   double penetration;
@@ -897,9 +932,9 @@ int	collideBoxSphere(CollisionObject* o1, CollisionObject* o2,
     normal = T0.linear() * normal;
     penetration = min + r1;
 
-    Contact contact;
-    contact.collisionObject1 = o1;
-    contact.collisionObject2 = o2;
+    // In this special case, it actually behaves as though it's just a raw vertex-face 
+    // collision for gradients, so don't reinvent the wheel
+    contact.type = FACE_VERTEX;
     contact.point = c0;
     contact.normal = normal;
     contact.penetrationDepth = penetration;
@@ -922,9 +957,6 @@ int	collideBoxSphere(CollisionObject* o1, CollisionObject* o2,
   {
     normal *= (1.0/mag);
 
-    Contact contact;
-    contact.collisionObject1 = o1;
-    contact.collisionObject2 = o2;
     contact.point = contactpt;
     contact.normal = normal;
     contact.penetrationDepth = penetration;
@@ -952,9 +984,6 @@ int	collideBoxSphere(CollisionObject* o1, CollisionObject* o2,
     normal[idx] = (p[idx] > 0.0 ? -1.0 : 1.0);
     normal = T0.linear() * normal;
 
-    Contact contact;
-    contact.collisionObject1 = o1;
-    contact.collisionObject2 = o2;
     contact.point = contactpt;
     contact.normal = normal;
     contact.penetrationDepth = penetration;
@@ -968,21 +997,57 @@ int collideSphereBox(CollisionObject* o1, CollisionObject* o2,
                      const Eigen::Vector3d& size1, const Eigen::Isometry3d& T1,
                      CollisionResult& result)
 {
-  Eigen::Vector3d size = 0.5 * size1;
+  Eigen::Vector3d halfSize = 0.5 * size1;
   bool inside_box = true;
 
   // clipping a center of the sphere to a boundary of the box
   Eigen::Vector3d c0 = T0.translation();
   Eigen::Vector3d p = T1.inverse() * c0;
 
-  if (p[0] < -size[0]) { p[0] = -size[0]; inside_box = false; }
-  if (p[0] >  size[0]) { p[0] =  size[0]; inside_box = false; }
+  Contact contact;
+  contact.sphereCenter = c0;
+  contact.collisionObject1 = o1;
+  contact.collisionObject2 = o2;
+  contact.type = SPHERE_BOX;
 
-  if (p[1] < -size[1]) { p[1] = -size[1]; inside_box = false; }
-  if (p[1] >  size[1]) { p[1] =  size[1]; inside_box = false; }
+  if (p[0] < -halfSize[0]) {
+    contact.face1Normal = T1.rotation().col(0);
+    contact.face1Locked = true;
+    p[0] = -halfSize[0];
+    inside_box = false;
+  }
+  if (p[0] > halfSize[0]) {
+    contact.face1Normal = T1.rotation().col(0);
+    contact.face1Locked = true;
+    p[0] = halfSize[0];
+    inside_box = false;
+  }
 
-  if (p[2] < -size[2]) { p[2] = -size[2]; inside_box = false; }
-  if (p[2] >  size[2]) { p[2] =  size[2]; inside_box = false; }
+  if (p[1] < -halfSize[1]) {
+    contact.face2Normal = T1.rotation().col(1);
+    contact.face2Locked = true;
+    p[1] = -halfSize[1];
+    inside_box = false;
+  }
+  if (p[1] > halfSize[1]) {
+    contact.face2Normal = T1.rotation().col(1);
+    contact.face2Locked = true;
+    p[1] =  halfSize[1];
+    inside_box = false;
+  }
+
+  if (p[2] < -halfSize[2]) {
+    contact.face3Normal = T1.rotation().col(2);
+    contact.face3Locked = true;
+    p[2] = -halfSize[2];
+    inside_box = false;
+  }
+  if (p[2] > halfSize[2]) {
+    contact.face3Normal = T1.rotation().col(2);
+    contact.face3Locked = true;
+    p[2] = halfSize[2];
+    inside_box = false;
+  }
 
 
   Eigen::Vector3d normal(0.0, 0.0, 0.0);
@@ -991,8 +1056,8 @@ int collideSphereBox(CollisionObject* o1, CollisionObject* o2,
   if ( inside_box )
   {
     // find nearest side from the sphere center
-    double min = size[0] - std::abs(p[0]);
-    double tmin = size[1] - std::abs(p[1]);
+    double min = halfSize[0] - std::abs(p[0]);
+    double tmin = halfSize[1] - std::abs(p[1]);
     int idx = 0;
 
     if ( tmin < min )
@@ -1000,7 +1065,7 @@ int collideSphereBox(CollisionObject* o1, CollisionObject* o2,
       min = tmin;
       idx = 1;
     }
-    tmin = size[2] - std::abs(p[2]);
+    tmin = halfSize[2] - std::abs(p[2]);
     if ( tmin < min )
     {
       min = tmin;
@@ -1011,9 +1076,9 @@ int collideSphereBox(CollisionObject* o1, CollisionObject* o2,
     normal = T1.linear() * normal;
     penetration = min + r0;
 
-    Contact contact;
-    contact.collisionObject1 = o1;
-    contact.collisionObject2 = o2;
+    // In this special case, it actually behaves as though it's just a raw vertex-face 
+    // collision for gradients, so don't reinvent the wheel
+    contact.type = VERTEX_FACE;
     contact.point = c0;
     contact.normal = normal;
     contact.penetrationDepth = penetration;
@@ -1036,9 +1101,6 @@ int collideSphereBox(CollisionObject* o1, CollisionObject* o2,
   {
     normal *= (1.0/mag);
 
-    Contact contact;
-    contact.collisionObject1 = o1;
-    contact.collisionObject2 = o2;
     contact.point = contactpt;
     contact.normal = normal;
     contact.penetrationDepth = penetration;
@@ -1046,8 +1108,8 @@ int collideSphereBox(CollisionObject* o1, CollisionObject* o2,
   }
   else
   {
-    double min = size[0] - std::abs(p[0]);
-    double tmin = size[1] - std::abs(p[1]);
+    double min = halfSize[0] - std::abs(p[0]);
+    double tmin = halfSize[1] - std::abs(p[1]);
     int idx = 0;
 
     if ( tmin < min )
@@ -1055,7 +1117,7 @@ int collideSphereBox(CollisionObject* o1, CollisionObject* o2,
       min = tmin;
       idx = 1;
     }
-    tmin = size[2] - std::abs(p[2]);
+    tmin = halfSize[2] - std::abs(p[2]);
     if ( tmin < min )
     {
       min = tmin;
@@ -1065,9 +1127,6 @@ int collideSphereBox(CollisionObject* o1, CollisionObject* o2,
     normal[idx] = (p[idx] > 0.0 ? 1.0 : -1.0);
     normal = T1.linear() * normal;
 
-    Contact contact;
-    contact.collisionObject1 = o1;
-    contact.collisionObject2 = o2;
     contact.point = contactpt;
     contact.normal = normal;
     contact.penetrationDepth = penetration;
@@ -1108,6 +1167,11 @@ int collideSphereSphere(CollisionObject* o1, CollisionObject* o2, const double& 
     contact.point = point;
     contact.normal = normal;
     contact.penetrationDepth = penetration;
+    contact.type == SPHERE_SPHERE;
+    contact.centerA = c0.translation();
+    contact.radiusA = r0;
+    contact.centerB = c1.translation();
+    contact.radiusB = r1;
     result.addContact(contact);
     return 1;
   }
@@ -1117,6 +1181,11 @@ int collideSphereSphere(CollisionObject* o1, CollisionObject* o2, const double& 
   penetration = rsum - normal_sqr;
 
   Contact contact;
+  contact.type == SPHERE_SPHERE;
+  contact.centerA = c0.translation();
+  contact.radiusA = r0;
+  contact.centerB = c1.translation();
+  contact.radiusB = r1;
   contact.collisionObject1 = o1;
   contact.collisionObject2 = o2;
   contact.point = point;

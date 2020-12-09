@@ -822,7 +822,8 @@ ContactConstraint::getTangentBasisMatrixODEGradient(
     }
   }
 
-  assert(tangent.norm() > 1e-06);
+  double tangentNorm = tangent.norm();
+  assert(tangentNorm > 1e-06);
   tangent.normalize();
 
   assert(!dart::math::isNan(tangent));
@@ -833,8 +834,23 @@ ContactConstraint::getTangentBasisMatrixODEGradient(
   // Note: a possible speedup is in place for mNumDir % 2 = 0
   // Each basis and its opposite belong in the matrix, so we iterate half as
   // many times
-  T.col(0) = cross.cross(g);
-  T.col(1) = g.cross(tangent) + n.cross(cross.cross(g));
+  Eigen::Vector3d gradOfFrictionalDirectionCrossNormal = cross.cross(g);
+  gradOfFrictionalDirectionCrossNormal /= tangentNorm;
+  // Account for the normalization
+  Eigen::Vector3d gradOfTangent;
+  if (abs(tangentNorm - 1.0) > DART_EPSILON)
+  {
+    gradOfTangent
+        = gradOfFrictionalDirectionCrossNormal
+          - ((gradOfFrictionalDirectionCrossNormal.dot(tangent)) * tangent);
+  }
+  else
+  {
+    gradOfTangent = gradOfFrictionalDirectionCrossNormal;
+  }
+
+  T.col(0) = gradOfTangent;
+  T.col(1) = g.cross(tangent) + n.cross(gradOfTangent);
   return T;
 }
 

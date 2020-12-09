@@ -48,7 +48,10 @@ enum ContactType
        // how the contact point changes as we move the skeletons.
   VERTEX_FACE = 1,
   FACE_VERTEX = 2,
-  EDGE_EDGE = 3
+  EDGE_EDGE = 3,
+  SPHERE_BOX = 4,
+  BOX_SPHERE = 5,
+  SPHERE_SPHERE = 6
 };
 
 /// Contact information
@@ -117,6 +120,53 @@ struct Contact
   /// This is only filled for (type == EDGE_EDGE) contacts. This is the
   /// direction of edge B
   Eigen::Vector3d edgeBDir;
+
+  /// This is only filled for (type == SPHERE_BOX || type == BOX_SPHERE)
+  /// contacts. This holds the center-point of the sphere
+  Eigen::Vector3d sphereCenter;
+
+  /// This is only useful for (type == SPHERE_BOX || type == BOX_SPHERE)
+  /// contacts. If this is true, then the contact point is clamped on face1.
+  bool face1Locked;
+
+  /// This is only filled for (type == SPHERE_BOX || type == BOX_SPHERE)
+  /// contacts. If (face1Locked) is true, then this means we don't move the
+  /// contact point along this normal.
+  Eigen::Vector3d face1Normal;
+
+  /// This is only useful for (type == SPHERE_BOX || type == BOX_SPHERE)
+  /// contacts. If this is true, then the contact point is clamped on face2.
+  bool face2Locked;
+
+  /// This is only filled for (type == SPHERE_BOX || type == BOX_SPHERE)
+  /// contacts. If (face2Locked) is true, then this means we don't move the
+  /// contact point along this normal.
+  Eigen::Vector3d face2Normal;
+
+  /// This is only useful for (type == SPHERE_BOX || type == BOX_SPHERE)
+  /// contacts. If this is true, then the contact point is clamped on face3.
+  bool face3Locked;
+
+  /// This is only filled for (type == SPHERE_BOX || type == BOX_SPHERE)
+  /// contacts. If (face3Locked) is true, then this means we don't move the
+  /// contact point along this normal.
+  Eigen::Vector3d face3Normal;
+
+  /// This is only filled for (type == SPHERE_SPHERE) contacts. It's the center
+  /// of the A sphere.
+  Eigen::Vector3d centerA;
+
+  /// This is only filled for (type == SPHERE_SPHERE) contacts. It's the radius
+  /// of the A sphere.
+  double radiusA;
+
+  /// This is only filled for (type == SPHERE_SPHERE) contacts. It's the center
+  /// of the B sphere.
+  Eigen::Vector3d centerB;
+
+  /// This is only filled for (type == SPHERE_SPHERE) contacts. It's the radius
+  /// of the B sphere.
+  double radiusB;
 
   /// Returns the epsilon to be used for determination of zero-length normal.
   constexpr static double getNormalEpsilon();
