@@ -30,7 +30,7 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <dart/realtime/MPC.hpp>
+#include <dart/realtime/MPCRemote.hpp>
 #include <dart/simulation/World.hpp>
 #include <dart/trajectory/LossFn.hpp>
 #include <dart/trajectory/Optimizer.hpp>
@@ -44,70 +44,39 @@ namespace py = pybind11;
 namespace dart {
 namespace python {
 
-void MPC(py::module& m)
+void MPCRemote(py::module& m)
 {
-  ::py::class_<dart::realtime::MPC>(m, "MPC")
+  ::py::class_<dart::realtime::MPCRemote>(m, "MPCRemote")
       .def(
-          ::py::init<
-              std::shared_ptr<dart::simulation::World>,
-              std::shared_ptr<dart::trajectory::LossFn>,
-              int>(),
-          ::py::arg("world"),
-          ::py::arg("loss"),
-          ::py::arg("planningHorizonMillis"))
-      .def("setLoss", &dart::realtime::MPC::setLoss, ::py::arg("loss"))
-      .def(
-          "setOptimizer",
-          &dart::realtime::MPC::setOptimizer,
-          ::py::arg("optimizer"))
-      .def("setProblem", &dart::realtime::MPC::setProblem, ::py::arg("problem"))
-      .def("getProblem", &dart::realtime::MPC::getProblem)
-      .def("getOptimizer", &dart::realtime::MPC::getOptimizer)
+          ::py::init<std::string, int, int, int, int>(),
+          ::py::arg("host"),
+          ::py::arg("port"),
+          ::py::arg("dofs"),
+          ::py::arg("steps"),
+          ::py::arg("millisPerStep"))
+      .def(::py::init<dart::realtime::MPCLocal&>(), ::py::arg("local"))
       .def(
           "getRemainingPlanBufferMillis",
-          &dart::realtime::MPC::getRemainingPlanBufferMillis)
-      .def("setSilent", &dart::realtime::MPC::setSilent, ::py::arg("silent"))
-      .def(
-          "setEnableLineSearch",
-          &dart::realtime::MPC::setEnableLineSearch,
-          ::py::arg("enabled"))
-      .def(
-          "setEnableOptimizationGuards",
-          &dart::realtime::MPC::setEnableOptimizationGuards,
-          ::py::arg("enabled"))
-      .def(
-          "setRecordIterations",
-          &dart::realtime::MPC::setRecordIterations,
-          ::py::arg("enabled"))
-      .def("getMaxIterations", &dart::realtime::MPC::getMaxIterations)
-      .def(
-          "setMaxIterations",
-          &dart::realtime::MPC::setMaxIterations,
-          ::py::arg("maxIterations"))
+          &dart::realtime::MPCRemote::getRemainingPlanBufferMillis)
       .def(
           "recordGroundTruthState",
-          &dart::realtime::MPC::recordGroundTruthState,
+          &dart::realtime::MPCRemote::recordGroundTruthState,
           ::py::arg("time"),
           ::py::arg("pos"),
           ::py::arg("vel"),
           ::py::arg("mass"))
       .def(
           "recordGroundTruthStateNow",
-          &dart::realtime::MPC::recordGroundTruthStateNow,
+          &dart::realtime::MPCRemote::recordGroundTruthStateNow,
           ::py::arg("pos"),
           ::py::arg("vel"),
           ::py::arg("mass"))
-      .def("optimizePlan", &dart::realtime::MPC::optimizePlan, ::py::arg("now"))
-      .def(
-          "adjustPerformance",
-          &dart::realtime::MPC::adjustPerformance,
-          ::py::arg("lastOptimizationTimeMillis"))
-      .def("start", &dart::realtime::MPC::start)
-      .def("stop", &dart::realtime::MPC::stop)
-      .def("getCurrentSolution", &dart::realtime::MPC::getCurrentSolution)
+      .def("getForce", &dart::realtime::MPCRemote::getForce, ::py::arg("now"))
+      .def("start", &dart::realtime::MPCRemote::start)
+      .def("stop", &dart::realtime::MPCRemote::stop)
       .def(
           "registerReplaningListener",
-          &dart::realtime::MPC::registerReplanningListener,
+          &dart::realtime::MPCRemote::registerReplanningListener,
           ::py::arg("replanListener"));
 }
 

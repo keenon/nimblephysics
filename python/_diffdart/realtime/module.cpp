@@ -39,7 +39,8 @@ namespace py = pybind11;
 namespace dart {
 namespace python {
 
-void MPC(py::module& sm);
+void MPCLocal(py::module& sm);
+void MPCRemote(py::module& sm);
 void RealtimeWorld(py::module& sm);
 
 void dart_realtime(py::module& m)
@@ -50,7 +51,8 @@ void dart_realtime(py::module& m)
       = "This provides a native realtime MPC and SSID framework to DART, "
         "utilizing the trajectory folder.";
 
-  MPC(sm);
+  MPCLocal(sm);
+  MPCRemote(sm);
   RealtimeWorld(sm);
 }
 
