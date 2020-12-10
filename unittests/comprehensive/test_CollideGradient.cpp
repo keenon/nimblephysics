@@ -302,14 +302,12 @@ TEST(GRADIENTS, SPHERE_BOX_COLLISION_2_FACE)
 {
   testSphereBoxCollision(false, 2);
 }
-#endif
 
 TEST(GRADIENTS, SPHERE_BOX_COLLISION_3_FACE)
 {
   testSphereBoxCollision(false, 3);
 }
 
-#ifdef ALL_TESTS
 TEST(GRADIENTS, SPHERE_BOX_COLLISION_4_FACE)
 {
   testSphereBoxCollision(false, 4);
@@ -318,5 +316,76 @@ TEST(GRADIENTS, SPHERE_BOX_COLLISION_4_FACE)
 TEST(GRADIENTS, SPHERE_BOX_SELF_COLLISION_1_FACE)
 {
   testSphereBoxCollision(true, 1);
+}
+#endif
+
+/**
+ * This sets up two spheres with asymmetric radii colliding with each other
+ */
+void testSphereSphereCollision(
+    bool isSelfCollision, double radius1, double radius2)
+{
+  // World
+  WorldPtr world = World::create();
+  auto collision_detector
+      = collision::CollisionDetector::getFactory()->create("dart");
+  world->getConstraintSolver()->setCollisionDetector(collision_detector);
+  world->setGravity(Eigen::Vector3d(0, -9.81, 0));
+
+  // This box is centered at (0,0,0), and extends to [-0.5, 0.5] on every axis
+  SkeletonPtr sphere1 = Skeleton::create("sphere 1");
+  std::pair<FreeJoint*, BodyNode*> sphere1Pair
+      = sphere1->createJointAndBodyNodePair<FreeJoint>();
+  std::shared_ptr<SphereShape> sphereShape1(new SphereShape(radius1));
+  ShapeNode* sphere1Node
+      = sphere1Pair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(
+          sphereShape1);
+
+  SkeletonPtr sphere2 = Skeleton::create("sphere 2");
+  std::pair<FreeJoint*, BodyNode*> sphere2Pair;
+
+  if (isSelfCollision)
+  {
+    sphere1->enableSelfCollision(true);
+    sphere2Pair
+        = sphere1Pair.second->createChildJointAndBodyNodePair<FreeJoint>();
+  }
+  else
+  {
+    sphere2Pair = sphere2->createJointAndBodyNodePair<FreeJoint>();
+  }
+
+  std::shared_ptr<SphereShape> sphere2Shape(new SphereShape(radius2));
+  ShapeNode* sphereNode
+      = sphere2Pair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(
+          sphere2Shape);
+  FreeJoint* sphere2Joint = sphere2Pair.first;
+  Eigen::Matrix3d rotation = Eigen::Matrix3d::Identity();
+
+  Eigen::Isometry3d sphere2Position = Eigen::Isometry3d::Identity();
+  sphere2Position.translation()
+      = Eigen::Vector3d(radius1 + radius2 - 2e-2, 0, 0);
+  sphere2Joint->setTransformFromChildBodyNode(sphere2Position);
+
+  world->addSkeleton(sphere1);
+  if (!isSelfCollision)
+  {
+    world->addSkeleton(sphere2);
+  }
+
+  Eigen::VectorXd vels = Eigen::VectorXd::Zero(world->getNumDofs());
+  // Set the vel of the X translation of the 2nd box
+  vels(9) = 0.1;
+
+  // renderWorld(world);
+  EXPECT_TRUE(verifyAnalyticalJacobians(world));
+  EXPECT_TRUE(verifyVelGradients(world, vels));
+  EXPECT_TRUE(verifyWrtMass(world));
+}
+
+#ifdef ALL_TESTS
+TEST(GRADIENTS, SPHERE_SPHERE_COLLISION)
+{
+  testSphereSphereCollision(false, 0.5, 0.7);
 }
 #endif

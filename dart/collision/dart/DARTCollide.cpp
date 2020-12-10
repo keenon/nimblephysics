@@ -1167,7 +1167,7 @@ int collideSphereSphere(CollisionObject* o1, CollisionObject* o2, const double& 
     contact.point = point;
     contact.normal = normal;
     contact.penetrationDepth = penetration;
-    contact.type == SPHERE_SPHERE;
+    contact.type = SPHERE_SPHERE;
     contact.centerA = c0.translation();
     contact.radiusA = r0;
     contact.centerB = c1.translation();
@@ -1181,7 +1181,7 @@ int collideSphereSphere(CollisionObject* o1, CollisionObject* o2, const double& 
   penetration = rsum - normal_sqr;
 
   Contact contact;
-  contact.type == SPHERE_SPHERE;
+  contact.type = SPHERE_SPHERE;
   contact.centerA = c0.translation();
   contact.radiusA = r0;
   contact.centerB = c1.translation();

@@ -261,7 +261,17 @@ Eigen::Vector3d DifferentiableContactConstraint::getContactPositionGradient(
       childNode->getWorldTransform(),
       dof->getJoint()->getRelativeJacobian().col(jointIndex));
 
-  if (type == SPHERE_TO_BOX)
+  if (type == SPHERE_A)
+  {
+    double weight = mContact->radiusB / (mContact->radiusA + mContact->radiusB);
+    return weight * math::gradientWrtTheta(worldTwist, mContact->centerA, 0.0);
+  }
+  else if (type == SPHERE_B)
+  {
+    double weight = mContact->radiusA / (mContact->radiusA + mContact->radiusB);
+    return weight * math::gradientWrtTheta(worldTwist, mContact->centerB, 0.0);
+  }
+  else if (type == SPHERE_TO_BOX)
   {
     Eigen::Vector3d sphereGrad
         = math::gradientWrtTheta(worldTwist, mContact->sphereCenter, 0.0);
@@ -377,7 +387,25 @@ Eigen::Vector3d DifferentiableContactConstraint::getContactNormalGradient(
       childNode->getWorldTransform(),
       dof->getJoint()->getRelativeJacobian().col(jointIndex));
 
-  if (type == SPHERE_TO_BOX)
+  if (type == SPHERE_A)
+  {
+    double norm = (mContact->centerA - mContact->centerB).norm();
+    Eigen::Vector3d posGrad
+        = math::gradientWrtTheta(worldTwist, mContact->centerA, 0.0);
+    posGrad /= norm;
+    posGrad -= mContact->normal.dot(posGrad) * mContact->normal;
+    return posGrad;
+  }
+  else if (type == SPHERE_B)
+  {
+    double norm = (mContact->centerA - mContact->centerB).norm();
+    Eigen::Vector3d posGrad
+        = math::gradientWrtTheta(worldTwist, mContact->centerB, 0.0);
+    posGrad /= norm;
+    posGrad -= mContact->normal.dot(posGrad) * mContact->normal;
+    return -posGrad;
+  }
+  else if (type == SPHERE_TO_BOX)
   {
     double norm = (mContact->sphereCenter - mContact->point).norm();
     Eigen::Vector3d contactPosGrad = getContactPositionGradient(dof);
@@ -1005,7 +1033,27 @@ DifferentiableContactConstraint::estimatePerturbedContactPosition(
   Eigen::Vector3d contactPos = getContactWorldPosition();
   DofContactType type = getDofContactType(skel->getDof(dofIndex));
 
-  if (type == SPHERE_TO_BOX)
+  if (type == SPHERE_A)
+  {
+    Eigen::Vector6d worldTwist = getWorldScrewAxis(skel, dofIndex);
+    Eigen::Isometry3d rotation = math::expMap(worldTwist * eps);
+    double weight = mContact->radiusB / (mContact->radiusA + mContact->radiusB);
+    Eigen::Vector3d posDiff
+        = (rotation * mContact->centerA) - mContact->centerA;
+    posDiff *= weight;
+    return contactPos + posDiff;
+  }
+  else if (type == SPHERE_B)
+  {
+    Eigen::Vector6d worldTwist = getWorldScrewAxis(skel, dofIndex);
+    Eigen::Isometry3d rotation = math::expMap(worldTwist * eps);
+    double weight = mContact->radiusA / (mContact->radiusA + mContact->radiusB);
+    Eigen::Vector3d posDiff
+        = (rotation * mContact->centerB) - mContact->centerB;
+    posDiff *= weight;
+    return contactPos + posDiff;
+  }
+  else if (type == SPHERE_TO_BOX)
   {
     Eigen::Vector6d worldTwist = getWorldScrewAxis(skel, dofIndex);
     Eigen::Isometry3d rotation = math::expMap(worldTwist * eps);
@@ -1108,7 +1156,23 @@ Eigen::Vector3d DifferentiableContactConstraint::estimatePerturbedContactNormal(
 
   Eigen::Vector6d worldTwist = getWorldScrewAxis(skel, dofIndex);
   Eigen::Isometry3d rotation = math::expMap(worldTwist * eps);
-  if (type == SPHERE_TO_BOX)
+  if (type == SPHERE_A)
+  {
+    double norm = (mContact->centerA - mContact->centerB).norm();
+    Eigen::Vector3d posDiff
+        = (rotation * mContact->centerA) - mContact->centerA;
+    posDiff /= norm;
+    return (normal + posDiff).normalized();
+  }
+  else if (type == SPHERE_B)
+  {
+    double norm = (mContact->centerA - mContact->centerB).norm();
+    Eigen::Vector3d posDiff
+        = (rotation * mContact->centerB) - mContact->centerB;
+    posDiff /= norm;
+    return (normal - posDiff).normalized();
+  }
+  else if (type == SPHERE_TO_BOX)
   {
     double norm = (mContact->sphereCenter - mContact->point).norm();
     Eigen::Vector3d newContactPos
