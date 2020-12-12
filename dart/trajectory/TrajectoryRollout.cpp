@@ -173,6 +173,74 @@ TrajectoryRolloutReal TrajectoryRollout::deserialize(
 }
 
 //==============================================================================
+/// This creates a rollout from forces over time
+static TrajectoryRolloutReal fromForces(
+    std::shared_ptr<simulation::World> world,
+    Eigen::VectorXd startPos,
+    Eigen::VectorXd startVel,
+    std::vector<Eigen::VectorXd> forces)
+{
+  int steps = forces.size();
+  int dofs = world->getNumDofs();
+  Eigen::MatrixXd posMatrix = Eigen::MatrixXd::Zero(dofs, steps);
+  Eigen::MatrixXd velMatrix = Eigen::MatrixXd::Zero(dofs, steps);
+  Eigen::MatrixXd forceMatrix = Eigen::MatrixXd::Zero(dofs, steps);
+
+  neural::RestorableSnapshot snapshot(world);
+
+  for (int i = 0; i < forces.size(); i++)
+  {
+    world->setExternalForces(forces[i]);
+    world->step();
+    posMatrix.col(i) = world->getPositions();
+    velMatrix.col(i) = world->getVelocities();
+    forceMatrix.col(i) = world->getExternalForces();
+  }
+
+  snapshot.restore();
+
+  std::unordered_map<std::string, Eigen::MatrixXd> pos;
+  pos["identity"] = posMatrix;
+  std::unordered_map<std::string, Eigen::MatrixXd> vel;
+  vel["identity"] = velMatrix;
+  std::unordered_map<std::string, Eigen::MatrixXd> force;
+  force["identity"] = forceMatrix;
+  Eigen::VectorXd mass = world->getMasses();
+  std::unordered_map<std::string, Eigen::MatrixXd> metadata;
+
+  return TrajectoryRolloutReal("identity", pos, vel, force, mass, metadata);
+}
+
+//==============================================================================
+/// This creates a rollout from poses over time
+static TrajectoryRolloutReal fromPoses(
+    std::shared_ptr<simulation::World> world,
+    std::vector<Eigen::VectorXd> poses)
+{
+  int steps = poses.size();
+  int dofs = world->getNumDofs();
+  Eigen::MatrixXd posMatrix = Eigen::MatrixXd::Zero(dofs, steps);
+  Eigen::MatrixXd velMatrix = Eigen::MatrixXd::Zero(dofs, steps);
+  Eigen::MatrixXd forceMatrix = Eigen::MatrixXd::Zero(dofs, steps);
+
+  for (int i = 0; i < poses.size(); i++)
+  {
+    posMatrix.col(i) = poses[i];
+  }
+
+  std::unordered_map<std::string, Eigen::MatrixXd> pos;
+  pos["identity"] = posMatrix;
+  std::unordered_map<std::string, Eigen::MatrixXd> vel;
+  vel["identity"] = velMatrix;
+  std::unordered_map<std::string, Eigen::MatrixXd> force;
+  force["identity"] = forceMatrix;
+  Eigen::VectorXd mass = world->getMasses();
+  std::unordered_map<std::string, Eigen::MatrixXd> metadata;
+
+  return TrajectoryRolloutReal("identity", pos, vel, force, mass, metadata);
+}
+
+//==============================================================================
 TrajectoryRolloutReal::TrajectoryRolloutReal(
     const std::unordered_map<std::string, std::shared_ptr<neural::Mapping>>
         mappings,

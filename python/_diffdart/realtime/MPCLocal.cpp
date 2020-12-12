@@ -113,6 +113,12 @@ void MPCLocal(py::module& m)
           ::py::arg("lastOptimizationTimeMillis"))
       .def("start", &dart::realtime::MPCLocal::start)
       .def("stop", &dart::realtime::MPCLocal::stop)
+      .def(
+          "serve",
+          &dart::realtime::MPCLocal::serve,
+          ::py::arg("port"),
+          "A blocking call - this starts a gRPC server that clients can "
+          "connect to to get MPC computations done remotely")
       .def("getCurrentSolution", &dart::realtime::MPCLocal::getCurrentSolution)
       .def(
           "registerReplaningListener",

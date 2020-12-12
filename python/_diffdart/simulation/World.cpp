@@ -399,6 +399,9 @@ void World(py::module& m)
           &dart::simulation::World::setConstraintForceMixingEnabled,
           ::py::arg("enabled"))
       .def("getWrtMass", &dart::simulation::World::getWrtMass)
+      .def("toJson", &dart::simulation::World::toJson)
+      .def("positionsToJson", &dart::simulation::World::positionsToJson)
+      .def("colorsToJson", &dart::simulation::World::colorsToJson)
       .def_readonly("onNameChanged", &dart::simulation::World::onNameChanged);
 }
 

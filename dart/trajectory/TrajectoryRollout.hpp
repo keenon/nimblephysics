@@ -78,6 +78,18 @@ public:
   /// This decodes a protobuf
   static TrajectoryRolloutReal deserialize(
       const proto::TrajectoryRollout& proto);
+
+  /// This creates a rollout from forces over time
+  static TrajectoryRolloutReal fromForces(
+      std::shared_ptr<simulation::World> world,
+      Eigen::VectorXd startPos,
+      Eigen::VectorXd startVel,
+      std::vector<Eigen::VectorXd> forces);
+
+  /// This creates a rollout from poses over time
+  static TrajectoryRolloutReal fromPoses(
+      std::shared_ptr<simulation::World> world,
+      std::vector<Eigen::VectorXd> poses);
 };
 
 class TrajectoryRolloutReal : public TrajectoryRollout

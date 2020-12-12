@@ -30,6 +30,7 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <dart/simulation/World.hpp>
 #include <dart/trajectory/TrajectoryConstants.hpp>
 #include <dart/trajectory/TrajectoryRollout.hpp>
 #include <pybind11/eigen.h>
@@ -69,6 +70,10 @@ void TrajectoryRollout(py::module& m)
           &dart::trajectory::TrajectoryRollout::getForces,
           ::py::arg("mapping") = "identity")
       .def("getMasses", &dart::trajectory::TrajectoryRollout::getMasses)
+      .def(
+          "toJson",
+          &dart::trajectory::TrajectoryRollout::toJson,
+          ::py::arg("world"))
       .def(
           "copy",
           &dart::trajectory::TrajectoryRollout::copy,

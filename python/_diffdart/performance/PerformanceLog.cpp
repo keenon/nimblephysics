@@ -51,7 +51,14 @@ void PerformanceLog(py::module& m)
       .def("toJson", &dart::performance::FinalizedPerformanceLog::toJson);
 
   ::py::class_<dart::performance::PerformanceLog>(m, "PerformanceLog")
-      .def("finalize", &dart::performance::PerformanceLog::finalize);
+      .def(
+          "finalize",
+          +[](dart::performance::PerformanceLog* self)
+              -> std::unordered_map<
+                  std::string,
+                  std::shared_ptr<dart::performance::FinalizedPerformanceLog>> {
+            return self->finalize();
+          });
 }
 
 } // namespace python

@@ -17,6 +17,7 @@ dart_add_test("comprehensive" test_Server)
 dart_add_test("comprehensive" test_Proto)
 dart_add_test("comprehensive" test_SimpleFeatherstone)
 dart_add_test("comprehensive" test_CollideGradient)
+dart_add_test("comprehensive" test_GUIWebsocketServer)
 
 # target_link_libraries(test_Gradients dart-collision-bullet)
 # target_link_libraries(test_Gradients dart-collision-ode)

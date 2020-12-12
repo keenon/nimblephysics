@@ -3,6 +3,7 @@ import * as THREE from "three";
 import { EffectComposer } from "../threejs_lib/postprocessing/EffectComposer.js";
 import { SSAOPass } from "../threejs_lib/postprocessing/SSAOPass.js";
 import { OrbitControls } from "../threejs_lib/controls/OrbitControls.js";
+import { DragControls } from "../threejs_lib/controls/DragControls.js";
 
 class View {
   container: HTMLDivElement;
@@ -12,10 +13,12 @@ class View {
   composer: EffectComposer;
   width: number;
   height: number;
-  controls: OrbitControls;
+  orbitControls: OrbitControls;
+  dragControls: DragControls;
   parent: HTMLElement;
 
   constructor(scene: THREE.Scene, parent: HTMLElement) {
+    this.scene = scene;
     this.container = document.createElement("div");
     this.container.className = "View__container";
     parent.appendChild(this.container);
@@ -49,8 +52,53 @@ class View {
 
     window.addEventListener("resize", this.onWindowResize, false);
 
-    this.controls = new OrbitControls(this.camera, this.renderer.domElement);
+    this.orbitControls = new OrbitControls(
+      this.camera,
+      this.renderer.domElement
+    );
+    this.dragControls = new DragControls(
+      [],
+      this.camera,
+      this.renderer.domElement
+    );
+
+    this.dragControls.addEventListener("dragstart", () => {
+      this.orbitControls.enabled = false;
+    });
+    this.dragControls.addEventListener("dragend", () => {
+      this.orbitControls.enabled = true;
+    });
+
+    this.orbitControls.addEventListener("change", () => {
+      this.composer.render();
+    });
+    this.dragControls.addEventListener("drag", () => {
+      this.composer.render();
+    });
   }
+
+  setDragHandler = (
+    handler: (obj: THREE.Object3D, pos: THREE.Vector3) => void
+  ) => {
+    this.dragControls.setDragHandler(handler);
+  };
+
+  add = (obj: THREE.Object3D) => {
+    this.scene.add(obj);
+  };
+
+  remove = (obj: THREE.Object3D) => {
+    this.scene.remove(obj);
+    this.dragControls.remove(obj);
+  };
+
+  enableMouseInteraction = (obj: THREE.Object3D) => {
+    this.dragControls.add(obj);
+  };
+
+  disableMouseInteraction = (obj: THREE.Object3D) => {
+    this.dragControls.remove(obj);
+  };
 
   refreshSize = () => {
     this.width = this.parent.getBoundingClientRect().width;
@@ -65,10 +113,11 @@ class View {
 
     this.renderer.setSize(this.width, this.height);
     this.composer.setSize(this.width, this.height);
+    this.composer.render();
   };
 
   render = () => {
-    this.controls.update();
+    this.orbitControls.update();
     this.composer.render();
   };
 }

@@ -2,7 +2,10 @@
   "name": "diffdart-visualizer",
   "version": "0.0.1",
   "description": "A WebGL-based visualizer for DiffDART trajectories",
-  "main": "index.js",
+  "entry": {
+    "index": "index.js",
+    "embedded": "embedded.js"
+  },
   "scripts": {
     "dev": "webpack-dev-server",
     "watch": "webpack --watch --mode=development",
