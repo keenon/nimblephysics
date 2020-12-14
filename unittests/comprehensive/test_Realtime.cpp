@@ -42,8 +42,9 @@
 #include "dart/realtime/MPC.hpp"
 #include "dart/realtime/MPCLocal.hpp"
 #include "dart/realtime/MPCRemote.hpp"
-#include "dart/realtime/RealtimeWorld.hpp"
 #include "dart/realtime/SSID.hpp"
+#include "dart/realtime/Ticker.hpp"
+#include "dart/server/GUIWebsocketServer.hpp"
 #include "dart/simulation/World.hpp"
 #include "dart/trajectory/IPOptOptimizer.hpp"
 #include "dart/trajectory/LossFn.hpp"
@@ -61,6 +62,7 @@ using namespace simulation;
 using namespace neural;
 using namespace realtime;
 using namespace trajectory;
+using namespace server;
 
 std::shared_ptr<LossFn> getMPCLoss()
 {
@@ -218,7 +220,58 @@ TEST(REALTIME, CARTPOLE_MPC)
   int planningHorizonMillis = 300 * millisPerTimestep;
   int advanceSteps = 70;
 
-  MPCLocal mpcLocal = MPCLocal(world, getMPCLoss(), planningHorizonMillis);
+  double goalX = 1.0;
+
+  TrajectoryLossFn loss = [&goalX](const TrajectoryRollout* rollout) {
+    int steps = rollout->getPosesConst("identity").cols();
+    double sum = 0.0;
+    for (int i = 0; i < steps; i++)
+    {
+      // rollout->getVelsConst().col(i).squaredNorm()
+      double xPos = rollout->getPosesConst()(0, i);
+      double theta = rollout->getPosesConst()(1, i);
+      sum += (goalX - xPos) * (goalX - xPos) + theta * theta;
+    }
+    return sum;
+  };
+
+  TrajectoryLossFnAndGrad lossGrad =
+      [&goalX](
+          const TrajectoryRollout* rollout,
+          TrajectoryRollout* gradWrtRollout // OUT
+      ) {
+        gradWrtRollout->getPoses().setZero();
+        gradWrtRollout->getVels().setZero();
+        gradWrtRollout->getForces().setZero();
+        int steps = rollout->getPosesConst().cols();
+        for (int i = 0; i < steps; i++)
+        {
+          gradWrtRollout->getPoses()(0, i)
+              = 2 * (rollout->getPosesConst()(0, i) - goalX);
+          gradWrtRollout->getPoses()(1, i) = 2 * rollout->getPosesConst()(1, i);
+          // gradWrtRollout->getVels().col(i) = 2 *
+          // rollout->getVelsConst().col(i);
+        }
+        /*
+        for (int i = 0; i < steps; i++)
+        {
+          gradWrtRollout->getForces("identity").col(i)
+              = 2 * rollout->getForcesConst("identity").col(i);
+        }
+        */
+        double sum = 0.0;
+        for (int i = 0; i < steps; i++)
+        {
+          // rollout->getVelsConst().col(i).squaredNorm()
+          double xPos = rollout->getPosesConst()(0, i);
+          double theta = rollout->getPosesConst()(1, i);
+          sum += (goalX - xPos) * (goalX - xPos) + theta * theta;
+        }
+        return sum;
+      };
+
+  MPCLocal mpcLocal = MPCLocal(
+      world, std::make_shared<LossFn>(loss, lossGrad), planningHorizonMillis);
   mpcLocal.setSilent(true);
 
   int inferenceHistoryMillis = 10 * millisPerTimestep;
@@ -232,7 +285,8 @@ TEST(REALTIME, CARTPOLE_MPC)
   mpcLocal.setEnableOptimizationGuards(true);
 
   // This should fork off mpcLocal to another process
-  MPCRemote mpcRemote = MPCRemote(mpcLocal);
+  // MPCRemote mpcRemote = MPCRemote(mpcLocal);
+  MPCLocal& mpcRemote = mpcLocal;
 
   std::function<Eigen::VectorXd()> getForces = [&]() {
     Eigen::VectorXd forces = mpcRemote.getForceNow();
@@ -253,21 +307,89 @@ TEST(REALTIME, CARTPOLE_MPC)
     mpcRemote.recordGroundTruthState(time, pos, vel, mass);
     world->setMasses(mass);
   });
+
   std::shared_ptr<simulation::World> realtimeUnderlyingWorld = world->clone();
-  RealtimeWorld realtimeWorld
-      = RealtimeWorld(realtimeUnderlyingWorld, getForces, recordState);
+  GUIWebsocketServer server;
+
+  server.createSphere(
+      "goal",
+      0.1,
+      Eigen::Vector3d(goalX, 1.0, 0),
+      Eigen::Vector3d(1.0, 0.0, 0.0));
+  server.registerDragListener("goal", [&](Eigen::Vector3d dragTo) {
+    goalX = dragTo(0);
+    dragTo(1) = 1.0;
+    dragTo(2) = 0.0;
+    server.setObjectPosition("goal", dragTo);
+  });
+
+  Ticker ticker = Ticker(realtimeUnderlyingWorld->getTimeStep());
+
+  auto sledBodyVisual = realtimeUnderlyingWorld->getSkeleton("cartpole")
+                            ->getBodyNodes()[0]
+                            ->getShapeNodesWith<VisualAspect>()[0]
+                            ->getVisualAspect();
+  Eigen::Vector3d originalColor = sledBodyVisual->getColor();
+
+  ticker.registerTickListener([&](long now) {
+    realtimeUnderlyingWorld->setExternalForces(mpcRemote.getForce(now));
+
+    if (server.getKeysDown().count("a"))
+    {
+      Eigen::VectorXd perturbedForces
+          = realtimeUnderlyingWorld->getExternalForces();
+      perturbedForces(0) = -15.0;
+      realtimeUnderlyingWorld->setExternalForces(perturbedForces);
+      sledBodyVisual->setColor(Eigen::Vector3d(1, 0, 0));
+    }
+    else if (server.getKeysDown().count("e"))
+    {
+      Eigen::VectorXd perturbedForces
+          = realtimeUnderlyingWorld->getExternalForces();
+      perturbedForces(0) = 15.0;
+      realtimeUnderlyingWorld->setExternalForces(perturbedForces);
+      sledBodyVisual->setColor(Eigen::Vector3d(0, 1, 0));
+    }
+    else
+    {
+      sledBodyVisual->setColor(originalColor);
+    }
+
+    if (server.getKeysDown().count(","))
+    {
+      // Increase mass
+    }
+    else if (server.getKeysDown().count("o"))
+    {
+      // Decrease mass
+    }
+
+    /*
+    realtimeWorld.registerTiming(
+        "buffer", mpcRemote.getRemainingPlanBufferMillis(), "ms");
+        */
+
+    realtimeUnderlyingWorld->step();
+    mpcRemote.recordGroundTruthState(
+        now,
+        realtimeUnderlyingWorld->getPositions(),
+        realtimeUnderlyingWorld->getVelocities(),
+        realtimeUnderlyingWorld->getMasses());
+
+    server.renderWorld(realtimeUnderlyingWorld);
+  });
 
   mpcRemote.registerReplanningListener(
       [&](long time,
           const trajectory::TrajectoryRollout* rollout,
           long duration) {
-        realtimeWorld.displayMPCPlan(rollout);
-        realtimeWorld.registerTiming("replanning", duration, "ms");
+        server.renderTrajectoryLines(world, rollout->getPosesConst());
+        // realtimeWorld.registerTiming("replanning", duration, "ms");
       });
 
   // Start everything up when someone connects for the first time
-  realtimeWorld.registerConnectionListener([&]() {
-    realtimeWorld.start();
+  server.registerConnectionListener([&]() {
+    ticker.start();
     mpcRemote.start();
 
     // TODO: turns out IPOPT isn't threadsafe to run in multiple instances in
@@ -279,51 +401,10 @@ TEST(REALTIME, CARTPOLE_MPC)
     // ssid.start();
   });
 
-  realtimeWorld.registerShutdownListener([&]() { mpcRemote.stop(); });
+  server.registerShutdownListener([&]() { mpcRemote.stop(); });
 
-  auto sledBodyVisual = realtimeUnderlyingWorld->getSkeleton("cartpole")
-                            ->getBodyNodes()[0]
-                            ->getShapeNodesWith<VisualAspect>()[0]
-                            ->getVisualAspect();
-  Eigen::Vector3d originalColor = sledBodyVisual->getColor();
-  realtimeWorld.registerPreStepListener(
-      [sledBodyVisual, originalColor, &realtimeWorld, &mpcRemote](
-          int step,
-          std::shared_ptr<simulation::World> world,
-          std::unordered_set<std::string> keysDown) {
-        realtimeWorld.registerTiming(
-            "buffer", mpcRemote.getRemainingPlanBufferMillis(), "ms");
-        if (keysDown.count("a"))
-        {
-          Eigen::VectorXd perturbedForces = world->getExternalForces();
-          perturbedForces(0) = -15.0;
-          world->setExternalForces(perturbedForces);
-          sledBodyVisual->setColor(Eigen::Vector3d(1, 0, 0));
-        }
-        else if (keysDown.count("e"))
-        {
-          Eigen::VectorXd perturbedForces = world->getExternalForces();
-          perturbedForces(0) = 15.0;
-          world->setExternalForces(perturbedForces);
-          sledBodyVisual->setColor(Eigen::Vector3d(0, 1, 0));
-        }
-        else
-        {
-          sledBodyVisual->setColor(originalColor);
-        }
-
-        if (keysDown.count(","))
-        {
-          // Increase mass
-        }
-        else if (keysDown.count("o"))
-        {
-          // Decrease mass
-        }
-      });
-
-  realtimeWorld.serve(8070);
-  while (realtimeWorld.isServing())
+  server.serve(8070);
+  while (server.isServing())
   {
     // spin
     // cartpole->setPosition(0, 0.0);
@@ -334,7 +415,7 @@ TEST(REALTIME, CARTPOLE_MPC)
 // #endif
 
 #ifdef ALL_TESTS
-TEST(REALTIME, CARTPOLE_MPC)
+TEST(REALTIME, CARTPOLE_SSID)
 {
   ////////////////////////////////////////////////////////////
   // Create a cartpole example

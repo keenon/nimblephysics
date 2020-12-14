@@ -20,7 +20,8 @@ MPCRemote::MPCRemote(
   : mChannel(grpc::CreateChannel(
       host + ":" + std::to_string(port), grpc::InsecureChannelCredentials())),
     mStub(proto::MPCService::NewStub(mChannel)),
-    mBuffer(dofs, steps, millisPerStep)
+    mBuffer(dofs, steps, millisPerStep),
+    mRunning(false)
 {
 }
 
@@ -29,7 +30,8 @@ MPCRemote::MPCRemote(
 MPCRemote::MPCRemote(MPCLocal& local)
   : mStub(nullptr),
     mBuffer(RealTimeControlBuffer(
-        local.mWorld->getNumDofs(), local.mSteps, local.mMillisPerStep))
+        local.mWorld->getNumDofs(), local.mSteps, local.mMillisPerStep)),
+    mRunning(false)
 {
   int port = (rand() % 2000) + 2000;
 
@@ -120,6 +122,10 @@ void MPCRemote::recordGroundTruthState(
 /// This starts our main thread and begins running optimizations
 void MPCRemote::start()
 {
+  if (mRunning)
+    return;
+  mRunning = true;
+
   // Context for the client. It could be used to convey extra information to
   // the server and/or tweak certain RPC behaviors.
   grpc::ClientContext context;
@@ -152,7 +158,7 @@ void MPCRemote::start()
         = mStub->ListenForUpdates(&context, request);
 
     proto::MPCListenForUpdatesReply reply;
-    while (stream->Read(&reply))
+    while (mRunning && stream->Read(&reply))
     {
       trajectory::TrajectoryRolloutReal rollout
           = trajectory::TrajectoryRollout::deserialize(reply.rollout());
@@ -171,6 +177,10 @@ void MPCRemote::start()
 /// This stops our main thread, waits for it to finish, and then returns
 void MPCRemote::stop()
 {
+  if (!mRunning)
+    return;
+  mRunning = false;
+
   // Context for the client. It could be used to convey extra information to
   // the server and/or tweak certain RPC behaviors.
   grpc::ClientContext context;

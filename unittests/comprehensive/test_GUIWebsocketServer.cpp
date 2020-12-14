@@ -38,6 +38,7 @@
 
 #include <gtest/gtest.h>
 
+#include "dart/realtime/Ticker.hpp"
 #include "dart/server/GUIWebsocketServer.hpp"
 
 #include "TestHelpers.hpp"
@@ -51,6 +52,7 @@ using namespace dynamics;
 using namespace simulation;
 using namespace neural;
 using namespace server;
+using namespace realtime;
 
 // #ifdef ALL_TESTS
 TEST(REALTIME, GUI_SERVER)
@@ -80,10 +82,74 @@ TEST(REALTIME, GUI_SERVER)
     server.setObjectPosition("box1", pos).flush();
   });
 
+  server.createText(
+      "text", "Hello world", Eigen::Vector2i(20, 20), Eigen::Vector2i(80, 20));
+
+  server.createButton(
+      "button",
+      "Click me!",
+      Eigen::Vector2i(20, 60),
+      Eigen::Vector2i(80, 20),
+      [&]() { std::cout << "Button was clicked!" << std::endl; });
+
+  server.createSlider(
+      "slider",
+      Eigen::Vector2i(80, 80),
+      Eigen::Vector2i(120, 40),
+      0,
+      100,
+      0,
+      true,
+      true,
+      [&](double val) { std::cout << "Slider moved to " << val << std::endl; });
+
+  server.createSlider(
+      "vert_slider",
+      Eigen::Vector2i(80, 140),
+      Eigen::Vector2i(40, 120),
+      0,
+      100,
+      0,
+      true,
+      false,
+      [&](double val) {
+        std::cout << "Vertical slider moved to " << val << std::endl;
+      });
+
+  std::vector<double> xs;
+  std::vector<double> ys;
+  for (int i = 0; i < 10; i++)
+  {
+    xs.push_back(i);
+    ys.push_back(log(i));
+  }
+  server.createPlot(
+      "plot",
+      Eigen::Vector2i(60, 270),
+      Eigen::Vector2i(80, 80),
+      xs,
+      0,
+      10,
+      ys,
+      0,
+      10,
+      "line");
+
+  server.registerScreenResizeListener([&](Eigen::Vector2i size) {
+    std::cout << "Screen resized: " << size << std::endl;
+  });
+
   server.registerKeydownListener([&](std::string key) {
     // double v = ((double)rand() / RAND_MAX) * 3;
     // server.setObjectPosition("box1", Eigen::Vector3d(v, v, v)).flush();
+    std::cout << "Pressed key " << key << std::endl;
   });
+
+  /*
+  Ticker ticker(1.0);
+  ticker.registerTickListener(
+      [&](long ms) { std::cout << "Tick: " << ms << std::endl; });
+  */
 
   while (server.isServing())
   {

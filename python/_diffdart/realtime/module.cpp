@@ -41,7 +41,6 @@ namespace python {
 
 void MPCLocal(py::module& sm);
 void MPCRemote(py::module& sm);
-void RealtimeWorld(py::module& sm);
 
 void dart_realtime(py::module& m)
 {
@@ -49,11 +48,10 @@ void dart_realtime(py::module& m)
 
   sm.doc()
       = "This provides a native realtime MPC and SSID framework to DART, "
-        "utilizing the trajectory folder.";
+        "utilizing the trajectory package to solve.";
 
   MPCLocal(sm);
   MPCRemote(sm);
-  RealtimeWorld(sm);
 }
 
 } // namespace python

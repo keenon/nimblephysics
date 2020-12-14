@@ -62,6 +62,7 @@ public:
           replanListener) override;
 
 protected:
+  bool mRunning;
   std::shared_ptr<grpc::Channel> mChannel;
   std::unique_ptr<proto::MPCService::Stub> mStub;
   RealTimeControlBuffer mBuffer;
