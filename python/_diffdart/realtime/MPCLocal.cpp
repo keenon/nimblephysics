@@ -30,6 +30,7 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <dart/realtime/MPC.hpp>
 #include <dart/realtime/MPCLocal.hpp>
 #include <dart/simulation/World.hpp>
 #include <dart/trajectory/LossFn.hpp>
@@ -46,7 +47,10 @@ namespace python {
 
 void MPCLocal(py::module& m)
 {
-  ::py::class_<dart::realtime::MPCLocal>(m, "MPCLocal")
+  ::py::class_<
+      dart::realtime::MPCLocal,
+      dart::realtime::MPC,
+      std::shared_ptr<dart::realtime::MPCLocal>>(m, "MPCLocal")
       .def(
           ::py::init<
               std::shared_ptr<dart::simulation::World>,

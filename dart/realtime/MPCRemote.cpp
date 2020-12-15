@@ -27,7 +27,7 @@ MPCRemote::MPCRemote(
 
 /// This forks the process, starts a server on another process, and connects
 /// to it
-MPCRemote::MPCRemote(MPCLocal& local)
+MPCRemote::MPCRemote(MPCLocal& local, int /* ignored */)
   : mStub(nullptr),
     mBuffer(RealTimeControlBuffer(
         local.mWorld->getNumDofs(), local.mSteps, local.mMillisPerStep)),

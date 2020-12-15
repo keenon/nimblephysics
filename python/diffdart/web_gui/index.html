@@ -1,27 +1,5 @@
 <html>
   <body>
-    Loading...
     <script src="./bundle.js"></script>
-    <script>
-      var xhttp = new XMLHttpRequest();
-      xhttp.onreadystatechange = function () {
-        if (this.readyState == 4 && this.status == 200) {
-          document.body.innerHTML = "";
-          const container = document.createElement("div");
-          container.style.height = "100vh";
-          container.style.width = "100vw";
-          document.body.style.padding = "0";
-          document.body.style.margin = "0";
-          document.body.style.overscrollBehavior = "none";
-          document.body.appendChild(container);
-
-          const blobJson = JSON.parse(this.responseText);
-          const dartWindow = new document.DARTWindow(container);
-          dartWindow.setData(blobJson);
-        }
-      };
-      xhttp.open("GET", "/json", true);
-      xhttp.send();
-    </script>
   </body>
 </html>

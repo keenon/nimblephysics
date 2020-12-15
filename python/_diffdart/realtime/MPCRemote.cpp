@@ -30,6 +30,7 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <dart/realtime/MPC.hpp>
 #include <dart/realtime/MPCRemote.hpp>
 #include <dart/simulation/World.hpp>
 #include <dart/trajectory/LossFn.hpp>
@@ -46,7 +47,10 @@ namespace python {
 
 void MPCRemote(py::module& m)
 {
-  ::py::class_<dart::realtime::MPCRemote>(m, "MPCRemote")
+  ::py::class_<
+      dart::realtime::MPCRemote,
+      dart::realtime::MPC,
+      std::shared_ptr<dart::realtime::MPCRemote>>(m, "MPCRemote")
       .def(
           ::py::init<std::string, int, int, int, int>(),
           ::py::arg("host"),
@@ -54,7 +58,10 @@ void MPCRemote(py::module& m)
           ::py::arg("dofs"),
           ::py::arg("steps"),
           ::py::arg("millisPerStep"))
-      .def(::py::init<dart::realtime::MPCLocal&>(), ::py::arg("local"))
+      .def(
+          ::py::init<dart::realtime::MPCLocal&, int>(),
+          ::py::arg("local"),
+          ::py::arg("ignored") = 0)
       .def(
           "getRemainingPlanBufferMillis",
           &dart::realtime::MPCRemote::getRemainingPlanBufferMillis)

@@ -251,6 +251,7 @@ void GUIWebsocketServer::serve(int port)
       std::cout << "Shutting down the server..." << std::endl;
       stopServing();
       mServerEventLoop.stop();
+      exit(signal_number);
     }
   });
 

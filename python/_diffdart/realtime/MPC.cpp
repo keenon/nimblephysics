@@ -30,8 +30,13 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <Eigen/Dense>
+#include <dart/realtime/MPC.hpp>
+#include <dart/simulation/World.hpp>
+#include <dart/trajectory/LossFn.hpp>
+#include <dart/trajectory/Optimizer.hpp>
+#include <dart/trajectory/Solution.hpp>
 #include <pybind11/eigen.h>
+#include <pybind11/functional.h>
 #include <pybind11/pybind11.h>
 
 namespace py = pybind11;
@@ -39,23 +44,34 @@ namespace py = pybind11;
 namespace dart {
 namespace python {
 
-void MPCLocal(py::module& sm);
-void MPCRemote(py::module& sm);
-void MPC(py::module& sm);
-void Ticker(py::module& sm);
-
-void dart_realtime(py::module& m)
+void MPC(py::module& m)
 {
-  auto sm = m.def_submodule("realtime");
-
-  sm.doc()
-      = "This provides a native realtime MPC and SSID framework to DART, "
-        "utilizing the trajectory package to solve.";
-
-  MPC(sm);
-  MPCLocal(sm);
-  MPCRemote(sm);
-  Ticker(sm);
+  ::py::class_<dart::realtime::MPC, std::shared_ptr<dart::realtime::MPC>>(
+      m, "MPC")
+      .def(
+          "getRemainingPlanBufferMillis",
+          &dart::realtime::MPC::getRemainingPlanBufferMillis)
+      .def(
+          "recordGroundTruthState",
+          &dart::realtime::MPC::recordGroundTruthState,
+          ::py::arg("time"),
+          ::py::arg("pos"),
+          ::py::arg("vel"),
+          ::py::arg("mass"))
+      .def(
+          "recordGroundTruthStateNow",
+          &dart::realtime::MPC::recordGroundTruthStateNow,
+          ::py::arg("pos"),
+          ::py::arg("vel"),
+          ::py::arg("mass"))
+      .def("getForce", &dart::realtime::MPC::getForce, ::py::arg("now"))
+      .def("getForceNow", &dart::realtime::MPC::getForceNow)
+      .def("start", &dart::realtime::MPC::start)
+      .def("stop", &dart::realtime::MPC::stop)
+      .def(
+          "registerReplaningListener",
+          &dart::realtime::MPC::registerReplanningListener,
+          ::py::arg("replanListener"));
 }
 
 } // namespace python

@@ -30,8 +30,8 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <dart/trajectory/Problem.hpp>
 #include <dart/trajectory/MultiShot.hpp>
+#include <dart/trajectory/Problem.hpp>
 #include <dart/trajectory/TrajectoryConstants.hpp>
 #include <pybind11/eigen.h>
 #include <pybind11/functional.h>
@@ -44,7 +44,9 @@ namespace python {
 
 void LossFn(py::module& m)
 {
-  ::py::class_<dart::trajectory::LossFn>(m, "LossFn")
+  ::py::class_<
+      dart::trajectory::LossFn,
+      std::shared_ptr<dart::trajectory::LossFn>>(m, "LossFn")
       .def(::py::init<>())
       .def(::py::init<dart::trajectory::TrajectoryLossFn>(), ::py::arg("loss"))
       .def(

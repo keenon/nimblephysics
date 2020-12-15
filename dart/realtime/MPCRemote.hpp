@@ -31,7 +31,7 @@ public:
 
   /// This forks the process, starts a server on another process, and connects
   /// to it
-  MPCRemote(MPCLocal& local);
+  MPCRemote(MPCLocal& local, int ignored = 0);
 
   /// This gets the force to apply to the world at this instant. If we haven't
   /// computed anything for this instant yet, this just returns 0s.

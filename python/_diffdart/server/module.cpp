@@ -39,23 +39,15 @@ namespace py = pybind11;
 namespace dart {
 namespace python {
 
-void MPCLocal(py::module& sm);
-void MPCRemote(py::module& sm);
-void MPC(py::module& sm);
-void Ticker(py::module& sm);
+void GUIWebsocketServer(py::module& sm);
 
-void dart_realtime(py::module& m)
+void dart_server(py::module& m)
 {
-  auto sm = m.def_submodule("realtime");
+  auto sm = m.def_submodule("server");
 
-  sm.doc()
-      = "This provides a native realtime MPC and SSID framework to DART, "
-        "utilizing the trajectory package to solve.";
+  sm.doc() = "This provides a native WebSocket server infrastructure.";
 
-  MPC(sm);
-  MPCLocal(sm);
-  MPCRemote(sm);
-  Ticker(sm);
+  GUIWebsocketServer(sm);
 }
 
 } // namespace python

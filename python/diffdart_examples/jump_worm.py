@@ -7,7 +7,6 @@ import time
 import diffdart as dart
 from typing import Dict
 from diffdart import DartTorchLossFn, DartTorchTrajectoryRollout
-import dart_map_pos
 
 
 def main():
@@ -109,18 +108,18 @@ def main():
     optimizer.setLBFGSHistoryLength(5)
     optimizer.setTolerance(1e-5)
     optimizer.setCheckDerivatives(False)
-    optimizer.setIterationLimit(400)
+    optimizer.setIterationLimit(150)
     optimizer.setRecordPerformanceLog(True)
-    result: dart.trajectory.OptimizationRecord = optimizer.optimize(trajectory)
-    perflogs: Dict[str, dart.performance.FinalizedPerformanceLog] = result.getPerfLog().finalize()
-    print(perflog)
+    result: dart.trajectory.Solution = optimizer.optimize(trajectory)
+    # perflogs: Dict[str, dart.performance.FinalizedPerformanceLog] = result.getPerfLog().finalize()
+    # print(perflog)
 
     json = result.toJson(world)
     text_file = open("worm.txt", "w")
     n = text_file.write(json)
     text_file.close()
 
-    dart.dart_serve_web_gui(json)
+    dart.dart_serve_optimization_solution(result, world)
 
 
 if __name__ == "__main__":

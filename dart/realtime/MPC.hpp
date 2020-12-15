@@ -13,6 +13,8 @@ namespace realtime {
 class MPC
 {
 public:
+  virtual ~MPC() = default;
+
   /// This gets the force to apply to the world at this instant. If we haven't
   /// computed anything for this instant yet, this just returns 0s.
   virtual Eigen::VectorXd getForce(long now) = 0;

@@ -7,7 +7,7 @@ import math
 
 class DartMapPosition(torch.autograd.Function):
     """
-    This implements a single, differentiable timestep of DART as a PyTorch layer
+    This allows you to use an arbitrary mapping as a standalone PyTorch function
     """
 
     @staticmethod
