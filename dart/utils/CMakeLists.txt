@@ -59,3 +59,5 @@ install(
 
 # Add subdirectories (components)
 add_subdirectory(urdf)
+
+add_subdirectory(amc)

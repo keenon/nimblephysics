@@ -50,6 +50,8 @@ if(TARGET dart-utils)
   dart_add_test("unit" test_VskParser)
   target_link_libraries(test_VskParser dart-utils)
 
+  dart_add_test("unit" test_AMCParser)
+  target_link_libraries(test_AMCParser dart-utils)
 endif()
 
 if(TARGET dart-utils-urdf)

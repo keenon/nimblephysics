@@ -7,6 +7,8 @@ type CreateBoxCommand = {
   pos: number[];
   euler: number[];
   color: number[];
+  cast_shadows: boolean;
+  receive_shadows: boolean;
 };
 
 type CreateSphereCommand = {
@@ -15,6 +17,8 @@ type CreateSphereCommand = {
   radius: number;
   pos: number[];
   color: number[];
+  cast_shadows: boolean;
+  receive_shadows: boolean;
 };
 
 type CreateLineCommand = {
@@ -22,6 +26,18 @@ type CreateLineCommand = {
   key: string;
   points: number[][];
   color: number[];
+};
+
+type CreateMeshCommand = {
+  type: "create_mesh";
+  key: string;
+  vertices: number[][];
+  faces: number[][];
+  pos: number[];
+  euler: number[];
+  color: number[];
+  cast_shadows: boolean;
+  receive_shadows: boolean;
 };
 
 type SetObjectPosCommand = {
@@ -156,6 +172,7 @@ type Command =
   | CreateBoxCommand
   | CreateSphereCommand
   | CreateLineCommand
+  | CreateMeshCommand
   | SetObjectPosCommand
   | SetObjectRotationCommand
   | SetObjectColorCommand
@@ -228,17 +245,32 @@ class DARTRemote {
         command.size,
         command.pos,
         command.euler,
-        command.color
+        command.color,
+        command.cast_shadows,
+        command.receive_shadows
       );
     } else if (command.type === "create_sphere") {
       this.view.createSphere(
         command.key,
         command.radius,
         command.pos,
-        command.color
+        command.color,
+        command.cast_shadows,
+        command.receive_shadows
       );
     } else if (command.type === "create_line") {
       this.view.createLine(command.key, command.points, command.color);
+    } else if (command.type === "create_mesh") {
+      this.view.createMesh(
+        command.key,
+        command.vertices,
+        command.faces,
+        command.pos,
+        command.euler,
+        command.color,
+        command.cast_shadows,
+        command.receive_shadows
+      );
     } else if (command.type === "set_object_pos") {
       this.view.setObjectPos(command.key, command.pos);
     } else if (command.type === "set_object_rotation") {

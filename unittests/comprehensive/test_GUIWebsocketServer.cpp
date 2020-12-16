@@ -36,8 +36,11 @@
 #include <memory>
 #include <thread>
 
+#include <dart/utils/urdf/urdf.hpp>
+#include <dart/utils/utils.hpp>
 #include <gtest/gtest.h>
 
+#include "dart/dynamics/Skeleton.hpp"
 #include "dart/realtime/Ticker.hpp"
 #include "dart/server/GUIWebsocketServer.hpp"
 
@@ -57,7 +60,46 @@ using namespace realtime;
 // #ifdef ALL_TESTS
 TEST(REALTIME, GUI_SERVER)
 {
+  // Create a world
+  dart::simulation::WorldPtr world(new dart::simulation::World);
+
+  // Load ground and Atlas robot and add them to the world
+  dart::utils::DartLoader urdfLoader;
+  std::shared_ptr<dynamics::Skeleton> ground
+      = urdfLoader.parseSkeleton("dart://sample/sdf/atlas/ground.urdf");
+  std::shared_ptr<dynamics::Skeleton> atlas
+      = dart::utils::SdfParser::readSkeleton(
+          "dart://sample/sdf/atlas/atlas_v3_no_head.sdf");
+  world->addSkeleton(ground);
+  world->addSkeleton(atlas);
+
+  // Set initial configuration for Atlas robot
+  atlas->setPosition(0, -0.5 * dart::math::constantsd::pi());
+
+  // Disable the ground from casting its own shadows
+  ground->getBodyNode(0)->getShapeNode(0)->getVisualAspect()->setCastShadows(
+      false);
+
+  // Set gravity of the world
+  world->setGravity(Eigen::Vector3d(0.0, 0.0, 9.81));
+
   GUIWebsocketServer server;
+  server.serve(8070);
+  server.renderWorld(world);
+
+  Ticker ticker(0.01);
+  ticker.registerTickListener([&](long time) {
+    double diff = sin(((double)time / 2000));
+    atlas->setPosition(0, diff * dart::math::constantsd::pi());
+    // double diff2 = sin(((double)time / 4000));
+    // atlas->setPosition(4, diff2 * 1);
+    // world->step();
+    server.renderWorld(world);
+  });
+
+  server.registerConnectionListener([&]() { ticker.start(); });
+
+  /*
   server
       .createBox(
           "box1",
@@ -67,7 +109,6 @@ TEST(REALTIME, GUI_SERVER)
           Eigen::Vector3d(0.5, 0.7, 0.5))
       .setObjectPosition("box1", Eigen::Vector3d(2, 2, 2))
       .flush();
-  server.serve(8070);
   server.createSphere(
       "ball1", 0.5, Eigen::Vector3d(1, 1, 1), Eigen::Vector3d(0.5, 0.5, 0.7));
 
@@ -144,6 +185,7 @@ TEST(REALTIME, GUI_SERVER)
     // server.setObjectPosition("box1", Eigen::Vector3d(v, v, v)).flush();
     std::cout << "Pressed key " << key << std::endl;
   });
+  */
 
   /*
   Ticker ticker(1.0);

@@ -30,6 +30,7 @@ class View {
     this.renderer.setSize(this.width, this.height);
     (this.renderer as any).shadowMap.enabled = true;
     (this.renderer as any).shadowMapType = THREE.PCFSoftShadowMap;
+    (this.renderer as any).outputEncoding = THREE.sRGBEncoding;
 
     this.container.appendChild(this.renderer.domElement);
 

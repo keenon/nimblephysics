@@ -75,6 +75,7 @@ if(TARGET dart-utils)
   if(TARGET dart-utils-urdf)
     dart_add_test("comprehensive" test_ForwardKinematics)
     target_link_libraries(test_ForwardKinematics dart-utils-urdf)
+    target_link_libraries(test_GUIWebsocketServer dart-utils-urdf)
   endif()
 
 endif()

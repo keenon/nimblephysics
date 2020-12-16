@@ -63,6 +63,7 @@ class DARTView {
     light.castShadow = true;
     light.position.set(0, 1000, 0);
     light.target.position.set(0, 0, 0);
+    light.color = new THREE.Color(1.0, 1.0, 1.0);
     light.intensity = 0.2;
 
     this.scene.add(light);
@@ -163,7 +164,9 @@ class DARTView {
     size: number[],
     pos: number[],
     euler: number[],
-    color: number[]
+    color: number[],
+    castShadows: boolean,
+    receiveShadows: boolean
   ) => {
     if (this.objects.has(key)) {
       this.view.remove(this.objects.get(key));
@@ -183,6 +186,9 @@ class DARTView {
     mesh.rotation.x = euler[0];
     mesh.rotation.y = euler[1];
     mesh.rotation.z = euler[2];
+    mesh.castShadow = castShadows;
+    mesh.receiveShadow = receiveShadows;
+
     this.objects.set(key, mesh);
     this.keys.set(mesh, key);
 
@@ -198,7 +204,9 @@ class DARTView {
     key: string,
     radius: number,
     pos: number[],
-    color: number[]
+    color: number[],
+    castShadows: boolean,
+    receiveShadows: boolean
   ) => {
     if (this.objects.has(key)) {
       this.view.remove(this.objects.get(key));
@@ -216,6 +224,9 @@ class DARTView {
     mesh.position.x = pos[0] * SCALE_FACTOR;
     mesh.position.y = pos[1] * SCALE_FACTOR;
     mesh.position.z = pos[2] * SCALE_FACTOR;
+    mesh.castShadow = castShadows;
+    mesh.receiveShadow = receiveShadows;
+
     this.objects.set(key, mesh);
     this.keys.set(mesh, key);
 
@@ -251,6 +262,61 @@ class DARTView {
     this.keys.set(path, key);
 
     this.view.add(path);
+  };
+
+  /**
+   * This adds a line to the scene
+   *
+   * Must call render() to see results!
+   */
+  createMesh = (
+    key: string,
+    vertices: number[][],
+    faces: number[][],
+    pos: number[],
+    euler: number[],
+    color: number[],
+    castShadows: boolean,
+    receiveShadows: boolean
+  ) => {
+    if (this.objects.has(key)) {
+      this.view.remove(this.objects.get(key));
+    }
+    const meshMaterial = new THREE.MeshLambertMaterial({
+      color: new THREE.Color(color[0], color[1], color[2]),
+    });
+
+    const meshPoints = [];
+    for (let i = 0; i < faces.length; i++) {
+      for (let j = 0; j < 3; j++) {
+        let vertexIndex = faces[i][j];
+        meshPoints.push(
+          new THREE.Vector3(
+            vertices[vertexIndex][0] * SCALE_FACTOR,
+            vertices[vertexIndex][1] * SCALE_FACTOR,
+            vertices[vertexIndex][2] * SCALE_FACTOR
+          )
+        );
+      }
+    }
+    const meshGeometry = new THREE.BufferGeometry().setFromPoints(meshPoints);
+    meshGeometry.computeVertexNormals();
+    meshGeometry.computeBoundingBox();
+
+    const mesh = new THREE.Mesh(meshGeometry, meshMaterial);
+    mesh.position.x = pos[0] * SCALE_FACTOR;
+    mesh.position.y = pos[1] * SCALE_FACTOR;
+    mesh.position.z = pos[2] * SCALE_FACTOR;
+    mesh.rotation.x = euler[0];
+    mesh.rotation.y = euler[1];
+    mesh.rotation.z = euler[2];
+    mesh.castShadow = castShadows;
+    mesh.receiveShadow = receiveShadows;
+
+    this.objects.set(key, mesh);
+    this.keys.set(mesh, key);
+
+    this.view.add(mesh);
   };
 
   /**

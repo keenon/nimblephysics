@@ -13,6 +13,9 @@
 
 #include <Eigen/Dense>
 #include <asio/io_service.hpp>
+#include <assimp/Importer.hpp>
+#include <assimp/cimport.h>
+#include <assimp/postprocess.h>
 
 #include "dart/server/WebsocketServer.hpp"
 
@@ -20,6 +23,10 @@ namespace dart {
 
 namespace simulation {
 class World;
+}
+
+namespace dynamics {
+class Skeleton;
 }
 
 namespace trajectory {
@@ -72,6 +79,13 @@ public:
   GUIWebsocketServer& renderWorld(
       std::shared_ptr<simulation::World> world, std::string prefix = "world");
 
+  /// This is a high-level command that creates/updates all the shapes in a
+  /// world by calling the lower-level commands
+  GUIWebsocketServer& renderSkeleton(
+      std::shared_ptr<dynamics::Skeleton> skel,
+      std::string prefix = "skel",
+      bool skipFlush = false);
+
   /// This is a high-level command that renders a given trajectory as a
   /// bunch of lines in the world, one per body
   GUIWebsocketServer& renderTrajectoryLines(
@@ -89,20 +103,47 @@ public:
       const Eigen::Vector3d& size,
       const Eigen::Vector3d& pos,
       const Eigen::Vector3d& euler,
-      const Eigen::Vector3d& color = Eigen::Vector3d::Zero());
+      const Eigen::Vector3d& color = Eigen::Vector3d::Zero(),
+      bool castShadows = false,
+      bool receiveShadows = false);
 
   /// This creates a sphere in the web GUI under a specified key
   GUIWebsocketServer& createSphere(
       const std::string& key,
       double radius,
       const Eigen::Vector3d& pos,
-      const Eigen::Vector3d& color = Eigen::Vector3d::Zero());
+      const Eigen::Vector3d& color = Eigen::Vector3d::Zero(),
+      bool castShadows = false,
+      bool receiveShadows = false);
 
   /// This creates a line in the web GUI under a specified key
   GUIWebsocketServer& createLine(
       const std::string& key,
       const std::vector<Eigen::Vector3d>& points,
       const Eigen::Vector3d& color = Eigen::Vector3d::Zero());
+
+  /// This creates a mesh in the web GUI under a specified key, using raw shape
+  /// data
+  GUIWebsocketServer& createMeshRaw(
+      const std::string& key,
+      const std::vector<Eigen::Vector3d>& vertices,
+      const std::vector<Eigen::Vector3i>& faces,
+      const Eigen::Vector3d& pos,
+      const Eigen::Vector3d& euler,
+      const Eigen::Vector3d& color = Eigen::Vector3d::Zero(),
+      bool castShadows = false,
+      bool receiveShadows = false);
+
+  /// This creates a mesh in the web GUI under a specified key, from the ASSIMP
+  /// mesh
+  GUIWebsocketServer& createMesh(
+      const std::string& key,
+      const aiScene* mesh,
+      const Eigen::Vector3d& pos,
+      const Eigen::Vector3d& euler,
+      const Eigen::Vector3d& color = Eigen::Vector3d::Zero(),
+      bool castShadows = false,
+      bool receiveShadows = false);
 
   /// This returns true if we've already got an object with the key "key"
   bool hasObject(const std::string& key);
@@ -265,6 +306,8 @@ protected:
     Eigen::Vector3d pos;
     Eigen::Vector3d euler;
     Eigen::Vector3d color;
+    bool castShadows;
+    bool receiveShadows;
   };
   std::unordered_map<std::string, Box> mBoxes;
   struct Sphere
@@ -273,6 +316,8 @@ protected:
     double radius;
     Eigen::Vector3d pos;
     Eigen::Vector3d color;
+    bool castShadows;
+    bool receiveShadows;
   };
   std::unordered_map<std::string, Sphere> mSpheres;
   struct Line
@@ -282,6 +327,19 @@ protected:
     Eigen::Vector3d color;
   };
   std::unordered_map<std::string, Line> mLines;
+
+  struct Mesh
+  {
+    std::string key;
+    std::vector<Eigen::Vector3d> vertices;
+    std::vector<Eigen::Vector3i> faces;
+    Eigen::Vector3d pos;
+    Eigen::Vector3d euler;
+    Eigen::Vector3d color;
+    bool castShadows;
+    bool receiveShadows;
+  };
+  std::unordered_map<std::string, Mesh> mMeshes;
   struct Text
   {
     std::string key;
@@ -335,6 +393,7 @@ protected:
   void encodeCreateBox(std::stringstream& json, Box& box);
   void encodeCreateSphere(std::stringstream& json, Sphere& sphere);
   void encodeCreateLine(std::stringstream& json, Line& line);
+  void encodeCreateMesh(std::stringstream& json, Mesh& mesh);
   void encodeEnableMouseInteraction(
       std::stringstream& json, const std::string& key);
   void encodeCreateText(std::stringstream& json, Text& text);

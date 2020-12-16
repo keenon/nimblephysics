@@ -172,15 +172,26 @@ void ShapeFrame(py::module& m)
             return self->getHidden();
           })
       .def(
-          "setShadowed",
+          "setCastShadows",
           +[](dart::dynamics::VisualAspect* self, const bool& value) {
-            self->setShadowed(value);
+            self->setCastShadows(value);
           },
           ::py::arg("value"))
       .def(
-          "getShadowed",
+          "getCastShadows",
           +[](dart::dynamics::VisualAspect* self) -> bool {
-            return self->getShadowed();
+            return self->getCastShadows();
+          })
+      .def(
+          "setReceiveShadows",
+          +[](dart::dynamics::VisualAspect* self, const bool& value) {
+            self->setReceiveShadows(value);
+          },
+          ::py::arg("value"))
+      .def(
+          "getReceiveShadows",
+          +[](dart::dynamics::VisualAspect* self) -> bool {
+            return self->getReceiveShadows();
           })
       .def(
           "setColor",

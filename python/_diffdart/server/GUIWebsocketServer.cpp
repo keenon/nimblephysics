@@ -62,14 +62,18 @@ void GUIWebsocketServer(py::module& m)
           ::py::arg("size"),
           ::py::arg("pos"),
           ::py::arg("euler"),
-          ::py::arg("color"))
+          ::py::arg("color"),
+          ::py::arg("castShadows"),
+          ::py::arg("receiveShadows"))
       .def(
           "createSphere",
           &dart::server::GUIWebsocketServer::createSphere,
           ::py::arg("key"),
           ::py::arg("radius"),
           ::py::arg("pos"),
-          ::py::arg("color"))
+          ::py::arg("color"),
+          ::py::arg("castShadows"),
+          ::py::arg("receiveShadows"))
       .def(
           "createLine",
           &dart::server::GUIWebsocketServer::createLine,
@@ -206,6 +210,12 @@ void GUIWebsocketServer(py::module& m)
           &dart::server::GUIWebsocketServer::renderWorld,
           ::py::arg("world"),
           ::py::arg("prefix") = "world")
+      .def(
+          "renderSkeleton",
+          &dart::server::GUIWebsocketServer::renderSkeleton,
+          ::py::arg("skeleton"),
+          ::py::arg("prefix") = "world",
+          ::py::arg("skipFlush") = false)
       .def(
           "renderTrajectoryLines",
           &dart::server::GUIWebsocketServer::renderTrajectoryLines,

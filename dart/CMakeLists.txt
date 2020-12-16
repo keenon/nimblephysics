@@ -58,6 +58,7 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
 # collision-bullet - (dart), {dart-collision-bullet}
 # utils - (collision-bullet), {dart-utils}
 # utils-urdf - (utils), {dart-utils-urdf}
+# utils-amc - (utils), {dart-utils-amc}
 # gui - (utils), {dart-gui}
 # gui-osg - (gui), {dart-gui-osg}
 # planning - (dart), {dart-planning}

@@ -22,6 +22,12 @@ void vec3ToJson(std::stringstream& json, const Eigen::Vector3d& vec)
 }
 
 //==============================================================================
+void vec3iToJson(std::stringstream& json, const Eigen::Vector3i& vec)
+{
+  json << "[" << vec(0) << "," << vec(1) << "," << vec(2) << "]";
+}
+
+//==============================================================================
 void vecXToJson(std::stringstream& json, const Eigen::VectorXd& vec)
 {
   json << "[";

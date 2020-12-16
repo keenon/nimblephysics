@@ -81,12 +81,12 @@ def main():
         else:
             cartVisual.setColor(originalColor)
 
+        world.step()
+
         mpc.recordGroundTruthState(
             now, world.getPositions(),
             world.getVelocities(),
             world.getMasses())
-
-        world.step()
 
         gui.stateMachine().renderWorld(world, "world")
 

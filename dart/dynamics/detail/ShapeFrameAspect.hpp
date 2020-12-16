@@ -58,14 +58,18 @@ struct VisualAspectProperties
   /// True if this shape node should be kept from rendering
   bool mHidden;
 
-  /// True if this shape node should be shadowed
-  bool mShadowed;
+  /// True if this shape node should cast shadows
+  bool mCastShadows;
+
+  /// True if this shape node should receive shadows
+  bool mReceiveShadows;
 
   /// Constructor
   VisualAspectProperties(
-      const Eigen::Vector4d& color = Eigen::Vector4d(0.5, 0.5, 1.0, 1.0),
+      const Eigen::Vector4d& color = Eigen::Vector4d(0.5, 0.5, 0.5, 1.0),
       const bool hidden = false,
-      const bool shadowed = true);
+      const bool castShadows = true,
+      const bool receiveShadows = true);
 
   /// Destructor
   virtual ~VisualAspectProperties() = default;
@@ -95,8 +99,8 @@ struct DynamicsAspectProperties
   double mRestitutionCoeff;
 
   /// Constructor
-  DynamicsAspectProperties(const double frictionCoeff = 1.0,
-                           const double restitutionCoeff = 0.0);
+  DynamicsAspectProperties(
+      const double frictionCoeff = 1.0, const double restitutionCoeff = 0.0);
 
   /// Destructor
   virtual ~DynamicsAspectProperties() = default;
@@ -115,9 +119,10 @@ struct ShapeFrameProperties
 };
 
 using ShapeFrameCompositeBase = common::EmbedPropertiesOnTopOf<
-    ShapeFrame, ShapeFrameProperties,
-    common::SpecializedForAspect<
-        VisualAspect, CollisionAspect, DynamicsAspect> >;
+    ShapeFrame,
+    ShapeFrameProperties,
+    common::
+        SpecializedForAspect<VisualAspect, CollisionAspect, DynamicsAspect> >;
 
 } // namespace detail
 } // namespace dynamics

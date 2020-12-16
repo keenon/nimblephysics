@@ -2,9 +2,12 @@
 
 #include <chrono>
 
+#include <assimp/scene.h>
+
 #include "dart/common/Aspect.hpp"
 #include "dart/dynamics/BodyNode.hpp"
 #include "dart/dynamics/BoxShape.hpp"
+#include "dart/dynamics/MeshShape.hpp"
 #include "dart/dynamics/ShapeFrame.hpp"
 #include "dart/dynamics/ShapeNode.hpp"
 #include "dart/dynamics/Skeleton.hpp"
@@ -76,6 +79,14 @@ void GUIWebsocketServer::serve(int port)
         else
           json << ",";
         encodeCreateLine(json, pair.second);
+      }
+      for (auto pair : mMeshes)
+      {
+        if (isFirst)
+          isFirst = false;
+        else
+          json << ",";
+        encodeCreateMesh(json, pair.second);
       }
       for (auto pair : mText)
       {
@@ -352,21 +363,41 @@ GUIWebsocketServer& GUIWebsocketServer::renderWorld(
   for (int i = 0; i < world->getNumSkeletons(); i++)
   {
     std::shared_ptr<dynamics::Skeleton> skel = world->getSkeleton(i);
-    for (int j = 0; j < skel->getNumBodyNodes(); j++)
+    renderSkeleton(skel, prefix, true);
+  }
+
+  flush();
+  mAutoflush = oldAutoflush;
+  return *this;
+}
+
+/// This is a high-level command that creates/updates all the shapes in a
+/// world by calling the lower-level commands
+GUIWebsocketServer& GUIWebsocketServer::renderSkeleton(
+    std::shared_ptr<dynamics::Skeleton> skel,
+    std::string prefix,
+    bool skipFlush)
+{
+  bool oldAutoflush = mAutoflush;
+  mAutoflush = false;
+
+  for (int j = 0; j < skel->getNumBodyNodes(); j++)
+  {
+    dynamics::BodyNode* node = skel->getBodyNode(j);
+    std::vector<dynamics::ShapeNode*> shapeNodes
+        = node->getShapeNodesWith<dynamics::VisualAspect>();
+    for (int k = 0; k < shapeNodes.size(); k++)
     {
-      dynamics::BodyNode* node = skel->getBodyNode(j);
-      std::vector<dynamics::ShapeNode*> shapeNodes
-          = node->getShapeNodesWith<dynamics::VisualAspect>();
-      for (int k = 0; k < shapeNodes.size(); k++)
+      dynamics::ShapeNode* node = shapeNodes[k];
+      dynamics::VisualAspect* visual = node->getVisualAspect();
+      dynamics::Shape* shape = node->getShape().get();
+
+      std::string shapeName = prefix + "_" + skel->getName() + "_"
+                              + node->getName() + "_" + std::to_string(k);
+
+      if (!hasObject(shapeName))
       {
-        dynamics::ShapeNode* node = shapeNodes[k];
-        dynamics::VisualAspect* visual = node->getVisualAspect();
-        dynamics::Shape* shape = node->getShape().get();
-
-        std::string shapeName = prefix + "_" + skel->getName() + "_"
-                                + node->getName() + "_" + std::to_string(k);
-
-        if (!hasObject(shapeName))
+        if (!visual->isHidden())
         {
           // Create the object from scratch
           if (shape->getType() == "BoxShape")
@@ -378,7 +409,22 @@ GUIWebsocketServer& GUIWebsocketServer::renderWorld(
                 boxShape->getSize(),
                 node->getWorldTransform().translation(),
                 math::matrixToEulerXYZ(node->getWorldTransform().rotation()),
-                visual->getColor());
+                visual->getColor(),
+                visual->getCastShadows(),
+                visual->getReceiveShadows());
+          }
+          else if (shape->getType() == "MeshShape")
+          {
+            dynamics::MeshShape* meshShape
+                = dynamic_cast<dynamics::MeshShape*>(shape);
+            createMesh(
+                shapeName,
+                meshShape->getMesh(),
+                node->getWorldTransform().translation(),
+                math::matrixToEulerXYZ(node->getWorldTransform().rotation()),
+                visual->getColor(),
+                visual->getCastShadows(),
+                visual->getReceiveShadows());
           }
           else if (shape->getType() == "SphereShape")
           {
@@ -388,12 +434,21 @@ GUIWebsocketServer& GUIWebsocketServer::renderWorld(
                 shapeName,
                 sphereShape->getRadius(),
                 node->getWorldTransform().translation(),
-                visual->getColor());
+                visual->getColor(),
+                visual->getCastShadows(),
+                visual->getReceiveShadows());
           }
+        }
+      }
+      else
+      {
+        // Otherwise, we just need to send updates for anything that changed
+        if (visual->isHidden())
+        {
+          deleteObject(shapeName);
         }
         else
         {
-          // Otherwise, we just need to send updates for anything that changed
           Eigen::Vector3d pos = node->getWorldTransform().translation();
           Eigen::Vector3d euler
               = math::matrixToEulerXYZ(node->getWorldTransform().rotation());
@@ -411,9 +466,11 @@ GUIWebsocketServer& GUIWebsocketServer::renderWorld(
     }
   }
 
-  flush();
+  if (!skipFlush)
+  {
+    flush();
+  }
   mAutoflush = oldAutoflush;
-  return *this;
 }
 
 /// This is a high-level command that renders a given trajectory as a bunch of
@@ -476,8 +533,9 @@ GUIWebsocketServer& GUIWebsocketServer::clear()
   queueCommand(
       [&](std::stringstream& json) { json << "{ \"type\": \"clear_all\" }"; });
   mBoxes.clear();
-  mLines.clear();
   mSpheres.clear();
+  mLines.clear();
+  mMeshes.clear();
   mText.clear();
   mButtons.clear();
   mSliders.clear();
@@ -494,7 +552,9 @@ GUIWebsocketServer& GUIWebsocketServer::createBox(
     const Eigen::Vector3d& size,
     const Eigen::Vector3d& pos,
     const Eigen::Vector3d& euler,
-    const Eigen::Vector3d& color)
+    const Eigen::Vector3d& color,
+    bool castShadows,
+    bool receiveShadows)
 {
   Box box;
   box.key = key;
@@ -502,6 +562,8 @@ GUIWebsocketServer& GUIWebsocketServer::createBox(
   box.pos = pos;
   box.euler = euler;
   box.color = color;
+  box.castShadows = castShadows;
+  box.receiveShadows = receiveShadows;
 
   mBoxes[key] = box;
 
@@ -515,13 +577,17 @@ GUIWebsocketServer& GUIWebsocketServer::createSphere(
     const std::string& key,
     double radius,
     const Eigen::Vector3d& pos,
-    const Eigen::Vector3d& color)
+    const Eigen::Vector3d& color,
+    bool castShadows,
+    bool receiveShadows)
 {
   Sphere sphere;
   sphere.key = key;
   sphere.radius = radius;
   sphere.pos = pos;
   sphere.color = color;
+  sphere.castShadows = castShadows;
+  sphere.receiveShadows = receiveShadows;
 
   mSpheres[key] = sphere;
 
@@ -549,6 +615,73 @@ GUIWebsocketServer& GUIWebsocketServer::createLine(
   return *this;
 }
 
+/// This creates a mesh in the web GUI under a specified key, using raw shape
+/// data
+GUIWebsocketServer& GUIWebsocketServer::createMeshRaw(
+    const std::string& key,
+    const std::vector<Eigen::Vector3d>& vertices,
+    const std::vector<Eigen::Vector3i>& faces,
+    const Eigen::Vector3d& pos,
+    const Eigen::Vector3d& euler,
+    const Eigen::Vector3d& color,
+    bool castShadows,
+    bool receiveShadows)
+{
+  Mesh mesh;
+  mesh.key = key;
+  mesh.vertices = vertices;
+  mesh.faces = faces;
+  mesh.pos = pos;
+  mesh.euler = euler;
+  mesh.color = color;
+  mesh.castShadows = castShadows;
+  mesh.receiveShadows = receiveShadows;
+
+  mMeshes[key] = mesh;
+
+  queueCommand([&](std::stringstream& json) { encodeCreateMesh(json, mesh); });
+
+  return *this;
+}
+
+/// This creates a mesh in the web GUI under a specified key, from the ASSIMP
+/// mesh
+GUIWebsocketServer& GUIWebsocketServer::createMesh(
+    const std::string& key,
+    const aiScene* mesh,
+    const Eigen::Vector3d& pos,
+    const Eigen::Vector3d& euler,
+    const Eigen::Vector3d& color,
+    bool castShadows,
+    bool receiveShadows)
+{
+  std::vector<Eigen::Vector3d> vertices;
+  std::vector<Eigen::Vector3i> faces;
+
+  for (int i = 0; i < mesh->mNumMeshes; i++)
+  {
+    aiMesh* m = mesh->mMeshes[i];
+    for (int j = 0; j < m->mNumVertices; j++)
+    {
+      vertices.emplace_back(
+          m->mVertices[j][0], m->mVertices[j][1], m->mVertices[j][2]);
+    }
+    for (int k = 0; k < m->mNumFaces; k++)
+    {
+      assert(m->mFaces[k].mNumIndices == 3);
+      faces.emplace_back(
+          m->mFaces[k].mIndices[0],
+          m->mFaces[k].mIndices[1],
+          m->mFaces[k].mIndices[2]);
+    }
+  }
+
+  createMeshRaw(
+      key, vertices, faces, pos, euler, color, castShadows, receiveShadows);
+
+  return *this;
+}
+
 /// This returns true if we've already got an object with the key "key"
 bool GUIWebsocketServer::hasObject(const std::string& key)
 {
@@ -557,6 +690,8 @@ bool GUIWebsocketServer::hasObject(const std::string& key)
   if (mSpheres.find(key) != mSpheres.end())
     return true;
   if (mLines.find(key) != mLines.end())
+    return true;
+  if (mMeshes.find(key) != mMeshes.end())
     return true;
   return false;
 }
@@ -591,6 +726,8 @@ Eigen::Vector3d GUIWebsocketServer::getObjectColor(const std::string& key)
     return mSpheres[key].color;
   if (mLines.find(key) != mLines.end())
     return mLines[key].color;
+  if (mMeshes.find(key) != mMeshes.end())
+    return mMeshes[key].color;
   return Eigen::Vector3d::Zero();
 }
 
@@ -652,6 +789,10 @@ GUIWebsocketServer& GUIWebsocketServer::setObjectColor(
   {
     mLines[key].color = color;
   }
+  if (mMeshes.find(key) != mMeshes.end())
+  {
+    mMeshes[key].color = color;
+  }
 
   queueCommand([&](std::stringstream& json) {
     json << "{ \"type\": \"set_object_color\", \"key\": \"" << key
@@ -683,6 +824,7 @@ GUIWebsocketServer& GUIWebsocketServer::deleteObject(const std::string& key)
   mBoxes.erase(key);
   mSpheres.erase(key);
   mLines.erase(key);
+  mMeshes.erase(key);
 
   queueCommand([&](std::stringstream& json) {
     json << "{ \"type\": \"delete_object\", \"key\": \"" << key << "\" }";
@@ -1082,6 +1224,8 @@ void GUIWebsocketServer::encodeCreateBox(std::stringstream& json, Box& box)
   vec3ToJson(json, box.euler);
   json << ", \"color\": ";
   vec3ToJson(json, box.color);
+  json << ", \"cast_shadows\": " << (box.castShadows ? "true" : "false");
+  json << ", \"receive_shadows\": " << (box.receiveShadows ? "true" : "false");
   json << "}";
 }
 
@@ -1094,6 +1238,9 @@ void GUIWebsocketServer::encodeCreateSphere(
   vec3ToJson(json, sphere.pos);
   json << ", \"color\": ";
   vec3ToJson(json, sphere.color);
+  json << ", \"cast_shadows\": " << (sphere.castShadows ? "true" : "false");
+  json << ", \"receive_shadows\": "
+       << (sphere.receiveShadows ? "true" : "false");
   json << "}";
 }
 
@@ -1112,6 +1259,40 @@ void GUIWebsocketServer::encodeCreateLine(std::stringstream& json, Line& line)
   }
   json << "], \"color\": ";
   vec3ToJson(json, line.color);
+  json << "}";
+}
+
+void GUIWebsocketServer::encodeCreateMesh(std::stringstream& json, Mesh& mesh)
+{
+  json << "{ \"type\": \"create_mesh\", \"key\": \"" << mesh.key;
+  json << "\", \"vertices\": [";
+  bool firstPoint = true;
+  for (Eigen::Vector3d& vertex : mesh.vertices)
+  {
+    if (firstPoint)
+      firstPoint = false;
+    else
+      json << ", ";
+    vec3ToJson(json, vertex);
+  }
+  json << "], \"faces\": [";
+  firstPoint = true;
+  for (Eigen::Vector3i& face : mesh.faces)
+  {
+    if (firstPoint)
+      firstPoint = false;
+    else
+      json << ", ";
+    vec3iToJson(json, face);
+  }
+  json << "], \"color\": ";
+  vec3ToJson(json, mesh.color);
+  json << ", \"pos\": ";
+  vec3ToJson(json, mesh.pos);
+  json << ", \"euler\": ";
+  vec3ToJson(json, mesh.euler);
+  json << ", \"cast_shadows\": " << (mesh.castShadows ? "true" : "false");
+  json << ", \"receive_shadows\": " << (mesh.receiveShadows ? "true" : "false");
   json << "}";
 }
 
