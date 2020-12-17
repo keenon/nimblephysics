@@ -10,7 +10,13 @@ std::string escapeJson(const std::string& str)
 }
 
 //==============================================================================
-void vec2ToJson(std::stringstream& json, const Eigen::Vector2i& vec)
+void vec2iToJson(std::stringstream& json, const Eigen::Vector2i& vec)
+{
+  json << "[" << vec(0) << "," << vec(1) << "]";
+}
+
+//==============================================================================
+void vec2dToJson(std::stringstream& json, const Eigen::Vector2d& vec)
 {
   json << "[" << vec(0) << "," << vec(1) << "]";
 }

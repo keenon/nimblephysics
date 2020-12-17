@@ -67,14 +67,21 @@ TEST(REALTIME, GUI_SERVER)
   dart::utils::DartLoader urdfLoader;
   std::shared_ptr<dynamics::Skeleton> ground
       = urdfLoader.parseSkeleton("dart://sample/sdf/atlas/ground.urdf");
+
   std::shared_ptr<dynamics::Skeleton> atlas
       = dart::utils::SdfParser::readSkeleton(
           "dart://sample/sdf/atlas/atlas_v3_no_head.sdf");
+
+  std::shared_ptr<dynamics::Skeleton> kr5
+      = urdfLoader.parseSkeleton("dart://sample/urdf/KR5/KR5 sixx R650.urdf");
+
   world->addSkeleton(ground);
   world->addSkeleton(atlas);
+  world->addSkeleton(kr5);
 
   // Set initial configuration for Atlas robot
   atlas->setPosition(0, -0.5 * dart::math::constantsd::pi());
+  atlas->setPosition(3, 0.7);
 
   // Disable the ground from casting its own shadows
   ground->getBodyNode(0)->getShapeNode(0)->getVisualAspect()->setCastShadows(

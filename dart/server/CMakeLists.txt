@@ -4,6 +4,7 @@ file(GLOB srcs "*.cpp")
 dart_add_core_headers(${hdrs})
 dart_add_core_sources(${srcs})
 dart_add_core_sources("${CMAKE_SOURCE_DIR}/dart/server/external/jsoncpp.cpp")
+dart_add_core_sources("${CMAKE_SOURCE_DIR}/dart/server/external/base64/base64.cpp")
 
 # Generate header for this namespace
 dart_get_filename_components(header_names "server headers" ${hdrs})

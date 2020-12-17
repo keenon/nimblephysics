@@ -32,12 +32,21 @@ type CreateMeshCommand = {
   type: "create_mesh";
   key: string;
   vertices: number[][];
+  vertex_normals: number[][];
   faces: number[][];
+  uv: number[][];
+  texture_starts: { key: string; start: number }[];
   pos: number[];
   euler: number[];
   color: number[];
   cast_shadows: boolean;
   receive_shadows: boolean;
+};
+
+type CreateTextureCommand = {
+  type: "create_texture";
+  key: string;
+  base64: string;
 };
 
 type SetObjectPosCommand = {
@@ -173,6 +182,7 @@ type Command =
   | CreateSphereCommand
   | CreateLineCommand
   | CreateMeshCommand
+  | CreateTextureCommand
   | SetObjectPosCommand
   | SetObjectRotationCommand
   | SetObjectColorCommand
@@ -264,13 +274,18 @@ class DARTRemote {
       this.view.createMesh(
         command.key,
         command.vertices,
+        command.vertex_normals,
         command.faces,
+        command.uv,
+        command.texture_starts,
         command.pos,
         command.euler,
         command.color,
         command.cast_shadows,
         command.receive_shadows
       );
+    } else if (command.type === "create_texture") {
+      this.view.createTexture(command.key, command.base64);
     } else if (command.type === "set_object_pos") {
       this.view.setObjectPos(command.key, command.pos);
     } else if (command.type === "set_object_rotation") {

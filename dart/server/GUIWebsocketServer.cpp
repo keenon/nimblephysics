@@ -1,8 +1,10 @@
 #include "dart/server/GUIWebsocketServer.hpp"
 
 #include <chrono>
+#include <fstream>
 
 #include <assimp/scene.h>
+#include <boost/filesystem.hpp>
 
 #include "dart/common/Aspect.hpp"
 #include "dart/dynamics/BodyNode.hpp"
@@ -15,6 +17,7 @@
 #include "dart/math/Geometry.hpp"
 #include "dart/neural/RestorableSnapshot.hpp"
 #include "dart/server/RawJsonUtils.hpp"
+#include "dart/server/external/base64/base64.h"
 #include "dart/simulation/World.hpp"
 
 namespace dart {
@@ -79,6 +82,14 @@ void GUIWebsocketServer::serve(int port)
         else
           json << ",";
         encodeCreateLine(json, pair.second);
+      }
+      for (auto pair : mTextures)
+      {
+        if (isFirst)
+          isFirst = false;
+        else
+          json << ",";
+        encodeCreateTexture(json, pair.second);
       }
       for (auto pair : mMeshes)
       {
@@ -417,9 +428,10 @@ GUIWebsocketServer& GUIWebsocketServer::renderSkeleton(
           {
             dynamics::MeshShape* meshShape
                 = dynamic_cast<dynamics::MeshShape*>(shape);
-            createMesh(
+            createMeshASSIMP(
                 shapeName,
                 meshShape->getMesh(),
+                meshShape->getMeshPath(),
                 node->getWorldTransform().translation(),
                 math::matrixToEulerXYZ(node->getWorldTransform().rotation()),
                 visual->getColor(),
@@ -617,10 +629,13 @@ GUIWebsocketServer& GUIWebsocketServer::createLine(
 
 /// This creates a mesh in the web GUI under a specified key, using raw shape
 /// data
-GUIWebsocketServer& GUIWebsocketServer::createMeshRaw(
+GUIWebsocketServer& GUIWebsocketServer::createMesh(
     const std::string& key,
     const std::vector<Eigen::Vector3d>& vertices,
+    const std::vector<Eigen::Vector3d>& vertexNormals,
     const std::vector<Eigen::Vector3i>& faces,
+    const std::vector<Eigen::Vector2d>& uv,
+    const std::vector<std::pair<std::string, int>>& textureStarts,
     const Eigen::Vector3d& pos,
     const Eigen::Vector3d& euler,
     const Eigen::Vector3d& color,
@@ -630,7 +645,10 @@ GUIWebsocketServer& GUIWebsocketServer::createMeshRaw(
   Mesh mesh;
   mesh.key = key;
   mesh.vertices = vertices;
+  mesh.vertexNormals = vertexNormals;
   mesh.faces = faces;
+  mesh.uv = uv;
+  mesh.textureStarts = textureStarts;
   mesh.pos = pos;
   mesh.euler = euler;
   mesh.color = color;
@@ -646,9 +664,10 @@ GUIWebsocketServer& GUIWebsocketServer::createMeshRaw(
 
 /// This creates a mesh in the web GUI under a specified key, from the ASSIMP
 /// mesh
-GUIWebsocketServer& GUIWebsocketServer::createMesh(
+GUIWebsocketServer& GUIWebsocketServer::createMeshASSIMP(
     const std::string& key,
     const aiScene* mesh,
+    const std::string& meshPath,
     const Eigen::Vector3d& pos,
     const Eigen::Vector3d& euler,
     const Eigen::Vector3d& color,
@@ -656,15 +675,56 @@ GUIWebsocketServer& GUIWebsocketServer::createMesh(
     bool receiveShadows)
 {
   std::vector<Eigen::Vector3d> vertices;
+  std::vector<Eigen::Vector3d> vertexNormals;
   std::vector<Eigen::Vector3i> faces;
+  std::vector<Eigen::Vector2d> uv;
+  std::vector<std::pair<std::string, int>> textureStarts;
+
+  std::string currentTexturePath = "";
 
   for (int i = 0; i < mesh->mNumMeshes; i++)
   {
     aiMesh* m = mesh->mMeshes[i];
+    aiMaterial* mtl = mesh->mMaterials[m->mMaterialIndex];
+    aiString path;
+    if (aiReturn_SUCCESS
+        == aiGetMaterialTexture(mtl, aiTextureType_DIFFUSE, 0, &path))
+    {
+      std::string newTexturePath = std::string(path.C_Str());
+      if (newTexturePath != currentTexturePath)
+      {
+        currentTexturePath = newTexturePath;
+        textureStarts.emplace_back(newTexturePath, vertices.size());
+        if (mTextures.find(newTexturePath) == mTextures.end())
+        {
+          boost::filesystem::path fullPath = boost::filesystem::canonical(
+              boost::filesystem::path(currentTexturePath),
+              boost::filesystem::path(
+                  meshPath.substr(0, meshPath.find_last_of("/"))));
+
+          createTextureFromFile(newTexturePath, std::string(fullPath.c_str()));
+        }
+      }
+    }
+
     for (int j = 0; j < m->mNumVertices; j++)
     {
       vertices.emplace_back(
           m->mVertices[j][0], m->mVertices[j][1], m->mVertices[j][2]);
+      if (m->mNormals != nullptr)
+      {
+        vertexNormals.emplace_back(
+            m->mNormals[j][0], m->mNormals[j][1], m->mNormals[j][2]);
+      }
+      if (m->mNumUVComponents[0] >= 2)
+      {
+        uv.emplace_back(m->mTextureCoords[0][j][0], m->mTextureCoords[0][j][1]);
+      }
+      /*
+      if (m->mNumUVComponents[0] == 2 && m->mTextureCoords[0][j][0])
+      {
+      }
+      */
     }
     for (int k = 0; k < m->mNumFaces; k++)
     {
@@ -676,9 +736,50 @@ GUIWebsocketServer& GUIWebsocketServer::createMesh(
     }
   }
 
-  createMeshRaw(
-      key, vertices, faces, pos, euler, color, castShadows, receiveShadows);
+  createMesh(
+      key,
+      vertices,
+      vertexNormals,
+      faces,
+      uv,
+      textureStarts,
+      pos,
+      euler,
+      color,
+      castShadows,
+      receiveShadows);
 
+  return *this;
+}
+
+/// This creates a texture object, to be sent to the web frontend
+GUIWebsocketServer& GUIWebsocketServer::createTexture(
+    const std::string& key, const std::string& base64)
+{
+  Texture tex;
+  tex.key = key;
+  tex.base64 = base64;
+
+  mTextures[key] = tex;
+
+  queueCommand(
+      [&](std::stringstream& json) { encodeCreateTexture(json, tex); });
+
+  return *this;
+}
+
+/// This creates a texture object by loading it from a file
+GUIWebsocketServer& GUIWebsocketServer::createTextureFromFile(
+    const std::string& key, const std::string& path)
+{
+  std::ifstream in(path);
+  std::ostringstream sstr;
+  sstr << in.rdbuf();
+
+  std::string suffix = path.substr(path.find_last_of(".") + 1);
+  std::string base64
+      = "data:image/" + suffix + ";base64, " + ::base64_encode(sstr.str());
+  createTexture(key, base64);
   return *this;
 }
 
@@ -1137,7 +1238,7 @@ GUIWebsocketServer& GUIWebsocketServer::setUIElementPosition(
   queueCommand([&](std::stringstream& json) {
     json << "{ \"type\": \"set_ui_elem_pos\", \"key\": " << key
          << "\", \"from_top_left\": ";
-    vec2ToJson(json, fromTopLeft);
+    vec2iToJson(json, fromTopLeft);
     json << " }";
   });
   return *this;
@@ -1167,7 +1268,7 @@ GUIWebsocketServer& GUIWebsocketServer::setUIElementSize(
   queueCommand([&](std::stringstream& json) {
     json << "{ \"type\": \"set_ui_elem_size\", \"key\": " << key
          << "\", \"size\": ";
-    vec2ToJson(json, size);
+    vec2iToJson(json, size);
     json << " }";
   });
   return *this;
@@ -1275,6 +1376,16 @@ void GUIWebsocketServer::encodeCreateMesh(std::stringstream& json, Mesh& mesh)
       json << ", ";
     vec3ToJson(json, vertex);
   }
+  json << "], \"vertex_normals\": [";
+  firstPoint = true;
+  for (Eigen::Vector3d& normal : mesh.vertexNormals)
+  {
+    if (firstPoint)
+      firstPoint = false;
+    else
+      json << ", ";
+    vec3ToJson(json, normal);
+  }
   json << "], \"faces\": [";
   firstPoint = true;
   for (Eigen::Vector3i& face : mesh.faces)
@@ -1284,6 +1395,27 @@ void GUIWebsocketServer::encodeCreateMesh(std::stringstream& json, Mesh& mesh)
     else
       json << ", ";
     vec3iToJson(json, face);
+  }
+  json << "], \"uv\": [";
+  firstPoint = true;
+  for (Eigen::Vector2d& uv : mesh.uv)
+  {
+    if (firstPoint)
+      firstPoint = false;
+    else
+      json << ", ";
+    vec2dToJson(json, uv);
+  }
+  json << "], \"texture_starts\": [";
+  firstPoint = true;
+  for (std::pair<std::string, int> pair : mesh.textureStarts)
+  {
+    if (firstPoint)
+      firstPoint = false;
+    else
+      json << ", ";
+    json << "{ \"key\": \"" << pair.first << "\", \"start\": " << pair.second
+         << "}";
   }
   json << "], \"color\": ";
   vec3ToJson(json, mesh.color);
@@ -1296,6 +1428,13 @@ void GUIWebsocketServer::encodeCreateMesh(std::stringstream& json, Mesh& mesh)
   json << "}";
 }
 
+void GUIWebsocketServer::encodeCreateTexture(
+    std::stringstream& json, Texture& texture)
+{
+  json << "{ \"type\": \"create_texture\", \"key\": \"" << texture.key;
+  json << "\", \"base64\": \"" << texture.base64 << "\" }";
+}
+
 void GUIWebsocketServer::encodeEnableMouseInteraction(
     std::stringstream& json, const std::string& key)
 {
@@ -1306,9 +1445,9 @@ void GUIWebsocketServer::encodeCreateText(std::stringstream& json, Text& text)
 {
   json << "{ \"type\": \"create_text\", \"key\": \"" << text.key
        << "\", \"from_top_left\": ";
-  vec2ToJson(json, text.fromTopLeft);
+  vec2iToJson(json, text.fromTopLeft);
   json << ", \"size\": ";
-  vec2ToJson(json, text.size);
+  vec2iToJson(json, text.size);
   json << ", \"contents\": \"" << escapeJson(text.contents);
   json << "\" }";
 }
@@ -1318,9 +1457,9 @@ void GUIWebsocketServer::encodeCreateButton(
 {
   json << "{ \"type\": \"create_button\", \"key\": \"" << button.key
        << "\", \"from_top_left\": ";
-  vec2ToJson(json, button.fromTopLeft);
+  vec2iToJson(json, button.fromTopLeft);
   json << ", \"size\": ";
-  vec2ToJson(json, button.size);
+  vec2iToJson(json, button.size);
   json << ", \"label\": \"" << escapeJson(button.label);
   json << "\" }";
 }
@@ -1330,9 +1469,9 @@ void GUIWebsocketServer::encodeCreateSlider(
 {
   json << "{ \"type\": \"create_slider\", \"key\": \"" << slider.key
        << "\", \"from_top_left\": ";
-  vec2ToJson(json, slider.fromTopLeft);
+  vec2iToJson(json, slider.fromTopLeft);
   json << ", \"size\": ";
-  vec2ToJson(json, slider.size);
+  vec2iToJson(json, slider.size);
   json << ", \"max\": " << slider.max;
   json << ", \"min\": " << slider.min;
   json << ", \"value\": " << slider.value;
@@ -1345,9 +1484,9 @@ void GUIWebsocketServer::encodeCreatePlot(std::stringstream& json, Plot& plot)
 {
   json << "{ \"type\": \"create_plot\", \"key\": \"" << plot.key
        << "\", \"from_top_left\": ";
-  vec2ToJson(json, plot.fromTopLeft);
+  vec2iToJson(json, plot.fromTopLeft);
   json << ", \"size\": ";
-  vec2ToJson(json, plot.size);
+  vec2iToJson(json, plot.size);
   json << ", \"max_x\": " << plot.maxX;
   json << ", \"min_x\": " << plot.minX;
   json << ", \"max_y\": " << plot.maxY;

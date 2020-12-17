@@ -124,10 +124,13 @@ public:
 
   /// This creates a mesh in the web GUI under a specified key, using raw shape
   /// data
-  GUIWebsocketServer& createMeshRaw(
+  GUIWebsocketServer& createMesh(
       const std::string& key,
       const std::vector<Eigen::Vector3d>& vertices,
+      const std::vector<Eigen::Vector3d>& vertexNormals,
       const std::vector<Eigen::Vector3i>& faces,
+      const std::vector<Eigen::Vector2d>& uv,
+      const std::vector<std::pair<std::string, int>>& textureStarts,
       const Eigen::Vector3d& pos,
       const Eigen::Vector3d& euler,
       const Eigen::Vector3d& color = Eigen::Vector3d::Zero(),
@@ -136,14 +139,23 @@ public:
 
   /// This creates a mesh in the web GUI under a specified key, from the ASSIMP
   /// mesh
-  GUIWebsocketServer& createMesh(
+  GUIWebsocketServer& createMeshASSIMP(
       const std::string& key,
       const aiScene* mesh,
+      const std::string& meshPath,
       const Eigen::Vector3d& pos,
       const Eigen::Vector3d& euler,
       const Eigen::Vector3d& color = Eigen::Vector3d::Zero(),
       bool castShadows = false,
       bool receiveShadows = false);
+
+  /// This creates a texture object, to be sent to the web frontend
+  GUIWebsocketServer& createTexture(
+      const std::string& key, const std::string& base64);
+
+  /// This creates a texture object by loading it from a file
+  GUIWebsocketServer& createTextureFromFile(
+      const std::string& key, const std::string& path);
 
   /// This returns true if we've already got an object with the key "key"
   bool hasObject(const std::string& key);
@@ -332,7 +344,10 @@ protected:
   {
     std::string key;
     std::vector<Eigen::Vector3d> vertices;
+    std::vector<Eigen::Vector3d> vertexNormals;
     std::vector<Eigen::Vector3i> faces;
+    std::vector<Eigen::Vector2d> uv;
+    std::vector<std::pair<std::string, int>> textureStarts;
     Eigen::Vector3d pos;
     Eigen::Vector3d euler;
     Eigen::Vector3d color;
@@ -340,6 +355,14 @@ protected:
     bool receiveShadows;
   };
   std::unordered_map<std::string, Mesh> mMeshes;
+
+  struct Texture
+  {
+    std::string key;
+    std::string base64;
+  };
+  std::unordered_map<std::string, Texture> mTextures;
+
   struct Text
   {
     std::string key;
@@ -394,6 +417,7 @@ protected:
   void encodeCreateSphere(std::stringstream& json, Sphere& sphere);
   void encodeCreateLine(std::stringstream& json, Line& line);
   void encodeCreateMesh(std::stringstream& json, Mesh& mesh);
+  void encodeCreateTexture(std::stringstream& json, Texture& texture);
   void encodeEnableMouseInteraction(
       std::stringstream& json, const std::string& key);
   void encodeCreateText(std::stringstream& json, Text& text);

@@ -36,6 +36,7 @@ class DARTView {
 
   objects: Map<string, THREE.Group | THREE.Mesh | THREE.Line>;
   keys: Map<THREE.Object3D, string>;
+  textures: Map<string, THREE.Texture>;
 
   uiElements: Map<string, Text | Button | Slider | Plot>;
 
@@ -53,6 +54,7 @@ class DARTView {
 
     this.objects = new Map();
     this.keys = new Map();
+    this.textures = new Map();
     this.uiElements = new Map();
     this.dragListeners = [];
 
@@ -265,6 +267,13 @@ class DARTView {
   };
 
   /**
+   * This loads a texture from a Base64 string encoding of it
+   */
+  createTexture = (key: string, base64: string) => {
+    this.textures.set(key, new THREE.TextureLoader().load(base64));
+  };
+
+  /**
    * This adds a line to the scene
    *
    * Must call render() to see results!
@@ -272,7 +281,10 @@ class DARTView {
   createMesh = (
     key: string,
     vertices: number[][],
+    vertexNormals: number[][],
     faces: number[][],
+    uv: number[][],
+    texture_starts: { key: string; start: number }[],
     pos: number[],
     euler: number[],
     color: number[],
@@ -282,11 +294,22 @@ class DARTView {
     if (this.objects.has(key)) {
       this.view.remove(this.objects.get(key));
     }
-    const meshMaterial = new THREE.MeshLambertMaterial({
-      color: new THREE.Color(color[0], color[1], color[2]),
-    });
+    let meshMaterial;
+    if (texture_starts.length > 0 && uv.length > 0) {
+      meshMaterial = new THREE.MeshLambertMaterial({
+        color: new THREE.Color(1, 1, 1),
+        map: this.textures.get(texture_starts[0].key),
+      });
+    } else {
+      meshMaterial = new THREE.MeshLambertMaterial({
+        color: new THREE.Color(color[0], color[1], color[2]),
+      });
+    }
 
     const meshPoints = [];
+    const rawUVs = [];
+    const rawNormals = [];
+
     for (let i = 0; i < faces.length; i++) {
       for (let j = 0; j < 3; j++) {
         let vertexIndex = faces[i][j];
@@ -297,10 +320,33 @@ class DARTView {
             vertices[vertexIndex][2] * SCALE_FACTOR
           )
         );
+        if (uv != null && uv.length > vertexIndex) {
+          rawUVs.push(uv[vertexIndex][0]);
+          rawUVs.push(uv[vertexIndex][1]);
+        }
+        if (vertexNormals != null && vertexNormals.length > vertexIndex) {
+          rawNormals.push(vertexNormals[vertexIndex][0]);
+          rawNormals.push(vertexNormals[vertexIndex][1]);
+          rawNormals.push(vertexNormals[vertexIndex][2]);
+        }
       }
     }
+
     const meshGeometry = new THREE.BufferGeometry().setFromPoints(meshPoints);
-    meshGeometry.computeVertexNormals();
+    if (rawUVs.length > 0) {
+      meshGeometry.setAttribute(
+        "uv",
+        new THREE.BufferAttribute(new Float32Array(rawUVs), 2)
+      );
+    }
+    if (rawNormals.length > 0) {
+      meshGeometry.setAttribute(
+        "normal",
+        new THREE.BufferAttribute(new Float32Array(rawNormals), 3)
+      );
+    } else {
+      meshGeometry.computeVertexNormals();
+    }
     meshGeometry.computeBoundingBox();
 
     const mesh = new THREE.Mesh(meshGeometry, meshMaterial);
