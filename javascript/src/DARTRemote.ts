@@ -38,6 +38,7 @@ type CreateMeshCommand = {
   texture_starts: { key: string; start: number }[];
   pos: number[];
   euler: number[];
+  scale: number[];
   color: number[];
   cast_shadows: boolean;
   receive_shadows: boolean;
@@ -59,6 +60,11 @@ type SetObjectRotationCommand = {
   type: "set_object_rotation";
   key: string;
   euler: number[];
+};
+
+type DeleteObjectCommand = {
+  type: "delete_object";
+  key: string;
 };
 
 type SetObjectColorCommand = {
@@ -186,6 +192,7 @@ type Command =
   | SetObjectPosCommand
   | SetObjectRotationCommand
   | SetObjectColorCommand
+  | DeleteObjectCommand
   | EnableMouseInteractionCommand
   | DisableMouseInteractionCommand
   | CreateTextCommand
@@ -280,6 +287,7 @@ class DARTRemote {
         command.texture_starts,
         command.pos,
         command.euler,
+        command.scale,
         command.color,
         command.cast_shadows,
         command.receive_shadows
@@ -359,6 +367,8 @@ class DARTRemote {
       this.view.setUIElementSize(command.key, command.size);
     } else if (command.type === "delete_ui_elem") {
       this.view.deleteUIElement(command.key);
+    } else if (command.type === "delete_object") {
+      this.view.deleteObject(command.key);
     } else if (command.type === "set_text_contents") {
       this.view.setTextContents(command.key, command.contents);
     } else if (command.type === "set_button_label") {

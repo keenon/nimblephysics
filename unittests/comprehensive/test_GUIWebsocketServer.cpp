@@ -40,6 +40,7 @@
 #include <dart/utils/utils.hpp>
 #include <gtest/gtest.h>
 
+#include "dart/collision/fcl/FCLCollisionDetector.hpp"
 #include "dart/dynamics/Skeleton.hpp"
 #include "dart/realtime/Ticker.hpp"
 #include "dart/server/GUIWebsocketServer.hpp"
@@ -61,7 +62,19 @@ using namespace realtime;
 TEST(REALTIME, GUI_SERVER)
 {
   // Create a world
-  dart::simulation::WorldPtr world(new dart::simulation::World);
+  std::shared_ptr<simulation::World> world = simulation::World::create();
+
+  // Set gravity of the world
+  world->setConstraintForceMixingEnabled(true);
+  // world->setPenetrationCorrectionEnabled(true);
+  world->setGravity(Eigen::Vector3d(0.0, 0.0, 9.81));
+
+  // This is just here to double check what's going wrong with our mesh
+  // colliders
+  /*
+  world->getConstraintSolver()->setCollisionDetector(
+      dart::collision::FCLCollisionDetector::create());
+  */
 
   // Load ground and Atlas robot and add them to the world
   dart::utils::DartLoader urdfLoader;
@@ -77,18 +90,22 @@ TEST(REALTIME, GUI_SERVER)
 
   world->addSkeleton(ground);
   world->addSkeleton(atlas);
-  world->addSkeleton(kr5);
+  // world->addSkeleton(kr5);
 
   // Set initial configuration for Atlas robot
   atlas->setPosition(0, -0.5 * dart::math::constantsd::pi());
-  atlas->setPosition(3, 0.7);
+  atlas->setPosition(3, 0.75);
 
   // Disable the ground from casting its own shadows
   ground->getBodyNode(0)->getShapeNode(0)->getVisualAspect()->setCastShadows(
       false);
 
-  // Set gravity of the world
-  world->setGravity(Eigen::Vector3d(0.0, 0.0, 9.81));
+  /*
+  while (true)
+  {
+    world->step();
+  }
+  */
 
   GUIWebsocketServer server;
   server.serve(8070);
@@ -97,10 +114,10 @@ TEST(REALTIME, GUI_SERVER)
   Ticker ticker(0.01);
   ticker.registerTickListener([&](long time) {
     double diff = sin(((double)time / 2000));
-    atlas->setPosition(0, diff * dart::math::constantsd::pi());
+    // atlas->setPosition(0, diff * dart::math::constantsd::pi());
     // double diff2 = sin(((double)time / 4000));
     // atlas->setPosition(4, diff2 * 1);
-    // world->step();
+    world->step();
     server.renderWorld(world);
   });
 

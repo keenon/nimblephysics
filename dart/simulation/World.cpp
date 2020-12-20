@@ -74,7 +74,7 @@ World::World(const std::string& _name)
     mDofs(0),
     mRecording(new Recording(mSkeletons)),
     onNameChanged(mNameChangedSignal),
-    mConstraintForceMixingEnabled(false),
+    mConstraintForceMixingEnabled(true),
     mPenetrationCorrectionEnabled(false),
     mWrtMass(std::make_shared<neural::WithRespectToMass>())
 {
@@ -213,11 +213,11 @@ void World::step(bool _resetCommand)
   }
 
   // Detect activated constraints and compute constraint impulses
-  mConstraintSolver->solve();
   mConstraintSolver->setPenetrationCorrectionEnabled(
       mPenetrationCorrectionEnabled);
   mConstraintSolver->setConstraintForceMixingEnabled(
       mConstraintForceMixingEnabled);
+  mConstraintSolver->solve();
 
   // Compute velocity changes given constraint impulses
   for (auto& skel : mSkeletons)
@@ -537,6 +537,13 @@ dynamics::SkeletonPtr World::getSkeleton(std::size_t _index) const
     return mSkeletons[_index];
 
   return nullptr;
+}
+
+//==============================================================================
+/// Get the indexed skeleton
+const dynamics::SkeletonPtr& World::getSkeletonRef(std::size_t _index) const
+{
+  return mSkeletons[_index];
 }
 
 //==============================================================================

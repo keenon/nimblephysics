@@ -32,39 +32,47 @@
 
 #include "dart/collision/dart/DARTCollisionDetector.hpp"
 
-#include "dart/collision/CollisionObject.hpp"
 #include "dart/collision/CollisionFilter.hpp"
+#include "dart/collision/CollisionObject.hpp"
 #include "dart/collision/dart/DARTCollide.hpp"
-#include "dart/collision/dart/DARTCollisionObject.hpp"
 #include "dart/collision/dart/DARTCollisionGroup.hpp"
-#include "dart/dynamics/ShapeFrame.hpp"
-#include "dart/dynamics/SphereShape.hpp"
+#include "dart/collision/dart/DARTCollisionObject.hpp"
 #include "dart/dynamics/BoxShape.hpp"
 #include "dart/dynamics/EllipsoidShape.hpp"
+#include "dart/dynamics/MeshShape.hpp"
+#include "dart/dynamics/ShapeFrame.hpp"
+#include "dart/dynamics/SphereShape.hpp"
 
 namespace dart {
 namespace collision {
 
 namespace {
 
-bool checkPair(CollisionObject* o1, CollisionObject* o2,
-               const CollisionOption& option, CollisionResult* result = nullptr);
+bool checkPair(
+    CollisionObject* o1,
+    CollisionObject* o2,
+    const CollisionOption& option,
+    CollisionResult* result = nullptr);
 
-bool isClose(const Eigen::Vector3d& pos1, const Eigen::Vector3d& pos2,
-             double tol);
+bool isClose(
+    const Eigen::Vector3d& pos1, const Eigen::Vector3d& pos2, double tol);
 
-void postProcess(CollisionObject* o1, CollisionObject* o2, const CollisionOption& option,
-                 CollisionResult& totalResult, const CollisionResult& pairResult);
+void postProcess(
+    CollisionObject* o1,
+    CollisionObject* o2,
+    const CollisionOption& option,
+    CollisionResult& totalResult,
+    const CollisionResult& pairResult);
 
 } // anonymous namespace
 
 //==============================================================================
 DARTCollisionDetector::Registrar<DARTCollisionDetector>
-DARTCollisionDetector::mRegistrar{
-  DARTCollisionDetector::getStaticType(),
-  []() -> std::shared_ptr<dart::collision::DARTCollisionDetector> {
-      return dart::collision::DARTCollisionDetector::create();
-  }};
+    DARTCollisionDetector::mRegistrar{
+        DARTCollisionDetector::getStaticType(),
+        []() -> std::shared_ptr<dart::collision::DARTCollisionDetector> {
+          return dart::collision::DARTCollisionDetector::create();
+        }};
 
 //==============================================================================
 std::shared_ptr<DARTCollisionDetector> DARTCollisionDetector::create()
@@ -93,8 +101,7 @@ const std::string& DARTCollisionDetector::getStaticType()
 }
 
 //==============================================================================
-std::unique_ptr<CollisionGroup>
-DARTCollisionDetector::createCollisionGroup()
+std::unique_ptr<CollisionGroup> DARTCollisionDetector::createCollisionGroup()
 {
   return std::make_unique<DARTCollisionGroup>(shared_from_this());
 }
@@ -257,8 +264,7 @@ double DARTCollisionDetector::distance(
 }
 
 //==============================================================================
-DARTCollisionDetector::DARTCollisionDetector()
-  : CollisionDetector()
+DARTCollisionDetector::DARTCollisionDetector() : CollisionDetector()
 {
   mCollisionObjectManager.reset(new ManagerForSharableCollisionObjects(this));
 }
@@ -278,6 +284,9 @@ void warnUnsupportedShapeType(const dynamics::ShapeFrame* shapeFrame)
   if (shapeType == dynamics::BoxShape::getStaticType())
     return;
 
+  if (shapeType == dynamics::MeshShape::getStaticType())
+    return;
+
   if (shapeType == dynamics::EllipsoidShape::getStaticType())
   {
     const auto& ellipsoid
@@ -290,7 +299,8 @@ void warnUnsupportedShapeType(const dynamics::ShapeFrame* shapeFrame)
   dterr << "[DARTCollisionDetector] Attempting to create shape type ["
         << shapeType << "] that is not supported "
         << "by DARTCollisionDetector. Currently, only BoxShape and "
-        << "EllipsoidShape (only when all the radii are equal) are "
+        << "EllipsoidShape (only when all the radii are equal) and SphereShape "
+           "and MeshShape are "
         << "supported. This shape will always get penetrated by other "
         << "objects.\n";
 }
@@ -302,7 +312,7 @@ std::unique_ptr<CollisionObject> DARTCollisionDetector::createCollisionObject(
   warnUnsupportedShapeType(shapeFrame);
 
   return std::unique_ptr<DARTCollisionObject>(
-        new DARTCollisionObject(this, shapeFrame));
+      new DARTCollisionObject(this, shapeFrame));
 }
 
 //==============================================================================
@@ -311,13 +321,14 @@ void DARTCollisionDetector::refreshCollisionObject(CollisionObject* /*object*/)
   // Do nothing
 }
 
-
-
 namespace {
 
 //==============================================================================
-bool checkPair(CollisionObject* o1, CollisionObject* o2,
-               const CollisionOption& option, CollisionResult* result)
+bool checkPair(
+    CollisionObject* o1,
+    CollisionObject* o2,
+    const CollisionOption& option,
+    CollisionResult* result)
 {
   CollisionResult pairResult;
 
@@ -334,18 +345,19 @@ bool checkPair(CollisionObject* o1, CollisionObject* o2,
 }
 
 //==============================================================================
-bool isClose(const Eigen::Vector3d& pos1, const Eigen::Vector3d& pos2,
-             double tol)
+bool isClose(
+    const Eigen::Vector3d& pos1, const Eigen::Vector3d& pos2, double tol)
 {
   return (pos1 - pos2).norm() < tol;
 }
 
 //==============================================================================
-void postProcess(CollisionObject* o1,
-                 CollisionObject* o2,
-                 const CollisionOption& option,
-                 CollisionResult& totalResult,
-                 const CollisionResult& pairResult)
+void postProcess(
+    CollisionObject* o1,
+    CollisionObject* o2,
+    const CollisionOption& option,
+    CollisionResult& totalResult,
+    const CollisionResult& pairResult)
 {
   if (!pairResult.isCollision())
     return;

@@ -73,11 +73,15 @@ public:
   // void setHidden(const bool& value);
   // const bool& getHidden() const;
 
-  DART_COMMON_SET_GET_ASPECT_PROPERTY(bool, CastShadows)
+  // DART_COMMON_SET_GET_ASPECT_PROPERTY(bool, CastShadows)
   // void setShadowed(const bool& value);
   // const bool& getShadowed() const;
+  void setCastShadows(const bool value);
+  bool getCastShadows();
 
-  DART_COMMON_SET_GET_ASPECT_PROPERTY(bool, ReceiveShadows)
+  // DART_COMMON_SET_GET_ASPECT_PROPERTY(bool, ReceiveShadows)
+  void setReceiveShadows(const bool value);
+  bool getReceiveShadows();
 
   /// Identical to setRGB(const Eigen::Vector3d&)
   void setColor(const Eigen::Vector3d& color);

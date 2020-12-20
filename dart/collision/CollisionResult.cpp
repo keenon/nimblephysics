@@ -33,9 +33,9 @@
 #include "dart/collision/CollisionResult.hpp"
 
 #include "dart/collision/CollisionObject.hpp"
+#include "dart/dynamics/BodyNode.hpp"
 #include "dart/dynamics/ShapeFrame.hpp"
 #include "dart/dynamics/ShapeNode.hpp"
-#include "dart/dynamics/BodyNode.hpp"
 
 namespace dart {
 namespace collision {
@@ -44,8 +44,21 @@ namespace collision {
 void CollisionResult::addContact(const Contact& contact)
 {
   mContacts.push_back(contact);
-  addObject(contact.collisionObject1);
-  addObject(contact.collisionObject2);
+  if (contact.collisionObject1 == nullptr
+      || contact.collisionObject2 == nullptr)
+  {
+    std::cout
+        << "THIS IS AN ERROR IN PRODUCTION! Got a nullptr in "
+           "CollisionResult::addContact() for collisionObject1 and/or "
+           "collisionObject2. Ignoring the objects, in case we're running a "
+           "unit test, but this could lead to invalid behavior downstream."
+        << std::endl;
+  }
+  else
+  {
+    addObject(contact.collisionObject1);
+    addObject(contact.collisionObject2);
+  }
 }
 
 //==============================================================================
@@ -68,6 +81,17 @@ const Contact& CollisionResult::getContact(std::size_t index) const
   assert(index < mContacts.size());
 
   return mContacts[index];
+}
+
+//==============================================================================
+/// This sorts the list of contacts by the contact position dotted with some
+/// random direction. This makes it much easier to compare sets of
+/// CollisionResults.
+void CollisionResult::sortContacts(Eigen::Vector3d& randDirection)
+{
+  std::sort(mContacts.begin(), mContacts.end(), [&](Contact& a, Contact& b) {
+    return a.point.dot(randDirection) < b.point.dot(randDirection);
+  });
 }
 
 //==============================================================================
@@ -125,7 +149,7 @@ void CollisionResult::clear()
 //==============================================================================
 void CollisionResult::addObject(CollisionObject* object)
 {
-  if(!object)
+  if (!object)
   {
     dterr << "[CollisionResult::addObject] Attempting to add a collision with "
           << "a nullptr object to a CollisionResult instance. This is not "
@@ -137,12 +161,12 @@ void CollisionResult::addObject(CollisionObject* object)
   const dynamics::ShapeFrame* frame = object->getShapeFrame();
   mCollidingShapeFrames.insert(frame);
 
-  if(frame->isShapeNode())
+  if (frame->isShapeNode())
   {
     const dynamics::ShapeNode* node = frame->asShapeNode();
     mCollidingBodyNodes.insert(node->getBodyNodePtr());
   }
 }
 
-}  // namespace collision
-}  // namespace dart
+} // namespace collision
+} // namespace dart

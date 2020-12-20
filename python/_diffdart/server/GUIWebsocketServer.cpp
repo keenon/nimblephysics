@@ -214,8 +214,7 @@ void GUIWebsocketServer(py::module& m)
           "renderSkeleton",
           &dart::server::GUIWebsocketServer::renderSkeleton,
           ::py::arg("skeleton"),
-          ::py::arg("prefix") = "world",
-          ::py::arg("skipFlush") = false)
+          ::py::arg("prefix") = "world")
       .def(
           "renderTrajectoryLines",
           &dart::server::GUIWebsocketServer::renderTrajectoryLines,

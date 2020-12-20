@@ -251,8 +251,7 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(ConstrainedGroup& group)
         // This iteration fill in row j
         // Probably mostly 0s
         index = nSkip * (mOffset[i] + j) + mOffset[k];
-        group.getConstraint(k)->getVelocityChange(
-            mA.data() + index, mConstraintForceMixingEnabled);
+        group.getConstraint(k)->getVelocityChange(mA.data() + index, false);
       }
 
       // Filling symmetric part of A matrix

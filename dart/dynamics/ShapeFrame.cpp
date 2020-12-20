@@ -93,6 +93,28 @@ void VisualAspect::setRGBA(const Eigen::Vector4d& color)
 }
 
 //==============================================================================
+void VisualAspect::setCastShadows(const bool value)
+{
+  mProperties.mCastShadows = value;
+}
+//==============================================================================
+bool VisualAspect::getCastShadows()
+{
+  return mProperties.mCastShadows;
+}
+
+//==============================================================================
+void VisualAspect::setReceiveShadows(const bool value)
+{
+  mProperties.mReceiveShadows = value;
+}
+//==============================================================================
+bool VisualAspect::getReceiveShadows()
+{
+  return mProperties.mReceiveShadows;
+}
+
+//==============================================================================
 void VisualAspect::setColor(const Eigen::Vector3d& color)
 {
   setRGB(color);

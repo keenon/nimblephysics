@@ -77,14 +77,14 @@ public:
   /// This is a high-level command that creates/updates all the shapes in a
   /// world by calling the lower-level commands
   GUIWebsocketServer& renderWorld(
-      std::shared_ptr<simulation::World> world, std::string prefix = "world");
+      const std::shared_ptr<simulation::World>& world,
+      const std::string& prefix = "world");
 
   /// This is a high-level command that creates/updates all the shapes in a
   /// world by calling the lower-level commands
   GUIWebsocketServer& renderSkeleton(
-      std::shared_ptr<dynamics::Skeleton> skel,
-      std::string prefix = "skel",
-      bool skipFlush = false);
+      const std::shared_ptr<dynamics::Skeleton>& skel,
+      const std::string& prefix = "skel");
 
   /// This is a high-level command that renders a given trajectory as a
   /// bunch of lines in the world, one per body
@@ -99,41 +99,43 @@ public:
 
   /// This creates a box in the web GUI under a specified key
   GUIWebsocketServer& createBox(
-      const std::string& key,
+      std::string key,
       const Eigen::Vector3d& size,
       const Eigen::Vector3d& pos,
       const Eigen::Vector3d& euler,
-      const Eigen::Vector3d& color = Eigen::Vector3d::Zero(),
+      const Eigen::Vector3d& color = Eigen::Vector3d(0.5, 0.5, 0.5),
       bool castShadows = false,
       bool receiveShadows = false);
 
   /// This creates a sphere in the web GUI under a specified key
   GUIWebsocketServer& createSphere(
-      const std::string& key,
+      std::string key,
       double radius,
       const Eigen::Vector3d& pos,
-      const Eigen::Vector3d& color = Eigen::Vector3d::Zero(),
+      const Eigen::Vector3d& color = Eigen::Vector3d(0.5, 0.5, 0.5),
       bool castShadows = false,
       bool receiveShadows = false);
 
   /// This creates a line in the web GUI under a specified key
   GUIWebsocketServer& createLine(
-      const std::string& key,
+      std::string key,
       const std::vector<Eigen::Vector3d>& points,
-      const Eigen::Vector3d& color = Eigen::Vector3d::Zero());
+      const Eigen::Vector3d& color = Eigen::Vector3d(1.0, 0.5, 0.5));
 
   /// This creates a mesh in the web GUI under a specified key, using raw shape
   /// data
   GUIWebsocketServer& createMesh(
-      const std::string& key,
+      std::string key,
       const std::vector<Eigen::Vector3d>& vertices,
       const std::vector<Eigen::Vector3d>& vertexNormals,
       const std::vector<Eigen::Vector3i>& faces,
       const std::vector<Eigen::Vector2d>& uv,
-      const std::vector<std::pair<std::string, int>>& textureStarts,
+      const std::vector<std::string>& textures,
+      const std::vector<int>& textureStartIndices,
       const Eigen::Vector3d& pos,
       const Eigen::Vector3d& euler,
-      const Eigen::Vector3d& color = Eigen::Vector3d::Zero(),
+      const Eigen::Vector3d& scale = Eigen::Vector3d::Ones(),
+      const Eigen::Vector3d& color = Eigen::Vector3d(0.5, 0.5, 0.5),
       bool castShadows = false,
       bool receiveShadows = false);
 
@@ -145,7 +147,8 @@ public:
       const std::string& meshPath,
       const Eigen::Vector3d& pos,
       const Eigen::Vector3d& euler,
-      const Eigen::Vector3d& color = Eigen::Vector3d::Zero(),
+      const Eigen::Vector3d& scale = Eigen::Vector3d::Ones(),
+      const Eigen::Vector3d& color = Eigen::Vector3d(0.5, 0.5, 0.5),
       bool castShadows = false,
       bool receiveShadows = false);
 
@@ -193,6 +196,9 @@ public:
 
   /// This deletes an object by key
   GUIWebsocketServer& deleteObject(const std::string& key);
+
+  /// This deletes all the objects that match a given prefix
+  GUIWebsocketServer& deleteObjectsByPrefix(const std::string& prefix);
 
   /// This gets the current screen size
   Eigen::Vector2i getScreenSize();
@@ -291,7 +297,7 @@ protected:
 
   // protects the buffered JSON message (mJson) from getting
   // corrupted if we queue messages while trying to flush()
-  std::mutex mJsonMutex;
+  std::recursive_mutex mJsonMutex;
   bool mAutoflush;
   int mMessagesQueued;
   std::stringstream mJson;
@@ -347,9 +353,11 @@ protected:
     std::vector<Eigen::Vector3d> vertexNormals;
     std::vector<Eigen::Vector3i> faces;
     std::vector<Eigen::Vector2d> uv;
-    std::vector<std::pair<std::string, int>> textureStarts;
+    std::vector<std::string> textures;
+    std::vector<int> textureStartIndices;
     Eigen::Vector3d pos;
     Eigen::Vector3d euler;
+    Eigen::Vector3d scale;
     Eigen::Vector3d color;
     bool castShadows;
     bool receiveShadows;

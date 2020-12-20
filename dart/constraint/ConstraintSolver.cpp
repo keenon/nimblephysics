@@ -71,8 +71,8 @@ ConstraintSolver::ConstraintSolver(double timeStep)
         false), // Default to no penetration correction, because it breaks our
                 // gradients
     mConstraintForceMixingEnabled(
-        false) // Default to no CFM, decreasing stability but increasing the
-               // accuracy of our gradients
+        true) // Default to CFM, increases stability but decreases the
+              // accuracy of our gradients
 {
   assert(timeStep > 0.0);
 

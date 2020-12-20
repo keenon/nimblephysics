@@ -287,6 +287,7 @@ class DARTView {
     texture_starts: { key: string; start: number }[],
     pos: number[],
     euler: number[],
+    scale: number[],
     color: number[],
     castShadows: boolean,
     receiveShadows: boolean
@@ -296,6 +297,7 @@ class DARTView {
     }
     let meshMaterial;
     if (texture_starts.length > 0 && uv.length > 0) {
+      // TODO: respect multiple texture_starts per object
       meshMaterial = new THREE.MeshLambertMaterial({
         color: new THREE.Color(1, 1, 1),
         map: this.textures.get(texture_starts[0].key),
@@ -315,9 +317,9 @@ class DARTView {
         let vertexIndex = faces[i][j];
         meshPoints.push(
           new THREE.Vector3(
-            vertices[vertexIndex][0] * SCALE_FACTOR,
-            vertices[vertexIndex][1] * SCALE_FACTOR,
-            vertices[vertexIndex][2] * SCALE_FACTOR
+            vertices[vertexIndex][0] * SCALE_FACTOR * scale[0],
+            vertices[vertexIndex][1] * SCALE_FACTOR * scale[1],
+            vertices[vertexIndex][2] * SCALE_FACTOR * scale[2]
           )
         );
         if (uv != null && uv.length > vertexIndex) {
@@ -404,6 +406,19 @@ class DARTView {
       (obj as any).material.color.r = color[0];
       (obj as any).material.color.g = color[1];
       (obj as any).material.color.b = color[2];
+    }
+  };
+
+  /**
+   * Removes an object from the scene, if it exists.
+   *
+   * @param key The key of the object (box, sphere, line, mesh) to be removed
+   */
+  deleteObject = (key: string) => {
+    const obj = this.objects.get(key);
+    if (obj) {
+      this.scene.remove(obj);
+      this.objects.delete(key);
     }
   };
 

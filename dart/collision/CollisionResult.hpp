@@ -33,8 +33,9 @@
 #ifndef DART_COLLISION_COLLISIONRESULT_HPP_
 #define DART_COLLISION_COLLISIONRESULT_HPP_
 
-#include <vector>
 #include <unordered_set>
+#include <vector>
+
 #include "dart/collision/Contact.hpp"
 
 namespace dart {
@@ -51,7 +52,6 @@ namespace collision {
 class CollisionResult
 {
 public:
-
   /// Add one contact
   void addContact(const Contact& contact);
 
@@ -64,12 +64,17 @@ public:
   /// Return (const) the index-th contact
   const Contact& getContact(std::size_t index) const;
 
+  /// This sorts the list of contacts by the contact position dotted with some
+  /// random direction. This makes it much easier to compare sets of
+  /// CollisionResults.
+  void sortContacts(Eigen::Vector3d& randDirection);
+
   /// Return contacts
   const std::vector<Contact>& getContacts() const;
 
   /// Return the set of BodyNodes that are in collision
-  const std::unordered_set<const dynamics::BodyNode*>&
-  getCollidingBodyNodes() const;
+  const std::unordered_set<const dynamics::BodyNode*>& getCollidingBodyNodes()
+      const;
 
   /// Return the set of ShapeFrames that are in collision
   const std::unordered_set<const dynamics::ShapeFrame*>&
@@ -91,7 +96,6 @@ public:
   void clear();
 
 protected:
-
   void addObject(CollisionObject* object);
 
   /// List of contact information for each contact
@@ -102,10 +106,9 @@ protected:
 
   /// Set of ShapeFrames that are colliding
   std::unordered_set<const dynamics::ShapeFrame*> mCollidingShapeFrames;
-
 };
 
-}  // namespace collision
-}  // namespace dart
+} // namespace collision
+} // namespace dart
 
-#endif  // DART_COLLISION_COLLISIONRESULT_HPP_
+#endif // DART_COLLISION_COLLISIONRESULT_HPP_

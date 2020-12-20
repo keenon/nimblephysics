@@ -141,6 +141,9 @@ public:
   /// Get the indexed skeleton
   dynamics::SkeletonPtr getSkeleton(std::size_t _index) const;
 
+  /// Get the indexed skeleton
+  const dynamics::SkeletonPtr& getSkeletonRef(std::size_t _index) const;
+
   /// Find a Skeleton by name
   /// \param[in] _name The name of the Skeleton you are looking for.
   /// \return If the skeleton does not exist then return nullptr.

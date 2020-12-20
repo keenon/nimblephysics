@@ -2,10 +2,12 @@
 
 #include <chrono>
 #include <fstream>
+#include <sstream>
 
 #include <assimp/scene.h>
 #include <boost/filesystem.hpp>
 
+#include "dart/collision/CollisionResult.hpp"
 #include "dart/common/Aspect.hpp"
 #include "dart/dynamics/BodyNode.hpp"
 #include "dart/dynamics/BoxShape.hpp"
@@ -346,7 +348,7 @@ void GUIWebsocketServer::setAutoflush(bool autoflush)
 /// This sends the current list of commands to the web GUI
 void GUIWebsocketServer::flush()
 {
-  const std::lock_guard<std::mutex> lock(mJsonMutex);
+  const std::lock_guard<std::recursive_mutex> lock(mJsonMutex);
 
   mJson << "]";
   std::string json = mJson.str();
@@ -358,36 +360,57 @@ void GUIWebsocketServer::flush()
 
   // Reset
   mMessagesQueued = 0;
+  /*
   mJson.str(std::string());
   mJson.clear();
+  */
+  mJson = std::stringstream();
   mJson << "[";
 }
 
 /// This is a high-level command that creates/updates all the shapes in a
 /// world by calling the lower-level commands
 GUIWebsocketServer& GUIWebsocketServer::renderWorld(
-    std::shared_ptr<simulation::World> world, std::string prefix)
+    const std::shared_ptr<simulation::World>& world, const std::string& prefix)
 {
   bool oldAutoflush = mAutoflush;
   mAutoflush = false;
 
   for (int i = 0; i < world->getNumSkeletons(); i++)
   {
-    std::shared_ptr<dynamics::Skeleton> skel = world->getSkeleton(i);
-    renderSkeleton(skel, prefix, true);
+    renderSkeleton(world->getSkeletonRef(i), prefix);
   }
 
-  flush();
+  const collision::CollisionResult& result = world->getLastCollisionResult();
+  deleteObjectsByPrefix(prefix + "__contact_");
+  for (int i = 0; i < result.getNumContacts(); i++)
+  {
+    const collision::Contact& contact = result.getContact(i);
+    std::vector<Eigen::Vector3d> points;
+    points.push_back(contact.point);
+    points.push_back(contact.point + contact.normal);
+    createLine(prefix + "__contact_" + std::to_string(i) + "_a", points);
+    std::vector<Eigen::Vector3d> pointsB;
+    pointsB.push_back(contact.point);
+    pointsB.push_back(contact.point - contact.normal);
+    createLine(
+        prefix + "__contact_" + std::to_string(i) + "_b",
+        pointsB,
+        Eigen::Vector3d(0, 1, 0));
+  }
+
   mAutoflush = oldAutoflush;
+  if (mAutoflush)
+  {
+    flush();
+  }
   return *this;
 }
 
 /// This is a high-level command that creates/updates all the shapes in a
 /// world by calling the lower-level commands
 GUIWebsocketServer& GUIWebsocketServer::renderSkeleton(
-    std::shared_ptr<dynamics::Skeleton> skel,
-    std::string prefix,
-    bool skipFlush)
+    const std::shared_ptr<dynamics::Skeleton>& skel, const std::string& prefix)
 {
   bool oldAutoflush = mAutoflush;
   mAutoflush = false;
@@ -395,16 +418,33 @@ GUIWebsocketServer& GUIWebsocketServer::renderSkeleton(
   for (int j = 0; j < skel->getNumBodyNodes(); j++)
   {
     dynamics::BodyNode* node = skel->getBodyNode(j);
-    std::vector<dynamics::ShapeNode*> shapeNodes
-        = node->getShapeNodesWith<dynamics::VisualAspect>();
-    for (int k = 0; k < shapeNodes.size(); k++)
+    if (node == nullptr)
     {
-      dynamics::ShapeNode* node = shapeNodes[k];
-      dynamics::VisualAspect* visual = node->getVisualAspect();
-      dynamics::Shape* shape = node->getShape().get();
+      std::cout << "ERROR! GUIWebsocketServer found a null body node! This "
+                   "isn't supposed to be possible. Proceeding anyways."
+                << std::endl;
+      continue;
+    }
 
-      std::string shapeName = prefix + "_" + skel->getName() + "_"
-                              + node->getName() + "_" + std::to_string(k);
+    for (int k = 0; k < node->getNumShapeNodes(); k++)
+    {
+      dynamics::ShapeNode* shapeNode = node->getShapeNode(k);
+      dynamics::Shape* shape = shapeNode->getShape().get();
+
+      std::stringstream shapeNameStream;
+      shapeNameStream << prefix << "_";
+      shapeNameStream << skel->getName();
+      shapeNameStream << "_";
+      shapeNameStream << node->getName();
+      shapeNameStream << "_";
+      shapeNameStream << k;
+      std::string shapeName = shapeNameStream.str();
+
+      if (!shapeNode->hasVisualAspect())
+        continue;
+      dynamics::VisualAspect* visual = shapeNode->getVisualAspect(true);
+      if (visual == nullptr)
+        continue;
 
       if (!hasObject(shapeName))
       {
@@ -418,8 +458,8 @@ GUIWebsocketServer& GUIWebsocketServer::renderSkeleton(
             createBox(
                 shapeName,
                 boxShape->getSize(),
-                node->getWorldTransform().translation(),
-                math::matrixToEulerXYZ(node->getWorldTransform().rotation()),
+                shapeNode->getWorldTransform().translation(),
+                math::matrixToEulerXYZ(shapeNode->getWorldTransform().linear()),
                 visual->getColor(),
                 visual->getCastShadows(),
                 visual->getReceiveShadows());
@@ -432,8 +472,9 @@ GUIWebsocketServer& GUIWebsocketServer::renderSkeleton(
                 shapeName,
                 meshShape->getMesh(),
                 meshShape->getMeshPath(),
-                node->getWorldTransform().translation(),
-                math::matrixToEulerXYZ(node->getWorldTransform().rotation()),
+                shapeNode->getWorldTransform().translation(),
+                math::matrixToEulerXYZ(shapeNode->getWorldTransform().linear()),
+                meshShape->getScale(),
                 visual->getColor(),
                 visual->getCastShadows(),
                 visual->getReceiveShadows());
@@ -445,7 +486,7 @@ GUIWebsocketServer& GUIWebsocketServer::renderSkeleton(
             createSphere(
                 shapeName,
                 sphereShape->getRadius(),
-                node->getWorldTransform().translation(),
+                shapeNode->getWorldTransform().translation(),
                 visual->getColor(),
                 visual->getCastShadows(),
                 visual->getReceiveShadows());
@@ -461,9 +502,9 @@ GUIWebsocketServer& GUIWebsocketServer::renderSkeleton(
         }
         else
         {
-          Eigen::Vector3d pos = node->getWorldTransform().translation();
+          Eigen::Vector3d pos = shapeNode->getWorldTransform().translation();
           Eigen::Vector3d euler
-              = math::matrixToEulerXYZ(node->getWorldTransform().rotation());
+              = math::matrixToEulerXYZ(shapeNode->getWorldTransform().linear());
           Eigen::Vector3d color = visual->getColor();
           // std::cout << "Color " << shapeName << ":" << color << std::endl;
 
@@ -478,11 +519,13 @@ GUIWebsocketServer& GUIWebsocketServer::renderSkeleton(
     }
   }
 
-  if (!skipFlush)
+  mAutoflush = oldAutoflush;
+  if (mAutoflush)
   {
     flush();
   }
-  mAutoflush = oldAutoflush;
+
+  return *this;
 }
 
 /// This is a high-level command that renders a given trajectory as a bunch of
@@ -517,8 +560,10 @@ GUIWebsocketServer& GUIWebsocketServer::renderTrajectoryLines(
           dynamics::ShapeNode* node = shapeNodes[k];
           dynamics::VisualAspect* visual = node->getVisualAspect();
 
-          std::string shapeName = prefix + "_" + skel->getName() + "_"
-                                  + node->getName() + "_" + std::to_string(k);
+          std::stringstream shapeNameStream;
+          shapeNameStream << prefix << "_" << skel->getName() << "_"
+                          << node->getName() << "_" << k;
+          std::string shapeName = shapeNameStream.str();
           paths[shapeName].push_back(node->getWorldTransform().translation());
           colors[shapeName] = visual->getColor();
         }
@@ -560,7 +605,7 @@ GUIWebsocketServer& GUIWebsocketServer::clear()
 
 /// This creates a box in the web GUI under a specified key
 GUIWebsocketServer& GUIWebsocketServer::createBox(
-    const std::string& key,
+    std::string key,
     const Eigen::Vector3d& size,
     const Eigen::Vector3d& pos,
     const Eigen::Vector3d& euler,
@@ -568,7 +613,7 @@ GUIWebsocketServer& GUIWebsocketServer::createBox(
     bool castShadows,
     bool receiveShadows)
 {
-  Box box;
+  Box& box = mBoxes[key];
   box.key = key;
   box.size = size;
   box.pos = pos;
@@ -577,23 +622,23 @@ GUIWebsocketServer& GUIWebsocketServer::createBox(
   box.castShadows = castShadows;
   box.receiveShadows = receiveShadows;
 
-  mBoxes[key] = box;
-
-  queueCommand([&](std::stringstream& json) { encodeCreateBox(json, box); });
+  queueCommand([this, key](std::stringstream& json) {
+    encodeCreateBox(json, mBoxes[key]);
+  });
 
   return *this;
 }
 
 /// This creates a sphere in the web GUI under a specified key
 GUIWebsocketServer& GUIWebsocketServer::createSphere(
-    const std::string& key,
+    std::string key,
     double radius,
     const Eigen::Vector3d& pos,
     const Eigen::Vector3d& color,
     bool castShadows,
     bool receiveShadows)
 {
-  Sphere sphere;
+  Sphere& sphere = mSpheres[key];
   sphere.key = key;
   sphere.radius = radius;
   sphere.pos = pos;
@@ -601,28 +646,27 @@ GUIWebsocketServer& GUIWebsocketServer::createSphere(
   sphere.castShadows = castShadows;
   sphere.receiveShadows = receiveShadows;
 
-  mSpheres[key] = sphere;
-
-  queueCommand(
-      [&](std::stringstream& json) { encodeCreateSphere(json, sphere); });
+  queueCommand([this, key](std::stringstream& json) {
+    encodeCreateSphere(json, mSpheres[key]);
+  });
 
   return *this;
 }
 
 /// This creates a line in the web GUI under a specified key
 GUIWebsocketServer& GUIWebsocketServer::createLine(
-    const std::string& key,
+    std::string key,
     const std::vector<Eigen::Vector3d>& points,
     const Eigen::Vector3d& color)
 {
-  Line line;
+  Line& line = mLines[key];
   line.key = key;
   line.points = points;
   line.color = color;
 
-  mLines[key] = line;
-
-  queueCommand([&](std::stringstream& json) { encodeCreateLine(json, line); });
+  queueCommand([this, key](std::stringstream& json) {
+    encodeCreateLine(json, mLines[key]);
+  });
 
   return *this;
 }
@@ -630,34 +674,38 @@ GUIWebsocketServer& GUIWebsocketServer::createLine(
 /// This creates a mesh in the web GUI under a specified key, using raw shape
 /// data
 GUIWebsocketServer& GUIWebsocketServer::createMesh(
-    const std::string& key,
+    std::string key,
     const std::vector<Eigen::Vector3d>& vertices,
     const std::vector<Eigen::Vector3d>& vertexNormals,
     const std::vector<Eigen::Vector3i>& faces,
     const std::vector<Eigen::Vector2d>& uv,
-    const std::vector<std::pair<std::string, int>>& textureStarts,
+    const std::vector<std::string>& textures,
+    const std::vector<int>& textureStartIndices,
     const Eigen::Vector3d& pos,
     const Eigen::Vector3d& euler,
+    const Eigen::Vector3d& scale,
     const Eigen::Vector3d& color,
     bool castShadows,
     bool receiveShadows)
 {
-  Mesh mesh;
+  Mesh& mesh = mMeshes[key];
   mesh.key = key;
   mesh.vertices = vertices;
   mesh.vertexNormals = vertexNormals;
   mesh.faces = faces;
   mesh.uv = uv;
-  mesh.textureStarts = textureStarts;
+  mesh.textures = textures;
+  mesh.textureStartIndices = textureStartIndices;
   mesh.pos = pos;
   mesh.euler = euler;
+  mesh.scale = scale;
   mesh.color = color;
   mesh.castShadows = castShadows;
   mesh.receiveShadows = receiveShadows;
 
-  mMeshes[key] = mesh;
-
-  queueCommand([&](std::stringstream& json) { encodeCreateMesh(json, mesh); });
+  queueCommand([this, key](std::stringstream& json) {
+    encodeCreateMesh(json, mMeshes[key]);
+  });
 
   return *this;
 }
@@ -670,6 +718,7 @@ GUIWebsocketServer& GUIWebsocketServer::createMeshASSIMP(
     const std::string& meshPath,
     const Eigen::Vector3d& pos,
     const Eigen::Vector3d& euler,
+    const Eigen::Vector3d& scale,
     const Eigen::Vector3d& color,
     bool castShadows,
     bool receiveShadows)
@@ -678,23 +727,30 @@ GUIWebsocketServer& GUIWebsocketServer::createMeshASSIMP(
   std::vector<Eigen::Vector3d> vertexNormals;
   std::vector<Eigen::Vector3i> faces;
   std::vector<Eigen::Vector2d> uv;
-  std::vector<std::pair<std::string, int>> textureStarts;
+  std::vector<std::string> textures;
+  std::vector<int> textureStartIndices;
 
   std::string currentTexturePath = "";
 
   for (int i = 0; i < mesh->mNumMeshes; i++)
   {
     aiMesh* m = mesh->mMeshes[i];
-    aiMaterial* mtl = mesh->mMaterials[m->mMaterialIndex];
+    aiMaterial* mtl = nullptr;
+    if (mesh->mMaterials != nullptr)
+    {
+      mtl = mesh->mMaterials[m->mMaterialIndex];
+    }
     aiString path;
-    if (aiReturn_SUCCESS
-        == aiGetMaterialTexture(mtl, aiTextureType_DIFFUSE, 0, &path))
+    if (mtl != nullptr
+        && aiReturn_SUCCESS
+               == aiGetMaterialTexture(mtl, aiTextureType_DIFFUSE, 0, &path))
     {
       std::string newTexturePath = std::string(path.C_Str());
       if (newTexturePath != currentTexturePath)
       {
         currentTexturePath = newTexturePath;
-        textureStarts.emplace_back(newTexturePath, vertices.size());
+        textures.push_back(newTexturePath);
+        textureStartIndices.push_back(vertices.size());
         if (mTextures.find(newTexturePath) == mTextures.end())
         {
           boost::filesystem::path fullPath = boost::filesystem::canonical(
@@ -742,9 +798,11 @@ GUIWebsocketServer& GUIWebsocketServer::createMeshASSIMP(
       vertexNormals,
       faces,
       uv,
-      textureStarts,
+      textures,
+      textureStartIndices,
       pos,
       euler,
+      scale,
       color,
       castShadows,
       receiveShadows);
@@ -930,6 +988,82 @@ GUIWebsocketServer& GUIWebsocketServer::deleteObject(const std::string& key)
   queueCommand([&](std::stringstream& json) {
     json << "{ \"type\": \"delete_object\", \"key\": \"" << key << "\" }";
   });
+
+  return *this;
+}
+
+/// This deletes all the objects that match a given prefix
+GUIWebsocketServer& GUIWebsocketServer::deleteObjectsByPrefix(
+    const std::string& prefix)
+{
+  bool oldAutoflush = mAutoflush;
+  mAutoflush = false;
+
+  std::vector<std::string> toDelete;
+  for (auto& pair : mBoxes)
+  {
+    if (prefix.size() <= pair.first.size())
+    {
+      auto res
+          = std::mismatch(prefix.begin(), prefix.end(), pair.first.begin());
+      if (res.first == prefix.end())
+      {
+        // We've got a match!
+        toDelete.push_back(pair.first);
+      }
+    }
+  }
+
+  for (auto& pair : mSpheres)
+  {
+    if (prefix.size() <= pair.first.size())
+    {
+      auto res
+          = std::mismatch(prefix.begin(), prefix.end(), pair.first.begin());
+      if (res.first == prefix.end())
+      {
+        // We've got a match!
+        toDelete.push_back(pair.first);
+      }
+    }
+  }
+
+  for (auto& pair : mLines)
+  {
+    if (prefix.size() <= pair.first.size())
+    {
+      auto res
+          = std::mismatch(prefix.begin(), prefix.end(), pair.first.begin());
+      if (res.first == prefix.end())
+      {
+        // We've got a match!
+        toDelete.push_back(pair.first);
+      }
+    }
+  }
+
+  for (auto& pair : mMeshes)
+  {
+    if (prefix.size() <= pair.first.size())
+    {
+      auto res
+          = std::mismatch(prefix.begin(), prefix.end(), pair.first.begin());
+      if (res.first == prefix.end())
+      {
+        // We've got a match!
+        toDelete.push_back(pair.first);
+      }
+    }
+  }
+
+  for (std::string key : toDelete)
+  {
+    deleteObject(key);
+  }
+
+  mAutoflush = oldAutoflush;
+  if (mAutoflush)
+    flush();
 
   return *this;
 }
@@ -1292,8 +1426,7 @@ GUIWebsocketServer& GUIWebsocketServer::deleteUIElement(const std::string& key)
 void GUIWebsocketServer::queueCommand(
     std::function<void(std::stringstream&)> writeCommand)
 {
-  const std::lock_guard<std::mutex>* lock
-      = new std::lock_guard<std::mutex>(mJsonMutex);
+  const std::lock_guard<std::recursive_mutex> lock(mJsonMutex);
 
   if (mMessagesQueued > 0)
   {
@@ -1304,13 +1437,9 @@ void GUIWebsocketServer::queueCommand(
 
   if (mAutoflush)
   {
-    // Release the lock before flushing, because that will grab the lock
-    delete lock;
+    // Our lock is re-entrant, so it'll be allowed to be acquired again during
+    // flushing
     flush();
-  }
-  else
-  {
-    delete lock;
   }
 }
 
@@ -1408,14 +1537,14 @@ void GUIWebsocketServer::encodeCreateMesh(std::stringstream& json, Mesh& mesh)
   }
   json << "], \"texture_starts\": [";
   firstPoint = true;
-  for (std::pair<std::string, int> pair : mesh.textureStarts)
+  for (int i = 0; i < mesh.textures.size(); i++)
   {
     if (firstPoint)
       firstPoint = false;
     else
       json << ", ";
-    json << "{ \"key\": \"" << pair.first << "\", \"start\": " << pair.second
-         << "}";
+    json << "{ \"key\": \"" << mesh.textures[i]
+         << "\", \"start\": " << mesh.textureStartIndices[i] << "}";
   }
   json << "], \"color\": ";
   vec3ToJson(json, mesh.color);
@@ -1423,6 +1552,8 @@ void GUIWebsocketServer::encodeCreateMesh(std::stringstream& json, Mesh& mesh)
   vec3ToJson(json, mesh.pos);
   json << ", \"euler\": ";
   vec3ToJson(json, mesh.euler);
+  json << ", \"scale\": ";
+  vec3ToJson(json, mesh.scale);
   json << ", \"cast_shadows\": " << (mesh.castShadows ? "true" : "false");
   json << ", \"receive_shadows\": " << (mesh.receiveShadows ? "true" : "false");
   json << "}";

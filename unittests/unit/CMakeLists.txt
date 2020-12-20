@@ -58,6 +58,10 @@ if(TARGET dart-utils-urdf)
   dart_add_test("unit" test_DartLoader)
   target_link_libraries(test_DartLoader dart-utils-urdf)
 
+  dart_add_test("unit" test_DARTCollide)
+  target_link_libraries(test_DARTCollide dart-utils)
+  target_link_libraries(test_DARTCollide dart-utils-urdf)
+
   dart_add_library(SharedLibraryWamIkFast SharedLibraryWamIkFast.hpp SharedLibraryWamIkFast.cpp)
   target_link_libraries(SharedLibraryWamIkFast PUBLIC dart)
   target_compile_definitions(SharedLibraryWamIkFast PUBLIC IKFAST_NO_MAIN IKFAST_CLIBRARY)
