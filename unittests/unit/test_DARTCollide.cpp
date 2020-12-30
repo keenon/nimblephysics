@@ -1417,7 +1417,7 @@ TEST(DARTCollide, MESH_MESH_FACE_FACE_OFFSET_COLLISION)
 }
 #endif
 
-// #ifdef ALL_TESTS
+#ifdef ALL_TESTS
 TEST(DARTCollide, WEIRD_GRAVITY)
 {
   // Create a world
@@ -1441,9 +1441,9 @@ TEST(DARTCollide, WEIRD_GRAVITY)
   std::cout << "Vel: " << vel << std::endl;
   std::cout << "Gravity: " << transformedGravity << std::endl;
 }
-// #endif
+#endif
 
-#ifdef ALL_TESTS
+// #ifdef ALL_TESTS
 TEST(DARTCollide, ATLAS_5)
 {
   // Create a world
@@ -1497,8 +1497,9 @@ TEST(DARTCollide, ATLAS_5)
   groundPair.first->setTransformFromParentBodyNode(groundTransform);
 
   world->addSkeleton(ground);
-  // world->addSkeleton(atlas);
-  world->addSkeleton(box);
+  world->addSkeleton(atlas);
+  // world->setPenetrationCorrectionEnabled(true);
+  // world->addSkeleton(box);
   // world->addSkeleton(groundBox);
 
   box->setPosition(0, 3.141 * 0.4);
@@ -1545,20 +1546,5 @@ TEST(DARTCollide, ATLAS_5)
   while (server.isServing())
   {
   }
-
-  const CollisionResult& result = world->getLastCollisionResult();
-  std::cout << "got collisions: " << result.getNumContacts() << std::endl;
-  Eigen::Vector3d expectedNormal = -Eigen::Vector3d::UnitZ();
-  for (int i = 0; i < result.getNumContacts(); i++)
-  {
-    const Contact& contact = result.getContact(i);
-    if (!equals(expectedNormal, contact.normal, 1e-8))
-    {
-      std::cout << "Normal[" << i
-                << "] is wrong! Should be -Z, got: " << std::endl
-                << contact.normal << std::endl;
-    }
-    EXPECT_TRUE(equals(expectedNormal, contact.normal, 1e-8));
-  }
 }
-#endif
+// #endif

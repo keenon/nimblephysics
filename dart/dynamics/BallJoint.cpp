@@ -139,6 +139,66 @@ void BallJoint::integratePositions(double _dt)
 }
 
 //==============================================================================
+Eigen::VectorXd BallJoint::integratePositionsExplicit(Eigen::VectorXd pos, Eigen::VectorXd vel, double dt) {
+  Eigen::Matrix3d Rnext
+      = convertToRotation(pos) * convertToRotation(vel * dt);
+
+  return convertToPositions(Rnext);
+}
+
+//==============================================================================
+Eigen::MatrixXd BallJoint::getPosPosJacobian(Eigen::VectorXd pos, Eigen::VectorXd vel, double _dt) {
+  // TODO
+  return finiteDifferencePosPosJacobian(pos, vel, _dt);
+}
+
+//==============================================================================
+Eigen::MatrixXd BallJoint::getVelPosJacobian(Eigen::VectorXd pos, Eigen::VectorXd vel, double _dt) {
+  // TODO
+  return finiteDifferenceVelPosJacobian(pos, vel, _dt);
+}
+
+//==============================================================================
+/// Returns d/dpos of integratePositionsExplicit() by finite differencing
+Eigen::MatrixXd BallJoint::finiteDifferencePosPosJacobian(Eigen::VectorXd pos, Eigen::VectorXd vel, double dt)
+{
+  Eigen::MatrixXd jac = Eigen::MatrixXd::Zero(3, 3);
+  double EPS = 1e-6;
+  for (int i = 0; i < 3; i++) {
+    Eigen::VectorXd perturbed = pos;
+    perturbed(i) += EPS;
+    Eigen::VectorXd plus = integratePositionsExplicit(perturbed, vel, dt);
+
+    perturbed = pos;
+    perturbed(i) -= EPS;
+    Eigen::VectorXd minus = integratePositionsExplicit(perturbed, vel, dt);
+
+    jac.col(i) = (plus - minus) / (2 * EPS);
+  }
+  return jac;
+}
+
+//==============================================================================
+/// Returns d/dvel of integratePositionsExplicit() by finite differencing
+Eigen::MatrixXd BallJoint::finiteDifferenceVelPosJacobian(Eigen::VectorXd pos, Eigen::VectorXd vel, double dt)
+{
+  Eigen::MatrixXd jac = Eigen::MatrixXd::Zero(3, 3);
+  double EPS = 1e-7;
+  for (int i = 0; i < 3; i++) {
+    Eigen::VectorXd perturbed = vel;
+    perturbed(i) += EPS;
+    Eigen::VectorXd plus = integratePositionsExplicit(pos, perturbed, dt);
+
+    perturbed = vel;
+    perturbed(i) -= EPS;
+    Eigen::VectorXd minus = integratePositionsExplicit(pos, perturbed, dt);
+
+    jac.col(i) = (plus - minus) / (2 * EPS);
+  }
+  return jac;
+}
+
+//==============================================================================
 void BallJoint::updateDegreeOfFreedomNames()
 {
   if(!mDofs[0]->isNamePreserved())

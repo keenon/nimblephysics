@@ -199,7 +199,7 @@ public:
   //--------------------------------------------------------------------------
 
   /// Returns the sum of all the dofs of all the skeletons in this world
-  std::size_t getNumDofs();
+  std::size_t getNumDofs() const;
 
   /// Returns a vector of all the degrees of freedom of all the skeletons in the
   /// world concatenated
@@ -417,6 +417,20 @@ public:
   /// Get the unconstrained velocities that we found in the last timestep,
   /// before we solved the LCP for constraints
   const Eigen::VectorXd& getLastPreConstraintVelocity() const;
+
+  /// This gets the Jacobian relating how changing our current position will
+  /// change our next position after a step. Intuitively, you'd expect this to
+  /// just be an identity matrix, and often it is, but if we have any FreeJoints
+  /// or BallJoints things get more complicated, because they actually use a
+  /// complicated function to integrate to the next position.
+  Eigen::MatrixXd getPosPosJacobian() const;
+
+  /// This gets the Jacobian relating how changing our current velocity will
+  /// change our next position after a step. Intuitively, you'd expect this to
+  /// just be an identity matrix * dt, and often it is, but if we have any
+  /// FreeJoints or BallJoints things get more complicated, because they
+  /// actually use a complicated function to integrate to the next position.
+  Eigen::MatrixXd getVelPosJacobian() const;
 
   /// True by default. Sets whether or not to apply artifical "penetration
   /// correction" forces to objects that inter-penetrate.

@@ -48,6 +48,7 @@
 #include "dart/constraint/BoxedLcpConstraintSolver.hpp"
 #include "dart/constraint/ConstrainedGroup.hpp"
 #include "dart/dynamics/BoxShape.hpp"
+#include "dart/dynamics/DegreeOfFreedom.hpp"
 #include "dart/dynamics/Skeleton.hpp"
 #include "dart/neural/ConstrainedGroupGradientMatrices.hpp"
 #include "dart/neural/WithRespectToMass.hpp"
@@ -74,7 +75,9 @@ World::World(const std::string& _name)
     mDofs(0),
     mRecording(new Recording(mSkeletons)),
     onNameChanged(mNameChangedSignal),
-    mConstraintForceMixingEnabled(true),
+    mConstraintForceMixingEnabled(
+        false), // TODO(keenon): We should updated gradients to support this,
+                // and re-enable it by default
     mPenetrationCorrectionEnabled(false),
     mWrtMass(std::make_shared<neural::WithRespectToMass>())
 {
@@ -249,9 +252,16 @@ void World::step(bool _resetCommand)
   // using v_t, instead of v_t+1
   if (_parallelVelocityAndPositionUpdates)
   {
-    Eigen::VectorXd pos = getPositions();
-    pos += initialVelocity * mTimeStep;
-    setPositions(pos);
+    int cursor = 0;
+    for (auto& skel : mSkeletons)
+    {
+      int dofs = skel->getNumDofs();
+      skel->setPositions(skel->integratePositionsExplicit(
+          skel->getPositions(),
+          initialVelocity.segment(cursor, dofs),
+          mTimeStep));
+      cursor += dofs;
+    }
   }
   // </DiffDART>: Integrate positions before velocity changes, instead of after
 
@@ -596,6 +606,40 @@ std::string World::addSkeleton(const dynamics::SkeletonPtr& _skeleton)
     return "";
   }
 
+  // TODO(keenon): Add support for springs and damping coefficients
+  bool warnedSpringStiffness = false;
+  bool warnedDampingCoefficient = false;
+  for (auto* dof : _skeleton->getDofs())
+  {
+    if (dof->getSpringStiffness() != 0)
+    {
+      if (!warnedSpringStiffness)
+      {
+        warnedSpringStiffness = true;
+        dtwarn << "[World::addSkeleton] Attempting to add a Skeleton \""
+               << _skeleton->getName() << "\" to "
+               << "the world with non-zero spring stiffness! This version of "
+                  "DiffDART doesn't support spring stiffness. It will be "
+                  "automatically set to zero.\n";
+      }
+    }
+    dof->setSpringStiffness(0);
+    if (dof->getDampingCoefficient() != 0)
+    {
+      if (!warnedDampingCoefficient)
+      {
+        warnedDampingCoefficient = true;
+        dtwarn
+            << "[World::addSkeleton] Attempting to add a Skeleton \""
+            << _skeleton->getName() << "\" to "
+            << "the world with non-zero damping coefficient! This version of "
+               "DiffDART doesn't support damping coefficients. It will be "
+               "automatically set to zero.\n";
+      }
+    }
+    dof->setDampingCoefficient(0);
+  }
+
   // If mSkeletons already has _skeleton, then we do nothing.
   if (find(mSkeletons.begin(), mSkeletons.end(), _skeleton) != mSkeletons.end())
   {
@@ -824,7 +868,7 @@ std::set<dynamics::SimpleFramePtr> World::removeAllSimpleFrames()
 }
 
 //==============================================================================
-std::size_t World::getNumDofs()
+std::size_t World::getNumDofs() const
 {
   return mDofs;
 }
@@ -1324,6 +1368,44 @@ Recording* World::getRecording()
 const Eigen::VectorXd& World::getLastPreConstraintVelocity() const
 {
   return mLastPreConstraintVelocity;
+}
+
+/// This gets the Jacobian relating how changing our current position will
+/// change our next position after a step. Intuitively, you'd expect this to
+/// just be an identity matrix, and often it is, but if we have any FreeJoints
+/// or BallJoints things get more complicated, because they actually use a
+/// complicated function to integrate to the next position.
+Eigen::MatrixXd World::getPosPosJacobian() const
+{
+  Eigen::MatrixXd jac = Eigen::MatrixXd::Zero(mDofs, mDofs);
+  int cursor = 0;
+  for (auto& skel : mSkeletons)
+  {
+    int dofs = skel->getNumDofs();
+    jac.block(cursor, cursor, dofs, dofs) = skel->getPosPosJac(
+        skel->getPositions(), skel->getVelocities(), mTimeStep);
+    cursor += dofs;
+  }
+  return jac;
+}
+
+/// This gets the Jacobian relating how changing our current velocity will
+/// change our next position after a step. Intuitively, you'd expect this to
+/// just be an identity matrix * dt, and often it is, but if we have any
+/// FreeJoints or BallJoints things get more complicated, because they
+/// actually use a complicated function to integrate to the next position.
+Eigen::MatrixXd World::getVelPosJacobian() const
+{
+  Eigen::MatrixXd jac = Eigen::MatrixXd::Zero(mDofs, mDofs);
+  int cursor = 0;
+  for (auto& skel : mSkeletons)
+  {
+    int dofs = skel->getNumDofs();
+    jac.block(cursor, cursor, dofs, dofs) = skel->getVelPosJac(
+        skel->getPositions(), skel->getVelocities(), mTimeStep);
+    cursor += dofs;
+  }
+  return jac;
 }
 
 //==============================================================================

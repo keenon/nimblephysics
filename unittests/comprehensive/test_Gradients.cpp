@@ -49,6 +49,9 @@
 #include "dart/neural/RestorableSnapshot.hpp"
 #include "dart/neural/WithRespectToMass.hpp"
 #include "dart/simulation/World.hpp"
+#include "dart/utils/DartResourceRetriever.hpp"
+#include "dart/utils/sdf/sdf.hpp"
+#include "dart/utils/urdf/urdf.hpp"
 
 #include "GradientTestUtils.hpp"
 #include "TestHelpers.hpp"
@@ -281,12 +284,12 @@ void testBlockWithFrictionCoeff(double frictionCoeff, double mass)
   EXPECT_TRUE(verifyWrtMass(world));
 }
 
+#ifdef ALL_TESTS
 TEST(GRADIENTS, BLOCK_ON_GROUND_NO_FRICTION_1_MASS)
 {
   testBlockWithFrictionCoeff(0, 1);
 }
 
-#ifdef ALL_TESTS
 TEST(GRADIENTS, BLOCK_ON_GROUND_NO_FRICTION_2_MASS)
 {
   testBlockWithFrictionCoeff(0, 2);
@@ -745,7 +748,7 @@ void testBouncingBlockPosGradients(double frictionCoeff, double mass)
   BodyNode* floorBody = floorPair.second;
 
   Eigen::Isometry3d floorPosition = Eigen::Isometry3d::Identity();
-  floorPosition.translation() = Eigen::Vector3d(0, -1.0, 0);
+  floorPosition.translation() = Eigen::Vector3d(0, -(1.0 - 1e-5), 0);
   floorJoint->setTransformFromParentBodyNode(floorPosition);
   floorJoint->setTransformFromChildBodyNode(Eigen::Isometry3d::Identity());
 
@@ -761,8 +764,25 @@ void testBouncingBlockPosGradients(double frictionCoeff, double mass)
   // Run the tests
   ///////////////////////////////////////////////
 
-  EXPECT_TRUE(verifyPosGradients(world, 300, 5e-3));
-  EXPECT_TRUE(verifyAnalyticalBackprop(world));
+  // The analytical Jacobian needs us to be in actual contact
+  floorPosition.translation() = Eigen::Vector3d(0, -(1.0 - 1e-5), 0);
+  neural::BackpropSnapshotPtr analyticalPtr = neural::forwardPass(world, true);
+  MatrixXd analytical = analyticalPtr->getPosPosJacobian(world);
+
+  // The FD Jacobian needs us to be just out of contact range, so the bounce can
+  // occur on some step in computation
+  floorPosition.translation() = Eigen::Vector3d(0, -(1.0 + 1e-8), 0);
+  neural::BackpropSnapshotPtr fdPtr = neural::forwardPass(world, true);
+  MatrixXd bruteForce = fdPtr->finiteDifferencePosPosJacobian(world, 100);
+
+  if (!equals(analytical, bruteForce, 5e-3))
+  {
+    std::cout << "Brute force pos-pos Jacobian: " << std::endl
+              << bruteForce << std::endl;
+    std::cout << "Analytical pos-pos Jacobian: " << std::endl
+              << analytical << std::endl;
+    EXPECT_TRUE(false);
+  }
 }
 
 #ifdef ALL_TESTS
@@ -1327,3 +1347,57 @@ TEST(GRADIENTS, JUMP_WORM_INTER_PENETRATE)
   testJumpWorm(false, true);
 }
 */
+
+void testAtlas(bool withGroundContact)
+{
+  // Create a world
+  std::shared_ptr<simulation::World> world = simulation::World::create();
+
+  // Set gravity of the world
+  world->setConstraintForceMixingEnabled(true);
+  world->setGravity(Eigen::Vector3d(0.0, -9.81, 0));
+
+  // Load ground and Atlas robot and add them to the world
+  dart::utils::DartLoader urdfLoader;
+
+  std::shared_ptr<dynamics::Skeleton> atlas
+      = dart::utils::SdfParser::readSkeleton(
+          "dart://sample/sdf/atlas/atlas_v3_no_head.sdf");
+  world->addSkeleton(atlas);
+
+  if (withGroundContact)
+  {
+    std::shared_ptr<dynamics::Skeleton> ground
+        = urdfLoader.parseSkeleton("dart://sample/sdf/atlas/ground.urdf");
+    world->addSkeleton(ground);
+  }
+
+  // Set initial configuration for Atlas robot
+  atlas->setPosition(0, -0.5 * dart::math::constantsd::pi());
+  Eigen::VectorXd originalPos = atlas->getPositions();
+  Eigen::VectorXd worldVel = world->getVelocities();
+
+  atlas->setVelocities(Eigen::VectorXd::Zero(atlas->getNumDofs()));
+
+  // EXPECT_TRUE(verifyPosGradients(world, 1, 1e-8));
+  EXPECT_TRUE(verifyVelGradients(world, worldVel));
+  // EXPECT_TRUE(verifyAnalyticalJacobians(world));
+  // EXPECT_TRUE(verifyAnalyticalBackprop(world));
+  // EXPECT_TRUE(verifyWrtMass(world));
+}
+
+#ifdef ALL_TESTS
+TEST(GRADIENTS, ATLAS_FLOATING)
+{
+  testAtlas(false);
+}
+#endif
+
+// #ifdef ALL_TESTS
+/*
+TEST(GRADIENTS, ATLAS_GROUND)
+{
+  testAtlas(true);
+}
+*/
+// #endif

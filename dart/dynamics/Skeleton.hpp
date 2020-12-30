@@ -691,6 +691,16 @@ public:
   // Documentation inherited
   void integratePositions(double _dt);
 
+  // This will do whatever math is necessary to move pos by vel*dt. This isn't always a straight linear
+  // addition, in we're using spatial coordinates for some of the joints.
+  Eigen::VectorXd integratePositionsExplicit(Eigen::VectorXd pos, Eigen::VectorXd vel, double dt);
+
+  // This is d/dpos integratePositionsExplicit()
+  Eigen::MatrixXd getPosPosJac(Eigen::VectorXd pos, Eigen::VectorXd vel, double dt);
+
+  // This is d/dvel integratePositionsExplicit()
+  Eigen::MatrixXd getVelPosJac(Eigen::VectorXd pos, Eigen::VectorXd vel, double dt);
+
   // Documentation inherited
   void integrateVelocities(double _dt);
 

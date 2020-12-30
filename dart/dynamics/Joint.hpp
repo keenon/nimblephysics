@@ -549,6 +549,15 @@ public:
   virtual Eigen::VectorXd getPositionDifferences(
       const Eigen::VectorXd& _q2, const Eigen::VectorXd& _q1) const = 0;
 
+  /// Returns the value of integrating a position, where it's possible to pass in an arbitrory position and velocity
+  virtual Eigen::VectorXd integratePositionsExplicit(Eigen::VectorXd pos, Eigen::VectorXd vel, double dt) = 0;
+
+  /// Returns d/dpos of integratePositionsExplicit()
+  virtual Eigen::MatrixXd getPosPosJacobian(Eigen::VectorXd pos, Eigen::VectorXd vel, double _dt) = 0;
+
+  /// Returns d/dvel of integratePositionsExplicit()
+  virtual Eigen::MatrixXd getVelPosJacobian(Eigen::VectorXd pos, Eigen::VectorXd vel, double _dt) = 0;
+
   /// \}
 
   //----------------------------------------------------------------------------

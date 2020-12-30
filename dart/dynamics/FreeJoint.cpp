@@ -593,6 +593,66 @@ void FreeJoint::integratePositions(double _dt)
 }
 
 //==============================================================================
+Eigen::VectorXd FreeJoint::integratePositionsExplicit(Eigen::VectorXd pos, Eigen::VectorXd vel, double dt) {
+  const Eigen::Isometry3d mQ = FreeJoint::convertToTransform(pos);
+  const Eigen::Isometry3d Qnext = mQ * FreeJoint::convertToTransform(vel * dt);
+
+  return FreeJoint::convertToPositions(Qnext);
+}
+
+//==============================================================================
+Eigen::MatrixXd FreeJoint::getPosPosJacobian(Eigen::VectorXd pos, Eigen::VectorXd vel, double _dt) {
+  // TODO
+  return finiteDifferencePosPosJacobian(pos, vel, _dt);
+}
+
+//==============================================================================
+Eigen::MatrixXd FreeJoint::getVelPosJacobian(Eigen::VectorXd pos, Eigen::VectorXd vel, double _dt) {
+  // TODO
+  return finiteDifferenceVelPosJacobian(pos, vel, _dt);
+}
+
+//==============================================================================
+/// Returns d/dpos of integratePositionsExplicit() by finite differencing
+Eigen::MatrixXd FreeJoint::finiteDifferencePosPosJacobian(Eigen::VectorXd pos, Eigen::VectorXd vel, double dt)
+{
+  Eigen::MatrixXd jac = Eigen::MatrixXd::Zero(6, 6);
+  double EPS = 1e-6;
+  for (int i = 0; i < 6; i++) {
+    Eigen::VectorXd perturbed = pos;
+    perturbed(i) += EPS;
+    Eigen::VectorXd plus = integratePositionsExplicit(perturbed, vel, dt);
+
+    perturbed = pos;
+    perturbed(i) -= EPS;
+    Eigen::VectorXd minus = integratePositionsExplicit(perturbed, vel, dt);
+
+    jac.col(i) = (plus - minus) / (2 * EPS);
+  }
+  return jac;
+}
+
+//==============================================================================
+/// Returns d/dvel of integratePositionsExplicit() by finite differencing
+Eigen::MatrixXd FreeJoint::finiteDifferenceVelPosJacobian(Eigen::VectorXd pos, Eigen::VectorXd vel, double dt)
+{
+  Eigen::MatrixXd jac = Eigen::MatrixXd::Zero(6, 6);
+  double EPS = 1e-7;
+  for (int i = 0; i < 6; i++) {
+    Eigen::VectorXd perturbed = vel;
+    perturbed(i) += EPS;
+    Eigen::VectorXd plus = integratePositionsExplicit(pos, perturbed, dt);
+
+    perturbed = vel;
+    perturbed(i) -= EPS;
+    Eigen::VectorXd minus = integratePositionsExplicit(pos, perturbed, dt);
+
+    jac.col(i) = (plus - minus) / (2 * EPS);
+  }
+  return jac;
+}
+
+//==============================================================================
 void FreeJoint::updateDegreeOfFreedomNames()
 {
   if(!mDofs[0]->isNamePreserved())
@@ -614,6 +674,8 @@ void FreeJoint::updateRelativeTransform() const
 {
   mQ = convertToTransform(getPositionsStatic());
 
+  // T_pj * mQ * T_cj^{-1}
+
   mT = Joint::mAspectProperties.mT_ParentBodyToJoint * mQ
       * Joint::mAspectProperties.mT_ChildBodyToJoint.inverse();
 
@@ -623,6 +685,9 @@ void FreeJoint::updateRelativeTransform() const
 //==============================================================================
 void FreeJoint::updateRelativeJacobian(bool _mandatory) const
 {
+
+  // Ad[T_cj]
+
   if (_mandatory)
     mJacobian = math::getAdTMatrix(Joint::mAspectProperties.mT_ChildBodyToJoint);
 }

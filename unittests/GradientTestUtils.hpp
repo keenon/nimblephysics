@@ -355,6 +355,8 @@ bool verifyClassicProjectionIntoClampsMatrix(
 
   VectorXi mappings = classicPtr->getContactConstraintMappings();
   VectorXd analyticalError = VectorXd(analyticalConstraintForces.size());
+  VectorXd mappedAnalyticalConstraintForces
+      = Eigen::VectorXd::Zero(contactConstraintForces.size());
   std::size_t pointer = 0;
   for (std::size_t i = 0; i < mappings.size(); i++)
   {
@@ -362,6 +364,8 @@ bool verifyClassicProjectionIntoClampsMatrix(
     {
       analyticalError(pointer) = contactConstraintForces(i)
                                  - analyticalConstraintForcesCorrected(pointer);
+      mappedAnalyticalConstraintForces(i)
+          = analyticalConstraintForcesCorrected(pointer);
       pointer++;
     }
   }
@@ -372,10 +376,13 @@ bool verifyClassicProjectionIntoClampsMatrix(
   double constraintForces = contactConstraintForces.norm();
   if (!equals(analyticalError, zero, 1e-8))
   {
+    std::cout << "Error in verifyClassicProjectionIntoClampsMatrix(): "
+              << std::endl;
     std::cout << "Proposed velocities: " << std::endl
               << proposedVelocities << std::endl;
     std::cout << "Integrated velocities: " << std::endl
               << integratedVelocities << std::endl;
+    /*
     std::cout << "P_c: " << std::endl << P_c << std::endl;
     std::cout << "bounce: " << std::endl
               << classicPtr->getBounceDiagonals() << std::endl;
@@ -384,8 +391,8 @@ bool verifyClassicProjectionIntoClampsMatrix(
     {
       std::cout << mappings(i) << std::endl;
     }
-    std::cout << "Constraint forces: " << std::endl
-              << contactConstraintForces << std::endl;
+    */
+    /*
     std::cout << "-(P_c * proposedVelocities) (should be the roughly same as "
                  "actual constraint forces): "
               << std::endl
@@ -396,10 +403,36 @@ bool verifyClassicProjectionIntoClampsMatrix(
                  "account for any errors in above): "
               << std::endl
               << penetrationOffset << std::endl;
-    std::cout << "Corrected analytical constraint forces (should be the same "
-                 "as actual constraint forces): "
-              << std::endl
-              << analyticalConstraintForcesCorrected << std::endl;
+    */
+
+    // Show the constraint forces at each of the contact points
+
+    Eigen::MatrixXd comparison
+        = Eigen::MatrixXd::Zero(contactConstraintForces.size(), 2);
+    comparison.col(0) = contactConstraintForces;
+    comparison.col(1) = mappedAnalyticalConstraintForces;
+    std::cout
+        << "Real clamping constraint forces - Analytical constraint forces: "
+        << std::endl
+        << comparison << std::endl;
+
+    // Show the joint forces
+
+    // classicPtr->getClampingAMatrix();
+
+    // Show the resulting joint accelerations
+
+    Eigen::VectorXd realAccel
+        = world->getInvMassMatrix() * contactConstraintForces;
+    Eigen::VectorXd analyticalAccel
+        = world->getInvMassMatrix() * mappedAnalyticalConstraintForces;
+    Eigen::MatrixXd accelComparison
+        = Eigen::MatrixXd::Zero(realAccel.size(), 2);
+    accelComparison.col(0) = realAccel;
+    accelComparison.col(1) = analyticalAccel;
+    std::cout << "Real accel - Analytical accel: " << std::endl
+              << accelComparison << std::endl;
+
     std::cout << "Analytical error (should be zero):" << std::endl
               << analyticalError << std::endl;
     return false;

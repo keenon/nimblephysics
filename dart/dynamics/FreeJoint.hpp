@@ -318,6 +318,21 @@ protected:
   void integratePositions(double _dt) override;
 
   // Documentation inherited
+  Eigen::VectorXd integratePositionsExplicit(Eigen::VectorXd pos, Eigen::VectorXd vel, double dt) override;
+
+  /// Returns d/dpos of integratePositionsExplicit()
+  Eigen::MatrixXd getPosPosJacobian(Eigen::VectorXd pos, Eigen::VectorXd vel, double _dt) override;
+
+  /// Returns d/dvel of integratePositionsExplicit()
+  Eigen::MatrixXd getVelPosJacobian(Eigen::VectorXd pos, Eigen::VectorXd vel, double _dt) override;
+
+  /// Returns d/dpos of integratePositionsExplicit() by finite differencing
+  Eigen::MatrixXd finiteDifferencePosPosJacobian(Eigen::VectorXd pos, Eigen::VectorXd vel, double _dt);
+
+  /// Returns d/dvel of integratePositionsExplicit() by finite differencing
+  Eigen::MatrixXd finiteDifferenceVelPosJacobian(Eigen::VectorXd pos, Eigen::VectorXd vel, double _dt);
+
+  // Documentation inherited
   void updateDegreeOfFreedomNames() override;
 
   // Documentation inherited

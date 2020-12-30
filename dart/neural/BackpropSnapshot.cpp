@@ -3,6 +3,7 @@
 #include <iostream>
 
 #include "dart/constraint/ConstraintSolver.hpp"
+#include "dart/dynamics/DegreeOfFreedom.hpp"
 #include "dart/dynamics/Skeleton.hpp"
 #include "dart/neural/ConstrainedGroupGradientMatrices.hpp"
 #include "dart/neural/DifferentiableContactConstraint.hpp"
@@ -92,8 +93,9 @@ BackpropSnapshot::BackpropSnapshot(
   snapshot.restore();
 
   mCachedPosPosDirty = true;
-  mCachedPosVelDirty = true;
   mCachedVelPosDirty = true;
+  mCachedBounceApproximationDirty = true;
+  mCachedPosVelDirty = true;
   mCachedVelVelDirty = true;
   mCachedForcePosDirty = true;
   mCachedForceVelDirty = true;
@@ -1181,31 +1183,29 @@ Eigen::MatrixXd BackpropSnapshot::getPosJacobianWrt(
 }
 
 //==============================================================================
-const Eigen::MatrixXd& BackpropSnapshot::getPosPosJacobian(
-    WorldPtr world, PerformanceLog* perfLog)
+const Eigen::MatrixXd& BackpropSnapshot::getBounceApproximationJacobian(
+    simulation::WorldPtr world, PerformanceLog* perfLog)
 {
   PerformanceLog* thisLog = nullptr;
 #ifdef LOG_PERFORMANCE_BACKPROP_SNAPSHOT
   if (perfLog != nullptr)
   {
-    thisLog = perfLog->startRun("BackpropSnapshot.getPosPosJacobian");
+    thisLog
+        = perfLog->startRun("BackpropSnapshot.getBounceApproximationJacobian");
   }
 #endif
 
-  if (mCachedPosPosDirty)
+  if (mCachedBounceApproximationDirty)
   {
     PerformanceLog* refreshLog = nullptr;
 #ifdef LOG_PERFORMANCE_BACKPROP_SNAPSHOT
     if (thisLog != nullptr)
     {
       refreshLog = thisLog->startRun(
-          "BackpropSnapshot.getPosPosJacobian#refreshCache");
+          "BackpropSnapshot.getBounceApproximationJacobian#refreshCache");
     }
 #endif
 
-#ifdef USE_FD_OVERRIDE
-    mCachedPosPos = finiteDifferencePosPosJacobian(world, 1);
-#else
     RestorableSnapshot snapshot(world);
     world->setPositions(mPreStepPosition);
     world->setVelocities(mPreStepVelocity);
@@ -1216,7 +1216,8 @@ const Eigen::MatrixXd& BackpropSnapshot::getPosPosJacobian(
     // If there are no bounces, pos-pos is a simple identity
     if (A_b.size() == 0)
     {
-      mCachedPosPos = Eigen::MatrixXd::Identity(mNumDOFs, mNumDOFs);
+      mCachedBounceApproximation
+          = Eigen::MatrixXd::Identity(mNumDOFs, mNumDOFs);
     }
     else
     {
@@ -1253,8 +1254,62 @@ const Eigen::MatrixXd& BackpropSnapshot::getPosPosJacobian(
         X.col(i) = q.segment(i * mNumDOFs, mNumDOFs);
       }
 
-      mCachedPosPos = X;
+      mCachedBounceApproximation = X;
     }
+    snapshot.restore();
+
+    mCachedBounceApproximationDirty = false;
+#ifdef LOG_PERFORMANCE_BACKPROP_SNAPSHOT
+    if (refreshLog != nullptr)
+    {
+      refreshLog->end();
+    }
+#endif
+  }
+
+#ifdef LOG_PERFORMANCE_BACKPROP_SNAPSHOT
+  if (thisLog != nullptr)
+  {
+    thisLog->end();
+  }
+#endif
+  return mCachedBounceApproximation;
+}
+
+//==============================================================================
+const Eigen::MatrixXd& BackpropSnapshot::getPosPosJacobian(
+    WorldPtr world, PerformanceLog* perfLog)
+{
+  PerformanceLog* thisLog = nullptr;
+#ifdef LOG_PERFORMANCE_BACKPROP_SNAPSHOT
+  if (perfLog != nullptr)
+  {
+    thisLog = perfLog->startRun("BackpropSnapshot.getPosPosJacobian");
+  }
+#endif
+
+  if (mCachedPosPosDirty)
+  {
+    PerformanceLog* refreshLog = nullptr;
+#ifdef LOG_PERFORMANCE_BACKPROP_SNAPSHOT
+    if (thisLog != nullptr)
+    {
+      refreshLog = thisLog->startRun(
+          "BackpropSnapshot.getPosPosJacobian#refreshCache");
+    }
+#endif
+
+#ifdef USE_FD_OVERRIDE
+    mCachedPosPos = finiteDifferencePosPosJacobian(world, 1);
+#else
+    RestorableSnapshot snapshot(world);
+    world->setPositions(mPreStepPosition);
+    world->setVelocities(mPreStepVelocity);
+    world->setExternalForces(mPreStepTorques);
+
+    mCachedPosPos = world->getPosPosJacobian()
+                    * getBounceApproximationJacobian(world, thisLog);
+
     snapshot.restore();
 #endif
 
@@ -1309,8 +1364,8 @@ const Eigen::MatrixXd& BackpropSnapshot::getVelPosJacobian(
 #ifdef USE_FD_OVERRIDE
     mCachedVelPos = finiteDifferenceVelPosJacobian(world, 1);
 #else
-    const Eigen::MatrixXd& posPos = getPosPosJacobian(world);
-    mCachedVelPos = mTimeStep * posPos;
+    mCachedVelPos = world->getVelPosJacobian()
+                    * getBounceApproximationJacobian(world, thisLog);
 #endif
 
 #ifdef SLOW_FD_CHECK_EVERYTHING
@@ -1759,6 +1814,33 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceVelVelJacobian(WorldPtr world)
     Eigen::VectorXd velNeg = world->getVelocities();
 
     Eigen::VectorXd velChange = (velPos - velNeg) / (2 * EPSILON);
+
+    // TODO: remove me
+    /*
+#ifndef NDEBUG
+    Eigen::VectorXd identityCol = Eigen::VectorXd::Zero(velChange.size());
+    identityCol(i) = 1.0;
+    // Sanity check
+    if ((velChange - identityCol).squaredNorm() > 1e-10)
+    {
+      // Something is screwy here, let's investigate
+      dynamics::DegreeOfFreedom* dof = world->getDofs()[i];
+      std::cout << "Error on perturbing joint vel: " << dof->getName()
+                << std::endl;
+
+      snapshot.restore();
+      world->setPositions(mPreStepPosition);
+      world->setExternalForces(mPreStepTorques);
+      tweakedVel = Eigen::VectorXd(mPreStepVelocity);
+      tweakedVel(i) -= EPSILON;
+      world->setVelocities(tweakedVel);
+      // Opportunity to put a breakpoint here
+      world->step(false);
+    }
+#endif
+    */
+    // TODO: </remove>
+
     J.col(i).noalias() = velChange;
   }
 
@@ -1939,7 +2021,7 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferencePosPosJacobian(
 
   // IMPORTANT: EPSILON must be larger than the distance traveled in a single
   // subdivided timestep. Ideally much larger.
-  double EPSILON = 1e-2 / subdivisions;
+  double EPSILON = (subdivisions > 1) ? (1e-2 / subdivisions) : 1e-6;
   for (std::size_t i = 0; i < world->getNumDofs(); i++)
   {
     snapshot.restore();

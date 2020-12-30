@@ -1698,7 +1698,7 @@ Eigen::MatrixXd Skeleton::finiteDifferenceVelCJacobian()
   Eigen::VectorXd vel = getVelocities();
 
   // Get baseline C(pos, vel)
-  Eigen::VectorXd baseline = getCoriolisForces();
+  Eigen::VectorXd baseline = getCoriolisAndGravityForces();
 
   double EPS = 1e-6;
 
@@ -1707,12 +1707,85 @@ Eigen::MatrixXd Skeleton::finiteDifferenceVelCJacobian()
     Eigen::VectorXd tweakedVel = vel;
     tweakedVel(i) += EPS;
     setVelocities(tweakedVel);
-    Eigen::VectorXd perturbedPos = getCoriolisForces();
-
+    Eigen::VectorXd perturbedPos = getCoriolisAndGravityForces();
     tweakedVel = vel;
     tweakedVel(i) -= EPS;
     setVelocities(tweakedVel);
-    Eigen::VectorXd perturbedNeg = getCoriolisForces();
+    Eigen::VectorXd perturbedNeg = getCoriolisAndGravityForces();
+
+#ifndef NDEBUG
+    if (perturbedPos == perturbedNeg && perturbedPos != baseline) {
+      // std::cout << "Got a mysteriously broken coriolis force result" << std::endl;
+
+      // Set positive vel change
+
+      tweakedVel = vel;
+      tweakedVel(i) += EPS;
+      setVelocities(tweakedVel);
+
+      DataCache& cache = mTreeCache[0];
+      std::size_t dof = cache.mDofs.size();
+      Eigen::VectorXd mCg = Eigen::VectorXd::Zero(dof);
+      assert(static_cast<std::size_t>(mCg.size()) == dof);
+
+      mCg.setZero();
+
+      std::vector<Eigen::Vector6d> posVecs;
+
+      for (std::vector<BodyNode*>::const_iterator it = cache.mBodyNodes.begin();
+          it != cache.mBodyNodes.end();
+          ++it)
+      {
+        (*it)->updateCombinedVector();
+      }
+
+      for (std::vector<BodyNode*>::const_reverse_iterator it
+          = cache.mBodyNodes.rbegin();
+          it != cache.mBodyNodes.rend();
+          ++it)
+      {
+        Eigen::Vector6d V = (*it)->getSpatialVelocity();
+        const Eigen::Matrix6d& mI = (*it)->mAspectProperties.mInertia.getSpatialTensor();
+        posVecs.push_back(math::dad(V, mI * V));
+        (*it)->aggregateCombinedVector(mCg, mAspectProperties.mGravity);
+      }
+
+      // Set negative vel change
+
+      tweakedVel = vel;
+      tweakedVel(i) -= EPS;
+      setVelocities(tweakedVel);
+
+      Eigen::VectorXd mCg2 = Eigen::VectorXd::Zero(dof);
+      assert(static_cast<std::size_t>(mCg2.size()) == dof);
+
+      mCg2.setZero();
+
+      std::vector<Eigen::Vector6d> negVecs;
+
+      for (std::vector<BodyNode*>::const_iterator it = cache.mBodyNodes.begin();
+          it != cache.mBodyNodes.end();
+          ++it)
+      {
+        (*it)->updateCombinedVector();
+      }
+
+      for (std::vector<BodyNode*>::const_reverse_iterator it
+          = cache.mBodyNodes.rbegin();
+          it != cache.mBodyNodes.rend();
+          ++it)
+      {
+        Eigen::Vector6d V = (*it)->getSpatialVelocity();
+        const Eigen::Matrix6d& mI = (*it)->mAspectProperties.mInertia.getSpatialTensor();
+        negVecs.push_back(math::dad(V, mI * V));
+        (*it)->aggregateCombinedVector(mCg2, mAspectProperties.mGravity);
+      }
+
+      // TODO: negVecs and posVecs are the same, cause math::dad() is *=-1 idempotent in V
+      // std::cout << "mCg pos: " << std::endl << mCg << std::endl;
+      // std::cout << "mCg neg: " << std::endl << mCg2 << std::endl;
+    }
+#endif
 
     J.col(i) = (perturbedPos - perturbedNeg) / (2 * EPS);
   }
@@ -1990,6 +2063,54 @@ void Skeleton::integratePositions(double _dt)
     for (std::size_t j = 0; j < mSoftBodyNodes[i]->getNumPointMasses(); ++j)
       mSoftBodyNodes[i]->getPointMass(j)->integratePositions(_dt);
   }
+}
+
+//==============================================================================
+Eigen::VectorXd Skeleton::integratePositionsExplicit(Eigen::VectorXd pos, Eigen::VectorXd vel, double dt)
+{
+  Eigen::VectorXd nextPos = Eigen::VectorXd::Zero(pos.size());
+
+  int cursor = 0;
+  for (std::size_t i = 0; i < mSkelCache.mBodyNodes.size(); ++i) {
+    Joint* joint = mSkelCache.mBodyNodes[i]->getParentJoint();
+    int dofs = joint->getNumDofs();
+    nextPos.segment(cursor, dofs) = joint->integratePositionsExplicit(pos.segment(cursor, dofs), vel.segment(cursor, dofs), dt);
+    cursor += dofs;
+  }
+
+  return nextPos;
+}
+
+//==============================================================================
+Eigen::MatrixXd Skeleton::getPosPosJac(Eigen::VectorXd pos, Eigen::VectorXd vel, double dt)
+{
+  Eigen::MatrixXd jac = Eigen::MatrixXd::Zero(pos.size(), pos.size());
+
+  int cursor = 0;
+  for (std::size_t i = 0; i < mSkelCache.mBodyNodes.size(); ++i) {
+    Joint* joint = mSkelCache.mBodyNodes[i]->getParentJoint();
+    int dofs = joint->getNumDofs();
+    jac.block(cursor, cursor, dofs, dofs) = joint->getPosPosJacobian(pos.segment(cursor, dofs), vel.segment(cursor, dofs), dt);
+    cursor += dofs;
+  }
+
+  return jac;
+}
+
+//==============================================================================
+Eigen::MatrixXd Skeleton::getVelPosJac(Eigen::VectorXd pos, Eigen::VectorXd vel, double dt)
+{
+  Eigen::MatrixXd jac = Eigen::MatrixXd::Zero(pos.size(), pos.size());
+
+  int cursor = 0;
+  for (std::size_t i = 0; i < mSkelCache.mBodyNodes.size(); ++i) {
+    Joint* joint = mSkelCache.mBodyNodes[i]->getParentJoint();
+    int dofs = joint->getNumDofs();
+    jac.block(cursor, cursor, dofs, dofs) = joint->getVelPosJacobian(pos.segment(cursor, dofs), vel.segment(cursor, dofs), dt);
+    cursor += dofs;
+  }
+
+  return jac;
 }
 
 //==============================================================================

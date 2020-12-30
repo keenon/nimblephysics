@@ -438,6 +438,15 @@ public:
   void integrateVelocities(double dt) override;
 
   // Documentation inherited
+  Eigen::VectorXd integratePositionsExplicit(Eigen::VectorXd pos, Eigen::VectorXd vel, double dt) override;
+
+  /// Returns d/dpos of integratePositionsExplicit()
+  Eigen::MatrixXd getPosPosJacobian(Eigen::VectorXd pos, Eigen::VectorXd vel, double _dt) override;
+
+  /// Returns d/dvel of integratePositionsExplicit()
+  Eigen::MatrixXd getVelPosJacobian(Eigen::VectorXd pos, Eigen::VectorXd vel, double _dt) override;
+
+  // Documentation inherited
   Eigen::VectorXd getPositionDifferences(
       const Eigen::VectorXd& q2, const Eigen::VectorXd& q1) const override;
 

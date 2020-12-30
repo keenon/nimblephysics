@@ -52,6 +52,7 @@ namespace collision {
 // normal : normal vector from right to left 0 <- 1
 // penetration : real positive means penetration
 
+#define DART_COLLISION_WITNESS_PLANE_DEPTH 1e-3
 #define DART_COLLISION_EPS 1E-6
 static const int MAX_CYLBOX_CLIP_POINTS = 16;
 static const int nCYLINDER_AXIS = 2;
@@ -1618,7 +1619,7 @@ std::vector<Eigen::Vector3d> ccdPointsAtWitnessMesh(
                    + m->mVertices[k].z * localDir(2);
       // If we're on the witness plane with our "maxDot" vector, then add us to
       // the list
-      if (std::abs(dot - maxDot) < 1e-7)
+      if (std::abs(dot - maxDot) < DART_COLLISION_WITNESS_PLANE_DEPTH)
       {
         Eigen::Vector3d proposedPoint
             = *(mesh->transform)
@@ -2044,12 +2045,14 @@ int createMeshMeshContacts(
     std::vector<Eigen::Vector2d> flatAWitness;
     for (Eigen::Vector3d vertexA : pointsAWitness)
     {
-      flatAWitness.emplace_back(vertexA.dot(basis2dX), vertexA.dot(basis2dY));
+      flatAWitness.emplace_back(
+          (vertexA - originA).dot(basis2dX), (vertexA - originA).dot(basis2dY));
     }
     std::vector<Eigen::Vector2d> flatBWitness;
     for (Eigen::Vector3d vertexB : pointsBWitness)
     {
-      flatBWitness.emplace_back(vertexB.dot(basis2dX), vertexB.dot(basis2dY));
+      flatBWitness.emplace_back(
+          (vertexB - originB).dot(basis2dX), (vertexB - originB).dot(basis2dY));
     }
 
     // <sanity check>
@@ -2059,6 +2062,9 @@ int createMeshMeshContacts(
       Eigen::Vector3d recovered = originA + basis2dX * flatAWitness[i](0)
                                   + basis2dY * flatAWitness[i](1);
       Eigen::Vector3d diff = pointsAWitness[i] - recovered;
+      // subtract out components orthogonal to the plane, cause that can be up
+      // to DART_COLLISION_WITNESS_PLANE_DEPTH away
+      diff -= diff.dot(normalA) * normalA;
       if (diff.squaredNorm() > 1e-12)
       {
         assert(diff.squaredNorm() < 1e-12);
@@ -2069,6 +2075,9 @@ int createMeshMeshContacts(
       Eigen::Vector3d recovered = originB + basis2dX * flatBWitness[i](0)
                                   + basis2dY * flatBWitness[i](1);
       Eigen::Vector3d diff = pointsBWitness[i] - recovered;
+      // subtract out components orthogonal to the plane, cause that can be up
+      // to DART_COLLISION_WITNESS_PLANE_DEPTH away
+      diff -= diff.dot(normalA) * normalA;
       if (diff.squaredNorm() > 1e-12)
       {
         assert(diff.squaredNorm() < 1e-12);

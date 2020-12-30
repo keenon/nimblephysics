@@ -599,6 +599,28 @@ void ZeroDofJoint::integrateVelocities(double /*_dt*/)
 }
 
 //==============================================================================
+// Documentation inherited
+Eigen::VectorXd ZeroDofJoint::integratePositionsExplicit(Eigen::VectorXd pos, Eigen::VectorXd vel, double dt)
+{
+  return pos;
+}
+
+//==============================================================================
+/// Returns d/dpos of integratePositionsExplicit()
+Eigen::MatrixXd ZeroDofJoint::getPosPosJacobian(Eigen::VectorXd pos, Eigen::VectorXd vel, double _dt)
+{
+  return Eigen::MatrixXd::Zero(0,0);
+}
+
+//==============================================================================
+/// Returns d/dvel of integratePositionsExplicit()
+Eigen::MatrixXd ZeroDofJoint::getVelPosJacobian(Eigen::VectorXd pos, Eigen::VectorXd vel, double _dt)
+{
+  return Eigen::MatrixXd::Zero(0,0);
+}
+
+
+//==============================================================================
 Eigen::VectorXd ZeroDofJoint::getPositionDifferences(
     const Eigen::VectorXd& /*_q2*/,
     const Eigen::VectorXd& /*_q1*/) const

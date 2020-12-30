@@ -1409,6 +1409,34 @@ void GenericJoint<ConfigSpaceT>::integrateVelocities(double dt)
 }
 
 //==============================================================================
+// Documentation inherited
+template <class ConfigSpaceT>
+Eigen::VectorXd GenericJoint<ConfigSpaceT>::integratePositionsExplicit(Eigen::VectorXd pos, Eigen::VectorXd vel, double dt)
+{
+  const Point& point = math::integratePosition<ConfigSpaceT>(
+        math::toManifoldPoint<ConfigSpaceT>(pos),
+        vel, dt);
+
+  return math::toEuclideanPoint<ConfigSpaceT>(point);
+}
+
+//==============================================================================
+/// Returns d/dpos of integratePositionsExplicit()
+template <class ConfigSpaceT>
+Eigen::MatrixXd GenericJoint<ConfigSpaceT>::getPosPosJacobian(Eigen::VectorXd pos, Eigen::VectorXd vel, double _dt)
+{
+  return Eigen::MatrixXd::Identity(pos.size(), pos.size());
+}
+
+//==============================================================================
+/// Returns d/dvel of integratePositionsExplicit()
+template <class ConfigSpaceT>
+Eigen::MatrixXd GenericJoint<ConfigSpaceT>::getVelPosJacobian(Eigen::VectorXd pos, Eigen::VectorXd vel, double _dt)
+{
+  return _dt * Eigen::MatrixXd::Identity(pos.size(), pos.size());
+}
+
+//==============================================================================
 template <class ConfigSpaceT>
 Eigen::VectorXd GenericJoint<ConfigSpaceT>::getPositionDifferences(
     const Eigen::VectorXd& q2, const Eigen::VectorXd& q1) const
@@ -2192,7 +2220,7 @@ void GenericJoint<ConfigSpaceT>::updateTotalForceDynamic(
   const Vector dampingForce
       = -Base::mAspectProperties.mDampingCoefficients.cwiseProduct(
         getVelocitiesStatic());
-
+  
   //
   mTotalForce = this->mAspectState.mForces
       + springForce

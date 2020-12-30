@@ -80,6 +80,13 @@ public:
   const Eigen::MatrixXd& getVelPosJacobian(
       simulation::WorldPtr world, PerformanceLog* perfLog = nullptr);
 
+  /// This computes and returns the component of the pos-pos and pos-vel
+  /// jacobians due to bounce approximation. For backprop, you don't actually
+  /// need this matrix, you can compute backprop directly. This is here if you
+  /// want access to the full Jacobian for some reason.
+  const Eigen::MatrixXd& getBounceApproximationJacobian(
+      simulation::WorldPtr world, PerformanceLog* perfLog = nullptr);
+
   /// Returns a concatenated vector of all the Skeletons' position()'s in the
   /// World, in order in which the Skeletons appear in the World's
   /// getSkeleton(i) returns them, BEFORE the timestep.
@@ -530,6 +537,8 @@ private:
   Eigen::MatrixXd mCachedPosPos;
   bool mCachedPosVelDirty;
   Eigen::MatrixXd mCachedPosVel;
+  bool mCachedBounceApproximationDirty;
+  Eigen::MatrixXd mCachedBounceApproximation;
   bool mCachedVelPosDirty;
   Eigen::MatrixXd mCachedVelPos;
   bool mCachedVelVelDirty;
