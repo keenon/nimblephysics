@@ -118,6 +118,23 @@ void BoxedLcpConstraintSolver::setBoxedLcpSolver(BoxedLcpSolverPtr lcpSolver)
 }
 
 //==============================================================================
+/// This is pretty much only useful for Finite Difference testing with very
+/// complex collisions. This replaces the standard LCP solver with a PGS
+/// algorithm dialed up to super-duper-accurate max settings.
+void BoxedLcpConstraintSolver::makeHyperAccurateAndVerySlow()
+{
+  std::shared_ptr<PgsBoxedLcpSolver> accurateAndSlowSolver
+      = std::make_shared<PgsBoxedLcpSolver>();
+  /*
+  accurateAndSlowSolver->setOption(
+      PgsBoxedLcpSolver::Option(50000, 1e-15, 1e-12, 1e-10, false));
+  */
+  accurateAndSlowSolver->setOption(
+      PgsBoxedLcpSolver::Option(1000, 1e-10, 1e-8, 1e-8, false));
+  setBoxedLcpSolver(accurateAndSlowSolver);
+}
+
+//==============================================================================
 ConstBoxedLcpSolverPtr BoxedLcpConstraintSolver::getBoxedLcpSolver() const
 {
   return mBoxedLcpSolver;

@@ -87,6 +87,11 @@ public:
   /// passed, Dantzig solver will be used.
   void setBoxedLcpSolver(BoxedLcpSolverPtr lcpSolver);
 
+  /// This is pretty much only useful for Finite Difference testing with very
+  /// complex collisions. This replaces the standard LCP solver with a PGS
+  /// algorithm dialed up to super-duper-accurate max settings.
+  void makeHyperAccurateAndVerySlow();
+
   /// Returns boxed LCP (BLCP) solver
   ConstBoxedLcpSolverPtr getBoxedLcpSolver() const;
 

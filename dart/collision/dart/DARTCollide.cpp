@@ -52,7 +52,7 @@ namespace collision {
 // normal : normal vector from right to left 0 <- 1
 // penetration : real positive means penetration
 
-#define DART_COLLISION_WITNESS_PLANE_DEPTH 1e-3
+#define DART_COLLISION_WITNESS_PLANE_DEPTH 0.005
 #define DART_COLLISION_EPS 1E-6
 static const int MAX_CYLBOX_CLIP_POINTS = 16;
 static const int nCYLINDER_AXIS = 2;
@@ -1609,6 +1609,23 @@ std::vector<Eigen::Vector3d> ccdPointsAtWitnessMesh(
 
   double maxDot = (neg ? 1 : -1) * std::numeric_limits<double>::infinity();
 
+  // 1. Find the max dot
+  for (int i = 0; i < mesh->mesh->mNumMeshes; i++)
+  {
+    aiMesh* m = mesh->mesh->mMeshes[i];
+    for (int k = 0; k < m->mNumVertices; k++)
+    {
+      double dot = m->mVertices[k].x * localDir(0)
+                   + m->mVertices[k].y * localDir(1)
+                   + m->mVertices[k].z * localDir(2);
+      if (((dot > maxDot) && !neg) || ((dot < maxDot) && neg))
+      {
+        maxDot = dot;
+      }
+    }
+  }
+
+  // 2. Use the max dot to find vertices at the contact plane
   for (int i = 0; i < mesh->mesh->mNumMeshes; i++)
   {
     aiMesh* m = mesh->mesh->mMeshes[i];
@@ -1642,17 +1659,6 @@ std::vector<Eigen::Vector3d> ccdPointsAtWitnessMesh(
         {
           points.push_back(proposedPoint);
         }
-      }
-      else if (((dot > maxDot) && !neg) || ((dot < maxDot) && neg))
-      {
-        points.clear();
-        points.push_back(
-            *(mesh->transform)
-            * Eigen::Vector3d(
-                m->mVertices[k].x * (*mesh->scale)(0),
-                m->mVertices[k].y * (*mesh->scale)(1),
-                m->mVertices[k].z * (*mesh->scale)(2)));
-        maxDot = dot;
       }
     }
   }

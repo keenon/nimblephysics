@@ -600,7 +600,7 @@ Eigen::VectorXd BackpropSnapshot::getAnalyticalNextV(
   Eigen::VectorXd tau = world->getExternalForces();
   Eigen::VectorXd C = world->getCoriolisAndGravityAndExternalForces();
   double dt = world->getTimeStep();
-  Eigen::VectorXd f_c = estimateClampingConstraintImpulses(world, A_c);
+  Eigen::VectorXd f_c = estimateClampingConstraintImpulses(world, A_c, A_ub, E);
 
   Eigen::VectorXd preSolveV = mPreStepVelocity + dt * Minv * (tau - C);
   Eigen::VectorXd f_cDeltaV = Minv * A_c_ub_E * f_c;
@@ -632,6 +632,62 @@ Eigen::MatrixXd BackpropSnapshot::getScratchAnalytical(
   Eigen::MatrixXd A_ub = getUpperBoundConstraintMatrix(world);
   Eigen::MatrixXd E = getUpperBoundMappingMatrix();
   Eigen::MatrixXd A_c_ub_E = A_c + A_ub * E;
+  Eigen::MatrixXd Minv = world->getInvMassMatrix();
+
+  Eigen::VectorXd inner = Eigen::VectorXd::Ones(mNumClamping);
+
+  /*
+  return (
+      getJacobianOfClampingConstraints(world, inner)
+      + getJacobianOfUpperBoundConstraints(world, E * inner));
+  */
+
+  Eigen::MatrixXd Q = A_c.transpose() * Minv * A_c_ub_E;
+  Eigen::MatrixXd Qinv = Q.completeOrthogonalDecomposition().pseudoInverse();
+  Eigen::MatrixXd I = Eigen::MatrixXd::Identity(Q.rows(), Q.cols());
+
+#define dQ(rhs)                                                                \
+  (getJacobianOfClampingConstraintsTranspose(world, Minv * A_c_ub_E * rhs)     \
+   + (A_c.transpose()                                                          \
+      * (getJacobianOfMinv(world, A_c_ub_E * rhs, wrt)                         \
+         + (Minv                                                               \
+            * (getJacobianOfClampingConstraints(world, rhs)                    \
+               + getJacobianOfUpperBoundConstraints(world, E * rhs))))))
+
+#define dQT(rhs)                                                               \
+  ((getJacobianOfClampingConstraintsTranspose(world, Minv * A_c * rhs)         \
+    + (A_c.transpose()                                                         \
+       * (getJacobianOfMinv(world, A_c * rhs, wrt)                             \
+          + (Minv * (getJacobianOfClampingConstraints(world, rhs))))))         \
+   + (E.transpose()                                                            \
+      * (getJacobianOfUpperBoundConstraintsTranspose(world, Minv * A_c * rhs)  \
+         + A_ub.transpose()                                                    \
+               * (getJacobianOfMinv(world, A_c * rhs, wrt)                     \
+                  + (Minv                                                      \
+                     * (getJacobianOfClampingConstraints(world, rhs)))))))
+
+  // This is the gradient of the pseudoinverse, see
+  // https://mathoverflow.net/a/29511/163259
+
+  return -Qinv * dQ(Qinv * inner)
+         + Qinv * Qinv.transpose() * dQT((I - Q * Qinv) * inner)
+         + (I - Qinv * Q) * dQT(Qinv.transpose() * Qinv * inner);
+
+#undef dQ
+#undef dQT
+
+  /*
+  Eigen::MatrixXd MinvA_cJac
+      = getJacobianOfMinv(world, A_c * inner, wrt)
+        + (Minv * (getJacobianOfClampingConstraints(world, inner)));
+
+  return (getJacobianOfClampingConstraintsTranspose(world, Minv * A_c * inner)
+          + (A_c.transpose() * MinvA_cJac))
+         + E.transpose()
+               * (getJacobianOfUpperBoundConstraintsTranspose(
+                      world, Minv * A_c * inner)
+                  + A_ub.transpose() * MinvA_cJac);
+                  */
 
   Eigen::VectorXd tau = world->getExternalForces();
   Eigen::VectorXd C = world->getCoriolisAndGravityAndExternalForces();
@@ -644,7 +700,6 @@ Eigen::MatrixXd BackpropSnapshot::getScratchAnalytical(
   Eigen::MatrixXd dM
       = getJacobianOfMinv(world, dt * (tau - C) + A_c_ub_E * f_c, wrt);
 
-  Eigen::MatrixXd Minv = world->getInvMassMatrix();
   Eigen::MatrixXd dC = getJacobianOfC(world, wrt);
 
   Eigen::MatrixXd dF_c = getJacobianOfConstraintForce(world, wrt);
@@ -656,7 +711,7 @@ Eigen::MatrixXd BackpropSnapshot::getScratchAnalytical(
   // Compute dF_c
   /////////////////////////////////////////////////////////////////
 
-  Eigen::MatrixXd Q = getClampingAMatrix();
+  Q = getClampingAMatrix();
 
   Eigen::CompleteOrthogonalDecomposition<Eigen::MatrixXd> Qfac
       = Q.completeOrthogonalDecomposition();
@@ -911,13 +966,21 @@ Eigen::VectorXd BackpropSnapshot::scratch(simulation::WorldPtr world)
   // Compute NextV
   /////////////////////////////////////////////////////////////////////////
 
-  Eigen::MatrixXd A_c = getClampingConstraintMatrix(world);
-  Eigen::MatrixXd A_ub = getUpperBoundConstraintMatrix(world);
+  Eigen::MatrixXd A_c
+      = estimateClampingConstraintMatrixAt(world, world->getPositions());
+  Eigen::MatrixXd A_ub
+      = estimateUpperBoundConstraintMatrixAt(world, world->getPositions());
   Eigen::MatrixXd E = getUpperBoundMappingMatrix();
   Eigen::MatrixXd A_c_ub_E = A_c + A_ub * E;
 
   Eigen::MatrixXd Minv = world->getInvMassMatrix();
-  Eigen::VectorXd f_c = estimateClampingConstraintImpulses(world, A_c);
+
+  Eigen::MatrixXd Q = A_c.transpose() * Minv * A_c_ub_E;
+
+  return Q.completeOrthogonalDecomposition().solve(
+      Eigen::VectorXd::Ones(Q.rows()));
+
+  Eigen::VectorXd f_c = estimateClampingConstraintImpulses(world, A_c, A_ub, E);
   Eigen::VectorXd tau = world->getExternalForces();
   Eigen::VectorXd C = world->getCoriolisAndGravityAndExternalForces();
   double dt = world->getTimeStep();
@@ -931,9 +994,9 @@ Eigen::VectorXd BackpropSnapshot::scratch(simulation::WorldPtr world)
   /////////////////////////////////////////////////////////////////////////
 
   Eigen::VectorXd b = Eigen::VectorXd(A_c.cols());
-  Eigen::MatrixXd Q = Eigen::MatrixXd(A_c.cols(), A_c.cols());
+  Q = Eigen::MatrixXd(A_c.cols(), A_c.cols());
   computeLCPOffsetClampingSubset(world, b, A_c);
-  computeLCPConstraintMatrixClampingSubset(world, Q, A_c);
+  computeLCPConstraintMatrixClampingSubset(world, Q, A_c, A_ub, E);
 
   // return Q.completeOrthogonalDecomposition().solve(b);
   // return b;
@@ -1036,7 +1099,7 @@ Eigen::MatrixXd BackpropSnapshot::getScratchFiniteDifference(
 
   Eigen::VectorXd preStepWrt = wrt->get(world.get());
 
-  double EPSILON = 1e-7;
+  double EPSILON = 1e-6;
   for (std::size_t i = 0; i < worldDim; i++)
   {
     Eigen::VectorXd tweakedWrt = preStepWrt;
@@ -2333,6 +2396,8 @@ Eigen::MatrixXd BackpropSnapshot::getJacobianOfConstraintForce(
     int wrtDim = wrt->dim(world.get());
     return Eigen::MatrixXd::Zero(0, wrtDim);
   }
+  Eigen::MatrixXd A_ub = getUpperBoundConstraintMatrix(world);
+  Eigen::MatrixXd E = getUpperBoundMappingMatrix();
 
   /*
     RestorableSnapshot snapshot(world);
@@ -2341,7 +2406,8 @@ Eigen::MatrixXd BackpropSnapshot::getJacobianOfConstraintForce(
     world->setForces(mPreStepTorques);
     */
 
-  Eigen::MatrixXd Q = getClampingAMatrix();
+  Eigen::MatrixXd Q
+      = A_c.transpose() * getInvMassMatrix(world) * (A_c + A_ub * E);
 
   Eigen::CompleteOrthogonalDecomposition<Eigen::MatrixXd> Qfac
       = Q.completeOrthogonalDecomposition();
@@ -2377,9 +2443,12 @@ BackpropSnapshot::getJacobianOfLCPConstraintMatrixClampingSubset(
   {
     return Eigen::MatrixXd::Zero(A_c.cols(), A_c.cols());
   }
+  Eigen::MatrixXd A_ub = getUpperBoundConstraintMatrix(world);
+  Eigen::MatrixXd E = getUpperBoundMappingMatrix();
+  Eigen::MatrixXd A_c_ub_E = A_c + A_ub * E;
 
   Eigen::MatrixXd Minv = getInvMassMatrix(world);
-  Eigen::MatrixXd Q = getClampingAMatrix(); // A_c.transpose() * Minv * A_c;
+  Eigen::MatrixXd Q = A_c.transpose() * Minv * (A_c + A_ub * E);
   Eigen::CompleteOrthogonalDecomposition<Eigen::MatrixXd> Qfactored
       = Q.completeOrthogonalDecomposition();
 
@@ -2387,14 +2456,94 @@ BackpropSnapshot::getJacobianOfLCPConstraintMatrixClampingSubset(
 
   if (wrt == WithRespectTo::POSITION)
   {
-    // Position is the only term that affects A_c
-    Eigen::MatrixXd innerTerms
-        = getJacobianOfClampingConstraintsTranspose(world, Minv * A_c * Qinv_b)
-          + A_c.transpose() * getJacobianOfMinv(world, A_c * Qinv_b, wrt)
-          + A_c.transpose() * Minv
-                * getJacobianOfClampingConstraints(world, Qinv_b);
-    Eigen::MatrixXd result = -Qfactored.solve(innerTerms);
-    return result;
+    Eigen::MatrixXd Qinv = Qfactored.pseudoInverse();
+    Eigen::MatrixXd I = Eigen::MatrixXd::Identity(Q.rows(), Q.cols());
+
+    // Position is the only term that affects A_c and A_ub. We use the full
+    // gradient of the pseudoinverse, rather than approximate with the gradient
+    // of the raw inverse, because Q could be rank-deficient.
+
+    if (A_ub.cols() > 0)
+    {
+
+#define dQ(rhs)                                                                \
+  (getJacobianOfClampingConstraintsTranspose(world, Minv * A_c_ub_E * rhs)     \
+   + (A_c.transpose()                                                          \
+      * (getJacobianOfMinv(world, A_c_ub_E * rhs, wrt)                         \
+         + (Minv                                                               \
+            * (getJacobianOfClampingConstraints(world, rhs)                    \
+               + getJacobianOfUpperBoundConstraints(world, E * rhs))))))
+
+#define dQT(rhs)                                                               \
+  ((getJacobianOfClampingConstraintsTranspose(world, Minv * A_c * rhs)         \
+    + (A_c.transpose()                                                         \
+       * (getJacobianOfMinv(world, A_c * rhs, wrt)                             \
+          + (Minv * (getJacobianOfClampingConstraints(world, rhs))))))         \
+   + (E.transpose()                                                            \
+      * (getJacobianOfUpperBoundConstraintsTranspose(world, Minv * A_c * rhs)  \
+         + A_ub.transpose()                                                    \
+               * (getJacobianOfMinv(world, A_c * rhs, wrt)                     \
+                  + (Minv                                                      \
+                     * (getJacobianOfClampingConstraints(world, rhs)))))))
+
+      // This is the gradient of the pseudoinverse, see
+      // https://mathoverflow.net/a/29511/163259
+      return -Qinv * dQ(Qinv * b)
+             + Qinv * Qinv.transpose() * dQT((I - Q * Qinv) * b)
+             + (I - Qinv * Q) * dQT(Qinv.transpose() * Qinv * b);
+
+#undef dQ
+#undef dQT
+
+      /*
+      // The old formula, approximating just the raw inverse, for posterity
+
+      Eigen::MatrixXd innerTerms
+          = getJacobianOfClampingConstraintsTranspose(
+                world, Minv * A_c_ub_E * Qinv_b)
+            + A_c.transpose()
+                  * (getJacobianOfMinv(world, A_c_ub_E * Qinv_b, wrt)
+                     + Minv
+                           * (getJacobianOfClampingConstraints(world, Qinv_b)
+                              + getJacobianOfUpperBoundConstraints(
+                                  world, E * Qinv_b)));
+      Eigen::MatrixXd result = -Qfactored.solve(innerTerms);
+      return result;
+      */
+    }
+    else
+    {
+
+#define dQ(rhs)                                                                \
+  (getJacobianOfClampingConstraintsTranspose(world, Minv * A_c_ub_E * rhs)     \
+   + (A_c.transpose()                                                          \
+      * (getJacobianOfMinv(world, A_c_ub_E * rhs, wrt)                         \
+         + (Minv * (getJacobianOfClampingConstraints(world, rhs))))))
+
+#define dQT(rhs) dQ(rhs)
+
+      // This is the gradient of the pseudoinverse, see
+      // https://mathoverflow.net/a/29511/163259
+      return -Qinv * dQ(Qinv * b)
+             + Qinv * Qinv.transpose() * dQT((I - Q * Qinv) * b)
+             + (I - Qinv * Q) * dQT(Qinv.transpose() * Qinv * b);
+
+#undef dQ
+#undef dQT
+
+      /*
+      // The old formula, approximating just the raw inverse, for posterity
+
+      Eigen::MatrixXd innerTerms
+          = getJacobianOfClampingConstraintsTranspose(
+                world, Minv * A_c * Qinv_b)
+            + A_c.transpose()
+                  * (getJacobianOfMinv(world, A_c * Qinv_b, wrt)
+                     + Minv * getJacobianOfClampingConstraints(world, Qinv_b));
+      Eigen::MatrixXd result = -Qfactored.solve(innerTerms);
+      return result;
+      */
+    }
   }
   else
   {
@@ -2404,6 +2553,65 @@ BackpropSnapshot::getJacobianOfLCPConstraintMatrixClampingSubset(
     Eigen::MatrixXd result = -Qfactored.solve(innerTerms);
     return result;
   }
+}
+
+//==============================================================================
+/// This returns the jacobian of Q^{-1}b, holding b constant, with respect to
+/// wrt, by finite differencing
+Eigen::MatrixXd
+BackpropSnapshot::finiteDifferenceJacobianOfLCPConstraintMatrixClampingSubset(
+    simulation::WorldPtr world, Eigen::VectorXd b, WithRespectTo* wrt)
+{
+  int wrtDim = wrt->dim(world.get());
+  Eigen::MatrixXd jac = Eigen::MatrixXd::Zero(mNumClamping, wrtDim);
+  if (wrt != WithRespectTo::POSITION)
+  {
+    return jac;
+  }
+
+  const double EPS = 1e-8;
+  Eigen::VectorXd original = wrt->get(world.get());
+  for (int i = 0; i < wrtDim; i++)
+  {
+    Eigen::VectorXd perturbed = original;
+    perturbed(i) += EPS;
+    wrt->set(world.get(), perturbed);
+
+    Eigen::MatrixXd A_c
+        = estimateClampingConstraintMatrixAt(world, world->getPositions());
+    Eigen::MatrixXd A_ub
+        = estimateUpperBoundConstraintMatrixAt(world, world->getPositions());
+    Eigen::MatrixXd E = getUpperBoundMappingMatrix();
+    Eigen::MatrixXd Q
+        = A_c.transpose() * world->getInvMassMatrix() * (A_c + A_ub * E);
+
+    /*
+    std::cout << "+" << i << ": " << A_c.cols() << " :: " << mNumClamping
+              << std::endl;
+              */
+
+    Eigen::VectorXd bPlus = Q.completeOrthogonalDecomposition().solve(b);
+
+    perturbed = original;
+    perturbed(i) -= EPS;
+    wrt->set(world.get(), perturbed);
+
+    A_c = estimateClampingConstraintMatrixAt(world, world->getPositions());
+    A_ub = estimateUpperBoundConstraintMatrixAt(world, world->getPositions());
+    E = getUpperBoundMappingMatrix();
+    Q = A_c.transpose() * world->getInvMassMatrix() * (A_c + A_ub * E);
+
+    /*
+    std::cout << "-" << i << ": " << A_c.cols() << " :: " << mNumClamping
+              << std::endl;
+              */
+
+    Eigen::VectorXd bMinus = Q.completeOrthogonalDecomposition().solve(b);
+
+    jac.col(i) = (bPlus - bMinus) / (2 * EPS);
+  }
+
+  return jac;
 }
 
 //==============================================================================
@@ -2450,7 +2658,11 @@ Eigen::MatrixXd BackpropSnapshot::getJacobianOfLCPOffsetClampingSubset(
 /// the clamping constraints. It relates constraint force to constraint
 /// acceleration. It's a mass matrix, just in a weird frame.
 void BackpropSnapshot::computeLCPConstraintMatrixClampingSubset(
-    simulation::WorldPtr world, Eigen::MatrixXd& Q, const Eigen::MatrixXd& A_c)
+    simulation::WorldPtr world,
+    Eigen::MatrixXd& Q,
+    const Eigen::MatrixXd& A_c,
+    const Eigen::MatrixXd& A_ub,
+    const Eigen::MatrixXd& E)
 {
   /*
   int numClamping = A_c.cols();
@@ -2460,7 +2672,14 @@ void BackpropSnapshot::computeLCPConstraintMatrixClampingSubset(
         = A_c.transpose() * implicitMultiplyByInvMassMatrix(world, A_c.col(i));
   }
   */
-  Q = A_c.transpose() * getInvMassMatrix(world) * A_c;
+  if (A_ub.cols() > 0)
+  {
+    Q = A_c.transpose() * getInvMassMatrix(world) * (A_c + A_ub * E);
+  }
+  else
+  {
+    Q = A_c.transpose() * getInvMassMatrix(world) * A_c;
+  }
 }
 
 //==============================================================================
@@ -2499,7 +2718,10 @@ void BackpropSnapshot::computeLCPOffsetClampingSubset(
 /// clamping constraints. This is based on a linear approximation of the
 /// constraint impulses.
 Eigen::VectorXd BackpropSnapshot::estimateClampingConstraintImpulses(
-    simulation::WorldPtr world, const Eigen::MatrixXd& A_c)
+    simulation::WorldPtr world,
+    const Eigen::MatrixXd& A_c,
+    const Eigen::MatrixXd& A_ub,
+    const Eigen::MatrixXd& E)
 {
   if (A_c.cols() == 0)
   {
@@ -2509,9 +2731,13 @@ Eigen::VectorXd BackpropSnapshot::estimateClampingConstraintImpulses(
   Eigen::VectorXd b = Eigen::VectorXd(A_c.cols());
   Eigen::MatrixXd Q = Eigen::MatrixXd(A_c.cols(), A_c.cols());
   computeLCPOffsetClampingSubset(world, b, A_c);
-  computeLCPConstraintMatrixClampingSubset(world, Q, A_c);
+  computeLCPConstraintMatrixClampingSubset(world, Q, A_c, A_ub, E);
 
-  return Q.completeOrthogonalDecomposition().solve(b);
+  // Q can be low rank, so center our estimates on the old clamping constraint
+  // impulses
+  return Q.completeOrthogonalDecomposition().solve(
+             b - Q * getClampingConstraintImpulses())
+         + getClampingConstraintImpulses();
 }
 
 //==============================================================================
@@ -2640,6 +2866,9 @@ Eigen::MatrixXd BackpropSnapshot::estimateClampingConstraintMatrixAt(
   {
     return getClampingConstraintMatrix(world);
   }
+  Eigen::VectorXd oldPos = world->getPositions();
+  world->setPositions(mPreStepPosition);
+
   auto clampingConstraints = getClampingConstraints();
   Eigen::MatrixXd result = Eigen::MatrixXd::Zero(mNumDOFs, mNumClamping);
   for (int i = 0; i < clampingConstraints.size(); i++)
@@ -2648,6 +2877,8 @@ Eigen::MatrixXd BackpropSnapshot::estimateClampingConstraintMatrixAt(
     result.col(i) = constraint->getConstraintForces(world)
                     + constraint->getConstraintForcesJacobian(world) * posDiff;
   }
+
+  world->setPositions(oldPos);
   return result;
 }
 
@@ -2662,6 +2893,9 @@ Eigen::MatrixXd BackpropSnapshot::estimateUpperBoundConstraintMatrixAt(
   {
     return getUpperBoundConstraintMatrix(world);
   }
+  Eigen::VectorXd oldPos = world->getPositions();
+  world->setPositions(mPreStepPosition);
+
   auto upperBoundConstraints = getUpperBoundConstraints();
   Eigen::MatrixXd result = Eigen::MatrixXd::Zero(mNumDOFs, mNumUpperBound);
   for (int i = 0; i < upperBoundConstraints.size(); i++)
@@ -2670,6 +2904,8 @@ Eigen::MatrixXd BackpropSnapshot::estimateUpperBoundConstraintMatrixAt(
     result.col(i) = constraint->getConstraintForces(world)
                     + constraint->getConstraintForcesJacobian(world) * posDiff;
   }
+
+  world->setPositions(oldPos);
   return result;
 }
 
@@ -2788,17 +3024,37 @@ Eigen::MatrixXd BackpropSnapshot::getJacobianOfClampingConstraintsTranspose(
 /// This computes the Jacobian of A_ub*E*f0 with respect to position using
 /// impulse tests.
 Eigen::MatrixXd BackpropSnapshot::getJacobianOfUpperBoundConstraints(
-    simulation::WorldPtr world, Eigen::VectorXd f0)
+    simulation::WorldPtr world, Eigen::VectorXd E_f0)
 {
   std::vector<std::shared_ptr<DifferentiableContactConstraint>> constraints
       = getUpperBoundConstraints();
   int dofs = world->getNumDofs();
   Eigen::MatrixXd result = Eigen::MatrixXd::Zero(dofs, dofs);
-  assert(constraints.size() == f0.size());
+  assert(constraints.size() == E_f0.size());
   for (int i = 0; i < constraints.size(); i++)
   {
-    result += f0(i) * constraints[i]->getConstraintForcesJacobian(world);
+    result += E_f0(i) * constraints[i]->getConstraintForcesJacobian(world);
   }
+  return result;
+}
+
+//==============================================================================
+/// This computes the Jacobian of A_ub^T*v0 with respect to position using
+/// impulse tests.
+Eigen::MatrixXd BackpropSnapshot::getJacobianOfUpperBoundConstraintsTranspose(
+    simulation::WorldPtr world, Eigen::VectorXd v0)
+{
+  std::vector<std::shared_ptr<DifferentiableContactConstraint>> constraints
+      = getUpperBoundConstraints();
+  int dofs = world->getNumDofs();
+  assert(constraints.size() == mNumUpperBound);
+  Eigen::MatrixXd result = Eigen::MatrixXd::Zero(mNumUpperBound, dofs);
+  for (int i = 0; i < constraints.size(); i++)
+  {
+    result.row(i)
+        = constraints[i]->getConstraintForcesJacobian(world).transpose() * v0;
+  }
+
   return result;
 }
 
@@ -3273,6 +3529,16 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceJacobianOfConstraintForce(
       epsNeg *= 0.5;
     }
     Eigen::VectorXd diff = fPlus - fMinus;
+
+    if (std::abs(epsPos) < 1e-11 || std::abs(epsNeg) < 1e-11)
+    {
+      std::cout << "WARNING: finiteDifferenceJacobianOfConstraintForce() had "
+                   "to use dangerously small EPS to get a sample with the same "
+                   "number of clamping contacts. Perturb["
+                << i << "]: eps_pos=" << epsPos << ", eps_neg=" << epsNeg
+                << std::endl;
+    }
+
     result.col(i) = diff / (epsPos + epsNeg);
   }
 

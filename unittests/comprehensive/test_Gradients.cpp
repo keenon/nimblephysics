@@ -37,6 +37,7 @@
 
 #include "dart/collision/CollisionObject.hpp"
 #include "dart/collision/Contact.hpp"
+#include "dart/constraint/BoxedLcpConstraintSolver.hpp"
 #include "dart/dynamics/BodyNode.hpp"
 #include "dart/dynamics/RevoluteJoint.hpp"
 #include "dart/dynamics/Skeleton.hpp"
@@ -57,7 +58,7 @@
 #include "TestHelpers.hpp"
 #include "stdio.h"
 
-#define ALL_TESTS
+// #define ALL_TESTS
 
 using namespace dart;
 using namespace math;
@@ -1357,6 +1358,14 @@ void testAtlas(bool withGroundContact)
   world->setConstraintForceMixingEnabled(true);
   world->setGravity(Eigen::Vector3d(0.0, -9.81, 0));
 
+  // Set up the LCP solver to be super super accurate, so our
+  // finite-differencing tests don't fail due to LCP errors. This isn't
+  // necessary during a real forward pass, but is helpful to make the
+  // mathematical invarients in the tests more reliable.
+  static_cast<constraint::BoxedLcpConstraintSolver*>(
+      world->getConstraintSolver())
+      ->makeHyperAccurateAndVerySlow();
+
   // Load ground and Atlas robot and add them to the world
   dart::utils::DartLoader urdfLoader;
 
@@ -1374,10 +1383,22 @@ void testAtlas(bool withGroundContact)
 
   // Set initial configuration for Atlas robot
   atlas->setPosition(0, -0.5 * dart::math::constantsd::pi());
+  atlas->setPosition(4, -0.01);
   Eigen::VectorXd originalPos = atlas->getPositions();
   Eigen::VectorXd worldVel = world->getVelocities();
 
   atlas->setVelocities(Eigen::VectorXd::Zero(atlas->getNumDofs()));
+
+  /*
+  world->step();
+  auto& result = world->getLastCollisionResult();
+  for (int i = 0; i < result.getNumContacts(); i++)
+  {
+    std::cout << "Depth[" << i << "]: " << result.getContact(i).penetrationDepth
+              << std::endl;
+  }
+  return;
+  */
 
   // EXPECT_TRUE(verifyPosGradients(world, 1, 1e-8));
   EXPECT_TRUE(verifyVelGradients(world, worldVel));
@@ -1394,10 +1415,8 @@ TEST(GRADIENTS, ATLAS_FLOATING)
 #endif
 
 // #ifdef ALL_TESTS
-/*
 TEST(GRADIENTS, ATLAS_GROUND)
 {
   testAtlas(true);
 }
-*/
 // #endif

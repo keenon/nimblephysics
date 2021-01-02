@@ -265,6 +265,11 @@ public:
   Eigen::MatrixXd getJacobianOfLCPConstraintMatrixClampingSubset(
       simulation::WorldPtr world, Eigen::VectorXd b, WithRespectTo* wrt);
 
+  /// This returns the jacobian of Q^{-1}b, holding b constant, with respect to
+  /// wrt, by finite differencing
+  Eigen::MatrixXd finiteDifferenceJacobianOfLCPConstraintMatrixClampingSubset(
+      simulation::WorldPtr world, Eigen::VectorXd b, WithRespectTo* wrt);
+
   /// This returns the jacobian of b (from Q^{-1}b) with respect to wrt
   Eigen::MatrixXd getJacobianOfLCPOffsetClampingSubset(
       simulation::WorldPtr world, WithRespectTo* wrt);
@@ -275,7 +280,9 @@ public:
   void computeLCPConstraintMatrixClampingSubset(
       simulation::WorldPtr world,
       Eigen::MatrixXd& Q,
-      const Eigen::MatrixXd& A_c);
+      const Eigen::MatrixXd& A_c,
+      const Eigen::MatrixXd& A_ub,
+      const Eigen::MatrixXd& E);
 
   /// This returns the subset of the b vector used by the original LCP for just
   /// the clamping constraints. It's just the relative velocity at the clamping
@@ -289,7 +296,10 @@ public:
   /// clamping constraints. This is based on a linear approximation of the
   /// constraint impulses.
   Eigen::VectorXd estimateClampingConstraintImpulses(
-      simulation::WorldPtr world, const Eigen::MatrixXd& A_c);
+      simulation::WorldPtr world,
+      const Eigen::MatrixXd& A_c,
+      const Eigen::MatrixXd& A_ub,
+      const Eigen::MatrixXd& E);
 
   /// This returns the jacobian of P_c * v, holding everyhing constant except
   /// the value of WithRespectTo
@@ -352,10 +362,15 @@ public:
   Eigen::MatrixXd getJacobianOfClampingConstraintsTranspose(
       simulation::WorldPtr world, Eigen::VectorXd v0);
 
-  /// This computes the Jacobian of A_ub*E*f0 with respect to position using
+  /// This computes the Jacobian of A_ub*(E*f0) with respect to position using
   /// impulse tests.
   Eigen::MatrixXd getJacobianOfUpperBoundConstraints(
-      simulation::WorldPtr world, Eigen::VectorXd f0);
+      simulation::WorldPtr world, Eigen::VectorXd E_f0);
+
+  /// This computes the Jacobian of A_ub^T*v0 with respect to position using
+  /// impulse tests.
+  Eigen::MatrixXd getJacobianOfUpperBoundConstraintsTranspose(
+      simulation::WorldPtr world, Eigen::VectorXd v0);
 
   /// This measures a vector of contact impulses (measured at the clamping
   /// constraints) on the world, to see what total velocity change results. This

@@ -411,14 +411,20 @@ void ConstrainedGroupGradientMatrices::constructMatrices(
 
     // If constraintForce is zero, this means "j" is in "Not Clamping" unless
     // relative velocity is also zero
-    if (std::abs(constraintForce) < 1e-9)
+    double CLAMPING_THRESHOLD = 1e-9;
+    if (std::abs(constraintForce) < CLAMPING_THRESHOLD)
     {
-      if (std::abs(relativeVelocity) < 1e-9)
+      if (std::abs(relativeVelocity) < CLAMPING_THRESHOLD)
       {
+        // This is technically a TIE! Therefore, technically non-differentiable.
+        // We tie break arbitrarily to CLAMPING, because this commonly occurs
+        // with friction when we have an object at rest on a surface. The
+        // friction force directions have 0 force, and 0 vel, but the object
+        // won't slide along the surface if you push on it a tiny epsilon,
+        // because friction will prevent it.
         mContactConstraintMappings(j) = neural::ConstraintMapping::CLAMPING;
         clampingIndex[j] = numClamping;
         numClamping++;
-        // TODO: do we ever want to mark this as bouncing?
       }
       else
       {
@@ -479,6 +485,9 @@ void ConstrainedGroupGradientMatrices::constructMatrices(
 
   // Create the matrices we want to pass along for this skeleton:
   mClampingConstraintMatrix = Eigen::MatrixXd::Zero(mNumDOFs, numClamping);
+#ifndef NDEBUG
+  mAllConstraintMatrix = Eigen::MatrixXd::Zero(mNumDOFs, mNumConstraintDim);
+#endif
   mMassedClampingConstraintMatrix
       = Eigen::MatrixXd::Zero(mNumDOFs, numClamping);
   mUpperBoundConstraintMatrix = Eigen::MatrixXd::Zero(mNumDOFs, numUpperBound);
@@ -513,6 +522,11 @@ void ConstrainedGroupGradientMatrices::constructMatrices(
         = std::make_shared<DifferentiableContactConstraint>(
             mConstraints[j], mConstraintIndices[j], mX(j));
     mDifferentiableConstraints.push_back(constraint);
+
+#ifndef NDEBUG
+    mAllConstraintMatrix.col(j)
+        = constraint->getConstraintForces(world, mSkeletons);
+#endif
 
     if (mContactConstraintMappings(j) == neural::ConstraintMapping::CLAMPING)
     {
@@ -917,27 +931,51 @@ Eigen::MatrixXd ConstrainedGroupGradientMatrices::
   {
     return Eigen::MatrixXd::Zero(A_c.cols(), A_c.cols());
   }
+  const Eigen::MatrixXd& A_ub = mUpperBoundConstraintMatrix;
+  const Eigen::MatrixXd& E = mUpperBoundMappingMatrix;
+  const Eigen::MatrixXd& Minv = getInvMassMatrix(world);
+  Eigen::MatrixXd A_c_ub_E = A_c + A_ub * E;
 
-  Eigen::MatrixXd Q = getClampingAMatrix(); // A_c.transpose() * Minv * A_c;
+  Eigen::MatrixXd Q = A_c.transpose() * Minv * A_c_ub_E;
   Eigen::CompleteOrthogonalDecomposition<Eigen::MatrixXd> Qfactored
       = Q.completeOrthogonalDecomposition();
 
+  // This is a proxy for f_c
   Eigen::VectorXd Qinv_b = Qfactored.solve(b);
 
   if (wrt == WithRespectTo::POSITION)
   {
-    // Position is the only term that affects A_c
-    Eigen::MatrixXd innerTerms
-        = getJacobianOfClampingConstraintsTranspose(world, mMinv * A_c * Qinv_b)
-          + A_c.transpose() * getJacobianOfMinv(world, A_c * Qinv_b, wrt)
-          + A_c.transpose() * mMinv
-                * getJacobianOfClampingConstraints(world, Qinv_b);
-    Eigen::MatrixXd result = -Qfactored.solve(innerTerms);
-    return result;
+    // Position is the only term that affects A_c and A_ub
+    if (mUpperBoundConstraints.size() > 0)
+    {
+      Eigen::MatrixXd innerTerms
+          = getJacobianOfClampingConstraintsTranspose(
+                world, mMinv * A_c_ub_E * Qinv_b)
+            + A_c.transpose()
+                  * (getJacobianOfMinv(world, A_c_ub_E * Qinv_b, wrt)
+                     + mMinv
+                           * (getJacobianOfClampingConstraints(world, Qinv_b)
+                              + getJacobianOfUpperBoundConstraints(
+                                  world, E * Qinv_b)));
+      Eigen::MatrixXd result = -Qfactored.solve(innerTerms);
+      return result;
+    }
+    else
+    {
+      // If A_ub is empty, this doesn't matter
+      Eigen::MatrixXd innerTerms
+          = getJacobianOfClampingConstraintsTranspose(
+                world, mMinv * A_c * Qinv_b)
+            + A_c.transpose()
+                  * (getJacobianOfMinv(world, A_c * Qinv_b, wrt)
+                     + mMinv * getJacobianOfClampingConstraints(world, Qinv_b));
+      Eigen::MatrixXd result = -Qfactored.solve(innerTerms);
+      return result;
+    }
   }
   else
   {
-    // All other terms get to treat A_c as constant
+    // All other terms get to treat A_c and A_ub as constant
     Eigen::MatrixXd innerTerms
         = A_c.transpose() * getJacobianOfMinv(world, A_c * Qinv_b, wrt);
     Eigen::MatrixXd result = -Qfactored.solve(innerTerms);

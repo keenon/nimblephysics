@@ -326,10 +326,14 @@ private:
   std::vector<std::shared_ptr<dynamics::Skeleton>> getSkeletons(
       simulation::WorldPtr world);
 
-protected:
+public:
   /// This is only true after we've called constructMatrices(). It's a useful
   /// flag to ensure we don't call it twice.
   bool mFinalized;
+
+  /// Impulse test matrix for all the constraints (only initialized in debug
+  /// mode)
+  Eigen::MatrixXd mAllConstraintMatrix;
 
   /// Impulse test matrix for the clamping constraints
   Eigen::MatrixXd mClampingConstraintMatrix;

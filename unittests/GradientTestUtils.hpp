@@ -307,18 +307,6 @@ bool verifyClassicProjectionIntoClampsMatrix(
     return false;
   }
 
-  // Get the integrated velocities
-
-  world->integrateVelocities();
-  VectorXd integratedVelocities = world->getVelocities();
-  world->setVelocities(proposedVelocities);
-
-  // Compute the analytical constraint forces, which should match our actual
-  // constraint forces
-
-  MatrixXd P_c = classicPtr->getProjectionIntoClampsMatrix(world);
-  VectorXd analyticalConstraintForces = -1 * P_c * integratedVelocities;
-
   // Compute the offset required from the penetration correction velocities
 
   VectorXd penetrationCorrectionVelocities
@@ -327,10 +315,13 @@ bool verifyClassicProjectionIntoClampsMatrix(
   Eigen::MatrixXd V_c = classicPtr->getMassedClampingConstraintMatrix(world);
   Eigen::MatrixXd V_ub = classicPtr->getMassedUpperBoundConstraintMatrix(world);
   Eigen::MatrixXd E = classicPtr->getUpperBoundMappingMatrix();
+  double dt = world->getTimeStep();
+  // Eigen::MatrixXd b = classicPtr->getClampingConstraintRelativeVels();
   Eigen::MatrixXd constraintForceToImpliedTorques = V_c + (V_ub * E);
   Eigen::MatrixXd forceToVel
       = A_c.eval().transpose() * constraintForceToImpliedTorques;
   Eigen::MatrixXd velToForce = Eigen::MatrixXd::Zero(0, 0);
+  VectorXi mappings = classicPtr->getContactConstraintMappings();
   if (forceToVel.size() > 0)
   {
     velToForce = forceToVel.completeOrthogonalDecomposition().pseudoInverse();
@@ -338,34 +329,49 @@ bool verifyClassicProjectionIntoClampsMatrix(
   VectorXd penetrationOffset
       = (velToForce * penetrationCorrectionVelocities) / world->getTimeStep();
 
-  // Sum the two constraints forces together
-
-  VectorXd analyticalConstraintForcesCorrected
-      = analyticalConstraintForces + penetrationOffset;
-
   // Get the actual constraint forces
 
-  VectorXd contactConstraintForces
+  VectorXd fReal
       = classicPtr->getContactConstraintImpluses() / world->getTimeStep();
+  VectorXd f_cReal = Eigen::VectorXd::Zero(A_c.cols());
+  std::size_t pointer = 0;
+  for (std::size_t i = 0; i < mappings.size(); i++)
+  {
+    if (mappings(i) == neural::ConstraintMapping::CLAMPING)
+    {
+      f_cReal(pointer) = fReal(i);
+      pointer++;
+    }
+  }
+
+  // Compute the analytical constraint forces, which should match our actual
+  // constraint forces. We center the approximation around our old solution,
+  // because A_c can be low-rank and so many solutions are possible.
+
+  MatrixXd P_c = classicPtr->getProjectionIntoClampsMatrix(world);
+  VectorXd contactVel
+      = (-1.0 / dt) * A_c.transpose() * classicPtr->getPreConstraintVelocity();
+  VectorXd contactVelFromForce = forceToVel * f_cReal;
+  VectorXd centeredVel = contactVel - contactVelFromForce;
+  VectorXd eps = -1 * velToForce * centeredVel;
+  VectorXd f_c = f_cReal + eps;
+
+  // Sum the two constraints forces together
+
+  VectorXd f_cPrime = f_c + penetrationOffset;
 
   // The analytical constraint forces are a shorter vector than the actual
   // constraint forces, since the analytical constraint forces are only
   // computing the constraints that are clamping. So we need to check equality
   // while taking into account that mapping.
 
-  VectorXi mappings = classicPtr->getContactConstraintMappings();
-  VectorXd analyticalError = VectorXd(analyticalConstraintForces.size());
-  VectorXd mappedAnalyticalConstraintForces
-      = Eigen::VectorXd::Zero(contactConstraintForces.size());
-  std::size_t pointer = 0;
+  VectorXd analyticalError = VectorXd(f_c.size());
+  pointer = 0;
   for (std::size_t i = 0; i < mappings.size(); i++)
   {
     if (mappings(i) == neural::ConstraintMapping::CLAMPING)
     {
-      analyticalError(pointer) = contactConstraintForces(i)
-                                 - analyticalConstraintForcesCorrected(pointer);
-      mappedAnalyticalConstraintForces(i)
-          = analyticalConstraintForcesCorrected(pointer);
+      analyticalError(pointer) = fReal(i) - f_cPrime(pointer);
       pointer++;
     }
   }
@@ -373,15 +379,113 @@ bool verifyClassicProjectionIntoClampsMatrix(
   // Check that the analytical error is zero
 
   VectorXd zero = VectorXd::Zero(analyticalError.size());
-  double constraintForces = contactConstraintForces.norm();
-  if (!equals(analyticalError, zero, 1e-8))
+  // We can crunch down this error by making the
+  // BoxedLcpConstraintSolver::makeHyperAccurateAndVerySlow() even more
+  // aggressive in tightening errors on the LCP, but that's very slow.
+  if (!equals(analyticalError, zero, 3e-7))
   {
     std::cout << "Error in verifyClassicProjectionIntoClampsMatrix(): "
               << std::endl;
-    std::cout << "Proposed velocities: " << std::endl
-              << proposedVelocities << std::endl;
-    std::cout << "Integrated velocities: " << std::endl
-              << integratedVelocities << std::endl;
+
+    std::cout << "analyticalError: " << std::endl
+              << analyticalError << std::endl;
+
+    Eigen::MatrixXd Q = classicPtr->mGradientMatrices[0]->mA;
+    Eigen::MatrixXd A = classicPtr->mGradientMatrices[0]->mAllConstraintMatrix;
+    Eigen::MatrixXd A_ub = classicPtr->getUpperBoundConstraintMatrix(world);
+    Eigen::VectorXd bReal = classicPtr->mGradientMatrices[0]->mB;
+    int numContacts = bReal.size();
+
+    /////////////////////////////////////////////////////
+    // Checking the forward computation
+    /////////////////////////////////////////////////////
+
+    // We expect these to be equal
+    Eigen::VectorXd tau = (A_c + A_ub * E) * f_cReal;
+    Eigen::VectorXd tauReal = A * fReal;
+
+    Eigen::MatrixXd compareTaus = Eigen::MatrixXd(tau.size(), 2);
+    compareTaus.col(0) = tau;
+    compareTaus.col(1) = tauReal;
+    std::cout << "(A_c + A_ub * E) * f_cReal  :::   A * fReal" << std::endl
+              << compareTaus << std::endl;
+
+    // We expect these to be equal
+    Eigen::VectorXd v = A.transpose() * (V_c + V_ub * E) * f_cReal;
+    Eigen::VectorXd vReal = Q * fReal;
+
+    Eigen::MatrixXd compareVs = Eigen::MatrixXd(v.size(), 6);
+    compareVs.col(0) = v;
+    compareVs.col(1) = vReal;
+    compareVs.col(2) = bReal / dt;
+    compareVs.col(3) = mappings.cast<double>();
+    compareVs.col(4) = fReal;
+    compareVs.col(5) = vReal - bReal / dt;
+    std::cout << "A^T * (V_c + V_ub * E) * f_cReal  :::   Q * fReal  :::   "
+                 "bReal / dt  :::   indexType   ::: fReal  ::: next v"
+              << std::endl
+              << compareVs << std::endl;
+
+    // Why doesn't least squares over Q find the right solution?
+    Eigen::FullPivLU<Eigen::MatrixXd> lu_decompQ(Q);
+    std::cout << "Dimension of Q: " << Q.rows() << "x" << Q.cols() << std::endl;
+    std::cout << "Rank of Q: " << lu_decompQ.rank() << std::endl;
+    double dist = (vReal - (bReal / dt)).norm();
+
+    Eigen::VectorXd eps
+        = Q.completeOrthogonalDecomposition().solve(bReal / dt - Q * fReal);
+    Eigen::VectorXd centeredApprox = fReal + eps;
+    double distApprox = (Q * centeredApprox - (bReal / dt)).norm();
+
+    std::cout << "Dist of fReal: " << dist << std::endl;
+    std::cout << "Dist of best approx: " << distApprox << std::endl;
+    Eigen::MatrixXd compareSolves = Eigen::MatrixXd(vReal.size(), 6);
+    compareSolves.col(0) = (vReal - (bReal / dt));
+    compareSolves.col(1) = (Q * centeredApprox - (bReal / dt));
+    compareSolves.col(2) = vReal;
+    compareSolves.col(3) = Q * centeredApprox;
+    compareSolves.col(4) = fReal;
+    compareSolves.col(5) = centeredApprox;
+    std::cout << "Q*fReal - bReal ::: Q*Q^{-1}*bReal - bReal ::: Q*fReal ::: "
+                 "Q*Q^{-1}*bReal ::: fReal ::: Q^{-1}*bReal"
+              << std::endl
+              << compareSolves << std::endl;
+
+    // We'd like to try to recover the original forces
+    // Eigen::MatrixXd R = A.transpose() * (V_c + V_ub * E);
+    Eigen::MatrixXd R = A.transpose() * (V_c + V_ub * E);
+    Eigen::FullPivLU<Eigen::MatrixXd> lu_decompR(R);
+    std::cout << "Dimension of R: " << R.rows() << "x" << R.cols() << std::endl;
+    std::cout << "Rank of R: " << lu_decompR.rank() << std::endl;
+    /*
+    std::cout << "Here is a matrix whose columns form a basis of the "
+                 "null-space of R:\n"
+              << lu_decomp.kernel() << std::endl;
+    std::cout << "Here is a matrix whose columns form a basis of the "
+                 "column-space of R:\n"
+              << lu_decomp.image(R) << std::endl;
+    */
+
+    Eigen::VectorXd random = Eigen::VectorXd::Random(R.cols());
+
+    Eigen::MatrixXd errorFwd
+        = random
+          - R.bdcSvd(Eigen::ComputeThinU | Eigen::ComputeThinV)
+                .solve(R * random);
+    Eigen::MatrixXd errorBack
+        = random
+          - R.transpose()
+                * R.transpose()
+                      .bdcSvd(Eigen::ComputeThinU | Eigen::ComputeThinV)
+                      .solve(random);
+
+    Eigen::MatrixXd compareRecovery = Eigen::MatrixXd(errorFwd.size(), 2);
+    compareRecovery.col(0) = errorBack;
+    compareRecovery.col(1) = errorFwd;
+    std::cout << "random - R^T*R^{-T}*random ::: random - R^{-1}*R*random"
+              << std::endl
+              << compareRecovery << std::endl;
+
     /*
     std::cout << "P_c: " << std::endl << P_c << std::endl;
     std::cout << "bounce: " << std::endl
@@ -393,8 +497,8 @@ bool verifyClassicProjectionIntoClampsMatrix(
     }
     */
     /*
-    std::cout << "-(P_c * proposedVelocities) (should be the roughly same as "
-                 "actual constraint forces): "
+    std::cout << "-(P_c * proposedVelocities) (should be the roughly same as
+    " "actual constraint forces): "
               << std::endl
               << analyticalConstraintForces << std::endl;
     std::cout << "Penetration correction velocities: " << std::endl
@@ -407,21 +511,53 @@ bool verifyClassicProjectionIntoClampsMatrix(
 
     // Show the constraint forces at each of the contact points
 
+    /*
     Eigen::MatrixXd comparison
         = Eigen::MatrixXd::Zero(contactConstraintForces.size(), 2);
     comparison.col(0) = contactConstraintForces;
     comparison.col(1) = mappedAnalyticalConstraintForces;
     std::cout
-        << "Real clamping constraint forces - Analytical constraint forces: "
+        << "Real clamping constraint forces - Analytical constraint forces:
+    "
         << std::endl
         << comparison << std::endl;
 
-    // Show the joint forces
+    // Show the contact accels
 
-    // classicPtr->getClampingAMatrix();
+    Eigen::VectorXd realContactAccels
+        = classicPtr->mGradientMatrices[0]->mA * contactConstraintForces;
+    Eigen::VectorXd analyticalContactAccels
+        = classicPtr->mGradientMatrices[0]->mA
+          * mappedAnalyticalConstraintForces;
+    Eigen::MatrixXd jointTorqueComparison
+        = Eigen::MatrixXd::Zero(realContactAccels.size(), 9);
+    double dt = world->getTimeStep();
+    jointTorqueComparison.col(0) = realContactAccels;
+    jointTorqueComparison.col(1) = analyticalContactAccels;
+    jointTorqueComparison.col(2) = mappings.cast<double>();
+    jointTorqueComparison.col(3) = classicPtr->mGradientMatrices[0]->mX;
+    jointTorqueComparison.col(4) = classicPtr->mGradientMatrices[0]->mA
+                                   * classicPtr->mGradientMatrices[0]->mX;
+    jointTorqueComparison.col(5) = classicPtr->mGradientMatrices[0]->mA
+                                       * classicPtr->mGradientMatrices[0]->mX
+                                   - classicPtr->mGradientMatrices[0]->mB;
+    jointTorqueComparison.col(6) = mappedAnalyticalConstraintForces * dt;
+    jointTorqueComparison.col(7) = classicPtr->mGradientMatrices[0]->mA
+                                   * mappedAnalyticalConstraintForces * dt;
+    jointTorqueComparison.col(8) = classicPtr->mGradientMatrices[0]->mA
+                                       * mappedAnalyticalConstraintForces *
+    dt
+                                   - classicPtr->mGradientMatrices[0]->mB;
+    std::cout << "Real contact accels - Analytical contact accels - type -
+    mX "
+                 "- mA*mX - mA*mX - mB - aX - mA*aX - mA*aX - mB: "
+              << std::endl
+              << jointTorqueComparison << std::endl;
+    */
 
     // Show the resulting joint accelerations
 
+    /*
     Eigen::VectorXd realAccel
         = world->getInvMassMatrix() * contactConstraintForces;
     Eigen::VectorXd analyticalAccel
@@ -435,6 +571,8 @@ bool verifyClassicProjectionIntoClampsMatrix(
 
     std::cout << "Analytical error (should be zero):" << std::endl
               << analyticalError << std::endl;
+    */
+
     return false;
   }
 
@@ -588,20 +726,20 @@ bool verifyF_c(WorldPtr world)
 
   neural::BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
   Eigen::MatrixXd A_c = classicPtr->getClampingConstraintMatrix(world);
+  Eigen::MatrixXd A_ub = classicPtr->getUpperBoundConstraintMatrix(world);
+  Eigen::MatrixXd E = classicPtr->getUpperBoundMappingMatrix();
 
   Eigen::MatrixXd realQ = classicPtr->getClampingAMatrix();
   Eigen::VectorXd realB = classicPtr->getClampingConstraintRelativeVels();
 
   Eigen::MatrixXd analyticalQ = Eigen::MatrixXd::Zero(A_c.cols(), A_c.cols());
-  classicPtr->computeLCPConstraintMatrixClampingSubset(world, analyticalQ, A_c);
+  classicPtr->computeLCPConstraintMatrixClampingSubset(
+      world, analyticalQ, A_c, A_ub, E);
   Eigen::VectorXd analyticalB = Eigen::VectorXd(A_c.cols());
   classicPtr->computeLCPOffsetClampingSubset(world, analyticalB, A_c);
 
-  if (!equals(realB, analyticalB, 1e-7) || !equals(realQ, analyticalQ, 2e-5))
+  if (!equals(realB, analyticalB, 1e-7))
   {
-    std::cout << "Real Q:" << std::endl << realQ << std::endl;
-    std::cout << "Analytical Q:" << std::endl << analyticalQ << std::endl;
-    std::cout << "Diff Q:" << std::endl << (realQ - analyticalQ) << std::endl;
     std::cout << "Real B:" << std::endl << realB << std::endl;
     std::cout << "Analytical B:" << std::endl << analyticalB << std::endl;
     classicPtr->computeLCPOffsetClampingSubset(world, analyticalB, A_c);
@@ -609,41 +747,77 @@ bool verifyF_c(WorldPtr world)
     return false;
   }
 
-  Eigen::VectorXd analyticalF_c
-      = classicPtr->estimateClampingConstraintImpulses(world, A_c);
-  Eigen::VectorXd realF_c = classicPtr->getClampingConstraintImpulses();
-  if (!equals(analyticalF_c, realF_c, 2e-5))
+  if (A_ub.cols() == 0 && !equals(realQ, analyticalQ, 2e-5))
   {
-    std::cout << "Real f_c:" << std::endl << realF_c << std::endl;
-    std::cout << "Analytical f_c:" << std::endl << analyticalF_c << std::endl;
-    std::cout << "Diff f_c:" << std::endl
-              << (realF_c - analyticalF_c) << std::endl;
     std::cout << "Real Q:" << std::endl << realQ << std::endl;
-    std::cout << "Real B:" << std::endl << realB << std::endl;
-    std::cout << "Real Qinv*B:" << std::endl
-              << realQ.completeOrthogonalDecomposition().solve(realB)
-              << std::endl;
+    std::cout << "Analytical Q:" << std::endl << analyticalQ << std::endl;
+    std::cout << "Diff Q:" << std::endl << (realQ - analyticalQ) << std::endl;
     return false;
   }
 
-  Eigen::MatrixXd bruteForceJac
-      = classicPtr->finiteDifferenceJacobianOfConstraintForce(
-          world, WithRespectTo::POSITION);
-  Eigen::MatrixXd analyticalJac = classicPtr->getJacobianOfConstraintForce(
-      world, WithRespectTo::POSITION);
-  if (!equals(analyticalJac, bruteForceJac, 2e-5))
+  Eigen::VectorXd analyticalF_c
+      = classicPtr->estimateClampingConstraintImpulses(world, A_c, A_ub, E);
+  Eigen::VectorXd realF_c = classicPtr->getClampingConstraintImpulses();
+  if (!equals(analyticalF_c, realF_c, 3e-5))
   {
-    std::cout << "Brute force f_c Jacobian:" << std::endl
-              << bruteForceJac << std::endl;
-    std::cout << "Analytical f_c Jacobian:" << std::endl
-              << analyticalJac << std::endl;
-    std::cout << "Diff Jac:" << std::endl
-              << (bruteForceJac - analyticalJac) << std::endl;
-    bruteForceJac = classicPtr->finiteDifferenceJacobianOfConstraintForce(
-        world, WithRespectTo::POSITION);
-    analyticalJac = classicPtr->getJacobianOfConstraintForce(
-        world, WithRespectTo::POSITION);
+    Eigen::MatrixXd comparison = Eigen::MatrixXd(realF_c.size(), 3);
+    comparison.col(0) = realF_c;
+    comparison.col(1) = analyticalF_c;
+    comparison.col(2) = (realF_c - analyticalF_c);
+    std::cout << "Real f_c ::: Analytical f_c ::: Diff f_c" << std::endl
+              << comparison << std::endl;
+    // "Real Q" only matches our Q if there are no columns in upper bounds
+    if (A_ub.cols() == 0)
+    {
+      std::cout << "Real Q:" << std::endl << realQ << std::endl;
+      std::cout << "Real B:" << std::endl << realB << std::endl;
+      std::cout << "Real Qinv*B:" << std::endl
+                << realQ.completeOrthogonalDecomposition().solve(realB)
+                << std::endl;
+    }
     return false;
+  }
+
+  if (realQ.size() > 0)
+  {
+    Eigen::MatrixXd bruteForceQinvBJac
+        = classicPtr
+              ->finiteDifferenceJacobianOfLCPConstraintMatrixClampingSubset(
+                  world, realB, WithRespectTo::POSITION);
+    Eigen::MatrixXd analyticalQinvBJac
+        = classicPtr->getJacobianOfLCPConstraintMatrixClampingSubset(
+            world, realB, WithRespectTo::POSITION);
+    if (!equals(analyticalQinvBJac, bruteForceQinvBJac, 2e-5))
+    {
+      std::cout << "Brute force Qinv*b (b constant) Jacobian (top-left 4x4):"
+                << std::endl
+                << bruteForceQinvBJac.block<4, 4>(0, 0) << std::endl;
+      std::cout << "Analytical Qinv*b (b constant) Jacobian (top-left 4x4):"
+                << std::endl
+                << analyticalQinvBJac.block<4, 4>(0, 0) << std::endl;
+      std::cout << "Diff Jac (top-left 4x4):" << std::endl
+                << (bruteForceQinvBJac - analyticalQinvBJac).block<4, 4>(0, 0)
+                << std::endl;
+      return false;
+    }
+
+    Eigen::MatrixXd bruteForceJac
+        = classicPtr->finiteDifferenceJacobianOfConstraintForce(
+            world, WithRespectTo::POSITION);
+    Eigen::MatrixXd analyticalJac = classicPtr->getJacobianOfConstraintForce(
+        world, WithRespectTo::POSITION);
+    if (!equals(analyticalJac, bruteForceJac, 2e-5))
+    {
+      std::cout << "Failed f_c Jacobian!" << std::endl;
+      std::cout << "Brute force f_c Jacobian (top-left 4x4):" << std::endl
+                << bruteForceJac.block<4, 4>(0, 0) << std::endl;
+      std::cout << "Analytical f_c Jacobian (top-left 4x4):" << std::endl
+                << analyticalJac.block<4, 4>(0, 0) << std::endl;
+      std::cout << "Diff Jac (top-left 4x4):" << std::endl
+                << (bruteForceJac - analyticalJac).block<4, 4>(0, 0)
+                << std::endl;
+      return false;
+    }
   }
 
   return true;
@@ -690,7 +864,7 @@ VelocityTest runVelocityTest(WorldPtr world)
   Eigen::MatrixXd Minv = world->getInvMassMatrix();
   Eigen::VectorXd C = world->getCoriolisAndGravityAndExternalForces();
   Eigen::VectorXd f_c
-      = classicPtr->estimateClampingConstraintImpulses(world, A_c);
+      = classicPtr->estimateClampingConstraintImpulses(world, A_c, A_ub, E);
 
   /*
   Eigen::VectorXd b = Eigen::VectorXd(A_c.cols());
@@ -1022,12 +1196,14 @@ bool verifyRecoveredLCPConstraints(WorldPtr world, VectorXd proposedVelocities)
     return true;
 
   MatrixXd A_c = classicPtr->getClampingConstraintMatrix(world);
+  MatrixXd A_ub = classicPtr->getUpperBoundConstraintMatrix(world);
+  MatrixXd E = classicPtr->getUpperBoundMappingMatrix();
 
   if (A_c.cols() == 0)
     return true;
 
   MatrixXd Q = Eigen::MatrixXd::Zero(A_c.cols(), A_c.cols());
-  classicPtr->computeLCPConstraintMatrixClampingSubset(world, Q, A_c);
+  classicPtr->computeLCPConstraintMatrixClampingSubset(world, Q, A_c, A_ub, E);
   Eigen::MatrixXd realQ = classicPtr->getClampingAMatrix();
 
   Eigen::VectorXd b = Eigen::VectorXd::Zero(A_c.cols());
@@ -1035,39 +1211,47 @@ bool verifyRecoveredLCPConstraints(WorldPtr world, VectorXd proposedVelocities)
   Eigen::VectorXd realB = classicPtr->getClampingConstraintRelativeVels();
   /* + (A_c.completeOrthogonalDecomposition().solve(
       classicPtr->getVelocityDueToIllegalImpulses())); */
-  Eigen::VectorXd X = Q.completeOrthogonalDecomposition().solve(b);
-  Eigen::VectorXd realX = classicPtr->getClampingConstraintImpulses();
 
-  Eigen::VectorXd partRealX
-      = realQ.completeOrthogonalDecomposition().solve(realB);
-
-  if (!equals(b, realB, 1e-8))
+  if (!equals(b, realB, 1e-12))
   {
     std::cout << "Error in verifyRecoveredLCPConstraints():" << std::endl;
     std::cout << "analytical B:" << std::endl << b << std::endl;
     std::cout << "real B:" << std::endl << realB << std::endl;
+    /*
     std::cout << "vel due to illegal impulses:" << std::endl
               << classicPtr->getVelocityDueToIllegalImpulses() << std::endl;
+    */
     return false;
   }
 
-  if (!equals(Q, realQ, 1e-8))
+  // The next test doesn't make sense if we have any upper bounded, because the
+  // matrices become more complex
+  if (classicPtr->getNumUpperBound() == 0)
   {
-    std::cout << "Error in verifyRecoveredLCPConstraints():" << std::endl;
-    std::cout << "analytical Q:" << std::endl << Q << std::endl;
-    std::cout << "real Q:" << std::endl << realQ << std::endl;
-    std::cout << "diff:" << std::endl << Q - realQ << std::endl;
-    return false;
+    if (!equals(Q, realQ, 1e-8))
+    {
+      std::cout << "Error in verifyRecoveredLCPConstraints Q():" << std::endl;
+      std::cout << "analytical Q:" << std::endl << Q << std::endl;
+      std::cout << "real Q:" << std::endl << realQ << std::endl;
+      std::cout << "diff:" << std::endl << Q - realQ << std::endl;
+      return false;
+    }
   }
 
+  Eigen::VectorXd realX = classicPtr->getClampingConstraintImpulses();
+  // Q can be low rank, so we center the solution on "realX"
+  Eigen::VectorXd X
+      = Q.completeOrthogonalDecomposition().solve(b - Q * realX) + realX;
+
+  // If we make it this far, it's possible for our computed X to have errors
+  // in it due to inverting a Q matrix that isn't precisely right. But
+  // partRealX is computed using the "real" Q matrix.
   if (!equals(X, realX, 1e-8))
   {
     std::cout << "Error in verifyRecoveredLCPConstraints():" << std::endl;
     std::cout << "analytical X:" << std::endl << X << std::endl;
     std::cout << "real X:" << std::endl << realX << std::endl;
     std::cout << "diff:" << std::endl << X - realX << std::endl;
-    std::cout << "part real X:" << std::endl << partRealX << std::endl;
-    std::cout << "diff:" << std::endl << X - partRealX << std::endl;
     return false;
   }
 
@@ -1076,6 +1260,7 @@ bool verifyRecoveredLCPConstraints(WorldPtr world, VectorXd proposedVelocities)
 
 bool verifyVelGradients(WorldPtr world, VectorXd worldVel)
 {
+  // return verifyScratch(world, WithRespectTo::POSITION);
   // return verifyJacobianOfProjectionIntoClampsMatrix(world, worldVel,
   // POSITION); return verifyScratch(world); return verifyF_c(world); return
   // verifyLinearScratch(); return verifyNextV(world);
