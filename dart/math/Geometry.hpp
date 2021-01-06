@@ -162,6 +162,11 @@ Eigen::Vector3d matrixToEulerZYX(const Eigen::Matrix3d& _R);
 /// \brief Exponential mapping
 Eigen::Isometry3d expMap(const Eigen::Vector6d& _S);
 
+/// \brief Exponential mapping, DART style. This treats the exponentiation
+/// operation as a rotation, and then a translation, rather than an integration
+/// of a screw.
+Eigen::Isometry3d expMapDart(const Eigen::Vector6d& _S);
+
 /// \brief fast version of Exp(se3(s, 0))
 /// \todo This expAngular() can be replaced by Eigen::AngleAxis() but we need
 /// to verify that they have exactly same functionality.
@@ -181,6 +186,10 @@ Eigen::Matrix3d expMapJacDot(
 /// \brief computes the derivative of the Jacobian of the expmap wrt to _qi
 /// indexed dof; _qi \f$ \in \f$ {0,1,2}
 Eigen::Matrix3d expMapJacDeriv(const Eigen::Vector3d& _expmap, int _qi);
+
+/// \brief computes the gradient of logMap(expMapRotation()) wrt to _qi
+/// indexed dof; _qi \f$ \in \f$ {0,1,2}
+Eigen::Vector3d expMapGradient(const Eigen::Vector3d& pos, int _qi);
 
 /// \brief Log mapping
 /// \note When @f$|Log(R)| = @pi@f$, Exp(LogR(R) = Exp(-Log(R)).

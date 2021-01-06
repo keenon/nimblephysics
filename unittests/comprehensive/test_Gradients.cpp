@@ -49,6 +49,7 @@
 #include "dart/neural/NeuralUtils.hpp"
 #include "dart/neural/RestorableSnapshot.hpp"
 #include "dart/neural/WithRespectToMass.hpp"
+#include "dart/server/GUIWebsocketServer.hpp"
 #include "dart/simulation/World.hpp"
 #include "dart/utils/DartResourceRetriever.hpp"
 #include "dart/utils/sdf/sdf.hpp"
@@ -280,6 +281,7 @@ void testBlockWithFrictionCoeff(double frictionCoeff, double mass)
 
   VectorXd worldVel = world->getVelocities();
   // Test the classic formulation
+  EXPECT_TRUE(verifyAnalyticalJacobians(world));
   EXPECT_TRUE(verifyVelGradients(world, worldVel));
   EXPECT_TRUE(verifyAnalyticalBackprop(world));
   EXPECT_TRUE(verifyWrtMass(world));
@@ -1355,7 +1357,8 @@ void testAtlas(bool withGroundContact)
   std::shared_ptr<simulation::World> world = simulation::World::create();
 
   // Set gravity of the world
-  world->setConstraintForceMixingEnabled(true);
+  world->setConstraintForceMixingEnabled(false);
+  world->setPenetrationCorrectionEnabled(false);
   world->setGravity(Eigen::Vector3d(0.0, -9.81, 0));
 
   // Set up the LCP solver to be super super accurate, so our
@@ -1401,8 +1404,8 @@ void testAtlas(bool withGroundContact)
   */
 
   // EXPECT_TRUE(verifyPosGradients(world, 1, 1e-8));
-  EXPECT_TRUE(verifyVelGradients(world, worldVel));
-  // EXPECT_TRUE(verifyAnalyticalJacobians(world));
+  EXPECT_TRUE(verifyAnalyticalJacobians(world));
+  // EXPECT_TRUE(verifyVelGradients(world, worldVel));
   // EXPECT_TRUE(verifyAnalyticalBackprop(world));
   // EXPECT_TRUE(verifyWrtMass(world));
 }
@@ -1414,9 +1417,162 @@ TEST(GRADIENTS, ATLAS_FLOATING)
 }
 #endif
 
-// #ifdef ALL_TESTS
+#ifdef ALL_TESTS
 TEST(GRADIENTS, ATLAS_GROUND)
 {
   testAtlas(true);
 }
-// #endif
+#endif
+
+/******************************************************************************
+
+This test sets up a configuration that looks like this:
+
+          Force
+            |
+            v
+          +---+
+Force --> |   |
+          +---+
+      -------------
+            ^
+       Fixed ground
+
+There's a box with six DOFs, a full FreeJoint, with a force driving it into the
+ground. The ground has configurable friction in this setup.
+
+*/
+void testFreeBlockWithFrictionCoeff(double frictionCoeff, double mass)
+{
+  // World
+  WorldPtr world = World::create();
+  world->setGravity(Eigen::Vector3d::Zero());
+
+  // Set up the LCP solver to be super super accurate, so our
+  // finite-differencing tests don't fail due to LCP errors. This isn't
+  // necessary during a real forward pass, but is helpful to make the
+  // mathematical invarients in the tests more reliable.
+  static_cast<constraint::BoxedLcpConstraintSolver*>(
+      world->getConstraintSolver())
+      ->makeHyperAccurateAndVerySlow();
+
+  ///////////////////////////////////////////////
+  // Create the box
+  ///////////////////////////////////////////////
+
+  SkeletonPtr box = Skeleton::create("box");
+
+  std::pair<FreeJoint*, BodyNode*> pair
+      = box->createJointAndBodyNodePair<FreeJoint>(nullptr);
+  FreeJoint* boxJoint = pair.first;
+  BodyNode* boxBody = pair.second;
+
+  Eigen::Isometry3d fromParent = Eigen::Isometry3d::Identity();
+  fromParent.translation() = Eigen::Vector3d::UnitX();
+  boxJoint->setTransformFromParentBodyNode(fromParent);
+
+  Eigen::Isometry3d fromChild = Eigen::Isometry3d::Identity();
+  fromChild.translation() = Eigen::Vector3d::UnitX();
+  boxJoint->setTransformFromChildBodyNode(fromChild);
+
+  std::shared_ptr<BoxShape> boxShape(
+      new BoxShape(Eigen::Vector3d(1.0, 1.0, 1.0)));
+  boxBody->createShapeNodeWith<VisualAspect, CollisionAspect>(boxShape);
+  boxBody->setFrictionCoeff(frictionCoeff);
+
+  // Add a force driving the box down into the floor, and to the left
+  boxBody->addExtForce(Eigen::Vector3d(1, -1, 0));
+  // Prevent the mass matrix from being Identity
+  boxBody->setMass(mass);
+
+  // Move off the origin to X=1, rotate 90deg on the Y axis
+  box->setPosition(3, 1.0);
+  box->setPosition(1, 90 * M_PI / 180);
+
+  world->addSkeleton(box);
+
+  /*
+  Eigen::Matrix4d realTransform = boxBody->getWorldTransform().matrix();
+  Eigen::Matrix4d expTransform = math::expMapDart(box->getPositions()).matrix();
+  if (realTransform != expTransform)
+  {
+    std::cout << "Transforms don't match!" << std::endl;
+    std::cout << "Real: " << std::endl << realTransform << std::endl;
+    std::cout << "Exp: " << std::endl << expTransform << std::endl;
+    std::cout << "Diff: " << std::endl
+              << (realTransform - expTransform) << std::endl;
+    return;
+  }
+  */
+
+  ///////////////////////////////////////////////
+  // Create the floor
+  ///////////////////////////////////////////////
+
+  SkeletonPtr floor = Skeleton::create("floor");
+
+  std::pair<WeldJoint*, BodyNode*> floorPair
+      = floor->createJointAndBodyNodePair<WeldJoint>(nullptr);
+  WeldJoint* floorJoint = floorPair.first;
+  BodyNode* floorBody = floorPair.second;
+
+  Eigen::Isometry3d floorPosition = Eigen::Isometry3d::Identity();
+  floorPosition.translation() = Eigen::Vector3d(0, -(1.0 - 1e-2), 0);
+  floorJoint->setTransformFromParentBodyNode(floorPosition);
+  floorJoint->setTransformFromChildBodyNode(Eigen::Isometry3d::Identity());
+
+  std::shared_ptr<BoxShape> floorShape(
+      new BoxShape(Eigen::Vector3d(10.0, 1.0, 10.0)));
+  floorBody->createShapeNodeWith<VisualAspect, CollisionAspect>(floorShape);
+  floorBody->setFrictionCoeff(frictionCoeff);
+
+  world->addSkeleton(floor);
+
+  ///////////////////////////////////////////////
+  // Run the tests
+  ///////////////////////////////////////////////
+
+  box->computeForwardDynamics();
+  box->integrateVelocities(world->getTimeStep());
+  VectorXd timestepVel = box->getVelocities();
+  VectorXd timestepWorldVel = world->getVelocities();
+
+  world->step();
+
+  /*
+  server::GUIWebsocketServer server;
+  server.renderWorld(world);
+  server.serve(8070);
+
+  while (server.isServing())
+  {
+  }
+  */
+
+  VectorXd worldVel = world->getVelocities();
+  // Test the classic formulation
+  EXPECT_TRUE(testScrews(world));
+  EXPECT_TRUE(verifyAnalyticalJacobians(world));
+  EXPECT_TRUE(verifyVelGradients(world, worldVel));
+  EXPECT_TRUE(verifyAnalyticalBackprop(world));
+  /*
+  EXPECT_TRUE(verifyWrtMass(world));
+  */
+}
+
+TEST(GRADIENTS, FREE_BLOCK_ON_GROUND_NO_FRICTION)
+{
+  testFreeBlockWithFrictionCoeff(0, 1);
+}
+
+#ifdef ALL_TESTS
+TEST(GRADIENTS, FREE_BLOCK_ON_GROUND_STATIC_FRICTION)
+{
+  testFreeBlockWithFrictionCoeff(1e7, 1);
+}
+
+TEST(GRADIENTS, FREE_BLOCK_ON_GROUND_SLIPPING_FRICTION)
+{
+  testFreeBlockWithFrictionCoeff(0.5, 1);
+}
+#endif

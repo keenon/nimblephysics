@@ -429,6 +429,9 @@ protected:
   const math::Jacobian getRelativeJacobianTimeDeriv() const override;
 
   // Documentation inherited
+  Eigen::Vector6d getWorldAxisScrew(int dof) const override;
+
+  // Documentation inherited
   void addVelocityTo(Eigen::Vector6d& _vel) override;
 
   // Documentation inherited

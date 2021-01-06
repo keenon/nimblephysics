@@ -7,7 +7,9 @@
 #include <gtest/gtest.h>
 #include <math.h>
 
+#include "dart/collision/CollisionResult.hpp"
 #include "dart/collision/dart/DARTCollide.hpp"
+#include "dart/neural/RestorableSnapshot.hpp"
 #include "dart/realtime/Ticker.hpp"
 #include "dart/server/GUIWebsocketServer.hpp"
 #include "dart/utils/DartResourceRetriever.hpp"
@@ -853,6 +855,8 @@ TEST(DARTCollide, BOX_BOX_MESH_FACE_SMALL_FACE_COLLISION)
   Eigen::Vector3d box2Size = Eigen::Vector3d::Ones() * 0.5;
   Eigen::Isometry3d box2Transform = Eigen::Isometry3d::Identity();
   box2Transform.translation()(0) = (0.5 + 0.25) - 0.01;
+  box2Transform.linear()
+      = math::eulerXYZToMatrix(Eigen::Vector3d(0, 0.0001, 0));
 
   ccdBox box2;
   box2.size = &box2Size;
@@ -986,21 +990,26 @@ TEST(DARTCollide, BOX_BOX_MESH_FACE_FACE_OFFSET_COLLISION)
 #ifdef ALL_TESTS
 TEST(DARTCollide, PREPARE_2D_CVX_SHAPE)
 {
-  std::vector<Eigen::Vector2d> shape;
-  shape.emplace_back(0.0, 0.0);
-  shape.emplace_back(0.0, 1.0);
-  shape.emplace_back(1.0, 0.0);
-  shape.emplace_back(1.0, 1.0);
+  std::vector<Eigen::Vector3d> shape;
+  shape.emplace_back(0.0, 0.0, 0.0);
+  shape.emplace_back(0.0, 1.0, 0.0);
+  shape.emplace_back(1.0, 0.0, 0.0);
+  shape.emplace_back(1.0, 1.0, 0.0);
   // In the inside of the convex shape
-  shape.emplace_back(0.6, 0.5);
+  shape.emplace_back(0.6, 0.5, 0.0);
 
-  prepareConvex2DShape(shape);
+  Eigen::Vector3d origin = Eigen::Vector3d::Zero();
+  Eigen::Vector3d basisX = Eigen::Vector3d::UnitX();
+  Eigen::Vector3d basisY = Eigen::Vector3d::UnitY();
+
+  prepareConvex2DShape(shape, origin, basisX, basisY);
   EXPECT_EQ(4, shape.size());
 
   std::vector<double> angles;
   double lastAngle = -450;
-  for (Eigen::Vector2d pt : shape)
+  for (Eigen::Vector3d pt3d : shape)
   {
+    Eigen::Vector2d pt = pointInPlane(pt3d, origin, basisX, basisY);
     double angle = angle2D(Eigen::Vector2d(0.5, 0.5), pt) * 180 / 3.14159;
     EXPECT_TRUE(angle > lastAngle);
     lastAngle = angle;
@@ -1012,53 +1021,119 @@ TEST(DARTCollide, PREPARE_2D_CVX_SHAPE)
 #ifdef ALL_TESTS
 TEST(DARTCollide, CVX_2D_SHAPE_CONTAINS)
 {
-  std::vector<Eigen::Vector2d> shape;
-  shape.emplace_back(0.0, 0.0);
-  shape.emplace_back(0.0, 1.0);
-  shape.emplace_back(1.0, 1.0);
-  shape.emplace_back(1.0, 0.0);
+  std::vector<Eigen::Vector3d> shape;
+  shape.emplace_back(0.0, 0.0, 0.0);
+  shape.emplace_back(0.0, 1.0, 0.0);
+  shape.emplace_back(1.0, 1.0, 0.0);
+  shape.emplace_back(1.0, 0.0, 0.0);
   // Add a point in the inside of the shape
-  shape.emplace_back(0.6, 0.7);
+  shape.emplace_back(0.6, 0.7, 0.0);
 
-  prepareConvex2DShape(shape);
+  Eigen::Vector3d origin = Eigen::Vector3d::Zero();
+  Eigen::Vector3d basisX = Eigen::Vector3d::UnitX();
+  Eigen::Vector3d basisY = Eigen::Vector3d::UnitY();
+
+  prepareConvex2DShape(shape, origin, basisX, basisY);
   EXPECT_EQ(4, shape.size());
 
-  EXPECT_TRUE(convex2DShapeContains(Eigen::Vector2d(0.5, 0.5), shape));
-  EXPECT_TRUE(convex2DShapeContains(Eigen::Vector2d(0.8, 0.2), shape));
-  EXPECT_TRUE(convex2DShapeContains(Eigen::Vector2d(0.2, 0.8), shape));
-  EXPECT_FALSE(convex2DShapeContains(Eigen::Vector2d(1.2, 0.8), shape));
-  EXPECT_FALSE(convex2DShapeContains(Eigen::Vector2d(0.2, -0.8), shape));
+  EXPECT_TRUE(convex2DShapeContains(
+      Eigen::Vector3d(0.5, 0.5, 0.0), shape, origin, basisX, basisY));
+  EXPECT_TRUE(convex2DShapeContains(
+      Eigen::Vector3d(0.8, 0.2, 0.0), shape, origin, basisX, basisY));
+  EXPECT_TRUE(convex2DShapeContains(
+      Eigen::Vector3d(0.2, 0.8, 0.0), shape, origin, basisX, basisY));
+  EXPECT_FALSE(convex2DShapeContains(
+      Eigen::Vector3d(1.2, 0.8, 0.0), shape, origin, basisX, basisY));
+  EXPECT_FALSE(convex2DShapeContains(
+      Eigen::Vector3d(0.2, -0.8, 0.0), shape, origin, basisX, basisY));
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(DARTCollide, PREPARE_2D_CVX_SHAPE_COLINEAR)
+{
+  std::vector<Eigen::Vector3d> shape;
+  // Create a box with vertices at the midpoint of every edge
+  shape.emplace_back(0.0, 0.0, 0.0);
+  shape.emplace_back(0.0, 0.5, 0.0);
+  shape.emplace_back(0.0, 1.0, 0.0);
+  shape.emplace_back(0.5, 1.0, 0.0);
+  shape.emplace_back(1.0, 1.0, 0.0);
+  shape.emplace_back(1.0, 0.5, 0.0);
+  shape.emplace_back(1.0, 0.0, 0.0);
+  shape.emplace_back(0.5, 0.0, 0.0);
+  // In the inside of the convex shape
+  shape.emplace_back(0.6, 0.5, 0.0);
+  shape.emplace_back(0.3, 0.7, 0.0);
+  shape.emplace_back(0.6, 0.2, 0.0);
+
+  // std::random_device rd;
+  std::mt19937 g(42L);
+  std::shuffle(shape.begin(), shape.end(), g);
+
+  Eigen::Vector3d origin = Eigen::Vector3d::Zero();
+  Eigen::Vector3d basisX = Eigen::Vector3d::UnitX();
+  Eigen::Vector3d basisY = Eigen::Vector3d::UnitY();
+
+  prepareConvex2DShape(shape, origin, basisX, basisY);
+  EXPECT_EQ(8, shape.size());
+
+  std::vector<double> angles;
+  double lastAngle = -450;
+  for (Eigen::Vector3d pt3d : shape)
+  {
+    Eigen::Vector2d pt = pointInPlane(pt3d, origin, basisX, basisY);
+    double angle = angle2D(Eigen::Vector2d(0.5, 0.5), pt) * 180 / 3.14159;
+    EXPECT_TRUE(angle > lastAngle);
+    lastAngle = angle;
+    angles.push_back(angle);
+  }
 }
 #endif
 
 #ifdef ALL_TESTS
 TEST(DARTCollide, CVX_2D_SHAPE_CONTAINS_OFFSET_BOX_EXAMPLE)
 {
-  std::vector<Eigen::Vector2d> shape;
-  shape.emplace_back(-0.5, -0.5);
-  shape.emplace_back(0.5, -0.5);
-  shape.emplace_back(0.5, 0.5);
-  shape.emplace_back(-0.5, 0.5);
+  std::vector<Eigen::Vector3d> shape;
+  shape.emplace_back(-0.5, -0.5, 0.0);
+  shape.emplace_back(0.5, -0.5, 0.0);
+  shape.emplace_back(0.5, 0.5, 0.0);
+  shape.emplace_back(-0.5, 0.5, 0.0);
 
-  EXPECT_FALSE(convex2DShapeContains(Eigen::Vector2d(-0.75, -0.25), shape));
+  Eigen::Vector3d origin = Eigen::Vector3d::Zero();
+  Eigen::Vector3d basisX = Eigen::Vector3d::UnitX();
+  Eigen::Vector3d basisY = Eigen::Vector3d::UnitY();
+
+  EXPECT_FALSE(convex2DShapeContains(
+      Eigen::Vector3d(-0.75, -0.25, 0.0), shape, origin, basisX, basisY));
 }
 #endif
 
 #ifdef ALL_TESTS
 TEST(DARTCollide, CVX_2D_SHAPE_CONTAINS_OFFSET)
 {
-  std::vector<Eigen::Vector2d> shape;
-  shape.emplace_back(2.0, 2.0);
-  shape.emplace_back(2.0, 3.0);
-  shape.emplace_back(3.0, 3.0);
-  shape.emplace_back(3.0, 2.0);
-  prepareConvex2DShape(shape);
+  std::vector<Eigen::Vector3d> shape;
+  shape.emplace_back(2.0, 2.0, 0.0);
+  shape.emplace_back(2.0, 3.0, 0.0);
+  shape.emplace_back(3.0, 3.0, 0.0);
+  shape.emplace_back(3.0, 2.0, 0.0);
 
-  EXPECT_TRUE(convex2DShapeContains(Eigen::Vector2d(2.5, 2.5), shape));
-  EXPECT_TRUE(convex2DShapeContains(Eigen::Vector2d(2.8, 2.2), shape));
-  EXPECT_TRUE(convex2DShapeContains(Eigen::Vector2d(2.2, 2.8), shape));
-  EXPECT_FALSE(convex2DShapeContains(Eigen::Vector2d(3.2, 2.8), shape));
-  EXPECT_FALSE(convex2DShapeContains(Eigen::Vector2d(2.2, 1.2), shape));
+  Eigen::Vector3d origin = Eigen::Vector3d::Zero();
+  Eigen::Vector3d basisX = Eigen::Vector3d::UnitX();
+  Eigen::Vector3d basisY = Eigen::Vector3d::UnitY();
+
+  prepareConvex2DShape(shape, origin, basisX, basisY);
+
+  EXPECT_TRUE(convex2DShapeContains(
+      Eigen::Vector3d(2.5, 2.5, 0.0), shape, origin, basisX, basisY));
+  EXPECT_TRUE(convex2DShapeContains(
+      Eigen::Vector3d(2.8, 2.2, 0.0), shape, origin, basisX, basisY));
+  EXPECT_TRUE(convex2DShapeContains(
+      Eigen::Vector3d(2.2, 2.8, 0.0), shape, origin, basisX, basisY));
+  EXPECT_FALSE(convex2DShapeContains(
+      Eigen::Vector3d(3.2, 2.8, 0.0), shape, origin, basisX, basisY));
+  EXPECT_FALSE(convex2DShapeContains(
+      Eigen::Vector3d(2.2, 1.2, 0.0), shape, origin, basisX, basisY));
 }
 #endif
 
@@ -1254,7 +1329,7 @@ TEST(DARTCollide, MESH_WITNESS_POINTS_RANDOM)
   box.transform = &boxTransform;
   box.size = &boxSize;
 
-  for (int i = 0; i < 20; i++)
+  for (int test = 0; test < 20; test++)
   {
     Eigen::Vector3d dirVec = Eigen::Vector3d::Random();
 
@@ -1417,29 +1492,93 @@ TEST(DARTCollide, MESH_MESH_FACE_FACE_OFFSET_COLLISION)
 }
 #endif
 
+// The number of contacts shouldn't change under tiny perturbations to position,
+// and the contacts should move in predictable ways.
+
 #ifdef ALL_TESTS
-TEST(DARTCollide, WEIRD_GRAVITY)
+TEST(DARTCollide, ATLAS_5_STABILITY)
 {
   // Create a world
   std::shared_ptr<simulation::World> world = simulation::World::create();
 
+  // Set gravity of the world
+  world->setConstraintForceMixingEnabled(true);
   // world->setPenetrationCorrectionEnabled(true);
-  Eigen::Vector3d gravity = Eigen::Vector3d(0.0, -9.81, 0);
-  world->setGravity(gravity);
+  world->setGravity(Eigen::Vector3d(0.0, -9.81, 0));
 
-  std::shared_ptr<dynamics::Skeleton> box = dynamics::Skeleton::create("box");
-  auto pair = box->createJointAndBodyNodePair<dynamics::FreeJoint>();
-  world->addSkeleton(box);
+  // Load ground and Atlas robot and add them to the world
+  dart::utils::DartLoader urdfLoader;
+  std::shared_ptr<dynamics::Skeleton> ground
+      = urdfLoader.parseSkeleton("dart://sample/sdf/atlas/ground.urdf");
 
-  box->setPosition(0, 3.141 * 0.4);
+  std::shared_ptr<dynamics::Skeleton> atlas
+      = dart::utils::SdfParser::readSkeleton(
+          "dart://sample/sdf/atlas/atlas_v3_no_head.sdf");
 
+  world->addSkeleton(ground);
+  world->addSkeleton(atlas);
+
+  // Set initial configuration for Atlas robot
+  atlas->setPosition(0, -0.5 * dart::math::constantsd::pi());
+  neural::RestorableSnapshot snapshot(world);
+
+  // Get the first snapshot
   world->step();
+  std::vector<collision::Contact> originalContacts
+      = world->getLastCollisionResult().getContacts();
 
-  Eigen::Vector3d vel = box->getVelocities().tail<3>();
-  Eigen::Vector3d transformedGravity
-      = pair.second->getWorldTransform() * gravity;
-  std::cout << "Vel: " << vel << std::endl;
-  std::cout << "Gravity: " << transformedGravity << std::endl;
+  snapshot.restore();
+
+  // Perturb by a tiny bit
+  atlas->setPosition(0, atlas->getPosition(0) + 1e-8);
+
+  // Get the second snapshot
+  world->step();
+  std::vector<collision::Contact> perturbedContacts
+      = world->getLastCollisionResult().getContacts();
+
+  snapshot.restore();
+
+  EXPECT_EQ(originalContacts.size(), perturbedContacts.size());
+
+  /*
+  server::GUIWebsocketServer server;
+  server.renderWorld(world);
+  int counter = 0;
+  for (collision::Contact col : originalContacts)
+  {
+    bool foundDuplicate = false;
+    for (collision::Contact col2 : perturbedContacts)
+    {
+      if ((col.point - col2.point).norm() < 1e-8)
+      {
+        foundDuplicate = true;
+      }
+    }
+    if (foundDuplicate)
+      continue;
+
+    std::vector<Eigen::Vector3d> points;
+    points.push_back(col.point);
+    points.push_back(col.point - col.normal);
+    server.createLine("contact_" + counter, points, Eigen::Vector3d::UnitY());
+    counter++;
+  }
+  for (collision::Contact col : perturbedContacts)
+  {
+    std::vector<Eigen::Vector3d> points;
+    points.push_back(col.point);
+    points.push_back(col.point - col.normal);
+    server.createLine("contact_" + counter, points, Eigen::Vector3d::UnitZ());
+    counter++;
+  }
+
+  server.serve(8070);
+
+  while (server.isServing())
+  {
+  }
+  */
 }
 #endif
 
@@ -1467,16 +1606,15 @@ TEST(DARTCollide, ATLAS_5)
       new BoxShape(Eigen::Vector3d(1.0, 1.0, 1.0)));
   // std::shared_ptr<SphereShape> boxShape(new SphereShape(1.0));
 
-  /*
-  auto retriever = std::make_shared<utils::CompositeResourceRetriever>();
-  retriever->addSchemaRetriever(
-      "file", std::make_shared<common::LocalResourceRetriever>());
-  retriever->addSchemaRetriever("dart", utils::DartResourceRetriever::create());
-  std::string meshURI = "dart://sample/sdf/atlas/l_foot.dae";
-  const aiScene* model = dynamics::MeshShape::loadMesh(meshURI, retriever);
-  dynamics::ShapePtr meshShape = std::make_shared<dynamics::MeshShape>(
-      Eigen::Vector3d::Ones(), model, meshURI, retriever);
-      */
+  // auto retriever = std::make_shared<utils::CompositeResourceRetriever>();
+  // retriever->addSchemaRetriever(
+  //    "file", std::make_shared<common::LocalResourceRetriever>());
+  // retriever->addSchemaRetriever("dart",
+  //    utils::DartResourceRetriever::create());
+  // std::string meshURI = "dart://sample/sdf/atlas/l_foot.dae";
+  // const aiScene* model = dynamics::MeshShape::loadMesh(meshURI, retriever);
+  // dynamics::ShapePtr meshShape = std::make_shared<dynamics::MeshShape>(
+  //    Eigen::Vector3d::Ones(), model, meshURI, retriever);
 
   std::shared_ptr<dynamics::Skeleton> box = dynamics::Skeleton::create("box");
   auto pair = box->createJointAndBodyNodePair<dynamics::FreeJoint>();

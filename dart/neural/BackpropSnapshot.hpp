@@ -274,6 +274,16 @@ public:
   Eigen::MatrixXd getJacobianOfLCPOffsetClampingSubset(
       simulation::WorldPtr world, WithRespectTo* wrt);
 
+  /// This returns the jacobian of b (from Q^{-1}b) with respect to wrt, by
+  /// finite differencing
+  Eigen::MatrixXd finiteDifferenceJacobianOfLCPEstimatedOffsetClampingSubset(
+      simulation::WorldPtr world, WithRespectTo* wrt);
+
+  /// This returns the jacobian of b (from Q^{-1}b) with respect to wrt, by
+  /// finite differencing
+  Eigen::MatrixXd finiteDifferenceJacobianOfLCPOffsetClampingSubset(
+      simulation::WorldPtr world, WithRespectTo* wrt);
+
   /// This returns the subset of the A matrix used by the original LCP for just
   /// the clamping constraints. It relates constraint force to constraint
   /// acceleration. It's a mass matrix, just in a weird frame.
@@ -420,6 +430,12 @@ public:
   /// This returns the jacobian of constraint force, holding everyhing constant
   /// except the value of WithRespectTo
   Eigen::MatrixXd finiteDifferenceJacobianOfConstraintForce(
+      simulation::WorldPtr world, WithRespectTo* wrt);
+
+  /// This returns the jacobian of estimated constraint force, without actually
+  /// running forward passes, holding everyhing constant except the value of
+  /// WithRespectTo
+  Eigen::MatrixXd finiteDifferenceJacobianOfEstimatedConstraintForce(
       simulation::WorldPtr world, WithRespectTo* wrt);
 
   /// These was the mX() vector used to construct this. Pretty much only here

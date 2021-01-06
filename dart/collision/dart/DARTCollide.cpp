@@ -52,7 +52,7 @@ namespace collision {
 // normal : normal vector from right to left 0 <- 1
 // penetration : real positive means penetration
 
-#define DART_COLLISION_WITNESS_PLANE_DEPTH 0.005
+#define DART_COLLISION_WITNESS_PLANE_DEPTH 0.01
 #define DART_COLLISION_EPS 1E-6
 static const int MAX_CYLBOX_CLIP_POINTS = 16;
 static const int nCYLINDER_AXIS = 2;
@@ -1539,45 +1539,18 @@ std::vector<Eigen::Vector3d> ccdPointsAtWitnessBox(
   // apply rotation on direction vector
   Eigen::Vector3d localDir = box->transform->linear().transpose() * dir;
 
-  double EPS = 1e-7;
-
-  std::vector<Eigen::Vector3d> points;
+  std::vector<Eigen::Vector3d> localPoints;
 
   std::vector<double> boundsX;
   std::vector<double> boundsY;
   std::vector<double> boundsZ;
 
-  double negMult = neg ? -1 : 1;
-
-  if (std::abs(localDir(0)) < EPS)
-  {
-    boundsX.push_back((*box->size)(0) * 0.5);
-    boundsX.push_back((*box->size)(0) * -0.5);
-  }
-  else
-  {
-    boundsX.push_back(negMult * ccdSign(localDir(0)) * (*box->size)(0) * 0.5);
-  }
-
-  if (std::abs(localDir(1)) < EPS)
-  {
-    boundsY.push_back((*box->size)(1) * 0.5);
-    boundsY.push_back((*box->size)(1) * -0.5);
-  }
-  else
-  {
-    boundsY.push_back(negMult * ccdSign(localDir(1)) * (*box->size)(1) * 0.5);
-  }
-
-  if (std::abs(localDir(2)) < EPS)
-  {
-    boundsZ.push_back((*box->size)(2) * 0.5);
-    boundsZ.push_back((*box->size)(2) * -0.5);
-  }
-  else
-  {
-    boundsZ.push_back(negMult * ccdSign(localDir(2)) * (*box->size)(2) * 0.5);
-  }
+  boundsX.push_back((*box->size)(0) * 0.5);
+  boundsX.push_back((*box->size)(0) * -0.5);
+  boundsY.push_back((*box->size)(1) * 0.5);
+  boundsY.push_back((*box->size)(1) * -0.5);
+  boundsZ.push_back((*box->size)(2) * 0.5);
+  boundsZ.push_back((*box->size)(2) * -0.5);
 
   for (double x : boundsX)
   {
@@ -1585,8 +1558,28 @@ std::vector<Eigen::Vector3d> ccdPointsAtWitnessBox(
     {
       for (double z : boundsZ)
       {
-        points.push_back((*box->transform) * Eigen::Vector3d(x, y, z));
+        localPoints.push_back(Eigen::Vector3d(x, y, z));
       }
+    }
+  }
+
+  double negMult = neg ? -1 : 1;
+
+  double maxDot = -1 * std::numeric_limits<double>::infinity();
+  for (Eigen::Vector3d& localPoint : localPoints)
+  {
+    double dot = negMult * localPoint.dot(localDir);
+    if (dot > maxDot)
+      maxDot = dot;
+  }
+
+  std::vector<Eigen::Vector3d> points;
+  for (Eigen::Vector3d& localPoint : localPoints)
+  {
+    double dot = negMult * localPoint.dot(localDir);
+    if (maxDot - dot < DART_COLLISION_WITNESS_PLANE_DEPTH)
+    {
+      points.push_back((*box->transform) * localPoint);
     }
   }
 
@@ -1615,9 +1608,12 @@ std::vector<Eigen::Vector3d> ccdPointsAtWitnessMesh(
     aiMesh* m = mesh->mesh->mMeshes[i];
     for (int k = 0; k < m->mNumVertices; k++)
     {
-      double dot = m->mVertices[k].x * localDir(0)
-                   + m->mVertices[k].y * localDir(1)
-                   + m->mVertices[k].z * localDir(2);
+      double dot = m->mVertices[k].x * localDir(0) * (*mesh->scale)(0)
+                       * (*mesh->scale)(0)
+                   + m->mVertices[k].y * localDir(1) * (*mesh->scale)(1)
+                         * (*mesh->scale)(1)
+                   + m->mVertices[k].z * localDir(2) * (*mesh->scale)(2)
+                         * (*mesh->scale)(2);
       if (((dot > maxDot) && !neg) || ((dot < maxDot) && neg))
       {
         maxDot = dot;
@@ -1631,9 +1627,12 @@ std::vector<Eigen::Vector3d> ccdPointsAtWitnessMesh(
     aiMesh* m = mesh->mesh->mMeshes[i];
     for (int k = 0; k < m->mNumVertices; k++)
     {
-      double dot = m->mVertices[k].x * localDir(0)
-                   + m->mVertices[k].y * localDir(1)
-                   + m->mVertices[k].z * localDir(2);
+      double dot = m->mVertices[k].x * localDir(0) * (*mesh->scale)(0)
+                       * (*mesh->scale)(0)
+                   + m->mVertices[k].y * localDir(1) * (*mesh->scale)(1)
+                         * (*mesh->scale)(1)
+                   + m->mVertices[k].z * localDir(2) * (*mesh->scale)(2)
+                         * (*mesh->scale)(2);
       // If we're on the witness plane with our "maxDot" vector, then add us to
       // the list
       if (std::abs(dot - maxDot) < DART_COLLISION_WITNESS_PLANE_DEPTH)
@@ -1683,6 +1682,31 @@ int createMeshMeshContacts(
         << std::endl;
   }
   assert(pointsAWitness.size() > 0 && pointsBWitness.size() > 0);
+
+  std::vector<Eigen::Vector3d> pointsAWitnessSorted = pointsAWitness;
+  std::vector<Eigen::Vector3d> pointsBWitnessSorted = pointsBWitness;
+
+  // `dir` points from A to B, so we want the highest dot product of dir at the
+  // front of A
+  std::sort(
+      pointsAWitnessSorted.begin(),
+      pointsAWitnessSorted.end(),
+      [dir](Eigen::Vector3d& a, Eigen::Vector3d& b) {
+        double aDot = a(0) * dir->v[0] + a(1) * dir->v[1] + a(2) * dir->v[2];
+        double bDot = b(0) * dir->v[0] + b(1) * dir->v[1] + b(2) * dir->v[2];
+        return aDot < bDot;
+      });
+  // `dir` points from A to B, so we want the lowest dot product of dir at the
+  // front of B
+  std::sort(
+      pointsBWitnessSorted.begin(),
+      pointsBWitnessSorted.end(),
+      [dir](Eigen::Vector3d& a, Eigen::Vector3d& b) {
+        double aDot = a(0) * dir->v[0] + a(1) * dir->v[1] + a(2) * dir->v[2];
+        double bDot = b(0) * dir->v[0] + b(1) * dir->v[1] + b(2) * dir->v[2];
+        return aDot > bDot;
+      });
+
   // Single vertex-face collision
   if (pointsAWitness.size() == 1 && pointsBWitness.size() > 2)
   {
@@ -1691,11 +1715,12 @@ int createMeshMeshContacts(
     contact.collisionObject2 = o2;
     contact.point = pointsAWitness[0];
 
-    // All the pointsBWitness vectors are co-planar, so we arbitrarily choose
+    // All the pointsBWitness vectors are co-planar, so we choose the closest
     // [0], [1] and [2] to cross to get a precise normal
-    Eigen::Vector3d normal = (pointsBWitness[0] - pointsBWitness[1])
-                                 .cross(pointsBWitness[1] - pointsBWitness[2])
-                                 .normalized();
+    Eigen::Vector3d normal
+        = (pointsBWitnessSorted[0] - pointsBWitnessSorted[1])
+              .cross(pointsBWitnessSorted[1] - pointsBWitnessSorted[2])
+              .normalized();
 
     // Ensure that the normal is in the opposite direction as `dir`, so we're
     // still pointing from B to A.
@@ -1708,7 +1733,7 @@ int createMeshMeshContacts(
     // Make sure that the normal vector is pointed from B to A, which should
     // mean that distA > distB because A's vertex is penetrating B
     double distA = pointsAWitness[0].dot(normal);
-    double distB = pointsBWitness[0].dot(normal);
+    double distB = pointsBWitnessSorted[0].dot(normal);
     // Normal is fine as it is
     contact.penetrationDepth = abs(distA - distB);
 
@@ -1725,11 +1750,13 @@ int createMeshMeshContacts(
     contact.collisionObject2 = o2;
     contact.point = pointsBWitness[0];
 
-    // All the pointsAWitness vectors are co-planar, so we arbitrarily choose
+    // All the pointsAWitness vectors are co-planar, so we choose the closest
     // [0], [1], and [2] to cross to get a precise normal
-    Eigen::Vector3d normal = (pointsAWitness[0] - pointsAWitness[1])
-                                 .cross(pointsAWitness[1] - pointsAWitness[2])
-                                 .normalized();
+    Eigen::Vector3d normal
+        = (pointsAWitnessSorted[0] - pointsAWitnessSorted[1])
+              .cross(pointsAWitnessSorted[1] - pointsAWitnessSorted[2])
+              .normalized();
+
     // Ensure that the normal is in the opposite direction as `dir`, so we're
     // still pointing from B to A.
     double normalDot
@@ -1740,7 +1767,7 @@ int createMeshMeshContacts(
 
     // Make sure that the normal vector is pointed from B to A, which should
     // mean that distB > distA because B's vertex is penetrating A
-    double distA = pointsAWitness[0].dot(normal);
+    double distA = pointsAWitnessSorted[0].dot(normal);
     double distB = pointsBWitness[0].dot(normal);
     // Normal is fine as it is
     contact.penetrationDepth = abs(distA - distB);
@@ -1806,9 +1833,10 @@ int createMeshMeshContacts(
   {
     // All the pointsBWitness vectors are co-planar, so we arbitrarily choose
     // [0], [1] and [2] to cross to get a precise normal
-    Eigen::Vector3d normal = (pointsBWitness[0] - pointsBWitness[1])
-                                 .cross(pointsBWitness[1] - pointsBWitness[2])
-                                 .normalized();
+    Eigen::Vector3d normal
+        = (pointsBWitnessSorted[0] - pointsBWitnessSorted[1])
+              .cross(pointsBWitnessSorted[1] - pointsBWitnessSorted[2])
+              .normalized();
     // Ensure that the normal is in the opposite direction as `dir`, so we're
     // still pointing from B to A.
     double normalDot
@@ -1826,7 +1854,7 @@ int createMeshMeshContacts(
       // Make sure that the normal vector is pointed from B to A, which should
       // mean that distA > distB because A's vertex is penetrating B
       double distA = vertexA.dot(normal);
-      double distB = pointsBWitness[0].dot(normal);
+      double distB = pointsBWitnessSorted[0].dot(normal);
       contact.normal = normal;
       contact.penetrationDepth = abs(distA - distB);
 
@@ -1841,9 +1869,10 @@ int createMeshMeshContacts(
   {
     // All the pointsAWitness vectors are co-planar, so we arbitrarily choose
     // [0], [1], and [2] to cross to get a precise normal
-    Eigen::Vector3d normal = (pointsAWitness[0] - pointsAWitness[1])
-                                 .cross(pointsAWitness[1] - pointsAWitness[2])
-                                 .normalized();
+    Eigen::Vector3d normal
+        = (pointsAWitnessSorted[0] - pointsAWitnessSorted[1])
+              .cross(pointsAWitnessSorted[1] - pointsAWitnessSorted[2])
+              .normalized();
     // Ensure that the normal is in the opposite direction as `dir`, so we're
     // still pointing from B to A.
     double normalDot
@@ -1860,7 +1889,7 @@ int createMeshMeshContacts(
 
       // Make sure that the normal vector is pointed from B to A, which should
       // mean that distB > distA because B's vertex is penetrating A
-      double distA = pointsAWitness[0].dot(normal);
+      double distA = pointsAWitnessSorted[0].dot(normal);
       double distB = vertexB.dot(normal);
       contact.normal = normal;
       contact.penetrationDepth = abs(distB - distA);
@@ -1884,7 +1913,7 @@ int createMeshMeshContacts(
     Eigen::Vector3d normal = Eigen::Vector3d(dir->v[0], dir->v[1], dir->v[2]);
     // Ensure the normal is orthogonal to edge B, at least
     Eigen::Vector3d edgeB
-        = (pointsBWitness[1] - pointsBWitness[1]).normalized();
+        = (pointsBWitness[0] - pointsBWitness[1]).normalized();
     normal -= normal.dot(edgeB) * edgeB;
     // Ensure that the normal is in the opposite direction as `dir`, so we're
     // still pointing from B to A.
@@ -1980,14 +2009,17 @@ int createMeshMeshContacts(
   {
     assert(pointsAWitness.size() > 2 || pointsBWitness.size() > 2);
 
-    // All the pointsAWitness vectors are co-planar, so we arbitrarily choose
+    // All the pointsAWitness vectors are co-planar, so we choose the closest
     // [0], [1], and [2] to cross to get a precise normal
-    Eigen::Vector3d normalA = (pointsAWitness[0] - pointsAWitness[1])
-                                  .cross(pointsAWitness[1] - pointsAWitness[2])
-                                  .normalized();
-    Eigen::Vector3d normalB = (pointsBWitness[0] - pointsBWitness[1])
-                                  .cross(pointsBWitness[1] - pointsBWitness[2])
-                                  .normalized();
+    Eigen::Vector3d normalA
+        = (pointsAWitnessSorted[0] - pointsAWitnessSorted[1])
+              .cross(pointsAWitnessSorted[1] - pointsAWitnessSorted[2])
+              .normalized();
+    // Likewise for the pointsBWitness vectors
+    Eigen::Vector3d normalB
+        = (pointsBWitnessSorted[0] - pointsBWitnessSorted[1])
+              .cross(pointsBWitnessSorted[1] - pointsBWitnessSorted[2])
+              .normalized();
 
     Eigen::Vector3d dirVec = Eigen::Vector3d(dir->v[0], dir->v[1], dir->v[2]);
 
@@ -2030,17 +2062,21 @@ int createMeshMeshContacts(
     if (normalBDot > 0)
       normalB *= -1;
 
+    Eigen::Vector3d normal = ((normalA + normalB) / 2).normalized();
+
     // This will the origin for our 2D plane we're going to use to compute
     // collision geometry. We use different origins for object A and B, because
     // they're slightly offset from each other in space due to penetration
     // distance.
-    Eigen::Vector3d originA = normalA * (pointsAWitness[0].dot(normalA));
-    Eigen::Vector3d originB = normalB * (pointsBWitness[0].dot(normalB));
+    Eigen::Vector3d originA = normal * (pointsAWitnessSorted[0].dot(normal));
+    Eigen::Vector3d originB = normal * (pointsBWitnessSorted[0].dot(normal));
 
-    Eigen::Vector3d tmp = normalA.cross(Eigen::Vector3d::UnitZ());
+    Eigen::Vector3d origin = (originA + originB) / 2;
+
+    Eigen::Vector3d tmp = normal.cross(Eigen::Vector3d::UnitZ());
     if (tmp.squaredNorm() < 1e-4)
     {
-      tmp = normalA.cross(Eigen::Vector3d::UnitX());
+      tmp = normal.cross(Eigen::Vector3d::UnitX());
     }
 
     // These are the basis for our 2D plane (with an origin at `origin2d` in 3D
@@ -2048,6 +2084,7 @@ int createMeshMeshContacts(
     Eigen::Vector3d basis2dX = normalA.cross(tmp);
     Eigen::Vector3d basis2dY = normalA.cross(basis2dX);
 
+    /*
     std::vector<Eigen::Vector2d> flatAWitness;
     for (Eigen::Vector3d vertexA : pointsAWitness)
     {
@@ -2091,9 +2128,12 @@ int createMeshMeshContacts(
     }
 #endif
     // </sanity check>
+    */
 
-    prepareConvex2DShape(flatAWitness);
-    prepareConvex2DShape(flatBWitness);
+    std::vector<Eigen::Vector3d> pointsAConvex = pointsAWitness;
+    prepareConvex2DShape(pointsAConvex, origin, basis2dX, basis2dY);
+    std::vector<Eigen::Vector3d> pointsBConvex = pointsBWitness;
+    prepareConvex2DShape(pointsBConvex, origin, basis2dX, basis2dY);
 
     int numContacts = 0;
 
@@ -2102,14 +2142,13 @@ int createMeshMeshContacts(
 
     // Start with points from object A. We'll later do the symmetric thing for
     // object B.
-    for (int i = 0; i < flatAWitness.size(); i++)
+    for (int i = 0; i < pointsAConvex.size(); i++)
     {
-      Eigen::Vector2d ptA = flatAWitness[i];
-      if (convex2DShapeContains(ptA, flatBWitness))
+      Eigen::Vector3d vertexA = pointsAConvex[i];
+      if (convex2DShapeContains(
+              vertexA, pointsBConvex, origin, basis2dX, basis2dY))
       {
         numContacts++;
-        Eigen::Vector3d vertexA
-            = originA + ptA(0) * basis2dX + ptA(1) * basis2dY;
 
         Contact contact;
         contact.collisionObject1 = o1;
@@ -2119,7 +2158,7 @@ int createMeshMeshContacts(
         // Make sure that the normal vector is pointed from B to A, which should
         // mean that distA > distB because A's vertex is penetrating B
         double distA = vertexA.dot(normalB);
-        double distB = pointsBWitness[0].dot(normalB);
+        double distB = pointsBWitnessSorted[0].dot(normalB);
         contact.normal = normalB;
         contact.penetrationDepth = distB - distA;
 
@@ -2129,14 +2168,13 @@ int createMeshMeshContacts(
     }
 
     // Now we need to repeat analagous logic for the vertices in shape B
-    for (int i = 0; i < flatBWitness.size(); i++)
+    for (int i = 0; i < pointsBConvex.size(); i++)
     {
-      Eigen::Vector2d ptB = flatBWitness[i];
-      if (convex2DShapeContains(ptB, flatAWitness))
+      Eigen::Vector3d vertexB = pointsBConvex[i];
+      if (convex2DShapeContains(
+              vertexB, pointsAConvex, origin, basis2dX, basis2dY))
       {
         numContacts++;
-        Eigen::Vector3d vertexB
-            = originB + ptB(0) * basis2dX + ptB(1) * basis2dY;
 
         Contact contact;
         contact.collisionObject1 = o1;
@@ -2145,7 +2183,7 @@ int createMeshMeshContacts(
 
         // Make sure that the normal vector is pointed from B to A, which should
         // mean that distB > distA because B's vertex is penetrating A
-        double distA = pointsAWitness[0].dot(normalA);
+        double distA = pointsAWitnessSorted[0].dot(normalA);
         double distB = vertexB.dot(normalA);
         contact.normal = normalA;
         contact.penetrationDepth = distB - distA;
@@ -2157,16 +2195,20 @@ int createMeshMeshContacts(
 
     // Now finally we check every pair of edges in shape A and shape B for
     // collisions.
-    for (int i = 0; i < flatAWitness.size(); i++)
+    for (int i = 0; i < pointsAConvex.size(); i++)
     {
-      Eigen::Vector2d a1 = flatAWitness[i];
-      Eigen::Vector2d a2
-          = flatAWitness[i == flatAWitness.size() - 1 ? 0 : i + 1];
-      for (int j = 0; j < flatBWitness.size(); j++)
+      Eigen::Vector3d a1World = pointsAConvex[i];
+      Eigen::Vector3d a2World
+          = pointsAConvex[i == pointsAConvex.size() - 1 ? 0 : i + 1];
+      Eigen::Vector2d a1 = pointInPlane(a1World, origin, basis2dX, basis2dY);
+      Eigen::Vector2d a2 = pointInPlane(a2World, origin, basis2dX, basis2dY);
+      for (int j = 0; j < pointsBConvex.size(); j++)
       {
-        Eigen::Vector2d b1 = flatBWitness[j];
-        Eigen::Vector2d b2
-            = flatBWitness[j == flatBWitness.size() - 1 ? 0 : j + 1];
+        Eigen::Vector3d b1World = pointsBConvex[j];
+        Eigen::Vector3d b2World
+            = pointsBConvex[j == pointsBConvex.size() - 1 ? 0 : j + 1];
+        Eigen::Vector2d b1 = pointInPlane(b1World, origin, basis2dX, basis2dY);
+        Eigen::Vector2d b2 = pointInPlane(b2World, origin, basis2dX, basis2dY);
 
         Eigen::Vector2d out;
         if (get2DLineIntersection(a1, a2, b1, b2, out))
@@ -2175,14 +2217,6 @@ int createMeshMeshContacts(
           numContacts++;
 
           // Get the relevant points in 3D space
-          Eigen::Vector3d a1World
-              = originA + a1(0) * basis2dX + a1(1) * basis2dY;
-          Eigen::Vector3d a2World
-              = originA + a2(0) * basis2dX + a2(1) * basis2dY;
-          Eigen::Vector3d b1World
-              = originB + b1(0) * basis2dX + b1(1) * basis2dY;
-          Eigen::Vector3d b2World
-              = originB + b2(0) * basis2dX + b2(1) * basis2dY;
           Eigen::Vector3d edgeAClosestPoint
               = originA + out(0) * basis2dX + out(1) * basis2dY;
           Eigen::Vector3d edgeBClosestPoint
@@ -2218,6 +2252,132 @@ int createMeshMeshContacts(
   return 0;
 }
 
+/// This is necessary preparation for rapidly checking if another point is
+/// contained within the convex shape. This sorts the shape by angle from the
+/// center, and trims out any points that lie inside the convex polygon.
+void prepareConvex2DShape(
+    std::vector<Eigen::Vector3d>& shape,
+    const Eigen::Vector3d& origin,
+    const Eigen::Vector3d& basis2dX,
+    const Eigen::Vector3d& basis2dY)
+{
+  /*
+  #ifndef NDEBUG
+    int originalSize = shape.size();
+  #endif
+  */
+
+  // We need to throw out any points on the inside of the convex shape
+  // TODO: there's gotta be a better algorithm than O(n^3).
+  while (shape.size() > 0)
+  {
+    bool foundAnyToRemove = false;
+    for (int i = 0; i < shape.size(); i++)
+    {
+      bool foundBoundaryPlane = false;
+      Eigen::Vector2d shapeI
+          = pointInPlane(shape[i], origin, basis2dX, basis2dY);
+
+      for (int j = 0; j < shape.size(); j++)
+      {
+        if (i == j)
+          continue;
+        Eigen::Vector2d shapeJ
+            = pointInPlane(shape[j], origin, basis2dX, basis2dY);
+
+        Eigen::Vector2d plane
+            = Eigen::Vector2d(shapeI(1) - shapeJ(1), shapeJ(0) - shapeI(0))
+                  .normalized();
+        double b = -plane.dot(shapeI);
+
+        bool isBoundaryPlane = true;
+
+        int side = 0;
+        for (int k = 0; k < shape.size(); k++)
+        {
+          double measure
+              = plane.dot(pointInPlane(shape[k], origin, basis2dX, basis2dY))
+                + b;
+          int kSide = ccdSign(measure);
+
+          if (std::abs(measure) < 1e-3)
+          {
+            // This is colinear with the proposed boundary plane, ignore it
+          }
+          else if (side == 0)
+          {
+            side = kSide;
+          }
+          else if (side != kSide)
+          {
+            isBoundaryPlane = false;
+            break;
+          }
+        }
+
+        if (isBoundaryPlane)
+        {
+          foundBoundaryPlane = true;
+          break;
+        }
+      }
+
+      if (!foundBoundaryPlane)
+      {
+        // This point is not convex, and needs to be thrown out!
+        shape.erase(shape.begin() + i);
+        foundAnyToRemove = true;
+        break;
+      }
+    }
+    if (!foundAnyToRemove)
+      break;
+  }
+
+  /*
+  #ifndef NDEBUG
+    int reducedSize = shape.size();
+    if (reducedSize < originalSize)
+    {
+      std::cout << "Went from " << originalSize << " to " << reducedSize
+                << " using:" << std::endl;
+      std::cout << "Origin: " << std::endl << origin << std::endl;
+      std::cout << "BasisX: " << std::endl << basis2dX << std::endl;
+      std::cout << "BasisY: " << std::endl << basis2dY << std::endl;
+    }
+  #endif
+  */
+
+  // Sort the shape in clockwise order around some internal point (choose the
+  // average).
+  Eigen::Vector2d avg = Eigen::Vector2d::Zero();
+  for (Eigen::Vector3d pt : shape)
+  {
+    avg += pointInPlane(pt, origin, basis2dX, basis2dY);
+  }
+  avg /= shape.size();
+  std::sort(
+      shape.begin(),
+      shape.end(),
+      [&avg, &origin, &basis2dX, &basis2dY](
+          Eigen::Vector3d& a, Eigen::Vector3d& b) {
+        return angle2D(avg, pointInPlane(a, origin, basis2dX, basis2dY))
+               < angle2D(avg, pointInPlane(b, origin, basis2dX, basis2dY));
+      });
+}
+
+/// This transforms a 3D point down to a 2D point in the given 3D plane
+Eigen::Vector2d pointInPlane(
+    const Eigen::Vector3d& point,
+    const Eigen::Vector3d& origin,
+    const Eigen::Vector3d& basis2dX,
+    const Eigen::Vector3d& basis2dY)
+{
+  return Eigen::Vector2d(
+      (point - origin).dot(basis2dX), (point - origin).dot(basis2dY));
+}
+
+/*
 /// This is necessary preparation for rapidly checking if another point is
 /// contained within the convex shape.
 void prepareConvex2DShape(std::vector<Eigen::Vector2d>& shape)
@@ -2287,6 +2447,7 @@ void prepareConvex2DShape(std::vector<Eigen::Vector2d>& shape)
         return angle2D(avg, a) < angle2D(avg, b);
       });
 }
+*/
 
 // This implements the "2D cross product" as redefined here:
 // https://stackoverflow.com/a/565282/13177487
@@ -2295,11 +2456,13 @@ inline double crossProduct2D(const Eigen::Vector2d& v, const Eigen::Vector2d& w)
   return v(0) * w(1) - v(1) * w(0);
 }
 
+/*
 /// This checks whether a 2D shape contains a point. This assumes that shape was
 /// sorted using sortConvex2DShape().
 ///
 /// Source:
-/// https://demonstrations.wolfram.com/AnEfficientTestForAPointToBeInAConvexPolygon/
+///
+https://demonstrations.wolfram.com/AnEfficientTestForAPointToBeInAConvexPolygon/
 /// A better source:
 /// https://inginious.org/course/competitive-programming/geometry-pointinconvex
 bool convex2DShapeContains(
@@ -2311,6 +2474,43 @@ bool convex2DShapeContains(
     const Eigen::Vector2d& a = shape[i];
     const Eigen::Vector2d& b = shape[(i + 1) % shape.size()];
     int thisSide = ccdSign(crossProduct2D(point - a, b - a));
+    if (i == 0)
+      side = thisSide;
+    else if (thisSide == 0)
+      continue;
+    else if (side == 0 && thisSide != 0)
+      side = thisSide;
+    else if (side != thisSide && side != 0)
+      return false;
+  }
+
+  return true;
+}
+*/
+
+/// This checks whether a 2D shape contains a point. This assumes that shape was
+/// sorted using sortConvex2DShape().
+///
+/// Source:
+/// https://demonstrations.wolfram.com/AnEfficientTestForAPointToBeInAConvexPolygon/
+/// A better source:
+/// https://inginious.org/course/competitive-programming/geometry-pointinconvex
+bool convex2DShapeContains(
+    const Eigen::Vector3d& point,
+    const std::vector<Eigen::Vector3d>& shape,
+    const Eigen::Vector3d& origin,
+    const Eigen::Vector3d& basis2dX,
+    const Eigen::Vector3d& basis2dY)
+{
+  Eigen::Vector2d point2d = pointInPlane(point, origin, basis2dX, basis2dY);
+
+  int side = 0;
+  for (int i = 0; i < shape.size(); i++)
+  {
+    Eigen::Vector2d a = pointInPlane(shape[i], origin, basis2dX, basis2dY);
+    Eigen::Vector2d b = pointInPlane(
+        shape[(i + 1) % shape.size()], origin, basis2dX, basis2dY);
+    int thisSide = ccdSign(crossProduct2D(point2d - a, b - a));
     if (i == 0)
       side = thisSide;
     else if (thisSide == 0)
@@ -2353,10 +2553,11 @@ bool get2DLineIntersection(
     double t0 = (q - p).dot(r) / r.dot(r);
     double t1 = (q + s - p).dot(r) / r.dot(r);
 
-    // If the interval between t0 and t1 intersects the interval [0, 1] then the
-    // line segments are collinear and overlapping; otherwise they are collinear
-    // and disjoint. Note that if s and r point in opposite directions, then s ·
-    // r < 0 and so the interval to be checked is [t1, t0] rather than [t0, t1].
+    // If the interval between t0 and t1 intersects the interval [0, 1] then
+    // the line segments are collinear and overlapping; otherwise they are
+    // collinear and disjoint. Note that if s and r point in opposite
+    // directions, then s · r < 0 and so the interval to be checked is [t1,
+    // t0] rather than [t0, t1].
 
     if (t0 >= 0 && t0 <= 1)
     {
@@ -2723,8 +2924,8 @@ int collideCylinderPlane(
   Eigen::Vector3d nn = T.linear().transpose() * normal;
   Eigen::Vector3d pn = T.inverse() * T1.translation();
 
-  // four corners c0 = ( -h/2, -r ), c1 = ( +h/2, -r ), c2 = ( +h/2, +r ), c3 =
-  // ( -h/2, +r )
+  // four corners c0 = ( -h/2, -r ), c1 = ( +h/2, -r ), c2 = ( +h/2, +r ), c3
+  // = ( -h/2, +r )
   Eigen::Vector3d c[4]
       = {Eigen::Vector3d(-half_height, -cyl_rad, 0.0),
          Eigen::Vector3d(+half_height, -cyl_rad, 0.0),

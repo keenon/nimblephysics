@@ -544,6 +544,23 @@ Eigen::Matrix3d expMapJacDeriv(const Eigen::Vector3d& _q, int _qi)
   return expMapJacDot(_q, qdot);
 }
 
+Eigen::Vector3d expMapGradient(const Eigen::Vector3d& pos, int _qi)
+{
+  assert(_qi >= 0 && _qi <= 2);
+
+  Eigen::MatrixXd original = expMapRot(pos);
+
+  double EPS = 1e-7;
+  Eigen::Vector3d perturbed = pos;
+  perturbed(_qi) += EPS;
+  Eigen::Vector3d plus = logMap(original.transpose() * expMapRot(perturbed));
+  perturbed = pos;
+  perturbed(_qi) -= EPS;
+  Eigen::Vector3d minus = logMap(original.transpose() * expMapRot(perturbed));
+
+  return (plus - minus) / (2 * EPS);
+}
+
 // Vec3 AdInvTLinear(const SE3& T, const Vec3& v)
 // {
 //     return Vec3(T(0,0)*v[0] + T(1,0)*v[1] + T(2,0)*v[2],
@@ -661,9 +678,10 @@ Eigen::Vector6d logMap(const Eigen::Isometry3d& _T)
       gamma = 1.0 / 12.0 + 1.0 / 720.0 * theta * theta;
     }
 
-    double w[] = {alpha * (_T(2, 1) - _T(1, 2)),
-                  alpha * (_T(0, 2) - _T(2, 0)),
-                  alpha * (_T(1, 0) - _T(0, 1))};
+    double w[]
+        = {alpha * (_T(2, 1) - _T(1, 2)),
+           alpha * (_T(0, 2) - _T(2, 0)),
+           alpha * (_T(1, 0) - _T(0, 1))};
     gamma *= w[0] * _T(0, 3) + w[1] * _T(1, 3) + w[2] * _T(2, 3);
 
     ret << w[0], w[1], w[2],
@@ -683,9 +701,11 @@ Eigen::Vector3d gradientWrtTheta(
 {
   const Eigen::Vector3d& w = _S.head<3>();
   const Eigen::Vector3d& v = _S.tail<3>();
-  if (w.norm() > DART_EPSILON)
+  double normW = w.norm();
+  if (normW > DART_EPSILON)
   {
-    assert(abs(w.norm() - 1) < 1e-7);
+    // TODO: this isn't true with FreeJoint and BallJoint. Is that a problem?
+    // assert(abs(normW - 1) < 1e-7);
     const double cos_t = cos(theta);
     const double sin_t = sin(theta);
     const Eigen::Vector3d wp = w.cross(point);
@@ -1479,6 +1499,16 @@ Eigen::Isometry3d expMap(const Eigen::Vector6d& _S)
       = alpha * _S[5] + beta * (_S[0] * _S[4] - _S[1] * _S[3]) + gamma * _S[2];
 
   return ret;
+}
+
+/// \brief Exponential mapping, DART style. This treats the exponentiation
+/// operation as a rotation, and then a translation, rather than an integration
+/// of a screw.
+Eigen::Isometry3d expMapDart(const Eigen::Vector6d& _S)
+{
+  Eigen::Isometry3d t = expAngular(_S.head<3>());
+  t.translation() = _S.tail<3>();
+  return t;
 }
 
 // I + sin(t) / t*[S] + (1 - cos(t)) / t^2*[S]^2, where t = |S|

@@ -118,7 +118,12 @@ public:
   Eigen::Vector6d getContactWorldForceGradient(dynamics::DegreeOfFreedom* dof);
 
   /// Returns the gradient of the screw axis with respect to the rotate dof
-  Eigen::Vector6d getScrewAxisGradient(
+  Eigen::Vector6d getScrewAxisForPositionGradient(
+      dynamics::DegreeOfFreedom* screwDof,
+      dynamics::DegreeOfFreedom* rotateDof);
+
+  /// Returns the gradient of the screw axis with respect to the rotate dof
+  Eigen::Vector6d getScrewAxisForForceGradient(
       dynamics::DegreeOfFreedom* screwDof,
       dynamics::DegreeOfFreedom* rotateDof);
 
@@ -237,7 +242,14 @@ public:
 
   /// Just for testing: This analytically estimates how a screw axis will move
   /// when rotated by another screw.
-  Eigen::Vector6d estimatePerturbedScrewAxis(
+  Eigen::Vector6d estimatePerturbedScrewAxisForPosition(
+      dynamics::DegreeOfFreedom* axis,
+      dynamics::DegreeOfFreedom* rotate,
+      double eps);
+
+  /// Just for testing: This analytically estimates how a screw axis will move
+  /// when rotated by another screw.
+  Eigen::Vector6d estimatePerturbedScrewAxisForForce(
       dynamics::DegreeOfFreedom* axis,
       dynamics::DegreeOfFreedom* rotate,
       double eps);
@@ -276,7 +288,14 @@ public:
 
   /// Just for testing: This perturbs the world position of a skeleton to read a
   /// screw axis will move when rotated by another screw.
-  Eigen::Vector6d bruteForceScrewAxis(
+  Eigen::Vector6d bruteForceScrewAxisForPosition(
+      dynamics::DegreeOfFreedom* axis,
+      dynamics::DegreeOfFreedom* rotate,
+      double eps);
+
+  /// Just for testing: This perturbs the world position of a skeleton to read a
+  /// screw axis will move when rotated by another screw.
+  Eigen::Vector6d bruteForceScrewAxisForForce(
       dynamics::DegreeOfFreedom* axis,
       dynamics::DegreeOfFreedom* rotate,
       double eps);
@@ -293,14 +312,25 @@ public:
   /// >0, then this is a frictional constraint.
   int getIndexInConstraint();
 
-  /// TODO: refactor this to move it to Skeleton
   /// This returns the axis for the specified dof index
-  Eigen::Vector6d getWorldScrewAxis(
+  static Eigen::Vector6d getWorldScrewAxisForPosition(
       std::shared_ptr<dynamics::Skeleton> skel, int dofIndex);
 
-  /// TODO: refactor this to move it to Dof
   /// This returns the axis for the specified dof index
-  Eigen::Vector6d getWorldScrewAxis(dynamics::DegreeOfFreedom* dof);
+  static Eigen::Vector6d getWorldScrewAxisForPosition(
+      dynamics::DegreeOfFreedom* dof);
+
+  /// This returns the axis for the specified dof index which, when dotted with
+  /// force, calculates the torque on this joint. THIS IS NOT THE SAME AS
+  /// getWorldScrewAxisForPosition(), because of FreeJoints and BallJoints.
+  static Eigen::Vector6d getWorldScrewAxisForForce(
+      std::shared_ptr<dynamics::Skeleton> skel, int dofIndex);
+
+  /// This returns the axis for the specified dof index which, when dotted with
+  /// force, calculates the torque on this joint. THIS IS NOT THE SAME AS
+  /// getWorldScrewAxisForPosition(), because of FreeJoints and BallJoints.
+  static Eigen::Vector6d getWorldScrewAxisForForce(
+      dynamics::DegreeOfFreedom* dof);
 
   /// This returns the constraint that's at our same location in the snapshot.
   /// This assumes that `mOffsetIntoWorld` and `mIsUpperBoundConstraint` are

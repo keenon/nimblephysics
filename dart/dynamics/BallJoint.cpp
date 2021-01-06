@@ -237,6 +237,85 @@ void BallJoint::updateRelativeJacobianTimeDeriv() const
 }
 
 //==============================================================================
+Eigen::Vector6d BallJoint::getWorldAxisScrew(int dof) const
+{
+  return getWorldAxisScrewAt(getPositionsStatic(), dof);
+}
+
+//==============================================================================
+// This computes the world axis screw at a given position, without moving the joint.
+//
+// We do this relative to the parent body, rather than the child body, because in
+// moving the joint we also move the child body.
+Eigen::Vector6d BallJoint::getWorldAxisScrewAt(Eigen::Vector3d pos, int dof) const
+{
+  Eigen::Vector6d grad = Eigen::Vector6d::Zero();
+  grad.head<3>() = math::expMapJac(pos).col(dof);
+  Eigen::Vector6d parentTwist = math::AdT(Joint::mAspectProperties.mT_ParentBodyToJoint, grad);
+
+  Eigen::Isometry3d parentTransform = Eigen::Isometry3d::Identity();
+  if (getParentBodyNode() != nullptr) {
+    parentTransform = getParentBodyNode()->getWorldTransform();
+  }
+  return math::AdT(parentTransform, parentTwist);
+}
+
+//==============================================================================
+// This estimates the new world screw axis at `axisDof` when we perturbe `rotateDof` by `eps`
+Eigen::Vector6d BallJoint::estimatePerturbedScrewAxisForPosition(
+  int axisDof,
+  int rotateDof,
+  double eps)
+{
+  Eigen::Vector3d pos = getPositionsStatic();
+  pos(rotateDof) += eps;
+  return getWorldAxisScrewAt(pos, axisDof);
+}
+
+//==============================================================================
+// This estimates the new world screw axis at `axisDof` when we perturbe `rotateDof` by `eps`
+Eigen::Vector6d BallJoint::estimatePerturbedScrewAxisForForce(
+  int axisDof,
+  int rotateDof,
+  double eps)
+{
+  Eigen::Vector3d pos = getPositionsStatic();
+  pos(rotateDof) += eps;
+
+  Eigen::Isometry3d parentTransform = Eigen::Isometry3d::Identity();
+  if (getParentBodyNode() != nullptr) {
+    parentTransform = getParentBodyNode()->getWorldTransform();
+  }
+  return math::AdT(
+    parentTransform * Joint::mAspectProperties.mT_ParentBodyToJoint * convertToTransform(pos)
+        * Joint::mAspectProperties.mT_ChildBodyToJoint.inverse(), getRelativeJacobian(pos).col(axisDof));
+}
+
+//==============================================================================
+// Returns the gradient of the screw axis with respect to the rotate dof
+Eigen::Vector6d BallJoint::getScrewAxisGradientForPosition(
+  int axisDof,
+  int rotateDof)
+{
+  double EPS = 1e-9;
+  Eigen::Vector6d pos = estimatePerturbedScrewAxisForPosition(axisDof, rotateDof, EPS);
+  Eigen::Vector6d neg = estimatePerturbedScrewAxisForPosition(axisDof, rotateDof, -EPS);
+  return (pos - neg) / (2 * EPS);
+}
+
+//==============================================================================
+// Returns the gradient of the screw axis with respect to the rotate dof
+Eigen::Vector6d BallJoint::getScrewAxisGradientForForce(
+  int axisDof,
+  int rotateDof)
+{
+  double EPS = 1e-9;
+  Eigen::Vector6d pos = estimatePerturbedScrewAxisForForce(axisDof, rotateDof, EPS);
+  Eigen::Vector6d neg = estimatePerturbedScrewAxisForForce(axisDof, rotateDof, -EPS);
+  return (pos - neg) / (2 * EPS);
+}
+
+//==============================================================================
 const Eigen::Isometry3d& BallJoint::getR() const
 {
   if(mNeedTransformUpdate)

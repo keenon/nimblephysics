@@ -3,7 +3,9 @@
 #include "dart/collision/Contact.hpp"
 #include "dart/constraint/ConstraintBase.hpp"
 #include "dart/constraint/ContactConstraint.hpp"
+#include "dart/dynamics/BallJoint.hpp"
 #include "dart/dynamics/DegreeOfFreedom.hpp"
+#include "dart/dynamics/FreeJoint.hpp"
 #include "dart/dynamics/Joint.hpp"
 #include "dart/dynamics/Skeleton.hpp"
 #include "dart/neural/BackpropSnapshot.hpp"
@@ -193,7 +195,7 @@ Eigen::VectorXd DifferentiableContactConstraint::getConstraintForces(
     }
     else
     {
-      Eigen::Vector6d worldTwist = getWorldScrewAxis(dof);
+      Eigen::Vector6d worldTwist = getWorldScrewAxisForForce(dof);
       taus(i) = worldTwist.dot(worldForce) * multiple;
     }
   }
@@ -255,11 +257,7 @@ Eigen::Vector3d DifferentiableContactConstraint::getContactPositionGradient(
 
   int jointIndex = dof->getIndexInJoint();
   dynamics::BodyNode* childNode = dof->getChildBodyNode();
-  // TODO:opt getRelativeJacobian() creates a whole matrix, when we only want
-  // a single column.
-  Eigen::Vector6d worldTwist = math::AdT(
-      childNode->getWorldTransform(),
-      dof->getJoint()->getRelativeJacobian().col(jointIndex));
+  Eigen::Vector6d worldTwist = dof->getJoint()->getWorldAxisScrew(jointIndex);
 
   if (type == SPHERE_A)
   {
@@ -381,11 +379,7 @@ Eigen::Vector3d DifferentiableContactConstraint::getContactNormalGradient(
   }
   int jointIndex = dof->getIndexInJoint();
   dynamics::BodyNode* childNode = dof->getChildBodyNode();
-  // TODO:opt getRelativeJacobian() creates a whole matrix, when we only want
-  // a single column.
-  Eigen::Vector6d worldTwist = math::AdT(
-      childNode->getWorldTransform(),
-      dof->getJoint()->getRelativeJacobian().col(jointIndex));
+  Eigen::Vector6d worldTwist = dof->getJoint()->getWorldAxisScrew(jointIndex);
 
   if (type == SPHERE_A)
   {
@@ -534,11 +528,7 @@ EdgeData DifferentiableContactConstraint::getEdgeGradient(
 
   int jointIndex = dof->getIndexInJoint();
   dynamics::BodyNode* childNode = dof->getChildBodyNode();
-  // TODO:opt getRelativeJacobian() creates a whole matrix, when we only want
-  // a single column.
-  Eigen::Vector6d worldTwist = math::AdT(
-      childNode->getWorldTransform(),
-      dof->getJoint()->getRelativeJacobian().col(jointIndex));
+  Eigen::Vector6d worldTwist = dof->getJoint()->getWorldAxisScrew(jointIndex);
 
   DofContactType type = getDofContactType(dof);
   if (type == EDGE_A)
@@ -572,14 +562,93 @@ EdgeData DifferentiableContactConstraint::getEdgeGradient(
 
 //==============================================================================
 /// Returns the gradient of the screw axis with respect to the rotate dof
-Eigen::Vector6d DifferentiableContactConstraint::getScrewAxisGradient(
+Eigen::Vector6d
+DifferentiableContactConstraint::getScrewAxisForPositionGradient(
     dynamics::DegreeOfFreedom* screwDof, dynamics::DegreeOfFreedom* rotateDof)
 {
+  // Special case: all angular DOFs within FreeJoints effect each other in
+  // special ways
+  if (screwDof->getJoint() == rotateDof->getJoint()
+      && screwDof->getJoint()->getType()
+             == dynamics::FreeJoint::getStaticType())
+  {
+    dynamics::FreeJoint* freeJoint
+        = static_cast<dynamics::FreeJoint*>(screwDof->getJoint());
+    int axisIndex = screwDof->getIndexInJoint();
+    int rotateIndex = rotateDof->getIndexInJoint();
+    if (axisIndex < 3)
+    {
+      return freeJoint->getScrewAxisGradientForPosition(axisIndex, rotateIndex);
+    }
+    else
+    {
+      // The translation axes aren't effected by anything
+      return Eigen::Vector6d::Zero();
+    }
+  }
+  // Special case: all DOFs within BallJoints effect each other in special ways
+  else if (
+      screwDof->getJoint() == rotateDof->getJoint()
+      && screwDof->getJoint()->getType()
+             == dynamics::BallJoint::getStaticType())
+  {
+    dynamics::BallJoint* ballJoint
+        = static_cast<dynamics::BallJoint*>(screwDof->getJoint());
+    int axisIndex = screwDof->getIndexInJoint();
+    int rotateIndex = rotateDof->getIndexInJoint();
+    if (axisIndex < 3 && rotateIndex < 3)
+    {
+      return ballJoint->getScrewAxisGradientForPosition(axisIndex, rotateIndex);
+    }
+  }
+  // General case:
   if (!isParent(rotateDof, screwDof))
     return Eigen::Vector6d::Zero();
 
-  Eigen::Vector6d axisWorldTwist = getWorldScrewAxis(screwDof);
-  Eigen::Vector6d rotateWorldTwist = getWorldScrewAxis(rotateDof);
+  Eigen::Vector6d axisWorldTwist = getWorldScrewAxisForPosition(screwDof);
+  Eigen::Vector6d rotateWorldTwist = getWorldScrewAxisForPosition(rotateDof);
+  return math::ad(rotateWorldTwist, axisWorldTwist);
+}
+
+//==============================================================================
+/// Returns the gradient of the screw axis with respect to the rotate dof
+Eigen::Vector6d DifferentiableContactConstraint::getScrewAxisForForceGradient(
+    dynamics::DegreeOfFreedom* screwDof, dynamics::DegreeOfFreedom* rotateDof)
+{
+  // Special case: all angular DOFs within FreeJoints effect each other in
+  // special ways
+  if (screwDof->getJoint() == rotateDof->getJoint()
+      && screwDof->getJoint()->getType()
+             == dynamics::FreeJoint::getStaticType())
+  {
+    dynamics::FreeJoint* freeJoint
+        = static_cast<dynamics::FreeJoint*>(screwDof->getJoint());
+    int axisIndex = screwDof->getIndexInJoint();
+    int rotateIndex = rotateDof->getIndexInJoint();
+
+    return freeJoint->getScrewAxisGradientForForce(axisIndex, rotateIndex);
+  }
+  // Special case: all DOFs within BallJoints effect each other in special ways
+  else if (
+      screwDof->getJoint() == rotateDof->getJoint()
+      && screwDof->getJoint()->getType()
+             == dynamics::BallJoint::getStaticType())
+  {
+    dynamics::BallJoint* ballJoint
+        = static_cast<dynamics::BallJoint*>(screwDof->getJoint());
+    int axisIndex = screwDof->getIndexInJoint();
+    int rotateIndex = rotateDof->getIndexInJoint();
+    if (axisIndex < 3 && rotateIndex < 3)
+    {
+      return ballJoint->getScrewAxisGradientForForce(axisIndex, rotateIndex);
+    }
+  }
+  // General case:
+  if (!isParent(rotateDof, screwDof))
+    return Eigen::Vector6d::Zero();
+
+  Eigen::Vector6d axisWorldTwist = getWorldScrewAxisForForce(screwDof);
+  Eigen::Vector6d rotateWorldTwist = getWorldScrewAxisForPosition(rotateDof);
   return math::ad(rotateWorldTwist, axisWorldTwist);
 }
 
@@ -696,7 +765,7 @@ double DifferentiableContactConstraint::getConstraintForce(
 {
   double multiple = getForceMultiple(dof);
   Eigen::Vector6d worldForce = getWorldForce();
-  Eigen::Vector6d worldTwist = getWorldScrewAxis(dof);
+  Eigen::Vector6d worldTwist = getWorldScrewAxisForForce(dof);
   return worldTwist.dot(worldForce) * multiple;
 }
 
@@ -709,8 +778,8 @@ double DifferentiableContactConstraint::getConstraintForceDerivative(
   double multiple = getForceMultiple(dof);
   Eigen::Vector6d worldForce = getWorldForce();
   Eigen::Vector6d gradientOfWorldForce = getContactWorldForceGradient(wrt);
-  Eigen::Vector6d gradientOfWorldTwist = getScrewAxisGradient(dof, wrt);
-  Eigen::Vector6d worldTwist = getWorldScrewAxis(dof);
+  Eigen::Vector6d gradientOfWorldTwist = getScrewAxisForForceGradient(dof, wrt);
+  Eigen::Vector6d worldTwist = getWorldScrewAxisForForce(dof);
   double dot1 = worldTwist.dot(gradientOfWorldForce);
   double dot2 = gradientOfWorldTwist.dot(worldForce);
   double sum = dot1 + dot2;
@@ -734,11 +803,11 @@ Eigen::MatrixXd DifferentiableContactConstraint::getConstraintForcesJacobian(
   std::vector<dynamics::DegreeOfFreedom*> dofs = world->getDofs();
   for (int row = 0; row < dim; row++)
   {
-    Eigen::Vector6d axis = getWorldScrewAxis(dofs[row]);
+    Eigen::Vector6d axis = getWorldScrewAxisForForce(dofs[row]);
     for (int wrt = 0; wrt < dim; wrt++)
     {
       Eigen::Vector6d screwAxisGradient
-          = getScrewAxisGradient(dofs[row], dofs[wrt]);
+          = getScrewAxisForForceGradient(dofs[row], dofs[wrt]);
       Eigen::Vector6d forceGradient = forceJac.col(wrt);
       double multiple = getForceMultiple(dofs[row]);
       result(row, wrt)
@@ -763,11 +832,11 @@ Eigen::MatrixXd DifferentiableContactConstraint::getConstraintForcesJacobian(
       = Eigen::MatrixXd::Zero(skel->getNumDofs(), wrt->getNumDofs());
   for (int row = 0; row < skel->getNumDofs(); row++)
   {
-    Eigen::Vector6d axis = getWorldScrewAxis(skel->getDof(row));
+    Eigen::Vector6d axis = getWorldScrewAxisForForce(skel->getDof(row));
     for (int col = 0; col < wrt->getNumDofs(); col++)
     {
       Eigen::Vector6d screwAxisGradient
-          = getScrewAxisGradient(skel->getDof(row), wrt->getDof(col));
+          = getScrewAxisForForceGradient(skel->getDof(row), wrt->getDof(col));
       Eigen::Vector6d forceGradient = forceJac.col(col);
       double multiple = getForceMultiple(skel->getDof(row));
       result(row, col)
@@ -800,11 +869,11 @@ Eigen::MatrixXd DifferentiableContactConstraint::getConstraintForcesJacobian(
   {
     for (int i = 0; i < skel->getNumDofs(); i++)
     {
-      Eigen::Vector6d axis = getWorldScrewAxis(skel->getDof(i));
+      Eigen::Vector6d axis = getWorldScrewAxisForForce(skel->getDof(i));
       for (int col = 0; col < wrt->getNumDofs(); col++)
       {
         Eigen::Vector6d screwAxisGradient
-            = getScrewAxisGradient(skel->getDof(i), wrt->getDof(col));
+            = getScrewAxisForForceGradient(skel->getDof(i), wrt->getDof(col));
         Eigen::Vector6d forceGradient = forceJac.col(col);
         double multiple = getForceMultiple(skel->getDof(i));
         result(row, col)
@@ -1035,7 +1104,7 @@ DifferentiableContactConstraint::estimatePerturbedContactPosition(
 
   if (type == SPHERE_A)
   {
-    Eigen::Vector6d worldTwist = getWorldScrewAxis(skel, dofIndex);
+    Eigen::Vector6d worldTwist = getWorldScrewAxisForPosition(skel, dofIndex);
     Eigen::Isometry3d rotation = math::expMap(worldTwist * eps);
     double weight = mContact->radiusB / (mContact->radiusA + mContact->radiusB);
     Eigen::Vector3d posDiff
@@ -1045,7 +1114,7 @@ DifferentiableContactConstraint::estimatePerturbedContactPosition(
   }
   else if (type == SPHERE_B)
   {
-    Eigen::Vector6d worldTwist = getWorldScrewAxis(skel, dofIndex);
+    Eigen::Vector6d worldTwist = getWorldScrewAxisForPosition(skel, dofIndex);
     Eigen::Isometry3d rotation = math::expMap(worldTwist * eps);
     double weight = mContact->radiusA / (mContact->radiusA + mContact->radiusB);
     Eigen::Vector3d posDiff
@@ -1055,7 +1124,7 @@ DifferentiableContactConstraint::estimatePerturbedContactPosition(
   }
   else if (type == SPHERE_TO_BOX)
   {
-    Eigen::Vector6d worldTwist = getWorldScrewAxis(skel, dofIndex);
+    Eigen::Vector6d worldTwist = getWorldScrewAxisForPosition(skel, dofIndex);
     Eigen::Isometry3d rotation = math::expMap(worldTwist * eps);
     Eigen::Vector3d perturbedSphereCenter = rotation * mContact->sphereCenter;
     Eigen::Vector3d diff = perturbedSphereCenter - mContact->sphereCenter;
@@ -1075,7 +1144,7 @@ DifferentiableContactConstraint::estimatePerturbedContactPosition(
   }
   else if (type == BOX_TO_SPHERE)
   {
-    Eigen::Vector6d worldTwist = getWorldScrewAxis(skel, dofIndex);
+    Eigen::Vector6d worldTwist = getWorldScrewAxisForPosition(skel, dofIndex);
     Eigen::Isometry3d rotation = math::expMap(worldTwist * eps);
     // Step 1. First pretend the sphere is moving relative to the box, by the
     // inverse of the box transform
@@ -1103,7 +1172,7 @@ DifferentiableContactConstraint::estimatePerturbedContactPosition(
   }
   else if (type == VERTEX || type == SELF_COLLISION)
   {
-    Eigen::Vector6d worldTwist = getWorldScrewAxis(skel, dofIndex);
+    Eigen::Vector6d worldTwist = getWorldScrewAxisForPosition(skel, dofIndex);
     Eigen::Isometry3d rotation = math::expMap(worldTwist * eps);
     Eigen::Vector3d perturbedContactPos = rotation * contactPos;
     return perturbedContactPos;
@@ -1114,7 +1183,7 @@ DifferentiableContactConstraint::estimatePerturbedContactPosition(
   }
   else if (type == EDGE_A)
   {
-    Eigen::Vector6d worldTwist = getWorldScrewAxis(skel, dofIndex);
+    Eigen::Vector6d worldTwist = getWorldScrewAxisForPosition(skel, dofIndex);
     Eigen::Isometry3d translation = math::expMap(worldTwist * eps);
     Eigen::Isometry3d rotation = translation;
     rotation.translation().setZero();
@@ -1127,7 +1196,7 @@ DifferentiableContactConstraint::estimatePerturbedContactPosition(
   }
   else if (type == EDGE_B)
   {
-    Eigen::Vector6d worldTwist = getWorldScrewAxis(skel, dofIndex);
+    Eigen::Vector6d worldTwist = getWorldScrewAxisForPosition(skel, dofIndex);
     Eigen::Isometry3d translation = math::expMap(worldTwist * eps);
     Eigen::Isometry3d rotation = translation;
     rotation.translation().setZero();
@@ -1154,7 +1223,7 @@ Eigen::Vector3d DifferentiableContactConstraint::estimatePerturbedContactNormal(
     return normal;
   }
 
-  Eigen::Vector6d worldTwist = getWorldScrewAxis(skel, dofIndex);
+  Eigen::Vector6d worldTwist = getWorldScrewAxisForPosition(skel, dofIndex);
   Eigen::Isometry3d rotation = math::expMap(worldTwist * eps);
   if (type == SPHERE_A)
   {
@@ -1289,7 +1358,7 @@ EdgeData DifferentiableContactConstraint::estimatePerturbedEdges(
   dynamics::DegreeOfFreedom* dof = skel->getDof(dofIndex);
   DofContactType type = getDofContactType(dof);
 
-  Eigen::Vector6d worldTwist = getWorldScrewAxis(skel, dofIndex);
+  Eigen::Vector6d worldTwist = getWorldScrewAxisForPosition(skel, dofIndex);
   Eigen::Isometry3d translation = math::expMap(worldTwist * eps);
   Eigen::Isometry3d rotation = translation;
   rotation.translation().setZero();
@@ -1342,17 +1411,97 @@ EdgeData DifferentiableContactConstraint::getEdges()
 //==============================================================================
 /// Just for testing: This analytically estimates how a screw axis will move
 /// when rotated by another screw.
-Eigen::Vector6d DifferentiableContactConstraint::estimatePerturbedScrewAxis(
+Eigen::Vector6d
+DifferentiableContactConstraint::estimatePerturbedScrewAxisForPosition(
     dynamics::DegreeOfFreedom* axis,
     dynamics::DegreeOfFreedom* rotate,
     double eps)
 {
-  Eigen::Vector6d axisWorldTwist = getWorldScrewAxis(axis);
+  Eigen::Vector6d originalAxisWorldTwist = getWorldScrewAxisForPosition(axis);
+
+  if (axis->getJoint() == rotate->getJoint()
+      && axis->getJoint()->getType() == dynamics::FreeJoint::getStaticType())
+  {
+    dynamics::FreeJoint* freeJoint
+        = static_cast<dynamics::FreeJoint*>(axis->getJoint());
+    int axisIndex = axis->getIndexInJoint();
+    int rotateIndex = rotate->getIndexInJoint();
+    if (axisIndex < 3)
+    {
+      return freeJoint->estimatePerturbedScrewAxisForPosition(
+          axisIndex, rotateIndex, eps);
+    }
+    else
+    {
+      // The translation joints aren't effected by anything
+      return originalAxisWorldTwist;
+    }
+  }
+  else if (
+      axis->getJoint() == rotate->getJoint()
+      && axis->getJoint()->getType() == dynamics::BallJoint::getStaticType())
+  {
+    dynamics::BallJoint* ballJoint
+        = static_cast<dynamics::BallJoint*>(axis->getJoint());
+    int axisIndex = axis->getIndexInJoint();
+    int rotateIndex = rotate->getIndexInJoint();
+    assert(axisIndex < 3 && rotateIndex < 3);
+    return ballJoint->estimatePerturbedScrewAxisForPosition(
+        axisIndex, rotateIndex, eps);
+  }
+
   if (!isParent(rotate, axis))
-    return axisWorldTwist;
-  Eigen::Vector6d rotateWorldTwist = getWorldScrewAxis(rotate);
+    return originalAxisWorldTwist;
+
+  Eigen::Vector6d rotateWorldTwist = getWorldScrewAxisForPosition(rotate);
   Eigen::Isometry3d transform = math::expMap(rotateWorldTwist * eps);
-  Eigen::Vector6d transformedAxis = math::AdT(transform, axisWorldTwist);
+  Eigen::Vector6d transformedAxis
+      = math::AdT(transform, originalAxisWorldTwist);
+  return transformedAxis;
+}
+
+//==============================================================================
+/// Just for testing: This analytically estimates how a screw axis will move
+/// when rotated by another screw.
+Eigen::Vector6d
+DifferentiableContactConstraint::estimatePerturbedScrewAxisForForce(
+    dynamics::DegreeOfFreedom* axis,
+    dynamics::DegreeOfFreedom* rotate,
+    double eps)
+{
+  Eigen::Vector6d originalAxisWorldTwist = getWorldScrewAxisForForce(axis);
+
+  if (axis->getJoint() == rotate->getJoint()
+      && axis->getJoint()->getType() == dynamics::FreeJoint::getStaticType())
+  {
+    dynamics::FreeJoint* freeJoint
+        = static_cast<dynamics::FreeJoint*>(axis->getJoint());
+    int axisIndex = axis->getIndexInJoint();
+    int rotateIndex = rotate->getIndexInJoint();
+
+    return freeJoint->estimatePerturbedScrewAxisForForce(
+        axisIndex, rotateIndex, eps);
+  }
+  else if (
+      axis->getJoint() == rotate->getJoint()
+      && axis->getJoint()->getType() == dynamics::BallJoint::getStaticType())
+  {
+    dynamics::BallJoint* ballJoint
+        = static_cast<dynamics::BallJoint*>(axis->getJoint());
+    int axisIndex = axis->getIndexInJoint();
+    int rotateIndex = rotate->getIndexInJoint();
+    assert(axisIndex < 3 && rotateIndex < 3);
+    return ballJoint->estimatePerturbedScrewAxisForForce(
+        axisIndex, rotateIndex, eps);
+  }
+
+  if (!isParent(rotate, axis))
+    return originalAxisWorldTwist;
+
+  Eigen::Vector6d rotateWorldTwist = getWorldScrewAxisForPosition(rotate);
+  Eigen::Isometry3d transform = math::expMap(rotateWorldTwist * eps);
+  Eigen::Vector6d transformedAxis
+      = math::AdT(transform, originalAxisWorldTwist);
   return transformedAxis;
 }
 
@@ -1381,6 +1530,15 @@ DifferentiableContactConstraint::bruteForcePerturbedContactPosition(
       = neural::forwardPass(world, true);
   std::shared_ptr<DifferentiableContactConstraint> peerConstraint
       = getPeerConstraint(backpropSnapshot);
+
+  if (peerConstraint == nullptr)
+  {
+    std::cout << world->getVelocities();
+    // Dirty velocities
+    world->setVelocities(world->getVelocities());
+    neural::forwardPass(world, true);
+  }
+  assert(peerConstraint != nullptr && "bruteForcePerturbedContactPosition() was unable to find a peer constraint to compare against.");
 
   snapshot.restore();
 
@@ -1436,7 +1594,7 @@ DifferentiableContactConstraint::bruteForcePerturbedContactForceDirection(
 //==============================================================================
 /// Just for testing: This perturbs the world position of a skeleton to read a
 /// screw axis will move when rotated by another screw.
-Eigen::Vector6d DifferentiableContactConstraint::bruteForceScrewAxis(
+Eigen::Vector6d DifferentiableContactConstraint::bruteForceScrewAxisForPosition(
     dynamics::DegreeOfFreedom* axis,
     dynamics::DegreeOfFreedom* rotate,
     double eps)
@@ -1444,7 +1602,25 @@ Eigen::Vector6d DifferentiableContactConstraint::bruteForceScrewAxis(
   double originalPos = rotate->getPosition();
   rotate->setPosition(originalPos + eps);
 
-  Eigen::Vector6d worldTwist = getWorldScrewAxis(axis);
+  Eigen::Vector6d worldTwist = getWorldScrewAxisForPosition(axis);
+
+  rotate->setPosition(originalPos);
+
+  return worldTwist;
+}
+
+//==============================================================================
+/// Just for testing: This perturbs the world position of a skeleton to read a
+/// screw axis will move when rotated by another screw.
+Eigen::Vector6d DifferentiableContactConstraint::bruteForceScrewAxisForForce(
+    dynamics::DegreeOfFreedom* axis,
+    dynamics::DegreeOfFreedom* rotate,
+    double eps)
+{
+  double originalPos = rotate->getPosition();
+  rotate->setPosition(originalPos + eps);
+
+  Eigen::Vector6d worldTwist = getWorldScrewAxisForForce(axis);
 
   rotate->setPosition(originalPos);
 
@@ -1593,23 +1769,34 @@ bool DifferentiableContactConstraint::isParent(
 }
 
 //==============================================================================
-Eigen::Vector6d DifferentiableContactConstraint::getWorldScrewAxis(
+Eigen::Vector6d DifferentiableContactConstraint::getWorldScrewAxisForPosition(
     std::shared_ptr<dynamics::Skeleton> skel, int dofIndex)
 {
-  return getWorldScrewAxis(skel->getDof(dofIndex));
+  return getWorldScrewAxisForPosition(skel->getDof(dofIndex));
 }
 
 //==============================================================================
-Eigen::Vector6d DifferentiableContactConstraint::getWorldScrewAxis(
+Eigen::Vector6d DifferentiableContactConstraint::getWorldScrewAxisForPosition(
     dynamics::DegreeOfFreedom* dof)
 {
   int jointIndex = dof->getIndexInJoint();
-  math::Jacobian relativeJac = dof->getJoint()->getRelativeJacobian();
-  dynamics::BodyNode* childNode = dof->getChildBodyNode();
-  Eigen::Isometry3d transform = childNode->getWorldTransform();
-  Eigen::Vector6d localTwist = relativeJac.col(jointIndex);
-  Eigen::Vector6d worldTwist = math::AdT(transform, localTwist);
-  return worldTwist;
+  return dof->getJoint()->getWorldAxisScrew(jointIndex);
+}
+
+//==============================================================================
+Eigen::Vector6d DifferentiableContactConstraint::getWorldScrewAxisForForce(
+    std::shared_ptr<dynamics::Skeleton> skel, int dofIndex)
+{
+  return getWorldScrewAxisForForce(skel->getDof(dofIndex));
+}
+
+//==============================================================================
+Eigen::Vector6d DifferentiableContactConstraint::getWorldScrewAxisForForce(
+    dynamics::DegreeOfFreedom* dof)
+{
+  int jointIndex = dof->getIndexInJoint();
+  Eigen::Vector6d col = dof->getJoint()->getRelativeJacobian().col(jointIndex);
+  return math::AdT(dof->getChildBodyNode()->getWorldTransform(), col);
 }
 
 //==============================================================================
@@ -1617,14 +1804,33 @@ std::shared_ptr<DifferentiableContactConstraint>
 DifferentiableContactConstraint::getPeerConstraint(
     std::shared_ptr<neural::BackpropSnapshot> snapshot)
 {
+  std::vector<std::shared_ptr<DifferentiableContactConstraint>>
+      otherConstraints;
   if (mIsUpperBoundConstraint)
   {
-    return snapshot->getUpperBoundConstraints()[mOffsetIntoWorld];
+    otherConstraints = snapshot->getUpperBoundConstraints();
   }
   else
   {
-    return snapshot->getClampingConstraints()[mOffsetIntoWorld];
+    otherConstraints = snapshot->getClampingConstraints();
   }
+
+  double minDistance = std::numeric_limits<double>::infinity();
+  std::shared_ptr<DifferentiableContactConstraint> closestConstraint = nullptr;
+  for (std::shared_ptr<DifferentiableContactConstraint>& constraint :
+       otherConstraints)
+  {
+    double distance
+        = (constraint->getContactWorldPosition() - getContactWorldPosition())
+              .squaredNorm();
+    if (distance < minDistance)
+    {
+      closestConstraint = constraint;
+      minDistance = distance;
+    }
+  }
+
+  return closestConstraint;
 }
 
 } // namespace neural

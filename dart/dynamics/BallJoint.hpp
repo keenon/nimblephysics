@@ -99,6 +99,34 @@ public:
   Eigen::Vector3d getPositionDifferencesStatic(
       const Eigen::Vector3d& _q2, const Eigen::Vector3d& _q1) const override;
 
+  // This gets the world axis screw at the current position, without moving the joint.
+  Eigen::Vector6d getWorldAxisScrew(int dof) const override;
+
+  // This computes the world axis screw at a given position, without moving the joint.
+  Eigen::Vector6d getWorldAxisScrewAt(Eigen::Vector3d pos, int dof) const;
+
+  // This estimates the new world screw axis at `axisDof` when we perturbe `rotateDof` by `eps`
+  Eigen::Vector6d estimatePerturbedScrewAxisForPosition(
+    int axisDof,
+    int rotateDof,
+    double eps);
+
+  // This estimates the new world screw axis at `axisDof` when we perturbe `rotateDof` by `eps`
+  Eigen::Vector6d estimatePerturbedScrewAxisForForce(
+    int axisDof,
+    int rotateDof,
+    double eps);
+
+  // Returns the gradient of the screw axis with respect to the rotate dof
+  Eigen::Vector6d getScrewAxisGradientForPosition(
+    int axisDof,
+    int rotateDof);
+
+  // Returns the gradient of the screw axis with respect to the rotate dof
+  Eigen::Vector6d getScrewAxisGradientForForce(
+    int axisDof,
+    int rotateDof);
+
 protected:
 
   /// Constructor called by Skeleton class

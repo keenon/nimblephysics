@@ -125,12 +125,12 @@ void BoxedLcpConstraintSolver::makeHyperAccurateAndVerySlow()
 {
   std::shared_ptr<PgsBoxedLcpSolver> accurateAndSlowSolver
       = std::make_shared<PgsBoxedLcpSolver>();
-  /*
   accurateAndSlowSolver->setOption(
       PgsBoxedLcpSolver::Option(50000, 1e-15, 1e-12, 1e-10, false));
-  */
+  /*
   accurateAndSlowSolver->setOption(
       PgsBoxedLcpSolver::Option(1000, 1e-10, 1e-8, 1e-8, false));
+  */
   setBoxedLcpSolver(accurateAndSlowSolver);
 }
 

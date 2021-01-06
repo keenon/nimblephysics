@@ -386,6 +386,21 @@ const Eigen::Vector6d& Joint::getRelativePrimaryAcceleration() const
 }
 
 //==============================================================================
+Eigen::Vector6d Joint::getWorldAxisScrew(int dof) const
+{
+  assert(dof >= 0 && dof < getNumDofs());
+  Eigen::Vector6d localTwist
+      = getRelativeJacobian().col(dof);
+  Eigen::Vector6d parentTwist = math::AdT(Joint::mAspectProperties.mT_ParentBodyToJoint, localTwist);
+
+  Eigen::Isometry3d parentTransform = Eigen::Isometry3d::Identity();
+  if (getParentBodyNode() != nullptr) {
+    parentTransform = getParentBodyNode()->getWorldTransform();
+  }
+  return math::AdT(parentTransform, parentTwist);
+}
+
+//==============================================================================
 void Joint::setPositionLimitEnforced(bool _isPositionLimitEnforced)
 {
   mAspectProperties.mIsPositionLimitEnforced = _isPositionLimitEnforced;

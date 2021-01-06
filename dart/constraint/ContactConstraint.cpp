@@ -208,6 +208,9 @@ ContactConstraint::ContactConstraint(
 
     collision::Contact& ct = mContact;
 
+    Eigen::Matrix4d bodyATransform = mBodyNodeA->getTransform().matrix();
+    Eigen::Matrix4d bodyBTransform = mBodyNodeA->getTransform().matrix();
+
     // Contact normal in the local coordinates
     const Eigen::Vector3d bodyDirectionA
         = mBodyNodeA->getTransform().linear().transpose() * ct.normal;
