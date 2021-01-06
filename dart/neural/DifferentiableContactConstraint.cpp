@@ -1822,7 +1822,10 @@ DifferentiableContactConstraint::getPeerConstraint(
   {
     double distance
         = (constraint->getContactWorldPosition() - getContactWorldPosition())
-              .squaredNorm();
+              .squaredNorm()
+          + (constraint->getContactWorldForceDirection()
+             - getContactWorldForceDirection())
+                .squaredNorm();
     if (distance < minDistance)
     {
       closestConstraint = constraint;

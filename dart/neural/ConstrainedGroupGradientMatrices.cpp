@@ -220,13 +220,9 @@ void ConstrainedGroupGradientMatrices::opportunisticallyStandardizeResults(
     }
     if (clampingIndex != -1)
     {
+      // If we're clamping
       assert(upperBoundIndex == -1);
       newX(i) = f_c(clampingIndex);
-      if (newX(i) > mHi(i) || newX(i) < mLo(i))
-      {
-        isValid = false;
-        break;
-      }
     }
     if (upperBoundIndex != -1)
     {
@@ -239,6 +235,28 @@ void ConstrainedGroupGradientMatrices::opportunisticallyStandardizeResults(
                                  ? mHi(i)
                                  : mLo(i);
       newX(i) = f_c(fIndex) * cleanMultiple;
+    }
+  }
+
+  // Check that all the clamping constraints are within expected limits in our
+  // new configuration, relative to one another. This is subtle, because we can
+  // have clamping friction constraints whose bounds depend on clamping normal
+  // constraints. Once we're done setting up the new vector completely, we can
+  // check that these constraints are all satisfied.
+  for (int i = 0; i < newX.size(); i++)
+  {
+    int clampingIndex = mClampingIndex[i];
+    if (clampingIndex != -1)
+    {
+      double boundaryMultiple = 1.0;
+      if (mFIndex(i) > -1)
+        boundaryMultiple = mX(mFIndex(i));
+      if (newX(i) > mHi(i) * boundaryMultiple
+          || newX(i) < mLo(i) * boundaryMultiple)
+      {
+        isValid = false;
+        break;
+      }
     }
   }
 

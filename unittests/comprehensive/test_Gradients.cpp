@@ -1559,14 +1559,15 @@ void testFreeBlockWithFrictionCoeff(double frictionCoeff, double mass)
   EXPECT_TRUE(verifyVelGradients(world, worldVel));
   EXPECT_TRUE(verifyAnalyticalBackprop(world));
   EXPECT_TRUE(verifyWrtMass(world));
+  EXPECT_TRUE(verifyPosGradients(world, 1, 1e-8));
 }
 
-#ifdef ALL_TESTS
+// #ifdef ALL_TESTS
 TEST(GRADIENTS, FREE_BLOCK_ON_GROUND_NO_FRICTION)
 {
   testFreeBlockWithFrictionCoeff(0, 1);
 }
-#endif
+// #endif
 
 // #ifdef ALL_TESTS
 TEST(GRADIENTS, FREE_BLOCK_ON_GROUND_STATIC_FRICTION)
@@ -1575,9 +1576,9 @@ TEST(GRADIENTS, FREE_BLOCK_ON_GROUND_STATIC_FRICTION)
 }
 // #endif
 
-#ifdef ALL_TESTS
+// #ifdef ALL_TESTS
 TEST(GRADIENTS, FREE_BLOCK_ON_GROUND_SLIPPING_FRICTION)
 {
   testFreeBlockWithFrictionCoeff(0.5, 1);
 }
-#endif
+// #endif
