@@ -440,7 +440,7 @@ void testTwoBlocks(
   // Test the classic formulation
 
   world->getConstraintSolver()->setGradientEnabled(true);
-  world->getConstraintSolver()->solve();
+  world->getConstraintSolver()->solve(world.get());
 
   EXPECT_TRUE(verifyVelGradients(world, worldVel));
   EXPECT_TRUE(verifyAnalyticalBackprop(world));
@@ -1446,7 +1446,8 @@ void testFreeBlockWithFrictionCoeff(double frictionCoeff, double mass)
 {
   // World
   WorldPtr world = World::create();
-  world->setGravity(Eigen::Vector3d::Zero());
+  world->setGravity(Eigen::Vector3d::UnitY() * -9.81);
+  world->setPenetrationCorrectionEnabled(false);
 
   // Set up the LCP solver to be super super accurate, so our
   // finite-differencing tests don't fail due to LCP errors. This isn't
@@ -1479,15 +1480,15 @@ void testFreeBlockWithFrictionCoeff(double frictionCoeff, double mass)
       new BoxShape(Eigen::Vector3d(1.0, 1.0, 1.0)));
   boxBody->createShapeNodeWith<VisualAspect, CollisionAspect>(boxShape);
   boxBody->setFrictionCoeff(frictionCoeff);
-
-  // Add a force driving the box down into the floor, and to the left
-  boxBody->addExtForce(Eigen::Vector3d(1, -1, 0));
   // Prevent the mass matrix from being Identity
   boxBody->setMass(mass);
 
   // Move off the origin to X=1, rotate 90deg on the Y axis
   box->setPosition(3, 1.0);
   box->setPosition(1, 90 * M_PI / 180);
+
+  // Add a force driving the box down into the floor, and to the left
+  boxBody->addExtForce(Eigen::Vector3d(1, -1, 0));
 
   world->addSkeleton(box);
 
@@ -1551,26 +1552,30 @@ void testFreeBlockWithFrictionCoeff(double frictionCoeff, double mass)
 
   VectorXd worldVel = world->getVelocities();
   // Test the classic formulation
+  // EXPECT_TRUE(verifyF_c(world));
+
   EXPECT_TRUE(testScrews(world));
   EXPECT_TRUE(verifyAnalyticalJacobians(world));
   EXPECT_TRUE(verifyVelGradients(world, worldVel));
   EXPECT_TRUE(verifyAnalyticalBackprop(world));
-  /*
   EXPECT_TRUE(verifyWrtMass(world));
-  */
 }
 
+#ifdef ALL_TESTS
 TEST(GRADIENTS, FREE_BLOCK_ON_GROUND_NO_FRICTION)
 {
   testFreeBlockWithFrictionCoeff(0, 1);
 }
+#endif
 
-#ifdef ALL_TESTS
+// #ifdef ALL_TESTS
 TEST(GRADIENTS, FREE_BLOCK_ON_GROUND_STATIC_FRICTION)
 {
   testFreeBlockWithFrictionCoeff(1e7, 1);
 }
+// #endif
 
+#ifdef ALL_TESTS
 TEST(GRADIENTS, FREE_BLOCK_ON_GROUND_SLIPPING_FRICTION)
 {
   testFreeBlockWithFrictionCoeff(0.5, 1);

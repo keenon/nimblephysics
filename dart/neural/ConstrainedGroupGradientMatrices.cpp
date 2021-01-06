@@ -181,6 +181,76 @@ void ConstrainedGroupGradientMatrices::registerLCPResults(
 }
 
 //==============================================================================
+void ConstrainedGroupGradientMatrices::opportunisticallyStandardizeResults(
+    simulation::World* world, Eigen::VectorXd& mX)
+{
+  if (mX.size() == 0)
+    return;
+  const Eigen::MatrixXd& A_c = getClampingConstraintMatrix();
+  if (A_c.cols() == 0)
+    return;
+  const Eigen::MatrixXd& A_ub = getUpperBoundConstraintMatrix();
+  const Eigen::MatrixXd& E = getUpperBoundMappingMatrix();
+  Eigen::MatrixXd A_c_ub_E = A_c + A_ub * E;
+  Eigen::MatrixXd Minv = world->getInvMassMatrix();
+
+  Eigen::MatrixXd Q = A_c.transpose() * Minv * A_c_ub_E;
+  Eigen::VectorXd b = getClampingConstraintRelativeVels();
+
+  Eigen::VectorXd f_c = Q.completeOrthogonalDecomposition().solve(b);
+  Eigen::VectorXd originalF_c = getClampingConstraintImpulses();
+  if (f_c == originalF_c)
+    return;
+
+  Eigen::VectorXd newX = Eigen::VectorXd::Zero(mX.size());
+  bool isValid = true;
+  for (int i = 0; i < newX.size(); i++)
+  {
+    int clampingIndex = mClampingIndex[i];
+    int upperBoundIndex = mUpperBoundIndex[i];
+    if (clampingIndex == -1 && upperBoundIndex == -1)
+    {
+      // This index should be zero, and zero must be in bounds in order for this
+      // new solution to be valid
+      if (mHi(i) < 0 || mLo(i) > 0)
+      {
+        isValid = false;
+        break;
+      }
+    }
+    if (clampingIndex != -1)
+    {
+      assert(upperBoundIndex == -1);
+      newX(i) = f_c(clampingIndex);
+      if (newX(i) > mHi(i) || newX(i) < mLo(i))
+      {
+        isValid = false;
+        break;
+      }
+    }
+    if (upperBoundIndex != -1)
+    {
+      assert(clampingIndex == -1);
+      int fIndex = mFIndex[i];
+      assert(fIndex == upperBoundIndex);
+      double originalMultiple = mX(i) / mX(fIndex);
+      double cleanMultiple = (std::abs(originalMultiple - mHi(i))
+                              < std::abs(originalMultiple - mLo(i)))
+                                 ? mHi(i)
+                                 : mLo(i);
+      newX(i) = f_c(fIndex) * cleanMultiple;
+    }
+  }
+
+  if (isValid)
+  {
+    mX = newX;
+    ConstrainedGroupGradientMatrices::mX = newX;
+    mClampingConstraintImpulses = f_c;
+  }
+}
+
+//==============================================================================
 void ConstrainedGroupGradientMatrices::deduplicateConstraints()
 {
   // Build the merge groups
@@ -322,7 +392,7 @@ void ConstrainedGroupGradientMatrices::deduplicateConstraints()
 /// be called once, and after this is called you cannot call
 /// measureConstraintImpulse() again!
 void ConstrainedGroupGradientMatrices::constructMatrices(
-    simulation::WorldPtr world)
+    simulation::World* world)
 {
   assert(!mFinalized);
   mFinalized = true;
@@ -362,13 +432,13 @@ void ConstrainedGroupGradientMatrices::constructMatrices(
   // - If mappings[j] == IRRELEVANT, constraint "j" is doesn't effect this
   //   skeleton, and so can be safely ignored.
 
-  std::vector<int> clampingIndex;
-  std::vector<int> upperBoundIndex;
+  mClampingIndex.clear();
+  mUpperBoundIndex.clear();
   std::vector<int> bouncingIndex;
   for (int i = 0; i < mNumConstraintDim; i++)
   {
-    clampingIndex.push_back(-1);
-    upperBoundIndex.push_back(-1);
+    mClampingIndex.push_back(-1);
+    mUpperBoundIndex.push_back(-1);
     bouncingIndex.push_back(-1);
   }
 
@@ -423,7 +493,7 @@ void ConstrainedGroupGradientMatrices::constructMatrices(
         // won't slide along the surface if you push on it a tiny epsilon,
         // because friction will prevent it.
         mContactConstraintMappings(j) = neural::ConstraintMapping::CLAMPING;
-        clampingIndex[j] = numClamping;
+        mClampingIndex[j] = numClamping;
         numClamping++;
       }
       else
@@ -439,7 +509,7 @@ void ConstrainedGroupGradientMatrices::constructMatrices(
     )
     {
       mContactConstraintMappings(j) = neural::ConstraintMapping::CLAMPING;
-      clampingIndex[j] = numClamping;
+      mClampingIndex[j] = numClamping;
       numClamping++;
       if (mRestitutionCoeffs[j] > 0)
       {
@@ -471,7 +541,7 @@ void ConstrainedGroupGradientMatrices::constructMatrices(
                 << ", lowerBound=" << lowerBound << std::endl;
       */
       mContactConstraintMappings(j) = fIndexPointer;
-      upperBoundIndex[j] = numUpperBound;
+      mUpperBoundIndex[j] = numUpperBound;
       numUpperBound++;
     }
     // If fIndex == -1, and we're at a bound, then we're actually "Not
@@ -530,26 +600,26 @@ void ConstrainedGroupGradientMatrices::constructMatrices(
 
     if (mContactConstraintMappings(j) == neural::ConstraintMapping::CLAMPING)
     {
-      assert(numClamping > clampingIndex[j]);
+      assert(numClamping > mClampingIndex[j]);
 
       mClampingConstraints.push_back(constraint);
 
       Eigen::VectorXd analyticalImpulse
           = constraint->getConstraintForces(world, mSkeletons);
 
-      mClampingConstraintMatrix.col(clampingIndex[j]) = analyticalImpulse;
-      mMassedClampingConstraintMatrix.col(clampingIndex[j])
+      mClampingConstraintMatrix.col(mClampingIndex[j]) = analyticalImpulse;
+      mMassedClampingConstraintMatrix.col(mClampingIndex[j])
           = mMassedImpulseTests[j];
-      mBounceDiagonals(clampingIndex[j]) = 1 + mRestitutionCoeffs[j];
-      mPenetrationCorrectionVelocitiesVec(clampingIndex[j])
+      mBounceDiagonals(mClampingIndex[j]) = 1 + mRestitutionCoeffs[j];
+      mPenetrationCorrectionVelocitiesVec(mClampingIndex[j])
           = mPenetrationCorrectionVelocities[j];
       if (mRestitutionCoeffs[j] > 0)
       {
         mBouncingConstraintMatrix.col(bouncingIndex[j]) = analyticalImpulse;
         mRestitutionDiagonals(bouncingIndex[j]) = mRestitutionCoeffs[j];
       }
-      mClampingConstraintImpulses(clampingIndex[j]) = mX(j);
-      mClampingConstraintRelativeVels(clampingIndex[j]) = mB(j);
+      mClampingConstraintImpulses(mClampingIndex[j]) = mX(j);
+      mClampingConstraintRelativeVels(mClampingIndex[j]) = mB(j);
     }
     else if (
         mContactConstraintMappings(j) == neural::ConstraintMapping::ILLEGAL)
@@ -558,12 +628,12 @@ void ConstrainedGroupGradientMatrices::constructMatrices(
     }
     else if (mContactConstraintMappings(j) >= 0) // means we're an UPPER_BOUND
     {
-      assert(numUpperBound > upperBoundIndex[j]);
+      assert(numUpperBound > mUpperBoundIndex[j]);
 
       mUpperBoundConstraints.push_back(constraint);
-      mUpperBoundConstraintMatrix.col(upperBoundIndex[j])
+      mUpperBoundConstraintMatrix.col(mUpperBoundIndex[j])
           = constraint->getConstraintForces(world);
-      mMassedUpperBoundConstraintMatrix.col(upperBoundIndex[j])
+      mMassedUpperBoundConstraintMatrix.col(mUpperBoundIndex[j])
           = mMassedImpulseTests[j];
     }
   }
@@ -598,7 +668,7 @@ void ConstrainedGroupGradientMatrices::constructMatrices(
         }
         assert(std::abs(mX(j) - upperBound) < 1e-2);
         mUpperBoundMappingMatrix(
-            upperBoundIndex[j], clampingIndex[fIndexPointer])
+            mUpperBoundIndex[j], mClampingIndex[fIndexPointer])
             = mHi(j);
       }
       // If we're clamped at the lower bound
@@ -615,7 +685,7 @@ void ConstrainedGroupGradientMatrices::constructMatrices(
         }
         assert(std::abs(mX(j) - lowerBound) < 1e-2);
         mUpperBoundMappingMatrix(
-            upperBoundIndex[j], clampingIndex[fIndexPointer])
+            mUpperBoundIndex[j], mClampingIndex[fIndexPointer])
             = mLo(j);
       }
     }
@@ -626,13 +696,13 @@ void ConstrainedGroupGradientMatrices::constructMatrices(
   {
     if (mContactConstraintMappings(row) == neural::ConstraintMapping::CLAMPING)
     {
-      int clampingRow = clampingIndex[row];
+      int clampingRow = mClampingIndex[row];
       for (size_t col = 0; col < mNumConstraintDim; col++)
       {
         if (mContactConstraintMappings(col)
             == neural::ConstraintMapping::CLAMPING)
         {
-          int clampingCol = clampingIndex[col];
+          int clampingCol = mClampingIndex[col];
           mClampingAMatrix(clampingRow, clampingCol) = mA(row, col);
         }
       }
@@ -1432,7 +1502,7 @@ ConstrainedGroupGradientMatrices::getVelocityDueToIllegalImpulses() const
 //==============================================================================
 /// Returns the coriolis and gravity forces pre-step
 const Eigen::VectorXd&
-ConstrainedGroupGradientMatrices::getCoriolisAndGravityForces() const
+ConstrainedGroupGradientMatrices::getCoriolisAndGravityAndExternalForces() const
 {
   return mCoriolisAndGravityForces;
 }
@@ -1532,7 +1602,7 @@ Eigen::MatrixXd ConstrainedGroupGradientMatrices::finiteDifferenceJacobianOfC(
   std::size_t innerDim = getWrtDim(world, wrt);
 
   // These are predicted contact forces at the clamping contacts
-  Eigen::VectorXd original = getCoriolisAndGravityAndExternalForces(world);
+  Eigen::VectorXd original = world->getCoriolisAndGravityAndExternalForces();
 
   Eigen::MatrixXd result = Eigen::MatrixXd::Zero(original.size(), innerDim);
 
@@ -1545,11 +1615,11 @@ Eigen::MatrixXd ConstrainedGroupGradientMatrices::finiteDifferenceJacobianOfC(
     Eigen::VectorXd perturbed = before;
     perturbed(i) += EPS;
     setWrt(world, wrt, perturbed);
-    Eigen::MatrixXd tauPos = getCoriolisAndGravityAndExternalForces(world);
+    Eigen::MatrixXd tauPos = world->getCoriolisAndGravityAndExternalForces();
     perturbed = before;
     perturbed(i) -= EPS;
     setWrt(world, wrt, perturbed);
-    Eigen::MatrixXd tauNeg = getCoriolisAndGravityAndExternalForces(world);
+    Eigen::MatrixXd tauNeg = world->getCoriolisAndGravityAndExternalForces();
     Eigen::VectorXd diff = tauPos - tauNeg;
     result.col(i) = diff / (2 * EPS);
   }

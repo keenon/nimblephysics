@@ -12,6 +12,7 @@
 #include "dart/math/Geometry.hpp"
 #include "dart/simulation/World.hpp"
 
+#include "GradientTestUtils.hpp"
 #include "TestHelpers.hpp"
 
 using namespace dart;
@@ -251,6 +252,7 @@ void testFreeBlockWithFrictionCoeff(
   */
 }
 
+#ifdef ALL_TESTS
 TEST(GRADIENTS, FREE_BLOCK)
 {
   testFreeBlockWithFrictionCoeff(1e7, 1, true);
@@ -259,4 +261,40 @@ TEST(GRADIENTS, FREE_BLOCK)
 TEST(GRADIENTS, BALL_BLOCK)
 {
   testFreeBlockWithFrictionCoeff(1e7, 1, false);
+}
+#endif
+
+TEST(GRADIENTS, FREE_VELOCITY_INTEGRATION)
+{
+  // World
+  WorldPtr world = World::create();
+  world->setGravity(Eigen::Vector3d::UnitY());
+
+  SkeletonPtr box = Skeleton::create("box");
+
+  std::pair<Joint*, BodyNode*> pair
+      = box->createJointAndBodyNodePair<FreeJoint>(nullptr);
+  Joint* boxJoint = pair.first;
+  BodyNode* boxBody = pair.second;
+
+  // boxBody->addExtForce(Eigen::Vector3d(1, -1, 0));
+
+  world->addSkeleton(box);
+
+  std::cout << world->getMassMatrix() << std::endl;
+
+  Eigen::Vector6d vel = Eigen::Vector6d::Zero();
+  vel(0) = 1.0;
+  vel(4) = 1.0;
+  world->setVelocities(vel);
+
+  world->step();
+  world->step();
+  BackpropSnapshotPtr snapshot = neural::forwardPass(world, true);
+  Eigen::MatrixXd jacC
+      = snapshot->getJacobianOfC(world, WithRespectTo::POSITION);
+
+  // verifyF_c(world);
+  // runVelocityTest(world);
+  std::cout << jacC << std::endl;
 }

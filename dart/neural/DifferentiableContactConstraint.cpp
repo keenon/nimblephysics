@@ -207,8 +207,7 @@ Eigen::VectorXd DifferentiableContactConstraint::getConstraintForces(
 
 //==============================================================================
 Eigen::VectorXd DifferentiableContactConstraint::getConstraintForces(
-    std::shared_ptr<simulation::World> world,
-    std::vector<std::string> skelNames)
+    simulation::World* world, std::vector<std::string> skelNames)
 {
   int totalDofs = 0;
   for (auto name : skelNames)
@@ -227,7 +226,7 @@ Eigen::VectorXd DifferentiableContactConstraint::getConstraintForces(
 
 //==============================================================================
 Eigen::VectorXd DifferentiableContactConstraint::getConstraintForces(
-    std::shared_ptr<simulation::World> world)
+    simulation::World* world)
 {
   Eigen::VectorXd taus = Eigen::VectorXd::Zero(world->getNumDofs());
   int cursor = 0;
@@ -1064,7 +1063,7 @@ DifferentiableContactConstraint::bruteForceConstraintForcesJacobian(
   std::shared_ptr<DifferentiableContactConstraint> originalPeerConstraint
       = getPeerConstraint(originalBackpropSnapshot);
   Eigen::VectorXd originalOut
-      = originalPeerConstraint->getConstraintForces(world);
+      = originalPeerConstraint->getConstraintForces(world.get());
 
   for (int i = 0; i < dims; i++)
   {
@@ -1075,7 +1074,7 @@ DifferentiableContactConstraint::bruteForceConstraintForcesJacobian(
         = neural::forwardPass(world, true);
     std::shared_ptr<DifferentiableContactConstraint> peerConstraint
         = getPeerConstraint(backpropSnapshot);
-    Eigen::VectorXd newOut = peerConstraint->getConstraintForces(world);
+    Eigen::VectorXd newOut = peerConstraint->getConstraintForces(world.get());
 
     tweakedPosition = originalPosition;
     tweakedPosition(i) -= EPS;
@@ -1084,7 +1083,8 @@ DifferentiableContactConstraint::bruteForceConstraintForcesJacobian(
         = neural::forwardPass(world, true);
     std::shared_ptr<DifferentiableContactConstraint> peerConstraintNeg
         = getPeerConstraint(backpropSnapshotNeg);
-    Eigen::VectorXd newOutNeg = peerConstraintNeg->getConstraintForces(world);
+    Eigen::VectorXd newOutNeg
+        = peerConstraintNeg->getConstraintForces(world.get());
 
     result.col(i) = (newOut - newOutNeg) / (2 * EPS);
   }

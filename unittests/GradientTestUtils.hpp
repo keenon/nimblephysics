@@ -138,7 +138,7 @@ bool verifyClassicClampingConstraintMatrix(
   // Populate the constraint matrices, without taking a time step or integrating
   // velocities
   world->getConstraintSolver()->setGradientEnabled(true);
-  world->getConstraintSolver()->solve();
+  world->getConstraintSolver()->solve(world.get());
 
   for (std::size_t i = 0; i < world->getNumSkeletons(); i++)
   {
@@ -747,7 +747,9 @@ bool verifyF_c(WorldPtr world)
       world, world->getPositions());
   Eigen::MatrixXd E = classicPtr->getUpperBoundMappingMatrix();
 
-  Eigen::MatrixXd realA_c = perturbedPtr->getClampingConstraintMatrix(world);
+  Eigen::MatrixXd realA_c
+      = perturbedPtr->getMassMatrix(world)
+        * perturbedPtr->getMassedClampingConstraintMatrix(world);
   Eigen::MatrixXd realA_ub = perturbedPtr->getUpperBoundConstraintMatrix(world);
   Eigen::MatrixXd realE = perturbedPtr->getUpperBoundMappingMatrix();
   Eigen::MatrixXd realQ = perturbedPtr->getClampingAMatrix();
@@ -770,12 +772,21 @@ bool verifyF_c(WorldPtr world)
 
   if (A_c.cols() > 0 && !equals(realA_c, A_c, 1e-9))
   {
-    std::cout << "Real A_c (top-left 6x6):" << std::endl
-              << realA_c.block<6, 6>(0, 0) << std::endl;
-    std::cout << "Analytical A_c (top-left 6x6):" << std::endl
-              << A_c.block<6, 6>(0, 0) << std::endl;
-    std::cout << "Diff A_c (top-left 6x6):" << std::endl
-              << (realA_c - A_c).block<6, 6>(0, 0) << std::endl;
+    if (realA_c.cols() >= 6 && realA_c.rows() >= 6)
+    {
+      std::cout << "Real A_c (top-left 6x6):" << std::endl
+                << realA_c.block<6, 6>(0, 0) << std::endl;
+      std::cout << "Analytical A_c (top-left 6x6):" << std::endl
+                << A_c.block<6, 6>(0, 0) << std::endl;
+      std::cout << "Diff A_c (top-left 6x6):" << std::endl
+                << (realA_c - A_c).block<6, 6>(0, 0) << std::endl;
+    }
+    else
+    {
+      std::cout << "Real A_c:" << std::endl << realA_c << std::endl;
+      std::cout << "Analytical A_c:" << std::endl << A_c << std::endl;
+      std::cout << "Diff A_c:" << std::endl << (realA_c - A_c) << std::endl;
+    }
     std::cout << "Diff A_c range:" << std::endl
               << (realA_c - A_c).minCoeff() << " to "
               << (realA_c - A_c).maxCoeff() << std::endl;
@@ -799,7 +810,7 @@ bool verifyF_c(WorldPtr world)
   Eigen::VectorXd analyticalF_c
       = classicPtr->estimateClampingConstraintImpulses(world, A_c, A_ub, E);
   Eigen::VectorXd realF_c = perturbedPtr->getClampingConstraintImpulses();
-  if (!equals(analyticalF_c, realF_c, 1e-8))
+  if (!equals(analyticalF_c, realF_c, 1e-9))
   {
     Eigen::MatrixXd comparison = Eigen::MatrixXd(realF_c.size(), 4);
     comparison.col(0) = realF_c;
@@ -880,23 +891,88 @@ bool verifyF_c(WorldPtr world)
         world, WithRespectTo::POSITION);
     if (!equals(analyticalJac, bruteForceJac, 2e-5))
     {
-      std::cout << "Failed f_c Jacobian!" << std::endl;
-      std::cout << "Brute force f_c Jacobian (size " << bruteForceJac.rows()
-                << "x" << bruteForceJac.cols()
-                << ") (top-left 6x6):" << std::endl
-                << bruteForceJac.block<6, 6>(0, 0) << std::endl;
-      std::cout << "Analytical f_c Jacobian (size " << analyticalJac.rows()
-                << "x" << analyticalJac.cols()
-                << ") (top-left 6x6):" << std::endl
-                << analyticalJac.block<6, 6>(0, 0) << std::endl;
-      std::cout << "Diff Jac (top-left 6x6):" << std::endl
-                << (bruteForceJac - analyticalJac).block<6, 6>(0, 0)
-                << std::endl;
-      std::cout << "Brute force f_c estimated Jacobian (size "
-                << bruteForceEstimatedJac.rows() << "x"
-                << bruteForceEstimatedJac.cols()
-                << ") (top-left 6x6):" << std::endl
-                << bruteForceEstimatedJac.block<6, 6>(0, 0) << std::endl;
+      std::cout << "Failed f_c Jacobian for POSITION!" << std::endl;
+      if (bruteForceJac.rows() >= 6 && bruteForceJac.cols() >= 6)
+      {
+        std::cout << "Brute force f_c Jacobian (size " << bruteForceJac.rows()
+                  << "x" << bruteForceJac.cols()
+                  << ") (top-left 6x6):" << std::endl
+                  << bruteForceJac.block<6, 6>(0, 0) << std::endl;
+        std::cout << "Analytical f_c Jacobian (size " << analyticalJac.rows()
+                  << "x" << analyticalJac.cols()
+                  << ") (top-left 6x6):" << std::endl
+                  << analyticalJac.block<6, 6>(0, 0) << std::endl;
+        std::cout << "Diff Jac (top-left 6x6):" << std::endl
+                  << (bruteForceJac - analyticalJac).block<6, 6>(0, 0)
+                  << std::endl;
+        std::cout << "Brute force f_c estimated Jacobian (size "
+                  << bruteForceEstimatedJac.rows() << "x"
+                  << bruteForceEstimatedJac.cols()
+                  << ") (top-left 6x6):" << std::endl
+                  << bruteForceEstimatedJac.block<6, 6>(0, 0) << std::endl;
+      }
+      else
+      {
+        std::cout << "Brute force f_c Jacobian (size " << bruteForceJac.rows()
+                  << "x" << bruteForceJac.cols() << "):" << std::endl
+                  << bruteForceJac << std::endl;
+        std::cout << "Analytical f_c Jacobian (size " << analyticalJac.rows()
+                  << "x" << analyticalJac.cols() << "):" << std::endl
+                  << analyticalJac << std::endl;
+        std::cout << "Diff Jac:" << std::endl
+                  << (bruteForceJac - analyticalJac) << std::endl;
+        std::cout << "Brute force f_c estimated Jacobian (size "
+                  << bruteForceEstimatedJac.rows() << "x"
+                  << bruteForceEstimatedJac.cols() << "):" << std::endl
+                  << bruteForceEstimatedJac << std::endl;
+      }
+      return false;
+    }
+
+    bruteForceEstimatedJac
+        = classicPtr->finiteDifferenceJacobianOfEstimatedConstraintForce(
+            world, WithRespectTo::VELOCITY);
+    bruteForceJac = classicPtr->finiteDifferenceJacobianOfConstraintForce(
+        world, WithRespectTo::VELOCITY);
+    analyticalJac = classicPtr->getJacobianOfConstraintForce(
+        world, WithRespectTo::VELOCITY);
+    if (!equals(analyticalJac, bruteForceJac, 2e-5))
+    {
+      std::cout << "Failed f_c Jacobian for VELOCITY!" << std::endl;
+      if (bruteForceJac.rows() >= 6 && bruteForceJac.cols() >= 6)
+      {
+        std::cout << "Brute force f_c Jacobian (size " << bruteForceJac.rows()
+                  << "x" << bruteForceJac.cols()
+                  << ") (top-left 6x6):" << std::endl
+                  << bruteForceJac.block<6, 6>(0, 0) << std::endl;
+        std::cout << "Analytical f_c Jacobian (size " << analyticalJac.rows()
+                  << "x" << analyticalJac.cols()
+                  << ") (top-left 6x6):" << std::endl
+                  << analyticalJac.block<6, 6>(0, 0) << std::endl;
+        std::cout << "Diff Jac (top-left 6x6):" << std::endl
+                  << (bruteForceJac - analyticalJac).block<6, 6>(0, 0)
+                  << std::endl;
+        std::cout << "Brute force f_c estimated Jacobian (size "
+                  << bruteForceEstimatedJac.rows() << "x"
+                  << bruteForceEstimatedJac.cols()
+                  << ") (top-left 6x6):" << std::endl
+                  << bruteForceEstimatedJac.block<6, 6>(0, 0) << std::endl;
+      }
+      else
+      {
+        std::cout << "Brute force f_c Jacobian (size " << bruteForceJac.rows()
+                  << "x" << bruteForceJac.cols() << "):" << std::endl
+                  << bruteForceJac << std::endl;
+        std::cout << "Analytical f_c Jacobian (size " << analyticalJac.rows()
+                  << "x" << analyticalJac.cols() << "):" << std::endl
+                  << analyticalJac << std::endl;
+        std::cout << "Diff Jac:" << std::endl
+                  << (bruteForceJac - analyticalJac) << std::endl;
+        std::cout << "Brute force f_c estimated Jacobian (size "
+                  << bruteForceEstimatedJac.rows() << "x"
+                  << bruteForceEstimatedJac.cols() << "):" << std::endl
+                  << bruteForceEstimatedJac << std::endl;
+      }
       return false;
     }
   }
@@ -1078,7 +1154,7 @@ bool verifyNextV(WorldPtr world)
             perturbedTest.realNextVel,
             classicPtr->hasBounces()
                 ? 1e-4 // things get sloppy when bouncing, increase tol
-                : 1e-8))
+                : 1e-9))
     {
       std::cout << "Real v_t+1:" << std::endl
                 << perturbedTest.realNextVel << std::endl;
@@ -1381,8 +1457,9 @@ bool verifyRecoveredLCPConstraints(WorldPtr world, VectorXd proposedVelocities)
 
 bool verifyVelGradients(WorldPtr world, VectorXd worldVel)
 {
+  // return verifyScratch(world, WithRespectTo::VELOCITY);
   // return verifyConstraintForceJac(world);
-  return verifyF_c(world);
+  // return verifyF_c(world);
   // return verifyScratch(world, WithRespectTo::POSITION);
   // return verifyJacobianOfProjectionIntoClampsMatrix(world, worldVel,
   // POSITION); return verifyScratch(world); return verifyF_c(world); return
@@ -1397,8 +1474,8 @@ bool verifyVelGradients(WorldPtr world, VectorXd worldVel)
       // && verifyJacobianOfProjectionIntoClampsMatrix(world, worldVel,
       // POSITION)
       && verifyRecoveredLCPConstraints(world, worldVel) && verifyF_c(world)
-      && verifyVelVelJacobian(world, worldVel)
       && verifyForceVelJacobian(world, worldVel)
+      && verifyVelVelJacobian(world, worldVel)
       && verifyPosVelJacobian(world, worldVel) && verifyNextV(world));
 }
 
@@ -3480,7 +3557,8 @@ bool verifyAnalyticalA_c(WorldPtr world)
 
   std::vector<std::shared_ptr<DifferentiableContactConstraint>> constraints
       = classicPtr->getClampingConstraints();
-  Eigen::MatrixXd A_c = classicPtr->getClampingConstraintMatrix(world);
+  Eigen::MatrixXd A_c = classicPtr->getMassMatrix(world)
+                        * classicPtr->getMassedClampingConstraintMatrix(world);
 
   Eigen::VectorXd preStepPos = classicPtr->getPreStepPosition();
   Eigen::VectorXd postStepPos = classicPtr->getPostStepPosition();
@@ -3488,7 +3566,8 @@ bool verifyAnalyticalA_c(WorldPtr world)
   for (int i = 0; i < classicPtr->getNumClamping(); i++)
   {
     Eigen::VectorXd trueCol = A_c.col(i);
-    Eigen::VectorXd analyticalCol = constraints[i]->getConstraintForces(world);
+    Eigen::VectorXd analyticalCol
+        = constraints[i]->getConstraintForces(world.get());
     if (!equals(trueCol, analyticalCol, 1e-8))
     {
       std::cout << "True A_c col: " << std::endl << trueCol << std::endl;
@@ -4393,7 +4472,7 @@ bool verifyAnalyticalA_cJacobian(WorldPtr world)
         = constraints[i]->getConstraintForcesJacobian(world);
     Eigen::MatrixXd bruteForce
         = constraints[i]->bruteForceConstraintForcesJacobian(world);
-    Eigen::VectorXd A_cCol = constraints[i]->getConstraintForces(world);
+    Eigen::VectorXd A_cCol = constraints[i]->getConstraintForces(world.get());
     if (!equals(analytical, bruteForce, 3e-8))
     {
       std::cout << "A_c col:" << std::endl << A_cCol << std::endl;

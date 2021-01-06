@@ -163,7 +163,8 @@ ConstBoxedLcpSolverPtr BoxedLcpConstraintSolver::getSecondaryBoxedLcpSolver()
 }
 
 //==============================================================================
-void BoxedLcpConstraintSolver::solveConstrainedGroup(ConstrainedGroup& group)
+void BoxedLcpConstraintSolver::solveConstrainedGroup(
+    ConstrainedGroup& group, simulation::World* world)
 {
   // Build LCP terms by aggregating them from constraints
   const std::size_t numConstraints = group.getNumConstraints();
@@ -412,14 +413,6 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(ConstrainedGroup& group)
       fIndexGradientBackup);
   */
 
-  // Apply constraint impulses
-  for (std::size_t i = 0; i < numConstraints; ++i)
-  {
-    const ConstraintBasePtr& constraint = group.getConstraint(i);
-    constraint->applyImpulse(mX.data() + mOffset[i]);
-    constraint->excite();
-  }
-
   if (group.getGradientConstraintMatrices())
   {
     group.getGradientConstraintMatrices()->registerLCPResults(
@@ -430,6 +423,19 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(ConstrainedGroup& group)
         bGradientBackup,
         aColNormGradientBackup,
         aGradientBackup);
+    group.getGradientConstraintMatrices()->constructMatrices(world);
+    // If possible (if A is rank-deficient), change to an equivalent
+    // least-squares solution that also satisfies the LCP
+    group.getGradientConstraintMatrices()->opportunisticallyStandardizeResults(
+        world, mX);
+  }
+
+  // Apply constraint impulses
+  for (std::size_t i = 0; i < numConstraints; ++i)
+  {
+    const ConstraintBasePtr& constraint = group.getConstraint(i);
+    constraint->applyImpulse(mX.data() + mOffset[i]);
+    constraint->excite();
   }
 }
 

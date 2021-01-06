@@ -104,7 +104,8 @@ public:
 
 protected:
   // Documentation inherited.
-  void solveConstrainedGroup(ConstrainedGroup& group) override;
+  void solveConstrainedGroup(
+      ConstrainedGroup& group, simulation::World* world) override;
 
   /// Boxed LCP solver
   BoxedLcpSolverPtr mBoxedLcpSolver;

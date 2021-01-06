@@ -33,6 +33,7 @@
 #ifndef DART_CONSTRAINT_CONSTRAINTSOVER_HPP_
 #define DART_CONSTRAINT_CONSTRAINTSOVER_HPP_
 
+#include <memory>
 #include <vector>
 
 #include <Eigen/Dense>
@@ -45,6 +46,10 @@
 #include "dart/neural/NeuralUtils.hpp"
 
 namespace dart {
+
+namespace simulation {
+class World;
+}
 
 namespace dynamics {
 class Skeleton;
@@ -179,7 +184,7 @@ public:
   LCPSolver* getLCPSolver() const;
 
   /// Solve constraint impulses and apply them to the skeletons
-  void solve();
+  void solve(simulation::World* world);
 
   /// Sets this constraint solver using other constraint solver. All the
   /// properties and registered skeletons and constraints will be copied over.
@@ -207,7 +212,9 @@ public:
 
 protected:
   // TODO(JS): Docstring
-  virtual void solveConstrainedGroup(ConstrainedGroup& group) = 0;
+  virtual void solveConstrainedGroup(
+      ConstrainedGroup& group, simulation::World* world)
+      = 0;
 
   /// Check if the skeleton is contained in this solver
   bool containSkeleton(const dynamics::ConstSkeletonPtr& skeleton) const;
@@ -228,7 +235,7 @@ protected:
   void buildConstrainedGroups();
 
   /// Solve constrained groups
-  void solveConstrainedGroups();
+  void solveConstrainedGroups(simulation::World* world);
 
   /// Return true if at least one of colliding body is soft body
   bool isSoftContact(const collision::Contact& contact) const;

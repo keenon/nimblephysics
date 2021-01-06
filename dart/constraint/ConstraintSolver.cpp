@@ -372,7 +372,7 @@ LCPSolver* ConstraintSolver::getLCPSolver() const
 }
 
 //==============================================================================
-void ConstraintSolver::solve()
+void ConstraintSolver::solve(simulation::World* world)
 {
   for (auto& skeleton : mSkeletons)
   {
@@ -389,7 +389,7 @@ void ConstraintSolver::solve()
   buildConstrainedGroups();
 
   // Solve constrained groups
-  solveConstrainedGroups();
+  solveConstrainedGroups(world);
 }
 
 //==============================================================================
@@ -750,10 +750,10 @@ void ConstraintSolver::buildConstrainedGroups()
 }
 
 //==============================================================================
-void ConstraintSolver::solveConstrainedGroups()
+void ConstraintSolver::solveConstrainedGroups(simulation::World* world)
 {
   for (auto& constraintGroup : mConstrainedGroups)
-    solveConstrainedGroup(constraintGroup);
+    solveConstrainedGroup(constraintGroup, world);
 }
 
 //==============================================================================

@@ -94,13 +94,12 @@ public:
   /// This analytically computes a column of the A_c matrix for this set of
   /// skeletons.
   Eigen::VectorXd getConstraintForces(
-      std::shared_ptr<simulation::World> world,
-      std::vector<std::string> skelNames);
+      simulation::World* world, std::vector<std::string> skelNames);
 
   /// This analytically computes a column of the A_c matrix, for this contact
   /// constraint, across the whole world by concatenating the result for each
   /// skeleton together into a single vector.
-  Eigen::VectorXd getConstraintForces(std::shared_ptr<simulation::World> world);
+  Eigen::VectorXd getConstraintForces(simulation::World* world);
 
   /// Returns the gradient of the contact position with respect to the
   /// specified dof of this skeleton

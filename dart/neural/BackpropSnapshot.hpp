@@ -469,7 +469,7 @@ public:
   Eigen::VectorXd getVelocityDueToIllegalImpulses();
 
   /// Returns the coriolis and gravity forces pre-step
-  Eigen::VectorXd getCoriolisAndGravityForces();
+  Eigen::VectorXd getCoriolisAndGravityAndExternalForces();
 
   /// Returns the velocity pre-LCP
   Eigen::VectorXd getPreLCPVelocity();

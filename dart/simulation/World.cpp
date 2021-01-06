@@ -220,7 +220,7 @@ void World::step(bool _resetCommand)
       mPenetrationCorrectionEnabled);
   mConstraintSolver->setConstraintForceMixingEnabled(
       mConstraintForceMixingEnabled);
-  mConstraintSolver->solve();
+  mConstraintSolver->solve(this);
 
   // Compute velocity changes given constraint impulses
   for (auto& skel : mSkeletons)

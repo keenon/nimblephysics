@@ -82,6 +82,12 @@ public:
       Eigen::VectorXd aColNorms,
       Eigen::MatrixXd A);
 
+  /// If possible (because A is rank-deficient), this changes mX to be the
+  /// least-squares minimal solution. This makes mX unique for a given set of
+  /// inputs, rather than leaving the exact solution undefined.
+  void opportunisticallyStandardizeResults(
+      simulation::World* world, Eigen::VectorXd& mX);
+
   /// This gets called by constructMatrices()
   void deduplicateConstraints();
 
@@ -89,7 +95,7 @@ public:
   /// after registerLCPResults(). This can only
   /// be called once, and after this is called you cannot call
   /// measureConstraintImpulse() again!
-  void constructMatrices(simulation::WorldPtr world);
+  void constructMatrices(simulation::World* world);
 
   /// This computes and returns the whole vel-vel jacobian for this group. For
   /// backprop, you don't actually need this matrix, you can compute backprop
@@ -271,7 +277,7 @@ public:
   const Eigen::VectorXd& getVelocityDueToIllegalImpulses() const;
 
   /// Returns the coriolis and gravity forces pre-step
-  const Eigen::VectorXd& getCoriolisAndGravityForces() const;
+  const Eigen::VectorXd& getCoriolisAndGravityAndExternalForces() const;
 
   /// Returns the torques applied pre-step
   const Eigen::VectorXd& getPreStepTorques() const;
@@ -402,6 +408,16 @@ public:
 
   /// These are the names of skeletons that are covered by this constraint group
   std::vector<std::string> mSkeletons;
+
+  /// For each index in the original force vector, this either points to an
+  /// index in the clamping vector, or it contains -1 to indicate the index was
+  /// not clamping.
+  std::vector<int> mClampingIndex;
+
+  /// For each index in the original force vector, this either points to an
+  /// index in the upper bound vector, or it contains -1 to indicate the index
+  /// was not clamping.
+  std::vector<int> mUpperBoundIndex;
 
   /// This is the global timestep length. This is included here because it shows
   /// up as a constant in some of the matrices.
