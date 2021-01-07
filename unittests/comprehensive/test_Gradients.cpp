@@ -59,7 +59,7 @@
 #include "TestHelpers.hpp"
 #include "stdio.h"
 
-// #define ALL_TESTS
+#define ALL_TESTS
 
 using namespace dart;
 using namespace math;
@@ -708,6 +708,7 @@ void testBouncingBlockPosGradients(double frictionCoeff, double mass)
 {
   // World
   WorldPtr world = World::create();
+  world->setGravity(Eigen::Vector3d::Zero());
 
   ///////////////////////////////////////////////
   // Create the box
@@ -730,7 +731,7 @@ void testBouncingBlockPosGradients(double frictionCoeff, double mass)
   boxBody->setFrictionCoeff(frictionCoeff);
 
   // Add a force driving the box to the left
-  boxBody->addExtForce(Eigen::Vector3d(1, -1, 0));
+  // boxBody->addExtForce(Eigen::Vector3d(1, -1, 0));
   // Prevent the mass matrix from being Identity
   boxBody->setMass(mass);
   boxBody->setRestitutionCoeff(0.5);
@@ -774,7 +775,7 @@ void testBouncingBlockPosGradients(double frictionCoeff, double mass)
 
   // The FD Jacobian needs us to be just out of contact range, so the bounce can
   // occur on some step in computation
-  floorPosition.translation() = Eigen::Vector3d(0, -(1.0 + 1e-8), 0);
+  floorPosition.translation() = Eigen::Vector3d(0, -(1.0 + 1e-7), 0);
   neural::BackpropSnapshotPtr fdPtr = neural::forwardPass(world, true);
   MatrixXd bruteForce = fdPtr->finiteDifferencePosPosJacobian(world, 100);
 
@@ -818,6 +819,14 @@ void testMultigroup(int numGroups)
 {
   // World
   WorldPtr world = World::create();
+
+  // Set up the LCP solver to be super super accurate, so our
+  // finite-differencing tests don't fail due to LCP errors. This isn't
+  // necessary during a real forward pass, but is helpful to make the
+  // mathematical invarients in the tests more reliable.
+  static_cast<constraint::BoxedLcpConstraintSolver*>(
+      world->getConstraintSolver())
+      ->makeHyperAccurateAndVerySlow();
 
   std::vector<SkeletonPtr> topBoxes;
   std::vector<SkeletonPtr> bottomBoxes;
@@ -878,11 +887,12 @@ void testMultigroup(int numGroups)
 
     bottomBoxes.push_back(bottomBox);
 
-    // Add a tiny bit of velocity to the boxes
-    topBox->computeForwardDynamics();
-    topBox->integrateVelocities(world->getTimeStep());
-    bottomBox->computeForwardDynamics();
-    bottomBox->integrateVelocities(world->getTimeStep());
+    // Add a tiny bit of velocity to the boxes pushing them into each other
+    topBox->setVelocity(1, -0.01);
+    bottomBox->setVelocity(1, 0.01);
+    // Add a non-zero shear velocity, so that we're not at a non-differentiable
+    // point for x-axis forces
+    topBox->setVelocity(0, 0.01);
   }
 
   // Add all the top boxes first, then all the bottom boxes. This ensures that
@@ -1410,6 +1420,7 @@ void testAtlas(bool withGroundContact)
   // EXPECT_TRUE(verifyWrtMass(world));
 }
 
+/*
 #ifdef ALL_TESTS
 TEST(GRADIENTS, ATLAS_FLOATING)
 {
@@ -1423,6 +1434,7 @@ TEST(GRADIENTS, ATLAS_GROUND)
   testAtlas(true);
 }
 #endif
+*/
 
 /******************************************************************************
 
@@ -1473,7 +1485,7 @@ void testFreeBlockWithFrictionCoeff(double frictionCoeff, double mass)
   boxJoint->setTransformFromParentBodyNode(fromParent);
 
   Eigen::Isometry3d fromChild = Eigen::Isometry3d::Identity();
-  fromChild.translation() = Eigen::Vector3d::UnitX();
+  fromChild.translation() = Eigen::Vector3d::UnitX() * -2;
   boxJoint->setTransformFromChildBodyNode(fromChild);
 
   std::shared_ptr<BoxShape> boxShape(
@@ -1562,23 +1574,23 @@ void testFreeBlockWithFrictionCoeff(double frictionCoeff, double mass)
   EXPECT_TRUE(verifyPosGradients(world, 1, 1e-8));
 }
 
-// #ifdef ALL_TESTS
+#ifdef ALL_TESTS
 TEST(GRADIENTS, FREE_BLOCK_ON_GROUND_NO_FRICTION)
 {
   testFreeBlockWithFrictionCoeff(0, 1);
 }
-// #endif
+#endif
 
-// #ifdef ALL_TESTS
+#ifdef ALL_TESTS
 TEST(GRADIENTS, FREE_BLOCK_ON_GROUND_STATIC_FRICTION)
 {
   testFreeBlockWithFrictionCoeff(1e7, 1);
 }
-// #endif
+#endif
 
-// #ifdef ALL_TESTS
+#ifdef ALL_TESTS
 TEST(GRADIENTS, FREE_BLOCK_ON_GROUND_SLIPPING_FRICTION)
 {
   testFreeBlockWithFrictionCoeff(0.5, 1);
 }
-// #endif
+#endif

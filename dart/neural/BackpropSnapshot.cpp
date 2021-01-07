@@ -2302,14 +2302,14 @@ Eigen::MatrixXd BackpropSnapshot::getJacobianOfLCPOffsetClampingSubset(
   Eigen::MatrixXd dC = getJacobianOfC(world, wrt);
   if (wrt == WithRespectTo::VELOCITY)
   {
-    return -A_c.transpose()
+    return getBounceDiagonals().asDiagonal() * -A_c.transpose()
            * (Eigen::MatrixXd::Identity(
                   world->getNumDofs(), world->getNumDofs())
               - dt * Minv * dC);
   }
   else if (wrt == WithRespectTo::FORCE)
   {
-    return -A_c.transpose() * dt * Minv;
+    return getBounceDiagonals().asDiagonal() * -A_c.transpose() * dt * Minv;
   }
 
   Eigen::VectorXd C = getCoriolisAndGravityAndExternalForces();
@@ -2322,11 +2322,13 @@ Eigen::MatrixXd BackpropSnapshot::getJacobianOfLCPOffsetClampingSubset(
     Eigen::MatrixXd dA_c_f
         = getJacobianOfClampingConstraintsTranspose(world, v_f);
 
-    return -(dA_c_f + A_c.transpose() * dt * (dMinv_f - Minv * dC));
+    return getBounceDiagonals().asDiagonal()
+           * -(dA_c_f + A_c.transpose() * dt * (dMinv_f - Minv * dC));
   }
   else
   {
-    return -(A_c.transpose() * dt * (dMinv_f - Minv * dC));
+    return getBounceDiagonals().asDiagonal()
+           * -(A_c.transpose() * dt * (dMinv_f - Minv * dC));
   }
 }
 
@@ -3017,7 +3019,7 @@ BackpropSnapshot::finiteDifferenceJacobianOfUpperBoundConstraints(
 
   Eigen::VectorXd original = getUpperBoundConstraintMatrix(world) * E * f0;
 
-  Eigen::MatrixXd result = Eigen::MatrixXd::Zero(mNumUpperBound, mNumDOFs);
+  Eigen::MatrixXd result = Eigen::MatrixXd::Zero(original.size(), mNumDOFs);
 
   const double EPS = 1e-8;
 
@@ -3331,12 +3333,12 @@ Eigen::MatrixXd
 BackpropSnapshot::finiteDifferenceJacobianOfEstimatedConstraintForce(
     simulation::WorldPtr world, WithRespectTo* wrt)
 {
+  Eigen::MatrixXd A_c = getClampingConstraintMatrix(world);
+  Eigen::MatrixXd A_ub = getUpperBoundConstraintMatrix(world);
+  Eigen::MatrixXd E = getUpperBoundMappingMatrix();
+
   int wrtDim = wrt->dim(world.get());
   Eigen::MatrixXd jac = Eigen::MatrixXd::Zero(mNumClamping, wrtDim);
-  if (wrt != WithRespectTo::POSITION)
-  {
-    return jac;
-  }
 
   const double EPS = 1e-7;
   Eigen::VectorXd original = wrt->get(world.get());
@@ -3346,11 +3348,11 @@ BackpropSnapshot::finiteDifferenceJacobianOfEstimatedConstraintForce(
     perturbed(i) += EPS;
     wrt->set(world.get(), perturbed);
 
-    Eigen::MatrixXd A_c
-        = estimateClampingConstraintMatrixAt(world, world->getPositions());
-    Eigen::MatrixXd A_ub
-        = estimateUpperBoundConstraintMatrixAt(world, world->getPositions());
-    Eigen::MatrixXd E = getUpperBoundMappingMatrix();
+    if (wrt == WithRespectTo::POSITION)
+    {
+      A_c = estimateClampingConstraintMatrixAt(world, world->getPositions());
+      A_ub = estimateUpperBoundConstraintMatrixAt(world, world->getPositions());
+    }
 
     Eigen::VectorXd bPlus
         = estimateClampingConstraintImpulses(world, A_c, A_ub, E);
@@ -3359,9 +3361,11 @@ BackpropSnapshot::finiteDifferenceJacobianOfEstimatedConstraintForce(
     perturbed(i) -= EPS;
     wrt->set(world.get(), perturbed);
 
-    A_c = estimateClampingConstraintMatrixAt(world, world->getPositions());
-    A_ub = estimateUpperBoundConstraintMatrixAt(world, world->getPositions());
-    E = getUpperBoundMappingMatrix();
+    if (wrt == WithRespectTo::POSITION)
+    {
+      A_c = estimateClampingConstraintMatrixAt(world, world->getPositions());
+      A_ub = estimateUpperBoundConstraintMatrixAt(world, world->getPositions());
+    }
 
     Eigen::VectorXd bMinus
         = estimateClampingConstraintImpulses(world, A_c, A_ub, E);

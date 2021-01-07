@@ -192,9 +192,8 @@ void ConstrainedGroupGradientMatrices::opportunisticallyStandardizeResults(
   const Eigen::MatrixXd& A_ub = getUpperBoundConstraintMatrix();
   const Eigen::MatrixXd& E = getUpperBoundMappingMatrix();
   Eigen::MatrixXd A_c_ub_E = A_c + A_ub * E;
-  Eigen::MatrixXd Minv = world->getInvMassMatrix();
 
-  Eigen::MatrixXd Q = A_c.transpose() * Minv * A_c_ub_E;
+  Eigen::MatrixXd Q = A_c.transpose() * mMinv * A_c_ub_E;
   Eigen::VectorXd b = getClampingConstraintRelativeVels();
 
   Eigen::VectorXd f_c = Q.completeOrthogonalDecomposition().solve(b);
