@@ -297,7 +297,7 @@ Eigen::Vector6d BallJoint::getScrewAxisGradientForPosition(
   int axisDof,
   int rotateDof)
 {
-  double EPS = 1e-9;
+  double EPS = 1e-7;
   Eigen::Vector6d pos = estimatePerturbedScrewAxisForPosition(axisDof, rotateDof, EPS);
   Eigen::Vector6d neg = estimatePerturbedScrewAxisForPosition(axisDof, rotateDof, -EPS);
   return (pos - neg) / (2 * EPS);
@@ -309,10 +309,22 @@ Eigen::Vector6d BallJoint::getScrewAxisGradientForForce(
   int axisDof,
   int rotateDof)
 {
-  double EPS = 1e-9;
-  Eigen::Vector6d pos = estimatePerturbedScrewAxisForForce(axisDof, rotateDof, EPS);
-  Eigen::Vector6d neg = estimatePerturbedScrewAxisForForce(axisDof, rotateDof, -EPS);
-  return (pos - neg) / (2 * EPS);
+  // getRelativeJacobian() is constant wrt position
+  // toRotate is also constant wrt position
+  // Eigen::Vector6d toRotate = Eigen::Vector6d::Unit(axisDof);
+  Eigen::Vector6d toRotate = math::AdT(Joint::mAspectProperties.mT_ChildBodyToJoint.inverse(), getRelativeJacobian().col(axisDof));
+  Eigen::Vector6d grad = Eigen::Vector6d::Zero();
+  Eigen::Matrix3d rotate = math::expMapRot(getPositionsStatic());
+  Eigen::Vector3d screwAxis = math::expMapJac(getPositionsStatic()).row(rotateDof);
+  grad.head<3>() = rotate * screwAxis.cross(toRotate.head<3>());
+  grad.tail<3>() = rotate * screwAxis.cross(toRotate.tail<3>());
+
+  Eigen::Isometry3d parentTransform = Eigen::Isometry3d::Identity();
+  if (getParentBodyNode() != nullptr) {
+    parentTransform = getParentBodyNode()->getWorldTransform();
+  }
+  return math::AdT(
+    parentTransform * Joint::mAspectProperties.mT_ParentBodyToJoint, grad);
 }
 
 //==============================================================================

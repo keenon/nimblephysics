@@ -55,57 +55,6 @@ TEST(ScrewGeometry, EXP_JAC)
 }
 */
 
-bool testScrews(WorldPtr world, SkeletonPtr skel)
-{
-  double EPS = 1e-4;
-
-  Eigen::VectorXd original = skel->getPositions();
-  std::vector<dynamics::DegreeOfFreedom*> dofs = skel->getDofs();
-  for (int dofIndex = 0; dofIndex < dofs.size(); dofIndex++)
-  {
-    dynamics::DegreeOfFreedom* dof = dofs[dofIndex];
-
-    dynamics::BodyNode* node = dof->getChildBodyNode();
-    Eigen::Isometry3d originalTransform = node->getWorldTransform();
-
-    // get world twist
-    int jointIndex = dof->getIndexInJoint();
-    math::Jacobian relativeJac = dof->getJoint()->getRelativeJacobian();
-    Eigen::Vector3d translation
-        = dof->getJoint()->getRelativeTransform().translation();
-    dynamics::BodyNode* childNode = dof->getChildBodyNode();
-    Eigen::Isometry3d transform = childNode->getWorldTransform();
-    Eigen::Vector6d worldTwist = dof->getJoint()->getWorldAxisScrew(jointIndex);
-    // Eigen::Vector6d worldTwist = math::AdT(transform, localTwist);
-
-    double pos = dof->getPosition();
-    dof->setPosition(pos + EPS);
-
-    Eigen::Matrix4d analyticalPerturbRotation
-        = (math::expMap(worldTwist * EPS) * transform).matrix();
-    Eigen::Matrix4d realPerturbRotation
-        = childNode->getWorldTransform().matrix();
-
-    // Reset
-    dof->setPosition(pos);
-
-    if (!equals(analyticalPerturbRotation, realPerturbRotation, 1e-8))
-    {
-      std::cout << "Axis: " << dofIndex << std::endl;
-      std::cout << "Analytical perturbations" << std::endl
-                << analyticalPerturbRotation << std::endl;
-      std::cout << "Real perturbations" << std::endl
-                << realPerturbRotation << std::endl;
-      Eigen::Matrix4d diff = analyticalPerturbRotation - realPerturbRotation;
-      std::cout << "Diff" << std::endl << diff << std::endl;
-
-      return false;
-    }
-  }
-
-  return true;
-}
-
 /******************************************************************************
 
 This test sets up a configuration that looks like this:
@@ -229,7 +178,7 @@ void testFreeBlockWithFrictionCoeff(
   Eigen::VectorXd timestepVel = box->getVelocities();
   Eigen::VectorXd timestepWorldVel = world->getVelocities();
 
-  world->step();
+  // world->step();
 
   /*
   server::GUIWebsocketServer server;
@@ -243,8 +192,9 @@ void testFreeBlockWithFrictionCoeff(
 
   Eigen::VectorXd worldVel = world->getVelocities();
   // Test the classic formulation
-  EXPECT_TRUE(testScrews(world, box));
+  EXPECT_TRUE(verifyPerturbedScrewAxisForForce(world));
   /*
+  EXPECT_TRUE(testScrews(world));
   EXPECT_TRUE(verifyAnalyticalJacobians(world));
   EXPECT_TRUE(verifyVelGradients(world, worldVel));
   EXPECT_TRUE(verifyAnalyticalBackprop(world));
@@ -252,18 +202,21 @@ void testFreeBlockWithFrictionCoeff(
   */
 }
 
-#ifdef ALL_TESTS
+// #ifdef ALL_TESTS
 TEST(GRADIENTS, FREE_BLOCK)
 {
   testFreeBlockWithFrictionCoeff(1e7, 1, true);
 }
+// #endif
 
+#ifdef ALL_TESTS
 TEST(GRADIENTS, BALL_BLOCK)
 {
   testFreeBlockWithFrictionCoeff(1e7, 1, false);
 }
 #endif
 
+#ifdef ALL_TESTS
 TEST(GRADIENTS, FREE_VELOCITY_INTEGRATION)
 {
   // World
@@ -298,3 +251,109 @@ TEST(GRADIENTS, FREE_VELOCITY_INTEGRATION)
   // runVelocityTest(world);
   std::cout << jacC << std::endl;
 }
+#endif
+
+#ifdef ALL_TESTS
+TEST(GRADIENTS, NORMALIZED_SCREW_GRADIENT_ROTATE_X)
+{
+  Eigen::Vector6d screwX = Eigen::Vector6d::Zero();
+  screwX(0) = 1.0;
+  Eigen::Vector3d point = Eigen::Vector3d::UnitY();
+  // if we rotate point by screwX, it should move in the negative Z direction
+  double theta = -90 * 3.1415926535 / 180;
+  // This should be at (0, 0, 1) = UnitZ()
+  Eigen::Vector3d rotatedPoint = math::expMap(screwX * theta) * point;
+  Eigen::Vector3d expectedPoint = -Eigen::Vector3d::UnitZ();
+  EXPECT_TRUE(equals(rotatedPoint, expectedPoint, 1e-6));
+
+  double EPS = 1e-7;
+  Eigen::Vector3d perturbedPos = math::expMap(screwX * (theta + EPS)) * point;
+  Eigen::Vector3d perturbedNeg = math::expMap(screwX * (theta - EPS)) * point;
+  Eigen::Vector3d bruteForceGradient
+      = (perturbedPos - perturbedNeg) / (2 * EPS);
+  Eigen::Vector3d expectedGradient = Eigen::Vector3d::UnitY();
+  EXPECT_TRUE(equals(bruteForceGradient, expectedGradient, 1e-9));
+
+  Eigen::Vector3d analyticalGradient
+      = math::gradientWrtTheta(screwX, point, theta);
+  EXPECT_TRUE(equals(analyticalGradient, expectedGradient, 1e-9));
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(GRADIENTS, NORMALIZED_SCREW_GRADIENT_RANDOM_THETA_ZERO)
+{
+  for (int i = 0; i < 20; i++)
+  {
+    Eigen::Vector6d screwRand = Eigen::Vector6d::Random();
+    screwRand.head<3>() = screwRand.head<3>().normalized();
+
+    Eigen::Vector3d point = Eigen::Vector3d::UnitY();
+    double theta = 0;
+
+    double EPS = 1e-7;
+    Eigen::Vector3d perturbedPos
+        = math::expMap(screwRand * (theta + EPS)) * point;
+    Eigen::Vector3d perturbedNeg
+        = math::expMap(screwRand * (theta - EPS)) * point;
+    Eigen::Vector3d bruteForceGradient
+        = (perturbedPos - perturbedNeg) / (2 * EPS);
+
+    Eigen::Vector3d analyticalGradient
+        = math::gradientWrtTheta(screwRand, point, theta);
+    EXPECT_TRUE(equals(analyticalGradient, bruteForceGradient, 1e-9));
+  }
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(GRADIENTS, UNNORMALIZED_SCREW_GRADIENT_RANDOM_THETA_ZERO)
+{
+  for (int i = 0; i < 20; i++)
+  {
+    Eigen::Vector6d screwRand = Eigen::Vector6d::Random();
+    // screwRand.head<3>() = screwRand.head<3>().normalized();
+
+    Eigen::Vector3d point = Eigen::Vector3d::UnitY();
+    double theta = 0;
+
+    double EPS = 1e-7;
+    Eigen::Vector3d perturbedPos
+        = math::expMap(screwRand * (theta + EPS)) * point;
+    Eigen::Vector3d perturbedNeg
+        = math::expMap(screwRand * (theta - EPS)) * point;
+    Eigen::Vector3d bruteForceGradient
+        = (perturbedPos - perturbedNeg) / (2 * EPS);
+
+    Eigen::Vector3d analyticalGradient
+        = math::gradientWrtTheta(screwRand, point, theta);
+    EXPECT_TRUE(equals(analyticalGradient, bruteForceGradient, 1e-9));
+  }
+}
+#endif
+
+/*
+TEST(GRADIENTS, NORMALIZED_SCREW_GRADIENT_RANDOM_THETA_RANDOM)
+{
+  for (int i = 0; i < 20; i++)
+  {
+    Eigen::Vector6d screwRand = Eigen::Vector6d::Random();
+    screwRand.head<3>() = screwRand.head<3>().normalized();
+
+    Eigen::Vector3d point = Eigen::Vector3d::UnitY();
+    double theta = rand() * 2 * 3.1415926535;
+
+    double EPS = 1e-7;
+    Eigen::Vector3d perturbedPos
+        = math::expMap(screwRand * (theta + EPS)) * point;
+    Eigen::Vector3d perturbedNeg
+        = math::expMap(screwRand * (theta - EPS)) * point;
+    Eigen::Vector3d bruteForceGradient
+        = (perturbedPos - perturbedNeg) / (2 * EPS);
+
+    Eigen::Vector3d analyticalGradient
+        = math::gradientWrtTheta(screwRand, point, theta);
+    EXPECT_TRUE(equals(analyticalGradient, bruteForceGradient, 1e-9));
+  }
+}
+*/

@@ -768,7 +768,7 @@ Eigen::Vector6d FreeJoint::getScrewAxisGradientForPosition(
   int axisDof,
   int rotateDof)
 {
-  double EPS = 1e-8;
+  double EPS = 5e-9;
   Eigen::Vector6d pos = estimatePerturbedScrewAxisForPosition(axisDof, rotateDof, EPS);
   Eigen::Vector6d neg = estimatePerturbedScrewAxisForPosition(axisDof, rotateDof, -EPS);
   return (pos - neg) / (2 * EPS);
@@ -780,10 +780,37 @@ Eigen::Vector6d FreeJoint::getScrewAxisGradientForForce(
   int axisDof,
   int rotateDof)
 {
-  double EPS = 1e-8;
-  Eigen::Vector6d pos = estimatePerturbedScrewAxisForForce(axisDof, rotateDof, EPS);
-  Eigen::Vector6d neg = estimatePerturbedScrewAxisForForce(axisDof, rotateDof, -EPS);
-  return (pos - neg) / (2 * EPS);
+  // toRotate is constant wrt position
+  Eigen::Vector6d toRotate = math::AdT(Joint::mAspectProperties.mT_ChildBodyToJoint.inverse(), getRelativeJacobian().col(axisDof));
+  Eigen::Vector6d grad = Eigen::Vector6d::Zero();
+
+  // If rotateDof is a rotation index (first 3), treat it like an offset BallJoint
+  if (rotateDof < 3) {
+    // Compute gradients here just like BallJoint
+    Eigen::Matrix3d rotate = math::expMapRot(getPositionsStatic().head<3>());
+    Eigen::Vector3d screwAxis = math::expMapJac(getPositionsStatic().head<3>()).row(rotateDof);
+    grad.head<3>() = rotate * screwAxis.cross(toRotate.head<3>());
+    grad.tail<3>() = rotate * screwAxis.cross(toRotate.tail<3>());
+    // Offset, without rotation, so that "grad" is now centered back at the root of the joint
+    Eigen::Isometry3d transform = Eigen::Isometry3d::Identity();
+    transform.translation() = getPositionsStatic().tail<3>();
+    grad = math::AdT(transform, grad);
+  }
+  // Otherwise rotateDof is a translation index (last 3)
+  else {
+    assert(rotateDof >= 3 && rotateDof < 6);
+
+    Eigen::Matrix3d rotate = math::expMapRot(getPositionsStatic().head<3>());
+    Eigen::Vector3d unitGrad = Eigen::Vector3d::Unit(rotateDof - 3);
+    grad.tail<3>() = unitGrad.cross(rotate * toRotate.head<3>());
+  }
+
+  Eigen::Isometry3d parentTransform = Eigen::Isometry3d::Identity();
+  if (getParentBodyNode() != nullptr) {
+    parentTransform = getParentBodyNode()->getWorldTransform();
+  }
+  return math::AdT(
+    parentTransform * Joint::mAspectProperties.mT_ParentBodyToJoint, grad);
 }
 
 //==============================================================================
