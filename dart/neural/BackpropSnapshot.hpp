@@ -511,6 +511,10 @@ public:
       Eigen::MatrixXd bruteForce,
       std::string name);
 
+  /// Returns true if we were able to standardize our LCP results, false if we
+  /// weren't
+  bool areResultsStandardized() const;
+
 protected:
   /// This is the global timestep length. This is included here because it shows
   /// up as a constant in some of the matrices.

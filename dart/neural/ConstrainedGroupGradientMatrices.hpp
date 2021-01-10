@@ -67,6 +67,20 @@ public:
       const std::shared_ptr<constraint::ConstraintBase>& constraint,
       std::size_t constraintIndex);
 
+  /// This will attempt to quickly solve an LCP by exploiting locality in the
+  /// solution. Assuming we were initialized at the last solution, there's
+  /// actually a good chance that we're still in all the same force categories.
+  /// This gets called before constructMatrices(), so it assumes no matrices
+  /// exist yet. Returns true if successful, false otherwise.
+  bool attemptFastSolveLCP(
+      simulation::World* world,
+      Eigen::VectorXd& mX,
+      const Eigen::VectorXd& A,
+      const Eigen::VectorXd& mHi,
+      const Eigen::VectorXd& mLo,
+      const Eigen::VectorXd& mB,
+      const Eigen::VectorXd& mFIndex);
+
   /// This mocks measuring a constraint impulse. Useful for testing.
   void mockMeasureConstraintImpulse(
       Eigen::VectorXd impulseTest, Eigen::VectorXd massedImpulseTest);
@@ -84,9 +98,18 @@ public:
 
   /// If possible (because A is rank-deficient), this changes mX to be the
   /// least-squares minimal solution. This makes mX unique for a given set of
-  /// inputs, rather than leaving the exact solution undefined.
-  void opportunisticallyStandardizeResults(
+  /// inputs, rather than leaving the exact solution undefined. This can also be
+  /// used to short-circuit an LCP solve before it even needs to start, by using
+  /// the previous LCP solution as a "close enough" guess that can then be
+  /// cleaned up by this method and made exact. To faccilitate that use case,
+  /// this method returns true if it's found a valid solution, whether it
+  /// changed anything or not, and false if the solution is invalid.
+  bool opportunisticallyStandardizeResults(
       simulation::World* world, Eigen::VectorXd& mX);
+
+  /// This returns true if the proposed mX is consistent with our recorded LCP
+  /// construction
+  bool isSolutionValid(const Eigen::VectorXd& mX);
 
   /// This gets called by constructMatrices()
   void deduplicateConstraints();
@@ -310,6 +333,10 @@ public:
   const std::vector<std::shared_ptr<DifferentiableContactConstraint>>&
   getUpperBoundConstraints() const;
 
+  /// Returns true if we were able to standardize our LCP results, false if we
+  /// weren't
+  bool areResultsStandardized() const;
+
   /// This computes and returns the jacobian of M^{-1}(pos, inertia) * tau by
   /// finite differences. This is SUPER SLOW, and is only here for testing.
   Eigen::MatrixXd finiteDifferenceJacobianOfMinv(
@@ -450,6 +477,10 @@ public:
   /// These are just the upper bound constraints
   std::vector<std::shared_ptr<DifferentiableContactConstraint>>
       mUpperBoundConstraints;
+
+  /// This is set to true when we were able to standardize the LCP output. It's
+  /// false if we were invalid for some reason.
+  bool mStandardizedResults;
 
   /// These are public to enable unit testing
 public:

@@ -125,12 +125,12 @@ void BoxedLcpConstraintSolver::makeHyperAccurateAndVerySlow()
 {
   std::shared_ptr<PgsBoxedLcpSolver> accurateAndSlowSolver
       = std::make_shared<PgsBoxedLcpSolver>();
-  accurateAndSlowSolver->setOption(
-      PgsBoxedLcpSolver::Option(50000, 1e-15, 1e-12, 1e-10, false));
   /*
   accurateAndSlowSolver->setOption(
-      PgsBoxedLcpSolver::Option(1000, 1e-10, 1e-8, 1e-8, false));
+      PgsBoxedLcpSolver::Option(50000, 1e-15, 1e-12, 1e-10, false));
   */
+  accurateAndSlowSolver->setOption(
+      PgsBoxedLcpSolver::Option(1000, 1e-10, 1e-8, 1e-8, false));
   setBoxedLcpSolver(accurateAndSlowSolver);
 }
 
@@ -180,7 +180,12 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(
 #else // debug
   mA.setZero(n, nSkip); // rows = n, cols = n + (n % 4)
 #endif
-  mX.resize(n);
+  bool mXResized = mX.size() != n;
+  if (mXResized)
+  {
+    mX.resize(n);
+    mX.setZero();
+  }
   mB.resize(n);
   mW.setZero(n); // set w to 0
   mLo.resize(n);
@@ -341,20 +346,55 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(
   {
     aColNormGradientBackup(i) = mA.col(i).squaredNorm();
   }
-  Eigen::MatrixXd aGradientBackup = mA;
+  // mA can actually be non-square, for efficiency reasons, so we make sure we
+  // keep just the square block.
+  Eigen::MatrixXd aGradientBackup = mA.block(0, 0, n, n);
 
-  const bool earlyTermination = (mSecondaryBoxedLcpSolver != nullptr);
-  assert(mBoxedLcpSolver);
-  bool success = mBoxedLcpSolver->solve(
-      n,
-      mA.data(),
-      mX.data(),
-      mB.data(),
-      0,
-      mLo.data(),
-      mHi.data(),
-      mFIndex.data(),
-      earlyTermination);
+  bool success = false;
+  bool shortCircuitLCP = false;
+
+  // Pre-solve, if we're using gradients. We're going to assume that the
+  // initialization mX is from last time step, and then guess that nothing has
+  // changed categories. If that's true, then we can get a solution in a single
+  // matrix inversion.
+  //
+  // This gives us two advantages:
+  //
+  // 1) It's less computation in order to get a very accurate result.
+  //
+  // 2) It keeps classes stable and nicely differentiable, by getting LCP
+  // solutions near previous solutions.
+
+  if (group.getGradientConstraintMatrices() && !mXResized)
+  {
+    std::shared_ptr<neural::ConstrainedGroupGradientMatrices> grads
+        = group.getGradientConstraintMatrices();
+    grads->registerLCPResults(
+        mX, mHi, mLo, mFIndex, mB, aColNormGradientBackup, aGradientBackup);
+    grads->constructMatrices(world);
+    success = grads->opportunisticallyStandardizeResults(world, mX);
+    // If this worked, we don't need to reconstruct our constraint matrices,
+    // since the ones we just made already work by construction
+    shortCircuitLCP = success;
+  }
+
+  // If we were unable to solve the problem by approximation from the previous
+  // solution, then re-solve it fully using an LCP
+  if (!success)
+  {
+    const bool earlyTermination = (mSecondaryBoxedLcpSolver != nullptr);
+    assert(mBoxedLcpSolver);
+    success = mBoxedLcpSolver->solve(
+        n,
+        mA.data(),
+        mX.data(),
+        mB.data(),
+        0,
+        mLo.data(),
+        mHi.data(),
+        mFIndex.data(),
+        earlyTermination);
+  }
 
   // Sanity check. LCP solvers should not report success with nan values, but
   // it could happen. So we set the sucees to false for nan values.
@@ -413,7 +453,9 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(
       fIndexGradientBackup);
   */
 
-  if (group.getGradientConstraintMatrices())
+  // If our short circuit didn't work, then we had to use the full LCP to get a
+  // fresh solution, and now we have to generate new constraint matrices.
+  if (group.getGradientConstraintMatrices() && !shortCircuitLCP)
   {
     group.getGradientConstraintMatrices()->registerLCPResults(
         mX,

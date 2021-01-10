@@ -1582,7 +1582,154 @@ TEST(DARTCollide, ATLAS_5_STABILITY)
 }
 #endif
 
-// #ifdef ALL_TESTS
+TEST(DARTCollide, ATLAS_5_HIP_FOOT)
+{
+  // Create a world
+  std::shared_ptr<simulation::World> world = simulation::World::create();
+
+  // Set gravity of the world
+  world->setConstraintForceMixingEnabled(false);
+  world->setPenetrationCorrectionEnabled(false);
+  world->setGravity(Eigen::Vector3d(0.0, -9.81, 0));
+
+  // Set up the LCP solver to be super super accurate, so our
+  // finite-differencing tests don't fail due to LCP errors. This isn't
+  // necessary during a real forward pass, but is helpful to make the
+  // mathematical invarients in the tests more reliable.
+  static_cast<constraint::BoxedLcpConstraintSolver*>(
+      world->getConstraintSolver())
+      ->makeHyperAccurateAndVerySlow();
+
+  // Load the meshes
+
+  auto retriever = std::make_shared<utils::CompositeResourceRetriever>();
+  retriever->addSchemaRetriever(
+      "file", std::make_shared<common::LocalResourceRetriever>());
+  retriever->addSchemaRetriever("dart", utils::DartResourceRetriever::create());
+  std::string leftFootPath = "dart://sample/sdf/atlas/l_foot.dae";
+  dynamics::ShapePtr leftFootMesh = std::make_shared<dynamics::MeshShape>(
+      Eigen::Vector3d::Ones(),
+      dynamics::MeshShape::loadMesh(leftFootPath, retriever),
+      leftFootPath,
+      retriever);
+  std::string rightFootPath = "dart://sample/sdf/atlas/r_foot.dae";
+  dynamics::ShapePtr rightFootMesh = std::make_shared<dynamics::MeshShape>(
+      Eigen::Vector3d::Ones(),
+      dynamics::MeshShape::loadMesh(rightFootPath, retriever),
+      rightFootPath,
+      retriever);
+  std::shared_ptr<BoxShape> rootShape(
+      new BoxShape(Eigen::Vector3d::Ones() * 0.5));
+
+  // Set up matrices
+
+  Eigen::Matrix4d l_leg_hpx_WorldTransform;
+  // clang-format off
+  l_leg_hpx_WorldTransform << 1,           0,           0,           0,
+                              0, 1.11022e-16,           1,       -0.01,
+                              0,          -1, 1.11022e-16,      -0.089,
+                              0,           0,           0,           1;
+  // clang-format on
+  Eigen::Vector3d l_leg_hpx_Axis = Eigen::Vector3d::UnitX();
+  Eigen::Matrix4d r_leg_hpx_WorldTransform;
+  // clang-format off
+  r_leg_hpx_WorldTransform << 1,           0,           0,           0,
+                              0, 1.11022e-16,           1,       -0.01,
+                              0,          -1, 1.11022e-16,       0.089,
+                              0,           0,           0,           1;
+  // clang-format on
+  Eigen::Vector3d r_leg_hpx_Axis = Eigen::Vector3d::UnitX();
+  Eigen::Matrix4d l_foot_WorldTransform;
+  // clang-format off
+  l_foot_WorldTransform << 1,           0,           0,           0,
+                           0, 1.11022e-16,           1,      -0.856,
+                           0,          -1, 1.11022e-16,      -0.089,
+                           0,           0,           0,           1;
+  // clang-format on
+  Eigen::Matrix4d r_foot_WorldTransform;
+  // clang-format off
+  r_foot_WorldTransform << 1,           0,           0,           0,
+                           0, 1.11022e-16,           1,      -0.856,
+                           0,          -1, 1.11022e-16,       0.089,
+                           0,           0,           0,           1;
+  // clang-format on
+
+  std::shared_ptr<dynamics::Skeleton> singleJointAtlas
+      = dynamics::Skeleton::create();
+
+  Eigen::Isometry3d leftHipPos = Eigen::Isometry3d(l_leg_hpx_WorldTransform);
+  Eigen::Isometry3d rightHipPos = Eigen::Isometry3d(r_leg_hpx_WorldTransform);
+  Eigen::Isometry3d leftFootPos = Eigen::Isometry3d(l_foot_WorldTransform);
+  Eigen::Isometry3d rightFootPos = Eigen::Isometry3d(r_foot_WorldTransform);
+  Eigen::Isometry3d leftHipToLeftFoot = leftHipPos.inverse() * leftFootPos;
+  Eigen::Isometry3d rightHipToRightFoot = rightHipPos.inverse() * rightFootPos;
+
+  // Create root box
+
+  std::pair<dynamics::FreeJoint*, dynamics::BodyNode*> rootPair
+      = singleJointAtlas->createJointAndBodyNodePair<dynamics::FreeJoint>();
+  dynamics::FreeJoint* rootJoint = rootPair.first;
+  dynamics::BodyNode* rootBody = rootPair.second;
+  rootBody->createShapeNodeWith<VisualAspect, CollisionAspect>(rootShape);
+
+  // Create left leg
+
+  std::pair<dynamics::RevoluteJoint*, dynamics::BodyNode*> leftHipPair
+      = rootBody->createChildJointAndBodyNodePair<dynamics::RevoluteJoint>();
+  dynamics::RevoluteJoint* leftHip = leftHipPair.first;
+  leftHip->setTransformFromParentBodyNode(leftHipPos);
+  leftHip->setTransformFromChildBodyNode(leftHipToLeftFoot.inverse());
+  leftHip->setAxis(l_leg_hpx_Axis);
+  dynamics::BodyNode* leftFoot = leftHipPair.second;
+  leftFoot->createShapeNodeWith<VisualAspect, CollisionAspect>(leftFootMesh);
+  assert(leftFoot->getWorldTransform().matrix() == leftFootPos.matrix());
+
+  // Create right leg
+
+  std::pair<dynamics::RevoluteJoint*, dynamics::BodyNode*> rightHipPair
+      = rootBody->createChildJointAndBodyNodePair<dynamics::RevoluteJoint>();
+  dynamics::RevoluteJoint* rightHip = rightHipPair.first;
+  rightHip->setTransformFromParentBodyNode(rightHipPos);
+  rightHip->setTransformFromChildBodyNode(rightHipToRightFoot.inverse());
+  rightHip->setAxis(r_leg_hpx_Axis);
+  dynamics::BodyNode* rightFoot = rightHipPair.second;
+  rightFoot->createShapeNodeWith<VisualAspect, CollisionAspect>(rightFootMesh);
+  assert(rightFoot->getWorldTransform().matrix() == rightFootPos.matrix());
+
+  world->addSkeleton(singleJointAtlas);
+
+  // Load ground
+  dart::utils::DartLoader urdfLoader;
+  std::shared_ptr<dynamics::Skeleton> ground
+      = urdfLoader.parseSkeleton("dart://sample/sdf/atlas/ground.urdf");
+  world->addSkeleton(ground);
+  // Disable the ground from casting its own shadows
+  ground->getBodyNode(0)->getShapeNode(0)->getVisualAspect()->setCastShadows(
+      false);
+
+  /*
+  // Display everything out on a GUI
+
+  server::GUIWebsocketServer server;
+  server.renderWorld(world);
+  server.serve(8070);
+
+  Ticker ticker(0.01);
+  ticker.registerTickListener([&](long time) {
+    double diff = sin(((double)time / 2000));
+    singleJointAtlas->setPosition(6, diff);
+    singleJointAtlas->setPosition(7, -diff);
+    server.renderWorld(world);
+  });
+  server.registerConnectionListener([&]() { ticker.start(); });
+
+  while (server.isServing())
+  {
+  }
+  */
+}
+
+#ifdef ALL_TESTS
 TEST(DARTCollide, ATLAS_5)
 {
   // Create a world
@@ -1685,4 +1832,4 @@ TEST(DARTCollide, ATLAS_5)
   {
   }
 }
-// #endif
+#endif

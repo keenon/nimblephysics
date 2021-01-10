@@ -921,7 +921,7 @@ DifferentiableContactConstraint::bruteForceContactPositionJacobian(
   int dofs = world->getNumDofs();
   math::LinearJacobian jac = math::LinearJacobian(3, dofs);
 
-  const double EPS = 1e-8;
+  const double EPS = 1e-7;
 
   Eigen::VectorXd positions = world->getPositions();
 
@@ -1010,7 +1010,7 @@ math::Jacobian DifferentiableContactConstraint::bruteForceContactForceJacobian(
   int dofs = world->getNumDofs();
   math::Jacobian jac = math::Jacobian(6, dofs);
 
-  const double EPS = 1e-8;
+  const double EPS = 1e-7;
 
   Eigen::VectorXd positions = world->getPositions();
 

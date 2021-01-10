@@ -17,6 +17,8 @@ using namespace math;
 using namespace dynamics;
 using namespace simulation;
 
+#define CLAMPING_THRESHOLD 1e-9
+
 namespace dart {
 namespace neural {
 
@@ -181,14 +183,93 @@ void ConstrainedGroupGradientMatrices::registerLCPResults(
 }
 
 //==============================================================================
-void ConstrainedGroupGradientMatrices::opportunisticallyStandardizeResults(
+/// This returns true if the proposed mX is consistent with our recorded LCP
+/// construction
+bool ConstrainedGroupGradientMatrices::isSolutionValid(
+    const Eigen::VectorXd& mX)
+{
+  Eigen::VectorXd v = mA * mX - mB;
+  for (int i = 0; i < mX.size(); i++)
+  {
+    double upperLimit = mHi(i);
+    double lowerLimit = mLo(i);
+    if (mFIndex(i) != -1)
+    {
+      upperLimit *= mX(mFIndex(i));
+      lowerLimit *= mX(mFIndex(i));
+    }
+
+    const double tol = 1e-3;
+
+    /// Solves constriant impulses for a constrained group. The LCP formulation
+    /// setting that this function solve is A*x = b + w where each x[i], w[i]
+    /// satisfies one of
+    ///   (1) x = lo, w >= 0
+    ///   (2) x = hi, w <= 0
+    ///   (3) lo < x < hi, w = 0
+
+    // If force has a zero bound, and we're at a zero bound (this is common with
+    // friction being upper-bounded by a near-zero normal force) then allow
+    // velocity in either direction.
+    if (std::abs(lowerLimit) < tol && std::abs(upperLimit) < tol
+        && std::abs(mX(i)) < tol)
+    {
+      // This is always allowed
+    }
+    // If force is at the lower bound, velocity must be >= 0
+    else if (std::abs(mX(i) - lowerLimit) < tol)
+    {
+      if (v(i) < -tol)
+        return false;
+    }
+    // If force is at the upper bound, velocity must be <= 0
+    else if (std::abs(mX(i) - upperLimit) < tol)
+    {
+      if (v(i) > tol)
+        return false;
+    }
+    // If force is within bounds, then velocity must be zero
+    else if (mX(i) > lowerLimit && mX(i) < upperLimit)
+    {
+      if (std::abs(v(i)) > tol)
+        return false;
+    }
+    // If force is out of bounds, we're always illegal
+    else
+    {
+      return false;
+    }
+  }
+  // If we make it here, the solution is fine
+  return true;
+}
+
+//==============================================================================
+/// If possible (because A is rank-deficient), this changes mX to be the
+/// least-squares minimal solution. This makes mX unique for a given set of
+/// inputs, rather than leaving the exact solution undefined. This can also be
+/// used to short-circuit an LCP solve before it even needs to start, by using
+/// the previous LCP solution as a "close enough" guess that can then be
+/// cleaned up by this method and made exact. To faccilitate that use case,
+/// this method returns true if it's found a valid solution, whether it
+/// changed anything or not, and false if the solution is invalid.
+bool ConstrainedGroupGradientMatrices::opportunisticallyStandardizeResults(
     simulation::World* world, Eigen::VectorXd& mX)
 {
+  mStandardizedResults = true;
   if (mX.size() == 0)
-    return;
+  {
+    // a 0-size solution is always valid, as long as it's not trivially broken
+    // (wrong dimensions)
+    return mX.size() == mA.rows();
+  }
   const Eigen::MatrixXd& A_c = getClampingConstraintMatrix();
   if (A_c.cols() == 0)
-    return;
+  {
+    // this means that our guessing formula won't work, so just return whether
+    // the solution is already valid.
+    return isSolutionValid(mX);
+  }
   const Eigen::MatrixXd& A_ub = getUpperBoundConstraintMatrix();
   const Eigen::MatrixXd& E = getUpperBoundMappingMatrix();
   Eigen::MatrixXd A_c_ub_E = A_c + A_ub * E;
@@ -196,27 +277,26 @@ void ConstrainedGroupGradientMatrices::opportunisticallyStandardizeResults(
   Eigen::MatrixXd Q = A_c.transpose() * mMinv * A_c_ub_E;
   Eigen::VectorXd b = getClampingConstraintRelativeVels();
 
+  if (A_ub.cols() == 0)
+  {
+#ifndef NDEBUG
+    // Sanity check
+    Eigen::MatrixXd realQ = getClampingAMatrix();
+    Eigen::MatrixXd diff = Q - realQ;
+    assert(std::abs(diff.maxCoeff()) < 1e-11);
+    assert(std::abs(diff.minCoeff()) < 1e-11);
+#endif
+    Q = realQ;
+  }
+
   Eigen::VectorXd f_c = Q.completeOrthogonalDecomposition().solve(b);
   Eigen::VectorXd originalF_c = getClampingConstraintImpulses();
-  if (f_c == originalF_c)
-    return;
 
   Eigen::VectorXd newX = Eigen::VectorXd::Zero(mX.size());
-  bool isValid = true;
   for (int i = 0; i < newX.size(); i++)
   {
     int clampingIndex = mClampingIndex[i];
     int upperBoundIndex = mUpperBoundIndex[i];
-    if (clampingIndex == -1 && upperBoundIndex == -1)
-    {
-      // This index should be zero, and zero must be in bounds in order for this
-      // new solution to be valid
-      if (mHi(i) < 0 || mLo(i) > 0)
-      {
-        isValid = false;
-        break;
-      }
-    }
     if (clampingIndex != -1)
     {
       // If we're clamping
@@ -227,43 +307,27 @@ void ConstrainedGroupGradientMatrices::opportunisticallyStandardizeResults(
     {
       assert(clampingIndex == -1);
       int fIndex = mFIndex[i];
-      assert(fIndex == upperBoundIndex);
+      assert(mClampingIndex[fIndex] != -1);
       double originalMultiple = mX(i) / mX(fIndex);
       double cleanMultiple = (std::abs(originalMultiple - mHi(i))
                               < std::abs(originalMultiple - mLo(i)))
                                  ? mHi(i)
                                  : mLo(i);
-      newX(i) = f_c(fIndex) * cleanMultiple;
+      newX(i) = f_c(mClampingIndex[fIndex]) * cleanMultiple;
     }
   }
 
-  // Check that all the clamping constraints are within expected limits in our
-  // new configuration, relative to one another. This is subtle, because we can
-  // have clamping friction constraints whose bounds depend on clamping normal
-  // constraints. Once we're done setting up the new vector completely, we can
-  // check that these constraints are all satisfied.
-  for (int i = 0; i < newX.size(); i++)
-  {
-    int clampingIndex = mClampingIndex[i];
-    if (clampingIndex != -1)
-    {
-      double boundaryMultiple = 1.0;
-      if (mFIndex(i) > -1)
-        boundaryMultiple = mX(mFIndex(i));
-      if (newX(i) > mHi(i) * boundaryMultiple
-          || newX(i) < mLo(i) * boundaryMultiple)
-      {
-        isValid = false;
-        break;
-      }
-    }
-  }
-
-  if (isValid)
+  if (isSolutionValid(newX))
   {
     mX = newX;
     ConstrainedGroupGradientMatrices::mX = newX;
     mClampingConstraintImpulses = f_c;
+    return true;
+  }
+  else
+  {
+    mStandardizedResults = false;
+    return false;
   }
 }
 
@@ -411,8 +475,9 @@ void ConstrainedGroupGradientMatrices::deduplicateConstraints()
 void ConstrainedGroupGradientMatrices::constructMatrices(
     simulation::World* world)
 {
-  assert(!mFinalized);
-  mFinalized = true;
+  // in the new world, we can actually call this multiple times
+  // assert(!mFinalized);
+  // mFinalized = true;
 
   // TODO: this actually results in very wrong values when we've got deep
   // inter-penetration, so we're leaving it disabled.
@@ -498,20 +563,50 @@ void ConstrainedGroupGradientMatrices::constructMatrices(
 
     // If constraintForce is zero, this means "j" is in "Not Clamping" unless
     // relative velocity is also zero
-    double CLAMPING_THRESHOLD = 1e-9;
     if (std::abs(constraintForce) < CLAMPING_THRESHOLD)
     {
       if (std::abs(relativeVelocity) < CLAMPING_THRESHOLD)
       {
         // This is technically a TIE! Therefore, technically non-differentiable.
-        // We tie break arbitrarily to CLAMPING, because this commonly occurs
-        // with friction when we have an object at rest on a surface. The
-        // friction force directions have 0 force, and 0 vel, but the object
-        // won't slide along the surface if you push on it a tiny epsilon,
-        // because friction will prevent it.
-        mContactConstraintMappings(j) = neural::ConstraintMapping::CLAMPING;
-        mClampingIndex[j] = numClamping;
-        numClamping++;
+        //
+        // We tie break following a heuristic to guess about the behavior of
+        // this constraint. This is all mathematically incorrect, since the
+        // gradient doesn't exist, but we're trying to pick something that is
+        // useful for downstream applications.
+
+        // If this is a frictional contact, we need to check how the
+        // corresponding normal constraint is doing. If the normal constraint
+        // has a 0 magnitude, then this clamping constraint can't increase to
+        // fight friction.
+        if (fIndexPointer != -1)
+        {
+          double normalForce = mX(fIndexPointer);
+          // If the normal force is 0, then we're NOT_CLAMPING, because we can't
+          // increase our friction force and stay in bounds.
+          if (std::abs(normalForce) < CLAMPING_THRESHOLD)
+          {
+            mContactConstraintMappings(j)
+                = neural::ConstraintMapping::NOT_CLAMPING;
+          }
+          // Otherwise, this is CLAMPING, because as we attempt to move the
+          // contact the friction force will stop us.
+          else
+          {
+            mContactConstraintMappings(j) = neural::ConstraintMapping::CLAMPING;
+            mClampingIndex[j] = numClamping;
+            numClamping++;
+          }
+        }
+        // If this is a normal contact, then we arbitrarily call it
+        // NOT_CLAMPING. These generally occur if there are lots of redundant
+        // vertices supporting a mesh, and some of them require 0 force during a
+        // solve. Leaving these out of CLAMPING also increases stability of our
+        // linear algebra later, like in opportunisticallyStandardizeResults()
+        else
+        {
+          mContactConstraintMappings(j)
+              = neural::ConstraintMapping::NOT_CLAMPING;
+        }
       }
       else
       {
@@ -587,10 +682,13 @@ void ConstrainedGroupGradientMatrices::constructMatrices(
   mRestitutionDiagonals = Eigen::VectorXd::Zero(numBouncing);
   mClampingConstraintImpulses = Eigen::VectorXd::Zero(numClamping);
   mClampingConstraintRelativeVels = Eigen::VectorXd::Zero(numClamping);
+  mDifferentiableConstraints.clear();
   mDifferentiableConstraints.reserve(mNumConstraintDim);
   assert(mDifferentiableConstraints.size() == 0);
+  mClampingConstraints.clear();
   mClampingConstraints.reserve(numClamping);
   assert(mClampingConstraints.size() == 0);
+  mUpperBoundConstraints.clear();
   mUpperBoundConstraints.reserve(numUpperBound);
   assert(mUpperBoundConstraints.size() == 0);
   mVelocityDueToIllegalImpulses = Eigen::VectorXd::Zero(mNumDOFs);
@@ -1475,6 +1573,12 @@ const std::vector<std::shared_ptr<DifferentiableContactConstraint>>&
 ConstrainedGroupGradientMatrices::getUpperBoundConstraints() const
 {
   return mUpperBoundConstraints;
+}
+
+//==============================================================================
+bool ConstrainedGroupGradientMatrices::areResultsStandardized() const
+{
+  return mStandardizedResults;
 }
 
 //==============================================================================

@@ -1235,6 +1235,14 @@ void testJumpWorm(bool offGround, bool interpenetration)
   WorldPtr world = World::create();
   world->setGravity(Eigen::Vector3d(0, -9.81, 0));
 
+  // Set up the LCP solver to be super super accurate, so our
+  // finite-differencing tests don't fail due to LCP errors. This isn't
+  // necessary during a real forward pass, but is helpful to make the
+  // mathematical invarients in the tests more reliable.
+  static_cast<constraint::BoxedLcpConstraintSolver*>(
+      world->getConstraintSolver())
+      ->makeHyperAccurateAndVerySlow();
+
   SkeletonPtr jumpworm = Skeleton::create("jumpworm");
 
   std::pair<TranslationalJoint2D*, BodyNode*> rootJointPair
@@ -1323,9 +1331,10 @@ void testJumpWorm(bool offGround, bool interpenetration)
 
   // renderWorld(world);
 
+  EXPECT_TRUE(verifyAnalyticalJacobians(world));
   EXPECT_TRUE(verifyVelGradients(world, vels));
+  EXPECT_TRUE(verifyPosGradients(world, 1, 1e-8));
   EXPECT_TRUE(verifyWrtMass(world));
-  // EXPECT_TRUE(verifyAnalyticalJacobians(world));
   // EXPECT_TRUE(verifyNoMultistepIntereference(world, 10));
   // EXPECT_TRUE(verifyAnalyticalBackprop(world));
 
@@ -1361,80 +1370,10 @@ TEST(GRADIENTS, JUMP_WORM_INTER_PENETRATE)
 }
 */
 
-void testAtlas(bool withGroundContact)
-{
-  // Create a world
-  std::shared_ptr<simulation::World> world = simulation::World::create();
-
-  // Set gravity of the world
-  world->setConstraintForceMixingEnabled(false);
-  world->setPenetrationCorrectionEnabled(false);
-  world->setGravity(Eigen::Vector3d(0.0, -9.81, 0));
-
-  // Set up the LCP solver to be super super accurate, so our
-  // finite-differencing tests don't fail due to LCP errors. This isn't
-  // necessary during a real forward pass, but is helpful to make the
-  // mathematical invarients in the tests more reliable.
-  static_cast<constraint::BoxedLcpConstraintSolver*>(
-      world->getConstraintSolver())
-      ->makeHyperAccurateAndVerySlow();
-
-  // Load ground and Atlas robot and add them to the world
-  dart::utils::DartLoader urdfLoader;
-
-  std::shared_ptr<dynamics::Skeleton> atlas
-      = dart::utils::SdfParser::readSkeleton(
-          "dart://sample/sdf/atlas/atlas_v3_no_head.sdf");
-  world->addSkeleton(atlas);
-
-  if (withGroundContact)
-  {
-    std::shared_ptr<dynamics::Skeleton> ground
-        = urdfLoader.parseSkeleton("dart://sample/sdf/atlas/ground.urdf");
-    world->addSkeleton(ground);
-  }
-
-  // Set initial configuration for Atlas robot
-  atlas->setPosition(0, -0.5 * dart::math::constantsd::pi());
-  atlas->setPosition(4, -0.01);
-  Eigen::VectorXd originalPos = atlas->getPositions();
-  Eigen::VectorXd worldVel = world->getVelocities();
-
-  atlas->setVelocities(Eigen::VectorXd::Zero(atlas->getNumDofs()));
-
-  /*
-  world->step();
-  auto& result = world->getLastCollisionResult();
-  for (int i = 0; i < result.getNumContacts(); i++)
-  {
-    std::cout << "Depth[" << i << "]: " << result.getContact(i).penetrationDepth
-              << std::endl;
-  }
-  return;
-  */
-
-  // EXPECT_TRUE(verifyPosGradients(world, 1, 1e-8));
-  EXPECT_TRUE(verifyAnalyticalJacobians(world));
-  // EXPECT_TRUE(verifyVelGradients(world, worldVel));
-  // EXPECT_TRUE(verifyAnalyticalBackprop(world));
-  // EXPECT_TRUE(verifyWrtMass(world));
-}
-
-/*
-#ifdef ALL_TESTS
-TEST(GRADIENTS, ATLAS_FLOATING)
-{
-  testAtlas(false);
-}
-#endif
-
-#ifdef ALL_TESTS
-TEST(GRADIENTS, ATLAS_GROUND)
-{
-  testAtlas(true);
-}
-#endif
-*/
+////////////////////////////////////////////////////////////////////
+// All Atlas robot tests have been moved to test_AtlasGradients.cpp, since
+// they're so slow.
+////////////////////////////////////////////////////////////////////
 
 /******************************************************************************
 
@@ -1547,10 +1486,19 @@ void testFreeBlockWithFrictionCoeff(double frictionCoeff, double mass)
 
   box->computeForwardDynamics();
   box->integrateVelocities(world->getTimeStep());
+  // Set a small positive horizontal velocity, to keep the box away from a
+  // numerically difficult point
+  box->setVelocity(3, 0.01);
+  box->setVelocity(5, 0.01);
   VectorXd timestepVel = box->getVelocities();
   VectorXd timestepWorldVel = world->getVelocities();
 
-  world->step();
+  world->step(true);
+
+  // Set a small positive horizontal velocity, to keep the box away from a
+  // numerically difficult point
+  box->setVelocity(3, 0.01);
+  box->setVelocity(5, 0.01);
 
   /*
   server::GUIWebsocketServer server;
@@ -1588,9 +1536,9 @@ TEST(GRADIENTS, FREE_BLOCK_ON_GROUND_STATIC_FRICTION)
 }
 #endif
 
-#ifdef ALL_TESTS
+// #ifdef ALL_TESTS
 TEST(GRADIENTS, FREE_BLOCK_ON_GROUND_SLIPPING_FRICTION)
 {
   testFreeBlockWithFrictionCoeff(0.5, 1);
 }
-#endif
+// #endif

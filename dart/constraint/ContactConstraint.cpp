@@ -429,11 +429,8 @@ void ContactConstraint::getInformation(ConstraintInfo* info)
 
     info->b[0] += bouncingVelocity;
 
-    // TODO(JS): Initial guess
-    // x
-    info->x[0] = 0.0;
-    info->x[1] = 0.0;
-    info->x[2] = 0.0;
+    // We deliberately don't disturb info->x, because it contains last LCP's
+    // solution, which is close to what we want already
   }
   //----------------------------------------------------------------------------
   // Frictionless case
@@ -499,9 +496,8 @@ void ContactConstraint::getInformation(ConstraintInfo* info)
 
     info->b[0] += bouncingVelocity;
 
-    // TODO(JS): Initial guess
-    // x
-    info->x[0] = 0.0;
+    // We deliberately don't disturb info->x, because it contains last LCP's
+    // solution, which is close to what we want already
   }
 }
 

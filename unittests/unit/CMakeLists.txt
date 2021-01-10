@@ -63,6 +63,10 @@ if(TARGET dart-utils-urdf)
   target_link_libraries(test_DARTCollide dart-utils)
   target_link_libraries(test_DARTCollide dart-utils-urdf)
 
+  dart_add_test("unit" test_AtlasGradients)
+  target_link_libraries(test_AtlasGradients dart-utils)
+  target_link_libraries(test_AtlasGradients dart-utils-urdf)
+
   dart_add_test("unit" test_FreeJointGradients)
   target_link_libraries(test_FreeJointGradients dart-utils)
   target_link_libraries(test_FreeJointGradients dart-utils-urdf)
