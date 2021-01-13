@@ -372,9 +372,13 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(
     grads->registerLCPResults(
         mX, mHi, mLo, mFIndex, mB, aColNormGradientBackup, aGradientBackup);
     grads->constructMatrices(world);
-    success = grads->opportunisticallyStandardizeResults(world, mX);
+    success = grads->areResultsStandardized();
     // If this worked, we don't need to reconstruct our constraint matrices,
     // since the ones we just made already work by construction
+    if (success)
+    {
+      mX = grads->getContactConstraintImpluses();
+    }
     shortCircuitLCP = success;
   }
 
@@ -466,10 +470,11 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(
         aColNormGradientBackup,
         aGradientBackup);
     group.getGradientConstraintMatrices()->constructMatrices(world);
-    // If possible (if A is rank-deficient), change to an equivalent
-    // least-squares solution that also satisfies the LCP
-    group.getGradientConstraintMatrices()->opportunisticallyStandardizeResults(
-        world, mX);
+    if (group.getGradientConstraintMatrices()->areResultsStandardized())
+    {
+      mX = group.getGradientConstraintMatrices()
+               ->getContactConstraintImpluses();
+    }
   }
 
   // Apply constraint impulses

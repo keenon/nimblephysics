@@ -17,7 +17,7 @@ using namespace math;
 using namespace dynamics;
 using namespace simulation;
 
-#define CLAMPING_THRESHOLD 1e-9
+#define CLAMPING_THRESHOLD 1e-4
 
 namespace dart {
 namespace neural {
@@ -288,9 +288,24 @@ bool ConstrainedGroupGradientMatrices::opportunisticallyStandardizeResults(
 #endif
     Q = realQ;
   }
+  /*
+    else
+    {
+  #ifndef NDEBUG
+      // Sanity check
+      Eigen::MatrixXd realQ = getClampingAMatrix();
+      Eigen::MatrixXd diff = Q - realQ;
+      // These should usually not be equal, but it's not a requirement
+      assert(
+          std::abs(diff.maxCoeff()) > 1e-11 || std::abs(diff.minCoeff()) >
+  1e-11); #endif
+    }
+  */
 
   Eigen::VectorXd f_c = Q.completeOrthogonalDecomposition().solve(b);
   Eigen::VectorXd originalF_c = getClampingConstraintImpulses();
+
+  bool anyNewlyNotClamping = false;
 
   Eigen::VectorXd newX = Eigen::VectorXd::Zero(mX.size());
   for (int i = 0; i < newX.size(); i++)
@@ -302,13 +317,24 @@ bool ConstrainedGroupGradientMatrices::opportunisticallyStandardizeResults(
       // If we're clamping
       assert(upperBoundIndex == -1);
       newX(i) = f_c(clampingIndex);
+
+      if (std::abs(f_c(clampingIndex)) < CLAMPING_THRESHOLD
+          && std::abs(mX(i)) > CLAMPING_THRESHOLD)
+      {
+        // Only mark stuff as "newly not clamping" if it's not a friction
+        // coordinate, since those will be tie broken as clamping anyways
+        if (mFIndex(i) == -1)
+        {
+          anyNewlyNotClamping = true;
+        }
+      }
     }
     if (upperBoundIndex != -1)
     {
       assert(clampingIndex == -1);
       int fIndex = mFIndex[i];
       assert(mClampingIndex[fIndex] != -1);
-      double originalMultiple = mX(i) / mX(fIndex);
+      double originalMultiple = mX(mClampingIndex[fIndex]) / mX(i);
       double cleanMultiple = (std::abs(originalMultiple - mHi(i))
                               < std::abs(originalMultiple - mLo(i)))
                                  ? mHi(i)
@@ -321,7 +347,14 @@ bool ConstrainedGroupGradientMatrices::opportunisticallyStandardizeResults(
   {
     mX = newX;
     ConstrainedGroupGradientMatrices::mX = newX;
+    mContactConstraintImpulses = newX;
     mClampingConstraintImpulses = f_c;
+    if (anyNewlyNotClamping)
+    {
+      // If any previously clamping indices have become "not clamping" then
+      // we need to reconstruct our matrices
+      constructMatrices(world);
+    }
     return true;
   }
   else
@@ -823,6 +856,9 @@ void ConstrainedGroupGradientMatrices::constructMatrices(
       }
     }
   }
+  // If possible (if A is rank-deficient), change to an equivalent
+  // least-squares solution that also satisfies the LCP
+  opportunisticallyStandardizeResults(world, mX);
 }
 
 //==============================================================================
