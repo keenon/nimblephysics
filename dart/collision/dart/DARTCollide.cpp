@@ -1430,8 +1430,10 @@ void ccdSupportBox(const void* _obj, const ccd_vec3_t* _dir, ccd_vec3_t* _out)
   // object (in this case box: x, y, z, pos, quat - dimensions of box,
   // position and rotation)
   ccdBox* box = (ccdBox*)_obj;
-  Eigen::Map<const Eigen::Vector3d> dir(_dir->v);
-  Eigen::Map<Eigen::Vector3d> out(_out->v);
+  // ccd_real_t can be a float on some platforms, so can't just use
+  // Eigen::Vector3d
+  Eigen::Map<const Eigen::Matrix<ccd_real_t, 3, 1>> dir(_dir->v);
+  Eigen::Map<Eigen::Matrix<ccd_real_t, 3, 1>> out(_out->v);
 
   // apply rotation on direction vector
   Eigen::Vector3d localDir = box->transform->linear().transpose() * dir;
@@ -1452,8 +1454,10 @@ void ccdSupportSphere(
 {
   ccdSphere* sphere = (ccdSphere*)_obj;
 
-  Eigen::Map<const Eigen::Vector3d> dir(_dir->v);
-  Eigen::Map<Eigen::Vector3d> out(_out->v);
+  // ccd_real_t can be a float on some platforms, so can't just use
+  // Eigen::Vector3d
+  Eigen::Map<const Eigen::Matrix<ccd_real_t, 3, 1>> dir(_dir->v);
+  Eigen::Map<Eigen::Matrix<ccd_real_t, 3, 1>> out(_out->v);
 
   // apply rotation on direction vector
   Eigen::Vector3d localDir = sphere->transform->linear().transpose() * dir;
@@ -1468,8 +1472,10 @@ void ccdSupportMesh(const void* _obj, const ccd_vec3_t* _dir, ccd_vec3_t* _out)
 {
   ccdMesh* mesh = (ccdMesh*)_obj;
 
-  Eigen::Map<const Eigen::Vector3d> dir(_dir->v);
-  Eigen::Map<Eigen::Vector3d> out(_out->v);
+  // ccd_real_t can be a float on some platforms, so can't just use
+  // Eigen::Vector3d
+  Eigen::Map<const Eigen::Matrix<ccd_real_t, 3, 1>> dir(_dir->v);
+  Eigen::Map<Eigen::Matrix<ccd_real_t, 3, 1>> out(_out->v);
 
   // apply rotation on direction vector
   Eigen::Vector3d localDir = mesh->transform->linear().transpose() * dir;
@@ -1534,7 +1540,9 @@ void ccdCenterMesh(const void* _obj, ccd_vec3_t* _center)
 std::vector<Eigen::Vector3d> ccdPointsAtWitnessBox(
     ccdBox* box, ccd_vec3_t* _dir, bool neg)
 {
-  Eigen::Map<const Eigen::Vector3d> dir(_dir->v);
+  // ccd_real_t can be a float on some platforms, so can't just use
+  // Eigen::Vector3d
+  Eigen::Map<const Eigen::Matrix<ccd_real_t, 3, 1>> dir(_dir->v);
 
   // apply rotation on direction vector
   Eigen::Vector3d localDir = box->transform->linear().transpose() * dir;
@@ -1590,7 +1598,9 @@ std::vector<Eigen::Vector3d> ccdPointsAtWitnessBox(
 std::vector<Eigen::Vector3d> ccdPointsAtWitnessMesh(
     ccdMesh* mesh, ccd_vec3_t* _dir, bool neg)
 {
-  Eigen::Map<const Eigen::Vector3d> dir(_dir->v);
+  // ccd_real_t can be a float on some platforms, so can't just use
+  // Eigen::Vector3d
+  Eigen::Map<const Eigen::Matrix<ccd_real_t, 3, 1>> dir(_dir->v);
 
   // apply rotation on direction vector
   Eigen::Vector3d localDir = mesh->transform->linear().transpose() * dir;

@@ -149,7 +149,8 @@ void ConstraintSolver(py::module& m)
           })
       .def(
           "solve",
-          +[](dart::constraint::ConstraintSolver* self) { self->solve(); });
+          +[](dart::constraint::ConstraintSolver* self,
+              dart::simulation::World* world) { self->solve(world); });
 }
 
 } // namespace python

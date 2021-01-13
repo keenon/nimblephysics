@@ -279,9 +279,9 @@ bool ConstrainedGroupGradientMatrices::opportunisticallyStandardizeResults(
 
   if (A_ub.cols() == 0)
   {
+    Eigen::MatrixXd realQ = getClampingAMatrix();
 #ifndef NDEBUG
     // Sanity check
-    Eigen::MatrixXd realQ = getClampingAMatrix();
     Eigen::MatrixXd diff = Q - realQ;
     assert(std::abs(diff.maxCoeff()) < 1e-11);
     assert(std::abs(diff.minCoeff()) < 1e-11);

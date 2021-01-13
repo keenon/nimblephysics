@@ -2,6 +2,9 @@
 set -e
 
 # brew install gnu-sed
+brew reinstall gcc
+export FC=$(which gfortran)
+echo "FC=$FC"
 
 # Install perfutils - Keenon's fork, compatible with Mac OSX
 git clone https://github.com/keenon/PerfUtils.git
@@ -22,7 +25,7 @@ git clone https://github.com/danfis/libccd.git
 pushd libccd
 mkdir build
 pushd build
-cmake ..
+cmake .. -DENABLE_DOUBLE_PRECISION=ON
 make install -j14
 popd
 popd
