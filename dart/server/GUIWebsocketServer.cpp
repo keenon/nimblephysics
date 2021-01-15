@@ -11,6 +11,7 @@
 #include "dart/common/Aspect.hpp"
 #include "dart/dynamics/BodyNode.hpp"
 #include "dart/dynamics/BoxShape.hpp"
+#include "dart/dynamics/CapsuleShape.hpp"
 #include "dart/dynamics/MeshShape.hpp"
 #include "dart/dynamics/ShapeFrame.hpp"
 #include "dart/dynamics/ShapeNode.hpp"
@@ -76,6 +77,14 @@ void GUIWebsocketServer::serve(int port)
         else
           json << ",";
         encodeCreateSphere(json, pair.second);
+      }
+      for (auto pair : mCapsules)
+      {
+        if (isFirst)
+          isFirst = false;
+        else
+          json << ",";
+        encodeCreateCapsule(json, pair.second);
       }
       for (auto pair : mLines)
       {
@@ -231,19 +240,6 @@ void GUIWebsocketServer::serve(int port)
     });
   });
 
-  // Start the networking thread
-  mServerThread = new std::thread([&]() {
-    // block signals in this thread and subsequently
-    // spawned threads so they're guaranteed to go to the main thread
-    sigset_t sigset;
-    sigemptyset(&sigset);
-    sigaddset(&sigset, SIGINT);
-    sigaddset(&sigset, SIGTERM);
-    pthread_sigmask(SIG_BLOCK, &sigset, nullptr);
-
-    mServer->run(port);
-  });
-
   // Start the event loop for the main thread
   mWork = new asio::io_service::work(mServerEventLoop);
 
@@ -281,6 +277,27 @@ void GUIWebsocketServer::serve(int port)
 
   // Start a thread to handle the main server event loop
   mAsioThread = new std::thread([&] { mServerEventLoop.run(); });
+
+  // Start the networking thread
+  mServerThread = new std::thread([&]() {
+    // block signals in this thread and subsequently
+    // spawned threads so they're guaranteed to go to the main thread
+    sigset_t sigset;
+    sigemptyset(&sigset);
+    sigaddset(&sigset, SIGINT);
+    sigaddset(&sigset, SIGTERM);
+    pthread_sigmask(SIG_BLOCK, &sigset, nullptr);
+
+    bool success = mServer->run(port);
+    if (!success)
+    {
+      mServerEventLoop.post([&]() {
+        // This means we failed to bind to the port
+        stopServing();
+        mServerEventLoop.stop();
+      });
+    }
+  });
 }
 
 /// This kills the server, if one was running
@@ -491,6 +508,20 @@ GUIWebsocketServer& GUIWebsocketServer::renderSkeleton(
                 visual->getCastShadows(),
                 visual->getReceiveShadows());
           }
+          else if (shape->getType() == "CapsuleShape")
+          {
+            dynamics::CapsuleShape* capsuleShape
+                = dynamic_cast<dynamics::CapsuleShape*>(shape);
+            createCapsule(
+                shapeName,
+                capsuleShape->getRadius(),
+                capsuleShape->getHeight(),
+                shapeNode->getWorldTransform().translation(),
+                math::matrixToEulerXYZ(shapeNode->getWorldTransform().linear()),
+                visual->getColor(),
+                visual->getCastShadows(),
+                visual->getReceiveShadows());
+          }
         }
       }
       else
@@ -648,6 +679,34 @@ GUIWebsocketServer& GUIWebsocketServer::createSphere(
 
   queueCommand([this, key](std::stringstream& json) {
     encodeCreateSphere(json, mSpheres[key]);
+  });
+
+  return *this;
+}
+
+/// This creates a capsule in the web GUI under a specified key
+GUIWebsocketServer& GUIWebsocketServer::createCapsule(
+    std::string key,
+    double radius,
+    double height,
+    const Eigen::Vector3d& pos,
+    const Eigen::Vector3d& euler,
+    const Eigen::Vector3d& color,
+    bool castShadows,
+    bool receiveShadows)
+{
+  Capsule& capsule = mCapsules[key];
+  capsule.key = key;
+  capsule.radius = radius;
+  capsule.height = height;
+  capsule.pos = pos;
+  capsule.euler = euler;
+  capsule.color = color;
+  capsule.castShadows = castShadows;
+  capsule.receiveShadows = receiveShadows;
+
+  queueCommand([this, key](std::stringstream& json) {
+    encodeCreateCapsule(json, mCapsules[key]);
   });
 
   return *this;
@@ -1471,6 +1530,24 @@ void GUIWebsocketServer::encodeCreateSphere(
   json << ", \"cast_shadows\": " << (sphere.castShadows ? "true" : "false");
   json << ", \"receive_shadows\": "
        << (sphere.receiveShadows ? "true" : "false");
+  json << "}";
+}
+
+void GUIWebsocketServer::encodeCreateCapsule(
+    std::stringstream& json, Capsule& capsule)
+{
+  json << "{ \"type\": \"create_capsule\", \"key\": \"" << capsule.key
+       << "\", \"radius\": " << capsule.radius
+       << ", \"height\": " << capsule.height;
+  json << ", \"pos\": ";
+  vec3ToJson(json, capsule.pos);
+  json << ", \"euler\": ";
+  vec3ToJson(json, capsule.euler);
+  json << ", \"color\": ";
+  vec3ToJson(json, capsule.color);
+  json << ", \"cast_shadows\": " << (capsule.castShadows ? "true" : "false");
+  json << ", \"receive_shadows\": "
+       << (capsule.receiveShadows ? "true" : "false");
   json << "}";
 }
 

@@ -116,6 +116,17 @@ public:
       bool castShadows = false,
       bool receiveShadows = false);
 
+  /// This creates a capsule in the web GUI under a specified key
+  GUIWebsocketServer& createCapsule(
+      std::string key,
+      double radius,
+      double height,
+      const Eigen::Vector3d& pos,
+      const Eigen::Vector3d& euler,
+      const Eigen::Vector3d& color = Eigen::Vector3d(0.5, 0.5, 0.5),
+      bool castShadows = false,
+      bool receiveShadows = false);
+
   /// This creates a line in the web GUI under a specified key
   GUIWebsocketServer& createLine(
       std::string key,
@@ -338,6 +349,19 @@ protected:
     bool receiveShadows;
   };
   std::unordered_map<std::string, Sphere> mSpheres;
+
+  struct Capsule
+  {
+    std::string key;
+    double radius;
+    double height;
+    Eigen::Vector3d pos;
+    Eigen::Vector3d euler;
+    Eigen::Vector3d color;
+    bool castShadows;
+    bool receiveShadows;
+  };
+  std::unordered_map<std::string, Capsule> mCapsules;
   struct Line
   {
     std::string key;
@@ -423,6 +447,7 @@ protected:
 
   void encodeCreateBox(std::stringstream& json, Box& box);
   void encodeCreateSphere(std::stringstream& json, Sphere& sphere);
+  void encodeCreateCapsule(std::stringstream& json, Capsule& capsule);
   void encodeCreateLine(std::stringstream& json, Line& line);
   void encodeCreateMesh(std::stringstream& json, Mesh& mesh);
   void encodeCreateTexture(std::stringstream& json, Texture& texture);

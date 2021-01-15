@@ -46,12 +46,39 @@ enum ContactType
   UNSUPPORTED
   = 0, // This is the default, and means that gradients won't attempt to model
        // how the contact point changes as we move the skeletons.
+
+  // Mesh-mesh collisions
   VERTEX_FACE = 1,
   FACE_VERTEX = 2,
   EDGE_EDGE = 3,
+
+  // Sphere-box collisions
   SPHERE_BOX = 4,
   BOX_SPHERE = 5,
-  SPHERE_SPHERE = 6
+
+  // Sphere-sphere collisions
+  SPHERE_SPHERE = 6,
+
+  // Sphere-mesh collisions
+  SPHERE_VERTEX = 7,
+  SPHERE_EDGE = 8,
+  SPHERE_FACE = 9,
+  VERTEX_SPHERE = 10,
+  EDGE_SPHERE = 11,
+  FACE_SPHERE = 12,
+
+  // Capsule-capsule and capsule-sphere collisions
+  PIPE_SPHERE = 13,
+  SPHERE_PIPE = 14,
+  PIPE_PIPE = 15,
+
+  // Pipe-mesh collisions
+  PIPE_VERTEX = 16,
+  PIPE_EDGE = 17,
+  PIPE_FACE = 18,
+  VERTEX_PIPE = 19,
+  EDGE_PIPE = 20,
+  FACE_PIPE = 21,
 };
 
 /// Contact information

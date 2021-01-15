@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { CapsuleBufferGeometry } from "./threejs_lib/three-js-capsule-geometry/CapsuleBufferGeometry";
 import "./style.scss";
 
 import View from "./components/View";
@@ -226,6 +227,65 @@ class DARTView {
     mesh.position.x = pos[0] * SCALE_FACTOR;
     mesh.position.y = pos[1] * SCALE_FACTOR;
     mesh.position.z = pos[2] * SCALE_FACTOR;
+    mesh.castShadow = castShadows;
+    mesh.receiveShadow = receiveShadows;
+
+    this.objects.set(key, mesh);
+    this.keys.set(mesh, key);
+
+    this.view.add(mesh);
+  };
+
+  /**
+   * This adds a capsule to the scene
+   *
+   * Must call render() to see results!
+   */
+  createCapsule = (
+    key: string,
+    radius: number,
+    height: number,
+    pos: number[],
+    euler: number[],
+    color: number[],
+    castShadows: boolean,
+    receiveShadows: boolean
+  ) => {
+    if (this.objects.has(key)) {
+      this.view.remove(this.objects.get(key));
+    }
+    const material = new THREE.MeshLambertMaterial({
+      color: new THREE.Color(color[0], color[1], color[2]),
+    });
+    const NUM_SPHERE_SEGMENTS = 18;
+    const geometry = new CapsuleBufferGeometry(
+      radius * SCALE_FACTOR,
+      radius * SCALE_FACTOR,
+      height * SCALE_FACTOR,
+      NUM_SPHERE_SEGMENTS,
+      1,
+      NUM_SPHERE_SEGMENTS,
+      NUM_SPHERE_SEGMENTS
+    );
+
+    // By default, this extends the capsule along the Y axis, we want the Z axis instead
+    const vertexArray: Float32Array = geometry.getAttribute("position")
+      .array as Float32Array;
+    for (var i = 0; i < vertexArray.length / 3; i++) {
+      const index = i * 3;
+      const swapY = vertexArray[index + 1];
+      vertexArray[index + 1] = -vertexArray[index + 2];
+      vertexArray[index + 2] = swapY;
+    }
+    geometry.computeVertexNormals();
+
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.position.x = pos[0] * SCALE_FACTOR;
+    mesh.position.y = pos[1] * SCALE_FACTOR;
+    mesh.position.z = pos[2] * SCALE_FACTOR;
+    mesh.rotation.x = euler[0];
+    mesh.rotation.y = euler[1];
+    mesh.rotation.z = euler[2];
     mesh.castShadow = castShadows;
     mesh.receiveShadow = receiveShadows;
 

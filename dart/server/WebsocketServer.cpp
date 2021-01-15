@@ -48,7 +48,7 @@ WebsocketServer::WebsocketServer()
   this->endpoint.clear_access_channels(websocketpp::log::alevel::all);
 }
 
-void WebsocketServer::run(int port)
+bool WebsocketServer::run(int port)
 {
   // Listen on the specified port number and start accepting connections
   websocketpp::lib::error_code error;
@@ -56,22 +56,32 @@ void WebsocketServer::run(int port)
   if (error)
   {
     std::cout << "Error listening! " << error << std::endl;
-    return;
+    return false;
   }
 
   this->endpoint.start_accept(error);
   if (error)
   {
     std::cout << "Error in start accept! " << error << std::endl;
-    return;
+    return false;
   }
 
   // Start the Asio event loop
   this->endpoint.run();
+  return true;
 }
 
 void WebsocketServer::stop()
 {
+  // Prevent concurrent access to the list of open connections from multiple
+  // threads
+  std::lock_guard<std::mutex> lock(this->connectionListMutex);
+  for (auto conn : this->openConnections)
+  {
+    std::cout << "Interrupting existing connection" << std::endl;
+    this->endpoint.interrupt(conn);
+  }
+
   this->endpoint.stop();
 }
 

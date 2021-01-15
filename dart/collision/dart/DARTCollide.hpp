@@ -121,6 +121,16 @@ int collideMeshSphere(
     const Eigen::Isometry3d& c1,
     CollisionResult& result);
 
+int collideSphereMesh(
+    CollisionObject* o1,
+    CollisionObject* o2,
+    const double& r0,
+    const Eigen::Isometry3d& c0,
+    const aiScene* mesh1,
+    const Eigen::Vector3d& size1,
+    const Eigen::Isometry3d& c1,
+    CollisionResult& result);
+
 int collideMeshMesh(
     CollisionObject* o1,
     CollisionObject* o2,
@@ -130,6 +140,79 @@ int collideMeshMesh(
     const aiScene* mesh1,
     const Eigen::Vector3d& size1,
     const Eigen::Isometry3d& c1,
+    CollisionResult& result);
+
+int collideCapsuleCapsule(
+    CollisionObject* o1,
+    CollisionObject* o2,
+    double height0,
+    double radius0,
+    const Eigen::Isometry3d& T0,
+    double height1,
+    double radius1,
+    const Eigen::Isometry3d& T1,
+    CollisionResult& result);
+
+int collideSphereCapsule(
+    CollisionObject* o1,
+    CollisionObject* o2,
+    double radius0,
+    const Eigen::Isometry3d& T0,
+    double height1,
+    double radius1,
+    const Eigen::Isometry3d& T1,
+    CollisionResult& result);
+
+int collideCapsuleSphere(
+    CollisionObject* o1,
+    CollisionObject* o2,
+    double height0,
+    double radius0,
+    const Eigen::Isometry3d& T0,
+    double radius1,
+    const Eigen::Isometry3d& T1,
+    CollisionResult& result);
+
+int collideBoxCapsule(
+    CollisionObject* o1,
+    CollisionObject* o2,
+    const Eigen::Vector3d& size0,
+    const Eigen::Isometry3d& T0,
+    double height1,
+    double radius1,
+    const Eigen::Isometry3d& T1,
+    CollisionResult& result);
+
+int collideCapsuleBox(
+    CollisionObject* o1,
+    CollisionObject* o2,
+    double height0,
+    double radius0,
+    const Eigen::Isometry3d& T0,
+    const Eigen::Vector3d& size1,
+    const Eigen::Isometry3d& T1,
+    CollisionResult& result);
+
+int collideMeshCapsule(
+    CollisionObject* o1,
+    CollisionObject* o2,
+    const aiScene* mesh0,
+    const Eigen::Vector3d& size0,
+    const Eigen::Isometry3d& T0,
+    double height1,
+    double radius1,
+    const Eigen::Isometry3d& T1,
+    CollisionResult& result);
+
+int collideCapsuleMesh(
+    CollisionObject* o1,
+    CollisionObject* o2,
+    double height0,
+    double radius0,
+    const Eigen::Isometry3d& T0,
+    const aiScene* mesh1,
+    const Eigen::Vector3d& size1,
+    const Eigen::Isometry3d& T1,
     CollisionResult& result);
 
 int collideCylinderSphere(
@@ -177,6 +260,13 @@ struct ccdMesh
   const Eigen::Vector3d* scale;
 };
 
+struct ccdCapsule
+{
+  double radius;
+  double height;
+  const Eigen::Isometry3d* transform;
+};
+
 // We also need to define "support" functions that will find the furthest point
 // in the object along the direction "_dir", and return it in "_vec" for each
 // type of object.
@@ -185,6 +275,8 @@ void ccdSupportBox(const void* _obj, const ccd_vec3_t* _dir, ccd_vec3_t* _out);
 void ccdSupportSphere(
     const void* _obj, const ccd_vec3_t* _dir, ccd_vec3_t* _out);
 void ccdSupportMesh(const void* _obj, const ccd_vec3_t* _dir, ccd_vec3_t* _out);
+void ccdSupportCapsule(
+    const void* _obj, const ccd_vec3_t* _dir, ccd_vec3_t* _out);
 
 // Finally, we need to define the "center" function for objects. This returns
 // the approximate center of each object.
@@ -192,6 +284,7 @@ void ccdSupportMesh(const void* _obj, const ccd_vec3_t* _dir, ccd_vec3_t* _out);
 void ccdCenterBox(const void* _obj, ccd_vec3_t* _center);
 void ccdCenterSphere(const void* _obj, ccd_vec3_t* _center);
 void ccdCenterMesh(const void* _obj, ccd_vec3_t* _center);
+void ccdCenterCapsule(const void* _obj, ccd_vec3_t* _center);
 
 // In order to differentiate between different types of contact, we need to be
 // able to get all the vertices that are within some small epsilon of being on
@@ -212,21 +305,58 @@ int createMeshMeshContacts(
     const std::vector<Eigen::Vector3d>& pointsAWitness,
     const std::vector<Eigen::Vector3d>& pointsBWitness);
 
+/// This is responsible for creating and annotating all the contact objects with
+/// all the metadata we need in order to get accurate gradients.
+int createMeshSphereContact(
+    CollisionObject* o1,
+    CollisionObject* o2,
+    CollisionResult& result,
+    ccd_vec3_t* dir,
+    const std::vector<Eigen::Vector3d>& meshPointsWitness,
+    const Eigen::Vector3d& sphereCenter,
+    double sphereRadius);
+
+/// This is responsible for creating and annotating all the contact objects with
+/// all the metadata we need in order to get accurate gradients.
+int createSphereMeshContact(
+    CollisionObject* o1,
+    CollisionObject* o2,
+    CollisionResult& result,
+    ccd_vec3_t* dir,
+    const Eigen::Vector3d& sphereCenter,
+    double sphereRadius,
+    const std::vector<Eigen::Vector3d>& meshPointsWitness);
+
+/// This is responsible for creating and annotating all the contact objects with
+/// all the metadata we need in order to get accurate gradients.
+int createCapsuleMeshContact(
+    CollisionObject* o1,
+    CollisionObject* o2,
+    CollisionResult& result,
+    ccd_vec3_t* dir,
+    const Eigen::Vector3d& capsuleA,
+    const Eigen::Vector3d& capsuleB,
+    double capsuleRadius,
+    const std::vector<Eigen::Vector3d>& meshPointsWitness);
+
 /*
 /// This is necessary preparation for rapidly checking if another point is
-/// contained within the convex shape. This sorts the shape by angle from the
+/// contained within the convex shape. This sorts the shape by angle from
+the
 /// center, and trims out any points that lie inside the convex polygon.
 void prepareConvex2DShape(std::vector<Eigen::Vector2d>& shape);
 
-/// This checks whether a 2D shape contains a point. This assumes that shape was
+/// This checks whether a 2D shape contains a point. This assumes that shape
+was
 /// sorted using prepareConvex2DShape().
 bool convex2DShapeContains(
-    const Eigen::Vector2d& point, const std::vector<Eigen::Vector2d>& shape);
+    const Eigen::Vector2d& point, const std::vector<Eigen::Vector2d>&
+shape);
 */
 
 /// This is necessary preparation for rapidly checking if another point is
-/// contained within the convex shape. This sorts the shape by angle from the
-/// center, and trims out any points that lie inside the convex polygon.
+/// contained within the convex shape. This sorts the shape by angle from
+/// the center, and trims out any points that lie inside the convex polygon.
 void prepareConvex2DShape(
     std::vector<Eigen::Vector3d>& shape,
     const Eigen::Vector3d& origin,

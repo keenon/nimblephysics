@@ -20,8 +20,9 @@
 
 using namespace dart;
 using namespace realtime;
+using namespace collision;
 
-// #define ALL_TESTS
+#define ALL_TESTS
 
 //==============================================================================
 #ifdef ALL_TESTS
@@ -1492,6 +1493,1219 @@ TEST(DARTCollide, MESH_MESH_FACE_FACE_OFFSET_COLLISION)
 }
 #endif
 
+#ifdef ALL_TESTS
+TEST(DARTCollide, VERTEX_SPHERE_COLLISION)
+{
+  ccd_t ccd;
+  CCD_INIT(&ccd); // initialize ccd_t struct
+
+  Eigen::Vector3d box1Size = Eigen::Vector3d::Ones();
+  aiScene* box1Mesh = createBoxMeshUnsafe();
+  Eigen::Isometry3d box1Transform = Eigen::Isometry3d::Identity();
+  ccdMesh box;
+  box.mesh = box1Mesh;
+  box.transform = &box1Transform;
+  box.scale = &box1Size;
+
+  Eigen::Isometry3d sphereTransform = Eigen::Isometry3d::Identity();
+  sphereTransform.translation()(0) = 0.5 + sqrt(0.25 / 3) - 0.01;
+  sphereTransform.translation()(1) = 0.5 + sqrt(0.25 / 3) - 0.01;
+  sphereTransform.translation()(2) = 0.5 + sqrt(0.25 / 3) - 0.01;
+
+  ccdSphere sphere;
+  sphere.radius = 0.5;
+  sphere.transform = &sphereTransform;
+
+  // set up ccd_t struct
+  ccd.support1 = ccdSupportMesh;   // support function for first object
+  ccd.support2 = ccdSupportSphere; // support function for second object
+  ccd.center1 = ccdCenterMesh;     // center function for first object
+  ccd.center2 = ccdCenterSphere;   // center function for second object
+  ccd.mpr_tolerance = 0.0001;      // maximal tolerance
+
+  /*
+  server::GUIWebsocketServer server;
+  server.createMeshASSIMP(
+      "box",
+      box1Mesh,
+      "",
+      box1Transform.translation(),
+      math::matrixToEulerXYZ(box1Transform.linear()),
+      box1Size);
+  server.createSphere("sphere", sphere.radius, sphereTransform.translation());
+  server.serve(8070);
+  while (server.isServing())
+  {
+  }
+  */
+
+  ccd_real_t depth;
+  ccd_vec3_t dir, pos;
+  int intersect = ccdMPRPenetration(&box, &sphere, &ccd, &depth, &dir, &pos);
+
+  EXPECT_EQ(intersect, 0);
+  /*
+  std::cout << "Dir: " << dir.v[0] << "," << dir.v[1] << "," << dir.v[2]
+            << std::endl;
+  std::cout << "Pos: " << pos.v[0] << "," << pos.v[1] << "," << pos.v[2]
+            << std::endl;
+  */
+
+  std::vector<Eigen::Vector3d> meshPoints
+      = ccdPointsAtWitnessMesh(&box, &dir, false);
+
+  EXPECT_EQ(meshPoints.size(), 1);
+
+  CollisionResult collisionResult;
+  createMeshSphereContact(
+      nullptr,
+      nullptr,
+      collisionResult,
+      &dir,
+      meshPoints,
+      sphereTransform.translation(),
+      sphere.radius);
+
+  EXPECT_EQ(collisionResult.getNumContacts(), 1);
+  if (collisionResult.getNumContacts() == 0)
+    return;
+
+  Contact& contact = collisionResult.getContact(0);
+  EXPECT_EQ(contact.type, ContactType::VERTEX_SPHERE);
+  Eigen::Vector3d expectedNormal = Eigen::Vector3d(-1, -1, -1).normalized();
+  EXPECT_TRUE(equals(expectedNormal, contact.normal, 1e-9));
+  Eigen::Vector3d expectedPoint
+      = Eigen::Vector3d(0.5 - 0.01, 0.5 - 0.01, 0.5 - 0.01);
+  EXPECT_TRUE(equals(expectedPoint, contact.point, 1e-9));
+  EXPECT_NEAR(contact.penetrationDepth, sqrt(3 * 0.01 * 0.01), 1e-8);
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(DARTCollide, EDGE_SPHERE_COLLISION)
+{
+  ccd_t ccd;
+  CCD_INIT(&ccd); // initialize ccd_t struct
+
+  Eigen::Vector3d box1Size = Eigen::Vector3d::Ones();
+  aiScene* box1Mesh = createBoxMeshUnsafe();
+  Eigen::Isometry3d box1Transform = Eigen::Isometry3d::Identity();
+  ccdMesh box;
+  box.mesh = box1Mesh;
+  box.transform = &box1Transform;
+  box.scale = &box1Size;
+
+  Eigen::Isometry3d sphereTransform = Eigen::Isometry3d::Identity();
+  sphereTransform.translation()(0) = 0.5 + sqrt(0.125) - 0.01;
+  sphereTransform.translation()(1) = 0.5 + sqrt(0.125) - 0.01;
+
+  ccdSphere sphere;
+  sphere.radius = 0.5;
+  sphere.transform = &sphereTransform;
+
+  // set up ccd_t struct
+  ccd.support1 = ccdSupportMesh;   // support function for first object
+  ccd.support2 = ccdSupportSphere; // support function for second object
+  ccd.center1 = ccdCenterMesh;     // center function for first object
+  ccd.center2 = ccdCenterSphere;   // center function for second object
+  ccd.mpr_tolerance = 0.0001;      // maximal tolerance
+
+  /*
+  server::GUIWebsocketServer server;
+  server.createMeshASSIMP(
+      "box",
+      box1Mesh,
+      "",
+      box1Transform.translation(),
+      math::matrixToEulerXYZ(box1Transform.linear()),
+      box1Size);
+  server.createSphere("sphere", sphere.radius, sphereTransform.translation());
+  server.serve(8070);
+  while (server.isServing())
+  {
+  }
+  */
+
+  ccd_real_t depth;
+  ccd_vec3_t dir, pos;
+  int intersect = ccdMPRPenetration(&box, &sphere, &ccd, &depth, &dir, &pos);
+
+  EXPECT_EQ(intersect, 0);
+  /*
+  std::cout << "Dir: " << dir.v[0] << "," << dir.v[1] << "," << dir.v[2]
+            << std::endl;
+  std::cout << "Pos: " << pos.v[0] << "," << pos.v[1] << "," << pos.v[2]
+            << std::endl;
+  */
+
+  std::vector<Eigen::Vector3d> meshPoints
+      = ccdPointsAtWitnessMesh(&box, &dir, false);
+
+  EXPECT_EQ(meshPoints.size(), 2);
+
+  CollisionResult collisionResult;
+  createMeshSphereContact(
+      nullptr,
+      nullptr,
+      collisionResult,
+      &dir,
+      meshPoints,
+      sphereTransform.translation(),
+      sphere.radius);
+
+  EXPECT_EQ(collisionResult.getNumContacts(), 1);
+  if (collisionResult.getNumContacts() == 0)
+    return;
+
+  Contact& contact = collisionResult.getContact(0);
+  EXPECT_EQ(contact.type, ContactType::EDGE_SPHERE);
+  Eigen::Vector3d expectedNormal = Eigen::Vector3d(-1, -1, 0).normalized();
+  EXPECT_TRUE(equals(expectedNormal, contact.normal, 1e-9));
+  Eigen::Vector3d expectedPoint = Eigen::Vector3d(0.5 - 0.01, 0.5 - 0.01, 0);
+  EXPECT_TRUE(equals(expectedPoint, contact.point, 1e-9));
+  EXPECT_NEAR(contact.penetrationDepth, sqrt(2 * 0.01 * 0.01), 1e-8);
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(DARTCollide, FACE_SPHERE_COLLISION)
+{
+  ccd_t ccd;
+  CCD_INIT(&ccd); // initialize ccd_t struct
+
+  Eigen::Vector3d box1Size = Eigen::Vector3d::Ones();
+  aiScene* box1Mesh = createBoxMeshUnsafe();
+  Eigen::Isometry3d box1Transform = Eigen::Isometry3d::Identity();
+  ccdMesh box;
+  box.mesh = box1Mesh;
+  box.transform = &box1Transform;
+  box.scale = &box1Size;
+
+  Eigen::Isometry3d sphereTransform = Eigen::Isometry3d::Identity();
+  sphereTransform.translation()(0) = 1.0 - 0.01;
+
+  ccdSphere sphere;
+  sphere.radius = 0.5;
+  sphere.transform = &sphereTransform;
+
+  // set up ccd_t struct
+  ccd.support1 = ccdSupportMesh;   // support function for first object
+  ccd.support2 = ccdSupportSphere; // support function for second object
+  ccd.center1 = ccdCenterMesh;     // center function for first object
+  ccd.center2 = ccdCenterSphere;   // center function for second object
+  ccd.mpr_tolerance = 0.0001;      // maximal tolerance
+
+  /*
+  server::GUIWebsocketServer server;
+  server.createMeshASSIMP(
+      "box",
+      box1Mesh,
+      "",
+      box1Transform.translation(),
+      math::matrixToEulerXYZ(box1Transform.linear()),
+      box1Size);
+  server.createSphere("sphere", sphere.radius, sphereTransform.translation());
+  server.serve(8070);
+  while (server.isServing())
+  {
+  }
+  */
+
+  ccd_real_t depth;
+  ccd_vec3_t dir, pos;
+  int intersect = ccdMPRPenetration(&box, &sphere, &ccd, &depth, &dir, &pos);
+
+  EXPECT_EQ(intersect, 0);
+  /*
+  std::cout << "Dir: " << dir.v[0] << "," << dir.v[1] << "," << dir.v[2]
+            << std::endl;
+  std::cout << "Pos: " << pos.v[0] << "," << pos.v[1] << "," << pos.v[2]
+            << std::endl;
+  */
+
+  std::vector<Eigen::Vector3d> meshPoints
+      = ccdPointsAtWitnessMesh(&box, &dir, false);
+
+  EXPECT_EQ(meshPoints.size(), 4);
+
+  CollisionResult collisionResult;
+  createMeshSphereContact(
+      nullptr,
+      nullptr,
+      collisionResult,
+      &dir,
+      meshPoints,
+      sphereTransform.translation(),
+      sphere.radius);
+
+  EXPECT_EQ(collisionResult.getNumContacts(), 1);
+  if (collisionResult.getNumContacts() == 0)
+    return;
+
+  Contact& contact = collisionResult.getContact(0);
+  EXPECT_EQ(contact.type, ContactType::FACE_SPHERE);
+  Eigen::Vector3d expectedNormal = -1 * Eigen::Vector3d::UnitX();
+  EXPECT_TRUE(equals(expectedNormal, contact.normal, 1e-9));
+  Eigen::Vector3d expectedPoint = Eigen::Vector3d(0.5 - 0.01, 0, 0);
+  EXPECT_TRUE(equals(expectedPoint, contact.point, 1e-9));
+  EXPECT_NEAR(contact.penetrationDepth, 0.01, 1e-8);
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(DARTCollide, SPHERE_VERTEX_COLLISION)
+{
+  ccd_t ccd;
+  CCD_INIT(&ccd); // initialize ccd_t struct
+
+  Eigen::Vector3d box1Size = Eigen::Vector3d::Ones();
+  aiScene* box1Mesh = createBoxMeshUnsafe();
+  Eigen::Isometry3d box1Transform = Eigen::Isometry3d::Identity();
+  ccdMesh box;
+  box.mesh = box1Mesh;
+  box.transform = &box1Transform;
+  box.scale = &box1Size;
+
+  Eigen::Isometry3d sphereTransform = Eigen::Isometry3d::Identity();
+  sphereTransform.translation()(0) = 0.5 + sqrt(0.25 / 3) - 0.01;
+  sphereTransform.translation()(1) = 0.5 + sqrt(0.25 / 3) - 0.01;
+  sphereTransform.translation()(2) = 0.5 + sqrt(0.25 / 3) - 0.01;
+
+  ccdSphere sphere;
+  sphere.radius = 0.5;
+  sphere.transform = &sphereTransform;
+
+  // set up ccd_t struct
+  ccd.support1 = ccdSupportSphere; // support function for first object
+  ccd.support2 = ccdSupportMesh;   // support function for second object
+  ccd.center1 = ccdCenterSphere;   // center function for first object
+  ccd.center2 = ccdCenterMesh;     // center function for second object
+  ccd.mpr_tolerance = 0.0001;      // maximal tolerance
+
+  /*
+  server::GUIWebsocketServer server;
+  server.createMeshASSIMP(
+      "box",
+      box1Mesh,
+      "",
+      box1Transform.translation(),
+      math::matrixToEulerXYZ(box1Transform.linear()),
+      box1Size);
+  server.createSphere("sphere", sphere.radius, sphereTransform.translation());
+  server.serve(8070);
+  while (server.isServing())
+  {
+  }
+  */
+
+  ccd_real_t depth;
+  ccd_vec3_t dir, pos;
+  int intersect = ccdMPRPenetration(&sphere, &box, &ccd, &depth, &dir, &pos);
+
+  EXPECT_EQ(intersect, 0);
+  /*
+  std::cout << "Dir: " << dir.v[0] << "," << dir.v[1] << "," << dir.v[2]
+            << std::endl;
+  std::cout << "Pos: " << pos.v[0] << "," << pos.v[1] << "," << pos.v[2]
+            << std::endl;
+  */
+
+  std::vector<Eigen::Vector3d> meshPoints
+      = ccdPointsAtWitnessMesh(&box, &dir, true);
+
+  EXPECT_EQ(meshPoints.size(), 1);
+
+  CollisionResult collisionResult;
+  createSphereMeshContact(
+      nullptr,
+      nullptr,
+      collisionResult,
+      &dir,
+      sphereTransform.translation(),
+      sphere.radius,
+      meshPoints);
+
+  EXPECT_EQ(collisionResult.getNumContacts(), 1);
+  if (collisionResult.getNumContacts() == 0)
+    return;
+
+  Contact& contact = collisionResult.getContact(0);
+  EXPECT_EQ(contact.type, ContactType::SPHERE_VERTEX);
+  Eigen::Vector3d expectedNormal = Eigen::Vector3d(1, 1, 1).normalized();
+  EXPECT_TRUE(equals(expectedNormal, contact.normal, 1e-9));
+  Eigen::Vector3d expectedPoint
+      = Eigen::Vector3d(0.5 - 0.01, 0.5 - 0.01, 0.5 - 0.01);
+  EXPECT_TRUE(equals(expectedPoint, contact.point, 1e-9));
+  EXPECT_NEAR(contact.penetrationDepth, sqrt(3 * 0.01 * 0.01), 1e-8);
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(DARTCollide, SPHERE_EDGE_COLLISION)
+{
+  ccd_t ccd;
+  CCD_INIT(&ccd); // initialize ccd_t struct
+
+  Eigen::Vector3d box1Size = Eigen::Vector3d::Ones();
+  aiScene* box1Mesh = createBoxMeshUnsafe();
+  Eigen::Isometry3d box1Transform = Eigen::Isometry3d::Identity();
+  ccdMesh box;
+  box.mesh = box1Mesh;
+  box.transform = &box1Transform;
+  box.scale = &box1Size;
+
+  Eigen::Isometry3d sphereTransform = Eigen::Isometry3d::Identity();
+  sphereTransform.translation()(0) = 0.5 + sqrt(0.125) - 0.01;
+  sphereTransform.translation()(1) = 0.5 + sqrt(0.125) - 0.01;
+
+  ccdSphere sphere;
+  sphere.radius = 0.5;
+  sphere.transform = &sphereTransform;
+
+  // set up ccd_t struct
+  ccd.support1 = ccdSupportSphere; // support function for first object
+  ccd.support2 = ccdSupportMesh;   // support function for second object
+  ccd.center1 = ccdCenterSphere;   // center function for first object
+  ccd.center2 = ccdCenterMesh;     // center function for second object
+  ccd.mpr_tolerance = 0.0001;      // maximal tolerance
+
+  /*
+  server::GUIWebsocketServer server;
+  server.createMeshASSIMP(
+      "box",
+      box1Mesh,
+      "",
+      box1Transform.translation(),
+      math::matrixToEulerXYZ(box1Transform.linear()),
+      box1Size);
+  server.createSphere("sphere", sphere.radius, sphereTransform.translation());
+  server.serve(8070);
+  while (server.isServing())
+  {
+  }
+  */
+
+  ccd_real_t depth;
+  ccd_vec3_t dir, pos;
+  int intersect = ccdMPRPenetration(&sphere, &box, &ccd, &depth, &dir, &pos);
+
+  EXPECT_EQ(intersect, 0);
+  /*
+  std::cout << "Dir: " << dir.v[0] << "," << dir.v[1] << "," << dir.v[2]
+            << std::endl;
+  std::cout << "Pos: " << pos.v[0] << "," << pos.v[1] << "," << pos.v[2]
+            << std::endl;
+  */
+
+  std::vector<Eigen::Vector3d> meshPoints
+      = ccdPointsAtWitnessMesh(&box, &dir, true);
+
+  EXPECT_EQ(meshPoints.size(), 2);
+
+  CollisionResult collisionResult;
+  createSphereMeshContact(
+      nullptr,
+      nullptr,
+      collisionResult,
+      &dir,
+      sphereTransform.translation(),
+      sphere.radius,
+      meshPoints);
+
+  EXPECT_EQ(collisionResult.getNumContacts(), 1);
+  if (collisionResult.getNumContacts() == 0)
+    return;
+
+  Contact& contact = collisionResult.getContact(0);
+  EXPECT_EQ(contact.type, ContactType::SPHERE_EDGE);
+  Eigen::Vector3d expectedNormal = Eigen::Vector3d(1, 1, 0).normalized();
+  EXPECT_TRUE(equals(expectedNormal, contact.normal, 1e-9));
+  Eigen::Vector3d expectedPoint = Eigen::Vector3d(0.5 - 0.01, 0.5 - 0.01, 0);
+  EXPECT_TRUE(equals(expectedPoint, contact.point, 1e-9));
+  EXPECT_NEAR(contact.penetrationDepth, sqrt(2 * 0.01 * 0.01), 1e-8);
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(DARTCollide, SPHERE_FACE_COLLISION)
+{
+  ccd_t ccd;
+  CCD_INIT(&ccd); // initialize ccd_t struct
+
+  Eigen::Vector3d box1Size = Eigen::Vector3d::Ones();
+  aiScene* box1Mesh = createBoxMeshUnsafe();
+  Eigen::Isometry3d box1Transform = Eigen::Isometry3d::Identity();
+  ccdMesh box;
+  box.mesh = box1Mesh;
+  box.transform = &box1Transform;
+  box.scale = &box1Size;
+
+  Eigen::Isometry3d sphereTransform = Eigen::Isometry3d::Identity();
+  sphereTransform.translation()(0) = 1.0 - 0.01;
+
+  ccdSphere sphere;
+  sphere.radius = 0.5;
+  sphere.transform = &sphereTransform;
+
+  // set up ccd_t struct
+  ccd.support1 = ccdSupportSphere; // support function for first object
+  ccd.support2 = ccdSupportMesh;   // support function for second object
+  ccd.center1 = ccdCenterSphere;   // center function for first object
+  ccd.center2 = ccdCenterMesh;     // center function for second object
+  ccd.mpr_tolerance = 0.0001;      // maximal tolerance
+
+  /*
+  server::GUIWebsocketServer server;
+  server.createMeshASSIMP(
+      "box",
+      box1Mesh,
+      "",
+      box1Transform.translation(),
+      math::matrixToEulerXYZ(box1Transform.linear()),
+      box1Size);
+  server.createSphere("sphere", sphere.radius, sphereTransform.translation());
+  server.serve(8070);
+  while (server.isServing())
+  {
+  }
+  */
+
+  ccd_real_t depth;
+  ccd_vec3_t dir, pos;
+  int intersect = ccdMPRPenetration(&sphere, &box, &ccd, &depth, &dir, &pos);
+
+  EXPECT_EQ(intersect, 0);
+  /*
+  std::cout << "Dir: " << dir.v[0] << "," << dir.v[1] << "," << dir.v[2]
+            << std::endl;
+  std::cout << "Pos: " << pos.v[0] << "," << pos.v[1] << "," << pos.v[2]
+            << std::endl;
+  */
+
+  std::vector<Eigen::Vector3d> meshPoints
+      = ccdPointsAtWitnessMesh(&box, &dir, true);
+
+  EXPECT_EQ(meshPoints.size(), 4);
+
+  CollisionResult collisionResult;
+  createSphereMeshContact(
+      nullptr,
+      nullptr,
+      collisionResult,
+      &dir,
+      sphereTransform.translation(),
+      sphere.radius,
+      meshPoints);
+
+  EXPECT_EQ(collisionResult.getNumContacts(), 1);
+  if (collisionResult.getNumContacts() == 0)
+    return;
+
+  Contact& contact = collisionResult.getContact(0);
+  EXPECT_EQ(contact.type, ContactType::SPHERE_FACE);
+  Eigen::Vector3d expectedNormal = Eigen::Vector3d::UnitX();
+  EXPECT_TRUE(equals(expectedNormal, contact.normal, 1e-9));
+  Eigen::Vector3d expectedPoint = Eigen::Vector3d(0.5 - 0.01, 0, 0);
+  EXPECT_TRUE(equals(expectedPoint, contact.point, 1e-9));
+  EXPECT_NEAR(contact.penetrationDepth, 0.01, 1e-8);
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(DARTCollide, CAPSULE_CAPSULE_T_SHAPED_COLLISION)
+{
+  double height = 1.0;
+  double radius1 = 0.4;
+  double radius2 = 0.3;
+
+  Eigen::Isometry3d T1 = Eigen::Isometry3d::Identity();
+
+  Eigen::Isometry3d T2 = Eigen::Isometry3d::Identity();
+  T2.translation()(0) = radius1 + radius2 + (height / 2) - 0.01;
+  T2.linear() = math::eulerXYZToMatrix(Eigen::Vector3d(0, M_PI_2, 0));
+
+  CollisionResult result;
+  collideCapsuleCapsule(
+      nullptr, nullptr, height, radius1, T1, height, radius2, T2, result);
+
+  EXPECT_EQ(result.getNumContacts(), 1);
+  if (result.getNumContacts() == 0)
+    return;
+  auto contact = result.getContact(0);
+
+  // Normals always go from B -> A
+  Eigen::Vector3d expectedPoint
+      = Eigen::Vector3d::UnitX()
+        * (radius1 - (0.01 * radius1 / (radius1 + radius2)));
+  Eigen::Vector3d expectedNormal = Eigen::Vector3d::UnitX() * -1;
+  if (!equals(expectedPoint, contact.point, 1e-10))
+  {
+    std::cout << "Expected point: " << std::endl << expectedPoint << std::endl;
+    std::cout << "Real point: " << std::endl << contact.point << std::endl;
+  }
+  EXPECT_EQ(contact.type, PIPE_SPHERE);
+  EXPECT_TRUE(equals(expectedPoint, contact.point, 1e-10));
+  EXPECT_TRUE(equals(expectedNormal, contact.normal, 1e-10));
+  EXPECT_NEAR(contact.penetrationDepth, 0.01, 1e-10);
+
+  // Check the results in the backwards direction
+
+  result.clear();
+  collideCapsuleCapsule(
+      nullptr, nullptr, height, radius2, T2, height, radius1, T1, result);
+
+  EXPECT_EQ(result.getNumContacts(), 1);
+  if (result.getNumContacts() == 0)
+    return;
+  contact = result.getContact(0);
+
+  // Normals always go from B -> A
+  expectedNormal = Eigen::Vector3d::UnitX();
+  if (!equals(expectedPoint, contact.point, 1e-10))
+  {
+    std::cout << "Expected point: " << std::endl << expectedPoint << std::endl;
+    std::cout << "Real point: " << std::endl << contact.point << std::endl;
+  }
+  EXPECT_EQ(contact.type, SPHERE_PIPE);
+  EXPECT_TRUE(equals(expectedPoint, contact.point, 1e-10));
+  EXPECT_TRUE(equals(expectedNormal, contact.normal, 1e-10));
+  EXPECT_NEAR(contact.penetrationDepth, 0.01, 1e-10);
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(DARTCollide, CAPSULE_CAPSULE_X_SHAPED_COLLISION)
+{
+  double height = 1.0;
+  double radius1 = 0.4;
+  double radius2 = 0.3;
+
+  Eigen::Isometry3d T1 = Eigen::Isometry3d::Identity();
+
+  Eigen::Isometry3d T2 = Eigen::Isometry3d::Identity();
+  T2.translation()(1) = radius1 + radius2 - 0.01;
+  T2.linear() = math::eulerXYZToMatrix(Eigen::Vector3d(0, M_PI_2, 0));
+
+  CollisionResult result;
+  collideCapsuleCapsule(
+      nullptr, nullptr, height, radius1, T1, height, radius2, T2, result);
+
+  EXPECT_EQ(result.getNumContacts(), 1);
+  if (result.getNumContacts() == 0)
+    return;
+  auto contact = result.getContact(0);
+
+  // Normals always go from B -> A
+  Eigen::Vector3d expectedPoint
+      = Eigen::Vector3d::UnitY()
+        * (radius1 - (0.01 * radius1 / (radius1 + radius2)));
+  Eigen::Vector3d expectedNormal = Eigen::Vector3d::UnitY() * -1;
+  if (!equals(expectedPoint, contact.point, 1e-10))
+  {
+    std::cout << "Expected point: " << std::endl << expectedPoint << std::endl;
+    std::cout << "Real point: " << std::endl << contact.point << std::endl;
+  }
+  EXPECT_EQ(contact.type, PIPE_PIPE);
+  EXPECT_TRUE(equals(expectedPoint, contact.point, 1e-10));
+  EXPECT_TRUE(equals(expectedNormal, contact.normal, 1e-10));
+  EXPECT_NEAR(contact.penetrationDepth, 0.01, 1e-10);
+
+  // Check the results in the backwards direction
+
+  result.clear();
+  collideCapsuleCapsule(
+      nullptr, nullptr, height, radius2, T2, height, radius1, T1, result);
+
+  EXPECT_EQ(result.getNumContacts(), 1);
+  if (result.getNumContacts() == 0)
+    return;
+  contact = result.getContact(0);
+
+  // Normals always go from B -> A
+  expectedNormal = Eigen::Vector3d::UnitY();
+  if (!equals(expectedPoint, contact.point, 1e-10))
+  {
+    std::cout << "Expected point: " << std::endl << expectedPoint << std::endl;
+    std::cout << "Real point: " << std::endl << contact.point << std::endl;
+  }
+  EXPECT_EQ(contact.type, PIPE_PIPE);
+  EXPECT_TRUE(equals(expectedPoint, contact.point, 1e-10));
+  EXPECT_TRUE(equals(expectedNormal, contact.normal, 1e-10));
+  EXPECT_NEAR(contact.penetrationDepth, 0.01, 1e-10);
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(DARTCollide, CAPSULE_CAPSULE_L_SHAPED_COLLISION)
+{
+  double height = 1.0;
+  double radius1 = 0.4;
+  double radius2 = 0.3;
+
+  Eigen::Isometry3d T1 = Eigen::Isometry3d::Identity();
+
+  Eigen::Isometry3d T2 = Eigen::Isometry3d::Identity();
+  T2.translation()(0) = sqrt(2) * height / 4;
+  T2.translation()(2)
+      = height / 2 + (sqrt(2) * height / 4) + radius1 + radius2 - 0.01;
+  T2.linear() = math::eulerXYZToMatrix(Eigen::Vector3d(0, M_PI_4, 0));
+
+  CollisionResult result;
+  collideCapsuleCapsule(
+      nullptr, nullptr, height, radius1, T1, height, radius2, T2, result);
+
+  EXPECT_EQ(result.getNumContacts(), 1);
+  if (result.getNumContacts() == 0)
+    return;
+  auto contact = result.getContact(0);
+
+  // Normals always go from B -> A
+  Eigen::Vector3d expectedPoint
+      = Eigen::Vector3d::UnitZ()
+        * (height / 2 + radius1 - (0.01 * radius1 / (radius1 + radius2)));
+  Eigen::Vector3d expectedNormal = Eigen::Vector3d::UnitZ() * -1;
+  if (!equals(expectedPoint, contact.point, 1e-10))
+  {
+    std::cout << "Expected point: " << std::endl << expectedPoint << std::endl;
+    std::cout << "Real point: " << std::endl << contact.point << std::endl;
+  }
+  EXPECT_EQ(contact.type, SPHERE_SPHERE);
+  EXPECT_TRUE(equals(expectedPoint, contact.point, 1e-10));
+  if (!equals(expectedNormal, contact.normal, 1e-10))
+  {
+    std::cout << "Expected normal: " << std::endl
+              << expectedNormal << std::endl;
+    std::cout << "Real normal: " << std::endl << contact.normal << std::endl;
+  }
+  EXPECT_TRUE(equals(expectedNormal, contact.normal, 1e-10));
+  EXPECT_NEAR(contact.penetrationDepth, 0.01, 1e-10);
+
+  // Check the results in the backwards direction
+
+  result.clear();
+  collideCapsuleCapsule(
+      nullptr, nullptr, height, radius2, T2, height, radius1, T1, result);
+
+  EXPECT_EQ(result.getNumContacts(), 1);
+  if (result.getNumContacts() == 0)
+    return;
+  contact = result.getContact(0);
+
+  // Normals always go from B -> A
+  expectedNormal = Eigen::Vector3d::UnitZ();
+  if (!equals(expectedPoint, contact.point, 1e-10))
+  {
+    std::cout << "Expected point: " << std::endl << expectedPoint << std::endl;
+    std::cout << "Real point: " << std::endl << contact.point << std::endl;
+  }
+  EXPECT_EQ(contact.type, SPHERE_SPHERE);
+  EXPECT_TRUE(equals(expectedPoint, contact.point, 1e-10));
+  if (!equals(expectedNormal, contact.normal, 1e-10))
+  {
+    std::cout << "Expected normal: " << std::endl
+              << expectedNormal << std::endl;
+    std::cout << "Real normal: " << std::endl << contact.normal << std::endl;
+  }
+  EXPECT_TRUE(equals(expectedNormal, contact.normal, 1e-10));
+  EXPECT_NEAR(contact.penetrationDepth, 0.01, 1e-10);
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(DARTCollide, CAPSULE_SPHERE_END_COLLISION)
+{
+  double height = 1.0;
+  double radius1 = 0.4;
+  double radius2 = 0.3;
+
+  Eigen::Isometry3d T1 = Eigen::Isometry3d::Identity();
+
+  Eigen::Isometry3d T2 = Eigen::Isometry3d::Identity();
+  T2.translation()(2) = height / 2 + radius1 + radius2 - 0.01;
+
+  CollisionResult result;
+  collideCapsuleSphere(
+      nullptr, nullptr, height, radius1, T1, radius2, T2, result);
+
+  EXPECT_EQ(result.getNumContacts(), 1);
+  if (result.getNumContacts() == 0)
+    return;
+  auto contact = result.getContact(0);
+
+  // Normals always go from B -> A
+  Eigen::Vector3d expectedPoint
+      = Eigen::Vector3d::UnitZ()
+        * (height / 2 + radius1 - (0.01 * radius1 / (radius1 + radius2)));
+  Eigen::Vector3d expectedNormal = Eigen::Vector3d::UnitZ() * -1;
+  if (!equals(expectedPoint, contact.point, 1e-10))
+  {
+    std::cout << "Expected point: " << std::endl << expectedPoint << std::endl;
+    std::cout << "Real point: " << std::endl << contact.point << std::endl;
+  }
+  EXPECT_EQ(contact.type, SPHERE_SPHERE);
+  EXPECT_TRUE(equals(expectedPoint, contact.point, 1e-10));
+  if (!equals(expectedNormal, contact.normal, 1e-10))
+  {
+    std::cout << "Expected normal: " << std::endl
+              << expectedNormal << std::endl;
+    std::cout << "Real normal: " << std::endl << contact.normal << std::endl;
+  }
+  EXPECT_TRUE(equals(expectedNormal, contact.normal, 1e-10));
+  EXPECT_NEAR(contact.penetrationDepth, 0.01, 1e-10);
+
+  // Check the results in the backwards direction
+
+  result.clear();
+  collideSphereCapsule(
+      nullptr, nullptr, radius2, T2, height, radius1, T1, result);
+
+  EXPECT_EQ(result.getNumContacts(), 1);
+  if (result.getNumContacts() == 0)
+    return;
+  contact = result.getContact(0);
+
+  // Normals always go from B -> A
+  expectedNormal = Eigen::Vector3d::UnitZ();
+  if (!equals(expectedPoint, contact.point, 1e-10))
+  {
+    std::cout << "Expected point: " << std::endl << expectedPoint << std::endl;
+    std::cout << "Real point: " << std::endl << contact.point << std::endl;
+  }
+  EXPECT_EQ(contact.type, SPHERE_SPHERE);
+  EXPECT_TRUE(equals(expectedPoint, contact.point, 1e-10));
+  if (!equals(expectedNormal, contact.normal, 1e-10))
+  {
+    std::cout << "Expected normal: " << std::endl
+              << expectedNormal << std::endl;
+    std::cout << "Real normal: " << std::endl << contact.normal << std::endl;
+  }
+  EXPECT_TRUE(equals(expectedNormal, contact.normal, 1e-10));
+  EXPECT_NEAR(contact.penetrationDepth, 0.01, 1e-10);
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(DARTCollide, CAPSULE_SPHERE_SIDE_COLLISION)
+{
+  double height = 1.0;
+  double radius1 = 0.4;
+  double radius2 = 0.3;
+
+  Eigen::Isometry3d T1 = Eigen::Isometry3d::Identity();
+
+  Eigen::Isometry3d T2 = Eigen::Isometry3d::Identity();
+  T2.translation()(0) = radius1 + radius2 - 0.01;
+
+  CollisionResult result;
+  collideCapsuleSphere(
+      nullptr, nullptr, height, radius1, T1, radius2, T2, result);
+
+  EXPECT_EQ(result.getNumContacts(), 1);
+  if (result.getNumContacts() == 0)
+    return;
+  auto contact = result.getContact(0);
+
+  // Normals always go from B -> A
+  Eigen::Vector3d expectedPoint
+      = Eigen::Vector3d::UnitX()
+        * (radius1 - (0.01 * radius1 / (radius1 + radius2)));
+  Eigen::Vector3d expectedNormal = Eigen::Vector3d::UnitX() * -1;
+  if (!equals(expectedPoint, contact.point, 1e-10))
+  {
+    std::cout << "Expected point: " << std::endl << expectedPoint << std::endl;
+    std::cout << "Real point: " << std::endl << contact.point << std::endl;
+  }
+  EXPECT_EQ(contact.type, PIPE_SPHERE);
+  EXPECT_TRUE(equals(expectedPoint, contact.point, 1e-10));
+  if (!equals(expectedNormal, contact.normal, 1e-10))
+  {
+    std::cout << "Expected normal: " << std::endl
+              << expectedNormal << std::endl;
+    std::cout << "Real normal: " << std::endl << contact.normal << std::endl;
+  }
+  EXPECT_TRUE(equals(expectedNormal, contact.normal, 1e-10));
+  EXPECT_NEAR(contact.penetrationDepth, 0.01, 1e-10);
+
+  // Check the results in the backwards direction
+
+  result.clear();
+  collideSphereCapsule(
+      nullptr, nullptr, radius2, T2, height, radius1, T1, result);
+
+  EXPECT_EQ(result.getNumContacts(), 1);
+  if (result.getNumContacts() == 0)
+    return;
+  contact = result.getContact(0);
+
+  // Normals always go from B -> A
+  expectedNormal = Eigen::Vector3d::UnitX();
+  if (!equals(expectedPoint, contact.point, 1e-10))
+  {
+    std::cout << "Expected point: " << std::endl << expectedPoint << std::endl;
+    std::cout << "Real point: " << std::endl << contact.point << std::endl;
+  }
+  EXPECT_EQ(contact.type, SPHERE_PIPE);
+  EXPECT_TRUE(equals(expectedPoint, contact.point, 1e-10));
+  if (!equals(expectedNormal, contact.normal, 1e-10))
+  {
+    std::cout << "Expected normal: " << std::endl
+              << expectedNormal << std::endl;
+    std::cout << "Real normal: " << std::endl << contact.normal << std::endl;
+  }
+  EXPECT_TRUE(equals(expectedNormal, contact.normal, 1e-10));
+  EXPECT_NEAR(contact.penetrationDepth, 0.01, 1e-10);
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(DARTCollide, CAPSULE_BOX_AS_SPHERE_COLLISION)
+{
+  Eigen::Vector3d size = Eigen::Vector3d::Ones();
+  Eigen::Isometry3d T1 = Eigen::Isometry3d::Identity();
+
+  double height = 1.0;
+  double radius = 0.4;
+  Eigen::Isometry3d T2 = Eigen::Isometry3d::Identity();
+  T2.translation()(2) = size(0) / 2 + height / 2 + radius - 0.01;
+
+  CollisionResult result;
+  collideCapsuleBox(nullptr, nullptr, height, radius, T2, size, T1, result);
+
+  EXPECT_EQ(result.getNumContacts(), 1);
+  if (result.getNumContacts() == 0)
+    return;
+  auto contact = result.getContact(0);
+
+  // Normals always go from B -> A
+  Eigen::Vector3d expectedPoint = Eigen::Vector3d::UnitZ() * 0.5;
+  Eigen::Vector3d expectedNormal = Eigen::Vector3d::UnitZ();
+  if (!equals(expectedPoint, contact.point, 1e-10))
+  {
+    std::cout << "Expected point: " << std::endl << expectedPoint << std::endl;
+    std::cout << "Real point: " << std::endl << contact.point << std::endl;
+  }
+  EXPECT_EQ(contact.type, SPHERE_BOX);
+  EXPECT_TRUE(equals(expectedPoint, contact.point, 1e-10));
+  if (!equals(expectedNormal, contact.normal, 1e-10))
+  {
+    std::cout << "Expected normal: " << std::endl
+              << expectedNormal << std::endl;
+    std::cout << "Real normal: " << std::endl << contact.normal << std::endl;
+  }
+  EXPECT_TRUE(equals(expectedNormal, contact.normal, 1e-10));
+  EXPECT_NEAR(contact.penetrationDepth, 0.01, 1e-10);
+
+  // Check the results in the backwards direction
+
+  result.clear();
+  collideBoxCapsule(nullptr, nullptr, size, T1, height, radius, T2, result);
+
+  EXPECT_EQ(result.getNumContacts(), 1);
+  if (result.getNumContacts() == 0)
+    return;
+  contact = result.getContact(0);
+
+  // Normals always go from B -> A
+  expectedNormal = Eigen::Vector3d::UnitZ() * -1;
+  if (!equals(expectedPoint, contact.point, 1e-10))
+  {
+    std::cout << "Expected point: " << std::endl << expectedPoint << std::endl;
+    std::cout << "Real point: " << std::endl << contact.point << std::endl;
+  }
+  EXPECT_EQ(contact.type, BOX_SPHERE);
+  EXPECT_TRUE(equals(expectedPoint, contact.point, 1e-10));
+  if (!equals(expectedNormal, contact.normal, 1e-10))
+  {
+    std::cout << "Expected normal: " << std::endl
+              << expectedNormal << std::endl;
+    std::cout << "Real normal: " << std::endl << contact.normal << std::endl;
+  }
+  EXPECT_TRUE(equals(expectedNormal, contact.normal, 1e-10));
+  EXPECT_NEAR(contact.penetrationDepth, 0.01, 1e-10);
+
+  /*
+  server::GUIWebsocketServer server;
+  server.createCapsule(
+      "capsule",
+      radius,
+      height,
+      T2.translation(),
+      math::matrixToEulerXYZ(T2.linear()));
+  server.createBox(
+      "box", size, T1.translation(), math::matrixToEulerXYZ(T1.linear()));
+
+  std::vector<Eigen::Vector3d> pointsX;
+  pointsX.push_back(Eigen::Vector3d::Zero());
+  pointsX.push_back(Eigen::Vector3d::UnitX() * 10);
+  std::vector<Eigen::Vector3d> pointsY;
+  pointsY.push_back(Eigen::Vector3d::Zero());
+  pointsY.push_back(Eigen::Vector3d::UnitY() * 10);
+  std::vector<Eigen::Vector3d> pointsZ;
+  pointsZ.push_back(Eigen::Vector3d::Zero());
+  pointsZ.push_back(Eigen::Vector3d::UnitZ() * 10);
+  server.createLine("unitX", pointsX, Eigen::Vector3d::UnitX());
+  server.createLine("unitY", pointsY, Eigen::Vector3d::UnitY());
+  server.createLine("unitZ", pointsZ, Eigen::Vector3d::UnitZ());
+
+  server.serve(8070);
+
+  while (server.isServing())
+  {
+  }
+  */
+}
+#endif
+
+// #ifdef ALL_TESTS
+TEST(DARTCollide, CAPSULE_BOX_PIPE_FACE_COLLISION)
+{
+  Eigen::Vector3d size = Eigen::Vector3d(10, 1, 10);
+  Eigen::Isometry3d T1 = Eigen::Isometry3d::Identity();
+
+  double height = 1.0;
+  double radius = 0.5;
+  Eigen::Isometry3d T2 = Eigen::Isometry3d::Identity();
+  T2.translation()(1) = 1.0 - 0.01;
+
+  /*
+  CollisionResult result;
+  collideCapsuleBox(nullptr, nullptr, height, radius, T2, size, T1, result);
+
+  EXPECT_EQ(result.getNumContacts(), 2);
+  if (result.getNumContacts() < 2)
+    return;
+  */
+
+  /*
+  server::GUIWebsocketServer server;
+  server.createCapsule(
+      "capsule",
+      radius,
+      height,
+      T2.translation(),
+      math::matrixToEulerXYZ(T2.linear()));
+  server.createBox(
+      "box", size, T1.translation(), math::matrixToEulerXYZ(T1.linear()));
+
+  std::vector<Eigen::Vector3d> pointsX;
+  pointsX.push_back(Eigen::Vector3d::Zero());
+  pointsX.push_back(Eigen::Vector3d::UnitX() * 10);
+  std::vector<Eigen::Vector3d> pointsY;
+  pointsY.push_back(Eigen::Vector3d::Zero());
+  pointsY.push_back(Eigen::Vector3d::UnitY() * 10);
+  std::vector<Eigen::Vector3d> pointsZ;
+  pointsZ.push_back(Eigen::Vector3d::Zero());
+  pointsZ.push_back(Eigen::Vector3d::UnitZ() * 10);
+  server.createLine("unitX", pointsX, Eigen::Vector3d::UnitX());
+  server.createLine("unitY", pointsY, Eigen::Vector3d::UnitY());
+  server.createLine("unitZ", pointsZ, Eigen::Vector3d::UnitZ());
+
+  server.serve(8070);
+
+  while (server.isServing())
+  {
+  }
+  */
+}
+// #endif
+
+#ifdef ALL_TESTS
+TEST(DARTCollide, CAPSULE_MESH_AS_SPHERE_COLLISION)
+{
+  Eigen::Vector3d size = Eigen::Vector3d::Ones();
+  aiScene* boxMesh = createBoxMeshUnsafe();
+  Eigen::Isometry3d T1 = Eigen::Isometry3d::Identity();
+
+  double height = 1.0;
+  double radius = 0.4;
+  Eigen::Isometry3d T2 = Eigen::Isometry3d::Identity();
+  T2.translation()(2) = size(0) / 2 + height / 2 + radius - 0.01;
+
+  CollisionResult result;
+  collideCapsuleMesh(
+      nullptr, nullptr, height, radius, T2, boxMesh, size, T1, result);
+
+  EXPECT_EQ(result.getNumContacts(), 1);
+  if (result.getNumContacts() == 0)
+    return;
+  auto contact = result.getContact(0);
+
+  // Normals always go from B -> A
+  Eigen::Vector3d expectedPoint = Eigen::Vector3d::UnitZ() * (0.5 - 0.01);
+  Eigen::Vector3d expectedNormal = Eigen::Vector3d::UnitZ();
+  if (!equals(expectedPoint, contact.point, 1e-10))
+  {
+    std::cout << "Expected point: " << std::endl << expectedPoint << std::endl;
+    std::cout << "Real point: " << std::endl << contact.point << std::endl;
+  }
+  EXPECT_EQ(contact.type, SPHERE_FACE);
+  EXPECT_TRUE(equals(expectedPoint, contact.point, 1e-10));
+  if (!equals(expectedNormal, contact.normal, 1e-10))
+  {
+    std::cout << "Expected normal: " << std::endl
+              << expectedNormal << std::endl;
+    std::cout << "Real normal: " << std::endl << contact.normal << std::endl;
+  }
+  EXPECT_TRUE(equals(expectedNormal, contact.normal, 1e-10));
+  EXPECT_NEAR(contact.penetrationDepth, 0.01, 1e-10);
+
+  // Check the results in the backwards direction
+
+  result.clear();
+  collideMeshCapsule(
+      nullptr, nullptr, boxMesh, size, T1, height, radius, T2, result);
+
+  EXPECT_EQ(result.getNumContacts(), 1);
+  if (result.getNumContacts() == 0)
+    return;
+  contact = result.getContact(0);
+
+  // Normals always go from B -> A
+  expectedNormal = Eigen::Vector3d::UnitZ() * -1;
+  if (!equals(expectedPoint, contact.point, 1e-10))
+  {
+    std::cout << "Expected point: " << std::endl << expectedPoint << std::endl;
+    std::cout << "Real point: " << std::endl << contact.point << std::endl;
+  }
+  EXPECT_EQ(contact.type, FACE_SPHERE);
+  EXPECT_TRUE(equals(expectedPoint, contact.point, 1e-10));
+  if (!equals(expectedNormal, contact.normal, 1e-10))
+  {
+    std::cout << "Expected normal: " << std::endl
+              << expectedNormal << std::endl;
+    std::cout << "Real normal: " << std::endl << contact.normal << std::endl;
+  }
+  EXPECT_TRUE(equals(expectedNormal, contact.normal, 1e-10));
+  EXPECT_NEAR(contact.penetrationDepth, 0.01, 1e-10);
+
+  /*
+  server::GUIWebsocketServer server;
+  server.createCapsule(
+      "capsule",
+      radius,
+      height,
+      T2.translation(),
+      math::matrixToEulerXYZ(T2.linear()));
+  server.createBox(
+      "box", size, T1.translation(), math::matrixToEulerXYZ(T1.linear()));
+
+  std::vector<Eigen::Vector3d> pointsX;
+  pointsX.push_back(Eigen::Vector3d::Zero());
+  pointsX.push_back(Eigen::Vector3d::UnitX() * 10);
+  std::vector<Eigen::Vector3d> pointsY;
+  pointsY.push_back(Eigen::Vector3d::Zero());
+  pointsY.push_back(Eigen::Vector3d::UnitY() * 10);
+  std::vector<Eigen::Vector3d> pointsZ;
+  pointsZ.push_back(Eigen::Vector3d::Zero());
+  pointsZ.push_back(Eigen::Vector3d::UnitZ() * 10);
+  server.createLine("unitX", pointsX, Eigen::Vector3d::UnitX());
+  server.createLine("unitY", pointsY, Eigen::Vector3d::UnitY());
+  server.createLine("unitZ", pointsZ, Eigen::Vector3d::UnitZ());
+
+  server.serve(8070);
+
+  while (server.isServing())
+  {
+  }
+  */
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(DARTCollide, CAPSULE_CCD_SUPPORT_FN)
+{
+  ccd_t ccd;
+  CCD_INIT(&ccd); // initialize ccd_t struct
+
+  Eigen::Isometry3d capsuleTransform = Eigen::Isometry3d::Identity();
+  capsuleTransform.translation()(0) = 0.5 + sqrt(0.25 / 3) - 0.01;
+  capsuleTransform.translation()(1) = 0.5 + sqrt(0.25 / 3) - 0.01;
+  capsuleTransform.translation()(2) = 0.5 + sqrt(0.25 / 3) - 0.01;
+
+  ccdCapsule capsule;
+  capsule.radius = 0.5;
+  capsule.height = 2.0;
+  capsule.transform = &capsuleTransform;
+
+  ccd_vec3_t dirRaw;
+  ccd_vec3_t outRaw;
+
+  Eigen::Map<Eigen::Vector3d> dir(dirRaw.v);
+  Eigen::Map<Eigen::Vector3d> out(outRaw.v);
+
+  // Straight up
+
+  dir = Eigen::Vector3d::UnitZ();
+
+  ccdSupportCapsule(&capsule, &dirRaw, &outRaw);
+
+  Eigen::Vector3d expectedOut
+      = capsuleTransform
+        * (Eigen::Vector3d::UnitZ() * (capsule.height / 2 + capsule.radius));
+  if (!out.isApprox(expectedOut, 1e-7))
+  {
+    std::cout << "Expected out: " << std::endl << expectedOut << std::endl;
+    std::cout << "Actual out: " << std::endl << out << std::endl;
+  }
+  EXPECT_TRUE(out.isApprox(expectedOut, 1e-7));
+
+  // Straight out
+
+  dir = Eigen::Vector3d::UnitX();
+
+  ccdSupportCapsule(&capsule, &dirRaw, &outRaw);
+
+  expectedOut = capsuleTransform * (Eigen::Vector3d::UnitX() * capsule.radius);
+  if (!out.isApprox(expectedOut, 1e-7))
+  {
+    std::cout << "Expected out: " << std::endl << expectedOut << std::endl;
+    std::cout << "Actual out: " << std::endl << out << std::endl;
+  }
+  EXPECT_TRUE(out.isApprox(expectedOut, 1e-7));
+
+  /*
+  server::GUIWebsocketServer server;
+  server.createCapsule(
+      "capsule",
+      capsule.radius,
+      capsule.height,
+      capsuleTransform.translation(),
+      math::matrixToEulerXYZ(capsuleTransform.linear()));
+  server.createSphere(
+      "marker", 0.1, Eigen::Vector3d::Zero(), Eigen::Vector3d::UnitX());
+
+  std::vector<Eigen::Vector3d> pointsX;
+  pointsX.push_back(Eigen::Vector3d::Zero());
+  pointsX.push_back(Eigen::Vector3d::UnitX() * 10);
+  std::vector<Eigen::Vector3d> pointsY;
+  pointsY.push_back(Eigen::Vector3d::Zero());
+  pointsY.push_back(Eigen::Vector3d::UnitY() * 10);
+  std::vector<Eigen::Vector3d> pointsZ;
+  pointsZ.push_back(Eigen::Vector3d::Zero());
+  pointsZ.push_back(Eigen::Vector3d::UnitZ() * 10);
+  server.createLine("unitX", pointsX, Eigen::Vector3d::UnitX());
+  server.createLine("unitY", pointsY, Eigen::Vector3d::UnitY());
+  server.createLine("unitZ", pointsZ, Eigen::Vector3d::UnitZ());
+
+  server.serve(8070);
+
+  Ticker ticker(0.01);
+  ticker.registerTickListener([&](long time) {
+    double diff = 10 * sin(((double)time / 2000));
+    dir = math::eulerXYZToMatrix(Eigen::Vector3d(diff, 0, 0))
+          * Eigen::Vector3d::UnitY();
+    ccdSupportCapsule(&capsule, &dirRaw, &outRaw);
+    server.setObjectPosition("marker", out);
+  });
+  server.registerConnectionListener([&]() { ticker.start(); });
+
+  while (server.isServing())
+  {
+  }
+  */
+}
+#endif
+
 // The number of contacts shouldn't change under tiny perturbations to position,
 // and the contacts should move in predictable ways.
 
@@ -1582,153 +2796,7 @@ TEST(DARTCollide, ATLAS_5_STABILITY)
 }
 #endif
 
-TEST(DARTCollide, ATLAS_5_HIP_FOOT)
-{
-  // Create a world
-  std::shared_ptr<simulation::World> world = simulation::World::create();
-
-  // Set gravity of the world
-  world->setConstraintForceMixingEnabled(false);
-  world->setPenetrationCorrectionEnabled(false);
-  world->setGravity(Eigen::Vector3d(0.0, -9.81, 0));
-
-  // Set up the LCP solver to be super super accurate, so our
-  // finite-differencing tests don't fail due to LCP errors. This isn't
-  // necessary during a real forward pass, but is helpful to make the
-  // mathematical invarients in the tests more reliable.
-  static_cast<constraint::BoxedLcpConstraintSolver*>(
-      world->getConstraintSolver())
-      ->makeHyperAccurateAndVerySlow();
-
-  // Load the meshes
-
-  auto retriever = std::make_shared<utils::CompositeResourceRetriever>();
-  retriever->addSchemaRetriever(
-      "file", std::make_shared<common::LocalResourceRetriever>());
-  retriever->addSchemaRetriever("dart", utils::DartResourceRetriever::create());
-  std::string leftFootPath = "dart://sample/sdf/atlas/l_foot.dae";
-  dynamics::ShapePtr leftFootMesh = std::make_shared<dynamics::MeshShape>(
-      Eigen::Vector3d::Ones(),
-      dynamics::MeshShape::loadMesh(leftFootPath, retriever),
-      leftFootPath,
-      retriever);
-  std::string rightFootPath = "dart://sample/sdf/atlas/r_foot.dae";
-  dynamics::ShapePtr rightFootMesh = std::make_shared<dynamics::MeshShape>(
-      Eigen::Vector3d::Ones(),
-      dynamics::MeshShape::loadMesh(rightFootPath, retriever),
-      rightFootPath,
-      retriever);
-  std::shared_ptr<BoxShape> rootShape(
-      new BoxShape(Eigen::Vector3d::Ones() * 0.5));
-
-  // Set up matrices
-
-  Eigen::Matrix4d l_leg_hpx_WorldTransform;
-  // clang-format off
-  l_leg_hpx_WorldTransform << 1,           0,           0,           0,
-                              0, 1.11022e-16,           1,       -0.01,
-                              0,          -1, 1.11022e-16,      -0.089,
-                              0,           0,           0,           1;
-  // clang-format on
-  Eigen::Vector3d l_leg_hpx_Axis = Eigen::Vector3d::UnitX();
-  Eigen::Matrix4d r_leg_hpx_WorldTransform;
-  // clang-format off
-  r_leg_hpx_WorldTransform << 1,           0,           0,           0,
-                              0, 1.11022e-16,           1,       -0.01,
-                              0,          -1, 1.11022e-16,       0.089,
-                              0,           0,           0,           1;
-  // clang-format on
-  Eigen::Vector3d r_leg_hpx_Axis = Eigen::Vector3d::UnitX();
-  Eigen::Matrix4d l_foot_WorldTransform;
-  // clang-format off
-  l_foot_WorldTransform << 1,           0,           0,           0,
-                           0, 1.11022e-16,           1,      -0.856,
-                           0,          -1, 1.11022e-16,      -0.089,
-                           0,           0,           0,           1;
-  // clang-format on
-  Eigen::Matrix4d r_foot_WorldTransform;
-  // clang-format off
-  r_foot_WorldTransform << 1,           0,           0,           0,
-                           0, 1.11022e-16,           1,      -0.856,
-                           0,          -1, 1.11022e-16,       0.089,
-                           0,           0,           0,           1;
-  // clang-format on
-
-  std::shared_ptr<dynamics::Skeleton> singleJointAtlas
-      = dynamics::Skeleton::create();
-
-  Eigen::Isometry3d leftHipPos = Eigen::Isometry3d(l_leg_hpx_WorldTransform);
-  Eigen::Isometry3d rightHipPos = Eigen::Isometry3d(r_leg_hpx_WorldTransform);
-  Eigen::Isometry3d leftFootPos = Eigen::Isometry3d(l_foot_WorldTransform);
-  Eigen::Isometry3d rightFootPos = Eigen::Isometry3d(r_foot_WorldTransform);
-  Eigen::Isometry3d leftHipToLeftFoot = leftHipPos.inverse() * leftFootPos;
-  Eigen::Isometry3d rightHipToRightFoot = rightHipPos.inverse() * rightFootPos;
-
-  // Create root box
-
-  std::pair<dynamics::FreeJoint*, dynamics::BodyNode*> rootPair
-      = singleJointAtlas->createJointAndBodyNodePair<dynamics::FreeJoint>();
-  dynamics::FreeJoint* rootJoint = rootPair.first;
-  dynamics::BodyNode* rootBody = rootPair.second;
-  rootBody->createShapeNodeWith<VisualAspect, CollisionAspect>(rootShape);
-
-  // Create left leg
-
-  std::pair<dynamics::RevoluteJoint*, dynamics::BodyNode*> leftHipPair
-      = rootBody->createChildJointAndBodyNodePair<dynamics::RevoluteJoint>();
-  dynamics::RevoluteJoint* leftHip = leftHipPair.first;
-  leftHip->setTransformFromParentBodyNode(leftHipPos);
-  leftHip->setTransformFromChildBodyNode(leftHipToLeftFoot.inverse());
-  leftHip->setAxis(l_leg_hpx_Axis);
-  dynamics::BodyNode* leftFoot = leftHipPair.second;
-  leftFoot->createShapeNodeWith<VisualAspect, CollisionAspect>(leftFootMesh);
-  assert(leftFoot->getWorldTransform().matrix() == leftFootPos.matrix());
-
-  // Create right leg
-
-  std::pair<dynamics::RevoluteJoint*, dynamics::BodyNode*> rightHipPair
-      = rootBody->createChildJointAndBodyNodePair<dynamics::RevoluteJoint>();
-  dynamics::RevoluteJoint* rightHip = rightHipPair.first;
-  rightHip->setTransformFromParentBodyNode(rightHipPos);
-  rightHip->setTransformFromChildBodyNode(rightHipToRightFoot.inverse());
-  rightHip->setAxis(r_leg_hpx_Axis);
-  dynamics::BodyNode* rightFoot = rightHipPair.second;
-  rightFoot->createShapeNodeWith<VisualAspect, CollisionAspect>(rightFootMesh);
-  assert(rightFoot->getWorldTransform().matrix() == rightFootPos.matrix());
-
-  world->addSkeleton(singleJointAtlas);
-
-  // Load ground
-  dart::utils::DartLoader urdfLoader;
-  std::shared_ptr<dynamics::Skeleton> ground
-      = urdfLoader.parseSkeleton("dart://sample/sdf/atlas/ground.urdf");
-  world->addSkeleton(ground);
-  // Disable the ground from casting its own shadows
-  ground->getBodyNode(0)->getShapeNode(0)->getVisualAspect()->setCastShadows(
-      false);
-
-  /*
-  // Display everything out on a GUI
-
-  server::GUIWebsocketServer server;
-  server.renderWorld(world);
-  server.serve(8070);
-
-  Ticker ticker(0.01);
-  ticker.registerTickListener([&](long time) {
-    double diff = sin(((double)time / 2000));
-    singleJointAtlas->setPosition(6, diff);
-    singleJointAtlas->setPosition(7, -diff);
-    server.renderWorld(world);
-  });
-  server.registerConnectionListener([&]() { ticker.start(); });
-
-  while (server.isServing())
-  {
-  }
-  */
-}
-
+/*
 #ifdef ALL_TESTS
 TEST(DARTCollide, ATLAS_5)
 {
@@ -1833,3 +2901,4 @@ TEST(DARTCollide, ATLAS_5)
   }
 }
 #endif
+*/

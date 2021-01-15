@@ -21,6 +21,18 @@ type CreateSphereCommand = {
   receive_shadows: boolean;
 };
 
+type CreateCapsuleCommand = {
+  type: "create_capsule";
+  key: string;
+  radius: number;
+  height: number;
+  pos: number[];
+  euler: number[];
+  color: number[];
+  cast_shadows: boolean;
+  receive_shadows: boolean;
+};
+
 type CreateLineCommand = {
   type: "create_line";
   key: string;
@@ -186,6 +198,7 @@ type SetPlotData = {
 type Command =
   | CreateBoxCommand
   | CreateSphereCommand
+  | CreateCapsuleCommand
   | CreateLineCommand
   | CreateMeshCommand
   | CreateTextureCommand
@@ -271,6 +284,17 @@ class DARTRemote {
         command.key,
         command.radius,
         command.pos,
+        command.color,
+        command.cast_shadows,
+        command.receive_shadows
+      );
+    } else if (command.type === "create_capsule") {
+      this.view.createCapsule(
+        command.key,
+        command.radius,
+        command.height,
+        command.pos,
+        command.euler,
         command.color,
         command.cast_shadows,
         command.receive_shadows
