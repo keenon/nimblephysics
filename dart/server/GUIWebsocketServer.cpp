@@ -9,6 +9,7 @@
 
 #include "dart/collision/CollisionResult.hpp"
 #include "dart/common/Aspect.hpp"
+#include "dart/constraint/ConstraintSolver.hpp"
 #include "dart/dynamics/BodyNode.hpp"
 #include "dart/dynamics/BoxShape.hpp"
 #include "dart/dynamics/CapsuleShape.hpp"
@@ -391,7 +392,10 @@ void GUIWebsocketServer::flush()
 /// This is a high-level command that creates/updates all the shapes in a
 /// world by calling the lower-level commands
 GUIWebsocketServer& GUIWebsocketServer::renderWorld(
-    const std::shared_ptr<simulation::World>& world, const std::string& prefix)
+    const std::shared_ptr<simulation::World>& world,
+    const std::string& prefix,
+    bool renderForces,
+    bool renderForceMagnitudes)
 {
   bool oldAutoflush = mAutoflush;
   mAutoflush = false;
@@ -403,21 +407,24 @@ GUIWebsocketServer& GUIWebsocketServer::renderWorld(
 
   const collision::CollisionResult& result = world->getLastCollisionResult();
   deleteObjectsByPrefix(prefix + "__contact_");
-  for (int i = 0; i < result.getNumContacts(); i++)
+  if (renderForces)
   {
-    const collision::Contact& contact = result.getContact(i);
-    double scale = 10;
-    std::vector<Eigen::Vector3d> points;
-    points.push_back(contact.point);
-    points.push_back(contact.point + (contact.normal * scale));
-    createLine(prefix + "__contact_" + std::to_string(i) + "_a", points);
-    std::vector<Eigen::Vector3d> pointsB;
-    pointsB.push_back(contact.point);
-    pointsB.push_back(contact.point - (contact.normal * scale));
-    createLine(
-        prefix + "__contact_" + std::to_string(i) + "_b",
-        pointsB,
-        Eigen::Vector3d(0, 1, 0));
+    for (int i = 0; i < result.getNumContacts(); i++)
+    {
+      const collision::Contact& contact = result.getContact(i);
+      double scale = renderForceMagnitudes ? contact.lcpResult * 10 : 2;
+      std::vector<Eigen::Vector3d> points;
+      points.push_back(contact.point);
+      points.push_back(contact.point + (contact.normal * scale));
+      createLine(prefix + "__contact_" + std::to_string(i) + "_a", points);
+      std::vector<Eigen::Vector3d> pointsB;
+      pointsB.push_back(contact.point);
+      pointsB.push_back(contact.point - (contact.normal * scale));
+      createLine(
+          prefix + "__contact_" + std::to_string(i) + "_b",
+          pointsB,
+          Eigen::Vector3d(0, 1, 0));
+    }
   }
 
   mAutoflush = oldAutoflush;
@@ -426,6 +433,33 @@ GUIWebsocketServer& GUIWebsocketServer::renderWorld(
     flush();
   }
   return *this;
+}
+
+/// This is a high-level command that creates a basis
+GUIWebsocketServer& GUIWebsocketServer::renderBasis(
+    double scale,
+    const std::string& prefix,
+    const Eigen::Vector3d pos,
+    const Eigen::Vector3d euler)
+{
+  Eigen::Isometry3d T = Eigen::Isometry3d::Identity();
+  T.translation() = pos;
+  T.linear() = math::eulerXYZToMatrix(euler);
+
+  std::vector<Eigen::Vector3d> pointsX;
+  pointsX.push_back(T * Eigen::Vector3d::Zero());
+  pointsX.push_back(T * (Eigen::Vector3d::UnitX() * scale));
+  std::vector<Eigen::Vector3d> pointsY;
+  pointsY.push_back(T * Eigen::Vector3d::Zero());
+  pointsY.push_back(T * (Eigen::Vector3d::UnitY() * scale));
+  std::vector<Eigen::Vector3d> pointsZ;
+  pointsZ.push_back(T * Eigen::Vector3d::Zero());
+  pointsZ.push_back(T * (Eigen::Vector3d::UnitZ() * scale));
+
+  deleteObjectsByPrefix(prefix + "__basis_");
+  createLine(prefix + "__basis_unitX", pointsX, Eigen::Vector3d::UnitX());
+  createLine(prefix + "__basis_unitY", pointsY, Eigen::Vector3d::UnitY());
+  createLine(prefix + "__basis_unitZ", pointsZ, Eigen::Vector3d::UnitZ());
 }
 
 /// This is a high-level command that creates/updates all the shapes in a

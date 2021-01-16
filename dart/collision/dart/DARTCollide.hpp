@@ -33,6 +33,7 @@
 #ifndef DART_COLLISION_DART_DARTCOLLIDE_HPP_
 #define DART_COLLISION_DART_DARTCOLLIDE_HPP_
 
+#include <unordered_map>
 #include <vector>
 
 #include <Eigen/Dense>
@@ -400,6 +401,10 @@ bool get2DLineIntersection(
 /// This sets the default settings for CCD in a single spot in the DARTCollide
 /// code, so it's easy to tweak settings across all collision pairs.
 inline void setCcdDefaultSettings(ccd_t& ccd);
+
+/// This is the static cache for all the CCD collision search data
+static std::unordered_map<long, ccd_vec3_t> _ccdDirCache;
+static std::unordered_map<long, ccd_vec3_t> _ccdPosCache;
 
 } // namespace collision
 } // namespace dart

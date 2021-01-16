@@ -118,6 +118,9 @@ struct Contact
   /// \brief User data.
   void* userData;
 
+  /// This holds the amount of force the LCP solved for for this contact
+  double lcpResult;
+
   /// This is necessary for computing gradients. This tells us what type of
   /// contact generated these contacts.
   ContactType type;

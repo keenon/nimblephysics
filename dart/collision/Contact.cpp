@@ -46,7 +46,8 @@ Contact::Contact()
     triID1(0),
     triID2(0),
     userData(nullptr),
-    type(ContactType::UNSUPPORTED)
+    type(ContactType::UNSUPPORTED),
+    lcpResult(0)
 {
   // TODO(MXG): Consider using NaN instead of zero for uninitialized quantities
   // Do nothing

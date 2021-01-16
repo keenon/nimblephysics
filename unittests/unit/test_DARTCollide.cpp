@@ -3881,7 +3881,7 @@ TEST(DARTCollide, CAPSULE_REALTIME)
 
   // Set gravity of the world
   // world->setConstraintForceMixingEnabled(true);
-  world->setPenetrationCorrectionEnabled(true);
+  // world->setPenetrationCorrectionEnabled(true);
   world->setGravity(Eigen::Vector3d(0.0, -9.81, 0));
 
   std::shared_ptr<BoxShape> boxShape(
@@ -3970,8 +3970,7 @@ TEST(DARTCollide, CAPSULE_REALTIME)
 // #endif
 */
 
-/*
-#ifdef ALL_TESTS
+// #ifdef ALL_TESTS
 TEST(DARTCollide, ATLAS_5)
 {
   // Create a world
@@ -4074,5 +4073,4 @@ TEST(DARTCollide, ATLAS_5)
   {
   }
 }
-#endif
-*/
+// #endif

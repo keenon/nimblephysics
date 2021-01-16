@@ -78,7 +78,16 @@ public:
   /// world by calling the lower-level commands
   GUIWebsocketServer& renderWorld(
       const std::shared_ptr<simulation::World>& world,
-      const std::string& prefix = "world");
+      const std::string& prefix = "world",
+      bool renderForces = true,
+      bool renderForceMagnitudes = true);
+
+  /// This is a high-level command that creates a basis
+  GUIWebsocketServer& renderBasis(
+      double scale = 10.0,
+      const std::string& prefix = "basis",
+      const Eigen::Vector3d pos = Eigen::Vector3d::Zero(),
+      const Eigen::Vector3d euler = Eigen::Vector3d::Zero());
 
   /// This is a high-level command that creates/updates all the shapes in a
   /// world by calling the lower-level commands

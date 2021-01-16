@@ -38,8 +38,10 @@
 #include <iostream>
 #endif
 
+#include "dart/collision/Contact.hpp"
 #include "dart/common/Console.hpp"
 #include "dart/constraint/ConstraintBase.hpp"
+#include "dart/constraint/ContactConstraint.hpp"
 #include "dart/constraint/DantzigBoxedLcpSolver.hpp"
 #include "dart/constraint/LCPUtils.hpp"
 #include "dart/constraint/PgsBoxedLcpSolver.hpp"
@@ -481,6 +483,17 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(
   for (std::size_t i = 0; i < numConstraints; ++i)
   {
     const ConstraintBasePtr& constraint = group.getConstraint(i);
+    if (constraint->isContactConstraint())
+    {
+      std::shared_ptr<ContactConstraint> contactConstraint
+          = std::static_pointer_cast<ContactConstraint>(constraint);
+      // getContact() returns a const, which is generally what we want, but in
+      // this specific case it's good to be able to write the LCP result back to
+      // the contact object for visualization later.
+      const_cast<collision::Contact*>(&contactConstraint->getContact())
+          ->lcpResult
+          = mX(mOffset[i]);
+    }
     constraint->applyImpulse(mX.data() + mOffset[i]);
     constraint->excite();
   }

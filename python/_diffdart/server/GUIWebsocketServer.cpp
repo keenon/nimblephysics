@@ -209,7 +209,16 @@ void GUIWebsocketServer(py::module& m)
           "renderWorld",
           &dart::server::GUIWebsocketServer::renderWorld,
           ::py::arg("world"),
-          ::py::arg("prefix") = "world")
+          ::py::arg("prefix") = "world",
+          ::py::arg("renderForces") = true,
+          ::py::arg("renderForceMagnitudes") = true)
+      .def(
+          "renderBasis",
+          &dart::server::GUIWebsocketServer::renderBasis,
+          ::py::arg("scale") = 10.0,
+          ::py::arg("prefix") = "basis",
+          ::py::arg("pos") = Eigen::Vector3d::Zero(),
+          ::py::arg("euler") = Eigen::Vector3d::Zero())
       .def(
           "renderSkeleton",
           &dart::server::GUIWebsocketServer::renderSkeleton,
