@@ -34,8 +34,6 @@
 
 #include <memory>
 
-#include <ccd/ccd.h>
-
 #include "dart/collision/CollisionObject.hpp"
 #include "dart/dynamics/BodyNode.hpp"
 #include "dart/dynamics/BoxShape.hpp"
@@ -1630,49 +1628,26 @@ void ccdSupportCapsule(
 
   // apply rotation on direction vector
   Eigen::Vector3d localDir = capsule->transform->linear().transpose() * dir;
-  double horizontalDist
-      = sqrt(localDir(0) * localDir(0) + localDir(1) * localDir(1));
+  localDir.normalize();
+  localDir *= capsule->radius;
 
-  // These can be NaN in the case where horizontalDist == 0
-  double scale = capsule->radius / horizontalDist;
-  Eigen::Vector3d projectedToCylinder = localDir * scale;
-
-  // This means we're in the top sphere or bottom sphere
-  if (std::abs(horizontalDist) < 1e-15
-      || projectedToCylinder(2) > capsule->height / 2
-      || projectedToCylinder(2) < -capsule->height / 2)
+  if (std::abs(localDir(2)) < 1e-10)
   {
-    Eigen::Vector3d sphereCenter = Eigen::Vector3d(
-        0, 0, (localDir(2) > 0 ? 1 : -1) * capsule->height / 2);
-
-    // We'll set up and solve the quadratic equation for when the distance
-    // between the projected ray and the sphereCenter = radius. This will have
-    // two solutions, and we take the larger solution, since that maps to the
-    // distance to the far side of the sphere.
-    //
-    // (t*d(0) - c(0))^2 + (...)
-    // (t*t*d(0)*d(0) - 2*t*d(0)*c(0) + c(0)*c(0)) + (...)
-    //
-    // For a polynomial a*x^2 + b*x + c = 0,
-    //
-    // a = d(0)*d(0) + d(1)*d(1) + d(2)*d(2) = d.dot(d)
-    // b = -2*d(0)*c(0) - 2*d(1)*c(1) - 2*d(2)*c(2) = -2*d.dot(c)
-    // c = c(0)*c(0) + c(1)*c(1) + c(2)*c(2) = c.dot(c)
-    //
-    // Quadratic formula is x = (-b (+/-) sqrt(b*b - 4*a*c))/(2 * a)
-
-    double a = localDir.dot(localDir);
-    double b = -2 * localDir.dot(sphereCenter);
-    double c
-        = sphereCenter.dot(sphereCenter) - (capsule->radius * capsule->radius);
-    double dist = (-b + sqrt(b * b - 4 * a * c)) / (2 * a);
-
-    out = *(capsule->transform) * (localDir * dist);
+    out = *(capsule->transform) * localDir;
   }
-  // This means we're on the cylinder
+  else if (localDir(2) > 0)
+  {
+    out = *(capsule->transform)
+          * (localDir + Eigen::Vector3d(0, 0, capsule->height / 2));
+  }
+  else if (localDir(2) < 0)
+  {
+    out = *(capsule->transform)
+          * (localDir + Eigen::Vector3d(0, 0, -capsule->height / 2));
+  }
   else
   {
-    out = *(capsule->transform) * projectedToCylinder;
+    assert(false && "This should be impossible to read");
   }
 }
 
@@ -2007,6 +1982,12 @@ void createFaceFaceContacts(
   // collisions.
   for (int i = 0; i < pointsAConvex.size(); i++)
   {
+    // Skip the last vertex loop-around if this is just a single edge, since we
+    // don't want to count the same edge twice
+    if (i == pointsAConvex.size() - 1 && pointsAConvex.size() == 2)
+    {
+      continue;
+    }
     Eigen::Vector3d a1World = pointsAConvex[i];
     Eigen::Vector3d a2World
         = pointsAConvex[i == pointsAConvex.size() - 1 ? 0 : i + 1];
@@ -2014,6 +1995,12 @@ void createFaceFaceContacts(
     Eigen::Vector2d a2 = pointInPlane(a2World, origin, basis2dX, basis2dY);
     for (int j = 0; j < pointsBConvex.size(); j++)
     {
+      // Skip the last vertex loop-around if this is just a single edge, since
+      // we don't want to count the same edge twice
+      if (j == pointsBConvex.size() - 1 && pointsBConvex.size() == 2)
+      {
+        continue;
+      }
       Eigen::Vector3d b1World = pointsBConvex[j];
       Eigen::Vector3d b2World
           = pointsBConvex[j == pointsBConvex.size() - 1 ? 0 : j + 1];
@@ -2644,58 +2631,214 @@ int createCapsuleMeshContact(
     Eigen::Vector3d pipeDir = (capsuleB - capsuleA).normalized();
     Eigen::Vector3d edgeDir
         = (meshPointsWitness[1] - meshPointsWitness[0]).normalized();
-    bool parallel = std::abs(1.0 - std::abs(pipeDir.dot(edgeDir))) < 1e-8;
+    bool parallel = std::abs(1.0 - std::abs(pipeDir.dot(edgeDir))) < 1e-5;
 
-    // For now, assume the standard case, edge and capsule are not parallel
-    // Find nearest point on both edges
-    double alpha;
-    double beta;
-    dSegmentsClosestApproach(
-        meshPointsWitness[0],
-        capsuleA,
-        meshPointsWitness[1],
-        capsuleB,
-        &alpha,
-        &beta);
-
-    Eigen::Vector3d edgeClosestPoint
-        = meshPointsWitness[0]
-          + alpha * (meshPointsWitness[1] - meshPointsWitness[0]);
-    Eigen::Vector3d pipeClosestPoint = capsuleA + beta * (capsuleB - capsuleA);
-    Eigen::Vector3d normal = (edgeClosestPoint - pipeClosestPoint).normalized();
-    Eigen::Vector3d contactPoint = edgeClosestPoint;
-
-    Contact contact;
-    contact.point = contactPoint;
-    if (flipObjectOrder)
+    // Special case, if the edge is parallel to the pipe. This generates two
+    // contacts, and has several different edge cases.
+    if (parallel)
     {
-      contact.collisionObject1 = o2;
-      contact.collisionObject2 = o1;
-      contact.normal = normal * -1;
-      contact.type = EDGE_PIPE;
-      contact.edgeAClosestPoint = edgeClosestPoint;
-      contact.edgeADir = (meshPointsWitness[1] - meshPointsWitness[0]);
-      contact.edgeBClosestPoint = pipeClosestPoint;
-      contact.edgeBDir = (capsuleB - capsuleA);
-      contact.radiusB = capsuleRadius;
+      double edgeALinear = edgeDir.dot(meshPointsWitness[0]);
+      double edgeBLinear = edgeDir.dot(meshPointsWitness[1]);
+      double capsuleALinear = edgeDir.dot(capsuleA);
+      double capsuleBLinear = edgeDir.dot(capsuleB);
+
+      double edgeMin = edgeALinear < edgeBLinear ? edgeALinear : edgeBLinear;
+      Eigen::Vector3d edgeMinPoint = edgeALinear < edgeBLinear
+                                         ? meshPointsWitness[0]
+                                         : meshPointsWitness[1];
+      double edgeMax = edgeALinear < edgeBLinear ? edgeBLinear : edgeALinear;
+      Eigen::Vector3d edgeMaxPoint = edgeALinear < edgeBLinear
+                                         ? meshPointsWitness[1]
+                                         : meshPointsWitness[0];
+      double capsuleMin
+          = capsuleALinear < capsuleBLinear ? capsuleALinear : capsuleBLinear;
+      Eigen::Vector3d capsuleMinPoint
+          = capsuleALinear < capsuleBLinear ? capsuleA : capsuleB;
+      double capsuleMax
+          = capsuleALinear < capsuleBLinear ? capsuleBLinear : capsuleALinear;
+      Eigen::Vector3d capsuleMaxPoint
+          = capsuleALinear < capsuleBLinear ? capsuleB : capsuleA;
+
+      Eigen::Vector3d normal = capsuleA - meshPointsWitness[0];
+      normal -= edgeDir * normal.dot(edgeDir);
+      double dist = normal.norm();
+      normal.normalize();
+
+      // This means our min-end contact point is the edgeMin, resulting in a
+      // VERTEX-EDGE collision
+      if (capsuleMin < edgeMin)
+      {
+        Contact contact;
+        contact.point = edgeMinPoint;
+        if (flipObjectOrder)
+        {
+          contact.collisionObject1 = o2;
+          contact.collisionObject2 = o1;
+          contact.normal = normal * -1;
+          contact.type = VERTEX_PIPE;
+          contact.edgeBClosestPoint = edgeMinPoint + normal * capsuleRadius;
+          contact.edgeBDir = (capsuleB - capsuleA);
+          contact.radiusB = capsuleRadius;
+        }
+        else
+        {
+          contact.collisionObject1 = o1;
+          contact.collisionObject2 = o2;
+          contact.normal = normal;
+          contact.type = PIPE_VERTEX;
+          contact.edgeAClosestPoint = edgeMinPoint + normal * capsuleRadius;
+          contact.edgeADir = (capsuleB - capsuleA);
+          contact.radiusA = capsuleRadius;
+        }
+        contact.penetrationDepth = capsuleRadius - dist;
+        result.addContact(contact);
+      }
+      // This means our min-edge contact is the capsuleMin, resulting in a
+      // SPHERE-EDGE collision
+      else
+      {
+        Contact contact;
+        contact.point = capsuleMinPoint - normal * capsuleRadius;
+        if (flipObjectOrder)
+        {
+          contact.collisionObject1 = o2;
+          contact.collisionObject2 = o1;
+          contact.normal = normal * -1;
+          contact.type = EDGE_SPHERE;
+          contact.edgeAClosestPoint = capsuleMinPoint - normal * capsuleRadius;
+          contact.edgeADir = edgeDir;
+          contact.radiusB = capsuleRadius;
+        }
+        else
+        {
+          contact.collisionObject1 = o1;
+          contact.collisionObject2 = o2;
+          contact.normal = normal;
+          contact.type = SPHERE_EDGE;
+          contact.radiusA = capsuleRadius;
+          contact.edgeBClosestPoint = capsuleMinPoint - normal * capsuleRadius;
+          contact.edgeBDir = edgeDir;
+        }
+        contact.penetrationDepth = capsuleRadius - dist;
+        result.addContact(contact);
+      }
+
+      // This means our max-end contact point is the edgeMax, resulting in a
+      // VERTEX-EDGE collision
+      if (capsuleMax > edgeMax)
+      {
+        Contact contact;
+        contact.point = edgeMaxPoint;
+        if (flipObjectOrder)
+        {
+          contact.collisionObject1 = o2;
+          contact.collisionObject2 = o1;
+          contact.normal = normal * -1;
+          contact.type = VERTEX_PIPE;
+          contact.edgeBClosestPoint = edgeMaxPoint + normal * capsuleRadius;
+          contact.edgeBDir = (capsuleB - capsuleA);
+          contact.radiusB = capsuleRadius;
+        }
+        else
+        {
+          contact.collisionObject1 = o1;
+          contact.collisionObject2 = o2;
+          contact.normal = normal;
+          contact.type = PIPE_VERTEX;
+          contact.edgeAClosestPoint = edgeMaxPoint + normal * capsuleRadius;
+          contact.edgeADir = (capsuleB - capsuleA);
+          contact.radiusA = capsuleRadius;
+        }
+        contact.penetrationDepth = capsuleRadius - dist;
+        result.addContact(contact);
+      }
+      // This means our min-edge contact is the capsuleMin, resulting in a
+      // SPHERE-EDGE collision
+      else
+      {
+        Contact contact;
+        contact.point = capsuleMaxPoint - normal * capsuleRadius;
+        if (flipObjectOrder)
+        {
+          contact.collisionObject1 = o2;
+          contact.collisionObject2 = o1;
+          contact.normal = normal * -1;
+          contact.type = EDGE_SPHERE;
+          contact.edgeAClosestPoint = capsuleMaxPoint - normal * capsuleRadius;
+          contact.edgeADir = edgeDir;
+          contact.radiusB = capsuleRadius;
+        }
+        else
+        {
+          contact.collisionObject1 = o1;
+          contact.collisionObject2 = o2;
+          contact.normal = normal;
+          contact.type = SPHERE_EDGE;
+          contact.radiusA = capsuleRadius;
+          contact.edgeBClosestPoint = capsuleMaxPoint - normal * capsuleRadius;
+          contact.edgeBDir = edgeDir;
+        }
+        contact.penetrationDepth = capsuleRadius - dist;
+        result.addContact(contact);
+      }
+
+      return 2;
     }
+    // Standard case, edge and capsule are not parallel
+    // Find nearest point on both edges and generate a single contact
     else
     {
-      contact.collisionObject1 = o1;
-      contact.collisionObject2 = o2;
-      contact.normal = normal;
-      contact.type = PIPE_EDGE;
-      contact.edgeAClosestPoint = pipeClosestPoint;
-      contact.edgeADir = (capsuleB - capsuleA);
-      contact.radiusA = capsuleRadius;
-      contact.edgeBClosestPoint = edgeClosestPoint;
-      contact.edgeBDir = (meshPointsWitness[1] - meshPointsWitness[0]);
-    }
-    contact.penetrationDepth
-        = capsuleRadius - (edgeClosestPoint - pipeClosestPoint).norm();
-    result.addContact(contact);
+      double alpha;
+      double beta;
+      dSegmentsClosestApproach(
+          meshPointsWitness[0],
+          capsuleA,
+          meshPointsWitness[1],
+          capsuleB,
+          &alpha,
+          &beta);
 
-    return 1;
+      Eigen::Vector3d edgeClosestPoint
+          = meshPointsWitness[0]
+            + alpha * (meshPointsWitness[1] - meshPointsWitness[0]);
+      Eigen::Vector3d pipeClosestPoint
+          = capsuleA + beta * (capsuleB - capsuleA);
+      Eigen::Vector3d normal
+          = (edgeClosestPoint - pipeClosestPoint).normalized();
+      Eigen::Vector3d contactPoint = edgeClosestPoint;
+
+      Contact contact;
+      contact.point = contactPoint;
+      if (flipObjectOrder)
+      {
+        contact.collisionObject1 = o2;
+        contact.collisionObject2 = o1;
+        contact.normal = normal;
+        contact.type = EDGE_PIPE;
+        contact.edgeAClosestPoint = edgeClosestPoint;
+        contact.edgeADir = (meshPointsWitness[1] - meshPointsWitness[0]);
+        contact.edgeBClosestPoint = pipeClosestPoint;
+        contact.edgeBDir = (capsuleB - capsuleA);
+        contact.radiusB = capsuleRadius;
+      }
+      else
+      {
+        contact.collisionObject1 = o1;
+        contact.collisionObject2 = o2;
+        contact.normal = normal * -1;
+        contact.type = PIPE_EDGE;
+        contact.edgeAClosestPoint = pipeClosestPoint;
+        contact.edgeADir = (capsuleB - capsuleA);
+        contact.radiusA = capsuleRadius;
+        contact.edgeBClosestPoint = edgeClosestPoint;
+        contact.edgeBDir = (meshPointsWitness[1] - meshPointsWitness[0]);
+      }
+      contact.penetrationDepth
+          = capsuleRadius - (edgeClosestPoint - pipeClosestPoint).norm();
+      result.addContact(contact);
+
+      return 1;
+    }
   }
   // face-pipe collision
   else if (meshPointsWitness.size() > 2)
@@ -2726,14 +2869,14 @@ int createCapsuleMeshContact(
 
     // We want to find the closest points to the mesh plane
     std::vector<Eigen::Vector3d> capsulePointsWitness;
-    capsulePointsWitness.push_back(capsuleA - normal * capsuleRadius);
-    capsulePointsWitness.push_back(capsuleB - normal * capsuleRadius);
 
     // Now we need to process the two shapes to find intersection points
     std::vector<Contact> contacts;
 
     if (flipObjectOrder)
     {
+      capsulePointsWitness.push_back(capsuleA + normal * capsuleRadius);
+      capsulePointsWitness.push_back(capsuleB + normal * capsuleRadius);
       createFaceFaceContacts(
           contacts, o2, o1, dir, pointsWitnessSorted, capsulePointsWitness);
       for (Contact& contact : contacts)
@@ -2778,7 +2921,8 @@ int createCapsuleMeshContact(
     }
     else
     {
-
+      capsulePointsWitness.push_back(capsuleA - normal * capsuleRadius);
+      capsulePointsWitness.push_back(capsuleB - normal * capsuleRadius);
       createFaceFaceContacts(
           contacts, o1, o2, dir, capsulePointsWitness, pointsWitnessSorted);
       for (Contact& contact : contacts)
@@ -3031,6 +3175,14 @@ inline double crossProduct2D(const Eigen::Vector2d& v, const Eigen::Vector2d& w)
   return v(0) * w(1) - v(1) * w(0);
 }
 
+inline void setCcdDefaultSettings(ccd_t& ccd)
+{
+  ccd.mpr_tolerance = 0.0001;
+  ccd.epa_tolerance = 0.0001;
+  ccd.dist_tolerance = 0.001;
+  ccd.max_iterations = 100;
+}
+
 /*
 /// This checks whether a 2D shape contains a point. This assumes that shape was
 /// sorted using sortConvex2DShape().
@@ -3207,7 +3359,7 @@ int collideBoxBoxAsMesh(
   ccd.support2 = ccdSupportBox; // support function for second object
   ccd.center1 = ccdCenterBox;   // center function for first object
   ccd.center2 = ccdCenterBox;   // center function for second object
-  ccd.mpr_tolerance = 0.0001;   // maximal tolerance
+  setCcdDefaultSettings(ccd);   // maximal tolerance
 
   ccdBox box1;
   box1.size = &size0;
@@ -3250,7 +3402,7 @@ int collideMeshBox(
   ccd.support2 = ccdSupportBox;  // support function for second object
   ccd.center1 = ccdCenterMesh;   // center function for first object
   ccd.center2 = ccdCenterBox;    // center function for second object
-  ccd.mpr_tolerance = 0.0001;    // maximal tolerance
+  setCcdDefaultSettings(ccd);    // maximal tolerance
 
   ccdMesh mesh1;
   mesh1.mesh = mesh0;
@@ -3294,7 +3446,7 @@ int collideBoxMesh(
   ccd.support2 = ccdSupportMesh; // support function for second object
   ccd.center1 = ccdCenterBox;    // center function for first object
   ccd.center2 = ccdCenterMesh;   // center function for second object
-  ccd.mpr_tolerance = 0.0001;    // maximal tolerance
+  setCcdDefaultSettings(ccd);    // maximal tolerance
 
   ccdBox box1;
   box1.size = &size0;
@@ -3353,7 +3505,7 @@ int collideMeshSphere(
   ccd.support2 = ccdSupportSphere; // support function for second object
   ccd.center1 = ccdCenterMesh;     // center function for first object
   ccd.center2 = ccdCenterSphere;   // center function for second object
-  ccd.mpr_tolerance = 0.0001;      // maximal tolerance
+  setCcdDefaultSettings(ccd);      // maximal tolerance
 
   ccd_real_t depth;
   ccd_vec3_t dir, pos;
@@ -3396,7 +3548,7 @@ int collideSphereMesh(
   ccd.support2 = ccdSupportMesh;   // support function for second object
   ccd.center1 = ccdCenterSphere;   // center function for first object
   ccd.center2 = ccdCenterMesh;     // center function for second object
-  ccd.mpr_tolerance = 0.0001;      // maximal tolerance
+  setCcdDefaultSettings(ccd);      // maximal tolerance
 
   ccd_real_t depth;
   ccd_vec3_t dir, pos;
@@ -3431,7 +3583,7 @@ int collideMeshMesh(
   ccd.support2 = ccdSupportMesh; // support function for second object
   ccd.center1 = ccdCenterMesh;   // center function for first object
   ccd.center2 = ccdCenterMesh;   // center function for second object
-  ccd.mpr_tolerance = 0.0001;    // maximal tolerance
+  setCcdDefaultSettings(ccd);    // maximal tolerance
 
   ccdMesh mesh1;
   mesh1.mesh = m0;
@@ -3690,7 +3842,7 @@ int collideBoxCapsule(
   ccd.support2 = ccdSupportCapsule; // support function for second object
   ccd.center1 = ccdCenterBox;       // center function for first object
   ccd.center2 = ccdCenterCapsule;   // center function for second object
-  ccd.mpr_tolerance = 0.0001;       // maximal tolerance
+  setCcdDefaultSettings(ccd);       // maximal tolerance
 
   ccdBox box1;
   box1.size = &size0;
@@ -3738,8 +3890,8 @@ int collideBoxCapsule(
         o2,
         result,
         &dir,
-        T0 * Eigen::Vector3d(0, 0, height1 / 2),
-        T0 * Eigen::Vector3d(0, 0, -height1 / 2),
+        T1 * Eigen::Vector3d(0, 0, height1 / 2),
+        T1 * Eigen::Vector3d(0, 0, -height1 / 2),
         radius1,
         meshPoints,
         true);
@@ -3765,7 +3917,7 @@ int collideCapsuleBox(
   ccd.support2 = ccdSupportBox;     // support function for second object
   ccd.center1 = ccdCenterCapsule;   // center function for first object
   ccd.center2 = ccdCenterBox;       // center function for second object
-  ccd.mpr_tolerance = 0.0001;       // maximal tolerance
+  setCcdDefaultSettings(ccd);
 
   ccdCapsule capsule1;
   capsule1.height = height0;
@@ -3837,7 +3989,7 @@ int collideMeshCapsule(
   ccd.support2 = ccdSupportCapsule; // support function for second object
   ccd.center1 = ccdCenterMesh;      // center function for first object
   ccd.center2 = ccdCenterCapsule;   // center function for second object
-  ccd.mpr_tolerance = 0.0001;       // maximal tolerance
+  setCcdDefaultSettings(ccd);       // maximal tolerance
 
   ccdMesh mesh1;
   mesh1.mesh = m0;
@@ -3887,8 +4039,8 @@ int collideMeshCapsule(
         o2,
         result,
         &dir,
-        T0 * Eigen::Vector3d(0, 0, height1 / 2),
-        T0 * Eigen::Vector3d(0, 0, -height1 / 2),
+        T1 * Eigen::Vector3d(0, 0, height1 / 2),
+        T1 * Eigen::Vector3d(0, 0, -height1 / 2),
         radius1,
         meshPoints,
         true);
@@ -3915,7 +4067,7 @@ int collideCapsuleMesh(
   ccd.support2 = ccdSupportMesh;    // support function for second object
   ccd.center1 = ccdCenterCapsule;   // center function for first object
   ccd.center2 = ccdCenterMesh;      // center function for second object
-  ccd.mpr_tolerance = 0.0001;       // maximal tolerance
+  setCcdDefaultSettings(ccd);       // maximal tolerance
 
   ccdCapsule capsule1;
   capsule1.height = height0;

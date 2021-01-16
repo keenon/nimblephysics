@@ -279,7 +279,7 @@ void GUIWebsocketServer::serve(int port)
   mAsioThread = new std::thread([&] { mServerEventLoop.run(); });
 
   // Start the networking thread
-  mServerThread = new std::thread([&]() {
+  mServerThread = new std::thread([&, port]() {
     // block signals in this thread and subsequently
     // spawned threads so they're guaranteed to go to the main thread
     sigset_t sigset;
@@ -288,6 +288,9 @@ void GUIWebsocketServer::serve(int port)
     sigaddset(&sigset, SIGTERM);
     pthread_sigmask(SIG_BLOCK, &sigset, nullptr);
 
+    std::cout << "GUIWebsocketServer will start serving a WebSocket server on "
+                 "ws://localhost:"
+              << port << std::endl;
     bool success = mServer->run(port);
     if (!success)
     {
@@ -403,13 +406,14 @@ GUIWebsocketServer& GUIWebsocketServer::renderWorld(
   for (int i = 0; i < result.getNumContacts(); i++)
   {
     const collision::Contact& contact = result.getContact(i);
+    double scale = 10;
     std::vector<Eigen::Vector3d> points;
     points.push_back(contact.point);
-    points.push_back(contact.point + contact.normal);
+    points.push_back(contact.point + (contact.normal * scale));
     createLine(prefix + "__contact_" + std::to_string(i) + "_a", points);
     std::vector<Eigen::Vector3d> pointsB;
     pointsB.push_back(contact.point);
-    pointsB.push_back(contact.point - contact.normal);
+    pointsB.push_back(contact.point - (contact.normal * scale));
     createLine(
         prefix + "__contact_" + std::to_string(i) + "_b",
         pointsB,

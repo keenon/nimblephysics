@@ -75,10 +75,8 @@ enum ContactType
   // Pipe-mesh collisions
   PIPE_VERTEX = 16,
   PIPE_EDGE = 17,
-  PIPE_FACE = 18,
-  VERTEX_PIPE = 19,
-  EDGE_PIPE = 20,
-  FACE_PIPE = 21,
+  VERTEX_PIPE = 18,
+  EDGE_PIPE = 19,
 };
 
 /// Contact information

@@ -37,6 +37,7 @@
 
 #include <Eigen/Dense>
 #include <assimp/scene.h>
+#include <ccd/ccd.h>
 #include <ccd/vec3.h>
 
 #include "dart/collision/CollisionDetector.hpp"
@@ -395,6 +396,10 @@ bool get2DLineIntersection(
     const Eigen::Vector2d& q0,
     const Eigen::Vector2d& q1,
     Eigen::Vector2d& out);
+
+/// This sets the default settings for CCD in a single spot in the DARTCollide
+/// code, so it's easy to tweak settings across all collision pairs.
+inline void setCcdDefaultSettings(ccd_t& ccd);
 
 } // namespace collision
 } // namespace dart
