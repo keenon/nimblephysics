@@ -8,5 +8,5 @@ echo "Build image ID $IMAGE_ID"
 CONTAINER_ID=$(docker create $IMAGE_ID)
 echo "Started container ID $CONTAINER_ID"
 mkdir -p ../../../wheelhouse
-docker cp $CONTAINER_ID:/wheelhouse/diffdart-${VERSION}-cp38-cp38-manylinux2010_x86_64.whl ../../../wheelhouse
+docker cp $CONTAINER_ID:/wheelhouse/diffdart-${VERSION}-cp38-cp38-manylinux2014_x86_64.whl ../../../wheelhouse
 docker rm -v $CONTAINER_ID

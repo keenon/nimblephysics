@@ -30,4 +30,4 @@ RUN cd diffdart && \
     cat setup.py && \
     ${PYTHON} setup.py sdist bdist_wheel && \
     ${PYTHON} -m auditwheel repair dist/diffdart-${VERSION}-${PYTHON_VERSION}-linux_x86_64.whl
-RUN mv /diffdart/wheelhouse/diffdart-${VERSION}-${PYTHON_VERSION}-manylinux2010_x86_64.whl /wheelhouse
+RUN mv /diffdart/wheelhouse/diffdart-${VERSION}-${PYTHON_VERSION}-manylinux2014_x86_64.whl /wheelhouse

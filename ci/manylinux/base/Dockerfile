@@ -1,19 +1,29 @@
-FROM quay.io/pypa/manylinux2010_x86_64
+FROM quay.io/pypa/manylinux2014_x86_64
 MAINTAINER keenonwerling@gmail.com
 # TAG keenon/diffdart:base
 
 ENV PKG_CONFIG_PATH="${PKG_CONFIG_PATH}:/usr/local/lib64/pkgconfig/"
 
-# Install CMake3
-RUN yum install -y cmake3 && \
-    rm /usr/bin/cmake && \
-    ln -s /usr/bin/cmake3 /usr/bin/cmake
+# Upgrade to the latest CMake version
+
+RUN yum install -y wget
+
+RUN yum install -y openssl-devel
+
+RUN wget https://github.com/Kitware/CMake/releases/download/v3.19.0/cmake-3.19.0.tar.gz
+RUN tar -xvzf cmake-3.19.0.tar.gz
+RUN pushd cmake-3.19.0 && \
+    ./bootstrap && \
+    make && \
+    make install
+RUN rm -rf cmake-3.19.0
+RUN rm cmake-3.19.0.tar.gz
 
 # Install Boost
-RUN yum install epel-release && \
-    rpm -ivh http://repo.okay.com.mx/centos/6/x86_64/release/okay-release-1-3.el6.noarch.rpm? && \
-    yum install -y boost-devel-1.55.0-25.el6.x86_64
-
+# RUN yum install epel-release && \
+#     rpm -ivh http://repo.okay.com.mx/centos/7/x86_64/release/okay-release-1-3.el6.noarch.rpm? && \
+#     yum install -y boost-devel-1.55.0-25.el6.x86_64
+RUN yum install -y boost-devel-1.53.0-28.el7.x86_64
 
 # Install Eigen
 RUN curl https://gitlab.com/libeigen/eigen/-/archive/3.3.7/eigen-3.3.7.tar.gz > eigen.tar.gz && \
@@ -32,7 +42,7 @@ RUN git clone https://github.com/danfis/libccd.git && \
     pushd libccd && \
     mkdir build && \
     pushd build && \
-    cmake .. && \
+    cmake .. -DENABLE_DOUBLE_PRECISION=ON && \
     make install -j14 && \
     popd && \
     popd && \
@@ -201,8 +211,6 @@ RUN git clone https://github.com/PlatformLab/PerfUtils.git && \
 
 ENV PROTOBUF_VERSION="3.14.0"
 
-RUN yum install -y wget
-
 RUN wget https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOBUF_VERSION}/protobuf-all-${PROTOBUF_VERSION}.tar.gz && \
     tar -xvzf protobuf-all-${PROTOBUF_VERSION}.tar.gz && \
     rm protobuf-all-${PROTOBUF_VERSION}.tar.gz && \
@@ -213,19 +221,6 @@ RUN wget https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOB
     make install && \ 
     popd && \
     rm -rf protobuf-${PROTOBUF_VERSION}
-
-# Upgrade to the latest CMake version
-
-RUN yum install -y openssl-devel
-
-RUN wget https://github.com/Kitware/CMake/releases/download/v3.19.0/cmake-3.19.0.tar.gz
-RUN tar -xvzf cmake-3.19.0.tar.gz
-RUN pushd cmake-3.19.0 && \
-    ./bootstrap && \
-    make && \
-    make install
-RUN rm -rf cmake-3.19.0
-RUN rm cmake-3.19.0.tar.gz
 
 RUN git clone --recurse-submodules -b v1.33.2 https://github.com/grpc/grpc
 RUN pushd grpc && \
