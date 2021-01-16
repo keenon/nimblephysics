@@ -38,6 +38,7 @@
 #include "dart/collision/dart/DARTCollisionGroup.hpp"
 #include "dart/collision/dart/DARTCollisionObject.hpp"
 #include "dart/dynamics/BoxShape.hpp"
+#include "dart/dynamics/CapsuleShape.hpp"
 #include "dart/dynamics/EllipsoidShape.hpp"
 #include "dart/dynamics/MeshShape.hpp"
 #include "dart/dynamics/ShapeFrame.hpp"
@@ -287,6 +288,9 @@ void warnUnsupportedShapeType(const dynamics::ShapeFrame* shapeFrame)
   if (shapeType == dynamics::MeshShape::getStaticType())
     return;
 
+  if (shapeType == dynamics::CapsuleShape::getStaticType())
+    return;
+
   if (shapeType == dynamics::EllipsoidShape::getStaticType())
   {
     const auto& ellipsoid
@@ -300,7 +304,7 @@ void warnUnsupportedShapeType(const dynamics::ShapeFrame* shapeFrame)
         << shapeType << "] that is not supported "
         << "by DARTCollisionDetector. Currently, only BoxShape and "
         << "EllipsoidShape (only when all the radii are equal) and SphereShape "
-           "and MeshShape are "
+           "and MeshShape and CapsuleShape are "
         << "supported. This shape will always get penetrated by other "
         << "objects.\n";
 }

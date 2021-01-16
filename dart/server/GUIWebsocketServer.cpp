@@ -560,6 +560,32 @@ GUIWebsocketServer& GUIWebsocketServer::renderSkeleton(
                 visual->getCastShadows(),
                 visual->getReceiveShadows());
           }
+          else if (
+              shape->getType() == "EllipsoidShape"
+              && dynamic_cast<dynamics::EllipsoidShape*>(shape)->isSphere())
+          {
+            dynamics::EllipsoidShape* sphereShape
+                = dynamic_cast<dynamics::EllipsoidShape*>(shape);
+            createSphere(
+                shapeName,
+                sphereShape->getRadii()[0],
+                shapeNode->getWorldTransform().translation(),
+                visual->getColor(),
+                visual->getCastShadows(),
+                visual->getReceiveShadows());
+          }
+          else
+          {
+            dterr
+                << "[GUIWebsocketServer.renderSkeleton()] Attempting to render "
+                   "a shape type ["
+                << shape->getType() << "] that is not supported "
+                << "by the web GUI. Currently, only BoxShape and "
+                << "EllipsoidShape (only when all the radii are equal) and "
+                   "SphereShape "
+                   "and MeshShape and CapsuleShape are "
+                << "supported. This shape will be invisible in the GUI.\n";
+          }
         }
       }
       else

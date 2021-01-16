@@ -35,6 +35,7 @@
 #include <dart/dynamics/Skeleton.hpp>
 #include <dart/neural/WithRespectToMass.hpp>
 #include <dart/simulation/World.hpp>
+#include <dart/utils/UniversalLoader.hpp>
 #include <pybind11/eigen.h>
 #include <pybind11/pybind11.h>
 
@@ -123,6 +124,19 @@ void World(py::module& m)
             return self->addSkeleton(_skeleton);
           },
           ::py::arg("skeleton"))
+      .def(
+          "loadSkeleton",
+          +[](dart::simulation::World* self,
+              const std::string& path,
+              Eigen::Vector3d basePosition,
+              Eigen::Vector3d baseEulerAnglesXYZ)
+              -> dart::dynamics::SkeletonPtr {
+            return dart::utils::UniversalLoader::loadSkeleton(
+                self, path, basePosition, baseEulerAnglesXYZ);
+          },
+          ::py::arg("path"),
+          ::py::arg("basePosition") = Eigen::Vector3d::Zero(),
+          ::py::arg("baseEulerAnglesXYZ") = Eigen::Vector3d::Zero())
       .def(
           "removeSkeleton",
           +[](dart::simulation::World* self,

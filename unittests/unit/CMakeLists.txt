@@ -71,6 +71,10 @@ if(TARGET dart-utils-urdf)
   target_link_libraries(test_FreeJointGradients dart-utils)
   target_link_libraries(test_FreeJointGradients dart-utils-urdf)
 
+  dart_add_test("unit" test_UniversalLoader)
+  target_link_libraries(test_UniversalLoader dart-utils)
+  target_link_libraries(test_UniversalLoader dart-utils-urdf)
+
   dart_add_library(SharedLibraryWamIkFast SharedLibraryWamIkFast.hpp SharedLibraryWamIkFast.cpp)
   target_link_libraries(SharedLibraryWamIkFast PUBLIC dart)
   target_compile_definitions(SharedLibraryWamIkFast PUBLIC IKFAST_NO_MAIN IKFAST_CLIBRARY)

@@ -5,6 +5,7 @@ import "./style.scss";
 import View from "./components/View";
 import Slider from "./components/Slider";
 import Plot from "./components/Plot";
+import VERSION_NUM from "../../VERSION.txt";
 
 const SCALE_FACTOR = 100;
 
@@ -43,7 +44,10 @@ class DARTView {
 
   dragListeners: ((key: string, pos: number[]) => void)[];
 
-  constructor(container: HTMLElement) {
+  connected: boolean;
+  notConnectedWarning: HTMLElement;
+
+  constructor(container: HTMLElement, startConnected: boolean = false) {
     container.className += " DARTWindow";
     this.container = container;
     this.glContainer = document.createElement("div");
@@ -125,10 +129,32 @@ class DARTView {
     /// Random GUI stuff
 
     const title = document.createElement("div");
-    title.innerHTML = "DiffDART Visualizer - v0.1.0";
+    title.innerHTML = "DiffDART Visualizer - v" + VERSION_NUM;
     title.className = "GUI_title";
     this.uiContainer.appendChild(title);
+    this.setConnected(startConnected);
   }
+
+  /**
+   * This marks the GUI as connected or not, which allows us to clearly display connection status on the GUI.
+   */
+  setConnected = (connected: boolean) => {
+    this.connected = connected;
+
+    if (!this.connected) {
+      if (this.notConnectedWarning == null) {
+        this.notConnectedWarning = document.createElement("div");
+        this.notConnectedWarning.innerHTML = "Connecting to GUI server...";
+        this.notConnectedWarning.className = "GUI_not_connected";
+        this.uiContainer.appendChild(this.notConnectedWarning);
+      }
+    } else {
+      if (this.notConnectedWarning != null) {
+        this.notConnectedWarning.remove();
+        this.notConnectedWarning = null;
+      }
+    }
+  };
 
   /**
    * This adds a listener for dragging events

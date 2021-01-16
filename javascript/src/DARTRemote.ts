@@ -424,7 +424,9 @@ class DARTRemote {
 
     // Connection opened
     this.socket.addEventListener("open", (event) => {
+      console.log("Socket connected!");
       // Clear the view on a reconnect, the socket will broadcast us new data
+      this.view.setConnected(true);
       this.view.clear();
     });
 
@@ -446,6 +448,7 @@ class DARTRemote {
       // do nothing
       console.log("Socket closed. Retrying in 1s");
       this.view.stop();
+      this.view.setConnected(false);
       setTimeout(this.trySocket, 1000);
     });
   };
