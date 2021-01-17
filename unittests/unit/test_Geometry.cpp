@@ -54,6 +54,8 @@ using namespace simulation;
 
 #define LIE_GROUP_OPT_TOL 1e-12
 
+// #define ALL_TESTS
+
 /******************************************************************************/
 Eigen::Matrix4d toMatrixForm(const Eigen::Vector6d& v)
 {
@@ -221,6 +223,7 @@ void testEulerAngles(const Eigen::Vector3d& angle)
 }
 
 /******************************************************************************/
+#ifdef ALL_TESTS
 TEST(LIE_GROUP_OPERATORS, SIMPLE_SCREW_ROTATION_ONLY_GRADIENT_90)
 {
   Eigen::Vector6d screwX = Eigen::Vector6d::Zero();
@@ -243,7 +246,9 @@ TEST(LIE_GROUP_OPERATORS, SIMPLE_SCREW_ROTATION_ONLY_GRADIENT_90)
       = math::gradientWrtTheta(screwX, point, theta);
   EXPECT_TRUE(equals(analyticalGradient, expectedGradient, 1e-6));
 }
+#endif
 
+#ifdef ALL_TESTS
 TEST(LIE_GROUP_OPERATORS, SIMPLE_SCREW_ROTATION_ONLY_NEGATIVE_THETA)
 {
   Eigen::Vector6d screwX = Eigen::Vector6d::Zero();
@@ -266,7 +271,9 @@ TEST(LIE_GROUP_OPERATORS, SIMPLE_SCREW_ROTATION_ONLY_NEGATIVE_THETA)
       = math::gradientWrtTheta(screwX, point, theta);
   EXPECT_TRUE(equals(analyticalGradient, expectedGradient, 1e-6));
 }
+#endif
 
+#ifdef ALL_TESTS
 TEST(LIE_GROUP_OPERATORS, SIMPLE_SCREW_ROTATION_ONLY_GRADIENT_30)
 {
   Eigen::Vector6d screwX = Eigen::Vector6d::Zero();
@@ -290,7 +297,9 @@ TEST(LIE_GROUP_OPERATORS, SIMPLE_SCREW_ROTATION_ONLY_GRADIENT_30)
       = math::gradientWrtTheta(screwX, point, theta);
   EXPECT_TRUE(equals(analyticalGradient, expectedGradient, 1e-6));
 }
+#endif
 
+#ifdef ALL_TESTS
 TEST(LIE_GROUP_OPERATORS, SIMPLE_SCREW_ROTATION_ONLY_3D)
 {
   Eigen::Vector6d screw = Eigen::Vector6d::Zero();
@@ -316,7 +325,9 @@ TEST(LIE_GROUP_OPERATORS, SIMPLE_SCREW_ROTATION_ONLY_3D)
       = math::gradientWrtTheta(screw, point, theta);
   EXPECT_TRUE(equals(analyticalGradient, expectedGradient, 1e-6));
 }
+#endif
 
+#ifdef ALL_TESTS
 TEST(LIE_GROUP_OPERATORS, SIMPLE_SCREW_TRANSLATION_ONLY_GRADIENT)
 {
   Eigen::Vector6d screwX = Eigen::Vector6d::Zero();
@@ -338,7 +349,9 @@ TEST(LIE_GROUP_OPERATORS, SIMPLE_SCREW_TRANSLATION_ONLY_GRADIENT)
       = math::gradientWrtTheta(screwX, point, theta);
   EXPECT_TRUE(equals(analyticalGradient, expectedGradient, 1e-6));
 }
+#endif
 
+#ifdef ALL_TESTS
 TEST(LIE_GROUP_OPERATORS, COMPLEX_SCREW_MIXED_ROTATION_AND_TRANSLATION)
 {
   Eigen::Vector6d screwX = Eigen::Vector6d::Zero();
@@ -363,7 +376,9 @@ TEST(LIE_GROUP_OPERATORS, COMPLEX_SCREW_MIXED_ROTATION_AND_TRANSLATION)
       = math::gradientWrtTheta(screwX, point, theta);
   EXPECT_TRUE(equals(analyticalGradient, expectedGradient, 1e-6));
 }
+#endif
 
+#ifdef ALL_TESTS
 TEST(LIE_GROUP_OPERATORS, RANDOM_SCREWS)
 {
   // Make the experiments repeatable
@@ -418,7 +433,9 @@ TEST(LIE_GROUP_OPERATORS, RANDOM_SCREWS)
     }
   }
 }
+#endif
 
+#ifdef ALL_TESTS
 TEST(LIE_GROUP_OPERATORS, RANDOM_ROTATIONS)
 {
   // Make the experiments repeatable
@@ -458,6 +475,7 @@ TEST(LIE_GROUP_OPERATORS, RANDOM_ROTATIONS)
     }
   }
 }
+#endif
 
 /******************************************************************************/
 bool verifyContactPoint(
@@ -470,15 +488,20 @@ bool verifyContactPoint(
     const Eigen::Vector3d& edgeBDir,
     const Eigen::Vector3d& edgeBDirGradient)
 {
-  const double EPS = 1e-8;
+  const double EPS = 1e-6;
   Eigen::Vector3d original
       = getContactPoint(edgeAPoint, edgeADir, edgeBPoint, edgeBDir);
-  Eigen::Vector3d perturbed = getContactPoint(
+  Eigen::Vector3d perturbedPos = getContactPoint(
       edgeAPoint + edgeAPointGradient * EPS,
       edgeADir + edgeADirGradient * EPS,
       edgeBPoint + edgeBPointGradient * EPS,
       edgeBDir + edgeBDirGradient * EPS);
-  Eigen::Vector3d finiteDiff = (perturbed - original) / EPS;
+  Eigen::Vector3d perturbedNeg = getContactPoint(
+      edgeAPoint - edgeAPointGradient * EPS,
+      edgeADir - edgeADirGradient * EPS,
+      edgeBPoint - edgeBPointGradient * EPS,
+      edgeBDir - edgeBDirGradient * EPS);
+  Eigen::Vector3d finiteDiff = (perturbedPos - perturbedNeg) / (2 * EPS);
   Eigen::Vector3d analytical = getContactPointGradient(
       edgeAPoint,
       edgeAPointGradient,
@@ -488,12 +511,13 @@ bool verifyContactPoint(
       edgeBPointGradient,
       edgeBDir,
       edgeBDirGradient);
-  if (!equals(analytical, finiteDiff, analytical.norm() * 1e-5))
+  if (!equals(analytical, finiteDiff, 1e-8))
   {
     std::cout << "Edge-edge contact point derivatives failed!" << std::endl;
     std::cout << "Analytical Gradient:" << std::endl << analytical << std::endl;
     std::cout << "Finite Difference Gradient:" << std::endl
               << finiteDiff << std::endl;
+    std::cout << "Diff:" << std::endl << (analytical - finiteDiff) << std::endl;
     std::cout << "Original Point:" << std::endl << original << std::endl;
     std::cout << "Edge A Point:" << std::endl << edgeAPoint << std::endl;
     std::cout << "Edge A Point Gradient:" << std::endl
@@ -512,6 +536,7 @@ bool verifyContactPoint(
   return true;
 }
 
+// #ifdef ALL_TESTS
 TEST(COLLISION_GEOM, CONTACT_POINT_GRADIENT)
 {
   Eigen::Vector3d edgeAPoint = Eigen::Vector3d(1, 0, 0);
@@ -625,7 +650,9 @@ TEST(COLLISION_GEOM, CONTACT_POINT_GRADIENT)
 
   EXPECT_TRUE(equals(result, expectedGradient, 1e-8));
 }
+// #endif
 
+// #ifdef ALL_TESTS
 TEST(COLLISION_GEOM, RANDOM_CONTACT_POINTS)
 {
   for (int i = 0; i < 700; i++)
@@ -687,8 +714,10 @@ TEST(COLLISION_GEOM, RANDOM_CONTACT_POINTS)
       return;
   }
 }
+// #endif
 
 /******************************************************************************/
+#ifdef ALL_TESTS
 TEST(LIE_GROUP_OPERATORS, EULER_ANGLES)
 {
   // TODO: Special angles such as (PI, 0, 0)
@@ -701,9 +730,11 @@ TEST(LIE_GROUP_OPERATORS, EULER_ANGLES)
     testEulerAngles(angle);
   }
 }
+#endif
 
 /******************************************************************************/
 #define EPSILON_EXPMAP_THETA 1.0e-3
+#ifdef ALL_TESTS
 TEST(LIE_GROUP_OPERATORS, EXPONENTIAL_MAPPINGS)
 {
   int numTest = 100;
@@ -841,8 +872,10 @@ TEST(LIE_GROUP_OPERATORS, EXPONENTIAL_MAPPINGS)
     EXPECT_TRUE(math::verifyTransform(T));
   }
 }
+#endif
 
 /******************************************************************************/
+#ifdef ALL_TESTS
 TEST(LIE_GROUP_OPERATORS, ADJOINT_MAPPINGS)
 {
   int numTest = 100;
@@ -1077,3 +1110,4 @@ TEST(LIE_GROUP_OPERATORS, ADJOINT_MAPPINGS)
       EXPECT_NEAR(dad_V_F(j), dadV_Matrix_F(j), LIE_GROUP_OPT_TOL);
   }
 }
+#endif

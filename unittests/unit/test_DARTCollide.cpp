@@ -22,7 +22,7 @@ using namespace dart;
 using namespace realtime;
 using namespace collision;
 
-// #define ALL_TESTS
+#define ALL_TESTS
 
 //==============================================================================
 #ifdef ALL_TESTS
@@ -137,135 +137,6 @@ TEST(DARTCollide, BOX_SUPPORT_ROTATED_45_TRANSLATED)
   EXPECT_NEAR(out.v[2], boxTransform.translation()(2), 1e-8);
 }
 #endif
-
-aiScene* createBoxMeshUnsafe()
-{
-  aiScene* scene = (aiScene*)malloc(sizeof(aiScene));
-  scene->mNumMeshes = 1;
-  aiMesh* mesh = (aiMesh*)malloc(sizeof(aiMesh));
-  aiMesh** arr = (aiMesh**)malloc(sizeof(void*) * scene->mNumMeshes);
-  scene->mMeshes = arr;
-  scene->mMeshes[0] = mesh;
-  scene->mMaterials = nullptr;
-
-  mesh->mNormals = nullptr;
-  mesh->mNumUVComponents[0] = 0;
-
-  // Create vertices
-
-  mesh->mNumVertices = 8;
-  mesh->mVertices = (aiVector3D*)malloc(sizeof(aiVector3D) * 10);
-
-  // Bottom face
-
-  mesh->mVertices[0].x = -.5;
-  mesh->mVertices[0].y = -.5;
-  mesh->mVertices[0].z = -.5;
-
-  mesh->mVertices[1].x = .5;
-  mesh->mVertices[1].y = -.5;
-  mesh->mVertices[1].z = -.5;
-
-  mesh->mVertices[2].x = .5;
-  mesh->mVertices[2].y = .5;
-  mesh->mVertices[2].z = -.5;
-
-  mesh->mVertices[3].x = -.5;
-  mesh->mVertices[3].y = .5;
-  mesh->mVertices[3].z = -.5;
-
-  // Top face
-
-  mesh->mVertices[4].x = -.5;
-  mesh->mVertices[4].y = -.5;
-  mesh->mVertices[4].z = .5;
-
-  mesh->mVertices[5].x = .5;
-  mesh->mVertices[5].y = -.5;
-  mesh->mVertices[5].z = .5;
-
-  mesh->mVertices[6].x = .5;
-  mesh->mVertices[6].y = .5;
-  mesh->mVertices[6].z = .5;
-
-  mesh->mVertices[7].x = -.5;
-  mesh->mVertices[7].y = .5;
-  mesh->mVertices[7].z = .5;
-
-  // Create faces
-
-  mesh->mNumFaces = 12;
-  mesh->mFaces = (aiFace*)malloc(sizeof(aiFace) * mesh->mNumFaces);
-  for (int i = 0; i < mesh->mNumFaces; i++)
-  {
-    mesh->mFaces[i].mIndices = (unsigned int*)malloc(sizeof(unsigned int) * 3);
-    mesh->mFaces[i].mNumIndices = 3;
-  }
-
-  // Bottom face
-
-  mesh->mFaces[0].mIndices[0] = 0;
-  mesh->mFaces[0].mIndices[1] = 1;
-  mesh->mFaces[0].mIndices[2] = 2;
-
-  mesh->mFaces[1].mIndices[0] = 0;
-  mesh->mFaces[1].mIndices[1] = 2;
-  mesh->mFaces[1].mIndices[2] = 3;
-
-  // Top face
-
-  mesh->mFaces[2].mIndices[0] = 4;
-  mesh->mFaces[2].mIndices[1] = 5;
-  mesh->mFaces[2].mIndices[2] = 6;
-
-  mesh->mFaces[3].mIndices[0] = 4;
-  mesh->mFaces[3].mIndices[1] = 6;
-  mesh->mFaces[3].mIndices[2] = 7;
-
-  // Left face
-
-  mesh->mFaces[4].mIndices[0] = 0;
-  mesh->mFaces[4].mIndices[1] = 1;
-  mesh->mFaces[4].mIndices[2] = 5;
-
-  mesh->mFaces[5].mIndices[0] = 0;
-  mesh->mFaces[5].mIndices[1] = 4;
-  mesh->mFaces[5].mIndices[2] = 5;
-
-  // Right face
-
-  mesh->mFaces[6].mIndices[0] = 2;
-  mesh->mFaces[6].mIndices[1] = 3;
-  mesh->mFaces[6].mIndices[2] = 6;
-
-  mesh->mFaces[7].mIndices[0] = 3;
-  mesh->mFaces[7].mIndices[1] = 6;
-  mesh->mFaces[7].mIndices[2] = 7;
-
-  // Back face
-
-  mesh->mFaces[8].mIndices[0] = 1;
-  mesh->mFaces[8].mIndices[1] = 2;
-  mesh->mFaces[8].mIndices[2] = 5;
-
-  mesh->mFaces[9].mIndices[0] = 2;
-  mesh->mFaces[9].mIndices[1] = 5;
-  mesh->mFaces[9].mIndices[2] = 6;
-
-  // Front face
-
-  mesh->mFaces[10].mIndices[0] = 0;
-  mesh->mFaces[10].mIndices[1] = 3;
-  mesh->mFaces[10].mIndices[2] = 4;
-
-  mesh->mFaces[11].mIndices[0] = 3;
-  mesh->mFaces[11].mIndices[1] = 4;
-  mesh->mFaces[11].mIndices[2] = 7;
-
-  mesh->mNumFaces = 12;
-
-  return scene;
-}
 
 void verifyBoxMeshResultsIdenticalToAnalytical(ccdBox* box1, ccdBox* box2)
 {
@@ -3970,6 +3841,7 @@ TEST(DARTCollide, CAPSULE_REALTIME)
 // #endif
 */
 
+/*
 // #ifdef ALL_TESTS
 TEST(DARTCollide, ATLAS_5)
 {
@@ -4074,3 +3946,4 @@ TEST(DARTCollide, ATLAS_5)
   }
 }
 // #endif
+*/

@@ -126,7 +126,7 @@ DofContactType DifferentiableContactConstraint::getDofContactType(
       case collision::ContactType::VERTEX_FACE:
         return DofContactType::VERTEX;
       case collision::ContactType::EDGE_EDGE:
-        return DofContactType::EDGE_B;
+        return DofContactType::EDGE_A;
       case collision::ContactType::SPHERE_BOX:
         return DofContactType::SPHERE_TO_BOX;
       case collision::ContactType::BOX_SPHERE:
@@ -147,7 +147,7 @@ DofContactType DifferentiableContactConstraint::getDofContactType(
       case collision::ContactType::VERTEX_FACE:
         return DofContactType::FACE;
       case collision::ContactType::EDGE_EDGE:
-        return DofContactType::EDGE_A;
+        return DofContactType::EDGE_B;
       case collision::ContactType::SPHERE_BOX:
         return DofContactType::BOX_TO_SPHERE;
       case collision::ContactType::BOX_SPHERE:
@@ -460,14 +460,14 @@ Eigen::Vector3d DifferentiableContactConstraint::getContactNormalGradient(
     Eigen::Vector3d edgeADirGradient = math::gradientWrtThetaPureRotation(
         worldTwist.head<3>(), mContact->edgeADir, 0.0);
 
-    return edgeADirGradient.cross(mContact->edgeBDir);
+    return mContact->edgeBDir.cross(edgeADirGradient);
   }
   else if (type == EDGE_B)
   {
     Eigen::Vector3d edgeBDirGradient = math::gradientWrtThetaPureRotation(
         worldTwist.head<3>(), mContact->edgeBDir, 0.0);
 
-    return mContact->edgeADir.cross(edgeBDirGradient);
+    return edgeBDirGradient.cross(mContact->edgeADir);
   }
 
   // Default case
@@ -966,7 +966,7 @@ DifferentiableContactConstraint::bruteForceContactForceDirectionJacobian(
   int dofs = world->getNumDofs();
   math::LinearJacobian jac = math::LinearJacobian(3, dofs);
 
-  const double EPS = 1e-8;
+  const double EPS = 1e-6;
 
   Eigen::VectorXd positions = world->getPositions();
 
@@ -1306,14 +1306,14 @@ Eigen::Vector3d DifferentiableContactConstraint::estimatePerturbedContactNormal(
   {
     rotation.translation().setZero();
     Eigen::Vector3d normal
-        = (rotation * mContact->edgeADir).cross(mContact->edgeBDir);
+        = (mContact->edgeBDir).cross(rotation * mContact->edgeADir);
     return normal;
   }
   else if (type == EDGE_B)
   {
     rotation.translation().setZero();
     Eigen::Vector3d normal
-        = mContact->edgeADir.cross(rotation * mContact->edgeBDir);
+        = (rotation * mContact->edgeBDir).cross(mContact->edgeADir);
     return normal;
   }
 

@@ -22,7 +22,7 @@
 #include "TestHelpers.hpp"
 #include "stdio.h"
 
-#define ALL_TESTS
+// #define ALL_TESTS
 
 using namespace dart;
 using namespace math;
@@ -99,6 +99,7 @@ void testVertexFaceCollision(bool isSelfCollision)
   Eigen::VectorXd vels = Eigen::VectorXd::Zero(world->getNumDofs());
   // Set the vel of the X translation of the 2nd box
   vels(9) = 0.1;
+  world->setVelocities(vels);
 
   // renderWorld(world);
   EXPECT_TRUE(verifyAnalyticalJacobians(world));
@@ -187,8 +188,11 @@ void testEdgeEdgeCollision(bool isSelfCollision)
   Eigen::VectorXd vels = Eigen::VectorXd::Zero(world->getNumDofs());
   vels(9) += 0.1;  // +x
   vels(10) -= 0.1; // -y
+  world->setVelocities(vels);
 
   // renderWorld(world);
+  // EXPECT_TRUE(verifyPerturbedContactEdges(world));
+  // EXPECT_TRUE(verifyPerturbedContactNormals(world));
   EXPECT_TRUE(verifyAnalyticalJacobians(world));
   EXPECT_TRUE(verifyVelGradients(world, vels));
   EXPECT_TRUE(verifyWrtMass(world));
@@ -285,6 +289,7 @@ void testSphereBoxCollision(bool isSelfCollision, int numFaces)
   Eigen::VectorXd vels = Eigen::VectorXd::Zero(world->getNumDofs());
   // Set the vel of the X translation of the 2nd box
   vels(9) = 0.1;
+  world->setVelocities(vels);
 
   // renderWorld(world);
   EXPECT_TRUE(verifyAnalyticalJacobians(world));
@@ -376,6 +381,7 @@ void testSphereSphereCollision(
   Eigen::VectorXd vels = Eigen::VectorXd::Zero(world->getNumDofs());
   // Set the vel of the X translation of the 2nd box
   vels(9) = 0.1;
+  world->setVelocities(vels);
 
   // renderWorld(world);
   EXPECT_TRUE(verifyAnalyticalJacobians(world));
@@ -387,5 +393,127 @@ void testSphereSphereCollision(
 TEST(GRADIENTS, SPHERE_SPHERE_COLLISION)
 {
   testSphereSphereCollision(false, 0.5, 0.7);
+}
+#endif
+
+/**
+ * This sets up a sphere colliding with a mesh box.
+ *
+ *     +---+
+ *     |   |
+ *    O|   |
+ *     +---+
+ */
+void testSphereMeshCollision(bool isSelfCollision, int numFaces)
+{
+  // World
+  WorldPtr world = World::create();
+  auto collision_detector
+      = collision::CollisionDetector::getFactory()->create("dart");
+  world->getConstraintSolver()->setCollisionDetector(collision_detector);
+  world->setGravity(Eigen::Vector3d(0, -9.81, 0));
+
+  // This box is centered at (0,0,0), and extends to [-0.5, 0.5] on every axis
+  SkeletonPtr box = Skeleton::create("face box");
+  std::pair<FreeJoint*, BodyNode*> boxPair
+      = box->createJointAndBodyNodePair<FreeJoint>();
+
+  aiScene* boxMesh = createBoxMeshUnsafe();
+  std::shared_ptr<MeshShape> boxShape(
+      new MeshShape(Eigen::Vector3d(1.0, 1.0, 1.0), boxMesh));
+
+  ShapeNode* boxNode
+      = boxPair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(
+          boxShape);
+
+  SkeletonPtr sphere = Skeleton::create("sphere");
+  std::pair<FreeJoint*, BodyNode*> spherePair;
+
+  if (isSelfCollision)
+  {
+    box->enableSelfCollision(true);
+    spherePair = boxPair.second->createChildJointAndBodyNodePair<FreeJoint>();
+  }
+  else
+  {
+    spherePair = sphere->createJointAndBodyNodePair<FreeJoint>();
+  }
+
+  std::shared_ptr<SphereShape> sphereShape(new SphereShape(0.5));
+  ShapeNode* sphereNode
+      = spherePair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(
+          sphereShape);
+  FreeJoint* sphereJoint = spherePair.first;
+  Eigen::Matrix3d rotation = Eigen::Matrix3d::Identity();
+
+  Eigen::Isometry3d spherePosition = Eigen::Isometry3d::Identity();
+  if (numFaces == 1)
+  {
+    spherePosition.translation() = Eigen::Vector3d(1.0 - 2e-2, 0, 0);
+  }
+  else if (numFaces == 2)
+  {
+    spherePosition.translation() = Eigen::Vector3d(
+        (0.5 / sqrt(2)) + 0.5 - 2e-2, (0.5 / sqrt(2)) + 0.5 - 2e-2, 0);
+  }
+  else if (numFaces == 3)
+  {
+    spherePosition.translation() = Eigen::Vector3d(
+        (0.5 / sqrt(3)) + 0.5 - 2e-2,
+        (0.5 / sqrt(3)) + 0.5 - 2e-2,
+        (0.5 / sqrt(3)) + 0.5 - 2e-2);
+  }
+  else if (numFaces == 4)
+  {
+    spherePosition.translation() = Eigen::Vector3d(0.1, 0.0, 0.0);
+  }
+  sphereJoint->setTransformFromChildBodyNode(spherePosition);
+
+  world->addSkeleton(box);
+  if (!isSelfCollision)
+  {
+    world->addSkeleton(sphere);
+  }
+
+  Eigen::VectorXd vels = Eigen::VectorXd::Zero(world->getNumDofs());
+  // Set the vel of the X translation of the 2nd box
+  vels(9) = 0.1;
+  world->setVelocities(vels);
+
+  // renderWorld(world);
+  EXPECT_TRUE(verifyPerturbedContactPositions(world));
+  /*
+  EXPECT_TRUE(verifyPerturbedContactNormals(world));
+  EXPECT_TRUE(verifyPerturbedContactEdges(world));
+  EXPECT_TRUE(verifyAnalyticalJacobians(world));
+  EXPECT_TRUE(verifyVelGradients(world, vels));
+  EXPECT_TRUE(verifyWrtMass(world));
+  */
+}
+
+TEST(GRADIENTS, SPHERE_MESH_COLLISION_1_FACE)
+{
+  testSphereMeshCollision(false, 1);
+}
+
+#ifdef ALL_TESTS
+TEST(GRADIENTS, SPHERE_MESH_COLLISION_2_FACE)
+{
+  testSphereMeshCollision(false, 2);
+}
+
+TEST(GRADIENTS, SPHERE_MESH_COLLISION_3_FACE)
+{
+  testSphereMeshCollision(false, 3);
+}
+
+TEST(GRADIENTS, SPHERE_MESH_COLLISION_4_FACE)
+{
+  testSphereMeshCollision(false, 4);
+}
+
+TEST(GRADIENTS, SPHERE_MESH_SELF_COLLISION_1_FACE)
+{
+  testSphereMeshCollision(true, 1);
 }
 #endif

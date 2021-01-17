@@ -4187,7 +4187,7 @@ bool verifyPerturbedContactEdges(WorldPtr world)
   BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
   std::vector<std::shared_ptr<DifferentiableContactConstraint>> constraints
       = classicPtr->getClampingConstraints();
-  const double EPS = 1e-7;
+  const double EPS = 1e-5;
   for (int k = 0; k < constraints.size(); k++)
   {
     if (constraints[k]->getContactType() == EDGE_EDGE)
@@ -4210,6 +4210,8 @@ bool verifyPerturbedContactEdges(WorldPtr world)
               = constraints[k]->bruteForceEdges(world, skel, j, -EPS);
           EdgeData analytical
               = constraints[k]->estimatePerturbedEdges(skel, j, EPS);
+          EdgeData analyticalNeg
+              = constraints[k]->estimatePerturbedEdges(skel, j, -EPS);
 
           Eigen::Vector3d bruteIntersection = math::getContactPoint(
               bruteForce.edgeAPos,
@@ -4227,7 +4229,7 @@ bool verifyPerturbedContactEdges(WorldPtr world)
               bruteForce.edgeBPos,
               bruteForce.edgeBDir);
 
-          double estimateThreshold = 1e-8;
+          double estimateThreshold = 1e-10;
 
           // Check the intersection point first, because the actual input
           // points can be different if the collision detector decided to use
@@ -4319,17 +4321,70 @@ bool verifyPerturbedContactEdges(WorldPtr world)
             }
           }
 
-          EdgeData analyticalGradient
-              = constraints[k]->getEdgeGradient(skel->getDof(j));
           EdgeData finiteDifferenceGradient;
           finiteDifferenceGradient.edgeAPos
-              = (bruteForce.edgeAPos - original.edgeAPos) / EPS;
+              = (bruteForce.edgeAPos - bruteForceNeg.edgeAPos) / (2 * EPS);
           finiteDifferenceGradient.edgeADir
-              = (bruteForce.edgeADir - original.edgeADir) / EPS;
+              = (bruteForce.edgeADir - bruteForceNeg.edgeADir) / (2 * EPS);
           finiteDifferenceGradient.edgeBPos
-              = (bruteForce.edgeBPos - original.edgeBPos) / EPS;
+              = (bruteForce.edgeBPos - bruteForceNeg.edgeBPos) / (2 * EPS);
           finiteDifferenceGradient.edgeBDir
-              = (bruteForce.edgeBDir - original.edgeBDir) / EPS;
+              = (bruteForce.edgeBDir - bruteForceNeg.edgeBDir) / (2 * EPS);
+
+          EdgeData finiteDifferenceAnalyticalGradient;
+          finiteDifferenceAnalyticalGradient.edgeAPos
+              = (analytical.edgeAPos - analyticalNeg.edgeAPos) / (2 * EPS);
+
+          EdgeData analyticalGradient
+              = constraints[k]->getEdgeGradient(skel->getDof(j));
+
+          if (!equals(
+                  finiteDifferenceGradient.edgeAPos,
+                  analyticalGradient.edgeAPos,
+                  estimateThreshold))
+          {
+            std::cout << "Edge A Pos analytical: " << std::endl
+                      << analyticalGradient.edgeAPos << std::endl;
+            std::cout << "Edge A Pos brute force: " << std::endl
+                      << finiteDifferenceGradient.edgeAPos << std::endl;
+            std::cout << "Edge A Pos brute force over estimates: " << std::endl
+                      << finiteDifferenceAnalyticalGradient.edgeAPos
+                      << std::endl;
+            return false;
+          }
+          if (!equals(
+                  finiteDifferenceGradient.edgeADir,
+                  analyticalGradient.edgeADir,
+                  estimateThreshold))
+          {
+            std::cout << "Edge A Dir analytical: " << std::endl
+                      << analyticalGradient.edgeADir << std::endl;
+            std::cout << "Edge A Dir brute force: " << std::endl
+                      << bruteForce.edgeADir << std::endl;
+            return false;
+          }
+          if (!equals(
+                  finiteDifferenceGradient.edgeBPos,
+                  analyticalGradient.edgeBPos,
+                  estimateThreshold))
+          {
+            std::cout << "Edge B Pos analytical: " << std::endl
+                      << analyticalGradient.edgeBPos << std::endl;
+            std::cout << "Edge B Pos brute force: " << std::endl
+                      << finiteDifferenceGradient.edgeBPos << std::endl;
+            return false;
+          }
+          if (!equals(
+                  finiteDifferenceGradient.edgeBDir,
+                  analyticalGradient.edgeBDir,
+                  estimateThreshold))
+          {
+            std::cout << "Edge B Dir analytical: " << std::endl
+                      << analyticalGradient.edgeBDir << std::endl;
+            std::cout << "Edge B Dir brute force: " << std::endl
+                      << finiteDifferenceGradient.edgeBDir << std::endl;
+            return false;
+          }
 
           Eigen::Vector3d analyticalIntersectionGradient
               = math::getContactPointGradient(
@@ -4379,65 +4434,6 @@ bool verifyPerturbedContactEdges(WorldPtr world)
               std::cout << "Contact Type:" << std::endl
                         << constraints[k]->getDofContactType(skel->getDof(j))
                         << std::endl;
-              // TODO: dirty hack to save retyping
-              bruteForce = finiteDifferenceGradient;
-              analytical = analyticalGradient;
-              if (equals(
-                      bruteForce.edgeAPos,
-                      analytical.edgeAPos,
-                      estimateThreshold))
-              {
-                std::cout << "Edge A Pos correct!" << std::endl;
-              }
-              else
-              {
-                std::cout << "Edge A Pos analytical: " << std::endl
-                          << analytical.edgeAPos << std::endl;
-                std::cout << "Edge A Pos brute force: " << std::endl
-                          << bruteForce.edgeAPos << std::endl;
-              }
-              if (equals(
-                      bruteForce.edgeADir,
-                      analytical.edgeADir,
-                      estimateThreshold))
-              {
-                std::cout << "Edge A Dir correct!" << std::endl;
-              }
-              else
-              {
-                std::cout << "Edge A Dir analytical: " << std::endl
-                          << analytical.edgeADir << std::endl;
-                std::cout << "Edge A Dir brute force: " << std::endl
-                          << bruteForce.edgeADir << std::endl;
-              }
-              if (equals(
-                      bruteForce.edgeBPos,
-                      analytical.edgeBPos,
-                      estimateThreshold))
-              {
-                std::cout << "Edge B Pos correct!" << std::endl;
-              }
-              else
-              {
-                std::cout << "Edge B Pos analytical: " << std::endl
-                          << analytical.edgeBPos << std::endl;
-                std::cout << "Edge B Pos brute force: " << std::endl
-                          << bruteForce.edgeBPos << std::endl;
-              }
-              if (equals(
-                      bruteForce.edgeBDir,
-                      analytical.edgeBDir,
-                      estimateThreshold))
-              {
-                std::cout << "Edge B Dir correct!" << std::endl;
-              }
-              else
-              {
-                std::cout << "Edge B Dir analytical: " << std::endl
-                          << analytical.edgeBDir << std::endl;
-                std::cout << "Edge B Dir brute force: " << std::endl
-                          << bruteForce.edgeBDir << std::endl;
-              }
               return false;
             }
           }
@@ -4448,11 +4444,17 @@ bool verifyPerturbedContactEdges(WorldPtr world)
   return true;
 }
 
-bool verifyPerturbedContactPositions(WorldPtr world)
+bool verifyPerturbedContactPositions(
+    WorldPtr world, bool expectNoContacts = false)
 {
   BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
   std::vector<std::shared_ptr<DifferentiableContactConstraint>> constraints
       = classicPtr->getClampingConstraints();
+  if ((constraints.size() == 0) != expectNoContacts)
+  {
+    return false;
+  }
+
   const double EPS = 1e-7;
   for (int i = 0; i < world->getNumSkeletons(); i++)
   {
@@ -4533,7 +4535,7 @@ bool verifyPerturbedContactPositions(WorldPtr world)
             = (analytical - analyticalNeg) / (2 * EPS);
         Eigen::Vector3d analyticalGradient
             = constraints[k]->getContactPositionGradient(skel->getDof(j));
-        if (!equals(analyticalGradient, finiteDifferenceGradient, 1e-8))
+        if (!equals(analyticalGradient, finiteDifferenceGradient, 1e-9))
         {
           std::cout << "Failed contact pos gradient!" << std::endl;
           std::cout << "Skel:" << std::endl
@@ -4566,7 +4568,7 @@ bool verifyPerturbedContactNormals(WorldPtr world)
   BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
   std::vector<std::shared_ptr<DifferentiableContactConstraint>> constraints
       = classicPtr->getClampingConstraints();
-  const double EPS = 1e-7;
+  const double EPS = 1e-6;
   for (int i = 0; i < world->getNumSkeletons(); i++)
   {
     auto skel = world->getSkeleton(i);
@@ -4614,7 +4616,7 @@ bool verifyPerturbedContactNormals(WorldPtr world)
             = (analytical - bruteForceNeg) / (2 * EPS);
         Eigen::Vector3d analyticalGradient
             = constraints[k]->getContactNormalGradient(skel->getDof(j));
-        if (!equals(analyticalGradient, finiteDifferenceGradient, 1e-8))
+        if (!equals(analyticalGradient, finiteDifferenceGradient, 1e-9))
         {
           std::cout << "Failed contact normal gradient!" << std::endl;
           std::cout << "Skel:" << std::endl << skel->getName() << std::endl;
@@ -4640,7 +4642,7 @@ bool verifyPerturbedContactForceDirections(WorldPtr world)
   BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
   std::vector<std::shared_ptr<DifferentiableContactConstraint>> constraints
       = classicPtr->getClampingConstraints();
-  const double EPS = 1e-7;
+  const double EPS = 1e-6;
   for (int i = 0; i < world->getNumSkeletons(); i++)
   {
     auto skel = world->getSkeleton(i);
@@ -4697,7 +4699,7 @@ bool verifyPerturbedContactForceDirections(WorldPtr world)
             = (bruteForce - bruteForceNeg) / (2 * EPS);
         Eigen::Vector3d analyticalGradient
             = constraints[k]->getContactForceGradient(skel->getDof(j));
-        if (!equals(analyticalGradient, finiteDifferenceGradient, 1e-8))
+        if (!equals(analyticalGradient, finiteDifferenceGradient, 1e-9))
         {
           analyticalGradient
               = constraints[k]->getContactForceGradient(skel->getDof(j));
@@ -5333,10 +5335,10 @@ bool testScrews(WorldPtr world)
   return true;
 }
 
-bool verifyAnalyticalJacobians(WorldPtr world)
+bool verifyAnalyticalJacobians(WorldPtr world, bool expectNoContacts = false)
 {
   return testScrews(world) && verifyPerturbedContactEdges(world)
-         && verifyPerturbedContactPositions(world)
+         && verifyPerturbedContactPositions(world, expectNoContacts)
          && verifyPerturbedContactNormals(world)
          && verifyPerturbedContactForceDirections(world)
          && verifyPerturbedScrewAxisForPosition(world)

@@ -42,6 +42,7 @@
 #include "dart/dynamics/EllipsoidShape.hpp"
 #include "dart/dynamics/MeshShape.hpp"
 #include "dart/dynamics/SphereShape.hpp"
+#include "dart/math/Geometry.hpp"
 #include "dart/math/Helpers.hpp"
 
 namespace dart {
@@ -216,6 +217,10 @@ void cullPoints(int n, double p[], int m, int i0, int iret[])
   }
 }
 
+/// pa: a point on line A
+/// ua: a unit vector in the direction of line A
+/// pb: a point on line B
+/// ub: a unit vector in the direction of B
 void dLineClosestApproach(
     const dVector3 pa,
     const dVector3 ua,
@@ -2189,12 +2194,12 @@ int createMeshMeshContacts(
       contact.collisionObject2 = o2;
       contact.point = point;
       contact.type = ContactType::EDGE_EDGE;
-      contact.edgeAClosestPoint = Eigen::Vector3d(pa[0], pa[1], pa[2]);
-      contact.edgeAFixedPoint = pa;
-      contact.edgeADir = Eigen::Vector3d(ua[0], ua[1], ua[2]);
-      contact.edgeBClosestPoint = Eigen::Vector3d(pb[0], pb[1], pb[2]);
-      contact.edgeBFixedPoint = pb;
-      contact.edgeBDir = Eigen::Vector3d(ub[0], ub[1], ub[2]);
+      contact.edgeAClosestPoint = pa;
+      contact.edgeAFixedPoint = pointsAWitness[0];
+      contact.edgeADir = ua;
+      contact.edgeBClosestPoint = pb;
+      contact.edgeBFixedPoint = pointsBWitness[0];
+      contact.edgeBDir = ub;
       contact.normal = normal;
 
       double distA = contact.edgeAClosestPoint.dot(normal);
