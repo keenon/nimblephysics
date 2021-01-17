@@ -78,6 +78,7 @@ DARTCollisionDetector::Registrar<DARTCollisionDetector>
 //==============================================================================
 std::shared_ptr<DARTCollisionDetector> DARTCollisionDetector::create()
 {
+  clearCcdCache();
   return std::shared_ptr<DARTCollisionDetector>(new DARTCollisionDetector());
 }
 

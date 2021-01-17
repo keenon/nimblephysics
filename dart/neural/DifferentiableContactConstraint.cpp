@@ -133,6 +133,18 @@ DofContactType DifferentiableContactConstraint::getDofContactType(
         return DofContactType::BOX_TO_SPHERE;
       case collision::ContactType::SPHERE_SPHERE:
         return DofContactType::SPHERE_A;
+      case collision::ContactType::SPHERE_FACE:
+        return DofContactType::SPHERE_TO_FACE;
+      case collision::ContactType::FACE_SPHERE:
+        return DofContactType::FACE_TO_SPHERE;
+      case collision::ContactType::SPHERE_EDGE:
+        return DofContactType::SPHERE_TO_EDGE;
+      case collision::ContactType::EDGE_SPHERE:
+        return DofContactType::EDGE_TO_SPHERE;
+      case collision::ContactType::SPHERE_VERTEX:
+        return DofContactType::SPHERE_TO_VERTEX;
+      case collision::ContactType::VERTEX_SPHERE:
+        return DofContactType::VERTEX_TO_SPHERE;
       default:
         return DofContactType::UNSUPPORTED;
     }
@@ -154,6 +166,18 @@ DofContactType DifferentiableContactConstraint::getDofContactType(
         return DofContactType::SPHERE_TO_BOX;
       case collision::ContactType::SPHERE_SPHERE:
         return DofContactType::SPHERE_B;
+      case collision::ContactType::SPHERE_FACE:
+        return DofContactType::FACE_TO_SPHERE;
+      case collision::ContactType::FACE_SPHERE:
+        return DofContactType::SPHERE_TO_FACE;
+      case collision::ContactType::SPHERE_EDGE:
+        return DofContactType::EDGE_TO_SPHERE;
+      case collision::ContactType::EDGE_SPHERE:
+        return DofContactType::SPHERE_TO_EDGE;
+      case collision::ContactType::SPHERE_VERTEX:
+        return DofContactType::VERTEX_TO_SPHERE;
+      case collision::ContactType::VERTEX_SPHERE:
+        return DofContactType::SPHERE_TO_VERTEX;
       default:
         return DofContactType::UNSUPPORTED;
     }
@@ -249,7 +273,7 @@ Eigen::Vector3d DifferentiableContactConstraint::getContactPositionGradient(
   Eigen::Vector3d contactPos = getContactWorldPosition();
   DofContactType type = getDofContactType(dof);
 
-  if (type == FACE)
+  if (type == FACE || type == SPHERE_TO_VERTEX)
   {
     return Eigen::Vector3d::Zero();
   }
@@ -321,7 +345,7 @@ Eigen::Vector3d DifferentiableContactConstraint::getContactPositionGradient(
         = math::gradientWrtTheta(worldTwist, contactPos, 0.0);
     return contactPosGrad + negSphereGrad;
   }
-  else if (type == VERTEX || type == SELF_COLLISION)
+  else if (type == VERTEX || type == SELF_COLLISION || type == VERTEX_TO_SPHERE)
   {
     return math::gradientWrtTheta(worldTwist, contactPos, 0.0);
   }
@@ -359,6 +383,44 @@ Eigen::Vector3d DifferentiableContactConstraint::getContactPositionGradient(
         mContact->edgeBDir,
         edgeBDirGradient);
   }
+  else if (type == SPHERE_TO_FACE)
+  {
+    return math::gradientWrtTheta(worldTwist, mContact->sphereCenter, 0.0);
+  }
+  else if (type == FACE_TO_SPHERE)
+  {
+    if (getContactType() == collision::ContactType::SPHERE_FACE)
+    {
+      return -math::gradientWrtThetaPureRotation(
+          worldTwist.head<3>(), mContact->normal * mContact->sphereRadius, 0.0);
+    }
+    else
+    {
+      return math::gradientWrtThetaPureRotation(
+          worldTwist.head<3>(), mContact->normal * mContact->sphereRadius, 0.0);
+    }
+  }
+  else if (type == SPHERE_TO_EDGE)
+  {
+    return math::closestPointOnLineGradient(
+        mContact->edgeAFixedPoint,
+        Eigen::Vector3d::Zero(),
+        mContact->edgeADir,
+        Eigen::Vector3d::Zero(),
+        mContact->sphereCenter,
+        math::gradientWrtTheta(worldTwist, mContact->sphereCenter, 0.0));
+  }
+  else if (type == EDGE_TO_SPHERE)
+  {
+    return math::closestPointOnLineGradient(
+        mContact->edgeAFixedPoint,
+        math::gradientWrtTheta(worldTwist, mContact->edgeAFixedPoint, 0.0),
+        mContact->edgeADir,
+        math::gradientWrtThetaPureRotation(
+            worldTwist.head<3>(), mContact->edgeADir, 0.0),
+        mContact->sphereCenter,
+        Eigen::Vector3d::Zero());
+  }
 
   // Default case
   return Eigen::Vector3d::Zero();
@@ -372,7 +434,7 @@ Eigen::Vector3d DifferentiableContactConstraint::getContactNormalGradient(
 {
   Eigen::Vector3d normal = getContactWorldNormal();
   DofContactType type = getDofContactType(dof);
-  if (type == VERTEX)
+  if (type == VERTEX || type == SPHERE_TO_FACE)
   {
     return Eigen::Vector3d::Zero();
   }
@@ -451,7 +513,7 @@ Eigen::Vector3d DifferentiableContactConstraint::getContactNormalGradient(
     totalGrad -= totalGrad.dot(normal) * normal;
     return totalGrad;
   }
-  else if (type == FACE || type == SELF_COLLISION)
+  else if (type == FACE || type == SELF_COLLISION || type == FACE_TO_SPHERE)
   {
     return math::gradientWrtThetaPureRotation(worldTwist.head<3>(), normal, 0);
   }
@@ -468,6 +530,92 @@ Eigen::Vector3d DifferentiableContactConstraint::getContactNormalGradient(
         worldTwist.head<3>(), mContact->edgeBDir, 0.0);
 
     return edgeBDirGradient.cross(mContact->edgeADir);
+  }
+  if (type == SPHERE_TO_VERTEX)
+  {
+    double norm = (mContact->sphereCenter - mContact->vertexPoint).norm();
+    Eigen::Vector3d posGrad
+        = math::gradientWrtTheta(worldTwist, mContact->sphereCenter, 0.0);
+    posGrad /= norm;
+    posGrad -= mContact->normal.dot(posGrad) * mContact->normal;
+    if (getContactType() == collision::ContactType::SPHERE_VERTEX)
+    {
+      return posGrad;
+    }
+    else
+    {
+      return -posGrad;
+    }
+  }
+  else if (type == VERTEX_TO_SPHERE)
+  {
+    double norm = (mContact->vertexPoint - mContact->sphereCenter).norm();
+    Eigen::Vector3d posGrad
+        = math::gradientWrtTheta(worldTwist, mContact->vertexPoint, 0.0);
+    posGrad /= norm;
+    posGrad -= mContact->normal.dot(posGrad) * mContact->normal;
+    if (getContactType() == collision::ContactType::VERTEX_SPHERE)
+    {
+      return posGrad;
+    }
+    else
+    {
+      return -posGrad;
+    }
+  }
+  else if (type == SPHERE_TO_EDGE)
+  {
+    Eigen::Vector3d closestPointGrad = math::closestPointOnLineGradient(
+        mContact->edgeAFixedPoint,
+        Eigen::Vector3d::Zero(),
+        mContact->edgeADir,
+        Eigen::Vector3d::Zero(),
+        mContact->sphereCenter,
+        math::gradientWrtTheta(worldTwist, mContact->sphereCenter, 0.0));
+    Eigen::Vector3d sphereCenterGrad
+        = math::gradientWrtTheta(worldTwist, mContact->sphereCenter, 0.0);
+
+    Eigen::Vector3d closestPoint = math::closestPointOnLine(
+        mContact->edgeAFixedPoint, mContact->edgeADir, mContact->sphereCenter);
+
+    double norm = (mContact->edgeAClosestPoint - mContact->sphereCenter).norm();
+    Eigen::Vector3d normGrad = closestPointGrad - sphereCenterGrad;
+    normGrad /= norm;
+    normGrad -= mContact->normal.dot(normGrad) * mContact->normal;
+
+    if (getContactType() == collision::ContactType::SPHERE_EDGE)
+    {
+      return -normGrad;
+    }
+    else
+    {
+      return normGrad;
+    }
+  }
+  else if (type == EDGE_TO_SPHERE)
+  {
+    Eigen::Vector3d closestPointGrad = math::closestPointOnLineGradient(
+        mContact->edgeAFixedPoint,
+        math::gradientWrtTheta(worldTwist, mContact->edgeAFixedPoint, 0.0),
+        mContact->edgeADir,
+        math::gradientWrtThetaPureRotation(
+            worldTwist.head<3>(), mContact->edgeADir, 0.0),
+        mContact->sphereCenter,
+        Eigen::Vector3d::Zero());
+
+    double norm = (mContact->edgeAClosestPoint - mContact->sphereCenter).norm();
+    Eigen::Vector3d normGrad = closestPointGrad;
+    normGrad /= norm;
+    normGrad -= mContact->normal.dot(normGrad) * mContact->normal;
+
+    if (getContactType() == collision::ContactType::EDGE_SPHERE)
+    {
+      return normGrad;
+    }
+    else
+    {
+      return -normGrad;
+    }
   }
 
   // Default case
@@ -1170,14 +1318,14 @@ DifferentiableContactConstraint::estimatePerturbedContactPosition(
     Eigen::Vector3d inverseSphereMovement = contactPos + diff;
     return rotation * inverseSphereMovement;
   }
-  else if (type == VERTEX || type == SELF_COLLISION)
+  else if (type == VERTEX || type == SELF_COLLISION || type == VERTEX_TO_SPHERE)
   {
     Eigen::Vector6d worldTwist = getWorldScrewAxisForPosition(skel, dofIndex);
     Eigen::Isometry3d rotation = math::expMap(worldTwist * eps);
     Eigen::Vector3d perturbedContactPos = rotation * contactPos;
     return perturbedContactPos;
   }
-  else if (type == FACE)
+  else if (type == FACE || type == SPHERE_TO_VERTEX)
   {
     return contactPos;
   }
@@ -1207,6 +1355,50 @@ DifferentiableContactConstraint::estimatePerturbedContactPosition(
         rotation * mContact->edgeBDir);
     return contactPoint;
   }
+  else if (type == SPHERE_TO_FACE)
+  {
+    Eigen::Vector6d worldTwist = getWorldScrewAxisForPosition(skel, dofIndex);
+    Eigen::Isometry3d translation = math::expMap(worldTwist * eps);
+    Eigen::Vector3d diff
+        = (translation * mContact->sphereCenter) - mContact->sphereCenter;
+    return mContact->point + diff;
+  }
+  else if (type == FACE_TO_SPHERE)
+  {
+    Eigen::Vector6d worldTwist = getWorldScrewAxisForPosition(skel, dofIndex);
+    Eigen::Isometry3d rotation = math::expMap(worldTwist * eps);
+    rotation.translation().setZero();
+    Eigen::Vector3d diff = ((rotation * mContact->normal) - mContact->normal)
+                           * mContact->sphereRadius;
+    if (getContactType() == collision::ContactType::SPHERE_FACE)
+    {
+      return mContact->point - diff;
+    }
+    else
+    {
+      return mContact->point + diff;
+    }
+  }
+  else if (type == SPHERE_TO_EDGE)
+  {
+    Eigen::Vector6d worldTwist = getWorldScrewAxisForPosition(skel, dofIndex);
+    Eigen::Isometry3d translation = math::expMap(worldTwist * eps);
+    return math::closestPointOnLine(
+        mContact->edgeAFixedPoint,
+        mContact->edgeADir,
+        translation * mContact->sphereCenter);
+  }
+  else if (type == EDGE_TO_SPHERE)
+  {
+    Eigen::Vector6d worldTwist = getWorldScrewAxisForPosition(skel, dofIndex);
+    Eigen::Isometry3d translation = math::expMap(worldTwist * eps);
+    Eigen::Isometry3d rotation = math::expMap(worldTwist * eps);
+    rotation.translation().setZero();
+    return math::closestPointOnLine(
+        translation * mContact->edgeAFixedPoint,
+        rotation * mContact->edgeADir,
+        mContact->sphereCenter);
+  }
 
   // Default case
   return contactPos;
@@ -1218,7 +1410,7 @@ Eigen::Vector3d DifferentiableContactConstraint::estimatePerturbedContactNormal(
 {
   Eigen::Vector3d normal = getContactWorldNormal();
   DofContactType type = getDofContactType(skel->getDof(dofIndex));
-  if (type == VERTEX)
+  if (type == VERTEX || type == SPHERE_TO_FACE)
   {
     return normal;
   }
@@ -1296,7 +1488,7 @@ Eigen::Vector3d DifferentiableContactConstraint::estimatePerturbedContactNormal(
     }
     return perturbedNormal.normalized();
   }
-  else if (type == FACE || type == SELF_COLLISION)
+  else if (type == FACE || type == SELF_COLLISION || type == FACE_TO_SPHERE)
   {
     rotation.translation().setZero();
     Eigen::Vector3d perturbedNormal = rotation * normal;
@@ -1315,6 +1507,79 @@ Eigen::Vector3d DifferentiableContactConstraint::estimatePerturbedContactNormal(
     Eigen::Vector3d normal
         = (rotation * mContact->edgeBDir).cross(mContact->edgeADir);
     return normal;
+  }
+  else if (type == SPHERE_TO_VERTEX)
+  {
+    double norm = (mContact->sphereCenter - mContact->vertexPoint).norm();
+    Eigen::Vector3d posDiff
+        = (rotation * mContact->sphereCenter) - mContact->sphereCenter;
+    posDiff /= norm;
+    if (getContactType() == collision::ContactType::SPHERE_VERTEX)
+    {
+      return (normal + posDiff).normalized();
+    }
+    else
+    {
+      return (normal - posDiff).normalized();
+    }
+  }
+  else if (type == VERTEX_TO_SPHERE)
+  {
+    double norm = (mContact->vertexPoint - mContact->sphereCenter).norm();
+    Eigen::Vector3d posDiff
+        = (rotation * mContact->vertexPoint) - mContact->vertexPoint;
+    posDiff /= norm;
+    if (getContactType() == collision::ContactType::VERTEX_SPHERE)
+    {
+      return (normal + posDiff).normalized();
+    }
+    else
+    {
+      return (normal - posDiff).normalized();
+    }
+  }
+  else if (type == SPHERE_TO_EDGE)
+  {
+    Eigen::Vector6d worldTwist = getWorldScrewAxisForPosition(skel, dofIndex);
+    Eigen::Isometry3d translation = math::expMap(worldTwist * eps);
+
+    Eigen::Vector3d closestPoint = math::closestPointOnLine(
+        mContact->edgeAFixedPoint,
+        mContact->edgeADir,
+        translation * mContact->sphereCenter);
+    Eigen::Vector3d sphereCenter = translation * mContact->sphereCenter;
+    Eigen::Vector3d normal = (closestPoint - sphereCenter).normalized();
+
+    if (getContactType() == collision::ContactType::SPHERE_EDGE)
+    {
+      return -normal;
+    }
+    else
+    {
+      return normal;
+    }
+  }
+  else if (type == EDGE_TO_SPHERE)
+  {
+    Eigen::Vector6d worldTwist = getWorldScrewAxisForPosition(skel, dofIndex);
+    Eigen::Isometry3d translation = math::expMap(worldTwist * eps);
+    Eigen::Isometry3d rotation = math::expMap(worldTwist * eps);
+    rotation.translation().setZero();
+    Eigen::Vector3d closestPoint = math::closestPointOnLine(
+        translation * mContact->edgeAFixedPoint,
+        rotation * mContact->edgeADir,
+        mContact->sphereCenter);
+    Eigen::Vector3d normal
+        = (closestPoint - mContact->sphereCenter).normalized();
+
+    if (getContactType() == collision::ContactType::EDGE_SPHERE)
+    {
+      return normal;
+    }
+    else
+    {
+      return -normal;
+    }
   }
 
   // Default case

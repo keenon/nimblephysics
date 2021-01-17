@@ -153,6 +153,12 @@ struct Contact
   /// contacts. This holds the center-point of the sphere
   Eigen::Vector3d sphereCenter;
 
+  /// This is useful for SPHERE_FACE, SPHERE_EDGE, SPHERE_VERTEX, etc
+  double sphereRadius;
+
+  /// This is useful for SPHERE_VERTEX, PIPE_VERTEX, etc
+  Eigen::Vector3d vertexPoint;
+
   /// This is only useful for (type == SPHERE_BOX || type == BOX_SPHERE)
   /// contacts. If this is true, then the contact point is clamped on face1.
   bool face1Locked;

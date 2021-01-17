@@ -1445,8 +1445,7 @@ TEST(DARTCollide, VERTEX_SPHERE_COLLISION)
   EXPECT_EQ(contact.type, ContactType::VERTEX_SPHERE);
   Eigen::Vector3d expectedNormal = Eigen::Vector3d(-1, -1, -1).normalized();
   EXPECT_TRUE(equals(expectedNormal, contact.normal, 1e-9));
-  Eigen::Vector3d expectedPoint
-      = Eigen::Vector3d(0.5 - 0.01, 0.5 - 0.01, 0.5 - 0.01);
+  Eigen::Vector3d expectedPoint = Eigen::Vector3d(0.5, 0.5, 0.5);
   EXPECT_TRUE(equals(expectedPoint, contact.point, 1e-9));
   EXPECT_NEAR(contact.penetrationDepth, sqrt(3 * 0.01 * 0.01), 1e-8);
 }
@@ -1532,7 +1531,7 @@ TEST(DARTCollide, EDGE_SPHERE_COLLISION)
   EXPECT_EQ(contact.type, ContactType::EDGE_SPHERE);
   Eigen::Vector3d expectedNormal = Eigen::Vector3d(-1, -1, 0).normalized();
   EXPECT_TRUE(equals(expectedNormal, contact.normal, 1e-9));
-  Eigen::Vector3d expectedPoint = Eigen::Vector3d(0.5 - 0.01, 0.5 - 0.01, 0);
+  Eigen::Vector3d expectedPoint = Eigen::Vector3d(0.5, 0.5, 0);
   EXPECT_TRUE(equals(expectedPoint, contact.point, 1e-9));
   EXPECT_NEAR(contact.penetrationDepth, sqrt(2 * 0.01 * 0.01), 1e-8);
 }
@@ -1704,8 +1703,7 @@ TEST(DARTCollide, SPHERE_VERTEX_COLLISION)
   EXPECT_EQ(contact.type, ContactType::SPHERE_VERTEX);
   Eigen::Vector3d expectedNormal = Eigen::Vector3d(1, 1, 1).normalized();
   EXPECT_TRUE(equals(expectedNormal, contact.normal, 1e-9));
-  Eigen::Vector3d expectedPoint
-      = Eigen::Vector3d(0.5 - 0.01, 0.5 - 0.01, 0.5 - 0.01);
+  Eigen::Vector3d expectedPoint = Eigen::Vector3d(0.5, 0.5, 0.5);
   EXPECT_TRUE(equals(expectedPoint, contact.point, 1e-9));
   EXPECT_NEAR(contact.penetrationDepth, sqrt(3 * 0.01 * 0.01), 1e-8);
 }
@@ -1791,7 +1789,7 @@ TEST(DARTCollide, SPHERE_EDGE_COLLISION)
   EXPECT_EQ(contact.type, ContactType::SPHERE_EDGE);
   Eigen::Vector3d expectedNormal = Eigen::Vector3d(1, 1, 0).normalized();
   EXPECT_TRUE(equals(expectedNormal, contact.normal, 1e-9));
-  Eigen::Vector3d expectedPoint = Eigen::Vector3d(0.5 - 0.01, 0.5 - 0.01, 0);
+  Eigen::Vector3d expectedPoint = Eigen::Vector3d(0.5, 0.5, 0);
   EXPECT_TRUE(equals(expectedPoint, contact.point, 1e-9));
   EXPECT_NEAR(contact.penetrationDepth, sqrt(2 * 0.01 * 0.01), 1e-8);
 }

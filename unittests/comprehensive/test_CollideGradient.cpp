@@ -22,7 +22,7 @@
 #include "TestHelpers.hpp"
 #include "stdio.h"
 
-// #define ALL_TESTS
+#define ALL_TESTS
 
 using namespace dart;
 using namespace math;
@@ -102,6 +102,23 @@ void testVertexFaceCollision(bool isSelfCollision)
   world->setVelocities(vels);
 
   // renderWorld(world);
+  EXPECT_TRUE(verifyAnalyticalJacobians(world));
+  EXPECT_TRUE(verifyVelGradients(world, vels));
+  EXPECT_TRUE(verifyWrtMass(world));
+
+  //////////////////////////////////////////////////
+  // Try it in reverse skeleton order, to flip collision type enums
+  //////////////////////////////////////////////////
+
+  world->removeAllSkeletons();
+  if (!isSelfCollision)
+  {
+    world->addSkeleton(box2);
+  }
+  world->addSkeleton(box1);
+
+  // EXPECT_TRUE(verifyPerturbedContactPositions(world));
+  // EXPECT_TRUE(verifyPerturbedContactNormals(world));
   EXPECT_TRUE(verifyAnalyticalJacobians(world));
   EXPECT_TRUE(verifyVelGradients(world, vels));
   EXPECT_TRUE(verifyWrtMass(world));
@@ -192,6 +209,23 @@ void testEdgeEdgeCollision(bool isSelfCollision)
 
   // renderWorld(world);
   // EXPECT_TRUE(verifyPerturbedContactEdges(world));
+  // EXPECT_TRUE(verifyPerturbedContactNormals(world));
+  EXPECT_TRUE(verifyAnalyticalJacobians(world));
+  EXPECT_TRUE(verifyVelGradients(world, vels));
+  EXPECT_TRUE(verifyWrtMass(world));
+
+  //////////////////////////////////////////////////
+  // Try it in reverse skeleton order, to flip collision type enums
+  //////////////////////////////////////////////////
+
+  world->removeAllSkeletons();
+  if (!isSelfCollision)
+  {
+    world->addSkeleton(box2);
+  }
+  world->addSkeleton(box1);
+
+  // EXPECT_TRUE(verifyPerturbedContactPositions(world));
   // EXPECT_TRUE(verifyPerturbedContactNormals(world));
   EXPECT_TRUE(verifyAnalyticalJacobians(world));
   EXPECT_TRUE(verifyVelGradients(world, vels));
@@ -292,9 +326,30 @@ void testSphereBoxCollision(bool isSelfCollision, int numFaces)
   world->setVelocities(vels);
 
   // renderWorld(world);
+  /*
   EXPECT_TRUE(verifyAnalyticalJacobians(world));
   EXPECT_TRUE(verifyVelGradients(world, vels));
   EXPECT_TRUE(verifyWrtMass(world));
+  */
+
+  //////////////////////////////////////////////////
+  // Try it in reverse skeleton order, to flip collision type enums
+  //////////////////////////////////////////////////
+
+  world->removeAllSkeletons();
+  if (!isSelfCollision)
+  {
+    world->addSkeleton(sphere);
+  }
+  world->addSkeleton(box);
+
+  // EXPECT_TRUE(verifyPerturbedContactPositions(world));
+  EXPECT_TRUE(verifyPerturbedContactNormals(world));
+  /*
+  EXPECT_TRUE(verifyAnalyticalJacobians(world));
+  EXPECT_TRUE(verifyVelGradients(world, vels));
+  EXPECT_TRUE(verifyWrtMass(world));
+  */
 }
 
 #ifdef ALL_TESTS
@@ -481,22 +536,37 @@ void testSphereMeshCollision(bool isSelfCollision, int numFaces)
   world->setVelocities(vels);
 
   // renderWorld(world);
-  EXPECT_TRUE(verifyPerturbedContactPositions(world));
-  /*
-  EXPECT_TRUE(verifyPerturbedContactNormals(world));
-  EXPECT_TRUE(verifyPerturbedContactEdges(world));
+  // EXPECT_TRUE(verifyPerturbedContactPositions(world));
+  // EXPECT_TRUE(verifyPerturbedContactNormals(world));
+  // EXPECT_TRUE(verifyPerturbedContactEdges(world));
   EXPECT_TRUE(verifyAnalyticalJacobians(world));
   EXPECT_TRUE(verifyVelGradients(world, vels));
   EXPECT_TRUE(verifyWrtMass(world));
-  */
+
+  //////////////////////////////////////////////////
+  // Try it in reverse skeleton order, to flip collision type enums
+  //////////////////////////////////////////////////
+
+  world->removeAllSkeletons();
+  if (!isSelfCollision)
+  {
+    world->addSkeleton(sphere);
+  }
+  world->addSkeleton(box);
+
+  // EXPECT_TRUE(verifyPerturbedContactPositions(world));
+  // EXPECT_TRUE(verifyPerturbedContactNormals(world));
+  EXPECT_TRUE(verifyAnalyticalJacobians(world));
+  EXPECT_TRUE(verifyVelGradients(world, vels));
+  EXPECT_TRUE(verifyWrtMass(world));
 }
 
+#ifdef ALL_TESTS
 TEST(GRADIENTS, SPHERE_MESH_COLLISION_1_FACE)
 {
   testSphereMeshCollision(false, 1);
 }
 
-#ifdef ALL_TESTS
 TEST(GRADIENTS, SPHERE_MESH_COLLISION_2_FACE)
 {
   testSphereMeshCollision(false, 2);
@@ -505,11 +575,6 @@ TEST(GRADIENTS, SPHERE_MESH_COLLISION_2_FACE)
 TEST(GRADIENTS, SPHERE_MESH_COLLISION_3_FACE)
 {
   testSphereMeshCollision(false, 3);
-}
-
-TEST(GRADIENTS, SPHERE_MESH_COLLISION_4_FACE)
-{
-  testSphereMeshCollision(false, 4);
 }
 
 TEST(GRADIENTS, SPHERE_MESH_SELF_COLLISION_1_FACE)

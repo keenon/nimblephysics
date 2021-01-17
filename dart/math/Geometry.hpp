@@ -626,6 +626,23 @@ Eigen::Vector2d computeClosestPointOnSupportPolygon(
     const Eigen::Vector2d& _p,
     const SupportPolygon& _support);
 
+/// This computes and returns the closest point on a line, given by a point and
+/// a direction, to a goal point
+Eigen::Vector3d closestPointOnLine(
+    const Eigen::Vector3d& pointOnLine,
+    const Eigen::Vector3d& lineDirection,
+    const Eigen::Vector3d& goalPoint);
+
+/// This computes and returns the gradient of closestPointOnLine(), given the
+/// gradients of its inputs
+Eigen::Vector3d closestPointOnLineGradient(
+    const Eigen::Vector3d& pointOnLine,
+    const Eigen::Vector3d& pointOnLineGradient,
+    const Eigen::Vector3d& lineDirection,
+    const Eigen::Vector3d& lineDirectionGradient,
+    const Eigen::Vector3d& goalPoint,
+    const Eigen::Vector3d& goalPointGradient);
+
 // Represents a bounding box with minimum and maximum coordinates.
 class BoundingBox
 {

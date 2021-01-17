@@ -2354,6 +2354,38 @@ Eigen::Vector2d computeClosestPointOnSupportPolygon(
   return result;
 }
 
+//==============================================================================
+Eigen::Vector3d closestPointOnLine(
+    const Eigen::Vector3d& pointOnLine,
+    const Eigen::Vector3d& lineDirection,
+    const Eigen::Vector3d& goalPoint)
+{
+  double offset = lineDirection.dot(pointOnLine);
+  double relative = lineDirection.dot(goalPoint) - offset;
+  return pointOnLine + relative * lineDirection;
+}
+
+//==============================================================================
+Eigen::Vector3d closestPointOnLineGradient(
+    const Eigen::Vector3d& pointOnLine,
+    const Eigen::Vector3d& pointOnLineGradient,
+    const Eigen::Vector3d& lineDirection,
+    const Eigen::Vector3d& lineDirectionGradient,
+    const Eigen::Vector3d& goalPoint,
+    const Eigen::Vector3d& goalPointGradient)
+{
+  double offset = lineDirection.dot(pointOnLine);
+  double dOffset = lineDirectionGradient.dot(pointOnLine)
+                   + lineDirection.dot(pointOnLineGradient);
+  double goalOffset = lineDirection.dot(goalPoint);
+  double dGoalOffset = lineDirectionGradient.dot(goalPoint)
+                       + lineDirection.dot(goalPointGradient);
+  double relative = goalOffset - offset;
+  double dRelative = dGoalOffset - dOffset;
+  return pointOnLineGradient + relative * lineDirectionGradient
+         + dRelative * lineDirection;
+}
+
 BoundingBox::BoundingBox() : mMin(0, 0, 0), mMax(0, 0, 0)
 {
 }

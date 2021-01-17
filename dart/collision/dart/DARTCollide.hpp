@@ -402,6 +402,10 @@ bool get2DLineIntersection(
 /// code, so it's easy to tweak settings across all collision pairs.
 inline void setCcdDefaultSettings(ccd_t& ccd);
 
+/// This allows us to prevent weird effects where we don't want to carry over
+/// cacheing
+void clearCcdCache();
+
 /// This is the static cache for all the CCD collision search data
 static std::unordered_map<long, ccd_vec3_t> _ccdDirCache;
 static std::unordered_map<long, ccd_vec3_t> _ccdPosCache;

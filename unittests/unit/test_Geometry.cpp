@@ -536,8 +536,8 @@ bool verifyContactPoint(
   return true;
 }
 
-// #ifdef ALL_TESTS
-TEST(COLLISION_GEOM, CONTACT_POINT_GRADIENT)
+#ifdef ALL_TESTS
+TEST(COLLISION_GEOM, EDGE_EDGE_GRADIENT)
 {
   Eigen::Vector3d edgeAPoint = Eigen::Vector3d(1, 0, 0);
   Eigen::Vector3d edgeAPointGradient = Eigen::Vector3d::Zero();
@@ -650,10 +650,10 @@ TEST(COLLISION_GEOM, CONTACT_POINT_GRADIENT)
 
   EXPECT_TRUE(equals(result, expectedGradient, 1e-8));
 }
-// #endif
+#endif
 
-// #ifdef ALL_TESTS
-TEST(COLLISION_GEOM, RANDOM_CONTACT_POINTS)
+#ifdef ALL_TESTS
+TEST(COLLISION_GEOM, RANDOM_EDGE_EDGE_GRADIENTS)
 {
   for (int i = 0; i < 700; i++)
   {
@@ -709,6 +709,110 @@ TEST(COLLISION_GEOM, RANDOM_CONTACT_POINTS)
         edgeBPointGradient,
         edgeBDir,
         edgeBDirGradient);
+    EXPECT_TRUE(result);
+    if (!result)
+      return;
+  }
+}
+#endif
+
+/******************************************************************************/
+bool verifyClosestPoint(
+    const Eigen::Vector3d& edgePoint,
+    const Eigen::Vector3d& edgePointGradient,
+    const Eigen::Vector3d& edgeDir,
+    const Eigen::Vector3d& edgeDirGradient,
+    const Eigen::Vector3d& goalPoint,
+    const Eigen::Vector3d& goalPointGradient)
+{
+  const double EPS = 1e-6;
+  Eigen::Vector3d original = closestPointOnLine(edgePoint, edgeDir, goalPoint);
+  Eigen::Vector3d perturbedPos = closestPointOnLine(
+      edgePoint + edgePointGradient * EPS,
+      edgeDir + edgeDirGradient * EPS,
+      goalPoint + goalPointGradient * EPS);
+  Eigen::Vector3d perturbedNeg = closestPointOnLine(
+      edgePoint - edgePointGradient * EPS,
+      edgeDir - edgeDirGradient * EPS,
+      goalPoint - goalPointGradient * EPS);
+  Eigen::Vector3d finiteDiff = (perturbedPos - perturbedNeg) / (2 * EPS);
+  Eigen::Vector3d analytical = closestPointOnLineGradient(
+      edgePoint,
+      edgePointGradient,
+      edgeDir,
+      edgeDirGradient,
+      goalPoint,
+      goalPointGradient);
+  if (!equals(analytical, finiteDiff, 1e-8))
+  {
+    std::cout << "Edge-edge contact point derivatives failed!" << std::endl;
+    std::cout << "Analytical Gradient:" << std::endl << analytical << std::endl;
+    std::cout << "Finite Difference Gradient:" << std::endl
+              << finiteDiff << std::endl;
+    std::cout << "Diff:" << std::endl << (analytical - finiteDiff) << std::endl;
+    std::cout << "Original Point:" << std::endl << original << std::endl;
+    std::cout << "Edge Point:" << std::endl << edgePoint << std::endl;
+    std::cout << "Edge Point Gradient:" << std::endl
+              << edgePointGradient << std::endl;
+    std::cout << "Edge Dir:" << std::endl << edgeDir << std::endl;
+    std::cout << "Edge Dir Gradient:" << std::endl
+              << edgeDirGradient << std::endl;
+    std::cout << "Goal Point:" << std::endl << goalPoint << std::endl;
+    std::cout << "Goal Point Gradient:" << std::endl
+              << goalPointGradient << std::endl;
+    return false;
+  }
+  return true;
+}
+
+// #ifdef ALL_TESTS
+TEST(COLLISION_GEOM, RANDOM_CLOSEST_POINT_GRADIENTS)
+{
+  for (int i = 0; i < 700; i++)
+  {
+    Eigen::Vector3d edgePoint = Eigen::Vector3d::Random();
+    Eigen::Vector3d edgePointGradient = Eigen::Vector3d::Zero();
+    Eigen::Vector3d edgeDir = Eigen::Vector3d::Random();
+    Eigen::Vector3d edgeDirGradient = Eigen::Vector3d::Zero();
+    Eigen::Vector3d goalPoint = Eigen::Vector3d::Random();
+    Eigen::Vector3d goalPointGradient = Eigen::Vector3d::Zero();
+
+    if (i < 100)
+    {
+      edgePointGradient = Eigen::Vector3d::Random();
+    }
+    else if (i < 200)
+    {
+      edgeDirGradient = Eigen::Vector3d::Random();
+    }
+    else if (i < 300)
+    {
+      goalPointGradient = Eigen::Vector3d::Random();
+    }
+    else if (i < 400)
+    {
+      edgePointGradient = Eigen::Vector3d::Random();
+      edgeDirGradient = Eigen::Vector3d::Random();
+    }
+    else if (i < 600)
+    {
+      edgePointGradient = Eigen::Vector3d::Random();
+      goalPointGradient = Eigen::Vector3d::Random();
+    }
+    else if (i < 700)
+    {
+      edgePointGradient = Eigen::Vector3d::Random();
+      edgeDirGradient = Eigen::Vector3d::Random();
+      goalPointGradient = Eigen::Vector3d::Random();
+    }
+
+    bool result = verifyClosestPoint(
+        edgePoint,
+        edgePointGradient,
+        edgeDir,
+        edgeDirGradient,
+        goalPoint,
+        goalPointGradient);
     EXPECT_TRUE(result);
     if (!result)
       return;

@@ -2383,13 +2383,15 @@ int createMeshSphereContact(
   {
     // normal is (vertex) -> (sphere center)
     Eigen::Vector3d normal = (meshPointsWitness[0] - sphereCenter).normalized();
-    Eigen::Vector3d contactPoint = sphereCenter + (sphereRadius * normal);
+    Eigen::Vector3d contactPoint = meshPointsWitness[0];
     Contact contact;
     contact.point = contactPoint;
     contact.normal = normal;
     contact.collisionObject1 = o1;
     contact.collisionObject2 = o2;
     contact.sphereCenter = sphereCenter;
+    contact.vertexPoint = meshPointsWitness[0];
+    contact.sphereRadius = sphereRadius;
     contact.penetrationDepth
         = sphereRadius - (meshPointsWitness[0] - sphereCenter).norm();
     contact.type = VERTEX_SPHERE;
@@ -2400,19 +2402,20 @@ int createMeshSphereContact(
   {
     // Find nearest point on the edge to sphere center
     // normal is (nearest point) -> (sphere center)
-    Eigen::Vector3d edge = meshPointsWitness[1] - meshPointsWitness[0];
-    double offset = edge.dot(meshPointsWitness[0]);
-    double relativeSphere = edge.dot(sphereCenter) - offset;
-    Eigen::Vector3d closestPoint = meshPointsWitness[0] + relativeSphere * edge;
+    Eigen::Vector3d edge
+        = (meshPointsWitness[1] - meshPointsWitness[0]).normalized();
+    Eigen::Vector3d closestPoint
+        = math::closestPointOnLine(meshPointsWitness[0], edge, sphereCenter);
     Eigen::Vector3d normal = (closestPoint - sphereCenter).normalized();
-    Eigen::Vector3d contactPoint = sphereCenter + (sphereRadius * normal);
     Contact contact;
-    contact.point = contactPoint;
+    contact.point = closestPoint;
     contact.normal = normal;
     contact.collisionObject1 = o1;
     contact.collisionObject2 = o2;
     contact.sphereCenter = sphereCenter;
+    contact.sphereRadius = sphereRadius;
     contact.type = EDGE_SPHERE;
+    contact.edgeAFixedPoint = meshPointsWitness[0];
     contact.edgeAClosestPoint = closestPoint;
     contact.edgeADir = edge;
     contact.penetrationDepth
@@ -2457,6 +2460,7 @@ int createMeshSphereContact(
     contact.collisionObject1 = o1;
     contact.collisionObject2 = o2;
     contact.sphereCenter = sphereCenter;
+    contact.sphereRadius = sphereRadius;
     contact.penetrationDepth
         = sphereRadius
           - (normal.dot(pointsWitnessSorted[0]) - normal.dot(sphereCenter));
@@ -2489,13 +2493,15 @@ int createSphereMeshContact(
   if (meshPointsWitness.size() == 1)
   {
     Eigen::Vector3d normal = (sphereCenter - meshPointsWitness[0]).normalized();
-    Eigen::Vector3d contactPoint = sphereCenter - (sphereRadius * normal);
+    Eigen::Vector3d contactPoint = meshPointsWitness[0];
     Contact contact;
     contact.point = contactPoint;
     contact.normal = normal;
     contact.collisionObject1 = o1;
     contact.collisionObject2 = o2;
     contact.sphereCenter = sphereCenter;
+    contact.vertexPoint = meshPointsWitness[0];
+    contact.sphereRadius = sphereRadius;
     contact.penetrationDepth
         = sphereRadius - (meshPointsWitness[0] - sphereCenter).norm();
     contact.type = SPHERE_VERTEX;
@@ -2506,20 +2512,20 @@ int createSphereMeshContact(
   {
     // Find nearest point on the edge to sphere center
     // normal is (nearest point) -> (sphere center)
-    Eigen::Vector3d edge = meshPointsWitness[1] - meshPointsWitness[0];
-    double offset = edge.dot(meshPointsWitness[0]);
-    double relativeSphere = edge.dot(sphereCenter) - offset;
-    Eigen::Vector3d closestPoint = meshPointsWitness[0] + relativeSphere * edge;
+    Eigen::Vector3d edge
+        = (meshPointsWitness[1] - meshPointsWitness[0]).normalized();
+    Eigen::Vector3d closestPoint
+        = math::closestPointOnLine(meshPointsWitness[0], edge, sphereCenter);
     Eigen::Vector3d normal = (closestPoint - sphereCenter).normalized();
-    Eigen::Vector3d contactPoint = sphereCenter + (sphereRadius * normal);
     Contact contact;
-    contact.point = contactPoint;
+    contact.point = closestPoint;
     contact.normal = normal * -1;
     contact.collisionObject1 = o1;
     contact.collisionObject2 = o2;
     contact.sphereCenter = sphereCenter;
     contact.type = SPHERE_EDGE;
     contact.edgeAClosestPoint = closestPoint;
+    contact.edgeAFixedPoint = meshPointsWitness[0];
     contact.edgeADir = edge;
     contact.penetrationDepth
         = sphereRadius - (closestPoint - sphereCenter).norm();
@@ -2563,6 +2569,7 @@ int createSphereMeshContact(
     contact.collisionObject1 = o1;
     contact.collisionObject2 = o2;
     contact.sphereCenter = sphereCenter;
+    contact.sphereRadius = sphereRadius;
     contact.type = SPHERE_FACE;
     contact.penetrationDepth
         = sphereRadius
@@ -2712,7 +2719,8 @@ int createCapsuleMeshContact(
           contact.type = EDGE_SPHERE;
           contact.edgeAClosestPoint = capsuleMinPoint - normal * capsuleRadius;
           contact.edgeADir = edgeDir;
-          contact.radiusB = capsuleRadius;
+          contact.edgeAFixedPoint = meshPointsWitness[0];
+          contact.sphereRadius = capsuleRadius;
         }
         else
         {
@@ -2720,9 +2728,10 @@ int createCapsuleMeshContact(
           contact.collisionObject2 = o2;
           contact.normal = normal;
           contact.type = SPHERE_EDGE;
-          contact.radiusA = capsuleRadius;
-          contact.edgeBClosestPoint = capsuleMinPoint - normal * capsuleRadius;
-          contact.edgeBDir = edgeDir;
+          contact.sphereRadius = capsuleRadius;
+          contact.edgeAClosestPoint = capsuleMinPoint - normal * capsuleRadius;
+          contact.edgeADir = edgeDir;
+          contact.edgeAFixedPoint = meshPointsWitness[0];
         }
         contact.penetrationDepth = capsuleRadius - dist;
         result.addContact(contact);
@@ -2771,7 +2780,8 @@ int createCapsuleMeshContact(
           contact.type = EDGE_SPHERE;
           contact.edgeAClosestPoint = capsuleMaxPoint - normal * capsuleRadius;
           contact.edgeADir = edgeDir;
-          contact.radiusB = capsuleRadius;
+          contact.edgeAFixedPoint = meshPointsWitness[0];
+          contact.sphereRadius = capsuleRadius;
         }
         else
         {
@@ -2779,9 +2789,10 @@ int createCapsuleMeshContact(
           contact.collisionObject2 = o2;
           contact.normal = normal;
           contact.type = SPHERE_EDGE;
-          contact.radiusA = capsuleRadius;
-          contact.edgeBClosestPoint = capsuleMaxPoint - normal * capsuleRadius;
-          contact.edgeBDir = edgeDir;
+          contact.sphereRadius = capsuleRadius;
+          contact.edgeAClosestPoint = capsuleMaxPoint - normal * capsuleRadius;
+          contact.edgeADir = edgeDir;
+          contact.edgeAFixedPoint = meshPointsWitness[0];
         }
         contact.penetrationDepth = capsuleRadius - dist;
         result.addContact(contact);
@@ -2893,7 +2904,7 @@ int createCapsuleMeshContact(
         if (contact.type == FACE_VERTEX)
         {
           contact.type = FACE_SPHERE;
-          contact.radiusB = capsuleRadius;
+          contact.sphereRadius = capsuleRadius;
           // Fill the sphere center value depending on which endpoint this
           // contact is nearest
           if ((contact.point - capsuleA).squaredNorm()
@@ -2910,7 +2921,7 @@ int createCapsuleMeshContact(
         {
           contact.type = EDGE_PIPE;
           contact.edgeBClosestPoint += normal * capsuleRadius;
-          contact.radiusB = capsuleRadius;
+          contact.sphereRadius = capsuleRadius;
         }
         else
         {
@@ -3186,6 +3197,14 @@ inline void setCcdDefaultSettings(ccd_t& ccd)
   ccd.epa_tolerance = 0.0001;
   ccd.dist_tolerance = 0.001;
   ccd.max_iterations = 100;
+}
+
+/// This allows us to prevent weird effects where we don't want to carry over
+/// cacheing
+void clearCcdCache()
+{
+  _ccdDirCache.clear();
+  _ccdPosCache.clear();
 }
 
 /*
