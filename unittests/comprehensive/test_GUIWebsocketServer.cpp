@@ -62,10 +62,11 @@ using namespace realtime;
 TEST(REALTIME, GUI_SERVER)
 {
   // Create a world
+  /*
   std::shared_ptr<simulation::World> world
       = dart::utils::SkelParser::readWorld("dart://sample/skel/cartpole.skel");
+      */
 
-  /*
   std::shared_ptr<simulation::World> world = simulation::World::create();
 
   // Set gravity of the world
@@ -85,8 +86,8 @@ TEST(REALTIME, GUI_SERVER)
   std::shared_ptr<dynamics::Skeleton> kr5
       = urdfLoader.parseSkeleton("dart://sample/urdf/KR5/KR5 sixx R650.urdf");
 
-  // world->addSkeleton(ground);
-  // world->addSkeleton(atlas);
+  world->addSkeleton(ground);
+  world->addSkeleton(atlas);
   // world->addSkeleton(kr5);
 
   // Set initial configuration for Atlas robot
@@ -96,7 +97,6 @@ TEST(REALTIME, GUI_SERVER)
   // Disable the ground from casting its own shadows
   ground->getBodyNode(0)->getShapeNode(0)->getVisualAspect()->setCastShadows(
       false);
-  */
 
   /*
   while (true)
@@ -109,19 +109,13 @@ TEST(REALTIME, GUI_SERVER)
   server.serve(8070);
   server.renderWorld(world);
 
-  /*
   Ticker ticker(world->getTimeStep());
   ticker.registerTickListener([&](long time) {
-    double diff = sin(((double)time / 2000));
-    // atlas->setPosition(0, diff * dart::math::constantsd::pi());
-    // double diff2 = sin(((double)time / 4000));
-    // atlas->setPosition(4, diff2 * 1);
     world->step();
     server.renderWorld(world);
   });
 
   server.registerConnectionListener([&]() { ticker.start(); });
-  */
 
   /*
   server

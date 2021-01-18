@@ -73,22 +73,22 @@ bool WebsocketServer::run(int port)
   // Do this in a loop to catch Websocket errors thrown by typical Chrome lazy
   // Websocket implementation, per:
   // https://github.com/zaphoyd/websocketpp/issues/580#issuecomment-689703724
-  for (;;)
+  while (true)
   {
     try
     {
       this->endpoint.run();
-      break; // run() exited normally
     }
     catch (websocketpp::exception const& e)
     {
-      dterr << e.what();
+      dterr << e.what() << std::endl;
       dterr << "Exception thrown from m_io_service->run(). Restarting "
-               "m_io_service->run()";
+               "m_io_service->run()"
+            << std::endl;
     }
     catch (...)
     {
-      dterr << "Hit critial error. Restarting m_io_service->run()";
+      dterr << "Hit critial error. Restarting m_io_service->run()" << std::endl;
     }
   }
   return true;
@@ -130,7 +130,19 @@ void WebsocketServer::send(ClientConnection conn, const string& message)
 {
   // Send the message data to the client (will happen on the networking thread's
   // event loop)
-  this->endpoint.send(conn, message, websocketpp::frame::opcode::text);
+  try
+  {
+    this->endpoint.send(conn, message, websocketpp::frame::opcode::text);
+  }
+  catch (websocketpp::exception const& e)
+  {
+    dterr << e.what() << std::endl;
+    dterr << "Exception thrown from endpoint.send(). Continuing." << std::endl;
+  }
+  catch (...)
+  {
+    dterr << "Hit unknown error in endpoint.send(). Continuing." << std::endl;
+  }
 }
 
 void WebsocketServer::broadcastJsonObject(

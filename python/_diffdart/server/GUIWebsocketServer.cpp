@@ -49,7 +49,11 @@ void GUIWebsocketServer(py::module& m)
       std::shared_ptr<dart::server::GUIWebsocketServer>>(
       m, "GUIWebsocketServer")
       .def(::py::init<>())
-      .def("serve", &dart::server::GUIWebsocketServer::serve, ::py::arg("port"))
+      .def(
+          "serve",
+          &dart::server::GUIWebsocketServer::serve,
+          ::py::arg("port"),
+          ::py::call_guard<py::gil_scoped_release>())
       .def("stopServing", &dart::server::GUIWebsocketServer::stopServing)
       .def("isServing", &dart::server::GUIWebsocketServer::isServing)
       .def("getScreenSize", &dart::server::GUIWebsocketServer::getScreenSize)
@@ -211,25 +215,29 @@ void GUIWebsocketServer(py::module& m)
           ::py::arg("world"),
           ::py::arg("prefix") = "world",
           ::py::arg("renderForces") = true,
-          ::py::arg("renderForceMagnitudes") = true)
+          ::py::arg("renderForceMagnitudes") = true,
+          ::py::call_guard<py::gil_scoped_release>())
       .def(
           "renderBasis",
           &dart::server::GUIWebsocketServer::renderBasis,
           ::py::arg("scale") = 10.0,
           ::py::arg("prefix") = "basis",
           ::py::arg("pos") = Eigen::Vector3d::Zero(),
-          ::py::arg("euler") = Eigen::Vector3d::Zero())
+          ::py::arg("euler") = Eigen::Vector3d::Zero(),
+          ::py::call_guard<py::gil_scoped_release>())
       .def(
           "renderSkeleton",
           &dart::server::GUIWebsocketServer::renderSkeleton,
           ::py::arg("skeleton"),
-          ::py::arg("prefix") = "world")
+          ::py::arg("prefix") = "world",
+          ::py::call_guard<py::gil_scoped_release>())
       .def(
           "renderTrajectoryLines",
           &dart::server::GUIWebsocketServer::renderTrajectoryLines,
           ::py::arg("world"),
           ::py::arg("positions"),
-          ::py::arg("prefix") = "trajectory")
+          ::py::arg("prefix") = "trajectory",
+          ::py::call_guard<py::gil_scoped_release>())
       .def(
           "registerConnectionListener",
           &dart::server::GUIWebsocketServer::registerConnectionListener,

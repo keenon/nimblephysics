@@ -175,7 +175,16 @@ void GUIWebsocketServer::serve(int port)
 
     // std::cout << json.str() << std::endl;
 
-    mServer->send(conn, json.str());
+    std::string jsonStr = json.str();
+    try
+    {
+      mServer->send(conn, jsonStr);
+    }
+    catch (...)
+    {
+      dterr << "GUIWebsocketServer caught an error broadcasting message \""
+            << jsonStr << "\"" << std::endl;
+    }
     // mServer->broadcast("{\"type\": 1}");
     /*
     mServer->broadcast(
@@ -189,24 +198,19 @@ void GUIWebsocketServer::serve(int port)
   });
 
   mServer->disconnect([this](ClientConnection /* conn */) {
-    // We don't need high throughput, so run everything through a global mutex
-    // to avoid data races
-    const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
-
     std::clog << "Connection closed." << std::endl;
     std::clog << "There are now " << mServer->numConnections()
               << " open connections." << std::endl;
   });
   mServer->message([this](
                        ClientConnection /* conn */, const Json::Value& args) {
-    // We don't need high throughput, so run everything through a global mutex
-    // to avoid data races
-    const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
-
     if (args["type"].asString() == "keydown")
     {
       std::string key = args["key"].asString();
-      this->mKeysDown.insert(key);
+      {
+        const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
+        this->mKeysDown.insert(key);
+      }
       for (auto listener : this->mKeydownListeners)
       {
         listener(key);
@@ -215,7 +219,10 @@ void GUIWebsocketServer::serve(int port)
     else if (args["type"].asString() == "keyup")
     {
       std::string key = args["key"].asString();
-      this->mKeysDown.erase(key);
+      {
+        const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
+        this->mKeysDown.erase(key);
+      }
       for (auto listener : this->mKeyupListeners)
       {
         listener(key);
@@ -301,6 +308,7 @@ void GUIWebsocketServer::serve(int port)
 
   // Start the networking thread
   mServerThread = new std::thread([this, port]() {
+    /*
     // block signals in this thread and subsequently
     // spawned threads so they're guaranteed to go to the main thread
     sigset_t sigset;
@@ -308,6 +316,7 @@ void GUIWebsocketServer::serve(int port)
     sigaddset(&sigset, SIGINT);
     sigaddset(&sigset, SIGTERM);
     pthread_sigmask(SIG_BLOCK, &sigset, nullptr);
+    */
 
     std::cout << "GUIWebsocketServer will start serving a WebSocket server on "
                  "ws://localhost:"
@@ -394,7 +403,15 @@ void GUIWebsocketServer::flush()
   std::string json = mJson.str();
   if (mServing)
   {
-    mServer->broadcast(json);
+    try
+    {
+      mServer->broadcast(json);
+    }
+    catch (...)
+    {
+      dterr << "GUIWebsocketServer caught an error broadcasting message \""
+            << json << "\"" << std::endl;
+    }
   }
 
   // Reset
