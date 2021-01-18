@@ -680,13 +680,15 @@ bool verifyAnalyticalConstraintMatrixEstimates(WorldPtr world)
   {
     Eigen::VectorXd diff = Eigen::VectorXd::Random(world->getNumDofs());
 
-    Eigen::MatrixXd analyticalDiff;
-    Eigen::MatrixXd bruteForceDiff;
+    Eigen::MatrixXd analyticalPos;
+    Eigen::MatrixXd analyticalNeg;
+    Eigen::MatrixXd bruteForcePos;
+    Eigen::MatrixXd bruteForceNeg;
 
-    double eps = EPS;
+    double epsPos = EPS;
     while (true)
     {
-      Eigen::VectorXd pos = world->getPositions() + diff * eps;
+      Eigen::VectorXd pos = world->getPositions() + diff * epsPos;
 
       Eigen::MatrixXd analytical
           = classicPtr->estimateClampingConstraintMatrixAt(world, pos);
@@ -696,12 +698,37 @@ bool verifyAnalyticalConstraintMatrixEstimates(WorldPtr world)
       if (bruteForce.cols() == original.cols()
           && bruteForce.rows() == original.rows())
       {
-        analyticalDiff = (analytical - original) / EPS;
-        bruteForceDiff = (bruteForce - original) / EPS;
+        analyticalPos = analytical;
+        bruteForcePos = bruteForce;
         break;
       }
-      eps *= 0.5;
+      epsPos *= 0.5;
     }
+
+    double epsNeg = EPS;
+    while (true)
+    {
+      Eigen::VectorXd pos = world->getPositions() + diff * epsNeg;
+
+      Eigen::MatrixXd analytical
+          = classicPtr->estimateClampingConstraintMatrixAt(world, pos);
+      Eigen::MatrixXd bruteForce
+          = classicPtr->getClampingConstraintMatrixAt(world, pos);
+
+      if (bruteForce.cols() == original.cols()
+          && bruteForce.rows() == original.rows())
+      {
+        analyticalNeg = analytical;
+        bruteForceNeg = bruteForce;
+        break;
+      }
+      epsNeg *= 0.5;
+    }
+
+    Eigen::MatrixXd analyticalDiff
+        = (analyticalPos - analyticalNeg) / (epsPos + epsNeg);
+    Eigen::MatrixXd bruteForceDiff
+        = (bruteForcePos - bruteForceNeg) / (epsPos + epsNeg);
 
     // I'm surprised by how quickly the gradient can change
     if (!equals(analyticalDiff, bruteForceDiff, 2e-3))
@@ -4452,6 +4479,10 @@ bool verifyPerturbedContactPositions(
       = classicPtr->getClampingConstraints();
   if ((constraints.size() == 0) != expectNoContacts)
   {
+    std::cout
+        << "verifyPerturbedContactPositions() got no clamping contacts, and "
+           "didn't pass `expectNoContacts = true`!"
+        << std::endl;
     return false;
   }
 
@@ -4589,7 +4620,8 @@ bool verifyPerturbedContactNormals(WorldPtr world)
               = constraints[k]->estimatePerturbedContactNormal(skel, j, EPS);
           bruteForce = constraints[k]->bruteForcePerturbedContactNormal(
               world, skel, j, EPS);
-          std::cout << "Failed perturbed contact normal!" << std::endl;
+          std::cout << "Failed perturbed contact normal by " << EPS << "!"
+                    << std::endl;
           std::cout << "Skel:" << std::endl << skel->getName() << std::endl;
           std::cout << "DOF:" << std::endl << j << std::endl;
           std::cout << "Contact:" << std::endl << k << std::endl;
@@ -4618,6 +4650,8 @@ bool verifyPerturbedContactNormals(WorldPtr world)
             = constraints[k]->getContactNormalGradient(skel->getDof(j));
         if (!equals(analyticalGradient, finiteDifferenceGradient, 1e-9))
         {
+          Eigen::Vector3d analyticalGradient
+              = constraints[k]->getContactNormalGradient(skel->getDof(j));
           std::cout << "Failed contact normal gradient!" << std::endl;
           std::cout << "Skel:" << std::endl << skel->getName() << std::endl;
           std::cout << "Contact Type:" << std::endl
@@ -4720,6 +4754,9 @@ bool verifyPerturbedContactForceDirections(WorldPtr world)
                     << analyticalGradient << std::endl;
           std::cout << "Finite Difference Contact Force Gradient:" << std::endl
                     << finiteDifferenceGradient << std::endl;
+          std::cout << "Diff:" << std::endl
+                    << analyticalGradient - finiteDifferenceGradient
+                    << std::endl;
           return false;
         }
       }

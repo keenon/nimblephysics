@@ -3043,6 +3043,7 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceJacobianOfClampingConstraints(
   world->setExternalForces(mPreStepTorques);
 
   Eigen::VectorXd original = getClampingConstraintMatrix(world) * f0;
+  Eigen::MatrixXd originalA_c = getClampingConstraintMatrix(world);
 
   Eigen::MatrixXd result = Eigen::MatrixXd::Zero(original.size(), mNumDOFs);
 
@@ -3068,7 +3069,21 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceJacobianOfClampingConstraints(
       if (perturbedA_c.cols() == f0.size())
       {
         perturbedResultPos = perturbedA_c * f0;
-        break;
+        double squaredNorm = (original - perturbedResultPos).squaredNorm();
+        if (squaredNorm < 100 * posEPS)
+        {
+          break;
+        }
+        else
+        {
+          std::cout << "Result diff at " << posEPS << std::endl
+                    << (original - perturbedResultPos) << std::endl;
+          std::cout << "A_c original at " << posEPS << std::endl
+                    << originalA_c << std::endl;
+          std::cout << "A_c diff at " << posEPS << std::endl
+                    << (originalA_c - perturbedA_c) << std::endl;
+          assert(false && "Encountered too large a jump in finiteDifferenceJacobianOfClampingConstraints()");
+        }
       }
       posEPS /= 2;
     }
@@ -3091,7 +3106,21 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceJacobianOfClampingConstraints(
       if (perturbedA_c.cols() == f0.size())
       {
         perturbedResultNeg = perturbedA_c * f0;
-        break;
+        double squaredNorm = (original - perturbedResultNeg).squaredNorm();
+        if (squaredNorm < 100 * negEPS)
+        {
+          break;
+        }
+        else
+        {
+          std::cout << "Result diff at -" << negEPS << std::endl
+                    << (original - perturbedResultNeg) << std::endl;
+          std::cout << "A_c original at -" << negEPS << std::endl
+                    << originalA_c << std::endl;
+          std::cout << "A_c diff at -" << negEPS << std::endl
+                    << (originalA_c - perturbedA_c) << std::endl;
+          assert(false && "Encountered too large a jump in finiteDifferenceJacobianOfClampingConstraints()");
+        }
       }
       negEPS /= 2;
     }

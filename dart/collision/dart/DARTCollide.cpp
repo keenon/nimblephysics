@@ -1918,10 +1918,19 @@ void createFaceFaceContacts(
   Eigen::Vector3d basis2dX = normalA.cross(tmp);
   Eigen::Vector3d basis2dY = normalA.cross(basis2dX);
 
-  std::vector<Eigen::Vector3d> pointsAConvex = pointsAWitnessSorted;
-  prepareConvex2DShape(pointsAConvex, origin, basis2dX, basis2dY);
-  std::vector<Eigen::Vector3d> pointsBConvex = pointsBWitnessSorted;
-  prepareConvex2DShape(pointsBConvex, origin, basis2dX, basis2dY);
+  // We have to be very careful to preserve the order of the points so that the
+  // order of our contacts is preserved even under perturbations.
+  std::vector<Eigen::Vector3d> pointsAConvexHull = pointsAWitnessSorted;
+  keepOnlyConvex2DHull(pointsAConvexHull, origin, basis2dX, basis2dY);
+  std::vector<Eigen::Vector3d> pointsAConvexSorted = pointsAConvexHull;
+  prepareConvex2DShape(pointsAConvexSorted, origin, basis2dX, basis2dY);
+
+  // We have to be very careful to preserve the order of the points so that the
+  // order of our contacts is preserved even under perturbations.
+  std::vector<Eigen::Vector3d> pointsBConvexHull = pointsBWitnessSorted;
+  keepOnlyConvex2DHull(pointsBConvexHull, origin, basis2dX, basis2dY);
+  std::vector<Eigen::Vector3d> pointsBConvexSorted = pointsBConvexHull;
+  prepareConvex2DShape(pointsBConvexSorted, origin, basis2dX, basis2dY);
 
   int numContacts = 0;
 
@@ -1930,11 +1939,11 @@ void createFaceFaceContacts(
 
   // Start with points from object A. We'll later do the symmetric thing for
   // object B.
-  for (int i = 0; i < pointsAConvex.size(); i++)
+  for (int i = 0; i < pointsAConvexHull.size(); i++)
   {
-    Eigen::Vector3d vertexA = pointsAConvex[i];
+    Eigen::Vector3d vertexA = pointsAConvexHull[i];
     if (convex2DShapeContains(
-            vertexA, pointsBConvex, origin, basis2dX, basis2dY))
+            vertexA, pointsBConvexSorted, origin, basis2dX, basis2dY))
     {
       numContacts++;
 
@@ -1957,11 +1966,11 @@ void createFaceFaceContacts(
   }
 
   // Now we need to repeat analagous logic for the vertices in shape B
-  for (int i = 0; i < pointsBConvex.size(); i++)
+  for (int i = 0; i < pointsBConvexHull.size(); i++)
   {
-    Eigen::Vector3d vertexB = pointsBConvex[i];
+    Eigen::Vector3d vertexB = pointsBConvexHull[i];
     if (convex2DShapeContains(
-            vertexB, pointsAConvex, origin, basis2dX, basis2dY))
+            vertexB, pointsAConvexSorted, origin, basis2dX, basis2dY))
     {
       numContacts++;
 
@@ -1985,30 +1994,31 @@ void createFaceFaceContacts(
 
   // Now finally we check every pair of edges in shape A and shape B for
   // collisions.
-  for (int i = 0; i < pointsAConvex.size(); i++)
+  for (int i = 0; i < pointsAConvexSorted.size(); i++)
   {
     // Skip the last vertex loop-around if this is just a single edge, since we
     // don't want to count the same edge twice
-    if (i == pointsAConvex.size() - 1 && pointsAConvex.size() == 2)
+    if (i == pointsAConvexSorted.size() - 1 && pointsAConvexSorted.size() == 2)
     {
       continue;
     }
-    Eigen::Vector3d a1World = pointsAConvex[i];
+    Eigen::Vector3d a1World = pointsAConvexSorted[i];
     Eigen::Vector3d a2World
-        = pointsAConvex[i == pointsAConvex.size() - 1 ? 0 : i + 1];
+        = pointsAConvexSorted[i == pointsAConvexSorted.size() - 1 ? 0 : i + 1];
     Eigen::Vector2d a1 = pointInPlane(a1World, origin, basis2dX, basis2dY);
     Eigen::Vector2d a2 = pointInPlane(a2World, origin, basis2dX, basis2dY);
-    for (int j = 0; j < pointsBConvex.size(); j++)
+    for (int j = 0; j < pointsBConvexSorted.size(); j++)
     {
       // Skip the last vertex loop-around if this is just a single edge, since
       // we don't want to count the same edge twice
-      if (j == pointsBConvex.size() - 1 && pointsBConvex.size() == 2)
+      if (j == pointsBConvexSorted.size() - 1
+          && pointsBConvexSorted.size() == 2)
       {
         continue;
       }
-      Eigen::Vector3d b1World = pointsBConvex[j];
-      Eigen::Vector3d b2World
-          = pointsBConvex[j == pointsBConvex.size() - 1 ? 0 : j + 1];
+      Eigen::Vector3d b1World = pointsBConvexSorted[j];
+      Eigen::Vector3d b2World = pointsBConvexSorted
+          [j == pointsBConvexSorted.size() - 1 ? 0 : j + 1];
       Eigen::Vector2d b1 = pointInPlane(b1World, origin, basis2dX, basis2dY);
       Eigen::Vector2d b2 = pointInPlane(b2World, origin, basis2dX, basis2dY);
 
@@ -2069,6 +2079,7 @@ int createMeshMeshContacts(
   std::vector<Eigen::Vector3d> pointsAWitnessSorted = pointsAWitness;
   std::vector<Eigen::Vector3d> pointsBWitnessSorted = pointsBWitness;
 
+  /*
   // `dir` points from A to B, so we want the highest dot product of dir at the
   // front of A
   std::sort(
@@ -2089,6 +2100,7 @@ int createMeshMeshContacts(
         double bDot = b(0) * dir->v[0] + b(1) * dir->v[1] + b(2) * dir->v[2];
         return aDot > bDot;
       });
+      */
 
   // Single vertex-face collision
   if (pointsAWitness.size() == 1 && pointsBWitness.size() > 2)
@@ -2426,6 +2438,7 @@ int createMeshSphereContact(
   else if (meshPointsWitness.size() > 2)
   {
     std::vector<Eigen::Vector3d> pointsWitnessSorted = meshPointsWitness;
+    /*
     // `dir` points from A to B, so we want the highest dot product of dir at
     // the front of A
     std::sort(
@@ -2436,6 +2449,7 @@ int createMeshSphereContact(
           double bDot = b(0) * dir->v[0] + b(1) * dir->v[1] + b(2) * dir->v[2];
           return aDot < bDot;
         });
+        */
     // All the meshPointsWitness vectors are co-planar, so we choose the closest
     // [0], [1] and [2] to cross to get a precise normal
     Eigen::Vector3d normal
@@ -2535,6 +2549,7 @@ int createSphereMeshContact(
   else if (meshPointsWitness.size() > 2)
   {
     std::vector<Eigen::Vector3d> pointsWitnessSorted = meshPointsWitness;
+    /*
     // `dir` points from A to B, so we want the highest dot product of dir at
     // the front of A
     std::sort(
@@ -2545,6 +2560,7 @@ int createSphereMeshContact(
           double bDot = b(0) * dir->v[0] + b(1) * dir->v[1] + b(2) * dir->v[2];
           return aDot < bDot;
         });
+        */
     // All the meshPointsWitness vectors are co-planar, so we choose the closest
     // [0], [1] and [2] to cross to get a precise normal
     Eigen::Vector3d normal
@@ -2833,9 +2849,10 @@ int createCapsuleMeshContact(
         contact.type = EDGE_PIPE;
         contact.edgeAClosestPoint = edgeClosestPoint;
         contact.edgeADir = (meshPointsWitness[1] - meshPointsWitness[0]);
-        contact.edgeBClosestPoint = pipeClosestPoint;
-        contact.edgeBDir = (capsuleB - capsuleA);
-        contact.radiusB = capsuleRadius;
+        contact.pipeClosestPoint = pipeClosestPoint;
+        contact.pipeDir = (capsuleB - capsuleA);
+        contact.pipeFixedPoint = capsuleA;
+        contact.pipeRadius = capsuleRadius;
       }
       else
       {
@@ -2843,11 +2860,12 @@ int createCapsuleMeshContact(
         contact.collisionObject2 = o2;
         contact.normal = normal * -1;
         contact.type = PIPE_EDGE;
-        contact.edgeAClosestPoint = pipeClosestPoint;
-        contact.edgeADir = (capsuleB - capsuleA);
-        contact.radiusA = capsuleRadius;
-        contact.edgeBClosestPoint = edgeClosestPoint;
-        contact.edgeBDir = (meshPointsWitness[1] - meshPointsWitness[0]);
+        contact.pipeClosestPoint = pipeClosestPoint;
+        contact.pipeDir = (capsuleB - capsuleA);
+        contact.pipeFixedPoint = capsuleA;
+        contact.pipeRadius = capsuleRadius;
+        contact.edgeAClosestPoint = edgeClosestPoint;
+        contact.edgeADir = (meshPointsWitness[1] - meshPointsWitness[0]);
       }
       contact.penetrationDepth
           = capsuleRadius - (edgeClosestPoint - pipeClosestPoint).norm();
@@ -2862,6 +2880,7 @@ int createCapsuleMeshContact(
     std::vector<Eigen::Vector3d> pointsWitnessSorted = meshPointsWitness;
     // `dir` points from A to B, so we want the highest dot product of dir at
     // the front of A
+    /*
     std::sort(
         pointsWitnessSorted.begin(),
         pointsWitnessSorted.end(),
@@ -2870,6 +2889,7 @@ int createCapsuleMeshContact(
           double bDot = b(0) * dir->v[0] + b(1) * dir->v[1] + b(2) * dir->v[2];
           return aDot < bDot;
         });
+        */
     // All the meshPointsWitness vectors are co-planar, so we choose the closest
     // [0], [1] and [2] to cross to get a precise normal
     Eigen::Vector3d normal
@@ -2916,6 +2936,7 @@ int createCapsuleMeshContact(
           {
             contact.sphereCenter = capsuleB;
           }
+          contact.point = contact.sphereCenter + contact.normal * capsuleRadius;
         }
         else if (contact.type == EDGE_EDGE)
         {
@@ -2950,7 +2971,7 @@ int createCapsuleMeshContact(
         if (contact.type == VERTEX_FACE)
         {
           contact.type = SPHERE_FACE;
-          contact.radiusA = capsuleRadius;
+          contact.sphereRadius = capsuleRadius;
           // Fill the sphere center value depending on which endpoint this
           // contact is nearest
           if ((contact.point - capsuleA).squaredNorm()
@@ -2962,6 +2983,7 @@ int createCapsuleMeshContact(
           {
             contact.sphereCenter = capsuleB;
           }
+          contact.point = contact.sphereCenter - contact.normal * capsuleRadius;
         }
         else if (contact.type == EDGE_EDGE)
         {
@@ -2987,21 +3009,14 @@ int createCapsuleMeshContact(
   return 0;
 }
 
-/// This is necessary preparation for rapidly checking if another point is
-/// contained within the convex shape. This sorts the shape by angle from the
-/// center, and trims out any points that lie inside the convex polygon.
-void prepareConvex2DShape(
+/// This trims out any points that lie inside the convex polygon, without
+/// changing the order.
+void keepOnlyConvex2DHull(
     std::vector<Eigen::Vector3d>& shape,
     const Eigen::Vector3d& origin,
     const Eigen::Vector3d& basis2dX,
     const Eigen::Vector3d& basis2dY)
 {
-  /*
-  #ifndef NDEBUG
-    int originalSize = shape.size();
-  #endif
-  */
-
   // We need to throw out any points on the inside of the convex shape
   // TODO: there's gotta be a better algorithm than O(n^3).
   while (shape.size() > 0)
@@ -3068,21 +3083,17 @@ void prepareConvex2DShape(
     if (!foundAnyToRemove)
       break;
   }
+}
 
-  /*
-  #ifndef NDEBUG
-    int reducedSize = shape.size();
-    if (reducedSize < originalSize)
-    {
-      std::cout << "Went from " << originalSize << " to " << reducedSize
-                << " using:" << std::endl;
-      std::cout << "Origin: " << std::endl << origin << std::endl;
-      std::cout << "BasisX: " << std::endl << basis2dX << std::endl;
-      std::cout << "BasisY: " << std::endl << basis2dY << std::endl;
-    }
-  #endif
-  */
-
+/// This is necessary preparation for rapidly checking if another point is
+/// contained within the convex shape. This sorts the shape by angle from the
+/// center, and trims out any points that lie inside the convex polygon.
+void prepareConvex2DShape(
+    std::vector<Eigen::Vector3d>& shape,
+    const Eigen::Vector3d& origin,
+    const Eigen::Vector3d& basis2dX,
+    const Eigen::Vector3d& basis2dY)
+{
   // Sort the shape in clockwise order around some internal point (choose the
   // average).
   Eigen::Vector2d avg = Eigen::Vector2d::Zero();
@@ -3708,24 +3719,42 @@ int collideCapsuleCapsule(
     else if (isSphere0)
     {
       contact.type = SPHERE_PIPE;
-      contact.centerA = closest0;
-      contact.edgeBClosestPoint = closest1;
-      contact.edgeBDir = ub - ua;
+      contact.sphereRadius = radius0 * rsum;
+      contact.sphereCenter = closest0;
+      contact.pipeRadius = radius1 * rsum;
+      contact.pipeClosestPoint = closest1;
+      contact.pipeFixedPoint = ua;
+      contact.pipeDir = (ub - ua).normalized();
     }
     else if (isSphere1)
     {
       contact.type = PIPE_SPHERE;
-      contact.edgeAClosestPoint = closest0;
-      contact.edgeADir = pb - pa;
-      contact.centerB = closest1;
+      contact.pipeRadius = radius0 * rsum;
+      contact.pipeClosestPoint = closest0;
+      contact.pipeFixedPoint = pa;
+      contact.pipeDir = (pb - pa).normalized();
+      contact.sphereRadius = radius1 * rsum;
+      contact.sphereCenter = closest1;
     }
     else
     {
       contact.type = PIPE_PIPE;
-      contact.edgeADir = pb - pa;
-      contact.centerB = closest1;
+      contact.radiusA = radius0;
+      contact.radiusB = radius1;
+      contact.edgeAFixedPoint = pa;
+      contact.edgeAClosestPoint = closest0;
+      contact.edgeADir = (pb - pa).normalized();
+      contact.edgeBFixedPoint = ua;
       contact.edgeBClosestPoint = closest1;
-      contact.edgeBDir = ub - ua;
+      contact.edgeBDir = (ub - ua).normalized();
+
+      Eigen::Vector3d contactPoint = math::getContactPoint(
+          contact.edgeAFixedPoint,
+          contact.edgeADir,
+          contact.edgeBFixedPoint,
+          contact.edgeBDir,
+          contact.radiusA,
+          contact.radiusB);
     }
 
     result.addContact(contact);
@@ -3785,9 +3814,12 @@ int collideSphereCapsule(
     else
     {
       contact.type = SPHERE_PIPE;
-      contact.centerA = center0;
-      contact.edgeBClosestPoint = closest1;
-      contact.edgeBDir = ub - ua;
+      contact.sphereRadius = radius0 * rsum;
+      contact.pipeRadius = radius1 * rsum;
+      contact.sphereCenter = center0;
+      contact.pipeClosestPoint = closest1;
+      contact.pipeFixedPoint = ua;
+      contact.pipeDir = (ub - ua).normalized();
     }
 
     result.addContact(contact);
@@ -3847,9 +3879,12 @@ int collideCapsuleSphere(
     else
     {
       contact.type = PIPE_SPHERE;
-      contact.edgeAClosestPoint = closest0;
-      contact.edgeADir = ub - ua;
-      contact.centerB = center1;
+      contact.pipeRadius = radius0 * rsum;
+      contact.pipeClosestPoint = closest0;
+      contact.pipeFixedPoint = ua;
+      contact.pipeDir = (ub - ua).normalized();
+      contact.sphereRadius = radius1 * rsum;
+      contact.sphereCenter = center1;
     }
 
     result.addContact(contact);

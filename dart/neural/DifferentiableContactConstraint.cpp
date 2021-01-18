@@ -145,6 +145,12 @@ DofContactType DifferentiableContactConstraint::getDofContactType(
         return DofContactType::SPHERE_TO_VERTEX;
       case collision::ContactType::VERTEX_SPHERE:
         return DofContactType::VERTEX_TO_SPHERE;
+      case collision::ContactType::SPHERE_PIPE:
+        return DofContactType::SPHERE_TO_PIPE;
+      case collision::ContactType::PIPE_SPHERE:
+        return DofContactType::PIPE_TO_SPHERE;
+      case collision::ContactType::PIPE_PIPE:
+        return DofContactType::PIPE_A;
       default:
         return DofContactType::UNSUPPORTED;
     }
@@ -178,6 +184,12 @@ DofContactType DifferentiableContactConstraint::getDofContactType(
         return DofContactType::VERTEX_TO_SPHERE;
       case collision::ContactType::VERTEX_SPHERE:
         return DofContactType::SPHERE_TO_VERTEX;
+      case collision::ContactType::SPHERE_PIPE:
+        return DofContactType::PIPE_TO_SPHERE;
+      case collision::ContactType::PIPE_SPHERE:
+        return DofContactType::SPHERE_TO_PIPE;
+      case collision::ContactType::PIPE_PIPE:
+        return DofContactType::PIPE_B;
       default:
         return DofContactType::UNSUPPORTED;
     }
@@ -421,6 +433,70 @@ Eigen::Vector3d DifferentiableContactConstraint::getContactPositionGradient(
         mContact->sphereCenter,
         Eigen::Vector3d::Zero());
   }
+  else if (type == SPHERE_TO_PIPE)
+  {
+    double weight = mContact->pipeRadius
+                    / (mContact->sphereRadius + mContact->pipeRadius);
+
+    Eigen::Vector3d rawGrad
+        = math::gradientWrtTheta(worldTwist, mContact->sphereCenter, 0.0);
+    Eigen::Vector3d parallelComponent
+        = mContact->pipeDir.dot(rawGrad) * mContact->pipeDir;
+    Eigen::Vector3d perpendicularComponent = rawGrad - parallelComponent;
+    return parallelComponent + (weight * perpendicularComponent);
+  }
+  else if (type == PIPE_TO_SPHERE)
+  {
+    Eigen::Vector3d rawGrad = math::closestPointOnLineGradient(
+        mContact->pipeFixedPoint,
+        math::gradientWrtTheta(worldTwist, mContact->pipeFixedPoint, 0.0),
+        mContact->pipeDir,
+        math::gradientWrtThetaPureRotation(
+            worldTwist.head<3>(), mContact->pipeDir, 0.0),
+        mContact->sphereCenter,
+        Eigen::Vector3d::Zero());
+    double weight = mContact->sphereRadius
+                    / (mContact->sphereRadius + mContact->pipeRadius);
+    return weight * rawGrad;
+  }
+  else if (type == PIPE_A)
+  {
+    Eigen::Vector3d edgeAPosGradient
+        = math::gradientWrtTheta(worldTwist, mContact->edgeAFixedPoint, 0.0);
+    Eigen::Vector3d edgeADirGradient = math::gradientWrtThetaPureRotation(
+        worldTwist.head<3>(), mContact->edgeADir, 0.0);
+
+    return math::getContactPointGradient(
+        mContact->edgeAFixedPoint,
+        edgeAPosGradient,
+        mContact->edgeADir,
+        edgeADirGradient,
+        mContact->edgeBFixedPoint,
+        Eigen::Vector3d::Zero(),
+        mContact->edgeBDir,
+        Eigen::Vector3d::Zero(),
+        mContact->radiusA,
+        mContact->radiusB);
+  }
+  else if (type == PIPE_B)
+  {
+    Eigen::Vector3d edgeBPosGradient
+        = math::gradientWrtTheta(worldTwist, mContact->edgeBFixedPoint, 0.0);
+    Eigen::Vector3d edgeBDirGradient = math::gradientWrtThetaPureRotation(
+        worldTwist.head<3>(), mContact->edgeBDir, 0.0);
+
+    return math::getContactPointGradient(
+        mContact->edgeAFixedPoint,
+        Eigen::Vector3d::Zero(),
+        mContact->edgeADir,
+        Eigen::Vector3d::Zero(),
+        mContact->edgeBFixedPoint,
+        edgeBPosGradient,
+        mContact->edgeBDir,
+        edgeBDirGradient,
+        mContact->radiusA,
+        mContact->radiusB);
+  }
 
   // Default case
   return Eigen::Vector3d::Zero();
@@ -441,6 +517,24 @@ Eigen::Vector3d DifferentiableContactConstraint::getContactNormalGradient(
   int jointIndex = dof->getIndexInJoint();
   dynamics::BodyNode* childNode = dof->getChildBodyNode();
   Eigen::Vector6d worldTwist = dof->getJoint()->getWorldAxisScrew(jointIndex);
+
+  // TODO(keenon): figure out a way to patch the Unit Z singularity in the
+  // friction cone computations
+  if (mContact->normal.cross(Eigen::Vector3d::UnitZ()).squaredNorm() < 1e-7
+      && mIndex > 0)
+  {
+    dterr << "Attempting to get a contact normal gradient through a "
+             "frictional contact where the underlying contact normal is very "
+             "near Unit Z! This can lead to gradient issues because of how "
+             "the friction cone basis are computed. The Unit Z normal is a "
+             "non-differentiable singularity for the friction basis, and the "
+             "friction directions can change very rapidly near the Unit Z "
+             "contact normal. If you can reformulate "
+             "your problem to change the angle of this contact, please do "
+             "so. Otherwise, you'll have to wait for a patch to address this "
+             "issue."
+          << std::endl;
+  }
 
   if (type == SPHERE_A)
   {
@@ -471,7 +565,7 @@ Eigen::Vector3d DifferentiableContactConstraint::getContactNormalGradient(
       contactPosGrad /= norm;
       spherePosGrad /= norm;
     }
-    Eigen::Vector3d totalGrad;
+    Eigen::Vector3d totalGrad = Eigen::Vector3d::Zero();
     // The normal flips direction depending on which order the contact detection
     // was called in :(
     if (mContact->type == collision::BOX_SPHERE)
@@ -482,7 +576,11 @@ Eigen::Vector3d DifferentiableContactConstraint::getContactNormalGradient(
     else if (mContact->type == collision::SPHERE_BOX)
     {
       // normal = sphereCenter - contact_pt
-      totalGrad += spherePosGrad - contactPosGrad;
+      totalGrad = spherePosGrad - contactPosGrad;
+    }
+    else
+    {
+      assert(false && "Illegal contact type detected");
     }
     totalGrad -= totalGrad.dot(normal) * normal;
     return totalGrad;
@@ -497,7 +595,7 @@ Eigen::Vector3d DifferentiableContactConstraint::getContactNormalGradient(
     {
       contactPosGrad /= norm;
     }
-    Eigen::Vector3d totalGrad;
+    Eigen::Vector3d totalGrad = Eigen::Vector3d::Zero();
     // The normal flips direction depending on which order the contact detection
     // was called in :(
     if (mContact->type == collision::BOX_SPHERE)
@@ -508,7 +606,11 @@ Eigen::Vector3d DifferentiableContactConstraint::getContactNormalGradient(
     else if (mContact->type == collision::SPHERE_BOX)
     {
       // normal = sphereCenter - contact_pt
-      totalGrad += -contactPosGrad;
+      totalGrad = -contactPosGrad;
+    }
+    else
+    {
+      assert(false && "Illegal contact type detected");
     }
     totalGrad -= totalGrad.dot(normal) * normal;
     return totalGrad;
@@ -616,6 +718,127 @@ Eigen::Vector3d DifferentiableContactConstraint::getContactNormalGradient(
     {
       return -normGrad;
     }
+  }
+  else if (type == SPHERE_TO_PIPE)
+  {
+    double norm = (mContact->edgeAClosestPoint - mContact->sphereCenter).norm();
+    Eigen::Vector3d normGrad
+        = math::gradientWrtTheta(worldTwist, mContact->sphereCenter, 0.0);
+    normGrad -= normGrad.dot(mContact->pipeDir) * mContact->pipeDir;
+    normGrad /= norm;
+    normGrad -= mContact->normal.dot(normGrad) * mContact->normal;
+
+    if (getContactType() == collision::ContactType::SPHERE_PIPE)
+    {
+      return normGrad;
+    }
+    else
+    {
+      return -normGrad;
+    }
+  }
+  else if (type == PIPE_TO_SPHERE)
+  {
+    Eigen::Vector3d closestPointGrad = math::closestPointOnLineGradient(
+        mContact->pipeFixedPoint,
+        math::gradientWrtTheta(worldTwist, mContact->pipeFixedPoint, 0.0),
+        mContact->pipeDir,
+        math::gradientWrtThetaPureRotation(
+            worldTwist.head<3>(), mContact->pipeDir, 0.0),
+        mContact->sphereCenter,
+        Eigen::Vector3d::Zero());
+
+    double norm = (mContact->pipeClosestPoint - mContact->sphereCenter).norm();
+    Eigen::Vector3d normGrad = closestPointGrad;
+    normGrad /= norm;
+    normGrad -= mContact->normal.dot(normGrad) * mContact->normal;
+
+    if (getContactType() == collision::ContactType::PIPE_SPHERE)
+    {
+      return normGrad;
+    }
+    else
+    {
+      return -normGrad;
+    }
+  }
+  else if (type == PIPE_A)
+  {
+    Eigen::Vector3d edgeAPosGradient
+        = math::gradientWrtTheta(worldTwist, mContact->edgeAFixedPoint, 0.0);
+    Eigen::Vector3d edgeADirGradient = math::gradientWrtThetaPureRotation(
+        worldTwist.head<3>(), mContact->edgeADir, 0.0);
+
+    Eigen::Vector3d closestPointAGrad = math::getContactPointGradient(
+        mContact->edgeAFixedPoint,
+        edgeAPosGradient,
+        mContact->edgeADir,
+        edgeADirGradient,
+        mContact->edgeBFixedPoint,
+        Eigen::Vector3d::Zero(),
+        mContact->edgeBDir,
+        Eigen::Vector3d::Zero(),
+        0.0,
+        1.0);
+
+    Eigen::Vector3d closestPointBGrad = math::getContactPointGradient(
+        mContact->edgeAFixedPoint,
+        edgeAPosGradient,
+        mContact->edgeADir,
+        edgeADirGradient,
+        mContact->edgeBFixedPoint,
+        Eigen::Vector3d::Zero(),
+        mContact->edgeBDir,
+        Eigen::Vector3d::Zero(),
+        1.0,
+        0.0);
+
+    Eigen::Vector3d normGrad = closestPointAGrad - closestPointBGrad;
+    double norm
+        = (mContact->edgeAClosestPoint - mContact->edgeBClosestPoint).norm();
+    normGrad /= norm;
+    normGrad -= mContact->normal.dot(normGrad) * mContact->normal;
+
+    return normGrad;
+  }
+  else if (type == PIPE_B)
+  {
+    Eigen::Vector3d edgeBPosGradient
+        = math::gradientWrtTheta(worldTwist, mContact->edgeBFixedPoint, 0.0);
+    Eigen::Vector3d edgeBDirGradient = math::gradientWrtThetaPureRotation(
+        worldTwist.head<3>(), mContact->edgeBDir, 0.0);
+
+    Eigen::Vector3d closestPointAGrad = math::getContactPointGradient(
+        mContact->edgeAFixedPoint,
+        Eigen::Vector3d::Zero(),
+        mContact->edgeADir,
+        Eigen::Vector3d::Zero(),
+        mContact->edgeBFixedPoint,
+        edgeBPosGradient,
+        mContact->edgeBDir,
+        edgeBDirGradient,
+        0.0,
+        1.0);
+
+    Eigen::Vector3d closestPointBGrad = math::getContactPointGradient(
+        mContact->edgeAFixedPoint,
+        Eigen::Vector3d::Zero(),
+        mContact->edgeADir,
+        Eigen::Vector3d::Zero(),
+        mContact->edgeBFixedPoint,
+        edgeBPosGradient,
+        mContact->edgeBDir,
+        edgeBDirGradient,
+        1.0,
+        0.0);
+
+    Eigen::Vector3d normGrad = closestPointAGrad - closestPointBGrad;
+    double norm
+        = (mContact->edgeAClosestPoint - mContact->edgeBClosestPoint).norm();
+    normGrad /= norm;
+    normGrad -= mContact->normal.dot(normGrad) * mContact->normal;
+
+    return normGrad;
   }
 
   // Default case
@@ -1399,6 +1622,71 @@ DifferentiableContactConstraint::estimatePerturbedContactPosition(
         rotation * mContact->edgeADir,
         mContact->sphereCenter);
   }
+  else if (type == SPHERE_TO_PIPE)
+  {
+    Eigen::Vector6d worldTwist = getWorldScrewAxisForPosition(skel, dofIndex);
+    Eigen::Isometry3d rotation = math::expMap(worldTwist * eps);
+    double weight = mContact->pipeRadius
+                    / (mContact->sphereRadius + mContact->pipeRadius);
+
+    Eigen::Vector3d posDiff
+        = (rotation * mContact->sphereCenter) - mContact->sphereCenter;
+    Eigen::Vector3d parallelComponent
+        = mContact->pipeDir.dot(posDiff) * mContact->pipeDir;
+    Eigen::Vector3d perpendicularComponent = posDiff - parallelComponent;
+
+    Eigen::Vector3d weightedDiff
+        = parallelComponent + (weight * perpendicularComponent);
+
+    return contactPos + weightedDiff;
+  }
+  else if (type == PIPE_TO_SPHERE)
+  {
+    Eigen::Vector6d worldTwist = getWorldScrewAxisForPosition(skel, dofIndex);
+    Eigen::Isometry3d translation = math::expMap(worldTwist * eps);
+    Eigen::Isometry3d rotation = math::expMap(worldTwist * eps);
+    rotation.translation().setZero();
+    Eigen::Vector3d posDiff = math::closestPointOnLine(
+                                  translation * mContact->pipeFixedPoint,
+                                  rotation * mContact->pipeDir,
+                                  mContact->sphereCenter)
+                              - mContact->pipeClosestPoint;
+
+    double weight = mContact->sphereRadius
+                    / (mContact->sphereRadius + mContact->pipeRadius);
+
+    return contactPos + (weight * posDiff);
+  }
+  else if (type == PIPE_A)
+  {
+    Eigen::Vector6d worldTwist = getWorldScrewAxisForPosition(skel, dofIndex);
+    Eigen::Isometry3d translation = math::expMap(worldTwist * eps);
+    Eigen::Isometry3d rotation = translation;
+    rotation.translation().setZero();
+    Eigen::Vector3d contactPoint = math::getContactPoint(
+        translation * mContact->edgeAFixedPoint,
+        rotation * mContact->edgeADir,
+        mContact->edgeBFixedPoint,
+        mContact->edgeBDir,
+        mContact->radiusA,
+        mContact->radiusB);
+    return contactPoint;
+  }
+  else if (type == PIPE_B)
+  {
+    Eigen::Vector6d worldTwist = getWorldScrewAxisForPosition(skel, dofIndex);
+    Eigen::Isometry3d translation = math::expMap(worldTwist * eps);
+    Eigen::Isometry3d rotation = translation;
+    rotation.translation().setZero();
+    Eigen::Vector3d contactPoint = math::getContactPoint(
+        mContact->edgeAFixedPoint,
+        mContact->edgeADir,
+        translation * mContact->edgeBFixedPoint,
+        rotation * mContact->edgeBDir,
+        mContact->radiusA,
+        mContact->radiusB);
+    return contactPoint;
+  }
 
   // Default case
   return contactPos;
@@ -1580,6 +1868,96 @@ Eigen::Vector3d DifferentiableContactConstraint::estimatePerturbedContactNormal(
     {
       return -normal;
     }
+  }
+  else if (type == SPHERE_TO_PIPE)
+  {
+    Eigen::Vector6d worldTwist = getWorldScrewAxisForPosition(skel, dofIndex);
+    Eigen::Isometry3d rotation = math::expMap(worldTwist * eps);
+    double norm = (mContact->sphereCenter - mContact->pipeClosestPoint).norm();
+    Eigen::Vector3d posDiff
+        = (rotation * mContact->sphereCenter) - mContact->sphereCenter;
+    posDiff -= posDiff.dot(mContact->pipeDir) * mContact->pipeDir;
+    posDiff /= norm;
+    if (getContactType() == collision::ContactType::SPHERE_PIPE)
+    {
+      return (normal + posDiff).normalized();
+    }
+    else
+    {
+      return (normal - posDiff).normalized();
+    }
+  }
+  else if (type == PIPE_TO_SPHERE)
+  {
+    Eigen::Vector6d worldTwist = getWorldScrewAxisForPosition(skel, dofIndex);
+    Eigen::Isometry3d translation = math::expMap(worldTwist * eps);
+    Eigen::Isometry3d rotation = math::expMap(worldTwist * eps);
+    rotation.translation().setZero();
+    double norm = (mContact->sphereCenter - mContact->pipeClosestPoint).norm();
+    Eigen::Vector3d posDiff = math::closestPointOnLine(
+                                  translation * mContact->pipeFixedPoint,
+                                  rotation * mContact->pipeDir,
+                                  mContact->sphereCenter)
+                              - mContact->pipeClosestPoint;
+    posDiff /= norm;
+    if (getContactType() == collision::ContactType::PIPE_SPHERE)
+    {
+      return (normal + posDiff).normalized();
+    }
+    else
+    {
+      return (normal - posDiff).normalized();
+    }
+  }
+  else if (type == PIPE_A)
+  {
+    Eigen::Vector6d worldTwist = getWorldScrewAxisForPosition(skel, dofIndex);
+    Eigen::Isometry3d translation = math::expMap(worldTwist * eps);
+    Eigen::Isometry3d rotation = translation;
+    rotation.translation().setZero();
+
+    Eigen::Vector3d pipeANearestPoint = math::getContactPoint(
+        translation * mContact->edgeAFixedPoint,
+        rotation * mContact->edgeADir,
+        mContact->edgeBFixedPoint,
+        mContact->edgeBDir,
+        0.0,
+        1.0);
+
+    Eigen::Vector3d pipeBNearestPoint = math::getContactPoint(
+        translation * mContact->edgeAFixedPoint,
+        rotation * mContact->edgeADir,
+        mContact->edgeBFixedPoint,
+        mContact->edgeBDir,
+        1.0,
+        0.0);
+
+    return (pipeANearestPoint - pipeBNearestPoint).normalized();
+  }
+  else if (type == PIPE_B)
+  {
+    Eigen::Vector6d worldTwist = getWorldScrewAxisForPosition(skel, dofIndex);
+    Eigen::Isometry3d translation = math::expMap(worldTwist * eps);
+    Eigen::Isometry3d rotation = translation;
+    rotation.translation().setZero();
+
+    Eigen::Vector3d pipeANearestPoint = math::getContactPoint(
+        mContact->edgeAFixedPoint,
+        mContact->edgeADir,
+        translation * mContact->edgeBFixedPoint,
+        rotation * mContact->edgeBDir,
+        0.0,
+        1.0);
+
+    Eigen::Vector3d pipeBNearestPoint = math::getContactPoint(
+        mContact->edgeAFixedPoint,
+        mContact->edgeADir,
+        translation * mContact->edgeBFixedPoint,
+        rotation * mContact->edgeBDir,
+        1.0,
+        0.0);
+
+    return (pipeANearestPoint - pipeBNearestPoint).normalized();
   }
 
   // Default case
@@ -2088,10 +2466,9 @@ DifferentiableContactConstraint::getPeerConstraint(
     double distance
         = (constraint->getContactWorldPosition() - getContactWorldPosition())
               .squaredNorm()
-          + (constraint->getContactWorldForceDirection()
-             - getContactWorldForceDirection())
+          + (constraint->getContactWorldNormal() - getContactWorldNormal())
                 .squaredNorm();
-    if (distance < minDistance)
+    if (mIndex == constraint->mIndex && distance < minDistance)
     {
       closestConstraint = constraint;
       minDistance = distance;

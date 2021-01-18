@@ -156,6 +156,18 @@ struct Contact
   /// This is useful for SPHERE_FACE, SPHERE_EDGE, SPHERE_VERTEX, etc
   double sphereRadius;
 
+  /// This is only filled for (type == PIPE_SPHERE || type == SPHERE_PIPE)
+  Eigen::Vector3d pipeDir;
+
+  /// This is only filled for (type == PIPE_SPHERE || type == SPHERE_PIPE)
+  Eigen::Vector3d pipeClosestPoint;
+
+  /// This is only filled for (type == PIPE_SPHERE || type == SPHERE_PIPE)
+  Eigen::Vector3d pipeFixedPoint;
+
+  /// This is only filled for (type == PIPE_SPHERE || type == SPHERE_PIPE)
+  double pipeRadius;
+
   /// This is useful for SPHERE_VERTEX, PIPE_VERTEX, etc
   Eigen::Vector3d vertexPoint;
 

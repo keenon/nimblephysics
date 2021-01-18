@@ -774,7 +774,9 @@ Eigen::Vector3d getContactPoint(
     const Eigen::Vector3d& edgeAPoint,
     const Eigen::Vector3d& edgeADir,
     const Eigen::Vector3d& edgeBPoint,
-    const Eigen::Vector3d& edgeBDir)
+    const Eigen::Vector3d& edgeBDir,
+    double radiusA,
+    double radiusB)
 {
   double alpha;
   double beta;
@@ -782,7 +784,8 @@ Eigen::Vector3d getContactPoint(
       edgeAPoint, edgeADir, edgeBPoint, edgeBDir, &alpha, &beta);
   Eigen::Vector3d closestPointA = edgeAPoint + alpha * edgeADir;
   Eigen::Vector3d closestPointB = edgeBPoint + beta * edgeBDir;
-  Eigen::Vector3d resultA = (closestPointA + closestPointB) / 2;
+  Eigen::Vector3d resultA = (closestPointA * radiusB + closestPointB * radiusA)
+                            / (radiusA + radiusB);
 
   /// TODO: this is the old way
 
@@ -795,7 +798,8 @@ Eigen::Vector3d getContactPoint(
   {
     // Comment from original code in DARTCollide.cpp: "@@@ this needs to be made
     // more robust" Don't try to find the nearest point, just average the points
-    Eigen::Vector3d resultB = (edgeAPoint + edgeBPoint) / 2;
+    Eigen::Vector3d resultB
+        = (edgeAPoint * radiusB + edgeBPoint * radiusA) / (radiusA + radiusB);
     if (resultA != resultB)
     {
       std::cout << "Error detected!" << std::endl;
@@ -807,9 +811,9 @@ Eigen::Vector3d getContactPoint(
     d = 1.0 / d;
     double alpha = (q1 + uaub * q2) * d;
     double beta = (uaub * q1 + q2) * d;
-    Eigen::Vector3d resultB
-        = ((edgeAPoint + alpha * edgeADir) + (edgeBPoint + beta * edgeBDir))
-          / 2;
+    Eigen::Vector3d resultB = ((edgeAPoint + alpha * edgeADir) * radiusB
+                               + (edgeBPoint + beta * edgeBDir) * radiusA)
+                              / (radiusA + radiusB);
     if (resultA != resultB)
     {
       std::cout << "Error detected!" << std::endl;
@@ -828,7 +832,9 @@ Eigen::Vector3d getContactPointGradient(
     const Eigen::Vector3d& edgeBPoint,
     const Eigen::Vector3d& edgeBPointGradient,
     const Eigen::Vector3d& edgeBDir,
-    const Eigen::Vector3d& edgeBDirGradient)
+    const Eigen::Vector3d& edgeBDirGradient,
+    double radiusA,
+    double radiusB)
 {
   const double EPS = 1e-7;
   Eigen::Vector3d p = edgeBPoint - edgeAPoint;
@@ -877,7 +883,8 @@ Eigen::Vector3d getContactPointGradient(
   {
     // Comment from original code in DARTCollide.cpp: "@@@ this needs to be made
     // more robust" Don't try to find the nearest point, just average the points
-    return (edgeAPointGradient + edgeBPointGradient) / 2;
+    return (edgeAPointGradient * radiusB + edgeBPointGradient * radiusA)
+           / (radiusA + radiusB);
   }
   else
   {
@@ -921,9 +928,11 @@ Eigen::Vector3d getContactPointGradient(
      Eigen::Vector3d d_offsetB_brute = (offsetB_prime - offsetB) / EPS;
      */
 
-    return (edgeAPointGradient + edgeBPointGradient + alpha * edgeADirGradient
-            + d_alpha * edgeADir + beta * edgeBDirGradient + d_beta * edgeBDir)
-           / 2;
+    return ((edgeAPointGradient + alpha * edgeADirGradient + d_alpha * edgeADir)
+                * radiusB
+            + (edgeBPointGradient + beta * edgeBDirGradient + d_beta * edgeBDir)
+                  * radiusA)
+           / (radiusA + radiusB);
   }
 }
 

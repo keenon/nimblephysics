@@ -90,7 +90,31 @@ const Contact& CollisionResult::getContact(std::size_t index) const
 void CollisionResult::sortContacts(Eigen::Vector3d& randDirection)
 {
   std::sort(mContacts.begin(), mContacts.end(), [&](Contact& a, Contact& b) {
-    return a.point.dot(randDirection) < b.point.dot(randDirection);
+    double dotA = a.point.dot(randDirection);
+    double dotB = b.point.dot(randDirection);
+    if (dotA == dotB)
+    {
+      dotA = a.normal.dot(randDirection);
+      dotB = b.normal.dot(randDirection);
+      if (dotA == dotB)
+      {
+        Eigen::Vector3d ortho1 = a.normal.cross(randDirection);
+        dotA = a.point.dot(ortho1);
+        dotB = b.point.dot(ortho1);
+        if (dotA == dotB)
+        {
+          dotA = a.normal.dot(ortho1);
+          dotB = b.normal.dot(ortho1);
+          if (dotA == dotB)
+          {
+            Eigen::Vector3d ortho2 = randDirection.cross(ortho1);
+            dotA = a.normal.dot(ortho2);
+            dotB = b.normal.dot(ortho2);
+          }
+        }
+      }
+    }
+    return dotA < dotB;
   });
 }
 

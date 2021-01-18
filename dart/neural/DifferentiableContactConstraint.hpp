@@ -51,6 +51,10 @@ enum DofContactType
   EDGE_TO_SPHERE = 15,
   SPHERE_TO_VERTEX = 16,
   VERTEX_TO_SPHERE = 17,
+  PIPE_TO_SPHERE = 18,
+  SPHERE_TO_PIPE = 19,
+  PIPE_A = 20,
+  PIPE_B = 21,
 };
 
 struct EdgeData

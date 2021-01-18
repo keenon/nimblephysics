@@ -356,6 +356,14 @@ bool convex2DShapeContains(
 shape);
 */
 
+/// This trims out any points that lie inside the convex polygon, without
+/// changing the order.
+void keepOnlyConvex2DHull(
+    std::vector<Eigen::Vector3d>& shape,
+    const Eigen::Vector3d& origin,
+    const Eigen::Vector3d& basis2dX,
+    const Eigen::Vector3d& basis2dY);
+
 /// This is necessary preparation for rapidly checking if another point is
 /// contained within the convex shape. This sorts the shape by angle from
 /// the center, and trims out any points that lie inside the convex polygon.

@@ -874,6 +874,7 @@ TEST(DARTCollide, PREPARE_2D_CVX_SHAPE)
   Eigen::Vector3d basisX = Eigen::Vector3d::UnitX();
   Eigen::Vector3d basisY = Eigen::Vector3d::UnitY();
 
+  keepOnlyConvex2DHull(shape, origin, basisX, basisY);
   prepareConvex2DShape(shape, origin, basisX, basisY);
   EXPECT_EQ(4, shape.size());
 
@@ -905,6 +906,7 @@ TEST(DARTCollide, CVX_2D_SHAPE_CONTAINS)
   Eigen::Vector3d basisX = Eigen::Vector3d::UnitX();
   Eigen::Vector3d basisY = Eigen::Vector3d::UnitY();
 
+  keepOnlyConvex2DHull(shape, origin, basisX, basisY);
   prepareConvex2DShape(shape, origin, basisX, basisY);
   EXPECT_EQ(4, shape.size());
 
@@ -947,6 +949,7 @@ TEST(DARTCollide, PREPARE_2D_CVX_SHAPE_COLINEAR)
   Eigen::Vector3d basisX = Eigen::Vector3d::UnitX();
   Eigen::Vector3d basisY = Eigen::Vector3d::UnitY();
 
+  keepOnlyConvex2DHull(shape, origin, basisX, basisY);
   prepareConvex2DShape(shape, origin, basisX, basisY);
   EXPECT_EQ(8, shape.size());
 
@@ -994,6 +997,7 @@ TEST(DARTCollide, CVX_2D_SHAPE_CONTAINS_OFFSET)
   Eigen::Vector3d basisX = Eigen::Vector3d::UnitX();
   Eigen::Vector3d basisY = Eigen::Vector3d::UnitY();
 
+  keepOnlyConvex2DHull(shape, origin, basisX, basisY);
   prepareConvex2DShape(shape, origin, basisX, basisY);
 
   EXPECT_TRUE(convex2DShapeContains(

@@ -16,13 +16,14 @@
 #include "dart/neural/NeuralUtils.hpp"
 #include "dart/neural/RestorableSnapshot.hpp"
 #include "dart/neural/WithRespectToMass.hpp"
+#include "dart/server/GUIWebsocketServer.hpp"
 #include "dart/simulation/World.hpp"
 
 #include "GradientTestUtils.hpp"
 #include "TestHelpers.hpp"
 #include "stdio.h"
 
-#define ALL_TESTS
+// #define ALL_TESTS
 
 using namespace dart;
 using namespace math;
@@ -326,11 +327,9 @@ void testSphereBoxCollision(bool isSelfCollision, int numFaces)
   world->setVelocities(vels);
 
   // renderWorld(world);
-  /*
   EXPECT_TRUE(verifyAnalyticalJacobians(world));
   EXPECT_TRUE(verifyVelGradients(world, vels));
   EXPECT_TRUE(verifyWrtMass(world));
-  */
 
   //////////////////////////////////////////////////
   // Try it in reverse skeleton order, to flip collision type enums
@@ -344,12 +343,10 @@ void testSphereBoxCollision(bool isSelfCollision, int numFaces)
   world->addSkeleton(box);
 
   // EXPECT_TRUE(verifyPerturbedContactPositions(world));
-  EXPECT_TRUE(verifyPerturbedContactNormals(world));
-  /*
+  // EXPECT_TRUE(verifyPerturbedContactNormals(world));
   EXPECT_TRUE(verifyAnalyticalJacobians(world));
   EXPECT_TRUE(verifyVelGradients(world, vels));
   EXPECT_TRUE(verifyWrtMass(world));
-  */
 }
 
 #ifdef ALL_TESTS
@@ -580,5 +577,527 @@ TEST(GRADIENTS, SPHERE_MESH_COLLISION_3_FACE)
 TEST(GRADIENTS, SPHERE_MESH_SELF_COLLISION_1_FACE)
 {
   testSphereMeshCollision(true, 1);
+}
+#endif
+
+/**
+ * This sets up a sphere colliding with a capsule, either on the end or at the
+ * mid-section.
+ *
+ *     C===D CD
+ *
+ *     or
+ *
+ *       CD
+ *     C===D
+ */
+void testSphereCapsuleCollision(bool isSelfCollision, int type)
+{
+  double height = 1.0;
+  double radius1 = 0.4;
+  double radius2 = 0.3;
+
+  Eigen::Isometry3d T1 = Eigen::Isometry3d::Identity();
+  Eigen::Isometry3d T2 = Eigen::Isometry3d::Identity();
+  if (type == 1)
+  {
+    T2.translation()(2) = height / 2 + sqrt(0.5) * (radius1 + radius2 - 0.01);
+    // Move slightly off exact Z axis, to avoid issues where we're finite
+    // differencing over a discontinuity in the friction cone matrix.
+    T2.translation()(0) = sqrt(0.5) * (radius1 + radius2 - 0.01);
+  }
+  else if (type == 2)
+  {
+    T2.translation()(0) = radius1 + radius2 - 0.01;
+  }
+
+  // World
+  WorldPtr world = World::create();
+  auto collision_detector
+      = collision::CollisionDetector::getFactory()->create("dart");
+  world->getConstraintSolver()->setCollisionDetector(collision_detector);
+  world->setGravity(Eigen::Vector3d(0, -9.81, 0));
+
+  // This capsule is centered at (0,0,0), and extends in the Z direction
+  SkeletonPtr capsule = Skeleton::create("capsule");
+  std::pair<FreeJoint*, BodyNode*> capsulePair
+      = capsule->createJointAndBodyNodePair<FreeJoint>();
+  capsulePair.first->setTransformFromParentBodyNode(T1);
+
+  std::shared_ptr<CapsuleShape> boxShape(new CapsuleShape(radius1, height));
+
+  ShapeNode* capsuleNode
+      = capsulePair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(
+          boxShape);
+
+  SkeletonPtr sphere = Skeleton::create("sphere");
+  std::pair<FreeJoint*, BodyNode*> spherePair;
+
+  if (isSelfCollision)
+  {
+    capsule->enableSelfCollision(true);
+    spherePair
+        = capsulePair.second->createChildJointAndBodyNodePair<FreeJoint>();
+  }
+  else
+  {
+    spherePair = sphere->createJointAndBodyNodePair<FreeJoint>();
+  }
+
+  std::shared_ptr<SphereShape> sphereShape(new SphereShape(radius2));
+  ShapeNode* sphereNode
+      = spherePair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(
+          sphereShape);
+  FreeJoint* sphereJoint = spherePair.first;
+  Eigen::Matrix3d rotation = Eigen::Matrix3d::Identity();
+
+  sphereJoint->setTransformFromParentBodyNode(T2);
+
+  world->addSkeleton(capsule);
+  if (!isSelfCollision)
+  {
+    world->addSkeleton(sphere);
+  }
+
+  Eigen::VectorXd vels = Eigen::VectorXd::Zero(world->getNumDofs());
+  if (type == 1)
+  {
+    // Set the vel of the Z translation of the sphere
+    vels(11) = -0.01;
+  }
+  else if (type == 2)
+  {
+    // Set the vel of the X translation of the sphere
+    vels(9) = -0.01;
+  }
+  world->setVelocities(vels);
+
+  // renderWorld(world);
+  // EXPECT_TRUE(verifyPerturbedContactPositions(world));
+  // EXPECT_TRUE(verifyPerturbedContactNormals(world));
+  // EXPECT_TRUE(verifyPerturbedContactEdges(world));
+  // EXPECT_TRUE(verifyPerturbedContactForceDirections(world));
+  EXPECT_TRUE(verifyAnalyticalJacobians(world));
+  EXPECT_TRUE(verifyVelGradients(world, vels));
+  EXPECT_TRUE(verifyWrtMass(world));
+
+  /*
+  server::GUIWebsocketServer server;
+  server.renderWorld(world);
+  server.renderBasis();
+  server.serve(8070);
+
+  while (server.isServing())
+  {
+  }
+  */
+
+  //////////////////////////////////////////////////
+  // Try it in reverse skeleton order, to flip collision type enums
+  //////////////////////////////////////////////////
+
+  world->removeAllSkeletons();
+  if (!isSelfCollision)
+  {
+    world->addSkeleton(sphere);
+  }
+  world->addSkeleton(capsule);
+
+  // EXPECT_TRUE(verifyPerturbedContactPositions(world));
+  // EXPECT_TRUE(verifyPerturbedContactNormals(world));
+  EXPECT_TRUE(verifyAnalyticalJacobians(world));
+  EXPECT_TRUE(verifyVelGradients(world, vels));
+  EXPECT_TRUE(verifyWrtMass(world));
+}
+
+#ifdef ALL_TESTS
+TEST(GRADIENTS, SPHERE_CAPSULE_END_COLLISION)
+{
+  testSphereCapsuleCollision(false, 1);
+}
+
+TEST(GRADIENTS, SPHERE_CAPSULE_SIDE_COLLISION)
+{
+  testSphereCapsuleCollision(false, 2);
+}
+
+TEST(GRADIENTS, SPHERE_CAPSULE_SIDE_SELF_COLLISION)
+{
+  testSphereCapsuleCollision(true, 2);
+}
+#endif
+
+/**
+ * This sets up a pair of capsules colliding
+ */
+void testCapsuleCapsuleCollision(bool isSelfCollision, int type)
+{
+  double height = 1.0;
+  double radius1 = 0.4;
+  double radius2 = 0.3;
+
+  Eigen::Isometry3d T1 = Eigen::Isometry3d::Identity();
+
+  Eigen::Isometry3d T2 = Eigen::Isometry3d::Identity();
+  if (type == 1)
+  {
+    // T shaped
+    T2.translation()(0) = radius1 + radius2 + (height / 2) - 0.01;
+    T2.linear() = math::eulerXYZToMatrix(Eigen::Vector3d(0, M_PI_2, 0));
+  }
+  else if (type == 2)
+  {
+    // X shaped
+    T2.translation()(1) = radius1 + radius2 - 0.01;
+    T2.linear() = math::eulerXYZToMatrix(Eigen::Vector3d(0, M_PI_2, 0));
+  }
+  else if (type == 3)
+  {
+    // L shaped
+    T2.translation()(0) = sqrt(0.5) * ((height / 2) + radius1 + radius2 - 0.01);
+    T2.translation()(2)
+        = (height / 2)
+          + (sqrt(0.5) * ((height / 2) + radius1 + radius2 - 0.01));
+    T2.linear() = math::eulerXYZToMatrix(Eigen::Vector3d(0, M_PI_4, 0));
+  }
+
+  // World
+  WorldPtr world = World::create();
+  auto collision_detector
+      = collision::CollisionDetector::getFactory()->create("dart");
+  world->getConstraintSolver()->setCollisionDetector(collision_detector);
+  world->setGravity(Eigen::Vector3d(0, -9.81, 0));
+
+  // This capsule is centered at (0,0,0), and extends in the Z direction
+  SkeletonPtr capsuleA = Skeleton::create("capsule_A");
+  std::pair<FreeJoint*, BodyNode*> capsulePair
+      = capsuleA->createJointAndBodyNodePair<FreeJoint>();
+  capsulePair.first->setTransformFromParentBodyNode(T1);
+
+  std::shared_ptr<CapsuleShape> capsuleShapeA(
+      new CapsuleShape(radius1, height));
+
+  ShapeNode* capsuleNodeA
+      = capsulePair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(
+          capsuleShapeA);
+
+  SkeletonPtr capsuleB = Skeleton::create("capsuleB");
+  std::pair<FreeJoint*, BodyNode*> capsuleBPair;
+
+  if (isSelfCollision)
+  {
+    capsuleA->enableSelfCollision(true);
+    capsuleBPair
+        = capsulePair.second->createChildJointAndBodyNodePair<FreeJoint>();
+  }
+  else
+  {
+    capsuleBPair = capsuleB->createJointAndBodyNodePair<FreeJoint>();
+  }
+
+  std::shared_ptr<CapsuleShape> capsuleShapeB(
+      new CapsuleShape(radius2, height));
+  ShapeNode* sphereNode
+      = capsuleBPair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(
+          capsuleShapeB);
+  FreeJoint* sphereJoint = capsuleBPair.first;
+  Eigen::Matrix3d rotation = Eigen::Matrix3d::Identity();
+
+  sphereJoint->setTransformFromParentBodyNode(T2);
+
+  world->addSkeleton(capsuleA);
+  if (!isSelfCollision)
+  {
+    world->addSkeleton(capsuleB);
+  }
+
+  Eigen::VectorXd vels = Eigen::VectorXd::Zero(world->getNumDofs());
+  if (type == 1)
+  {
+    // Set the vel of the X translation of capsule B
+    vels(9) = -0.01;
+  }
+  else if (type == 2)
+  {
+    // Set the vel of the Y translation of capsule B
+    vels(10) = -0.01;
+  }
+  else if (type == 3)
+  {
+    // Set the vel of the X and Z translation of capsule B
+    vels(9) = -0.01;
+    vels(11) = -0.01;
+  }
+  // translate velocity of capsule B to local space
+  vels.segment<3>(9) = T2.linear().transpose() * vels.segment<3>(9);
+
+  world->setVelocities(vels);
+
+  // renderWorld(world);
+  // EXPECT_TRUE(verifyPerturbedContactPositions(world));
+  // EXPECT_TRUE(verifyPerturbedContactNormals(world));
+  // EXPECT_TRUE(verifyPerturbedContactEdges(world));
+  // EXPECT_TRUE(verifyPerturbedContactForceDirections(world));
+  EXPECT_TRUE(verifyAnalyticalJacobians(world));
+  EXPECT_TRUE(verifyVelGradients(world, vels));
+  EXPECT_TRUE(verifyWrtMass(world));
+
+  /*
+  server::GUIWebsocketServer server;
+  server.renderWorld(world);
+  server.renderBasis();
+  server.serve(8070);
+
+  while (server.isServing())
+  {
+  }
+  */
+
+  //////////////////////////////////////////////////
+  // Try it in reverse skeleton order, to flip collision type enums
+  //////////////////////////////////////////////////
+
+  world->removeAllSkeletons();
+  if (!isSelfCollision)
+  {
+    world->addSkeleton(capsuleB);
+  }
+  world->addSkeleton(capsuleA);
+
+  // EXPECT_TRUE(verifyPerturbedContactPositions(world));
+  // EXPECT_TRUE(verifyPerturbedContactNormals(world));
+  EXPECT_TRUE(verifyAnalyticalJacobians(world));
+  EXPECT_TRUE(verifyVelGradients(world, vels));
+  EXPECT_TRUE(verifyWrtMass(world));
+}
+
+#ifdef ALL_TESTS
+TEST(GRADIENTS, CAPSULE_CAPSULE_T_SHAPE)
+{
+  testCapsuleCapsuleCollision(false, 1);
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(GRADIENTS, CAPSULE_CAPSULE_X_SHAPE)
+{
+  testCapsuleCapsuleCollision(false, 2);
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(GRADIENTS, CAPSULE_CAPSULE_L_SHAPE)
+{
+  testCapsuleCapsuleCollision(false, 3);
+}
+#endif
+
+/**
+ * This sets up a pair of capsules colliding
+ */
+void testBoxCapsuleCollision(bool isSelfCollision, bool useMesh, int type)
+{
+  Eigen::Vector3d size = Eigen::Vector3d(1, 1, 1);
+  double height = 1.0;
+  double radius = 0.5;
+
+  Eigen::Isometry3d T1 = Eigen::Isometry3d::Identity();
+
+  Eigen::Isometry3d T2 = Eigen::Isometry3d::Identity();
+  if (type == 1)
+  {
+    // capsule-edge collision
+    T2.translation()(1) = 0.5 + sqrt(0.5) * (radius - 0.01);
+    T2.translation()(2) = 0.5 + sqrt(0.5) * (radius - 0.01);
+    T2.linear() = math::eulerXYZToMatrix(Eigen::Vector3d(M_PI_4, 0, 0));
+  }
+  else if (type == 2)
+  {
+    // sphere-face and pipe-edge
+    size = Eigen::Vector3d(2, 1, 2);
+    T2.translation()(1) = 1.0 - 0.01;
+    T2.translation()(2) = 1.0;
+  }
+  else if (type == 3)
+  {
+    // pipe-face collision
+    size = Eigen::Vector3d(10, 1, 10);
+    T2.translation()(1) = 1.0 - 0.01;
+  }
+  else if (type == 4)
+  {
+    // end-sphere -> face collision, rotated 45 deg to avoid +Z
+    T1.linear() = math::eulerXYZToMatrix(Eigen::Vector3d(0, M_PI_4, 0));
+    T2.translation()(0)
+        = sqrt(0.5) * (size(0) / 2 + height / 2 + radius - 0.01);
+    T2.translation()(2)
+        = sqrt(0.5) * (size(0) / 2 + height / 2 + radius - 0.01);
+    T2.linear() = math::eulerXYZToMatrix(Eigen::Vector3d(0, M_PI_4, 0));
+  }
+  else if (type == 5)
+  {
+    // vertex - pipe collision
+    T2.translation()(0)
+        = 0.5 + sqrt(radius * radius / 3) - sqrt(0.01 * 0.01 / 3);
+    T2.translation()(1)
+        = 0.5 + sqrt(radius * radius / 3) - sqrt(0.01 * 0.01 / 3);
+    T2.translation()(2)
+        = 0.5 + sqrt(radius * radius / 3) - sqrt(0.01 * 0.01 / 3);
+    T2.linear() = math::eulerXYZToMatrix(Eigen::Vector3d(M_PI_4, 0, 0));
+  }
+
+  // World
+  WorldPtr world = World::create();
+  auto collision_detector
+      = collision::CollisionDetector::getFactory()->create("dart");
+  world->getConstraintSolver()->setCollisionDetector(collision_detector);
+  world->setPenetrationCorrectionEnabled(false);
+  world->setConstraintForceMixingEnabled(false);
+  world->setGravity(Eigen::Vector3d(0, -9.81, 0));
+
+  // This capsule is centered at (0,0,0), and extends in the Z direction
+  SkeletonPtr capsule = Skeleton::create("capsule_A");
+  std::pair<FreeJoint*, BodyNode*> capsulePair
+      = capsule->createJointAndBodyNodePair<FreeJoint>();
+  capsulePair.first->setTransformFromParentBodyNode(T1);
+
+  std::shared_ptr<CapsuleShape> capsuleShape(new CapsuleShape(radius, height));
+
+  ShapeNode* capsuleNode
+      = capsulePair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(
+          capsuleShape);
+
+  SkeletonPtr box = Skeleton::create("box");
+  std::pair<FreeJoint*, BodyNode*> boxPair;
+
+  if (isSelfCollision)
+  {
+    capsule->enableSelfCollision(true);
+    boxPair = capsulePair.second->createChildJointAndBodyNodePair<FreeJoint>();
+  }
+  else
+  {
+    boxPair = box->createJointAndBodyNodePair<FreeJoint>();
+  }
+
+  if (useMesh)
+  {
+    aiScene* boxMesh = createBoxMeshUnsafe();
+    std::shared_ptr<MeshShape> boxShape(new MeshShape(size, boxMesh));
+    ShapeNode* sphereNode
+        = boxPair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(
+            boxShape);
+  }
+  else
+  {
+    std::shared_ptr<BoxShape> boxShape(new BoxShape(size));
+    ShapeNode* sphereNode
+        = boxPair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(
+            boxShape);
+  }
+
+  FreeJoint* boxJoint = boxPair.first;
+  FreeJoint* capsuleJoint = capsulePair.first;
+  Eigen::Matrix3d rotation = Eigen::Matrix3d::Identity();
+
+  boxJoint->setTransformFromParentBodyNode(T1);
+  capsuleJoint->setTransformFromParentBodyNode(T2);
+
+  world->addSkeleton(capsule);
+  if (!isSelfCollision)
+  {
+    world->addSkeleton(box);
+  }
+
+  Eigen::VectorXd vels = Eigen::VectorXd::Zero(world->getNumDofs());
+  if (type == 1 || type == 2 || type == 3)
+  {
+    // Set the vel of the Y translation of the capsule
+    vels(4) = -0.01;
+  }
+  else if (type == 4 || type == 5)
+  {
+    // Set the vel of the X translation of capsule
+    vels(3) = -0.01;
+  }
+  // translate velocity of capsule B to local space
+  vels.segment<3>(3) = T2.linear().transpose() * vels.segment<3>(3);
+
+  world->setVelocities(vels);
+
+  // renderWorld(world);
+  EXPECT_TRUE(verifyPerturbedContactPositions(world));
+  // EXPECT_TRUE(verifyPerturbedContactNormals(world));
+  // EXPECT_TRUE(verifyPerturbedContactEdges(world));
+  // EXPECT_TRUE(verifyPerturbedContactForceDirections(world));
+  /*
+  EXPECT_TRUE(verifyAnalyticalJacobians(world));
+  EXPECT_TRUE(verifyVelGradients(world, vels));
+  EXPECT_TRUE(verifyWrtMass(world));
+  */
+
+  /*
+  server::GUIWebsocketServer server;
+  server.renderWorld(world);
+  server.renderBasis();
+  server.serve(8070);
+
+  while (server.isServing())
+  {
+  }
+  */
+
+  //////////////////////////////////////////////////
+  // Try it in reverse skeleton order, to flip collision type enums
+  //////////////////////////////////////////////////
+
+  world->removeAllSkeletons();
+  if (!isSelfCollision)
+  {
+    world->addSkeleton(box);
+  }
+  world->addSkeleton(capsule);
+
+  // EXPECT_TRUE(verifyPerturbedContactPositions(world));
+  // EXPECT_TRUE(verifyPerturbedContactNormals(world));
+  /*
+  EXPECT_TRUE(verifyAnalyticalJacobians(world));
+  EXPECT_TRUE(verifyVelGradients(world, vels));
+  EXPECT_TRUE(verifyWrtMass(world));
+  */
+}
+
+#ifdef ALL_TESTS
+TEST(GRADIENTS, PIPE_EDGE_BOX)
+{
+  testBoxCapsuleCollision(false, false, 1);
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(GRADIENTS, PIPE_FACE_AND_EDGE)
+{
+  testBoxCapsuleCollision(false, false, 2);
+}
+#endif
+
+// #ifdef ALL_TESTS
+TEST(GRADIENTS, PIPE_VERTEX)
+{
+  testBoxCapsuleCollision(false, false, 5);
+}
+// #endif
+
+#ifdef ALL_TESTS
+TEST(GRADIENTS, PIPE_FACE)
+{
+  testBoxCapsuleCollision(false, false, 3);
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(GRADIENTS, END_SPHERE_FACE)
+{
+  testBoxCapsuleCollision(false, false, 4);
 }
 #endif

@@ -718,9 +718,14 @@ ContactConstraint::getTangentBasisMatrixODE(const Eigen::Vector3d& n)
 {
   using namespace math::suffixes;
 
+  // TODO(keenon): find a smoother way to handle the tangent basis. Will need to
+  // be path dependent, because this is in general impossible without path
+  // dependence: https://scicomp.stackexchange.com/a/27843
+
   // TODO(JS): Use mNumFrictionConeBases
   // Check if the number of bases is even number.
   //  bool isEvenNumBases = mNumFrictionConeBases % 2 ? true : false;
+  assert(n.squaredNorm() >= DART_CONTACT_CONSTRAINT_EPSILON_SQUARED);
 
   // Pick an arbitrary vector to take the cross product of (in this case,
   // Z-axis)

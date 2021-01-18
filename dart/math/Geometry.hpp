@@ -217,7 +217,9 @@ Eigen::Vector3d getContactPoint(
     const Eigen::Vector3d& edgeAPoint,
     const Eigen::Vector3d& edgeADir,
     const Eigen::Vector3d& edgeBPoint,
-    const Eigen::Vector3d& edgeBDir);
+    const Eigen::Vector3d& edgeBDir,
+    double radiusA = 1.0,
+    double radiusB = 1.0);
 
 /// This returns gradient of the average of the points on edge A and edge B
 /// closest to each other, allowing all the inputs to change.
@@ -229,7 +231,9 @@ Eigen::Vector3d getContactPointGradient(
     const Eigen::Vector3d& edgeBPoint,
     const Eigen::Vector3d& edgeBPointGradient,
     const Eigen::Vector3d& edgeBDir,
-    const Eigen::Vector3d& edgeBDirGradient);
+    const Eigen::Vector3d& edgeBDirGradient,
+    double radiusA = 1.0,
+    double radiusB = 1.0);
 
 //------------------------------------------------------------------------------
 /// \brief Rectify the rotation part so as that it satifies the orthogonality
