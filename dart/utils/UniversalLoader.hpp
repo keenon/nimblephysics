@@ -1,3 +1,6 @@
+#ifndef DART_UNIVERSAL_LOADER
+#define DART_UNIVERSAL_LOADER
+
 #include <memory>
 #include <string>
 
@@ -32,3 +35,5 @@ std::shared_ptr<dynamics::Skeleton> loadSkeleton(
 } // namespace UniversalLoader
 } // namespace utils
 } // namespace dart
+
+#endif

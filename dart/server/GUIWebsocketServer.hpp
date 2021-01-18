@@ -40,6 +40,8 @@ class GUIWebsocketServer
 public:
   GUIWebsocketServer();
 
+  ~GUIWebsocketServer();
+
   /// This is a non-blocking call to start a websocket server on a given
   /// port
   void serve(int port);
@@ -307,13 +309,12 @@ public:
   GUIWebsocketServer& deleteUIElement(const std::string& key);
 
 protected:
+  int mPort;
   bool mServing;
-  asio::io_service mServerEventLoop;
-  asio::io_service::work* mWork;
   asio::signal_set* mSignalSet;
-  std::thread* mAsioThread;
   std::thread* mServerThread;
   WebsocketServer* mServer;
+  std::recursive_mutex globalMutex;
 
   // protects the buffered JSON message (mJson) from getting
   // corrupted if we queue messages while trying to flush()

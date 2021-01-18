@@ -31,14 +31,33 @@ GUIWebsocketServer::GUIWebsocketServer()
   : mServing(false),
     mMessagesQueued(0),
     mAutoflush(true),
-    mScreenSize(Eigen::Vector2i(680, 420))
+    mScreenSize(Eigen::Vector2i(680, 420)),
+    mPort(-1)
 {
   mJson << "[";
+}
+
+GUIWebsocketServer::~GUIWebsocketServer()
+{
+  if (mServing)
+  {
+    dterr
+        << "GUIWebsocketServer is being deallocated while it's still "
+           "serving! The server will now terminate, and attempt to clean up. "
+           "If this was not intended "
+           "behavior, please keep a reference to the GUIWebsocketServer to "
+           "keep the server alive. If this was intended behavior, please call "
+           "stopServing() on "
+           "the server before deallocating it."
+        << std::endl;
+    stopServing();
+  }
 }
 
 /// This is a non-blocking call to start a websocket server on a given port
 void GUIWebsocketServer::serve(int port)
 {
+  mPort = port;
   // Register signal and signal handler
   if (mServing)
   {
@@ -52,197 +71,199 @@ void GUIWebsocketServer::serve(int port)
 
   // Register our network callbacks, ensuring the logic is run on the main
   // thread's event loop
-  mServer->connect([&](ClientConnection conn) {
-    mServerEventLoop.post([&, conn]() {
-      std::clog << "Connection opened." << std::endl;
-      std::clog << "There are now " << mServer->numConnections()
-                << " open connections." << std::endl;
-      // Send a hello message to the client
-      // mServer->send(conn) seems to break, cause conn appears to get cleaned
-      // up in race conditions (it's a weak pointer)
-      std::stringstream json;
-      json << "[";
-      bool isFirst = true;
-      for (auto pair : mBoxes)
-      {
-        if (isFirst)
-          isFirst = false;
-        else
-          json << ",";
-        encodeCreateBox(json, pair.second);
-      }
-      for (auto pair : mSpheres)
-      {
-        if (isFirst)
-          isFirst = false;
-        else
-          json << ",";
-        encodeCreateSphere(json, pair.second);
-      }
-      for (auto pair : mCapsules)
-      {
-        if (isFirst)
-          isFirst = false;
-        else
-          json << ",";
-        encodeCreateCapsule(json, pair.second);
-      }
-      for (auto pair : mLines)
-      {
-        if (isFirst)
-          isFirst = false;
-        else
-          json << ",";
-        encodeCreateLine(json, pair.second);
-      }
-      for (auto pair : mTextures)
-      {
-        if (isFirst)
-          isFirst = false;
-        else
-          json << ",";
-        encodeCreateTexture(json, pair.second);
-      }
-      for (auto pair : mMeshes)
-      {
-        if (isFirst)
-          isFirst = false;
-        else
-          json << ",";
-        encodeCreateMesh(json, pair.second);
-      }
-      for (auto pair : mText)
-      {
-        if (isFirst)
-          isFirst = false;
-        else
-          json << ",";
-        encodeCreateText(json, pair.second);
-      }
-      for (auto pair : mButtons)
-      {
-        if (isFirst)
-          isFirst = false;
-        else
-          json << ",";
-        encodeCreateButton(json, pair.second);
-      }
-      for (auto pair : mSliders)
-      {
-        if (isFirst)
-          isFirst = false;
-        else
-          json << ",";
-        encodeCreateSlider(json, pair.second);
-      }
-      for (auto pair : mPlots)
-      {
-        if (isFirst)
-          isFirst = false;
-        else
-          json << ",";
-        encodeCreatePlot(json, pair.second);
-      }
-      for (auto key : mMouseInteractionEnabled)
-      {
-        if (isFirst)
-          isFirst = false;
-        else
-          json << ",";
-        encodeEnableMouseInteraction(json, key);
-      }
+  mServer->connect([this](ClientConnection conn) {
+    // We don't need high throughput, so run everything through a global mutex
+    // to avoid data races
+    const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
 
-      json << "]";
+    // Send a hello message to the client
+    // mServer->send(conn) seems to break, cause conn appears to get cleaned
+    // up in race conditions (it's a weak pointer)
+    std::stringstream json;
+    json << "[";
+    bool isFirst = true;
+    for (auto pair : mBoxes)
+    {
+      if (isFirst)
+        isFirst = false;
+      else
+        json << ",";
+      encodeCreateBox(json, pair.second);
+    }
+    for (auto pair : mSpheres)
+    {
+      if (isFirst)
+        isFirst = false;
+      else
+        json << ",";
+      encodeCreateSphere(json, pair.second);
+    }
+    for (auto pair : mCapsules)
+    {
+      if (isFirst)
+        isFirst = false;
+      else
+        json << ",";
+      encodeCreateCapsule(json, pair.second);
+    }
+    for (auto pair : mLines)
+    {
+      if (isFirst)
+        isFirst = false;
+      else
+        json << ",";
+      encodeCreateLine(json, pair.second);
+    }
+    for (auto pair : mTextures)
+    {
+      if (isFirst)
+        isFirst = false;
+      else
+        json << ",";
+      encodeCreateTexture(json, pair.second);
+    }
+    for (auto pair : mMeshes)
+    {
+      if (isFirst)
+        isFirst = false;
+      else
+        json << ",";
+      encodeCreateMesh(json, pair.second);
+    }
+    for (auto pair : mText)
+    {
+      if (isFirst)
+        isFirst = false;
+      else
+        json << ",";
+      encodeCreateText(json, pair.second);
+    }
+    for (auto pair : mButtons)
+    {
+      if (isFirst)
+        isFirst = false;
+      else
+        json << ",";
+      encodeCreateButton(json, pair.second);
+    }
+    for (auto pair : mSliders)
+    {
+      if (isFirst)
+        isFirst = false;
+      else
+        json << ",";
+      encodeCreateSlider(json, pair.second);
+    }
+    for (auto pair : mPlots)
+    {
+      if (isFirst)
+        isFirst = false;
+      else
+        json << ",";
+      encodeCreatePlot(json, pair.second);
+    }
+    for (auto key : mMouseInteractionEnabled)
+    {
+      if (isFirst)
+        isFirst = false;
+      else
+        json << ",";
+      encodeEnableMouseInteraction(json, key);
+    }
 
-      // std::cout << json.str() << std::endl;
+    json << "]";
 
-      mServer->send(conn, json.str());
-      // mServer->broadcast("{\"type\": 1}");
-      /*
-      mServer->broadcast(
-          "{\"type\": \"init\", \"world\": " + mWorld->toJson() + "}");
-      */
+    // std::cout << json.str() << std::endl;
 
-      for (auto listener : mConnectionListeners)
-      {
-        listener();
-      }
-    });
-  });
-  mServer->disconnect([&](ClientConnection /* conn */) {
-    mServerEventLoop.post([&]() {
-      std::clog << "Connection closed." << std::endl;
-      std::clog << "There are now " << mServer->numConnections()
-                << " open connections." << std::endl;
-    });
-  });
-  mServer->message([&](ClientConnection /* conn */, const Json::Value& args) {
-    mServerEventLoop.post([args, this]() {
-      if (args["type"].asString() == "keydown")
-      {
-        std::string key = args["key"].asString();
-        this->mKeysDown.insert(key);
-        for (auto listener : this->mKeydownListeners)
-        {
-          listener(key);
-        }
-      }
-      else if (args["type"].asString() == "keyup")
-      {
-        std::string key = args["key"].asString();
-        this->mKeysDown.erase(key);
-        for (auto listener : this->mKeyupListeners)
-        {
-          listener(key);
-        }
-      }
-      else if (args["type"].asString() == "button_click")
-      {
-        std::string key = args["key"].asString();
-        if (mButtons.find(key) != mButtons.end())
-        {
-          mButtons[key].onClick();
-        }
-      }
-      else if (args["type"].asString() == "slider_set_value")
-      {
-        std::string key = args["key"].asString();
-        double value = args["value"].asDouble();
-        if (mSliders.find(key) != mSliders.end())
-        {
-          mSliders[key].value = value;
-          mSliders[key].onChange(value);
-        }
-      }
-      else if (args["type"].asString() == "screen_resize")
-      {
-        Eigen::Vector2i size
-            = Eigen::Vector2i(args["size"][0].asInt(), args["size"][1].asInt());
-        mScreenSize = size;
+    mServer->send(conn, json.str());
+    // mServer->broadcast("{\"type\": 1}");
+    /*
+    mServer->broadcast(
+        "{\"type\": \"init\", \"world\": " + mWorld->toJson() + "}");
+    */
 
-        for (auto handler : mScreenResizeListeners)
-        {
-          handler(size);
-        }
-      }
-      else if (args["type"].asString() == "drag")
-      {
-        std::string key = args["key"].asString();
-        Eigen::Vector3d pos = Eigen::Vector3d(
-            args["pos"][0].asDouble(),
-            args["pos"][1].asDouble(),
-            args["pos"][2].asDouble());
-
-        for (auto handler : mDragListeners[key])
-        {
-          handler(pos);
-        }
-      }
-    });
+    for (auto listener : mConnectionListeners)
+    {
+      listener();
+    }
   });
 
-  // Start the event loop for the main thread
-  mWork = new asio::io_service::work(mServerEventLoop);
+  mServer->disconnect([this](ClientConnection /* conn */) {
+    // We don't need high throughput, so run everything through a global mutex
+    // to avoid data races
+    const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
+
+    std::clog << "Connection closed." << std::endl;
+    std::clog << "There are now " << mServer->numConnections()
+              << " open connections." << std::endl;
+  });
+  mServer->message([this](
+                       ClientConnection /* conn */, const Json::Value& args) {
+    // We don't need high throughput, so run everything through a global mutex
+    // to avoid data races
+    const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
+
+    if (args["type"].asString() == "keydown")
+    {
+      std::string key = args["key"].asString();
+      this->mKeysDown.insert(key);
+      for (auto listener : this->mKeydownListeners)
+      {
+        listener(key);
+      }
+    }
+    else if (args["type"].asString() == "keyup")
+    {
+      std::string key = args["key"].asString();
+      this->mKeysDown.erase(key);
+      for (auto listener : this->mKeyupListeners)
+      {
+        listener(key);
+      }
+    }
+    else if (args["type"].asString() == "button_click")
+    {
+      std::string key = args["key"].asString();
+      if (mButtons.find(key) != mButtons.end())
+      {
+        mButtons[key].onClick();
+      }
+    }
+    else if (args["type"].asString() == "slider_set_value")
+    {
+      std::string key = args["key"].asString();
+      double value = args["value"].asDouble();
+      if (mSliders.find(key) != mSliders.end())
+      {
+        mSliders[key].value = value;
+        mSliders[key].onChange(value);
+      }
+    }
+    else if (args["type"].asString() == "screen_resize")
+    {
+      Eigen::Vector2i size
+          = Eigen::Vector2i(args["size"][0].asInt(), args["size"][1].asInt());
+      mScreenSize = size;
+
+      for (auto handler : mScreenResizeListeners)
+      {
+        handler(size);
+      }
+    }
+    else if (args["type"].asString() == "drag")
+    {
+      std::string key = args["key"].asString();
+      Eigen::Vector3d pos = Eigen::Vector3d(
+          args["pos"][0].asDouble(),
+          args["pos"][1].asDouble(),
+          args["pos"][2].asDouble());
+
+      for (auto handler : mDragListeners[key])
+      {
+        handler(pos);
+      }
+    }
+  });
 
   // unblock signals in this thread
   sigset_t sigset;
@@ -278,11 +299,8 @@ void GUIWebsocketServer::serve(int port)
   });
   */
 
-  // Start a thread to handle the main server event loop
-  mAsioThread = new std::thread([&] { mServerEventLoop.run(); });
-
   // Start the networking thread
-  mServerThread = new std::thread([&, port]() {
+  mServerThread = new std::thread([this, port]() {
     // block signals in this thread and subsequently
     // spawned threads so they're guaranteed to go to the main thread
     sigset_t sigset;
@@ -297,11 +315,8 @@ void GUIWebsocketServer::serve(int port)
     bool success = mServer->run(port);
     if (!success)
     {
-      mServerEventLoop.post([&]() {
-        // This means we failed to bind to the port
-        stopServing();
-        mServerEventLoop.stop();
-      });
+      // This means we failed to bind to the port
+      stopServing();
     }
   });
 }
@@ -311,7 +326,9 @@ void GUIWebsocketServer::stopServing()
 {
   if (!mServing)
     return;
-  delete mWork;
+  std::cout << "GUIWebsocketServer is shutting down the WebSocket server on "
+               "ws://localhost:"
+            << mPort << std::endl;
   mServer->stop();
   mServerThread->join();
   delete mServer;
@@ -375,10 +392,9 @@ void GUIWebsocketServer::flush()
 
   mJson << "]";
   std::string json = mJson.str();
-  // std::cout << json << std::endl;
   if (mServing)
   {
-    mServerEventLoop.post([json, this]() { mServer->broadcast(json); });
+    mServer->broadcast(json);
   }
 
   // Reset
@@ -399,6 +415,8 @@ GUIWebsocketServer& GUIWebsocketServer::renderWorld(
     bool renderForces,
     bool renderForceMagnitudes)
 {
+  const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
+
   bool oldAutoflush = mAutoflush;
   mAutoflush = false;
 
@@ -444,6 +462,8 @@ GUIWebsocketServer& GUIWebsocketServer::renderBasis(
     const Eigen::Vector3d pos,
     const Eigen::Vector3d euler)
 {
+  const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
+
   Eigen::Isometry3d T = Eigen::Isometry3d::Identity();
   T.translation() = pos;
   T.linear() = math::eulerXYZToMatrix(euler);
@@ -469,6 +489,8 @@ GUIWebsocketServer& GUIWebsocketServer::renderBasis(
 GUIWebsocketServer& GUIWebsocketServer::renderSkeleton(
     const std::shared_ptr<dynamics::Skeleton>& skel, const std::string& prefix)
 {
+  const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
+
   bool oldAutoflush = mAutoflush;
   mAutoflush = false;
 
@@ -632,6 +654,8 @@ GUIWebsocketServer& GUIWebsocketServer::renderTrajectoryLines(
     Eigen::MatrixXd positions,
     std::string prefix)
 {
+  const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
+
   assert(positions.rows() == world->getNumDofs());
 
   bool oldAutoflush = mAutoflush;
@@ -684,10 +708,13 @@ GUIWebsocketServer& GUIWebsocketServer::renderTrajectoryLines(
 /// listeners
 GUIWebsocketServer& GUIWebsocketServer::clear()
 {
+  const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
+
   queueCommand(
       [&](std::stringstream& json) { json << "{ \"type\": \"clear_all\" }"; });
   mBoxes.clear();
   mSpheres.clear();
+  mCapsules.clear();
   mLines.clear();
   mMeshes.clear();
   mText.clear();
@@ -710,6 +737,8 @@ GUIWebsocketServer& GUIWebsocketServer::createBox(
     bool castShadows,
     bool receiveShadows)
 {
+  const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
+
   Box& box = mBoxes[key];
   box.key = key;
   box.size = size;
@@ -735,6 +764,8 @@ GUIWebsocketServer& GUIWebsocketServer::createSphere(
     bool castShadows,
     bool receiveShadows)
 {
+  const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
+
   Sphere& sphere = mSpheres[key];
   sphere.key = key;
   sphere.radius = radius;
@@ -761,6 +792,8 @@ GUIWebsocketServer& GUIWebsocketServer::createCapsule(
     bool castShadows,
     bool receiveShadows)
 {
+  const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
+
   Capsule& capsule = mCapsules[key];
   capsule.key = key;
   capsule.radius = radius;
@@ -784,6 +817,8 @@ GUIWebsocketServer& GUIWebsocketServer::createLine(
     const std::vector<Eigen::Vector3d>& points,
     const Eigen::Vector3d& color)
 {
+  const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
+
   Line& line = mLines[key];
   line.key = key;
   line.points = points;
@@ -813,6 +848,8 @@ GUIWebsocketServer& GUIWebsocketServer::createMesh(
     bool castShadows,
     bool receiveShadows)
 {
+  const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
+
   Mesh& mesh = mMeshes[key];
   mesh.key = key;
   mesh.vertices = vertices;
@@ -848,6 +885,8 @@ GUIWebsocketServer& GUIWebsocketServer::createMeshASSIMP(
     bool castShadows,
     bool receiveShadows)
 {
+  const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
+
   std::vector<Eigen::Vector3d> vertices;
   std::vector<Eigen::Vector3d> vertexNormals;
   std::vector<Eigen::Vector3i> faces;
@@ -939,6 +978,8 @@ GUIWebsocketServer& GUIWebsocketServer::createMeshASSIMP(
 GUIWebsocketServer& GUIWebsocketServer::createTexture(
     const std::string& key, const std::string& base64)
 {
+  const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
+
   Texture tex;
   tex.key = key;
   tex.base64 = base64;
@@ -955,6 +996,8 @@ GUIWebsocketServer& GUIWebsocketServer::createTexture(
 GUIWebsocketServer& GUIWebsocketServer::createTextureFromFile(
     const std::string& key, const std::string& path)
 {
+  const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
+
   std::ifstream in(path);
   std::ostringstream sstr;
   sstr << in.rdbuf();
@@ -969,9 +1012,13 @@ GUIWebsocketServer& GUIWebsocketServer::createTextureFromFile(
 /// This returns true if we've already got an object with the key "key"
 bool GUIWebsocketServer::hasObject(const std::string& key)
 {
+  const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
+
   if (mBoxes.find(key) != mBoxes.end())
     return true;
   if (mSpheres.find(key) != mSpheres.end())
+    return true;
+  if (mCapsules.find(key) != mCapsules.end())
     return true;
   if (mLines.find(key) != mLines.end())
     return true;
@@ -984,10 +1031,16 @@ bool GUIWebsocketServer::hasObject(const std::string& key)
 /// line). Otherwise it returns Vector3d::Zero().
 Eigen::Vector3d GUIWebsocketServer::getObjectPosition(const std::string& key)
 {
+  const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
+
   if (mBoxes.find(key) != mBoxes.end())
     return mBoxes[key].pos;
   if (mSpheres.find(key) != mSpheres.end())
     return mSpheres[key].pos;
+  if (mCapsules.find(key) != mCapsules.end())
+    return mCapsules[key].pos;
+  if (mMeshes.find(key) != mMeshes.end())
+    return mMeshes[key].pos;
   return Eigen::Vector3d::Zero();
 }
 
@@ -995,8 +1048,14 @@ Eigen::Vector3d GUIWebsocketServer::getObjectPosition(const std::string& key)
 /// line or a sphere). Otherwise it returns Vector3d::Zero().
 Eigen::Vector3d GUIWebsocketServer::getObjectRotation(const std::string& key)
 {
+  const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
+
   if (mBoxes.find(key) != mBoxes.end())
     return mBoxes[key].euler;
+  if (mCapsules.find(key) != mCapsules.end())
+    return mCapsules[key].euler;
+  if (mMeshes.find(key) != mMeshes.end())
+    return mMeshes[key].euler;
   return Eigen::Vector3d::Zero();
 }
 
@@ -1004,10 +1063,14 @@ Eigen::Vector3d GUIWebsocketServer::getObjectRotation(const std::string& key)
 /// Vector3d::Zero().
 Eigen::Vector3d GUIWebsocketServer::getObjectColor(const std::string& key)
 {
+  const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
+
   if (mBoxes.find(key) != mBoxes.end())
     return mBoxes[key].color;
   if (mSpheres.find(key) != mSpheres.end())
     return mSpheres[key].color;
+  if (mCapsules.find(key) != mCapsules.end())
+    return mCapsules[key].color;
   if (mLines.find(key) != mLines.end())
     return mLines[key].color;
   if (mMeshes.find(key) != mMeshes.end())
@@ -1019,6 +1082,8 @@ Eigen::Vector3d GUIWebsocketServer::getObjectColor(const std::string& key)
 GUIWebsocketServer& GUIWebsocketServer::setObjectPosition(
     const std::string& key, const Eigen::Vector3d& pos)
 {
+  const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
+
   if (mBoxes.find(key) != mBoxes.end())
   {
     mBoxes[key].pos = pos;
@@ -1026,6 +1091,14 @@ GUIWebsocketServer& GUIWebsocketServer::setObjectPosition(
   if (mSpheres.find(key) != mSpheres.end())
   {
     mSpheres[key].pos = pos;
+  }
+  if (mCapsules.find(key) != mCapsules.end())
+  {
+    mCapsules[key].pos = pos;
+  }
+  if (mMeshes.find(key) != mMeshes.end())
+  {
+    mMeshes[key].pos = pos;
   }
 
   queueCommand([&](std::stringstream& json) {
@@ -1042,9 +1115,19 @@ GUIWebsocketServer& GUIWebsocketServer::setObjectPosition(
 GUIWebsocketServer& GUIWebsocketServer::setObjectRotation(
     const std::string& key, const Eigen::Vector3d& euler)
 {
+  const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
+
   if (mBoxes.find(key) != mBoxes.end())
   {
     mBoxes[key].euler = euler;
+  }
+  if (mCapsules.find(key) != mCapsules.end())
+  {
+    mCapsules[key].euler = euler;
+  }
+  if (mMeshes.find(key) != mMeshes.end())
+  {
+    mMeshes[key].euler = euler;
   }
 
   queueCommand([&](std::stringstream& json) {
@@ -1061,6 +1144,8 @@ GUIWebsocketServer& GUIWebsocketServer::setObjectRotation(
 GUIWebsocketServer& GUIWebsocketServer::setObjectColor(
     const std::string& key, const Eigen::Vector3d& color)
 {
+  const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
+
   if (mBoxes.find(key) != mBoxes.end())
   {
     mBoxes[key].color = color;
@@ -1076,6 +1161,10 @@ GUIWebsocketServer& GUIWebsocketServer::setObjectColor(
   if (mMeshes.find(key) != mMeshes.end())
   {
     mMeshes[key].color = color;
+  }
+  if (mCapsules.find(key) != mCapsules.end())
+  {
+    mCapsules[key].color = color;
   }
 
   queueCommand([&](std::stringstream& json) {
@@ -1094,6 +1183,8 @@ GUIWebsocketServer& GUIWebsocketServer::setObjectColor(
 GUIWebsocketServer& GUIWebsocketServer::registerDragListener(
     const std::string& key, std::function<void(Eigen::Vector3d)> listener)
 {
+  const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
+
   mMouseInteractionEnabled.emplace(key);
   queueCommand([&](std::stringstream& json) {
     encodeEnableMouseInteraction(json, key);
@@ -1105,10 +1196,13 @@ GUIWebsocketServer& GUIWebsocketServer::registerDragListener(
 /// This deletes an object by key
 GUIWebsocketServer& GUIWebsocketServer::deleteObject(const std::string& key)
 {
+  const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
+
   mBoxes.erase(key);
   mSpheres.erase(key);
   mLines.erase(key);
   mMeshes.erase(key);
+  mCapsules.erase(key);
 
   queueCommand([&](std::stringstream& json) {
     json << "{ \"type\": \"delete_object\", \"key\": \"" << key << "\" }";
@@ -1121,6 +1215,8 @@ GUIWebsocketServer& GUIWebsocketServer::deleteObject(const std::string& key)
 GUIWebsocketServer& GUIWebsocketServer::deleteObjectsByPrefix(
     const std::string& prefix)
 {
+  const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
+
   bool oldAutoflush = mAutoflush;
   mAutoflush = false;
 
@@ -1181,6 +1277,20 @@ GUIWebsocketServer& GUIWebsocketServer::deleteObjectsByPrefix(
     }
   }
 
+  for (auto& pair : mCapsules)
+  {
+    if (prefix.size() <= pair.first.size())
+    {
+      auto res
+          = std::mismatch(prefix.begin(), prefix.end(), pair.first.begin());
+      if (res.first == prefix.end())
+      {
+        // We've got a match!
+        toDelete.push_back(pair.first);
+      }
+    }
+  }
+
   for (std::string key : toDelete)
   {
     deleteObject(key);
@@ -1196,6 +1306,8 @@ GUIWebsocketServer& GUIWebsocketServer::deleteObjectsByPrefix(
 /// This gets the current screen size
 Eigen::Vector2i GUIWebsocketServer::getScreenSize()
 {
+  const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
+
   return mScreenSize;
 }
 
@@ -1203,6 +1315,8 @@ Eigen::Vector2i GUIWebsocketServer::getScreenSize()
 void GUIWebsocketServer::registerScreenResizeListener(
     std::function<void(Eigen::Vector2i)> listener)
 {
+  const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
+
   mScreenResizeListeners.push_back(listener);
 }
 
@@ -1213,6 +1327,8 @@ GUIWebsocketServer& GUIWebsocketServer::createText(
     const Eigen::Vector2i& fromTopLeft,
     const Eigen::Vector2i& size)
 {
+  const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
+
   Text text;
   text.key = key;
   text.contents = contents;
@@ -1230,6 +1346,8 @@ GUIWebsocketServer& GUIWebsocketServer::createText(
 GUIWebsocketServer& GUIWebsocketServer::setTextContents(
     const std::string& key, const std::string& newContents)
 {
+  const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
+
   if (mText.find(key) != mText.end())
   {
     mText[key].contents = newContents;
@@ -1258,6 +1376,8 @@ GUIWebsocketServer& GUIWebsocketServer::createButton(
     const Eigen::Vector2i& size,
     std::function<void()> onClick)
 {
+  const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
+
   Button button;
   button.key = key;
   button.label = label;
@@ -1277,6 +1397,8 @@ GUIWebsocketServer& GUIWebsocketServer::createButton(
 GUIWebsocketServer& GUIWebsocketServer::setButtonLabel(
     const std::string& key, const std::string& newLabel)
 {
+  const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
+
   if (mButtons.find(key) != mButtons.end())
   {
     mButtons[key].label = newLabel;
@@ -1309,6 +1431,8 @@ GUIWebsocketServer& GUIWebsocketServer::createSlider(
     bool horizontal,
     std::function<void(double)> onChange)
 {
+  const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
+
   Slider slider;
   slider.key = key;
   slider.fromTopLeft = fromTopLeft;
@@ -1332,6 +1456,8 @@ GUIWebsocketServer& GUIWebsocketServer::createSlider(
 GUIWebsocketServer& GUIWebsocketServer::setSliderValue(
     const std::string& key, double value)
 {
+  const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
+
   if (mSliders.find(key) != mSliders.end())
   {
     mSliders[key].value = value;
@@ -1356,6 +1482,8 @@ GUIWebsocketServer& GUIWebsocketServer::setSliderValue(
 GUIWebsocketServer& GUIWebsocketServer::setSliderMin(
     const std::string& key, double min)
 {
+  const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
+
   if (mSliders.find(key) != mSliders.end())
   {
     mSliders[key].min = min;
@@ -1380,6 +1508,8 @@ GUIWebsocketServer& GUIWebsocketServer::setSliderMin(
 GUIWebsocketServer& GUIWebsocketServer::setSliderMax(
     const std::string& key, double max)
 {
+  const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
+
   if (mSliders.find(key) != mSliders.end())
   {
     mSliders[key].max = max;
@@ -1413,6 +1543,8 @@ GUIWebsocketServer& GUIWebsocketServer::createPlot(
     double maxY,
     const std::string& type)
 {
+  const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
+
   Plot plot;
   plot.key = key;
   plot.fromTopLeft = fromTopLeft;
@@ -1442,6 +1574,8 @@ GUIWebsocketServer& GUIWebsocketServer::setPlotData(
     double minY,
     double maxY)
 {
+  const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
+
   if (mPlots.find(key) != mPlots.end())
   {
     mPlots[key].xs = xs;
@@ -1477,6 +1611,8 @@ GUIWebsocketServer& GUIWebsocketServer::setPlotData(
 GUIWebsocketServer& GUIWebsocketServer::setUIElementPosition(
     const std::string& key, const Eigen::Vector2i& fromTopLeft)
 {
+  const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
+
   if (mText.find(key) != mText.end())
   {
     mText[key].fromTopLeft = fromTopLeft;
@@ -1507,6 +1643,8 @@ GUIWebsocketServer& GUIWebsocketServer::setUIElementPosition(
 GUIWebsocketServer& GUIWebsocketServer::setUIElementSize(
     const std::string& key, const Eigen::Vector2i& size)
 {
+  const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
+
   if (mText.find(key) != mText.end())
   {
     mText[key].size = size;
@@ -1536,6 +1674,8 @@ GUIWebsocketServer& GUIWebsocketServer::setUIElementSize(
 /// This deletes a UI element by key
 GUIWebsocketServer& GUIWebsocketServer::deleteUIElement(const std::string& key)
 {
+  const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
+
   mText.erase(key);
   mButtons.erase(key);
   mSliders.erase(key);

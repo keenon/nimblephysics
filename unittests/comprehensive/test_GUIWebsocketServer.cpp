@@ -62,19 +62,16 @@ using namespace realtime;
 TEST(REALTIME, GUI_SERVER)
 {
   // Create a world
+  std::shared_ptr<simulation::World> world
+      = dart::utils::SkelParser::readWorld("dart://sample/skel/cartpole.skel");
+
+  /*
   std::shared_ptr<simulation::World> world = simulation::World::create();
 
   // Set gravity of the world
   // world->setConstraintForceMixingEnabled(true);
   // world->setPenetrationCorrectionEnabled(true);
   world->setGravity(Eigen::Vector3d(0.0, -9.81, 0.0));
-
-  // This is just here to double check what's going wrong with our mesh
-  // colliders
-  /*
-  world->getConstraintSolver()->setCollisionDetector(
-      dart::collision::FCLCollisionDetector::create());
-  */
 
   // Load ground and Atlas robot and add them to the world
   dart::utils::DartLoader urdfLoader;
@@ -88,8 +85,8 @@ TEST(REALTIME, GUI_SERVER)
   std::shared_ptr<dynamics::Skeleton> kr5
       = urdfLoader.parseSkeleton("dart://sample/urdf/KR5/KR5 sixx R650.urdf");
 
-  world->addSkeleton(ground);
-  world->addSkeleton(atlas);
+  // world->addSkeleton(ground);
+  // world->addSkeleton(atlas);
   // world->addSkeleton(kr5);
 
   // Set initial configuration for Atlas robot
@@ -99,6 +96,7 @@ TEST(REALTIME, GUI_SERVER)
   // Disable the ground from casting its own shadows
   ground->getBodyNode(0)->getShapeNode(0)->getVisualAspect()->setCastShadows(
       false);
+  */
 
   /*
   while (true)
@@ -111,6 +109,7 @@ TEST(REALTIME, GUI_SERVER)
   server.serve(8070);
   server.renderWorld(world);
 
+  /*
   Ticker ticker(world->getTimeStep());
   ticker.registerTickListener([&](long time) {
     double diff = sin(((double)time / 2000));
@@ -122,6 +121,7 @@ TEST(REALTIME, GUI_SERVER)
   });
 
   server.registerConnectionListener([&]() { ticker.start(); });
+  */
 
   /*
   server

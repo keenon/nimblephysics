@@ -96,15 +96,6 @@ bool WebsocketServer::run(int port)
 
 void WebsocketServer::stop()
 {
-  // Prevent concurrent access to the list of open connections from multiple
-  // threads
-  std::lock_guard<std::mutex> lock(this->connectionListMutex);
-  for (auto conn : this->openConnections)
-  {
-    std::cout << "Interrupting existing connection" << std::endl;
-    this->endpoint.interrupt(conn);
-  }
-
   this->endpoint.stop();
 }
 
@@ -158,6 +149,10 @@ void WebsocketServer::broadcastJsonObject(
 // Broadcast a raw text message to all clients
 void WebsocketServer::broadcast(const string& message)
 {
+  // Prevent concurrent access to the list of open connections from multiple
+  // threads
+  std::lock_guard<std::mutex> lock(this->connectionListMutex);
+
   for (auto conn : this->openConnections)
   {
     this->send(conn, message);
