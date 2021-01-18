@@ -23,7 +23,7 @@
 #include "TestHelpers.hpp"
 #include "stdio.h"
 
-// #define ALL_TESTS
+#define ALL_TESTS
 
 using namespace dart;
 using namespace math;
@@ -1026,15 +1026,13 @@ void testBoxCapsuleCollision(bool isSelfCollision, bool useMesh, int type)
   world->setVelocities(vels);
 
   // renderWorld(world);
-  EXPECT_TRUE(verifyPerturbedContactPositions(world));
+  // EXPECT_TRUE(verifyPerturbedContactPositions(world));
   // EXPECT_TRUE(verifyPerturbedContactNormals(world));
   // EXPECT_TRUE(verifyPerturbedContactEdges(world));
   // EXPECT_TRUE(verifyPerturbedContactForceDirections(world));
-  /*
   EXPECT_TRUE(verifyAnalyticalJacobians(world));
   EXPECT_TRUE(verifyVelGradients(world, vels));
   EXPECT_TRUE(verifyWrtMass(world));
-  */
 
   /*
   server::GUIWebsocketServer server;
@@ -1060,11 +1058,9 @@ void testBoxCapsuleCollision(bool isSelfCollision, bool useMesh, int type)
 
   // EXPECT_TRUE(verifyPerturbedContactPositions(world));
   // EXPECT_TRUE(verifyPerturbedContactNormals(world));
-  /*
   EXPECT_TRUE(verifyAnalyticalJacobians(world));
   EXPECT_TRUE(verifyVelGradients(world, vels));
   EXPECT_TRUE(verifyWrtMass(world));
-  */
 }
 
 #ifdef ALL_TESTS
@@ -1075,29 +1071,56 @@ TEST(GRADIENTS, PIPE_EDGE_BOX)
 #endif
 
 #ifdef ALL_TESTS
-TEST(GRADIENTS, PIPE_FACE_AND_EDGE)
+TEST(GRADIENTS, PIPE_FACE_AND_EDGE_BOX)
 {
   testBoxCapsuleCollision(false, false, 2);
 }
 #endif
 
-// #ifdef ALL_TESTS
-TEST(GRADIENTS, PIPE_VERTEX)
+#ifdef ALL_TESTS
+TEST(GRADIENTS, PIPE_VERTEX_BOX)
 {
   testBoxCapsuleCollision(false, false, 5);
 }
-// #endif
+#endif
 
 #ifdef ALL_TESTS
-TEST(GRADIENTS, PIPE_FACE)
+TEST(GRADIENTS, PIPE_FACE_BOX)
 {
   testBoxCapsuleCollision(false, false, 3);
 }
 #endif
 
 #ifdef ALL_TESTS
-TEST(GRADIENTS, END_SPHERE_FACE)
+TEST(GRADIENTS, END_SPHERE_FACE_BOX)
 {
   testBoxCapsuleCollision(false, false, 4);
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(GRADIENTS, PIPE_EDGE_MESH)
+{
+  testBoxCapsuleCollision(false, true, 1);
+}
+
+TEST(GRADIENTS, PIPE_FACE_AND_EDGE_MESH)
+{
+  testBoxCapsuleCollision(false, true, 2);
+}
+
+TEST(GRADIENTS, PIPE_VERTEX_MESH)
+{
+  testBoxCapsuleCollision(false, true, 5);
+}
+
+TEST(GRADIENTS, PIPE_FACE_MESH)
+{
+  testBoxCapsuleCollision(false, true, 3);
+}
+
+TEST(GRADIENTS, END_SPHERE_FACE_MESH)
+{
+  testBoxCapsuleCollision(false, true, 4);
 }
 #endif

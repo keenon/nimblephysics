@@ -2634,8 +2634,10 @@ int createCapsuleMeshContact(
       contact.collisionObject1 = o2;
       contact.collisionObject2 = o1;
       contact.normal = normal * -1;
-      contact.edgeBClosestPoint = nearestPoint;
-      contact.edgeBDir = (capsuleB - capsuleA);
+      contact.pipeClosestPoint = nearestPoint;
+      contact.pipeDir = (capsuleB - capsuleA).normalized();
+      contact.pipeFixedPoint = capsuleA;
+      contact.pipeRadius = capsuleRadius;
       contact.type = VERTEX_PIPE;
     }
     else
@@ -2643,8 +2645,10 @@ int createCapsuleMeshContact(
       contact.collisionObject1 = o1;
       contact.collisionObject2 = o2;
       contact.normal = normal;
-      contact.edgeAClosestPoint = nearestPoint;
-      contact.edgeADir = (capsuleB - capsuleA);
+      contact.pipeClosestPoint = nearestPoint;
+      contact.pipeDir = (capsuleB - capsuleA).normalized();
+      contact.pipeFixedPoint = capsuleA;
+      contact.pipeRadius = capsuleRadius;
       contact.type = PIPE_VERTEX;
     }
     contact.penetrationDepth
@@ -2704,9 +2708,10 @@ int createCapsuleMeshContact(
           contact.collisionObject2 = o1;
           contact.normal = normal * -1;
           contact.type = VERTEX_PIPE;
-          contact.edgeBClosestPoint = edgeMinPoint + normal * capsuleRadius;
-          contact.edgeBDir = (capsuleB - capsuleA);
-          contact.radiusB = capsuleRadius;
+          contact.pipeClosestPoint = edgeMinPoint + normal * capsuleRadius;
+          contact.pipeFixedPoint = capsuleA;
+          contact.pipeDir = (capsuleB - capsuleA).normalized();
+          contact.pipeRadius = capsuleRadius;
         }
         else
         {
@@ -2714,9 +2719,10 @@ int createCapsuleMeshContact(
           contact.collisionObject2 = o2;
           contact.normal = normal;
           contact.type = PIPE_VERTEX;
-          contact.edgeAClosestPoint = edgeMinPoint + normal * capsuleRadius;
-          contact.edgeADir = (capsuleB - capsuleA);
-          contact.radiusA = capsuleRadius;
+          contact.pipeClosestPoint = edgeMinPoint + normal * capsuleRadius;
+          contact.pipeFixedPoint = capsuleB;
+          contact.pipeDir = (capsuleB - capsuleA);
+          contact.pipeRadius = capsuleRadius;
         }
         contact.penetrationDepth = capsuleRadius - dist;
         result.addContact(contact);
@@ -2765,9 +2771,10 @@ int createCapsuleMeshContact(
           contact.collisionObject2 = o1;
           contact.normal = normal * -1;
           contact.type = VERTEX_PIPE;
-          contact.edgeBClosestPoint = edgeMaxPoint + normal * capsuleRadius;
-          contact.edgeBDir = (capsuleB - capsuleA);
-          contact.radiusB = capsuleRadius;
+          contact.pipeClosestPoint = edgeMaxPoint + normal * capsuleRadius;
+          contact.pipeFixedPoint = capsuleA;
+          contact.pipeDir = (capsuleB - capsuleA).normalized();
+          contact.pipeRadius = capsuleRadius;
         }
         else
         {
@@ -2775,9 +2782,10 @@ int createCapsuleMeshContact(
           contact.collisionObject2 = o2;
           contact.normal = normal;
           contact.type = PIPE_VERTEX;
-          contact.edgeAClosestPoint = edgeMaxPoint + normal * capsuleRadius;
-          contact.edgeADir = (capsuleB - capsuleA);
-          contact.radiusA = capsuleRadius;
+          contact.pipeClosestPoint = edgeMaxPoint + normal * capsuleRadius;
+          contact.pipeFixedPoint = capsuleA;
+          contact.pipeDir = (capsuleB - capsuleA).normalized();
+          contact.pipeRadius = capsuleRadius;
         }
         contact.penetrationDepth = capsuleRadius - dist;
         result.addContact(contact);
@@ -2848,9 +2856,11 @@ int createCapsuleMeshContact(
         contact.normal = normal;
         contact.type = EDGE_PIPE;
         contact.edgeAClosestPoint = edgeClosestPoint;
-        contact.edgeADir = (meshPointsWitness[1] - meshPointsWitness[0]);
+        contact.edgeAFixedPoint = meshPointsWitness[0];
+        contact.edgeADir
+            = (meshPointsWitness[1] - meshPointsWitness[0]).normalized();
         contact.pipeClosestPoint = pipeClosestPoint;
-        contact.pipeDir = (capsuleB - capsuleA);
+        contact.pipeDir = (capsuleB - capsuleA).normalized();
         contact.pipeFixedPoint = capsuleA;
         contact.pipeRadius = capsuleRadius;
       }
@@ -2861,11 +2871,13 @@ int createCapsuleMeshContact(
         contact.normal = normal * -1;
         contact.type = PIPE_EDGE;
         contact.pipeClosestPoint = pipeClosestPoint;
-        contact.pipeDir = (capsuleB - capsuleA);
+        contact.pipeDir = (capsuleB - capsuleA).normalized();
         contact.pipeFixedPoint = capsuleA;
         contact.pipeRadius = capsuleRadius;
         contact.edgeAClosestPoint = edgeClosestPoint;
-        contact.edgeADir = (meshPointsWitness[1] - meshPointsWitness[0]);
+        contact.edgeAFixedPoint = meshPointsWitness[0];
+        contact.edgeADir
+            = (meshPointsWitness[1] - meshPointsWitness[0]).normalized();
       }
       contact.penetrationDepth
           = capsuleRadius - (edgeClosestPoint - pipeClosestPoint).norm();
@@ -2941,8 +2953,12 @@ int createCapsuleMeshContact(
         else if (contact.type == EDGE_EDGE)
         {
           contact.type = EDGE_PIPE;
-          contact.edgeBClosestPoint += normal * capsuleRadius;
-          contact.sphereRadius = capsuleRadius;
+          contact.pipeFixedPoint
+              = contact.edgeBFixedPoint + normal * capsuleRadius;
+          contact.pipeClosestPoint
+              = contact.edgeBClosestPoint + normal * capsuleRadius;
+          contact.pipeDir = contact.edgeBDir;
+          contact.pipeRadius = capsuleRadius;
         }
         else
         {
@@ -2988,8 +3004,15 @@ int createCapsuleMeshContact(
         else if (contact.type == EDGE_EDGE)
         {
           contact.type = PIPE_EDGE;
-          contact.edgeAClosestPoint += normal * capsuleRadius;
-          contact.radiusA = capsuleRadius;
+          contact.pipeFixedPoint
+              = contact.edgeAFixedPoint + normal * capsuleRadius;
+          contact.pipeClosestPoint
+              = contact.edgeAClosestPoint + normal * capsuleRadius;
+          contact.pipeDir = contact.edgeADir;
+          contact.pipeRadius = capsuleRadius;
+          contact.edgeAFixedPoint = contact.edgeBFixedPoint;
+          contact.edgeAClosestPoint = contact.edgeBClosestPoint;
+          contact.edgeADir = contact.edgeBDir;
         }
         else
         {
