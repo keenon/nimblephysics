@@ -65,9 +65,9 @@ TEST(REALTIME, GUI_SERVER)
   std::shared_ptr<simulation::World> world = simulation::World::create();
 
   // Set gravity of the world
-  world->setConstraintForceMixingEnabled(true);
+  // world->setConstraintForceMixingEnabled(true);
   // world->setPenetrationCorrectionEnabled(true);
-  world->setGravity(Eigen::Vector3d(0.0, 0.0, 9.81));
+  world->setGravity(Eigen::Vector3d(0.0, -9.81, 0.0));
 
   // This is just here to double check what's going wrong with our mesh
   // colliders
@@ -111,7 +111,7 @@ TEST(REALTIME, GUI_SERVER)
   server.serve(8070);
   server.renderWorld(world);
 
-  Ticker ticker(0.01);
+  Ticker ticker(world->getTimeStep());
   ticker.registerTickListener([&](long time) {
     double diff = sin(((double)time / 2000));
     // atlas->setPosition(0, diff * dart::math::constantsd::pi());

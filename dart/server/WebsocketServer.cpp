@@ -6,6 +6,8 @@
 
 #include <websocketpp/logger/levels.hpp>
 
+#include "dart/common/Console.hpp"
+
 // The name of the special JSON field that holds the message type for messages
 #define MESSAGE_FIELD "__MESSAGE__"
 
@@ -67,7 +69,28 @@ bool WebsocketServer::run(int port)
   }
 
   // Start the Asio event loop
-  this->endpoint.run();
+  //
+  // Do this in a loop to catch Websocket errors thrown by typical Chrome lazy
+  // Websocket implementation, per:
+  // https://github.com/zaphoyd/websocketpp/issues/580#issuecomment-689703724
+  for (;;)
+  {
+    try
+    {
+      this->endpoint.run();
+      break; // run() exited normally
+    }
+    catch (websocketpp::exception const& e)
+    {
+      dterr << e.what();
+      dterr << "Exception thrown from m_io_service->run(). Restarting "
+               "m_io_service->run()";
+    }
+    catch (...)
+    {
+      dterr << "Hit critial error. Restarting m_io_service->run()";
+    }
+  }
   return true;
 }
 

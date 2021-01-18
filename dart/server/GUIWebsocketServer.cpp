@@ -251,6 +251,7 @@ void GUIWebsocketServer::serve(int port)
   sigaddset(&sigset, SIGTERM);
   pthread_sigmask(SIG_UNBLOCK, &sigset, nullptr);
 
+  /*
   // The signal set is used to register termination notifications
   mSignalSet = new asio::signal_set(mServerEventLoop, SIGINT, SIGTERM);
 
@@ -275,6 +276,7 @@ void GUIWebsocketServer::serve(int port)
       exit(signal_number);
     }
   });
+  */
 
   // Start a thread to handle the main server event loop
   mAsioThread = new std::thread([&] { mServerEventLoop.run(); });
