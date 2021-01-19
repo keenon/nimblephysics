@@ -51,9 +51,11 @@ RUN git clone https://github.com/danfis/libccd.git && \
 # Install ASSIMP
 RUN git clone https://github.com/assimp/assimp.git && \
     pushd assimp && \
+    git checkout v5.0.1 && \
     mkdir build && \
     pushd build && \
-    cmake .. && \
+    # cmake .. -DASSIMP_BUILD_ZLIB=ON -DASSIMP_BUILD_TESTS=ON -DASSIMP_BUILD_ASSIMP_TOOLS=OFF -DCMAKE_BUILD_TYPE=Debug && \
+    cmake .. -DASSIMP_BUILD_ZLIB=ON -DASSIMP_BUILD_TESTS=ON -DASSIMP_BUILD_ASSIMP_TOOLS=OFF && \
     make install -j10 && \
     popd && \
     popd && \
@@ -121,32 +123,32 @@ RUN git clone https://github.com/leethomason/tinyxml2.git && \
     rm -rf tinyxml2
 
 # Install freeglut
-RUN yum install -y libXi-devel && \
-    yum install -y mesa-libGLU-devel && \
-    yum install -y libXmu-devel && \
-    curl https://managedway.dl.sourceforge.net/project/freeglut/freeglut/3.2.1/freeglut-3.2.1.tar.gz > freeglut.tar.gz && \
-    tar -zxf freeglut.tar.gz && \
-    rm freeglut.tar.gz && \
-    pushd freeglut-3.2.1 && \
-    mkdir build && \
-    pushd build && \
-    cmake .. && \
-    make install -j10 && \
-    popd && \
-    popd && \
-    rm -rf freeglut-3.2.1
+# RUN yum install -y libXi-devel && \
+#     yum install -y mesa-libGLU-devel && \
+#     yum install -y libXmu-devel && \
+#     curl https://managedway.dl.sourceforge.net/project/freeglut/freeglut/3.2.1/freeglut-3.2.1.tar.gz > freeglut.tar.gz && \
+#     tar -zxf freeglut.tar.gz && \
+#     rm freeglut.tar.gz && \
+#     pushd freeglut-3.2.1 && \
+#     mkdir build && \
+#     pushd build && \
+#     cmake .. && \
+#     make install -j10 && \
+#     popd && \
+#     popd && \
+#     rm -rf freeglut-3.2.1
 
 # Install Open Scene Graph
-RUN git clone https://github.com/openscenegraph/OpenSceneGraph.git && \
-    pushd OpenSceneGraph && \
-    git checkout OpenSceneGraph-3.6.5 && \
-    mkdir build && \
-    pushd build && \
-    cmake .. && \
-    make install -j10 && \
-    popd && \
-    popd && \
-    rm -rf OpenSceneGraph
+# RUN git clone https://github.com/openscenegraph/OpenSceneGraph.git && \
+#     pushd OpenSceneGraph && \
+#     git checkout OpenSceneGraph-3.6.5 && \
+#     mkdir build && \
+#     pushd build && \
+#     cmake .. && \
+#     make install -j10 && \
+#     popd && \
+#     popd && \
+#     rm -rf OpenSceneGraph
 
 # Install tinyxml1
 RUN git clone https://github.com/robotology-dependencies/tinyxml.git && \
@@ -248,3 +250,9 @@ RUN pushd benchmark && \
     popd && \
     popd
 RUN rm -rf benchmark
+
+# RUN ls /usr/local/lib64 | grep assimp
+# RUN ls /usr/local/lib | grep assimp
+# RUN rm -rf /usr/local/lib64/libassimp.so
+# RUN rm -rf /usr/local/lib64/libassimp.5.so
+# RUN rm -rf /usr/local/lib64/libassimp.5.0.1.so

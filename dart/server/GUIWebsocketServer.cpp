@@ -538,6 +538,16 @@ GUIWebsocketServer& GUIWebsocketServer::renderSkeleton(
 
       if (!shapeNode->hasVisualAspect())
         continue;
+
+      if (shape == nullptr)
+      {
+        dtwarn << "Found a ShapeNode with no attached Shape object. This can "
+                  "sometimes happen if you're trying to load models with "
+                  "corrupted mesh files. Ignoring: "
+               << shapeName << std::endl;
+        continue;
+      }
+
       dynamics::VisualAspect* visual = shapeNode->getVisualAspect(true);
       if (visual == nullptr)
         continue;

@@ -38,6 +38,9 @@
 #include <assimp/Importer.hpp>
 #include <assimp/postprocess.h>
 #include <assimp/cimport.h>
+#include <assimp/Logger.hpp>
+#include <assimp/DefaultLogger.hpp>
+#include <assimp/LogStream.hpp>
 
 #include "dart/config.hpp"
 #include "dart/common/Console.hpp"
@@ -123,6 +126,29 @@ aiMaterial::~aiMaterial()
   delete[] mProperties;
 }
 #endif  // #if !(ASSIMP_AIMATERIAL_CTOR_DTOR_DEFINED)
+
+// Example stream
+class AssimpStream :
+        public Assimp::LogStream
+{
+public:
+        // Constructor
+        AssimpStream()
+        {
+                // empty
+        }
+        
+        // Destructor
+        ~AssimpStream()
+        {
+                // empty
+        }
+        // Write womethink using your own functionality
+        void write(const char* message)
+        {
+                ::printf("%s\n", message);
+        }
+};
 
 namespace dart {
 namespace dynamics {
@@ -374,6 +400,13 @@ const aiScene* MeshShape::loadMesh(const std::string& _uri, const common::Resour
   AssimpInputResourceRetrieverAdaptor systemIO(retriever);
   aiFileIO fileIO = createFileIO(&systemIO);
 
+  /*
+  // Uncomment this code and the block below the aiImportFileExWithProperties() call to get full ASSIMP logging
+  // Create a logger instance 
+  Assimp::DefaultLogger::create("",Assimp::Logger::VERBOSE);
+  Assimp::DefaultLogger::get()->attachStream( new AssimpStream(), Assimp::Logger::ErrorSeverity::Debugging | Assimp::Logger::ErrorSeverity::Info | Assimp::Logger::ErrorSeverity::Warn | Assimp::Logger::ErrorSeverity::Err);
+  */
+
   // Import the file.
   const aiScene* scene = aiImportFileExWithProperties(
     _uri.c_str(), 
@@ -381,16 +414,24 @@ const aiScene* MeshShape::loadMesh(const std::string& _uri, const common::Resour
     | aiProcess_Triangulate
     | aiProcess_JoinIdenticalVertices
     | aiProcess_SortByPType
-    | aiProcess_OptimizeMeshes,
+    | aiProcess_OptimizeMeshes
+    | aiProcess_ValidateDataStructure,
     &fileIO,
     propertyStore
   );
+
+  /*
+  // Uncomment this code and the block above the aiImportFileExWithProperties() call to get full ASSIMP logging
+  // Clean up the global logger, since we create it fresh with every call
+  Assimp::DefaultLogger::kill();
+  */
 
   // If succeeded, store the importer in the scene to keep it alive. This is
   // necessary because the importer owns the memory that it allocates.
   if(!scene)
   {
-    dtwarn << "[MeshShape::loadMesh] Failed loading mesh '" << _uri << "'.\n";
+    dtwarn << "[MeshShape::loadMesh] Failed loading mesh '" << _uri << "' with ASSIMP error '" << std::string(aiGetErrorString()) << "'.\n";
+    
     aiReleasePropertyStore(propertyStore);
     return nullptr;
   }
