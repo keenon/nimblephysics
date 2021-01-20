@@ -29,7 +29,7 @@ string WebsocketServer::stringifyJson(const Json::Value& val)
   return Json::writeString(wbuilder, val);
 }
 
-WebsocketServer::WebsocketServer()
+WebsocketServer::WebsocketServer() : mRunning(false)
 {
   // Wire up our event handlers
   this->endpoint.set_open_handler(
@@ -68,12 +68,14 @@ bool WebsocketServer::run(int port)
     return false;
   }
 
+  mRunning = true;
+
   // Start the Asio event loop
   //
   // Do this in a loop to catch Websocket errors thrown by typical Chrome lazy
   // Websocket implementation, per:
   // https://github.com/zaphoyd/websocketpp/issues/580#issuecomment-689703724
-  while (true)
+  while (mRunning)
   {
     try
     {
@@ -96,6 +98,7 @@ bool WebsocketServer::run(int port)
 
 void WebsocketServer::stop()
 {
+  mRunning = false;
   this->endpoint.stop();
 }
 

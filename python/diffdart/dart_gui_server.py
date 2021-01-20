@@ -43,10 +43,15 @@ class DartGUI:
     def serve(self, port):
         self.guiServer.serve(8070)
         server_address = ('', port)
-        httpd = ThreadingHTTPServer(server_address, createRequestHandler())
+        self.httpd = ThreadingHTTPServer(server_address, createRequestHandler())
         print('Web GUI serving optimization solution on http://localhost:'+str(port))
-        t = threading.Thread(None, httpd.serve_forever)
+        t = threading.Thread(None, self.httpd.serve_forever)
+        t.daemon = True
         t.start()
 
     def stateMachine(self) -> dart.server.GUIWebsocketServer:
         return self.guiServer
+
+    def stopServing(self):
+        self.guiServer.stopServing()
+        self.httpd.shutdown()

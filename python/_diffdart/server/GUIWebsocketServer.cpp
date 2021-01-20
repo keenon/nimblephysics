@@ -54,7 +54,10 @@ void GUIWebsocketServer(py::module& m)
           &dart::server::GUIWebsocketServer::serve,
           ::py::arg("port"),
           ::py::call_guard<py::gil_scoped_release>())
-      .def("stopServing", &dart::server::GUIWebsocketServer::stopServing)
+      .def(
+          "stopServing",
+          &dart::server::GUIWebsocketServer::stopServing,
+          ::py::call_guard<py::gil_scoped_release>())
       .def("isServing", &dart::server::GUIWebsocketServer::isServing)
       .def("getScreenSize", &dart::server::GUIWebsocketServer::getScreenSize)
       .def("getKeysDown", &dart::server::GUIWebsocketServer::getKeysDown)

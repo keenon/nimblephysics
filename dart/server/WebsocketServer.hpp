@@ -90,6 +90,7 @@ protected:
   void onClose(ClientConnection conn);
   void onMessage(ClientConnection conn, WebsocketEndpoint::message_ptr msg);
 
+  bool mRunning;
   asio::io_service eventLoop;
   WebsocketEndpoint endpoint;
   vector<ClientConnection> openConnections;

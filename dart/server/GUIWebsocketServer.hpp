@@ -315,6 +315,7 @@ protected:
   std::thread* mServerThread;
   WebsocketServer* mServer;
   std::recursive_mutex globalMutex;
+  std::recursive_mutex destructorMutex;
 
   // protects the buffered JSON message (mJson) from getting
   // corrupted if we queue messages while trying to flush()

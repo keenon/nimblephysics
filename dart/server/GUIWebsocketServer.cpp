@@ -39,18 +39,22 @@ GUIWebsocketServer::GUIWebsocketServer()
 
 GUIWebsocketServer::~GUIWebsocketServer()
 {
-  if (mServing)
   {
-    dterr
-        << "GUIWebsocketServer is being deallocated while it's still "
-           "serving! The server will now terminate, and attempt to clean up. "
-           "If this was not intended "
-           "behavior, please keep a reference to the GUIWebsocketServer to "
-           "keep the server alive. If this was intended behavior, please call "
-           "stopServing() on "
-           "the server before deallocating it."
-        << std::endl;
-    stopServing();
+    const std::lock_guard<std::recursive_mutex> lock(this->destructorMutex);
+    if (mServing)
+    {
+      dterr
+          << "GUIWebsocketServer is being deallocated while it's still "
+             "serving! The server will now terminate, and attempt to clean up. "
+             "If this was not intended "
+             "behavior, please keep a reference to the GUIWebsocketServer to "
+             "keep the server alive. If this was intended behavior, please "
+             "call "
+             "stopServing() on "
+             "the server before deallocating it."
+          << std::endl;
+      stopServing();
+    }
   }
 }
 
@@ -333,16 +337,23 @@ void GUIWebsocketServer::serve(int port)
 /// This kills the server, if one was running
 void GUIWebsocketServer::stopServing()
 {
-  if (!mServing)
-    return;
+  {
+    const std::lock_guard<std::recursive_mutex> lock(this->destructorMutex);
+    if (!mServing)
+      return;
+    mServing = false;
+  }
   std::cout << "GUIWebsocketServer is shutting down the WebSocket server on "
                "ws://localhost:"
             << mPort << std::endl;
+  assert(mServer != nullptr);
   mServer->stop();
+  assert(mServerThread != nullptr);
   mServerThread->join();
   delete mServer;
   delete mServerThread;
-  mServing = false;
+  mServer = nullptr;
+  mServerThread = nullptr;
 }
 
 /// Returns true if we're serving
