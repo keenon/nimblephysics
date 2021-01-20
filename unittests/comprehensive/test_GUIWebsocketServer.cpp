@@ -83,8 +83,10 @@ TEST(REALTIME, GUI_SERVER)
       = dart::utils::SdfParser::readSkeleton(
           "dart://sample/sdf/atlas/atlas_v3_no_head.sdf");
 
+  /*
   std::shared_ptr<dynamics::Skeleton> kr5
       = urdfLoader.parseSkeleton("dart://sample/urdf/KR5/KR5 sixx R650.urdf");
+  */
 
   world->addSkeleton(ground);
   world->addSkeleton(atlas);

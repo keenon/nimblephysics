@@ -77,7 +77,9 @@ if(TARGET dart-utils)
 
     dart_add_test("comprehensive" test_Gradients)
     target_link_libraries(test_Gradients dart-utils-urdf)
-    target_link_libraries(test_Gradients dart-gui)
+
+    dart_add_test("comprehensive" test_ParallelPosAndVel)
+    target_link_libraries(test_ParallelPosAndVel dart-utils-urdf)
   endif()
 
 endif()
