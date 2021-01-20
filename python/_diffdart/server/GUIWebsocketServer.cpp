@@ -61,6 +61,10 @@ void GUIWebsocketServer(py::module& m)
       .def("isServing", &dart::server::GUIWebsocketServer::isServing)
       .def("getScreenSize", &dart::server::GUIWebsocketServer::getScreenSize)
       .def("getKeysDown", &dart::server::GUIWebsocketServer::getKeysDown)
+      .def(
+          "isKeyDown",
+          &dart::server::GUIWebsocketServer::isKeyDown,
+          ::py::arg("key"))
       .def("clear", &dart::server::GUIWebsocketServer::clear)
       .def(
           "createBox",

@@ -70,6 +70,9 @@ public:
   /// Gets the set of all the keys currently being pressed
   const std::unordered_set<std::string>& getKeysDown() const;
 
+  /// Returns true if a key is currently being pressed
+  bool isKeyDown(const std::string& key) const;
+
   /// This tells us whether or not to automatically flush after each command
   void setAutoflush(bool autoflush);
 

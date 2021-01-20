@@ -75,6 +75,9 @@ World::World(const std::string& _name)
     mDofs(0),
     mRecording(new Recording(mSkeletons)),
     onNameChanged(mNameChangedSignal),
+    mParallelVelocityAndPositionUpdates(
+        true), // TODO(keenon): We should fix our backprop to somehow achieve
+               // the best of both worlds here
     mConstraintForceMixingEnabled(
         false), // TODO(keenon): We should updated gradients to support this,
                 // and re-enable it by default
@@ -108,6 +111,8 @@ WorldPtr World::clone() const
   worldClone->setTimeStep(mTimeStep);
   worldClone->setConstraintForceMixingEnabled(mConstraintForceMixingEnabled);
   worldClone->setPenetrationCorrectionEnabled(mPenetrationCorrectionEnabled);
+  worldClone->setParallelVelocityAndPositionUpdates(
+      mParallelVelocityAndPositionUpdates);
 
   // Copy the WithRespectToMass pointer, so we have the same object
   worldClone->mWrtMass = mWrtMass;
@@ -197,7 +202,6 @@ void World::integrateVelocities()
 void World::step(bool _resetCommand)
 {
   Eigen::VectorXd initialVelocity = getVelocities();
-  bool _parallelVelocityAndPositionUpdates = true;
 
   // Integrate velocity for unconstrained skeletons
   for (auto& skel : mSkeletons)
@@ -236,7 +240,7 @@ void World::step(bool _resetCommand)
 
     // <DiffDART>: This is the original way integration happened, right after
     // velocity updates
-    if (!_parallelVelocityAndPositionUpdates)
+    if (!mParallelVelocityAndPositionUpdates)
       skel->integratePositions(mTimeStep);
     // </DiffDART>
 
@@ -250,7 +254,7 @@ void World::step(bool _resetCommand)
 
   // <DiffDART>: This is an easier way to compute gradients for. We update p_t+1
   // using v_t, instead of v_t+1
-  if (_parallelVelocityAndPositionUpdates)
+  if (mParallelVelocityAndPositionUpdates)
   {
     int cursor = 0;
     for (auto& skel : mSkeletons)
@@ -279,6 +283,18 @@ void World::setTime(double _time)
 double World::getTime() const
 {
   return mTime;
+}
+
+//==============================================================================
+void World::setParallelVelocityAndPositionUpdates(bool enable)
+{
+  mParallelVelocityAndPositionUpdates = enable;
+}
+
+//==============================================================================
+bool World::getParallelVelocityAndPositionUpdates()
+{
+  return mParallelVelocityAndPositionUpdates;
 }
 
 //==============================================================================

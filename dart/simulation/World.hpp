@@ -432,6 +432,14 @@ public:
   /// actually use a complicated function to integrate to the next position.
   Eigen::MatrixXd getVelPosJacobian() const;
 
+  /// True if we want to update p_{t+1} as f(p_t, v_t), rather than the old
+  /// f(p_t, v_{t+1}). This makes it much easier to reason about
+  /// backpropagation, but it can introduce simulation instability in some
+  /// environments. True by default.
+  void setParallelVelocityAndPositionUpdates(bool enable);
+
+  bool getParallelVelocityAndPositionUpdates();
+
   /// True by default. Sets whether or not to apply artifical "penetration
   /// correction" forces to objects that inter-penetrate.
   void setPenetrationCorrectionEnabled(bool enable);
@@ -530,6 +538,12 @@ protected:
   /// This holds the unconstrained velocities that we found in the last
   /// timestep, before we solved the LCP for constraints
   Eigen::VectorXd mLastPreConstraintVelocity;
+
+  /// True if we want to update p_{t+1} as f(p_t, v_t), rather than the old
+  /// f(p_t, v_{t+1}). This makes it much easier to reason about
+  /// backpropagation, but it can introduce simulation instability in some
+  /// environments. True by default.
+  bool mParallelVelocityAndPositionUpdates;
 
   /// True if we want to enable artificial penetration correction forces
   bool mPenetrationCorrectionEnabled;

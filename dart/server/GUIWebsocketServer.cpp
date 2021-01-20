@@ -399,6 +399,12 @@ const std::unordered_set<std::string>& GUIWebsocketServer::getKeysDown() const
   return mKeysDown;
 }
 
+/// Returns true if a key is currently being pressed
+bool GUIWebsocketServer::isKeyDown(const std::string& key) const
+{
+  return mKeysDown.find(key) != mKeysDown.end();
+}
+
 /// This tells us whether or not to automatically flush after each command
 void GUIWebsocketServer::setAutoflush(bool autoflush)
 {

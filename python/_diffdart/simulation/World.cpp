@@ -399,6 +399,13 @@ void World(py::module& m)
             return self->getInvMassMatrix();
           })
       .def(
+          "getParallelVelocityAndPositionUpdates",
+          &dart::simulation::World::getParallelVelocityAndPositionUpdates)
+      .def(
+          "setParallelVelocityAndPositionUpdates",
+          &dart::simulation::World::setParallelVelocityAndPositionUpdates,
+          ::py::arg("enabled"))
+      .def(
           "getPenetrationCorrectionEnabled",
           &dart::simulation::World::getPenetrationCorrectionEnabled)
       .def(
