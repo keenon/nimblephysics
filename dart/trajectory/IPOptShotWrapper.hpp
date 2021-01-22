@@ -1,6 +1,7 @@
 #ifndef DART_NEURAL_IPOPT_SHOT_WRAPPER_HPP_
 #define DART_NEURAL_IPOPT_SHOT_WRAPPER_HPP_
 
+#include <functional>
 #include <memory>
 #include <vector>
 
@@ -179,6 +180,13 @@ public:
   /// This resets the stored data from this iteration
   void reset_iteration();
 
+  /// This registers an intermediate callback, to get called by IPOPT after each
+  /// step of optimization. If any callback returns false on a given step, then
+  /// the optimizer will terminate early.
+  void registerIntermediateCallback(
+      std::function<bool(Problem* problem, int, double primal, double dual)>
+          callback);
+
 private:
   Problem* mWrapped;
   std::shared_ptr<Solution> mRecord;
@@ -200,6 +208,10 @@ private:
   Eigen::VectorXd mSaved_zU;
   Eigen::VectorXd mSaved_zL;
   Eigen::VectorXd mSaved_lambda;
+
+  std::vector<
+      std::function<bool(Problem* problem, int, double primal, double dual)>>
+      mIntermediateCallbacks;
 };
 
 } // namespace trajectory

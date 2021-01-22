@@ -1837,7 +1837,9 @@ void createFaceFaceContacts(
   assert(pointsAWitnessSorted.size() > 2 || pointsBWitnessSorted.size() > 2);
   assert(pointsAWitnessSorted.size() >= 2 && pointsBWitnessSorted.size() >= 2);
 
-  Eigen::Map<Eigen::Vector3d> dirVec(dir->v);
+  // Eigen::Map<Eigen::Vector3d> dirVec(dir->v);
+  // Make a copy so we can see it in the debugger
+  Eigen::Vector3d dirVec = Eigen::Map<Eigen::Vector3d>(dir->v);
 
   // All the pointsAWitness vectors are co-planar, so we choose the closest
   // [0], [1], and [2] to cross to get a precise normal
@@ -2233,7 +2235,8 @@ int createMeshMeshContacts(
     {
       result.addContact(contact);
     }
-    assert(contacts.size() == 2);
+    // TODO(keenon): This isn't always true when we have deep inter-penetration
+    // assert(contacts.size() == 2);
     return contacts.size();
   }
   // Face-edge collision, results in two collisions
@@ -2246,7 +2249,8 @@ int createMeshMeshContacts(
     {
       result.addContact(contact);
     }
-    assert(contacts.size() == 2);
+    // TODO(keenon): This isn't always true when we have deep inter-penetration
+    // assert(contacts.size() == 2);
     return contacts.size();
   }
   // Single vertex-edge collision, awkward special case. Pretend it's
@@ -3230,7 +3234,7 @@ inline void setCcdDefaultSettings(ccd_t& ccd)
   ccd.mpr_tolerance = 0.0001;
   ccd.epa_tolerance = 0.0001;
   ccd.dist_tolerance = 0.001;
-  ccd.max_iterations = 100;
+  ccd.max_iterations = 10000;
 }
 
 /// This allows us to prevent weird effects where we don't want to carry over
@@ -4482,9 +4486,147 @@ int collide(CollisionObject* o1, CollisionObject* o2, CollisionResult& result)
     {
       const auto* box1 = static_cast<const dynamics::BoxShape*>(shape2.get());
 
-      // Used to be collideBoxBox(), but that doesn't annotate its collision
-      // points properly for complex face-face collisions.
-      return collideBoxBoxAsMesh(
+#ifndef NDEBUG
+      CollisionResult boxBoxResult;
+      int boxCollides = collideBoxBox(
+          o1, o2, box0->getSize(), T1, box1->getSize(), T2, boxBoxResult);
+      CollisionResult meshMeshResult;
+      int meshCollides = collideBoxBoxAsMesh(
+          o1, o2, box0->getSize(), T1, box1->getSize(), T2, meshMeshResult);
+
+      if ((boxCollides > 0) != (meshCollides > 0))
+      {
+        std::cout << "Breakpoint!" << std::endl;
+        Eigen::Vector3d randDir = Eigen::Vector3d::Random();
+        boxBoxResult.sortContacts(randDir);
+        meshMeshResult.sortContacts(randDir);
+        for (int i = 0; i < std::min(
+                            boxBoxResult.getNumContacts(),
+                            meshMeshResult.getNumContacts());
+             i++)
+        {
+          std::cout << "Contact " << i << std::endl;
+          std::cout << "Box-box Type: " << std::endl
+                    << boxBoxResult.getContact(i).type << std::endl;
+          std::cout << "Mesh-mesh Type: " << std::endl
+                    << meshMeshResult.getContact(i).type << std::endl;
+          std::cout << "Box-box Normal: " << std::endl
+                    << boxBoxResult.getContact(i).normal << std::endl;
+          std::cout << "Mesh-mesh Normal: " << std::endl
+                    << meshMeshResult.getContact(i).normal << std::endl;
+          std::cout << "Normal diff: " << std::endl
+                    << (boxBoxResult.getContact(i).normal
+                        - meshMeshResult.getContact(i).normal)
+                    << std::endl;
+          std::cout << "Box-box Point: " << std::endl
+                    << boxBoxResult.getContact(i).point << std::endl;
+          std::cout << "Mesh-mesh Point: " << std::endl
+                    << meshMeshResult.getContact(i).point << std::endl;
+          std::cout << "Point diff: " << std::endl
+                    << (boxBoxResult.getContact(i).point
+                        - meshMeshResult.getContact(i).point)
+                    << std::endl;
+        }
+        for (int i = std::min(
+                 boxBoxResult.getNumContacts(),
+                 meshMeshResult.getNumContacts());
+             i < boxBoxResult.getNumContacts();
+             i++)
+        {
+          std::cout << "Box-box Contact " << i << std::endl;
+          std::cout << "Box-box Type: " << std::endl
+                    << boxBoxResult.getContact(i).type << std::endl;
+          std::cout << "Box-box Normal: " << std::endl
+                    << boxBoxResult.getContact(i).normal << std::endl;
+          std::cout << "Box-box Point: " << std::endl
+                    << boxBoxResult.getContact(i).point << std::endl;
+        }
+        for (int i = std::min(
+                 boxBoxResult.getNumContacts(),
+                 meshMeshResult.getNumContacts());
+             i < meshMeshResult.getNumContacts();
+             i++)
+        {
+          std::cout << "Mesh-mesh Contact " << i << std::endl;
+          std::cout << "Mesh-mesh Type: " << std::endl
+                    << meshMeshResult.getContact(i).type << std::endl;
+          std::cout << "Mesh-mesh Normal: " << std::endl
+                    << meshMeshResult.getContact(i).normal << std::endl;
+          std::cout << "Mesh-mesh Point: " << std::endl
+                    << meshMeshResult.getContact(i).point << std::endl;
+        }
+        std::cout << "To replicate:" << std::endl;
+        std::cout << "////////////////////////////////////////" << std::endl;
+        std::cout << "Eigen::Vector3d size0 = Eigen::Vector3d("
+                  << box0->getSize()(0) << "," << box0->getSize()(1) << ","
+                  << box0->getSize()(2) << ");" << std::endl;
+        std::cout << "Eigen::Matrix4d M_T0;" << std::endl;
+        std::cout << "// clang-format off" << std::endl;
+        std::cout << "M_T0 << ";
+        for (int row = 0; row < 4; row++)
+        {
+          for (int col = 0; col < 4; col++)
+          {
+            std::cout << T1.matrix()(row, col);
+            if (row == 3 && col == 3)
+            {
+              std::cout << ";";
+            }
+            else
+            {
+              std::cout << ",";
+            }
+          }
+          std::cout << std::endl;
+          if (row < 3)
+          {
+            std::cout << "        ";
+          }
+        }
+        std::cout << "// clang-format on" << std::endl;
+        std::cout << "Eigen::Isometry3d T0(M_T0);" << std::endl;
+        std::cout << "Eigen::Vector3d size1 = Eigen::Vector3d("
+                  << box1->getSize()(0) << "," << box1->getSize()(1) << ","
+                  << box1->getSize()(2) << ");" << std::endl;
+        std::cout << "Eigen::Matrix4d M_T1;" << std::endl;
+        std::cout << "// clang-format off" << std::endl;
+        std::cout << "M_T1 << ";
+        for (int row = 0; row < 4; row++)
+        {
+          for (int col = 0; col < 4; col++)
+          {
+            std::cout << T2.matrix()(row, col);
+            if (row == 3 && col == 3)
+            {
+              std::cout << ";";
+            }
+            else
+            {
+              std::cout << ",";
+            }
+          }
+          std::cout << std::endl;
+          if (row < 3)
+          {
+            std::cout << "        ";
+          }
+        }
+        std::cout << "// clang-format on" << std::endl;
+        std::cout << "Eigen::Isometry3d T1(M_T1);" << std::endl;
+        std::cout << "////////////////////////////////////////" << std::endl;
+      }
+#endif
+
+      // There are two options here, neither perfect:
+      //
+      // Use collideBoxBox(), but that doesn't annotate its
+      // collision points properly for complex face-face collisions.
+      // OR use collideBoxBoxAsMesh(), but that doesn't handle deep
+      // inter-penetration very well.
+      //
+      // Since deep inter-penetration is important for trajectory optimization,
+      // we'll stick with collideBoxBox() for now.
+      return collideBoxBox(
           o1, o2, box0->getSize(), T1, box1->getSize(), T2, result);
     }
     else if (dynamics::EllipsoidShape::getStaticType() == shapeType2)

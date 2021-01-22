@@ -103,7 +103,7 @@ std::shared_ptr<Solution> IPOptOptimizer::optimize(
     record->startPerfLog();
 
   // Initialize the IpoptApplication and process the options
-  ApplicationReturnStatus status;
+  Ipopt::ApplicationReturnStatus status;
   status = app->Initialize();
   if (status != Solve_Succeeded)
   {
@@ -124,6 +124,10 @@ std::shared_ptr<Solution> IPOptOptimizer::optimize(
       mRecordFullDebugInfo,
       mSuppressOutput && !mSilenceOutput,
       mRecordIterations);
+  for (auto& callback : mIntermediateCallbacks)
+  {
+    problem->registerIntermediateCallback(callback);
+  }
   SmartPtr<IPOptShotWrapper> problemPtr(problem);
   status = app->OptimizeTNLP(problemPtr);
 
@@ -219,6 +223,14 @@ void IPOptOptimizer::setDisableLinesearch(bool disableLinesearch)
 void IPOptOptimizer::setRecordIterations(bool recordIterations)
 {
   mRecordIterations = recordIterations;
+}
+
+//==============================================================================
+void IPOptOptimizer::registerIntermediateCallback(
+    std::function<bool(Problem* problem, int, double primal, double dual)>
+        callback)
+{
+  mIntermediateCallbacks.push_back(callback);
 }
 
 } // namespace trajectory

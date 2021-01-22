@@ -46,11 +46,25 @@ void Solution(py::module& m)
       dart::trajectory::Solution,
       std::shared_ptr<dart::trajectory::Solution>>(m, "Solution")
       .def("toJson", &dart::trajectory::Solution::toJson, ::py::arg("world"))
+      .def("getNumSteps", &dart::trajectory::Solution::getNumSteps)
+      .def(
+          "getStep",
+          &dart::trajectory::Solution::getStep,
+          ::py::arg("step"),
+          ::py::return_value_policy::reference_internal)
       .def(
           "getPerfLog",
           &dart::trajectory::Solution::getPerfLog,
           ::py::return_value_policy::reference)
       .def("reoptimize", &dart::trajectory::Solution::reoptimize);
+
+  ::py::class_<dart::trajectory::OptimizationStep>(m, "OptimizationStep")
+      .def_readonly("index", &dart::trajectory::OptimizationStep::index)
+      .def_readonly("rollout", &dart::trajectory::OptimizationStep::rollout)
+      .def_readonly("loss", &dart::trajectory::OptimizationStep::loss)
+      .def_readonly(
+          "constraintViolation",
+          &dart::trajectory::OptimizationStep::constraintViolation);
 }
 
 } // namespace python

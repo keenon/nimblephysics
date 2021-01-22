@@ -606,13 +606,39 @@ bool IPOptShotWrapper::intermediate_callback(
     mWrapped->flatten(mWrapped->mWorld, mBestFeasibleState, perflog);
   }
 
+  PerformanceLog* childPerflog = nullptr;
+#ifdef LOG_PERFORMANCE_IPOPT
+  if (perflog != nullptr)
+  {
+    childPerflog = perflog->startRun(
+        "IPOptShotWrapper.intermediate_callback#callingRegisteredCallbacks");
+  }
+#endif
+
+  bool allCallbacksReturnedTrue = true;
+  for (auto& callback : mIntermediateCallbacks)
+  {
+    if (!callback(mWrapped, iter, obj_value, inf_pr))
+    {
+      allCallbacksReturnedTrue = false;
+    }
+  }
+
+#ifdef LOG_PERFORMANCE_IPOPT
+  if (childPerflog != nullptr)
+  {
+    childPerflog->end();
+  }
+#endif
+
 #ifdef LOG_PERFORMANCE_IPOPT
   if (perflog != nullptr)
   {
     perflog->end();
   }
 #endif
-  return true;
+
+  return allCallbacksReturnedTrue;
 }
 
 /// This gets called when we're about to repoptimize, to let us reset values.
@@ -678,6 +704,16 @@ void IPOptShotWrapper::reset_iteration()
   mGCalls = 0;
   mJacGCalls = 0;
   mNewXs = 0;
+}
+
+/// This registers an intermediate callback, to get called by IPOPT after each
+/// step of optimization. If any callback returns false on a given step, then
+/// the optimizer will terminate early.
+void IPOptShotWrapper::registerIntermediateCallback(
+    std::function<bool(Problem* problem, int, double primal, double dual)>
+        callback)
+{
+  mIntermediateCallbacks.push_back(callback);
 }
 
 } // namespace trajectory

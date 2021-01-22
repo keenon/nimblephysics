@@ -268,7 +268,15 @@ bool ConstrainedGroupGradientMatrices::opportunisticallyStandardizeResults(
   {
     // this means that our guessing formula won't work, so just return whether
     // the solution is already valid.
-    return isSolutionValid(mX);
+    if (isSolutionValid(mX))
+    {
+      return true;
+    }
+    else
+    {
+      mStandardizedResults = false;
+      return false;
+    }
   }
   const Eigen::MatrixXd& A_ub = getUpperBoundConstraintMatrix();
   const Eigen::MatrixXd& E = getUpperBoundMappingMatrix();
@@ -675,7 +683,11 @@ void ConstrainedGroupGradientMatrices::constructMatrices(
     // Bound". The only exception to this rule is if the fIndex pointer is
     // pointing at an index that's not clamping, in which case this is also not
     // clamping.
-    else if (fIndexPointer != -1 && std::abs(mX(fIndexPointer)) > 1e-9)
+    else if (
+        fIndexPointer != -1 && std::abs(mX(fIndexPointer)) > 1e-9
+        && mAColNorms(fIndexPointer) > 1e-9
+        && ((fIndexPointer > j)
+            || mContactConstraintMappings(fIndexPointer) == CLAMPING))
     {
       /*
       std::cout << "Listing " << j << " as UB: mX=" << mX(j)
@@ -780,7 +792,7 @@ void ConstrainedGroupGradientMatrices::constructMatrices(
 
       mUpperBoundConstraints.push_back(constraint);
       mUpperBoundConstraintMatrix.col(mUpperBoundIndex[j])
-          = constraint->getConstraintForces(world);
+          = constraint->getConstraintForces(world, mSkeletons);
       mMassedUpperBoundConstraintMatrix.col(mUpperBoundIndex[j])
           = mMassedImpulseTests[j];
     }

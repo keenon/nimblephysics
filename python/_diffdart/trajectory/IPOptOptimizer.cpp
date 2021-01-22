@@ -32,6 +32,7 @@
 
 #include <dart/trajectory/IPOptOptimizer.hpp>
 #include <pybind11/eigen.h>
+#include <pybind11/functional.h>
 #include <pybind11/pybind11.h>
 
 namespace py = pybind11;
@@ -93,7 +94,11 @@ void IPOptOptimizer(py::module& m)
       .def(
           "setRecordIterations",
           &dart::trajectory::IPOptOptimizer::setRecordIterations,
-          ::py::arg("recordIterations") = true);
+          ::py::arg("recordIterations") = true)
+      .def(
+          "registerIntermediateCallback",
+          &dart::trajectory::IPOptOptimizer::registerIntermediateCallback,
+          ::py::arg("callback"));
 }
 
 } // namespace python
