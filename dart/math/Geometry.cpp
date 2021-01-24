@@ -502,6 +502,22 @@ Eigen::Matrix3d expMapJac(const Eigen::Vector3d& _q)
   return J;
 }
 
+/// \brief Computes the Jacobian of the logMap(R * expMapRot(expMap))
+Eigen::Matrix3d expMapJacAt(
+    const Eigen::Vector3d& _expmap, const Eigen::Matrix3d& R)
+{
+  Eigen::Matrix3d J = Eigen::Matrix3d::Zero();
+  const double EPS = 1e-5;
+  for (int i = 0; i < 3; i++)
+  {
+    Eigen::Vector3d perturb = Eigen::Vector3d::Unit(i) * EPS;
+    Eigen::Vector3d plus = logMap(R * expMapRot(_expmap + perturb));
+    Eigen::Vector3d minus = logMap(R * expMapRot(_expmap - perturb));
+    J.col(i) = (plus - minus) / (2 * EPS);
+  }
+  return J;
+}
+
 Eigen::Matrix3d expMapJacDot(
     const Eigen::Vector3d& _q, const Eigen::Vector3d& _qdot)
 {
@@ -557,6 +573,18 @@ Eigen::Vector3d expMapGradient(const Eigen::Vector3d& pos, int _qi)
   perturbed = pos;
   perturbed(_qi) -= EPS;
   Eigen::Vector3d minus = logMap(original.transpose() * expMapRot(perturbed));
+
+  return (plus - minus) / (2 * EPS);
+}
+
+Eigen::Vector3d expMapNestedGradient(
+    const Eigen::Vector3d& original, const Eigen::Vector3d& screw)
+{
+  Eigen::MatrixXd R = expMapRot(original);
+
+  double EPS = 1e-7;
+  Eigen::Vector3d plus = logMap(expMapRot(screw * EPS) * R);
+  Eigen::Vector3d minus = logMap(expMapRot(screw * -EPS) * R);
 
   return (plus - minus) / (2 * EPS);
 }
@@ -934,6 +962,65 @@ Eigen::Vector3d getContactPointGradient(
                   * radiusA)
            / (radiusA + radiusB);
   }
+}
+
+Eigen::VectorXd dampedPInv(
+    const Eigen::MatrixXd& J, const Eigen::VectorXd& x, double damping)
+{
+  int rows = J.rows(), cols = J.cols();
+  if (rows <= cols)
+  {
+    return J.transpose()
+           * (pow(damping, 2) * Eigen::MatrixXd::Identity(rows, rows)
+              + J * J.transpose())
+                 .inverse()
+           * x;
+  }
+  else
+  {
+    return (pow(damping, 2) * Eigen::MatrixXd::Identity(cols, cols)
+            + J.transpose() * J)
+               .inverse()
+           * J.transpose() * x;
+  }
+}
+
+bool hasTinySingularValues(const Eigen::MatrixXd& J, double clippingThreshold)
+{
+  Eigen::JacobiSVD<Eigen::MatrixXd> svd(
+      J, Eigen::ComputeThinU | Eigen::ComputeThinV);
+  Eigen::VectorXd singulars = svd.singularValues();
+  for (int i = 0; i < singulars.size(); i++)
+  {
+    if (std::abs(singulars(i)) < 1e-4)
+    {
+      return true;
+    }
+  }
+}
+
+Eigen::MatrixXd clippedSingularsPinv(
+    const Eigen::MatrixXd& J, double clippingThreshold)
+{
+  Eigen::JacobiSVD<Eigen::MatrixXd> svd(
+      J, Eigen::ComputeThinU | Eigen::ComputeThinV);
+  Eigen::VectorXd singulars = svd.singularValues();
+  Eigen::MatrixXd Ds = singulars.asDiagonal();
+  Eigen::MatrixXd recovered = svd.matrixU() * Ds * svd.matrixV().transpose();
+  // Kill any small singular values before inverting, to avoid numerical
+  // instability issues.
+  for (int i = 0; i < singulars.size(); i++)
+  {
+    if (std::abs(singulars(i)) < 1e-6)
+    {
+      singulars(i) = 0.0;
+    }
+    else
+    {
+      singulars(i) = 1.0 / singulars(i);
+    }
+  }
+  return svd.matrixV() * singulars.asDiagonal() * svd.matrixU().transpose();
 }
 
 // res = T * s * Inv(T)

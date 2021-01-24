@@ -59,6 +59,8 @@ using namespace dynamics;
 using namespace simulation;
 using namespace neural;
 
+#define ALL_TESTS
+
 void testWorldSpace(std::size_t numLinks)
 {
   srand(42);
@@ -113,10 +115,12 @@ void testWorldSpace(std::size_t numLinks)
   EXPECT_TRUE(verifyIKMapping(world));
 }
 
+#ifdef ALL_TESTS
 TEST(GRADIENTS, WORLD_SPACE_5_LINK_ROBOT)
 {
   testWorldSpace(5);
 }
+#endif
 
 /******************************************************************************
 
@@ -160,16 +164,20 @@ void testSimple3Link()
   secondJointPair.first->setTransformFromChildBodyNode(secondOffset);
 
   Eigen::MatrixXd expectedJac = Eigen::MatrixXd::Zero(9, 3);
+  // clang-format off
   expectedJac <<
-      /* Body 1 X */
-      1,
-      0, 0, /* Body 1 Y */ 0, 0, 0, /* Body 1 Z */ 0, 0, 0,
-      /* Body 2 X */ 1, 0, 0, /* Body 2 Y */ -1, -1, 0,
+      /* Body 1 X */ 1, 0, 0, 
+      /* Body 1 Y */ 0, 0, 0, 
+      /* Body 1 Z */ 0, 0, 0,
+      /* Body 2 X */ 1, 0, 0,
+      /* Body 2 Y */ -1, -1, 0,
       /* Body 2 Z */ 0, 0, 0,
-      /* Body 3 X */ 0, -1, -1, /* Body 3 Y */ -1, -1, 0,
+      /* Body 3 X */ 0, -1, -1,
+      /* Body 3 Y */ -1, -1, 0,
       /* Body 3 Z */ 0, 0, 0;
+  // clang-format on
   Eigen::MatrixXd analyticalJac
-      = jointToWorldLinearJacobian(arm, arm->getBodyNodes());
+      = jointPosToWorldLinearJacobian(arm, arm->getBodyNodes());
 
   if (!equals(analyticalJac, expectedJac, 1e-5))
   {
@@ -189,12 +197,14 @@ void testSimple3Link()
   EXPECT_TRUE(verifyIKMapping(world));
 }
 
+#ifdef ALL_TESTS
 TEST(GRADIENTS, WORLD_SPACE_SIMPLE_LINK)
 {
   testSimple3Link();
 }
+#endif
 
-void testWorldSpaceWithBoxes()
+void testWorldSpaceWithBoxes(int jointType)
 {
   // World
   WorldPtr world = World::create();
@@ -211,14 +221,33 @@ void testWorldSpaceWithBoxes()
   BodyNode* rootBody = rootJointPair.second;
   Eigen::Isometry3d rootTransform = Eigen::Isometry3d::Identity();
   rootTransform.linear()
-      = eulerXYZToMatrix(Eigen::Vector3d(90.0 * 3.14159 / 180.0, 0, 0));
+      = eulerXYZToMatrix(Eigen::Vector3d(90.0 * M_PI / 180.0, 0, 0));
   rootJoint->setTransformFromParentBodyNode(rootTransform);
 
   // Then we add a box, on a free transform from the root. This is now a
   // different frame than the world, by 90 deg on the x axis.
 
-  std::pair<TranslationalJoint*, BodyNode*> boxJointPair
-      = boxes->createJointAndBodyNodePair<TranslationalJoint>(rootBody);
+  Eigen::Isometry3d fromChild = Eigen::Isometry3d::Identity();
+  fromChild.translation() = Eigen::Vector3d::Ones();
+  if (jointType == 0)
+  {
+    std::pair<TranslationalJoint*, BodyNode*> boxJointPair
+        = boxes->createJointAndBodyNodePair<TranslationalJoint>(rootBody);
+    boxJointPair.first->setTransformFromChildBodyNode(fromChild);
+  }
+  else if (jointType == 1)
+  {
+    std::pair<BallJoint*, BodyNode*> boxJointPair
+        = boxes->createJointAndBodyNodePair<BallJoint>(rootBody);
+    boxJointPair.first->setTransformFromChildBodyNode(fromChild);
+  }
+  else if (jointType == 2)
+  {
+    std::pair<FreeJoint*, BodyNode*> boxJointPair
+        = boxes->createJointAndBodyNodePair<FreeJoint>(rootBody);
+    boxJointPair.first->setTransformFromChildBodyNode(fromChild);
+  }
+  boxes->setPositions(Eigen::VectorXd::Zero(boxes->getNumDofs()));
 
   world->addSkeleton(boxes);
 
@@ -226,7 +255,23 @@ void testWorldSpaceWithBoxes()
   EXPECT_TRUE(verifyIKMapping(world));
 }
 
-TEST(GRADIENTS, WORLD_SPACE_BOXES)
+#ifdef ALL_TESTS
+TEST(GRADIENTS, WORLD_SPACE_BOXES_TRANSLATION_JOINT)
 {
-  testWorldSpaceWithBoxes();
+  testWorldSpaceWithBoxes(0);
 }
+#endif
+
+#ifdef ALL_TESTS
+TEST(GRADIENTS, WORLD_SPACE_BOXES_BALL_JOINT)
+{
+  testWorldSpaceWithBoxes(1);
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(GRADIENTS, WORLD_SPACE_BOXES_FREE_JOINT)
+{
+  testWorldSpaceWithBoxes(2);
+}
+#endif

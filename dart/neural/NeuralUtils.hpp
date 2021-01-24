@@ -94,13 +94,25 @@ Eigen::MatrixXd convertJointSpaceToWorldSpace(
 
 /// Computes a Jacobian that transforms changes in joint angle to changes in
 /// body positions (expressed in log space).
-Eigen::MatrixXd jointToWorldSpatialJacobian(
+Eigen::MatrixXd jointPosToWorldSpatialJacobian(
     const std::shared_ptr<dynamics::Skeleton>& skel,
     const std::vector<dynamics::BodyNode*>& nodes);
 
 /// Computes a Jacobian that transforms changes in joint angle to changes in
 /// body positions (expressed in linear space).
-Eigen::MatrixXd jointToWorldLinearJacobian(
+Eigen::MatrixXd jointPosToWorldLinearJacobian(
+    const std::shared_ptr<dynamics::Skeleton>& skel,
+    const std::vector<dynamics::BodyNode*>& nodes);
+
+/// Computes a Jacobian that transforms changes in joint velocity to changes in
+/// body velocity (expressed in log space).
+Eigen::MatrixXd jointVelToWorldSpatialJacobian(
+    const std::shared_ptr<dynamics::Skeleton>& skel,
+    const std::vector<dynamics::BodyNode*>& nodes);
+
+/// Computes a Jacobian that transforms changes in joint velocity to changes in
+/// body velocity (expressed in linear space).
+Eigen::MatrixXd jointVelToWorldLinearJacobian(
     const std::shared_ptr<dynamics::Skeleton>& skel,
     const std::vector<dynamics::BodyNode*>& nodes);
 

@@ -179,6 +179,10 @@ Eigen::Matrix3d expMapRot(const Eigen::Vector3d& _expmap);
 /// \brief Computes the Jacobian of the expmap
 Eigen::Matrix3d expMapJac(const Eigen::Vector3d& _expmap);
 
+/// \brief Computes the Jacobian of the logMap(R * expMapRot(expMap))
+Eigen::Matrix3d expMapJacAt(
+    const Eigen::Vector3d& _expmap, const Eigen::Matrix3d& R);
+
 /// \brief Computes the time derivative of the expmap Jacobian.
 Eigen::Matrix3d expMapJacDot(
     const Eigen::Vector3d& _expmap, const Eigen::Vector3d& _qdot);
@@ -187,9 +191,14 @@ Eigen::Matrix3d expMapJacDot(
 /// indexed dof; _qi \f$ \in \f$ {0,1,2}
 Eigen::Matrix3d expMapJacDeriv(const Eigen::Vector3d& _expmap, int _qi);
 
-/// \brief computes the gradient of logMap(expMapRotation()) wrt to _qi
+/// \brief computes the gradient of logMap(expMapRot()) wrt to _qi
 /// indexed dof; _qi \f$ \in \f$ {0,1,2}
 Eigen::Vector3d expMapGradient(const Eigen::Vector3d& pos, int _qi);
+
+/// \brief computes the gradient of logMap(expMapRot(screw * eps) *
+/// expMapRot(original)) wrt to eps
+Eigen::Vector3d expMapNestedGradient(
+    const Eigen::Vector3d& original, const Eigen::Vector3d& screw);
 
 /// \brief Log mapping
 /// \note When @f$|Log(R)| = @pi@f$, Exp(LogR(R) = Exp(-Log(R)).
@@ -234,6 +243,15 @@ Eigen::Vector3d getContactPointGradient(
     const Eigen::Vector3d& edgeBDirGradient,
     double radiusA = 1.0,
     double radiusB = 1.0);
+
+Eigen::VectorXd dampedPInv(
+    const Eigen::MatrixXd& J, const Eigen::VectorXd& x, double damping = 0.05);
+
+bool hasTinySingularValues(
+    const Eigen::MatrixXd& J, double clippingThreshold = 1e-4);
+
+Eigen::MatrixXd clippedSingularsPinv(
+    const Eigen::MatrixXd& J, double clippingThreshold = 1e-4);
 
 //------------------------------------------------------------------------------
 /// \brief Rectify the rotation part so as that it satifies the orthogonality

@@ -129,7 +129,39 @@ std::shared_ptr<MappedBackpropSnapshot> mappedForwardPass(
 }
 
 //==============================================================================
-Eigen::MatrixXd jointToWorldSpatialJacobian(
+Eigen::MatrixXd jointPosToWorldSpatialJacobian(
+    const std::shared_ptr<dynamics::Skeleton>& skel,
+    const std::vector<dynamics::BodyNode*>& nodes)
+{
+  int dofs = skel->getNumDofs();
+  Eigen::MatrixXd jac = Eigen::MatrixXd::Zero(nodes.size() * 6, dofs);
+  for (int i = 0; i < nodes.size(); i++)
+  {
+    jac.block(i * 6, 0, 6, dofs) = skel->getWorldPositionJacobian(
+        skel->getBodyNode(nodes[i]->getIndexInSkeleton()));
+  }
+  return jac;
+}
+
+//==============================================================================
+Eigen::MatrixXd jointPosToWorldLinearJacobian(
+    const std::shared_ptr<dynamics::Skeleton>& skel,
+    const std::vector<dynamics::BodyNode*>& nodes)
+{
+  int dofs = skel->getNumDofs();
+  Eigen::MatrixXd jac = Eigen::MatrixXd::Zero(nodes.size() * 3, dofs);
+  for (int i = 0; i < nodes.size(); i++)
+  {
+    jac.block(i * 3, 0, 3, dofs)
+        = skel->getWorldPositionJacobian(
+                  skel->getBodyNode(nodes[i]->getIndexInSkeleton()))
+              .block(3, 0, 3, jac.cols());
+  }
+  return jac;
+}
+
+//==============================================================================
+Eigen::MatrixXd jointVelToWorldSpatialJacobian(
     const std::shared_ptr<dynamics::Skeleton>& skel,
     const std::vector<dynamics::BodyNode*>& nodes)
 {
@@ -144,7 +176,7 @@ Eigen::MatrixXd jointToWorldSpatialJacobian(
 }
 
 //==============================================================================
-Eigen::MatrixXd jointToWorldLinearJacobian(
+Eigen::MatrixXd jointVelToWorldLinearJacobian(
     const std::shared_ptr<dynamics::Skeleton>& skel,
     const std::vector<dynamics::BodyNode*>& nodes)
 {
@@ -212,7 +244,7 @@ Eigen::VectorXd skelConvertJointSpaceToWorldSpace(
       || space == ConvertToSpace::COM_VEL_LINEAR
       || space == ConvertToSpace::COM_VEL_SPATIAL)
   {
-    Eigen::MatrixXd jac = jointToWorldSpatialJacobian(skel, nodes);
+    Eigen::MatrixXd jac = jointVelToWorldSpatialJacobian(skel, nodes);
     Eigen::VectorXd spatialVel = jac * jointValues;
 
     if (space == ConvertToSpace::VEL_SPATIAL)
@@ -269,20 +301,27 @@ Eigen::VectorXd skelBackpropWorldSpaceToJointSpace(
     bool useIK)
 {
   Eigen::MatrixXd jac;
-  if (space == ConvertToSpace::POS_LINEAR
-      || space == ConvertToSpace::VEL_LINEAR)
+  if (space == ConvertToSpace::POS_LINEAR)
   {
-    jac = jointToWorldLinearJacobian(skel, nodes);
+    jac = jointPosToWorldLinearJacobian(skel, nodes);
   }
-  else if (
-      space == ConvertToSpace::POS_SPATIAL
-      || space == ConvertToSpace::VEL_SPATIAL)
+  else if (space == ConvertToSpace::VEL_LINEAR)
   {
-    jac = jointToWorldSpatialJacobian(skel, nodes);
+    jac = jointVelToWorldLinearJacobian(skel, nodes);
   }
-  else if (
-      space == ConvertToSpace::COM_POS
-      || space == ConvertToSpace::COM_VEL_LINEAR)
+  else if (space == ConvertToSpace::POS_SPATIAL)
+  {
+    jac = jointPosToWorldSpatialJacobian(skel, nodes);
+  }
+  else if (space == ConvertToSpace::VEL_SPATIAL)
+  {
+    jac = jointVelToWorldSpatialJacobian(skel, nodes);
+  }
+  else if (space == ConvertToSpace::COM_POS)
+  {
+    jac = skel->getCOMPositionJacobian().bottomRows<3>();
+  }
+  else if (space == ConvertToSpace::COM_VEL_LINEAR)
   {
     jac = skel->getCOMLinearJacobian();
   }

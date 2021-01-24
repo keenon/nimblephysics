@@ -2789,7 +2789,7 @@ bool verifyBackpropWorldSpacePositionToSpatial(
   Eigen::VectorXd perturbedWorldPos = convertJointSpaceToWorldSpace(
       world, perturbedPos, bodyNodes, ConvertToSpace::POS_SPATIAL, false);
   Eigen::MatrixXd skelSpatialJac
-      = jointToWorldSpatialJacobian(world->getSkeleton(0), bodyNodes);
+      = jointPosToWorldSpatialJacobian(world->getSkeleton(0), bodyNodes);
   Eigen::VectorXd expectedPerturbation = skelSpatialJac * perturbation;
 
   /*
@@ -2806,7 +2806,7 @@ bool verifyBackpropWorldSpacePositionToSpatial(
   if (!equals(perturbation, recoveredPerturbation, 1e-8))
   {
     std::cout << "backprop() POS_SPATIAL failed!" << std::endl;
-    Eigen::MatrixXd skelSpatialJac2 = jointToWorldSpatialJacobian(
+    Eigen::MatrixXd skelSpatialJac2 = jointPosToWorldSpatialJacobian(
         world->getSkeleton(0), world->getSkeleton(0)->getBodyNodes());
     Eigen::MatrixXd perturbations(worldPerturbation.size(), 2);
     perturbations << worldPerturbation, expectedPerturbation;
@@ -3008,8 +3008,6 @@ bool verifyMappingSetGet(
 {
   RestorableSnapshot snapshot(world);
 
-  Eigen::VectorXd original = getTestComponentWorld(world, component);
-
   // Pick a random target, set to it, and see if there are any near-neighbors
   // that are better
   for (int i = 0; i < 5; i++)
@@ -3018,8 +3016,10 @@ bool verifyMappingSetGet(
     double originalLoss;
 
     setTestComponentMapping(mapping, world, component, target);
-    originalLoss = (getTestComponentMapping(mapping, world, component) - target)
-                       .squaredNorm();
+    Eigen::VectorXd original = getTestComponentWorld(world, component);
+    Eigen::VectorXd originalMapped
+        = getTestComponentMapping(mapping, world, component);
+    originalLoss = (originalMapped - target).squaredNorm();
 
     // Try a bunch of near neighbor perturbations
     for (int j = 0; j < 20; j++)
@@ -3028,9 +3028,9 @@ bool verifyMappingSetGet(
           = Eigen::VectorXd::Random(world->getNumDofs()) * 0.001;
 
       setTestComponentWorld(world, component, original + randomPerturbations);
-      double newLoss
-          = (getTestComponentMapping(mapping, world, component) - target)
-                .squaredNorm();
+      Eigen::VectorXd newMapped
+          = getTestComponentMapping(mapping, world, component);
+      double newLoss = (newMapped - target).squaredNorm();
 
       if (newLoss < originalLoss)
       {
@@ -3040,6 +3040,11 @@ bool verifyMappingSetGet(
         std::cout << "Original loss: " << originalLoss << std::endl;
         std::cout << "New loss: " << newLoss << std::endl;
         std::cout << "Diff: " << (newLoss - originalLoss) << std::endl;
+        std::cout << "Original mapped: " << originalMapped << std::endl;
+        std::cout << "Target: " << target << std::endl;
+        std::cout << "Original world: " << original << std::endl;
+        std::cout << "Perturbation: " << randomPerturbations << std::endl;
+        std::cout << "New mapped: " << newMapped << std::endl;
         return false;
       }
     }
@@ -3106,6 +3111,14 @@ bool verifyMappingOutJacobian(
   RestorableSnapshot snapshot(world);
 
   int mappedDim = getTestComponentMappingDim(mapping, world, component);
+
+  // If we have tiny singular values, then this matrix won't perfectly invert,
+  // and we can skip this test.
+  Eigen::MatrixXd analyticalInto
+      = getTestComponentMappingIntoJac(mapping, world, component, component);
+  if (math::hasTinySingularValues(analyticalInto))
+    return true;
+
   Eigen::MatrixXd analytical
       = getTestComponentMappingOutJac(mapping, world, component);
   Eigen::MatrixXd bruteForce = Eigen::MatrixXd(world->getNumDofs(), mappedDim);
@@ -3132,13 +3145,16 @@ bool verifyMappingOutJacobian(
 
   // Out Jac brute-forcing is pretty innacurate, cause it relies on repeated
   // IK with tiny differences, so we allow a larger tolerance here
-  if (!equals(bruteForce, analytical, 5e-8))
+
+  if (!equals(bruteForce, analytical, 4e-6))
   {
     std::cout << "Got a bad Out Jac for " << getComponentName(component) << "!"
               << std::endl;
     std::cout << "Analytical: " << std::endl << analytical << std::endl;
     std::cout << "Brute Force: " << std::endl << bruteForce << std::endl;
-    std::cout << "Diff: " << (analytical - bruteForce) << std::endl;
+    std::cout << "Diff (" << (analytical - bruteForce).minCoeff() << " to "
+              << (analytical - bruteForce).maxCoeff()
+              << "): " << (analytical - bruteForce) << std::endl;
     return false;
   }
 
@@ -3190,6 +3206,13 @@ bool verifyMappedStepJacobian(
     MappingTestComponent inComponent,
     MappingTestComponent outComponent)
 {
+  // If we have tiny singular values, then this matrix won't perfectly invert,
+  // and we can skip this test.
+  Eigen::MatrixXd analyticalInto = getTestComponentMappingIntoJac(
+      mapping, world, inComponent, inComponent);
+  if (math::hasTinySingularValues(analyticalInto))
+    return true;
+
   RestorableSnapshot snapshot(world);
 
   std::unordered_map<std::string, std::shared_ptr<Mapping>> mappings;
@@ -3464,17 +3487,19 @@ bool verifyClosestIKPosition(WorldPtr world, Eigen::VectorXd position)
 
     Eigen::VectorXd targetPos = Eigen::VectorXd::Random(mapping.getPosDim());
     mapping.setPositions(world, targetPos);
+    Eigen::VectorXd originalMapped = mapping.getPositions(world);
+    Eigen::VectorXd originalWorld = world->getPositions();
 
-    double originalLoss
-        = (mapping.getPositions(world) - targetPos).squaredNorm();
+    double originalLoss = (originalMapped - targetPos).squaredNorm();
 
     // Try a bunch of near neighbor perturbations
     for (int i = 0; i < 20; i++)
     {
       Eigen::VectorXd randomPerturbations
           = Eigen::VectorXd::Random(world->getNumDofs()) * 0.001;
-      world->setPositions(position + randomPerturbations);
-      double newLoss = (mapping.getPositions(world) - targetPos).squaredNorm();
+      world->setPositions(originalWorld + randomPerturbations);
+      Eigen::VectorXd newMapped = mapping.getPositions(world);
+      double newLoss = (newMapped - targetPos).squaredNorm();
 
       if (newLoss < originalLoss)
       {
@@ -3484,6 +3509,11 @@ bool verifyClosestIKPosition(WorldPtr world, Eigen::VectorXd position)
         std::cout << "Original loss: " << originalLoss << std::endl;
         std::cout << "New loss: " << newLoss << std::endl;
         std::cout << "Diff: " << (newLoss - originalLoss) << std::endl;
+        std::cout << "Target: " << targetPos << std::endl;
+        std::cout << "Original Mapped: " << originalMapped << std::endl;
+        std::cout << "Original World: " << originalWorld << std::endl;
+        std::cout << "Perturbation: " << randomPerturbations << std::endl;
+        std::cout << "New Mapped: " << newMapped << std::endl;
         return false;
       }
     }
@@ -3549,10 +3579,11 @@ bool verifyClosestIKVelocity(WorldPtr world, Eigen::VectorXd velocity)
 bool verifyLinearJacobian(
     WorldPtr world, Eigen::VectorXd position, Eigen::VectorXd velocity)
 {
-  world->setPositions(position);
-  world->setVelocities(velocity);
   for (int i = 0; i < world->getNumSkeletons(); i++)
   {
+    world->setPositions(position);
+    world->setVelocities(velocity);
+
     auto skel = world->getSkeleton(i);
 
     std::vector<dynamics::BodyNode*> bodyNodes
@@ -3575,34 +3606,23 @@ bool verifyLinearJacobian(
     Eigen::VectorXd originalWorldVel = mapping.getVelocities(world);
     Eigen::MatrixXd bruteForce
         = Eigen::MatrixXd::Zero(analytical.rows(), analytical.cols());
-    const double EPS = 1e-7;
+    const double EPS = 1e-5;
     for (int j = 0; j < skel->getNumDofs(); j++)
     {
       Eigen::VectorXd perturbedPos = originalPos;
       perturbedPos(j) += EPS;
-      Eigen::VectorXd perturbedVel = originalVel;
-      perturbedVel(j) += EPS;
       skel->setPositions(perturbedPos);
-      Eigen::VectorXd posColumn
-          = (mapping.getPositions(world) - originalWorldPos) / EPS;
+      Eigen::VectorXd posColumn = mapping.getPositions(world);
+
+      Eigen::VectorXd perturbedNeg = originalPos;
+      perturbedNeg(j) -= EPS;
+      skel->setPositions(perturbedNeg);
+      Eigen::VectorXd negColumn = mapping.getPositions(world);
+
       skel->setPositions(originalPos);
 
-      skel->setVelocities(perturbedVel);
-      Eigen::VectorXd velColumn
-          = (mapping.getVelocities(world) - originalWorldVel) / EPS;
-      skel->setVelocities(originalVel);
-
-      if (!equals(posColumn, velColumn, 1e-4))
-      {
-        std::cout
-            << "Check your assumptions! jointToWorldLinearJacobian() Column "
-            << j << " pos:\n"
-            << posColumn << "\nvel:\n"
-            << velColumn << "\nanalytical:\n"
-            << analytical.col(j) << "\n";
-        return false;
-      }
-      bruteForce.block(0, j, bruteForce.rows(), 1) = posColumn;
+      bruteForce.block(0, j, bruteForce.rows(), 1)
+          = (posColumn - negColumn) / (2 * EPS);
     }
 
     if (!equals(bruteForce, analytical, 1e-5))
@@ -3647,34 +3667,23 @@ bool verifySpatialJacobian(
     Eigen::VectorXd originalWorldVel = mapping.getVelocities(world);
     Eigen::MatrixXd bruteForce
         = Eigen::MatrixXd::Zero(analytical.rows(), analytical.cols());
-    const double EPS = 1e-7;
+    const double EPS = 1e-6;
     for (int j = 0; j < skel->getNumDofs(); j++)
     {
       Eigen::VectorXd perturbedPos = originalPos;
       perturbedPos(j) += EPS;
-      Eigen::VectorXd perturbedVel = originalVel;
-      perturbedVel(j) += EPS;
       skel->setPositions(perturbedPos);
-      Eigen::VectorXd posColumn
-          = (mapping.getPositions(world) - originalWorldPos) / EPS;
+      Eigen::VectorXd plusPos = mapping.getPositions(world);
+
+      perturbedPos = originalPos;
+      perturbedPos(j) -= EPS;
+      skel->setPositions(perturbedPos);
+      Eigen::VectorXd minusPos = mapping.getPositions(world);
+
+      Eigen::VectorXd posColumn = (plusPos - minusPos) / (2 * EPS);
+
       skel->setPositions(originalPos);
 
-      skel->setVelocities(perturbedVel);
-      Eigen::VectorXd newVel = mapping.getVelocities(world);
-      Eigen::VectorXd velColumn
-          = (mapping.getVelocities(world) - originalWorldVel) / EPS;
-      skel->setVelocities(originalVel);
-
-      if (!equals(posColumn, velColumn, 1e-4))
-      {
-        std::cout
-            << "Check your assumptions! jointToWorldSpatialJacobian() Column "
-            << j << " pos:\n"
-            << posColumn << "\nvel:\n"
-            << velColumn << "\nanalytical:\n"
-            << analytical.col(j) << "\n";
-        return false;
-      }
       bruteForce.block(0, j, bruteForce.rows(), 1) = posColumn;
     }
 
@@ -3770,11 +3779,11 @@ bool verifyBackpropWorldSpaceVelocityToPosition(
       = Eigen::VectorXd::Random(velocity.size()) * 1e-4;
   Eigen::VectorXd perturbedVel = velocity + perturbation;
 
-  Eigen::MatrixXd skelLinearJac = jointToWorldLinearJacobian(
+  Eigen::MatrixXd skelLinearJac = jointVelToWorldLinearJacobian(
       world->getSkeleton(0), world->getSkeleton(0)->getBodyNodes());
   Eigen::VectorXd expectedPerturbation = skelLinearJac * perturbation;
 
-  Eigen::MatrixXd skelSpatialJac = jointToWorldSpatialJacobian(
+  Eigen::MatrixXd skelSpatialJac = jointVelToWorldSpatialJacobian(
       world->getSkeleton(0), world->getSkeleton(0)->getBodyNodes());
   Eigen::VectorXd expectedPerturbationSpatial = skelSpatialJac * perturbation;
 
@@ -3852,7 +3861,8 @@ bool verifyBackpropWorldSpacePositionToCOM(
       = Eigen::VectorXd::Random(velocity.size()) * 1e-4;
   Eigen::VectorXd perturbedPos = position + perturbation;
 
-  Eigen::MatrixXd skelLinearJac = world->getSkeleton(0)->getCOMLinearJacobian();
+  Eigen::MatrixXd skelLinearJac
+      = world->getSkeleton(0)->getCOMPositionJacobian().bottomRows<3>();
   Eigen::VectorXd expectedPerturbation = skelLinearJac * perturbation;
 
   Eigen::VectorXd perturbedWorldPos = convertJointSpaceToWorldSpace(

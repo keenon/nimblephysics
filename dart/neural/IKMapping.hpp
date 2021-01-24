@@ -165,10 +165,19 @@ protected:
 
   /// Computes a Jacobian that transforms changes in joint angle to changes in
   /// IK body positions (expressed in log space).
-  Eigen::MatrixXd getJacobian(std::shared_ptr<simulation::World> world);
+  Eigen::MatrixXd getPosJacobian(std::shared_ptr<simulation::World> world);
 
-  /// Computes the pseudo-inverse of the Jacobian
-  Eigen::MatrixXd getJacobianInverse(std::shared_ptr<simulation::World> world);
+  /// Computes the pseudo-inverse of the pos Jacobian
+  Eigen::MatrixXd getPosJacobianInverse(
+      std::shared_ptr<simulation::World> world);
+
+  /// Computes a Jacobian that transforms changes in joint vel to changes in
+  /// IK body vels (expressed in log space).
+  Eigen::MatrixXd getVelJacobian(std::shared_ptr<simulation::World> world);
+
+  /// Computes the pseudo-inverse of the vel Jacobian
+  Eigen::MatrixXd getVelJacobianInverse(
+      std::shared_ptr<simulation::World> world);
 
   /// Computes a Jacobian of J(x)*vel wrt pos
   Eigen::MatrixXd getJacobianOfJacVelWrtPosition(

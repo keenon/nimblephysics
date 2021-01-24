@@ -45,6 +45,8 @@
 #include "dart/dynamics/EndEffector.hpp"
 #include "dart/dynamics/InverseKinematics.hpp"
 #include "dart/dynamics/Joint.hpp"
+#include "dart/dynamics/FreeJoint.hpp"
+#include "dart/dynamics/BallJoint.hpp"
 #include "dart/dynamics/Marker.hpp"
 #include "dart/dynamics/PointMass.hpp"
 #include "dart/dynamics/ShapeNode.hpp"
@@ -2281,6 +2283,47 @@ math::Jacobian variadicGetWorldJacobian(
   const math::Jacobian JBodyNode = _node->getWorldJacobian(args...);
 
   assignJacobian<math::Jacobian>(J, _node, JBodyNode);
+
+  return J;
+}
+
+//==============================================================================
+math::Jacobian Skeleton::getWorldPositionJacobian(const JacobianNode* _node) const
+{
+  math::Jacobian J = math::Jacobian::Zero(6, getNumDofs());
+
+  if (!isValidBodyNode(this, _node, "getWorldJacobian"))
+    return J;
+
+  const BodyNode* bodyNode = static_cast<const BodyNode*>(_node);
+  Eigen::Vector3d originalRotation = math::logMap(bodyNode->getWorldTransform().linear());
+
+  for (int i = 0; i < getNumDofs(); i++) {
+    const DegreeOfFreedom* dof = getDof(i);
+    const Joint* joint = dof->getJoint();
+
+    bool isParent = false;
+    const BodyNode* cursor = bodyNode;
+    while (cursor != nullptr) {
+      if (cursor->getParentJoint() == joint) {
+        isParent = true;
+        break;
+      }
+      if (cursor->getParentJoint() != nullptr) {
+        cursor = cursor->getParentJoint()->getParentBodyNode();
+      }
+    }
+
+    if (isParent) {
+      Eigen::Vector6d screw = joint->getWorldAxisScrew(dof->getIndexInJoint());
+      screw.tail<3>() += screw.head<3>().cross(bodyNode->getWorldTransform().translation());
+      // This is key so we get an actual gradient of the angle (as a screw), rather than just 
+      // a screw representing a rotation.
+      screw.head<3>() = math::expMapNestedGradient(originalRotation, screw.head<3>());
+      J.col(i) = screw;
+    }
+    // else leave J.col(i) as zeros
+  }
 
   return J;
 }
@@ -4860,6 +4903,19 @@ math::Jacobian Skeleton::getCOMJacobian(const Frame* _inCoordinatesOf) const
   return getCOMJacobianTemplate<
       math::Jacobian,
       &TemplatedJacobianNode<BodyNode>::getJacobian>(this, _inCoordinatesOf);
+}
+
+//==============================================================================
+math::Jacobian Skeleton::getCOMPositionJacobian() const
+{
+  math::Jacobian J = math::Jacobian::Zero(6, getNumDofs());
+  double totalMass = 0.0;
+  for (const BodyNode* node : getBodyNodes()) {
+    totalMass += node->getMass();
+    J += getWorldPositionJacobian(node) * node->getMass();
+  }
+  J /= totalMass;
+  return J;
 }
 
 //==============================================================================

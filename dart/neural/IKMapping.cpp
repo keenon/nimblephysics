@@ -74,7 +74,7 @@ void IKMapping::setPositions(
   // guess.
   double error = std::numeric_limits<double>::infinity();
   double lr = 1.0;
-  for (int i = 0; i < 30; i++)
+  for (int i = 0; i < 150; i++)
   {
     Eigen::VectorXd diff = positions - getPositions(world);
     double newError = diff.squaredNorm();
@@ -104,8 +104,20 @@ void IKMapping::setPositions(
 #endif
       break;
     }
-    Eigen::VectorXd delta
-        = getJacobian(world).completeOrthogonalDecomposition().solve(diff);
+    Eigen::MatrixXd J = getPosJacobianInverse(world);
+    Eigen::VectorXd delta = J * diff; // math::dampedPInv(J, diff, 0.05);
+    double MAX = 100;
+    if (delta.norm() > MAX)
+    {
+      delta.normalize();
+      delta *= MAX;
+    }
+#ifdef DART_NEURAL_LOG_IK_OUTPUT
+    std::cout << "IK Diff: " << std::endl << diff << std::endl;
+    std::cout << "IK J: " << std::endl << J << std::endl;
+    std::cout << "IK Delta: " << std::endl << delta << std::endl;
+    std::cout << "J * IK Delta: " << std::endl << J * delta << std::endl;
+#endif
     world->setPositions(world->getPositions() + (lr * delta));
   }
 #ifdef DART_NEURAL_LOG_IK_OUTPUT
@@ -153,15 +165,15 @@ void IKMapping::getPositionsInPlace(
     {
       // Get the body node in this world
       dynamics::BodyNode* node = skel->getBodyNode(entry.bodyNodeOffset);
+      Eigen::Isometry3d T = node->getWorldTransform();
       if (entry.type == NODE_ANGULAR || entry.type == NODE_SPATIAL)
       {
-        positions.segment<3>(cursor)
-            = math::logMap(node->getWorldTransform()).head<3>();
+        positions.segment<3>(cursor) = math::logMap(T.linear());
         cursor += 3;
       }
       if (entry.type == NODE_LINEAR || entry.type == NODE_SPATIAL)
       {
-        positions.segment<3>(cursor) = node->getWorldTransform().translation();
+        positions.segment<3>(cursor) = T.translation();
         cursor += 3;
       }
     }
@@ -254,7 +266,7 @@ void IKMapping::getMassesInPlace(
 Eigen::MatrixXd IKMapping::getMappedPosToRealPosJac(
     std::shared_ptr<simulation::World> world)
 {
-  return getJacobianInverse(world);
+  return getPosJacobianInverse(world);
 }
 
 //==============================================================================
@@ -264,7 +276,7 @@ Eigen::MatrixXd IKMapping::getMappedPosToRealPosJac(
 Eigen::MatrixXd IKMapping::getRealPosToMappedPosJac(
     std::shared_ptr<simulation::World> world)
 {
-  return getJacobian(world);
+  return getPosJacobian(world);
 }
 
 //==============================================================================
@@ -283,7 +295,7 @@ Eigen::MatrixXd IKMapping::getRealVelToMappedPosJac(
 Eigen::MatrixXd IKMapping::getMappedVelToRealVelJac(
     std::shared_ptr<simulation::World> world)
 {
-  return getJacobianInverse(world);
+  return getVelJacobianInverse(world);
 }
 
 //==============================================================================
@@ -293,7 +305,7 @@ Eigen::MatrixXd IKMapping::getMappedVelToRealVelJac(
 Eigen::MatrixXd IKMapping::getRealVelToMappedVelJac(
     std::shared_ptr<simulation::World> world)
 {
-  return getJacobian(world);
+  return getVelJacobian(world);
 }
 
 //==============================================================================
@@ -314,7 +326,7 @@ Eigen::MatrixXd IKMapping::getRealPosToMappedVelJac(
 Eigen::MatrixXd IKMapping::getMappedForceToRealForceJac(
     std::shared_ptr<simulation::World> world)
 {
-  return getJacobian(world).transpose();
+  return getVelJacobian(world).transpose();
 }
 
 //==============================================================================
@@ -324,7 +336,7 @@ Eigen::MatrixXd IKMapping::getMappedForceToRealForceJac(
 Eigen::MatrixXd IKMapping::getRealForceToMappedForceJac(
     std::shared_ptr<simulation::World> world)
 {
-  return getJacobianInverse(world).transpose();
+  return getVelJacobianInverse(world).transpose();
 }
 
 //==============================================================================
@@ -363,7 +375,69 @@ int IKMapping::getDim()
 //==============================================================================
 /// Computes a Jacobian that transforms changes in joint angle to changes in
 /// IK body positions (expressed in log space).
-Eigen::MatrixXd IKMapping::getJacobian(std::shared_ptr<simulation::World> world)
+Eigen::MatrixXd IKMapping::getPosJacobian(
+    std::shared_ptr<simulation::World> world)
+{
+  int rows = getDim();
+  int cols = world->getNumDofs();
+  Eigen::MatrixXd jac = Eigen::MatrixXd::Zero(rows, cols);
+  int cursor = 0;
+  for (IKMappingEntry& entry : mEntries)
+  {
+    auto skel = world->getSkeleton(entry.skelName);
+    int offset = world->getSkeletonDofOffset(skel);
+    int dofs = skel->getNumDofs();
+
+    if (entry.type == NODE_SPATIAL || entry.type == NODE_LINEAR
+        || entry.type == NODE_ANGULAR)
+    {
+      // Get the body node in this world
+      dynamics::BodyNode* node = skel->getBodyNode(entry.bodyNodeOffset);
+
+      if (entry.type == NODE_SPATIAL)
+      {
+        skel->getWorldJacobian(node);
+        jac.block(cursor, offset, 6, dofs)
+            = skel->getWorldPositionJacobian(node);
+        cursor += 6;
+      }
+      if (entry.type == NODE_ANGULAR)
+      {
+        jac.block(cursor, offset, 3, dofs)
+            = skel->getWorldPositionJacobian(node).block(0, 0, 3, dofs);
+        cursor += 3;
+      }
+      if (entry.type == NODE_LINEAR)
+      {
+        jac.block(cursor, offset, 3, dofs)
+            = skel->getWorldPositionJacobian(node).block(3, 0, 3, dofs);
+        cursor += 3;
+      }
+    }
+    else if (entry.type == COM)
+    {
+      jac.block(cursor, offset, 3, dofs) = skel->getCOMLinearJacobian();
+      cursor += 3;
+    }
+  }
+  return jac;
+}
+
+/// Computes the pseudo-inverse of the Jacobian
+Eigen::MatrixXd IKMapping::getPosJacobianInverse(
+    std::shared_ptr<simulation::World> world)
+{
+  Eigen::MatrixXd J = getPosJacobian(world);
+  return math::clippedSingularsPinv(J);
+  /*
+  return J.completeOrthogonalDecomposition().pseudoInverse();
+  */
+}
+
+/// Computes a Jacobian that transforms changes in joint vel to changes in
+/// IK body vels (expressed in log space).
+Eigen::MatrixXd IKMapping::getVelJacobian(
+    std::shared_ptr<simulation::World> world)
 {
   int rows = getDim();
   int cols = world->getNumDofs();
@@ -408,11 +482,13 @@ Eigen::MatrixXd IKMapping::getJacobian(std::shared_ptr<simulation::World> world)
   return jac;
 }
 
-/// Computes the pseudo-inverse of the Jacobian
-Eigen::MatrixXd IKMapping::getJacobianInverse(
+/// Computes the pseudo-inverse of the vel Jacobian
+Eigen::MatrixXd IKMapping::getVelJacobianInverse(
     std::shared_ptr<simulation::World> world)
 {
-  return getJacobian(world).completeOrthogonalDecomposition().pseudoInverse();
+  return getVelJacobian(world)
+      .completeOrthogonalDecomposition()
+      .pseudoInverse();
 }
 
 /// Computes a Jacobian of J(x)*vel wrt pos
@@ -441,12 +517,12 @@ Eigen::MatrixXd IKMapping::bruteForceJacobianOfJacVelWrtPosition(
     Eigen::VectorXd perturbedPosition = originalPosition;
     perturbedPosition(i) += EPS;
     world->setPositions(perturbedPosition);
-    Eigen::VectorXd pos = getJacobian(world) * originalVel;
+    Eigen::VectorXd pos = getVelJacobian(world) * originalVel;
 
     perturbedPosition = originalPosition;
     perturbedPosition(i) -= EPS;
     world->setPositions(perturbedPosition);
-    Eigen::VectorXd neg = getJacobian(world) * originalVel;
+    Eigen::VectorXd neg = getVelJacobian(world) * originalVel;
 
     jac.col(i) = (pos - neg) / (2 * EPS);
   }

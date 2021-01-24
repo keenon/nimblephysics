@@ -893,6 +893,9 @@ public:
       const Frame* _inCoordinatesOf) const override;
 
   // Documentation inherited
+  math::Jacobian getWorldPositionJacobian(const JacobianNode* _node) const;
+
+  // Documentation inherited
   math::Jacobian getWorldJacobian(const JacobianNode* _node) const override;
 
   // Documentation inherited
@@ -1114,6 +1117,10 @@ public:
   /// Frame)
   math::Jacobian getCOMJacobian(
       const Frame* _inCoordinatesOf = Frame::World()) const override;
+
+  /// Get the Skeleton's COM Position Jacobian. This is different from the standard 
+  // COM Jacobian because of FreeJoint and BallJoints.
+  math::Jacobian getCOMPositionJacobian() const;
 
   /// Get the Skeleton's COM Linear Jacobian in terms of any Frame (default is
   /// World Frame)
