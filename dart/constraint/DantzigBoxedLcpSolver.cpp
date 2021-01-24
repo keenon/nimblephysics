@@ -62,7 +62,16 @@ bool DantzigBoxedLcpSolver::solve(
     int* findex,
     bool earlyTermination)
 {
-  return dSolveLCP(n, A, x, b, nullptr, 0, lo, hi, findex, earlyTermination);
+  try
+  {
+    return dSolveLCP(n, A, x, b, nullptr, 0, lo, hi, findex, earlyTermination);
+  }
+  catch (...)
+  {
+    // In case of unspecified error, don't crash the whole program, just return
+    // failure so we can fall back to another LCP solver.
+    return false;
+  }
 }
 
 #ifndef NDEBUG

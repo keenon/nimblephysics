@@ -33,6 +33,7 @@
 #ifndef DART_COLLISION_DART_DARTCOLLIDE_HPP_
 #define DART_COLLISION_DART_DARTCOLLIDE_HPP_
 
+#include <thread>
 #include <unordered_map>
 #include <vector>
 
@@ -241,6 +242,12 @@ int collideCylinderPlane(
 // Interface with libccd:
 /////////////////////////////////////////////////////////////////////
 
+// Get the `pos` vec for CCD for this pair of objects
+ccd_vec3_t& getCachedCcdPos(CollisionObject* o1, CollisionObject* o2);
+
+// Get the `dir` vec for CCD for this pair of objects
+ccd_vec3_t& getCachedCcdDir(CollisionObject* o1, CollisionObject* o2);
+
 // We need to define structs for each object type that we pass to libccd, with
 // all relevant info about the object.
 struct ccdBox
@@ -415,8 +422,10 @@ inline void setCcdDefaultSettings(ccd_t& ccd);
 void clearCcdCache();
 
 /// This is the static cache for all the CCD collision search data
-static std::unordered_map<long, ccd_vec3_t> _ccdDirCache;
-static std::unordered_map<long, ccd_vec3_t> _ccdPosCache;
+static std::unordered_map<std::thread::id, std::unordered_map<long, ccd_vec3_t>>
+    _ccdDirCache;
+static std::unordered_map<std::thread::id, std::unordered_map<long, ccd_vec3_t>>
+    _ccdPosCache;
 
 } // namespace collision
 } // namespace dart

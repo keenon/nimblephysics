@@ -22,7 +22,7 @@ using namespace dart;
 using namespace realtime;
 using namespace collision;
 
-#define ALL_TESTS
+// #define ALL_TESTS
 
 //==============================================================================
 #ifdef ALL_TESTS
@@ -254,7 +254,10 @@ void verifyMeshAndBoxResultsIdentical(
   meshResultBackwards.sortContacts(randDirection);
   analyticalResultBackwards.sortContacts(randDirection);
 
-  for (int i = 0; i < meshResult.getNumContacts(); i++)
+  for (int i = 0;
+       i < std::min(
+           analyticalResult.getNumContacts(), meshResult.getNumContacts());
+       i++)
   {
     Contact& meshContact = meshResult.getContact(i);
     Contact& analyticalContact = analyticalResult.getContact(i);
@@ -318,6 +321,203 @@ void verifyMeshAndBoxResultsIdentical(
         meshContact.penetrationDepth, analyticalContact.penetrationDepth, 1e-8);
   }
 }
+
+//==============================================================================
+#ifdef ALL_TESTS
+TEST(DARTCollide, BOX_CATAPULT_EDGE_EDGE_PARALLEL_CASE)
+{
+  // This bug appeared in the Catapult test case, in the wild. This test is here
+  // to catch regressions at the source.
+
+  Eigen::Vector3d size0 = Eigen::Vector3d(0.1, 0.1, 0.1);
+  Eigen::Matrix4d M_T0_T;
+  // clang-format off
+  M_T0_T << 1, 0, 0, 0,
+            0, 1, 0, 0,
+            0, 0, 1, 0,
+            -2.7807346909040666e-29, -0.11941045999999991, 0, 1;
+  // clang-format on
+  Eigen::Isometry3d T0(M_T0_T.transpose());
+
+  Eigen::Vector3d size1 = Eigen::Vector3d(0.05, 0.25, 0.05);
+  Eigen::Matrix4d M_T1_T;
+  // clang-format off
+  M_T1_T << -0.016937176236502371, 0.99985655574243948, 0, 0,
+            -0.99985655574243948, -0.016937176236502371, 0, 0,
+            0, 0, 1, 0,
+            0.009234186353806767, -0.11678049047941066, 0, 1;
+  // clang-format on
+  Eigen::Isometry3d T1(M_T1_T.transpose());
+
+  verifyMeshAndBoxResultsIdentical(size0, T0, size1, T1);
+
+  server::GUIWebsocketServer server;
+  server.renderBasis();
+  server.createBox(
+      "box1", size0, T0.translation(), math::matrixToEulerXYZ(T0.linear()));
+  server.createBox(
+      "box2", size1, T1.translation(), math::matrixToEulerXYZ(T1.linear()));
+  server.serve(8070);
+  while (server.isServing())
+  {
+    // spin
+  }
+  /*
+  CollisionResult result;
+  collideBoxBoxAsMesh(nullptr, nullptr, size0, T0, size1, T1, result);
+
+  EXPECT_EQ(result.getNumContacts(), 2);
+  */
+}
+#endif
+
+//==============================================================================
+#ifdef ALL_TESTS
+TEST(DARTCollide, BOX_CATAPULT_INTER_PENETRATE_CASE)
+{
+  // This bug appeared in the Catapult test case, in the wild. This test is here
+  // to catch regressions at the source.
+
+  Eigen::Vector3d size0 = Eigen::Vector3d(0.1, 0.1, 0.1);
+  Eigen::Matrix4d M_T0_T;
+  // clang-format off
+  M_T0_T << 1, 0, 0, 0,
+            0, 1, 0, 0,
+            0, 0, 1, 0,
+            0, -0.051074000000000175, 0, 1;
+  // clang-format on
+  Eigen::Isometry3d T0(M_T0_T.transpose());
+
+  Eigen::Vector3d size1 = Eigen::Vector3d(0.05, 0.25, 0.05);
+  Eigen::Matrix4d M_T1_T;
+  // clang-format off
+  M_T1_T << -0.016196940812207683, 0.99986882095019136, 0, 0,
+            -0.99986882095019136, -0.016196940812207683, 0, 0,
+            0, 0, 1, 0,
+            0.0061889905849920879, -0.11447217037238604, 0, 1;
+  // clang-format on
+  Eigen::Isometry3d T1(M_T1_T.transpose());
+
+  verifyMeshAndBoxResultsIdentical(size0, T0, size1, T1);
+
+  server::GUIWebsocketServer server;
+  server.renderBasis();
+  server.createBox(
+      "box1", size0, T0.translation(), math::matrixToEulerXYZ(T0.linear()));
+  server.createBox(
+      "box2", size1, T1.translation(), math::matrixToEulerXYZ(T1.linear()));
+  server.serve(8070);
+  while (server.isServing())
+  {
+    // spin
+  }
+  /*
+  CollisionResult result;
+  collideBoxBoxAsMesh(nullptr, nullptr, size0, T0, size1, T1, result);
+
+  EXPECT_EQ(result.getNumContacts(), 2);
+  */
+}
+#endif
+
+//==============================================================================
+#ifdef ALL_TESTS
+TEST(DARTCollide, BOX_CATAPULT_BROKEN_CASE)
+{
+  // This bug appeared in the Catapult test case, in the wild. This test is here
+  // to catch regressions at the source.
+
+  Eigen::Vector3d size0 = Eigen::Vector3d(0.1, 0.1, 0.1);
+  Eigen::Matrix4d M_T0;
+  // clang-format off
+  M_T0 << 1,0,0,0.27082,
+          0,1,0,0.189111,
+          0,0,1,0,
+          0,0,0,1;
+  // clang-format on
+  Eigen::Isometry3d T0(M_T0);
+  Eigen::Vector3d size1 = Eigen::Vector3d(0.05, 0.25, 0.05);
+  Eigen::Matrix4d M_T1;
+  // clang-format off
+  M_T1 << 0.862653,-0.505797,0,0.331802,
+          0.505797,0.862653,0,0.143934,
+          0,0,1,0,
+          0,0,0,1;
+  // clang-format on
+  Eigen::Isometry3d T1(M_T1);
+
+  verifyMeshAndBoxResultsIdentical(size0, T0, size1, T1);
+
+  server::GUIWebsocketServer server;
+
+  aiScene* boxMesh = createBoxMeshUnsafe();
+
+  CollisionResult meshResult;
+  collideMeshMesh(
+      nullptr, nullptr, boxMesh, size0, T0, boxMesh, size1, T1, meshResult);
+  CollisionResult analyticalResult;
+  collideBoxBox(nullptr, nullptr, size0, T0, size1, T1, analyticalResult);
+
+  for (int i = 0; i < analyticalResult.getNumContacts(); i++)
+  {
+    std::vector<Eigen::Vector3d> points;
+    points.push_back(analyticalResult.getContact(i).point);
+    points.push_back(
+        analyticalResult.getContact(i).point
+        + analyticalResult.getContact(i).normal);
+    server.createLine("analytical_" + i, points, Eigen::Vector3d::UnitX());
+  }
+  for (int i = 0; i < meshResult.getNumContacts(); i++)
+  {
+    std::vector<Eigen::Vector3d> points;
+    points.push_back(meshResult.getContact(i).point);
+    points.push_back(
+        meshResult.getContact(i).point + meshResult.getContact(i).normal);
+    server.createLine("mesh_" + i, points, Eigen::Vector3d::UnitZ());
+  }
+
+  meshResult.clear();
+  collideMeshMesh(
+      nullptr, nullptr, boxMesh, size1, T1, boxMesh, size0, T0, meshResult);
+  analyticalResult.clear();
+  collideBoxBox(nullptr, nullptr, size1, T1, size0, T0, analyticalResult);
+
+  for (int i = 0; i < analyticalResult.getNumContacts(); i++)
+  {
+    std::vector<Eigen::Vector3d> points;
+    points.push_back(analyticalResult.getContact(i).point);
+    points.push_back(
+        analyticalResult.getContact(i).point
+        + analyticalResult.getContact(i).normal);
+    server.createLine("back_analytical_" + i, points, Eigen::Vector3d::UnitY());
+  }
+  for (int i = 0; i < meshResult.getNumContacts(); i++)
+  {
+    std::vector<Eigen::Vector3d> points;
+    points.push_back(meshResult.getContact(i).point);
+    points.push_back(
+        meshResult.getContact(i).point + meshResult.getContact(i).normal);
+    server.createLine("back_mesh_" + i, points, Eigen::Vector3d(1.0, 0.5, 0));
+  }
+
+  server.renderBasis();
+  server.createBox(
+      "box1", size0, T0.translation(), math::matrixToEulerXYZ(T0.linear()));
+  server.createBox(
+      "box2", size1, T1.translation(), math::matrixToEulerXYZ(T1.linear()));
+  server.serve(8070);
+  while (server.isServing())
+  {
+    // spin
+  }
+  /*
+  CollisionResult result;
+  collideBoxBoxAsMesh(nullptr, nullptr, size0, T0, size1, T1, result);
+
+  EXPECT_EQ(result.getNumContacts(), 2);
+  */
+}
+#endif
 
 #ifdef ALL_TESTS
 TEST(DARTCollide, EDGE_EDGE_2D_COLLISION_TEST)

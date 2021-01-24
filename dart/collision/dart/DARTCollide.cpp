@@ -33,6 +33,7 @@
 #include "dart/collision/dart/DARTCollide.hpp"
 
 #include <memory>
+#include <thread>
 
 #include "dart/collision/CollisionObject.hpp"
 #include "dart/dynamics/BodyNode.hpp"
@@ -3404,6 +3405,22 @@ bool get2DLineIntersection(
   return false; // No collision
 }
 
+// Get the `pos` vec for CCD for this pair of objects
+ccd_vec3_t& getCachedCcdPos(CollisionObject* o1, CollisionObject* o2)
+{
+  long key = (long)o1 ^ (long)o2;
+  ccd_vec3_t& pos = _ccdPosCache[std::this_thread::get_id()][key];
+  return pos;
+}
+
+// Get the `dir` vec for CCD for this pair of objects
+ccd_vec3_t& getCachedCcdDir(CollisionObject* o1, CollisionObject* o2)
+{
+  long key = (long)o1 ^ (long)o2;
+  ccd_vec3_t& dir = _ccdDirCache[std::this_thread::get_id()][key];
+  return dir;
+}
+
 int collideBoxBoxAsMesh(
     CollisionObject* o1,
     CollisionObject* o2,
@@ -3432,9 +3449,8 @@ int collideBoxBoxAsMesh(
   box2.transform = &T1;
 
   ccd_real_t depth;
-  long key = (long)o1 ^ (long)o2;
-  ccd_vec3_t& dir = _ccdDirCache[key];
-  ccd_vec3_t& pos = _ccdPosCache[key];
+  ccd_vec3_t& dir = getCachedCcdDir(o1, o2);
+  ccd_vec3_t& pos = getCachedCcdPos(o1, o2);
   int intersect = ccdMPRPenetration(&box1, &box2, &ccd, &depth, &dir, &pos);
   if (intersect == 0)
   {
@@ -3478,9 +3494,8 @@ int collideMeshBox(
   box2.transform = &c1;
 
   ccd_real_t depth;
-  long key = (long)o1 ^ (long)o2;
-  ccd_vec3_t& dir = _ccdDirCache[key];
-  ccd_vec3_t& pos = _ccdPosCache[key];
+  ccd_vec3_t& dir = getCachedCcdDir(o1, o2);
+  ccd_vec3_t& pos = getCachedCcdPos(o1, o2);
   int intersect = ccdMPRPenetration(&mesh1, &box2, &ccd, &depth, &dir, &pos);
   if (intersect == 0)
   {
@@ -3524,9 +3539,8 @@ int collideBoxMesh(
   mesh2.scale = &size1;
 
   ccd_real_t depth;
-  long key = (long)o1 ^ (long)o2;
-  ccd_vec3_t& dir = _ccdDirCache[key];
-  ccd_vec3_t& pos = _ccdPosCache[key];
+  ccd_vec3_t& dir = getCachedCcdDir(o1, o2);
+  ccd_vec3_t& pos = getCachedCcdPos(o1, o2);
   int intersect = ccdMPRPenetration(&box1, &mesh2, &ccd, &depth, &dir, &pos);
   if (intersect == 0)
   {
@@ -3576,9 +3590,8 @@ int collideMeshSphere(
   setCcdDefaultSettings(ccd);      // maximal tolerance
 
   ccd_real_t depth;
-  long key = (long)o1 ^ (long)o2;
-  ccd_vec3_t& dir = _ccdDirCache[key];
-  ccd_vec3_t& pos = _ccdPosCache[key];
+  ccd_vec3_t& dir = getCachedCcdDir(o1, o2);
+  ccd_vec3_t& pos = getCachedCcdPos(o1, o2);
   int intersect = ccdMPRPenetration(&mesh, &sphere, &ccd, &depth, &dir, &pos);
   if (intersect == 0)
   {
@@ -3621,9 +3634,8 @@ int collideSphereMesh(
   setCcdDefaultSettings(ccd);      // maximal tolerance
 
   ccd_real_t depth;
-  long key = (long)o1 ^ (long)o2;
-  ccd_vec3_t& dir = _ccdDirCache[key];
-  ccd_vec3_t& pos = _ccdPosCache[key];
+  ccd_vec3_t& dir = getCachedCcdDir(o1, o2);
+  ccd_vec3_t& pos = getCachedCcdPos(o1, o2);
   int intersect = ccdMPRPenetration(&sphere, &mesh, &ccd, &depth, &dir, &pos);
   if (intersect == 0)
   {
@@ -3668,9 +3680,8 @@ int collideMeshMesh(
   mesh2.scale = &size1;
 
   ccd_real_t depth;
-  long key = (long)o1 ^ (long)o2;
-  ccd_vec3_t& dir = _ccdDirCache[key];
-  ccd_vec3_t& pos = _ccdPosCache[key];
+  ccd_vec3_t& dir = getCachedCcdDir(o1, o2);
+  ccd_vec3_t& pos = getCachedCcdPos(o1, o2);
   int intersect = ccdMPRPenetration(&mesh1, &mesh2, &ccd, &depth, &dir, &pos);
   if (intersect == 0)
   {
@@ -3952,9 +3963,8 @@ int collideBoxCapsule(
   capsule2.transform = &T1;
 
   ccd_real_t depth;
-  long key = (long)o1 ^ (long)o2;
-  ccd_vec3_t& dir = _ccdDirCache[key];
-  ccd_vec3_t& pos = _ccdPosCache[key];
+  ccd_vec3_t& dir = getCachedCcdDir(o1, o2);
+  ccd_vec3_t& pos = getCachedCcdPos(o1, o2);
   int intersect = ccdMPRPenetration(&box1, &capsule2, &ccd, &depth, &dir, &pos);
   if (intersect == 0)
   {
@@ -4029,9 +4039,8 @@ int collideCapsuleBox(
   box2.transform = &T1;
 
   ccd_real_t depth;
-  long key = (long)o1 ^ (long)o2;
-  ccd_vec3_t& dir = _ccdDirCache[key];
-  ccd_vec3_t& pos = _ccdPosCache[key];
+  ccd_vec3_t& dir = getCachedCcdDir(o1, o2);
+  ccd_vec3_t& pos = getCachedCcdPos(o1, o2);
   int intersect = ccdMPRPenetration(&capsule1, &box2, &ccd, &depth, &dir, &pos);
   if (intersect == 0)
   {
@@ -4104,9 +4113,8 @@ int collideMeshCapsule(
   capsule2.transform = &T1;
 
   ccd_real_t depth;
-  long key = (long)o1 ^ (long)o2;
-  ccd_vec3_t& dir = _ccdDirCache[key];
-  ccd_vec3_t& pos = _ccdPosCache[key];
+  ccd_vec3_t& dir = getCachedCcdDir(o1, o2);
+  ccd_vec3_t& pos = getCachedCcdPos(o1, o2);
   int intersect
       = ccdMPRPenetration(&mesh1, &capsule2, &ccd, &depth, &dir, &pos);
   if (intersect == 0)
@@ -4184,9 +4192,8 @@ int collideCapsuleMesh(
   mesh2.transform = &T1;
 
   ccd_real_t depth;
-  long key = (long)o1 ^ (long)o2;
-  ccd_vec3_t& dir = _ccdDirCache[key];
-  ccd_vec3_t& pos = _ccdPosCache[key];
+  ccd_vec3_t& dir = getCachedCcdDir(o1, o2);
+  ccd_vec3_t& pos = getCachedCcdPos(o1, o2);
   int intersect
       = ccdMPRPenetration(&capsule1, &mesh2, &ccd, &depth, &dir, &pos);
   if (intersect == 0)
