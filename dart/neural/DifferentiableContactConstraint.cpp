@@ -2688,9 +2688,25 @@ bool DifferentiableContactConstraint::isParent(
 {
   const dynamics::Joint* dofJoint = dof->getJoint();
   const dynamics::Joint* nodeParentJoint = node->getParentJoint();
+
+  // If our immediate parent is a weld joint, keep walking up the tree until we
+  // find a normal joint. If there are none, then return false.
+  while (nodeParentJoint->getNumDofs() == 0)
+  {
+    if (nodeParentJoint->getParentBodyNode() != nullptr
+        && nodeParentJoint->getParentBodyNode()->getParentJoint() != nullptr)
+    {
+      nodeParentJoint = nodeParentJoint->getParentBodyNode()->getParentJoint();
+    }
+    else
+    {
+      return false;
+    }
+  }
   // Edge cases
   if (nodeParentJoint == nullptr || dofJoint->getSkeleton() == nullptr
-      || nodeParentJoint->getSkeleton() == nullptr)
+      || nodeParentJoint->getSkeleton() == nullptr
+      || dofJoint->getNumDofs() == 0)
   {
     return false;
   }

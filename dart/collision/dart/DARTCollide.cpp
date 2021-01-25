@@ -3409,7 +3409,8 @@ bool get2DLineIntersection(
 ccd_vec3_t& getCachedCcdPos(CollisionObject* o1, CollisionObject* o2)
 {
   long key = (long)o1 ^ (long)o2;
-  ccd_vec3_t& pos = _ccdPosCache[std::this_thread::get_id()][key];
+  const std::thread::id tid = std::this_thread::get_id();
+  ccd_vec3_t& pos = _ccdPosCache[tid][key];
   return pos;
 }
 
@@ -3417,7 +3418,8 @@ ccd_vec3_t& getCachedCcdPos(CollisionObject* o1, CollisionObject* o2)
 ccd_vec3_t& getCachedCcdDir(CollisionObject* o1, CollisionObject* o2)
 {
   long key = (long)o1 ^ (long)o2;
-  ccd_vec3_t& dir = _ccdDirCache[std::this_thread::get_id()][key];
+  const std::thread::id tid = std::this_thread::get_id();
+  ccd_vec3_t& dir = _ccdDirCache[tid][key];
   return dir;
 }
 

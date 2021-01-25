@@ -34,6 +34,12 @@ bool hasSuffix(const std::string& str, const std::string& suffix)
 #endif
 
 //==============================================================================
+std::shared_ptr<simulation::World> loadWorld(const std::string& path)
+{
+  return dart::utils::SkelParser::readWorld(path);
+}
+
+//==============================================================================
 std::shared_ptr<dynamics::Skeleton> loadSkeleton(
     simulation::World* world,
     std::string path,

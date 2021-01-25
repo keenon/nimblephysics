@@ -137,6 +137,12 @@ void World(py::module& m)
           ::py::arg("path"),
           ::py::arg("basePosition") = Eigen::Vector3d::Zero(),
           ::py::arg("baseEulerAnglesXYZ") = Eigen::Vector3d::Zero())
+      .def_static(
+          "loadFrom",
+          +[](const std::string& path)
+              -> std::shared_ptr<dart::simulation::World> {
+            return dart::utils::UniversalLoader::loadWorld(path);
+          })
       .def(
           "removeSkeleton",
           +[](dart::simulation::World* self,
