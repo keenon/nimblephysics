@@ -1060,6 +1060,20 @@ protected:
 
   /// \}
 
+  //----------------------------------------------------------------------------
+  /// \{ \name Differential Dynamics
+  //----------------------------------------------------------------------------
+
+  void computeJacobianOfCForwardIteration(neural::WithRespectTo* wrt);
+  void computeJacobianOfCBackwardIteration(
+      neural::WithRespectTo* wrt,
+      Eigen::MatrixXd& dCg,
+      const Eigen::Vector3d& gravity);
+
+  void computeJacobianOfMinvXInit();
+  void computeJacobianOfMinvXBackwardIteration(const Eigen::VectorXd& x);
+  void computeJacobianOfMinvXForwardIteration(Eigen::MatrixXd& DinvMx_Dq);
+
 // protected:
 public:
   //--------------------------------------------------------------------------
@@ -1185,6 +1199,20 @@ public:
 
   /// Cache data for arbitrary spatial value
   Eigen::Vector6d mArbitrarySpatial;
+
+  //------------------------- Differential Dynamics ----------------------------
+
+  /// Cache data for combined vector of the system.
+  math::Jacobian mCg_V_p;
+  math::Jacobian mCg_dV_p;
+  math::Jacobian mCg_F_p;
+
+  std::vector<math::Inertia> mInvM_DAI_Dq;
+  math::Jacobian mInvM_DAB_Dq;
+  std::vector<math::Inertia> mInvM_DPi_Dq;
+  math::Jacobian mInvM_Dbeta_Dq;
+
+  math::Jacobian mInvM_dV_q;
 
   //------------------------- Impulse-based Dyanmics ---------------------------
   /// Velocity change due to to external impulsive force exerted on

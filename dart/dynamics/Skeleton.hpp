@@ -492,6 +492,8 @@ public:
   // Documentation inherited
   std::size_t getNumDofs() const override;
 
+  std::size_t getNumDofs(std::size_t treeIndex) const;
+
   // Documentation inherited
   DegreeOfFreedom* getDof(std::size_t _idx) override;
 
@@ -586,9 +588,46 @@ public:
   /// This gives the unconstrained Jacobian of C(pos, vel)
   Eigen::MatrixXd getJacobianOfC(neural::WithRespectTo* wrt);
 
+#ifdef DART_DEBUG_ANALYTICAL_DERIV
+  struct DiffMinv
+  {
+    struct Data
+    {
+      math::Jacobian S;
+
+      math::Inertia AI;
+      Eigen::Vector6d AB;
+      Eigen::MatrixXd psi;
+      math::Inertia Pi;
+      Eigen::VectorXd alpha;
+      Eigen::Vector6d beta;
+
+      Eigen::VectorXd ddq;
+      Eigen::Vector6d dV;
+
+      void init();
+    };
+
+    struct Node
+    {
+      Data data;
+      std::vector<Data> derivs;
+    };
+
+    std::vector<Node> nodes;
+
+    std::vector<Node> nodes_numeric;
+
+    void init(size_t numBodies, size_t numDofs);
+    void print();
+  };
+
+  DiffMinv mDiffMinv;
+#endif
+
   /// This gives the unconstrained Jacobian of M^{-1}f
   Eigen::MatrixXd getJacobianOfMinv(
-      Eigen::VectorXd f, neural::WithRespectTo* wrt);
+      const Eigen::VectorXd& f, neural::WithRespectTo* wrt);
 
   /// VERY SLOW: Only for testing. This computes the unconstrained Jacobian
   /// giving the difference in C(pos, vel) for finite changes
@@ -597,7 +636,7 @@ public:
   /// VERY SLOW: Only for testing. This computes the unconstrained Jacobian
   /// giving the difference in M^{-1}f for finite changes
   Eigen::MatrixXd finiteDifferenceJacobianOfMinv(
-      Eigen::VectorXd f, neural::WithRespectTo* wrt);
+      const Eigen::VectorXd& f, neural::WithRespectTo* wrt);
 
   /// VERY SLOW: Only for testing. This computes the unconstrained Jacobian
   /// giving the difference in C(pos, vel) for finite changes in vel

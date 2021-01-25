@@ -53,6 +53,9 @@ if(TARGET dart-utils)
     target_link_libraries(test_Collision dart-collision-ode)
   endif()
 
+  dart_add_test("comprehensive" test_DifferentialDynamics)
+  target_link_libraries(test_DifferentialDynamics dart-utils)
+
   dart_add_test("comprehensive" test_Dynamics)
   target_link_libraries(test_Dynamics dart-utils)
 
@@ -95,6 +98,7 @@ if(TARGET dart-utils)
 endif()
 
 dart_format_add(
+  test_DifferentialDynamics.cpp
   test_InverseKinematics.cpp
   test_MultiObjectiveOptimization.cpp
   test_Raycast.cpp

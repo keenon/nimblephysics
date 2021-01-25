@@ -285,6 +285,370 @@ Eigen::Matrix<double, 6, 3> EulerJoint::getRelativeJacobianStatic(
 }
 
 //==============================================================================
+math::Jacobian EulerJoint::getRelativeJacobianDeriv(std::size_t index) const
+{
+  assert(index < 3);
+
+  Eigen::Matrix<double, 6, 3> DJ_Dq = Eigen::Matrix<double, 6, 3>::Zero();
+
+  const Eigen::Vector3d& q = getPositionsStatic();
+
+  const double q1 = q[1];
+  const double q2 = q[2];
+
+  // double c0 = cos(q0);
+  const double c1 = std::cos(q1);
+  const double c2 = std::cos(q2);
+
+  // double s0 = sin(q0);
+  const double s1 = std::sin(q1);
+  const double s2 = std::sin(q2);
+
+  switch (getAxisOrder())
+  {
+    case AxisOrder::XYZ:
+    {
+        //------------------------------------------------------------------------
+        // S = [    c1*c2, s2,  0
+        //       -(c1*s2), c2,  0
+        //             s1,  0,  1
+        //              0,  0,  0
+        //              0,  0,  0
+        //              0,  0,  0 ];
+        //------------------------------------------------------------------------
+
+      if (index == 0)
+      {
+        // DS/Dq0 = 0;
+      }
+      else if (index == 1)
+      {
+        // DS/Dq1 = [ -s1*c2,  0,  0
+        //             s1*s2,  0,  0
+        //                c1,  0,  0
+        //                 0,  0,  0
+        //                 0,  0,  0
+        //                 0,  0,  0 ];
+
+        DJ_Dq(0, 0) = -s1*c2;
+        DJ_Dq(1, 0) = -s1*s2;
+        DJ_Dq(2, 0) = c1;
+      }
+      else if (index == 2)
+      {
+        // DS/Dq2 = [ -c1*s2,  c2,  0
+        //            -c1*c2, -s2,  0
+        //                s1,   0,  0
+        //                 0,   0,  0
+        //                 0,   0,  0
+        //                 0,   0,  0 ];
+
+        DJ_Dq(0, 0) = -c1*s2;
+        DJ_Dq(1, 0) = -c1*c2;
+        DJ_Dq(2, 0) = s1;
+
+        DJ_Dq(0, 1) = c2;
+        DJ_Dq(1, 1) = -s2;
+      }
+      break;
+    }
+    case AxisOrder::ZYX:
+    {
+        //------------------------------------------------------------------------
+        // S = [   -s1,    0,   1
+        //       s2*c1,   c2,   0
+        //       c1*c2,  -s2,   0
+        //           0,    0,   0
+        //           0,    0,   0
+        //           0,    0,   0 ];
+        //------------------------------------------------------------------------
+
+      if (index == 0)
+      {
+        // DS/Dq0 = 0;
+      }
+      else if (index == 1)
+      {
+        // DS/Dq1 = [   -c1,  0,   0
+        //           -s1*s2,  0,   0
+        //           -s1*c2,  0,   0
+        //                0,  0,   0
+        //                0,  0,   0
+        //                0,  0,   0 ];
+
+        DJ_Dq(0, 0) = -c1;
+        DJ_Dq(1, 0) = -s1*s2;
+        DJ_Dq(2, 0) = -s1*c2;
+      }
+      else if (index == 2)
+      {
+        // DS/Dq2 = [     0,    0,   0
+        //            c1*c2,  -s2,   0
+        //           -c1*s2,  -c2,   0
+        //                0,    0,   0
+        //                0,    0,   0
+        //                0,    0,   0 ];
+
+        DJ_Dq(1, 0) = c1*c2;
+        DJ_Dq(2, 0) = -c1*s2;
+
+        DJ_Dq(1, 1) = -s2;
+        DJ_Dq(2, 1) = -c2;
+      }
+
+      break;
+    }
+    default:
+    {
+      dterr << "Undefined Euler axis order\n";
+      break;
+    }
+  }
+
+  DJ_Dq = math::AdTJac(Joint::mAspectProperties.mT_ChildBodyToJoint, DJ_Dq);
+
+  assert(!math::isNan(DJ_Dq));
+
+  return DJ_Dq;
+}
+
+//==============================================================================
+math::Jacobian EulerJoint::getRelativeJacobianTimeDerivDeriv(std::size_t index) const
+{
+  assert(index < 3);
+
+  Eigen::Matrix<double, 6, 3> DdJ_Dq = Eigen::Matrix<double, 6, 3>::Zero();
+
+  const Eigen::Vector3d& q = getPositionsStatic();
+  const double q1 = q[1];
+  const double q2 = q[2];
+
+  // double dq0 = mVelocities[0];
+  const Eigen::Vector3d& dq = getVelocitiesStatic();
+  const double dq1 = dq[1];
+  const double dq2 = dq[2];
+
+  const double c1 = std::cos(q1);
+  const double c2 = std::cos(q2);
+
+  const double s1 = std::sin(q1);
+  const double s2 = std::sin(q2);
+
+  switch (getAxisOrder())
+  {
+    case AxisOrder::XYZ:
+    {
+      if (index == 0)
+      {
+        // DdS/Dq0 = 0;
+      }
+      else if (index == 1)
+      {
+        // DdS/Dq1 = [ -c1*c2*dq1 + s1*s2*dq2, 0, 0
+        //              c1*s2*dq1 + s1*c2*dq2, 0, 0
+        //                            -s1*dq1, 0, 0
+        //                                  0, 0, 0
+        //                                  0, 0, 0
+        //                                  0, 0, 0 ];
+
+        DdJ_Dq(0, 0) = -c1*c2*dq1 + s1*s2*dq2;
+        DdJ_Dq(1, 0) = c1*s2*dq1 + s1*c2*dq2;
+        DdJ_Dq(2, 0) = -s1*dq1;
+      }
+      else if (index == 2)
+      {
+        // DdS/Dq2 = [ s1*s2*dq1 - c1*c2*dq2, -s2*dq2, 0
+        //             s1*c2*dq1 + c1*s2*dq2, -c2*dq2, 0
+        //                                 0,       0, 0
+        //                                 0,       0, 0
+        //                                 0,       0, 0
+        //                                 0,       0, 0 ];
+
+        DdJ_Dq(0, 0) = s1*s2*dq1 - c1*c2*dq2;
+        DdJ_Dq(1, 0) = s1*c2*dq1 + c1*s2*dq2;
+
+        DdJ_Dq(0, 1) = -s2*dq2;
+        DdJ_Dq(1, 1) = -c2*dq2;
+      }
+      break;
+    }
+    case AxisOrder::ZYX:
+    {
+      if (index == 0)
+      {
+        // DdS/Dq0 = 0;
+      }
+      else if (index == 1)
+      {
+        // DdS/Dq1 = [                 s1*dq1, 0, 0
+        //             -c1*s2*dq1 - s1*c2*dq2, 0, 0
+        //             -c1*c2*dq1 + s1*s2*dq2, 0, 0
+        //                                  0, 0, 0
+        //                                  0, 0, 0
+        //                                  0, 0, 0 ];
+
+        DdJ_Dq(0, 0) = s1*dq1;
+        DdJ_Dq(1, 0) = -c1*s2*dq1 - s1*c2*dq2;
+        DdJ_Dq(2, 0) = -c1*c2*dq1 + s1*s2*dq2;
+      }
+      else if (index == 2)
+      {
+        // DdS/Dq1 = [                      0,       0, 0
+        //             -s1*c2*dq1 - c1*s2*dq2, -c2*dq2, 0
+        //              s1*s2*dq1 - c1*c2*dq2,  s2*dq2, 0
+        //                                  0,       0, 0
+        //                                  0,       0, 0
+        //                                  0,       0, 0 ];
+
+        DdJ_Dq(1, 0) = -s1*c2*dq1 - c1*s2*dq2;
+        DdJ_Dq(2, 0) = s1*s2*dq1 - c1*c2*dq2;
+
+        DdJ_Dq(1, 1) = -c2*dq2;
+        DdJ_Dq(2, 1) = s2*dq2;
+      }
+      break;
+    }
+    default:
+    {
+      dterr << "Undefined Euler axis order\n";
+      break;
+    }
+  }
+
+  DdJ_Dq = math::AdTJac(Joint::mAspectProperties.mT_ChildBodyToJoint, DdJ_Dq);
+
+  assert(!math::isNan(DdJ_Dq));
+
+  return DdJ_Dq;
+}
+
+//==============================================================================
+math::Jacobian EulerJoint::getRelativeJacobianTimeDerivDeriv2(std::size_t index) const
+{
+  assert(index < 3);
+
+  Eigen::Matrix<double, 6, 3> DdJ_Ddq = Eigen::Matrix<double, 6, 3>::Zero();
+
+  const Eigen::Vector3d& q = getPositionsStatic();
+  const double q1 = q[1];
+  const double q2 = q[2];
+
+  const Eigen::Vector3d& dq = getVelocitiesStatic();
+  const double dq1 = dq[1];
+  const double dq2 = dq[2];
+
+  const double c1 = std::cos(q1);
+  const double c2 = std::cos(q2);
+
+  const double s1 = std::sin(q1);
+  const double s2 = std::sin(q2);
+
+  switch (getAxisOrder())
+  {
+    case AxisOrder::XYZ:
+    {
+        //------------------------------------------------------------------------
+        // dS = [  -(dq1*c2*s1) - dq2*c1*s2,    dq2*c2,  0
+        //         -(dq2*c1*c2) + dq1*s1*s2, -(dq2*s2),  0
+        //                           dq1*c1,         0,  0
+        //                                0,         0,  0
+        //                                0,         0,  0
+        //                                0,         0,  0 ];
+        //------------------------------------------------------------------------
+
+      if (index == 0)
+      {
+        // DdS/Ddq0 = 0;
+      }
+      else if (index == 1)
+      {
+        // DdS/Ddq1 = [ -s1*c2, 0, 0
+        //               s1*s2, 0, 0
+        //                  c1, 0, 0
+        //                   0, 0, 0
+        //                   0, 0, 0
+        //                   0, 0, 0 ];
+
+        DdJ_Ddq(0, 0) = -s1*c2;
+        DdJ_Ddq(1, 0) = s1*s2;
+        DdJ_Ddq(2, 0) = c1;
+      }
+      else if (index == 2)
+      {
+        // DdS/Ddq2 = [ -c1*s2,  c2, 0
+        //              -c1*c2, -s2, 0
+        //                   0,   0, 0
+        //                   0,   0, 0
+        //                   0,   0, 0
+        //                   0,   0, 0 ];
+
+        DdJ_Ddq(0, 0) = -c1*s2;
+        DdJ_Ddq(1, 0) = -c1*c2;
+
+        DdJ_Ddq(0, 1) = c2;
+        DdJ_Ddq(1, 1) = -s2;
+      }
+      break;
+    }
+    case AxisOrder::ZYX:
+    {
+        //------------------------------------------------------------------------
+        // dS = [               -c1*dq1,        0,   0
+        //          c2*c1*dq2-s2*s1*dq1,  -s2*dq2,   0
+        //         -s1*c2*dq1-c1*s2*dq2,  -c2*dq2,   0
+        //                            0,        0,   0
+        //                            0,        0,   0
+        //                            0,        0,   0 ];
+        //------------------------------------------------------------------------
+      if (index == 0)
+      {
+        // DdS/Ddq0 = 0;
+      }
+      else if (index == 1)
+      {
+        // DdS/Ddq1 = [    -c1, 0, 0
+        //              -s1*s2, 0, 0
+        //              -s1*c2, 0, 0
+        //                   0, 0, 0
+        //                   0, 0, 0
+        //                   0, 0, 0 ];
+
+        DdJ_Ddq(0, 0) = -c1;
+        DdJ_Ddq(1, 0) = -s1*s2;
+        DdJ_Ddq(2, 0) = -s1*c2;
+      }
+      else if (index == 2)
+      {
+        // DdS/Ddq1 = [      0,   0, 0
+        //               c1*c2, -s2, 0
+        //              -c1*s2, -c2, 0
+        //                   0,   0, 0
+        //                   0,   0, 0
+        //                   0,   0, 0 ];
+
+        DdJ_Ddq(1, 0) = c1*c2;
+        DdJ_Ddq(2, 0) = -c1*s2;
+
+        DdJ_Ddq(1, 1) = -s2;
+        DdJ_Ddq(2, 1) = -c2;
+      }
+      break;
+    }
+    default:
+    {
+      dterr << "Undefined Euler axis order\n";
+      break;
+    }
+  }
+
+  DdJ_Ddq = math::AdTJac(Joint::mAspectProperties.mT_ChildBodyToJoint, DdJ_Ddq);
+
+  assert(!math::isNan(DdJ_Ddq));
+
+  return DdJ_Ddq;
+}
+
+//==============================================================================
 EulerJoint::EulerJoint(const Properties& properties)
   : detail::EulerJointBase(properties)
 {

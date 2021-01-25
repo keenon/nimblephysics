@@ -222,6 +222,8 @@ public:
   /// Get the index of the tree that this Joint belongs to
   std::size_t getTreeIndex() const;
 
+  virtual bool hasDof(const DegreeOfFreedom* dof) const = 0;
+
   /// Get an object to access the _index-th degree of freedom (generalized
   /// coordinate) of this Joint
   virtual DegreeOfFreedom* getDof(std::size_t _index) = 0;
@@ -666,9 +668,29 @@ public:
   virtual math::Jacobian getRelativeJacobian(
       const Eigen::VectorXd& positions) const = 0;
 
+  // TODO(JS): Rename and add documentation
+  virtual math::Jacobian getRelativeJacobianDeriv(std::size_t /*index*/) const {
+    // TODO(JS): Remove
+    return math::Jacobian::Zero(6, getNumDofs());
+  }
+
   /// Get time derivative of spatial Jacobian of the child BodyNode relative to
   /// the parent BodyNode expressed in the child BodyNode frame
   virtual const math::Jacobian getRelativeJacobianTimeDeriv() const = 0;
+
+  // TODO(JS): Rename and add documentation
+  virtual math::Jacobian getRelativeJacobianTimeDerivDeriv(
+      std::size_t /*index*/) const {
+    // TODO(JS): Remove
+    return math::Jacobian::Zero(6, getNumDofs());
+  }
+
+  // TODO(JS): Rename and add documentation
+  virtual math::Jacobian getRelativeJacobianTimeDerivDeriv2(
+      std::size_t /*index*/) const {
+    // TODO(JS): Remove
+    return math::Jacobian::Zero(6, getNumDofs());
+  }
 
   /// Returns the screw representation of a given dof at our current position. 
   /// That is, if we increment dof by EPS, that's the same as left-multiplying 
@@ -711,6 +733,56 @@ public:
   /// \sa BodyNode::updateArticulatedInertia(double).
 //  Eigen::VectorXd getDampingForces() const;
 
+  //----------------------------------------------------------------------------
+  /// \{ \name Differential Dynamics
+  //----------------------------------------------------------------------------
+
+  // TODO(JS): Rename and add documentation
+  virtual Eigen::VectorXd getAlpha() const
+  {
+    return Eigen::VectorXd::Zero(0);
+  }
+
+  // TODO(JS): Rename and add documentation
+  virtual math::Inertia computePi(const math::Inertia& AI) const
+  {
+    return AI;
+  }
+
+  // TODO(JS): Rename and add documentation
+  virtual Eigen::Vector6d computeBeta(
+      const math::Inertia& /*AI*/, const Eigen::Vector6d& AB) const
+  {
+    return AB;
+  }
+
+  // TODO(JS): Rename and add documentation
+  virtual void computeJacobianOfMinvX_init()
+  {
+    // Do nothing
+  }
+
+  // TODO(JS): Rename and add documentation
+  virtual void computeJacobianOfMinvX_A(
+      std::vector<math::Inertia>& /*DPi_Dq*/,
+      math::Jacobian& /*invM_DBeta_Dq*/,
+      const math::Inertia& /*AI*/,
+      const Eigen::Vector6d& /*AB*/,
+      const std::vector<math::Inertia>& /*DAI_Dq*/,
+      const math::Jacobian& /*DAB_Dq*/)
+  {
+    // Do nothing
+  }
+
+  // TODO(JS): Rename and add documentation
+  virtual Eigen::MatrixXd computeJacobianOfMinvX_B(
+      const math::Inertia& /*AI*/,
+      const std::vector<math::Inertia>& /*DAI_Dq*/)
+  {
+    return Eigen::MatrixXd::Zero(0, 0);
+  }
+
+  /// \}
 
   //----------------------------------------------------------------------------
   /// \{ \name Update Notifiers

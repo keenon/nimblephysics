@@ -67,6 +67,9 @@ public:
   //----------------------------------------------------------------------------
 
   // Documentation inherited
+  bool hasDof(const DegreeOfFreedom*) const override;
+
+  // Documentation inherited
   DegreeOfFreedom* getDof(std::size_t) override;
 
   // Documentation inherited

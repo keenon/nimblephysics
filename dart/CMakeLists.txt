@@ -182,6 +182,8 @@ if(DART_ENABLE_SIMD)
     target_compile_options(dart PUBLIC -march=native -faligned-new)
   endif()
 endif()
+#TODO(JS): just for debugging
+#target_compile_definitions(dart PUBLIC -DDART_DEBUG_ANALYTICAL_DERIV)
 
 # Default component
 add_component_targets(${PROJECT_NAME} dart dart)

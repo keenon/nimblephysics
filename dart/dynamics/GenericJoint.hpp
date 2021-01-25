@@ -101,6 +101,9 @@ public:
   //----------------------------------------------------------------------------
 
   // Documentation inherited
+  bool hasDof(const DegreeOfFreedom*) const override;
+
+  // Documentation inherited
   DegreeOfFreedom* getDof(std::size_t index) override;
 
   // Documentation inherited
@@ -757,6 +760,34 @@ protected:
 
   ///
   Vector mInvMassMatrixSegment;
+
+  //----------------------------------------------------------------------------
+  /// \{ \name Differential Dynamics
+  //----------------------------------------------------------------------------
+
+  Eigen::VectorXd getAlpha() const override;
+  math::Inertia computePi(const math::Inertia& AI) const override;
+  Eigen::Vector6d computeBeta(
+      const math::Inertia& AI, const Eigen::Vector6d& AB) const override;
+
+  void computeJacobianOfMinvX_init() override;
+  void computeJacobianOfMinvX_A(
+      std::vector<math::Inertia>& DPi_Dq,
+      math::Jacobian& DBeta_Dq,
+      const math::Inertia& AI,
+      const Eigen::Vector6d& AB,
+      const std::vector<math::Inertia>& DAI_Dq,
+      const math::Jacobian& DAB_Dq) override;
+  Eigen::MatrixXd computeJacobianOfMinvX_B(
+      const math::Inertia& AI,
+      const std::vector<math::Inertia>& DAI_Dq) override;
+
+  std::size_t mNumSkeletonDofs;
+  std::vector<Matrix> mInvM_Dpsi_Dq;
+  Eigen::MatrixXd mInvM_Dalpha_Dq;
+  Eigen::MatrixXd mInvM_DInvM_Dq;
+
+  /// \}
 
 private:
   //----------------------------------------------------------------------------

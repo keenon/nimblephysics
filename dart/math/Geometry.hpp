@@ -274,6 +274,12 @@ Eigen::Vector6d AdT(const Eigen::Isometry3d& _T, const Eigen::Vector6d& _V);
 /// \brief Get linear transformation matrix of Adjoint mapping
 Eigen::Matrix6d getAdTMatrix(const Eigen::Isometry3d& T);
 
+// TODO(JS): Rename and add documentation
+Eigen::Matrix6d AdTMatrix(const Eigen::Isometry3d& T);
+
+// TODO(JS): Rename and add documentation
+Eigen::Matrix6d dAdTMatrix(const Eigen::Isometry3d& T);
+
 /// Adjoint mapping for dynamic size Jacobian
 template <typename Derived>
 typename Derived::PlainObject AdTJac(
@@ -472,6 +478,9 @@ Eigen::Vector6d dAdInvR(const Eigen::Isometry3d& _T, const Eigen::Vector6d& _F);
 /// \note @f$ad_X Y = ( w_X @times w_Y@,,~w_X @times v_Y - w_Y @times v_X),@f$,
 /// where @f$X=(w_X,v_X)@in se(3), @quad Y=(w_Y,v_Y)@in se(3) @f$.
 Eigen::Vector6d ad(const Eigen::Vector6d& _X, const Eigen::Vector6d& _Y);
+
+// TODO(JS): Rename and add documentation
+Eigen::Matrix6d adMatrix(const Eigen::Vector6d& X);
 
 /// \brief fast version of ad(se3(Eigen_Vec3(0), v), S)
 // Vec3 ad_Vec3_se3(const Vec3& v, const se3& S);

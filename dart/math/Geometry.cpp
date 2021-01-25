@@ -1051,6 +1051,18 @@ Eigen::Matrix6d getAdTMatrix(const Eigen::Isometry3d& T)
   return AdT;
 }
 
+//==============================================================================
+Eigen::Matrix6d AdTMatrix(const Eigen::Isometry3d& T)
+{
+  return getAdTMatrix(T);
+}
+
+//==============================================================================
+Eigen::Matrix6d dAdTMatrix(const Eigen::Isometry3d& T)
+{
+  return AdTMatrix(T).transpose();
+}
+
 Eigen::Vector6d AdR(const Eigen::Isometry3d& _T, const Eigen::Vector6d& _V)
 {
   //--------------------------------------------------------------------------
@@ -1163,6 +1175,25 @@ Eigen::Vector6d ad(const Eigen::Vector6d& _X, const Eigen::Vector6d& _Y)
   res.head<3>() = _X.head<3>().cross(_Y.head<3>());
   res.tail<3>()
       = _X.head<3>().cross(_Y.tail<3>()) + _X.tail<3>().cross(_Y.head<3>());
+  return res;
+}
+
+Eigen::Matrix6d adMatrix(const Eigen::Vector6d& X)
+{
+  //--------------------------------------------------------------------------
+  // ad(s) = | [w1]    0 |
+  //         | [v1] [w1] |
+  //--------------------------------------------------------------------------
+
+  Eigen::Matrix6d res;
+
+  res.topRightCorner<3, 3>().setZero();
+
+  res.topLeftCorner<3, 3>() = makeSkewSymmetric(X.head<3>());
+  res.bottomRightCorner<3, 3>() = res.topLeftCorner<3, 3>();
+
+  res.bottomLeftCorner<3, 3>() = makeSkewSymmetric(X.tail<3>());
+
   return res;
 }
 

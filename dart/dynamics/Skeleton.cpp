@@ -1199,6 +1199,12 @@ std::size_t Skeleton::getNumDofs() const
 }
 
 //==============================================================================
+std::size_t Skeleton::getNumDofs(std::size_t treeIndex) const
+{
+  return mTreeCache[treeIndex].mDofs.size();
+}
+
+//==============================================================================
 DegreeOfFreedom* Skeleton::getDof(std::size_t _idx)
 {
   return common::getVectorObjectIfAvailable<DegreeOfFreedom*>(
@@ -1573,17 +1579,251 @@ void Skeleton::setGradientConstraintMatrices(
 //==============================================================================
 Eigen::MatrixXd Skeleton::getJacobianOfC(neural::WithRespectTo* wrt)
 {
-  // TOOD(keenon): replace with the GEAR approach
-  return finiteDifferenceJacobianOfC(wrt);
+  const int dofs = static_cast<int>(getNumDofs());
+  Eigen::MatrixXd DCg_Dp = Eigen::MatrixXd::Zero(dofs, dofs);
+
+  if (wrt == neural::WithRespectTo::FORCE)
+  {
+    return DCg_Dp;
+  }
+
+  std::vector<BodyNode*>& bodyNodes = mSkelCache.mBodyNodes;
+
+  for (BodyNode* bodyNode : bodyNodes)
+  {
+    bodyNode->computeJacobianOfCForwardIteration(wrt);
+  }
+
+  for (auto it = bodyNodes.rbegin(); it != bodyNodes.rend(); ++it)
+  {
+    BodyNode* bodyNode = *it;
+    bodyNode->computeJacobianOfCBackwardIteration(
+          wrt, DCg_Dp, mAspectProperties.mGravity);
+  }
+
+  return DCg_Dp;
 }
+
+#ifdef DART_DEBUG_ANALYTICAL_DERIV
+
+//==============================================================================
+void Skeleton::DiffMinv::Data::init()
+{
+  AI.setZero();
+  AB.setZero();
+  psi.setZero(0, 0);
+}
+
+//==============================================================================
+void Skeleton::DiffMinv::init(size_t numBodies, size_t numDofs)
+{
+  nodes.resize(numBodies);
+  for (auto& node : nodes)
+  {
+    node.data.init();
+    node.derivs.resize(numDofs);
+    for (auto& deriv : node.derivs)
+    {
+      deriv.init();
+    }
+  }
+
+  nodes_numeric.resize(numBodies);
+  for (auto& node : nodes_numeric)
+  {
+    node.data.init();
+    node.derivs.resize(numDofs);
+    for (auto& deriv : node.derivs)
+    {
+      deriv.init();
+    }
+  }
+}
+
+//==============================================================================
+void Skeleton::DiffMinv::print()
+{
+  std::cout << "[Diff DMinv_Dq]\n\n";
+
+  std::cout << "<<<< BACKWARD >>>>\n\n";
+
+  if (nodes.empty())
+  {
+    return;
+  }
+
+  for (int i = static_cast<int>(nodes.size() - 1); i >= 0; --i)
+  {
+    const auto& node = nodes[static_cast<size_t>(i)];
+    const auto& data = node.data;
+
+    const auto& node_numeric = nodes_numeric[static_cast<size_t>(i)];
+    const auto& data_numeric = node_numeric.data;
+
+    std::cout << "<<< i: " << i+1 << ">>>\n\n";
+
+    std::cout << "S[" << i+1 << "]    : " << data.S.transpose() << "\n";
+//    std::cout << "AI[" << i+1 << "]:\n" << data.AI << "\n";
+    std::cout << "AIS[" << i+1 << "]  : " << (data.AI*data.S).transpose() << "\n";
+    std::cout << "AB[" << i+1 << "]   : " << data.AB.transpose() << "\n";
+    std::cout << "psi[" << i+1 << "]  : " << data.psi << "\n";
+//    std::cout << "Pi[" << i+1 << "]:\n" << data.Pi << "\n";
+    std::cout << "alpha[" << i+1 << "]: " << data.alpha.transpose() << "\n";
+    std::cout << "beta[" << i+1 << "] : " << data.beta.transpose() << "\n";
+
+    std::cout << "\n";
+
+    for (auto j = 0u; j < node.derivs.size(); ++j)
+    {
+      const auto& deriv = node.derivs[j];
+      const auto& deriv_numeric = node_numeric.derivs[j];
+      std::cout << "DAI[" << i+1 << "," << j+1 << "]   :\n" << deriv.AI << "\n";
+      std::cout << "DAI_num[" << i+1 << "," << j+1 << "]   :\n" << deriv_numeric.AI << "\n";
+      std::cout << "DAB[" << i+1 << "," << j+1 << "]   : " << deriv.AB.transpose() << "\n";
+      std::cout << "DAB_num[" << i+1 << "," << j+1 << "]   : " << deriv_numeric.AB.transpose() << "\n";
+      std::cout << "Dpsi[" << i+1 << "," << j+1 << "]  : " << deriv.psi << "\n";
+      std::cout << "Dpsi_num[" << i+1 << "," << j+1 << "]  : " << deriv_numeric.psi << "\n";
+      std::cout << "DPi[" << i+1 << "," << j+1 << "]   :\n" << deriv.Pi << "\n";
+      std::cout << "Dalpha[" << i+1 << "," << j+1 << "]: " << deriv.alpha.transpose() << "\n";
+      std::cout << "Dalpha_num[" << i+1 << "," << j+1 << "]: " << deriv_numeric.alpha.transpose() << "\n";
+      std::cout << "Dbeta[" << i+1 << "," << j+1 << "] : " << deriv.beta.transpose() << "\n";
+      std::cout << "Dbeta_num[" << i+1 << "," << j+1 << "] : " << deriv_numeric.beta.transpose() << "\n";
+      std::cout << "\n";
+    }
+
+    std::cout << "\n";
+  }
+
+  std::cout << "<<<< FORWARD >>>>\n\n";
+
+  for (auto i = 0u; i < nodes.size(); ++i)
+  {
+    const auto& node = nodes[i];
+    const auto& data = node.data;
+
+    std::cout << "<<< i: " << i+1 << ">>>\n\n";
+
+    std::cout << "ddq[" << i+1 << "]:" << data.ddq.transpose() << "\n";
+    std::cout << "dV[" << i+1 << "]:" << data.dV.transpose() << "\n";
+
+//    for (auto j = 0u; j < node.derivs.size(); ++j)
+//    {
+//      const auto& deriv = node.derivs[j];
+//    }
+  }
+
+  std::cout << std::endl << std::endl;
+}
+
+#endif
 
 //==============================================================================
 /// This gives the unconstrained Jacobian of M^{-1}f
 Eigen::MatrixXd Skeleton::getJacobianOfMinv(
-    Eigen::VectorXd f, neural::WithRespectTo* wrt)
+    const Eigen::VectorXd& f, neural::WithRespectTo* wrt)
 {
-  // TOOD(keenon): replace with the GEAR approach
-  return finiteDifferenceJacobianOfMinv(f, wrt);
+  const int dofs = static_cast<int>(getNumDofs());
+  Eigen::MatrixXd DMinvX_Dp = Eigen::MatrixXd::Zero(dofs, dofs);
+
+  if (wrt == neural::WithRespectTo::VELOCITY
+      || wrt == neural::WithRespectTo::FORCE)
+  {
+    return DMinvX_Dp;
+  }
+
+  std::vector<BodyNode*>& bodyNodes = mSkelCache.mBodyNodes;
+
+#ifdef DART_DEBUG_ANALYTICAL_DERIV
+  mDiffMinv.init(bodyNodes.size(), getNumDofs());
+#endif
+
+  for (BodyNode* bodyNode : bodyNodes)
+  {
+    bodyNode->computeJacobianOfMinvXInit();
+  }
+
+  const Eigen::VectorXd oldForces = getForces();
+  setForces(f);
+
+  // Backward iteration
+  for (auto it = bodyNodes.rbegin(); it != bodyNodes.rend(); ++it)
+  {
+    BodyNode* bodyNode = *it;
+    bodyNode->computeJacobianOfMinvXBackwardIteration(f);
+  }
+
+  // Forward iteration
+  for (BodyNode* bodyNode : bodyNodes)
+  {
+    bodyNode->computeJacobianOfMinvXForwardIteration(DMinvX_Dp);
+  }
+
+#ifdef DART_DEBUG_ANALYTICAL_DERIV
+  // Verification
+  if (!bodyNodes.empty())
+  {
+    const double EPS = 1e-7;
+    const size_t numDofs = getNumDofs();
+    Eigen::VectorXd start = getPositions();
+    for (size_t i = 0; i < numDofs; ++i)
+    {
+      Eigen::VectorXd tweaked = start;
+      tweaked[static_cast<int>(i)] += EPS;
+      setPositions(tweaked);
+
+      for (int j = static_cast<int>(bodyNodes.size()) - 1; j >= 0; --j)
+      {
+        auto& node = mDiffMinv.nodes_numeric[j];
+
+        BodyNode* bodyNode = bodyNodes[static_cast<size_t>(j)];
+        Joint* joint = bodyNode->getParentJoint();
+        const math::Jacobian S = joint->getRelativeJacobian();
+        bodyNode->updateInvMassMatrix();
+        const math::Inertia& AI = bodyNode->getArticulatedInertia();
+        const Eigen::Vector6d& AB = bodyNode->mInvM_c;
+        const Eigen::VectorXd& alpha = joint->getAlpha();
+        const Eigen::Vector6d& beta = joint->computeBeta(AI, AB);
+        Eigen::MatrixXd psi = (S.transpose() * AI * S).inverse();
+        node.derivs[i].AI = AI;
+        node.derivs[i].AB = AB;
+        node.derivs[i].alpha = alpha;
+        node.derivs[i].beta = beta;
+        node.derivs[i].psi = psi;
+      }
+
+      tweaked = start;
+      tweaked[static_cast<int>(i)] -= EPS;
+      setPositions(tweaked);
+
+      for (int j = static_cast<int>(bodyNodes.size()) - 1; j >= 0; --j)
+      {
+        auto& node = mDiffMinv.nodes_numeric[j];
+
+        BodyNode* bodyNode = bodyNodes[static_cast<size_t>(j)];
+        Joint* joint = bodyNode->getParentJoint();
+        const math::Jacobian S = joint->getRelativeJacobian();
+        bodyNode->updateInvMassMatrix();
+        const math::Inertia& AI = bodyNode->getArticulatedInertia();
+        const Eigen::Vector6d& AB = bodyNode->mInvM_c;
+        const Eigen::VectorXd& alpha = joint->getAlpha();
+        const Eigen::Vector6d& beta = joint->computeBeta(AI, AB);
+        Eigen::MatrixXd psi = (S.transpose() * AI * S).inverse();
+        node.derivs[i].AI = (node.derivs[i].AI - AI) / (2 * EPS);
+        node.derivs[i].AB = (node.derivs[i].AB - AB) / (2 * EPS);
+        node.derivs[i].alpha = (node.derivs[i].alpha - alpha) / (2 * EPS);
+        node.derivs[i].beta = (node.derivs[i].beta - beta) / (2 * EPS);
+        node.derivs[i].psi = (node.derivs[i].psi - psi) / (2 * EPS);
+      }
+    }
+
+    setPositions(start);
+  }
+//  mDiffMinv.print();
+#endif
+
+  setForces(oldForces);
+
+  return DMinvX_Dp;
 }
 
 //==============================================================================
@@ -1612,8 +1852,8 @@ Eigen::MatrixXd Skeleton::getVelCJacobian()
 Eigen::MatrixXd Skeleton::finiteDifferenceJacobianOfC(
     neural::WithRespectTo* wrt)
 {
-  std::size_t n = getNumDofs();
-  std::size_t m = wrt->dim(this);
+  int n = static_cast<int>(getNumDofs());
+  int m = wrt->dim(this);
   Eigen::MatrixXd J = Eigen::MatrixXd::Zero(n, m);
   Eigen::VectorXd start = wrt->get(this);
 
@@ -1622,7 +1862,7 @@ Eigen::MatrixXd Skeleton::finiteDifferenceJacobianOfC(
 
   double EPS = 1e-7;
 
-  for (std::size_t i = 0; i < m; i++)
+  for (int i = 0; i < m; i++)
   {
     Eigen::VectorXd tweaked = start;
     tweaked(i) += EPS;
@@ -1644,10 +1884,10 @@ Eigen::MatrixXd Skeleton::finiteDifferenceJacobianOfC(
 
 //==============================================================================
 Eigen::MatrixXd Skeleton::finiteDifferenceJacobianOfMinv(
-    Eigen::VectorXd f, neural::WithRespectTo* wrt)
+    const Eigen::VectorXd& f, neural::WithRespectTo* wrt)
 {
-  std::size_t n = getNumDofs();
-  std::size_t m = wrt->dim(this);
+  int n = static_cast<int>(getNumDofs());
+  int m = wrt->dim(this);
   Eigen::MatrixXd J = Eigen::MatrixXd::Zero(n, m);
   Eigen::VectorXd start = wrt->get(this);
 
@@ -1656,7 +1896,7 @@ Eigen::MatrixXd Skeleton::finiteDifferenceJacobianOfMinv(
 
   double EPS = 1e-7;
 
-  for (std::size_t i = 0; i < m; i++)
+  for (int i = 0; i < m; i++)
   {
     Eigen::VectorXd tweaked = start;
     tweaked(i) += EPS;
@@ -1683,7 +1923,7 @@ Eigen::VectorXd Skeleton::getDynamicsForces()
   {
     Eigen::VectorXd jointForces = mSkelCache.mBodyNodes[i]
                                       ->getParentJoint()
-                                      ->getLocalJacobian()
+                                      ->getRelativeJacobian()
                                       .transpose()
                                   * mSkelCache.mBodyNodes[i]->getBodyForce();
     forces.segment(cursor, jointForces.size()) = jointForces;
@@ -2290,7 +2530,7 @@ math::Jacobian variadicGetWorldJacobian(
 //==============================================================================
 math::Jacobian Skeleton::getWorldPositionJacobian(const JacobianNode* _node) const
 {
-  math::Jacobian J = math::Jacobian::Zero(6, getNumDofs());
+  math::Jacobian J = math::Jacobian::Zero(6, static_cast<int>(getNumDofs()));
 
   if (!isValidBodyNode(this, _node, "getWorldJacobian"))
     return J;
@@ -2298,7 +2538,7 @@ math::Jacobian Skeleton::getWorldPositionJacobian(const JacobianNode* _node) con
   const BodyNode* bodyNode = static_cast<const BodyNode*>(_node);
   Eigen::Vector3d originalRotation = math::logMap(bodyNode->getWorldTransform().linear());
 
-  for (int i = 0; i < getNumDofs(); i++) {
+  for (auto i = 0u; i < getNumDofs(); ++i) {
     const DegreeOfFreedom* dof = getDof(i);
     const Joint* joint = dof->getJoint();
 
@@ -3483,7 +3723,7 @@ void Skeleton::updateTotalMass()
 //==============================================================================
 void Skeleton::updateCacheDimensions(Skeleton::DataCache& _cache)
 {
-  std::size_t dof = _cache.mDofs.size();
+  int dof = static_cast<int>(_cache.mDofs.size());
   _cache.mM = Eigen::MatrixXd::Zero(dof, dof);
   _cache.mAugM = Eigen::MatrixXd::Zero(dof, dof);
   _cache.mInvM = Eigen::MatrixXd::Zero(dof, dof);

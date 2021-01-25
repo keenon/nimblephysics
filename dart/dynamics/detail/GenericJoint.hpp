@@ -188,6 +188,21 @@ GenericJoint<ConfigSpaceT>::operator=(
 
 //==============================================================================
 template <class ConfigSpaceT>
+bool GenericJoint<ConfigSpaceT>::hasDof(const DegreeOfFreedom* dof) const
+{
+  for (const DegreeOfFreedom* internalDof : mDofs)
+  {
+    if (dof == internalDof)
+    {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+//==============================================================================
+template <class ConfigSpaceT>
 DegreeOfFreedom* GenericJoint<ConfigSpaceT>::getDof(size_t index)
 {
   if (index < NumDofs)
@@ -1822,6 +1837,262 @@ void GenericJoint<ConfigSpaceT>::addChildArtInertiaTo(
 
 //==============================================================================
 template <class ConfigSpaceT>
+Eigen::VectorXd GenericJoint<ConfigSpaceT>::getAlpha() const
+{
+  return mInvM_a;
+}
+
+//==============================================================================
+template <class ConfigSpaceT>
+math::Inertia GenericJoint<ConfigSpaceT>::computePi(const math::Inertia& AI) const
+{
+  const Matrix& psi = getInvProjArtInertia();
+  const math::Jacobian& S = getRelativeJacobianStatic();
+  const Eigen::MatrixXd AIS = AI * S;
+
+  return AI - AIS * psi * AIS.transpose();
+}
+
+//==============================================================================
+template <class ConfigSpaceT>
+Eigen::Vector6d GenericJoint<ConfigSpaceT>::computeBeta(
+    const math::Inertia& AI, const Eigen::Vector6d& AB) const
+{
+  const Matrix& psi = getInvProjArtInertia();
+  const math::Jacobian& S = getRelativeJacobianStatic();
+  const Vector& alpha = mInvM_a;
+
+  return AB + AI * S * psi * alpha;
+}
+
+//==============================================================================
+template <class ConfigSpaceT>
+void GenericJoint<ConfigSpaceT>::computeJacobianOfMinvX_init()
+{
+  mNumSkeletonDofs = this->getSkeleton()->getNumDofs();
+  mInvM_Dpsi_Dq.resize(mNumSkeletonDofs);
+  mInvM_DInvM_Dq.setZero(NumDofs, mNumSkeletonDofs);
+  mInvM_Dalpha_Dq.setZero(NumDofs, mNumSkeletonDofs);
+}
+
+//==============================================================================
+template <class ConfigSpaceT>
+void GenericJoint<ConfigSpaceT>::computeJacobianOfMinvX_A(
+    std::vector<math::Inertia>& DPi_Dq,
+    math::Jacobian& Dbeta_Dq,
+    const math::Inertia& AI,
+    const Eigen::Vector6d& AB,
+    const std::vector<math::Inertia>& DAI_Dq,
+    const math::Jacobian& DAB_Dq)
+{
+  using math::Jacobian;
+  using math::AdInvT;
+  using math::ad;
+
+  assert(mInvM_DInvM_Dq.cols() == static_cast<int>(mNumSkeletonDofs));
+
+  const auto& skel = this->getSkeleton();
+  const BodyNode* parentBody = this->getParentBodyNode();
+  const BodyNode* childBody = this->getChildBodyNode();
+
+  const auto bodyNodeIndex = childBody->getIndexInSkeleton();
+#ifdef DART_DEBUG_ANALYTICAL_DERIV
+  auto& data = skel->mDiffMinv.nodes[bodyNodeIndex].data;
+#endif
+
+  const Eigen::Isometry3d& T = this->getRelativeTransform();
+  const Jacobian& S = getRelativeJacobianStatic();
+  const Jacobian AIS = AI * S;
+
+  const Vector& alpha = mInvM_a;
+  const Matrix& psi = getInvProjArtInertia();
+#ifdef DART_DEBUG_ANALYTICAL_DERIV
+  data.psi = psi;
+  data.Pi = this->computePi(AI);
+  data.alpha = alpha;
+  data.beta = this->computeBeta(AI, AB);
+#endif
+
+  DPi_Dq = DAI_Dq;
+
+  for (auto i = 0u; i < mNumSkeletonDofs; ++i)
+  {
+#ifdef DART_DEBUG_ANALYTICAL_DERIV
+    auto& deriv = skel->mDiffMinv.nodes[bodyNodeIndex].derivs[i];
+#endif
+    const DegreeOfFreedom* dof = skel->getDof(i);
+    Matrix& Dpsi_Dq = mInvM_Dpsi_Dq[i];
+
+    if (hasDof(dof))
+    {
+      const int dofIndexInJoint = static_cast<int>(dof->getIndexInJoint());
+
+      const Jacobian DS_Dq = this->getRelativeJacobianDeriv(dof->getIndexInJoint());
+      const Jacobian DdS_Dq = this->getRelativeJacobianTimeDerivDeriv(dof->getIndexInJoint());
+
+      const Matrix tmp0 = DS_Dq.transpose() * AIS;
+      Dpsi_Dq
+          = -psi
+          * (S.transpose() * DAI_Dq[i] * S + tmp0 + tmp0.transpose())
+          * psi;
+
+      DPi_Dq[i].noalias() -= AIS * Dpsi_Dq * AIS.transpose();
+      const math::Inertia tmp1 = DAI_Dq[i] * S * psi * AIS.transpose();
+      DPi_Dq[i] -= tmp1;
+      DPi_Dq[i] -= tmp1.transpose();
+      const math::Inertia tmp2 = AI * DS_Dq * psi * AIS.transpose();
+      DPi_Dq[i] -= tmp2;
+      DPi_Dq[i] -= tmp2.transpose();
+
+      mInvM_Dalpha_Dq.col(i) = -(DS_Dq.transpose() * AB);
+      mInvM_Dalpha_Dq.col(i) -= S.transpose() * DAB_Dq.col(i);
+
+      Dbeta_Dq.col(i) += DAI_Dq[i] * S * psi * alpha;
+      Dbeta_Dq.col(i) += AI * DS_Dq * psi * alpha;
+      Dbeta_Dq.col(i) += AIS * Dpsi_Dq * alpha;
+      Dbeta_Dq.col(i) += AIS * psi * mInvM_Dalpha_Dq.col(i);
+    }
+    else
+    {
+      Dpsi_Dq = -psi * S.transpose() * DAI_Dq[i] * S * psi;
+
+      DPi_Dq[i].noalias() -= AIS * Dpsi_Dq * AIS.transpose();
+      const math::Inertia tmp1 = DAI_Dq[i] * S * psi * AIS.transpose();
+      DPi_Dq[i] -= tmp1;
+      DPi_Dq[i] -= tmp1.transpose();
+
+      mInvM_Dalpha_Dq.col(i) = -(S.transpose() * DAB_Dq.col(i));
+
+      Dbeta_Dq.col(i) += DAI_Dq[i] * S * psi * alpha;
+      Dbeta_Dq.col(i) += AIS * Dpsi_Dq * alpha;
+      Dbeta_Dq.col(i) += AIS * psi * mInvM_Dalpha_Dq.col(i);
+    }
+
+#ifdef DART_DEBUG_ANALYTICAL_DERIV
+    deriv.psi = Dpsi_Dq;
+    deriv.Pi = DPi_Dq[i];
+    deriv.alpha = mInvM_Dalpha_Dq.col(i);
+    deriv.beta = Dbeta_Dq.col(i);
+#endif
+  }
+}
+
+//==============================================================================
+template <class ConfigSpaceT>
+Eigen::MatrixXd GenericJoint<ConfigSpaceT>::computeJacobianOfMinvX_B(
+    const math::Inertia& AI,
+    const std::vector<math::Inertia>& DAI_Dq)
+{
+  using math::Jacobian;
+  using math::AdInvT;
+  using math::AdInvTJac;
+  using math::ad;
+  using math::adJac;
+
+  assert(mInvM_DInvM_Dq.cols() == static_cast<int>(mNumSkeletonDofs));
+
+  const auto& skel = this->getSkeleton();
+  const BodyNode* parentBody = this->getParentBodyNode();
+  BodyNode* childBody = this->getChildBodyNode();
+
+  const auto bodyNodeIndex = childBody->getIndexInSkeleton();
+#ifdef DART_DEBUG_ANALYTICAL_DERIV
+  auto& data = skel->mDiffMinv.nodes[bodyNodeIndex].data;
+#endif
+
+  const Eigen::Isometry3d& T = this->getRelativeTransform();
+  const Jacobian& S = getRelativeJacobianStatic();
+  // TODO(JS): Assuming mInvM_a is already updated
+  const Vector& alpha = mInvM_a;
+  const Matrix& psi = getInvProjArtInertia();
+  const Vector& ddq = mInvMassMatrixSegment;
+
+  Eigen::MatrixXd& DInvM_Dq = mInvM_DInvM_Dq;
+  Eigen::MatrixXd& Dalpha_Dq = mInvM_Dalpha_Dq;
+
+  for (auto i = 0u; i < mNumSkeletonDofs; ++i)
+  {
+    const DegreeOfFreedom* dof = skel->getDof(i);
+    const Matrix& Dpsi_Dq = mInvM_Dpsi_Dq[i];
+#ifdef DART_DEBUG_ANALYTICAL_DERIV
+    auto& deriv = skel->mDiffMinv.nodes[bodyNodeIndex].derivs[i];
+#endif
+
+    if (hasDof(dof))
+    {
+      const int dofIndexInJoint = static_cast<int>(dof->getIndexInJoint());
+      const Eigen::Vector6d Scol = S.col(dofIndexInJoint);
+
+      const Jacobian DS_Dq = this->getRelativeJacobianDeriv(dof->getIndexInJoint());
+      const Jacobian DdS_Dq = this->getRelativeJacobianTimeDerivDeriv(dof->getIndexInJoint());
+
+      if (parentBody)
+      {
+        const Eigen::Vector6d parent_dV2 = AdInvT(T, parentBody->mInvM_U);
+        const math::Jacobian& parent_DdV_Dq = parentBody->mInvM_dV_q;
+        const Eigen::Vector6d parent_DdV_Dq2 = AdInvT(T, parent_DdV_Dq.col(i));
+
+        DInvM_Dq.col(i)
+            = Dpsi_Dq * (alpha - S.transpose() * AI * parent_dV2);
+        DInvM_Dq.col(i)
+            += psi * (
+                Dalpha_Dq.col(i)
+                  - (DS_Dq.transpose() * AI + S.transpose() * DAI_Dq[i]) * parent_dV2
+                  - S.transpose() * AI * (parent_DdV_Dq2 - ad(Scol, parent_dV2))
+              );
+
+        childBody->mInvM_dV_q.col(i) = AdInvT(T, parentBody->mInvM_dV_q.col(i))
+            - ad(Scol, AdInvT(T, parentBody->mInvM_U))
+            + DS_Dq * ddq
+            + S * DInvM_Dq.col(i);
+      }
+      else
+      {
+        DInvM_Dq.col(i) = Dpsi_Dq * alpha;
+        DInvM_Dq.col(i) += psi * Dalpha_Dq.col(i);
+
+        childBody->mInvM_dV_q.col(i) = DS_Dq * ddq + S * DInvM_Dq.col(i);
+      }
+    }
+    else
+    {
+      if (parentBody)
+      {
+        const Eigen::Vector6d parent_dV2 = AdInvT(T, parentBody->mInvM_U);
+        const math::Jacobian& parent_DdV_Dq = parentBody->mInvM_dV_q;
+        const Eigen::Vector6d parent_DdV_Dq2 = AdInvTJac(T, parent_DdV_Dq.col(i));
+
+        DInvM_Dq.col(i)
+            = Dpsi_Dq * (alpha - S.transpose() * AI * parent_dV2);
+        DInvM_Dq.col(i)
+            += psi * (
+                Dalpha_Dq.col(i)
+                  - S.transpose() * DAI_Dq[i] * parent_dV2
+                  - S.transpose() * AI * parent_DdV_Dq2
+              );
+
+        childBody->mInvM_dV_q.col(i) = AdInvT(T, parentBody->mInvM_dV_q.col(i))
+            + S * DInvM_Dq.col(i);
+      }
+      else
+      {
+        DInvM_Dq.col(i) = Dpsi_Dq * alpha;
+        DInvM_Dq.col(i) += psi * Dalpha_Dq.col(i);
+
+        childBody->mInvM_dV_q.col(i) = S * DInvM_Dq.col(i);
+      }
+    }
+#ifdef DART_DEBUG_ANALYTICAL_DERIV
+    deriv.ddq = DInvM_Dq.col(i);
+    deriv.dV = childBody->mInvM_dV_q.col(i);
+#endif
+  }
+
+  return DInvM_Dq;
+}
+
+//==============================================================================
+template <class ConfigSpaceT>
 void GenericJoint<ConfigSpaceT>::addChildArtInertiaToDynamic(
     Eigen::Matrix6d& parentArtInertia,
     const Eigen::Matrix6d& childArtInertia)
@@ -2622,7 +2893,7 @@ void GenericJoint<ConfigSpaceT>::addInvMassMatrixSegmentTo(
     Eigen::Vector6d& acc)
 {
   //
-  acc += getRelativeJacobianStatic() * mInvMassMatrixSegment;
+  acc.noalias() += getRelativeJacobianStatic() * mInvMassMatrixSegment;
 }
 
 //==============================================================================
