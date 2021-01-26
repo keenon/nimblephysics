@@ -31,7 +31,8 @@ public:
       Eigen::VectorXd preStepPosition,
       Eigen::VectorXd preStepVelocity,
       Eigen::VectorXd preStepTorques,
-      Eigen::VectorXd preConstraintVelocities);
+      Eigen::VectorXd preConstraintVelocities,
+      Eigen::VectorXd preStepLCPCache);
 
   /// This computes the implicit backprop without forming intermediate
   /// Jacobians. It takes a LossGradient with the position and velocity vectors
@@ -511,11 +512,36 @@ public:
       Eigen::MatrixXd bruteForce,
       std::string name);
 
+  /// This prints code to the console to replicate a scenario for testing.
+  void printReplicationInstructions(std::shared_ptr<simulation::World> world);
+
   /// Returns true if we were able to standardize our LCP results, false if we
   /// weren't
   bool areResultsStandardized() const;
 
+  /// If this is true, we use finite-differencing to compute all of the
+  /// requested Jacobians. This override can be useful to verify if there's a
+  /// bug in the analytical Jacobians that's causing learning to not converge.
+  void setUseFDOverride(bool override);
+
+  /// If this is true, we check all Jacobians against their finite-differencing
+  /// counterparts at runtime. If they aren't sufficiently close, we immediately
+  /// crash the program and print what went wrong and some simple replication
+  /// instructions.
+  void setSlowDebugResultsAgainstFD(bool slowDebug);
+
 protected:
+  /// If this is true, we use finite-differencing to compute all of the
+  /// requested Jacobians. This override can be useful to verify if there's a
+  /// bug in the analytical Jacobians that's causing learning to not converge.
+  bool mUseFDOverride;
+
+  /// If this is true, we check all Jacobians against their finite-differencing
+  /// counterparts at runtime. If they aren't sufficiently close, we immediately
+  /// crash the program and print what went wrong and some simple replication
+  /// instructions.
+  bool mSlowDebugResultsAgainstFD;
+
   /// This is the global timestep length. This is included here because it shows
   /// up as a constant in some of the matrices.
   double mTimeStep;
@@ -550,6 +576,9 @@ protected:
 
   /// The torques on all the DOFs of the world BEFORE the timestep
   Eigen::VectorXd mPreStepTorques;
+
+  /// The LCP's initial cached value BEFORE the timestep
+  Eigen::VectorXd mPreStepLCPCache;
 
   /// The velocities of all the DOFs of the world AFTER an unconstrained forward
   /// step, but BEFORE the LCP runs

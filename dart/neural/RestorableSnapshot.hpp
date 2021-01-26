@@ -24,6 +24,7 @@ public:
 
 private:
   std::shared_ptr<simulation::World> mWorld;
+  Eigen::VectorXd mLCPCache;
   std::vector<dynamics::Skeleton::Configuration> mSkeletonConfigurations;
 };
 

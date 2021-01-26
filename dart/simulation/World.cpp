@@ -82,7 +82,9 @@ World::World(const std::string& _name)
         false), // TODO(keenon): We should updated gradients to support this,
                 // and re-enable it by default
     mPenetrationCorrectionEnabled(false),
-    mWrtMass(std::make_shared<neural::WithRespectToMass>())
+    mWrtMass(std::make_shared<neural::WithRespectToMass>()),
+    mUseFDOverride(false),
+    mSlowDebugResultsAgainstFD(false)
 {
   mIndices.push_back(0);
 
@@ -507,6 +509,55 @@ std::string World::colorsToJson()
   json << "}";
 
   return json.str();
+}
+
+//==============================================================================
+/// This gets the cached LCP solution, which is useful to be able to get/set
+/// because it can effect the forward solutions of physics problems because of
+/// our optimistic LCP-stabilization-to-acceptance approach.
+Eigen::VectorXd World::getCachedLCPSolution()
+{
+  return mConstraintSolver->getCachedLCPSolution();
+}
+
+//==============================================================================
+/// This gets the cached LCP solution, which is useful to be able to get/set
+/// because it can effect the forward solutions of physics problems because of
+/// our optimistic LCP-stabilization-to-acceptance approach.
+void World::setCachedLCPSolution(Eigen::VectorXd X)
+{
+  mConstraintSolver->setCachedLCPSolution(X);
+}
+
+//==============================================================================
+/// If this is true, we use finite-differencing to compute all of the
+/// requested Jacobians. This override can be useful to verify if there's a
+/// bug in the analytical Jacobians that's causing learning to not converge.
+void World::setUseFDOverride(bool fdOverride)
+{
+  mUseFDOverride = fdOverride;
+}
+
+//==============================================================================
+bool World::getUseFDOverride()
+{
+  return mUseFDOverride;
+}
+
+//==============================================================================
+/// If this is true, we check all Jacobians against their finite-differencing
+/// counterparts at runtime. If they aren't sufficiently close, we immediately
+/// crash the program and print what went wrong and some simple replication
+/// instructions.
+void World::setSlowDebugResultsAgainstFD(bool slowDebug)
+{
+  mSlowDebugResultsAgainstFD = slowDebug;
+}
+
+//==============================================================================
+bool World::getSlowDebugResultsAgainstFD()
+{
+  return mSlowDebugResultsAgainstFD;
 }
 
 //==============================================================================

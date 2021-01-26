@@ -11,16 +11,10 @@
 #include "dart/neural/WithRespectToMass.hpp"
 #include "dart/simulation/World.hpp"
 
-// This replaces all analytical Jacobian calculations with finite differencing.
-//
-// #define USE_FD_OVERRIDE
-
 // This will enable runtime checks where every analytical Jacobian is compared
 // to the finite difference version, and we error if they're too close far
 // apart:
 //
-// #define SLOW_FD_CHECK_EVERYTHING
-
 #define LOG_PERFORMANCE_BACKPROP_SNAPSHOT ;
 
 using namespace dart;
@@ -38,21 +32,25 @@ BackpropSnapshot::BackpropSnapshot(
     Eigen::VectorXd preStepPosition,
     Eigen::VectorXd preStepVelocity,
     Eigen::VectorXd preStepTorques,
-    Eigen::VectorXd preConstraintVelocities)
+    Eigen::VectorXd preConstraintVelocities,
+    Eigen::VectorXd preStepLCPCache)
+  : mUseFDOverride(world->getUseFDOverride()),
+    mSlowDebugResultsAgainstFD(world->getSlowDebugResultsAgainstFD()),
+    mNumDOFs(0),
+    mNumConstraintDim(0),
+    mNumClamping(0),
+    mNumUpperBound(0),
+    mNumBouncing(0)
 {
   mTimeStep = world->getTimeStep();
   mPreStepPosition = preStepPosition;
   mPreStepVelocity = preStepVelocity;
   mPreStepTorques = preStepTorques;
   mPreConstraintVelocities = preConstraintVelocities;
+  mPreStepLCPCache = preStepLCPCache;
   mPostStepPosition = world->getPositions();
   mPostStepVelocity = world->getVelocities();
   mPostStepTorques = world->getExternalForces();
-  mNumDOFs = 0;
-  mNumConstraintDim = 0;
-  mNumClamping = 0;
-  mNumUpperBound = 0;
-  mNumBouncing = 0;
 
   // Reset the world to the initial state before finalizing all the gradient
   // matrices
@@ -61,6 +59,7 @@ BackpropSnapshot::BackpropSnapshot(
   world->setPositions(mPreStepPosition);
   world->setVelocities(mPreStepVelocity);
   world->setExternalForces(mPreStepTorques);
+  world->setCachedLCPSolution(mPreStepLCPCache);
 
   // Collect all the constraint groups attached to each skeleton
 
@@ -99,6 +98,16 @@ BackpropSnapshot::BackpropSnapshot(
   mCachedForcePosDirty = true;
   mCachedForceVelDirty = true;
   mCachedMassVelDirty = true;
+
+  /*
+  if (!areResultsStandardized())
+  {
+    std::cout << "Found an example which was impossible to standardize!"
+              << std::endl;
+    printReplicationInstructions(world);
+    assert(false);
+  }
+  */
 }
 
 //==============================================================================
@@ -316,48 +325,52 @@ const Eigen::MatrixXd& BackpropSnapshot::getForceVelJacobian(
           "BackpropSnapshot.getForceVelJacobian#refreshCache");
     }
 #endif
-#ifdef USE_FD_OVERRIDE
-    mCachedForceVel = finiteDifferenceForceVelJacobian(world);
-#else
-    Eigen::MatrixXd A_c = getClampingConstraintMatrix(world);
-    Eigen::MatrixXd Minv = getInvMassMatrix(world);
-
-    // If there are no clamping constraints, then force-vel is just the
-    // mTimeStep
-    // * Minv
-    if (A_c.size() == 0)
+    if (mUseFDOverride)
     {
-      mCachedForceVel = mTimeStep * Minv;
+      mCachedForceVel = finiteDifferenceForceVelJacobian(world);
     }
     else
     {
-      mCachedForceVel = getVelJacobianWrt(world, WithRespectTo::FORCE);
+      Eigen::MatrixXd A_c = getClampingConstraintMatrix(world);
+      Eigen::MatrixXd Minv = getInvMassMatrix(world);
 
-      /*
-      Eigen::MatrixXd A_ub = getUpperBoundConstraintMatrix(world);
-      Eigen::MatrixXd E = getUpperBoundMappingMatrix();
-      Eigen::MatrixXd P_c = getProjectionIntoClampsMatrix(world);
-
-      if (A_ub.size() > 0 && E.size() > 0)
+      // If there are no clamping constraints, then force-vel is just the
+      // mTimeStep
+      // * Minv
+      if (A_c.size() == 0)
       {
-        mCachedForceVel = mTimeStep * Minv
-                          * (Eigen::MatrixXd::Identity(mNumDOFs, mNumDOFs)
-                             - mTimeStep * (A_c + A_ub * E) * P_c * Minv);
+        mCachedForceVel = mTimeStep * Minv;
       }
       else
       {
-        mCachedForceVel = mTimeStep * Minv
-                          * (Eigen::MatrixXd::Identity(mNumDOFs, mNumDOFs)
-                             - mTimeStep * A_c * P_c * Minv);
-      }
-      */
-    }
-#endif
+        mCachedForceVel = getVelJacobianWrt(world, WithRespectTo::FORCE);
 
-#ifdef SLOW_FD_CHECK_EVERYTHING
-    Eigen::MatrixXd bruteForce = finiteDifferenceForceVelJacobian(world);
-    equalsOrCrash(world, mCachedForceVel, bruteForce, "force-vel");
-#endif
+        /*
+        Eigen::MatrixXd A_ub = getUpperBoundConstraintMatrix(world);
+        Eigen::MatrixXd E = getUpperBoundMappingMatrix();
+        Eigen::MatrixXd P_c = getProjectionIntoClampsMatrix(world);
+
+        if (A_ub.size() > 0 && E.size() > 0)
+        {
+          mCachedForceVel = mTimeStep * Minv
+                            * (Eigen::MatrixXd::Identity(mNumDOFs, mNumDOFs)
+                               - mTimeStep * (A_c + A_ub * E) * P_c * Minv);
+        }
+        else
+        {
+          mCachedForceVel = mTimeStep * Minv
+                            * (Eigen::MatrixXd::Identity(mNumDOFs, mNumDOFs)
+                               - mTimeStep * A_c * P_c * Minv);
+        }
+        */
+      }
+    }
+
+    if (mSlowDebugResultsAgainstFD)
+    {
+      Eigen::MatrixXd bruteForce = finiteDifferenceForceVelJacobian(world);
+      equalsOrCrash(world, mCachedForceVel, bruteForce, "force-vel");
+    }
 
     // mCachedForceVel = getVelJacobianWrt(world, WithRespectTo::FORCE);
     mCachedForceVelDirty = false;
@@ -405,16 +418,20 @@ const Eigen::MatrixXd& BackpropSnapshot::getMassVelJacobian(
     }
 #endif
 
-#ifdef USE_FD_OVERRIDE
-    mCachedVelVel = finiteDifferenceMassVelJacobian(world);
-#else
-    mCachedMassVel = getVelJacobianWrt(world, world->getWrtMass().get());
-#endif
+    if (mUseFDOverride)
+    {
+      mCachedMassVel = finiteDifferenceMassVelJacobian(world);
+    }
+    else
+    {
+      mCachedMassVel = getVelJacobianWrt(world, world->getWrtMass().get());
+    }
 
-#ifdef SLOW_FD_CHECK_EVERYTHING
-    Eigen::MatrixXd bruteForce = finiteDifferenceMassVelJacobian(world);
-    equalsOrCrash(world, mCachedForceVel, bruteForce, "mass-vel");
-#endif
+    if (mSlowDebugResultsAgainstFD)
+    {
+      Eigen::MatrixXd bruteForce = finiteDifferenceMassVelJacobian(world);
+      equalsOrCrash(world, mCachedMassVel, bruteForce, "mass-vel");
+    }
 
     mCachedMassVelDirty = false;
 
@@ -458,63 +475,67 @@ const Eigen::MatrixXd& BackpropSnapshot::getVelVelJacobian(
     }
 #endif
 
-#ifdef USE_FD_OVERRIDE
-    mCachedVelVel = finiteDifferenceVelVelJacobian(world);
-#else
-    Eigen::MatrixXd A_c = getClampingConstraintMatrix(world);
-
-    // If there are no clamping constraints, then vel-vel is just the identity
-    if (A_c.size() == 0)
+    if (mUseFDOverride)
     {
-      mCachedVelVel = Eigen::MatrixXd::Identity(mNumDOFs, mNumDOFs)
-                      - getForceVelJacobian(world) * getVelCJacobian(world);
+      mCachedVelVel = finiteDifferenceVelVelJacobian(world);
     }
     else
     {
-      mCachedVelVel = getVelJacobianWrt(world, WithRespectTo::VELOCITY);
+      Eigen::MatrixXd A_c = getClampingConstraintMatrix(world);
 
-      /*
-      Eigen::MatrixXd A_ub = getUpperBoundConstraintMatrix(world);
-      Eigen::MatrixXd E = getUpperBoundMappingMatrix();
-      Eigen::MatrixXd P_c = getProjectionIntoClampsMatrix(world);
-      Eigen::MatrixXd Minv = getInvMassMatrix(world);
-      Eigen::MatrixXd dF_c
-          = getJacobianOfConstraintForce(world, WithRespectTo::VELOCITY);
-      Eigen::MatrixXd A_c_ub_E = A_c + A_ub * E;
-      Eigen::MatrixXd parts2 = Minv * A_c_ub_E * dF_c;
+      // If there are no clamping constraints, then vel-vel is just the identity
+      if (A_c.size() == 0)
+      {
+        mCachedVelVel = Eigen::MatrixXd::Identity(mNumDOFs, mNumDOFs)
+                        - getForceVelJacobian(world) * getVelCJacobian(world);
+      }
+      else
+      {
+        mCachedVelVel = getVelJacobianWrt(world, WithRespectTo::VELOCITY);
 
-      mCachedVelVel = (Eigen::MatrixXd::Identity(mNumDOFs, mNumDOFs) + parts2)
-                      - getForceVelJacobian(world) * getVelCJacobian(world);
-      */
+        /*
+        Eigen::MatrixXd A_ub = getUpperBoundConstraintMatrix(world);
+        Eigen::MatrixXd E = getUpperBoundMappingMatrix();
+        Eigen::MatrixXd P_c = getProjectionIntoClampsMatrix(world);
+        Eigen::MatrixXd Minv = getInvMassMatrix(world);
+        Eigen::MatrixXd dF_c
+            = getJacobianOfConstraintForce(world, WithRespectTo::VELOCITY);
+        Eigen::MatrixXd A_c_ub_E = A_c + A_ub * E;
+        Eigen::MatrixXd parts2 = Minv * A_c_ub_E * dF_c;
 
-      /*
-      std::cout << "A_c: " << std::endl << A_c << std::endl;
-      std::cout << "A_ub: " << std::endl << A_ub << std::endl;
-      std::cout << "E: " << std::endl << E << std::endl;
-      std::cout << "P_c: " << std::endl << P_c << std::endl;
-      std::cout << "Minv: " << std::endl << Minv << std::endl;
-      std::cout << "mTimestep: " << mTimeStep << std::endl;
-      std::cout << "A_c + A_ub * E: " << std::endl << parts1 << std::endl;
-      */
-      /*
-       std::cout << "Vel-vel construction pieces: " << std::endl;
-       std::cout << "1: I " << std::endl
-                 << Eigen::MatrixXd::Identity(mNumDOFs, mNumDOFs) << std::endl;
-       std::cout << "2: - mTimestep * Minv * (A_c + A_ub * E) * P_c" <<
-       std::endl
-                 << -parts2 << std::endl;
-       std::cout << "2.5: velC" << std::endl << getVelCJacobian(world) <<
-       std::endl; std::cout << "3: - forceVel * velC" << std::endl
-                 << -getForceVelJacobian(world) * getVelCJacobian(world)
-                 << std::endl;
-       */
+        mCachedVelVel = (Eigen::MatrixXd::Identity(mNumDOFs, mNumDOFs) + parts2)
+                        - getForceVelJacobian(world) * getVelCJacobian(world);
+        */
+
+        /*
+        std::cout << "A_c: " << std::endl << A_c << std::endl;
+        std::cout << "A_ub: " << std::endl << A_ub << std::endl;
+        std::cout << "E: " << std::endl << E << std::endl;
+        std::cout << "P_c: " << std::endl << P_c << std::endl;
+        std::cout << "Minv: " << std::endl << Minv << std::endl;
+        std::cout << "mTimestep: " << mTimeStep << std::endl;
+        std::cout << "A_c + A_ub * E: " << std::endl << parts1 << std::endl;
+        */
+        /*
+         std::cout << "Vel-vel construction pieces: " << std::endl;
+         std::cout << "1: I " << std::endl
+                   << Eigen::MatrixXd::Identity(mNumDOFs, mNumDOFs) <<
+         std::endl; std::cout << "2: - mTimestep * Minv * (A_c + A_ub * E) *
+         P_c" << std::endl
+                   << -parts2 << std::endl;
+         std::cout << "2.5: velC" << std::endl << getVelCJacobian(world) <<
+         std::endl; std::cout << "3: - forceVel * velC" << std::endl
+                   << -getForceVelJacobian(world) * getVelCJacobian(world)
+                   << std::endl;
+         */
+      }
     }
-#endif
 
-#ifdef SLOW_FD_CHECK_EVERYTHING
-    Eigen::MatrixXd bruteForce = finiteDifferenceVelVelJacobian(world);
-    equalsOrCrash(world, mCachedVelVel, bruteForce, "vel-vel");
-#endif
+    if (mSlowDebugResultsAgainstFD)
+    {
+      Eigen::MatrixXd bruteForce = finiteDifferenceVelVelJacobian(world);
+      equalsOrCrash(world, mCachedVelVel, bruteForce, "vel-vel");
+    }
 
     mCachedVelVelDirty = false;
 #ifdef LOG_PERFORMANCE_BACKPROP_SNAPSHOT
@@ -557,16 +578,20 @@ const Eigen::MatrixXd& BackpropSnapshot::getPosVelJacobian(
     }
 #endif
 
-#ifdef USE_FD_OVERRIDE
-    mCachedPosVel = finiteDifferencePosVelJacobian(world);
-#else
-    mCachedPosVel = getVelJacobianWrt(world, WithRespectTo::POSITION);
-#endif
+    if (mUseFDOverride)
+    {
+      mCachedPosVel = finiteDifferencePosVelJacobian(world);
+    }
+    else
+    {
+      mCachedPosVel = getVelJacobianWrt(world, WithRespectTo::POSITION);
+    }
 
-#ifdef SLOW_FD_CHECK_EVERYTHING
-    Eigen::MatrixXd bruteForce = finiteDifferencePosVelJacobian(world);
-    equalsOrCrash(world, mCachedPosVel, bruteForce, "pos-vel");
-#endif
+    if (mSlowDebugResultsAgainstFD)
+    {
+      Eigen::MatrixXd bruteForce = finiteDifferencePosVelJacobian(world);
+      equalsOrCrash(world, mCachedPosVel, bruteForce, "pos-vel");
+    }
 
     mCachedPosVelDirty = false;
 #ifdef LOG_PERFORMANCE_BACKPROP_SNAPSHOT
@@ -629,6 +654,7 @@ Eigen::MatrixXd BackpropSnapshot::getScratchAnalytical(
   world->setPositions(mPreStepPosition);
   world->setVelocities(mPreStepVelocity);
   world->setExternalForces(mPreStepTorques);
+  world->setCachedLCPSolution(mPreStepLCPCache);
 
   Eigen::MatrixXd A_c = getClampingConstraintMatrix(world);
   Eigen::MatrixXd A_ub = getUpperBoundConstraintMatrix(world);
@@ -719,6 +745,7 @@ Eigen::MatrixXd BackpropSnapshot::getScratchFiniteDifference(
   world->setPositions(mPreStepPosition);
   world->setVelocities(mPreStepVelocity);
   world->setExternalForces(mPreStepTorques);
+  world->setCachedLCPSolution(mPreStepLCPCache);
 
   Eigen::VectorXd original = scratch(world);
 
@@ -765,6 +792,7 @@ Eigen::MatrixXd BackpropSnapshot::getVelJacobianWrt(
   world->setPositions(mPreStepPosition);
   world->setVelocities(mPreStepVelocity);
   world->setExternalForces(mPreStepTorques);
+  world->setCachedLCPSolution(mPreStepLCPCache);
 
   Eigen::MatrixXd A_c = getClampingConstraintMatrix(world);
   Eigen::MatrixXd A_ub = getUpperBoundConstraintMatrix(world);
@@ -839,6 +867,7 @@ Eigen::MatrixXd BackpropSnapshot::getVelJacobianWrt(
   world->setPositions(mPreStepPosition);
   world->setVelocities(mPreStepVelocity);
   world->setForces(mPreStepTorques);
+  world->setCachedLCPSolution(mPreStepLCPCache);
 
   Eigen::VectorXd tau = world->getForces();
   Eigen::VectorXd C = world->getCoriolisAndGravityAndExternalForces();
@@ -917,6 +946,7 @@ const Eigen::MatrixXd& BackpropSnapshot::getBounceApproximationJacobian(
     world->setPositions(mPreStepPosition);
     world->setVelocities(mPreStepVelocity);
     world->setExternalForces(mPreStepTorques);
+    world->setCachedLCPSolution(mPreStepLCPCache);
 
     Eigen::MatrixXd A_b = getBouncingConstraintMatrix(world);
 
@@ -1006,26 +1036,31 @@ const Eigen::MatrixXd& BackpropSnapshot::getPosPosJacobian(
     }
 #endif
 
-#ifdef USE_FD_OVERRIDE
-    mCachedPosPos = finiteDifferencePosPosJacobian(world, 1);
-#else
-    RestorableSnapshot snapshot(world);
-    world->setPositions(mPreStepPosition);
-    world->setVelocities(mPreStepVelocity);
-    world->setExternalForces(mPreStepTorques);
+    if (mUseFDOverride)
+    {
+      mCachedPosPos = finiteDifferencePosPosJacobian(world, 1);
+    }
+    else
+    {
+      RestorableSnapshot snapshot(world);
+      world->setPositions(mPreStepPosition);
+      world->setVelocities(mPreStepVelocity);
+      world->setExternalForces(mPreStepTorques);
+      world->setCachedLCPSolution(mPreStepLCPCache);
 
-    mCachedPosPos = world->getPosPosJacobian()
-                    * getBounceApproximationJacobian(world, thisLog);
+      mCachedPosPos = world->getPosPosJacobian()
+                      * getBounceApproximationJacobian(world, thisLog);
 
-    snapshot.restore();
-#endif
+      snapshot.restore();
+    }
 
-#ifdef SLOW_FD_CHECK_EVERYTHING
-    // TODO: this is crappy, because if we are actually bouncing we want a
-    // better approximation
-    Eigen::MatrixXd bruteForce = finiteDifferencePosPosJacobian(world, 1);
-    equalsOrCrash(world, mCachedPosPos, bruteForce, "pos-pos");
-#endif
+    if (mSlowDebugResultsAgainstFD)
+    {
+      // TODO: this is crappy, because if we are actually bouncing we want a
+      // better approximation
+      Eigen::MatrixXd bruteForce = finiteDifferencePosPosJacobian(world, 1);
+      equalsOrCrash(world, mCachedPosPos, bruteForce, "pos-pos");
+    }
 
     mCachedPosPosDirty = false;
 #ifdef LOG_PERFORMANCE_BACKPROP_SNAPSHOT
@@ -1068,19 +1103,23 @@ const Eigen::MatrixXd& BackpropSnapshot::getVelPosJacobian(
     }
 #endif
 
-#ifdef USE_FD_OVERRIDE
-    mCachedVelPos = finiteDifferenceVelPosJacobian(world, 1);
-#else
-    mCachedVelPos = world->getVelPosJacobian()
-                    * getBounceApproximationJacobian(world, thisLog);
-#endif
+    if (mUseFDOverride)
+    {
+      mCachedVelPos = finiteDifferenceVelPosJacobian(world, 1);
+    }
+    else
+    {
+      mCachedVelPos = world->getVelPosJacobian()
+                      * getBounceApproximationJacobian(world, thisLog);
+    }
 
-#ifdef SLOW_FD_CHECK_EVERYTHING
-    // TODO: this is crappy, because if we are actually bouncing we want a
-    // better approximation
-    Eigen::MatrixXd bruteForce = finiteDifferenceVelPosJacobian(world, 1);
-    equalsOrCrash(world, mCachedVelPos, bruteForce, "vel-pos");
-#endif
+    if (mSlowDebugResultsAgainstFD)
+    {
+      // TODO: this is crappy, because if we are actually bouncing we want a
+      // better approximation
+      Eigen::MatrixXd bruteForce = finiteDifferenceVelPosJacobian(world, 1);
+      equalsOrCrash(world, mCachedVelPos, bruteForce, "vel-pos");
+    }
 
     mCachedVelPosDirty = false;
 #ifdef LOG_PERFORMANCE_BACKPROP_SNAPSHOT
@@ -1416,7 +1455,7 @@ void BackpropSnapshot::equalsOrCrash(
     std::string name)
 {
   Eigen::MatrixXd diff = (analytical - bruteForce).cwiseAbs();
-  double threshold = 1e-7;
+  double threshold = 1e-5;
   bool broken = (diff.array() > threshold).any();
   if (broken)
   {
@@ -1424,59 +1463,87 @@ void BackpropSnapshot::equalsOrCrash(
     std::cout << "Analytical:" << std::endl << analytical << std::endl;
     std::cout << "Brute Force:" << std::endl << bruteForce << std::endl;
     std::cout << "Diff:" << std::endl << diff << std::endl;
-    std::cout << "Code to replicate:" << std::endl;
-    std::cout << "--------------------" << std::endl;
-    std::cout << "Eigen::VectorXd brokenPos = Eigen::VectorXd::Zero("
-              << mNumDOFs << ");" << std::endl;
-    std::cout << "brokenPos <<" << std::endl;
-    for (int i = 0; i < mNumDOFs; i++)
-    {
-      std::cout << "  " << mPreStepPosition(i);
-      if (i == mNumDOFs - 1)
-      {
-        std::cout << ";" << std::endl;
-      }
-      else
-      {
-        std::cout << "," << std::endl;
-      }
-    }
-    std::cout << "Eigen::VectorXd brokenVel = Eigen::VectorXd::Zero("
-              << mNumDOFs << ");" << std::endl;
-    std::cout << "brokenVel <<" << std::endl;
-    for (int i = 0; i < mNumDOFs; i++)
-    {
-      std::cout << "  " << mPreStepVelocity(i);
-      if (i == mNumDOFs - 1)
-      {
-        std::cout << ";" << std::endl;
-      }
-      else
-      {
-        std::cout << "," << std::endl;
-      }
-    }
-    std::cout << "Eigen::VectorXd brokenForce = Eigen::VectorXd::Zero("
-              << mNumDOFs << ");" << std::endl;
-    std::cout << "brokenForce <<" << std::endl;
-    for (int i = 0; i < mNumDOFs; i++)
-    {
-      std::cout << "  " << mPreStepTorques(i);
-      if (i == mNumDOFs - 1)
-      {
-        std::cout << ";" << std::endl;
-      }
-      else
-      {
-        std::cout << "," << std::endl;
-      }
-    }
-    std::cout << "world->setPositions(brokenPos);" << std::endl;
-    std::cout << "world->setVelocities(brokenVel);" << std::endl;
-    std::cout << "world->setForces(brokenForce);" << std::endl;
-    std::cout << "--------------------" << std::endl;
+    printReplicationInstructions(world);
     exit(1);
   }
+}
+
+//==============================================================================
+void BackpropSnapshot::printReplicationInstructions(
+    std::shared_ptr<simulation::World> world)
+{
+  std::cout << "Code to replicate:" << std::endl;
+  std::cout << "--------------------" << std::endl;
+  std::cout << "Eigen::VectorXd brokenPos = Eigen::VectorXd::Zero(" << mNumDOFs
+            << ");" << std::endl;
+  std::cout << "brokenPos <<" << std::endl;
+  for (int i = 0; i < mNumDOFs; i++)
+  {
+    std::cout << "  " << mPreStepPosition(i);
+    if (i == mNumDOFs - 1)
+    {
+      std::cout << ";" << std::endl;
+    }
+    else
+    {
+      std::cout << "," << std::endl;
+    }
+  }
+  std::cout << "Eigen::VectorXd brokenVel = Eigen::VectorXd::Zero(" << mNumDOFs
+            << ");" << std::endl;
+  std::cout << "brokenVel <<" << std::endl;
+  for (int i = 0; i < mNumDOFs; i++)
+  {
+    std::cout << "  " << mPreStepVelocity(i);
+    if (i == mNumDOFs - 1)
+    {
+      std::cout << ";" << std::endl;
+    }
+    else
+    {
+      std::cout << "," << std::endl;
+    }
+  }
+  std::cout << "Eigen::VectorXd brokenForce = Eigen::VectorXd::Zero("
+            << mNumDOFs << ");" << std::endl;
+  std::cout << "brokenForce <<" << std::endl;
+  for (int i = 0; i < mNumDOFs; i++)
+  {
+    std::cout << "  " << mPreStepTorques(i);
+    if (i == mNumDOFs - 1)
+    {
+      std::cout << ";" << std::endl;
+    }
+    else
+    {
+      std::cout << "," << std::endl;
+    }
+  }
+  std::cout << "Eigen::VectorXd brokenLCPCache = Eigen::VectorXd::Zero("
+            << mPreStepLCPCache.size() << ");" << std::endl;
+  if (mPreStepLCPCache.size() > 0)
+  {
+    std::cout << "brokenLCPCache <<" << std::endl;
+    for (int i = 0; i < mPreStepLCPCache.size(); i++)
+    {
+      std::cout << "  " << mPreStepLCPCache(i);
+      if (i == mPreStepLCPCache.size() - 1)
+      {
+        std::cout << ";" << std::endl;
+      }
+      else
+      {
+        std::cout << "," << std::endl;
+      }
+    }
+  }
+
+  std::cout << "world->setPositions(brokenPos);" << std::endl;
+  std::cout << "world->setVelocities(brokenVel);" << std::endl;
+  std::cout << "world->setExternalForces(brokenForce);" << std::endl;
+  std::cout << "world->setCachedLCPSolution(brokenLCPCache);" << std::endl;
+
+  std::cout << "--------------------" << std::endl;
 }
 
 //==============================================================================
@@ -1488,6 +1555,18 @@ bool BackpropSnapshot::areResultsStandardized() const
       return false;
   }
   return true;
+}
+
+//==============================================================================
+void BackpropSnapshot::setUseFDOverride(bool fdOverride)
+{
+  mUseFDOverride = fdOverride;
+}
+
+//==============================================================================
+void BackpropSnapshot::setSlowDebugResultsAgainstFD(bool slowDebug)
+{
+  mSlowDebugResultsAgainstFD = slowDebug;
 }
 
 //==============================================================================
@@ -1503,6 +1582,7 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceVelVelJacobian(WorldPtr world)
   world->setPositions(mPreStepPosition);
   world->setVelocities(mPreStepVelocity);
   world->setExternalForces(mPreStepTorques);
+  world->setCachedLCPSolution(mPreStepLCPCache);
   world->step(false);
 
   Eigen::VectorXd originalVel = world->getVelocities();
@@ -1520,13 +1600,14 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceVelVelJacobian(WorldPtr world)
     {
       world->setPositions(mPreStepPosition);
       world->setExternalForces(mPreStepTorques);
+      world->setCachedLCPSolution(mPreStepLCPCache);
       Eigen::VectorXd tweakedVel = Eigen::VectorXd(mPreStepVelocity);
       tweakedVel(i) += epsPos;
       world->setVelocities(tweakedVel);
       std::shared_ptr<neural::BackpropSnapshot> snapshot
           = neural::forwardPass(world, true);
 
-      if (snapshot->areResultsStandardized()
+      if ((!areResultsStandardized() || snapshot->areResultsStandardized())
           && snapshot->getNumClamping() == getNumClamping()
           && snapshot->getNumUpperBound() == getNumUpperBound())
       {
@@ -1543,13 +1624,14 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceVelVelJacobian(WorldPtr world)
     {
       world->setPositions(mPreStepPosition);
       world->setExternalForces(mPreStepTorques);
+      world->setCachedLCPSolution(mPreStepLCPCache);
       Eigen::VectorXd tweakedVel = Eigen::VectorXd(mPreStepVelocity);
       tweakedVel(i) -= epsNeg;
       world->setVelocities(tweakedVel);
       std::shared_ptr<neural::BackpropSnapshot> snapshot
           = neural::forwardPass(world, true);
 
-      if (snapshot->areResultsStandardized()
+      if ((!areResultsStandardized() || snapshot->areResultsStandardized())
           && snapshot->getNumClamping() == getNumClamping()
           && snapshot->getNumUpperBound() == getNumUpperBound())
       {
@@ -1579,6 +1661,7 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceVelVelJacobian(WorldPtr world)
       snapshot.restore();
       world->setPositions(mPreStepPosition);
       world->setExternalForces(mPreStepTorques);
+      world->setCachedLCPSolution(mPreStepLCPCache);
       tweakedVel = Eigen::VectorXd(mPreStepVelocity);
       tweakedVel(i) -= EPSILON;
       world->setVelocities(tweakedVel);
@@ -1619,6 +1702,7 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferencePosVelJacobian(
   world->setPositions(mPreStepPosition);
   world->setVelocities(mPreStepVelocity);
   world->setExternalForces(mPreStepTorques);
+  world->setCachedLCPSolution(mPreStepLCPCache);
 
   world->step(false);
 
@@ -1637,13 +1721,14 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferencePosVelJacobian(
     {
       // Get predicted next vel
       world->setExternalForces(mPreStepTorques);
+      world->setCachedLCPSolution(mPreStepLCPCache);
       world->setVelocities(mPreStepVelocity);
       Eigen::VectorXd tweakedPos = Eigen::VectorXd(mPreStepPosition);
       tweakedPos(i) += epsPos;
       world->setPositions(tweakedPos);
 
       BackpropSnapshotPtr ptr = neural::forwardPass(world, true);
-      if (ptr->areResultsStandardized()
+      if ((!areResultsStandardized() || ptr->areResultsStandardized())
           && ptr->getNumClamping() == getNumClamping()
           && ptr->getNumUpperBound() == getNumUpperBound())
       {
@@ -1652,6 +1737,12 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferencePosVelJacobian(
       }
       epsPos *= 0.5;
 
+      if (std::abs(epsPos) <= 1e-20)
+      {
+        std::cout << "Found a non-differentiabe point in getting pos-vel Jac:"
+                  << std::endl;
+        printReplicationInstructions(world);
+      }
       assert(std::abs(epsPos) > 1e-20);
     }
 
@@ -1660,13 +1751,14 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferencePosVelJacobian(
     {
       // Get predicted next vel
       world->setExternalForces(mPreStepTorques);
+      world->setCachedLCPSolution(mPreStepLCPCache);
       world->setVelocities(mPreStepVelocity);
       Eigen::VectorXd tweakedPos = Eigen::VectorXd(mPreStepPosition);
       tweakedPos(i) -= epsNeg;
       world->setPositions(tweakedPos);
 
       BackpropSnapshotPtr ptr = neural::forwardPass(world, true);
-      if (ptr->areResultsStandardized()
+      if ((!areResultsStandardized() || ptr->areResultsStandardized())
           && ptr->getNumClamping() == getNumClamping()
           && ptr->getNumUpperBound() == getNumUpperBound())
       {
@@ -1675,6 +1767,12 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferencePosVelJacobian(
       }
       epsNeg *= 0.5;
 
+      if (std::abs(epsNeg) <= 1e-20)
+      {
+        std::cout << "Found a non-differentiabe point in getting pos-vel Jac:"
+                  << std::endl;
+        printReplicationInstructions(world);
+      }
       assert(std::abs(epsNeg) > 1e-20);
     }
 
@@ -1704,6 +1802,7 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceForceVelJacobian(
   world->setPositions(mPreStepPosition);
   world->setVelocities(mPreStepVelocity);
   world->setExternalForces(mPreStepTorques);
+  world->setCachedLCPSolution(mPreStepLCPCache);
   world->step(false);
 
   Eigen::VectorXd originalForces = world->getExternalForces();
@@ -1723,6 +1822,7 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceForceVelJacobian(
       // Get predicted next vel
       world->setPositions(mPreStepPosition);
       world->setVelocities(mPreStepVelocity);
+      world->setCachedLCPSolution(mPreStepLCPCache);
       Eigen::VectorXd tweakedForces = Eigen::VectorXd(mPreStepTorques);
       tweakedForces(i) += epsPos;
       world->setExternalForces(tweakedForces);
@@ -1731,7 +1831,7 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceForceVelJacobian(
 
       BackpropSnapshotPtr ptr = neural::forwardPass(world, true);
       Eigen::VectorXd afterV = world->getVelocities();
-      if (ptr->areResultsStandardized()
+      if ((!areResultsStandardized() || ptr->areResultsStandardized())
           && ptr->getNumClamping() == getNumClamping()
           && ptr->getNumUpperBound() == getNumUpperBound())
       {
@@ -1749,6 +1849,7 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceForceVelJacobian(
       // Get predicted next vel
       world->setPositions(mPreStepPosition);
       world->setVelocities(mPreStepVelocity);
+      world->setCachedLCPSolution(mPreStepLCPCache);
       Eigen::VectorXd tweakedForces = Eigen::VectorXd(mPreStepTorques);
       tweakedForces(i) -= epsNeg;
       world->setExternalForces(tweakedForces);
@@ -1756,7 +1857,7 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceForceVelJacobian(
       Eigen::VectorXd nextV = getAnalyticalNextV(world);
 
       BackpropSnapshotPtr ptr = neural::forwardPass(world, true);
-      if (ptr->areResultsStandardized()
+      if ((!areResultsStandardized() || ptr->areResultsStandardized())
           && ptr->getNumClamping() == getNumClamping()
           && ptr->getNumUpperBound() == getNumUpperBound())
       {
@@ -1811,21 +1912,22 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceMassVelJacobian(
 {
   RestorableSnapshot snapshot(world);
 
-  Eigen::MatrixXd J(mNumDOFs, mNumDOFs);
-
   bool oldGradientEnabled = world->getConstraintSolver()->getGradientEnabled();
   // world->getConstraintSolver()->setGradientEnabled(false);
 
   world->setPositions(mPreStepPosition);
   world->setVelocities(mPreStepVelocity);
   world->setExternalForces(mPreStepTorques);
+  world->setCachedLCPSolution(mPreStepLCPCache);
   world->step(false);
 
   Eigen::VectorXd originalMass = world->getWrtMass()->get(world.get());
   Eigen::VectorXd originalVel = world->getVelocities();
 
+  Eigen::MatrixXd J(mNumDOFs, originalMass.size());
+
   double EPSILON = 1e-7;
-  for (std::size_t i = 0; i < world->getNumDofs(); i++)
+  for (std::size_t i = 0; i < originalMass.size(); i++)
   {
     snapshot.restore();
 
@@ -1864,6 +1966,7 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferencePosPosJacobian(
   world->setPositions(mPreStepPosition);
   world->setVelocities(mPreStepVelocity);
   world->setExternalForces(mPreStepTorques);
+  world->setCachedLCPSolution(mPreStepLCPCache);
 
   for (std::size_t j = 0; j < subdivisions; j++)
     world->step(false);
@@ -1879,6 +1982,7 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferencePosPosJacobian(
 
     world->setVelocities(mPreStepVelocity);
     world->setExternalForces(mPreStepTorques);
+    world->setCachedLCPSolution(mPreStepLCPCache);
 
     Eigen::VectorXd tweakedPositions = Eigen::VectorXd(mPreStepPosition);
     tweakedPositions(i) += EPSILON;
@@ -1915,6 +2019,7 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceVelPosJacobian(
   world->setPositions(mPreStepPosition);
   world->setVelocities(mPreStepVelocity);
   world->setExternalForces(mPreStepTorques);
+  world->setCachedLCPSolution(mPreStepLCPCache);
 
   for (std::size_t j = 0; j < subdivisions; j++)
     world->step(false);
@@ -1928,6 +2033,7 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceVelPosJacobian(
 
     world->setPositions(mPreStepPosition);
     world->setExternalForces(mPreStepTorques);
+    world->setCachedLCPSolution(mPreStepLCPCache);
 
     Eigen::VectorXd tweakedVelocity = Eigen::VectorXd(mPreStepVelocity);
     tweakedVelocity(i) += EPSILON;
@@ -1967,6 +2073,7 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceVelJacobianWrt(
   world->setPositions(mPreStepPosition);
   world->setVelocities(mPreStepVelocity);
   world->setExternalForces(mPreStepTorques);
+  world->setCachedLCPSolution(mPreStepLCPCache);
   world->step(false);
 
   Eigen::VectorXd originalVel = world->getVelocities();
@@ -2014,24 +2121,37 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferencePosJacobianWrt(
   world->setPositions(mPreStepPosition);
   world->setVelocities(mPreStepVelocity);
   world->setExternalForces(mPreStepTorques);
+  world->setCachedLCPSolution(mPreStepLCPCache);
   world->step(false);
 
   Eigen::VectorXd originalPos = world->getPositions();
 
-  double EPSILON = 1e-7;
+  double EPSILON = 1e-6;
   for (std::size_t i = 0; i < wrtDim; i++)
   {
     snapshot.restore();
-
     world->setPositions(mPreStepPosition);
     world->setVelocities(mPreStepVelocity);
+    world->setExternalForces(mPreStepTorques);
+    world->setCachedLCPSolution(mPreStepLCPCache);
     Eigen::VectorXd tweakedWrt = Eigen::VectorXd(originalWrt);
     tweakedWrt(i) += EPSILON;
     wrt->set(world.get(), tweakedWrt);
-
     world->step(false);
+    Eigen::VectorXd pos = world->getPositions();
 
-    Eigen::VectorXd posChange = (world->getPositions() - originalPos) / EPSILON;
+    snapshot.restore();
+    world->setPositions(mPreStepPosition);
+    world->setVelocities(mPreStepVelocity);
+    world->setExternalForces(mPreStepTorques);
+    world->setCachedLCPSolution(mPreStepLCPCache);
+    tweakedWrt = Eigen::VectorXd(originalWrt);
+    tweakedWrt(i) -= EPSILON;
+    wrt->set(world.get(), tweakedWrt);
+    world->step(false);
+    Eigen::VectorXd neg = world->getPositions();
+
+    Eigen::VectorXd posChange = (pos - neg) / (2 * EPSILON);
     J.col(i).noalias() = posChange;
   }
 
@@ -2191,6 +2311,7 @@ Eigen::MatrixXd BackpropSnapshot::getJacobianOfConstraintForce(
   world->setPositions(mPreStepPosition);
   world->setVelocities(mPreStepVelocity);
   world->setExternalForces(mPreStepTorques);
+  world->setCachedLCPSolution(mPreStepLCPCache);
 
   Eigen::MatrixXd Minv = getInvMassMatrix(world);
   Eigen::MatrixXd A_c_ub_E = A_c + A_ub * E;
@@ -2236,6 +2357,7 @@ BackpropSnapshot::getJacobianOfLCPConstraintMatrixClampingSubset(
   world->setPositions(mPreStepPosition);
   world->setVelocities(mPreStepVelocity);
   world->setExternalForces(mPreStepTorques);
+  world->setCachedLCPSolution(mPreStepLCPCache);
 
   Eigen::MatrixXd A_ub = getUpperBoundConstraintMatrix(world);
   Eigen::MatrixXd E = getUpperBoundMappingMatrix();
@@ -2375,6 +2497,7 @@ BackpropSnapshot::finiteDifferenceJacobianOfLCPConstraintMatrixClampingSubset(
   world->setPositions(mPreStepPosition);
   world->setVelocities(mPreStepVelocity);
   world->setExternalForces(mPreStepTorques);
+  world->setCachedLCPSolution(mPreStepLCPCache);
 
   const double EPS = 5e-7;
   Eigen::VectorXd original = wrt->get(world.get());
@@ -2432,6 +2555,7 @@ Eigen::MatrixXd BackpropSnapshot::getJacobianOfLCPOffsetClampingSubset(
   world->setPositions(mPreStepPosition);
   world->setVelocities(mPreStepVelocity);
   world->setExternalForces(mPreStepTorques);
+  world->setCachedLCPSolution(mPreStepLCPCache);
 
   double dt = world->getTimeStep();
   Eigen::MatrixXd Minv = getInvMassMatrix(world);
@@ -2484,6 +2608,7 @@ BackpropSnapshot::finiteDifferenceJacobianOfLCPOffsetClampingSubset(
   world->setPositions(mPreStepPosition);
   world->setVelocities(mPreStepVelocity);
   world->setExternalForces(mPreStepTorques);
+  world->setCachedLCPSolution(mPreStepLCPCache);
 
   int wrtDim = wrt->dim(world.get());
   Eigen::MatrixXd jac = Eigen::MatrixXd::Zero(mNumClamping, wrtDim);
@@ -2554,6 +2679,7 @@ BackpropSnapshot::finiteDifferenceJacobianOfLCPEstimatedOffsetClampingSubset(
   world->setPositions(mPreStepPosition);
   world->setVelocities(mPreStepVelocity);
   world->setExternalForces(mPreStepTorques);
+  world->setCachedLCPSolution(mPreStepLCPCache);
 
   const double EPS = 1e-8;
   Eigen::VectorXd original = wrt->get(world.get());
@@ -2854,6 +2980,7 @@ Eigen::MatrixXd BackpropSnapshot::getClampingConstraintMatrixAt(
   world->setPositions(pos);
   world->setVelocities(mPreStepVelocity);
   world->setExternalForces(mPreStepTorques);
+  world->setCachedLCPSolution(mPreStepLCPCache);
 
   BackpropSnapshotPtr ptr = neural::forwardPass(world, true);
 
@@ -2873,6 +3000,7 @@ Eigen::MatrixXd BackpropSnapshot::getUpperBoundConstraintMatrixAt(
   world->setPositions(pos);
   world->setVelocities(mPreStepVelocity);
   world->setExternalForces(mPreStepTorques);
+  world->setCachedLCPSolution(mPreStepLCPCache);
 
   BackpropSnapshotPtr ptr = neural::forwardPass(world, true);
 
@@ -2891,6 +3019,7 @@ Eigen::MatrixXd BackpropSnapshot::getUpperBoundMappingMatrixAt(
   world->setPositions(pos);
   world->setVelocities(mPreStepVelocity);
   world->setExternalForces(mPreStepTorques);
+  world->setCachedLCPSolution(mPreStepLCPCache);
 
   BackpropSnapshotPtr ptr = neural::forwardPass(world, true);
 
@@ -2909,6 +3038,7 @@ Eigen::VectorXd BackpropSnapshot::getBounceDiagonalsAt(
   world->setPositions(pos);
   world->setVelocities(mPreStepVelocity);
   world->setExternalForces(mPreStepTorques);
+  world->setCachedLCPSolution(mPreStepLCPCache);
 
   BackpropSnapshotPtr ptr = neural::forwardPass(world, true);
 
@@ -2927,6 +3057,7 @@ Eigen::MatrixXd BackpropSnapshot::getJacobianOfClampingConstraints(
   world->setPositions(mPreStepPosition);
   world->setVelocities(mPreStepVelocity);
   world->setExternalForces(mPreStepTorques);
+  world->setCachedLCPSolution(mPreStepLCPCache);
 
   std::vector<std::shared_ptr<DifferentiableContactConstraint>> constraints
       = getClampingConstraints();
@@ -2952,6 +3083,7 @@ Eigen::MatrixXd BackpropSnapshot::getJacobianOfClampingConstraintsTranspose(
   world->setPositions(mPreStepPosition);
   world->setVelocities(mPreStepVelocity);
   world->setExternalForces(mPreStepTorques);
+  world->setCachedLCPSolution(mPreStepLCPCache);
 
   std::vector<std::shared_ptr<DifferentiableContactConstraint>> constraints
       = getClampingConstraints();
@@ -3041,6 +3173,7 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceJacobianOfClampingConstraints(
   world->setPositions(mPreStepPosition);
   world->setVelocities(mPreStepVelocity);
   world->setExternalForces(mPreStepTorques);
+  world->setCachedLCPSolution(mPreStepLCPCache);
 
   Eigen::VectorXd original = getClampingConstraintMatrix(world) * f0;
   Eigen::MatrixXd originalA_c = getClampingConstraintMatrix(world);
@@ -3063,6 +3196,7 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceJacobianOfClampingConstraints(
       world->setPositions(perturbed);
       world->setVelocities(mPreStepVelocity);
       world->setExternalForces(mPreStepTorques);
+      world->setCachedLCPSolution(mPreStepLCPCache);
 
       BackpropSnapshotPtr ptr = neural::forwardPass(world, true);
       Eigen::MatrixXd perturbedA_c = ptr->getClampingConstraintMatrix(world);
@@ -3100,6 +3234,7 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceJacobianOfClampingConstraints(
       world->setPositions(perturbed);
       world->setVelocities(mPreStepVelocity);
       world->setExternalForces(mPreStepTorques);
+      world->setCachedLCPSolution(mPreStepLCPCache);
 
       BackpropSnapshotPtr ptr = neural::forwardPass(world, true);
       Eigen::MatrixXd perturbedA_c = ptr->getClampingConstraintMatrix(world);
@@ -3147,6 +3282,7 @@ BackpropSnapshot::finiteDifferenceJacobianOfClampingConstraintsTranspose(
   world->setPositions(mPreStepPosition);
   world->setVelocities(mPreStepVelocity);
   world->setExternalForces(mPreStepTorques);
+  world->setCachedLCPSolution(mPreStepLCPCache);
 
   Eigen::VectorXd original
       = getClampingConstraintMatrix(world).transpose() * v0;
@@ -3170,6 +3306,7 @@ BackpropSnapshot::finiteDifferenceJacobianOfClampingConstraintsTranspose(
       world->setPositions(perturbed);
       world->setVelocities(mPreStepVelocity);
       world->setExternalForces(mPreStepTorques);
+      world->setCachedLCPSolution(mPreStepLCPCache);
 
       BackpropSnapshotPtr ptr = neural::forwardPass(world, true);
       perturbedResultPos
@@ -3194,6 +3331,7 @@ BackpropSnapshot::finiteDifferenceJacobianOfClampingConstraintsTranspose(
       world->setPositions(perturbed);
       world->setVelocities(mPreStepVelocity);
       world->setExternalForces(mPreStepTorques);
+      world->setCachedLCPSolution(mPreStepLCPCache);
 
       BackpropSnapshotPtr ptr = neural::forwardPass(world, true);
       perturbedResultNeg
@@ -3231,6 +3369,7 @@ BackpropSnapshot::finiteDifferenceJacobianOfUpperBoundConstraints(
   world->setPositions(mPreStepPosition);
   world->setVelocities(mPreStepVelocity);
   world->setExternalForces(mPreStepTorques);
+  world->setCachedLCPSolution(mPreStepLCPCache);
 
   Eigen::MatrixXd A_ub = getUpperBoundConstraintMatrix(world);
   /*
@@ -3254,6 +3393,7 @@ BackpropSnapshot::finiteDifferenceJacobianOfUpperBoundConstraints(
     world->setPositions(perturbed);
     world->setVelocities(mPreStepVelocity);
     world->setExternalForces(mPreStepTorques);
+    world->setCachedLCPSolution(mPreStepLCPCache);
 
     BackpropSnapshotPtr ptr = neural::forwardPass(world, true);
     Eigen::VectorXd perturbedResultPos
@@ -3264,6 +3404,7 @@ BackpropSnapshot::finiteDifferenceJacobianOfUpperBoundConstraints(
     world->setPositions(perturbed);
     world->setVelocities(mPreStepVelocity);
     world->setExternalForces(mPreStepTorques);
+    world->setCachedLCPSolution(mPreStepLCPCache);
 
     ptr = neural::forwardPass(world, true);
     Eigen::VectorXd perturbedResultNeg
@@ -3475,6 +3616,7 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceJacobianOfConstraintForce(
   world->setPositions(mPreStepPosition);
   world->setVelocities(mPreStepVelocity);
   world->setExternalForces(mPreStepTorques);
+  world->setCachedLCPSolution(mPreStepLCPCache);
 
   bool oldPenetrationCorrection = world->getPenetrationCorrectionEnabled();
   world->setPenetrationCorrectionEnabled(false);
@@ -3510,7 +3652,8 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceJacobianOfConstraintForce(
       BackpropSnapshotPtr perturbedPtr = neural::forwardPass(world, true);
       if (perturbedPtr->getNumClamping() == f0.size()
           && perturbedPtr->getNumUpperBound() == originalPtr->getNumUpperBound()
-          && perturbedPtr->areResultsStandardized())
+          && (!areResultsStandardized()
+              || perturbedPtr->areResultsStandardized()))
       {
         fPlus = perturbedPtr->getClampingConstraintImpulses();
         break;
@@ -3551,7 +3694,8 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceJacobianOfConstraintForce(
       BackpropSnapshotPtr perturbedPtr = neural::forwardPass(world, true);
       if (perturbedPtr->getNumClamping() == f0.size()
           && perturbedPtr->getNumUpperBound() == originalPtr->getNumUpperBound()
-          && perturbedPtr->areResultsStandardized())
+          && (!areResultsStandardized()
+              || perturbedPtr->areResultsStandardized()))
       {
         fMinus = perturbedPtr->getClampingConstraintImpulses();
         break;

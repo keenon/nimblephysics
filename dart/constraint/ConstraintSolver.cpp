@@ -440,6 +440,19 @@ bool ConstraintSolver::getConstraintForceMixingEnabled()
 }
 
 //==============================================================================
+Eigen::VectorXd ConstraintSolver::getCachedLCPSolution()
+{
+  assert(false && "You should never call getCachedLCPSolution() on the root ConstraintSolver, only on BoxedLCPConstraintSolver!");
+  return Eigen::VectorXd::Zero(0);
+}
+
+//==============================================================================
+void ConstraintSolver::setCachedLCPSolution(Eigen::VectorXd X)
+{
+  assert(false && "You should never call setCachedLCPSolution() on the root ConstraintSolver, only on BoxedLCPConstraintSolver!");
+}
+
+//==============================================================================
 bool ConstraintSolver::containSkeleton(const ConstSkeletonPtr& _skeleton) const
 {
   assert(

@@ -429,6 +429,18 @@ void World(py::module& m)
       .def("toJson", &dart::simulation::World::toJson)
       .def("positionsToJson", &dart::simulation::World::positionsToJson)
       .def("colorsToJson", &dart::simulation::World::colorsToJson)
+      .def(
+          "setUseFDOverride",
+          &dart::simulation::World::setUseFDOverride,
+          ::py::arg("useFDOverride"))
+      .def("getUseFDOverride", &dart::simulation::World::getUseFDOverride)
+      .def(
+          "setSlowDebugResultsAgainstFD",
+          &dart::simulation::World::setSlowDebugResultsAgainstFD,
+          ::py::arg("setSlowDebugResultsAgainstFD"))
+      .def(
+          "setSlowDebugResultsAgainstFD",
+          &dart::simulation::World::setSlowDebugResultsAgainstFD)
       .def_readonly("onNameChanged", &dart::simulation::World::onNameChanged);
 }
 

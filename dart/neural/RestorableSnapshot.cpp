@@ -20,6 +20,7 @@ RestorableSnapshot::RestorableSnapshot(std::shared_ptr<World> world)
     mSkeletonConfigurations.push_back(world->getSkeleton(i)->getConfiguration(
         Skeleton::ConfigFlags::CONFIG_ALL));
   }
+  mLCPCache = world->getCachedLCPSolution();
 }
 
 void RestorableSnapshot::restore()
@@ -28,6 +29,7 @@ void RestorableSnapshot::restore()
   {
     mWorld->getSkeleton(i)->setConfiguration(mSkeletonConfigurations[i]);
   }
+  mWorld->setCachedLCPSolution(mLCPCache);
 }
 
 } // namespace neural

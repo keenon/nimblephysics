@@ -30,7 +30,10 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <functional>
+
 #include <dart/trajectory/IPOptOptimizer.hpp>
+#include <dart/trajectory/Problem.hpp>
 #include <pybind11/eigen.h>
 #include <pybind11/functional.h>
 #include <pybind11/pybind11.h>
@@ -97,7 +100,37 @@ void IPOptOptimizer(py::module& m)
           ::py::arg("recordIterations") = true)
       .def(
           "registerIntermediateCallback",
-          &dart::trajectory::IPOptOptimizer::registerIntermediateCallback,
+          +[](dart::trajectory::IPOptOptimizer* self,
+              std::function<bool(
+                  dart::trajectory::Problem * problem,
+                  int,
+                  double primal,
+                  double dual)> callback) -> void {
+            std::function<bool(
+                dart::trajectory::Problem * problem,
+                int,
+                double primal,
+                double dual)>
+                wrappedCallback = [callback](
+                                      dart::trajectory::Problem* problem,
+                                      int step,
+                                      double primal,
+                                      double dual) {
+                  try
+                  {
+                    return callback(problem, step, primal, dual);
+                  }
+                  catch (::py::error_already_set& e)
+                  {
+                    std::cout << "DiffDART caught an exception calling "
+                                 "callback from registerIntermediateCallback():"
+                              << std::endl
+                              << std::string(e.what()) << std::endl;
+                    return true;
+                  }
+                };
+            self->registerIntermediateCallback(wrappedCallback);
+          },
           ::py::arg("callback"));
 }
 

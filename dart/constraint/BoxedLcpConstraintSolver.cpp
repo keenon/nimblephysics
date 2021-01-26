@@ -76,7 +76,11 @@ BoxedLcpConstraintSolver::BoxedLcpConstraintSolver(
   : BoxedLcpConstraintSolver(
       std::move(boxedLcpSolver), std::make_shared<PgsBoxedLcpSolver>())
 {
-  // Do nothing
+  // Set the PGS options to be more accurate and tolerant than usual, to try
+  // really hard to avoid returning no solution.
+  PgsBoxedLcpSolver* solver
+      = static_cast<PgsBoxedLcpSolver*>(mSecondaryBoxedLcpSolver.get());
+  solver->setOption(PgsBoxedLcpSolver::Option(10000, 1e-10, 1e-8, 1e-8, false));
 }
 
 //==============================================================================
@@ -162,6 +166,22 @@ ConstBoxedLcpSolverPtr BoxedLcpConstraintSolver::getSecondaryBoxedLcpSolver()
     const
 {
   return mSecondaryBoxedLcpSolver;
+}
+
+/// This gets the cached LCP solution, which is useful to be able to get/set
+/// because it can effect the forward solutions of physics problems because of
+/// our optimistic LCP-stabilization-to-acceptance approach.
+Eigen::VectorXd BoxedLcpConstraintSolver::getCachedLCPSolution()
+{
+  return mX;
+}
+
+/// This gets the cached LCP solution, which is useful to be able to get/set
+/// because it can effect the forward solutions of physics problems because of
+/// our optimistic LCP-stabilization-to-acceptance approach.
+void BoxedLcpConstraintSolver::setCachedLCPSolution(Eigen::VectorXd X)
+{
+  mX = X;
 }
 
 //==============================================================================
@@ -307,6 +327,19 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(
     constraint->unexcite();
   }
 
+  /*
+  // TODO: The documentation for the LCP solver says to set LCP indices to
+  // themselves for normal forces, not -1. So let's try that and see what
+  // happens...
+  for (int i = 0; i < mFIndex.size(); i++)
+  {
+    if (mFIndex(i) == -1)
+    {
+      mFIndex(i) = i;
+    }
+  }
+  */
+
   assert(isSymmetric(n, mA.data()));
 
   // Print LCP formulation
@@ -400,6 +433,22 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(
         mHi.data(),
         mFIndex.data(),
         earlyTermination);
+
+    if (success)
+    {
+      // Double check if the LCP solution is valid. The ODE solver can sometimes
+      // return invalid solutions with success=true >:(
+      if (!math::isLCPSolutionValid(
+              aGradientBackup,
+              mX,
+              mBBackup,
+              mHiBackup,
+              mLoBackup,
+              mFIndexBackup))
+      {
+        success = false;
+      }
+    }
   }
 
   // Sanity check. LCP solvers should not report success with nan values, but
@@ -409,7 +458,7 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(
 
   if (!success && mSecondaryBoxedLcpSolver)
   {
-    mSecondaryBoxedLcpSolver->solve(
+    success = mSecondaryBoxedLcpSolver->solve(
         n,
         mABackup.data(),
         mXBackup.data(),
@@ -420,6 +469,18 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(
         mFIndexBackup.data(),
         false);
     mX = mXBackup;
+    if (!math::isLCPSolutionValid(
+            aGradientBackup,
+            mX,
+            bGradientBackup,
+            hiGradientBackup,
+            loGradientBackup,
+            fIndexGradientBackup))
+    {
+      assert(
+          false
+          && "Both Dantzig and PGS failed to produce a valid LCP solution");
+    }
   }
 
   if (mX.hasNaN())
@@ -476,6 +537,11 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(
     {
       mX = group.getGradientConstraintMatrices()
                ->getContactConstraintImpluses();
+    }
+    else
+    {
+      // assert(false && "Despite a valid LCP solution, we were unable to
+      // standardize our results.");
     }
   }
 

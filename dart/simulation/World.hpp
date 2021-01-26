@@ -470,7 +470,43 @@ public:
   /// already have the original world loaded. Good for real-time viewing.
   std::string colorsToJson();
 
+  /// This gets the cached LCP solution, which is useful to be able to get/set
+  /// because it can effect the forward solutions of physics problems because of
+  /// our optimistic LCP-stabilization-to-acceptance approach.
+  Eigen::VectorXd getCachedLCPSolution();
+
+  /// This gets the cached LCP solution, which is useful to be able to get/set
+  /// because it can effect the forward solutions of physics problems because of
+  /// our optimistic LCP-stabilization-to-acceptance approach.
+  void setCachedLCPSolution(Eigen::VectorXd X);
+
+  /// If this is true, we use finite-differencing to compute all of the
+  /// requested Jacobians. This override can be useful to verify if there's a
+  /// bug in the analytical Jacobians that's causing learning to not converge.
+  void setUseFDOverride(bool override);
+
+  bool getUseFDOverride();
+
+  /// If this is true, we check all Jacobians against their finite-differencing
+  /// counterparts at runtime. If they aren't sufficiently close, we immediately
+  /// crash the program and print what went wrong and some simple replication
+  /// instructions.
+  void setSlowDebugResultsAgainstFD(bool slowDebug);
+
+  bool getSlowDebugResultsAgainstFD();
+
 protected:
+  /// If this is true, we use finite-differencing to compute all of the
+  /// requested Jacobians. This override can be useful to verify if there's a
+  /// bug in the analytical Jacobians that's causing learning to not converge.
+  bool mUseFDOverride;
+
+  /// If this is true, we check all Jacobians against their finite-differencing
+  /// counterparts at runtime. If they aren't sufficiently close, we immediately
+  /// crash the program and print what went wrong and some simple replication
+  /// instructions.
+  bool mSlowDebugResultsAgainstFD;
+
   /// Register when a Skeleton's name is changed
   void handleSkeletonNameChange(
       const dynamics::ConstMetaSkeletonPtr& _skeleton);

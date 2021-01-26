@@ -102,6 +102,16 @@ public:
   /// failed
   ConstBoxedLcpSolverPtr getSecondaryBoxedLcpSolver() const;
 
+  /// This gets the cached LCP solution, which is useful to be able to get/set
+  /// because it can effect the forward solutions of physics problems because of
+  /// our optimistic LCP-stabilization-to-acceptance approach.
+  virtual Eigen::VectorXd getCachedLCPSolution() override;
+
+  /// This gets the cached LCP solution, which is useful to be able to get/set
+  /// because it can effect the forward solutions of physics problems because of
+  /// our optimistic LCP-stabilization-to-acceptance approach.
+  virtual void setCachedLCPSolution(Eigen::VectorXd X) override;
+
 protected:
   // Documentation inherited.
   void solveConstrainedGroup(

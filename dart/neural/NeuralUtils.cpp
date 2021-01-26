@@ -36,6 +36,7 @@ std::shared_ptr<BackpropSnapshot> forwardPass(
   Eigen::VectorXd preStepPosition = world->getPositions();
   Eigen::VectorXd preStepVelocity = world->getVelocities();
   Eigen::VectorXd preStepTorques = world->getExternalForces();
+  Eigen::VectorXd preStepLCPCache = world->getCachedLCPSolution();
 
   // Set the gradient mode we're going to use to calculate gradients
   bool oldGradientEnabled = world->getConstraintSolver()->getGradientEnabled();
@@ -55,7 +56,8 @@ std::shared_ptr<BackpropSnapshot> forwardPass(
           preStepPosition,
           preStepVelocity,
           preStepTorques,
-          world->getLastPreConstraintVelocity());
+          world->getLastPreConstraintVelocity(),
+          preStepLCPCache);
 
   if (idempotent)
     restorableSnapshot->restore();
@@ -82,6 +84,7 @@ std::shared_ptr<MappedBackpropSnapshot> mappedForwardPass(
   Eigen::VectorXd preStepPosition = world->getPositions();
   Eigen::VectorXd preStepVelocity = world->getVelocities();
   Eigen::VectorXd preStepTorques = world->getExternalForces();
+  Eigen::VectorXd preStepLCPCache = world->getCachedLCPSolution();
 
   // Record the Jacobians for mapping out from mapped space to world space
   // pre-step
@@ -110,7 +113,8 @@ std::shared_ptr<MappedBackpropSnapshot> mappedForwardPass(
           preStepPosition,
           preStepVelocity,
           preStepTorques,
-          world->getLastPreConstraintVelocity());
+          world->getLastPreConstraintVelocity(),
+          preStepLCPCache);
 
   // Record the Jacobians for mapping out from mapped space to world space
   // pre-step

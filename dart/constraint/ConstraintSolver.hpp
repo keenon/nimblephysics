@@ -210,6 +210,16 @@ public:
 
   bool getConstraintForceMixingEnabled();
 
+  /// This gets the cached LCP solution, which is useful to be able to get/set
+  /// because it can effect the forward solutions of physics problems because of
+  /// our optimistic LCP-stabilization-to-acceptance approach.
+  virtual Eigen::VectorXd getCachedLCPSolution();
+
+  /// This gets the cached LCP solution, which is useful to be able to get/set
+  /// because it can effect the forward solutions of physics problems because of
+  /// our optimistic LCP-stabilization-to-acceptance approach.
+  virtual void setCachedLCPSolution(Eigen::VectorXd X);
+
 protected:
   // TODO(JS): Docstring
   virtual void solveConstrainedGroup(

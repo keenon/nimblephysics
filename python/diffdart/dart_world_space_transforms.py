@@ -47,7 +47,7 @@ class DartTransformToWorldSpaceLayer(torch.autograd.Function):
         space: dart.neural.ConvertToSpace = ctx.space
         is_vector: bool = ctx.is_vector
         gradient = dart.neural.convertJointSpaceToWorldSpace(
-            world, grad_world_pos, nodes, space, backprop=True, useIK=True)
+            world, grad_world_pos.detch().numpy(), nodes, space, backprop=True, useIK=True)
 
         # Normalize by column and multiply by 1e-2, to stabilize learning
         gradient = (gradient / abs(gradient.max(0)[0])) * 1e-2

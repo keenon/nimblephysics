@@ -253,6 +253,14 @@ bool hasTinySingularValues(
 Eigen::MatrixXd clippedSingularsPinv(
     const Eigen::MatrixXd& J, double clippingThreshold = 1e-4);
 
+bool isLCPSolutionValid(
+    const Eigen::MatrixXd& mA,
+    const Eigen::VectorXd& mX,
+    const Eigen::VectorXd& mB,
+    const Eigen::VectorXd& mHi,
+    const Eigen::VectorXd& mLo,
+    const Eigen::VectorXi& mFIndex);
+
 //------------------------------------------------------------------------------
 /// \brief Rectify the rotation part so as that it satifies the orthogonality
 /// condition.
