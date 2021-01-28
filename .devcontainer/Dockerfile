@@ -26,3 +26,8 @@ RUN ${PYTHON} -m pip install pytest
 RUN ${PYTHON} -m pip install auditwheel
 RUN git clone https://github.com/keenon/diffdart
 RUN cd diffdart
+
+# Install some extra tools that we don't typically need in CI, but are nice in development
+RUN yum install -y gdb
+RUN curl -sL https://rpm.nodesource.com/setup_10.x | bash -
+RUN yum install -y nodejs
