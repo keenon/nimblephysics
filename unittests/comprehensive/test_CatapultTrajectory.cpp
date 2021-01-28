@@ -67,7 +67,9 @@
 #include "dart/utils/sdf/sdf.hpp"
 #include "dart/utils/urdf/urdf.hpp"
 
+#include "GradientTestUtils.hpp"
 #include "TestHelpers.hpp"
+#include "TrajectoryTestUtils.hpp"
 #include "stdio.h"
 
 // #define ALL_TESTS
@@ -286,8 +288,7 @@ BodyNode* createTailSegment(BodyNode* parent, Eigen::Vector3d color)
   return pole;
 }
 
-// #ifdef ALL_TESTS
-TEST(CATAPULT_EXAMPLE, FULL_TEST)
+std::shared_ptr<simulation::World> createWorld(double target_x, double target_y)
 {
   // Create a world
   std::shared_ptr<simulation::World> world = simulation::World::create();
@@ -368,9 +369,6 @@ TEST(CATAPULT_EXAMPLE, FULL_TEST)
 
   // Create target
 
-  double target_x = 2.2;
-  double target_y = 2.2;
-
   SkeletonPtr target = Skeleton::create("target");
   std::pair<WeldJoint*, BodyNode*> targetJointPair
       = target->createJointAndBodyNodePair<WeldJoint>(nullptr);
@@ -388,7 +386,151 @@ TEST(CATAPULT_EXAMPLE, FULL_TEST)
 
   world->addSkeleton(target);
 
-  trajectory::LossFn loss(
+  return world;
+}
+
+#ifdef ALL_TESTS
+TEST(CATAPULT_EXAMPLE, BROKEN_POINT)
+{
+  double target_x = 2.2;
+  double target_y = 2.2;
+
+  // Create a world
+  std::shared_ptr<simulation::World> world = createWorld(target_x, target_y);
+
+  /*
+  Eigen::VectorXd brokenPos = Eigen::VectorXd::Zero(5);
+  brokenPos << -7.4747, 9.43449, 2.12166, 2.98394, 2.34673;
+  Eigen::VectorXd brokenVel = Eigen::VectorXd::Zero(5);
+  brokenVel << -2.84978, 1.03633, 0, 9.16668, 6.99675;
+  Eigen::VectorXd brokenForce = Eigen::VectorXd::Zero(5);
+  brokenForce << 0, 0, -2.11163, -2.06504, -1.3781;
+  Eigen::VectorXd brokenLCPCache = Eigen::VectorXd::Zero(12);
+  brokenLCPCache << 0.0173545, 0.0132076, 0, 0.0173545, 0.0132076, 0, 0, 0, 0,
+      0, 0, 0;
+  world->setPositions(brokenPos);
+  world->setVelocities(brokenVel);
+  world->setExternalForces(brokenForce);
+  world->setCachedLCPSolution(brokenLCPCache);
+  */
+  /*
+  Eigen::VectorXd brokenPos = Eigen::VectorXd::Zero(5);
+  brokenPos << 8.75823, -1.33554, 1.60919, 0.367526, 1.09027;
+  Eigen::VectorXd brokenVel = Eigen::VectorXd::Zero(5);
+  brokenVel << 4.48639, -5.53436, 1.73472e-18, -1.03812e-17, -0.472044;
+  Eigen::VectorXd brokenForce = Eigen::VectorXd::Zero(5);
+  brokenForce << 0, 0, 9.428, -1.14176, 0.947147;
+  Eigen::VectorXd brokenLCPCache = Eigen::VectorXd::Zero(6);
+  brokenLCPCache << 0.0491903, 0.00921924, 0, 0, 0, 0;
+  world->setPositions(brokenPos);
+  world->setVelocities(brokenVel);
+  world->setExternalForces(brokenForce);
+  world->setCachedLCPSolution(brokenLCPCache);
+  */
+  /*
+  ///
+  /// This used to fail to standardize the LCP properly
+  ///
+
+  Eigen::VectorXd brokenPos = Eigen::VectorXd::Zero(5);
+  brokenPos << 8.75828, -1.33554, 1.6092, 0.367528, 1.09028;
+  Eigen::VectorXd brokenVel = Eigen::VectorXd::Zero(5);
+  brokenVel << 4.48642, -5.53436, -1.73472e-18, -2.35814e-18, -0.472011;
+  Eigen::VectorXd brokenForce = Eigen::VectorXd::Zero(5);
+  brokenForce << 0, 0, 9.428, -1.14176, 0.947147;
+  Eigen::VectorXd brokenLCPCache = Eigen::VectorXd::Zero(6);
+  brokenLCPCache << 0.0245947, 0.00461058, 0, 0.0245947, 0.00461058, 0;
+  world->setPositions(brokenPos);
+  world->setVelocities(brokenVel);
+  world->setExternalForces(brokenForce);
+  world->setCachedLCPSolution(brokenLCPCache);
+  */
+
+  /*
+  ///
+  /// This used to fail on edge-edge gradients being computed incorrectly
+  ///
+  Eigen::VectorXd brokenPos = Eigen::VectorXd::Zero(5);
+  brokenPos << -0.13334, -0.178891, 1.07272, 0.130007, 0.436478;
+  Eigen::VectorXd brokenVel = Eigen::VectorXd::Zero(5);
+  brokenVel << -0.433131, -0.847734, 2.55373, -1.13021, -1.61568;
+  Eigen::VectorXd brokenForce = Eigen::VectorXd::Zero(5);
+  brokenForce << 0, 0, -0.17232, 6.83192, -0.275112;
+  Eigen::VectorXd brokenLCPCache = Eigen::VectorXd::Zero(12);
+  brokenLCPCache << 0, 0, 0, 0, 0, 0, 1.0778, 0.330749, 0, 1.0778, 0.330749, 0;
+  world->setPositions(brokenPos);
+  world->setVelocities(brokenVel);
+  world->setExternalForces(brokenForce);
+  world->setCachedLCPSolution(brokenLCPCache);
+  */
+
+  ///
+  /// This used to fail on CLAMPING_THRESHOLD being too large in
+  /// ConstraintGroupGradientMatrices.cpp
+  ///
+  Eigen::VectorXd brokenPos = Eigen::VectorXd::Zero(5);
+  brokenPos << -0.000646825, -0.0351094, 0.759088, 0.102786, 0.731049;
+  Eigen::VectorXd brokenVel = Eigen::VectorXd::Zero(5);
+  brokenVel << -0.216819, -0.25626, 0.256483, 0.758835, -0.794271;
+  Eigen::VectorXd brokenForce = Eigen::VectorXd::Zero(5);
+  brokenForce << 0, 0, 0.136721, 1.88135, 7.45379;
+  Eigen::VectorXd brokenLCPCache = Eigen::VectorXd::Zero(12);
+  brokenLCPCache << 0.00454883, -5.55535e-05, 0, 0.00454883, -5.55535e-05, 0, 0,
+      0, 0, 0, 0, 0;
+  world->setPositions(brokenPos);
+  world->setVelocities(brokenVel);
+  world->setExternalForces(brokenForce);
+  world->setCachedLCPSolution(brokenLCPCache);
+
+  EXPECT_TRUE(verifyAnalyticalJacobians(world));
+  // EXPECT_TRUE(verifyVelGradients(world, brokenVel));
+  // EXPECT_TRUE(verifyPosVelJacobian(world, brokenVel));
+  // EXPECT_TRUE(verifyF_c(world));
+
+  GUIWebsocketServer server;
+  server.serve(8070);
+  server.renderWorld(world);
+
+  Eigen::VectorXd animatePos = brokenPos;
+  int i = 0;
+  Ticker ticker(0.01);
+  ticker.registerTickListener([&](long time) {
+    world->setPositions(animatePos);
+    animatePos += brokenVel * 0.001;
+
+    i++;
+    if (i >= 100)
+    {
+      animatePos = brokenPos;
+      i = 0;
+    }
+    // world->step();
+    server.renderWorld(world);
+  });
+
+  server.registerConnectionListener([&]() { ticker.start(); });
+  while (server.isServing())
+  {
+    // spin
+  }
+
+  std::shared_ptr<neural::BackpropSnapshot> snapshot
+      = neural::forwardPass(world, true);
+  EXPECT_TRUE(snapshot->areResultsStandardized());
+}
+#endif
+
+// #ifdef ALL_TESTS
+TEST(CATAPULT_EXAMPLE, FULL_TEST)
+{
+  double target_x = 2.2;
+  double target_y = 2.2;
+
+  // Create a world
+  std::shared_ptr<simulation::World> world = createWorld(target_x, target_y);
+  world->setSlowDebugResultsAgainstFD(true);
+
+  TrajectoryLossFn loss =
       [target_x, target_y](const trajectory::TrajectoryRollout* rollout) {
         const Eigen::VectorXd lastPos
             = rollout->getPosesConst().col(rollout->getPosesConst().cols() - 1);
@@ -397,19 +539,69 @@ TEST(CATAPULT_EXAMPLE, FULL_TEST)
         double diffY = lastPos(1) - target_y;
 
         return diffX * diffX + diffY * diffY;
-      });
+      };
+
+  TrajectoryLossFnAndGrad lossGrad
+      = [target_x, target_y](
+            const TrajectoryRollout* rollout,
+            TrajectoryRollout* gradWrtRollout // OUT
+        ) {
+          int lastCol = rollout->getPosesConst().cols() - 1;
+          const Eigen::VectorXd lastPos = rollout->getPosesConst().col(lastCol);
+
+          double diffX = lastPos(0) - target_x;
+          double diffY = lastPos(1) - target_y;
+
+          gradWrtRollout->getPoses().setZero();
+          gradWrtRollout->getVels().setZero();
+          gradWrtRollout->getForces().setZero();
+          gradWrtRollout->getPoses()(0, lastCol) = 2 * diffX;
+          gradWrtRollout->getPoses()(1, lastCol) = 2 * diffY;
+
+          return diffX * diffX + diffY * diffY;
+        };
+
+  trajectory::LossFn lossObj(loss);
 
   std::shared_ptr<trajectory::MultiShot> trajectory
-      = std::make_shared<trajectory::MultiShot>(world, loss, 500, 20, false);
+      = std::make_shared<trajectory::MultiShot>(world, lossObj, 500, 20, false);
+  trajectory->setParallelOperationsEnabled(false);
+
+  /*
+  // EXPECT_TRUE(verifyTrajectory(world, trajectory));
+  EXPECT_TRUE(verifyAnalyticalBackprop(world));
+  EXPECT_TRUE(verifyGradientBackprop(
+      world,
+      500,
+      [target_x, target_y](std::shared_ptr<simulation::World> world) {
+        const Eigen::VectorXd lastPos = world->getPositions();
+
+        double diffX = lastPos(0) - target_x;
+        double diffY = lastPos(1) - target_y;
+
+        return diffX * diffX + diffY * diffY;
+      }));
+
+  EXPECT_TRUE(verifySingleStep(world, 5e-7));
+  EXPECT_TRUE(verifySingleShot(world, 40, 5e-7, false, nullptr));
+  EXPECT_TRUE(verifyShotJacobian(world, 4, nullptr));
+  EXPECT_TRUE(verifyShotGradient(world, 7, loss, lossGrad));
+  EXPECT_TRUE(verifyMultiShotJacobian(world, 6, 2, nullptr));
+  EXPECT_TRUE(verifySparseJacobian(world, 8, 2, nullptr));
+  EXPECT_TRUE(verifyMultiShotGradient(world, 8, 4, loss, lossGrad));
+  EXPECT_TRUE(verifyMultiShotJacobianCustomConstraint(
+      world, 8, 4, loss, lossGrad, 3.0));
+  */
 
   trajectory::IPOptOptimizer optimizer;
-  optimizer.setLBFGSHistoryLength(5);
+  optimizer.setLBFGSHistoryLength(1);
   optimizer.setTolerance(1e-4);
-  optimizer.setCheckDerivatives(false);
+  optimizer.setCheckDerivatives(true);
   optimizer.setIterationLimit(500);
   std::shared_ptr<trajectory::Solution> result
       = optimizer.optimize(trajectory.get());
 
+  /*
   GUIWebsocketServer server;
   server.serve(8070);
   server.renderWorld(world);
@@ -420,18 +612,6 @@ TEST(CATAPULT_EXAMPLE, FULL_TEST)
   const Eigen::MatrixXd vels
       = result->getStep(result->getNumSteps() - 1).rollout->getVelsConst();
 
-  /*
-  world->setPositions(poses.col(0));
-  world->setVelocities(vels.col(0));
-
-  for (int i = 0; i < 175; i++)
-  {
-    world->step();
-    server.renderWorld(world);
-  }
-
-  world->step();
-  */
   server.renderTrajectoryLines(world, poses);
 
   Ticker ticker(world->getTimeStep());
@@ -454,5 +634,6 @@ TEST(CATAPULT_EXAMPLE, FULL_TEST)
   {
     // spin
   }
+  */
 }
 // #endif

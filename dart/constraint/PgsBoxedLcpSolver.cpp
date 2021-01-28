@@ -34,7 +34,9 @@
 
 #include <cmath>
 #include <cstring>
+
 #include <Eigen/Dense>
+
 #include "dart/external/odelcpsolver/matrix.h"
 #include "dart/external/odelcpsolver/misc.h"
 #include "dart/math/Constants.hpp"
@@ -119,6 +121,7 @@ bool PgsBoxedLcpSolver::solve(
     // Initial loop
     const double* A_ptr = A + nskip * i;
     const double old_x = x[i];
+    assert(!isnan(old_x));
 
     double new_x = b[i];
 
@@ -128,7 +131,10 @@ bool PgsBoxedLcpSolver::solve(
     for (int j = i + 1; j < n; ++j)
       new_x -= A_ptr[j] * x[j];
 
+    assert(!isnan(new_x));
+    assert(A[nskip * i + i] != 0);
     new_x /= A[nskip * i + i];
+    assert(!isnan(new_x));
 
     if (findex[i] >= 0)
     {
@@ -151,6 +157,7 @@ bool PgsBoxedLcpSolver::solve(
       else
         x[i] = new_x;
     }
+    assert(!isnan(x[i]));
 
     // Test
     if (possibleToTerminate)

@@ -327,19 +327,6 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(
     constraint->unexcite();
   }
 
-  /*
-  // TODO: The documentation for the LCP solver says to set LCP indices to
-  // themselves for normal forces, not -1. So let's try that and see what
-  // happens...
-  for (int i = 0; i < mFIndex.size(); i++)
-  {
-    if (mFIndex(i) == -1)
-    {
-      mFIndex(i) = i;
-    }
-  }
-  */
-
   assert(isSymmetric(n, mA.data()));
 
   // Print LCP formulation
@@ -423,22 +410,42 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(
   {
     const bool earlyTermination = (mSecondaryBoxedLcpSolver != nullptr);
     assert(mBoxedLcpSolver);
+
+    Eigen::MatrixXd mAReduced = mA.block(0, 0, n, n);
+    Eigen::VectorXd mXReduced = mX;
+    Eigen::VectorXd mBReduced = mB;
+    Eigen::VectorXd mHiReduced = mHi;
+    Eigen::VectorXd mLoReduced = mLo;
+    Eigen::VectorXi mFIndexReduced = mFIndex;
+    Eigen::MatrixXd mapOut = LCPUtils::reduce(
+        mAReduced,
+        mXReduced,
+        mBReduced,
+        mHiReduced,
+        mLoReduced,
+        mFIndexReduced);
+    int reducedN = mXReduced.size();
+    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>
+        reducedAPadded = Eigen::MatrixXd::Zero(reducedN, dPAD(reducedN));
+    reducedAPadded.block(0, 0, reducedN, reducedN) = mAReduced;
+
     success = mBoxedLcpSolver->solve(
-        n,
-        mA.data(),
-        mX.data(),
-        mB.data(),
+        reducedN,
+        reducedAPadded.data(),
+        mXReduced.data(),
+        mBReduced.data(),
         0,
-        mLo.data(),
-        mHi.data(),
-        mFIndex.data(),
+        mLoReduced.data(),
+        mHiReduced.data(),
+        mFIndexReduced.data(),
         earlyTermination);
 
     if (success)
     {
+      mX = mapOut * mXReduced;
       // Double check if the LCP solution is valid. The ODE solver can sometimes
       // return invalid solutions with success=true >:(
-      if (!math::isLCPSolutionValid(
+      if (!LCPUtils::isLCPSolutionValid(
               aGradientBackup,
               mX,
               mBBackup,
@@ -446,6 +453,16 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(
               mLoBackup,
               mFIndexBackup))
       {
+        /*
+        std::cout << "ODE failed to produce a valid solution" << std::endl;
+        LCPUtils::printReplicationCode(
+            aGradientBackup,
+            mXBackup,
+            mLoBackup,
+            mHiBackup,
+            mBBackup,
+            mFIndexBackup);
+        */
         success = false;
       }
     }
@@ -453,23 +470,46 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(
 
   // Sanity check. LCP solvers should not report success with nan values, but
   // it could happen. So we set the sucees to false for nan values.
-  if (success && mX.hasNaN())
+  if (mX.hasNaN())
+  {
     success = false;
+    // secondary PGS solver will produce NaNs if mX is initialized with NaNs, so
+    // reset mX
+    mX.setZero();
+  }
 
   if (!success && mSecondaryBoxedLcpSolver)
   {
+    Eigen::MatrixXd mAReduced = mA.block(0, 0, n, n);
+    Eigen::VectorXd mXReduced = mX;
+    Eigen::VectorXd mBReduced = mB;
+    Eigen::VectorXd mHiReduced = mHi;
+    Eigen::VectorXd mLoReduced = mLo;
+    Eigen::VectorXi mFIndexReduced = mFIndex;
+    Eigen::MatrixXd mapOut = LCPUtils::reduce(
+        mAReduced,
+        mXReduced,
+        mBReduced,
+        mHiReduced,
+        mLoReduced,
+        mFIndexReduced);
+    int reducedN = mXReduced.size();
+    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>
+        reducedAPadded = Eigen::MatrixXd::Zero(reducedN, dPAD(reducedN));
+    reducedAPadded.block(0, 0, reducedN, reducedN) = mAReduced;
+
     success = mSecondaryBoxedLcpSolver->solve(
-        n,
-        mABackup.data(),
-        mXBackup.data(),
-        mBBackup.data(),
+        reducedN,
+        reducedAPadded.data(),
+        mXReduced.data(),
+        mBReduced.data(),
         0,
-        mLoBackup.data(),
-        mHiBackup.data(),
-        mFIndexBackup.data(),
+        mLoReduced.data(),
+        mHiReduced.data(),
+        mFIndexReduced.data(),
         false);
-    mX = mXBackup;
-    if (!math::isLCPSolutionValid(
+    mX = mapOut * mXReduced;
+    if (!LCPUtils::isLCPSolutionValid(
             aGradientBackup,
             mX,
             bGradientBackup,
@@ -477,6 +517,11 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(
             loGradientBackup,
             fIndexGradientBackup))
     {
+      std::cout << "Both Dantzig and PGS failed to produce a valid LCP "
+                   "solution. Here's the original:"
+                << std::endl;
+      LCPUtils::printReplicationCode(
+          aGradientBackup, mX, mLoBackup, mHiBackup, mBBackup, mFIndexBackup);
       assert(
           false
           && "Both Dantzig and PGS failed to produce a valid LCP solution");
@@ -537,11 +582,6 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(
     {
       mX = group.getGradientConstraintMatrices()
                ->getContactConstraintImpluses();
-    }
-    else
-    {
-      // assert(false && "Despite a valid LCP solution, we were unable to
-      // standardize our results.");
     }
   }
 

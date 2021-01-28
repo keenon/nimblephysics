@@ -1454,6 +1454,13 @@ void BackpropSnapshot::equalsOrCrash(
     Eigen::MatrixXd bruteForce,
     std::string name)
 {
+  if (!areResultsStandardized())
+  {
+    std::cout << "Got an LCP result that couldn't be standardized!"
+              << std::endl;
+    printReplicationInstructions(world);
+    exit(1);
+  }
   Eigen::MatrixXd diff = (analytical - bruteForce).cwiseAbs();
   double threshold = 1e-5;
   bool broken = (diff.array() > threshold).any();
@@ -1827,10 +1834,7 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceForceVelJacobian(
       tweakedForces(i) += epsPos;
       world->setExternalForces(tweakedForces);
 
-      Eigen::VectorXd nextV = getAnalyticalNextV(world);
-
       BackpropSnapshotPtr ptr = neural::forwardPass(world, true);
-      Eigen::VectorXd afterV = world->getVelocities();
       if ((!areResultsStandardized() || ptr->areResultsStandardized())
           && ptr->getNumClamping() == getNumClamping()
           && ptr->getNumUpperBound() == getNumUpperBound())
@@ -1853,8 +1857,6 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceForceVelJacobian(
       Eigen::VectorXd tweakedForces = Eigen::VectorXd(mPreStepTorques);
       tweakedForces(i) -= epsNeg;
       world->setExternalForces(tweakedForces);
-
-      Eigen::VectorXd nextV = getAnalyticalNextV(world);
 
       BackpropSnapshotPtr ptr = neural::forwardPass(world, true);
       if ((!areResultsStandardized() || ptr->areResultsStandardized())
@@ -2935,6 +2937,15 @@ Eigen::MatrixXd BackpropSnapshot::estimateClampingConstraintMatrixAt(
   for (int i = 0; i < clampingConstraints.size(); i++)
   {
     auto constraint = clampingConstraints[i];
+    /*
+    std::cout << "Constraint forces jac " << i << "=" << std::endl
+              << constraint->getConstraintForcesJacobian(world) << std::endl
+              << "*" << std::endl
+              << posDiff << std::endl
+              << "=" << std::endl
+              << (constraint->getConstraintForcesJacobian(world) * posDiff)
+              << std::endl;
+    */
     result.col(i) = constraint->getConstraintForces(world.get())
                     + constraint->getConstraintForcesJacobian(world) * posDiff;
   }

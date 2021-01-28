@@ -881,10 +881,10 @@ int dBoxBox(
       contact.type = ContactType::EDGE_EDGE;
       contact.edgeAClosestPoint = Eigen::Vector3d(pa[0], pa[1], pa[2]);
       contact.edgeAFixedPoint = edgeAFixedPoint;
-      contact.edgeADir = Eigen::Vector3d(ua[0], ua[1], ua[2]);
+      contact.edgeADir = Eigen::Vector3d(ua[0], ua[1], ua[2]).normalized();
       contact.edgeBClosestPoint = Eigen::Vector3d(pb[0], pb[1], pb[2]);
       contact.edgeBFixedPoint = edgeBFixedPoint;
-      contact.edgeBDir = Eigen::Vector3d(ub[0], ub[1], ub[2]);
+      contact.edgeBDir = Eigen::Vector3d(ub[0], ub[1], ub[2]).normalized();
       result.addContact(contact);
     }
     return 1;
@@ -2040,20 +2040,44 @@ void createFaceFaceContacts(
         Contact contact;
         contact.collisionObject1 = o1;
         contact.collisionObject2 = o2;
-        contact.point = (edgeAClosestPoint + edgeBClosestPoint) / 2;
         contact.type = EDGE_EDGE;
         contact.edgeAClosestPoint = edgeAClosestPoint;
-        contact.edgeAFixedPoint = edgeAClosestPoint;
-        contact.edgeADir = a2World - a1World;
+        contact.edgeAFixedPoint = a1World;
+        contact.edgeADir = (a2World - a1World).normalized();
         contact.edgeBClosestPoint = edgeBClosestPoint;
-        contact.edgeBFixedPoint = edgeBClosestPoint;
-        contact.edgeBDir = b2World - b1World;
-        // Arbitrarily tie break normal, cause we're not using either face
-        // precisely
-        double distA = contact.edgeAClosestPoint.dot(normalA);
-        double distB = contact.edgeBClosestPoint.dot(normalA);
-        contact.normal = normalA;
+        contact.edgeBFixedPoint = b1World;
+        contact.edgeBDir = (b2World - b1World).normalized();
+
+        // Construct the normal as exactly perpendicular to both edges.
+        contact.normal = contact.edgeADir.cross(contact.edgeBDir);
+        // Ensure contact.normal points in roughly the same direction as
+        // normalA.
+        if (contact.normal.dot(normalA) < 0)
+        {
+          contact.normal *= -1;
+        }
+        // Compute penetration depth
+        double distA = contact.edgeAClosestPoint.dot(contact.normal);
+        double distB = contact.edgeBClosestPoint.dot(contact.normal);
         contact.penetrationDepth = distB - distA;
+        if (contact.penetrationDepth < 0)
+        {
+          contact.normal *= -1;
+          contact.penetrationDepth *= -1;
+        }
+
+        // Construct our contact point using the standard geometry routine
+        contact.point = math::getContactPoint(
+            contact.edgeAFixedPoint,
+            contact.edgeADir,
+            contact.edgeBFixedPoint,
+            contact.edgeBDir);
+
+        // TODO(keenon): This produces a slightly different contact point, which
+        // is suspicious because it should be exactly the same. That indicates
+        // there's a bug hiding in here somewhere.
+        //
+        // contact.point = (edgeAClosestPoint + edgeBClosestPoint) / 2;
 
         collisionsOut.push_back(contact);
       }
@@ -4495,6 +4519,7 @@ int collide(CollisionObject* o1, CollisionObject* o2, CollisionResult& result)
     {
       const auto* box1 = static_cast<const dynamics::BoxShape*>(shape2.get());
 
+      /*
 #ifndef NDEBUG
       CollisionResult boxBoxResult;
       int boxCollides = collideBoxBox(
@@ -4625,6 +4650,7 @@ int collide(CollisionObject* o1, CollisionObject* o2, CollisionResult& result)
         std::cout << "////////////////////////////////////////" << std::endl;
       }
 #endif
+      */
 
       // There are two options here, neither perfect:
       //
@@ -4633,9 +4659,8 @@ int collide(CollisionObject* o1, CollisionObject* o2, CollisionResult& result)
       // OR use collideBoxBoxAsMesh(), but that doesn't handle deep
       // inter-penetration very well.
       //
-      // Since deep inter-penetration is important for trajectory optimization,
-      // we'll stick with collideBoxBox() for now.
-      return collideBoxBox(
+      // Since we're clipping deep contacts, we'll use collideBoxBoxAsMesh().
+      return collideBoxBoxAsMesh(
           o1, o2, box0->getSize(), T1, box1->getSize(), T2, result);
     }
     else if (dynamics::EllipsoidShape::getStaticType() == shapeType2)

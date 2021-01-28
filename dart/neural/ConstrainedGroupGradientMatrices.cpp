@@ -7,6 +7,7 @@
 
 #include "dart/constraint/ConstrainedGroup.hpp"
 #include "dart/constraint/ConstraintBase.hpp"
+#include "dart/constraint/LCPUtils.hpp"
 #include "dart/dynamics/Skeleton.hpp"
 #include "dart/neural/NeuralUtils.hpp"
 #include "dart/neural/RestorableSnapshot.hpp"
@@ -17,7 +18,7 @@ using namespace math;
 using namespace dynamics;
 using namespace simulation;
 
-#define CLAMPING_THRESHOLD 1e-4
+#define CLAMPING_THRESHOLD 1e-6
 
 namespace dart {
 namespace neural {
@@ -188,7 +189,8 @@ void ConstrainedGroupGradientMatrices::registerLCPResults(
 bool ConstrainedGroupGradientMatrices::isSolutionValid(
     const Eigen::VectorXd& mX)
 {
-  return math::isLCPSolutionValid(mA, mX, mB, mHi, mLo, mFIndex);
+  return constraint::LCPUtils::isLCPSolutionValid(
+      mA, mX, mB, mHi, mLo, mFIndex);
 }
 
 //==============================================================================
@@ -213,10 +215,12 @@ bool ConstrainedGroupGradientMatrices::opportunisticallyStandardizeResults(
   const Eigen::MatrixXd& A_c = getClampingConstraintMatrix();
   if (A_c.cols() == 0)
   {
-    // this means that our guessing formula won't work, so just return whether
-    // the solution is already valid.
-    if (isSolutionValid(mX))
+    // this means that we should apply 0 force all around, so check if that's
+    // right. If it isn't, then something is pretty badly wrong...
+    Eigen::VectorXd zero = Eigen::VectorXd::Zero(mX.size());
+    if (isSolutionValid(zero))
     {
+      mX = zero;
       return true;
     }
     else
@@ -289,7 +293,7 @@ bool ConstrainedGroupGradientMatrices::opportunisticallyStandardizeResults(
       assert(clampingIndex == -1);
       int fIndex = mFIndex[i];
       assert(mClampingIndex[fIndex] != -1);
-      double originalMultiple = mX(mClampingIndex[fIndex]) / mX(i);
+      double originalMultiple = originalF_c(mClampingIndex[fIndex]) / mX(i);
       double cleanMultiple = (std::abs(originalMultiple - mHi(i))
                               < std::abs(originalMultiple - mLo(i)))
                                  ? mHi(i)
@@ -302,7 +306,6 @@ bool ConstrainedGroupGradientMatrices::opportunisticallyStandardizeResults(
   {
     mX = newX;
     ConstrainedGroupGradientMatrices::mX = newX;
-    mContactConstraintImpulses = newX;
     mClampingConstraintImpulses = f_c;
     if (anyNewlyNotClamping)
     {
@@ -471,7 +474,6 @@ void ConstrainedGroupGradientMatrices::constructMatrices(
   // inter-penetration, so we're leaving it disabled.
   // deduplicateConstraints();
 
-  mContactConstraintImpulses = mX;
   mContactConstraintMappings = mFIndex;
   // Group the constraints based on their solution values into three buckets:
   //
@@ -1504,7 +1506,7 @@ ConstrainedGroupGradientMatrices::getBouncingConstraintMatrix() const
 const Eigen::VectorXd&
 ConstrainedGroupGradientMatrices::getContactConstraintImpluses() const
 {
-  return mContactConstraintImpulses;
+  return mX;
 }
 
 //==============================================================================

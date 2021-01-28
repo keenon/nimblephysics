@@ -220,6 +220,16 @@ public:
   /// our optimistic LCP-stabilization-to-acceptance approach.
   virtual void setCachedLCPSolution(Eigen::VectorXd X);
 
+  /// Contacts whose penetrationDepth is deeper than this depth will be ignored.
+  /// This is a simple solution to avoid extremely nasty situations with
+  /// impossibly deep inter-penetration during multiple shooting optimization.
+  void setContactClippingDepth(double depth);
+
+  /// Contacts whose penetrationDepth is deeper than this depth will be ignored.
+  /// This is a simple solution to avoid extremely nasty situations with
+  /// impossibly deep inter-penetration during multiple shooting optimization.
+  double getContactClippingDepth();
+
 protected:
   // TODO(JS): Docstring
   virtual void solveConstrainedGroup(
@@ -307,6 +317,11 @@ protected:
   /// True if we want to enable adding tiny positive values to the diagonal
   /// of the A matrix before solving our LCP.
   bool mConstraintForceMixingEnabled;
+
+  /// Contacts whose penetrationDepth is deeper than this depth will be ignored.
+  /// This is a simple solution to avoid extremely nasty situations with
+  /// impossibly deep inter-penetration during multiple shooting optimization.
+  double mContactClippingDepth;
 };
 
 } // namespace constraint

@@ -586,6 +586,8 @@ void testReversePendulumSledWithFrictionCoeff(double frictionCoeff)
 {
   // World
   WorldPtr world = World::create();
+  world->setPenetrationCorrectionEnabled(false);
+  world->setConstraintForceMixingEnabled(false);
 
   ///////////////////////////////////////////////
   // Create the box
@@ -613,7 +615,7 @@ void testReversePendulumSledWithFrictionCoeff(double frictionCoeff)
   boxBody->setFrictionCoeff(frictionCoeff);
 
   // Add a force driving the box down into the floor, and to the left
-  boxBody->addExtForce(Eigen::Vector3d(1, -1, 0));
+  boxBody->addExtForce(Eigen::Vector3d(1, -10, 0));
 
   // Create the reverse pendulum portion
 
@@ -651,7 +653,7 @@ void testReversePendulumSledWithFrictionCoeff(double frictionCoeff)
   BodyNode* floorBody = floorPair.second;
 
   Eigen::Isometry3d floorPosition = Eigen::Isometry3d::Identity();
-  floorPosition.translation() = Eigen::Vector3d(0, -(1.0 - 1e-6), 0);
+  floorPosition.translation() = Eigen::Vector3d(0, -(1.0 - 1e-2), 0);
   floorJoint->setTransformFromParentBodyNode(floorPosition);
   floorJoint->setTransformFromChildBodyNode(Eigen::Isometry3d::Identity());
 
@@ -1049,7 +1051,14 @@ void testRobotArm(
   // arm->integrateVelocities(world->getTimeStep());
   // -0.029 at 0.5
   // -0.323 at 5.0
-  arm->setVelocities(Eigen::VectorXd::Ones(arm->getNumDofs()) * 0.05);
+  if (numLinks == 5)
+  {
+    arm->setVelocities(Eigen::VectorXd::Ones(arm->getNumDofs()) * -0.05);
+  }
+  if (numLinks == 6 || numLinks == 3)
+  {
+    arm->setVelocities(Eigen::VectorXd::Ones(arm->getNumDofs()) * 0.05);
+  }
 
   VectorXd worldVel = world->getVelocities();
 

@@ -97,6 +97,7 @@ public:
   MappedBackpropSnapshot(
       std::shared_ptr<BackpropSnapshot> backpropSnapshot,
       std::string representation,
+      std::unordered_map<std::string, std::shared_ptr<Mapping>> mappings,
       std::unordered_map<std::string, PreStepMapping> preStepMappings,
       std::unordered_map<std::string, PostStepMapping> postStepMappings);
 
@@ -105,27 +106,33 @@ public:
 
   Eigen::MatrixXd getPosPosJacobian(
       std::shared_ptr<simulation::World> world,
-      const std::string& mapping,
+      const std::string& mapBefore,
+      const std::string& mapAfter,
       PerformanceLog* perfLog = nullptr);
   Eigen::MatrixXd getPosVelJacobian(
       std::shared_ptr<simulation::World> world,
-      const std::string& mapping,
+      const std::string& mapBefore,
+      const std::string& mapAfter,
       PerformanceLog* perfLog = nullptr);
   Eigen::MatrixXd getVelPosJacobian(
       std::shared_ptr<simulation::World> world,
-      const std::string& mapping,
+      const std::string& mapBefore,
+      const std::string& mapAfter,
       PerformanceLog* perfLog = nullptr);
   Eigen::MatrixXd getVelVelJacobian(
       std::shared_ptr<simulation::World> world,
-      const std::string& mapping,
+      const std::string& mapBefore,
+      const std::string& mapAfter,
       PerformanceLog* perfLog = nullptr);
   Eigen::MatrixXd getForceVelJacobian(
       std::shared_ptr<simulation::World> world,
-      const std::string& mapping,
+      const std::string& mapBefore,
+      const std::string& mapAfter,
       PerformanceLog* perfLog = nullptr);
   Eigen::MatrixXd getMassVelJacobian(
       std::shared_ptr<simulation::World> world,
-      const std::string& mapping,
+      const std::string& mapBefore,
+      const std::string& mapAfter,
       PerformanceLog* perfLog = nullptr);
 
   /// This computes the implicit backprop without forming intermediate
@@ -170,10 +177,47 @@ public:
   /// Returns the underlying BackpropSnapshot, without the mappings
   std::shared_ptr<BackpropSnapshot> getUnderlyingSnapshot();
 
+  /// This computes and returns the whole vel-vel jacobian by finite
+  /// differences. This is SUPER SLOW, and is only here for testing.
+  Eigen::MatrixXd finiteDifferenceVelVelJacobian(
+      simulation::WorldPtr world,
+      const std::string& mapBefore,
+      const std::string& mapAfter);
+
+  /// This computes and returns the whole pos-C(pos,vel) jacobian by finite
+  /// differences. This is SUPER SUPER SLOW, and is only here for testing.
+  Eigen::MatrixXd finiteDifferencePosVelJacobian(
+      simulation::WorldPtr world,
+      const std::string& mapBefore,
+      const std::string& mapAfter);
+
+  /// This computes and returns the whole force-vel jacobian by finite
+  /// differences. This is SUPER SLOW, and is only here for testing.
+  Eigen::MatrixXd finiteDifferenceForceVelJacobian(
+      simulation::WorldPtr world,
+      const std::string& mapBefore,
+      const std::string& mapAfter);
+
+  /// This computes a finite differenced Jacobian for pos_t->mapped_pos_{t+1}
+  Eigen::MatrixXd finiteDifferencePosPosJacobian(
+      std::shared_ptr<simulation::World> world,
+      const std::string& mapBefore,
+      const std::string& mapAfter,
+      std::size_t subdivisions = 20);
+
+  /// This computes and returns the whole vel-pos jacobian by finite
+  /// differences. This is SUPER SUPER SLOW, and is only here for testing.
+  Eigen::MatrixXd finiteDifferenceVelPosJacobian(
+      simulation::WorldPtr world,
+      const std::string& mapBefore,
+      const std::string& mapAfter,
+      std::size_t subdivisions = 20);
+
 protected:
   std::shared_ptr<BackpropSnapshot> mBackpropSnapshot;
   std::string mRepresentation;
-  std::vector<std::string> mMappings;
+  std::vector<std::string> mMappingsSet;
+  std::unordered_map<std::string, std::shared_ptr<Mapping>> mMappings;
   std::unordered_map<std::string, PreStepMapping> mPreStepMappings;
   std::unordered_map<std::string, PostStepMapping> mPostStepMappings;
 };

@@ -409,9 +409,6 @@ public:
   Eigen::VectorXi mContactConstraintMappings;
 
   /// This is just useful for testing the gradient computations
-  Eigen::VectorXd mContactConstraintImpulses;
-
-  /// This is just useful for testing the gradient computations
   Eigen::VectorXd mPenetrationCorrectionVelocitiesVec;
 
   /// This is the subset of the A matrix from the original LCP that corresponds

@@ -1,3 +1,5 @@
+#ifndef GRADIENT_TEST_UTILS
+#define GRADIENT_TEST_UTILS
 /*
  * Copyright (c) 2011-2019, The DART development contributors
  * All rights reserved.
@@ -52,6 +54,9 @@
 #include "dart/neural/RestorableSnapshot.hpp"
 #include "dart/neural/WithRespectToMass.hpp"
 #include "dart/simulation/World.hpp"
+#include "dart/trajectory/MultiShot.hpp"
+#include "dart/trajectory/SingleShot.hpp"
+#include "dart/trajectory/TrajectoryRollout.hpp"
 
 #include "TestHelpers.hpp"
 #include "stdio.h"
@@ -747,18 +752,16 @@ bool verifyAnalyticalConstraintMatrixEstimates(WorldPtr world)
   return true;
 }
 
-// We can use a larger `toleranceMultiple` to loosen the error tolerances, which
-// is useful for large robots like Atlas that naturally experience more
-// numerical error.
-bool verifyF_c(WorldPtr world)
+// This verifies that f_c changes in predictable ways as we perturb the
+// positions
+bool verifyPerturbedF_c(WorldPtr world)
 {
   RestorableSnapshot snapshot(world);
 
   neural::BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
-  assert(classicPtr->areResultsStandardized());
+  // assert(classicPtr->areResultsStandardized());
 
   Eigen::VectorXd original = world->getPositions();
-
   const double EPS = 1e-6;
   std::vector<std::pair<int, double>> testPairs;
   for (int i = 0; i < world->getNumDofs(); i++)
@@ -782,7 +785,8 @@ bool verifyF_c(WorldPtr world)
       perturbedPos(i) += eps;
       world->setPositions(perturbedPos);
       perturbedPtr = neural::forwardPass(world, true);
-      if (perturbedPtr->areResultsStandardized()
+      if ((!classicPtr->areResultsStandardized()
+           || perturbedPtr->areResultsStandardized())
           && perturbedPtr->getNumClamping() == classicPtr->getNumClamping()
           && perturbedPtr->getNumUpperBound() == classicPtr->getNumUpperBound())
       {
@@ -933,7 +937,8 @@ bool verifyF_c(WorldPtr world)
       {
         Eigen::VectorXd cleanRealF_c
             = realQ.completeOrthogonalDecomposition().solve(realB);
-        if (!equals(realF_c, cleanRealF_c, 1e-18))
+        if (classicPtr->areResultsStandardized()
+            && !equals(realF_c, cleanRealF_c, 1e-18))
         {
           std::cout << "f_c isn't exactly the same as a solve on Q and B!"
                     << std::endl;
@@ -997,6 +1002,21 @@ bool verifyF_c(WorldPtr world)
       }
     }
   }
+
+  snapshot.restore();
+  return true;
+}
+
+bool verifyF_c(WorldPtr world)
+{
+  RestorableSnapshot snapshot(world);
+
+  neural::BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
+  // assert(classicPtr->areResultsStandardized());
+
+  Eigen::VectorXd original = world->getPositions();
+
+  const double EPS = 1e-6;
 
   Eigen::MatrixXd A_c = classicPtr->getClampingConstraintMatrix(world);
   Eigen::MatrixXd A_ub = classicPtr->getUpperBoundConstraintMatrix(world);
@@ -1135,6 +1155,14 @@ bool verifyF_c(WorldPtr world)
       return false;
     }
 
+    /*
+    // Suspicious inputs to check if dB is broken:
+
+    Eigen::MatrixXd dMinv_f = getJacobianOfMinv(world, f, wrt);
+    Eigen::MatrixXd dA_c_f
+        = getJacobianOfClampingConstraintsTranspose(world, v_f);
+    */
+
     Eigen::MatrixXd bruteForceJacB
         = classicPtr->finiteDifferenceJacobianOfLCPOffsetClampingSubset(
             world, WithRespectTo::POSITION);
@@ -1154,7 +1182,10 @@ bool verifyF_c(WorldPtr world)
                   << "x" << analyticalJacB.cols()
                   << ") (top-left 6x6):" << std::endl
                   << analyticalJacB.block<6, 6>(0, 0) << std::endl;
-        std::cout << "Diff Jac (top-left 6x6):" << std::endl
+        std::cout << "Diff Jac (top-left 6x6) ("
+                  << (bruteForceJacB - analyticalJacB).minCoeff() << " - "
+                  << (bruteForceJacB - analyticalJacB).maxCoeff()
+                  << "):" << std::endl
                   << (bruteForceJacB - analyticalJacB).block<6, 6>(0, 0)
                   << std::endl;
       }
@@ -1840,6 +1871,11 @@ bool verifyForceVelJacobian(WorldPtr world, VectorXd proposedVelocities)
               << std::endl;
     return false;
   }
+  if (!classicPtr->areResultsStandardized())
+  {
+    std::cout << "verifyForceVelJacobian() got a non-standardized result"
+              << std::endl;
+  }
 
   MatrixXd analytical = classicPtr->getForceVelJacobian(world);
   MatrixXd bruteForce = classicPtr->finiteDifferenceForceVelJacobian(world);
@@ -1955,7 +1991,8 @@ bool verifyVelGradients(WorldPtr world, VectorXd worldVel)
       // && verifyMassedProjectionIntoClampsMatrix(world, worldVel)
       // && verifyJacobianOfProjectionIntoClampsMatrix(world, worldVel,
       // POSITION)
-      && verifyRecoveredLCPConstraints(world, worldVel) && verifyF_c(world)
+      && verifyRecoveredLCPConstraints(world, worldVel)
+      && verifyPerturbedF_c(world) && verifyF_c(world)
       && verifyForceVelJacobian(world, worldVel)
       && verifyVelVelJacobian(world, worldVel)
       && verifyPosVelJacobian(world, worldVel) && verifyNextV(world));
@@ -3171,31 +3208,36 @@ Eigen::MatrixXd getTimestepJacobian(
   if (inComponent == MappingTestComponent::POSITION
       && outComponent == MappingTestComponent::POSITION)
   {
-    return snapshot->getPosPosJacobian(world, snapshot->getRepresentation());
+    return snapshot->getPosPosJacobian(
+        world, snapshot->getRepresentation(), snapshot->getRepresentation());
   }
   else if (
       inComponent == MappingTestComponent::POSITION
       && outComponent == MappingTestComponent::VELOCITY)
   {
-    return snapshot->getPosVelJacobian(world, snapshot->getRepresentation());
+    return snapshot->getPosVelJacobian(
+        world, snapshot->getRepresentation(), snapshot->getRepresentation());
   }
   else if (
       inComponent == MappingTestComponent::VELOCITY
       && outComponent == MappingTestComponent::POSITION)
   {
-    return snapshot->getVelPosJacobian(world, snapshot->getRepresentation());
+    return snapshot->getVelPosJacobian(
+        world, snapshot->getRepresentation(), snapshot->getRepresentation());
   }
   else if (
       inComponent == MappingTestComponent::VELOCITY
       && outComponent == MappingTestComponent::VELOCITY)
   {
-    return snapshot->getVelVelJacobian(world, snapshot->getRepresentation());
+    return snapshot->getVelVelJacobian(
+        world, snapshot->getRepresentation(), snapshot->getRepresentation());
   }
   else if (
       inComponent == MappingTestComponent::FORCE
       && outComponent == MappingTestComponent::VELOCITY)
   {
-    return snapshot->getForceVelJacobian(world, snapshot->getRepresentation());
+    return snapshot->getForceVelJacobian(
+        world, snapshot->getRepresentation(), snapshot->getRepresentation());
   }
   assert(false && "Unsupported combination of inComponent and outComponent in getTimestepJacobian()!");
 }
@@ -4371,6 +4413,12 @@ bool verifyPerturbedContactEdges(WorldPtr world)
           EdgeData finiteDifferenceAnalyticalGradient;
           finiteDifferenceAnalyticalGradient.edgeAPos
               = (analytical.edgeAPos - analyticalNeg.edgeAPos) / (2 * EPS);
+          finiteDifferenceAnalyticalGradient.edgeADir
+              = (analytical.edgeADir - analyticalNeg.edgeADir) / (2 * EPS);
+          finiteDifferenceAnalyticalGradient.edgeBPos
+              = (analytical.edgeBPos - analyticalNeg.edgeBPos) / (2 * EPS);
+          finiteDifferenceAnalyticalGradient.edgeBDir
+              = (analytical.edgeBDir - analyticalNeg.edgeBDir) / (2 * EPS);
 
           EdgeData analyticalGradient
               = constraints[k]->getEdgeGradient(skel->getDof(j));
@@ -4380,11 +4428,12 @@ bool verifyPerturbedContactEdges(WorldPtr world)
                   analyticalGradient.edgeAPos,
                   estimateThreshold))
           {
-            std::cout << "Edge A Pos analytical: " << std::endl
+            std::cout << "Edge A Pos gradient analytical: " << std::endl
                       << analyticalGradient.edgeAPos << std::endl;
-            std::cout << "Edge A Pos brute force: " << std::endl
+            std::cout << "Edge A Pos gradient brute force: " << std::endl
                       << finiteDifferenceGradient.edgeAPos << std::endl;
-            std::cout << "Edge A Pos brute force over estimates: " << std::endl
+            std::cout << "Edge A Pos gradient brute force over estimates: "
+                      << std::endl
                       << finiteDifferenceAnalyticalGradient.edgeAPos
                       << std::endl;
             return false;
@@ -4394,9 +4443,9 @@ bool verifyPerturbedContactEdges(WorldPtr world)
                   analyticalGradient.edgeADir,
                   estimateThreshold))
           {
-            std::cout << "Edge A Dir analytical: " << std::endl
+            std::cout << "Edge A Dir gradient analytical: " << std::endl
                       << analyticalGradient.edgeADir << std::endl;
-            std::cout << "Edge A Dir brute force: " << std::endl
+            std::cout << "Edge A Dir gradient brute force: " << std::endl
                       << bruteForce.edgeADir << std::endl;
             return false;
           }
@@ -4405,10 +4454,11 @@ bool verifyPerturbedContactEdges(WorldPtr world)
                   analyticalGradient.edgeBPos,
                   estimateThreshold))
           {
-            std::cout << "Edge B Pos analytical: " << std::endl
+            std::cout << "Edge B Pos gradient analytical: " << std::endl
                       << analyticalGradient.edgeBPos << std::endl;
-            std::cout << "Edge B Pos brute force: " << std::endl
+            std::cout << "Edge B Pos gradient brute force: " << std::endl
                       << finiteDifferenceGradient.edgeBPos << std::endl;
+            constraints[k]->getEdgeGradient(skel->getDof(j));
             return false;
           }
           if (!equals(
@@ -4416,9 +4466,9 @@ bool verifyPerturbedContactEdges(WorldPtr world)
                   analyticalGradient.edgeBDir,
                   estimateThreshold))
           {
-            std::cout << "Edge B Dir analytical: " << std::endl
+            std::cout << "Edge B Dir gradient analytical: " << std::endl
                       << analyticalGradient.edgeBDir << std::endl;
-            std::cout << "Edge B Dir brute force: " << std::endl
+            std::cout << "Edge B Dir gradient brute force: " << std::endl
                       << finiteDifferenceGradient.edgeBDir << std::endl;
             return false;
           }
@@ -4482,16 +4532,16 @@ bool verifyPerturbedContactEdges(WorldPtr world)
 }
 
 bool verifyPerturbedContactPositions(
-    WorldPtr world, bool expectNoContacts = false)
+    WorldPtr world, bool allowNoContacts = false)
 {
   BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
   std::vector<std::shared_ptr<DifferentiableContactConstraint>> constraints
       = classicPtr->getClampingConstraints();
-  if ((constraints.size() == 0) != expectNoContacts)
+  if ((constraints.size() == 0) && !allowNoContacts)
   {
     std::cout
         << "verifyPerturbedContactPositions() got no clamping contacts, and "
-           "didn't pass `expectNoContacts = true`!"
+           "didn't pass `allowNoContacts = true`!"
         << std::endl;
     return false;
   }
@@ -4561,6 +4611,8 @@ bool verifyPerturbedContactPositions(
                       << point->getContactWorldPosition() << std::endl;
           }
 
+          Eigen::Vector3d analytical
+              = constraints[k]->estimatePerturbedContactPosition(skel, j, EPS);
           return false;
         }
 
@@ -4576,7 +4628,7 @@ bool verifyPerturbedContactPositions(
             = (analytical - analyticalNeg) / (2 * EPS);
         Eigen::Vector3d analyticalGradient
             = constraints[k]->getContactPositionGradient(skel->getDof(j));
-        if (!equals(analyticalGradient, finiteDifferenceGradient, 1e-9))
+        if (!equals(analyticalGradient, finiteDifferenceGradient, 1e-8))
         {
           std::cout << "Failed contact pos gradient!" << std::endl;
           std::cout << "Skel:" << std::endl
@@ -5382,10 +5434,10 @@ bool testScrews(WorldPtr world)
   return true;
 }
 
-bool verifyAnalyticalJacobians(WorldPtr world, bool expectNoContacts = false)
+bool verifyAnalyticalJacobians(WorldPtr world, bool allowNoContacts = false)
 {
   return testScrews(world) && verifyPerturbedContactEdges(world)
-         && verifyPerturbedContactPositions(world, expectNoContacts)
+         && verifyPerturbedContactPositions(world, allowNoContacts)
          && verifyPerturbedContactNormals(world)
          && verifyPerturbedContactForceDirections(world)
          && verifyPerturbedScrewAxisForPosition(world)
@@ -5580,6 +5632,47 @@ bool verifyWrtMass(WorldPtr world)
   return true;
 }
 
+bool verifyTrajectory(
+    std::shared_ptr<simulation::World> world,
+    std::shared_ptr<trajectory::MultiShot> trajectory)
+{
+  const trajectory::TrajectoryRollout* rollout
+      = trajectory->getRolloutCache(world);
+  Eigen::MatrixXd poses = rollout->getPosesConst();
+  Eigen::MatrixXd vels = rollout->getVelsConst();
+  Eigen::MatrixXd forces = rollout->getForcesConst();
+
+  for (int i = 0; i < poses.cols(); i++)
+  {
+    std::cout << "Checking trajectory step " << i << "/" << poses.cols()
+              << "..." << std::endl;
+    world->setPositions(poses.col(i));
+    world->setVelocities(vels.col(i));
+    world->setExternalForces(forces.col(i));
+
+    if (!verifyAnalyticalJacobians(world, true))
+    {
+      std::cout << "Error in verifyAnalyticalJacobians() on trajectory step "
+                << i << "/" << poses.cols() << std::endl;
+      return false;
+    }
+    if (!verifyVelGradients(world, vels.col(i)))
+    {
+      std::cout << "Error in verifyVelGradients() on trajectory step " << i
+                << "/" << poses.cols() << std::endl;
+      return false;
+    }
+    if (!verifyWrtMass(world))
+    {
+      std::cout << "Error in verifyWrtMass() on trajectory step " << i << "/"
+                << poses.cols() << std::endl;
+      return false;
+    }
+  }
+
+  return true;
+}
+
 /*
 class MyWindow : public dart::gui::glut::SimWindow
 {
@@ -5602,3 +5695,4 @@ void renderWorld(WorldPtr world)
   glutMainLoop();
 }
 */
+#endif

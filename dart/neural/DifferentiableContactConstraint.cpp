@@ -680,14 +680,28 @@ Eigen::Vector3d DifferentiableContactConstraint::getContactNormalGradient(
     Eigen::Vector3d edgeADirGradient = math::gradientWrtThetaPureRotation(
         worldTwist.head<3>(), mContact->edgeADir, 0.0);
 
-    return mContact->edgeBDir.cross(edgeADirGradient);
+    double sign = 1.0;
+    Eigen::Vector3d normal = mContact->edgeBDir.cross(mContact->edgeADir);
+    if (normal.dot(mContact->normal) < 0)
+    {
+      sign = -1.0;
+    }
+
+    return sign * mContact->edgeBDir.cross(edgeADirGradient);
   }
   else if (type == EDGE_B)
   {
     Eigen::Vector3d edgeBDirGradient = math::gradientWrtThetaPureRotation(
         worldTwist.head<3>(), mContact->edgeBDir, 0.0);
 
-    return edgeBDirGradient.cross(mContact->edgeADir);
+    double sign = 1.0;
+    Eigen::Vector3d normal = mContact->edgeBDir.cross(mContact->edgeADir);
+    if (normal.dot(mContact->normal) < 0)
+    {
+      sign = -1.0;
+    }
+
+    return sign * edgeBDirGradient.cross(mContact->edgeADir);
   }
   if (type == SPHERE_TO_VERTEX)
   {
@@ -2027,6 +2041,10 @@ Eigen::Vector3d DifferentiableContactConstraint::estimatePerturbedContactNormal(
     rotation.translation().setZero();
     Eigen::Vector3d normal
         = (mContact->edgeBDir).cross(rotation * mContact->edgeADir);
+    if (normal.dot(mContact->normal) < 0)
+    {
+      normal *= -1;
+    }
     return normal;
   }
   else if (type == EDGE_B)
@@ -2034,6 +2052,10 @@ Eigen::Vector3d DifferentiableContactConstraint::estimatePerturbedContactNormal(
     rotation.translation().setZero();
     Eigen::Vector3d normal
         = (rotation * mContact->edgeBDir).cross(mContact->edgeADir);
+    if (normal.dot(mContact->normal) < 0)
+    {
+      normal *= -1;
+    }
     return normal;
   }
   else if (type == SPHERE_TO_VERTEX)
@@ -2515,10 +2537,14 @@ DifferentiableContactConstraint::bruteForcePerturbedContactPosition(
 
   if (peerConstraint == nullptr)
   {
-    std::cout << world->getVelocities();
+    std::cout << "bruteForcePerturbedContactPosition() failed to find a peer "
+                 "constraint!"
+              << std::endl;
+    std::cout << "Perturbed snapshot num clamping: "
+              << backpropSnapshot->getNumClamping() << std::endl;
     // Dirty velocities
-    world->setVelocities(world->getVelocities());
-    neural::forwardPass(world, true);
+    std::shared_ptr<DifferentiableContactConstraint> peerConstraint
+        = getPeerConstraint(backpropSnapshot);
   }
   assert(peerConstraint != nullptr && "bruteForcePerturbedContactPosition() was unable to find a peer constraint to compare against.");
 

@@ -482,18 +482,18 @@ void SingleShot::backpropJacobianOfFinalState(
   {
     MappedBackpropSnapshotPtr ptr = snapshots[i];
     TimestepJacobians thisTimestep;
-    Eigen::MatrixXd forceVel
-        = ptr->getForceVelJacobian(world, mRepresentationMapping, thisLog);
-    Eigen::MatrixXd massVel
-        = ptr->getMassVelJacobian(world, mRepresentationMapping, thisLog);
-    Eigen::MatrixXd posPos
-        = ptr->getPosPosJacobian(world, mRepresentationMapping, thisLog);
-    Eigen::MatrixXd posVel
-        = ptr->getPosVelJacobian(world, mRepresentationMapping, thisLog);
-    Eigen::MatrixXd velPos
-        = ptr->getVelPosJacobian(world, mRepresentationMapping, thisLog);
-    Eigen::MatrixXd velVel
-        = ptr->getVelVelJacobian(world, mRepresentationMapping, thisLog);
+    Eigen::MatrixXd forceVel = ptr->getForceVelJacobian(
+        world, mRepresentationMapping, mRepresentationMapping, thisLog);
+    Eigen::MatrixXd massVel = ptr->getMassVelJacobian(
+        world, mRepresentationMapping, mRepresentationMapping, thisLog);
+    Eigen::MatrixXd posPos = ptr->getPosPosJacobian(
+        world, mRepresentationMapping, mRepresentationMapping, thisLog);
+    Eigen::MatrixXd posVel = ptr->getPosVelJacobian(
+        world, mRepresentationMapping, mRepresentationMapping, thisLog);
+    Eigen::MatrixXd velPos = ptr->getVelPosJacobian(
+        world, mRepresentationMapping, mRepresentationMapping, thisLog);
+    Eigen::MatrixXd velVel = ptr->getVelVelJacobian(
+        world, mRepresentationMapping, mRepresentationMapping, thisLog);
 
     // p_end <- f_t = p_end <- v_t+1 * v_t+1 <- f_t
     thisTimestep.forcePos = last.velPos * forceVel;
@@ -1008,16 +1008,16 @@ TimestepJacobians SingleShot::backpropStartStateJacobians(
   {
     MappedBackpropSnapshotPtr ptr = snapshots[i];
     TimestepJacobians thisTimestep;
-    Eigen::MatrixXd forceVel
-        = ptr->getForceVelJacobian(world, mRepresentationMapping);
-    Eigen::MatrixXd posPos
-        = ptr->getPosPosJacobian(world, mRepresentationMapping);
-    Eigen::MatrixXd posVel
-        = ptr->getPosVelJacobian(world, mRepresentationMapping);
-    Eigen::MatrixXd velPos
-        = ptr->getVelPosJacobian(world, mRepresentationMapping);
-    Eigen::MatrixXd velVel
-        = ptr->getVelVelJacobian(world, mRepresentationMapping);
+    Eigen::MatrixXd forceVel = ptr->getForceVelJacobian(
+        world, mRepresentationMapping, mRepresentationMapping);
+    Eigen::MatrixXd posPos = ptr->getPosPosJacobian(
+        world, mRepresentationMapping, mRepresentationMapping);
+    Eigen::MatrixXd posVel = ptr->getPosVelJacobian(
+        world, mRepresentationMapping, mRepresentationMapping);
+    Eigen::MatrixXd velPos = ptr->getVelPosJacobian(
+        world, mRepresentationMapping, mRepresentationMapping);
+    Eigen::MatrixXd velVel = ptr->getVelVelJacobian(
+        world, mRepresentationMapping, mRepresentationMapping);
 
     // v_end <- f_t = v_end <- v_t+1 * v_t+1 <- f_t
     thisTimestep.forceVel = last.velVel * forceVel;

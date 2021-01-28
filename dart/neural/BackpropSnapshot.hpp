@@ -21,6 +21,8 @@ namespace neural {
 
 class BackpropSnapshot
 {
+  friend class MappedBackpropSnapshot;
+
 public:
   /// This saves a snapshot from a forward pass, with all the info we need in
   /// order to efficiently compute a backwards pass. Crucially, the positions

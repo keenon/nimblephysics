@@ -129,7 +129,7 @@ std::shared_ptr<MappedBackpropSnapshot> mappedForwardPass(
     restorableSnapshot->restore();
 
   return std::make_shared<MappedBackpropSnapshot>(
-      snapshot, representation, preStepMappings, postStepMappings);
+      snapshot, representation, mappings, preStepMappings, postStepMappings);
 }
 
 //==============================================================================

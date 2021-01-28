@@ -455,6 +455,16 @@ public:
 
   bool getConstraintForceMixingEnabled();
 
+  /// Contacts whose penetrationDepth is deeper than this depth will be ignored.
+  /// This is a simple solution to avoid extremely nasty situations with
+  /// impossibly deep inter-penetration during multiple shooting optimization.
+  void setContactClippingDepth(double depth);
+
+  /// Contacts whose penetrationDepth is deeper than this depth will be ignored.
+  /// This is a simple solution to avoid extremely nasty situations with
+  /// impossibly deep inter-penetration during multiple shooting optimization.
+  double getContactClippingDepth();
+
   /// This returns the object that we're using to keep track of which objects in
   /// the world need gradients through which kinds of mass.
   std::shared_ptr<neural::WithRespectToMass> getWrtMass();
@@ -587,6 +597,11 @@ protected:
   /// True if we want to enable adding tiny positive values to the diagonal
   /// of the A matrix before solving our LCP.
   bool mConstraintForceMixingEnabled;
+
+  /// Contacts whose penetrationDepth is deeper than this depth will be ignored.
+  /// This is a simple solution to avoid extremely nasty situations with
+  /// impossibly deep inter-penetration during multiple shooting optimization.
+  double mContactClippingDepth;
 
   //--------------------------------------------------------------------------
   // Signals

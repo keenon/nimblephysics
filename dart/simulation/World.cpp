@@ -81,6 +81,7 @@ World::World(const std::string& _name)
     mConstraintForceMixingEnabled(
         false), // TODO(keenon): We should updated gradients to support this,
                 // and re-enable it by default
+    mContactClippingDepth(0.03),
     mPenetrationCorrectionEnabled(false),
     mWrtMass(std::make_shared<neural::WithRespectToMass>()),
     mUseFDOverride(false),
@@ -112,6 +113,7 @@ WorldPtr World::clone() const
   worldClone->setGravity(mGravity);
   worldClone->setTimeStep(mTimeStep);
   worldClone->setConstraintForceMixingEnabled(mConstraintForceMixingEnabled);
+  worldClone->setContactClippingDepth(mContactClippingDepth);
   worldClone->setPenetrationCorrectionEnabled(mPenetrationCorrectionEnabled);
   worldClone->setParallelVelocityAndPositionUpdates(
       mParallelVelocityAndPositionUpdates);
@@ -226,6 +228,7 @@ void World::step(bool _resetCommand)
       mPenetrationCorrectionEnabled);
   mConstraintSolver->setConstraintForceMixingEnabled(
       mConstraintForceMixingEnabled);
+  mConstraintSolver->setContactClippingDepth(mContactClippingDepth);
   mConstraintSolver->solve(this);
 
   // Compute velocity changes given constraint impulses
@@ -321,6 +324,18 @@ void World::setConstraintForceMixingEnabled(bool enable)
 bool World::getConstraintForceMixingEnabled()
 {
   return mConstraintForceMixingEnabled;
+}
+
+//==============================================================================
+void World::setContactClippingDepth(double depth)
+{
+  mContactClippingDepth = depth;
+}
+
+//==============================================================================
+double World::getContactClippingDepth()
+{
+  return mContactClippingDepth;
 }
 
 //==============================================================================

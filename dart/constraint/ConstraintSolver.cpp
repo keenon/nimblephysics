@@ -71,8 +71,10 @@ ConstraintSolver::ConstraintSolver(double timeStep)
         false), // Default to no penetration correction, because it breaks our
                 // gradients
     mConstraintForceMixingEnabled(
-        true) // Default to CFM, increases stability but decreases the
-              // accuracy of our gradients
+        true), // Default to CFM, increases stability but decreases the
+               // accuracy of our gradients
+    mContactClippingDepth(
+        0.03) // Default to clipping only after fairly deep penetration
 {
   assert(timeStep > 0.0);
 
@@ -453,6 +455,18 @@ void ConstraintSolver::setCachedLCPSolution(Eigen::VectorXd X)
 }
 
 //==============================================================================
+void ConstraintSolver::setContactClippingDepth(double depth)
+{
+  mContactClippingDepth = depth;
+}
+
+//==============================================================================
+double ConstraintSolver::getContactClippingDepth()
+{
+  return mContactClippingDepth;
+}
+
+//==============================================================================
 bool ConstraintSolver::containSkeleton(const ConstSkeletonPtr& _skeleton) const
 {
   assert(
@@ -568,6 +582,8 @@ void ConstraintSolver::updateConstraints()
     // TODO(MXG): Investigate ways to leverage the proximity information of a
     //            negative penetration to improve collision handling.
     if (contact.penetrationDepth < 0.0)
+      continue;
+    if (contact.penetrationDepth > mContactClippingDepth)
       continue;
 
     if (isSoftContact(contact))
