@@ -555,53 +555,51 @@ void ConstrainedGroupGradientMatrices::constructMatrices(
     // relative velocity is also zero
     if (std::abs(constraintForce) < CLAMPING_THRESHOLD)
     {
-      if (std::abs(relativeVelocity) < CLAMPING_THRESHOLD)
+      // If this is a frictional contact, we need to check how the
+      // corresponding normal constraint is doing. If the normal constraint
+      // has a 0 magnitude, then this clamping constraint can't increase to
+      // fight friction, and it's not UPPER_BOUND in this special case because
+      // the constraint force is at 0. If the normal force isn't at 0, then we
+      // just say friction forces are always CLAMPING.
+      if (fIndexPointer != -1)
       {
-        // This is technically a TIE! Therefore, technically non-differentiable.
-        //
-        // We tie break following a heuristic to guess about the behavior of
-        // this constraint. This is all mathematically incorrect, since the
-        // gradient doesn't exist, but we're trying to pick something that is
-        // useful for downstream applications.
-
-        // If this is a frictional contact, we need to check how the
-        // corresponding normal constraint is doing. If the normal constraint
-        // has a 0 magnitude, then this clamping constraint can't increase to
-        // fight friction.
-        if (fIndexPointer != -1)
-        {
-          double normalForce = mX(fIndexPointer);
-          // If the normal force is 0, then we're NOT_CLAMPING, because we can't
-          // increase our friction force and stay in bounds.
-          if (std::abs(normalForce) < CLAMPING_THRESHOLD)
-          {
-            mContactConstraintMappings(j)
-                = neural::ConstraintMapping::NOT_CLAMPING;
-          }
-          // Otherwise, this is CLAMPING, because as we attempt to move the
-          // contact the friction force will stop us.
-          else
-          {
-            mContactConstraintMappings(j) = neural::ConstraintMapping::CLAMPING;
-            mClampingIndex[j] = numClamping;
-            numClamping++;
-          }
-        }
-        // If this is a normal contact, then we arbitrarily call it
-        // NOT_CLAMPING. These generally occur if there are lots of redundant
-        // vertices supporting a mesh, and some of them require 0 force during a
-        // solve. Leaving these out of CLAMPING also increases stability of our
-        // linear algebra later, like in opportunisticallyStandardizeResults()
-        else
+        double normalForce = mX(fIndexPointer);
+        // If the corresponding normal force is 0, then we're NOT_CLAMPING,
+        // because we can't increase our friction force and stay in bounds.
+        if (std::abs(normalForce) < CLAMPING_THRESHOLD)
         {
           mContactConstraintMappings(j)
               = neural::ConstraintMapping::NOT_CLAMPING;
+        }
+        // Otherwise, this is CLAMPING, because as we attempt to move the
+        // contact the friction force will stop us.
+        else
+        {
+          mContactConstraintMappings(j) = neural::ConstraintMapping::CLAMPING;
+          mClampingIndex[j] = numClamping;
+          numClamping++;
         }
       }
       else
       {
         mContactConstraintMappings(j) = neural::ConstraintMapping::NOT_CLAMPING;
       }
+
+      if (std::abs(relativeVelocity) < CLAMPING_THRESHOLD)
+      {
+        // This is technically a TIE! Therefore, technically non-differentiable.
+        //
+        // For now, we just default to the above classification as tie-breaking.
+        //
+        // If this is a normal contact, then we arbitrarily still call it
+        // NOT_CLAMPING. These generally occur if there are lots of redundant
+        // vertices supporting a mesh, and some of them require 0 force during a
+        // solve. Leaving these out of CLAMPING also increases stability of our
+        // linear algebra later, like in opportunisticallyStandardizeResults()
+        //
+        // If it's a friction pointer, then the above classification is right.
+      }
+
       continue;
     }
 
