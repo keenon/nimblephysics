@@ -33,6 +33,7 @@
 #include "dart/dynamics/DegreeOfFreedom.hpp"
 #include "dart/dynamics/Joint.hpp"
 #include "dart/dynamics/Skeleton.hpp"
+#include "dart/dynamics/BodyNode.hpp"
 
 namespace dart {
 namespace dynamics {
@@ -520,6 +521,87 @@ BodyNode* DegreeOfFreedom::getParentBodyNode()
 const BodyNode* DegreeOfFreedom::getParentBodyNode() const
 {
   return mJoint->getParentBodyNode();
+}
+
+//==============================================================================
+bool DegreeOfFreedom::isParentOf(const DegreeOfFreedom* target) const
+{
+  const dynamics::Joint* parentJoint = getJoint();
+  const dynamics::Joint* childJoint = target->getJoint();
+  if (parentJoint == childJoint)
+  {
+    // For multi-DOF joints, each axis affects all the others.
+    return target->getIndexInJoint() != getIndexInJoint();
+  }
+  // If these joints aren't in the same skeleton, or aren't in the same tree
+  // within that skeleton, this is trivially false
+  if (parentJoint->getSkeleton()->getName()
+          != childJoint->getSkeleton()->getName()
+      || parentJoint->getTreeIndex() != childJoint->getTreeIndex())
+    return false;
+  // If the dof joint is after the node parent joint in the skeleton, this is
+  // also false
+  if (parentJoint->getIndexInTree(0) > childJoint->getIndexInTree(0))
+    return false;
+  // Now this may be true, if the node is a direct child of the dof
+  while (true)
+  {
+    if (parentJoint == childJoint)
+      return true;
+    if (childJoint->getParentBodyNode() == nullptr
+        || childJoint->getParentBodyNode()->getParentJoint() == nullptr)
+      return false;
+    childJoint = childJoint->getParentBodyNode()->getParentJoint();
+  }
+}
+
+//==============================================================================
+bool DegreeOfFreedom::isParentOf(const BodyNode* target) const
+{
+  const dynamics::Joint* dofJoint = getJoint();
+  const dynamics::Joint* nodeParentJoint = target->getParentJoint();
+
+  // If our immediate parent is a weld joint, keep walking up the tree until we
+  // find a normal joint. If there are none, then return false.
+  while (nodeParentJoint->getNumDofs() == 0)
+  {
+    if (nodeParentJoint->getParentBodyNode() != nullptr
+        && nodeParentJoint->getParentBodyNode()->getParentJoint() != nullptr)
+    {
+      nodeParentJoint = nodeParentJoint->getParentBodyNode()->getParentJoint();
+    }
+    else
+    {
+      return false;
+    }
+  }
+  // Edge cases
+  if (nodeParentJoint == nullptr || dofJoint->getSkeleton() == nullptr
+      || nodeParentJoint->getSkeleton() == nullptr
+      || dofJoint->getNumDofs() == 0)
+  {
+    return false;
+  }
+  // If these joints aren't in the same skeleton, or aren't in the same tree
+  // within that skeleton, this is trivially false
+  if (dofJoint->getSkeleton()->getName()
+          != nodeParentJoint->getSkeleton()->getName()
+      || dofJoint->getTreeIndex() != nodeParentJoint->getTreeIndex())
+    return false;
+  // If the dof joint is after the node parent joint in the skeleton, this is
+  // also false
+  if (dofJoint->getIndexInTree(0) > nodeParentJoint->getIndexInTree(0))
+    return false;
+  // Now this may be true, if the node is a direct child of the dof
+  while (true)
+  {
+    if (nodeParentJoint->getName() == dofJoint->getName())
+      return true;
+    if (nodeParentJoint->getParentBodyNode() == nullptr
+        || nodeParentJoint->getParentBodyNode()->getParentJoint() == nullptr)
+      return false;
+    nodeParentJoint = nodeParentJoint->getParentBodyNode()->getParentJoint();
+  }
 }
 
 //==============================================================================

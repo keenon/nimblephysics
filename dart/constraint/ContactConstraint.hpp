@@ -170,7 +170,6 @@ public:
   ///
   void updateFirstFrictionalDirection();
 
-  ///
   TangentBasisMatrix getTangentBasisMatrixODE(const Eigen::Vector3d& n);
 
   /// This returns the gradient of each element of the Tangent basis matrix, if

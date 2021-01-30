@@ -2315,7 +2315,7 @@ math::Jacobian Skeleton::getWorldPositionJacobian(const JacobianNode* _node) con
     }
 
     if (isParent) {
-      Eigen::Vector6d screw = joint->getWorldAxisScrew(dof->getIndexInJoint());
+      Eigen::Vector6d screw = joint->getWorldAxisScrewForPosition(dof->getIndexInJoint());
       screw.tail<3>() += screw.head<3>().cross(bodyNode->getWorldTransform().translation());
       // This is key so we get an actual gradient of the angle (as a screw), rather than just 
       // a screw representing a rotation.

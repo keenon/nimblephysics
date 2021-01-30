@@ -13,6 +13,8 @@
 #include "dart/simulation/World.hpp"
 
 namespace dart {
+
+using namespace constraint;
 namespace neural {
 
 //==============================================================================
@@ -104,8 +106,8 @@ collision::ContactType DifferentiableContactConstraint::getContactType()
 DofContactType DifferentiableContactConstraint::getDofContactType(
     dynamics::DegreeOfFreedom* dof)
 {
-  bool isParentA = isParent(dof, mContactConstraint->getBodyNodeA());
-  bool isParentB = isParent(dof, mContactConstraint->getBodyNodeB());
+  bool isParentA = dof->isParentOf(mContactConstraint->getBodyNodeA());
+  bool isParentB = dof->isParentOf(mContactConstraint->getBodyNodeB());
   // If we're a parent of both contact points, it's a self-contact down the tree
   if (isParentA && isParentB)
   {
@@ -308,7 +310,8 @@ Eigen::Vector3d DifferentiableContactConstraint::getContactPositionGradient(
 
   int jointIndex = dof->getIndexInJoint();
   dynamics::BodyNode* childNode = dof->getChildBodyNode();
-  Eigen::Vector6d worldTwist = dof->getJoint()->getWorldAxisScrew(jointIndex);
+  Eigen::Vector6d worldTwist
+      = dof->getJoint()->getWorldAxisScrewForPosition(jointIndex);
 
   if (type == SPHERE_A)
   {
@@ -572,7 +575,8 @@ Eigen::Vector3d DifferentiableContactConstraint::getContactNormalGradient(
   }
   int jointIndex = dof->getIndexInJoint();
   dynamics::BodyNode* childNode = dof->getChildBodyNode();
-  Eigen::Vector6d worldTwist = dof->getJoint()->getWorldAxisScrew(jointIndex);
+  Eigen::Vector6d worldTwist
+      = dof->getJoint()->getWorldAxisScrewForPosition(jointIndex);
 
   // TODO(keenon): figure out a way to patch the Unit Z singularity in the
   // friction cone computations
@@ -1112,7 +1116,8 @@ EdgeData DifferentiableContactConstraint::getEdgeGradient(
 
   int jointIndex = dof->getIndexInJoint();
   dynamics::BodyNode* childNode = dof->getChildBodyNode();
-  Eigen::Vector6d worldTwist = dof->getJoint()->getWorldAxisScrew(jointIndex);
+  Eigen::Vector6d worldTwist
+      = dof->getJoint()->getWorldAxisScrewForPosition(jointIndex);
 
   DofContactType type = getDofContactType(dof);
   if (type == EDGE_A)
@@ -1186,7 +1191,7 @@ DifferentiableContactConstraint::getScrewAxisForPositionGradient(
     }
   }
   // General case:
-  if (!isParent(rotateDof, screwDof))
+  if (!rotateDof->isParentOf(screwDof))
     return Eigen::Vector6d::Zero();
 
   Eigen::Vector6d axisWorldTwist = getWorldScrewAxisForPosition(screwDof);
@@ -1228,7 +1233,7 @@ Eigen::Vector6d DifferentiableContactConstraint::getScrewAxisForForceGradient(
     }
   }
   // General case:
-  if (!isParent(rotateDof, screwDof))
+  if (!rotateDof->isParentOf(screwDof))
     return Eigen::Vector6d::Zero();
 
   Eigen::Vector6d axisWorldTwist = getWorldScrewAxisForForce(screwDof);
@@ -2454,7 +2459,7 @@ DifferentiableContactConstraint::estimatePerturbedScrewAxisForPosition(
         axisIndex, rotateIndex, eps);
   }
 
-  if (!isParent(rotate, axis))
+  if (!rotate->isParentOf(axis))
     return originalAxisWorldTwist;
 
   Eigen::Vector6d rotateWorldTwist = getWorldScrewAxisForPosition(rotate);
@@ -2499,7 +2504,7 @@ DifferentiableContactConstraint::estimatePerturbedScrewAxisForForce(
         axisIndex, rotateIndex, eps);
   }
 
-  if (!isParent(rotate, axis))
+  if (!rotate->isParentOf(axis))
     return originalAxisWorldTwist;
 
   Eigen::Vector6d rotateWorldTwist = getWorldScrewAxisForPosition(rotate);
@@ -2685,8 +2690,8 @@ double DifferentiableContactConstraint::getForceMultiple(
   if (!mConstraint->isContactConstraint())
     return 1.0;
 
-  bool isParentA = isParent(dof, mContactConstraint->getBodyNodeA());
-  bool isParentB = isParent(dof, mContactConstraint->getBodyNodeB());
+  bool isParentA = dof->isParentOf(mContactConstraint->getBodyNodeA());
+  bool isParentB = dof->isParentOf(mContactConstraint->getBodyNodeB());
 
   // This means it's a self-collision, and we're up stream, so the net effect is
   // 0
@@ -2709,90 +2714,6 @@ double DifferentiableContactConstraint::getForceMultiple(
 }
 
 //==============================================================================
-bool DifferentiableContactConstraint::isParent(
-    const dynamics::DegreeOfFreedom* dof, const dynamics::BodyNode* node)
-{
-  const dynamics::Joint* dofJoint = dof->getJoint();
-  const dynamics::Joint* nodeParentJoint = node->getParentJoint();
-
-  // If our immediate parent is a weld joint, keep walking up the tree until we
-  // find a normal joint. If there are none, then return false.
-  while (nodeParentJoint->getNumDofs() == 0)
-  {
-    if (nodeParentJoint->getParentBodyNode() != nullptr
-        && nodeParentJoint->getParentBodyNode()->getParentJoint() != nullptr)
-    {
-      nodeParentJoint = nodeParentJoint->getParentBodyNode()->getParentJoint();
-    }
-    else
-    {
-      return false;
-    }
-  }
-  // Edge cases
-  if (nodeParentJoint == nullptr || dofJoint->getSkeleton() == nullptr
-      || nodeParentJoint->getSkeleton() == nullptr
-      || dofJoint->getNumDofs() == 0)
-  {
-    return false;
-  }
-  // If these joints aren't in the same skeleton, or aren't in the same tree
-  // within that skeleton, this is trivially false
-  if (dofJoint->getSkeleton()->getName()
-          != nodeParentJoint->getSkeleton()->getName()
-      || dofJoint->getTreeIndex() != nodeParentJoint->getTreeIndex())
-    return false;
-  // If the dof joint is after the node parent joint in the skeleton, this is
-  // also false
-  if (dofJoint->getIndexInTree(0) > nodeParentJoint->getIndexInTree(0))
-    return false;
-  // Now this may be true, if the node is a direct child of the dof
-  while (true)
-  {
-    if (nodeParentJoint->getName() == dofJoint->getName())
-      return true;
-    if (nodeParentJoint->getParentBodyNode() == nullptr
-        || nodeParentJoint->getParentBodyNode()->getParentJoint() == nullptr)
-      return false;
-    nodeParentJoint = nodeParentJoint->getParentBodyNode()->getParentJoint();
-  }
-}
-
-//==============================================================================
-bool DifferentiableContactConstraint::isParent(
-    const dynamics::DegreeOfFreedom* parent,
-    const dynamics::DegreeOfFreedom* child)
-{
-  const dynamics::Joint* parentJoint = parent->getJoint();
-  const dynamics::Joint* childJoint = child->getJoint();
-  if (parentJoint == childJoint)
-  {
-    // For multi-DOF joints, each axis affects all the others.
-    return parent->getIndexInJoint() != child->getIndexInJoint();
-  }
-  // If these joints aren't in the same skeleton, or aren't in the same tree
-  // within that skeleton, this is trivially false
-  if (parentJoint->getSkeleton()->getName()
-          != childJoint->getSkeleton()->getName()
-      || parentJoint->getTreeIndex() != childJoint->getTreeIndex())
-    return false;
-  // If the dof joint is after the node parent joint in the skeleton, this is
-  // also false
-  if (parentJoint->getIndexInTree(0) > childJoint->getIndexInTree(0))
-    return false;
-  // Now this may be true, if the node is a direct child of the dof
-  while (true)
-  {
-    if (parentJoint == childJoint)
-      return true;
-    if (childJoint->getParentBodyNode() == nullptr
-        || childJoint->getParentBodyNode()->getParentJoint() == nullptr)
-      return false;
-    childJoint = childJoint->getParentBodyNode()->getParentJoint();
-  }
-}
-
-//==============================================================================
 Eigen::Vector6d DifferentiableContactConstraint::getWorldScrewAxisForPosition(
     std::shared_ptr<dynamics::Skeleton> skel, int dofIndex)
 {
@@ -2804,7 +2725,7 @@ Eigen::Vector6d DifferentiableContactConstraint::getWorldScrewAxisForPosition(
     dynamics::DegreeOfFreedom* dof)
 {
   int jointIndex = dof->getIndexInJoint();
-  return dof->getJoint()->getWorldAxisScrew(jointIndex);
+  return dof->getJoint()->getWorldAxisScrewForPosition(jointIndex);
 }
 
 //==============================================================================
@@ -2819,8 +2740,7 @@ Eigen::Vector6d DifferentiableContactConstraint::getWorldScrewAxisForForce(
     dynamics::DegreeOfFreedom* dof)
 {
   int jointIndex = dof->getIndexInJoint();
-  Eigen::Vector6d col = dof->getJoint()->getRelativeJacobian().col(jointIndex);
-  return math::AdT(dof->getChildBodyNode()->getWorldTransform(), col);
+  return dof->getJoint()->getWorldAxisScrewForVelocity(jointIndex);
 }
 
 //==============================================================================
@@ -2855,6 +2775,8 @@ DifferentiableContactConstraint::getPeerConstraint(
       minDistance = distance;
     }
   }
+
+  assert(closestConstraint != nullptr && "This probably means eps is too large, and we're moving to a state where contact has changed.");
 
   return closestConstraint;
 }

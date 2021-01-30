@@ -727,7 +727,13 @@ const math::Jacobian ZeroDofJoint::getRelativeJacobianTimeDeriv() const
 }
 
 //==============================================================================
-Eigen::Vector6d ZeroDofJoint::getWorldAxisScrew(int dof) const {
+Eigen::Vector6d ZeroDofJoint::getWorldAxisScrewForPosition(int dof) const {
+  assert(false && "You can't getWorldAxisScrew() on a joint with no degrees of freedom");
+  return Eigen::Vector6d::Zero();
+}
+
+//==============================================================================
+Eigen::Vector6d ZeroDofJoint::getWorldAxisScrewForVelocity(int dof) const {
   assert(false && "You can't getWorldAxisScrew() on a joint with no degrees of freedom");
   return Eigen::Vector6d::Zero();
 }

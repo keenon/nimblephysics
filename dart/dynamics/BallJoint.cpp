@@ -237,7 +237,7 @@ void BallJoint::updateRelativeJacobianTimeDeriv() const
 }
 
 //==============================================================================
-Eigen::Vector6d BallJoint::getWorldAxisScrew(int dof) const
+Eigen::Vector6d BallJoint::getWorldAxisScrewForPosition(int dof) const
 {
   return getWorldAxisScrewAt(getPositionsStatic(), dof);
 }

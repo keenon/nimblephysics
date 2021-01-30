@@ -386,7 +386,7 @@ const Eigen::Vector6d& Joint::getRelativePrimaryAcceleration() const
 }
 
 //==============================================================================
-Eigen::Vector6d Joint::getWorldAxisScrew(int dof) const
+Eigen::Vector6d Joint::getWorldAxisScrewForPosition(int dof) const
 {
   assert(dof >= 0 && dof < getNumDofs());
   Eigen::Vector6d localTwist
@@ -399,6 +399,13 @@ Eigen::Vector6d Joint::getWorldAxisScrew(int dof) const
     parentTransform = getParentBodyNode()->getWorldTransform();
   }
   return math::AdT(parentTransform, parentTwist);
+}
+
+//==============================================================================
+Eigen::Vector6d Joint::getWorldAxisScrewForVelocity(int dof) const
+{
+  Eigen::Vector6d col = getRelativeJacobian().col(dof);
+  return math::AdT(getChildBodyNode()->getWorldTransform(), col);
 }
 
 //==============================================================================

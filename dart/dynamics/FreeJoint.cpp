@@ -700,7 +700,7 @@ void FreeJoint::updateRelativeJacobianTimeDeriv() const
 
 //==============================================================================
 // This gets the world axis screw at the current position, without moving the joint.
-Eigen::Vector6d FreeJoint::getWorldAxisScrew(int dof) const {
+Eigen::Vector6d FreeJoint::getWorldAxisScrewForPosition(int dof) const {
   return getWorldAxisScrewAt(getPositionsStatic(), dof);
 }
 

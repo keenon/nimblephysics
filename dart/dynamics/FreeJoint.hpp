@@ -305,7 +305,7 @@ public:
       const Eigen::Vector6d& _q2, const Eigen::Vector6d& _q1) const override;
 
   // This gets the world axis screw at the current position, without moving the joint.
-  Eigen::Vector6d getWorldAxisScrew(int dof) const override;
+  Eigen::Vector6d getWorldAxisScrewForPosition(int dof) const override;
 
   // This computes the world axis screw at a given position, without moving the joint.
   Eigen::Vector6d getWorldAxisScrewAt(Eigen::Vector6d pos, int dof) const;

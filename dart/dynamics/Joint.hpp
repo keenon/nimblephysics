@@ -673,7 +673,12 @@ public:
   /// Returns the screw representation of a given dof at our current position. 
   /// That is, if we increment dof by EPS, that's the same as left-multiplying 
   /// our getWorldTransform() by math::expMap(screw * EPS).
-  virtual Eigen::Vector6d getWorldAxisScrew(int dof) const;
+  virtual Eigen::Vector6d getWorldAxisScrewForPosition(int dof) const;
+
+  /// Returns the screw representation of a given dof at our current position. 
+  /// That is, if we increment the vel for dof by EPS, that increases all the 
+  /// child body spatial velocities by the returned screw.
+  virtual Eigen::Vector6d getWorldAxisScrewForVelocity(int dof) const;
 
   /// Get constraint wrench expressed in body node frame
   virtual Eigen::Vector6d getBodyConstraintWrench() const = 0;

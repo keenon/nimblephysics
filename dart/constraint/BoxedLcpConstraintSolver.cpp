@@ -215,7 +215,7 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(
   mFIndex.setConstant(n, -1); // set findex to -1
 
   // Compute offset indices
-  mOffset.resize(n);
+  mOffset.resize(numConstraints);
   mOffset[0] = 0;
   for (std::size_t i = 1; i < numConstraints; ++i)
   {

@@ -4859,8 +4859,7 @@ bool verifyPerturbedScrewAxisForPosition(WorldPtr world)
                     << constraints[q]->getDofContactType(axis) << std::endl;
           std::cout << "Rotate Contact Type: "
                     << constraints[q]->getDofContactType(wrt) << std::endl;
-          std::cout << "Is parent: " << constraints[q]->isParent(wrt, axis)
-                    << std::endl;
+          std::cout << "Is parent: " << wrt->isParentOf(axis) << std::endl;
           std::cout << "Analytical World Screw (for pos):" << std::endl
                     << analytical << std::endl;
           std::cout << "Analytical World Screw (for pos) Diff:" << std::endl
@@ -4959,8 +4958,7 @@ bool verifyPerturbedScrewAxisForForce(WorldPtr world)
                     << constraints[q]->getDofContactType(axis) << std::endl;
           std::cout << "Rotate Contact Type: "
                     << constraints[q]->getDofContactType(wrt) << std::endl;
-          std::cout << "Is parent: " << constraints[q]->isParent(wrt, axis)
-                    << std::endl;
+          std::cout << "Is parent: " << wrt->isParentOf(axis) << std::endl;
           std::cout << "Analytical World Screw (for force):" << std::endl
                     << analytical << std::endl;
           std::cout << "Analytical World Screw (for force) Diff:" << std::endl
@@ -5377,7 +5375,7 @@ bool verifyJacobianOfUpperBoundConstraints(WorldPtr world)
   return true;
 }
 
-bool testScrews(WorldPtr world)
+bool verifyPositionScrews(WorldPtr world)
 {
   double EPS = 1e-4;
 
@@ -5393,7 +5391,8 @@ bool testScrews(WorldPtr world)
     int jointIndex = dof->getIndexInJoint();
     dynamics::BodyNode* childNode = dof->getChildBodyNode();
     Eigen::Isometry3d transform = childNode->getWorldTransform();
-    Eigen::Vector6d worldTwist = dof->getJoint()->getWorldAxisScrew(jointIndex);
+    Eigen::Vector6d worldTwist
+        = dof->getJoint()->getWorldAxisScrewForPosition(jointIndex);
 
     double pos = dof->getPosition();
     dof->setPosition(pos + EPS);
@@ -5424,7 +5423,7 @@ bool testScrews(WorldPtr world)
       std::cout << "Relative transform" << std::endl
                 << dof->getJoint()->getRelativeTransform().matrix()
                 << std::endl;
-      worldTwist = dof->getJoint()->getWorldAxisScrew(jointIndex);
+      worldTwist = dof->getJoint()->getWorldAxisScrewForPosition(jointIndex);
 
       return false;
     }
@@ -5433,9 +5432,69 @@ bool testScrews(WorldPtr world)
   return true;
 }
 
+bool verifyVelocityScrews(WorldPtr world)
+{
+  double EPS = 1e-4;
+
+  for (int i = 0; i < world->getNumSkeletons(); i++)
+  {
+    std::shared_ptr<dynamics::Skeleton> skel = world->getSkeleton(i);
+
+    std::vector<dynamics::DegreeOfFreedom*> dofs = skel->getDofs();
+    for (int dofIndex = 0; dofIndex < dofs.size(); dofIndex++)
+    {
+      dynamics::DegreeOfFreedom* dof = dofs[dofIndex];
+
+      for (int j = 0; j < skel->getNumBodyNodes(); j++)
+      {
+        dynamics::BodyNode* node = skel->getBodyNode(j);
+
+        double originalVel = dof->getVelocity();
+        Eigen::Vector6d originalSpatialVel = node->getSpatialVelocity();
+
+        dof->setVelocity(originalVel + EPS);
+        Eigen::Vector6d plusVel = node->getSpatialVelocity();
+
+        dof->setVelocity(originalVel - EPS);
+        Eigen::Vector6d minusVel = node->getSpatialVelocity();
+
+        dof->setVelocity(originalVel);
+
+        // Doing this double-sided should be unnecessary, because it should be
+        // exactly linear (in theory).
+        Eigen::Vector6d bruteForceDiff = (plusVel - minusVel) / (2 * EPS);
+
+        Eigen::Vector6d bruteForceWorldJac
+            = math::AdT(node->getWorldTransform(), bruteForceDiff);
+
+        int jointIndex = dof->getIndexInJoint();
+        Eigen::Vector6d analyticalWorldJac
+            = dof->getJoint()->getWorldAxisScrewForVelocity(jointIndex);
+        if (!dof->isParentOf(node))
+          analyticalWorldJac.setZero();
+
+        if (!equals(bruteForceWorldJac, analyticalWorldJac, 1e-10))
+        {
+          std::cout << "World jac col " << dofIndex << " against body node "
+                    << j << "error: " << std::endl
+                    << "Brute force jac col: " << std::endl
+                    << bruteForceWorldJac << std::endl
+                    << "Analytical jac col: " << std::endl
+                    << analyticalWorldJac << std::endl
+                    << "Diff: " << std::endl
+                    << (bruteForceWorldJac - analyticalWorldJac) << std::endl;
+        }
+      }
+    }
+  }
+
+  return true;
+}
+
 bool verifyAnalyticalJacobians(WorldPtr world, bool allowNoContacts = false)
 {
-  return testScrews(world) && verifyPerturbedContactEdges(world)
+  return verifyPositionScrews(world) && verifyVelocityScrews(world)
+         && verifyPerturbedContactEdges(world)
          && verifyPerturbedContactPositions(world, allowNoContacts)
          && verifyPerturbedContactNormals(world)
          && verifyPerturbedContactForceDirections(world)

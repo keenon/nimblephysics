@@ -4,6 +4,7 @@
 
 #include "dart/collision/CollisionObject.hpp"
 #include "dart/collision/Contact.hpp"
+#include "dart/constraint/ContactConstraint.hpp"
 #include "dart/dynamics/BodyNode.hpp"
 #include "dart/dynamics/RevoluteJoint.hpp"
 #include "dart/dynamics/Skeleton.hpp"
@@ -29,6 +30,24 @@ using namespace math;
 using namespace dynamics;
 using namespace simulation;
 using namespace neural;
+using namespace constraint;
+
+/*
+TEST(GRADIENTS, ODE_GRADIENTS)
+{
+  Eigen::Vector3d grad = Eigen::Vector3d::Random();
+  Eigen::Vector3d normal = Eigen::Vector3d::Random();
+  Eigen::Vector3d firstFrictionDirection = Eigen::Vector3d::UnitZ();
+
+  ContactConstraint::TangentBasisMatrix ode
+      = ContactConstraint::getTangentBasisMatrixODE(
+          normal, firstFrictionDirection);
+
+  ContactConstraint::TangentBasisMatrix odeGrad
+      = ContactConstraint::getTangentBasisMatrixODEGradient(
+          normal, grad, firstFrictionDirection);
+}
+*/
 
 /**
  * This sets up two boxes colliding with each other. Each can rotate and
@@ -193,7 +212,7 @@ void testEdgeEdgeCollision(bool isSelfCollision)
   box2Position.linear()
       = math::eulerXYZToMatrix(Eigen::Vector3d(0, 45, 45) * 3.1415 / 180);
   box2Position.translation() = box2Position.linear() * Eigen::Vector3d(1, -1, 0)
-                               * ((2 * sqrt(0.5) / sqrt(2)) - 2e-2);
+                               * ((2 * sqrt(0.5) / sqrt(2)) - 0.01);
   box2Joint->setTransformFromChildBodyNode(box2Position);
 
   world->addSkeleton(box1);
@@ -237,7 +256,9 @@ TEST(GRADIENTS, EDGE_EDGE_COLLISION)
 {
   testEdgeEdgeCollision(false);
 }
+#endif
 
+#ifdef ALL_TESTS
 TEST(GRADIENTS, EDGE_EDGE_SELF_COLLISION)
 {
   testEdgeEdgeCollision(true);
@@ -326,7 +347,7 @@ void testSphereBoxCollision(bool isSelfCollision, int numFaces)
   world->setVelocities(vels);
 
   // renderWorld(world);
-  EXPECT_TRUE(verifyAnalyticalJacobians(world));
+  EXPECT_TRUE(verifyAnalyticalJacobians(world, numFaces == 4));
   EXPECT_TRUE(verifyVelGradients(world, vels));
   EXPECT_TRUE(verifyWrtMass(world));
 
@@ -343,7 +364,7 @@ void testSphereBoxCollision(bool isSelfCollision, int numFaces)
 
   // EXPECT_TRUE(verifyPerturbedContactPositions(world));
   // EXPECT_TRUE(verifyPerturbedContactNormals(world));
-  EXPECT_TRUE(verifyAnalyticalJacobians(world));
+  EXPECT_TRUE(verifyAnalyticalJacobians(world, numFaces == 4));
   EXPECT_TRUE(verifyVelGradients(world, vels));
   EXPECT_TRUE(verifyWrtMass(world));
 }
@@ -470,8 +491,8 @@ void testSphereMeshCollision(bool isSelfCollision, int numFaces)
       = box->createJointAndBodyNodePair<FreeJoint>();
 
   aiScene* boxMesh = createBoxMeshUnsafe();
-  std::shared_ptr<MeshShape> boxShape(
-      new MeshShape(Eigen::Vector3d(1.0, 1.0, 1.0), boxMesh));
+  std::shared_ptr<MeshShape> boxShape(new MeshShape(
+      Eigen::Vector3d(1.0, 1.0, 1.0), boxMesh, "", nullptr, true));
 
   ShapeNode* boxNode
       = boxPair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(
@@ -498,21 +519,25 @@ void testSphereMeshCollision(bool isSelfCollision, int numFaces)
   Eigen::Matrix3d rotation = Eigen::Matrix3d::Identity();
 
   Eigen::Isometry3d spherePosition = Eigen::Isometry3d::Identity();
+  double penetrationDepth = 2e-3;
   if (numFaces == 1)
   {
-    spherePosition.translation() = Eigen::Vector3d(1.0 - 2e-2, 0, 0);
+    spherePosition.translation()
+        = Eigen::Vector3d(1.0 - penetrationDepth, 0, 0);
   }
   else if (numFaces == 2)
   {
     spherePosition.translation() = Eigen::Vector3d(
-        (0.5 / sqrt(2)) + 0.5 - 2e-2, (0.5 / sqrt(2)) + 0.5 - 2e-2, 0);
+        ((0.5 - penetrationDepth) * sqrt(1.0 / 2)) + 0.5,
+        ((0.5 - penetrationDepth) * sqrt(1.0 / 2)) + 0.5,
+        0);
   }
   else if (numFaces == 3)
   {
     spherePosition.translation() = Eigen::Vector3d(
-        (0.5 / sqrt(3)) + 0.5 - 2e-2,
-        (0.5 / sqrt(3)) + 0.5 - 2e-2,
-        (0.5 / sqrt(3)) + 0.5 - 2e-2);
+        ((0.5 - penetrationDepth) * sqrt(1.0 / 3)) + 0.5,
+        ((0.5 - penetrationDepth) * sqrt(1.0 / 3)) + 0.5,
+        ((0.5 - penetrationDepth) * sqrt(1.0 / 3)) + 0.5);
   }
   else if (numFaces == 4)
   {
@@ -527,15 +552,36 @@ void testSphereMeshCollision(bool isSelfCollision, int numFaces)
   }
 
   Eigen::VectorXd vels = Eigen::VectorXd::Zero(world->getNumDofs());
-  // Set the vel of the X translation of the 2nd box
-  vels(9) = 0.1;
+  if (numFaces == 1 || numFaces == 2)
+  {
+    // Set the vel of the X translation of the 2nd box
+    vels(9) = 0.1;
+  }
+  else if (numFaces == 3 || numFaces == 4)
+  {
+    // Set the vel of the X, Y, Z translation of the 2nd box
+    vels(9) = 0.1;
+    vels(10) = 0.1;
+    vels(11) = 0.1;
+
+    /*
+    server::GUIWebsocketServer server;
+    server.renderWorld(world);
+    server.renderBasis();
+    server.serve(8070);
+
+    while (server.isServing())
+    {
+    }
+    */
+  }
   world->setVelocities(vels);
 
   // renderWorld(world);
   // EXPECT_TRUE(verifyPerturbedContactPositions(world));
   // EXPECT_TRUE(verifyPerturbedContactNormals(world));
   // EXPECT_TRUE(verifyPerturbedContactEdges(world));
-  EXPECT_TRUE(verifyAnalyticalJacobians(world));
+  EXPECT_TRUE(verifyAnalyticalJacobians(world, numFaces == 4));
   EXPECT_TRUE(verifyVelGradients(world, vels));
   EXPECT_TRUE(verifyWrtMass(world));
 
@@ -552,7 +598,7 @@ void testSphereMeshCollision(bool isSelfCollision, int numFaces)
 
   // EXPECT_TRUE(verifyPerturbedContactPositions(world));
   // EXPECT_TRUE(verifyPerturbedContactNormals(world));
-  EXPECT_TRUE(verifyAnalyticalJacobians(world));
+  EXPECT_TRUE(verifyAnalyticalJacobians(world, numFaces == 4));
   EXPECT_TRUE(verifyVelGradients(world, vels));
   EXPECT_TRUE(verifyWrtMass(world));
 }
@@ -982,7 +1028,8 @@ void testBoxCapsuleCollision(bool isSelfCollision, bool useMesh, int type)
   if (useMesh)
   {
     aiScene* boxMesh = createBoxMeshUnsafe();
-    std::shared_ptr<MeshShape> boxShape(new MeshShape(size, boxMesh));
+    std::shared_ptr<MeshShape> boxShape(
+        new MeshShape(size, boxMesh, "", nullptr, true));
     ShapeNode* sphereNode
         = boxPair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(
             boxShape);

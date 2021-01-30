@@ -375,6 +375,12 @@ public:
   /// Get the BodyNode upstream of this DegreeOfFreedom
   const BodyNode* getParentBodyNode() const;
 
+  /// This does a slow walk up the tree to figure out if `target` is a child of this node.
+  bool isParentOf(const DegreeOfFreedom* target) const;
+
+  /// This does a slow walk up the tree to figure out if `target` is a child of this node.
+  bool isParentOf(const BodyNode* target) const;
+
   /// \}
 
 protected:
