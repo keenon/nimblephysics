@@ -158,12 +158,14 @@ MeshShape::MeshShape(
     const Eigen::Vector3d& scale,
     const aiScene* mesh,
     const common::Uri& path,
-    common::ResourceRetrieverPtr resourceRetriever)
+    common::ResourceRetrieverPtr resourceRetriever, 
+    bool dontFreeMesh)
   : Shape(MESH),
     mDisplayList(0),
     mColorMode(MATERIAL_COLOR),
     mAlphaMode(BLEND),
-    mColorIndex(0)
+    mColorIndex(0),
+    mDontFreeMesh(dontFreeMesh)
 {
   setMesh(mesh, path, std::move(resourceRetriever));
   setScale(scale);
@@ -172,6 +174,7 @@ MeshShape::MeshShape(
 //==============================================================================
 MeshShape::~MeshShape()
 {
+  if (mDontFreeMesh) return;
   aiReleaseImport(mMesh);
 }
 

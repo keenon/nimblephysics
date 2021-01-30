@@ -80,7 +80,8 @@ public:
   MeshShape(const Eigen::Vector3d& scale,
     const aiScene* mesh,
     const common::Uri& uri = "",
-    common::ResourceRetrieverPtr resourceRetriever = nullptr);
+    common::ResourceRetrieverPtr resourceRetriever = nullptr,
+    bool dontFreeMesh = false);
 
   /// Destructor.
   ~MeshShape() override;
@@ -170,6 +171,9 @@ protected:
   void updateVolume() const override;
 
   const aiScene* mMesh;
+
+  /// If this is true, don't take ownership of the mMesh object and don't free it
+  bool mDontFreeMesh;
 
   /// URI the mesh, if available).
   common::Uri mMeshUri;
