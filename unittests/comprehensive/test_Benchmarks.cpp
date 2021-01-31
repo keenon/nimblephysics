@@ -92,9 +92,9 @@ bool verifyMultiShotOptimization(WorldPtr world, MultiShot shot)
   optimizer.setIterationLimit(100);
   optimizer.setRecordPerformanceLog(true);
   std::shared_ptr<Solution> record = optimizer.optimize(&shot);
-  EXPECT_TRUE(record->getNumSteps() == 101);
-  EXPECT_TRUE(record->getStep(0).index == 0);
-  EXPECT_TRUE(record->getStep(1).index == 1);
+  EXPECT_TRUE(record->getNumSteps() <= 101);
+  EXPECT_EQ(record->getStep(0).index, 0);
+  EXPECT_EQ(record->getStep(1).index, 1);
   EXPECT_TRUE(record->getStep(1).rollout != record->getStep(0).rollout);
 
   // Playback the trajectory
