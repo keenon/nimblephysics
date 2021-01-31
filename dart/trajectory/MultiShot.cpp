@@ -9,6 +9,9 @@
 #include "dart/neural/RestorableSnapshot.hpp"
 #include "dart/simulation/World.hpp"
 
+// Make production builds happy with asserts
+#define _unused(x) ((void)(x))
+
 using namespace dart;
 using namespace dynamics;
 using namespace simulation;
@@ -961,6 +964,9 @@ void MultiShot::getStates(
   assert(rollout->getVels(mRepresentationMapping).rows() == velDim);
   assert(rollout->getForces(mRepresentationMapping).cols() == mSteps);
   assert(rollout->getForces(mRepresentationMapping).rows() == forceDim);
+  _unused(posDim);
+  _unused(velDim);
+  _unused(forceDim);
   int cursor = 0;
   if (useKnots)
   {

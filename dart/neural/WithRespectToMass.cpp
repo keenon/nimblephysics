@@ -34,6 +34,7 @@ int WrtMassBodyNodyEntry::dim()
   if (type == INERTIA_FULL)
     return 10;
   assert(false);
+  return 0;
 }
 
 //==============================================================================
@@ -213,6 +214,9 @@ WrtMassBodyNodyEntry& WithRespectToMass::getNode(dynamics::BodyNode* node)
     }
   }
   assert(false);
+  // The code should never reach this point, but this is here to keep the
+  // compiler happy
+  return *(WrtMassBodyNodyEntry*)(0L);
 }
 
 //==============================================================================

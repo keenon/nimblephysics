@@ -656,6 +656,7 @@ std::size_t World::getSkeletonDofOffset(
     dofCursor += skel->getNumDofs();
   }
   assert(false && "You asked for an world DOF offset for a skeleton that isn't in the world");
+  return 0;
 }
 
 //==============================================================================

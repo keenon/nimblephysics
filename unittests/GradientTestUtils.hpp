@@ -2925,6 +2925,7 @@ Eigen::VectorXd getTestComponentWorld(
     return world->getExternalForces();
   else
     assert(false && "Unrecognized component value in getTestComponent()");
+  return *(Eigen::VectorXd*)(0L);
 }
 
 void setTestComponentWorld(
@@ -2953,6 +2954,7 @@ Eigen::VectorXd getTestComponentMapping(
     return mapping->getForces(world);
   else
     assert(false && "Unrecognized component value in getTestComponent()");
+  return *(Eigen::VectorXd*)(0L);
 }
 
 int getTestComponentMappingDim(
@@ -2968,6 +2970,7 @@ int getTestComponentMappingDim(
     return mapping->getForceDim();
   else
     assert(false && "Unrecognized component value in getTestComponent()");
+  return 0;
 }
 
 Eigen::MatrixXd getTestComponentMappingIntoJac(
@@ -2994,6 +2997,7 @@ Eigen::MatrixXd getTestComponentMappingIntoJac(
     return mapping->getRealForceToMappedForceJac(world);
   else
     assert(false && "Unrecognized <component, wrt> pair in getTestComponent()");
+  return *(Eigen::MatrixXd*)(0L);
 }
 
 Eigen::MatrixXd getTestComponentMappingOutJac(
@@ -3009,6 +3013,7 @@ Eigen::MatrixXd getTestComponentMappingOutJac(
     return mapping->getMappedForceToRealForceJac(world);
   else
     assert(false && "Unrecognized component value in getTestComponent()");
+  return *(Eigen::MatrixXd*)(0L);
 }
 
 void setTestComponentMapping(
@@ -3037,6 +3042,7 @@ std::string getComponentName(MappingTestComponent component)
     return "FORCE";
   else
     assert(false && "Unrecognized component value in getTestComponent()");
+  return *(std::string*)(0L);
 }
 
 bool verifyMappingSetGet(
@@ -3241,6 +3247,7 @@ Eigen::MatrixXd getTimestepJacobian(
         world, snapshot->getRepresentation(), snapshot->getRepresentation());
   }
   assert(false && "Unsupported combination of inComponent and outComponent in getTimestepJacobian()!");
+  return *(Eigen::MatrixXd*)(0L);
 }
 
 bool verifyMappedStepJacobian(

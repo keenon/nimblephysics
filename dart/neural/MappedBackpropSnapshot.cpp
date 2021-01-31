@@ -5,6 +5,9 @@
 #include "dart/neural/RestorableSnapshot.hpp"
 #include "dart/neural/WithRespectToMass.hpp"
 
+// Make production builds happy with asserts
+#define _unused(x) ((void)(x))
+
 #define LOG_PERFORMANCE_MAPPED_BACKPROP_SNAPSHOT ;
 
 using namespace dart;
@@ -552,6 +555,7 @@ Eigen::MatrixXd MappedBackpropSnapshot::finiteDifferenceForceVelJacobian(
 
   // TODO: this needs to support non-identity mapIns
   assert(mapBefore == "identity" && "Non-identity map ins are currently not supported by finite differencing");
+  _unused(mapBefore);
 
   Eigen::MatrixXd J(outDim, inDim);
 
@@ -651,6 +655,7 @@ Eigen::MatrixXd MappedBackpropSnapshot::finiteDifferencePosPosJacobian(
 
   // TODO: this needs to support non-identity mapIns
   assert(mapBefore == "identity" && "Non-identity map ins are currently not supported by finite differencing");
+  _unused(mapBefore);
 
   RestorableSnapshot snapshot(world);
 
@@ -724,6 +729,7 @@ Eigen::MatrixXd MappedBackpropSnapshot::finiteDifferenceVelPosJacobian(
 
   // TODO: this needs to support non-identity mapIns
   assert(mapBefore == "identity" && "Non-identity map ins are currently not supported by finite differencing");
+  _unused(mapBefore);
 
   RestorableSnapshot snapshot(world);
 

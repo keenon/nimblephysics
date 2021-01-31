@@ -11,6 +11,9 @@
 #include "dart/neural/WithRespectToMass.hpp"
 #include "dart/simulation/World.hpp"
 
+// Make production builds happy with asserts
+#define _unused(x) ((void)(x))
+
 // This will enable runtime checks where every analytical Jacobian is compared
 // to the finite difference version, and we error if they're too close far
 // apart:
@@ -4024,6 +4027,7 @@ const Eigen::VectorXi& BackpropSnapshot::getVectorToAssemble(
     VectorToAssemble whichVector)
 {
   assert(whichVector == VectorToAssemble::CONTACT_CONSTRAINT_MAPPINGS);
+  _unused(whichVector);
   return matrices->getContactConstraintMappings();
 }
 

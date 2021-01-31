@@ -10,6 +10,9 @@
 #include "dart/simulation/World.hpp"
 #include "dart/trajectory/Problem.hpp"
 
+// Make production builds happy with asserts
+#define _unused(x) ((void)(x))
+
 using namespace dart;
 
 namespace dart {
@@ -541,6 +544,7 @@ Eigen::Ref<Eigen::MatrixXd> TrajectoryRolloutConstRef::getPoses(
     const std::string& /* mapping */)
 {
   assert(false && "It should be impossible to get a mutable reference from a TrajectorRolloutConstRef");
+  return *(Eigen::Ref<Eigen::MatrixXd>*)(0L);
 }
 
 //==============================================================================
@@ -548,6 +552,7 @@ Eigen::Ref<Eigen::MatrixXd> TrajectoryRolloutConstRef::getVels(
     const std::string& /* mapping */)
 {
   assert(false && "It should be impossible to get a mutable reference from a TrajectorRolloutConstRef");
+  return *(Eigen::Ref<Eigen::MatrixXd>*)(0L);
 }
 
 //==============================================================================
@@ -555,12 +560,14 @@ Eigen::Ref<Eigen::MatrixXd> TrajectoryRolloutConstRef::getForces(
     const std::string& /* mapping */)
 {
   assert(false && "It should be impossible to get a mutable reference from a TrajectorRolloutConstRef");
+  return *(Eigen::Ref<Eigen::MatrixXd>*)(0L);
 }
 
 //==============================================================================
 Eigen::Ref<Eigen::VectorXd> TrajectoryRolloutConstRef::getMasses()
 {
   assert(false && "It should be impossible to get a mutable reference from a TrajectorRolloutConstRef");
+  return *(Eigen::Ref<Eigen::MatrixXd>*)(0L);
 }
 
 //==============================================================================
