@@ -319,14 +319,14 @@ void testSphereBoxCollision(bool isSelfCollision, int numFaces)
   else if (numFaces == 2)
   {
     spherePosition.translation() = Eigen::Vector3d(
-        (0.5 / sqrt(2)) + 0.5 - 2e-2, (0.5 / sqrt(2)) + 0.5 - 2e-2, 0);
+        ((0.5 - 2e-2) / sqrt(2)) + 0.5, ((0.5 - 2e-2) / sqrt(2)) + 0.5, 0);
   }
   else if (numFaces == 3)
   {
     spherePosition.translation() = Eigen::Vector3d(
-        (0.5 / sqrt(3)) + 0.5 - 2e-2,
-        (0.5 / sqrt(3)) + 0.5 - 2e-2,
-        (0.5 / sqrt(3)) + 0.5 - 2e-2);
+        ((0.5 - 2e-2) / sqrt(3)) + 0.5,
+        ((0.5 - 2e-2) / sqrt(3)) + 0.5,
+        ((0.5 - 2e-2) / sqrt(3)) + 0.5);
   }
   else if (numFaces == 4)
   {
