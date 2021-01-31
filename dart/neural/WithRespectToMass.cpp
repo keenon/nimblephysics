@@ -216,7 +216,7 @@ WrtMassBodyNodyEntry& WithRespectToMass::getNode(dynamics::BodyNode* node)
   assert(false);
   // The code should never reach this point, but this is here to keep the
   // compiler happy
-  return *(WrtMassBodyNodyEntry*)(0L);
+  throw std::runtime_error{"Execution should never reach this point"};
 }
 
 //==============================================================================

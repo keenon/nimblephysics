@@ -544,7 +544,7 @@ Eigen::Ref<Eigen::MatrixXd> TrajectoryRolloutConstRef::getPoses(
     const std::string& /* mapping */)
 {
   assert(false && "It should be impossible to get a mutable reference from a TrajectorRolloutConstRef");
-  return *(Eigen::Ref<Eigen::MatrixXd>*)(0L);
+  throw std::runtime_error{"Execution should never reach this point"};
 }
 
 //==============================================================================
@@ -552,7 +552,7 @@ Eigen::Ref<Eigen::MatrixXd> TrajectoryRolloutConstRef::getVels(
     const std::string& /* mapping */)
 {
   assert(false && "It should be impossible to get a mutable reference from a TrajectorRolloutConstRef");
-  return *(Eigen::Ref<Eigen::MatrixXd>*)(0L);
+  throw std::runtime_error{"Execution should never reach this point"};
 }
 
 //==============================================================================
@@ -560,14 +560,14 @@ Eigen::Ref<Eigen::MatrixXd> TrajectoryRolloutConstRef::getForces(
     const std::string& /* mapping */)
 {
   assert(false && "It should be impossible to get a mutable reference from a TrajectorRolloutConstRef");
-  return *(Eigen::Ref<Eigen::MatrixXd>*)(0L);
+  throw std::runtime_error{"Execution should never reach this point"};
 }
 
 //==============================================================================
 Eigen::Ref<Eigen::VectorXd> TrajectoryRolloutConstRef::getMasses()
 {
   assert(false && "It should be impossible to get a mutable reference from a TrajectorRolloutConstRef");
-  return *(Eigen::Ref<Eigen::MatrixXd>*)(0L);
+  throw std::runtime_error{"Execution should never reach this point"};
 }
 
 //==============================================================================
