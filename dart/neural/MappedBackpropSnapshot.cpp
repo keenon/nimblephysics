@@ -200,6 +200,8 @@ void MappedBackpropSnapshot::backprop(
       = Eigen::VectorXd::Zero(mMappings[mRepresentation]->getVelDim());
   thisTimestepLoss.lossWrtTorque
       = Eigen::VectorXd::Zero(mMappings[mRepresentation]->getForceDim());
+  thisTimestepLoss.lossWrtMass
+      = Eigen::VectorXd::Zero(mMappings[mRepresentation]->getMassDim());
 
   // Cleaner, slower way to compute backprop
   for (auto pair : nextTimestepLosses)
