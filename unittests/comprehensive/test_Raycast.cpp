@@ -31,6 +31,7 @@
  */
 
 #include <gtest/gtest.h>
+
 #include "dart/collision/fcl/fcl.hpp"
 #include "dart/dart.hpp"
 #if HAVE_BULLET
@@ -43,12 +44,18 @@ using namespace dart;
 //==============================================================================
 void testBasicInterface(const std::shared_ptr<CollisionDetector>& cd)
 {
+#if HAVE_BULLET
   if (cd->getType() != collision::BulletCollisionDetector::getStaticType())
   {
     dtwarn << "Aborting test: distance check is not supported by "
            << cd->getType() << ".\n";
     return;
   }
+#else
+  dtwarn << "Aborting test: distance check is not supported by "
+         << cd->getType() << ".\n";
+  return;
+#endif
 
   auto simpleFrame1 = SimpleFrame::createShared(Frame::World());
 
@@ -132,12 +139,18 @@ TEST(Distance, testBasicInterface)
 //==============================================================================
 void testOptions(const std::shared_ptr<CollisionDetector>& cd)
 {
+#if HAVE_BULLET
   if (cd->getType() != collision::BulletCollisionDetector::getStaticType())
   {
     dtwarn << "Aborting test: distance check is not supported by "
            << cd->getType() << ".\n";
     return;
   }
+#else
+  dtwarn << "Aborting test: distance check is not supported by "
+         << cd->getType() << ".\n";
+  return;
+#endif
 
   auto simpleFrame1 = SimpleFrame::createShared(Frame::World());
   auto shape1 = std::make_shared<SphereShape>(1.0);

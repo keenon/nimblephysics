@@ -168,8 +168,13 @@ Eigen::Ref<Eigen::VectorXd> MultiShot::getPinnedForce(int time)
     else
       time -= steps;
   }
-  std::cout << "WARNING: Attempted to get pinned force for OOB timestep"
+  std::cout << "ERROR: Attempted to get pinned force for OOB timestep"
             << std::endl;
+  assert(false && "Control should never reach this point");
+  // Control should never reach this point, but this keeps the compiler from
+  // complaining
+  Eigen::VectorXd zero = Eigen::VectorXd::Zero(0);
+  return zero;
 }
 
 //==============================================================================
@@ -648,7 +653,6 @@ int MultiShot::getNumberNonZeroJacobianDynamic(
   int nnzj = Problem::getNumberNonZeroJacobianDynamic(world);
 
   int stateDim = getRepresentationStateSize();
-  int staticDim = getFlatStaticProblemDim(world);
 
   for (int i = 0; i < mShots.size() - 1; i++)
   {
@@ -1069,13 +1073,29 @@ void MultiShot::setStates(
 /// This sets the forces in this trajectory from the passed in matrix
 void MultiShot::setForcesRaw(Eigen::MatrixXd forces, PerformanceLog* log)
 {
+  PerformanceLog* thisLog = nullptr;
+#ifdef LOG_PERFORMANCE_MULTI_SHOT
+  if (log != nullptr)
+  {
+    thisLog = log->startRun("MultiShot.setForcesRaw");
+  }
+#endif
+
   int cursor = 0;
   for (int i = 0; i < mShots.size(); i++)
   {
     int len = mShots[i]->getNumSteps();
-    mShots[i]->setForcesRaw(forces.block(0, cursor, forces.rows(), len));
+    mShots[i]->setForcesRaw(
+        forces.block(0, cursor, forces.rows(), len), thisLog);
     cursor += len;
   }
+
+#ifdef LOG_PERFORMANCE_MULTI_SHOT
+  if (thisLog != nullptr)
+  {
+    thisLog->end();
+  }
+#endif
 }
 
 //==============================================================================

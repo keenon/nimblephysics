@@ -22,11 +22,11 @@ namespace trajectory {
 
 //==============================================================================
 IPOptOptimizer::IPOptOptimizer()
-  : mTolerance(1e-7),
+  : mIterationLimit(100),
+    mTolerance(1e-7),
     mLBFGSHistoryLength(1),
-    mPrintFrequency(1),
-    mIterationLimit(100),
     mCheckDerivatives(false),
+    mPrintFrequency(1),
     mRecordPerfLog(false),
     mRecoverBest(true),
     mRecordFullDebugInfo(false),

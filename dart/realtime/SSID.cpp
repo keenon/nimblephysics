@@ -21,18 +21,19 @@ SSID::SSID(
     std::shared_ptr<trajectory::LossFn> loss,
     int planningHistoryMillis,
     int sensorDim)
-  : mWorld(world),
+  : mRunning(false),
+    mWorld(world),
     mLoss(loss),
     mPlanningHistoryMillis(planningHistoryMillis),
     mSensorDim(sensorDim),
     mSensorLog(VectorLog(sensorDim)),
-    mControlLog(VectorLog(world->getNumDofs())),
-    mRunning(false)
+    mControlLog(VectorLog(world->getNumDofs()))
 {
   int dofs = world->getNumDofs();
-  mInitialPosEstimator = [dofs](Eigen::MatrixXd sensors, long time) {
-    return Eigen::VectorXd::Zero(dofs);
-  };
+  mInitialPosEstimator
+      = [dofs](Eigen::MatrixXd /* sensors */, long /* time */) {
+          return Eigen::VectorXd::Zero(dofs);
+        };
 
   std::shared_ptr<IPOptOptimizer> ipoptOptimizer
       = std::make_shared<IPOptOptimizer>();
@@ -214,7 +215,7 @@ void SSID::optimizationThreadLoop()
       std::cout << "Running inference" << std::endl;
       runInference(startTime);
     }
-    long endTime = timeSinceEpochMillis();
+    // long endTime = timeSinceEpochMillis();
   }
 }
 

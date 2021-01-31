@@ -457,13 +457,13 @@ TEST(REALTIME, CONTROL_BUFFER_ESTIMATE)
 
   std::pair<PrismaticJoint*, BodyNode*> boxJointPair
       = box->createJointAndBodyNodePair<PrismaticJoint>();
-  PrismaticJoint* boxJoint = boxJointPair.first;
+  // PrismaticJoint* boxJoint = boxJointPair.first;
   BodyNode* boxBody = boxJointPair.second;
 
   std::shared_ptr<BoxShape> shape(
       new BoxShape(Eigen::Vector3d(0.05, 0.25, 0.05)));
-  ShapeNode* boxShape
-      = boxBody->createShapeNodeWith<VisualAspect, CollisionAspect>(shape);
+  // ShapeNode* boxShape =
+  boxBody->createShapeNodeWith<VisualAspect, CollisionAspect>(shape);
 
   // We're going to tune the full inertia properties of the swinging object
   Eigen::VectorXd upperBounds = Eigen::VectorXd::Ones(1) * 5.0;

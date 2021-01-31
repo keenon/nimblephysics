@@ -309,7 +309,6 @@ Eigen::Vector3d DifferentiableContactConstraint::getContactPositionGradient(
   }
 
   int jointIndex = dof->getIndexInJoint();
-  dynamics::BodyNode* childNode = dof->getChildBodyNode();
   Eigen::Vector6d worldTwist
       = dof->getJoint()->getWorldAxisScrewForPosition(jointIndex);
 
@@ -574,7 +573,6 @@ Eigen::Vector3d DifferentiableContactConstraint::getContactNormalGradient(
     return Eigen::Vector3d::Zero();
   }
   int jointIndex = dof->getIndexInJoint();
-  dynamics::BodyNode* childNode = dof->getChildBodyNode();
   Eigen::Vector6d worldTwist
       = dof->getJoint()->getWorldAxisScrewForPosition(jointIndex);
 
@@ -750,9 +748,6 @@ Eigen::Vector3d DifferentiableContactConstraint::getContactNormalGradient(
         math::gradientWrtTheta(worldTwist, mContact->sphereCenter, 0.0));
     Eigen::Vector3d sphereCenterGrad
         = math::gradientWrtTheta(worldTwist, mContact->sphereCenter, 0.0);
-
-    Eigen::Vector3d closestPoint = math::closestPointOnLine(
-        mContact->edgeAFixedPoint, mContact->edgeADir, mContact->sphereCenter);
 
     double norm = (mContact->edgeAClosestPoint - mContact->sphereCenter).norm();
     Eigen::Vector3d normGrad = closestPointGrad - sphereCenterGrad;
@@ -1115,7 +1110,6 @@ EdgeData DifferentiableContactConstraint::getEdgeGradient(
   data.edgeBDir = Eigen::Vector3d::Zero();
 
   int jointIndex = dof->getIndexInJoint();
-  dynamics::BodyNode* childNode = dof->getChildBodyNode();
   Eigen::Vector6d worldTwist
       = dof->getJoint()->getWorldAxisScrewForPosition(jointIndex);
 
@@ -1369,10 +1363,6 @@ double DifferentiableContactConstraint::getConstraintForceDerivative(
   Eigen::Vector6d gradientOfWorldForce = getContactWorldForceGradient(wrt);
   Eigen::Vector6d gradientOfWorldTwist = getScrewAxisForForceGradient(dof, wrt);
   Eigen::Vector6d worldTwist = getWorldScrewAxisForForce(dof);
-  double dot1 = worldTwist.dot(gradientOfWorldForce);
-  double dot2 = gradientOfWorldTwist.dot(worldForce);
-  double sum = dot1 + dot2;
-  double ret = sum * multiple;
   return (worldTwist.dot(gradientOfWorldForce)
           + gradientOfWorldTwist.dot(worldForce))
          * multiple;

@@ -21,7 +21,11 @@ ObservationLog::ObservationLog(
 }
 
 void ObservationLog::observe(
-    long time, Eigen::VectorXd pos, Eigen::VectorXd vel, Eigen::VectorXd mass)
+    long time,
+    Eigen::VectorXd pos,
+    Eigen::VectorXd vel,
+    // TODO(keenon): Support mass observations
+    Eigen::VectorXd /* mass */)
 {
   mObservations.emplace_back(time, pos, vel);
 }

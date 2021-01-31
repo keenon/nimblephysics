@@ -6,7 +6,7 @@ namespace dart {
 namespace realtime {
 
 Ticker::Ticker(double secondsPerTick)
-  : mSecondsPerTick(secondsPerTick), mRunning(false)
+  : mRunning(false), mSecondsPerTick(secondsPerTick)
 {
 }
 

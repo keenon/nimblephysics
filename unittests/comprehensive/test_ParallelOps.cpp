@@ -279,7 +279,8 @@ TEST(TRAJECTORY, JUMP_WORM)
       root, Eigen::Vector3d(182.0 / 255, 223.0 / 255, 144.0 / 255));
   BodyNode* tail2 = createTailSegment(
       tail1, Eigen::Vector3d(223.0 / 255, 228.0 / 255, 163.0 / 255));
-  BodyNode* tail3 = createTailSegment(
+  // BodyNode* tail3 =
+  createTailSegment(
       tail2, Eigen::Vector3d(221.0 / 255, 193.0 / 255, 121.0 / 255));
 
   Eigen::VectorXd pos = Eigen::VectorXd(5);
@@ -301,9 +302,8 @@ TEST(TRAJECTORY, JUMP_WORM)
   floorJoint->setTransformFromParentBodyNode(floorOffset);
   std::shared_ptr<BoxShape> floorShape(
       new BoxShape(Eigen::Vector3d(2.5, 0.25, 0.5)));
-  ShapeNode* floorVisual
-      = floorBody->createShapeNodeWith<VisualAspect, CollisionAspect>(
-          floorShape);
+  // ShapeNode* floorVisual =
+  floorBody->createShapeNodeWith<VisualAspect, CollisionAspect>(floorShape);
   floorBody->setFrictionCoeff(0);
 
   world->addSkeleton(floor);
@@ -332,12 +332,12 @@ TEST(TRAJECTORY, JUMP_WORM)
         minPos = poses(1, i);
       }
     }
-    double peakPosLoss = -(maxPos * maxPos) * (maxPos > 0 ? 1.0 : -1.0);
-    double minPosLoss = -(minPos * minPos) * (minPos > 0 ? 1.0 : -1.0);
+    // double peakPosLoss = -(maxPos * maxPos) * (maxPos > 0 ? 1.0 : -1.0);
+    // double minPosLoss = -(minPos * minPos) * (minPos > 0 ? 1.0 : -1.0);
     double endPos = poses(1, poses.cols() - 1);
     double endPosLoss = -(endPos * endPos) * (endPos > 0 ? 1.0 : -1.0);
 
-    double forceLoss = forces.squaredNorm();
+    // double forceLoss = forces.squaredNorm();
 
     // return endPosLoss * 100 + forceLoss * 1e-3;
     // return forceLoss;
@@ -577,8 +577,8 @@ TEST(TRAJECTORY, JUMP_WORM)
             std::cout << "         dC off" << std::endl;
           }
 
-          Eigen::VectorXd C1 = b1->getCoriolisAndGravityForces();
-          Eigen::VectorXd C2 = b2->getCoriolisAndGravityForces();
+          Eigen::VectorXd C1 = b1->getCoriolisAndGravityAndExternalForces();
+          Eigen::VectorXd C2 = b2->getCoriolisAndGravityAndExternalForces();
           if (!equals(C1, C2, 0.0))
           {
             std::cout << "         C off" << std::endl;
@@ -686,8 +686,10 @@ TEST(TRAJECTORY, JUMP_WORM)
                 std::vector<dynamics::DegreeOfFreedom*> dofs = world->getDofs();
                 for (int row = 0; row < dim; row++)
                 {
-                  Eigen::Vector6d axis1 = con1[i]->getWorldScrewAxis(dofs[row]);
-                  Eigen::Vector6d axis2 = con2[i]->getWorldScrewAxis(dofs[row]);
+                  Eigen::Vector6d axis1
+                      = con1[i]->getWorldScrewAxisForPosition(dofs[row]);
+                  Eigen::Vector6d axis2
+                      = con2[i]->getWorldScrewAxisForPosition(dofs[row]);
                   if (!equals(axis1, axis2, 0.0))
                   {
                     std::cout << "               axis @ " << row << " off"
@@ -696,10 +698,13 @@ TEST(TRAJECTORY, JUMP_WORM)
 
                   for (int wrt = 0; wrt < dim; wrt++)
                   {
+                    // DifferentiableContactConstraint
                     Eigen::Vector6d screwAxisGradient1
-                        = con1[i]->getScrewAxisGradient(dofs[row], dofs[wrt]);
+                        = con1[i]->getScrewAxisForPositionGradient(
+                            dofs[row], dofs[wrt]);
                     Eigen::Vector6d screwAxisGradient2
-                        = con2[i]->getScrewAxisGradient(dofs[row], dofs[wrt]);
+                        = con2[i]->getScrewAxisForPositionGradient(
+                            dofs[row], dofs[wrt]);
                     if (!equals(screwAxisGradient1, screwAxisGradient2, 0.0))
                     {
                       std::cout << "               axis grad @ " << row << ", "

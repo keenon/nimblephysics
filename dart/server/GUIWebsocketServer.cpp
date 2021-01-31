@@ -28,11 +28,11 @@ namespace dart {
 namespace server {
 
 GUIWebsocketServer::GUIWebsocketServer()
-  : mServing(false),
-    mMessagesQueued(0),
-    mAutoflush(true),
+  : mPort(-1),
+    mServing(false),
     mScreenSize(Eigen::Vector2i(680, 420)),
-    mPort(-1)
+    mAutoflush(true),
+    mMessagesQueued(0)
 {
   mJson << "[";
 }
@@ -516,6 +516,8 @@ GUIWebsocketServer& GUIWebsocketServer::renderBasis(
   createLine(prefix + "__basis_unitX", pointsX, Eigen::Vector3d::UnitX());
   createLine(prefix + "__basis_unitY", pointsY, Eigen::Vector3d::UnitY());
   createLine(prefix + "__basis_unitZ", pointsZ, Eigen::Vector3d::UnitZ());
+
+  return *this;
 }
 
 /// This is a high-level command that creates/updates all the shapes in a
@@ -1649,6 +1651,8 @@ GUIWebsocketServer& GUIWebsocketServer::setPlotData(
         << ") that doesn't exist as a Plot object. Call createPlot() first."
         << std::endl;
   }
+
+  return *this;
 }
 
 /// This moves a UI element on the screen
@@ -1933,8 +1937,8 @@ void GUIWebsocketServer::encodeCreateSlider(
   json << ", \"max\": " << slider.max;
   json << ", \"min\": " << slider.min;
   json << ", \"value\": " << slider.value;
-  json << ", \"only_ints\": " << slider.onlyInts ? "true" : "false";
-  json << ", \"horizontal\": " << slider.horizontal ? "true" : "false";
+  json << ", \"only_ints\": " << (slider.onlyInts ? "true" : "false");
+  json << ", \"horizontal\": " << (slider.horizontal ? "true" : "false");
   json << "}";
 }
 

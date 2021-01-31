@@ -262,16 +262,16 @@ TEST(TRAJECTORY, CARTPOLE)
   sledPair.first->setAxis(Eigen::Vector3d(1, 0, 0));
   std::shared_ptr<BoxShape> sledShapeBox(
       new BoxShape(Eigen::Vector3d(0.05, 0.25, 0.05)));
-  ShapeNode* sledShape
-      = sledPair.second->createShapeNodeWith<VisualAspect>(sledShapeBox);
+  // ShapeNode* sledShape =
+  sledPair.second->createShapeNodeWith<VisualAspect>(sledShapeBox);
 
   std::pair<RevoluteJoint*, BodyNode*> armPair
       = cartpole->createJointAndBodyNodePair<RevoluteJoint>(sledPair.second);
   armPair.first->setAxis(Eigen::Vector3d(0, 0, 1));
   std::shared_ptr<BoxShape> armShapeBox(
       new BoxShape(Eigen::Vector3d(0.05, 0.25, 0.05)));
-  ShapeNode* armShape
-      = armPair.second->createShapeNodeWith<VisualAspect>(armShapeBox);
+  // ShapeNode* armShape =
+  armPair.second->createShapeNodeWith<VisualAspect>(armShapeBox);
 
   Eigen::Isometry3d armOffset = Eigen::Isometry3d::Identity();
   armOffset.translation() = Eigen::Vector3d(0, -0.5, 0);
@@ -409,8 +409,8 @@ TEST(TRAJECTORY, TUNE_SIMPLE_MASS)
 
   std::shared_ptr<BoxShape> shape(
       new BoxShape(Eigen::Vector3d(0.05, 0.25, 0.05)));
-  ShapeNode* poleShape
-      = pole->createShapeNodeWith<VisualAspect, CollisionAspect>(shape);
+  // ShapeNode* poleShape =
+  pole->createShapeNodeWith<VisualAspect, CollisionAspect>(shape);
   poleJoint->setForceUpperLimit(0, 100.0);
   poleJoint->setForceLowerLimit(0, -100.0);
   poleJoint->setVelocityUpperLimit(0, 100.0);
@@ -630,7 +630,7 @@ TEST(TRAJECTORY, TUNE_SIMPLE_MASS)
     if (!equals(analyticalJacobian, bruteForceJacobian, threshold))
     {
       std::cout << "Jacobians don't match!" << std::endl;
-      int staticDim = shot.getFlatStaticProblemDim(world);
+      // int staticDim = shot.getFlatStaticProblemDim(world);
       std::cout << "Static region size: " << shot.getFlatStaticProblemDim(world)
                 << std::endl;
       std::cout << "Analytical first region: " << std::endl
@@ -846,13 +846,13 @@ TEST(TRAJECTORY, RECOVER_MASS)
 
   std::pair<PrismaticJoint*, BodyNode*> boxJointPair
       = box->createJointAndBodyNodePair<PrismaticJoint>();
-  PrismaticJoint* boxJoint = boxJointPair.first;
+  // PrismaticJoint* boxJoint = boxJointPair.first;
   BodyNode* boxBody = boxJointPair.second;
 
   std::shared_ptr<BoxShape> shape(
       new BoxShape(Eigen::Vector3d(0.05, 0.25, 0.05)));
-  ShapeNode* boxShape
-      = boxBody->createShapeNodeWith<VisualAspect, CollisionAspect>(shape);
+  // ShapeNode* boxShape =
+  boxBody->createShapeNodeWith<VisualAspect, CollisionAspect>(shape);
 
   // We're going to tune the full inertia properties of the swinging object
   Eigen::VectorXd upperBounds = Eigen::VectorXd::Ones(1) * 5.0;
@@ -875,8 +875,8 @@ TEST(TRAJECTORY, RECOVER_MASS)
   double TRUE_MASS = 2.5;
   int STEPS = 12;
   int SHOT_LENGTH = 3;
-  int GOAL_STEP = 6;
-  double GOAL_AT_STEP = 0.1;
+  // int GOAL_STEP = 6;
+  // double GOAL_AT_STEP = 0.1;
 
   boxBody->setMass(TRUE_MASS);
   Eigen::VectorXd knownForce = Eigen::VectorXd::Ones(1) * 0.1;
@@ -989,8 +989,8 @@ TEST(TRAJECTORY, CONSTRAINED_CYCLE)
 
   std::shared_ptr<BoxShape> shape(
       new BoxShape(Eigen::Vector3d(0.05, 0.25, 0.05)));
-  ShapeNode* poleShape
-      = pole->createShapeNodeWith<VisualAspect, CollisionAspect>(shape);
+  // ShapeNode* poleShape =
+  pole->createShapeNodeWith<VisualAspect, CollisionAspect>(shape);
   poleJoint->setForceUpperLimit(0, 100.0);
   poleJoint->setForceLowerLimit(0, -100.0);
   poleJoint->setVelocityUpperLimit(0, 100.0);
@@ -1148,7 +1148,8 @@ TEST(TRAJECTORY, JUMP_WORM)
       root, Eigen::Vector3d(182.0 / 255, 223.0 / 255, 144.0 / 255));
   BodyNode* tail2 = createTailSegment(
       tail1, Eigen::Vector3d(223.0 / 255, 228.0 / 255, 163.0 / 255));
-  BodyNode* tail3 = createTailSegment(
+  // BodyNode* tail3 =
+  createTailSegment(
       tail2, Eigen::Vector3d(221.0 / 255, 193.0 / 255, 121.0 / 255));
 
   Eigen::VectorXd pos = Eigen::VectorXd(5);
@@ -1170,9 +1171,8 @@ TEST(TRAJECTORY, JUMP_WORM)
   floorJoint->setTransformFromParentBodyNode(floorOffset);
   std::shared_ptr<BoxShape> floorShape(
       new BoxShape(Eigen::Vector3d(2.5, 0.25, 0.5)));
-  ShapeNode* floorVisual
-      = floorBody->createShapeNodeWith<VisualAspect, CollisionAspect>(
-          floorShape);
+  // ShapeNode* floorVisual =
+  floorBody->createShapeNodeWith<VisualAspect, CollisionAspect>(floorShape);
   floorBody->setFrictionCoeff(0);
 
   world->addSkeleton(floor);
@@ -1201,12 +1201,12 @@ TEST(TRAJECTORY, JUMP_WORM)
         minPos = poses(1, i);
       }
     }
-    double peakPosLoss = -(maxPos * maxPos) * (maxPos > 0 ? 1.0 : -1.0);
-    double minPosLoss = -(minPos * minPos) * (minPos > 0 ? 1.0 : -1.0);
+    // double peakPosLoss = -(maxPos * maxPos) * (maxPos > 0 ? 1.0 : -1.0);
+    // double minPosLoss = -(minPos * minPos) * (minPos > 0 ? 1.0 : -1.0);
     double endPos = poses(1, poses.cols() - 1);
     double endPosLoss = -(endPos * endPos) * (endPos > 0 ? 1.0 : -1.0);
 
-    double forceLoss = forces.squaredNorm();
+    // double forceLoss = forces.squaredNorm();
 
     // return endPosLoss * 100 + forceLoss * 1e-3;
     // return forceLoss;
@@ -1306,7 +1306,8 @@ TEST(TRAJECTORY, REOPTIMIZATION)
       root, Eigen::Vector3d(182.0 / 255, 223.0 / 255, 144.0 / 255));
   BodyNode* tail2 = createTailSegment(
       tail1, Eigen::Vector3d(223.0 / 255, 228.0 / 255, 163.0 / 255));
-  BodyNode* tail3 = createTailSegment(
+  // BodyNode* tail3 =
+  createTailSegment(
       tail2, Eigen::Vector3d(221.0 / 255, 193.0 / 255, 121.0 / 255));
 
   Eigen::VectorXd pos = Eigen::VectorXd(5);
@@ -1328,9 +1329,8 @@ TEST(TRAJECTORY, REOPTIMIZATION)
   floorJoint->setTransformFromParentBodyNode(floorOffset);
   std::shared_ptr<BoxShape> floorShape(
       new BoxShape(Eigen::Vector3d(2.5, 0.25, 0.5)));
-  ShapeNode* floorVisual
-      = floorBody->createShapeNodeWith<VisualAspect, CollisionAspect>(
-          floorShape);
+  // ShapeNode* floorVisual =
+  floorBody->createShapeNodeWith<VisualAspect, CollisionAspect>(floorShape);
   floorBody->setFrictionCoeff(0);
 
   world->addSkeleton(floor);
@@ -1359,12 +1359,12 @@ TEST(TRAJECTORY, REOPTIMIZATION)
         minPos = poses(1, i);
       }
     }
-    double peakPosLoss = -(maxPos * maxPos) * (maxPos > 0 ? 1.0 : -1.0);
-    double minPosLoss = -(minPos * minPos) * (minPos > 0 ? 1.0 : -1.0);
+    // double peakPosLoss = -(maxPos * maxPos) * (maxPos > 0 ? 1.0 : -1.0);
+    // double minPosLoss = -(minPos * minPos) * (minPos > 0 ? 1.0 : -1.0);
     double endPos = poses(1, poses.cols() - 1);
     double endPosLoss = -(endPos * endPos) * (endPos > 0 ? 1.0 : -1.0);
 
-    double forceLoss = forces.squaredNorm();
+    // double forceLoss = forces.squaredNorm();
 
     // return endPosLoss * 100 + forceLoss * 1e-3;
     // return forceLoss;

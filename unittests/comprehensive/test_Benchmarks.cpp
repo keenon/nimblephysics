@@ -115,6 +115,7 @@ bool verifyMultiShotOptimization(WorldPtr world, MultiShot shot)
 
   // Create a window for rendering the world and handling user input
   // dart::gui::glut::displayTrajectoryInGUI(world, &shot);
+  return true;
 }
 
 /*
@@ -441,7 +442,8 @@ TEST(TRAJECTORY, JUMP_WORM)
       root, Eigen::Vector3d(182.0 / 255, 223.0 / 255, 144.0 / 255));
   BodyNode* tail2 = createTailSegment(
       tail1, Eigen::Vector3d(223.0 / 255, 228.0 / 255, 163.0 / 255));
-  BodyNode* tail3 = createTailSegment(
+  // BodyNode* tail3 =
+  createTailSegment(
       tail2, Eigen::Vector3d(221.0 / 255, 193.0 / 255, 121.0 / 255));
 
   Eigen::VectorXd pos = Eigen::VectorXd(5);
@@ -463,9 +465,8 @@ TEST(TRAJECTORY, JUMP_WORM)
   floorJoint->setTransformFromParentBodyNode(floorOffset);
   std::shared_ptr<BoxShape> floorShape(
       new BoxShape(Eigen::Vector3d(2.5, 0.25, 0.5)));
-  ShapeNode* floorVisual
-      = floorBody->createShapeNodeWith<VisualAspect, CollisionAspect>(
-          floorShape);
+  // ShapeNode* floorVisual =
+  floorBody->createShapeNodeWith<VisualAspect, CollisionAspect>(floorShape);
   floorBody->setFrictionCoeff(0);
 
   world->addSkeleton(floor);
@@ -494,12 +495,12 @@ TEST(TRAJECTORY, JUMP_WORM)
         minPos = poses(1, i);
       }
     }
-    double peakPosLoss = -(maxPos * maxPos) * (maxPos > 0 ? 1.0 : -1.0);
-    double minPosLoss = -(minPos * minPos) * (minPos > 0 ? 1.0 : -1.0);
+    // double peakPosLoss = -(maxPos * maxPos) * (maxPos > 0 ? 1.0 : -1.0);
+    // double minPosLoss = -(minPos * minPos) * (minPos > 0 ? 1.0 : -1.0);
     double endPos = poses(1, poses.cols() - 1);
     double endPosLoss = -(endPos * endPos) * (endPos > 0 ? 1.0 : -1.0);
 
-    double forceLoss = forces.squaredNorm();
+    // double forceLoss = forces.squaredNorm();
 
     // return endPosLoss * 100 + forceLoss * 1e-3;
     // return forceLoss;

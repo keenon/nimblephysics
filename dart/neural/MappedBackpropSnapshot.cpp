@@ -156,9 +156,9 @@ Eigen::MatrixXd MappedBackpropSnapshot::getForceVelJacobian(
 //==============================================================================
 Eigen::MatrixXd MappedBackpropSnapshot::getMassVelJacobian(
     std::shared_ptr<simulation::World> world,
-    const std::string& mapBefore,
+    const std::string& /* mapBefore */,
     const std::string& mapAfter,
-    PerformanceLog* perfLog)
+    PerformanceLog* /* perfLog */)
 {
   // No pre-step mapping necessary, because mass doesn't support mappings
   int massDim = world->getMassDims();
@@ -429,6 +429,9 @@ Eigen::MatrixXd MappedBackpropSnapshot::finiteDifferenceVelVelJacobian(
     J.col(i).noalias()
         = (perturbedVelPos - perturbedVelNeg) / (epsPos + epsNeg);
   }
+
+  world->getConstraintSolver()->setGradientEnabled(oldGradientEnabled);
+  snapshot.restore();
   return J;
 }
 
@@ -527,6 +530,10 @@ Eigen::MatrixXd MappedBackpropSnapshot::finiteDifferencePosVelJacobian(
     J.col(i).noalias()
         = (perturbedVelPos - perturbedVelNeg) / (epsPos + epsNeg);
   }
+
+  world->getConstraintSolver()->setGradientEnabled(oldGradientEnabled);
+  snapshot.restore();
+
   return J;
 }
 
@@ -624,6 +631,10 @@ Eigen::MatrixXd MappedBackpropSnapshot::finiteDifferenceForceVelJacobian(
     J.col(i).noalias()
         = (perturbedVelPos - perturbedVelNeg) / (epsPos + epsNeg);
   }
+
+  world->getConstraintSolver()->setGradientEnabled(oldGradientEnabled);
+  snapshot.restore();
+
   return J;
 }
 

@@ -58,18 +58,18 @@ TEST(ConstrainedGroupGradientMatrices, SIMPLE_MERGE)
   // Register 2 constraints with similar impulse tests
   Eigen::VectorXd i1(2);
   i1 << 0.0, 1.0;
-  matrices.mockMeasureConstraintImpulse(i1, i1);
+  matrices.mockMeasureConstraintImpulse(i1);
   Eigen::VectorXd i2(2);
   i2 << 0.01, 0.99;
-  matrices.mockMeasureConstraintImpulse(i2, i2);
+  matrices.mockMeasureConstraintImpulse(i2);
 
   // Register another 2 constraints with similar impulse tests
   Eigen::VectorXd i3(2);
   i3 << 1.0, 0.0;
-  matrices.mockMeasureConstraintImpulse(i3, i3);
+  matrices.mockMeasureConstraintImpulse(i3);
   Eigen::VectorXd i4(2);
   i4 << 0.99, 0.01;
-  matrices.mockMeasureConstraintImpulse(i4, i4);
+  matrices.mockMeasureConstraintImpulse(i4);
 
   // Regester mock LCP results
   Eigen::VectorXd X(4);
@@ -98,16 +98,13 @@ TEST(ConstrainedGroupGradientMatrices, SIMPLE_MERGE)
   EXPECT_TRUE(matrices.mFIndex.size() == 2);
   EXPECT_TRUE(matrices.mB.size() == 2);
   EXPECT_TRUE(matrices.mAColNorms.size() == 2);
-  EXPECT_TRUE(matrices.mImpulseTests.size() == 2);
   EXPECT_TRUE(matrices.mMassedImpulseTests.size() == 2);
   EXPECT_TRUE(matrices.mRestitutionCoeffs.size() == 2);
   EXPECT_TRUE(matrices.mPenetrationCorrectionVelocities.size() == 2);
 
   Eigen::VectorXd c1 = (i1 + i2) / 2;
   Eigen::VectorXd c2 = (i3 + i4) / 2;
-  EXPECT_TRUE(equals(c1, matrices.mImpulseTests[0]));
   EXPECT_TRUE(equals(c1, matrices.mMassedImpulseTests[0]));
-  EXPECT_TRUE(equals(c2, matrices.mImpulseTests[1]));
   EXPECT_TRUE(equals(c2, matrices.mMassedImpulseTests[1]));
 
   Eigen::VectorXd newX(2);

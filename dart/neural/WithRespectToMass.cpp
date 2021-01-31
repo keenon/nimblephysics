@@ -310,14 +310,14 @@ int WithRespectToMass::dim(dynamics::Skeleton* skel)
 
 /// This gives a vector of upper bound values for this WRT, given state in the
 /// world
-Eigen::VectorXd WithRespectToMass::upperBound(simulation::World* world)
+Eigen::VectorXd WithRespectToMass::upperBound(simulation::World* /* world */)
 {
   return mUpperBounds;
 }
 
 /// This gives a vector of lower bound values for this WRT, given state in the
 /// world
-Eigen::VectorXd WithRespectToMass::lowerBound(simulation::World* world)
+Eigen::VectorXd WithRespectToMass::lowerBound(simulation::World* /* world */)
 {
   return mLowerBounds;
 }

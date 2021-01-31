@@ -11,7 +11,7 @@
 #include "dart/neural/RestorableSnapshot.hpp"
 #include "dart/simulation/World.hpp"
 
-#define LOG_PERFORMANCE_ABSTRACT_SHOT
+#define LOG_PERFORMANCE_PROBLEM
 
 namespace dart {
 namespace trajectory {
@@ -31,7 +31,7 @@ Problem::Problem(
 //==============================================================================
 Problem::~Problem()
 {
-  // std::cout << "Freeing AbstractShot: " << this << std::endl;
+  // std::cout << "Freeing Problem: " << this << std::endl;
 }
 
 //==============================================================================
@@ -78,9 +78,9 @@ std::unordered_map<std::string, Eigen::MatrixXd>& Problem::getMetadataMap()
 /// certainly be mapped spaces that are easier to optimize in than native
 /// joint space, at least initially.
 void Problem::switchRepresentationMapping(
-    std::shared_ptr<simulation::World> world,
+    std::shared_ptr<simulation::World> /* world */,
     const std::string& mapping,
-    PerformanceLog* log)
+    PerformanceLog* /* log */)
 {
   // Reset the main representation mapping
   mRepresentationMapping = mapping;
@@ -164,12 +164,12 @@ int Problem::getFlatProblemDim(std::shared_ptr<simulation::World> world) const
 int Problem::getFlatStaticProblemDim(
     std::shared_ptr<simulation::World> world) const
 {
-  return mWorld->getMassDims();
+  return world->getMassDims();
 }
 
 //==============================================================================
 int Problem::getFlatDynamicProblemDim(
-    std::shared_ptr<simulation::World> world) const
+    std::shared_ptr<simulation::World> /* world */) const
 {
   return 0;
 }
@@ -179,20 +179,22 @@ int Problem::getFlatDynamicProblemDim(
 void Problem::flatten(
     std::shared_ptr<simulation::World> world,
     /* OUT */ Eigen::Ref<Eigen::VectorXd> flatStatic,
-    /* OUT */ Eigen::Ref<Eigen::VectorXd> flatDynamic,
+    // Subclasses use flatDynamic, but we don't because at this level of
+    // abstraction we don't know about the temporal aspects of the problem.
+    /* OUT */ Eigen::Ref<Eigen::VectorXd> /* flatDynamic */,
     PerformanceLog* log) const
 {
   PerformanceLog* thisLog = nullptr;
-#ifdef LOG_PERFORMANCE_ABSTRACT_SHOT
+#ifdef LOG_PERFORMANCE_PROBLEM
   if (log != nullptr)
   {
-    thisLog = log->startRun("AbstractShot.flatten");
+    thisLog = log->startRun("Problem.flatten");
   }
 #endif
 
   flatStatic.segment(0, world->getMassDims()) = world->getMasses();
 
-#ifdef LOG_PERFORMANCE_ABSTRACT_SHOT
+#ifdef LOG_PERFORMANCE_PROBLEM
   if (thisLog != nullptr)
   {
     thisLog->end();
@@ -221,20 +223,22 @@ void Problem::flatten(
 void Problem::unflatten(
     std::shared_ptr<simulation::World> world,
     const Eigen::Ref<const Eigen::VectorXd>& flatStatic,
-    const Eigen::Ref<const Eigen::VectorXd>& flatDynamic,
+    // Subclasses use flatDynamic, but we don't because at this level of
+    // abstraction we don't know about the temporal aspects of the problem.
+    const Eigen::Ref<const Eigen::VectorXd>& /* flatDynamic */,
     PerformanceLog* log)
 {
   PerformanceLog* thisLog = nullptr;
-#ifdef LOG_PERFORMANCE_ABSTRACT_SHOT
+#ifdef LOG_PERFORMANCE_PROBLEM
   if (log != nullptr)
   {
-    thisLog = log->startRun("AbstractShot.unflatten");
+    thisLog = log->startRun("Problem.unflatten");
   }
 #endif
 
   world->setMasses(flatStatic.segment(0, world->getMassDims()));
 
-#ifdef LOG_PERFORMANCE_ABSTRACT_SHOT
+#ifdef LOG_PERFORMANCE_PROBLEM
   if (thisLog != nullptr)
   {
     thisLog->end();
@@ -298,20 +302,22 @@ void Problem::getLowerBounds(
 void Problem::getUpperBounds(
     std::shared_ptr<simulation::World> world,
     /* OUT */ Eigen::Ref<Eigen::VectorXd> flatStatic,
-    /* OUT */ Eigen::Ref<Eigen::VectorXd> flatDynamic,
+    // Subclasses use flatDynamic, but we don't because at this level of
+    // abstraction we don't know about the temporal aspects of the problem.
+    /* OUT */ Eigen::Ref<Eigen::VectorXd> /* flatDynamic */,
     PerformanceLog* log) const
 {
   PerformanceLog* thisLog = nullptr;
-#ifdef LOG_PERFORMANCE_ABSTRACT_SHOT
+#ifdef LOG_PERFORMANCE_PROBLEM
   if (log != nullptr)
   {
-    thisLog = log->startRun("AbstractShot.getUpperBounds");
+    thisLog = log->startRun("Problem.getUpperBounds");
   }
 #endif
 
   flatStatic.segment(0, world->getMassDims()) = world->getMassUpperLimits();
 
-#ifdef LOG_PERFORMANCE_ABSTRACT_SHOT
+#ifdef LOG_PERFORMANCE_PROBLEM
   if (thisLog != nullptr)
   {
     thisLog->end();
@@ -325,20 +331,22 @@ void Problem::getUpperBounds(
 void Problem::getLowerBounds(
     std::shared_ptr<simulation::World> world,
     /* OUT */ Eigen::Ref<Eigen::VectorXd> flatStatic,
-    /* OUT */ Eigen::Ref<Eigen::VectorXd> flatDynamic,
+    // Subclasses use flatDynamic, but we don't because at this level of
+    // abstraction we don't know about the temporal aspects of the problem.
+    /* OUT */ Eigen::Ref<Eigen::VectorXd> /* flatDynamic */,
     PerformanceLog* log) const
 {
   PerformanceLog* thisLog = nullptr;
-#ifdef LOG_PERFORMANCE_ABSTRACT_SHOT
+#ifdef LOG_PERFORMANCE_PROBLEM
   if (log != nullptr)
   {
-    thisLog = log->startRun("AbstractShot.getLowerBounds");
+    thisLog = log->startRun("Problem.getLowerBounds");
   }
 #endif
 
   flatStatic.segment(0, world->getMassDims()) = world->getMassLowerLimits();
 
-#ifdef LOG_PERFORMANCE_ABSTRACT_SHOT
+#ifdef LOG_PERFORMANCE_PROBLEM
   if (thisLog != nullptr)
   {
     thisLog->end();
@@ -352,10 +360,27 @@ void Problem::getLowerBounds(
 void Problem::getInitialGuess(
     std::shared_ptr<simulation::World> world,
     /* OUT */ Eigen::Ref<Eigen::VectorXd> flatStatic,
-    /* OUT */ Eigen::Ref<Eigen::VectorXd> flatDynamic,
+    // Subclasses use flatDynamic, but we don't because at this level of
+    // abstraction we don't know about the temporal aspects of the problem.
+    /* OUT */ Eigen::Ref<Eigen::VectorXd> /* flatDynamic */,
     PerformanceLog* log) const
 {
+  PerformanceLog* thisLog = nullptr;
+#ifdef LOG_PERFORMANCE_PROBLEM
+  if (log != nullptr)
+  {
+    thisLog = log->startRun("Problem.getInitialGuess");
+  }
+#endif
+
   flatStatic.segment(0, world->getMassDims()) = world->getMasses();
+
+#ifdef LOG_PERFORMANCE_PROBLEM
+  if (thisLog != nullptr)
+  {
+    thisLog->end();
+  }
+#endif
 }
 
 //==============================================================================
@@ -365,10 +390,10 @@ void Problem::getConstraintUpperBounds(
     /* OUT */ Eigen::Ref<Eigen::VectorXd> flat, PerformanceLog* log) const
 {
   PerformanceLog* thisLog = nullptr;
-#ifdef LOG_PERFORMANCE_ABSTRACT_SHOT
+#ifdef LOG_PERFORMANCE_PROBLEM
   if (log != nullptr)
   {
-    thisLog = log->startRun("AbstractShot.getConstraintUpperBounds");
+    thisLog = log->startRun("Problem.getConstraintUpperBounds");
   }
 #endif
 
@@ -378,7 +403,7 @@ void Problem::getConstraintUpperBounds(
     flat(i) = mConstraints[i].getUpperBound();
   }
 
-#ifdef LOG_PERFORMANCE_ABSTRACT_SHOT
+#ifdef LOG_PERFORMANCE_PROBLEM
   if (thisLog != nullptr)
   {
     thisLog->end();
@@ -393,10 +418,10 @@ void Problem::getConstraintLowerBounds(
     /* OUT */ Eigen::Ref<Eigen::VectorXd> flat, PerformanceLog* log) const
 {
   PerformanceLog* thisLog = nullptr;
-#ifdef LOG_PERFORMANCE_ABSTRACT_SHOT
+#ifdef LOG_PERFORMANCE_PROBLEM
   if (log != nullptr)
   {
-    thisLog = log->startRun("AbstractShot.getConstraintLowerBounds");
+    thisLog = log->startRun("Problem.getConstraintLowerBounds");
   }
 #endif
 
@@ -406,7 +431,7 @@ void Problem::getConstraintLowerBounds(
     flat(i) = mConstraints[i].getLowerBound();
   }
 
-#ifdef LOG_PERFORMANCE_ABSTRACT_SHOT
+#ifdef LOG_PERFORMANCE_PROBLEM
   if (thisLog != nullptr)
   {
     thisLog->end();
@@ -446,10 +471,10 @@ void Problem::computeConstraints(
     PerformanceLog* log)
 {
   PerformanceLog* thisLog = nullptr;
-#ifdef LOG_PERFORMANCE_ABSTRACT_SHOT
+#ifdef LOG_PERFORMANCE_PROBLEM
   if (log != nullptr)
   {
-    thisLog = log->startRun("AbstractShot.computeConstraints");
+    thisLog = log->startRun("Problem.computeConstraints");
   }
 #endif
 
@@ -461,7 +486,7 @@ void Problem::computeConstraints(
         = mConstraints[i].getLoss(getRolloutCache(world, thisLog), thisLog);
   }
 
-#ifdef LOG_PERFORMANCE_ABSTRACT_SHOT
+#ifdef LOG_PERFORMANCE_PROBLEM
   if (thisLog != nullptr)
   {
     thisLog->end();
@@ -499,10 +524,10 @@ void Problem::backpropJacobian(
     PerformanceLog* log)
 {
   PerformanceLog* thisLog = nullptr;
-#ifdef LOG_PERFORMANCE_ABSTRACT_SHOT
+#ifdef LOG_PERFORMANCE_PROBLEM
   if (log != nullptr)
   {
-    thisLog = log->startRun("AbstractShot.backpropJacobian");
+    thisLog = log->startRun("Problem.backpropJacobian");
   }
 #endif
 
@@ -533,7 +558,7 @@ void Problem::backpropJacobian(
     jacStatic.row(i) = gradStatic;
   }
 
-#ifdef LOG_PERFORMANCE_ABSTRACT_SHOT
+#ifdef LOG_PERFORMANCE_PROBLEM
   if (thisLog != nullptr)
   {
     thisLog->end();
@@ -592,10 +617,10 @@ void Problem::getJacobianSparsityStructureDynamic(
     PerformanceLog* log)
 {
   PerformanceLog* thisLog = nullptr;
-#ifdef LOG_PERFORMANCE_ABSTRACT_SHOT
+#ifdef LOG_PERFORMANCE_PROBLEM
   if (log != nullptr)
   {
-    thisLog = log->startRun("AbstractShot.getJacobianSparsityStructure");
+    thisLog = log->startRun("Problem.getJacobianSparsityStructure");
   }
 #endif
 
@@ -614,7 +639,7 @@ void Problem::getJacobianSparsityStructureDynamic(
   }
   assert(cursor == Problem::getNumberNonZeroJacobianDynamic(world));
 
-#ifdef LOG_PERFORMANCE_ABSTRACT_SHOT
+#ifdef LOG_PERFORMANCE_PROBLEM
   if (thisLog != nullptr)
   {
     thisLog->end();
@@ -631,10 +656,10 @@ void Problem::getJacobianSparsityStructureStatic(
     PerformanceLog* log)
 {
   PerformanceLog* thisLog = nullptr;
-#ifdef LOG_PERFORMANCE_ABSTRACT_SHOT
+#ifdef LOG_PERFORMANCE_PROBLEM
   if (log != nullptr)
   {
-    thisLog = log->startRun("AbstractShot.getJacobianSparsityStructure");
+    thisLog = log->startRun("Problem.getJacobianSparsityStructure");
   }
 #endif
 
@@ -653,7 +678,7 @@ void Problem::getJacobianSparsityStructureStatic(
   }
   assert(cursor == Problem::getNumberNonZeroJacobianStatic(world));
 
-#ifdef LOG_PERFORMANCE_ABSTRACT_SHOT
+#ifdef LOG_PERFORMANCE_PROBLEM
   if (thisLog != nullptr)
   {
     thisLog->end();
@@ -671,10 +696,10 @@ void Problem::getSparseJacobian(
     PerformanceLog* log)
 {
   PerformanceLog* thisLog = nullptr;
-#ifdef LOG_PERFORMANCE_ABSTRACT_SHOT
+#ifdef LOG_PERFORMANCE_PROBLEM
   if (log != nullptr)
   {
-    thisLog = log->startRun("AbstractShot.getSparseJacobian");
+    thisLog = log->startRun("Problem.getSparseJacobian");
   }
 #endif
 
@@ -708,7 +733,7 @@ void Problem::getSparseJacobian(
   assert(cursorStatic == sparseStatic.size());
   assert(cursorDynamic == sparseDynamic.size());
 
-#ifdef LOG_PERFORMANCE_ABSTRACT_SHOT
+#ifdef LOG_PERFORMANCE_PROBLEM
   if (thisLog != nullptr)
   {
     thisLog->end();
@@ -742,10 +767,10 @@ void Problem::backpropGradient(
     PerformanceLog* log)
 {
   PerformanceLog* thisLog = nullptr;
-#ifdef LOG_PERFORMANCE_ABSTRACT_SHOT
+#ifdef LOG_PERFORMANCE_PROBLEM
   if (log != nullptr)
   {
-    thisLog = log->startRun("AbstractShot.backpropGradient");
+    thisLog = log->startRun("Problem.backpropGradient");
   }
 #endif
 
@@ -763,7 +788,7 @@ void Problem::backpropGradient(
       /* OUT */ grad.segment(staticDim, dynamicDim),
       thisLog);
 
-#ifdef LOG_PERFORMANCE_ABSTRACT_SHOT
+#ifdef LOG_PERFORMANCE_PROBLEM
   if (thisLog != nullptr)
   {
     thisLog->end();
@@ -796,16 +821,16 @@ double Problem::getLoss(
     std::shared_ptr<simulation::World> world, PerformanceLog* log)
 {
   PerformanceLog* thisLog = nullptr;
-#ifdef LOG_PERFORMANCE_ABSTRACT_SHOT
+#ifdef LOG_PERFORMANCE_PROBLEM
   if (log != nullptr)
   {
-    thisLog = log->startRun("AbstractShot.getLoss");
+    thisLog = log->startRun("Problem.getLoss");
   }
 #endif
 
   double val = mLoss.getLoss(getRolloutCache(world, thisLog), thisLog);
 
-#ifdef LOG_PERFORMANCE_ABSTRACT_SHOT
+#ifdef LOG_PERFORMANCE_PROBLEM
   if (thisLog != nullptr)
   {
     thisLog->end();
@@ -818,13 +843,28 @@ double Problem::getLoss(
 //==============================================================================
 /// This gets called at the beginning of backpropGradientWrt(), as an
 /// opportunity to zero out any static gradient values being managed by
-/// AbstractShot.
+/// Problem.
 void Problem::initializeStaticGradient(
     std::shared_ptr<simulation::World> world,
     Eigen::Ref<Eigen::VectorXd> gradStatic,
     PerformanceLog* log)
 {
+  PerformanceLog* thisLog = nullptr;
+#ifdef LOG_PERFORMANCE_PROBLEM
+  if (log != nullptr)
+  {
+    thisLog = log->startRun("Problem.initializeStaticGradient");
+  }
+#endif
+
   gradStatic.segment(0, world->getMassDims()).setZero();
+
+#ifdef LOG_PERFORMANCE_PROBLEM
+  if (thisLog != nullptr)
+  {
+    thisLog->end();
+  }
+#endif
 }
 
 //==============================================================================
@@ -836,19 +876,49 @@ void Problem::accumulateStaticGradient(
     neural::LossGradient& thisTimestep,
     PerformanceLog* log)
 {
+  PerformanceLog* thisLog = nullptr;
+#ifdef LOG_PERFORMANCE_PROBLEM
+  if (log != nullptr)
+  {
+    thisLog = log->startRun("Problem.accumulateStaticGradient");
+  }
+#endif
+
   gradStatic.segment(0, world->getMassDims()) += thisTimestep.lossWrtMass;
+
+#ifdef LOG_PERFORMANCE_PROBLEM
+  if (thisLog != nullptr)
+  {
+    thisLog->end();
+  }
+#endif
 }
 
 //==============================================================================
 /// This gets called at the beginning of backpropJacobianOfFinalState() in
 /// SingleShot, as an opportunity to zero out any static jacobian values being
-/// managed by AbstractShot.
+/// managed by Problem.
 void Problem::initializeStaticJacobianOfFinalState(
-    std::shared_ptr<simulation::World> world,
+    std::shared_ptr<simulation::World> /* world */,
     Eigen::Ref<Eigen::MatrixXd> jacStatic,
     PerformanceLog* log)
 {
+  PerformanceLog* thisLog = nullptr;
+#ifdef LOG_PERFORMANCE_PROBLEM
+  if (log != nullptr)
+  {
+    thisLog = log->startRun("Problem.initializeStaticJacobianOfFinalState");
+  }
+#endif
+
   jacStatic.setZero();
+
+#ifdef LOG_PERFORMANCE_PROBLEM
+  if (thisLog != nullptr)
+  {
+    thisLog->end();
+  }
+#endif
 }
 
 //==============================================================================
@@ -856,11 +926,19 @@ void Problem::initializeStaticJacobianOfFinalState(
 /// called for every timestep during backpropJacobianOfFinalState() in
 /// SingleShot.
 void Problem::accumulateStaticJacobianOfFinalState(
-    std::shared_ptr<simulation::World> world,
+    std::shared_ptr<simulation::World> /* world */,
     Eigen::Ref<Eigen::MatrixXd> jacStatic,
     TimestepJacobians& thisTimestep,
     PerformanceLog* log)
 {
+  PerformanceLog* thisLog = nullptr;
+#ifdef LOG_PERFORMANCE_PROBLEM
+  if (log != nullptr)
+  {
+    thisLog = log->startRun("Problem.accumulateStaticJacobianOfFinalState");
+  }
+#endif
+
   jacStatic.block(
       0, 0, thisTimestep.massPos.rows(), thisTimestep.massPos.cols())
       += thisTimestep.massPos;
@@ -870,6 +948,13 @@ void Problem::accumulateStaticJacobianOfFinalState(
       thisTimestep.massVel.rows(),
       thisTimestep.massVel.cols())
       += thisTimestep.massVel;
+
+#ifdef LOG_PERFORMANCE_PROBLEM
+  if (thisLog != nullptr)
+  {
+    thisLog->end();
+  }
+#endif
 }
 
 //==============================================================================
@@ -883,10 +968,10 @@ Eigen::VectorXi Problem::updateWithForces(
     PerformanceLog* log)
 {
   PerformanceLog* thisLog = nullptr;
-#ifdef LOG_PERFORMANCE_ABSTRACT_SHOT
+#ifdef LOG_PERFORMANCE_PROBLEM
   if (log != nullptr)
   {
-    thisLog = log->startRun("AbstractShot.updateWithForces");
+    thisLog = log->startRun("Problem.updateWithForces");
   }
 #endif
 
@@ -915,7 +1000,7 @@ Eigen::VectorXi Problem::updateWithForces(
   snapshot.restore();
   delete rollout;
 
-#ifdef LOG_PERFORMANCE_ABSTRACT_SHOT
+#ifdef LOG_PERFORMANCE_PROBLEM
   if (thisLog != nullptr)
   {
     thisLog->end();
@@ -929,13 +1014,13 @@ Eigen::VectorXi Problem::updateWithForces(
 const TrajectoryRollout* Problem::getRolloutCache(
     std::shared_ptr<simulation::World> world,
     PerformanceLog* log,
-    bool useKnots)
+    bool /* useKnots */)
 {
   PerformanceLog* thisLog = nullptr;
-#ifdef LOG_PERFORMANCE_ABSTRACT_SHOT
+#ifdef LOG_PERFORMANCE_PROBLEM
   if (log != nullptr)
   {
-    thisLog = log->startRun("AbstractShot.getRolloutCache");
+    thisLog = log->startRun("Problem.getRolloutCache");
   }
 #endif
 
@@ -950,7 +1035,7 @@ const TrajectoryRollout* Problem::getRolloutCache(
     mRolloutCacheDirty = false;
   }
 
-#ifdef LOG_PERFORMANCE_ABSTRACT_SHOT
+#ifdef LOG_PERFORMANCE_PROBLEM
   if (thisLog != nullptr)
   {
     thisLog->end();
@@ -964,13 +1049,13 @@ const TrajectoryRollout* Problem::getRolloutCache(
 TrajectoryRollout* Problem::getGradientWrtRolloutCache(
     std::shared_ptr<simulation::World> world,
     PerformanceLog* log,
-    bool useKnots)
+    bool /* useKnots */)
 {
   PerformanceLog* thisLog = nullptr;
-#ifdef LOG_PERFORMANCE_ABSTRACT_SHOT
+#ifdef LOG_PERFORMANCE_PROBLEM
   if (log != nullptr)
   {
-    thisLog = log->startRun("AbstractShot.getGradientWrtRolloutCache");
+    thisLog = log->startRun("Problem.getGradientWrtRolloutCache");
   }
 #endif
 
@@ -985,7 +1070,7 @@ TrajectoryRollout* Problem::getGradientWrtRolloutCache(
     mRolloutCacheDirty = false;
   }
 
-#ifdef LOG_PERFORMANCE_ABSTRACT_SHOT
+#ifdef LOG_PERFORMANCE_PROBLEM
   if (thisLog != nullptr)
   {
     thisLog->end();
@@ -1002,8 +1087,6 @@ void Problem::finiteDifferenceGradient(
     std::shared_ptr<simulation::World> world,
     /* OUT */ Eigen::Ref<Eigen::VectorXd> grad)
 {
-  double originalLoss = mLoss.getLoss(getRolloutCache(world, nullptr), nullptr);
-
   int dims = getFlatProblemDim(world);
   Eigen::VectorXd flat = Eigen::VectorXd::Zero(dims);
   flatten(world, flat, nullptr);

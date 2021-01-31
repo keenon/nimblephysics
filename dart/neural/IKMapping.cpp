@@ -146,7 +146,7 @@ void IKMapping::setMasses(
     std::shared_ptr<simulation::World> world,
     const Eigen::Ref<Eigen::VectorXd>& masses)
 {
-  world->getMasses();
+  world->setMasses(masses);
 }
 
 //==============================================================================
@@ -343,7 +343,7 @@ Eigen::MatrixXd IKMapping::getRealForceToMappedForceJac(
 /// This gets a Jacobian relating the changes in the outer mass (the
 /// "mapped" mass) to inner mass (the "real" mass)
 Eigen::MatrixXd IKMapping::getMappedMassToRealMassJac(
-    std::shared_ptr<simulation::World> world)
+    std::shared_ptr<simulation::World> /* world */)
 {
   return Eigen::MatrixXd::Identity(mMassDim, mMassDim);
 }
@@ -353,7 +353,7 @@ Eigen::MatrixXd IKMapping::getMappedMassToRealMassJac(
 /// "real" mass) to the corresponding outer mass (the "mapped"
 /// mass)
 Eigen::MatrixXd IKMapping::getRealMassToMappedMassJac(
-    std::shared_ptr<simulation::World> world)
+    std::shared_ptr<simulation::World> /* world */)
 {
   return Eigen::MatrixXd::Identity(mMassDim, mMassDim);
 }
@@ -533,7 +533,7 @@ Eigen::MatrixXd IKMapping::bruteForceJacobianOfJacVelWrtPosition(
 
 //==============================================================================
 Eigen::VectorXd IKMapping::getPositionLowerLimits(
-    std::shared_ptr<simulation::World> world)
+    std::shared_ptr<simulation::World> /* world */)
 {
   return Eigen::VectorXd::Ones(getPosDim())
          * -std::numeric_limits<double>::infinity();
@@ -541,7 +541,7 @@ Eigen::VectorXd IKMapping::getPositionLowerLimits(
 
 //==============================================================================
 Eigen::VectorXd IKMapping::getPositionUpperLimits(
-    std::shared_ptr<simulation::World> world)
+    std::shared_ptr<simulation::World> /* world */)
 {
   return Eigen::VectorXd::Ones(getPosDim())
          * std::numeric_limits<double>::infinity();
@@ -549,7 +549,7 @@ Eigen::VectorXd IKMapping::getPositionUpperLimits(
 
 //==============================================================================
 Eigen::VectorXd IKMapping::getVelocityLowerLimits(
-    std::shared_ptr<simulation::World> world)
+    std::shared_ptr<simulation::World> /* world */)
 {
   return Eigen::VectorXd::Ones(getVelDim())
          * -std::numeric_limits<double>::infinity();
@@ -557,7 +557,7 @@ Eigen::VectorXd IKMapping::getVelocityLowerLimits(
 
 //==============================================================================
 Eigen::VectorXd IKMapping::getVelocityUpperLimits(
-    std::shared_ptr<simulation::World> world)
+    std::shared_ptr<simulation::World> /* world */)
 {
   return Eigen::VectorXd::Ones(getVelDim())
          * std::numeric_limits<double>::infinity();
@@ -565,7 +565,7 @@ Eigen::VectorXd IKMapping::getVelocityUpperLimits(
 
 //==============================================================================
 Eigen::VectorXd IKMapping::getForceLowerLimits(
-    std::shared_ptr<simulation::World> world)
+    std::shared_ptr<simulation::World> /* world */)
 {
   return Eigen::VectorXd::Ones(getForceDim())
          * -std::numeric_limits<double>::infinity();
@@ -573,7 +573,7 @@ Eigen::VectorXd IKMapping::getForceLowerLimits(
 
 //==============================================================================
 Eigen::VectorXd IKMapping::getForceUpperLimits(
-    std::shared_ptr<simulation::World> world)
+    std::shared_ptr<simulation::World> /* world */)
 {
   return Eigen::VectorXd::Ones(getForceDim())
          * std::numeric_limits<double>::infinity();

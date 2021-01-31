@@ -43,7 +43,7 @@
 // The port number the WebSocket server listens on
 #define PORT_NUMBER 8080
 
-#define ALL_TESTS
+// #define ALL_TESTS
 
 #ifdef ALL_TESTS
 TEST(SERVER, BASIC_SERVER)

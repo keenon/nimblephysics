@@ -1423,7 +1423,7 @@ Eigen::VectorXd GenericJoint<ConfigSpaceT>::integratePositionsExplicit(Eigen::Ve
 //==============================================================================
 /// Returns d/dpos of integratePositionsExplicit()
 template <class ConfigSpaceT>
-Eigen::MatrixXd GenericJoint<ConfigSpaceT>::getPosPosJacobian(Eigen::VectorXd pos, Eigen::VectorXd vel, double _dt)
+Eigen::MatrixXd GenericJoint<ConfigSpaceT>::getPosPosJacobian(Eigen::VectorXd pos, Eigen::VectorXd /* vel */, double /* _dt */)
 {
   return Eigen::MatrixXd::Identity(pos.size(), pos.size());
 }
@@ -1431,7 +1431,7 @@ Eigen::MatrixXd GenericJoint<ConfigSpaceT>::getPosPosJacobian(Eigen::VectorXd po
 //==============================================================================
 /// Returns d/dvel of integratePositionsExplicit()
 template <class ConfigSpaceT>
-Eigen::MatrixXd GenericJoint<ConfigSpaceT>::getVelPosJacobian(Eigen::VectorXd pos, Eigen::VectorXd vel, double _dt)
+Eigen::MatrixXd GenericJoint<ConfigSpaceT>::getVelPosJacobian(Eigen::VectorXd pos, Eigen::VectorXd /* vel */, double _dt)
 {
   return _dt * Eigen::MatrixXd::Identity(pos.size(), pos.size());
 }

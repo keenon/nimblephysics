@@ -385,12 +385,6 @@ public:
   Eigen::MatrixXd getJacobianOfUpperBoundConstraintsTranspose(
       simulation::WorldPtr world, Eigen::VectorXd v0);
 
-  /// This measures a vector of contact impulses (measured at the clamping
-  /// constraints) on the world, to see what total velocity change results. This
-  /// is a fast way to get A_c * f0.
-  Eigen::VectorXd getClampingImpulseVelChange(
-      simulation::WorldPtr world, Eigen::VectorXd f0);
-
   /// This computes the finite difference Jacobian of A_c*f0 with respect to
   /// position. This is AS SLOW AS FINITE DIFFERENCING THE WHOLE ENGINE, which
   /// is way too slow to use in practice.

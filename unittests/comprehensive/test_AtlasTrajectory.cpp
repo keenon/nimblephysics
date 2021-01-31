@@ -294,7 +294,7 @@ TEST(ATLAS, BROKEN_2)
   Eigen::VectorXd animatePos = brokenPos;
   int i = 0;
   Ticker ticker(0.01);
-  ticker.registerTickListener([&](long time) {
+  ticker.registerTickListener([&](long /* time */) {
     world->setPositions(animatePos);
     animatePos += brokenVel * 0.001;
 

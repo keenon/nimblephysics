@@ -299,11 +299,5 @@ void FinalizedPerformanceLog::recursivePrettyPrint(
   }
 }
 
-//==============================================================================
-/// This JSON prints to a stream
-void FinalizedPerformanceLog::recursiveJson(std::stringstream& stream)
-{
-}
-
 } // namespace performance
 } // namespace dart

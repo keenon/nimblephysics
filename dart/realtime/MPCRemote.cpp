@@ -17,21 +17,22 @@ namespace realtime {
 /// This connects to an MPC remote server
 MPCRemote::MPCRemote(
     const std::string& host, int port, int dofs, int steps, int millisPerStep)
-  : mChannel(grpc::CreateChannel(
-      host + ":" + std::to_string(port), grpc::InsecureChannelCredentials())),
+  : mRunning(false),
+    mChannel(grpc::CreateChannel(
+        host + ":" + std::to_string(port), grpc::InsecureChannelCredentials())),
     mStub(proto::MPCService::NewStub(mChannel)),
-    mBuffer(dofs, steps, millisPerStep),
-    mRunning(false)
+    mBuffer(dofs, steps, millisPerStep)
 {
 }
 
 /// This forks the process, starts a server on another process, and connects
 /// to it
 MPCRemote::MPCRemote(MPCLocal& local, int /* ignored */)
-  : mStub(nullptr),
+  : mRunning(false),
+    mChannel(nullptr),
+    mStub(nullptr),
     mBuffer(RealTimeControlBuffer(
-        local.mWorld->getNumDofs(), local.mSteps, local.mMillisPerStep)),
-    mRunning(false)
+        local.mWorld->getNumDofs(), local.mSteps, local.mMillisPerStep))
 {
   int port = (rand() % 2000) + 2000;
 

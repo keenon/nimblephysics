@@ -114,7 +114,7 @@ bool verifySingleStep(WorldPtr world, double EPS)
 bool verifySingleShot(
     WorldPtr world,
     int maxSteps,
-    double EPS,
+    double /* EPS */,
     bool useFdJacs,
     std::shared_ptr<Mapping> mapping)
 {
@@ -408,7 +408,7 @@ bool verifySparseJacobian(WorldPtr world, MultiShot& shot)
   if (!equals(analyticalJacobian, sparseRecoveredJacobian, threshold))
   {
     std::cout << "Sparse jacobians don't match!" << std::endl;
-    int staticDim = shot.getFlatStaticProblemDim(world);
+    // int staticDim = shot.getFlatStaticProblemDim(world);
     std::cout << "Static region size: " << shot.getFlatStaticProblemDim(world)
               << std::endl;
     std::cout << "Analytical first region: " << std::endl
@@ -718,6 +718,8 @@ bool verifyMultiShotOptimization(WorldPtr world, MultiShot shot)
 
   // Create a window for rendering the world and handling user input
   // dart::gui::glut::displayTrajectoryInGUI(world, &shot);
+
+  return true;
 }
 
 #endif

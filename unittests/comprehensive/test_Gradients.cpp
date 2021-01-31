@@ -991,7 +991,8 @@ void testRobotArm(
     parent = jointPair.second;
     if ((attachPoint == -1 && i < numLinks - 1) || i != attachPoint)
     {
-      ShapeNode* visual = parent->createShapeNodeWith<VisualAspect>(boxShape);
+      // ShapeNode* visual =
+      parent->createShapeNodeWith<VisualAspect>(boxShape);
     }
   }
 
@@ -1020,9 +1021,9 @@ void testRobotArm(
       = wall->createJointAndBodyNodePair<WeldJoint>(nullptr);
   std::shared_ptr<BoxShape> wallShape(
       new BoxShape(Eigen::Vector3d(1.0, 10.0, 10.0)));
-  ShapeNode* wallNode
-      = jointPair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(
-          wallShape);
+  // ShapeNode* wallNode =
+  jointPair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(
+      wallShape);
   world->addSkeleton(wall);
   // jointPair.second->setFrictionCoeff(0.0);
 
@@ -1279,7 +1280,8 @@ void testJumpWorm(bool offGround, bool interpenetration)
       root, Eigen::Vector3d(182.0 / 255, 223.0 / 255, 144.0 / 255));
   BodyNode* tail2 = createTailSegment(
       tail1, Eigen::Vector3d(223.0 / 255, 228.0 / 255, 163.0 / 255));
-  BodyNode* tail3 = createTailSegment(
+  // BodyNode* tail3 =
+  createTailSegment(
       tail2, Eigen::Vector3d(221.0 / 255, 193.0 / 255, 121.0 / 255));
 
   Eigen::VectorXd pos = Eigen::VectorXd(5);
@@ -1301,9 +1303,8 @@ void testJumpWorm(bool offGround, bool interpenetration)
   floorJoint->setTransformFromParentBodyNode(floorOffset);
   std::shared_ptr<BoxShape> floorShape(
       new BoxShape(Eigen::Vector3d(2.5, 0.25, 0.5)));
-  ShapeNode* floorVisual
-      = floorBody->createShapeNodeWith<VisualAspect, CollisionAspect>(
-          floorShape);
+  // ShapeNode* floorVisual =
+  floorBody->createShapeNodeWith<VisualAspect, CollisionAspect>(floorShape);
   floorBody->setFrictionCoeff(0);
 
   world->addSkeleton(floor);

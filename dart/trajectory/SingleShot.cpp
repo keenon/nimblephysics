@@ -842,7 +842,22 @@ void SingleShot::setStates(
 /// This sets the forces in this trajectory from the passed in matrix
 void SingleShot::setForcesRaw(Eigen::MatrixXd forces, PerformanceLog* log)
 {
+  PerformanceLog* thisLog = nullptr;
+#ifdef LOG_PERFORMANCE_SINGLE_SHOT
+  if (log != nullptr)
+  {
+    thisLog = log->startRun("SingleShot.setForcesRaw");
+  }
+#endif
+
   mForces = forces;
+
+#ifdef LOG_PERFORMANCE_SINGLE_SHOT
+  if (thisLog != nullptr)
+  {
+    thisLog->end();
+  }
+#endif
 }
 
 //==============================================================================
@@ -1008,16 +1023,38 @@ TimestepJacobians SingleShot::backpropStartStateJacobians(
   {
     MappedBackpropSnapshotPtr ptr = snapshots[i];
     TimestepJacobians thisTimestep;
-    Eigen::MatrixXd forceVel = ptr->getForceVelJacobian(
-        world, mRepresentationMapping, mRepresentationMapping);
-    Eigen::MatrixXd posPos = ptr->getPosPosJacobian(
-        world, mRepresentationMapping, mRepresentationMapping);
-    Eigen::MatrixXd posVel = ptr->getPosVelJacobian(
-        world, mRepresentationMapping, mRepresentationMapping);
-    Eigen::MatrixXd velPos = ptr->getVelPosJacobian(
-        world, mRepresentationMapping, mRepresentationMapping);
-    Eigen::MatrixXd velVel = ptr->getVelVelJacobian(
-        world, mRepresentationMapping, mRepresentationMapping);
+
+    Eigen::MatrixXd forceVel;
+    Eigen::MatrixXd posPos;
+    Eigen::MatrixXd posVel;
+    Eigen::MatrixXd velPos;
+    Eigen::MatrixXd velVel;
+    if (useFdJacs)
+    {
+      forceVel = ptr->finiteDifferenceForceVelJacobian(
+          world, mRepresentationMapping, mRepresentationMapping);
+      posPos = ptr->finiteDifferencePosPosJacobian(
+          world, mRepresentationMapping, mRepresentationMapping);
+      posVel = ptr->finiteDifferencePosVelJacobian(
+          world, mRepresentationMapping, mRepresentationMapping);
+      velPos = ptr->finiteDifferenceVelPosJacobian(
+          world, mRepresentationMapping, mRepresentationMapping);
+      velVel = ptr->finiteDifferenceVelVelJacobian(
+          world, mRepresentationMapping, mRepresentationMapping);
+    }
+    else
+    {
+      forceVel = ptr->getForceVelJacobian(
+          world, mRepresentationMapping, mRepresentationMapping);
+      posPos = ptr->getPosPosJacobian(
+          world, mRepresentationMapping, mRepresentationMapping);
+      posVel = ptr->getPosVelJacobian(
+          world, mRepresentationMapping, mRepresentationMapping);
+      velPos = ptr->getVelPosJacobian(
+          world, mRepresentationMapping, mRepresentationMapping);
+      velVel = ptr->getVelVelJacobian(
+          world, mRepresentationMapping, mRepresentationMapping);
+    }
 
     // v_end <- f_t = v_end <- v_t+1 * v_t+1 <- f_t
     thisTimestep.forceVel = last.velVel * forceVel;

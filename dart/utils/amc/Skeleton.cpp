@@ -174,6 +174,7 @@ Quatd ordered_rotation(string const& order, Vector3d const& rot)
   return normalize(ret);
 }
 
+/*
 Vector3d get_dof_trans(string const& dof, double const* info, int start_pos)
 {
   Vector3d trans;
@@ -248,6 +249,7 @@ void put_dof_trans(
     ++info;
   }
 }
+*/
 
 } // namespace
 Quatd get_dof_rot(string const& dof, double const* info, int start_pos)

@@ -58,7 +58,7 @@ using namespace neural;
 using namespace server;
 using namespace realtime;
 
-// #ifdef ALL_TESTS
+#ifdef ALL_TESTS
 TEST(REALTIME, GUI_SERVER)
 {
   // Create a world
@@ -221,4 +221,4 @@ TEST(REALTIME, GUI_SERVER)
     // cartpole->setPositions(Eigen::VectorXd::Zero(cartpole->getNumDofs()));
   }
 }
-// #endif
+#endif

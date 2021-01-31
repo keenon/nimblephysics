@@ -467,7 +467,7 @@ public:
   virtual bool use_data(
       Reader::VectorPattern<OrderTokenPattern, 6>::MatchData& data,
       Skeleton& obj,
-      Reader::Reader<Skeleton> const& reader) const
+      Reader::Reader<Skeleton> const& /* reader */) const
   {
     obj.order = "";
     set<char> seen;
@@ -493,7 +493,7 @@ public:
   virtual bool use_data(
       Reader::TypePattern<string>::MatchData& data,
       Skeleton& obj,
-      Reader::Reader<Skeleton> const& reader) const
+      Reader::Reader<Skeleton> const& /* reader */) const
   {
     obj.offset_order = data.mat;
     transform(
@@ -512,7 +512,7 @@ class TypeHandler
   virtual bool use_data(
       typename Reader::TypePattern<TYPE>::MatchData& data,
       Skeleton& obj,
-      Reader::Reader<Skeleton> const& reader) const
+      Reader::Reader<Skeleton> const& /* reader */) const
   {
     TYPE& t = get_storage(obj);
     t = data.mat;
@@ -520,7 +520,7 @@ class TypeHandler
     return true;
   }
   virtual TYPE& get_storage(Skeleton& obj) const = 0;
-  virtual void postprocess(Skeleton& obj, TYPE& t) const
+  virtual void postprocess(Skeleton& /* obj */, TYPE& /* t */) const
   {
   }
 };
@@ -646,7 +646,7 @@ class UnitsAngleHandler
   virtual bool use_data(
       Reader::TypePattern<string>::MatchData& data,
       Skeleton& obj,
-      Reader::Reader<Skeleton> const& reader) const
+      Reader::Reader<Skeleton> const& /* reader */) const
   {
     if (data.mat == "deg")
     {
@@ -674,7 +674,7 @@ class VectorHandler : public Reader::BasePatternHandler<
       typename Reader::VectorPattern<Reader::TypePattern<NUM>, size>::MatchData&
           data,
       Skeleton& obj,
-      Reader::Reader<Skeleton> const& reader) const
+      Reader::Reader<Skeleton> const& /* reader */) const
   {
     assert(data.data.size() == size);
     Vector<NUM, size>& store = get_storage(obj);
@@ -686,7 +686,8 @@ class VectorHandler : public Reader::BasePatternHandler<
     return true;
   }
   virtual Vector<NUM, size>& get_storage(Skeleton& obj) const = 0;
-  virtual void postprocess(Skeleton& obj, Vector<NUM, size>& storage) const
+  virtual void postprocess(
+      Skeleton& /* obj */, Vector<NUM, size>& /* storage */) const
   {
   }
 };
@@ -747,7 +748,7 @@ public:
           Reader::VectorPattern<Reader::TypePattern<double>, 3>,
           Reader::TypePattern<string> >::MatchData& data,
       Skeleton& obj,
-      Reader::Reader<Skeleton> const& reader) const
+      Reader::Reader<Skeleton> const& /* reader */) const
   {
     if (!obj.in_bone)
     {
@@ -896,7 +897,7 @@ public:
   virtual bool use_data(
       Reader::StarPattern<DofTokenPattern>::MatchData& data,
       Skeleton& obj,
-      Reader::Reader<Skeleton> const& reader) const
+      Reader::Reader<Skeleton> const& /* reader */) const
   {
     if (!obj.in_bone)
     {
@@ -969,9 +970,9 @@ class BoneDataLimitsHandler
 {
 public:
   virtual bool use_data(
-      Reader::StarPattern<LimitsPattern>::MatchData& data,
+      Reader::StarPattern<LimitsPattern>::MatchData& /* data */,
       Skeleton& obj,
-      Reader::Reader<Skeleton> const& reader) const
+      Reader::Reader<Skeleton> const& /* reader */) const
   {
     if (!obj.in_bone)
     {
@@ -994,7 +995,7 @@ public:
   virtual bool use_data(
       Reader::StarPattern<LimitsPattern>::MatchData& data,
       Skeleton& obj,
-      Reader::Reader<Skeleton> const& reader) const
+      Reader::Reader<Skeleton> const& /* reader */) const
   {
     if (!obj.in_bone)
     {
@@ -1018,9 +1019,9 @@ class BoneDataBeginHandler
   : public Reader::BasePatternHandler<Reader::NullPattern, Skeleton>
 {
   virtual bool use_data(
-      Reader::NullPattern::MatchData& data,
+      Reader::NullPattern::MatchData& /* data */,
       Skeleton& obj,
-      Reader::Reader<Skeleton> const& reader) const
+      Reader::Reader<Skeleton> const& /* reader */) const
   {
     if (obj.in_bone)
     {
@@ -1039,9 +1040,9 @@ class BoneDataEndHandler
 {
 public:
   virtual bool use_data(
-      Reader::NullPattern::MatchData& data,
+      Reader::NullPattern::MatchData& /* data */,
       Skeleton& obj,
-      Reader::Reader<Skeleton> const& reader) const
+      Reader::Reader<Skeleton> const& /* reader */) const
   {
     if (!obj.in_bone)
     {

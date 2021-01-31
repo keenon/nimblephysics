@@ -270,8 +270,8 @@ void dSegmentsClosestApproach(
   double d = u.dot(w);
   double e = v.dot(w);
   double D = a * c - b * b; // always >= 0
-  double sc, sN, sD = D;    // sc = sN / sD, default sD = D >= 0
-  double tc, tN, tD = D;    // tc = tN / tD, default tD = D >= 0
+  double sN, sD = D;        // sc = sN / sD, default sD = D >= 0
+  double tN, tD = D;        // tc = tN / tD, default tD = D >= 0
 
   const double SMALL_NUM = 1e-15;
 
@@ -3811,14 +3811,6 @@ int collideCapsuleCapsule(
       contact.edgeBFixedPoint = ua;
       contact.edgeBClosestPoint = closest1;
       contact.edgeBDir = (ub - ua).normalized();
-
-      Eigen::Vector3d contactPoint = math::getContactPoint(
-          contact.edgeAFixedPoint,
-          contact.edgeADir,
-          contact.edgeBFixedPoint,
-          contact.edgeBDir,
-          contact.radiusA,
-          contact.radiusB);
     }
 
     result.addContact(contact);
@@ -4000,8 +3992,6 @@ int collideBoxCapsule(
     {
       Eigen::Isometry3d sphereTransform = Eigen::Isometry3d::Identity();
       sphereTransform.translation() = Eigen::Vector3d(0, 0, height1 / 2);
-      Eigen::Vector3d sphereCenter = T1 * Eigen::Vector3d(0, 0, height1 / 2);
-      Eigen::Vector3d transCenter = (T1 * sphereTransform).translation();
       return collideBoxSphere(
           o1, o2, size0, T0, radius1, T1 * sphereTransform, result);
     }
@@ -4009,8 +3999,6 @@ int collideBoxCapsule(
     {
       Eigen::Isometry3d sphereTransform = Eigen::Isometry3d::Identity();
       sphereTransform.translation() = Eigen::Vector3d(0, 0, -height1 / 2);
-      Eigen::Vector3d sphereCenter = T1 * Eigen::Vector3d(0, 0, -height1 / 2);
-      Eigen::Vector3d transCenter = (T1 * sphereTransform).translation();
       return collideBoxSphere(
           o1, o2, size0, T0, radius1, T1 * sphereTransform, result);
     }
@@ -4151,8 +4139,6 @@ int collideMeshCapsule(
     {
       Eigen::Isometry3d sphereTransform = Eigen::Isometry3d::Identity();
       sphereTransform.translation() = Eigen::Vector3d(0, 0, height1 / 2);
-      Eigen::Vector3d sphereCenter = T1 * Eigen::Vector3d(0, 0, height1 / 2);
-      Eigen::Vector3d transCenter = (T1 * sphereTransform).translation();
       return collideMeshSphere(
           o1, o2, m0, size0, T0, radius1, T1 * sphereTransform, result);
     }
@@ -4160,8 +4146,6 @@ int collideMeshCapsule(
     {
       Eigen::Isometry3d sphereTransform = Eigen::Isometry3d::Identity();
       sphereTransform.translation() = Eigen::Vector3d(0, 0, -height1 / 2);
-      Eigen::Vector3d sphereCenter = T1 * Eigen::Vector3d(0, 0, -height1 / 2);
-      Eigen::Vector3d transCenter = (T1 * sphereTransform).translation();
       return collideMeshSphere(
           o1, o2, m0, size0, T0, radius1, T1 * sphereTransform, result);
     }

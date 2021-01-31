@@ -864,7 +864,6 @@ Eigen::Vector3d getContactPointGradient(
     double radiusA,
     double radiusB)
 {
-  const double EPS = 1e-7;
   Eigen::Vector3d p = edgeBPoint - edgeAPoint;
   Eigen::Vector3d d_p = edgeBPointGradient - edgeAPointGradient;
 
@@ -992,11 +991,12 @@ bool hasTinySingularValues(const Eigen::MatrixXd& J, double clippingThreshold)
   Eigen::VectorXd singulars = svd.singularValues();
   for (int i = 0; i < singulars.size(); i++)
   {
-    if (std::abs(singulars(i)) < 1e-4)
+    if (std::abs(singulars(i)) < clippingThreshold)
     {
       return true;
     }
   }
+  return false;
 }
 
 Eigen::MatrixXd clippedSingularsPinv(
@@ -1011,7 +1011,7 @@ Eigen::MatrixXd clippedSingularsPinv(
   // instability issues.
   for (int i = 0; i < singulars.size(); i++)
   {
-    if (std::abs(singulars(i)) < 1e-6)
+    if (std::abs(singulars(i)) < clippingThreshold)
     {
       singulars(i) = 0.0;
     }

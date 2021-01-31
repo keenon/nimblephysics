@@ -449,7 +449,7 @@ Eigen::VectorXd ConstraintSolver::getCachedLCPSolution()
 }
 
 //==============================================================================
-void ConstraintSolver::setCachedLCPSolution(Eigen::VectorXd X)
+void ConstraintSolver::setCachedLCPSolution(Eigen::VectorXd /* X */)
 {
   assert(false && "You should never call setCachedLCPSolution() on the root ConstraintSolver, only on BoxedLCPConstraintSolver!");
 }

@@ -27,46 +27,47 @@ MPCLocal::MPCLocal(
     std::shared_ptr<simulation::World> world,
     std::shared_ptr<trajectory::LossFn> loss,
     int planningHorizonMillis)
-  : mWorld(world),
+  : mRunning(false),
+    mWorld(world),
     mLoss(loss),
-    mPlanningHorizonMillis(planningHorizonMillis),
-    mMillisPerStep(1000 * world->getTimeStep()),
-    mSteps((int)ceil((double)planningHorizonMillis / mMillisPerStep)),
-    mBuffer(RealTimeControlBuffer(world->getNumDofs(), mSteps, mMillisPerStep)),
-    mShotLength(50),
-    mRunning(false),
     mObservationLog(
         timeSinceEpochMillis(),
         world->getPositions(),
         world->getVelocities(),
         world->getMasses()),
-    mLastOptimizedTime(0L),
-    mSilent(false),
-    mMaxIterations(5),
     mEnableLinesearch(true),
     mEnableOptimizationGuards(false),
     mRecordIterations(false),
-    mMillisInAdvanceToPlan(0)
+    mPlanningHorizonMillis(planningHorizonMillis),
+    mMillisPerStep(1000 * world->getTimeStep()),
+    mSteps((int)ceil((double)planningHorizonMillis / mMillisPerStep)),
+    mShotLength(50),
+    mMaxIterations(5),
+    mMillisInAdvanceToPlan(0),
+    mLastOptimizedTime(0L),
+    mBuffer(RealTimeControlBuffer(world->getNumDofs(), mSteps, mMillisPerStep)),
+    mSilent(false)
 {
 }
 
 /// Copy constructor
 MPCLocal::MPCLocal(const MPCLocal& mpc)
-  : mWorld(mpc.mWorld),
+  : mRunning(mpc.mRunning),
+    mWorld(mpc.mWorld),
     mLoss(mpc.mLoss),
+    mObservationLog(mpc.mObservationLog),
+    mEnableLinesearch(mpc.mEnableLinesearch),
+    mEnableOptimizationGuards(mpc.mEnableOptimizationGuards),
+    mRecordIterations(mpc.mRecordIterations),
     mPlanningHorizonMillis(mpc.mPlanningHorizonMillis),
     mMillisPerStep(mpc.mMillisPerStep),
     mSteps(mpc.mSteps),
-    mBuffer(mpc.mBuffer),
     mShotLength(mpc.mShotLength),
-    mRunning(mpc.mRunning),
-    mObservationLog(mpc.mObservationLog),
-    mLastOptimizedTime(mpc.mLastOptimizedTime),
-    mSilent(mpc.mSilent),
     mMaxIterations(mpc.mMaxIterations),
-    mEnableLinesearch(mpc.mEnableLinesearch),
-    mEnableOptimizationGuards(mpc.mEnableOptimizationGuards),
-    mRecordIterations(mpc.mRecordIterations)
+    mMillisInAdvanceToPlan(mpc.mMillisInAdvanceToPlan),
+    mLastOptimizedTime(mpc.mLastOptimizedTime),
+    mBuffer(mpc.mBuffer),
+    mSilent(mpc.mSilent)
 {
 }
 
@@ -418,9 +419,9 @@ RPCWrapperMPCLocal::RPCWrapperMPCLocal(MPCLocal& local) : mLocal(local)
 
 /// Remotely start the compute running
 grpc::Status RPCWrapperMPCLocal::Start(
-    grpc::ServerContext* context,
-    const proto::MPCStartRequest* request,
-    proto::MPCStartReply* response)
+    grpc::ServerContext* /* context */,
+    const proto::MPCStartRequest* /* request */,
+    proto::MPCStartReply* /* response */)
 {
   mLocal.start();
   return grpc::Status::OK;
@@ -428,9 +429,9 @@ grpc::Status RPCWrapperMPCLocal::Start(
 
 /// Remotely stop the compute running
 grpc::Status RPCWrapperMPCLocal::Stop(
-    grpc::ServerContext* context,
-    const proto::MPCStopRequest* request,
-    proto::MPCStopReply* response)
+    grpc::ServerContext* /* context */,
+    const proto::MPCStopRequest* /* request */,
+    proto::MPCStopReply* /* response */)
 {
   mLocal.stop();
   return grpc::Status::OK;
@@ -438,8 +439,8 @@ grpc::Status RPCWrapperMPCLocal::Stop(
 
 /// Remotely listen for replanning updates
 grpc::Status RPCWrapperMPCLocal::ListenForUpdates(
-    grpc::ServerContext* context,
-    const proto::MPCListenForUpdatesRequest* request,
+    grpc::ServerContext* /* context */,
+    const proto::MPCListenForUpdatesRequest* /* request */,
     grpc::ServerWriter<proto::MPCListenForUpdatesReply>* writer)
 {
   proto::MPCListenForUpdatesReply reply;
@@ -462,9 +463,9 @@ grpc::Status RPCWrapperMPCLocal::ListenForUpdates(
 
 /// Remotely listen for replanning updates
 grpc::Status RPCWrapperMPCLocal::RecordGroundTruthState(
-    grpc::ServerContext* context,
+    grpc::ServerContext* /* context */,
     const proto::MPCRecordGroundTruthStateRequest* request,
-    proto::MPCRecordGroundTruthStateReply* reply)
+    proto::MPCRecordGroundTruthStateReply* /* reply */)
 {
   // std::cout << "gRPC server: RecordGroundTruthState" << std::endl;
   mLocal.recordGroundTruthState(
@@ -477,9 +478,9 @@ grpc::Status RPCWrapperMPCLocal::RecordGroundTruthState(
 
 /// Remotely listen for replanning updates
 grpc::Status RPCWrapperMPCLocal::ObserveForce(
-    grpc::ServerContext* context,
+    grpc::ServerContext* /* context */,
     const proto::MPCObserveForceRequest* request,
-    proto::MPCObserveForceReply* reply)
+    proto::MPCObserveForceReply* /* reply */)
 {
   // std::cout << "gRPC server: ObserveForce" << std::endl;
   mLocal.mBuffer.manuallyRecordObservedForce(

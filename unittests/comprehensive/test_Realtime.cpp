@@ -151,7 +151,7 @@ std::shared_ptr<LossFn> getSSIDLoss()
   return std::make_shared<LossFn>(loss, lossGrad);
 }
 
-// #ifdef ALL_TESTS
+#ifdef ALL_TESTS
 TEST(REALTIME, CARTPOLE_MPC)
 {
   ////////////////////////////////////////////////////////////
@@ -412,7 +412,7 @@ TEST(REALTIME, CARTPOLE_MPC)
     // cartpole->setPositions(Eigen::VectorXd::Zero(cartpole->getNumDofs()));
   }
 }
-// #endif
+#endif
 
 #ifdef ALL_TESTS
 TEST(REALTIME, CARTPOLE_SSID)

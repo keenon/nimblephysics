@@ -140,7 +140,9 @@ void ConstrainedGroupGradientMatrices::mockRegisterConstraint(
 /// dimension.
 void ConstrainedGroupGradientMatrices::measureConstraintImpulse(
     const constraint::ConstraintBasePtr& constraint,
-    std::size_t constraintIndex)
+    // we currently just rely on the order of the calls to sequence our massed
+    // impuls test vector correctly, so we don't use constraintIndex
+    std::size_t /* constraintIndex */)
 {
   // For gradient computations: record the velocity changes for each
   // skeleton for the unit impulse on this constraint. We are guaranteed that
@@ -159,7 +161,7 @@ void ConstrainedGroupGradientMatrices::measureConstraintImpulse(
 
 //==============================================================================
 void ConstrainedGroupGradientMatrices::mockMeasureConstraintImpulse(
-    Eigen::VectorXd impulseTest, Eigen::VectorXd massedImpulseTest)
+    Eigen::VectorXd massedImpulseTest)
 {
   mMassedImpulseTests.push_back(massedImpulseTest);
 }
@@ -1649,7 +1651,7 @@ const Eigen::VectorXd& ConstrainedGroupGradientMatrices::getPreLCPVelocity()
 
 //==============================================================================
 /// Returns the M^{-1} matrix from pre-step
-const Eigen::VectorXd& ConstrainedGroupGradientMatrices::getMinv() const
+const Eigen::MatrixXd& ConstrainedGroupGradientMatrices::getMinv() const
 {
   return mMinv;
 }

@@ -174,7 +174,7 @@ TrajectoryRolloutReal TrajectoryRollout::deserialize(
 
 //==============================================================================
 /// This creates a rollout from forces over time
-static TrajectoryRolloutReal fromForces(
+TrajectoryRolloutReal TrajectoryRollout::fromForces(
     std::shared_ptr<simulation::World> world,
     Eigen::VectorXd startPos,
     Eigen::VectorXd startVel,
@@ -187,6 +187,8 @@ static TrajectoryRolloutReal fromForces(
   Eigen::MatrixXd forceMatrix = Eigen::MatrixXd::Zero(dofs, steps);
 
   neural::RestorableSnapshot snapshot(world);
+  world->setPositions(startPos);
+  world->setVelocities(startVel);
 
   for (int i = 0; i < forces.size(); i++)
   {
@@ -213,7 +215,7 @@ static TrajectoryRolloutReal fromForces(
 
 //==============================================================================
 /// This creates a rollout from poses over time
-static TrajectoryRolloutReal fromPoses(
+TrajectoryRolloutReal TrajectoryRollout::fromPoses(
     std::shared_ptr<simulation::World> world,
     std::vector<Eigen::VectorXd> poses)
 {
@@ -282,7 +284,7 @@ TrajectoryRolloutReal::TrajectoryRolloutReal(
     const std::unordered_map<std::string, Eigen::MatrixXd> force,
     const Eigen::VectorXd mass,
     const std::unordered_map<std::string, Eigen::MatrixXd> metadata)
-  : mRepresentationMapping(representationMapping), mMasses(mass)
+  : mMasses(mass), mRepresentationMapping(representationMapping)
 {
   for (auto pair : pos)
   {
@@ -608,7 +610,7 @@ Eigen::MatrixXd TrajectoryRolloutConstRef::getMetadata(
 
 //==============================================================================
 void TrajectoryRolloutConstRef::setMetadata(
-    const std::string& key, Eigen::MatrixXd value)
+    const std::string& /* key */, Eigen::MatrixXd /* value */)
 {
   assert(false && "It should be impossible to get a mutable reference from a TrajectorRolloutConstRef");
 }

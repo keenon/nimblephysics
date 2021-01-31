@@ -69,7 +69,6 @@ ContactConstraint::ContactConstraint(
     bool penetrationCorrectionEnabled)
   : ConstraintBase(),
     mTimeStep(timeStep),
-    mPenetrationCorrectionEnabled(penetrationCorrectionEnabled),
     mBodyNodeA(const_cast<dynamics::ShapeFrame*>(
                    contact.collisionObject1->getShapeFrame())
                    ->asShapeNode()
@@ -82,8 +81,9 @@ ContactConstraint::ContactConstraint(
     mFirstFrictionalDirection(Eigen::Vector3d::UnitZ()),
     mIsFrictionOn(true),
     mAppliedImpulseIndex(dynamics::INVALID_INDEX),
-    mIsBounceOn(false),
+    mPenetrationCorrectionEnabled(penetrationCorrectionEnabled),
     mDidBounce(false),
+    mIsBounceOn(false),
     mActive(false)
 {
   assert(

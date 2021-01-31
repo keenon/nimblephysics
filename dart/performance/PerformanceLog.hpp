@@ -56,9 +56,6 @@ protected:
       long parentTotalCycles,
       double parentPercentage,
       std::stringstream& stream);
-
-  /// This JSON prints to a stream
-  void recursiveJson(std::stringstream& stream);
 };
 
 class PerformanceLog

@@ -93,15 +93,15 @@ protected:
   bool mRunning;
   std::shared_ptr<simulation::World> mWorld;
   std::shared_ptr<trajectory::LossFn> mLoss;
+  int mPlanningHistoryMillis;
+  int mSensorDim;
+  VectorLog mSensorLog;
+  VectorLog mControlLog;
+
   std::shared_ptr<trajectory::Optimizer> mOptimizer;
   std::shared_ptr<trajectory::Problem> mProblem;
   std::shared_ptr<trajectory::Solution> mSolution;
-  int mSensorDim;
-  int mPlanningHistoryMillis;
   std::thread mOptimizationThread;
-
-  VectorLog mSensorLog;
-  VectorLog mControlLog;
 
   // These are listeners that get called when we finish replanning
   std::vector<std::function<void(

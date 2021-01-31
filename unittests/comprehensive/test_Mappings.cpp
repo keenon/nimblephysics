@@ -107,8 +107,8 @@ void testWorldSpace(std::size_t numLinks)
   world->addSkeleton(arm);
 
   SkeletonPtr floor = Skeleton::create("floor");
-  std::pair<WeldJoint*, BodyNode*> floorJointPair
-      = floor->createJointAndBodyNodePair<WeldJoint>(nullptr);
+  // std::pair<WeldJoint*, BodyNode*> floorJointPair =
+  floor->createJointAndBodyNodePair<WeldJoint>(nullptr);
   world->addSkeleton(floor);
 
   EXPECT_TRUE(verifyWorldSpaceTransform(world));

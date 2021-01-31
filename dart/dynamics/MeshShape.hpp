@@ -172,9 +172,6 @@ protected:
 
   const aiScene* mMesh;
 
-  /// If this is true, don't take ownership of the mMesh object and don't free it
-  bool mDontFreeMesh;
-
   /// URI the mesh, if available).
   common::Uri mMeshUri;
 
@@ -198,6 +195,9 @@ protected:
 
   /// Specifies which color index should be used when mColorMode is COLOR_INDEX
   int mColorIndex;
+
+  /// If this is true, don't take ownership of the mMesh object and don't free it
+  bool mDontFreeMesh;
 };
 
 }  // namespace dynamics

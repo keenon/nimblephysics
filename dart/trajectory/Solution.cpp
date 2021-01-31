@@ -102,8 +102,10 @@ void Solution::reoptimize()
   if (status == Solve_Succeeded)
   {
     // Retrieve some statistics about the solve
+    /*
     Index iter_count = mIpopt->Statistics()->IterationCount();
     Number final_obj = mIpopt->Statistics()->FinalObjective();
+    */
   }
 
   this->setSuccess(status == Ipopt::Solve_Succeeded);

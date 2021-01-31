@@ -398,7 +398,7 @@ bool verifyClassicProjectionIntoClampsMatrix(
     Eigen::MatrixXd A = classicPtr->mGradientMatrices[0]->mAllConstraintMatrix;
     Eigen::MatrixXd A_ub = classicPtr->getUpperBoundConstraintMatrix(world);
     Eigen::VectorXd bReal = classicPtr->mGradientMatrices[0]->mB;
-    int numContacts = bReal.size();
+    // int numContacts = bReal.size();
 
     /////////////////////////////////////////////////////
     // Checking the forward computation
@@ -1015,7 +1015,7 @@ bool verifyF_c(WorldPtr world)
 
   Eigen::VectorXd original = world->getPositions();
 
-  const double EPS = 1e-6;
+  // const double EPS = 1e-6;
 
   Eigen::MatrixXd A_c = classicPtr->getClampingConstraintMatrix(world);
   Eigen::MatrixXd A_ub = classicPtr->getUpperBoundConstraintMatrix(world);
@@ -1764,7 +1764,7 @@ double bruteForceLinearScratch(double startingPoint)
          / EPS;
 }
 
-double analyticalLinearScratch(double point)
+double analyticalLinearScratch(double /* point */)
 {
   return 1.0;
 }
@@ -2457,10 +2457,12 @@ bool verifyGradientBackprop(
     Eigen::MatrixXd velVelFD
         = backpropSnapshots[i]->finiteDifferenceVelVelJacobian(world);
 
+    /*
     double diffPosPos = (posPos - posPosFD).norm();
     double diffPosVel = (posVel - posVelFD).norm();
     double diffVelPos = (velPos - velPosFD).norm();
     double diffVelVel = (velVel - velVelFD).norm();
+    */
 
     /*
     std::cout << "Jacobian error at step:" << numSteps << ": " << diffPosPos
@@ -2569,8 +2571,8 @@ bool verifyWorldSpaceToVelocitySpatial(
       BodyNode* node = skel->getBodyNode(k);
       Eigen::Vector6d bruteVel
           = math::AdR(node->getWorldTransform(), node->getSpatialVelocity());
-      Eigen::Vector6d analyticalVel = worldVel.segment(cursor, 6);
       /*
+      Eigen::Vector6d analyticalVel = worldVel.segment(cursor, 6);
       std::cout << "Body " << k << std::endl << bruteVel << std::endl;
       std::cout << "Analytical " << k << std::endl
                 << analyticalVel << std::endl;
@@ -2620,9 +2622,9 @@ bool verifyWorldSpaceToLinearVelocity(
       Eigen::Vector3d bruteVel
           = math::AdR(node->getWorldTransform(), node->getSpatialVelocity())
                 .tail<3>();
-      Eigen::Vector3d analyticalVel = worldVel.segment(cursor, 3);
 
       /*
+      Eigen::Vector3d analyticalVel = worldVel.segment(cursor, 3);
       std::cout << "Body " << k << std::endl << bruteVel << std::endl;
       std::cout << "Analytical " << k << std::endl
                 << analyticalVel << std::endl;
@@ -2667,8 +2669,8 @@ bool verifyWorldSpaceToPositionCOM(
     // std::endl;
     Eigen::Vector3d bruteCOMPos = skel->getCOM();
 
-    Eigen::Vector3d analyticalVel = worldPos.segment(cursor, 3);
     /*
+    Eigen::Vector3d analyticalVel = worldPos.segment(cursor, 3);
     std::cout << "Body " << k << std::endl << bruteVel << std::endl;
     std::cout << "Analytical " << k << std::endl
               << analyticalVel << std::endl;
@@ -2723,8 +2725,8 @@ bool verifyWorldSpaceToVelocityCOMLinear(
     }
     bruteCOMVel /= totalMass;
 
-    Eigen::Vector3d analyticalVel = worldVel.segment(cursor, 3);
     /*
+    Eigen::Vector3d analyticalVel = worldVel.segment(cursor, 3);
     std::cout << "Body " << k << std::endl << bruteVel << std::endl;
     std::cout << "Analytical " << k << std::endl
               << analyticalVel << std::endl;
@@ -2778,8 +2780,8 @@ bool verifyWorldSpaceToVelocityCOMSpatial(
     }
     bruteCOMVel /= totalMass;
 
-    Eigen::Vector6d analyticalVel = worldVel.segment(cursor, 6);
     /*
+    Eigen::Vector6d analyticalVel = worldVel.segment(cursor, 6);
     std::cout << "Body " << k << std::endl << bruteVel << std::endl;
     std::cout << "Analytical " << k << std::endl
               << analyticalVel << std::endl;
@@ -2955,7 +2957,7 @@ Eigen::VectorXd getTestComponentMapping(
 
 int getTestComponentMappingDim(
     std::shared_ptr<Mapping> mapping,
-    WorldPtr world,
+    WorldPtr /* world */,
     MappingTestComponent component)
 {
   if (component == MappingTestComponent::POSITION)
@@ -4271,11 +4273,13 @@ bool verifyPerturbedContactEdges(WorldPtr world)
     if (constraints[k]->getContactType() == EDGE_EDGE)
     {
       EdgeData original = constraints[k]->getEdges();
+      /*
       Eigen::Vector3d originalIntersectionPoint = math::getContactPoint(
           original.edgeAPos,
           original.edgeADir,
           original.edgeBPos,
           original.edgeBDir);
+          */
 
       for (int i = 0; i < world->getNumSkeletons(); i++)
       {
@@ -4610,8 +4614,11 @@ bool verifyPerturbedContactPositions(
                       << point->getContactWorldPosition() << std::endl;
           }
 
+          /*
+          // Uncomment for a breakpoint
           Eigen::Vector3d analytical
               = constraints[k]->estimatePerturbedContactPosition(skel, j, EPS);
+          */
           return false;
         }
 
@@ -5075,8 +5082,11 @@ bool verifyAnalyticalConstraintDerivatives(WorldPtr world)
                     << gradientOfWorldForce << std::endl;
           std::cout << "World twist (for force):" << std::endl
                     << worldTwist << std::endl;
+          /*
+          // Uncomment for a breakpoint
           double analytical
               = constraints[i]->getConstraintForceDerivative(axis, rotate);
+          */
           return false;
         }
       }
@@ -5384,8 +5394,8 @@ bool verifyPositionScrews(WorldPtr world)
   {
     dynamics::DegreeOfFreedom* dof = dofs[dofIndex];
 
-    dynamics::BodyNode* node = dof->getChildBodyNode();
-    Eigen::Isometry3d originalTransform = node->getWorldTransform();
+    // dynamics::BodyNode* node = dof->getChildBodyNode();
+    // Eigen::Isometry3d originalTransform = node->getWorldTransform();
 
     // get world twist
     int jointIndex = dof->getIndexInJoint();
@@ -5450,7 +5460,7 @@ bool verifyVelocityScrews(WorldPtr world)
         dynamics::BodyNode* node = skel->getBodyNode(j);
 
         double originalVel = dof->getVelocity();
-        Eigen::Vector6d originalSpatialVel = node->getSpatialVelocity();
+        // Eigen::Vector6d originalSpatialVel = node->getSpatialVelocity();
 
         dof->setVelocity(originalVel + EPS);
         Eigen::Vector6d plusVel = node->getSpatialVelocity();

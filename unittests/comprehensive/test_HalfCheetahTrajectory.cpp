@@ -142,18 +142,20 @@ TEST(ATLAS_EXAMPLE, FULL_TEST)
   optimizer.setTolerance(1e-4);
   optimizer.setCheckDerivatives(false);
   optimizer.setIterationLimit(500);
-  optimizer.registerIntermediateCallback(
-      [&](trajectory::Problem* problem, int step, double primal, double dual) {
-        const Eigen::MatrixXd poses
-            = problem->getRolloutCache(world)->getPosesConst();
-        const Eigen::MatrixXd vels
-            = problem->getRolloutCache(world)->getVelsConst();
-        std::cout << "Rendering trajectory lines" << std::endl;
-        server.renderTrajectoryLines(world, poses);
-        world->setPositions(poses.col(0));
-        server.renderWorld(world);
-        return true;
-      });
+  optimizer.registerIntermediateCallback([&](trajectory::Problem* problem,
+                                             int /* step */,
+                                             double /* primal */,
+                                             double /* dual */) {
+    const Eigen::MatrixXd poses
+        = problem->getRolloutCache(world)->getPosesConst();
+    const Eigen::MatrixXd vels
+        = problem->getRolloutCache(world)->getVelsConst();
+    std::cout << "Rendering trajectory lines" << std::endl;
+    server.renderTrajectoryLines(world, poses);
+    world->setPositions(poses.col(0));
+    server.renderWorld(world);
+    return true;
+  });
   std::shared_ptr<trajectory::Solution> result
       = optimizer.optimize(trajectory.get());
 

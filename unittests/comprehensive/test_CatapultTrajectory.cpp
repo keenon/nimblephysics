@@ -340,7 +340,8 @@ std::shared_ptr<simulation::World> createWorld(double target_x, double target_y)
       root, Eigen::Vector3d(182.0 / 255, 223.0 / 255, 144.0 / 255));
   BodyNode* tail2 = createTailSegment(
       tail1, Eigen::Vector3d(223.0 / 255, 228.0 / 255, 163.0 / 255));
-  BodyNode* tail3 = createTailSegment(
+  // BodyNode* tail3 =
+  createTailSegment(
       tail2, Eigen::Vector3d(221.0 / 255, 193.0 / 255, 121.0 / 255));
 
   catapult->setPositions(Eigen::Vector3d(45, 0, 45) * 3.1415 / 180);
@@ -564,7 +565,7 @@ TEST(CATAPULT_EXAMPLE, FULL_TEST)
   trajectory::LossFn lossObj(loss);
 
   std::shared_ptr<trajectory::MultiShot> trajectory
-      = std::make_shared<trajectory::MultiShot>(world, lossObj, 500, 20, false);
+      = std::make_shared<trajectory::MultiShot>(world, lossObj, 100, 20, false);
   trajectory->setParallelOperationsEnabled(false);
 
   /*
@@ -597,7 +598,7 @@ TEST(CATAPULT_EXAMPLE, FULL_TEST)
   optimizer.setLBFGSHistoryLength(1);
   optimizer.setTolerance(1e-4);
   optimizer.setCheckDerivatives(true);
-  optimizer.setIterationLimit(500);
+  optimizer.setIterationLimit(20);
   std::shared_ptr<trajectory::Solution> result
       = optimizer.optimize(trajectory.get());
 

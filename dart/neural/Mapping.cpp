@@ -49,7 +49,7 @@ Eigen::VectorXd Mapping::getMasses(std::shared_ptr<simulation::World> world)
 
 //==============================================================================
 Eigen::VectorXd Mapping::getPositionLowerLimits(
-    std::shared_ptr<simulation::World> world)
+    std::shared_ptr<simulation::World> /* world */)
 {
   return Eigen::VectorXd::Ones(getPosDim())
          * -std::numeric_limits<double>::infinity();
@@ -57,7 +57,7 @@ Eigen::VectorXd Mapping::getPositionLowerLimits(
 
 //==============================================================================
 Eigen::VectorXd Mapping::getPositionUpperLimits(
-    std::shared_ptr<simulation::World> world)
+    std::shared_ptr<simulation::World> /* world */)
 {
   return Eigen::VectorXd::Ones(getPosDim())
          * std::numeric_limits<double>::infinity();
@@ -65,7 +65,7 @@ Eigen::VectorXd Mapping::getPositionUpperLimits(
 
 //==============================================================================
 Eigen::VectorXd Mapping::getVelocityLowerLimits(
-    std::shared_ptr<simulation::World> world)
+    std::shared_ptr<simulation::World> /* world */)
 {
   return Eigen::VectorXd::Ones(getVelDim())
          * -std::numeric_limits<double>::infinity();
@@ -73,7 +73,7 @@ Eigen::VectorXd Mapping::getVelocityLowerLimits(
 
 //==============================================================================
 Eigen::VectorXd Mapping::getVelocityUpperLimits(
-    std::shared_ptr<simulation::World> world)
+    std::shared_ptr<simulation::World> /* world */)
 {
   return Eigen::VectorXd::Ones(getVelDim())
          * std::numeric_limits<double>::infinity();
@@ -81,7 +81,7 @@ Eigen::VectorXd Mapping::getVelocityUpperLimits(
 
 //==============================================================================
 Eigen::VectorXd Mapping::getForceLowerLimits(
-    std::shared_ptr<simulation::World> world)
+    std::shared_ptr<simulation::World> /* world */)
 {
   return Eigen::VectorXd::Ones(getForceDim())
          * -std::numeric_limits<double>::infinity();
@@ -89,7 +89,7 @@ Eigen::VectorXd Mapping::getForceLowerLimits(
 
 //==============================================================================
 Eigen::VectorXd Mapping::getForceUpperLimits(
-    std::shared_ptr<simulation::World> world)
+    std::shared_ptr<simulation::World> /* world */)
 {
   return Eigen::VectorXd::Ones(getForceDim())
          * std::numeric_limits<double>::infinity();
@@ -97,7 +97,7 @@ Eigen::VectorXd Mapping::getForceUpperLimits(
 
 //==============================================================================
 Eigen::VectorXd Mapping::getMassLowerLimits(
-    std::shared_ptr<simulation::World> world)
+    std::shared_ptr<simulation::World> /* world */)
 {
   // Non-zero lower bound by default
   return Eigen::VectorXd::Ones(getMassDim()) * 1e-7;
@@ -105,7 +105,7 @@ Eigen::VectorXd Mapping::getMassLowerLimits(
 
 //==============================================================================
 Eigen::VectorXd Mapping::getMassUpperLimits(
-    std::shared_ptr<simulation::World> world)
+    std::shared_ptr<simulation::World> /* world */)
 {
   return Eigen::VectorXd::Ones(getMassDim())
          * std::numeric_limits<double>::infinity();

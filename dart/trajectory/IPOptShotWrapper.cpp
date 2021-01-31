@@ -30,20 +30,21 @@ IPOptShotWrapper::IPOptShotWrapper(
     bool recordFullDebugInfo,
     bool printIterations,
     bool recordIterations)
-  : mBestFeasibleObjectiveValue(std::numeric_limits<double>::infinity()),
-    mWrapped(wrapped),
-    mBestIter(-1),
+  : mWrapped(wrapped),
     mRecord(record),
     mRecoverBest(recoverBest),
     mRecordFullDebugInfo(recordFullDebugInfo),
-    mPrintIterations(printIterations),
     mRecordIterations(recordIterations),
+    mBestIter(-1),
+    mBestFeasibleObjectiveValue(std::numeric_limits<double>::infinity()),
+    mBestFeasibleState(Eigen::VectorXd::Zero(0)),
+    mPrintIterations(printIterations),
     mLastTimestep(timeSinceEpochMillis()),
+    mNewXs(0),
     mFCalls(0),
     mGradFCalls(0),
     mGCalls(0),
-    mJacGCalls(0),
-    mNewXs(0)
+    mJacGCalls(0)
 {
   if (mRecoverBest)
   {
@@ -460,17 +461,17 @@ bool IPOptShotWrapper::eval_jac_g(
 
 //==============================================================================
 bool IPOptShotWrapper::eval_h(
-    Ipopt::Index _n,
-    const Ipopt::Number* _x,
-    bool _new_x,
-    Ipopt::Number _obj_factor,
-    Ipopt::Index _m,
-    const Ipopt::Number* _lambda,
-    bool _new_lambda,
-    Ipopt::Index _nele_hess,
-    Ipopt::Index* _iRow,
-    Ipopt::Index* _jCol,
-    Ipopt::Number* _values)
+    Ipopt::Index /* _n */,
+    const Ipopt::Number* /* _x */,
+    bool /* _new_x */,
+    Ipopt::Number /* _obj_factor */,
+    Ipopt::Index /* _m */,
+    const Ipopt::Number* /* _lambda */,
+    bool /* _new_lambda */,
+    Ipopt::Index /* _nele_hess */,
+    Ipopt::Index* /* _iRow */,
+    Ipopt::Index* /* _jCol */,
+    Ipopt::Number* /* _values */)
 {
   // TODO(JS): Not implemented yet.
   std::cout << "[IPOptShotWrapper::eval_h] Not implemented yet.\n";
@@ -502,7 +503,7 @@ void IPOptShotWrapper::finalize_solution(
     Ipopt::Index _m,
     const Ipopt::Number* /*_g*/,
     const Ipopt::Number* _lambda,
-    Ipopt::Number _obj_value,
+    Ipopt::Number /* _obj_value */,
     const Ipopt::IpoptData* /*_ip_data*/,
     Ipopt::IpoptCalculatedQuantities* /*_ip_cq*/)
 {
@@ -551,19 +552,19 @@ void IPOptShotWrapper::finalize_solution(
 
 //==============================================================================
 bool IPOptShotWrapper::intermediate_callback(
-    Ipopt::AlgorithmMode mode,
+    Ipopt::AlgorithmMode /* mode */,
     Ipopt::Index iter,
     Ipopt::Number obj_value,
     Ipopt::Number inf_pr,
-    Ipopt::Number inf_du,
-    Ipopt::Number mu,
-    Ipopt::Number d_norm,
-    Ipopt::Number regularization_size,
-    Ipopt::Number alpha_du,
-    Ipopt::Number alpha_pr,
-    Ipopt::Index ls_trials,
-    const Ipopt::IpoptData* ip_data,
-    Ipopt::IpoptCalculatedQuantities* ip_cq)
+    Ipopt::Number /* inf_du */,
+    Ipopt::Number /* mu */,
+    Ipopt::Number /* d_norm */,
+    Ipopt::Number /* regularization_size */,
+    Ipopt::Number /* alpha_du */,
+    Ipopt::Number /* alpha_pr */,
+    Ipopt::Index /* ls_trials */,
+    const Ipopt::IpoptData* /* ip_data */,
+    Ipopt::IpoptCalculatedQuantities* /* ip_cq */)
 {
   // Reset call counts
   reset_iteration();

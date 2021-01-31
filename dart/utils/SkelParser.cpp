@@ -680,18 +680,18 @@ tinyxml2::XMLElement* checkFormatAndGetWorldElement(
 }
 
 //==============================================================================
+#ifdef HAVE_FCL
 static std::shared_ptr<collision::CollisionDetector>
 createFclMeshCollisionDetector()
 {
-  /*
   auto cd = collision::CollisionDetector::getFactory()->create("fcl");
   auto fcl = std::static_pointer_cast<collision::FCLCollisionDetector>(cd);
   fcl->setPrimitiveShapeType(collision::FCLCollisionDetector::MESH);
   fcl->setContactPointComputationMethod(collision::FCLCollisionDetector::DART);
 
   return fcl;
-  */
 }
+#endif
 
 //==============================================================================
 simulation::WorldPtr readWorld(
@@ -737,7 +737,7 @@ simulation::WorldPtr readWorld(
     {
       const auto cdType = getValueString(physicsElement, "collision_detector");
 
-      /*
+#ifdef HAVE_FCL
       if (cdType == "fcl_mesh")
       {
         collision_detector = createFclMeshCollisionDetector();
@@ -747,17 +747,18 @@ simulation::WorldPtr readWorld(
         collision_detector
             = collision::CollisionDetector::getFactory()->create("fcl");
         auto cd = std::static_pointer_cast<collision::FCLCollisionDetector>(
-              collision_detector);
+            collision_detector);
         cd->setPrimitiveShapeType(collision::FCLCollisionDetector::PRIMITIVE);
         cd->setContactPointComputationMethod(
-              collision::FCLCollisionDetector::DART);
+            collision::FCLCollisionDetector::DART);
       }
       else
       {
         collision_detector
             = collision::CollisionDetector::getFactory()->create(cdType);
       }
-      */
+#endif
+
       collision_detector
           = collision::CollisionDetector::getFactory()->create(cdType);
 

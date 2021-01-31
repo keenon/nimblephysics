@@ -82,8 +82,7 @@ public:
       const Eigen::VectorXd& mFIndex);
 
   /// This mocks measuring a constraint impulse. Useful for testing.
-  void mockMeasureConstraintImpulse(
-      Eigen::VectorXd impulseTest, Eigen::VectorXd massedImpulseTest);
+  void mockMeasureConstraintImpulse(Eigen::VectorXd massedImpulseTest);
 
   /// This gets called during the setup of the ConstrainedGroupGradientMatrices
   /// after the LCP has run, with the result from the LCP solver.
@@ -312,7 +311,7 @@ public:
   const Eigen::VectorXd& getPreLCPVelocity() const;
 
   /// Returns the M^{-1} matrix from pre-step
-  const Eigen::VectorXd& getMinv() const;
+  const Eigen::MatrixXd& getMinv() const;
 
   /// Get the coriolis and gravity forces
   const Eigen::VectorXd getCoriolisAndGravityAndExternalForces(

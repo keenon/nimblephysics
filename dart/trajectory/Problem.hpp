@@ -450,10 +450,10 @@ protected:
       = 0;
 
 protected:
+  std::shared_ptr<simulation::World> mWorld;
   LossFn mLoss;
   int mSteps;
   bool mTuneStartingState;
-  std::shared_ptr<simulation::World> mWorld;
   std::vector<LossFn> mConstraints;
   std::string mRepresentationMapping;
   std::unordered_map<std::string, std::shared_ptr<neural::Mapping>> mMappings;

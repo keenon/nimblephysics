@@ -86,7 +86,7 @@ public:
 class NullPattern : public BasePattern
 {
 public:
-  virtual BaseMatchData* operator()(BaseReader& from)
+  virtual BaseMatchData* operator()(BaseReader& /* from */)
   {
     static NullPattern::MatchData data;
     return &data;
@@ -269,7 +269,9 @@ class IgnorePatternHandler : public BasePatternHandler<PAT, OBJ>
 {
 public:
   virtual bool use_data(
-      typename PAT::MatchData& data, OBJ& obj, Reader<OBJ> const& reader) const
+      typename PAT::MatchData& /* data */,
+      OBJ& /* obj */,
+      Reader<OBJ> const& /* reader */) const
   {
     /* nothing, just ignore */
     return true;

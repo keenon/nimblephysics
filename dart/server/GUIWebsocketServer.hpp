@@ -314,6 +314,7 @@ public:
 protected:
   int mPort;
   bool mServing;
+  Eigen::Vector2i mScreenSize;
   asio::signal_set* mSignalSet;
   std::thread* mServerThread;
   WebsocketServer* mServer;
@@ -337,7 +338,6 @@ protected:
       std::string,
       std::vector<std::function<void(Eigen::Vector3d)>>>
       mDragListeners;
-  Eigen::Vector2i mScreenSize;
   std::vector<std::function<void(Eigen::Vector2i)>> mScreenResizeListeners;
   // This is a list of all the objects with mouse interaction enabled
   std::unordered_set<std::string> mMouseInteractionEnabled;

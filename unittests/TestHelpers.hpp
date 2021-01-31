@@ -196,16 +196,16 @@ SkeletonPtr createCartpole()
   sledPair.first->setAxis(Eigen::Vector3d(1, 0, 0));
   std::shared_ptr<BoxShape> sledShapeBox(
       new BoxShape(Eigen::Vector3d(0.05, 0.25, 0.05)));
-  ShapeNode* sledShape
-      = sledPair.second->createShapeNodeWith<VisualAspect>(sledShapeBox);
+  // ShapeNode* sledShape =
+  sledPair.second->createShapeNodeWith<VisualAspect>(sledShapeBox);
 
   std::pair<RevoluteJoint*, BodyNode*> armPair
       = cartpole->createJointAndBodyNodePair<RevoluteJoint>(sledPair.second);
   armPair.first->setAxis(Eigen::Vector3d(0, 0, 1));
   std::shared_ptr<BoxShape> armShapeBox(
       new BoxShape(Eigen::Vector3d(0.05, 0.25, 0.05)));
-  ShapeNode* armShape
-      = armPair.second->createShapeNodeWith<VisualAspect>(armShapeBox);
+  // ShapeNode* armShape =
+  armPair.second->createShapeNodeWith<VisualAspect>(armShapeBox);
 
   Eigen::Isometry3d armOffset = Eigen::Isometry3d::Identity();
   armOffset.translation() = Eigen::Vector3d(0, -0.5, 0);
@@ -215,7 +215,7 @@ SkeletonPtr createCartpole()
 }
 
 SkeletonPtr createMultiarmRobot(
-    int numLinks, double radiansPerJoint, int attachPoint = -1)
+    int numLinks, double /* radiansPerJoint */, int attachPoint = -1)
 {
   SkeletonPtr arm = Skeleton::create("arm");
   BodyNode* parent = nullptr;
@@ -245,7 +245,8 @@ SkeletonPtr createMultiarmRobot(
     parent = jointPair.second;
     if ((attachPoint == -1 && i < numLinks - 1) || i != attachPoint)
     {
-      ShapeNode* visual = parent->createShapeNodeWith<VisualAspect>(boxShape);
+      // ShapeNode* visual =
+      parent->createShapeNodeWith<VisualAspect>(boxShape);
     }
   }
 
@@ -256,8 +257,8 @@ SkeletonPtr createMultiarmRobot(
 
   std::shared_ptr<BoxShape> endShape(
       new BoxShape(Eigen::Vector3d(1.0, 1.0, 1.0) * sqrt(1.0 / 3.0)));
-  ShapeNode* endNode
-      = parent->createShapeNodeWith<VisualAspect, CollisionAspect>(endShape);
+  // ShapeNode* endNode =
+  parent->createShapeNodeWith<VisualAspect, CollisionAspect>(endShape);
   parent->setFrictionCoeff(1);
   return arm;
 }

@@ -1477,7 +1477,8 @@ void BackpropSnapshot::equalsOrCrash(
 
 //==============================================================================
 void BackpropSnapshot::printReplicationInstructions(
-    std::shared_ptr<simulation::World> world)
+    // TODO: export the world as a skel file
+    std::shared_ptr<simulation::World> /* world */)
 {
   std::cout << "Code to replicate:" << std::endl;
   std::cout << "--------------------" << std::endl;
@@ -1703,8 +1704,6 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferencePosVelJacobian(
   world->setPenetrationCorrectionEnabled(false);
   bool oldCFM = world->getConstraintForceMixingEnabled();
   world->setConstraintForceMixingEnabled(false);
-
-  double dt = world->getTimeStep();
 
   world->setPositions(mPreStepPosition);
   world->setVelocities(mPreStepVelocity);
@@ -3147,30 +3146,6 @@ Eigen::MatrixXd BackpropSnapshot::getJacobianOfUpperBoundConstraintsTranspose(
   }
 
   return result;
-}
-
-//==============================================================================
-/// This measures a vector of contact impulses (measured at the clamping
-/// constraints) on the world, to see what total velocity change results. This
-/// is a fast way to get A_c * f0.
-Eigen::VectorXd BackpropSnapshot::getClampingImpulseVelChange(
-    simulation::WorldPtr world, Eigen::VectorXd f0)
-{
-  std::vector<std::shared_ptr<DifferentiableContactConstraint>>
-      clampingConstraints = getClampingConstraints();
-  assert(
-      clampingConstraints.size() == f0.size()
-      && "f0 must have exactly one entry per clamping constraint");
-  for (int i = 0; i < world->getNumSkeletons(); i++)
-  {
-    auto skel = world->getSkeleton(i);
-    skel->clearConstraintImpulses();
-  }
-  for (int i = 0; i < f0.size(); i++)
-  {
-    // TODO(keenon): Finish implementing me if useful
-    // clampingConstraints[i]->applyImpulse(f0(i));
-  }
 }
 
 //==============================================================================

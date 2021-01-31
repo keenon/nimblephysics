@@ -74,9 +74,9 @@ void testVertexFaceCollision(bool isSelfCollision)
       = box1->createJointAndBodyNodePair<FreeJoint>();
   std::shared_ptr<BoxShape> box1Shape(
       new BoxShape(Eigen::Vector3d(1.0, 1.0, 1.0)));
-  ShapeNode* box1Node
-      = box1Pair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(
-          box1Shape);
+  // ShapeNode* box1Node =
+  box1Pair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(
+      box1Shape);
 
   // This box is rotated by 45 degrees on the X and Y axis, so that it's
   // sqrt(3) along the X axis.
@@ -96,11 +96,11 @@ void testVertexFaceCollision(bool isSelfCollision)
   double box2EdgeSize = sqrt(1.0 / 3);
   std::shared_ptr<BoxShape> box2Shape(
       new BoxShape(Eigen::Vector3d(1.0, 1.0, 1.0) * box2EdgeSize));
-  ShapeNode* box2Node
-      = box2Pair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(
-          box2Shape);
+  // ShapeNode* box2Node =
+  box2Pair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(
+      box2Shape);
   FreeJoint* box2Joint = box2Pair.first;
-  Eigen::Matrix3d rotation = Eigen::Matrix3d::Identity();
+  // Eigen::Matrix3d rotation = Eigen::Matrix3d::Identity();
 
   Eigen::Isometry3d box2Position = Eigen::Isometry3d::Identity();
   box2Position.linear()
@@ -181,9 +181,9 @@ void testEdgeEdgeCollision(bool isSelfCollision)
       = box1->createJointAndBodyNodePair<FreeJoint>();
   std::shared_ptr<BoxShape> box1Shape(
       new BoxShape(Eigen::Vector3d(1.0, 1.0, 1.0)));
-  ShapeNode* box1Node
-      = box1Pair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(
-          box1Shape);
+  // ShapeNode* box1Node =
+  box1Pair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(
+      box1Shape);
 
   // This box is rotated by 45 degrees on the X and Y axis, so that it's
   // sqrt(3) along the X axis.
@@ -202,11 +202,11 @@ void testEdgeEdgeCollision(bool isSelfCollision)
 
   std::shared_ptr<BoxShape> box2Shape(
       new BoxShape(Eigen::Vector3d(1.0, 1.0, 1.0)));
-  ShapeNode* box2Node
-      = box2Pair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(
-          box2Shape);
+  // ShapeNode* box2Node =
+  box2Pair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(
+      box2Shape);
   FreeJoint* box2Joint = box2Pair.first;
-  Eigen::Matrix3d rotation = Eigen::Matrix3d::Identity();
+  // Eigen::Matrix3d rotation = Eigen::Matrix3d::Identity();
 
   Eigen::Isometry3d box2Position = Eigen::Isometry3d::Identity();
   box2Position.linear()
@@ -288,9 +288,8 @@ void testSphereBoxCollision(bool isSelfCollision, int numFaces)
       = box->createJointAndBodyNodePair<FreeJoint>();
   std::shared_ptr<BoxShape> boxShape(
       new BoxShape(Eigen::Vector3d(1.0, 1.0, 1.0)));
-  ShapeNode* boxNode
-      = boxPair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(
-          boxShape);
+  // ShapeNode* boxNode =
+  boxPair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(boxShape);
 
   SkeletonPtr sphere = Skeleton::create("sphere");
   std::pair<FreeJoint*, BodyNode*> spherePair;
@@ -306,11 +305,11 @@ void testSphereBoxCollision(bool isSelfCollision, int numFaces)
   }
 
   std::shared_ptr<SphereShape> sphereShape(new SphereShape(0.5));
-  ShapeNode* sphereNode
-      = spherePair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(
-          sphereShape);
+  // ShapeNode* sphereNode =
+  spherePair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(
+      sphereShape);
   FreeJoint* sphereJoint = spherePair.first;
-  Eigen::Matrix3d rotation = Eigen::Matrix3d::Identity();
+  // Eigen::Matrix3d rotation = Eigen::Matrix3d::Identity();
 
   Eigen::Isometry3d spherePosition = Eigen::Isometry3d::Identity();
   if (numFaces == 1)
@@ -414,9 +413,9 @@ void testSphereSphereCollision(
   std::pair<FreeJoint*, BodyNode*> sphere1Pair
       = sphere1->createJointAndBodyNodePair<FreeJoint>();
   std::shared_ptr<SphereShape> sphereShape1(new SphereShape(radius1));
-  ShapeNode* sphere1Node
-      = sphere1Pair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(
-          sphereShape1);
+  // ShapeNode* sphere1Node =
+  sphere1Pair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(
+      sphereShape1);
 
   SkeletonPtr sphere2 = Skeleton::create("sphere 2");
   std::pair<FreeJoint*, BodyNode*> sphere2Pair;
@@ -433,11 +432,11 @@ void testSphereSphereCollision(
   }
 
   std::shared_ptr<SphereShape> sphere2Shape(new SphereShape(radius2));
-  ShapeNode* sphereNode
-      = sphere2Pair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(
-          sphere2Shape);
+  // ShapeNode* sphereNode =
+  sphere2Pair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(
+      sphere2Shape);
   FreeJoint* sphere2Joint = sphere2Pair.first;
-  Eigen::Matrix3d rotation = Eigen::Matrix3d::Identity();
+  // Eigen::Matrix3d rotation = Eigen::Matrix3d::Identity();
 
   Eigen::Isometry3d sphere2Position = Eigen::Isometry3d::Identity();
   sphere2Position.translation()
@@ -494,9 +493,8 @@ void testSphereMeshCollision(bool isSelfCollision, int numFaces)
   std::shared_ptr<MeshShape> boxShape(new MeshShape(
       Eigen::Vector3d(1.0, 1.0, 1.0), boxMesh, "", nullptr, true));
 
-  ShapeNode* boxNode
-      = boxPair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(
-          boxShape);
+  // ShapeNode* boxNode =
+  boxPair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(boxShape);
 
   SkeletonPtr sphere = Skeleton::create("sphere");
   std::pair<FreeJoint*, BodyNode*> spherePair;
@@ -512,11 +510,11 @@ void testSphereMeshCollision(bool isSelfCollision, int numFaces)
   }
 
   std::shared_ptr<SphereShape> sphereShape(new SphereShape(0.5));
-  ShapeNode* sphereNode
-      = spherePair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(
-          sphereShape);
+  // ShapeNode* sphereNode =
+  spherePair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(
+      sphereShape);
   FreeJoint* sphereJoint = spherePair.first;
-  Eigen::Matrix3d rotation = Eigen::Matrix3d::Identity();
+  // Eigen::Matrix3d rotation = Eigen::Matrix3d::Identity();
 
   Eigen::Isometry3d spherePosition = Eigen::Isometry3d::Identity();
   double penetrationDepth = 2e-3;
@@ -671,9 +669,9 @@ void testSphereCapsuleCollision(bool isSelfCollision, int type)
 
   std::shared_ptr<CapsuleShape> boxShape(new CapsuleShape(radius1, height));
 
-  ShapeNode* capsuleNode
-      = capsulePair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(
-          boxShape);
+  // ShapeNode* capsuleNode =
+  capsulePair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(
+      boxShape);
 
   SkeletonPtr sphere = Skeleton::create("sphere");
   std::pair<FreeJoint*, BodyNode*> spherePair;
@@ -690,11 +688,11 @@ void testSphereCapsuleCollision(bool isSelfCollision, int type)
   }
 
   std::shared_ptr<SphereShape> sphereShape(new SphereShape(radius2));
-  ShapeNode* sphereNode
-      = spherePair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(
-          sphereShape);
+  // ShapeNode* sphereNode =
+  spherePair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(
+      sphereShape);
   FreeJoint* sphereJoint = spherePair.first;
-  Eigen::Matrix3d rotation = Eigen::Matrix3d::Identity();
+  // Eigen::Matrix3d rotation = Eigen::Matrix3d::Identity();
 
   sphereJoint->setTransformFromParentBodyNode(T2);
 
@@ -822,9 +820,9 @@ void testCapsuleCapsuleCollision(bool isSelfCollision, int type)
   std::shared_ptr<CapsuleShape> capsuleShapeA(
       new CapsuleShape(radius1, height));
 
-  ShapeNode* capsuleNodeA
-      = capsulePair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(
-          capsuleShapeA);
+  // ShapeNode* capsuleNodeA =
+  capsulePair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(
+      capsuleShapeA);
 
   SkeletonPtr capsuleB = Skeleton::create("capsuleB");
   std::pair<FreeJoint*, BodyNode*> capsuleBPair;
@@ -842,11 +840,11 @@ void testCapsuleCapsuleCollision(bool isSelfCollision, int type)
 
   std::shared_ptr<CapsuleShape> capsuleShapeB(
       new CapsuleShape(radius2, height));
-  ShapeNode* sphereNode
-      = capsuleBPair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(
-          capsuleShapeB);
+  // ShapeNode* sphereNode =
+  capsuleBPair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(
+      capsuleShapeB);
   FreeJoint* sphereJoint = capsuleBPair.first;
-  Eigen::Matrix3d rotation = Eigen::Matrix3d::Identity();
+  // Eigen::Matrix3d rotation = Eigen::Matrix3d::Identity();
 
   sphereJoint->setTransformFromParentBodyNode(T2);
 
@@ -1008,9 +1006,9 @@ void testBoxCapsuleCollision(bool isSelfCollision, bool useMesh, int type)
 
   std::shared_ptr<CapsuleShape> capsuleShape(new CapsuleShape(radius, height));
 
-  ShapeNode* capsuleNode
-      = capsulePair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(
-          capsuleShape);
+  // ShapeNode* capsuleNode =
+  capsulePair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(
+      capsuleShape);
 
   SkeletonPtr box = Skeleton::create("box");
   std::pair<FreeJoint*, BodyNode*> boxPair;
@@ -1030,21 +1028,21 @@ void testBoxCapsuleCollision(bool isSelfCollision, bool useMesh, int type)
     aiScene* boxMesh = createBoxMeshUnsafe();
     std::shared_ptr<MeshShape> boxShape(
         new MeshShape(size, boxMesh, "", nullptr, true));
-    ShapeNode* sphereNode
-        = boxPair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(
-            boxShape);
+    // ShapeNode* sphereNode =
+    boxPair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(
+        boxShape);
   }
   else
   {
     std::shared_ptr<BoxShape> boxShape(new BoxShape(size));
-    ShapeNode* sphereNode
-        = boxPair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(
-            boxShape);
+    // ShapeNode* sphereNode =
+    boxPair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(
+        boxShape);
   }
 
   FreeJoint* boxJoint = boxPair.first;
   FreeJoint* capsuleJoint = capsulePair.first;
-  Eigen::Matrix3d rotation = Eigen::Matrix3d::Identity();
+  // Eigen::Matrix3d rotation = Eigen::Matrix3d::Identity();
 
   boxJoint->setTransformFromParentBodyNode(T1);
   capsuleJoint->setTransformFromParentBodyNode(T2);

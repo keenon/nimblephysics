@@ -600,21 +600,21 @@ void ZeroDofJoint::integrateVelocities(double /*_dt*/)
 
 //==============================================================================
 // Documentation inherited
-Eigen::VectorXd ZeroDofJoint::integratePositionsExplicit(Eigen::VectorXd pos, Eigen::VectorXd vel, double dt)
+Eigen::VectorXd ZeroDofJoint::integratePositionsExplicit(Eigen::VectorXd pos, Eigen::VectorXd /* vel */, double /* dt */)
 {
   return pos;
 }
 
 //==============================================================================
 /// Returns d/dpos of integratePositionsExplicit()
-Eigen::MatrixXd ZeroDofJoint::getPosPosJacobian(Eigen::VectorXd pos, Eigen::VectorXd vel, double _dt)
+Eigen::MatrixXd ZeroDofJoint::getPosPosJacobian(Eigen::VectorXd /* pos */, Eigen::VectorXd /* vel */, double /* _dt */)
 {
   return Eigen::MatrixXd::Zero(0,0);
 }
 
 //==============================================================================
 /// Returns d/dvel of integratePositionsExplicit()
-Eigen::MatrixXd ZeroDofJoint::getVelPosJacobian(Eigen::VectorXd pos, Eigen::VectorXd vel, double _dt)
+Eigen::MatrixXd ZeroDofJoint::getVelPosJacobian(Eigen::VectorXd /* pos */, Eigen::VectorXd /* vel */, double /* _dt */)
 {
   return Eigen::MatrixXd::Zero(0,0);
 }
@@ -727,13 +727,13 @@ const math::Jacobian ZeroDofJoint::getRelativeJacobianTimeDeriv() const
 }
 
 //==============================================================================
-Eigen::Vector6d ZeroDofJoint::getWorldAxisScrewForPosition(int dof) const {
+Eigen::Vector6d ZeroDofJoint::getWorldAxisScrewForPosition(int /* dof */) const {
   assert(false && "You can't getWorldAxisScrew() on a joint with no degrees of freedom");
   return Eigen::Vector6d::Zero();
 }
 
 //==============================================================================
-Eigen::Vector6d ZeroDofJoint::getWorldAxisScrewForVelocity(int dof) const {
+Eigen::Vector6d ZeroDofJoint::getWorldAxisScrewForVelocity(int /* dof */) const {
   assert(false && "You can't getWorldAxisScrew() on a joint with no degrees of freedom");
   return Eigen::Vector6d::Zero();
 }
