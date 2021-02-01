@@ -192,6 +192,59 @@ TEST(LCP_UTILS, SOLVE_MERGED)
 }
 #endif
 
+// #ifdef ALL_TESTS
+TEST(LCP_UTILS, LCP_FAILURE)
+{
+  Eigen::MatrixXd A = Eigen::MatrixXd::Zero(6, 6);
+  // clang-format off
+  A <<
+  2.5,  0,  -0.00500001,  1.5,  0,  -0.00499901,
+  0,  2.9901,  0,  0,  1.9901,  0,
+  -0.00500001,  0,  2.4901,  0.00500099,  0,  2.4901,
+  1.5,  0,  0.00500099,  2.5,  0,  0.00499999,
+  0,  1.9901,  0,  0,  2.9901,  0,
+  -0.00499901,  0,  2.4901,  0.00499999,  0,  2.4901;
+  // clang-format on
+  Eigen::VectorXd x = Eigen::VectorXd::Zero(6);
+  x << 0, 0, 0, 0, 0, 0;
+  Eigen::VectorXd lo = Eigen::VectorXd::Zero(6);
+  lo << 0, -10000, -10000, 0, -10000, -10000;
+  Eigen::VectorXd hi = Eigen::VectorXd::Zero(6);
+  hi << std::numeric_limits<double>::infinity(), 10000, 10000,
+      std::numeric_limits<double>::infinity(), 10000, 10000;
+  Eigen::VectorXd b = Eigen::VectorXd::Zero(6);
+  b << 0.01, 0, -1e-08, 0.01, 0, -1e-08;
+  Eigen::VectorXi fIndex = Eigen::VectorXi::Zero(6);
+  fIndex << -1, 0, 0, -1, 3, 3;
+
+  int n = x.size();
+  Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> APadded
+      = Eigen::MatrixXd::Zero(n, dPAD(n));
+  APadded.block(0, 0, n, n) = A;
+
+  x = LCPUtils::guessSolution(A, b, hi, lo, fIndex);
+
+  PgsBoxedLcpSolver lcpSolver;
+  lcpSolver.setOption(
+      PgsBoxedLcpSolver::Option(50000, 1e-15, 1e-12, 1e-10, false));
+  lcpSolver.solve(
+      n,
+      APadded.data(),
+      x.data(),
+      b.data(),
+      0,
+      lo.data(),
+      hi.data(),
+      fIndex.data(),
+      false);
+
+  Eigen::VectorXd v = A * x - b;
+  // x = A.completeOrthogonalDecomposition().solve(b);
+
+  EXPECT_TRUE(LCPUtils::isLCPSolutionValid(A, x, b, hi, lo, fIndex));
+}
+// #endif
+
 #ifdef ALL_TESTS
 TEST(LCP_UTILS, REAL_LIFE_FAILURE_1)
 {

@@ -72,6 +72,61 @@ bool LCPUtils::isLCPSolutionValid(
   return true;
 }
 
+/// This applies a simple algorithm to guess the solution to the LCP problem.
+/// It's not guaranteed to be correct, but it often can be if there is no
+/// sliding friction on this timestep.
+Eigen::VectorXd LCPUtils::guessSolution(
+    const Eigen::MatrixXd& mA,
+    const Eigen::VectorXd& mB,
+    const Eigen::VectorXd& /* mHi */,
+    const Eigen::VectorXd& /* mLo */,
+    const Eigen::VectorXi& mFIndex)
+{
+  std::vector<int> clampingIndices;
+  for (int i = 0; i < mB.size(); i++)
+  {
+    if (mFIndex[i] == -1)
+    {
+      // Normal forces are only clamping if mB[i] > 0
+      if (mB[i] > 0)
+        clampingIndices.push_back(i);
+    }
+    else
+    {
+      // Always treat friction as clamping
+      clampingIndices.push_back(i);
+    }
+  }
+
+  int numClamping = clampingIndices.size();
+  // Special case, everything is clamping
+  if (numClamping == mB.size())
+  {
+    return mA.completeOrthogonalDecomposition().solve(mB);
+  }
+  // Otherwise we have to map down to the clamping subset
+  Eigen::MatrixXd reducedA = Eigen::MatrixXd::Zero(numClamping, numClamping);
+  Eigen::VectorXd reducedB = Eigen::VectorXd::Zero(numClamping);
+  for (int row = 0; row < numClamping; row++)
+  {
+    reducedB(row) = mB(clampingIndices[row]);
+    for (int col = 0; col < numClamping; col++)
+    {
+      reducedA(row, col) = mA(clampingIndices[row], clampingIndices[col]);
+    }
+  }
+  // Then we solve the clamping subset, and map back out to the full problem
+  // size
+  Eigen::VectorXd reducedX
+      = reducedA.completeOrthogonalDecomposition().solve(reducedB);
+  Eigen::VectorXd fullX = Eigen::VectorXd::Zero(mB.size());
+  for (int i = 0; i < numClamping; i++)
+  {
+    fullX(clampingIndices[i]) = reducedX(i);
+  }
+  return fullX;
+}
+
 /// This reduces an LCP problem by merging any near-identical contact points.
 Eigen::MatrixXd LCPUtils::reduce(
     Eigen::MatrixXd& A,
