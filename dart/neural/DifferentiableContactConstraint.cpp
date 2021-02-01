@@ -790,7 +790,7 @@ Eigen::Vector3d DifferentiableContactConstraint::getContactNormalGradient(
   }
   else if (type == SPHERE_TO_PIPE)
   {
-    double norm = (mContact->edgeAClosestPoint - mContact->sphereCenter).norm();
+    double norm = (mContact->pipeClosestPoint - mContact->sphereCenter).norm();
     Eigen::Vector3d normGrad
         = math::gradientWrtTheta(worldTwist, mContact->sphereCenter, 0.0);
     normGrad -= normGrad.dot(mContact->pipeDir) * mContact->pipeDir;
@@ -1280,6 +1280,7 @@ DifferentiableContactConstraint::getContactForceDirectionJacobian(
     jac.col(i) = getContactForceGradient(dof);
     i++;
   }
+  assert(i == jac.cols());
   return jac;
 }
 
@@ -2738,16 +2739,8 @@ std::shared_ptr<DifferentiableContactConstraint>
 DifferentiableContactConstraint::getPeerConstraint(
     std::shared_ptr<neural::BackpropSnapshot> snapshot)
 {
-  std::vector<std::shared_ptr<DifferentiableContactConstraint>>
-      otherConstraints;
-  if (mIsUpperBoundConstraint)
-  {
-    otherConstraints = snapshot->getUpperBoundConstraints();
-  }
-  else
-  {
-    otherConstraints = snapshot->getClampingConstraints();
-  }
+  std::vector<std::shared_ptr<DifferentiableContactConstraint>> otherConstraints
+      = snapshot->getDifferentiableConstraints();
 
   double minDistance = std::numeric_limits<double>::infinity();
   std::shared_ptr<DifferentiableContactConstraint> closestConstraint = nullptr;
