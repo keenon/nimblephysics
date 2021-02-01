@@ -64,10 +64,10 @@ ConstrainedGroupGradientMatrices::ConstrainedGroupGradientMatrices(
 
   // Cache an inverse mass matrix for later use
   mMinv = Eigen::MatrixXd::Zero(mNumDOFs, mNumDOFs);
-  mCoriolisAndGravityForces = Eigen::VectorXd(mNumDOFs);
-  mPreStepTorques = Eigen::VectorXd(mNumDOFs);
-  mPreStepVelocities = Eigen::VectorXd(mNumDOFs);
-  mPreLCPVelocities = Eigen::VectorXd(mNumDOFs);
+  mCoriolisAndGravityForces = Eigen::VectorXd::Zero(mNumDOFs);
+  mPreStepTorques = Eigen::VectorXd::Zero(mNumDOFs);
+  mPreStepVelocities = Eigen::VectorXd::Zero(mNumDOFs);
+  mPreLCPVelocities = Eigen::VectorXd::Zero(mNumDOFs);
   int cursor = 0;
   for (auto skel : skeletons)
   {
@@ -605,8 +605,13 @@ void ConstrainedGroupGradientMatrices::constructMatrices(
       continue;
     }
 
+    // If we're within a very small distance to the upper bound, we want to tie
+    // break in favor of upper bounding
+    double tieBreakToUpperBound = 1e-5;
+
     // This means "j" is in "Clamping"
-    if ((mX(j) > lowerBound && mX(j) < upperBound)                  // Clamping
+    if ((mX(j) > lowerBound + tieBreakToUpperBound
+         && mX(j) < upperBound - tieBreakToUpperBound)              // Clamping
         || (lowerBound - mX(j) > 1e-2 || mX(j) - upperBound > 1e-2) // Illegal
     )
     {
@@ -1246,8 +1251,8 @@ ConstrainedGroupGradientMatrices::estimateClampingConstraintImpulses(
     return Eigen::VectorXd::Zero(0);
   }
 
-  Eigen::VectorXd b = Eigen::VectorXd(A_c.cols());
-  Eigen::MatrixXd Q = Eigen::MatrixXd(A_c.cols(), A_c.cols());
+  Eigen::VectorXd b = Eigen::VectorXd::Zero(A_c.cols());
+  Eigen::MatrixXd Q = Eigen::MatrixXd::Zero(A_c.cols(), A_c.cols());
   computeLCPOffsetClampingSubset(world, b, A_c);
   computeLCPConstraintMatrixClampingSubset(world, Q, A_c);
 
@@ -1662,7 +1667,7 @@ const Eigen::VectorXd
 ConstrainedGroupGradientMatrices::getCoriolisAndGravityAndExternalForces(
     simulation::WorldPtr world) const
 {
-  Eigen::VectorXd result = Eigen::VectorXd(mNumDOFs);
+  Eigen::VectorXd result = Eigen::VectorXd::Zero(mNumDOFs);
   int cursor = 0;
   for (std::string skelName : mSkeletons)
   {
@@ -1672,6 +1677,20 @@ ConstrainedGroupGradientMatrices::getCoriolisAndGravityAndExternalForces(
     cursor += dofs;
   }
   return result;
+}
+
+//==============================================================================
+Eigen::MatrixXd ConstrainedGroupGradientMatrices::getFullConstraintMatrix(
+    simulation::WorldPtr world) const
+{
+  Eigen::MatrixXd impulses = Eigen::MatrixXd::Zero(
+      world->getNumDofs(), mDifferentiableConstraints.size());
+  for (int i = 0; i < mDifferentiableConstraints.size(); i++)
+  {
+    impulses.col(i)
+        = mDifferentiableConstraints[i]->getConstraintForces(world.get());
+  }
+  return impulses;
 }
 
 //==============================================================================
@@ -1763,7 +1782,7 @@ std::size_t ConstrainedGroupGradientMatrices::getWrtDim(
 Eigen::VectorXd ConstrainedGroupGradientMatrices::getWrt(
     simulation::WorldPtr world, WithRespectTo* wrt)
 {
-  Eigen::VectorXd result = Eigen::VectorXd(getWrtDim(world, wrt));
+  Eigen::VectorXd result = Eigen::VectorXd::Zero(getWrtDim(world, wrt));
   int cursor = 0;
   for (auto skelName : mSkeletons)
   {
