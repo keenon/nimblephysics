@@ -32,5 +32,20 @@ void RestorableSnapshot::restore()
   mWorld->setCachedLCPSolution(mLCPCache);
 }
 
+bool RestorableSnapshot::isPreserved()
+{
+  if (mWorld->getCachedLCPSolution() != mLCPCache)
+    return false;
+  for (std::size_t i = 0; i < mWorld->getNumSkeletons(); i++)
+  {
+    dynamics::Skeleton::Configuration config
+        = mWorld->getSkeleton(i)->getConfiguration(
+            Skeleton::ConfigFlags::CONFIG_ALL);
+    if (mSkeletonConfigurations[i] != config)
+      return false;
+  }
+  return true;
+}
+
 } // namespace neural
 } // namespace dart
