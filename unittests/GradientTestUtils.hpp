@@ -39,6 +39,7 @@
 #include "dart/collision/CollisionObject.hpp"
 #include "dart/collision/Contact.hpp"
 #include "dart/dynamics/BodyNode.hpp"
+#include "dart/dynamics/DegreeOfFreedom.hpp"
 #include "dart/dynamics/RevoluteJoint.hpp"
 #include "dart/dynamics/Skeleton.hpp"
 #include "dart/math/Geometry.hpp"
@@ -408,7 +409,7 @@ bool verifyClassicProjectionIntoClampsMatrix(
     Eigen::VectorXd tau = (A_c + A_ub * E) * f_cReal;
     Eigen::VectorXd tauReal = A * fReal;
 
-    Eigen::MatrixXd compareTaus = Eigen::MatrixXd(tau.size(), 2);
+    Eigen::MatrixXd compareTaus = Eigen::MatrixXd::Zero(tau.size(), 2);
     compareTaus.col(0) = tau;
     compareTaus.col(1) = tauReal;
     std::cout << "(A_c + A_ub * E) * f_cReal  :::   A * fReal" << std::endl
@@ -418,7 +419,7 @@ bool verifyClassicProjectionIntoClampsMatrix(
     Eigen::VectorXd v = A.transpose() * (V_c + V_ub * E) * f_cReal;
     Eigen::VectorXd vReal = Q * fReal;
 
-    Eigen::MatrixXd compareVs = Eigen::MatrixXd(v.size(), 6);
+    Eigen::MatrixXd compareVs = Eigen::MatrixXd::Zero(v.size(), 6);
     compareVs.col(0) = v;
     compareVs.col(1) = vReal;
     compareVs.col(2) = bReal / dt;
@@ -443,7 +444,7 @@ bool verifyClassicProjectionIntoClampsMatrix(
 
     std::cout << "Dist of fReal: " << dist << std::endl;
     std::cout << "Dist of best approx: " << distApprox << std::endl;
-    Eigen::MatrixXd compareSolves = Eigen::MatrixXd(vReal.size(), 6);
+    Eigen::MatrixXd compareSolves = Eigen::MatrixXd::Zero(vReal.size(), 6);
     compareSolves.col(0) = (vReal - (bReal / dt));
     compareSolves.col(1) = (Q * centeredApprox - (bReal / dt));
     compareSolves.col(2) = vReal;
@@ -483,7 +484,7 @@ bool verifyClassicProjectionIntoClampsMatrix(
                       .bdcSvd(Eigen::ComputeThinU | Eigen::ComputeThinV)
                       .solve(random);
 
-    Eigen::MatrixXd compareRecovery = Eigen::MatrixXd(errorFwd.size(), 2);
+    Eigen::MatrixXd compareRecovery = Eigen::MatrixXd::Zero(errorFwd.size(), 2);
     compareRecovery.col(0) = errorBack;
     compareRecovery.col(1) = errorFwd;
     std::cout << "random - R^T*R^{-T}*random ::: random - R^{-1}*R*random"
@@ -780,6 +781,7 @@ bool verifyPerturbedF_c(WorldPtr world)
 
     while (true)
     {
+      snapshot.restore();
       perturbedPos = original;
       perturbedPos(i) += eps;
       world->setPositions(perturbedPos);
@@ -834,6 +836,55 @@ bool verifyPerturbedF_c(WorldPtr world)
 
     if (A_c.cols() > 0 && !equals(realA_c, A_c, 1e-10))
     {
+      /*
+      std::cout << "Failed perturb " << i << " by " << eps << std::endl;
+      std::cout << "Jac[0]:" << std::endl
+                << classicPtr->getClampingConstraints()[0]
+                       ->getConstraintForcesJacobian(world)
+                << std::endl;
+      std::cout << "Contact force Jac[0]:" << std::endl
+                << classicPtr->getClampingConstraints()[0]
+                       ->getContactForceJacobian(world)
+                << std::endl;
+      std::cout << "Contact pos Jac[0]:" << std::endl
+                << classicPtr->getClampingConstraints()[0]
+                       ->getContactPositionJacobian(world)
+                << std::endl;
+      std::cout << "Contact force dir Jac[0]:" << std::endl
+                << classicPtr->getClampingConstraints()[0]
+                       ->getContactForceDirectionJacobian(world)
+                << std::endl;
+      std::cout << "Contact force dir Jac[0] 10:" << std::endl
+                << classicPtr->getClampingConstraints()[0]
+                       ->getContactForceGradient(world->getDofs()[10])
+                << std::endl;
+      */
+      /*
+      std::cout << "Contact getScrewAxisForForceGradient(2,10) for Jac[0]:"
+                << std::endl
+                << classicPtr->getClampingConstraints()[0]
+                       ->getScrewAxisForForceGradient(
+                           world->getDofs()[2], world->getDofs()[10])
+                << std::endl;
+      std::cout << "Contact getScrewAxisForForceGradient(4,10) for Jac[0]:"
+                << std::endl
+                << classicPtr->getClampingConstraints()[0]
+                       ->getScrewAxisForForceGradient(
+                           world->getDofs()[4], world->getDofs()[10])
+                << std::endl;
+      std::cout << "Contact getScrewAxisForForceGradient(8,10) for Jac[0]:"
+                << std::endl
+                << classicPtr->getClampingConstraints()[0]
+                       ->getScrewAxisForForceGradient(
+                           world->getDofs()[8], world->getDofs()[10])
+                << std::endl;
+      std::cout << "Contact getScrewAxisForForceGradient(10,10) for Jac[0]:"
+                << std::endl
+                << classicPtr->getClampingConstraints()[0]
+                       ->getScrewAxisForForceGradient(
+                           world->getDofs()[10], world->getDofs()[10])
+                << std::endl;
+      */
       if (realA_c.cols() >= 6 && realA_c.rows() >= 6)
       {
         std::cout << "Real A_c (top-left 6x6):" << std::endl
@@ -946,7 +997,7 @@ bool verifyPerturbedF_c(WorldPtr world)
       }
       if (!equals(analyticalF_c, realF_c, 1e-9))
       {
-        Eigen::MatrixXd comparison = Eigen::MatrixXd(realF_c.size(), 4);
+        Eigen::MatrixXd comparison = Eigen::MatrixXd::Zero(realF_c.size(), 4);
         comparison.col(0) = realF_c;
         comparison.col(1) = analyticalF_c;
         comparison.col(2) = (realF_c - analyticalF_c);
@@ -958,7 +1009,7 @@ bool verifyPerturbedF_c(WorldPtr world)
                   << std::endl
                   << comparison << std::endl;
 
-        Eigen::MatrixXd comparisonB = Eigen::MatrixXd(realB.size(), 4);
+        Eigen::MatrixXd comparisonB = Eigen::MatrixXd::Zero(realB.size(), 4);
         comparisonB.col(0) = realB;
         comparisonB.col(1) = analyticalQ * analyticalF_c;
         comparisonB.col(2) = (realB - (analyticalQ * analyticalF_c));
@@ -3109,7 +3160,8 @@ bool verifyMappingIntoJacobian(
   int mappedDim = getTestComponentMappingDim(mapping, world, component);
   Eigen::MatrixXd analytical
       = getTestComponentMappingIntoJac(mapping, world, component, wrt);
-  Eigen::MatrixXd bruteForce = Eigen::MatrixXd(mappedDim, world->getNumDofs());
+  Eigen::MatrixXd bruteForce
+      = Eigen::MatrixXd::Zero(mappedDim, world->getNumDofs());
 
   Eigen::VectorXd originalWorld = getTestComponentWorld(world, wrt);
   Eigen::VectorXd originalMapped
@@ -3165,7 +3217,8 @@ bool verifyMappingOutJacobian(
 
   Eigen::MatrixXd analytical
       = getTestComponentMappingOutJac(mapping, world, component);
-  Eigen::MatrixXd bruteForce = Eigen::MatrixXd(world->getNumDofs(), mappedDim);
+  Eigen::MatrixXd bruteForce
+      = Eigen::MatrixXd::Zero(world->getNumDofs(), mappedDim);
 
   Eigen::VectorXd originalWorld = getTestComponentWorld(world, component);
   Eigen::VectorXd originalMapped
@@ -4117,7 +4170,7 @@ bool verifyAnalyticalA_c(WorldPtr world)
     Eigen::VectorXd trueCol = A_c.col(i);
     Eigen::VectorXd analyticalCol
         = constraints[i]->getConstraintForces(world.get());
-    if (!equals(trueCol, analyticalCol, 5e-9))
+    if (!equals(trueCol, analyticalCol, 5e-10))
     {
       std::cout << "True A_c col: " << std::endl << trueCol << std::endl;
       std::cout << "Analytical A_c col: " << std::endl
@@ -4541,6 +4594,56 @@ bool verifyPerturbedContactEdges(WorldPtr world)
   return true;
 }
 
+bool verifyTranlationalLCPInvariance(
+    WorldPtr world, int dofIndex, double perturbBy)
+{
+  RestorableSnapshot snapshot(world);
+
+  BackpropSnapshotPtr originalPtr = neural::forwardPass(world, true);
+  dynamics::DegreeOfFreedom* dof = world->getDofs()[dofIndex];
+  dof->setPosition(dof->getPosition() + perturbBy);
+  BackpropSnapshotPtr perturbedPtr = neural::forwardPass(world, true);
+
+  Eigen::MatrixXd perturbedA = perturbedPtr->mGradientMatrices[0]->mA;
+  Eigen::MatrixXd originalA = originalPtr->mGradientMatrices[0]->mA;
+  std::cout << "Original A:" << std::endl << originalA << std::endl;
+  std::cout << "Perturbed A:" << std::endl << perturbedA << std::endl;
+  std::cout << "Diff:" << std::endl << (originalA - perturbedA) << std::endl;
+
+  Eigen::MatrixXd perturbedA_c
+      = perturbedPtr->mGradientMatrices[0]->getFullConstraintMatrix(world);
+  Eigen::MatrixXd originalA_c
+      = originalPtr->mGradientMatrices[0]->getFullConstraintMatrix(world);
+  std::cout << "Original A_c:" << std::endl << originalA_c << std::endl;
+  std::cout << "Perturbed A_c:" << std::endl << perturbedA_c << std::endl;
+  std::cout << "Diff:" << std::endl
+            << (originalA_c - perturbedA_c) << std::endl;
+
+  std::shared_ptr<DifferentiableContactConstraint> perturbedConstraint
+      = perturbedPtr->mGradientMatrices[0]->getDifferentiableConstraints()[0];
+  std::shared_ptr<DifferentiableContactConstraint> originalConstraint
+      = originalPtr->mGradientMatrices[0]->getDifferentiableConstraints()[0];
+
+  std::cout << "Contact world force gradient: " << std::endl
+            << originalConstraint->getContactWorldForceGradient(dof)
+            << std::endl;
+
+  Eigen::VectorXd perturbedB = perturbedPtr->mGradientMatrices[0]->mB;
+  Eigen::VectorXd originalB = originalPtr->mGradientMatrices[0]->mB;
+  std::cout << "Original B:" << std::endl << originalB << std::endl;
+  std::cout << "Perturbed B:" << std::endl << perturbedB << std::endl;
+  std::cout << "Diff:" << std::endl << (originalB - perturbedB) << std::endl;
+
+  Eigen::VectorXd perturbedX = perturbedPtr->mGradientMatrices[0]->mX;
+  Eigen::VectorXd originalX = originalPtr->mGradientMatrices[0]->mX;
+  std::cout << "Original X:" << std::endl << originalX << std::endl;
+  std::cout << "Perturbed X:" << std::endl << perturbedX << std::endl;
+  std::cout << "Diff:" << std::endl << (originalX - perturbedX) << std::endl;
+
+  snapshot.restore();
+  return true;
+}
+
 bool verifyPerturbedContactPositions(
     WorldPtr world, bool allowNoContacts = false)
 {
@@ -4661,6 +4764,8 @@ bool verifyPerturbedContactPositions(
           std::cout << "Finite Difference Analytical Contact Pos Gradient:"
                     << std::endl
                     << finiteDifferenceAnalyticalGradient << std::endl;
+          constraints[k]->bruteForcePerturbedContactPosition(
+              world, skel, j, -EPS);
           return false;
         }
       }
@@ -5340,6 +5445,30 @@ bool verifyJacobianOfClampingConstraints(WorldPtr world)
     std::cout << "Analytical:" << std::endl << analytical << std::endl;
     std::cout << "Brute Force:" << std::endl << bruteForce << std::endl;
     std::cout << "Diff:" << std::endl << analytical - bruteForce << std::endl;
+
+    for (int i = 0; i < f0.size(); i++)
+    {
+      Eigen::VectorXd oneHot = Eigen::VectorXd::Zero(f0.size());
+      oneHot(i) = 1.0;
+
+      Eigen::MatrixXd analyticalOneHot
+          = classicPtr->getJacobianOfClampingConstraints(world, oneHot);
+      Eigen::MatrixXd bruteForceOneHot
+          = classicPtr->finiteDifferenceJacobianOfClampingConstraints(
+              world, oneHot);
+      if (!equals(analyticalOneHot, bruteForceOneHot, 1e-8))
+      {
+        std::cout << "getJacobianOfClampingConstraints error [" << i
+                  << "]:" << std::endl;
+        std::cout << "Analytical one hot:" << std::endl
+                  << analyticalOneHot << std::endl;
+        std::cout << "Brute Force one hot:" << std::endl
+                  << bruteForceOneHot << std::endl;
+        std::cout << "Diff:" << std::endl
+                  << analyticalOneHot - bruteForceOneHot << std::endl;
+      }
+    }
+
     return false;
   }
   return true;

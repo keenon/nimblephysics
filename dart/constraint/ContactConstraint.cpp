@@ -764,6 +764,7 @@ ContactConstraint::getTangentBasisMatrixODE(const Eigen::Vector3d& n)
   assert(!dart::math::isNan(tangent));
 
   TangentBasisMatrix T;
+  T.setZero();
 
   // Rotate the tangent around the normal to compute bases.
   // Note: a possible speedup is in place for mNumDir % 2 = 0
@@ -830,6 +831,7 @@ ContactConstraint::getTangentBasisMatrixODEGradient(
   assert(!dart::math::isNan(tangent));
 
   TangentBasisMatrix T;
+  T.setZero();
 
   // Rotate the tangent around the normal to compute bases.
   // Note: a possible speedup is in place for mNumDir % 2 = 0
