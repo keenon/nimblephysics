@@ -50,6 +50,7 @@ TEST(AMC_PARSER, READ)
   auto pair = parser.loadAMC(
       "../../../data/mocap/09.asf", "../../../data/mocap/09_12.amc");
 
+  /*
   server::GUIWebsocketServer server;
   server.serve(8070);
   server.renderSkeleton(pair.first);
@@ -59,5 +60,7 @@ TEST(AMC_PARSER, READ)
     // spin
   }
 
+  */
+  // TODO: This test is WIP
   EXPECT_TRUE(true);
 }

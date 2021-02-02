@@ -408,7 +408,7 @@ TEST(KR5_EXAMPLE, FULL_TEST)
   optimizer.setLBFGSHistoryLength(1);
   optimizer.setTolerance(1e-4);
   optimizer.setCheckDerivatives(false);
-  optimizer.setIterationLimit(500);
+  optimizer.setIterationLimit(20);
   optimizer.registerIntermediateCallback([&](trajectory::Problem* problem,
                                              int /* step */,
                                              double /* primal */,
@@ -426,7 +426,6 @@ TEST(KR5_EXAMPLE, FULL_TEST)
   std::shared_ptr<trajectory::Solution> result
       = optimizer.optimize(trajectory.get());
 
-  int i = 0;
   const Eigen::MatrixXd poses
       = result->getStep(result->getNumSteps() - 1).rollout->getPosesConst();
   const Eigen::MatrixXd vels
@@ -434,8 +433,12 @@ TEST(KR5_EXAMPLE, FULL_TEST)
 
   server.renderTrajectoryLines(world, poses);
 
+  /*
+  int i = 0;
   Ticker ticker(world->getTimeStep());
-  ticker.registerTickListener([&](long /* time */) {
+  ticker.registerTickListener([&](
+    long // time
+  ) {
     world->setPositions(poses.col(i));
     // world->setVelocities(vels.col(i));
 
@@ -454,5 +457,6 @@ TEST(KR5_EXAMPLE, FULL_TEST)
   {
     // spin
   }
+  */
 }
 // #endif

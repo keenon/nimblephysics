@@ -83,8 +83,8 @@ using namespace neural;
 using namespace server;
 using namespace realtime;
 
-// #ifdef ALL_TESTS
-TEST(ATLAS_EXAMPLE, FULL_TEST)
+#ifdef ALL_TESTS
+TEST(HALF_CHEETAH, FULL_TEST)
 {
   // Create a world
   std::shared_ptr<simulation::World> world
@@ -159,9 +159,11 @@ TEST(ATLAS_EXAMPLE, FULL_TEST)
   std::shared_ptr<trajectory::Solution> result
       = optimizer.optimize(trajectory.get());
 
+  /*
   while (server.isServing())
   {
   }
+  */
 
   /*
   Eigen::VectorXd forceLimits = Eigen::VectorXd::Ones(atlas->getNumDofs()) * 30;
@@ -324,4 +326,4 @@ TEST(ATLAS_EXAMPLE, FULL_TEST)
   }
   */
 }
-// #endif
+#endif
