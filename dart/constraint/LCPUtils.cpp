@@ -104,6 +104,10 @@ Eigen::VectorXd LCPUtils::guessSolution(
   {
     return mA.completeOrthogonalDecomposition().solve(mB);
   }
+  if (numClamping == 0)
+  {
+    return Eigen::VectorXd::Zero(mB.size());
+  }
   // Otherwise we have to map down to the clamping subset
   Eigen::MatrixXd reducedA = Eigen::MatrixXd::Zero(numClamping, numClamping);
   Eigen::VectorXd reducedB = Eigen::VectorXd::Zero(numClamping);
