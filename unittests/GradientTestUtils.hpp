@@ -1720,6 +1720,8 @@ bool verifyScratch(WorldPtr world, WithRespectTo* wrt)
               << std::endl
               << analytical << std::endl;
     std::cout << "Diff:" << std::endl << analytical - bruteForce << std::endl;
+    std::cout << "Diff (" << (analytical - bruteForce).minCoeff() << " - "
+              << (analytical - bruteForce).maxCoeff() << "):" << std::endl;
     /*
     std::cout << "Pos-Vel Analytical:" << std::endl
               << posVelAnalytical << std::endl;

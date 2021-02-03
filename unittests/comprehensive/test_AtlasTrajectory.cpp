@@ -74,7 +74,14 @@
 #include "TestHelpers.hpp"
 #include "stdio.h"
 
-// #define ALL_TESTS
+#define ALL_TESTS
+// #define TEST1
+// #define TEST2
+
+#ifdef ALL_TESTS
+#define TEST1
+#define TEST2
+#endif
 
 using namespace dart;
 using namespace math;
@@ -142,7 +149,7 @@ std::shared_ptr<simulation::World> createWorld(
   return world;
 }
 
-#ifdef ALL_TESTS
+#ifdef TEST1
 TEST(ATLAS, BROKEN_1)
 {
   double target_x = 0.5;
@@ -228,9 +235,9 @@ TEST(ATLAS, BROKEN_1)
       = neural::forwardPass(world, true);
   EXPECT_TRUE(snapshot->areResultsStandardized());
 }
-#endif
+#endif // TEST1
 
-// #ifdef ALL_TESTS
+#ifdef TEST2
 TEST(ATLAS, BROKEN_2)
 {
   double target_x = 0.5;
@@ -282,6 +289,7 @@ TEST(ATLAS, BROKEN_2)
   world->setExternalForces(brokenForce);
   world->setCachedLCPSolution(brokenLCPCache);
 
+  // EXPECT_TRUE(verifyScratch(world, WithRespectTo::POSITION));
   EXPECT_TRUE(verifyF_c(world));
   // EXPECT_TRUE(verifyPosVelJacobian(world, brokenVel));
   // EXPECT_TRUE(verifyAnalyticalJacobians(world));
@@ -318,7 +326,7 @@ TEST(ATLAS, BROKEN_2)
       = neural::forwardPass(world, true);
   EXPECT_TRUE(snapshot->areResultsStandardized());
 }
-// #endif
+#endif // TEST2
 
 #ifdef ALL_TESTS
 TEST(ATLAS_EXAMPLE, FULL_TEST)
@@ -455,4 +463,4 @@ TEST(ATLAS_EXAMPLE, FULL_TEST)
     // spin
   }
 }
-#endif
+#endif // ALL_TESTS
