@@ -5,6 +5,9 @@
 #include "dart/neural/RestorableSnapshot.hpp"
 #include "dart/neural/WithRespectToMass.hpp"
 
+// Make production builds happy with asserts
+#define _unused(x) ((void)(x))
+
 #define LOG_PERFORMANCE_MAPPED_BACKPROP_SNAPSHOT ;
 
 using namespace dart;
@@ -197,6 +200,8 @@ void MappedBackpropSnapshot::backprop(
       = Eigen::VectorXd::Zero(mMappings[mRepresentation]->getVelDim());
   thisTimestepLoss.lossWrtTorque
       = Eigen::VectorXd::Zero(mMappings[mRepresentation]->getForceDim());
+  thisTimestepLoss.lossWrtMass
+      = Eigen::VectorXd::Zero(mMappings[mRepresentation]->getMassDim());
 
   // Cleaner, slower way to compute backprop
   for (auto pair : nextTimestepLosses)
@@ -552,6 +557,7 @@ Eigen::MatrixXd MappedBackpropSnapshot::finiteDifferenceForceVelJacobian(
 
   // TODO: this needs to support non-identity mapIns
   assert(mapBefore == "identity" && "Non-identity map ins are currently not supported by finite differencing");
+  _unused(mapBefore);
 
   Eigen::MatrixXd J(outDim, inDim);
 
@@ -651,6 +657,7 @@ Eigen::MatrixXd MappedBackpropSnapshot::finiteDifferencePosPosJacobian(
 
   // TODO: this needs to support non-identity mapIns
   assert(mapBefore == "identity" && "Non-identity map ins are currently not supported by finite differencing");
+  _unused(mapBefore);
 
   RestorableSnapshot snapshot(world);
 
@@ -724,6 +731,7 @@ Eigen::MatrixXd MappedBackpropSnapshot::finiteDifferenceVelPosJacobian(
 
   // TODO: this needs to support non-identity mapIns
   assert(mapBefore == "identity" && "Non-identity map ins are currently not supported by finite differencing");
+  _unused(mapBefore);
 
   RestorableSnapshot snapshot(world);
 

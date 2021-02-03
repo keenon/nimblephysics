@@ -60,6 +60,8 @@ Eigen::VectorXd RealTimeControlBuffer::getPlannedForce(long time, bool dontLog)
       mControlLog.record(time, oob);
     return oob;
   }
+  // The code should never reach here, but it's here to keep the compiler happy
+  throw std::runtime_error{"Execution should never reach this point"};
 }
 
 /// This gets planned forces starting at `start`, and continuing for the

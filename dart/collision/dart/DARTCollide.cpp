@@ -2988,6 +2988,9 @@ int createCapsuleMeshContact(
               = contact.edgeBClosestPoint + normal * capsuleRadius;
           contact.pipeDir = contact.edgeBDir;
           contact.pipeRadius = capsuleRadius;
+          // the contact point is defined as the closest point on the edge
+          // (always included as edge A) in these cases
+          contact.point = contact.edgeAClosestPoint;
         }
         else
         {
@@ -3042,6 +3045,9 @@ int createCapsuleMeshContact(
           contact.edgeAFixedPoint = contact.edgeBFixedPoint;
           contact.edgeAClosestPoint = contact.edgeBClosestPoint;
           contact.edgeADir = contact.edgeBDir;
+          // the contact point is defined as the closest point on the edge
+          // (always included as edge A) in these cases
+          contact.point = contact.edgeAClosestPoint;
         }
         else
         {

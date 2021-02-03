@@ -777,7 +777,7 @@ void testBouncingBlockPosGradients(double frictionCoeff, double mass)
 
   // The FD Jacobian needs us to be just out of contact range, so the bounce can
   // occur on some step in computation
-  Eigen::MatrixXd bruteForce = Eigen::MatrixXd(2, 2);
+  Eigen::MatrixXd bruteForce = Eigen::MatrixXd::Zero(2, 2);
   // clang-format off
   bruteForce << 1, 0, 
                 0, -0.5;

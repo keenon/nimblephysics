@@ -11,6 +11,9 @@
 #include "dart/realtime/Millis.hpp"
 #include "dart/trajectory/Solution.hpp"
 
+// Make production builds happy with asserts
+#define _unused(x) ((void)(x))
+
 #define LOG_PERFORMANCE_IPOPT
 
 using namespace dart;
@@ -389,6 +392,7 @@ bool IPOptShotWrapper::eval_jac_g(
     // return the structure of the Jacobian
     assert(_n == mWrapped->getFlatProblemDim(mWrapped->mWorld));
     assert(_m == mWrapped->getConstraintDim());
+    _unused(_m);
     assert(_nnzj == mWrapped->getNumberNonZeroJacobian(mWrapped->mWorld));
 
     Eigen::Map<Eigen::VectorXi> rows(_iRow, _nnzj);

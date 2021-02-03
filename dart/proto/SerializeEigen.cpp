@@ -14,7 +14,7 @@ void serializeVector(proto::VectorXd& proto, const Eigen::VectorXd& vec)
 
 Eigen::VectorXd deserializeVector(const proto::VectorXd& proto)
 {
-  Eigen::VectorXd recovered = Eigen::VectorXd(proto.size());
+  Eigen::VectorXd recovered = Eigen::VectorXd::Zero(proto.size());
   for (int i = 0; i < proto.size(); i++)
   {
     recovered(i) = proto.values(i);
@@ -37,7 +37,7 @@ void serializeMatrix(proto::MatrixXd& proto, const Eigen::MatrixXd& mat)
 
 Eigen::MatrixXd deserializeMatrix(const proto::MatrixXd& proto)
 {
-  Eigen::MatrixXd recovered = Eigen::MatrixXd(proto.rows(), proto.cols());
+  Eigen::MatrixXd recovered = Eigen::MatrixXd::Zero(proto.rows(), proto.cols());
   int cursor = 0;
   for (int col = 0; col < proto.cols(); col++)
   {

@@ -317,6 +317,11 @@ public:
   const Eigen::VectorXd getCoriolisAndGravityAndExternalForces(
       simulation::WorldPtr world) const;
 
+  /// This is like `getClampingConstraintMatrix()` or
+  /// `getUpperBoundConstraintMatrix()`, except that it returns all the columns
+  /// instead of just a subset.
+  Eigen::MatrixXd getFullConstraintMatrix(simulation::WorldPtr world) const;
+
   std::size_t getNumDOFs() const;
 
   std::size_t getNumConstraintDim() const;

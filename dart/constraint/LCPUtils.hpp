@@ -21,6 +21,16 @@ public:
       const Eigen::VectorXd& mLo,
       const Eigen::VectorXi& mFIndex);
 
+  /// This applies a simple algorithm to guess the solution to the LCP problem.
+  /// It's not guaranteed to be correct, but it often can be if there is no
+  /// sliding friction on this timestep.
+  static Eigen::VectorXd guessSolution(
+      const Eigen::MatrixXd& mA,
+      const Eigen::VectorXd& mB,
+      const Eigen::VectorXd& mHi,
+      const Eigen::VectorXd& mLo,
+      const Eigen::VectorXi& mFIndex);
+
   /// This reduces an LCP problem by merging any near-identical contact points.
   /// It returns a mapOut matrix, such that if you solve this LCP and then
   /// multiply the resulting x as mapOut*x, you'll get the solution to the

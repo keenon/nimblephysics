@@ -2,72 +2,72 @@
 # Ref: https://docs.microsoft.com/en-us/azure/devops/pipelines
 
 stages:
-  - stage: Mac
-    jobs:
-      - job: macos_35
-        pool: { vmImage: "macOS-10.15" }
-        variables:
-          - name: PYTHON_VERSION_NUMBER
-            value: "3.5"
-        steps:
-          - task: UsePythonVersion@0
-            inputs:
-              versionSpec: "3.5"
-              architecture: "x64"
-          - script: ci/mac/install_dependencies.sh
-          - bash: |
-              cd ci/mac
-              ./build_wheels.sh
-          - task: PublishBuildArtifacts@1
-            inputs: { pathtoPublish: "wheelhouse" }
-      - job: macos_36
-        pool: { vmImage: "macOS-10.15" }
-        variables:
-          - name: PYTHON_VERSION_NUMBER
-            value: "3.6"
-        steps:
-          - task: UsePythonVersion@0
-            inputs:
-              versionSpec: "3.6"
-              architecture: "x64"
-          - script: ci/mac/install_dependencies.sh
-          - bash: |
-              cd ci/mac
-              ./build_wheels.sh
-          - task: PublishBuildArtifacts@1
-            inputs: { pathtoPublish: "wheelhouse" }
-      - job: macos_37
-        pool: { vmImage: "macOS-10.15" }
-        variables:
-          - name: PYTHON_VERSION_NUMBER
-            value: "3.7"
-        steps:
-          - task: UsePythonVersion@0
-            inputs:
-              versionSpec: "3.7"
-              architecture: "x64"
-          - script: ci/mac/install_dependencies.sh
-          - bash: |
-              cd ci/mac
-              ./build_wheels.sh
-          - task: PublishBuildArtifacts@1
-            inputs: { pathtoPublish: "wheelhouse" }
-      - job: macos_38
-        pool: { vmImage: "macOS-10.15" }
-        variables:
-          - name: PYTHON_VERSION_NUMBER
-            value: "3.8"
-        steps:
-          - task: UsePythonVersion@0
-            inputs:
-              versionSpec: "3.8"
-              architecture: "x64"
-          - script: ci/mac/install_dependencies.sh
-          - bash: |
-              cd ci/mac
-              ./build_wheels.sh
-          - task: PublishBuildArtifacts@1
-            inputs: { pathtoPublish: "wheelhouse" }
+  # - stage: Mac
+  #   jobs:
+  #     - job: macos_35
+  #       pool: { vmImage: "macOS-10.15" }
+  #       variables:
+  #         - name: PYTHON_VERSION_NUMBER
+  #           value: "3.5"
+  #       steps:
+  #         - task: UsePythonVersion@0
+  #           inputs:
+  #             versionSpec: "3.5"
+  #             architecture: "x64"
+  #         - script: ci/mac/install_dependencies.sh
+  #         - bash: |
+  #             cd ci/mac
+  #             ./build_wheels.sh
+  #         - task: PublishBuildArtifacts@1
+  #           inputs: { pathtoPublish: "wheelhouse" }
+  #     - job: macos_36
+  #       pool: { vmImage: "macOS-10.15" }
+  #       variables:
+  #         - name: PYTHON_VERSION_NUMBER
+  #           value: "3.6"
+  #       steps:
+  #         - task: UsePythonVersion@0
+  #           inputs:
+  #             versionSpec: "3.6"
+  #             architecture: "x64"
+  #         - script: ci/mac/install_dependencies.sh
+  #         - bash: |
+  #             cd ci/mac
+  #             ./build_wheels.sh
+  #         - task: PublishBuildArtifacts@1
+  #           inputs: { pathtoPublish: "wheelhouse" }
+  #     - job: macos_37
+  #       pool: { vmImage: "macOS-10.15" }
+  #       variables:
+  #         - name: PYTHON_VERSION_NUMBER
+  #           value: "3.7"
+  #       steps:
+  #         - task: UsePythonVersion@0
+  #           inputs:
+  #             versionSpec: "3.7"
+  #             architecture: "x64"
+  #         - script: ci/mac/install_dependencies.sh
+  #         - bash: |
+  #             cd ci/mac
+  #             ./build_wheels.sh
+  #         - task: PublishBuildArtifacts@1
+  #           inputs: { pathtoPublish: "wheelhouse" }
+  #     - job: macos_38
+  #       pool: { vmImage: "macOS-10.15" }
+  #       variables:
+  #         - name: PYTHON_VERSION_NUMBER
+  #           value: "3.8"
+  #       steps:
+  #         - task: UsePythonVersion@0
+  #           inputs:
+  #             versionSpec: "3.8"
+  #             architecture: "x64"
+  #         - script: ci/mac/install_dependencies.sh
+  #         - bash: |
+  #             cd ci/mac
+  #             ./build_wheels.sh
+  #         - task: PublishBuildArtifacts@1
+  #           inputs: { pathtoPublish: "wheelhouse" }
   - stage: Linux
     jobs:
       - job: linux_35

@@ -34,6 +34,7 @@ int WrtMassBodyNodyEntry::dim()
   if (type == INERTIA_FULL)
     return 10;
   assert(false);
+  return 0;
 }
 
 //==============================================================================
@@ -213,6 +214,9 @@ WrtMassBodyNodyEntry& WithRespectToMass::getNode(dynamics::BodyNode* node)
     }
   }
   assert(false);
+  // The code should never reach this point, but this is here to keep the
+  // compiler happy
+  throw std::runtime_error{"Execution should never reach this point"};
 }
 
 //==============================================================================
@@ -242,7 +246,7 @@ Eigen::VectorXd WithRespectToMass::get(dynamics::Skeleton* skel)
     return Eigen::VectorXd::Zero(0);
   int cursor = 0;
   int skelDim = dim(skel);
-  Eigen::VectorXd result = Eigen::VectorXd(skelDim);
+  Eigen::VectorXd result = Eigen::VectorXd::Zero(skelDim);
   for (WrtMassBodyNodyEntry& entry : skelEntries)
   {
     entry.get(skel, result.segment(cursor, entry.dim()));

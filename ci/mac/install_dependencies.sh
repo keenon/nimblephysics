@@ -20,6 +20,9 @@ rm -rf PerfUtils
 brew install boost # @1.73
 brew install eigen
 
+brew install openssl@1.1
+cp /usr/local/opt/openssl@1.1/lib/pkgconfig/*.pc /usr/local/lib/pkgconfig/
+
 # Install CCD
 git clone https://github.com/danfis/libccd.git
 pushd libccd

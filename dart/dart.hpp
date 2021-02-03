@@ -35,7 +35,7 @@
 #include "dart/config.hpp"
 #include "dart/constraint/constraint.hpp"
 #include "dart/dynamics/dynamics.hpp"
-#include "dart/integration/integration.hpp"
+// #include "dart/integration/integration.hpp"
 #include "dart/lcpsolver/lcpsolver.hpp"
 #include "dart/math/math.hpp"
 #include "dart/neural/neural.hpp"

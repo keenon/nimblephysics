@@ -8,6 +8,9 @@
 #include "dart/neural/RestorableSnapshot.hpp"
 #include "dart/simulation/World.hpp"
 
+// Make production builds happy with asserts
+#define _unused(x) ((void)(x))
+
 using namespace dart;
 using namespace dynamics;
 using namespace simulation;
@@ -627,6 +630,7 @@ void SingleShot::backpropGradientWrt(
   int staticDims = getFlatStaticProblemDim(world);
   int dynamicDims = getFlatDynamicProblemDim(world);
   assert(gradStatic.size() == staticDims);
+  _unused(staticDims);
   assert(gradDynamic.size() == dynamicDims);
 
   std::vector<MappedBackpropSnapshotPtr> snapshots

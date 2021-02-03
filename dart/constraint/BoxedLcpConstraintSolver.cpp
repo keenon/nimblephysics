@@ -363,7 +363,7 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(
   Eigen::VectorXd hiGradientBackup = mHi;
   Eigen::VectorXi fIndexGradientBackup = mFIndex;
   Eigen::VectorXd bGradientBackup = mB;
-  Eigen::VectorXd aColNormGradientBackup = Eigen::VectorXd(n);
+  Eigen::VectorXd aColNormGradientBackup = Eigen::VectorXd::Zero(n);
   for (std::size_t i = 0; i < n; i++)
   {
     aColNormGradientBackup(i) = mA.col(i).squaredNorm();
@@ -374,6 +374,14 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(
 
   bool success = false;
   bool shortCircuitLCP = false;
+
+  // If we just zeroed out the mX vector, let's re-initialize it with a
+  // reasonable guess, since those are often correct.
+  if (mXResized)
+  {
+    mX = LCPUtils::guessSolution(aGradientBackup, mB, mHi, mLo, mFIndex);
+    mXBackup = mX;
+  }
 
   // Pre-solve, if we're using gradients. We're going to assume that the
   // initialization mX is from last time step, and then guess that nothing has
@@ -387,7 +395,7 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(
   // 2) It keeps classes stable and nicely differentiable, by getting LCP
   // solutions near previous solutions.
 
-  if (group.getGradientConstraintMatrices() && !mXResized)
+  if (group.getGradientConstraintMatrices())
   {
     std::shared_ptr<neural::ConstrainedGroupGradientMatrices> grads
         = group.getGradientConstraintMatrices();
@@ -480,12 +488,12 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(
 
   if (!success && mSecondaryBoxedLcpSolver)
   {
-    Eigen::MatrixXd mAReduced = mA.block(0, 0, n, n);
-    Eigen::VectorXd mXReduced = mX;
-    Eigen::VectorXd mBReduced = mB;
-    Eigen::VectorXd mHiReduced = mHi;
-    Eigen::VectorXd mLoReduced = mLo;
-    Eigen::VectorXi mFIndexReduced = mFIndex;
+    Eigen::MatrixXd mAReduced = mABackup.block(0, 0, n, n);
+    Eigen::VectorXd mXReduced = mXBackup;
+    Eigen::VectorXd mBReduced = mBBackup;
+    Eigen::VectorXd mHiReduced = mHiBackup;
+    Eigen::VectorXd mLoReduced = mLoBackup;
+    Eigen::VectorXi mFIndexReduced = mFIndexBackup;
     Eigen::MatrixXd mapOut = LCPUtils::reduce(
         mAReduced,
         mXReduced,

@@ -21,6 +21,8 @@ class RestorableSnapshot
 public:
   RestorableSnapshot(std::shared_ptr<simulation::World> world);
   void restore();
+  /// Returns true if the world is already in the preserved state
+  bool isPreserved();
 
 private:
   std::shared_ptr<simulation::World> mWorld;
