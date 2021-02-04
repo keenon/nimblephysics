@@ -1362,11 +1362,12 @@ Eigen::VectorXd BackpropSnapshot::getVelocityDueToIllegalImpulses()
 }
 
 //==============================================================================
-/// Returns the coriolis and gravity forces pre-step
+/// Returns the coriolis and gravity forces after unconstrained forward dynamics.
+/// For pre-step forces, use world->getCoriolisAndGravityAndExternalForces()
 Eigen::VectorXd BackpropSnapshot::getCoriolisAndGravityAndExternalForces()
 {
   return assembleVector<Eigen::VectorXd>(
-      VectorToAssemble::CORIOLIS_AND_GRAVITY);
+      VectorToAssemble::CORIOLIS_AND_GRAVITY_AND_EXTERNAL);
 }
 
 //==============================================================================
@@ -2580,7 +2581,7 @@ Eigen::MatrixXd BackpropSnapshot::getJacobianOfLCPOffsetClampingSubset(
     return getBounceDiagonals().asDiagonal() * -A_c.transpose() * dt * Minv;
   }
 
-  Eigen::VectorXd C = getCoriolisAndGravityAndExternalForces();
+  Eigen::VectorXd C = world->getCoriolisAndGravityAndExternalForces();
   Eigen::VectorXd f = getPreStepTorques() - C;
   Eigen::MatrixXd dMinv_f = getJacobianOfMinv(world, f, wrt);
   Eigen::VectorXd v_f = getPreConstraintVelocity();
@@ -4016,7 +4017,7 @@ const Eigen::VectorXd& BackpropSnapshot::getVectorToAssemble(
     return matrices->getPreStepTorques();
   if (whichVector == VectorToAssemble::PRE_LCP_VEL)
     return matrices->getPreLCPVelocity();
-  if (whichVector == VectorToAssemble::CORIOLIS_AND_GRAVITY)
+  if (whichVector == VectorToAssemble::CORIOLIS_AND_GRAVITY_AND_EXTERNAL)
     return matrices->getCoriolisAndGravityAndExternalForces();
 
   assert(whichVector != VectorToAssemble::CONTACT_CONSTRAINT_MAPPINGS);
