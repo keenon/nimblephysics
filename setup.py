@@ -47,7 +47,12 @@ class CMakeBuild(build_ext):
         cmake_args += ['-DPYBIND11_PYTHON_VERSION:STRING=' +
                        os.getenv('PYTHON_VERSION_NUMBER', '3.8')]
 
-        cfg = 'Debug' if self.debug else 'Release'
+        # We include debug info in our released binaries, because it makes it
+        # easier to profile and debug in the wild, which is more valuable than
+        # the small performance gain from stripping debug symbols.
+        #
+        # So this is 'RelWithDebInfo', not 'Release'
+        cfg = 'Debug' if self.debug else 'RelWithDebInfo'
         build_args = ['--config', cfg]
         if ext.target is not None:
             build_args += ['--target', ext.target]
