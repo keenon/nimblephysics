@@ -60,6 +60,8 @@ using namespace dart::simulation;
 
 #define JOINT_TOL 0.01
 
+#define ALL_TESTS
+
 //==============================================================================
 class JOINTS : public testing::Test
 {
@@ -276,40 +278,52 @@ void JOINTS::kinematicsTest(const typename JointType::Properties& _properties)
 }
 
 // 0-dof joint
+#ifdef ALL_TESTS
 TEST_F(JOINTS, WELD_JOINT)
 {
   kinematicsTest<WeldJoint>();
 }
+#endif
 
 // 1-dof joint
+#ifdef ALL_TESTS
 TEST_F(JOINTS, REVOLUTE_JOINT)
 {
   kinematicsTest<RevoluteJoint>();
 }
+#endif
 
 // 1-dof joint
+#ifdef ALL_TESTS
 TEST_F(JOINTS, PRISMATIC_JOINT)
 {
   kinematicsTest<PrismaticJoint>();
 }
+#endif
 
 // 1-dof joint
+#ifdef ALL_TESTS
 TEST_F(JOINTS, SCREW_JOINT)
 {
   kinematicsTest<ScrewJoint>();
 }
+#endif
 
 // 2-dof joint
+#ifdef ALL_TESTS
 TEST_F(JOINTS, UNIVERSAL_JOINT)
 {
   kinematicsTest<UniversalJoint>();
 }
+#endif
 
 // 2-dof joint
+#ifdef ALL_TESTS
 TEST_F(JOINTS, TRANSLATIONAL_JOINT_2D)
 {
   kinematicsTest<TranslationalJoint2D>();
 }
+#endif
 
 // 3-dof joint
 //TEST_F(JOINTS, BALL_JOINT)
@@ -322,6 +336,7 @@ TEST_F(JOINTS, TRANSLATIONAL_JOINT_2D)
 // velocities and accelerations, repectively.
 
 // 3-dof joint
+#ifdef ALL_TESTS
 TEST_F(JOINTS, EULER_JOINT)
 {
   EulerJoint::Properties properties;
@@ -332,18 +347,23 @@ TEST_F(JOINTS, EULER_JOINT)
   properties.mAxisOrder = EulerJoint::AxisOrder::ZYX;
   kinematicsTest<EulerJoint>(properties);
 }
+#endif
 
 // 3-dof joint
+#ifdef ALL_TESTS
 TEST_F(JOINTS, TRANSLATIONAL_JOINT)
 {
   kinematicsTest<TranslationalJoint>();
 }
+#endif
 
 // 3-dof joint
+#ifdef ALL_TESTS
 TEST_F(JOINTS, PLANAR_JOINT)
 {
   kinematicsTest<PlanarJoint>();
 }
+#endif
 
 // 6-dof joint
 //TEST_F(JOINTS, FREE_JOINT)
@@ -390,6 +410,7 @@ void testCommandLimits(dynamics::Joint* joint)
 }
 
 //==============================================================================
+#ifdef ALL_TESTS
 TEST_F(JOINTS, COMMAND_LIMIT)
 {
   simulation::WorldPtr myWorld
@@ -428,8 +449,10 @@ TEST_F(JOINTS, COMMAND_LIMIT)
         &Joint::setVelocityUpperLimit>(joint);
   }
 }
+#endif
 
 //==============================================================================
+#ifdef ALL_TESTS
 TEST_F(JOINTS, POSITION_LIMIT)
 {
   double tol = 1e-3;
@@ -503,8 +526,10 @@ TEST_F(JOINTS, POSITION_LIMIT)
     EXPECT_LE(jointPos1, limit1 + tol);
   }
 }
+#endif
 
 //==============================================================================
+#ifdef ALL_TESTS
 TEST_F(JOINTS, JOINT_LIMITS)
 {
   simulation::WorldPtr myWorld
@@ -572,6 +597,7 @@ TEST_F(JOINTS, JOINT_LIMITS)
   EXPECT_EQ(joint0->getForceLowerLimits(), -limits);
   EXPECT_EQ(joint0->getForceUpperLimits(), limits);
 }
+#endif
 
 //==============================================================================
 void testJointCoulombFrictionForce(double _timeStep)
@@ -685,6 +711,7 @@ void testJointCoulombFrictionForce(double _timeStep)
 }
 
 //==============================================================================
+#ifdef ALL_TESTS
 TEST_F(JOINTS, JOINT_COULOMB_FRICTION)
 {
   std::array<double, 3> timeSteps;
@@ -695,6 +722,7 @@ TEST_F(JOINTS, JOINT_COULOMB_FRICTION)
   for (auto timeStep : timeSteps)
     testJointCoulombFrictionForce(timeStep);
 }
+#endif
 
 //==============================================================================
 SkeletonPtr createPendulum(Joint::ActuatorType actType)
@@ -880,10 +908,12 @@ void testServoMotor()
 }
 
 //==============================================================================
+#ifdef ALL_TESTS
 TEST_F(JOINTS, SERVO_MOTOR)
 {
   testServoMotor();
 }
+#endif
 
 //==============================================================================
 void testMimicJoint()
@@ -943,7 +973,10 @@ void testMimicJoint()
   joints[1]->setActuatorType(Joint::MIMIC);
   joints[1]->setMimicJoint(joints[0], 1., 0.);
 
-  world->addSkeleton(pendulum);
+  world->addSkeleton(pendulum, true);
+  // We need to use implicit integration here to keep the results stable enough for the
+  // numerical tolerances to be satisfied.
+  world->setParallelVelocityAndPositionUpdates(false);
 
 #ifndef NDEBUG // Debug mode
   double simTime = 0.2;
@@ -974,12 +1007,15 @@ void testMimicJoint()
 }
 
 //==============================================================================
+#ifdef ALL_TESTS
 TEST_F(JOINTS, MIMIC_JOINT)
 {
   testMimicJoint();
 }
+#endif
 
 //==============================================================================
+#ifdef ALL_TESTS
 TEST_F(JOINTS, JOINT_COULOMB_FRICTION_AND_POSITION_LIMIT)
 {
   const double timeStep = 1e-3;
@@ -992,6 +1028,8 @@ TEST_F(JOINTS, JOINT_COULOMB_FRICTION_AND_POSITION_LIMIT)
 
   myWorld->setGravity(Eigen::Vector3d(0.0, 0.0, 0.0));
   myWorld->setTimeStep(timeStep);
+  // Use implicit integration for precision for this test
+  myWorld->setParallelVelocityAndPositionUpdates(false);
 
   dynamics::SkeletonPtr pendulum = myWorld->getSkeleton("double_pendulum");
   EXPECT_TRUE(pendulum != nullptr);
@@ -1090,6 +1128,7 @@ TEST_F(JOINTS, JOINT_COULOMB_FRICTION_AND_POSITION_LIMIT)
     EXPECT_LE(jointPos1, ul + tol);
   }
 }
+#endif
 
 //==============================================================================
 template<int N>
@@ -1133,6 +1172,7 @@ Eigen::Isometry3d get_relative_transform(BodyNode* bn, BodyNode* relativeTo)
 }
 
 //==============================================================================
+#ifdef ALL_TESTS
 TEST_F(JOINTS, CONVENIENCE_FUNCTIONS)
 {
   SkeletonPtr skel = Skeleton::create();
@@ -1247,8 +1287,10 @@ TEST_F(JOINTS, CONVENIENCE_FUNCTIONS)
     }
   }
 }
+#endif
 
 //==============================================================================
+#ifdef ALL_TESTS
 TEST_F(JOINTS, FREE_JOINT_RELATIVE_TRANSFORM_VELOCITY_ACCELERATION)
 {
   const std::size_t numTests = 50;
@@ -1470,3 +1512,4 @@ TEST_F(JOINTS, FREE_JOINT_RELATIVE_TRANSFORM_VELOCITY_ACCELERATION)
     }
   }
 }
+#endif
