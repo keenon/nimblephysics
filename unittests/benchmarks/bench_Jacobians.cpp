@@ -57,16 +57,16 @@ static void BM_Cartpole_Jacobians(benchmark::State& state)
   sledPair.first->setAxis(Eigen::Vector3d(1, 0, 0));
   std::shared_ptr<BoxShape> sledShapeBox(
       new BoxShape(Eigen::Vector3d(0.05, 0.25, 0.05)));
-  ShapeNode* sledShape
-      = sledPair.second->createShapeNodeWith<VisualAspect>(sledShapeBox);
+  // ShapeNode* sledShape =
+  sledPair.second->createShapeNodeWith<VisualAspect>(sledShapeBox);
 
   std::pair<RevoluteJoint*, BodyNode*> armPair
       = cartpole->createJointAndBodyNodePair<RevoluteJoint>(sledPair.second);
   armPair.first->setAxis(Eigen::Vector3d(0, 0, 1));
   std::shared_ptr<BoxShape> armShapeBox(
       new BoxShape(Eigen::Vector3d(0.05, 0.25, 0.05)));
-  ShapeNode* armShape
-      = armPair.second->createShapeNodeWith<VisualAspect>(armShapeBox);
+  // ShapeNode* armShape =
+  armPair.second->createShapeNodeWith<VisualAspect>(armShapeBox);
 
   Eigen::Isometry3d armOffset = Eigen::Isometry3d::Identity();
   armOffset.translation() = Eigen::Vector3d(0, -0.5, 0);
@@ -216,7 +216,8 @@ WorldPtr createJumpwormWorld()
       root, Eigen::Vector3d(182.0 / 255, 223.0 / 255, 144.0 / 255));
   BodyNode* tail2 = createTailSegment(
       tail1, Eigen::Vector3d(223.0 / 255, 228.0 / 255, 163.0 / 255));
-  BodyNode* tail3 = createTailSegment(
+  // BodyNode* tail3 =
+  createTailSegment(
       tail2, Eigen::Vector3d(221.0 / 255, 193.0 / 255, 121.0 / 255));
 
   Eigen::VectorXd pos = Eigen::VectorXd(5);
@@ -238,9 +239,8 @@ WorldPtr createJumpwormWorld()
   floorJoint->setTransformFromParentBodyNode(floorOffset);
   std::shared_ptr<BoxShape> floorShape(
       new BoxShape(Eigen::Vector3d(2.5, 0.25, 0.5)));
-  ShapeNode* floorVisual
-      = floorBody->createShapeNodeWith<VisualAspect, CollisionAspect>(
-          floorShape);
+  // ShapeNode* floorVisual =
+  floorBody->createShapeNodeWith<VisualAspect, CollisionAspect>(floorShape);
   floorBody->setFrictionCoeff(0);
 
   world->addSkeleton(floor);
