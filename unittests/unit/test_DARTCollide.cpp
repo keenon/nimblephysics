@@ -2846,7 +2846,7 @@ TEST(DARTCollide, CAPSULE_BOX_SPHERE_AND_PIPE_EDGE_COLLISION)
   // Points from B to A
   Eigen::Vector3d expectedNormal = Eigen::Vector3d::UnitY();
   Eigen::Vector3d expectedPointA = Eigen::Vector3d(0, 0.5 - 0.01, radius);
-  Eigen::Vector3d expectedPointB = Eigen::Vector3d(0, 0.5 - (0.01 / 2), 1.0);
+  Eigen::Vector3d expectedPointB = Eigen::Vector3d(0, 0.5, 1.0);
 
   Contact contact1 = result.getContact(0);
   EXPECT_EQ(contact1.type, SPHERE_FACE);
@@ -2935,7 +2935,7 @@ TEST(DARTCollide, CAPSULE_MESH_SPHERE_AND_PIPE_EDGE_COLLISION)
   // Points from B to A
   Eigen::Vector3d expectedNormal = Eigen::Vector3d::UnitY();
   Eigen::Vector3d expectedPointA = Eigen::Vector3d(0, 0.5 - 0.01, radius);
-  Eigen::Vector3d expectedPointB = Eigen::Vector3d(0, 0.5 - (0.01 / 2), 1.0);
+  Eigen::Vector3d expectedPointB = Eigen::Vector3d(0, 0.5, 1.0);
 
   Contact contact1 = result.getContact(0);
   EXPECT_EQ(contact1.type, SPHERE_FACE);
