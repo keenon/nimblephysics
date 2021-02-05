@@ -21,7 +21,7 @@
 using namespace dart;
 using namespace realtime;
 
-// #define ALL_TESTS
+#define ALL_TESTS
 
 Eigen::MatrixXd skelPosPosJacFD(
     std::shared_ptr<dynamics::Skeleton> skel,
@@ -76,7 +76,7 @@ Eigen::MatrixXd skelVelPosJacFD(
 }
 
 //==============================================================================
-// #ifdef ALL_TESTS
+#ifdef ALL_TESTS
 TEST(FreeJointGradients, ATLAS_JACOBIANS)
 {
   std::shared_ptr<simulation::World> world = simulation::World::create();
@@ -97,28 +97,40 @@ TEST(FreeJointGradients, ATLAS_JACOBIANS)
     Eigen::MatrixXd posPosFD = skelPosPosJacFD(atlas, pos, vel, dt);
     Eigen::MatrixXd velPosFD = skelVelPosJacFD(atlas, pos, vel, dt);
 
-    if (!equals(posPosAnalytical, posPosFD, 1e-9))
-    {
-      std::cout << "Pos-Pos Analytical: " << std::endl
-                << posPosAnalytical << std::endl;
-      std::cout << "Pos-Pos FD: " << std::endl << posPosFD << std::endl;
-      std::cout << "Pos-Pos Diff: " << std::endl
-                << posPosAnalytical - posPosFD << std::endl;
-    }
-    EXPECT_TRUE(equals(posPosAnalytical, posPosFD, 1e-9));
+    const double tol = 3e-9;
 
-    if (!equals(velPosAnalytical, velPosFD, 1e-9))
+    if (!equals(posPosAnalytical, posPosFD, tol))
     {
-      std::cout << "Vel-Pos Analytical: " << std::endl
-                << velPosAnalytical << std::endl;
-      std::cout << "Vel-Pos FD: " << std::endl << velPosFD << std::endl;
-      std::cout << "Vel-Pos Diff: " << std::endl
-                << velPosAnalytical - velPosFD << std::endl;
+      std::cout << "Pos-Pos Analytical (top-left 6x6): " << std::endl
+                << posPosAnalytical.block<6, 6>(0, 0) << std::endl;
+      std::cout << "Pos-Pos FD (top-left 6x6): " << std::endl
+                << posPosFD.block<6, 6>(0, 0) << std::endl;
+      std::cout << "Pos-Pos Diff (" << (posPosAnalytical - posPosFD).minCoeff()
+                << " - " << (posPosAnalytical - posPosFD).maxCoeff()
+                << ") (top-left 6x6): " << std::endl
+                << (posPosAnalytical - posPosFD).block<6, 6>(0, 0) << std::endl;
+      break;
     }
-    EXPECT_TRUE(equals(velPosAnalytical, velPosFD, 1e-9));
+    EXPECT_TRUE(equals(posPosAnalytical, posPosFD, tol));
+
+    if (!equals(velPosAnalytical, velPosFD, tol))
+    {
+      std::cout << "Vel-Pos Analytical (top-left 6x6): " << std::endl
+                << velPosAnalytical.block<6, 6>(0, 0) << std::endl;
+      std::cout << "Vel-Pos FD (top-left 6x6): " << std::endl
+                << velPosFD.block<6, 6>(0, 0) << std::endl;
+      std::cout << "Vel-Pos Diff (" << (velPosAnalytical - velPosFD).minCoeff()
+                << " - " << (velPosAnalytical - velPosFD).maxCoeff()
+                << ") (top-left 6x6): " << std::endl
+                << (velPosAnalytical - velPosFD).block<6, 6>(0, 0) << std::endl;
+      break;
+    }
+    EXPECT_TRUE(equals(velPosAnalytical, velPosFD, tol));
+
+    world->step();
   }
 }
-// #endif
+#endif
 
 //==============================================================================
 #ifdef ALL_TESTS
@@ -254,13 +266,13 @@ TEST(FreeJointGradients, ROTATION_JOINT_JAC)
   Eigen::Vector3d pos = Eigen::Vector3d::UnitX();
   Eigen::Vector3d vel = Eigen::Vector3d::UnitY();
 
-  Eigen::Matrix3d posPos = rotatePosPosJacFD(pos, vel, dt);
-  Eigen::Matrix3d velPos = rotateVelPosJacFD(pos, vel, dt);
-  std::cout << "Pos-pos: " << std::endl << posPos << std::endl;
-  std::cout << "Vel-pos: " << std::endl << velPos << std::endl;
+  // Just check these don't crash
+  rotatePosPosJacFD(pos, vel, dt);
+  rotateVelPosJacFD(pos, vel, dt);
 }
 #endif
 
+/*
 //==============================================================================
 #ifdef ALL_TESTS
 TEST(FreeJointGradients, GUI_EXPLORE)
@@ -342,3 +354,4 @@ TEST(FreeJointGradients, GUI_EXPLORE)
   }
 }
 #endif
+*/
