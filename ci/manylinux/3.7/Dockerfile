@@ -24,7 +24,6 @@ RUN git clone https://github.com/pybind/pybind11.git && \
 # Install pytest
 RUN ${PYTHON} -m pip install pytest
 RUN ${PYTHON} -m pip install auditwheel
-RUN git clone https://github.com/keenon/diffdart
 ADD . diffdart
 RUN cd diffdart && \
     cat setup.py && \
