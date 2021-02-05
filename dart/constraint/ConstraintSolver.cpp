@@ -95,7 +95,16 @@ ConstraintSolver::ConstraintSolver()
     mCollisionGroup(mCollisionDetector->createCollisionGroupAsSharedPtr()),
     mCollisionOption(collision::CollisionOption(
         true, 1000u, std::make_shared<collision::BodyNodeCollisionFilter>())),
-    mTimeStep(0.001)
+    mTimeStep(0.001),
+    mGradientEnabled(false), // Default to no gradients
+    mPenetrationCorrectionEnabled(
+        false), // Default to no penetration correction, because it breaks our
+                // gradients
+    mConstraintForceMixingEnabled(
+        true), // Default to CFM, increases stability but decreases the
+               // accuracy of our gradients
+    mContactClippingDepth(
+        0.03) // Default to clipping only after fairly deep penetration
 {
   /*
   auto cd = std::static_pointer_cast<collision::FCLCollisionDetector>(
