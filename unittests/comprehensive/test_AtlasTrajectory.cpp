@@ -292,6 +292,7 @@ TEST(ATLAS, BROKEN_2)
   // EXPECT_TRUE(verifyAnalyticalJacobians(world));
   EXPECT_TRUE(verifyVelGradients(world, brokenVel));
 
+  /*
   GUIWebsocketServer server;
   server.serve(8080);
   server.renderWorld(world);
@@ -299,7 +300,7 @@ TEST(ATLAS, BROKEN_2)
   Eigen::VectorXd animatePos = brokenPos;
   int i = 0;
   Ticker ticker(0.01);
-  ticker.registerTickListener([&](long /* time */) {
+  ticker.registerTickListener([&](long) {
     world->setPositions(animatePos);
     animatePos += brokenVel * 0.001;
 
@@ -322,6 +323,7 @@ TEST(ATLAS, BROKEN_2)
   std::shared_ptr<neural::BackpropSnapshot> snapshot
       = neural::forwardPass(world, true);
   EXPECT_TRUE(snapshot->areResultsStandardized());
+  */
 }
 #endif // TEST2
 

@@ -364,6 +364,107 @@ double dDistPointToSegment(
   return (p - Pb).norm();
 }
 
+/*
+/// This method intersects a rectangle with an arbitrary quad.
+///
+/// The rectangle is centered at (0,0) and extends along h[0] in the X axis and
+/// h[1] in the Y axis. The quad in encoded in p, and consists of 4 points at
+/// (p[0], p[1]), (p[1], p[2]), etc.
+///
+/// The intersection points are stored in ret, at (ret[0], ret[1]), (ret[2],
+/// ret[3]), etc. The number of intersection points is the return value of this
+/// function.
+int intersectRectQuad(
+    double rectDimensions[2], double quadPoints[8], double ret[16])
+{
+  // q (and r) contain nq (and nr) coordinate points for the current (and
+  // chopped) polygons
+  int srcPointsNum = 4;
+  int dstPointsNum = 0;
+
+  double retBuffer[16];
+
+  double* srcPoints = quadPoints;
+  double* dstPoints = ret;
+
+  // Iterate over X (dir == 0) and Y (dir == 1) axis
+  for (int dir = 0; dir <= 1; dir++)
+  {
+    // Iterate over -dir and +dir, to get all 4 sides of our rectangle
+    for (int sign = -1; sign <= 1; sign += 2)
+    {
+      // Inside this loop we're comparing all the `srcPoints` to the barrier
+      // we've set up. If a point is beyond (rectDimensions[dir] * sign), then
+      // it's out of bounds and needs to be clipped. If an edge between two
+      // subsequent points on the quad crosses the barrier, then we need to
+      // introduce an edge-edge contact at that clipping point. Otherwise, we
+      // can keep the all points inside our barrier.
+
+      double* srcPointsCursor = srcPoints;
+      double* dstPointsCursor = dstPoints;
+      dstPointsNum = 0;
+
+#define INCREMENT_DST_POINTS_CURSOR                                            \
+  dstPointsCursor += 2;                                                        \
+  dstPointsNum++;                                                              \
+  if (dstPointsNum & 8)                                                        \
+  {                                                                            \
+    srcPoints = dstPoints;                                                     \
+    goto done;                                                                 \
+  }
+
+      // This loop increments the `srcPointsCursor` at the end
+      for (int i = srcPointsNum; i > 0; i--)
+      {
+        // Check 1: If this point is within our boundary along `dir`, then we
+        // can keep it
+        if (sign * srcPointsCursor[dir] < rectDimensions[dir])
+        {
+          // this point is inside the chopping line
+          dstPointsCursor[0] = srcPointsCursor[0];
+          dstPointsCursor[1] = srcPointsCursor[1];
+          INCREMENT_DST_POINTS_CURSOR
+        }
+        // Check 2: If the edge from this point to the next point crosses our
+        // boundary, introduce a point at the crossing point
+        double* nextSrcPointsCursor = (i > 1) ? srcPointsCursor + 2 : srcPoints;
+        if ((sign * srcPointsCursor[dir] < rectDimensions[dir])
+            ^ (sign * nextSrcPointsCursor[dir] < rectDimensions[dir]))
+        {
+          // this line crosses the chopping line
+          dstPointsCursor[1 - dir]
+              = srcPointsCursor[1 - dir]
+                + (nextSrcPointsCursor[1 - dir] - srcPointsCursor[1 - dir])
+                      / (nextSrcPointsCursor[dir] - srcPointsCursor[dir])
+                      * (sign * rectDimensions[dir] - srcPointsCursor[dir]);
+          dstPointsCursor[dir] = sign * rectDimensions[dir];
+          INCREMENT_DST_POINTS_CURSOR
+        }
+
+        // Increment the src pointer
+        srcPointsCursor += 2;
+      }
+
+#undef INCREMENT_DST_POINTS_CURSOR
+
+      // Swap `dst` into `src`
+      srcPoints = dstPoints;
+      srcPointsNum = dstPointsNum;
+
+      // Point `dst` at whatever unused buffers we've got
+      dstPoints = (srcPoints == ret) ? retBuffer : ret;
+    }
+  }
+done:
+  if (srcPoints != ret)
+    memcpy(ret, srcPoints, dstPointsNum * 2 * sizeof(double));
+  return dstPointsNum;
+}
+*/
+
+// See the commented version above for more explanation. Should be equivalent,
+// but don't want to rock the boat with changes right now. TODO(keenon): Swap in
+// the commented version for clarity.
 int intersectRectQuad(double h[2], double p[8], double ret[16])
 {
   // q (and r) contain nq (and nr) coordinate points for the current (and
@@ -808,6 +909,7 @@ int dBoxBox(
   {
     normal << Inner((R1), (normalC)), Inner((R1 + 4), (normalC)),
         Inner((R1 + 8), (normalC));
+    normal.normalize();
     // dMULTIPLY0_331 (normal,R1,normalC);
   }
   if (invert_normal)
@@ -829,7 +931,11 @@ int dBoxBox(
     for (j = 0; j < 3; j++)
     {
 #define TEMP_INNER14(a, b) (a[0] * (b)[0] + a[1] * (b)[4] + a[2] * (b)[8])
-      sign = (TEMP_INNER14(normal, R1 + j) > 0) ? 1.0 : -1.0;
+      double val = TEMP_INNER14(normal, R1 + j);
+      // we want to do val > 0, but there's numerical issues when normal is
+      // perpendicular to R1.col(j), so add a very small negative buffer to keep
+      // things stable for finite differencing
+      sign = (val > -1e-10) ? 1.0 : -1.0;
 
       // sign = (Inner14(normal,R1+j) > 0) ? 1.0 : -1.0;
 
@@ -843,7 +949,11 @@ int dBoxBox(
       pb[i] = p2[i];
     for (j = 0; j < 3; j++)
     {
-      sign = (TEMP_INNER14(normal, R2 + j) > 0) ? -1.0 : 1.0;
+      double val = TEMP_INNER14(normal, R2 + j);
+      // we want to do val > 0, but there's numerical issues when normal is
+      // perpendicular to R1.col(j), so add a very small negative buffer to keep
+      // things stable for finite differencing
+      sign = (val > -1e-3) ? -1.0 : 1.0;
 #undef TEMP_INNER14
       for (i = 0; i < 3; i++)
         pb[i] += sign * B[j] * R2[i * 4 + j];
@@ -876,7 +986,7 @@ int dBoxBox(
       contact.collisionObject1 = o1;
       contact.collisionObject2 = o2;
       contact.point = point_vec;
-      contact.normal = normal;
+      contact.normal = normal * -1;
       contact.penetrationDepth = penetration;
       contact.type = ContactType::EDGE_EDGE;
       contact.edgeAClosestPoint = Eigen::Vector3d(pa[0], pa[1], pa[2]);
@@ -896,7 +1006,7 @@ int dBoxBox(
   // the incident face (the closest face of the other box).
 
   const double *Ra, *Rb, *pa, *pb, *Sa, *Sb;
-  ContactType type;
+  bool flipGradientMetadataOrder = false;
   if (code <= 3)
   {
     Ra = R1;
@@ -905,7 +1015,7 @@ int dBoxBox(
     pb = p2;
     Sa = A;
     Sb = B;
-    type = ContactType::VERTEX_FACE;
+    flipGradientMetadataOrder = false;
   }
   else
   {
@@ -915,7 +1025,7 @@ int dBoxBox(
     pb = p1;
     Sa = B;
     Sb = A;
-    type = ContactType::FACE_VERTEX;
+    flipGradientMetadataOrder = true;
   }
 
   // nr = normal vector of reference face dotted with axes of incident box.
@@ -1079,6 +1189,144 @@ int dBoxBox(
   if (cnum < 1)
     return 0; // this should never happen
 
+  // Compute the normal of the incident face (because our current normal is wrt
+  // the reference face). We may need to use the incident face normal for some
+  // of our contacts.
+  Eigen::Vector3d otherNormal
+      = Eigen::Vector3d(Rb[lanr], Rb[4 + lanr], Rb[8 + lanr]);
+  if (otherNormal.dot(normal) < 0)
+    otherNormal *= -1;
+
+  // These are the two basis vectors that are mutually perpendicular to the
+  // `otherNormal` for the incident box.
+  Eigen::Vector3d ortho1 = Eigen::Vector3d(Rb[a1], Rb[4 + a1], Rb[8 + a1]);
+  Eigen::Vector3d ortho2 = Eigen::Vector3d(Rb[a2], Rb[4 + a2], Rb[8 + a2]);
+  Eigen::Vector3d centerB = Eigen::Vector3d(pb[0], pb[1], pb[2]);
+  Eigen::Vector3d faceCenter = centerB - Sb[lanr] * otherNormal;
+
+  // we have less contacts than we need, so we use them all
+  for (j = 0; j < cnum; j++)
+  {
+    point_vec << point[j * 3 + 0] + pa[0], point[j * 3 + 1] + pa[1],
+        point[j * 3 + 2] + pa[2];
+
+    double* point2dBuf = ret + (j * 2);
+    double x = point2dBuf[0];
+    double y = point2dBuf[1];
+    double rectWidthX = rect[0];
+    double rectWidthY = rect[1];
+
+    Contact contact;
+    contact.collisionObject1 = o1;
+    contact.collisionObject2 = o2;
+    contact.point = point_vec;
+    contact.normal = normal * -1;
+    contact.penetrationDepth = dep[j];
+
+    bool onEdgeX = std::abs(x) == rectWidthX;
+    bool onEdgeY = std::abs(y) == rectWidthY;
+
+    if (onEdgeX && onEdgeY)
+    {
+      // We're at a corner of our primary rectangle
+      if (flipGradientMetadataOrder)
+      {
+        contact.type = ContactType::FACE_VERTEX;
+      }
+      else
+      {
+        contact.type = ContactType::VERTEX_FACE;
+        // Use the normal from the other face
+        // contact.normal = otherNormal;
+      }
+    }
+    else if (!onEdgeX && !onEdgeY)
+    {
+      // We're inside our primary rectangle
+      if (flipGradientMetadataOrder)
+      {
+        contact.type = ContactType::VERTEX_FACE;
+      }
+      else
+      {
+        contact.type = ContactType::FACE_VERTEX;
+        // Use the normal from the other face
+        // contact.normal = otherNormal;
+      }
+    }
+    else
+    {
+      // We're on an edge, but not at a corner.
+      contact.type = ContactType::EDGE_EDGE;
+
+      // Get the nearest corner, as a fixed point for our edge
+      double faceX = x > 0 ? rectWidthX : -rectWidthX;
+      double faceY = y > 0 ? rectWidthY : -rectWidthY;
+      Eigen::Vector3d centerA = Eigen::Vector3d(pa[0], pa[1], pa[2]);
+      Eigen::Vector3d faceCenterA = centerA + Sa[codeN] * normal;
+      Eigen::Vector3d ortho1A
+          = Eigen::Vector3d(Ra[code1], Ra[4 + code1], Ra[8 + code1]);
+      Eigen::Vector3d ortho2A
+          = Eigen::Vector3d(Ra[code2], Ra[4 + code2], Ra[8 + code2]);
+
+      contact.edgeAFixedPoint = faceCenterA + faceX * ortho1A + faceY * ortho2A;
+      contact.edgeADir = (contact.point - contact.edgeAFixedPoint).normalized();
+      contact.edgeAClosestPoint = contact.point;
+
+      // Map the point into relative space on the incident face, rather than the
+      // reference face
+      double incidentFaceX = ortho1.dot(contact.point) - ortho1.dot(centerB);
+      double incidentFaceY = ortho2.dot(contact.point) - ortho2.dot(centerB);
+      double signX = incidentFaceX == 0
+                         ? 1.0
+                         : (incidentFaceX / std::abs(incidentFaceX));
+      double signY = incidentFaceY == 0
+                         ? 1.0
+                         : (incidentFaceY / std::abs(incidentFaceY));
+      Eigen::Vector3d nearestBCorner
+          = (signX * Sb[a1]) * ortho1 + (signY * Sb[a2]) * ortho2 + faceCenter;
+
+      double distX = std::abs(std::abs(incidentFaceX) - Sb[a1]);
+      double distY = std::abs(std::abs(incidentFaceY) - Sb[a2]);
+
+      Eigen::Vector3d otherBCorner;
+      if (distX < distY)
+      {
+        // If we're on the x-edge, then grab the corner on the opposite Y
+        otherBCorner = (signX * Sb[a1]) * ortho1
+                       + (-1 * signY * Sb[a2]) * ortho2 + faceCenter;
+      }
+      else
+      {
+        // If we're on the y-edge, then grab the corner on the opposite X
+        otherBCorner = (-1 * signX * Sb[a1]) * ortho1
+                       + (signY * Sb[a2]) * ortho2 + faceCenter;
+      }
+
+      contact.edgeBDir = (nearestBCorner - otherBCorner).normalized();
+      contact.edgeBFixedPoint = nearestBCorner;
+
+      // Flip the order of the metadata.
+      if (flipGradientMetadataOrder)
+      {
+        Eigen::Vector3d buf = contact.edgeADir;
+        contact.edgeADir = contact.edgeBDir;
+        contact.edgeBDir = buf;
+        buf = contact.edgeAFixedPoint;
+        contact.edgeAFixedPoint = contact.edgeBFixedPoint;
+        contact.edgeBFixedPoint = buf;
+      }
+    }
+
+    result.addContact(contact);
+  }
+
+  // TODO: We once limited the number of contact points to 4. This introduces
+  // problems when we're finite differencing, because we can get
+  // discontinuities. If we have more than 4 contacts at an equal depth, and we
+  // rotate the contact by any tiny EPS, we can get different contact points.
+
+  /*
   // we can't generate more contacts than we actually have
   int maxc = 4;
   if (maxc > cnum)
@@ -1137,6 +1385,7 @@ int dBoxBox(
       result.addContact(contact);
     }
   }
+  */
   return cnum;
 }
 
@@ -1166,7 +1415,7 @@ int collideBoxBox(
   convVector(T0.translation(), p0);
   convVector(T1.translation(), p1);
 
-  return dBoxBox(o1, o2, p1, R1, halfSize1, p0, R0, halfSize0, result);
+  return dBoxBox(o1, o2, p0, R0, halfSize0, p1, R1, halfSize1, result);
 }
 
 int collideBoxSphere(
@@ -4641,16 +4890,7 @@ int collide(CollisionObject* o1, CollisionObject* o2, CollisionResult& result)
       }
 #endif
       */
-
-      // There are two options here, neither perfect:
-      //
-      // Use collideBoxBox(), but that doesn't annotate its
-      // collision points properly for complex face-face collisions.
-      // OR use collideBoxBoxAsMesh(), but that doesn't handle deep
-      // inter-penetration very well.
-      //
-      // Since we're clipping deep contacts, we'll use collideBoxBoxAsMesh().
-      return collideBoxBoxAsMesh(
+      return collideBoxBox(
           o1, o2, box0->getSize(), T1, box1->getSize(), T2, result);
     }
     else if (dynamics::EllipsoidShape::getStaticType() == shapeType2)

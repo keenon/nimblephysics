@@ -661,8 +661,8 @@ bool verifyVelVelJacobian(WorldPtr world, VectorXd proposedVelocities)
               << analytical << std::endl;
     std::cout << "Diff:" << std::endl << analytical - bruteForce << std::endl;
     std::cout << "Diff range:" << std::endl
-                << (analytical - bruteForce).minCoeff() << " to "
-                << (analytical - bruteForce).maxCoeff() << std::endl;
+              << (analytical - bruteForce).minCoeff() << " to "
+              << (analytical - bruteForce).maxCoeff() << std::endl;
     std::cout << "Brute force velCJacobian:" << std::endl
               << classicPtr->getVelCJacobian(world) << std::endl;
     std::cout << "Brute force forceVelJacobian:" << std::endl
@@ -1946,8 +1946,8 @@ bool verifyForceVelJacobian(WorldPtr world, VectorXd proposedVelocities)
               << analytical << std::endl;
     std::cout << "Diff:" << std::endl << analytical - bruteForce << std::endl;
     std::cout << "Diff range:" << std::endl
-                << (analytical - bruteForce).minCoeff() << " to "
-                << (analytical - bruteForce).maxCoeff() << std::endl;
+              << (analytical - bruteForce).minCoeff() << " to "
+              << (analytical - bruteForce).maxCoeff() << std::endl;
     return false;
   }
 
@@ -4836,7 +4836,7 @@ bool verifyPerturbedContactNormals(WorldPtr world)
                 world, skel, j, -EPS);
 
         Eigen::Vector3d finiteDifferenceGradient
-            = (analytical - bruteForceNeg) / (2 * EPS);
+            = (bruteForce - bruteForceNeg) / (2 * EPS);
         Eigen::Vector3d analyticalGradient
             = constraints[k]->getContactNormalGradient(skel->getDof(j));
         if (!equals(analyticalGradient, finiteDifferenceGradient, 1e-9))

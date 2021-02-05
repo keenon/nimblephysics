@@ -166,7 +166,7 @@ TEST(GRADIENTS, VERTEX_FACE_SELF_COLLISION)
  *  \/ |   |
  *     +---+
  */
-void testEdgeEdgeCollision(bool isSelfCollision)
+void testEdgeEdgeCollision(bool isSelfCollision, bool useMesh)
 {
   // World
   WorldPtr world = World::create();
@@ -181,9 +181,23 @@ void testEdgeEdgeCollision(bool isSelfCollision)
       = box1->createJointAndBodyNodePair<FreeJoint>();
   std::shared_ptr<BoxShape> box1Shape(
       new BoxShape(Eigen::Vector3d(1.0, 1.0, 1.0)));
-  // ShapeNode* box1Node =
-  box1Pair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(
-      box1Shape);
+  Eigen::Vector3d size = Eigen::Vector3d(1.0, 1.0, 1.0);
+  if (useMesh)
+  {
+    aiScene* boxMesh = createBoxMeshUnsafe();
+    std::shared_ptr<MeshShape> boxShape(
+        new MeshShape(size, boxMesh, "", nullptr, true));
+    // ShapeNode* sphereNode =
+    box1Pair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(
+        boxShape);
+  }
+  else
+  {
+    std::shared_ptr<BoxShape> boxShape(new BoxShape(size));
+    // ShapeNode* sphereNode =
+    box1Pair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(
+        boxShape);
+  }
 
   // This box is rotated by 45 degrees on the X and Y axis, so that it's
   // sqrt(3) along the X axis.
@@ -203,8 +217,23 @@ void testEdgeEdgeCollision(bool isSelfCollision)
   std::shared_ptr<BoxShape> box2Shape(
       new BoxShape(Eigen::Vector3d(1.0, 1.0, 1.0)));
   // ShapeNode* box2Node =
-  box2Pair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(
-      box2Shape);
+  if (useMesh)
+  {
+    aiScene* boxMesh = createBoxMeshUnsafe();
+    std::shared_ptr<MeshShape> boxShape(
+        new MeshShape(size, boxMesh, "", nullptr, true));
+    // ShapeNode* sphereNode =
+    box2Pair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(
+        boxShape);
+  }
+  else
+  {
+    std::shared_ptr<BoxShape> boxShape(new BoxShape(size));
+    // ShapeNode* sphereNode =
+    box2Pair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(
+        boxShape);
+  }
+
   FreeJoint* box2Joint = box2Pair.first;
   // Eigen::Matrix3d rotation = Eigen::Matrix3d::Identity();
 
@@ -225,6 +254,36 @@ void testEdgeEdgeCollision(bool isSelfCollision)
   vels(9) += 0.1;  // +x
   vels(10) -= 0.1; // -y
   world->setVelocities(vels);
+
+  /*
+  RestorableSnapshot snapshot(world);
+  world->step();
+  snapshot.restore();
+
+  server::GUIWebsocketServer server;
+  server.renderWorld(world);
+  server.renderBasis();
+
+  const collision::CollisionResult& result = world->getLastCollisionResult();
+  const collision::Contact& contact = result.getContact(0);
+  std::cout << contact.penetrationDepth << std::endl;
+
+  std::vector<Eigen::Vector3d> edgeLineA;
+  edgeLineA.push_back(contact.edgeAFixedPoint);
+  edgeLineA.push_back(contact.edgeAFixedPoint + contact.edgeADir);
+  server.createLine("edge_a", edgeLineA, Eigen::Vector3d(0,1,0));
+
+  std::vector<Eigen::Vector3d> edgeLineB;
+  edgeLineB.push_back(contact.edgeBFixedPoint);
+  edgeLineB.push_back(contact.edgeBFixedPoint + contact.edgeBDir);
+  server.createLine("edge_b", edgeLineB, Eigen::Vector3d(1,0,0));
+
+  server.serve(8070);
+
+  while (server.isServing())
+  {
+  }
+  */
 
   // renderWorld(world);
   // EXPECT_TRUE(verifyPerturbedContactEdges(world));
@@ -252,16 +311,30 @@ void testEdgeEdgeCollision(bool isSelfCollision)
 }
 
 #ifdef ALL_TESTS
-TEST(GRADIENTS, EDGE_EDGE_COLLISION)
+TEST(GRADIENTS, EDGE_EDGE_BOX_COLLISION)
 {
-  testEdgeEdgeCollision(false);
+  testEdgeEdgeCollision(false, false);
 }
 #endif
 
 #ifdef ALL_TESTS
-TEST(GRADIENTS, EDGE_EDGE_SELF_COLLISION)
+TEST(GRADIENTS, EDGE_EDGE_BOX_SELF_COLLISION)
 {
-  testEdgeEdgeCollision(true);
+  testEdgeEdgeCollision(true, false);
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(GRADIENTS, EDGE_EDGE_MESH_COLLISION)
+{
+  testEdgeEdgeCollision(false, true);
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(GRADIENTS, EDGE_EDGE_MESH_SELF_COLLISION)
+{
+  testEdgeEdgeCollision(true, true);
 }
 #endif
 

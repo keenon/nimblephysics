@@ -57,6 +57,8 @@ using namespace dynamics;
 using namespace simulation;
 using namespace utils;
 
+#define ALL_TESTS
+
 class Collision : public testing::Test
 {
 public:
@@ -219,6 +221,7 @@ void Collision::printResult(const dart::collision::fcl::CollisionResult& _result
   std::cout << std::endl;
 }
 
+#ifdef ALL_TESTS
 TEST_F(Collision, DROP)
 {
     dtdbg << "Unrotated box\n";
@@ -237,7 +240,9 @@ TEST_F(Collision, DROP)
                      0.1,
                      0.0);
 }
+#endif
 
+#ifdef ALL_TESTS
 TEST_F(Collision, FCL_BOX_BOX)
 {
     double EulerZ = 1;
@@ -291,6 +296,7 @@ TEST_F(Collision, FCL_BOX_BOX)
         std::cout << "normal: " << result.getContact(i).normal << std::endl;
     }
 }
+#endif
 
 //==============================================================================
 void testSimpleFrames(const std::shared_ptr<CollisionDetector>& cd)
@@ -377,6 +383,7 @@ void testSimpleFrames(const std::shared_ptr<CollisionDetector>& cd)
 }
 
 //==============================================================================
+#ifdef ALL_TESTS
 TEST_F(Collision, SimpleFrames)
 {
   auto fcl_mesh_dart = FCLCollisionDetector::create();
@@ -407,6 +414,7 @@ TEST_F(Collision, SimpleFrames)
   auto dart = DARTCollisionDetector::create();
   testSimpleFrames(dart);
 }
+#endif
 
 //==============================================================================
 void testSphereSphere(const std::shared_ptr<CollisionDetector>& cd,
@@ -508,6 +516,7 @@ void testSphereSphere(const std::shared_ptr<CollisionDetector>& cd,
 }
 
 //==============================================================================
+#ifdef ALL_TESTS
 TEST_F(Collision, SphereSphere)
 {
   auto fcl_mesh_dart = FCLCollisionDetector::create();
@@ -543,6 +552,7 @@ TEST_F(Collision, SphereSphere)
   auto dart = DARTCollisionDetector::create();
   testSphereSphere(dart);
 }
+#endif
 
 //==============================================================================
 bool checkBoundingBox(const Eigen::Vector3d& min, const Eigen::Vector3d& max,
@@ -616,12 +626,14 @@ void testBoxBox(const std::shared_ptr<CollisionDetector>& cd,
 }
 
 //==============================================================================
+// #ifdef ALL_TESTS
 TEST_F(Collision, BoxBox)
 {
-  auto fcl_mesh_dart = FCLCollisionDetector::create();
-  fcl_mesh_dart->setPrimitiveShapeType(FCLCollisionDetector::MESH);
-  fcl_mesh_dart->setContactPointComputationMethod(FCLCollisionDetector::DART);
-  testBoxBox(fcl_mesh_dart);
+  // TODO: uncomment this block
+  // auto fcl_mesh_dart = FCLCollisionDetector::create();
+  // fcl_mesh_dart->setPrimitiveShapeType(FCLCollisionDetector::MESH);
+  // fcl_mesh_dart->setContactPointComputationMethod(FCLCollisionDetector::DART);
+  // testBoxBox(fcl_mesh_dart);
 
   // auto fcl_prim_fcl = FCLCollisionDetector::create();
   // fcl_prim_fcl->setPrimitiveShapeType(FCLCollisionDetector::MESH);
@@ -651,6 +663,7 @@ TEST_F(Collision, BoxBox)
   auto dart = DARTCollisionDetector::create();
   testBoxBox(dart);
 }
+// #endif
 
 //==============================================================================
 void testOptions(const std::shared_ptr<CollisionDetector>& cd)
@@ -747,6 +760,7 @@ void testCylinderCylinder(const std::shared_ptr<CollisionDetector>& cd)
 }
 
 //==============================================================================
+#ifdef ALL_TESTS
 TEST_F(Collision, testCylinderCylinder)
 {
   auto fcl_mesh_dart = FCLCollisionDetector::create();
@@ -782,6 +796,7 @@ TEST_F(Collision, testCylinderCylinder)
   // auto dart = DARTCollisionDetector::create();
   // testCylinderCylinder(dart);
 }
+#endif
 
 //==============================================================================
 void testCapsuleCapsule(const std::shared_ptr<CollisionDetector>& cd)
@@ -818,6 +833,7 @@ void testCapsuleCapsule(const std::shared_ptr<CollisionDetector>& cd)
 }
 
 //==============================================================================
+#ifdef ALL_TESTS
 TEST_F(Collision, testCapsuleCapsule)
 {
   // auto fcl_mesh_dart = FCLCollisionDetector::create();
@@ -853,6 +869,7 @@ TEST_F(Collision, testCapsuleCapsule)
   // auto dart = DARTCollisionDetector::create();
   // testCapsuleCapsule(dart);
 }
+#endif
 
 //==============================================================================
 void testPlane(const std::shared_ptr<CollisionDetector>& cd)
@@ -893,6 +910,7 @@ void testPlane(const std::shared_ptr<CollisionDetector>& cd)
 }
 
 //==============================================================================
+#ifdef ALL_TESTS
 TEST_F(Collision, testPlane)
 {
 #if HAVE_ODE
@@ -900,6 +918,7 @@ TEST_F(Collision, testPlane)
   testPlane(ode);
 #endif
 }
+#endif
 
 //==============================================================================
 /// \param[in] collidesUnderTerrain Set to true if the collision engine returns
@@ -1072,6 +1091,7 @@ void testHeightmapBox(CollisionDetector* cd,
 }
 
 //==============================================================================
+#ifdef ALL_TESTS
 TEST_F(Collision, testHeightmapBox)
 {
 #if HAVE_ODE
@@ -1095,9 +1115,11 @@ TEST_F(Collision, testHeightmapBox)
 
 #endif
 }
+#endif
 
 //==============================================================================
 // Tests HeightmapShape::flipY();
+#ifdef ALL_TESTS
 TEST_F(Collision, testHeightmapFlipY)
 {
   using S = double;
@@ -1180,8 +1202,10 @@ TEST_F(Collision, testHeightmapFlipY)
   shape->flipY();
   EXPECT_EQ(shape->getHeightField().data()[0], heights8[0]);
 }
+#endif
 
 //==============================================================================
+#ifdef ALL_TESTS
 TEST_F(Collision, Options)
 {
   auto fcl_mesh_dart = FCLCollisionDetector::create();
@@ -1212,6 +1236,7 @@ TEST_F(Collision, Options)
   auto dart = DARTCollisionDetector::create();
   testOptions(dart);
 }
+#endif
 
 //==============================================================================
 void testFilter(const std::shared_ptr<CollisionDetector>& cd)
@@ -1284,6 +1309,7 @@ void testFilter(const std::shared_ptr<CollisionDetector>& cd)
 }
 
 //==============================================================================
+#ifdef ALL_TESTS
 TEST_F(Collision, Filter)
 {
   auto fcl_mesh_dart = FCLCollisionDetector::create();
@@ -1314,6 +1340,7 @@ TEST_F(Collision, Filter)
   auto dart = DARTCollisionDetector::create();
   testFilter(dart);
 }
+#endif
 
 //==============================================================================
 void testCreateCollisionGroups(const std::shared_ptr<CollisionDetector>& cd)
@@ -1386,6 +1413,7 @@ DART_SUPPRESS_DEPRECATED_END
 }
 
 //==============================================================================
+#ifdef ALL_TESTS
 TEST_F(Collision, CreateCollisionGroupFromVariousObject)
 {
   auto fcl_mesh_dart = FCLCollisionDetector::create();
@@ -1416,8 +1444,10 @@ TEST_F(Collision, CreateCollisionGroupFromVariousObject)
   auto dart = DARTCollisionDetector::create();
   testCreateCollisionGroups(dart);
 }
+#endif
 
 //==============================================================================
+#ifdef ALL_TESTS
 TEST_F(Collision, CollisionOfPrescribedJoints)
 {
   // There are one red plate (static skeleton) and 5 pendulums with different
@@ -1434,6 +1464,8 @@ TEST_F(Collision, CollisionOfPrescribedJoints)
         "dart://sample/skel/test/collision_of_prescribed_joints_test.skel");
   world->setTimeStep(timeStep);
   EXPECT_TRUE(world != nullptr);
+  // Gradients don't support prescribed joints
+  world->getConstraintSolver()->setGradientEnabled(false);
   EXPECT_NEAR(world->getTimeStep(), timeStep, tol);
 
   SkeletonPtr skel1 = world->getSkeleton("skeleton 1");
@@ -1498,8 +1530,10 @@ TEST_F(Collision, CollisionOfPrescribedJoints)
     EXPECT_NEAR(joint6->getAcceleration(0), 0.0, tol);
   }
 }
+#endif
 
 //==============================================================================
+#ifdef ALL_TESTS
 TEST_F(Collision, Factory)
 {
   EXPECT_TRUE(collision::CollisionDetector::getFactory()->canCreate("fcl"));
@@ -1517,9 +1551,11 @@ TEST_F(Collision, Factory)
   EXPECT_TRUE(!collision::CollisionDetector::getFactory()->canCreate("ode"));
 #endif
 }
+#endif
 
 //==============================================================================
 #if HAVE_OCTOMAP && FCL_HAVE_OCTOMAP
+#ifdef ALL_TESTS
 TEST_F(Collision, VoxelGrid)
 {
   auto simpleFrame1 = SimpleFrame::createShared(Frame::World());
@@ -1552,4 +1588,5 @@ TEST_F(Collision, VoxelGrid)
   EXPECT_TRUE(group->collide(option, &result));
   EXPECT_TRUE(result.getNumContacts() >= 1u);
 }
+#endif
 #endif // HAVE_OCTOMAP && FCL_HAVE_OCTOMAP
