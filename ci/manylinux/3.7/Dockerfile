@@ -25,8 +25,8 @@ RUN git clone https://github.com/pybind/pybind11.git && \
 RUN ${PYTHON} -m pip install pytest
 RUN ${PYTHON} -m pip install auditwheel
 RUN git clone https://github.com/keenon/diffdart
+ADD . diffdart
 RUN cd diffdart && \
-    git pull && \
     cat setup.py && \
     ${PYTHON} setup.py sdist bdist_wheel && \
     ${PYTHON} -m auditwheel repair dist/diffdart-${VERSION}-${PYTHON_VERSION}-linux_x86_64.whl
