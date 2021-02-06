@@ -32,7 +32,6 @@
 
 #include <iostream>
 
-#include <dart/gui/gui.hpp>
 #include <gtest/gtest.h>
 
 #include "dart/collision/CollisionObject.hpp"
@@ -49,6 +48,7 @@
 #include "dart/neural/NeuralUtils.hpp"
 #include "dart/neural/RestorableSnapshot.hpp"
 #include "dart/neural/WithRespectToMass.hpp"
+#include "dart/realtime/Ticker.hpp"
 #include "dart/server/GUIWebsocketServer.hpp"
 #include "dart/simulation/World.hpp"
 #include "dart/utils/DartResourceRetriever.hpp"
@@ -962,6 +962,7 @@ void testRobotArm(
       = collision::CollisionDetector::getFactory()->create("dart");
   world->getConstraintSolver()->setCollisionDetector(collision_detector);
   world->setGravity(Eigen::Vector3d(0, -9.81, 0));
+  world->setContactClippingDepth(1.);
 
   SkeletonPtr arm = Skeleton::create("arm");
   BodyNode* parent = nullptr;
@@ -989,7 +990,8 @@ void testRobotArm(
     }
     jointPair.second->setMass(1.0);
     parent = jointPair.second;
-    if ((attachPoint == -1 && i < numLinks - 1) || i != attachPoint)
+    if ((attachPoint == -1 && i < numLinks - 1) ||
+        (attachPoint != -1 && i != attachPoint))
     {
       // ShapeNode* visual =
       parent->createShapeNodeWith<VisualAspect>(boxShape);
@@ -1002,7 +1004,7 @@ void testRobotArm(
   }
 
   std::shared_ptr<BoxShape> endShape(
-      new BoxShape(Eigen::Vector3d(1.0, 1.0, 1.0) * sqrt(1.0 / 3.0)));
+      new BoxShape(Eigen::Vector3d(1.0, 1.0, 1.0) * 1. / sqrt(2.0)));
   ShapeNode* endNode
       = parent->createShapeNodeWith<VisualAspect, CollisionAspect>(endShape);
   parent->setFrictionCoeff(1);
@@ -1021,7 +1023,7 @@ void testRobotArm(
       = wall->createJointAndBodyNodePair<WeldJoint>(nullptr);
   std::shared_ptr<BoxShape> wallShape(
       new BoxShape(Eigen::Vector3d(1.0, 10.0, 10.0)));
-  // ShapeNode* wallNode =
+  ShapeNode* wallNode =
   jointPair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(
       wallShape);
   world->addSkeleton(wall);
@@ -1029,24 +1031,10 @@ void testRobotArm(
 
   Eigen::Isometry3d wallLocalOffset = Eigen::Isometry3d::Identity();
   wallLocalOffset.translation() = parent->getWorldTransform().translation()
-                                  + Eigen::Vector3d(-(1.0 - 1e-2), 0.0, 0);
+                                  + Eigen::Vector3d(-(1.0 - 1e-2), 0.0, 0.0);
   jointPair.first->setTransformFromParentBodyNode(wallLocalOffset);
 
-  /*
-  // Run collision detection
-  world->getConstraintSolver()->solve();
 
-  // Check
-  auto result = world->getLastCollisionResult();
-  if (result.getNumContacts() > 0)
-  {
-    std::cout << "Num contacts: " << result.getNumContacts() << std::endl;
-    std::cout << "end affector offset: " << std::endl
-              << endNode->getWorldTransform().matrix() << std::endl;
-    std::cout << "wall node position: " << std::endl
-              << wallNode->getWorldTransform().matrix() << std::endl;
-  }
-  */
 
   // arm->computeForwardDynamics();
   // arm->integrateVelocities(world->getTimeStep());
@@ -1061,13 +1049,48 @@ void testRobotArm(
     arm->setVelocities(Eigen::VectorXd::Ones(arm->getNumDofs()) * 0.05);
   }
 
-  VectorXd worldVel = world->getVelocities();
+  // // Run collision detection
+  // world->getConstraintSolver()->solve(world.get());
 
-  /*
-  VectorXd pos = world->getPositions();
-  pos(0) += 1e-4;
-  world->setPositions(pos);
-  */
+  // // Check
+  // auto result = world->getLastCollisionResult();
+  // if (result.getNumContacts() > 0)
+  // {
+  //   std::cout << "Num contacts: " << result.getNumContacts() << std::endl;
+  //   std::cout << "end affector offset: " << std::endl
+  //             << endNode->getWorldTransform().matrix() << std::endl;
+  //   std::cout << "wall node position: " << std::endl
+  //             << wallNode->getWorldTransform().matrix() << std::endl;
+  // }
+
+  Eigen::VectorXd worldVel = world->getVelocities();
+
+  
+  // // visual inspection code
+  // Eigen::VectorXd worldPos = world->getPositions();
+  // server::GUIWebsocketServer server;
+  // server.serve(8070);
+  // server.renderWorld(world);
+  // Eigen::VectorXd animatePos = worldPos;
+  // int i = 0;
+  // realtime::Ticker ticker(0.01);
+  // ticker.registerTickListener([&](long /* time */) {
+  //   world->setPositions(animatePos);
+  //   animatePos += worldVel * 0.001;
+  //   i++;
+  //   if (i >= 100)
+  //   {
+  //     animatePos = worldPos;
+  //     i = 0;
+  //   }
+  //   server.renderWorld(world);
+  // });
+
+  // server.registerConnectionListener([&]() { ticker.start(); });
+  // while (server.isServing())
+  // {
+  //   // spin
+  // }
 
   EXPECT_TRUE(verifyVelGradients(world, worldVel));
   EXPECT_TRUE(verifyAnalyticalJacobians(world));
@@ -1083,8 +1106,7 @@ TEST(GRADIENTS, ARM_3_LINK_30_DEG)
 
 TEST(GRADIENTS, ARM_5_LINK_40_DEG)
 {
-  // This test wraps an arm around, and it's actually breaking contact, so this
-  // tests unconstrained free-motion
+  // This one penetrates much more deeply than the others
   testRobotArm(5, 40.0 / 180 * 3.1415);
 }
 
@@ -1343,7 +1365,7 @@ void testJumpWorm(bool offGround, bool interpenetration)
 
   // renderWorld(world);
 
-  EXPECT_TRUE(verifyAnalyticalJacobians(world));
+  EXPECT_TRUE(verifyAnalyticalJacobians(world, offGround));
   EXPECT_TRUE(verifyVelGradients(world, vels));
   EXPECT_TRUE(verifyPosGradients(world, 1, 1e-8));
   EXPECT_TRUE(verifyWrtMass(world));
