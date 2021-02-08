@@ -1023,7 +1023,7 @@ void testRobotArm(
       = wall->createJointAndBodyNodePair<WeldJoint>(nullptr);
   std::shared_ptr<BoxShape> wallShape(
       new BoxShape(Eigen::Vector3d(1.0, 10.0, 10.0)));
-  ShapeNode* wallNode =
+  // ShapeNode* wallNode =
   jointPair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(
       wallShape);
   world->addSkeleton(wall);
