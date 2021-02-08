@@ -13,7 +13,7 @@ stages:
           - task: PublishTestResults@2
             inputs: {
                 testResultsFormat: "cTest",
-                testResultsFiles: "**/Test.xml",
+                testResultsFiles: "Testing/**/Test.xml",
                 searchFolder: "$(System.DefaultWorkingDirectory)", # Optional
                 #mergeTestResults: false # Optional
                 #failTaskOnFailedTests: false # Optional

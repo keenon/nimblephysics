@@ -30,7 +30,7 @@ RUN cd diffdart && \
     mkdir build && \
     cd build && \
     cmake .. -DCMAKE_BUILD_TYPE=Release && \
-    make _diffdart -j10 && \
-    make tests -j10 && \
-    ctest -T Test
+    make tests -j10
+RUN cd diffdart/build && \
+    ctest -T Test; exit 0
 RUN mv /diffdart/build/Testing /Testing
