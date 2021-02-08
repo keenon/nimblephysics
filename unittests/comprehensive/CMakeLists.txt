@@ -22,8 +22,6 @@ dart_add_test("comprehensive" test_KR5Trajectory)
 
 # target_link_libraries(test_Gradients dart-collision-bullet)
 # target_link_libraries(test_Gradients dart-collision-ode)
-target_link_libraries(test_Mappings dart-gui)
-target_link_libraries(test_Trajectory dart-gui)
 
 if(TARGET dart-optimizer-pagmo)
   dart_add_test("comprehensive" test_MultiObjectiveOptimization)

@@ -2,6 +2,26 @@
 # Ref: https://docs.microsoft.com/en-us/azure/devops/pipelines
 
 stages:
+  - stage: Test
+    jobs:
+      - job: linux_test
+        pool: { vmImage: "Ubuntu-16.04" }
+        steps:
+          - bash: |
+              cd ci/manylinux/tests
+              ./run_tests.sh
+          - task: PublishTestResults@2
+            inputs: {
+                testResultsFormat: "cTest",
+                testResultsFiles: "**/Test.xml",
+                searchFolder: "$(System.DefaultWorkingDirectory)", # Optional
+                #mergeTestResults: false # Optional
+                #failTaskOnFailedTests: false # Optional
+                #testRunTitle: # Optional
+                #buildPlatform: # Optional
+                #buildConfiguration: # Optional
+                #publishRunAttachments: true # Optional
+              }
   # - stage: Mac
   #   jobs:
   #     - job: macos_35
