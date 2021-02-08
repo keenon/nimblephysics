@@ -1228,21 +1228,29 @@ int dBoxBox(
 
     if (onEdgeX && onEdgeY)
     {
-      // We're at a corner of our primary rectangle
+
+      // point_vec at this point lays on our reference face. Since we've
+      // determined at this point that this is a vertex from another box
+      // colliding with our reference face, we need to move the collision point
+      // to the exact depth of the contact vertex.
+
+      // We're at a corner of our reference rectangle
       if (flipGradientMetadataOrder)
       {
         contact.type = ContactType::FACE_VERTEX;
+        contact.point += contact.normal * contact.penetrationDepth;
       }
       else
       {
         contact.type = ContactType::VERTEX_FACE;
+        contact.point -= contact.normal * contact.penetrationDepth;
         // Use the normal from the other face
         // contact.normal = otherNormal;
       }
     }
     else if (!onEdgeX && !onEdgeY)
     {
-      // We're inside our primary rectangle
+      // We're inside our reference rectangle
       if (flipGradientMetadataOrder)
       {
         contact.type = ContactType::VERTEX_FACE;
