@@ -47,12 +47,14 @@ class CMakeBuild(build_ext):
         cmake_args += ['-DPYBIND11_PYTHON_VERSION:STRING=' +
                        os.getenv('PYTHON_VERSION_NUMBER', '3.8')]
 
-        # We include debug info in our released binaries, because it makes it
-        # easier to profile and debug in the wild, which is more valuable than
+        # TODO: We include debug info in our released binaries, because it makes
+        # it easier to profile and debug in the wild, which is more valuable than
         # the small performance gain from stripping debug symbols.
         #
-        # So this is 'RelWithDebInfo', not 'Release'
-        cfg = 'Debug' if self.debug else 'RelWithDebInfo'
+        # So this should be 'RelWithDebInfo', not 'Release'. But that seems
+        # to causes Azure Pipelines to hang while building our binaries, so this
+        # needs investigation.
+        cfg = 'Debug' if self.debug else 'Release'
         build_args = ['--config', cfg]
         if ext.target is not None:
             build_args += ['--target', ext.target]
