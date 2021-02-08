@@ -1737,11 +1737,6 @@ Eigen::MatrixXd Skeleton::getJacobianOfMinv(
   mDiffMinv.init(bodyNodes.size(), getNumDofs());
 #endif
 
-  for (BodyNode* bodyNode : bodyNodes)
-  {
-    bodyNode->computeJacobianOfMinvXInit();
-  }
-
   const Eigen::VectorXd oldForces = getForces();
   setForces(f);
 
@@ -1749,7 +1744,8 @@ Eigen::MatrixXd Skeleton::getJacobianOfMinv(
   for (auto it = bodyNodes.rbegin(); it != bodyNodes.rend(); ++it)
   {
     BodyNode* bodyNode = *it;
-    bodyNode->computeJacobianOfMinvXBackwardIteration(f);
+    bodyNode->computeJacobianOfMinvXInit();
+    bodyNode->computeJacobianOfMinvXBackwardIteration();
   }
 
   // Forward iteration

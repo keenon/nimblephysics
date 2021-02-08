@@ -533,9 +533,9 @@ math::Jacobian EulerJoint::getRelativeJacobianTimeDerivDeriv2(std::size_t index)
   const double q1 = q[1];
   const double q2 = q[2];
 
-  const Eigen::Vector3d& dq = getVelocitiesStatic();
-  const double dq1 = dq[1];
-  const double dq2 = dq[2];
+//  const Eigen::Vector3d& dq = getVelocitiesStatic();
+//  const double dq1 = dq[1];
+//  const double dq2 = dq[2];
 
   const double c1 = std::cos(q1);
   const double c2 = std::cos(q2);

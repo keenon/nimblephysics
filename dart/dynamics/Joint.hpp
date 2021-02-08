@@ -764,20 +764,15 @@ public:
 
   // TODO(JS): Rename and add documentation
   virtual void computeJacobianOfMinvX_A(
-      std::vector<math::Inertia>& /*DPi_Dq*/,
-      math::Jacobian& /*invM_DBeta_Dq*/,
       const math::Inertia& /*AI*/,
-      const Eigen::Vector6d& /*AB*/,
-      const std::vector<math::Inertia>& /*DAI_Dq*/,
-      const math::Jacobian& /*DAB_Dq*/)
+      const Eigen::Vector6d& /*AB*/)
   {
     // Do nothing
   }
 
   // TODO(JS): Rename and add documentation
   virtual Eigen::MatrixXd computeJacobianOfMinvX_B(
-      const math::Inertia& /*AI*/,
-      const std::vector<math::Inertia>& /*DAI_Dq*/)
+      const math::Inertia& /*AI*/)
   {
     return Eigen::MatrixXd::Zero(0, 0);
   }

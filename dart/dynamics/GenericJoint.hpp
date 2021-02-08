@@ -772,15 +772,10 @@ protected:
 
   void computeJacobianOfMinvX_init() override;
   void computeJacobianOfMinvX_A(
-      std::vector<math::Inertia>& DPi_Dq,
-      math::Jacobian& DBeta_Dq,
       const math::Inertia& AI,
-      const Eigen::Vector6d& AB,
-      const std::vector<math::Inertia>& DAI_Dq,
-      const math::Jacobian& DAB_Dq) override;
+      const Eigen::Vector6d& AB) override;
   Eigen::MatrixXd computeJacobianOfMinvX_B(
-      const math::Inertia& AI,
-      const std::vector<math::Inertia>& DAI_Dq) override;
+      const math::Inertia& AI) override;
 
   std::size_t mNumSkeletonDofs;
   std::vector<Matrix> mInvM_Dpsi_Dq;

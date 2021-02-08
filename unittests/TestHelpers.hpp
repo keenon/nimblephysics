@@ -106,6 +106,46 @@ bool equals(
   return true;
 }
 
+template <class MATRIX>
+bool equals(
+    const Eigen::DenseBase<MATRIX>& _expected,
+    const Eigen::DenseBase<MATRIX>& _actual,
+    double abs_tol,
+    double rel_tol)
+{
+  // Get the matrix sizes and sanity check the call
+  const size_t n1 = _expected.cols(), m1 = _expected.rows();
+  const size_t n2 = _actual.cols(), m2 = _actual.rows();
+  if (m1 != m2 || n1 != n2)
+    return false;
+
+  // Check each index
+  for (size_t i = 0; i < m1; i++)
+  {
+    for (size_t j = 0; j < n1; j++)
+    {
+      const auto abs_diff = std::abs(_actual(i, j) - _expected(i, j));
+      const auto abs_actual = std::abs(_actual(i, j));
+      const auto abs_expectd = std::abs(_expected(i, j));
+      const auto largest = std::min(abs_actual, abs_expectd);
+
+      if (std::isnan(_expected(i, j)) ^ std::isnan(_actual(i, j)))
+        return false;
+
+      if (abs_diff <= abs_tol)
+        continue;
+
+      if (abs_diff <= rel_tol * largest)
+        continue;
+
+      return false;
+    }
+  }
+
+  // If no problems, the two matrices are equal
+  return true;
+}
+
 //==============================================================================
 bool equals(
     const Eigen::Isometry3d& tf1,

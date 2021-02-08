@@ -179,6 +179,16 @@ Eigen::Matrix3d expMapRot(const Eigen::Vector3d& _expmap);
 /// \brief Computes the Jacobian of the expmap
 Eigen::Matrix3d expMapJac(const Eigen::Vector3d& _expmap);
 
+/// Returns the Jacobian of an SO(3) element w.r.t. its exponential
+/// coordinates where the Jacobian maps the time derivative of the exponential
+/// coordinates to the angular velocity in the world frame.
+Eigen::Matrix3d so3LeftJacobian(const Eigen::Vector3d& w);
+
+/// Returns the Jacobian of an SO(3) element w.r.t. its exponential
+/// coordinates where the Jacobian maps the time derivative of the exponential
+/// coordinates to the angular velocity in the body frame.
+Eigen::Matrix3d so3RightJacobian(const Eigen::Vector3d& w);
+
 /// \brief Computes the Jacobian of the logMap(R * expMapRot(expMap))
 Eigen::Matrix3d expMapJacAt(
     const Eigen::Vector3d& _expmap, const Eigen::Matrix3d& R);
@@ -186,6 +196,18 @@ Eigen::Matrix3d expMapJacAt(
 /// \brief Computes the time derivative of the expmap Jacobian.
 Eigen::Matrix3d expMapJacDot(
     const Eigen::Vector3d& _expmap, const Eigen::Vector3d& _qdot);
+
+Eigen::Matrix3d so3LeftJacobianTimeDeriv(
+    const Eigen::Vector3d& q, const Eigen::Vector3d& dq);
+
+Eigen::Matrix3d so3RightJacobianTimeDeriv(
+    const Eigen::Vector3d& q, const Eigen::Vector3d& dq);
+
+Eigen::Matrix3d so3RightJacobianTimeDerivDeriv(
+    const Eigen::Vector3d& q, const Eigen::Vector3d& dq, int index);
+
+Eigen::Matrix3d so3RightJacobianTimeDerivDeriv2(
+    const Eigen::Vector3d& q, const Eigen::Vector3d& dq, int index);
 
 /// \brief computes the derivative of the Jacobian of the expmap wrt to _qi
 /// indexed dof; _qi \f$ \in \f$ {0,1,2}
@@ -276,9 +298,11 @@ Eigen::Matrix6d getAdTMatrix(const Eigen::Isometry3d& T);
 
 // TODO(JS): Rename and add documentation
 Eigen::Matrix6d AdTMatrix(const Eigen::Isometry3d& T);
+Eigen::Matrix6d AdInvTMatrix(const Eigen::Isometry3d& T);
 
 // TODO(JS): Rename and add documentation
 Eigen::Matrix6d dAdTMatrix(const Eigen::Isometry3d& T);
+Eigen::Matrix6d dAdInvTMatrix(const Eigen::Isometry3d& T);
 
 /// Adjoint mapping for dynamic size Jacobian
 template <typename Derived>

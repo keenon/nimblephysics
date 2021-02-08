@@ -1071,7 +1071,7 @@ protected:
       const Eigen::Vector3d& gravity);
 
   void computeJacobianOfMinvXInit();
-  void computeJacobianOfMinvXBackwardIteration(const Eigen::VectorXd& x);
+  void computeJacobianOfMinvXBackwardIteration();
   void computeJacobianOfMinvXForwardIteration(Eigen::MatrixXd& DinvMx_Dq);
 
 // protected:

@@ -2795,8 +2795,7 @@ void BodyNode::computeJacobianOfMinvXInit()
 }
 
 //==============================================================================
-void BodyNode::computeJacobianOfMinvXBackwardIteration(
-    const Eigen::VectorXd& /*x*/)
+void BodyNode::computeJacobianOfMinvXBackwardIteration()
 {
   using math::Jacobian;
   using math::ad;
@@ -2817,7 +2816,6 @@ void BodyNode::computeJacobianOfMinvXBackwardIteration(
   // Compute articulated bias force (mInvM_c) and alpha (mInvM_a)...
   updateInvMassMatrix();
 
-  const Jacobian J = skel->getJacobian(this);
   const math::Inertia& AI = getArticulatedInertia();
   const Eigen::Vector6d& AB = mInvM_c;
 
@@ -2856,9 +2854,9 @@ void BodyNode::computeJacobianOfMinvXBackwardIteration(
         const math::Inertia tmp = Pi * adS;
 
         mInvM_DAI_Dq[i]
-            += dAdTMatrix(childT.inverse())
+            += math::dAdInvTMatrix(childT)
             * (childBody->mInvM_DPi_Dq[i] - tmp - tmp.transpose())
-            * AdTMatrix(childT.inverse());
+            * math::AdInvTMatrix(childT);
 
         DAB_Dq.col(i)
             += dAdInvT(
@@ -2868,9 +2866,9 @@ void BodyNode::computeJacobianOfMinvXBackwardIteration(
       else
       {
         mInvM_DAI_Dq[i]
-            += dAdTMatrix(childT.inverse())
+            += math::dAdInvTMatrix(childT)
             * childBody->mInvM_DPi_Dq[i]
-            * AdTMatrix(childT.inverse());
+            * math::AdInvTMatrix(childT);
 
         DAB_Dq.col(i)
             += dAdInvT(childT, childBody->mInvM_Dbeta_Dq.col(i));
@@ -2883,13 +2881,7 @@ void BodyNode::computeJacobianOfMinvXBackwardIteration(
   }
 
   mInvM_Dbeta_Dq = DAB_Dq;
-  mParentJoint->computeJacobianOfMinvX_A(
-        mInvM_DPi_Dq,
-        mInvM_Dbeta_Dq,
-        AI,
-        AB,
-        mInvM_DAI_Dq,
-        DAB_Dq);
+  mParentJoint->computeJacobianOfMinvX_A(AI, AB);
 }
 
 //==============================================================================
@@ -2909,40 +2901,41 @@ void BodyNode::computeJacobianOfMinvXForwardIteration(Eigen::MatrixXd& DinvMx_Dq
   auto& data = skel->mDiffMinv.nodes[bodyNodeIndex].data;
 #endif
 
-  const Jacobian J = skel->getJacobian(this);
   const Joint* joint = mParentJoint;
   const int jointNumDofs = static_cast<int>(joint->getNumDofs());
   const BodyNode* parentBody = mParentBodyNode;
-
   const Eigen::Isometry3d& T = mParentJoint->getRelativeTransform();
-  const Jacobian& S = mParentJoint->getRelativeJacobian();
+
   const math::Inertia& AI = getArticulatedInertia();
 
   Eigen::MatrixXd invMx = Eigen::MatrixXd::Zero(static_cast<int>(numDofs), 1);
 #ifdef DART_DEBUG_ANALYTICAL_DERIV
+  const Jacobian& S = mParentJoint->getRelativeJacobian();
   data.S = S;
 #endif
-  if (parentBody)
+  if (getNumChildBodyNodes() > 0)
   {
-    mParentJoint->getInvMassMatrixSegment(invMx, 0, AI, parentBody->mInvM_U);
-
-    mInvM_U = math::AdInvT(T, parentBody->mInvM_U);
+    if (parentBody)
+    {
+      mParentJoint->getInvMassMatrixSegment(invMx, 0, AI, parentBody->mInvM_U);
+      mInvM_U = math::AdInvT(T, parentBody->mInvM_U);
+    }
+    else
+    {
+      mParentJoint->getInvMassMatrixSegment(
+            invMx, 0, AI, Eigen::Vector6d::Zero());
+      mInvM_U.setZero();
+    }
+    mParentJoint->addInvMassMatrixSegmentTo(mInvM_U);
   }
-  else
-  {
-    mParentJoint->getInvMassMatrixSegment(
-        invMx, 0, AI, Eigen::Vector6d::Zero());
 
-    mInvM_U.setZero();
-  }
-  mParentJoint->addInvMassMatrixSegmentTo(mInvM_U);
+#ifdef DART_DEBUG_ANALYTICAL_DERIV
   Eigen::VectorXd ddq = Eigen::VectorXd::Zero(0);
   if (jointNumDofs > 0)
   {
     const int indexI = static_cast<int>(joint->getDof(0)->getIndexInSkeleton());
     ddq = invMx.block(indexI, 0, jointNumDofs, 1);
   }
-#ifdef DART_DEBUG_ANALYTICAL_DERIV
   data.ddq = ddq;
   data.dV = mInvM_U;
 #endif
@@ -2950,8 +2943,7 @@ void BodyNode::computeJacobianOfMinvXForwardIteration(Eigen::MatrixXd& DinvMx_Dq
   if (jointNumDofs > 0)
   {
     const int iStart = static_cast<int>(mParentJoint->getDof(0)->getIndexInSkeleton());
-    const Eigen::MatrixXd block = mParentJoint->computeJacobianOfMinvX_B(
-          AI, mInvM_DAI_Dq);
+    const Eigen::MatrixXd block = mParentJoint->computeJacobianOfMinvX_B(AI);
     DinvMx_Dq.block(iStart, 0, jointNumDofs, static_cast<int>(numDofs)) = block;
   }
 }
