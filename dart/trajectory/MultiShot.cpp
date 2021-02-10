@@ -121,7 +121,7 @@ void MultiShot::addMapping(
     const std::string& key, std::shared_ptr<neural::Mapping> mapping)
 {
   Problem::addMapping(key, mapping);
-  for (const std::shared_ptr<SingleShot> shot : mShots)
+  for (const std::shared_ptr<SingleShot>& shot : mShots)
   {
     shot->addMapping(key, mapping);
   }
@@ -132,7 +132,7 @@ void MultiShot::addMapping(
 void MultiShot::removeMapping(const std::string& key)
 {
   Problem::removeMapping(key);
-  for (const std::shared_ptr<SingleShot> shot : mShots)
+  for (const std::shared_ptr<SingleShot>& shot : mShots)
   {
     shot->removeMapping(key);
   }
@@ -186,7 +186,7 @@ int MultiShot::getFlatDynamicProblemDim(
     std::shared_ptr<simulation::World> world) const
 {
   int sum = 0;
-  for (const std::shared_ptr<SingleShot> shot : mShots)
+  for (const std::shared_ptr<SingleShot>& shot : mShots)
   {
     sum += shot->getFlatDynamicProblemDim(world);
   }

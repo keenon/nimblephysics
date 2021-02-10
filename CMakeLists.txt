@@ -219,10 +219,14 @@ elseif(CMAKE_COMPILER_IS_GNUCXX)
 
 elseif("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
 
-  if(DART_TREAT_WARNINGS_AS_ERRORS)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror -Wno-error=deprecated-declarations")
+  # if(DART_TREAT_WARNINGS_AS_ERRORS)
+    # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror -Wno-error=deprecated-declarations")
     # Turn warning "deprecated-declarations" into an warning even if -Werror is
     # specified until we abandon glut.
+  # endif()
+  if(DART_TREAT_WARNINGS_AS_ERRORS)
+    # Even if we're treating all warnings as errors, still ignore sign comparison, cause that shows up in every for loop
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror -Wall -Wextra -Werror=return-type -Wno-sign-compare -Wno-deprecated-copy -Wno-deprecated-declarations -Wno-reorder")
   endif()
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
   execute_process(

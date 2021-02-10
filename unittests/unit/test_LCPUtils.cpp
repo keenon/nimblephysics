@@ -325,7 +325,7 @@ TEST(LCP_UTILS, LCP_FAILURE_2)
   lo = reducedLo;
   fIndex = reducedFIndex;
 
-  bool success = lcpSolver.solve(
+  lcpSolver.solve(
       reducedN,
       reducedAPadded.data(),
       reducedX.data(),

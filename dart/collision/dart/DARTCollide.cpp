@@ -55,11 +55,11 @@ namespace collision {
 
 #define DART_COLLISION_WITNESS_PLANE_DEPTH 0.01
 #define DART_COLLISION_EPS 1E-6
-static const int MAX_CYLBOX_CLIP_POINTS = 16;
-static const int nCYLINDER_AXIS = 2;
+// static const int MAX_CYLBOX_CLIP_POINTS = 16;
+// static const int nCYLINDER_AXIS = 2;
 // Number of segment of cylinder base circle.
 // Must be divisible by 4.
-static const int nCYLINDER_SEGMENT = 8;
+// static const int nCYLINDER_SEGMENT = 8;
 
 typedef double dVector3[4];
 typedef double dVector3[4];
