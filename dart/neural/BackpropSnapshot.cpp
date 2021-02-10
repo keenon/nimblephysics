@@ -1362,8 +1362,9 @@ Eigen::VectorXd BackpropSnapshot::getVelocityDueToIllegalImpulses()
 }
 
 //==============================================================================
-/// Returns the coriolis and gravity forces after unconstrained forward dynamics.
-/// For pre-step forces, use world->getCoriolisAndGravityAndExternalForces()
+/// Returns the coriolis and gravity forces after unconstrained forward
+/// dynamics. For pre-step forces, use
+/// world->getCoriolisAndGravityAndExternalForces()
 Eigen::VectorXd BackpropSnapshot::getCoriolisAndGravityAndExternalForces()
 {
   return assembleVector<Eigen::VectorXd>(
@@ -2505,7 +2506,7 @@ BackpropSnapshot::finiteDifferenceJacobianOfLCPConstraintMatrixClampingSubset(
   world->setExternalForces(mPreStepTorques);
   world->setCachedLCPSolution(mPreStepLCPCache);
 
-  const double EPS = 5e-7;
+  const double EPS = 1e-6;
   Eigen::VectorXd original = wrt->get(world.get());
   for (int i = 0; i < wrtDim; i++)
   {

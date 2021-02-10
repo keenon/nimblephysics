@@ -19,7 +19,8 @@ public:
       const Eigen::VectorXd& mB,
       const Eigen::VectorXd& mHi,
       const Eigen::VectorXd& mLo,
-      const Eigen::VectorXi& mFIndex);
+      const Eigen::VectorXi& mFIndex,
+      bool ignoreFrictionIndices);
 
   /// This applies a simple algorithm to guess the solution to the LCP problem.
   /// It's not guaranteed to be correct, but it often can be if there is no
@@ -36,6 +37,18 @@ public:
   /// multiply the resulting x as mapOut*x, you'll get the solution to the
   /// original LCP.
   static Eigen::MatrixXd reduce(
+      Eigen::MatrixXd& A,
+      Eigen::VectorXd& X,
+      Eigen::VectorXd& b,
+      Eigen::VectorXd& hi,
+      Eigen::VectorXd& lo,
+      Eigen::VectorXi& fIndex);
+
+  /// This cuts a problem down to just the normal forces, ignoring friction.
+  /// It returns a mapOut matrix, such that if you solve this LCP and then
+  /// multiply the resulting x as mapOut*x, you'll get the solution to the
+  /// original LCP, but with friction forces all 0.
+  static Eigen::MatrixXd removeFriction(
       Eigen::MatrixXd& A,
       Eigen::VectorXd& X,
       Eigen::VectorXd& b,
@@ -65,6 +78,21 @@ public:
   static void mergeLCPColumns(
       int colA,
       int colB,
+      Eigen::MatrixXd& A,
+      Eigen::VectorXd& X,
+      Eigen::VectorXd& b,
+      Eigen::VectorXd& hi,
+      Eigen::VectorXd& lo,
+      Eigen::VectorXi& fIndex,
+      Eigen::MatrixXd& mapOut);
+
+  /// This will modify the LCP problem formulation to drop a column
+  /// and rewrite and resize all the matrices appropriately.
+  /// It'll also update the mapOut matrix, so that it's possible to simply
+  /// multiply mapOut*x on the reduced problem to get a valid solution to the
+  /// larger problem.
+  static void dropLCPColumn(
+      int col,
       Eigen::MatrixXd& A,
       Eigen::VectorXd& X,
       Eigen::VectorXd& b,

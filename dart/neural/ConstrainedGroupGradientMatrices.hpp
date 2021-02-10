@@ -93,7 +93,8 @@ public:
       Eigen::VectorXi fIndex,
       Eigen::VectorXd b,
       Eigen::VectorXd aColNorms,
-      Eigen::MatrixXd A);
+      Eigen::MatrixXd A,
+      bool deliberatelyIgnoreFriction);
 
   /// If possible (because A is rank-deficient), this changes mX to be the
   /// least-squares minimal solution. This makes mX unique for a given set of
@@ -320,7 +321,7 @@ public:
   /// This is like `getClampingConstraintMatrix()` or
   /// `getUpperBoundConstraintMatrix()`, except that it returns all the columns
   /// instead of just a subset.
-  Eigen::MatrixXd getFullConstraintMatrix(simulation::WorldPtr world) const;
+  Eigen::MatrixXd getFullConstraintMatrix(simulation::World* world) const;
 
   std::size_t getNumDOFs() const;
 
@@ -367,6 +368,11 @@ public:
   /// This is only true after we've called constructMatrices(). It's a useful
   /// flag to ensure we don't call it twice.
   bool mFinalized;
+
+  /// This flag gets set if we needed to ignore the friction indices in order to
+  /// solve the LCP. This can happen because boxed LCPs that we use to solve
+  /// friction aren't guaranteed to be solvable.
+  bool mDeliberatelyIgnoreFriction;
 
   /// Impulse test matrix for all the constraints (only initialized in debug
   /// mode)

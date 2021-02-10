@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>DiffDART Visualizer</title>
+  </head>
+  <body>
+    <table>
+      <tr>
+        <td>A</td>
+        <td>*</td>
+        <td>x</td>
+        <td>-</td>
+        <td>b</td>
+        <td>=</td>
+        <td>w</td>
+      </tr>
+      <tr>
+        <!-- A matrix -->
+        <td>
+          <table>
+            <tr>
+              <td>
+                <input type="number" id="A11" class="matrix-cell">
+              </td>
+              <td>
+                <input type="number" id="A12" class="matrix-cell">
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <input type="number" id="A21" class="matrix-cell">
+              </td>
+              <td>
+                <input type="number" id="A22" class="matrix-cell">
+              </td>
+            </tr>
+          </table>
+        </td>
+        <!-- * -->
+        <td></td>
+        <!-- x vector -->
+        <td>
+          <table>
+            <tr>
+              <td id="x1">
+                0.0
+              </td>
+            </tr>
+            <tr>
+              <td id="x2">
+                0.0
+              </td>
+            </tr>
+          </table>
+        </td>
+        <!-- "-" -->
+        <td></td>
+        <!-- b vector -->
+        <td>
+          <table>
+            <tr>
+              <td>
+                <input type="number" id="b1" class="matrix-cell">
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <input type="number" id="b2" class="matrix-cell">
+              </td>
+            </tr>
+          </table>
+        </td>
+        <!-- = -->
+        <td></td>
+        <!-- w vector -->
+        <td>
+          <table>
+            <tr>
+              <td id="w1">
+                0.0
+              </td>
+            </tr>
+            <tr>
+              <td id="w2">
+                0.0
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+    <div>
+      <div>Legend:</div>
+      <ul>
+        <li><div class="color-box" id="w-geq"></div> w >= 0</li>
+        <li><div class="color-box" id="x-geq"></div> x >= 0</li>
+        <li><div class="color-box" id="comp-0"></div> x[0]*w[0] == 0</li>
+        <li><div class="color-box" id="comp-1"></div> x[1]*w[1] == 0</li>
+      </ul>
+    </div>
+    <!-- Visualizer goes here -->
+  </body>
+</html>

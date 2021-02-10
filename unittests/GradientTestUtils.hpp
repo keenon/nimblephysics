@@ -4622,9 +4622,10 @@ bool verifyTranlationalLCPInvariance(
   std::cout << "Diff:" << std::endl << (originalA - perturbedA) << std::endl;
 
   Eigen::MatrixXd perturbedA_c
-      = perturbedPtr->mGradientMatrices[0]->getFullConstraintMatrix(world);
+      = perturbedPtr->mGradientMatrices[0]->getFullConstraintMatrix(
+          world.get());
   Eigen::MatrixXd originalA_c
-      = originalPtr->mGradientMatrices[0]->getFullConstraintMatrix(world);
+      = originalPtr->mGradientMatrices[0]->getFullConstraintMatrix(world.get());
   std::cout << "Original A_c:" << std::endl << originalA_c << std::endl;
   std::cout << "Perturbed A_c:" << std::endl << perturbedA_c << std::endl;
   std::cout << "Diff:" << std::endl

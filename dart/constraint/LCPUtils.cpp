@@ -8,13 +8,15 @@
 namespace dart {
 namespace constraint {
 
+//==============================================================================
 bool LCPUtils::isLCPSolutionValid(
     const Eigen::MatrixXd& mA,
     const Eigen::VectorXd& mX,
     const Eigen::VectorXd& mB,
     const Eigen::VectorXd& mHi,
     const Eigen::VectorXd& mLo,
-    const Eigen::VectorXi& mFIndex)
+    const Eigen::VectorXi& mFIndex,
+    bool ignoreFrictionIndices)
 {
   Eigen::VectorXd v = mA * mX - mB;
   for (int i = 0; i < mX.size(); i++)
@@ -23,6 +25,12 @@ bool LCPUtils::isLCPSolutionValid(
     double lowerLimit = mLo(i);
     if (mFIndex(i) != -1)
     {
+      if (ignoreFrictionIndices)
+      {
+        if (mX(i) != 0)
+          return false;
+        continue;
+      }
       upperLimit *= mX(mFIndex(i));
       lowerLimit *= mX(mFIndex(i));
     }
@@ -72,6 +80,7 @@ bool LCPUtils::isLCPSolutionValid(
   return true;
 }
 
+//==============================================================================
 /// This applies a simple algorithm to guess the solution to the LCP problem.
 /// It's not guaranteed to be correct, but it often can be if there is no
 /// sliding friction on this timestep.
@@ -131,6 +140,7 @@ Eigen::VectorXd LCPUtils::guessSolution(
   return fullX;
 }
 
+//==============================================================================
 /// This reduces an LCP problem by merging any near-identical contact points.
 Eigen::MatrixXd LCPUtils::reduce(
     Eigen::MatrixXd& A,
@@ -191,6 +201,53 @@ Eigen::MatrixXd LCPUtils::reduce(
   return mapOut;
 }
 
+//==============================================================================
+/// This cuts a problem down to just the normal forces, ignoring friction.
+/// It returns a mapOut matrix, such that if you solve this LCP and then
+/// multiply the resulting x as mapOut*x, you'll get the solution to the
+/// original LCP, but with friction forces all 0.
+Eigen::MatrixXd LCPUtils::removeFriction(
+    Eigen::MatrixXd& A,
+    Eigen::VectorXd& X,
+    Eigen::VectorXd& b,
+    Eigen::VectorXd& hi,
+    Eigen::VectorXd& lo,
+    Eigen::VectorXi& fIndex)
+{
+  Eigen::MatrixXd reducedA = A;
+  Eigen::VectorXd reducedX = X;
+  Eigen::VectorXd reducedB = b;
+  Eigen::VectorXd reducedHi = hi;
+  Eigen::VectorXd reducedLo = lo;
+  Eigen::VectorXi reducedFIndex = fIndex;
+  Eigen::MatrixXd mapOut = Eigen::MatrixXd::Identity(A.rows(), A.cols());
+
+  for (int i = fIndex.size() - 1; i >= 0; i--)
+  {
+    if (fIndex(i) != -1)
+    {
+      dropLCPColumn(
+          i,
+          reducedA,
+          reducedX,
+          reducedB,
+          reducedHi,
+          reducedLo,
+          reducedFIndex,
+          mapOut);
+    }
+  }
+
+  A = reducedA;
+  X = reducedX;
+  b = reducedB;
+  hi = reducedHi;
+  lo = reducedLo;
+  fIndex = reducedFIndex;
+  return mapOut;
+}
+
+//==============================================================================
 bool LCPUtils::solveDeduplicated(
     std::shared_ptr<BoxedLcpSolver>& solver,
     const Eigen::MatrixXd& A,
@@ -262,7 +319,7 @@ bool LCPUtils::solveDeduplicated(
       false);
 
   bool valid = LCPUtils::isLCPSolutionValid(
-      oldA, reducedX, oldB, oldHi, oldLo, oldFIndex);
+      oldA, reducedX, oldB, oldHi, oldLo, oldFIndex, false);
 
   // Step 3. Map out results
   if (success && valid)
@@ -280,6 +337,7 @@ bool LCPUtils::solveDeduplicated(
   return success;
 }
 
+//==============================================================================
 /// This will modify the LCP problem formulation to merge two columns
 /// together, and rewrite and resize all the matrices appropriately. It will
 /// also yell and scream (throw asserts) if the columns shouldn't be merged.
@@ -371,6 +429,95 @@ void LCPUtils::mergeLCPColumns(
     {
       int newIndex = i;
       if (i > colB)
+        newIndex--;
+      newA.row(newIndex) = newACols.row(i);
+    }
+  }
+
+  // Write out results
+  A = newA;
+  X = newX;
+  b = newB;
+  hi = newHi;
+  lo = newLo;
+  fIndex = newFIndex;
+  mapOut = newMapOut;
+}
+
+//==============================================================================
+/// This will modify the LCP problem formulation to drop a column
+/// and rewrite and resize all the matrices appropriately.
+/// It'll also update the mapOut matrix, so that it's possible to simply
+/// multiply mapOut*x on the reduced problem to get a valid solution to the
+/// larger problem.
+void LCPUtils::dropLCPColumn(
+    int col,
+    Eigen::MatrixXd& A,
+    Eigen::VectorXd& X,
+    Eigen::VectorXd& b,
+    Eigen::VectorXd& hi,
+    Eigen::VectorXd& lo,
+    Eigen::VectorXi& fIndex,
+    Eigen::MatrixXd& mapOut)
+{
+  int n = A.cols();
+  Eigen::MatrixXd newACols = Eigen::MatrixXd::Zero(n, n - 1);
+  Eigen::VectorXd newX = Eigen::VectorXd::Zero(n - 1);
+  Eigen::VectorXd newB = Eigen::VectorXd::Zero(n - 1);
+  Eigen::VectorXd newHi = Eigen::VectorXd::Zero(n - 1);
+  Eigen::VectorXd newLo = Eigen::VectorXd::Zero(n - 1);
+  Eigen::VectorXi newFIndex = Eigen::VectorXi::Zero(n - 1);
+  Eigen::MatrixXd newMapOut = Eigen::MatrixXd::Zero(mapOut.rows(), n - 1);
+
+  // Map columns down
+  for (int i = 0; i < n; i++)
+  {
+    if (i == col)
+    {
+      // Delete column
+    }
+    else
+    {
+      int newIndex = i;
+      if (i > col)
+      {
+        newIndex--;
+      }
+
+      newACols.col(newIndex) = A.col(i);
+      newX(newIndex) = X(i);
+      newB(newIndex) = b(i);
+      newHi(newIndex) = hi(i);
+      newLo(newIndex) = lo(i);
+      if (fIndex(i) < col)
+      {
+        newFIndex(newIndex) = fIndex(i);
+      }
+      else if (fIndex(i) > col)
+      {
+        newFIndex(newIndex) = fIndex(i) - 1;
+      }
+      else if (fIndex(i) == col)
+      {
+        assert(false && "You shouldn't be removing columns that other columns depend on!");
+      }
+
+      newMapOut.col(newIndex) += mapOut.col(i);
+    }
+  }
+
+  // Map rows down for A
+  Eigen::MatrixXd newA = Eigen::MatrixXd::Zero(n - 1, n - 1);
+  for (int i = 0; i < n; i++)
+  {
+    if (i == col)
+    {
+      // Do nothing, this is being deleted
+    }
+    else
+    {
+      int newIndex = i;
+      if (i > col)
         newIndex--;
       newA.row(newIndex) = newACols.row(i);
     }

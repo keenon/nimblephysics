@@ -102,6 +102,12 @@ collision::ContactType DifferentiableContactConstraint::getContactType()
 }
 
 //==============================================================================
+collision::Contact& DifferentiableContactConstraint::getContact()
+{
+  return *(mContact.get());
+}
+
+//==============================================================================
 /// This figures out what type of contact this skeleton is involved in.
 DofContactType DifferentiableContactConstraint::getDofContactType(
     dynamics::DegreeOfFreedom* dof)

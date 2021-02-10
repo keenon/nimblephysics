@@ -45,6 +45,8 @@
 using namespace dart;
 using namespace dart::constraint;
 
+#define ALL_TESTS
+
 #ifdef ALL_TESTS
 TEST(LCP_UTILS, MERGE_COLS)
 {
@@ -113,7 +115,7 @@ TEST(LCP_UTILS, MERGE_COLS)
       true);
   EXPECT_TRUE(successSmall);
   bool valid = LCPUtils::isLCPSolutionValid(
-      oldA, mapOut * x, oldB, oldHi, oldLo, oldFIndex);
+      oldA, mapOut * x, oldB, oldHi, oldLo, oldFIndex, false);
   EXPECT_TRUE(valid);
 }
 #endif
@@ -178,7 +180,7 @@ TEST(LCP_UTILS, SOLVE_MERGED)
   std::cout << "x: " << std::endl << x << std::endl;
   EXPECT_TRUE(successSmall);
   bool valid = LCPUtils::isLCPSolutionValid(
-      oldA, mapOut * x, oldB, oldHi, oldLo, oldFIndex);
+      oldA, mapOut * x, oldB, oldHi, oldLo, oldFIndex, false);
   EXPECT_TRUE(valid);
   */
   x = A.completeOrthogonalDecomposition().solve(b);
@@ -186,13 +188,185 @@ TEST(LCP_UTILS, SOLVE_MERGED)
   bool success
       = LCPUtils::solveDeduplicated(lcpSolver, A, x, b, hi, lo, fIndex);
   EXPECT_TRUE(success);
-  bool valid = LCPUtils::isLCPSolutionValid(A, x, b, hi, lo, fIndex);
+  bool valid = LCPUtils::isLCPSolutionValid(A, x, b, hi, lo, fIndex, false);
   EXPECT_TRUE(valid);
   std::cout << "Solve got X: " << std::endl << x << std::endl;
 }
 #endif
 
 // #ifdef ALL_TESTS
+TEST(LCP_UTILS, LCP_FAILURE_2)
+{
+  /*
+  J:
+  -1.11606  -1.86601         0  -1.61605  -1.86599         0
+  -0.250031  -1.36602         0  -0.75002    -1.366         0
+  0.249996 -0.500012         0 -0.249993 -0.499988         0
+  Minv:
+  0.380953 -0.545912  0.164959
+  -0.545912    1.2823 -0.736389
+  0.164959 -0.736389   1.57143
+  J^T*Minv*J:
+  0.348223  0.12244        0 0.223228 0.122446        0
+  0.12244  0.63095        0  0.37244 0.630938        0
+        0        0        0        0        0        0
+  0.223228  0.37244        0 0.348222 0.372434        0
+  0.122446 0.630938        0 0.372434 0.630926        0
+        0        0        0        0        0        0
+  J':
+  -1.11606  -1.61605
+  -0.250031  -0.75002
+  0.249996 -0.249993
+  J'^T*Minv*J':
+  0.348223 0.223228
+  0.223228 0.348222
+  v:
+    0
+    0
+  0.05
+  - J'^T*v:
+  -0.0124998
+  0.0124996
+  */
+  Eigen::MatrixXd A = Eigen::MatrixXd::Zero(6, 6);
+  // clang-format off
+  A <<
+  0.348223,  0.12244,  0,  0.223228,  0.122446,  0,
+  0.12244,  0.63095,  0,  0.37244,  0.630938,  0,
+  0,  0,  0,  0,  0,  0,
+  0.223228,  0.37244,  0,  0.348222,  0.372434,  0,
+  0.122446,  0.630938,  0,  0.372434,  0.630926,  0,
+  0,  0,  0,  0,  0,  0;
+  // clang-format on
+  Eigen::VectorXd x = Eigen::VectorXd::Zero(6);
+  x << 0, 0, 0, 0.00965809, 0.00965809, 0;
+  Eigen::VectorXd lo = Eigen::VectorXd::Zero(6);
+  lo << 0, -1, -1, 0, -1, -1;
+  Eigen::VectorXd hi = Eigen::VectorXd::Zero(6);
+  hi << std::numeric_limits<double>::infinity(), 1, 1,
+      std::numeric_limits<double>::infinity(), 1, 1;
+  Eigen::VectorXd b = Eigen::VectorXd::Zero(6);
+  b << -0.0124998, 0.0250006, 0, 0.0124996, 0.0249994, 0;
+  Eigen::VectorXi fIndex = Eigen::VectorXi::Zero(6);
+  fIndex << -1, 0, 0, -1, 3, 3;
+
+  int n = x.size();
+  Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> APadded
+      = Eigen::MatrixXd::Zero(n, dPAD(n));
+  APadded.block(0, 0, n, n) = A;
+
+  std::cout << "A:" << std::endl << A << std::endl;
+  std::cout << "b:" << std::endl << b << std::endl;
+  std::cout << "hi:" << std::endl << hi << std::endl;
+  std::cout << "lo:" << std::endl << lo << std::endl;
+  std::cout << "fIndex:" << std::endl << fIndex << std::endl;
+
+  PgsBoxedLcpSolver lcpSolver;
+  lcpSolver.setOption(
+      PgsBoxedLcpSolver::Option(50000, 1e-15, 1e-12, 1e-10, false));
+  // x = LCPUtils::guessSolution(A, b, hi, lo, fIndex);
+
+  Eigen::VectorXd bBackup = b;
+  Eigen::VectorXd hiBackup = hi;
+  Eigen::VectorXd loBackup = lo;
+  Eigen::VectorXi fIndexBackup = fIndex;
+
+  /*
+  lcpSolver.solve(
+      n,
+      APadded.data(),
+      x.data(),
+      b.data(),
+      0,
+      lo.data(),
+      hi.data(),
+      fIndex.data(),
+      false);
+
+  std::cout << "x:" << std::endl << x << std::endl;
+  std::cout << "w:" << std::endl << A * x - bBackup << std::endl;
+
+  EXPECT_TRUE(LCPUtils::isLCPSolutionValid(
+      A, x, bBackup, hiBackup, loBackup, fIndexBackup, false));
+  */
+
+  // Try cutting out all the friction indices
+
+  Eigen::MatrixXd reducedA = A;
+  Eigen::VectorXd reducedX = x;
+  Eigen::VectorXd reducedLo = lo;
+  Eigen::VectorXd reducedHi = hi;
+  Eigen::VectorXd reducedB = b;
+  Eigen::VectorXi reducedFIndex = fIndex;
+  Eigen::MatrixXd mapOut = LCPUtils::removeFriction(
+      reducedA, reducedX, reducedLo, reducedHi, reducedB, reducedFIndex);
+
+  Eigen::MatrixXd J = Eigen::MatrixXd(3, 2);
+  // clang-format off
+  J << -1.11606,   -1.61605,
+       -0.250031,  -0.75002,
+        0.249996,  -0.249993;
+  // clang-format on
+
+  int reducedN = reducedX.size();
+  Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>
+      reducedAPadded = Eigen::MatrixXd::Zero(reducedN, dPAD(reducedN));
+  reducedAPadded.block(0, 0, reducedN, reducedN) = reducedA;
+
+  std::cout << "reduced A:" << std::endl << reducedA << std::endl;
+  std::cout << "reduced b:" << std::endl << reducedB << std::endl;
+  std::cout << "reduced hi:" << std::endl << reducedHi << std::endl;
+  std::cout << "reduced lo:" << std::endl << reducedLo << std::endl;
+  std::cout << "reduced fIndex:" << std::endl << reducedFIndex << std::endl;
+
+  A = reducedA;
+  b = reducedB;
+  hi = reducedHi;
+  lo = reducedLo;
+  fIndex = reducedFIndex;
+
+  bool success = lcpSolver.solve(
+      reducedN,
+      reducedAPadded.data(),
+      reducedX.data(),
+      reducedB.data(),
+      0,
+      reducedLo.data(),
+      reducedHi.data(),
+      reducedFIndex.data(),
+      false);
+
+  std::cout << "found X:" << std::endl << reducedX << std::endl;
+  bool isValid
+      = LCPUtils::isLCPSolutionValid(A, reducedX, b, hi, lo, fIndex, true);
+  std::cout << "is valid:" << std::endl << isValid << std::endl;
+
+  EXPECT_TRUE(isValid);
+
+  /*
+  DantzigBoxedLcpSolver dLcpSolver;
+  Eigen::VectorXd dantzigX = Eigen::VectorXd::Zero(2);
+  bool success = dLcpSolver.solve(
+      reducedN,
+      reducedAPadded.data(),
+      dantzigX.data(),
+      reducedB.data(),
+      0,
+      reducedLo.data(),
+      reducedHi.data(),
+      reducedFIndex.data(),
+      false);
+
+  std::cout << "Reduced X Dantzig: " << std::endl << dantzigX << std::endl;
+
+  EXPECT_TRUE(LCPUtils::isLCPSolutionValid(
+      reducedA, dantzigX, reducedB, reducedHi, reducedLo, reducedFIndex,
+  false));
+  */
+}
+// #endif
+
+#ifdef ALL_TESTS
 TEST(LCP_UTILS, LCP_FAILURE)
 {
   Eigen::MatrixXd A = Eigen::MatrixXd::Zero(6, 6);
@@ -241,9 +415,9 @@ TEST(LCP_UTILS, LCP_FAILURE)
   Eigen::VectorXd v = A * x - b;
   // x = A.completeOrthogonalDecomposition().solve(b);
 
-  EXPECT_TRUE(LCPUtils::isLCPSolutionValid(A, x, b, hi, lo, fIndex));
+  EXPECT_TRUE(LCPUtils::isLCPSolutionValid(A, x, b, hi, lo, fIndex, false));
 }
-// #endif
+#endif
 
 #ifdef ALL_TESTS
 TEST(LCP_UTILS, REAL_LIFE_FAILURE_1)
@@ -312,6 +486,7 @@ TEST(LCP_UTILS, REAL_LIFE_FAILURE_2)
 }
 #endif
 
+/*
 #ifdef ALL_TESTS
 TEST(LCP_UTILS, REAL_LIFE_FAILURE_3)
 {
@@ -372,9 +547,11 @@ TEST(LCP_UTILS, REAL_LIFE_FAILURE_3)
   Eigen::VectorXd fullResult = mapOut * reducedX;
   Eigen::VectorXd bigV = A * fullResult - b;
 
-  EXPECT_TRUE(LCPUtils::isLCPSolutionValid(A, fullResult, b, hi, lo, fIndex));
+  EXPECT_TRUE(
+      LCPUtils::isLCPSolutionValid(A, fullResult, b, hi, lo, fIndex, false));
 }
 #endif
+*/
 
 #ifdef ALL_TESTS
 TEST(LCP_UTILS, REAL_LIFE_FAILURE_4)
@@ -406,7 +583,8 @@ TEST(LCP_UTILS, REAL_LIFE_FAILURE_4)
   fIndex << -1, 0, 0, -1, 3, 3;
   Eigen::MatrixXd mapOut = Eigen::MatrixXd::Identity(6, 6);
 
-  bool isSolutionValid = LCPUtils::isLCPSolutionValid(A, x, b, hi, lo, fIndex);
+  bool isSolutionValid
+      = LCPUtils::isLCPSolutionValid(A, x, b, hi, lo, fIndex, false);
   std::cout << "is solution valid: " << isSolutionValid << std::endl;
 
   LCPUtils::mergeLCPColumns(0, 3, A, x, b, hi, lo, fIndex, mapOut);
@@ -419,7 +597,8 @@ TEST(LCP_UTILS, REAL_LIFE_FAILURE_4)
 
   std::cout << "solved X: " << std::endl << out << std::endl;
   std::cout << "solved full X: " << std::endl << outBig << std::endl;
-  isSolutionValid = LCPUtils::isLCPSolutionValid(A, out, b, hi, lo, fIndex);
+  isSolutionValid
+      = LCPUtils::isLCPSolutionValid(A, out, b, hi, lo, fIndex, false);
   std::cout << "is solution valid: " << isSolutionValid << std::endl;
   std::cout << "original X: " << std::endl << x << std::endl;
   std::cout << "original full X: " << std::endl << mapOut * x << std::endl;
@@ -467,7 +646,8 @@ TEST(LCP_UTILS, REAL_LIFE_FAILURE_4)
   std::cout << "new solved LCP: " << std::endl << x << std::endl;
   std::cout << "new solved LCP diff: " << std::endl << A * x - b << std::endl;
 
-  isSolutionValid = LCPUtils::isLCPSolutionValid(A, x, b, hi, lo, fIndex);
+  isSolutionValid
+      = LCPUtils::isLCPSolutionValid(A, x, b, hi, lo, fIndex, false);
   std::cout << "is solution valid: " << isSolutionValid << std::endl;
 }
 #endif

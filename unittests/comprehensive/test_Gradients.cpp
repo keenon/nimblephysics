@@ -1087,15 +1087,16 @@ void testRobotArm(
   // });
 
   // server.registerConnectionListener([&]() { ticker.start(); });
-  // while (server.isServing())
-  // {
-  //   // spin
-  // }
 
   EXPECT_TRUE(verifyVelGradients(world, worldVel));
   EXPECT_TRUE(verifyAnalyticalJacobians(world));
   EXPECT_TRUE(verifyAnalyticalBackprop(world));
   EXPECT_TRUE(verifyWrtMass(world));
+
+  // while (server.isServing())
+  // {
+  //   // spin
+  // }
 }
 
 #ifdef ALL_TESTS

@@ -98,6 +98,8 @@ public:
   /// and normal will change as we perturb skeletons by small amounts.
   collision::ContactType getContactType();
 
+  collision::Contact& getContact();
+
   /// This figures out what type of contact this skeleton is involved in.
   DofContactType getDofContactType(dynamics::DegreeOfFreedom* dof);
 

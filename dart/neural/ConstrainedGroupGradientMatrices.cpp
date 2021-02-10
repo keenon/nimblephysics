@@ -26,7 +26,7 @@ namespace neural {
 //==============================================================================
 ConstrainedGroupGradientMatrices::ConstrainedGroupGradientMatrices(
     constraint::ConstrainedGroup& group, double timeStep)
-  : mFinalized(false)
+  : mFinalized(false), mDeliberatelyIgnoreFriction(false)
 {
   mTimeStep = timeStep;
   assert(mClampingConstraints.size() == 0);
@@ -174,7 +174,8 @@ void ConstrainedGroupGradientMatrices::registerLCPResults(
     Eigen::VectorXi fIndex,
     Eigen::VectorXd b,
     Eigen::VectorXd aColNorms,
-    Eigen::MatrixXd A)
+    Eigen::MatrixXd A,
+    bool deliberatelyIgnoreFriction)
 {
   mX = X;
   mHi = hi;
@@ -183,6 +184,7 @@ void ConstrainedGroupGradientMatrices::registerLCPResults(
   mB = b;
   mAColNorms = aColNorms;
   mA = A;
+  mDeliberatelyIgnoreFriction = deliberatelyIgnoreFriction;
 }
 
 //==============================================================================
@@ -192,7 +194,7 @@ bool ConstrainedGroupGradientMatrices::isSolutionValid(
     const Eigen::VectorXd& mX)
 {
   return constraint::LCPUtils::isLCPSolutionValid(
-      mA, mX, mB, mHi, mLo, mFIndex);
+      mA, mX, mB, mHi, mLo, mFIndex, mDeliberatelyIgnoreFriction);
 }
 
 //==============================================================================
@@ -574,12 +576,22 @@ void ConstrainedGroupGradientMatrices::constructMatrices(
               = neural::ConstraintMapping::NOT_CLAMPING;
         }
         // Otherwise, this is CLAMPING, because as we attempt to move the
-        // contact the friction force will stop us.
+        // contact the friction force will stop us. If we're deliberately
+        // ignoring friction then this is NOT_CLAMPING, because we'll always set
+        // the values to 0.
         else
         {
-          mContactConstraintMappings(j) = neural::ConstraintMapping::CLAMPING;
-          mClampingIndex[j] = numClamping;
-          numClamping++;
+          if (mDeliberatelyIgnoreFriction)
+          {
+            mContactConstraintMappings(j)
+                = neural::ConstraintMapping::NOT_CLAMPING;
+          }
+          else
+          {
+            mContactConstraintMappings(j) = neural::ConstraintMapping::CLAMPING;
+            mClampingIndex[j] = numClamping;
+            numClamping++;
+          }
         }
       }
       else
@@ -1681,14 +1693,13 @@ ConstrainedGroupGradientMatrices::getCoriolisAndGravityAndExternalForces(
 
 //==============================================================================
 Eigen::MatrixXd ConstrainedGroupGradientMatrices::getFullConstraintMatrix(
-    simulation::WorldPtr world) const
+    simulation::World* world) const
 {
   Eigen::MatrixXd impulses = Eigen::MatrixXd::Zero(
       world->getNumDofs(), mDifferentiableConstraints.size());
   for (int i = 0; i < mDifferentiableConstraints.size(); i++)
   {
-    impulses.col(i)
-        = mDifferentiableConstraints[i]->getConstraintForces(world.get());
+    impulses.col(i) = mDifferentiableConstraints[i]->getConstraintForces(world);
   }
   return impulses;
 }
