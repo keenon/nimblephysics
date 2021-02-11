@@ -6,7 +6,7 @@ brew reinstall gcc
 export FC=$(which gfortran)
 echo "FC=$FC"
 
-export MACOSX_DEPLOYMENT_TARGET="10.8"
+export MACOSX_DEPLOYMENT_TARGET="10.9"
 
 export PYTHON3=$(which python3)
 echo "Python3=${PYTHON3}"
