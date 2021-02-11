@@ -9,6 +9,11 @@ if(DART_VERBOSE)
   message(STATUS "[ Mandatory dependencies for DART core ]")
 endif()
 
+# Threads on Mac OS X
+if(APPLE)
+  find_package(Threads)
+endif()
+
 # Eigen
 dart_find_package(Eigen3)
 dart_check_required_package(EIGEN3 "eigen3")
