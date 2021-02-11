@@ -4,9 +4,9 @@ set -e
 VERSION=$(cat ../../VERSION.txt)
 
 # Find our python paths
-PYTHON_INCLUDE=$(python-config --includes)
+PYTHON_INCLUDE=$(python3-config --includes)
 echo "PYTHON_INCLUDE=${PYTHON_INCLUDE}"
-PYTHON_LIB=$(python-config --libs)
+PYTHON_LIB=$(python3-config --libs)
 echo "PYTHON_LIB=${PYTHON_LIB}"
 
 pushd ../..
