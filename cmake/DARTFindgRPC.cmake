@@ -22,6 +22,12 @@ endif()
 
 find_package(gRPC CONFIG REQUIRED)
 
+message(STATUS "gRPC_FOUND: ${gRPC_FOUND}")
+# get_target_property(gRPC_INCLUDE_DIRS gRPC::grpc++ INTERFACE_INCLUDE_DIRECTORIES)
+# get_target_property(gRPC_LIBRARIES gRPC::grpc++ INTERFACE_LINK_LIBRARIES)
+message(STATUS "gRPC_INCLUDE_DIRS: ${gRPC_INCLUDE_DIRS}")
+message(STATUS "gRPC_LIBRARIES: ${gRPC_LIBRARIES}")
+
 if(gRPC_FOUND AND NOT TARGET gRPC::grpc++)
   add_library(gRPC::grpc++ INTERFACE IMPORTED)
   set_target_properties(gRPC::grpc++ PROPERTIES

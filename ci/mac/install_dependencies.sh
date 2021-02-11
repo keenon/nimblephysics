@@ -176,7 +176,7 @@ wget https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOBUF_V
 tar -xvzf protobuf-all-${PROTOBUF_VERSION}.tar.gz
 rm protobuf-all-${PROTOBUF_VERSION}.tar.gz
 pushd protobuf-${PROTOBUF_VERSION}
-./configure
+CXX_FLAGS="-fvisibility=hidden" ./configure
 make -j10
 make install
 popd
@@ -189,6 +189,7 @@ mkdir -p cmake/build
 pushd cmake/build
 cmake -DgRPC_INSTALL=ON \
       -DgRPC_BUILD_TESTS=OFF \
+      -DCMAKE_CXX_FLAGS="-fvisibility=hidden" \
       ../..
 make -j
 make install

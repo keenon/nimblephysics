@@ -142,9 +142,9 @@ target_link_libraries(dart
     Boost::filesystem
     IPOPT::ipopt
     PerfUtils
-    protobuf::libprotobuf
+    # protobuf::libprotobuf
     # protobuf::libprotobuf-lite
-    protobuf::libprotoc
+    # protobuf::libprotoc
     gRPC::grpc++
 )
 if (TARGET octomap)

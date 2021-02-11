@@ -226,7 +226,7 @@ elseif("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
   # endif()
   if(DART_TREAT_WARNINGS_AS_ERRORS)
     # Even if we're treating all warnings as errors, still ignore sign comparison, cause that shows up in every for loop
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror -Wall -Wextra -Werror=return-type -Wno-sign-compare -Wno-deprecated-copy -Wno-deprecated-declarations -Wno-reorder")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror -Wall -Wextra -Werror=return-type -Wno-sign-compare -Wno-deprecated -Wno-deprecated-declarations -Wno-reorder")
   endif()
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
   execute_process(
@@ -251,6 +251,10 @@ else()
 
   message(SEND_ERROR "Compiler[${CMAKE_CXX_COMPILER_ID}] not supported.")
 
+endif()
+
+if (APPLE)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fvisibility=hidden")
 endif()
 
 #===============================================================================
