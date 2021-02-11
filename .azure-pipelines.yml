@@ -16,7 +16,7 @@ stages:
                 testResultsFiles: "Testing/**/Test.xml",
                 searchFolder: "$(System.DefaultWorkingDirectory)", # Optional
                 #mergeTestResults: false # Optional
-                #failTaskOnFailedTests: false # Optional
+                failTaskOnFailedTests: true, # Optional
                 #testRunTitle: # Optional
                 #buildPlatform: # Optional
                 #buildConfiguration: # Optional
