@@ -11,6 +11,10 @@ export MACOSX_DEPLOYMENT_TARGET="10.9"
 export PYTHON3=$(which python3)
 echo "Python3=${PYTHON3}"
 
+rm /usr/bin/python
+ln -s $(which python3) /usr/bin/python
+echo "python=$(which python3)"
+
 # Install perfutils - Keenon's fork, compatible with Mac OSX
 git clone https://github.com/keenon/PerfUtils.git
 pushd PerfUtils
@@ -91,7 +95,7 @@ pushd fcl
 git checkout 0.3.4
 mkdir build
 pushd build
-cmake .. -DFCL_WITH_OCTOMAP=OFF
+cmake .. -DFCL_WITH_OCTOMAP=OFF -DBUILD_TESTING=OFF
 make install -j
 popd
 popd
