@@ -13,6 +13,8 @@ ENV PYTHON_VERSION="cp36-cp36m"
 ENV PYTHON_INCLUDE="/opt/python/cp36-cp36m/include/python3.6m/"
 ENV PYTHON_LIB="/opt/python/cp36-cp36m/lib/python3.6"
 ENV PYTHON_VERSION_NUMBER="3.6"
+RUN rm /usr/bin/python && \
+    ln -s $PYTHON /usr/bin/python
 
 # Install pybind11
 ENV CPATH="${PYTHON_INCLUDE}"
