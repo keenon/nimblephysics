@@ -24,7 +24,7 @@ endif()
 #   return()
 # endif()
 
-find_package(Python ${DARTPY_PYTHON_VERSION} COMPONENTS Interpreter Development)
+find_package(Python3 ${DARTPY_PYTHON_VERSION} EXACT REQUIRED COMPONENTS Interpreter Development)
 
 # Find pybind11
 # Needs to set PYBIND11_PYTHON_VERSION before finding pybind11
