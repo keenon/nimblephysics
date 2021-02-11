@@ -29,7 +29,7 @@ pushd libccd
 mkdir build
 pushd build
 cmake .. -DENABLE_DOUBLE_PRECISION=ON
-make install -j14
+make install -j
 popd
 popd
 rm -rf libccd
@@ -40,7 +40,7 @@ pushd assimp
 mkdir build
 pushd build
 cmake ..
-make install -j10
+make install -j
 popd
 popd
 rm -rf assimp
@@ -53,7 +53,7 @@ git clone https://github.com/coin-or-tools/ThirdParty-Mumps.git
 pushd ThirdParty-Mumps
 ./get.Mumps
 ./configure
-make -j14
+make -j
 make install
 popd
 rm -rf ThirdParty-Mumps
@@ -62,7 +62,7 @@ rm -rf ThirdParty-Mumps
 git clone https://github.com/coin-or/Ipopt.git
 pushd Ipopt
 ./configure --with-mumps
-make -j14
+make -j
 make install
 popd
 rm -rf Ipopt
@@ -74,7 +74,7 @@ pushd pybind11
 mkdir build
 pushd build
 cmake .. -DPYTHON_EXECUTABLE:FILEPATH=$(which python)
-make install -j10
+make install -j
 popd
 popd
 rm -rf pybind11
@@ -87,7 +87,7 @@ git checkout 0.3.4
 mkdir build
 pushd build
 cmake .. -DFCL_WITH_OCTOMAP=OFF
-make install -j14
+make install -j
 popd
 popd
 rm -rf fcl
@@ -99,7 +99,7 @@ git checkout v1.8.1
 mkdir build
 pushd build
 cmake ..
-make install -j10
+make install -j
 popd
 popd
 rm -rf octomap
@@ -110,7 +110,7 @@ pushd tinyxml2
 mkdir build
 pushd build
 cmake ..
-make install -j10
+make install -j
 popd
 popd
 rm -rf tinyxml2
@@ -132,7 +132,7 @@ pushd tinyxml
 mkdir build
 pushd build
 cmake ..
-make install -j10
+make install -j
 popd
 popd
 rm -rf tinyxml
@@ -143,7 +143,7 @@ pushd urdfdom_headers
 mkdir build
 pushd build
 cmake ..
-make install -j10
+make install -j
 popd
 popd
 rm -rf urdfdom_headers
@@ -154,7 +154,7 @@ pushd console_bridge
 mkdir build
 pushd build
 cmake ..
-make install -j10
+make install -j
 popd
 popd
 rm -rf console_bridge
@@ -165,7 +165,7 @@ pushd urdfdom
 mkdir build
 pushd build
 cmake ..
-make install -j10
+make install -j
 popd
 popd
 rm -rf urdfdom
@@ -177,7 +177,7 @@ tar -xvzf protobuf-all-${PROTOBUF_VERSION}.tar.gz
 rm protobuf-all-${PROTOBUF_VERSION}.tar.gz
 pushd protobuf-${PROTOBUF_VERSION}
 CXX_FLAGS="-fvisibility=hidden" ./configure
-make -j10
+make -j
 make install
 popd
 rm -rf protobuf-${PROTOBUF_VERSION}
