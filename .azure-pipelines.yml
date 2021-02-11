@@ -25,7 +25,7 @@ stages:
   - stage: Mac
     jobs:
       - job: macos_35
-        pool: { vmImage: "macOS-10.14" }
+        pool: { vmImage: "macOS-10.15" }
         variables:
           - name: PYTHON_VERSION_NUMBER
             value: "3.5"
@@ -41,7 +41,7 @@ stages:
           - task: PublishBuildArtifacts@1
             inputs: { pathtoPublish: "wheelhouse" }
       - job: macos_36
-        pool: { vmImage: "macOS-10.14" }
+        pool: { vmImage: "macOS-10.15" }
         variables:
           - name: PYTHON_VERSION_NUMBER
             value: "3.6"
@@ -57,7 +57,7 @@ stages:
           - task: PublishBuildArtifacts@1
             inputs: { pathtoPublish: "wheelhouse" }
       - job: macos_37
-        pool: { vmImage: "macOS-10.14" }
+        pool: { vmImage: "macOS-10.15" }
         variables:
           - name: PYTHON_VERSION_NUMBER
             value: "3.7"
@@ -73,7 +73,7 @@ stages:
           - task: PublishBuildArtifacts@1
             inputs: { pathtoPublish: "wheelhouse" }
       - job: macos_38
-        pool: { vmImage: "macOS-10.14" }
+        pool: { vmImage: "macOS-10.15" }
         variables:
           - name: PYTHON_VERSION_NUMBER
             value: "3.8"
