@@ -6,6 +6,8 @@ brew reinstall gcc
 export FC=$(which gfortran)
 echo "FC=$FC"
 
+export MACOSX_DEPLOYMENT_TARGET="10.14"
+
 # Install perfutils - Keenon's fork, compatible with Mac OSX
 git clone https://github.com/keenon/PerfUtils.git
 pushd PerfUtils
