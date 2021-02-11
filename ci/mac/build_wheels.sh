@@ -11,12 +11,17 @@ echo "PYTHON_LIB=${PYTHON_LIB}"
 
 pushd ../..
 
+mkdir -p bin
+ln -sfn $(which python3) ./bin/python
+export PATH=$(pwd)/bin:${PATH}
+echo "python=$(which python)"
+
 rm -rf dist/*
 rm -rf build/*
 # rm -rf wheelhouse/*
 
 # Actually build the code
-python3 setup.py sdist bdist_wheel
+python setup.py sdist bdist_wheel
 
 # Install delocate, to bundle dependencies into the wheel
 pushd dist
