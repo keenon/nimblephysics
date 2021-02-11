@@ -8,6 +8,9 @@ echo "FC=$FC"
 
 export MACOSX_DEPLOYMENT_TARGET="10.15"
 
+export PYTHON3=$(which python3)
+echo "Python3=${PYTHON3}"
+
 # Install perfutils - Keenon's fork, compatible with Mac OSX
 git clone https://github.com/keenon/PerfUtils.git
 pushd PerfUtils
@@ -75,7 +78,7 @@ git clone https://github.com/pybind/pybind11.git
 pushd pybind11
 mkdir build
 pushd build
-cmake .. -DPYTHON_EXECUTABLE:FILEPATH=$(which python)
+cmake .. -DPYTHON_EXECUTABLE:FILEPATH=$(which python3)
 make install -j
 popd
 popd
