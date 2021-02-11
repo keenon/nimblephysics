@@ -16,16 +16,16 @@ stages:
                 testResultsFiles: "Testing/**/Test.xml",
                 searchFolder: "$(System.DefaultWorkingDirectory)", # Optional
                 #mergeTestResults: false # Optional
-                failTaskOnFailedTests: true, # Optional
                 #testRunTitle: # Optional
                 #buildPlatform: # Optional
                 #buildConfiguration: # Optional
                 #publishRunAttachments: true # Optional
+                failTaskOnFailedTests: true, # Optional
               }
   - stage: Mac
     jobs:
       - job: macos_35
-        pool: { vmImage: "macOS-10.15" }
+        pool: { vmImage: "macOS-10.14" }
         variables:
           - name: PYTHON_VERSION_NUMBER
             value: "3.5"
@@ -41,7 +41,7 @@ stages:
           - task: PublishBuildArtifacts@1
             inputs: { pathtoPublish: "wheelhouse" }
       - job: macos_36
-        pool: { vmImage: "macOS-10.15" }
+        pool: { vmImage: "macOS-10.14" }
         variables:
           - name: PYTHON_VERSION_NUMBER
             value: "3.6"
@@ -57,7 +57,7 @@ stages:
           - task: PublishBuildArtifacts@1
             inputs: { pathtoPublish: "wheelhouse" }
       - job: macos_37
-        pool: { vmImage: "macOS-10.15" }
+        pool: { vmImage: "macOS-10.14" }
         variables:
           - name: PYTHON_VERSION_NUMBER
             value: "3.7"
@@ -73,7 +73,7 @@ stages:
           - task: PublishBuildArtifacts@1
             inputs: { pathtoPublish: "wheelhouse" }
       - job: macos_38
-        pool: { vmImage: "macOS-10.15" }
+        pool: { vmImage: "macOS-10.14" }
         variables:
           - name: PYTHON_VERSION_NUMBER
             value: "3.8"
