@@ -88,7 +88,10 @@ void SSID(py::module& m)
           &dart::realtime::SSID::registerControls,
           ::py::arg("now"),
           ::py::arg("controls"))
-      .def("start", &dart::realtime::SSID::start)
+      .def(
+          "start",
+          &dart::realtime::SSID::start,
+          ::py::call_guard<py::gil_scoped_release>())
       .def("stop", &dart::realtime::SSID::stop)
       .def(
           "runInference",

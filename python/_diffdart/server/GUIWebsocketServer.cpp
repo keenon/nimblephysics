@@ -107,7 +107,8 @@ void GUIWebsocketServer(py::module& m)
           "setObjectPosition",
           &dart::server::GUIWebsocketServer::setObjectPosition,
           ::py::arg("key"),
-          ::py::arg("position"))
+          ::py::arg("position"),
+          ::py::call_guard<py::gil_scoped_release>())
       .def(
           "setObjectRotation",
           &dart::server::GUIWebsocketServer::setObjectRotation,

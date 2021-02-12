@@ -32,6 +32,7 @@
 
 #include <functional>
 
+#include <Python.h>
 #include <dart/trajectory/IPOptOptimizer.hpp>
 #include <dart/trajectory/Problem.hpp>
 #include <pybind11/eigen.h>
@@ -53,7 +54,8 @@ void IPOptOptimizer(py::module& m)
           "optimize",
           &dart::trajectory::IPOptOptimizer::optimize,
           ::py::arg("shot"),
-          ::py::arg("reuseRecord") = nullptr)
+          ::py::arg("reuseRecord") = nullptr,
+          ::py::call_guard<py::gil_scoped_release>())
       .def(
           "setIterationLimit",
           &dart::trajectory::IPOptOptimizer::setIterationLimit,
@@ -116,17 +118,32 @@ void IPOptOptimizer(py::module& m)
                                       int step,
                                       double primal,
                                       double dual) {
+                  /* Acquire GIL before calling Python code */
+                  py::gil_scoped_acquire acquire;
                   try
                   {
                     return callback(problem, step, primal, dual);
                   }
                   catch (::py::error_already_set& e)
                   {
-                    std::cout << "DiffDART caught an exception calling "
-                                 "callback from registerIntermediateCallback():"
-                              << std::endl
-                              << std::string(e.what()) << std::endl;
-                    return true;
+                    if (e.matches(PyExc_KeyboardInterrupt))
+                    {
+                      std::cout << "DiffDART caught a keyboard interrupt in a "
+                                   "callback from "
+                                   "registerIntermediateCallback(). Exiting "
+                                   "with code 0."
+                                << std::endl;
+                      exit(0);
+                    }
+                    else
+                    {
+                      std::cout
+                          << "DiffDART caught an exception calling "
+                             "callback from registerIntermediateCallback():"
+                          << std::endl
+                          << std::string(e.what()) << std::endl;
+                      return true;
+                    }
                   }
                 };
             self->registerIntermediateCallback(wrappedCallback);
