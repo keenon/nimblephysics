@@ -24,7 +24,14 @@ endif()
 #   return()
 # endif()
 
-find_package(Python3 ${DARTPY_PYTHON_VERSION} EXACT REQUIRED COMPONENTS Interpreter Development)
+find_program(PYTHON_EXECUTABLE python3)
+execute_process(COMMAND "${PYTHON_EXECUTABLE}" "-c" "from distutils.sysconfig import get_python_inc; print(get_python_inc())" OUTPUT_VARIABLE Python3_INCLUDE_DIRS)
+message(STATUS "Python3_INCLUDE_DIRS=${Python3_INCLUDE_DIRS}")
+execute_process(COMMAND "${PYTHON_EXECUTABLE}" "-c" "import distutils.sysconfig as sysconfig; print(sysconfig.get_config_var('LIBDIR'))" OUTPUT_VARIABLE Python3_LIBRARIES)
+message(STATUS "Python3_LIBRARIES=${Python3_LIBRARIES}")
+# -DPYTHON_INCLUDE_DIR=$(python -c "from distutils.sysconfig import get_python_inc; print(get_python_inc())")
+# -DPYTHON_LIBRARY=$(python -c "import distutils.sysconfig as sysconfig; print(sysconfig.get_config_var('LIBDIR'))")
+# find_package(Python3 ${DARTPY_PYTHON_VERSION} EXACT REQUIRED COMPONENTS Interpreter Development)
 
 # Find pybind11
 # Needs to set PYBIND11_PYTHON_VERSION before finding pybind11
