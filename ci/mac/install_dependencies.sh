@@ -177,19 +177,22 @@ rm -rf urdfdom
 
 # Install protobuf
 PROTOBUF_VERSION="3.14.0"
-wget https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOBUF_VERSION}/protobuf-all-${PROTOBUF_VERSION}.tar.gz
-tar -xvzf protobuf-all-${PROTOBUF_VERSION}.tar.gz
-rm protobuf-all-${PROTOBUF_VERSION}.tar.gz
-pushd protobuf-${PROTOBUF_VERSION}
-CXX_FLAGS="-fvisibility=hidden" ./configure
-make -j
-make install
-popd
-rm -rf protobuf-${PROTOBUF_VERSION}
+# wget https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOBUF_VERSION}/protobuf-all-${PROTOBUF_VERSION}.tar.gz
+# tar -xvzf protobuf-all-${PROTOBUF_VERSION}.tar.gz
+# rm protobuf-all-${PROTOBUF_VERSION}.tar.gz
+# pushd protobuf-${PROTOBUF_VERSION}
+# CXX_FLAGS="-fvisibility=hidden" ./configure
+# make -j
+# make install
+# popd
+# rm -rf protobuf-${PROTOBUF_VERSION}
 
 # Install grpc
 git clone --recurse-submodules -b v1.33.2 https://github.com/grpc/grpc
 pushd grpc
+pushd third_party/protobuf
+git checkout v${PROTOBUF_VERSION}
+popd
 mkdir -p cmake/build
 pushd cmake/build
 cmake -DgRPC_INSTALL=ON \

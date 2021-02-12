@@ -9,12 +9,11 @@ RUN mkdir /wheelhouse
 # Build Python 3.7
 
 ENV PYTHON="/opt/python/cp37-cp37m/bin/python3.7"
+ENV PATH="/opt/python/cp37-cp37m/bin/:${PATH}"
 ENV PYTHON_VERSION="cp37-cp37m"
 ENV PYTHON_INCLUDE="/opt/python/cp37-cp37m/include/python3.7m/"
 ENV PYTHON_LIB="/opt/python/cp37-cp37m/lib/python3.7"
 ENV PYTHON_VERSION_NUMBER="3.7"
-RUN rm /usr/bin/python && \
-    ln -s $PYTHON /usr/bin/python
 
 # Install pybind11
 ENV CPATH="${PYTHON_INCLUDE}"

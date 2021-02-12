@@ -8,13 +8,11 @@ RUN mkdir /wheelhouse
 # Build Python 3.8
 
 ENV PYTHON="/opt/python/cp38-cp38/bin/python3.8"
+ENV PATH="/opt/python/cp38-cp38/bin/:${PATH}"
 ENV PYTHON_VERSION="cp38-cp38"
 ENV PYTHON_INCLUDE="/opt/python/cp38-cp38/include/python3.8/"
 ENV PYTHON_LIB="/opt/python/cp38-cp38/lib/python3.8"
 ENV PYTHON_VERSION_NUMBER="3.8"
-
-RUN rm /usr/bin/python && \
-    ln -s $PYTHON /usr/bin/python
 
 # Install pybind11
 ENV CPATH="${PYTHON_INCLUDE}"
@@ -34,3 +32,4 @@ RUN cd diffdart
 RUN yum install -y gdb
 RUN curl -sL https://rpm.nodesource.com/setup_10.x | bash -
 RUN yum install -y nodejs
+RUN protoc --version
