@@ -30,6 +30,7 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <Python.h>
 #include <dart/server/GUIWebsocketServer.hpp>
 #include <dart/simulation/World.hpp>
 #include <pybind11/eigen.h>
@@ -57,6 +58,18 @@ void GUIWebsocketServer(py::module& m)
       .def(
           "stopServing",
           &dart::server::GUIWebsocketServer::stopServing,
+          ::py::call_guard<py::gil_scoped_release>())
+      .def(
+          "blockWhileServing",
+          +[](dart::server::GUIWebsocketServer* self) -> void {
+            self->blockWhileServing([]() {
+              /* Acquire GIL before calling Python code */
+              py::gil_scoped_acquire acquire;
+
+              if (PyErr_CheckSignals() != 0)
+                throw py::error_already_set();
+            });
+          },
           ::py::call_guard<py::gil_scoped_release>())
       .def("isServing", &dart::server::GUIWebsocketServer::isServing)
       .def("getScreenSize", &dart::server::GUIWebsocketServer::getScreenSize)

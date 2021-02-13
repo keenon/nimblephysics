@@ -30,6 +30,7 @@ namespace server {
 GUIWebsocketServer::GUIWebsocketServer()
   : mPort(-1),
     mServing(false),
+    mStartingServer(false),
     mScreenSize(Eigen::Vector2i(680, 420)),
     mAutoflush(true),
     mMessagesQueued(0)
@@ -40,22 +41,20 @@ GUIWebsocketServer::GUIWebsocketServer()
 GUIWebsocketServer::~GUIWebsocketServer()
 {
   {
-    const std::lock_guard<std::recursive_mutex> lock(this->destructorMutex);
-    if (mServing)
-    {
-      dterr
-          << "GUIWebsocketServer is being deallocated while it's still "
-             "serving! The server will now terminate, and attempt to clean up. "
-             "If this was not intended "
-             "behavior, please keep a reference to the GUIWebsocketServer to "
-             "keep the server alive. If this was intended behavior, please "
-             "call "
-             "stopServing() on "
-             "the server before deallocating it."
-          << std::endl;
-      stopServing();
-    }
+    const std::unique_lock<std::mutex> lock(this->mServingMutex);
+    if (!mServing)
+      return;
   }
+  dterr << "GUIWebsocketServer is being deallocated while it's still "
+           "serving! The server will now terminate, and attempt to clean up. "
+           "If this was not intended "
+           "behavior, please keep a reference to the GUIWebsocketServer to "
+           "keep the server alive. If this was intended behavior, please "
+           "call "
+           "stopServing() on "
+           "the server before deallocating it."
+        << std::endl;
+  stopServing();
 }
 
 /// This is a non-blocking call to start a websocket server on a given port
@@ -63,14 +62,19 @@ void GUIWebsocketServer::serve(int port)
 {
   mPort = port;
   // Register signal and signal handler
-  if (mServing)
   {
-    std::cout << "Errer in GUIWebsocketServer::serve()! Already serving. "
-                 "Ignoring request."
-              << std::endl;
-    return;
+    const std::unique_lock<std::mutex> lock(this->mServingMutex);
+    if (mServing || mStartingServer)
+    {
+      std::cout << "Errer in GUIWebsocketServer::serve()! Already serving. "
+                   "Ignoring request."
+                << std::endl;
+      return;
+    }
+    // We're not serving yet, but we are starting the server
+    mServing = false;
+    mStartingServer = true;
   }
-  mServing = true;
   mServer = new WebsocketServer();
 
   // Register our network callbacks, ensuring the logic is run on the main
@@ -325,6 +329,16 @@ void GUIWebsocketServer::serve(int port)
     std::cout << "GUIWebsocketServer will start serving a WebSocket server on "
                  "ws://localhost:"
               << port << std::endl;
+
+    // Note that we've started, but do it from within the server's event loop
+    // once the server has _actually_ started.
+    mServer->eventLoop.post([&]() {
+      const std::unique_lock<std::mutex> lock(this->mServingMutex);
+      mStartingServer = false;
+      mServing = true;
+      mServingConditionValue.notify_all();
+    });
+
     bool success = mServer->run(port);
     if (!success)
     {
@@ -338,7 +352,18 @@ void GUIWebsocketServer::serve(int port)
 void GUIWebsocketServer::stopServing()
 {
   {
-    const std::lock_guard<std::recursive_mutex> lock(this->destructorMutex);
+    std::unique_lock<std::mutex> lock(this->mServingMutex);
+    if (mStartingServer)
+    {
+      std::cout << "GUIWebsocketServer called stopServing() while we're in the "
+                   "middle of booting "
+                   "the server. Waiting until booting finished..."
+                << std::endl;
+      mServingConditionValue.wait(lock, [&]() { return !mStartingServer; });
+      std::cout << "GUIWebsocketServer finished booting server, will now "
+                   "resume stopServing()."
+                << std::endl;
+    }
     if (!mServing)
       return;
     mServing = false;
@@ -354,12 +379,38 @@ void GUIWebsocketServer::stopServing()
   delete mServerThread;
   mServer = nullptr;
   mServerThread = nullptr;
+  mServingConditionValue.notify_all();
 }
 
 /// Returns true if we're serving
 bool GUIWebsocketServer::isServing()
 {
   return mServing;
+}
+
+/// This sleeps until we're done serving, without busy-waiting in a loop. It
+/// wakes up occassionally to call the `checkForSignals` callback, where you
+/// can throw an exception to shut down the program.
+void GUIWebsocketServer::blockWhileServing(
+    std::function<void()> checkForSignals)
+{
+  std::unique_lock<std::mutex> lock(this->mServingMutex);
+  if (!mServing)
+    return;
+  while (true)
+  {
+    if (mServingConditionValue.wait_for(
+            lock, std::chrono::milliseconds(1000), [&]() { return !mServing; }))
+    {
+      // Our condition was met!
+      return;
+    }
+    else
+    {
+      // Wake up and check for signals
+      checkForSignals();
+    }
+  }
 }
 
 /// This adds a listener that will get called when someone connects to the

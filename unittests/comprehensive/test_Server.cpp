@@ -39,11 +39,84 @@
 #include <gtest/gtest.h>
 
 #include "dart/server/WebsocketServer.hpp"
+#include "dart/server/GUIWebsocketServer.hpp"
 
 // The port number the WebSocket server listens on
 #define PORT_NUMBER 8080
 
+using namespace dart;
+using namespace server;
+
 // #define ALL_TESTS
+
+TEST(SERVER, SERVER_BLOCK_STOP)
+{
+  server::GUIWebsocketServer server;
+  server.serve(8080);
+
+  bool finished = false;
+  std::thread t([&](){
+    server.blockWhileServing();
+    finished = true;
+  });
+
+  EXPECT_FALSE(finished);
+  server.stopServing();
+  t.join();
+  EXPECT_TRUE(finished);
+}
+
+TEST(SERVER, SERVER_BLOCK_WAIT_STOP)
+{
+  server::GUIWebsocketServer server;
+  server.serve(8080);
+
+  bool finished = false;
+  std::thread t([&](){
+    server.blockWhileServing();
+    finished = true;
+  });
+
+  EXPECT_FALSE(finished);
+
+  std::this_thread::sleep_for(std::chrono::milliseconds(50));
+  server.stopServing();
+  t.join();
+  EXPECT_TRUE(finished);
+}
+
+TEST(SERVER, SERVER_STOP_BLOCK)
+{
+  server::GUIWebsocketServer server;
+  server.serve(8080);
+
+  bool finished = false;
+  std::thread t([&](){
+    server.stopServing();
+    finished = true;
+  });
+
+  server.blockWhileServing();
+  t.join();
+  EXPECT_TRUE(finished);
+}
+
+TEST(SERVER, SERVER_WAIT_STOP_BLOCK)
+{
+  server::GUIWebsocketServer server;
+  server.serve(8080);
+
+  bool finished = false;
+  std::thread t([&](){
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    server.stopServing();
+    finished = true;
+  });
+
+  server.blockWhileServing();
+  t.join();
+  EXPECT_TRUE(finished);
+}
 
 #ifdef ALL_TESTS
 TEST(SERVER, BASIC_SERVER)
