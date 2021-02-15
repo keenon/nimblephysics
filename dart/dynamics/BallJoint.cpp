@@ -95,8 +95,7 @@ Eigen::Matrix3d BallJoint::convertToRotation(const Eigen::Vector3d& _positions)
 
 //==============================================================================
 BallJoint::BallJoint(const Properties& properties)
-  : Base(properties),
-    mR(Eigen::Isometry3d::Identity())
+  : Base(properties)
 {
   mJacobianDeriv = Eigen::Matrix<double, 6, 3>::Zero();
 
@@ -114,9 +113,18 @@ Joint* BallJoint::clone() const
 
 //==============================================================================
 Eigen::Matrix<double, 6, 3> BallJoint::getRelativeJacobianStatic(
-    const Eigen::Vector3d& /*positions*/) const
+    const Eigen::Vector3d& positions) const
 {
-  return mJacobian;
+  Eigen::Matrix<double, 6, 3> J;
+
+  const Eigen::Vector3d& q = positions;
+  const Eigen::Isometry3d& T = Joint::mAspectProperties.mT_ChildBodyToJoint;
+
+  J.topRows(3).noalias() = T.rotation() * math::so3RightJacobian(q);
+  J.bottomRows(3).noalias()
+      = math::makeSkewSymmetric(T.translation()) * J.topRows(3);
+
+  return J;
 }
 
 //==============================================================================
@@ -125,15 +133,20 @@ Eigen::Vector3d BallJoint::getPositionDifferencesStatic(
 {
   const Eigen::Matrix3d R1 = convertToRotation(_q1);
   const Eigen::Matrix3d R2 = convertToRotation(_q2);
+  const Eigen::Matrix3d S = math::so3RightJacobian(_q1);
 
-  return convertToPositions(R1.transpose() * R2);
+  return S.inverse() * convertToPositions(R1.transpose() * R2);
 }
 
 //==============================================================================
-void BallJoint::integratePositions(double _dt)
+void BallJoint::integratePositions(double dt)
 {
-  Eigen::Matrix3d Rnext
-      = getR().linear() * convertToRotation(getVelocitiesStatic() * _dt);
+  const auto& q = getPositionsStatic();
+  const auto& dq = getVelocitiesStatic();
+
+  const Eigen::Matrix3d S = math::so3RightJacobian(q);
+  const Eigen::Matrix3d Rnext
+      = convertToRotation(q) * convertToRotation(S * dq * dt);
 
   setPositionsStatic(convertToPositions(Rnext));
 }
@@ -212,28 +225,33 @@ void BallJoint::updateDegreeOfFreedomNames()
 //==============================================================================
 void BallJoint::updateRelativeTransform() const
 {
-  mR.linear() = convertToRotation(getPositionsStatic());
+  Eigen::Isometry3d R = Eigen::Isometry3d::Identity();
+  R.linear() = convertToRotation(getPositionsStatic());
 
-  mT = Joint::mAspectProperties.mT_ParentBodyToJoint * mR
+  mT = Joint::mAspectProperties.mT_ParentBodyToJoint * R
       * Joint::mAspectProperties.mT_ChildBodyToJoint.inverse();
 
   assert(math::verifyTransform(mT));
 }
 
 //==============================================================================
-void BallJoint::updateRelativeJacobian(bool _mandatory) const
+void BallJoint::updateRelativeJacobian(bool /*_mandatory*/) const
 {
-  if (_mandatory)
-  {
-    mJacobian = math::getAdTMatrix(
-          Joint::mAspectProperties.mT_ChildBodyToJoint).leftCols<3>();
-  }
+  mJacobian = getRelativeJacobianStatic(getPositionsStatic());
 }
 
 //==============================================================================
 void BallJoint::updateRelativeJacobianTimeDeriv() const
 {
-  assert(Eigen::Matrix6d::Zero().leftCols<3>() == mJacobianDeriv);
+  const auto& q = getPositionsStatic();
+  const auto& dq = getVelocitiesStatic();
+  const Eigen::Isometry3d& T = Joint::mAspectProperties.mT_ChildBodyToJoint;
+
+  const Eigen::Matrix3d dJ = math::so3RightJacobianTimeDeriv(q, dq);
+
+  mJacobianDeriv.topRows(3).noalias() = T.rotation() * dJ;
+  mJacobianDeriv.bottomRows(3).noalias()
+      = math::makeSkewSymmetric(T.translation()) * mJacobianDeriv.topRows(3);
 }
 
 //==============================================================================
@@ -327,18 +345,5 @@ Eigen::Vector6d BallJoint::getScrewAxisGradientForForce(
     parentTransform * Joint::mAspectProperties.mT_ParentBodyToJoint, grad);
 }
 
-//==============================================================================
-const Eigen::Isometry3d& BallJoint::getR() const
-{
-  if(mNeedTransformUpdate)
-  {
-    updateRelativeTransform();
-    mNeedTransformUpdate = false;
-  }
-
-  return mR;
-}
-
 }  // namespace dynamics
 }  // namespace dart
-
