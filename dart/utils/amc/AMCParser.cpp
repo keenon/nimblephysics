@@ -12,7 +12,7 @@
 #include "dart/dynamics/RevoluteJoint.hpp"
 #include "dart/dynamics/ShapeFrame.hpp"
 #include "dart/dynamics/Skeleton.hpp"
-#include "dart/utils/amc/ReadSkeleton.hpp"
+#include "dart/utils/amc/skeleton.h"
 
 namespace dart {
 
@@ -22,14 +22,15 @@ namespace utils {
 namespace amc {
 
 std::pair<std::shared_ptr<dynamics::Skeleton>, Eigen::MatrixXd>
-AMCParser::loadAMC(const std::string& asfPath, const std::string& amcPath)
+AMCParser::loadAMC(const std::string& /* asfPath */, const std::string& /* amcPath */)
 {
+  std::shared_ptr<dynamics::Skeleton> skel = dynamics::Skeleton::create("name");
+
+  /*
   ::Library::Skeleton amcSkel;
   ::ReadSkeleton(asfPath, amcSkel);
   std::vector<double> amcAnimation;
   ::ReadAnimation(amcPath, amcSkel, amcAnimation);
-
-  std::shared_ptr<dynamics::Skeleton> skel = dynamics::Skeleton::create("name");
 
   std::shared_ptr<BoxShape> box(new BoxShape(Eigen::Vector3d(0.1, 0.1, 0.1)));
 
@@ -61,6 +62,7 @@ AMCParser::loadAMC(const std::string& asfPath, const std::string& amcPath)
 
     nodes.push_back(linkPair.second);
   }
+  */
 
   Eigen::MatrixXd animation = Eigen::MatrixXd::Zero(10, 10);
   return std::pair<std::shared_ptr<dynamics::Skeleton>, Eigen::MatrixXd>(
