@@ -11,27 +11,19 @@ from diffdart import DartTorchLossFn, DartTorchTrajectoryRollout, DartGUI, GUITr
 
 
 def main():
-  world = dart.simulation.World()
-  world.setGravity([0, -9.81, 0])
-  # world.setSlowDebugResultsAgainstFD(True)
+  world: dart.simulation.World = dart.simulation.World.loadFrom(os.path.join(
+      os.path.dirname(__file__), "../../data/skel/half_cheetah.skel"))
 
-  # Set up skeleton
-  atlas: dart.dynamics.Skeleton = world.loadSkeleton(os.path.join(
-      os.path.dirname(__file__), "../../data/sdf/atlas/atlas_v3_no_head.urdf"))
-  atlas.setPosition(0, -0.5 * 3.14159)
-  ground: dart.dynamics.Skeleton = world.loadSkeleton(os.path.join(
-      os.path.dirname(__file__), "../../data/sdf/atlas/ground.urdf"))
-  floorBody: dart.dynamics.BodyNode = ground.getBodyNode(0)
-  floorBody.getShapeNode(0).getVisualAspect().setCastShadows(False)
+  cheetah = world.getSkeleton(1)
 
-  # forceLimits = np.ones([atlas.getNumDofs()]) * 500
-  # forceLimits[0:6] = 0
-  # atlas.setForceUpperLimits(forceLimits)
-  # atlas.setForceLowerLimits(forceLimits * -1)
+  forceLimits = np.ones([cheetah.getNumDofs()]) * 500
+  # forceLimits[0:1] = 0
+  cheetah.setForceUpperLimits(forceLimits)
+  cheetah.setForceLowerLimits(forceLimits * -1)
 
-  goal_x = 0.0
-  goal_y = 0.8
-  goal_z = -1.0
+  goal_x = 0.5
+  goal_y = 1.0
+  goal_z = 0.0
 
   def loss(rollout: DartTorchTrajectoryRollout):
     pos = rollout.getPoses('ik')
@@ -42,13 +34,13 @@ def main():
     return torch.square(last_pos_x - goal_x) + torch.square(last_pos_y - goal_y) + torch.square(last_pos_z - goal_z)
   dartLoss: dart.trajectory.LossFn = DartTorchLossFn(loss)
 
-  trajectory = dart.trajectory.MultiShot(world, dartLoss, 400, 20, False)
+  trajectory = dart.trajectory.SingleShot(world, dartLoss, 400, False)
 
   ikMap: dart.neural.IKMapping = dart.neural.IKMapping(world)
-  handNode: dart.dynamics.BodyNode = atlas.getBodyNode("l_hand")
+  handNode: dart.dynamics.BodyNode = cheetah.getBodyNode("h_head")
   ikMap.addLinearBodyNode(handNode)
   trajectory.addMapping('ik', ikMap)
-  trajectory.setParallelOperationsEnabled(True)
+  # trajectory.setParallelOperationsEnabled(True)
 
   optimizer = dart.trajectory.IPOptOptimizer()
   optimizer.setLBFGSHistoryLength(3)

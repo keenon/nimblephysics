@@ -6,7 +6,7 @@ import math
 import time
 import diffdart as dart
 from typing import Dict
-from diffdart import DartTorchLossFn, DartTorchTrajectoryRollout, GUITrajectoryTrainer
+from diffdart import DartTorchLossFn, DartTorchTrajectoryRollout, DartGUI
 
 
 def main():
@@ -38,8 +38,8 @@ def main():
     poleShape = pole.createShapeNode(dart.dynamics.BoxShape([.05, 0.25, .05]))
     poleVisual = poleShape.createVisualAspect()
     poleVisual.setColor(color)
-    poleJoint.setForceUpperLimit(0, 100.0)
-    poleJoint.setForceLowerLimit(0, -100.0)
+    poleJoint.setForceUpperLimit(0, 1000.0)
+    poleJoint.setForceLowerLimit(0, -1000.0)
     poleJoint.setVelocityUpperLimit(0, 10000.0)
     poleJoint.setVelocityLowerLimit(0, -10000.0)
 
@@ -87,34 +87,72 @@ def main():
 
   # Set up the view
 
+  goal_x = 0.0
+  goal_y = 0.3
+
   def loss(rollout: DartTorchTrajectoryRollout):
-    pos = rollout.getPoses('ik')
-    vel = rollout.getVels('ik')
-    step_loss = - torch.sum(pos[1, :] * pos[1, :] * torch.sign(pos[1, :]))
-    last_pos_y = pos[1, -1]
-    last_vel_y = vel[1, -1]
-    final_loss = - 100 * torch.square(last_pos_y) * torch.sign(last_pos_y)
-    return step_loss + final_loss
+    pos = rollout.getPoses()
+    head_x = pos[-1, 0]
+    head_y = pos[-1, 1]
+    diff_x = head_x - goal_x
+    diff_y = head_y - goal_y
+    return (diff_x * diff_x) + (diff_y * diff_y)
   dartLoss: dart.trajectory.LossFn = DartTorchLossFn(loss)
 
-  trajectory = dart.trajectory.MultiShot(world, dartLoss, 400, 20, False)
+  gui = DartGUI()
+  gui.serve(8080)
+  gui.stateMachine().renderWorld(world, "world")
+  gui.stateMachine().createSphere("goal_pos", 0.05, np.array(
+      [goal_x, goal_y, 0.0]), np.array([118/255, 224/255, 65/255]), True, False)
 
-  ikMap: dart.neural.IKMapping = dart.neural.IKMapping(world)
-  ikMap.addLinearBodyNode(root)
-  trajectory.addMapping('ik', ikMap)
+  def onDrag(pos: np.array):
+    goal_x = pos[0]
+    goal_y = pos[1]
+    gui.stateMachine().setObjectPosition("goal_pos", np.array([goal_x, goal_y, 0.0]))
 
-  trajectory.setParallelOperationsEnabled(True)
-  optimizer = dart.trajectory.IPOptOptimizer()
-  optimizer.setLBFGSHistoryLength(3)
-  optimizer.setTolerance(1e-5)
-  optimizer.setCheckDerivatives(False)
-  optimizer.setIterationLimit(500)
-  optimizer.setRecordPerformanceLog(True)
+  gui.stateMachine().registerDragListener("goal_pos", onDrag)
 
-  trainer = GUITrajectoryTrainer(world, trajectory, optimizer)
-  result: dart.trajectory.Solution = trainer.train(True)
-  # perflogs: Dict[str, dart.performance.FinalizedPerformanceLog] = result.getPerfLog().finalize()
-  # print(perflog)
+  def onReplan(time: int, rollout: dart.trajectory.TrajectoryRollout, duration: int):
+    gui.stateMachine().renderTrajectoryLines(world, rollout.getPoses())
+  mpc = dart.realtime.MPCLocal(world.clone(), dartLoss, 3000)
+  mpc.registerReplaningListener(onReplan)
+  mpc.setSilent(True)
+
+  ticker = dart.realtime.Ticker(world.getTimeStep())
+  originalColor = rootVisual.getColor()
+
+  def onTick(now):
+    world.setExternalForces(mpc.getForce(now))
+    if "a" in gui.stateMachine().getKeysDown():
+      perturbedForces = world.getExternalForces()
+      perturbedForces[0] = -15.0
+      world.setExternalForces(perturbedForces)
+      rootVisual.setColor([1, 0, 0])
+    elif "e" in gui.stateMachine().getKeysDown():
+      perturbedForces = world.getExternalForces()
+      perturbedForces[0] = 15.0
+      world.setExternalForces(perturbedForces)
+      rootVisual.setColor([0, 1, 0])
+    else:
+      rootVisual.setColor(originalColor)
+
+    world.step()
+
+    mpc.recordGroundTruthState(
+        now, world.getPositions(),
+        world.getVelocities(),
+        world.getMasses())
+
+    gui.stateMachine().renderWorld(world, "world")
+
+  def onConnect():
+    ticker.start()
+    mpc.start()
+
+  ticker.registerTickListener(onTick)
+  gui.stateMachine().registerConnectionListener(onConnect)
+
+  gui.stateMachine().blockWhileServing()
 
   """
   json = result.toJson(world)
