@@ -6,7 +6,9 @@
 #
 # This file is provided under the "BSD-style" License
 
-find_package(Protobuf "3.14.0.0" EXACT REQUIRED)
+# TODO(JS): Change to 3.14 before submitting PRs
+# find_package(Protobuf "3.14.0.0" EXACT REQUIRED)
+find_package(Protobuf "3.12.3.0" REQUIRED)
 
 message(STATUS "Protobuf_LIBRARIES: ${Protobuf_LIBRARIES}")
 

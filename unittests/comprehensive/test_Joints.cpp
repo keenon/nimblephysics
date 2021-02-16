@@ -362,14 +362,10 @@ TEST_F(JOINTS, PLANAR_JOINT)
 #endif
 
 // 6-dof joint
-//TEST_F(JOINTS, FREE_JOINT)
-//{
-//  kinematicsTest<FreeJoint>();
-//}
-// TODO(JS): Disabled the test compares analytical Jacobian and numerical
-// Jacobian since the meaning of FreeJoint Jacobian is changed per
-// we now use spatial velocity and spatial accertions as FreeJoint's generalized
-// velocities and accelerations, repectively.
+TEST_F(JOINTS, FREE_JOINT)
+{
+  kinematicsTest<FreeJoint>();
+}
 
 //==============================================================================
 template <void (Joint::*setX)(std::size_t, double),
