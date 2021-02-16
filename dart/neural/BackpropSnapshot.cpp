@@ -144,6 +144,7 @@ void BackpropSnapshot::backprop(
   thisTimestepLoss.lossWrtPosition = Eigen::VectorXd::Zero(mNumDOFs);
   thisTimestepLoss.lossWrtVelocity = Eigen::VectorXd::Zero(mNumDOFs);
   thisTimestepLoss.lossWrtTorque = Eigen::VectorXd::Zero(mNumDOFs);
+  thisTimestepLoss.lossWrtMass = Eigen::VectorXd::Zero(world->getMassDims());
 
   const Eigen::MatrixXd& posPos = getPosPosJacobian(world, thisLog);
   const Eigen::MatrixXd& posVel = getPosVelJacobian(world, thisLog);
@@ -172,10 +173,7 @@ void BackpropSnapshot::backprop(
   return;
 
   //////////////////////////////////////////////////////////
-  // TODO: this is the older, potentially more efficient way to do it. We should
-  // measure and verify that during optimization.
 
-  /*
   // Actually run the backprop
 
   std::unordered_map<std::string, bool> skeletonsVisited;
@@ -205,6 +203,7 @@ void BackpropSnapshot::backprop(
       // Keep track of which skeletons have been covered by constraint groups
       bool skelAlreadyVisited
           = (skeletonsVisited.find(skel->getName()) != skeletonsVisited.end());
+      DART_UNUSED(skelAlreadyVisited);
       assert(!skelAlreadyVisited);
       skeletonsVisited[skel->getName()] = true;
 
@@ -303,7 +302,6 @@ void BackpropSnapshot::backprop(
     thisLog->end();
   }
 #endif
-  */
 }
 
 //==============================================================================
@@ -1359,16 +1357,6 @@ Eigen::VectorXd BackpropSnapshot::getClampingConstraintRelativeVels()
 Eigen::VectorXd BackpropSnapshot::getVelocityDueToIllegalImpulses()
 {
   return assembleVector<Eigen::VectorXd>(VectorToAssemble::VEL_DUE_TO_ILLEGAL);
-}
-
-//==============================================================================
-/// Returns the coriolis and gravity forces after unconstrained forward
-/// dynamics. For pre-step forces, use
-/// world->getCoriolisAndGravityAndExternalForces()
-Eigen::VectorXd BackpropSnapshot::getCoriolisAndGravityAndExternalForces()
-{
-  return assembleVector<Eigen::VectorXd>(
-      VectorToAssemble::CORIOLIS_AND_GRAVITY_AND_EXTERNAL);
 }
 
 //==============================================================================
@@ -4018,8 +4006,6 @@ const Eigen::VectorXd& BackpropSnapshot::getVectorToAssemble(
     return matrices->getPreStepTorques();
   if (whichVector == VectorToAssemble::PRE_LCP_VEL)
     return matrices->getPreLCPVelocity();
-  if (whichVector == VectorToAssemble::CORIOLIS_AND_GRAVITY_AND_EXTERNAL)
-    return matrices->getCoriolisAndGravityAndExternalForces();
 
   assert(whichVector != VectorToAssemble::CONTACT_CONSTRAINT_MAPPINGS);
   // Control will never reach this point, but this removes a warning

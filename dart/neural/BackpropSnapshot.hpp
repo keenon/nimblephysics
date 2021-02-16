@@ -465,9 +465,6 @@ public:
   /// timestep
   Eigen::VectorXd getVelocityDueToIllegalImpulses();
 
-  /// Returns the coriolis and gravity forces pre-step
-  Eigen::VectorXd getCoriolisAndGravityAndExternalForces();
-
   /// Returns the velocity pre-LCP
   Eigen::VectorXd getPreLCPVelocity();
 
@@ -647,7 +644,6 @@ private:
     CLAMPING_CONSTRAINT_IMPULSES,
     CLAMPING_CONSTRAINT_RELATIVE_VELS,
     VEL_DUE_TO_ILLEGAL,
-    CORIOLIS_AND_GRAVITY_AND_EXTERNAL,
     PRE_STEP_VEL,
     PRE_STEP_TAU,
     PRE_LCP_VEL

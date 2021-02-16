@@ -299,9 +299,6 @@ public:
   /// Returns the velocity change caused by the illegal impulses from the LCP
   const Eigen::VectorXd& getVelocityDueToIllegalImpulses() const;
 
-  /// Returns the coriolis and gravity forces pre-step
-  const Eigen::VectorXd& getCoriolisAndGravityAndExternalForces() const;
-
   /// Returns the torques applied pre-step
   const Eigen::VectorXd& getPreStepTorques() const;
 
@@ -427,9 +424,6 @@ public:
 
   /// This is the inverse mass matrix computed in the constuctor
   Eigen::MatrixXd mMinv;
-
-  /// These are the coriolis and gravity forces, computed in the constuctor
-  Eigen::VectorXd mCoriolisAndGravityForces;
 
   /// These are the torques being applied, computed in the constuctor
   Eigen::VectorXd mPreStepTorques;
