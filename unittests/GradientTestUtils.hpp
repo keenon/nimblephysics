@@ -649,10 +649,10 @@ bool verifyVelVelJacobian(WorldPtr world, VectorXd proposedVelocities)
   }
 
   MatrixXd analytical = classicPtr->getVelVelJacobian(world);
-  MatrixXd bruteForce = classicPtr->finiteDifferenceVelVelJacobian(world);
+  MatrixXd bruteForce = classicPtr->finiteDifferenceRiddersVelVelJacobian(world);
 
   // atlas run as 1.6e-08 error
-  if (!equals(analytical, bruteForce, 2e-8))
+  if (!equals(analytical, bruteForce, 1e-8))
   {
     std::cout << "Brute force velVelJacobian:" << std::endl
               << bruteForce << std::endl;
@@ -1082,7 +1082,7 @@ bool verifyF_c(WorldPtr world)
   Eigen::MatrixXd analyticalA_cJac
       = classicPtr->getJacobianOfClampingConstraints(world, ones);
   Eigen::MatrixXd bruteForceA_cJac
-      = classicPtr->finiteDifferenceJacobianOfClampingConstraints(world, ones);
+      = classicPtr->finiteDifferenceRiddersJacobianOfClampingConstraints(world, ones);
 
   if (!equals(analyticalA_cJac, bruteForceA_cJac, 1e-8))
   {
@@ -1116,7 +1116,7 @@ bool verifyF_c(WorldPtr world)
   Eigen::MatrixXd analyticalA_cTJac
       = classicPtr->getJacobianOfClampingConstraintsTranspose(world, ones);
   Eigen::MatrixXd bruteForceA_cTJac
-      = classicPtr->finiteDifferenceJacobianOfClampingConstraintsTranspose(
+      = classicPtr->finiteDifferenceRiddersJacobianOfClampingConstraintsTranspose(
           world, ones);
 
   if (!equals(analyticalA_cTJac, bruteForceA_cTJac, 1e-8))
@@ -1156,12 +1156,12 @@ bool verifyF_c(WorldPtr world)
 
     Eigen::MatrixXd bruteForceQinvBJac
         = classicPtr
-              ->finiteDifferenceJacobianOfLCPConstraintMatrixClampingSubset(
+              ->finiteDifferenceRiddersJacobianOfLCPConstraintMatrixClampingSubset(
                   world, realB, WithRespectTo::POSITION);
     Eigen::MatrixXd analyticalQinvBJac
         = classicPtr->getJacobianOfLCPConstraintMatrixClampingSubset(
             world, realB, WithRespectTo::POSITION);
-    if (!equals(analyticalQinvBJac, bruteForceQinvBJac, 3e-8))
+    if (!equals(analyticalQinvBJac, bruteForceQinvBJac, 1e-8))
     {
       if (analyticalQinvBJac.rows() >= 6 && analyticalQinvBJac.cols() >= 6)
       {
@@ -1218,7 +1218,7 @@ bool verifyF_c(WorldPtr world)
     */
 
     Eigen::MatrixXd bruteForceJacB
-        = classicPtr->finiteDifferenceJacobianOfLCPOffsetClampingSubset(
+        = classicPtr->finiteDifferenceRiddersJacobianOfLCPOffsetClampingSubset(
             world, WithRespectTo::POSITION);
     Eigen::MatrixXd analyticalJacB
         = classicPtr->getJacobianOfLCPOffsetClampingSubset(
@@ -1321,7 +1321,7 @@ bool verifyF_c(WorldPtr world)
     }
 
     bruteForceJacB
-        = classicPtr->finiteDifferenceJacobianOfLCPOffsetClampingSubset(
+        = classicPtr->finiteDifferenceRiddersJacobianOfLCPOffsetClampingSubset(
             world, WithRespectTo::VELOCITY);
     analyticalJacB = classicPtr->getJacobianOfLCPOffsetClampingSubset(
         world, WithRespectTo::VELOCITY);
@@ -1407,7 +1407,7 @@ bool verifyF_c(WorldPtr world)
     }
 
     bruteForceJacB
-        = classicPtr->finiteDifferenceJacobianOfLCPOffsetClampingSubset(
+        = classicPtr->finiteDifferenceRiddersJacobianOfLCPOffsetClampingSubset(
             world, WithRespectTo::FORCE);
     analyticalJacB = classicPtr->getJacobianOfLCPOffsetClampingSubset(
         world, WithRespectTo::FORCE);
@@ -1748,7 +1748,7 @@ bool verifyScratch(WorldPtr world, WithRespectTo* wrt)
   neural::BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
 
   MatrixXd analytical = classicPtr->getScratchAnalytical(world, wrt);
-  MatrixXd bruteForce = classicPtr->getScratchFiniteDifference(world, wrt);
+  MatrixXd bruteForce = classicPtr->getScratchFiniteDifferenceRidders(world, wrt);
 
   /*
   MatrixXd posVelAnalytical = classicPtr->getPosVelJacobian(world);
@@ -1893,13 +1893,13 @@ bool verifyPosVelJacobian(WorldPtr world, VectorXd proposedVelocities)
   }
 
   MatrixXd analytical = classicPtr->getPosVelJacobian(world);
-  MatrixXd bruteForce = classicPtr->finiteDifferencePosVelJacobian(world);
+  MatrixXd bruteForce = classicPtr->finiteDifferenceRiddersPosVelJacobian(world);
 
   // Everything except Atlas passes this in 1e-8, but atlas runs closer to
   // 6e-8 max error. I'm going to cheerfully assume that this is just due to
   // the size and complexity of Atlas producing finite differencing errors in
   // dC and dMinv, which end up propagating. For now, this is fine.
-  if (!equals(analytical, bruteForce, 7e-8))
+  if (!equals(analytical, bruteForce, 1e-8))
   {
     std::cout << "Brute force posVelJacobian:" << std::endl
               << bruteForce << std::endl;
@@ -1934,10 +1934,10 @@ bool verifyForceVelJacobian(WorldPtr world, VectorXd proposedVelocities)
   }
 
   MatrixXd analytical = classicPtr->getForceVelJacobian(world);
-  MatrixXd bruteForce = classicPtr->finiteDifferenceForceVelJacobian(world);
+  MatrixXd bruteForce = classicPtr->finiteDifferenceRiddersForceVelJacobian(world);
 
   // Atlas runs at 1.5e-8 error
-  if (!equals(analytical, bruteForce, 2e-8))
+  if (!equals(analytical, bruteForce, 1e-8))
   {
     std::cout << "Brute force forceVelJacobian:" << std::endl
               << bruteForce << std::endl;
@@ -2074,7 +2074,7 @@ bool verifyPosPosJacobianApproximation(
 
   MatrixXd analytical = classicPtr->getPosPosJacobian(world);
   MatrixXd bruteForce
-      = classicPtr->finiteDifferencePosPosJacobian(world, subdivisions);
+      = classicPtr->finiteDifferenceRiddersPosPosJacobian(world, subdivisions);
 
   if (!equals(analytical, bruteForce, tolerance))
   {
@@ -2102,7 +2102,7 @@ bool verifyVelPosJacobianApproximation(
 
   MatrixXd analytical = classicPtr->getVelPosJacobian(world);
   MatrixXd bruteForce
-      = classicPtr->finiteDifferenceVelPosJacobian(world, subdivisions);
+      = classicPtr->finiteDifferenceRiddersVelPosJacobian(world, subdivisions);
 
   if (!equals(analytical, bruteForce, tolerance))
   {
@@ -2508,16 +2508,16 @@ bool verifyGradientBackprop(
 
     // p_t+1 <-- p_t
     Eigen::MatrixXd posPosFD
-        = backpropSnapshots[i]->finiteDifferencePosPosJacobian(world, 1);
+        = backpropSnapshots[i]->finiteDifferenceRiddersPosPosJacobian(world, 1);
     // v_t+1 <-- p_t
     Eigen::MatrixXd posVelFD
-        = backpropSnapshots[i]->finiteDifferencePosVelJacobian(world);
+        = backpropSnapshots[i]->finiteDifferenceRiddersPosVelJacobian(world);
     // p_t+1 <-- v_t
     Eigen::MatrixXd velPosFD
-        = backpropSnapshots[i]->finiteDifferenceVelPosJacobian(world, 1);
+        = backpropSnapshots[i]->finiteDifferenceRiddersVelPosJacobian(world, 1);
     // v_t+1 <-- v_t
     Eigen::MatrixXd velVelFD
-        = backpropSnapshots[i]->finiteDifferenceVelVelJacobian(world);
+        = backpropSnapshots[i]->finiteDifferenceRiddersVelVelJacobian(world);
 
     /*
     double diffPosPos = (posPos - posPosFD).norm();
@@ -5448,9 +5448,9 @@ bool verifyJacobianOfClampingConstraints(WorldPtr world)
   Eigen::MatrixXd analytical
       = classicPtr->getJacobianOfClampingConstraints(world, f0);
   Eigen::MatrixXd bruteForce
-      = classicPtr->finiteDifferenceJacobianOfClampingConstraints(world, f0);
+      = classicPtr->finiteDifferenceRiddersJacobianOfClampingConstraints(world, f0);
 
-  if (!equals(analytical, bruteForce, 2e-8))
+  if (!equals(analytical, bruteForce, 1e-8))
   {
     std::cout << "getJacobianOfClampingConstraints error:" << std::endl;
     std::cout << "f0:" << std::endl << f0 << std::endl;
@@ -5466,7 +5466,7 @@ bool verifyJacobianOfClampingConstraints(WorldPtr world)
       Eigen::MatrixXd analyticalOneHot
           = classicPtr->getJacobianOfClampingConstraints(world, oneHot);
       Eigen::MatrixXd bruteForceOneHot
-          = classicPtr->finiteDifferenceJacobianOfClampingConstraints(
+          = classicPtr->finiteDifferenceRiddersJacobianOfClampingConstraints(
               world, oneHot);
       if (!equals(analyticalOneHot, bruteForceOneHot, 1e-8))
       {
@@ -5495,10 +5495,10 @@ bool verifyJacobianOfClampingConstraintsTranspose(WorldPtr world)
   Eigen::MatrixXd analytical
       = classicPtr->getJacobianOfClampingConstraintsTranspose(world, v0);
   Eigen::MatrixXd bruteForce
-      = classicPtr->finiteDifferenceJacobianOfClampingConstraintsTranspose(
+      = classicPtr->finiteDifferenceRiddersJacobianOfClampingConstraintsTranspose(
           world, v0);
 
-  if (!equals(analytical, bruteForce, 2e-8))
+  if (!equals(analytical, bruteForce, 1e-8))
   {
     std::cout << "getJacobianOfClampingConstraintsTranspose error:"
               << std::endl;
@@ -5520,7 +5520,7 @@ bool verifyJacobianOfUpperBoundConstraints(WorldPtr world)
   Eigen::MatrixXd analytical
       = classicPtr->getJacobianOfUpperBoundConstraints(world, f0);
   Eigen::MatrixXd bruteForce
-      = classicPtr->finiteDifferenceJacobianOfUpperBoundConstraints(world, f0);
+      = classicPtr->finiteDifferenceRiddersJacobianOfUpperBoundConstraints(world, f0);
 
   if (!equals(analytical, bruteForce, 1e-8))
   {
@@ -5725,7 +5725,8 @@ bool verifyVelJacobianWrt(WorldPtr world, WithRespectTo* wrt)
   neural::BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
 
   MatrixXd analytical = classicPtr->getVelJacobianWrt(world, wrt);
-  MatrixXd bruteForce = classicPtr->finiteDifferenceVelJacobianWrt(world, wrt);
+  MatrixXd bruteForce = 
+      classicPtr->finiteDifferenceRiddersVelJacobianWrt(world, wrt);
 
   if (!equals(analytical, bruteForce, 5e-7))
   {
@@ -5745,7 +5746,8 @@ bool verifyPosJacobianWrt(WorldPtr world, WithRespectTo* wrt)
   neural::BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
 
   MatrixXd analytical = classicPtr->getPosJacobianWrt(world, wrt);
-  MatrixXd bruteForce = classicPtr->finiteDifferencePosJacobianWrt(world, wrt);
+  MatrixXd bruteForce = 
+      classicPtr->finiteDifferenceRiddersPosJacobianWrt(world, wrt);
 
   if (!equals(analytical, bruteForce, 1e-8))
   {

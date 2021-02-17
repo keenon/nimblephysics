@@ -1547,16 +1547,15 @@ void testFreeBlockWithFrictionCoeff(
   VectorXd worldVel = world->getVelocities();
   // Test the classic formulation
   EXPECT_TRUE(verifyNextV(world));
-  /*
-  EXPECT_TRUE(verifyF_c(world));
+  
+  // EXPECT_TRUE(verifyF_c(world));
 
-  EXPECT_TRUE(testScrews(world));
   EXPECT_TRUE(verifyAnalyticalJacobians(world));
   EXPECT_TRUE(verifyVelGradients(world, worldVel));
   EXPECT_TRUE(verifyAnalyticalBackprop(world));
   EXPECT_TRUE(verifyWrtMass(world));
   EXPECT_TRUE(verifyPosGradients(world, 1, 1e-8));
-  */
+
 }
 
 #ifdef ALL_TESTS
