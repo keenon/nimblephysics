@@ -1261,10 +1261,10 @@ bool verifyF_c(WorldPtr world)
     }
 
     Eigen::MatrixXd bruteForceEstimatedJac
-        = classicPtr->finiteDifferenceJacobianOfEstimatedConstraintForce(
+        = classicPtr->finiteDifferenceRiddersJacobianOfEstimatedConstraintForce(
             world, WithRespectTo::POSITION);
     Eigen::MatrixXd bruteForceJac
-        = classicPtr->finiteDifferenceJacobianOfConstraintForce(
+        = classicPtr->finiteDifferenceRiddersJacobianOfConstraintForce(
             world, WithRespectTo::POSITION);
     Eigen::MatrixXd analyticalJac = classicPtr->getJacobianOfConstraintForce(
         world, WithRespectTo::POSITION);
@@ -1360,9 +1360,9 @@ bool verifyF_c(WorldPtr world)
     }
 
     bruteForceEstimatedJac
-        = classicPtr->finiteDifferenceJacobianOfEstimatedConstraintForce(
+        = classicPtr->finiteDifferenceRiddersJacobianOfEstimatedConstraintForce(
             world, WithRespectTo::VELOCITY);
-    bruteForceJac = classicPtr->finiteDifferenceJacobianOfConstraintForce(
+    bruteForceJac = classicPtr->finiteDifferenceRiddersJacobianOfConstraintForce(
         world, WithRespectTo::VELOCITY);
     analyticalJac = classicPtr->getJacobianOfConstraintForce(
         world, WithRespectTo::VELOCITY);
@@ -1446,9 +1446,9 @@ bool verifyF_c(WorldPtr world)
     }
 
     bruteForceEstimatedJac
-        = classicPtr->finiteDifferenceJacobianOfEstimatedConstraintForce(
+        = classicPtr->finiteDifferenceRiddersJacobianOfEstimatedConstraintForce(
             world, WithRespectTo::FORCE);
-    bruteForceJac = classicPtr->finiteDifferenceJacobianOfConstraintForce(
+    bruteForceJac = classicPtr->finiteDifferenceRiddersJacobianOfConstraintForce(
         world, WithRespectTo::FORCE);
     analyticalJac
         = classicPtr->getJacobianOfConstraintForce(world, WithRespectTo::FORCE);
@@ -1509,11 +1509,11 @@ bool verifyConstraintForceJac(WorldPtr world)
 
   /*
   Eigen::MatrixXd bruteForceJac
-      = classicPtr->finiteDifferenceJacobianOfConstraintForce(
+      = classicPtr->finiteDifferenceRiddersJacobianOfConstraintForce(
           world, WithRespectTo::POSITION);
   */
   Eigen::MatrixXd bruteForceJac
-      = classicPtr->finiteDifferenceJacobianOfEstimatedConstraintForce(
+      = classicPtr->finiteDifferenceRiddersJacobianOfEstimatedConstraintForce(
           world, WithRespectTo::POSITION);
   Eigen::MatrixXd analyticalJac = classicPtr->getJacobianOfConstraintForce(
       world, WithRespectTo::POSITION);
@@ -1752,7 +1752,7 @@ bool verifyScratch(WorldPtr world, WithRespectTo* wrt)
 
   /*
   MatrixXd posVelAnalytical = classicPtr->getPosVelJacobian(world);
-  MatrixXd posVelFd = classicPtr->finiteDifferencePosVelJacobian(world);
+  MatrixXd posVelFd = classicPtr->finiteDifferenceRiddersPosVelJacobian(world);
   */
   if (!equals(world->getPositions(), classicPtr->getPreStepPosition()))
   {
@@ -1853,7 +1853,7 @@ bool verifyJacobianOfProjectionIntoClampsMatrix(
   MatrixXd analytical = classicPtr->getJacobianOfProjectionIntoClampsMatrix(
       world, proposedVelocities * 10, wrt);
   MatrixXd bruteForce
-      = classicPtr->finiteDifferenceJacobianOfProjectionIntoClampsMatrix(
+      = classicPtr->finiteDifferenceRiddersJacobianOfProjectionIntoClampsMatrix(
           world, proposedVelocities * 10, wrt);
 
   // These individual values can be quite large, on the order of 1e+4, so we

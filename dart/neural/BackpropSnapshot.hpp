@@ -504,9 +504,21 @@ public:
   Eigen::MatrixXd finiteDifferenceJacobianOfMinv(
       simulation::WorldPtr world, Eigen::VectorXd tau, WithRespectTo* wrt);
 
+  /// This computes and returns the jacobian of M^{-1}(pos, inertia) * tau by
+  /// Ridders extrapolated finite differences. This is SUPER SLOW, and is
+  /// only here for testing.
+  Eigen::MatrixXd finiteDifferenceRiddersJacobianOfMinv(
+      simulation::WorldPtr world, Eigen::VectorXd tau, WithRespectTo* wrt);
+
   /// This computes and returns the jacobian of C(pos, inertia, vel) by finite
   /// differences. This is SUPER SLOW, and is only here for testing.
   Eigen::MatrixXd finiteDifferenceJacobianOfC(
+      simulation::WorldPtr world, WithRespectTo* wrt);
+
+  /// This computes and returns the jacobian of C(pos, inertia, vel) by Ridders
+  /// extrapolated finite differences. This is SUPER SLOW, and is only here
+  /// for testing.
+  Eigen::MatrixXd finiteDifferenceRiddersJacobianOfC(
       simulation::WorldPtr world, WithRespectTo* wrt);
 
   /// This computes and returns the jacobian of M^{-1}(pos, inertia) * C(pos,
@@ -515,15 +527,32 @@ public:
   Eigen::MatrixXd finiteDifferenceJacobianOfMinvC(
       simulation::WorldPtr world, WithRespectTo* wrt);
 
-  /// This returns the jacobian of constraint force, holding everyhing constant
+  /// This computes and returns the jacobian of M^{-1}(pos, inertia) * C(pos,
+  /// inertia, vel) by Ridders extrapolated finite differences. This is SUPER SLOW,
+  /// and is only here for testing.
+  Eigen::MatrixXd finiteDifferenceRiddersJacobianOfMinvC(
+      simulation::WorldPtr world, WithRespectTo* wrt);
+
+  /// This returns the jacobian of constraint force, holding everything constant
   /// except the value of WithRespectTo
   Eigen::MatrixXd finiteDifferenceJacobianOfConstraintForce(
+      simulation::WorldPtr world, WithRespectTo* wrt);
+
+  /// This returns the jacobian of constraint force, holding everything constant
+  /// except the value of WithRespectTo. Uses Ridders method.
+  Eigen::MatrixXd finiteDifferenceRiddersJacobianOfConstraintForce(
       simulation::WorldPtr world, WithRespectTo* wrt);
 
   /// This returns the jacobian of estimated constraint force, without actually
   /// running forward passes, holding everyhing constant except the value of
   /// WithRespectTo
   Eigen::MatrixXd finiteDifferenceJacobianOfEstimatedConstraintForce(
+      simulation::WorldPtr world, WithRespectTo* wrt);
+
+  /// This returns the jacobian of estimated constraint force, without actually
+  /// running forward passes, holding everyhing constant except the value of
+  /// WithRespectTo. Uses Ridders method.
+  Eigen::MatrixXd finiteDifferenceRiddersJacobianOfEstimatedConstraintForce(
       simulation::WorldPtr world, WithRespectTo* wrt);
 
   /// These was the mX() vector used to construct this. Pretty much only here
