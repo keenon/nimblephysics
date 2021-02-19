@@ -11,6 +11,7 @@
 #include "dart/neural/DifferentiableContactConstraint.hpp"
 #include "dart/neural/NeuralConstants.hpp"
 #include "dart/neural/NeuralUtils.hpp"
+#include "dart/performance/PerformanceLog.hpp"
 #include "dart/simulation/World.hpp"
 
 namespace dart {
@@ -23,6 +24,8 @@ class ConstraintBase;
 namespace dynamics {
 class Skeleton;
 } // namespace dynamics
+
+using namespace performance;
 
 namespace neural {
 
@@ -124,30 +127,35 @@ public:
   /// backprop, you don't actually need this matrix, you can compute backprop
   /// directly. This is here if you want access to the full Jacobian for some
   /// reason.
-  Eigen::MatrixXd getVelVelJacobian(simulation::WorldPtr world);
+  Eigen::MatrixXd getVelVelJacobian(
+      simulation::WorldPtr world, PerformanceLog* perfLog = nullptr);
 
   /// This computes and returns the whole pos-vel jacobian. For backprop, you
   /// don't actually need this matrix, you can compute backprop directly. This
   /// is here if you want access to the full Jacobian for some reason.
-  Eigen::MatrixXd getPosVelJacobian(simulation::WorldPtr world);
+  Eigen::MatrixXd getPosVelJacobian(
+      simulation::WorldPtr world, PerformanceLog* perfLog = nullptr);
 
   /// This computes and returns the whole force-vel jacobian for this group. For
   /// backprop, you don't actually need this matrix, you can compute backprop
   /// directly. This is here if you want access to the full Jacobian for some
   /// reason.
-  Eigen::MatrixXd getForceVelJacobian(simulation::WorldPtr world);
+  Eigen::MatrixXd getForceVelJacobian(
+      simulation::WorldPtr world, PerformanceLog* perfLog = nullptr);
 
   /// This computes and returns the whole pos-pos jacobian for this group. For
   /// backprop, you don't actually need this matrix, you can compute backprop
   /// directly. This is here if you want access to the full Jacobian for some
   /// reason.
-  Eigen::MatrixXd getPosPosJacobian();
+  Eigen::MatrixXd getPosPosJacobian(
+      simulation::WorldPtr world, PerformanceLog* perfLog = nullptr);
 
   /// This computes and returns the whole vel-pos jacobian for this group. For
   /// backprop, you don't actually need this matrix, you can compute backprop
   /// directly. This is here if you want access to the full Jacobian for some
   /// reason.
-  Eigen::MatrixXd getVelPosJacobian();
+  Eigen::MatrixXd getVelPosJacobian(
+      simulation::WorldPtr world, PerformanceLog* perfLog = nullptr);
 
   /// This returns the [dC(pos,vel)/dpos] for the group, a block diagonal
   /// concatenation of the skeleton [dC(pos,vel)/dpos] matrices.
@@ -165,9 +173,19 @@ public:
   /// concatenation of the skeleton inverse mass matrices.
   Eigen::MatrixXd getInvMassMatrix(simulation::WorldPtr world);
 
-  /// This returns the P_c matrix. You shouldn't ever need this matrix, it's
-  /// just here to enable testing.
-  Eigen::MatrixXd getProjectionIntoClampsMatrix();
+  /// This returns the block diagonal matrix where each skeleton's joints
+  /// integration scheme is reflected.
+  Eigen::MatrixXd getJointsPosPosJacobian(simulation::WorldPtr world);
+
+  /// This returns the block diagonal matrix where each skeleton's joints
+  /// integration scheme is reflected.
+  Eigen::MatrixXd getJointsVelPosJacobian(simulation::WorldPtr world);
+
+  /// This computes and returns the component of the pos-pos and pos-vel
+  /// jacobians due to bounce approximation. For backprop, you don't actually
+  /// need this matrix, you can compute backprop directly. This is here if you
+  /// want access to the full Jacobian for some reason.
+  Eigen::MatrixXd getBounceApproximationJacobian(PerformanceLog* perfLog);
 
   /// This computes and returns the whole pos-vel jacobian. For backprop, you
   /// don't actually need this matrix, you can compute backprop directly. This
@@ -235,6 +253,11 @@ public:
   /// impulse tests.
   Eigen::MatrixXd getJacobianOfUpperBoundConstraints(
       simulation::WorldPtr world, Eigen::VectorXd f0);
+
+  /// This computes the Jacobian of A_ub^T*E*v0 with respect to position using
+  /// impulse tests.
+  Eigen::MatrixXd getJacobianOfUpperBoundConstraintsTranspose(
+      simulation::WorldPtr world, Eigen::VectorXd v0);
 
   /// This computes the implicit backprop without forming intermediate
   /// Jacobians. It takes a LossGradient with the position and velocity vectors

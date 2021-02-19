@@ -1591,14 +1591,18 @@ Eigen::MatrixXd Skeleton::getUnconstrainedVelJacobianWrt(
     double dt, neural::WithRespectTo* wrt)
 {
   Eigen::VectorXd tau = getForces();
-  Eigen::VectorXd C = getCoriolisAndGravityForces() + getExternalForces();
-
-  Eigen::MatrixXd dM = getJacobianOfMinv(dt * (tau - C), wrt);
+  Eigen::VectorXd C = getCoriolisAndGravityForces() - getExternalForces();
 
   Eigen::MatrixXd Minv = getInvMassMatrix();
   Eigen::MatrixXd dC = getJacobianOfC(wrt);
 
-  return dM - Minv * dt * dC;
+  if (wrt == neural::WithRespectTo::POSITION) {
+    Eigen::MatrixXd dM = getJacobianOfMinv(dt * (tau - C), wrt);
+    return dM - Minv * dt * dC;
+  }
+  else {
+    return -Minv * dt * dC;
+  }
 }
 
 //==============================================================================
@@ -1618,7 +1622,7 @@ Eigen::MatrixXd Skeleton::finiteDifferenceJacobianOfC(
   Eigen::VectorXd start = wrt->get(this);
 
   // Get baseline C(pos, vel)
-  Eigen::VectorXd baseline = getCoriolisAndGravityForces();
+  Eigen::VectorXd baseline = getCoriolisAndGravityForces() - getExternalForces();
 
   double EPS = 1e-7;
 
@@ -1627,11 +1631,11 @@ Eigen::MatrixXd Skeleton::finiteDifferenceJacobianOfC(
     Eigen::VectorXd tweaked = start;
     tweaked(i) += EPS;
     wrt->set(this, tweaked);
-    Eigen::VectorXd perturbedPos = getCoriolisAndGravityForces();
+    Eigen::VectorXd perturbedPos = getCoriolisAndGravityForces() - getExternalForces();
     tweaked = start;
     tweaked(i) -= EPS;
     wrt->set(this, tweaked);
-    Eigen::VectorXd perturbedNeg = getCoriolisAndGravityForces();
+    Eigen::VectorXd perturbedNeg = getCoriolisAndGravityForces() - getExternalForces();
 
     J.col(i) = (perturbedPos - perturbedNeg) / (2 * EPS);
   }
@@ -1654,16 +1658,20 @@ Eigen::MatrixXd Skeleton::finiteDifferenceJacobianOfMinv(
   // Get baseline C(pos, vel)
   Eigen::VectorXd baseline = multiplyByImplicitInvMassMatrix(f);
 
-  double EPS = 1e-7;
+  double EPS = 5e-7;
 
   for (std::size_t i = 0; i < m; i++)
   {
     Eigen::VectorXd tweaked = start;
     tweaked(i) += EPS;
     wrt->set(this, tweaked);
-    Eigen::VectorXd perturbed = multiplyByImplicitInvMassMatrix(f);
+    Eigen::VectorXd plus = multiplyByImplicitInvMassMatrix(f);
+    tweaked = start;
+    tweaked(i) -= EPS;
+    wrt->set(this, tweaked);
+    Eigen::VectorXd minus = multiplyByImplicitInvMassMatrix(f);
 
-    J.col(i) = (perturbed - baseline) / EPS;
+    J.col(i) = (plus - minus) / (2 * EPS);
   }
 
   // Reset everything how we left it

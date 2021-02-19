@@ -14,11 +14,7 @@
 // Make production builds happy with asserts
 #define _unused(x) ((void)(x))
 
-// This will enable runtime checks where every analytical Jacobian is compared
-// to the finite difference version, and we error if they're too close far
-// apart:
-//
-#define LOG_PERFORMANCE_BACKPROP_SNAPSHOT ;
+#define LOG_PERFORMANCE_BACKPROP_SNAPSHOT
 
 using namespace dart;
 using namespace math;
@@ -134,10 +130,10 @@ void BackpropSnapshot::backprop(
   // Set the state of the world back to what it was during the forward pass, so
   // that implicit mass matrix computations work correctly.
 
-  Eigen::VectorXd oldPositions = world->getPositions();
-  Eigen::VectorXd oldVelocities = world->getVelocities();
+  RestorableSnapshot snapshot(world);
   world->setPositions(mPreStepPosition);
   world->setVelocities(mPreStepVelocity);
+  world->setExternalForces(mPreStepTorques);
 
   // Create the vectors for this timestep
 
@@ -146,6 +142,7 @@ void BackpropSnapshot::backprop(
   thisTimestepLoss.lossWrtTorque = Eigen::VectorXd::Zero(mNumDOFs);
   thisTimestepLoss.lossWrtMass = Eigen::VectorXd::Zero(world->getMassDims());
 
+  /*
   const Eigen::MatrixXd& posPos = getPosPosJacobian(world, thisLog);
   const Eigen::MatrixXd& posVel = getPosVelJacobian(world, thisLog);
   const Eigen::MatrixXd& velPos = getVelPosJacobian(world, thisLog);
@@ -170,7 +167,9 @@ void BackpropSnapshot::backprop(
     thisLog->end();
   }
 #endif
+  snapshot.restore();
   return;
+  */
 
   //////////////////////////////////////////////////////////
 
@@ -253,13 +252,51 @@ void BackpropSnapshot::backprop(
     {
       std::size_t dofCursorWorld = mSkeletonOffset[skel->getName()];
       std::size_t dofs = skel->getNumDofs();
+
+      /////////////////////////////////////////////////////////////////
+      // Explicitly form the matrices
+      /////////////////////////////////////////////////////////////////
+
+      Eigen::MatrixXd Minv = skel->getInvMassMatrix();
+
+      Eigen::MatrixXd forceVel = mTimeStep * Minv;
+      Eigen::MatrixXd velVel
+          = Eigen::MatrixXd::Identity(skel->getNumDofs(), skel->getNumDofs())
+            - mTimeStep * Minv * skel->getVelCJacobian();
+      Eigen::MatrixXd posVel = skel->getUnconstrainedVelJacobianWrt(
+          world->getTimeStep(), WithRespectTo::POSITION);
+      Eigen::MatrixXd posPos
+          = Eigen::MatrixXd::Identity(skel->getNumDofs(), skel->getNumDofs());
+      Eigen::MatrixXd velPos
+          = mTimeStep
+            * Eigen::MatrixXd::Identity(skel->getNumDofs(), skel->getNumDofs());
+
+      thisTimestepLoss.lossWrtTorque.segment(dofCursorWorld, dofs)
+          = forceVel.transpose()
+            * nextTimestepLoss.lossWrtVelocity.segment(dofCursorWorld, dofs);
+      thisTimestepLoss.lossWrtVelocity.segment(dofCursorWorld, dofs)
+          = velVel.transpose()
+                * nextTimestepLoss.lossWrtVelocity.segment(dofCursorWorld, dofs)
+            + velPos.transpose()
+                  * nextTimestepLoss.lossWrtPosition.segment(
+                      dofCursorWorld, dofs);
+      thisTimestepLoss.lossWrtPosition.segment(dofCursorWorld, dofs)
+          = posVel.transpose()
+                * nextTimestepLoss.lossWrtVelocity.segment(dofCursorWorld, dofs)
+            + posPos.transpose()
+                  * nextTimestepLoss.lossWrtPosition.segment(
+                      dofCursorWorld, dofs);
+
+      /*
+
       // f_t
       // force-vel = dT * Minv
       thisTimestepLoss.lossWrtTorque.segment(dofCursorWorld, dofs)
           // f_t --> v_t+1
           = mTimeStep
-            * skel->multiplyByImplicitInvMassMatrix(
-                nextTimestepLoss.lossWrtVelocity.segment(dofCursorWorld, dofs));
+            * skel->getInvMassMatrix() // This is symmetric, but otherwise
+                                       // we would need to .transpose()
+            * nextTimestepLoss.lossWrtVelocity.segment(dofCursorWorld, dofs);
 
       // skel->getJacobionOfMinv();
       // getUnconstrainedVelJacobianWrt
@@ -283,18 +320,18 @@ void BackpropSnapshot::backprop(
       thisTimestepLoss.lossWrtVelocity.segment(dofCursorWorld, dofs)
           // v_t --> v_t+1
           = nextTimestepLoss.lossWrtVelocity.segment(dofCursorWorld, dofs)
-            - skel->getVelCJacobian().transpose()
+            - mTimeStep * skel->getVelCJacobian().transpose()
                   * thisTimestepLoss.lossWrtTorque.segment(dofCursorWorld, dofs)
-            // v_t --> p_t
+            // v_t --> p_t+1
             + mTimeStep
-                  * thisTimestepLoss.lossWrtPosition.segment(
+                  * nextTimestepLoss.lossWrtPosition.segment(
                       dofCursorWorld, dofs);
+      */
     }
   }
 
   // Restore the old position and velocity values before we ran backprop
-  world->setPositions(oldPositions);
-  world->setVelocities(oldVelocities);
+  snapshot.restore();
 
 #ifdef LOG_PERFORMANCE_BACKPROP_SNAPSHOT
   if (thisLog != nullptr)
@@ -2345,7 +2382,9 @@ BackpropSnapshot::getJacobianOfLCPConstraintMatrixClampingSubset(
   }
   if (wrt == WithRespectTo::VELOCITY || wrt == WithRespectTo::FORCE)
   {
-    return Eigen::MatrixXd::Zero(A_c.cols(), A_c.cols());
+    // TODO(keenon): this was A_c.cols() columns, instead of mNumDOFs, but that
+    // doesn't seem to make dimensional sense. Change this back if things break.
+    return Eigen::MatrixXd::Zero(A_c.cols(), mNumDOFs);
   }
 
   RestorableSnapshot snapshot(world);

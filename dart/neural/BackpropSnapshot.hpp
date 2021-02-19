@@ -589,7 +589,6 @@ protected:
 
 private:
   /// These are mCached versions of the various Jacobians
-
   bool mCachedPosPosDirty;
   Eigen::MatrixXd mCachedPosPos;
   bool mCachedPosVelDirty;

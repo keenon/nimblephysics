@@ -664,12 +664,14 @@ bool verifyVelVelJacobian(WorldPtr world, VectorXd proposedVelocities)
               << (analytical - bruteForce).minCoeff() << " to "
               << (analytical - bruteForce).maxCoeff() << std::endl;
     std::cout << "Brute force velCJacobian:" << std::endl
-              << classicPtr->getVelCJacobian(world) << std::endl;
+              << classicPtr->getJacobianOfC(world, WithRespectTo::VELOCITY)
+              << std::endl;
     std::cout << "Brute force forceVelJacobian:" << std::endl
               << classicPtr->getForceVelJacobian(world) << std::endl;
     std::cout << "Brute force forceVelJacobian * velCJacobian:" << std::endl
               << classicPtr->getForceVelJacobian(world)
-                     * classicPtr->getVelCJacobian(world)
+                     * classicPtr->getJacobianOfC(
+                         world, WithRespectTo::VELOCITY)
               << std::endl;
     return false;
   }
@@ -2123,6 +2125,198 @@ bool verifyPosGradients(
       && verifyVelPosJacobianApproximation(world, subdivisions, tolerance));
 }
 
+bool verifyConstraintGroupSubJacobians(
+    WorldPtr world, const neural::BackpropSnapshotPtr& classicPtr)
+{
+
+  RestorableSnapshot snapshot(world);
+
+  world->setPositions(classicPtr->getPreStepPosition());
+  world->setVelocities(classicPtr->getPreStepVelocity());
+  world->setExternalForces(classicPtr->getPreStepTorques());
+
+  // Special case, there's only one constraint group
+  if (classicPtr->mGradientMatrices.size() == 1)
+  {
+    std::shared_ptr<ConstrainedGroupGradientMatrices> group
+        = classicPtr->mGradientMatrices[0];
+
+    Eigen::MatrixXd groupPosPos = group->getPosPosJacobian(world);
+    Eigen::MatrixXd worldPosPos = classicPtr->getPosPosJacobian(world);
+    if (!equals(groupPosPos, worldPosPos, 0))
+    {
+      std::cout << "ConstrainedGroupGradientMatrices and BackpropSnapshotPtr "
+                   "don't match!"
+                << std::endl;
+      std::cout << "World pos-pos Jacobian: " << std::endl
+                << worldPosPos << std::endl;
+      std::cout << "Group pos-pos Jacobian: " << std::endl
+                << groupPosPos << std::endl;
+      return false;
+    }
+
+    Eigen::MatrixXd groupVelPos = group->getVelPosJacobian(world);
+    Eigen::MatrixXd worldVelPos = classicPtr->getVelPosJacobian(world);
+    if (!equals(groupVelPos, worldVelPos, 1e-10))
+    {
+      std::cout << "ConstrainedGroupGradientMatrices and BackpropSnapshotPtr "
+                   "don't match!"
+                << std::endl;
+      std::cout << "World vel-pos Jacobian: " << std::endl
+                << worldVelPos << std::endl;
+      std::cout << "Group vel-pos Jacobian: " << std::endl
+                << groupVelPos << std::endl;
+      return false;
+    }
+
+    Eigen::MatrixXd groupPosVel = group->getPosVelJacobian(world);
+    Eigen::MatrixXd worldPosVel = classicPtr->getPosVelJacobian(world);
+    if (!equals(groupPosVel, worldPosVel, 0))
+    {
+      std::cout << "ConstrainedGroupGradientMatrices and BackpropSnapshotPtr "
+                   "don't match!"
+                << std::endl;
+      std::cout << "World pos-vel Jacobian: " << std::endl
+                << worldPosVel << std::endl;
+      std::cout << "Group pos-vel Jacobian: " << std::endl
+                << groupPosVel << std::endl;
+      std::cout << "Diff: " << std::endl
+                << worldPosVel - groupPosVel << std::endl;
+
+      // Find the constrained group variables
+      const Eigen::MatrixXd& groupA_c = group->getClampingConstraintMatrix();
+      const Eigen::MatrixXd& groupA_ub = group->getUpperBoundConstraintMatrix();
+      const Eigen::MatrixXd& groupE = group->getUpperBoundMappingMatrix();
+      Eigen::MatrixXd groupA_c_ub_E = groupA_c + groupA_ub * groupE;
+      Eigen::VectorXd groupTau = group->mPreStepTorques;
+      Eigen::VectorXd groupC
+          = group->getCoriolisAndGravityAndExternalForces(world);
+      const Eigen::VectorXd& groupF_c = group->getClampingConstraintImpulses();
+      double dt = world->getTimeStep();
+      Eigen::MatrixXd group_dM = group->getJacobianOfMinv(
+          world,
+          dt * (groupTau - groupC) + groupA_c_ub_E * groupF_c,
+          WithRespectTo::POSITION);
+      // Do the same thing with the backprop snapshot
+      const Eigen::MatrixXd& worldA_c
+          = classicPtr->getClampingConstraintMatrix(world);
+      const Eigen::MatrixXd& worldA_ub
+          = classicPtr->getUpperBoundConstraintMatrix(world);
+      const Eigen::MatrixXd& worldE = classicPtr->getUpperBoundMappingMatrix();
+      Eigen::MatrixXd worldA_c_ub_E = worldA_c + worldA_ub * worldE;
+      Eigen::VectorXd worldTau = classicPtr->getPreStepTorques();
+      Eigen::VectorXd worldC = world->getCoriolisAndGravityAndExternalForces();
+      const Eigen::VectorXd& worldF_c
+          = classicPtr->getClampingConstraintImpulses();
+      Eigen::MatrixXd world_dM = classicPtr->getJacobianOfMinv(
+          world,
+          dt * (worldTau - worldC) + worldA_c_ub_E * worldF_c,
+          WithRespectTo::POSITION);
+
+      std::cout << "World dM Jacobian: " << std::endl << world_dM << std::endl;
+      std::cout << "Group dM Jacobian: " << std::endl << group_dM << std::endl;
+      std::cout << "Diff: " << std::endl << world_dM - group_dM << std::endl;
+
+      std::cout << "World f_c: " << std::endl << worldF_c << std::endl;
+      std::cout << "Group f_c: " << std::endl << groupF_c << std::endl;
+      std::cout << "Diff: " << std::endl << worldF_c - groupF_c << std::endl;
+
+      Eigen::MatrixXd group_dA_c
+          = group->getJacobianOfClampingConstraints(world, groupF_c);
+      Eigen::MatrixXd world_dA_c
+          = classicPtr->getJacobianOfClampingConstraints(world, worldF_c);
+
+      std::cout << "World dA_c: " << std::endl << world_dA_c << std::endl;
+      std::cout << "Group dA_c: " << std::endl << group_dA_c << std::endl;
+      std::cout << "Diff: " << std::endl
+                << world_dA_c - group_dA_c << std::endl;
+
+      Eigen::MatrixXd group_dF_c
+          = group->getJacobianOfConstraintForce(world, WithRespectTo::POSITION);
+      Eigen::MatrixXd world_dF_c = classicPtr->getJacobianOfConstraintForce(
+          world, WithRespectTo::POSITION);
+
+      std::cout << "World dF_c: " << std::endl << world_dF_c << std::endl;
+      std::cout << "Group dF_c: " << std::endl << group_dF_c << std::endl;
+      std::cout << "Diff: " << std::endl
+                << world_dF_c - group_dF_c << std::endl;
+
+      Eigen::VectorXd group_b = group->getClampingConstraintRelativeVels();
+      Eigen::MatrixXd group_dQ_b
+          = group->getJacobianOfLCPConstraintMatrixClampingSubset(
+              world, group_b, WithRespectTo::POSITION);
+
+      Eigen::VectorXd world_b = classicPtr->getClampingConstraintRelativeVels();
+      Eigen::MatrixXd world_dQ_b
+          = classicPtr->getJacobianOfLCPConstraintMatrixClampingSubset(
+              world, world_b, WithRespectTo::POSITION);
+
+      std::cout << "World b: " << std::endl << world_b << std::endl;
+      std::cout << "Group b: " << std::endl << group_b << std::endl;
+      std::cout << "Diff: " << std::endl << world_b - group_b << std::endl;
+
+      std::cout << "World dQ_b: " << std::endl << world_dQ_b << std::endl;
+      std::cout << "Group dQ_b: " << std::endl << group_dQ_b << std::endl;
+      std::cout << "Diff: " << std::endl
+                << world_dQ_b - group_dQ_b << std::endl;
+
+      Eigen::MatrixXd group_dB = group->getJacobianOfLCPOffsetClampingSubset(
+          world, WithRespectTo::POSITION);
+      Eigen::MatrixXd world_dB
+          = classicPtr->getJacobianOfLCPOffsetClampingSubset(
+              world, WithRespectTo::POSITION);
+
+      std::cout << "World dB: " << std::endl << world_dB << std::endl;
+      std::cout << "Group dB: " << std::endl << group_dB << std::endl;
+      std::cout << "Diff: " << std::endl << world_dB - group_dB << std::endl;
+
+      Eigen::MatrixXd group_posC
+          = group->getJacobianOfC(world, WithRespectTo::POSITION);
+      Eigen::MatrixXd world_posC
+          = classicPtr->getJacobianOfC(world, WithRespectTo::POSITION);
+
+      std::cout << "World pos-C: " << std::endl << world_posC << std::endl;
+      std::cout << "Group pos-C: " << std::endl << group_posC << std::endl;
+      std::cout << "Diff: " << std::endl
+                << world_posC - group_posC << std::endl;
+
+      return false;
+    }
+
+    Eigen::MatrixXd groupVelVel = group->getVelVelJacobian(world);
+    Eigen::MatrixXd worldVelVel = classicPtr->getVelVelJacobian(world);
+    if (!equals(groupVelVel, worldVelVel, 0))
+    {
+      std::cout << "ConstrainedGroupGradientMatrices and BackpropSnapshotPtr "
+                   "don't match!"
+                << std::endl;
+      std::cout << "World vel-vel Jacobian: " << std::endl
+                << worldVelVel << std::endl;
+      std::cout << "Group vel-vel Jacobian: " << std::endl
+                << groupVelVel << std::endl;
+      return false;
+    }
+
+    Eigen::MatrixXd groupForceVel = group->getForceVelJacobian(world);
+    Eigen::MatrixXd worldForceVel = classicPtr->getForceVelJacobian(world);
+    if (!equals(groupForceVel, worldForceVel, 0))
+    {
+      std::cout << "ConstrainedGroupGradientMatrices and BackpropSnapshotPtr "
+                   "don't match!"
+                << std::endl;
+      std::cout << "World force-vel Jacobian: " << std::endl
+                << worldForceVel << std::endl;
+      std::cout << "Group force-vel Jacobian: " << std::endl
+                << groupForceVel << std::endl;
+      return false;
+    }
+  }
+
+  snapshot.restore();
+
+  return true;
+}
+
 bool verifyAnalyticalBackpropInstance(
     WorldPtr world,
     const neural::BackpropSnapshotPtr& classicPtr,
@@ -2198,7 +2392,8 @@ bool verifyAnalyticalBackpropInstance(
       std::cout << "pos-vel Jacobian:" << std::endl
                 << classicPtr->getPosVelJacobian(world) << std::endl;
       std::cout << "pos-C Jacobian:" << std::endl
-                << classicPtr->getPosCJacobian(world) << std::endl;
+                << classicPtr->getJacobianOfC(world, WithRespectTo::POSITION)
+                << std::endl;
       std::cout << "Brute force: pos-pos Jac:" << std::endl
                 << classicPtr->getPosPosJacobian(world) << std::endl;
     }
@@ -2230,63 +2425,67 @@ bool verifyAnalyticalBackpropInstance(
 
       Eigen::MatrixXd classicInnerPart
           = A_c.transpose().eval() * Minv * (A_c + A_ub * E);
-      Eigen::MatrixXd classicInnerPartInv
-          = classicInnerPart.completeOrthogonalDecomposition().pseudoInverse();
-      Eigen::MatrixXd classicRightPart = B * A_c.transpose().eval();
-      Eigen::MatrixXd classicLeftPart = Minv * (A_c + A_ub * E);
-      Eigen::MatrixXd classicComplete
-          = classicLeftPart * classicInnerPart * classicRightPart;
-
-      std::cout << "Classic brute force A_c*z:" << std::endl
-                << classicComplete.transpose() * nextTimeStep.lossWrtVelocity
-                << std::endl;
-
-      // Massed formulation
-
-      Eigen::MatrixXd massedInnerPart
-          = A_c.transpose().eval() * (V_c + V_ub * E);
-      Eigen::MatrixXd massedInnerPartInv
-          = massedInnerPart.completeOrthogonalDecomposition().pseudoInverse();
-      Eigen::MatrixXd massedRightPart = B * A_c.transpose().eval();
-      Eigen::MatrixXd massedLeftPart = V_c + V_ub * E;
-      Eigen::MatrixXd massedComplete
-          = massedLeftPart * massedInnerPart * massedRightPart;
-
-      std::cout << "Massed brute force A_c*z:" << std::endl
-                << massedComplete.transpose() * nextTimeStep.lossWrtVelocity
-                << std::endl;
-
-      if (!equals(massedInnerPart, classicInnerPart, 1e-8))
+      if (classicInnerPart.size() > 0)
       {
-        std::cout << "Mismatch at inner part!" << std::endl;
-        std::cout << "Classic inner part:" << std::endl
-                  << classicInnerPart << std::endl;
-        std::cout << "Massed inner part:" << std::endl
-                  << massedInnerPart << std::endl;
-      }
-      if (!equals(massedInnerPartInv, classicInnerPartInv, 1e-8))
-      {
-        std::cout << "Mismatch at inner part inv!" << std::endl;
-        std::cout << "Classic inner part inv:" << std::endl
-                  << classicInnerPartInv << std::endl;
-        std::cout << "Massed inner part inv:" << std::endl
-                  << massedInnerPartInv << std::endl;
-      }
-      if (!equals(massedLeftPart, classicLeftPart, 1e-8))
-      {
-        std::cout << "Mismatch at left part!" << std::endl;
-        std::cout << "Classic left part:" << std::endl
-                  << classicLeftPart << std::endl;
-        std::cout << "Massed left part:" << std::endl
-                  << massedLeftPart << std::endl;
-      }
-      if (!equals(massedRightPart, classicRightPart, 1e-8))
-      {
-        std::cout << "Mismatch at right part!" << std::endl;
-        std::cout << "Classic right part:" << std::endl
-                  << classicRightPart << std::endl;
-        std::cout << "Massed right part:" << std::endl
-                  << massedRightPart << std::endl;
+        Eigen::MatrixXd classicInnerPartInv
+            = classicInnerPart.completeOrthogonalDecomposition()
+                  .pseudoInverse();
+        Eigen::MatrixXd classicRightPart = B * A_c.transpose().eval();
+        Eigen::MatrixXd classicLeftPart = Minv * (A_c + A_ub * E);
+        Eigen::MatrixXd classicComplete
+            = classicLeftPart * classicInnerPart * classicRightPart;
+
+        std::cout << "Classic brute force A_c*z:" << std::endl
+                  << classicComplete.transpose() * nextTimeStep.lossWrtVelocity
+                  << std::endl;
+
+        // Massed formulation
+
+        Eigen::MatrixXd massedInnerPart
+            = A_c.transpose().eval() * (V_c + V_ub * E);
+        Eigen::MatrixXd massedInnerPartInv
+            = massedInnerPart.completeOrthogonalDecomposition().pseudoInverse();
+        Eigen::MatrixXd massedRightPart = B * A_c.transpose().eval();
+        Eigen::MatrixXd massedLeftPart = V_c + V_ub * E;
+        Eigen::MatrixXd massedComplete
+            = massedLeftPart * massedInnerPart * massedRightPart;
+
+        std::cout << "Massed brute force A_c*z:" << std::endl
+                  << massedComplete.transpose() * nextTimeStep.lossWrtVelocity
+                  << std::endl;
+
+        if (!equals(massedInnerPart, classicInnerPart, 1e-8))
+        {
+          std::cout << "Mismatch at inner part!" << std::endl;
+          std::cout << "Classic inner part:" << std::endl
+                    << classicInnerPart << std::endl;
+          std::cout << "Massed inner part:" << std::endl
+                    << massedInnerPart << std::endl;
+        }
+        if (!equals(massedInnerPartInv, classicInnerPartInv, 1e-8))
+        {
+          std::cout << "Mismatch at inner part inv!" << std::endl;
+          std::cout << "Classic inner part inv:" << std::endl
+                    << classicInnerPartInv << std::endl;
+          std::cout << "Massed inner part inv:" << std::endl
+                    << massedInnerPartInv << std::endl;
+        }
+        if (!equals(massedLeftPart, classicLeftPart, 1e-8))
+        {
+          std::cout << "Mismatch at left part!" << std::endl;
+          std::cout << "Classic left part:" << std::endl
+                    << classicLeftPart << std::endl;
+          std::cout << "Massed left part:" << std::endl
+                    << massedLeftPart << std::endl;
+        }
+        if (!equals(massedRightPart, classicRightPart, 1e-8))
+        {
+          std::cout << "Mismatch at right part!" << std::endl;
+          std::cout << "Classic right part:" << std::endl
+                    << classicRightPart << std::endl;
+          std::cout << "Massed right part:" << std::endl
+                    << massedRightPart << std::endl;
+        }
       }
       Eigen::MatrixXd V_c_recovered = Minv * A_c;
       if (!equals(V_c_recovered, V_c, 1e-8))
@@ -2324,7 +2523,8 @@ bool verifyAnalyticalBackpropInstance(
       std::cout << "3: -((force-vel) * (vel-C))^T * nextLossWrtVel:"
                 << std::endl
                 << -(classicPtr->getForceVelJacobian(world)
-                     * classicPtr->getVelCJacobian(world))
+                     * classicPtr->getJacobianOfC(
+                         world, WithRespectTo::VELOCITY))
                            .transpose()
                        * nextTimeStep.lossWrtVelocity
                 << std::endl;
@@ -2383,6 +2583,11 @@ bool verifyAnalyticalBackprop(WorldPtr world)
               << std::endl;
     return false;
   }
+
+  // This can often be the root of the problem, so verify that the constraint
+  // group Jacobians match the Jacobians of the BackpropSnapshot.
+  if (!verifyConstraintGroupSubJacobians(world, classicPtr))
+    return false;
 
   VectorXd phaseSpace = VectorXd::Zero(world->getNumDofs() * 2);
 
@@ -2534,12 +2739,15 @@ bool verifyGradientBackprop(
     */
 
     LossGradient analyticalWithBruteForce;
+    backpropSnapshots[i]->backprop(world, analyticalWithBruteForce, bruteForce);
+    /*
     analyticalWithBruteForce.lossWrtPosition
         = posPos.transpose() * bruteForce.lossWrtPosition
           + posVel.transpose() * bruteForce.lossWrtVelocity;
     analyticalWithBruteForce.lossWrtVelocity
         = velPos.transpose() * bruteForce.lossWrtPosition
           + velVel.transpose() * bruteForce.lossWrtVelocity;
+    */
 
     bruteForce = bruteForceThisTimestep;
 
