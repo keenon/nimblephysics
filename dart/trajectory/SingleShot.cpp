@@ -671,7 +671,12 @@ void SingleShot::backpropGradientWrt(
         += nextTimestep.lossWrtVelocity;
 
     LossGradient thisTimestep;
-    snapshots[i]->backprop(world, thisTimestep, mappedLosses, thisLog);
+    snapshots[i]->backprop(
+        world,
+        thisTimestep,
+        mappedLosses,
+        thisLog,
+        mExploreAlternateStrategies);
 
     Problem::accumulateStaticGradient(world, gradStatic, thisTimestep, thisLog);
 

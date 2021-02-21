@@ -114,7 +114,8 @@ void BackpropSnapshot::backprop(
     WorldPtr world,
     LossGradient& thisTimestepLoss,
     const LossGradient& nextTimestepLoss,
-    PerformanceLog* perfLog)
+    PerformanceLog* perfLog,
+    bool exploreAlternateStrategies)
 {
   PerformanceLog* thisLog = nullptr;
 #ifdef LOG_PERFORMANCE_BACKPROP_SNAPSHOT
@@ -173,6 +174,12 @@ void BackpropSnapshot::backprop(
 
   //////////////////////////////////////////////////////////
 
+  // Handle mass the old fashioned way, for now
+
+  const Eigen::MatrixXd& massVel = getMassVelJacobian(world, thisLog);
+  thisTimestepLoss.lossWrtMass
+      = massVel.transpose() * nextTimestepLoss.lossWrtVelocity;
+
   // Actually run the backprop
 
   std::unordered_map<std::string, bool> skeletonsVisited;
@@ -216,7 +223,11 @@ void BackpropSnapshot::backprop(
 
     // Now actually run the backprop
 
-    group->backprop(world, groupThisTimestepLoss, groupNextTimestepLoss);
+    group->backprop(
+        world,
+        groupThisTimestepLoss,
+        groupNextTimestepLoss,
+        exploreAlternateStrategies);
 
     // Read the values back out of the group backprop
 

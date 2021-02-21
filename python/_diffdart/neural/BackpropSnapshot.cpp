@@ -64,7 +64,8 @@ void BackpropSnapshot(py::module& m)
           ::py::arg("world"),
           ::py::arg("thisTimestepLoss"),
           ::py::arg("nextTimestepLoss"),
-          ::py::arg("perfLog") = nullptr)
+          ::py::arg("perfLog") = nullptr,
+          ::py::arg("exploreAlternateStrategies") = false)
       .def(
           "getVelVelJacobian",
           &dart::neural::BackpropSnapshot::getVelVelJacobian,

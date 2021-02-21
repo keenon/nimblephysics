@@ -45,7 +45,8 @@ public:
       simulation::WorldPtr world,
       LossGradient& thisTimestepLoss,
       const LossGradient& nextTimestepLoss,
-      PerformanceLog* perfLog = nullptr);
+      PerformanceLog* perfLog = nullptr,
+      bool exploreAlternateStrategies = false);
 
   /// This computes and returns the whole vel-vel jacobian. For backprop, you
   /// don't actually need this matrix, you can compute backprop directly. This

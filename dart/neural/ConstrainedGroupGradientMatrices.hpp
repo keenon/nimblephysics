@@ -121,7 +121,9 @@ public:
   /// after registerLCPResults(). This can only
   /// be called once, and after this is called you cannot call
   /// measureConstraintImpulse() again!
-  void constructMatrices(simulation::World* world);
+  void constructMatrices(
+      simulation::World* world,
+      Eigen::VectorXi overrideClasses = Eigen::VectorXi::Zero(0));
 
   /// This computes and returns the whole vel-vel jacobian for this group. For
   /// backprop, you don't actually need this matrix, you can compute backprop
@@ -267,7 +269,16 @@ public:
   void backprop(
       simulation::WorldPtr world,
       LossGradient& thisTimestepLoss,
-      const LossGradient& nextTimestepLoss);
+      const LossGradient& nextTimestepLoss,
+      bool exploreAlternateStrategies = false);
+
+  /// This zeros out any components of the gradient that would want to push us
+  /// out of the box-bounds encoded in the world for pos, vel, or force.
+  void clipLossGradientsToBounds(
+      simulation::WorldPtr world,
+      Eigen::VectorXd& lossWrtPos,
+      Eigen::VectorXd& lossWrtVel,
+      Eigen::VectorXd& lossWrtForce);
 
   /// This replaces x with the result of M*x in place, without explicitly
   /// forming M
@@ -278,6 +289,8 @@ public:
   /// forming Minv
   Eigen::VectorXd implicitMultiplyByInvMassMatrix(
       simulation::WorldPtr world, const Eigen::VectorXd& x);
+
+  const Eigen::MatrixXd& getAllConstraintMatrix() const;
 
   const Eigen::MatrixXd& getClampingConstraintMatrix() const;
 

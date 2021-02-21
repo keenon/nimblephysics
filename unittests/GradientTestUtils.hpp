@@ -2372,6 +2372,53 @@ bool verifyAnalyticalBackpropInstance(
       classicPtr->getForceVelJacobian(world).transpose()
       * nextTimeStep.lossWrtVelocity;
 
+  // Trim gradients to the box constraints
+
+  Eigen::VectorXd pos = world->getPositions();
+  Eigen::VectorXd posUpperLimits = world->getPositionUpperLimits();
+  Eigen::VectorXd posLowerLimits = world->getPositionLowerLimits();
+  Eigen::VectorXd vels = world->getVelocities();
+  Eigen::VectorXd velUpperLimits = world->getVelocityUpperLimits();
+  Eigen::VectorXd velLowerLimits = world->getVelocityLowerLimits();
+  Eigen::VectorXd forces = world->getExternalForces();
+  Eigen::VectorXd forceUpperLimits = world->getExternalForceUpperLimits();
+  Eigen::VectorXd forceLowerLimits = world->getExternalForceLowerLimits();
+  for (int i = 0; i < world->getNumDofs(); i++)
+  {
+    // Clip position gradients
+
+    if ((pos(i) == posLowerLimits(i)) && (lossWrtThisPosition(i) > 0))
+    {
+      lossWrtThisPosition(i) = 0;
+    }
+    if ((pos(i) == posUpperLimits(i)) && (lossWrtThisPosition(i) < 0))
+    {
+      lossWrtThisPosition(i) = 0;
+    }
+
+    // Clip velocity gradients
+
+    if ((vels(i) == velLowerLimits(i)) && (lossWrtThisVelocity(i) > 0))
+    {
+      lossWrtThisVelocity(i) = 0;
+    }
+    if ((vels(i) == velUpperLimits(i)) && (lossWrtThisVelocity(i) < 0))
+    {
+      lossWrtThisVelocity(i) = 0;
+    }
+
+    // Clip force gradients
+
+    if ((forces(i) == forceLowerLimits(i)) && (lossWrtThisTorque(i) > 0))
+    {
+      lossWrtThisTorque(i) = 0;
+    }
+    if ((forces(i) == forceUpperLimits(i)) && (lossWrtThisTorque(i) < 0))
+    {
+      lossWrtThisTorque(i) = 0;
+    }
+  }
+
   if (!equals(lossWrtThisPosition, thisTimeStep.lossWrtPosition, 1e-5)
       || !equals(lossWrtThisVelocity, thisTimeStep.lossWrtVelocity, 1e-5)
       || !equals(lossWrtThisTorque, thisTimeStep.lossWrtTorque, 1e-5))
