@@ -1,5 +1,6 @@
 #include "dart/neural/BackpropSnapshot.hpp"
 
+#include <chrono>
 #include <iostream>
 
 #include "dart/constraint/ConstraintSolver.hpp"
@@ -1617,6 +1618,208 @@ void BackpropSnapshot::setUseFDOverride(bool fdOverride)
 void BackpropSnapshot::setSlowDebugResultsAgainstFD(bool slowDebug)
 {
   mSlowDebugResultsAgainstFD = slowDebug;
+}
+
+//==============================================================================
+/// This does a battery of tests comparing the speeds to compute all the
+/// different Jacobians, both with finite differencing and analytically, and
+/// prints the results to std out.
+void BackpropSnapshot::benchmarkJacobians(
+    std::shared_ptr<simulation::World> world, int numSamples)
+{
+  long posPosFd = 0L;
+  long posPosA = 0L;
+
+  long posVelFd = 0L;
+  long posVelA = 0L;
+
+  long velPosFd = 0L;
+  long velPosA = 0L;
+
+  long velVelFd = 0L;
+  long velVelA = 0L;
+
+  long forceVelFd = 0L;
+  long forceVelA = 0L;
+
+  // Take a bunch of samples. This will not be the same speed as real runtime,
+  // because of branch predictions warming up and caches getting warm, but it's
+  // a reasonable indicator.
+  for (int sample = 0; sample < numSamples; sample++)
+  {
+    using namespace std::chrono;
+
+    for (auto contact : getClampingConstraints())
+    {
+      contact->mWorldConstraintJacCacheDirty = true;
+    }
+    for (auto contact : getUpperBoundConstraints())
+    {
+      contact->mWorldConstraintJacCacheDirty = true;
+    }
+
+    ////////////////////////////////////////////////////////////////////
+    // Do all the analytical Jacobians one after another first
+    ////////////////////////////////////////////////////////////////////
+
+    long startTime
+        = duration_cast<nanoseconds>(system_clock::now().time_since_epoch())
+              .count();
+    mCachedPosPosDirty = true;
+    getPosPosJacobian(world);
+    long endTime
+        = duration_cast<nanoseconds>(system_clock::now().time_since_epoch())
+              .count();
+    posPosA += endTime - startTime;
+
+    startTime
+        = duration_cast<nanoseconds>(system_clock::now().time_since_epoch())
+              .count();
+    mCachedPosVelDirty = true;
+    getPosVelJacobian(world);
+    endTime = duration_cast<nanoseconds>(system_clock::now().time_since_epoch())
+                  .count();
+    posVelA += endTime - startTime;
+
+    startTime
+        = duration_cast<nanoseconds>(system_clock::now().time_since_epoch())
+              .count();
+    mCachedVelPosDirty = true;
+    getVelPosJacobian(world);
+    endTime = duration_cast<nanoseconds>(system_clock::now().time_since_epoch())
+                  .count();
+    velPosA += endTime - startTime;
+
+    startTime
+        = duration_cast<nanoseconds>(system_clock::now().time_since_epoch())
+              .count();
+    mCachedVelVelDirty = true;
+    getVelVelJacobian(world);
+    endTime = duration_cast<nanoseconds>(system_clock::now().time_since_epoch())
+                  .count();
+    velVelA += endTime - startTime;
+
+    startTime
+        = duration_cast<nanoseconds>(system_clock::now().time_since_epoch())
+              .count();
+    mCachedForceVelDirty = true;
+    getForceVelJacobian(world);
+    endTime = duration_cast<nanoseconds>(system_clock::now().time_since_epoch())
+                  .count();
+    forceVelA += endTime - startTime;
+
+    ////////////////////////////////////////////////////////////////////
+    // Now do all the FD Jacobians one after another
+    ////////////////////////////////////////////////////////////////////
+
+    startTime
+        = duration_cast<nanoseconds>(system_clock::now().time_since_epoch())
+              .count();
+    finiteDifferencePosPosJacobian(world, 1);
+    endTime = duration_cast<nanoseconds>(system_clock::now().time_since_epoch())
+                  .count();
+    posPosFd += endTime - startTime;
+
+    startTime
+        = duration_cast<nanoseconds>(system_clock::now().time_since_epoch())
+              .count();
+    finiteDifferencePosVelJacobian(world);
+    endTime = duration_cast<nanoseconds>(system_clock::now().time_since_epoch())
+                  .count();
+    posVelFd += endTime - startTime;
+
+    startTime
+        = duration_cast<nanoseconds>(system_clock::now().time_since_epoch())
+              .count();
+    finiteDifferenceVelPosJacobian(world, 1);
+    endTime = duration_cast<nanoseconds>(system_clock::now().time_since_epoch())
+                  .count();
+    velPosFd += endTime - startTime;
+
+    startTime
+        = duration_cast<nanoseconds>(system_clock::now().time_since_epoch())
+              .count();
+    finiteDifferenceVelVelJacobian(world);
+    endTime = duration_cast<nanoseconds>(system_clock::now().time_since_epoch())
+                  .count();
+    velVelFd += endTime - startTime;
+
+    startTime
+        = duration_cast<nanoseconds>(system_clock::now().time_since_epoch())
+              .count();
+    finiteDifferenceForceVelJacobian(world);
+    endTime = duration_cast<nanoseconds>(system_clock::now().time_since_epoch())
+                  .count();
+    forceVelFd += endTime - startTime;
+  }
+
+  // Now we need to form and print out a report
+  std::cout << "Benchmark results:" << std::endl;
+
+  long allA = posPosA + posVelA + velPosA + velVelA + forceVelA;
+  long allFd = posPosFd + posVelFd + velPosFd + velVelFd + forceVelFd;
+  double NANOS_TO_MILLIS = 1e-6;
+
+  std::cout << "All Jacs:" << std::endl;
+  std::cout << "   All Jacs  ANALYTICAL: "
+            << ((double)allA * NANOS_TO_MILLIS / numSamples) << "ms"
+            << std::endl;
+  std::cout << "   All Jacs          FD: "
+            << ((double)allFd * NANOS_TO_MILLIS / numSamples) << "ms"
+            << std::endl;
+  std::cout << "   All Jacs FD MULTIPLE: " << ((double)allFd / (double)allA)
+            << "x faster" << std::endl;
+
+  std::cout << "Pos-pos Jac:" << std::endl;
+  std::cout << "   Pos-pos Jac  ANALYTICAL: "
+            << ((double)posPosA * NANOS_TO_MILLIS / numSamples) << "ms"
+            << std::endl;
+  std::cout << "   Pos-pos Jac          FD: "
+            << ((double)posPosFd * NANOS_TO_MILLIS / numSamples) << "ms"
+            << std::endl;
+  std::cout << "   Pos-pos Jac FD MULTIPLE: "
+            << ((double)posPosFd / (double)posPosA) << "x faster" << std::endl;
+
+  std::cout << "Pos-vel Jac:" << std::endl;
+  std::cout << "   Pos-vel Jac  ANALYTICAL: "
+            << ((double)posVelA * NANOS_TO_MILLIS / numSamples) << "ms"
+            << std::endl;
+  std::cout << "   Pos-vel Jac          FD: "
+            << ((double)posVelFd * NANOS_TO_MILLIS / numSamples) << "ms"
+            << std::endl;
+  std::cout << "   Pos-vel Jac FD MULTIPLE: "
+            << ((double)posVelFd / (double)posVelA) << "x faster" << std::endl;
+
+  std::cout << "Vel-pos Jac:" << std::endl;
+  std::cout << "   Vel-pos Jac  ANALYTICAL: "
+            << ((double)velPosA * NANOS_TO_MILLIS / numSamples) << "ms"
+            << std::endl;
+  std::cout << "   Vel-pos Jac          FD: "
+            << ((double)velPosFd * NANOS_TO_MILLIS / numSamples) << "ms"
+            << std::endl;
+  std::cout << "   Vel-pos Jac FD MULTIPLE: "
+            << ((double)velPosFd / (double)velPosA) << "x faster" << std::endl;
+
+  std::cout << "Vel-vel Jac:" << std::endl;
+  std::cout << "   Vel-vel Jac  ANALYTICAL: "
+            << ((double)velVelA * NANOS_TO_MILLIS / numSamples) << "ms"
+            << std::endl;
+  std::cout << "   Vel-vel Jac          FD: "
+            << ((double)velVelFd * NANOS_TO_MILLIS / numSamples) << "ms"
+            << std::endl;
+  std::cout << "   Vel-vel Jac FD MULTIPLE: "
+            << ((double)velVelFd / (double)velVelA) << "x faster" << std::endl;
+
+  std::cout << "Force-vel Jac:" << std::endl;
+  std::cout << "   Force-vel Jac  ANALYTICAL: "
+            << ((double)forceVelA * NANOS_TO_MILLIS / numSamples) << "ms"
+            << std::endl;
+  std::cout << "   Force-vel Jac          FD: "
+            << ((double)forceVelFd * NANOS_TO_MILLIS / numSamples) << "ms"
+            << std::endl;
+  std::cout << "   Force-vel Jac FD MULTIPLE: "
+            << ((double)forceVelFd / (double)forceVelA) << "x faster"
+            << std::endl;
 }
 
 //==============================================================================

@@ -1508,6 +1508,52 @@ bool Skeleton::checkIndexingConsistency() const
 }
 
 //==============================================================================
+/// This returns a square (N x N) matrix, filled with 1s and 0s. This can be
+/// interpreted as:
+///
+/// getParentMap(i,j) == 1: Dof[i] is a parent of Dof[j]
+/// getParentMap(i,j) == 0: Dof[i] is NOT a parent of Dof[j]
+///
+/// This is computed in bulk, and cached in the skeleton.
+const Eigen::MatrixXi& Skeleton::getParentMap()
+{
+  if (mSkelCache.mDirty.mParentMap) {
+    mSkelCache.mParentMap = Eigen::MatrixXi::Zero(getNumDofs(), getNumDofs());
+    for (int row = 0; row < getNumDofs(); row++) {
+      /*
+      dynamics::DegreeOfFreedom* rowDof = getDof(row);
+      for (int col = 0; col < getNumDofs(); col++) {
+        dynamics::DegreeOfFreedom* colDof = getDof(col);
+        if (rowDof->isParentOf(colDof)) {
+          mSkelCache.mParentMap(row, col) = 1;
+        }
+      }
+      */
+      dynamics::DegreeOfFreedom* dof = getDof(row);
+      dynamics::Joint* joint = dof->getJoint();
+      std::vector<dynamics::Joint*> visit;
+      visit.push_back(joint);
+      while (visit.size() > 0) {
+        dynamics::Joint* cursor = visit.back();
+        visit.pop_back();
+
+        dynamics::BodyNode* cursorChildBodyNode = cursor->getChildBodyNode();
+        for (int i = 0; i < cursorChildBodyNode->getNumChildJoints(); i++) {
+          dynamics::Joint* childJoint = cursorChildBodyNode->getChildJoint(i);
+          visit.push_back(childJoint);
+
+          for (int j = 0; j < childJoint->getNumDofs(); j++) {
+            mSkelCache.mParentMap(row, childJoint->getIndexInSkeleton(j)) = 1;
+          }
+        }
+      }
+    }
+    mSkelCache.mDirty.mParentMap = false;
+  }
+  return mSkelCache.mParentMap;
+}
+
+//==============================================================================
 const std::shared_ptr<WholeBodyIK>& Skeleton::getIK(bool _createIfNull)
 {
   if (nullptr == mWholeBodyIK && _createIfNull)
@@ -4969,6 +5015,7 @@ Skeleton::DirtyFlags::DirtyFlags()
     mExternalForces(true),
     mDampingForces(true),
     mSupport(true),
+    mParentMap(true),
     mSupportVersion(0)
 {
   // Do nothing

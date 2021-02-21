@@ -524,6 +524,12 @@ public:
   /// instructions.
   void setSlowDebugResultsAgainstFD(bool slowDebug);
 
+  /// This does a battery of tests comparing the speeds to compute all the
+  /// different Jacobians, both with finite differencing and analytically, and
+  /// prints the results to std out.
+  void benchmarkJacobians(
+      std::shared_ptr<simulation::World> world, int numSamples);
+
 protected:
   /// If this is true, we use finite-differencing to compute all of the
   /// requested Jacobians. This override can be useful to verify if there's a
