@@ -1673,11 +1673,15 @@ Eigen::MatrixXd DifferentiableContactConstraint::getConstraintForcesJacobian(
   for (auto rowSkel : skels)
   {
     int rowDof = rowSkel->getNumDofs();
+    if (rowDof == 0)
+      continue;
     int rowWorldOffset = world->getSkeletonDofOffset(rowSkel);
     int colCursor = 0;
     for (auto colSkel : skels)
     {
       int colDof = colSkel->getNumDofs();
+      if (colDof == 0)
+        continue;
       int colWorldOffset = world->getSkeletonDofOffset(rowSkel);
 
       result.block(rowCursor, colCursor, rowDof, colDof)
