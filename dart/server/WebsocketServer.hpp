@@ -86,7 +86,11 @@ protected:
   void onMessage(ClientConnection conn, WebsocketEndpoint::message_ptr msg);
 
   bool mRunning;
+
+public:
   asio::io_service eventLoop;
+
+protected:
   WebsocketEndpoint endpoint;
   vector<ClientConnection> openConnections;
   std::mutex connectionListMutex;

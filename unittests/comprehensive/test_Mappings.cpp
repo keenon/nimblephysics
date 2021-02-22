@@ -32,7 +32,6 @@
 
 #include <iostream>
 
-#include <dart/gui/gui.hpp>
 #include <gtest/gtest.h>
 
 #include "dart/collision/CollisionObject.hpp"

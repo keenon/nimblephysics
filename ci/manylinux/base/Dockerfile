@@ -213,21 +213,24 @@ RUN git clone https://github.com/PlatformLab/PerfUtils.git && \
 
 ENV PROTOBUF_VERSION="3.14.0"
 
-RUN wget https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOBUF_VERSION}/protobuf-all-${PROTOBUF_VERSION}.tar.gz && \
-    tar -xvzf protobuf-all-${PROTOBUF_VERSION}.tar.gz && \
-    rm protobuf-all-${PROTOBUF_VERSION}.tar.gz && \
-    pushd protobuf-${PROTOBUF_VERSION} && \
-    ./configure && \
-    make -j16 && \
-    make check -j16 && \
-    make install && \ 
-    popd && \
-    rm -rf protobuf-${PROTOBUF_VERSION}
+# RUN wget https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOBUF_VERSION}/protobuf-all-${PROTOBUF_VERSION}.tar.gz && \
+#     tar -xvzf protobuf-all-${PROTOBUF_VERSION}.tar.gz && \
+#     rm protobuf-all-${PROTOBUF_VERSION}.tar.gz && \
+#     pushd protobuf-${PROTOBUF_VERSION} && \
+#     ./configure && \
+#     make -j16 && \
+#     make check -j16 && \
+#     make install && \ 
+#     popd && \
+#     rm -rf protobuf-${PROTOBUF_VERSION}
 
 RUN git clone --recurse-submodules -b v1.33.2 https://github.com/grpc/grpc
 RUN pushd grpc && \
     # This fixes the boringssl build on the ancient CentOS we have to use by adding "rt" as an explicit dependency
     sed -i '642s/.*/target_link_libraries(bssl ssl crypto rt)/' third_party/boringssl-with-bazel/CMakeLists.txt && \
+    pushd third_party/protobuf && \
+    git checkout v${PROTOBUF_VERSION} && \
+    popd && \
     mkdir -p cmake/build && \
     pushd cmake/build && \
     cmake -DgRPC_INSTALL=ON \
@@ -256,3 +259,4 @@ RUN rm -rf benchmark
 # RUN rm -rf /usr/local/lib64/libassimp.so
 # RUN rm -rf /usr/local/lib64/libassimp.5.so
 # RUN rm -rf /usr/local/lib64/libassimp.5.0.1.so
+RUN protoc --version

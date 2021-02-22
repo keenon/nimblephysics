@@ -229,6 +229,13 @@ void Problem(py::module& m)
   ::py::class_<dart::trajectory::Problem>(m, "Problem")
       .def("setLoss", &dart::trajectory::Problem::setLoss, ::py::arg("loss"))
       .def(
+          "setExploreAlternateStrategies",
+          &dart::trajectory::Problem::setExploreAlternateStrategies,
+          ::py::arg("flag"))
+      .def(
+          "getExploreAlternateStrategies",
+          &dart::trajectory::Problem::getExploreAlternateStrategies)
+      .def(
           "addConstraint",
           &dart::trajectory::Problem::addConstraint,
           ::py::arg("constraint"))

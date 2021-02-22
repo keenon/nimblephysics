@@ -74,7 +74,10 @@
 #include "TestHelpers.hpp"
 #include "stdio.h"
 
-// #define ALL_TESTS
+// #define TEST1
+#define TEST2
+// #define TEST3
+// #define FULL_TEST
 
 using namespace dart;
 using namespace math;
@@ -142,7 +145,7 @@ std::shared_ptr<simulation::World> createWorld(
   return world;
 }
 
-#ifdef ALL_TESTS
+#ifdef TEST1
 TEST(ATLAS, BROKEN_1)
 {
   double target_x = 0.5;
@@ -228,9 +231,10 @@ TEST(ATLAS, BROKEN_1)
       = neural::forwardPass(world, true);
   EXPECT_TRUE(snapshot->areResultsStandardized());
 }
-#endif
+#endif // TEST1
 
-// #ifdef ALL_TESTS
+#ifdef TEST2
+// failed verifyF_c() due to bugged getCoriolisAndGravityAndExternalForces()
 TEST(ATLAS, BROKEN_2)
 {
   double target_x = 0.5;
@@ -282,13 +286,105 @@ TEST(ATLAS, BROKEN_2)
   world->setExternalForces(brokenForce);
   world->setCachedLCPSolution(brokenLCPCache);
 
+  // EXPECT_TRUE(verifyScratch(world, WithRespectTo::POSITION));
+  // EXPECT_TRUE(verifyF_c(world));
+  // EXPECT_TRUE(verifyPosVelJacobian(world, brokenVel));
+  // EXPECT_TRUE(verifyAnalyticalJacobians(world));
+  EXPECT_TRUE(verifyVelGradients(world, brokenVel));
+
+  /*
+  GUIWebsocketServer server;
+  server.serve(8080);
+  server.renderWorld(world);
+
+  Eigen::VectorXd animatePos = brokenPos;
+  int i = 0;
+  Ticker ticker(0.01);
+  ticker.registerTickListener([&](long) {
+    world->setPositions(animatePos);
+    animatePos += brokenVel * 0.001;
+
+    i++;
+    if (i >= 100)
+    {
+      animatePos = brokenPos;
+      i = 0;
+    }
+    // world->step();
+    server.renderWorld(world);
+  });
+
+  server.registerConnectionListener([&]() { ticker.start(); });
+  while (server.isServing())
+  {
+    // spin
+  }
+
+  std::shared_ptr<neural::BackpropSnapshot> snapshot
+      = neural::forwardPass(world, true);
+  EXPECT_TRUE(snapshot->areResultsStandardized());
+  */
+}
+#endif // TEST2
+
+#ifdef TEST3
+// fails areResultsStandardized() for LCP
+TEST(ATLAS, BROKEN_3)
+{
+  double target_x = 0.5;
+  double target_y = 1.0;
+  double target_z = -1.0;
+  std::shared_ptr<simulation::World> world
+      = createWorld(target_x, target_y, target_z);
+
+  Eigen::VectorXd brokenPos = Eigen::VectorXd::Zero(33);
+brokenPos <<
+  -1.57098, -0.00244077, 0.00131736, 0.000214826, -0.0101934, 1.85193e-05,
+   0.000759851, 0.00276811, 0.000261443, -0.00019732, 0.000574608, 0.0133507,
+  -0.00239568, -0.0184735, 0.000715009, 0.000210485, 0.00419423, -0.00245556, 
+   0.000653731, -2.188e-05, 0.0532566, -4.87561e-05, -0.000114901, -0.00672978,
+   8.71723e-05, 0.00632901, 0.000715009, 0.00021045, 0.00353137, -0.00150703,
+   0.000368055, -2.18447e-05, 0.0189617;
+Eigen::VectorXd brokenVel = Eigen::VectorXd::Zero(33);
+brokenVel << -0.0344442, -0.631138, -0.0567461, 0.058374, -0.00398089, 
+  -0.0513241, 0.0781846, 0.726033, 0.0405993, -0.0707367, 0.106453, 1.72279, 
+  -0.468507, -1.77798, 0.0566378, 0.0395876, 1.07904, -0.619651, 0.171733, 
+  -0.0047619, 11.3439, 0.0163738, 0.0498022, -3.92009, -0.0821927, 5.36199,
+   0.0566378, 0.0395791, 0.959703, -0.418562, 0.0899755, -0.0047534, 3.07108;
+Eigen::VectorXd brokenForce = Eigen::VectorXd::Zero(33);
+brokenForce << 0, 0, 0, 0, 0, 0, -2.87179, -0.392243, 1.37066, -6.96699,
+   7.84975, -9.84715, -9.55796, 2.85221, 1.37246, -3.28473, 3.33182, 4.61692,
+  -1.53041, -8.09531, -1.30448, 4.58172, -6.8179, -4.38499, -9.95055, -2.08851,
+  -8.31803, 3.78765, -5.04101, 8.23899, -9.01072, -0.45285, -1.28571;
+Eigen::VectorXd brokenLCPCache = Eigen::VectorXd::Zero(96);
+brokenLCPCache << 0.0642214, 0.0642214, -0.0489385, 0.123966, -0.0680728,
+  0.059233, 0.00893705, 0.000922174, 0.00279593, 0.00378316, 0.00295676,
+  0.000770773, 0.0514538, -0.0456528, 0.000229659, 0.0334224, 0.0110034,
+  0.0027105, 0.0429435, 0.0146451, -0.017795, 0.101721, -0.0099077, 0.00332014,
+  0.00503838, 0.00503838, 0.000957086, 0.00092021, 0.00092021, -0.000515607, 
+  0.00305797, 0.00305797, 0.00175212, 2.09859e-05, 2.09859e-05, -2.46869e-06,
+  0.0212729, -0.00963059, 0.00888123, 0.00469605, 0.00469605, 0.000838551,
+  0.0054364, -0.000839053, -0.000775008, 0.00175603, 0.00175603,
+  -0.000909833, 0.0511683, -0.0313881, 0.0315636, 0.116205, 0.0857426, 
+  0.0207674, 0.0161944, 0.00462615, -0.00102314, 0.00247793, -0.00247793,
+  0.00247793, 0.000536775, -0.000536775, 0.000536775, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0.00392152, -0.00392152, -0.00370251, 0.0108626, -0.0108626,
+  -0.0108626, 0.00151502, -0.00151502, -0.00151502, 0, 0, 0, 0.000123806,
+  -0.000123806, -0.000123806, 0, 0, 0, 0.0528901, -0.0247297, -0.0528901, 0,
+   0, 0;
+  world->setPositions(brokenPos);
+  world->setVelocities(brokenVel);
+  world->setExternalForces(brokenForce);
+  world->setCachedLCPSolution(brokenLCPCache);
+
+  // EXPECT_TRUE(verifyScratch(world, WithRespectTo::POSITION));
   EXPECT_TRUE(verifyF_c(world));
   // EXPECT_TRUE(verifyPosVelJacobian(world, brokenVel));
   // EXPECT_TRUE(verifyAnalyticalJacobians(world));
   // EXPECT_TRUE(verifyVelGradients(world, brokenVel));
 
   GUIWebsocketServer server;
-  server.serve(8070);
+  server.serve(8080);
   server.renderWorld(world);
 
   Eigen::VectorXd animatePos = brokenPos;
@@ -318,9 +414,9 @@ TEST(ATLAS, BROKEN_2)
       = neural::forwardPass(world, true);
   EXPECT_TRUE(snapshot->areResultsStandardized());
 }
-// #endif
+#endif // TEST3
 
-#ifdef ALL_TESTS
+#ifdef FULL_TEST
 TEST(ATLAS_EXAMPLE, FULL_TEST)
 {
   double target_x = 0.5;
@@ -411,21 +507,24 @@ TEST(ATLAS_EXAMPLE, FULL_TEST)
   optimizer.setTolerance(1e-4);
   optimizer.setCheckDerivatives(true);
   optimizer.setIterationLimit(500);
-  optimizer.registerIntermediateCallback(
-      [&](trajectory::Problem* problem, int step, double primal, double dual) {
-        const Eigen::MatrixXd poses
-            = problem->getRolloutCache(world)->getPosesConst();
-        const Eigen::MatrixXd vels
-            = problem->getRolloutCache(world)->getVelsConst();
-        std::cout << "Rendering trajectory lines" << std::endl;
-        server.renderTrajectoryLines(world, poses);
-        world->setPositions(poses.col(0));
-        server.renderWorld(world);
-        return true;
-      });
+  optimizer.registerIntermediateCallback([&](trajectory::Problem* problem,
+                                             int /* step */,
+                                             double /* primal */,
+                                             double /* dual */) {
+    const Eigen::MatrixXd poses
+        = problem->getRolloutCache(world)->getPosesConst();
+    const Eigen::MatrixXd vels
+        = problem->getRolloutCache(world)->getVelsConst();
+    std::cout << "Rendering trajectory lines" << std::endl;
+    server.renderTrajectoryLines(world, poses);
+    world->setPositions(poses.col(0));
+    server.renderWorld(world);
+    return true;
+  });
   std::shared_ptr<trajectory::Solution> result
       = optimizer.optimize(trajectory.get());
 
+  /*
   int i = 0;
   const Eigen::MatrixXd poses
       = result->getStep(result->getNumSteps() - 1).rollout->getPosesConst();
@@ -454,5 +553,6 @@ TEST(ATLAS_EXAMPLE, FULL_TEST)
   {
     // spin
   }
+  */
 }
-#endif
+#endif // FULL_TEST

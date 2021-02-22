@@ -6,7 +6,7 @@
 #
 # This file is provided under the "BSD-style" License
 
-find_package(Protobuf REQUIRED)
+find_package(Protobuf "3.14.0.0" EXACT REQUIRED)
 
 message(STATUS "Protobuf_LIBRARIES: ${Protobuf_LIBRARIES}")
 

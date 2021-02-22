@@ -246,7 +246,7 @@ Eigen::VectorXd WithRespectToMass::get(dynamics::Skeleton* skel)
     return Eigen::VectorXd::Zero(0);
   int cursor = 0;
   int skelDim = dim(skel);
-  Eigen::VectorXd result = Eigen::VectorXd(skelDim);
+  Eigen::VectorXd result = Eigen::VectorXd::Zero(skelDim);
   for (WrtMassBodyNodyEntry& entry : skelEntries)
   {
     entry.get(skel, result.segment(cursor, entry.dim()));

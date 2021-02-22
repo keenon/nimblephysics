@@ -11,6 +11,7 @@
 #include "dart/neural/DifferentiableContactConstraint.hpp"
 #include "dart/neural/NeuralConstants.hpp"
 #include "dart/neural/NeuralUtils.hpp"
+#include "dart/performance/PerformanceLog.hpp"
 #include "dart/simulation/World.hpp"
 
 namespace dart {
@@ -23,6 +24,8 @@ class ConstraintBase;
 namespace dynamics {
 class Skeleton;
 } // namespace dynamics
+
+using namespace performance;
 
 namespace neural {
 
@@ -93,7 +96,8 @@ public:
       Eigen::VectorXi fIndex,
       Eigen::VectorXd b,
       Eigen::VectorXd aColNorms,
-      Eigen::MatrixXd A);
+      Eigen::MatrixXd A,
+      bool deliberatelyIgnoreFriction);
 
   /// If possible (because A is rank-deficient), this changes mX to be the
   /// least-squares minimal solution. This makes mX unique for a given set of
@@ -117,36 +121,43 @@ public:
   /// after registerLCPResults(). This can only
   /// be called once, and after this is called you cannot call
   /// measureConstraintImpulse() again!
-  void constructMatrices(simulation::World* world);
+  void constructMatrices(
+      simulation::World* world,
+      Eigen::VectorXi overrideClasses = Eigen::VectorXi::Zero(0));
 
   /// This computes and returns the whole vel-vel jacobian for this group. For
   /// backprop, you don't actually need this matrix, you can compute backprop
   /// directly. This is here if you want access to the full Jacobian for some
   /// reason.
-  Eigen::MatrixXd getVelVelJacobian(simulation::WorldPtr world);
+  Eigen::MatrixXd getVelVelJacobian(
+      simulation::WorldPtr world, PerformanceLog* perfLog = nullptr);
 
   /// This computes and returns the whole pos-vel jacobian. For backprop, you
   /// don't actually need this matrix, you can compute backprop directly. This
   /// is here if you want access to the full Jacobian for some reason.
-  Eigen::MatrixXd getPosVelJacobian(simulation::WorldPtr world);
+  Eigen::MatrixXd getPosVelJacobian(
+      simulation::WorldPtr world, PerformanceLog* perfLog = nullptr);
 
   /// This computes and returns the whole force-vel jacobian for this group. For
   /// backprop, you don't actually need this matrix, you can compute backprop
   /// directly. This is here if you want access to the full Jacobian for some
   /// reason.
-  Eigen::MatrixXd getForceVelJacobian(simulation::WorldPtr world);
+  Eigen::MatrixXd getForceVelJacobian(
+      simulation::WorldPtr world, PerformanceLog* perfLog = nullptr);
 
   /// This computes and returns the whole pos-pos jacobian for this group. For
   /// backprop, you don't actually need this matrix, you can compute backprop
   /// directly. This is here if you want access to the full Jacobian for some
   /// reason.
-  Eigen::MatrixXd getPosPosJacobian();
+  Eigen::MatrixXd getPosPosJacobian(
+      simulation::WorldPtr world, PerformanceLog* perfLog = nullptr);
 
   /// This computes and returns the whole vel-pos jacobian for this group. For
   /// backprop, you don't actually need this matrix, you can compute backprop
   /// directly. This is here if you want access to the full Jacobian for some
   /// reason.
-  Eigen::MatrixXd getVelPosJacobian();
+  Eigen::MatrixXd getVelPosJacobian(
+      simulation::WorldPtr world, PerformanceLog* perfLog = nullptr);
 
   /// This returns the [dC(pos,vel)/dpos] for the group, a block diagonal
   /// concatenation of the skeleton [dC(pos,vel)/dpos] matrices.
@@ -164,9 +175,19 @@ public:
   /// concatenation of the skeleton inverse mass matrices.
   Eigen::MatrixXd getInvMassMatrix(simulation::WorldPtr world);
 
-  /// This returns the P_c matrix. You shouldn't ever need this matrix, it's
-  /// just here to enable testing.
-  Eigen::MatrixXd getProjectionIntoClampsMatrix();
+  /// This returns the block diagonal matrix where each skeleton's joints
+  /// integration scheme is reflected.
+  Eigen::MatrixXd getJointsPosPosJacobian(simulation::WorldPtr world);
+
+  /// This returns the block diagonal matrix where each skeleton's joints
+  /// integration scheme is reflected.
+  Eigen::MatrixXd getJointsVelPosJacobian(simulation::WorldPtr world);
+
+  /// This computes and returns the component of the pos-pos and pos-vel
+  /// jacobians due to bounce approximation. For backprop, you don't actually
+  /// need this matrix, you can compute backprop directly. This is here if you
+  /// want access to the full Jacobian for some reason.
+  Eigen::MatrixXd getBounceApproximationJacobian(PerformanceLog* perfLog);
 
   /// This computes and returns the whole pos-vel jacobian. For backprop, you
   /// don't actually need this matrix, you can compute backprop directly. This
@@ -235,6 +256,11 @@ public:
   Eigen::MatrixXd getJacobianOfUpperBoundConstraints(
       simulation::WorldPtr world, Eigen::VectorXd f0);
 
+  /// This computes the Jacobian of A_ub^T*E*v0 with respect to position using
+  /// impulse tests.
+  Eigen::MatrixXd getJacobianOfUpperBoundConstraintsTranspose(
+      simulation::WorldPtr world, Eigen::VectorXd v0);
+
   /// This computes the implicit backprop without forming intermediate
   /// Jacobians. It takes a LossGradient with the position and velocity vectors
   /// filled it, though the loss with respect to torque is ignored and can be
@@ -243,7 +269,16 @@ public:
   void backprop(
       simulation::WorldPtr world,
       LossGradient& thisTimestepLoss,
-      const LossGradient& nextTimestepLoss);
+      const LossGradient& nextTimestepLoss,
+      bool exploreAlternateStrategies = false);
+
+  /// This zeros out any components of the gradient that would want to push us
+  /// out of the box-bounds encoded in the world for pos, vel, or force.
+  void clipLossGradientsToBounds(
+      simulation::WorldPtr world,
+      Eigen::VectorXd& lossWrtPos,
+      Eigen::VectorXd& lossWrtVel,
+      Eigen::VectorXd& lossWrtForce);
 
   /// This replaces x with the result of M*x in place, without explicitly
   /// forming M
@@ -254,6 +289,8 @@ public:
   /// forming Minv
   Eigen::VectorXd implicitMultiplyByInvMassMatrix(
       simulation::WorldPtr world, const Eigen::VectorXd& x);
+
+  const Eigen::MatrixXd& getAllConstraintMatrix() const;
 
   const Eigen::MatrixXd& getClampingConstraintMatrix() const;
 
@@ -298,9 +335,6 @@ public:
   /// Returns the velocity change caused by the illegal impulses from the LCP
   const Eigen::VectorXd& getVelocityDueToIllegalImpulses() const;
 
-  /// Returns the coriolis and gravity forces pre-step
-  const Eigen::VectorXd& getCoriolisAndGravityAndExternalForces() const;
-
   /// Returns the torques applied pre-step
   const Eigen::VectorXd& getPreStepTorques() const;
 
@@ -316,6 +350,11 @@ public:
   /// Get the coriolis and gravity forces
   const Eigen::VectorXd getCoriolisAndGravityAndExternalForces(
       simulation::WorldPtr world) const;
+
+  /// This is like `getClampingConstraintMatrix()` or
+  /// `getUpperBoundConstraintMatrix()`, except that it returns all the columns
+  /// instead of just a subset.
+  Eigen::MatrixXd getFullConstraintMatrix(simulation::World* world) const;
 
   std::size_t getNumDOFs() const;
 
@@ -362,6 +401,11 @@ public:
   /// This is only true after we've called constructMatrices(). It's a useful
   /// flag to ensure we don't call it twice.
   bool mFinalized;
+
+  /// This flag gets set if we needed to ignore the friction indices in order to
+  /// solve the LCP. This can happen because boxed LCPs that we use to solve
+  /// friction aren't guaranteed to be solvable.
+  bool mDeliberatelyIgnoreFriction;
 
   /// Impulse test matrix for all the constraints (only initialized in debug
   /// mode)
@@ -416,9 +460,6 @@ public:
 
   /// This is the inverse mass matrix computed in the constuctor
   Eigen::MatrixXd mMinv;
-
-  /// These are the coriolis and gravity forces, computed in the constuctor
-  Eigen::VectorXd mCoriolisAndGravityForces;
 
   /// These are the torques being applied, computed in the constuctor
   Eigen::VectorXd mPreStepTorques;

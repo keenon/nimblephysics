@@ -2,12 +2,14 @@ FROM keenon/diffdart:base
 
 # This is allowed to be empty string, but if it's not it must be prefixed by
 ARG VERSION
+ARG GIT_HASH
 
 RUN mkdir /wheelhouse
 
 # Build Python 3.7
 
 ENV PYTHON="/opt/python/cp37-cp37m/bin/python3.7"
+ENV PATH="/opt/python/cp37-cp37m/bin/:${PATH}"
 ENV PYTHON_VERSION="cp37-cp37m"
 ENV PYTHON_INCLUDE="/opt/python/cp37-cp37m/include/python3.7m/"
 ENV PYTHON_LIB="/opt/python/cp37-cp37m/lib/python3.7"
@@ -24,9 +26,9 @@ RUN git clone https://github.com/pybind/pybind11.git && \
 # Install pytest
 RUN ${PYTHON} -m pip install pytest
 RUN ${PYTHON} -m pip install auditwheel
-RUN git clone https://github.com/keenon/diffdart
+RUN git clone https://github.com/keenon/diffdart.git
 RUN cd diffdart && \
-    git pull && \
+    git checkout ${GIT_HASH} && \
     cat setup.py && \
     ${PYTHON} setup.py sdist bdist_wheel && \
     ${PYTHON} -m auditwheel repair dist/diffdart-${VERSION}-${PYTHON_VERSION}-linux_x86_64.whl

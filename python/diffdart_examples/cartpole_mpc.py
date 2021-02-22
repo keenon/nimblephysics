@@ -97,6 +97,8 @@ def main():
     ticker.registerTickListener(onTick)
     gui.stateMachine().registerConnectionListener(onConnect)
 
+    gui.stateMachine().blockWhileServing()
+
 
 if __name__ == "__main__":
     main()

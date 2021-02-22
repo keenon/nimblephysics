@@ -184,7 +184,8 @@ void MappedBackpropSnapshot::backprop(
     simulation::WorldPtr world,
     LossGradient& thisTimestepLoss,
     const std::unordered_map<std::string, LossGradient> nextTimestepLosses,
-    PerformanceLog* perfLog)
+    PerformanceLog* perfLog,
+    bool exploreAlternateStrategies)
 {
   PerformanceLog* thisLog = nullptr;
 #ifdef LOG_PERFORMANCE_MAPPED_BACKPROP_SNAPSHOT
@@ -194,6 +195,7 @@ void MappedBackpropSnapshot::backprop(
   }
 #endif
 
+  /*
   thisTimestepLoss.lossWrtPosition
       = Eigen::VectorXd::Zero(mMappings[mRepresentation]->getPosDim());
   thisTimestepLoss.lossWrtVelocity
@@ -233,9 +235,9 @@ void MappedBackpropSnapshot::backprop(
     thisTimestepLoss.lossWrtMass
         += massVel.transpose() * nextTimestepLoss.lossWrtVelocity;
   }
+  */
 
   // Faster, but not obviously correct way
-  /*
   LossGradient nextTimestepRealLoss;
   nextTimestepRealLoss.lossWrtPosition
       = Eigen::VectorXd::Zero(world->getNumDofs());
@@ -256,7 +258,11 @@ void MappedBackpropSnapshot::backprop(
   }
   LossGradient thisTimestepRealLoss;
   mBackpropSnapshot->backprop(
-      world, thisTimestepRealLoss, nextTimestepRealLoss, thisLog);
+      world,
+      thisTimestepRealLoss,
+      nextTimestepRealLoss,
+      thisLog,
+      exploreAlternateStrategies);
 
   thisTimestepLoss.lossWrtPosition
       = mPreStepMappings[mRepresentation].posOutJac.transpose()
@@ -270,7 +276,6 @@ void MappedBackpropSnapshot::backprop(
   thisTimestepLoss.lossWrtMass
       = mPreStepMappings[mRepresentation].massOutJac.transpose()
         * thisTimestepRealLoss.lossWrtMass;
-  */
 
 #ifdef LOG_PERFORMANCE_MAPPED_BACKPROP_SNAPSHOT
   if (thisLog != nullptr)

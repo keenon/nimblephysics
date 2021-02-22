@@ -79,7 +79,10 @@ void MPCRemote(py::module& m)
           ::py::arg("vel"),
           ::py::arg("mass"))
       .def("getForce", &dart::realtime::MPCRemote::getForce, ::py::arg("now"))
-      .def("start", &dart::realtime::MPCRemote::start)
+      .def(
+          "start",
+          &dart::realtime::MPCRemote::start,
+          ::py::call_guard<py::gil_scoped_release>())
       .def("stop", &dart::realtime::MPCRemote::stop)
       .def(
           "registerReplaningListener",

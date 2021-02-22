@@ -32,7 +32,6 @@
 
 #include <iostream>
 
-#include <dart/gui/gui.hpp>
 #include <gtest/gtest.h>
 
 #include "dart/collision/CollisionObject.hpp"
@@ -49,6 +48,7 @@
 #include "dart/neural/NeuralUtils.hpp"
 #include "dart/neural/RestorableSnapshot.hpp"
 #include "dart/neural/WithRespectToMass.hpp"
+#include "dart/realtime/Ticker.hpp"
 #include "dart/server/GUIWebsocketServer.hpp"
 #include "dart/simulation/World.hpp"
 #include "dart/utils/DartResourceRetriever.hpp"
@@ -311,6 +311,120 @@ TEST(GRADIENTS, BLOCK_ON_GROUND_STATIC_FRICTION)
 TEST(GRADIENTS, BLOCK_ON_GROUND_SLIPPING_FRICTION)
 {
   testBlockWithFrictionCoeff(0.5, 1);
+}
+#endif
+
+/******************************************************************************
+
+This test sets up a configuration that looks like this:
+
+          +---+
+          |   |
+          +---+
+            * contact
+          +---+
+          |   |
+          +---+
+
+There are a pair of spheres each on a single linear DOF, with the bottom sphere
+pushing the top sphere up.
+
+*/
+void testSphereStack()
+{
+  // World
+  WorldPtr world = World::create();
+
+  std::shared_ptr<SphereShape> sphereShape(
+      new SphereShape(0.5));
+
+  ///////////////////////////////////////////////
+  // Create the sphere A
+  ///////////////////////////////////////////////
+
+  SkeletonPtr sphereA = Skeleton::create("sphereA");
+  std::pair<PrismaticJoint*, BodyNode*> pairA
+      = sphereA->createJointAndBodyNodePair<PrismaticJoint>(nullptr);
+  PrismaticJoint* jointA = pairA.first;
+  BodyNode* bodyA = pairA.second;
+  jointA->setAxis(Eigen::Vector3d::UnitY());
+  bodyA->createShapeNodeWith<VisualAspect, CollisionAspect>(sphereShape);
+  bodyA->setFrictionCoeff(0.0);
+
+  world->addSkeleton(sphereA);
+
+  ///////////////////////////////////////////////
+  // Create the sphere B (on top)
+  ///////////////////////////////////////////////
+
+  SkeletonPtr sphereB = Skeleton::create("sphereB");
+  std::pair<PrismaticJoint*, BodyNode*> pairB
+      = sphereB->createJointAndBodyNodePair<PrismaticJoint>(nullptr);
+  PrismaticJoint* jointB = pairB.first;
+  BodyNode* bodyB = pairB.second;
+  jointB->setAxis(Eigen::Vector3d::UnitY());
+  bodyB->createShapeNodeWith<VisualAspect, CollisionAspect>(sphereShape);
+  bodyB->setFrictionCoeff(0.0);
+
+  sphereB->setForceUpperLimit(0, 0.0);
+  sphereB->setForceLowerLimit(0, 0.0);
+  sphereB->setPosition(0, 1.0 - CONTACT_MARGIN);
+
+  world->addSkeleton(sphereB);
+
+  ///////////////////////////////////////////////
+  // Run the tests
+  ///////////////////////////////////////////////
+
+  VectorXd worldVel = world->getVelocities();
+  worldVel(0) = 0.01;
+  worldVel(1) = -0.005;
+  world->setVelocities(worldVel);
+
+  /*
+  std::shared_ptr<neural::BackpropSnapshot> snapshot = neural::forwardPass(world, true);
+  Eigen::MatrixXd forceVel = snapshot->getForceVelJacobian(world);
+  std::cout << "force-vel" << std::endl << forceVel << std::endl;
+  Eigen::MatrixXd velVel = snapshot->getVelVelJacobian(world);
+  std::cout << "vel-vel" << std::endl << velVel << std::endl;
+  Eigen::MatrixXd A_c = snapshot->getClampingConstraintMatrix(world);
+  std::cout << "A_c" << std::endl << A_c << std::endl;
+  Eigen::MatrixXd A_cc = snapshot->getClampingAMatrix();
+  std::cout << "A_cc" << std::endl << A_cc << std::endl;
+  Eigen::MatrixXd Minv = snapshot->getInvMassMatrix(world);
+  std::cout << "Minv" << std::endl << Minv << std::endl;
+  Eigen::MatrixXd rel = Minv * A_c * A_cc.completeOrthogonalDecomposition().pseudoInverse() * A_c.transpose();
+  std::cout << "rel" << std::endl << rel << std::endl;
+  // We want to push up the top sphere
+  Eigen::VectorXd lossWrtNextVel = Eigen::VectorXd::Zero(2);
+  lossWrtNextVel(1) = 1.0;
+  std::cout << "loss wrt v_t+1" << std::endl << lossWrtNextVel << std::endl;
+  // Here are the resulting other losses
+  Eigen::VectorXd lossWrtForces = A_c.transpose() * lossWrtNextVel;
+  std::cout << "loss wrt f_t" << std::endl << lossWrtForces << std::endl;
+  Eigen::VectorXd lossWrtVel = velVel.transpose() * lossWrtNextVel;
+  std::cout << "loss wrt v_t" << std::endl << lossWrtVel << std::endl;
+  Eigen::VectorXd lossWrtControl = forceVel.transpose() * lossWrtNextVel;
+  std::cout << "loss wrt tau_t" << std::endl << lossWrtControl << std::endl;
+  lossWrtControl(1) = 0.0;
+  std::cout << "clipped loss wrt tau_t" << std::endl << lossWrtControl << std::endl;
+  Eigen::VectorXd lossWrtNextVelRecovered = forceVel * lossWrtControl;
+  std::cout << "loss wrt v_t+1" << std::endl << lossWrtNextVelRecovered << std::endl;
+  Eigen::VectorXd lossThroughLCP = rel.transpose() * lossWrtNextVel;
+  std::cout << "loss wrt v_t through LCP" << std::endl << lossThroughLCP << std::endl;
+  */
+
+  // Test the classic formulation
+  EXPECT_TRUE(verifyAnalyticalJacobians(world));
+  EXPECT_TRUE(verifyVelGradients(world, worldVel));
+  EXPECT_TRUE(verifyAnalyticalBackprop(world));
+  EXPECT_TRUE(verifyWrtMass(world));
+}
+
+#ifdef ALL_TESTS
+TEST(GRADIENTS, SPHERE_STACK)
+{
+  testSphereStack();
 }
 #endif
 
@@ -777,7 +891,7 @@ void testBouncingBlockPosGradients(double frictionCoeff, double mass)
 
   // The FD Jacobian needs us to be just out of contact range, so the bounce can
   // occur on some step in computation
-  Eigen::MatrixXd bruteForce = Eigen::MatrixXd(2, 2);
+  Eigen::MatrixXd bruteForce = Eigen::MatrixXd::Zero(2, 2);
   // clang-format off
   bruteForce << 1, 0, 
                 0, -0.5;
@@ -962,6 +1076,7 @@ void testRobotArm(
       = collision::CollisionDetector::getFactory()->create("dart");
   world->getConstraintSolver()->setCollisionDetector(collision_detector);
   world->setGravity(Eigen::Vector3d(0, -9.81, 0));
+  world->setContactClippingDepth(1.);
 
   SkeletonPtr arm = Skeleton::create("arm");
   BodyNode* parent = nullptr;
@@ -989,7 +1104,8 @@ void testRobotArm(
     }
     jointPair.second->setMass(1.0);
     parent = jointPair.second;
-    if ((attachPoint == -1 && i < numLinks - 1) || i != attachPoint)
+    if ((attachPoint == -1 && i < numLinks - 1) ||
+        (attachPoint != -1 && i != attachPoint))
     {
       // ShapeNode* visual =
       parent->createShapeNodeWith<VisualAspect>(boxShape);
@@ -1002,7 +1118,7 @@ void testRobotArm(
   }
 
   std::shared_ptr<BoxShape> endShape(
-      new BoxShape(Eigen::Vector3d(1.0, 1.0, 1.0) * sqrt(1.0 / 3.0)));
+      new BoxShape(Eigen::Vector3d(1.0, 1.0, 1.0) * 1. / sqrt(2.0)));
   ShapeNode* endNode
       = parent->createShapeNodeWith<VisualAspect, CollisionAspect>(endShape);
   parent->setFrictionCoeff(1);
@@ -1029,24 +1145,10 @@ void testRobotArm(
 
   Eigen::Isometry3d wallLocalOffset = Eigen::Isometry3d::Identity();
   wallLocalOffset.translation() = parent->getWorldTransform().translation()
-                                  + Eigen::Vector3d(-(1.0 - 1e-2), 0.0, 0);
+                                  + Eigen::Vector3d(-(1.0 - 1e-2), 0.0, 0.0);
   jointPair.first->setTransformFromParentBodyNode(wallLocalOffset);
 
-  /*
-  // Run collision detection
-  world->getConstraintSolver()->solve();
 
-  // Check
-  auto result = world->getLastCollisionResult();
-  if (result.getNumContacts() > 0)
-  {
-    std::cout << "Num contacts: " << result.getNumContacts() << std::endl;
-    std::cout << "end affector offset: " << std::endl
-              << endNode->getWorldTransform().matrix() << std::endl;
-    std::cout << "wall node position: " << std::endl
-              << wallNode->getWorldTransform().matrix() << std::endl;
-  }
-  */
 
   // arm->computeForwardDynamics();
   // arm->integrateVelocities(world->getTimeStep());
@@ -1061,18 +1163,54 @@ void testRobotArm(
     arm->setVelocities(Eigen::VectorXd::Ones(arm->getNumDofs()) * 0.05);
   }
 
-  VectorXd worldVel = world->getVelocities();
+  // // Run collision detection
+  // world->getConstraintSolver()->solve(world.get());
 
-  /*
-  VectorXd pos = world->getPositions();
-  pos(0) += 1e-4;
-  world->setPositions(pos);
-  */
+  // // Check
+  // auto result = world->getLastCollisionResult();
+  // if (result.getNumContacts() > 0)
+  // {
+  //   std::cout << "Num contacts: " << result.getNumContacts() << std::endl;
+  //   std::cout << "end affector offset: " << std::endl
+  //             << endNode->getWorldTransform().matrix() << std::endl;
+  //   std::cout << "wall node position: " << std::endl
+  //             << wallNode->getWorldTransform().matrix() << std::endl;
+  // }
+
+  Eigen::VectorXd worldVel = world->getVelocities();
+
+  
+  // // visual inspection code
+  // Eigen::VectorXd worldPos = world->getPositions();
+  // server::GUIWebsocketServer server;
+  // server.serve(8070);
+  // server.renderWorld(world);
+  // Eigen::VectorXd animatePos = worldPos;
+  // int i = 0;
+  // realtime::Ticker ticker(0.01);
+  // ticker.registerTickListener([&](long /* time */) {
+  //   world->setPositions(animatePos);
+  //   animatePos += worldVel * 0.001;
+  //   i++;
+  //   if (i >= 100)
+  //   {
+  //     animatePos = worldPos;
+  //     i = 0;
+  //   }
+  //   server.renderWorld(world);
+  // });
+
+  // server.registerConnectionListener([&]() { ticker.start(); });
 
   EXPECT_TRUE(verifyVelGradients(world, worldVel));
   EXPECT_TRUE(verifyAnalyticalJacobians(world));
   EXPECT_TRUE(verifyAnalyticalBackprop(world));
   EXPECT_TRUE(verifyWrtMass(world));
+
+  // while (server.isServing())
+  // {
+  //   // spin
+  // }
 }
 
 #ifdef ALL_TESTS
@@ -1083,8 +1221,7 @@ TEST(GRADIENTS, ARM_3_LINK_30_DEG)
 
 TEST(GRADIENTS, ARM_5_LINK_40_DEG)
 {
-  // This test wraps an arm around, and it's actually breaking contact, so this
-  // tests unconstrained free-motion
+  // This one penetrates much more deeply than the others
   testRobotArm(5, 40.0 / 180 * 3.1415);
 }
 
@@ -1343,7 +1480,7 @@ void testJumpWorm(bool offGround, bool interpenetration)
 
   // renderWorld(world);
 
-  EXPECT_TRUE(verifyAnalyticalJacobians(world));
+  EXPECT_TRUE(verifyAnalyticalJacobians(world, offGround));
   EXPECT_TRUE(verifyVelGradients(world, vels));
   EXPECT_TRUE(verifyPosGradients(world, 1, 1e-8));
   EXPECT_TRUE(verifyWrtMass(world));

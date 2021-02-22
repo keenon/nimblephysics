@@ -47,13 +47,21 @@ namespace SkelParser {
   /// Read World from skel file
   simulation::WorldPtr readWorld(
     const common::Uri& uri,
-    const common::ResourceRetrieverPtr& retriever = nullptr);
+    const common::ResourceRetrieverPtr& retriever = nullptr,
+    // By default DiffDART clears out springs and damping, because our
+    // Jacobians don't support them. TODO: remove me when springs and damping
+    // support is added
+    bool allowSpringsAndDamping = false);
 
   /// Read World from an xml-formatted string
   simulation::WorldPtr readWorldXML(
     const std::string& xmlString,
     const common::Uri& baseUri = "",
-    const common::ResourceRetrieverPtr& retriever = nullptr);
+    const common::ResourceRetrieverPtr& retriever = nullptr,
+    // By default DiffDART clears out springs and damping, because our
+    // Jacobians don't support them. TODO: remove me when springs and damping
+    // support is added
+    bool allowSpringsAndDamping = false);
 
   /// Read Skeleton from skel file
   dynamics::SkeletonPtr readSkeleton(

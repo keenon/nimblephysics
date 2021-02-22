@@ -6,6 +6,11 @@ brew reinstall gcc
 export FC=$(which gfortran)
 echo "FC=$FC"
 
+export MACOSX_DEPLOYMENT_TARGET="10.9"
+
+export PYTHON3=$(which python3)
+echo "Python3=${PYTHON3}"
+
 # Install perfutils - Keenon's fork, compatible with Mac OSX
 git clone https://github.com/keenon/PerfUtils.git
 pushd PerfUtils
@@ -29,7 +34,7 @@ pushd libccd
 mkdir build
 pushd build
 cmake .. -DENABLE_DOUBLE_PRECISION=ON
-make install -j14
+make install -j
 popd
 popd
 rm -rf libccd
@@ -40,7 +45,7 @@ pushd assimp
 mkdir build
 pushd build
 cmake ..
-make install -j10
+make install -j
 popd
 popd
 rm -rf assimp
@@ -53,7 +58,7 @@ git clone https://github.com/coin-or-tools/ThirdParty-Mumps.git
 pushd ThirdParty-Mumps
 ./get.Mumps
 ./configure
-make -j14
+make -j
 make install
 popd
 rm -rf ThirdParty-Mumps
@@ -62,7 +67,7 @@ rm -rf ThirdParty-Mumps
 git clone https://github.com/coin-or/Ipopt.git
 pushd Ipopt
 ./configure --with-mumps
-make -j14
+make -j
 make install
 popd
 rm -rf Ipopt
@@ -73,8 +78,8 @@ git clone https://github.com/pybind/pybind11.git
 pushd pybind11
 mkdir build
 pushd build
-cmake .. -DPYTHON_EXECUTABLE:FILEPATH=$(which python)
-make install -j10
+cmake .. -DPYTHON_EXECUTABLE:FILEPATH=$(which python3)
+make install -j
 popd
 popd
 rm -rf pybind11
@@ -86,8 +91,8 @@ pushd fcl
 git checkout 0.3.4
 mkdir build
 pushd build
-cmake .. -DFCL_WITH_OCTOMAP=OFF
-make install -j14
+cmake .. -DFCL_WITH_OCTOMAP=OFF -DBUILD_TESTING=OFF
+make install -j
 popd
 popd
 rm -rf fcl
@@ -99,7 +104,7 @@ git checkout v1.8.1
 mkdir build
 pushd build
 cmake ..
-make install -j10
+make install -j
 popd
 popd
 rm -rf octomap
@@ -110,7 +115,7 @@ pushd tinyxml2
 mkdir build
 pushd build
 cmake ..
-make install -j10
+make install -j
 popd
 popd
 rm -rf tinyxml2
@@ -132,7 +137,7 @@ pushd tinyxml
 mkdir build
 pushd build
 cmake ..
-make install -j10
+make install -j
 popd
 popd
 rm -rf tinyxml
@@ -143,7 +148,7 @@ pushd urdfdom_headers
 mkdir build
 pushd build
 cmake ..
-make install -j10
+make install -j
 popd
 popd
 rm -rf urdfdom_headers
@@ -154,7 +159,7 @@ pushd console_bridge
 mkdir build
 pushd build
 cmake ..
-make install -j10
+make install -j
 popd
 popd
 rm -rf console_bridge
@@ -165,30 +170,34 @@ pushd urdfdom
 mkdir build
 pushd build
 cmake ..
-make install -j10
+make install -j
 popd
 popd
 rm -rf urdfdom
 
 # Install protobuf
 PROTOBUF_VERSION="3.14.0"
-wget https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOBUF_VERSION}/protobuf-all-${PROTOBUF_VERSION}.tar.gz
-tar -xvzf protobuf-all-${PROTOBUF_VERSION}.tar.gz
-rm protobuf-all-${PROTOBUF_VERSION}.tar.gz
-pushd protobuf-${PROTOBUF_VERSION}
-./configure
-make -j10
-make install
-popd
-rm -rf protobuf-${PROTOBUF_VERSION}
+# wget https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOBUF_VERSION}/protobuf-all-${PROTOBUF_VERSION}.tar.gz
+# tar -xvzf protobuf-all-${PROTOBUF_VERSION}.tar.gz
+# rm protobuf-all-${PROTOBUF_VERSION}.tar.gz
+# pushd protobuf-${PROTOBUF_VERSION}
+# CXX_FLAGS="-fvisibility=hidden" ./configure
+# make -j
+# make install
+# popd
+# rm -rf protobuf-${PROTOBUF_VERSION}
 
 # Install grpc
 git clone --recurse-submodules -b v1.33.2 https://github.com/grpc/grpc
 pushd grpc
+pushd third_party/protobuf
+git checkout v${PROTOBUF_VERSION}
+popd
 mkdir -p cmake/build
 pushd cmake/build
 cmake -DgRPC_INSTALL=ON \
       -DgRPC_BUILD_TESTS=OFF \
+      -DCMAKE_CXX_FLAGS="-fvisibility=hidden" \
       ../..
 make -j
 make install

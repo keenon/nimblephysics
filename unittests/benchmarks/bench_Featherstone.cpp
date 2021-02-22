@@ -3,7 +3,6 @@
 #include <thread>
 
 #include <benchmark/benchmark.h>
-#include <dart/gui/gui.hpp>
 #include <gtest/gtest.h>
 
 #include "dart/collision/CollisionObject.hpp"
@@ -11,7 +10,6 @@
 #include "dart/dynamics/BodyNode.hpp"
 #include "dart/dynamics/RevoluteJoint.hpp"
 #include "dart/dynamics/Skeleton.hpp"
-#include "dart/gui/glut/TrajectoryReplayWindow.hpp"
 #include "dart/math/Geometry.hpp"
 #include "dart/neural/BackpropSnapshot.hpp"
 #include "dart/neural/ConstrainedGroupGradientMatrices.hpp"

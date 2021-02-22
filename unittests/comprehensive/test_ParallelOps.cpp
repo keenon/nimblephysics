@@ -577,8 +577,8 @@ TEST(TRAJECTORY, JUMP_WORM)
             std::cout << "         dC off" << std::endl;
           }
 
-          Eigen::VectorXd C1 = b1->getCoriolisAndGravityAndExternalForces();
-          Eigen::VectorXd C2 = b2->getCoriolisAndGravityAndExternalForces();
+          Eigen::VectorXd C1 = world->getCoriolisAndGravityAndExternalForces();
+          Eigen::VectorXd C2 = world->getCoriolisAndGravityAndExternalForces();
           if (!equals(C1, C2, 0.0))
           {
             std::cout << "         C off" << std::endl;

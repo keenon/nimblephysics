@@ -32,6 +32,8 @@ class IPOptOptimizer : public Optimizer
 public:
   IPOptOptimizer();
 
+  virtual ~IPOptOptimizer() = default;
+
   std::shared_ptr<Solution> optimize(
       Problem* shot, std::shared_ptr<Solution> warmStart = nullptr) override;
 

@@ -34,7 +34,6 @@
 #include <iostream>
 #include <thread>
 
-#include <dart/gui/gui.hpp>
 #include <gtest/gtest.h>
 
 #include "dart/neural/DiffNode.hpp"

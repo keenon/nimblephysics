@@ -98,6 +98,8 @@ public:
   /// and normal will change as we perturb skeletons by small amounts.
   collision::ContactType getContactType();
 
+  collision::Contact& getContact();
+
   /// This figures out what type of contact this skeleton is involved in.
   DofContactType getDofContactType(dynamics::DegreeOfFreedom* dof);
 
@@ -140,6 +142,15 @@ public:
       dynamics::DegreeOfFreedom* screwDof,
       dynamics::DegreeOfFreedom* rotateDof);
 
+  /// Returns the gradient of the screw axis with respect to the rotate dof
+  ///
+  /// Unlike its sibling, getScrewAxisForForceGradient(), this allows passing
+  /// in values that are otherwise repeatedly computed.
+  Eigen::Vector6d getScrewAxisForForceGradient_Optimized(
+      dynamics::DegreeOfFreedom* screwDof,
+      dynamics::DegreeOfFreedom* rotateDof,
+      const Eigen::Vector6d& axisWorldTwist);
+
   /// This is the analytical Jacobian for the contact position
   math::LinearJacobian getContactPositionJacobian(
       std::shared_ptr<simulation::World> world);
@@ -180,7 +191,7 @@ public:
 
   /// This returns an analytical Jacobian relating the skeletons that this
   /// contact touches.
-  Eigen::MatrixXd getConstraintForcesJacobian(
+  const Eigen::MatrixXd& getConstraintForcesJacobian(
       std::shared_ptr<simulation::World> world);
 
   /// This computes and returns the analytical Jacobian relating how changes in
@@ -200,6 +211,7 @@ public:
   /// the positions of any of the DOFs changes the constraint forces on all the
   /// skels.
   Eigen::MatrixXd getConstraintForcesJacobian(
+      std::shared_ptr<simulation::World> world,
       std::vector<std::shared_ptr<dynamics::Skeleton>> skels);
 
   /// This returns the skeletons that this contact constraint interacts with.
@@ -366,6 +378,8 @@ public:
       const dynamics::DegreeOfFreedom* parent,
       const dynamics::DegreeOfFreedom* child);
 
+  friend class BackpropSnapshot;
+
 protected:
   std::shared_ptr<constraint::ConstraintBase> mConstraint;
   std::shared_ptr<constraint::ContactConstraint> mContactConstraint;
@@ -373,6 +387,9 @@ protected:
   std::vector<std::string> mSkeletons;
   std::vector<Eigen::VectorXd> mSkeletonOriginalPositions;
   double mConstraintForce;
+
+  bool mWorldConstraintJacCacheDirty;
+  Eigen::MatrixXd mWorldConstraintJacCache;
 
   int mIndex;
 

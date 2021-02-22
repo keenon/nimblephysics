@@ -363,7 +363,7 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(
   Eigen::VectorXd hiGradientBackup = mHi;
   Eigen::VectorXi fIndexGradientBackup = mFIndex;
   Eigen::VectorXd bGradientBackup = mB;
-  Eigen::VectorXd aColNormGradientBackup = Eigen::VectorXd(n);
+  Eigen::VectorXd aColNormGradientBackup = Eigen::VectorXd::Zero(n);
   for (std::size_t i = 0; i < n; i++)
   {
     aColNormGradientBackup(i) = mA.col(i).squaredNorm();
@@ -374,6 +374,15 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(
 
   bool success = false;
   bool shortCircuitLCP = false;
+  bool hadToIgnoreFrictionToSolve = false;
+
+  // If we just zeroed out the mX vector, let's re-initialize it with a
+  // reasonable guess, since those are often correct.
+  if (mXResized)
+  {
+    mX = LCPUtils::guessSolution(aGradientBackup, mB, mHi, mLo, mFIndex);
+    mXBackup = mX;
+  }
 
   // Pre-solve, if we're using gradients. We're going to assume that the
   // initialization mX is from last time step, and then guess that nothing has
@@ -387,12 +396,19 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(
   // 2) It keeps classes stable and nicely differentiable, by getting LCP
   // solutions near previous solutions.
 
-  if (group.getGradientConstraintMatrices() && !mXResized)
+  if (group.getGradientConstraintMatrices())
   {
     std::shared_ptr<neural::ConstrainedGroupGradientMatrices> grads
         = group.getGradientConstraintMatrices();
     grads->registerLCPResults(
-        mX, mHi, mLo, mFIndex, mB, aColNormGradientBackup, aGradientBackup);
+        mX,
+        mHi,
+        mLo,
+        mFIndex,
+        mB,
+        aColNormGradientBackup,
+        aGradientBackup,
+        false);
     grads->constructMatrices(world);
     success = grads->areResultsStandardized();
     // If this worked, we don't need to reconstruct our constraint matrices,
@@ -405,7 +421,7 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(
   }
 
   // If we were unable to solve the problem by approximation from the previous
-  // solution, then re-solve it fully using an LCP
+  // solution, then re-solve it fully using Dantzig
   if (!success)
   {
     const bool earlyTermination = (mSecondaryBoxedLcpSolver != nullptr);
@@ -451,7 +467,8 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(
               mBBackup,
               mHiBackup,
               mLoBackup,
-              mFIndexBackup))
+              mFIndexBackup,
+              false))
       {
         /*
         std::cout << "ODE failed to produce a valid solution" << std::endl;
@@ -478,14 +495,15 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(
     mX.setZero();
   }
 
+  // If Dantzig failed to solve the problem, fall back to PGS
   if (!success && mSecondaryBoxedLcpSolver)
   {
-    Eigen::MatrixXd mAReduced = mA.block(0, 0, n, n);
-    Eigen::VectorXd mXReduced = mX;
-    Eigen::VectorXd mBReduced = mB;
-    Eigen::VectorXd mHiReduced = mHi;
-    Eigen::VectorXd mLoReduced = mLo;
-    Eigen::VectorXi mFIndexReduced = mFIndex;
+    Eigen::MatrixXd mAReduced = mABackup.block(0, 0, n, n);
+    Eigen::VectorXd mXReduced = mXBackup;
+    Eigen::VectorXd mBReduced = mBBackup;
+    Eigen::VectorXd mHiReduced = mHiBackup;
+    Eigen::VectorXd mLoReduced = mLoBackup;
+    Eigen::VectorXi mFIndexReduced = mFIndexBackup;
     Eigen::MatrixXd mapOut = LCPUtils::reduce(
         mAReduced,
         mXReduced,
@@ -508,24 +526,83 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(
         mHiReduced.data(),
         mFIndexReduced.data(),
         false);
-    mX = mapOut * mXReduced;
-    if (!LCPUtils::isLCPSolutionValid(
-            aGradientBackup,
-            mX,
-            bGradientBackup,
-            hiGradientBackup,
-            loGradientBackup,
-            fIndexGradientBackup))
+    if (success)
     {
-      std::cout << "Both Dantzig and PGS failed to produce a valid LCP "
-                   "solution. Here's the original:"
-                << std::endl;
-      LCPUtils::printReplicationCode(
-          aGradientBackup, mX, mLoBackup, mHiBackup, mBBackup, mFIndexBackup);
-      assert(
-          false
-          && "Both Dantzig and PGS failed to produce a valid LCP solution");
+      mX = mapOut * mXReduced;
+      if (!LCPUtils::isLCPSolutionValid(
+              aGradientBackup,
+              mX,
+              bGradientBackup,
+              hiGradientBackup,
+              loGradientBackup,
+              fIndexGradientBackup,
+              false))
+      {
+        success = false;
+        // This is fine and allowed, as long as there's friction. Boxed LCPs
+        // aren't guaranteed to be solvable with friction.
+      }
     }
+  }
+
+  // If Dantzig (and PGS, if we've got it) both failed to solve the problem, our
+  // final fallback is to drop the friction constraints and solve the ordinary
+  // (non-boxed) LCP. This is guaranteed solvable. Things may slip around
+  // during this timestep, but at least they won't inter-penetrate. This seems
+  // like the best we can do, given the limitations of boxed LCP solvers. In the
+  // long run, we should probably reformulate the LCP problem to guarantee
+  // solvability.
+  if (!success)
+  {
+    hadToIgnoreFrictionToSolve = true;
+
+    Eigen::MatrixXd mAReduced = mABackup.block(0, 0, n, n);
+    Eigen::VectorXd mXReduced = mXBackup;
+    Eigen::VectorXd mBReduced = mBBackup;
+    Eigen::VectorXd mHiReduced = mHiBackup;
+    Eigen::VectorXd mLoReduced = mLoBackup;
+    Eigen::VectorXi mFIndexReduced = mFIndexBackup;
+    Eigen::MatrixXd mapOut = LCPUtils::removeFriction(
+        mAReduced,
+        mXReduced,
+        mBReduced,
+        mHiReduced,
+        mLoReduced,
+        mFIndexReduced);
+    int reducedN = mXReduced.size();
+    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>
+        reducedAPadded = Eigen::MatrixXd::Zero(reducedN, dPAD(reducedN));
+    reducedAPadded.block(0, 0, reducedN, reducedN) = mAReduced;
+    // Prefer using PGS to Dantzig at this point, if it's available
+    if (mSecondaryBoxedLcpSolver)
+    {
+      success = mSecondaryBoxedLcpSolver->solve(
+          reducedN,
+          reducedAPadded.data(),
+          mXReduced.data(),
+          mBReduced.data(),
+          0,
+          mLoReduced.data(),
+          mHiReduced.data(),
+          mFIndexReduced.data(),
+          false);
+    }
+    else
+    {
+      success = mBoxedLcpSolver->solve(
+          reducedN,
+          reducedAPadded.data(),
+          mXReduced.data(),
+          mBReduced.data(),
+          0,
+          mLoReduced.data(),
+          mHiReduced.data(),
+          mFIndexReduced.data(),
+          true);
+    }
+    mX = mapOut * mXReduced;
+    // Don't bother checking validity at this point, because we know the
+    // solution is invalid with friction constraints, and that's ok.
   }
 
   if (mX.hasNaN())
@@ -576,7 +653,8 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(
         fIndexGradientBackup,
         bGradientBackup,
         aColNormGradientBackup,
-        aGradientBackup);
+        aGradientBackup,
+        hadToIgnoreFrictionToSolve);
     group.getGradientConstraintMatrices()->constructMatrices(world);
     if (group.getGradientConstraintMatrices()->areResultsStandardized())
     {

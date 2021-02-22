@@ -510,7 +510,7 @@ Eigen::MatrixXd IKMapping::bruteForceJacobianOfJacVelWrtPosition(
   const double EPS = 1e-6;
   int n = world->getNumDofs();
   int m = getDim();
-  Eigen::MatrixXd jac = Eigen::MatrixXd(m, n);
+  Eigen::MatrixXd jac = Eigen::MatrixXd::Zero(m, n);
 
   for (int i = 0; i < n; i++)
   {

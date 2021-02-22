@@ -22,7 +22,7 @@ using namespace dart;
 using namespace realtime;
 using namespace collision;
 
-// #define ALL_TESTS
+#define ALL_TESTS
 
 //==============================================================================
 #ifdef ALL_TESTS
@@ -265,10 +265,37 @@ void verifyMeshAndBoxResultsIdentical(
     Contact& analyticalContactBackwards
         = analyticalResultBackwards.getContact(i);
 
-    // Don't actually enforce this, cause there are places where the meshes are
-    // actually more specific and correct.
+    EXPECT_EQ(meshContact.type, analyticalContact.type);
 
-    // EXPECT_EQ(meshContact.type, analyticalContact.type);
+    if (meshContact.type == ContactType::EDGE_EDGE)
+    {
+      if (!equals(
+              meshContact.edgeADir.cwiseAbs().eval(),
+              analyticalContact.edgeADir.cwiseAbs().eval(),
+              2e-2))
+      {
+        std::cout << "Analytical got edge A dir: " << std::endl
+                  << analyticalContact.edgeADir << std::endl
+                  << "Mesh got edge A dir: " << std::endl
+                  << meshContact.edgeADir << std::endl;
+      }
+      EXPECT_TRUE(equals(
+          meshContact.edgeADir.cwiseAbs().eval(),
+          analyticalContact.edgeADir.cwiseAbs().eval()));
+      if (!equals(
+              meshContact.edgeBDir.cwiseAbs().eval(),
+              analyticalContact.edgeBDir.cwiseAbs().eval(),
+              2e-2))
+      {
+        std::cout << "Analytical got edge B dir: " << std::endl
+                  << analyticalContact.edgeBDir << std::endl
+                  << "Mesh got edge B dir: " << std::endl
+                  << meshContact.edgeBDir << std::endl;
+      }
+      EXPECT_TRUE(equals(
+          meshContact.edgeBDir.cwiseAbs().eval(),
+          analyticalContact.edgeBDir.cwiseAbs().eval()));
+    }
 
     // The tolerances on the point equality is pretty huge, because again the
     // meshes are actually more specific, because they pick each contact point
@@ -322,6 +349,7 @@ void verifyMeshAndBoxResultsIdentical(
   }
 }
 
+/*
 //==============================================================================
 #ifdef ALL_TESTS
 TEST(DARTCollide, BOX_CATAPULT_EDGE_EDGE_PARALLEL_CASE)
@@ -351,26 +379,15 @@ TEST(DARTCollide, BOX_CATAPULT_EDGE_EDGE_PARALLEL_CASE)
 
   verifyMeshAndBoxResultsIdentical(size0, T0, size1, T1);
 
-  server::GUIWebsocketServer server;
-  server.renderBasis();
-  server.createBox(
-      "box1", size0, T0.translation(), math::matrixToEulerXYZ(T0.linear()));
-  server.createBox(
-      "box2", size1, T1.translation(), math::matrixToEulerXYZ(T1.linear()));
-  server.serve(8070);
-  while (server.isServing())
-  {
-    // spin
-  }
-  /*
   CollisionResult result;
   collideBoxBoxAsMesh(nullptr, nullptr, size0, T0, size1, T1, result);
 
   EXPECT_EQ(result.getNumContacts(), 2);
-  */
 }
 #endif
+*/
 
+/*
 //==============================================================================
 #ifdef ALL_TESTS
 TEST(DARTCollide, BOX_CATAPULT_INTER_PENETRATE_CASE)
@@ -400,26 +417,15 @@ TEST(DARTCollide, BOX_CATAPULT_INTER_PENETRATE_CASE)
 
   verifyMeshAndBoxResultsIdentical(size0, T0, size1, T1);
 
-  server::GUIWebsocketServer server;
-  server.renderBasis();
-  server.createBox(
-      "box1", size0, T0.translation(), math::matrixToEulerXYZ(T0.linear()));
-  server.createBox(
-      "box2", size1, T1.translation(), math::matrixToEulerXYZ(T1.linear()));
-  server.serve(8070);
-  while (server.isServing())
-  {
-    // spin
-  }
-  /*
   CollisionResult result;
   collideBoxBoxAsMesh(nullptr, nullptr, size0, T0, size1, T1, result);
 
   EXPECT_EQ(result.getNumContacts(), 2);
-  */
 }
 #endif
+*/
 
+/*
 //==============================================================================
 #ifdef ALL_TESTS
 TEST(DARTCollide, BOX_CATAPULT_BROKEN_CASE)
@@ -505,17 +511,52 @@ TEST(DARTCollide, BOX_CATAPULT_BROKEN_CASE)
       "box1", size0, T0.translation(), math::matrixToEulerXYZ(T0.linear()));
   server.createBox(
       "box2", size1, T1.translation(), math::matrixToEulerXYZ(T1.linear()));
-  server.serve(8070);
-  while (server.isServing())
-  {
-    // spin
-  }
-  /*
   CollisionResult result;
   collideBoxBoxAsMesh(nullptr, nullptr, size0, T0, size1, T1, result);
 
   EXPECT_EQ(result.getNumContacts(), 2);
-  */
+}
+#endif
+*/
+
+//==============================================================================
+#ifdef ALL_TESTS
+TEST(DARTCollide, BOX_BOX_FACE_FACE_COLLISION_ANNOTATION)
+{
+  Eigen::Vector3d size1 = Eigen::Vector3d(1.0, 1.0, 1.0);
+  Eigen::Vector3d size2 = Eigen::Vector3d(0.5, 0.5, 0.5);
+  Eigen::Isometry3d T1 = Eigen::Isometry3d::Identity();
+  T1.translation() = Eigen::Vector3d(0.0, 0.0, -0.5);
+  Eigen::Isometry3d T2 = Eigen::Isometry3d::Identity();
+  T2.translation() = Eigen::Vector3d(0.0, 0.5, 0.25);
+
+  CollisionResult analyticalResult;
+  collideBoxBox(nullptr, nullptr, size1, T1, size2, T2, analyticalResult);
+
+  EXPECT_EQ(analyticalResult.getNumContacts(), 4);
+
+  // Give the top Y points first, then go X positive to negative
+  Eigen::Vector3d sortDir = Eigen::Vector3d(-0.1, -1.0, 0);
+  analyticalResult.sortContacts(sortDir);
+
+  // These should be the edge-edge contacts
+  Contact& contact1 = analyticalResult.getContact(0);
+  EXPECT_TRUE(equals(contact1.point, Eigen::Vector3d(0.25, 0.5, 0)));
+  EXPECT_EQ(contact1.type, ContactType::EDGE_EDGE);
+  EXPECT_TRUE(
+      equals(contact1.edgeADir.cwiseAbs().eval(), Eigen::Vector3d(1, 0, 0)));
+  EXPECT_TRUE(
+      equals(contact1.edgeBDir.cwiseAbs().eval(), Eigen::Vector3d(0, 1, 0)));
+  Contact& contact2 = analyticalResult.getContact(1);
+  EXPECT_TRUE(equals(contact2.point, Eigen::Vector3d(-0.25, 0.5, 0)));
+  EXPECT_EQ(contact2.type, ContactType::EDGE_EDGE);
+  // These should be the vertex-face contacts
+  Contact& contact3 = analyticalResult.getContact(2);
+  EXPECT_TRUE(equals(contact3.point, Eigen::Vector3d(0.25, 0.25, 0)));
+  EXPECT_EQ(contact3.type, ContactType::FACE_VERTEX);
+  Contact& contact4 = analyticalResult.getContact(3);
+  EXPECT_TRUE(equals(contact4.point, Eigen::Vector3d(-0.25, 0.25, 0)));
+  EXPECT_EQ(contact4.type, ContactType::FACE_VERTEX);
 }
 #endif
 
@@ -1314,9 +1355,6 @@ TEST(DARTCollide, MESH_WITNESS_POINTS)
   dir.v[1] = 0.0;
   dir.v[2] = 0.0;
 
-  ccd_vec3_t outBox;
-  ccd_vec3_t outMesh;
-
   // Start with the positive direction
 
   std::vector<Eigen::Vector3d> boxWitness
@@ -1413,9 +1451,6 @@ TEST(DARTCollide, MESH_WITNESS_POINTS_RANDOM)
     dir.v[0] = dirVec(0);
     dir.v[1] = dirVec(1);
     dir.v[2] = dirVec(2);
-
-    ccd_vec3_t outBox;
-    ccd_vec3_t outMesh;
 
     // Start with the positive direction
 
@@ -2811,7 +2846,7 @@ TEST(DARTCollide, CAPSULE_BOX_SPHERE_AND_PIPE_EDGE_COLLISION)
   // Points from B to A
   Eigen::Vector3d expectedNormal = Eigen::Vector3d::UnitY();
   Eigen::Vector3d expectedPointA = Eigen::Vector3d(0, 0.5 - 0.01, radius);
-  Eigen::Vector3d expectedPointB = Eigen::Vector3d(0, 0.5 - (0.01 / 2), 1.0);
+  Eigen::Vector3d expectedPointB = Eigen::Vector3d(0, 0.5, 1.0);
 
   Contact contact1 = result.getContact(0);
   EXPECT_EQ(contact1.type, SPHERE_FACE);
@@ -2900,7 +2935,7 @@ TEST(DARTCollide, CAPSULE_MESH_SPHERE_AND_PIPE_EDGE_COLLISION)
   // Points from B to A
   Eigen::Vector3d expectedNormal = Eigen::Vector3d::UnitY();
   Eigen::Vector3d expectedPointA = Eigen::Vector3d(0, 0.5 - 0.01, radius);
-  Eigen::Vector3d expectedPointB = Eigen::Vector3d(0, 0.5 - (0.01 / 2), 1.0);
+  Eigen::Vector3d expectedPointB = Eigen::Vector3d(0, 0.5, 1.0);
 
   Contact contact1 = result.getContact(0);
   EXPECT_EQ(contact1.type, SPHERE_FACE);

@@ -73,7 +73,7 @@
 #include "TestHelpers.hpp"
 #include "stdio.h"
 
-// #define ALL_TESTS
+#define ALL_TESTS
 
 using namespace dart;
 using namespace math;
@@ -83,13 +83,14 @@ using namespace neural;
 using namespace server;
 using namespace realtime;
 
-// #ifdef ALL_TESTS
-TEST(ATLAS_EXAMPLE, FULL_TEST)
+#ifdef ALL_TESTS
+TEST(HALF_CHEETAH, FULL_TEST)
 {
   // Create a world
   std::shared_ptr<simulation::World> world
       = dart::utils::UniversalLoader::loadWorld(
           "dart://sample/skel/half_cheetah.skel");
+  world->setSlowDebugResultsAgainstFD(true);
 
   for (auto* dof : world->getDofs())
   {
@@ -140,7 +141,7 @@ TEST(ATLAS_EXAMPLE, FULL_TEST)
   trajectory::IPOptOptimizer optimizer;
   optimizer.setLBFGSHistoryLength(5);
   optimizer.setTolerance(1e-4);
-  optimizer.setCheckDerivatives(false);
+  optimizer.setCheckDerivatives(true);
   optimizer.setIterationLimit(500);
   optimizer.registerIntermediateCallback([&](trajectory::Problem* problem,
                                              int /* step */,
@@ -159,9 +160,11 @@ TEST(ATLAS_EXAMPLE, FULL_TEST)
   std::shared_ptr<trajectory::Solution> result
       = optimizer.optimize(trajectory.get());
 
+  /*
   while (server.isServing())
   {
   }
+  */
 
   /*
   Eigen::VectorXd forceLimits = Eigen::VectorXd::Ones(atlas->getNumDofs()) * 30;
@@ -324,4 +327,4 @@ TEST(ATLAS_EXAMPLE, FULL_TEST)
   }
   */
 }
-// #endif
+#endif

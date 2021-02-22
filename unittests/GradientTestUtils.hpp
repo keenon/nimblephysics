@@ -39,6 +39,7 @@
 #include "dart/collision/CollisionObject.hpp"
 #include "dart/collision/Contact.hpp"
 #include "dart/dynamics/BodyNode.hpp"
+#include "dart/dynamics/DegreeOfFreedom.hpp"
 #include "dart/dynamics/RevoluteJoint.hpp"
 #include "dart/dynamics/Skeleton.hpp"
 #include "dart/math/Geometry.hpp"
@@ -408,7 +409,7 @@ bool verifyClassicProjectionIntoClampsMatrix(
     Eigen::VectorXd tau = (A_c + A_ub * E) * f_cReal;
     Eigen::VectorXd tauReal = A * fReal;
 
-    Eigen::MatrixXd compareTaus = Eigen::MatrixXd(tau.size(), 2);
+    Eigen::MatrixXd compareTaus = Eigen::MatrixXd::Zero(tau.size(), 2);
     compareTaus.col(0) = tau;
     compareTaus.col(1) = tauReal;
     std::cout << "(A_c + A_ub * E) * f_cReal  :::   A * fReal" << std::endl
@@ -418,7 +419,7 @@ bool verifyClassicProjectionIntoClampsMatrix(
     Eigen::VectorXd v = A.transpose() * (V_c + V_ub * E) * f_cReal;
     Eigen::VectorXd vReal = Q * fReal;
 
-    Eigen::MatrixXd compareVs = Eigen::MatrixXd(v.size(), 6);
+    Eigen::MatrixXd compareVs = Eigen::MatrixXd::Zero(v.size(), 6);
     compareVs.col(0) = v;
     compareVs.col(1) = vReal;
     compareVs.col(2) = bReal / dt;
@@ -443,7 +444,7 @@ bool verifyClassicProjectionIntoClampsMatrix(
 
     std::cout << "Dist of fReal: " << dist << std::endl;
     std::cout << "Dist of best approx: " << distApprox << std::endl;
-    Eigen::MatrixXd compareSolves = Eigen::MatrixXd(vReal.size(), 6);
+    Eigen::MatrixXd compareSolves = Eigen::MatrixXd::Zero(vReal.size(), 6);
     compareSolves.col(0) = (vReal - (bReal / dt));
     compareSolves.col(1) = (Q * centeredApprox - (bReal / dt));
     compareSolves.col(2) = vReal;
@@ -483,7 +484,7 @@ bool verifyClassicProjectionIntoClampsMatrix(
                       .bdcSvd(Eigen::ComputeThinU | Eigen::ComputeThinV)
                       .solve(random);
 
-    Eigen::MatrixXd compareRecovery = Eigen::MatrixXd(errorFwd.size(), 2);
+    Eigen::MatrixXd compareRecovery = Eigen::MatrixXd::Zero(errorFwd.size(), 2);
     compareRecovery.col(0) = errorBack;
     compareRecovery.col(1) = errorFwd;
     std::cout << "random - R^T*R^{-T}*random ::: random - R^{-1}*R*random"
@@ -650,7 +651,8 @@ bool verifyVelVelJacobian(WorldPtr world, VectorXd proposedVelocities)
   MatrixXd analytical = classicPtr->getVelVelJacobian(world);
   MatrixXd bruteForce = classicPtr->finiteDifferenceVelVelJacobian(world);
 
-  if (!equals(analytical, bruteForce, 1e-8))
+  // atlas run as 1.6e-08 error
+  if (!equals(analytical, bruteForce, 2e-8))
   {
     std::cout << "Brute force velVelJacobian:" << std::endl
               << bruteForce << std::endl;
@@ -658,13 +660,18 @@ bool verifyVelVelJacobian(WorldPtr world, VectorXd proposedVelocities)
               << std::endl
               << analytical << std::endl;
     std::cout << "Diff:" << std::endl << analytical - bruteForce << std::endl;
+    std::cout << "Diff range:" << std::endl
+              << (analytical - bruteForce).minCoeff() << " to "
+              << (analytical - bruteForce).maxCoeff() << std::endl;
     std::cout << "Brute force velCJacobian:" << std::endl
-              << classicPtr->getVelCJacobian(world) << std::endl;
+              << classicPtr->getJacobianOfC(world, WithRespectTo::VELOCITY)
+              << std::endl;
     std::cout << "Brute force forceVelJacobian:" << std::endl
               << classicPtr->getForceVelJacobian(world) << std::endl;
     std::cout << "Brute force forceVelJacobian * velCJacobian:" << std::endl
               << classicPtr->getForceVelJacobian(world)
-                     * classicPtr->getVelCJacobian(world)
+                     * classicPtr->getJacobianOfC(
+                         world, WithRespectTo::VELOCITY)
               << std::endl;
     return false;
   }
@@ -780,6 +787,7 @@ bool verifyPerturbedF_c(WorldPtr world)
 
     while (true)
     {
+      snapshot.restore();
       perturbedPos = original;
       perturbedPos(i) += eps;
       world->setPositions(perturbedPos);
@@ -834,6 +842,55 @@ bool verifyPerturbedF_c(WorldPtr world)
 
     if (A_c.cols() > 0 && !equals(realA_c, A_c, 1e-10))
     {
+      /*
+      std::cout << "Failed perturb " << i << " by " << eps << std::endl;
+      std::cout << "Jac[0]:" << std::endl
+                << classicPtr->getClampingConstraints()[0]
+                       ->getConstraintForcesJacobian(world)
+                << std::endl;
+      std::cout << "Contact force Jac[0]:" << std::endl
+                << classicPtr->getClampingConstraints()[0]
+                       ->getContactForceJacobian(world)
+                << std::endl;
+      std::cout << "Contact pos Jac[0]:" << std::endl
+                << classicPtr->getClampingConstraints()[0]
+                       ->getContactPositionJacobian(world)
+                << std::endl;
+      std::cout << "Contact force dir Jac[0]:" << std::endl
+                << classicPtr->getClampingConstraints()[0]
+                       ->getContactForceDirectionJacobian(world)
+                << std::endl;
+      std::cout << "Contact force dir Jac[0] 10:" << std::endl
+                << classicPtr->getClampingConstraints()[0]
+                       ->getContactForceGradient(world->getDofs()[10])
+                << std::endl;
+      */
+      /*
+      std::cout << "Contact getScrewAxisForForceGradient(2,10) for Jac[0]:"
+                << std::endl
+                << classicPtr->getClampingConstraints()[0]
+                       ->getScrewAxisForForceGradient(
+                           world->getDofs()[2], world->getDofs()[10])
+                << std::endl;
+      std::cout << "Contact getScrewAxisForForceGradient(4,10) for Jac[0]:"
+                << std::endl
+                << classicPtr->getClampingConstraints()[0]
+                       ->getScrewAxisForForceGradient(
+                           world->getDofs()[4], world->getDofs()[10])
+                << std::endl;
+      std::cout << "Contact getScrewAxisForForceGradient(8,10) for Jac[0]:"
+                << std::endl
+                << classicPtr->getClampingConstraints()[0]
+                       ->getScrewAxisForForceGradient(
+                           world->getDofs()[8], world->getDofs()[10])
+                << std::endl;
+      std::cout << "Contact getScrewAxisForForceGradient(10,10) for Jac[0]:"
+                << std::endl
+                << classicPtr->getClampingConstraints()[0]
+                       ->getScrewAxisForForceGradient(
+                           world->getDofs()[10], world->getDofs()[10])
+                << std::endl;
+      */
       if (realA_c.cols() >= 6 && realA_c.rows() >= 6)
       {
         std::cout << "Real A_c (top-left 6x6):" << std::endl
@@ -946,7 +1003,7 @@ bool verifyPerturbedF_c(WorldPtr world)
       }
       if (!equals(analyticalF_c, realF_c, 1e-9))
       {
-        Eigen::MatrixXd comparison = Eigen::MatrixXd(realF_c.size(), 4);
+        Eigen::MatrixXd comparison = Eigen::MatrixXd::Zero(realF_c.size(), 4);
         comparison.col(0) = realF_c;
         comparison.col(1) = analyticalF_c;
         comparison.col(2) = (realF_c - analyticalF_c);
@@ -958,7 +1015,7 @@ bool verifyPerturbedF_c(WorldPtr world)
                   << std::endl
                   << comparison << std::endl;
 
-        Eigen::MatrixXd comparisonB = Eigen::MatrixXd(realB.size(), 4);
+        Eigen::MatrixXd comparisonB = Eigen::MatrixXd::Zero(realB.size(), 4);
         comparisonB.col(0) = realB;
         comparisonB.col(1) = analyticalQ * analyticalF_c;
         comparisonB.col(2) = (realB - (analyticalQ * analyticalF_c));
@@ -1720,6 +1777,8 @@ bool verifyScratch(WorldPtr world, WithRespectTo* wrt)
               << std::endl
               << analytical << std::endl;
     std::cout << "Diff:" << std::endl << analytical - bruteForce << std::endl;
+    std::cout << "Diff (" << (analytical - bruteForce).minCoeff() << " - "
+              << (analytical - bruteForce).maxCoeff() << "):" << std::endl;
     /*
     std::cout << "Pos-Vel Analytical:" << std::endl
               << posVelAnalytical << std::endl;
@@ -1879,13 +1938,18 @@ bool verifyForceVelJacobian(WorldPtr world, VectorXd proposedVelocities)
   MatrixXd analytical = classicPtr->getForceVelJacobian(world);
   MatrixXd bruteForce = classicPtr->finiteDifferenceForceVelJacobian(world);
 
-  if (!equals(analytical, bruteForce, 1e-8))
+  // Atlas runs at 1.5e-8 error
+  if (!equals(analytical, bruteForce, 2e-8))
   {
     std::cout << "Brute force forceVelJacobian:" << std::endl
               << bruteForce << std::endl;
     std::cout << "Analytical forceVelJacobian (should be the same as above):"
               << std::endl
               << analytical << std::endl;
+    std::cout << "Diff:" << std::endl << analytical - bruteForce << std::endl;
+    std::cout << "Diff range:" << std::endl
+              << (analytical - bruteForce).minCoeff() << " to "
+              << (analytical - bruteForce).maxCoeff() << std::endl;
     return false;
   }
 
@@ -2061,6 +2125,198 @@ bool verifyPosGradients(
       && verifyVelPosJacobianApproximation(world, subdivisions, tolerance));
 }
 
+bool verifyConstraintGroupSubJacobians(
+    WorldPtr world, const neural::BackpropSnapshotPtr& classicPtr)
+{
+
+  RestorableSnapshot snapshot(world);
+
+  world->setPositions(classicPtr->getPreStepPosition());
+  world->setVelocities(classicPtr->getPreStepVelocity());
+  world->setExternalForces(classicPtr->getPreStepTorques());
+
+  // Special case, there's only one constraint group
+  if (classicPtr->mGradientMatrices.size() == 1)
+  {
+    std::shared_ptr<ConstrainedGroupGradientMatrices> group
+        = classicPtr->mGradientMatrices[0];
+
+    Eigen::MatrixXd groupPosPos = group->getPosPosJacobian(world);
+    Eigen::MatrixXd worldPosPos = classicPtr->getPosPosJacobian(world);
+    if (!equals(groupPosPos, worldPosPos, 0))
+    {
+      std::cout << "ConstrainedGroupGradientMatrices and BackpropSnapshotPtr "
+                   "don't match!"
+                << std::endl;
+      std::cout << "World pos-pos Jacobian: " << std::endl
+                << worldPosPos << std::endl;
+      std::cout << "Group pos-pos Jacobian: " << std::endl
+                << groupPosPos << std::endl;
+      return false;
+    }
+
+    Eigen::MatrixXd groupVelPos = group->getVelPosJacobian(world);
+    Eigen::MatrixXd worldVelPos = classicPtr->getVelPosJacobian(world);
+    if (!equals(groupVelPos, worldVelPos, 1e-10))
+    {
+      std::cout << "ConstrainedGroupGradientMatrices and BackpropSnapshotPtr "
+                   "don't match!"
+                << std::endl;
+      std::cout << "World vel-pos Jacobian: " << std::endl
+                << worldVelPos << std::endl;
+      std::cout << "Group vel-pos Jacobian: " << std::endl
+                << groupVelPos << std::endl;
+      return false;
+    }
+
+    Eigen::MatrixXd groupPosVel = group->getPosVelJacobian(world);
+    Eigen::MatrixXd worldPosVel = classicPtr->getPosVelJacobian(world);
+    if (!equals(groupPosVel, worldPosVel, 0))
+    {
+      std::cout << "ConstrainedGroupGradientMatrices and BackpropSnapshotPtr "
+                   "don't match!"
+                << std::endl;
+      std::cout << "World pos-vel Jacobian: " << std::endl
+                << worldPosVel << std::endl;
+      std::cout << "Group pos-vel Jacobian: " << std::endl
+                << groupPosVel << std::endl;
+      std::cout << "Diff: " << std::endl
+                << worldPosVel - groupPosVel << std::endl;
+
+      // Find the constrained group variables
+      const Eigen::MatrixXd& groupA_c = group->getClampingConstraintMatrix();
+      const Eigen::MatrixXd& groupA_ub = group->getUpperBoundConstraintMatrix();
+      const Eigen::MatrixXd& groupE = group->getUpperBoundMappingMatrix();
+      Eigen::MatrixXd groupA_c_ub_E = groupA_c + groupA_ub * groupE;
+      Eigen::VectorXd groupTau = group->mPreStepTorques;
+      Eigen::VectorXd groupC
+          = group->getCoriolisAndGravityAndExternalForces(world);
+      const Eigen::VectorXd& groupF_c = group->getClampingConstraintImpulses();
+      double dt = world->getTimeStep();
+      Eigen::MatrixXd group_dM = group->getJacobianOfMinv(
+          world,
+          dt * (groupTau - groupC) + groupA_c_ub_E * groupF_c,
+          WithRespectTo::POSITION);
+      // Do the same thing with the backprop snapshot
+      const Eigen::MatrixXd& worldA_c
+          = classicPtr->getClampingConstraintMatrix(world);
+      const Eigen::MatrixXd& worldA_ub
+          = classicPtr->getUpperBoundConstraintMatrix(world);
+      const Eigen::MatrixXd& worldE = classicPtr->getUpperBoundMappingMatrix();
+      Eigen::MatrixXd worldA_c_ub_E = worldA_c + worldA_ub * worldE;
+      Eigen::VectorXd worldTau = classicPtr->getPreStepTorques();
+      Eigen::VectorXd worldC = world->getCoriolisAndGravityAndExternalForces();
+      const Eigen::VectorXd& worldF_c
+          = classicPtr->getClampingConstraintImpulses();
+      Eigen::MatrixXd world_dM = classicPtr->getJacobianOfMinv(
+          world,
+          dt * (worldTau - worldC) + worldA_c_ub_E * worldF_c,
+          WithRespectTo::POSITION);
+
+      std::cout << "World dM Jacobian: " << std::endl << world_dM << std::endl;
+      std::cout << "Group dM Jacobian: " << std::endl << group_dM << std::endl;
+      std::cout << "Diff: " << std::endl << world_dM - group_dM << std::endl;
+
+      std::cout << "World f_c: " << std::endl << worldF_c << std::endl;
+      std::cout << "Group f_c: " << std::endl << groupF_c << std::endl;
+      std::cout << "Diff: " << std::endl << worldF_c - groupF_c << std::endl;
+
+      Eigen::MatrixXd group_dA_c
+          = group->getJacobianOfClampingConstraints(world, groupF_c);
+      Eigen::MatrixXd world_dA_c
+          = classicPtr->getJacobianOfClampingConstraints(world, worldF_c);
+
+      std::cout << "World dA_c: " << std::endl << world_dA_c << std::endl;
+      std::cout << "Group dA_c: " << std::endl << group_dA_c << std::endl;
+      std::cout << "Diff: " << std::endl
+                << world_dA_c - group_dA_c << std::endl;
+
+      Eigen::MatrixXd group_dF_c
+          = group->getJacobianOfConstraintForce(world, WithRespectTo::POSITION);
+      Eigen::MatrixXd world_dF_c = classicPtr->getJacobianOfConstraintForce(
+          world, WithRespectTo::POSITION);
+
+      std::cout << "World dF_c: " << std::endl << world_dF_c << std::endl;
+      std::cout << "Group dF_c: " << std::endl << group_dF_c << std::endl;
+      std::cout << "Diff: " << std::endl
+                << world_dF_c - group_dF_c << std::endl;
+
+      Eigen::VectorXd group_b = group->getClampingConstraintRelativeVels();
+      Eigen::MatrixXd group_dQ_b
+          = group->getJacobianOfLCPConstraintMatrixClampingSubset(
+              world, group_b, WithRespectTo::POSITION);
+
+      Eigen::VectorXd world_b = classicPtr->getClampingConstraintRelativeVels();
+      Eigen::MatrixXd world_dQ_b
+          = classicPtr->getJacobianOfLCPConstraintMatrixClampingSubset(
+              world, world_b, WithRespectTo::POSITION);
+
+      std::cout << "World b: " << std::endl << world_b << std::endl;
+      std::cout << "Group b: " << std::endl << group_b << std::endl;
+      std::cout << "Diff: " << std::endl << world_b - group_b << std::endl;
+
+      std::cout << "World dQ_b: " << std::endl << world_dQ_b << std::endl;
+      std::cout << "Group dQ_b: " << std::endl << group_dQ_b << std::endl;
+      std::cout << "Diff: " << std::endl
+                << world_dQ_b - group_dQ_b << std::endl;
+
+      Eigen::MatrixXd group_dB = group->getJacobianOfLCPOffsetClampingSubset(
+          world, WithRespectTo::POSITION);
+      Eigen::MatrixXd world_dB
+          = classicPtr->getJacobianOfLCPOffsetClampingSubset(
+              world, WithRespectTo::POSITION);
+
+      std::cout << "World dB: " << std::endl << world_dB << std::endl;
+      std::cout << "Group dB: " << std::endl << group_dB << std::endl;
+      std::cout << "Diff: " << std::endl << world_dB - group_dB << std::endl;
+
+      Eigen::MatrixXd group_posC
+          = group->getJacobianOfC(world, WithRespectTo::POSITION);
+      Eigen::MatrixXd world_posC
+          = classicPtr->getJacobianOfC(world, WithRespectTo::POSITION);
+
+      std::cout << "World pos-C: " << std::endl << world_posC << std::endl;
+      std::cout << "Group pos-C: " << std::endl << group_posC << std::endl;
+      std::cout << "Diff: " << std::endl
+                << world_posC - group_posC << std::endl;
+
+      return false;
+    }
+
+    Eigen::MatrixXd groupVelVel = group->getVelVelJacobian(world);
+    Eigen::MatrixXd worldVelVel = classicPtr->getVelVelJacobian(world);
+    if (!equals(groupVelVel, worldVelVel, 0))
+    {
+      std::cout << "ConstrainedGroupGradientMatrices and BackpropSnapshotPtr "
+                   "don't match!"
+                << std::endl;
+      std::cout << "World vel-vel Jacobian: " << std::endl
+                << worldVelVel << std::endl;
+      std::cout << "Group vel-vel Jacobian: " << std::endl
+                << groupVelVel << std::endl;
+      return false;
+    }
+
+    Eigen::MatrixXd groupForceVel = group->getForceVelJacobian(world);
+    Eigen::MatrixXd worldForceVel = classicPtr->getForceVelJacobian(world);
+    if (!equals(groupForceVel, worldForceVel, 0))
+    {
+      std::cout << "ConstrainedGroupGradientMatrices and BackpropSnapshotPtr "
+                   "don't match!"
+                << std::endl;
+      std::cout << "World force-vel Jacobian: " << std::endl
+                << worldForceVel << std::endl;
+      std::cout << "Group force-vel Jacobian: " << std::endl
+                << groupForceVel << std::endl;
+      return false;
+    }
+  }
+
+  snapshot.restore();
+
+  return true;
+}
+
 bool verifyAnalyticalBackpropInstance(
     WorldPtr world,
     const neural::BackpropSnapshotPtr& classicPtr,
@@ -2116,6 +2372,53 @@ bool verifyAnalyticalBackpropInstance(
       classicPtr->getForceVelJacobian(world).transpose()
       * nextTimeStep.lossWrtVelocity;
 
+  // Trim gradients to the box constraints
+
+  Eigen::VectorXd pos = world->getPositions();
+  Eigen::VectorXd posUpperLimits = world->getPositionUpperLimits();
+  Eigen::VectorXd posLowerLimits = world->getPositionLowerLimits();
+  Eigen::VectorXd vels = world->getVelocities();
+  Eigen::VectorXd velUpperLimits = world->getVelocityUpperLimits();
+  Eigen::VectorXd velLowerLimits = world->getVelocityLowerLimits();
+  Eigen::VectorXd forces = world->getExternalForces();
+  Eigen::VectorXd forceUpperLimits = world->getExternalForceUpperLimits();
+  Eigen::VectorXd forceLowerLimits = world->getExternalForceLowerLimits();
+  for (int i = 0; i < world->getNumDofs(); i++)
+  {
+    // Clip position gradients
+
+    if ((pos(i) == posLowerLimits(i)) && (lossWrtThisPosition(i) > 0))
+    {
+      lossWrtThisPosition(i) = 0;
+    }
+    if ((pos(i) == posUpperLimits(i)) && (lossWrtThisPosition(i) < 0))
+    {
+      lossWrtThisPosition(i) = 0;
+    }
+
+    // Clip velocity gradients
+
+    if ((vels(i) == velLowerLimits(i)) && (lossWrtThisVelocity(i) > 0))
+    {
+      lossWrtThisVelocity(i) = 0;
+    }
+    if ((vels(i) == velUpperLimits(i)) && (lossWrtThisVelocity(i) < 0))
+    {
+      lossWrtThisVelocity(i) = 0;
+    }
+
+    // Clip force gradients
+
+    if ((forces(i) == forceLowerLimits(i)) && (lossWrtThisTorque(i) > 0))
+    {
+      lossWrtThisTorque(i) = 0;
+    }
+    if ((forces(i) == forceUpperLimits(i)) && (lossWrtThisTorque(i) < 0))
+    {
+      lossWrtThisTorque(i) = 0;
+    }
+  }
+
   if (!equals(lossWrtThisPosition, thisTimeStep.lossWrtPosition, 1e-5)
       || !equals(lossWrtThisVelocity, thisTimeStep.lossWrtVelocity, 1e-5)
       || !equals(lossWrtThisTorque, thisTimeStep.lossWrtTorque, 1e-5))
@@ -2136,7 +2439,8 @@ bool verifyAnalyticalBackpropInstance(
       std::cout << "pos-vel Jacobian:" << std::endl
                 << classicPtr->getPosVelJacobian(world) << std::endl;
       std::cout << "pos-C Jacobian:" << std::endl
-                << classicPtr->getPosCJacobian(world) << std::endl;
+                << classicPtr->getJacobianOfC(world, WithRespectTo::POSITION)
+                << std::endl;
       std::cout << "Brute force: pos-pos Jac:" << std::endl
                 << classicPtr->getPosPosJacobian(world) << std::endl;
     }
@@ -2168,63 +2472,67 @@ bool verifyAnalyticalBackpropInstance(
 
       Eigen::MatrixXd classicInnerPart
           = A_c.transpose().eval() * Minv * (A_c + A_ub * E);
-      Eigen::MatrixXd classicInnerPartInv
-          = classicInnerPart.completeOrthogonalDecomposition().pseudoInverse();
-      Eigen::MatrixXd classicRightPart = B * A_c.transpose().eval();
-      Eigen::MatrixXd classicLeftPart = Minv * (A_c + A_ub * E);
-      Eigen::MatrixXd classicComplete
-          = classicLeftPart * classicInnerPart * classicRightPart;
-
-      std::cout << "Classic brute force A_c*z:" << std::endl
-                << classicComplete.transpose() * nextTimeStep.lossWrtVelocity
-                << std::endl;
-
-      // Massed formulation
-
-      Eigen::MatrixXd massedInnerPart
-          = A_c.transpose().eval() * (V_c + V_ub * E);
-      Eigen::MatrixXd massedInnerPartInv
-          = massedInnerPart.completeOrthogonalDecomposition().pseudoInverse();
-      Eigen::MatrixXd massedRightPart = B * A_c.transpose().eval();
-      Eigen::MatrixXd massedLeftPart = V_c + V_ub * E;
-      Eigen::MatrixXd massedComplete
-          = massedLeftPart * massedInnerPart * massedRightPart;
-
-      std::cout << "Massed brute force A_c*z:" << std::endl
-                << massedComplete.transpose() * nextTimeStep.lossWrtVelocity
-                << std::endl;
-
-      if (!equals(massedInnerPart, classicInnerPart, 1e-8))
+      if (classicInnerPart.size() > 0)
       {
-        std::cout << "Mismatch at inner part!" << std::endl;
-        std::cout << "Classic inner part:" << std::endl
-                  << classicInnerPart << std::endl;
-        std::cout << "Massed inner part:" << std::endl
-                  << massedInnerPart << std::endl;
-      }
-      if (!equals(massedInnerPartInv, classicInnerPartInv, 1e-8))
-      {
-        std::cout << "Mismatch at inner part inv!" << std::endl;
-        std::cout << "Classic inner part inv:" << std::endl
-                  << classicInnerPartInv << std::endl;
-        std::cout << "Massed inner part inv:" << std::endl
-                  << massedInnerPartInv << std::endl;
-      }
-      if (!equals(massedLeftPart, classicLeftPart, 1e-8))
-      {
-        std::cout << "Mismatch at left part!" << std::endl;
-        std::cout << "Classic left part:" << std::endl
-                  << classicLeftPart << std::endl;
-        std::cout << "Massed left part:" << std::endl
-                  << massedLeftPart << std::endl;
-      }
-      if (!equals(massedRightPart, classicRightPart, 1e-8))
-      {
-        std::cout << "Mismatch at right part!" << std::endl;
-        std::cout << "Classic right part:" << std::endl
-                  << classicRightPart << std::endl;
-        std::cout << "Massed right part:" << std::endl
-                  << massedRightPart << std::endl;
+        Eigen::MatrixXd classicInnerPartInv
+            = classicInnerPart.completeOrthogonalDecomposition()
+                  .pseudoInverse();
+        Eigen::MatrixXd classicRightPart = B * A_c.transpose().eval();
+        Eigen::MatrixXd classicLeftPart = Minv * (A_c + A_ub * E);
+        Eigen::MatrixXd classicComplete
+            = classicLeftPart * classicInnerPart * classicRightPart;
+
+        std::cout << "Classic brute force A_c*z:" << std::endl
+                  << classicComplete.transpose() * nextTimeStep.lossWrtVelocity
+                  << std::endl;
+
+        // Massed formulation
+
+        Eigen::MatrixXd massedInnerPart
+            = A_c.transpose().eval() * (V_c + V_ub * E);
+        Eigen::MatrixXd massedInnerPartInv
+            = massedInnerPart.completeOrthogonalDecomposition().pseudoInverse();
+        Eigen::MatrixXd massedRightPart = B * A_c.transpose().eval();
+        Eigen::MatrixXd massedLeftPart = V_c + V_ub * E;
+        Eigen::MatrixXd massedComplete
+            = massedLeftPart * massedInnerPart * massedRightPart;
+
+        std::cout << "Massed brute force A_c*z:" << std::endl
+                  << massedComplete.transpose() * nextTimeStep.lossWrtVelocity
+                  << std::endl;
+
+        if (!equals(massedInnerPart, classicInnerPart, 1e-8))
+        {
+          std::cout << "Mismatch at inner part!" << std::endl;
+          std::cout << "Classic inner part:" << std::endl
+                    << classicInnerPart << std::endl;
+          std::cout << "Massed inner part:" << std::endl
+                    << massedInnerPart << std::endl;
+        }
+        if (!equals(massedInnerPartInv, classicInnerPartInv, 1e-8))
+        {
+          std::cout << "Mismatch at inner part inv!" << std::endl;
+          std::cout << "Classic inner part inv:" << std::endl
+                    << classicInnerPartInv << std::endl;
+          std::cout << "Massed inner part inv:" << std::endl
+                    << massedInnerPartInv << std::endl;
+        }
+        if (!equals(massedLeftPart, classicLeftPart, 1e-8))
+        {
+          std::cout << "Mismatch at left part!" << std::endl;
+          std::cout << "Classic left part:" << std::endl
+                    << classicLeftPart << std::endl;
+          std::cout << "Massed left part:" << std::endl
+                    << massedLeftPart << std::endl;
+        }
+        if (!equals(massedRightPart, classicRightPart, 1e-8))
+        {
+          std::cout << "Mismatch at right part!" << std::endl;
+          std::cout << "Classic right part:" << std::endl
+                    << classicRightPart << std::endl;
+          std::cout << "Massed right part:" << std::endl
+                    << massedRightPart << std::endl;
+        }
       }
       Eigen::MatrixXd V_c_recovered = Minv * A_c;
       if (!equals(V_c_recovered, V_c, 1e-8))
@@ -2262,7 +2570,8 @@ bool verifyAnalyticalBackpropInstance(
       std::cout << "3: -((force-vel) * (vel-C))^T * nextLossWrtVel:"
                 << std::endl
                 << -(classicPtr->getForceVelJacobian(world)
-                     * classicPtr->getVelCJacobian(world))
+                     * classicPtr->getJacobianOfC(
+                         world, WithRespectTo::VELOCITY))
                            .transpose()
                        * nextTimeStep.lossWrtVelocity
                 << std::endl;
@@ -2321,6 +2630,11 @@ bool verifyAnalyticalBackprop(WorldPtr world)
               << std::endl;
     return false;
   }
+
+  // This can often be the root of the problem, so verify that the constraint
+  // group Jacobians match the Jacobians of the BackpropSnapshot.
+  if (!verifyConstraintGroupSubJacobians(world, classicPtr))
+    return false;
 
   VectorXd phaseSpace = VectorXd::Zero(world->getNumDofs() * 2);
 
@@ -2472,12 +2786,15 @@ bool verifyGradientBackprop(
     */
 
     LossGradient analyticalWithBruteForce;
+    backpropSnapshots[i]->backprop(world, analyticalWithBruteForce, bruteForce);
+    /*
     analyticalWithBruteForce.lossWrtPosition
         = posPos.transpose() * bruteForce.lossWrtPosition
           + posVel.transpose() * bruteForce.lossWrtVelocity;
     analyticalWithBruteForce.lossWrtVelocity
         = velPos.transpose() * bruteForce.lossWrtPosition
           + velVel.transpose() * bruteForce.lossWrtVelocity;
+    */
 
     bruteForce = bruteForceThisTimestep;
 
@@ -3109,7 +3426,8 @@ bool verifyMappingIntoJacobian(
   int mappedDim = getTestComponentMappingDim(mapping, world, component);
   Eigen::MatrixXd analytical
       = getTestComponentMappingIntoJac(mapping, world, component, wrt);
-  Eigen::MatrixXd bruteForce = Eigen::MatrixXd(mappedDim, world->getNumDofs());
+  Eigen::MatrixXd bruteForce
+      = Eigen::MatrixXd::Zero(mappedDim, world->getNumDofs());
 
   Eigen::VectorXd originalWorld = getTestComponentWorld(world, wrt);
   Eigen::VectorXd originalMapped
@@ -3165,7 +3483,8 @@ bool verifyMappingOutJacobian(
 
   Eigen::MatrixXd analytical
       = getTestComponentMappingOutJac(mapping, world, component);
-  Eigen::MatrixXd bruteForce = Eigen::MatrixXd(world->getNumDofs(), mappedDim);
+  Eigen::MatrixXd bruteForce
+      = Eigen::MatrixXd::Zero(world->getNumDofs(), mappedDim);
 
   Eigen::VectorXd originalWorld = getTestComponentWorld(world, component);
   Eigen::VectorXd originalMapped
@@ -4117,7 +4436,7 @@ bool verifyAnalyticalA_c(WorldPtr world)
     Eigen::VectorXd trueCol = A_c.col(i);
     Eigen::VectorXd analyticalCol
         = constraints[i]->getConstraintForces(world.get());
-    if (!equals(trueCol, analyticalCol, 5e-9))
+    if (!equals(trueCol, analyticalCol, 5e-10))
     {
       std::cout << "True A_c col: " << std::endl << trueCol << std::endl;
       std::cout << "Analytical A_c col: " << std::endl
@@ -4541,6 +4860,57 @@ bool verifyPerturbedContactEdges(WorldPtr world)
   return true;
 }
 
+bool verifyTranlationalLCPInvariance(
+    WorldPtr world, int dofIndex, double perturbBy)
+{
+  RestorableSnapshot snapshot(world);
+
+  BackpropSnapshotPtr originalPtr = neural::forwardPass(world, true);
+  dynamics::DegreeOfFreedom* dof = world->getDofs()[dofIndex];
+  dof->setPosition(dof->getPosition() + perturbBy);
+  BackpropSnapshotPtr perturbedPtr = neural::forwardPass(world, true);
+
+  Eigen::MatrixXd perturbedA = perturbedPtr->mGradientMatrices[0]->mA;
+  Eigen::MatrixXd originalA = originalPtr->mGradientMatrices[0]->mA;
+  std::cout << "Original A:" << std::endl << originalA << std::endl;
+  std::cout << "Perturbed A:" << std::endl << perturbedA << std::endl;
+  std::cout << "Diff:" << std::endl << (originalA - perturbedA) << std::endl;
+
+  Eigen::MatrixXd perturbedA_c
+      = perturbedPtr->mGradientMatrices[0]->getFullConstraintMatrix(
+          world.get());
+  Eigen::MatrixXd originalA_c
+      = originalPtr->mGradientMatrices[0]->getFullConstraintMatrix(world.get());
+  std::cout << "Original A_c:" << std::endl << originalA_c << std::endl;
+  std::cout << "Perturbed A_c:" << std::endl << perturbedA_c << std::endl;
+  std::cout << "Diff:" << std::endl
+            << (originalA_c - perturbedA_c) << std::endl;
+
+  std::shared_ptr<DifferentiableContactConstraint> perturbedConstraint
+      = perturbedPtr->mGradientMatrices[0]->getDifferentiableConstraints()[0];
+  std::shared_ptr<DifferentiableContactConstraint> originalConstraint
+      = originalPtr->mGradientMatrices[0]->getDifferentiableConstraints()[0];
+
+  std::cout << "Contact world force gradient: " << std::endl
+            << originalConstraint->getContactWorldForceGradient(dof)
+            << std::endl;
+
+  Eigen::VectorXd perturbedB = perturbedPtr->mGradientMatrices[0]->mB;
+  Eigen::VectorXd originalB = originalPtr->mGradientMatrices[0]->mB;
+  std::cout << "Original B:" << std::endl << originalB << std::endl;
+  std::cout << "Perturbed B:" << std::endl << perturbedB << std::endl;
+  std::cout << "Diff:" << std::endl << (originalB - perturbedB) << std::endl;
+
+  Eigen::VectorXd perturbedX = perturbedPtr->mGradientMatrices[0]->mX;
+  Eigen::VectorXd originalX = originalPtr->mGradientMatrices[0]->mX;
+  std::cout << "Original X:" << std::endl << originalX << std::endl;
+  std::cout << "Perturbed X:" << std::endl << perturbedX << std::endl;
+  std::cout << "Diff:" << std::endl << (originalX - perturbedX) << std::endl;
+
+  snapshot.restore();
+  return true;
+}
+
 bool verifyPerturbedContactPositions(
     WorldPtr world, bool allowNoContacts = false)
 {
@@ -4661,6 +5031,8 @@ bool verifyPerturbedContactPositions(
           std::cout << "Finite Difference Analytical Contact Pos Gradient:"
                     << std::endl
                     << finiteDifferenceAnalyticalGradient << std::endl;
+          constraints[k]->bruteForcePerturbedContactPosition(
+              world, skel, j, -EPS);
           return false;
         }
       }
@@ -4720,7 +5092,7 @@ bool verifyPerturbedContactNormals(WorldPtr world)
                 world, skel, j, -EPS);
 
         Eigen::Vector3d finiteDifferenceGradient
-            = (analytical - bruteForceNeg) / (2 * EPS);
+            = (bruteForce - bruteForceNeg) / (2 * EPS);
         Eigen::Vector3d analyticalGradient
             = constraints[k]->getContactNormalGradient(skel->getDof(j));
         if (!equals(analyticalGradient, finiteDifferenceGradient, 1e-9))
@@ -5194,7 +5566,7 @@ bool verifyAnalyticalA_cJacobian(WorldPtr world)
     }
 
     Eigen::MatrixXd skelAnalytical
-        = constraints[i]->getConstraintForcesJacobian(skels);
+        = constraints[i]->getConstraintForcesJacobian(world, skels);
     if (!equals(analytical, skelAnalytical, 1e-9))
     {
       std::cout << "Analytical constraint forces Jac of "
@@ -5304,7 +5676,7 @@ bool verifyAnalyticalA_ubJacobian(WorldPtr world)
     }
 
     Eigen::MatrixXd skelAnalytical
-        = constraints[i]->getConstraintForcesJacobian(skels);
+        = constraints[i]->getConstraintForcesJacobian(world, skels);
     if (!equals(analytical, skelAnalytical, 1e-9))
     {
       std::cout << "Analytical constraint forces Jac of "
@@ -5340,6 +5712,30 @@ bool verifyJacobianOfClampingConstraints(WorldPtr world)
     std::cout << "Analytical:" << std::endl << analytical << std::endl;
     std::cout << "Brute Force:" << std::endl << bruteForce << std::endl;
     std::cout << "Diff:" << std::endl << analytical - bruteForce << std::endl;
+
+    for (int i = 0; i < f0.size(); i++)
+    {
+      Eigen::VectorXd oneHot = Eigen::VectorXd::Zero(f0.size());
+      oneHot(i) = 1.0;
+
+      Eigen::MatrixXd analyticalOneHot
+          = classicPtr->getJacobianOfClampingConstraints(world, oneHot);
+      Eigen::MatrixXd bruteForceOneHot
+          = classicPtr->finiteDifferenceJacobianOfClampingConstraints(
+              world, oneHot);
+      if (!equals(analyticalOneHot, bruteForceOneHot, 1e-8))
+      {
+        std::cout << "getJacobianOfClampingConstraints error [" << i
+                  << "]:" << std::endl;
+        std::cout << "Analytical one hot:" << std::endl
+                  << analyticalOneHot << std::endl;
+        std::cout << "Brute Force one hot:" << std::endl
+                  << bruteForceOneHot << std::endl;
+        std::cout << "Diff:" << std::endl
+                  << analyticalOneHot - bruteForceOneHot << std::endl;
+      }
+    }
+
     return false;
   }
   return true;

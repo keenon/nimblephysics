@@ -122,7 +122,8 @@ void MPCLocal(py::module& m)
           &dart::realtime::MPCLocal::serve,
           ::py::arg("port"),
           "A blocking call - this starts a gRPC server that clients can "
-          "connect to to get MPC computations done remotely")
+          "connect to to get MPC computations done remotely",
+          ::py::call_guard<py::gil_scoped_release>())
       .def("getCurrentSolution", &dart::realtime::MPCLocal::getCurrentSolution)
       .def(
           "registerReplaningListener",

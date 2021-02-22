@@ -1,6 +1,7 @@
 #ifndef DART_GUI_SERVER
 #define DART_GUI_SERVER
 
+#include <condition_variable>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -51,6 +52,11 @@ public:
 
   /// Returns true if we're serving
   bool isServing();
+
+  /// This sleeps until we're done serving, without busy-waiting in a loop. It
+  /// wakes up occassionally to call the `checkForSignals` callback, where you
+  /// can throw an exception to shut down the program.
+  void blockWhileServing(std::function<void()> checkForSignals = []() {});
 
   /// This adds a listener that will get called when someone connects to the
   /// server
@@ -314,12 +320,14 @@ public:
 protected:
   int mPort;
   bool mServing;
+  bool mStartingServer;
   Eigen::Vector2i mScreenSize;
   asio::signal_set* mSignalSet;
   std::thread* mServerThread;
   WebsocketServer* mServer;
   std::recursive_mutex globalMutex;
-  std::recursive_mutex destructorMutex;
+  std::mutex mServingMutex;
+  std::condition_variable mServingConditionValue;
 
   // protects the buffered JSON message (mJson) from getting
   // corrupted if we queue messages while trying to flush()

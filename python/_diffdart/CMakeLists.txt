@@ -1,6 +1,6 @@
-# if(NOT DARTPY_PYTHON_VERSION)
-#  set(DARTPY_PYTHON_VERSION 3.4 CACHE STRING "Choose the target Python version (e.g., 3.4, 2.7)" FORCE)
-# endif()
+if(NOT DARTPY_PYTHON_VERSION)
+ set(DARTPY_PYTHON_VERSION 3.8 CACHE STRING "Choose the target Python version (e.g., 3.8, 3.9)" FORCE)
+endif()
 
 # find_package(PythonInterp ${DARTPY_PYTHON_VERSION} QUIET)
 # execute_process(COMMAND ${PYTHON_EXECUTABLE} -c
@@ -24,11 +24,18 @@
 #   return()
 # endif()
 
-find_package(Python COMPONENTS Interpreter Development)
+find_program(PYTHON_EXECUTABLE python3)
+execute_process(COMMAND "${PYTHON_EXECUTABLE}" "-c" "from distutils.sysconfig import get_python_inc; print(get_python_inc())" OUTPUT_VARIABLE Python3_INCLUDE_DIRS)
+message(STATUS "Python3_INCLUDE_DIRS=${Python3_INCLUDE_DIRS}")
+execute_process(COMMAND "${PYTHON_EXECUTABLE}" "-c" "import distutils.sysconfig as sysconfig; print(sysconfig.get_config_var('LIBDIR'))" OUTPUT_VARIABLE Python3_LIBRARIES)
+message(STATUS "Python3_LIBRARIES=${Python3_LIBRARIES}")
+# -DPYTHON_INCLUDE_DIR=$(python -c "from distutils.sysconfig import get_python_inc; print(get_python_inc())")
+# -DPYTHON_LIBRARY=$(python -c "import distutils.sysconfig as sysconfig; print(sysconfig.get_config_var('LIBDIR'))")
+# find_package(Python3 ${DARTPY_PYTHON_VERSION} EXACT REQUIRED COMPONENTS Interpreter Development)
 
 # Find pybind11
-# Old note: Needs to set PYBIND11_PYTHON_VERSION before finding pybind11
-# set(PYBIND11_PYTHON_VERSION ${DARTPY_PYTHON_VERSION})
+# Needs to set PYBIND11_PYTHON_VERSION before finding pybind11
+set(PYBIND11_PYTHON_VERSION ${DARTPY_PYTHON_VERSION})
 find_package(pybind11 2.2.0 QUIET)
 if(NOT pybind11_FOUND)
   message(STATUS "DART_BUILD_DARTPY is ON, but failed to find pybind11 >= "

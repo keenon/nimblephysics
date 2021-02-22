@@ -46,8 +46,33 @@ Contact::Contact()
     triID1(0),
     triID2(0),
     userData(nullptr),
+    lcpResult(0),
     type(ContactType::UNSUPPORTED),
-    lcpResult(0)
+    // Poison all of the gradient related metadata to make it easier to detect
+    // using uninitialized values
+    edgeAClosestPoint(Eigen::Vector3d::Constant(NAN)),
+    edgeAFixedPoint(Eigen::Vector3d::Constant(NAN)),
+    edgeADir(Eigen::Vector3d::Constant(NAN)),
+    edgeBClosestPoint(Eigen::Vector3d::Constant(NAN)),
+    edgeBFixedPoint(Eigen::Vector3d::Constant(NAN)),
+    edgeBDir(Eigen::Vector3d::Constant(NAN)),
+    sphereCenter(Eigen::Vector3d::Constant(NAN)),
+    sphereRadius(NAN),
+    pipeDir(Eigen::Vector3d::Constant(NAN)),
+    pipeClosestPoint(Eigen::Vector3d::Constant(NAN)),
+    pipeFixedPoint(Eigen::Vector3d::Constant(NAN)),
+    pipeRadius(NAN),
+    vertexPoint(Eigen::Vector3d::Constant(NAN)),
+    face1Locked(false),
+    face1Normal(Eigen::Vector3d::Constant(NAN)),
+    face2Locked(false),
+    face2Normal(Eigen::Vector3d::Constant(NAN)),
+    face3Locked(false),
+    face3Normal(Eigen::Vector3d::Constant(NAN)),
+    centerA(Eigen::Vector3d::Constant(NAN)),
+    radiusA(NAN),
+    centerB(Eigen::Vector3d::Constant(NAN)),
+    radiusB(NAN)
 {
   // TODO(MXG): Consider using NaN instead of zero for uninitialized quantities
   // Do nothing

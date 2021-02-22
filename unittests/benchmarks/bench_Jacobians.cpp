@@ -3,7 +3,6 @@
 #include <thread>
 
 #include <benchmark/benchmark.h>
-#include <dart/gui/gui.hpp>
 #include <gtest/gtest.h>
 
 #include "dart/collision/CollisionObject.hpp"
@@ -11,7 +10,6 @@
 #include "dart/dynamics/BodyNode.hpp"
 #include "dart/dynamics/RevoluteJoint.hpp"
 #include "dart/dynamics/Skeleton.hpp"
-#include "dart/gui/glut/TrajectoryReplayWindow.hpp"
 #include "dart/math/Geometry.hpp"
 #include "dart/neural/BackpropSnapshot.hpp"
 #include "dart/neural/ConstrainedGroupGradientMatrices.hpp"
@@ -31,6 +29,7 @@
 #include "dart/trajectory/Solution.hpp"
 #include "dart/trajectory/TrajectoryConstants.hpp"
 #include "dart/trajectory/TrajectoryRollout.hpp"
+#include "dart/utils/UniversalLoader.hpp"
 
 #include "GradientTestUtils.hpp"
 #include "TestHelpers.hpp"
@@ -57,16 +56,16 @@ static void BM_Cartpole_Jacobians(benchmark::State& state)
   sledPair.first->setAxis(Eigen::Vector3d(1, 0, 0));
   std::shared_ptr<BoxShape> sledShapeBox(
       new BoxShape(Eigen::Vector3d(0.05, 0.25, 0.05)));
-  ShapeNode* sledShape
-      = sledPair.second->createShapeNodeWith<VisualAspect>(sledShapeBox);
+  // ShapeNode* sledShape =
+  sledPair.second->createShapeNodeWith<VisualAspect>(sledShapeBox);
 
   std::pair<RevoluteJoint*, BodyNode*> armPair
       = cartpole->createJointAndBodyNodePair<RevoluteJoint>(sledPair.second);
   armPair.first->setAxis(Eigen::Vector3d(0, 0, 1));
   std::shared_ptr<BoxShape> armShapeBox(
       new BoxShape(Eigen::Vector3d(0.05, 0.25, 0.05)));
-  ShapeNode* armShape
-      = armPair.second->createShapeNodeWith<VisualAspect>(armShapeBox);
+  // ShapeNode* armShape =
+  armPair.second->createShapeNodeWith<VisualAspect>(armShapeBox);
 
   Eigen::Isometry3d armOffset = Eigen::Isometry3d::Identity();
   armOffset.translation() = Eigen::Vector3d(0, -0.5, 0);
@@ -216,7 +215,8 @@ WorldPtr createJumpwormWorld()
       root, Eigen::Vector3d(182.0 / 255, 223.0 / 255, 144.0 / 255));
   BodyNode* tail2 = createTailSegment(
       tail1, Eigen::Vector3d(223.0 / 255, 228.0 / 255, 163.0 / 255));
-  BodyNode* tail3 = createTailSegment(
+  // BodyNode* tail3 =
+  createTailSegment(
       tail2, Eigen::Vector3d(221.0 / 255, 193.0 / 255, 121.0 / 255));
 
   Eigen::VectorXd pos = Eigen::VectorXd(5);
@@ -238,9 +238,8 @@ WorldPtr createJumpwormWorld()
   floorJoint->setTransformFromParentBodyNode(floorOffset);
   std::shared_ptr<BoxShape> floorShape(
       new BoxShape(Eigen::Vector3d(2.5, 0.25, 0.5)));
-  ShapeNode* floorVisual
-      = floorBody->createShapeNodeWith<VisualAspect, CollisionAspect>(
-          floorShape);
+  // ShapeNode* floorVisual =
+  floorBody->createShapeNodeWith<VisualAspect, CollisionAspect>(floorShape);
   floorBody->setFrictionCoeff(0);
 
   world->addSkeleton(floor);
@@ -289,5 +288,75 @@ static void BM_Jumpworm_Finite_Difference(benchmark::State& state)
 };
 // Register the function as a benchmark
 BENCHMARK(BM_Jumpworm_Finite_Difference);
+
+static void BM_Atlas(benchmark::State& state)
+{
+  // Create a world
+  std::shared_ptr<simulation::World> world = simulation::World::create();
+
+  // Set gravity of the world
+  world->setGravity(Eigen::Vector3d(0.0, -9.81, 0.0));
+
+  std::shared_ptr<dynamics::Skeleton> atlas
+      = dart::utils::UniversalLoader::loadSkeleton(
+          world.get(), "dart://sample/sdf/atlas/atlas_v3_no_head.sdf");
+  std::shared_ptr<dynamics::Skeleton> ground
+      = dart::utils::UniversalLoader::loadSkeleton(
+          world.get(), "dart://sample/sdf/atlas/ground.urdf");
+  ground->getBodyNode(0)->getShapeNode(0)->getVisualAspect()->setCastShadows(
+      false);
+
+  // Set initial configuration for Atlas robot
+  atlas->setPosition(0, -0.5 * dart::math::constantsd::pi());
+  atlas->setPosition(4, -0.01);
+
+  for (auto _ : state)
+  {
+    std::shared_ptr<BackpropSnapshot> snapshot
+        = neural::forwardPass(world, true);
+    snapshot->getPosPosJacobian(world);
+    snapshot->getPosVelJacobian(world);
+    snapshot->getVelVelJacobian(world);
+    snapshot->getVelPosJacobian(world);
+    snapshot->getForceVelJacobian(world);
+  }
+};
+// Register the function as a benchmark
+BENCHMARK(BM_Atlas);
+
+static void BM_Atlas_Finite_Difference(benchmark::State& state)
+{
+  // Create a world
+  std::shared_ptr<simulation::World> world = simulation::World::create();
+
+  // Set gravity of the world
+  world->setGravity(Eigen::Vector3d(0.0, -9.81, 0.0));
+
+  std::shared_ptr<dynamics::Skeleton> atlas
+      = dart::utils::UniversalLoader::loadSkeleton(
+          world.get(), "dart://sample/sdf/atlas/atlas_v3_no_head.sdf");
+  std::shared_ptr<dynamics::Skeleton> ground
+      = dart::utils::UniversalLoader::loadSkeleton(
+          world.get(), "dart://sample/sdf/atlas/ground.urdf");
+  ground->getBodyNode(0)->getShapeNode(0)->getVisualAspect()->setCastShadows(
+      false);
+
+  // Set initial configuration for Atlas robot
+  atlas->setPosition(0, -0.5 * dart::math::constantsd::pi());
+  atlas->setPosition(4, -0.01);
+
+  for (auto _ : state)
+  {
+    std::shared_ptr<BackpropSnapshot> snapshot
+        = neural::forwardPass(world, true);
+    snapshot->finiteDifferencePosPosJacobian(world);
+    snapshot->finiteDifferencePosVelJacobian(world);
+    snapshot->finiteDifferenceVelVelJacobian(world);
+    snapshot->finiteDifferenceVelPosJacobian(world);
+    snapshot->finiteDifferenceForceVelJacobian(world);
+  }
+};
+// Register the function as a benchmark
+BENCHMARK(BM_Atlas_Finite_Difference);
 
 BENCHMARK_MAIN();

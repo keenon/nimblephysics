@@ -680,7 +680,12 @@ std::size_t World::getNumSkeletons() const
 }
 
 //==============================================================================
-std::string World::addSkeleton(const dynamics::SkeletonPtr& _skeleton)
+std::string World::addSkeleton(
+    const dynamics::SkeletonPtr& _skeleton,
+    // By default DiffDART clears out springs and damping, because our
+    // Jacobians don't support them. TODO: remove me when springs and damping
+    // support is added
+    bool allowSpringsAndDamping)
 {
   if (nullptr == _skeleton)
   {
@@ -690,37 +695,40 @@ std::string World::addSkeleton(const dynamics::SkeletonPtr& _skeleton)
   }
 
   // TODO(keenon): Add support for springs and damping coefficients
-  bool warnedSpringStiffness = false;
-  bool warnedDampingCoefficient = false;
-  for (auto* dof : _skeleton->getDofs())
+  if (!allowSpringsAndDamping)
   {
-    if (dof->getSpringStiffness() != 0)
+    bool warnedSpringStiffness = false;
+    bool warnedDampingCoefficient = false;
+    for (auto* dof : _skeleton->getDofs())
     {
-      if (!warnedSpringStiffness)
+      if (dof->getSpringStiffness() != 0)
       {
-        warnedSpringStiffness = true;
-        dtwarn << "[World::addSkeleton] Attempting to add a Skeleton \""
-               << _skeleton->getName() << "\" to "
-               << "the world with non-zero spring stiffness! This version of "
-                  "DiffDART doesn't support spring stiffness. It will be "
-                  "automatically set to zero.\n";
+        if (!warnedSpringStiffness)
+        {
+          warnedSpringStiffness = true;
+          dtwarn << "[World::addSkeleton] Attempting to add a Skeleton \""
+                 << _skeleton->getName() << "\" to "
+                 << "the world with non-zero spring stiffness! This version of "
+                    "DiffDART doesn't support spring stiffness. It will be "
+                    "automatically set to zero.\n";
+        }
       }
-    }
-    dof->setSpringStiffness(0);
-    if (dof->getDampingCoefficient() != 0)
-    {
-      if (!warnedDampingCoefficient)
+      dof->setSpringStiffness(0);
+      if (dof->getDampingCoefficient() != 0)
       {
-        warnedDampingCoefficient = true;
-        dtwarn
-            << "[World::addSkeleton] Attempting to add a Skeleton \""
-            << _skeleton->getName() << "\" to "
-            << "the world with non-zero damping coefficient! This version of "
-               "DiffDART doesn't support damping coefficients. It will be "
-               "automatically set to zero.\n";
+        if (!warnedDampingCoefficient)
+        {
+          warnedDampingCoefficient = true;
+          dtwarn
+              << "[World::addSkeleton] Attempting to add a Skeleton \""
+              << _skeleton->getName() << "\" to "
+              << "the world with non-zero damping coefficient! This version of "
+                 "DiffDART doesn't support damping coefficients. It will be "
+                 "automatically set to zero.\n";
+        }
       }
+      dof->setDampingCoefficient(0);
     }
-    dof->setDampingCoefficient(0);
   }
 
   // If mSkeletons already has _skeleton, then we do nothing.

@@ -219,10 +219,14 @@ elseif(CMAKE_COMPILER_IS_GNUCXX)
 
 elseif("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
 
-  if(DART_TREAT_WARNINGS_AS_ERRORS)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror -Wno-error=deprecated-declarations")
+  # if(DART_TREAT_WARNINGS_AS_ERRORS)
+    # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror -Wno-error=deprecated-declarations")
     # Turn warning "deprecated-declarations" into an warning even if -Werror is
     # specified until we abandon glut.
+  # endif()
+  if(DART_TREAT_WARNINGS_AS_ERRORS)
+    # Even if we're treating all warnings as errors, still ignore sign comparison, cause that shows up in every for loop
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror -Wall -Wextra -Werror=return-type -Wno-sign-compare -Wno-deprecated -Wno-deprecated-declarations -Wno-reorder")
   endif()
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
   execute_process(
@@ -241,12 +245,16 @@ elseif("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
   endif()
   set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELEASE} ${CMAKE_CXX_FLAGS_DEBUG}")
   set(CMAKE_CXX_FLAGS_PROFILE "${CMAKE_CXX_FLAGS_DEBUG} -pg")
-  set(CMAKE_OSX_DEPLOYMENT_TARGET "10.15")
+  set(CMAKE_OSX_DEPLOYMENT_TARGET "10.9")
 
 else()
 
   message(SEND_ERROR "Compiler[${CMAKE_CXX_COMPILER_ID}] not supported.")
 
+endif()
+
+if (APPLE)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fvisibility=hidden")
 endif()
 
 #===============================================================================

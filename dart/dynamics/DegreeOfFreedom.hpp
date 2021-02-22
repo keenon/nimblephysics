@@ -381,6 +381,12 @@ public:
   /// This does a slow walk up the tree to figure out if `target` is a child of this node.
   bool isParentOf(const BodyNode* target) const;
 
+  /// This uses the cached version, stored on the parent Skeleton, to return the same value as isParentOf()
+  bool isParentOfFast(const DegreeOfFreedom* target) const;
+
+  /// This uses the cached version, stored on the parent Skeleton, to return the same value as isParentOf()
+  bool isParentOfFast(const BodyNode* target) const;
+
   /// \}
 
 protected:

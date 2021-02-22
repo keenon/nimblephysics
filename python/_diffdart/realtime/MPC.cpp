@@ -66,12 +66,16 @@ void MPC(py::module& m)
           ::py::arg("mass"))
       .def("getForce", &dart::realtime::MPC::getForce, ::py::arg("now"))
       .def("getForceNow", &dart::realtime::MPC::getForceNow)
-      .def("start", &dart::realtime::MPC::start)
+      .def(
+          "start",
+          &dart::realtime::MPC::start,
+          ::py::call_guard<py::gil_scoped_release>())
       .def("stop", &dart::realtime::MPC::stop)
       .def(
           "registerReplaningListener",
           &dart::realtime::MPC::registerReplanningListener,
-          ::py::arg("replanListener"));
+          ::py::arg("replanListener"),
+          ::py::call_guard<py::gil_scoped_release>());
 }
 
 } // namespace python
