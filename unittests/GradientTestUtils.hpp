@@ -5566,7 +5566,7 @@ bool verifyAnalyticalA_cJacobian(WorldPtr world)
     }
 
     Eigen::MatrixXd skelAnalytical
-        = constraints[i]->getConstraintForcesJacobian(skels);
+        = constraints[i]->getConstraintForcesJacobian(world, skels);
     if (!equals(analytical, skelAnalytical, 1e-9))
     {
       std::cout << "Analytical constraint forces Jac of "
@@ -5676,7 +5676,7 @@ bool verifyAnalyticalA_ubJacobian(WorldPtr world)
     }
 
     Eigen::MatrixXd skelAnalytical
-        = constraints[i]->getConstraintForcesJacobian(skels);
+        = constraints[i]->getConstraintForcesJacobian(world, skels);
     if (!equals(analytical, skelAnalytical, 1e-9))
     {
       std::cout << "Analytical constraint forces Jac of "

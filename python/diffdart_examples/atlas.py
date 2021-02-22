@@ -24,14 +24,14 @@ def main():
   floorBody: dart.dynamics.BodyNode = ground.getBodyNode(0)
   floorBody.getShapeNode(0).getVisualAspect().setCastShadows(False)
 
-  snapshot: dart.neural.BackpropSnapshot = dart.neural.forwardPass(world)
-  snapshot.benchmarkJacobians(world, 100)
-  return
+  # snapshot: dart.neural.BackpropSnapshot = dart.neural.forwardPass(world)
+  # snapshot.benchmarkJacobians(world, 100)
+  # return
 
-  # forceLimits = np.ones([atlas.getNumDofs()]) * 500
-  # forceLimits[0:6] = 0
-  # atlas.setForceUpperLimits(forceLimits)
-  # atlas.setForceLowerLimits(forceLimits * -1)
+  forceLimits = np.ones([atlas.getNumDofs()]) * 500
+  forceLimits[0:6] = 0
+  atlas.setForceUpperLimits(forceLimits)
+  atlas.setForceLowerLimits(forceLimits * -1)
 
   goal_x = 0.0
   goal_y = 0.8

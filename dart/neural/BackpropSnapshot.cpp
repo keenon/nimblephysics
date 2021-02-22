@@ -144,35 +144,49 @@ void BackpropSnapshot::backprop(
   thisTimestepLoss.lossWrtTorque = Eigen::VectorXd::Zero(mNumDOFs);
   thisTimestepLoss.lossWrtMass = Eigen::VectorXd::Zero(world->getMassDims());
 
-  /*
-  const Eigen::MatrixXd& posPos = getPosPosJacobian(world, thisLog);
-  const Eigen::MatrixXd& posVel = getPosVelJacobian(world, thisLog);
-  const Eigen::MatrixXd& velPos = getVelPosJacobian(world, thisLog);
-  const Eigen::MatrixXd& velVel = getVelVelJacobian(world, thisLog);
-  const Eigen::MatrixXd& forceVel = getForceVelJacobian(world, thisLog);
-  const Eigen::MatrixXd& massVel = getMassVelJacobian(world, thisLog);
+  // TODO(opt): remove me, as soon as it's faster to construct the Jacobians
+  // using ConstrainedGroups directly. Currently it's redundant to construct
+  // Jacobians _both_ in the ConstrainedGroups and in the BackpropSnapshot, so
+  // it's better overall to just use one.
+  if (exploreAlternateStrategies == false)
+  {
+    const Eigen::MatrixXd& posPos = getPosPosJacobian(world, thisLog);
+    const Eigen::MatrixXd& posVel = getPosVelJacobian(world, thisLog);
+    const Eigen::MatrixXd& velPos = getVelPosJacobian(world, thisLog);
+    const Eigen::MatrixXd& velVel = getVelVelJacobian(world, thisLog);
+    const Eigen::MatrixXd& forceVel = getForceVelJacobian(world, thisLog);
+    const Eigen::MatrixXd& massVel = getMassVelJacobian(world, thisLog);
 
-  thisTimestepLoss.lossWrtPosition
-      = posPos.transpose() * nextTimestepLoss.lossWrtPosition
-        + posVel.transpose() * nextTimestepLoss.lossWrtVelocity;
-  thisTimestepLoss.lossWrtVelocity
-      = velPos.transpose() * nextTimestepLoss.lossWrtPosition
-        + velVel.transpose() * nextTimestepLoss.lossWrtVelocity;
-  thisTimestepLoss.lossWrtTorque
-      = forceVel.transpose() * nextTimestepLoss.lossWrtVelocity;
-  thisTimestepLoss.lossWrtMass
-      = massVel.transpose() * nextTimestepLoss.lossWrtVelocity;
+    thisTimestepLoss.lossWrtPosition
+        = posPos.transpose() * nextTimestepLoss.lossWrtPosition
+          + posVel.transpose() * nextTimestepLoss.lossWrtVelocity;
+    thisTimestepLoss.lossWrtVelocity
+        = velPos.transpose() * nextTimestepLoss.lossWrtPosition
+          + velVel.transpose() * nextTimestepLoss.lossWrtVelocity;
+    thisTimestepLoss.lossWrtTorque
+        = forceVel.transpose() * nextTimestepLoss.lossWrtVelocity;
+    thisTimestepLoss.lossWrtMass
+        = massVel.transpose() * nextTimestepLoss.lossWrtVelocity;
+
+    clipLossGradientsToBounds(
+        world,
+        thisTimestepLoss.lossWrtPosition,
+        thisTimestepLoss.lossWrtVelocity,
+        thisTimestepLoss.lossWrtTorque);
 
 #ifdef LOG_PERFORMANCE_BACKPROP_SNAPSHOT
-  if (thisLog != nullptr)
-  {
-    thisLog->end();
-  }
+    if (thisLog != nullptr)
+    {
+      thisLog->end();
+    }
 #endif
-  snapshot.restore();
-  return;
-  */
+    snapshot.restore();
+    return;
+  }
 
+  //////////////////////////////////////////////////////////
+  // Exploring alternate strategies requires breaking down into the individual
+  // constrained groups and doing backprop there
   //////////////////////////////////////////////////////////
 
   // Handle mass the old fashioned way, for now
@@ -351,6 +365,65 @@ void BackpropSnapshot::backprop(
     thisLog->end();
   }
 #endif
+}
+
+//==============================================================================
+/// This zeros out any components of the gradient that would want to push us
+/// out of the box-bounds encoded in the world for pos, vel, or force.
+void BackpropSnapshot::clipLossGradientsToBounds(
+    simulation::WorldPtr world,
+    Eigen::VectorXd& lossWrtPos,
+    Eigen::VectorXd& lossWrtVel,
+    Eigen::VectorXd& lossWrtForce)
+{
+  int cursor = 0;
+  for (int i = 0; i < world->getNumSkeletons(); i++)
+  {
+    std::shared_ptr<dynamics::Skeleton> skel = world->getSkeleton(i);
+    for (int j = 0; j < skel->getNumDofs(); j++)
+    {
+      // Clip position gradients
+
+      if ((skel->getPosition(j) == skel->getPositionLowerLimit(j))
+          && (lossWrtPos(cursor) > 0))
+      {
+        lossWrtPos(cursor) = 0;
+      }
+      if ((skel->getPosition(j) == skel->getPositionUpperLimit(j))
+          && (lossWrtPos(cursor) < 0))
+      {
+        lossWrtPos(cursor) = 0;
+      }
+
+      // Clip velocity gradients
+
+      if ((skel->getVelocity(j) == skel->getVelocityLowerLimit(j))
+          && (lossWrtVel(cursor) > 0))
+      {
+        lossWrtVel(cursor) = 0;
+      }
+      if ((skel->getVelocity(j) == skel->getVelocityUpperLimit(j))
+          && (lossWrtVel(cursor) < 0))
+      {
+        lossWrtVel(cursor) = 0;
+      }
+
+      // Clip force gradients
+
+      if ((skel->getForce(j) == skel->getForceLowerLimit(j))
+          && (lossWrtForce(cursor) > 0))
+      {
+        lossWrtForce(cursor) = 0;
+      }
+      if ((skel->getForce(j) == skel->getForceUpperLimit(j))
+          && (lossWrtForce(cursor) < 0))
+      {
+        lossWrtForce(cursor) = 0;
+      }
+
+      cursor++;
+    }
+  }
 }
 
 //==============================================================================
@@ -2219,27 +2292,65 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferencePosPosJacobian(
 
   Eigen::VectorXd originalPosition = world->getPositions();
 
-  // IMPORTANT: EPSILON must be larger than the distance traveled in a single
-  // subdivided timestep. Ideally much larger.
-  double EPSILON = (subdivisions > 1) ? (1e-2 / subdivisions) : 1e-6;
-  for (std::size_t i = 0; i < world->getNumDofs(); i++)
+  // Hey Dalton! If you're reading this as part of a merge conflict, feel free
+  // to overwrite this code with your Ridder's implementation. This change is
+  // just here so that our benchmark comparison for the paper is accurate for
+  // pos-pos time. I wanted to make sure that all our Jacobians are computed
+  // using 2-sided FD.
+  if (subdivisions == 1)
   {
-    snapshot.restore();
+    double EPSILON = 1e-6;
+    for (std::size_t i = 0; i < world->getNumDofs(); i++)
+    {
+      snapshot.restore();
 
-    world->setVelocities(mPreStepVelocity);
-    world->setExternalForces(mPreStepTorques);
-    world->setCachedLCPSolution(mPreStepLCPCache);
+      world->setVelocities(mPreStepVelocity);
+      world->setExternalForces(mPreStepTorques);
+      world->setCachedLCPSolution(mPreStepLCPCache);
 
-    Eigen::VectorXd tweakedPositions = Eigen::VectorXd(mPreStepPosition);
-    tweakedPositions(i) += EPSILON;
-    world->setPositions(tweakedPositions);
-
-    for (std::size_t j = 0; j < subdivisions; j++)
+      Eigen::VectorXd tweakedPositions = mPreStepPosition;
+      tweakedPositions(i) += EPSILON;
+      world->setPositions(tweakedPositions);
       world->step(false);
+      Eigen::VectorXd posChange = world->getPositions();
 
-    Eigen::VectorXd posChange
-        = (world->getPositions() - originalPosition) / EPSILON;
-    J.col(i).noalias() = posChange;
+      world->setVelocities(mPreStepVelocity);
+      world->setExternalForces(mPreStepTorques);
+      world->setCachedLCPSolution(mPreStepLCPCache);
+
+      tweakedPositions = mPreStepPosition;
+      tweakedPositions(i) -= EPSILON;
+      world->setPositions(tweakedPositions);
+      world->step(false);
+      Eigen::VectorXd negChange = world->getPositions();
+
+      J.col(i).noalias() = (posChange - negChange) / (2 * EPSILON);
+    }
+  }
+  else
+  {
+    // IMPORTANT: EPSILON must be larger than the distance traveled in a single
+    // subdivided timestep. Ideally much larger.
+    double EPSILON = 1e-2 / subdivisions;
+    for (std::size_t i = 0; i < world->getNumDofs(); i++)
+    {
+      snapshot.restore();
+
+      world->setVelocities(mPreStepVelocity);
+      world->setExternalForces(mPreStepTorques);
+      world->setCachedLCPSolution(mPreStepLCPCache);
+
+      Eigen::VectorXd tweakedPositions = Eigen::VectorXd(mPreStepPosition);
+      tweakedPositions(i) += EPSILON;
+      world->setPositions(tweakedPositions);
+
+      for (std::size_t j = 0; j < subdivisions; j++)
+        world->step(false);
+
+      Eigen::VectorXd posChange
+          = (world->getPositions() - originalPosition) / EPSILON;
+      J.col(i).noalias() = posChange;
+    }
   }
 
   world->setTimeStep(oldTimestep);
@@ -2272,25 +2383,63 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceVelPosJacobian(
 
   Eigen::VectorXd originalPosition = world->getPositions();
 
-  double EPSILON = 1e-3 / subdivisions;
-  for (std::size_t i = 0; i < world->getNumDofs(); i++)
+  // Hey Dalton! If you're reading this as part of a merge conflict, feel free
+  // to overwrite this code with your Ridder's implementation. This change is
+  // just here so that our benchmark comparison for the paper is accurate for
+  // vel-pos time. I wanted to make sure that all our Jacobians are computed
+  // using 2-sided FD.
+  if (subdivisions == 1)
   {
-    snapshot.restore();
+    double EPSILON = 1e-6;
+    for (std::size_t i = 0; i < world->getNumDofs(); i++)
+    {
+      snapshot.restore();
 
-    world->setPositions(mPreStepPosition);
-    world->setExternalForces(mPreStepTorques);
-    world->setCachedLCPSolution(mPreStepLCPCache);
+      world->setPositions(mPreStepPosition);
+      world->setExternalForces(mPreStepTorques);
+      world->setCachedLCPSolution(mPreStepLCPCache);
 
-    Eigen::VectorXd tweakedVelocity = Eigen::VectorXd(mPreStepVelocity);
-    tweakedVelocity(i) += EPSILON;
-    world->setVelocities(tweakedVelocity);
-
-    for (std::size_t j = 0; j < subdivisions; j++)
+      Eigen::VectorXd tweakedVelocity = mPreStepVelocity;
+      tweakedVelocity(i) += EPSILON;
+      world->setVelocities(tweakedVelocity);
       world->step(false);
+      Eigen::VectorXd posChange = world->getPositions();
 
-    Eigen::VectorXd posChange
-        = (world->getPositions() - originalPosition) / EPSILON;
-    J.col(i).noalias() = posChange;
+      world->setPositions(mPreStepPosition);
+      world->setExternalForces(mPreStepTorques);
+      world->setCachedLCPSolution(mPreStepLCPCache);
+
+      tweakedVelocity = mPreStepVelocity;
+      tweakedVelocity(i) -= EPSILON;
+      world->setVelocities(tweakedVelocity);
+      world->step(false);
+      Eigen::VectorXd negChange = world->getPositions();
+
+      J.col(i).noalias() = (posChange - negChange) / (2 * EPSILON);
+    }
+  }
+  else
+  {
+    double EPSILON = 1e-3 / subdivisions;
+    for (std::size_t i = 0; i < world->getNumDofs(); i++)
+    {
+      snapshot.restore();
+
+      world->setPositions(mPreStepPosition);
+      world->setExternalForces(mPreStepTorques);
+      world->setCachedLCPSolution(mPreStepLCPCache);
+
+      Eigen::VectorXd tweakedVelocity = Eigen::VectorXd(mPreStepVelocity);
+      tweakedVelocity(i) += EPSILON;
+      world->setVelocities(tweakedVelocity);
+
+      for (std::size_t j = 0; j < subdivisions; j++)
+        world->step(false);
+
+      Eigen::VectorXd posChange
+          = (world->getPositions() - originalPosition) / EPSILON;
+      J.col(i).noalias() = posChange;
+    }
   }
 
   world->setTimeStep(oldTimestep);
