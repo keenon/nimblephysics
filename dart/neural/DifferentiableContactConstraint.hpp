@@ -191,7 +191,7 @@ public:
 
   /// This returns an analytical Jacobian relating the skeletons that this
   /// contact touches.
-  Eigen::MatrixXd getConstraintForcesJacobian(
+  const Eigen::MatrixXd& getConstraintForcesJacobian(
       std::shared_ptr<simulation::World> world);
 
   /// This computes and returns the analytical Jacobian relating how changes in
@@ -211,6 +211,7 @@ public:
   /// the positions of any of the DOFs changes the constraint forces on all the
   /// skels.
   Eigen::MatrixXd getConstraintForcesJacobian(
+      std::shared_ptr<simulation::World> world,
       std::vector<std::shared_ptr<dynamics::Skeleton>> skels);
 
   /// This returns the skeletons that this contact constraint interacts with.

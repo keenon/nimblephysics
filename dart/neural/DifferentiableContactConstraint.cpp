@@ -1429,7 +1429,8 @@ double DifferentiableContactConstraint::getConstraintForceDerivative(
 //==============================================================================
 /// This returns an analytical Jacobian relating the skeletons that this
 /// contact touches.
-Eigen::MatrixXd DifferentiableContactConstraint::getConstraintForcesJacobian(
+const Eigen::MatrixXd&
+DifferentiableContactConstraint::getConstraintForcesJacobian(
     std::shared_ptr<simulation::World> world)
 {
   if (mWorldConstraintJacCacheDirty)
@@ -1648,6 +1649,7 @@ Eigen::MatrixXd DifferentiableContactConstraint::getConstraintForcesJacobian(
 /// the positions of any of the DOFs changes the constraint forces on all the
 /// skels.
 Eigen::MatrixXd DifferentiableContactConstraint::getConstraintForcesJacobian(
+    std::shared_ptr<simulation::World> world,
     std::vector<std::shared_ptr<dynamics::Skeleton>> skels)
 {
   int dofs = 0;
@@ -1656,12 +1658,33 @@ Eigen::MatrixXd DifferentiableContactConstraint::getConstraintForcesJacobian(
 
   Eigen::MatrixXd result = Eigen::MatrixXd::Zero(dofs, dofs);
 
+  /*
   int cursor = 0;
   for (auto skel : skels)
   {
     result.block(0, cursor, dofs, skel->getNumDofs())
         = getConstraintForcesJacobian(skels, skel);
     cursor += skel->getNumDofs();
+  }
+  */
+
+  const Eigen::MatrixXd& cachedWorld = getConstraintForcesJacobian(world);
+  int rowCursor = 0;
+  for (auto rowSkel : skels)
+  {
+    int rowDof = rowSkel->getNumDofs();
+    int rowWorldOffset = world->getSkeletonDofOffset(rowSkel);
+    int colCursor = 0;
+    for (auto colSkel : skels)
+    {
+      int colDof = colSkel->getNumDofs();
+      int colWorldOffset = world->getSkeletonDofOffset(rowSkel);
+
+      result.block(rowCursor, colCursor, rowDof, colDof)
+          = cachedWorld.block(rowWorldOffset, colWorldOffset, rowDof, colDof);
+      colCursor += colDof;
+    }
+    rowCursor += rowDof;
   }
 
   return result;

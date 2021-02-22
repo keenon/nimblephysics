@@ -48,6 +48,14 @@ public:
       PerformanceLog* perfLog = nullptr,
       bool exploreAlternateStrategies = false);
 
+  /// This zeros out any components of the gradient that would want to push us
+  /// out of the box-bounds encoded in the world for pos, vel, or force.
+  void clipLossGradientsToBounds(
+      simulation::WorldPtr world,
+      Eigen::VectorXd& lossWrtPos,
+      Eigen::VectorXd& lossWrtVel,
+      Eigen::VectorXd& lossWrtForce);
+
   /// This computes and returns the whole vel-vel jacobian. For backprop, you
   /// don't actually need this matrix, you can compute backprop directly. This
   /// is here if you want access to the full Jacobian for some reason.

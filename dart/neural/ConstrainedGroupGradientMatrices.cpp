@@ -1537,7 +1537,7 @@ ConstrainedGroupGradientMatrices::getJacobianOfClampingConstraints(
   assert(constraints.size() == f0.size());
   for (int i = 0; i < constraints.size(); i++)
   {
-    result += f0(i) * constraints[i]->getConstraintForcesJacobian(skels);
+    result += f0(i) * constraints[i]->getConstraintForcesJacobian(world, skels);
   }
 
   return result;
@@ -1558,7 +1558,8 @@ ConstrainedGroupGradientMatrices::getJacobianOfClampingConstraintsTranspose(
   for (int i = 0; i < constraints.size(); i++)
   {
     result.row(i)
-        = constraints[i]->getConstraintForcesJacobian(skels).transpose() * v0;
+        = constraints[i]->getConstraintForcesJacobian(world, skels).transpose()
+          * v0;
   }
 
   return result;
@@ -1579,7 +1580,7 @@ ConstrainedGroupGradientMatrices::getJacobianOfUpperBoundConstraints(
   assert(constraints.size() == f0.size());
   for (int i = 0; i < constraints.size(); i++)
   {
-    result += f0(i) * constraints[i]->getConstraintForcesJacobian(skels);
+    result += f0(i) * constraints[i]->getConstraintForcesJacobian(world, skels);
   }
   return result;
 }
