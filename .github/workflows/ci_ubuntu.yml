@@ -1,0 +1,39 @@
+name: CI Ubuntu
+
+on:
+  push:
+    branches:
+      - "**"
+  pull_request:
+    branches:
+      - "**"
+  schedule:
+    # Run every day at 02:00
+    - cron: "0 2 * * 0-6"
+
+env:
+  # Hosted on: https://hub.docker.com/repository/docker/jslee02/diffdart-dev
+  DIFFDART_DEV_IMAGE: jslee02/diffdart-dev
+  UBUNTU_BUILD_CMD: |
+    docker run \
+      -v $GITHUB_WORKSPACE:$GITHUB_WORKSPACE \
+      --env-file ./.ci/docker/env.list \
+      $DIFFDART_DEV_IMAGE:$DOCKER_TAG \
+      /bin/sh -c "cd $GITHUB_WORKSPACE && ./.ci/build.sh"
+
+jobs:
+  focal_gcc_release:
+    name: Ubuntu 20.04 [GCC|Release]
+    runs-on: ubuntu-18.04
+    env:
+      DOCKER_TAG: ubuntu-focal-v0.0
+      COMPILER: gcc
+      BUILD_TYPE: Release
+      BUILD_PYTHON: ON
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v2
+      - name: Pull dev container
+        run: docker pull ${{ env.DIFFDART_DEV_IMAGE }}:${{ env.DOCKER_TAG }}
+      - name: Build
+        run: ${{ env.UBUNTU_BUILD_CMD }}
