@@ -781,8 +781,10 @@ Eigen::VectorXd BackpropSnapshot::scratch(simulation::WorldPtr world)
 }
 
 Eigen::MatrixXd BackpropSnapshot::getScratchFiniteDifference(
-    simulation::WorldPtr world, WithRespectTo* wrt)
+    simulation::WorldPtr world, WithRespectTo* wrt, bool useRidders)
 {
+  if (useRidders) return getScratchFiniteDifferenceRidders(world, wrt);
+
   RestorableSnapshot snapshot(world);
 
   bool oldGradientEnabled = world->getConstraintSolver()->getGradientEnabled();
@@ -1917,8 +1919,11 @@ void BackpropSnapshot::benchmarkJacobians(
 }
 
 //==============================================================================
-Eigen::MatrixXd BackpropSnapshot::finiteDifferenceVelVelJacobian(WorldPtr world)
+Eigen::MatrixXd BackpropSnapshot::finiteDifferenceVelVelJacobian(
+  WorldPtr world, bool useRidders)
 {
+  if (useRidders) return finiteDifferenceRiddersVelVelJacobian(world);
+
   RestorableSnapshot snapshot(world);
 
   Eigen::MatrixXd J(mNumDOFs, mNumDOFs);
@@ -2156,8 +2161,10 @@ BackpropSnapshot::finiteDifferenceRiddersVelVelJacobian(WorldPtr world)
 
 //==============================================================================
 Eigen::MatrixXd BackpropSnapshot::finiteDifferencePosVelJacobian(
-    simulation::WorldPtr world)
+    simulation::WorldPtr world, bool useRidders)
 {
+  if (useRidders) return finiteDifferenceRiddersPosVelJacobian(world);
+
   RestorableSnapshot snapshot(world);
 
   Eigen::MatrixXd J(mNumDOFs, mNumDOFs);
@@ -2401,8 +2408,10 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersPosVelJacobian(
 
 //==============================================================================
 Eigen::MatrixXd BackpropSnapshot::finiteDifferenceForceVelJacobian(
-    WorldPtr world)
+    WorldPtr world, bool useRidders)
 {
+  if (useRidders) return finiteDifferenceRiddersForceVelJacobian(world);
+
   RestorableSnapshot snapshot(world);
 
   Eigen::MatrixXd J(mNumDOFs, mNumDOFs);
@@ -2640,8 +2649,10 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersForceVelJacobian(
 
 //==============================================================================
 Eigen::MatrixXd BackpropSnapshot::finiteDifferenceMassVelJacobian(
-    simulation::WorldPtr world)
+    simulation::WorldPtr world, bool useRidders)
 {
+  if (useRidders) return finiteDifferenceRiddersMassVelJacobian(world);
+
   RestorableSnapshot snapshot(world);
 
   bool oldGradientEnabled = world->getConstraintSolver()->getGradientEnabled();
@@ -2781,8 +2792,10 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersMassVelJacobian(
 
 //==============================================================================
 Eigen::MatrixXd BackpropSnapshot::finiteDifferencePosPosJacobian(
-    WorldPtr world, std::size_t subdivisions)
+    WorldPtr world, std::size_t subdivisions, bool useRidders)
 {
+  if (useRidders) return finiteDifferenceRiddersPosPosJacobian(world);
+
   RestorableSnapshot snapshot(world);
 
   double oldTimestep = world->getTimeStep();
@@ -2940,8 +2953,10 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersPosPosJacobian(
 
 //==============================================================================
 Eigen::MatrixXd BackpropSnapshot::finiteDifferenceVelPosJacobian(
-    WorldPtr world, std::size_t subdivisions)
+    WorldPtr world, std::size_t subdivisions, bool useRidders)
 {
+  if (useRidders) return finiteDifferenceRiddersVelPosJacobian(world);
+
   RestorableSnapshot snapshot(world);
 
   double oldTimestep = world->getTimeStep();
@@ -3099,8 +3114,10 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersVelPosJacobian(
 /// This computes and returns the whole wrt-vel jacobian by finite
 /// differences. This is SUPER SUPER SLOW, and is only here for testing.
 Eigen::MatrixXd BackpropSnapshot::finiteDifferenceVelJacobianWrt(
-    simulation::WorldPtr world, WithRespectTo* wrt)
+    simulation::WorldPtr world, WithRespectTo* wrt, bool useRidders)
 {
+  if (useRidders) return finiteDifferenceRiddersVelJacobianWrt(world, wrt);
+
   RestorableSnapshot snapshot(world);
 
   int wrtDim = wrt->dim(world.get());
@@ -3248,8 +3265,10 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersVelJacobianWrt(
 /// This computes and returns the whole wrt-pos jacobian by finite
 /// differences. This is SUPER SUPER SLOW, and is only here for testing.
 Eigen::MatrixXd BackpropSnapshot::finiteDifferencePosJacobianWrt(
-    simulation::WorldPtr world, WithRespectTo* wrt)
+    simulation::WorldPtr world, WithRespectTo* wrt, bool useRidders)
 {
+  if (useRidders) return finiteDifferenceRiddersPosJacobianWrt(world, wrt);
+
   RestorableSnapshot snapshot(world);
 
   int wrtDim = wrt->dim(world.get());
@@ -3747,8 +3766,15 @@ BackpropSnapshot::getJacobianOfLCPConstraintMatrixClampingSubset(
 /// wrt, by finite differencing
 Eigen::MatrixXd
 BackpropSnapshot::finiteDifferenceJacobianOfLCPConstraintMatrixClampingSubset(
-    simulation::WorldPtr world, Eigen::VectorXd b, WithRespectTo* wrt)
+    simulation::WorldPtr world, Eigen::VectorXd b, WithRespectTo* wrt,
+    bool useRidders)
 {
+  if (useRidders)
+  {
+    return finiteDifferenceRiddersJacobianOfLCPConstraintMatrixClampingSubset(
+      world, b, wrt);
+  }
+
   int wrtDim = wrt->dim(world.get());
   Eigen::MatrixXd jac = Eigen::MatrixXd::Zero(mNumClamping, wrtDim);
   if (wrt != WithRespectTo::POSITION)
@@ -3984,8 +4010,13 @@ Eigen::MatrixXd BackpropSnapshot::getJacobianOfLCPOffsetClampingSubset(
 /// finite differencing
 Eigen::MatrixXd
 BackpropSnapshot::finiteDifferenceJacobianOfLCPOffsetClampingSubset(
-    simulation::WorldPtr world, WithRespectTo* wrt)
+    simulation::WorldPtr world, WithRespectTo* wrt, bool useRidders)
 {
+  if (useRidders) 
+  {
+    return finiteDifferenceRiddersJacobianOfLCPOffsetClampingSubset(world, wrt);
+  }
+
   RestorableSnapshot snapshot(world);
   world->setPositions(mPreStepPosition);
   world->setVelocities(mPreStepVelocity);
@@ -4170,8 +4201,13 @@ BackpropSnapshot::finiteDifferenceRiddersJacobianOfLCPOffsetClampingSubset(
 /// finite differencing
 Eigen::MatrixXd
 BackpropSnapshot::finiteDifferenceJacobianOfLCPEstimatedOffsetClampingSubset(
-    simulation::WorldPtr world, WithRespectTo* wrt)
+    simulation::WorldPtr world, WithRespectTo* wrt, bool useRidders)
 {
+  if (useRidders)
+  {
+    return finiteDifferenceRiddersJacobianOfLCPEstimatedOffsetClampingSubset(world, wrt);
+  }
+
   int wrtDim = wrt->dim(world.get());
   Eigen::MatrixXd jac = Eigen::MatrixXd::Zero(mNumClamping, wrtDim);
   Eigen::MatrixXd A_c = getClampingConstraintMatrix(world);
@@ -4510,7 +4546,7 @@ Eigen::MatrixXd BackpropSnapshot::getJacobianOfProjectionIntoClampsMatrix(
 Eigen::MatrixXd BackpropSnapshot::getJacobianOfMinv(
     simulation::WorldPtr world, Eigen::VectorXd tau, WithRespectTo* wrt)
 {
-  return finiteDifferenceRiddersJacobianOfMinv(world, tau, wrt);
+  return finiteDifferenceJacobianOfMinv(world, tau, wrt);
 }
 
 //==============================================================================
@@ -4519,7 +4555,7 @@ Eigen::MatrixXd BackpropSnapshot::getJacobianOfMinv(
 Eigen::MatrixXd BackpropSnapshot::getJacobianOfC(
     simulation::WorldPtr world, WithRespectTo* wrt)
 {
-  return finiteDifferenceRiddersJacobianOfC(world, wrt);
+  return finiteDifferenceJacobianOfC(world, wrt);
 }
 
 /// This returns the jacobian of M^{-1}(pos, inertia) * (C(pos, inertia, vel) +
@@ -4528,7 +4564,7 @@ Eigen::MatrixXd BackpropSnapshot::getJacobianOfC(
 Eigen::MatrixXd BackpropSnapshot::getJacobianOfMinvC(
     simulation::WorldPtr world, WithRespectTo* wrt)
 {
-  return finiteDifferenceRiddersJacobianOfMinvC(world, wrt);
+  return finiteDifferenceJacobianOfMinvC(world, wrt);
 }
 
 //==============================================================================
@@ -4765,8 +4801,10 @@ Eigen::MatrixXd BackpropSnapshot::getJacobianOfUpperBoundConstraintsTranspose(
 /// This computes the finite difference Jacobian of A_c*f0 with respect to
 /// position
 Eigen::MatrixXd BackpropSnapshot::finiteDifferenceJacobianOfClampingConstraints(
-    simulation::WorldPtr world, Eigen::VectorXd f0)
+    simulation::WorldPtr world, Eigen::VectorXd f0, bool useRidders)
 {
+  if (useRidders) return finiteDifferenceRiddersJacobianOfClampingConstraints(world, f0);
+
   RestorableSnapshot snapshot(world);
 
   world->setPositions(mPreStepPosition);
@@ -5011,8 +5049,13 @@ BackpropSnapshot::finiteDifferenceRiddersJacobianOfClampingConstraints(
 /// is way too slow to use in practice.
 Eigen::MatrixXd
 BackpropSnapshot::finiteDifferenceJacobianOfClampingConstraintsTranspose(
-    simulation::WorldPtr world, Eigen::VectorXd v0)
+    simulation::WorldPtr world, Eigen::VectorXd v0, bool useRidders)
 {
+  if (useRidders) 
+  {
+    return finiteDifferenceRiddersJacobianOfClampingConstraintsTranspose(world, v0);
+  }
+
   RestorableSnapshot snapshot(world);
 
   world->setPositions(mPreStepPosition);
@@ -5225,8 +5268,13 @@ BackpropSnapshot::finiteDifferenceRiddersJacobianOfClampingConstraintsTranspose(
 /// is way too slow to use in practice.
 Eigen::MatrixXd
 BackpropSnapshot::finiteDifferenceJacobianOfUpperBoundConstraints(
-    simulation::WorldPtr world, Eigen::VectorXd f0)
+    simulation::WorldPtr world, Eigen::VectorXd f0, bool useRidders)
 {
+  if (useRidders)
+  {
+    return finiteDifferenceRiddersJacobianOfUpperBoundConstraints(world, f0);
+  }
+
   if (mNumUpperBound == 0)
   {
     return Eigen::MatrixXd::Zero(mNumDOFs, mNumDOFs);
@@ -5429,9 +5477,17 @@ BackpropSnapshot::finiteDifferenceRiddersJacobianOfUpperBoundConstraints(
 /// differences. This is SUPER SLOW, and is only here for testing.
 Eigen::MatrixXd
 BackpropSnapshot::finiteDifferenceJacobianOfProjectionIntoClampsMatrix(
-    simulation::WorldPtr world, Eigen::VectorXd v, WithRespectTo* wrt)
+    simulation::WorldPtr world, Eigen::VectorXd v, WithRespectTo* wrt,
+    bool useRidders)
 {
-  std::size_t innerDim = wrt->dim(world.get());
+  if (useRidders)
+  {
+    return finiteDifferenceRiddersJacobianOfProjectionIntoClampsMatrix(
+      world, v, wrt);
+  }
+
+  std::size_t
+   innerDim = wrt->dim(world.get());
 
   Eigen::VectorXd before = wrt->get(world.get());
 
@@ -5633,8 +5689,11 @@ BackpropSnapshot::finiteDifferenceRiddersJacobianOfProjectionIntoClampsMatrix(
 /// This computes and returns the jacobian of M^{-1}(pos, inertia) * tau by
 /// finite differences.
 Eigen::MatrixXd BackpropSnapshot::finiteDifferenceJacobianOfMinv(
-    simulation::WorldPtr world, Eigen::VectorXd tau, WithRespectTo* wrt)
+    simulation::WorldPtr world, Eigen::VectorXd tau, WithRespectTo* wrt,
+    bool useRidders)
 {
+  if (useRidders) return finiteDifferenceRiddersJacobianOfMinv(world, tau, wrt);
+
   std::size_t innerDim = wrt->dim(world.get());
 
   // These are predicted contact forces at the clamping contacts
@@ -5755,8 +5814,10 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersJacobianOfMinv(
 /// This computes and returns the jacobian of C(pos, inertia, vel) by finite
 /// differences.
 Eigen::MatrixXd BackpropSnapshot::finiteDifferenceJacobianOfC(
-    simulation::WorldPtr world, WithRespectTo* wrt)
+    simulation::WorldPtr world, WithRespectTo* wrt, bool useRidders)
 {
+  if (useRidders) return finiteDifferenceRiddersJacobianOfC(world, wrt);
+
   std::size_t innerDim = wrt->dim(world.get());
 
   // These are predicted contact forces at the clamping contacts
@@ -5878,8 +5939,10 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersJacobianOfC(
 /// inertia, vel) by finite differences. This is SUPER SLOW, and is only here
 /// for testing.
 Eigen::MatrixXd BackpropSnapshot::finiteDifferenceJacobianOfMinvC(
-    simulation::WorldPtr world, WithRespectTo* wrt)
+    simulation::WorldPtr world, WithRespectTo* wrt, bool useRidders)
 {
+  if (useRidders) return finiteDifferenceRiddersJacobianOfMinvC(world, wrt);
+
   std::size_t innerDim = wrt->dim(world.get());
 
   // These are predicted contact forces at the clamping contacts
@@ -6012,8 +6075,13 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersJacobianOfMinvC(
 
 //==============================================================================
 Eigen::MatrixXd BackpropSnapshot::finiteDifferenceJacobianOfConstraintForce(
-    simulation::WorldPtr world, WithRespectTo* wrt)
+    simulation::WorldPtr world, WithRespectTo* wrt, bool useRidders)
 {
+  if(useRidders)
+  {
+    return finiteDifferenceRiddersJacobianOfConstraintForce(world, wrt);
+  }
+
   RestorableSnapshot snapshot(world);
   world->setPositions(mPreStepPosition);
   world->setVelocities(mPreStepVelocity);
@@ -6312,8 +6380,13 @@ BackpropSnapshot::finiteDifferenceRiddersJacobianOfConstraintForce(
 /// WithRespectTo
 Eigen::MatrixXd
 BackpropSnapshot::finiteDifferenceJacobianOfEstimatedConstraintForce(
-    simulation::WorldPtr world, WithRespectTo* wrt)
+    simulation::WorldPtr world, WithRespectTo* wrt, bool useRidders)
 {
+  if (useRidders)
+  {
+    return finiteDifferenceRiddersJacobianOfEstimatedConstraintForce(world, wrt);
+  }
+
   Eigen::MatrixXd A_c = getClampingConstraintMatrix(world);
   Eigen::MatrixXd A_ub = getUpperBoundConstraintMatrix(world);
   Eigen::MatrixXd E = getUpperBoundMappingMatrix();
