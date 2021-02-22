@@ -36,6 +36,7 @@
 #include <queue>
 #include <string>
 #include <vector>
+#include <array>
 
 #include "dart/common/Console.hpp"
 #include "dart/common/Deprecated.hpp"
@@ -1660,8 +1661,10 @@ Eigen::MatrixXd Skeleton::getVelCJacobian()
 
 //==============================================================================
 Eigen::MatrixXd Skeleton::finiteDifferenceJacobianOfC(
-    neural::WithRespectTo* wrt)
+    neural::WithRespectTo* wrt, bool useRidders)
 {
+  if (useRidders) return finiteDifferenceRiddersJacobianOfC(wrt);
+
   std::size_t n = getNumDofs();
   std::size_t m = wrt->dim(this);
   Eigen::MatrixXd J = Eigen::MatrixXd::Zero(n, m);
@@ -1693,9 +1696,90 @@ Eigen::MatrixXd Skeleton::finiteDifferenceJacobianOfC(
 }
 
 //==============================================================================
-Eigen::MatrixXd Skeleton::finiteDifferenceJacobianOfMinv(
-    Eigen::VectorXd f, neural::WithRespectTo* wrt)
+Eigen::MatrixXd Skeleton::finiteDifferenceRiddersJacobianOfC(
+    neural::WithRespectTo* wrt)
 {
+  std::size_t n = getNumDofs();
+  std::size_t m = wrt->dim(this);
+  Eigen::MatrixXd J = Eigen::MatrixXd::Zero(n, m);
+  Eigen::VectorXd originalWrt = wrt->get(this);
+
+  const double originalStepSize = 1e-3; 
+  const double con = 1.4, con2 = (con * con); 
+  const double safeThreshold = 2.0; 
+  const int tabSize = 10;
+
+  for (std::size_t i = 0; i < m; i++)
+  {
+    double stepSize = originalStepSize;
+    double bestError = std::numeric_limits<double>::max();
+
+    // Neville tableau of finite difference results
+    std::array<std::array<Eigen::VectorXd, tabSize>, tabSize> tab;
+
+    Eigen::VectorXd perturbedPlus = Eigen::VectorXd(originalWrt);
+    perturbedPlus(i) += stepSize;
+    wrt->set(this, perturbedPlus);
+    Eigen::MatrixXd tauPlus = getCoriolisAndGravityForces() - getExternalForces();
+    Eigen::VectorXd perturbedMinus = Eigen::VectorXd(originalWrt);
+    perturbedMinus(i) -= stepSize;
+    wrt->set(this, perturbedMinus);
+    Eigen::MatrixXd tauMinus = getCoriolisAndGravityForces() - getExternalForces();
+
+    tab[0][0] = (tauPlus - tauMinus) / (2 * stepSize);
+
+    // Iterate over smaller and smaller step sizes
+    for (int iTab = 1; iTab < tabSize; iTab++)
+    {
+      stepSize /= con;
+
+      perturbedPlus = Eigen::VectorXd(originalWrt);
+      perturbedPlus(i) += stepSize;
+      wrt->set(this, perturbedPlus);
+      tauPlus = getCoriolisAndGravityForces() - getExternalForces();
+      perturbedMinus = Eigen::VectorXd(originalWrt);
+      perturbedMinus(i) -= stepSize;
+      wrt->set(this, perturbedMinus);
+      tauMinus = getCoriolisAndGravityForces() - getExternalForces();
+      
+      tab[0][iTab] = (tauPlus - tauMinus) / (2 * stepSize);
+
+      double fac = con2;
+      // Compute extrapolations of increasing orders, requiring no new evaluations
+      for (int jTab = 1; jTab <= iTab; jTab++)
+      {
+        tab[jTab][iTab] = (tab[jTab-1][iTab] * fac - tab[jTab-1][iTab-1]) /
+                              (fac - 1.0);
+        fac = con2 * fac;
+        double currError = 
+          std::max((tab[jTab][iTab] - tab[jTab-1][iTab]).array().abs().maxCoeff(),
+                   (tab[jTab][iTab] - tab[jTab-1][iTab-1]).array().abs().maxCoeff());
+        if (currError < bestError)
+        {
+          bestError = currError;
+          J.col(i).noalias() = tab[jTab][iTab];
+        }
+      }
+
+      // If higher order is worse by a significant factor, quit early.
+      if ((tab[iTab][iTab] - tab[iTab-1][iTab-1]).array().abs().maxCoeff() >= 
+          safeThreshold * bestError)
+      {
+        break;
+      }
+    }
+  }
+  wrt->set(this, originalWrt);
+
+  return J;
+}
+
+//==============================================================================
+Eigen::MatrixXd Skeleton::finiteDifferenceJacobianOfMinv(
+    Eigen::VectorXd f, neural::WithRespectTo* wrt, bool useRidders)
+{
+  if (useRidders) return finiteDifferenceRiddersJacobianOfMinv(f, wrt);
+
   std::size_t n = getNumDofs();
   std::size_t m = wrt->dim(this);
   Eigen::MatrixXd J = Eigen::MatrixXd::Zero(n, m);
@@ -1727,6 +1811,85 @@ Eigen::MatrixXd Skeleton::finiteDifferenceJacobianOfMinv(
 }
 
 //==============================================================================
+Eigen::MatrixXd Skeleton::finiteDifferenceRiddersJacobianOfMinv(
+    Eigen::VectorXd f, neural::WithRespectTo* wrt)
+{
+  std::size_t n = getNumDofs();
+  std::size_t m = wrt->dim(this);
+  Eigen::MatrixXd J = Eigen::MatrixXd::Zero(n, m);
+  Eigen::VectorXd originalWrt = wrt->get(this);
+
+  const double originalStepSize = 1e-3; 
+  const double con = 1.4, con2 = (con * con); 
+  const double safeThreshold = 2.0; 
+  const int tabSize = 10;
+
+  for (std::size_t i = 0; i < m; i++)
+  {
+    double stepSize = originalStepSize;
+    double bestError = std::numeric_limits<double>::max();
+
+    // Neville tableau of finite difference results
+    std::array<std::array<Eigen::VectorXd, tabSize>, tabSize> tab;
+
+    Eigen::VectorXd perturbedPlus = Eigen::VectorXd(originalWrt);
+    perturbedPlus(i) += stepSize;
+    wrt->set(this, perturbedPlus);
+    Eigen::MatrixXd MinvFPlus = multiplyByImplicitInvMassMatrix(f);
+    Eigen::VectorXd perturbedMinus = Eigen::VectorXd(originalWrt);
+    perturbedMinus(i) -= stepSize;
+    wrt->set(this, perturbedMinus);
+    Eigen::MatrixXd MinvFMinus = multiplyByImplicitInvMassMatrix(f);
+
+    tab[0][0] = (MinvFPlus - MinvFMinus) / (2 * stepSize);
+
+    // Iterate over smaller and smaller step sizes
+    for (int iTab = 1; iTab < tabSize; iTab++)
+    {
+      stepSize /= con;
+
+      perturbedPlus = Eigen::VectorXd(originalWrt);
+      perturbedPlus(i) += stepSize;
+      wrt->set(this, perturbedPlus);
+      MinvFPlus = multiplyByImplicitInvMassMatrix(f);
+      perturbedMinus = Eigen::VectorXd(originalWrt);
+      perturbedMinus(i) -= stepSize;
+      wrt->set(this, perturbedMinus);
+      MinvFMinus = multiplyByImplicitInvMassMatrix(f);
+      
+      tab[0][iTab] = (MinvFPlus - MinvFMinus) / (2 * stepSize);
+
+      double fac = con2;
+      // Compute extrapolations of increasing orders, requiring no new evaluations
+      for (int jTab = 1; jTab <= iTab; jTab++)
+      {
+        tab[jTab][iTab] = (tab[jTab-1][iTab] * fac - tab[jTab-1][iTab-1]) /
+                              (fac - 1.0);
+        fac = con2 * fac;
+        double currError = 
+          std::max((tab[jTab][iTab] - tab[jTab-1][iTab]).array().abs().maxCoeff(),
+                   (tab[jTab][iTab] - tab[jTab-1][iTab-1]).array().abs().maxCoeff());
+        if (currError < bestError)
+        {
+          bestError = currError;
+          J.col(i).noalias() = tab[jTab][iTab];
+        }
+      }
+
+      // If higher order is worse by a significant factor, quit early.
+      if ((tab[iTab][iTab] - tab[iTab-1][iTab-1]).array().abs().maxCoeff() >= 
+          safeThreshold * bestError)
+      {
+        break;
+      }
+    }
+  }
+  wrt->set(this, originalWrt);
+
+  return J;
+}
+
+//==============================================================================
 Eigen::VectorXd Skeleton::getDynamicsForces()
 {
   computeForwardDynamics();
@@ -1747,8 +1910,10 @@ Eigen::VectorXd Skeleton::getDynamicsForces()
 }
 
 //==============================================================================
-Eigen::MatrixXd Skeleton::finiteDifferenceVelCJacobian()
+Eigen::MatrixXd Skeleton::finiteDifferenceVelCJacobian(bool useRidders)
 {
+  if (useRidders) return finiteDifferenceRiddersVelCJacobian();
+
   std::size_t n = getNumDofs();
   Eigen::MatrixXd J = Eigen::MatrixXd::Zero(n, n);
   Eigen::VectorXd vel = getVelocities();
@@ -1844,6 +2009,85 @@ Eigen::MatrixXd Skeleton::finiteDifferenceVelCJacobian()
 #endif
 
     J.col(i) = (perturbedPos - perturbedNeg) / (2 * EPS);
+  }
+
+  // Reset everything how we left it
+  setVelocities(vel);
+
+  return J;
+}
+
+//==============================================================================
+Eigen::MatrixXd Skeleton::finiteDifferenceRiddersVelCJacobian()
+{
+  std::size_t n = getNumDofs();
+  Eigen::MatrixXd J = Eigen::MatrixXd::Zero(n, n);
+  Eigen::VectorXd vel = getVelocities();
+
+  const double originalStepSize = 1e-3; 
+  const double con = 1.4, con2 = (con * con); 
+  const double safeThreshold = 2.0; 
+  const int tabSize = 10;
+
+  for (std::size_t i = 0; i < n; i++)
+  {
+    double stepSize = originalStepSize;
+    double bestError = std::numeric_limits<double>::max();
+
+    // Neville tableau of finite difference results
+    std::array<std::array<Eigen::VectorXd, tabSize>, tabSize> tab;
+
+    Eigen::VectorXd tweakedVel = vel;
+    tweakedVel(i) += stepSize;
+    setVelocities(tweakedVel);
+    Eigen::VectorXd perturbedPos = getCoriolisAndGravityForces();
+    tweakedVel = vel;
+    tweakedVel(i) -= stepSize;
+    setVelocities(tweakedVel);
+    Eigen::VectorXd perturbedNeg = getCoriolisAndGravityForces();
+
+    tab[0][0] = (perturbedPos - perturbedNeg) / (2 * stepSize);
+
+    // Iterate over smaller and smaller step sizes
+    for (int iTab = 1; iTab < tabSize; iTab++)
+    {
+      stepSize /= con;
+
+      tweakedVel = vel;
+      tweakedVel(i) += stepSize;
+      setVelocities(tweakedVel);
+      perturbedPos = getCoriolisAndGravityForces();
+      tweakedVel = vel;
+      tweakedVel(i) -= stepSize;
+      setVelocities(tweakedVel);
+      perturbedNeg = getCoriolisAndGravityForces();
+
+      tab[0][iTab] = (perturbedPos - perturbedNeg) / (2 * stepSize);
+
+      double fac = con2;
+      // Compute extrapolations of increasing orders, requiring no new evaluations
+      for (int jTab = 1; jTab <= iTab; jTab++)
+      {
+        tab[jTab][iTab] = (tab[jTab-1][iTab] * fac - tab[jTab-1][iTab-1]) /
+                              (fac - 1.0);
+        fac = con2 * fac;
+        double currError = 
+          std::max((tab[jTab][iTab] - tab[jTab-1][iTab]).array().abs().maxCoeff(),
+                   (tab[jTab][iTab] - tab[jTab-1][iTab-1]).array().abs().maxCoeff());
+        if (currError < bestError)
+        {
+          bestError = currError;
+          J.col(i) = tab[jTab][iTab];
+        }
+      }
+
+      // If higher order is worse by a significant factor, quit early.
+      if ((tab[iTab][iTab] - tab[iTab-1][iTab-1]).array().abs().maxCoeff() >= 
+          safeThreshold * bestError)
+      {
+        break;
+      }
+    }
   }
 
   // Reset everything how we left it

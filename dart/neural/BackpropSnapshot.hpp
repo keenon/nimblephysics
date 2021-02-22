@@ -450,7 +450,7 @@ public:
   /// inertia, vel) by finite differences. This is SUPER SLOW, and is only here
   /// for testing.
   Eigen::MatrixXd finiteDifferenceJacobianOfMinvC(
-      simulation::WorldPtr world, WithRespectTo* wrt, bool useRidders);
+      simulation::WorldPtr world, WithRespectTo* wrt, bool useRidders = true);
 
   /// This computes and returns the jacobian of M^{-1}(pos, inertia) * C(pos,
   /// inertia, vel) by Ridders extrapolated finite differences. This is SUPER SLOW,

@@ -601,16 +601,30 @@ public:
 
   /// VERY SLOW: Only for testing. This computes the unconstrained Jacobian
   /// giving the difference in C(pos, vel) for finite changes
-  Eigen::MatrixXd finiteDifferenceJacobianOfC(neural::WithRespectTo* wrt);
+  Eigen::MatrixXd finiteDifferenceJacobianOfC(
+      neural::WithRespectTo* wrt, bool useRidders = true);
+
+  /// VERY SLOW: Only for testing. This computes the unconstrained Jacobian
+  /// giving the difference in C(pos, vel) for finite changes, using Ridders
+  Eigen::MatrixXd finiteDifferenceRiddersJacobianOfC(neural::WithRespectTo* wrt);
 
   /// VERY SLOW: Only for testing. This computes the unconstrained Jacobian
   /// giving the difference in M^{-1}f for finite changes
   Eigen::MatrixXd finiteDifferenceJacobianOfMinv(
+      Eigen::VectorXd f, neural::WithRespectTo* wrt, bool useRidders = true);
+
+  /// VERY SLOW: Only for testing. This computes the unconstrained Jacobian
+  /// giving the difference in M^{-1}f for finite changes, using Ridders
+  Eigen::MatrixXd finiteDifferenceRiddersJacobianOfMinv(
       Eigen::VectorXd f, neural::WithRespectTo* wrt);
 
   /// VERY SLOW: Only for testing. This computes the unconstrained Jacobian
   /// giving the difference in C(pos, vel) for finite changes in vel
-  Eigen::MatrixXd finiteDifferenceVelCJacobian();
+  Eigen::MatrixXd finiteDifferenceVelCJacobian(bool useRidders = true);
+
+  /// VERY SLOW: Only for testing. This computes the unconstrained Jacobian
+  /// giving the difference in C(pos, vel) for finite changes in vel
+  Eigen::MatrixXd finiteDifferenceRiddersVelCJacobian();
 
   Eigen::VectorXd getDynamicsForces();
 

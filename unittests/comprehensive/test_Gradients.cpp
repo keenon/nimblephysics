@@ -59,7 +59,7 @@
 #include "TestHelpers.hpp"
 #include "stdio.h"
 
-#define ALL_TESTS
+// #define ALL_TESTS
 
 using namespace dart;
 using namespace math;
@@ -1707,9 +1707,9 @@ TEST(GRADIENTS, FREE_BLOCK_ON_GROUND_STATIC_FRICTION_INITIAL_VELOCITY)
 }
 #endif
 
-#ifdef ALL_TESTS
+// #ifdef ALL_TESTS
 TEST(GRADIENTS, FREE_BLOCK_ON_GROUND_SLIPPING_FRICTION_INITIAL_VELOCITY)
 {
   testFreeBlockWithFrictionCoeff(0.5, 1, true);
 }
-#endif
+// #endif

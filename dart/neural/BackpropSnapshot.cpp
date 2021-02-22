@@ -2794,7 +2794,7 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersMassVelJacobian(
 Eigen::MatrixXd BackpropSnapshot::finiteDifferencePosPosJacobian(
     WorldPtr world, std::size_t subdivisions, bool useRidders)
 {
-  if (useRidders) return finiteDifferenceRiddersPosPosJacobian(world);
+  if (useRidders) return finiteDifferenceRiddersPosPosJacobian(world, subdivisions);
 
   RestorableSnapshot snapshot(world);
 
@@ -2955,7 +2955,7 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersPosPosJacobian(
 Eigen::MatrixXd BackpropSnapshot::finiteDifferenceVelPosJacobian(
     WorldPtr world, std::size_t subdivisions, bool useRidders)
 {
-  if (useRidders) return finiteDifferenceRiddersVelPosJacobian(world);
+  if (useRidders) return finiteDifferenceRiddersVelPosJacobian(world, subdivisions);
 
   RestorableSnapshot snapshot(world);
 
