@@ -53,6 +53,14 @@ public:
   /// function, but will not be backpropagated into.
   void setMetadata(std::string key, Eigen::MatrixXd value);
 
+  /// If set to true, our backprop for finding the gradient may use alternative
+  /// contact strategies, other than the ones that are technically "correct".
+  void setExploreAlternateStrategies(bool flag);
+
+  /// If set to true, our backprop for finding the gradient may use alternative
+  /// contact strategies, other than the ones that are technically "correct".
+  bool getExploreAlternateStrategies();
+
   /// This returns the whole map for metadata
   std::unordered_map<std::string, Eigen::MatrixXd>& getMetadataMap();
 
@@ -454,6 +462,7 @@ protected:
   LossFn mLoss;
   int mSteps;
   bool mTuneStartingState;
+  bool mExploreAlternateStrategies;
   std::vector<LossFn> mConstraints;
   std::string mRepresentationMapping;
   std::unordered_map<std::string, std::shared_ptr<neural::Mapping>> mMappings;

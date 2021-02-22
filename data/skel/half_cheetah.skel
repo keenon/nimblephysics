@@ -29,7 +29,7 @@
                     </geometry>
                 </collision_shape>
             </body>
-            <joint type="free" name="joint 1">
+            <joint type="weld" name="joint 1">
                 <parent>world</parent>
                 <child>ground</child>
             </joint>

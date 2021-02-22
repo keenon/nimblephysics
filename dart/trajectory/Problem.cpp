@@ -20,7 +20,11 @@ namespace trajectory {
 /// Default constructor
 Problem::Problem(
     std::shared_ptr<simulation::World> world, LossFn loss, int steps)
-  : mWorld(world), mLoss(loss), mSteps(steps), mRolloutCacheDirty(true)
+  : mWorld(world),
+    mLoss(loss),
+    mSteps(steps),
+    mRolloutCacheDirty(true),
+    mExploreAlternateStrategies(false)
 {
   std::shared_ptr<neural::Mapping> identityMapping
       = std::make_shared<neural::IdentityMapping>(world);
@@ -61,6 +65,22 @@ void Problem::setMetadata(std::string key, Eigen::MatrixXd value)
 std::unordered_map<std::string, Eigen::MatrixXd>& Problem::getMetadataMap()
 {
   return mMetadata;
+}
+
+//==============================================================================
+/// If set to true, our backprop for finding the gradient may use alternative
+/// contact strategies, other than the ones that are technically "correct".
+void Problem::setExploreAlternateStrategies(bool flag)
+{
+  mExploreAlternateStrategies = flag;
+}
+
+//==============================================================================
+/// If set to true, our backprop for finding the gradient may use alternative
+/// contact strategies, other than the ones that are technically "correct".
+bool Problem::getExploreAlternateStrategies()
+{
+  return mExploreAlternateStrategies;
 }
 
 //==============================================================================

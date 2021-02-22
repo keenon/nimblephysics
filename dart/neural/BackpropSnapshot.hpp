@@ -45,7 +45,8 @@ public:
       simulation::WorldPtr world,
       LossGradient& thisTimestepLoss,
       const LossGradient& nextTimestepLoss,
-      PerformanceLog* perfLog = nullptr);
+      PerformanceLog* perfLog = nullptr,
+      bool exploreAlternateStrategies = false);
 
   /// This computes and returns the whole vel-vel jacobian. For backprop, you
   /// don't actually need this matrix, you can compute backprop directly. This
@@ -585,9 +586,6 @@ public:
   /// timestep
   Eigen::VectorXd getVelocityDueToIllegalImpulses();
 
-  /// Returns the coriolis and gravity forces pre-step
-  Eigen::VectorXd getCoriolisAndGravityAndExternalForces();
-
   /// Returns the velocity pre-LCP
   Eigen::VectorXd getPreLCPVelocity();
 
@@ -645,6 +643,12 @@ public:
   /// crash the program and print what went wrong and some simple replication
   /// instructions.
   void setSlowDebugResultsAgainstFD(bool slowDebug);
+
+  /// This does a battery of tests comparing the speeds to compute all the
+  /// different Jacobians, both with finite differencing and analytically, and
+  /// prints the results to std out.
+  void benchmarkJacobians(
+      std::shared_ptr<simulation::World> world, int numSamples);
 
 protected:
   /// If this is true, we use finite-differencing to compute all of the
@@ -712,7 +716,6 @@ protected:
 
 private:
   /// These are mCached versions of the various Jacobians
-
   bool mCachedPosPosDirty;
   Eigen::MatrixXd mCachedPosPos;
   bool mCachedPosVelDirty;
@@ -767,7 +770,6 @@ private:
     CLAMPING_CONSTRAINT_IMPULSES,
     CLAMPING_CONSTRAINT_RELATIVE_VELS,
     VEL_DUE_TO_ILLEGAL,
-    CORIOLIS_AND_GRAVITY_AND_EXTERNAL,
     PRE_STEP_VEL,
     PRE_STEP_TAU,
     PRE_LCP_VEL

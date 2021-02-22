@@ -142,6 +142,15 @@ public:
       dynamics::DegreeOfFreedom* screwDof,
       dynamics::DegreeOfFreedom* rotateDof);
 
+  /// Returns the gradient of the screw axis with respect to the rotate dof
+  ///
+  /// Unlike its sibling, getScrewAxisForForceGradient(), this allows passing
+  /// in values that are otherwise repeatedly computed.
+  Eigen::Vector6d getScrewAxisForForceGradient_Optimized(
+      dynamics::DegreeOfFreedom* screwDof,
+      dynamics::DegreeOfFreedom* rotateDof,
+      const Eigen::Vector6d& axisWorldTwist);
+
   /// This is the analytical Jacobian for the contact position
   math::LinearJacobian getContactPositionJacobian(
       std::shared_ptr<simulation::World> world);
@@ -368,6 +377,8 @@ public:
       const dynamics::DegreeOfFreedom* parent,
       const dynamics::DegreeOfFreedom* child);
 
+  friend class BackpropSnapshot;
+
 protected:
   std::shared_ptr<constraint::ConstraintBase> mConstraint;
   std::shared_ptr<constraint::ContactConstraint> mContactConstraint;
@@ -375,6 +386,9 @@ protected:
   std::vector<std::string> mSkeletons;
   std::vector<Eigen::VectorXd> mSkeletonOriginalPositions;
   double mConstraintForce;
+
+  bool mWorldConstraintJacCacheDirty;
+  Eigen::MatrixXd mWorldConstraintJacCache;
 
   int mIndex;
 

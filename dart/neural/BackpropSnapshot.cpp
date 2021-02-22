@@ -1,5 +1,6 @@
 #include "dart/neural/BackpropSnapshot.hpp"
 
+#include <chrono>
 #include <iostream>
 #include <array>
 
@@ -15,11 +16,7 @@
 // Make production builds happy with asserts
 #define _unused(x) ((void)(x))
 
-// This will enable runtime checks where every analytical Jacobian is compared
-// to the finite difference version, and we error if they're too close far
-// apart:
-//
-#define LOG_PERFORMANCE_BACKPROP_SNAPSHOT ;
+#define LOG_PERFORMANCE_BACKPROP_SNAPSHOT
 
 using namespace dart;
 using namespace math;
@@ -119,7 +116,8 @@ void BackpropSnapshot::backprop(
     WorldPtr world,
     LossGradient& thisTimestepLoss,
     const LossGradient& nextTimestepLoss,
-    PerformanceLog* perfLog)
+    PerformanceLog* perfLog,
+    bool exploreAlternateStrategies)
 {
   PerformanceLog* thisLog = nullptr;
 #ifdef LOG_PERFORMANCE_BACKPROP_SNAPSHOT
@@ -135,17 +133,19 @@ void BackpropSnapshot::backprop(
   // Set the state of the world back to what it was during the forward pass, so
   // that implicit mass matrix computations work correctly.
 
-  Eigen::VectorXd oldPositions = world->getPositions();
-  Eigen::VectorXd oldVelocities = world->getVelocities();
+  RestorableSnapshot snapshot(world);
   world->setPositions(mPreStepPosition);
   world->setVelocities(mPreStepVelocity);
+  world->setExternalForces(mPreStepTorques);
 
   // Create the vectors for this timestep
 
   thisTimestepLoss.lossWrtPosition = Eigen::VectorXd::Zero(mNumDOFs);
   thisTimestepLoss.lossWrtVelocity = Eigen::VectorXd::Zero(mNumDOFs);
   thisTimestepLoss.lossWrtTorque = Eigen::VectorXd::Zero(mNumDOFs);
+  thisTimestepLoss.lossWrtMass = Eigen::VectorXd::Zero(world->getMassDims());
 
+  /*
   const Eigen::MatrixXd& posPos = getPosPosJacobian(world, thisLog);
   const Eigen::MatrixXd& posVel = getPosVelJacobian(world, thisLog);
   const Eigen::MatrixXd& velPos = getVelPosJacobian(world, thisLog);
@@ -170,13 +170,18 @@ void BackpropSnapshot::backprop(
     thisLog->end();
   }
 #endif
+  snapshot.restore();
   return;
+  */
 
   //////////////////////////////////////////////////////////
-  // TODO: this is the older, potentially more efficient way to do it. We should
-  // measure and verify that during optimization.
 
-  /*
+  // Handle mass the old fashioned way, for now
+
+  const Eigen::MatrixXd& massVel = getMassVelJacobian(world, thisLog);
+  thisTimestepLoss.lossWrtMass
+      = massVel.transpose() * nextTimestepLoss.lossWrtVelocity;
+
   // Actually run the backprop
 
   std::unordered_map<std::string, bool> skeletonsVisited;
@@ -206,6 +211,7 @@ void BackpropSnapshot::backprop(
       // Keep track of which skeletons have been covered by constraint groups
       bool skelAlreadyVisited
           = (skeletonsVisited.find(skel->getName()) != skeletonsVisited.end());
+      DART_UNUSED(skelAlreadyVisited);
       assert(!skelAlreadyVisited);
       skeletonsVisited[skel->getName()] = true;
 
@@ -219,7 +225,11 @@ void BackpropSnapshot::backprop(
 
     // Now actually run the backprop
 
-    group->backprop(world, groupThisTimestepLoss, groupNextTimestepLoss);
+    group->backprop(
+        world,
+        groupThisTimestepLoss,
+        groupNextTimestepLoss,
+        exploreAlternateStrategies);
 
     // Read the values back out of the group backprop
 
@@ -255,13 +265,51 @@ void BackpropSnapshot::backprop(
     {
       std::size_t dofCursorWorld = mSkeletonOffset[skel->getName()];
       std::size_t dofs = skel->getNumDofs();
+
+      /////////////////////////////////////////////////////////////////
+      // Explicitly form the matrices
+      /////////////////////////////////////////////////////////////////
+
+      Eigen::MatrixXd Minv = skel->getInvMassMatrix();
+
+      Eigen::MatrixXd forceVel = mTimeStep * Minv;
+      Eigen::MatrixXd velVel
+          = Eigen::MatrixXd::Identity(skel->getNumDofs(), skel->getNumDofs())
+            - mTimeStep * Minv * skel->getVelCJacobian();
+      Eigen::MatrixXd posVel = skel->getUnconstrainedVelJacobianWrt(
+          world->getTimeStep(), WithRespectTo::POSITION);
+      Eigen::MatrixXd posPos
+          = Eigen::MatrixXd::Identity(skel->getNumDofs(), skel->getNumDofs());
+      Eigen::MatrixXd velPos
+          = mTimeStep
+            * Eigen::MatrixXd::Identity(skel->getNumDofs(), skel->getNumDofs());
+
+      thisTimestepLoss.lossWrtTorque.segment(dofCursorWorld, dofs)
+          = forceVel.transpose()
+            * nextTimestepLoss.lossWrtVelocity.segment(dofCursorWorld, dofs);
+      thisTimestepLoss.lossWrtVelocity.segment(dofCursorWorld, dofs)
+          = velVel.transpose()
+                * nextTimestepLoss.lossWrtVelocity.segment(dofCursorWorld, dofs)
+            + velPos.transpose()
+                  * nextTimestepLoss.lossWrtPosition.segment(
+                      dofCursorWorld, dofs);
+      thisTimestepLoss.lossWrtPosition.segment(dofCursorWorld, dofs)
+          = posVel.transpose()
+                * nextTimestepLoss.lossWrtVelocity.segment(dofCursorWorld, dofs)
+            + posPos.transpose()
+                  * nextTimestepLoss.lossWrtPosition.segment(
+                      dofCursorWorld, dofs);
+
+      /*
+
       // f_t
       // force-vel = dT * Minv
       thisTimestepLoss.lossWrtTorque.segment(dofCursorWorld, dofs)
           // f_t --> v_t+1
           = mTimeStep
-            * skel->multiplyByImplicitInvMassMatrix(
-                nextTimestepLoss.lossWrtVelocity.segment(dofCursorWorld, dofs));
+            * skel->getInvMassMatrix() // This is symmetric, but otherwise
+                                       // we would need to .transpose()
+            * nextTimestepLoss.lossWrtVelocity.segment(dofCursorWorld, dofs);
 
       // skel->getJacobionOfMinv();
       // getUnconstrainedVelJacobianWrt
@@ -285,18 +333,18 @@ void BackpropSnapshot::backprop(
       thisTimestepLoss.lossWrtVelocity.segment(dofCursorWorld, dofs)
           // v_t --> v_t+1
           = nextTimestepLoss.lossWrtVelocity.segment(dofCursorWorld, dofs)
-            - skel->getVelCJacobian().transpose()
+            - mTimeStep * skel->getVelCJacobian().transpose()
                   * thisTimestepLoss.lossWrtTorque.segment(dofCursorWorld, dofs)
-            // v_t --> p_t
+            // v_t --> p_t+1
             + mTimeStep
-                  * thisTimestepLoss.lossWrtPosition.segment(
+                  * nextTimestepLoss.lossWrtPosition.segment(
                       dofCursorWorld, dofs);
+      */
     }
   }
 
   // Restore the old position and velocity values before we ran backprop
-  world->setPositions(oldPositions);
-  world->setVelocities(oldVelocities);
+  snapshot.restore();
 
 #ifdef LOG_PERFORMANCE_BACKPROP_SNAPSHOT
   if (thisLog != nullptr)
@@ -304,7 +352,6 @@ void BackpropSnapshot::backprop(
     thisLog->end();
   }
 #endif
-  */
 }
 
 //==============================================================================
@@ -1456,16 +1503,6 @@ Eigen::VectorXd BackpropSnapshot::getVelocityDueToIllegalImpulses()
 }
 
 //==============================================================================
-/// Returns the coriolis and gravity forces after unconstrained forward
-/// dynamics. For pre-step forces, use
-/// world->getCoriolisAndGravityAndExternalForces()
-Eigen::VectorXd BackpropSnapshot::getCoriolisAndGravityAndExternalForces()
-{
-  return assembleVector<Eigen::VectorXd>(
-      VectorToAssemble::CORIOLIS_AND_GRAVITY_AND_EXTERNAL);
-}
-
-//==============================================================================
 /// Returns the velocity pre-LCP
 Eigen::VectorXd BackpropSnapshot::getPreLCPVelocity()
 {
@@ -1675,6 +1712,208 @@ void BackpropSnapshot::setUseFDOverride(bool fdOverride)
 void BackpropSnapshot::setSlowDebugResultsAgainstFD(bool slowDebug)
 {
   mSlowDebugResultsAgainstFD = slowDebug;
+}
+
+//==============================================================================
+/// This does a battery of tests comparing the speeds to compute all the
+/// different Jacobians, both with finite differencing and analytically, and
+/// prints the results to std out.
+void BackpropSnapshot::benchmarkJacobians(
+    std::shared_ptr<simulation::World> world, int numSamples)
+{
+  long posPosFd = 0L;
+  long posPosA = 0L;
+
+  long posVelFd = 0L;
+  long posVelA = 0L;
+
+  long velPosFd = 0L;
+  long velPosA = 0L;
+
+  long velVelFd = 0L;
+  long velVelA = 0L;
+
+  long forceVelFd = 0L;
+  long forceVelA = 0L;
+
+  // Take a bunch of samples. This will not be the same speed as real runtime,
+  // because of branch predictions warming up and caches getting warm, but it's
+  // a reasonable indicator.
+  for (int sample = 0; sample < numSamples; sample++)
+  {
+    using namespace std::chrono;
+
+    for (auto contact : getClampingConstraints())
+    {
+      contact->mWorldConstraintJacCacheDirty = true;
+    }
+    for (auto contact : getUpperBoundConstraints())
+    {
+      contact->mWorldConstraintJacCacheDirty = true;
+    }
+
+    ////////////////////////////////////////////////////////////////////
+    // Do all the analytical Jacobians one after another first
+    ////////////////////////////////////////////////////////////////////
+
+    long startTime
+        = duration_cast<nanoseconds>(system_clock::now().time_since_epoch())
+              .count();
+    mCachedPosPosDirty = true;
+    getPosPosJacobian(world);
+    long endTime
+        = duration_cast<nanoseconds>(system_clock::now().time_since_epoch())
+              .count();
+    posPosA += endTime - startTime;
+
+    startTime
+        = duration_cast<nanoseconds>(system_clock::now().time_since_epoch())
+              .count();
+    mCachedPosVelDirty = true;
+    getPosVelJacobian(world);
+    endTime = duration_cast<nanoseconds>(system_clock::now().time_since_epoch())
+                  .count();
+    posVelA += endTime - startTime;
+
+    startTime
+        = duration_cast<nanoseconds>(system_clock::now().time_since_epoch())
+              .count();
+    mCachedVelPosDirty = true;
+    getVelPosJacobian(world);
+    endTime = duration_cast<nanoseconds>(system_clock::now().time_since_epoch())
+                  .count();
+    velPosA += endTime - startTime;
+
+    startTime
+        = duration_cast<nanoseconds>(system_clock::now().time_since_epoch())
+              .count();
+    mCachedVelVelDirty = true;
+    getVelVelJacobian(world);
+    endTime = duration_cast<nanoseconds>(system_clock::now().time_since_epoch())
+                  .count();
+    velVelA += endTime - startTime;
+
+    startTime
+        = duration_cast<nanoseconds>(system_clock::now().time_since_epoch())
+              .count();
+    mCachedForceVelDirty = true;
+    getForceVelJacobian(world);
+    endTime = duration_cast<nanoseconds>(system_clock::now().time_since_epoch())
+                  .count();
+    forceVelA += endTime - startTime;
+
+    ////////////////////////////////////////////////////////////////////
+    // Now do all the FD Jacobians one after another
+    ////////////////////////////////////////////////////////////////////
+
+    startTime
+        = duration_cast<nanoseconds>(system_clock::now().time_since_epoch())
+              .count();
+    finiteDifferencePosPosJacobian(world, 1);
+    endTime = duration_cast<nanoseconds>(system_clock::now().time_since_epoch())
+                  .count();
+    posPosFd += endTime - startTime;
+
+    startTime
+        = duration_cast<nanoseconds>(system_clock::now().time_since_epoch())
+              .count();
+    finiteDifferencePosVelJacobian(world);
+    endTime = duration_cast<nanoseconds>(system_clock::now().time_since_epoch())
+                  .count();
+    posVelFd += endTime - startTime;
+
+    startTime
+        = duration_cast<nanoseconds>(system_clock::now().time_since_epoch())
+              .count();
+    finiteDifferenceVelPosJacobian(world, 1);
+    endTime = duration_cast<nanoseconds>(system_clock::now().time_since_epoch())
+                  .count();
+    velPosFd += endTime - startTime;
+
+    startTime
+        = duration_cast<nanoseconds>(system_clock::now().time_since_epoch())
+              .count();
+    finiteDifferenceVelVelJacobian(world);
+    endTime = duration_cast<nanoseconds>(system_clock::now().time_since_epoch())
+                  .count();
+    velVelFd += endTime - startTime;
+
+    startTime
+        = duration_cast<nanoseconds>(system_clock::now().time_since_epoch())
+              .count();
+    finiteDifferenceForceVelJacobian(world);
+    endTime = duration_cast<nanoseconds>(system_clock::now().time_since_epoch())
+                  .count();
+    forceVelFd += endTime - startTime;
+  }
+
+  // Now we need to form and print out a report
+  std::cout << "Benchmark results:" << std::endl;
+
+  long allA = posPosA + posVelA + velPosA + velVelA + forceVelA;
+  long allFd = posPosFd + posVelFd + velPosFd + velVelFd + forceVelFd;
+  double NANOS_TO_MILLIS = 1e-6;
+
+  std::cout << "All Jacs:" << std::endl;
+  std::cout << "   All Jacs  ANALYTICAL: "
+            << ((double)allA * NANOS_TO_MILLIS / numSamples) << "ms"
+            << std::endl;
+  std::cout << "   All Jacs          FD: "
+            << ((double)allFd * NANOS_TO_MILLIS / numSamples) << "ms"
+            << std::endl;
+  std::cout << "   All Jacs FD MULTIPLE: " << ((double)allFd / (double)allA)
+            << "x faster" << std::endl;
+
+  std::cout << "Pos-pos Jac:" << std::endl;
+  std::cout << "   Pos-pos Jac  ANALYTICAL: "
+            << ((double)posPosA * NANOS_TO_MILLIS / numSamples) << "ms"
+            << std::endl;
+  std::cout << "   Pos-pos Jac          FD: "
+            << ((double)posPosFd * NANOS_TO_MILLIS / numSamples) << "ms"
+            << std::endl;
+  std::cout << "   Pos-pos Jac FD MULTIPLE: "
+            << ((double)posPosFd / (double)posPosA) << "x faster" << std::endl;
+
+  std::cout << "Pos-vel Jac:" << std::endl;
+  std::cout << "   Pos-vel Jac  ANALYTICAL: "
+            << ((double)posVelA * NANOS_TO_MILLIS / numSamples) << "ms"
+            << std::endl;
+  std::cout << "   Pos-vel Jac          FD: "
+            << ((double)posVelFd * NANOS_TO_MILLIS / numSamples) << "ms"
+            << std::endl;
+  std::cout << "   Pos-vel Jac FD MULTIPLE: "
+            << ((double)posVelFd / (double)posVelA) << "x faster" << std::endl;
+
+  std::cout << "Vel-pos Jac:" << std::endl;
+  std::cout << "   Vel-pos Jac  ANALYTICAL: "
+            << ((double)velPosA * NANOS_TO_MILLIS / numSamples) << "ms"
+            << std::endl;
+  std::cout << "   Vel-pos Jac          FD: "
+            << ((double)velPosFd * NANOS_TO_MILLIS / numSamples) << "ms"
+            << std::endl;
+  std::cout << "   Vel-pos Jac FD MULTIPLE: "
+            << ((double)velPosFd / (double)velPosA) << "x faster" << std::endl;
+
+  std::cout << "Vel-vel Jac:" << std::endl;
+  std::cout << "   Vel-vel Jac  ANALYTICAL: "
+            << ((double)velVelA * NANOS_TO_MILLIS / numSamples) << "ms"
+            << std::endl;
+  std::cout << "   Vel-vel Jac          FD: "
+            << ((double)velVelFd * NANOS_TO_MILLIS / numSamples) << "ms"
+            << std::endl;
+  std::cout << "   Vel-vel Jac FD MULTIPLE: "
+            << ((double)velVelFd / (double)velVelA) << "x faster" << std::endl;
+
+  std::cout << "Force-vel Jac:" << std::endl;
+  std::cout << "   Force-vel Jac  ANALYTICAL: "
+            << ((double)forceVelA * NANOS_TO_MILLIS / numSamples) << "ms"
+            << std::endl;
+  std::cout << "   Force-vel Jac          FD: "
+            << ((double)forceVelFd * NANOS_TO_MILLIS / numSamples) << "ms"
+            << std::endl;
+  std::cout << "   Force-vel Jac FD MULTIPLE: "
+            << ((double)forceVelFd / (double)forceVelA) << "x faster"
+            << std::endl;
 }
 
 //==============================================================================
@@ -3354,7 +3593,9 @@ BackpropSnapshot::getJacobianOfLCPConstraintMatrixClampingSubset(
   }
   if (wrt == WithRespectTo::VELOCITY || wrt == WithRespectTo::FORCE)
   {
-    return Eigen::MatrixXd::Zero(A_c.cols(), A_c.cols());
+    // TODO(keenon): this was A_c.cols() columns, instead of mNumDOFs, but that
+    // doesn't seem to make dimensional sense. Change this back if things break.
+    return Eigen::MatrixXd::Zero(A_c.cols(), mNumDOFs);
   }
 
   RestorableSnapshot snapshot(world);
@@ -3407,11 +3648,27 @@ BackpropSnapshot::getJacobianOfLCPConstraintMatrixClampingSubset(
                      * (getJacobianOfClampingConstraints(world, rhs)))))))
 
       snapshot.restore();
-      // This is the gradient of the pseudoinverse, see
-      // https://mathoverflow.net/a/29511/163259
-      return -Qinv * dQ(Qinv * b)
-             + Qinv * Qinv.transpose() * dQT((I - Q * Qinv) * b)
-             + (I - Qinv * Q) * dQT(Qinv.transpose() * Qinv * b);
+
+      Eigen::MatrixXd imprecisionMap = I - Q * Qinv;
+
+      // If we were able to precisely invert Q, then let's use the exact inverse
+      // Jacobian, because it's faster to compute
+      if (imprecisionMap.squaredNorm() < 1e-18)
+      {
+        // Note: this formula only asks for the Jacobian of Minv once, instead
+        // of 3 times like the below formula. That's actually a pretty big speed
+        // advantage. When we can, we should use this formula instead.
+        return -Qinv * dQ(Qinv * b);
+      }
+      // Otherwise fall back to the exact Jacobian of the pseudo-inverse
+      else
+      {
+        // This is the gradient of the pseudoinverse, see
+        // https://mathoverflow.net/a/29511/163259
+        return -Qinv * dQ(Qinv * b)
+               + Qinv * Qinv.transpose() * dQT(imprecisionMap * b)
+               + (I - Qinv * Q) * dQT(Qinv.transpose() * Qinv * b);
+      }
 
 #undef dQ
 #undef dQT
@@ -3446,27 +3703,29 @@ BackpropSnapshot::getJacobianOfLCPConstraintMatrixClampingSubset(
 #define dQT(rhs) dQ(rhs)
 
       snapshot.restore();
-      // This is the gradient of the pseudoinverse, see
-      // https://mathoverflow.net/a/29511/163259
-      return -Qinv * dQ(Qinv * b)
-             + Qinv * Qinv.transpose() * dQT((I - Q * Qinv) * b)
-             + (I - Qinv * Q) * dQT(Qinv.transpose() * Qinv * b);
+
+      Eigen::MatrixXd imprecisionMap = I - Q * Qinv;
+
+      // If we were able to precisely invert Q, then let's use the exact inverse
+      // Jacobian, because it's faster to compute
+      if (imprecisionMap.squaredNorm() < 1e-18)
+      {
+        // Note: this formula only asks for the Jacobian of Minv once, instead
+        // of 3 times like the below formula. That's actually a pretty big speed
+        // advantage. When we can, we should use this formula instead.
+        return -Qinv * dQ(Qinv * b);
+      }
+      else
+      {
+        // This is the gradient of the pseudoinverse, see
+        // https://mathoverflow.net/a/29511/163259
+        return -Qinv * dQ(Qinv * b)
+               + Qinv * Qinv.transpose() * dQT(imprecisionMap * b)
+               + (I - Qinv * Q) * dQT(Qinv.transpose() * Qinv * b);
+      }
 
 #undef dQ
 #undef dQT
-
-      /*
-      // The old formula, approximating just the raw inverse, for posterity
-
-      Eigen::MatrixXd innerTerms
-          = getJacobianOfClampingConstraintsTranspose(
-                world, Minv * A_c * Qinv_b)
-            + A_c.transpose()
-                  * (getJacobianOfMinv(world, A_c * Qinv_b, wrt)
-                     + Minv * getJacobianOfClampingConstraints(world, Qinv_b));
-      Eigen::MatrixXd result = -Qfactored.solve(innerTerms);
-      return result;
-      */
     }
   }
   else
@@ -6431,8 +6690,6 @@ const Eigen::VectorXd& BackpropSnapshot::getVectorToAssemble(
     return matrices->getPreStepTorques();
   if (whichVector == VectorToAssemble::PRE_LCP_VEL)
     return matrices->getPreLCPVelocity();
-  if (whichVector == VectorToAssemble::CORIOLIS_AND_GRAVITY_AND_EXTERNAL)
-    return matrices->getCoriolisAndGravityAndExternalForces();
 
   assert(whichVector != VectorToAssemble::CONTACT_CONSTRAINT_MAPPINGS);
   // Control will never reach this point, but this removes a warning

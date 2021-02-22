@@ -19,6 +19,7 @@ dart_add_test("comprehensive" test_CatapultTrajectory)
 dart_add_test("comprehensive" test_AtlasTrajectory)
 dart_add_test("comprehensive" test_HalfCheetahTrajectory)
 dart_add_test("comprehensive" test_KR5Trajectory)
+dart_add_test("comprehensive" test_SaddlepointEscape)
 
 # target_link_libraries(test_Gradients dart-collision-bullet)
 # target_link_libraries(test_Gradients dart-collision-ode)

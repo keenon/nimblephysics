@@ -144,7 +144,8 @@ public:
       simulation::WorldPtr world,
       LossGradient& thisTimestepLoss,
       const std::unordered_map<std::string, LossGradient> nextTimestepLosses,
-      PerformanceLog* perfLog = nullptr);
+      PerformanceLog* perfLog = nullptr,
+      bool exploreAlternateStrategies = false);
 
   /// Returns a concatenated vector of all the Skeletons' position()'s in the
   /// World, in order in which the Skeletons appear in the World's

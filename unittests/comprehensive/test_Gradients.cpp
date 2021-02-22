@@ -318,6 +318,120 @@ TEST(GRADIENTS, BLOCK_ON_GROUND_SLIPPING_FRICTION)
 
 This test sets up a configuration that looks like this:
 
+          +---+
+          |   |
+          +---+
+            * contact
+          +---+
+          |   |
+          +---+
+
+There are a pair of spheres each on a single linear DOF, with the bottom sphere
+pushing the top sphere up.
+
+*/
+void testSphereStack()
+{
+  // World
+  WorldPtr world = World::create();
+
+  std::shared_ptr<SphereShape> sphereShape(
+      new SphereShape(0.5));
+
+  ///////////////////////////////////////////////
+  // Create the sphere A
+  ///////////////////////////////////////////////
+
+  SkeletonPtr sphereA = Skeleton::create("sphereA");
+  std::pair<PrismaticJoint*, BodyNode*> pairA
+      = sphereA->createJointAndBodyNodePair<PrismaticJoint>(nullptr);
+  PrismaticJoint* jointA = pairA.first;
+  BodyNode* bodyA = pairA.second;
+  jointA->setAxis(Eigen::Vector3d::UnitY());
+  bodyA->createShapeNodeWith<VisualAspect, CollisionAspect>(sphereShape);
+  bodyA->setFrictionCoeff(0.0);
+
+  world->addSkeleton(sphereA);
+
+  ///////////////////////////////////////////////
+  // Create the sphere B (on top)
+  ///////////////////////////////////////////////
+
+  SkeletonPtr sphereB = Skeleton::create("sphereB");
+  std::pair<PrismaticJoint*, BodyNode*> pairB
+      = sphereB->createJointAndBodyNodePair<PrismaticJoint>(nullptr);
+  PrismaticJoint* jointB = pairB.first;
+  BodyNode* bodyB = pairB.second;
+  jointB->setAxis(Eigen::Vector3d::UnitY());
+  bodyB->createShapeNodeWith<VisualAspect, CollisionAspect>(sphereShape);
+  bodyB->setFrictionCoeff(0.0);
+
+  sphereB->setForceUpperLimit(0, 0.0);
+  sphereB->setForceLowerLimit(0, 0.0);
+  sphereB->setPosition(0, 1.0 - CONTACT_MARGIN);
+
+  world->addSkeleton(sphereB);
+
+  ///////////////////////////////////////////////
+  // Run the tests
+  ///////////////////////////////////////////////
+
+  VectorXd worldVel = world->getVelocities();
+  worldVel(0) = 0.01;
+  worldVel(1) = -0.005;
+  world->setVelocities(worldVel);
+
+  /*
+  std::shared_ptr<neural::BackpropSnapshot> snapshot = neural::forwardPass(world, true);
+  Eigen::MatrixXd forceVel = snapshot->getForceVelJacobian(world);
+  std::cout << "force-vel" << std::endl << forceVel << std::endl;
+  Eigen::MatrixXd velVel = snapshot->getVelVelJacobian(world);
+  std::cout << "vel-vel" << std::endl << velVel << std::endl;
+  Eigen::MatrixXd A_c = snapshot->getClampingConstraintMatrix(world);
+  std::cout << "A_c" << std::endl << A_c << std::endl;
+  Eigen::MatrixXd A_cc = snapshot->getClampingAMatrix();
+  std::cout << "A_cc" << std::endl << A_cc << std::endl;
+  Eigen::MatrixXd Minv = snapshot->getInvMassMatrix(world);
+  std::cout << "Minv" << std::endl << Minv << std::endl;
+  Eigen::MatrixXd rel = Minv * A_c * A_cc.completeOrthogonalDecomposition().pseudoInverse() * A_c.transpose();
+  std::cout << "rel" << std::endl << rel << std::endl;
+  // We want to push up the top sphere
+  Eigen::VectorXd lossWrtNextVel = Eigen::VectorXd::Zero(2);
+  lossWrtNextVel(1) = 1.0;
+  std::cout << "loss wrt v_t+1" << std::endl << lossWrtNextVel << std::endl;
+  // Here are the resulting other losses
+  Eigen::VectorXd lossWrtForces = A_c.transpose() * lossWrtNextVel;
+  std::cout << "loss wrt f_t" << std::endl << lossWrtForces << std::endl;
+  Eigen::VectorXd lossWrtVel = velVel.transpose() * lossWrtNextVel;
+  std::cout << "loss wrt v_t" << std::endl << lossWrtVel << std::endl;
+  Eigen::VectorXd lossWrtControl = forceVel.transpose() * lossWrtNextVel;
+  std::cout << "loss wrt tau_t" << std::endl << lossWrtControl << std::endl;
+  lossWrtControl(1) = 0.0;
+  std::cout << "clipped loss wrt tau_t" << std::endl << lossWrtControl << std::endl;
+  Eigen::VectorXd lossWrtNextVelRecovered = forceVel * lossWrtControl;
+  std::cout << "loss wrt v_t+1" << std::endl << lossWrtNextVelRecovered << std::endl;
+  Eigen::VectorXd lossThroughLCP = rel.transpose() * lossWrtNextVel;
+  std::cout << "loss wrt v_t through LCP" << std::endl << lossThroughLCP << std::endl;
+  */
+
+  // Test the classic formulation
+  EXPECT_TRUE(verifyAnalyticalJacobians(world));
+  EXPECT_TRUE(verifyVelGradients(world, worldVel));
+  EXPECT_TRUE(verifyAnalyticalBackprop(world));
+  EXPECT_TRUE(verifyWrtMass(world));
+}
+
+#ifdef ALL_TESTS
+TEST(GRADIENTS, SPHERE_STACK)
+{
+  testSphereStack();
+}
+#endif
+
+/******************************************************************************
+
+This test sets up a configuration that looks like this:
+
                 +---+
           +---+ |   |
 Force --> |   | |   | <-- Force

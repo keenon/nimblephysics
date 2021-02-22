@@ -1508,6 +1508,52 @@ bool Skeleton::checkIndexingConsistency() const
 }
 
 //==============================================================================
+/// This returns a square (N x N) matrix, filled with 1s and 0s. This can be
+/// interpreted as:
+///
+/// getParentMap(i,j) == 1: Dof[i] is a parent of Dof[j]
+/// getParentMap(i,j) == 0: Dof[i] is NOT a parent of Dof[j]
+///
+/// This is computed in bulk, and cached in the skeleton.
+const Eigen::MatrixXi& Skeleton::getParentMap()
+{
+  if (mSkelCache.mDirty.mParentMap) {
+    mSkelCache.mParentMap = Eigen::MatrixXi::Zero(getNumDofs(), getNumDofs());
+    for (int row = 0; row < getNumDofs(); row++) {
+      /*
+      dynamics::DegreeOfFreedom* rowDof = getDof(row);
+      for (int col = 0; col < getNumDofs(); col++) {
+        dynamics::DegreeOfFreedom* colDof = getDof(col);
+        if (rowDof->isParentOf(colDof)) {
+          mSkelCache.mParentMap(row, col) = 1;
+        }
+      }
+      */
+      dynamics::DegreeOfFreedom* dof = getDof(row);
+      dynamics::Joint* joint = dof->getJoint();
+      std::vector<dynamics::Joint*> visit;
+      visit.push_back(joint);
+      while (visit.size() > 0) {
+        dynamics::Joint* cursor = visit.back();
+        visit.pop_back();
+
+        dynamics::BodyNode* cursorChildBodyNode = cursor->getChildBodyNode();
+        for (int i = 0; i < cursorChildBodyNode->getNumChildJoints(); i++) {
+          dynamics::Joint* childJoint = cursorChildBodyNode->getChildJoint(i);
+          visit.push_back(childJoint);
+
+          for (int j = 0; j < childJoint->getNumDofs(); j++) {
+            mSkelCache.mParentMap(row, childJoint->getIndexInSkeleton(j)) = 1;
+          }
+        }
+      }
+    }
+    mSkelCache.mDirty.mParentMap = false;
+  }
+  return mSkelCache.mParentMap;
+}
+
+//==============================================================================
 const std::shared_ptr<WholeBodyIK>& Skeleton::getIK(bool _createIfNull)
 {
   if (nullptr == mWholeBodyIK && _createIfNull)
@@ -1591,14 +1637,18 @@ Eigen::MatrixXd Skeleton::getUnconstrainedVelJacobianWrt(
     double dt, neural::WithRespectTo* wrt)
 {
   Eigen::VectorXd tau = getForces();
-  Eigen::VectorXd C = getCoriolisAndGravityForces() + getExternalForces();
-
-  Eigen::MatrixXd dM = getJacobianOfMinv(dt * (tau - C), wrt);
+  Eigen::VectorXd C = getCoriolisAndGravityForces() - getExternalForces();
 
   Eigen::MatrixXd Minv = getInvMassMatrix();
   Eigen::MatrixXd dC = getJacobianOfC(wrt);
 
-  return dM - Minv * dt * dC;
+  if (wrt == neural::WithRespectTo::POSITION) {
+    Eigen::MatrixXd dM = getJacobianOfMinv(dt * (tau - C), wrt);
+    return dM - Minv * dt * dC;
+  }
+  else {
+    return -Minv * dt * dC;
+  }
 }
 
 //==============================================================================
@@ -1618,7 +1668,7 @@ Eigen::MatrixXd Skeleton::finiteDifferenceJacobianOfC(
   Eigen::VectorXd start = wrt->get(this);
 
   // Get baseline C(pos, vel)
-  Eigen::VectorXd baseline = getCoriolisAndGravityForces();
+  Eigen::VectorXd baseline = getCoriolisAndGravityForces() - getExternalForces();
 
   double EPS = 1e-7;
 
@@ -1627,11 +1677,11 @@ Eigen::MatrixXd Skeleton::finiteDifferenceJacobianOfC(
     Eigen::VectorXd tweaked = start;
     tweaked(i) += EPS;
     wrt->set(this, tweaked);
-    Eigen::VectorXd perturbedPos = getCoriolisAndGravityForces();
+    Eigen::VectorXd perturbedPos = getCoriolisAndGravityForces() - getExternalForces();
     tweaked = start;
     tweaked(i) -= EPS;
     wrt->set(this, tweaked);
-    Eigen::VectorXd perturbedNeg = getCoriolisAndGravityForces();
+    Eigen::VectorXd perturbedNeg = getCoriolisAndGravityForces() - getExternalForces();
 
     J.col(i) = (perturbedPos - perturbedNeg) / (2 * EPS);
   }
@@ -1654,16 +1704,20 @@ Eigen::MatrixXd Skeleton::finiteDifferenceJacobianOfMinv(
   // Get baseline C(pos, vel)
   Eigen::VectorXd baseline = multiplyByImplicitInvMassMatrix(f);
 
-  double EPS = 1e-7;
+  double EPS = 5e-7;
 
   for (std::size_t i = 0; i < m; i++)
   {
     Eigen::VectorXd tweaked = start;
     tweaked(i) += EPS;
     wrt->set(this, tweaked);
-    Eigen::VectorXd perturbed = multiplyByImplicitInvMassMatrix(f);
+    Eigen::VectorXd plus = multiplyByImplicitInvMassMatrix(f);
+    tweaked = start;
+    tweaked(i) -= EPS;
+    wrt->set(this, tweaked);
+    Eigen::VectorXd minus = multiplyByImplicitInvMassMatrix(f);
 
-    J.col(i) = (perturbed - baseline) / EPS;
+    J.col(i) = (plus - minus) / (2 * EPS);
   }
 
   // Reset everything how we left it
@@ -4961,6 +5015,7 @@ Skeleton::DirtyFlags::DirtyFlags()
     mExternalForces(true),
     mDampingForces(true),
     mSupport(true),
+    mParentMap(true),
     mSupportVersion(0)
 {
   // Do nothing
