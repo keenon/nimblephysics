@@ -1722,6 +1722,40 @@ void Skeleton::DiffMinv::print()
 Eigen::MatrixXd Skeleton::getJacobianOfMinv(
     const Eigen::VectorXd& f, neural::WithRespectTo* wrt)
 {
+  return getJacobianOfMinv_ID(f, wrt);
+//  return getJacobianOfMinv_Direct(f, wrt);
+}
+
+//==============================================================================
+Eigen::MatrixXd Skeleton::getJacobianOfMinv_ID(
+    const Eigen::VectorXd& f, neural::WithRespectTo* wrt)
+{
+  (void)f;
+  const int dofs = static_cast<int>(getNumDofs());
+  Eigen::MatrixXd DMinvX_Dp = Eigen::MatrixXd::Zero(dofs, dofs);
+
+  if (wrt == neural::WithRespectTo::VELOCITY
+      || wrt == neural::WithRespectTo::FORCE)
+  {
+    return DMinvX_Dp;
+  }
+
+  const auto Minv = getInvMassMatrix();
+
+  const auto DC_Dq = getJacobianOfC(wrt);
+
+  for (auto i = 0; i < dofs; ++i) {
+    DMinvX_Dp.col(i).noalias() = Minv * DC_Dq.col(i);
+  }
+
+  return DMinvX_Dp;
+}
+
+//==============================================================================
+/// This gives the unconstrained Jacobian of M^{-1}f
+Eigen::MatrixXd Skeleton::getJacobianOfMinv_Direct(
+    const Eigen::VectorXd& f, neural::WithRespectTo* wrt)
+{
   const int dofs = static_cast<int>(getNumDofs());
   Eigen::MatrixXd DMinvX_Dp = Eigen::MatrixXd::Zero(dofs, dofs);
 

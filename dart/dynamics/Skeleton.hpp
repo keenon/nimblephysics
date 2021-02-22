@@ -629,6 +629,12 @@ public:
   Eigen::MatrixXd getJacobianOfMinv(
       const Eigen::VectorXd& f, neural::WithRespectTo* wrt);
 
+  Eigen::MatrixXd getJacobianOfMinv_ID(
+      const Eigen::VectorXd& f, neural::WithRespectTo* wrt);
+
+  Eigen::MatrixXd getJacobianOfMinv_Direct(
+      const Eigen::VectorXd& f, neural::WithRespectTo* wrt);
+
   /// VERY SLOW: Only for testing. This computes the unconstrained Jacobian
   /// giving the difference in C(pos, vel) for finite changes
   Eigen::MatrixXd finiteDifferenceJacobianOfC(neural::WithRespectTo* wrt);
