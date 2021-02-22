@@ -556,6 +556,32 @@ bool DegreeOfFreedom::isParentOf(const DegreeOfFreedom* target) const
 }
 
 //==============================================================================
+/// This uses the cached version, stored on the parent Skeleton, to return the same value as isParentOf()
+bool DegreeOfFreedom::isParentOfFast(const DegreeOfFreedom* target) const
+{
+  const dynamics::Joint* parentJoint = getJoint();
+  const dynamics::Joint* childJoint = target->getJoint();
+  if (parentJoint == childJoint)
+  {
+    // For multi-DOF joints, each axis affects all the others.
+    return target->getIndexInJoint() != getIndexInJoint();
+  }
+  // If these joints aren't in the same skeleton, or aren't in the same tree
+  // within that skeleton, this is trivially false
+  if (parentJoint->getSkeleton()->getName()
+          != childJoint->getSkeleton()->getName()
+      || parentJoint->getTreeIndex() != childJoint->getTreeIndex())
+    return false;
+
+  bool result = const_cast<dynamics::Skeleton*>(parentJoint->getSkeleton().get())->getParentMap()(getIndexInSkeleton(), target->getIndexInSkeleton()) == 1;
+  #ifndef NDEBUG
+  bool slowResult = isParentOf(target);
+  assert(result == slowResult);
+  #endif
+  return result;
+}
+
+//==============================================================================
 bool DegreeOfFreedom::isParentOf(const BodyNode* target) const
 {
   const dynamics::Joint* dofJoint = getJoint();
@@ -602,6 +628,63 @@ bool DegreeOfFreedom::isParentOf(const BodyNode* target) const
       return false;
     nodeParentJoint = nodeParentJoint->getParentBodyNode()->getParentJoint();
   }
+}
+
+//==============================================================================
+/// This uses the cached version, stored on the parent Skeleton, to return the same value as isParentOf()
+bool DegreeOfFreedom::isParentOfFast(const BodyNode* target) const
+{
+  const dynamics::Joint* dofJoint = getJoint();
+  const dynamics::Joint* nodeParentJoint = target->getParentJoint();
+
+  // If our immediate parent is a weld joint, keep walking up the tree until we
+  // find a normal joint. If there are none, then return false.
+  while (nodeParentJoint->getNumDofs() == 0)
+  {
+    if (nodeParentJoint->getParentBodyNode() != nullptr
+        && nodeParentJoint->getParentBodyNode()->getParentJoint() != nullptr)
+    {
+      nodeParentJoint = nodeParentJoint->getParentBodyNode()->getParentJoint();
+    }
+    else
+    {
+      return false;
+    }
+  }
+  // Edge cases
+  if (nodeParentJoint == nullptr || dofJoint->getSkeleton() == nullptr
+      || nodeParentJoint->getSkeleton() == nullptr
+      || dofJoint->getNumDofs() == 0)
+  {
+    return false;
+  }
+  // If these joints aren't in the same skeleton, or aren't in the same tree
+  // within that skeleton, this is trivially false
+  if (dofJoint->getSkeleton()->getName()
+          != nodeParentJoint->getSkeleton()->getName()
+      || dofJoint->getTreeIndex() != nodeParentJoint->getTreeIndex())
+    return false;
+  if (nodeParentJoint->getName() == dofJoint->getName())
+    return true;
+
+  bool result = const_cast<dynamics::Skeleton*>(nodeParentJoint->getSkeleton().get())->getParentMap()(getIndexInSkeleton(), nodeParentJoint->getIndexInSkeleton(0)) == 1;
+
+  #ifndef NDEBUG
+  bool slowResult = isParentOf(target);
+  if (result != slowResult) {
+    Eigen::MatrixXi parentMap = const_cast<dynamics::Skeleton*>(nodeParentJoint->getSkeleton().get())->getParentMap();
+    int myIndex = getIndexInSkeleton();
+    int childIndex = nodeParentJoint->getIndexInSkeleton(0);
+    std::cout << "Parent map: " << std::endl << parentMap << std::endl;
+    std::cout << "My index: " << myIndex << std::endl;
+    std::cout << "Child index: " << childIndex << std::endl;
+    std::cout << "Slow result: " << slowResult << std::endl;
+    std::cout << "Fast result: " << result << std::endl;
+    slowResult = isParentOf(target);
+  }
+  assert(result == slowResult);
+  #endif
+  return result;
 }
 
 //==============================================================================

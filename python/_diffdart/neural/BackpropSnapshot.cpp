@@ -64,7 +64,8 @@ void BackpropSnapshot(py::module& m)
           ::py::arg("world"),
           ::py::arg("thisTimestepLoss"),
           ::py::arg("nextTimestepLoss"),
-          ::py::arg("perfLog") = nullptr)
+          ::py::arg("perfLog") = nullptr,
+          ::py::arg("exploreAlternateStrategies") = false)
       .def(
           "getVelVelJacobian",
           &dart::neural::BackpropSnapshot::getVelVelJacobian,
@@ -133,7 +134,12 @@ void BackpropSnapshot(py::module& m)
           "finiteDifferenceVelPosJacobian",
           &dart::neural::BackpropSnapshot::finiteDifferenceVelPosJacobian,
           ::py::arg("world"),
-          ::py::arg("subdivisions"));
+          ::py::arg("subdivisions"))
+      .def(
+          "benchmarkJacobians",
+          &dart::neural::BackpropSnapshot::benchmarkJacobians,
+          ::py::arg("world"),
+          ::py::arg("numSamples"));
 }
 
 } // namespace python

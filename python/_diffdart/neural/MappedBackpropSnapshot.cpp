@@ -51,7 +51,8 @@ void MappedBackpropSnapshot(py::module& m)
           ::py::arg("world"),
           ::py::arg("thisTimestepLoss"),
           ::py::arg("nextTimestepLosses"),
-          ::py::arg("perfLog") = nullptr)
+          ::py::arg("perfLog") = nullptr,
+          ::py::arg("exploreAlternateStrategies") = false)
       .def(
           "getRepresentation",
           &dart::neural::MappedBackpropSnapshot::getRepresentation)

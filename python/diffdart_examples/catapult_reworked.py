@@ -5,7 +5,7 @@ import random
 import math
 import time
 import diffdart as dart
-from diffdart import DartTorchLossFn, DartTorchTrajectoryRollout, DartGUI
+from diffdart import DartTorchLossFn, DartTorchTrajectoryRollout, DartGUI, GUITrajectoryTrainer
 
 
 def main():
@@ -22,6 +22,7 @@ def main():
   projectileVisual = projectileShape.createVisualAspect()
   projectileShape.createCollisionAspect()
   projectileVisual.setColor([0.7, 0.7, 0.7])
+  projectileVisual.setCastShadows(False)
   projectileJoint.setForceUpperLimit(0, 0)
   projectileJoint.setForceLowerLimit(0, 0)
   projectileJoint.setForceUpperLimit(1, 0)
@@ -88,9 +89,11 @@ def main():
   floorOffset = dart.math.Isometry3()
   floorOffset.set_translation([1.2, -0.7, 0])
   floorJoint.setTransformFromParentBodyNode(floorOffset)
-  floorShape = floorBody.createShapeNode(dart.dynamics.BoxShape([3.5, 0.25, .5]))
-  floorVisual = floorShape.createVisualAspect()
+  floorShape: dart.dynamics.ShapeNode = floorBody.createShapeNode(dart.dynamics.BoxShape(
+      [3.5, 0.25, .5]))
+  floorVisual: dart.dynamics.VisualAspect = floorShape.createVisualAspect()
   floorVisual.setColor([0.5, 0.5, 0.5])
+  floorVisual.setCastShadows(False)
   floorShape.createCollisionAspect()
 
   world.addSkeleton(floor)
@@ -125,47 +128,50 @@ def main():
 
   trajectory = dart.trajectory.MultiShot(world, dartLoss, 500, 20, False)
   trajectory.setParallelOperationsEnabled(True)
-  trajectory.setExploreAlternateStrategies(False)
 
   optimizer = dart.trajectory.IPOptOptimizer()
   optimizer.setLBFGSHistoryLength(5)
   optimizer.setTolerance(1e-4)
   optimizer.setCheckDerivatives(False)
   optimizer.setIterationLimit(500)
-  optimizer.setRecordPerformanceLog(True)
-  result: dart.trajectory.Solution = optimizer.optimize(trajectory)
+  # result: dart.trajectory.Solution = optimizer.optimize(trajectory)
 
-  # Set up a GUI
-  gui = DartGUI()
-  gui.serve(8080)
-  gui.stateMachine().renderWorld(world, "world")
-  rollout: dart.trajectory.TrajectoryRollout = result.getStep(
-      result.getNumSteps() - 1).rollout
-  poses = rollout.getPoses()
-  vels = rollout.getVels()
-  gui.stateMachine().renderTrajectoryLines(world, poses)
-  world.setPositions(poses[:, 0])
+  trainer = GUITrajectoryTrainer(world, trajectory, optimizer)
+  trainer.train(True)
 
-  ticker = dart.realtime.Ticker(world.getTimeStep())
-
-  i = 0
-
-  def onTick(now):
-    nonlocal i
-    world.setPositions(poses[:, i])
-    # world.setVelocities(vels[:, i])
+  """
+    # Set up a GUI
+    gui = DartGUI()
+    gui.serve(8080)
     gui.stateMachine().renderWorld(world, "world")
-    i += 1
-    if i >= poses.shape[1]:
-      i = 0
+    rollout: dart.trajectory.TrajectoryRollout = result.getStep(
+        result.getNumSteps() - 1).rollout
+    poses = rollout.getPoses()
+    vels = rollout.getVels()
+    gui.stateMachine().renderTrajectoryLines(world, poses)
+    world.setPositions(poses[:, 0])
 
-  def onConnect():
-    ticker.start()
-  ticker.registerTickListener(onTick)
-  gui.stateMachine().registerConnectionListener(onConnect)
+    ticker = dart.realtime.Ticker(world.getTimeStep())
 
-  while gui.stateMachine().isServing():
-    pass
+    i = 0
+
+    def onTick(now):
+        nonlocal i
+        world.setPositions(poses[:, i])
+        # world.setVelocities(vels[:, i])
+        gui.stateMachine().renderWorld(world, "world")
+        i += 1
+        if i >= poses.shape[1]:
+            i = 0
+
+    def onConnect():
+        ticker.start()
+    ticker.registerTickListener(onTick)
+    gui.stateMachine().registerConnectionListener(onConnect)
+
+    while gui.stateMachine().isServing():
+        pass
+    """
 
 
 if __name__ == "__main__":
