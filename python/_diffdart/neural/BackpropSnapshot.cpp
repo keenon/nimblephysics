@@ -134,7 +134,12 @@ void BackpropSnapshot(py::module& m)
           "finiteDifferenceVelPosJacobian",
           &dart::neural::BackpropSnapshot::finiteDifferenceVelPosJacobian,
           ::py::arg("world"),
-          ::py::arg("subdivisions"));
+          ::py::arg("subdivisions"))
+      .def(
+          "benchmarkJacobians",
+          &dart::neural::BackpropSnapshot::benchmarkJacobians,
+          ::py::arg("world"),
+          ::py::arg("numSamples"));
 }
 
 } // namespace python

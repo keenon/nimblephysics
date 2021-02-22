@@ -94,7 +94,7 @@ def main():
     last_pos_y = pos[1, -1]
     last_vel_y = vel[1, -1]
     final_loss = - 100 * torch.square(last_pos_y) * torch.sign(last_pos_y)
-    return step_loss + final_loss
+    return final_loss
   dartLoss: dart.trajectory.LossFn = DartTorchLossFn(loss)
 
   trajectory = dart.trajectory.MultiShot(world, dartLoss, 400, 20, False)

@@ -125,13 +125,15 @@ def main():
 
   trajectory = dart.trajectory.MultiShot(world, dartLoss, 500, 20, False)
   trajectory.setParallelOperationsEnabled(True)
+  trajectory.setExploreAlternateStrategies(False)
 
   optimizer = dart.trajectory.IPOptOptimizer()
   optimizer.setLBFGSHistoryLength(5)
   optimizer.setTolerance(1e-4)
   optimizer.setCheckDerivatives(False)
   optimizer.setIterationLimit(500)
-  result = optimizer.optimize(trajectory)
+  optimizer.setRecordPerformanceLog(True)
+  result: dart.trajectory.Solution = optimizer.optimize(trajectory)
 
   # Set up a GUI
   gui = DartGUI()
