@@ -29,6 +29,7 @@
 #include "dart/trajectory/Solution.hpp"
 #include "dart/trajectory/TrajectoryConstants.hpp"
 #include "dart/trajectory/TrajectoryRollout.hpp"
+#include "dart/utils/UniversalLoader.hpp"
 
 #include "GradientTestUtils.hpp"
 #include "TestHelpers.hpp"
@@ -287,5 +288,75 @@ static void BM_Jumpworm_Finite_Difference(benchmark::State& state)
 };
 // Register the function as a benchmark
 BENCHMARK(BM_Jumpworm_Finite_Difference);
+
+static void BM_Atlas(benchmark::State& state)
+{
+  // Create a world
+  std::shared_ptr<simulation::World> world = simulation::World::create();
+
+  // Set gravity of the world
+  world->setGravity(Eigen::Vector3d(0.0, -9.81, 0.0));
+
+  std::shared_ptr<dynamics::Skeleton> atlas
+      = dart::utils::UniversalLoader::loadSkeleton(
+          world.get(), "dart://sample/sdf/atlas/atlas_v3_no_head.sdf");
+  std::shared_ptr<dynamics::Skeleton> ground
+      = dart::utils::UniversalLoader::loadSkeleton(
+          world.get(), "dart://sample/sdf/atlas/ground.urdf");
+  ground->getBodyNode(0)->getShapeNode(0)->getVisualAspect()->setCastShadows(
+      false);
+
+  // Set initial configuration for Atlas robot
+  atlas->setPosition(0, -0.5 * dart::math::constantsd::pi());
+  atlas->setPosition(4, -0.01);
+
+  for (auto _ : state)
+  {
+    std::shared_ptr<BackpropSnapshot> snapshot
+        = neural::forwardPass(world, true);
+    snapshot->getPosPosJacobian(world);
+    snapshot->getPosVelJacobian(world);
+    snapshot->getVelVelJacobian(world);
+    snapshot->getVelPosJacobian(world);
+    snapshot->getForceVelJacobian(world);
+  }
+};
+// Register the function as a benchmark
+BENCHMARK(BM_Atlas);
+
+static void BM_Atlas_Finite_Difference(benchmark::State& state)
+{
+  // Create a world
+  std::shared_ptr<simulation::World> world = simulation::World::create();
+
+  // Set gravity of the world
+  world->setGravity(Eigen::Vector3d(0.0, -9.81, 0.0));
+
+  std::shared_ptr<dynamics::Skeleton> atlas
+      = dart::utils::UniversalLoader::loadSkeleton(
+          world.get(), "dart://sample/sdf/atlas/atlas_v3_no_head.sdf");
+  std::shared_ptr<dynamics::Skeleton> ground
+      = dart::utils::UniversalLoader::loadSkeleton(
+          world.get(), "dart://sample/sdf/atlas/ground.urdf");
+  ground->getBodyNode(0)->getShapeNode(0)->getVisualAspect()->setCastShadows(
+      false);
+
+  // Set initial configuration for Atlas robot
+  atlas->setPosition(0, -0.5 * dart::math::constantsd::pi());
+  atlas->setPosition(4, -0.01);
+
+  for (auto _ : state)
+  {
+    std::shared_ptr<BackpropSnapshot> snapshot
+        = neural::forwardPass(world, true);
+    snapshot->finiteDifferencePosPosJacobian(world);
+    snapshot->finiteDifferencePosVelJacobian(world);
+    snapshot->finiteDifferenceVelVelJacobian(world);
+    snapshot->finiteDifferenceVelPosJacobian(world);
+    snapshot->finiteDifferenceForceVelJacobian(world);
+  }
+};
+// Register the function as a benchmark
+BENCHMARK(BM_Atlas_Finite_Difference);
 
 BENCHMARK_MAIN();
