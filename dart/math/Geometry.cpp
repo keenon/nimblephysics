@@ -1605,6 +1605,71 @@ Eigen::Matrix3d eulerZYZToMatrix(const Eigen::Vector3d& _angle)
   return ret;
 }
 
+//==============================================================================
+Eigen::Matrix3d so3LeftJacobian(const Eigen::Vector3d& w)
+{
+  return expMapJac(w);
+}
+
+//==============================================================================
+Eigen::Matrix3d so3RightJacobian(const Eigen::Vector3d& w)
+{
+  const double theta = w.norm();
+
+  Eigen::Matrix3d J = Eigen::Matrix3d::Zero();
+  const Eigen::Matrix3d qss = math::makeSkewSymmetric(w);
+  const Eigen::Matrix3d qss2 = qss * qss;
+
+  if (theta < EPSILON_EXPMAP_THETA)
+    J = Eigen::Matrix3d::Identity() - 0.5 * qss + (1.0 / 6.0) * qss2;
+  else
+    J = Eigen::Matrix3d::Identity() - ((1 - cos(theta)) / (theta * theta)) * qss
+        + ((theta - sin(theta)) / (theta * theta * theta)) * qss2;
+
+  return J;
+}
+
+//==============================================================================
+Eigen::Matrix3d so3LeftJacobianTimeDeriv(
+    const Eigen::Vector3d& q, const Eigen::Vector3d& dq)
+{
+  return expMapJacDot(q, dq);
+}
+
+//==============================================================================
+Eigen::Matrix3d so3RightJacobianTimeDeriv(
+    const Eigen::Vector3d& q, const Eigen::Vector3d& dq)
+{
+  const double theta = q.norm();
+
+  Eigen::Matrix3d Jdot = Eigen::Matrix3d::Zero();
+  const Eigen::Matrix3d qss = math::makeSkewSymmetric(q);
+  const Eigen::Matrix3d qss2 = qss * qss;
+  const Eigen::Matrix3d qdss = math::makeSkewSymmetric(dq);
+  const double ttdot = q.dot(dq); // theta*thetaDot
+  const double st = sin(theta);
+  const double ct = cos(theta);
+  const double t2 = theta * theta;
+  const double t3 = t2 * theta;
+  const double t4 = t3 * theta;
+  const double t5 = t4 * theta;
+
+  if (theta < EPSILON_EXPMAP_THETA)
+  {
+    Jdot = -0.5 * qdss + (1.0 / 6.0) * (qss * qdss + qdss * qss);
+    Jdot += (1.0 / 12) * ttdot * qss + (-1.0 / 60) * ttdot * qss2;
+  }
+  else
+  {
+    Jdot = -((1 - ct) / t2) * qdss
+           + ((theta - st) / t3) * (qss * qdss + qdss * qss);
+    Jdot += -((theta * st + 2 * ct - 2) / t4) * ttdot * qss
+            + ((3 * st - theta * ct - 2 * theta) / t5) * ttdot * qss2;
+  }
+
+  return Jdot;
+}
+
 // R = Exp(w)
 // p = sin(t) / t*v + (t - sin(t)) / t^3*<w, v>*w + (1 - cos(t)) / t^2*(w X v)
 // , when S = (w, v), t = |w|

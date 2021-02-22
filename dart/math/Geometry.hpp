@@ -159,6 +159,25 @@ Eigen::Vector3d matrixToEulerZYX(const Eigen::Matrix3d& _R);
 // Eigen::Vector3d matrixToEulerZYZ(const Eigen::Matrix3d& R);
 
 //------------------------------------------------------------------------------
+
+/// Returns the Jacobian of an SO(3) element w.r.t. its exponential
+/// coordinates where the Jacobian maps the time derivative of the exponential
+/// coordinates to the angular velocity in the world frame.
+Eigen::Matrix3d so3LeftJacobian(const Eigen::Vector3d& w);
+
+/// Returns the Jacobian of an SO(3) element w.r.t. its exponential
+/// coordinates where the Jacobian maps the time derivative of the exponential
+/// coordinates to the angular velocity in the body frame.
+Eigen::Matrix3d so3RightJacobian(const Eigen::Vector3d& w);
+
+/// Returns the time derivative of the left Jacobian of SO(3).
+Eigen::Matrix3d so3LeftJacobianTimeDeriv(
+    const Eigen::Vector3d& q, const Eigen::Vector3d& dq);
+
+/// Returns the time derivative of the right Jacobian of SO(3).
+Eigen::Matrix3d so3RightJacobianTimeDeriv(
+    const Eigen::Vector3d& q, const Eigen::Vector3d& dq);
+
 /// \brief Exponential mapping
 Eigen::Isometry3d expMap(const Eigen::Vector6d& _S);
 

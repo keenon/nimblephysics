@@ -3,6 +3,7 @@ set -e
 
 VERSION=$(cat ../../../VERSION.txt)
 GIT_HASH=$(git log --pretty=format:'%H' -n 1)
+echo "Testing commit: $GIT_HASH"
 docker build . --build-arg VERSION=${VERSION} --build-arg GIT_HASH=${GIT_HASH}
 IMAGE_ID=$(docker images | awk '{print $3}' | awk 'NR==2')
 echo "Build image ID $IMAGE_ID"

@@ -326,14 +326,10 @@ TEST_F(JOINTS, TRANSLATIONAL_JOINT_2D)
 #endif
 
 // 3-dof joint
-//TEST_F(JOINTS, BALL_JOINT)
-//{
-//  kinematicsTest<BallJoint>();
-//}
-// TODO(JS): Disabled the test compares analytical Jacobian and numerical
-// Jacobian since the meaning of BallJoint Jacobian is changed per
-// we now use angular velocity and angular accertions as BallJoint's generalized
-// velocities and accelerations, repectively.
+TEST_F(JOINTS, BALL_JOINT)
+{
+  kinematicsTest<BallJoint>();
+}
 
 // 3-dof joint
 #ifdef ALL_TESTS
