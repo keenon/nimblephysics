@@ -2651,11 +2651,27 @@ BackpropSnapshot::getJacobianOfLCPConstraintMatrixClampingSubset(
                      * (getJacobianOfClampingConstraints(world, rhs)))))))
 
       snapshot.restore();
-      // This is the gradient of the pseudoinverse, see
-      // https://mathoverflow.net/a/29511/163259
-      return -Qinv * dQ(Qinv * b)
-             + Qinv * Qinv.transpose() * dQT((I - Q * Qinv) * b)
-             + (I - Qinv * Q) * dQT(Qinv.transpose() * Qinv * b);
+
+      Eigen::MatrixXd imprecisionMap = I - Q * Qinv;
+
+      // If we were able to precisely invert Q, then let's use the exact inverse
+      // Jacobian, because it's faster to compute
+      if (imprecisionMap.squaredNorm() < 1e-18)
+      {
+        // Note: this formula only asks for the Jacobian of Minv once, instead
+        // of 3 times like the below formula. That's actually a pretty big speed
+        // advantage. When we can, we should use this formula instead.
+        return -Qinv * dQ(Qinv * b);
+      }
+      // Otherwise fall back to the exact Jacobian of the pseudo-inverse
+      else
+      {
+        // This is the gradient of the pseudoinverse, see
+        // https://mathoverflow.net/a/29511/163259
+        return -Qinv * dQ(Qinv * b)
+               + Qinv * Qinv.transpose() * dQT(imprecisionMap * b)
+               + (I - Qinv * Q) * dQT(Qinv.transpose() * Qinv * b);
+      }
 
 #undef dQ
 #undef dQT
@@ -2690,27 +2706,29 @@ BackpropSnapshot::getJacobianOfLCPConstraintMatrixClampingSubset(
 #define dQT(rhs) dQ(rhs)
 
       snapshot.restore();
-      // This is the gradient of the pseudoinverse, see
-      // https://mathoverflow.net/a/29511/163259
-      return -Qinv * dQ(Qinv * b)
-             + Qinv * Qinv.transpose() * dQT((I - Q * Qinv) * b)
-             + (I - Qinv * Q) * dQT(Qinv.transpose() * Qinv * b);
+
+      Eigen::MatrixXd imprecisionMap = I - Q * Qinv;
+
+      // If we were able to precisely invert Q, then let's use the exact inverse
+      // Jacobian, because it's faster to compute
+      if (imprecisionMap.squaredNorm() < 1e-18)
+      {
+        // Note: this formula only asks for the Jacobian of Minv once, instead
+        // of 3 times like the below formula. That's actually a pretty big speed
+        // advantage. When we can, we should use this formula instead.
+        return -Qinv * dQ(Qinv * b);
+      }
+      else
+      {
+        // This is the gradient of the pseudoinverse, see
+        // https://mathoverflow.net/a/29511/163259
+        return -Qinv * dQ(Qinv * b)
+               + Qinv * Qinv.transpose() * dQT(imprecisionMap * b)
+               + (I - Qinv * Q) * dQT(Qinv.transpose() * Qinv * b);
+      }
 
 #undef dQ
 #undef dQT
-
-      /*
-      // The old formula, approximating just the raw inverse, for posterity
-
-      Eigen::MatrixXd innerTerms
-          = getJacobianOfClampingConstraintsTranspose(
-                world, Minv * A_c * Qinv_b)
-            + A_c.transpose()
-                  * (getJacobianOfMinv(world, A_c * Qinv_b, wrt)
-                     + Minv * getJacobianOfClampingConstraints(world, Qinv_b));
-      Eigen::MatrixXd result = -Qfactored.solve(innerTerms);
-      return result;
-      */
     }
   }
   else

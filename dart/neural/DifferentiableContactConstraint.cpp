@@ -1281,9 +1281,12 @@ DifferentiableContactConstraint::getScrewAxisForForceGradient_Optimized(
       return ballJoint->getScrewAxisGradientForForce(axisIndex, rotateIndex);
     }
   }
-  // General case:
-  if (!rotateDof->isParentOfFast(screwDof))
-    return Eigen::Vector6d::Zero();
+  // In the optimized version of this code, we ensure that we only call this
+  // method if we know that the rotateDof is a parent of the screwDof
+
+#ifndef NDEBUG
+  assert(rotateDof->isParentOf(screwDof));
+#endif
 
   Eigen::Vector6d rotateWorldTwist = getWorldScrewAxisForPosition(rotateDof);
   return math::ad(rotateWorldTwist, axisWorldTwist);
@@ -1434,9 +1437,48 @@ Eigen::MatrixXd DifferentiableContactConstraint::getConstraintForcesJacobian(
     int dim = world->getNumDofs();
     math::Jacobian forceJac = getContactForceJacobian(world);
     Eigen::Vector6d force = getWorldForce();
+    std::vector<dynamics::DegreeOfFreedom*> dofs = world->getDofs();
+
+    ////////////////////////////////////////////////////////////////////
+    // Compute a slow, but known to be correct version
+    ////////////////////////////////////////////////////////////////////
+
+#ifndef NDEBUG
+    Eigen::MatrixXd slowJacCache = Eigen::MatrixXd::Zero(dim, dim);
+    for (int row = 0; row < dim; row++)
+    {
+      double multiple = getForceMultiple(dofs[row]);
+      if (multiple == 0.0)
+        continue;
+
+      Eigen::Vector6d axis = getWorldScrewAxisForForce(dofs[row]);
+
+      for (int wrt = 0; wrt < dim; wrt++)
+      {
+        // Anything that goes in this inner loop is called O(n^2 * C), where n
+        // is the number of DOFs, and c is the number of contacts. For something
+        // like Atlas, with a lot of contacts and a lot of joints, this gets
+        // called A LOT. So it's very important that this be fast.
+
+        Eigen::Vector6d screwAxisGradient
+            = getScrewAxisForForceGradient(dofs[row], dofs[wrt]);
+        Eigen::Vector6d forceGradient = forceJac.col(wrt);
+        slowJacCache(row, wrt)
+            = multiple
+              * (screwAxisGradient.dot(force) + axis.dot(forceGradient));
+      }
+    }
+#endif
+
+    ////////////////////////////////////////////////////////////////////
+    // </slow version>
+    ////////////////////////////////////////////////////////////////////
+
+    ////////////////////////////////////////////////////////////////////
+    // Compute the same thing, but hopefully faster
+    ////////////////////////////////////////////////////////////////////
 
     mWorldConstraintJacCache = Eigen::MatrixXd::Zero(dim, dim);
-    std::vector<dynamics::DegreeOfFreedom*> dofs = world->getDofs();
     for (int row = 0; row < dim; row++)
     {
       double multiple = getForceMultiple(dofs[row]);
@@ -1446,6 +1488,52 @@ Eigen::MatrixXd DifferentiableContactConstraint::getConstraintForcesJacobian(
       Eigen::Vector6d axis = getWorldScrewAxisForForce(dofs[row]);
       Eigen::Vector6d axisWorldTwist = getWorldScrewAxisForForce(dofs[row]);
 
+      // Each element [i] of this vector is the forceJac col(i) dotted with
+      // axis.
+      mWorldConstraintJacCache.row(row)
+          = multiple * forceJac.transpose() * axis;
+
+      dynamics::Joint* jointCursor = dofs[row]->getJoint();
+
+      // Include all the DOFs in this joint, if it's a FreeJoint or BallJoint
+      if (jointCursor->getType() != dynamics::FreeJoint::getStaticType()
+          && jointCursor->getType() != dynamics::BallJoint::getStaticType())
+      {
+        dynamics::BodyNode* cursorParentBody = jointCursor->getParentBodyNode();
+        if (cursorParentBody != nullptr)
+        {
+          jointCursor = cursorParentBody->getParentJoint();
+        }
+        else
+        {
+          jointCursor = nullptr;
+        }
+      }
+
+      while (jointCursor != nullptr)
+      {
+        for (int i = 0; i < jointCursor->getNumDofs(); i++)
+        {
+          int wrt = jointCursor->getIndexInSkeleton(i)
+                    + world->getSkeletonDofOffset(jointCursor->getSkeleton());
+          Eigen::Vector6d screwAxisGradient
+              = getScrewAxisForForceGradient_Optimized(
+                  dofs[row], dofs[wrt], axisWorldTwist);
+          mWorldConstraintJacCache(row, wrt)
+              += multiple * screwAxisGradient.dot(force);
+        }
+        dynamics::BodyNode* cursorParentBody = jointCursor->getParentBodyNode();
+        if (cursorParentBody != nullptr)
+        {
+          jointCursor = cursorParentBody->getParentJoint();
+        }
+        else
+        {
+          jointCursor = nullptr;
+        }
+      }
+
+      /*
       for (int wrt = 0; wrt < dim; wrt++)
       {
         // Anything that goes in this inner loop is called O(n^2 * C), where n
@@ -1461,7 +1549,25 @@ Eigen::MatrixXd DifferentiableContactConstraint::getConstraintForcesJacobian(
             = multiple
               * (screwAxisGradient.dot(force) + axis.dot(forceGradient));
       }
+      */
     }
+
+    ////////////////////////////////////////////////////////////////////
+    // </fast version>
+    ////////////////////////////////////////////////////////////////////
+
+#ifndef NDEBUG
+    if (slowJacCache != mWorldConstraintJacCache)
+    {
+      std::cout << "Slow version" << std::endl << slowJacCache << std::endl;
+      std::cout << "Faster version" << std::endl
+                << mWorldConstraintJacCache << std::endl;
+      std::cout << "Diff" << std::endl
+                << slowJacCache - mWorldConstraintJacCache << std::endl;
+    }
+    assert(slowJacCache == mWorldConstraintJacCache);
+#endif
+
     mWorldConstraintJacCacheDirty = false;
   }
 
