@@ -652,7 +652,7 @@ bool verifyVelVelJacobian(WorldPtr world, VectorXd proposedVelocities)
   MatrixXd bruteForce = classicPtr->finiteDifferenceVelVelJacobian(world);
 
   // atlas run as 1.6e-08 error
-  if (!equals(analytical, bruteForce, 2e-8))
+  if (!equals(analytical, bruteForce, 1e-8))
   {
     std::cout << "Brute force velVelJacobian:" << std::endl
               << bruteForce << std::endl;
@@ -1163,7 +1163,7 @@ bool verifyF_c(WorldPtr world)
     Eigen::MatrixXd analyticalQinvBJac
         = classicPtr->getJacobianOfLCPConstraintMatrixClampingSubset(
             world, realB, WithRespectTo::POSITION);
-    if (!equals(analyticalQinvBJac, bruteForceQinvBJac, 3e-8))
+    if (!equals(analyticalQinvBJac, bruteForceQinvBJac, 1e-8))
     {
       if (analyticalQinvBJac.rows() >= 6 && analyticalQinvBJac.cols() >= 6)
       {
@@ -1901,7 +1901,7 @@ bool verifyPosVelJacobian(WorldPtr world, VectorXd proposedVelocities)
   // 6e-8 max error. I'm going to cheerfully assume that this is just due to
   // the size and complexity of Atlas producing finite differencing errors in
   // dC and dMinv, which end up propagating. For now, this is fine.
-  if (!equals(analytical, bruteForce, 7e-8))
+  if (!equals(analytical, bruteForce, 1e-8))
   {
     std::cout << "Brute force posVelJacobian:" << std::endl
               << bruteForce << std::endl;
@@ -1939,7 +1939,7 @@ bool verifyForceVelJacobian(WorldPtr world, VectorXd proposedVelocities)
   MatrixXd bruteForce = classicPtr->finiteDifferenceForceVelJacobian(world);
 
   // Atlas runs at 1.5e-8 error
-  if (!equals(analytical, bruteForce, 2e-8))
+  if (!equals(analytical, bruteForce, 1e-8))
   {
     std::cout << "Brute force forceVelJacobian:" << std::endl
               << bruteForce << std::endl;
@@ -5705,7 +5705,7 @@ bool verifyJacobianOfClampingConstraints(WorldPtr world)
   Eigen::MatrixXd bruteForce
       = classicPtr->finiteDifferenceJacobianOfClampingConstraints(world, f0);
 
-  if (!equals(analytical, bruteForce, 2e-8))
+  if (!equals(analytical, bruteForce, 1e-8))
   {
     std::cout << "getJacobianOfClampingConstraints error:" << std::endl;
     std::cout << "f0:" << std::endl << f0 << std::endl;
@@ -5753,7 +5753,7 @@ bool verifyJacobianOfClampingConstraintsTranspose(WorldPtr world)
       = classicPtr->finiteDifferenceJacobianOfClampingConstraintsTranspose(
           world, v0);
 
-  if (!equals(analytical, bruteForce, 2e-8))
+  if (!equals(analytical, bruteForce, 1e-8))
   {
     std::cout << "getJacobianOfClampingConstraintsTranspose error:"
               << std::endl;
@@ -5980,7 +5980,8 @@ bool verifyVelJacobianWrt(WorldPtr world, WithRespectTo* wrt)
   neural::BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
 
   MatrixXd analytical = classicPtr->getVelJacobianWrt(world, wrt);
-  MatrixXd bruteForce = classicPtr->finiteDifferenceVelJacobianWrt(world, wrt);
+  MatrixXd bruteForce = 
+      classicPtr->finiteDifferenceVelJacobianWrt(world, wrt);
 
   if (!equals(analytical, bruteForce, 5e-7))
   {
@@ -6000,7 +6001,8 @@ bool verifyPosJacobianWrt(WorldPtr world, WithRespectTo* wrt)
   neural::BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
 
   MatrixXd analytical = classicPtr->getPosJacobianWrt(world, wrt);
-  MatrixXd bruteForce = classicPtr->finiteDifferencePosJacobianWrt(world, wrt);
+  MatrixXd bruteForce = 
+      classicPtr->finiteDifferencePosJacobianWrt(world, wrt);
 
   if (!equals(analytical, bruteForce, 1e-8))
   {

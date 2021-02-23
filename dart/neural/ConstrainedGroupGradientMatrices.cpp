@@ -1336,11 +1336,26 @@ Eigen::MatrixXd ConstrainedGroupGradientMatrices::
                   + (Minv                                                      \
                      * (getJacobianOfClampingConstraints(world, rhs)))))))
 
-      // This is the gradient of the pseudoinverse, see
-      // https://mathoverflow.net/a/29511/163259
-      return -Qinv * dQ(Qinv * b)
-             + Qinv * Qinv.transpose() * dQT((I - Q * Qinv) * b)
-             + (I - Qinv * Q) * dQT(Qinv.transpose() * Qinv * b);
+      Eigen::MatrixXd imprecisionMap = I - Q * Qinv;
+
+      // If we were able to precisely invert Q, then let's use the exact inverse
+      // Jacobian, because it's faster to compute
+      if (imprecisionMap.squaredNorm() < 1e-18)
+      {
+        // Note: this formula only asks for the Jacobian of Minv once, instead
+        // of 3 times like the below formula. That's actually a pretty big speed
+        // advantage. When we can, we should use this formula instead.
+        return -Qinv * dQ(Qinv * b);
+      }
+      // Otherwise fall back to the exact Jacobian of the pseudo-inverse
+      else
+      {
+        // This is the gradient of the pseudoinverse, see
+        // https://mathoverflow.net/a/29511/163259
+        return -Qinv * dQ(Qinv * b)
+               + Qinv * Qinv.transpose() * dQT(imprecisionMap * b)
+               + (I - Qinv * Q) * dQT(Qinv.transpose() * Qinv * b);
+      }
 
 #undef dQ
 #undef dQT
@@ -2107,8 +2122,11 @@ Eigen::MatrixXd ConstrainedGroupGradientMatrices::getFullConstraintMatrix(
 /// finite differences. This is SUPER SLOW, and is only here for testing.
 Eigen::MatrixXd
 ConstrainedGroupGradientMatrices::finiteDifferenceJacobianOfMinv(
-    simulation::WorldPtr world, Eigen::VectorXd tau, WithRespectTo* wrt)
+    simulation::WorldPtr world, Eigen::VectorXd tau, WithRespectTo* wrt,
+    bool useRidders)
 {
+  if (useRidders) return finiteDifferenceRiddersJacobianOfMinv(world, tau, wrt);
+
   std::size_t innerDim = getWrtDim(world, wrt);
 
   // These are predicted contact forces at the clamping contacts
@@ -2140,11 +2158,100 @@ ConstrainedGroupGradientMatrices::finiteDifferenceJacobianOfMinv(
 }
 
 //==============================================================================
+/// This computes and returns the jacobian of M^{-1}(pos, inertia) * tau by
+/// finite differences. This is SUPER SLOW, and is only here for testing.
+Eigen::MatrixXd
+ConstrainedGroupGradientMatrices::finiteDifferenceRiddersJacobianOfMinv(
+    simulation::WorldPtr world, Eigen::VectorXd tau, WithRespectTo* wrt)
+{
+  std::size_t innerDim = getWrtDim(world, wrt);
+
+  // These are predicted contact forces at the clamping contacts
+  Eigen::VectorXd original = implicitMultiplyByInvMassMatrix(world, tau);
+
+  Eigen::MatrixXd J = Eigen::MatrixXd::Zero(original.size(), innerDim);
+
+  Eigen::VectorXd originalWrt = getWrt(world, wrt);
+
+  const double originalStepSize = 1e-3; 
+  const double con = 1.4, con2 = (con * con); 
+  const double safeThreshold = 2.0; 
+  const int tabSize = 10;
+
+  for (std::size_t i = 0; i < innerDim; i++)
+  {
+    double stepSize = originalStepSize;
+    double bestError = std::numeric_limits<double>::max();
+
+    // Neville tableau of finite difference results
+    std::array<std::array<Eigen::VectorXd, tabSize>, tabSize> tab;
+
+    Eigen::VectorXd perturbedPlus = Eigen::VectorXd(originalWrt);
+    perturbedPlus(i) += stepSize;
+    setWrt(world, wrt, perturbedPlus);
+    Eigen::MatrixXd MinvTauPlus = implicitMultiplyByInvMassMatrix(world, tau); 
+    Eigen::VectorXd perturbedMinus = Eigen::VectorXd(originalWrt);
+    perturbedMinus(i) -= stepSize;
+    setWrt(world, wrt, perturbedMinus);
+    Eigen::MatrixXd MinvTauMinus = implicitMultiplyByInvMassMatrix(world, tau);
+
+    tab[0][0] = (MinvTauPlus - MinvTauMinus) / (2 * stepSize);
+
+    // Iterate over smaller and smaller step sizes
+    for (int iTab = 1; iTab < tabSize; iTab++)
+    {
+      stepSize /= con;
+
+      perturbedPlus = Eigen::VectorXd(originalWrt);
+      perturbedPlus(i) += stepSize;
+      setWrt(world, wrt, perturbedPlus);
+      MinvTauPlus = implicitMultiplyByInvMassMatrix(world, tau); 
+      perturbedMinus = Eigen::VectorXd(originalWrt);
+      perturbedMinus(i) -= stepSize;
+      setWrt(world, wrt, perturbedMinus);
+      MinvTauMinus = implicitMultiplyByInvMassMatrix(world, tau);
+      
+      tab[0][iTab] = (MinvTauPlus - MinvTauMinus) / (2 * stepSize);
+
+      double fac = con2;
+      // Compute extrapolations of increasing orders, requiring no new evaluations
+      for (int jTab = 1; jTab <= iTab; jTab++)
+      {
+        tab[jTab][iTab] = (tab[jTab-1][iTab] * fac - tab[jTab-1][iTab-1]) /
+                              (fac - 1.0);
+        fac = con2 * fac;
+        double currError = 
+          std::max((tab[jTab][iTab] - tab[jTab-1][iTab]).array().abs().maxCoeff(),
+                   (tab[jTab][iTab] - tab[jTab-1][iTab-1]).array().abs().maxCoeff());
+        if (currError < bestError)
+        {
+          bestError = currError;
+          J.col(i).noalias() = tab[jTab][iTab];
+        }
+      }
+
+      // If higher order is worse by a significant factor, quit early.
+      if ((tab[iTab][iTab] - tab[iTab-1][iTab-1]).array().abs().maxCoeff() >= 
+          safeThreshold * bestError)
+      {
+        break;
+      }
+    }
+  }
+
+  setWrt(world, wrt, originalWrt);
+
+  return J;
+}
+
+//==============================================================================
 /// This computes and returns the jacobian of C(pos, inertia, vel) by finite
 /// differences.
 Eigen::MatrixXd ConstrainedGroupGradientMatrices::finiteDifferenceJacobianOfC(
-    simulation::WorldPtr world, WithRespectTo* wrt)
+    simulation::WorldPtr world, WithRespectTo* wrt, bool useRidders)
 {
+  if (useRidders) return finiteDifferenceRiddersJacobianOfC(world, wrt);
+
   std::size_t innerDim = getWrtDim(world, wrt);
 
   // These are predicted contact forces at the clamping contacts
@@ -2173,6 +2280,93 @@ Eigen::MatrixXd ConstrainedGroupGradientMatrices::finiteDifferenceJacobianOfC(
   setWrt(world, wrt, before);
 
   return result;
+}
+
+//==============================================================================
+/// This computes and returns the jacobian of C(pos, inertia, vel) by finite
+/// differences.
+Eigen::MatrixXd
+ConstrainedGroupGradientMatrices::finiteDifferenceRiddersJacobianOfC(
+    simulation::WorldPtr world, WithRespectTo* wrt)
+{
+  std::size_t innerDim = getWrtDim(world, wrt);
+
+  // These are predicted contact forces at the clamping contacts
+  Eigen::VectorXd original = getCoriolisAndGravityAndExternalForces(world);
+
+  Eigen::MatrixXd J = Eigen::MatrixXd::Zero(original.size(), innerDim);
+
+  Eigen::VectorXd originalWrt = getWrt(world, wrt);
+
+  const double originalStepSize = 1e-3; 
+  const double con = 1.4, con2 = (con * con); 
+  const double safeThreshold = 2.0; 
+  const int tabSize = 10;
+
+  for (std::size_t i = 0; i < innerDim; i++)
+  {
+    double stepSize = originalStepSize;
+    double bestError = std::numeric_limits<double>::max();
+
+    // Neville tableau of finite difference results
+    std::array<std::array<Eigen::VectorXd, tabSize>, tabSize> tab;
+
+    Eigen::VectorXd perturbedPlus = Eigen::VectorXd(originalWrt);
+    perturbedPlus(i) += stepSize;
+    setWrt(world, wrt, perturbedPlus);
+    Eigen::MatrixXd tauPlus = getCoriolisAndGravityAndExternalForces(world);
+    Eigen::VectorXd perturbedMinus = Eigen::VectorXd(originalWrt);
+    perturbedMinus(i) -= stepSize;
+    setWrt(world, wrt, perturbedMinus);
+    Eigen::MatrixXd tauMinus = getCoriolisAndGravityAndExternalForces(world);
+
+    tab[0][0] = (tauPlus - tauMinus) / (2 * stepSize);
+
+    // Iterate over smaller and smaller step sizes
+    for (int iTab = 1; iTab < tabSize; iTab++)
+    {
+      stepSize /= con;
+
+      perturbedPlus = Eigen::VectorXd(originalWrt);
+      perturbedPlus(i) += stepSize;
+      setWrt(world, wrt, perturbedPlus);
+      tauPlus = getCoriolisAndGravityAndExternalForces(world);
+      perturbedMinus = Eigen::VectorXd(originalWrt);
+      perturbedMinus(i) -= stepSize;
+      setWrt(world, wrt, perturbedMinus);
+      tauMinus = getCoriolisAndGravityAndExternalForces(world);
+      
+      tab[0][iTab] = (tauPlus - tauMinus) / (2 * stepSize);
+
+      double fac = con2;
+      // Compute extrapolations of increasing orders, requiring no new evaluations
+      for (int jTab = 1; jTab <= iTab; jTab++)
+      {
+        tab[jTab][iTab] = (tab[jTab-1][iTab] * fac - tab[jTab-1][iTab-1]) /
+                              (fac - 1.0);
+        fac = con2 * fac;
+        double currError = 
+          std::max((tab[jTab][iTab] - tab[jTab-1][iTab]).array().abs().maxCoeff(),
+                   (tab[jTab][iTab] - tab[jTab-1][iTab-1]).array().abs().maxCoeff());
+        if (currError < bestError)
+        {
+          bestError = currError;
+          J.col(i).noalias() = tab[jTab][iTab];
+        }
+      }
+
+      // If higher order is worse by a significant factor, quit early.
+      if ((tab[iTab][iTab] - tab[iTab-1][iTab-1]).array().abs().maxCoeff() >= 
+          safeThreshold * bestError)
+      {
+        break;
+      }
+    }
+  }
+
+  setWrt(world, wrt, originalWrt);
+
+  return J;
 }
 
 //==============================================================================

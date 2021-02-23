@@ -120,21 +120,25 @@ void BackpropSnapshot(py::module& m)
       .def(
           "finiteDifferenceVelVelJacobian",
           &dart::neural::BackpropSnapshot::finiteDifferenceVelVelJacobian,
-          ::py::arg("world"))
+          ::py::arg("world"),
+          ::py::arg("useRidders") = true)
       .def(
           "finiteDifferenceForceVelJacobian",
           &dart::neural::BackpropSnapshot::finiteDifferenceForceVelJacobian,
-          ::py::arg("world"))
+          ::py::arg("world"),
+          ::py::arg("useRidders") = true)
       .def(
           "finiteDifferencePosPosJacobian",
           &dart::neural::BackpropSnapshot::finiteDifferencePosPosJacobian,
           ::py::arg("world"),
-          ::py::arg("subdivisions"))
+          ::py::arg("subdivisions"),
+          ::py::arg("useRidders") = true)
       .def(
           "finiteDifferenceVelPosJacobian",
           &dart::neural::BackpropSnapshot::finiteDifferenceVelPosJacobian,
           ::py::arg("world"),
-          ::py::arg("subdivisions"))
+          ::py::arg("subdivisions"),
+          ::py::arg("useRidders") = true)
       .def(
           "benchmarkJacobians",
           &dart::neural::BackpropSnapshot::benchmarkJacobians,
