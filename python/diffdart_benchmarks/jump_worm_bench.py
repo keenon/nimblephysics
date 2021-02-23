@@ -1,32 +1,3 @@
----
-title: "Jump Worm Demo"
-date: 2020-10-01T11:00:57-07:00
-draft: false
-menu:
-  main:
-    parent: "tutorials"
-    name: "Jump Worm Demo"
----
-
-# Jump Worm
-
-## Demo
-
-You're going to be creating this:
-
-{{< viewer3d "Jumpworm" "/data/worm.txt" >}}
-
-## Code
-
-Here's the code to run the Jump Worm example, tested against DiffDART version 0.3.4:
-
-{{< warning >}}
-**Warning**: DiffDART is still in Alpha, and we reserve the right to change the APIs in breaking ways (like renaming API calls, for example). To ensure that this demo works, make sure you're using version 0.3.4 by running `pip3 install diffdart==0.3.4`
-{{< /warning >}}
-
-{{< code python >}}
-
-```
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -112,7 +83,6 @@ def main():
 
   world.addSkeleton(floor)
 
-  """
   # Do a benchmark
 
   jumpworm.setPosition(1, -0.14)
@@ -120,46 +90,14 @@ def main():
 
   snapshot: dart.neural.BackpropSnapshot = dart.neural.forwardPass(world)
   snapshot.benchmarkJacobians(world, 100)
-  return
 
+  """
   gui = DartGUI()
   gui.stateMachine().renderWorld(world)
   gui.serve(8080)
   gui.stateMachine().blockWhileServing()
   """
 
-  # Set up the view
-
-  def loss(rollout: DartTorchTrajectoryRollout):
-    pos = rollout.getPoses('ik')
-    vel = rollout.getVels('ik')
-    step_loss = - torch.sum(pos[1, :] * pos[1, :] * torch.sign(pos[1, :]))
-    last_pos_y = pos[1, -1]
-    last_vel_y = vel[1, -1]
-    final_loss = - 100 * torch.square(last_pos_y) * torch.sign(last_pos_y)
-    return final_loss
-  dartLoss: dart.trajectory.LossFn = DartTorchLossFn(loss)
-
-  trajectory = dart.trajectory.MultiShot(world, dartLoss, 400, 20, False)
-
-  ikMap: dart.neural.IKMapping = dart.neural.IKMapping(world)
-  ikMap.addLinearBodyNode(root)
-  trajectory.addMapping('ik', ikMap)
-
-  trajectory.setParallelOperationsEnabled(True)
-  optimizer = dart.trajectory.IPOptOptimizer()
-  optimizer.setLBFGSHistoryLength(3)
-  optimizer.setTolerance(1e-5)
-  optimizer.setCheckDerivatives(False)
-  optimizer.setIterationLimit(500)
-  optimizer.setRecordPerformanceLog(True)
-
-  trainer = GUITrajectoryTrainer(world, trajectory, optimizer)
-  result: dart.trajectory.Solution = trainer.train(True)
-
 
 if __name__ == "__main__":
   main()
-```
-
-{{< /code >}}

@@ -1,32 +1,3 @@
----
-title: "Catapult Demo"
-date: 2020-10-01T11:00:57-07:00
-draft: false
-menu:
-  main:
-    parent: "tutorials"
-    name: "Catapult Demo"
----
-
-# Catapult
-
-## Demo
-
-You're going to be creating this:
-
-{{< viewer3d "Catapult" "/data/catapult.txt" >}}
-
-## Code
-
-Here's the code to run the catapult example, tested against DiffDART version 0.3.4:
-
-{{< warning >}}
-**Warning**: DiffDART is still in Alpha, and we reserve the right to change the APIs in breaking ways (like renaming API calls, for example). To ensure that this demo works, make sure you're using version 0.3.4 by running `pip3 install diffdart==0.3.4`
-{{< /warning >}}
-
-{{< code python >}}
-
-```
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -34,7 +5,7 @@ import random
 import math
 import time
 import diffdart as dart
-from diffdart import DartTorchLossFn, DartTorchTrajectoryRollout, DartGUI, GUITrajectoryTrainer
+from diffdart import DartTorchLossFn, DartTorchTrajectoryRollout, DartGUI
 
 
 def main():
@@ -51,7 +22,6 @@ def main():
   projectileVisual = projectileShape.createVisualAspect()
   projectileShape.createCollisionAspect()
   projectileVisual.setColor([0.7, 0.7, 0.7])
-  projectileVisual.setCastShadows(False)
   projectileJoint.setForceUpperLimit(0, 0)
   projectileJoint.setForceLowerLimit(0, 0)
   projectileJoint.setForceUpperLimit(1, 0)
@@ -118,11 +88,9 @@ def main():
   floorOffset = dart.math.Isometry3()
   floorOffset.set_translation([1.2, -0.7, 0])
   floorJoint.setTransformFromParentBodyNode(floorOffset)
-  floorShape: dart.dynamics.ShapeNode = floorBody.createShapeNode(dart.dynamics.BoxShape(
-      [3.5, 0.25, .5]))
-  floorVisual: dart.dynamics.VisualAspect = floorShape.createVisualAspect()
+  floorShape = floorBody.createShapeNode(dart.dynamics.BoxShape([3.5, 0.25, .5]))
+  floorVisual = floorShape.createVisualAspect()
   floorVisual.setColor([0.5, 0.5, 0.5])
-  floorVisual.setCastShadows(False)
   floorShape.createCollisionAspect()
 
   world.addSkeleton(floor)
@@ -145,32 +113,23 @@ def main():
 
   world.addSkeleton(target)
 
-  # Set up the view
+  # Do a benchmark
+  # projectile.setPosition(0, -0.1)
+  projectile.setPosition(1, 0.0)
+  catapult.setPosition(2, 0.65)
 
-  def loss(rollout: DartTorchTrajectoryRollout):
-    last_pos = rollout.getPoses('identity')[:, -1]
-    last_x = last_pos[0]
-    last_y = last_pos[1]
-    final_loss = (target_x - last_x)**2 + (target_y - last_y)**2
-    return final_loss
-  dartLoss: dart.trajectory.LossFn = DartTorchLossFn(loss)
+  world.step()
 
-  trajectory = dart.trajectory.MultiShot(world, dartLoss, 500, 20, False)
-  trajectory.setParallelOperationsEnabled(True)
+  snapshot: dart.neural.BackpropSnapshot = dart.neural.forwardPass(world)
+  snapshot.benchmarkJacobians(world, 100)
 
-  optimizer = dart.trajectory.IPOptOptimizer()
-  optimizer.setLBFGSHistoryLength(5)
-  optimizer.setTolerance(1e-4)
-  optimizer.setCheckDerivatives(False)
-  optimizer.setIterationLimit(500)
-  # result: dart.trajectory.Solution = optimizer.optimize(trajectory)
-
-  trainer = GUITrajectoryTrainer(world, trajectory, optimizer)
-  trainer.train(loopAfterSolve=True)
+  """
+  gui = DartGUI()
+  gui.stateMachine().renderWorld(world)
+  gui.serve(8080)
+  gui.stateMachine().blockWhileServing()
+  """
 
 
 if __name__ == "__main__":
   main()
-```
-
-{{< /code >}}
