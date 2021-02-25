@@ -18,6 +18,8 @@ public:
       Problem* shot, std::shared_ptr<Solution> warmStart = nullptr)
       = 0;
 
+  virtual ~Optimizer() = default;
+
   /// This registers an intermediate callback, to get called by IPOPT after each
   /// step of optimization. If any callback returns false on a given step, then
   /// the optimizer will terminate early.
