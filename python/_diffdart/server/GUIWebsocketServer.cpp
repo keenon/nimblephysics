@@ -83,27 +83,38 @@ void GUIWebsocketServer(py::module& m)
           "createBox",
           &dart::server::GUIWebsocketServer::createBox,
           ::py::arg("key"),
-          ::py::arg("size"),
-          ::py::arg("pos"),
-          ::py::arg("euler"),
-          ::py::arg("color"),
-          ::py::arg("castShadows"),
-          ::py::arg("receiveShadows"))
+          ::py::arg("size") = Eigen::Vector3d::Ones(),
+          ::py::arg("pos") = Eigen::Vector3d::Zero(),
+          ::py::arg("euler") = Eigen::Vector3d::Zero(),
+          ::py::arg("color") = Eigen::Vector3d::Ones() * 0.5,
+          ::py::arg("castShadows") = true,
+          ::py::arg("receiveShadows") = false)
       .def(
           "createSphere",
           &dart::server::GUIWebsocketServer::createSphere,
           ::py::arg("key"),
-          ::py::arg("radius"),
-          ::py::arg("pos"),
-          ::py::arg("color"),
-          ::py::arg("castShadows"),
-          ::py::arg("receiveShadows"))
+          ::py::arg("radius") = 0.5,
+          ::py::arg("pos") = Eigen::Vector3d::Zero(),
+          ::py::arg("color") = Eigen::Vector3d::Ones() * 0.5,
+          ::py::arg("castShadows") = true,
+          ::py::arg("receiveShadows") = false)
       .def(
           "createLine",
           &dart::server::GUIWebsocketServer::createLine,
           ::py::arg("key"),
           ::py::arg("points"),
-          ::py::arg("color"))
+          ::py::arg("color") = Eigen::Vector3d::Ones() * 0.5)
+      .def(
+          "createMeshFromShape",
+          &dart::server::GUIWebsocketServer::createMeshFromShape,
+          ::py::arg("key"),
+          ::py::arg("mesh"),
+          ::py::arg("pos") = Eigen::Vector3d::Zero(),
+          ::py::arg("euler") = Eigen::Vector3d::Zero(),
+          ::py::arg("scale") = Eigen::Vector3d::Ones(),
+          ::py::arg("color") = Eigen::Vector3d::Ones() * 0.5,
+          ::py::arg("castShadows") = true,
+          ::py::arg("receiveShadows") = false)
       .def(
           "getObjectPosition",
           &dart::server::GUIWebsocketServer::getObjectPosition,

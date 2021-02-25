@@ -39,6 +39,7 @@ namespace python {
 
 void DartLoader(py::module& sm);
 void SkelParser(py::module& sm);
+void UniversalLoader(py::module& sm);
 
 void dart_utils(py::module& m)
 {
@@ -46,6 +47,7 @@ void dart_utils(py::module& m)
 
   DartLoader(sm);
   SkelParser(sm);
+  UniversalLoader(sm);
 }
 
 } // namespace python

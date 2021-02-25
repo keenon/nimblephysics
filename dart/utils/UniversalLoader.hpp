@@ -8,6 +8,7 @@
 
 #include "dart/common/LocalResourceRetriever.hpp"
 #include "dart/common/Uri.hpp"
+#include "dart/dynamics/MeshShape.hpp"
 
 namespace dart {
 
@@ -34,6 +35,9 @@ std::shared_ptr<dynamics::Skeleton> loadSkeleton(
     std::string path,
     Eigen::Vector3d basePosition = Eigen::Vector3d::Zero(),
     Eigen::Vector3d baseEulerAnglesXYZ = Eigen::Vector3d::Zero());
+
+/// This loads a mesh from a file
+std::shared_ptr<dynamics::MeshShape> loadMeshShape(std::string path);
 
 } // namespace UniversalLoader
 } // namespace utils

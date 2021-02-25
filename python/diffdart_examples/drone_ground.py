@@ -43,6 +43,16 @@ def main():
   drone.setVelocity(0, - 1e-4)
   droneBody.setMass(0.1)
 
+  droneBody = dart.utils.UniversalLoader.loadMeshShape("./data/obj/drone-body.obj")
+  droneRotor = dart.utils.UniversalLoader.loadMeshShape("./data/obj/drone-rotor.obj")
+
+  gui = DartGUI()
+  gui.stateMachine().renderWorld(world)
+  gui.stateMachine().createMeshFromShape("droneBody", droneBody, [0, 0, 0])
+  gui.stateMachine().createMeshFromShape("droneRotor", droneRotor, [0, 0, 0])
+  gui.serve(8080)
+  gui.stateMachine().blockWhileServing()
+
   """
   # Do a benchmark
 

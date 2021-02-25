@@ -4,10 +4,12 @@
 #include "dart/dynamics/FreeJoint.hpp"
 #include "dart/dynamics/Joint.hpp"
 #include "dart/dynamics/Skeleton.hpp"
+#include "dart/dynamics/MeshShape.hpp"
 #include "dart/math/Geometry.hpp"
 #include "dart/utils/SkelParser.hpp"
 #include "dart/utils/sdf/SdfParser.hpp"
 #include "dart/utils/urdf/DartLoader.hpp"
+#include "dart/utils/DartResourceRetriever.hpp"
 
 namespace dart {
 namespace utils {
@@ -111,6 +113,35 @@ std::shared_ptr<dynamics::Skeleton> loadSkeleton(
   world->addSkeleton(skel);
 
   return skel;
+}
+
+/// This loads a mesh from a file
+std::shared_ptr<dynamics::MeshShape> loadMeshShape(std::string path)
+{
+  // Source: https://stackoverflow.com/a/145309/13177487
+  if (path[0] == '.')
+  {
+    char cCurrentPath[FILENAME_MAX];
+
+    if (!GetCurrentDir(cCurrentPath, sizeof(cCurrentPath)))
+    {
+      // ignore, couldn't prefix the current working directory
+    }
+    cCurrentPath[sizeof(cCurrentPath) - 1] = '\0'; /* not really required */
+    std::string cwd(cCurrentPath);
+
+    path = cwd + "/" + path;
+  }
+
+  auto retriever = std::make_shared<utils::CompositeResourceRetriever>();
+  retriever->addSchemaRetriever(
+      "file", std::make_shared<common::LocalResourceRetriever>());
+  retriever->addSchemaRetriever("dart", utils::DartResourceRetriever::create());
+  return std::make_shared<dynamics::MeshShape>(
+      Eigen::Vector3d::Ones(),
+      dynamics::MeshShape::loadMesh(path, retriever),
+      path,
+      retriever);
 }
 
 } // namespace UniversalLoader

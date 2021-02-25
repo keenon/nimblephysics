@@ -1071,6 +1071,29 @@ GUIWebsocketServer& GUIWebsocketServer::createMeshASSIMP(
   return *this;
 }
 
+GUIWebsocketServer& GUIWebsocketServer::createMeshFromShape(
+    const std::string& key,
+    const std::shared_ptr<dynamics::MeshShape> mesh,
+    const Eigen::Vector3d& pos,
+    const Eigen::Vector3d& euler,
+    const Eigen::Vector3d& scale,
+    const Eigen::Vector3d& color,
+    bool castShadows,
+    bool receiveShadows)
+{
+  createMeshASSIMP(
+      key,
+      mesh->getMesh(),
+      mesh->getMeshPath(),
+      pos,
+      euler,
+      scale,
+      color,
+      castShadows,
+      receiveShadows);
+  return *this;
+}
+
 /// This creates a texture object, to be sent to the web frontend
 GUIWebsocketServer& GUIWebsocketServer::createTexture(
     const std::string& key, const std::string& base64)

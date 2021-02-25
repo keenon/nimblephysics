@@ -18,6 +18,7 @@
 #include <assimp/cimport.h>
 #include <assimp/postprocess.h>
 
+#include "dart/dynamics/MeshShape.hpp"
 #include "dart/server/WebsocketServer.hpp"
 
 namespace dart {
@@ -176,6 +177,18 @@ public:
       const std::string& key,
       const aiScene* mesh,
       const std::string& meshPath,
+      const Eigen::Vector3d& pos,
+      const Eigen::Vector3d& euler,
+      const Eigen::Vector3d& scale = Eigen::Vector3d::Ones(),
+      const Eigen::Vector3d& color = Eigen::Vector3d(0.5, 0.5, 0.5),
+      bool castShadows = false,
+      bool receiveShadows = false);
+
+  /// This creates a mesh in the web GUI under a specified key, from the ASSIMP
+  /// mesh
+  GUIWebsocketServer& createMeshFromShape(
+      const std::string& key,
+      const std::shared_ptr<dynamics::MeshShape> mesh,
       const Eigen::Vector3d& pos,
       const Eigen::Vector3d& euler,
       const Eigen::Vector3d& scale = Eigen::Vector3d::Ones(),
