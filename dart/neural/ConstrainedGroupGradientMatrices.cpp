@@ -1692,8 +1692,14 @@ void ConstrainedGroupGradientMatrices::backprop(
     // First, we need to compute the Jacobian of v_t+1 wrt contact force. This
     // is straightforward, M^{-1}*A. Then backprop with the transpose method.
 
+    /*
     Eigen::MatrixXd jac = getMinv() * getAllConstraintMatrix();
     Eigen::VectorXd lossWrtContactForce
+        = jac.transpose() * nextTimestepLoss.lossWrtVelocity;
+    */
+
+    Eigen::MatrixXd jac = getAllConstraintMatrix();
+    Eigen::VectorXd lossWrtContactVels
         = jac.transpose() * nextTimestepLoss.lossWrtVelocity;
 
     // Now we're going to try using the `lossWrtContactForce` gradient to set
@@ -1702,8 +1708,8 @@ void ConstrainedGroupGradientMatrices::backprop(
     // technically incorrect.
 
     Eigen::VectorXi overrideClasses
-        = Eigen::VectorXi::Zero(lossWrtContactForce.size());
-    for (int i = 0; i < lossWrtContactForce.size(); i++)
+        = Eigen::VectorXi::Zero(lossWrtContactVels.size());
+    for (int i = 0; i < lossWrtContactVels.size(); i++)
     {
       // If this is a frictional contact force
       if (mFIndex(i) != -1)
@@ -1713,17 +1719,17 @@ void ConstrainedGroupGradientMatrices::backprop(
       // If this is a normal contact force
       else
       {
-        // If we want to increase contact force (pushing closer together), let's
-        // try this as clamping
-        if (lossWrtContactForce(i) > 0)
-        {
-          overrideClasses(i) = neural::ConstraintMapping::CLAMPING;
-        }
-        // If we want to decrease contact force (pulling further apart), let's
-        // try not clamping
-        else
+        // If we want to increase contact vels (pulling further apart), let's
+        // try this as not clamping
+        if (lossWrtContactVels(i) < 0)
         {
           overrideClasses(i) = neural::ConstraintMapping::NOT_CLAMPING;
+        }
+        // If we want to decrease contact vels (pushing closer together), let's
+        // try clamping
+        else
+        {
+          overrideClasses(i) = neural::ConstraintMapping::CLAMPING;
         }
       }
     }
@@ -2122,10 +2128,13 @@ Eigen::MatrixXd ConstrainedGroupGradientMatrices::getFullConstraintMatrix(
 /// finite differences. This is SUPER SLOW, and is only here for testing.
 Eigen::MatrixXd
 ConstrainedGroupGradientMatrices::finiteDifferenceJacobianOfMinv(
-    simulation::WorldPtr world, Eigen::VectorXd tau, WithRespectTo* wrt,
+    simulation::WorldPtr world,
+    Eigen::VectorXd tau,
+    WithRespectTo* wrt,
     bool useRidders)
 {
-  if (useRidders) return finiteDifferenceRiddersJacobianOfMinv(world, tau, wrt);
+  if (useRidders)
+    return finiteDifferenceRiddersJacobianOfMinv(world, tau, wrt);
 
   std::size_t innerDim = getWrtDim(world, wrt);
 
@@ -2173,9 +2182,9 @@ ConstrainedGroupGradientMatrices::finiteDifferenceRiddersJacobianOfMinv(
 
   Eigen::VectorXd originalWrt = getWrt(world, wrt);
 
-  const double originalStepSize = 1e-3; 
-  const double con = 1.4, con2 = (con * con); 
-  const double safeThreshold = 2.0; 
+  const double originalStepSize = 1e-3;
+  const double con = 1.4, con2 = (con * con);
+  const double safeThreshold = 2.0;
   const int tabSize = 10;
 
   for (std::size_t i = 0; i < innerDim; i++)
@@ -2189,7 +2198,7 @@ ConstrainedGroupGradientMatrices::finiteDifferenceRiddersJacobianOfMinv(
     Eigen::VectorXd perturbedPlus = Eigen::VectorXd(originalWrt);
     perturbedPlus(i) += stepSize;
     setWrt(world, wrt, perturbedPlus);
-    Eigen::MatrixXd MinvTauPlus = implicitMultiplyByInvMassMatrix(world, tau); 
+    Eigen::MatrixXd MinvTauPlus = implicitMultiplyByInvMassMatrix(world, tau);
     Eigen::VectorXd perturbedMinus = Eigen::VectorXd(originalWrt);
     perturbedMinus(i) -= stepSize;
     setWrt(world, wrt, perturbedMinus);
@@ -2205,24 +2214,28 @@ ConstrainedGroupGradientMatrices::finiteDifferenceRiddersJacobianOfMinv(
       perturbedPlus = Eigen::VectorXd(originalWrt);
       perturbedPlus(i) += stepSize;
       setWrt(world, wrt, perturbedPlus);
-      MinvTauPlus = implicitMultiplyByInvMassMatrix(world, tau); 
+      MinvTauPlus = implicitMultiplyByInvMassMatrix(world, tau);
       perturbedMinus = Eigen::VectorXd(originalWrt);
       perturbedMinus(i) -= stepSize;
       setWrt(world, wrt, perturbedMinus);
       MinvTauMinus = implicitMultiplyByInvMassMatrix(world, tau);
-      
+
       tab[0][iTab] = (MinvTauPlus - MinvTauMinus) / (2 * stepSize);
 
       double fac = con2;
-      // Compute extrapolations of increasing orders, requiring no new evaluations
+      // Compute extrapolations of increasing orders, requiring no new
+      // evaluations
       for (int jTab = 1; jTab <= iTab; jTab++)
       {
-        tab[jTab][iTab] = (tab[jTab-1][iTab] * fac - tab[jTab-1][iTab-1]) /
-                              (fac - 1.0);
+        tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
+                          / (fac - 1.0);
         fac = con2 * fac;
-        double currError = 
-          std::max((tab[jTab][iTab] - tab[jTab-1][iTab]).array().abs().maxCoeff(),
-                   (tab[jTab][iTab] - tab[jTab-1][iTab-1]).array().abs().maxCoeff());
+        double currError = std::max(
+            (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
+            (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
+                .array()
+                .abs()
+                .maxCoeff());
         if (currError < bestError)
         {
           bestError = currError;
@@ -2231,8 +2244,8 @@ ConstrainedGroupGradientMatrices::finiteDifferenceRiddersJacobianOfMinv(
       }
 
       // If higher order is worse by a significant factor, quit early.
-      if ((tab[iTab][iTab] - tab[iTab-1][iTab-1]).array().abs().maxCoeff() >= 
-          safeThreshold * bestError)
+      if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
+          >= safeThreshold * bestError)
       {
         break;
       }
@@ -2250,7 +2263,8 @@ ConstrainedGroupGradientMatrices::finiteDifferenceRiddersJacobianOfMinv(
 Eigen::MatrixXd ConstrainedGroupGradientMatrices::finiteDifferenceJacobianOfC(
     simulation::WorldPtr world, WithRespectTo* wrt, bool useRidders)
 {
-  if (useRidders) return finiteDifferenceRiddersJacobianOfC(world, wrt);
+  if (useRidders)
+    return finiteDifferenceRiddersJacobianOfC(world, wrt);
 
   std::size_t innerDim = getWrtDim(world, wrt);
 
@@ -2298,9 +2312,9 @@ ConstrainedGroupGradientMatrices::finiteDifferenceRiddersJacobianOfC(
 
   Eigen::VectorXd originalWrt = getWrt(world, wrt);
 
-  const double originalStepSize = 1e-3; 
-  const double con = 1.4, con2 = (con * con); 
-  const double safeThreshold = 2.0; 
+  const double originalStepSize = 1e-3;
+  const double con = 1.4, con2 = (con * con);
+  const double safeThreshold = 2.0;
   const int tabSize = 10;
 
   for (std::size_t i = 0; i < innerDim; i++)
@@ -2335,19 +2349,23 @@ ConstrainedGroupGradientMatrices::finiteDifferenceRiddersJacobianOfC(
       perturbedMinus(i) -= stepSize;
       setWrt(world, wrt, perturbedMinus);
       tauMinus = getCoriolisAndGravityAndExternalForces(world);
-      
+
       tab[0][iTab] = (tauPlus - tauMinus) / (2 * stepSize);
 
       double fac = con2;
-      // Compute extrapolations of increasing orders, requiring no new evaluations
+      // Compute extrapolations of increasing orders, requiring no new
+      // evaluations
       for (int jTab = 1; jTab <= iTab; jTab++)
       {
-        tab[jTab][iTab] = (tab[jTab-1][iTab] * fac - tab[jTab-1][iTab-1]) /
-                              (fac - 1.0);
+        tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
+                          / (fac - 1.0);
         fac = con2 * fac;
-        double currError = 
-          std::max((tab[jTab][iTab] - tab[jTab-1][iTab]).array().abs().maxCoeff(),
-                   (tab[jTab][iTab] - tab[jTab-1][iTab-1]).array().abs().maxCoeff());
+        double currError = std::max(
+            (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
+            (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
+                .array()
+                .abs()
+                .maxCoeff());
         if (currError < bestError)
         {
           bestError = currError;
@@ -2356,8 +2374,8 @@ ConstrainedGroupGradientMatrices::finiteDifferenceRiddersJacobianOfC(
       }
 
       // If higher order is worse by a significant factor, quit early.
-      if ((tab[iTab][iTab] - tab[iTab-1][iTab-1]).array().abs().maxCoeff() >= 
-          safeThreshold * bestError)
+      if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
+          >= safeThreshold * bestError)
       {
         break;
       }

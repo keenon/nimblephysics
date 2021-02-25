@@ -30,9 +30,13 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <dart/trajectory/IPOptOptimizer.hpp>
+#include <functional>
+
+#include <Python.h>
 #include <dart/trajectory/Problem.hpp>
+#include <dart/trajectory/SGDOptimizer.hpp>
 #include <pybind11/eigen.h>
+#include <pybind11/functional.h>
 #include <pybind11/pybind11.h>
 
 namespace py = pybind11;
@@ -40,63 +44,31 @@ namespace py = pybind11;
 namespace dart {
 namespace python {
 
-void IPOptOptimizer(py::module& m)
+void SGDOptimizer(py::module& m)
 {
   ::py::class_<
-      dart::trajectory::IPOptOptimizer,
-      std::shared_ptr<dart::trajectory::IPOptOptimizer>,
-      dart::trajectory::Optimizer>(m, "IPOptOptimizer")
+      dart::trajectory::SGDOptimizer,
+      std::shared_ptr<dart::trajectory::SGDOptimizer>,
+      dart::trajectory::Optimizer>(m, "SGDOptimizer")
       .def(::py::init<>())
       .def(
           "optimize",
-          &dart::trajectory::IPOptOptimizer::optimize,
+          &dart::trajectory::SGDOptimizer::optimize,
           ::py::arg("shot"),
           ::py::arg("reuseRecord") = nullptr,
           ::py::call_guard<py::gil_scoped_release>())
       .def(
           "setIterationLimit",
-          &dart::trajectory::IPOptOptimizer::setIterationLimit,
+          &dart::trajectory::SGDOptimizer::setIterationLimit,
           ::py::arg("iterationLimit") = 500)
       .def(
           "setTolerance",
-          &dart::trajectory::IPOptOptimizer::setTolerance,
+          &dart::trajectory::SGDOptimizer::setTolerance,
           ::py::arg("tol") = 1e-7)
       .def(
-          "setLBFGSHistoryLength",
-          &dart::trajectory::IPOptOptimizer::setLBFGSHistoryLength,
-          ::py::arg("historyLen") = 1)
-      .def(
-          "setCheckDerivatives",
-          &dart::trajectory::IPOptOptimizer::setCheckDerivatives,
-          ::py::arg("checkDerivatives") = true)
-      .def(
-          "setPrintFrequency",
-          &dart::trajectory::IPOptOptimizer::setPrintFrequency,
-          ::py::arg("printFrequency") = 1)
-      .def(
-          "setRecordPerformanceLog",
-          &dart::trajectory::IPOptOptimizer::setRecordPerformanceLog,
-          ::py::arg("recordPerfLog") = true)
-      .def(
-          "setRecoverBest",
-          &dart::trajectory::IPOptOptimizer::setRecoverBest,
-          ::py::arg("recoverBest") = true)
-      .def(
-          "setSuppressOutput",
-          &dart::trajectory::IPOptOptimizer::setSuppressOutput,
-          ::py::arg("suppressOutput") = true)
-      .def(
-          "setSilenceOutput",
-          &dart::trajectory::IPOptOptimizer::setSilenceOutput,
-          ::py::arg("silenceOutput") = true)
-      .def(
-          "setDisableLinesearch",
-          &dart::trajectory::IPOptOptimizer::setDisableLinesearch,
-          ::py::arg("disableLinesearch") = true)
-      .def(
-          "setRecordIterations",
-          &dart::trajectory::IPOptOptimizer::setRecordIterations,
-          ::py::arg("recordIterations") = true);
+          "setLearningRate",
+          &dart::trajectory::SGDOptimizer::setLearningRate,
+          ::py::arg("learningRate") = 0.1);
   /*
   .def(
       "registerIntermediateCallback",

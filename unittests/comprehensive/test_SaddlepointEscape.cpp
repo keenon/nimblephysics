@@ -54,18 +54,24 @@
 #include "dart/utils/DartResourceRetriever.hpp"
 #include "dart/utils/sdf/sdf.hpp"
 #include "dart/utils/urdf/urdf.hpp"
+#include "dart/trajectory/SingleShot.hpp"
+#include "dart/trajectory/MultiShot.hpp"
+#include "dart/trajectory/Solution.hpp"
+#include "dart/trajectory/LossFn.hpp"
+#include "dart/trajectory/SGDOptimizer.hpp"
 
 #include "GradientTestUtils.hpp"
 #include "TestHelpers.hpp"
 #include "stdio.h"
 
-#define ALL_TESTS
+// #define ALL_TESTS
 
 using namespace dart;
 using namespace math;
 using namespace dynamics;
 using namespace simulation;
 using namespace neural;
+using namespace trajectory;
 
 #ifdef ALL_TESTS
 TEST(SADDLEPOINTS, BALL_ON_FIXED_GROUND)
@@ -117,23 +123,39 @@ TEST(SADDLEPOINTS, BALL_ON_FIXED_GROUND)
   std::shared_ptr<neural::BackpropSnapshot> snapshot = neural::forwardPass(world, true);
   EXPECT_EQ(1, snapshot->getNumClamping());
 
-  // Do plain vanilla loss, should block all progress
+  // Do plain vanilla loss, should block all progress to torque for both timesteps
   
   neural::LossGradient nextTimestepLoss;
-  nextTimestepLoss.lossWrtPosition = Eigen::VectorXd::Zero(1);
-  nextTimestepLoss.lossWrtVelocity = Eigen::VectorXd::Ones(1) * -0.1; // points downwards, which means we want to move upwards
+  nextTimestepLoss.lossWrtPosition = Eigen::VectorXd::Ones(1) * -0.1; // points downwards, which means we want to move upwards
+  nextTimestepLoss.lossWrtVelocity = Eigen::VectorXd::Zero(1);
   neural::LossGradient thisTimestepLoss;
   snapshot->backprop(world, thisTimestepLoss, nextTimestepLoss);
-  EXPECT_EQ(0, thisTimestepLoss.lossWrtPosition(0));
-  EXPECT_EQ(0, thisTimestepLoss.lossWrtVelocity(0));
+  EXPECT_EQ(-0.1, thisTimestepLoss.lossWrtPosition(0));
+  EXPECT_EQ(-0.1 * world->getTimeStep(), thisTimestepLoss.lossWrtVelocity(0));
+  EXPECT_EQ(0, thisTimestepLoss.lossWrtTorque(0));
+  nextTimestepLoss.lossWrtPosition = thisTimestepLoss.lossWrtPosition;
+  nextTimestepLoss.lossWrtVelocity = thisTimestepLoss.lossWrtVelocity;
+  nextTimestepLoss.lossWrtTorque.setZero();
+  snapshot->backprop(world, thisTimestepLoss, nextTimestepLoss);
+  EXPECT_EQ(-0.1, thisTimestepLoss.lossWrtPosition(0));
+  EXPECT_EQ(-0.1 * world->getTimeStep(), thisTimestepLoss.lossWrtVelocity(0));
   EXPECT_EQ(0, thisTimestepLoss.lossWrtTorque(0));
 
-  // Try exploratory loss
+  // Try exploratory loss, should allow progress on torque
 
+  nextTimestepLoss.lossWrtPosition = Eigen::VectorXd::Ones(1) * -0.1; // points downwards, which means we want to move upwards
+  nextTimestepLoss.lossWrtVelocity = Eigen::VectorXd::Zero(1);
   snapshot->backprop(world, thisTimestepLoss, nextTimestepLoss, nullptr, true);
-  EXPECT_EQ(0.0, thisTimestepLoss.lossWrtPosition(0));
-  EXPECT_EQ(-0.1, thisTimestepLoss.lossWrtVelocity(0));
-  EXPECT_EQ(-0.1 * world->getTimeStep(), thisTimestepLoss.lossWrtTorque(0));
+  EXPECT_EQ(-0.1, thisTimestepLoss.lossWrtPosition(0));
+  EXPECT_EQ(-0.1 * world->getTimeStep(), thisTimestepLoss.lossWrtVelocity(0));
+  EXPECT_EQ(0, thisTimestepLoss.lossWrtTorque(0));
+  nextTimestepLoss.lossWrtPosition = thisTimestepLoss.lossWrtPosition;
+  nextTimestepLoss.lossWrtVelocity = thisTimestepLoss.lossWrtVelocity;
+  nextTimestepLoss.lossWrtTorque.setZero();
+  snapshot->backprop(world, thisTimestepLoss, nextTimestepLoss, nullptr, true);
+  EXPECT_EQ(-0.1, thisTimestepLoss.lossWrtPosition(0));
+  EXPECT_EQ(-0.2 * world->getTimeStep(), thisTimestepLoss.lossWrtVelocity(0));
+  EXPECT_EQ(-0.1 * world->getTimeStep() * world->getTimeStep(), thisTimestepLoss.lossWrtTorque(0));
 
   /*
   ///////////////////////////////////////////////
@@ -238,3 +260,117 @@ TEST(SADDLEPOINTS, UNCONTROLLED_BALL_ON_PADDLE)
   */
 }
 #endif
+
+// #ifdef ALL_TESTS
+TEST(SADDLEPOINTS, BALL_ON_FIXED_GROUND_TRAJECTORY)
+{
+  // World
+  WorldPtr world = World::create();
+  world->setGravity(Eigen::Vector3d::UnitY() * -9.81);
+
+  ///////////////////////////////////////////////
+  // Create the ball
+  ///////////////////////////////////////////////
+
+  SkeletonPtr ball = Skeleton::create("ball");
+  std::pair<PrismaticJoint*, BodyNode*> pairBall
+      = ball->createJointAndBodyNodePair<PrismaticJoint>(nullptr);
+  PrismaticJoint* ballJoint = pairBall.first;
+  BodyNode* ballBody = pairBall.second;
+  ballJoint->setAxis(Eigen::Vector3d::UnitY());
+  std::shared_ptr<SphereShape> sphereShape(
+      new SphereShape(0.5));
+  ballBody->createShapeNodeWith<VisualAspect, CollisionAspect>(sphereShape);
+  ballBody->setFrictionCoeff(0.0);
+
+  ballJoint->setForceLowerLimit(0, -10);
+  ballJoint->setForceUpperLimit(0, 10);
+
+  world->addSkeleton(ball);
+
+  ///////////////////////////////////////////////
+  // Create the floor
+  ///////////////////////////////////////////////
+
+  SkeletonPtr floor = Skeleton::create("floor");
+  std::pair<WeldJoint*, BodyNode*> pairFloor
+      = floor->createJointAndBodyNodePair<WeldJoint>(nullptr);
+  // WeldJoint* floorJoint = pairFloor.first;
+  BodyNode* floorBody = pairFloor.second;
+  std::shared_ptr<BoxShape> floorShape(
+      new BoxShape(Eigen::Vector3d(5.0,1.0,5.0)));
+  floorBody->createShapeNodeWith<VisualAspect, CollisionAspect>(floorShape);
+  floorBody->setFrictionCoeff(0.0);
+
+  world->addSkeleton(floor);
+
+  ///////////////////////////////////////////////
+  // Try a loss function
+  ///////////////////////////////////////////////
+
+  ball->setPosition(0, 1.0 - 1e-4);
+  // Set the ball to be clamping
+  ball->setVelocity(0, - 1e-4);
+  ballBody->setMass(0.1);
+
+  std::shared_ptr<neural::BackpropSnapshot> snapshot = neural::forwardPass(world, true);
+  EXPECT_EQ(1, snapshot->getNumClamping());
+
+  ///////////////////////////////////////////////
+  // Build an actual trajectory
+  ///////////////////////////////////////////////
+
+  double goalPos = 5.0;
+
+  TrajectoryLossFn loss = [goalPos](const TrajectoryRollout* rollout) {
+    int steps = rollout->getPosesConst().cols();
+    double lastPos = rollout->getPosesConst()(0, steps - 1);
+    double diff = goalPos - lastPos;
+    return diff * diff;
+  };
+
+  TrajectoryLossFnAndGrad lossGrad = [goalPos](const TrajectoryRollout* rollout,
+                                        TrajectoryRollout* gradWrtRollout // OUT
+                                     ) {
+    gradWrtRollout->getPoses().setZero();
+    gradWrtRollout->getVels().setZero();
+    gradWrtRollout->getForces().setZero();
+
+    int steps = rollout->getPosesConst().cols();
+    double lastPos = rollout->getPosesConst()(0, steps - 1);
+    double diff = lastPos - goalPos;
+    gradWrtRollout->getPoses()(0, steps - 1) = 2 * diff;
+    return diff * diff;
+  };
+
+  LossFn lossFn = LossFn(loss, lossGrad);
+
+  SingleShot trajectory = SingleShot(world, lossFn, 50, false);
+  trajectory.setExploreAlternateStrategies(true);
+
+  world->setTimeStep(0.01);
+
+  SGDOptimizer optimizer;
+  optimizer.setLearningRate(1.0);
+  optimizer.setIterationLimit(500);
+
+  std::shared_ptr<Solution> solution = optimizer.optimize(&trajectory);
+  std::cout << "Found forces: " << trajectory.getRolloutCache(world)->getForcesConst() << std::endl;
+  std::cout << "Found vels: " << trajectory.getRolloutCache(world)->getVelsConst() << std::endl;
+  std::cout << "Found poses: " << trajectory.getRolloutCache(world)->getPosesConst() << std::endl;
+
+  /*
+  ///////////////////////////////////////////////
+  // Display a GUI
+  ///////////////////////////////////////////////
+
+  server::GUIWebsocketServer server;
+  server.serve(8070);
+  server.renderWorld(world);
+  while (server.isServing()) {
+    // do nothing
+  }
+  // server.blockWhileServing();
+  */
+}
+// #endif

@@ -29,6 +29,7 @@ class Problem
 {
 public:
   friend class IPOptShotWrapper;
+  friend class SGDOptimizer;
 
   /// Default constructor
   Problem(std::shared_ptr<simulation::World> world, LossFn loss, int steps);

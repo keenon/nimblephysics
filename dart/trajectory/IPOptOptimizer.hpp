@@ -61,13 +61,6 @@ public:
 
   void setRecordIterations(bool recordIterations);
 
-  /// This registers an intermediate callback, to get called by IPOPT after each
-  /// step of optimization. If any callback returns false on a given step, then
-  /// the optimizer will terminate early.
-  void registerIntermediateCallback(
-      std::function<bool(Problem* problem, int, double primal, double dual)>
-          callback);
-
 protected:
   int mIterationLimit;
   double mTolerance;
@@ -81,9 +74,6 @@ protected:
   bool mSilenceOutput;
   bool mDisableLinesearch;
   bool mRecordIterations;
-  std::vector<
-      std::function<bool(Problem* problem, int, double primal, double dual)>>
-      mIntermediateCallbacks;
 };
 
 } // namespace trajectory

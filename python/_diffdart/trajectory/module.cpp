@@ -39,7 +39,9 @@ namespace py = pybind11;
 namespace dart {
 namespace python {
 
+void Optimizer(py::module& sm);
 void IPOptOptimizer(py::module& sm);
+void SGDOptimizer(py::module& sm);
 void LossFn(py::module& sm);
 void Problem(py::module& sm);
 void MultiShot(py::module& sm);
@@ -55,7 +57,9 @@ void dart_trajectory(py::module& m)
       = "This provides a native trajectory optimization framework to DART, "
         "transcribing DART trajectory problems into IPOPT for solutions.";
 
+  Optimizer(sm);
   IPOptOptimizer(sm);
+  SGDOptimizer(sm);
   LossFn(sm);
   Problem(sm);
   MultiShot(sm);
