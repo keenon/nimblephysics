@@ -283,11 +283,11 @@ void _dSolveLDLT (const dReal *L, const dReal *d, dReal *b, int n, int nskip)
 }
 
 
-void _dLDLTAddTL (dReal *L, dReal *d, const dReal *a, int n, int nskip, void *tmpbuf/*[2*nskip]*/)
+bool _dLDLTAddTL (dReal *L, dReal *d, const dReal *a, int n, int nskip, void *tmpbuf/*[2*nskip]*/)
 {
   dAASSERT (L && d && a && n > 0 && nskip >= n);
 
-  if (n < 2) return;
+  if (n < 2) return true;
   dReal *W1 = tmpbuf ? (dReal *)tmpbuf : (dReal*) ALLOCA ((2*nskip)*sizeof(dReal));
   dReal *W2 = W1 + nskip;
 
@@ -305,7 +305,8 @@ void _dLDLTAddTL (dReal *L, dReal *d, const dReal *a, int n, int nskip, void *tm
   {
     dReal dee = d[0];
     dReal alphanew = alpha1 + (W11*W11)*dee;
-    dIASSERT(alphanew != dReal(0.0));
+    if (alphanew == dReal(0.0)) return false;
+    // dIASSERT(alphanew != dReal(0.0));
     dee /= alphanew;
     dReal gamma1 = W11 * dee;
     dee *= alpha1;
@@ -332,7 +333,8 @@ void _dLDLTAddTL (dReal *L, dReal *d, const dReal *a, int n, int nskip, void *tm
 
     dReal dee = d[j];
     dReal alphanew = alpha1 + (k1*k1)*dee;
-    dIASSERT(alphanew != dReal(0.0));
+    if (alphanew == dReal(0.0)) return false;
+    // dIASSERT(alphanew != dReal(0.0));
     dee /= alphanew;
     dReal gamma1 = k1 * dee;
     dee *= alpha1;
@@ -356,6 +358,7 @@ void _dLDLTAddTL (dReal *L, dReal *d, const dReal *a, int n, int nskip, void *tm
       *l = ell;
     }
   }
+  return true;
 }
 
 
@@ -371,7 +374,7 @@ void _dLDLTAddTL (dReal *L, dReal *d, const dReal *a, int n, int nskip, void *tm
 #define GETA(i,j) ((i > j) ? _GETA(i,j) : _GETA(j,i))
 
 
-void _dLDLTRemove (dReal **A, const int *p, dReal *L, dReal *d,
+bool _dLDLTRemove (dReal **A, const int *p, dReal *L, dReal *d,
     int n1, int n2, int r, int nskip, void *tmpbuf/*n2 + 2*nskip*/)
 {
   dAASSERT(A && p && L && d && n1 > 0 && n2 > 0 && r >= 0 && r < n2 &&
@@ -381,7 +384,7 @@ void _dLDLTRemove (dReal **A, const int *p, dReal *L, dReal *d,
   #endif
 
   if (r==n2-1) {
-    return;		// deleting last row/col is easy
+    return true;		// deleting last row/col is easy
   }
   else {
     size_t LDLTAddTL_size = _dEstimateLDLTAddTLTmpbufSize(nskip);
@@ -394,14 +397,15 @@ void _dLDLTRemove (dReal **A, const int *p, dReal *L, dReal *d,
         a[i] = -GETA(p[i],p_0);
       }
       a[0] += REAL(1.0);
-      dLDLTAddTL (L,d,a,n2,nskip,tmp);
+      if (!dLDLTAddTL (L,d,a,n2,nskip,tmp)) return false;
     }
     else {
       dReal *t = (dReal *)((char *)tmp + LDLTAddTL_size);
       {
         dReal *Lcurr = L + r*nskip;
         for (int i=0; i<r; ++Lcurr, ++i) {
-          dIASSERT(d[i] != dReal(0.0));
+          if (d[i] == dReal(0.0)) return false;
+          // dIASSERT(d[i] != dReal(0.0));
           t[i] = *Lcurr / d[i];
         }
       }
@@ -415,13 +419,14 @@ void _dLDLTRemove (dReal **A, const int *p, dReal *L, dReal *d,
         }
       }
       a[0] += REAL(1.0);
-      dLDLTAddTL (L + r*nskip+r, d+r, a, n2-r, nskip, tmp);
+      if (!dLDLTAddTL (L + r*nskip+r, d+r, a, n2-r, nskip, tmp)) return false;
     }
   }
 
   // snip out row/column r from L and d
   dRemoveRowCol (L,n2,nskip,r);
   if (r < (n2-1)) memmove (d+r,d+r+1,(n2-r-1)*sizeof(dReal));
+  return true;
 }
 
 
@@ -541,14 +546,14 @@ void dSolveLDLT (const dReal *L, const dReal *d, dReal *b, int n, int nskip)
   _dSolveLDLT (L, d, b, n, nskip);
 }
 
-void dLDLTAddTL (dReal *L, dReal *d, const dReal *a, int n, int nskip)
+bool dLDLTAddTL (dReal *L, dReal *d, const dReal *a, int n, int nskip)
 {
-  _dLDLTAddTL (L, d, a, n, nskip, nullptr);
+  return _dLDLTAddTL (L, d, a, n, nskip, nullptr);
 }
 
-void dLDLTRemove (dReal **A, const int *p, dReal *L, dReal *d, int n1, int n2, int r, int nskip)
+bool dLDLTRemove (dReal **A, const int *p, dReal *L, dReal *d, int n1, int n2, int r, int nskip)
 {
-  _dLDLTRemove (A, p, L, d, n1, n2, r, nskip, nullptr);
+  return _dLDLTRemove (A, p, L, d, n1, n2, r, nskip, nullptr);
 }
 
 void dRemoveRowCol (dReal *A, int n, int nskip, int r)

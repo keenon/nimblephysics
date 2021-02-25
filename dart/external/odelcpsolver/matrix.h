@@ -156,7 +156,7 @@ ODE_API void dSolveLDLT (const dReal *L, const dReal *d, dReal *b, int n, int ns
  * the result is written into L, except that the left column of L and d[0]
  * are not actually modified. see ldltaddTL.m for further comments. 
  */
-ODE_API void dLDLTAddTL (dReal *L, dReal *d, const dReal *a, int n, int nskip);
+ODE_API bool dLDLTAddTL (dReal *L, dReal *d, const dReal *a, int n, int nskip);
 
 
 /* given an L*D*L' factorization of a permuted matrix A, produce a new
@@ -176,7 +176,7 @@ ODE_API void dLDLTAddTL (dReal *L, dReal *d, const dReal *a, int n, int nskip);
  *
  * a fast O(n^2) algorithm is used. see ldltremove.m for further comments.
  */
-ODE_API void dLDLTRemove (dReal **A, const int *p, dReal *L, dReal *d,
+ODE_API bool dLDLTRemove (dReal **A, const int *p, dReal *L, dReal *d,
 		  int n1, int n2, int r, int nskip);
 
 
@@ -204,8 +204,8 @@ void _dSolveL1 (const dReal *L, dReal *b, int n, int nskip);
 void _dSolveL1T (const dReal *L, dReal *b, int n, int nskip);
 void _dVectorScale (dReal *a, const dReal *d, int n);
 void _dSolveLDLT (const dReal *L, const dReal *d, dReal *b, int n, int nskip);
-void _dLDLTAddTL (dReal *L, dReal *d, const dReal *a, int n, int nskip, void *tmpbuf);
-void _dLDLTRemove (dReal **A, const int *p, dReal *L, dReal *d, int n1, int n2, int r, int nskip, void *tmpbuf);
+bool _dLDLTAddTL (dReal *L, dReal *d, const dReal *a, int n, int nskip, void *tmpbuf);
+bool _dLDLTRemove (dReal **A, const int *p, dReal *L, dReal *d, int n1, int n2, int r, int nskip, void *tmpbuf);
 void _dRemoveRowCol (dReal *A, int n, int nskip, int r);
 
 PURE_INLINE size_t _dEstimateFactorCholeskyTmpbufSize(int n)
