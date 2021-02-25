@@ -424,7 +424,7 @@ public:
   /// finite differences. This is SUPER SLOW, and is only here for testing.
   Eigen::MatrixXd finiteDifferenceJacobianOfMinv(
       simulation::WorldPtr world, Eigen::VectorXd tau, WithRespectTo* wrt,
-      bool useRidders = true);
+      bool useRidders = false);
 
   /// This computes and returns the jacobian of M^{-1}(pos, inertia) * tau by
   /// Ridders extrapolated finite differences. This is SUPER SLOW, and is
@@ -440,7 +440,7 @@ public:
   /// This computes and returns the jacobian of C(pos, inertia, vel) by finite
   /// differences. This is SUPER SLOW, and is only here for testing.
   Eigen::MatrixXd finiteDifferenceJacobianOfC(
-      simulation::WorldPtr world, WithRespectTo* wrt, bool useRidders = true);
+      simulation::WorldPtr world, WithRespectTo* wrt, bool useRidders = false);
 
   /// This computes and returns the jacobian of C(pos, inertia, vel) by Ridders
   /// extrapolated finite differences. This is SUPER SLOW, and is only here
@@ -458,7 +458,7 @@ public:
   /// inertia, vel) by finite differences. This is SUPER SLOW, and is only here
   /// for testing.
   Eigen::MatrixXd finiteDifferenceJacobianOfMinvC(
-      simulation::WorldPtr world, WithRespectTo* wrt, bool useRidders = true);
+      simulation::WorldPtr world, WithRespectTo* wrt, bool useRidders = false);
 
   /// This computes and returns the jacobian of M^{-1}(pos, inertia) * C(pos,
   /// inertia, vel) by Ridders extrapolated finite differences. This is SUPER SLOW,

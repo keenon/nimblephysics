@@ -602,7 +602,7 @@ public:
   /// VERY SLOW: Only for testing. This computes the unconstrained Jacobian
   /// giving the difference in C(pos, vel) for finite changes
   Eigen::MatrixXd finiteDifferenceJacobianOfC(
-      neural::WithRespectTo* wrt, bool useRidders = true);
+      neural::WithRespectTo* wrt, bool useRidders = false);
 
   /// VERY SLOW: Only for testing. This computes the unconstrained Jacobian
   /// giving the difference in C(pos, vel) for finite changes, using Ridders
@@ -611,7 +611,7 @@ public:
   /// VERY SLOW: Only for testing. This computes the unconstrained Jacobian
   /// giving the difference in M^{-1}f for finite changes
   Eigen::MatrixXd finiteDifferenceJacobianOfMinv(
-      Eigen::VectorXd f, neural::WithRespectTo* wrt, bool useRidders = true);
+      Eigen::VectorXd f, neural::WithRespectTo* wrt, bool useRidders = false);
 
   /// VERY SLOW: Only for testing. This computes the unconstrained Jacobian
   /// giving the difference in M^{-1}f for finite changes, using Ridders
@@ -620,7 +620,7 @@ public:
 
   /// VERY SLOW: Only for testing. This computes the unconstrained Jacobian
   /// giving the difference in C(pos, vel) for finite changes in vel
-  Eigen::MatrixXd finiteDifferenceVelCJacobian(bool useRidders = true);
+  Eigen::MatrixXd finiteDifferenceVelCJacobian(bool useRidders = false);
 
   /// VERY SLOW: Only for testing. This computes the unconstrained Jacobian
   /// giving the difference in C(pos, vel) for finite changes in vel
