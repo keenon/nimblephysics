@@ -98,6 +98,7 @@ option(DART_CODECOV "Turn on codecov support" OFF)
 option(DART_TREAT_WARNINGS_AS_ERRORS "Treat warnings as errors" ON)
 option(DART_FAST_DEBUG "Add -O1 option for DEBUG mode build" OFF)
 option(DART_BUILD_DARTPY "Build dartpy (the python binding)" ON)
+option(DART_BUILD_BENCHMARKS "Build benchmarks" ON)
 
 if(DART_BUILD_DARTPY)
   set(BUILD_SHARED_LIBS OFF)

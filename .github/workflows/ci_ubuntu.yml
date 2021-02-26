@@ -30,6 +30,7 @@ jobs:
       COMPILER: gcc
       BUILD_TYPE: Release
       BUILD_PYTHON: ON
+      BUILD_BENCHMARKS: OFF
     steps:
       - name: Check out the repo
         uses: actions/checkout@v2

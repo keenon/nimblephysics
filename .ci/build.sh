@@ -44,6 +44,11 @@ if [ -z "$BUILD_TEST" ]; then
   BUILD_TEST=ON
 fi
 
+if [ -z "$BUILD_BENCHMARKS" ]; then
+  echo "Info: Environment variable BUILD_BENCHMARKS is unset. Using OFF by default"
+  BUILD_BENCHMARKS=OFF
+fi
+
 if [ -z "$COMPILER" ]; then
   echo "Info: Environment variable COMPILER is unset. Using gcc by default."
   COMPILER=gcc
@@ -109,6 +114,7 @@ fi
 cmake --version
 cmake $BUILD_DIR \
   -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
+  -DDART_BUILD_BENCHMARKS=$BUILD_BENCHMARKS \
   -DDART_VERBOSE=ON \
   ${install_prefix_option}
 

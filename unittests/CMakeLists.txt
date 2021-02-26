@@ -104,7 +104,9 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 add_subdirectory(comprehensive)
 add_subdirectory(regression)
 add_subdirectory(unit)
-add_subdirectory(benchmarks)
+if(DART_BUILD_BENCHMARKS)
+  add_subdirectory(benchmarks)
+endif()
 
 # Print tests
 dart_get_tests(comprehensive_tests "comprehensive")
