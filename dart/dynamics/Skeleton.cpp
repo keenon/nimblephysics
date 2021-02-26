@@ -1638,17 +1638,51 @@ Eigen::MatrixXd Skeleton::getJacobianOfC(neural::WithRespectTo* wrt)
 
   for (BodyNode* bodyNode : bodyNodes)
   {
-    bodyNode->computeJacobianOfCForwardIteration(wrt);
+    bodyNode->computeJacobianOfCForward(wrt);
   }
 
   for (auto it = bodyNodes.rbegin(); it != bodyNodes.rend(); ++it)
   {
     BodyNode* bodyNode = *it;
-    bodyNode->computeJacobianOfCBackwardIteration(
+    bodyNode->computeJacobianOfCBackward(
           wrt, DCg_Dp, mAspectProperties.mGravity);
   }
 
   return DCg_Dp;
+}
+
+//==============================================================================
+Eigen::MatrixXd Skeleton::getJacobianOfM(
+    const Eigen::VectorXd& x, neural::WithRespectTo* wrt)
+{
+  const int dofs = static_cast<int>(getNumDofs());
+  Eigen::MatrixXd DM_Dq = Eigen::MatrixXd::Zero(dofs, dofs);
+
+  if (wrt == neural::WithRespectTo::VELOCITY
+      || wrt == neural::WithRespectTo::FORCE)
+  {
+    return DM_Dq;
+  }
+
+  const auto old_ddq = getAccelerations();
+  setAccelerations(x);
+
+  std::vector<BodyNode*>& bodyNodes = mSkelCache.mBodyNodes;
+
+  for (BodyNode* bodyNode : bodyNodes)
+  {
+    bodyNode->computeJacobianOfMForward(wrt);
+  }
+
+  for (auto it = bodyNodes.rbegin(); it != bodyNodes.rend(); ++it)
+  {
+    BodyNode* bodyNode = *it;
+    bodyNode->computeJacobianOfMBackward(wrt, DM_Dq);
+  }
+
+  setAccelerations(old_ddq);
+
+  return DM_Dq;
 }
 
 #ifdef DART_DEBUG_ANALYTICAL_DERIV
@@ -1767,6 +1801,35 @@ void Skeleton::DiffMinv::print()
 //==============================================================================
 /// This gives the unconstrained Jacobian of M^{-1}f
 Eigen::MatrixXd Skeleton::getJacobianOfMinv(
+    const Eigen::VectorXd& f, neural::WithRespectTo* wrt, bool useID)
+{
+  if (useID)
+    return getJacobianOfMinv_ID(f, wrt);
+  else
+    return getJacobianOfMinv_Direct(f, wrt);
+}
+
+//==============================================================================
+Eigen::MatrixXd Skeleton::getJacobianOfMinv_ID(
+    const Eigen::VectorXd& f, neural::WithRespectTo* wrt)
+{
+  if (wrt == neural::WithRespectTo::VELOCITY
+      || wrt == neural::WithRespectTo::FORCE)
+  {
+    const int dofs = static_cast<int>(getNumDofs());
+    return Eigen::MatrixXd::Zero(dofs, dofs);
+  }
+
+  const Eigen::MatrixXd& Minv = getInvMassMatrix();
+  // const Eigen::MatrixXd& M = getMassMatrix();
+  const Eigen::MatrixXd& DMddq_Dq = getJacobianOfM(f, wrt);
+  const Eigen::MatrixXd& DC_Dq = getJacobianOfC(wrt);
+
+  return -Minv * DMddq_Dq;
+}
+
+//==============================================================================
+Eigen::MatrixXd Skeleton::getJacobianOfMinv_Direct(
     const Eigen::VectorXd& f, neural::WithRespectTo* wrt)
 {
   const int dofs = static_cast<int>(getNumDofs());
@@ -1792,13 +1855,13 @@ Eigen::MatrixXd Skeleton::getJacobianOfMinv(
   {
     BodyNode* bodyNode = *it;
     bodyNode->computeJacobianOfMinvXInit();
-    bodyNode->computeJacobianOfMinvXBackwardIteration();
+    bodyNode->computeJacobianOfMinvXBackward();
   }
 
   // Forward iteration
   for (BodyNode* bodyNode : bodyNodes)
   {
-    bodyNode->computeJacobianOfMinvXForwardIteration(DMinvX_Dp);
+    bodyNode->computeJacobianOfMinvXForward(DMinvX_Dp);
   }
 
 #ifdef DART_DEBUG_ANALYTICAL_DERIV
@@ -1893,6 +1956,42 @@ Eigen::MatrixXd Skeleton::getVelCJacobian()
 {
   // TOOD(keenon): replace with the GEAR approach
   return finiteDifferenceVelCJacobian();
+}
+
+//==============================================================================
+Eigen::MatrixXd Skeleton::finiteDifferenceJacobianOfM(
+    const Eigen::VectorXd& f, neural::WithRespectTo* wrt, bool /*useRidders*/)
+{
+//  if (useRidders) return finiteDifferenceRiddersJacobianOfM(f, wrt);
+
+  std::size_t n = getNumDofs();
+  std::size_t m = wrt->dim(this);
+  Eigen::MatrixXd J = Eigen::MatrixXd::Zero(n, m);
+  Eigen::VectorXd start = wrt->get(this);
+
+  // Get baseline C(pos, vel)
+  Eigen::VectorXd baseline = getMassMatrix() * f;
+
+  double EPS = 5e-7;
+
+  for (std::size_t i = 0; i < m; i++)
+  {
+    Eigen::VectorXd tweaked = start;
+    tweaked(i) += EPS;
+    wrt->set(this, tweaked);
+    Eigen::VectorXd plus = getMassMatrix() * f;
+    tweaked = start;
+    tweaked(i) -= EPS;
+    wrt->set(this, tweaked);
+    Eigen::VectorXd minus = getMassMatrix() * f;
+
+    J.col(i) = (plus - minus) / (2 * EPS);
+  }
+
+  // Reset everything how we left it
+  wrt->set(this, start);
+
+  return J;
 }
 
 //==============================================================================
