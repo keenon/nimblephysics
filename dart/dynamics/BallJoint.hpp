@@ -167,17 +167,6 @@ protected:
   // Documentation inherited
   void updateRelativeJacobianTimeDeriv() const override;
 
-protected:
-
-  /// Access mR, which is an auto-updating variable
-  const Eigen::Isometry3d& getR() const;
-
-  /// Rotation matrix dependent on the generalized coordinates
-  ///
-  /// Do not use directly! Use getR() to access this
-  mutable Eigen::Isometry3d mR;
-
-public:
   // To get byte-aligned Eigen vectors
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
