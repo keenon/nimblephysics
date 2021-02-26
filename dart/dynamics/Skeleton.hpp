@@ -604,6 +604,12 @@ public:
   Eigen::MatrixXd getJacobianOfM(
       const Eigen::VectorXd& x, neural::WithRespectTo* wrt);
 
+  /// This gives the unconstrained Jacobian of M*x using the derivative of the
+  /// inverse dynamics
+  /// @warning SLOW: Only for testing
+  Eigen::MatrixXd getJacobianOfID(
+      const Eigen::VectorXd& x, neural::WithRespectTo* wrt);
+
 #ifdef DART_DEBUG_ANALYTICAL_DERIV
   struct DiffMinv
   {
@@ -665,6 +671,11 @@ public:
   /// giving the difference in C(pos, vel) for finite changes
   Eigen::MatrixXd finiteDifferenceJacobianOfC(
       neural::WithRespectTo* wrt, bool useRidders = false);
+
+  /// VERY SLOW: Only for testing. This computes the unconstrained Jacobian
+  /// giving the difference in M*f + C(pos, vel) for finite changes
+  Eigen::MatrixXd finiteDifferenceJacobianOfID(
+      const Eigen::VectorXd& f, neural::WithRespectTo* wrt, bool useRidders = false);
 
   /// VERY SLOW: Only for testing. This computes the unconstrained Jacobian
   /// giving the difference in C(pos, vel) for finite changes, using Ridders

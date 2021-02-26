@@ -284,6 +284,96 @@ TEST_F(DifferentialDynamics, compareEquationsOfMotion)
           }
         }
 
+        // Test derivative of inverse dynamics w.r.t. position
+        {
+          Eigen::VectorXd x = Eigen::VectorXd::Random(dof);
+          Eigen::MatrixXd DID_Dq_numerical
+              = skel->finiteDifferenceJacobianOfID(x, neural::WithRespectTo::POSITION);
+          Eigen::MatrixXd DID_Dq_analytic
+              = skel->getJacobianOfID(x, neural::WithRespectTo::POSITION);
+          const bool res = equals(DID_Dq_analytic, DID_Dq_numerical,
+                                  abs_tol_invM, rel_tol_invM);
+          EXPECT_TRUE(res);
+          if (!res)
+          {
+#ifdef DART_DEBUG_ANALYTICAL_DERIV
+            skel->mDiffMinv.print();
+#endif
+            cout << "[DEBUG] URI: " << uri.toString() << std::endl;
+
+            cout << "[DEBUG] DID/Dq * x analytic\n";
+            cout << DID_Dq_analytic << std::endl;
+
+            cout << "[DEBUG] DID/Dq * x numerical\n";
+            cout << DID_Dq_numerical << std::endl;
+
+            cout << "[DEBUG] Diff\n";
+            cout << DID_Dq_analytic - DID_Dq_numerical << std::endl;
+
+            cout << "[DEBUG] max(Diff): " << (DID_Dq_analytic - DID_Dq_numerical).maxCoeff() << std::endl;
+          }
+        }
+
+        // Test derivative of inverse dynamics w.r.t. velocity
+        {
+          Eigen::VectorXd x = Eigen::VectorXd::Random(dof);
+          Eigen::MatrixXd DID_Ddq_numerical
+              = skel->finiteDifferenceJacobianOfID(x, neural::WithRespectTo::VELOCITY);
+          Eigen::MatrixXd DID_Ddq_analytic
+              = skel->getJacobianOfID(x, neural::WithRespectTo::VELOCITY);
+          const bool res = equals(DID_Ddq_analytic, DID_Ddq_numerical,
+                                  abs_tol_invM, rel_tol_invM);
+          EXPECT_TRUE(res);
+          if (!res)
+          {
+#ifdef DART_DEBUG_ANALYTICAL_DERIV
+            skel->mDiffMinv.print();
+#endif
+            cout << "[DEBUG] URI: " << uri.toString() << std::endl;
+
+            cout << "[DEBUG] DID/Ddq * x analytic\n";
+            cout << DID_Ddq_analytic << std::endl;
+
+            cout << "[DEBUG] DID/Ddq * x numerical\n";
+            cout << DID_Ddq_numerical << std::endl;
+
+            cout << "[DEBUG] Diff\n";
+            cout << DID_Ddq_analytic - DID_Ddq_numerical << std::endl;
+
+            cout << "[DEBUG] max(Diff): " << (DID_Ddq_analytic - DID_Ddq_numerical).maxCoeff() << std::endl;
+          }
+        }
+
+        // Test derivative of inverse dynamics w.r.t. force
+        {
+          Eigen::VectorXd x = Eigen::VectorXd::Random(dof);
+          Eigen::MatrixXd DID_Df_numerical
+              = skel->finiteDifferenceJacobianOfID(x, neural::WithRespectTo::FORCE);
+          Eigen::MatrixXd DID_Df_analytic
+              = skel->getJacobianOfID(x, neural::WithRespectTo::FORCE);
+          const bool res = equals(DID_Df_analytic, DID_Df_numerical,
+                                  abs_tol_invM, rel_tol_invM);
+          EXPECT_TRUE(res);
+          if (!res)
+          {
+#ifdef DART_DEBUG_ANALYTICAL_DERIV
+            skel->mDiffMinv.print();
+#endif
+            cout << "[DEBUG] URI: " << uri.toString() << std::endl;
+
+            cout << "[DEBUG] DID/Df * x analytic\n";
+            cout << DID_Df_analytic << std::endl;
+
+            cout << "[DEBUG] DID/Df * x numerical\n";
+            cout << DID_Df_numerical << std::endl;
+
+            cout << "[DEBUG] Diff\n";
+            cout << DID_Df_analytic - DID_Df_numerical << std::endl;
+
+            cout << "[DEBUG] max(Diff): " << (DID_Df_analytic - DID_Df_numerical).maxCoeff() << std::endl;
+          }
+        }
+
         // Test derivative of Coriolis matrix w.r.t. velocity
         {
           Eigen::MatrixXd C_dq_analytic
@@ -382,6 +472,37 @@ TEST_F(DifferentialDynamics, compareEquationsOfMotion)
           EXPECT_TRUE(skel->getJacobianOfMinv_ID(x, neural::WithRespectTo::FORCE).isZero());
           EXPECT_TRUE(skel->finiteDifferenceJacobianOfMinv(x, neural::WithRespectTo::VELOCITY).isZero());
           EXPECT_TRUE(skel->finiteDifferenceJacobianOfMinv(x, neural::WithRespectTo::FORCE).isZero());
+        }
+
+        // Verify Equation 24 of Carpentier's papaer
+        {
+//          Eigen::VectorXd x = Eigen::VectorXd::Random(dof);
+//          x = skel->getAccelerations();
+//          const Eigen::MatrixXd DMinvX_Dq_1
+//              = skel->getJacobianOfMinv_Direct(x, neural::WithRespectTo::POSITION);
+
+//          const Eigen::MatrixXd Minv = skel->getInvMassMatrix();
+//          const Eigen::MatrixXd dID_Dq
+//              = skel->getJacobianOfID(x, neural::WithRespectTo::POSITION);
+//          const Eigen::MatrixXd DMinvX_Dq_2 = - Minv * dID_Dq;
+//          const bool res = equals(DMinvX_Dq_1, DMinvX_Dq_2,
+//                                  abs_tol_invM, rel_tol_invM);
+//          EXPECT_TRUE(res);
+//          if (!res)
+//          {
+//            cout << "[DEBUG] URI: " << uri.toString() << std::endl;
+
+//            cout << "[DEBUG] D(M^{-1})/Dq * x: FD\n";
+//            cout << DMinvX_Dq_1 << std::endl;
+
+//            cout << "[DEBUG] D(M^{-1})/Dq * x: ID\n";
+//            cout << DMinvX_Dq_2 << std::endl;
+
+//            cout << "[DEBUG] Diff\n";
+//            cout << DMinvX_Dq_1 - DMinvX_Dq_2 << std::endl;
+
+//            cout << "[DEBUG] max(Diff): " << (DMinvX_Dq_2 - DMinvX_Dq_2).maxCoeff() << std::endl;
+//          }
         }
       }
     }
