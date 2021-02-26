@@ -1064,6 +1064,11 @@ protected:
   /// \{ \name Differential Dynamics
   //----------------------------------------------------------------------------
 
+  void computeJacobianOfMddqForward(neural::WithRespectTo* wrt);
+  void computeJacobianOfMddqBackward(
+      neural::WithRespectTo* wrt,
+      Eigen::MatrixXd& dCg);
+
   void computeJacobianOfCForwardIteration(neural::WithRespectTo* wrt);
   void computeJacobianOfCBackwardIteration(
       neural::WithRespectTo* wrt,
@@ -1201,6 +1206,10 @@ public:
   Eigen::Vector6d mArbitrarySpatial;
 
   //------------------------- Differential Dynamics ----------------------------
+
+  math::Jacobian mMddq_V_p;
+  math::Jacobian mMddq_dV_p;
+  math::Jacobian mMddq_F_p;
 
   /// Cache data for combined vector of the system.
   math::Jacobian mCg_V_p;

@@ -1623,6 +1623,33 @@ void Skeleton::setGradientConstraintMatrices(
 }
 
 //==============================================================================
+Eigen::MatrixXd Skeleton::getDerivativeOfMddq(neural::WithRespectTo* wrt)
+{
+  const int dofs = static_cast<int>(getNumDofs());
+  Eigen::MatrixXd DCg_Dp = Eigen::MatrixXd::Zero(dofs, dofs);
+
+  if (wrt == neural::WithRespectTo::FORCE)
+  {
+    return DCg_Dp;
+  }
+
+  std::vector<BodyNode*>& bodyNodes = mSkelCache.mBodyNodes;
+
+  for (BodyNode* bodyNode : bodyNodes)
+  {
+    bodyNode->computeJacobianOfMddqForward(wrt);
+  }
+
+  for (auto it = bodyNodes.rbegin(); it != bodyNodes.rend(); ++it)
+  {
+    BodyNode* bodyNode = *it;
+    bodyNode->computeJacobianOfMddqBackward(wrt, DCg_Dp);
+  }
+
+  return DCg_Dp;
+}
+
+//==============================================================================
 Eigen::MatrixXd Skeleton::getJacobianOfC(neural::WithRespectTo* wrt)
 {
   const int dofs = static_cast<int>(getNumDofs());
@@ -1768,8 +1795,8 @@ void Skeleton::DiffMinv::print()
 Eigen::MatrixXd Skeleton::getJacobianOfMinv(
     const Eigen::VectorXd& f, neural::WithRespectTo* wrt)
 {
-  return getJacobianOfMinv_ID(f, wrt);
-//  return getJacobianOfMinv_Direct(f, wrt);
+//  return getJacobianOfMinv_ID(f, wrt);
+  return getJacobianOfMinv_Direct(f, wrt);
 }
 
 //==============================================================================

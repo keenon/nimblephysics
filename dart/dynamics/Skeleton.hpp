@@ -594,6 +594,8 @@ public:
   /// This gives the unconstrained Jacobian giving the difference in C(pos, vel)
   Eigen::MatrixXd getVelCJacobian();
 
+  Eigen::MatrixXd getDerivativeOfMddq(neural::WithRespectTo* wrt);
+
   /// This gives the unconstrained Jacobian of C(pos, vel)
   Eigen::MatrixXd getJacobianOfC(neural::WithRespectTo* wrt);
 
