@@ -141,20 +141,20 @@ Eigen::Vector3d BallJoint::getPositionDifferencesStatic(
 //==============================================================================
 void BallJoint::integratePositions(double dt)
 {
-  const auto& q = getPositionsStatic();
-  const auto& dq = getVelocitiesStatic();
+  const Eigen::Vector3d& q = getPositionsStatic();
+  const Eigen::Vector3d& dq = getVelocitiesStatic();
 
-  const Eigen::Matrix3d S = math::so3RightJacobian(q);
-  const Eigen::Matrix3d Rnext
-      = convertToRotation(q) * convertToRotation(S * dq * dt);
-
-  setPositionsStatic(convertToPositions(Rnext));
+  setPositionsStatic(integratePositionsExplicit(q, dq, dt));
 }
 
 //==============================================================================
 Eigen::VectorXd BallJoint::integratePositionsExplicit(Eigen::VectorXd pos, Eigen::VectorXd vel, double dt) {
-  Eigen::Matrix3d Rnext
-      = convertToRotation(pos) * convertToRotation(vel * dt);
+  const auto& q = pos;
+  const auto& dq = vel;
+
+  const Eigen::Matrix3d S = math::so3RightJacobian(q);
+  const Eigen::Matrix3d Rnext
+      = convertToRotation(q) * convertToRotation(S * dq * dt);
 
   return convertToPositions(Rnext);
 }

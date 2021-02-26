@@ -372,16 +372,6 @@ protected:
   // Documentation inherited
   void updateRelativeJacobianTimeDeriv() const override;
 
-protected:
-
-  /// Access mQ, which is an auto-updating variable
-  const Eigen::Isometry3d& getQ() const;
-
-  /// Transformation matrix dependent on generalized coordinates
-  ///
-  /// Do not use directly! Use getQ() to access this
-  mutable Eigen::Isometry3d mQ;
-
 public:
   // To get byte-aligned Eigen vectors
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW

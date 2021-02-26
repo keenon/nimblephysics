@@ -139,7 +139,11 @@ void JOINTS::randomizeRefFrames()
 template <typename JointType>
 void JOINTS::kinematicsTest(const typename JointType::Properties& _properties)
 {
-  int numTests = 1;
+#ifdef NDEBUG
+  int numTests = 5;
+#else
+  int numTests = 2;
+#endif
 
   SkeletonPtr skeleton = Skeleton::create();
   Joint* joint = skeleton->createJointAndBodyNodePair<JointType>(
@@ -157,7 +161,7 @@ void JOINTS::kinematicsTest(const typename JointType::Properties& _properties)
 
   for (int idxTest = 0; idxTest < numTests; ++idxTest)
   {
-    double q_delta = 0.000001;
+    double q_delta = 1e-6;
 
     for (int i = 0; i < dof; ++i)
     {
@@ -362,14 +366,12 @@ TEST_F(JOINTS, PLANAR_JOINT)
 #endif
 
 // 6-dof joint
-//TEST_F(JOINTS, FREE_JOINT)
-//{
-//  kinematicsTest<FreeJoint>();
-//}
-// TODO(JS): Disabled the test compares analytical Jacobian and numerical
-// Jacobian since the meaning of FreeJoint Jacobian is changed per
-// we now use spatial velocity and spatial accertions as FreeJoint's generalized
-// velocities and accelerations, repectively.
+#ifdef ALL_TESTS
+TEST_F(JOINTS, FREE_JOINT)
+{
+  kinematicsTest<FreeJoint>();
+}
+#endif
 
 //==============================================================================
 template <void (Joint::*setX)(std::size_t, double),

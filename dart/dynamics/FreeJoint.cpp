@@ -528,9 +528,23 @@ void FreeJoint::setAngularAcceleration(
 
 //==============================================================================
 Eigen::Matrix6d FreeJoint::getRelativeJacobianStatic(
-    const Eigen::Vector6d& /*positions*/) const
+    const Eigen::Vector6d& positions) const
 {
-  return mJacobian;
+  const Eigen::Vector6d& q = positions;
+  const Eigen::Isometry3d& T = Joint::mAspectProperties.mT_ChildBodyToJoint;
+
+  Eigen::Matrix6d J;
+
+  J.topLeftCorner<3, 3>().noalias()
+      = T.rotation() * math::so3RightJacobian(q.head<3>());
+  J.bottomLeftCorner<3, 3>().noalias()
+      = math::makeSkewSymmetric(T.translation()) * J.topLeftCorner<3, 3>();
+
+  J.topRightCorner<3, 3>().setZero();
+  J.bottomRightCorner<3, 3>()
+      = T.rotation() * math::expMapRot(q.head<3>()).transpose();
+
+  return J;
 }
 
 //==============================================================================
@@ -540,14 +554,17 @@ Eigen::Vector6d FreeJoint::getPositionDifferencesStatic(
 {
   const Eigen::Isometry3d T1 = convertToTransform(_q1);
   const Eigen::Isometry3d T2 = convertToTransform(_q2);
+  const Eigen::Matrix3d S_angular = math::so3RightJacobian(_q1.head<3>());
+  Eigen::Matrix6d J = Eigen::Matrix6d::Zero();
+  J.topLeftCorner<3, 3>() = S_angular;
+  J.bottomRightCorner<3, 3>() = T1.linear().transpose();
 
-  return convertToPositions(T1.inverse() * T2);
+  return J.inverse() * convertToPositions(T1.inverse() * T2);
 }
 
 //==============================================================================
 FreeJoint::FreeJoint(const Properties& properties)
-  : Base(properties),
-    mQ(Eigen::Isometry3d::Identity())
+  : Base(properties)
 {
   mJacobianDeriv = Eigen::Matrix6d::Zero();
 
@@ -584,20 +601,27 @@ bool FreeJoint::isCyclic(std::size_t _index) const
 }
 
 //==============================================================================
-void FreeJoint::integratePositions(double _dt)
+void FreeJoint::integratePositions(double dt)
 {
-  const Eigen::Isometry3d Qnext
-      = getQ() * convertToTransform(getVelocitiesStatic() * _dt);
+  const Eigen::Vector6d& q = getPositionsStatic();
+  const Eigen::Vector6d& dq = getVelocitiesStatic();
 
-  setPositionsStatic(convertToPositions(Qnext));
+  setPositionsStatic(integratePositionsExplicit(q, dq, dt));
 }
 
 //==============================================================================
 Eigen::VectorXd FreeJoint::integratePositionsExplicit(Eigen::VectorXd pos, Eigen::VectorXd vel, double dt) {
-  const Eigen::Isometry3d mQ = FreeJoint::convertToTransform(pos);
-  const Eigen::Isometry3d Qnext = mQ * FreeJoint::convertToTransform(vel * dt);
+  const Eigen::Vector6d& q = pos;
+  const Eigen::Vector6d& dq = vel;
 
-  return FreeJoint::convertToPositions(Qnext);
+  const Eigen::Matrix3d S_angular = math::so3RightJacobian(q.head<3>());
+  const Eigen::Isometry3d T1 = convertToTransform(q);
+
+  Eigen::Isometry3d T2 = Eigen::Isometry3d::Identity();
+  T2.linear() = T1.linear() * math::expMapRot(S_angular * dq.head<3>() * dt);
+  T2.translation() = T1.translation() + dq.tail<3>() * dt;
+
+  return convertToPositions(T2);
 }
 
 //==============================================================================
@@ -672,30 +696,39 @@ void FreeJoint::updateDegreeOfFreedomNames()
 //==============================================================================
 void FreeJoint::updateRelativeTransform() const
 {
-  mQ = convertToTransform(getPositionsStatic());
+  const Eigen::Isometry3d T = convertToTransform(getPositionsStatic());
 
-  // T_pj * mQ * T_cj^{-1}
-
-  mT = Joint::mAspectProperties.mT_ParentBodyToJoint * mQ
+  mT = Joint::mAspectProperties.mT_ParentBodyToJoint * T
       * Joint::mAspectProperties.mT_ChildBodyToJoint.inverse();
 
   assert(math::verifyTransform(mT));
 }
 
 //==============================================================================
-void FreeJoint::updateRelativeJacobian(bool _mandatory) const
+void FreeJoint::updateRelativeJacobian(bool /*mandatory*/) const
 {
-
-  // Ad[T_cj]
-
-  if (_mandatory)
-    mJacobian = math::getAdTMatrix(Joint::mAspectProperties.mT_ChildBodyToJoint);
+  mJacobian = getRelativeJacobianStatic(getPositionsStatic());
 }
 
 //==============================================================================
 void FreeJoint::updateRelativeJacobianTimeDeriv() const
 {
-  assert(Eigen::Matrix6d::Zero() == mJacobianDeriv);
+  const auto& q = getPositionsStatic();
+  const auto& dq = getVelocitiesStatic();
+  const Eigen::Isometry3d& T = Joint::mAspectProperties.mT_ChildBodyToJoint;
+
+  const Eigen::Matrix3d dJ
+      = math::so3RightJacobianTimeDeriv(q.head<3>(), dq.head<3>());
+
+  const Eigen::Matrix3d S = math::so3RightJacobian(q.head<3>());
+
+  mJacobianDeriv.topLeftCorner<3, 3>().noalias() = T.rotation() * dJ;
+  mJacobianDeriv.bottomLeftCorner<3, 3>().noalias()
+      = math::makeSkewSymmetric(T.translation()) * mJacobianDeriv.topLeftCorner<3, 3>();
+  mJacobianDeriv.bottomRightCorner<3, 3>().noalias()
+      = T.rotation()
+      * math::makeSkewSymmetric(S * -dq.head<3>())
+      * math::expMapRot(q.head<3>()).transpose();
 }
 
 //==============================================================================
@@ -811,18 +844,6 @@ Eigen::Vector6d FreeJoint::getScrewAxisGradientForForce(
   }
   return math::AdT(
     parentTransform * Joint::mAspectProperties.mT_ParentBodyToJoint, grad);
-}
-
-//==============================================================================
-const Eigen::Isometry3d& FreeJoint::getQ() const
-{
-  if(mNeedTransformUpdate)
-  {
-    updateRelativeTransform();
-    mNeedTransformUpdate = false;
-  }
-
-  return mQ;
 }
 
 }  // namespace dynamics
