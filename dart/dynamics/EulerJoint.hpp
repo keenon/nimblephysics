@@ -146,6 +146,10 @@ public:
   Eigen::Matrix<double, 6, 3> getRelativeJacobianStatic(
       const Eigen::Vector3d& _positions) const override;
 
+  math::Jacobian getRelativeJacobianDeriv(std::size_t index) const override;
+  math::Jacobian getRelativeJacobianTimeDerivDeriv(std::size_t index) const override;
+  math::Jacobian getRelativeJacobianTimeDerivDeriv2(std::size_t index) const override;
+
 protected:
 
   /// Constructor called by Skeleton class

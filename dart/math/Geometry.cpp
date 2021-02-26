@@ -1051,6 +1051,50 @@ Eigen::Matrix6d getAdTMatrix(const Eigen::Isometry3d& T)
   return AdT;
 }
 
+//==============================================================================
+Eigen::Matrix6d AdTMatrix(const Eigen::Isometry3d& T)
+{
+  return getAdTMatrix(T);
+}
+
+//==============================================================================
+Eigen::Matrix6d AdInvTMatrix(const Eigen::Isometry3d& T)
+{
+  Eigen::Matrix6d AdT;
+
+  AdT.topRightCorner<3, 3>().setZero();
+
+  AdT.topLeftCorner<3, 3>() = T.linear().transpose();
+  AdT.bottomRightCorner<3, 3>() = AdT.topLeftCorner<3, 3>();
+
+  AdT.bottomLeftCorner<3, 3>()
+      = AdT.topLeftCorner<3, 3>() * makeSkewSymmetric(-T.translation());
+
+  return AdT;
+}
+
+//==============================================================================
+Eigen::Matrix6d dAdTMatrix(const Eigen::Isometry3d& T)
+{
+  Eigen::Matrix6d AdT;
+
+  AdT.bottomLeftCorner<3, 3>().setZero();
+
+  AdT.topLeftCorner<3, 3>() = T.linear();
+  AdT.bottomRightCorner<3, 3>() = AdT.topLeftCorner<3, 3>();
+
+  AdT.topRightCorner<3, 3>()
+      = makeSkewSymmetric(T.translation()) * T.linear();
+
+  return AdT;
+}
+
+//==============================================================================
+Eigen::Matrix6d dAdInvTMatrix(const Eigen::Isometry3d& T)
+{
+  return AdInvTMatrix(T).transpose();
+}
+
 Eigen::Vector6d AdR(const Eigen::Isometry3d& _T, const Eigen::Vector6d& _V)
 {
   //--------------------------------------------------------------------------
@@ -1163,6 +1207,25 @@ Eigen::Vector6d ad(const Eigen::Vector6d& _X, const Eigen::Vector6d& _Y)
   res.head<3>() = _X.head<3>().cross(_Y.head<3>());
   res.tail<3>()
       = _X.head<3>().cross(_Y.tail<3>()) + _X.tail<3>().cross(_Y.head<3>());
+  return res;
+}
+
+Eigen::Matrix6d adMatrix(const Eigen::Vector6d& X)
+{
+  //--------------------------------------------------------------------------
+  // ad(s) = | [w1]    0 |
+  //         | [v1] [w1] |
+  //--------------------------------------------------------------------------
+
+  Eigen::Matrix6d res;
+
+  res.topRightCorner<3, 3>().setZero();
+
+  res.topLeftCorner<3, 3>() = makeSkewSymmetric(X.head<3>());
+  res.bottomRightCorner<3, 3>() = res.topLeftCorner<3, 3>();
+
+  res.bottomLeftCorner<3, 3>() = makeSkewSymmetric(X.tail<3>());
+
   return res;
 }
 
@@ -1668,6 +1731,42 @@ Eigen::Matrix3d so3RightJacobianTimeDeriv(
   }
 
   return Jdot;
+}
+
+//==============================================================================
+Eigen::Matrix3d so3RightJacobianTimeDerivDeriv(
+    const Eigen::Vector3d& q, const Eigen::Vector3d& dq, int index) {
+  // TODO(JS): Relplace with analytical method
+
+  const double eps = 1e-7;
+
+  Eigen::Vector3d perterb = q;
+  perterb[index] += eps;
+  const Eigen::Matrix3d mat1 = so3RightJacobianTimeDeriv(perterb, dq);
+
+  perterb = q;
+  perterb[index] -= eps;
+  const Eigen::Matrix3d mat2 = so3RightJacobianTimeDeriv(perterb, dq);
+
+  return (mat1 - mat2) / (eps * 2);
+}
+
+//==============================================================================
+Eigen::Matrix3d so3RightJacobianTimeDerivDeriv2(
+    const Eigen::Vector3d& q, const Eigen::Vector3d& dq, int index) {
+  // TODO(JS): Relplace with analytical method
+
+  const double eps = 1e-7;
+
+  Eigen::Vector3d perterb = dq;
+  perterb[index] += eps;
+  const Eigen::Matrix3d mat1 = so3RightJacobianTimeDeriv(q, perterb);
+
+  perterb = dq;
+  perterb[index] -= eps;
+  const Eigen::Matrix3d mat2 = so3RightJacobianTimeDeriv(q, perterb);
+
+  return (mat1 - mat2) / (eps * 2);
 }
 
 // R = Exp(w)

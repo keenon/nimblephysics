@@ -128,6 +128,64 @@ Eigen::Matrix<double, 6, 3> BallJoint::getRelativeJacobianStatic(
 }
 
 //==============================================================================
+math::Jacobian BallJoint::getRelativeJacobianDeriv(std::size_t index) const
+{
+  Eigen::Matrix<double, 6, 3> DS_Dq;
+
+  const auto& q = getPositionsStatic();
+  Eigen::Vector3d dq = Eigen::Vector3d::Zero();
+  dq[static_cast<int>(index)] = 1;
+
+  Eigen::Matrix3d S = math::so3RightJacobianTimeDeriv(q, dq);
+
+  const Eigen::Isometry3d& T = Joint::mAspectProperties.mT_ChildBodyToJoint;
+
+  DS_Dq.topRows(3).noalias() = T.rotation() * S;
+  DS_Dq.bottomRows(3).noalias()
+      = math::makeSkewSymmetric(T.translation()) * DS_Dq.topRows(3);
+
+  return DS_Dq;
+}
+
+//==============================================================================
+math::Jacobian BallJoint::getRelativeJacobianTimeDerivDeriv(std::size_t index) const
+{
+  Eigen::Matrix<double, 6, 3> DdS_Dq;
+
+  const auto& q = getPositionsStatic();
+  const auto& dq = getVelocitiesStatic();
+
+  const Eigen::Matrix3d S
+      = math::so3RightJacobianTimeDerivDeriv(q, dq, static_cast<int>(index));
+  const Eigen::Isometry3d& T = Joint::mAspectProperties.mT_ChildBodyToJoint;
+
+  DdS_Dq.topRows(3).noalias() = T.rotation() * S;
+  DdS_Dq.bottomRows(3).noalias()
+      = math::makeSkewSymmetric(T.translation()) * DdS_Dq.topRows(3);
+
+  return DdS_Dq;
+}
+
+//==============================================================================
+math::Jacobian BallJoint::getRelativeJacobianTimeDerivDeriv2(std::size_t index) const
+{
+  Eigen::Matrix<double, 6, 3> DdS_Dq;
+
+  const auto& q = getPositionsStatic();
+  const auto& dq = getVelocitiesStatic();
+
+  const Eigen::Matrix3d S
+      = math::so3RightJacobianTimeDerivDeriv2(q, dq, static_cast<int>(index));
+  const Eigen::Isometry3d& T = Joint::mAspectProperties.mT_ChildBodyToJoint;
+
+  DdS_Dq.topRows(3).noalias() = T.rotation() * S;
+  DdS_Dq.bottomRows(3).noalias()
+      = math::makeSkewSymmetric(T.translation()) * DdS_Dq.topRows(3);
+
+  return DdS_Dq;
+}
+
+//==============================================================================
 Eigen::Vector3d BallJoint::getPositionDifferencesStatic(
     const Eigen::Vector3d& _q2, const Eigen::Vector3d& _q1) const
 {

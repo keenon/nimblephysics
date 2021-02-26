@@ -60,6 +60,12 @@ ZeroDofJoint::Properties ZeroDofJoint::getZeroDofJointProperties() const
 }
 
 //==============================================================================
+bool ZeroDofJoint::hasDof(const DegreeOfFreedom*) const
+{
+  return false;
+}
+
+//==============================================================================
 DegreeOfFreedom* ZeroDofJoint::getDof(std::size_t)
 {
   dterr << "[ZeroDofJoint::getDof] Attempting to get a DegreeOfFreedom from a "
