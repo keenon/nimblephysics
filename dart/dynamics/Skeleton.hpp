@@ -641,8 +641,9 @@ public:
 
   /// This gives the unconstrained Jacobian of M^{-1}f
   Eigen::MatrixXd getJacobianOfMinv(
-      const Eigen::VectorXd& f, neural::WithRespectTo* wrt);
+      const Eigen::VectorXd& f, neural::WithRespectTo* wrt, bool useID = false);
 
+  // TODO(JS): Still doesn't work
   Eigen::MatrixXd getJacobianOfMinv_ID(
       const Eigen::VectorXd& f, neural::WithRespectTo* wrt);
 

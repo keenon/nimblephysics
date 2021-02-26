@@ -1801,19 +1801,31 @@ void Skeleton::DiffMinv::print()
 //==============================================================================
 /// This gives the unconstrained Jacobian of M^{-1}f
 Eigen::MatrixXd Skeleton::getJacobianOfMinv(
-    const Eigen::VectorXd& f, neural::WithRespectTo* wrt)
+    const Eigen::VectorXd& f, neural::WithRespectTo* wrt, bool useID)
 {
-  return getJacobianOfMinv_Direct(f, wrt);
+  if (useID)
+    return getJacobianOfMinv_ID(f, wrt);
+  else
+    return getJacobianOfMinv_Direct(f, wrt);
 }
 
 //==============================================================================
 Eigen::MatrixXd Skeleton::getJacobianOfMinv_ID(
     const Eigen::VectorXd& f, neural::WithRespectTo* wrt)
 {
-  // TODO(JS)
-  (void)f;
-  (void)wrt;
-  return {};
+  if (wrt == neural::WithRespectTo::VELOCITY
+      || wrt == neural::WithRespectTo::FORCE)
+  {
+    const int dofs = static_cast<int>(getNumDofs());
+    return Eigen::MatrixXd::Zero(dofs, dofs);
+  }
+
+  const Eigen::MatrixXd& Minv = getInvMassMatrix();
+  // const Eigen::MatrixXd& M = getMassMatrix();
+  const Eigen::MatrixXd& DMddq_Dq = getJacobianOfM(f, wrt);
+  const Eigen::MatrixXd& DC_Dq = getJacobianOfC(wrt);
+
+  return -Minv * DMddq_Dq;
 }
 
 //==============================================================================
