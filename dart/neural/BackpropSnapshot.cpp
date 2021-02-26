@@ -1803,23 +1803,18 @@ void BackpropSnapshot::setSlowDebugResultsAgainstFD(bool slowDebug)
 void BackpropSnapshot::benchmarkJacobians(
     std::shared_ptr<simulation::World> world, int numSamples)
 {
-  long posPosR = 0L;
   long posPosFd = 0L;
   long posPosA = 0L;
 
-  long posVelR = 0L;
   long posVelFd = 0L;
   long posVelA = 0L;
 
-  long velPosR = 0L;
   long velPosFd = 0L;
   long velPosA = 0L;
 
-  long velVelR = 0L;
   long velVelFd = 0L;
   long velVelA = 0L;
 
-  long forceVelR = 0L;
   long forceVelFd = 0L;
   long forceVelA = 0L;
 
@@ -1932,50 +1927,6 @@ void BackpropSnapshot::benchmarkJacobians(
     endTime = duration_cast<nanoseconds>(system_clock::now().time_since_epoch())
                   .count();
     forceVelFd += endTime - startTime;
-
-    ////////////////////////////////////////////////////////////////////
-    // Now do all the Ridders Jacobians one after another
-    ////////////////////////////////////////////////////////////////////
-
-    startTime
-        = duration_cast<nanoseconds>(system_clock::now().time_since_epoch())
-              .count();
-    finiteDifferencePosPosJacobian(world, 1, true);
-    endTime = duration_cast<nanoseconds>(system_clock::now().time_since_epoch())
-                  .count();
-    posPosR += endTime - startTime;
-
-    startTime
-        = duration_cast<nanoseconds>(system_clock::now().time_since_epoch())
-              .count();
-    finiteDifferencePosVelJacobian(world, true);
-    endTime = duration_cast<nanoseconds>(system_clock::now().time_since_epoch())
-                  .count();
-    posVelR += endTime - startTime;
-
-    startTime
-        = duration_cast<nanoseconds>(system_clock::now().time_since_epoch())
-              .count();
-    finiteDifferenceVelPosJacobian(world, 1, true);
-    endTime = duration_cast<nanoseconds>(system_clock::now().time_since_epoch())
-                  .count();
-    velPosR += endTime - startTime;
-
-    startTime
-        = duration_cast<nanoseconds>(system_clock::now().time_since_epoch())
-              .count();
-    finiteDifferenceVelVelJacobian(world, true);
-    endTime = duration_cast<nanoseconds>(system_clock::now().time_since_epoch())
-                  .count();
-    velVelR += endTime - startTime;
-
-    startTime
-        = duration_cast<nanoseconds>(system_clock::now().time_since_epoch())
-              .count();
-    finiteDifferenceForceVelJacobian(world, true);
-    endTime = duration_cast<nanoseconds>(system_clock::now().time_since_epoch())
-                  .count();
-    forceVelR += endTime - startTime;
   }
 
   // Get one sample of each for accuracy testing
@@ -2000,7 +1951,6 @@ void BackpropSnapshot::benchmarkJacobians(
 
   long allA = posPosA + posVelA + velPosA + velVelA + forceVelA;
   long allFd = posPosFd + posVelFd + velPosFd + velVelFd + forceVelFd;
-  long allR = posPosR + posVelR + velPosR + velVelR + forceVelR;
   double NANOS_TO_MILLIS = 1e-6;
 
   std::cout << "All Jacs:" << std::endl;
@@ -2010,12 +1960,7 @@ void BackpropSnapshot::benchmarkJacobians(
   std::cout << "   All Jacs          FD: "
             << ((double)allFd * NANOS_TO_MILLIS / numSamples) << "ms"
             << std::endl;
-  std::cout << "   All Jacs           R: "
-            << ((double)allR * NANOS_TO_MILLIS / numSamples) << "ms"
-            << std::endl;
   std::cout << "   All Jacs FD MULTIPLE: " << ((double)allFd / (double)allA)
-            << "x faster" << std::endl;
-  std::cout << "   All Jacs  R MULTIPLE: " << ((double)allR / (double)allA)
             << "x faster" << std::endl;
 
   std::cout << "Pos-pos Jac:" << std::endl;
@@ -2025,16 +1970,11 @@ void BackpropSnapshot::benchmarkJacobians(
   std::cout << "   Pos-pos Jac          FD: "
             << ((double)posPosFd * NANOS_TO_MILLIS / numSamples) << "ms"
             << std::endl;
-  std::cout << "   Pos-pos Jac           R: "
-            << ((double)posPosR * NANOS_TO_MILLIS / numSamples) << "ms"
-            << std::endl;
   std::cout << "   Pos-pos Jac FD MULTIPLE: "
             << ((double)posPosFd / (double)posPosA) << "x faster" << std::endl;
-  std::cout << "   Pos-pos Jac  R MULTIPLE: "
-            << ((double)posPosR / (double)posPosA) << "x faster" << std::endl;
   std::cout << "   Pos-pos Jac FD ACCURACY: "
-            << (posPosJacA - posPosJacFD).array().abs().maxCoeff() << std::endl;
-  std::cout << "   Pos-pos Jac  R ACCURACY: "
+            << (posPosJacFD - posPosJacR).array().abs().maxCoeff() << std::endl;
+  std::cout << "   Pos-pos Jac  A ACCURACY: "
             << (posPosJacA - posPosJacR).array().abs().maxCoeff() << std::endl;
 
   std::cout << "Pos-vel Jac:" << std::endl;
@@ -2044,16 +1984,11 @@ void BackpropSnapshot::benchmarkJacobians(
   std::cout << "   Pos-vel Jac          FD: "
             << ((double)posVelFd * NANOS_TO_MILLIS / numSamples) << "ms"
             << std::endl;
-  std::cout << "   Pos-vel Jac           R: "
-            << ((double)posVelR * NANOS_TO_MILLIS / numSamples) << "ms"
-            << std::endl;
   std::cout << "   Pos-vel Jac FD MULTIPLE: "
             << ((double)posVelFd / (double)posVelA) << "x faster" << std::endl;
-  std::cout << "   Pos-vel Jac  R MULTIPLE: "
-            << ((double)posVelR / (double)posVelA) << "x faster" << std::endl;
   std::cout << "   Pos-vel Jac FD ACCURACY: "
-            << (posVelJacA - posVelJacFD).array().abs().maxCoeff() << std::endl;
-  std::cout << "   Pos-vel Jac  R ACCURACY: "
+            << (posVelJacFD - posVelJacR).array().abs().maxCoeff() << std::endl;
+  std::cout << "   Pos-vel Jac  A ACCURACY: "
             << (posVelJacA - posVelJacR).array().abs().maxCoeff() << std::endl;
 
   std::cout << "Vel-pos Jac:" << std::endl;
@@ -2063,16 +1998,11 @@ void BackpropSnapshot::benchmarkJacobians(
   std::cout << "   Vel-pos Jac          FD: "
             << ((double)velPosFd * NANOS_TO_MILLIS / numSamples) << "ms"
             << std::endl;
-  std::cout << "   Vel-pos Jac           R: "
-            << ((double)velPosR * NANOS_TO_MILLIS / numSamples) << "ms"
-            << std::endl;
   std::cout << "   Vel-pos Jac FD MULTIPLE: "
             << ((double)velPosFd / (double)velPosA) << "x faster" << std::endl;
-  std::cout << "   Vel-pos Jac  R MULTIPLE: "
-            << ((double)velPosR / (double)velPosA) << "x faster" << std::endl;
   std::cout << "   Vel-pos Jac FD ACCURACY: "
-            << (velPosJacA - velPosJacFD).array().abs().maxCoeff() << std::endl;
-  std::cout << "   Vel-pos Jac  R ACCURACY: "
+            << (velPosJacFD - velPosJacR).array().abs().maxCoeff() << std::endl;
+  std::cout << "   Vel-pos Jac  A ACCURACY: "
             << (velPosJacA - velPosJacR).array().abs().maxCoeff() << std::endl;
 
   std::cout << "Vel-vel Jac:" << std::endl;
@@ -2082,16 +2012,11 @@ void BackpropSnapshot::benchmarkJacobians(
   std::cout << "   Vel-vel Jac          FD: "
             << ((double)velVelFd * NANOS_TO_MILLIS / numSamples) << "ms"
             << std::endl;
-  std::cout << "   Vel-vel Jac           R: "
-            << ((double)velVelR * NANOS_TO_MILLIS / numSamples) << "ms"
-            << std::endl;
   std::cout << "   Vel-vel Jac FD MULTIPLE: "
             << ((double)velVelFd / (double)velVelA) << "x faster" << std::endl;
-  std::cout << "   Vel-vel Jac  R MULTIPLE: "
-            << ((double)velVelR / (double)velVelA) << "x faster" << std::endl;
   std::cout << "   Vel-vel Jac FD ACCURACY: "
-            << (velVelJacA - velVelJacFD).array().abs().maxCoeff() << std::endl;
-  std::cout << "   Vel-vel Jac  R ACCURACY: "
+            << (velVelJacFD - velVelJacR).array().abs().maxCoeff() << std::endl;
+  std::cout << "   Vel-vel Jac  A ACCURACY: "
             << (velVelJacA - velVelJacR).array().abs().maxCoeff() << std::endl;
 
   std::cout << "Force-vel Jac:" << std::endl;
@@ -2101,18 +2026,12 @@ void BackpropSnapshot::benchmarkJacobians(
   std::cout << "   Force-vel Jac          FD: "
             << ((double)forceVelFd * NANOS_TO_MILLIS / numSamples) << "ms"
             << std::endl;
-  std::cout << "   Force-vel Jac           R: "
-            << ((double)forceVelR * NANOS_TO_MILLIS / numSamples) << "ms"
-            << std::endl;
   std::cout << "   Force-vel Jac FD MULTIPLE: "
             << ((double)forceVelFd / (double)forceVelA) << "x faster"
             << std::endl;
-  std::cout << "   Force-vel Jac  R MULTIPLE: "
-            << ((double)forceVelR / (double)forceVelA) << "x faster"
-            << std::endl;
   std::cout << "   Force-vel Jac FD ACCURACY: "
-            << (forceVelJacA - forceVelJacFD).array().abs().maxCoeff() << std::endl;
-  std::cout << "   Force-vel Jac  R ACCURACY: "
+            << (forceVelJacFD - forceVelJacR).array().abs().maxCoeff() << std::endl;
+  std::cout << "   Force-vel Jac  A ACCURACY: "
             << (forceVelJacA - forceVelJacR).array().abs().maxCoeff() << std::endl;
 }
 
