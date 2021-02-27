@@ -439,34 +439,34 @@ TEST_F(DifferentialDynamics, compareEquationsOfMotion)
           EXPECT_TRUE(skel->finiteDifferenceJacobianOfMinv(x, neural::WithRespectTo::FORCE).isZero());
         }
 
-        // Test derivative of M^{-1}x w.r.t. position/velocity/acceleration
+        // Test derivative of M^{-1}x (ID) w.r.t. position/velocity/acceleration
         {
           Eigen::VectorXd x = Eigen::VectorXd::Random(dof);
-//          Eigen::MatrixXd DMinvX_Dq_numerical
-//              = skel->finiteDifferenceJacobianOfMinv(x, neural::WithRespectTo::POSITION);
-//          Eigen::MatrixXd DMinvX_Dq_analytic
-//              = skel->getJacobianOfMinv_ID(x, neural::WithRespectTo::POSITION);
-//          const bool res = equals(DMinvX_Dq_analytic, DMinvX_Dq_numerical,
-//                                  abs_tol_invM, rel_tol_invM);
-//          EXPECT_TRUE(res);
-//          if (!res)
-//          {
-//#ifdef DART_DEBUG_ANALYTICAL_DERIV
-//            skel->mDiffMinv.print();
-//#endif
-//            cout << "[DEBUG] URI: " << uri.toString() << std::endl;
+          Eigen::MatrixXd DMinvX_Dq_numerical
+              = skel->finiteDifferenceJacobianOfMinv(x, neural::WithRespectTo::POSITION);
+          Eigen::MatrixXd DMinvX_Dq_analytic
+              = skel->getJacobianOfMinv_ID(x, neural::WithRespectTo::POSITION);
+          const bool res = equals(DMinvX_Dq_analytic, DMinvX_Dq_numerical,
+                                  abs_tol_invM, rel_tol_invM);
+          EXPECT_TRUE(res);
+          if (!res)
+          {
+#ifdef DART_DEBUG_ANALYTICAL_DERIV
+            skel->mDiffMinv.print();
+#endif
+            cout << "[DEBUG] URI: " << uri.toString() << std::endl;
 
-//            cout << "[DEBUG] D(M^{-1})/Dq * x analytic\n";
-//            cout << DMinvX_Dq_analytic << std::endl;
+            cout << "[DEBUG] D(M^{-1})/Dq * x analytic\n";
+            cout << DMinvX_Dq_analytic << std::endl;
 
-//            cout << "[DEBUG] D(M^{-1})/Dq * x numerical\n";
-//            cout << DMinvX_Dq_numerical << std::endl;
+            cout << "[DEBUG] D(M^{-1})/Dq * x numerical\n";
+            cout << DMinvX_Dq_numerical << std::endl;
 
-//            cout << "[DEBUG] Diff\n";
-//            cout << DMinvX_Dq_analytic - DMinvX_Dq_numerical << std::endl;
+            cout << "[DEBUG] Diff\n";
+            cout << DMinvX_Dq_analytic - DMinvX_Dq_numerical << std::endl;
 
-//            cout << "[DEBUG] max(Diff): " << (DMinvX_Dq_analytic - DMinvX_Dq_numerical).maxCoeff() << std::endl;
-//          }
+            cout << "[DEBUG] max(Diff): " << (DMinvX_Dq_analytic - DMinvX_Dq_numerical).maxCoeff() << std::endl;
+          }
 
           EXPECT_TRUE(skel->getJacobianOfMinv_ID(x, neural::WithRespectTo::VELOCITY).isZero());
           EXPECT_TRUE(skel->getJacobianOfMinv_ID(x, neural::WithRespectTo::FORCE).isZero());
@@ -474,35 +474,57 @@ TEST_F(DifferentialDynamics, compareEquationsOfMotion)
           EXPECT_TRUE(skel->finiteDifferenceJacobianOfMinv(x, neural::WithRespectTo::FORCE).isZero());
         }
 
-        // Verify Equation 24 of Carpentier's papaer
+        // Test derivative of forward dynamics w.r.t. position
         {
-//          Eigen::VectorXd x = Eigen::VectorXd::Random(dof);
-//          x = skel->getAccelerations();
-//          const Eigen::MatrixXd DMinvX_Dq_1
-//              = skel->getJacobianOfMinv_Direct(x, neural::WithRespectTo::POSITION);
+          Eigen::MatrixXd DFD_Dq_numerical
+              = skel->finiteDifferenceJacobianOfFD(neural::WithRespectTo::POSITION);
+          Eigen::MatrixXd DFD_Dq_analytic
+              = skel->getJacobianOfFD(neural::WithRespectTo::POSITION);
+          Eigen::MatrixXd DFD_Dq_analytic_ID
+              = skel->getJacobianOfFD_ID(neural::WithRespectTo::POSITION);
+          const bool res = equals(DFD_Dq_analytic, DFD_Dq_numerical,
+                                  abs_tol_invM, rel_tol_invM);
+          EXPECT_TRUE(res);
+          if (!res)
+          {
+#ifdef DART_DEBUG_ANALYTICAL_DERIV
+            skel->mDiffMinv.print();
+#endif
+            cout << "[DEBUG] URI: " << uri.toString() << std::endl;
 
-//          const Eigen::MatrixXd Minv = skel->getInvMassMatrix();
-//          const Eigen::MatrixXd dID_Dq
-//              = skel->getJacobianOfID(x, neural::WithRespectTo::POSITION);
-//          const Eigen::MatrixXd DMinvX_Dq_2 = - Minv * dID_Dq;
-//          const bool res = equals(DMinvX_Dq_1, DMinvX_Dq_2,
-//                                  abs_tol_invM, rel_tol_invM);
-//          EXPECT_TRUE(res);
-//          if (!res)
-//          {
-//            cout << "[DEBUG] URI: " << uri.toString() << std::endl;
+            cout << "[DEBUG] DFD/Dq * x analytic\n";
+            cout << DFD_Dq_analytic << std::endl;
 
-//            cout << "[DEBUG] D(M^{-1})/Dq * x: FD\n";
-//            cout << DMinvX_Dq_1 << std::endl;
+            cout << "[DEBUG] DFD/Dq * x numerical\n";
+            cout << DFD_Dq_numerical << std::endl;
 
-//            cout << "[DEBUG] D(M^{-1})/Dq * x: ID\n";
-//            cout << DMinvX_Dq_2 << std::endl;
+            cout << "[DEBUG] Diff\n";
+            cout << DFD_Dq_analytic - DFD_Dq_numerical << std::endl;
 
-//            cout << "[DEBUG] Diff\n";
-//            cout << DMinvX_Dq_1 - DMinvX_Dq_2 << std::endl;
+            cout << "[DEBUG] max(Diff): " << (DFD_Dq_analytic - DFD_Dq_numerical).maxCoeff() << std::endl;
+          }
 
-//            cout << "[DEBUG] max(Diff): " << (DMinvX_Dq_2 - DMinvX_Dq_2).maxCoeff() << std::endl;
-//          }
+          const bool res2 = equals(DFD_Dq_analytic_ID, DFD_Dq_numerical,
+                                  abs_tol_invM, rel_tol_invM);
+          EXPECT_TRUE(res2);
+          if (!res2)
+          {
+#ifdef DART_DEBUG_ANALYTICAL_DERIV
+            skel->mDiffMinv.print();
+#endif
+            cout << "[DEBUG] URI: " << uri.toString() << std::endl;
+
+            cout << "[DEBUG] DFD/Dq * x analytic (using ID)\n";
+            cout << DFD_Dq_analytic_ID << std::endl;
+
+            cout << "[DEBUG] DFD/Dq * x numerical\n";
+            cout << DFD_Dq_numerical << std::endl;
+
+            cout << "[DEBUG] Diff\n";
+            cout << DFD_Dq_analytic_ID - DFD_Dq_numerical << std::endl;
+
+            cout << "[DEBUG] max(Diff): " << (DFD_Dq_analytic_ID - DFD_Dq_numerical).maxCoeff() << std::endl;
+          }
         }
       }
     }

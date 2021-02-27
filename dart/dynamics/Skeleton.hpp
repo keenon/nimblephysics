@@ -649,11 +649,12 @@ public:
 
   /// This gives the unconstrained Jacobian of M^{-1}f
   Eigen::MatrixXd getJacobianOfMinv(
-      const Eigen::VectorXd& f, neural::WithRespectTo* wrt, bool useID = false);
+      const Eigen::VectorXd& f, neural::WithRespectTo* wrt, bool useID = true);
 
-  // TODO(JS): Still doesn't work
   /// This gives the unconstrained Jacobian of M^{-1}f using the derivative of
   /// the inverse dynamics.
+  /// @note This function is about 2.33 times faster than
+  /// getJacobianOfMinv_Direct() for a 10 degrees-of-freedom serial chain robot.
   Eigen::MatrixXd getJacobianOfMinv_ID(
       const Eigen::VectorXd& f, neural::WithRespectTo* wrt);
 
@@ -661,6 +662,12 @@ public:
   /// the forward dynamics (supposedly slower than getJacobianOfMinv_ID).
   Eigen::MatrixXd getJacobianOfMinv_Direct(
       const Eigen::VectorXd& f, neural::WithRespectTo* wrt);
+
+  /// This gives the unconstrained Jacobian of the forward dynamics.
+  /// @warning SLOW: Only for testing
+  Eigen::MatrixXd getJacobianOfFD(neural::WithRespectTo* wrt);
+
+  Eigen::MatrixXd getJacobianOfFD_ID(neural::WithRespectTo* wrt);
 
   /// VERY SLOW: Only for testing. This computes the unconstrained Jacobian
   /// giving the difference in M(pos) for finite changes
@@ -698,6 +705,9 @@ public:
   /// VERY SLOW: Only for testing. This computes the unconstrained Jacobian
   /// giving the difference in C(pos, vel) for finite changes in vel
   Eigen::MatrixXd finiteDifferenceRiddersVelCJacobian();
+
+  Eigen::MatrixXd finiteDifferenceJacobianOfFD(
+      neural::WithRespectTo* wrt, bool useRidders = false);
 
   Eigen::VectorXd getDynamicsForces();
 

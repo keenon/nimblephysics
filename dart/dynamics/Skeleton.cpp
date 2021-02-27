@@ -1835,10 +1835,7 @@ Eigen::MatrixXd Skeleton::getJacobianOfMinv_ID(
   }
 
   const Eigen::MatrixXd& Minv = getInvMassMatrix();
-  // const Eigen::MatrixXd& M = getMassMatrix();
-  const Eigen::MatrixXd& DMddq_Dq = getJacobianOfM(f, wrt);
-  const Eigen::MatrixXd& DC_Dq = getJacobianOfC(wrt);
-
+  const Eigen::MatrixXd& DMddq_Dq = getJacobianOfM(Minv * f, wrt);
   return -Minv * DMddq_Dq;
 }
 
@@ -1944,6 +1941,39 @@ Eigen::MatrixXd Skeleton::getJacobianOfMinv_Direct(
   setForces(oldForces);
 
   return DMinvX_Dp;
+}
+
+//==============================================================================
+Eigen::MatrixXd Skeleton::getJacobianOfFD(neural::WithRespectTo* wrt)
+{
+  const int dofs = static_cast<int>(getNumDofs());
+  Eigen::MatrixXd DFD_Dp = Eigen::MatrixXd::Zero(dofs, dofs);
+
+  const auto& tau = getForces();
+  const auto& Cg = getCoriolisAndGravityForces();
+  const auto& Minv = getInvMassMatrix();
+
+  const auto& DMinv_Dp = getJacobianOfMinv(tau - Cg, wrt);
+  const auto& DC_Dp = getJacobianOfC(wrt);
+
+  DFD_Dp = DMinv_Dp + Minv * (-DC_Dp);
+
+  return DFD_Dp;
+}
+
+//==============================================================================
+Eigen::MatrixXd Skeleton::getJacobianOfFD_ID(neural::WithRespectTo* wrt)
+{
+  const int dofs = static_cast<int>(getNumDofs());
+  Eigen::MatrixXd DFD_Dp = Eigen::MatrixXd::Zero(dofs, dofs);
+
+  const auto& ddq = getAccelerations();
+  const auto& Minv = getInvMassMatrix();
+  const auto& DID_Dq = getJacobianOfID(ddq, wrt);
+
+  DFD_Dp = -Minv * DID_Dq;
+
+  return DFD_Dp;
 }
 
 //==============================================================================
@@ -2481,6 +2511,40 @@ Eigen::MatrixXd Skeleton::finiteDifferenceRiddersVelCJacobian()
 
   // Reset everything how we left it
   setVelocities(vel);
+
+  return J;
+}
+
+//==============================================================================
+Eigen::MatrixXd Skeleton::finiteDifferenceJacobianOfFD(neural::WithRespectTo* wrt, bool /*useRidders*/)
+{
+  //  if (useRidders) return finiteDifferenceRiddersJacobianOfM(f, wrt);
+
+  std::size_t n = getNumDofs();
+  std::size_t m = wrt->dim(this);
+  Eigen::MatrixXd J = Eigen::MatrixXd::Zero(n, m);
+  Eigen::VectorXd start = wrt->get(this);
+
+  double EPS = 5e-7;
+
+  for (std::size_t i = 0; i < m; i++)
+  {
+    Eigen::VectorXd tweaked = start;
+    tweaked(i) += EPS;
+    wrt->set(this, tweaked);
+    computeForwardDynamics();
+    Eigen::VectorXd plus = getAccelerations();
+    tweaked = start;
+    tweaked(i) -= EPS;
+    wrt->set(this, tweaked);
+    computeForwardDynamics();
+    Eigen::VectorXd minus = getAccelerations();
+
+    J.col(i) = (plus - minus) / (2 * EPS);
+  }
+
+  // Reset everything how we left it
+  wrt->set(this, start);
 
   return J;
 }
