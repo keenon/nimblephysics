@@ -96,8 +96,13 @@ public:
       const Eigen::Vector3d& _positions) const override;
 
   math::Jacobian getRelativeJacobianDeriv(std::size_t index) const override;
+  math::Jacobian finiteDifferenceRelativeJacobianDeriv(std::size_t index) const;
+
   math::Jacobian getRelativeJacobianTimeDerivDeriv(std::size_t index) const override;
+  math::Jacobian finiteDifferenceRelativeJacobianTimeDerivDeriv(std::size_t index) const;
+
   math::Jacobian getRelativeJacobianTimeDerivDeriv2(std::size_t index) const override;
+  math::Jacobian finiteDifferenceRelativeJacobianTimeDerivDeriv2(std::size_t index) const;
 
   // Documentation inherited
   Eigen::Vector3d getPositionDifferencesStatic(
@@ -144,20 +149,25 @@ protected:
   // Documentation inherited
   void integratePositions(double _dt) override;
 
+#ifndef DART_USE_IDENTITY_JACOBIAN
   // Documentation inherited
-  Eigen::VectorXd integratePositionsExplicit(Eigen::VectorXd pos, Eigen::VectorXd vel, double dt) override;
+  void integrateVelocities(double dt) override;
+#endif
+
+  // Documentation inherited
+  Eigen::VectorXd integratePositionsExplicit(const Eigen::VectorXd& pos, const Eigen::VectorXd& vel, double dt) override;
 
   /// Returns d/dpos of integratePositionsExplicit()
-  Eigen::MatrixXd getPosPosJacobian(Eigen::VectorXd pos, Eigen::VectorXd vel, double _dt) override;
+  Eigen::MatrixXd getPosPosJacobian(const Eigen::VectorXd& pos, const Eigen::VectorXd& vel, double _dt) override;
 
   /// Returns d/dvel of integratePositionsExplicit()
-  Eigen::MatrixXd getVelPosJacobian(Eigen::VectorXd pos, Eigen::VectorXd vel, double _dt) override;
+  Eigen::MatrixXd getVelPosJacobian(const Eigen::VectorXd& pos, const Eigen::VectorXd& vel, double _dt) override;
 
   /// Returns d/dpos of integratePositionsExplicit() by finite differencing
-  Eigen::MatrixXd finiteDifferencePosPosJacobian(Eigen::VectorXd pos, Eigen::VectorXd vel, double _dt);
+  Eigen::MatrixXd finiteDifferencePosPosJacobian(const Eigen::VectorXd& pos, const Eigen::VectorXd& vel, double _dt);
 
   /// Returns d/dvel of integratePositionsExplicit() by finite differencing
-  Eigen::MatrixXd finiteDifferenceVelPosJacobian(Eigen::VectorXd pos, Eigen::VectorXd vel, double _dt);
+  Eigen::MatrixXd finiteDifferenceVelPosJacobian(const Eigen::VectorXd& pos, const Eigen::VectorXd& vel, double _dt);
 
   // Documentation inherited
   void updateDegreeOfFreedomNames() override;
@@ -171,6 +181,16 @@ protected:
   // Documentation inherited
   void updateRelativeJacobianTimeDeriv() const override;
 
+protected:
+#ifdef DART_USE_IDENTITY_JACOBIAN
+  /// Access mR, which is an auto-updating variable
+  const Eigen::Isometry3d& getR() const;
+
+  /// Rotation matrix dependent on the generalized coordinates
+  ///
+  /// Do not use directly! Use getR() to access this
+  mutable Eigen::Isometry3d mR;
+#endif
 public:
   // To get byte-aligned Eigen vectors
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW

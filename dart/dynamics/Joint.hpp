@@ -553,13 +553,13 @@ public:
       const Eigen::VectorXd& _q2, const Eigen::VectorXd& _q1) const = 0;
 
   /// Returns the value of integrating a position, where it's possible to pass in an arbitrory position and velocity
-  virtual Eigen::VectorXd integratePositionsExplicit(Eigen::VectorXd pos, Eigen::VectorXd vel, double dt) = 0;
+  virtual Eigen::VectorXd integratePositionsExplicit(const Eigen::VectorXd& pos, const Eigen::VectorXd& vel, double dt) = 0;
 
   /// Returns d/dpos of integratePositionsExplicit()
-  virtual Eigen::MatrixXd getPosPosJacobian(Eigen::VectorXd pos, Eigen::VectorXd vel, double _dt) = 0;
+  virtual Eigen::MatrixXd getPosPosJacobian(const Eigen::VectorXd& pos, const Eigen::VectorXd& vel, double _dt) = 0;
 
   /// Returns d/dvel of integratePositionsExplicit()
-  virtual Eigen::MatrixXd getVelPosJacobian(Eigen::VectorXd pos, Eigen::VectorXd vel, double _dt) = 0;
+  virtual Eigen::MatrixXd getVelPosJacobian(const Eigen::VectorXd& pos, const Eigen::VectorXd& vel, double _dt) = 0;
 
   /// \}
 
@@ -680,6 +680,7 @@ public:
   virtual const math::Jacobian getRelativeJacobianTimeDeriv() const = 0;
 
   // TODO(JS): Rename and add documentation
+  /// Computes derivative of time derivative of Jacobian w.r.t. position.
   virtual math::Jacobian getRelativeJacobianTimeDerivDeriv(
       std::size_t /*index*/) const {
     // TODO(JS): Remove
@@ -687,6 +688,7 @@ public:
   }
 
   // TODO(JS): Rename and add documentation
+  /// Computes derivative of time derivative of Jacobian w.r.t. velocity.
   virtual math::Jacobian getRelativeJacobianTimeDerivDeriv2(
       std::size_t /*index*/) const {
     // TODO(JS): Remove

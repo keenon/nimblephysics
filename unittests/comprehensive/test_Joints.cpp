@@ -224,10 +224,12 @@ void JOINTS::kinematicsTest(const typename JointType::Properties& _properties)
       numericJ.col(i) = Ji;
     }
 
-    for (int i = 0; i < dof; ++i)
+    auto res = equals(J, numericJ, JOINT_TOL);
+    EXPECT_TRUE(res);
+    if (!res)
     {
-      for (int j = 0; j < 6; ++j)
-        EXPECT_NEAR(J.col(i)(j), numericJ.col(i)(j), JOINT_TOL);
+      std::cout << "J       : \n" << J << std::endl;
+      std::cout << "numericJ: \n" << numericJ << std::endl;
     }
 
     //--------------------------------------------------------------------------
@@ -330,10 +332,14 @@ TEST_F(JOINTS, TRANSLATIONAL_JOINT_2D)
 #endif
 
 // 3-dof joint
+#ifdef ALL_TESTS
+#ifndef DART_USE_IDENTITY_JACOBIAN
 TEST_F(JOINTS, BALL_JOINT)
 {
   kinematicsTest<BallJoint>();
 }
+#endif
+#endif
 
 // 3-dof joint
 #ifdef ALL_TESTS
@@ -367,10 +373,12 @@ TEST_F(JOINTS, PLANAR_JOINT)
 
 // 6-dof joint
 #ifdef ALL_TESTS
+#ifndef DART_USE_IDENTITY_JACOBIAN
 TEST_F(JOINTS, FREE_JOINT)
 {
   kinematicsTest<FreeJoint>();
 }
+#endif
 #endif
 
 //==============================================================================

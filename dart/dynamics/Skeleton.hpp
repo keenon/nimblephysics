@@ -595,6 +595,38 @@ public:
   /// This gives the unconstrained Jacobian giving the difference in C(pos, vel)
   Eigen::MatrixXd getVelCJacobian();
 
+#ifdef DART_DEBUG_ANALYTICAL_DERIV
+  struct DiffC
+  {
+    struct Data
+    {
+      math::Jacobian S;
+
+      Eigen::Vector6d V;
+      Eigen::Vector6d dV;
+      Eigen::Vector6d F;
+      Eigen::VectorXd tau;
+
+      void init();
+    };
+
+    struct Node
+    {
+      Data data;
+      std::vector<Data> derivs;
+    };
+
+    std::vector<Node> nodes;
+
+    std::vector<Node> nodes_numeric;
+
+    void init(size_t numBodies, size_t numDofs);
+    void print();
+  };
+
+  DiffC mDiffC;
+#endif
+
   /// This gives the unconstrained Jacobian of C(pos, vel) using the derivative
   /// f the inverse dynamics
   Eigen::MatrixXd getJacobianOfC(neural::WithRespectTo* wrt);

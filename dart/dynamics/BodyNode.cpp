@@ -2530,11 +2530,19 @@ void BodyNode::computeJacobianOfMForward(neural::WithRespectTo* wrt)
   using math::AdInvT;
   using math::ad;
 
+  (void)wrt;
+#ifndef NDEBUG
   if (wrt != neural::WithRespectTo::POSITION)
   {
-    // Shouldn't reach here
-    assert(false);
+    std::cout << "wrt: " << wrt << std::endl;
+    std::cout << "when:\n"
+              << "- neural::WithRespectTo::POSITION: " << neural::WithRespectTo::POSITION << "\n"
+              << "- neural::WithRespectTo::VELOCITY: " << neural::WithRespectTo::VELOCITY << "\n"
+              << "- neural::WithRespectTo::FORCE   : " << neural::WithRespectTo::FORCE << "\n"
+              << std::endl;
+    assert(wrt == neural::WithRespectTo::POSITION);
   }
+#endif
 
   const auto skel = getSkeleton();
   const auto numDofs = skel->getNumDofs();
@@ -2695,11 +2703,25 @@ void BodyNode::computeJacobianOfCForward(
   const Eigen::VectorXd& dq = mParentJoint->getVelocities();
   const Eigen::Vector6d& V = getSpatialVelocity();
 
+#ifdef DART_DEBUG_ANALYTICAL_DERIV
+  const auto bodyNodeIndex = getIndexInSkeleton();
+  auto& data = skel->mDiffC.nodes[bodyNodeIndex].data;
+#endif
+
+#ifdef DART_DEBUG_ANALYTICAL_DERIV
+  data.V = V;
+  data.dV = mCg_dV;
+#endif
+
   if (wrt == neural::WithRespectTo::POSITION)
   {
     // TODO(JS): iterate joints instead for vectorization
     for (auto i = 0u; i < numDofs; ++i)
     {
+#ifdef DART_DEBUG_ANALYTICAL_DERIV
+      auto& deriv = skel->mDiffC.nodes[bodyNodeIndex].derivs[i];
+#endif
+
       const DegreeOfFreedom* dof = skel->getDof(i);
       if (mParentJoint->hasDof(dof))
       {
@@ -2745,6 +2767,11 @@ void BodyNode::computeJacobianOfCForward(
           mCg_dV_p.col(i) = ad(mCg_V_p.col(i), S * dq);
         }
       }
+
+#ifdef DART_DEBUG_ANALYTICAL_DERIV
+        deriv.V = mCg_V_p.col(i);
+        deriv.dV = mCg_dV_p.col(i);
+#endif
     }
   }
   else if (wrt == neural::WithRespectTo::VELOCITY)
@@ -2978,7 +3005,6 @@ void BodyNode::computeJacobianOfMinvXBackward()
   for (auto i = 0u; i < numDofs; ++i)
   {
 #ifdef DART_DEBUG_ANALYTICAL_DERIV
-//    std::cout << "j: " << i << std::endl;
     auto& deriv = skel->mDiffMinv.nodes[bodyNodeIndex].derivs[i];
 #endif
     const DegreeOfFreedom* dof = skel->getDof(i);

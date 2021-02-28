@@ -184,6 +184,7 @@ if(DART_ENABLE_SIMD)
 endif()
 #TODO(JS): just for debugging
 #target_compile_definitions(dart PUBLIC -DDART_DEBUG_ANALYTICAL_DERIV)
+target_compile_definitions(dart PUBLIC -DDART_USE_IDENTITY_JACOBIAN)
 
 # Default component
 add_component_targets(${PROJECT_NAME} dart dart)

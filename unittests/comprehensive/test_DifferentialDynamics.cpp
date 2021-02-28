@@ -75,6 +75,7 @@ void DifferentialDynamics::SetUp()
   fileList.push_back("dart://sample/skel/test/single_pendulum.skel");
   fileList.push_back("dart://sample/skel/test/single_pendulum_euler_joint.skel");
   fileList.push_back("dart://sample/skel/test/single_pendulum_ball_joint.skel");
+  fileList.push_back("dart://sample/skel/test/single_rigid_body.skel");
   fileList.push_back("dart://sample/skel/test/double_pendulum.skel");
   fileList.push_back("dart://sample/skel/test/double_pendulum_euler_joint.skel");
   fileList.push_back("dart://sample/skel/test/double_pendulum_ball_joint.skel");
@@ -89,6 +90,7 @@ void DifferentialDynamics::SetUp()
     fileList.push_back("dart://sample/skel/test/tree_structure.skel");
 //    fileList.push_back("dart://sample/skel/test/tree_structure_euler_joint.skel");
 //    fileList.push_back("dart://sample/skel/test/tree_structure_ball_joint.skel");
+    fileList.push_back("dart://sample/skel/test/tree_structure_root_free.skel");
   //  fileList.push_back("dart://sample/skel/fullbody1.skel");
 }
 
@@ -146,7 +148,7 @@ TEST_F(DifferentialDynamics, compareEquationsOfMotion)
   //---------------------------- Settings --------------------------------------
   // Number of random state tests for each skeletons
 #ifndef NDEBUG // Debug mode
-  int nRandomItr = 5;
+  int nRandomItr = 1;
 #else
   int nRandomItr = 100;
 #endif
@@ -178,13 +180,12 @@ TEST_F(DifferentialDynamics, compareEquationsOfMotion)
     }
     else if (uri.toString() == "dart://sample/skel/test/serial_chain_revolute_joint.skel")
     {
-      abs_tol_invM = 1e-2;
+      abs_tol_invM = 3e-2;
       rel_tol_invM = 5e-2;  // 5 %
     }
     else if (uri.toString() == "dart://sample/skel/test/serial_chain_ball_joint.skel")
     {
-//      abs_tol_invM = 1e-2;
-      abs_tol_invM = 10;
+      abs_tol_invM = 1e-1;
       rel_tol_invM = 5e-2;  // 5 %
     }
     else if (uri.toString() == "dart://sample/skel/test/serial_chain_eulerxyz_joint.skel")
@@ -249,7 +250,11 @@ TEST_F(DifferentialDynamics, compareEquationsOfMotion)
             cout << "[DEBUG] Diff\n";
             cout << DMX_Dq_analytic - DMX_Dq_numerical << std::endl;
 
-            cout << "[DEBUG] max(Diff): " << (DMX_Dq_analytic - DMX_Dq_numerical).maxCoeff() << std::endl;
+            cout << "[DEBUG] range: "
+                 << (DMX_Dq_analytic - DMX_Dq_numerical).minCoeff()
+                 << " - "
+                 << (DMX_Dq_analytic - DMX_Dq_numerical).maxCoeff()
+                 << std::endl;
           }
 
           EXPECT_TRUE(skel->getJacobianOfM(x, neural::WithRespectTo::VELOCITY).isZero());

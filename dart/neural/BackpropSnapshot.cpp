@@ -4920,19 +4920,30 @@ Eigen::MatrixXd BackpropSnapshot::getJacobianOfProjectionIntoClampsMatrix(
 Eigen::MatrixXd BackpropSnapshot::getJacobianOfMinv(
     simulation::WorldPtr world, Eigen::VectorXd tau, WithRespectTo* wrt)
 {
-  Eigen::MatrixXd jac
-      = Eigen::MatrixXd::Zero(world->getNumDofs(), world->getNumDofs());
-  int cursor = 0;
-  for (int i = 0; i < world->getNumSkeletons(); i++)
+  if (wrt == neural::WithRespectTo::POSITION
+      || wrt == neural::WithRespectTo::VELOCITY
+      || wrt == neural::WithRespectTo::FORCE)
   {
-    auto skel = world->getSkeleton(i);
-    int dofs = skel->getNumDofs();
-    jac.block(cursor, cursor, dofs, dofs)
-        = skel->getJacobianOfMinv(tau.segment(cursor, dofs), wrt);
-    cursor += dofs;
+    // TODO(JS): Is this correct?
+    // Eigen::MatrixXd jac
+    //     = Eigen::MatrixXd::Zero(world->getNumDofs(), world->getNumDofs());
+    Eigen::MatrixXd jac
+        = Eigen::MatrixXd::Zero(world->getNumDofs(), wrt->dim(world.get()));
+    int cursor = 0;
+    for (int i = 0; i < world->getNumSkeletons(); i++)
+    {
+      auto skel = world->getSkeleton(i);
+      int dofs = skel->getNumDofs();
+      jac.block(cursor, cursor, dofs, dofs)
+          = skel->getJacobianOfMinv(tau.segment(cursor, dofs), wrt);
+      cursor += dofs;
+    }
+    return jac;
   }
-  return jac;
-  // return finiteDifferenceJacobianOfMinv(world, tau, wrt);
+  else
+  {
+    return finiteDifferenceJacobianOfMinv(world, tau, wrt);
+  }
 }
 
 //==============================================================================

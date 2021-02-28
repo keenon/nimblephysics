@@ -1426,7 +1426,7 @@ void GenericJoint<ConfigSpaceT>::integrateVelocities(double dt)
 //==============================================================================
 // Documentation inherited
 template <class ConfigSpaceT>
-Eigen::VectorXd GenericJoint<ConfigSpaceT>::integratePositionsExplicit(Eigen::VectorXd pos, Eigen::VectorXd vel, double dt)
+Eigen::VectorXd GenericJoint<ConfigSpaceT>::integratePositionsExplicit(const Eigen::VectorXd& pos, const Eigen::VectorXd& vel, double dt)
 {
   const Point& point = math::integratePosition<ConfigSpaceT>(
         math::toManifoldPoint<ConfigSpaceT>(pos),
@@ -1438,7 +1438,7 @@ Eigen::VectorXd GenericJoint<ConfigSpaceT>::integratePositionsExplicit(Eigen::Ve
 //==============================================================================
 /// Returns d/dpos of integratePositionsExplicit()
 template <class ConfigSpaceT>
-Eigen::MatrixXd GenericJoint<ConfigSpaceT>::getPosPosJacobian(Eigen::VectorXd pos, Eigen::VectorXd /* vel */, double /* _dt */)
+Eigen::MatrixXd GenericJoint<ConfigSpaceT>::getPosPosJacobian(const Eigen::VectorXd& pos, const Eigen::VectorXd& /* vel */, double /* _dt */)
 {
   return Eigen::MatrixXd::Identity(pos.size(), pos.size());
 }
@@ -1446,7 +1446,7 @@ Eigen::MatrixXd GenericJoint<ConfigSpaceT>::getPosPosJacobian(Eigen::VectorXd po
 //==============================================================================
 /// Returns d/dvel of integratePositionsExplicit()
 template <class ConfigSpaceT>
-Eigen::MatrixXd GenericJoint<ConfigSpaceT>::getVelPosJacobian(Eigen::VectorXd pos, Eigen::VectorXd /* vel */, double _dt)
+Eigen::MatrixXd GenericJoint<ConfigSpaceT>::getVelPosJacobian(const Eigen::VectorXd& pos, const Eigen::VectorXd& /* vel */, double _dt)
 {
   return _dt * Eigen::MatrixXd::Identity(pos.size(), pos.size());
 }
@@ -1896,7 +1896,6 @@ void GenericJoint<ConfigSpaceT>::computeJacobianOfMinvX_A(
   const math::Jacobian& DAB_Dq = childBody->mInvM_DAB_Dq;
 
 #ifdef DART_DEBUG_ANALYTICAL_DERIV
-  const BodyNode* childBody = this->getChildBodyNode();
   const auto bodyNodeIndex = childBody->getIndexInSkeleton();
   auto& data = skel->mDiffMinv.nodes[bodyNodeIndex].data;
 #endif

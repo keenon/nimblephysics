@@ -126,6 +126,7 @@ void DynamicsTest::SetUp()
   fileList.push_back("dart://sample/skel/test/single_pendulum.skel");
   fileList.push_back("dart://sample/skel/test/single_pendulum_euler_joint.skel");
   fileList.push_back("dart://sample/skel/test/single_pendulum_ball_joint.skel");
+  fileList.push_back("dart://sample/skel/test/single_rigid_body.skel");
   fileList.push_back("dart://sample/skel/test/double_pendulum.skel");
   fileList.push_back("dart://sample/skel/test/double_pendulum_euler_joint.skel");
   fileList.push_back("dart://sample/skel/test/double_pendulum_ball_joint.skel");
@@ -1072,6 +1073,10 @@ void DynamicsTest::testFiniteDifferenceBodyNodeVelocity(const common::Uri& uri)
           Vector6d V_diff = math::logMap(T1.inverse() * T2) / timeStep;
           Vector6d V_actual = body->getSpatialVelocity();
 
+          Joint* joint = body->getParentJoint();
+          auto J = joint->getRelativeJacobian();
+          Vector6d V_Sdq = J * joint->getVelocities();
+
           bool checkSpatialVelocity = equals(V_diff, V_actual, tol);
           EXPECT_TRUE(checkSpatialVelocity);
           if (!checkSpatialVelocity)
@@ -1081,6 +1086,8 @@ void DynamicsTest::testFiniteDifferenceBodyNodeVelocity(const common::Uri& uri)
                       << V_diff.transpose() << std::endl;
             std::cout << "V_actual  : "
                       << V_actual.transpose() << std::endl;
+            std::cout << "V_Sdq  : "
+                      << V_Sdq.transpose() << std::endl;
             std::cout << std::endl;
           }
 
@@ -2151,198 +2158,198 @@ TEST_F(DynamicsTest, testFiniteDifference)
   }
 }
 
-//==============================================================================
-TEST_F(DynamicsTest, testForwardKinematics)
-{
-  for (std::size_t i = 0; i < getList().size(); ++i)
-  {
-#ifndef NDEBUG
-    dtdbg << getList()[i].toString() << std::endl;
-#endif
-    testForwardKinematics(getList()[i]);
-  }
-}
+////==============================================================================
+//TEST_F(DynamicsTest, testForwardKinematics)
+//{
+//  for (std::size_t i = 0; i < getList().size(); ++i)
+//  {
+//#ifndef NDEBUG
+//    dtdbg << getList()[i].toString() << std::endl;
+//#endif
+//    testForwardKinematics(getList()[i]);
+//  }
+//}
 
-//==============================================================================
-TEST_F(DynamicsTest, compareEquationsOfMotion)
-{
-  for (std::size_t i = 0; i < getList().size(); ++i)
-  {
-    ////////////////////////////////////////////////////////////////////////////
-    // TODO(JS): Following skel files, which contain euler joints couldn't
-    //           pass EQUATIONS_OF_MOTION, are disabled.
-    const auto uri = getList()[i];
-    if (uri.toString() == "dart://sample/skel/test/double_pendulum_euler_joint.skel"
-        || uri.toString() == "dart://sample/skel/test/chainwhipa.skel"
-        || uri.toString() == "dart://sample/skel/test/serial_chain_eulerxyz_joint.skel"
-        || uri.toString() == "dart://sample/skel/test/simple_tree_structure_euler_joint.skel"
-        || uri.toString() == "dart://sample/skel/test/tree_structure_euler_joint.skel"
-        || uri.toString() == "dart://sample/skel/fullbody1.skel")
-    {
-        continue;
-    }
-    ////////////////////////////////////////////////////////////////////////////
+////==============================================================================
+//TEST_F(DynamicsTest, compareEquationsOfMotion)
+//{
+//  for (std::size_t i = 0; i < getList().size(); ++i)
+//  {
+//    ////////////////////////////////////////////////////////////////////////////
+//    // TODO(JS): Following skel files, which contain euler joints couldn't
+//    //           pass EQUATIONS_OF_MOTION, are disabled.
+//    const auto uri = getList()[i];
+//    if (uri.toString() == "dart://sample/skel/test/double_pendulum_euler_joint.skel"
+//        || uri.toString() == "dart://sample/skel/test/chainwhipa.skel"
+//        || uri.toString() == "dart://sample/skel/test/serial_chain_eulerxyz_joint.skel"
+//        || uri.toString() == "dart://sample/skel/test/simple_tree_structure_euler_joint.skel"
+//        || uri.toString() == "dart://sample/skel/test/tree_structure_euler_joint.skel"
+//        || uri.toString() == "dart://sample/skel/fullbody1.skel")
+//    {
+//        continue;
+//    }
+//    ////////////////////////////////////////////////////////////////////////////
 
-#ifndef NDEBUG
-    dtdbg << getList()[i].toString() << std::endl;
-#endif
-    compareEquationsOfMotion(getList()[i]);
-  }
-}
+//#ifndef NDEBUG
+//    dtdbg << getList()[i].toString() << std::endl;
+//#endif
+//    compareEquationsOfMotion(getList()[i]);
+//  }
+//}
 
-//==============================================================================
-TEST_F(DynamicsTest, testCenterOfMass)
-{
-  for (std::size_t i = 0; i < getList().size(); ++i)
-  {
-#ifndef NDEBUG
-    dtdbg << getList()[i].toString() << std::endl;
-#endif
-    testCenterOfMass(getList()[i]);
-  }
-}
+////==============================================================================
+//TEST_F(DynamicsTest, testCenterOfMass)
+//{
+//  for (std::size_t i = 0; i < getList().size(); ++i)
+//  {
+//#ifndef NDEBUG
+//    dtdbg << getList()[i].toString() << std::endl;
+//#endif
+//    testCenterOfMass(getList()[i]);
+//  }
+//}
 
-//==============================================================================
-TEST_F(DynamicsTest, testCenterOfMassFreeFall)
-{
-  for (std::size_t i = 0; i < getList().size(); ++i)
-  {
-#ifndef NDEBUG
-    dtdbg << getList()[i].toString() << std::endl;
-#endif
-    testCenterOfMassFreeFall(getList()[i]);
-  }
-}
+////==============================================================================
+//TEST_F(DynamicsTest, testCenterOfMassFreeFall)
+//{
+//  for (std::size_t i = 0; i < getList().size(); ++i)
+//  {
+//#ifndef NDEBUG
+//    dtdbg << getList()[i].toString() << std::endl;
+//#endif
+//    testCenterOfMassFreeFall(getList()[i]);
+//  }
+//}
 
-//==============================================================================
-TEST_F(DynamicsTest, testConstraintImpulse)
-{
-  for (std::size_t i = 0; i < getList().size(); ++i)
-  {
-#ifndef NDEBUG
-    dtdbg << getList()[i].toString() << std::endl;
-#endif
-    testConstraintImpulse(getList()[i]);
-  }
-}
+////==============================================================================
+//TEST_F(DynamicsTest, testConstraintImpulse)
+//{
+//  for (std::size_t i = 0; i < getList().size(); ++i)
+//  {
+//#ifndef NDEBUG
+//    dtdbg << getList()[i].toString() << std::endl;
+//#endif
+//    testConstraintImpulse(getList()[i]);
+//  }
+//}
 
-//==============================================================================
-TEST_F(DynamicsTest, testImpulseBasedDynamics)
-{
-  for (std::size_t i = 0; i < getList().size(); ++i)
-  {
-#ifndef NDEBUG
-    dtdbg << getList()[i].toString() << std::endl;
-#endif
-    testImpulseBasedDynamics(getList()[i]);
-  }
-}
+////==============================================================================
+//TEST_F(DynamicsTest, testImpulseBasedDynamics)
+//{
+//  for (std::size_t i = 0; i < getList().size(); ++i)
+//  {
+//#ifndef NDEBUG
+//    dtdbg << getList()[i].toString() << std::endl;
+//#endif
+//    testImpulseBasedDynamics(getList()[i]);
+//  }
+//}
 
-//==============================================================================
-TEST_F(DynamicsTest, HybridDynamics)
-{
-  const double tol       = 1e-8;
-  const double timeStep  = 1e-3;
-#ifndef NDEBUG // Debug mode
-  const std::size_t numFrames = 50;  // 0.05 secs
-#else
-  const std::size_t numFrames = 5e+3;  // 5 secs
-#endif // ------- Debug mode
+////==============================================================================
+//TEST_F(DynamicsTest, HybridDynamics)
+//{
+//  const double tol       = 1e-8;
+//  const double timeStep  = 1e-3;
+//#ifndef NDEBUG // Debug mode
+//  const std::size_t numFrames = 50;  // 0.05 secs
+//#else
+//  const std::size_t numFrames = 5e+3;  // 5 secs
+//#endif // ------- Debug mode
 
-  // Load world and skeleton
-  WorldPtr world = utils::SkelParser::readWorld(
-      "dart://sample/skel/test/hybrid_dynamics_test.skel");
-  world->setTimeStep(timeStep);
-  EXPECT_TRUE(world != nullptr);
-  EXPECT_NEAR(world->getTimeStep(), timeStep, tol);
+//  // Load world and skeleton
+//  WorldPtr world = utils::SkelParser::readWorld(
+//      "dart://sample/skel/test/hybrid_dynamics_test.skel");
+//  world->setTimeStep(timeStep);
+//  EXPECT_TRUE(world != nullptr);
+//  EXPECT_NEAR(world->getTimeStep(), timeStep, tol);
 
-  SkeletonPtr skel = world->getSkeleton("skeleton 1");
-  EXPECT_TRUE(skel != nullptr);
-  EXPECT_NEAR(skel->getTimeStep(), timeStep, tol);
+//  SkeletonPtr skel = world->getSkeleton("skeleton 1");
+//  EXPECT_TRUE(skel != nullptr);
+//  EXPECT_NEAR(skel->getTimeStep(), timeStep, tol);
 
-  const std::size_t numDofs = skel->getNumDofs();
+//  const std::size_t numDofs = skel->getNumDofs();
 
-  // Zero initial states
-  Eigen::VectorXd q0  = Eigen::VectorXd::Zero(numDofs);
-  Eigen::VectorXd dq0 = Eigen::VectorXd::Zero(numDofs);
+//  // Zero initial states
+//  Eigen::VectorXd q0  = Eigen::VectorXd::Zero(numDofs);
+//  Eigen::VectorXd dq0 = Eigen::VectorXd::Zero(numDofs);
 
-  // Initialize the skeleton with the zero initial states
-  skel->setPositions(q0);
-  skel->setVelocities(dq0);
-  EXPECT_TRUE(equals(skel->getPositions(), q0));
-  EXPECT_TRUE(equals(skel->getVelocities(), dq0));
+//  // Initialize the skeleton with the zero initial states
+//  skel->setPositions(q0);
+//  skel->setVelocities(dq0);
+//  EXPECT_TRUE(equals(skel->getPositions(), q0));
+//  EXPECT_TRUE(equals(skel->getVelocities(), dq0));
 
-  // Make sure all the joint actuator types
-  EXPECT_EQ(skel->getJoint(0)->getActuatorType(), Joint::FORCE);
-  EXPECT_EQ(skel->getJoint(1)->getActuatorType(), Joint::ACCELERATION);
-  EXPECT_EQ(skel->getJoint(2)->getActuatorType(), Joint::VELOCITY);
-  EXPECT_EQ(skel->getJoint(3)->getActuatorType(), Joint::ACCELERATION);
-  EXPECT_EQ(skel->getJoint(4)->getActuatorType(), Joint::VELOCITY);
+//  // Make sure all the joint actuator types
+//  EXPECT_EQ(skel->getJoint(0)->getActuatorType(), Joint::FORCE);
+//  EXPECT_EQ(skel->getJoint(1)->getActuatorType(), Joint::ACCELERATION);
+//  EXPECT_EQ(skel->getJoint(2)->getActuatorType(), Joint::VELOCITY);
+//  EXPECT_EQ(skel->getJoint(3)->getActuatorType(), Joint::ACCELERATION);
+//  EXPECT_EQ(skel->getJoint(4)->getActuatorType(), Joint::VELOCITY);
 
-  // Prepare command for each joint types per simulation steps
-  Eigen::MatrixXd command = Eigen::MatrixXd::Zero(numFrames, numDofs);
-  Eigen::VectorXd amp = Eigen::VectorXd::Zero(numDofs);
-  for (std::size_t i = 0; i < numDofs; ++i)
-    amp[i] = math::Random::uniform(-1.5, 1.5);
-  for (std::size_t i = 0; i < numFrames; ++i)
-  {
-    for (std::size_t j = 0; j < numDofs; ++j)
-      command(i,j) = amp[j] * std::sin(i * timeStep);
-  }
+//  // Prepare command for each joint types per simulation steps
+//  Eigen::MatrixXd command = Eigen::MatrixXd::Zero(numFrames, numDofs);
+//  Eigen::VectorXd amp = Eigen::VectorXd::Zero(numDofs);
+//  for (std::size_t i = 0; i < numDofs; ++i)
+//    amp[i] = math::Random::uniform(-1.5, 1.5);
+//  for (std::size_t i = 0; i < numFrames; ++i)
+//  {
+//    for (std::size_t j = 0; j < numDofs; ++j)
+//      command(i,j) = amp[j] * std::sin(i * timeStep);
+//  }
 
-  // Record joint forces for joint[1~4]
-  Eigen::MatrixXd forces  = Eigen::MatrixXd::Zero(numFrames, numDofs);
-  for (std::size_t i = 0; i < numFrames; ++i)
-  {
-    skel->setCommands(command.row(i));
+//  // Record joint forces for joint[1~4]
+//  Eigen::MatrixXd forces  = Eigen::MatrixXd::Zero(numFrames, numDofs);
+//  for (std::size_t i = 0; i < numFrames; ++i)
+//  {
+//    skel->setCommands(command.row(i));
 
-    world->step(false);
+//    world->step(false);
 
-    forces.row(i) = skel->getForces();
+//    forces.row(i) = skel->getForces();
 
-    EXPECT_NEAR(command(i,0), skel->getForce(0),        tol);
-    EXPECT_NEAR(command(i,1), skel->getAcceleration(1), tol);
-    EXPECT_NEAR(command(i,2), skel->getVelocity(2),     tol);
-    EXPECT_NEAR(command(i,3), skel->getAcceleration(3), tol);
-    EXPECT_NEAR(command(i,4), skel->getVelocity(4),     tol);
-  }
+//    EXPECT_NEAR(command(i,0), skel->getForce(0),        tol);
+//    EXPECT_NEAR(command(i,1), skel->getAcceleration(1), tol);
+//    EXPECT_NEAR(command(i,2), skel->getVelocity(2),     tol);
+//    EXPECT_NEAR(command(i,3), skel->getAcceleration(3), tol);
+//    EXPECT_NEAR(command(i,4), skel->getVelocity(4),     tol);
+//  }
 
-  // Restore the skeleton to the initial state
-  skel->setPositions(q0);
-  skel->setVelocities(dq0);
-  EXPECT_TRUE(equals(skel->getPositions(), q0));
-  EXPECT_TRUE(equals(skel->getVelocities(), dq0));
+//  // Restore the skeleton to the initial state
+//  skel->setPositions(q0);
+//  skel->setVelocities(dq0);
+//  EXPECT_TRUE(equals(skel->getPositions(), q0));
+//  EXPECT_TRUE(equals(skel->getVelocities(), dq0));
 
-  // Change all the actuator types to force
-  skel->getJoint(0)->setActuatorType(Joint::FORCE);
-  skel->getJoint(1)->setActuatorType(Joint::FORCE);
-  skel->getJoint(2)->setActuatorType(Joint::FORCE);
-  skel->getJoint(3)->setActuatorType(Joint::FORCE);
-  skel->getJoint(4)->setActuatorType(Joint::FORCE);
-  EXPECT_EQ(skel->getJoint(0)->getActuatorType(), Joint::FORCE);
-  EXPECT_EQ(skel->getJoint(1)->getActuatorType(), Joint::FORCE);
-  EXPECT_EQ(skel->getJoint(2)->getActuatorType(), Joint::FORCE);
-  EXPECT_EQ(skel->getJoint(3)->getActuatorType(), Joint::FORCE);
-  EXPECT_EQ(skel->getJoint(4)->getActuatorType(), Joint::FORCE);
+//  // Change all the actuator types to force
+//  skel->getJoint(0)->setActuatorType(Joint::FORCE);
+//  skel->getJoint(1)->setActuatorType(Joint::FORCE);
+//  skel->getJoint(2)->setActuatorType(Joint::FORCE);
+//  skel->getJoint(3)->setActuatorType(Joint::FORCE);
+//  skel->getJoint(4)->setActuatorType(Joint::FORCE);
+//  EXPECT_EQ(skel->getJoint(0)->getActuatorType(), Joint::FORCE);
+//  EXPECT_EQ(skel->getJoint(1)->getActuatorType(), Joint::FORCE);
+//  EXPECT_EQ(skel->getJoint(2)->getActuatorType(), Joint::FORCE);
+//  EXPECT_EQ(skel->getJoint(3)->getActuatorType(), Joint::FORCE);
+//  EXPECT_EQ(skel->getJoint(4)->getActuatorType(), Joint::FORCE);
 
-  // Test if the skeleton moves as the command with the joint forces
-  Eigen::MatrixXd output = Eigen::MatrixXd::Zero(numFrames, numDofs);
-  for (std::size_t i = 0; i < numFrames; ++i)
-  {
-    skel->setCommands(forces.row(i));
+//  // Test if the skeleton moves as the command with the joint forces
+//  Eigen::MatrixXd output = Eigen::MatrixXd::Zero(numFrames, numDofs);
+//  for (std::size_t i = 0; i < numFrames; ++i)
+//  {
+//    skel->setCommands(forces.row(i));
 
-    world->step(false);
+//    world->step(false);
 
-    output(i,0) = skel->getJoint(0)->getForce(0);
-    output(i,1) = skel->getJoint(1)->getAcceleration(0);
-    output(i,2) = skel->getJoint(2)->getVelocity(0);
-    output(i,3) = skel->getJoint(3)->getAcceleration(0);
-    output(i,4) = skel->getJoint(4)->getVelocity(0);
+//    output(i,0) = skel->getJoint(0)->getForce(0);
+//    output(i,1) = skel->getJoint(1)->getAcceleration(0);
+//    output(i,2) = skel->getJoint(2)->getVelocity(0);
+//    output(i,3) = skel->getJoint(3)->getAcceleration(0);
+//    output(i,4) = skel->getJoint(4)->getVelocity(0);
 
-    EXPECT_NEAR(command(i,0), output(i,0), tol);
-    EXPECT_NEAR(command(i,1), output(i,1), tol);
-    EXPECT_NEAR(command(i,2), output(i,2), tol);
-    EXPECT_NEAR(command(i,3), output(i,3), tol);
-    EXPECT_NEAR(command(i,4), output(i,4), tol);
-  }
-}
+//    EXPECT_NEAR(command(i,0), output(i,0), tol);
+//    EXPECT_NEAR(command(i,1), output(i,1), tol);
+//    EXPECT_NEAR(command(i,2), output(i,2), tol);
+//    EXPECT_NEAR(command(i,3), output(i,3), tol);
+//    EXPECT_NEAR(command(i,4), output(i,4), tol);
+//  }
+//}
