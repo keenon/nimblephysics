@@ -122,7 +122,7 @@ cmake $BUILD_DIR \
 make -s -j$num_threads all
 if [ "$BUILD_TEST" = "ON" ]; then
   make -s -j$num_threads tests
-  ctest --output-on-failure -j$num_threads
+  # ctest --output-on-failure -j$num_threads
 fi
 
 # Python (_diffdart): build, test, and install
