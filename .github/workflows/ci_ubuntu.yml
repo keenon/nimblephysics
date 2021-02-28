@@ -29,6 +29,7 @@ jobs:
       DOCKER_TAG: ubuntu-focal-v0.0
       COMPILER: gcc
       BUILD_TYPE: Release
+      BUILD_TEST: OFF
       BUILD_PYTHON: ON
       BUILD_BENCHMARKS: OFF
     steps:
