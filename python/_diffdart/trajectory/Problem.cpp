@@ -306,7 +306,13 @@ void Problem(py::module& m)
           ::py::arg("world"),
           ::py::arg("perfLog") = nullptr,
           ::py::arg("useKnots") = true,
-          ::py::return_value_policy::reference);
+          ::py::return_value_policy::reference)
+      .def(
+          "setStates",
+          &dart::trajectory::Problem::setStates,
+          ::py::arg("world"),
+          ::py::arg("rollout"),
+          ::py::arg("perfLog") = nullptr);
   /*
 .def(
   "getRepresentation",
@@ -372,11 +378,7 @@ void Problem(py::module& m)
   &dart::trajectory::Problem::getStates,
   ::py::arg("world"),
   ::py::arg("rollout"),
-  ::py::arg("useKnots") = true)
-.def(
-  "getRolloutCache",
-  &dart::trajectory::Problem::getRolloutCache,
-  ::py::arg("world"),
+  ::py::arg("perfLog") = nullptr,
   ::py::arg("useKnots") = true)
 .def(
   "getGradientWrtRolloutCache",
