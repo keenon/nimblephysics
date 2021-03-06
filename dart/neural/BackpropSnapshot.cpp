@@ -1679,22 +1679,126 @@ void BackpropSnapshot::equalsOrCrash(
     exit(1);
   }
   Eigen::MatrixXd diff = (analytical - bruteForce).cwiseAbs();
-  double threshold = 1e-5;
+  double threshold = 1e-8;
   bool broken = (diff.array() > threshold).any();
   if (broken)
   {
+    /*
     Eigen::MatrixXd fd1 = finiteDifferencePosVelJacobian(world, true);
     Eigen::MatrixXd fd2 = finiteDifferencePosVelJacobian(world, false);
 
     std::cout << "Ridders: " << fd1 << std::endl;
     std::cout << "non:   : " << fd2 << std::endl;
+    */
 
     std::cout << "Found invalid matrix! " << name << std::endl;
     std::cout << "Analytical:" << std::endl << analytical << std::endl;
     std::cout << "Brute Force:" << std::endl << bruteForce << std::endl;
     std::cout << "Diff:" << std::endl << diff << std::endl;
+    diagnoseSubJacobianErrors(world, WithRespectTo::POSITION);
     printReplicationInstructions(world);
     exit(1);
+  }
+}
+
+#define compare(analytical, bruteForce, threshold, name)                       \
+  do                                                                           \
+  {                                                                            \
+    if (((analytical - bruteForce).cwiseAbs().array() > threshold).any())      \
+    {                                                                          \
+      std::cout << name << " disagrees! " << name << std::endl;                \
+      std::cout << "Analytical:" << std::endl << analytical << std::endl;      \
+      std::cout << "Brute Force:" << std::endl << bruteForce << std::endl;     \
+      std::cout << "Diff:" << std::endl                                        \
+                << analytical - bruteForce << std::endl;                       \
+    }                                                                          \
+  } while (0)
+
+//==============================================================================
+/// This compares our analytical sub-Jacobians (like dMinv), to attempt to
+/// diagnose where there are differences creeping in between our finite
+/// differencing and our analytical results.
+void BackpropSnapshot::diagnoseSubJacobianErrors(
+    std::shared_ptr<simulation::World> world, WithRespectTo* wrt)
+{
+  double threshold = 1e-8;
+
+  RestorableSnapshot snapshot(world);
+  world->setPositions(mPreStepPosition);
+  world->setVelocities(mPreStepVelocity);
+  world->setExternalForces(mPreStepTorques);
+  world->setCachedLCPSolution(mPreStepLCPCache);
+
+  Eigen::MatrixXd A_c = getClampingConstraintMatrix(world);
+  Eigen::MatrixXd A_ub = getUpperBoundConstraintMatrix(world);
+  Eigen::MatrixXd E = getUpperBoundMappingMatrix();
+  Eigen::MatrixXd A_c_ub_E = A_c + A_ub * E;
+
+  Eigen::VectorXd tau = world->getExternalForces();
+  Eigen::VectorXd C = world->getCoriolisAndGravityAndExternalForces();
+  Eigen::VectorXd f_c = getClampingConstraintImpulses();
+  double dt = world->getTimeStep();
+
+  Eigen::MatrixXd dM
+      = getJacobianOfMinv(world, dt * (tau - C) + A_c_ub_E * f_c, wrt);
+  Eigen::MatrixXd dMFd = finiteDifferenceJacobianOfMinv(
+      world, dt * (tau - C) + A_c_ub_E * f_c, wrt);
+  compare(dM, dMFd, threshold, "dMinv");
+
+  Eigen::MatrixXd Minv = world->getInvMassMatrix();
+
+  Eigen::MatrixXd dF_c = getJacobianOfConstraintForce(world, wrt);
+  if (f_c.size() > 0)
+  {
+    Eigen::MatrixXd dF_cFd
+        = finiteDifferenceJacobianOfConstraintForce(world, wrt);
+    compare(dF_c, dF_cFd, threshold, "dF_c");
+  }
+
+  if (wrt == WithRespectTo::FORCE)
+  {
+    snapshot.restore();
+  }
+
+  Eigen::MatrixXd dC = getJacobianOfC(world, wrt);
+  Eigen::MatrixXd dCFd = finiteDifferenceJacobianOfC(world, wrt);
+  compare(dC, dCFd, threshold, "dC");
+  if (((dC - dCFd).cwiseAbs().array() > threshold).any())
+  {
+    for (int i = 0; i < world->getNumSkeletons(); i++)
+    {
+      auto skel = world->getSkeleton(i);
+      for (int j = 0; j < skel->getNumBodyNodes(); j++)
+      {
+        skel->getBodyNode(j)->debugJacobianOfCForward(WithRespectTo::POSITION);
+      }
+      for (int j = skel->getNumBodyNodes() - 1; j >= 0; j--)
+      {
+        skel->getBodyNode(j)->debugJacobianOfCBackward(WithRespectTo::POSITION);
+      }
+    }
+  }
+
+  if (wrt == WithRespectTo::VELOCITY)
+  {
+    snapshot.restore();
+  }
+  else if (wrt == WithRespectTo::POSITION)
+  {
+    Eigen::MatrixXd dA_c = getJacobianOfClampingConstraints(world, f_c);
+    Eigen::MatrixXd dA_cFd
+        = finiteDifferenceJacobianOfClampingConstraints(world, f_c);
+    compare(dA_c, dA_cFd, threshold, "dA_c");
+
+    Eigen::MatrixXd dA_ubE = getJacobianOfUpperBoundConstraints(world, E * f_c);
+    Eigen::MatrixXd dA_ubEFd
+        = finiteDifferenceJacobianOfUpperBoundConstraints(world, E * f_c);
+    compare(dA_ubE, dA_ubEFd, threshold, "dA_ub");
+    snapshot.restore();
+  }
+  else
+  {
+    snapshot.restore();
   }
 }
 

@@ -1066,8 +1066,7 @@ protected:
 
   void computeJacobianOfMForward(neural::WithRespectTo* wrt);
   void computeJacobianOfMBackward(
-      neural::WithRespectTo* wrt,
-      Eigen::MatrixXd& dCg);
+      neural::WithRespectTo* wrt, Eigen::MatrixXd& dCg);
 
   void computeJacobianOfCForward(neural::WithRespectTo* wrt);
   void computeJacobianOfCBackward(
@@ -1079,7 +1078,29 @@ protected:
   void computeJacobianOfMinvXBackward();
   void computeJacobianOfMinvXForward(Eigen::MatrixXd& DinvMx_Dq);
 
-// protected:
+public:
+  /// This checks the intermediate analytical results of
+  /// computeJacobianOfCForward() against the finite differencing equivalents.
+  void debugJacobianOfCForward(neural::WithRespectTo* wrt);
+  /// This computes the Jacobian of spatial velocity with respect to wrt
+  Eigen::MatrixXd finiteDifferenceJacobianOfSpatialVelocity(
+      neural::WithRespectTo* wrt);
+  /// This computes the Jacobian of spatial acceleration (mCg_dV) with respect
+  /// to wrt
+  Eigen::MatrixXd finiteDifferenceJacobianOfSpatialCoriolisAcceleration(
+      neural::WithRespectTo* wrt);
+  /// This checks the intermediate analytical results of
+  /// computeJacobianOfCBackword() against the finite differencing equivalents.
+  void debugJacobianOfCBackward(neural::WithRespectTo* wrt);
+  /// This computes the Jacobian of gravity force (mFgravity) with respect to
+  /// wrt
+  Eigen::MatrixXd finiteDifferenceJacobianOfGravityForce(
+      neural::WithRespectTo* wrt);
+  /// This computes the Jacobian of body force (mCg_F) with respect to wrt
+  Eigen::MatrixXd finiteDifferenceJacobianOfBodyForce(
+      neural::WithRespectTo* wrt);
+
+  // protected:
 public:
   //--------------------------------------------------------------------------
   // General properties
@@ -1215,6 +1236,7 @@ public:
   /// Cache data for combined vector of the system.
   math::Jacobian mCg_V_p;
   math::Jacobian mCg_dV_p;
+  math::Jacobian mCg_g_p;
   math::Jacobian mCg_F_p;
 
   std::vector<math::Inertia> mInvM_DAI_Dq;
