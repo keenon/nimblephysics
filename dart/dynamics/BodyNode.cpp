@@ -2839,7 +2839,7 @@ void BodyNode::computeJacobianOfCForward(neural::WithRespectTo* wrt)
 void BodyNode::debugJacobianOfCForward(neural::WithRespectTo* wrt)
 {
   computeJacobianOfCForward(wrt);
-  const double threshold = 1e-8;
+  const double threshold = 1e-9;
   Eigen::MatrixXd mCg_V_p_fd = finiteDifferenceJacobianOfSpatialVelocity(wrt);
   if (((mCg_V_p_fd - mCg_V_p).cwiseAbs().array() > threshold).any())
   {
@@ -2908,12 +2908,20 @@ Eigen::MatrixXd BodyNode::finiteDifferenceJacobianOfSpatialCoriolisAcceleration(
     perturbed(i) += EPS;
     wrt->set(skel, perturbed);
     skel->computeForwardDynamics();
+    for (int j = 0; j < skel->getNumBodyNodes(); j++)
+    {
+      skel->getBodyNode(j)->updateCombinedVector();
+    }
     Eigen::Vector6d plus = mCg_dV;
 
     perturbed = original;
     perturbed(i) -= EPS;
     wrt->set(skel, perturbed);
     skel->computeForwardDynamics();
+    for (int j = 0; j < skel->getNumBodyNodes(); j++)
+    {
+      skel->getBodyNode(j)->updateCombinedVector();
+    }
     Eigen::Vector6d minus = mCg_dV;
 
     jac.col(i) = (plus - minus) / (2 * EPS);
@@ -2942,11 +2950,12 @@ void BodyNode::computeJacobianOfCBackward(
   aggregateCombinedVector(tmp, gravity);
 
   mCg_F_p.resize(6, static_cast<int>(numDofs));
+  mCg_V_ad_IV_p.resize(6, static_cast<int>(numDofs));
+  mCg_IdV_p.resize(6, static_cast<int>(numDofs));
   mCg_g_p.resize(6, static_cast<int>(numDofs));
   mCg_g_p.setZero();
 
   const Eigen::Matrix6d& G = mAspectProperties.mInertia.getSpatialTensor();
-  const double mass = getMass();
   const Eigen::Isometry3d& Tworld = getWorldTransform();
   const Jacobian J = skel->getJacobian(this);
   const Eigen::Vector6d& V = getSpatialVelocity();
@@ -2964,11 +2973,13 @@ void BodyNode::computeJacobianOfCBackward(
 
       // Derivative of gravity force
       mCg_g_p.col(i).tail<3>().noalias()
-          = mass * math::makeSkewSymmetric(J.col(dofIndexInSkeleton).head<3>())
+          = -1 * math::makeSkewSymmetric(J.col(dofIndexInSkeleton).head<3>())
             * Tworld.rotation().transpose() * gravity;
-
-      mCg_F_p.col(i) = G * mCg_dV_p.col(i) - dad(mCg_V_p.col(i), G * V)
-                       - dad(V, G * mCg_V_p.col(i)) + mCg_g_p.col(i);
+      mCg_g_p.col(i) = G * mCg_g_p.col(i);
+      mCg_V_ad_IV_p.col(i)
+          = dad(mCg_V_p.col(i), G * V) + dad(V, G * mCg_V_p.col(i));
+      mCg_IdV_p.col(i) = G * mCg_dV_p.col(i);
+      mCg_F_p.col(i) = mCg_IdV_p.col(i) - mCg_V_ad_IV_p.col(i) - mCg_g_p.col(i);
       // TODO(JS): Add -(D F_{ext} / D q^k) to handle external forces other than
       // gravity
 
@@ -2977,6 +2988,7 @@ void BodyNode::computeJacobianOfCBackward(
         const Joint* childJoint = childBody->getParentJoint();
         const Eigen::Isometry3d& childT = childJoint->getRelativeTransform();
 
+        // mCg_F += math::dAdInvT((*it)->getParentJoint()->mT, (*it)->mCg_F);
         if (childJoint->hasDof(dof))
         {
           const math::Jacobian& S = childJoint->getRelativeJacobian();
@@ -3018,8 +3030,10 @@ void BodyNode::computeJacobianOfCBackward(
     {
       const DegreeOfFreedom* dof = skel->getDof(i);
 
-      mCg_F_p.col(i) = G * mCg_dV_p.col(i) - dad(mCg_V_p.col(i), G * V)
-                       - dad(V, G * mCg_V_p.col(i));
+      mCg_V_ad_IV_p.col(i)
+          = dad(mCg_V_p.col(i), G * V) + dad(V, G * mCg_V_p.col(i));
+      mCg_IdV_p.col(i) = G * mCg_dV_p.col(i);
+      mCg_F_p.col(i) = mCg_IdV_p.col(i) - mCg_V_ad_IV_p.col(i);
       // TODO(JS): Add -(D F_{ext} / D q^k) for the case that F_ext (other than
       // gravity force) is a function of q
 
@@ -3059,6 +3073,7 @@ void BodyNode::debugJacobianOfCBackward(neural::WithRespectTo* wrt)
       wrt, dC, getSkeleton()->mAspectProperties.mGravity);
 
   const double threshold = 1e-8;
+  // mCg_g_p holds an inverse of the gradient of gravity wrt position
   Eigen::MatrixXd mCg_g_p_fd = finiteDifferenceJacobianOfGravityForce(wrt);
   if (((mCg_g_p_fd - mCg_g_p).cwiseAbs().array() > threshold).any())
   {
@@ -3072,10 +3087,30 @@ void BodyNode::debugJacobianOfCBackward(neural::WithRespectTo* wrt)
   if (((mCg_F_p_fd - mCg_F_p).cwiseAbs().array() > threshold).any())
   {
     std::cout << "mCg_F_p disagrees on body node " << getIndexInSkeleton()
-              << "! " << std::endl;
+              << "! num children = " << mChildBodyNodes.size() << std::endl;
     std::cout << "Analytical:" << std::endl << mCg_F_p << std::endl;
     std::cout << "Brute Force:" << std::endl << mCg_F_p_fd << std::endl;
     std::cout << "Diff:" << std::endl << mCg_F_p - mCg_F_p_fd << std::endl;
+  }
+  Eigen::MatrixXd mCg_V_ad_IV_p_fd
+      = finiteDifferenceJacobianOfBodyForceAdVIV(wrt);
+  if (((mCg_V_ad_IV_p - mCg_V_ad_IV_p_fd).cwiseAbs().array() > threshold).any())
+  {
+    std::cout << "ad(V, I*V) disagrees on body node " << getIndexInSkeleton()
+              << "!" << std::endl;
+    std::cout << "Analytical:" << std::endl << mCg_V_ad_IV_p << std::endl;
+    std::cout << "Brute Force:" << std::endl << mCg_V_ad_IV_p_fd << std::endl;
+    std::cout << "Diff:" << std::endl
+              << mCg_V_ad_IV_p - mCg_V_ad_IV_p_fd << std::endl;
+  }
+  Eigen::MatrixXd mCg_IdV_p_fd = finiteDifferenceJacobianOfBodyForceIdV(wrt);
+  if (((mCg_IdV_p - mCg_IdV_p_fd).cwiseAbs().array() > threshold).any())
+  {
+    std::cout << "I*dV disagrees on body node " << getIndexInSkeleton() << "!"
+              << std::endl;
+    std::cout << "Analytical:" << std::endl << mCg_IdV_p << std::endl;
+    std::cout << "Brute Force:" << std::endl << mCg_IdV_p_fd << std::endl;
+    std::cout << "Diff:" << std::endl << mCg_IdV_p - mCg_IdV_p_fd << std::endl;
   }
 }
 
@@ -3120,7 +3155,10 @@ Eigen::MatrixXd BodyNode::finiteDifferenceJacobianOfBodyForce(
   int dofs = wrt->dim(skel);
   Eigen::MatrixXd jac = Eigen::MatrixXd::Zero(6, dofs);
 
-  const double EPS = 1e-6;
+  Eigen::VectorXd tmp;
+  tmp.resize(static_cast<int>(skel->getNumDofs()));
+
+  const double EPS = 1e-4;
   Eigen::VectorXd original = wrt->get(skel);
   for (int i = 0; i < dofs; i++)
   {
@@ -3128,13 +3166,130 @@ Eigen::MatrixXd BodyNode::finiteDifferenceJacobianOfBodyForce(
     perturbed(i) += EPS;
     wrt->set(skel, perturbed);
     skel->computeForwardDynamics();
+    for (int j = 0; j < skel->getNumBodyNodes(); j++)
+    {
+      skel->getBodyNode(j)->updateCombinedVector();
+    }
+    for (int j = skel->getNumBodyNodes() - 1; j >= 0; j--)
+    {
+      skel->getBodyNode(j)->aggregateCombinedVector(tmp, skel->getGravity());
+    }
     Eigen::Vector6d plus = mCg_F;
 
     perturbed = original;
     perturbed(i) -= EPS;
     wrt->set(skel, perturbed);
     skel->computeForwardDynamics();
+    for (int j = 0; j < skel->getNumBodyNodes(); j++)
+    {
+      skel->getBodyNode(j)->updateCombinedVector();
+    }
+    for (int j = skel->getNumBodyNodes() - 1; j >= 0; j--)
+    {
+      skel->getBodyNode(j)->aggregateCombinedVector(tmp, skel->getGravity());
+    }
     Eigen::Vector6d minus = mCg_F;
+
+    jac.col(i) = (plus - minus) / (2 * EPS);
+  }
+  wrt->set(skel, original);
+
+  return jac;
+}
+
+//==============================================================================
+/// This computes the Jacobian of body force (mCg_F) with respect to wrt
+Eigen::MatrixXd BodyNode::finiteDifferenceJacobianOfBodyForceAdVIV(
+    neural::WithRespectTo* wrt)
+{
+  auto skel = getSkeleton().get();
+  int dofs = wrt->dim(skel);
+  Eigen::MatrixXd jac = Eigen::MatrixXd::Zero(6, dofs);
+
+  Eigen::VectorXd tmp;
+  tmp.resize(static_cast<int>(skel->getNumDofs()));
+
+  const double EPS = 1e-4;
+  Eigen::VectorXd original = wrt->get(skel);
+  for (int i = 0; i < dofs; i++)
+  {
+    Eigen::VectorXd perturbed = original;
+    perturbed(i) += EPS;
+    wrt->set(skel, perturbed);
+    skel->computeForwardDynamics();
+    for (int j = 0; j < skel->getNumBodyNodes(); j++)
+    {
+      skel->getBodyNode(j)->updateCombinedVector();
+    }
+    // mCg_F = mI * mCg_dV;
+    // mCg_F -= mFgravity;
+    // mCg_F -= math::dad(V, mI * V);
+    const Eigen::Matrix6d& mI = mAspectProperties.mInertia.getSpatialTensor();
+    const Eigen::Vector6d& V = getSpatialVelocity();
+    Eigen::Vector6d plus = math::dad(V, mI * V);
+
+    perturbed = original;
+    perturbed(i) -= EPS;
+    wrt->set(skel, perturbed);
+    skel->computeForwardDynamics();
+    for (int j = 0; j < skel->getNumBodyNodes(); j++)
+    {
+      skel->getBodyNode(j)->updateCombinedVector();
+    }
+    const Eigen::Matrix6d& mI_minus
+        = mAspectProperties.mInertia.getSpatialTensor();
+    const Eigen::Vector6d& V_minus = getSpatialVelocity();
+    Eigen::Vector6d minus = math::dad(V_minus, mI_minus * V_minus);
+
+    jac.col(i) = (plus - minus) / (2 * EPS);
+  }
+  wrt->set(skel, original);
+
+  return jac;
+}
+
+//==============================================================================
+/// This computes the Jacobian of the I*dV subexpression of body force (mCg_F)
+/// with respect to wrt
+Eigen::MatrixXd BodyNode::finiteDifferenceJacobianOfBodyForceIdV(
+    neural::WithRespectTo* wrt)
+{
+  auto skel = getSkeleton().get();
+  int dofs = wrt->dim(skel);
+  Eigen::MatrixXd jac = Eigen::MatrixXd::Zero(6, dofs);
+
+  Eigen::VectorXd tmp;
+  tmp.resize(static_cast<int>(skel->getNumDofs()));
+
+  const double EPS = 1e-4;
+  Eigen::VectorXd original = wrt->get(skel);
+  for (int i = 0; i < dofs; i++)
+  {
+    Eigen::VectorXd perturbed = original;
+    perturbed(i) += EPS;
+    wrt->set(skel, perturbed);
+    skel->computeForwardDynamics();
+    for (int j = 0; j < skel->getNumBodyNodes(); j++)
+    {
+      skel->getBodyNode(j)->updateCombinedVector();
+    }
+    // mCg_F = mI * mCg_dV;
+    // mCg_F -= mFgravity;
+    // mCg_F -= math::dad(V, mI * V);
+    const Eigen::Matrix6d& mI = mAspectProperties.mInertia.getSpatialTensor();
+    Eigen::Vector6d plus = mI * mCg_dV;
+
+    perturbed = original;
+    perturbed(i) -= EPS;
+    wrt->set(skel, perturbed);
+    skel->computeForwardDynamics();
+    for (int j = 0; j < skel->getNumBodyNodes(); j++)
+    {
+      skel->getBodyNode(j)->updateCombinedVector();
+    }
+    const Eigen::Matrix6d& mI_minus
+        = mAspectProperties.mInertia.getSpatialTensor();
+    Eigen::Vector6d minus = mI_minus * mCg_dV;
 
     jac.col(i) = (plus - minus) / (2 * EPS);
   }
