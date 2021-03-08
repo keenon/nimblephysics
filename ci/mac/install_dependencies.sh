@@ -239,20 +239,22 @@ install_name_tool -id /usr/local/lib/libassimp.5.dylib /usr/local/lib/libassimp.
 # install_name_tool -id /usr/local/lib/libOpenThreads.21.dylib /usr/local/lib/libOpenThreads.21.dylib
 
 # Fix "icu4c" installed by Brew
-pushd /usr/local/Cellar/icu4c/67.1/lib/
-sudo install_name_tool -change "@loader_path/libicuuc.67.dylib" "@loader_path/libicuuc.67.1.dylib" libicui18n.67.1.dylib
-sudo install_name_tool -change "@loader_path/libicudata.67.dylib" "@loader_path/libicudata.67.1.dylib" libicui18n.67.1.dylib
-sudo install_name_tool -change "@loader_path/libicuuc.67.dylib" "@loader_path/libicuuc.67.1.dylib" libicuio.67.1.dylib
-sudo install_name_tool -change "@loader_path/libicudata.67.dylib" "@loader_path/libicudata.67.1.dylib" libicuio.67.1.dylib
-sudo install_name_tool -change "@loader_path/libicui18n.67.dylib" "@loader_path/libicui18n.67.dylib" libicuio.67.1.dylib
-sudo install_name_tool -change "@loader_path/libicutu.67.dylib" "@loader_path/libicutu.67.1.dylib" libicutest.67.1.dylib
-sudo install_name_tool -change "@loader_path/libicui18n.67.dylib" "@loader_path/libicui18n.67.dylib" libicutest.67.1.dylib
-sudo install_name_tool -change "@loader_path/libicuuc.67.dylib" "@loader_path/libicuuc.67.1.dylib" libicutest.67.1.dylib
-sudo install_name_tool -change "@loader_path/libicudata.67.dylib" "@loader_path/libicudata.67.1.dylib" libicutest.67.1.dylib
-sudo install_name_tool -change "@loader_path/libicuuc.67.dylib" "@loader_path/libicuuc.67.1.dylib" libicutu.67.1.dylib
-sudo install_name_tool -change "@loader_path/libicudata.67.dylib" "@loader_path/libicudata.67.1.dylib" libicutu.67.1.dylib
-sudo install_name_tool -change "@loader_path/libicui18n.67.dylib" "@loader_path/libicui18n.67.dylib" libicutu.67.1.dylib
-sudo install_name_tool -change "@loader_path/libicudata.67.dylib" "@loader_path/libicudata.67.1.dylib" libicuuc.67.1.dylib 
+ICU4C_MAJOR_VERSION="68"
+ICU4C_FULL_VERSION="68.2"
+pushd /usr/local/Cellar/icu4c/${ICU4C_FULL_VERSION}/lib/
+sudo install_name_tool -change "@loader_path/libicuuc.${ICU4C_MAJOR_VERSION}.dylib" "@loader_path/libicuuc.${ICU4C_FULL_VERSION}.dylib" libicui18n.${ICU4C_FULL_VERSION}.dylib
+sudo install_name_tool -change "@loader_path/libicudata.${ICU4C_MAJOR_VERSION}.dylib" "@loader_path/libicudata.${ICU4C_FULL_VERSION}.dylib" libicui18n.${ICU4C_FULL_VERSION}.dylib
+sudo install_name_tool -change "@loader_path/libicuuc.${ICU4C_MAJOR_VERSION}.dylib" "@loader_path/libicuuc.${ICU4C_FULL_VERSION}.dylib" libicuio.${ICU4C_FULL_VERSION}.dylib
+sudo install_name_tool -change "@loader_path/libicudata.${ICU4C_MAJOR_VERSION}.dylib" "@loader_path/libicudata.${ICU4C_FULL_VERSION}.dylib" libicuio.${ICU4C_FULL_VERSION}.dylib
+sudo install_name_tool -change "@loader_path/libicui18n.${ICU4C_MAJOR_VERSION}.dylib" "@loader_path/libicui18n.${ICU4C_MAJOR_VERSION}.dylib" libicuio.${ICU4C_FULL_VERSION}.dylib
+sudo install_name_tool -change "@loader_path/libicutu.${ICU4C_MAJOR_VERSION}.dylib" "@loader_path/libicutu.${ICU4C_FULL_VERSION}.dylib" libicutest.${ICU4C_FULL_VERSION}.dylib
+sudo install_name_tool -change "@loader_path/libicui18n.${ICU4C_MAJOR_VERSION}.dylib" "@loader_path/libicui18n.${ICU4C_MAJOR_VERSION}.dylib" libicutest.${ICU4C_FULL_VERSION}.dylib
+sudo install_name_tool -change "@loader_path/libicuuc.${ICU4C_MAJOR_VERSION}.dylib" "@loader_path/libicuuc.${ICU4C_FULL_VERSION}.dylib" libicutest.${ICU4C_FULL_VERSION}.dylib
+sudo install_name_tool -change "@loader_path/libicudata.${ICU4C_MAJOR_VERSION}.dylib" "@loader_path/libicudata.${ICU4C_FULL_VERSION}.dylib" libicutest.${ICU4C_FULL_VERSION}.dylib
+sudo install_name_tool -change "@loader_path/libicuuc.${ICU4C_MAJOR_VERSION}.dylib" "@loader_path/libicuuc.${ICU4C_FULL_VERSION}.dylib" libicutu.${ICU4C_FULL_VERSION}.dylib
+sudo install_name_tool -change "@loader_path/libicudata.${ICU4C_MAJOR_VERSION}.dylib" "@loader_path/libicudata.${ICU4C_FULL_VERSION}.dylib" libicutu.${ICU4C_FULL_VERSION}.dylib
+sudo install_name_tool -change "@loader_path/libicui18n.${ICU4C_MAJOR_VERSION}.dylib" "@loader_path/libicui18n.${ICU4C_MAJOR_VERSION}.dylib" libicutu.${ICU4C_FULL_VERSION}.dylib
+sudo install_name_tool -change "@loader_path/libicudata.${ICU4C_MAJOR_VERSION}.dylib" "@loader_path/libicudata.${ICU4C_FULL_VERSION}.dylib" libicuuc.${ICU4C_FULL_VERSION}.dylib 
 popd
 
 # Get ready to bundle the links
