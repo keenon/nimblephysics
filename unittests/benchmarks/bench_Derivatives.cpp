@@ -3,7 +3,6 @@
 #include <thread>
 
 #include <benchmark/benchmark.h>
-#include <dart/gui/gui.hpp>
 #include <gtest/gtest.h>
 
 #include "dart/collision/CollisionObject.hpp"
@@ -11,7 +10,6 @@
 #include "dart/dynamics/BodyNode.hpp"
 #include "dart/dynamics/RevoluteJoint.hpp"
 #include "dart/dynamics/Skeleton.hpp"
-#include "dart/gui/glut/TrajectoryReplayWindow.hpp"
 #include "dart/math/Geometry.hpp"
 #include "dart/performance/PerformanceLog.hpp"
 #include "dart/simulation/World.hpp"
@@ -272,8 +270,8 @@ static void BM_Jacobian_Of_Minv_q_Numerical(benchmark::State& state)
       for (auto j = 0; j < 100; ++j)
       {
         Eigen::VectorXd x = Eigen::VectorXd::Random(dof);
-        Eigen::MatrixXd dC_numerical
-            = skel->finiteDifferenceJacobianOfMinv(x, neural::WithRespectTo::POSITION);
+        Eigen::MatrixXd dC_numerical = skel->finiteDifferenceJacobianOfMinv(
+            x, neural::WithRespectTo::POSITION);
       }
     }
   }
@@ -326,8 +324,8 @@ static void BM_Jacobian_Of_Minv_q_Analytical(benchmark::State& state)
       for (auto j = 0; j < 100; ++j)
       {
         Eigen::VectorXd x = Eigen::VectorXd::Random(dof);
-        Eigen::MatrixXd C_dq_analytic
-            = skel->getJacobianOfMinv_Direct(x, neural::WithRespectTo::POSITION);
+        Eigen::MatrixXd C_dq_analytic = skel->getJacobianOfMinv_Direct(
+            x, neural::WithRespectTo::POSITION);
       }
     }
   }
