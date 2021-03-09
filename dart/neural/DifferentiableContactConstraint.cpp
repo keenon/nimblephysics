@@ -1682,7 +1682,7 @@ Eigen::MatrixXd DifferentiableContactConstraint::getConstraintForcesJacobian(
       int colDof = colSkel->getNumDofs();
       if (colDof == 0)
         continue;
-      int colWorldOffset = world->getSkeletonDofOffset(rowSkel);
+      int colWorldOffset = world->getSkeletonDofOffset(colSkel);
 
       result.block(rowCursor, colCursor, rowDof, colDof)
           = cachedWorld.block(rowWorldOffset, colWorldOffset, rowDof, colDof);
