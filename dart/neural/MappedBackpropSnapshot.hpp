@@ -183,11 +183,27 @@ public:
   Eigen::MatrixXd finiteDifferenceVelVelJacobian(
       simulation::WorldPtr world,
       const std::string& mapBefore,
-      const std::string& mapAfter);
+      const std::string& mapAfter,
+      bool useRidders = true);
+
+  /// This computes and returns the whole vel-vel jacobian by finite
+  /// differences. This is SUPER SLOW, and is only here for testing.
+  Eigen::MatrixXd finiteDifferenceRiddersVelVelJacobian(
+      simulation::WorldPtr world,
+      const std::string& mapBefore,
+      const std::string& mapAfter);      
 
   /// This computes and returns the whole pos-C(pos,vel) jacobian by finite
   /// differences. This is SUPER SUPER SLOW, and is only here for testing.
   Eigen::MatrixXd finiteDifferencePosVelJacobian(
+      simulation::WorldPtr world,
+      const std::string& mapBefore,
+      const std::string& mapAfter,
+      bool useRidders = true);
+
+  /// This computes and returns the whole pos-C(pos,vel) jacobian by finite
+  /// differences. This is SUPER SUPER SLOW, and is only here for testing.
+  Eigen::MatrixXd finiteDifferenceRiddersPosVelJacobian(
       simulation::WorldPtr world,
       const std::string& mapBefore,
       const std::string& mapAfter);
@@ -197,10 +213,26 @@ public:
   Eigen::MatrixXd finiteDifferenceForceVelJacobian(
       simulation::WorldPtr world,
       const std::string& mapBefore,
+      const std::string& mapAfter,
+      bool useRidders = true);
+
+  /// This computes and returns the whole force-vel jacobian by finite
+  /// differences. This is SUPER SLOW, and is only here for testing.
+  Eigen::MatrixXd finiteDifferenceRiddersForceVelJacobian(
+      simulation::WorldPtr world,
+      const std::string& mapBefore,
       const std::string& mapAfter);
 
   /// This computes a finite differenced Jacobian for pos_t->mapped_pos_{t+1}
   Eigen::MatrixXd finiteDifferencePosPosJacobian(
+      std::shared_ptr<simulation::World> world,
+      const std::string& mapBefore,
+      const std::string& mapAfter,
+      std::size_t subdivisions = 20,
+      bool useRidders = true);
+
+    /// This computes a finite differenced Jacobian for pos_t->mapped_pos_{t+1}
+  Eigen::MatrixXd finiteDifferenceRiddersPosPosJacobian(
       std::shared_ptr<simulation::World> world,
       const std::string& mapBefore,
       const std::string& mapAfter,
@@ -209,6 +241,15 @@ public:
   /// This computes and returns the whole vel-pos jacobian by finite
   /// differences. This is SUPER SUPER SLOW, and is only here for testing.
   Eigen::MatrixXd finiteDifferenceVelPosJacobian(
+      simulation::WorldPtr world,
+      const std::string& mapBefore,
+      const std::string& mapAfter,
+      std::size_t subdivisions = 20,
+      bool useRidders = true);
+
+  /// This computes and returns the whole vel-pos jacobian by finite
+  /// differences. This is SUPER SUPER SLOW, and is only here for testing.
+  Eigen::MatrixXd finiteDifferenceRiddersVelPosJacobian(
       simulation::WorldPtr world,
       const std::string& mapBefore,
       const std::string& mapAfter,
