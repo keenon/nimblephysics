@@ -39,6 +39,7 @@
 #include "dart/common/Console.hpp"
 #include "dart/common/StlHelpers.hpp"
 #include "dart/dynamics/Chain.hpp"
+#include "dart/dynamics/DegreeOfFreedom.hpp"
 #include "dart/dynamics/EndEffector.hpp"
 #include "dart/dynamics/Joint.hpp"
 #include "dart/dynamics/Marker.hpp"
@@ -2522,6 +2523,948 @@ void BodyNode::updateWorldJacobianClassicDeriv() const
   mIsWorldJacobianClassicDerivDirty = false;
 }
 
+//==============================================================================
+void BodyNode::computeJacobianOfMForward(neural::WithRespectTo* wrt)
+{
+  using math::ad;
+  using math::AdInvT;
+  using math::Jacobian;
+
+  (void)wrt;
+#ifndef NDEBUG
+  if (wrt != neural::WithRespectTo::POSITION)
+  {
+    std::cout << "wrt: " << wrt << std::endl;
+    std::cout << "when:\n"
+              << "- neural::WithRespectTo::POSITION: "
+              << neural::WithRespectTo::POSITION << "\n"
+              << "- neural::WithRespectTo::VELOCITY: "
+              << neural::WithRespectTo::VELOCITY << "\n"
+              << "- neural::WithRespectTo::FORCE   : "
+              << neural::WithRespectTo::FORCE << "\n"
+              << std::endl;
+    assert(wrt == neural::WithRespectTo::POSITION);
+  }
+#endif
+
+  const auto skel = getSkeleton();
+  const auto numDofs = skel->getNumDofs();
+
+  mMddq_dV_p.resize(6, static_cast<int>(numDofs));
+
+  const Eigen::Isometry3d& T = mParentJoint->getRelativeTransform();
+  const Jacobian& S = mParentJoint->getRelativeJacobian();
+  const Eigen::VectorXd& ddq = mParentJoint->getAccelerations();
+
+  // Update mMddq_dV
+  if (mParentBodyNode)
+    mMddq_dV = math::AdInvT(T, mParentBodyNode->mMddq_dV) + S * ddq;
+  else
+    mMddq_dV.noalias() = S * ddq;
+
+  // TODO(JS): iterate joints instead for vectorization
+  for (auto i = 0u; i < numDofs; ++i)
+  {
+    const DegreeOfFreedom* dof = skel->getDof(i);
+    if (mParentJoint->hasDof(dof))
+    {
+      const int dofIndexInJoint = static_cast<int>(dof->getIndexInJoint());
+      const Eigen::Vector6d Scol = S.col(dofIndexInJoint);
+
+      const Jacobian DS_Dq
+          = mParentJoint->getRelativeJacobianDeriv(dof->getIndexInJoint());
+      const Jacobian DdS_Dq = mParentJoint->getRelativeJacobianTimeDerivDeriv(
+          dof->getIndexInJoint());
+
+      if (mParentBodyNode)
+      {
+        const Eigen::Vector6d& parent_dV = mParentBodyNode->mMddq_dV;
+        mMddq_dV_p.col(i) = AdInvT(T, mParentBodyNode->mMddq_dV_p.col(i))
+                            - ad(Scol, AdInvT(T, parent_dV)) + DS_Dq * ddq;
+      }
+      else
+      {
+        mMddq_dV_p.col(i).noalias() = DS_Dq * ddq;
+      }
+    }
+    else
+    {
+      if (mParentBodyNode)
+      {
+        mMddq_dV_p.col(i) = AdInvT(T, mParentBodyNode->mMddq_dV_p.col(i));
+      }
+      else
+      {
+        mMddq_dV_p.col(i).setZero();
+      }
+    }
+  }
+}
+
+//==============================================================================
+void BodyNode::computeJacobianOfMBackward(
+    neural::WithRespectTo* wrt, Eigen::MatrixXd& dMddq)
+{
+  using math::AdInvRLinear;
+  using math::dad;
+  using math::dAdInvT;
+  using math::Jacobian;
+
+  if (wrt != neural::WithRespectTo::POSITION)
+  {
+    // Shouldn't reach here
+    assert(false);
+  }
+
+  const auto skel = getSkeleton();
+  const auto numDofs = skel->getNumDofs();
+
+  mMddq_F_p.resize(6, static_cast<int>(numDofs));
+
+  const Eigen::Matrix6d& G = mAspectProperties.mInertia.getSpatialTensor();
+  const Jacobian J = skel->getJacobian(this);
+  const int jointNumDofs = static_cast<int>(mParentJoint->getNumDofs());
+
+  // Update mMddq_dV
+  mMddq_F = G * mMddq_dV;
+
+  for (BodyNode* childBody : mChildBodyNodes)
+  {
+    const Joint* childJoint = childBody->getParentJoint();
+    const Eigen::Isometry3d& childT = childJoint->getRelativeTransform();
+    mMddq_F += dAdInvT(childT, childBody->mMddq_F);
+  }
+
+  // TODO(JS): iterate joints instead for vectorization
+  for (auto i = 0u; i < numDofs; ++i)
+  {
+    const DegreeOfFreedom* dof = skel->getDof(i);
+    const int dofIndexInJoint = static_cast<int>(dof->getIndexInJoint());
+
+    mMddq_F_p.col(i) = G * mMddq_dV_p.col(i);
+    // TODO(JS): Add -(D F_{ext} / D q^k) to handle external forces other than
+    // gravity
+
+    for (BodyNode* childBody : mChildBodyNodes)
+    {
+      const Joint* childJoint = childBody->getParentJoint();
+      const Eigen::Isometry3d& childT = childJoint->getRelativeTransform();
+
+      if (childJoint->hasDof(dof))
+      {
+        const math::Jacobian& S = childJoint->getRelativeJacobian();
+        const Eigen::Vector6d Scol = S.col(dofIndexInJoint);
+
+        mMddq_F_p.col(i) += dAdInvT(
+            childT,
+            childBody->mMddq_F_p.col(i) - dad(Scol, childBody->mMddq_F));
+      }
+      else
+      {
+        mMddq_F_p.col(i) += dAdInvT(childT, childBody->mMddq_F_p.col(i));
+      }
+    }
+
+    if (jointNumDofs > 0)
+    {
+      const Jacobian& S = mParentJoint->getRelativeJacobian();
+
+      Eigen::MatrixXd dMddq_seg = S.transpose() * mMddq_F_p.col(i); // m x 1
+      if (mParentJoint->hasDof(dof))
+      {
+        const Jacobian DS_Dq
+            = mParentJoint->getRelativeJacobianDeriv(dof->getIndexInJoint());
+
+        dMddq_seg += DS_Dq.transpose() * mMddq_F;
+      }
+
+      const int iStart
+          = static_cast<int>(mParentJoint->getDof(0)->getIndexInSkeleton());
+      const int jStart = static_cast<int>(dof->getIndexInSkeleton());
+      dMddq.block(iStart, jStart, jointNumDofs, 1) = dMddq_seg;
+    }
+  }
+}
+
+//==============================================================================
+void BodyNode::computeJacobianOfCForward(neural::WithRespectTo* wrt)
+{
+  using math::ad;
+  using math::AdInvT;
+  using math::Jacobian;
+
+  const auto skel = getSkeleton();
+  const auto numDofs = skel->getNumDofs();
+
+  // To update mCg_dV
+  updateCombinedVector();
+
+  mCg_V_p.resize(6, static_cast<int>(numDofs));
+  mCg_dV_p.resize(6, static_cast<int>(numDofs));
+
+  const Eigen::Isometry3d& T = mParentJoint->getRelativeTransform();
+  const Jacobian& S = mParentJoint->getRelativeJacobian();
+  const Jacobian& dS = mParentJoint->getRelativeJacobianTimeDeriv();
+  const Eigen::VectorXd& dq = mParentJoint->getVelocities();
+  const Eigen::Vector6d& V = getSpatialVelocity();
+
+#ifdef DART_DEBUG_ANALYTICAL_DERIV
+  const auto bodyNodeIndex = getIndexInSkeleton();
+  auto& data = skel->mDiffC.nodes[bodyNodeIndex].data;
+#endif
+
+#ifdef DART_DEBUG_ANALYTICAL_DERIV
+  data.V = V;
+  data.dV = mCg_dV;
+#endif
+
+  if (wrt == neural::WithRespectTo::POSITION)
+  {
+    // TODO(JS): iterate joints instead for vectorization
+    for (auto i = 0u; i < numDofs; ++i)
+    {
+#ifdef DART_DEBUG_ANALYTICAL_DERIV
+      auto& deriv = skel->mDiffC.nodes[bodyNodeIndex].derivs[i];
+#endif
+
+      const DegreeOfFreedom* dof = skel->getDof(i);
+      if (mParentJoint->hasDof(dof))
+      {
+        const int dofIndexInJoint = static_cast<int>(dof->getIndexInJoint());
+        const Eigen::Vector6d Scol = S.col(dofIndexInJoint);
+
+        const Jacobian DS_Dq
+            = mParentJoint->getRelativeJacobianDeriv(dof->getIndexInJoint());
+        const Jacobian DdS_Dq = mParentJoint->getRelativeJacobianTimeDerivDeriv(
+            dof->getIndexInJoint());
+
+        if (mParentBodyNode)
+        {
+          const Eigen::Vector6d& parent_V
+              = mParentBodyNode->getSpatialVelocity();
+          mCg_V_p.col(i) = AdInvT(T, mParentBodyNode->mCg_V_p.col(i))
+                           - ad(Scol, AdInvT(T, parent_V)) + DS_Dq * dq;
+
+          const Eigen::Vector6d& parent_dV = mParentBodyNode->mCg_dV;
+          mCg_dV_p.col(i) = AdInvT(T, mParentBodyNode->mCg_dV_p.col(i))
+                            - ad(Scol, AdInvT(T, parent_dV))
+                            + ad(mCg_V_p.col(i), S * dq) + ad(V, DS_Dq * dq)
+                            + DdS_Dq * dq;
+        }
+        else
+        {
+          mCg_V_p.col(i) = DS_Dq * dq;
+          mCg_dV_p.col(i)
+              = ad(mCg_V_p.col(i), S * dq) + ad(V, DS_Dq * dq) + DdS_Dq * dq;
+        }
+      }
+      else
+      {
+        if (mParentBodyNode)
+        {
+          mCg_V_p.col(i) = AdInvT(T, mParentBodyNode->mCg_V_p.col(i));
+          mCg_dV_p.col(i) = AdInvT(T, mParentBodyNode->mCg_dV_p.col(i))
+                            + ad(mCg_V_p.col(i), S * dq);
+        }
+        else
+        {
+          mCg_V_p.col(i).setZero();
+          mCg_dV_p.col(i) = ad(mCg_V_p.col(i), S * dq);
+        }
+      }
+
+#ifdef DART_DEBUG_ANALYTICAL_DERIV
+      deriv.V = mCg_V_p.col(i);
+      deriv.dV = mCg_dV_p.col(i);
+#endif
+    }
+  }
+  else if (wrt == neural::WithRespectTo::VELOCITY)
+  {
+    for (auto i = 0u; i < numDofs; ++i)
+    {
+      const DegreeOfFreedom* dof = skel->getDof(i);
+      if (mParentJoint->hasDof(dof))
+      {
+        const Jacobian DS_Dq
+            = mParentJoint->getRelativeJacobianDeriv(dof->getIndexInJoint());
+        const Jacobian DdS_Dq = mParentJoint->getRelativeJacobianTimeDerivDeriv(
+            dof->getIndexInJoint());
+        const Jacobian DdS_Ddq
+            = mParentJoint->getRelativeJacobianTimeDerivDeriv2(
+                dof->getIndexInJoint());
+
+        const int dofIndexInJoint = static_cast<int>(dof->getIndexInJoint());
+        const Eigen::Vector6d Scol = S.col(dofIndexInJoint);
+        const Eigen::Vector6d dScol = dS.col(dofIndexInJoint);
+
+        if (mParentBodyNode)
+        {
+          mCg_V_p.col(i) = AdInvT(T, mParentBodyNode->mCg_V_p.col(i)) + Scol;
+          mCg_dV_p.col(i) = AdInvT(T, mParentBodyNode->mCg_dV_p.col(i))
+                            + ad(mCg_V_p.col(i), S * dq) + ad(V, Scol)
+                            + DdS_Ddq * dq + dScol;
+        }
+        else
+        {
+          mCg_V_p.col(i) = Scol;
+          mCg_dV_p.col(i)
+              = ad(mCg_V_p.col(i), S * dq) + ad(V, Scol) + DdS_Ddq * dq + dScol;
+        }
+      }
+      else
+      {
+        if (mParentBodyNode)
+        {
+          mCg_V_p.col(i) = AdInvT(T, mParentBodyNode->mCg_V_p.col(i));
+          mCg_dV_p.col(i) = AdInvT(T, mParentBodyNode->mCg_dV_p.col(i))
+                            + ad(mCg_V_p.col(i), S * dq);
+        }
+        else
+        {
+          mCg_V_p.col(i).setZero();
+          mCg_dV_p.col(i) = ad(mCg_V_p.col(i), S * dq);
+        }
+      }
+    }
+  }
+  else
+  {
+    // Shouldn't reach here
+    assert(false);
+  }
+}
+
+//============================================================================
+void BodyNode::debugJacobianOfCForward(neural::WithRespectTo* wrt)
+{
+  computeJacobianOfCForward(wrt);
+  const double threshold = 1e-9;
+  Eigen::MatrixXd mCg_V_p_fd = finiteDifferenceJacobianOfSpatialVelocity(wrt);
+  if (((mCg_V_p_fd - mCg_V_p).cwiseAbs().array() > threshold).any())
+  {
+    std::cout << "mCg_V_p disagrees on body node " << getIndexInSkeleton()
+              << "!" << std::endl;
+    std::cout << "Analytical:" << std::endl << mCg_V_p << std::endl;
+    std::cout << "Brute Force:" << std::endl << mCg_V_p_fd << std::endl;
+    std::cout << "Diff:" << std::endl << mCg_V_p - mCg_V_p_fd << std::endl;
+  }
+  Eigen::MatrixXd mCg_dV_p_fd
+      = finiteDifferenceJacobianOfSpatialCoriolisAcceleration(wrt);
+  if (((mCg_dV_p_fd - mCg_dV_p).cwiseAbs().array() > threshold).any())
+  {
+    std::cout << "mCg_dV_p disagrees on body node " << getIndexInSkeleton()
+              << "!" << std::endl;
+    std::cout << "Analytical:" << std::endl << mCg_dV_p << std::endl;
+    std::cout << "Brute Force:" << std::endl << mCg_dV_p_fd << std::endl;
+    std::cout << "Diff:" << std::endl << mCg_dV_p - mCg_dV_p_fd << std::endl;
+  }
+}
+
+//============================================================================
+Eigen::MatrixXd BodyNode::finiteDifferenceJacobianOfSpatialVelocity(
+    neural::WithRespectTo* wrt)
+{
+  auto skel = getSkeleton().get();
+  int dofs = wrt->dim(skel);
+  Eigen::MatrixXd jac = Eigen::MatrixXd::Zero(6, dofs);
+
+  const double EPS = 1e-6;
+  Eigen::VectorXd original = wrt->get(skel);
+  for (int i = 0; i < dofs; i++)
+  {
+    Eigen::VectorXd perturbed = original;
+    perturbed(i) += EPS;
+    wrt->set(skel, perturbed);
+    skel->computeForwardDynamics();
+    Eigen::Vector6d plus = getSpatialVelocity();
+
+    perturbed = original;
+    perturbed(i) -= EPS;
+    wrt->set(skel, perturbed);
+    skel->computeForwardDynamics();
+    Eigen::Vector6d minus = getSpatialVelocity();
+
+    jac.col(i) = (plus - minus) / (2 * EPS);
+  }
+  wrt->set(skel, original);
+
+  return jac;
+}
+
+//============================================================================
+Eigen::MatrixXd BodyNode::finiteDifferenceJacobianOfSpatialCoriolisAcceleration(
+    neural::WithRespectTo* wrt)
+{
+  auto skel = getSkeleton().get();
+  int dofs = wrt->dim(skel);
+  Eigen::MatrixXd jac = Eigen::MatrixXd::Zero(6, dofs);
+
+  const double EPS = 1e-6;
+  Eigen::VectorXd original = wrt->get(skel);
+  for (int i = 0; i < dofs; i++)
+  {
+    Eigen::VectorXd perturbed = original;
+    perturbed(i) += EPS;
+    wrt->set(skel, perturbed);
+    skel->computeForwardDynamics();
+    for (int j = 0; j < skel->getNumBodyNodes(); j++)
+    {
+      skel->getBodyNode(j)->updateCombinedVector();
+    }
+    Eigen::Vector6d plus = mCg_dV;
+
+    perturbed = original;
+    perturbed(i) -= EPS;
+    wrt->set(skel, perturbed);
+    skel->computeForwardDynamics();
+    for (int j = 0; j < skel->getNumBodyNodes(); j++)
+    {
+      skel->getBodyNode(j)->updateCombinedVector();
+    }
+    Eigen::Vector6d minus = mCg_dV;
+
+    jac.col(i) = (plus - minus) / (2 * EPS);
+  }
+  wrt->set(skel, original);
+
+  return jac;
+}
+
+//==============================================================================
+void BodyNode::computeJacobianOfCBackward(
+    neural::WithRespectTo* wrt,
+    Eigen::MatrixXd& dCg,
+    const Eigen::Vector3d& gravity)
+{
+  using math::AdInvRLinear;
+  using math::dad;
+  using math::dAdInvT;
+  using math::Jacobian;
+
+  const auto skel = getSkeleton();
+  const auto numDofs = skel->getNumDofs();
+
+  Eigen::VectorXd tmp;
+  tmp.resize(static_cast<int>(numDofs));
+  aggregateCombinedVector(tmp, gravity);
+
+  mCg_F_p.resize(6, static_cast<int>(numDofs));
+  mCg_V_ad_IV_p.resize(6, static_cast<int>(numDofs));
+  mCg_IdV_p.resize(6, static_cast<int>(numDofs));
+  mCg_g_p.resize(6, static_cast<int>(numDofs));
+  mCg_g_p.setZero();
+
+  const Eigen::Matrix6d& G = mAspectProperties.mInertia.getSpatialTensor();
+  const Eigen::Isometry3d& Tworld = getWorldTransform();
+  const Jacobian J = skel->getJacobian(this);
+  const Eigen::Vector6d& V = getSpatialVelocity();
+  const int jointNumDofs = static_cast<int>(mParentJoint->getNumDofs());
+
+  if (wrt == neural::WithRespectTo::POSITION)
+  {
+    // TODO(JS): iterate joints instead for vectorization
+    for (auto i = 0u; i < numDofs; ++i)
+    {
+      const DegreeOfFreedom* dof = skel->getDof(i);
+      const int dofIndexInJoint = static_cast<int>(dof->getIndexInJoint());
+      const int dofIndexInSkeleton
+          = static_cast<int>(dof->getIndexInSkeleton());
+
+      // Derivative of gravity force
+      mCg_g_p.col(i).tail<3>().noalias()
+          = -1 * math::makeSkewSymmetric(J.col(dofIndexInSkeleton).head<3>())
+            * Tworld.rotation().transpose() * gravity;
+      mCg_g_p.col(i) = G * mCg_g_p.col(i);
+      mCg_V_ad_IV_p.col(i)
+          = dad(mCg_V_p.col(i), G * V) + dad(V, G * mCg_V_p.col(i));
+      mCg_IdV_p.col(i) = G * mCg_dV_p.col(i);
+      mCg_F_p.col(i) = mCg_IdV_p.col(i) - mCg_V_ad_IV_p.col(i) - mCg_g_p.col(i);
+      // TODO(JS): Add -(D F_{ext} / D q^k) to handle external forces other than
+      // gravity
+
+      for (BodyNode* childBody : mChildBodyNodes)
+      {
+        const Joint* childJoint = childBody->getParentJoint();
+        const Eigen::Isometry3d& childT = childJoint->getRelativeTransform();
+
+        // mCg_F += math::dAdInvT((*it)->getParentJoint()->mT, (*it)->mCg_F);
+        if (childJoint->hasDof(dof))
+        {
+          const math::Jacobian& S = childJoint->getRelativeJacobian();
+          const Eigen::Vector6d Scol = S.col(dofIndexInJoint);
+
+          mCg_F_p.col(i) += dAdInvT(
+              childT, childBody->mCg_F_p.col(i) - dad(Scol, childBody->mCg_F));
+        }
+        else
+        {
+          mCg_F_p.col(i) += dAdInvT(childT, childBody->mCg_F_p.col(i));
+        }
+      }
+
+      if (jointNumDofs > 0)
+      {
+        const Jacobian& S = mParentJoint->getRelativeJacobian();
+
+        Eigen::MatrixXd dCg_seg = S.transpose() * mCg_F_p.col(i); // m x 1
+        if (mParentJoint->hasDof(dof))
+        {
+          const Jacobian DS_Dq
+              = mParentJoint->getRelativeJacobianDeriv(dof->getIndexInJoint());
+
+          dCg_seg += DS_Dq.transpose() * mCg_F;
+        }
+
+        const int iStart
+            = static_cast<int>(mParentJoint->getDof(0)->getIndexInSkeleton());
+        const int jStart = static_cast<int>(dof->getIndexInSkeleton());
+        dCg.block(iStart, jStart, jointNumDofs, 1) = dCg_seg;
+      }
+    }
+  }
+  else if (wrt == neural::WithRespectTo::VELOCITY)
+  {
+    // TODO(JS): Vectorize instead of iterating DOFs
+    for (auto i = 0u; i < numDofs; ++i)
+    {
+      const DegreeOfFreedom* dof = skel->getDof(i);
+
+      mCg_V_ad_IV_p.col(i)
+          = dad(mCg_V_p.col(i), G * V) + dad(V, G * mCg_V_p.col(i));
+      mCg_IdV_p.col(i) = G * mCg_dV_p.col(i);
+      mCg_F_p.col(i) = mCg_IdV_p.col(i) - mCg_V_ad_IV_p.col(i);
+      // TODO(JS): Add -(D F_{ext} / D q^k) for the case that F_ext (other than
+      // gravity force) is a function of q
+
+      for (const BodyNode* childBody : mChildBodyNodes)
+      {
+        const Joint* childJoint = childBody->getParentJoint();
+        const Eigen::Isometry3d& childT = childJoint->getRelativeTransform();
+        mCg_F_p.col(i) += dAdInvT(childT, childBody->mCg_F_p.col(i));
+      }
+
+      if (jointNumDofs > 0)
+      {
+        const Jacobian& S = mParentJoint->getRelativeJacobian();
+        const int iStart
+            = static_cast<int>(mParentJoint->getDof(0)->getIndexInSkeleton());
+        const int jStart = static_cast<int>(dof->getIndexInSkeleton());
+        dCg.block(iStart, jStart, jointNumDofs, 1).noalias()
+            = S.transpose() * mCg_F_p.col(i);
+      }
+    }
+  }
+  else
+  {
+    // Shouldn't reach here
+    assert(false);
+  }
+}
+
+//==============================================================================
+/// This checks the intermediate analytical results of
+/// computeJacobianOfCBackword() against the finite differencing equivalents.
+void BodyNode::debugJacobianOfCBackward(neural::WithRespectTo* wrt)
+{
+  Eigen::MatrixXd dC = Eigen::MatrixXd::Zero(
+      getSkeleton()->getNumDofs(), getSkeleton()->getNumDofs());
+  computeJacobianOfCBackward(
+      wrt, dC, getSkeleton()->mAspectProperties.mGravity);
+
+  const double threshold = 1e-8;
+  // mCg_g_p holds an inverse of the gradient of gravity wrt position
+  Eigen::MatrixXd mCg_g_p_fd = finiteDifferenceJacobianOfGravityForce(wrt);
+  if (((mCg_g_p_fd - mCg_g_p).cwiseAbs().array() > threshold).any())
+  {
+    std::cout << "mCg_g_p disagrees on body node " << getIndexInSkeleton()
+              << "! " << std::endl;
+    std::cout << "Analytical:" << std::endl << mCg_g_p << std::endl;
+    std::cout << "Brute Force:" << std::endl << mCg_g_p_fd << std::endl;
+    std::cout << "Diff:" << std::endl << mCg_g_p - mCg_g_p_fd << std::endl;
+  }
+  Eigen::MatrixXd mCg_F_p_fd = finiteDifferenceJacobianOfBodyForce(wrt);
+  if (((mCg_F_p_fd - mCg_F_p).cwiseAbs().array() > threshold).any())
+  {
+    std::cout << "mCg_F_p disagrees on body node " << getIndexInSkeleton()
+              << "! num children = " << mChildBodyNodes.size() << std::endl;
+    std::cout << "Analytical:" << std::endl << mCg_F_p << std::endl;
+    std::cout << "Brute Force:" << std::endl << mCg_F_p_fd << std::endl;
+    std::cout << "Diff:" << std::endl << mCg_F_p - mCg_F_p_fd << std::endl;
+  }
+  Eigen::MatrixXd mCg_V_ad_IV_p_fd
+      = finiteDifferenceJacobianOfBodyForceAdVIV(wrt);
+  if (((mCg_V_ad_IV_p - mCg_V_ad_IV_p_fd).cwiseAbs().array() > threshold).any())
+  {
+    std::cout << "ad(V, I*V) disagrees on body node " << getIndexInSkeleton()
+              << "!" << std::endl;
+    std::cout << "Analytical:" << std::endl << mCg_V_ad_IV_p << std::endl;
+    std::cout << "Brute Force:" << std::endl << mCg_V_ad_IV_p_fd << std::endl;
+    std::cout << "Diff:" << std::endl
+              << mCg_V_ad_IV_p - mCg_V_ad_IV_p_fd << std::endl;
+  }
+  Eigen::MatrixXd mCg_IdV_p_fd = finiteDifferenceJacobianOfBodyForceIdV(wrt);
+  if (((mCg_IdV_p - mCg_IdV_p_fd).cwiseAbs().array() > threshold).any())
+  {
+    std::cout << "I*dV disagrees on body node " << getIndexInSkeleton() << "!"
+              << std::endl;
+    std::cout << "Analytical:" << std::endl << mCg_IdV_p << std::endl;
+    std::cout << "Brute Force:" << std::endl << mCg_IdV_p_fd << std::endl;
+    std::cout << "Diff:" << std::endl << mCg_IdV_p - mCg_IdV_p_fd << std::endl;
+  }
+}
+
+//==============================================================================
+/// This computes the Jacobian of gravity force (mFgravity) with respect to wrt
+Eigen::MatrixXd BodyNode::finiteDifferenceJacobianOfGravityForce(
+    neural::WithRespectTo* wrt)
+{
+  auto skel = getSkeleton().get();
+  int dofs = wrt->dim(skel);
+  Eigen::MatrixXd jac = Eigen::MatrixXd::Zero(6, dofs);
+
+  const double EPS = 1e-6;
+  Eigen::VectorXd original = wrt->get(skel);
+  for (int i = 0; i < dofs; i++)
+  {
+    Eigen::VectorXd perturbed = original;
+    perturbed(i) += EPS;
+    wrt->set(skel, perturbed);
+    skel->computeForwardDynamics();
+    Eigen::Vector6d plus = mFgravity;
+
+    perturbed = original;
+    perturbed(i) -= EPS;
+    wrt->set(skel, perturbed);
+    skel->computeForwardDynamics();
+    Eigen::Vector6d minus = mFgravity;
+
+    jac.col(i) = (plus - minus) / (2 * EPS);
+  }
+  wrt->set(skel, original);
+
+  return jac;
+}
+
+//==============================================================================
+/// This computes the Jacobian of body force (mCg_F) with respect to wrt
+Eigen::MatrixXd BodyNode::finiteDifferenceJacobianOfBodyForce(
+    neural::WithRespectTo* wrt)
+{
+  auto skel = getSkeleton().get();
+  int dofs = wrt->dim(skel);
+  Eigen::MatrixXd jac = Eigen::MatrixXd::Zero(6, dofs);
+
+  Eigen::VectorXd tmp;
+  tmp.resize(static_cast<int>(skel->getNumDofs()));
+
+  const double EPS = 1e-4;
+  Eigen::VectorXd original = wrt->get(skel);
+  for (int i = 0; i < dofs; i++)
+  {
+    Eigen::VectorXd perturbed = original;
+    perturbed(i) += EPS;
+    wrt->set(skel, perturbed);
+    skel->computeForwardDynamics();
+    for (int j = 0; j < skel->getNumBodyNodes(); j++)
+    {
+      skel->getBodyNode(j)->updateCombinedVector();
+    }
+    for (int j = skel->getNumBodyNodes() - 1; j >= 0; j--)
+    {
+      skel->getBodyNode(j)->aggregateCombinedVector(tmp, skel->getGravity());
+    }
+    Eigen::Vector6d plus = mCg_F;
+
+    perturbed = original;
+    perturbed(i) -= EPS;
+    wrt->set(skel, perturbed);
+    skel->computeForwardDynamics();
+    for (int j = 0; j < skel->getNumBodyNodes(); j++)
+    {
+      skel->getBodyNode(j)->updateCombinedVector();
+    }
+    for (int j = skel->getNumBodyNodes() - 1; j >= 0; j--)
+    {
+      skel->getBodyNode(j)->aggregateCombinedVector(tmp, skel->getGravity());
+    }
+    Eigen::Vector6d minus = mCg_F;
+
+    jac.col(i) = (plus - minus) / (2 * EPS);
+  }
+  wrt->set(skel, original);
+
+  return jac;
+}
+
+//==============================================================================
+/// This computes the Jacobian of body force (mCg_F) with respect to wrt
+Eigen::MatrixXd BodyNode::finiteDifferenceJacobianOfBodyForceAdVIV(
+    neural::WithRespectTo* wrt)
+{
+  auto skel = getSkeleton().get();
+  int dofs = wrt->dim(skel);
+  Eigen::MatrixXd jac = Eigen::MatrixXd::Zero(6, dofs);
+
+  Eigen::VectorXd tmp;
+  tmp.resize(static_cast<int>(skel->getNumDofs()));
+
+  const double EPS = 1e-4;
+  Eigen::VectorXd original = wrt->get(skel);
+  for (int i = 0; i < dofs; i++)
+  {
+    Eigen::VectorXd perturbed = original;
+    perturbed(i) += EPS;
+    wrt->set(skel, perturbed);
+    skel->computeForwardDynamics();
+    for (int j = 0; j < skel->getNumBodyNodes(); j++)
+    {
+      skel->getBodyNode(j)->updateCombinedVector();
+    }
+    // mCg_F = mI * mCg_dV;
+    // mCg_F -= mFgravity;
+    // mCg_F -= math::dad(V, mI * V);
+    const Eigen::Matrix6d& mI = mAspectProperties.mInertia.getSpatialTensor();
+    const Eigen::Vector6d& V = getSpatialVelocity();
+    Eigen::Vector6d plus = math::dad(V, mI * V);
+
+    perturbed = original;
+    perturbed(i) -= EPS;
+    wrt->set(skel, perturbed);
+    skel->computeForwardDynamics();
+    for (int j = 0; j < skel->getNumBodyNodes(); j++)
+    {
+      skel->getBodyNode(j)->updateCombinedVector();
+    }
+    const Eigen::Matrix6d& mI_minus
+        = mAspectProperties.mInertia.getSpatialTensor();
+    const Eigen::Vector6d& V_minus = getSpatialVelocity();
+    Eigen::Vector6d minus = math::dad(V_minus, mI_minus * V_minus);
+
+    jac.col(i) = (plus - minus) / (2 * EPS);
+  }
+  wrt->set(skel, original);
+
+  return jac;
+}
+
+//==============================================================================
+/// This computes the Jacobian of the I*dV subexpression of body force (mCg_F)
+/// with respect to wrt
+Eigen::MatrixXd BodyNode::finiteDifferenceJacobianOfBodyForceIdV(
+    neural::WithRespectTo* wrt)
+{
+  auto skel = getSkeleton().get();
+  int dofs = wrt->dim(skel);
+  Eigen::MatrixXd jac = Eigen::MatrixXd::Zero(6, dofs);
+
+  Eigen::VectorXd tmp;
+  tmp.resize(static_cast<int>(skel->getNumDofs()));
+
+  const double EPS = 1e-4;
+  Eigen::VectorXd original = wrt->get(skel);
+  for (int i = 0; i < dofs; i++)
+  {
+    Eigen::VectorXd perturbed = original;
+    perturbed(i) += EPS;
+    wrt->set(skel, perturbed);
+    skel->computeForwardDynamics();
+    for (int j = 0; j < skel->getNumBodyNodes(); j++)
+    {
+      skel->getBodyNode(j)->updateCombinedVector();
+    }
+    // mCg_F = mI * mCg_dV;
+    // mCg_F -= mFgravity;
+    // mCg_F -= math::dad(V, mI * V);
+    const Eigen::Matrix6d& mI = mAspectProperties.mInertia.getSpatialTensor();
+    Eigen::Vector6d plus = mI * mCg_dV;
+
+    perturbed = original;
+    perturbed(i) -= EPS;
+    wrt->set(skel, perturbed);
+    skel->computeForwardDynamics();
+    for (int j = 0; j < skel->getNumBodyNodes(); j++)
+    {
+      skel->getBodyNode(j)->updateCombinedVector();
+    }
+    const Eigen::Matrix6d& mI_minus
+        = mAspectProperties.mInertia.getSpatialTensor();
+    Eigen::Vector6d minus = mI_minus * mCg_dV;
+
+    jac.col(i) = (plus - minus) / (2 * EPS);
+  }
+  wrt->set(skel, original);
+
+  return jac;
+}
+
+//==============================================================================
+void BodyNode::computeJacobianOfMinvXInit()
+{
+  const auto skel = getSkeleton();
+  const auto numDofs = skel->getNumDofs();
+
+  mInvM_DAI_Dq.resize(numDofs);
+  mInvM_DAB_Dq.setZero(6, static_cast<int>(numDofs));
+  mInvM_DPi_Dq.resize(numDofs);
+  mInvM_Dbeta_Dq.setZero(6, static_cast<int>(numDofs));
+  mInvM_dV_q.setZero(6, static_cast<int>(numDofs));
+
+  mParentJoint->computeJacobianOfMinvX_init();
+}
+
+//==============================================================================
+void BodyNode::computeJacobianOfMinvXBackward()
+{
+  using math::ad;
+  using math::AdInvRLinear;
+  using math::adMatrix;
+  using math::AdTMatrix;
+  using math::dad;
+  using math::dAdInvT;
+  using math::dAdTMatrix;
+  using math::Jacobian;
+
+  const auto skel = getSkeleton();
+  const auto numDofs = skel->getNumDofs();
+#ifdef DART_DEBUG_ANALYTICAL_DERIV
+  const auto bodyNodeIndex = getIndexInSkeleton();
+  auto& data = skel->mDiffMinv.nodes[bodyNodeIndex].data;
+#endif
+
+  // Compute articulated bias force (mInvM_c) and alpha (mInvM_a)...
+  updateInvMassMatrix();
+
+  const math::Inertia& AI = getArticulatedInertia();
+  const Eigen::Vector6d& AB = mInvM_c;
+
+#ifdef DART_DEBUG_ANALYTICAL_DERIV
+  data.AI = AI;
+  data.AB = AB;
+#endif
+
+  math::Jacobian& DAB_Dq = mInvM_DAB_Dq;
+
+  for (auto i = 0u; i < numDofs; ++i)
+  {
+#ifdef DART_DEBUG_ANALYTICAL_DERIV
+    auto& deriv = skel->mDiffMinv.nodes[bodyNodeIndex].derivs[i];
+#endif
+    const DegreeOfFreedom* dof = skel->getDof(i);
+    const int dofIndexInJoint = static_cast<int>(dof->getIndexInJoint());
+
+    mInvM_DAI_Dq[i].setZero();
+    DAB_Dq.col(i).setZero();
+    for (BodyNode* childBody : mChildBodyNodes)
+    {
+      const Joint* childJoint = childBody->getParentJoint();
+      const Eigen::Isometry3d& childT = childJoint->getRelativeTransform();
+      const math::Inertia& childAI = childBody->getArticulatedInertia();
+      const Eigen::Vector6d& childAB = childBody->mInvM_c;
+
+      if (childJoint->hasDof(dof))
+      {
+        const math::Jacobian& S = childJoint->getRelativeJacobian();
+        const Eigen::Vector6d Scol = S.col(dofIndexInJoint);
+        const math::Inertia Pi = childJoint->computePi(childAI);
+        const Eigen::Matrix6d adS = adMatrix(Scol);
+        const Eigen::Vector6d child_beta
+            = childJoint->computeBeta(childAI, childAB);
+        const math::Inertia tmp = Pi * adS;
+
+        mInvM_DAI_Dq[i]
+            += math::dAdInvTMatrix(childT)
+               * (childBody->mInvM_DPi_Dq[i] - tmp - tmp.transpose())
+               * math::AdInvTMatrix(childT);
+
+        DAB_Dq.col(i) += dAdInvT(
+            childT, childBody->mInvM_Dbeta_Dq.col(i) - dad(Scol, child_beta));
+      }
+      else
+      {
+        mInvM_DAI_Dq[i] += math::dAdInvTMatrix(childT)
+                           * childBody->mInvM_DPi_Dq[i]
+                           * math::AdInvTMatrix(childT);
+
+        DAB_Dq.col(i) += dAdInvT(childT, childBody->mInvM_Dbeta_Dq.col(i));
+      }
+    }
+#ifdef DART_DEBUG_ANALYTICAL_DERIV
+    deriv.AI = mInvM_DAI_Dq[i];
+    deriv.AB = DAB_Dq.col(i);
+#endif
+  }
+
+  mInvM_Dbeta_Dq = DAB_Dq;
+  mParentJoint->computeJacobianOfMinvX_A(AI, AB);
+}
+
+//==============================================================================
+void BodyNode::computeJacobianOfMinvXForward(Eigen::MatrixXd& DinvMx_Dq)
+{
+  using math::ad;
+  using math::AdInvRLinear;
+  using math::AdInvT;
+  using math::dad;
+  using math::dAdInvT;
+  using math::Jacobian;
+
+  const auto skel = getSkeleton();
+  const auto numDofs = skel->getNumDofs();
+#ifdef DART_DEBUG_ANALYTICAL_DERIV
+  const auto bodyNodeIndex = getIndexInSkeleton();
+  auto& data = skel->mDiffMinv.nodes[bodyNodeIndex].data;
+#endif
+
+  const Joint* joint = mParentJoint;
+  const int jointNumDofs = static_cast<int>(joint->getNumDofs());
+  const BodyNode* parentBody = mParentBodyNode;
+  const Eigen::Isometry3d& T = mParentJoint->getRelativeTransform();
+
+  const math::Inertia& AI = getArticulatedInertia();
+
+  Eigen::MatrixXd invMx = Eigen::MatrixXd::Zero(static_cast<int>(numDofs), 1);
+#ifdef DART_DEBUG_ANALYTICAL_DERIV
+  const Jacobian& S = mParentJoint->getRelativeJacobian();
+  data.S = S;
+#endif
+  if (getNumChildBodyNodes() > 0)
+  {
+    if (parentBody)
+    {
+      mParentJoint->getInvMassMatrixSegment(invMx, 0, AI, parentBody->mInvM_U);
+      mInvM_U = math::AdInvT(T, parentBody->mInvM_U);
+    }
+    else
+    {
+      mParentJoint->getInvMassMatrixSegment(
+          invMx, 0, AI, Eigen::Vector6d::Zero());
+      mInvM_U.setZero();
+    }
+    mParentJoint->addInvMassMatrixSegmentTo(mInvM_U);
+  }
+
+#ifdef DART_DEBUG_ANALYTICAL_DERIV
+  Eigen::VectorXd ddq = Eigen::VectorXd::Zero(0);
+  if (jointNumDofs > 0)
+  {
+    const int indexI = static_cast<int>(joint->getDof(0)->getIndexInSkeleton());
+    ddq = invMx.block(indexI, 0, jointNumDofs, 1);
+  }
+  data.ddq = ddq;
+  data.dV = mInvM_U;
+#endif
+
+  if (jointNumDofs > 0)
+  {
+    const int iStart
+        = static_cast<int>(mParentJoint->getDof(0)->getIndexInSkeleton());
+    const Eigen::MatrixXd block = mParentJoint->computeJacobianOfMinvX_B(AI);
+    DinvMx_Dq.block(iStart, 0, jointNumDofs, static_cast<int>(numDofs)) = block;
+  }
+}
+
+//==============================================================================
 const Eigen::Vector6d& BodyNode::getBiasForce() const
 {
   return mBiasForce;

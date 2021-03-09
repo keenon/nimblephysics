@@ -60,6 +60,12 @@ ZeroDofJoint::Properties ZeroDofJoint::getZeroDofJointProperties() const
 }
 
 //==============================================================================
+bool ZeroDofJoint::hasDof(const DegreeOfFreedom*) const
+{
+  return false;
+}
+
+//==============================================================================
 DegreeOfFreedom* ZeroDofJoint::getDof(std::size_t)
 {
   dterr << "[ZeroDofJoint::getDof] Attempting to get a DegreeOfFreedom from a "
@@ -600,21 +606,21 @@ void ZeroDofJoint::integrateVelocities(double /*_dt*/)
 
 //==============================================================================
 // Documentation inherited
-Eigen::VectorXd ZeroDofJoint::integratePositionsExplicit(Eigen::VectorXd pos, Eigen::VectorXd /* vel */, double /* dt */)
+Eigen::VectorXd ZeroDofJoint::integratePositionsExplicit(const Eigen::VectorXd& pos, const Eigen::VectorXd& /* vel */, double /* dt */)
 {
   return pos;
 }
 
 //==============================================================================
 /// Returns d/dpos of integratePositionsExplicit()
-Eigen::MatrixXd ZeroDofJoint::getPosPosJacobian(Eigen::VectorXd /* pos */, Eigen::VectorXd /* vel */, double /* _dt */)
+Eigen::MatrixXd ZeroDofJoint::getPosPosJacobian(const Eigen::VectorXd& /* pos */, const Eigen::VectorXd& /* vel */, double /* _dt */)
 {
   return Eigen::MatrixXd::Zero(0,0);
 }
 
 //==============================================================================
 /// Returns d/dvel of integratePositionsExplicit()
-Eigen::MatrixXd ZeroDofJoint::getVelPosJacobian(Eigen::VectorXd /* pos */, Eigen::VectorXd /* vel */, double /* _dt */)
+Eigen::MatrixXd ZeroDofJoint::getVelPosJacobian(const Eigen::VectorXd& /* pos */, const Eigen::VectorXd& /* vel */, double /* _dt */)
 {
   return Eigen::MatrixXd::Zero(0,0);
 }

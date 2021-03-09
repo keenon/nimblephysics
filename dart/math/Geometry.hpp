@@ -159,6 +159,25 @@ Eigen::Vector3d matrixToEulerZYX(const Eigen::Matrix3d& _R);
 // Eigen::Vector3d matrixToEulerZYZ(const Eigen::Matrix3d& R);
 
 //------------------------------------------------------------------------------
+
+/// Returns the Jacobian of an SO(3) element w.r.t. its exponential
+/// coordinates where the Jacobian maps the time derivative of the exponential
+/// coordinates to the angular velocity in the world frame.
+Eigen::Matrix3d so3LeftJacobian(const Eigen::Vector3d& w);
+
+/// Returns the Jacobian of an SO(3) element w.r.t. its exponential
+/// coordinates where the Jacobian maps the time derivative of the exponential
+/// coordinates to the angular velocity in the body frame.
+Eigen::Matrix3d so3RightJacobian(const Eigen::Vector3d& w);
+
+/// Returns the time derivative of the left Jacobian of SO(3).
+Eigen::Matrix3d so3LeftJacobianTimeDeriv(
+    const Eigen::Vector3d& q, const Eigen::Vector3d& dq);
+
+/// Returns the time derivative of the right Jacobian of SO(3).
+Eigen::Matrix3d so3RightJacobianTimeDeriv(
+    const Eigen::Vector3d& q, const Eigen::Vector3d& dq);
+
 /// \brief Exponential mapping
 Eigen::Isometry3d expMap(const Eigen::Vector6d& _S);
 
@@ -179,6 +198,16 @@ Eigen::Matrix3d expMapRot(const Eigen::Vector3d& _expmap);
 /// \brief Computes the Jacobian of the expmap
 Eigen::Matrix3d expMapJac(const Eigen::Vector3d& _expmap);
 
+/// Returns the Jacobian of an SO(3) element w.r.t. its exponential
+/// coordinates where the Jacobian maps the time derivative of the exponential
+/// coordinates to the angular velocity in the world frame.
+Eigen::Matrix3d so3LeftJacobian(const Eigen::Vector3d& w);
+
+/// Returns the Jacobian of an SO(3) element w.r.t. its exponential
+/// coordinates where the Jacobian maps the time derivative of the exponential
+/// coordinates to the angular velocity in the body frame.
+Eigen::Matrix3d so3RightJacobian(const Eigen::Vector3d& w);
+
 /// \brief Computes the Jacobian of the logMap(R * expMapRot(expMap))
 Eigen::Matrix3d expMapJacAt(
     const Eigen::Vector3d& _expmap, const Eigen::Matrix3d& R);
@@ -186,6 +215,18 @@ Eigen::Matrix3d expMapJacAt(
 /// \brief Computes the time derivative of the expmap Jacobian.
 Eigen::Matrix3d expMapJacDot(
     const Eigen::Vector3d& _expmap, const Eigen::Vector3d& _qdot);
+
+Eigen::Matrix3d so3LeftJacobianTimeDeriv(
+    const Eigen::Vector3d& q, const Eigen::Vector3d& dq);
+
+Eigen::Matrix3d so3RightJacobianTimeDeriv(
+    const Eigen::Vector3d& q, const Eigen::Vector3d& dq);
+
+Eigen::Matrix3d so3RightJacobianTimeDerivDeriv(
+    const Eigen::Vector3d& q, const Eigen::Vector3d& dq, int index);
+
+Eigen::Matrix3d so3RightJacobianTimeDerivDeriv2(
+    const Eigen::Vector3d& q, const Eigen::Vector3d& dq, int index);
 
 /// \brief computes the derivative of the Jacobian of the expmap wrt to _qi
 /// indexed dof; _qi \f$ \in \f$ {0,1,2}
@@ -273,6 +314,14 @@ Eigen::Vector6d AdT(const Eigen::Isometry3d& _T, const Eigen::Vector6d& _V);
 
 /// \brief Get linear transformation matrix of Adjoint mapping
 Eigen::Matrix6d getAdTMatrix(const Eigen::Isometry3d& T);
+
+// TODO(JS): Rename and add documentation
+Eigen::Matrix6d AdTMatrix(const Eigen::Isometry3d& T);
+Eigen::Matrix6d AdInvTMatrix(const Eigen::Isometry3d& T);
+
+// TODO(JS): Rename and add documentation
+Eigen::Matrix6d dAdTMatrix(const Eigen::Isometry3d& T);
+Eigen::Matrix6d dAdInvTMatrix(const Eigen::Isometry3d& T);
 
 /// Adjoint mapping for dynamic size Jacobian
 template <typename Derived>
@@ -472,6 +521,9 @@ Eigen::Vector6d dAdInvR(const Eigen::Isometry3d& _T, const Eigen::Vector6d& _F);
 /// \note @f$ad_X Y = ( w_X @times w_Y@,,~w_X @times v_Y - w_Y @times v_X),@f$,
 /// where @f$X=(w_X,v_X)@in se(3), @quad Y=(w_Y,v_Y)@in se(3) @f$.
 Eigen::Vector6d ad(const Eigen::Vector6d& _X, const Eigen::Vector6d& _Y);
+
+// TODO(JS): Rename and add documentation
+Eigen::Matrix6d adMatrix(const Eigen::Vector6d& X);
 
 /// \brief fast version of ad(se3(Eigen_Vec3(0), v), S)
 // Vec3 ad_Vec3_se3(const Vec3& v, const se3& S);

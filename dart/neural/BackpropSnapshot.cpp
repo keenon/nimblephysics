@@ -1,8 +1,8 @@
 #include "dart/neural/BackpropSnapshot.hpp"
 
+#include <array>
 #include <chrono>
 #include <iostream>
-#include <array>
 
 #include "dart/constraint/ConstraintSolver.hpp"
 #include "dart/dynamics/DegreeOfFreedom.hpp"
@@ -856,7 +856,8 @@ Eigen::VectorXd BackpropSnapshot::scratch(simulation::WorldPtr world)
 Eigen::MatrixXd BackpropSnapshot::getScratchFiniteDifference(
     simulation::WorldPtr world, WithRespectTo* wrt, bool useRidders)
 {
-  if (useRidders) return getScratchFiniteDifferenceRidders(world, wrt);
+  if (useRidders)
+    return getScratchFiniteDifferenceRidders(world, wrt);
 
   RestorableSnapshot snapshot(world);
 
@@ -918,9 +919,9 @@ Eigen::MatrixXd BackpropSnapshot::getScratchFiniteDifferenceRidders(
   world->setPenetrationCorrectionEnabled(false);
   world->setConstraintForceMixingEnabled(false);
 
-  const double originalStepSize = 1e-3; 
-  const double con = 1.4, con2 = (con * con); 
-  const double safeThreshold = 2.0; 
+  const double originalStepSize = 1e-3;
+  const double con = 1.4, con2 = (con * con);
+  const double safeThreshold = 2.0;
   const int tabSize = 10;
 
   Eigen::VectorXd original = scratch(world);
@@ -961,19 +962,23 @@ Eigen::MatrixXd BackpropSnapshot::getScratchFiniteDifferenceRidders(
       perturbed(i) -= stepSize;
       wrt->set(world.get(), perturbed);
       perturbedMinus = scratch(world);
-      
+
       tab[0][iTab] = (perturbedPlus - perturbedMinus) / (2 * stepSize);
 
       double fac = con2;
-      // Compute extrapolations of increasing orders, requiring no new evaluations
+      // Compute extrapolations of increasing orders, requiring no new
+      // evaluations
       for (int jTab = 1; jTab <= iTab; jTab++)
       {
-        tab[jTab][iTab] = (tab[jTab-1][iTab] * fac - tab[jTab-1][iTab-1]) /
-                              (fac - 1.0);
+        tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
+                          / (fac - 1.0);
         fac = con2 * fac;
-        double currError = 
-          std::max((tab[jTab][iTab] - tab[jTab-1][iTab]).array().abs().maxCoeff(),
-                   (tab[jTab][iTab] - tab[jTab-1][iTab-1]).array().abs().maxCoeff());
+        double currError = std::max(
+            (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
+            (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
+                .array()
+                .abs()
+                .maxCoeff());
         if (currError < bestError)
         {
           bestError = currError;
@@ -982,8 +987,8 @@ Eigen::MatrixXd BackpropSnapshot::getScratchFiniteDifferenceRidders(
       }
 
       // If higher order is worse by a significant factor, quit early.
-      if ((tab[iTab][iTab] - tab[iTab-1][iTab-1]).array().abs().maxCoeff() >= 
-          safeThreshold * bestError)
+      if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
+          >= safeThreshold * bestError)
       {
         break;
       }
@@ -1674,23 +1679,128 @@ void BackpropSnapshot::equalsOrCrash(
     exit(1);
   }
   Eigen::MatrixXd diff = (analytical - bruteForce).cwiseAbs();
-  double threshold = 1e-5;
+  // TODO: this should be 1e-8, investigate catapult trajectory test, since
+  // that's where this diverges.
+  double threshold = 1e-7;
   bool broken = (diff.array() > threshold).any();
   if (broken)
   {
+    /*
     Eigen::MatrixXd fd1 = finiteDifferencePosVelJacobian(world, true);
     Eigen::MatrixXd fd2 = finiteDifferencePosVelJacobian(world, false);
 
     std::cout << "Ridders: " << fd1 << std::endl;
     std::cout << "non:   : " << fd2 << std::endl;
-
+    */
 
     std::cout << "Found invalid matrix! " << name << std::endl;
     std::cout << "Analytical:" << std::endl << analytical << std::endl;
     std::cout << "Brute Force:" << std::endl << bruteForce << std::endl;
     std::cout << "Diff:" << std::endl << diff << std::endl;
+    diagnoseSubJacobianErrors(world, WithRespectTo::POSITION);
     printReplicationInstructions(world);
     exit(1);
+  }
+}
+
+#define compare(analytical, bruteForce, threshold, name)                       \
+  do                                                                           \
+  {                                                                            \
+    if (((analytical - bruteForce).cwiseAbs().array() > threshold).any())      \
+    {                                                                          \
+      std::cout << name << " disagrees! " << name << std::endl;                \
+      std::cout << "Analytical:" << std::endl << analytical << std::endl;      \
+      std::cout << "Brute Force:" << std::endl << bruteForce << std::endl;     \
+      std::cout << "Diff:" << std::endl                                        \
+                << analytical - bruteForce << std::endl;                       \
+    }                                                                          \
+  } while (0)
+
+//==============================================================================
+/// This compares our analytical sub-Jacobians (like dMinv), to attempt to
+/// diagnose where there are differences creeping in between our finite
+/// differencing and our analytical results.
+void BackpropSnapshot::diagnoseSubJacobianErrors(
+    std::shared_ptr<simulation::World> world, WithRespectTo* wrt)
+{
+  double threshold = 1e-8;
+
+  RestorableSnapshot snapshot(world);
+  world->setPositions(mPreStepPosition);
+  world->setVelocities(mPreStepVelocity);
+  world->setExternalForces(mPreStepTorques);
+  world->setCachedLCPSolution(mPreStepLCPCache);
+
+  Eigen::MatrixXd A_c = getClampingConstraintMatrix(world);
+  Eigen::MatrixXd A_ub = getUpperBoundConstraintMatrix(world);
+  Eigen::MatrixXd E = getUpperBoundMappingMatrix();
+  Eigen::MatrixXd A_c_ub_E = A_c + A_ub * E;
+
+  Eigen::VectorXd tau = world->getExternalForces();
+  Eigen::VectorXd C = world->getCoriolisAndGravityAndExternalForces();
+  Eigen::VectorXd f_c = getClampingConstraintImpulses();
+  double dt = world->getTimeStep();
+
+  Eigen::MatrixXd dM
+      = getJacobianOfMinv(world, dt * (tau - C) + A_c_ub_E * f_c, wrt);
+  Eigen::MatrixXd dMFd = finiteDifferenceJacobianOfMinv(
+      world, dt * (tau - C) + A_c_ub_E * f_c, wrt);
+  compare(dM, dMFd, threshold, "dMinv");
+
+  Eigen::MatrixXd Minv = world->getInvMassMatrix();
+
+  Eigen::MatrixXd dF_c = getJacobianOfConstraintForce(world, wrt);
+  if (f_c.size() > 0)
+  {
+    Eigen::MatrixXd dF_cFd
+        = finiteDifferenceJacobianOfConstraintForce(world, wrt);
+    compare(dF_c, dF_cFd, threshold, "dF_c");
+  }
+
+  if (wrt == WithRespectTo::FORCE)
+  {
+    snapshot.restore();
+  }
+
+  Eigen::MatrixXd dC = getJacobianOfC(world, wrt);
+  Eigen::MatrixXd dCFd = finiteDifferenceJacobianOfC(world, wrt);
+  compare(dC, dCFd, threshold, "dC");
+  if (((dC - dCFd).cwiseAbs().array() > threshold).any())
+  {
+    for (int i = 0; i < world->getNumSkeletons(); i++)
+    {
+      auto skel = world->getSkeleton(i);
+      for (int j = 0; j < skel->getNumBodyNodes(); j++)
+      {
+        skel->getBodyNode(j)->debugJacobianOfCForward(WithRespectTo::POSITION);
+      }
+      for (int j = skel->getNumBodyNodes() - 1; j >= 0; j--)
+      {
+        skel->getBodyNode(j)->debugJacobianOfCBackward(WithRespectTo::POSITION);
+      }
+    }
+  }
+
+  if (wrt == WithRespectTo::VELOCITY)
+  {
+    snapshot.restore();
+  }
+  else if (wrt == WithRespectTo::POSITION)
+  {
+    Eigen::MatrixXd dA_c = getJacobianOfClampingConstraints(world, f_c);
+    Eigen::MatrixXd dA_cFd
+        = finiteDifferenceJacobianOfClampingConstraints(world, f_c);
+    compare(dA_c, dA_cFd, threshold, "dA_c");
+
+    Eigen::MatrixXd dA_ubE = getJacobianOfUpperBoundConstraints(world, E * f_c);
+    Eigen::MatrixXd dA_ubEFd
+        = finiteDifferenceJacobianOfUpperBoundConstraints(world, E * f_c);
+    compare(dA_ubE, dA_ubEFd, threshold, "dA_ub");
+    snapshot.restore();
+  }
+  else
+  {
+    snapshot.restore();
   }
 }
 
@@ -1930,21 +2040,22 @@ void BackpropSnapshot::benchmarkJacobians(
   }
 
   // Get one sample of each for accuracy testing
-  Eigen::MatrixXd posPosJacA    = getPosPosJacobian(world);
-  Eigen::MatrixXd posVelJacA    = getPosVelJacobian(world);
-  Eigen::MatrixXd velPosJacA    = getVelPosJacobian(world);
-  Eigen::MatrixXd velVelJacA    = getVelVelJacobian(world);
-  Eigen::MatrixXd forceVelJacA  = getForceVelJacobian(world);
-  Eigen::MatrixXd posPosJacFD   = finiteDifferencePosPosJacobian(world, 1, false);
-  Eigen::MatrixXd posVelJacFD   = finiteDifferencePosVelJacobian(world, false);
-  Eigen::MatrixXd velPosJacFD   = finiteDifferenceVelPosJacobian(world, 1, false);
-  Eigen::MatrixXd velVelJacFD   = finiteDifferenceVelVelJacobian(world, false);
-  Eigen::MatrixXd forceVelJacFD = finiteDifferenceForceVelJacobian(world, false);
-  Eigen::MatrixXd posPosJacR    = finiteDifferencePosPosJacobian(world, 1, true);
-  Eigen::MatrixXd posVelJacR    = finiteDifferencePosVelJacobian(world, true);
-  Eigen::MatrixXd velPosJacR    = finiteDifferenceVelPosJacobian(world, 1, true);
-  Eigen::MatrixXd velVelJacR    = finiteDifferenceVelVelJacobian(world, true);
-  Eigen::MatrixXd forceVelJacR  = finiteDifferenceForceVelJacobian(world, true);
+  Eigen::MatrixXd posPosJacA = getPosPosJacobian(world);
+  Eigen::MatrixXd posVelJacA = getPosVelJacobian(world);
+  Eigen::MatrixXd velPosJacA = getVelPosJacobian(world);
+  Eigen::MatrixXd velVelJacA = getVelVelJacobian(world);
+  Eigen::MatrixXd forceVelJacA = getForceVelJacobian(world);
+  Eigen::MatrixXd posPosJacFD = finiteDifferencePosPosJacobian(world, 1, false);
+  Eigen::MatrixXd posVelJacFD = finiteDifferencePosVelJacobian(world, false);
+  Eigen::MatrixXd velPosJacFD = finiteDifferenceVelPosJacobian(world, 1, false);
+  Eigen::MatrixXd velVelJacFD = finiteDifferenceVelVelJacobian(world, false);
+  Eigen::MatrixXd forceVelJacFD
+      = finiteDifferenceForceVelJacobian(world, false);
+  Eigen::MatrixXd posPosJacR = finiteDifferencePosPosJacobian(world, 1, true);
+  Eigen::MatrixXd posVelJacR = finiteDifferencePosVelJacobian(world, true);
+  Eigen::MatrixXd velPosJacR = finiteDifferenceVelPosJacobian(world, 1, true);
+  Eigen::MatrixXd velVelJacR = finiteDifferenceVelVelJacobian(world, true);
+  Eigen::MatrixXd forceVelJacR = finiteDifferenceForceVelJacobian(world, true);
 
   // Now we need to form and print out a report
   std::cout << "Benchmark results:" << std::endl;
@@ -2030,16 +2141,19 @@ void BackpropSnapshot::benchmarkJacobians(
             << ((double)forceVelFd / (double)forceVelA) << "x faster"
             << std::endl;
   std::cout << "   Force-vel Jac FD ACCURACY: "
-            << (forceVelJacFD - forceVelJacR).array().abs().maxCoeff() << std::endl;
+            << (forceVelJacFD - forceVelJacR).array().abs().maxCoeff()
+            << std::endl;
   std::cout << "   Force-vel Jac  A ACCURACY: "
-            << (forceVelJacA - forceVelJacR).array().abs().maxCoeff() << std::endl;
+            << (forceVelJacA - forceVelJacR).array().abs().maxCoeff()
+            << std::endl;
 }
 
 //==============================================================================
 Eigen::MatrixXd BackpropSnapshot::finiteDifferenceVelVelJacobian(
-  WorldPtr world, bool useRidders)
+    WorldPtr world, bool useRidders)
 {
-  if (useRidders) return finiteDifferenceRiddersVelVelJacobian(world);
+  if (useRidders)
+    return finiteDifferenceRiddersVelVelJacobian(world);
 
   RestorableSnapshot snapshot(world);
 
@@ -2151,8 +2265,8 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceVelVelJacobian(
 }
 
 //==============================================================================
-Eigen::MatrixXd
-BackpropSnapshot::finiteDifferenceRiddersVelVelJacobian(WorldPtr world)
+Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersVelVelJacobian(
+    WorldPtr world)
 {
   RestorableSnapshot snapshot(world);
 
@@ -2167,9 +2281,9 @@ BackpropSnapshot::finiteDifferenceRiddersVelVelJacobian(WorldPtr world)
   world->setCachedLCPSolution(mPreStepLCPCache);
   world->step(false);
 
-  double originalStepSize = 1e-4; 
-  const double con = 1.4, con2 = (con * con); 
-  const double safeThreshold = 2.0; 
+  double originalStepSize = 1e-4;
+  const double con = 1.4, con2 = (con * con);
+  const double safeThreshold = 2.0;
   const int tabSize = 10;
 
   for (std::size_t i = 0; i < world->getNumDofs(); i++)
@@ -2205,7 +2319,8 @@ BackpropSnapshot::finiteDifferenceRiddersVelVelJacobian(WorldPtr world)
       if ((!areResultsStandardized() || snapshotPlus->areResultsStandardized())
           && snapshotPlus->getNumClamping() == getNumClamping()
           && snapshotPlus->getNumUpperBound() == getNumUpperBound()
-          && (!areResultsStandardized() || snapshotMinus->areResultsStandardized())
+          && (!areResultsStandardized()
+              || snapshotMinus->areResultsStandardized())
           && snapshotMinus->getNumClamping() == getNumClamping()
           && snapshotMinus->getNumUpperBound() == getNumUpperBound())
       {
@@ -2236,7 +2351,8 @@ BackpropSnapshot::finiteDifferenceRiddersVelVelJacobian(WorldPtr world)
       std::shared_ptr<neural::BackpropSnapshot> snapshotPlus
           = neural::forwardPass(world, true);
       velPlus = snapshotPlus->getPostStepVelocity();
-      if (!((!areResultsStandardized() || snapshotPlus->areResultsStandardized())
+      if (!((!areResultsStandardized()
+             || snapshotPlus->areResultsStandardized())
             && snapshotPlus->getNumClamping() == getNumClamping()
             && snapshotPlus->getNumUpperBound() == getNumUpperBound()))
       {
@@ -2252,26 +2368,31 @@ BackpropSnapshot::finiteDifferenceRiddersVelVelJacobian(WorldPtr world)
       std::shared_ptr<neural::BackpropSnapshot> snapshotMinus
           = neural::forwardPass(world, true);
       velMinus = snapshotMinus->getPostStepVelocity();
-      if (!((!areResultsStandardized() || snapshotMinus->areResultsStandardized())
+      if (!((!areResultsStandardized()
+             || snapshotMinus->areResultsStandardized())
             && snapshotMinus->getNumClamping() == getNumClamping()
             && snapshotMinus->getNumUpperBound() == getNumUpperBound()))
       {
         assert(false && "Lowering EPS in finiteDifferenceRiddersVelVelJacobian() "
                       "caused numClamping() or numUpperBound() to change.");
       }
-      
+
       tab[0][iTab] = (velPlus - velMinus) / (2 * stepSize);
 
       double fac = con2;
-      // Compute extrapolations of increasing orders, requiring no new evaluations
+      // Compute extrapolations of increasing orders, requiring no new
+      // evaluations
       for (int jTab = 1; jTab <= iTab; jTab++)
       {
-        tab[jTab][iTab] = (tab[jTab-1][iTab] * fac - tab[jTab-1][iTab-1]) /
-                              (fac - 1.0);
+        tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
+                          / (fac - 1.0);
         fac = con2 * fac;
-        double currError = 
-          std::max((tab[jTab][iTab] - tab[jTab-1][iTab]).array().abs().maxCoeff(),
-                   (tab[jTab][iTab] - tab[jTab-1][iTab-1]).array().abs().maxCoeff());
+        double currError = std::max(
+            (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
+            (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
+                .array()
+                .abs()
+                .maxCoeff());
         if (currError < bestError)
         {
           bestError = currError;
@@ -2280,8 +2401,8 @@ BackpropSnapshot::finiteDifferenceRiddersVelVelJacobian(WorldPtr world)
       }
 
       // If higher order is worse by a significant factor, quit early.
-      if ((tab[iTab][iTab] - tab[iTab-1][iTab-1]).array().abs().maxCoeff() >= 
-          safeThreshold * bestError)
+      if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
+          >= safeThreshold * bestError)
       {
         break;
       }
@@ -2298,7 +2419,8 @@ BackpropSnapshot::finiteDifferenceRiddersVelVelJacobian(WorldPtr world)
 Eigen::MatrixXd BackpropSnapshot::finiteDifferencePosVelJacobian(
     simulation::WorldPtr world, bool useRidders)
 {
-  if (useRidders) return finiteDifferenceRiddersPosVelJacobian(world);
+  if (useRidders)
+    return finiteDifferenceRiddersPosVelJacobian(world);
 
   RestorableSnapshot snapshot(world);
 
@@ -2423,9 +2545,9 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersPosVelJacobian(
   world->setCachedLCPSolution(mPreStepLCPCache);
   world->step(false);
 
-  double originalStepSize = 1e-4; 
-  const double con = 1.4, con2 = (con * con); 
-  const double safeThreshold = 2.0; 
+  double originalStepSize = 1e-4;
+  const double con = 1.4, con2 = (con * con);
+  const double safeThreshold = 2.0;
   const int tabSize = 10;
 
   for (std::size_t i = 0; i < world->getNumDofs(); i++)
@@ -2461,7 +2583,8 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersPosVelJacobian(
       if ((!areResultsStandardized() || snapshotPlus->areResultsStandardized())
           && snapshotPlus->getNumClamping() == getNumClamping()
           && snapshotPlus->getNumUpperBound() == getNumUpperBound()
-          && (!areResultsStandardized() || snapshotMinus->areResultsStandardized())
+          && (!areResultsStandardized()
+              || snapshotMinus->areResultsStandardized())
           && snapshotMinus->getNumClamping() == getNumClamping()
           && snapshotMinus->getNumUpperBound() == getNumUpperBound())
       {
@@ -2499,7 +2622,8 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersPosVelJacobian(
       std::shared_ptr<neural::BackpropSnapshot> snapshotPlus
           = neural::forwardPass(world, true);
       velPlus = snapshotPlus->getPostStepVelocity();
-      if (!((!areResultsStandardized() || snapshotPlus->areResultsStandardized())
+      if (!((!areResultsStandardized()
+             || snapshotPlus->areResultsStandardized())
             && snapshotPlus->getNumClamping() == getNumClamping()
             && snapshotPlus->getNumUpperBound() == getNumUpperBound()))
       {
@@ -2515,26 +2639,31 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersPosVelJacobian(
       std::shared_ptr<neural::BackpropSnapshot> snapshotMinus
           = neural::forwardPass(world, true);
       velMinus = snapshotMinus->getPostStepVelocity();
-      if (!((!areResultsStandardized() || snapshotMinus->areResultsStandardized())
+      if (!((!areResultsStandardized()
+             || snapshotMinus->areResultsStandardized())
             && snapshotMinus->getNumClamping() == getNumClamping()
             && snapshotMinus->getNumUpperBound() == getNumUpperBound()))
       {
         assert(false && "Lowering EPS in finiteDifferenceRiddersPosVelJacobian() "
                       "caused numClamping() or numUpperBound() to change.");
       }
-      
+
       tab[0][iTab] = (velPlus - velMinus) / (2 * stepSize);
 
       double fac = con2;
-      // Compute extrapolations of increasing orders, requiring no new evaluations
+      // Compute extrapolations of increasing orders, requiring no new
+      // evaluations
       for (int jTab = 1; jTab <= iTab; jTab++)
       {
-        tab[jTab][iTab] = (tab[jTab-1][iTab] * fac - tab[jTab-1][iTab-1]) /
-                              (fac - 1.0);
+        tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
+                          / (fac - 1.0);
         fac = con2 * fac;
-        double currError = 
-          std::max((tab[jTab][iTab] - tab[jTab-1][iTab]).array().abs().maxCoeff(),
-                   (tab[jTab][iTab] - tab[jTab-1][iTab-1]).array().abs().maxCoeff());
+        double currError = std::max(
+            (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
+            (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
+                .array()
+                .abs()
+                .maxCoeff());
         if (currError < bestError)
         {
           bestError = currError;
@@ -2543,8 +2672,8 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersPosVelJacobian(
       }
 
       // If higher order is worse by a significant factor, quit early.
-      if ((tab[iTab][iTab] - tab[iTab-1][iTab-1]).array().abs().maxCoeff() >= 
-          safeThreshold * bestError)
+      if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
+          >= safeThreshold * bestError)
       {
         break;
       }
@@ -2563,7 +2692,8 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersPosVelJacobian(
 Eigen::MatrixXd BackpropSnapshot::finiteDifferenceForceVelJacobian(
     WorldPtr world, bool useRidders)
 {
-  if (useRidders) return finiteDifferenceRiddersForceVelJacobian(world);
+  if (useRidders)
+    return finiteDifferenceRiddersForceVelJacobian(world);
 
   RestorableSnapshot snapshot(world);
 
@@ -2691,9 +2821,9 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersForceVelJacobian(
   world->setCachedLCPSolution(mPreStepLCPCache);
   world->step(false);
 
-  double originalStepSize = 1e-4; 
-  const double con = 1.4, con2 = (con * con); 
-  const double safeThreshold = 2.0; 
+  double originalStepSize = 1e-4;
+  const double con = 1.4, con2 = (con * con);
+  const double safeThreshold = 2.0;
   const int tabSize = 10;
 
   for (std::size_t i = 0; i < world->getNumDofs(); i++)
@@ -2729,7 +2859,8 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersForceVelJacobian(
       if ((!areResultsStandardized() || snapshotPlus->areResultsStandardized())
           && snapshotPlus->getNumClamping() == getNumClamping()
           && snapshotPlus->getNumUpperBound() == getNumUpperBound()
-          && (!areResultsStandardized() || snapshotMinus->areResultsStandardized())
+          && (!areResultsStandardized()
+              || snapshotMinus->areResultsStandardized())
           && snapshotMinus->getNumClamping() == getNumClamping()
           && snapshotMinus->getNumUpperBound() == getNumUpperBound())
       {
@@ -2760,7 +2891,8 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersForceVelJacobian(
       std::shared_ptr<neural::BackpropSnapshot> snapshotPlus
           = neural::forwardPass(world, true);
       velPlus = snapshotPlus->getPostStepVelocity();
-      if (!((!areResultsStandardized() || snapshotPlus->areResultsStandardized())
+      if (!((!areResultsStandardized()
+             || snapshotPlus->areResultsStandardized())
             && snapshotPlus->getNumClamping() == getNumClamping()
             && snapshotPlus->getNumUpperBound() == getNumUpperBound()))
       {
@@ -2776,26 +2908,31 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersForceVelJacobian(
       std::shared_ptr<neural::BackpropSnapshot> snapshotMinus
           = neural::forwardPass(world, true);
       velMinus = snapshotMinus->getPostStepVelocity();
-      if (!((!areResultsStandardized() || snapshotMinus->areResultsStandardized())
+      if (!((!areResultsStandardized()
+             || snapshotMinus->areResultsStandardized())
             && snapshotMinus->getNumClamping() == getNumClamping()
             && snapshotMinus->getNumUpperBound() == getNumUpperBound()))
       {
         assert(false && "Lowering EPS in finiteDifferenceRiddersForceVelJacobian() "
                       "caused numClamping() or numUpperBound() to change.");
       }
-      
+
       tab[0][iTab] = (velPlus - velMinus) / (2 * stepSize);
 
       double fac = con2;
-      // Compute extrapolations of increasing orders, requiring no new evaluations
+      // Compute extrapolations of increasing orders, requiring no new
+      // evaluations
       for (int jTab = 1; jTab <= iTab; jTab++)
       {
-        tab[jTab][iTab] = (tab[jTab-1][iTab] * fac - tab[jTab-1][iTab-1]) /
-                              (fac - 1.0);
+        tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
+                          / (fac - 1.0);
         fac = con2 * fac;
-        double currError = 
-          std::max((tab[jTab][iTab] - tab[jTab-1][iTab]).array().abs().maxCoeff(),
-                   (tab[jTab][iTab] - tab[jTab-1][iTab-1]).array().abs().maxCoeff());
+        double currError = std::max(
+            (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
+            (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
+                .array()
+                .abs()
+                .maxCoeff());
         if (currError < bestError)
         {
           bestError = currError;
@@ -2804,8 +2941,8 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersForceVelJacobian(
       }
 
       // If higher order is worse by a significant factor, quit early.
-      if ((tab[iTab][iTab] - tab[iTab-1][iTab-1]).array().abs().maxCoeff() >= 
-          safeThreshold * bestError)
+      if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
+          >= safeThreshold * bestError)
       {
         break;
       }
@@ -2822,7 +2959,8 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersForceVelJacobian(
 Eigen::MatrixXd BackpropSnapshot::finiteDifferenceMassVelJacobian(
     simulation::WorldPtr world, bool useRidders)
 {
-  if (useRidders) return finiteDifferenceRiddersMassVelJacobian(world);
+  if (useRidders)
+    return finiteDifferenceRiddersMassVelJacobian(world);
 
   RestorableSnapshot snapshot(world);
 
@@ -2879,9 +3017,9 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersMassVelJacobian(
   world->setCachedLCPSolution(mPreStepLCPCache);
   world->step(false);
 
-  const double originalStepSize = 1e-3; 
-  const double con = 1.4, con2 = (con * con); 
-  const double safeThreshold = 2.0; 
+  const double originalStepSize = 1e-3;
+  const double con = 1.4, con2 = (con * con);
+  const double safeThreshold = 2.0;
   const int tabSize = 10;
 
   Eigen::VectorXd originalMass = world->getWrtMass()->get(world.get());
@@ -2906,7 +3044,7 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersMassVelJacobian(
     perturbedPlus(i) += stepSize;
     world->getWrtMass()->set(world.get(), perturbedPlus);
     std::shared_ptr<neural::BackpropSnapshot> snapshotPlus
-          = neural::forwardPass(world, true);
+        = neural::forwardPass(world, true);
     velPlus = snapshotPlus->getPostStepVelocity();
     world->setPositions(mPreStepPosition);
     world->setVelocities(mPreStepVelocity);
@@ -2914,7 +3052,7 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersMassVelJacobian(
     perturbedMinus(i) -= stepSize;
     world->getWrtMass()->set(world.get(), perturbedMinus);
     std::shared_ptr<neural::BackpropSnapshot> snapshotMinus
-          = neural::forwardPass(world, true);
+        = neural::forwardPass(world, true);
     velMinus = snapshotMinus->getPostStepVelocity();
 
     tab[0][0] = (velPlus - velMinus) / (2 * stepSize);
@@ -2930,7 +3068,7 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersMassVelJacobian(
       perturbedPlus(i) += stepSize;
       world->getWrtMass()->set(world.get(), perturbedPlus);
       std::shared_ptr<neural::BackpropSnapshot> snapshotPlus
-            = neural::forwardPass(world, true);
+          = neural::forwardPass(world, true);
       velPlus = snapshotPlus->getPostStepVelocity();
       world->setPositions(mPreStepPosition);
       world->setVelocities(mPreStepVelocity);
@@ -2938,21 +3076,25 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersMassVelJacobian(
       perturbedMinus(i) -= stepSize;
       world->getWrtMass()->set(world.get(), perturbedMinus);
       std::shared_ptr<neural::BackpropSnapshot> snapshotMinus
-            = neural::forwardPass(world, true);
+          = neural::forwardPass(world, true);
       velMinus = snapshotMinus->getPostStepVelocity();
-      
+
       tab[0][iTab] = (velPlus - velMinus) / (2 * stepSize);
 
       double fac = con2;
-      // Compute extrapolations of increasing orders, requiring no new evaluations
+      // Compute extrapolations of increasing orders, requiring no new
+      // evaluations
       for (int jTab = 1; jTab <= iTab; jTab++)
       {
-        tab[jTab][iTab] = (tab[jTab-1][iTab] * fac - tab[jTab-1][iTab-1]) /
-                              (fac - 1.0);
+        tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
+                          / (fac - 1.0);
         fac = con2 * fac;
-        double currError = 
-          std::max((tab[jTab][iTab] - tab[jTab-1][iTab]).array().abs().maxCoeff(),
-                   (tab[jTab][iTab] - tab[jTab-1][iTab-1]).array().abs().maxCoeff());
+        double currError = std::max(
+            (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
+            (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
+                .array()
+                .abs()
+                .maxCoeff());
         if (currError < bestError)
         {
           bestError = currError;
@@ -2961,8 +3103,8 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersMassVelJacobian(
       }
 
       // If higher order is worse by a significant factor, quit early.
-      if ((tab[iTab][iTab] - tab[iTab-1][iTab-1]).array().abs().maxCoeff() >= 
-          safeThreshold * bestError)
+      if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
+          >= safeThreshold * bestError)
       {
         break;
       }
@@ -2979,7 +3121,8 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersMassVelJacobian(
 Eigen::MatrixXd BackpropSnapshot::finiteDifferencePosPosJacobian(
     WorldPtr world, std::size_t subdivisions, bool useRidders)
 {
-  if (useRidders) return finiteDifferenceRiddersPosPosJacobian(world, subdivisions);
+  if (useRidders)
+    return finiteDifferenceRiddersPosPosJacobian(world, subdivisions);
 
   RestorableSnapshot snapshot(world);
 
@@ -3084,9 +3227,9 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersPosPosJacobian(
   for (std::size_t j = 0; j < subdivisions; j++)
     world->step(false);
 
-  const double originalStepSize = 1e-3 / subdivisions; 
-  const double con = 1.4, con2 = (con * con); 
-  const double safeThreshold = 2.0; 
+  const double originalStepSize = 1e-3 / subdivisions;
+  const double con = 1.4, con2 = (con * con);
+  const double safeThreshold = 2.0;
   const int tabSize = 10;
 
   for (std::size_t i = 0; i < world->getNumDofs(); i++)
@@ -3105,7 +3248,8 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersPosPosJacobian(
     Eigen::VectorXd perturbedPlus = Eigen::VectorXd(mPreStepPosition);
     perturbedPlus(i) += stepSize;
     world->setPositions(perturbedPlus);
-    for (std::size_t j = 0; j < subdivisions; j++) world->step(false);
+    for (std::size_t j = 0; j < subdivisions; j++)
+      world->step(false);
     Eigen::VectorXd posPlus = world->getPositions();
 
     world->setVelocities(mPreStepVelocity);
@@ -3114,7 +3258,8 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersPosPosJacobian(
     Eigen::VectorXd perturbedMinus = Eigen::VectorXd(mPreStepPosition);
     perturbedMinus(i) -= stepSize;
     world->setPositions(perturbedMinus);
-    for (std::size_t j = 0; j < subdivisions; j++) world->step(false);
+    for (std::size_t j = 0; j < subdivisions; j++)
+      world->step(false);
     Eigen::VectorXd posMinus = world->getPositions();
 
     tab[0][0] = (posPlus - posMinus) / (2 * stepSize);
@@ -3130,30 +3275,36 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersPosPosJacobian(
       perturbedPlus = Eigen::VectorXd(mPreStepPosition);
       perturbedPlus(i) += stepSize;
       world->setPositions(perturbedPlus);
-      for (std::size_t j = 0; j < subdivisions; j++) world->step(false);
+      for (std::size_t j = 0; j < subdivisions; j++)
+        world->step(false);
       posPlus = world->getPositions();
-      
+
       world->setVelocities(mPreStepVelocity);
       world->setExternalForces(mPreStepTorques);
       world->setCachedLCPSolution(mPreStepLCPCache);
       perturbedMinus = Eigen::VectorXd(mPreStepPosition);
       perturbedMinus(i) -= stepSize;
       world->setPositions(perturbedMinus);
-      for (std::size_t j = 0; j < subdivisions; j++) world->step(false);
+      for (std::size_t j = 0; j < subdivisions; j++)
+        world->step(false);
       posMinus = world->getPositions();
-      
+
       tab[0][iTab] = (posPlus - posMinus) / (2 * stepSize);
 
       double fac = con2;
-      // Compute extrapolations of increasing orders, requiring no new evaluations
+      // Compute extrapolations of increasing orders, requiring no new
+      // evaluations
       for (int jTab = 1; jTab <= iTab; jTab++)
       {
-        tab[jTab][iTab] = (tab[jTab-1][iTab] * fac - tab[jTab-1][iTab-1]) /
-                              (fac - 1.0);
+        tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
+                          / (fac - 1.0);
         fac = con2 * fac;
-        double currError = 
-          std::max((tab[jTab][iTab] - tab[jTab-1][iTab]).array().abs().maxCoeff(),
-                   (tab[jTab][iTab] - tab[jTab-1][iTab-1]).array().abs().maxCoeff());
+        double currError = std::max(
+            (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
+            (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
+                .array()
+                .abs()
+                .maxCoeff());
         if (currError < bestError)
         {
           bestError = currError;
@@ -3162,8 +3313,8 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersPosPosJacobian(
       }
 
       // If higher order is worse by a significant factor, quit early.
-      if ((tab[iTab][iTab] - tab[iTab-1][iTab-1]).array().abs().maxCoeff() >= 
-          safeThreshold * bestError)
+      if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
+          >= safeThreshold * bestError)
       {
         break;
       }
@@ -3181,7 +3332,8 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersPosPosJacobian(
 Eigen::MatrixXd BackpropSnapshot::finiteDifferenceVelPosJacobian(
     WorldPtr world, std::size_t subdivisions, bool useRidders)
 {
-  if (useRidders) return finiteDifferenceRiddersVelPosJacobian(world, subdivisions);
+  if (useRidders)
+    return finiteDifferenceRiddersVelPosJacobian(world, subdivisions);
 
   RestorableSnapshot snapshot(world);
 
@@ -3284,9 +3436,9 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersVelPosJacobian(
   for (std::size_t j = 0; j < subdivisions; j++)
     world->step(false);
 
-  const double originalStepSize = 1e-3 / subdivisions; 
-  const double con = 1.4, con2 = (con * con); 
-  const double safeThreshold = 2.0; 
+  const double originalStepSize = 1e-3 / subdivisions;
+  const double con = 1.4, con2 = (con * con);
+  const double safeThreshold = 2.0;
   const int tabSize = 10;
 
   for (std::size_t i = 0; i < world->getNumDofs(); i++)
@@ -3305,7 +3457,8 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersVelPosJacobian(
     Eigen::VectorXd perturbedPlus = Eigen::VectorXd(mPreStepVelocity);
     perturbedPlus(i) += stepSize;
     world->setVelocities(perturbedPlus);
-    for (std::size_t j = 0; j < subdivisions; j++) world->step(false);
+    for (std::size_t j = 0; j < subdivisions; j++)
+      world->step(false);
     Eigen::VectorXd posPlus = world->getPositions();
 
     world->setPositions(mPreStepPosition);
@@ -3314,7 +3467,8 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersVelPosJacobian(
     Eigen::VectorXd perturbedMinus = Eigen::VectorXd(mPreStepVelocity);
     perturbedMinus(i) -= stepSize;
     world->setVelocities(perturbedMinus);
-    for (std::size_t j = 0; j < subdivisions; j++) world->step(false);
+    for (std::size_t j = 0; j < subdivisions; j++)
+      world->step(false);
     Eigen::VectorXd posMinus = world->getPositions();
 
     tab[0][0] = (posPlus - posMinus) / (2 * stepSize);
@@ -3330,7 +3484,8 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersVelPosJacobian(
       perturbedPlus = Eigen::VectorXd(mPreStepVelocity);
       perturbedPlus(i) += stepSize;
       world->setVelocities(perturbedPlus);
-      for (std::size_t j = 0; j < subdivisions; j++) world->step(false);
+      for (std::size_t j = 0; j < subdivisions; j++)
+        world->step(false);
       posPlus = world->getPositions();
 
       world->setPositions(mPreStepPosition);
@@ -3339,21 +3494,26 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersVelPosJacobian(
       perturbedMinus = Eigen::VectorXd(mPreStepVelocity);
       perturbedMinus(i) -= stepSize;
       world->setVelocities(perturbedMinus);
-      for (std::size_t j = 0; j < subdivisions; j++) world->step(false);
+      for (std::size_t j = 0; j < subdivisions; j++)
+        world->step(false);
       posMinus = world->getPositions();
-      
+
       tab[0][iTab] = (posPlus - posMinus) / (2 * stepSize);
 
       double fac = con2;
-      // Compute extrapolations of increasing orders, requiring no new evaluations
+      // Compute extrapolations of increasing orders, requiring no new
+      // evaluations
       for (int jTab = 1; jTab <= iTab; jTab++)
       {
-        tab[jTab][iTab] = (tab[jTab-1][iTab] * fac - tab[jTab-1][iTab-1]) /
-                              (fac - 1.0);
+        tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
+                          / (fac - 1.0);
         fac = con2 * fac;
-        double currError = 
-          std::max((tab[jTab][iTab] - tab[jTab-1][iTab]).array().abs().maxCoeff(),
-                   (tab[jTab][iTab] - tab[jTab-1][iTab-1]).array().abs().maxCoeff());
+        double currError = std::max(
+            (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
+            (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
+                .array()
+                .abs()
+                .maxCoeff());
         if (currError < bestError)
         {
           bestError = currError;
@@ -3362,8 +3522,8 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersVelPosJacobian(
       }
 
       // If higher order is worse by a significant factor, quit early.
-      if ((tab[iTab][iTab] - tab[iTab-1][iTab-1]).array().abs().maxCoeff() >= 
-          safeThreshold * bestError)
+      if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
+          >= safeThreshold * bestError)
       {
         break;
       }
@@ -3383,7 +3543,8 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersVelPosJacobian(
 Eigen::MatrixXd BackpropSnapshot::finiteDifferenceVelJacobianWrt(
     simulation::WorldPtr world, WithRespectTo* wrt, bool useRidders)
 {
-  if (useRidders) return finiteDifferenceRiddersVelJacobianWrt(world, wrt);
+  if (useRidders)
+    return finiteDifferenceRiddersVelJacobianWrt(world, wrt);
 
   RestorableSnapshot snapshot(world);
 
@@ -3442,9 +3603,9 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersVelJacobianWrt(
   bool oldGradientEnabled = world->getConstraintSolver()->getGradientEnabled();
   // world->getConstraintSolver()->setGradientEnabled(false);
 
-  const double originalStepSize = 1e-3; 
-  const double con = 1.4, con2 = (con * con); 
-  const double safeThreshold = 2.0; 
+  const double originalStepSize = 1e-3;
+  const double con = 1.4, con2 = (con * con);
+  const double safeThreshold = 2.0;
   const int tabSize = 10;
 
   Eigen::VectorXd originalWrt = wrt->get(world.get());
@@ -3469,15 +3630,15 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersVelJacobianWrt(
     perturbedPlus(i) += stepSize;
     wrt->set(world.get(), perturbedPlus);
     std::shared_ptr<neural::BackpropSnapshot> snapshotPlus
-            = neural::forwardPass(world, true);
-    Eigen:: VectorXd velPlus = snapshotPlus->getPostStepVelocity();
+        = neural::forwardPass(world, true);
+    Eigen::VectorXd velPlus = snapshotPlus->getPostStepVelocity();
 
     Eigen::VectorXd perturbedMinus = Eigen::VectorXd(originalWrt);
     perturbedMinus(i) -= stepSize;
     wrt->set(world.get(), perturbedMinus);
     std::shared_ptr<neural::BackpropSnapshot> snapshotMinus
-            = neural::forwardPass(world, true);
-    Eigen:: VectorXd velMinus = snapshotMinus->getPostStepVelocity();
+        = neural::forwardPass(world, true);
+    Eigen::VectorXd velMinus = snapshotMinus->getPostStepVelocity();
 
     tab[0][0] = (velPlus - velMinus) / (2 * stepSize);
 
@@ -3490,28 +3651,32 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersVelJacobianWrt(
       perturbedPlus(i) += stepSize;
       wrt->set(world.get(), perturbedPlus);
       std::shared_ptr<neural::BackpropSnapshot> snapshotPlus
-              = neural::forwardPass(world, true);
+          = neural::forwardPass(world, true);
       velPlus = snapshotPlus->getPostStepVelocity();
 
       perturbedMinus = Eigen::VectorXd(originalWrt);
       perturbedMinus(i) -= stepSize;
       wrt->set(world.get(), perturbedMinus);
       std::shared_ptr<neural::BackpropSnapshot> snapshotMinus
-              = neural::forwardPass(world, true);
+          = neural::forwardPass(world, true);
       velMinus = snapshotMinus->getPostStepVelocity();
-      
+
       tab[0][iTab] = (velPlus - velMinus) / (2 * stepSize);
 
       double fac = con2;
-      // Compute extrapolations of increasing orders, requiring no new evaluations
+      // Compute extrapolations of increasing orders, requiring no new
+      // evaluations
       for (int jTab = 1; jTab <= iTab; jTab++)
       {
-        tab[jTab][iTab] = (tab[jTab-1][iTab] * fac - tab[jTab-1][iTab-1]) /
-                              (fac - 1.0);
+        tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
+                          / (fac - 1.0);
         fac = con2 * fac;
-        double currError = 
-          std::max((tab[jTab][iTab] - tab[jTab-1][iTab]).array().abs().maxCoeff(),
-                   (tab[jTab][iTab] - tab[jTab-1][iTab-1]).array().abs().maxCoeff());
+        double currError = std::max(
+            (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
+            (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
+                .array()
+                .abs()
+                .maxCoeff());
         if (currError < bestError)
         {
           bestError = currError;
@@ -3520,8 +3685,8 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersVelJacobianWrt(
       }
 
       // If higher order is worse by a significant factor, quit early.
-      if ((tab[iTab][iTab] - tab[iTab-1][iTab-1]).array().abs().maxCoeff() >= 
-          safeThreshold * bestError)
+      if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
+          >= safeThreshold * bestError)
       {
         break;
       }
@@ -3540,7 +3705,8 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersVelJacobianWrt(
 Eigen::MatrixXd BackpropSnapshot::finiteDifferencePosJacobianWrt(
     simulation::WorldPtr world, WithRespectTo* wrt, bool useRidders)
 {
-  if (useRidders) return finiteDifferenceRiddersPosJacobianWrt(world, wrt);
+  if (useRidders)
+    return finiteDifferenceRiddersPosJacobianWrt(world, wrt);
 
   RestorableSnapshot snapshot(world);
 
@@ -3610,9 +3776,9 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersPosJacobianWrt(
   bool oldGradientEnabled = world->getConstraintSolver()->getGradientEnabled();
   // world->getConstraintSolver()->setGradientEnabled(false);
 
-  const double originalStepSize = 1e-3; 
-  const double con = 1.4, con2 = (con * con); 
-  const double safeThreshold = 2.0; 
+  const double originalStepSize = 1e-3;
+  const double con = 1.4, con2 = (con * con);
+  const double safeThreshold = 2.0;
   const int tabSize = 10;
 
   Eigen::VectorXd originalWrt = wrt->get(world.get());
@@ -3641,8 +3807,8 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersPosJacobianWrt(
     perturbedPlus(i) += stepSize;
     wrt->set(world.get(), perturbedPlus);
     std::shared_ptr<neural::BackpropSnapshot> snapshotPlus
-            = neural::forwardPass(world, true);
-    Eigen:: VectorXd posPlus = snapshotPlus->getPostStepPosition();
+        = neural::forwardPass(world, true);
+    Eigen::VectorXd posPlus = snapshotPlus->getPostStepPosition();
     world->setPositions(mPreStepPosition);
     world->setVelocities(mPreStepVelocity);
     world->setExternalForces(mPreStepTorques);
@@ -3651,8 +3817,8 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersPosJacobianWrt(
     perturbedMinus(i) -= stepSize;
     wrt->set(world.get(), perturbedMinus);
     std::shared_ptr<neural::BackpropSnapshot> snapshotMinus
-            = neural::forwardPass(world, true);
-    Eigen:: VectorXd posMinus = snapshotMinus->getPostStepPosition();
+        = neural::forwardPass(world, true);
+    Eigen::VectorXd posMinus = snapshotMinus->getPostStepPosition();
 
     tab[0][0] = (posPlus - posMinus) / (2 * stepSize);
 
@@ -3669,7 +3835,7 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersPosJacobianWrt(
       perturbedPlus(i) += stepSize;
       wrt->set(world.get(), perturbedPlus);
       std::shared_ptr<neural::BackpropSnapshot> snapshotPlus
-              = neural::forwardPass(world, true);
+          = neural::forwardPass(world, true);
       posPlus = snapshotPlus->getPostStepPosition();
       world->setPositions(mPreStepPosition);
       world->setVelocities(mPreStepVelocity);
@@ -3679,21 +3845,25 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersPosJacobianWrt(
       perturbedMinus(i) -= stepSize;
       wrt->set(world.get(), perturbedMinus);
       std::shared_ptr<neural::BackpropSnapshot> snapshotMinus
-              = neural::forwardPass(world, true);
+          = neural::forwardPass(world, true);
       posMinus = snapshotMinus->getPostStepPosition();
 
       tab[0][0] = (posPlus - posMinus) / (2 * stepSize);
 
       double fac = con2;
-      // Compute extrapolations of increasing orders, requiring no new evaluations
+      // Compute extrapolations of increasing orders, requiring no new
+      // evaluations
       for (int jTab = 1; jTab <= iTab; jTab++)
       {
-        tab[jTab][iTab] = (tab[jTab-1][iTab] * fac - tab[jTab-1][iTab-1]) /
-                              (fac - 1.0);
+        tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
+                          / (fac - 1.0);
         fac = con2 * fac;
-        double currError = 
-          std::max((tab[jTab][iTab] - tab[jTab-1][iTab]).array().abs().maxCoeff(),
-                   (tab[jTab][iTab] - tab[jTab-1][iTab-1]).array().abs().maxCoeff());
+        double currError = std::max(
+            (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
+            (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
+                .array()
+                .abs()
+                .maxCoeff());
         if (currError < bestError)
         {
           bestError = currError;
@@ -3702,8 +3872,8 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersPosJacobianWrt(
       }
 
       // If higher order is worse by a significant factor, quit early.
-      if ((tab[iTab][iTab] - tab[iTab-1][iTab-1]).array().abs().maxCoeff() >= 
-          safeThreshold * bestError)
+      if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
+          >= safeThreshold * bestError)
       {
         break;
       }
@@ -4059,13 +4229,15 @@ BackpropSnapshot::getJacobianOfLCPConstraintMatrixClampingSubset(
 /// wrt, by finite differencing
 Eigen::MatrixXd
 BackpropSnapshot::finiteDifferenceJacobianOfLCPConstraintMatrixClampingSubset(
-    simulation::WorldPtr world, Eigen::VectorXd b, WithRespectTo* wrt,
+    simulation::WorldPtr world,
+    Eigen::VectorXd b,
+    WithRespectTo* wrt,
     bool useRidders)
 {
   if (useRidders)
   {
     return finiteDifferenceRiddersJacobianOfLCPConstraintMatrixClampingSubset(
-      world, b, wrt);
+        world, b, wrt);
   }
 
   int wrtDim = wrt->dim(world.get());
@@ -4131,9 +4303,9 @@ BackpropSnapshot::finiteDifferenceJacobianOfLCPConstraintMatrixClampingSubset(
 //==============================================================================
 /// This returns the jacobian of Q^{-1}b, holding b constant, with respect to
 /// wrt, by Ridders extrapolated finite differencing
-Eigen::MatrixXd
-BackpropSnapshot::finiteDifferenceRiddersJacobianOfLCPConstraintMatrixClampingSubset(
-    simulation::WorldPtr world, Eigen::VectorXd b, WithRespectTo* wrt)
+Eigen::MatrixXd BackpropSnapshot::
+    finiteDifferenceRiddersJacobianOfLCPConstraintMatrixClampingSubset(
+        simulation::WorldPtr world, Eigen::VectorXd b, WithRespectTo* wrt)
 {
   int wrtDim = wrt->dim(world.get());
   Eigen::MatrixXd jac = Eigen::MatrixXd::Zero(mNumClamping, wrtDim);
@@ -4148,9 +4320,9 @@ BackpropSnapshot::finiteDifferenceRiddersJacobianOfLCPConstraintMatrixClampingSu
   world->setExternalForces(mPreStepTorques);
   world->setCachedLCPSolution(mPreStepLCPCache);
 
-  const double originalStepSize = 1e-3; 
-  const double con = 1.4, con2 = (con * con); 
-  const double safeThreshold = 2.0; 
+  const double originalStepSize = 1e-3;
+  const double con = 1.4, con2 = (con * con);
+  const double safeThreshold = 2.0;
   const int tabSize = 10;
 
   Eigen::VectorXd original = wrt->get(world.get());
@@ -4166,13 +4338,13 @@ BackpropSnapshot::finiteDifferenceRiddersJacobianOfLCPConstraintMatrixClampingSu
     Eigen::VectorXd perturbed = original;
     perturbed(i) += stepSize;
     wrt->set(world.get(), perturbed);
-    Eigen::MatrixXd A_c 
-      = estimateClampingConstraintMatrixAt(world, world->getPositions());
-    Eigen::MatrixXd A_ub 
-      = estimateUpperBoundConstraintMatrixAt(world, world->getPositions());
+    Eigen::MatrixXd A_c
+        = estimateClampingConstraintMatrixAt(world, world->getPositions());
+    Eigen::MatrixXd A_ub
+        = estimateUpperBoundConstraintMatrixAt(world, world->getPositions());
     Eigen::MatrixXd E = getUpperBoundMappingMatrix();
-    Eigen::MatrixXd Q 
-      = A_c.transpose() * world->getInvMassMatrix() * (A_c + A_ub * E);
+    Eigen::MatrixXd Q
+        = A_c.transpose() * world->getInvMassMatrix() * (A_c + A_ub * E);
     // std::cout << "+" << i << ": " << A_c.cols() << " :: " <<
     //   mNumClamping << std::endl;
     Eigen::VectorXd QinvBPlus = Q.completeOrthogonalDecomposition().solve(b);
@@ -4201,7 +4373,8 @@ BackpropSnapshot::finiteDifferenceRiddersJacobianOfLCPConstraintMatrixClampingSu
       A_ub = estimateUpperBoundConstraintMatrixAt(world, world->getPositions());
       E = getUpperBoundMappingMatrix();
       Q = A_c.transpose() * world->getInvMassMatrix() * (A_c + A_ub * E);
-      // std::cout << "+" << i << ": " << A_c.cols() << " :: " << mNumClamping << std::endl;
+      // std::cout << "+" << i << ": " << A_c.cols() << " :: " << mNumClamping
+      // << std::endl;
       QinvBPlus = Q.completeOrthogonalDecomposition().solve(b);
       perturbed = original;
       perturbed(i) -= stepSize;
@@ -4210,21 +4383,26 @@ BackpropSnapshot::finiteDifferenceRiddersJacobianOfLCPConstraintMatrixClampingSu
       A_ub = estimateUpperBoundConstraintMatrixAt(world, world->getPositions());
       E = getUpperBoundMappingMatrix();
       Q = A_c.transpose() * world->getInvMassMatrix() * (A_c + A_ub * E);
-      // std::cout << "+" << i << ": " << A_c.cols() << " :: " << mNumClamping << std::endl;
+      // std::cout << "+" << i << ": " << A_c.cols() << " :: " << mNumClamping
+      // << std::endl;
       QinvBMinus = Q.completeOrthogonalDecomposition().solve(b);
-      
+
       tab[0][iTab] = (QinvBPlus - QinvBMinus) / (2 * stepSize);
 
       double fac = con2;
-      // Compute extrapolations of increasing orders, requiring no new evaluations
+      // Compute extrapolations of increasing orders, requiring no new
+      // evaluations
       for (int jTab = 1; jTab <= iTab; jTab++)
       {
-        tab[jTab][iTab] = (tab[jTab-1][iTab] * fac - tab[jTab-1][iTab-1]) /
-                              (fac - 1.0);
+        tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
+                          / (fac - 1.0);
         fac = con2 * fac;
-        double currError = 
-          std::max((tab[jTab][iTab] - tab[jTab-1][iTab]).array().abs().maxCoeff(),
-                   (tab[jTab][iTab] - tab[jTab-1][iTab-1]).array().abs().maxCoeff());
+        double currError = std::max(
+            (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
+            (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
+                .array()
+                .abs()
+                .maxCoeff());
         if (currError < bestError)
         {
           bestError = currError;
@@ -4233,8 +4411,8 @@ BackpropSnapshot::finiteDifferenceRiddersJacobianOfLCPConstraintMatrixClampingSu
       }
 
       // If higher order is worse by a significant factor, quit early.
-      if ((tab[iTab][iTab] - tab[iTab-1][iTab-1]).array().abs().maxCoeff() >= 
-          safeThreshold * bestError)
+      if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
+          >= safeThreshold * bestError)
       {
         break;
       }
@@ -4305,7 +4483,7 @@ Eigen::MatrixXd
 BackpropSnapshot::finiteDifferenceJacobianOfLCPOffsetClampingSubset(
     simulation::WorldPtr world, WithRespectTo* wrt, bool useRidders)
 {
-  if (useRidders) 
+  if (useRidders)
   {
     return finiteDifferenceRiddersJacobianOfLCPOffsetClampingSubset(world, wrt);
   }
@@ -4386,9 +4564,9 @@ BackpropSnapshot::finiteDifferenceRiddersJacobianOfLCPOffsetClampingSubset(
   int wrtDim = wrt->dim(world.get());
   Eigen::MatrixXd J = Eigen::MatrixXd::Zero(mNumClamping, wrtDim);
 
-  double originalStepSize = 1e-4; 
-  const double con = 1.4, con2 = (con * con); 
-  const double safeThreshold = 2.0; 
+  double originalStepSize = 1e-4;
+  const double con = 1.4, con2 = (con * con);
+  const double safeThreshold = 2.0;
   const int tabSize = 10;
 
   Eigen::VectorXd original = wrt->get(world.get());
@@ -4454,19 +4632,23 @@ BackpropSnapshot::finiteDifferenceRiddersJacobianOfLCPOffsetClampingSubset(
   "Lowering EPS in finiteDifferenceRiddersJacobianOfLCPOffsetClampingSubset() "
   "caused bPlus.size() to change.");
       }
-      
+
       tab[0][iTab] = (bPlus - bMinus) / (2 * stepSize);
 
       double fac = con2;
-      // Compute extrapolations of increasing orders, requiring no new evaluations
+      // Compute extrapolations of increasing orders, requiring no new
+      // evaluations
       for (int jTab = 1; jTab <= iTab; jTab++)
       {
-        tab[jTab][iTab] = (tab[jTab-1][iTab] * fac - tab[jTab-1][iTab-1]) /
-                              (fac - 1.0);
+        tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
+                          / (fac - 1.0);
         fac = con2 * fac;
-        double currError = 
-          std::max((tab[jTab][iTab] - tab[jTab-1][iTab]).array().abs().maxCoeff(),
-                   (tab[jTab][iTab] - tab[jTab-1][iTab-1]).array().abs().maxCoeff());
+        double currError = std::max(
+            (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
+            (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
+                .array()
+                .abs()
+                .maxCoeff());
         if (currError < bestError)
         {
           bestError = currError;
@@ -4475,8 +4657,8 @@ BackpropSnapshot::finiteDifferenceRiddersJacobianOfLCPOffsetClampingSubset(
       }
 
       // If higher order is worse by a significant factor, quit early.
-      if ((tab[iTab][iTab] - tab[iTab-1][iTab-1]).array().abs().maxCoeff() >= 
-          safeThreshold * bestError)
+      if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
+          >= safeThreshold * bestError)
       {
         break;
       }
@@ -4498,7 +4680,8 @@ BackpropSnapshot::finiteDifferenceJacobianOfLCPEstimatedOffsetClampingSubset(
 {
   if (useRidders)
   {
-    return finiteDifferenceRiddersJacobianOfLCPEstimatedOffsetClampingSubset(world, wrt);
+    return finiteDifferenceRiddersJacobianOfLCPEstimatedOffsetClampingSubset(
+        world, wrt);
   }
 
   int wrtDim = wrt->dim(world.get());
@@ -4549,9 +4732,9 @@ BackpropSnapshot::finiteDifferenceJacobianOfLCPEstimatedOffsetClampingSubset(
 //==============================================================================
 /// This returns the jacobian of b (from Q^{-1}b) with respect to wrt, by
 /// Ridders extrapolated finite differencing
-Eigen::MatrixXd
-BackpropSnapshot::finiteDifferenceRiddersJacobianOfLCPEstimatedOffsetClampingSubset(
-    simulation::WorldPtr world, WithRespectTo* wrt)
+Eigen::MatrixXd BackpropSnapshot::
+    finiteDifferenceRiddersJacobianOfLCPEstimatedOffsetClampingSubset(
+        simulation::WorldPtr world, WithRespectTo* wrt)
 {
   int wrtDim = wrt->dim(world.get());
   Eigen::MatrixXd J = Eigen::MatrixXd::Zero(mNumClamping, wrtDim);
@@ -4563,9 +4746,9 @@ BackpropSnapshot::finiteDifferenceRiddersJacobianOfLCPEstimatedOffsetClampingSub
   world->setExternalForces(mPreStepTorques);
   world->setCachedLCPSolution(mPreStepLCPCache);
 
-  const double originalStepSize = 1e-3; 
-  const double con = 1.4, con2 = (con * con); 
-  const double safeThreshold = 2.0; 
+  const double originalStepSize = 1e-3;
+  const double con = 1.4, con2 = (con * con);
+  const double safeThreshold = 2.0;
   const int tabSize = 10;
 
   Eigen::VectorXd original = wrt->get(world.get());
@@ -4623,19 +4806,23 @@ BackpropSnapshot::finiteDifferenceRiddersJacobianOfLCPEstimatedOffsetClampingSub
       }
       bMinus = Eigen::VectorXd::Zero(mNumClamping);
       computeLCPOffsetClampingSubset(world, bMinus, A_c);
-      
+
       tab[0][iTab] = (bPlus - bMinus) / (2 * stepSize);
 
       double fac = con2;
-      // Compute extrapolations of increasing orders, requiring no new evaluations
+      // Compute extrapolations of increasing orders, requiring no new
+      // evaluations
       for (int jTab = 1; jTab <= iTab; jTab++)
       {
-        tab[jTab][iTab] = (tab[jTab-1][iTab] * fac - tab[jTab-1][iTab-1]) /
-                              (fac - 1.0);
+        tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
+                          / (fac - 1.0);
         fac = con2 * fac;
-        double currError = 
-          std::max((tab[jTab][iTab] - tab[jTab-1][iTab]).array().abs().maxCoeff(),
-                   (tab[jTab][iTab] - tab[jTab-1][iTab-1]).array().abs().maxCoeff());
+        double currError = std::max(
+            (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
+            (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
+                .array()
+                .abs()
+                .maxCoeff());
         if (currError < bestError)
         {
           bestError = currError;
@@ -4644,8 +4831,8 @@ BackpropSnapshot::finiteDifferenceRiddersJacobianOfLCPEstimatedOffsetClampingSub
       }
 
       // If higher order is worse by a significant factor, quit early.
-      if ((tab[iTab][iTab] - tab[iTab-1][iTab-1]).array().abs().maxCoeff() >= 
-          safeThreshold * bestError)
+      if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
+          >= safeThreshold * bestError)
       {
         break;
       }
@@ -4839,7 +5026,30 @@ Eigen::MatrixXd BackpropSnapshot::getJacobianOfProjectionIntoClampsMatrix(
 Eigen::MatrixXd BackpropSnapshot::getJacobianOfMinv(
     simulation::WorldPtr world, Eigen::VectorXd tau, WithRespectTo* wrt)
 {
-  return finiteDifferenceJacobianOfMinv(world, tau, wrt);
+  if (wrt == neural::WithRespectTo::POSITION
+      || wrt == neural::WithRespectTo::VELOCITY
+      || wrt == neural::WithRespectTo::FORCE)
+  {
+    // TODO(JS): Is this correct?
+    // Eigen::MatrixXd jac
+    //     = Eigen::MatrixXd::Zero(world->getNumDofs(), world->getNumDofs());
+    Eigen::MatrixXd jac
+        = Eigen::MatrixXd::Zero(world->getNumDofs(), wrt->dim(world.get()));
+    int cursor = 0;
+    for (int i = 0; i < world->getNumSkeletons(); i++)
+    {
+      auto skel = world->getSkeleton(i);
+      int dofs = skel->getNumDofs();
+      jac.block(cursor, cursor, dofs, dofs)
+          = skel->getJacobianOfMinv(tau.segment(cursor, dofs), wrt);
+      cursor += dofs;
+    }
+    return jac;
+  }
+  else
+  {
+    return finiteDifferenceJacobianOfMinv(world, tau, wrt);
+  }
 }
 
 //==============================================================================
@@ -4848,7 +5058,24 @@ Eigen::MatrixXd BackpropSnapshot::getJacobianOfMinv(
 Eigen::MatrixXd BackpropSnapshot::getJacobianOfC(
     simulation::WorldPtr world, WithRespectTo* wrt)
 {
-  return finiteDifferenceJacobianOfC(world, wrt);
+  std::size_t wrtDim = wrt->dim(world.get());
+
+  Eigen::MatrixXd J = Eigen::MatrixXd::Zero(mNumDOFs, wrtDim);
+
+  int wrtCursor = 0;
+  int dofCursor = 0;
+  for (int i = 0; i < world->getNumSkeletons(); i++)
+  {
+    auto skel = world->getSkeleton(i);
+    int dofs = skel->getNumDofs();
+    int skelWrtDim = wrt->dim(skel.get());
+    J.block(dofCursor, wrtCursor, dofs, skelWrtDim) = skel->getJacobianOfC(wrt);
+    wrtCursor += skelWrtDim;
+    dofCursor += dofs;
+  }
+
+  return J;
+  // return finiteDifferenceJacobianOfC(world, wrt);
 }
 
 /// This returns the jacobian of M^{-1}(pos, inertia) * (C(pos, inertia, vel) +
@@ -5096,7 +5323,8 @@ Eigen::MatrixXd BackpropSnapshot::getJacobianOfUpperBoundConstraintsTranspose(
 Eigen::MatrixXd BackpropSnapshot::finiteDifferenceJacobianOfClampingConstraints(
     simulation::WorldPtr world, Eigen::VectorXd f0, bool useRidders)
 {
-  if (useRidders) return finiteDifferenceRiddersJacobianOfClampingConstraints(world, f0);
+  if (useRidders)
+    return finiteDifferenceRiddersJacobianOfClampingConstraints(world, f0);
 
   RestorableSnapshot snapshot(world);
 
@@ -5221,9 +5449,9 @@ BackpropSnapshot::finiteDifferenceRiddersJacobianOfClampingConstraints(
 
   Eigen::MatrixXd J = Eigen::MatrixXd::Zero(original.size(), mNumDOFs);
 
-  double originalStepSize = 1e-4; 
-  const double con = 1.4, con2 = (con * con); 
-  const double safeThreshold = 2.0; 
+  double originalStepSize = 1e-4;
+  const double con = 1.4, con2 = (con * con);
+  const double safeThreshold = 2.0;
   const int tabSize = 10;
 
   for (std::size_t i = 0; i < mNumDOFs; i++)
@@ -5243,13 +5471,15 @@ BackpropSnapshot::finiteDifferenceRiddersJacobianOfClampingConstraints(
       perturbedPlus(i) += originalStepSize;
       world->setPositions(perturbedPlus);
       BackpropSnapshotPtr snapshotPlus = neural::forwardPass(world, true);
-      Eigen::MatrixXd A_cPlus = snapshotPlus->getClampingConstraintMatrix(world);
+      Eigen::MatrixXd A_cPlus
+          = snapshotPlus->getClampingConstraintMatrix(world);
 
       Eigen::VectorXd perturbedMinus = mPreStepPosition;
       perturbedMinus(i) -= originalStepSize;
       world->setPositions(perturbedMinus);
       BackpropSnapshotPtr snapshotMinus = neural::forwardPass(world, true);
-      Eigen::MatrixXd A_cMinus = snapshotMinus->getClampingConstraintMatrix(world);
+      Eigen::MatrixXd A_cMinus
+          = snapshotMinus->getClampingConstraintMatrix(world);
 
       if (A_cPlus.cols() == f0.size() && A_cMinus.cols() == f0.size())
       {
@@ -5257,8 +5487,8 @@ BackpropSnapshot::finiteDifferenceRiddersJacobianOfClampingConstraints(
         double squaredNormPlus = (original - A_c_f0Plus).squaredNorm();
         A_c_f0Minus = A_cMinus * f0;
         double squaredNormMinus = (original - A_c_f0Minus).squaredNorm();
-        if (squaredNormPlus < 100 * originalStepSize && 
-            squaredNormMinus < 100 * originalStepSize)
+        if (squaredNormPlus < 100 * originalStepSize
+            && squaredNormMinus < 100 * originalStepSize)
         {
           break;
         }
@@ -5286,13 +5516,15 @@ BackpropSnapshot::finiteDifferenceRiddersJacobianOfClampingConstraints(
       perturbedPlus(i) += stepSize;
       world->setPositions(perturbedPlus);
       BackpropSnapshotPtr snapshotPlus = neural::forwardPass(world, true);
-      Eigen::MatrixXd A_cPlus = snapshotPlus->getClampingConstraintMatrix(world);
+      Eigen::MatrixXd A_cPlus
+          = snapshotPlus->getClampingConstraintMatrix(world);
 
       Eigen::VectorXd perturbedMinus = mPreStepPosition;
       perturbedMinus(i) -= stepSize;
       world->setPositions(perturbedMinus);
       BackpropSnapshotPtr snapshotMinus = neural::forwardPass(world, true);
-      Eigen::MatrixXd A_cMinus = snapshotMinus->getClampingConstraintMatrix(world);
+      Eigen::MatrixXd A_cMinus
+          = snapshotMinus->getClampingConstraintMatrix(world);
 
       if (!(A_cPlus.cols() == f0.size() && A_cMinus.cols() == f0.size()))
       {
@@ -5306,15 +5538,19 @@ BackpropSnapshot::finiteDifferenceRiddersJacobianOfClampingConstraints(
       tab[0][iTab] = (A_c_f0Plus - A_c_f0Minus) / (2 * stepSize);
 
       double fac = con2;
-      // Compute extrapolations of increasing orders, requiring no new evaluations
+      // Compute extrapolations of increasing orders, requiring no new
+      // evaluations
       for (int jTab = 1; jTab <= iTab; jTab++)
       {
-        tab[jTab][iTab] = (tab[jTab-1][iTab] * fac - tab[jTab-1][iTab-1]) /
-                              (fac - 1.0);
+        tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
+                          / (fac - 1.0);
         fac = con2 * fac;
-        double currError = 
-          std::max((tab[jTab][iTab] - tab[jTab-1][iTab]).array().abs().maxCoeff(),
-                   (tab[jTab][iTab] - tab[jTab-1][iTab-1]).array().abs().maxCoeff());
+        double currError = std::max(
+            (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
+            (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
+                .array()
+                .abs()
+                .maxCoeff());
         if (currError < bestError)
         {
           bestError = currError;
@@ -5323,8 +5559,8 @@ BackpropSnapshot::finiteDifferenceRiddersJacobianOfClampingConstraints(
       }
 
       // If higher order is worse by a significant factor, quit early.
-      if ((tab[iTab][iTab] - tab[iTab-1][iTab-1]).array().abs().maxCoeff() >= 
-          safeThreshold * bestError)
+      if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
+          >= safeThreshold * bestError)
       {
         break;
       }
@@ -5344,9 +5580,10 @@ Eigen::MatrixXd
 BackpropSnapshot::finiteDifferenceJacobianOfClampingConstraintsTranspose(
     simulation::WorldPtr world, Eigen::VectorXd v0, bool useRidders)
 {
-  if (useRidders) 
+  if (useRidders)
   {
-    return finiteDifferenceRiddersJacobianOfClampingConstraintsTranspose(world, v0);
+    return finiteDifferenceRiddersJacobianOfClampingConstraintsTranspose(
+        world, v0);
   }
 
   RestorableSnapshot snapshot(world);
@@ -5450,9 +5687,9 @@ BackpropSnapshot::finiteDifferenceRiddersJacobianOfClampingConstraintsTranspose(
     return J;
   }
 
-  double originalStepSize = 1e-4; 
-  const double con = 1.4, con2 = (con * con); 
-  const double safeThreshold = 2.0; 
+  double originalStepSize = 1e-4;
+  const double con = 1.4, con2 = (con * con);
+  const double safeThreshold = 2.0;
   const int tabSize = 10;
 
   for (std::size_t i = 0; i < mNumDOFs; i++)
@@ -5472,18 +5709,18 @@ BackpropSnapshot::finiteDifferenceRiddersJacobianOfClampingConstraintsTranspose(
       perturbedPlus(i) += originalStepSize;
       world->setPositions(perturbedPlus);
       BackpropSnapshotPtr snapshotPlus = neural::forwardPass(world, true);
-      A_c_T_v0Plus =
-         snapshotPlus->getClampingConstraintMatrix(world).transpose() * v0;
+      A_c_T_v0Plus
+          = snapshotPlus->getClampingConstraintMatrix(world).transpose() * v0;
 
       Eigen::VectorXd perturbedMinus = Eigen::VectorXd(mPreStepPosition);
       perturbedMinus(i) -= originalStepSize;
       world->setPositions(perturbedMinus);
       BackpropSnapshotPtr snapshotMinus = neural::forwardPass(world, true);
-      A_c_T_v0Minus =
-         snapshotMinus->getClampingConstraintMatrix(world).transpose() * v0;
+      A_c_T_v0Minus
+          = snapshotMinus->getClampingConstraintMatrix(world).transpose() * v0;
 
-      if (A_c_T_v0Plus.size() == original.size() && 
-          A_c_T_v0Minus.size() == original.size())
+      if (A_c_T_v0Plus.size() == original.size()
+          && A_c_T_v0Minus.size() == original.size())
       {
         break;
       }
@@ -5505,18 +5742,18 @@ BackpropSnapshot::finiteDifferenceRiddersJacobianOfClampingConstraintsTranspose(
       perturbedPlus(i) += stepSize;
       world->setPositions(perturbedPlus);
       BackpropSnapshotPtr snapshotPlus = neural::forwardPass(world, true);
-      Eigen::MatrixXd A_c_T_v0Plus =
-         snapshotPlus->getClampingConstraintMatrix(world).transpose() * v0;
+      Eigen::MatrixXd A_c_T_v0Plus
+          = snapshotPlus->getClampingConstraintMatrix(world).transpose() * v0;
 
       Eigen::VectorXd perturbedMinus = Eigen::VectorXd(mPreStepPosition);
       perturbedMinus(i) -= stepSize;
       world->setPositions(perturbedMinus);
       BackpropSnapshotPtr snapshotMinus = neural::forwardPass(world, true);
-      Eigen::MatrixXd A_c_T_v0Minus =
-         snapshotMinus->getClampingConstraintMatrix(world).transpose() * v0;
+      Eigen::MatrixXd A_c_T_v0Minus
+          = snapshotMinus->getClampingConstraintMatrix(world).transpose() * v0;
 
-      if (!(A_c_T_v0Plus.size() == original.size() && 
-            A_c_T_v0Minus.size() == original.size()))
+      if (!(A_c_T_v0Plus.size() == original.size()
+            && A_c_T_v0Minus.size() == original.size()))
       {
         assert(false && 
     "Lowering EPS in finiteDifferenceRiddersJacobianOfClampingConstraintsTranspose()"
@@ -5526,15 +5763,19 @@ BackpropSnapshot::finiteDifferenceRiddersJacobianOfClampingConstraintsTranspose(
       tab[0][iTab] = (A_c_T_v0Plus - A_c_T_v0Minus) / (2 * stepSize);
 
       double fac = con2;
-      // Compute extrapolations of increasing orders, requiring no new evaluations
+      // Compute extrapolations of increasing orders, requiring no new
+      // evaluations
       for (int jTab = 1; jTab <= iTab; jTab++)
       {
-        tab[jTab][iTab] = (tab[jTab-1][iTab] * fac - tab[jTab-1][iTab-1]) /
-                              (fac - 1.0);
+        tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
+                          / (fac - 1.0);
         fac = con2 * fac;
-        double currError = 
-          std::max((tab[jTab][iTab] - tab[jTab-1][iTab]).array().abs().maxCoeff(),
-                   (tab[jTab][iTab] - tab[jTab-1][iTab-1]).array().abs().maxCoeff());
+        double currError = std::max(
+            (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
+            (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
+                .array()
+                .abs()
+                .maxCoeff());
         if (currError < bestError)
         {
           bestError = currError;
@@ -5543,8 +5784,8 @@ BackpropSnapshot::finiteDifferenceRiddersJacobianOfClampingConstraintsTranspose(
       }
 
       // If higher order is worse by a significant factor, quit early.
-      if ((tab[iTab][iTab] - tab[iTab-1][iTab-1]).array().abs().maxCoeff() >= 
-          safeThreshold * bestError)
+      if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
+          >= safeThreshold * bestError)
       {
         break;
       }
@@ -5651,9 +5892,9 @@ BackpropSnapshot::finiteDifferenceRiddersJacobianOfUpperBoundConstraints(
 
   Eigen::MatrixXd J = Eigen::MatrixXd::Zero(original.size(), mNumDOFs);
 
-  double originalStepSize = 1e-3; 
-  const double con = 1.4, con2 = (con * con); 
-  const double safeThreshold = 2.0; 
+  double originalStepSize = 1e-3;
+  const double con = 1.4, con2 = (con * con);
+  const double safeThreshold = 2.0;
   const int tabSize = 10;
 
   for (std::size_t i = 0; i < mNumDOFs; i++)
@@ -5673,7 +5914,7 @@ BackpropSnapshot::finiteDifferenceRiddersJacobianOfUpperBoundConstraints(
       perturbedPlus(i) += originalStepSize;
       world->setPositions(perturbedPlus);
       BackpropSnapshotPtr snapshotPlus = neural::forwardPass(world, true);
-      Eigen::MatrixXd A_ubPlus 
+      Eigen::MatrixXd A_ubPlus
           = snapshotPlus->getUpperBoundConstraintMatrix(world);
 
       Eigen::VectorXd perturbedMinus = Eigen::VectorXd(mPreStepPosition);
@@ -5683,8 +5924,8 @@ BackpropSnapshot::finiteDifferenceRiddersJacobianOfUpperBoundConstraints(
       Eigen::MatrixXd A_ubMinus
           = snapshotMinus->getUpperBoundConstraintMatrix(world);
 
-      if (A_ubPlus.size() == originalA_ub.size() && 
-          A_ubMinus.size() == originalA_ub.size())
+      if (A_ubPlus.size() == originalA_ub.size()
+          && A_ubMinus.size() == originalA_ub.size())
       {
         A_ub_f0Plus = A_ubPlus * f0;
         A_ub_f0Minus = A_ubMinus * f0;
@@ -5708,7 +5949,7 @@ BackpropSnapshot::finiteDifferenceRiddersJacobianOfUpperBoundConstraints(
       perturbedPlus(i) += stepSize;
       world->setPositions(perturbedPlus);
       BackpropSnapshotPtr snapshotPlus = neural::forwardPass(world, true);
-      Eigen::MatrixXd A_ubPlus 
+      Eigen::MatrixXd A_ubPlus
           = snapshotPlus->getUpperBoundConstraintMatrix(world);
       if (!(A_ubPlus.size() == originalA_ub.size()))
       {
@@ -5731,19 +5972,23 @@ BackpropSnapshot::finiteDifferenceRiddersJacobianOfUpperBoundConstraints(
   "caused A_ub.size() to change.");
       }
       A_ub_f0Minus = A_ubMinus * f0;
-      
+
       tab[0][iTab] = (A_ub_f0Plus - A_ub_f0Minus) / (2 * stepSize);
 
       double fac = con2;
-      // Compute extrapolations of increasing orders, requiring no new evaluations
+      // Compute extrapolations of increasing orders, requiring no new
+      // evaluations
       for (int jTab = 1; jTab <= iTab; jTab++)
       {
-        tab[jTab][iTab] = (tab[jTab-1][iTab] * fac - tab[jTab-1][iTab-1]) /
-                              (fac - 1.0);
+        tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
+                          / (fac - 1.0);
         fac = con2 * fac;
-        double currError = 
-          std::max((tab[jTab][iTab] - tab[jTab-1][iTab]).array().abs().maxCoeff(),
-                   (tab[jTab][iTab] - tab[jTab-1][iTab-1]).array().abs().maxCoeff());
+        double currError = std::max(
+            (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
+            (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
+                .array()
+                .abs()
+                .maxCoeff());
         if (currError < bestError)
         {
           bestError = currError;
@@ -5752,8 +5997,8 @@ BackpropSnapshot::finiteDifferenceRiddersJacobianOfUpperBoundConstraints(
       }
 
       // If higher order is worse by a significant factor, quit early.
-      if ((tab[iTab][iTab] - tab[iTab-1][iTab-1]).array().abs().maxCoeff() >= 
-          safeThreshold * bestError)
+      if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
+          >= safeThreshold * bestError)
       {
         break;
       }
@@ -5770,19 +6015,20 @@ BackpropSnapshot::finiteDifferenceRiddersJacobianOfUpperBoundConstraints(
 /// differences. This is SUPER SLOW, and is only here for testing.
 Eigen::MatrixXd
 BackpropSnapshot::finiteDifferenceJacobianOfProjectionIntoClampsMatrix(
-    simulation::WorldPtr world, Eigen::VectorXd v, WithRespectTo* wrt,
+    simulation::WorldPtr world,
+    Eigen::VectorXd v,
+    WithRespectTo* wrt,
     bool useRidders)
 {
   if (useRidders)
   {
     return finiteDifferenceRiddersJacobianOfProjectionIntoClampsMatrix(
-      world, v, wrt);
+        world, v, wrt);
   }
 
   RestorableSnapshot snapshot(world);
 
-  std::size_t
-   innerDim = wrt->dim(world.get());
+  std::size_t innerDim = wrt->dim(world.get());
 
   Eigen::VectorXd before = wrt->get(world.get());
 
@@ -5853,7 +6099,7 @@ BackpropSnapshot::finiteDifferenceJacobianOfProjectionIntoClampsMatrix(
 }
 
 //==============================================================================
-/// This computes and returns the jacobian of P_c * v by Ridders extrapolated 
+/// This computes and returns the jacobian of P_c * v by Ridders extrapolated
 /// finite differences. This is SUPER SLOW, and is only here for testing.
 Eigen::MatrixXd
 BackpropSnapshot::finiteDifferenceRiddersJacobianOfProjectionIntoClampsMatrix(
@@ -5866,14 +6112,15 @@ BackpropSnapshot::finiteDifferenceRiddersJacobianOfProjectionIntoClampsMatrix(
   Eigen::VectorXd originalWrt = wrt->get(world.get());
 
   // These are predicted contact forces at the clamping contacts
-  Eigen::VectorXd originalP_c_v = getProjectionIntoClampsMatrix(world, true) * v;
+  Eigen::VectorXd originalP_c_v
+      = getProjectionIntoClampsMatrix(world, true) * v;
   Eigen::MatrixXd originalP_c = getProjectionIntoClampsMatrix(world, true);
 
   Eigen::MatrixXd J = Eigen::MatrixXd::Zero(originalP_c_v.size(), innerDim);
 
-  double originalStepSize = 1e-3; 
-  const double con = 1.4, con2 = (con * con); 
-  const double safeThreshold = 2.0; 
+  double originalStepSize = 1e-3;
+  const double con = 1.4, con2 = (con * con);
+  const double safeThreshold = 2.0;
   const int tabSize = 10;
 
   for (std::size_t i = 0; i < innerDim; i++)
@@ -5900,8 +6147,8 @@ BackpropSnapshot::finiteDifferenceRiddersJacobianOfProjectionIntoClampsMatrix(
       BackpropSnapshotPtr snapshotMinus = neural::forwardPass(world, true);
       Eigen::MatrixXd P_cMinus
           = snapshotMinus->getProjectionIntoClampsMatrix(world);
-      if (P_cPlus.rows() == originalP_c.rows() &&
-          P_cMinus.rows() == originalP_c.rows())
+      if (P_cPlus.rows() == originalP_c.rows()
+          && P_cMinus.rows() == originalP_c.rows())
       {
         P_c_vPlus = P_cPlus * v;
         P_c_vMinus = P_cMinus * v;
@@ -5949,19 +6196,23 @@ BackpropSnapshot::finiteDifferenceRiddersJacobianOfProjectionIntoClampsMatrix(
   "caused P_c.rows() to change.");
       }
       P_c_vMinus = P_cMinus * v;
-      
+
       tab[0][iTab] = (P_c_vPlus - P_c_vMinus) / (2 * stepSize);
 
       double fac = con2;
-      // Compute extrapolations of increasing orders, requiring no new evaluations
+      // Compute extrapolations of increasing orders, requiring no new
+      // evaluations
       for (int jTab = 1; jTab <= iTab; jTab++)
       {
-        tab[jTab][iTab] = (tab[jTab-1][iTab] * fac - tab[jTab-1][iTab-1]) /
-                              (fac - 1.0);
+        tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
+                          / (fac - 1.0);
         fac = con2 * fac;
-        double currError = 
-          std::max((tab[jTab][iTab] - tab[jTab-1][iTab]).array().abs().maxCoeff(),
-                   (tab[jTab][iTab] - tab[jTab-1][iTab-1]).array().abs().maxCoeff());
+        double currError = std::max(
+            (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
+            (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
+                .array()
+                .abs()
+                .maxCoeff());
         if (currError < bestError)
         {
           bestError = currError;
@@ -5970,8 +6221,8 @@ BackpropSnapshot::finiteDifferenceRiddersJacobianOfProjectionIntoClampsMatrix(
       }
 
       // If higher order is worse by a significant factor, quit early.
-      if ((tab[iTab][iTab] - tab[iTab-1][iTab-1]).array().abs().maxCoeff() >= 
-          safeThreshold * bestError)
+      if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
+          >= safeThreshold * bestError)
       {
         break;
       }
@@ -5988,10 +6239,13 @@ BackpropSnapshot::finiteDifferenceRiddersJacobianOfProjectionIntoClampsMatrix(
 /// This computes and returns the jacobian of M^{-1}(pos, inertia) * tau by
 /// finite differences.
 Eigen::MatrixXd BackpropSnapshot::finiteDifferenceJacobianOfMinv(
-    simulation::WorldPtr world, Eigen::VectorXd tau, WithRespectTo* wrt,
+    simulation::WorldPtr world,
+    Eigen::VectorXd tau,
+    WithRespectTo* wrt,
     bool useRidders)
 {
-  if (useRidders) return finiteDifferenceRiddersJacobianOfMinv(world, tau, wrt);
+  if (useRidders)
+    return finiteDifferenceRiddersJacobianOfMinv(world, tau, wrt);
 
   RestorableSnapshot snapshot(world);
 
@@ -6043,9 +6297,9 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersJacobianOfMinv(
 
   Eigen::VectorXd originalWrt = wrt->get(world.get());
 
-  const double originalStepSize = 1e-3; 
-  const double con = 1.4, con2 = (con * con); 
-  const double safeThreshold = 2.0; 
+  const double originalStepSize = 1e-3;
+  const double con = 1.4, con2 = (con * con);
+  const double safeThreshold = 2.0;
   const int tabSize = 10;
 
   for (std::size_t i = 0; i < innerDim; i++)
@@ -6059,7 +6313,7 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersJacobianOfMinv(
     Eigen::VectorXd perturbedPlus = Eigen::VectorXd(originalWrt);
     perturbedPlus(i) += stepSize;
     wrt->set(world.get(), perturbedPlus);
-    Eigen::MatrixXd MinvTauPlus = implicitMultiplyByInvMassMatrix(world, tau); 
+    Eigen::MatrixXd MinvTauPlus = implicitMultiplyByInvMassMatrix(world, tau);
     Eigen::VectorXd perturbedMinus = Eigen::VectorXd(originalWrt);
     perturbedMinus(i) -= stepSize;
     wrt->set(world.get(), perturbedMinus);
@@ -6075,24 +6329,28 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersJacobianOfMinv(
       perturbedPlus = Eigen::VectorXd(originalWrt);
       perturbedPlus(i) += stepSize;
       wrt->set(world.get(), perturbedPlus);
-      MinvTauPlus = implicitMultiplyByInvMassMatrix(world, tau); 
+      MinvTauPlus = implicitMultiplyByInvMassMatrix(world, tau);
       perturbedMinus = Eigen::VectorXd(originalWrt);
       perturbedMinus(i) -= stepSize;
       wrt->set(world.get(), perturbedMinus);
       MinvTauMinus = implicitMultiplyByInvMassMatrix(world, tau);
-      
+
       tab[0][iTab] = (MinvTauPlus - MinvTauMinus) / (2 * stepSize);
 
       double fac = con2;
-      // Compute extrapolations of increasing orders, requiring no new evaluations
+      // Compute extrapolations of increasing orders, requiring no new
+      // evaluations
       for (int jTab = 1; jTab <= iTab; jTab++)
       {
-        tab[jTab][iTab] = (tab[jTab-1][iTab] * fac - tab[jTab-1][iTab-1]) /
-                              (fac - 1.0);
+        tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
+                          / (fac - 1.0);
         fac = con2 * fac;
-        double currError = 
-          std::max((tab[jTab][iTab] - tab[jTab-1][iTab]).array().abs().maxCoeff(),
-                   (tab[jTab][iTab] - tab[jTab-1][iTab-1]).array().abs().maxCoeff());
+        double currError = std::max(
+            (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
+            (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
+                .array()
+                .abs()
+                .maxCoeff());
         if (currError < bestError)
         {
           bestError = currError;
@@ -6101,8 +6359,8 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersJacobianOfMinv(
       }
 
       // If higher order is worse by a significant factor, quit early.
-      if ((tab[iTab][iTab] - tab[iTab-1][iTab-1]).array().abs().maxCoeff() >= 
-          safeThreshold * bestError)
+      if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
+          >= safeThreshold * bestError)
       {
         break;
       }
@@ -6121,7 +6379,8 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersJacobianOfMinv(
 Eigen::MatrixXd BackpropSnapshot::finiteDifferenceJacobianOfC(
     simulation::WorldPtr world, WithRespectTo* wrt, bool useRidders)
 {
-  if (useRidders) return finiteDifferenceRiddersJacobianOfC(world, wrt);
+  if (useRidders)
+    return finiteDifferenceRiddersJacobianOfC(world, wrt);
 
   RestorableSnapshot snapshot(world);
 
@@ -6173,9 +6432,9 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersJacobianOfC(
 
   Eigen::VectorXd originalWrt = wrt->get(world.get());
 
-  const double originalStepSize = 1e-3; 
-  const double con = 1.4, con2 = (con * con); 
-  const double safeThreshold = 2.0; 
+  const double originalStepSize = 1e-3;
+  const double con = 1.4, con2 = (con * con);
+  const double safeThreshold = 2.0;
   const int tabSize = 10;
 
   for (std::size_t i = 0; i < innerDim; i++)
@@ -6210,19 +6469,23 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersJacobianOfC(
       perturbedMinus(i) -= stepSize;
       wrt->set(world.get(), perturbedMinus);
       tauMinus = world->getCoriolisAndGravityAndExternalForces();
-      
+
       tab[0][iTab] = (tauPlus - tauMinus) / (2 * stepSize);
 
       double fac = con2;
-      // Compute extrapolations of increasing orders, requiring no new evaluations
+      // Compute extrapolations of increasing orders, requiring no new
+      // evaluations
       for (int jTab = 1; jTab <= iTab; jTab++)
       {
-        tab[jTab][iTab] = (tab[jTab-1][iTab] * fac - tab[jTab-1][iTab-1]) /
-                              (fac - 1.0);
+        tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
+                          / (fac - 1.0);
         fac = con2 * fac;
-        double currError = 
-          std::max((tab[jTab][iTab] - tab[jTab-1][iTab]).array().abs().maxCoeff(),
-                   (tab[jTab][iTab] - tab[jTab-1][iTab-1]).array().abs().maxCoeff());
+        double currError = std::max(
+            (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
+            (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
+                .array()
+                .abs()
+                .maxCoeff());
         if (currError < bestError)
         {
           bestError = currError;
@@ -6231,8 +6494,8 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersJacobianOfC(
       }
 
       // If higher order is worse by a significant factor, quit early.
-      if ((tab[iTab][iTab] - tab[iTab-1][iTab-1]).array().abs().maxCoeff() >= 
-          safeThreshold * bestError)
+      if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
+          >= safeThreshold * bestError)
       {
         break;
       }
@@ -6252,7 +6515,8 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersJacobianOfC(
 Eigen::MatrixXd BackpropSnapshot::finiteDifferenceJacobianOfMinvC(
     simulation::WorldPtr world, WithRespectTo* wrt, bool useRidders)
 {
-  if (useRidders) return finiteDifferenceRiddersJacobianOfMinvC(world, wrt);
+  if (useRidders)
+    return finiteDifferenceRiddersJacobianOfMinvC(world, wrt);
 
   RestorableSnapshot snapshot(world);
 
@@ -6294,8 +6558,8 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceJacobianOfMinvC(
 
 //==============================================================================
 /// This computes and returns the jacobian of M^{-1}(pos, inertia) * C(pos,
-/// inertia, vel) by Ridders extrapolated finite differences. This is SUPER SLOW,
-/// and is only here for testing.
+/// inertia, vel) by Ridders extrapolated finite differences. This is SUPER
+/// SLOW, and is only here for testing.
 Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersJacobianOfMinvC(
     simulation::WorldPtr world, WithRespectTo* wrt)
 {
@@ -6310,9 +6574,9 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersJacobianOfMinvC(
 
   Eigen::VectorXd originalWrt = wrt->get(world.get());
 
-  const double originalStepSize = 1e-3; 
-  const double con = 1.4, con2 = (con * con); 
-  const double safeThreshold = 2.0; 
+  const double originalStepSize = 1e-3;
+  const double con = 1.4, con2 = (con * con);
+  const double safeThreshold = 2.0;
   const int tabSize = 10;
 
   for (std::size_t i = 0; i < innerDim; i++)
@@ -6347,27 +6611,31 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersJacobianOfMinvC(
       perturbedPlus(i) += stepSize;
       wrt->set(world.get(), perturbedPlus);
       MinvCPlus = implicitMultiplyByInvMassMatrix(
-        world,
-        mPreStepTorques - world->getCoriolisAndGravityAndExternalForces());
+          world,
+          mPreStepTorques - world->getCoriolisAndGravityAndExternalForces());
       perturbedMinus = Eigen::VectorXd(originalWrt);
       perturbedMinus(i) -= stepSize;
       wrt->set(world.get(), perturbedMinus);
       MinvCMinus = implicitMultiplyByInvMassMatrix(
-        world,
-        mPreStepTorques - world->getCoriolisAndGravityAndExternalForces());
-      
+          world,
+          mPreStepTorques - world->getCoriolisAndGravityAndExternalForces());
+
       tab[0][iTab] = (MinvCPlus - MinvCMinus) / (2 * stepSize);
 
       double fac = con2;
-      // Compute extrapolations of increasing orders, requiring no new evaluations
+      // Compute extrapolations of increasing orders, requiring no new
+      // evaluations
       for (int jTab = 1; jTab <= iTab; jTab++)
       {
-        tab[jTab][iTab] = (tab[jTab-1][iTab] * fac - tab[jTab-1][iTab-1]) /
-                              (fac - 1.0);
+        tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
+                          / (fac - 1.0);
         fac = con2 * fac;
-        double currError = 
-          std::max((tab[jTab][iTab] - tab[jTab-1][iTab]).array().abs().maxCoeff(),
-                   (tab[jTab][iTab] - tab[jTab-1][iTab-1]).array().abs().maxCoeff());
+        double currError = std::max(
+            (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
+            (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
+                .array()
+                .abs()
+                .maxCoeff());
         if (currError < bestError)
         {
           bestError = currError;
@@ -6376,8 +6644,8 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersJacobianOfMinvC(
       }
 
       // If higher order is worse by a significant factor, quit early.
-      if ((tab[iTab][iTab] - tab[iTab-1][iTab-1]).array().abs().maxCoeff() >= 
-          safeThreshold * bestError)
+      if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
+          >= safeThreshold * bestError)
       {
         break;
       }
@@ -6394,7 +6662,7 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersJacobianOfMinvC(
 Eigen::MatrixXd BackpropSnapshot::finiteDifferenceJacobianOfConstraintForce(
     simulation::WorldPtr world, WithRespectTo* wrt, bool useRidders)
 {
-  if(useRidders)
+  if (useRidders)
   {
     return finiteDifferenceRiddersJacobianOfConstraintForce(world, wrt);
   }
@@ -6563,9 +6831,9 @@ BackpropSnapshot::finiteDifferenceRiddersJacobianOfConstraintForce(
 
   Eigen::MatrixXd J = Eigen::MatrixXd::Zero(f0.size(), innerDim);
 
-  double originalStepSize = 1e-4; 
-  const double con = 1.4, con2 = (con * con); 
-  const double safeThreshold = 2.0; 
+  double originalStepSize = 1e-4;
+  const double con = 1.4, con2 = (con * con);
+  const double safeThreshold = 2.0;
   const int tabSize = 10;
 
   for (std::size_t i = 0; i < innerDim; i++)
@@ -6578,7 +6846,7 @@ BackpropSnapshot::finiteDifferenceRiddersJacobianOfConstraintForce(
 
     Eigen::VectorXd perturbed = originalWrt;
 
-    // Find largest original step size which doesn't change 
+    // Find largest original step size which doesn't change
     // numClamping/numUpperBound
     while (true)
     {
@@ -6592,12 +6860,13 @@ BackpropSnapshot::finiteDifferenceRiddersJacobianOfConstraintForce(
       BackpropSnapshotPtr snapshotMinus = neural::forwardPass(world, true);
       if (snapshotPlus->getNumClamping() == f0.size()
           && snapshotPlus->getNumUpperBound() == originalPtr->getNumUpperBound()
-          && (!areResultsStandardized() || 
-              snapshotPlus->areResultsStandardized())
+          && (!areResultsStandardized()
+              || snapshotPlus->areResultsStandardized())
           && snapshotMinus->getNumClamping() == f0.size()
-          && snapshotMinus->getNumUpperBound() == originalPtr->getNumUpperBound()
-          && (!areResultsStandardized() || 
-              snapshotMinus->areResultsStandardized()))
+          && snapshotMinus->getNumUpperBound()
+                 == originalPtr->getNumUpperBound()
+          && (!areResultsStandardized()
+              || snapshotMinus->areResultsStandardized()))
       {
         fPlus = snapshotPlus->getClampingConstraintImpulses();
         fMinus = snapshotMinus->getClampingConstraintImpulses();
@@ -6612,8 +6881,7 @@ BackpropSnapshot::finiteDifferenceRiddersJacobianOfConstraintForce(
       std::cout << "WARNING: finiteDifferenceRiddersJacobianOfConstraintForce()"
                    " had to use dangerously small EPS to get a sample with the"
                    " same number of clamping contacts. Perturb["
-                << i << "]: originalStepSize=" << originalStepSize
-                << std::endl;
+                << i << "]: originalStepSize=" << originalStepSize << std::endl;
     }
 
     tab[0][0] = (fPlus - fMinus) / (2 * originalStepSize);
@@ -6632,9 +6900,10 @@ BackpropSnapshot::finiteDifferenceRiddersJacobianOfConstraintForce(
       BackpropSnapshotPtr snapshotPlus = neural::forwardPass(world, true);
       fPlus = snapshotPlus->getClampingConstraintImpulses();
       if (!(snapshotPlus->getNumClamping() == f0.size()
-            && snapshotPlus->getNumUpperBound() == originalPtr->getNumUpperBound()
-            && (!areResultsStandardized() || 
-                snapshotPlus->areResultsStandardized())))
+            && snapshotPlus->getNumUpperBound()
+                   == originalPtr->getNumUpperBound()
+            && (!areResultsStandardized()
+                || snapshotPlus->areResultsStandardized())))
       {
         assert(false && 
         "Lowering EPS in finiteDifferenceRiddersJacobianOfConstraintForce "
@@ -6646,27 +6915,32 @@ BackpropSnapshot::finiteDifferenceRiddersJacobianOfConstraintForce(
       BackpropSnapshotPtr snapshotMinus = neural::forwardPass(world, true);
       fMinus = snapshotMinus->getClampingConstraintImpulses();
       if (!(snapshotMinus->getNumClamping() == f0.size()
-            && snapshotMinus->getNumUpperBound() == originalPtr->getNumUpperBound()
-            && (!areResultsStandardized() || 
-                snapshotMinus->areResultsStandardized())))
+            && snapshotMinus->getNumUpperBound()
+                   == originalPtr->getNumUpperBound()
+            && (!areResultsStandardized()
+                || snapshotMinus->areResultsStandardized())))
       {
         assert(false && 
         "Lowering EPS in finiteDifferenceRiddersJacobianOfConstraintForce "
         "caused numClamping() or numUpperBound() to change.");
       }
-      
-      tab[0][iTab] = (fPlus - fMinus)  / (2 * stepSize);
+
+      tab[0][iTab] = (fPlus - fMinus) / (2 * stepSize);
 
       double fac = con2;
-      // Compute extrapolations of increasing orders, requiring no new evaluations
+      // Compute extrapolations of increasing orders, requiring no new
+      // evaluations
       for (int jTab = 1; jTab <= iTab; jTab++)
       {
-        tab[jTab][iTab] = (tab[jTab-1][iTab] * fac - tab[jTab-1][iTab-1]) /
-                              (fac - 1.0);
+        tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
+                          / (fac - 1.0);
         fac = con2 * fac;
-        double currError = 
-          std::max((tab[jTab][iTab] - tab[jTab-1][iTab]).array().abs().maxCoeff(),
-                   (tab[jTab][iTab] - tab[jTab-1][iTab-1]).array().abs().maxCoeff());
+        double currError = std::max(
+            (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
+            (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
+                .array()
+                .abs()
+                .maxCoeff());
         if (currError < bestError)
         {
           bestError = currError;
@@ -6675,8 +6949,8 @@ BackpropSnapshot::finiteDifferenceRiddersJacobianOfConstraintForce(
       }
 
       // If higher order is worse by a significant factor, quit early.
-      if ((tab[iTab][iTab] - tab[iTab-1][iTab-1]).array().abs().maxCoeff() >= 
-          safeThreshold * bestError)
+      if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
+          >= safeThreshold * bestError)
       {
         break;
       }
@@ -6701,7 +6975,8 @@ BackpropSnapshot::finiteDifferenceJacobianOfEstimatedConstraintForce(
 {
   if (useRidders)
   {
-    return finiteDifferenceRiddersJacobianOfEstimatedConstraintForce(world, wrt);
+    return finiteDifferenceRiddersJacobianOfEstimatedConstraintForce(
+        world, wrt);
   }
 
   RestorableSnapshot snapshot(world);
@@ -6768,9 +7043,9 @@ BackpropSnapshot::finiteDifferenceRiddersJacobianOfEstimatedConstraintForce(
   int wrtDim = wrt->dim(world.get());
   Eigen::MatrixXd J = Eigen::MatrixXd::Zero(mNumClamping, wrtDim);
 
-  const double originalStepSize = 1e-3; 
-  const double con = 1.4, con2 = (con * con); 
-  const double safeThreshold = 2.0; 
+  const double originalStepSize = 1e-3;
+  const double con = 1.4, con2 = (con * con);
+  const double safeThreshold = 2.0;
   const int tabSize = 10;
 
   Eigen::VectorXd originalWrt = wrt->get(world.get());
@@ -6817,7 +7092,8 @@ BackpropSnapshot::finiteDifferenceRiddersJacobianOfEstimatedConstraintForce(
       if (wrt == WithRespectTo::POSITION)
       {
         A_c = estimateClampingConstraintMatrixAt(world, world->getPositions());
-        A_ub = estimateUpperBoundConstraintMatrixAt(world, world->getPositions());
+        A_ub = estimateUpperBoundConstraintMatrixAt(
+            world, world->getPositions());
       }
       fPlus = estimateClampingConstraintImpulses(world, A_c, A_ub, E);
 
@@ -6827,22 +7103,27 @@ BackpropSnapshot::finiteDifferenceRiddersJacobianOfEstimatedConstraintForce(
       if (wrt == WithRespectTo::POSITION)
       {
         A_c = estimateClampingConstraintMatrixAt(world, world->getPositions());
-        A_ub = estimateUpperBoundConstraintMatrixAt(world, world->getPositions());
+        A_ub = estimateUpperBoundConstraintMatrixAt(
+            world, world->getPositions());
       }
       fMinus = estimateClampingConstraintImpulses(world, A_c, A_ub, E);
-      
+
       tab[0][iTab] = (fPlus - fMinus) / (2 * stepSize);
 
       double fac = con2;
-      // Compute extrapolations of increasing orders, requiring no new evaluations
+      // Compute extrapolations of increasing orders, requiring no new
+      // evaluations
       for (int jTab = 1; jTab <= iTab; jTab++)
       {
-        tab[jTab][iTab] = (tab[jTab-1][iTab] * fac - tab[jTab-1][iTab-1]) /
-                              (fac - 1.0);
+        tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
+                          / (fac - 1.0);
         fac = con2 * fac;
-        double currError = 
-          std::max((tab[jTab][iTab] - tab[jTab-1][iTab]).array().abs().maxCoeff(),
-                   (tab[jTab][iTab] - tab[jTab-1][iTab-1]).array().abs().maxCoeff());
+        double currError = std::max(
+            (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
+            (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
+                .array()
+                .abs()
+                .maxCoeff());
         if (currError < bestError)
         {
           bestError = currError;
@@ -6851,8 +7132,8 @@ BackpropSnapshot::finiteDifferenceRiddersJacobianOfEstimatedConstraintForce(
       }
 
       // If higher order is worse by a significant factor, quit early.
-      if ((tab[iTab][iTab] - tab[iTab-1][iTab-1]).array().abs().maxCoeff() >= 
-          safeThreshold * bestError)
+      if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
+          >= safeThreshold * bestError)
       {
         break;
       }

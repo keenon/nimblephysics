@@ -1051,6 +1051,50 @@ Eigen::Matrix6d getAdTMatrix(const Eigen::Isometry3d& T)
   return AdT;
 }
 
+//==============================================================================
+Eigen::Matrix6d AdTMatrix(const Eigen::Isometry3d& T)
+{
+  return getAdTMatrix(T);
+}
+
+//==============================================================================
+Eigen::Matrix6d AdInvTMatrix(const Eigen::Isometry3d& T)
+{
+  Eigen::Matrix6d AdT;
+
+  AdT.topRightCorner<3, 3>().setZero();
+
+  AdT.topLeftCorner<3, 3>() = T.linear().transpose();
+  AdT.bottomRightCorner<3, 3>() = AdT.topLeftCorner<3, 3>();
+
+  AdT.bottomLeftCorner<3, 3>()
+      = AdT.topLeftCorner<3, 3>() * makeSkewSymmetric(-T.translation());
+
+  return AdT;
+}
+
+//==============================================================================
+Eigen::Matrix6d dAdTMatrix(const Eigen::Isometry3d& T)
+{
+  Eigen::Matrix6d AdT;
+
+  AdT.bottomLeftCorner<3, 3>().setZero();
+
+  AdT.topLeftCorner<3, 3>() = T.linear();
+  AdT.bottomRightCorner<3, 3>() = AdT.topLeftCorner<3, 3>();
+
+  AdT.topRightCorner<3, 3>()
+      = makeSkewSymmetric(T.translation()) * T.linear();
+
+  return AdT;
+}
+
+//==============================================================================
+Eigen::Matrix6d dAdInvTMatrix(const Eigen::Isometry3d& T)
+{
+  return AdInvTMatrix(T).transpose();
+}
+
 Eigen::Vector6d AdR(const Eigen::Isometry3d& _T, const Eigen::Vector6d& _V)
 {
   //--------------------------------------------------------------------------
@@ -1163,6 +1207,25 @@ Eigen::Vector6d ad(const Eigen::Vector6d& _X, const Eigen::Vector6d& _Y)
   res.head<3>() = _X.head<3>().cross(_Y.head<3>());
   res.tail<3>()
       = _X.head<3>().cross(_Y.tail<3>()) + _X.tail<3>().cross(_Y.head<3>());
+  return res;
+}
+
+Eigen::Matrix6d adMatrix(const Eigen::Vector6d& X)
+{
+  //--------------------------------------------------------------------------
+  // ad(s) = | [w1]    0 |
+  //         | [v1] [w1] |
+  //--------------------------------------------------------------------------
+
+  Eigen::Matrix6d res;
+
+  res.topRightCorner<3, 3>().setZero();
+
+  res.topLeftCorner<3, 3>() = makeSkewSymmetric(X.head<3>());
+  res.bottomRightCorner<3, 3>() = res.topLeftCorner<3, 3>();
+
+  res.bottomLeftCorner<3, 3>() = makeSkewSymmetric(X.tail<3>());
+
   return res;
 }
 
@@ -1603,6 +1666,107 @@ Eigen::Matrix3d eulerZYZToMatrix(const Eigen::Vector3d& _angle)
   ret(2, 2) = cy;
 
   return ret;
+}
+
+//==============================================================================
+Eigen::Matrix3d so3LeftJacobian(const Eigen::Vector3d& w)
+{
+  return expMapJac(w);
+}
+
+//==============================================================================
+Eigen::Matrix3d so3RightJacobian(const Eigen::Vector3d& w)
+{
+  const double theta = w.norm();
+
+  Eigen::Matrix3d J = Eigen::Matrix3d::Zero();
+  const Eigen::Matrix3d qss = math::makeSkewSymmetric(w);
+  const Eigen::Matrix3d qss2 = qss * qss;
+
+  if (theta < EPSILON_EXPMAP_THETA)
+    J = Eigen::Matrix3d::Identity() - 0.5 * qss + (1.0 / 6.0) * qss2;
+  else
+    J = Eigen::Matrix3d::Identity() - ((1 - cos(theta)) / (theta * theta)) * qss
+        + ((theta - sin(theta)) / (theta * theta * theta)) * qss2;
+
+  return J;
+}
+
+//==============================================================================
+Eigen::Matrix3d so3LeftJacobianTimeDeriv(
+    const Eigen::Vector3d& q, const Eigen::Vector3d& dq)
+{
+  return expMapJacDot(q, dq);
+}
+
+//==============================================================================
+Eigen::Matrix3d so3RightJacobianTimeDeriv(
+    const Eigen::Vector3d& q, const Eigen::Vector3d& dq)
+{
+  const double theta = q.norm();
+
+  Eigen::Matrix3d Jdot = Eigen::Matrix3d::Zero();
+  const Eigen::Matrix3d qss = math::makeSkewSymmetric(q);
+  const Eigen::Matrix3d qss2 = qss * qss;
+  const Eigen::Matrix3d qdss = math::makeSkewSymmetric(dq);
+  const double ttdot = q.dot(dq); // theta*thetaDot
+  const double st = sin(theta);
+  const double ct = cos(theta);
+  const double t2 = theta * theta;
+  const double t3 = t2 * theta;
+  const double t4 = t3 * theta;
+  const double t5 = t4 * theta;
+
+  if (theta < EPSILON_EXPMAP_THETA)
+  {
+    Jdot = -0.5 * qdss + (1.0 / 6.0) * (qss * qdss + qdss * qss);
+    Jdot += (1.0 / 12) * ttdot * qss + (-1.0 / 60) * ttdot * qss2;
+  }
+  else
+  {
+    Jdot = -((1 - ct) / t2) * qdss
+           + ((theta - st) / t3) * (qss * qdss + qdss * qss);
+    Jdot += -((theta * st + 2 * ct - 2) / t4) * ttdot * qss
+            + ((3 * st - theta * ct - 2 * theta) / t5) * ttdot * qss2;
+  }
+
+  return Jdot;
+}
+
+//==============================================================================
+Eigen::Matrix3d so3RightJacobianTimeDerivDeriv(
+    const Eigen::Vector3d& q, const Eigen::Vector3d& dq, int index) {
+  // TODO(JS): Relplace with analytical method
+
+  const double eps = 1e-7;
+
+  Eigen::Vector3d perterb = q;
+  perterb[index] += eps;
+  const Eigen::Matrix3d mat1 = so3RightJacobianTimeDeriv(perterb, dq);
+
+  perterb = q;
+  perterb[index] -= eps;
+  const Eigen::Matrix3d mat2 = so3RightJacobianTimeDeriv(perterb, dq);
+
+  return (mat1 - mat2) / (eps * 2);
+}
+
+//==============================================================================
+Eigen::Matrix3d so3RightJacobianTimeDerivDeriv2(
+    const Eigen::Vector3d& q, const Eigen::Vector3d& dq, int index) {
+  // TODO(JS): Relplace with analytical method
+
+  const double eps = 1e-7;
+
+  Eigen::Vector3d perterb = dq;
+  perterb[index] += eps;
+  const Eigen::Matrix3d mat1 = so3RightJacobianTimeDeriv(q, perterb);
+
+  perterb = dq;
+  perterb[index] -= eps;
+  const Eigen::Matrix3d mat2 = so3RightJacobianTimeDeriv(q, perterb);
+
+  return (mat1 - mat2) / (eps * 2);
 }
 
 // R = Exp(w)

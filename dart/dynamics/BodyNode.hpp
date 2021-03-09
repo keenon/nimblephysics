@@ -1060,7 +1060,55 @@ protected:
 
   /// \}
 
-// protected:
+  //----------------------------------------------------------------------------
+  /// \{ \name Differential Dynamics
+  //----------------------------------------------------------------------------
+
+  void computeJacobianOfMForward(neural::WithRespectTo* wrt);
+  void computeJacobianOfMBackward(
+      neural::WithRespectTo* wrt, Eigen::MatrixXd& dCg);
+
+  void computeJacobianOfCForward(neural::WithRespectTo* wrt);
+  void computeJacobianOfCBackward(
+      neural::WithRespectTo* wrt,
+      Eigen::MatrixXd& dCg,
+      const Eigen::Vector3d& gravity);
+
+  void computeJacobianOfMinvXInit();
+  void computeJacobianOfMinvXBackward();
+  void computeJacobianOfMinvXForward(Eigen::MatrixXd& DinvMx_Dq);
+
+public:
+  /// This checks the intermediate analytical results of
+  /// computeJacobianOfCForward() against the finite differencing equivalents.
+  void debugJacobianOfCForward(neural::WithRespectTo* wrt);
+  /// This computes the Jacobian of spatial velocity with respect to wrt
+  Eigen::MatrixXd finiteDifferenceJacobianOfSpatialVelocity(
+      neural::WithRespectTo* wrt);
+  /// This computes the Jacobian of spatial acceleration (mCg_dV) with respect
+  /// to wrt
+  Eigen::MatrixXd finiteDifferenceJacobianOfSpatialCoriolisAcceleration(
+      neural::WithRespectTo* wrt);
+  /// This checks the intermediate analytical results of
+  /// computeJacobianOfCBackword() against the finite differencing equivalents.
+  void debugJacobianOfCBackward(neural::WithRespectTo* wrt);
+  /// This computes the Jacobian of gravity force (mFgravity) with respect to
+  /// wrt
+  Eigen::MatrixXd finiteDifferenceJacobianOfGravityForce(
+      neural::WithRespectTo* wrt);
+  /// This computes the Jacobian of body force (mCg_F) with respect to wrt
+  Eigen::MatrixXd finiteDifferenceJacobianOfBodyForce(
+      neural::WithRespectTo* wrt);
+  /// This computes the Jacobian of the ad(V, I*V) subexpression of body force
+  /// (mCg_F) with respect to wrt
+  Eigen::MatrixXd finiteDifferenceJacobianOfBodyForceAdVIV(
+      neural::WithRespectTo* wrt);
+  /// This computes the Jacobian of the I*dV subexpression of body force (mCg_F)
+  /// with respect to wrt
+  Eigen::MatrixXd finiteDifferenceJacobianOfBodyForceIdV(
+      neural::WithRespectTo* wrt);
+
+  // protected:
 public:
   //--------------------------------------------------------------------------
   // General properties
@@ -1185,6 +1233,28 @@ public:
 
   /// Cache data for arbitrary spatial value
   Eigen::Vector6d mArbitrarySpatial;
+
+  //------------------------- Differential Dynamics ----------------------------
+
+  Eigen::Vector6d mMddq_dV;
+  Eigen::Vector6d mMddq_F;
+  math::Jacobian mMddq_dV_p;
+  math::Jacobian mMddq_F_p;
+
+  /// Cache data for combined vector of the system.
+  math::Jacobian mCg_V_p;
+  math::Jacobian mCg_dV_p;
+  math::Jacobian mCg_g_p;
+  math::Jacobian mCg_F_p;
+  math::Jacobian mCg_V_ad_IV_p;
+  math::Jacobian mCg_IdV_p;
+
+  std::vector<math::Inertia> mInvM_DAI_Dq;
+  math::Jacobian mInvM_DAB_Dq;
+  std::vector<math::Inertia> mInvM_DPi_Dq;
+  math::Jacobian mInvM_Dbeta_Dq;
+
+  math::Jacobian mInvM_dV_q;
 
   //------------------------- Impulse-based Dyanmics ---------------------------
   /// Velocity change due to to external impulsive force exerted on

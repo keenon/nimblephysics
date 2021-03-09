@@ -1494,6 +1494,17 @@ ConstrainedGroupGradientMatrices::estimateClampingConstraintImpulses(
 Eigen::MatrixXd ConstrainedGroupGradientMatrices::getJacobianOfMinv(
     simulation::WorldPtr world, Eigen::VectorXd tau, WithRespectTo* wrt)
 {
+  Eigen::MatrixXd jac = Eigen::MatrixXd::Zero(mNumDOFs, mNumDOFs);
+  int cursor = 0;
+  for (int i = 0; i < mSkeletons.size(); i++)
+  {
+    auto skel = world->getSkeleton(mSkeletons[i]);
+    int dofs = skel->getNumDofs();
+    jac.block(cursor, cursor, dofs, dofs)
+        = skel->getJacobianOfMinv(tau.segment(cursor, dofs), wrt);
+    cursor += dofs;
+  }
+  return jac;
   return finiteDifferenceJacobianOfMinv(world, tau, wrt);
 }
 

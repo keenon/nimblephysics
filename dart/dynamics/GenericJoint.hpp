@@ -101,6 +101,9 @@ public:
   //----------------------------------------------------------------------------
 
   // Documentation inherited
+  bool hasDof(const DegreeOfFreedom*) const override;
+
+  // Documentation inherited
   DegreeOfFreedom* getDof(std::size_t index) override;
 
   // Documentation inherited
@@ -438,13 +441,13 @@ public:
   void integrateVelocities(double dt) override;
 
   // Documentation inherited
-  Eigen::VectorXd integratePositionsExplicit(Eigen::VectorXd pos, Eigen::VectorXd vel, double dt) override;
+  Eigen::VectorXd integratePositionsExplicit(const Eigen::VectorXd& pos, const Eigen::VectorXd& vel, double dt) override;
 
   /// Returns d/dpos of integratePositionsExplicit()
-  Eigen::MatrixXd getPosPosJacobian(Eigen::VectorXd pos, Eigen::VectorXd vel, double _dt) override;
+  Eigen::MatrixXd getPosPosJacobian(const Eigen::VectorXd& pos, const Eigen::VectorXd& vel, double _dt) override;
 
   /// Returns d/dvel of integratePositionsExplicit()
-  Eigen::MatrixXd getVelPosJacobian(Eigen::VectorXd pos, Eigen::VectorXd vel, double _dt) override;
+  Eigen::MatrixXd getVelPosJacobian(const Eigen::VectorXd& pos, const Eigen::VectorXd& vel, double _dt) override;
 
   // Documentation inherited
   Eigen::VectorXd getPositionDifferences(
@@ -757,6 +760,29 @@ protected:
 
   ///
   Vector mInvMassMatrixSegment;
+
+  //----------------------------------------------------------------------------
+  /// \{ \name Differential Dynamics
+  //----------------------------------------------------------------------------
+
+  Eigen::VectorXd getAlpha() const override;
+  math::Inertia computePi(const math::Inertia& AI) const override;
+  Eigen::Vector6d computeBeta(
+      const math::Inertia& AI, const Eigen::Vector6d& AB) const override;
+
+  void computeJacobianOfMinvX_init() override;
+  void computeJacobianOfMinvX_A(
+      const math::Inertia& AI,
+      const Eigen::Vector6d& AB) override;
+  Eigen::MatrixXd computeJacobianOfMinvX_B(
+      const math::Inertia& AI) override;
+
+  std::size_t mNumSkeletonDofs;
+  std::vector<Matrix> mInvM_Dpsi_Dq;
+  Eigen::MatrixXd mInvM_Dalpha_Dq;
+  Eigen::MatrixXd mInvM_DInvM_Dq;
+
+  /// \}
 
 private:
   //----------------------------------------------------------------------------

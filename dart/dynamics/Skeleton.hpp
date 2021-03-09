@@ -492,6 +492,9 @@ public:
   // Documentation inherited
   std::size_t getNumDofs() const override;
 
+  /// Returns the number of degrees of freedom of a subtree.
+  std::size_t getNumDofs(std::size_t treeIndex) const;
+
   // Documentation inherited
   DegreeOfFreedom* getDof(std::size_t _idx) override;
 
@@ -592,17 +595,126 @@ public:
   /// This gives the unconstrained Jacobian giving the difference in C(pos, vel)
   Eigen::MatrixXd getVelCJacobian();
 
-  /// This gives the unconstrained Jacobian of C(pos, vel)
+#ifdef DART_DEBUG_ANALYTICAL_DERIV
+  struct DiffC
+  {
+    struct Data
+    {
+      math::Jacobian S;
+
+      Eigen::Vector6d V;
+      Eigen::Vector6d dV;
+      Eigen::Vector6d F;
+      Eigen::VectorXd tau;
+
+      void init();
+    };
+
+    struct Node
+    {
+      Data data;
+      std::vector<Data> derivs;
+    };
+
+    std::vector<Node> nodes;
+
+    std::vector<Node> nodes_numeric;
+
+    void init(size_t numBodies, size_t numDofs);
+    void print();
+  };
+
+  DiffC mDiffC;
+#endif
+
+  /// This gives the unconstrained Jacobian of C(pos, vel) using the derivative
+  /// f the inverse dynamics
   Eigen::MatrixXd getJacobianOfC(neural::WithRespectTo* wrt);
+
+  /// This gives the unconstrained Jacobian of M*x using the derivative of the
+  /// inverse dynamics
+  Eigen::MatrixXd getJacobianOfM(
+      const Eigen::VectorXd& x, neural::WithRespectTo* wrt);
+
+  /// This gives the unconstrained Jacobian of M*x using the derivative of the
+  /// inverse dynamics
+  /// @warning SLOW: Only for testing
+  Eigen::MatrixXd getJacobianOfID(
+      const Eigen::VectorXd& x, neural::WithRespectTo* wrt);
+
+#ifdef DART_DEBUG_ANALYTICAL_DERIV
+  struct DiffMinv
+  {
+    struct Data
+    {
+      math::Jacobian S;
+
+      math::Inertia AI;
+      Eigen::Vector6d AB;
+      Eigen::MatrixXd psi;
+      math::Inertia Pi;
+      Eigen::VectorXd alpha;
+      Eigen::Vector6d beta;
+
+      Eigen::VectorXd ddq;
+      Eigen::Vector6d dV;
+
+      void init();
+    };
+
+    struct Node
+    {
+      Data data;
+      std::vector<Data> derivs;
+    };
+
+    std::vector<Node> nodes;
+
+    std::vector<Node> nodes_numeric;
+
+    void init(size_t numBodies, size_t numDofs);
+    void print();
+  };
+
+  DiffMinv mDiffMinv;
+#endif
 
   /// This gives the unconstrained Jacobian of M^{-1}f
   Eigen::MatrixXd getJacobianOfMinv(
-      Eigen::VectorXd f, neural::WithRespectTo* wrt);
+      const Eigen::VectorXd& f, neural::WithRespectTo* wrt, bool useID = true);
+
+  /// This gives the unconstrained Jacobian of M^{-1}f using the derivative of
+  /// the inverse dynamics.
+  /// @note This function is about 2.33 times faster than
+  /// getJacobianOfMinv_Direct() for a 10 degrees-of-freedom serial chain robot.
+  Eigen::MatrixXd getJacobianOfMinv_ID(
+      const Eigen::VectorXd& f, neural::WithRespectTo* wrt);
+
+  /// This gives the unconstrained Jacobian of M^{-1}f using the derivative of
+  /// the forward dynamics (supposedly slower than getJacobianOfMinv_ID).
+  Eigen::MatrixXd getJacobianOfMinv_Direct(
+      const Eigen::VectorXd& f, neural::WithRespectTo* wrt);
+
+  /// This gives the unconstrained Jacobian of the forward dynamics.
+  /// @warning SLOW: Only for testing
+  Eigen::MatrixXd getJacobianOfFD(neural::WithRespectTo* wrt);
+
+  Eigen::MatrixXd getJacobianOfFD_ID(neural::WithRespectTo* wrt);
+
+  /// VERY SLOW: Only for testing. This computes the unconstrained Jacobian
+  /// giving the difference in M(pos) for finite changes
+  Eigen::MatrixXd finiteDifferenceJacobianOfM(
+      const Eigen::VectorXd& f, neural::WithRespectTo* wrt, bool useRidders = false);
 
   /// VERY SLOW: Only for testing. This computes the unconstrained Jacobian
   /// giving the difference in C(pos, vel) for finite changes
   Eigen::MatrixXd finiteDifferenceJacobianOfC(
       neural::WithRespectTo* wrt, bool useRidders = false);
+
+  /// VERY SLOW: Only for testing. This computes the unconstrained Jacobian
+  /// giving the difference in M*f + C(pos, vel) for finite changes
+  Eigen::MatrixXd finiteDifferenceJacobianOfID(
+      const Eigen::VectorXd& f, neural::WithRespectTo* wrt, bool useRidders = false);
 
   /// VERY SLOW: Only for testing. This computes the unconstrained Jacobian
   /// giving the difference in C(pos, vel) for finite changes, using Ridders
@@ -611,7 +723,7 @@ public:
   /// VERY SLOW: Only for testing. This computes the unconstrained Jacobian
   /// giving the difference in M^{-1}f for finite changes
   Eigen::MatrixXd finiteDifferenceJacobianOfMinv(
-      Eigen::VectorXd f, neural::WithRespectTo* wrt, bool useRidders = false);
+      const Eigen::VectorXd& f, neural::WithRespectTo* wrt, bool useRidders = false);
 
   /// VERY SLOW: Only for testing. This computes the unconstrained Jacobian
   /// giving the difference in M^{-1}f for finite changes, using Ridders
@@ -625,6 +737,9 @@ public:
   /// VERY SLOW: Only for testing. This computes the unconstrained Jacobian
   /// giving the difference in C(pos, vel) for finite changes in vel
   Eigen::MatrixXd finiteDifferenceRiddersVelCJacobian();
+
+  Eigen::MatrixXd finiteDifferenceJacobianOfFD(
+      neural::WithRespectTo* wrt, bool useRidders = false);
 
   Eigen::VectorXd getDynamicsForces();
 
