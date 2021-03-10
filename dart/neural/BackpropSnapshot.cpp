@@ -4131,16 +4131,22 @@ BackpropSnapshot::getJacobianOfLCPConstraintMatrixClampingSubset(
         // Note: this formula only asks for the Jacobian of Minv once, instead
         // of 3 times like the below formula. That's actually a pretty big speed
         // advantage. When we can, we should use this formula instead.
-        return -Qinv * dQ(Qinv * b);
+        // return -Qinv * dQ(Qinv * b);
+        return -Qfactored.solve(dQ(Qfactored.solve(b)));
       }
       // Otherwise fall back to the exact Jacobian of the pseudo-inverse
       else
       {
         // This is the gradient of the pseudoinverse, see
         // https://mathoverflow.net/a/29511/163259
+        /*
         return -Qinv * dQ(Qinv * b)
                + Qinv * Qinv.transpose() * dQT(imprecisionMap * b)
                + (I - Qinv * Q) * dQT(Qinv.transpose() * Qinv * b);
+        */
+        return -Qfactored.solve(dQ(Qfactored.solve(b)))
+               + Qfactored.solve(Qinv.transpose() * dQT(imprecisionMap * b))
+               + (I - Qinv * Q) * dQT(Qinv.transpose() * Qfactored.solve(b));
       }
 
 #undef dQ
@@ -4186,15 +4192,21 @@ BackpropSnapshot::getJacobianOfLCPConstraintMatrixClampingSubset(
         // Note: this formula only asks for the Jacobian of Minv once, instead
         // of 3 times like the below formula. That's actually a pretty big speed
         // advantage. When we can, we should use this formula instead.
-        return -Qinv * dQ(Qinv * b);
+        // return -Qinv * dQ(Qinv * b);
+        return -Qfactored.solve(dQ(Qfactored.solve(b)));
       }
       else
       {
         // This is the gradient of the pseudoinverse, see
         // https://mathoverflow.net/a/29511/163259
+        /*
         return -Qinv * dQ(Qinv * b)
                + Qinv * Qinv.transpose() * dQT(imprecisionMap * b)
                + (I - Qinv * Q) * dQT(Qinv.transpose() * Qinv * b);
+        */
+        return -Qfactored.solve(dQ(Qfactored.solve(b)))
+               + Qfactored.solve(Qinv.transpose() * dQT(imprecisionMap * b))
+               + (I - Qinv * Q) * dQT(Qinv.transpose() * Qfactored.solve(b));
       }
 
 #undef dQ
