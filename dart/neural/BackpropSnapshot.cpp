@@ -1681,18 +1681,10 @@ void BackpropSnapshot::equalsOrCrash(
   Eigen::MatrixXd diff = (analytical - bruteForce).cwiseAbs();
   // TODO: this should be 1e-8, investigate catapult trajectory test, since
   // that's where this diverges.
-  double threshold = 1e-7;
+  double threshold = 1e-8;
   bool broken = (diff.array() > threshold).any();
   if (broken)
   {
-    /*
-    Eigen::MatrixXd fd1 = finiteDifferencePosVelJacobian(world, true);
-    Eigen::MatrixXd fd2 = finiteDifferencePosVelJacobian(world, false);
-
-    std::cout << "Ridders: " << fd1 << std::endl;
-    std::cout << "non:   : " << fd2 << std::endl;
-    */
-
     std::cout << "Found invalid matrix! " << name << std::endl;
     std::cout << "Analytical:" << std::endl << analytical << std::endl;
     std::cout << "Brute Force:" << std::endl << bruteForce << std::endl;

@@ -1098,14 +1098,25 @@ public:
       neural::WithRespectTo* wrt);
   /// This computes the Jacobian of body force (mCg_F) with respect to wrt
   Eigen::MatrixXd finiteDifferenceJacobianOfBodyForce(
+      neural::WithRespectTo* wrt, bool useRidders = true);
+  /// This computes the Jacobian of body force (mCg_F) with respect to wrt
+  Eigen::MatrixXd finiteDifferenceRiddersJacobianOfBodyForce(
       neural::WithRespectTo* wrt);
   /// This computes the Jacobian of the ad(V, I*V) subexpression of body force
   /// (mCg_F) with respect to wrt
   Eigen::MatrixXd finiteDifferenceJacobianOfBodyForceAdVIV(
-      neural::WithRespectTo* wrt);
+      neural::WithRespectTo* wrt, bool useRidders = true);
+  /// This computes the Jacobian of the ad(V, I*V) subexpression of body force
+  /// (mCg_F) with respect to wrt
+  Eigen::MatrixXd finiteDifferenceRiddersJacobianOfBodyForceAdVIV(
+      neural::WithRespectTo* wrt); 
   /// This computes the Jacobian of the I*dV subexpression of body force (mCg_F)
   /// with respect to wrt
   Eigen::MatrixXd finiteDifferenceJacobianOfBodyForceIdV(
+      neural::WithRespectTo* wrt, bool useRidders = true);
+  /// This computes the Jacobian of the I*dV subexpression of body force (mCg_F)
+  /// with respect to wrt
+  Eigen::MatrixXd finiteDifferenceRiddersJacobianOfBodyForceIdV(
       neural::WithRespectTo* wrt);
 
   // protected:

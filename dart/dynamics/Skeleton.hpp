@@ -709,7 +709,7 @@ public:
   /// VERY SLOW: Only for testing. This computes the unconstrained Jacobian
   /// giving the difference in C(pos, vel) for finite changes
   Eigen::MatrixXd finiteDifferenceJacobianOfC(
-      neural::WithRespectTo* wrt, bool useRidders = false);
+      neural::WithRespectTo* wrt, bool useRidders = true);
 
   /// VERY SLOW: Only for testing. This computes the unconstrained Jacobian
   /// giving the difference in M*f + C(pos, vel) for finite changes

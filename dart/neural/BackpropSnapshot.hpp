@@ -448,7 +448,7 @@ public:
   /// This computes and returns the jacobian of C(pos, inertia, vel) by finite
   /// differences. This is SUPER SLOW, and is only here for testing.
   Eigen::MatrixXd finiteDifferenceJacobianOfC(
-      simulation::WorldPtr world, WithRespectTo* wrt, bool useRidders = false);
+      simulation::WorldPtr world, WithRespectTo* wrt, bool useRidders = true);
 
   /// This computes and returns the jacobian of C(pos, inertia, vel) by Ridders
   /// extrapolated finite differences. This is SUPER SLOW, and is only here
