@@ -491,13 +491,16 @@ Eigen::MatrixXd MappedBackpropSnapshot::finiteDifferenceRiddersVelVelJacobian(
 
     snapshot.restore();
 
-    Eigen::VectorXd perturbedVelPlus = mMappings[mapAfter]->getVelocities(world);
-    Eigen::VectorXd perturbedVelMinus = mMappings[mapAfter]->getVelocities(world);
+    Eigen::VectorXd perturbedVelPlus
+        = mMappings[mapAfter]->getVelocities(world);
+    Eigen::VectorXd perturbedVelMinus
+        = mMappings[mapAfter]->getVelocities(world);
 
     // Find largest original step size which doesn't change numClamping
     while (true)
     {
-      bool plusGood, minusGood = false;
+      bool plusGood = false;
+      bool minusGood = false;
       // Get predicted next vel
       snapshot.restore();
       world->setPositions(mBackpropSnapshot->mPreStepPosition);
@@ -511,8 +514,10 @@ Eigen::MatrixXd MappedBackpropSnapshot::finiteDifferenceRiddersVelVelJacobian(
 
       if ((!mBackpropSnapshot->areResultsStandardized()
            || snapshotPlus->areResultsStandardized())
-          && snapshotPlus->getNumClamping() == mBackpropSnapshot->getNumClamping()
-          && snapshotPlus->getNumUpperBound() == mBackpropSnapshot->getNumUpperBound())
+          && snapshotPlus->getNumClamping()
+                 == mBackpropSnapshot->getNumClamping()
+          && snapshotPlus->getNumUpperBound()
+                 == mBackpropSnapshot->getNumUpperBound())
       {
         perturbedVelPlus = mMappings[mapAfter]->getVelocities(world);
         plusGood = true;
@@ -530,13 +535,16 @@ Eigen::MatrixXd MappedBackpropSnapshot::finiteDifferenceRiddersVelVelJacobian(
 
       if ((!mBackpropSnapshot->areResultsStandardized()
            || snapshotMinus->areResultsStandardized())
-          && snapshotMinus->getNumClamping() == mBackpropSnapshot->getNumClamping()
-          && snapshotMinus->getNumUpperBound() == mBackpropSnapshot->getNumUpperBound())
+          && snapshotMinus->getNumClamping()
+                 == mBackpropSnapshot->getNumClamping()
+          && snapshotMinus->getNumUpperBound()
+                 == mBackpropSnapshot->getNumUpperBound())
       {
         perturbedVelMinus = mMappings[mapAfter]->getVelocities(world);
         minusGood = true;
       }
-      if (plusGood && minusGood) break;
+      if (plusGood && minusGood)
+        break;
 
       originalStepSize *= 0.5;
 
@@ -564,9 +572,11 @@ Eigen::MatrixXd MappedBackpropSnapshot::finiteDifferenceRiddersVelVelJacobian(
       BackpropSnapshotPtr snapshotPlus = neural::forwardPass(world, false);
       perturbedVelPlus = mMappings[mapAfter]->getVelocities(world);
       if (!((!mBackpropSnapshot->areResultsStandardized()
-           || snapshotPlus->areResultsStandardized())
-          && snapshotPlus->getNumClamping() == mBackpropSnapshot->getNumClamping()
-          && snapshotPlus->getNumUpperBound() == mBackpropSnapshot->getNumUpperBound()))
+             || snapshotPlus->areResultsStandardized())
+            && snapshotPlus->getNumClamping()
+                   == mBackpropSnapshot->getNumClamping()
+            && snapshotPlus->getNumUpperBound()
+                   == mBackpropSnapshot->getNumUpperBound()))
       {
         assert(false && "Lowering EPS in finiteDifferenceRiddersVelVelJacobian() "
                       "caused numClamping() or numUpperBound() to change.");
@@ -583,9 +593,11 @@ Eigen::MatrixXd MappedBackpropSnapshot::finiteDifferenceRiddersVelVelJacobian(
       BackpropSnapshotPtr snapshotMinus = neural::forwardPass(world, false);
       perturbedVelMinus = mMappings[mapAfter]->getVelocities(world);
       if (!((!mBackpropSnapshot->areResultsStandardized()
-           || snapshotMinus->areResultsStandardized())
-          && snapshotMinus->getNumClamping() == mBackpropSnapshot->getNumClamping()
-          && snapshotMinus->getNumUpperBound() == mBackpropSnapshot->getNumUpperBound()))
+             || snapshotMinus->areResultsStandardized())
+            && snapshotMinus->getNumClamping()
+                   == mBackpropSnapshot->getNumClamping()
+            && snapshotMinus->getNumUpperBound()
+                   == mBackpropSnapshot->getNumUpperBound()))
       {
         assert(false && "Lowering EPS in finiteDifferenceRiddersVelVelJacobian() "
                       "caused numClamping() or numUpperBound() to change.");
@@ -777,13 +789,16 @@ Eigen::MatrixXd MappedBackpropSnapshot::finiteDifferenceRiddersPosVelJacobian(
 
     snapshot.restore();
 
-    Eigen::VectorXd perturbedVelPlus = mMappings[mapAfter]->getVelocities(world);
-    Eigen::VectorXd perturbedVelMinus = mMappings[mapAfter]->getVelocities(world);
+    Eigen::VectorXd perturbedVelPlus
+        = mMappings[mapAfter]->getVelocities(world);
+    Eigen::VectorXd perturbedVelMinus
+        = mMappings[mapAfter]->getVelocities(world);
 
     // Find largest original step size which doesn't change numClamping
     while (true)
     {
-      bool plusGood, minusGood = false;
+      bool plusGood = false;
+      bool minusGood = false;
       // Get predicted next vel
       snapshot.restore();
       world->setVelocities(mBackpropSnapshot->mPreStepVelocity);
@@ -797,8 +812,10 @@ Eigen::MatrixXd MappedBackpropSnapshot::finiteDifferenceRiddersPosVelJacobian(
 
       if ((!mBackpropSnapshot->areResultsStandardized()
            || snapshotPlus->areResultsStandardized())
-          && snapshotPlus->getNumClamping() == mBackpropSnapshot->getNumClamping()
-          && snapshotPlus->getNumUpperBound() == mBackpropSnapshot->getNumUpperBound())
+          && snapshotPlus->getNumClamping()
+                 == mBackpropSnapshot->getNumClamping()
+          && snapshotPlus->getNumUpperBound()
+                 == mBackpropSnapshot->getNumUpperBound())
       {
         perturbedVelPlus = mMappings[mapAfter]->getVelocities(world);
         plusGood = true;
@@ -816,13 +833,16 @@ Eigen::MatrixXd MappedBackpropSnapshot::finiteDifferenceRiddersPosVelJacobian(
 
       if ((!mBackpropSnapshot->areResultsStandardized()
            || snapshotMinus->areResultsStandardized())
-          && snapshotMinus->getNumClamping() == mBackpropSnapshot->getNumClamping()
-          && snapshotMinus->getNumUpperBound() == mBackpropSnapshot->getNumUpperBound())
+          && snapshotMinus->getNumClamping()
+                 == mBackpropSnapshot->getNumClamping()
+          && snapshotMinus->getNumUpperBound()
+                 == mBackpropSnapshot->getNumUpperBound())
       {
         perturbedVelMinus = mMappings[mapAfter]->getVelocities(world);
         minusGood = true;
       }
-      if (plusGood && minusGood) break;
+      if (plusGood && minusGood)
+        break;
 
       originalStepSize *= 0.5;
 
@@ -850,9 +870,11 @@ Eigen::MatrixXd MappedBackpropSnapshot::finiteDifferenceRiddersPosVelJacobian(
       BackpropSnapshotPtr snapshotPlus = neural::forwardPass(world, false);
       perturbedVelPlus = mMappings[mapAfter]->getVelocities(world);
       if (!((!mBackpropSnapshot->areResultsStandardized()
-           || snapshotPlus->areResultsStandardized())
-          && snapshotPlus->getNumClamping() == mBackpropSnapshot->getNumClamping()
-          && snapshotPlus->getNumUpperBound() == mBackpropSnapshot->getNumUpperBound()))
+             || snapshotPlus->areResultsStandardized())
+            && snapshotPlus->getNumClamping()
+                   == mBackpropSnapshot->getNumClamping()
+            && snapshotPlus->getNumUpperBound()
+                   == mBackpropSnapshot->getNumUpperBound()))
       {
         assert(false && "Lowering EPS in finiteDifferenceRiddersPosVelJacobian() "
                       "caused numClamping() or numUpperBound() to change.");
@@ -869,9 +891,11 @@ Eigen::MatrixXd MappedBackpropSnapshot::finiteDifferenceRiddersPosVelJacobian(
       BackpropSnapshotPtr snapshotMinus = neural::forwardPass(world, false);
       perturbedVelMinus = mMappings[mapAfter]->getVelocities(world);
       if (!((!mBackpropSnapshot->areResultsStandardized()
-           || snapshotMinus->areResultsStandardized())
-          && snapshotMinus->getNumClamping() == mBackpropSnapshot->getNumClamping()
-          && snapshotMinus->getNumUpperBound() == mBackpropSnapshot->getNumUpperBound()))
+             || snapshotMinus->areResultsStandardized())
+            && snapshotMinus->getNumClamping()
+                   == mBackpropSnapshot->getNumClamping()
+            && snapshotMinus->getNumUpperBound()
+                   == mBackpropSnapshot->getNumUpperBound()))
       {
         assert(false && "Lowering EPS in finiteDifferenceRiddersPosVelJacobian() "
                       "caused numClamping() or numUpperBound() to change.");
@@ -1063,13 +1087,16 @@ Eigen::MatrixXd MappedBackpropSnapshot::finiteDifferenceRiddersForceVelJacobian(
 
     snapshot.restore();
 
-    Eigen::VectorXd perturbedVelPlus = mMappings[mapAfter]->getVelocities(world);
-    Eigen::VectorXd perturbedVelMinus = mMappings[mapAfter]->getVelocities(world);
+    Eigen::VectorXd perturbedVelPlus
+        = mMappings[mapAfter]->getVelocities(world);
+    Eigen::VectorXd perturbedVelMinus
+        = mMappings[mapAfter]->getVelocities(world);
 
     // Find largest original step size which doesn't change numClamping
     while (true)
     {
-      bool plusGood, minusGood = false;
+      bool plusGood = false;
+      bool minusGood = false;
       // Get predicted next vel
       snapshot.restore();
       world->setPositions(mBackpropSnapshot->mPreStepPosition);
@@ -1083,8 +1110,10 @@ Eigen::MatrixXd MappedBackpropSnapshot::finiteDifferenceRiddersForceVelJacobian(
 
       if ((!mBackpropSnapshot->areResultsStandardized()
            || snapshotPlus->areResultsStandardized())
-          && snapshotPlus->getNumClamping() == mBackpropSnapshot->getNumClamping()
-          && snapshotPlus->getNumUpperBound() == mBackpropSnapshot->getNumUpperBound())
+          && snapshotPlus->getNumClamping()
+                 == mBackpropSnapshot->getNumClamping()
+          && snapshotPlus->getNumUpperBound()
+                 == mBackpropSnapshot->getNumUpperBound())
       {
         perturbedVelPlus = mMappings[mapAfter]->getVelocities(world);
         plusGood = true;
@@ -1102,13 +1131,16 @@ Eigen::MatrixXd MappedBackpropSnapshot::finiteDifferenceRiddersForceVelJacobian(
 
       if ((!mBackpropSnapshot->areResultsStandardized()
            || snapshotMinus->areResultsStandardized())
-          && snapshotMinus->getNumClamping() == mBackpropSnapshot->getNumClamping()
-          && snapshotMinus->getNumUpperBound() == mBackpropSnapshot->getNumUpperBound())
+          && snapshotMinus->getNumClamping()
+                 == mBackpropSnapshot->getNumClamping()
+          && snapshotMinus->getNumUpperBound()
+                 == mBackpropSnapshot->getNumUpperBound())
       {
         perturbedVelMinus = mMappings[mapAfter]->getVelocities(world);
         minusGood = true;
       }
-      if (plusGood && minusGood) break;
+      if (plusGood && minusGood)
+        break;
 
       originalStepSize *= 0.5;
 
@@ -1136,9 +1168,11 @@ Eigen::MatrixXd MappedBackpropSnapshot::finiteDifferenceRiddersForceVelJacobian(
       BackpropSnapshotPtr snapshotPlus = neural::forwardPass(world, false);
       perturbedVelPlus = mMappings[mapAfter]->getVelocities(world);
       if (!((!mBackpropSnapshot->areResultsStandardized()
-           || snapshotPlus->areResultsStandardized())
-          && snapshotPlus->getNumClamping() == mBackpropSnapshot->getNumClamping()
-          && snapshotPlus->getNumUpperBound() == mBackpropSnapshot->getNumUpperBound()))
+             || snapshotPlus->areResultsStandardized())
+            && snapshotPlus->getNumClamping()
+                   == mBackpropSnapshot->getNumClamping()
+            && snapshotPlus->getNumUpperBound()
+                   == mBackpropSnapshot->getNumUpperBound()))
       {
         assert(false && "Lowering EPS in finiteDifferenceRiddersForceVelJacobian() "
                       "caused numClamping() or numUpperBound() to change.");
@@ -1155,9 +1189,11 @@ Eigen::MatrixXd MappedBackpropSnapshot::finiteDifferenceRiddersForceVelJacobian(
       BackpropSnapshotPtr snapshotMinus = neural::forwardPass(world, false);
       perturbedVelMinus = mMappings[mapAfter]->getVelocities(world);
       if (!((!mBackpropSnapshot->areResultsStandardized()
-           || snapshotMinus->areResultsStandardized())
-          && snapshotMinus->getNumClamping() == mBackpropSnapshot->getNumClamping()
-          && snapshotMinus->getNumUpperBound() == mBackpropSnapshot->getNumUpperBound()))
+             || snapshotMinus->areResultsStandardized())
+            && snapshotMinus->getNumClamping()
+                   == mBackpropSnapshot->getNumClamping()
+            && snapshotMinus->getNumUpperBound()
+                   == mBackpropSnapshot->getNumUpperBound()))
       {
         assert(false && "Lowering EPS in finiteDifferenceRiddersForceVelJacobian() "
                       "caused numClamping() or numUpperBound() to change.");
@@ -1212,7 +1248,7 @@ Eigen::MatrixXd MappedBackpropSnapshot::finiteDifferencePosPosJacobian(
   if (useRidders)
   {
     return finiteDifferenceRiddersPosPosJacobian(
-      world, mapBefore, mapAfter, subdivisions);
+        world, mapBefore, mapAfter, subdivisions);
   }
 
   int inDim = world->getNumDofs();
@@ -1431,7 +1467,7 @@ Eigen::MatrixXd MappedBackpropSnapshot::finiteDifferenceVelPosJacobian(
   if (useRidders)
   {
     return finiteDifferenceRiddersVelPosJacobian(
-      world, mapBefore, mapAfter, subdivisions);
+        world, mapBefore, mapAfter, subdivisions);
   }
 
   int inDim = world->getNumDofs();
