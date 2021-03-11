@@ -47,6 +47,7 @@
 #include "dart/neural/ConstrainedGroupGradientMatrices.hpp"
 #include "dart/neural/DifferentiableContactConstraint.hpp"
 #include "dart/neural/IKMapping.hpp"
+#include "dart/neural/IdentityMapping.hpp"
 #include "dart/neural/MappedBackpropSnapshot.hpp"
 #include "dart/neural/Mapping.hpp"
 #include "dart/neural/NeuralConstants.hpp"
@@ -953,10 +954,8 @@ bool verifyPerturbedF_c(WorldPtr world)
       else
       {
         // TODO(JS): There is cases that the size of realQ is smaller than 6x6
-        std::cout << "Real Q:" << std::endl
-                  << realQ << std::endl;
-        std::cout << "Analytical Q:" << std::endl
-                  << analyticalQ << std::endl;
+        std::cout << "Real Q:" << std::endl << realQ << std::endl;
+        std::cout << "Analytical Q:" << std::endl << analyticalQ << std::endl;
         std::cout << "Diff Q:" << std::endl
                   << (realQ - analyticalQ) << std::endl;
         std::cout << "Diff Q range:" << std::endl
@@ -982,7 +981,8 @@ bool verifyPerturbedF_c(WorldPtr world)
           std::cout << "Analytical Qinv (top-left 6x6):" << std::endl
                     << analyticalQinv.block<6, 6>(0, 0) << std::endl;
           std::cout << "Diff Qinv (top-left 6x6):" << std::endl
-                    << (realQinv - analyticalQinv).block<6, 6>(0, 0) << std::endl;
+                    << (realQinv - analyticalQinv).block<6, 6>(0, 0)
+                    << std::endl;
           std::cout << "Diff Qinv range:" << std::endl
                     << (realQinv - analyticalQinv).minCoeff() << " to "
                     << (realQinv - analyticalQinv).maxCoeff() << std::endl;
@@ -990,8 +990,7 @@ bool verifyPerturbedF_c(WorldPtr world)
         }
         else
         {
-          std::cout << "Real Qinv:" << std::endl
-                    << realQinv << std::endl;
+          std::cout << "Real Qinv:" << std::endl << realQinv << std::endl;
           std::cout << "Analytical Qinv:" << std::endl
                     << analyticalQinv << std::endl;
           std::cout << "Diff Qinv:" << std::endl
@@ -1156,7 +1155,7 @@ bool verifyF_c(WorldPtr world)
       = classicPtr->finiteDifferenceJacobianOfClampingConstraintsTranspose(
           world, ones);
 
-  if (!equals(analyticalA_cTJac, bruteForceA_cTJac, 1e-8))
+  if (!equals(analyticalA_cTJac, bruteForceA_cTJac, 1e-9))
   {
     if (analyticalA_cTJac.cols() >= 6 && analyticalA_cTJac.rows() >= 6)
     {
@@ -1190,6 +1189,69 @@ bool verifyF_c(WorldPtr world)
   {
     Eigen::MatrixXd realQ = classicPtr->getClampingAMatrix();
     Eigen::VectorXd realB = classicPtr->getClampingConstraintRelativeVels();
+
+    Eigen::VectorXd x
+        = A_c * realQ.completeOrthogonalDecomposition().solve(realB);
+    Eigen::MatrixXd analyticalMinv_fJac
+        = classicPtr->getJacobianOfMinv(world, x, WithRespectTo::POSITION);
+    Eigen::MatrixXd bruteForceMinv_fJac
+        = classicPtr->finiteDifferenceJacobianOfMinv(
+            world, x, WithRespectTo::POSITION);
+    if (!equals(analyticalMinv_fJac, bruteForceMinv_fJac, 1e-8))
+    {
+      std::cout << "Brute force Minv*x (x constant) Jacobian:" << std::endl
+                << bruteForceMinv_fJac << std::endl;
+      std::cout << "Analytical Minv*x (x constant) Jacobian:" << std::endl
+                << analyticalMinv_fJac << std::endl;
+      std::cout << "Diff Jac ("
+                << (bruteForceMinv_fJac - analyticalMinv_fJac).minCoeff()
+                << " - "
+                << (bruteForceMinv_fJac - analyticalMinv_fJac).maxCoeff()
+                << "):" << std::endl
+                << (bruteForceMinv_fJac - analyticalMinv_fJac) << std::endl;
+
+      // The first step of the computation for Minv involves finding the Jac for
+      // M
+      Eigen::VectorXd v = classicPtr->getInvMassMatrix(world) * x;
+      Eigen::MatrixXd bruteForceMvJac = classicPtr->finiteDifferenceJacobianOfM(
+          world, v, WithRespectTo::POSITION);
+      Eigen::MatrixXd analyticalMvJac
+          = classicPtr->getJacobianOfM(world, v, WithRespectTo::POSITION);
+      if (!equals(analyticalMvJac, bruteForceMvJac, 1e-8))
+      {
+        std::cout << "Brute force M*v (v constant) Jacobian:" << std::endl
+                  << bruteForceMvJac << std::endl;
+        std::cout << "Analytical M*v (v constant) Jacobian:" << std::endl
+                  << analyticalMvJac << std::endl;
+        std::cout << "Diff Jac ("
+                  << (bruteForceMvJac - analyticalMvJac).minCoeff() << " - "
+                  << (bruteForceMvJac - analyticalMvJac).maxCoeff()
+                  << "):" << std::endl
+                  << (bruteForceMvJac - analyticalMvJac) << std::endl;
+
+        // Check accuracy on component pieces
+
+        int cursor = 0;
+        for (int i = 0; i < world->getNumSkeletons(); i++)
+        {
+          auto skel = world->getSkeleton(i);
+          int dofs = skel->getNumDofs();
+          for (int j = 0; j < skel->getNumBodyNodes(); j++)
+          {
+            skel->getBodyNode(j)->debugJacobianOfMForward(
+                WithRespectTo::POSITION, v.segment(cursor, dofs));
+          }
+          for (int j = skel->getNumBodyNodes() - 1; j >= 0; j--)
+          {
+            skel->getBodyNode(j)->debugJacobianOfMBackward(
+                WithRespectTo::POSITION,
+                v.segment(cursor, dofs),
+                bruteForceMvJac);
+          }
+          cursor += dofs;
+        }
+      }
+    }
 
     Eigen::MatrixXd bruteForceQinvBJac
         = classicPtr
@@ -3664,14 +3726,18 @@ bool verifyMappedStepJacobian(
 
   // Out Jac brute-forcing is pretty innacurate, cause it relies on repeated
   // IK with tiny differences, so we allow a larger tolerance here
-  if (!equals(bruteForce, analytical, 5e-3))  // TODO(JS): Increased from 5e-4 to 1e-2
+  if (!equals(
+          bruteForce,
+          analytical,
+          5e-3)) // TODO(JS): Increased from 5e-4 to 1e-2
   {
     std::cout << "Got a bad timestep Jac for " << getComponentName(inComponent)
               << " -> " << getComponentName(outComponent) << "!" << std::endl;
     std::cout << "Analytical: " << std::endl << analytical << std::endl;
     std::cout << "Brute Force: " << std::endl << bruteForce << std::endl;
     std::cout << "Diff: " << (analytical - bruteForce) << std::endl;
-    std::cout << "Diff range: " << (analytical - bruteForce).minCoeff() << " - " << (analytical - bruteForce).maxCoeff() << std::endl;
+    std::cout << "Diff range: " << (analytical - bruteForce).minCoeff() << " - "
+              << (analytical - bruteForce).maxCoeff() << std::endl;
 
     // Check the components of the analytical Jacobian are correct too
     snapshot.restore();
@@ -3872,6 +3938,13 @@ bool verifyIKMapping(WorldPtr world)
 {
   return verifyLinearIKMapping(world) && verifyAngularIKMapping(world)
          && verifySpatialIKMapping(world) && verifyRandomIKMapping(world);
+}
+
+bool verifyIdentityMapping(WorldPtr world)
+{
+  std::shared_ptr<IdentityMapping> mapping
+      = std::make_shared<IdentityMapping>(world);
+  return verifyMapping(world, mapping);
 }
 
 bool verifyClosestIKPosition(WorldPtr world, Eigen::VectorXd position)
@@ -6022,8 +6095,7 @@ bool verifyVelJacobianWrt(WorldPtr world, WithRespectTo* wrt)
   neural::BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
 
   MatrixXd analytical = classicPtr->getVelJacobianWrt(world, wrt);
-  MatrixXd bruteForce = 
-      classicPtr->finiteDifferenceVelJacobianWrt(world, wrt);
+  MatrixXd bruteForce = classicPtr->finiteDifferenceVelJacobianWrt(world, wrt);
 
   if (!equals(analytical, bruteForce, 5e-7))
   {
@@ -6043,8 +6115,7 @@ bool verifyPosJacobianWrt(WorldPtr world, WithRespectTo* wrt)
   neural::BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
 
   MatrixXd analytical = classicPtr->getPosJacobianWrt(world, wrt);
-  MatrixXd bruteForce = 
-      classicPtr->finiteDifferencePosJacobianWrt(world, wrt);
+  MatrixXd bruteForce = classicPtr->finiteDifferencePosJacobianWrt(world, wrt);
 
   if (!equals(analytical, bruteForce, 1e-8))
   {

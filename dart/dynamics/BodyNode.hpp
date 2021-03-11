@@ -1109,7 +1109,7 @@ public:
   /// This computes the Jacobian of the ad(V, I*V) subexpression of body force
   /// (mCg_F) with respect to wrt
   Eigen::MatrixXd finiteDifferenceRiddersJacobianOfBodyForceAdVIV(
-      neural::WithRespectTo* wrt); 
+      neural::WithRespectTo* wrt);
   /// This computes the Jacobian of the I*dV subexpression of body force (mCg_F)
   /// with respect to wrt
   Eigen::MatrixXd finiteDifferenceJacobianOfBodyForceIdV(
@@ -1117,6 +1117,29 @@ public:
   /// This computes the Jacobian of the I*dV subexpression of body force (mCg_F)
   /// with respect to wrt
   Eigen::MatrixXd finiteDifferenceRiddersJacobianOfBodyForceIdV(
+      neural::WithRespectTo* wrt);
+  /// This checks the intermediate analytical results of
+  /// computeJacobianOfMForward() against the finite differencing equivalents.
+  void debugJacobianOfMForward(neural::WithRespectTo* wrt, Eigen::VectorXd x);
+  /// This computes the Jacobian of the dV (mM_dV) as it's computed in the M
+  /// computation
+  Eigen::MatrixXd finiteDifferenceJacobianOfMassSpatialAcceleration(
+      neural::WithRespectTo* wrt, bool useRidders = true);
+  /// This computes the Jacobian of the dV (mM_dV) as it's computed in the M
+  /// computation
+  Eigen::MatrixXd finiteDifferenceRiddersJacobianOfMassSpatialAcceleration(
+      neural::WithRespectTo* wrt);
+  /// This checks the intermediate analytical results of
+  /// computeJacobianOfMBackward() against the finite differencing equivalents.
+  void debugJacobianOfMBackward(
+      neural::WithRespectTo* wrt, Eigen::VectorXd x, Eigen::MatrixXd dM);
+  /// This computes the Jacobian of the F (mM_F) as it's computed in the M
+  /// computation
+  Eigen::MatrixXd finiteDifferenceJacobianOfMassBodyForce(
+      neural::WithRespectTo* wrt, bool useRidders = true);
+  /// This computes the Jacobian of the F (mM_F) as it's computed in the M
+  /// computation
+  Eigen::MatrixXd finiteDifferenceRiddersJacobianOfMassBodyForce(
       neural::WithRespectTo* wrt);
 
   // protected:

@@ -70,10 +70,12 @@
 #include "dart/utils/sdf/sdf.hpp"
 #include "dart/utils/urdf/urdf.hpp"
 
+#include "GradientTestUtils.hpp"
 #include "TestHelpers.hpp"
+#include "TrajectoryTestUtils.hpp"
 #include "stdio.h"
 
-#define ALL_TESTS
+// #define ALL_TESTS
 
 using namespace dart;
 using namespace math;
@@ -82,6 +84,37 @@ using namespace simulation;
 using namespace neural;
 using namespace server;
 using namespace realtime;
+
+// #ifdef ALL_TESTS
+TEST(HALF_CHEETAH, BROKEN)
+{
+  // Create a world
+  std::shared_ptr<simulation::World> world
+      = dart::utils::UniversalLoader::loadWorld(
+          "dart://sample/skel/half_cheetah.skel");
+  // world->setSlowDebugResultsAgainstFD(true);
+  Eigen::VectorXd brokenPos = Eigen::VectorXd::Zero(9);
+  brokenPos << -5.15992, -0.210083, 8.27897, -0.00318367, 0.513758, -0.0286844,
+      0.587853, 0.0282165, 0.486934;
+  Eigen::VectorXd brokenVel = Eigen::VectorXd::Zero(9);
+  brokenVel << -2.22286, -6.07728, 0.890211, 9.22385, 3.00743, 1.34837, 9.61029,
+      -2.97553, 9.96726;
+  Eigen::VectorXd brokenForce = Eigen::VectorXd::Zero(9);
+  brokenForce << 0, 0, 3.15531, -8.41413, -6.37498, -5.82503, -7.75906, 9.98554,
+      7.19786;
+  Eigen::VectorXd brokenLCPCache = Eigen::VectorXd::Zero(0);
+  world->setPositions(brokenPos);
+  world->setVelocities(brokenVel);
+  world->setExternalForces(brokenForce);
+  world->setCachedLCPSolution(brokenLCPCache);
+
+  EXPECT_TRUE(verifyAnalyticalJacobians(world));
+  EXPECT_TRUE(verifyVelGradients(world, brokenVel));
+  EXPECT_TRUE(verifyPosVelJacobian(world, brokenVel));
+  EXPECT_TRUE(verifyF_c(world));
+  EXPECT_TRUE(verifyIdentityMapping(world));
+}
+// #endif
 
 #ifdef ALL_TESTS
 TEST(HALF_CHEETAH, FULL_TEST)
@@ -96,6 +129,13 @@ TEST(HALF_CHEETAH, FULL_TEST)
   {
     std::cout << "DOF: " << dof->getName() << std::endl;
   }
+
+  Eigen::VectorXd forceLimits
+      = Eigen::VectorXd::Ones(world->getNumDofs()) * 100;
+  forceLimits(0) = 0;
+  forceLimits(1) = 0;
+  world->setExternalForceUpperLimits(forceLimits);
+  world->setExternalForceLowerLimits(-1 * forceLimits);
 
   GUIWebsocketServer server;
   server.serve(8070);
@@ -128,15 +168,15 @@ TEST(HALF_CHEETAH, FULL_TEST)
         const Eigen::VectorXd lastPos
             = rollout->getPosesConst().col(rollout->getPosesConst().cols() - 1);
 
-        double diffX = lastPos(3) - target_x;
-        double diffY = lastPos(4) - target_y;
+        double diffX = lastPos(0) - target_x;
+        double diffY = lastPos(1) - target_y;
 
         return diffX * diffX + diffY * diffY;
       });
 
   std::shared_ptr<trajectory::MultiShot> trajectory
-      = std::make_shared<trajectory::MultiShot>(world, loss, 100, 10, false);
-  trajectory->setParallelOperationsEnabled(true);
+      = std::make_shared<trajectory::MultiShot>(world, loss, 400, 10, false);
+  trajectory->setParallelOperationsEnabled(false);
 
   trajectory::IPOptOptimizer optimizer;
   optimizer.setLBFGSHistoryLength(5);
@@ -160,11 +200,34 @@ TEST(HALF_CHEETAH, FULL_TEST)
   std::shared_ptr<trajectory::Solution> result
       = optimizer.optimize(trajectory.get());
 
-  /*
+  int i = 0;
+  const Eigen::MatrixXd poses
+      = result->getStep(result->getNumSteps() - 1).rollout->getPosesConst();
+  const Eigen::MatrixXd vels
+      = result->getStep(result->getNumSteps() - 1).rollout->getVelsConst();
+
+  server.renderTrajectoryLines(world, poses);
+
+  Ticker ticker(0.1);
+  ticker.registerTickListener([&](long /* time */) {
+    world->setPositions(poses.col(i));
+    // world->setVelocities(vels.col(i));
+
+    i++;
+    if (i >= poses.cols())
+    {
+      i = 0;
+    }
+    // world->step();
+    server.renderWorld(world);
+  });
+
+  server.registerConnectionListener([&]() { ticker.start(); });
+
   while (server.isServing())
   {
+    // spin
   }
-  */
 
   /*
   Eigen::VectorXd forceLimits = Eigen::VectorXd::Ones(atlas->getNumDofs()) * 30;

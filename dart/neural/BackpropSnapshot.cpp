@@ -1732,11 +1732,34 @@ void BackpropSnapshot::diagnoseSubJacobianErrors(
   Eigen::VectorXd f_c = getClampingConstraintImpulses();
   double dt = world->getTimeStep();
 
-  Eigen::MatrixXd dM
-      = getJacobianOfMinv(world, dt * (tau - C) + A_c_ub_E * f_c, wrt);
-  Eigen::MatrixXd dMFd = finiteDifferenceJacobianOfMinv(
-      world, dt * (tau - C) + A_c_ub_E * f_c, wrt);
+  Eigen::VectorXd x = dt * (tau - C) + A_c_ub_E * f_c;
+  Eigen::MatrixXd dM = getJacobianOfMinv(world, x, wrt);
+  Eigen::MatrixXd dMFd = finiteDifferenceJacobianOfMinv(world, x, wrt);
   compare(dM, dMFd, threshold, "dMinv");
+  if (((dM - dMFd).cwiseAbs().array() > threshold).any())
+  {
+    Eigen::VectorXd y = getInvMassMatrix(world) * x;
+    // Internally, the dMinv calculation uses Minv*dM*Minv. So we need to check
+    // the accuracy of dM.
+    Eigen::MatrixXd dMyFd = finiteDifferenceJacobianOfM(world, y, wrt);
+    int cursor = 0;
+    for (int i = 0; i < world->getNumSkeletons(); i++)
+    {
+      auto skel = world->getSkeleton(i);
+      int dofs = skel->getNumDofs();
+      for (int j = 0; j < skel->getNumBodyNodes(); j++)
+      {
+        skel->getBodyNode(j)->debugJacobianOfMForward(
+            WithRespectTo::POSITION, y.segment(cursor, dofs));
+      }
+      for (int j = skel->getNumBodyNodes() - 1; j >= 0; j--)
+      {
+        skel->getBodyNode(j)->debugJacobianOfMBackward(
+            WithRespectTo::POSITION, y.segment(cursor, dofs), dMyFd);
+      }
+      cursor += dofs;
+    }
+  }
 
   Eigen::MatrixXd Minv = world->getInvMassMatrix();
 
@@ -5033,9 +5056,6 @@ Eigen::MatrixXd BackpropSnapshot::getJacobianOfMinv(
       || wrt == neural::WithRespectTo::VELOCITY
       || wrt == neural::WithRespectTo::FORCE)
   {
-    // TODO(JS): Is this correct?
-    // Eigen::MatrixXd jac
-    //     = Eigen::MatrixXd::Zero(world->getNumDofs(), world->getNumDofs());
     Eigen::MatrixXd jac
         = Eigen::MatrixXd::Zero(world->getNumDofs(), wrt->dim(world.get()));
     int cursor = 0;
@@ -6339,6 +6359,164 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersJacobianOfMinv(
       MinvTauMinus = implicitMultiplyByInvMassMatrix(world, tau);
 
       tab[0][iTab] = (MinvTauPlus - MinvTauMinus) / (2 * stepSize);
+
+      double fac = con2;
+      // Compute extrapolations of increasing orders, requiring no new
+      // evaluations
+      for (int jTab = 1; jTab <= iTab; jTab++)
+      {
+        tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
+                          / (fac - 1.0);
+        fac = con2 * fac;
+        double currError = std::max(
+            (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
+            (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
+                .array()
+                .abs()
+                .maxCoeff());
+        if (currError < bestError)
+        {
+          bestError = currError;
+          J.col(i).noalias() = tab[jTab][iTab];
+        }
+      }
+
+      // If higher order is worse by a significant factor, quit early.
+      if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
+          >= safeThreshold * bestError)
+      {
+        break;
+      }
+    }
+  }
+
+  wrt->set(world.get(), originalWrt);
+  snapshot.restore();
+
+  return J;
+}
+
+//==============================================================================
+/// This returns the jacobian of M(pos, inertia) * v, holding
+/// everything constant except the value of WithRespectTo
+Eigen::MatrixXd BackpropSnapshot::getJacobianOfM(
+    simulation::WorldPtr world, Eigen::VectorXd v, WithRespectTo* wrt)
+{
+  Eigen::MatrixXd J
+      = Eigen::MatrixXd::Zero(world->getNumDofs(), wrt->dim(world.get()));
+  int dofCursor = 0;
+  int wrtCursor = 0;
+  for (int i = 0; i < world->getNumSkeletons(); i++)
+  {
+    auto skel = world->getSkeleton(i);
+    int dofs = skel->getNumDofs();
+    int wrts = wrt->dim(skel.get());
+    J.block(dofCursor, wrtCursor, dofs, wrts)
+        = skel->getJacobianOfM(v.segment(dofCursor, dofs), wrt);
+    dofCursor += dofs;
+    wrtCursor += wrts;
+  }
+  return J;
+}
+
+//==============================================================================
+/// This computes and returns the jacobian of M(pos, inertia) * v by
+/// finite differences. This is SUPER SLOW, and is only here for testing.
+Eigen::MatrixXd BackpropSnapshot::finiteDifferenceJacobianOfM(
+    simulation::WorldPtr world,
+    Eigen::VectorXd v,
+    WithRespectTo* wrt,
+    bool useRidders)
+{
+  if (useRidders)
+    return finiteDifferenceRiddersJacobianOfM(world, v, wrt);
+
+  RestorableSnapshot snapshot(world);
+
+  std::size_t wrtDim = wrt->dim(world.get());
+
+  Eigen::MatrixXd result = Eigen::MatrixXd::Zero(world->getNumDofs(), wrtDim);
+
+  Eigen::VectorXd before = wrt->get(world.get());
+
+  const double EPS = 5e-7;
+
+  for (std::size_t i = 0; i < wrtDim; i++)
+  {
+    Eigen::VectorXd perturbed = before;
+    perturbed(i) += EPS;
+    wrt->set(world.get(), perturbed);
+    Eigen::MatrixXd newVPlus = world->getMassMatrix() * v;
+    perturbed = before;
+    perturbed(i) -= EPS;
+    wrt->set(world.get(), perturbed);
+    Eigen::MatrixXd newVMinus = world->getMassMatrix() * v;
+    Eigen::VectorXd diff = newVPlus - newVMinus;
+    result.col(i) = diff / (2 * EPS);
+  }
+
+  wrt->set(world.get(), before);
+  snapshot.restore();
+
+  return result;
+}
+
+//==============================================================================
+/// This computes and returns the jacobian of M(pos, inertia) * v by
+/// Ridders extrapolated finite differences. This is SUPER SLOW, and is
+/// only here for testing.
+Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersJacobianOfM(
+    simulation::WorldPtr world, Eigen::VectorXd v, WithRespectTo* wrt)
+{
+  RestorableSnapshot snapshot(world);
+
+  std::size_t wrtDim = wrt->dim(world.get());
+
+  // These are predicted contact forces at the clamping contacts
+  Eigen::MatrixXd J = Eigen::MatrixXd::Zero(world->getNumDofs(), wrtDim);
+
+  Eigen::VectorXd originalWrt = wrt->get(world.get());
+
+  const double originalStepSize = 1e-3;
+  const double con = 1.4, con2 = (con * con);
+  const double safeThreshold = 2.0;
+  const int tabSize = 10;
+
+  for (std::size_t i = 0; i < wrtDim; i++)
+  {
+    double stepSize = originalStepSize;
+    double bestError = std::numeric_limits<double>::max();
+
+    // Neville tableau of finite difference results
+    std::array<std::array<Eigen::VectorXd, tabSize>, tabSize> tab;
+
+    Eigen::VectorXd perturbedPlus = Eigen::VectorXd(originalWrt);
+    perturbedPlus(i) += stepSize;
+    wrt->set(world.get(), perturbedPlus);
+    Eigen::MatrixXd plus = world->getMassMatrix() * v;
+
+    Eigen::VectorXd perturbedMinus = Eigen::VectorXd(originalWrt);
+    perturbedMinus(i) -= stepSize;
+    wrt->set(world.get(), perturbedMinus);
+    Eigen::MatrixXd minus = world->getMassMatrix() * v;
+
+    tab[0][0] = (plus - minus) / (2 * stepSize);
+
+    // Iterate over smaller and smaller step sizes
+    for (int iTab = 1; iTab < tabSize; iTab++)
+    {
+      stepSize /= con;
+
+      perturbedPlus = Eigen::VectorXd(originalWrt);
+      perturbedPlus(i) += stepSize;
+      wrt->set(world.get(), perturbedPlus);
+      plus = world->getMassMatrix() * v;
+      perturbedMinus = Eigen::VectorXd(originalWrt);
+      perturbedMinus(i) -= stepSize;
+      wrt->set(world.get(), perturbedMinus);
+      minus = world->getMassMatrix() * v;
+
+      tab[0][iTab] = (plus - minus) / (2 * stepSize);
 
       double fac = con2;
       // Compute extrapolations of increasing orders, requiring no new

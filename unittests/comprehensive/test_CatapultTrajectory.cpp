@@ -390,6 +390,69 @@ std::shared_ptr<simulation::World> createWorld(double target_x, double target_y)
   return world;
 }
 
+// #ifdef ALL_TESTS
+TEST(CATAPULT_EXAMPLE, TESTS)
+{
+  double target_x = 2.2;
+  double target_y = 2.2;
+
+  // Create a world
+  std::shared_ptr<simulation::World> world = createWorld(target_x, target_y);
+
+  ///
+  // This fails on pos-vel being too far off
+  ///
+  Eigen::VectorXd brokenPos = Eigen::VectorXd::Zero(5);
+  brokenPos << 8.86733, 1.2779, 3.069, 1.53746, 2.58821;
+  Eigen::VectorXd brokenVel = Eigen::VectorXd::Zero(5);
+  brokenVel << 1.15962, 0.884694, 5.2078, 5.22604, 1.34678;
+  Eigen::VectorXd brokenForce = Eigen::VectorXd::Zero(5);
+  brokenForce << 0, 0, -6.52332, -4.70401, 2.88616;
+  Eigen::VectorXd brokenLCPCache = Eigen::VectorXd::Zero(6);
+  brokenLCPCache << 0.079406, 0.0704275, 0, 0.079406, 0.0704275, 0;
+  world->setPositions(brokenPos);
+  world->setVelocities(brokenVel);
+  world->setExternalForces(brokenForce);
+  world->setCachedLCPSolution(brokenLCPCache);
+
+  EXPECT_TRUE(verifyAnalyticalJacobians(world));
+  EXPECT_TRUE(verifyVelGradients(world, brokenVel));
+  EXPECT_TRUE(verifyPosVelJacobian(world, brokenVel));
+  EXPECT_TRUE(verifyF_c(world));
+  EXPECT_TRUE(verifyIdentityMapping(world));
+
+  /*
+  GUIWebsocketServer server;
+  server.serve(8070);
+  server.renderWorld(world);
+
+  Eigen::VectorXd animatePos = brokenPos;
+  int i = 0;
+  Ticker ticker(0.01);
+  ticker.registerTickListener([&](long time) {
+    world->setPositions(animatePos);
+    animatePos += brokenVel * 0.001;
+
+    i++;
+    if (i >= 100)
+    {
+      animatePos = brokenPos;
+      i = 0;
+    }
+    // world->step();
+    server.renderWorld(world);
+  });
+
+  server.registerConnectionListener([&]() { ticker.start(); });
+  server.blockWhileServing();
+
+  std::shared_ptr<neural::BackpropSnapshot> snapshot
+      = neural::forwardPass(world, true);
+  EXPECT_TRUE(snapshot->areResultsStandardized());
+  */
+}
+// #endif
+
 #ifdef ALL_TESTS
 TEST(CATAPULT_EXAMPLE, BROKEN_POINT)
 {
@@ -521,7 +584,7 @@ TEST(CATAPULT_EXAMPLE, BROKEN_POINT)
 }
 #endif
 
-// #ifdef ALL_TESTS
+#ifdef ALL_TESTS
 TEST(CATAPULT_EXAMPLE, FULL_TEST)
 {
   double target_x = 2.2;
@@ -637,4 +700,4 @@ TEST(CATAPULT_EXAMPLE, FULL_TEST)
   }
   */
 }
-// #endif
+#endif

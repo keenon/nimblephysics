@@ -33,21 +33,21 @@
 #include "dart/dynamics/Skeleton.hpp"
 
 #include <algorithm>
+#include <array>
 #include <queue>
 #include <string>
 #include <vector>
-#include <array>
 
 #include "dart/common/Console.hpp"
 #include "dart/common/Deprecated.hpp"
 #include "dart/common/StlHelpers.hpp"
+#include "dart/dynamics/BallJoint.hpp"
 #include "dart/dynamics/BodyNode.hpp"
 #include "dart/dynamics/DegreeOfFreedom.hpp"
 #include "dart/dynamics/EndEffector.hpp"
+#include "dart/dynamics/FreeJoint.hpp"
 #include "dart/dynamics/InverseKinematics.hpp"
 #include "dart/dynamics/Joint.hpp"
-#include "dart/dynamics/FreeJoint.hpp"
-#include "dart/dynamics/BallJoint.hpp"
 #include "dart/dynamics/Marker.hpp"
 #include "dart/dynamics/PointMass.hpp"
 #include "dart/dynamics/ShapeNode.hpp"
@@ -1524,9 +1524,11 @@ bool Skeleton::checkIndexingConsistency() const
 /// This is computed in bulk, and cached in the skeleton.
 const Eigen::MatrixXi& Skeleton::getParentMap()
 {
-  if (mSkelCache.mDirty.mParentMap) {
+  if (mSkelCache.mDirty.mParentMap)
+  {
     mSkelCache.mParentMap = Eigen::MatrixXi::Zero(getNumDofs(), getNumDofs());
-    for (int row = 0; row < getNumDofs(); row++) {
+    for (int row = 0; row < getNumDofs(); row++)
+    {
       /*
       dynamics::DegreeOfFreedom* rowDof = getDof(row);
       for (int col = 0; col < getNumDofs(); col++) {
@@ -1540,16 +1542,19 @@ const Eigen::MatrixXi& Skeleton::getParentMap()
       dynamics::Joint* joint = dof->getJoint();
       std::vector<dynamics::Joint*> visit;
       visit.push_back(joint);
-      while (visit.size() > 0) {
+      while (visit.size() > 0)
+      {
         dynamics::Joint* cursor = visit.back();
         visit.pop_back();
 
         dynamics::BodyNode* cursorChildBodyNode = cursor->getChildBodyNode();
-        for (int i = 0; i < cursorChildBodyNode->getNumChildJoints(); i++) {
+        for (int i = 0; i < cursorChildBodyNode->getNumChildJoints(); i++)
+        {
           dynamics::Joint* childJoint = cursorChildBodyNode->getChildJoint(i);
           visit.push_back(childJoint);
 
-          for (int j = 0; j < childJoint->getNumDofs(); j++) {
+          for (int j = 0; j < childJoint->getNumDofs(); j++)
+          {
             mSkelCache.mParentMap(row, childJoint->getIndexInSkeleton(j)) = 1;
           }
         }
@@ -1633,12 +1638,17 @@ Eigen::MatrixXd Skeleton::getJacobianOfC(neural::WithRespectTo* wrt)
   {
     return DCg_Dp;
   }
-  else if (wrt == neural::WithRespectTo::POSITION || wrt == neural::WithRespectTo::VELOCITY)
+  else if (
+      wrt == neural::WithRespectTo::POSITION
+      || wrt == neural::WithRespectTo::VELOCITY)
   {
     // TODO(JS): Remove this once FreeJoint is fixed
-    for (auto i = 0u; i < getNumJoints(); ++i) {
+    for (auto i = 0u; i < getNumJoints(); ++i)
+    {
       Joint* joint = getJoint(i);
-      if (joint->getType() == BallJoint::getStaticType() || joint->getType() == FreeJoint::getStaticType()) {
+      if (joint->getType() == BallJoint::getStaticType()
+          || joint->getType() == FreeJoint::getStaticType())
+      {
         return finiteDifferenceJacobianOfC(wrt);
       }
     }
@@ -1654,11 +1664,11 @@ Eigen::MatrixXd Skeleton::getJacobianOfC(neural::WithRespectTo* wrt)
       bodyNode->computeJacobianOfCForward(wrt);
     }
 
-    for (auto it = bodyNodes.rbegin(); it != bodyNodes.rend(); ++it)
+    for (int i = bodyNodes.size() - 1; i >= 0; i--)
     {
-      BodyNode* bodyNode = *it;
+      BodyNode* bodyNode = bodyNodes[i];
       bodyNode->computeJacobianOfCBackward(
-            wrt, DCg_Dp, mAspectProperties.mGravity);
+          wrt, DCg_Dp, mAspectProperties.mGravity);
     }
 
 #ifdef DART_DEBUG_ANALYTICAL_DERIV
@@ -1685,8 +1695,19 @@ Eigen::MatrixXd Skeleton::getJacobianOfM(
   {
     return DM_Dq;
   }
-  else if (wrt == neural::WithRespectTo::FORCE)
+  else if (wrt == neural::WithRespectTo::POSITION)
   {
+    // TODO(JS): Remove this once FreeJoint is fixed
+    for (auto i = 0u; i < getNumJoints(); ++i)
+    {
+      Joint* joint = getJoint(i);
+      if (joint->getType() == BallJoint::getStaticType()
+          || joint->getType() == FreeJoint::getStaticType())
+      {
+        return finiteDifferenceJacobianOfM(x, wrt);
+      }
+    }
+
     const auto old_ddq = getAccelerations();
     setAccelerations(x);
 
@@ -1697,9 +1718,9 @@ Eigen::MatrixXd Skeleton::getJacobianOfM(
       bodyNode->computeJacobianOfMForward(wrt);
     }
 
-    for (auto it = bodyNodes.rbegin(); it != bodyNodes.rend(); ++it)
+    for (int i = bodyNodes.size() - 1; i >= 0; i--)
     {
-      BodyNode* bodyNode = *it;
+      BodyNode* bodyNode = bodyNodes[i];
       bodyNode->computeJacobianOfMBackward(wrt, DM_Dq);
     }
 
@@ -1784,16 +1805,17 @@ void Skeleton::DiffMinv::print()
     const auto& node_numeric = nodes_numeric[static_cast<size_t>(i)];
     // const auto& data_numeric = node_numeric.data;
 
-    std::cout << "<<< i: " << i+1 << ">>>\n\n";
+    std::cout << "<<< i: " << i + 1 << ">>>\n\n";
 
-    std::cout << "S[" << i+1 << "]    : " << data.S.transpose() << "\n";
-//    std::cout << "AI[" << i+1 << "]:\n" << data.AI << "\n";
-    std::cout << "AIS[" << i+1 << "]  : " << (data.AI*data.S).transpose() << "\n";
-    std::cout << "AB[" << i+1 << "]   : " << data.AB.transpose() << "\n";
-    std::cout << "psi[" << i+1 << "]  : " << data.psi << "\n";
-//    std::cout << "Pi[" << i+1 << "]:\n" << data.Pi << "\n";
-    std::cout << "alpha[" << i+1 << "]: " << data.alpha.transpose() << "\n";
-    std::cout << "beta[" << i+1 << "] : " << data.beta.transpose() << "\n";
+    std::cout << "S[" << i + 1 << "]    : " << data.S.transpose() << "\n";
+    //    std::cout << "AI[" << i+1 << "]:\n" << data.AI << "\n";
+    std::cout << "AIS[" << i + 1 << "]  : " << (data.AI * data.S).transpose()
+              << "\n";
+    std::cout << "AB[" << i + 1 << "]   : " << data.AB.transpose() << "\n";
+    std::cout << "psi[" << i + 1 << "]  : " << data.psi << "\n";
+    //    std::cout << "Pi[" << i+1 << "]:\n" << data.Pi << "\n";
+    std::cout << "alpha[" << i + 1 << "]: " << data.alpha.transpose() << "\n";
+    std::cout << "beta[" << i + 1 << "] : " << data.beta.transpose() << "\n";
 
     std::cout << "\n";
 
@@ -1801,17 +1823,28 @@ void Skeleton::DiffMinv::print()
     {
       const auto& deriv = node.derivs[j];
       const auto& deriv_numeric = node_numeric.derivs[j];
-      std::cout << "DAI[" << i+1 << "," << j+1 << "]   :\n" << deriv.AI << "\n";
-      std::cout << "DAI_num[" << i+1 << "," << j+1 << "]   :\n" << deriv_numeric.AI << "\n";
-      std::cout << "DAB[" << i+1 << "," << j+1 << "]   : " << deriv.AB.transpose() << "\n";
-      std::cout << "DAB_num[" << i+1 << "," << j+1 << "]   : " << deriv_numeric.AB.transpose() << "\n";
-      std::cout << "Dpsi[" << i+1 << "," << j+1 << "]  : " << deriv.psi << "\n";
-      std::cout << "Dpsi_num[" << i+1 << "," << j+1 << "]  : " << deriv_numeric.psi << "\n";
-      std::cout << "DPi[" << i+1 << "," << j+1 << "]   :\n" << deriv.Pi << "\n";
-      std::cout << "Dalpha[" << i+1 << "," << j+1 << "]: " << deriv.alpha.transpose() << "\n";
-      std::cout << "Dalpha_num[" << i+1 << "," << j+1 << "]: " << deriv_numeric.alpha.transpose() << "\n";
-      std::cout << "Dbeta[" << i+1 << "," << j+1 << "] : " << deriv.beta.transpose() << "\n";
-      std::cout << "Dbeta_num[" << i+1 << "," << j+1 << "] : " << deriv_numeric.beta.transpose() << "\n";
+      std::cout << "DAI[" << i + 1 << "," << j + 1 << "]   :\n"
+                << deriv.AI << "\n";
+      std::cout << "DAI_num[" << i + 1 << "," << j + 1 << "]   :\n"
+                << deriv_numeric.AI << "\n";
+      std::cout << "DAB[" << i + 1 << "," << j + 1
+                << "]   : " << deriv.AB.transpose() << "\n";
+      std::cout << "DAB_num[" << i + 1 << "," << j + 1
+                << "]   : " << deriv_numeric.AB.transpose() << "\n";
+      std::cout << "Dpsi[" << i + 1 << "," << j + 1 << "]  : " << deriv.psi
+                << "\n";
+      std::cout << "Dpsi_num[" << i + 1 << "," << j + 1
+                << "]  : " << deriv_numeric.psi << "\n";
+      std::cout << "DPi[" << i + 1 << "," << j + 1 << "]   :\n"
+                << deriv.Pi << "\n";
+      std::cout << "Dalpha[" << i + 1 << "," << j + 1
+                << "]: " << deriv.alpha.transpose() << "\n";
+      std::cout << "Dalpha_num[" << i + 1 << "," << j + 1
+                << "]: " << deriv_numeric.alpha.transpose() << "\n";
+      std::cout << "Dbeta[" << i + 1 << "," << j + 1
+                << "] : " << deriv.beta.transpose() << "\n";
+      std::cout << "Dbeta_num[" << i + 1 << "," << j + 1
+                << "] : " << deriv_numeric.beta.transpose() << "\n";
       std::cout << "\n";
     }
 
@@ -1825,15 +1858,15 @@ void Skeleton::DiffMinv::print()
     const auto& node = nodes[i];
     const auto& data = node.data;
 
-    std::cout << "<<< i: " << i+1 << ">>>\n\n";
+    std::cout << "<<< i: " << i + 1 << ">>>\n\n";
 
-    std::cout << "ddq[" << i+1 << "]:" << data.ddq.transpose() << "\n";
-    std::cout << "dV[" << i+1 << "]:" << data.dV.transpose() << "\n";
+    std::cout << "ddq[" << i + 1 << "]:" << data.ddq.transpose() << "\n";
+    std::cout << "dV[" << i + 1 << "]:" << data.dV.transpose() << "\n";
 
-//    for (auto j = 0u; j < node.derivs.size(); ++j)
-//    {
-//      const auto& deriv = node.derivs[j];
-//    }
+    //    for (auto j = 0u; j < node.derivs.size(); ++j)
+    //    {
+    //      const auto& deriv = node.derivs[j];
+    //    }
   }
 
   std::cout << std::endl << std::endl;
@@ -1856,6 +1889,10 @@ Eigen::MatrixXd Skeleton::getJacobianOfMinv(
 Eigen::MatrixXd Skeleton::getJacobianOfMinv_ID(
     const Eigen::VectorXd& f, neural::WithRespectTo* wrt)
 {
+  if (getNumDofs() == 0)
+  {
+    return Eigen::MatrixXd::Zero(0, wrt->dim(this));
+  }
   if (wrt == neural::WithRespectTo::VELOCITY
       || wrt == neural::WithRespectTo::FORCE)
   {
@@ -1865,9 +1902,12 @@ Eigen::MatrixXd Skeleton::getJacobianOfMinv_ID(
   else if (wrt == neural::WithRespectTo::POSITION)
   {
     // TODO(JS): Remove this once FreeJoint is fixed
-    for (auto i = 0u; i < getNumJoints(); ++i) {
+    for (auto i = 0u; i < getNumJoints(); ++i)
+    {
       Joint* joint = getJoint(i);
-      if (joint->getType() == BallJoint::getStaticType() || joint->getType() == FreeJoint::getStaticType()) {
+      if (joint->getType() == BallJoint::getStaticType()
+          || joint->getType() == FreeJoint::getStaticType())
+      {
         return finiteDifferenceJacobianOfMinv(f, wrt);
       }
     }
@@ -1897,9 +1937,12 @@ Eigen::MatrixXd Skeleton::getJacobianOfMinv_Direct(
   else if (wrt == neural::WithRespectTo::POSITION)
   {
     // TODO(JS): Remove this once FreeJoint is fixed
-    for (auto i = 0u; i < getNumJoints(); ++i) {
+    for (auto i = 0u; i < getNumJoints(); ++i)
+    {
       Joint* joint = getJoint(i);
-      if (joint->getType() == BallJoint::getStaticType() || joint->getType() == FreeJoint::getStaticType()) {
+      if (joint->getType() == BallJoint::getStaticType()
+          || joint->getType() == FreeJoint::getStaticType())
+      {
         return finiteDifferenceJacobianOfMinv(f, wrt);
       }
     }
@@ -2043,11 +2086,13 @@ Eigen::MatrixXd Skeleton::getUnconstrainedVelJacobianWrt(
   Eigen::MatrixXd Minv = getInvMassMatrix();
   Eigen::MatrixXd dC = getJacobianOfC(wrt);
 
-  if (wrt == neural::WithRespectTo::POSITION) {
+  if (wrt == neural::WithRespectTo::POSITION)
+  {
     Eigen::MatrixXd dM = getJacobianOfMinv(dt * (tau - C), wrt);
     return dM - Minv * dt * dC;
   }
-  else {
+  else
+  {
     return -Minv * dt * dC;
   }
 }
@@ -2112,12 +2157,12 @@ void Skeleton::DiffC::print()
     const auto& node_numeric = nodes_numeric[static_cast<size_t>(i)];
     const auto& data_numeric = node_numeric.data;
 
-    std::cout << "<<< i: " << i+1 << ">>>\n\n";
+    std::cout << "<<< i: " << i + 1 << ">>>\n\n";
 
-    std::cout << "S[" << i+1 << "]    : " << data.S.transpose() << "\n";
-    std::cout << "dV[" << i+1 << "] : " << data.dV.transpose() << "\n";
-    std::cout << "F[" << i+1 << "] : " << data.F.transpose() << "\n";
-    std::cout << "tau[" << i+1 << "] : " << data.tau.transpose() << "\n";
+    std::cout << "S[" << i + 1 << "]    : " << data.S.transpose() << "\n";
+    std::cout << "dV[" << i + 1 << "] : " << data.dV.transpose() << "\n";
+    std::cout << "F[" << i + 1 << "] : " << data.F.transpose() << "\n";
+    std::cout << "tau[" << i + 1 << "] : " << data.tau.transpose() << "\n";
 
     std::cout << "\n";
 
@@ -2125,8 +2170,10 @@ void Skeleton::DiffC::print()
     {
       const auto& deriv = node.derivs[j];
       const auto& deriv_numeric = node_numeric.derivs[j];
-      std::cout << "DdV[" << i+1 << "," << j+1 << "] : " << deriv.dV.transpose() << "\n";
-      std::cout << "DdV_num[" << i+1 << "," << j+1 << "] : " << deriv_numeric.dV.transpose() << "\n";
+      std::cout << "DdV[" << i + 1 << "," << j + 1
+                << "] : " << deriv.dV.transpose() << "\n";
+      std::cout << "DdV_num[" << i + 1 << "," << j + 1
+                << "] : " << deriv_numeric.dV.transpose() << "\n";
       std::cout << "\n";
     }
 
@@ -2140,14 +2187,14 @@ void Skeleton::DiffC::print()
     const auto& node = nodes[i];
     const auto& data = node.data;
 
-    std::cout << "<<< i: " << i+1 << ">>>\n\n";
+    std::cout << "<<< i: " << i + 1 << ">>>\n\n";
 
-    std::cout << "F[" << i+1 << "]:" << data.F.transpose() << "\n";
+    std::cout << "F[" << i + 1 << "]:" << data.F.transpose() << "\n";
 
-//    for (auto j = 0u; j < node.derivs.size(); ++j)
-//    {
-//      const auto& deriv = node.derivs[j];
-//    }
+    //    for (auto j = 0u; j < node.derivs.size(); ++j)
+    //    {
+    //      const auto& deriv = node.derivs[j];
+    //    }
   }
 
   std::cout << std::endl << std::endl;
@@ -2156,9 +2203,10 @@ void Skeleton::DiffC::print()
 
 //==============================================================================
 Eigen::MatrixXd Skeleton::finiteDifferenceJacobianOfM(
-    const Eigen::VectorXd& f, neural::WithRespectTo* wrt, bool /*useRidders*/)
+    const Eigen::VectorXd& x, neural::WithRespectTo* wrt, bool useRidders)
 {
-//  if (useRidders) return finiteDifferenceRiddersJacobianOfM(f, wrt);
+  if (useRidders)
+    return finiteDifferenceRiddersJacobianOfM(x, wrt);
 
   std::size_t n = getNumDofs();
   std::size_t m = wrt->dim(this);
@@ -2166,7 +2214,7 @@ Eigen::MatrixXd Skeleton::finiteDifferenceJacobianOfM(
   Eigen::VectorXd start = wrt->get(this);
 
   // Get baseline C(pos, vel)
-  Eigen::VectorXd baseline = getMassMatrix() * f;
+  Eigen::VectorXd baseline = getMassMatrix() * x;
 
   double EPS = 5e-7;
 
@@ -2175,17 +2223,112 @@ Eigen::MatrixXd Skeleton::finiteDifferenceJacobianOfM(
     Eigen::VectorXd tweaked = start;
     tweaked(i) += EPS;
     wrt->set(this, tweaked);
-    Eigen::VectorXd plus = getMassMatrix() * f;
+    mSkelCache.mDirty.mMassMatrix = true;
+    Eigen::VectorXd plus = getMassMatrix() * x;
     tweaked = start;
     tweaked(i) -= EPS;
     wrt->set(this, tweaked);
-    Eigen::VectorXd minus = getMassMatrix() * f;
+    mSkelCache.mDirty.mMassMatrix = true;
+    Eigen::VectorXd minus = getMassMatrix() * x;
 
     J.col(i) = (plus - minus) / (2 * EPS);
   }
 
   // Reset everything how we left it
   wrt->set(this, start);
+  mSkelCache.mDirty.mMassMatrix = true;
+  getMassMatrix();
+
+  return J;
+}
+
+//==============================================================================
+Eigen::MatrixXd Skeleton::finiteDifferenceRiddersJacobianOfM(
+    const Eigen::VectorXd& x, neural::WithRespectTo* wrt)
+{
+  std::size_t n = getNumDofs();
+  std::size_t m = wrt->dim(this);
+  Eigen::MatrixXd J = Eigen::MatrixXd::Zero(n, m);
+  Eigen::VectorXd originalWrt = wrt->get(this);
+
+  const double originalStepSize = 1e-3;
+  const double con = 1.4, con2 = (con * con);
+  const double safeThreshold = 2.0;
+  const int tabSize = 10;
+
+  for (std::size_t i = 0; i < m; i++)
+  {
+    double stepSize = originalStepSize;
+    double bestError = std::numeric_limits<double>::max();
+
+    // Neville tableau of finite difference results
+    std::array<std::array<Eigen::VectorXd, tabSize>, tabSize> tab;
+
+    Eigen::VectorXd perturbedPlus = Eigen::VectorXd(originalWrt);
+    perturbedPlus(i) += stepSize;
+    wrt->set(this, perturbedPlus);
+    mSkelCache.mDirty.mMassMatrix = true;
+    Eigen::MatrixXd plus = getMassMatrix() * x;
+
+    Eigen::VectorXd perturbedMinus = Eigen::VectorXd(originalWrt);
+    perturbedMinus(i) -= stepSize;
+    wrt->set(this, perturbedMinus);
+    mSkelCache.mDirty.mMassMatrix = true;
+    Eigen::MatrixXd minus = getMassMatrix() * x;
+
+    tab[0][0] = (plus - minus) / (2 * stepSize);
+
+    // Iterate over smaller and smaller step sizes
+    for (int iTab = 1; iTab < tabSize; iTab++)
+    {
+      stepSize /= con;
+
+      perturbedPlus = Eigen::VectorXd(originalWrt);
+      perturbedPlus(i) += stepSize;
+      wrt->set(this, perturbedPlus);
+      mSkelCache.mDirty.mMassMatrix = true;
+      plus = getMassMatrix() * x;
+
+      perturbedMinus = Eigen::VectorXd(originalWrt);
+      perturbedMinus(i) -= stepSize;
+      wrt->set(this, perturbedMinus);
+      mSkelCache.mDirty.mMassMatrix = true;
+      minus = getMassMatrix() * x;
+
+      tab[0][iTab] = (plus - minus) / (2 * stepSize);
+
+      double fac = con2;
+      // Compute extrapolations of increasing orders, requiring no new
+      // evaluations
+      for (int jTab = 1; jTab <= iTab; jTab++)
+      {
+        tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
+                          / (fac - 1.0);
+        fac = con2 * fac;
+        double currError = std::max(
+            (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
+            (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
+                .array()
+                .abs()
+                .maxCoeff());
+        if (currError < bestError)
+        {
+          bestError = currError;
+          J.col(i).noalias() = tab[jTab][iTab];
+        }
+      }
+
+      // If higher order is worse by a significant factor, quit early.
+      if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
+          >= safeThreshold * bestError)
+      {
+        break;
+      }
+    }
+  }
+  wrt->set(this, originalWrt);
+  mSkelCache.mDirty.mMassMatrix = true;
+  getMassMatrix();
 
   return J;
 }
@@ -2194,7 +2337,8 @@ Eigen::MatrixXd Skeleton::finiteDifferenceJacobianOfM(
 Eigen::MatrixXd Skeleton::finiteDifferenceJacobianOfC(
     neural::WithRespectTo* wrt, bool useRidders)
 {
-  if (useRidders) return finiteDifferenceRiddersJacobianOfC(wrt);
+  if (useRidders)
+    return finiteDifferenceRiddersJacobianOfC(wrt);
 
   std::size_t n = getNumDofs();
   std::size_t m = wrt->dim(this);
@@ -2202,7 +2346,8 @@ Eigen::MatrixXd Skeleton::finiteDifferenceJacobianOfC(
   Eigen::VectorXd start = wrt->get(this);
 
   // Get baseline C(pos, vel)
-  Eigen::VectorXd baseline = getCoriolisAndGravityForces() - getExternalForces();
+  Eigen::VectorXd baseline
+      = getCoriolisAndGravityForces() - getExternalForces();
 
   double EPS = 1e-7;
 
@@ -2211,11 +2356,13 @@ Eigen::MatrixXd Skeleton::finiteDifferenceJacobianOfC(
     Eigen::VectorXd tweaked = start;
     tweaked(i) += EPS;
     wrt->set(this, tweaked);
-    Eigen::VectorXd perturbedPos = getCoriolisAndGravityForces() - getExternalForces();
+    Eigen::VectorXd perturbedPos
+        = getCoriolisAndGravityForces() - getExternalForces();
     tweaked = start;
     tweaked(i) -= EPS;
     wrt->set(this, tweaked);
-    Eigen::VectorXd perturbedNeg = getCoriolisAndGravityForces() - getExternalForces();
+    Eigen::VectorXd perturbedNeg
+        = getCoriolisAndGravityForces() - getExternalForces();
 
     J.col(i) = (perturbedPos - perturbedNeg) / (2 * EPS);
   }
@@ -2275,9 +2422,9 @@ Eigen::MatrixXd Skeleton::finiteDifferenceRiddersJacobianOfC(
   Eigen::MatrixXd J = Eigen::MatrixXd::Zero(n, m);
   Eigen::VectorXd originalWrt = wrt->get(this);
 
-  const double originalStepSize = 1e-3; 
-  const double con = 1.4, con2 = (con * con); 
-  const double safeThreshold = 2.0; 
+  const double originalStepSize = 1e-3;
+  const double con = 1.4, con2 = (con * con);
+  const double safeThreshold = 2.0;
   const int tabSize = 10;
 
   for (std::size_t i = 0; i < m; i++)
@@ -2291,11 +2438,13 @@ Eigen::MatrixXd Skeleton::finiteDifferenceRiddersJacobianOfC(
     Eigen::VectorXd perturbedPlus = Eigen::VectorXd(originalWrt);
     perturbedPlus(i) += stepSize;
     wrt->set(this, perturbedPlus);
-    Eigen::MatrixXd tauPlus = getCoriolisAndGravityForces() - getExternalForces();
+    Eigen::MatrixXd tauPlus
+        = getCoriolisAndGravityForces() - getExternalForces();
     Eigen::VectorXd perturbedMinus = Eigen::VectorXd(originalWrt);
     perturbedMinus(i) -= stepSize;
     wrt->set(this, perturbedMinus);
-    Eigen::MatrixXd tauMinus = getCoriolisAndGravityForces() - getExternalForces();
+    Eigen::MatrixXd tauMinus
+        = getCoriolisAndGravityForces() - getExternalForces();
 
     tab[0][0] = (tauPlus - tauMinus) / (2 * stepSize);
 
@@ -2312,19 +2461,23 @@ Eigen::MatrixXd Skeleton::finiteDifferenceRiddersJacobianOfC(
       perturbedMinus(i) -= stepSize;
       wrt->set(this, perturbedMinus);
       tauMinus = getCoriolisAndGravityForces() - getExternalForces();
-      
+
       tab[0][iTab] = (tauPlus - tauMinus) / (2 * stepSize);
 
       double fac = con2;
-      // Compute extrapolations of increasing orders, requiring no new evaluations
+      // Compute extrapolations of increasing orders, requiring no new
+      // evaluations
       for (int jTab = 1; jTab <= iTab; jTab++)
       {
-        tab[jTab][iTab] = (tab[jTab-1][iTab] * fac - tab[jTab-1][iTab-1]) /
-                              (fac - 1.0);
+        tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
+                          / (fac - 1.0);
         fac = con2 * fac;
-        double currError = 
-          std::max((tab[jTab][iTab] - tab[jTab-1][iTab]).array().abs().maxCoeff(),
-                   (tab[jTab][iTab] - tab[jTab-1][iTab-1]).array().abs().maxCoeff());
+        double currError = std::max(
+            (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
+            (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
+                .array()
+                .abs()
+                .maxCoeff());
         if (currError < bestError)
         {
           bestError = currError;
@@ -2333,8 +2486,8 @@ Eigen::MatrixXd Skeleton::finiteDifferenceRiddersJacobianOfC(
       }
 
       // If higher order is worse by a significant factor, quit early.
-      if ((tab[iTab][iTab] - tab[iTab-1][iTab-1]).array().abs().maxCoeff() >= 
-          safeThreshold * bestError)
+      if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
+          >= safeThreshold * bestError)
       {
         break;
       }
@@ -2349,7 +2502,8 @@ Eigen::MatrixXd Skeleton::finiteDifferenceRiddersJacobianOfC(
 Eigen::MatrixXd Skeleton::finiteDifferenceJacobianOfMinv(
     const Eigen::VectorXd& f, neural::WithRespectTo* wrt, bool useRidders)
 {
-  if (useRidders) return finiteDifferenceRiddersJacobianOfMinv(f, wrt);
+  if (useRidders)
+    return finiteDifferenceRiddersJacobianOfMinv(f, wrt);
 
   std::size_t n = getNumDofs();
   std::size_t m = wrt->dim(this);
@@ -2390,9 +2544,9 @@ Eigen::MatrixXd Skeleton::finiteDifferenceRiddersJacobianOfMinv(
   Eigen::MatrixXd J = Eigen::MatrixXd::Zero(n, m);
   Eigen::VectorXd originalWrt = wrt->get(this);
 
-  const double originalStepSize = 1e-3; 
-  const double con = 1.4, con2 = (con * con); 
-  const double safeThreshold = 2.0; 
+  const double originalStepSize = 1e-3;
+  const double con = 1.4, con2 = (con * con);
+  const double safeThreshold = 2.0;
   const int tabSize = 10;
 
   for (std::size_t i = 0; i < m; i++)
@@ -2427,19 +2581,23 @@ Eigen::MatrixXd Skeleton::finiteDifferenceRiddersJacobianOfMinv(
       perturbedMinus(i) -= stepSize;
       wrt->set(this, perturbedMinus);
       MinvFMinus = multiplyByImplicitInvMassMatrix(f);
-      
+
       tab[0][iTab] = (MinvFPlus - MinvFMinus) / (2 * stepSize);
 
       double fac = con2;
-      // Compute extrapolations of increasing orders, requiring no new evaluations
+      // Compute extrapolations of increasing orders, requiring no new
+      // evaluations
       for (int jTab = 1; jTab <= iTab; jTab++)
       {
-        tab[jTab][iTab] = (tab[jTab-1][iTab] * fac - tab[jTab-1][iTab-1]) /
-                              (fac - 1.0);
+        tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
+                          / (fac - 1.0);
         fac = con2 * fac;
-        double currError = 
-          std::max((tab[jTab][iTab] - tab[jTab-1][iTab]).array().abs().maxCoeff(),
-                   (tab[jTab][iTab] - tab[jTab-1][iTab-1]).array().abs().maxCoeff());
+        double currError = std::max(
+            (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
+            (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
+                .array()
+                .abs()
+                .maxCoeff());
         if (currError < bestError)
         {
           bestError = currError;
@@ -2448,8 +2606,8 @@ Eigen::MatrixXd Skeleton::finiteDifferenceRiddersJacobianOfMinv(
       }
 
       // If higher order is worse by a significant factor, quit early.
-      if ((tab[iTab][iTab] - tab[iTab-1][iTab-1]).array().abs().maxCoeff() >= 
-          safeThreshold * bestError)
+      if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
+          >= safeThreshold * bestError)
       {
         break;
       }
@@ -2483,7 +2641,8 @@ Eigen::VectorXd Skeleton::getDynamicsForces()
 //==============================================================================
 Eigen::MatrixXd Skeleton::finiteDifferenceVelCJacobian(bool useRidders)
 {
-  if (useRidders) return finiteDifferenceRiddersVelCJacobian();
+  if (useRidders)
+    return finiteDifferenceRiddersVelCJacobian();
 
   std::size_t n = getNumDofs();
   Eigen::MatrixXd J = Eigen::MatrixXd::Zero(n, n);
@@ -2506,8 +2665,10 @@ Eigen::MatrixXd Skeleton::finiteDifferenceVelCJacobian(bool useRidders)
     Eigen::VectorXd perturbedNeg = getCoriolisAndGravityForces();
 
 #ifndef NDEBUG
-    if (perturbedPos == perturbedNeg && perturbedPos != baseline) {
-      // std::cout << "Got a mysteriously broken coriolis force result" << std::endl;
+    if (perturbedPos == perturbedNeg && perturbedPos != baseline)
+    {
+      // std::cout << "Got a mysteriously broken coriolis force result" <<
+      // std::endl;
 
       // Set positive vel change
 
@@ -2525,19 +2686,20 @@ Eigen::MatrixXd Skeleton::finiteDifferenceVelCJacobian(bool useRidders)
       std::vector<Eigen::Vector6d> posVecs;
 
       for (std::vector<BodyNode*>::const_iterator it = cache.mBodyNodes.begin();
-          it != cache.mBodyNodes.end();
-          ++it)
+           it != cache.mBodyNodes.end();
+           ++it)
       {
         (*it)->updateCombinedVector();
       }
 
       for (std::vector<BodyNode*>::const_reverse_iterator it
-          = cache.mBodyNodes.rbegin();
-          it != cache.mBodyNodes.rend();
-          ++it)
+           = cache.mBodyNodes.rbegin();
+           it != cache.mBodyNodes.rend();
+           ++it)
       {
         Eigen::Vector6d V = (*it)->getSpatialVelocity();
-        const Eigen::Matrix6d& mI = (*it)->mAspectProperties.mInertia.getSpatialTensor();
+        const Eigen::Matrix6d& mI
+            = (*it)->mAspectProperties.mInertia.getSpatialTensor();
         posVecs.push_back(math::dad(V, mI * V));
         (*it)->aggregateCombinedVector(mCg, mAspectProperties.mGravity);
       }
@@ -2556,26 +2718,27 @@ Eigen::MatrixXd Skeleton::finiteDifferenceVelCJacobian(bool useRidders)
       std::vector<Eigen::Vector6d> negVecs;
 
       for (std::vector<BodyNode*>::const_iterator it = cache.mBodyNodes.begin();
-          it != cache.mBodyNodes.end();
-          ++it)
+           it != cache.mBodyNodes.end();
+           ++it)
       {
         (*it)->updateCombinedVector();
       }
 
       for (std::vector<BodyNode*>::const_reverse_iterator it
-          = cache.mBodyNodes.rbegin();
-          it != cache.mBodyNodes.rend();
-          ++it)
+           = cache.mBodyNodes.rbegin();
+           it != cache.mBodyNodes.rend();
+           ++it)
       {
         Eigen::Vector6d V = (*it)->getSpatialVelocity();
-        const Eigen::Matrix6d& mI = (*it)->mAspectProperties.mInertia.getSpatialTensor();
+        const Eigen::Matrix6d& mI
+            = (*it)->mAspectProperties.mInertia.getSpatialTensor();
         negVecs.push_back(math::dad(V, mI * V));
         (*it)->aggregateCombinedVector(mCg2, mAspectProperties.mGravity);
       }
 
-      // TODO: negVecs and posVecs are the same, cause math::dad() is *=-1 idempotent in V
-      // std::cout << "mCg pos: " << std::endl << mCg << std::endl;
-      // std::cout << "mCg neg: " << std::endl << mCg2 << std::endl;
+      // TODO: negVecs and posVecs are the same, cause math::dad() is *=-1
+      // idempotent in V std::cout << "mCg pos: " << std::endl << mCg <<
+      // std::endl; std::cout << "mCg neg: " << std::endl << mCg2 << std::endl;
     }
 #endif
 
@@ -2595,9 +2758,9 @@ Eigen::MatrixXd Skeleton::finiteDifferenceRiddersVelCJacobian()
   Eigen::MatrixXd J = Eigen::MatrixXd::Zero(n, n);
   Eigen::VectorXd vel = getVelocities();
 
-  const double originalStepSize = 1e-3; 
-  const double con = 1.4, con2 = (con * con); 
-  const double safeThreshold = 2.0; 
+  const double originalStepSize = 1e-3;
+  const double con = 1.4, con2 = (con * con);
+  const double safeThreshold = 2.0;
   const int tabSize = 10;
 
   for (std::size_t i = 0; i < n; i++)
@@ -2636,15 +2799,19 @@ Eigen::MatrixXd Skeleton::finiteDifferenceRiddersVelCJacobian()
       tab[0][iTab] = (perturbedPos - perturbedNeg) / (2 * stepSize);
 
       double fac = con2;
-      // Compute extrapolations of increasing orders, requiring no new evaluations
+      // Compute extrapolations of increasing orders, requiring no new
+      // evaluations
       for (int jTab = 1; jTab <= iTab; jTab++)
       {
-        tab[jTab][iTab] = (tab[jTab-1][iTab] * fac - tab[jTab-1][iTab-1]) /
-                              (fac - 1.0);
+        tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
+                          / (fac - 1.0);
         fac = con2 * fac;
-        double currError = 
-          std::max((tab[jTab][iTab] - tab[jTab-1][iTab]).array().abs().maxCoeff(),
-                   (tab[jTab][iTab] - tab[jTab-1][iTab-1]).array().abs().maxCoeff());
+        double currError = std::max(
+            (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
+            (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
+                .array()
+                .abs()
+                .maxCoeff());
         if (currError < bestError)
         {
           bestError = currError;
@@ -2653,8 +2820,8 @@ Eigen::MatrixXd Skeleton::finiteDifferenceRiddersVelCJacobian()
       }
 
       // If higher order is worse by a significant factor, quit early.
-      if ((tab[iTab][iTab] - tab[iTab-1][iTab-1]).array().abs().maxCoeff() >= 
-          safeThreshold * bestError)
+      if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
+          >= safeThreshold * bestError)
       {
         break;
       }
@@ -2668,7 +2835,8 @@ Eigen::MatrixXd Skeleton::finiteDifferenceRiddersVelCJacobian()
 }
 
 //==============================================================================
-Eigen::MatrixXd Skeleton::finiteDifferenceJacobianOfFD(neural::WithRespectTo* wrt, bool /*useRidders*/)
+Eigen::MatrixXd Skeleton::finiteDifferenceJacobianOfFD(
+    neural::WithRespectTo* wrt, bool /*useRidders*/)
 {
   //  if (useRidders) return finiteDifferenceRiddersJacobianOfM(f, wrt);
 
@@ -2971,15 +3139,18 @@ void Skeleton::integratePositions(double _dt)
 }
 
 //==============================================================================
-Eigen::VectorXd Skeleton::integratePositionsExplicit(Eigen::VectorXd pos, Eigen::VectorXd vel, double dt)
+Eigen::VectorXd Skeleton::integratePositionsExplicit(
+    Eigen::VectorXd pos, Eigen::VectorXd vel, double dt)
 {
   Eigen::VectorXd nextPos = Eigen::VectorXd::Zero(pos.size());
 
   int cursor = 0;
-  for (std::size_t i = 0; i < mSkelCache.mBodyNodes.size(); ++i) {
+  for (std::size_t i = 0; i < mSkelCache.mBodyNodes.size(); ++i)
+  {
     Joint* joint = mSkelCache.mBodyNodes[i]->getParentJoint();
     int dofs = joint->getNumDofs();
-    nextPos.segment(cursor, dofs) = joint->integratePositionsExplicit(pos.segment(cursor, dofs), vel.segment(cursor, dofs), dt);
+    nextPos.segment(cursor, dofs) = joint->integratePositionsExplicit(
+        pos.segment(cursor, dofs), vel.segment(cursor, dofs), dt);
     cursor += dofs;
   }
 
@@ -2987,15 +3158,18 @@ Eigen::VectorXd Skeleton::integratePositionsExplicit(Eigen::VectorXd pos, Eigen:
 }
 
 //==============================================================================
-Eigen::MatrixXd Skeleton::getPosPosJac(Eigen::VectorXd pos, Eigen::VectorXd vel, double dt)
+Eigen::MatrixXd Skeleton::getPosPosJac(
+    Eigen::VectorXd pos, Eigen::VectorXd vel, double dt)
 {
   Eigen::MatrixXd jac = Eigen::MatrixXd::Zero(pos.size(), pos.size());
 
   int cursor = 0;
-  for (std::size_t i = 0; i < mSkelCache.mBodyNodes.size(); ++i) {
+  for (std::size_t i = 0; i < mSkelCache.mBodyNodes.size(); ++i)
+  {
     Joint* joint = mSkelCache.mBodyNodes[i]->getParentJoint();
     int dofs = joint->getNumDofs();
-    jac.block(cursor, cursor, dofs, dofs) = joint->getPosPosJacobian(pos.segment(cursor, dofs), vel.segment(cursor, dofs), dt);
+    jac.block(cursor, cursor, dofs, dofs) = joint->getPosPosJacobian(
+        pos.segment(cursor, dofs), vel.segment(cursor, dofs), dt);
     cursor += dofs;
   }
 
@@ -3003,15 +3177,18 @@ Eigen::MatrixXd Skeleton::getPosPosJac(Eigen::VectorXd pos, Eigen::VectorXd vel,
 }
 
 //==============================================================================
-Eigen::MatrixXd Skeleton::getVelPosJac(Eigen::VectorXd pos, Eigen::VectorXd vel, double dt)
+Eigen::MatrixXd Skeleton::getVelPosJac(
+    Eigen::VectorXd pos, Eigen::VectorXd vel, double dt)
 {
   Eigen::MatrixXd jac = Eigen::MatrixXd::Zero(pos.size(), pos.size());
 
   int cursor = 0;
-  for (std::size_t i = 0; i < mSkelCache.mBodyNodes.size(); ++i) {
+  for (std::size_t i = 0; i < mSkelCache.mBodyNodes.size(); ++i)
+  {
     Joint* joint = mSkelCache.mBodyNodes[i]->getParentJoint();
     int dofs = joint->getNumDofs();
-    jac.block(cursor, cursor, dofs, dofs) = joint->getVelPosJacobian(pos.segment(cursor, dofs), vel.segment(cursor, dofs), dt);
+    jac.block(cursor, cursor, dofs, dofs) = joint->getVelPosJacobian(
+        pos.segment(cursor, dofs), vel.segment(cursor, dofs), dt);
     cursor += dofs;
   }
 
@@ -3191,7 +3368,8 @@ math::Jacobian variadicGetWorldJacobian(
 }
 
 //==============================================================================
-math::Jacobian Skeleton::getWorldPositionJacobian(const JacobianNode* _node) const
+math::Jacobian Skeleton::getWorldPositionJacobian(
+    const JacobianNode* _node) const
 {
   math::Jacobian J = math::Jacobian::Zero(6, getNumDofs());
 
@@ -3199,30 +3377,39 @@ math::Jacobian Skeleton::getWorldPositionJacobian(const JacobianNode* _node) con
     return J;
 
   const BodyNode* bodyNode = static_cast<const BodyNode*>(_node);
-  Eigen::Vector3d originalRotation = math::logMap(bodyNode->getWorldTransform().linear());
+  Eigen::Vector3d originalRotation
+      = math::logMap(bodyNode->getWorldTransform().linear());
 
-  for (int i = 0; i < getNumDofs(); i++) {
+  for (int i = 0; i < getNumDofs(); i++)
+  {
     const DegreeOfFreedom* dof = getDof(i);
     const Joint* joint = dof->getJoint();
 
     bool isParent = false;
     const BodyNode* cursor = bodyNode;
-    while (cursor != nullptr) {
-      if (cursor->getParentJoint() == joint) {
+    while (cursor != nullptr)
+    {
+      if (cursor->getParentJoint() == joint)
+      {
         isParent = true;
         break;
       }
-      if (cursor->getParentJoint() != nullptr) {
+      if (cursor->getParentJoint() != nullptr)
+      {
         cursor = cursor->getParentJoint()->getParentBodyNode();
       }
     }
 
-    if (isParent) {
-      Eigen::Vector6d screw = joint->getWorldAxisScrewForPosition(dof->getIndexInJoint());
-      screw.tail<3>() += screw.head<3>().cross(bodyNode->getWorldTransform().translation());
-      // This is key so we get an actual gradient of the angle (as a screw), rather than just 
-      // a screw representing a rotation.
-      screw.head<3>() = math::expMapNestedGradient(originalRotation, screw.head<3>());
+    if (isParent)
+    {
+      Eigen::Vector6d screw
+          = joint->getWorldAxisScrewForPosition(dof->getIndexInJoint());
+      screw.tail<3>()
+          += screw.head<3>().cross(bodyNode->getWorldTransform().translation());
+      // This is key so we get an actual gradient of the angle (as a screw),
+      // rather than just a screw representing a rotation.
+      screw.head<3>()
+          = math::expMapNestedGradient(originalRotation, screw.head<3>());
       J.col(i) = screw;
     }
     // else leave J.col(i) as zeros
@@ -5813,7 +6000,8 @@ math::Jacobian Skeleton::getCOMPositionJacobian() const
 {
   math::Jacobian J = math::Jacobian::Zero(6, getNumDofs());
   double totalMass = 0.0;
-  for (const BodyNode* node : getBodyNodes()) {
+  for (const BodyNode* node : getBodyNodes())
+  {
     totalMass += node->getMass();
     J += getWorldPositionJacobian(node) * node->getMass();
   }

@@ -704,7 +704,14 @@ public:
   /// VERY SLOW: Only for testing. This computes the unconstrained Jacobian
   /// giving the difference in M(pos) for finite changes
   Eigen::MatrixXd finiteDifferenceJacobianOfM(
-      const Eigen::VectorXd& f, neural::WithRespectTo* wrt, bool useRidders = false);
+      const Eigen::VectorXd& f,
+      neural::WithRespectTo* wrt,
+      bool useRidders = false);
+
+  /// VERY SLOW: Only for testing. This computes the unconstrained Jacobian
+  /// giving the difference in M(pos) for finite changes
+  Eigen::MatrixXd finiteDifferenceRiddersJacobianOfM(
+      const Eigen::VectorXd& f, neural::WithRespectTo* wrt);
 
   /// VERY SLOW: Only for testing. This computes the unconstrained Jacobian
   /// giving the difference in C(pos, vel) for finite changes
@@ -714,16 +721,21 @@ public:
   /// VERY SLOW: Only for testing. This computes the unconstrained Jacobian
   /// giving the difference in M*f + C(pos, vel) for finite changes
   Eigen::MatrixXd finiteDifferenceJacobianOfID(
-      const Eigen::VectorXd& f, neural::WithRespectTo* wrt, bool useRidders = false);
+      const Eigen::VectorXd& f,
+      neural::WithRespectTo* wrt,
+      bool useRidders = false);
 
   /// VERY SLOW: Only for testing. This computes the unconstrained Jacobian
   /// giving the difference in C(pos, vel) for finite changes, using Ridders
-  Eigen::MatrixXd finiteDifferenceRiddersJacobianOfC(neural::WithRespectTo* wrt);
+  Eigen::MatrixXd finiteDifferenceRiddersJacobianOfC(
+      neural::WithRespectTo* wrt);
 
   /// VERY SLOW: Only for testing. This computes the unconstrained Jacobian
   /// giving the difference in M^{-1}f for finite changes
   Eigen::MatrixXd finiteDifferenceJacobianOfMinv(
-      const Eigen::VectorXd& f, neural::WithRespectTo* wrt, bool useRidders = false);
+      const Eigen::VectorXd& f,
+      neural::WithRespectTo* wrt,
+      bool useRidders = false);
 
   /// VERY SLOW: Only for testing. This computes the unconstrained Jacobian
   /// giving the difference in M^{-1}f for finite changes, using Ridders
@@ -829,15 +841,19 @@ public:
   // Documentation inherited
   void integratePositions(double _dt);
 
-  // This will do whatever math is necessary to move pos by vel*dt. This isn't always a straight linear
-  // addition, in we're using spatial coordinates for some of the joints.
-  Eigen::VectorXd integratePositionsExplicit(Eigen::VectorXd pos, Eigen::VectorXd vel, double dt);
+  // This will do whatever math is necessary to move pos by vel*dt. This isn't
+  // always a straight linear addition, in we're using spatial coordinates for
+  // some of the joints.
+  Eigen::VectorXd integratePositionsExplicit(
+      Eigen::VectorXd pos, Eigen::VectorXd vel, double dt);
 
   // This is d/dpos integratePositionsExplicit()
-  Eigen::MatrixXd getPosPosJac(Eigen::VectorXd pos, Eigen::VectorXd vel, double dt);
+  Eigen::MatrixXd getPosPosJac(
+      Eigen::VectorXd pos, Eigen::VectorXd vel, double dt);
 
   // This is d/dvel integratePositionsExplicit()
-  Eigen::MatrixXd getVelPosJac(Eigen::VectorXd pos, Eigen::VectorXd vel, double dt);
+  Eigen::MatrixXd getVelPosJac(
+      Eigen::VectorXd pos, Eigen::VectorXd vel, double dt);
 
   // Documentation inherited
   void integrateVelocities(double _dt);
@@ -1256,7 +1272,8 @@ public:
   math::Jacobian getCOMJacobian(
       const Frame* _inCoordinatesOf = Frame::World()) const override;
 
-  /// Get the Skeleton's COM Position Jacobian. This is different from the standard 
+  /// Get the Skeleton's COM Position Jacobian. This is different from the
+  /// standard
   // COM Jacobian because of FreeJoint and BallJoints.
   math::Jacobian getCOMPositionJacobian() const;
 
