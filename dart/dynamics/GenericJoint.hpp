@@ -535,7 +535,7 @@ public:
   /// generally the same as the getRelativeJacobian() for the `dq` vector space, 
   /// because `q` and `dq` are generally in the same vector space. However, for 
   /// BallJoint and FreeJoint these are different values.
-  virtual const math::Jacobian getRelativeJacobianInPositionSpace() const;
+  virtual const math::Jacobian getRelativeJacobianInPositionSpace() const override;
 
   /// Fixed-size version of getRelativeJacobianInPositionSpace(positions)
   virtual JacobianMatrix getRelativeJacobianInPositionSpaceStatic(
@@ -547,10 +547,10 @@ public:
   /// because `q` and `dq` are generally in the same vector space. However, for 
   /// BallJoint and FreeJoint these are different values.
   virtual math::Jacobian getRelativeJacobianInPositionSpace(
-      const Eigen::VectorXd& positions) const;
+      const Eigen::VectorXd& positions) const override;
 
   /// Provide a default implementation to update the relative Jacobian
-  virtual void updateRelativeJacobianInPositionSpace(bool mandatory = true) const;
+  virtual void updateRelativeJacobianInPositionSpace(bool mandatory = true) const override;
 
   /// \}
 

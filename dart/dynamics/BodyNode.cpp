@@ -4311,7 +4311,6 @@ void BodyNode::computeJacobianOfMinvXBackward()
 
       if (childJoint->hasDof(dof))
       {
-        const math::Jacobian& S = childJoint->getRelativeJacobian();
         const math::Jacobian& H = childJoint->getRelativeJacobianInPositionSpace();
         const Eigen::Vector6d Hcol = H.col(dofIndexInJoint);
         const math::Inertia Pi = childJoint->computePi(childAI);

@@ -739,7 +739,7 @@ public:
   Eigen::MatrixXd finiteDifferenceJacobianOfMinv(
       const Eigen::VectorXd& f,
       neural::WithRespectTo* wrt,
-      bool useRidders = false);
+      bool useRidders = true);
 
   /// VERY SLOW: Only for testing. This computes the unconstrained Jacobian
   /// giving the difference in M^{-1}f for finite changes, using Ridders

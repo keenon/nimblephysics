@@ -171,6 +171,8 @@ TEST_F(DifferentialDynamics, compareEquationsOfMotion)
 
   simulation::WorldPtr world;
 
+  srand(42);
+
   for (const auto& uri : getList())
   {
 #ifndef NDEBUG
