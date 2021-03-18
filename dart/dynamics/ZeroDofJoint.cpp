@@ -745,6 +745,22 @@ Eigen::Vector6d ZeroDofJoint::getWorldAxisScrewForVelocity(int /* dof */) const 
 }
 
 //==============================================================================
+const math::Jacobian ZeroDofJoint::getRelativeJacobianInPositionSpace() const {
+  return getRelativeJacobian();
+}
+
+//==============================================================================
+math::Jacobian ZeroDofJoint::getRelativeJacobianInPositionSpace(
+    const Eigen::VectorXd& _positions) const {
+  return getRelativeJacobian(_positions);
+}
+
+//==============================================================================
+void ZeroDofJoint::updateRelativeJacobianInPositionSpace(bool /* mandatory */) const {
+  // Do nothing
+}
+
+//==============================================================================
 void ZeroDofJoint::addVelocityTo(Eigen::Vector6d& /*_vel*/)
 {
   // Do nothing

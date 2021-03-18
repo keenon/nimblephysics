@@ -677,6 +677,10 @@ public:
   /// Jacobian is expressed in the Frame of this BodyNode.
   const math::Jacobian& getJacobian() const override final;
 
+  /// Return the generalized Jacobian targeting the origin of this BodyNode. The
+  /// Jacobian is expressed in the Frame of this BodyNode.
+  const math::Jacobian& getJacobianInPositionSpace() const override final;
+
   // Prevent the inherited getJacobian functions from being shadowed
   using TemplatedJacobianNode<BodyNode>::getJacobian;
 
@@ -1044,6 +1048,10 @@ protected:
   /// mIsBodyJacobianDirty is true.
   void updateBodyJacobian() const;
 
+  /// Update body Jacobian. getJacobianInPositionSpace() calls this function if
+  /// mIsBodyJacobianInPositionSpaceDirty is true.
+  void updateBodyJacobianInPositionSpace() const;
+
   /// Update the World Jacobian. The commonality of using the World Jacobian
   /// makes it worth caching.
   void updateWorldJacobian() const;
@@ -1141,6 +1149,20 @@ public:
   /// computation
   Eigen::MatrixXd finiteDifferenceRiddersJacobianOfMassBodyForce(
       neural::WithRespectTo* wrt);
+  /// This checks the intermediate analytical results of
+  /// computeJacobianOfMinvXBackward() against the finite differencing equivalents.
+  void debugJacobianOfMinvXBackward(neural::WithRespectTo* wrt, Eigen::VectorXd x);
+  /// This computes the Jacobian (tensor) of the articulate inertia (mArtInertia) as it's computed 
+  /// in the Minv computation
+  std::vector<Eigen::MatrixXd> finiteDifferenceJacobianOfInvMassArtInertia(
+      neural::WithRespectTo* wrt, bool useRidders = true);
+  /// This computes the Jacobian (tensor) of the articulate bias force (mInvM_c) as it's computed 
+  /// in the Minv computation
+  Eigen::MatrixXd finiteDifferenceJacobianOfInvMassArtBias(
+      neural::WithRespectTo* wrt, bool useRidders = true);
+  /// This checks the intermediate analytical results of
+  /// computeJacobianOfMinvXForward() against the finite differencing equivalents.
+  void debugJacobianOfMinvXForward(neural::WithRespectTo* wrt, Eigen::VectorXd x);
 
   // protected:
 public:
@@ -1202,6 +1224,11 @@ public:
   ///
   /// Do not use directly! Use getJacobian() to access this quantity
   mutable math::Jacobian mBodyJacobian;
+
+  /// Body Jacobian
+  ///
+  /// Do not use directly! Use getJacobian() to access this quantity
+  mutable math::Jacobian mBodyJacobianInPositionSpace;
 
   /// Cached World Jacobian
   ///

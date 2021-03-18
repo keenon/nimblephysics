@@ -695,6 +695,43 @@ public:
     return math::Jacobian::Zero(6, getNumDofs());
   }
 
+  /// Get spatial Jacobian of the child BodyNode relative to the parent BodyNode
+  /// expressed in the child BodyNode frame, in the `q` vector space. This is 
+  /// generally the same as the getRelativeJacobian() for the `dq` vector space, 
+  /// because `q` and `dq` are generally in the same vector space. However, for 
+  /// BallJoint and FreeJoint these are different values.
+  virtual const math::Jacobian getRelativeJacobianInPositionSpace() const = 0;
+
+  /// Get spatial Jacobian of the child BodyNode relative to the parent BodyNode
+  /// expressed in the child BodyNode frame, in the `q` vector space. This is 
+  /// generally the same as the getRelativeJacobian() for the `dq` vector space, 
+  /// because `q` and `dq` are generally in the same vector space. However, for 
+  /// BallJoint and FreeJoint these are different values.
+  virtual math::Jacobian getRelativeJacobianInPositionSpace(
+      const Eigen::VectorXd& positions) const = 0;
+
+  /// Update spatial Jacobian of the child BodyNode relative to the parent
+  /// BodyNode expressed in the child BodyNode frame, in the `q` vector space. This is 
+  /// generally the same as the updateRelativeJacobian() for the `dq` vector space, 
+  /// because `q` and `dq` are generally in the same vector space. However, for 
+  /// BallJoint and FreeJoint these are different values.
+  ///
+  /// \param[in] mandatory This argument can be set to false if the Jacobian
+  /// update request is due to a change in Joint positions, because not all
+  /// Joint types have a relative Jacobian that depends on their Joint
+  /// positions, so a relative Jacobian update would not actually be required.
+  virtual void updateRelativeJacobianInPositionSpace(bool mandatory = true) const = 0;
+
+  /// This uses finite differencing to compute the relative Jacobian in velocity space
+  Eigen::MatrixXd finiteDifferenceRelativeJacobian();
+
+  /// This uses finite differencing to compute the relative Jacobian in position space
+  Eigen::MatrixXd finiteDifferenceRelativeJacobianInPositionSpace();
+
+  /// This checks the intermediate analytical results of
+  /// getRelativeJacobianInPositionSpace() against the finite differencing equivalents.
+  void debugRelativeJacobianInPositionSpace();
+
   /// Returns the screw representation of a given dof at our current position.
   /// That is, if we increment dof by EPS, that's the same as left-multiplying
   /// our getWorldTransform() by math::expMap(screw * EPS).
@@ -1103,6 +1140,10 @@ protected:
   /// True iff this joint's relative Jacobian has not been updated since the last
   /// position change
   mutable bool mIsRelativeJacobianDirty;
+
+  /// True iff this joint's relative Jacobian has not been updated since the last
+  /// position change
+  mutable bool mIsRelativeJacobianInPositionSpaceDirty;
 
   /// True iff this joint's relative Jacobian time derivative has not been updated
   /// since the last position or velocity change

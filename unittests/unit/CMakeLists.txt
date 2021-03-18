@@ -19,6 +19,7 @@ dart_add_test("unit" test_LCPUtils)
 dart_add_test("unit" test_PerformanceLog)
 dart_add_test("unit" test_RealtimeUtils)
 dart_add_test("unit" test_ScrewGeometry)
+dart_add_test("unit" test_JointJacobians)
 
 if(TARGET dart-optimizer-ipopt)
   target_link_libraries(test_Optimizer dart-optimizer-ipopt)

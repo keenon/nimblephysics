@@ -86,6 +86,9 @@ public:
   // Documentation inherited
   const math::Jacobian& getJacobian() const override final;
 
+  // Documentation inherited
+  const math::Jacobian& getJacobianInPositionSpace() const override final;
+
   // Prevent the inherited getJacobian functions from being shadowed
   using TemplatedJacobianNode<FixedJacobianNode>::getJacobian;
 
@@ -121,6 +124,10 @@ protected:
   /// if mIsBodyJacobianDirty is true.
   void updateBodyJacobian() const;
 
+  /// Update the Jacobian of this Fixed Frame. getJacobian() calls this function
+  /// if mIsBodyJacobianDirty is true.
+  void updateBodyJacobianInPositionSpace() const;
+
   /// Update the World Jacobian cache.
   void updateWorldJacobian() const;
 
@@ -140,6 +147,11 @@ protected:
     ///
     /// Do not use directly! Use getJacobian() to access this quantity
     math::Jacobian mBodyJacobian;
+
+    /// Cached Jacobian of this Fixed Frame
+    ///
+    /// Do not use directly! Use getJacobian() to access this quantity
+    math::Jacobian mBodyJacobianInPositionSpace;
 
     /// Cached World Jacobian of this Fixed Frame
     ///

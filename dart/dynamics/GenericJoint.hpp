@@ -526,6 +526,32 @@ public:
   /// Fixed-size version of getRelativeJacobianTimeDeriv()
   const JacobianMatrix& getRelativeJacobianTimeDerivStatic() const;
 
+  /// Fixed-size version of getRelativeJacobianInPositionSpace()
+  const typename GenericJoint<ConfigSpaceT>::JacobianMatrix&
+  getRelativeJacobianInPositionSpaceStatic() const;
+
+  /// Get spatial Jacobian of the child BodyNode relative to the parent BodyNode
+  /// expressed in the child BodyNode frame, in the `q` vector space. This is 
+  /// generally the same as the getRelativeJacobian() for the `dq` vector space, 
+  /// because `q` and `dq` are generally in the same vector space. However, for 
+  /// BallJoint and FreeJoint these are different values.
+  virtual const math::Jacobian getRelativeJacobianInPositionSpace() const;
+
+  /// Fixed-size version of getRelativeJacobianInPositionSpace(positions)
+  virtual JacobianMatrix getRelativeJacobianInPositionSpaceStatic(
+      const Vector& positions) const;
+
+  /// Get spatial Jacobian of the child BodyNode relative to the parent BodyNode
+  /// expressed in the child BodyNode frame, in the `q` vector space. This is 
+  /// generally the same as the getRelativeJacobian() for the `dq` vector space, 
+  /// because `q` and `dq` are generally in the same vector space. However, for 
+  /// BallJoint and FreeJoint these are different values.
+  virtual math::Jacobian getRelativeJacobianInPositionSpace(
+      const Eigen::VectorXd& positions) const;
+
+  /// Provide a default implementation to update the relative Jacobian
+  virtual void updateRelativeJacobianInPositionSpace(bool mandatory = true) const;
+
   /// \}
 
   //----------------------------------------------------------------------------
@@ -726,6 +752,12 @@ protected:
   /// Do not use directly! Use getRelativeJacobianStatic() to access this
   /// quantity
   mutable JacobianMatrix mJacobian;
+
+  /// Spatial Jacobian expressed in the child body frame
+  ///
+  /// Do not use directly! Use getRelativeJacobianInPositionSpaceStatic() to access this
+  /// quantity
+  mutable JacobianMatrix mJacobianInPositionSpace;
 
   /// Time derivative of spatial Jacobian expressed in the child body frame
   ///

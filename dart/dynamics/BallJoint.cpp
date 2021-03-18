@@ -274,6 +274,16 @@ math::Jacobian BallJoint::finiteDifferenceRelativeJacobianTimeDerivDeriv2(std::s
 }
 
 //==============================================================================
+Eigen::Matrix<double, 6, 3> BallJoint::getRelativeJacobianInPositionSpaceStatic(
+    const Eigen::Vector3d& _positions) const {
+  Eigen::Matrix<double, 6, 3> J;
+  J.topLeftCorner<3, 3>().noalias()
+      = math::expMapJac(_positions).transpose();
+  J.bottomLeftCorner<3, 3>().setZero();
+  return math::AdTJacFixed(Joint::mAspectProperties.mT_ChildBodyToJoint, J);
+}
+
+//==============================================================================
 Eigen::Vector3d BallJoint::getPositionDifferencesStatic(
     const Eigen::Vector3d& _q2, const Eigen::Vector3d& _q1) const
 {

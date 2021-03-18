@@ -87,6 +87,7 @@ JacobianNode::JacobianNode(BodyNode* bn)
     Frame(Frame::ConstructAbstract),
     Node(bn),
     mIsBodyJacobianDirty(true),
+    mIsBodyJacobianInPositionSpaceDirty(true),
     mIsWorldJacobianDirty(true),
     mIsBodyJacobianSpatialDerivDirty(true),
     mIsWorldJacobianClassicDerivDirty(true)
@@ -110,6 +111,7 @@ void JacobianNode::dirtyJacobian()
     return;
 
   mIsBodyJacobianDirty = true;
+  mIsBodyJacobianInPositionSpaceDirty = true;
   mIsWorldJacobianDirty = true;
 
   for(JacobianNode* child : mChildJacobianNodes)

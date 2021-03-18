@@ -1576,6 +1576,7 @@ void testFreeBlockWithFrictionCoeff(
 
   Eigen::Isometry3d fromChild = Eigen::Isometry3d::Identity();
   fromChild.translation() = Eigen::Vector3d::UnitX() * -2;
+  fromChild = fromChild.rotate(Eigen::AngleAxis<double>(M_PI_2, Eigen::Vector3d::UnitX()));
   boxJoint->setTransformFromChildBodyNode(fromChild);
 
   std::shared_ptr<BoxShape> boxShape(

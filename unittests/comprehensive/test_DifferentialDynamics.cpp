@@ -70,6 +70,9 @@ protected:
 //==============================================================================
 void DifferentialDynamics::SetUp()
 {
+  // fileList.push_back("dart://sample/skel/test/single_pendulum_ball_joint.skel");
+  // fileList.push_back("dart://sample/skel/test/double_pendulum_ball_joint.skel");
+  // fileList.push_back("dart://sample/skel/test/single_rigid_body.skel");
   // Create a list of skel files to test with
   //  fileList.push_back("dart://sample/skel/test/chainwhipa.skel");
   fileList.push_back("dart://sample/skel/test/single_pendulum.skel");
@@ -180,6 +183,7 @@ TEST_F(DifferentialDynamics, compareEquationsOfMotion)
     double rel_tol_C = 1e-3; // 0.1 %
     double abs_tol_invM = 1e-8;
     double rel_tol_invM = 1e-3; // 0.1 %
+    /*
     if (uri.toString() == "dart://sample/skel/test/chainwhipa.skel")
     {
     }
@@ -221,6 +225,7 @@ TEST_F(DifferentialDynamics, compareEquationsOfMotion)
         == "dart://sample/skel/test/serial_chain_eulerxyz_joint.skel")
     {
     }
+    */
 
     //----------------------------- Tests --------------------------------------
     // Check whether multiplication of mass matrix and its inverse is identity
@@ -252,6 +257,14 @@ TEST_F(DifferentialDynamics, compareEquationsOfMotion)
         skel->setPositions(q);
         skel->setVelocities(dq);
         skel->setAccelerations(ddq);
+
+        for (int i = 0; i < skel->getNumJoints(); i++) {
+          // Eigen::Isometry3d Tparent = Eigen::Isometry3d::Identity();
+          // Tparent.translation()(2) = 1.0;
+          // skel->getJoint(i)->setTransformFromParentBodyNode(Tparent);
+          // skel->getJoint(i)->setTransformFromChildBodyNode(Tparent);
+          // skel->getJoint(i)->debugRelativeJacobianInPositionSpace();
+        }
 
         // Test derivative of DM/dq*x
         {
@@ -333,6 +346,14 @@ TEST_F(DifferentialDynamics, compareEquationsOfMotion)
 
             cout << "[DEBUG] max(Diff): "
                  << (C_q_analytic - C_q_numerical).maxCoeff() << std::endl;
+            
+            for (int i = 0; i < skel->getNumBodyNodes(); i++) {
+              std::cout << "Checking body node " << i << ":" << std::endl;
+              skel->getBodyNode(i)->debugJacobianOfCForward(neural::WithRespectTo::POSITION);
+              skel->getBodyNode(i)->debugJacobianOfCBackward(neural::WithRespectTo::POSITION);
+            }
+
+            return;
           }
         }
 
@@ -468,6 +489,8 @@ TEST_F(DifferentialDynamics, compareEquationsOfMotion)
             skel->finiteDifferenceJacobianOfC(neural::WithRespectTo::FORCE)
                 .isZero());
 
+        /*
+        // TODO: uncomment this if we ever start using the Direct Minv Jacobian again
         // Test derivative of M^{-1}x w.r.t. position/velocity/acceleration
         {
           Eigen::VectorXd x = Eigen::VectorXd::Random(dof);
@@ -501,6 +524,13 @@ TEST_F(DifferentialDynamics, compareEquationsOfMotion)
             cout << "[DEBUG] max(Diff): "
                  << (DMinvX_Dq_analytic - DMinvX_Dq_numerical).maxCoeff()
                  << std::endl;
+            
+            for (int i = 0; i < skel->getNumBodyNodes(); i++) {
+              std::cout << "Checking body node " << i << ":" << std::endl;
+              skel->getBodyNode(i)->debugJacobianOfMinvXBackward(neural::WithRespectTo::POSITION, x);
+              skel->getBodyNode(i)->debugJacobianOfMinvXForward(neural::WithRespectTo::POSITION, x);
+            }
+            // TODO
           }
 
           EXPECT_TRUE(
@@ -516,6 +546,7 @@ TEST_F(DifferentialDynamics, compareEquationsOfMotion)
                               x, neural::WithRespectTo::FORCE)
                           .isZero());
         }
+        */
 
         // Test derivative of M^{-1}x (ID) w.r.t. position/velocity/acceleration
         {
@@ -572,8 +603,6 @@ TEST_F(DifferentialDynamics, compareEquationsOfMotion)
               neural::WithRespectTo::POSITION);
           Eigen::MatrixXd DFD_Dq_analytic
               = skel->getJacobianOfFD(neural::WithRespectTo::POSITION);
-          Eigen::MatrixXd DFD_Dq_analytic_ID
-              = skel->getJacobianOfFD_ID(neural::WithRespectTo::POSITION);
           const bool res = equals(
               DFD_Dq_analytic, DFD_Dq_numerical, abs_tol_invM, rel_tol_invM);
           EXPECT_TRUE(res);
@@ -595,30 +624,6 @@ TEST_F(DifferentialDynamics, compareEquationsOfMotion)
 
             cout << "[DEBUG] max(Diff): "
                  << (DFD_Dq_analytic - DFD_Dq_numerical).maxCoeff()
-                 << std::endl;
-          }
-
-          const bool res2 = equals(
-              DFD_Dq_analytic_ID, DFD_Dq_numerical, abs_tol_invM, rel_tol_invM);
-          EXPECT_TRUE(res2);
-          if (!res2)
-          {
-#ifdef DART_DEBUG_ANALYTICAL_DERIV
-            skel->mDiffMinv.print();
-#endif
-            cout << "[DEBUG] URI: " << uri.toString() << std::endl;
-
-            cout << "[DEBUG] DFD/Dq * x analytic (using ID)\n";
-            cout << DFD_Dq_analytic_ID << std::endl;
-
-            cout << "[DEBUG] DFD/Dq * x numerical\n";
-            cout << DFD_Dq_numerical << std::endl;
-
-            cout << "[DEBUG] Diff\n";
-            cout << DFD_Dq_analytic_ID - DFD_Dq_numerical << std::endl;
-
-            cout << "[DEBUG] max(Diff): "
-                 << (DFD_Dq_analytic_ID - DFD_Dq_numerical).maxCoeff()
                  << std::endl;
           }
         }

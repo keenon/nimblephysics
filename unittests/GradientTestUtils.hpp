@@ -1977,6 +1977,71 @@ bool verifyJacobianOfProjectionIntoClampsMatrix(
   return true;
 }
 
+bool verifyJointVelocityJacobians(WorldPtr world)
+{
+  double threshold = 1e-9;
+  for (int i = 0; i < world->getNumSkeletons(); i++) {
+    auto skel = world->getSkeleton(i);
+    for (int j = 0; j < skel->getNumJoints(); j++) {
+      Eigen::MatrixXd fd = skel->getJoint(i)->finiteDifferenceRelativeJacobian();
+      Eigen::MatrixXd analytical = skel->getJoint(i)->getRelativeJacobian();
+      if (!equals(fd, analytical, threshold)) {
+        std::cout << "Velocity jacabians disagree on skeleton \"" << skel->getName() << "\", joint [" << j << "]:" << std::endl;
+        std::cout << "Brute force: " << std::endl << fd << std::endl;
+        std::cout << "Analytical: " << std::endl << analytical << std::endl;
+        std::cout << "Diff: " << std::endl << fd - analytical << std::endl;
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+bool verifyJointPositionJacobians(WorldPtr world)
+{
+  double threshold = 1e-9;
+  for (int i = 0; i < world->getNumSkeletons(); i++) {
+    auto skel = world->getSkeleton(i);
+    for (int j = 0; j < skel->getNumJoints(); j++) {
+      Eigen::MatrixXd fd = skel->getJoint(i)->finiteDifferenceRelativeJacobianInPositionSpace();
+      Eigen::MatrixXd analytical = skel->getJoint(i)->getRelativeJacobianInPositionSpace();
+      if (!equals(fd, analytical, threshold)) {
+        std::cout << "Position jacabians disagree on skeleton \"" << skel->getName() << "\", joint [" << j << "]:" << std::endl;
+        std::cout << "Brute force: " << std::endl << fd << std::endl;
+        std::cout << "Analytical: " << std::endl << analytical << std::endl;
+        std::cout << "Diff: " << std::endl << fd - analytical << std::endl;
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+bool verifyFeatherstoneJacobians(WorldPtr world)
+{
+  for (int i = 0; i < world->getNumSkeletons(); i++) {
+    auto skel = world->getSkeleton(i);
+    for (int j = 0; j < skel->getNumJoints(); j++) {
+      skel->getJoint(j)->debugRelativeJacobianInPositionSpace();
+    }
+    for (int j = 0; j < skel->getNumBodyNodes(); j++) {
+      skel->getBodyNode(j)->debugJacobianOfCForward(WithRespectTo::POSITION);
+    }
+    for (int j = skel->getNumBodyNodes() - 1; j >= 0; j--) {
+      skel->getBodyNode(j)->debugJacobianOfCBackward(WithRespectTo::POSITION);
+    }
+    Eigen::VectorXd x = Eigen::VectorXd::Random(skel->getNumDofs());
+    for (int j = 0; j < skel->getNumBodyNodes(); j++) {
+      skel->getBodyNode(j)->debugJacobianOfMForward(WithRespectTo::POSITION, x);
+    }
+    Eigen::MatrixXd MinvX = skel->finiteDifferenceJacobianOfM(x, WithRespectTo::POSITION);
+    for (int j = skel->getNumBodyNodes() - 1; j >= 0; j--) {
+      skel->getBodyNode(j)->debugJacobianOfMBackward(WithRespectTo::POSITION, x, MinvX);
+    }
+  }
+  return true;
+}
+
 bool verifyPosVelJacobian(WorldPtr world, VectorXd proposedVelocities)
 {
   world->setVelocities(proposedVelocities);
@@ -2155,6 +2220,7 @@ bool verifyVelGradients(WorldPtr world, VectorXd worldVel)
       && verifyPerturbedF_c(world) && verifyF_c(world)
       && verifyForceVelJacobian(world, worldVel)
       && verifyVelVelJacobian(world, worldVel)
+      && verifyFeatherstoneJacobians(world)
       && verifyPosVelJacobian(world, worldVel) && verifyNextV(world));
 }
 

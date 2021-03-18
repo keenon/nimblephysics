@@ -386,6 +386,82 @@ const Eigen::Vector6d& Joint::getRelativePrimaryAcceleration() const
 }
 
 //==============================================================================
+Eigen::MatrixXd Joint::finiteDifferenceRelativeJacobian()
+{
+  Eigen::Matrix<double, 6, Eigen::Dynamic> J = Eigen::MatrixXd::Zero(6, getNumDofs());
+  const double EPS = 1e-5;
+
+  for (int i = 0; i < getNumDofs(); i++) {
+    double original = getVelocity(i);
+    setVelocity(i, original + EPS);
+    Eigen::Vector6d Vplus = getRelativeSpatialVelocity();
+    setVelocity(i, original - EPS);
+    Eigen::Vector6d Vminus = getRelativeSpatialVelocity();
+    setVelocity(i, original);
+
+    J.col(i) = (Vplus - Vminus) / (2 * EPS);
+  }
+
+  return J;
+}
+
+//==============================================================================
+Eigen::MatrixXd Joint::finiteDifferenceRelativeJacobianInPositionSpace()
+{
+  Eigen::Matrix<double, 6, Eigen::Dynamic> J = Eigen::MatrixXd::Zero(6, getNumDofs());
+  const double EPS = 1e-5;
+
+  Eigen::Isometry3d T = getRelativeTransform();
+
+  for (int i = 0; i < getNumDofs(); i++) {
+    double original = getPosition(i);
+    setPosition(i, original + EPS);
+    Eigen::Vector6d Tplus = math::logMap(T.inverse() * getRelativeTransform());
+    setPosition(i, original - EPS);
+    Eigen::Vector6d Tminus = math::logMap(T.inverse() * getRelativeTransform());
+    setPosition(i, original);
+
+    J.col(i) = (Tplus - Tminus) / (2 * EPS);
+    /*
+    double original = getPosition(i);
+    setPosition(i, original + EPS);
+    Eigen::Matrix4d Tplus = getRelativeTransform().matrix();
+    setPosition(i, original - EPS);
+    Eigen::Matrix4d Tminus = getRelativeTransform().matrix();
+    setPosition(i, original);
+    Eigen::Matrix4d dT = (Tplus - Tminus) / (2 * EPS);
+    Eigen::Matrix4d spatialVel = dT * getRelativeTransform().inverse().matrix();
+
+    J.col(i).segment(0,3) = math::logMap(spatialVel.topLeftCorner<3,3>());
+    J.col(i).segment(3,3) = spatialVel.topRightCorner<3,1>();
+
+    Eigen::Matrix4d recoveredPlus = (math::expMap(J.col(i) * EPS) * getRelativeTransform()).matrix();
+    std::cout << "Tplus: " << std::endl << Tplus << std::endl;
+    std::cout << "recoveredPlus: " << std::endl << recoveredPlus << std::endl;
+    std::cout << "diff: " << std::endl << Tplus - recoveredPlus << std::endl;
+    */
+  }
+
+  return J;
+}
+
+//==============================================================================
+void Joint::debugRelativeJacobianInPositionSpace()
+{
+  Eigen::MatrixXd bruteForce = finiteDifferenceRelativeJacobianInPositionSpace();
+  Eigen::MatrixXd analytical = getRelativeJacobianInPositionSpace();
+  const double threshold = 1e-9;
+  if (((bruteForce - analytical).cwiseAbs().array() > threshold).any())
+  {
+    std::cout << "Relative Jacobian (in position space) disagrees on joint"
+              << "!" << std::endl;
+    std::cout << "Analytical:" << std::endl << analytical << std::endl;
+    std::cout << "Brute Force:" << std::endl << bruteForce << std::endl;
+    std::cout << "Diff:" << std::endl << analytical - bruteForce << std::endl;
+  }
+}
+
+//==============================================================================
 Eigen::Vector6d Joint::getWorldAxisScrewForPosition(int dof) const
 {
   assert(dof >= 0 && dof < getNumDofs());
@@ -535,6 +611,7 @@ Joint::Joint()
     mNeedSpatialAccelerationUpdate(true),
     mNeedPrimaryAccelerationUpdate(true),
     mIsRelativeJacobianDirty(true),
+    mIsRelativeJacobianInPositionSpaceDirty(true),
     mIsRelativeJacobianTimeDerivDirty(true)
 {
   // Do nothing. The Joint::Aspect must be created by a derived class.
@@ -633,6 +710,7 @@ void Joint::notifyPositionUpdated()
   }
 
   mIsRelativeJacobianDirty = true;
+  mIsRelativeJacobianInPositionSpaceDirty = true;
   mIsRelativeJacobianTimeDerivDirty = true;
   mNeedPrimaryAccelerationUpdate = true;
 

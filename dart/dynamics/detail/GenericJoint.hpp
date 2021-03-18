@@ -1671,6 +1671,51 @@ GenericJoint<ConfigSpaceT>::getRelativeJacobianTimeDerivStatic() const
 
 //==============================================================================
 template <class ConfigSpaceT>
+const typename GenericJoint<ConfigSpaceT>::JacobianMatrix&
+GenericJoint<ConfigSpaceT>::getRelativeJacobianInPositionSpaceStatic() const
+{
+  if (this->mIsRelativeJacobianInPositionSpaceDirty)
+  {
+    this->updateRelativeJacobianInPositionSpace(false);
+    this->mIsRelativeJacobianInPositionSpaceDirty = false;
+  }
+
+  return mJacobianInPositionSpace;
+}
+
+//==============================================================================
+template <class ConfigSpaceT>
+const math::Jacobian GenericJoint<ConfigSpaceT>::getRelativeJacobianInPositionSpace() const
+{
+  return getRelativeJacobianInPositionSpaceStatic();
+}
+
+//==============================================================================
+template <class ConfigSpaceT>
+typename GenericJoint<ConfigSpaceT>::JacobianMatrix GenericJoint<ConfigSpaceT>::getRelativeJacobianInPositionSpaceStatic(
+const Vector& positions) const
+{
+  // Default to just returning the ordinary Jacobian, which is defined in velocity space. 
+  // In most joints, except FreeJoint and BallJoint, these are the same quantity.
+  return getRelativeJacobianStatic(positions);
+}
+
+//==============================================================================
+template <class ConfigSpaceT>
+math::Jacobian GenericJoint<ConfigSpaceT>::getRelativeJacobianInPositionSpace(
+const Eigen::VectorXd& positions) const
+{
+  return getRelativeJacobianInPositionSpaceStatic(positions);
+}
+
+//==============================================================================
+template <class ConfigSpaceT>
+void GenericJoint<ConfigSpaceT>::updateRelativeJacobianInPositionSpace(bool /* mandatory */) const {
+  mJacobianInPositionSpace = getRelativeJacobianInPositionSpaceStatic(getPositionsStatic());
+}
+
+//==============================================================================
+template <class ConfigSpaceT>
 GenericJoint<ConfigSpaceT>::GenericJoint(
     const Properties& properties)
   : mVelocityChanges(Vector::Zero()),

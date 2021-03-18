@@ -772,6 +772,40 @@ math::Jacobian FreeJoint::finiteDifferenceRelativeJacobianTimeDerivDeriv2(
 }
 
 //==============================================================================
+Eigen::Matrix6d FreeJoint::getRelativeJacobianInPositionSpaceStatic(
+    const Eigen::Vector6d& positions) const
+{
+  const Eigen::Vector6d& q = positions;
+  Eigen::Matrix6d J;
+
+  J.topLeftCorner<3, 3>().noalias()
+      = math::expMapJac(q.head<3>()).transpose();
+  J.bottomLeftCorner<3, 3>().setZero();
+  J.topRightCorner<3, 3>().setZero();
+  J.bottomRightCorner<3, 3>().noalias()
+      = math::expMapRot(q.head<3>()).transpose();
+
+  Eigen::Matrix6d result = math::AdTJacFixed(Joint::mAspectProperties.mT_ChildBodyToJoint, J);
+
+#ifndef NDEBUG
+  const double threshold = 1e-10;
+  Eigen::Matrix6d fd = const_cast<FreeJoint*>(this)->finiteDifferenceRelativeJacobianInPositionSpace();
+  if (((fd - result).cwiseAbs().array() > threshold).any())
+  {
+    std::cout << "FreeJoint position Jacobian wrong!" << std::endl;
+    std::cout << "Position:" << std::endl << getPositions() << std::endl;
+    std::cout << "Analytical:" << std::endl << result << std::endl;
+    std::cout << "Brute Force:" << std::endl << fd << std::endl;
+    std::cout << "Diff:" << std::endl << result - fd << std::endl;
+    assert(false);
+  }
+#endif
+
+  return result;
+}
+
+
+//==============================================================================
 Eigen::Vector6d FreeJoint::getPositionDifferencesStatic(
     const Eigen::Vector6d& q2,
     const Eigen::Vector6d& q1) const

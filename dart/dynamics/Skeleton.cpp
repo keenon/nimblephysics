@@ -1642,17 +1642,6 @@ Eigen::MatrixXd Skeleton::getJacobianOfC(neural::WithRespectTo* wrt)
       wrt == neural::WithRespectTo::POSITION
       || wrt == neural::WithRespectTo::VELOCITY)
   {
-    // TODO(JS): Remove this once FreeJoint is fixed
-    for (auto i = 0u; i < getNumJoints(); ++i)
-    {
-      Joint* joint = getJoint(i);
-      if (joint->getType() == BallJoint::getStaticType()
-          || joint->getType() == FreeJoint::getStaticType())
-      {
-        return finiteDifferenceJacobianOfC(wrt);
-      }
-    }
-
     std::vector<BodyNode*>& bodyNodes = mSkelCache.mBodyNodes;
 
 #ifdef DART_DEBUG_ANALYTICAL_DERIV
@@ -1697,17 +1686,6 @@ Eigen::MatrixXd Skeleton::getJacobianOfM(
   }
   else if (wrt == neural::WithRespectTo::POSITION)
   {
-    // TODO(JS): Remove this once FreeJoint is fixed
-    for (auto i = 0u; i < getNumJoints(); ++i)
-    {
-      Joint* joint = getJoint(i);
-      if (joint->getType() == BallJoint::getStaticType()
-          || joint->getType() == FreeJoint::getStaticType())
-      {
-        return finiteDifferenceJacobianOfM(x, wrt);
-      }
-    }
-
     const auto old_ddq = getAccelerations();
     setAccelerations(x);
 
@@ -1877,12 +1855,17 @@ void Skeleton::DiffMinv::print()
 //==============================================================================
 /// This gives the unconstrained Jacobian of M^{-1}f
 Eigen::MatrixXd Skeleton::getJacobianOfMinv(
-    const Eigen::VectorXd& f, neural::WithRespectTo* wrt, bool useID)
+    const Eigen::VectorXd& f, neural::WithRespectTo* wrt)
 {
+  return getJacobianOfMinv_ID(f, wrt);
+  // We no longer use the direct Jacobian, because it's both incorrect _and_ slower 
+  // than doing the inverse-dynamics approach, so probably not worth fixing.
+  /*
   if (useID)
     return getJacobianOfMinv_ID(f, wrt);
   else
     return getJacobianOfMinv_Direct(f, wrt);
+  */
 }
 
 //==============================================================================
@@ -1901,6 +1884,7 @@ Eigen::MatrixXd Skeleton::getJacobianOfMinv_ID(
   }
   else if (wrt == neural::WithRespectTo::POSITION)
   {
+    /*
     // TODO(JS): Remove this once FreeJoint is fixed
     for (auto i = 0u; i < getNumJoints(); ++i)
     {
@@ -1911,6 +1895,7 @@ Eigen::MatrixXd Skeleton::getJacobianOfMinv_ID(
         return finiteDifferenceJacobianOfMinv(f, wrt);
       }
     }
+    */
 
     const Eigen::MatrixXd& Minv = getInvMassMatrix();
     const Eigen::MatrixXd& DMddq_Dq = getJacobianOfM(Minv * f, wrt);
@@ -1926,6 +1911,9 @@ Eigen::MatrixXd Skeleton::getJacobianOfMinv_ID(
 Eigen::MatrixXd Skeleton::getJacobianOfMinv_Direct(
     const Eigen::VectorXd& f, neural::WithRespectTo* wrt)
 {
+  // TODO: explore correcting and debugging this method.
+  assert(false && "We should never be calling this method, it's not completely correct.");
+
   const int dofs = static_cast<int>(getNumDofs());
   Eigen::MatrixXd DMinvX_Dp = Eigen::MatrixXd::Zero(dofs, dofs);
 
@@ -1936,17 +1924,6 @@ Eigen::MatrixXd Skeleton::getJacobianOfMinv_Direct(
   }
   else if (wrt == neural::WithRespectTo::POSITION)
   {
-    // TODO(JS): Remove this once FreeJoint is fixed
-    for (auto i = 0u; i < getNumJoints(); ++i)
-    {
-      Joint* joint = getJoint(i);
-      if (joint->getType() == BallJoint::getStaticType()
-          || joint->getType() == FreeJoint::getStaticType())
-      {
-        return finiteDifferenceJacobianOfMinv(f, wrt);
-      }
-    }
-
     std::vector<BodyNode*>& bodyNodes = mSkelCache.mBodyNodes;
 
 #ifdef DART_DEBUG_ANALYTICAL_DERIV
@@ -2046,9 +2023,6 @@ Eigen::MatrixXd Skeleton::getJacobianOfMinv_Direct(
 //==============================================================================
 Eigen::MatrixXd Skeleton::getJacobianOfFD(neural::WithRespectTo* wrt)
 {
-  const int dofs = static_cast<int>(getNumDofs());
-  Eigen::MatrixXd DFD_Dp = Eigen::MatrixXd::Zero(dofs, dofs);
-
   const auto& tau = getForces();
   const auto& Cg = getCoriolisAndGravityForces();
   const auto& Minv = getInvMassMatrix();
@@ -2056,24 +2030,7 @@ Eigen::MatrixXd Skeleton::getJacobianOfFD(neural::WithRespectTo* wrt)
   const auto& DMinv_Dp = getJacobianOfMinv(tau - Cg, wrt);
   const auto& DC_Dp = getJacobianOfC(wrt);
 
-  DFD_Dp = DMinv_Dp + Minv * (-DC_Dp);
-
-  return DFD_Dp;
-}
-
-//==============================================================================
-Eigen::MatrixXd Skeleton::getJacobianOfFD_ID(neural::WithRespectTo* wrt)
-{
-  const int dofs = static_cast<int>(getNumDofs());
-  Eigen::MatrixXd DFD_Dp = Eigen::MatrixXd::Zero(dofs, dofs);
-
-  const auto& ddq = getAccelerations();
-  const auto& Minv = getInvMassMatrix();
-  const auto& DID_Dq = getJacobianOfID(ddq, wrt);
-
-  DFD_Dp = -Minv * DID_Dq;
-
-  return DFD_Dp;
+  return DMinv_Dp - Minv * DC_Dp;
 }
 
 //==============================================================================
@@ -2375,9 +2332,9 @@ Eigen::MatrixXd Skeleton::finiteDifferenceJacobianOfC(
 
 //==============================================================================
 Eigen::MatrixXd Skeleton::finiteDifferenceJacobianOfID(
-    const Eigen::VectorXd& f, neural::WithRespectTo* wrt, bool /*useRidders*/)
+    const Eigen::VectorXd& f, neural::WithRespectTo* wrt, bool useRidders)
 {
-  //  if (useRidders) return finiteDifferenceRiddersJacobianOfM(f, wrt);
+  if (useRidders) return finiteDifferenceRiddersJacobianOfID(f, wrt);
 
   std::size_t n = getNumDofs();
   std::size_t m = wrt->dim(this);
@@ -2409,6 +2366,97 @@ Eigen::MatrixXd Skeleton::finiteDifferenceJacobianOfID(
   wrt->set(this, start);
 
   setAccelerations(old_ddq);
+
+  return J;
+}
+
+//==============================================================================
+Eigen::MatrixXd Skeleton::finiteDifferenceRiddersJacobianOfID(
+    const Eigen::VectorXd& f,
+    neural::WithRespectTo* wrt)
+{
+  std::size_t n = getNumDofs();
+  std::size_t m = wrt->dim(this);
+  Eigen::MatrixXd J = Eigen::MatrixXd::Zero(n, m);
+  Eigen::VectorXd originalWrt = wrt->get(this);
+
+  const Eigen::VectorXd old_ddq = getAccelerations();
+  setAccelerations(f);
+
+  const double originalStepSize = 1e-3;
+  const double con = 1.4, con2 = (con * con);
+  const double safeThreshold = 2.0;
+  const int tabSize = 10;
+
+  for (std::size_t i = 0; i < m; i++)
+  {
+    double stepSize = originalStepSize;
+    double bestError = std::numeric_limits<double>::max();
+
+    // Neville tableau of finite difference results
+    std::array<std::array<Eigen::VectorXd, tabSize>, tabSize> tab;
+
+    Eigen::VectorXd perturbedPlus = Eigen::VectorXd(originalWrt);
+    perturbedPlus(i) += stepSize;
+    wrt->set(this, perturbedPlus);
+    computeInverseDynamics();
+    Eigen::VectorXd plus = getForces();
+    Eigen::VectorXd perturbedMinus = Eigen::VectorXd(originalWrt);
+    perturbedMinus(i) -= stepSize;
+    wrt->set(this, perturbedMinus);
+    computeInverseDynamics();
+    Eigen::VectorXd minus = getForces();
+
+    tab[0][0] = (plus - minus) / (2 * stepSize);
+
+    // Iterate over smaller and smaller step sizes
+    for (int iTab = 1; iTab < tabSize; iTab++)
+    {
+      stepSize /= con;
+
+      perturbedPlus = Eigen::VectorXd(originalWrt);
+      perturbedPlus(i) += stepSize;
+      wrt->set(this, perturbedPlus);
+      computeInverseDynamics();
+      plus = getForces();
+      perturbedMinus = Eigen::VectorXd(originalWrt);
+      perturbedMinus(i) -= stepSize;
+      wrt->set(this, perturbedMinus);
+      computeInverseDynamics();
+      minus = getForces();
+
+      tab[0][iTab] = (plus - minus) / (2 * stepSize);
+
+      double fac = con2;
+      // Compute extrapolations of increasing orders, requiring no new
+      // evaluations
+      for (int jTab = 1; jTab <= iTab; jTab++)
+      {
+        tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
+                          / (fac - 1.0);
+        fac = con2 * fac;
+        double currError = std::max(
+            (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
+            (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
+                .array()
+                .abs()
+                .maxCoeff());
+        if (currError < bestError)
+        {
+          bestError = currError;
+          J.col(i).noalias() = tab[jTab][iTab];
+        }
+      }
+
+      // If higher order is worse by a significant factor, quit early.
+      if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
+          >= safeThreshold * bestError)
+      {
+        break;
+      }
+    }
+  }
+  wrt->set(this, originalWrt);
 
   return J;
 }
@@ -2836,9 +2884,9 @@ Eigen::MatrixXd Skeleton::finiteDifferenceRiddersVelCJacobian()
 
 //==============================================================================
 Eigen::MatrixXd Skeleton::finiteDifferenceJacobianOfFD(
-    neural::WithRespectTo* wrt, bool /*useRidders*/)
+    neural::WithRespectTo* wrt, bool useRidders)
 {
-  //  if (useRidders) return finiteDifferenceRiddersJacobianOfM(f, wrt);
+  if (useRidders) return finiteDifferenceRiddersJacobianOfFD(wrt);
 
   std::size_t n = getNumDofs();
   std::size_t m = wrt->dim(this);
@@ -2865,6 +2913,96 @@ Eigen::MatrixXd Skeleton::finiteDifferenceJacobianOfFD(
 
   // Reset everything how we left it
   wrt->set(this, start);
+
+  return J;
+}
+
+//==============================================================================
+Eigen::MatrixXd Skeleton::finiteDifferenceRiddersJacobianOfFD(
+    neural::WithRespectTo* wrt)
+{
+  std::size_t n = getNumDofs();
+  std::size_t m = wrt->dim(this);
+  Eigen::MatrixXd J = Eigen::MatrixXd::Zero(n, m);
+  Eigen::VectorXd start = wrt->get(this);
+
+  const double originalStepSize = 1e-3;
+  const double con = 1.4, con2 = (con * con);
+  const double safeThreshold = 2.0;
+  const int tabSize = 10;
+
+  for (std::size_t i = 0; i < n; i++)
+  {
+    double stepSize = originalStepSize;
+    double bestError = std::numeric_limits<double>::max();
+
+    // Neville tableau of finite difference results
+    std::array<std::array<Eigen::VectorXd, tabSize>, tabSize> tab;
+
+    Eigen::VectorXd tweaked = start;
+    tweaked(i) += stepSize;
+    wrt->set(this, tweaked);
+    computeForwardDynamics();
+    Eigen::VectorXd plus = getAccelerations();
+    tweaked = start;
+    tweaked(i) -= stepSize;
+    wrt->set(this, tweaked);
+    computeForwardDynamics();
+    Eigen::VectorXd minus = getAccelerations();
+
+    tab[0][0] = (plus - minus) / (2 * stepSize);
+
+    // Iterate over smaller and smaller step sizes
+    for (int iTab = 1; iTab < tabSize; iTab++)
+    {
+      stepSize /= con;
+
+      tweaked = start;
+      tweaked(i) += stepSize;
+      wrt->set(this, tweaked);
+      computeForwardDynamics();
+      plus = getAccelerations();
+      tweaked = start;
+      tweaked(i) -= stepSize;
+      wrt->set(this, tweaked);
+      computeForwardDynamics();
+      minus = getAccelerations();
+
+      tab[0][iTab] = (plus - minus) / (2 * stepSize);
+
+      double fac = con2;
+      // Compute extrapolations of increasing orders, requiring no new
+      // evaluations
+      for (int jTab = 1; jTab <= iTab; jTab++)
+      {
+        tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
+                          / (fac - 1.0);
+        fac = con2 * fac;
+        double currError = std::max(
+            (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
+            (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
+                .array()
+                .abs()
+                .maxCoeff());
+        if (currError < bestError)
+        {
+          bestError = currError;
+          J.col(i) = tab[jTab][iTab];
+        }
+      }
+
+      // If higher order is worse by a significant factor, quit early.
+      if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
+          >= safeThreshold * bestError)
+      {
+        break;
+      }
+    }
+  }
+
+  // Reset everything how we left it
+  wrt->set(this, start);
+  computeForwardDynamics();
 
   return J;
 }
@@ -3322,9 +3460,32 @@ math::Jacobian variadicGetJacobian(
 }
 
 //==============================================================================
+template <typename... Args>
+math::Jacobian variadicGetJacobianInPositionSpace(
+    const Skeleton* _skel, const JacobianNode* _node, Args... args)
+{
+  math::Jacobian J = math::Jacobian::Zero(6, _skel->getNumDofs());
+
+  if (!isValidBodyNode(_skel, _node, "getJacobian"))
+    return J;
+
+  const math::Jacobian JBodyNode = _node->getJacobianInPositionSpace(args...);
+
+  assignJacobian<math::Jacobian>(J, _node, JBodyNode);
+
+  return J;
+}
+
+//==============================================================================
 math::Jacobian Skeleton::getJacobian(const JacobianNode* _node) const
 {
   return variadicGetJacobian(this, _node);
+}
+
+//==============================================================================
+math::Jacobian Skeleton::getJacobianInPositionSpace(const JacobianNode* _node) const
+{
+  return variadicGetJacobianInPositionSpace(this, _node);
 }
 
 //==============================================================================

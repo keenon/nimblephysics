@@ -105,6 +105,10 @@ public:
   math::Jacobian finiteDifferenceRelativeJacobianTimeDerivDeriv2(std::size_t index) const;
 
   // Documentation inherited
+  Eigen::Matrix<double, 6, 3> getRelativeJacobianInPositionSpaceStatic(
+      const Eigen::Vector3d& _positions) const override;
+
+  // Documentation inherited
   Eigen::Vector3d getPositionDifferencesStatic(
       const Eigen::Vector3d& _q2, const Eigen::Vector3d& _q1) const override;
 

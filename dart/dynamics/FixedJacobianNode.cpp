@@ -119,6 +119,15 @@ const math::Jacobian& FixedJacobianNode::getJacobian() const
 }
 
 //==============================================================================
+const math::Jacobian& FixedJacobianNode::getJacobianInPositionSpace() const
+{
+  if (mIsBodyJacobianInPositionSpaceDirty)
+    updateBodyJacobianInPositionSpace();
+
+  return mCache.mBodyJacobianInPositionSpace;
+}
+
+//==============================================================================
 const math::Jacobian& FixedJacobianNode::getWorldJacobian() const
 {
   if(mIsWorldJacobianDirty)
@@ -168,6 +177,14 @@ void FixedJacobianNode::updateBodyJacobian() const
   mCache.mBodyJacobian = math::AdInvTJac(getRelativeTransform(),
                                          mBodyNode->getJacobian());
   mIsBodyJacobianDirty = false;
+}
+
+//==============================================================================
+void FixedJacobianNode::updateBodyJacobianInPositionSpace() const
+{
+  mCache.mBodyJacobianInPositionSpace = math::AdInvTJac(getRelativeTransform(),
+                                         mBodyNode->getJacobianInPositionSpace());
+  mIsBodyJacobianInPositionSpaceDirty = false;
 }
 
 //==============================================================================

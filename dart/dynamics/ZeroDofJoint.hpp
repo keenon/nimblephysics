@@ -438,6 +438,16 @@ protected:
   Eigen::Vector6d getWorldAxisScrewForVelocity(int dof) const override;
 
   // Documentation inherited
+  const math::Jacobian getRelativeJacobianInPositionSpace() const override;
+
+  // Documentation inherited
+  math::Jacobian getRelativeJacobianInPositionSpace(
+      const Eigen::VectorXd& _positions) const override;
+
+  // Documentation inherited
+  void updateRelativeJacobianInPositionSpace(bool mandatory = true) const override;
+
+  // Documentation inherited
   void addVelocityTo(Eigen::Vector6d& _vel) override;
 
   // Documentation inherited

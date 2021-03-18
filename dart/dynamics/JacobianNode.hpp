@@ -128,6 +128,10 @@ public:
   /// The Jacobian is expressed in the Frame of this JacobianNode.
   virtual const math::Jacobian& getJacobian() const = 0;
 
+  /// Return the generalized Jacobian targeting the origin of this JacobianNode.
+  /// The Jacobian is expressed in the Frame of this JacobianNode.
+  virtual const math::Jacobian& getJacobianInPositionSpace() const = 0;
+
   /// A version of getJacobian() that lets you specify a coordinate Frame to
   /// express the Jacobian in.
   virtual math::Jacobian getJacobian(const Frame* _inCoordinatesOf) const = 0;
@@ -287,6 +291,9 @@ protected:
 
   /// Dirty flag for body Jacobian.
   mutable bool mIsBodyJacobianDirty;
+
+  /// Dirty flag for body Jacobian.
+  mutable bool mIsBodyJacobianInPositionSpaceDirty;
 
   /// Dirty flag for world Jacobian
   mutable bool mIsWorldJacobianDirty;
