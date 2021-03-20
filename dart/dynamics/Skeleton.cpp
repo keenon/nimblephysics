@@ -2058,7 +2058,8 @@ Eigen::MatrixXd Skeleton::getUnconstrainedVelJacobianWrt(
 Eigen::MatrixXd Skeleton::getVelCJacobian()
 {
   // TOOD(keenon): replace with the GEAR approach
-  return finiteDifferenceVelCJacobian();
+  // return finiteDifferenceVelCJacobian();
+  return getJacobianOfC(neural::WithRespectTo::VELOCITY);
 }
 
 #ifdef DART_DEBUG_ANALYTICAL_DERIV
