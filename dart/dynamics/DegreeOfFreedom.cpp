@@ -561,6 +561,7 @@ bool DegreeOfFreedom::isParentOfFast(const DegreeOfFreedom* target) const
 {
   const dynamics::Joint* parentJoint = getJoint();
   const dynamics::Joint* childJoint = target->getJoint();
+  dynamics::Skeleton* parentSkel = const_cast<dynamics::Skeleton*>(getSkeleton().get());
   if (parentJoint == childJoint)
   {
     // For multi-DOF joints, each axis affects all the others.
@@ -568,12 +569,12 @@ bool DegreeOfFreedom::isParentOfFast(const DegreeOfFreedom* target) const
   }
   // If these joints aren't in the same skeleton, or aren't in the same tree
   // within that skeleton, this is trivially false
-  if (parentJoint->getSkeleton()->getName()
+  if (parentSkel->getName()
           != childJoint->getSkeleton()->getName()
       || parentJoint->getTreeIndex() != childJoint->getTreeIndex())
     return false;
 
-  bool result = const_cast<dynamics::Skeleton*>(parentJoint->getSkeleton().get())->getParentMap()(getIndexInSkeleton(), target->getIndexInSkeleton()) == 1;
+  bool result = parentSkel->getParentMap()(getIndexInSkeleton(), target->getIndexInSkeleton()) == 1;
   #ifndef NDEBUG
   bool slowResult = isParentOf(target);
   assert(result == slowResult);
