@@ -465,23 +465,14 @@ void Joint::debugRelativeJacobianInPositionSpace()
 Eigen::Vector6d Joint::getWorldAxisScrewForPosition(int dof) const
 {
   assert(dof >= 0 && dof < getNumDofs());
-  Eigen::Vector6d localTwist
-      = getRelativeJacobian().col(dof);
-  // used to be AdT by Joint::mAspectProperties.mT_ParentBodyToJoint
-  Eigen::Vector6d parentTwist = math::AdT(getRelativeTransform(), localTwist);
-
-  Eigen::Isometry3d parentTransform = Eigen::Isometry3d::Identity();
-  if (getParentBodyNode() != nullptr) {
-    parentTransform = getParentBodyNode()->getWorldTransform();
-  }
-  return math::AdT(parentTransform, parentTwist);
+  return math::AdT(getChildBodyNode()->getWorldTransform(), getRelativeJacobianInPositionSpace().col(dof));
 }
 
 //==============================================================================
 Eigen::Vector6d Joint::getWorldAxisScrewForVelocity(int dof) const
 {
-  Eigen::Vector6d col = getRelativeJacobian().col(dof);
-  return math::AdT(getChildBodyNode()->getWorldTransform(), col);
+  assert(dof >= 0 && dof < getNumDofs());
+  return math::AdT(getChildBodyNode()->getWorldTransform(), getRelativeJacobian().col(dof));
 }
 
 //==============================================================================
