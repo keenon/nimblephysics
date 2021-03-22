@@ -461,11 +461,13 @@ void BallJoint::updateRelativeJacobianTimeDeriv() const
 #endif
 }
 
+/*
 //==============================================================================
 Eigen::Vector6d BallJoint::getWorldAxisScrewForPosition(int dof) const
 {
   return getWorldAxisScrewAt(getPositionsStatic(), dof);
 }
+*/
 
 //==============================================================================
 // This computes the world axis screw at a given position, without moving the joint.

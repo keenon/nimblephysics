@@ -1074,11 +1074,13 @@ const Eigen::Isometry3d& FreeJoint::getQ() const
   return mQ;
 }
 
+/*
 //==============================================================================
 // This gets the world axis screw at the current position, without moving the joint.
 Eigen::Vector6d FreeJoint::getWorldAxisScrewForPosition(int dof) const {
   return getWorldAxisScrewAt(getPositionsStatic(), dof);
 }
+*/
 
 //==============================================================================
 // This computes the world axis screw at a given position, without moving the joint.
