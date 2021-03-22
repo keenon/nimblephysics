@@ -561,7 +561,7 @@ Eigen::Matrix6d FreeJoint::finiteDifferenceRelativeJacobianStatic(
   Eigen::Matrix6d J;
 
   const Eigen::Vector6d& q = positions;
-  const auto& old_q = getPositions();
+  const auto& old_q = getPositionsStatic();
 
   for (auto i = 0u; i < 6; ++i)
   {
@@ -601,9 +601,9 @@ Eigen::Matrix6d FreeJoint::finiteDifferenceRelativeJacobianStatic(
 math::Jacobian FreeJoint::getRelativeJacobianDeriv(std::size_t index) const
 {
 #ifdef DART_USE_IDENTITY_JACOBIAN
-   return finiteDifferenceRelativeJacobianTimeDerivDeriv2(index);
-//  (void)index;
-//  return Eigen::Matrix6d::Zero();
+   // return finiteDifferenceRelativeJacobianTimeDerivDeriv2(index);
+  (void)index;
+  return Eigen::Matrix6d::Zero();
 #else
 //  Eigen::Matrix6d DS_Dq = Eigen::Matrix6d::Zero();
 
@@ -660,9 +660,9 @@ math::Jacobian FreeJoint::getRelativeJacobianTimeDerivDeriv(
     std::size_t index) const
 {
 #ifdef DART_USE_IDENTITY_JACOBIAN
-   return finiteDifferenceRelativeJacobianTimeDerivDeriv2(index);
-//  (void)index;
-//  return Eigen::Matrix6d::Zero();
+ // return finiteDifferenceRelativeJacobianTimeDerivDeriv2(index);
+  (void)index;
+  return Eigen::Matrix6d::Zero();
 #else
 //  Eigen::Matrix6d DS_Dq = Eigen::Matrix6d::Zero();
 
@@ -718,9 +718,9 @@ math::Jacobian FreeJoint::getRelativeJacobianTimeDerivDeriv2(
     std::size_t index) const
 {
 #ifdef DART_USE_IDENTITY_JACOBIAN
-   return finiteDifferenceRelativeJacobianTimeDerivDeriv2(index);
-//  (void)index;
-//  return Eigen::Matrix6d::Zero();
+   // return finiteDifferenceRelativeJacobianTimeDerivDeriv2(index);
+   (void)index;
+   return Eigen::Matrix6d::Zero();
 #else
 //  Eigen::Matrix6d DS_Dq = Eigen::Matrix6d::Zero();
 

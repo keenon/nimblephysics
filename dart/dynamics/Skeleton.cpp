@@ -1884,19 +1884,6 @@ Eigen::MatrixXd Skeleton::getJacobianOfMinv_ID(
   }
   else if (wrt == neural::WithRespectTo::POSITION)
   {
-    /*
-    // TODO(JS): Remove this once FreeJoint is fixed
-    for (auto i = 0u; i < getNumJoints(); ++i)
-    {
-      Joint* joint = getJoint(i);
-      if (joint->getType() == BallJoint::getStaticType()
-          || joint->getType() == FreeJoint::getStaticType())
-      {
-        return finiteDifferenceJacobianOfMinv(f, wrt);
-      }
-    }
-    */
-
     const Eigen::MatrixXd& Minv = getInvMassMatrix();
     const Eigen::MatrixXd& DMddq_Dq = getJacobianOfM(Minv * f, wrt);
     return -Minv * DMddq_Dq;

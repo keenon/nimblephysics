@@ -464,6 +464,11 @@ public:
   Eigen::MatrixXd getJacobianOfC(
       simulation::WorldPtr world, WithRespectTo* wrt);
 
+  /// This returns the jacobian of C(pos, inertia, vel), holding everything
+  /// constant except the value of WithRespectTo
+  Eigen::MatrixXd computeJacobianOfC(
+      simulation::WorldPtr world, WithRespectTo* wrt);
+
   /// This computes and returns the jacobian of C(pos, inertia, vel) by finite
   /// differences. This is SUPER SLOW, and is only here for testing.
   Eigen::MatrixXd finiteDifferenceJacobianOfC(
@@ -783,6 +788,10 @@ private:
   Eigen::MatrixXd mCachedForceVel;
   bool mCachedMassVelDirty;
   Eigen::MatrixXd mCachedMassVel;
+  bool mCachedPosCDirty;
+  Eigen::MatrixXd mCachedPosC;
+  bool mCachedVelCDirty;
+  Eigen::MatrixXd mCachedVelC;
 
   Eigen::VectorXd scratch(simulation::WorldPtr world);
 

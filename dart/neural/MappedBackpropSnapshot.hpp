@@ -150,16 +150,19 @@ public:
   /// Returns a concatenated vector of all the Skeletons' position()'s in the
   /// World, in order in which the Skeletons appear in the World's
   /// getSkeleton(i) returns them, BEFORE the timestep.
-  const Eigen::VectorXd& getPreStepPosition(const std::string& mapping);
+  const Eigen::VectorXd& getPreStepPosition(const std::string& mapping = "identity");
 
   /// Returns a concatenated vector of all the Skeletons' velocity()'s in the
   /// World, in order in which the Skeletons appear in the World's
   /// getSkeleton(i) returns them, BEFORE the timestep.
-  const Eigen::VectorXd& getPreStepVelocity(const std::string& mapping);
+  const Eigen::VectorXd& getPreStepVelocity(const std::string& mapping = "identity");
 
   /// Returns a concatenated vector of all the joint torques that were applied
   /// during the forward pass, BEFORE the timestep.
-  const Eigen::VectorXd& getPreStepTorques(const std::string& mapping);
+  const Eigen::VectorXd& getPreStepTorques(const std::string& mapping = "identity");
+
+  /// Returns the LCP's cached solution from before the step
+  const Eigen::VectorXd& getPreStepLCPCache();
 
   /// Returns a concatenated vector of all the Skeletons' position()'s in the
   /// World, in order in which the Skeletons appear in the World's

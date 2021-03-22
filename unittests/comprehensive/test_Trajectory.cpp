@@ -66,7 +66,7 @@
 #include "TrajectoryTestUtils.hpp"
 #include "stdio.h"
 
-#define ALL_TESTS
+// #define ALL_TESTS
 
 using namespace dart;
 using namespace math;
@@ -1115,7 +1115,7 @@ TEST(TRAJECTORY, CONSTRAINED_CYCLE)
 }
 #endif
 
-#ifdef ALL_TESTS
+// #ifdef ALL_TESTS
 TEST(TRAJECTORY, JUMP_WORM)
 {
   bool offGround = false;
@@ -1271,7 +1271,7 @@ TEST(TRAJECTORY, JUMP_WORM)
   EXPECT_TRUE(verifyMultiShotJacobianCustomConstraint(
       world, 8, 4, loss, lossGrad, 3.0));
 }
-#endif
+// #endif
 
 #ifdef ALL_TESTS
 TEST(TRAJECTORY, REOPTIMIZATION)

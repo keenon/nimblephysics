@@ -480,14 +480,20 @@ void SingleShot::backpropJacobianOfFinalState(
   assert(jacDynamic.rows() == posDim + velDim);
   assert(jacStatic.rows() == posDim + velDim);
 
+  RestorableSnapshot restoreSnapshot(world);
+
   int cursorDynamic = getFlatDynamicProblemDim(world);
   for (int i = mSteps - 1; i >= 0; i--)
   {
     MappedBackpropSnapshotPtr ptr = snapshots[i];
     TimestepJacobians thisTimestep;
+
+    world->setPositions(ptr->getPreStepPosition());
+    world->setVelocities(ptr->getPreStepVelocity());
+    world->setExternalForces(ptr->getPreStepTorques());
+    world->setCachedLCPSolution(ptr->getPreStepLCPCache());
+
     Eigen::MatrixXd forceVel = ptr->getForceVelJacobian(
-        world, mRepresentationMapping, mRepresentationMapping, thisLog);
-    Eigen::MatrixXd massVel = ptr->getMassVelJacobian(
         world, mRepresentationMapping, mRepresentationMapping, thisLog);
     Eigen::MatrixXd posPos = ptr->getPosPosJacobian(
         world, mRepresentationMapping, mRepresentationMapping, thisLog);
@@ -496,6 +502,9 @@ void SingleShot::backpropJacobianOfFinalState(
     Eigen::MatrixXd velPos = ptr->getVelPosJacobian(
         world, mRepresentationMapping, mRepresentationMapping, thisLog);
     Eigen::MatrixXd velVel = ptr->getVelVelJacobian(
+        world, mRepresentationMapping, mRepresentationMapping, thisLog);
+    // This blows up our caches, because it does finite differencing, so put this last
+    Eigen::MatrixXd massVel = ptr->getMassVelJacobian(
         world, mRepresentationMapping, mRepresentationMapping, thisLog);
 
     // p_end <- f_t = p_end <- v_t+1 * v_t+1 <- f_t
@@ -545,6 +554,8 @@ void SingleShot::backpropJacobianOfFinalState(
     last = thisTimestep;
   }
   assert(cursorDynamic == 0);
+
+  restoreSnapshot.restore();
 
 #ifdef LOG_PERFORMANCE_SINGLE_SHOT
   if (thisLog != nullptr)
@@ -1028,6 +1039,8 @@ TimestepJacobians SingleShot::backpropStartStateJacobians(
   last.velVel = Eigen::MatrixXd::Identity(velDim, velDim);
   last.velPos = Eigen::MatrixXd::Zero(posDim, velDim);
 
+  RestorableSnapshot restoreSnapshot(world);
+
   for (int i = mSteps - 1; i >= 0; i--)
   {
     MappedBackpropSnapshotPtr ptr = snapshots[i];
@@ -1053,6 +1066,11 @@ TimestepJacobians SingleShot::backpropStartStateJacobians(
     }
     else
     {
+      world->setPositions(ptr->getPreStepPosition());
+      world->setVelocities(ptr->getPreStepVelocity());
+      world->setExternalForces(ptr->getPreStepTorques());
+      world->setCachedLCPSolution(ptr->getPreStepLCPCache());
+
       forceVel = ptr->getForceVelJacobian(
           world, mRepresentationMapping, mRepresentationMapping);
       posPos = ptr->getPosPosJacobian(
@@ -1084,6 +1102,8 @@ TimestepJacobians SingleShot::backpropStartStateJacobians(
 
     last = thisTimestep;
   }
+
+  restoreSnapshot.restore();
 
   return last;
 }

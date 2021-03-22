@@ -76,7 +76,7 @@ bool verifySingleStep(WorldPtr world, double EPS)
       = shot.backpropStartStateJacobians(world);
   TimestepJacobians bruteForceJacobians
       = shot.finiteDifferenceStartStateJacobians(world, EPS);
-  BackpropSnapshotPtr ptr = neural::forwardPass(world);
+  BackpropSnapshotPtr ptr = neural::forwardPass(world, true);
   Eigen::MatrixXd velVelAnalytical = ptr->getVelVelJacobian(world);
   Eigen::MatrixXd velVelFD = ptr->finiteDifferenceVelVelJacobian(world);
 

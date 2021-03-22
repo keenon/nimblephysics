@@ -1120,6 +1120,8 @@ bool verifyF_c(WorldPtr world)
   Eigen::MatrixXd bruteForceA_cJac
       = classicPtr->finiteDifferenceJacobianOfClampingConstraints(world, ones);
 
+  assert(world->getPositions() == classicPtr->getPreStepPosition() && world->getVelocities() == classicPtr->getPreStepVelocity());
+
   if (!equals(analyticalA_cJac, bruteForceA_cJac, 1e-8))
   {
     if (analyticalA_cJac.cols() >= 6 && analyticalA_cJac.rows() >= 6)
@@ -1154,6 +1156,8 @@ bool verifyF_c(WorldPtr world)
   Eigen::MatrixXd bruteForceA_cTJac
       = classicPtr->finiteDifferenceJacobianOfClampingConstraintsTranspose(
           world, ones);
+
+  assert(world->getPositions() == classicPtr->getPreStepPosition() && world->getVelocities() == classicPtr->getPreStepVelocity());
 
   if (!equals(analyticalA_cTJac, bruteForceA_cTJac, 1e-9))
   {
@@ -1197,6 +1201,8 @@ bool verifyF_c(WorldPtr world)
     Eigen::MatrixXd bruteForceMinv_fJac
         = classicPtr->finiteDifferenceJacobianOfMinv(
             world, x, WithRespectTo::POSITION);
+
+    assert(world->getPositions() == classicPtr->getPreStepPosition() && world->getVelocities() == classicPtr->getPreStepVelocity());
     if (!equals(analyticalMinv_fJac, bruteForceMinv_fJac, 1e-8))
     {
       std::cout << "Brute force Minv*x (x constant) Jacobian:" << std::endl
@@ -1260,6 +1266,9 @@ bool verifyF_c(WorldPtr world)
     Eigen::MatrixXd analyticalQinvBJac
         = classicPtr->getJacobianOfLCPConstraintMatrixClampingSubset(
             world, realB, WithRespectTo::POSITION);
+
+    assert(world->getPositions() == classicPtr->getPreStepPosition() && world->getVelocities() == classicPtr->getPreStepVelocity());
+
     if (!equals(analyticalQinvBJac, bruteForceQinvBJac, 1e-8))
     {
       if (analyticalQinvBJac.rows() >= 6 && analyticalQinvBJac.cols() >= 6)
@@ -1322,6 +1331,9 @@ bool verifyF_c(WorldPtr world)
     Eigen::MatrixXd analyticalJacB
         = classicPtr->getJacobianOfLCPOffsetClampingSubset(
             world, WithRespectTo::POSITION);
+
+    assert(world->getPositions() == classicPtr->getPreStepPosition() && world->getVelocities() == classicPtr->getPreStepVelocity());
+
     if (!equals(analyticalJacB, bruteForceJacB, 1e-8))
     {
       std::cout << "Failed dB Jacobian for POSITION!" << std::endl;
@@ -1367,6 +1379,9 @@ bool verifyF_c(WorldPtr world)
             world, WithRespectTo::POSITION);
     Eigen::MatrixXd analyticalJac = classicPtr->getJacobianOfConstraintForce(
         world, WithRespectTo::POSITION);
+
+    assert(world->getPositions() == classicPtr->getPreStepPosition() && world->getVelocities() == classicPtr->getPreStepVelocity());
+
     if (!equals(analyticalJac, bruteForceJac, 2e-8))
     {
       std::cout << "Failed f_c Jacobian for POSITION!" << std::endl;
@@ -1424,6 +1439,9 @@ bool verifyF_c(WorldPtr world)
             world, WithRespectTo::VELOCITY);
     analyticalJacB = classicPtr->getJacobianOfLCPOffsetClampingSubset(
         world, WithRespectTo::VELOCITY);
+
+    assert(world->getPositions() == classicPtr->getPreStepPosition() && world->getVelocities() == classicPtr->getPreStepVelocity());
+
     if (!equals(analyticalJacB, bruteForceJacB, 1e-8))
     {
       std::cout << "Failed dB Jacobian for VELOCITY!" << std::endl;
@@ -1465,6 +1483,9 @@ bool verifyF_c(WorldPtr world)
         world, WithRespectTo::VELOCITY);
     analyticalJac = classicPtr->getJacobianOfConstraintForce(
         world, WithRespectTo::VELOCITY);
+
+    assert(world->getPositions() == classicPtr->getPreStepPosition() && world->getVelocities() == classicPtr->getPreStepVelocity());
+
     if (!equals(analyticalJac, bruteForceJac, 1e-8))
     {
       std::cout << "Failed f_c Jacobian for VELOCITY!" << std::endl;
@@ -1510,6 +1531,9 @@ bool verifyF_c(WorldPtr world)
             world, WithRespectTo::FORCE);
     analyticalJacB = classicPtr->getJacobianOfLCPOffsetClampingSubset(
         world, WithRespectTo::FORCE);
+
+    assert(world->getPositions() == classicPtr->getPreStepPosition() && world->getVelocities() == classicPtr->getPreStepVelocity());
+
     if (!equals(analyticalJacB, bruteForceJacB, 1e-8))
     {
       std::cout << "Failed dB Jacobian for FORCE!" << std::endl;
@@ -1551,6 +1575,9 @@ bool verifyF_c(WorldPtr world)
         world, WithRespectTo::FORCE);
     analyticalJac
         = classicPtr->getJacobianOfConstraintForce(world, WithRespectTo::FORCE);
+
+    assert(world->getPositions() == classicPtr->getPreStepPosition() && world->getVelocities() == classicPtr->getPreStepVelocity());
+
     if (!equals(analyticalJac, bruteForceJac, 1e-8))
     {
       std::cout << "Failed f_c Jacobian for FORCE!" << std::endl;

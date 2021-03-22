@@ -56,11 +56,13 @@ BackpropSnapshot::BackpropSnapshot(
   // Reset the world to the initial state before finalizing all the gradient
   // matrices
 
+  /*
   RestorableSnapshot snapshot(world);
   world->setPositions(mPreStepPosition);
   world->setVelocities(mPreStepVelocity);
   world->setExternalForces(mPreStepTorques);
   world->setCachedLCPSolution(mPreStepLCPCache);
+  */
 
   // Collect all the constraint groups attached to each skeleton
 
@@ -89,7 +91,7 @@ BackpropSnapshot::BackpropSnapshot(
     }
   }
 
-  snapshot.restore();
+  // snapshot.restore();
 
   mCachedPosPosDirty = true;
   mCachedVelPosDirty = true;
@@ -99,6 +101,8 @@ BackpropSnapshot::BackpropSnapshot(
   mCachedForcePosDirty = true;
   mCachedForceVelDirty = true;
   mCachedMassVelDirty = true;
+  mCachedVelCDirty = true;
+  mCachedPosCDirty = true;
 
   /*
   if (!areResultsStandardized())
@@ -137,6 +141,7 @@ void BackpropSnapshot::backprop(
   world->setPositions(mPreStepPosition);
   world->setVelocities(mPreStepVelocity);
   world->setExternalForces(mPreStepTorques);
+  world->setCachedLCPSolution(mPreStepLCPCache);
 
   // Create the vectors for this timestep
 
@@ -431,6 +436,10 @@ void BackpropSnapshot::clipLossGradientsToBounds(
 const Eigen::MatrixXd& BackpropSnapshot::getForceVelJacobian(
     WorldPtr world, PerformanceLog* perfLog)
 {
+  #ifndef NDEBUG
+  assert(world->getPositions() == mPreStepPosition && world->getVelocities() == mPreStepVelocity);
+  #endif
+
   PerformanceLog* thisLog = nullptr;
 #ifdef LOG_PERFORMANCE_BACKPROP_SNAPSHOT
   if (perfLog != nullptr)
@@ -523,6 +532,10 @@ const Eigen::MatrixXd& BackpropSnapshot::getForceVelJacobian(
 const Eigen::MatrixXd& BackpropSnapshot::getMassVelJacobian(
     simulation::WorldPtr world, PerformanceLog* perfLog)
 {
+  #ifndef NDEBUG
+  assert(world->getPositions() == mPreStepPosition && world->getVelocities() == mPreStepVelocity);
+  #endif
+
   PerformanceLog* thisLog = nullptr;
 #ifdef LOG_PERFORMANCE_BACKPROP_SNAPSHOT
   if (perfLog != nullptr)
@@ -580,6 +593,10 @@ const Eigen::MatrixXd& BackpropSnapshot::getMassVelJacobian(
 const Eigen::MatrixXd& BackpropSnapshot::getVelVelJacobian(
     WorldPtr world, PerformanceLog* perfLog)
 {
+  #ifndef NDEBUG
+  assert(world->getPositions() == mPreStepPosition && world->getVelocities() == mPreStepVelocity);
+  #endif
+
   PerformanceLog* thisLog = nullptr;
 #ifdef LOG_PERFORMANCE_BACKPROP_SNAPSHOT
   if (perfLog != nullptr)
@@ -683,6 +700,10 @@ const Eigen::MatrixXd& BackpropSnapshot::getVelVelJacobian(
 const Eigen::MatrixXd& BackpropSnapshot::getPosVelJacobian(
     WorldPtr world, PerformanceLog* perfLog)
 {
+  #ifndef NDEBUG
+  assert(world->getPositions() == mPreStepPosition && world->getVelocities() == mPreStepVelocity);
+  #endif
+
   PerformanceLog* thisLog = nullptr;
 #ifdef LOG_PERFORMANCE_BACKPROP_SNAPSHOT
   if (perfLog != nullptr)
@@ -1012,11 +1033,13 @@ Eigen::MatrixXd BackpropSnapshot::getVelJacobianWrt(
   {
     return Eigen::MatrixXd::Zero(world->getNumDofs(), 0);
   }
+  /*
   RestorableSnapshot snapshot(world);
   world->setPositions(mPreStepPosition);
   world->setVelocities(mPreStepVelocity);
   world->setExternalForces(mPreStepTorques);
   world->setCachedLCPSolution(mPreStepLCPCache);
+  */
 
   Eigen::MatrixXd A_c = getClampingConstraintMatrix(world);
   Eigen::MatrixXd A_ub = getUpperBoundConstraintMatrix(world);
@@ -1051,7 +1074,7 @@ Eigen::MatrixXd BackpropSnapshot::getVelJacobianWrt(
                             world->getNumDofs(), world->getNumDofs()))
               << std::endl;
     */
-    snapshot.restore();
+    // snapshot.restore();
     return Minv
            * ((A_c_ub_E * dF_c)
               + (dt
@@ -1063,7 +1086,7 @@ Eigen::MatrixXd BackpropSnapshot::getVelJacobianWrt(
 
   if (wrt == WithRespectTo::VELOCITY)
   {
-    snapshot.restore();
+    // snapshot.restore();
     return Eigen::MatrixXd::Identity(world->getNumDofs(), world->getNumDofs())
            + Minv * (A_c_ub_E * dF_c - dt * dC);
   }
@@ -1071,12 +1094,12 @@ Eigen::MatrixXd BackpropSnapshot::getVelJacobianWrt(
   {
     Eigen::MatrixXd dA_c = getJacobianOfClampingConstraints(world, f_c);
     Eigen::MatrixXd dA_ubE = getJacobianOfUpperBoundConstraints(world, E * f_c);
-    snapshot.restore();
+    // snapshot.restore();
     return dM + Minv * (A_c_ub_E * dF_c + dA_c + dA_ubE - dt * dC);
   }
   else
   {
-    snapshot.restore();
+    // snapshot.restore();
     return dM + Minv * (A_c_ub_E * dF_c - dt * dC);
   }
 
@@ -1166,11 +1189,13 @@ const Eigen::MatrixXd& BackpropSnapshot::getBounceApproximationJacobian(
     }
 #endif
 
+    /*
     RestorableSnapshot snapshot(world);
     world->setPositions(mPreStepPosition);
     world->setVelocities(mPreStepVelocity);
     world->setExternalForces(mPreStepTorques);
     world->setCachedLCPSolution(mPreStepLCPCache);
+    */
 
     Eigen::MatrixXd A_b = getBouncingConstraintMatrix(world);
 
@@ -1218,7 +1243,7 @@ const Eigen::MatrixXd& BackpropSnapshot::getBounceApproximationJacobian(
 
       mCachedBounceApproximation = X;
     }
-    snapshot.restore();
+    // snapshot.restore();
 
     mCachedBounceApproximationDirty = false;
 #ifdef LOG_PERFORMANCE_BACKPROP_SNAPSHOT
@@ -1242,6 +1267,10 @@ const Eigen::MatrixXd& BackpropSnapshot::getBounceApproximationJacobian(
 const Eigen::MatrixXd& BackpropSnapshot::getPosPosJacobian(
     WorldPtr world, PerformanceLog* perfLog)
 {
+  #ifndef NDEBUG
+  assert(world->getPositions() == mPreStepPosition && world->getVelocities() == mPreStepVelocity);
+  #endif
+
   PerformanceLog* thisLog = nullptr;
 #ifdef LOG_PERFORMANCE_BACKPROP_SNAPSHOT
   if (perfLog != nullptr)
@@ -1267,16 +1296,18 @@ const Eigen::MatrixXd& BackpropSnapshot::getPosPosJacobian(
     }
     else
     {
+      /*
       RestorableSnapshot snapshot(world);
       world->setPositions(mPreStepPosition);
       world->setVelocities(mPreStepVelocity);
       world->setExternalForces(mPreStepTorques);
       world->setCachedLCPSolution(mPreStepLCPCache);
+      */
 
       mCachedPosPos = world->getPosPosJacobian()
                       * getBounceApproximationJacobian(world, thisLog);
 
-      snapshot.restore();
+      // snapshot.restore();
     }
 
     if (mSlowDebugResultsAgainstFD)
@@ -1309,6 +1340,10 @@ const Eigen::MatrixXd& BackpropSnapshot::getPosPosJacobian(
 const Eigen::MatrixXd& BackpropSnapshot::getVelPosJacobian(
     WorldPtr world, PerformanceLog* perfLog)
 {
+  #ifndef NDEBUG
+  assert(world->getPositions() == mPreStepPosition && world->getVelocities() == mPreStepVelocity);
+  #endif
+
   PerformanceLog* thisLog = nullptr;
 #ifdef LOG_PERFORMANCE_BACKPROP_SNAPSHOT
   if (perfLog != nullptr)
@@ -1520,8 +1555,7 @@ Eigen::MatrixXd BackpropSnapshot::getPosCJacobian(simulation::WorldPtr world)
 //==============================================================================
 Eigen::MatrixXd BackpropSnapshot::getVelCJacobian(simulation::WorldPtr world)
 {
-  return assembleBlockDiagonalMatrix(
-      world, BackpropSnapshot::BlockDiagonalMatrixToAssemble::VEL_C);
+  return getJacobianOfC(world, WithRespectTo::VELOCITY);
 }
 
 //==============================================================================
@@ -4046,11 +4080,13 @@ Eigen::MatrixXd BackpropSnapshot::getJacobianOfConstraintForce(
   Eigen::MatrixXd A_ub = getUpperBoundConstraintMatrix(world);
   Eigen::MatrixXd E = getUpperBoundMappingMatrix();
 
+  /*
   RestorableSnapshot snapshot(world);
   world->setPositions(mPreStepPosition);
   world->setVelocities(mPreStepVelocity);
   world->setExternalForces(mPreStepTorques);
   world->setCachedLCPSolution(mPreStepLCPCache);
+  */
 
   Eigen::MatrixXd Minv = getInvMassMatrix(world);
   Eigen::MatrixXd A_c_ub_E = A_c + A_ub * E;
@@ -4064,7 +4100,7 @@ Eigen::MatrixXd BackpropSnapshot::getJacobianOfConstraintForce(
   if (wrt == WithRespectTo::VELOCITY || wrt == WithRespectTo::FORCE)
   {
     // dQ_b is 0, so don't compute it
-    snapshot.restore();
+    // snapshot.restore();
     return Qfac.solve(dB);
   }
 
@@ -4072,7 +4108,7 @@ Eigen::MatrixXd BackpropSnapshot::getJacobianOfConstraintForce(
   Eigen::MatrixXd dQ_b
       = getJacobianOfLCPConstraintMatrixClampingSubset(world, b, wrt);
 
-  snapshot.restore();
+  // snapshot.restore();
 
   return dQ_b + Qfac.solve(dB);
 }
@@ -4094,11 +4130,13 @@ BackpropSnapshot::getJacobianOfLCPConstraintMatrixClampingSubset(
     return Eigen::MatrixXd::Zero(A_c.cols(), mNumDOFs);
   }
 
+  /*
   RestorableSnapshot snapshot(world);
   world->setPositions(mPreStepPosition);
   world->setVelocities(mPreStepVelocity);
   world->setExternalForces(mPreStepTorques);
   world->setCachedLCPSolution(mPreStepLCPCache);
+  */
 
   Eigen::MatrixXd A_ub = getUpperBoundConstraintMatrix(world);
   Eigen::MatrixXd E = getUpperBoundMappingMatrix();
@@ -4143,7 +4181,7 @@ BackpropSnapshot::getJacobianOfLCPConstraintMatrixClampingSubset(
                   + (Minv                                                      \
                      * (getJacobianOfClampingConstraints(world, rhs)))))))
 
-      snapshot.restore();
+      // snapshot.restore();
 
       Eigen::MatrixXd imprecisionMap = I - Q * Qinv;
 
@@ -4204,7 +4242,7 @@ BackpropSnapshot::getJacobianOfLCPConstraintMatrixClampingSubset(
 
 #define dQT(rhs) dQ(rhs)
 
-      snapshot.restore();
+      // snapshot.restore();
 
       Eigen::MatrixXd imprecisionMap = I - Q * Qinv;
 
@@ -4243,7 +4281,7 @@ BackpropSnapshot::getJacobianOfLCPConstraintMatrixClampingSubset(
         = A_c.transpose() * getJacobianOfMinv(world, A_c * Qinv_b, wrt);
     Eigen::MatrixXd result = -Qfactored.solve(innerTerms);
 
-    snapshot.restore();
+    // snapshot.restore();
     return result;
   }
 
@@ -4456,11 +4494,13 @@ Eigen::MatrixXd BackpropSnapshot::
 Eigen::MatrixXd BackpropSnapshot::getJacobianOfLCPOffsetClampingSubset(
     simulation::WorldPtr world, WithRespectTo* wrt)
 {
+  /*
   RestorableSnapshot snapshot(world);
   world->setPositions(mPreStepPosition);
   world->setVelocities(mPreStepVelocity);
   world->setExternalForces(mPreStepTorques);
   world->setCachedLCPSolution(mPreStepLCPCache);
+  */
 
   double dt = world->getTimeStep();
   Eigen::MatrixXd Minv = getInvMassMatrix(world);
@@ -4468,7 +4508,7 @@ Eigen::MatrixXd BackpropSnapshot::getJacobianOfLCPOffsetClampingSubset(
   Eigen::MatrixXd dC = getJacobianOfC(world, wrt);
   if (wrt == WithRespectTo::VELOCITY)
   {
-    snapshot.restore();
+    // snapshot.restore();
     return getBounceDiagonals().asDiagonal() * -A_c.transpose()
            * (Eigen::MatrixXd::Identity(
                   world->getNumDofs(), world->getNumDofs())
@@ -4476,7 +4516,7 @@ Eigen::MatrixXd BackpropSnapshot::getJacobianOfLCPOffsetClampingSubset(
   }
   else if (wrt == WithRespectTo::FORCE)
   {
-    snapshot.restore();
+    // snapshot.restore();
     return getBounceDiagonals().asDiagonal() * -A_c.transpose() * dt * Minv;
   }
 
@@ -4490,13 +4530,13 @@ Eigen::MatrixXd BackpropSnapshot::getJacobianOfLCPOffsetClampingSubset(
     Eigen::MatrixXd dA_c_f
         = getJacobianOfClampingConstraintsTranspose(world, v_f);
 
-    snapshot.restore();
+    // snapshot.restore();
     return getBounceDiagonals().asDiagonal()
            * -(dA_c_f + A_c.transpose() * dt * (dMinv_f - Minv * dC));
   }
   else
   {
-    snapshot.restore();
+    // snapshot.restore();
     return getBounceDiagonals().asDiagonal()
            * -(A_c.transpose() * dt * (dMinv_f - Minv * dC));
   }
@@ -5052,6 +5092,10 @@ Eigen::MatrixXd BackpropSnapshot::getJacobianOfProjectionIntoClampsMatrix(
 Eigen::MatrixXd BackpropSnapshot::getJacobianOfMinv(
     simulation::WorldPtr world, Eigen::VectorXd tau, WithRespectTo* wrt)
 {
+  #ifndef NDEBUG
+  assert(world->getPositions() == mPreStepPosition && world->getVelocities() == mPreStepVelocity);
+  #endif
+
   if (wrt == neural::WithRespectTo::POSITION
       || wrt == neural::WithRespectTo::VELOCITY
       || wrt == neural::WithRespectTo::FORCE)
@@ -5067,6 +5111,11 @@ Eigen::MatrixXd BackpropSnapshot::getJacobianOfMinv(
           = skel->getJacobianOfMinv(tau.segment(cursor, dofs), wrt);
       cursor += dofs;
     }
+
+    #ifndef NDEBUG
+    assert(world->getPositions() == mPreStepPosition && world->getVelocities() == mPreStepVelocity);
+    #endif
+
     return jac;
   }
   else
@@ -5079,6 +5128,33 @@ Eigen::MatrixXd BackpropSnapshot::getJacobianOfMinv(
 /// This returns the jacobian of C(pos, inertia, vel), holding everything
 /// constant except the value of WithRespectTo
 Eigen::MatrixXd BackpropSnapshot::getJacobianOfC(
+    simulation::WorldPtr world, WithRespectTo* wrt)
+{
+  #ifndef NDEBUG
+  assert(world->getPositions() == mPreStepPosition && world->getVelocities() == mPreStepVelocity);
+  #endif
+
+  if (wrt == WithRespectTo::POSITION) {
+    if (mCachedPosCDirty) {
+      mCachedPosC = computeJacobianOfC(world, WithRespectTo::POSITION);
+      mCachedPosCDirty = false;
+    }
+    return mCachedPosC;
+  }
+  if (wrt == WithRespectTo::VELOCITY) {
+    if (mCachedVelCDirty) {
+      mCachedVelC = computeJacobianOfC(world, WithRespectTo::VELOCITY);
+      mCachedVelCDirty = false;
+    }
+    return mCachedVelC;
+  }
+  return computeJacobianOfC(world, wrt);
+}
+
+//==============================================================================
+/// This returns the jacobian of C(pos, inertia, vel), holding everything
+/// constant except the value of WithRespectTo
+Eigen::MatrixXd BackpropSnapshot::computeJacobianOfC(
     simulation::WorldPtr world, WithRespectTo* wrt)
 {
   std::size_t wrtDim = wrt->dim(world.get());
@@ -5098,7 +5174,6 @@ Eigen::MatrixXd BackpropSnapshot::getJacobianOfC(
   }
 
   return J;
-  // return finiteDifferenceJacobianOfC(world, wrt);
 }
 
 /// This returns the jacobian of M^{-1}(pos, inertia) * (C(pos, inertia, vel) +
@@ -5255,11 +5330,13 @@ Eigen::VectorXd BackpropSnapshot::getBounceDiagonalsAt(
 Eigen::MatrixXd BackpropSnapshot::getJacobianOfClampingConstraints(
     simulation::WorldPtr world, Eigen::VectorXd f0)
 {
+  /*
   RestorableSnapshot snapshot(world);
   world->setPositions(mPreStepPosition);
   world->setVelocities(mPreStepVelocity);
   world->setExternalForces(mPreStepTorques);
   world->setCachedLCPSolution(mPreStepLCPCache);
+  */
 
   std::vector<std::shared_ptr<DifferentiableContactConstraint>> constraints
       = getClampingConstraints();
@@ -5271,7 +5348,7 @@ Eigen::MatrixXd BackpropSnapshot::getJacobianOfClampingConstraints(
     result += f0(i) * constraints[i]->getConstraintForcesJacobian(world);
   }
 
-  snapshot.restore();
+  // snapshot.restore();
   return result;
 }
 
@@ -5281,11 +5358,13 @@ Eigen::MatrixXd BackpropSnapshot::getJacobianOfClampingConstraints(
 Eigen::MatrixXd BackpropSnapshot::getJacobianOfClampingConstraintsTranspose(
     simulation::WorldPtr world, Eigen::VectorXd v0)
 {
+  /*
   RestorableSnapshot snapshot(world);
   world->setPositions(mPreStepPosition);
   world->setVelocities(mPreStepVelocity);
   world->setExternalForces(mPreStepTorques);
   world->setCachedLCPSolution(mPreStepLCPCache);
+  */
 
   std::vector<std::shared_ptr<DifferentiableContactConstraint>> constraints
       = getClampingConstraints();
@@ -5298,7 +5377,7 @@ Eigen::MatrixXd BackpropSnapshot::getJacobianOfClampingConstraintsTranspose(
         = constraints[i]->getConstraintForcesJacobian(world).transpose() * v0;
   }
 
-  snapshot.restore();
+  // snapshot.restore();
   return result;
 }
 

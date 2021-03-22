@@ -315,6 +315,13 @@ const Eigen::VectorXd& MappedBackpropSnapshot::getPreStepTorques(
 }
 
 //==============================================================================
+/// Returns the LCP's cached solution from before the step
+const Eigen::VectorXd& MappedBackpropSnapshot::getPreStepLCPCache()
+{
+  return mBackpropSnapshot->mPreStepLCPCache;
+}
+
+//==============================================================================
 /// Returns a concatenated vector of all the Skeletons' position()'s in the
 /// World, in order in which the Skeletons appear in the World's
 /// getSkeleton(i) returns them, AFTER the timestep.
