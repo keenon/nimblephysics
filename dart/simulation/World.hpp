@@ -451,14 +451,20 @@ public:
 
   bool getPenetrationCorrectionEnabled();
 
-  /// This adds tiny positive values to the diagonal before solving the LCP,
-  /// which makes our gradients slightly inaccurate, but does increase stability
-  /// of our solutions.
+  /// We add this value to the diagonal entries of A, ONLY IF our initial LCP
+  /// solution fails, to help prevent A from being low-rank. This both increases
+  /// the stability of the forward LCP solution, and it also helps prevent cases
+  /// where a low-rank A means that the least-squares stabilization of A has
+  /// illegal negative force values. This corresponds to slightly softening the
+  /// hard contact constraint.
   ///
-  /// Defaults to false
-  void setConstraintForceMixingEnabled(bool enable);
+  /// This needs to be a fairly large value (compared to normal CFM), like 1e-3,
+  /// to prevent numerical accuracy issues during the backprop computations. We
+  /// don't use this on most timesteps, so a relatively large CFM constant
+  /// shouldn't affect simulation accuracy.
+  void setFallbackConstraintForceMixingConstant(double constant);
 
-  bool getConstraintForceMixingEnabled();
+  double getFallbackConstraintForceMixingConstant();
 
   /// Contacts whose penetrationDepth is deeper than this depth will be ignored.
   /// This is a simple solution to avoid extremely nasty situations with
@@ -599,9 +605,18 @@ protected:
   /// True if we want to enable artificial penetration correction forces
   bool mPenetrationCorrectionEnabled;
 
-  /// True if we want to enable adding tiny positive values to the diagonal
-  /// of the A matrix before solving our LCP.
-  bool mConstraintForceMixingEnabled;
+  /// We add this value to the diagonal entries of A, ONLY IF our initial LCP
+  /// solution fails, to help prevent A from being low-rank. This both increases
+  /// the stability of the forward LCP solution, and it also helps prevent cases
+  /// where a low-rank A means that the least-squares stabilization of A has
+  /// illegal negative force values. This corresponds to slightly softening the
+  /// hard contact constraint.
+  ///
+  /// This needs to be a fairly large value (compared to normal CFM), like 1e-3,
+  /// to prevent numerical accuracy issues during the backprop computations. We
+  /// don't use this on most timesteps, so a relatively large CFM constant
+  /// shouldn't affect simulation accuracy.
+  double mFallbackConstraintForceMixingConstant;
 
   /// Contacts whose penetrationDepth is deeper than this depth will be ignored.
   /// This is a simple solution to avoid extremely nasty situations with

@@ -335,8 +335,7 @@ void testSphereStack()
   // World
   WorldPtr world = World::create();
 
-  std::shared_ptr<SphereShape> sphereShape(
-      new SphereShape(0.5));
+  std::shared_ptr<SphereShape> sphereShape(new SphereShape(0.5));
 
   ///////////////////////////////////////////////
   // Create the sphere A
@@ -382,18 +381,19 @@ void testSphereStack()
   world->setVelocities(worldVel);
 
   /*
-  std::shared_ptr<neural::BackpropSnapshot> snapshot = neural::forwardPass(world, true);
-  Eigen::MatrixXd forceVel = snapshot->getForceVelJacobian(world);
-  std::cout << "force-vel" << std::endl << forceVel << std::endl;
-  Eigen::MatrixXd velVel = snapshot->getVelVelJacobian(world);
-  std::cout << "vel-vel" << std::endl << velVel << std::endl;
-  Eigen::MatrixXd A_c = snapshot->getClampingConstraintMatrix(world);
-  std::cout << "A_c" << std::endl << A_c << std::endl;
-  Eigen::MatrixXd A_cc = snapshot->getClampingAMatrix();
+  std::shared_ptr<neural::BackpropSnapshot> snapshot =
+  neural::forwardPass(world, true); Eigen::MatrixXd forceVel =
+  snapshot->getForceVelJacobian(world); std::cout << "force-vel" << std::endl <<
+  forceVel << std::endl; Eigen::MatrixXd velVel =
+  snapshot->getVelVelJacobian(world); std::cout << "vel-vel" << std::endl <<
+  velVel << std::endl; Eigen::MatrixXd A_c =
+  snapshot->getClampingConstraintMatrix(world); std::cout << "A_c" << std::endl
+  << A_c << std::endl; Eigen::MatrixXd A_cc = snapshot->getClampingAMatrix();
   std::cout << "A_cc" << std::endl << A_cc << std::endl;
   Eigen::MatrixXd Minv = snapshot->getInvMassMatrix(world);
   std::cout << "Minv" << std::endl << Minv << std::endl;
-  Eigen::MatrixXd rel = Minv * A_c * A_cc.completeOrthogonalDecomposition().pseudoInverse() * A_c.transpose();
+  Eigen::MatrixXd rel = Minv * A_c *
+  A_cc.completeOrthogonalDecomposition().pseudoInverse() * A_c.transpose();
   std::cout << "rel" << std::endl << rel << std::endl;
   // We want to push up the top sphere
   Eigen::VectorXd lossWrtNextVel = Eigen::VectorXd::Zero(2);
@@ -407,11 +407,12 @@ void testSphereStack()
   Eigen::VectorXd lossWrtControl = forceVel.transpose() * lossWrtNextVel;
   std::cout << "loss wrt tau_t" << std::endl << lossWrtControl << std::endl;
   lossWrtControl(1) = 0.0;
-  std::cout << "clipped loss wrt tau_t" << std::endl << lossWrtControl << std::endl;
-  Eigen::VectorXd lossWrtNextVelRecovered = forceVel * lossWrtControl;
-  std::cout << "loss wrt v_t+1" << std::endl << lossWrtNextVelRecovered << std::endl;
-  Eigen::VectorXd lossThroughLCP = rel.transpose() * lossWrtNextVel;
-  std::cout << "loss wrt v_t through LCP" << std::endl << lossThroughLCP << std::endl;
+  std::cout << "clipped loss wrt tau_t" << std::endl << lossWrtControl <<
+  std::endl; Eigen::VectorXd lossWrtNextVelRecovered = forceVel *
+  lossWrtControl; std::cout << "loss wrt v_t+1" << std::endl <<
+  lossWrtNextVelRecovered << std::endl; Eigen::VectorXd lossThroughLCP =
+  rel.transpose() * lossWrtNextVel; std::cout << "loss wrt v_t through LCP" <<
+  std::endl << lossThroughLCP << std::endl;
   */
 
   // Test the classic formulation
@@ -701,7 +702,6 @@ void testReversePendulumSledWithFrictionCoeff(double frictionCoeff)
   // World
   WorldPtr world = World::create();
   world->setPenetrationCorrectionEnabled(false);
-  world->setConstraintForceMixingEnabled(false);
 
   ///////////////////////////////////////////////
   // Create the box
@@ -1104,8 +1104,8 @@ void testRobotArm(
     }
     jointPair.second->setMass(1.0);
     parent = jointPair.second;
-    if ((attachPoint == -1 && i < numLinks - 1) ||
-        (attachPoint != -1 && i != attachPoint))
+    if ((attachPoint == -1 && i < numLinks - 1)
+        || (attachPoint != -1 && i != attachPoint))
     {
       // ShapeNode* visual =
       parent->createShapeNodeWith<VisualAspect>(boxShape);
@@ -1148,8 +1148,6 @@ void testRobotArm(
                                   + Eigen::Vector3d(-(1.0 - 1e-2), 0.0, 0.0);
   jointPair.first->setTransformFromParentBodyNode(wallLocalOffset);
 
-
-
   // arm->computeForwardDynamics();
   // arm->integrateVelocities(world->getTimeStep());
   // -0.029 at 0.5
@@ -1179,7 +1177,6 @@ void testRobotArm(
 
   Eigen::VectorXd worldVel = world->getVelocities();
 
-  
   // // visual inspection code
   // Eigen::VectorXd worldPos = world->getPositions();
   // server::GUIWebsocketServer server;
@@ -1549,7 +1546,6 @@ void testFreeBlockWithFrictionCoeff(
   WorldPtr world = World::create();
   world->setGravity(Eigen::Vector3d::UnitY() * -9.81);
   world->setPenetrationCorrectionEnabled(false);
-  world->setConstraintForceMixingEnabled(false);
 
   // Set up the LCP solver to be super super accurate, so our
   // finite-differencing tests don't fail due to LCP errors. This isn't
@@ -1576,7 +1572,8 @@ void testFreeBlockWithFrictionCoeff(
 
   Eigen::Isometry3d fromChild = Eigen::Isometry3d::Identity();
   fromChild.translation() = Eigen::Vector3d::UnitX() * -2;
-  fromChild = fromChild.rotate(Eigen::AngleAxis<double>(M_PI_2, Eigen::Vector3d::UnitX()));
+  fromChild = fromChild.rotate(
+      Eigen::AngleAxis<double>(M_PI_2, Eigen::Vector3d::UnitX()));
   boxJoint->setTransformFromChildBodyNode(fromChild);
 
   std::shared_ptr<BoxShape> boxShape(
@@ -1662,7 +1659,7 @@ void testFreeBlockWithFrictionCoeff(
   VectorXd worldVel = world->getVelocities();
   // Test the classic formulation
   EXPECT_TRUE(verifyNextV(world));
-  
+
   // EXPECT_TRUE(verifyF_c(world));
 
   EXPECT_TRUE(verifyAnalyticalJacobians(world));
@@ -1670,7 +1667,6 @@ void testFreeBlockWithFrictionCoeff(
   EXPECT_TRUE(verifyAnalyticalBackprop(world));
   EXPECT_TRUE(verifyWrtMass(world));
   EXPECT_TRUE(verifyPosGradients(world, 1, 1e-8));
-
 }
 
 #ifdef ALL_TESTS

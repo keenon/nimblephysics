@@ -447,7 +447,6 @@ TEST(REALTIME, CONTROL_BUFFER_ESTIMATE)
   world->setGravity(Eigen::Vector3d(0, -9.81, 0));
 
   world->setPenetrationCorrectionEnabled(false);
-  world->setConstraintForceMixingEnabled(false);
 
   /////////////////////////////////////////////////////////////////////
   // Create the skeleton with a single prismatic joint

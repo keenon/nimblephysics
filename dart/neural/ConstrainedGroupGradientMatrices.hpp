@@ -97,6 +97,7 @@ public:
       Eigen::VectorXd b,
       Eigen::VectorXd aColNorms,
       Eigen::MatrixXd A,
+      double constraintForceMixingConstant,
       bool deliberatelyIgnoreFriction);
 
   /// If possible (because A is rank-deficient), this changes mX to be the
@@ -199,6 +200,41 @@ public:
   /// except the value of WithRespectTo
   Eigen::MatrixXd getJacobianOfConstraintForce(
       simulation::WorldPtr world, WithRespectTo* wrt);
+
+  /// This returns the analytical expression for the Jacobian of Q*b, holding b
+  /// constant, if there are some upper-bound indices
+  Eigen::MatrixXd dQ_WithUB(
+      simulation::WorldPtr world,
+      const Eigen::MatrixXd& Minv,
+      const Eigen::MatrixXd& A_c,
+      const Eigen::MatrixXd& E,
+      const Eigen::MatrixXd& A_c_ub_E,
+      Eigen::VectorXd rhs,
+      WithRespectTo* wrt);
+
+  /// This returns the analytical expression for the Jacobian of Q^T*b, holding
+  /// b constant, if there are some upper-bound indices
+  Eigen::MatrixXd dQT_WithUB(
+      simulation::WorldPtr world,
+      const Eigen::MatrixXd& Minv,
+      const Eigen::MatrixXd& A_c,
+      const Eigen::MatrixXd& E,
+      const Eigen::MatrixXd& A_ub,
+      Eigen::VectorXd rhs,
+      WithRespectTo* wrt);
+
+  /// This returns the analytical expression for the Jacobian of Q*b, holding b
+  /// constant, if there are no upper-bound indices
+  Eigen::MatrixXd dQ_WithoutUB(
+      simulation::WorldPtr world,
+      const Eigen::MatrixXd& Minv,
+      const Eigen::MatrixXd& A_c,
+      Eigen::VectorXd rhs,
+      WithRespectTo* wrt);
+
+  /// This returns the vector of constants that get added to the diagonal of Q
+  /// to guarantee that Q is full-rank
+  Eigen::VectorXd& getConstraintForceMixingDiagonal();
 
   /// This returns the jacobian of Q^{-1}b, holding b constant, with respect to
   /// wrt
@@ -306,7 +342,7 @@ public:
 
   /// These was the mX() vector used to construct this. Pretty much only here
   /// for testing.
-  const Eigen::VectorXd& getContactConstraintImpluses() const;
+  const Eigen::VectorXd& getContactConstraintImpulses() const;
 
   /// These was the fIndex() vector used to construct this. Pretty much only
   /// here for testing.
@@ -378,7 +414,9 @@ public:
   /// This computes and returns the jacobian of M^{-1}(pos, inertia) * tau by
   /// finite differences. This is SUPER SLOW, and is only here for testing.
   Eigen::MatrixXd finiteDifferenceJacobianOfMinv(
-      simulation::WorldPtr world, Eigen::VectorXd tau, WithRespectTo* wrt,
+      simulation::WorldPtr world,
+      Eigen::VectorXd tau,
+      WithRespectTo* wrt,
       bool useRidders = false);
 
   /// This computes and returns the jacobian of M^{-1}(pos, inertia) * tau by
@@ -412,6 +450,15 @@ public:
   /// This is only true after we've called constructMatrices(). It's a useful
   /// flag to ensure we don't call it twice.
   bool mFinalized;
+
+  /// This is a constant value we added to the diagonal entries of the A matrix,
+  /// which we only do if we were having problems because A is low rank.
+  /// Applying CFM amounts to softening the contact constraints on this
+  /// timestep.
+  double mConstraintForceMixingConstant;
+
+  bool mConstraintForceMixingDiagonalDirty;
+  Eigen::VectorXd mConstraintForceMixingDiagonal;
 
   /// This flag gets set if we needed to ignore the friction indices in order to
   /// solve the LCP. This can happen because boxed LCPs that we use to solve

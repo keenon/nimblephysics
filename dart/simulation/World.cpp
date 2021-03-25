@@ -78,9 +78,7 @@ World::World(const std::string& _name)
     mParallelVelocityAndPositionUpdates(
         true), // TODO(keenon): We should fix our backprop to somehow achieve
                // the best of both worlds here
-    mConstraintForceMixingEnabled(
-        false), // TODO(keenon): We should updated gradients to support this,
-                // and re-enable it by default
+    mFallbackConstraintForceMixingConstant(1e-4),
     mContactClippingDepth(0.03),
     mPenetrationCorrectionEnabled(false),
     mWrtMass(std::make_shared<neural::WithRespectToMass>()),
@@ -112,7 +110,8 @@ WorldPtr World::clone() const
 
   worldClone->setGravity(mGravity);
   worldClone->setTimeStep(mTimeStep);
-  worldClone->setConstraintForceMixingEnabled(mConstraintForceMixingEnabled);
+  worldClone->setFallbackConstraintForceMixingConstant(
+      mFallbackConstraintForceMixingConstant);
   worldClone->setContactClippingDepth(mContactClippingDepth);
   worldClone->setPenetrationCorrectionEnabled(mPenetrationCorrectionEnabled);
   worldClone->setParallelVelocityAndPositionUpdates(
@@ -226,8 +225,6 @@ void World::step(bool _resetCommand)
   // Detect activated constraints and compute constraint impulses
   mConstraintSolver->setPenetrationCorrectionEnabled(
       mPenetrationCorrectionEnabled);
-  mConstraintSolver->setConstraintForceMixingEnabled(
-      mConstraintForceMixingEnabled);
   mConstraintSolver->setContactClippingDepth(mContactClippingDepth);
   mConstraintSolver->solve(this);
 
@@ -315,15 +312,15 @@ bool World::getPenetrationCorrectionEnabled()
 }
 
 //==============================================================================
-void World::setConstraintForceMixingEnabled(bool enable)
+void World::setFallbackConstraintForceMixingConstant(double constant)
 {
-  mConstraintForceMixingEnabled = enable;
+  mFallbackConstraintForceMixingConstant = constant;
 }
 
 //==============================================================================
-bool World::getConstraintForceMixingEnabled()
+double World::getFallbackConstraintForceMixingConstant()
 {
-  return mConstraintForceMixingEnabled;
+  return mFallbackConstraintForceMixingConstant;
 }
 
 //==============================================================================

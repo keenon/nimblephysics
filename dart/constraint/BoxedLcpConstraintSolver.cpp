@@ -287,8 +287,10 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(
       // Create a 3x3 square from A(mOffset[i], mOffset[i]) iterating over j
       // This iteration fill in row j
       int index = nSkip * (mOffset[i] + j) + mOffset[i];
-      constraint->getVelocityChange(
-          mA.data() + index, mConstraintForceMixingEnabled);
+      // We never apply constraint force mixing in the individual constraints,
+      // instead we apply it at the whole matrix level to make it easier to
+      // differentiate.
+      constraint->getVelocityChange(mA.data() + index, false);
 
       for (std::size_t k = i + 1; k < numConstraints; ++k)
       {
@@ -343,6 +345,14 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(
       mFIndex.data());
   std::cout << std::endl;
   */
+
+  // We always start out with no constraint-force-mixing. CFM adds constants to
+  // the diagonal of the A matrix, which amounts to softening the constraints.
+  // It helps guarantee that A is full-rank, but it reduces the accuracy of the
+  // solution. We have to use fairly large constants for CFM to prevent
+  // numerical issues during backprop, so we'd rather not use it at all, if we
+  // can avoid it.
+  double cfm = 0.0;
 
   // Solve LCP using the primary solver and fallback to secondary solver when
   // the parimary solver failed.
@@ -408,6 +418,7 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(
         mB,
         aColNormGradientBackup,
         aGradientBackup,
+        cfm,
         false);
     grads->constructMatrices(world);
     success = grads->areResultsStandardized();
@@ -415,7 +426,7 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(
     // since the ones we just made already work by construction
     if (success)
     {
-      mX = grads->getContactConstraintImpluses();
+      mX = grads->getContactConstraintImpulses();
     }
     shortCircuitLCP = success;
   }
@@ -493,6 +504,21 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(
     // secondary PGS solver will produce NaNs if mX is initialized with NaNs, so
     // reset mX
     mX.setZero();
+  }
+
+  // If we failed to solve the LCP, at this point apply some constraint force
+  // mixing before we try all our different fallbacks. We'll apply a large
+  // amount of CFM, which will reduce the accuracy of the problem, but increase
+  // the stability of solutions a lot. We could apply a smaller CFM, but that
+  // leads to numerical instability during the backwards pass.
+  if (!success)
+  {
+    cfm = world->getFallbackConstraintForceMixingConstant();
+    // Apple the constraint force mixing
+    mABackup.diagonal()
+        += Eigen::VectorXd::Ones(mABackup.diagonal().size()) * cfm;
+    aGradientBackup.diagonal()
+        += Eigen::VectorXd::Ones(aGradientBackup.diagonal().size()) * cfm;
   }
 
   // If Dantzig failed to solve the problem, fall back to PGS
@@ -654,12 +680,13 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(
         bGradientBackup,
         aColNormGradientBackup,
         aGradientBackup,
+        cfm,
         hadToIgnoreFrictionToSolve);
     group.getGradientConstraintMatrices()->constructMatrices(world);
     if (group.getGradientConstraintMatrices()->areResultsStandardized())
     {
       mX = group.getGradientConstraintMatrices()
-               ->getContactConstraintImpluses();
+               ->getContactConstraintImpulses();
     }
   }
 

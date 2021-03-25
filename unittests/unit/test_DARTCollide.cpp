@@ -3900,7 +3900,6 @@ TEST(DARTCollide, ATLAS_5_STABILITY)
   std::shared_ptr<simulation::World> world = simulation::World::create();
 
   // Set gravity of the world
-  world->setConstraintForceMixingEnabled(true);
   // world->setPenetrationCorrectionEnabled(true);
   world->setGravity(Eigen::Vector3d(0.0, -9.81, 0));
 
@@ -3988,7 +3987,6 @@ TEST(DARTCollide, CAPSULE_REALTIME)
   std::shared_ptr<simulation::World> world = simulation::World::create();
 
   // Set gravity of the world
-  // world->setConstraintForceMixingEnabled(true);
   // world->setPenetrationCorrectionEnabled(true);
   world->setGravity(Eigen::Vector3d(0.0, -9.81, 0));
 
@@ -4086,7 +4084,6 @@ TEST(DARTCollide, ATLAS_5)
   std::shared_ptr<simulation::World> world = simulation::World::create();
 
   // Set gravity of the world
-  world->setConstraintForceMixingEnabled(true);
   // world->setPenetrationCorrectionEnabled(true);
   world->setGravity(Eigen::Vector3d(0.0, -9.81, 0));
 

@@ -1068,7 +1068,6 @@ void testBoxCapsuleCollision(bool isSelfCollision, bool useMesh, int type)
       = collision::CollisionDetector::getFactory()->create("dart");
   world->getConstraintSolver()->setCollisionDetector(collision_detector);
   world->setPenetrationCorrectionEnabled(false);
-  world->setConstraintForceMixingEnabled(false);
   world->setGravity(Eigen::Vector3d(0, -9.81, 0));
 
   // This capsule is centered at (0,0,0), and extends in the Z direction
@@ -1157,9 +1156,7 @@ void testBoxCapsuleCollision(bool isSelfCollision, bool useMesh, int type)
   server.renderBasis();
   server.serve(8070);
 
-  while (server.isServing())
-  {
-  }
+  server.blockWhileServing();
   */
 
   //////////////////////////////////////////////////

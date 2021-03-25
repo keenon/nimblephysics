@@ -184,7 +184,6 @@ WorldPtr createJumpwormWorld()
   world->setGravity(Eigen::Vector3d(0, -9.81, 0));
 
   world->setPenetrationCorrectionEnabled(false);
-  world->setConstraintForceMixingEnabled(false);
 
   SkeletonPtr jumpworm = Skeleton::create("jumpworm");
 
@@ -324,6 +323,7 @@ static void BM_Atlas(benchmark::State& state)
 // Register the function as a benchmark
 BENCHMARK(BM_Atlas);
 
+/*
 static void BM_Atlas_Finite_Difference(benchmark::State& state)
 {
   // Create a world
@@ -358,5 +358,6 @@ static void BM_Atlas_Finite_Difference(benchmark::State& state)
 };
 // Register the function as a benchmark
 BENCHMARK(BM_Atlas_Finite_Difference);
+*/
 
 BENCHMARK_MAIN();

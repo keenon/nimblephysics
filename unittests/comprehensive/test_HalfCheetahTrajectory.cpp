@@ -86,7 +86,7 @@ using namespace server;
 using namespace realtime;
 
 // #ifdef ALL_TESTS
-TEST(HALF_CHEETAH, BROKEN)
+TEST(HALF_CHEETAH, NUMERICAL_INSTABILITY)
 {
   // Create a world
   std::shared_ptr<simulation::World> world
@@ -115,6 +115,38 @@ TEST(HALF_CHEETAH, BROKEN)
   EXPECT_TRUE(verifyIdentityMapping(world));
 }
 // #endif
+
+#ifdef ALL_TESTS
+TEST(HALF_CHEETAH, BROKEN_POINT)
+{
+  // Create a world
+  std::shared_ptr<simulation::World> world
+      = dart::utils::UniversalLoader::loadWorld(
+          "dart://sample/skel/half_cheetah.skel");
+  // world->setSlowDebugResultsAgainstFD(true);
+  Eigen::VectorXd brokenPos = Eigen::VectorXd::Zero(9);
+  brokenPos << 3.21866, -0.465303, 5.9565, -0.487295, -0.969093, 0.0792724,
+      -0.235988, -0.109183, 0.0769134;
+  Eigen::VectorXd brokenVel = Eigen::VectorXd::Zero(9);
+  brokenVel << 4.32527, -4.96436, 12.677, 6.0086, -21.5535, 6.76575, 25.5498,
+      -86.1003, 38.0762;
+  Eigen::VectorXd brokenForce = Eigen::VectorXd::Zero(9);
+  brokenForce << -0, -0, -0.398301, -2.15491, -6.51447, 23.0772, 7.68141,
+      -30.2488, 9.71529;
+  Eigen::VectorXd brokenLCPCache = Eigen::VectorXd::Zero(3);
+  brokenLCPCache << 11.9108, 11.8521, 0;
+  world->setPositions(brokenPos);
+  world->setVelocities(brokenVel);
+  world->setExternalForces(brokenForce);
+  world->setCachedLCPSolution(brokenLCPCache);
+
+  EXPECT_TRUE(verifyAnalyticalJacobians(world));
+  EXPECT_TRUE(verifyVelGradients(world, brokenVel));
+  EXPECT_TRUE(verifyPosVelJacobian(world, brokenVel));
+  EXPECT_TRUE(verifyF_c(world));
+  EXPECT_TRUE(verifyIdentityMapping(world));
+}
+#endif
 
 #ifdef ALL_TESTS
 TEST(HALF_CHEETAH, FULL_TEST)

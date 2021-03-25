@@ -332,6 +332,52 @@ public:
   Eigen::MatrixXd getJacobianOfConstraintForce(
       simulation::WorldPtr world, WithRespectTo* wrt);
 
+  /// This returns the analytical expression for the Jacobian of Q*b, holding b
+  /// constant, if there are some upper-bound indices
+  Eigen::MatrixXd dQ_WithUB(
+      simulation::WorldPtr world,
+      Eigen::MatrixXd& Minv,
+      Eigen::MatrixXd& A_c,
+      Eigen::MatrixXd& E,
+      Eigen::MatrixXd& A_c_ub_E,
+      Eigen::VectorXd rhs,
+      WithRespectTo* wrt);
+  /// This returns the analytical expression for the Jacobian of Q^T*b, holding
+  /// b constant, if there are some upper-bound indices
+  Eigen::MatrixXd dQT_WithUB(
+      simulation::WorldPtr world,
+      Eigen::MatrixXd& Minv,
+      Eigen::MatrixXd& A_c,
+      Eigen::MatrixXd& E,
+      Eigen::MatrixXd& A_ub,
+      Eigen::VectorXd rhs,
+      WithRespectTo* wrt);
+  /// This returns the analytical expression for the Jacobian of Q*b, holding b
+  /// constant, if there are no upper-bound indices
+  Eigen::MatrixXd dQ_WithoutUB(
+      simulation::WorldPtr world,
+      Eigen::MatrixXd& Minv,
+      Eigen::MatrixXd& A_c,
+      Eigen::VectorXd rhs,
+      WithRespectTo* wrt);
+
+  /// This returns the jacobian of Qb, holding b constant, with respect to
+  /// wrt, by finite differencing
+  Eigen::MatrixXd finiteDifferenceJacobianOfQb(
+      simulation::WorldPtr world,
+      Eigen::VectorXd b,
+      WithRespectTo* wrt,
+      bool useRidders = true);
+
+  /// This returns the jacobian of Qb, holding b constant, with respect to
+  /// wrt, by finite differencing
+  Eigen::MatrixXd finiteDifferenceRiddersJacobianOfQb(
+      simulation::WorldPtr world, Eigen::VectorXd b, WithRespectTo* wrt);
+
+  /// This returns the vector of constants that get added to the diagonal of Q
+  /// to guarantee that Q is full-rank
+  Eigen::VectorXd getConstraintForceMixingDiagonal();
+
   /// This returns the jacobian of Q^{-1}b, holding b constant, with respect to
   /// wrt
   Eigen::MatrixXd getJacobianOfLCPConstraintMatrixClampingSubset(
@@ -608,7 +654,7 @@ public:
 
   /// These was the mX() vector used to construct this. Pretty much only here
   /// for testing.
-  Eigen::VectorXd getContactConstraintImpluses();
+  Eigen::VectorXd getContactConstraintImpulses();
 
   /// These was the fIndex() vector used to construct this. Pretty much only
   /// here for testing.
@@ -641,6 +687,9 @@ public:
 
   /// Returns true if there were any bounces in this snapshot.
   bool hasBounces();
+
+  /// Returns the number of contacts (regardless of state) in this snapshot.
+  std::size_t getNumContacts();
 
   /// Returns the number of clamping contacts in this snapshot.
   std::size_t getNumClamping();
@@ -832,7 +881,8 @@ private:
     VEL_DUE_TO_ILLEGAL,
     PRE_STEP_VEL,
     PRE_STEP_TAU,
-    PRE_LCP_VEL
+    PRE_LCP_VEL,
+    CFM_CONSTANTS
   };
   template <typename Vec>
   Vec assembleVector(VectorToAssemble whichVector);

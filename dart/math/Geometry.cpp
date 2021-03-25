@@ -1083,8 +1083,7 @@ Eigen::Matrix6d dAdTMatrix(const Eigen::Isometry3d& T)
   AdT.topLeftCorner<3, 3>() = T.linear();
   AdT.bottomRightCorner<3, 3>() = AdT.topLeftCorner<3, 3>();
 
-  AdT.topRightCorner<3, 3>()
-      = makeSkewSymmetric(T.translation()) * T.linear();
+  AdT.topRightCorner<3, 3>() = makeSkewSymmetric(T.translation()) * T.linear();
 
   return AdT;
 }
@@ -1735,7 +1734,8 @@ Eigen::Matrix3d so3RightJacobianTimeDeriv(
 
 //==============================================================================
 Eigen::Matrix3d so3RightJacobianTimeDerivDeriv(
-    const Eigen::Vector3d& q, const Eigen::Vector3d& dq, int index) {
+    const Eigen::Vector3d& q, const Eigen::Vector3d& dq, int index)
+{
   // TODO(JS): Relplace with analytical method
 
   const double eps = 1e-7;
@@ -1753,7 +1753,8 @@ Eigen::Matrix3d so3RightJacobianTimeDerivDeriv(
 
 //==============================================================================
 Eigen::Matrix3d so3RightJacobianTimeDerivDeriv2(
-    const Eigen::Vector3d& q, const Eigen::Vector3d& dq, int index) {
+    const Eigen::Vector3d& q, const Eigen::Vector3d& dq, int index)
+{
   // TODO(JS): Relplace with analytical method
 
   const double eps = 1e-7;

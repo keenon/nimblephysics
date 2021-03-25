@@ -172,6 +172,7 @@ void ConstrainedGroupGradientMatrices::registerLCPResults(
     Eigen::VectorXd b,
     Eigen::VectorXd aColNorms,
     Eigen::MatrixXd A,
+    double constraintForceMixingConstant,
     bool deliberatelyIgnoreFriction)
 {
   mX = X;
@@ -181,6 +182,7 @@ void ConstrainedGroupGradientMatrices::registerLCPResults(
   mB = b;
   mAColNorms = aColNorms;
   mA = A;
+  mConstraintForceMixingConstant = constraintForceMixingConstant;
   mDeliberatelyIgnoreFriction = deliberatelyIgnoreFriction;
 }
 
@@ -235,6 +237,7 @@ bool ConstrainedGroupGradientMatrices::opportunisticallyStandardizeResults(
   Eigen::MatrixXd A_c_ub_E = A_c + A_ub * E;
 
   Eigen::MatrixXd Q = A_c.transpose() * mMinv * A_c_ub_E;
+  Q.diagonal() += getConstraintForceMixingDiagonal();
   Eigen::VectorXd b = getClampingConstraintRelativeVels();
 
   if (A_ub.cols() == 0)
@@ -262,7 +265,8 @@ bool ConstrainedGroupGradientMatrices::opportunisticallyStandardizeResults(
     }
   */
 
-  Eigen::VectorXd f_c = Q.completeOrthogonalDecomposition().solve(b);
+  Eigen::VectorXd f_c
+      = Q.jacobiSvd(Eigen::ComputeThinU | Eigen::ComputeThinV).solve(b);
   Eigen::VectorXd originalF_c = getClampingConstraintImpulses();
 
   bool anyNewlyNotClamping = false;
@@ -722,6 +726,8 @@ void ConstrainedGroupGradientMatrices::constructMatrices(
   assert(mUpperBoundConstraints.size() == 0);
   mVelocityDueToIllegalImpulses = Eigen::VectorXd::Zero(mNumDOFs);
   mClampingAMatrix = Eigen::MatrixXd::Zero(numClamping, numClamping);
+  mConstraintForceMixingDiagonal
+      = Eigen::VectorXd::Ones(numClamping) * mConstraintForceMixingConstant;
 
   /*
   std::cout << "numClamping: " << numClamping << std::endl;
@@ -1257,6 +1263,7 @@ Eigen::MatrixXd ConstrainedGroupGradientMatrices::getJacobianOfConstraintForce(
   Eigen::MatrixXd Minv = getInvMassMatrix(world);
   Eigen::MatrixXd A_c_ub_E = A_c + A_ub * E;
   Eigen::MatrixXd Q = A_c.transpose() * Minv * A_c_ub_E;
+  Q.diagonal() += getConstraintForceMixingDiagonal();
 
   Eigen::CompleteOrthogonalDecomposition<Eigen::MatrixXd> Qfac
       = Q.completeOrthogonalDecomposition();
@@ -1274,6 +1281,76 @@ Eigen::MatrixXd ConstrainedGroupGradientMatrices::getJacobianOfConstraintForce(
       = getJacobianOfLCPConstraintMatrixClampingSubset(world, b, wrt);
 
   return dQ_b + Qfac.solve(dB);
+}
+
+//==============================================================================
+Eigen::MatrixXd ConstrainedGroupGradientMatrices::dQ_WithUB(
+    simulation::WorldPtr world,
+    const Eigen::MatrixXd& Minv,
+    const Eigen::MatrixXd& A_c,
+    const Eigen::MatrixXd& E,
+    const Eigen::MatrixXd& A_c_ub_E,
+    Eigen::VectorXd rhs,
+    WithRespectTo* wrt)
+{
+  Eigen::MatrixXd result
+      = getJacobianOfClampingConstraintsTranspose(world, Minv * A_c_ub_E * rhs)
+        + (A_c.transpose()
+           * (getJacobianOfMinv(world, A_c_ub_E * rhs, wrt)
+              + (Minv
+                 * (getJacobianOfClampingConstraints(world, rhs)
+                    + getJacobianOfUpperBoundConstraints(world, E * rhs)))));
+  return result;
+}
+
+//==============================================================================
+Eigen::MatrixXd ConstrainedGroupGradientMatrices::dQT_WithUB(
+    simulation::WorldPtr world,
+    const Eigen::MatrixXd& Minv,
+    const Eigen::MatrixXd& A_c,
+    const Eigen::MatrixXd& E,
+    const Eigen::MatrixXd& A_ub,
+    Eigen::VectorXd rhs,
+    WithRespectTo* wrt)
+{
+  Eigen::MatrixXd result
+      = (getJacobianOfClampingConstraintsTranspose(world, Minv * A_c * rhs)
+         + (A_c.transpose()
+            * (getJacobianOfMinv(world, A_c * rhs, wrt)
+               + (Minv * (getJacobianOfClampingConstraints(world, rhs))))))
+        + (E.transpose()
+           * (getJacobianOfUpperBoundConstraintsTranspose(
+                  world, Minv * A_c * rhs)
+              + A_ub.transpose()
+                    * (getJacobianOfMinv(world, A_c * rhs, wrt)
+                       + (Minv
+                          * (getJacobianOfClampingConstraints(world, rhs))))));
+  return result;
+}
+
+//==============================================================================
+Eigen::MatrixXd ConstrainedGroupGradientMatrices::dQ_WithoutUB(
+    simulation::WorldPtr world,
+    const Eigen::MatrixXd& Minv,
+    const Eigen::MatrixXd& A_c,
+    Eigen::VectorXd rhs,
+    WithRespectTo* wrt)
+{
+  Eigen::MatrixXd result
+      = getJacobianOfClampingConstraintsTranspose(world, Minv * A_c * rhs)
+        + (A_c.transpose()
+           * (getJacobianOfMinv(world, A_c * rhs, wrt)
+              + (Minv * (getJacobianOfClampingConstraints(world, rhs)))));
+  return result;
+}
+
+//==============================================================================
+/// This returns the vector of constants that get added to the diagonal of Q
+/// to guarantee that Q is full-rank
+Eigen::VectorXd&
+ConstrainedGroupGradientMatrices::getConstraintForceMixingDiagonal()
+{
+  return mConstraintForceMixingDiagonal;
 }
 
 //==============================================================================
@@ -1299,6 +1376,7 @@ Eigen::MatrixXd ConstrainedGroupGradientMatrices::
 
   Eigen::MatrixXd Minv = getInvMassMatrix(world);
   Eigen::MatrixXd Q = A_c.transpose() * Minv * (A_c + A_ub * E);
+  Q.diagonal() += getConstraintForceMixingDiagonal();
   Eigen::CompleteOrthogonalDecomposition<Eigen::MatrixXd> Qfactored
       = Q.completeOrthogonalDecomposition();
 
@@ -1978,7 +2056,7 @@ ConstrainedGroupGradientMatrices::getBouncingConstraintMatrix() const
 /// These was the mX() vector used to construct this. Pretty much only here
 /// for testing.
 const Eigen::VectorXd&
-ConstrainedGroupGradientMatrices::getContactConstraintImpluses() const
+ConstrainedGroupGradientMatrices::getContactConstraintImpulses() const
 {
   return mX;
 }

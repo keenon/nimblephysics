@@ -201,15 +201,6 @@ public:
 
   bool getPenetrationCorrectionEnabled();
 
-  /// This adds tiny positive values to the diagonal before solving the LCP,
-  /// which makes our gradients slightly inaccurate, but does increase stability
-  /// of our solutions.
-  ///
-  /// Defaults to false
-  void setConstraintForceMixingEnabled(bool enable);
-
-  bool getConstraintForceMixingEnabled();
-
   /// This gets the cached LCP solution, which is useful to be able to get/set
   /// because it can effect the forward solutions of physics problems because of
   /// our optimistic LCP-stabilization-to-acceptance approach.
@@ -313,10 +304,6 @@ protected:
 
   /// True if we want to enable artificial penetration correction forces
   bool mPenetrationCorrectionEnabled;
-
-  /// True if we want to enable adding tiny positive values to the diagonal
-  /// of the A matrix before solving our LCP.
-  bool mConstraintForceMixingEnabled;
 
   /// Contacts whose penetrationDepth is deeper than this depth will be ignored.
   /// This is a simple solution to avoid extremely nasty situations with

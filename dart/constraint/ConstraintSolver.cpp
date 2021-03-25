@@ -70,9 +70,6 @@ ConstraintSolver::ConstraintSolver(double timeStep)
     mPenetrationCorrectionEnabled(
         false), // Default to no penetration correction, because it breaks our
                 // gradients
-    mConstraintForceMixingEnabled(
-        false), // Default to CFM, increases stability but decreases the
-               // accuracy of our gradients
     mContactClippingDepth(
         0.03) // Default to clipping only after fairly deep penetration
 {
@@ -100,9 +97,6 @@ ConstraintSolver::ConstraintSolver()
     mPenetrationCorrectionEnabled(
         false), // Default to no penetration correction, because it breaks our
                 // gradients
-    mConstraintForceMixingEnabled(
-        false), // Default to CFM, increases stability but decreases the
-               // accuracy of our gradients
     mContactClippingDepth(
         0.03) // Default to clipping only after fairly deep penetration
 {
@@ -436,18 +430,6 @@ void ConstraintSolver::setPenetrationCorrectionEnabled(bool enable)
 bool ConstraintSolver::getPenetrationCorrectionEnabled()
 {
   return mPenetrationCorrectionEnabled;
-}
-
-//==============================================================================
-void ConstraintSolver::setConstraintForceMixingEnabled(bool enable)
-{
-  mConstraintForceMixingEnabled = enable;
-}
-
-//==============================================================================
-bool ConstraintSolver::getConstraintForceMixingEnabled()
-{
-  return mConstraintForceMixingEnabled;
 }
 
 //==============================================================================

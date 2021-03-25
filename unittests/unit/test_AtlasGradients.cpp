@@ -32,7 +32,6 @@ TEST(DARTCollide, ATLAS_5_HIP_FOOT)
   std::shared_ptr<simulation::World> world = simulation::World::create();
 
   // Set gravity of the world
-  world->setConstraintForceMixingEnabled(false);
   world->setPenetrationCorrectionEnabled(false);
   world->setGravity(Eigen::Vector3d(0.0, -9.81, 0));
 
@@ -206,7 +205,6 @@ void testAtlas(bool withGroundContact)
   std::shared_ptr<simulation::World> world = simulation::World::create();
 
   // Set gravity of the world
-  world->setConstraintForceMixingEnabled(false);
   world->setPenetrationCorrectionEnabled(false);
   world->setGravity(Eigen::Vector3d(0.0, -9.81, 0));
 

@@ -1092,10 +1092,18 @@ public:
   void debugJacobianOfCForward(neural::WithRespectTo* wrt);
   /// This computes the Jacobian of spatial velocity with respect to wrt
   Eigen::MatrixXd finiteDifferenceJacobianOfSpatialVelocity(
+      neural::WithRespectTo* wrt, bool useRidders = true);
+  /// This computes the Jacobian of spatial velocity with respect
+  /// to wrt using Ridders method
+  Eigen::MatrixXd finiteDifferenceRiddersJacobianOfSpatialVelocity(
       neural::WithRespectTo* wrt);
   /// This computes the Jacobian of spatial acceleration (mCg_dV) with respect
   /// to wrt
   Eigen::MatrixXd finiteDifferenceJacobianOfSpatialCoriolisAcceleration(
+      neural::WithRespectTo* wrt, bool useRidders = true);
+  /// This computes the Jacobian of spatial acceleration (mCg_dV) with respect
+  /// to wrt using Ridders method
+  Eigen::MatrixXd finiteDifferenceRiddersJacobianOfSpatialCoriolisAcceleration(
       neural::WithRespectTo* wrt);
   /// This checks the intermediate analytical results of
   /// computeJacobianOfCBackword() against the finite differencing equivalents.
@@ -1103,6 +1111,10 @@ public:
   /// This computes the Jacobian of gravity force (mFgravity) with respect to
   /// wrt
   Eigen::MatrixXd finiteDifferenceJacobianOfGravityForce(
+      neural::WithRespectTo* wrt, bool useRidders = true);
+  /// This computes the Jacobian of gravity force (mFgravity) with respect to
+  /// wrt using Ridders method
+  Eigen::MatrixXd finiteDifferenceRiddersJacobianOfGravityForce(
       neural::WithRespectTo* wrt);
   /// This computes the Jacobian of body force (mCg_F) with respect to wrt
   Eigen::MatrixXd finiteDifferenceJacobianOfBodyForce(
@@ -1150,19 +1162,23 @@ public:
   Eigen::MatrixXd finiteDifferenceRiddersJacobianOfMassBodyForce(
       neural::WithRespectTo* wrt);
   /// This checks the intermediate analytical results of
-  /// computeJacobianOfMinvXBackward() against the finite differencing equivalents.
-  void debugJacobianOfMinvXBackward(neural::WithRespectTo* wrt, Eigen::VectorXd x);
-  /// This computes the Jacobian (tensor) of the articulate inertia (mArtInertia) as it's computed 
-  /// in the Minv computation
+  /// computeJacobianOfMinvXBackward() against the finite differencing
+  /// equivalents.
+  void debugJacobianOfMinvXBackward(
+      neural::WithRespectTo* wrt, Eigen::VectorXd x);
+  /// This computes the Jacobian (tensor) of the articulate inertia
+  /// (mArtInertia) as it's computed in the Minv computation
   std::vector<Eigen::MatrixXd> finiteDifferenceJacobianOfInvMassArtInertia(
       neural::WithRespectTo* wrt, bool useRidders = true);
-  /// This computes the Jacobian (tensor) of the articulate bias force (mInvM_c) as it's computed 
-  /// in the Minv computation
+  /// This computes the Jacobian (tensor) of the articulate bias force (mInvM_c)
+  /// as it's computed in the Minv computation
   Eigen::MatrixXd finiteDifferenceJacobianOfInvMassArtBias(
       neural::WithRespectTo* wrt, bool useRidders = true);
   /// This checks the intermediate analytical results of
-  /// computeJacobianOfMinvXForward() against the finite differencing equivalents.
-  void debugJacobianOfMinvXForward(neural::WithRespectTo* wrt, Eigen::VectorXd x);
+  /// computeJacobianOfMinvXForward() against the finite differencing
+  /// equivalents.
+  void debugJacobianOfMinvXForward(
+      neural::WithRespectTo* wrt, Eigen::VectorXd x);
 
   // protected:
 public:

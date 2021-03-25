@@ -248,7 +248,6 @@ TEST(TRAJECTORY, JUMP_WORM)
   world->setGravity(Eigen::Vector3d(0, -9.81, 0));
 
   world->setPenetrationCorrectionEnabled(false);
-  world->setConstraintForceMixingEnabled(false);
 
   SkeletonPtr jumpworm = Skeleton::create("jumpworm");
 
@@ -370,7 +369,6 @@ TEST(TRAJECTORY, JUMP_WORM)
   world->setTimeStep(1e-3);
 
   world->setPenetrationCorrectionEnabled(false);
-  world->setConstraintForceMixingEnabled(false);
 
   EXPECT_TRUE(checkOutOfOrderBackprop(world));
 
@@ -533,8 +531,8 @@ TEST(TRAJECTORY, JUMP_WORM)
       }
 
       // Check LCP solution is the same
-      Eigen::VectorXd mX1 = b1->getContactConstraintImpluses();
-      Eigen::VectorXd mX2 = b2->getContactConstraintImpluses();
+      Eigen::VectorXd mX1 = b1->getContactConstraintImpulses();
+      Eigen::VectorXd mX2 = b2->getContactConstraintImpulses();
       if (!equals(mX1, mX2, 0.0))
       {
         std::cout << "   mX off" << std::endl;

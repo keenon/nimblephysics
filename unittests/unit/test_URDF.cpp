@@ -89,7 +89,6 @@ std::shared_ptr<simulation::World> createWorld()
   world->setGravity(Eigen::Vector3d(0, -9.81, 0));
 
   world->setPenetrationCorrectionEnabled(false);
-  world->setConstraintForceMixingEnabled(false);
 
   SkeletonPtr jumpworm = Skeleton::create("jumpworm");
 

@@ -66,7 +66,7 @@
 #include "TrajectoryTestUtils.hpp"
 #include "stdio.h"
 
-// #define ALL_TESTS
+#define ALL_TESTS
 
 using namespace dart;
 using namespace math;
@@ -327,12 +327,14 @@ TEST(TRAJECTORY, CARTPOLE)
   };
 
   // TODO(keenon):URGENT:fixme
-  // This test interacts badly with the gradient clipping introduced in BackpropSnapshot
-  // It's being temporarily disabled, but should be fixed ASAP.
-  // The solution requires that finite differencing also respect gradient clipping.
-  // The crucial method is `BackpropSnapshot::clipLossGradientsToBounds()`. The call to that
-  // method in `BackpropSnapshot::backprop()` is what clips the gradients, and that clipping
-  // leads to these tests disagreeing with finite differencing, which doesn't clip.
+  // This test interacts badly with the gradient clipping introduced in
+  // BackpropSnapshot It's being temporarily disabled, but should be fixed ASAP.
+  // The solution requires that finite differencing also respect gradient
+  // clipping. The crucial method is
+  // `BackpropSnapshot::clipLossGradientsToBounds()`. The call to that method in
+  // `BackpropSnapshot::backprop()` is what clips the gradients, and that
+  // clipping leads to these tests disagreeing with finite differencing, which
+  // doesn't clip.
 
   /*
   EXPECT_TRUE(verifySingleStep(world, 1e-7));
@@ -401,7 +403,6 @@ TEST(TRAJECTORY, TUNE_SIMPLE_MASS)
   world->setGravity(Eigen::Vector3d(0, -9.81, 0));
 
   world->setPenetrationCorrectionEnabled(false);
-  world->setConstraintForceMixingEnabled(false);
 
   /////////////////////////////////////////////////////////////////////
   // Create the skeleton with a single revolute joint
@@ -844,7 +845,6 @@ TEST(TRAJECTORY, RECOVER_MASS)
   world->setGravity(Eigen::Vector3d(0, -9.81, 0));
 
   world->setPenetrationCorrectionEnabled(false);
-  world->setConstraintForceMixingEnabled(false);
 
   /////////////////////////////////////////////////////////////////////
   // Create the skeleton with a single revolute joint
@@ -981,7 +981,6 @@ TEST(TRAJECTORY, CONSTRAINED_CYCLE)
   world->setGravity(Eigen::Vector3d(0, -9.81, 0));
 
   world->setPenetrationCorrectionEnabled(false);
-  world->setConstraintForceMixingEnabled(false);
 
   /////////////////////////////////////////////////////////////////////
   // Create the skeleton with a single revolute joint
@@ -1125,7 +1124,6 @@ TEST(TRAJECTORY, JUMP_WORM)
   world->setGravity(Eigen::Vector3d(0, -9.81, 0));
 
   world->setPenetrationCorrectionEnabled(false);
-  world->setConstraintForceMixingEnabled(false);
 
   SkeletonPtr jumpworm = Skeleton::create("jumpworm");
 
@@ -1247,7 +1245,6 @@ TEST(TRAJECTORY, JUMP_WORM)
   world->setTimeStep(1e-3);
 
   world->setPenetrationCorrectionEnabled(false);
-  world->setConstraintForceMixingEnabled(false);
 
   // EXPECT_TRUE(verifyVelGradients(world, world->getVelocities()));
   // EXPECT_TRUE(verifyNoMultistepIntereference(world, 10));
@@ -1283,7 +1280,6 @@ TEST(TRAJECTORY, REOPTIMIZATION)
   world->setGravity(Eigen::Vector3d(0, -9.81, 0));
 
   world->setPenetrationCorrectionEnabled(false);
-  world->setConstraintForceMixingEnabled(false);
 
   SkeletonPtr jumpworm = Skeleton::create("jumpworm");
 
@@ -1405,7 +1401,6 @@ TEST(TRAJECTORY, REOPTIMIZATION)
   world->setTimeStep(1e-3);
 
   world->setPenetrationCorrectionEnabled(false);
-  world->setConstraintForceMixingEnabled(false);
 
   // EXPECT_TRUE(verifyVelGradients(world, world->getVelocities()));
   // EXPECT_TRUE(verifyNoMultistepIntereference(world, 10));

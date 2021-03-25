@@ -419,12 +419,12 @@ void World(py::module& m)
           &dart::simulation::World::setPenetrationCorrectionEnabled,
           ::py::arg("enabled"))
       .def(
-          "getConstraintForceMixingEnabled",
-          &dart::simulation::World::getConstraintForceMixingEnabled)
+          "getFallbackConstraintForceMixingConstant",
+          &dart::simulation::World::getFallbackConstraintForceMixingConstant)
       .def(
-          "setConstraintForceMixingEnabled",
-          &dart::simulation::World::setConstraintForceMixingEnabled,
-          ::py::arg("enabled"))
+          "setFallbackConstraintForceMixingConstant",
+          &dart::simulation::World::setFallbackConstraintForceMixingConstant,
+          ::py::arg("constant") = 1e-3)
       .def("getWrtMass", &dart::simulation::World::getWrtMass)
       .def("toJson", &dart::simulation::World::toJson)
       .def("positionsToJson", &dart::simulation::World::positionsToJson)
