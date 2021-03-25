@@ -395,12 +395,14 @@ void GUIWebsocketServer::blockWhileServing(
     std::function<void()> checkForSignals)
 {
   std::unique_lock<std::mutex> lock(this->mServingMutex);
-  if (!mServing)
+  if (!mServing && !mStartingServer)
     return;
   while (true)
   {
     if (mServingConditionValue.wait_for(
-            lock, std::chrono::milliseconds(1000), [&]() { return !mServing; }))
+            lock, std::chrono::milliseconds(1000), [&]() {
+              return !mServing && !mStartingServer;
+            }))
     {
       // Our condition was met!
       return;
