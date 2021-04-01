@@ -719,6 +719,7 @@ int dBoxBox(
     const dVector3 p2,
     const dMatrix3 R2,
     const dVector3 side2,
+    const CollisionOption& option,
     CollisionResult& result)
 {
   const double fudge_factor = 1.05;
@@ -981,6 +982,8 @@ int dBoxBox(
       point_vec << 0.5 * (pa[0] + pb[0]), 0.5 * (pa[1] + pb[1]),
           0.5 * (pa[2] + pb[2]);
       penetration = -s;
+      if (penetration > option.contactClippingDepth)
+        return 0;
 
       Contact contact;
       contact.collisionObject1 = o1;
@@ -1404,6 +1407,7 @@ int collideBoxBox(
     const Eigen::Isometry3d& T0,
     const Eigen::Vector3d& size1,
     const Eigen::Isometry3d& T1,
+    const CollisionOption& option,
     CollisionResult& result)
 {
   dVector3 halfSize0;
@@ -1423,7 +1427,7 @@ int collideBoxBox(
   convVector(T0.translation(), p0);
   convVector(T1.translation(), p1);
 
-  return dBoxBox(o1, o2, p0, R0, halfSize0, p1, R1, halfSize1, result);
+  return dBoxBox(o1, o2, p0, R0, halfSize0, p1, R1, halfSize1, option, result);
 }
 
 int collideBoxSphere(
@@ -1433,7 +1437,9 @@ int collideBoxSphere(
     const Eigen::Isometry3d& T0,
     const double& r1,
     const Eigen::Isometry3d& T1,
-    CollisionResult& result)
+    const CollisionOption& option,
+    CollisionResult& result,
+    ClipSphereHalfspace halfspace)
 {
   Eigen::Vector3d halfSize = 0.5 * size0;
   bool inside_box = true;
@@ -1520,6 +1526,8 @@ int collideBoxSphere(
     normal[idx] = (p[idx] > 0.0 ? -1.0 : 1.0);
     normal = T0.linear() * normal;
     penetration = min + r1;
+    if (penetration > option.contactClippingDepth)
+      return 0;
 
     // In this special case, it actually behaves as though it's just a raw
     // vertex-face collision for gradients, so don't reinvent the wheel
@@ -1536,6 +1544,20 @@ int collideBoxSphere(
   normal = contactpt - c0;
   double mag = normal.norm();
   penetration = r1 - mag;
+  if (penetration > option.contactClippingDepth)
+    return 0;
+
+  // Enforce halfspace clipping on the sphere, if we're not in the BOTH setting
+  if (halfspace == ClipSphereHalfspace::BOTTOM
+      && (T1.inverse() * contactpt)(2) >= 0)
+  {
+    return 0;
+  }
+  if (halfspace == ClipSphereHalfspace::TOP
+      && (T1.inverse() * contactpt)(2) <= 0)
+  {
+    return 0;
+  }
 
   if (penetration < 0.0)
   {
@@ -1588,7 +1610,9 @@ int collideSphereBox(
     const Eigen::Isometry3d& T0,
     const Eigen::Vector3d& size1,
     const Eigen::Isometry3d& T1,
-    CollisionResult& result)
+    const CollisionOption& option,
+    CollisionResult& result,
+    ClipSphereHalfspace /* halfspace */)
 {
   Eigen::Vector3d halfSize = 0.5 * size1;
   bool inside_box = true;
@@ -1673,6 +1697,8 @@ int collideSphereBox(
     normal[idx] = (p[idx] > 0.0 ? 1.0 : -1.0);
     normal = T1.linear() * normal;
     penetration = min + r0;
+    if (penetration > option.contactClippingDepth)
+      return 0;
 
     // In this special case, it actually behaves as though it's just a raw
     // vertex-face collision for gradients, so don't reinvent the wheel
@@ -1688,6 +1714,8 @@ int collideSphereBox(
   normal = c0 - contactpt;
   double mag = normal.norm();
   penetration = r0 - mag;
+  if (penetration > option.contactClippingDepth)
+    return 0;
 
   if (penetration < 0.0)
   {
@@ -1739,7 +1767,10 @@ int collideSphereSphere(
     const Eigen::Isometry3d& c0,
     const double& _r1,
     const Eigen::Isometry3d& c1,
-    CollisionResult& result)
+    const CollisionOption& option,
+    CollisionResult& result,
+    ClipSphereHalfspace /* halfspace0 */,
+    ClipSphereHalfspace /* halfspace1 */)
 {
   double r0 = _r0;
   double r1 = _r1;
@@ -1762,6 +1793,8 @@ int collideSphereSphere(
   {
     normal.setZero();
     penetration = rsum;
+    if (penetration > option.contactClippingDepth)
+      return 0;
 
     Contact contact;
     contact.collisionObject1 = o1;
@@ -1781,6 +1814,8 @@ int collideSphereSphere(
   normal_sqr = sqrt(normal_sqr);
   normal *= (1.0 / normal_sqr);
   penetration = rsum - normal_sqr;
+  if (penetration > option.contactClippingDepth)
+    return 0;
 
   Contact contact;
   contact.type = SPHERE_SPHERE;
@@ -2090,7 +2125,8 @@ void createFaceFaceContacts(
     CollisionObject* o2,
     ccd_vec3_t* dir,
     const std::vector<Eigen::Vector3d>& pointsAWitnessSorted,
-    const std::vector<Eigen::Vector3d>& pointsBWitnessSorted)
+    const std::vector<Eigen::Vector3d>& pointsBWitnessSorted,
+    PinToFace pinToFace = PinToFace::AVERAGE)
 {
   assert(pointsAWitnessSorted.size() > 2 || pointsBWitnessSorted.size() > 2);
   assert(pointsAWitnessSorted.size() >= 2 && pointsBWitnessSorted.size() >= 2);
@@ -2124,12 +2160,12 @@ void createFaceFaceContacts(
                  || std::min(
                         (normalA - dirVec).squaredNorm(),
                         (-normalA - dirVec).squaredNorm())
-                        > 1e-5;
+                        > 0.2;
   bool bBroken = abs(normalB.squaredNorm() - 1) > 1e-10
                  || std::min(
                         (normalB - dirVec).squaredNorm(),
                         (-normalB - dirVec).squaredNorm())
-                        > 1e-5;
+                        > 0.2;
   if (aBroken && !bBroken)
   {
     normalA = normalB;
@@ -2166,6 +2202,16 @@ void createFaceFaceContacts(
   Eigen::Vector3d originB = normal * (pointsBWitnessSorted[0].dot(normal));
 
   Eigen::Vector3d origin = (originA + originB) / 2;
+  if (pinToFace == PinToFace::FACE_A)
+  {
+    origin = originA;
+    normal = normalA;
+  }
+  else if (pinToFace == PinToFace::FACE_B)
+  {
+    origin = originB;
+    normal = normalB;
+  }
 
   Eigen::Vector3d tmp = normal.cross(Eigen::Vector3d::UnitZ());
   if (tmp.squaredNorm() < 1e-4)
@@ -2211,12 +2257,24 @@ void createFaceFaceContacts(
       contact.collisionObject1 = o1;
       contact.collisionObject2 = o2;
       contact.point = vertexA;
+      if (pinToFace == PinToFace::FACE_B)
+      {
+        contact.point = originB + (basis2dX * basis2dX.dot(contact.point))
+                        + (basis2dY * basis2dY.dot(contact.point));
+      }
 
       // Make sure that the normal vector is pointed from B to A, which should
       // mean that distA > distB because A's vertex is penetrating B
       double distA = vertexA.dot(normalB);
       double distB = pointsBWitnessSorted[0].dot(normalB);
-      contact.normal = normalB;
+      if (pinToFace == PinToFace::FACE_B)
+      {
+        contact.normal = normalA;
+      }
+      else
+      {
+        contact.normal = normalB;
+      }
       contact.penetrationDepth = distB - distA;
 
       contact.type = VERTEX_FACE;
@@ -2238,12 +2296,24 @@ void createFaceFaceContacts(
       contact.collisionObject1 = o1;
       contact.collisionObject2 = o2;
       contact.point = vertexB;
+      if (pinToFace == PinToFace::FACE_A)
+      {
+        contact.point = originA + (basis2dX * basis2dX.dot(contact.point))
+                        + (basis2dY * basis2dY.dot(contact.point));
+      }
 
       // Make sure that the normal vector is pointed from B to A, which should
       // mean that distB > distA because B's vertex is penetrating A
       double distA = pointsAWitnessSorted[0].dot(normalA);
       double distB = vertexB.dot(normalA);
-      contact.normal = normalA;
+      if (pinToFace == PinToFace::FACE_A)
+      {
+        contact.normal = normalB;
+      }
+      else
+      {
+        contact.normal = normalA;
+      }
       contact.penetrationDepth = distB - distA;
 
       contact.type = FACE_VERTEX;
@@ -2324,17 +2394,23 @@ void createFaceFaceContacts(
         }
 
         // Construct our contact point using the standard geometry routine
+        double radiusA = 1.0;
+        double radiusB = 1.0;
+        if (pinToFace == PinToFace::FACE_A)
+        {
+          radiusA = 0.0;
+        }
+        else if (pinToFace == PinToFace::FACE_B)
+        {
+          radiusB = 0.0;
+        }
         contact.point = math::getContactPoint(
             contact.edgeAFixedPoint,
             contact.edgeADir,
             contact.edgeBFixedPoint,
-            contact.edgeBDir);
-
-        // TODO(keenon): This produces a slightly different contact point, which
-        // is suspicious because it should be exactly the same. That indicates
-        // there's a bug hiding in here somewhere.
-        //
-        // contact.point = (edgeAClosestPoint + edgeBClosestPoint) / 2;
+            contact.edgeBDir,
+            radiusA,
+            radiusB);
 
         collisionsOut.push_back(contact);
       }
@@ -2667,7 +2743,8 @@ int createMeshSphereContact(
     ccd_vec3_t* dir,
     const std::vector<Eigen::Vector3d>& meshPointsWitness,
     const Eigen::Vector3d& sphereCenter,
-    double sphereRadius)
+    double sphereRadius,
+    ClipSphereHalfspace /* halfspace */)
 {
   if (meshPointsWitness.size() == 0)
   {
@@ -2780,7 +2857,8 @@ int createSphereMeshContact(
     ccd_vec3_t* dir,
     const Eigen::Vector3d& sphereCenter,
     double sphereRadius,
-    const std::vector<Eigen::Vector3d>& meshPointsWitness)
+    const std::vector<Eigen::Vector3d>& meshPointsWitness,
+    ClipSphereHalfspace /* halfspace */)
 {
   if (meshPointsWitness.size() == 0)
   {
@@ -2887,13 +2965,14 @@ int createSphereMeshContact(
 int createCapsuleMeshContact(
     CollisionObject* o1,
     CollisionObject* o2,
-    CollisionResult& result,
+    std::vector<Contact>& contacts,
     ccd_vec3_t* dir,
     const Eigen::Vector3d& capsuleA,
     const Eigen::Vector3d& capsuleB,
     double capsuleRadius,
     const std::vector<Eigen::Vector3d>& meshPointsWitness,
-    bool flipObjectOrder)
+    bool flipObjectOrder,
+    const CollisionOption& option)
 {
   if (meshPointsWitness.size() == 0)
   {
@@ -2939,7 +3018,9 @@ int createCapsuleMeshContact(
     }
     contact.penetrationDepth
         = capsuleRadius - (meshPointsWitness[0] - nearestPoint).norm();
-    result.addContact(contact);
+    if (contact.penetrationDepth > option.contactClippingDepth)
+      return 0;
+    contacts.push_back(contact);
 
     return 1;
   }
@@ -2955,6 +3036,8 @@ int createCapsuleMeshContact(
     // contacts, and has several different edge cases.
     if (parallel)
     {
+      int numContacts = 0;
+
       double edgeALinear = edgeDir.dot(meshPointsWitness[0]);
       double edgeBLinear = edgeDir.dot(meshPointsWitness[1]);
       double capsuleALinear = edgeDir.dot(capsuleA);
@@ -3011,7 +3094,12 @@ int createCapsuleMeshContact(
           contact.pipeRadius = capsuleRadius;
         }
         contact.penetrationDepth = capsuleRadius - dist;
-        result.addContact(contact);
+        if (contact.penetrationDepth > 0
+            && contact.penetrationDepth < option.contactClippingDepth)
+        {
+          numContacts++;
+          contacts.push_back(contact);
+        }
       }
       // This means our min-edge contact is the capsuleMin, resulting in a
       // SPHERE-EDGE collision
@@ -3042,7 +3130,12 @@ int createCapsuleMeshContact(
           contact.edgeAFixedPoint = meshPointsWitness[0];
         }
         contact.penetrationDepth = capsuleRadius - dist;
-        result.addContact(contact);
+        if (contact.penetrationDepth > 0
+            && contact.penetrationDepth < option.contactClippingDepth)
+        {
+          numContacts++;
+          contacts.push_back(contact);
+        }
       }
 
       // This means our max-end contact point is the edgeMax, resulting in a
@@ -3074,7 +3167,12 @@ int createCapsuleMeshContact(
           contact.pipeRadius = capsuleRadius;
         }
         contact.penetrationDepth = capsuleRadius - dist;
-        result.addContact(contact);
+        if (contact.penetrationDepth > 0
+            && contact.penetrationDepth < option.contactClippingDepth)
+        {
+          numContacts++;
+          contacts.push_back(contact);
+        }
       }
       // This means our min-edge contact is the capsuleMin, resulting in a
       // SPHERE-EDGE collision
@@ -3105,10 +3203,15 @@ int createCapsuleMeshContact(
           contact.edgeAFixedPoint = meshPointsWitness[0];
         }
         contact.penetrationDepth = capsuleRadius - dist;
-        result.addContact(contact);
+        if (contact.penetrationDepth > 0
+            && contact.penetrationDepth < option.contactClippingDepth)
+        {
+          numContacts++;
+          contacts.push_back(contact);
+        }
       }
 
-      return 2;
+      return numContacts;
     }
     // Standard case, edge and capsule are not parallel
     // Find nearest point on both edges and generate a single contact
@@ -3167,7 +3270,12 @@ int createCapsuleMeshContact(
       }
       contact.penetrationDepth
           = capsuleRadius - (edgeClosestPoint - pipeClosestPoint).norm();
-      result.addContact(contact);
+      if (contact.penetrationDepth > option.contactClippingDepth)
+      {
+        return 0;
+      }
+
+      contacts.push_back(contact);
 
       return 1;
     }
@@ -3205,15 +3313,22 @@ int createCapsuleMeshContact(
     std::vector<Eigen::Vector3d> capsulePointsWitness;
 
     // Now we need to process the two shapes to find intersection points
-    std::vector<Contact> contacts;
+    std::vector<Contact> faceContacts;
 
     if (flipObjectOrder)
     {
       capsulePointsWitness.push_back(capsuleA + normal * capsuleRadius);
       capsulePointsWitness.push_back(capsuleB + normal * capsuleRadius);
       createFaceFaceContacts(
-          contacts, o2, o1, dir, pointsWitnessSorted, capsulePointsWitness);
-      for (Contact& contact : contacts)
+          faceContacts,
+          o2,
+          o1,
+          dir,
+          pointsWitnessSorted,
+          capsulePointsWitness,
+          PinToFace::FACE_A);
+      int numContacts = 0;
+      for (Contact& contact : faceContacts)
       {
         assert(contact.type != VERTEX_FACE);
 
@@ -3240,9 +3355,9 @@ int createCapsuleMeshContact(
         {
           contact.type = EDGE_PIPE;
           contact.pipeFixedPoint
-              = contact.edgeBFixedPoint + normal * capsuleRadius;
+              = contact.edgeBFixedPoint - normal * capsuleRadius;
           contact.pipeClosestPoint
-              = contact.edgeBClosestPoint + normal * capsuleRadius;
+              = contact.edgeBClosestPoint - normal * capsuleRadius;
           contact.pipeDir = contact.edgeBDir;
           contact.pipeRadius = capsuleRadius;
           // the contact point is defined as the closest point on the edge
@@ -3255,19 +3370,30 @@ int createCapsuleMeshContact(
               "Got an unexpected contact type in createCapsuleMeshContacts"
               && false);
         }
-
-        result.addContact(contact);
+        if (contact.penetrationDepth >= 0
+            && contact.penetrationDepth < option.contactClippingDepth)
+        {
+          numContacts++;
+          contacts.push_back(contact);
+        }
       }
 
-      return contacts.size();
+      return numContacts;
     }
     else
     {
       capsulePointsWitness.push_back(capsuleA - normal * capsuleRadius);
       capsulePointsWitness.push_back(capsuleB - normal * capsuleRadius);
       createFaceFaceContacts(
-          contacts, o1, o2, dir, capsulePointsWitness, pointsWitnessSorted);
-      for (Contact& contact : contacts)
+          faceContacts,
+          o1,
+          o2,
+          dir,
+          capsulePointsWitness,
+          pointsWitnessSorted,
+          PinToFace::FACE_B);
+      int numContacts = 0;
+      for (Contact& contact : faceContacts)
       {
         assert(contact.type != FACE_VERTEX);
 
@@ -3313,10 +3439,15 @@ int createCapsuleMeshContact(
               && false);
         }
 
-        result.addContact(contact);
+        if (contact.penetrationDepth >= 0
+            && contact.penetrationDepth < option.contactClippingDepth)
+        {
+          numContacts++;
+          contacts.push_back(contact);
+        }
       }
 
-      return contacts.size();
+      return numContacts;
     }
   }
 
@@ -3717,6 +3848,7 @@ int collideBoxBoxAsMesh(
     const Eigen::Isometry3d& T0,
     const Eigen::Vector3d& size1,
     const Eigen::Isometry3d& T1,
+    const CollisionOption& option,
     CollisionResult& result)
 {
   ccd_t ccd;
@@ -3741,6 +3873,8 @@ int collideBoxBoxAsMesh(
   ccd_vec3_t& dir = getCachedCcdDir(o1, o2);
   ccd_vec3_t& pos = getCachedCcdPos(o1, o2);
   int intersect = ccdMPRPenetration(&box1, &box2, &ccd, &depth, &dir, &pos);
+  if (depth > option.contactClippingDepth)
+    return 0;
   if (intersect == 0)
   {
     std::vector<Eigen::Vector3d> pointsA
@@ -3761,6 +3895,7 @@ int collideMeshBox(
     const Eigen::Isometry3d& c0,
     const Eigen::Vector3d& size1,
     const Eigen::Isometry3d& c1,
+    const CollisionOption& option,
     CollisionResult& result)
 {
   ccd_t ccd;
@@ -3786,6 +3921,8 @@ int collideMeshBox(
   ccd_vec3_t& dir = getCachedCcdDir(o1, o2);
   ccd_vec3_t& pos = getCachedCcdPos(o1, o2);
   int intersect = ccdMPRPenetration(&mesh1, &box2, &ccd, &depth, &dir, &pos);
+  if (depth > option.contactClippingDepth)
+    return 0;
   if (intersect == 0)
   {
     std::vector<Eigen::Vector3d> pointsA
@@ -3806,6 +3943,7 @@ int collideBoxMesh(
     const aiScene* m1,
     const Eigen::Vector3d& size1,
     const Eigen::Isometry3d& c1,
+    const CollisionOption& option,
     CollisionResult& result)
 {
   ccd_t ccd;
@@ -3831,6 +3969,8 @@ int collideBoxMesh(
   ccd_vec3_t& dir = getCachedCcdDir(o1, o2);
   ccd_vec3_t& pos = getCachedCcdPos(o1, o2);
   int intersect = ccdMPRPenetration(&box1, &mesh2, &ccd, &depth, &dir, &pos);
+  if (depth > option.contactClippingDepth)
+    return 0;
   if (intersect == 0)
   {
     std::vector<Eigen::Vector3d> pointsA
@@ -3857,7 +3997,9 @@ int collideMeshSphere(
     const Eigen::Isometry3d& c0,
     const double& r1,
     const Eigen::Isometry3d& c1,
-    CollisionResult& result)
+    const CollisionOption& option,
+    CollisionResult& result,
+    ClipSphereHalfspace /* halfspace */)
 {
   ccd_t ccd;
   CCD_INIT(&ccd); // initialize ccd_t struct
@@ -3882,6 +4024,8 @@ int collideMeshSphere(
   ccd_vec3_t& dir = getCachedCcdDir(o1, o2);
   ccd_vec3_t& pos = getCachedCcdPos(o1, o2);
   int intersect = ccdMPRPenetration(&mesh, &sphere, &ccd, &depth, &dir, &pos);
+  if (depth > option.contactClippingDepth)
+    return 0;
   if (intersect == 0)
   {
     std::vector<Eigen::Vector3d> meshPoints
@@ -3901,7 +4045,9 @@ int collideSphereMesh(
     const aiScene* mesh1,
     const Eigen::Vector3d& size1,
     const Eigen::Isometry3d& c1,
-    CollisionResult& result)
+    const CollisionOption& option,
+    CollisionResult& result,
+    ClipSphereHalfspace /* halfspace */)
 {
   ccd_t ccd;
   CCD_INIT(&ccd); // initialize ccd_t struct
@@ -3926,6 +4072,8 @@ int collideSphereMesh(
   ccd_vec3_t& dir = getCachedCcdDir(o1, o2);
   ccd_vec3_t& pos = getCachedCcdPos(o1, o2);
   int intersect = ccdMPRPenetration(&sphere, &mesh, &ccd, &depth, &dir, &pos);
+  if (depth > option.contactClippingDepth)
+    return 0;
   if (intersect == 0)
   {
     std::vector<Eigen::Vector3d> meshPoints
@@ -3946,6 +4094,7 @@ int collideMeshMesh(
     const aiScene* m1,
     const Eigen::Vector3d& size1,
     const Eigen::Isometry3d& c1,
+    const CollisionOption& option,
     CollisionResult& result)
 {
   ccd_t ccd;
@@ -3972,6 +4121,8 @@ int collideMeshMesh(
   ccd_vec3_t& dir = getCachedCcdDir(o1, o2);
   ccd_vec3_t& pos = getCachedCcdPos(o1, o2);
   int intersect = ccdMPRPenetration(&mesh1, &mesh2, &ccd, &depth, &dir, &pos);
+  if (depth > option.contactClippingDepth)
+    return 0;
   if (intersect == 0)
   {
     std::vector<Eigen::Vector3d> pointsA
@@ -3993,6 +4144,7 @@ int collideCapsuleCapsule(
     double height1,
     double radius1,
     const Eigen::Isometry3d& T1,
+    const CollisionOption& option,
     CollisionResult& result)
 {
   Eigen::Vector3d pa = T0 * (Eigen::Vector3d::UnitZ() * -(height0 / 2));
@@ -4025,6 +4177,8 @@ int collideCapsuleCapsule(
     contact.collisionObject1 = o1;
     contact.collisionObject2 = o2;
     contact.penetrationDepth = rsum - dist;
+    if (contact.penetrationDepth > option.contactClippingDepth)
+      return 0;
     contact.point = (closest0 * radius1) + (closest1 * radius0);
     contact.normal = (closest0 - closest1).normalized();
 
@@ -4092,6 +4246,7 @@ int collideSphereCapsule(
     double height1,
     double radius1,
     const Eigen::Isometry3d& T1,
+    const CollisionOption& option,
     CollisionResult& result)
 {
   double alpha;
@@ -4114,6 +4269,8 @@ int collideSphereCapsule(
     contact.collisionObject1 = o1;
     contact.collisionObject2 = o2;
     contact.penetrationDepth = rsum - dist;
+    if (contact.penetrationDepth > option.contactClippingDepth)
+      return 0;
     contact.point = (center0 * radius1) + (closest1 * radius0);
     contact.normal = (center0 - closest1).normalized();
 
@@ -4157,6 +4314,7 @@ int collideCapsuleSphere(
     const Eigen::Isometry3d& T0,
     double radius1,
     const Eigen::Isometry3d& T1,
+    const CollisionOption& option,
     CollisionResult& result)
 {
   double alpha;
@@ -4179,6 +4337,8 @@ int collideCapsuleSphere(
     contact.collisionObject1 = o1;
     contact.collisionObject2 = o2;
     contact.penetrationDepth = rsum - dist;
+    if (contact.penetrationDepth > option.contactClippingDepth)
+      return 0;
     contact.point = (closest0 * radius1) + (center1 * radius0);
     contact.normal = (closest0 - center1).normalized();
 
@@ -4222,6 +4382,7 @@ int collideBoxCapsule(
     double height1,
     double radius1,
     const Eigen::Isometry3d& T1,
+    const CollisionOption& option,
     CollisionResult& result)
 {
   ccd_t ccd;
@@ -4249,6 +4410,8 @@ int collideBoxCapsule(
   int intersect = ccdMPRPenetration(&box1, &capsule2, &ccd, &depth, &dir, &pos);
   if (intersect == 0)
   {
+    if (depth > option.contactClippingDepth)
+      return 0;
     Eigen::Map<Eigen::Vector3d> posMap(pos.v);
     Eigen::Vector3d localPos = T1.inverse() * posMap;
     if (localPos(2) > height1 / 2)
@@ -4256,14 +4419,30 @@ int collideBoxCapsule(
       Eigen::Isometry3d sphereTransform = Eigen::Isometry3d::Identity();
       sphereTransform.translation() = Eigen::Vector3d(0, 0, height1 / 2);
       return collideBoxSphere(
-          o1, o2, size0, T0, radius1, T1 * sphereTransform, result);
+          o1,
+          o2,
+          size0,
+          T0,
+          radius1,
+          T1 * sphereTransform,
+          option,
+          result,
+          ClipSphereHalfspace::TOP);
     }
     else if (localPos(2) < -height1 / 2)
     {
       Eigen::Isometry3d sphereTransform = Eigen::Isometry3d::Identity();
       sphereTransform.translation() = Eigen::Vector3d(0, 0, -height1 / 2);
       return collideBoxSphere(
-          o1, o2, size0, T0, radius1, T1 * sphereTransform, result);
+          o1,
+          o2,
+          size0,
+          T0,
+          radius1,
+          T1 * sphereTransform,
+          option,
+          result,
+          ClipSphereHalfspace::BOTTOM);
     }
 
     // Otherwise we're on an edge, and have to handle the pipe collisions
@@ -4272,16 +4451,36 @@ int collideBoxCapsule(
     std::vector<Eigen::Vector3d> meshPoints
         = ccdPointsAtWitnessBox(&box1, &dir, false);
 
-    return createCapsuleMeshContact(
+    std::vector<Contact> contacts;
+    int numContacts = createCapsuleMeshContact(
         o1,
         o2,
-        result,
+        contacts,
         &dir,
         T1 * Eigen::Vector3d(0, 0, height1 / 2),
         T1 * Eigen::Vector3d(0, 0, -height1 / 2),
         radius1,
         meshPoints,
-        true);
+        true,
+        option);
+    (void)numContacts;
+    assert(contacts.size() == numContacts);
+    for (auto contact : contacts)
+    {
+      assert(contact.type != ContactType::SPHERE_FACE);
+      if (contact.type == ContactType::FACE_SPHERE)
+      {
+        Eigen::Isometry3d sphereTransform = Eigen::Isometry3d::Identity();
+        sphereTransform.translation() = contact.sphereCenter;
+        collideBoxSphere(
+            o1, o2, size0, T0, radius1, sphereTransform, option, result);
+      }
+      else
+      {
+        result.addContact(contact);
+      }
+    }
+    return contacts.size();
   }
   return 0;
 }
@@ -4294,6 +4493,7 @@ int collideCapsuleBox(
     const Eigen::Isometry3d& T0,
     const Eigen::Vector3d& size1,
     const Eigen::Isometry3d& T1,
+    const CollisionOption& option,
     CollisionResult& result)
 {
   ccd_t ccd;
@@ -4321,6 +4521,8 @@ int collideCapsuleBox(
   int intersect = ccdMPRPenetration(&capsule1, &box2, &ccd, &depth, &dir, &pos);
   if (intersect == 0)
   {
+    if (depth > option.contactClippingDepth)
+      return 0;
     Eigen::Map<Eigen::Vector3d> posMap(pos.v);
     Eigen::Vector3d localPos = T0.inverse() * posMap;
     if (localPos(2) > height0 / 2)
@@ -4328,14 +4530,30 @@ int collideCapsuleBox(
       Eigen::Isometry3d sphereTransform = Eigen::Isometry3d::Identity();
       sphereTransform.translation() = Eigen::Vector3d(0, 0, height0 / 2);
       return collideSphereBox(
-          o1, o2, radius0, T0 * sphereTransform, size1, T1, result);
+          o1,
+          o2,
+          radius0,
+          T0 * sphereTransform,
+          size1,
+          T1,
+          option,
+          result,
+          ClipSphereHalfspace::TOP);
     }
     else if (localPos(2) < -height0 / 2)
     {
       Eigen::Isometry3d sphereTransform = Eigen::Isometry3d::Identity();
       sphereTransform.translation() = Eigen::Vector3d(0, 0, -height0 / 2);
       return collideSphereBox(
-          o1, o2, radius0, T0 * sphereTransform, size1, T1, result);
+          o1,
+          o2,
+          radius0,
+          T0 * sphereTransform,
+          size1,
+          T1,
+          option,
+          result,
+          ClipSphereHalfspace::BOTTOM);
     }
 
     // Otherwise we're on an edge, and have to handle the pipe collisions
@@ -4344,16 +4562,36 @@ int collideCapsuleBox(
     std::vector<Eigen::Vector3d> meshPoints
         = ccdPointsAtWitnessBox(&box2, &dir, true);
 
-    return createCapsuleMeshContact(
+    std::vector<Contact> contacts;
+    int numContacts = createCapsuleMeshContact(
         o1,
         o2,
-        result,
+        contacts,
         &dir,
         T0 * Eigen::Vector3d(0, 0, height0 / 2),
         T0 * Eigen::Vector3d(0, 0, -height0 / 2),
         radius0,
         meshPoints,
-        false);
+        false,
+        option);
+    (void)numContacts;
+    assert(contacts.size() == numContacts);
+    for (auto contact : contacts)
+    {
+      assert(contact.type != ContactType::FACE_SPHERE);
+      if (contact.type == ContactType::SPHERE_FACE)
+      {
+        Eigen::Isometry3d sphereTransform = Eigen::Isometry3d::Identity();
+        sphereTransform.translation() = contact.sphereCenter;
+        collideSphereBox(
+            o1, o2, radius0, sphereTransform, size1, T1, option, result);
+      }
+      else
+      {
+        result.addContact(contact);
+      }
+    }
+    return contacts.size();
   }
   return 0;
 }
@@ -4367,6 +4605,7 @@ int collideMeshCapsule(
     double height1,
     double radius1,
     const Eigen::Isometry3d& T1,
+    const CollisionOption& option,
     CollisionResult& result)
 {
   ccd_t ccd;
@@ -4394,6 +4633,8 @@ int collideMeshCapsule(
   ccd_vec3_t& pos = getCachedCcdPos(o1, o2);
   int intersect
       = ccdMPRPenetration(&mesh1, &capsule2, &ccd, &depth, &dir, &pos);
+  if (depth > option.contactClippingDepth)
+    return 0;
   if (intersect == 0)
   {
     Eigen::Map<Eigen::Vector3d> posMap(pos.v);
@@ -4403,14 +4644,32 @@ int collideMeshCapsule(
       Eigen::Isometry3d sphereTransform = Eigen::Isometry3d::Identity();
       sphereTransform.translation() = Eigen::Vector3d(0, 0, height1 / 2);
       return collideMeshSphere(
-          o1, o2, m0, size0, T0, radius1, T1 * sphereTransform, result);
+          o1,
+          o2,
+          m0,
+          size0,
+          T0,
+          radius1,
+          T1 * sphereTransform,
+          option,
+          result,
+          ClipSphereHalfspace::TOP);
     }
     else if (localPos(2) < -height1 / 2)
     {
       Eigen::Isometry3d sphereTransform = Eigen::Isometry3d::Identity();
       sphereTransform.translation() = Eigen::Vector3d(0, 0, -height1 / 2);
       return collideMeshSphere(
-          o1, o2, m0, size0, T0, radius1, T1 * sphereTransform, result);
+          o1,
+          o2,
+          m0,
+          size0,
+          T0,
+          radius1,
+          T1 * sphereTransform,
+          option,
+          result,
+          ClipSphereHalfspace::BOTTOM);
     }
 
     // Otherwise we're on an edge, and have to handle the pipe collisions
@@ -4419,16 +4678,25 @@ int collideMeshCapsule(
     std::vector<Eigen::Vector3d> meshPoints
         = ccdPointsAtWitnessMesh(&mesh1, &dir, false);
 
-    return createCapsuleMeshContact(
+    std::vector<Contact> contacts;
+    int numContacts = createCapsuleMeshContact(
         o1,
         o2,
-        result,
+        contacts,
         &dir,
         T1 * Eigen::Vector3d(0, 0, height1 / 2),
         T1 * Eigen::Vector3d(0, 0, -height1 / 2),
         radius1,
         meshPoints,
-        true);
+        true,
+        option);
+    (void)numContacts;
+    assert(contacts.size() == numContacts);
+    for (auto contact : contacts)
+    {
+      result.addContact(contact);
+    }
+    return contacts.size();
   }
   return 0;
 }
@@ -4442,6 +4710,7 @@ int collideCapsuleMesh(
     const aiScene* m1,
     const Eigen::Vector3d& size1,
     const Eigen::Isometry3d& T1,
+    const CollisionOption& option,
     CollisionResult& result)
 {
   ccd_t ccd;
@@ -4469,6 +4738,8 @@ int collideCapsuleMesh(
   ccd_vec3_t& pos = getCachedCcdPos(o1, o2);
   int intersect
       = ccdMPRPenetration(&capsule1, &mesh2, &ccd, &depth, &dir, &pos);
+  if (depth > option.contactClippingDepth)
+    return 0;
   if (intersect == 0)
   {
     Eigen::Map<Eigen::Vector3d> posMap(pos.v);
@@ -4478,14 +4749,32 @@ int collideCapsuleMesh(
       Eigen::Isometry3d sphereTransform = Eigen::Isometry3d::Identity();
       sphereTransform.translation() = Eigen::Vector3d(0, 0, height0 / 2);
       return collideSphereMesh(
-          o1, o2, radius0, T0 * sphereTransform, m1, size1, T1, result);
+          o1,
+          o2,
+          radius0,
+          T0 * sphereTransform,
+          m1,
+          size1,
+          T1,
+          option,
+          result,
+          ClipSphereHalfspace::TOP);
     }
     else if (localPos(2) < -height0 / 2)
     {
       Eigen::Isometry3d sphereTransform = Eigen::Isometry3d::Identity();
       sphereTransform.translation() = Eigen::Vector3d(0, 0, -height0 / 2);
       return collideSphereMesh(
-          o1, o2, radius0, T0 * sphereTransform, m1, size1, T1, result);
+          o1,
+          o2,
+          radius0,
+          T0 * sphereTransform,
+          m1,
+          size1,
+          T1,
+          option,
+          result,
+          ClipSphereHalfspace::BOTTOM);
     }
 
     // Otherwise we're on an edge, and have to handle the pipe collisions
@@ -4494,16 +4783,25 @@ int collideCapsuleMesh(
     std::vector<Eigen::Vector3d> meshPoints
         = ccdPointsAtWitnessMesh(&mesh2, &dir, true);
 
-    return createCapsuleMeshContact(
+    std::vector<Contact> contacts;
+    int numContacts = createCapsuleMeshContact(
         o1,
         o2,
-        result,
+        contacts,
         &dir,
         T0 * Eigen::Vector3d(0, 0, height0 / 2),
         T0 * Eigen::Vector3d(0, 0, -height0 / 2),
         radius0,
         meshPoints,
-        false);
+        false,
+        option);
+    (void)numContacts;
+    assert(contacts.size() == numContacts);
+    for (auto contact : contacts)
+    {
+      result.addContact(contact);
+    }
+    return contacts.size();
   }
   return 0;
 }
@@ -4516,7 +4814,9 @@ int collideCylinderSphere(
     const Eigen::Isometry3d& T0,
     const double& sphere_rad,
     const Eigen::Isometry3d& T1,
-    CollisionResult& result)
+    CollisionResult& result,
+    const CollisionOption& /* option */,
+    ClipSphereHalfspace /* halfspace */)
 {
   Eigen::Vector3d center = T0.inverse() * T1.translation();
 
@@ -4597,6 +4897,7 @@ int collideCylinderPlane(
     const Eigen::Isometry3d& T0,
     const Eigen::Vector3d& plane_normal,
     const Eigen::Isometry3d& T1,
+    const CollisionOption& /* option */,
     CollisionResult& result)
 {
   Eigen::Vector3d normal = T1.linear() * plane_normal;
@@ -4672,7 +4973,11 @@ int collideCylinderPlane(
 }
 
 //==============================================================================
-int collide(CollisionObject* o1, CollisionObject* o2, CollisionResult& result)
+int collide(
+    CollisionObject* o1,
+    CollisionObject* o2,
+    const CollisionOption& option,
+    CollisionResult& result)
 {
   // TODO(JS): We could make the contact point computation as optional for
   // the case that we want only binary check.
@@ -4697,14 +5002,28 @@ int collide(CollisionObject* o1, CollisionObject* o2, CollisionResult& result)
           = static_cast<const dynamics::SphereShape*>(shape2.get());
 
       return collideSphereSphere(
-          o1, o2, sphere0->getRadius(), T1, sphere1->getRadius(), T2, result);
+          o1,
+          o2,
+          sphere0->getRadius(),
+          T1,
+          sphere1->getRadius(),
+          T2,
+          option,
+          result);
     }
     else if (dynamics::BoxShape::getStaticType() == shapeType2)
     {
       const auto* box1 = static_cast<const dynamics::BoxShape*>(shape2.get());
 
       return collideSphereBox(
-          o1, o2, sphere0->getRadius(), T1, box1->getSize(), T2, result);
+          o1,
+          o2,
+          sphere0->getRadius(),
+          T1,
+          box1->getSize(),
+          T2,
+          option,
+          result);
     }
     else if (dynamics::EllipsoidShape::getStaticType() == shapeType2)
     {
@@ -4718,6 +5037,7 @@ int collide(CollisionObject* o1, CollisionObject* o2, CollisionResult& result)
           T1,
           ellipsoid1->getRadii()[0],
           T2,
+          option,
           result);
     }
     else if (dynamics::MeshShape::getStaticType() == shapeType2)
@@ -4732,6 +5052,7 @@ int collide(CollisionObject* o1, CollisionObject* o2, CollisionResult& result)
           mesh1->getMesh(),
           mesh1->getScale(),
           T2,
+          option,
           result);
     }
     else if (dynamics::CapsuleShape::getStaticType() == shapeType2)
@@ -4747,6 +5068,7 @@ int collide(CollisionObject* o1, CollisionObject* o2, CollisionResult& result)
           capsule1->getHeight(),
           capsule1->getRadius(),
           T2,
+          option,
           result);
     }
   }
@@ -4760,7 +5082,14 @@ int collide(CollisionObject* o1, CollisionObject* o2, CollisionResult& result)
           = static_cast<const dynamics::SphereShape*>(shape2.get());
 
       return collideBoxSphere(
-          o1, o2, box0->getSize(), T1, sphere1->getRadius(), T2, result);
+          o1,
+          o2,
+          box0->getSize(),
+          T1,
+          sphere1->getRadius(),
+          T2,
+          option,
+          result);
     }
     else if (dynamics::BoxShape::getStaticType() == shapeType2)
     {
@@ -4899,7 +5228,7 @@ int collide(CollisionObject* o1, CollisionObject* o2, CollisionResult& result)
 #endif
       */
       return collideBoxBox(
-          o1, o2, box0->getSize(), T1, box1->getSize(), T2, result);
+          o1, o2, box0->getSize(), T1, box1->getSize(), T2, option, result);
     }
     else if (dynamics::EllipsoidShape::getStaticType() == shapeType2)
     {
@@ -4907,7 +5236,14 @@ int collide(CollisionObject* o1, CollisionObject* o2, CollisionResult& result)
           = static_cast<const dynamics::EllipsoidShape*>(shape2.get());
 
       return collideBoxSphere(
-          o1, o2, box0->getSize(), T1, ellipsoid1->getRadii()[0], T2, result);
+          o1,
+          o2,
+          box0->getSize(),
+          T1,
+          ellipsoid1->getRadii()[0],
+          T2,
+          option,
+          result);
     }
     else if (dynamics::MeshShape::getStaticType() == shapeType2)
     {
@@ -4921,6 +5257,7 @@ int collide(CollisionObject* o1, CollisionObject* o2, CollisionResult& result)
           mesh1->getMesh(),
           mesh1->getScale(),
           T2,
+          option,
           result);
     }
     else if (dynamics::CapsuleShape::getStaticType() == shapeType2)
@@ -4936,6 +5273,7 @@ int collide(CollisionObject* o1, CollisionObject* o2, CollisionResult& result)
           capsule1->getHeight(),
           capsule1->getRadius(),
           T2,
+          option,
           result);
     }
   }
@@ -4956,6 +5294,7 @@ int collide(CollisionObject* o1, CollisionObject* o2, CollisionResult& result)
           T1,
           sphere1->getRadius(),
           T2,
+          option,
           result);
     }
     else if (dynamics::BoxShape::getStaticType() == shapeType2)
@@ -4963,7 +5302,14 @@ int collide(CollisionObject* o1, CollisionObject* o2, CollisionResult& result)
       const auto* box1 = static_cast<const dynamics::BoxShape*>(shape2.get());
 
       return collideSphereBox(
-          o1, o2, ellipsoid0->getRadii()[0], T1, box1->getSize(), T2, result);
+          o1,
+          o2,
+          ellipsoid0->getRadii()[0],
+          T1,
+          box1->getSize(),
+          T2,
+          option,
+          result);
     }
     else if (dynamics::EllipsoidShape::getStaticType() == shapeType2)
     {
@@ -4977,6 +5323,7 @@ int collide(CollisionObject* o1, CollisionObject* o2, CollisionResult& result)
           T1,
           ellipsoid1->getRadii()[0],
           T2,
+          option,
           result);
     }
     else if (dynamics::MeshShape::getStaticType() == shapeType2)
@@ -4991,6 +5338,7 @@ int collide(CollisionObject* o1, CollisionObject* o2, CollisionResult& result)
           mesh1->getMesh(),
           mesh1->getScale(),
           T2,
+          option,
           result);
     }
     else if (dynamics::CapsuleShape::getStaticType() == shapeType2)
@@ -5006,6 +5354,7 @@ int collide(CollisionObject* o1, CollisionObject* o2, CollisionResult& result)
           capsule1->getHeight(),
           capsule1->getRadius(),
           T2,
+          option,
           result);
     }
   }
@@ -5025,6 +5374,7 @@ int collide(CollisionObject* o1, CollisionObject* o2, CollisionResult& result)
           T1,
           box1->getSize(),
           T2,
+          option,
           result);
     }
     else if (dynamics::SphereShape::getStaticType() == shapeType2)
@@ -5040,6 +5390,7 @@ int collide(CollisionObject* o1, CollisionObject* o2, CollisionResult& result)
           T1,
           sphere1->getRadius(),
           T2,
+          option,
           result);
     }
     else if (dynamics::EllipsoidShape::getStaticType() == shapeType2)
@@ -5055,6 +5406,7 @@ int collide(CollisionObject* o1, CollisionObject* o2, CollisionResult& result)
           T1,
           ellipsoid1->getRadii()[0],
           T2,
+          option,
           result);
     }
     else if (dynamics::MeshShape::getStaticType() == shapeType2)
@@ -5070,6 +5422,7 @@ int collide(CollisionObject* o1, CollisionObject* o2, CollisionResult& result)
           mesh1->getMesh(),
           mesh1->getScale(),
           T2,
+          option,
           result);
     }
     else if (dynamics::CapsuleShape::getStaticType() == shapeType2)
@@ -5086,6 +5439,7 @@ int collide(CollisionObject* o1, CollisionObject* o2, CollisionResult& result)
           capsule1->getHeight(),
           capsule1->getRadius(),
           T2,
+          option,
           result);
     }
   }
@@ -5106,6 +5460,7 @@ int collide(CollisionObject* o1, CollisionObject* o2, CollisionResult& result)
           T1,
           box1->getSize(),
           T2,
+          option,
           result);
     }
     else if (dynamics::SphereShape::getStaticType() == shapeType2)
@@ -5121,6 +5476,7 @@ int collide(CollisionObject* o1, CollisionObject* o2, CollisionResult& result)
           T1,
           sphere1->getRadius(),
           T2,
+          option,
           result);
     }
     else if (dynamics::EllipsoidShape::getStaticType() == shapeType2)
@@ -5136,6 +5492,7 @@ int collide(CollisionObject* o1, CollisionObject* o2, CollisionResult& result)
           T1,
           ellipsoid1->getRadii()[0],
           T2,
+          option,
           result);
     }
     else if (dynamics::MeshShape::getStaticType() == shapeType2)
@@ -5151,6 +5508,7 @@ int collide(CollisionObject* o1, CollisionObject* o2, CollisionResult& result)
           mesh1->getMesh(),
           mesh1->getScale(),
           T2,
+          option,
           result);
     }
     else if (dynamics::CapsuleShape::getStaticType() == shapeType2)
@@ -5167,6 +5525,7 @@ int collide(CollisionObject* o1, CollisionObject* o2, CollisionResult& result)
           capsule1->getHeight(),
           capsule1->getRadius(),
           T2,
+          option,
           result);
     }
   }

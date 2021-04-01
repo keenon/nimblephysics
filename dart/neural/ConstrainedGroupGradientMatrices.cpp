@@ -264,9 +264,14 @@ bool ConstrainedGroupGradientMatrices::opportunisticallyStandardizeResults(
   1e-11); #endif
     }
   */
+  // TODO: <remove>
+  mStabilizationPos = world->getPositions();
+  mStabilizationVel = world->getVelocities();
+  // TODO: </remove>
+  mStabilizationQ = Q;
+  mStabilizationB = b;
 
-  Eigen::VectorXd f_c
-      = Q.jacobiSvd(Eigen::ComputeThinU | Eigen::ComputeThinV).solve(b);
+  Eigen::VectorXd f_c = Q.completeOrthogonalDecomposition().solve(b);
   Eigen::VectorXd originalF_c = getClampingConstraintImpulses();
 
   bool anyNewlyNotClamping = false;

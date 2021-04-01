@@ -165,6 +165,7 @@ void verifyBoxMeshResultsIdenticalToAnalytical(ccdBox* box1, ccdBox* box2)
   createMeshMeshContacts(nullptr, nullptr, meshResult, &dir, pointsA, pointsB);
 
   CollisionResult analyticalResult;
+  CollisionOption option;
   collideBoxBox(
       nullptr,
       nullptr,
@@ -172,6 +173,7 @@ void verifyBoxMeshResultsIdenticalToAnalytical(ccdBox* box1, ccdBox* box2)
       *box1->transform,
       *box2->size,
       *box2->transform,
+      option,
       analyticalResult);
 
   EXPECT_EQ(meshResult.getNumContacts(), analyticalResult.getNumContacts());
@@ -224,11 +226,22 @@ void verifyMeshAndBoxResultsIdentical(
   aiScene* boxMesh = createBoxMeshUnsafe();
 
   CollisionResult meshResult;
+  CollisionOption option;
   collideMeshMesh(
-      nullptr, nullptr, boxMesh, size1, T1, boxMesh, size2, T2, meshResult);
+      nullptr,
+      nullptr,
+      boxMesh,
+      size1,
+      T1,
+      boxMesh,
+      size2,
+      T2,
+      option,
+      meshResult);
 
   CollisionResult analyticalResult;
-  collideBoxBox(nullptr, nullptr, size1, T1, size2, T2, analyticalResult);
+  collideBoxBox(
+      nullptr, nullptr, size1, T1, size2, T2, option, analyticalResult);
 
   EXPECT_EQ(meshResult.getNumContacts(), analyticalResult.getNumContacts());
 
@@ -242,11 +255,19 @@ void verifyMeshAndBoxResultsIdentical(
       boxMesh,
       size1,
       T1,
+      option,
       meshResultBackwards);
 
   CollisionResult analyticalResultBackwards;
   collideBoxBox(
-      nullptr, nullptr, size2, T2, size1, T1, analyticalResultBackwards);
+      nullptr,
+      nullptr,
+      size2,
+      T2,
+      size1,
+      T1,
+      option,
+      analyticalResultBackwards);
 
   Eigen::Vector3d randDirection = Eigen::Vector3d::Random();
   meshResult.sortContacts(randDirection);
@@ -531,7 +552,9 @@ TEST(DARTCollide, BOX_BOX_FACE_FACE_COLLISION_ANNOTATION)
   T2.translation() = Eigen::Vector3d(0.0, 0.5, 0.25);
 
   CollisionResult analyticalResult;
-  collideBoxBox(nullptr, nullptr, size1, T1, size2, T2, analyticalResult);
+  CollisionOption option;
+  collideBoxBox(
+      nullptr, nullptr, size1, T1, size2, T2, option, analyticalResult);
 
   EXPECT_EQ(analyticalResult.getNumContacts(), 4);
 
@@ -2133,8 +2156,18 @@ TEST(DARTCollide, CAPSULE_CAPSULE_T_SHAPED_COLLISION)
   T2.linear() = math::eulerXYZToMatrix(Eigen::Vector3d(0, M_PI_2, 0));
 
   CollisionResult result;
+  CollisionOption option;
   collideCapsuleCapsule(
-      nullptr, nullptr, height, radius1, T1, height, radius2, T2, result);
+      nullptr,
+      nullptr,
+      height,
+      radius1,
+      T1,
+      height,
+      radius2,
+      T2,
+      option,
+      result);
 
   EXPECT_EQ(result.getNumContacts(), 1);
   if (result.getNumContacts() == 0)
@@ -2160,7 +2193,16 @@ TEST(DARTCollide, CAPSULE_CAPSULE_T_SHAPED_COLLISION)
 
   result.clear();
   collideCapsuleCapsule(
-      nullptr, nullptr, height, radius2, T2, height, radius1, T1, result);
+      nullptr,
+      nullptr,
+      height,
+      radius2,
+      T2,
+      height,
+      radius1,
+      T1,
+      option,
+      result);
 
   EXPECT_EQ(result.getNumContacts(), 1);
   if (result.getNumContacts() == 0)
@@ -2195,8 +2237,18 @@ TEST(DARTCollide, CAPSULE_CAPSULE_X_SHAPED_COLLISION)
   T2.linear() = math::eulerXYZToMatrix(Eigen::Vector3d(0, M_PI_2, 0));
 
   CollisionResult result;
+  CollisionOption option;
   collideCapsuleCapsule(
-      nullptr, nullptr, height, radius1, T1, height, radius2, T2, result);
+      nullptr,
+      nullptr,
+      height,
+      radius1,
+      T1,
+      height,
+      radius2,
+      T2,
+      option,
+      result);
 
   EXPECT_EQ(result.getNumContacts(), 1);
   if (result.getNumContacts() == 0)
@@ -2222,7 +2274,16 @@ TEST(DARTCollide, CAPSULE_CAPSULE_X_SHAPED_COLLISION)
 
   result.clear();
   collideCapsuleCapsule(
-      nullptr, nullptr, height, radius2, T2, height, radius1, T1, result);
+      nullptr,
+      nullptr,
+      height,
+      radius2,
+      T2,
+      height,
+      radius1,
+      T1,
+      option,
+      result);
 
   EXPECT_EQ(result.getNumContacts(), 1);
   if (result.getNumContacts() == 0)
@@ -2259,8 +2320,18 @@ TEST(DARTCollide, CAPSULE_CAPSULE_L_SHAPED_COLLISION)
   T2.linear() = math::eulerXYZToMatrix(Eigen::Vector3d(0, M_PI_4, 0));
 
   CollisionResult result;
+  CollisionOption option;
   collideCapsuleCapsule(
-      nullptr, nullptr, height, radius1, T1, height, radius2, T2, result);
+      nullptr,
+      nullptr,
+      height,
+      radius1,
+      T1,
+      height,
+      radius2,
+      T2,
+      option,
+      result);
 
   EXPECT_EQ(result.getNumContacts(), 1);
   if (result.getNumContacts() == 0)
@@ -2292,7 +2363,16 @@ TEST(DARTCollide, CAPSULE_CAPSULE_L_SHAPED_COLLISION)
 
   result.clear();
   collideCapsuleCapsule(
-      nullptr, nullptr, height, radius2, T2, height, radius1, T1, result);
+      nullptr,
+      nullptr,
+      height,
+      radius2,
+      T2,
+      height,
+      radius1,
+      T1,
+      option,
+      result);
 
   EXPECT_EQ(result.getNumContacts(), 1);
   if (result.getNumContacts() == 0)
@@ -2332,8 +2412,9 @@ TEST(DARTCollide, CAPSULE_SPHERE_END_COLLISION)
   T2.translation()(2) = height / 2 + radius1 + radius2 - 0.01;
 
   CollisionResult result;
+  CollisionOption option;
   collideCapsuleSphere(
-      nullptr, nullptr, height, radius1, T1, radius2, T2, result);
+      nullptr, nullptr, height, radius1, T1, radius2, T2, option, result);
 
   EXPECT_EQ(result.getNumContacts(), 1);
   if (result.getNumContacts() == 0)
@@ -2365,7 +2446,7 @@ TEST(DARTCollide, CAPSULE_SPHERE_END_COLLISION)
 
   result.clear();
   collideSphereCapsule(
-      nullptr, nullptr, radius2, T2, height, radius1, T1, result);
+      nullptr, nullptr, radius2, T2, height, radius1, T1, option, result);
 
   EXPECT_EQ(result.getNumContacts(), 1);
   if (result.getNumContacts() == 0)
@@ -2405,8 +2486,9 @@ TEST(DARTCollide, CAPSULE_SPHERE_SIDE_COLLISION)
   T2.translation()(0) = radius1 + radius2 - 0.01;
 
   CollisionResult result;
+  CollisionOption option;
   collideCapsuleSphere(
-      nullptr, nullptr, height, radius1, T1, radius2, T2, result);
+      nullptr, nullptr, height, radius1, T1, radius2, T2, option, result);
 
   EXPECT_EQ(result.getNumContacts(), 1);
   if (result.getNumContacts() == 0)
@@ -2438,7 +2520,7 @@ TEST(DARTCollide, CAPSULE_SPHERE_SIDE_COLLISION)
 
   result.clear();
   collideSphereCapsule(
-      nullptr, nullptr, radius2, T2, height, radius1, T1, result);
+      nullptr, nullptr, radius2, T2, height, radius1, T1, option, result);
 
   EXPECT_EQ(result.getNumContacts(), 1);
   if (result.getNumContacts() == 0)
@@ -2477,7 +2559,9 @@ TEST(DARTCollide, CAPSULE_BOX_AS_SPHERE_COLLISION)
   T2.translation()(2) = size(0) / 2 + height / 2 + radius - 0.01;
 
   CollisionResult result;
-  collideCapsuleBox(nullptr, nullptr, height, radius, T2, size, T1, result);
+  CollisionOption option;
+  collideCapsuleBox(
+      nullptr, nullptr, height, radius, T2, size, T1, option, result);
 
   EXPECT_EQ(result.getNumContacts(), 1);
   if (result.getNumContacts() == 0)
@@ -2506,7 +2590,8 @@ TEST(DARTCollide, CAPSULE_BOX_AS_SPHERE_COLLISION)
   // Check the results in the backwards direction
 
   result.clear();
-  collideBoxCapsule(nullptr, nullptr, size, T1, height, radius, T2, result);
+  collideBoxCapsule(
+      nullptr, nullptr, size, T1, height, radius, T2, option, result);
 
   EXPECT_EQ(result.getNumContacts(), 1);
   if (result.getNumContacts() == 0)
@@ -2577,8 +2662,9 @@ TEST(DARTCollide, CAPSULE_MESH_AS_SPHERE_COLLISION)
   T2.translation()(2) = size(0) / 2 + height / 2 + radius - 0.01;
 
   CollisionResult result;
+  CollisionOption option;
   collideCapsuleMesh(
-      nullptr, nullptr, height, radius, T2, boxMesh, size, T1, result);
+      nullptr, nullptr, height, radius, T2, boxMesh, size, T1, option, result);
 
   EXPECT_EQ(result.getNumContacts(), 1);
   if (result.getNumContacts() == 0)
@@ -2608,7 +2694,7 @@ TEST(DARTCollide, CAPSULE_MESH_AS_SPHERE_COLLISION)
 
   result.clear();
   collideMeshCapsule(
-      nullptr, nullptr, boxMesh, size, T1, height, radius, T2, result);
+      nullptr, nullptr, boxMesh, size, T1, height, radius, T2, option, result);
 
   EXPECT_EQ(result.getNumContacts(), 1);
   if (result.getNumContacts() == 0)
@@ -2678,7 +2764,9 @@ TEST(DARTCollide, CAPSULE_BOX_PIPE_FACE_COLLISION)
   T2.translation()(1) = 1.0 - 0.01;
 
   CollisionResult result;
-  collideCapsuleBox(nullptr, nullptr, height, radius, T2, size, T1, result);
+  CollisionOption option;
+  collideCapsuleBox(
+      nullptr, nullptr, height, radius, T2, size, T1, option, result);
 
   EXPECT_EQ(result.getNumContacts(), 2);
   if (result.getNumContacts() < 2)
@@ -2689,11 +2777,11 @@ TEST(DARTCollide, CAPSULE_BOX_PIPE_FACE_COLLISION)
 
   // Points from B to A
   Eigen::Vector3d expectedNormal = Eigen::Vector3d::UnitY();
-  Eigen::Vector3d expectedPointA = Eigen::Vector3d(0, 0.5 - 0.01, -height / 2);
-  Eigen::Vector3d expectedPointB = Eigen::Vector3d(0, 0.5 - 0.01, height / 2);
+  Eigen::Vector3d expectedPointA = Eigen::Vector3d(0, 0.5, -height / 2);
+  Eigen::Vector3d expectedPointB = Eigen::Vector3d(0, 0.5, height / 2);
 
   Contact contact1 = result.getContact(0);
-  EXPECT_EQ(contact1.type, SPHERE_FACE);
+  EXPECT_EQ(contact1.type, SPHERE_BOX);
   EXPECT_TRUE(equals(contact1.normal, expectedNormal, 1e-10));
   if (!equals(contact1.point, expectedPointA, 1e-10))
   {
@@ -2703,7 +2791,7 @@ TEST(DARTCollide, CAPSULE_BOX_PIPE_FACE_COLLISION)
   EXPECT_TRUE(equals(contact1.point, expectedPointA, 1e-10));
   EXPECT_NEAR(contact1.penetrationDepth, 0.01, 1e-10);
   Contact contact2 = result.getContact(1);
-  EXPECT_EQ(contact2.type, SPHERE_FACE);
+  EXPECT_EQ(contact2.type, SPHERE_BOX);
   EXPECT_TRUE(equals(contact2.normal, expectedNormal, 1e-10));
   EXPECT_TRUE(equals(contact2.point, expectedPointB, 1e-10));
   EXPECT_NEAR(contact2.penetrationDepth, 0.01, 1e-10);
@@ -2713,7 +2801,8 @@ TEST(DARTCollide, CAPSULE_BOX_PIPE_FACE_COLLISION)
   /////////////////////////////////////////////////////////
 
   result.clear();
-  collideBoxCapsule(nullptr, nullptr, size, T1, height, radius, T2, result);
+  collideBoxCapsule(
+      nullptr, nullptr, size, T1, height, radius, T2, option, result);
 
   EXPECT_EQ(result.getNumContacts(), 2);
   if (result.getNumContacts() < 2)
@@ -2725,7 +2814,7 @@ TEST(DARTCollide, CAPSULE_BOX_PIPE_FACE_COLLISION)
   expectedNormal = -1 * Eigen::Vector3d::UnitY();
 
   contact1 = result.getContact(0);
-  EXPECT_EQ(contact1.type, FACE_SPHERE);
+  EXPECT_EQ(contact1.type, BOX_SPHERE);
   EXPECT_TRUE(equals(contact1.normal, expectedNormal, 1e-10));
   if (!equals(contact1.point, expectedPointA, 1e-10))
   {
@@ -2735,7 +2824,7 @@ TEST(DARTCollide, CAPSULE_BOX_PIPE_FACE_COLLISION)
   EXPECT_TRUE(equals(contact1.point, expectedPointA, 1e-10));
   EXPECT_NEAR(contact1.penetrationDepth, 0.01, 1e-10);
   contact2 = result.getContact(1);
-  EXPECT_EQ(contact2.type, FACE_SPHERE);
+  EXPECT_EQ(contact2.type, BOX_SPHERE);
   EXPECT_TRUE(equals(contact2.normal, expectedNormal, 1e-10));
   EXPECT_TRUE(equals(contact2.point, expectedPointB, 1e-10));
   EXPECT_NEAR(contact2.penetrationDepth, 0.01, 1e-10);
@@ -2755,8 +2844,9 @@ TEST(DARTCollide, CAPSULE_MESH_PIPE_FACE_COLLISION)
   T2.translation()(1) = 1.0 - 0.01;
 
   CollisionResult result;
+  CollisionOption option;
   collideCapsuleMesh(
-      nullptr, nullptr, height, radius, T2, boxMesh, size, T1, result);
+      nullptr, nullptr, height, radius, T2, boxMesh, size, T1, option, result);
 
   EXPECT_EQ(result.getNumContacts(), 2);
   if (result.getNumContacts() < 2)
@@ -2792,7 +2882,7 @@ TEST(DARTCollide, CAPSULE_MESH_PIPE_FACE_COLLISION)
 
   result.clear();
   collideMeshCapsule(
-      nullptr, nullptr, boxMesh, size, T1, height, radius, T2, result);
+      nullptr, nullptr, boxMesh, size, T1, height, radius, T2, option, result);
 
   EXPECT_EQ(result.getNumContacts(), 2);
   if (result.getNumContacts() < 2)
@@ -2834,7 +2924,9 @@ TEST(DARTCollide, CAPSULE_BOX_SPHERE_AND_PIPE_EDGE_COLLISION)
   T2.translation()(2) = 1.0;
 
   CollisionResult result;
-  collideCapsuleBox(nullptr, nullptr, height, radius, T2, size, T1, result);
+  CollisionOption option;
+  collideCapsuleBox(
+      nullptr, nullptr, height, radius, T2, size, T1, option, result);
 
   EXPECT_EQ(result.getNumContacts(), 2);
   if (result.getNumContacts() < 2)
@@ -2845,11 +2937,11 @@ TEST(DARTCollide, CAPSULE_BOX_SPHERE_AND_PIPE_EDGE_COLLISION)
 
   // Points from B to A
   Eigen::Vector3d expectedNormal = Eigen::Vector3d::UnitY();
-  Eigen::Vector3d expectedPointA = Eigen::Vector3d(0, 0.5 - 0.01, radius);
+  Eigen::Vector3d expectedPointA = Eigen::Vector3d(0, 0.5, radius);
   Eigen::Vector3d expectedPointB = Eigen::Vector3d(0, 0.5, 1.0);
 
   Contact contact1 = result.getContact(0);
-  EXPECT_EQ(contact1.type, SPHERE_FACE);
+  EXPECT_EQ(contact1.type, SPHERE_BOX);
   EXPECT_TRUE(equals(contact1.normal, expectedNormal, 1e-10));
   if (!equals(contact1.point, expectedPointA, 1e-10))
   {
@@ -2874,7 +2966,8 @@ TEST(DARTCollide, CAPSULE_BOX_SPHERE_AND_PIPE_EDGE_COLLISION)
   /////////////////////////////////////////////////////////
 
   result.clear();
-  collideBoxCapsule(nullptr, nullptr, size, T1, height, radius, T2, result);
+  collideBoxCapsule(
+      nullptr, nullptr, size, T1, height, radius, T2, option, result);
 
   EXPECT_EQ(result.getNumContacts(), 2);
   if (result.getNumContacts() < 2)
@@ -2886,7 +2979,7 @@ TEST(DARTCollide, CAPSULE_BOX_SPHERE_AND_PIPE_EDGE_COLLISION)
   expectedNormal = Eigen::Vector3d::UnitY() * -1;
 
   contact1 = result.getContact(0);
-  EXPECT_EQ(contact1.type, FACE_SPHERE);
+  EXPECT_EQ(contact1.type, BOX_SPHERE);
   EXPECT_TRUE(equals(contact1.normal, expectedNormal, 1e-10));
   if (!equals(contact1.point, expectedPointA, 1e-10))
   {
@@ -2922,8 +3015,9 @@ TEST(DARTCollide, CAPSULE_MESH_SPHERE_AND_PIPE_EDGE_COLLISION)
   T2.translation()(2) = 1.0;
 
   CollisionResult result;
+  CollisionOption option;
   collideCapsuleMesh(
-      nullptr, nullptr, height, radius, T2, boxMesh, size, T1, result);
+      nullptr, nullptr, height, radius, T2, boxMesh, size, T1, option, result);
 
   EXPECT_EQ(result.getNumContacts(), 2);
   if (result.getNumContacts() < 2)
@@ -2964,7 +3058,7 @@ TEST(DARTCollide, CAPSULE_MESH_SPHERE_AND_PIPE_EDGE_COLLISION)
 
   result.clear();
   collideMeshCapsule(
-      nullptr, nullptr, boxMesh, size, T1, height, radius, T2, result);
+      nullptr, nullptr, boxMesh, size, T1, height, radius, T2, option, result);
 
   EXPECT_EQ(result.getNumContacts(), 2);
   if (result.getNumContacts() < 2)
@@ -3012,7 +3106,9 @@ TEST(DARTCollide, CAPSULE_BOX_PIPE_EDGE_COLLISION)
   T2.linear() = math::eulerXYZToMatrix(Eigen::Vector3d(M_PI_4, 0, 0));
 
   CollisionResult result;
-  collideCapsuleBox(nullptr, nullptr, height, radius, T2, size, T1, result);
+  CollisionOption option;
+  collideCapsuleBox(
+      nullptr, nullptr, height, radius, T2, size, T1, option, result);
 
   EXPECT_EQ(result.getNumContacts(), 1);
   if (result.getNumContacts() != 1)
@@ -3044,7 +3140,8 @@ TEST(DARTCollide, CAPSULE_BOX_PIPE_EDGE_COLLISION)
   /////////////////////////////////////////////////////////
 
   result.clear();
-  collideBoxCapsule(nullptr, nullptr, size, T1, height, radius, T2, result);
+  collideBoxCapsule(
+      nullptr, nullptr, size, T1, height, radius, T2, option, result);
 
   EXPECT_EQ(result.getNumContacts(), 1);
   if (result.getNumContacts() != 1)
@@ -3087,8 +3184,9 @@ TEST(DARTCollide, CAPSULE_MESH_PIPE_EDGE_COLLISION)
   T2.linear() = math::eulerXYZToMatrix(Eigen::Vector3d(M_PI_4, 0, 0));
 
   CollisionResult result;
+  CollisionOption option;
   collideCapsuleMesh(
-      nullptr, nullptr, height, radius, T2, boxMesh, size, T1, result);
+      nullptr, nullptr, height, radius, T2, boxMesh, size, T1, option, result);
 
   EXPECT_EQ(result.getNumContacts(), 1);
   if (result.getNumContacts() != 1)
@@ -3121,7 +3219,7 @@ TEST(DARTCollide, CAPSULE_MESH_PIPE_EDGE_COLLISION)
 
   result.clear();
   collideMeshCapsule(
-      nullptr, nullptr, boxMesh, size, T1, height, radius, T2, result);
+      nullptr, nullptr, boxMesh, size, T1, height, radius, T2, option, result);
 
   EXPECT_EQ(result.getNumContacts(), 1);
   if (result.getNumContacts() != 1)
@@ -3164,7 +3262,9 @@ TEST(DARTCollide, CAPSULE_BOX_PIPE_VERTEX_COLLISION)
   T2.linear() = math::eulerXYZToMatrix(Eigen::Vector3d(M_PI_4, 0, 0));
 
   CollisionResult result;
-  collideCapsuleBox(nullptr, nullptr, height, radius, T2, size, T1, result);
+  CollisionOption option;
+  collideCapsuleBox(
+      nullptr, nullptr, height, radius, T2, size, T1, option, result);
 
   EXPECT_EQ(result.getNumContacts(), 1);
   if (result.getNumContacts() != 1)
@@ -3196,7 +3296,8 @@ TEST(DARTCollide, CAPSULE_BOX_PIPE_VERTEX_COLLISION)
   /////////////////////////////////////////////////////////
 
   result.clear();
-  collideBoxCapsule(nullptr, nullptr, size, T1, height, radius, T2, result);
+  collideBoxCapsule(
+      nullptr, nullptr, size, T1, height, radius, T2, option, result);
 
   EXPECT_EQ(result.getNumContacts(), 1);
   if (result.getNumContacts() != 1)
@@ -3240,8 +3341,9 @@ TEST(DARTCollide, CAPSULE_MESH_PIPE_VERTEX_COLLISION)
   T2.linear() = math::eulerXYZToMatrix(Eigen::Vector3d(M_PI_4, 0, 0));
 
   CollisionResult result;
+  CollisionOption option;
   collideCapsuleMesh(
-      nullptr, nullptr, height, radius, T2, boxMesh, size, T1, result);
+      nullptr, nullptr, height, radius, T2, boxMesh, size, T1, option, result);
 
   EXPECT_EQ(result.getNumContacts(), 1);
   if (result.getNumContacts() != 1)
@@ -3274,7 +3376,7 @@ TEST(DARTCollide, CAPSULE_MESH_PIPE_VERTEX_COLLISION)
 
   result.clear();
   collideMeshCapsule(
-      nullptr, nullptr, boxMesh, size, T1, height, radius, T2, result);
+      nullptr, nullptr, boxMesh, size, T1, height, radius, T2, option, result);
 
   EXPECT_EQ(result.getNumContacts(), 1);
   if (result.getNumContacts() != 1)
@@ -3315,7 +3417,9 @@ TEST(DARTCollide, CAPSULE_BOX_PIPE_EDGE_PARALLEL_VERTEX_COLLISION)
   T2.translation()(1) = 0.5 + sqrt(radius * radius / 2) - sqrt(0.01 * 0.01 / 2);
 
   CollisionResult result;
-  collideCapsuleBox(nullptr, nullptr, height, radius, T2, size, T1, result);
+  CollisionOption option;
+  collideCapsuleBox(
+      nullptr, nullptr, height, radius, T2, size, T1, option, result);
 
   EXPECT_EQ(result.getNumContacts(), 2);
   if (result.getNumContacts() != 2)
@@ -3368,7 +3472,8 @@ TEST(DARTCollide, CAPSULE_BOX_PIPE_EDGE_PARALLEL_VERTEX_COLLISION)
   /////////////////////////////////////////////////////////
 
   result.clear();
-  collideBoxCapsule(nullptr, nullptr, size, T1, height, radius, T2, result);
+  collideBoxCapsule(
+      nullptr, nullptr, size, T1, height, radius, T2, option, result);
 
   EXPECT_EQ(result.getNumContacts(), 2);
   if (result.getNumContacts() != 2)
@@ -3429,8 +3534,9 @@ TEST(DARTCollide, CAPSULE_MESH_PIPE_EDGE_PARALLEL_VERTEX_COLLISION)
   T2.translation()(1) = 0.5 + sqrt(radius * radius / 2) - sqrt(0.01 * 0.01 / 2);
 
   CollisionResult result;
+  CollisionOption option;
   collideCapsuleMesh(
-      nullptr, nullptr, height, radius, T2, boxMesh, size, T1, result);
+      nullptr, nullptr, height, radius, T2, boxMesh, size, T1, option, result);
 
   EXPECT_EQ(result.getNumContacts(), 2);
   if (result.getNumContacts() != 2)
@@ -3484,7 +3590,7 @@ TEST(DARTCollide, CAPSULE_MESH_PIPE_EDGE_PARALLEL_VERTEX_COLLISION)
 
   result.clear();
   collideMeshCapsule(
-      nullptr, nullptr, boxMesh, size, T1, height, radius, T2, result);
+      nullptr, nullptr, boxMesh, size, T1, height, radius, T2, option, result);
 
   EXPECT_EQ(result.getNumContacts(), 2);
   if (result.getNumContacts() != 2)
@@ -3544,7 +3650,9 @@ TEST(DARTCollide, CAPSULE_BOX_PIPE_EDGE_PARALLEL_SPHERE_COLLISION)
   T2.translation()(1) = 0.5 + sqrt(radius * radius / 2) - sqrt(0.01 * 0.01 / 2);
 
   CollisionResult result;
-  collideCapsuleBox(nullptr, nullptr, height, radius, T2, size, T1, result);
+  CollisionOption option;
+  collideCapsuleBox(
+      nullptr, nullptr, height, radius, T2, size, T1, option, result);
 
   EXPECT_EQ(result.getNumContacts(), 2);
   if (result.getNumContacts() != 2)
@@ -3599,7 +3707,8 @@ TEST(DARTCollide, CAPSULE_BOX_PIPE_EDGE_PARALLEL_SPHERE_COLLISION)
   /////////////////////////////////////////////////////////
 
   result.clear();
-  collideBoxCapsule(nullptr, nullptr, size, T1, height, radius, T2, result);
+  collideBoxCapsule(
+      nullptr, nullptr, size, T1, height, radius, T2, option, result);
 
   EXPECT_EQ(result.getNumContacts(), 2);
   if (result.getNumContacts() != 2)
@@ -3691,8 +3800,9 @@ TEST(DARTCollide, CAPSULE_MESH_PIPE_EDGE_PARALLEL_SPHERE_COLLISION)
   T2.translation()(1) = 0.5 + sqrt(radius * radius / 2) - sqrt(0.01 * 0.01 / 2);
 
   CollisionResult result;
+  CollisionOption option;
   collideCapsuleMesh(
-      nullptr, nullptr, height, radius, T2, boxMesh, size, T1, result);
+      nullptr, nullptr, height, radius, T2, boxMesh, size, T1, option, result);
 
   EXPECT_EQ(result.getNumContacts(), 2);
   if (result.getNumContacts() != 2)
@@ -3748,7 +3858,7 @@ TEST(DARTCollide, CAPSULE_MESH_PIPE_EDGE_PARALLEL_SPHERE_COLLISION)
 
   result.clear();
   collideMeshCapsule(
-      nullptr, nullptr, boxMesh, size, T1, height, radius, T2, result);
+      nullptr, nullptr, boxMesh, size, T1, height, radius, T2, option, result);
 
   EXPECT_EQ(result.getNumContacts(), 2);
   if (result.getNumContacts() != 2)
@@ -3792,6 +3902,163 @@ TEST(DARTCollide, CAPSULE_MESH_PIPE_EDGE_PARALLEL_SPHERE_COLLISION)
   }
   EXPECT_TRUE(equals(contact2.point, expectedPointB, 1e-10));
   EXPECT_NEAR(contact2.penetrationDepth, 0.01, 1e-10);
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(DARTCollide, CAPSULE_BOX_PIPE_THROUGH_PENETRATION)
+{
+  Eigen::Vector3d size = Eigen::Vector3d(1, 0.5, 1);
+  Eigen::Isometry3d T1 = Eigen::Isometry3d::Identity();
+
+  double height = 2.0;
+  double radius = 0.25;
+  Eigen::Isometry3d T2 = Eigen::Isometry3d::Identity();
+  T2.translation()(1) = 0.01;
+  T2.linear() = math::eulerXYZToMatrix(Eigen::Vector3d(M_PI_2, 0, 0));
+
+  CollisionResult result;
+  CollisionOption option;
+  int numContacts = collideCapsuleBox(
+      nullptr, nullptr, height, radius, T2, size, T1, option, result);
+  EXPECT_EQ(numContacts, 0);
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(DARTCollide, CAPSULE_BOX_PIPE_INTERPENETRATION_FILTER)
+{
+  Eigen::Vector3d size = Eigen::Vector3d(1, 0.5, 1);
+  Eigen::Isometry3d T1 = Eigen::Isometry3d::Identity();
+
+  double height = 1.0;
+  double radius = 0.25;
+  Eigen::Isometry3d T2 = Eigen::Isometry3d::Identity();
+  T2.translation()(1) = 0.01;
+  T2.linear() = math::eulerXYZToMatrix(Eigen::Vector3d(M_PI_2, 0, 0));
+
+  CollisionResult result;
+  CollisionOption option;
+  int numContacts = collideCapsuleBox(
+      nullptr, nullptr, height, radius, T2, size, T1, option, result);
+  EXPECT_EQ(numContacts, 0);
+
+  /*
+  EXPECT_EQ(result.getNumContacts(), 2);
+  if (result.getNumContacts() != 2)
+    return;
+
+  Eigen::Vector3d sortDir = Eigen::Vector3d::UnitZ();
+  result.sortContacts(sortDir);
+
+  // Points from B to A
+  Eigen::Vector3d expectedNormal = Eigen::Vector3d(1, 1, 0).normalized();
+  Eigen::Vector3d expectedPointA = Eigen::Vector3d(
+      0.5 - sqrt(0.01 * 0.01 / 2), 0.5 - sqrt(0.01 * 0.01 / 2), -0.5);
+  Eigen::Vector3d expectedPointB = Eigen::Vector3d(
+      0.5 - sqrt(0.01 * 0.01 / 2), 0.5 - sqrt(0.01 * 0.01 / 2), 0.5);
+
+  Contact contact1 = result.getContact(0);
+  EXPECT_EQ(contact1.type, SPHERE_EDGE);
+  if (!equals(contact1.normal, expectedNormal, 1e-10))
+  {
+    std::cout << "Expected normal: " << std::endl
+              << expectedNormal << std::endl;
+    std::cout << "Actual normal: " << std::endl << contact1.normal << std::endl;
+  }
+  EXPECT_TRUE(equals(contact1.normal, expectedNormal, 1e-10));
+  if (!equals(contact1.point, expectedPointA, 1e-10))
+  {
+    std::cout << "Expected point: " << std::endl << expectedPointA << std::endl;
+    std::cout << "Actual point: " << std::endl << contact1.point << std::endl;
+  }
+  EXPECT_TRUE(equals(contact1.point, expectedPointA, 1e-10));
+  EXPECT_NEAR(contact1.penetrationDepth, 0.01, 1e-10);
+
+  Contact contact2 = result.getContact(1);
+  EXPECT_EQ(contact2.type, SPHERE_EDGE);
+  if (!equals(contact2.normal, expectedNormal, 1e-10))
+  {
+    std::cout << "Expected normal: " << std::endl
+              << expectedNormal << std::endl;
+    std::cout << "Actual normal: " << std::endl << contact2.normal << std::endl;
+  }
+  EXPECT_TRUE(equals(contact2.normal, expectedNormal, 1e-10));
+  if (!equals(contact2.point, expectedPointB, 1e-10))
+  {
+    std::cout << "Expected point: " << std::endl << expectedPointB << std::endl;
+    std::cout << "Actual point: " << std::endl << contact2.point << std::endl;
+  }
+  EXPECT_TRUE(equals(contact2.point, expectedPointB, 1e-10));
+  EXPECT_NEAR(contact2.penetrationDepth, 0.01, 1e-10);
+
+  /////////////////////////////////////////////////////////
+  // Try the reverse direction
+  /////////////////////////////////////////////////////////
+
+  result.clear();
+  collideBoxCapsule(nullptr, nullptr, size, T1, height, radius, T2, result);
+
+  EXPECT_EQ(result.getNumContacts(), 2);
+  if (result.getNumContacts() != 2)
+    return;
+
+  result.sortContacts(sortDir);
+
+  // Points from B to A
+  expectedNormal = Eigen::Vector3d(1, 1, 0).normalized() * -1;
+
+  contact1 = result.getContact(0);
+  EXPECT_EQ(contact1.type, EDGE_SPHERE);
+  if (!equals(contact1.normal, expectedNormal, 1e-10))
+  {
+    std::cout << "Expected normal: " << std::endl
+              << expectedNormal << std::endl;
+    std::cout << "Actual normal: " << std::endl << contact1.normal << std::endl;
+  }
+  EXPECT_TRUE(equals(contact1.normal, expectedNormal, 1e-10));
+  if (!equals(contact1.point, expectedPointA, 1e-10))
+  {
+    std::cout << "Expected point: " << std::endl << expectedPointA << std::endl;
+    std::cout << "Actual point: " << std::endl << contact1.point << std::endl;
+  }
+  EXPECT_TRUE(equals(contact1.point, expectedPointA, 1e-10));
+  EXPECT_NEAR(contact1.penetrationDepth, 0.01, 1e-10);
+
+  contact2 = result.getContact(1);
+  EXPECT_EQ(contact2.type, EDGE_SPHERE);
+  if (!equals(contact2.normal, expectedNormal, 1e-10))
+  {
+    std::cout << "Expected normal: " << std::endl
+              << expectedNormal << std::endl;
+    std::cout << "Actual normal: " << std::endl << contact2.normal << std::endl;
+  }
+  EXPECT_TRUE(equals(contact2.normal, expectedNormal, 1e-10));
+  if (!equals(contact2.point, expectedPointB, 1e-10))
+  {
+    std::cout << "Expected point: " << std::endl << expectedPointB << std::endl;
+    std::cout << "Actual point: " << std::endl << contact2.point << std::endl;
+  }
+  EXPECT_TRUE(equals(contact2.point, expectedPointB, 1e-10));
+  EXPECT_NEAR(contact2.penetrationDepth, 0.01, 1e-10);
+  */
+
+  /*
+  server::GUIWebsocketServer server;
+  server.createCapsule(
+      "capsule",
+      radius,
+      height,
+      T2.translation(),
+      math::matrixToEulerXYZ(T2.linear()));
+  server.createBox(
+      "box", size, T1.translation(), math::matrixToEulerXYZ(T1.linear()));
+  server.renderBasis();
+
+  server.serve(8070);
+
+  server.blockWhileServing();
+  */
 }
 #endif
 

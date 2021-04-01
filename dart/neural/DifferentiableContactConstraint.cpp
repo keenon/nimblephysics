@@ -1591,17 +1591,20 @@ Eigen::MatrixXd DifferentiableContactConstraint::getConstraintForcesJacobian(
   {
     Eigen::Vector6d axis = getWorldScrewAxisForForce(skel->getDof(row));
     double multiple = getForceMultiple(skel->getDof(row));
-    if (multiple != 0) {
+    if (multiple != 0)
+    {
       for (int col = 0; col < wrt->getNumDofs(); col++)
       {
         Eigen::Vector6d screwAxisGradient
             = getScrewAxisForForceGradient(skel->getDof(row), wrt->getDof(col));
         Eigen::Vector6d forceGradient = forceJac.col(col);
         result(row, col)
-            = multiple * (screwAxisGradient.dot(force) + axis.dot(forceGradient));
+            = multiple
+              * (screwAxisGradient.dot(force) + axis.dot(forceGradient));
       }
     }
-    else {
+    else
+    {
       result.row(row).setZero();
     }
   }
@@ -1632,7 +1635,8 @@ Eigen::MatrixXd DifferentiableContactConstraint::getConstraintForcesJacobian(
     for (int i = 0; i < skel->getNumDofs(); i++)
     {
       double multiple = getForceMultiple(skel->getDof(i));
-      if (multiple != 0) {
+      if (multiple != 0)
+      {
         Eigen::Vector6d axis = getWorldScrewAxisForForce(skel->getDof(i));
         for (int col = 0; col < wrt->getNumDofs(); col++)
         {
@@ -1644,7 +1648,8 @@ Eigen::MatrixXd DifferentiableContactConstraint::getConstraintForcesJacobian(
                 * (screwAxisGradient.dot(force) + axis.dot(forceGradient));
         }
       }
-      else {
+      else
+      {
         result.row(row).setZero();
       }
       row++;
@@ -1804,7 +1809,7 @@ math::Jacobian DifferentiableContactConstraint::bruteForceContactForceJacobian(
   int dofs = world->getNumDofs();
   math::Jacobian jac = math::Jacobian(6, dofs);
 
-  const double EPS = 1e-7;
+  const double EPS = 1e-6;
 
   Eigen::VectorXd positions = world->getPositions();
 

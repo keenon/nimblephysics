@@ -39,13 +39,15 @@ namespace collision {
 CollisionOption::CollisionOption(
     bool enableContact,
     std::size_t maxNumContacts,
-    const std::shared_ptr<CollisionFilter>& collisionFilter)
+    const std::shared_ptr<CollisionFilter>& collisionFilter,
+    double contactClippingDepth)
   : enableContact(enableContact),
     maxNumContacts(maxNumContacts),
-    collisionFilter(collisionFilter)
+    collisionFilter(collisionFilter),
+    contactClippingDepth(contactClippingDepth)
 {
   // Do nothing
 }
 
-}  // namespace collision
-}  // namespace dart
+} // namespace collision
+} // namespace dart

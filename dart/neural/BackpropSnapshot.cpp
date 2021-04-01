@@ -1766,7 +1766,7 @@ void BackpropSnapshot::equalsOrCrash(
 void BackpropSnapshot::diagnoseSubJacobianErrors(
     std::shared_ptr<simulation::World> world, WithRespectTo* wrt)
 {
-  double threshold = 1e-8;
+  double threshold = 3e-8;
 
   RestorableSnapshot snapshot(world);
   world->setPositions(mPreStepPosition);
@@ -2606,7 +2606,7 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersPosVelJacobian(
   world->setCachedLCPSolution(mPreStepLCPCache);
   world->step(false);
 
-  double originalStepSize = 1e-4;
+  double originalStepSize = 5e-3;
   const double con = 1.4, con2 = (con * con);
   const double safeThreshold = 2.0;
   const int tabSize = 10;
@@ -2642,10 +2642,12 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersPosVelJacobian(
           = neural::forwardPass(world, true);
 
       if ((!areResultsStandardized() || snapshotPlus->areResultsStandardized())
+          && snapshotPlus->getNumContacts() == getNumContacts()
           && snapshotPlus->getNumClamping() == getNumClamping()
           && snapshotPlus->getNumUpperBound() == getNumUpperBound()
           && (!areResultsStandardized()
               || snapshotMinus->areResultsStandardized())
+          && snapshotMinus->getNumContacts() == getNumContacts()
           && snapshotMinus->getNumClamping() == getNumClamping()
           && snapshotMinus->getNumUpperBound() == getNumUpperBound())
       {
@@ -2685,6 +2687,7 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersPosVelJacobian(
       velPlus = snapshotPlus->getPostStepVelocity();
       if (!((!areResultsStandardized()
              || snapshotPlus->areResultsStandardized())
+            && snapshotPlus->getNumContacts() == getNumContacts()
             && snapshotPlus->getNumClamping() == getNumClamping()
             && snapshotPlus->getNumUpperBound() == getNumUpperBound()))
       {
@@ -4278,7 +4281,7 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceRiddersJacobianOfQb(
   const double originalStepSize = 1e-3;
   const double con = 1.4, con2 = (con * con);
   const double safeThreshold = 2.0;
-  const int tabSize = 10;
+  const int tabSize = 14;
 
   Eigen::VectorXd original = wrt->get(world.get());
 
@@ -5897,12 +5900,107 @@ BackpropSnapshot::finiteDifferenceRiddersJacobianOfClampingConstraints(
 
       if (!(A_cPlus.cols() == f0.size() && A_cMinus.cols() == f0.size()))
       {
+        /*
+        neural::forwardPass(world, true);
+        std::vector<std::shared_ptr<DifferentiableContactConstraint>>
+            originalConstraints = getDifferentiableConstraints();
+        for (int k = 0; k < originalConstraints.size(); k++)
+        {
+          std::shared_ptr<DifferentiableContactConstraint> constraint
+              = originalConstraints[k];
+          std::cout << "Original Constraint " << k << " type "
+                    << constraint->getContactType() << "\npos:\n"
+                    << constraint->getContactWorldPosition() << "\nnormal:\n"
+                    << constraint->getContactWorldNormal() << std::endl;
+        }
+        std::vector<std::shared_ptr<DifferentiableContactConstraint>>
+            plusConstraints = snapshotPlus->getDifferentiableConstraints();
+        for (int k = 0; k < plusConstraints.size(); k++)
+        {
+          std::shared_ptr<DifferentiableContactConstraint> constraint
+              = plusConstraints[k];
+          std::cout << "Plus Constraint " << k << " type "
+                    << constraint->getContactType() << "\npos:\n"
+                    << constraint->getContactWorldPosition() << "\nnormal:\n"
+                    << constraint->getContactWorldNormal() << std::endl;
+        }
+        std::vector<std::shared_ptr<DifferentiableContactConstraint>>
+            minusConstraints = snapshotMinus->getDifferentiableConstraints();
+        for (int k = 0; k < minusConstraints.size(); k++)
+        {
+          std::shared_ptr<DifferentiableContactConstraint> constraint
+              = minusConstraints[k];
+          std::cout << "Minus Constraint " << k << " type "
+                    << constraint->getContactType() << "\npos:\n"
+                    << constraint->getContactWorldPosition() << "\nnormal:\n"
+                    << constraint->getContactWorldNormal() << std::endl;
+        }
+        */
         assert(false && 
         "Lowering EPS in finiteDifferenceRiddersJacobianOfClampingConstraints()"
           "caused A_c.cols() to change.");
       }
       A_c_f0Plus = A_cPlus * f0;
       A_c_f0Minus = A_cMinus * f0;
+      /*
+      if (i == 0 && std::abs(A_c_f0Minus(2) - original(2)) > stepSize)
+      {
+        std::cout << "Error of " << A_c_f0Minus(2) - original(2)
+                  << " on [0] -= " << stepSize << std::endl;
+      }
+      if (i == 0 && std::abs(A_c_f0Plus(2) - original(2)) > stepSize)
+      {
+        std::cout << "*********" << std::endl;
+        std::cout << "Error of " << A_c_f0Plus(2) - original(2)
+                  << " on [0] += " << stepSize << std::endl;
+        for (int k = 0; k < f0.size(); k++)
+        {
+          std::shared_ptr<DifferentiableContactConstraint> originalConstraint
+              = getDifferentiableConstraints()[k];
+          Eigen::Vector3d posGrad
+              = originalConstraint->getContactPositionGradient(
+                  world->getDofs()[0]);
+          Eigen::Vector3d dirGrad
+              = originalConstraint->getContactNormalGradient(
+                  world->getDofs()[0]);
+          collision::Contact& originalContact
+              = originalConstraint->getContact();
+          std::shared_ptr<DifferentiableContactConstraint> constraint
+              = snapshotPlus->getDifferentiableConstraints()[k];
+          collision::Contact& contact = constraint->getContact();
+          // constraint->getContactWorldForceDirection()
+          std::cout << "Contact: " << k << ", type: " << contact.type
+                    << std::endl;
+          if (contact.type != collision::ContactType::PIPE_EDGE)
+          {
+            std::cout << "Pos grad: " << posGrad << std::endl;
+            std::cout << "Dir grad: " << dirGrad << std::endl;
+            if (originalContact.type != contact.type)
+            {
+              std::cout << "Original type: " << originalContact.type
+                        << std::endl;
+              std::cout << "New type: " << contact.type << std::endl;
+            }
+            if (originalContact.point != contact.point)
+            {
+              std::cout << "Original pt: " << originalContact.point
+                        << std::endl;
+              std::cout << "New pt: " << contact.point << std::endl;
+              std::cout << "Diff: " << contact.point - originalContact.point
+                        << std::endl;
+            }
+            if (originalContact.normal != contact.normal)
+            {
+              std::cout << "Original normal: " << originalContact.normal
+                        << std::endl;
+              std::cout << "New normal: " << contact.normal << std::endl;
+              std::cout << "Diff: " << contact.normal - originalContact.normal
+                        << std::endl;
+            }
+          }
+        }
+      }
+      */
 
       tab[0][iTab] = (A_c_f0Plus - A_c_f0Minus) / (2 * stepSize);
 
@@ -7233,7 +7331,10 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceJacobianOfConstraintForce(
       if (perturbedPtr->getNumClamping() == f0.size()
           && perturbedPtr->getNumUpperBound() == originalPtr->getNumUpperBound()
           && (!areResultsStandardized()
-              || perturbedPtr->areResultsStandardized()))
+              || perturbedPtr->areResultsStandardized())
+          && perturbedPtr->getNumContacts() == originalPtr->getNumContacts()
+          && perturbedPtr->getConstraintForceMixingDiagonal()(0)
+                 == originalPtr->getConstraintForceMixingDiagonal()(0))
       {
         fPlus = perturbedPtr->getClampingConstraintImpulses();
         break;
@@ -7273,8 +7374,11 @@ Eigen::MatrixXd BackpropSnapshot::finiteDifferenceJacobianOfConstraintForce(
       BackpropSnapshotPtr perturbedPtr = neural::forwardPass(world, true);
       if (perturbedPtr->getNumClamping() == f0.size()
           && perturbedPtr->getNumUpperBound() == originalPtr->getNumUpperBound()
+          && perturbedPtr->getNumContacts() == originalPtr->getNumContacts()
           && (!areResultsStandardized()
-              || perturbedPtr->areResultsStandardized()))
+              || perturbedPtr->areResultsStandardized())
+          && perturbedPtr->getConstraintForceMixingDiagonal()(0)
+                 == originalPtr->getConstraintForceMixingDiagonal()(0))
       {
         fMinus = perturbedPtr->getClampingConstraintImpulses();
         break;
@@ -7382,11 +7486,16 @@ BackpropSnapshot::finiteDifferenceRiddersJacobianOfConstraintForce(
       if (snapshotPlus->getNumClamping() == f0.size()
           && snapshotPlus->getNumUpperBound() == originalPtr->getNumUpperBound()
           && snapshotPlus->getNumContacts() == originalPtr->getNumContacts()
+          && snapshotPlus->getConstraintForceMixingDiagonal()(0)
+                 == originalPtr->getConstraintForceMixingDiagonal()(0)
           && (!areResultsStandardized()
               || snapshotPlus->areResultsStandardized())
           && snapshotMinus->getNumClamping() == f0.size()
           && snapshotMinus->getNumUpperBound()
                  == originalPtr->getNumUpperBound()
+          && snapshotMinus->getNumContacts() == originalPtr->getNumContacts()
+          && snapshotMinus->getConstraintForceMixingDiagonal()(0)
+                 == originalPtr->getConstraintForceMixingDiagonal()(0)
           && (!areResultsStandardized()
               || snapshotMinus->areResultsStandardized()))
       {
@@ -7421,63 +7530,16 @@ BackpropSnapshot::finiteDifferenceRiddersJacobianOfConstraintForce(
       wrt->set(world.get(), perturbedPlus);
       BackpropSnapshotPtr snapshotPlus = neural::forwardPass(world, true);
       fPlus = snapshotPlus->getClampingConstraintImpulses();
+
       if (!(snapshotPlus->getNumClamping() == f0.size()
             && snapshotPlus->getNumUpperBound()
                    == originalPtr->getNumUpperBound()
             && snapshotPlus->getNumContacts() == originalPtr->getNumContacts()
+            && snapshotPlus->getConstraintForceMixingDiagonal()(0)
+                   == originalPtr->getConstraintForceMixingDiagonal()(0)
             && (!areResultsStandardized()
                 || snapshotPlus->areResultsStandardized())))
       {
-        /*
-        double originalCFM = originalPtr->getConstraintForceMixingDiagonal()(0);
-        Eigen::VectorXd mX = originalPtr->getContactConstraintImpulses();
-        std::cout << "Original CFM: " << originalCFM << std::endl;
-        std::cout << "Original mX: " << std::endl << mX << std::endl;
-        double plusCFM = snapshotPlus->getConstraintForceMixingDiagonal()(0);
-        Eigen::VectorXd mXPlus = snapshotPlus->getContactConstraintImpulses();
-        std::cout << "Plus CFM: " << plusCFM << std::endl;
-        std::cout << "Plus mX: " << std::endl << mXPlus << std::endl;
-        std::cout << "Comparing contacts: " << std::endl;
-        auto originalConstraints = originalPtr->getDifferentiableConstraints();
-        auto plusConstraints = snapshotPlus->getDifferentiableConstraints();
-        for (int k = 0; k < originalConstraints.size(); k++)
-        {
-          auto constraint = originalConstraints[k];
-          auto plusConstraint = plusConstraints[k];
-          std::cout << "Constraint[" << k << "]: original=" << mX(k)
-                    << ", plus=" << mXPlus(k) << ", diff=" << mX(k) - mXPlus(k)
-                    << std::endl;
-          std::cout << "Original Type: " << constraint->getContact().type
-                    << std::endl;
-          std::cout << "Plus Type: " << plusConstraint->getContact().type
-                    << std::endl;
-          std::cout << "Original Point: " << std::endl
-                    << constraint->getContact().point << std::endl;
-          std::cout << "Plus Point: " << std::endl
-                    << plusConstraint->getContact().point << std::endl;
-          std::cout << "Diff: " << std::endl
-                    << constraint->getContact().point
-                           - plusConstraint->getContact().point
-                    << std::endl;
-          std::cout << "Original Normal: " << std::endl
-                    << constraint->getContact().normal << std::endl;
-          std::cout << "Plus Normal: " << std::endl
-                    << plusConstraint->getContact().normal << std::endl;
-          std::cout << "Diff: " << std::endl
-                    << constraint->getContact().normal
-                           - plusConstraint->getContact().normal
-                    << std::endl;
-          std::cout << "Original Force Dir: " << std::endl
-                    << constraint->getContactWorldForceDirection() << std::endl;
-          std::cout << "Plus Force Dir: " << std::endl
-                    << plusConstraint->getContactWorldForceDirection()
-                    << std::endl;
-          std::cout << "Diff: " << std::endl
-                    << constraint->getContactWorldForceDirection()
-                           - plusConstraint->getContactWorldForceDirection()
-                    << std::endl;
-        }
-        */
         assert(false && 
         "Lowering EPS in finiteDifferenceRiddersJacobianOfConstraintForce "
         "caused numClamping() or numUpperBound() to change.");
@@ -7490,6 +7552,9 @@ BackpropSnapshot::finiteDifferenceRiddersJacobianOfConstraintForce(
       if (!(snapshotMinus->getNumClamping() == f0.size()
             && snapshotMinus->getNumUpperBound()
                    == originalPtr->getNumUpperBound()
+            && snapshotMinus->getNumContacts() == originalPtr->getNumContacts()
+            && snapshotMinus->getConstraintForceMixingDiagonal()(0)
+                   == originalPtr->getConstraintForceMixingDiagonal()(0)
             && (!areResultsStandardized()
                 || snapshotMinus->areResultsStandardized())))
       {
@@ -7497,6 +7562,66 @@ BackpropSnapshot::finiteDifferenceRiddersJacobianOfConstraintForce(
         "Lowering EPS in finiteDifferenceRiddersJacobianOfConstraintForce "
         "caused numClamping() or numUpperBound() to change.");
       }
+
+      /*
+      #ifndef NDEBUG
+      if (i == 1)
+      {
+        if (std::abs(fPlus(0) - f0(0)) > 1e-12)
+        {
+          std::cout << "Constraint force changed by " << fPlus(0) - f0(0)
+                    << " with positive y-axis bump of " << stepSize << "!"
+                    << std::endl;
+        }
+        else
+        {
+          std::cout
+              << "Constraint force not changed with positive y-axis bump of "
+              << stepSize << "!" << std::endl;
+        }
+        if (std::abs(fMinus(0) - f0(0)) > 1e-12)
+        {
+          std::cout << "Constraint force changed by " << fMinus(0) - f0(0)
+                    << " with negative y-axis bump of " << stepSize << "!"
+                    << std::endl;
+          std::shared_ptr<DifferentiableContactConstraint> originalConstraint
+              = originalPtr->getDifferentiableConstraints()[0];
+          collision::Contact& originalContact
+              = originalConstraint->getContact();
+          std::shared_ptr<DifferentiableContactConstraint> constraint
+              = snapshotMinus->getDifferentiableConstraints()[0];
+          collision::Contact& contact = constraint->getContact();
+          // constraint->getContactWorldForceDirection()
+          if (originalContact.type != contact.type)
+          {
+            std::cout << "Original type: " << originalContact.type << std::endl;
+            std::cout << "New type: " << contact.type << std::endl;
+          }
+          if (originalContact.point != contact.point)
+          {
+            std::cout << "Original pt: " << originalContact.point << std::endl;
+            std::cout << "New pt: " << contact.point << std::endl;
+            std::cout << "Diff: " << contact.point - originalContact.point
+                      << std::endl;
+          }
+          if (originalContact.normal != contact.normal)
+          {
+            std::cout << "Original normal: " << originalContact.normal
+                      << std::endl;
+            std::cout << "New normal: " << contact.normal << std::endl;
+            std::cout << "Diff: " << contact.normal - originalContact.normal
+                      << std::endl;
+          }
+        }
+        else
+        {
+          std::cout
+              << "Constraint force not changed with negative y-axis bump of "
+              << stepSize << "!" << std::endl;
+        }
+      }
+      #endif
+      */
 
       tab[0][iTab] = (fPlus - fMinus) / (2 * stepSize);
 

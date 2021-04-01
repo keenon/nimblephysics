@@ -285,6 +285,13 @@ void testEdgeEdgeCollision(bool isSelfCollision, bool useMesh)
   }
   */
 
+  /*
+  std::shared_ptr<neural::BackpropSnapshot> snapshot
+      = neural::forwardPass(world, true);
+  snapshot->diagnoseSubJacobianErrors(world, WithRespectTo::POSITION);
+  return;
+  */
+
   // renderWorld(world);
   // EXPECT_TRUE(verifyPerturbedContactEdges(world));
   // EXPECT_TRUE(verifyPerturbedContactNormals(world));
@@ -1140,6 +1147,21 @@ void testBoxCapsuleCollision(bool isSelfCollision, bool useMesh, int type)
   vels.segment<3>(3) = T2.linear().transpose() * vels.segment<3>(3);
 
   world->setVelocities(vels);
+
+  /*
+  server::GUIWebsocketServer server;
+  server.renderWorld(world);
+  server.renderBasis();
+  server.serve(8070);
+
+  server.blockWhileServing();
+  */
+
+  // EXPECT_TRUE(verifyPerturbedContactPositions(world));
+  // EXPECT_TRUE(verifyJacobianOfClampingConstraints(world));
+  // EXPECT_TRUE(verifyVelGradients(world, vels));
+  // EXPECT_TRUE(verifyPerturbedContactPositions(world));
+  // return;
 
   // renderWorld(world);
   // EXPECT_TRUE(verifyPerturbedContactPositions(world));

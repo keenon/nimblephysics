@@ -338,7 +338,7 @@ bool checkPair(
   CollisionResult pairResult;
 
   // Perform narrow-phase detection
-  collide(o1, o2, pairResult);
+  collide(o1, o2, option, pairResult);
 
   // Early return for binary check
   if (!result)

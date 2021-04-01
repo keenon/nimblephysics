@@ -596,6 +596,14 @@ public:
   Eigen::VectorXd mAColNorms;
   Eigen::MatrixXd mA;
 
+  /// These are values from our stabilization, for debugging
+  // TODO: <remove>
+  Eigen::VectorXd mStabilizationPos;
+  Eigen::VectorXd mStabilizationVel;
+  // TODO: </remove>
+  Eigen::MatrixXd mStabilizationQ;
+  Eigen::VectorXd mStabilizationB;
+
   /// This holds the outputs of the impulse tests we run to create the
   /// constraint matrices. We shuffle these vectors into the columns of
   /// mClampingConstraintMatrix and mUpperBoundConstraintMatrix depending on the

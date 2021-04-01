@@ -55,6 +55,9 @@ struct CollisionOption
   /// this to 1 for binary check.
   std::size_t maxNumContacts;
 
+  /// The maximum depth, beyond which we clip collisions.
+  double contactClippingDepth;
+
   /// CollisionFilter
   std::shared_ptr<CollisionFilter> collisionFilter;
 
@@ -62,11 +65,11 @@ struct CollisionOption
   CollisionOption(
       bool enableContact = true,
       std::size_t maxNumContacts = 1000u,
-      const std::shared_ptr<CollisionFilter>& collisionFilter = nullptr);
-
+      const std::shared_ptr<CollisionFilter>& collisionFilter = nullptr,
+      double contactClippingDepth = 0.03);
 };
 
-}  // namespace collision
-}  // namespace dart
+} // namespace collision
+} // namespace dart
 
-#endif  // DART_COLLISION_COLLISIONOPTION_HPP_
+#endif // DART_COLLISION_COLLISIONOPTION_HPP_

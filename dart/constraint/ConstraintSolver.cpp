@@ -449,6 +449,7 @@ void ConstraintSolver::setCachedLCPSolution(Eigen::VectorXd /* X */)
 void ConstraintSolver::setContactClippingDepth(double depth)
 {
   mContactClippingDepth = depth;
+  mCollisionOption.contactClippingDepth = depth;
 }
 
 //==============================================================================

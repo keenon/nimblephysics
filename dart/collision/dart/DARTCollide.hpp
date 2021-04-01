@@ -47,7 +47,34 @@
 namespace dart {
 namespace collision {
 
-int collide(CollisionObject* o1, CollisionObject* o2, CollisionResult& result);
+int collide(
+    CollisionObject* o1,
+    CollisionObject* o2,
+    const CollisionOption& option,
+    CollisionResult& result);
+
+/// This is for when we use the sphere collision routines for capsule-ends. If
+/// we have a capsule in deep inter-penetration with another object, we want to
+/// only detect collisions on one half of the sphere. This is easy to decide,
+/// because it's the Z coordinate of the collision in the local space for the
+/// sphere. TOP will allow only Z > 0, BOTTOM will allow only Z < 0, and BOTH
+/// will allow either configuration.
+enum ClipSphereHalfspace
+{
+  BOTH = 0,
+  TOP = 1,
+  BOTTOM = 2
+};
+
+/// This is for pipe-edge collisions, when found by the face-face collision
+/// algorithm. We want to be able to ensure that all contacts lie exactly in the
+/// plane of the mesh/box that is responsible for the collision.
+enum PinToFace
+{
+  AVERAGE = 0,
+  FACE_A = 1,
+  FACE_B = 2
+};
 
 int collideBoxBox(
     CollisionObject* o1,
@@ -56,6 +83,7 @@ int collideBoxBox(
     const Eigen::Isometry3d& T0,
     const Eigen::Vector3d& size1,
     const Eigen::Isometry3d& T1,
+    const CollisionOption& option,
     CollisionResult& result);
 
 int collideBoxSphere(
@@ -65,7 +93,9 @@ int collideBoxSphere(
     const Eigen::Isometry3d& T0,
     const double& r1,
     const Eigen::Isometry3d& T1,
-    CollisionResult& result);
+    const CollisionOption& option,
+    CollisionResult& result,
+    ClipSphereHalfspace halfspace = ClipSphereHalfspace::BOTH);
 
 int collideSphereBox(
     CollisionObject* o1,
@@ -74,7 +104,9 @@ int collideSphereBox(
     const Eigen::Isometry3d& T0,
     const Eigen::Vector3d& size1,
     const Eigen::Isometry3d& T1,
-    CollisionResult& result);
+    const CollisionOption& option,
+    CollisionResult& result,
+    ClipSphereHalfspace halfspace = ClipSphereHalfspace::BOTH);
 
 int collideSphereSphere(
     CollisionObject* o1,
@@ -83,7 +115,10 @@ int collideSphereSphere(
     const Eigen::Isometry3d& c0,
     const double& r1,
     const Eigen::Isometry3d& c1,
-    CollisionResult& result);
+    const CollisionOption& option,
+    CollisionResult& result,
+    ClipSphereHalfspace halfspace0 = ClipSphereHalfspace::BOTH,
+    ClipSphereHalfspace halfspace1 = ClipSphereHalfspace::BOTH);
 
 int collideBoxBoxAsMesh(
     CollisionObject* o1,
@@ -92,6 +127,7 @@ int collideBoxBoxAsMesh(
     const Eigen::Isometry3d& T0,
     const Eigen::Vector3d& size1,
     const Eigen::Isometry3d& T1,
+    const CollisionOption& option,
     CollisionResult& result);
 
 int collideMeshBox(
@@ -102,6 +138,7 @@ int collideMeshBox(
     const Eigen::Isometry3d& c0,
     const Eigen::Vector3d& size1,
     const Eigen::Isometry3d& c1,
+    const CollisionOption& option,
     CollisionResult& result);
 
 int collideBoxMesh(
@@ -112,6 +149,7 @@ int collideBoxMesh(
     const aiScene* mesh1,
     const Eigen::Vector3d& size1,
     const Eigen::Isometry3d& c1,
+    const CollisionOption& option,
     CollisionResult& result);
 
 int collideMeshSphere(
@@ -122,7 +160,9 @@ int collideMeshSphere(
     const Eigen::Isometry3d& c0,
     const double& r1,
     const Eigen::Isometry3d& c1,
-    CollisionResult& result);
+    const CollisionOption& option,
+    CollisionResult& result,
+    ClipSphereHalfspace halfspace = ClipSphereHalfspace::BOTH);
 
 int collideSphereMesh(
     CollisionObject* o1,
@@ -132,7 +172,9 @@ int collideSphereMesh(
     const aiScene* mesh1,
     const Eigen::Vector3d& size1,
     const Eigen::Isometry3d& c1,
-    CollisionResult& result);
+    const CollisionOption& option,
+    CollisionResult& result,
+    ClipSphereHalfspace halfspace = ClipSphereHalfspace::BOTH);
 
 int collideMeshMesh(
     CollisionObject* o1,
@@ -143,6 +185,7 @@ int collideMeshMesh(
     const aiScene* mesh1,
     const Eigen::Vector3d& size1,
     const Eigen::Isometry3d& c1,
+    const CollisionOption& option,
     CollisionResult& result);
 
 int collideCapsuleCapsule(
@@ -154,6 +197,7 @@ int collideCapsuleCapsule(
     double height1,
     double radius1,
     const Eigen::Isometry3d& T1,
+    const CollisionOption& option,
     CollisionResult& result);
 
 int collideSphereCapsule(
@@ -164,6 +208,7 @@ int collideSphereCapsule(
     double height1,
     double radius1,
     const Eigen::Isometry3d& T1,
+    const CollisionOption& option,
     CollisionResult& result);
 
 int collideCapsuleSphere(
@@ -174,6 +219,7 @@ int collideCapsuleSphere(
     const Eigen::Isometry3d& T0,
     double radius1,
     const Eigen::Isometry3d& T1,
+    const CollisionOption& option,
     CollisionResult& result);
 
 int collideBoxCapsule(
@@ -184,6 +230,7 @@ int collideBoxCapsule(
     double height1,
     double radius1,
     const Eigen::Isometry3d& T1,
+    const CollisionOption& option,
     CollisionResult& result);
 
 int collideCapsuleBox(
@@ -194,6 +241,7 @@ int collideCapsuleBox(
     const Eigen::Isometry3d& T0,
     const Eigen::Vector3d& size1,
     const Eigen::Isometry3d& T1,
+    const CollisionOption& option,
     CollisionResult& result);
 
 int collideMeshCapsule(
@@ -205,6 +253,7 @@ int collideMeshCapsule(
     double height1,
     double radius1,
     const Eigen::Isometry3d& T1,
+    const CollisionOption& option,
     CollisionResult& result);
 
 int collideCapsuleMesh(
@@ -216,6 +265,7 @@ int collideCapsuleMesh(
     const aiScene* mesh1,
     const Eigen::Vector3d& size1,
     const Eigen::Isometry3d& T1,
+    const CollisionOption& option,
     CollisionResult& result);
 
 int collideCylinderSphere(
@@ -226,7 +276,9 @@ int collideCylinderSphere(
     const Eigen::Isometry3d& T0,
     const double& sphere_rad,
     const Eigen::Isometry3d& T1,
-    CollisionResult& result);
+    const CollisionOption& option,
+    CollisionResult& result,
+    ClipSphereHalfspace halfspace = ClipSphereHalfspace::BOTH);
 
 int collideCylinderPlane(
     CollisionObject* o1,
@@ -236,6 +288,7 @@ int collideCylinderPlane(
     const Eigen::Isometry3d& T0,
     const Eigen::Vector3d& plane_normal,
     const Eigen::Isometry3d& T1,
+    const CollisionOption& option,
     CollisionResult& result);
 
 /////////////////////////////////////////////////////////////////////
@@ -323,7 +376,8 @@ int createMeshSphereContact(
     ccd_vec3_t* dir,
     const std::vector<Eigen::Vector3d>& meshPointsWitness,
     const Eigen::Vector3d& sphereCenter,
-    double sphereRadius);
+    double sphereRadius,
+    ClipSphereHalfspace halfspace = ClipSphereHalfspace::BOTH);
 
 /// This is responsible for creating and annotating all the contact objects with
 /// all the metadata we need in order to get accurate gradients.
@@ -334,19 +388,8 @@ int createSphereMeshContact(
     ccd_vec3_t* dir,
     const Eigen::Vector3d& sphereCenter,
     double sphereRadius,
-    const std::vector<Eigen::Vector3d>& meshPointsWitness);
-
-/// This is responsible for creating and annotating all the contact objects with
-/// all the metadata we need in order to get accurate gradients.
-int createCapsuleMeshContact(
-    CollisionObject* o1,
-    CollisionObject* o2,
-    CollisionResult& result,
-    ccd_vec3_t* dir,
-    const Eigen::Vector3d& capsuleA,
-    const Eigen::Vector3d& capsuleB,
-    double capsuleRadius,
-    const std::vector<Eigen::Vector3d>& meshPointsWitness);
+    const std::vector<Eigen::Vector3d>& meshPointsWitness,
+    ClipSphereHalfspace halfspace = ClipSphereHalfspace::BOTH);
 
 /*
 /// This is necessary preparation for rapidly checking if another point is
