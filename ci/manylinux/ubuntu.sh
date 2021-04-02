@@ -231,3 +231,29 @@ make install
 popd
 popd
 rm -rf benchmark
+
+# Install MPFR - Arbitrary precision floating point
+sudo apt-get install -y libgmp3-dev # brew install gmp
+curl https://www.mpfr.org/mpfr-current/mpfr-4.1.0.tar.gz > mpfr-4.1.0.tar.gz
+tar -zxf mpfr-4.1.0.tar.gz
+pushd mpfr-4.1.0
+./configure
+make
+sudo make install
+sudo ldconfig
+popd
+rm -rf mpfr-4.1.0
+rm mpfr-4.1.0.tar.gz
+
+# Install MPIR - Arbitrary precision integer math
+sudo apt-get install -y yasm m4 #brew install yasm m4
+curl http://mpir.org/mpir-3.0.0.tar.bz2 > mpir-3.0.0.tar.bz2
+tar -xf mpir-3.0.0.tar.bz2
+pushd mpir-3.0.0
+./configure --enable-cxx
+make
+sudo make install
+sudo ldconfig
+popd
+rm -rf mpir-3.0.0
+rm mpir-3.0.0.tar.bz2

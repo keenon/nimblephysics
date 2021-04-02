@@ -254,6 +254,30 @@ RUN pushd benchmark && \
     popd
 RUN rm -rf benchmark
 
+# Install MPFR - Arbirtatry precision floating point math
+RUN apt-get install -y libgmp3-dev
+RUN curl https://www.mpfr.org/mpfr-current/mpfr-4.1.0.tar.gz > mpfr-4.1.0.tar.gz && \
+    tar -zxf mpfr-4.1.0.tar.gz && \
+    pushd mpfr-4.1.0 && \
+    ./configure && \
+    make && \
+    make install && \
+    popd && \
+    rm -rf mpfr-4.1.0 && \
+    rm mpfr-4.1.0.tar.gz
+
+# Install MPIR - Arbirtatry precision integer math
+RUN apt-get install -y yasm m4
+RUN curl http://mpir.org/mpir-3.0.0.tar.bz2 > mpir-3.0.0.tar.bz2 && \
+    tar -xf mpir-3.0.0.tar.bz2 && \
+    pushd mpir-3.0.0 && \
+    ./configure --enable-cxx && \
+    make && \
+    make install && \
+    popd && \
+    rm -rf mpir-3.0.0 && \
+    rm mpir-3.0.0.tar.bz2
+
 # RUN ls /usr/local/lib64 | grep assimp
 # RUN ls /usr/local/lib | grep assimp
 # RUN rm -rf /usr/local/lib64/libassimp.so
