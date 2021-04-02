@@ -51,6 +51,7 @@
 #include "dart/dynamics/TemplatedJacobianNode.hpp"
 #include "dart/dynamics/detail/BodyNodeAspect.hpp"
 #include "dart/math/Geometry.hpp"
+#include "dart/math/MathTypes.hpp"
 
 namespace dart {
 namespace dynamics {

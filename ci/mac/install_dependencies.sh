@@ -243,6 +243,15 @@ popd
 rm -rf mpir-3.0.0
 rm mpir-3.0.0.tar.bz2
 
+# Install MPFRC++
+wget https://github.com/advanpix/mpreal/archive/refs/tags/mpfrc++-3.6.8.tar.gz
+tar -xzf mpfrc++-3.6.8.tar.gz
+pushd mpreal-mpfrc-3.6.8
+sudo cp mpreal.h /usr/include/
+popd
+rm -rf mpreal-mpfrc-3.6.8
+rm mpfrc++-3.6.8.tar.gz
+
 # Reset the IDs for our libraries to absolute paths
 install_name_tool -id /usr/local/lib/liburdfdom_sensor.dylib /usr/local/lib/liburdfdom_sensor.dylib
 install_name_tool -id /usr/local/lib/liburdfdom_model_state.dylib /usr/local/lib/liburdfdom_model_state.dylib

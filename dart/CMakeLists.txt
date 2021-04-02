@@ -146,6 +146,8 @@ target_link_libraries(dart
     # protobuf::libprotobuf-lite
     # protobuf::libprotoc
     gRPC::grpc++
+    gmp
+    mpfr
 )
 if (TARGET octomap)
   target_link_libraries(dart PUBLIC octomap)

@@ -104,6 +104,10 @@ dart_find_package(PerfUtils)
 dart_find_package(Protobuf)
 dart_find_package(gRPC)
 
+# MPFR + GMP -- Arbitrary precision floating point math
+dart_find_package(MPFR)
+dart_find_package(GMP)
+
 # octomap
 dart_find_package(octomap)
 if(MSVC)

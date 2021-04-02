@@ -6,4 +6,4 @@
 #
 # This file is provided under the "BSD-style" License
 
-find_package(MPFR QUIET MODULE)
+find_package(GMP QUIET MODULE)

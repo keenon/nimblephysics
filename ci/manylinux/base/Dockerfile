@@ -278,6 +278,15 @@ RUN curl http://mpir.org/mpir-3.0.0.tar.bz2 > mpir-3.0.0.tar.bz2 && \
     rm -rf mpir-3.0.0 && \
     rm mpir-3.0.0.tar.bz2
 
+# Install MPFRC++
+RUN wget https://github.com/advanpix/mpreal/archive/refs/tags/mpfrc++-3.6.8.tar.gz
+RUN tar -xzf mpfrc++-3.6.8.tar.gz && \
+    pushd mpreal-mpfrc-3.6.8 && \
+    sudo cp mpreal.h /usr/include/ && \
+    popd && \
+    rm -rf mpreal-mpfrc-3.6.8 && \
+    rm mpfrc++-3.6.8.tar.gz
+
 # RUN ls /usr/local/lib64 | grep assimp
 # RUN ls /usr/local/lib | grep assimp
 # RUN rm -rf /usr/local/lib64/libassimp.so
