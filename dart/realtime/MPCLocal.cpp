@@ -40,7 +40,7 @@ MPCLocal::MPCLocal(
     mRecordIterations(false),
     mPlanningHorizonMillis(planningHorizonMillis),
     mMillisPerStep(1000 * world->getTimeStep()),
-    mSteps((int)ceil((double)planningHorizonMillis / mMillisPerStep)),
+    mSteps((int)ceil((s_t)planningHorizonMillis / mMillisPerStep)),
     mShotLength(50),
     mMaxIterations(5),
     mMillisInAdvanceToPlan(0),
@@ -108,7 +108,7 @@ std::shared_ptr<trajectory::Problem> MPCLocal::getProblem()
 
 /// This gets the force to apply to the world at this instant. If we haven't
 /// computed anything for this instant yet, this just returns 0s.
-Eigen::VectorXd MPCLocal::getForce(long now)
+Eigen::VectorXs MPCLocal::getForce(long now)
 {
   return mBuffer.getPlannedForce(now);
 }
@@ -171,7 +171,7 @@ void MPCLocal::setMaxIterations(int maxIters)
 /// and inference. This resets the error in our model just assuming the world
 /// is exactly following our simulation.
 void MPCLocal::recordGroundTruthState(
-    long time, Eigen::VectorXd pos, Eigen::VectorXd vel, Eigen::VectorXd mass)
+    long time, Eigen::VectorXs pos, Eigen::VectorXs vel, Eigen::VectorXs mass)
 {
   mObservationLog.observe(time, pos, vel, mass);
 }
@@ -253,11 +253,12 @@ void MPCLocal::optimizePlan(long startTime)
     std::shared_ptr<simulation::World> worldClone = mWorld->clone();
 
     int diff = startTime - mLastOptimizedTime;
-    int steps = floor((double)diff / mMillisPerStep);
+    int steps
+        = static_cast<int>(floor(static_cast<s_t>(diff) / mMillisPerStep));
     int roundedDiff = steps * mMillisPerStep;
     long roundedStartTime = mLastOptimizedTime + roundedDiff;
     long totalPlanTime = mSteps * mMillisPerStep;
-    double percentage = (double)roundedDiff * 100.0 / totalPlanTime;
+    s_t percentage = (s_t)roundedDiff * 100.0 / totalPlanTime;
 
     if (!mSilent)
     {
@@ -301,7 +302,7 @@ void MPCLocal::optimizePlan(long startTime)
 
     if (!mSilent)
     {
-      double factorOfSafety = 0.5;
+      s_t factorOfSafety = 0.5;
       std::cout << " -> We were allowed "
                 << (int)floor(roundedDiff * factorOfSafety)
                 << "ms to solve this problem (" << roundedDiff
@@ -333,7 +334,7 @@ void MPCLocal::adjustPerformance(long lastOptimizeTimeMillis)
     mMillisInAdvanceToPlan = 200;
 
   /*
-  double millisToComputeEachStep = (double)lastOptimizeTimeMillis / mSteps;
+  s_t millisToComputeEachStep = (s_t)lastOptimizeTimeMillis / mSteps;
   // Our safety margin is 3x, we want to be at least 3 times as fast as real
   // time
   long desiredMillisPerStep = 3 * millisToComputeEachStep;

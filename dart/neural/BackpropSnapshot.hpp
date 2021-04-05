@@ -30,11 +30,11 @@ public:
   /// be called after the timestep.
   BackpropSnapshot(
       simulation::WorldPtr world,
-      Eigen::VectorXd preStepPosition,
-      Eigen::VectorXd preStepVelocity,
-      Eigen::VectorXd preStepTorques,
-      Eigen::VectorXd preConstraintVelocities,
-      Eigen::VectorXd preStepLCPCache);
+      Eigen::VectorXs preStepPosition,
+      Eigen::VectorXs preStepVelocity,
+      Eigen::VectorXs preStepTorques,
+      Eigen::VectorXs preConstraintVelocities,
+      Eigen::VectorXs preStepLCPCache);
 
   /// This computes the implicit backprop without forming intermediate
   /// Jacobians. It takes a LossGradient with the position and velocity vectors
@@ -52,86 +52,86 @@ public:
   /// out of the box-bounds encoded in the world for pos, vel, or force.
   void clipLossGradientsToBounds(
       simulation::WorldPtr world,
-      Eigen::VectorXd& lossWrtPos,
-      Eigen::VectorXd& lossWrtVel,
-      Eigen::VectorXd& lossWrtForce);
+      Eigen::VectorXs& lossWrtPos,
+      Eigen::VectorXs& lossWrtVel,
+      Eigen::VectorXs& lossWrtForce);
 
   /// This computes and returns the whole vel-vel jacobian. For backprop, you
   /// don't actually need this matrix, you can compute backprop directly. This
   /// is here if you want access to the full Jacobian for some reason.
-  const Eigen::MatrixXd& getVelVelJacobian(
+  const Eigen::MatrixXs& getVelVelJacobian(
       simulation::WorldPtr world, PerformanceLog* perfLog = nullptr);
 
   /// This computes and returns the whole pos-vel jacobian. For backprop, you
   /// don't actually need this matrix, you can compute backprop directly. This
   /// is here if you want access to the full Jacobian for some reason.
-  const Eigen::MatrixXd& getPosVelJacobian(
+  const Eigen::MatrixXs& getPosVelJacobian(
       simulation::WorldPtr world, PerformanceLog* perfLog = nullptr);
 
   /// This computes and returns the whole force-vel jacobian. For backprop, you
   /// don't actually need this matrix, you can compute backprop directly. This
   /// is here if you want access to the full Jacobian for some reason.
-  const Eigen::MatrixXd& getForceVelJacobian(
+  const Eigen::MatrixXs& getForceVelJacobian(
       simulation::WorldPtr world, PerformanceLog* perfLog = nullptr);
 
   /// This computes and returns the whole mass-vel jacobian. For backprop, you
   /// don't actually need this matrix, you can compute backprop directly. This
   /// is here if you want access to the full Jacobian for some reason.
-  const Eigen::MatrixXd& getMassVelJacobian(
+  const Eigen::MatrixXs& getMassVelJacobian(
       simulation::WorldPtr world, PerformanceLog* perfLog = nullptr);
 
   /// This computes and returns the whole pos-pos jacobian. For backprop, you
   /// don't actually need this matrix, you can compute backprop directly. This
   /// is here if you want access to the full Jacobian for some reason.
-  const Eigen::MatrixXd& getPosPosJacobian(
+  const Eigen::MatrixXs& getPosPosJacobian(
       simulation::WorldPtr world, PerformanceLog* perfLog = nullptr);
 
   /// This computes and returns the whole vel-pos jacobian. For backprop, you
   /// don't actually need this matrix, you can compute backprop directly. This
   /// is here if you want access to the full Jacobian for some reason.
-  const Eigen::MatrixXd& getVelPosJacobian(
+  const Eigen::MatrixXs& getVelPosJacobian(
       simulation::WorldPtr world, PerformanceLog* perfLog = nullptr);
 
   /// This computes and returns the component of the pos-pos and pos-vel
   /// jacobians due to bounce approximation. For backprop, you don't actually
   /// need this matrix, you can compute backprop directly. This is here if you
   /// want access to the full Jacobian for some reason.
-  const Eigen::MatrixXd& getBounceApproximationJacobian(
+  const Eigen::MatrixXs& getBounceApproximationJacobian(
       simulation::WorldPtr world, PerformanceLog* perfLog = nullptr);
 
   /// Returns a concatenated vector of all the Skeletons' position()'s in the
   /// World, in order in which the Skeletons appear in the World's
   /// getSkeleton(i) returns them, BEFORE the timestep.
-  Eigen::VectorXd getPreStepPosition();
+  Eigen::VectorXs getPreStepPosition();
 
   /// Returns a concatenated vector of all the Skeletons' velocity()'s in the
   /// World, in order in which the Skeletons appear in the World's
   /// getSkeleton(i) returns them, BEFORE the timestep.
-  Eigen::VectorXd getPreStepVelocity();
+  Eigen::VectorXs getPreStepVelocity();
 
   /// Returns a concatenated vector of all the joint torques that were applied
   /// during the forward pass, BEFORE the timestep.
-  Eigen::VectorXd getPreStepTorques();
+  Eigen::VectorXs getPreStepTorques();
 
   /// Returns a concatenated vector of all the Skeletons' velocity()'s in the
   /// World, in order in which the Skeletons appear in the World's
   /// getSkeleton(i) returns them, AFTER integrating forward dynamics but BEFORE
   /// running the LCP.
-  Eigen::VectorXd getPreConstraintVelocity();
+  Eigen::VectorXs getPreConstraintVelocity();
 
   /// Returns a concatenated vector of all the Skeletons' position()'s in the
   /// World, in order in which the Skeletons appear in the World's
   /// getSkeleton(i) returns them, AFTER the timestep.
-  Eigen::VectorXd getPostStepPosition();
+  Eigen::VectorXs getPostStepPosition();
 
   /// Returns a concatenated vector of all the Skeletons' velocity()'s in the
   /// World, in order in which the Skeletons appear in the World's
   /// getSkeleton(i) returns them, AFTER the timestep.
-  Eigen::VectorXd getPostStepVelocity();
+  Eigen::VectorXs getPostStepVelocity();
 
   /// Returns a concatenated vector of all the joint torques that were applied
   /// during the forward pass, AFTER the timestep.
-  Eigen::VectorXd getPostStepTorques();
+  Eigen::VectorXs getPostStepTorques();
 
   /////////////////////////////////////////////////////////////////////////////
   /// Just public for testing
@@ -139,98 +139,98 @@ public:
 
   /// This returns the A_c matrix. You shouldn't ever need this matrix, it's
   /// just here to enable testing.
-  Eigen::MatrixXd getClampingConstraintMatrix(simulation::WorldPtr world);
+  Eigen::MatrixXs getClampingConstraintMatrix(simulation::WorldPtr world);
 
   /// This returns the V_c matrix. You shouldn't ever need this matrix, it's
   /// just here to enable testing.
-  Eigen::MatrixXd getMassedClampingConstraintMatrix(simulation::WorldPtr world);
+  Eigen::MatrixXs getMassedClampingConstraintMatrix(simulation::WorldPtr world);
 
   /// This returns the A_ub matrix. You shouldn't ever need this matrix, it's
   /// just here to enable testing.
-  Eigen::MatrixXd getUpperBoundConstraintMatrix(simulation::WorldPtr world);
+  Eigen::MatrixXs getUpperBoundConstraintMatrix(simulation::WorldPtr world);
 
   /// This returns the V_c matrix. You shouldn't ever need this matrix, it's
   /// just here to enable testing.
-  Eigen::MatrixXd getMassedUpperBoundConstraintMatrix(
+  Eigen::MatrixXs getMassedUpperBoundConstraintMatrix(
       simulation::WorldPtr world);
 
   /// This returns the E matrix. You shouldn't ever need this matrix, it's
   /// just here to enable testing.
-  Eigen::MatrixXd getUpperBoundMappingMatrix();
+  Eigen::MatrixXs getUpperBoundMappingMatrix();
 
   /// This returns the B matrix. You shouldn't ever need this matrix, it's
   /// just here to enable testing.
-  Eigen::MatrixXd getBouncingConstraintMatrix(simulation::WorldPtr world);
+  Eigen::MatrixXs getBouncingConstraintMatrix(simulation::WorldPtr world);
 
   /// This returns the mass matrix for the whole world, a block diagonal
   /// concatenation of the skeleton mass matrices.
-  Eigen::MatrixXd getMassMatrix(
+  Eigen::MatrixXs getMassMatrix(
       simulation::WorldPtr world, bool forFiniteDifferencing = false);
 
   /// This returns the inverse mass matrix for the whole world, a block diagonal
   /// concatenation of the skeleton inverse mass matrices.
-  Eigen::MatrixXd getInvMassMatrix(
+  Eigen::MatrixXs getInvMassMatrix(
       simulation::WorldPtr world, bool forFiniteDifferencing = false);
 
   /// This is the subset of the A matrix from the original LCP that corresponds
   /// to clamping indices.
-  Eigen::MatrixXd getClampingAMatrix();
+  Eigen::MatrixXs getClampingAMatrix();
 
   /// This returns the pos-C(pos,vel) Jacobian for the whole world, a block
   /// diagonal concatenation of the skeleton pos-C(pos,vel) Jacobians.
-  Eigen::MatrixXd getPosCJacobian(simulation::WorldPtr world);
+  Eigen::MatrixXs getPosCJacobian(simulation::WorldPtr world);
 
   /// This returns the vel-C(pos,vel) Jacobian for the whole world, a block
   /// diagonal concatenation of the skeleton vel-C(pos,vel) Jacobians.
-  Eigen::MatrixXd getVelCJacobian(simulation::WorldPtr world);
+  Eigen::MatrixXs getVelCJacobian(simulation::WorldPtr world);
 
   /// This computes and returns the whole vel-vel jacobian by finite
   /// differences. This is SUPER SLOW, and is only here for testing.
-  Eigen::MatrixXd finiteDifferenceVelVelJacobian(
+  Eigen::MatrixXs finiteDifferenceVelVelJacobian(
       simulation::WorldPtr world, bool useRidders = true);
 
   /// This computes and returns the whole vel-vel jacobian by Ridders
   /// extrapolated finite differences. This is SUPER DUPER SLOW,
   /// and is only here for testing.
-  Eigen::MatrixXd finiteDifferenceRiddersVelVelJacobian(
+  Eigen::MatrixXs finiteDifferenceRiddersVelVelJacobian(
       simulation::WorldPtr world);
 
   /// This computes and returns the whole pos-C(pos,vel) jacobian by finite
   /// differences. This is SUPER SUPER SLOW, and is only here for testing.
-  Eigen::MatrixXd finiteDifferencePosVelJacobian(
+  Eigen::MatrixXs finiteDifferencePosVelJacobian(
       simulation::WorldPtr world, bool useRidders = true);
 
   /// This computes and returns the whole pos-C(pos,vel) jacobian by Ridders
   /// extrapolated finite differences. This is SUPER DUPER SLOW,
   /// and is only here for testing.
-  Eigen::MatrixXd finiteDifferenceRiddersPosVelJacobian(
+  Eigen::MatrixXs finiteDifferenceRiddersPosVelJacobian(
       simulation::WorldPtr world);
 
   /// This computes and returns the whole force-vel jacobian by finite
   /// differences. This is SUPER SLOW, and is only here for testing.
-  Eigen::MatrixXd finiteDifferenceForceVelJacobian(
+  Eigen::MatrixXs finiteDifferenceForceVelJacobian(
       simulation::WorldPtr world, bool useRidders = true);
 
   /// This computes and returns the whole force-vel jacobian by Ridders
   /// extrapolated finite differences. This is SUPER DUPER SLOW,
   /// and is only here for testing.
-  Eigen::MatrixXd finiteDifferenceRiddersForceVelJacobian(
+  Eigen::MatrixXs finiteDifferenceRiddersForceVelJacobian(
       simulation::WorldPtr world);
 
   /// This computes and returns the whole mass-vel jacobian by finite
   /// differences. This is SUPER SLOW, and is only here for testing.
-  Eigen::MatrixXd finiteDifferenceMassVelJacobian(
+  Eigen::MatrixXs finiteDifferenceMassVelJacobian(
       simulation::WorldPtr world, bool useRidders = true);
 
   /// This computes and returns the whole mass-vel jacobian by Ridders
   /// extrapolated finite differences. This is SUPER DUPER SLOW,
   /// and is only here for testing.
-  Eigen::MatrixXd finiteDifferenceRiddersMassVelJacobian(
+  Eigen::MatrixXs finiteDifferenceRiddersMassVelJacobian(
       simulation::WorldPtr world);
 
   /// This computes and returns the whole pos-pos jacobian by finite
   /// differences. This is SUPER SUPER SLOW, and is only here for testing.
-  Eigen::MatrixXd finiteDifferencePosPosJacobian(
+  Eigen::MatrixXs finiteDifferencePosPosJacobian(
       simulation::WorldPtr world,
       std::size_t subdivisions = 20,
       bool useRidders = true);
@@ -238,12 +238,12 @@ public:
   /// This computes and returns the whole pos-pos jacobian by Ridders
   /// extrapolated finite differences. This is SUPER DUPER SUPER SLOW,
   /// and is only here for testing.
-  Eigen::MatrixXd finiteDifferenceRiddersPosPosJacobian(
+  Eigen::MatrixXs finiteDifferenceRiddersPosPosJacobian(
       simulation::WorldPtr world, std::size_t subdivisions = 20);
 
   /// This computes and returns the whole vel-pos jacobian by finite
   /// differences. This is SUPER SUPER SLOW, and is only here for testing.
-  Eigen::MatrixXd finiteDifferenceVelPosJacobian(
+  Eigen::MatrixXs finiteDifferenceVelPosJacobian(
       simulation::WorldPtr world,
       std::size_t subdivisions = 20,
       bool useRidders = true);
@@ -251,56 +251,56 @@ public:
   /// This computes and returns the whole vel-pos jacobian by Ridders
   /// extrapolated finite differences. This is SUPER DUPER SUPER SLOW,
   /// and is only here for testing.
-  Eigen::MatrixXd finiteDifferenceRiddersVelPosJacobian(
+  Eigen::MatrixXs finiteDifferenceRiddersVelPosJacobian(
       simulation::WorldPtr world, std::size_t subdivisions = 20);
 
   /// This computes and returns the whole wrt-vel jacobian by finite
   /// differences. This is SUPER SUPER SLOW, and is only here for testing.
-  Eigen::MatrixXd finiteDifferenceVelJacobianWrt(
+  Eigen::MatrixXs finiteDifferenceVelJacobianWrt(
       simulation::WorldPtr world, WithRespectTo* wrt, bool useRidders = true);
 
   /// This computes and returns the whole wrt-vel jacobian by Ridders
   /// extrapolated finite differences. This is SUPER SUPER SLOW,
   /// and is only here for testing.
-  Eigen::MatrixXd finiteDifferenceRiddersVelJacobianWrt(
+  Eigen::MatrixXs finiteDifferenceRiddersVelJacobianWrt(
       simulation::WorldPtr world, WithRespectTo* wrt);
 
   /// This computes and returns the whole wrt-pos jacobian by finite
   /// differences. This is SUPER SUPER SLOW, and is only here for testing.
-  Eigen::MatrixXd finiteDifferencePosJacobianWrt(
+  Eigen::MatrixXs finiteDifferencePosJacobianWrt(
       simulation::WorldPtr world, WithRespectTo* wrt, bool useRidders = true);
 
   /// This computes and returns the whole wrt-pos jacobian by Ridders
   /// extrapolated finite differences. This is SUPER SUPER SLOW,
   /// and is only here for testing.
-  Eigen::MatrixXd finiteDifferenceRiddersPosJacobianWrt(
+  Eigen::MatrixXs finiteDifferenceRiddersPosJacobianWrt(
       simulation::WorldPtr world, WithRespectTo* wrt);
 
   /// This returns the P_c matrix. You shouldn't ever need this matrix, it's
   /// just here to enable testing.
-  Eigen::MatrixXd getProjectionIntoClampsMatrix(
+  Eigen::MatrixXs getProjectionIntoClampsMatrix(
       simulation::WorldPtr world, bool forFiniteDifferencing = false);
 
   /// This replaces x with the result of M*x in place, without explicitly
   /// forming M
-  Eigen::VectorXd implicitMultiplyByMassMatrix(
-      simulation::WorldPtr world, const Eigen::VectorXd& x);
+  Eigen::VectorXs implicitMultiplyByMassMatrix(
+      simulation::WorldPtr world, const Eigen::VectorXs& x);
 
   /// This replaces x with the result of Minv*x in place, without explicitly
   /// forming Minv
-  Eigen::VectorXd implicitMultiplyByInvMassMatrix(
-      simulation::WorldPtr world, const Eigen::VectorXd& x);
+  Eigen::VectorXs implicitMultiplyByInvMassMatrix(
+      simulation::WorldPtr world, const Eigen::VectorXs& x);
 
   /// TODO(keenon): Remove me
-  Eigen::MatrixXd getScratchAnalytical(
+  Eigen::MatrixXs getScratchAnalytical(
       simulation::WorldPtr world, WithRespectTo* wrt);
 
   /// TODO(keenon): Remove me
-  Eigen::MatrixXd getScratchFiniteDifference(
+  Eigen::MatrixXs getScratchFiniteDifference(
       simulation::WorldPtr world, WithRespectTo* wrt, bool useRidders = true);
 
   /// TODO(keenon): Remove me
-  Eigen::MatrixXd getScratchFiniteDifferenceRidders(
+  Eigen::MatrixXs getScratchFiniteDifferenceRidders(
       simulation::WorldPtr world, WithRespectTo* wrt);
 
   /// This predicts what the next velocity will be using our linear algebra
@@ -312,113 +312,113 @@ public:
   /// approximations. This is important because when we're doing
   /// finite-differencing over tiny EPS (1e-9) then tiny errors in the 1st order
   /// approximations blow up to become huge errors in gradients.
-  Eigen::VectorXd getAnalyticalNextV(
+  Eigen::VectorXs getAnalyticalNextV(
       simulation::WorldPtr world, bool morePreciseButSlower = false);
 
   /// This computes and returns the whole wrt-vel jacobian. For backprop, you
   /// don't actually need this matrix, you can compute backprop directly. This
   /// is here if you want access to the full Jacobian for some reason.
-  Eigen::MatrixXd getVelJacobianWrt(
+  Eigen::MatrixXs getVelJacobianWrt(
       simulation::WorldPtr world, WithRespectTo* wrt);
 
   /// This computes and returns the whole wrt-pos jacobian. For backprop, you
   /// don't actually need this matrix, you can compute backprop directly. This
   /// is here if you want access to the full Jacobian for some reason.
-  Eigen::MatrixXd getPosJacobianWrt(
+  Eigen::MatrixXs getPosJacobianWrt(
       simulation::WorldPtr world, WithRespectTo* wrt);
 
   /// This returns the jacobian of constraint force, holding everyhing constant
   /// except the value of WithRespectTo
-  Eigen::MatrixXd getJacobianOfConstraintForce(
+  Eigen::MatrixXs getJacobianOfConstraintForce(
       simulation::WorldPtr world, WithRespectTo* wrt);
 
   /// This returns the analytical expression for the Jacobian of Q*b, holding b
   /// constant, if there are some upper-bound indices
-  Eigen::MatrixXd dQ_WithUB(
+  Eigen::MatrixXs dQ_WithUB(
       simulation::WorldPtr world,
-      Eigen::MatrixXd& Minv,
-      Eigen::MatrixXd& A_c,
-      Eigen::MatrixXd& E,
-      Eigen::MatrixXd& A_c_ub_E,
-      Eigen::VectorXd rhs,
+      Eigen::MatrixXs& Minv,
+      Eigen::MatrixXs& A_c,
+      Eigen::MatrixXs& E,
+      Eigen::MatrixXs& A_c_ub_E,
+      Eigen::VectorXs rhs,
       WithRespectTo* wrt);
   /// This returns the analytical expression for the Jacobian of Q^T*b, holding
   /// b constant, if there are some upper-bound indices
-  Eigen::MatrixXd dQT_WithUB(
+  Eigen::MatrixXs dQT_WithUB(
       simulation::WorldPtr world,
-      Eigen::MatrixXd& Minv,
-      Eigen::MatrixXd& A_c,
-      Eigen::MatrixXd& E,
-      Eigen::MatrixXd& A_ub,
-      Eigen::VectorXd rhs,
+      Eigen::MatrixXs& Minv,
+      Eigen::MatrixXs& A_c,
+      Eigen::MatrixXs& E,
+      Eigen::MatrixXs& A_ub,
+      Eigen::VectorXs rhs,
       WithRespectTo* wrt);
   /// This returns the analytical expression for the Jacobian of Q*b, holding b
   /// constant, if there are no upper-bound indices
-  Eigen::MatrixXd dQ_WithoutUB(
+  Eigen::MatrixXs dQ_WithoutUB(
       simulation::WorldPtr world,
-      Eigen::MatrixXd& Minv,
-      Eigen::MatrixXd& A_c,
-      Eigen::VectorXd rhs,
+      Eigen::MatrixXs& Minv,
+      Eigen::MatrixXs& A_c,
+      Eigen::VectorXs rhs,
       WithRespectTo* wrt);
 
   /// This returns the jacobian of Qb, holding b constant, with respect to
   /// wrt, by finite differencing
-  Eigen::MatrixXd finiteDifferenceJacobianOfQb(
+  Eigen::MatrixXs finiteDifferenceJacobianOfQb(
       simulation::WorldPtr world,
-      Eigen::VectorXd b,
+      Eigen::VectorXs b,
       WithRespectTo* wrt,
       bool useRidders = true);
 
   /// This returns the jacobian of Qb, holding b constant, with respect to
   /// wrt, by finite differencing
-  Eigen::MatrixXd finiteDifferenceRiddersJacobianOfQb(
-      simulation::WorldPtr world, Eigen::VectorXd b, WithRespectTo* wrt);
+  Eigen::MatrixXs finiteDifferenceRiddersJacobianOfQb(
+      simulation::WorldPtr world, Eigen::VectorXs b, WithRespectTo* wrt);
 
   /// This returns the vector of constants that get added to the diagonal of Q
   /// to guarantee that Q is full-rank
-  Eigen::VectorXd getConstraintForceMixingDiagonal();
+  Eigen::VectorXs getConstraintForceMixingDiagonal();
 
   /// This returns the jacobian of Q^{-1}b, holding b constant, with respect to
   /// wrt
-  Eigen::MatrixXd getJacobianOfLCPConstraintMatrixClampingSubset(
-      simulation::WorldPtr world, Eigen::VectorXd b, WithRespectTo* wrt);
+  Eigen::MatrixXs getJacobianOfLCPConstraintMatrixClampingSubset(
+      simulation::WorldPtr world, Eigen::VectorXs b, WithRespectTo* wrt);
 
   /// This returns the jacobian of Q^{-1}b, holding b constant, with respect to
   /// wrt, by finite differencing
-  Eigen::MatrixXd finiteDifferenceJacobianOfLCPConstraintMatrixClampingSubset(
+  Eigen::MatrixXs finiteDifferenceJacobianOfLCPConstraintMatrixClampingSubset(
       simulation::WorldPtr world,
-      Eigen::VectorXd b,
+      Eigen::VectorXs b,
       WithRespectTo* wrt,
       bool useRidders = true);
 
   /// This returns the jacobian of Q^{-1}b, holding b constant, with respect to
   /// wrt, by Ridders extrapolated finite differencing
-  Eigen::MatrixXd
+  Eigen::MatrixXs
   finiteDifferenceRiddersJacobianOfLCPConstraintMatrixClampingSubset(
-      simulation::WorldPtr world, Eigen::VectorXd b, WithRespectTo* wrt);
+      simulation::WorldPtr world, Eigen::VectorXs b, WithRespectTo* wrt);
 
   /// This returns the jacobian of b (from Q^{-1}b) with respect to wrt
-  Eigen::MatrixXd getJacobianOfLCPOffsetClampingSubset(
+  Eigen::MatrixXs getJacobianOfLCPOffsetClampingSubset(
       simulation::WorldPtr world, WithRespectTo* wrt);
 
   /// This returns the jacobian of b (from Q^{-1}b) with respect to wrt, by
   /// finite differencing
-  Eigen::MatrixXd finiteDifferenceJacobianOfLCPOffsetClampingSubset(
+  Eigen::MatrixXs finiteDifferenceJacobianOfLCPOffsetClampingSubset(
       simulation::WorldPtr world, WithRespectTo* wrt, bool useRidders = true);
 
   /// This returns the jacobian of b (from Q^{-1}b) with respect to wrt, by
   /// Ridders extrapolated finite differencing
-  Eigen::MatrixXd finiteDifferenceRiddersJacobianOfLCPOffsetClampingSubset(
+  Eigen::MatrixXs finiteDifferenceRiddersJacobianOfLCPOffsetClampingSubset(
       simulation::WorldPtr world, WithRespectTo* wrt);
 
   /// This returns the jacobian of b (from Q^{-1}b) with respect to wrt, by
   /// finite differencing
-  Eigen::MatrixXd finiteDifferenceJacobianOfLCPEstimatedOffsetClampingSubset(
+  Eigen::MatrixXs finiteDifferenceJacobianOfLCPEstimatedOffsetClampingSubset(
       simulation::WorldPtr world, WithRespectTo* wrt, bool useRidders = true);
 
   /// This returns the jacobian of b (from Q^{-1}b) with respect to wrt, by
   /// Ridders extrapolated finite differencing
-  Eigen::MatrixXd
+  Eigen::MatrixXs
   finiteDifferenceRiddersJacobianOfLCPEstimatedOffsetClampingSubset(
       simulation::WorldPtr world, WithRespectTo* wrt);
 
@@ -427,234 +427,234 @@ public:
   /// acceleration. It's a mass matrix, just in a weird frame.
   void computeLCPConstraintMatrixClampingSubset(
       simulation::WorldPtr world,
-      Eigen::MatrixXd& Q,
-      const Eigen::MatrixXd& A_c,
-      const Eigen::MatrixXd& A_ub,
-      const Eigen::MatrixXd& E);
+      Eigen::MatrixXs& Q,
+      const Eigen::MatrixXs& A_c,
+      const Eigen::MatrixXs& A_ub,
+      const Eigen::MatrixXs& E);
 
   /// This returns the subset of the b vector used by the original LCP for just
   /// the clamping constraints. It's just the relative velocity at the clamping
   /// contact points.
   void computeLCPOffsetClampingSubset(
       simulation::WorldPtr world,
-      Eigen::VectorXd& b,
-      const Eigen::MatrixXd& A_c);
+      Eigen::VectorXs& b,
+      const Eigen::MatrixXs& A_c);
 
   /// This computes and returns an estimate of the constraint impulses for the
   /// clamping constraints. This is based on a linear approximation of the
   /// constraint impulses.
-  Eigen::VectorXd estimateClampingConstraintImpulses(
+  Eigen::VectorXs estimateClampingConstraintImpulses(
       simulation::WorldPtr world,
-      const Eigen::MatrixXd& A_c,
-      const Eigen::MatrixXd& A_ub,
-      const Eigen::MatrixXd& E);
+      const Eigen::MatrixXs& A_c,
+      const Eigen::MatrixXs& A_ub,
+      const Eigen::MatrixXs& E);
 
   /// This returns the jacobian of P_c * v, holding everyhing constant except
   /// the value of WithRespectTo
-  Eigen::MatrixXd getJacobianOfProjectionIntoClampsMatrix(
-      simulation::WorldPtr world, Eigen::VectorXd v, WithRespectTo* wrt);
+  Eigen::MatrixXs getJacobianOfProjectionIntoClampsMatrix(
+      simulation::WorldPtr world, Eigen::VectorXs v, WithRespectTo* wrt);
 
   /// This computes and returns the jacobian of P_c * v by finite
   /// differences. This is SUPER SLOW, and is only here for testing.
-  Eigen::MatrixXd finiteDifferenceJacobianOfProjectionIntoClampsMatrix(
+  Eigen::MatrixXs finiteDifferenceJacobianOfProjectionIntoClampsMatrix(
       simulation::WorldPtr world,
-      Eigen::VectorXd v,
+      Eigen::VectorXs v,
       WithRespectTo* wrt,
       bool useRidders = true);
 
   /// This computes and returns the jacobian of P_c * v by Ridders extrapolated
   /// finite differences. This is SUPER SLOW, and is only here for testing.
-  Eigen::MatrixXd finiteDifferenceRiddersJacobianOfProjectionIntoClampsMatrix(
-      simulation::WorldPtr world, Eigen::VectorXd v, WithRespectTo* wrt);
+  Eigen::MatrixXs finiteDifferenceRiddersJacobianOfProjectionIntoClampsMatrix(
+      simulation::WorldPtr world, Eigen::VectorXs v, WithRespectTo* wrt);
 
   /// This returns the jacobian of M^{-1}(pos, inertia) * tau, holding
   /// everything constant except the value of WithRespectTo
-  Eigen::MatrixXd getJacobianOfMinv(
-      simulation::WorldPtr world, Eigen::VectorXd tau, WithRespectTo* wrt);
+  Eigen::MatrixXs getJacobianOfMinv(
+      simulation::WorldPtr world, Eigen::VectorXs tau, WithRespectTo* wrt);
 
   /// This computes and returns the jacobian of M^{-1}(pos, inertia) * tau by
   /// finite differences. This is SUPER SLOW, and is only here for testing.
-  Eigen::MatrixXd finiteDifferenceJacobianOfMinv(
+  Eigen::MatrixXs finiteDifferenceJacobianOfMinv(
       simulation::WorldPtr world,
-      Eigen::VectorXd tau,
+      Eigen::VectorXs tau,
       WithRespectTo* wrt,
       bool useRidders = true);
 
   /// This computes and returns the jacobian of M^{-1}(pos, inertia) * tau by
   /// Ridders extrapolated finite differences. This is SUPER SLOW, and is
   /// only here for testing.
-  Eigen::MatrixXd finiteDifferenceRiddersJacobianOfMinv(
-      simulation::WorldPtr world, Eigen::VectorXd tau, WithRespectTo* wrt);
+  Eigen::MatrixXs finiteDifferenceRiddersJacobianOfMinv(
+      simulation::WorldPtr world, Eigen::VectorXs tau, WithRespectTo* wrt);
 
   /// This returns the jacobian of M(pos, inertia) * v, holding
   /// everything constant except the value of WithRespectTo
-  Eigen::MatrixXd getJacobianOfM(
-      simulation::WorldPtr world, Eigen::VectorXd v, WithRespectTo* wrt);
+  Eigen::MatrixXs getJacobianOfM(
+      simulation::WorldPtr world, Eigen::VectorXs v, WithRespectTo* wrt);
 
   /// This computes and returns the jacobian of M(pos, inertia) * v by
   /// finite differences. This is SUPER SLOW, and is only here for testing.
-  Eigen::MatrixXd finiteDifferenceJacobianOfM(
+  Eigen::MatrixXs finiteDifferenceJacobianOfM(
       simulation::WorldPtr world,
-      Eigen::VectorXd v,
+      Eigen::VectorXs v,
       WithRespectTo* wrt,
       bool useRidders = true);
 
   /// This computes and returns the jacobian of M(pos, inertia) * v by
   /// Ridders extrapolated finite differences. This is SUPER SLOW, and is
   /// only here for testing.
-  Eigen::MatrixXd finiteDifferenceRiddersJacobianOfM(
-      simulation::WorldPtr world, Eigen::VectorXd v, WithRespectTo* wrt);
+  Eigen::MatrixXs finiteDifferenceRiddersJacobianOfM(
+      simulation::WorldPtr world, Eigen::VectorXs v, WithRespectTo* wrt);
 
   /// This returns the jacobian of C(pos, inertia, vel), holding everything
   /// constant except the value of WithRespectTo
-  Eigen::MatrixXd getJacobianOfC(
+  Eigen::MatrixXs getJacobianOfC(
       simulation::WorldPtr world, WithRespectTo* wrt);
 
   /// This returns the jacobian of C(pos, inertia, vel), holding everything
   /// constant except the value of WithRespectTo
-  Eigen::MatrixXd computeJacobianOfC(
+  Eigen::MatrixXs computeJacobianOfC(
       simulation::WorldPtr world, WithRespectTo* wrt);
 
   /// This computes and returns the jacobian of C(pos, inertia, vel) by finite
   /// differences. This is SUPER SLOW, and is only here for testing.
-  Eigen::MatrixXd finiteDifferenceJacobianOfC(
+  Eigen::MatrixXs finiteDifferenceJacobianOfC(
       simulation::WorldPtr world, WithRespectTo* wrt, bool useRidders = true);
 
   /// This computes and returns the jacobian of C(pos, inertia, vel) by Ridders
   /// extrapolated finite differences. This is SUPER SLOW, and is only here
   /// for testing.
-  Eigen::MatrixXd finiteDifferenceRiddersJacobianOfC(
+  Eigen::MatrixXs finiteDifferenceRiddersJacobianOfC(
       simulation::WorldPtr world, WithRespectTo* wrt);
 
   /// This returns the jacobian of M^{-1}(pos, inertia) * (C(pos, inertia, vel)
   /// + mPreStepTorques), holding everything constant except the value of
   /// WithRespectTo
-  Eigen::MatrixXd getJacobianOfMinvC(
+  Eigen::MatrixXs getJacobianOfMinvC(
       simulation::WorldPtr world, WithRespectTo* wrt);
 
   /// This computes and returns the jacobian of M^{-1}(pos, inertia) * C(pos,
   /// inertia, vel) by finite differences. This is SUPER SLOW, and is only here
   /// for testing.
-  Eigen::MatrixXd finiteDifferenceJacobianOfMinvC(
+  Eigen::MatrixXs finiteDifferenceJacobianOfMinvC(
       simulation::WorldPtr world, WithRespectTo* wrt, bool useRidders = false);
 
   /// This computes and returns the jacobian of M^{-1}(pos, inertia) * C(pos,
   /// inertia, vel) by Ridders extrapolated finite differences. This is SUPER
   /// SLOW, and is only here for testing.
-  Eigen::MatrixXd finiteDifferenceRiddersJacobianOfMinvC(
+  Eigen::MatrixXs finiteDifferenceRiddersJacobianOfMinvC(
       simulation::WorldPtr world, WithRespectTo* wrt);
 
   /// This returns a fast approximation to A_c in the neighborhood of the
   /// original
-  Eigen::MatrixXd estimateClampingConstraintMatrixAt(
-      simulation::WorldPtr world, Eigen::VectorXd pos);
+  Eigen::MatrixXs estimateClampingConstraintMatrixAt(
+      simulation::WorldPtr world, Eigen::VectorXs pos);
 
   /// This returns a fast approximation to A_ub in the neighborhood of the
   /// original
-  Eigen::MatrixXd estimateUpperBoundConstraintMatrixAt(
-      simulation::WorldPtr world, Eigen::VectorXd pos);
+  Eigen::MatrixXs estimateUpperBoundConstraintMatrixAt(
+      simulation::WorldPtr world, Eigen::VectorXs pos);
 
   /// Only for testing: VERY SLOW. This returns the actual value of A_c at the
   /// desired position.
-  Eigen::MatrixXd getClampingConstraintMatrixAt(
-      simulation::WorldPtr world, Eigen::VectorXd pos);
+  Eigen::MatrixXs getClampingConstraintMatrixAt(
+      simulation::WorldPtr world, Eigen::VectorXs pos);
 
   /// Only for testing: VERY SLOW. This returns the actual value of A_ub at the
   /// desired position.
-  Eigen::MatrixXd getUpperBoundConstraintMatrixAt(
-      simulation::WorldPtr world, Eigen::VectorXd pos);
+  Eigen::MatrixXs getUpperBoundConstraintMatrixAt(
+      simulation::WorldPtr world, Eigen::VectorXs pos);
 
   /// Only for testing: VERY SLOW. This returns the actual value of E at the
   /// desired position.
-  Eigen::MatrixXd getUpperBoundMappingMatrixAt(
-      simulation::WorldPtr world, Eigen::VectorXd pos);
+  Eigen::MatrixXs getUpperBoundMappingMatrixAt(
+      simulation::WorldPtr world, Eigen::VectorXs pos);
 
   /// Only for testing: VERY SLOW. This returns the actual value of the bounce
   /// diagonals at the desired position.
-  Eigen::VectorXd getBounceDiagonalsAt(
-      simulation::WorldPtr world, Eigen::VectorXd pos);
+  Eigen::VectorXs getBounceDiagonalsAt(
+      simulation::WorldPtr world, Eigen::VectorXs pos);
 
   /// This computes the Jacobian of A_c*f0 with respect to position using
   /// impulse tests.
-  Eigen::MatrixXd getJacobianOfClampingConstraints(
-      simulation::WorldPtr world, Eigen::VectorXd f0);
+  Eigen::MatrixXs getJacobianOfClampingConstraints(
+      simulation::WorldPtr world, Eigen::VectorXs f0);
 
   /// This computes the finite difference Jacobian of A_c*f0 with respect to
   /// position. This is AS SLOW AS FINITE DIFFERENCING THE WHOLE ENGINE, which
   /// is way too slow to use in practice.
-  Eigen::MatrixXd finiteDifferenceJacobianOfClampingConstraints(
-      simulation::WorldPtr world, Eigen::VectorXd f0, bool useRidders = true);
+  Eigen::MatrixXs finiteDifferenceJacobianOfClampingConstraints(
+      simulation::WorldPtr world, Eigen::VectorXs f0, bool useRidders = true);
 
   /// This computes the finite difference Jacobian of A_c*f0 with respect to
   /// position. This is AS SLOW AS FINITE DIFFERENCING THE WHOLE ENGINE, which
   /// is way too slow to use in practice. Using Ridders, so even slower.
-  Eigen::MatrixXd finiteDifferenceRiddersJacobianOfClampingConstraints(
-      simulation::WorldPtr world, Eigen::VectorXd f0);
+  Eigen::MatrixXs finiteDifferenceRiddersJacobianOfClampingConstraints(
+      simulation::WorldPtr world, Eigen::VectorXs f0);
 
   /// This computes the Jacobian of A_c^T*v0 with respect to position using
   /// impulse tests.
-  Eigen::MatrixXd getJacobianOfClampingConstraintsTranspose(
-      simulation::WorldPtr world, Eigen::VectorXd v0);
+  Eigen::MatrixXs getJacobianOfClampingConstraintsTranspose(
+      simulation::WorldPtr world, Eigen::VectorXs v0);
 
   /// This computes the finite difference Jacobian of A_c^T*v0 with respect to
   /// position. This is AS SLOW AS FINITE DIFFERENCING THE WHOLE ENGINE, which
   /// is way too slow to use in practice.
-  Eigen::MatrixXd finiteDifferenceJacobianOfClampingConstraintsTranspose(
-      simulation::WorldPtr world, Eigen::VectorXd v0, bool useRidders = true);
+  Eigen::MatrixXs finiteDifferenceJacobianOfClampingConstraintsTranspose(
+      simulation::WorldPtr world, Eigen::VectorXs v0, bool useRidders = true);
 
   /// This computes the finite difference Jacobian of A_c^T*v0 with respect to
   /// position. This is AS SLOW AS FINITE DIFFERENCING THE WHOLE ENGINE, which
   /// is way too slow to use in practice. Using Ridders, so even slower.
-  Eigen::MatrixXd finiteDifferenceRiddersJacobianOfClampingConstraintsTranspose(
-      simulation::WorldPtr world, Eigen::VectorXd v0);
+  Eigen::MatrixXs finiteDifferenceRiddersJacobianOfClampingConstraintsTranspose(
+      simulation::WorldPtr world, Eigen::VectorXs v0);
 
   /// This computes the Jacobian of A_ub*(E*f0) with respect to position using
   /// impulse tests.
-  Eigen::MatrixXd getJacobianOfUpperBoundConstraints(
-      simulation::WorldPtr world, Eigen::VectorXd E_f0);
+  Eigen::MatrixXs getJacobianOfUpperBoundConstraints(
+      simulation::WorldPtr world, Eigen::VectorXs E_f0);
 
   /// This computes the finite difference Jacobian of A_ub*E*f0 with respect to
   /// position. This is AS SLOW AS FINITE DIFFERENCING THE WHOLE ENGINE, which
   /// is way too slow to use in practice.
-  Eigen::MatrixXd finiteDifferenceJacobianOfUpperBoundConstraints(
-      simulation::WorldPtr world, Eigen::VectorXd f0, bool useRidders = true);
+  Eigen::MatrixXs finiteDifferenceJacobianOfUpperBoundConstraints(
+      simulation::WorldPtr world, Eigen::VectorXs f0, bool useRidders = true);
 
   /// This computes the finite difference Jacobian of A_ub*E*f0 with respect to
   /// position. This is AS SLOW AS FINITE DIFFERENCING THE WHOLE ENGINE, which
   /// is way too slow to use in practice. Uses Ridders method.
-  Eigen::MatrixXd finiteDifferenceRiddersJacobianOfUpperBoundConstraints(
-      simulation::WorldPtr world, Eigen::VectorXd f0);
+  Eigen::MatrixXs finiteDifferenceRiddersJacobianOfUpperBoundConstraints(
+      simulation::WorldPtr world, Eigen::VectorXs f0);
 
   /// This computes the Jacobian of A_ub^T*v0 with respect to position using
   /// impulse tests.
-  Eigen::MatrixXd getJacobianOfUpperBoundConstraintsTranspose(
-      simulation::WorldPtr world, Eigen::VectorXd v0);
+  Eigen::MatrixXs getJacobianOfUpperBoundConstraintsTranspose(
+      simulation::WorldPtr world, Eigen::VectorXs v0);
 
   /// This returns the jacobian of constraint force, holding everything constant
   /// except the value of WithRespectTo
-  Eigen::MatrixXd finiteDifferenceJacobianOfConstraintForce(
+  Eigen::MatrixXs finiteDifferenceJacobianOfConstraintForce(
       simulation::WorldPtr world, WithRespectTo* wrt, bool useRidders = true);
 
   /// This returns the jacobian of constraint force, holding everything constant
   /// except the value of WithRespectTo. Uses Ridders method.
-  Eigen::MatrixXd finiteDifferenceRiddersJacobianOfConstraintForce(
+  Eigen::MatrixXs finiteDifferenceRiddersJacobianOfConstraintForce(
       simulation::WorldPtr world, WithRespectTo* wrt);
 
   /// This returns the jacobian of estimated constraint force, without actually
   /// running forward passes, holding everyhing constant except the value of
   /// WithRespectTo
-  Eigen::MatrixXd finiteDifferenceJacobianOfEstimatedConstraintForce(
+  Eigen::MatrixXs finiteDifferenceJacobianOfEstimatedConstraintForce(
       simulation::WorldPtr world, WithRespectTo* wrt, bool useRidders = true);
 
   /// This returns the jacobian of estimated constraint force, without actually
   /// running forward passes, holding everyhing constant except the value of
   /// WithRespectTo. Uses Ridders method.
-  Eigen::MatrixXd finiteDifferenceRiddersJacobianOfEstimatedConstraintForce(
+  Eigen::MatrixXs finiteDifferenceRiddersJacobianOfEstimatedConstraintForce(
       simulation::WorldPtr world, WithRespectTo* wrt);
 
   /// These was the mX() vector used to construct this. Pretty much only here
   /// for testing.
-  Eigen::VectorXd getContactConstraintImpulses();
+  Eigen::VectorXs getContactConstraintImpulses();
 
   /// These was the fIndex() vector used to construct this. Pretty much only
   /// here for testing.
@@ -662,28 +662,28 @@ public:
 
   /// Returns the vector of the coefficients on the diagonal of the bounce
   /// matrix. These are 1+restitutionCoeff[i].
-  Eigen::VectorXd getBounceDiagonals();
+  Eigen::VectorXs getBounceDiagonals();
 
   /// Returns the vector of the restitution coeffs, sized for the number of
   /// bouncing collisions.
-  Eigen::VectorXd getRestitutionDiagonals();
+  Eigen::VectorXs getRestitutionDiagonals();
 
   /// Returns the penetration correction hack "bounce" (or 0 if the contact is
   /// not inter-penetrating or is actively bouncing) at each contact point.
-  Eigen::VectorXd getPenetrationCorrectionVelocities();
+  Eigen::VectorXs getPenetrationCorrectionVelocities();
 
   /// Returns the constraint impulses along the clamping constraints
-  Eigen::VectorXd getClampingConstraintImpulses();
+  Eigen::VectorXs getClampingConstraintImpulses();
 
   /// Returns the relative velocities along the clamping constraints
-  Eigen::VectorXd getClampingConstraintRelativeVels();
+  Eigen::VectorXs getClampingConstraintRelativeVels();
 
   /// Returns the velocity change caused by illegal impulses in the LCP this
   /// timestep
-  Eigen::VectorXd getVelocityDueToIllegalImpulses();
+  Eigen::VectorXs getVelocityDueToIllegalImpulses();
 
   /// Returns the velocity pre-LCP
-  Eigen::VectorXd getPreLCPVelocity();
+  Eigen::VectorXs getPreLCPVelocity();
 
   /// Returns true if there were any bounces in this snapshot.
   bool hasBounces();
@@ -721,8 +721,8 @@ public:
   /// and it exits the program.
   void equalsOrCrash(
       std::shared_ptr<simulation::World> world,
-      Eigen::MatrixXd analytical,
-      Eigen::MatrixXd bruteForce,
+      Eigen::MatrixXs analytical,
+      Eigen::MatrixXs bruteForce,
       std::string name);
 
   /// This compares our analytical sub-Jacobians (like dMinv), to attempt to
@@ -769,7 +769,7 @@ protected:
 
   /// This is the global timestep length. This is included here because it shows
   /// up as a constant in some of the matrices.
-  double mTimeStep;
+  s_t mTimeStep;
 
   /// This is the total DOFs for this World
   std::size_t mNumDOFs;
@@ -794,55 +794,55 @@ protected:
   std::unordered_map<std::string, std::size_t> mSkeletonDofs;
 
   /// The position of all the DOFs of the world BEFORE the timestep
-  Eigen::VectorXd mPreStepPosition;
+  Eigen::VectorXs mPreStepPosition;
 
   /// The velocities of all the DOFs of the world BEFORE the timestep
-  Eigen::VectorXd mPreStepVelocity;
+  Eigen::VectorXs mPreStepVelocity;
 
   /// The torques on all the DOFs of the world BEFORE the timestep
-  Eigen::VectorXd mPreStepTorques;
+  Eigen::VectorXs mPreStepTorques;
 
   /// The LCP's initial cached value BEFORE the timestep
-  Eigen::VectorXd mPreStepLCPCache;
+  Eigen::VectorXs mPreStepLCPCache;
 
   /// The velocities of all the DOFs of the world AFTER an unconstrained forward
   /// step, but BEFORE the LCP runs
-  Eigen::VectorXd mPreConstraintVelocities;
+  Eigen::VectorXs mPreConstraintVelocities;
 
   /// The position of all the DOFs of the world AFTER the timestep
-  Eigen::VectorXd mPostStepPosition;
+  Eigen::VectorXs mPostStepPosition;
 
   /// The velocities of all the DOFs of the world AFTER the timestep
   /// created
-  Eigen::VectorXd mPostStepVelocity;
+  Eigen::VectorXs mPostStepVelocity;
 
   /// The torques on all the DOFs of the world AFTER the timestep
-  Eigen::VectorXd mPostStepTorques;
+  Eigen::VectorXs mPostStepTorques;
 
 private:
   /// These are mCached versions of the various Jacobians
   bool mCachedPosPosDirty;
-  Eigen::MatrixXd mCachedPosPos;
+  Eigen::MatrixXs mCachedPosPos;
   bool mCachedPosVelDirty;
-  Eigen::MatrixXd mCachedPosVel;
+  Eigen::MatrixXs mCachedPosVel;
   bool mCachedBounceApproximationDirty;
-  Eigen::MatrixXd mCachedBounceApproximation;
+  Eigen::MatrixXs mCachedBounceApproximation;
   bool mCachedVelPosDirty;
-  Eigen::MatrixXd mCachedVelPos;
+  Eigen::MatrixXs mCachedVelPos;
   bool mCachedVelVelDirty;
-  Eigen::MatrixXd mCachedVelVel;
+  Eigen::MatrixXs mCachedVelVel;
   bool mCachedForcePosDirty;
-  Eigen::MatrixXd mCachedForcePos;
+  Eigen::MatrixXs mCachedForcePos;
   bool mCachedForceVelDirty;
-  Eigen::MatrixXd mCachedForceVel;
+  Eigen::MatrixXs mCachedForceVel;
   bool mCachedMassVelDirty;
-  Eigen::MatrixXd mCachedMassVel;
+  Eigen::MatrixXs mCachedMassVel;
   bool mCachedPosCDirty;
-  Eigen::MatrixXd mCachedPosC;
+  Eigen::MatrixXs mCachedPosC;
   bool mCachedVelCDirty;
-  Eigen::MatrixXd mCachedVelC;
+  Eigen::MatrixXs mCachedVelC;
 
-  Eigen::VectorXd scratch(simulation::WorldPtr world);
+  Eigen::VectorXs scratch(simulation::WorldPtr world);
 
   enum MatrixToAssemble
   {
@@ -853,7 +853,7 @@ private:
     BOUNCING
   };
 
-  Eigen::MatrixXd assembleMatrix(
+  Eigen::MatrixXs assembleMatrix(
       simulation::WorldPtr world, MatrixToAssemble whichMatrix);
 
   enum BlockDiagonalMatrixToAssemble
@@ -864,7 +864,7 @@ private:
     VEL_C
   };
 
-  Eigen::MatrixXd assembleBlockDiagonalMatrix(
+  Eigen::MatrixXs assembleBlockDiagonalMatrix(
       simulation::WorldPtr world,
       BlockDiagonalMatrixToAssemble whichMatrix,
       bool forFiniteDifferencing = false);

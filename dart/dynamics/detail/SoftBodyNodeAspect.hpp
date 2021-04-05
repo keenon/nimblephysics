@@ -40,9 +40,9 @@
 namespace dart {
 namespace dynamics {
 
-const double DART_DEFAULT_VERTEX_STIFFNESS = 1.0;
-const double DART_DEFAULT_EDGE_STIFNESS    = 1.0;
-const double DART_DEFAULT_DAMPING_COEFF    = 0.01;
+const s_t DART_DEFAULT_VERTEX_STIFFNESS = 1.0;
+const s_t DART_DEFAULT_EDGE_STIFNESS    = 1.0;
+const s_t DART_DEFAULT_DAMPING_COEFF    = 0.01;
 
 class SoftBodyNode;
 class SoftMeshShape;
@@ -66,14 +66,14 @@ struct SoftBodyNodeUniqueProperties
 {
   /// Spring stiffness for vertex deformation restoring spring force of the
   /// point masses
-  double mKv;
+  s_t mKv;
 
   /// Spring stiffness for edge deformation restoring spring force of the
   /// point masses
-  double mKe;
+  s_t mKe;
 
   /// Damping coefficient
-  double mDampCoeff;
+  s_t mDampCoeff;
 
   /// Array of Properties for PointMasses
   std::vector<PointMass::Properties> mPointProps;
@@ -83,9 +83,9 @@ struct SoftBodyNodeUniqueProperties
   std::vector<Eigen::Vector3i> mFaces;
 
   SoftBodyNodeUniqueProperties(
-      double _Kv = DART_DEFAULT_VERTEX_STIFFNESS,
-      double _Ke = DART_DEFAULT_EDGE_STIFNESS,
-      double _DampCoeff = DART_DEFAULT_DAMPING_COEFF,
+      s_t _Kv = DART_DEFAULT_VERTEX_STIFFNESS,
+      s_t _Ke = DART_DEFAULT_EDGE_STIFNESS,
+      s_t _DampCoeff = DART_DEFAULT_DAMPING_COEFF,
       const std::vector<PointMass::Properties>& _points =
                                         std::vector<PointMass::Properties>(),
       const std::vector<Eigen::Vector3i>& _faces =

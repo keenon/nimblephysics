@@ -81,13 +81,13 @@ std::string toString(char v)
 }
 
 //==============================================================================
-std::string toString(const Eigen::Vector2d& v)
+std::string toString(const Eigen::Vector2s& v)
 {
   return boost::lexical_cast<std::string>(v.transpose());
 }
 
 //==============================================================================
-std::string toString(const Eigen::Vector3d& v)
+std::string toString(const Eigen::Vector3s& v)
 {
   return boost::lexical_cast<std::string>(v.transpose());
 }
@@ -99,24 +99,24 @@ std::string toString(const Eigen::Vector3i& v)
 }
 
 //==============================================================================
-std::string toString(const Eigen::Vector6d& v)
+std::string toString(const Eigen::Vector6s& v)
 {
   return boost::lexical_cast<std::string>(v.transpose());
 }
 
 //==============================================================================
-std::string toString(const Eigen::VectorXd& v)
+std::string toString(const Eigen::VectorXs& v)
 {
   return boost::lexical_cast<std::string>(v.transpose());
 }
 
 //==============================================================================
-std::string toString(const Eigen::Isometry3d& v)
+std::string toString(const Eigen::Isometry3s& v)
 {
   std::ostringstream ostr;
   ostr.precision(6);
 
-  Eigen::Vector3d xyz = math::matrixToEulerXYZ(v.linear());
+  Eigen::Vector3s xyz = math::matrixToEulerXYZ(v.linear());
 
   ostr << v.translation()(0) << " "
        << v.translation()(1) << " "
@@ -174,9 +174,9 @@ char toChar(const std::string& str)
 }
 
 //==============================================================================
-Eigen::Vector2d toVector2d(const std::string& str)
+Eigen::Vector2s toVector2s(const std::string& str)
 {
-  Eigen::Vector2d ret;
+  Eigen::Vector2s ret;
 
   std::vector<std::string> pieces;
   std::string trimedStr = boost::trim_copy(str);
@@ -196,7 +196,7 @@ Eigen::Vector2d toVector2d(const std::string& str)
       {
         std::cerr << "value ["
                   << pieces[i]
-                     << "] is not a valid double for Eigen::Vector2d["
+                     << "] is not a valid double for Eigen::Vector2s["
                      << i
                      << std::endl;
       }
@@ -207,9 +207,9 @@ Eigen::Vector2d toVector2d(const std::string& str)
 }
 
 //==============================================================================
-Eigen::Vector3d toVector3d(const std::string& str)
+Eigen::Vector3s toVector3s(const std::string& str)
 {
-  Eigen::Vector3d ret;
+  Eigen::Vector3s ret;
 
   std::vector<std::string> pieces;
   std::string trimedStr = boost::trim_copy(str);
@@ -229,7 +229,7 @@ Eigen::Vector3d toVector3d(const std::string& str)
       {
         std::cerr << "value ["
                   << pieces[i]
-                     << "] is not a valid double for Eigen::Vector3d["
+                     << "] is not a valid double for Eigen::Vector3s["
                      << i
                      << "]"
                      << std::endl;
@@ -275,9 +275,9 @@ Eigen::Vector3i toVector3i(const std::string& str)
 }
 
 //==============================================================================
-Eigen::Vector6d toVector6d(const std::string& str)
+Eigen::Vector6s toVector6s(const std::string& str)
 {
-  Eigen::Vector6d ret;
+  Eigen::Vector6s ret;
 
   std::vector<std::string> pieces;
   std::string trimedStr = boost::trim_copy(str);
@@ -297,7 +297,7 @@ Eigen::Vector6d toVector6d(const std::string& str)
       {
         std::cerr << "value ["
                   << pieces[i]
-                     << "] is not a valid double for Eigen::Vector6d["
+                     << "] is not a valid double for Eigen::Vector6s["
                      << i
                      << "]"
                      << std::endl;
@@ -309,7 +309,7 @@ Eigen::Vector6d toVector6d(const std::string& str)
 }
 
 //==============================================================================
-Eigen::VectorXd toVectorXd(const std::string& str)
+Eigen::VectorXs toVectorXs(const std::string& str)
 {
   std::vector<std::string> pieces;
   std::string trimedStr = boost::trim_copy(str);
@@ -317,7 +317,7 @@ Eigen::VectorXd toVectorXd(const std::string& str)
                boost::token_compress_on);
   assert(pieces.size() > 0);
 
-  Eigen::VectorXd ret(pieces.size());
+  Eigen::VectorXs ret(pieces.size());
 
   for (std::size_t i = 0; i < pieces.size(); ++i)
   {
@@ -331,7 +331,7 @@ Eigen::VectorXd toVectorXd(const std::string& str)
       {
         std::cerr << "value ["
                   << pieces[i]
-                     << "] is not a valid double for Eigen::VectorXd["
+                     << "] is not a valid double for Eigen::VectorXs["
                      << i
                      << "]"
                      << std::endl;
@@ -343,10 +343,10 @@ Eigen::VectorXd toVectorXd(const std::string& str)
 }
 
 //==============================================================================
-Eigen::Isometry3d toIsometry3d(const std::string& str)
+Eigen::Isometry3s toIsometry3s(const std::string& str)
 {
-  Eigen::Isometry3d T = Eigen::Isometry3d::Identity();
-  Eigen::Vector6d elements = Eigen::Vector6d::Zero();
+  Eigen::Isometry3s T = Eigen::Isometry3s::Identity();
+  Eigen::Vector6s elements = Eigen::Vector6s::Zero();
   std::vector<std::string> pieces;
   std::string trimedStr = boost::trim_copy(str);
   boost::split(pieces, trimedStr, boost::is_any_of(" "),
@@ -379,10 +379,10 @@ Eigen::Isometry3d toIsometry3d(const std::string& str)
 }
 
 //==============================================================================
-Eigen::Isometry3d toIsometry3dWithExtrinsicRotation(const std::string& str)
+Eigen::Isometry3s toIsometry3sWithExtrinsicRotation(const std::string& str)
 {
-  Eigen::Isometry3d T = Eigen::Isometry3d::Identity();
-  Eigen::Vector6d elements = Eigen::Vector6d::Zero();
+  Eigen::Isometry3s T = Eigen::Isometry3s::Identity();
+  Eigen::Vector6s elements = Eigen::Vector6s::Zero();
   std::vector<std::string> pieces;
   std::string trimedStr = boost::trim_copy(str);
   boost::split(pieces, trimedStr, boost::is_any_of(" "),
@@ -409,7 +409,7 @@ Eigen::Isometry3d toIsometry3dWithExtrinsicRotation(const std::string& str)
     }
   }
 
-  Eigen::Vector3d reverseEulerAngles(
+  Eigen::Vector3s reverseEulerAngles(
         elements.tail<3>()[2],
       elements.tail<3>()[1],
       elements.tail<3>()[0]);
@@ -517,7 +517,7 @@ char getValueChar(const tinyxml2::XMLElement* parentElement,
 }
 
 //==============================================================================
-Eigen::Vector2d getValueVector2d(const tinyxml2::XMLElement* parentElement,
+Eigen::Vector2s getValueVector2s(const tinyxml2::XMLElement* parentElement,
                                  const std::string& name)
 {
   assert(parentElement != nullptr);
@@ -525,11 +525,11 @@ Eigen::Vector2d getValueVector2d(const tinyxml2::XMLElement* parentElement,
 
   std::string str = parentElement->FirstChildElement(name.c_str())->GetText();
 
-  return toVector2d(str);
+  return toVector2s(str);
 }
 
 //==============================================================================
-Eigen::Vector3d getValueVector3d(const tinyxml2::XMLElement* parentElement,
+Eigen::Vector3s getValueVector3s(const tinyxml2::XMLElement* parentElement,
                                  const std::string& name)
 {
   assert(parentElement != nullptr);
@@ -537,7 +537,7 @@ Eigen::Vector3d getValueVector3d(const tinyxml2::XMLElement* parentElement,
 
   std::string str = parentElement->FirstChildElement(name.c_str())->GetText();
 
-  return toVector3d(str);
+  return toVector3s(str);
 }
 
 //==============================================================================
@@ -553,7 +553,7 @@ Eigen::Vector3i getValueVector3i(const tinyxml2::XMLElement* parentElement,
 }
 
 //==============================================================================
-Eigen::Vector6d getValueVector6d(const tinyxml2::XMLElement* parentElement,
+Eigen::Vector6s getValueVector6s(const tinyxml2::XMLElement* parentElement,
                                  const std::string& name)
 {
   assert(parentElement != nullptr);
@@ -561,11 +561,11 @@ Eigen::Vector6d getValueVector6d(const tinyxml2::XMLElement* parentElement,
 
   std::string str = parentElement->FirstChildElement(name.c_str())->GetText();
 
-  return toVector6d(str);
+  return toVector6s(str);
 }
 
 //==============================================================================
-Eigen::VectorXd getValueVectorXd(const tinyxml2::XMLElement* parentElement,
+Eigen::VectorXs getValueVectorXs(const tinyxml2::XMLElement* parentElement,
                                  const std::string& name)
 {
   assert(parentElement != nullptr);
@@ -573,11 +573,11 @@ Eigen::VectorXd getValueVectorXd(const tinyxml2::XMLElement* parentElement,
 
   std::string str = parentElement->FirstChildElement(name.c_str())->GetText();
 
-  return toVectorXd(str);
+  return toVectorXs(str);
 }
 
 //==============================================================================
-Eigen::Vector3d getValueVec3(const tinyxml2::XMLElement* parentElement,
+Eigen::Vector3s getValueVec3(const tinyxml2::XMLElement* parentElement,
                              const std::string& name)
 {
   assert(parentElement != nullptr);
@@ -585,11 +585,11 @@ Eigen::Vector3d getValueVec3(const tinyxml2::XMLElement* parentElement,
 
   std::string str = parentElement->FirstChildElement(name.c_str())->GetText();
 
-  return toVector3d(str);
+  return toVector3s(str);
 }
 
 //==============================================================================
-Eigen::Isometry3d getValueIsometry3d(const tinyxml2::XMLElement* parentElement,
+Eigen::Isometry3s getValueIsometry3s(const tinyxml2::XMLElement* parentElement,
                                      const std::string& name)
 {
   assert(parentElement != nullptr);
@@ -597,11 +597,11 @@ Eigen::Isometry3d getValueIsometry3d(const tinyxml2::XMLElement* parentElement,
 
   std::string str = parentElement->FirstChildElement(name.c_str())->GetText();
 
-  return toIsometry3d(str);
+  return toIsometry3s(str);
 }
 
 //==============================================================================
-Eigen::Isometry3d getValueIsometry3dWithExtrinsicRotation(
+Eigen::Isometry3s getValueIsometry3sWithExtrinsicRotation(
     const tinyxml2::XMLElement* parentElement, const std::string& name)
 {
   assert(parentElement != nullptr);
@@ -609,7 +609,7 @@ Eigen::Isometry3d getValueIsometry3dWithExtrinsicRotation(
 
   std::string str = parentElement->FirstChildElement(name.c_str())->GetText();
 
-  return toIsometry3dWithExtrinsicRotation(str);
+  return toIsometry3sWithExtrinsicRotation(str);
 }
 
 //==============================================================================
@@ -805,39 +805,39 @@ char getAttributeChar(const tinyxml2::XMLElement* element,
 }
 
 //==============================================================================
-Eigen::Vector2d getAttributeVector2d(const tinyxml2::XMLElement* element,
+Eigen::Vector2s getAttributeVector2s(const tinyxml2::XMLElement* element,
                                      const std::string& attributeName)
 {
   const std::string val = getAttributeString(element, attributeName);
 
-  return toVector2d(val);
+  return toVector2s(val);
 }
 
 //==============================================================================
-Eigen::Vector3d getAttributeVector3d(const tinyxml2::XMLElement* element,
+Eigen::Vector3s getAttributeVector3s(const tinyxml2::XMLElement* element,
                                      const std::string& attributeName)
 {
   const std::string val = getAttributeString(element, attributeName);
 
-  return toVector3d(val);
+  return toVector3s(val);
 }
 
 //==============================================================================
-Eigen::Vector6d getAttributeVector6d(const tinyxml2::XMLElement* element,
+Eigen::Vector6s getAttributeVector6s(const tinyxml2::XMLElement* element,
                                      const std::string& attributeName)
 {
   const std::string val = getAttributeString(element, attributeName);
 
-  return toVector6d(val);
+  return toVector6s(val);
 }
 
 //==============================================================================
-Eigen::VectorXd getAttributeVectorXd(const tinyxml2::XMLElement* element,
+Eigen::VectorXs getAttributeVectorXs(const tinyxml2::XMLElement* element,
                                      const std::string& attributeName)
 {
   const std::string val = getAttributeString(element, attributeName);
 
-  return toVectorXd(val);
+  return toVectorXs(val);
 }
 
 } // namespace utils

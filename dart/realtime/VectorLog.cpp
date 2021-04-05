@@ -3,7 +3,7 @@
 namespace dart {
 namespace realtime {
 
-VectorObservation::VectorObservation(long time, Eigen::VectorXd value)
+VectorObservation::VectorObservation(long time, Eigen::VectorXs value)
   : time(time), value(value)
 {
 }
@@ -12,7 +12,7 @@ VectorLog::VectorLog(int dim) : mDim(dim), mStartTime(0L)
 {
 }
 
-void VectorLog::record(long time, Eigen::VectorXd val)
+void VectorLog::record(long time, Eigen::VectorXs val)
 {
   if (mObservations.size() == 0)
     mStartTime = time;
@@ -20,15 +20,16 @@ void VectorLog::record(long time, Eigen::VectorXd val)
   mObservations.emplace_back(time, val);
 }
 
-Eigen::MatrixXd VectorLog::getValues(long start, int steps, long millisPerStep)
+Eigen::MatrixXs VectorLog::getValues(long start, int steps, long millisPerStep)
 {
-  Eigen::MatrixXd observations = Eigen::MatrixXd::Zero(mDim, steps);
+  Eigen::MatrixXs observations = Eigen::MatrixXs::Zero(mDim, steps);
 
-  Eigen::VectorXd cursorValue = Eigen::VectorXd::Zero(mDim);
+  Eigen::VectorXs cursorValue = Eigen::VectorXs::Zero(mDim);
   int cursorStep = 0;
   for (const VectorObservation& obs : mObservations)
   {
-    int step = ceil((double)(obs.time - start) / millisPerStep);
+    int step = static_cast<int>(
+        ceil(static_cast<s_t>(obs.time - start) / millisPerStep));
     if (step > steps - 1)
       break;
     if (step >= cursorStep)

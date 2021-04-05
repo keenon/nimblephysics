@@ -25,15 +25,15 @@ std::shared_ptr<Solution> SGDOptimizer::optimize(
       = reuseRecord ? reuseRecord : std::make_shared<Solution>();
 
   int n = shot->getFlatProblemDim(shot->mWorld);
-  Eigen::VectorXd x = Eigen::VectorXd::Zero(n);
-  Eigen::VectorXd grad = Eigen::VectorXd::Zero(n);
+  Eigen::VectorXs x = Eigen::VectorXs::Zero(n);
+  Eigen::VectorXs grad = Eigen::VectorXs::Zero(n);
   shot->flatten(shot->mWorld, x);
-  double loss = shot->getLoss(shot->mWorld);
+  s_t loss = shot->getLoss(shot->mWorld);
 
   for (int i = 0; i < mIterationLimit; i++)
   {
-    double newLoss = shot->getLoss(shot->mWorld);
-    double improvement = loss - newLoss;
+    s_t newLoss = shot->getLoss(shot->mWorld);
+    s_t improvement = loss - newLoss;
     if (improvement > 0 && improvement < mTolerance)
     {
       std::cout << "Improvement less than tolerance, converged." << std::endl;
@@ -62,13 +62,13 @@ void SGDOptimizer::setIterationLimit(int iterationLimit)
 }
 
 //==============================================================================
-void SGDOptimizer::setTolerance(double tolerance)
+void SGDOptimizer::setTolerance(s_t tolerance)
 {
   mTolerance = tolerance;
 }
 
 //==============================================================================
-void SGDOptimizer::setLearningRate(double learningRate)
+void SGDOptimizer::setLearningRate(s_t learningRate)
 {
   mLearningRate = learningRate;
 }

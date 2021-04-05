@@ -6,9 +6,9 @@ import "Eigen.proto";
 
 message TrajectoryRollout {
   string representationMapping = 1;
-  map<string, MatrixXd> pos = 2;
-  map<string, MatrixXd> vel = 3;
-  map<string, MatrixXd> force = 4;
-  VectorXd mass = 5;
-  map<string, MatrixXd> metadata = 6;
+  map<string, MatrixXs> pos = 2;
+  map<string, MatrixXs> vel = 3;
+  map<string, MatrixXs> force = 4;
+  VectorXs mass = 5;
+  map<string, MatrixXs> metadata = 6;
 }

@@ -43,10 +43,10 @@ class PlaneShape : public Shape
 {
 public:
   /// Constructor
-  PlaneShape(const Eigen::Vector3d& _normal, double _offset);
+  PlaneShape(const Eigen::Vector3s& _normal, s_t _offset);
 
   /// Constructor
-  PlaneShape(const Eigen::Vector3d& _normal, const Eigen::Vector3d& _point);
+  PlaneShape(const Eigen::Vector3s& _normal, const Eigen::Vector3s& _point);
 
   // Documentation inherited.
   const std::string& getType() const override;
@@ -55,32 +55,32 @@ public:
   static const std::string& getStaticType();
 
   // Documentation inherited.
-  Eigen::Matrix3d computeInertia(double mass) const override;
+  Eigen::Matrix3s computeInertia(s_t mass) const override;
 
   /// Set plane normal
-  void setNormal(const Eigen::Vector3d& _normal);
+  void setNormal(const Eigen::Vector3s& _normal);
 
   /// Get plane normal
-  const Eigen::Vector3d& getNormal() const;
+  const Eigen::Vector3s& getNormal() const;
 
   /// Set plane offset
-  void setOffset(double _offset);
+  void setOffset(s_t _offset);
 
   /// Get plane offset
-  double getOffset() const;
+  s_t getOffset() const;
 
   /// Set plane normal and offset
-  void setNormalAndOffset(const Eigen::Vector3d& _normal, double _offset);
+  void setNormalAndOffset(const Eigen::Vector3s& _normal, s_t _offset);
 
   /// Set plane normal and point
-  void setNormalAndPoint(const Eigen::Vector3d& _normal,
-                         const Eigen::Vector3d& _point);
+  void setNormalAndPoint(const Eigen::Vector3s& _normal,
+                         const Eigen::Vector3s& _point);
 
   /// Compute distance between the plane and the given point
-  double computeDistance(const Eigen::Vector3d& _point) const;
+  s_t computeDistance(const Eigen::Vector3s& _point) const;
 
   /// Compute signed distance between the plane and the given point
-  double computeSignedDistance(const Eigen::Vector3d& _point) const;
+  s_t computeSignedDistance(const Eigen::Vector3s& _point) const;
 
 private:
   // Documentation inherited.
@@ -90,10 +90,10 @@ private:
   void updateVolume() const override;
 
   /// Plane normal
-  Eigen::Vector3d mNormal;
+  Eigen::Vector3s mNormal;
 
   /// Plane offset
-  double mOffset;
+  s_t mOffset;
 };
 
 }  // namespace dynamics

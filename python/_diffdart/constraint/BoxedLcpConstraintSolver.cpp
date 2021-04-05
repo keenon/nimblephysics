@@ -47,9 +47,9 @@ void BoxedLcpConstraintSolver(py::module& m)
       dart::constraint::ConstraintSolver,
       std::shared_ptr<dart::constraint::BoxedLcpConstraintSolver>>(
       m, "BoxedLcpConstraintSolver")
-      .def(::py::init<double>(), ::py::arg("timeStep"))
+      .def(::py::init<s_t>(), ::py::arg("timeStep"))
       .def(
-          ::py::init<double, dart::constraint::BoxedLcpSolverPtr>(),
+          ::py::init<s_t, dart::constraint::BoxedLcpSolverPtr>(),
           ::py::arg("timeStep"),
           ::py::arg("boxedLcpSolver"))
       .def(

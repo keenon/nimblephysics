@@ -86,10 +86,10 @@ public:
   bool isCyclic(std::size_t _index) const override;
 
   ///
-  void setAxis(const Eigen::Vector3d& _axis);
+  void setAxis(const Eigen::Vector3s& _axis);
 
   ///
-  const Eigen::Vector3d& getAxis() const;
+  const Eigen::Vector3s& getAxis() const;
 
   // Documentation inherited
   GenericJoint<math::R1Space>::JacobianMatrix getRelativeJacobianStatic(

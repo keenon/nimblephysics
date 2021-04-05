@@ -68,17 +68,17 @@ TEST(BUILDING, BASIC)
   body3 = pair.second;
 
 	// Joints
-  joint1->setTransformFromParentBodyNode(Eigen::Isometry3d::Identity());
-  joint1->setTransformFromChildBodyNode(Eigen::Isometry3d::Identity());
-  joint1->setAxis(Eigen::Vector3d(1.0, 0.0, 0.0));
+  joint1->setTransformFromParentBodyNode(Eigen::Isometry3s::Identity());
+  joint1->setTransformFromChildBodyNode(Eigen::Isometry3s::Identity());
+  joint1->setAxis(Eigen::Vector3s(1.0, 0.0, 0.0));
 
-  joint2->setTransformFromParentBodyNode(Eigen::Isometry3d::Identity());
-  joint2->setTransformFromChildBodyNode(Eigen::Isometry3d::Identity());
-  joint2->setAxis(Eigen::Vector3d(1.0, 0.0, 0.0));
+  joint2->setTransformFromParentBodyNode(Eigen::Isometry3s::Identity());
+  joint2->setTransformFromChildBodyNode(Eigen::Isometry3s::Identity());
+  joint2->setAxis(Eigen::Vector3s(1.0, 0.0, 0.0));
 
-  joint3->setTransformFromParentBodyNode(Eigen::Isometry3d::Identity());
-  joint3->setTransformFromChildBodyNode(Eigen::Isometry3d::Identity());
-  joint3->setAxis(Eigen::Vector3d(1.0, 0.0, 0.0));
+  joint3->setTransformFromParentBodyNode(Eigen::Isometry3s::Identity());
+  joint3->setTransformFromChildBodyNode(Eigen::Isometry3s::Identity());
+  joint3->setAxis(Eigen::Vector3s(1.0, 0.0, 0.0));
 
   // World
   WorldPtr world = World::create();

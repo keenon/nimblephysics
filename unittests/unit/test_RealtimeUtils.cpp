@@ -61,12 +61,12 @@ TEST(REALTIME, VECTOR_LOG)
   int dim = 2;
   VectorLog log = VectorLog(dim);
 
-  log.record(0L, Eigen::VectorXd::Ones(dim) * 1);
-  log.record(10L, Eigen::VectorXd::Ones(dim) * 2);
+  log.record(0L, Eigen::VectorXs::Ones(dim) * 1);
+  log.record(10L, Eigen::VectorXs::Ones(dim) * 2);
 
-  Eigen::MatrixXd expected = Eigen::MatrixXd::Ones(dim, 20);
+  Eigen::MatrixXs expected = Eigen::MatrixXs::Ones(dim, 20);
   expected.block(0, 10, 2, 10) *= 2;
-  Eigen::MatrixXd actual = log.getValues(0L, 20, 1L);
+  Eigen::MatrixXs actual = log.getValues(0L, 20, 1L);
 
   if (!equals(expected, actual))
   {
@@ -84,12 +84,12 @@ TEST(REALTIME, VECTOR_LOG_EXTEND)
   int dim = 2;
   VectorLog log = VectorLog(dim);
 
-  log.record(0L, Eigen::VectorXd::Ones(dim) * 1);
-  log.record(10L, Eigen::VectorXd::Ones(dim) * 2);
+  log.record(0L, Eigen::VectorXs::Ones(dim) * 1);
+  log.record(10L, Eigen::VectorXs::Ones(dim) * 2);
 
-  Eigen::MatrixXd expected = Eigen::MatrixXd::Ones(dim, 20);
+  Eigen::MatrixXs expected = Eigen::MatrixXs::Ones(dim, 20);
   expected.block(0, 2, 2, 18) *= 2;
-  Eigen::MatrixXd actual = log.getValues(8L, 20, 1L);
+  Eigen::MatrixXs actual = log.getValues(8L, 20, 1L);
 
   if (!equals(expected, actual))
   {
@@ -107,12 +107,12 @@ TEST(REALTIME, VECTOR_LOG_AFTER)
   int dim = 2;
   VectorLog log = VectorLog(dim);
 
-  log.record(0L, Eigen::VectorXd::Ones(dim) * 1);
-  log.record(10L, Eigen::VectorXd::Ones(dim) * 2);
+  log.record(0L, Eigen::VectorXs::Ones(dim) * 1);
+  log.record(10L, Eigen::VectorXs::Ones(dim) * 2);
 
-  Eigen::MatrixXd expected = Eigen::MatrixXd::Ones(dim, 20);
+  Eigen::MatrixXs expected = Eigen::MatrixXs::Ones(dim, 20);
   expected *= 2;
-  Eigen::MatrixXd actual = log.getValues(18L, 20, 1L);
+  Eigen::MatrixXs actual = log.getValues(18L, 20, 1L);
 
   if (!equals(expected, actual))
   {
@@ -130,14 +130,14 @@ TEST(REALTIME, CONTROL_LOG)
   int dim = 2;
   int dt = 5;
   ControlLog log = ControlLog(dim, dt);
-  log.record(0L, Eigen::VectorXd::Ones(dim) * 1);
-  log.record(10L, Eigen::VectorXd::Ones(dim) * 2);
+  log.record(0L, Eigen::VectorXs::Ones(dim) * 1);
+  log.record(10L, Eigen::VectorXs::Ones(dim) * 2);
 
-  EXPECT_DOUBLE_EQ(1.0, log.get(-3L)(0));
-  EXPECT_DOUBLE_EQ(1.0, log.get(3L)(0));
-  EXPECT_DOUBLE_EQ(1.0, log.get(7L)(0));
-  EXPECT_DOUBLE_EQ(2.0, log.get(10L)(0));
-  EXPECT_DOUBLE_EQ(2.0, log.get(24L)(0));
+  EXPECT_s_t_EQ(1.0, log.get(-3L)(0));
+  EXPECT_s_t_EQ(1.0, log.get(3L)(0));
+  EXPECT_s_t_EQ(1.0, log.get(7L)(0));
+  EXPECT_s_t_EQ(2.0, log.get(10L)(0));
+  EXPECT_s_t_EQ(2.0, log.get(24L)(0));
 }
 #endif
 
@@ -147,16 +147,16 @@ TEST(REALTIME, CONTROL_LOG_DISCARD_BEFORE)
   int dim = 2;
   int dt = 5;
   ControlLog log = ControlLog(dim, dt);
-  log.record(0L, Eigen::VectorXd::Ones(dim) * 1);
-  log.record(5L, Eigen::VectorXd::Ones(dim) * 3);
-  log.record(10L, Eigen::VectorXd::Ones(dim) * 2);
+  log.record(0L, Eigen::VectorXs::Ones(dim) * 1);
+  log.record(5L, Eigen::VectorXs::Ones(dim) * 3);
+  log.record(10L, Eigen::VectorXs::Ones(dim) * 2);
   log.discardBefore(5L);
 
-  EXPECT_DOUBLE_EQ(3.0, log.get(-3L)(0));
-  EXPECT_DOUBLE_EQ(3.0, log.get(3L)(0));
-  EXPECT_DOUBLE_EQ(3.0, log.get(7L)(0));
-  EXPECT_DOUBLE_EQ(2.0, log.get(24L)(0));
-  EXPECT_DOUBLE_EQ(2.0, log.get(10L)(0));
+  EXPECT_s_t_EQ(3.0, log.get(-3L)(0));
+  EXPECT_s_t_EQ(3.0, log.get(3L)(0));
+  EXPECT_s_t_EQ(3.0, log.get(7L)(0));
+  EXPECT_s_t_EQ(2.0, log.get(24L)(0));
+  EXPECT_s_t_EQ(2.0, log.get(10L)(0));
 }
 #endif
 
@@ -166,21 +166,21 @@ TEST(REALTIME, CONTROL_LOG_DISCARD_BEFORE_OFF_TIMESTEP)
   int dim = 2;
   int dt = 5;
   ControlLog log = ControlLog(dim, dt);
-  log.record(0L, Eigen::VectorXd::Ones(dim) * 1);
-  log.record(5L, Eigen::VectorXd::Ones(dim) * 3);
-  log.record(10L, Eigen::VectorXd::Ones(dim) * 2);
+  log.record(0L, Eigen::VectorXs::Ones(dim) * 1);
+  log.record(5L, Eigen::VectorXs::Ones(dim) * 3);
+  log.record(10L, Eigen::VectorXs::Ones(dim) * 2);
   // This should discard up through 5L, and set last observed to 10L
   log.discardBefore(7L);
   // This should overwrite the 10L slot, because it's not far enough to hit the
   // 15L slot. That won't happen if the discardBefore() didn't set the last
   // observed point correctly.
-  log.record(14L, Eigen::VectorXd::Ones(dim) * 3);
+  log.record(14L, Eigen::VectorXs::Ones(dim) * 3);
 
-  EXPECT_DOUBLE_EQ(3.0, log.get(-3L)(0));
-  EXPECT_DOUBLE_EQ(3.0, log.get(3L)(0));
-  EXPECT_DOUBLE_EQ(3.0, log.get(7L)(0));
-  EXPECT_DOUBLE_EQ(3.0, log.get(24L)(0));
-  EXPECT_DOUBLE_EQ(3.0, log.get(10L)(0));
+  EXPECT_s_t_EQ(3.0, log.get(-3L)(0));
+  EXPECT_s_t_EQ(3.0, log.get(3L)(0));
+  EXPECT_s_t_EQ(3.0, log.get(7L)(0));
+  EXPECT_s_t_EQ(3.0, log.get(24L)(0));
+  EXPECT_s_t_EQ(3.0, log.get(10L)(0));
 }
 #endif
 
@@ -190,10 +190,10 @@ TEST(REALTIME, CONTROL_LOG_GET_EMPTY)
   int dim = 2;
   int dt = 5;
   ControlLog log = ControlLog(dim, dt);
-  EXPECT_DOUBLE_EQ(0.0, log.get(-3L)(0));
-  EXPECT_DOUBLE_EQ(0.0, log.get(3L)(0));
-  EXPECT_DOUBLE_EQ(0.0, log.get(7L)(0));
-  EXPECT_DOUBLE_EQ(0.0, log.get(24L)(0));
+  EXPECT_s_t_EQ(0.0, log.get(-3L)(0));
+  EXPECT_s_t_EQ(0.0, log.get(3L)(0));
+  EXPECT_s_t_EQ(0.0, log.get(7L)(0));
+  EXPECT_s_t_EQ(0.0, log.get(24L)(0));
 }
 #endif
 
@@ -205,9 +205,9 @@ TEST(REALTIME, CONTROL_BUFFER)
   int dt = 5;
   RealTimeControlBuffer buffer = RealTimeControlBuffer(forceDim, steps, dt);
 
-  buffer.setForcePlan(0L, 0L, Eigen::MatrixXd::Ones(forceDim, steps) * 2);
-  EXPECT_DOUBLE_EQ(buffer.getPlannedForce(25L)(0), 2.0);
-  EXPECT_DOUBLE_EQ(buffer.getPlannedForce(49L)(0), 2.0);
+  buffer.setForcePlan(0L, 0L, Eigen::MatrixXs::Ones(forceDim, steps) * 2);
+  EXPECT_s_t_EQ(buffer.getPlannedForce(25L)(0), 2.0);
+  EXPECT_s_t_EQ(buffer.getPlannedForce(49L)(0), 2.0);
 }
 #endif
 
@@ -219,9 +219,9 @@ TEST(REALTIME, CONTROL_BUFFER_OOB)
   int dt = 5;
   RealTimeControlBuffer buffer = RealTimeControlBuffer(forceDim, steps, dt);
 
-  buffer.setForcePlan(0L, 0L, Eigen::MatrixXd::Ones(forceDim, steps) * 2);
+  buffer.setForcePlan(0L, 0L, Eigen::MatrixXs::Ones(forceDim, steps) * 2);
   // This reads off the end, should print a warning and return 0s
-  EXPECT_DOUBLE_EQ(buffer.getPlannedForce(50L)(0), 0.0);
+  EXPECT_s_t_EQ(buffer.getPlannedForce(50L)(0), 0.0);
 }
 #endif
 
@@ -233,7 +233,7 @@ TEST(REALTIME, CONTROL_BUFFER_SCALE_DOWN)
   int dt = 5;
   RealTimeControlBuffer buffer = RealTimeControlBuffer(forceDim, steps, dt);
 
-  Eigen::MatrixXd plan = Eigen::MatrixXd::Ones(forceDim, steps);
+  Eigen::MatrixXs plan = Eigen::MatrixXs::Ones(forceDim, steps);
   for (int i = 0; i < steps; i++)
   {
     plan.col(i) *= i;
@@ -243,12 +243,12 @@ TEST(REALTIME, CONTROL_BUFFER_SCALE_DOWN)
   buffer.setNumSteps(5);
 
   // Read off the lower resolution, should now jump by whole numbers
-  EXPECT_DOUBLE_EQ(buffer.getPlannedForce(0 * dt)(0), 0);
-  EXPECT_DOUBLE_EQ(buffer.getPlannedForce(1 * dt)(0), 0);
-  EXPECT_DOUBLE_EQ(buffer.getPlannedForce(2 * dt)(0), 2);
-  EXPECT_DOUBLE_EQ(buffer.getPlannedForce(3 * dt)(0), 2);
-  EXPECT_DOUBLE_EQ(buffer.getPlannedForce(4 * dt)(0), 4);
-  EXPECT_DOUBLE_EQ(buffer.getPlannedForce(5 * dt)(0), 4);
+  EXPECT_s_t_EQ(buffer.getPlannedForce(0 * dt)(0), 0);
+  EXPECT_s_t_EQ(buffer.getPlannedForce(1 * dt)(0), 0);
+  EXPECT_s_t_EQ(buffer.getPlannedForce(2 * dt)(0), 2);
+  EXPECT_s_t_EQ(buffer.getPlannedForce(3 * dt)(0), 2);
+  EXPECT_s_t_EQ(buffer.getPlannedForce(4 * dt)(0), 4);
+  EXPECT_s_t_EQ(buffer.getPlannedForce(5 * dt)(0), 4);
 }
 #endif
 
@@ -260,7 +260,7 @@ TEST(REALTIME, CONTROL_BUFFER_SCALE_UP)
   int dt = 5;
   RealTimeControlBuffer buffer = RealTimeControlBuffer(forceDim, steps, dt);
 
-  Eigen::MatrixXd plan = Eigen::MatrixXd::Ones(forceDim, steps);
+  Eigen::MatrixXs plan = Eigen::MatrixXs::Ones(forceDim, steps);
   for (int i = 0; i < steps; i++)
   {
     plan.col(i) *= i;
@@ -269,19 +269,19 @@ TEST(REALTIME, CONTROL_BUFFER_SCALE_UP)
   buffer.setMillisPerStep(1);
 
   // Read off the lower resolution, should now jump by whole numbers
-  EXPECT_DOUBLE_EQ(buffer.getPlannedForce(0)(0), 0);
-  EXPECT_DOUBLE_EQ(buffer.getPlannedForce(1)(0), 0);
-  EXPECT_DOUBLE_EQ(buffer.getPlannedForce(2)(0), 0);
-  EXPECT_DOUBLE_EQ(buffer.getPlannedForce(3)(0), 0);
-  EXPECT_DOUBLE_EQ(buffer.getPlannedForce(4)(0), 0);
-  EXPECT_DOUBLE_EQ(buffer.getPlannedForce(5)(0), 1);
-  EXPECT_DOUBLE_EQ(buffer.getPlannedForce(6)(0), 1);
-  EXPECT_DOUBLE_EQ(buffer.getPlannedForce(7)(0), 1);
-  EXPECT_DOUBLE_EQ(buffer.getPlannedForce(8)(0), 1);
-  EXPECT_DOUBLE_EQ(buffer.getPlannedForce(9)(0), 1);
+  EXPECT_s_t_EQ(buffer.getPlannedForce(0)(0), 0);
+  EXPECT_s_t_EQ(buffer.getPlannedForce(1)(0), 0);
+  EXPECT_s_t_EQ(buffer.getPlannedForce(2)(0), 0);
+  EXPECT_s_t_EQ(buffer.getPlannedForce(3)(0), 0);
+  EXPECT_s_t_EQ(buffer.getPlannedForce(4)(0), 0);
+  EXPECT_s_t_EQ(buffer.getPlannedForce(5)(0), 1);
+  EXPECT_s_t_EQ(buffer.getPlannedForce(6)(0), 1);
+  EXPECT_s_t_EQ(buffer.getPlannedForce(7)(0), 1);
+  EXPECT_s_t_EQ(buffer.getPlannedForce(8)(0), 1);
+  EXPECT_s_t_EQ(buffer.getPlannedForce(9)(0), 1);
 
   // This is OOB, throws a warning and return 0
-  EXPECT_DOUBLE_EQ(buffer.getPlannedForce(10)(0), 0);
+  EXPECT_s_t_EQ(buffer.getPlannedForce(10)(0), 0);
 }
 #endif
 
@@ -293,24 +293,24 @@ TEST(REALTIME, CONTROL_BUFFER_MIX)
   int dt = 5;
   RealTimeControlBuffer buffer = RealTimeControlBuffer(forceDim, steps, dt);
 
-  Eigen::MatrixXd plan = Eigen::MatrixXd::Ones(forceDim, steps);
+  Eigen::MatrixXs plan = Eigen::MatrixXs::Ones(forceDim, steps);
   for (int i = 0; i < steps; i++)
   {
     plan.col(i) *= i;
   }
   buffer.setForcePlan(0L, 0L, plan);
 
-  Eigen::MatrixXd plan2 = Eigen::MatrixXd::Ones(forceDim, steps) * 2;
+  Eigen::MatrixXs plan2 = Eigen::MatrixXs::Ones(forceDim, steps) * 2;
   for (int i = 0; i < steps; i++)
   {
     plan2.col(i) *= i;
   }
   buffer.setForcePlan(25L, 0L, plan2);
 
-  Eigen::MatrixXd planOut = Eigen::MatrixXd::Random(forceDim, steps);
+  Eigen::MatrixXs planOut = Eigen::MatrixXs::Random(forceDim, steps);
   buffer.getPlannedForcesStartingAt(0L, planOut);
 
-  Eigen::MatrixXd expectedPlan = Eigen::MatrixXd::Ones(forceDim, steps);
+  Eigen::MatrixXs expectedPlan = Eigen::MatrixXs::Ones(forceDim, steps);
   for (int i = 0; i < 5; i++)
   {
     expectedPlan.col(i) *= (i + 5);
@@ -337,24 +337,24 @@ TEST(REALTIME, CONTROL_BUFFER_GAP)
   int dt = 5;
   RealTimeControlBuffer buffer = RealTimeControlBuffer(forceDim, steps, dt);
 
-  Eigen::MatrixXd plan = Eigen::MatrixXd::Ones(forceDim, steps);
+  Eigen::MatrixXs plan = Eigen::MatrixXs::Ones(forceDim, steps);
   for (int i = 0; i < steps; i++)
   {
     plan.col(i) *= i;
   }
   buffer.setForcePlan(0L, 0L, plan);
 
-  Eigen::MatrixXd plan2 = Eigen::MatrixXd::Ones(forceDim, steps) * 2;
+  Eigen::MatrixXs plan2 = Eigen::MatrixXs::Ones(forceDim, steps) * 2;
   for (int i = 0; i < steps; i++)
   {
     plan2.col(i) *= i;
   }
   buffer.setForcePlan(12 * dt, 8 * dt, plan2);
 
-  Eigen::MatrixXd planOut = Eigen::MatrixXd::Random(forceDim, steps);
+  Eigen::MatrixXs planOut = Eigen::MatrixXs::Random(forceDim, steps);
   buffer.getPlannedForcesStartingAt(8 * dt, planOut);
 
-  Eigen::MatrixXd expectedPlan = Eigen::MatrixXd::Ones(forceDim, steps);
+  Eigen::MatrixXs expectedPlan = Eigen::MatrixXs::Ones(forceDim, steps);
   for (int i = 0; i < 2; i++)
   {
     expectedPlan.col(i) *= (i + 8);
@@ -385,14 +385,14 @@ TEST(REALTIME, CONTROL_BUFFER_MERGE_OOB)
   int dt = 5;
   RealTimeControlBuffer buffer = RealTimeControlBuffer(forceDim, steps, dt);
 
-  Eigen::MatrixXd plan = Eigen::MatrixXd::Ones(forceDim, steps);
+  Eigen::MatrixXs plan = Eigen::MatrixXs::Ones(forceDim, steps);
   for (int i = 0; i < steps; i++)
   {
     plan.col(i) *= i;
   }
   buffer.setForcePlan(0L, 0L, plan);
 
-  Eigen::MatrixXd plan2 = Eigen::MatrixXd::Ones(forceDim, steps) * 2;
+  Eigen::MatrixXs plan2 = Eigen::MatrixXs::Ones(forceDim, steps) * 2;
   for (int i = 0; i < steps; i++)
   {
     plan2.col(i) *= i;
@@ -401,7 +401,7 @@ TEST(REALTIME, CONTROL_BUFFER_MERGE_OOB)
   // This is out of bounds, so should be discarded
   buffer.setForcePlan(12 * dt, 0L, plan2);
 
-  Eigen::MatrixXd planOut = Eigen::MatrixXd::Random(forceDim, steps);
+  Eigen::MatrixXs planOut = Eigen::MatrixXs::Random(forceDim, steps);
   buffer.getPlannedForcesStartingAt(0L, planOut);
 
   if (!equals(planOut, plan))
@@ -421,20 +421,20 @@ TEST(REALTIME, CONTROL_BUFFER_PLAN)
   int dt = 5;
   RealTimeControlBuffer buffer = RealTimeControlBuffer(forceDim, steps, dt);
 
-  buffer.setForcePlan(0L, 0L, Eigen::MatrixXd::Ones(forceDim, steps) * 2);
+  buffer.setForcePlan(0L, 0L, Eigen::MatrixXs::Ones(forceDim, steps) * 2);
 
-  Eigen::MatrixXd plan = Eigen::MatrixXd::Random(forceDim, steps);
+  Eigen::MatrixXs plan = Eigen::MatrixXs::Random(forceDim, steps);
   buffer.getPlannedForcesStartingAt(25L, plan);
 
   // the beginning of the buffer should be the old plan
   for (int i = 0; i < 5; i++)
   {
-    EXPECT_DOUBLE_EQ(plan.col(i).sum(), 6.0);
+    EXPECT_s_t_EQ(plan.col(i).sum(), 6.0);
   }
   // the end of the buffer should be 0s
   for (int i = 5; i < 10; i++)
   {
-    EXPECT_DOUBLE_EQ(plan.col(i).sum(), 0.0);
+    EXPECT_s_t_EQ(plan.col(i).sum(), 0.0);
   }
 }
 #endif
@@ -444,7 +444,7 @@ TEST(REALTIME, CONTROL_BUFFER_ESTIMATE)
 {
   // World
   WorldPtr world = World::create();
-  world->setGravity(Eigen::Vector3d(0, -9.81, 0));
+  world->setGravity(Eigen::Vector3s(0, -9.81, 0));
 
   world->setPenetrationCorrectionEnabled(false);
 
@@ -460,13 +460,13 @@ TEST(REALTIME, CONTROL_BUFFER_ESTIMATE)
   BodyNode* boxBody = boxJointPair.second;
 
   std::shared_ptr<BoxShape> shape(
-      new BoxShape(Eigen::Vector3d(0.05, 0.25, 0.05)));
+      new BoxShape(Eigen::Vector3s(0.05, 0.25, 0.05)));
   // ShapeNode* boxShape =
   boxBody->createShapeNodeWith<VisualAspect, CollisionAspect>(shape);
 
   // We're going to tune the full inertia properties of the swinging object
-  Eigen::VectorXd upperBounds = Eigen::VectorXd::Ones(1) * 5.0;
-  Eigen::VectorXd lowerBounds = Eigen::VectorXd::Ones(1) * 0.1;
+  Eigen::VectorXs upperBounds = Eigen::VectorXs::Ones(1) * 5.0;
+  Eigen::VectorXs lowerBounds = Eigen::VectorXs::Ones(1) * 0.1;
   world->getWrtMass()->registerNode(
       boxBody,
       neural::WrtMassBodyNodeEntryType::INERTIA_MASS,
@@ -488,13 +488,13 @@ TEST(REALTIME, CONTROL_BUFFER_ESTIMATE)
   ObservationLog log = ObservationLog(
       0L, world->getPositions(), world->getVelocities(), world->getMasses());
 
-  buffer.setForcePlan(0L, 0L, Eigen::MatrixXd::Ones(forceDim, steps) * 2);
+  buffer.setForcePlan(0L, 0L, Eigen::MatrixXs::Ones(forceDim, steps) * 2);
 
   log.observe(
       0L,
-      Eigen::VectorXd::Zero(1),
-      Eigen::VectorXd::Zero(1),
-      Eigen::VectorXd::Ones(1));
+      Eigen::VectorXs::Zero(1),
+      Eigen::VectorXs::Zero(1),
+      Eigen::VectorXs::Ones(1));
 
   /////////////////////////////////////////////////////////////////////
   // Get ground truth behavior
@@ -505,16 +505,16 @@ TEST(REALTIME, CONTROL_BUFFER_ESTIMATE)
     world->setExternalForces(buffer.getPlannedForce(i * dt));
     world->step();
   }
-  Eigen::VectorXd truePos = world->getPositions();
-  Eigen::VectorXd trueVel = world->getVelocities();
+  Eigen::VectorXs truePos = world->getPositions();
+  Eigen::VectorXs trueVel = world->getVelocities();
 
   /////////////////////////////////////////////////////////////////////
   // Get ground truth behavior
   /////////////////////////////////////////////////////////////////////
 
   // Scramble state
-  world->setPositions(Eigen::VectorXd::Random(1));
-  world->setVelocities(Eigen::VectorXd::Random(1));
+  world->setPositions(Eigen::VectorXs::Random(1));
+  world->setVelocities(Eigen::VectorXs::Random(1));
   // Estimate state
   buffer.estimateWorldStateAt(world, &log, steps * dt);
 

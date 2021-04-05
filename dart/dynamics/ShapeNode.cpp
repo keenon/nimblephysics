@@ -31,6 +31,7 @@
  */
 
 #include "dart/dynamics/ShapeNode.hpp"
+
 #include "dart/dynamics/BodyNode.hpp"
 
 namespace dart {
@@ -74,59 +75,59 @@ ShapeNode& ShapeNode::operator=(const ShapeNode& other)
 }
 
 //==============================================================================
-void ShapeNode::setRelativeTransform(const Eigen::Isometry3d& transform)
+void ShapeNode::setRelativeTransform(const Eigen::Isometry3s& transform)
 {
-  if(transform.matrix() == FixedFrame::mAspectProperties.mRelativeTf.matrix())
+  if (transform.matrix() == FixedFrame::mAspectProperties.mRelativeTf.matrix())
     return;
 
-  const Eigen::Isometry3d oldTransform = getRelativeTransform();
+  const Eigen::Isometry3s oldTransform = getRelativeTransform();
 
   FixedFrame::setRelativeTransform(transform);
   dirtyJacobian();
   dirtyJacobianDeriv();
 
   mRelativeTransformUpdatedSignal.raise(
-        this, oldTransform, getRelativeTransform());
+      this, oldTransform, getRelativeTransform());
 }
 
 //==============================================================================
-void ShapeNode::setRelativeRotation(const Eigen::Matrix3d& rotation)
+void ShapeNode::setRelativeRotation(const Eigen::Matrix3s& rotation)
 {
-  Eigen::Isometry3d transform = getRelativeTransform();
+  Eigen::Isometry3s transform = getRelativeTransform();
   transform.linear() = rotation;
 
   setRelativeTransform(transform);
 }
 
 //==============================================================================
-Eigen::Matrix3d ShapeNode::getRelativeRotation() const
+Eigen::Matrix3s ShapeNode::getRelativeRotation() const
 {
   return getRelativeTransform().linear();
 }
 
 //==============================================================================
-void ShapeNode::setRelativeTranslation(const Eigen::Vector3d& translation)
+void ShapeNode::setRelativeTranslation(const Eigen::Vector3s& translation)
 {
-  Eigen::Isometry3d transform = getRelativeTransform();
+  Eigen::Isometry3s transform = getRelativeTransform();
   transform.translation() = translation;
 
   setRelativeTransform(transform);
 }
 
 //==============================================================================
-void ShapeNode::setOffset(const Eigen::Vector3d& offset)
+void ShapeNode::setOffset(const Eigen::Vector3s& offset)
 {
   setRelativeTranslation(offset);
 }
 
 //==============================================================================
-Eigen::Vector3d ShapeNode::getRelativeTranslation() const
+Eigen::Vector3s ShapeNode::getRelativeTranslation() const
 {
   return getRelativeTransform().translation();
 }
 
 //==============================================================================
-Eigen::Vector3d ShapeNode::getOffset() const
+Eigen::Vector3s ShapeNode::getOffset() const
 {
   return getRelativeTranslation();
 }
@@ -149,23 +150,21 @@ ShapeNode::ShapeNode(BodyNode* bodyNode, const BasicProperties& properties)
     Frame(bodyNode),
     FixedFrame(bodyNode),
     detail::ShapeNodeCompositeBase(
-      std::make_tuple(bodyNode, properties.mRelativeTf),
-      bodyNode, properties)
+        std::make_tuple(bodyNode, properties.mRelativeTf), bodyNode, properties)
 {
   setProperties(properties);
   mAmShapeNode = true;
 }
 
 //==============================================================================
-ShapeNode::ShapeNode(BodyNode* bodyNode,
-                     const ShapePtr& shape,
-                     const std::string& name)
+ShapeNode::ShapeNode(
+    BodyNode* bodyNode, const ShapePtr& shape, const std::string& name)
   : Entity(ConstructFrame),
     Frame(bodyNode),
     FixedFrame(bodyNode),
     detail::ShapeNodeCompositeBase(
-      std::make_tuple(bodyNode, Eigen::Isometry3d::Identity()),
-      std::make_tuple(bodyNode, ShapeFrame::Properties(shape)))
+        std::make_tuple(bodyNode, Eigen::Isometry3s::Identity()),
+        std::make_tuple(bodyNode, ShapeFrame::Properties(shape)))
 {
   // TODO(MXG): Consider changing this to a delegating constructor instead
   setName(name);
@@ -180,12 +179,8 @@ Node* ShapeNode::cloneNode(BodyNode* parent) const
 
   shapeNode->copy(this);
 
-  if(mIK)
-    shapeNode->mIK = mIK->clone(shapeNode);
-
   return shapeNode;
 }
 
 } // namespace dynamics
 } // namespace dart
-

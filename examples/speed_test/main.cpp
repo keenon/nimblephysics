@@ -36,7 +36,7 @@
 #include <dart/dart.hpp>
 #include "dart/utils/utils.hpp"
 
-double testForwardKinematicSpeed(
+s_t testForwardKinematicSpeed(
     dart::dynamics::SkeletonPtr skel,
     bool position = true,
     bool velocity = true,
@@ -79,18 +79,18 @@ double testForwardKinematicSpeed(
 
   end = std::chrono::system_clock::now();
 
-  std::chrono::duration<double> elapsed_seconds = end - start;
+  std::chrono::duration<s_t> elapsed_seconds = end - start;
   return elapsed_seconds.count();
 }
 
 void runKinematicsTest(
-    std::vector<double>& results,
+    std::vector<s_t>& results,
     const std::vector<dart::simulation::WorldPtr>& worlds,
     bool position,
     bool velocity,
     bool acceleration)
 {
-  double totalTime = 0;
+  s_t totalTime = 0;
   std::cout << "Testing: ";
   if (position)
     std::cout << "Position ";
@@ -111,7 +111,7 @@ void runKinematicsTest(
   std::cout << "Result: " << totalTime << "s" << std::endl;
 }
 
-double testDynamicsSpeed(
+s_t testDynamicsSpeed(
     dart::simulation::WorldPtr world, std::size_t numIterations = 10000)
 {
   if (nullptr == world)
@@ -135,15 +135,15 @@ double testDynamicsSpeed(
 
   end = std::chrono::system_clock::now();
 
-  std::chrono::duration<double> elapsed_seconds = end - start;
+  std::chrono::duration<s_t> elapsed_seconds = end - start;
   return elapsed_seconds.count();
 }
 
 void runDynamicsTest(
-    std::vector<double>& results,
+    std::vector<s_t>& results,
     const std::vector<dart::simulation::WorldPtr>& worlds)
 {
-  double totalTime = 0;
+  s_t totalTime = 0;
 
   for (std::size_t i = 0; i < worlds.size(); ++i)
   {
@@ -154,18 +154,18 @@ void runDynamicsTest(
   std::cout << "Result: " << totalTime << "s" << std::endl;
 }
 
-void print_results(const std::vector<double>& result)
+void print_results(const std::vector<s_t>& result)
 {
-  double sum = std::accumulate(result.begin(), result.end(), 0.0);
-  double mean = sum / result.size();
+  s_t sum = std::accumulate(result.begin(), result.end(), 0.0);
+  s_t mean = sum / result.size();
   std::cout << "Average: " << mean << "\n";
-  std::vector<double> diff(result.size());
+  std::vector<s_t> diff(result.size());
   std::transform(
       result.begin(),
       result.end(),
       diff.begin(),
-      std::bind2nd(std::minus<double>(), mean));
-  double stddev = std::sqrt(
+      std::bind2nd(std::minus<s_t>(), mean));
+  s_t stddev = std::sqrt(
       std::inner_product(diff.begin(), diff.end(), diff.begin(), 0.0)
       / result.size());
   std::cout << "Std Dev: " << stddev << "\n";
@@ -178,9 +178,9 @@ std::vector<std::string> getSceneFiles()
   scenes.push_back("dart://sample/skel/test/single_pendulum.skel");
   scenes.push_back("dart://sample/skel/test/single_pendulum_euler_joint.skel");
   scenes.push_back("dart://sample/skel/test/single_pendulum_ball_joint.skel");
-  scenes.push_back("dart://sample/skel/test/double_pendulum.skel");
-  scenes.push_back("dart://sample/skel/test/double_pendulum_euler_joint.skel");
-  scenes.push_back("dart://sample/skel/test/double_pendulum_ball_joint.skel");
+  scenes.push_back("dart://sample/skel/test/s_t_pendulum.skel");
+  scenes.push_back("dart://sample/skel/test/s_t_pendulum_euler_joint.skel");
+  scenes.push_back("dart://sample/skel/test/s_t_pendulum_ball_joint.skel");
   scenes.push_back("dart://sample/skel/test/serial_chain_revolute_joint.skel");
   scenes.push_back("dart://sample/skel/test/serial_chain_eulerxyz_joint.skel");
   scenes.push_back("dart://sample/skel/test/serial_chain_ball_joint.skel");
@@ -223,9 +223,9 @@ int main(int argc, char* argv[])
   if (test_kinematics)
   {
     std::cout << "Testing Kinematics" << std::endl;
-    std::vector<double> acceleration_results;
-    std::vector<double> velocity_results;
-    std::vector<double> position_results;
+    std::vector<s_t> acceleration_results;
+    std::vector<s_t> velocity_results;
+    std::vector<s_t> position_results;
 
     for (std::size_t i = 0; i < 10; ++i)
     {
@@ -250,7 +250,7 @@ int main(int argc, char* argv[])
   }
 
   std::cout << "Testing Dynamics" << std::endl;
-  std::vector<double> dynamics_results;
+  std::vector<s_t> dynamics_results;
   for (std::size_t i = 0; i < 10; ++i)
   {
     std::cout << "\nTrial #" << i + 1 << std::endl;

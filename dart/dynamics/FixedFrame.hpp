@@ -33,9 +33,9 @@
 #ifndef DART_DYNAMICS_FIXEDFRAME_HPP_
 #define DART_DYNAMICS_FIXEDFRAME_HPP_
 
-#include "dart/dynamics/Frame.hpp"
 #include "dart/common/EmbeddedAspect.hpp"
 #include "dart/common/VersionCounter.hpp"
+#include "dart/dynamics/Frame.hpp"
 #include "dart/dynamics/detail/FixedFrameAspect.hpp"
 
 namespace dart {
@@ -45,16 +45,17 @@ namespace dynamics {
 /// zero relative acceleration. It does not move within its parent Frame after
 /// its relative transform is set. However, classes that inherit the FixedFrame
 /// class may alter its relative transform or change what its parent Frame is.
-class FixedFrame :
-    public virtual Frame,
+class FixedFrame
+  : public virtual Frame,
     public virtual common::VersionCounter,
     public common::EmbedProperties<FixedFrame, detail::FixedFrameProperties>
 {
 public:
   /// Constructor
-  explicit FixedFrame(Frame* refFrame,
-      const Eigen::Isometry3d& relativeTransform =
-          Eigen::Isometry3d::Identity());
+  explicit FixedFrame(
+      Frame* refFrame,
+      const Eigen::Isometry3s& relativeTransform
+      = Eigen::Isometry3s::Identity());
 
   /// Destructor
   virtual ~FixedFrame();
@@ -63,25 +64,24 @@ public:
   void setAspectProperties(const AspectProperties& properties);
 
   /// Set the relative transform of this FixedFrame
-  virtual void setRelativeTransform(const Eigen::Isometry3d& transform);
+  virtual void setRelativeTransform(const Eigen::Isometry3s& transform);
 
   // Documentation inherited
-  const Eigen::Isometry3d& getRelativeTransform() const override;
+  const Eigen::Isometry3s& getRelativeTransform() const override;
 
   /// Always returns a zero vector
-  const Eigen::Vector6d& getRelativeSpatialVelocity() const override;
+  const Eigen::Vector6s& getRelativeSpatialVelocity() const override;
 
   /// Always returns a zero vector
-  const Eigen::Vector6d& getRelativeSpatialAcceleration() const override;
+  const Eigen::Vector6s& getRelativeSpatialAcceleration() const override;
 
   /// Always returns a zero vector
-  const Eigen::Vector6d& getPrimaryRelativeAcceleration() const override;
+  const Eigen::Vector6s& getPrimaryRelativeAcceleration() const override;
 
   /// Always returns a zero vector
-  const Eigen::Vector6d& getPartialAcceleration() const override;
+  const Eigen::Vector6s& getPartialAcceleration() const override;
 
 protected:
-
   /// Default constructor -- calls the Abstract constructor
   FixedFrame();
 
@@ -89,7 +89,7 @@ protected:
   explicit FixedFrame(ConstructAbstractTag);
 
   /// Used for Relative Velocity and Relative Acceleration of this Frame
-  static const Eigen::Vector6d mZero;
+  static const Eigen::Vector6s mZero;
 
 public:
   // To get byte-aligned Eigen vectors
@@ -98,6 +98,5 @@ public:
 
 } // namespace dynamics
 } // namespace dart
-
 
 #endif // DART_DYNAMICS_FIXEDFRAME_HPP_

@@ -3,26 +3,26 @@
 namespace dart {
 namespace proto {
 
-void serializeVector(proto::VectorXd& proto, const Eigen::VectorXd& vec)
+void serializeVector(proto::VectorXs& proto, const Eigen::VectorXs& vec)
 {
   proto.set_size(vec.size());
   for (int i = 0; i < vec.size(); i++)
   {
-    proto.add_values(vec(i));
+    proto.add_values(static_cast<double>(vec(i)));
   }
 }
 
-Eigen::VectorXd deserializeVector(const proto::VectorXd& proto)
+Eigen::VectorXs deserializeVector(const proto::VectorXs& proto)
 {
-  Eigen::VectorXd recovered = Eigen::VectorXd::Zero(proto.size());
+  Eigen::VectorXs recovered = Eigen::VectorXs::Zero(proto.size());
   for (int i = 0; i < proto.size(); i++)
   {
-    recovered(i) = proto.values(i);
+    recovered(i) = static_cast<s_t>(proto.values(i));
   }
   return recovered;
 }
 
-void serializeMatrix(proto::MatrixXd& proto, const Eigen::MatrixXd& mat)
+void serializeMatrix(proto::MatrixXs& proto, const Eigen::MatrixXs& mat)
 {
   proto.set_rows(mat.rows());
   proto.set_cols(mat.cols());
@@ -30,20 +30,20 @@ void serializeMatrix(proto::MatrixXd& proto, const Eigen::MatrixXd& mat)
   {
     for (int row = 0; row < mat.rows(); row++)
     {
-      proto.add_values(mat(row, col));
+      proto.add_values(static_cast<double>(mat(row, col)));
     }
   }
 }
 
-Eigen::MatrixXd deserializeMatrix(const proto::MatrixXd& proto)
+Eigen::MatrixXs deserializeMatrix(const proto::MatrixXs& proto)
 {
-  Eigen::MatrixXd recovered = Eigen::MatrixXd::Zero(proto.rows(), proto.cols());
+  Eigen::MatrixXs recovered = Eigen::MatrixXs::Zero(proto.rows(), proto.cols());
   int cursor = 0;
   for (int col = 0; col < proto.cols(); col++)
   {
     for (int row = 0; row < proto.rows(); row++)
     {
-      recovered(row, col) = proto.values(cursor);
+      recovered(row, col) = static_cast<s_t>(proto.values(cursor));
       cursor++;
     }
   }

@@ -17,13 +17,13 @@ struct JointAndBody
 {
   // This is a normalized transform, represented in log-space. You can recover
   // the transform by dart::math::expMap(axis * position)
-  Eigen::Vector6d axis;
+  Eigen::Vector6s axis;
   // This is the transform from the parent
-  Eigen::Isometry3d transformFromParent;
+  Eigen::Isometry3s transformFromParent;
   // This is the transform from the children
-  Eigen::Isometry3d transformFromChildren;
+  Eigen::Isometry3s transformFromChildren;
   // This is the spatial inertia matrix for the body node
-  Eigen::Matrix6d inertia;
+  Eigen::Matrix6s inertia;
   // -1 indicates this is the root element, otherwise this is the index into
   // SimpleFeatherstone::mJointsAndBodies where the parent lives
   int parentIndex;
@@ -31,19 +31,19 @@ struct JointAndBody
 
 struct FeatherstoneScratchSpace
 {
-  Eigen::Isometry3d transformFromParent;
-  Eigen::Vector6d spatialVelocity;
-  Eigen::Vector6d spatialAcceleration;
+  Eigen::Isometry3s transformFromParent;
+  Eigen::Vector6s spatialVelocity;
+  Eigen::Vector6s spatialAcceleration;
 
-  Eigen::Matrix6d articulatedInertia;
-  Eigen::Vector6d articulatedBiasForce;
+  Eigen::Matrix6s articulatedInertia;
+  Eigen::Vector6s articulatedBiasForce;
 
   // Intermediate values without convenient names. From the symbols on
   // page 12 of http://www.cs.cmu.edu/~junggon/tools/liegroupdynamics.pdf
-  double psi;
-  double totalForce;
-  Eigen::Vector6d partialAcceleration; // = eta
-  Eigen::Matrix6d phi;
+  s_t psi;
+  s_t totalForce;
+  Eigen::Vector6s partialAcceleration; // = eta
+  Eigen::Matrix6s phi;
 };
 
 class SimpleFeatherstone
@@ -59,10 +59,10 @@ public:
   // This computes accelerations. All the pointer arguments are assumed to point
   // to arrays of length len()
   void forwardDynamics(
-      double* pos,
-      double* vel,
-      double* force,
-      /* OUT */ double* accelerations);
+      s_t* pos,
+      s_t* vel,
+      s_t* force,
+      /* OUT */ s_t* accelerations);
 
   // This gets the values from a DART skeleton to populate our Featherstone
   // implementation

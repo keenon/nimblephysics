@@ -79,17 +79,17 @@ TEST_P(CollisionGroupsTest, SkeletonSubscription)
   // We will now add some BodyNodes and collision shapes *after* the Skeletons
   // have been added to the world, to see that the collision geometries get
   // updated automatically.
-  Eigen::Isometry3d tf = Eigen::Isometry3d::Identity();
-  tf.translation() = (1.0 + 0.25) * Eigen::Vector3d::UnitX();
+  Eigen::Isometry3s tf = Eigen::Isometry3s::Identity();
+  tf.translation() = (1.0 + 0.25) * Eigen::Vector3s::UnitX();
 
   auto boxShape = std::make_shared<dart::dynamics::BoxShape>(
-      Eigen::Vector3d::Constant(1.0));
+      Eigen::Vector3s::Constant(1.0));
   auto pair = skel_A->createJointAndBodyNodePair<dart::dynamics::FreeJoint>();
   pair.first->setTransform(tf);
   auto sn1 = pair.second->createShapeNodeWith<dart::dynamics::CollisionAspect>(
       boxShape);
 
-  tf.translation() = (1.0 - 0.25) * Eigen::Vector3d::UnitX();
+  tf.translation() = (1.0 - 0.25) * Eigen::Vector3s::UnitX();
 
   pair = skel_B->createJointAndBodyNodePair<dart::dynamics::FreeJoint>();
   pair.first->setTransform(tf);
@@ -100,14 +100,14 @@ TEST_P(CollisionGroupsTest, SkeletonSubscription)
 
   // Now we'll change the properties of one the box shape so that there should
   // no longer be any collisions.
-  boxShape->setSize(Eigen::Vector3d::Constant(0.2));
+  boxShape->setSize(Eigen::Vector3s::Constant(0.2));
   dart::collision::CollisionResult result2;
   EXPECT_FALSE(world->checkCollision());
 
   // Now we'll replace one of the boxes with a large one, so that a collision
   // will occur again.
   auto largeBox = std::make_shared<dart::dynamics::BoxShape>(
-      Eigen::Vector3d::Constant(0.95));
+      Eigen::Vector3s::Constant(0.95));
   sn1->setShape(largeBox);
   EXPECT_TRUE(world->checkCollision());
 
@@ -179,7 +179,7 @@ TEST_P(CollisionGroupsTest, BodyNodeSubscription)
   // be no collisions.
   EXPECT_FALSE(group->collide());
 
-  Eigen::Isometry3d tf{Eigen::Translation3d(0.5, 0.0, 0.0)};
+  Eigen::Isometry3s tf{Eigen::Translation3d(0.5, 0.0, 0.0)};
   pair_1a.first->setTransform(tf);
   pair_1a.first->setName("1a");
   pair_1a.second->setName("1a");
@@ -218,7 +218,7 @@ TEST_P(CollisionGroupsTest, BodyNodeSubscription)
   EXPECT_TRUE(group->collide());
 
   auto box = std::make_shared<dart::dynamics::BoxShape>(
-      Eigen::Vector3d::Constant(0.5));
+      Eigen::Vector3s::Constant(0.5));
   sn_2a->setShape(box);
   // Now a shape has been replaced with a smaller one, so there should no longer
   // be a collision.
@@ -227,7 +227,7 @@ TEST_P(CollisionGroupsTest, BodyNodeSubscription)
   auto pair_1b = skel1->createJointAndBodyNodePair<dart::dynamics::FreeJoint>();
   auto pair_2b = skel2->createJointAndBodyNodePair<dart::dynamics::FreeJoint>();
 
-  tf.translation() = 0.5 * Eigen::Vector3d::UnitX();
+  tf.translation() = 0.5 * Eigen::Vector3s::UnitX();
   pair_1b.first->setTransform(tf);
   pair_1b.first->setName("1b");
   pair_1b.second->setName("1b");
@@ -247,7 +247,7 @@ TEST_P(CollisionGroupsTest, BodyNodeSubscription)
   // Change the size of the box so that there are overlapping collision
   // geometries. The collision information should update automatically, and a
   // collision should be detected.
-  box->setSize(Eigen::Vector3d::Constant(2.0));
+  box->setSize(Eigen::Vector3s::Constant(2.0));
   EXPECT_TRUE(group->collide());
 
   sn_1a->remove();

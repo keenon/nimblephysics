@@ -16,99 +16,99 @@ Mapping::~Mapping()
 }
 
 //==============================================================================
-Eigen::VectorXd Mapping::getPositions(std::shared_ptr<simulation::World> world)
+Eigen::VectorXs Mapping::getPositions(std::shared_ptr<simulation::World> world)
 {
-  Eigen::VectorXd poses = Eigen::VectorXd::Zero(getPosDim());
+  Eigen::VectorXs poses = Eigen::VectorXs::Zero(getPosDim());
   getPositionsInPlace(world, poses);
   return poses;
 }
 
 //==============================================================================
-Eigen::VectorXd Mapping::getVelocities(std::shared_ptr<simulation::World> world)
+Eigen::VectorXs Mapping::getVelocities(std::shared_ptr<simulation::World> world)
 {
-  Eigen::VectorXd vels = Eigen::VectorXd::Zero(getVelDim());
+  Eigen::VectorXs vels = Eigen::VectorXs::Zero(getVelDim());
   getVelocitiesInPlace(world, vels);
   return vels;
 }
 
 //==============================================================================
-Eigen::VectorXd Mapping::getForces(std::shared_ptr<simulation::World> world)
+Eigen::VectorXs Mapping::getForces(std::shared_ptr<simulation::World> world)
 {
-  Eigen::VectorXd forces = Eigen::VectorXd::Zero(getForceDim());
+  Eigen::VectorXs forces = Eigen::VectorXs::Zero(getForceDim());
   getForcesInPlace(world, forces);
   return forces;
 }
 
 //==============================================================================
-Eigen::VectorXd Mapping::getMasses(std::shared_ptr<simulation::World> world)
+Eigen::VectorXs Mapping::getMasses(std::shared_ptr<simulation::World> world)
 {
-  Eigen::VectorXd masses = Eigen::VectorXd::Zero(getMassDim());
+  Eigen::VectorXs masses = Eigen::VectorXs::Zero(getMassDim());
   getMassesInPlace(world, masses);
   return masses;
 }
 
 //==============================================================================
-Eigen::VectorXd Mapping::getPositionLowerLimits(
+Eigen::VectorXs Mapping::getPositionLowerLimits(
     std::shared_ptr<simulation::World> /* world */)
 {
-  return Eigen::VectorXd::Ones(getPosDim())
-         * -std::numeric_limits<double>::infinity();
+  return Eigen::VectorXs::Ones(getPosDim())
+         * -std::numeric_limits<s_t>::infinity();
 }
 
 //==============================================================================
-Eigen::VectorXd Mapping::getPositionUpperLimits(
+Eigen::VectorXs Mapping::getPositionUpperLimits(
     std::shared_ptr<simulation::World> /* world */)
 {
-  return Eigen::VectorXd::Ones(getPosDim())
-         * std::numeric_limits<double>::infinity();
+  return Eigen::VectorXs::Ones(getPosDim())
+         * std::numeric_limits<s_t>::infinity();
 }
 
 //==============================================================================
-Eigen::VectorXd Mapping::getVelocityLowerLimits(
+Eigen::VectorXs Mapping::getVelocityLowerLimits(
     std::shared_ptr<simulation::World> /* world */)
 {
-  return Eigen::VectorXd::Ones(getVelDim())
-         * -std::numeric_limits<double>::infinity();
+  return Eigen::VectorXs::Ones(getVelDim())
+         * -std::numeric_limits<s_t>::infinity();
 }
 
 //==============================================================================
-Eigen::VectorXd Mapping::getVelocityUpperLimits(
+Eigen::VectorXs Mapping::getVelocityUpperLimits(
     std::shared_ptr<simulation::World> /* world */)
 {
-  return Eigen::VectorXd::Ones(getVelDim())
-         * std::numeric_limits<double>::infinity();
+  return Eigen::VectorXs::Ones(getVelDim())
+         * std::numeric_limits<s_t>::infinity();
 }
 
 //==============================================================================
-Eigen::VectorXd Mapping::getForceLowerLimits(
+Eigen::VectorXs Mapping::getForceLowerLimits(
     std::shared_ptr<simulation::World> /* world */)
 {
-  return Eigen::VectorXd::Ones(getForceDim())
-         * -std::numeric_limits<double>::infinity();
+  return Eigen::VectorXs::Ones(getForceDim())
+         * -std::numeric_limits<s_t>::infinity();
 }
 
 //==============================================================================
-Eigen::VectorXd Mapping::getForceUpperLimits(
+Eigen::VectorXs Mapping::getForceUpperLimits(
     std::shared_ptr<simulation::World> /* world */)
 {
-  return Eigen::VectorXd::Ones(getForceDim())
-         * std::numeric_limits<double>::infinity();
+  return Eigen::VectorXs::Ones(getForceDim())
+         * std::numeric_limits<s_t>::infinity();
 }
 
 //==============================================================================
-Eigen::VectorXd Mapping::getMassLowerLimits(
+Eigen::VectorXs Mapping::getMassLowerLimits(
     std::shared_ptr<simulation::World> /* world */)
 {
   // Non-zero lower bound by default
-  return Eigen::VectorXd::Ones(getMassDim()) * 1e-7;
+  return Eigen::VectorXs::Ones(getMassDim()) * 1e-7;
 }
 
 //==============================================================================
-Eigen::VectorXd Mapping::getMassUpperLimits(
+Eigen::VectorXs Mapping::getMassUpperLimits(
     std::shared_ptr<simulation::World> /* world */)
 {
-  return Eigen::VectorXd::Ones(getMassDim())
-         * std::numeric_limits<double>::infinity();
+  return Eigen::VectorXs::Ones(getMassDim())
+         * std::numeric_limits<s_t>::infinity();
 }
 
 } // namespace neural

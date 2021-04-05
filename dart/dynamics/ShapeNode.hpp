@@ -58,8 +58,8 @@ public:
 
   using RelativeTransformUpdatedSignal
       = common::Signal<void(const ShapeNode* thisShapeNode,
-                            const Eigen::Isometry3d& oldTransform,
-                            const Eigen::Isometry3d& newTransform)>;
+                            const Eigen::Isometry3s& oldTransform,
+                            const Eigen::Isometry3s& newTransform)>;
 
   using BasicProperties = common::Composite::MakeProperties<
       NameAspect,
@@ -88,25 +88,25 @@ public:
   ShapeNode& operator=(const ShapeNode& other);
 
   /// Set transformation of this shape node relative to the parent frame
-  void setRelativeTransform(const Eigen::Isometry3d& transform) override;
+  void setRelativeTransform(const Eigen::Isometry3s& transform) override;
 
   /// Set rotation of this shape node relative to the parent frame
-  void setRelativeRotation(const Eigen::Matrix3d& rotation);
+  void setRelativeRotation(const Eigen::Matrix3s& rotation);
 
   /// Get rotation of this shape node relative to the parent frame
-  Eigen::Matrix3d getRelativeRotation() const;
+  Eigen::Matrix3s getRelativeRotation() const;
 
   /// Set translation of this shape node relative to the parent frame
-  void setRelativeTranslation(const Eigen::Vector3d& translation);
+  void setRelativeTranslation(const Eigen::Vector3s& translation);
 
   /// Same as setRelativeTranslation(offset)
-  void setOffset(const Eigen::Vector3d& offset);
+  void setOffset(const Eigen::Vector3s& offset);
 
   /// Get translation of this shape node relative to the parent frame
-  Eigen::Vector3d getRelativeTranslation() const;
+  Eigen::Vector3s getRelativeTranslation() const;
 
   /// Same as getRelativeTranslation()
-  Eigen::Vector3d getOffset() const;
+  Eigen::Vector3s getOffset() const;
 
   // Documentation inherited
   ShapeNode* asShapeNode() override;

@@ -56,7 +56,7 @@ public:
 
 private:
   void plotCOMX();
-  Eigen::Vector3d mForce;
+  Eigen::Vector3s mForce;
   Controller* mController;
   int mImpulseDuration;
 };

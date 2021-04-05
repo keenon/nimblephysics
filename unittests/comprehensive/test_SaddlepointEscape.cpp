@@ -88,7 +88,7 @@ TEST(SADDLEPOINTS, BALL_ON_FIXED_GROUND)
       = ball->createJointAndBodyNodePair<PrismaticJoint>(nullptr);
   PrismaticJoint* ballJoint = pairBall.first;
   BodyNode* ballBody = pairBall.second;
-  ballJoint->setAxis(Eigen::Vector3d::UnitY());
+  ballJoint->setAxis(Eigen::Vector3s::UnitY());
   std::shared_ptr<SphereShape> sphereShape(
       new SphereShape(0.5));
   ballBody->createShapeNodeWith<VisualAspect, CollisionAspect>(sphereShape);
@@ -106,7 +106,7 @@ TEST(SADDLEPOINTS, BALL_ON_FIXED_GROUND)
   // WeldJoint* floorJoint = pairFloor.first;
   BodyNode* floorBody = pairFloor.second;
   std::shared_ptr<BoxShape> floorShape(
-      new BoxShape(Eigen::Vector3d(5.0,1.0,5.0)));
+      new BoxShape(Eigen::Vector3s(5.0,1.0,5.0)));
   floorBody->createShapeNodeWith<VisualAspect, CollisionAspect>(floorShape);
   floorBody->setFrictionCoeff(0.0);
 
@@ -126,8 +126,8 @@ TEST(SADDLEPOINTS, BALL_ON_FIXED_GROUND)
   // Do plain vanilla loss, should block all progress to torque for both timesteps
   
   neural::LossGradient nextTimestepLoss;
-  nextTimestepLoss.lossWrtPosition = Eigen::VectorXd::Ones(1) * -0.1; // points downwards, which means we want to move upwards
-  nextTimestepLoss.lossWrtVelocity = Eigen::VectorXd::Zero(1);
+  nextTimestepLoss.lossWrtPosition = Eigen::VectorXs::Ones(1) * -0.1; // points downwards, which means we want to move upwards
+  nextTimestepLoss.lossWrtVelocity = Eigen::VectorXs::Zero(1);
   neural::LossGradient thisTimestepLoss;
   snapshot->backprop(world, thisTimestepLoss, nextTimestepLoss);
   EXPECT_EQ(-0.1, thisTimestepLoss.lossWrtPosition(0));
@@ -143,8 +143,8 @@ TEST(SADDLEPOINTS, BALL_ON_FIXED_GROUND)
 
   // Try exploratory loss, should allow progress on torque
 
-  nextTimestepLoss.lossWrtPosition = Eigen::VectorXd::Ones(1) * -0.1; // points downwards, which means we want to move upwards
-  nextTimestepLoss.lossWrtVelocity = Eigen::VectorXd::Zero(1);
+  nextTimestepLoss.lossWrtPosition = Eigen::VectorXs::Ones(1) * -0.1; // points downwards, which means we want to move upwards
+  nextTimestepLoss.lossWrtVelocity = Eigen::VectorXs::Zero(1);
   snapshot->backprop(world, thisTimestepLoss, nextTimestepLoss, nullptr, true);
   EXPECT_EQ(-0.1, thisTimestepLoss.lossWrtPosition(0));
   EXPECT_EQ(-0.1 * world->getTimeStep(), thisTimestepLoss.lossWrtVelocity(0));
@@ -188,7 +188,7 @@ TEST(SADDLEPOINTS, UNCONTROLLED_BALL_ON_PADDLE)
       = ball->createJointAndBodyNodePair<PrismaticJoint>(nullptr);
   PrismaticJoint* ballJoint = pairBall.first;
   BodyNode* ballBody = pairBall.second;
-  ballJoint->setAxis(Eigen::Vector3d::UnitY());
+  ballJoint->setAxis(Eigen::Vector3s::UnitY());
   std::shared_ptr<SphereShape> sphereShape(
       new SphereShape(0.5));
   ballBody->createShapeNodeWith<VisualAspect, CollisionAspect>(sphereShape);
@@ -206,10 +206,10 @@ TEST(SADDLEPOINTS, UNCONTROLLED_BALL_ON_PADDLE)
   std::pair<PrismaticJoint*, BodyNode*> pairPaddle
       = paddle->createJointAndBodyNodePair<PrismaticJoint>(nullptr);
   PrismaticJoint* paddleJoint = pairPaddle.first;
-  paddleJoint->setAxis(Eigen::Vector3d::UnitY());
+  paddleJoint->setAxis(Eigen::Vector3s::UnitY());
   BodyNode* paddleBody = pairPaddle.second;
   std::shared_ptr<BoxShape> paddleShape(
-      new BoxShape(Eigen::Vector3d(5.0,1.0,5.0)));
+      new BoxShape(Eigen::Vector3s(5.0,1.0,5.0)));
   paddleBody->createShapeNodeWith<VisualAspect, CollisionAspect>(paddleShape);
   paddleBody->setFrictionCoeff(0.0);
 
@@ -228,8 +228,8 @@ TEST(SADDLEPOINTS, UNCONTROLLED_BALL_ON_PADDLE)
   // Do plain vanilla loss, should block all progress
   
   neural::LossGradient nextTimestepLoss;
-  nextTimestepLoss.lossWrtPosition = Eigen::VectorXd::Zero(2);
-  nextTimestepLoss.lossWrtVelocity = Eigen::Vector2d(-0.1, 0.0); // points downwards for ball, which means we want to move upwards
+  nextTimestepLoss.lossWrtPosition = Eigen::VectorXs::Zero(2);
+  nextTimestepLoss.lossWrtVelocity = Eigen::Vector2s(-0.1, 0.0); // points downwards for ball, which means we want to move upwards
   neural::LossGradient thisTimestepLoss;
   snapshot->backprop(world, thisTimestepLoss, nextTimestepLoss);
   // We're interested in the paddle's loss
@@ -266,7 +266,7 @@ TEST(SADDLEPOINTS, BALL_ON_FIXED_GROUND_TRAJECTORY)
 {
   // World
   WorldPtr world = World::create();
-  world->setGravity(Eigen::Vector3d::UnitY() * -9.81);
+  world->setGravity(Eigen::Vector3s::UnitY() * -9.81);
 
   ///////////////////////////////////////////////
   // Create the ball
@@ -277,7 +277,7 @@ TEST(SADDLEPOINTS, BALL_ON_FIXED_GROUND_TRAJECTORY)
       = ball->createJointAndBodyNodePair<PrismaticJoint>(nullptr);
   PrismaticJoint* ballJoint = pairBall.first;
   BodyNode* ballBody = pairBall.second;
-  ballJoint->setAxis(Eigen::Vector3d::UnitY());
+  ballJoint->setAxis(Eigen::Vector3s::UnitY());
   std::shared_ptr<SphereShape> sphereShape(
       new SphereShape(0.5));
   ballBody->createShapeNodeWith<VisualAspect, CollisionAspect>(sphereShape);
@@ -298,7 +298,7 @@ TEST(SADDLEPOINTS, BALL_ON_FIXED_GROUND_TRAJECTORY)
   // WeldJoint* floorJoint = pairFloor.first;
   BodyNode* floorBody = pairFloor.second;
   std::shared_ptr<BoxShape> floorShape(
-      new BoxShape(Eigen::Vector3d(5.0,1.0,5.0)));
+      new BoxShape(Eigen::Vector3s(5.0,1.0,5.0)));
   floorBody->createShapeNodeWith<VisualAspect, CollisionAspect>(floorShape);
   floorBody->setFrictionCoeff(0.0);
 
@@ -320,12 +320,12 @@ TEST(SADDLEPOINTS, BALL_ON_FIXED_GROUND_TRAJECTORY)
   // Build an actual trajectory
   ///////////////////////////////////////////////
 
-  double goalPos = 5.0;
+  s_t goalPos = 5.0;
 
   TrajectoryLossFn loss = [goalPos](const TrajectoryRollout* rollout) {
     int steps = rollout->getPosesConst().cols();
-    double lastPos = rollout->getPosesConst()(0, steps - 1);
-    double diff = goalPos - lastPos;
+    s_t lastPos = rollout->getPosesConst()(0, steps - 1);
+    s_t diff = goalPos - lastPos;
     return diff * diff;
   };
 
@@ -337,8 +337,8 @@ TEST(SADDLEPOINTS, BALL_ON_FIXED_GROUND_TRAJECTORY)
     gradWrtRollout->getForces().setZero();
 
     int steps = rollout->getPosesConst().cols();
-    double lastPos = rollout->getPosesConst()(0, steps - 1);
-    double diff = lastPos - goalPos;
+    s_t lastPos = rollout->getPosesConst()(0, steps - 1);
+    s_t diff = lastPos - goalPos;
     gradWrtRollout->getPoses()(0, steps - 1) = 2 * diff;
     return diff * diff;
   };

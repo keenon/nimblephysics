@@ -24,10 +24,10 @@ int SimpleFeatherstone::len()
 
 // This computes accelerations
 void SimpleFeatherstone::forwardDynamics(
-    double* pos,
-    double* vel,
-    double* force,
-    /* OUT */ double* accelerations)
+    s_t* pos,
+    s_t* vel,
+    s_t* force,
+    /* OUT */ s_t* accelerations)
 {
   // Forward pass
   for (int i = 0; i < len(); i++)
@@ -90,15 +90,15 @@ void SimpleFeatherstone::forwardDynamics(
     // See GenericJoint.hpp:1801 for DART equivalent,
     // GenericJoint::addChildArtInertiaToDynamic()
     // AIS = Articulated_Inertia_times_axiS
-    Eigen::Vector6d AIS
+    Eigen::Vector6s AIS
         = mScratchSpace[i].articulatedInertia * mJointsAndBodies[i].axis;
-    Eigen::MatrixXd PI = mScratchSpace[i].articulatedInertia;
+    Eigen::MatrixXs PI = mScratchSpace[i].articulatedInertia;
     PI.noalias() -= AIS * mScratchSpace[i].psi * AIS.transpose();
     mScratchSpace[mJointsAndBodies[i].parentIndex].articulatedInertia
         += math::transformInertia(
             mScratchSpace[i].transformFromParent.inverse(), PI);
 
-    Eigen::Vector6d beta
+    Eigen::Vector6s beta
         = mScratchSpace[i].articulatedBiasForce
           + mScratchSpace[i].articulatedInertia
                 * (mScratchSpace[i].partialAcceleration

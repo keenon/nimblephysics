@@ -33,18 +33,17 @@
 #include "dart/dynamics/ConeShape.hpp"
 
 #include <cmath>
-#include "dart/math/Helpers.hpp"
-#include "dart/dynamics/SphereShape.hpp"
+
 #include "dart/dynamics/CylinderShape.hpp"
+#include "dart/dynamics/SphereShape.hpp"
+#include "dart/math/Helpers.hpp"
 
 namespace dart {
 namespace dynamics {
 
 //==============================================================================
-ConeShape::ConeShape(double radius, double height)
-  : Shape(CONE),
-    mRadius(radius),
-    mHeight(height)
+ConeShape::ConeShape(s_t radius, s_t height)
+  : Shape(CONE), mRadius(radius), mHeight(height)
 {
   assert(0.0 < radius);
   assert(0.0 < height);
@@ -64,13 +63,13 @@ const std::string& ConeShape::getStaticType()
 }
 
 //==============================================================================
-double ConeShape::getRadius() const
+s_t ConeShape::getRadius() const
 {
   return mRadius;
 }
 
 //==============================================================================
-void ConeShape::setRadius(double radius)
+void ConeShape::setRadius(s_t radius)
 {
   assert(0.0 < radius);
   mRadius = radius;
@@ -81,13 +80,13 @@ void ConeShape::setRadius(double radius)
 }
 
 //==============================================================================
-double ConeShape::getHeight() const
+s_t ConeShape::getHeight() const
 {
   return mHeight;
 }
 
 //==============================================================================
-void ConeShape::setHeight(double height)
+void ConeShape::setHeight(s_t height)
 {
   assert(0.0 < height);
   mHeight = height;
@@ -98,30 +97,29 @@ void ConeShape::setHeight(double height)
 }
 
 //==============================================================================
-double ConeShape::computeVolume(double radius, double height)
+s_t ConeShape::computeVolume(s_t radius, s_t height)
 {
-  return (1.0/3.0) * math::constantsd::pi() * std::pow(radius, 2) * height;
+  return (1.0 / 3.0) * math::constantsd::pi() * pow(radius, 2) * height;
 }
 
 //==============================================================================
-Eigen::Matrix3d ConeShape::computeInertia(
-    double radius, double height, double mass)
+Eigen::Matrix3s ConeShape::computeInertia(s_t radius, s_t height, s_t mass)
 {
   // Reference: https://en.wikipedia.org/wiki/List_of_moments_of_inertia
 
-  const auto radius2 = radius*radius;
-  const auto height2 = height*height;
+  const auto radius2 = radius * radius;
+  const auto height2 = height * height;
 
-  const auto Ixx = (3.0/20.0)*mass*(radius2 + (2.0/3.0)*height2);
-  const auto Izz = (3.0/10.0)*mass*radius2;
+  const auto Ixx = (3.0 / 20.0) * mass * (radius2 + (2.0 / 3.0) * height2);
+  const auto Izz = (3.0 / 10.0) * mass * radius2;
 
-  return Eigen::Vector3d(Ixx, Ixx, Izz).asDiagonal();
+  return Eigen::Vector3s(Ixx, Ixx, Izz).asDiagonal();
 }
 
 //==============================================================================
 void ConeShape::updateBoundingBox() const
 {
-  const Eigen::Vector3d corner(mRadius, mRadius, mRadius + 0.5*mHeight);
+  const Eigen::Vector3s corner(mRadius, mRadius, mRadius + 0.5 * mHeight);
 
   mBoundingBox.setMin(-corner);
   mBoundingBox.setMax(corner);
@@ -137,10 +135,10 @@ void ConeShape::updateVolume() const
 }
 
 //==============================================================================
-Eigen::Matrix3d ConeShape::computeInertia(double mass) const
+Eigen::Matrix3s ConeShape::computeInertia(s_t mass) const
 {
   return computeInertia(mRadius, mHeight, mass);
 }
 
-}  // namespace dynamics
-}  // namespace dart
+} // namespace dynamics
+} // namespace dart

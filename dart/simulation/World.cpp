@@ -156,7 +156,7 @@ WorldPtr World::clone() const
 }
 
 //==============================================================================
-void World::setTimeStep(double _timeStep)
+void World::setTimeStep(s_t _timeStep)
 {
   if (_timeStep <= 0.0)
   {
@@ -173,7 +173,7 @@ void World::setTimeStep(double _timeStep)
 }
 
 //==============================================================================
-double World::getTimeStep() const
+s_t World::getTimeStep() const
 {
   return mTimeStep;
 }
@@ -204,7 +204,7 @@ void World::integrateVelocities()
 //==============================================================================
 void World::step(bool _resetCommand)
 {
-  Eigen::VectorXd initialVelocity = getVelocities();
+  Eigen::VectorXs initialVelocity = getVelocities();
 
   // Integrate velocity for unconstrained skeletons
   for (auto& skel : mSkeletons)
@@ -276,13 +276,13 @@ void World::step(bool _resetCommand)
 }
 
 //==============================================================================
-void World::setTime(double _time)
+void World::setTime(s_t _time)
 {
   mTime = _time;
 }
 
 //==============================================================================
-double World::getTime() const
+s_t World::getTime() const
 {
   return mTime;
 }
@@ -312,25 +312,25 @@ bool World::getPenetrationCorrectionEnabled()
 }
 
 //==============================================================================
-void World::setFallbackConstraintForceMixingConstant(double constant)
+void World::setFallbackConstraintForceMixingConstant(s_t constant)
 {
   mFallbackConstraintForceMixingConstant = constant;
 }
 
 //==============================================================================
-double World::getFallbackConstraintForceMixingConstant()
+s_t World::getFallbackConstraintForceMixingConstant()
 {
   return mFallbackConstraintForceMixingConstant;
 }
 
 //==============================================================================
-void World::setContactClippingDepth(double depth)
+void World::setContactClippingDepth(s_t depth)
 {
   mContactClippingDepth = depth;
 }
 
 //==============================================================================
-double World::getContactClippingDepth()
+s_t World::getContactClippingDepth()
 {
   return mContactClippingDepth;
 }
@@ -385,7 +385,7 @@ std::string World::toJson()
       {
         const auto box = static_cast<const dynamics::BoxShape*>(shapePtr.get());
         json << "\"type\": \"box\",";
-        const Eigen::Vector3d& size = box->getSize();
+        const Eigen::Vector3s& size = box->getSize();
         json << "\"size\": ";
         vec3ToJson(json, size);
         json << ",";
@@ -396,12 +396,12 @@ std::string World::toJson()
       vec3ToJson(json, visual->getColor());
       json << ",";
 
-      Eigen::Vector3d relativePos = shape->getRelativeTranslation();
+      Eigen::Vector3s relativePos = shape->getRelativeTranslation();
       json << "\"pos\": ";
       vec3ToJson(json, relativePos);
       json << ",";
 
-      Eigen::Vector3d relativeAngle
+      Eigen::Vector3s relativeAngle
           = math::matrixToEulerXYZ(shape->getRelativeRotation());
       json << "\"angle\": ";
       vec3ToJson(json, relativeAngle);
@@ -413,7 +413,7 @@ std::string World::toJson()
       }
     }
     json << "],";
-    const Eigen::Isometry3d& bodyTransform = bodyNode->getWorldTransform();
+    const Eigen::Isometry3s& bodyTransform = bodyNode->getWorldTransform();
     json << "\"pos\":";
     vec3ToJson(json, bodyTransform.translation());
     json << ",";
@@ -455,7 +455,7 @@ std::string World::positionsToJson()
     */
     std::string name = skel->getName() + "." + bodyNode->getName();
     json << "\"" << name << "\": {";
-    const Eigen::Isometry3d& bodyTransform = bodyNode->getWorldTransform();
+    const Eigen::Isometry3s& bodyTransform = bodyNode->getWorldTransform();
     json << "\"pos\":";
     vec3ToJson(json, bodyTransform.translation());
     json << ",";
@@ -527,7 +527,7 @@ std::string World::colorsToJson()
 /// This gets the cached LCP solution, which is useful to be able to get/set
 /// because it can effect the forward solutions of physics problems because of
 /// our optimistic LCP-stabilization-to-acceptance approach.
-Eigen::VectorXd World::getCachedLCPSolution()
+Eigen::VectorXs World::getCachedLCPSolution()
 {
   return mConstraintSolver->getCachedLCPSolution();
 }
@@ -536,7 +536,7 @@ Eigen::VectorXd World::getCachedLCPSolution()
 /// This gets the cached LCP solution, which is useful to be able to get/set
 /// because it can effect the forward solutions of physics problems because of
 /// our optimistic LCP-stabilization-to-acceptance approach.
-void World::setCachedLCPSolution(Eigen::VectorXd X)
+void World::setCachedLCPSolution(Eigen::VectorXs X)
 {
   mConstraintSolver->setCachedLCPSolution(X);
 }
@@ -602,7 +602,7 @@ const std::string& World::getName() const
 }
 
 //==============================================================================
-void World::setGravity(const Eigen::Vector3d& _gravity)
+void World::setGravity(const Eigen::Vector3s& _gravity)
 {
   mGravity = _gravity;
   for (std::vector<dynamics::SkeletonPtr>::iterator it = mSkeletons.begin();
@@ -614,7 +614,7 @@ void World::setGravity(const Eigen::Vector3d& _gravity)
 }
 
 //==============================================================================
-const Eigen::Vector3d& World::getGravity() const
+const Eigen::Vector3s& World::getGravity() const
 {
   return mGravity;
 }
@@ -997,8 +997,8 @@ void World::clearTunableMassThisInstance()
 void World::tuneMass(
     dynamics::BodyNode* node,
     neural::WrtMassBodyNodeEntryType type,
-    Eigen::VectorXd upperBound,
-    Eigen::VectorXd lowerBound)
+    Eigen::VectorXs upperBound,
+    Eigen::VectorXs lowerBound)
 {
   mWrtMass->registerNode(node, type, upperBound, lowerBound);
 }
@@ -1015,15 +1015,15 @@ std::size_t World::getNumBodyNodes()
 }
 
 //==============================================================================
-Eigen::VectorXd World::getMasses()
+Eigen::VectorXs World::getMasses()
 {
   return mWrtMass->get(this);
 }
 
 //==============================================================================
-Eigen::VectorXd World::getPositions()
+Eigen::VectorXs World::getPositions()
 {
-  Eigen::VectorXd positions = Eigen::VectorXd(mDofs);
+  Eigen::VectorXs positions = Eigen::VectorXs(mDofs);
   std::size_t cursor = 0;
   for (std::size_t i = 0; i < mSkeletons.size(); i++)
   {
@@ -1035,9 +1035,9 @@ Eigen::VectorXd World::getPositions()
 }
 
 //==============================================================================
-Eigen::VectorXd World::getVelocities()
+Eigen::VectorXs World::getVelocities()
 {
-  Eigen::VectorXd velocities = Eigen::VectorXd(mDofs);
+  Eigen::VectorXs velocities = Eigen::VectorXs(mDofs);
   std::size_t cursor = 0;
   for (std::size_t i = 0; i < mSkeletons.size(); i++)
   {
@@ -1049,9 +1049,9 @@ Eigen::VectorXd World::getVelocities()
 }
 
 //==============================================================================
-Eigen::VectorXd World::getAccelerations()
+Eigen::VectorXs World::getAccelerations()
 {
-  Eigen::VectorXd velocities = Eigen::VectorXd(mDofs);
+  Eigen::VectorXs velocities = Eigen::VectorXs(mDofs);
   std::size_t cursor = 0;
   for (std::size_t i = 0; i < mSkeletons.size(); i++)
   {
@@ -1063,9 +1063,9 @@ Eigen::VectorXd World::getAccelerations()
 }
 
 //==============================================================================
-Eigen::VectorXd World::getExternalForces()
+Eigen::VectorXs World::getExternalForces()
 {
-  Eigen::VectorXd forces = Eigen::VectorXd(mDofs);
+  Eigen::VectorXs forces = Eigen::VectorXs(mDofs);
   std::size_t cursor = 0;
   for (std::size_t i = 0; i < mSkeletons.size(); i++)
   {
@@ -1077,9 +1077,9 @@ Eigen::VectorXd World::getExternalForces()
 }
 
 //==============================================================================
-Eigen::VectorXd World::getExternalForceUpperLimits()
+Eigen::VectorXs World::getExternalForceUpperLimits()
 {
-  Eigen::VectorXd limits = Eigen::VectorXd(mDofs);
+  Eigen::VectorXs limits = Eigen::VectorXs(mDofs);
   std::size_t cursor = 0;
   for (std::size_t i = 0; i < mSkeletons.size(); i++)
   {
@@ -1091,9 +1091,9 @@ Eigen::VectorXd World::getExternalForceUpperLimits()
 }
 
 //==============================================================================
-Eigen::VectorXd World::getExternalForceLowerLimits()
+Eigen::VectorXs World::getExternalForceLowerLimits()
 {
-  Eigen::VectorXd limits = Eigen::VectorXd(mDofs);
+  Eigen::VectorXs limits = Eigen::VectorXs(mDofs);
   std::size_t cursor = 0;
   for (std::size_t i = 0; i < mSkeletons.size(); i++)
   {
@@ -1105,9 +1105,9 @@ Eigen::VectorXd World::getExternalForceLowerLimits()
 }
 
 //==============================================================================
-Eigen::VectorXd World::getPositionUpperLimits()
+Eigen::VectorXs World::getPositionUpperLimits()
 {
-  Eigen::VectorXd limits = Eigen::VectorXd(mDofs);
+  Eigen::VectorXs limits = Eigen::VectorXs(mDofs);
   std::size_t cursor = 0;
   for (std::size_t i = 0; i < mSkeletons.size(); i++)
   {
@@ -1119,9 +1119,9 @@ Eigen::VectorXd World::getPositionUpperLimits()
 }
 
 //==============================================================================
-Eigen::VectorXd World::getPositionLowerLimits()
+Eigen::VectorXs World::getPositionLowerLimits()
 {
-  Eigen::VectorXd limits = Eigen::VectorXd(mDofs);
+  Eigen::VectorXs limits = Eigen::VectorXs(mDofs);
   std::size_t cursor = 0;
   for (std::size_t i = 0; i < mSkeletons.size(); i++)
   {
@@ -1133,9 +1133,9 @@ Eigen::VectorXd World::getPositionLowerLimits()
 }
 
 //==============================================================================
-Eigen::VectorXd World::getVelocityUpperLimits()
+Eigen::VectorXs World::getVelocityUpperLimits()
 {
-  Eigen::VectorXd limits = Eigen::VectorXd(mDofs);
+  Eigen::VectorXs limits = Eigen::VectorXs(mDofs);
   std::size_t cursor = 0;
   for (std::size_t i = 0; i < mSkeletons.size(); i++)
   {
@@ -1147,9 +1147,9 @@ Eigen::VectorXd World::getVelocityUpperLimits()
 }
 
 //==============================================================================
-Eigen::VectorXd World::getVelocityLowerLimits()
+Eigen::VectorXs World::getVelocityLowerLimits()
 {
-  Eigen::VectorXd limits = Eigen::VectorXd(mDofs);
+  Eigen::VectorXs limits = Eigen::VectorXs(mDofs);
   std::size_t cursor = 0;
   for (std::size_t i = 0; i < mSkeletons.size(); i++)
   {
@@ -1163,7 +1163,7 @@ Eigen::VectorXd World::getVelocityLowerLimits()
 //==============================================================================
 // This gives the vector of mass upper limits for all the registered bodies in
 // this world
-Eigen::VectorXd World::getMassUpperLimits()
+Eigen::VectorXs World::getMassUpperLimits()
 {
   return mWrtMass->upperBound(this);
 }
@@ -1171,13 +1171,13 @@ Eigen::VectorXd World::getMassUpperLimits()
 //==============================================================================
 // This gives the vector of mass lower limits for all the registered bodies in
 // this world
-Eigen::VectorXd World::getMassLowerLimits()
+Eigen::VectorXs World::getMassLowerLimits()
 {
   return mWrtMass->lowerBound(this);
 }
 
 //==============================================================================
-void World::setPositions(Eigen::VectorXd position)
+void World::setPositions(Eigen::VectorXs position)
 {
   std::size_t cursor = 0;
   for (std::size_t i = 0; i < mSkeletons.size(); i++)
@@ -1189,7 +1189,7 @@ void World::setPositions(Eigen::VectorXd position)
 }
 
 //==============================================================================
-void World::setVelocities(Eigen::VectorXd velocity)
+void World::setVelocities(Eigen::VectorXs velocity)
 {
   std::size_t cursor = 0;
   for (std::size_t i = 0; i < mSkeletons.size(); i++)
@@ -1201,7 +1201,7 @@ void World::setVelocities(Eigen::VectorXd velocity)
 }
 
 //==============================================================================
-void World::setAccelerations(Eigen::VectorXd accelerations)
+void World::setAccelerations(Eigen::VectorXs accelerations)
 {
   std::size_t cursor = 0;
   for (std::size_t i = 0; i < mSkeletons.size(); i++)
@@ -1213,7 +1213,7 @@ void World::setAccelerations(Eigen::VectorXd accelerations)
 }
 
 //==============================================================================
-void World::setExternalForces(Eigen::VectorXd forces)
+void World::setExternalForces(Eigen::VectorXs forces)
 {
   std::size_t cursor = 0;
   for (std::size_t i = 0; i < mSkeletons.size(); i++)
@@ -1225,7 +1225,7 @@ void World::setExternalForces(Eigen::VectorXd forces)
 }
 
 //==============================================================================
-void World::setExternalForceUpperLimits(Eigen::VectorXd limits)
+void World::setExternalForceUpperLimits(Eigen::VectorXs limits)
 {
   std::size_t cursor = 0;
   for (std::size_t i = 0; i < mSkeletons.size(); i++)
@@ -1237,7 +1237,7 @@ void World::setExternalForceUpperLimits(Eigen::VectorXd limits)
 }
 
 //==============================================================================
-void World::setExternalForceLowerLimits(Eigen::VectorXd limits)
+void World::setExternalForceLowerLimits(Eigen::VectorXs limits)
 {
   std::size_t cursor = 0;
   for (std::size_t i = 0; i < mSkeletons.size(); i++)
@@ -1249,7 +1249,7 @@ void World::setExternalForceLowerLimits(Eigen::VectorXd limits)
 }
 
 //==============================================================================
-void World::setPositionUpperLimits(Eigen::VectorXd limits)
+void World::setPositionUpperLimits(Eigen::VectorXs limits)
 {
   std::size_t cursor = 0;
   for (std::size_t i = 0; i < mSkeletons.size(); i++)
@@ -1261,7 +1261,7 @@ void World::setPositionUpperLimits(Eigen::VectorXd limits)
 }
 
 //==============================================================================
-void World::setPositionLowerLimits(Eigen::VectorXd limits)
+void World::setPositionLowerLimits(Eigen::VectorXs limits)
 {
   std::size_t cursor = 0;
   for (std::size_t i = 0; i < mSkeletons.size(); i++)
@@ -1273,7 +1273,7 @@ void World::setPositionLowerLimits(Eigen::VectorXd limits)
 }
 
 //==============================================================================
-void World::setVelocityUpperLimits(Eigen::VectorXd limits)
+void World::setVelocityUpperLimits(Eigen::VectorXs limits)
 {
   std::size_t cursor = 0;
   for (std::size_t i = 0; i < mSkeletons.size(); i++)
@@ -1285,7 +1285,7 @@ void World::setVelocityUpperLimits(Eigen::VectorXd limits)
 }
 
 //==============================================================================
-void World::setVelocityLowerLimits(Eigen::VectorXd limits)
+void World::setVelocityLowerLimits(Eigen::VectorXs limits)
 {
   std::size_t cursor = 0;
   for (std::size_t i = 0; i < mSkeletons.size(); i++)
@@ -1298,7 +1298,7 @@ void World::setVelocityLowerLimits(Eigen::VectorXd limits)
 
 //==============================================================================
 // This sets all the masses for all the registered bodies in the world
-void World::setMasses(Eigen::VectorXd masses)
+void World::setMasses(Eigen::VectorXs masses)
 {
   mWrtMass->set(this, masses);
 }
@@ -1306,9 +1306,9 @@ void World::setMasses(Eigen::VectorXd masses)
 //==============================================================================
 /// This gives the C(pos, vel) vector for all the skeletons in the world,
 /// without accounting for the external forces
-Eigen::VectorXd World::getCoriolisAndGravityForces()
+Eigen::VectorXs World::getCoriolisAndGravityForces()
 {
-  Eigen::VectorXd result = Eigen::VectorXd::Zero(getNumDofs());
+  Eigen::VectorXs result = Eigen::VectorXs::Zero(getNumDofs());
   std::size_t cursor = 0;
   for (std::size_t i = 0; i < getNumSkeletons(); i++)
   {
@@ -1321,9 +1321,9 @@ Eigen::VectorXd World::getCoriolisAndGravityForces()
 }
 
 //==============================================================================
-Eigen::VectorXd World::getCoriolisAndGravityAndExternalForces()
+Eigen::VectorXs World::getCoriolisAndGravityAndExternalForces()
 {
-  Eigen::VectorXd result = Eigen::VectorXd::Zero(getNumDofs());
+  Eigen::VectorXs result = Eigen::VectorXs::Zero(getNumDofs());
   std::size_t cursor = 0;
   for (std::size_t i = 0; i < getNumSkeletons(); i++)
   {
@@ -1337,9 +1337,9 @@ Eigen::VectorXd World::getCoriolisAndGravityAndExternalForces()
 }
 
 //==============================================================================
-Eigen::MatrixXd World::getMassMatrix()
+Eigen::MatrixXs World::getMassMatrix()
 {
-  Eigen::MatrixXd massMatrix = Eigen::MatrixXd::Zero(mDofs, mDofs);
+  Eigen::MatrixXs massMatrix = Eigen::MatrixXs::Zero(mDofs, mDofs);
   std::size_t cursor = 0;
   for (std::size_t i = 0; i < mSkeletons.size(); i++)
   {
@@ -1352,9 +1352,9 @@ Eigen::MatrixXd World::getMassMatrix()
 }
 
 //==============================================================================
-Eigen::MatrixXd World::getInvMassMatrix()
+Eigen::MatrixXs World::getInvMassMatrix()
 {
-  Eigen::MatrixXd invMassMatrix = Eigen::MatrixXd::Zero(mDofs, mDofs);
+  Eigen::MatrixXs invMassMatrix = Eigen::MatrixXs::Zero(mDofs, mDofs);
   std::size_t cursor = 0;
   for (std::size_t i = 0; i < mSkeletons.size(); i++)
   {
@@ -1429,7 +1429,7 @@ void World::bake()
   const auto nContacts = static_cast<int>(collisionResult.getNumContacts());
   const auto nSkeletons = getNumSkeletons();
 
-  Eigen::VectorXd state(getIndex(nSkeletons) + 6 * nContacts);
+  Eigen::VectorXs state(getIndex(nSkeletons) + 6 * nContacts);
   for (auto i = 0u; i < getNumSkeletons(); ++i)
   {
     state.segment(getIndex(i), getSkeleton(i)->getNumDofs())
@@ -1453,7 +1453,7 @@ Recording* World::getRecording()
 }
 
 //==============================================================================
-const Eigen::VectorXd& World::getLastPreConstraintVelocity() const
+const Eigen::VectorXs& World::getLastPreConstraintVelocity() const
 {
   return mLastPreConstraintVelocity;
 }
@@ -1463,9 +1463,9 @@ const Eigen::VectorXd& World::getLastPreConstraintVelocity() const
 /// just be an identity matrix, and often it is, but if we have any FreeJoints
 /// or BallJoints things get more complicated, because they actually use a
 /// complicated function to integrate to the next position.
-Eigen::MatrixXd World::getPosPosJacobian() const
+Eigen::MatrixXs World::getPosPosJacobian() const
 {
-  Eigen::MatrixXd jac = Eigen::MatrixXd::Zero(mDofs, mDofs);
+  Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(mDofs, mDofs);
   int cursor = 0;
   for (auto& skel : mSkeletons)
   {
@@ -1482,9 +1482,9 @@ Eigen::MatrixXd World::getPosPosJacobian() const
 /// just be an identity matrix * dt, and often it is, but if we have any
 /// FreeJoints or BallJoints things get more complicated, because they
 /// actually use a complicated function to integrate to the next position.
-Eigen::MatrixXd World::getVelPosJacobian() const
+Eigen::MatrixXs World::getVelPosJacobian() const
 {
-  Eigen::MatrixXd jac = Eigen::MatrixXd::Zero(mDofs, mDofs);
+  Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(mDofs, mDofs);
   int cursor = 0;
   for (auto& skel : mSkeletons)
   {

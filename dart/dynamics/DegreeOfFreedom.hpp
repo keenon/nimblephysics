@@ -33,12 +33,14 @@
 #ifndef DART_DYNAMICS_DEGREEOFFREEDOM_HPP_
 #define DART_DYNAMICS_DEGREEOFFREEDOM_HPP_
 
-#include <string>
 #include <memory>
+#include <string>
+
 #include <Eigen/Core>
 
 #include "dart/common/Subject.hpp"
 #include "dart/dynamics/SmartPointer.hpp"
+#include "dart/math/MathTypes.hpp"
 
 namespace dart {
 namespace dynamics {
@@ -52,9 +54,9 @@ class BodyNode;
 class DegreeOfFreedom : public virtual common::Subject
 {
 public:
-
   friend class Joint;
-  template<class> friend class GenericJoint;
+  template <class>
+  friend class GenericJoint;
   friend class Skeleton;
 
   DegreeOfFreedom(const DegreeOfFreedom&) = delete;
@@ -65,7 +67,8 @@ public:
   /// function. Set _preserveName to true when customizing the name of the
   /// DegreeOfFreedom; that way the name will not be overwritten if the Joint
   /// name changes.
-  const std::string& setName(const std::string& _name, bool _preserveName=true);
+  const std::string& setName(
+      const std::string& _name, bool _preserveName = true);
 
   /// \brief Get the name of this DegreeOfFreedom
   ///
@@ -110,10 +113,10 @@ public:
   //----------------------------------------------------------------------------
 
   /// Set the command of this DegreeOfFreedom
-  void setCommand(double _command);
+  void setCommand(s_t _command);
 
   /// Get the command of this DegreeOfFreedom
-  double getCommand() const;
+  s_t getCommand() const;
 
   /// Set the command of this DegreeOfFreedom to zero
   void resetCommand();
@@ -125,31 +128,31 @@ public:
   //----------------------------------------------------------------------------
 
   /// Set the position of this DegreeOfFreedom
-  void setPosition(double _position);
+  void setPosition(s_t _position);
 
   /// Get the position of this DegreeOfFreedom
-  double getPosition() const;
+  s_t getPosition() const;
 
   /// Set the position limits of this DegreeOfFreedom
-  void setPositionLimits(double _lowerLimit, double _upperLimit);
+  void setPositionLimits(s_t _lowerLimit, s_t _upperLimit);
 
   /// Set the position limits of this DegreeOfFreedom
-  void setPositionLimits(const std::pair<double,double>& _limits);
+  void setPositionLimits(const std::pair<s_t, s_t>& _limits);
 
   /// Get the position limits of this DegreeOfFreedom
-  std::pair<double,double> getPositionLimits() const;
+  std::pair<s_t, s_t> getPositionLimits() const;
 
   /// Set the lower position limit of this DegreeOfFreedom
-  void setPositionLowerLimit(double _limit);
+  void setPositionLowerLimit(s_t _limit);
 
   /// Get the lower position limit of this DegreeOfFreedom
-  double getPositionLowerLimit() const;
+  s_t getPositionLowerLimit() const;
 
   /// Set the upper position limit of this DegreeOfFreedom
-  void setPositionUpperLimit(double _limit);
+  void setPositionUpperLimit(s_t _limit);
 
   /// Get the upper position limit of this DegreeOfFreedom
-  double getPositionUpperLimit() const;
+  s_t getPositionUpperLimit() const;
 
   /// Get whether this DOF is cyclic. Return true if and only if an infinite
   /// number of DOF positions produce the same local transform. If this DOF is
@@ -164,10 +167,10 @@ public:
   void resetPosition();
 
   /// Change the position that resetPosition() will give to this DegreeOfFreedom
-  void setInitialPosition(double _initial);
+  void setInitialPosition(s_t _initial);
 
   /// Get the position that resetPosition() will give to this DegreeOfFreedom
-  double getInitialPosition() const;
+  s_t getInitialPosition() const;
 
   /// \}
 
@@ -176,40 +179,40 @@ public:
   //----------------------------------------------------------------------------
 
   /// Set the velocity of this DegreeOfFreedom
-  void setVelocity(double _velocity);
+  void setVelocity(s_t _velocity);
 
   /// Get the velocity of this DegreeOfFreedom
-  double getVelocity() const;
+  s_t getVelocity() const;
 
   /// Set the velocity limits of this DegreeOfFreedom
-  void setVelocityLimits(double _lowerLimit, double _upperLimit);
+  void setVelocityLimits(s_t _lowerLimit, s_t _upperLimit);
 
   /// Set the velocity limtis of this DegreeOfFreedom
-  void setVelocityLimits(const std::pair<double,double>& _limits);
+  void setVelocityLimits(const std::pair<s_t, s_t>& _limits);
 
   /// Get the velocity limits of this DegreeOfFreedom
-  std::pair<double,double> getVelocityLimits() const;
+  std::pair<s_t, s_t> getVelocityLimits() const;
 
   /// Set the lower velocity limit of this DegreeOfFreedom
-  void setVelocityLowerLimit(double _limit);
+  void setVelocityLowerLimit(s_t _limit);
 
   /// Get the lower velocity limit of this DegreeOfFreedom
-  double getVelocityLowerLimit() const;
+  s_t getVelocityLowerLimit() const;
 
   /// Set the upper velocity limit of this DegreeOfFreedom
-  void setVelocityUpperLimit(double _limit);
+  void setVelocityUpperLimit(s_t _limit);
 
   /// Get the upper Velocity limit of this DegreeOfFreedom
-  double getVelocityUpperLimit() const;
+  s_t getVelocityUpperLimit() const;
 
   /// Set the velocity of this DegreeOfFreedom to zero
   void resetVelocity();
 
   /// Change the velocity that resetVelocity() will give to this DegreeOfFreedom
-  void setInitialVelocity(double _initial);
+  void setInitialVelocity(s_t _initial);
 
   /// Get the velocity that resetVelocity() will give to this DegreeOfFreedom
-  double getInitialVelocity() const;
+  s_t getInitialVelocity() const;
 
   /// \}
 
@@ -218,34 +221,34 @@ public:
   //----------------------------------------------------------------------------
 
   /// Set the acceleration of this DegreeOfFreedom
-  void setAcceleration(double _acceleration);
+  void setAcceleration(s_t _acceleration);
 
   /// Get the acceleration of this DegreeOfFreedom
-  double getAcceleration() const;
+  s_t getAcceleration() const;
 
   /// Set the acceleration of this DegreeOfFreedom to zero
   void resetAcceleration();
 
   /// Set the acceleration limits of this DegreeOfFreedom
-  void setAccelerationLimits(double _lowerLimit, double _upperLimit);
+  void setAccelerationLimits(s_t _lowerLimit, s_t _upperLimit);
 
   /// Set the acceleartion limits of this DegreeOfFreedom
-  void setAccelerationLimits(const std::pair<double,double>& _limits);
+  void setAccelerationLimits(const std::pair<s_t, s_t>& _limits);
 
   /// Get the acceleration limits of this DegreeOfFreedom
-  std::pair<double,double> getAccelerationLimits() const;
+  std::pair<s_t, s_t> getAccelerationLimits() const;
 
   /// Set the lower acceleration limit of this DegreeOfFreedom
-  void setAccelerationLowerLimit(double _limit);
+  void setAccelerationLowerLimit(s_t _limit);
 
   /// Get the lower acceleration limit of this DegreeOfFreedom
-  double getAccelerationLowerLimit() const;
+  s_t getAccelerationLowerLimit() const;
 
   /// Set the upper acceleration limit of this DegreeOfFreedom
-  void setAccelerationUpperLimit(double _limit);
+  void setAccelerationUpperLimit(s_t _limit);
 
   /// Get the upper acceleration limit of this DegreeOfFreedom
-  double getAccelerationUpperLimit() const;
+  s_t getAccelerationUpperLimit() const;
 
   /// \}
 
@@ -254,34 +257,34 @@ public:
   //----------------------------------------------------------------------------
 
   /// Set the generalized force of this DegreeOfFreedom
-  void setForce(double _force);
+  void setForce(s_t _force);
 
   /// Get the generalized force of this DegreeOfFreedom
-  double getForce() const;
+  s_t getForce() const;
 
   /// Set the generalized force of this DegreeOfFreedom to zero
   void resetForce();
 
   /// Set the generalized force limits of this DegreeOfFreedom
-  void setForceLimits(double _lowerLimit, double _upperLimit);
+  void setForceLimits(s_t _lowerLimit, s_t _upperLimit);
 
   /// Set the generalized force limits of this DegreeOfFreedom
-  void setForceLimits(const std::pair<double,double>& _limits);
+  void setForceLimits(const std::pair<s_t, s_t>& _limits);
 
   /// Get the generalized force limits of this DegreeOfFreedom
-  std::pair<double,double> getForceLimits() const;
+  std::pair<s_t, s_t> getForceLimits() const;
 
   /// Set the lower generalized force limit of this DegreeOfFreedom
-  void setForceLowerLimit(double _limit);
+  void setForceLowerLimit(s_t _limit);
 
   /// Get the lower generalized force limit of this DegreeOfFreedom
-  double getForceLowerLimit() const;
+  s_t getForceLowerLimit() const;
 
   /// Set the upper generalized force limit of this DegreeOfFreedom
-  void setForceUpperLimit(double _limit);
+  void setForceUpperLimit(s_t _limit);
 
   /// Get the upper generalized force limit of this DegreeOfFreedom
-  double getForceUpperLimit() const;
+  s_t getForceUpperLimit() const;
 
   /// \}
 
@@ -290,10 +293,10 @@ public:
   //----------------------------------------------------------------------------
 
   /// Set the velocity change of this DegreeOfFreedom
-  void setVelocityChange(double _velocityChange);
+  void setVelocityChange(s_t _velocityChange);
 
   /// Get the velocity change of this DegreeOfFreedom
-  double getVelocityChange() const;
+  s_t getVelocityChange() const;
 
   /// Set the velocity change of this DegreeOfFreedom to zero
   void resetVelocityChange();
@@ -305,10 +308,10 @@ public:
   //----------------------------------------------------------------------------
 
   /// Set the constraint impulse of this generalized coordinate
-  void setConstraintImpulse(double _impulse);
+  void setConstraintImpulse(s_t _impulse);
 
   /// Get the constraint impulse of this generalized coordinate
-  double getConstraintImpulse() const;
+  s_t getConstraintImpulse() const;
 
   /// Set the constraint impulse of this generalized coordinate to zero
   void resetConstraintImpulse();
@@ -320,30 +323,30 @@ public:
   //----------------------------------------------------------------------------
 
   /// Set stiffness of the spring force for this generalized coordinate
-  void setSpringStiffness(double _k);
+  void setSpringStiffness(s_t _k);
 
   /// Get stiffness of the spring force for this generalized coordinate
-  double getSpringStiffness() const;
+  s_t getSpringStiffness() const;
 
   /// Set rest position for the spring force of this generalized coordinate
-  void setRestPosition(double _q0);
+  void setRestPosition(s_t _q0);
 
   /// Get rest position for the spring force of this generalized coordinate
-  double getRestPosition() const;
+  s_t getRestPosition() const;
 
   /// Set coefficient of damping (viscous friction) force for this generalized
   /// coordinate
-  void setDampingCoefficient(double _coeff);
+  void setDampingCoefficient(s_t _coeff);
 
   /// Get coefficient of damping (viscous friction) force for this generalized
   /// coordinate
-  double getDampingCoefficient() const;
+  s_t getDampingCoefficient() const;
 
   /// Set Coulomb friction force for this generalized coordinate
-  void setCoulombFriction(double _friction);
+  void setCoulombFriction(s_t _friction);
 
   /// Get Coulomb friction force for this generalized coordinate
-  double getCoulombFriction() const;
+  s_t getCoulombFriction() const;
 
   /// \}
 
@@ -375,16 +378,20 @@ public:
   /// Get the BodyNode upstream of this DegreeOfFreedom
   const BodyNode* getParentBodyNode() const;
 
-  /// This does a slow walk up the tree to figure out if `target` is a child of this node.
+  /// This does a slow walk up the tree to figure out if `target` is a child of
+  /// this node.
   bool isParentOf(const DegreeOfFreedom* target) const;
 
-  /// This does a slow walk up the tree to figure out if `target` is a child of this node.
+  /// This does a slow walk up the tree to figure out if `target` is a child of
+  /// this node.
   bool isParentOf(const BodyNode* target) const;
 
-  /// This uses the cached version, stored on the parent Skeleton, to return the same value as isParentOf()
+  /// This uses the cached version, stored on the parent Skeleton, to return the
+  /// same value as isParentOf()
   bool isParentOfFast(const DegreeOfFreedom* target) const;
 
-  /// This uses the cached version, stored on the parent Skeleton, to return the same value as isParentOf()
+  /// This uses the cached version, stored on the parent Skeleton, to return the
+  /// same value as isParentOf()
   bool isParentOfFast(const BodyNode* target) const;
 
   /// \}
@@ -413,7 +420,6 @@ protected:
   // whether mJoint is nullptr, because only Joints are allowed to create a
   // DegreeOfFreedom and every DegreeOfFreedom is deleted when its Joint is
   // destructed.
-
 };
 
 } // namespace dynamics

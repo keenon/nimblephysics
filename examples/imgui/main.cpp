@@ -257,9 +257,9 @@ protected:
     mGravity = gravity;
 
     if (mGravity)
-      mWorld->setGravity(-9.81 * Eigen::Vector3d::UnitZ());
+      mWorld->setGravity(-9.81 * Eigen::Vector3s::UnitZ());
     else
-      mWorld->setGravity(Eigen::Vector3d::Zero());
+      mWorld->setGravity(Eigen::Vector3s::Zero());
   }
 
   osg::ref_ptr<dart::gui::osg::ImGuiViewer> mViewer;

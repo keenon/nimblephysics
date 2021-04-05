@@ -36,7 +36,6 @@
 #include "dart/common/SmartPointer.hpp"
 #include "dart/dynamics/detail/BodyNodePtr.hpp"
 #include "dart/dynamics/detail/DegreeOfFreedomPtr.hpp"
-#include "dart/dynamics/detail/InverseKinematicsPtr.hpp"
 #include "dart/dynamics/detail/JointPtr.hpp"
 #include "dart/dynamics/detail/NodePtr.hpp"
 
@@ -163,20 +162,6 @@ DART_DYNAMICS_MAKE_NODEPTR(EndEffector)
 // TemplateWeakNodePtr<const EndEffector>   --> WeakConstEndEffectorPtr
 
 DART_DYNAMICS_MAKE_NODEPTR(ShapeNode)
-
-//-----------------------------------------------------------------------------
-// InverseKinematics Smart Pointers
-//-----------------------------------------------------------------------------
-#define DART_DYNAMICS_MAKE_IK_PTR(X)                                           \
-  class X;                                                                     \
-  using X##Ptr = TemplateInverseKinematicsPtr<X, JacobianNodePtr>;             \
-  using Const##X##Ptr                                                          \
-      = TemplateInverseKinematicsPtr<const X, ConstJacobianNodePtr>;           \
-  using Weak##X##Ptr = TemplateWeakInverseKinematicsPtr<X, JacobianNodePtr>;   \
-  using WeakConst##X##Ptr                                                      \
-      = TemplateWeakInverseKinematicsPtr<const X, ConstJacobianNodePtr>;
-
-DART_DYNAMICS_MAKE_IK_PTR(InverseKinematics)
 
 } // namespace dynamics
 } // namespace dart

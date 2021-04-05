@@ -51,10 +51,10 @@ using namespace tiny_dnn;
 using namespace tiny_dnn::activation;
 using namespace tiny_dnn::layers;
 
-double HumanLegJointLimitConstraint::mErrorAllowance = DART_ERROR_ALLOWANCE;
-double HumanLegJointLimitConstraint::mErrorReductionParameter = DART_ERP;
-double HumanLegJointLimitConstraint::mMaxErrorReductionVelocity = DART_MAX_ERV;
-double HumanLegJointLimitConstraint::mConstraintForceMixing = DART_CFM;
+s_t HumanLegJointLimitConstraint::mErrorAllowance = DART_ERROR_ALLOWANCE;
+s_t HumanLegJointLimitConstraint::mErrorReductionParameter = DART_ERP;
+s_t HumanLegJointLimitConstraint::mMaxErrorReductionVelocity = DART_MAX_ERV;
+s_t HumanLegJointLimitConstraint::mConstraintForceMixing = DART_CFM;
 
 //==============================================================================
 HumanLegJointLimitConstraint::HumanLegJointLimitConstraint(
@@ -96,7 +96,7 @@ HumanLegJointLimitConstraint::HumanLegJointLimitConstraint(
 }
 
 //==============================================================================
-void HumanLegJointLimitConstraint::setErrorAllowance(double allowance)
+void HumanLegJointLimitConstraint::setErrorAllowance(s_t allowance)
 {
   // Clamp error reduction parameter if it is out of the range
   if (allowance < 0.0)
@@ -111,13 +111,13 @@ void HumanLegJointLimitConstraint::setErrorAllowance(double allowance)
 }
 
 //==============================================================================
-double HumanLegJointLimitConstraint::getErrorAllowance()
+s_t HumanLegJointLimitConstraint::getErrorAllowance()
 {
   return mErrorAllowance;
 }
 
 //==============================================================================
-void HumanLegJointLimitConstraint::setErrorReductionParameter(double erp)
+void HumanLegJointLimitConstraint::setErrorReductionParameter(s_t erp)
 {
   // Clamp error reduction parameter if it is out of the range [0, 1]
   if (erp < 0.0)
@@ -137,13 +137,13 @@ void HumanLegJointLimitConstraint::setErrorReductionParameter(double erp)
 }
 
 //==============================================================================
-double HumanLegJointLimitConstraint::getErrorReductionParameter()
+s_t HumanLegJointLimitConstraint::getErrorReductionParameter()
 {
   return mErrorReductionParameter;
 }
 
 //==============================================================================
-void HumanLegJointLimitConstraint::setMaxErrorReductionVelocity(double erv)
+void HumanLegJointLimitConstraint::setMaxErrorReductionVelocity(s_t erv)
 {
   // Clamp maximum error reduction velocity if it is out of the range
   if (erv < 0.0)
@@ -158,13 +158,13 @@ void HumanLegJointLimitConstraint::setMaxErrorReductionVelocity(double erv)
 }
 
 //==============================================================================
-double HumanLegJointLimitConstraint::getMaxErrorReductionVelocity()
+s_t HumanLegJointLimitConstraint::getMaxErrorReductionVelocity()
 {
   return mMaxErrorReductionVelocity;
 }
 
 //==============================================================================
-void HumanLegJointLimitConstraint::setConstraintForceMixing(double cfm)
+void HumanLegJointLimitConstraint::setConstraintForceMixing(s_t cfm)
 {
   // Clamp constraint force mixing parameter if it is out of the range
   if (cfm < 1e-9)
@@ -186,7 +186,7 @@ void HumanLegJointLimitConstraint::setConstraintForceMixing(double cfm)
 }
 
 //==============================================================================
-double HumanLegJointLimitConstraint::getConstraintForceMixing()
+s_t HumanLegJointLimitConstraint::getConstraintForceMixing()
 {
   return mConstraintForceMixing;
 }
@@ -194,19 +194,19 @@ double HumanLegJointLimitConstraint::getConstraintForceMixing()
 //==============================================================================
 void HumanLegJointLimitConstraint::update()
 {
-  double qz = mHipJoint->getPosition(0);
-  double qx = mHipJoint->getPosition(1);
-  double qy = mHipJoint->getPosition(2);
-  double qe = mKneeJoint->getPosition(0);
-  double hx = mAnkleJoint->getPosition(0);
-  double hy = mAnkleJoint->getPosition(1);
+  s_t qz = mHipJoint->getPosition(0);
+  s_t qx = mHipJoint->getPosition(1);
+  s_t qy = mHipJoint->getPosition(2);
+  s_t qe = mKneeJoint->getPosition(0);
+  s_t hx = mAnkleJoint->getPosition(0);
+  s_t hy = mAnkleJoint->getPosition(1);
 
-  double qz_d = mHipJoint->getVelocity(0);
-  double qx_d = mHipJoint->getVelocity(1);
-  double qy_d = mHipJoint->getVelocity(2);
-  double qe_d = mKneeJoint->getVelocity(0);
-  double hx_d = mAnkleJoint->getVelocity(0);
-  double hy_d = mAnkleJoint->getVelocity(1);
+  s_t qz_d = mHipJoint->getVelocity(0);
+  s_t qx_d = mHipJoint->getVelocity(1);
+  s_t qy_d = mHipJoint->getVelocity(2);
+  s_t qe_d = mKneeJoint->getVelocity(0);
+  s_t hx_d = mAnkleJoint->getVelocity(0);
+  s_t hy_d = mAnkleJoint->getVelocity(1);
 
   // if isMirror (right-lrg), set up a mirrored euler joint for hip
   // i.e. pass the mirrored config to NN
@@ -216,7 +216,7 @@ void HumanLegJointLimitConstraint::update()
     qy = -qy;
   }
 
-  double qsin[8] = {cos(qz),
+  s_t qsin[8] = {cos(qz),
                     sin(qz),
                     cos(qx),
                     sin(qx),
@@ -227,7 +227,7 @@ void HumanLegJointLimitConstraint::update()
   vec_t input;
   input.assign(qsin, qsin + 8);
   vec_t pred_vec = mNet.predict(input);
-  double C = *(pred_vec.begin());
+  s_t C = *(pred_vec.begin());
 
   mViolation = C - 0.5;
 
@@ -301,7 +301,7 @@ void HumanLegJointLimitConstraint::update()
 
     // TODO: Normalize grad seems unnecessary?
 
-    Eigen::Vector6d q_d;
+    Eigen::Vector6s q_d;
     q_d << qz_d, qx_d, qy_d, qe_d, hx_d, hy_d;
     mNegativeVel = -mJacobian.dot(q_d);
 
@@ -322,7 +322,7 @@ void HumanLegJointLimitConstraint::getInformation(
   assert(lcp->w[0] == 0.0);
   assert(lcp->findex[0] == -1);
 
-  double bouncingVel = -mViolation - mErrorAllowance;
+  s_t bouncingVel = -mViolation - mErrorAllowance;
   if (bouncingVel < 0.0)
   {
     bouncingVel = 0.0;
@@ -381,14 +381,14 @@ void HumanLegJointLimitConstraint::applyUnitImpulse(std::size_t index)
 
 //==============================================================================
 void HumanLegJointLimitConstraint::getVelocityChange(
-    double* delVel, bool withCfm)
+    s_t* delVel, bool withCfm)
 {
   assert(delVel != nullptr && "Null pointer is not allowed.");
   delVel[0] = 0.0;
 
   if (mHipJoint->getSkeleton()->isImpulseApplied())
   {
-    Eigen::Vector6d delq_d;
+    Eigen::Vector6s delq_d;
     for (std::size_t i = 0; i < 3; i++)
     {
       delq_d[i] = mHipJoint->getVelocityChange(i);
@@ -421,7 +421,7 @@ void HumanLegJointLimitConstraint::unexcite()
 }
 
 //==============================================================================
-void HumanLegJointLimitConstraint::applyImpulse(double* lambda)
+void HumanLegJointLimitConstraint::applyImpulse(s_t* lambda)
 {
   assert(isActive());
 

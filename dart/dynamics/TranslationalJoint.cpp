@@ -41,8 +41,7 @@ namespace dart {
 namespace dynamics {
 
 //==============================================================================
-TranslationalJoint::Properties::Properties(
-    const Base::Properties& _properties)
+TranslationalJoint::Properties::Properties(const Base::Properties& _properties)
   : Base::Properties(_properties)
 {
   // Do nothing
@@ -55,8 +54,8 @@ TranslationalJoint::~TranslationalJoint()
 }
 
 //==============================================================================
-Eigen::Matrix<double, 6, 3> TranslationalJoint::getRelativeJacobianStatic(
-    const Eigen::Vector3d& /*_positions*/) const
+Eigen::Matrix<s_t, 6, 3> TranslationalJoint::getRelativeJacobianStatic(
+    const Eigen::Vector3s& /*_positions*/) const
 {
   // The Jacobian is always constant w.r.t. the generalized coordinates.
   return getRelativeJacobianStatic();
@@ -107,11 +106,11 @@ bool TranslationalJoint::isCyclic(std::size_t /*_index*/) const
 //==============================================================================
 void TranslationalJoint::updateDegreeOfFreedomNames()
 {
-  if(!mDofs[0]->isNamePreserved())
+  if (!mDofs[0]->isNamePreserved())
     mDofs[0]->setName(Joint::mAspectProperties.mName + "_x", false);
-  if(!mDofs[1]->isNamePreserved())
+  if (!mDofs[1]->isNamePreserved())
     mDofs[1]->setName(Joint::mAspectProperties.mName + "_y", false);
-  if(!mDofs[2]->isNamePreserved())
+  if (!mDofs[2]->isNamePreserved())
     mDofs[2]->setName(Joint::mAspectProperties.mName + "_z", false);
 }
 
@@ -119,7 +118,7 @@ void TranslationalJoint::updateDegreeOfFreedomNames()
 void TranslationalJoint::updateRelativeTransform() const
 {
   mT = Joint::mAspectProperties.mT_ParentBodyToJoint
-       * Eigen::Translation3d(getPositionsStatic())
+       * Eigen::Translation3s(getPositionsStatic())
        * Joint::mAspectProperties.mT_ChildBodyToJoint.inverse();
 
   // Verification
@@ -131,10 +130,11 @@ void TranslationalJoint::updateRelativeJacobian(bool _mandatory) const
 {
   if (_mandatory)
   {
-    mJacobian.bottomRows<3>() = Joint::mAspectProperties.mT_ChildBodyToJoint.linear();
+    mJacobian.bottomRows<3>()
+        = Joint::mAspectProperties.mT_ChildBodyToJoint.linear();
 
     // Verification
-    assert(mJacobian.topRows<3>() == Eigen::Matrix3d::Zero());
+    assert(mJacobian.topRows<3>() == Eigen::Matrix3s::Zero());
     assert(!math::isNan(mJacobian.bottomRows<3>()));
   }
 }
@@ -143,8 +143,8 @@ void TranslationalJoint::updateRelativeJacobian(bool _mandatory) const
 void TranslationalJoint::updateRelativeJacobianTimeDeriv() const
 {
   // Time derivative of translational joint is always zero
-  assert(mJacobianDeriv == (Eigen::Matrix<double, 6, 3>::Zero()));
+  assert(mJacobianDeriv == (Eigen::Matrix<s_t, 6, 3>::Zero()));
 }
 
-}  // namespace dynamics
-}  // namespace dart
+} // namespace dynamics
+} // namespace dart

@@ -13,8 +13,8 @@ namespace trajectory {
 LossFn::LossFn()
   : mLoss(tl::nullopt),
     mLossAndGrad(tl::nullopt),
-    mLowerBound(-std::numeric_limits<double>::infinity()),
-    mUpperBound(std::numeric_limits<double>::infinity())
+    mLowerBound(-std::numeric_limits<s_t>::infinity()),
+    mUpperBound(std::numeric_limits<s_t>::infinity())
 {
 }
 
@@ -22,8 +22,8 @@ LossFn::LossFn()
 LossFn::LossFn(TrajectoryLossFn loss)
   : mLoss(loss),
     mLossAndGrad(tl::nullopt),
-    mLowerBound(-std::numeric_limits<double>::infinity()),
-    mUpperBound(std::numeric_limits<double>::infinity())
+    mLowerBound(-std::numeric_limits<s_t>::infinity()),
+    mUpperBound(std::numeric_limits<s_t>::infinity())
 {
 }
 
@@ -31,8 +31,8 @@ LossFn::LossFn(TrajectoryLossFn loss)
 LossFn::LossFn(TrajectoryLossFn loss, TrajectoryLossFnAndGrad lossAndGrad)
   : mLoss(loss),
     mLossAndGrad(lossAndGrad),
-    mLowerBound(-std::numeric_limits<double>::infinity()),
-    mUpperBound(std::numeric_limits<double>::infinity())
+    mLowerBound(-std::numeric_limits<s_t>::infinity()),
+    mUpperBound(std::numeric_limits<s_t>::infinity())
 {
 }
 
@@ -42,7 +42,7 @@ LossFn::~LossFn()
 }
 
 //==============================================================================
-double LossFn::getLoss(
+s_t LossFn::getLoss(
     const TrajectoryRollout* rollout, PerformanceLog* perflog)
 {
   PerformanceLog* thisLog = nullptr;
@@ -53,7 +53,7 @@ double LossFn::getLoss(
   }
 #endif
 
-  double loss = 0.0;
+  s_t loss = 0.0;
 
   if (mLoss)
   {
@@ -71,7 +71,7 @@ double LossFn::getLoss(
 }
 
 //==============================================================================
-double LossFn::getLossAndGradient(
+s_t LossFn::getLossAndGradient(
     const TrajectoryRollout* rollout,
     /* OUT */ TrajectoryRollout* gradWrtRollout,
     PerformanceLog* perflog)
@@ -84,7 +84,7 @@ double LossFn::getLossAndGradient(
   }
 #endif
 
-  double loss = 0.0;
+  s_t loss = 0.0;
 
   if (mLossAndGrad)
   {
@@ -93,18 +93,18 @@ double LossFn::getLossAndGradient(
   else if (mLoss)
   {
     TrajectoryRolloutReal rolloutCopy = TrajectoryRolloutReal(rollout);
-    double originalLoss = mLoss.value()(&rolloutCopy);
+    s_t originalLoss = mLoss.value()(&rolloutCopy);
 
-    const double EPS = 1e-7;
+    const s_t EPS = 1e-7;
 
     for (int i = 0; i < rolloutCopy.getMasses().size(); i++)
     {
       rolloutCopy.getMasses()(i) += EPS;
-      double lossPos = mLoss.value()(&rolloutCopy);
+      s_t lossPos = mLoss.value()(&rolloutCopy);
       rolloutCopy.getMasses()(i) -= EPS;
 
       rolloutCopy.getMasses()(i) -= EPS;
-      double lossNeg = mLoss.value()(&rolloutCopy);
+      s_t lossNeg = mLoss.value()(&rolloutCopy);
       rolloutCopy.getMasses()(i) += EPS;
 
       gradWrtRollout->getMasses()(i) = (lossPos - lossNeg) / (2 * EPS);
@@ -117,11 +117,11 @@ double LossFn::getLossAndGradient(
         for (int col = 0; col < rolloutCopy.getPoses(key).cols(); col++)
         {
           rolloutCopy.getPoses(key)(row, col) += EPS;
-          double lossPos = mLoss.value()(&rolloutCopy);
+          s_t lossPos = mLoss.value()(&rolloutCopy);
           rolloutCopy.getPoses(key)(row, col) -= EPS;
 
           rolloutCopy.getPoses(key)(row, col) -= EPS;
-          double lossNeg = mLoss.value()(&rolloutCopy);
+          s_t lossNeg = mLoss.value()(&rolloutCopy);
           rolloutCopy.getPoses(key)(row, col) += EPS;
 
           gradWrtRollout->getPoses(key)(row, col)
@@ -133,11 +133,11 @@ double LossFn::getLossAndGradient(
         for (int col = 0; col < rolloutCopy.getVels(key).cols(); col++)
         {
           rolloutCopy.getVels(key)(row, col) += EPS;
-          double lossVel = mLoss.value()(&rolloutCopy);
+          s_t lossVel = mLoss.value()(&rolloutCopy);
           rolloutCopy.getVels(key)(row, col) -= EPS;
 
           rolloutCopy.getVels(key)(row, col) -= EPS;
-          double lossNeg = mLoss.value()(&rolloutCopy);
+          s_t lossNeg = mLoss.value()(&rolloutCopy);
           rolloutCopy.getVels(key)(row, col) += EPS;
 
           gradWrtRollout->getVels(key)(row, col)
@@ -149,11 +149,11 @@ double LossFn::getLossAndGradient(
         for (int col = 0; col < rolloutCopy.getForces(key).cols(); col++)
         {
           rolloutCopy.getForces(key)(row, col) += EPS;
-          double lossForce = mLoss.value()(&rolloutCopy);
+          s_t lossForce = mLoss.value()(&rolloutCopy);
           rolloutCopy.getForces(key)(row, col) -= EPS;
 
           rolloutCopy.getForces(key)(row, col) -= EPS;
-          double lossNeg = mLoss.value()(&rolloutCopy);
+          s_t lossNeg = mLoss.value()(&rolloutCopy);
           rolloutCopy.getForces(key)(row, col) += EPS;
 
           gradWrtRollout->getForces(key)(row, col)
@@ -189,7 +189,7 @@ double LossFn::getLossAndGradient(
 //==============================================================================
 /// If this LossFn is being used as a constraint, this gets the lower bound
 /// it's allowed to reach
-double LossFn::getLowerBound() const
+s_t LossFn::getLowerBound() const
 {
   return mLowerBound;
 }
@@ -197,7 +197,7 @@ double LossFn::getLowerBound() const
 //==============================================================================
 /// If this LossFn is being used as a constraint, this sets the lower bound
 /// it's allowed to reach
-void LossFn::setLowerBound(double lowerBound)
+void LossFn::setLowerBound(s_t lowerBound)
 {
   mLowerBound = lowerBound;
 }
@@ -205,7 +205,7 @@ void LossFn::setLowerBound(double lowerBound)
 //==============================================================================
 /// If this LossFn is being used as a constraint, this gets the upper bound
 /// it's allowed to reach
-double LossFn::getUpperBound() const
+s_t LossFn::getUpperBound() const
 {
   return mUpperBound;
 }
@@ -213,7 +213,7 @@ double LossFn::getUpperBound() const
 //==============================================================================
 /// If this LossFn is being used as a constraint, this sets the upper bound
 /// it's allowed to reach
-void LossFn::setUpperBound(double upperBound)
+void LossFn::setUpperBound(s_t upperBound)
 {
   mUpperBound = upperBound;
 }

@@ -73,7 +73,7 @@ static bool checkIndexArrayValidity(const MetaSkeleton* skel,
 //==============================================================================
 static bool checkIndexArrayAgreement(const MetaSkeleton* skel,
                                      const std::vector<std::size_t>& _indices,
-                                     const Eigen::VectorXd& _values,
+                                     const Eigen::VectorXs& _values,
                                      const std::string& _fname,
                                      const std::string& _vname)
 {
@@ -91,10 +91,10 @@ static bool checkIndexArrayAgreement(const MetaSkeleton* skel,
 }
 
 //==============================================================================
-template <void (DegreeOfFreedom::*setValue)(double _value)>
+template <void (DegreeOfFreedom::*setValue)(s_t _value)>
 static void setValuesFromVector(MetaSkeleton* skel,
                                 const std::vector<std::size_t>& _indices,
-                                const Eigen::VectorXd& _values,
+                                const Eigen::VectorXs& _values,
                                 const std::string& _fname,
                                 const std::string& _vname)
 {
@@ -121,9 +121,9 @@ static void setValuesFromVector(MetaSkeleton* skel,
 }
 
 //==============================================================================
-template <void (DegreeOfFreedom::*setValue)(double _value)>
+template <void (DegreeOfFreedom::*setValue)(s_t _value)>
 static void setAllValuesFromVector(MetaSkeleton* skel,
-                                   const Eigen::VectorXd& _values,
+                                   const Eigen::VectorXs& _values,
                                    const std::string& _fname,
                                    const std::string& _vname)
 {
@@ -159,12 +159,12 @@ static void setAllValuesFromVector(MetaSkeleton* skel,
 }
 
 //==============================================================================
-template <double (DegreeOfFreedom::*getValue)() const>
-static Eigen::VectorXd getValuesFromVector(
+template <s_t (DegreeOfFreedom::*getValue)() const>
+static Eigen::VectorXs getValuesFromVector(
     const MetaSkeleton* skel, const std::vector<std::size_t>& _indices,
     const std::string& _fname)
 {
-  Eigen::VectorXd values(_indices.size());
+  Eigen::VectorXs values(_indices.size());
 
   for(std::size_t i=0; i<_indices.size(); ++i)
   {
@@ -201,12 +201,12 @@ static Eigen::VectorXd getValuesFromVector(
 }
 
 //==============================================================================
-template <double (DegreeOfFreedom::*getValue)() const>
-static Eigen::VectorXd getValuesFromAllDofs(
+template <s_t (DegreeOfFreedom::*getValue)() const>
+static Eigen::VectorXs getValuesFromAllDofs(
     const MetaSkeleton* skel, const std::string& _fname)
 {
   std::size_t nDofs = skel->getNumDofs();
-  Eigen::VectorXd values(nDofs);
+  Eigen::VectorXs values(nDofs);
 
   for(std::size_t i=0; i<nDofs; ++i)
   {
@@ -243,8 +243,8 @@ static void applyToAllDofs(MetaSkeleton* skel)
 }
 
 //==============================================================================
-template <void (DegreeOfFreedom::*setValue)(double _value)>
-static void setValueFromIndex(MetaSkeleton* skel, std::size_t _index, double _value,
+template <void (DegreeOfFreedom::*setValue)(s_t _value)>
+static void setValueFromIndex(MetaSkeleton* skel, std::size_t _index, s_t _value,
                               const std::string& _fname)
 {
   if(_index >= skel->getNumDofs())
@@ -279,8 +279,8 @@ static void setValueFromIndex(MetaSkeleton* skel, std::size_t _index, double _va
 }
 
 //==============================================================================
-template <double (DegreeOfFreedom::*getValue)() const>
-static double getValueFromIndex(const MetaSkeleton* skel, std::size_t _index,
+template <s_t (DegreeOfFreedom::*getValue)() const>
+static s_t getValueFromIndex(const MetaSkeleton* skel, std::size_t _index,
                                 const std::string& _fname)
 {
   if(_index >= skel->getNumDofs())
@@ -321,21 +321,21 @@ MetaSkeletonPtr MetaSkeleton::cloneMetaSkeleton() const
 }
 
 //==============================================================================
-void MetaSkeleton::setCommand(std::size_t _index, double _command)
+void MetaSkeleton::setCommand(std::size_t _index, s_t _command)
 {
   setValueFromIndex<&DegreeOfFreedom::setCommand>(
         this, _index, _command, "setCommand");
 }
 
 //==============================================================================
-double MetaSkeleton::getCommand(std::size_t _index) const
+s_t MetaSkeleton::getCommand(std::size_t _index) const
 {
   return getValueFromIndex<&DegreeOfFreedom::getCommand>(
         this, _index, "getCommand");
 }
 
 //==============================================================================
-void MetaSkeleton::setCommands(const Eigen::VectorXd& _commands)
+void MetaSkeleton::setCommands(const Eigen::VectorXs& _commands)
 {
   setAllValuesFromVector<&DegreeOfFreedom::setCommand>(
         this, _commands, "setCommands", "_commands");
@@ -343,21 +343,21 @@ void MetaSkeleton::setCommands(const Eigen::VectorXd& _commands)
 
 //==============================================================================
 void MetaSkeleton::setCommands(const std::vector<std::size_t>& _indices,
-                           const Eigen::VectorXd& _commands)
+                           const Eigen::VectorXs& _commands)
 {
   setValuesFromVector<&DegreeOfFreedom::setCommand>(
         this, _indices, _commands, "setCommands", "_commands");
 }
 
 //==============================================================================
-Eigen::VectorXd MetaSkeleton::getCommands() const
+Eigen::VectorXs MetaSkeleton::getCommands() const
 {
   return getValuesFromAllDofs<&DegreeOfFreedom::getCommand>(
         this, "getCommands");
 }
 
 //==============================================================================
-Eigen::VectorXd MetaSkeleton::getCommands(const std::vector<std::size_t>& _indices) const
+Eigen::VectorXs MetaSkeleton::getCommands(const std::vector<std::size_t>& _indices) const
 {
   return getValuesFromVector<&DegreeOfFreedom::getCommand>(
         this, _indices, "getCommands");
@@ -370,21 +370,21 @@ void MetaSkeleton::resetCommands()
 }
 
 //==============================================================================
-void MetaSkeleton::setPosition(std::size_t _index, double _position)
+void MetaSkeleton::setPosition(std::size_t _index, s_t _position)
 {
   setValueFromIndex<&DegreeOfFreedom::setPosition>(
         this, _index, _position, "setPosition");
 }
 
 //==============================================================================
-double MetaSkeleton::getPosition(std::size_t _index) const
+s_t MetaSkeleton::getPosition(std::size_t _index) const
 {
   return getValueFromIndex<&DegreeOfFreedom::getPosition>(
         this, _index, "getPosition");
 }
 
 //==============================================================================
-void MetaSkeleton::setPositions(const Eigen::VectorXd& _positions)
+void MetaSkeleton::setPositions(const Eigen::VectorXs& _positions)
 {
   setAllValuesFromVector<&DegreeOfFreedom::setPosition>(
         this, _positions, "setPositions", "_positions");
@@ -392,21 +392,21 @@ void MetaSkeleton::setPositions(const Eigen::VectorXd& _positions)
 
 //==============================================================================
 void MetaSkeleton::setPositions(const std::vector<std::size_t>& _indices,
-                            const Eigen::VectorXd& _positions)
+                            const Eigen::VectorXs& _positions)
 {
   setValuesFromVector<&DegreeOfFreedom::setPosition>(
         this, _indices, _positions, "setPositions", "_positions");
 }
 
 //==============================================================================
-Eigen::VectorXd MetaSkeleton::getPositions() const
+Eigen::VectorXs MetaSkeleton::getPositions() const
 {
   return getValuesFromAllDofs<&DegreeOfFreedom::getPosition>(
         this, "getPositions");
 }
 
 //==============================================================================
-Eigen::VectorXd MetaSkeleton::getPositions(const std::vector<std::size_t>& _indices) const
+Eigen::VectorXs MetaSkeleton::getPositions(const std::vector<std::size_t>& _indices) const
 {
   return getValuesFromVector<&DegreeOfFreedom::getPosition>(
         this, _indices, "getPositions");
@@ -419,14 +419,14 @@ void MetaSkeleton::resetPositions()
 }
 
 //==============================================================================
-void MetaSkeleton::setPositionLowerLimit(std::size_t _index, double _position)
+void MetaSkeleton::setPositionLowerLimit(std::size_t _index, s_t _position)
 {
   setValueFromIndex<&DegreeOfFreedom::setPositionLowerLimit>(
         this, _index, _position, "setPositionLowerLimit");
 }
 
 //==============================================================================
-void MetaSkeleton::setPositionLowerLimits(const Eigen::VectorXd& positions)
+void MetaSkeleton::setPositionLowerLimits(const Eigen::VectorXs& positions)
 {
   setAllValuesFromVector<&DegreeOfFreedom::setPositionLowerLimit>(
         this, positions, "setPositionLowerLimits", "positions");
@@ -434,28 +434,28 @@ void MetaSkeleton::setPositionLowerLimits(const Eigen::VectorXd& positions)
 
 //==============================================================================
 void MetaSkeleton::setPositionLowerLimits(
-    const std::vector<std::size_t>& indices, const Eigen::VectorXd& positions)
+    const std::vector<std::size_t>& indices, const Eigen::VectorXs& positions)
 {
   setValuesFromVector<&DegreeOfFreedom::setPositionLowerLimit>(
         this, indices, positions, "setPositionLowerLimits", "positions");
 }
 
 //==============================================================================
-double MetaSkeleton::getPositionLowerLimit(std::size_t _index) const
+s_t MetaSkeleton::getPositionLowerLimit(std::size_t _index) const
 {
   return getValueFromIndex<&DegreeOfFreedom::getPositionLowerLimit>(
         this, _index, "getPositionLowerLimit");
 }
 
 //==============================================================================
-Eigen::VectorXd MetaSkeleton::getPositionLowerLimits() const
+Eigen::VectorXs MetaSkeleton::getPositionLowerLimits() const
 {
   return getValuesFromAllDofs<&DegreeOfFreedom::getPositionLowerLimit>(
         this, "getPositionLowerLimits");
 }
 
 //==============================================================================
-Eigen::VectorXd MetaSkeleton::getPositionLowerLimits(
+Eigen::VectorXs MetaSkeleton::getPositionLowerLimits(
     const std::vector<std::size_t>& indices) const
 {
   return getValuesFromVector<&DegreeOfFreedom::getPositionLowerLimit>(
@@ -463,14 +463,14 @@ Eigen::VectorXd MetaSkeleton::getPositionLowerLimits(
 }
 
 //==============================================================================
-void MetaSkeleton::setPositionUpperLimit(std::size_t _index, double _position)
+void MetaSkeleton::setPositionUpperLimit(std::size_t _index, s_t _position)
 {
   setValueFromIndex<&DegreeOfFreedom::setPositionUpperLimit>(
         this, _index, _position, "setPositionUpperLimit");
 }
 
 //==============================================================================
-void MetaSkeleton::setPositionUpperLimits(const Eigen::VectorXd& positions)
+void MetaSkeleton::setPositionUpperLimits(const Eigen::VectorXs& positions)
 {
   setAllValuesFromVector<&DegreeOfFreedom::setPositionUpperLimit>(
         this, positions, "setPositionUpperLimits", "positions");
@@ -478,28 +478,28 @@ void MetaSkeleton::setPositionUpperLimits(const Eigen::VectorXd& positions)
 
 //==============================================================================
 void MetaSkeleton::setPositionUpperLimits(
-    const std::vector<std::size_t>& indices, const Eigen::VectorXd& positions)
+    const std::vector<std::size_t>& indices, const Eigen::VectorXs& positions)
 {
   setValuesFromVector<&DegreeOfFreedom::setPositionUpperLimit>(
         this, indices, positions, "setPositionUpperLimits", "positions");
 }
 
 //==============================================================================
-double MetaSkeleton::getPositionUpperLimit(std::size_t _index) const
+s_t MetaSkeleton::getPositionUpperLimit(std::size_t _index) const
 {
   return getValueFromIndex<&DegreeOfFreedom::getPositionUpperLimit>(
         this, _index, "getPositionUpperLimit");
 }
 
 //==============================================================================
-Eigen::VectorXd MetaSkeleton::getPositionUpperLimits() const
+Eigen::VectorXs MetaSkeleton::getPositionUpperLimits() const
 {
   return getValuesFromAllDofs<&DegreeOfFreedom::getPositionUpperLimit>(
         this, "getPositionUpperLimits");
 }
 
 //==============================================================================
-Eigen::VectorXd MetaSkeleton::getPositionUpperLimits(
+Eigen::VectorXs MetaSkeleton::getPositionUpperLimits(
     const std::vector<std::size_t>& indices) const
 {
   return getValuesFromVector<&DegreeOfFreedom::getPositionUpperLimit>(
@@ -507,21 +507,21 @@ Eigen::VectorXd MetaSkeleton::getPositionUpperLimits(
 }
 
 //==============================================================================
-void MetaSkeleton::setVelocity(std::size_t _index, double _velocity)
+void MetaSkeleton::setVelocity(std::size_t _index, s_t _velocity)
 {
   setValueFromIndex<&DegreeOfFreedom::setVelocity>(
         this, _index, _velocity, "setVelocity");
 }
 
 //==============================================================================
-double MetaSkeleton::getVelocity(std::size_t _index) const
+s_t MetaSkeleton::getVelocity(std::size_t _index) const
 {
   return getValueFromIndex<&DegreeOfFreedom::getVelocity>(
         this, _index, "getVelocity");
 }
 
 //==============================================================================
-void MetaSkeleton::setVelocities(const Eigen::VectorXd& _velocities)
+void MetaSkeleton::setVelocities(const Eigen::VectorXs& _velocities)
 {
   setAllValuesFromVector<&DegreeOfFreedom::setVelocity>(
         this, _velocities, "setVelocities", "_velocities");
@@ -529,21 +529,21 @@ void MetaSkeleton::setVelocities(const Eigen::VectorXd& _velocities)
 
 //==============================================================================
 void MetaSkeleton::setVelocities(const std::vector<std::size_t>& _indices,
-                             const Eigen::VectorXd& _velocities)
+                             const Eigen::VectorXs& _velocities)
 {
   setValuesFromVector<&DegreeOfFreedom::setVelocity>(
         this, _indices, _velocities, "setVelocities", "_velocities");
 }
 
 //==============================================================================
-Eigen::VectorXd MetaSkeleton::getVelocities() const
+Eigen::VectorXs MetaSkeleton::getVelocities() const
 {
   return getValuesFromAllDofs<&DegreeOfFreedom::getVelocity>(
         this, "getVelocities");
 }
 
 //==============================================================================
-Eigen::VectorXd MetaSkeleton::getVelocities(const std::vector<std::size_t>& _indices) const
+Eigen::VectorXs MetaSkeleton::getVelocities(const std::vector<std::size_t>& _indices) const
 {
   return getValuesFromVector<&DegreeOfFreedom::getVelocity>(
         this, _indices, "getVelocities");
@@ -556,14 +556,14 @@ void MetaSkeleton::resetVelocities()
 }
 
 //==============================================================================
-void MetaSkeleton::setVelocityLowerLimit(std::size_t _index, double _velocity)
+void MetaSkeleton::setVelocityLowerLimit(std::size_t _index, s_t _velocity)
 {
   setValueFromIndex<&DegreeOfFreedom::setVelocityLowerLimit>(
         this, _index, _velocity, "setVelocityLowerLimit");
 }
 
 //==============================================================================
-void MetaSkeleton::setVelocityLowerLimits(const Eigen::VectorXd& velocities)
+void MetaSkeleton::setVelocityLowerLimits(const Eigen::VectorXs& velocities)
 {
   setAllValuesFromVector<&DegreeOfFreedom::setVelocityLowerLimit>(
         this, velocities, "setVelocityLowerLimits", "velocities");
@@ -571,28 +571,28 @@ void MetaSkeleton::setVelocityLowerLimits(const Eigen::VectorXd& velocities)
 
 //==============================================================================
 void MetaSkeleton::setVelocityLowerLimits(
-    const std::vector<std::size_t>& indices, const Eigen::VectorXd& velocities)
+    const std::vector<std::size_t>& indices, const Eigen::VectorXs& velocities)
 {
   setValuesFromVector<&DegreeOfFreedom::setVelocityLowerLimit>(
         this, indices, velocities, "setVelocityLowerLimits", "velocities");
 }
 
 //==============================================================================
-double MetaSkeleton::getVelocityLowerLimit(std::size_t _index)
+s_t MetaSkeleton::getVelocityLowerLimit(std::size_t _index)
 {
   return getValueFromIndex<&DegreeOfFreedom::getVelocityLowerLimit>(
         this, _index, "getVelocityLowerLimit");
 }
 
 //==============================================================================
-Eigen::VectorXd MetaSkeleton::getVelocityLowerLimits() const
+Eigen::VectorXs MetaSkeleton::getVelocityLowerLimits() const
 {
   return getValuesFromAllDofs<&DegreeOfFreedom::getVelocityLowerLimit>(
         this, "getVelocityLowerLimits");
 }
 
 //==============================================================================
-Eigen::VectorXd MetaSkeleton::getVelocityLowerLimits(
+Eigen::VectorXs MetaSkeleton::getVelocityLowerLimits(
     const std::vector<std::size_t>& indices) const
 {
   return getValuesFromVector<&DegreeOfFreedom::getVelocityLowerLimit>(
@@ -600,14 +600,14 @@ Eigen::VectorXd MetaSkeleton::getVelocityLowerLimits(
 }
 
 //==============================================================================
-void MetaSkeleton::setVelocityUpperLimit(std::size_t _index, double _velocity)
+void MetaSkeleton::setVelocityUpperLimit(std::size_t _index, s_t _velocity)
 {
   setValueFromIndex<&DegreeOfFreedom::setVelocityUpperLimit>(
         this, _index, _velocity, "setVelocityUpperLimit");
 }
 
 //==============================================================================
-void MetaSkeleton::setVelocityUpperLimits(const Eigen::VectorXd& velocities)
+void MetaSkeleton::setVelocityUpperLimits(const Eigen::VectorXs& velocities)
 {
   setAllValuesFromVector<&DegreeOfFreedom::setVelocityUpperLimit>(
         this, velocities, "setVelocityUpperLimits", "velocities");
@@ -615,28 +615,28 @@ void MetaSkeleton::setVelocityUpperLimits(const Eigen::VectorXd& velocities)
 
 //==============================================================================
 void MetaSkeleton::setVelocityUpperLimits(
-    const std::vector<std::size_t>& indices, const Eigen::VectorXd& velocities)
+    const std::vector<std::size_t>& indices, const Eigen::VectorXs& velocities)
 {
   setValuesFromVector<&DegreeOfFreedom::setVelocityUpperLimit>(
         this, indices, velocities, "setVelocityUpperLimits", "velocities");
 }
 
 //==============================================================================
-double MetaSkeleton::getVelocityUpperLimit(std::size_t _index)
+s_t MetaSkeleton::getVelocityUpperLimit(std::size_t _index)
 {
   return getValueFromIndex<&DegreeOfFreedom::getVelocityUpperLimit>(
         this, _index, "getVelocityUpperLimit");
 }
 
 //==============================================================================
-Eigen::VectorXd MetaSkeleton::getVelocityUpperLimits() const
+Eigen::VectorXs MetaSkeleton::getVelocityUpperLimits() const
 {
   return getValuesFromAllDofs<&DegreeOfFreedom::getVelocityUpperLimit>(
         this, "getVelocityUpperLimits");
 }
 
 //==============================================================================
-Eigen::VectorXd MetaSkeleton::getVelocityUpperLimits(
+Eigen::VectorXs MetaSkeleton::getVelocityUpperLimits(
     const std::vector<std::size_t>& indices) const
 {
   return getValuesFromVector<&DegreeOfFreedom::getVelocityUpperLimit>(
@@ -644,21 +644,21 @@ Eigen::VectorXd MetaSkeleton::getVelocityUpperLimits(
 }
 
 //==============================================================================
-void MetaSkeleton::setAcceleration(std::size_t _index, double _acceleration)
+void MetaSkeleton::setAcceleration(std::size_t _index, s_t _acceleration)
 {
   setValueFromIndex<&DegreeOfFreedom::setAcceleration>(
         this, _index, _acceleration, "setAcceleration");
 }
 
 //==============================================================================
-double MetaSkeleton::getAcceleration(std::size_t _index) const
+s_t MetaSkeleton::getAcceleration(std::size_t _index) const
 {
   return getValueFromIndex<&DegreeOfFreedom::getAcceleration>(
         this, _index, "getAcceleration");
 }
 
 //==============================================================================
-void MetaSkeleton::setAccelerations(const Eigen::VectorXd& _accelerations)
+void MetaSkeleton::setAccelerations(const Eigen::VectorXs& _accelerations)
 {
   setAllValuesFromVector<&DegreeOfFreedom::setAcceleration>(
         this, _accelerations, "setAccelerations", "_accelerations");
@@ -666,21 +666,21 @@ void MetaSkeleton::setAccelerations(const Eigen::VectorXd& _accelerations)
 
 //==============================================================================
 void MetaSkeleton::setAccelerations(const std::vector<std::size_t>& _indices,
-                                const Eigen::VectorXd& _accelerations)
+                                const Eigen::VectorXs& _accelerations)
 {
   setValuesFromVector<&DegreeOfFreedom::setAcceleration>(
         this, _indices, _accelerations, "setAccelerations", "_accelerations");
 }
 
 //==============================================================================
-Eigen::VectorXd MetaSkeleton::getAccelerations() const
+Eigen::VectorXs MetaSkeleton::getAccelerations() const
 {
   return getValuesFromAllDofs<&DegreeOfFreedom::getAcceleration>(
         this, "getAccelerations");
 }
 
 //==============================================================================
-Eigen::VectorXd MetaSkeleton::getAccelerations(
+Eigen::VectorXs MetaSkeleton::getAccelerations(
     const std::vector<std::size_t>& _indices) const
 {
   return getValuesFromVector<&DegreeOfFreedom::getAcceleration>(
@@ -694,7 +694,7 @@ void MetaSkeleton::resetAccelerations()
 }
 
 //==============================================================================
-void MetaSkeleton::setAccelerationLowerLimit(std::size_t _index, double _acceleration)
+void MetaSkeleton::setAccelerationLowerLimit(std::size_t _index, s_t _acceleration)
 {
   setValueFromIndex<&DegreeOfFreedom::setAccelerationLowerLimit>(
         this, _index, _acceleration, "setAccelerationLowerLimit");
@@ -702,7 +702,7 @@ void MetaSkeleton::setAccelerationLowerLimit(std::size_t _index, double _acceler
 
 //==============================================================================
 void MetaSkeleton::setAccelerationLowerLimits(
-    const Eigen::VectorXd& accelerations)
+    const Eigen::VectorXs& accelerations)
 {
   setAllValuesFromVector<&DegreeOfFreedom::setAccelerationLowerLimit>(
         this, accelerations, "setAccelerationLowerLimits", "accelerations");
@@ -711,7 +711,7 @@ void MetaSkeleton::setAccelerationLowerLimits(
 //==============================================================================
 void MetaSkeleton::setAccelerationLowerLimits(
     const std::vector<std::size_t>& indices,
-    const Eigen::VectorXd& accelerations)
+    const Eigen::VectorXs& accelerations)
 {
   setValuesFromVector<&DegreeOfFreedom::setAccelerationLowerLimit>(
         this, indices, accelerations, "setAccelerationLowerLimits",
@@ -719,21 +719,21 @@ void MetaSkeleton::setAccelerationLowerLimits(
 }
 
 //==============================================================================
-double MetaSkeleton::getAccelerationLowerLimit(std::size_t _index) const
+s_t MetaSkeleton::getAccelerationLowerLimit(std::size_t _index) const
 {
   return getValueFromIndex<&DegreeOfFreedom::getAccelerationLowerLimit>(
         this, _index, "getAccelerationLowerLimit");
 }
 
 //==============================================================================
-Eigen::VectorXd MetaSkeleton::getAccelerationLowerLimits() const
+Eigen::VectorXs MetaSkeleton::getAccelerationLowerLimits() const
 {
   return getValuesFromAllDofs<&DegreeOfFreedom::getAccelerationLowerLimit>(
         this, "getAccelerationLowerLimits");
 }
 
 //==============================================================================
-Eigen::VectorXd MetaSkeleton::getAccelerationLowerLimits(
+Eigen::VectorXs MetaSkeleton::getAccelerationLowerLimits(
     const std::vector<std::size_t>& indices) const
 {
   return getValuesFromVector<&DegreeOfFreedom::getAccelerationLowerLimit>(
@@ -741,7 +741,7 @@ Eigen::VectorXd MetaSkeleton::getAccelerationLowerLimits(
 }
 
 //==============================================================================
-void MetaSkeleton::setAccelerationUpperLimit(std::size_t _index, double _acceleration)
+void MetaSkeleton::setAccelerationUpperLimit(std::size_t _index, s_t _acceleration)
 {
   setValueFromIndex<&DegreeOfFreedom::setAccelerationUpperLimit>(
         this, _index, _acceleration, "setAccelerationUpperLimit");
@@ -749,7 +749,7 @@ void MetaSkeleton::setAccelerationUpperLimit(std::size_t _index, double _acceler
 
 //==============================================================================
 void MetaSkeleton::setAccelerationUpperLimits(
-    const Eigen::VectorXd& accelerations)
+    const Eigen::VectorXs& accelerations)
 {
   setAllValuesFromVector<&DegreeOfFreedom::setAccelerationUpperLimit>(
         this, accelerations, "setAccelerationUpperLimits", "accelerations");
@@ -758,7 +758,7 @@ void MetaSkeleton::setAccelerationUpperLimits(
 //==============================================================================
 void MetaSkeleton::setAccelerationUpperLimits(
     const std::vector<std::size_t>& indices,
-    const Eigen::VectorXd& accelerations)
+    const Eigen::VectorXs& accelerations)
 {
   setValuesFromVector<&DegreeOfFreedom::setAccelerationUpperLimit>(
         this, indices, accelerations, "setAccelerationUpperLimits",
@@ -766,21 +766,21 @@ void MetaSkeleton::setAccelerationUpperLimits(
 }
 
 //==============================================================================
-double MetaSkeleton::getAccelerationUpperLimit(std::size_t _index) const
+s_t MetaSkeleton::getAccelerationUpperLimit(std::size_t _index) const
 {
   return getValueFromIndex<&DegreeOfFreedom::getAccelerationUpperLimit>(
         this, _index, "getAccelerationUpperLimit");
 }
 
 //==============================================================================
-Eigen::VectorXd MetaSkeleton::getAccelerationUpperLimits() const
+Eigen::VectorXs MetaSkeleton::getAccelerationUpperLimits() const
 {
   return getValuesFromAllDofs<&DegreeOfFreedom::getAccelerationUpperLimit>(
         this, "getAccelerationUpperLimits");
 }
 
 //==============================================================================
-Eigen::VectorXd MetaSkeleton::getAccelerationUpperLimits(
+Eigen::VectorXs MetaSkeleton::getAccelerationUpperLimits(
     const std::vector<std::size_t>& indices) const
 {
   return getValuesFromVector<&DegreeOfFreedom::getAccelerationUpperLimit>(
@@ -788,21 +788,21 @@ Eigen::VectorXd MetaSkeleton::getAccelerationUpperLimits(
 }
 
 //==============================================================================
-void MetaSkeleton::setForce(std::size_t _index, double _force)
+void MetaSkeleton::setForce(std::size_t _index, s_t _force)
 {
   setValueFromIndex<&DegreeOfFreedom::setForce>(
         this, _index, _force, "setForce");
 }
 
 //==============================================================================
-double MetaSkeleton::getForce(std::size_t _index) const
+s_t MetaSkeleton::getForce(std::size_t _index) const
 {
   return getValueFromIndex<&DegreeOfFreedom::getForce>(
         this, _index, "getForce");
 }
 
 //==============================================================================
-void MetaSkeleton::setForces(const Eigen::VectorXd& _forces)
+void MetaSkeleton::setForces(const Eigen::VectorXs& _forces)
 {
   setAllValuesFromVector<&DegreeOfFreedom::setForce>(
         this, _forces, "setForces", "_forces");
@@ -810,21 +810,21 @@ void MetaSkeleton::setForces(const Eigen::VectorXd& _forces)
 
 //==============================================================================
 void MetaSkeleton::setForces(const std::vector<std::size_t>& _indices,
-                         const Eigen::VectorXd& _forces)
+                         const Eigen::VectorXs& _forces)
 {
   setValuesFromVector<&DegreeOfFreedom::setForce>(
         this, _indices, _forces, "setForces", "_forces");
 }
 
 //==============================================================================
-Eigen::VectorXd MetaSkeleton::getForces() const
+Eigen::VectorXs MetaSkeleton::getForces() const
 {
   return getValuesFromAllDofs<&DegreeOfFreedom::getForce>(
         this, "getForces");
 }
 
 //==============================================================================
-Eigen::VectorXd MetaSkeleton::getForces(const std::vector<std::size_t>& _indices) const
+Eigen::VectorXs MetaSkeleton::getForces(const std::vector<std::size_t>& _indices) const
 {
   return getValuesFromVector<&DegreeOfFreedom::getForce>(
         this, _indices, "getForces");
@@ -839,14 +839,14 @@ void MetaSkeleton::resetGeneralizedForces()
 }
 
 //==============================================================================
-void MetaSkeleton::setForceLowerLimit(std::size_t _index, double _force)
+void MetaSkeleton::setForceLowerLimit(std::size_t _index, s_t _force)
 {
   setValueFromIndex<&DegreeOfFreedom::setForceLowerLimit>(
         this, _index, _force, "setForceLowerLimit");
 }
 
 //==============================================================================
-void MetaSkeleton::setForceLowerLimits(const Eigen::VectorXd& forces)
+void MetaSkeleton::setForceLowerLimits(const Eigen::VectorXs& forces)
 {
   setAllValuesFromVector<&DegreeOfFreedom::setForceLowerLimit>(
         this, forces, "setForceLowerLimits", "forces");
@@ -854,28 +854,28 @@ void MetaSkeleton::setForceLowerLimits(const Eigen::VectorXd& forces)
 
 //==============================================================================
 void MetaSkeleton::setForceLowerLimits(const std::vector<std::size_t>& indices,
-                                       const Eigen::VectorXd& forces)
+                                       const Eigen::VectorXs& forces)
 {
   setValuesFromVector<&DegreeOfFreedom::setForceLowerLimit>(
         this, indices, forces, "setForceLowerLimits", "forces");
 }
 
 //==============================================================================
-double MetaSkeleton::getForceLowerLimit(std::size_t _index) const
+s_t MetaSkeleton::getForceLowerLimit(std::size_t _index) const
 {
   return getValueFromIndex<&DegreeOfFreedom::getForceLowerLimit>(
         this, _index, "getForceLowerLimit");
 }
 
 //==============================================================================
-Eigen::VectorXd MetaSkeleton::getForceLowerLimits() const
+Eigen::VectorXs MetaSkeleton::getForceLowerLimits() const
 {
   return getValuesFromAllDofs<&DegreeOfFreedom::getForceLowerLimit>(
         this, "getForceLowerLimits");
 }
 
 //==============================================================================
-Eigen::VectorXd MetaSkeleton::getForceLowerLimits(
+Eigen::VectorXs MetaSkeleton::getForceLowerLimits(
     const std::vector<std::size_t>& indices) const
 {
   return getValuesFromVector<&DegreeOfFreedom::getForceLowerLimit>(
@@ -883,14 +883,14 @@ Eigen::VectorXd MetaSkeleton::getForceLowerLimits(
 }
 
 //==============================================================================
-void MetaSkeleton::setForceUpperLimit(std::size_t _index, double _force)
+void MetaSkeleton::setForceUpperLimit(std::size_t _index, s_t _force)
 {
   setValueFromIndex<&DegreeOfFreedom::setForceUpperLimit>(
         this, _index, _force, "setForceUpperLimit");
 }
 
 //==============================================================================
-void MetaSkeleton::setForceUpperLimits(const Eigen::VectorXd& forces)
+void MetaSkeleton::setForceUpperLimits(const Eigen::VectorXs& forces)
 {
   setAllValuesFromVector<&DegreeOfFreedom::setForceUpperLimit>(
         this, forces, "setForceUpperLimits", "forces");
@@ -898,28 +898,28 @@ void MetaSkeleton::setForceUpperLimits(const Eigen::VectorXd& forces)
 
 //==============================================================================
 void MetaSkeleton::setForceUpperLimits(const std::vector<std::size_t>& indices,
-                                       const Eigen::VectorXd& forces)
+                                       const Eigen::VectorXs& forces)
 {
   setValuesFromVector<&DegreeOfFreedom::setForceUpperLimit>(
         this, indices, forces, "setForceUpperLimits", "forces");
 }
 
 //==============================================================================
-double MetaSkeleton::getForceUpperLimit(std::size_t _index) const
+s_t MetaSkeleton::getForceUpperLimit(std::size_t _index) const
 {
   return getValueFromIndex<&DegreeOfFreedom::getForceUpperLimit>(
         this, _index, "getForceUpperLimit");
 }
 
 //==============================================================================
-Eigen::VectorXd MetaSkeleton::getForceUpperLimits() const
+Eigen::VectorXs MetaSkeleton::getForceUpperLimits() const
 {
   return getValuesFromAllDofs<&DegreeOfFreedom::getForceUpperLimit>(
         this, "getForceUpperLimits");
 }
 
 //==============================================================================
-Eigen::VectorXd MetaSkeleton::getForceUpperLimits(
+Eigen::VectorXs MetaSkeleton::getForceUpperLimits(
     const std::vector<std::size_t>& indices) const
 {
   return getValuesFromVector<&DegreeOfFreedom::getForceUpperLimit>(
@@ -927,21 +927,21 @@ Eigen::VectorXd MetaSkeleton::getForceUpperLimits(
 }
 
 //==============================================================================
-Eigen::VectorXd MetaSkeleton::getVelocityChanges() const
+Eigen::VectorXs MetaSkeleton::getVelocityChanges() const
 {
   return getValuesFromAllDofs<&DegreeOfFreedom::getVelocityChange>(
         this, "getVelocityChanges");
 }
 
 //==============================================================================
-void MetaSkeleton::setJointConstraintImpulses(const Eigen::VectorXd& _impulses)
+void MetaSkeleton::setJointConstraintImpulses(const Eigen::VectorXs& _impulses)
 {
   setAllValuesFromVector<&DegreeOfFreedom::setConstraintImpulse>(
         this, _impulses, "setJointConstraintImpulses", "_impulses");
 }
 
 //==============================================================================
-Eigen::VectorXd MetaSkeleton::getJointConstraintImpulses() const
+Eigen::VectorXs MetaSkeleton::getJointConstraintImpulses() const
 {
   return getValuesFromAllDofs<&DegreeOfFreedom::getConstraintImpulse>(
         this, "getJointConstraintImpulses");
@@ -958,7 +958,7 @@ math::Jacobian MetaSkeleton::getJacobian(
 
   const math::Jacobian J = getJacobian(_node);
   const math::Jacobian JRelTo = getJacobian(_relativeTo);
-  const Eigen::Isometry3d T = _relativeTo->getTransform(_node);
+  const Eigen::Isometry3s T = _relativeTo->getTransform(_node);
 
   const math::Jacobian result = (J - math::AdTJac(T, JRelTo)).eval();
 
@@ -971,7 +971,7 @@ math::Jacobian MetaSkeleton::getJacobian(
 //==============================================================================
 math::Jacobian MetaSkeleton::getJacobian(
     const JacobianNode* _node,
-    const Eigen::Vector3d& _localOffset,
+    const Eigen::Vector3s& _localOffset,
     const JacobianNode* _relativeTo,
     const Frame* _inCoordinatesOf) const
 {
@@ -980,7 +980,7 @@ math::Jacobian MetaSkeleton::getJacobian(
 
   const math::Jacobian J = getJacobian(_node);
   const math::Jacobian JRelTo = getJacobian(_relativeTo);
-  const Eigen::Isometry3d T = _relativeTo->getTransform(_node);
+  const Eigen::Isometry3s T = _relativeTo->getTransform(_node);
 
   math::Jacobian result = (J - math::AdTJac(T, JRelTo)).eval();
   result.bottomRows<3>() += result.topRows<3>().colwise().cross(_localOffset);
@@ -1003,7 +1003,7 @@ math::LinearJacobian MetaSkeleton::getLinearJacobian(
 //==============================================================================
 math::LinearJacobian MetaSkeleton::getLinearJacobian(
     const JacobianNode* _node,
-    const Eigen::Vector3d& _localOffset,
+    const Eigen::Vector3s& _localOffset,
     const JacobianNode* _relativeTo,
     const Frame* _inCoordinatesOf) const
 {
@@ -1032,8 +1032,8 @@ math::Jacobian MetaSkeleton::getJacobianSpatialDeriv(
   const math::Jacobian dJ = getJacobianSpatialDeriv(_node);
   const math::Jacobian JRelTo = getJacobian(_relativeTo);
   const math::Jacobian dJRelTo = getJacobianSpatialDeriv(_relativeTo);
-  const Eigen::Isometry3d T = _relativeTo->getTransform(_node);
-  const Eigen::Vector6d V = _relativeTo->getSpatialVelocity(_node, _relativeTo);
+  const Eigen::Isometry3s T = _relativeTo->getTransform(_node);
+  const Eigen::Vector6s V = _relativeTo->getSpatialVelocity(_node, _relativeTo);
   const math::Jacobian adJRelTo = math::adJac(V, JRelTo);
 
   const math::Jacobian result = dJ - math::AdTJac(T, dJRelTo + adJRelTo);
@@ -1047,7 +1047,7 @@ math::Jacobian MetaSkeleton::getJacobianSpatialDeriv(
 //==============================================================================
 math::Jacobian MetaSkeleton::getJacobianSpatialDeriv(
     const JacobianNode* _node,
-    const Eigen::Vector3d& _localOffset,
+    const Eigen::Vector3s& _localOffset,
     const JacobianNode* _relativeTo,
     const Frame* _inCoordinatesOf) const
 {
@@ -1057,8 +1057,8 @@ math::Jacobian MetaSkeleton::getJacobianSpatialDeriv(
   const math::Jacobian dJ = getJacobianSpatialDeriv(_node);
   const math::Jacobian JRelTo = getJacobian(_relativeTo);
   const math::Jacobian dJRelTo = getJacobianSpatialDeriv(_relativeTo);
-  const Eigen::Isometry3d T = _relativeTo->getTransform(_node);
-  const Eigen::Vector6d V = _relativeTo->getSpatialVelocity(_node, _relativeTo);
+  const Eigen::Isometry3s T = _relativeTo->getTransform(_node);
+  const Eigen::Vector6s V = _relativeTo->getSpatialVelocity(_node, _relativeTo);
   const math::Jacobian adJRelTo = math::adJac(V, JRelTo);
 
   math::Jacobian result = dJ - math::AdTJac(T, dJRelTo + adJRelTo);
@@ -1071,19 +1071,19 @@ math::Jacobian MetaSkeleton::getJacobianSpatialDeriv(
 }
 
 //==============================================================================
-double MetaSkeleton::computeLagrangian() const
+s_t MetaSkeleton::computeLagrangian() const
 {
   return computeKineticEnergy() - computePotentialEnergy();
 }
 
 //==============================================================================
-double MetaSkeleton::getKineticEnergy() const
+s_t MetaSkeleton::getKineticEnergy() const
 {
   return computeKineticEnergy();
 }
 
 //==============================================================================
-double MetaSkeleton::getPotentialEnergy() const
+s_t MetaSkeleton::getPotentialEnergy() const
 {
   return computePotentialEnergy();
 }

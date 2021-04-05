@@ -34,7 +34,10 @@
 #define DART_CONSTRAINT_BOXEDLCPSOLVER_HPP_
 
 #include <string>
+
 #include <Eigen/Core>
+
+#include "dart/math/MathTypes.hpp"
 
 namespace dart {
 namespace constraint {
@@ -91,18 +94,18 @@ public:
   // this to Eigen friendly version once own Dantzig LCP solver is available.
   virtual bool solve(
       int n,
-      double* A,
-      double* x,
-      double* b,
+      s_t* A,
+      s_t* x,
+      s_t* b,
       int nub,
-      double* lo,
-      double* hi,
+      s_t* lo,
+      s_t* hi,
       int* findex,
       bool earlyTermination = false)
       = 0;
 
 #ifndef NDEBUG
-  virtual bool canSolve(int n, const double* A) = 0;
+  virtual bool canSolve(int n, const s_t* A) = 0;
 #endif
 };
 

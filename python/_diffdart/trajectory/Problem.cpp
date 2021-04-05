@@ -99,65 +99,65 @@ namespace python {
   virtual int getConstraintDim() const;
 
   /// This copies a shot down into a single flat vector
-  virtual void flatten(Eigen::Ref<Eigen::VectorXd> flat) const = 0;
+  virtual void flatten(Eigen::Ref<Eigen::VectorXs> flat) const = 0;
 
 /// This gets the parameters out of a flat vector
-virtual void unflatten(const Eigen::Ref<const Eigen::VectorXd>& flat) = 0;
+virtual void unflatten(const Eigen::Ref<const Eigen::VectorXs>& flat) = 0;
 
 /// This gets the fixed upper bounds for a flat vector, used during
 /// optimization
 virtual void getUpperBounds(
     std::shared_ptr<simulation::World> world,
-    Eigen::Ref<Eigen::VectorXd> flat) const = 0;
+    Eigen::Ref<Eigen::VectorXs> flat) const = 0;
 
 /// This gets the fixed lower bounds for a flat vector, used during
 /// optimization
 virtual void getLowerBounds(
     std::shared_ptr<simulation::World> world,
-    Eigen::Ref<Eigen::VectorXd> flat) const = 0;
+    Eigen::Ref<Eigen::VectorXs> flat) const = 0;
 
 /// This gets the bounds on the constraint functions (both knot points and any
 /// custom constraints)
 virtual void getConstraintUpperBounds(
-    Eigen::Ref<Eigen::VectorXd> flat) const;
+    Eigen::Ref<Eigen::VectorXs> flat) const;
 
 /// This gets the bounds on the constraint functions (both knot points and any
 /// custom constraints)
 virtual void getConstraintLowerBounds(
-    Eigen::Ref<Eigen::VectorXd> flat) const;
+    Eigen::Ref<Eigen::VectorXs> flat) const;
 
 /// This returns the initial guess for the values of X when running an
 /// optimization
 virtual void getInitialGuess(
     std::shared_ptr<simulation::World> world,
-    Eigen::Ref<Eigen::VectorXd> flat) const = 0;
+    Eigen::Ref<Eigen::VectorXs> flat) const = 0;
 
 /// This computes the values of the constraints
 virtual void computeConstraints(
     std::shared_ptr<simulation::World> world,
-    Eigen::Ref<Eigen::VectorXd> constraints);
+    Eigen::Ref<Eigen::VectorXs> constraints);
 
 /// This computes the Jacobian that relates the flat problem to the end state.
 /// This returns a matrix that's (getConstraintDim(), getFlatProblemDim()).
 virtual void backpropJacobian(
     std::shared_ptr<simulation::World> world,
-    Eigen::Ref<Eigen::MatrixXd> jac);
+    Eigen::Ref<Eigen::MatrixXs> jac);
 
 /// This computes the gradient in the flat problem space, automatically
 /// computing the gradients of the loss function as part of the call
 void backpropGradient(
     std::shared_ptr<simulation::World> world,
-    Eigen::Ref<Eigen::VectorXd> grad);
+    Eigen::Ref<Eigen::VectorXs> grad);
 
 /// Get the loss for the rollout
-double getLoss(std::shared_ptr<simulation::World> world);
+s_t getLoss(std::shared_ptr<simulation::World> world);
 
 /// This computes the gradient in the flat problem space, taking into accounts
 /// incoming gradients with respect to any of the shot's values.
 virtual void backpropGradientWrt(
     std::shared_ptr<simulation::World> world,
     const TrajectoryRollout& gradWrtRollout,
-    Eigen::Ref<Eigen::VectorXd> grad)
+    Eigen::Ref<Eigen::VectorXs> grad)
     = 0;
 
 /// This populates the passed in matrices with the values from this trajectory
@@ -174,11 +174,11 @@ TrajectoryRollout& getGradientWrtRolloutCache(
     std::shared_ptr<simulation::World> world, bool useKnots = true);
 
 /// This returns the concatenation of (start pos, start vel) for convenience
-virtual Eigen::VectorXd getStartState() = 0;
+virtual Eigen::VectorXs getStartState() = 0;
 
 /// This unrolls the shot, and returns the (pos, vel) state concatenated at
 /// the end of the shot
-virtual Eigen::VectorXd getFinalState(std::shared_ptr<simulation::World> world)
+virtual Eigen::VectorXs getFinalState(std::shared_ptr<simulation::World> world)
     = 0;
 
 int getNumSteps();
@@ -196,7 +196,7 @@ virtual void getJacobianSparsityStructure(
 /// This writes the Jacobian to a sparse vector
 virtual void getSparseJacobian(
     std::shared_ptr<simulation::World> world,
-    Eigen::Ref<Eigen::VectorXd> sparse);
+    Eigen::Ref<Eigen::VectorXs> sparse);
 
 //////////////////////////////////////////////////////////////////////////////
 // For Testing
@@ -204,13 +204,13 @@ virtual void getSparseJacobian(
 
 /// This computes finite difference Jacobians analagous to backpropJacobians()
 void finiteDifferenceJacobian(
-    std::shared_ptr<simulation::World> world, Eigen::Ref<Eigen::MatrixXd> jac);
+    std::shared_ptr<simulation::World> world, Eigen::Ref<Eigen::MatrixXs> jac);
 
 /// This computes finite difference Jacobians analagous to
 /// backpropGradient()
 void finiteDifferenceGradient(
     std::shared_ptr<simulation::World> world,
-    Eigen::Ref<Eigen::VectorXd> grad);
+    Eigen::Ref<Eigen::VectorXs> grad);
 
 /// This computes the Jacobians that relate each timestep to the endpoint of
 /// the trajectory. For a timestep at time t, this will relate quantities like
@@ -221,7 +221,7 @@ TimestepJacobians backpropStartStateJacobians(
 /// This computes finite difference Jacobians analagous to
 /// backpropStartStateJacobians()
 TimestepJacobians finiteDifferenceStartStateJacobians(
-    std::shared_ptr<simulation::World> world, double EPS);
+    std::shared_ptr<simulation::World> world, s_t EPS);
 */
 
 void Problem(py::module& m)

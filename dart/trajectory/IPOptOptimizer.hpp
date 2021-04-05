@@ -39,7 +39,7 @@ public:
 
   void setIterationLimit(int iterationLimit);
 
-  void setTolerance(double tolerance);
+  void setTolerance(s_t tolerance);
 
   void setLBFGSHistoryLength(int historyLen);
 
@@ -63,7 +63,7 @@ public:
 
 protected:
   int mIterationLimit;
-  double mTolerance;
+  s_t mTolerance;
   int mLBFGSHistoryLength;
   bool mCheckDerivatives;
   int mPrintFrequency;

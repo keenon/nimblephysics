@@ -16,10 +16,10 @@ using namespace performance;
 
 namespace trajectory {
 
-typedef std::function<double(const TrajectoryRollout* rollout)>
+typedef std::function<s_t(const TrajectoryRollout* rollout)>
     TrajectoryLossFn;
 
-typedef std::function<double(
+typedef std::function<s_t(
     const TrajectoryRollout* rollout,
     /* OUT */ TrajectoryRollout* gradWrtRollout)>
     TrajectoryLossFnAndGrad;
@@ -35,39 +35,39 @@ public:
 
   virtual ~LossFn();
 
-  virtual double getLoss(
+  virtual s_t getLoss(
       const TrajectoryRollout* rollout, PerformanceLog* perflog = nullptr);
 
-  virtual double getLossAndGradient(
+  virtual s_t getLossAndGradient(
       const TrajectoryRollout* rollout,
       /* OUT */ TrajectoryRollout* gradWrtRollout,
       PerformanceLog* perflog = nullptr);
 
   /// If this LossFn is being used as a constraint, this gets the lower bound
   /// it's allowed to reach
-  double getLowerBound() const;
+  s_t getLowerBound() const;
 
   /// If this LossFn is being used as a constraint, this sets the lower bound
   /// it's allowed to reach
-  void setLowerBound(double lowerBound);
+  void setLowerBound(s_t lowerBound);
 
   /// If this LossFn is being used as a constraint, this gets the upper bound
   /// it's allowed to reach
-  double getUpperBound() const;
+  s_t getUpperBound() const;
 
   /// If this LossFn is being used as a constraint, this sets the upper bound
   /// it's allowed to reach
-  void setUpperBound(double upperBound);
+  void setUpperBound(s_t upperBound);
 
 protected:
   tl::optional<TrajectoryLossFn> mLoss;
   tl::optional<TrajectoryLossFnAndGrad> mLossAndGrad;
   // If this loss function is being used as a constraint, this is the lower
   // bound it's allowed to reach
-  double mLowerBound;
+  s_t mLowerBound;
   // If this loss function is being used as a constraint, this is the upper
   // bound it's allowed to reach
-  double mUpperBound;
+  s_t mUpperBound;
 };
 
 } // namespace trajectory

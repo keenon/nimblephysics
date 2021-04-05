@@ -81,19 +81,19 @@ const math::BoundingBox& Shape::getBoundingBox() const
 }
 
 //==============================================================================
-Eigen::Matrix3d Shape::computeInertiaFromDensity(double density) const
+Eigen::Matrix3s Shape::computeInertiaFromDensity(s_t density) const
 {
   return computeInertiaFromMass(density * getVolume());
 }
 
 //==============================================================================
-Eigen::Matrix3d Shape::computeInertiaFromMass(double mass) const
+Eigen::Matrix3s Shape::computeInertiaFromMass(s_t mass) const
 {
   return computeInertia(mass);
 }
 
 //==============================================================================
-double Shape::getVolume() const
+s_t Shape::getVolume() const
 {
   if (mIsVolumeDirty)
     updateVolume();
@@ -153,25 +153,25 @@ void Shape::refreshData()
 }
 
 //==============================================================================
-void Shape::notifyAlphaUpdate(double alpha)
+void Shape::notifyAlphaUpdate(s_t alpha)
 {
   notifyAlphaUpdated(alpha);
 }
 
 //==============================================================================
-void Shape::notifyAlphaUpdated(double /*alpha*/)
+void Shape::notifyAlphaUpdated(s_t /*alpha*/)
 {
   // Do nothing
 }
 
 //==============================================================================
-void Shape::notifyColorUpdate(const Eigen::Vector4d& color)
+void Shape::notifyColorUpdate(const Eigen::Vector4s& color)
 {
   notifyColorUpdated(color);
 }
 
 //==============================================================================
-void Shape::notifyColorUpdated(const Eigen::Vector4d& /*color*/)
+void Shape::notifyColorUpdated(const Eigen::Vector4s& /*color*/)
 {
   // Do nothing
 }

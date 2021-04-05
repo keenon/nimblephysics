@@ -76,8 +76,8 @@ void TranslationalJoint(py::module& m)
       .def(
           "getRelativeJacobianStatic",
           +[](const dart::dynamics::TranslationalJoint* self,
-              const Eigen::Vector3d& _positions)
-              -> Eigen::Matrix<double, 6, 3> {
+              const Eigen::Vector3s& _positions)
+              -> Eigen::Matrix<s_t, 6, 3> {
             return self->getRelativeJacobianStatic(_positions);
           },
           ::py::arg("positions"))

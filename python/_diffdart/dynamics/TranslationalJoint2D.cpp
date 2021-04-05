@@ -188,8 +188,8 @@ void TranslationalJoint2D(py::module& m)
       .def(
           "setArbitraryPlane",
           +[](dart::dynamics::TranslationalJoint2D* self,
-              const Eigen::Vector3d& transAxis1,
-              const Eigen::Vector3d& transAxis2) {
+              const Eigen::Vector3s& transAxis1,
+              const Eigen::Vector3s& transAxis2) {
             self->setArbitraryPlane(transAxis1, transAxis2);
           },
           ::py::arg("transAxis1"),
@@ -197,8 +197,8 @@ void TranslationalJoint2D(py::module& m)
       .def(
           "setArbitraryPlane",
           +[](dart::dynamics::TranslationalJoint2D* self,
-              const Eigen::Vector3d& transAxis1,
-              const Eigen::Vector3d& transAxis2,
+              const Eigen::Vector3s& transAxis1,
+              const Eigen::Vector3s& transAxis2,
               bool renameDofs) {
             self->setArbitraryPlane(transAxis1, transAxis2, renameDofs);
           },
@@ -214,15 +214,15 @@ void TranslationalJoint2D(py::module& m)
       .def(
           "getTranslationalAxis1",
           +[](const dart::dynamics::TranslationalJoint2D* self)
-              -> Eigen::Vector3d { return self->getTranslationalAxis1(); })
+              -> Eigen::Vector3s { return self->getTranslationalAxis1(); })
       .def(
           "getTranslationalAxis2",
           +[](const dart::dynamics::TranslationalJoint2D* self)
-              -> Eigen::Vector3d { return self->getTranslationalAxis2(); })
+              -> Eigen::Vector3s { return self->getTranslationalAxis2(); })
       .def(
           "getRelativeJacobianStatic",
           +[](const dart::dynamics::TranslationalJoint2D* self,
-              const Eigen::Vector2d& positions) -> Eigen::Matrix<double, 6, 2> {
+              const Eigen::Vector2s& positions) -> Eigen::Matrix<s_t, 6, 2> {
             return self->getRelativeJacobianStatic(positions);
           },
           ::py::arg("positions"))

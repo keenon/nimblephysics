@@ -60,14 +60,14 @@ std::string TrajectoryRollout::toJson(
   std::vector<dynamics::BodyNode*> bodies = world->getAllBodyNodes();
 
   // Initialize a map to hold everything
-  std::unordered_map<std::string, Eigen::MatrixXd> map;
+  std::unordered_map<std::string, Eigen::MatrixXs> map;
   for (int i = 0; i < bodies.size(); i++)
   {
     auto bodyNode = bodies[i];
     std::string name
         = bodyNode->getSkeleton()->getName() + "." + bodyNode->getName();
     // 6 rows: pos_x, pos_y, pos_z, rot_x, rot_y, rot_z
-    map[name] = Eigen::MatrixXd::Zero(6, timesteps);
+    map[name] = Eigen::MatrixXs::Zero(6, timesteps);
   }
 
   // Fill the map with every timestep
@@ -79,10 +79,10 @@ std::string TrajectoryRollout::toJson(
       auto bodyNode = bodies[i];
       std::string name
           = bodyNode->getSkeleton()->getName() + "." + bodyNode->getName();
-      const Eigen::Isometry3d& bodyTransform = bodyNode->getWorldTransform();
+      const Eigen::Isometry3s& bodyTransform = bodyNode->getWorldTransform();
 
       // 6 rows: pos_x, pos_y, pos_z, rot_x, rot_y, rot_z
-      Eigen::Vector6d state = Eigen::Vector6d::Zero();
+      Eigen::Vector6s state = Eigen::Vector6s::Zero();
       state.head<3>() = bodyTransform.translation();
       state.tail<3>() = math::matrixToEulerXYZ(bodyTransform.linear());
       map[name].col(t) = state;
@@ -148,23 +148,23 @@ TrajectoryRolloutReal TrajectoryRollout::deserialize(
     const proto::TrajectoryRollout& proto)
 {
   std::string representationMapping = proto.representationmapping();
-  std::unordered_map<std::string, Eigen::MatrixXd> pos;
+  std::unordered_map<std::string, Eigen::MatrixXs> pos;
   for (auto pair : proto.pos())
   {
     pos[pair.first] = proto::deserializeMatrix(pair.second);
   }
-  std::unordered_map<std::string, Eigen::MatrixXd> vel;
+  std::unordered_map<std::string, Eigen::MatrixXs> vel;
   for (auto pair : proto.vel())
   {
     vel[pair.first] = proto::deserializeMatrix(pair.second);
   }
-  std::unordered_map<std::string, Eigen::MatrixXd> force;
+  std::unordered_map<std::string, Eigen::MatrixXs> force;
   for (auto pair : proto.force())
   {
     force[pair.first] = proto::deserializeMatrix(pair.second);
   }
-  Eigen::VectorXd mass = proto::deserializeVector(proto.mass());
-  std::unordered_map<std::string, Eigen::MatrixXd> metadata;
+  Eigen::VectorXs mass = proto::deserializeVector(proto.mass());
+  std::unordered_map<std::string, Eigen::MatrixXs> metadata;
   for (auto pair : proto.metadata())
   {
     metadata[pair.first] = proto::deserializeMatrix(pair.second);
@@ -179,15 +179,15 @@ TrajectoryRolloutReal TrajectoryRollout::deserialize(
 /// This creates a rollout from forces over time
 TrajectoryRolloutReal TrajectoryRollout::fromForces(
     std::shared_ptr<simulation::World> world,
-    Eigen::VectorXd startPos,
-    Eigen::VectorXd startVel,
-    std::vector<Eigen::VectorXd> forces)
+    Eigen::VectorXs startPos,
+    Eigen::VectorXs startVel,
+    std::vector<Eigen::VectorXs> forces)
 {
   int steps = forces.size();
   int dofs = world->getNumDofs();
-  Eigen::MatrixXd posMatrix = Eigen::MatrixXd::Zero(dofs, steps);
-  Eigen::MatrixXd velMatrix = Eigen::MatrixXd::Zero(dofs, steps);
-  Eigen::MatrixXd forceMatrix = Eigen::MatrixXd::Zero(dofs, steps);
+  Eigen::MatrixXs posMatrix = Eigen::MatrixXs::Zero(dofs, steps);
+  Eigen::MatrixXs velMatrix = Eigen::MatrixXs::Zero(dofs, steps);
+  Eigen::MatrixXs forceMatrix = Eigen::MatrixXs::Zero(dofs, steps);
 
   neural::RestorableSnapshot snapshot(world);
   world->setPositions(startPos);
@@ -204,14 +204,14 @@ TrajectoryRolloutReal TrajectoryRollout::fromForces(
 
   snapshot.restore();
 
-  std::unordered_map<std::string, Eigen::MatrixXd> pos;
+  std::unordered_map<std::string, Eigen::MatrixXs> pos;
   pos["identity"] = posMatrix;
-  std::unordered_map<std::string, Eigen::MatrixXd> vel;
+  std::unordered_map<std::string, Eigen::MatrixXs> vel;
   vel["identity"] = velMatrix;
-  std::unordered_map<std::string, Eigen::MatrixXd> force;
+  std::unordered_map<std::string, Eigen::MatrixXs> force;
   force["identity"] = forceMatrix;
-  Eigen::VectorXd mass = world->getMasses();
-  std::unordered_map<std::string, Eigen::MatrixXd> metadata;
+  Eigen::VectorXs mass = world->getMasses();
+  std::unordered_map<std::string, Eigen::MatrixXs> metadata;
 
   return TrajectoryRolloutReal("identity", pos, vel, force, mass, metadata);
 }
@@ -220,27 +220,27 @@ TrajectoryRolloutReal TrajectoryRollout::fromForces(
 /// This creates a rollout from poses over time
 TrajectoryRolloutReal TrajectoryRollout::fromPoses(
     std::shared_ptr<simulation::World> world,
-    std::vector<Eigen::VectorXd> poses)
+    std::vector<Eigen::VectorXs> poses)
 {
   int steps = poses.size();
   int dofs = world->getNumDofs();
-  Eigen::MatrixXd posMatrix = Eigen::MatrixXd::Zero(dofs, steps);
-  Eigen::MatrixXd velMatrix = Eigen::MatrixXd::Zero(dofs, steps);
-  Eigen::MatrixXd forceMatrix = Eigen::MatrixXd::Zero(dofs, steps);
+  Eigen::MatrixXs posMatrix = Eigen::MatrixXs::Zero(dofs, steps);
+  Eigen::MatrixXs velMatrix = Eigen::MatrixXs::Zero(dofs, steps);
+  Eigen::MatrixXs forceMatrix = Eigen::MatrixXs::Zero(dofs, steps);
 
   for (int i = 0; i < poses.size(); i++)
   {
     posMatrix.col(i) = poses[i];
   }
 
-  std::unordered_map<std::string, Eigen::MatrixXd> pos;
+  std::unordered_map<std::string, Eigen::MatrixXs> pos;
   pos["identity"] = posMatrix;
-  std::unordered_map<std::string, Eigen::MatrixXd> vel;
+  std::unordered_map<std::string, Eigen::MatrixXs> vel;
   vel["identity"] = velMatrix;
-  std::unordered_map<std::string, Eigen::MatrixXd> force;
+  std::unordered_map<std::string, Eigen::MatrixXs> force;
   force["identity"] = forceMatrix;
-  Eigen::VectorXd mass = world->getMasses();
-  std::unordered_map<std::string, Eigen::MatrixXd> metadata;
+  Eigen::VectorXs mass = world->getMasses();
+  std::unordered_map<std::string, Eigen::MatrixXs> metadata;
 
   return TrajectoryRolloutReal("identity", pos, vel, force, mass, metadata);
 }
@@ -252,19 +252,19 @@ TrajectoryRolloutReal::TrajectoryRolloutReal(
     int steps,
     std::string representationMapping,
     int massDim,
-    const std::unordered_map<std::string, Eigen::MatrixXd> metadata)
+    const std::unordered_map<std::string, Eigen::MatrixXs> metadata)
   : mMetadata(metadata)
 {
   mRepresentationMapping = representationMapping;
   for (auto pair : mappings)
   {
-    mPoses[pair.first] = Eigen::MatrixXd::Zero(pair.second->getPosDim(), steps);
-    mVels[pair.first] = Eigen::MatrixXd::Zero(pair.second->getVelDim(), steps);
+    mPoses[pair.first] = Eigen::MatrixXs::Zero(pair.second->getPosDim(), steps);
+    mVels[pair.first] = Eigen::MatrixXs::Zero(pair.second->getVelDim(), steps);
     mForces[pair.first]
-        = Eigen::MatrixXd::Zero(pair.second->getForceDim(), steps);
+        = Eigen::MatrixXs::Zero(pair.second->getForceDim(), steps);
     mMappings.push_back(pair.first);
   }
-  mMasses = Eigen::VectorXd::Zero(massDim);
+  mMasses = Eigen::VectorXs::Zero(massDim);
 }
 
 //==============================================================================
@@ -282,11 +282,11 @@ TrajectoryRolloutReal::TrajectoryRolloutReal(Problem* shot)
 /// Raw constructor
 TrajectoryRolloutReal::TrajectoryRolloutReal(
     std::string representationMapping,
-    const std::unordered_map<std::string, Eigen::MatrixXd> pos,
-    const std::unordered_map<std::string, Eigen::MatrixXd> vel,
-    const std::unordered_map<std::string, Eigen::MatrixXd> force,
-    const Eigen::VectorXd mass,
-    const std::unordered_map<std::string, Eigen::MatrixXd> metadata)
+    const std::unordered_map<std::string, Eigen::MatrixXs> pos,
+    const std::unordered_map<std::string, Eigen::MatrixXs> vel,
+    const std::unordered_map<std::string, Eigen::MatrixXs> force,
+    const Eigen::VectorXs mass,
+    const std::unordered_map<std::string, Eigen::MatrixXs> metadata)
   : mMasses(mass), mRepresentationMapping(representationMapping)
 {
   for (auto pair : pos)
@@ -334,69 +334,69 @@ TrajectoryRolloutReal::TrajectoryRolloutReal(const TrajectoryRollout* copy)
 }
 
 //==============================================================================
-Eigen::Ref<Eigen::MatrixXd> TrajectoryRolloutReal::getPoses(
+Eigen::Ref<Eigen::MatrixXs> TrajectoryRolloutReal::getPoses(
     const std::string& mapping)
 {
   return mPoses.at(mapping);
 }
 
 //==============================================================================
-Eigen::Ref<Eigen::MatrixXd> TrajectoryRolloutReal::getVels(
+Eigen::Ref<Eigen::MatrixXs> TrajectoryRolloutReal::getVels(
     const std::string& mapping)
 {
   return mVels.at(mapping);
 }
 
 //==============================================================================
-Eigen::Ref<Eigen::MatrixXd> TrajectoryRolloutReal::getForces(
+Eigen::Ref<Eigen::MatrixXs> TrajectoryRolloutReal::getForces(
     const std::string& mapping)
 {
   return mForces.at(mapping);
 }
 
 //==============================================================================
-Eigen::Ref<Eigen::VectorXd> TrajectoryRolloutReal::getMasses()
+Eigen::Ref<Eigen::VectorXs> TrajectoryRolloutReal::getMasses()
 {
   return mMasses;
 }
 
 //==============================================================================
-const Eigen::Ref<const Eigen::MatrixXd> TrajectoryRolloutReal::getPosesConst(
+const Eigen::Ref<const Eigen::MatrixXs> TrajectoryRolloutReal::getPosesConst(
     const std::string& mapping) const
 {
   return mPoses.at(mapping);
 }
 
 //==============================================================================
-const Eigen::Ref<const Eigen::MatrixXd> TrajectoryRolloutReal::getVelsConst(
+const Eigen::Ref<const Eigen::MatrixXs> TrajectoryRolloutReal::getVelsConst(
     const std::string& mapping) const
 {
   return mVels.at(mapping);
 }
 
 //==============================================================================
-const Eigen::Ref<const Eigen::MatrixXd> TrajectoryRolloutReal::getForcesConst(
+const Eigen::Ref<const Eigen::MatrixXs> TrajectoryRolloutReal::getForcesConst(
     const std::string& mapping) const
 {
   return mForces.at(mapping);
 }
 
 //==============================================================================
-const Eigen::Ref<const Eigen::VectorXd> TrajectoryRolloutReal::getMassesConst()
+const Eigen::Ref<const Eigen::VectorXs> TrajectoryRolloutReal::getMassesConst()
     const
 {
   return mMasses;
 }
 
 //==============================================================================
-const std::unordered_map<std::string, Eigen::MatrixXd>&
+const std::unordered_map<std::string, Eigen::MatrixXs>&
 TrajectoryRolloutReal::getMetadataMap() const
 {
   return mMetadata;
 }
 
 //==============================================================================
-Eigen::MatrixXd TrajectoryRolloutReal::getMetadata(const std::string& key) const
+Eigen::MatrixXs TrajectoryRolloutReal::getMetadata(const std::string& key) const
 {
   if (mMetadata.find(key) == mMetadata.end())
   {
@@ -406,14 +406,14 @@ Eigen::MatrixXd TrajectoryRolloutReal::getMetadata(const std::string& key) const
     {
       std::cout << "   - \"" << pair.first << "\"" << std::endl;
     }
-    return Eigen::MatrixXd::Zero(0, 0);
+    return Eigen::MatrixXs::Zero(0, 0);
   }
   return mMetadata.at(key);
 }
 
 //==============================================================================
 void TrajectoryRolloutReal::setMetadata(
-    const std::string& key, Eigen::MatrixXd value)
+    const std::string& key, Eigen::MatrixXs value)
 {
   mMetadata[key] = value;
 }
@@ -439,7 +439,7 @@ const std::vector<std::string>& TrajectoryRolloutRef::getMappings() const
 }
 
 //==============================================================================
-Eigen::Ref<Eigen::MatrixXd> TrajectoryRolloutRef::getPoses(
+Eigen::Ref<Eigen::MatrixXs> TrajectoryRolloutRef::getPoses(
     const std::string& mapping)
 {
   return mToSlice->getPoses(mapping).block(
@@ -447,7 +447,7 @@ Eigen::Ref<Eigen::MatrixXd> TrajectoryRolloutRef::getPoses(
 }
 
 //==============================================================================
-Eigen::Ref<Eigen::MatrixXd> TrajectoryRolloutRef::getVels(
+Eigen::Ref<Eigen::MatrixXs> TrajectoryRolloutRef::getVels(
     const std::string& mapping)
 {
   return mToSlice->getVels(mapping).block(
@@ -455,7 +455,7 @@ Eigen::Ref<Eigen::MatrixXd> TrajectoryRolloutRef::getVels(
 }
 
 //==============================================================================
-Eigen::Ref<Eigen::MatrixXd> TrajectoryRolloutRef::getForces(
+Eigen::Ref<Eigen::MatrixXs> TrajectoryRolloutRef::getForces(
     const std::string& mapping)
 {
   return mToSlice->getForces(mapping).block(
@@ -463,13 +463,13 @@ Eigen::Ref<Eigen::MatrixXd> TrajectoryRolloutRef::getForces(
 }
 
 //==============================================================================
-Eigen::Ref<Eigen::VectorXd> TrajectoryRolloutRef::getMasses()
+Eigen::Ref<Eigen::VectorXs> TrajectoryRolloutRef::getMasses()
 {
   return mToSlice->getMasses();
 }
 
 //==============================================================================
-const Eigen::Ref<const Eigen::MatrixXd> TrajectoryRolloutRef::getPosesConst(
+const Eigen::Ref<const Eigen::MatrixXs> TrajectoryRolloutRef::getPosesConst(
     const std::string& mapping) const
 {
   return mToSlice->getPosesConst(mapping).block(
@@ -477,7 +477,7 @@ const Eigen::Ref<const Eigen::MatrixXd> TrajectoryRolloutRef::getPosesConst(
 }
 
 //==============================================================================
-const Eigen::Ref<const Eigen::MatrixXd> TrajectoryRolloutRef::getVelsConst(
+const Eigen::Ref<const Eigen::MatrixXs> TrajectoryRolloutRef::getVelsConst(
     const std::string& mapping) const
 {
   return mToSlice->getVelsConst(mapping).block(
@@ -485,7 +485,7 @@ const Eigen::Ref<const Eigen::MatrixXd> TrajectoryRolloutRef::getVelsConst(
 }
 
 //==============================================================================
-const Eigen::Ref<const Eigen::MatrixXd> TrajectoryRolloutRef::getForcesConst(
+const Eigen::Ref<const Eigen::MatrixXs> TrajectoryRolloutRef::getForcesConst(
     const std::string& mapping) const
 {
   return mToSlice->getForcesConst(mapping).block(
@@ -493,28 +493,28 @@ const Eigen::Ref<const Eigen::MatrixXd> TrajectoryRolloutRef::getForcesConst(
 }
 
 //==============================================================================
-const Eigen::Ref<const Eigen::VectorXd> TrajectoryRolloutRef::getMassesConst()
+const Eigen::Ref<const Eigen::VectorXs> TrajectoryRolloutRef::getMassesConst()
     const
 {
   return mToSlice->getMassesConst();
 }
 
 //==============================================================================
-const std::unordered_map<std::string, Eigen::MatrixXd>&
+const std::unordered_map<std::string, Eigen::MatrixXs>&
 TrajectoryRolloutRef::getMetadataMap() const
 {
   return mToSlice->getMetadataMap();
 }
 
 //==============================================================================
-Eigen::MatrixXd TrajectoryRolloutRef::getMetadata(const std::string& key) const
+Eigen::MatrixXs TrajectoryRolloutRef::getMetadata(const std::string& key) const
 {
   return mToSlice->getMetadata(key);
 }
 
 //==============================================================================
 void TrajectoryRolloutRef::setMetadata(
-    const std::string& key, Eigen::MatrixXd value)
+    const std::string& key, Eigen::MatrixXs value)
 {
   mToSlice->setMetadata(key, value);
 }
@@ -540,7 +540,7 @@ const std::vector<std::string>& TrajectoryRolloutConstRef::getMappings() const
 }
 
 //==============================================================================
-Eigen::Ref<Eigen::MatrixXd> TrajectoryRolloutConstRef::getPoses(
+Eigen::Ref<Eigen::MatrixXs> TrajectoryRolloutConstRef::getPoses(
     const std::string& /* mapping */)
 {
   assert(false && "It should be impossible to get a mutable reference from a TrajectorRolloutConstRef");
@@ -548,7 +548,7 @@ Eigen::Ref<Eigen::MatrixXd> TrajectoryRolloutConstRef::getPoses(
 }
 
 //==============================================================================
-Eigen::Ref<Eigen::MatrixXd> TrajectoryRolloutConstRef::getVels(
+Eigen::Ref<Eigen::MatrixXs> TrajectoryRolloutConstRef::getVels(
     const std::string& /* mapping */)
 {
   assert(false && "It should be impossible to get a mutable reference from a TrajectorRolloutConstRef");
@@ -556,7 +556,7 @@ Eigen::Ref<Eigen::MatrixXd> TrajectoryRolloutConstRef::getVels(
 }
 
 //==============================================================================
-Eigen::Ref<Eigen::MatrixXd> TrajectoryRolloutConstRef::getForces(
+Eigen::Ref<Eigen::MatrixXs> TrajectoryRolloutConstRef::getForces(
     const std::string& /* mapping */)
 {
   assert(false && "It should be impossible to get a mutable reference from a TrajectorRolloutConstRef");
@@ -564,14 +564,14 @@ Eigen::Ref<Eigen::MatrixXd> TrajectoryRolloutConstRef::getForces(
 }
 
 //==============================================================================
-Eigen::Ref<Eigen::VectorXd> TrajectoryRolloutConstRef::getMasses()
+Eigen::Ref<Eigen::VectorXs> TrajectoryRolloutConstRef::getMasses()
 {
   assert(false && "It should be impossible to get a mutable reference from a TrajectorRolloutConstRef");
   throw std::runtime_error{"Execution should never reach this point"};
 }
 
 //==============================================================================
-const Eigen::Ref<const Eigen::MatrixXd>
+const Eigen::Ref<const Eigen::MatrixXs>
 TrajectoryRolloutConstRef::getPosesConst(const std::string& mapping) const
 {
   return mToSlice->getPosesConst(mapping).block(
@@ -579,7 +579,7 @@ TrajectoryRolloutConstRef::getPosesConst(const std::string& mapping) const
 }
 
 //==============================================================================
-const Eigen::Ref<const Eigen::MatrixXd> TrajectoryRolloutConstRef::getVelsConst(
+const Eigen::Ref<const Eigen::MatrixXs> TrajectoryRolloutConstRef::getVelsConst(
     const std::string& mapping) const
 {
   return mToSlice->getVelsConst(mapping).block(
@@ -587,7 +587,7 @@ const Eigen::Ref<const Eigen::MatrixXd> TrajectoryRolloutConstRef::getVelsConst(
 }
 
 //==============================================================================
-const Eigen::Ref<const Eigen::MatrixXd>
+const Eigen::Ref<const Eigen::MatrixXs>
 TrajectoryRolloutConstRef::getForcesConst(const std::string& mapping) const
 {
   return mToSlice->getForcesConst(mapping).block(
@@ -595,21 +595,21 @@ TrajectoryRolloutConstRef::getForcesConst(const std::string& mapping) const
 }
 
 //==============================================================================
-const Eigen::Ref<const Eigen::VectorXd>
+const Eigen::Ref<const Eigen::VectorXs>
 TrajectoryRolloutConstRef::getMassesConst() const
 {
   return mToSlice->getMassesConst();
 }
 
 //==============================================================================
-const std::unordered_map<std::string, Eigen::MatrixXd>&
+const std::unordered_map<std::string, Eigen::MatrixXs>&
 TrajectoryRolloutConstRef::getMetadataMap() const
 {
   return mToSlice->getMetadataMap();
 }
 
 //==============================================================================
-Eigen::MatrixXd TrajectoryRolloutConstRef::getMetadata(
+Eigen::MatrixXs TrajectoryRolloutConstRef::getMetadata(
     const std::string& key) const
 {
   return mToSlice->getMetadata(key);
@@ -617,7 +617,7 @@ Eigen::MatrixXd TrajectoryRolloutConstRef::getMetadata(
 
 //==============================================================================
 void TrajectoryRolloutConstRef::setMetadata(
-    const std::string& /* key */, Eigen::MatrixXd /* value */)
+    const std::string& /* key */, Eigen::MatrixXs /* value */)
 {
   assert(false && "It should be impossible to get a mutable reference from a TrajectorRolloutConstRef");
 }

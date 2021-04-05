@@ -35,9 +35,9 @@ using namespace constraint;
 /*
 TEST(GRADIENTS, ODE_GRADIENTS)
 {
-  Eigen::Vector3d grad = Eigen::Vector3d::Random();
-  Eigen::Vector3d normal = Eigen::Vector3d::Random();
-  Eigen::Vector3d firstFrictionDirection = Eigen::Vector3d::UnitZ();
+  Eigen::Vector3s grad = Eigen::Vector3s::Random();
+  Eigen::Vector3s normal = Eigen::Vector3s::Random();
+  Eigen::Vector3s firstFrictionDirection = Eigen::Vector3s::UnitZ();
 
   ContactConstraint::TangentBasisMatrix ode
       = ContactConstraint::getTangentBasisMatrixODE(
@@ -66,14 +66,14 @@ void testVertexFaceCollision(bool isSelfCollision)
   auto collision_detector
       = collision::CollisionDetector::getFactory()->create("dart");
   world->getConstraintSolver()->setCollisionDetector(collision_detector);
-  world->setGravity(Eigen::Vector3d(0, -9.81, 0));
+  world->setGravity(Eigen::Vector3s(0, -9.81, 0));
 
   // This box is centered at (0,0,0), and extends to [-0.5, 0.5] on every axis
   SkeletonPtr box1 = Skeleton::create("face box");
   std::pair<FreeJoint*, BodyNode*> box1Pair
       = box1->createJointAndBodyNodePair<FreeJoint>();
   std::shared_ptr<BoxShape> box1Shape(
-      new BoxShape(Eigen::Vector3d(1.0, 1.0, 1.0)));
+      new BoxShape(Eigen::Vector3s(1.0, 1.0, 1.0)));
   // ShapeNode* box1Node =
   box1Pair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(
       box1Shape);
@@ -93,20 +93,20 @@ void testVertexFaceCollision(bool isSelfCollision)
     box2Pair = box2->createJointAndBodyNodePair<FreeJoint>();
   }
 
-  double box2EdgeSize = sqrt(1.0 / 3);
+  s_t box2EdgeSize = sqrt(1.0 / 3);
   std::shared_ptr<BoxShape> box2Shape(
-      new BoxShape(Eigen::Vector3d(1.0, 1.0, 1.0) * box2EdgeSize));
+      new BoxShape(Eigen::Vector3s(1.0, 1.0, 1.0) * box2EdgeSize));
   // ShapeNode* box2Node =
   box2Pair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(
       box2Shape);
   FreeJoint* box2Joint = box2Pair.first;
-  // Eigen::Matrix3d rotation = Eigen::Matrix3d::Identity();
+  // Eigen::Matrix3s rotation = Eigen::Matrix3s::Identity();
 
-  Eigen::Isometry3d box2Position = Eigen::Isometry3d::Identity();
+  Eigen::Isometry3s box2Position = Eigen::Isometry3s::Identity();
   box2Position.linear()
-      = math::eulerXYZToMatrix(Eigen::Vector3d(0, 45, -45) * 3.1415 / 180);
+      = math::eulerXYZToMatrix(Eigen::Vector3s(0, 45, -45) * 3.1415 / 180);
   box2Position.translation()
-      = box2Position.linear() * Eigen::Vector3d(1.0 - 2e-2, 0, 0);
+      = box2Position.linear() * Eigen::Vector3s(1.0 - 2e-2, 0, 0);
   box2Joint->setTransformFromChildBodyNode(box2Position);
 
   world->addSkeleton(box1);
@@ -115,7 +115,7 @@ void testVertexFaceCollision(bool isSelfCollision)
     world->addSkeleton(box2);
   }
 
-  Eigen::VectorXd vels = Eigen::VectorXd::Zero(world->getNumDofs());
+  Eigen::VectorXs vels = Eigen::VectorXs::Zero(world->getNumDofs());
   // Set the vel of the X translation of the 2nd box
   vels(9) = 0.1;
   world->setVelocities(vels);
@@ -173,15 +173,15 @@ void testEdgeEdgeCollision(bool isSelfCollision, bool useMesh)
   auto collision_detector
       = collision::CollisionDetector::getFactory()->create("dart");
   world->getConstraintSolver()->setCollisionDetector(collision_detector);
-  world->setGravity(Eigen::Vector3d(0, -9.81, 0));
+  world->setGravity(Eigen::Vector3s(0, -9.81, 0));
 
   // This box is centered at (0,0,0), and extends to [-0.5, 0.5] on every axis
   SkeletonPtr box1 = Skeleton::create("face box");
   std::pair<FreeJoint*, BodyNode*> box1Pair
       = box1->createJointAndBodyNodePair<FreeJoint>();
   std::shared_ptr<BoxShape> box1Shape(
-      new BoxShape(Eigen::Vector3d(1.0, 1.0, 1.0)));
-  Eigen::Vector3d size = Eigen::Vector3d(1.0, 1.0, 1.0);
+      new BoxShape(Eigen::Vector3s(1.0, 1.0, 1.0)));
+  Eigen::Vector3s size = Eigen::Vector3s(1.0, 1.0, 1.0);
   if (useMesh)
   {
     aiScene* boxMesh = createBoxMeshUnsafe();
@@ -215,7 +215,7 @@ void testEdgeEdgeCollision(bool isSelfCollision, bool useMesh)
   }
 
   std::shared_ptr<BoxShape> box2Shape(
-      new BoxShape(Eigen::Vector3d(1.0, 1.0, 1.0)));
+      new BoxShape(Eigen::Vector3s(1.0, 1.0, 1.0)));
   // ShapeNode* box2Node =
   if (useMesh)
   {
@@ -235,12 +235,12 @@ void testEdgeEdgeCollision(bool isSelfCollision, bool useMesh)
   }
 
   FreeJoint* box2Joint = box2Pair.first;
-  // Eigen::Matrix3d rotation = Eigen::Matrix3d::Identity();
+  // Eigen::Matrix3s rotation = Eigen::Matrix3s::Identity();
 
-  Eigen::Isometry3d box2Position = Eigen::Isometry3d::Identity();
+  Eigen::Isometry3s box2Position = Eigen::Isometry3s::Identity();
   box2Position.linear()
-      = math::eulerXYZToMatrix(Eigen::Vector3d(0, 45, 45) * 3.1415 / 180);
-  box2Position.translation() = box2Position.linear() * Eigen::Vector3d(1, -1, 0)
+      = math::eulerXYZToMatrix(Eigen::Vector3s(0, 45, 45) * 3.1415 / 180);
+  box2Position.translation() = box2Position.linear() * Eigen::Vector3s(1, -1, 0)
                                * ((2 * sqrt(0.5) / sqrt(2)) - 0.01);
   box2Joint->setTransformFromChildBodyNode(box2Position);
 
@@ -250,7 +250,7 @@ void testEdgeEdgeCollision(bool isSelfCollision, bool useMesh)
     world->addSkeleton(box2);
   }
 
-  Eigen::VectorXd vels = Eigen::VectorXd::Zero(world->getNumDofs());
+  Eigen::VectorXs vels = Eigen::VectorXs::Zero(world->getNumDofs());
   vels(9) += 0.1;  // +x
   vels(10) -= 0.1; // -y
   world->setVelocities(vels);
@@ -268,15 +268,15 @@ void testEdgeEdgeCollision(bool isSelfCollision, bool useMesh)
   const collision::Contact& contact = result.getContact(0);
   std::cout << contact.penetrationDepth << std::endl;
 
-  std::vector<Eigen::Vector3d> edgeLineA;
+  std::vector<Eigen::Vector3s> edgeLineA;
   edgeLineA.push_back(contact.edgeAFixedPoint);
   edgeLineA.push_back(contact.edgeAFixedPoint + contact.edgeADir);
-  server.createLine("edge_a", edgeLineA, Eigen::Vector3d(0,1,0));
+  server.createLine("edge_a", edgeLineA, Eigen::Vector3s(0,1,0));
 
-  std::vector<Eigen::Vector3d> edgeLineB;
+  std::vector<Eigen::Vector3s> edgeLineB;
   edgeLineB.push_back(contact.edgeBFixedPoint);
   edgeLineB.push_back(contact.edgeBFixedPoint + contact.edgeBDir);
-  server.createLine("edge_b", edgeLineB, Eigen::Vector3d(1,0,0));
+  server.createLine("edge_b", edgeLineB, Eigen::Vector3s(1,0,0));
 
   server.serve(8070);
 
@@ -360,14 +360,14 @@ void testSphereBoxCollision(bool isSelfCollision, int numFaces)
   auto collision_detector
       = collision::CollisionDetector::getFactory()->create("dart");
   world->getConstraintSolver()->setCollisionDetector(collision_detector);
-  world->setGravity(Eigen::Vector3d(0, -9.81, 0));
+  world->setGravity(Eigen::Vector3s(0, -9.81, 0));
 
   // This box is centered at (0,0,0), and extends to [-0.5, 0.5] on every axis
   SkeletonPtr box = Skeleton::create("face box");
   std::pair<FreeJoint*, BodyNode*> boxPair
       = box->createJointAndBodyNodePair<FreeJoint>();
   std::shared_ptr<BoxShape> boxShape(
-      new BoxShape(Eigen::Vector3d(1.0, 1.0, 1.0)));
+      new BoxShape(Eigen::Vector3s(1.0, 1.0, 1.0)));
   // ShapeNode* boxNode =
   boxPair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(boxShape);
 
@@ -389,28 +389,28 @@ void testSphereBoxCollision(bool isSelfCollision, int numFaces)
   spherePair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(
       sphereShape);
   FreeJoint* sphereJoint = spherePair.first;
-  // Eigen::Matrix3d rotation = Eigen::Matrix3d::Identity();
+  // Eigen::Matrix3s rotation = Eigen::Matrix3s::Identity();
 
-  Eigen::Isometry3d spherePosition = Eigen::Isometry3d::Identity();
+  Eigen::Isometry3s spherePosition = Eigen::Isometry3s::Identity();
   if (numFaces == 1)
   {
-    spherePosition.translation() = Eigen::Vector3d(1.0 - 2e-2, 0, 0);
+    spherePosition.translation() = Eigen::Vector3s(1.0 - 2e-2, 0, 0);
   }
   else if (numFaces == 2)
   {
-    spherePosition.translation() = Eigen::Vector3d(
+    spherePosition.translation() = Eigen::Vector3s(
         ((0.5 - 2e-2) / sqrt(2)) + 0.5, ((0.5 - 2e-2) / sqrt(2)) + 0.5, 0);
   }
   else if (numFaces == 3)
   {
-    spherePosition.translation() = Eigen::Vector3d(
+    spherePosition.translation() = Eigen::Vector3s(
         ((0.5 - 2e-2) / sqrt(3)) + 0.5,
         ((0.5 - 2e-2) / sqrt(3)) + 0.5,
         ((0.5 - 2e-2) / sqrt(3)) + 0.5);
   }
   else if (numFaces == 4)
   {
-    spherePosition.translation() = Eigen::Vector3d(0.1, 0.0, 0.0);
+    spherePosition.translation() = Eigen::Vector3s(0.1, 0.0, 0.0);
   }
   sphereJoint->setTransformFromChildBodyNode(spherePosition);
 
@@ -420,7 +420,7 @@ void testSphereBoxCollision(bool isSelfCollision, int numFaces)
     world->addSkeleton(sphere);
   }
 
-  Eigen::VectorXd vels = Eigen::VectorXd::Zero(world->getNumDofs());
+  Eigen::VectorXs vels = Eigen::VectorXs::Zero(world->getNumDofs());
   // Set the vel of the X translation of the 2nd box
   vels(9) = 0.1;
   world->setVelocities(vels);
@@ -479,14 +479,14 @@ TEST(GRADIENTS, SPHERE_BOX_SELF_COLLISION_1_FACE)
  * This sets up two spheres with asymmetric radii colliding with each other
  */
 void testSphereSphereCollision(
-    bool isSelfCollision, double radius1, double radius2)
+    bool isSelfCollision, s_t radius1, s_t radius2)
 {
   // World
   WorldPtr world = World::create();
   auto collision_detector
       = collision::CollisionDetector::getFactory()->create("dart");
   world->getConstraintSolver()->setCollisionDetector(collision_detector);
-  world->setGravity(Eigen::Vector3d(0, -9.81, 0));
+  world->setGravity(Eigen::Vector3s(0, -9.81, 0));
 
   // This box is centered at (0,0,0), and extends to [-0.5, 0.5] on every axis
   SkeletonPtr sphere1 = Skeleton::create("sphere 1");
@@ -516,11 +516,11 @@ void testSphereSphereCollision(
   sphere2Pair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(
       sphere2Shape);
   FreeJoint* sphere2Joint = sphere2Pair.first;
-  // Eigen::Matrix3d rotation = Eigen::Matrix3d::Identity();
+  // Eigen::Matrix3s rotation = Eigen::Matrix3s::Identity();
 
-  Eigen::Isometry3d sphere2Position = Eigen::Isometry3d::Identity();
+  Eigen::Isometry3s sphere2Position = Eigen::Isometry3s::Identity();
   sphere2Position.translation()
-      = Eigen::Vector3d(radius1 + radius2 - 2e-2, 0, 0);
+      = Eigen::Vector3s(radius1 + radius2 - 2e-2, 0, 0);
   sphere2Joint->setTransformFromChildBodyNode(sphere2Position);
 
   world->addSkeleton(sphere1);
@@ -529,7 +529,7 @@ void testSphereSphereCollision(
     world->addSkeleton(sphere2);
   }
 
-  Eigen::VectorXd vels = Eigen::VectorXd::Zero(world->getNumDofs());
+  Eigen::VectorXs vels = Eigen::VectorXs::Zero(world->getNumDofs());
   // Set the vel of the X translation of the 2nd box
   vels(9) = 0.1;
   world->setVelocities(vels);
@@ -562,7 +562,7 @@ void testSphereMeshCollision(bool isSelfCollision, int numFaces)
   auto collision_detector
       = collision::CollisionDetector::getFactory()->create("dart");
   world->getConstraintSolver()->setCollisionDetector(collision_detector);
-  world->setGravity(Eigen::Vector3d(0, -9.81, 0));
+  world->setGravity(Eigen::Vector3s(0, -9.81, 0));
 
   // This box is centered at (0,0,0), and extends to [-0.5, 0.5] on every axis
   SkeletonPtr box = Skeleton::create("face box");
@@ -571,7 +571,7 @@ void testSphereMeshCollision(bool isSelfCollision, int numFaces)
 
   aiScene* boxMesh = createBoxMeshUnsafe();
   std::shared_ptr<MeshShape> boxShape(new MeshShape(
-      Eigen::Vector3d(1.0, 1.0, 1.0), boxMesh, "", nullptr, true));
+      Eigen::Vector3s(1.0, 1.0, 1.0), boxMesh, "", nullptr, true));
 
   // ShapeNode* boxNode =
   boxPair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(boxShape);
@@ -594,32 +594,32 @@ void testSphereMeshCollision(bool isSelfCollision, int numFaces)
   spherePair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(
       sphereShape);
   FreeJoint* sphereJoint = spherePair.first;
-  // Eigen::Matrix3d rotation = Eigen::Matrix3d::Identity();
+  // Eigen::Matrix3s rotation = Eigen::Matrix3s::Identity();
 
-  Eigen::Isometry3d spherePosition = Eigen::Isometry3d::Identity();
-  double penetrationDepth = 2e-3;
+  Eigen::Isometry3s spherePosition = Eigen::Isometry3s::Identity();
+  s_t penetrationDepth = 2e-3;
   if (numFaces == 1)
   {
     spherePosition.translation()
-        = Eigen::Vector3d(1.0 - penetrationDepth, 0, 0);
+        = Eigen::Vector3s(1.0 - penetrationDepth, 0, 0);
   }
   else if (numFaces == 2)
   {
-    spherePosition.translation() = Eigen::Vector3d(
+    spherePosition.translation() = Eigen::Vector3s(
         ((0.5 - penetrationDepth) * sqrt(1.0 / 2)) + 0.5,
         ((0.5 - penetrationDepth) * sqrt(1.0 / 2)) + 0.5,
         0);
   }
   else if (numFaces == 3)
   {
-    spherePosition.translation() = Eigen::Vector3d(
+    spherePosition.translation() = Eigen::Vector3s(
         ((0.5 - penetrationDepth) * sqrt(1.0 / 3)) + 0.5,
         ((0.5 - penetrationDepth) * sqrt(1.0 / 3)) + 0.5,
         ((0.5 - penetrationDepth) * sqrt(1.0 / 3)) + 0.5);
   }
   else if (numFaces == 4)
   {
-    spherePosition.translation() = Eigen::Vector3d(0.1, 0.0, 0.0);
+    spherePosition.translation() = Eigen::Vector3s(0.1, 0.0, 0.0);
   }
   sphereJoint->setTransformFromChildBodyNode(spherePosition);
 
@@ -629,7 +629,7 @@ void testSphereMeshCollision(bool isSelfCollision, int numFaces)
     world->addSkeleton(sphere);
   }
 
-  Eigen::VectorXd vels = Eigen::VectorXd::Zero(world->getNumDofs());
+  Eigen::VectorXs vels = Eigen::VectorXs::Zero(world->getNumDofs());
   if (numFaces == 1 || numFaces == 2)
   {
     // Set the vel of the X translation of the 2nd box
@@ -716,12 +716,12 @@ TEST(GRADIENTS, SPHERE_MESH_SELF_COLLISION_1_FACE)
  */
 void testSphereCapsuleCollision(bool isSelfCollision, int type)
 {
-  double height = 1.0;
-  double radius1 = 0.4;
-  double radius2 = 0.3;
+  s_t height = 1.0;
+  s_t radius1 = 0.4;
+  s_t radius2 = 0.3;
 
-  Eigen::Isometry3d T1 = Eigen::Isometry3d::Identity();
-  Eigen::Isometry3d T2 = Eigen::Isometry3d::Identity();
+  Eigen::Isometry3s T1 = Eigen::Isometry3s::Identity();
+  Eigen::Isometry3s T2 = Eigen::Isometry3s::Identity();
   if (type == 1)
   {
     T2.translation()(2) = height / 2 + sqrt(0.5) * (radius1 + radius2 - 0.01);
@@ -739,7 +739,7 @@ void testSphereCapsuleCollision(bool isSelfCollision, int type)
   auto collision_detector
       = collision::CollisionDetector::getFactory()->create("dart");
   world->getConstraintSolver()->setCollisionDetector(collision_detector);
-  world->setGravity(Eigen::Vector3d(0, -9.81, 0));
+  world->setGravity(Eigen::Vector3s(0, -9.81, 0));
 
   // This capsule is centered at (0,0,0), and extends in the Z direction
   SkeletonPtr capsule = Skeleton::create("capsule");
@@ -772,7 +772,7 @@ void testSphereCapsuleCollision(bool isSelfCollision, int type)
   spherePair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(
       sphereShape);
   FreeJoint* sphereJoint = spherePair.first;
-  // Eigen::Matrix3d rotation = Eigen::Matrix3d::Identity();
+  // Eigen::Matrix3s rotation = Eigen::Matrix3s::Identity();
 
   sphereJoint->setTransformFromParentBodyNode(T2);
 
@@ -782,7 +782,7 @@ void testSphereCapsuleCollision(bool isSelfCollision, int type)
     world->addSkeleton(sphere);
   }
 
-  Eigen::VectorXd vels = Eigen::VectorXd::Zero(world->getNumDofs());
+  Eigen::VectorXs vels = Eigen::VectorXs::Zero(world->getNumDofs());
   if (type == 1)
   {
     // Set the vel of the Z translation of the sphere
@@ -855,24 +855,24 @@ TEST(GRADIENTS, SPHERE_CAPSULE_SIDE_SELF_COLLISION)
  */
 void testCapsuleCapsuleCollision(bool isSelfCollision, int type)
 {
-  double height = 1.0;
-  double radius1 = 0.4;
-  double radius2 = 0.3;
+  s_t height = 1.0;
+  s_t radius1 = 0.4;
+  s_t radius2 = 0.3;
 
-  Eigen::Isometry3d T1 = Eigen::Isometry3d::Identity();
+  Eigen::Isometry3s T1 = Eigen::Isometry3s::Identity();
 
-  Eigen::Isometry3d T2 = Eigen::Isometry3d::Identity();
+  Eigen::Isometry3s T2 = Eigen::Isometry3s::Identity();
   if (type == 1)
   {
     // T shaped
     T2.translation()(0) = radius1 + radius2 + (height / 2) - 0.01;
-    T2.linear() = math::eulerXYZToMatrix(Eigen::Vector3d(0, M_PI_2, 0));
+    T2.linear() = math::eulerXYZToMatrix(Eigen::Vector3s(0, M_PI_2, 0));
   }
   else if (type == 2)
   {
     // X shaped
     T2.translation()(1) = radius1 + radius2 - 0.01;
-    T2.linear() = math::eulerXYZToMatrix(Eigen::Vector3d(0, M_PI_2, 0));
+    T2.linear() = math::eulerXYZToMatrix(Eigen::Vector3s(0, M_PI_2, 0));
   }
   else if (type == 3)
   {
@@ -881,7 +881,7 @@ void testCapsuleCapsuleCollision(bool isSelfCollision, int type)
     T2.translation()(2)
         = (height / 2)
           + (sqrt(0.5) * ((height / 2) + radius1 + radius2 - 0.01));
-    T2.linear() = math::eulerXYZToMatrix(Eigen::Vector3d(0, M_PI_4, 0));
+    T2.linear() = math::eulerXYZToMatrix(Eigen::Vector3s(0, M_PI_4, 0));
   }
 
   // World
@@ -889,7 +889,7 @@ void testCapsuleCapsuleCollision(bool isSelfCollision, int type)
   auto collision_detector
       = collision::CollisionDetector::getFactory()->create("dart");
   world->getConstraintSolver()->setCollisionDetector(collision_detector);
-  world->setGravity(Eigen::Vector3d(0, -9.81, 0));
+  world->setGravity(Eigen::Vector3s(0, -9.81, 0));
 
   // This capsule is centered at (0,0,0), and extends in the Z direction
   SkeletonPtr capsuleA = Skeleton::create("capsule_A");
@@ -924,7 +924,7 @@ void testCapsuleCapsuleCollision(bool isSelfCollision, int type)
   capsuleBPair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(
       capsuleShapeB);
   FreeJoint* sphereJoint = capsuleBPair.first;
-  // Eigen::Matrix3d rotation = Eigen::Matrix3d::Identity();
+  // Eigen::Matrix3s rotation = Eigen::Matrix3s::Identity();
 
   sphereJoint->setTransformFromParentBodyNode(T2);
 
@@ -934,7 +934,7 @@ void testCapsuleCapsuleCollision(bool isSelfCollision, int type)
     world->addSkeleton(capsuleB);
   }
 
-  Eigen::VectorXd vels = Eigen::VectorXd::Zero(world->getNumDofs());
+  Eigen::VectorXs vels = Eigen::VectorXs::Zero(world->getNumDofs());
   if (type == 1)
   {
     // Set the vel of the X translation of capsule B
@@ -1020,42 +1020,42 @@ TEST(GRADIENTS, CAPSULE_CAPSULE_L_SHAPE)
  */
 void testBoxCapsuleCollision(bool isSelfCollision, bool useMesh, int type)
 {
-  Eigen::Vector3d size = Eigen::Vector3d(1, 1, 1);
-  double height = 1.0;
-  double radius = 0.5;
+  Eigen::Vector3s size = Eigen::Vector3s(1, 1, 1);
+  s_t height = 1.0;
+  s_t radius = 0.5;
 
-  Eigen::Isometry3d T1 = Eigen::Isometry3d::Identity();
+  Eigen::Isometry3s T1 = Eigen::Isometry3s::Identity();
 
-  Eigen::Isometry3d T2 = Eigen::Isometry3d::Identity();
+  Eigen::Isometry3s T2 = Eigen::Isometry3s::Identity();
   if (type == 1)
   {
     // capsule-edge collision
     T2.translation()(1) = 0.5 + sqrt(0.5) * (radius - 0.01);
     T2.translation()(2) = 0.5 + sqrt(0.5) * (radius - 0.01);
-    T2.linear() = math::eulerXYZToMatrix(Eigen::Vector3d(M_PI_4, 0, 0));
+    T2.linear() = math::eulerXYZToMatrix(Eigen::Vector3s(M_PI_4, 0, 0));
   }
   else if (type == 2)
   {
     // sphere-face and pipe-edge
-    size = Eigen::Vector3d(2, 1, 2);
+    size = Eigen::Vector3s(2, 1, 2);
     T2.translation()(1) = 1.0 - 0.01;
     T2.translation()(2) = 1.0;
   }
   else if (type == 3)
   {
     // pipe-face collision
-    size = Eigen::Vector3d(10, 1, 10);
+    size = Eigen::Vector3s(10, 1, 10);
     T2.translation()(1) = 1.0 - 0.01;
   }
   else if (type == 4)
   {
     // end-sphere -> face collision, rotated 45 deg to avoid +Z
-    T1.linear() = math::eulerXYZToMatrix(Eigen::Vector3d(0, M_PI_4, 0));
+    T1.linear() = math::eulerXYZToMatrix(Eigen::Vector3s(0, M_PI_4, 0));
     T2.translation()(0)
         = sqrt(0.5) * (size(0) / 2 + height / 2 + radius - 0.01);
     T2.translation()(2)
         = sqrt(0.5) * (size(0) / 2 + height / 2 + radius - 0.01);
-    T2.linear() = math::eulerXYZToMatrix(Eigen::Vector3d(0, M_PI_4, 0));
+    T2.linear() = math::eulerXYZToMatrix(Eigen::Vector3s(0, M_PI_4, 0));
   }
   else if (type == 5)
   {
@@ -1066,7 +1066,7 @@ void testBoxCapsuleCollision(bool isSelfCollision, bool useMesh, int type)
         = 0.5 + sqrt(radius * radius / 3) - sqrt(0.01 * 0.01 / 3);
     T2.translation()(2)
         = 0.5 + sqrt(radius * radius / 3) - sqrt(0.01 * 0.01 / 3);
-    T2.linear() = math::eulerXYZToMatrix(Eigen::Vector3d(M_PI_4, 0, 0));
+    T2.linear() = math::eulerXYZToMatrix(Eigen::Vector3s(M_PI_4, 0, 0));
   }
 
   // World
@@ -1075,7 +1075,7 @@ void testBoxCapsuleCollision(bool isSelfCollision, bool useMesh, int type)
       = collision::CollisionDetector::getFactory()->create("dart");
   world->getConstraintSolver()->setCollisionDetector(collision_detector);
   world->setPenetrationCorrectionEnabled(false);
-  world->setGravity(Eigen::Vector3d(0, -9.81, 0));
+  world->setGravity(Eigen::Vector3s(0, -9.81, 0));
 
   // This capsule is centered at (0,0,0), and extends in the Z direction
   SkeletonPtr capsule = Skeleton::create("capsule_A");
@@ -1121,7 +1121,7 @@ void testBoxCapsuleCollision(bool isSelfCollision, bool useMesh, int type)
 
   FreeJoint* boxJoint = boxPair.first;
   FreeJoint* capsuleJoint = capsulePair.first;
-  // Eigen::Matrix3d rotation = Eigen::Matrix3d::Identity();
+  // Eigen::Matrix3s rotation = Eigen::Matrix3s::Identity();
 
   boxJoint->setTransformFromParentBodyNode(T1);
   capsuleJoint->setTransformFromParentBodyNode(T2);
@@ -1132,7 +1132,7 @@ void testBoxCapsuleCollision(bool isSelfCollision, bool useMesh, int type)
     world->addSkeleton(box);
   }
 
-  Eigen::VectorXd vels = Eigen::VectorXd::Zero(world->getNumDofs());
+  Eigen::VectorXs vels = Eigen::VectorXs::Zero(world->getNumDofs());
   if (type == 1 || type == 2 || type == 3)
   {
     // Set the vel of the Y translation of the capsule

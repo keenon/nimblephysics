@@ -30,9 +30,9 @@ message MPCListenForUpdatesReply {
 
 message MPCRecordGroundTruthStateRequest {
   uint64 time = 1;
-  VectorXd pos = 2;
-  VectorXd vel = 3;
-  VectorXd mass = 4;
+  VectorXs pos = 2;
+  VectorXs vel = 3;
+  VectorXs mass = 4;
 }
 
 message MPCRecordGroundTruthStateReply {
@@ -40,7 +40,7 @@ message MPCRecordGroundTruthStateReply {
 
 message MPCObserveForceRequest {
   uint64 time = 1;
-  VectorXd force = 2;
+  VectorXs force = 2;
 }
 
 message MPCObserveForceReply {

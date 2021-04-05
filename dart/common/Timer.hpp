@@ -35,21 +35,23 @@
 
 #include <string>
 
+#include "dart/math/MathTypes.hpp"
+
 #ifdef _WIN32
-  #ifdef NOMINMAX
-    #include <windows.h>
-  #else
-    #define NOMINMAX
-    #include <windows.h>
-    #undef NOMINMAX
-  #endif
-  typedef struct
-  {
-    LARGE_INTEGER  start;
-    LARGE_INTEGER  stop;
-  } stopWatch;
+#ifdef NOMINMAX
+#include <windows.h>
 #else
-  #include <sys/time.h>
+#define NOMINMAX
+#include <windows.h>
+#undef NOMINMAX
+#endif
+typedef struct
+{
+  LARGE_INTEGER start;
+  LARGE_INTEGER stop;
+} stopWatch;
+#else
+#include <sys/time.h>
 #endif
 
 namespace dart {
@@ -79,19 +81,19 @@ public:
 
   /// \brief Return elapsed time in seconds since startTimer()
   /// \see start()
-  double getElapsedTime();
+  s_t getElapsedTime();
 
   /// \brief Return last elapsed time in seconds
-  double getLastElapsedTime() const;
+  s_t getLastElapsedTime() const;
 
   /// \brief Return total elapsed time in seconds
-  double getTotalElapsedTime() const;
+  s_t getTotalElapsedTime() const;
 
   /// \brief Print results
   void print();
 
   /// \brief Return the current time of the system in seconds
-  static double getWallTime();
+  static s_t getWallTime();
 
 private:
   int mCount;
@@ -100,22 +102,22 @@ private:
   stopWatch mTimer;
 #else
   timeval mTimeVal;
-  double mStartedTime;
-  double mStoppedTime;
+  s_t mStartedTime;
+  s_t mStoppedTime;
 #endif
 
-  double mLastElapsedTime;
-  double mTotalElapsedTime;
+  s_t mLastElapsedTime;
+  s_t mTotalElapsedTime;
   std::string mName;
   bool mIsStarted;
 
 #ifdef _WIN32
-  LARGE_INTEGER  mFrequency;
-  double _convLIToSecs(const LARGE_INTEGER& _L);
+  LARGE_INTEGER mFrequency;
+  s_t _convLIToSecs(const LARGE_INTEGER& _L);
 #endif
 };
 
-}  // namespace common
-}  // namespace dart
+} // namespace common
+} // namespace dart
 
-#endif  // DART_COMMON_TIMER_HPP_
+#endif // DART_COMMON_TIMER_HPP_

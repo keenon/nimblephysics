@@ -1991,7 +1991,7 @@ void __createMarker( char* name, doubleVec3 offset, int id, char* node_name ) {
     strcpy(fullName, namePrefix);
     strcat(fullName, name);
 
-    Vector3d vecOffset(offset[0],offset[1],offset[2]);
+    Vector3s vecOffset(offset[0],offset[1],offset[2]);
     Marker *tempMarker = new Marker(fullName, vecOffset, node);
     gSkel->addMarker(tempMarker);
 }
@@ -2083,11 +2083,11 @@ void __startNode( const char* s, int id ) {
 void __setShape( doubleVec3 s, doubleVec3 t, Dof* bone ) {
     double bone_length = bone->getValue();
 
-    Vector3d vecScale(s[0],s[1],s[2]);
+    Vector3s vecScale(s[0],s[1],s[2]);
     vecScale *= bone_length;
     Shape* prim = new ShapeEllipsoid(vecScale);
 
-    Vector3d vecTrans(t[0],t[1],t[2]);
+    Vector3s vecTrans(t[0],t[1],t[2]);
     vecTrans *= bone_length;
     // Set COM to be Shape offset
     prim->setOffset(vecTrans);
@@ -2110,9 +2110,9 @@ void __setShape( doubleVec3 s, doubleVec3 t, Dof* bone, Shape *geo ) {
 		cur_node->setMass(mass);
 	/******************************************************************************/
 
-	geo->setDim(bone_length*Vector3d(s[0], s[1], s[2]));
+	geo->setDim(bone_length*Vector3s(s[0], s[1], s[2]));
 
-    Vector3d vecTrans(t[0],t[1],t[2]);
+    Vector3s vecTrans(t[0],t[1],t[2]);
     vecTrans *= bone_length;
     // Set COM to be Shape offset
     geo->setOffset(vecTrans);
@@ -2311,18 +2311,18 @@ Shape* __setGeometry(const char* shape, const char *massName, doubleVec3 color)
 
     // create new primitive according to the shape
     if(!strcmp(shape, "CUBE"))
-        prim = new ShapeBox(Vector3d(0,0,0));
+        prim = new ShapeBox(Vector3s(0,0,0));
     //	else if(!strcmp(shape, "CAPSULE"))
-    //		prim = new Capsule(Vector3d(0,0,0), massValue);
+    //		prim = new Capsule(Vector3s(0,0,0), massValue);
     else if(!strcmp(shape, "") || !strcmp(shape, "SPHERE"))
-        prim = new ShapeEllipsoid(Vector3d(0,0,0));
+        prim = new ShapeEllipsoid(Vector3s(0,0,0));
     else{
         cout<<"Unknown primitive type "<<shape<<endl;
         exit(0);
     }
 
     //set color
-    prim->setColor(Vector3d(color[0], color[1], color[2]));
+    prim->setColor(Vector3s(color[0], color[1], color[2]));
 
 	/* SHAPE MASS IS DEPRECIATED **************************************************/
 	/* TEMPORARY HACK TO RETURN MASS TO CALLER ************************************/
@@ -2349,11 +2349,11 @@ Shape* __setGeometry(const char *shape, const char *massName)
 
     // create new primitive according to the shape
     if(!strcmp(shape, "CUBE"))
-        prim = new ShapeBox(Vector3d(0,0,0));
+        prim = new ShapeBox(Vector3s(0,0,0));
     //	else if(!strcmp(shape, "CAPSULE"))
-    //		prim = new Capsule(Vector3d(0,0,0), massValue);
+    //		prim = new Capsule(Vector3s(0,0,0), massValue);
     else if(!strcmp(shape, "") || !strcmp(shape, "SPHERE"))
-        prim = new ShapeEllipsoid(Vector3d(0,0,0));
+        prim = new ShapeEllipsoid(Vector3s(0,0,0));
     else{
         cout<<"Unknown primitive type "<<shape<<endl;
         exit(0);
@@ -2376,11 +2376,11 @@ Shape* __setGeometry(const char *shape, doubleVec3 color)
     // create new primitive by shape
     double massValue = 0.0;
     if(!strcmp(shape, "CUBE"))
-        prim = new ShapeBox(Vector3d(0,0,0));
+        prim = new ShapeBox(Vector3s(0,0,0));
     //	else if(!strcmp(shape, "CAPSULE"))
-    //		prim = new Capsule(Vector3d(0,0,0), massValue);
+    //		prim = new Capsule(Vector3s(0,0,0), massValue);
     else if(!strcmp(shape, "") || !strcmp(shape, "SPHERE"))
-        prim = new ShapeEllipsoid(Vector3d(0,0,0));
+        prim = new ShapeEllipsoid(Vector3s(0,0,0));
     else{
         // mass name instead of shape is specified
         //lookup mass by name
@@ -2394,11 +2394,11 @@ Shape* __setGeometry(const char *shape, doubleVec3 color)
         }
         // create new ellipsoid primitive
         if(found)
-            prim = new ShapeEllipsoid(Vector3d(0,0,0));
+            prim = new ShapeEllipsoid(Vector3s(0,0,0));
     }
 
     // set color
-    prim->setColor(Vector3d(color[0], color[1], color[2]));
+    prim->setColor(Vector3s(color[0], color[1], color[2]));
 
     /* SHAPE MASS IS DEPRECIATED **************************************************/
     /* TEMPORARY HACK TO RETURN MASS TO CALLER ************************************/
@@ -2412,8 +2412,8 @@ Shape* __setGeometry(const char *shape, doubleVec3 color)
 /* create new primitive */
 Shape* __setGeometry(doubleVec3 color)
 {
-    Shape *prim = new ShapeEllipsoid(Vector3d(0,0,0));
-    prim->setColor(Vector3d(color[0], color[1], color[2]));
+    Shape *prim = new ShapeEllipsoid(Vector3s(0,0,0));
+    prim->setColor(Vector3s(color[0], color[1], color[2]));
     return prim;
 }
 
@@ -2423,11 +2423,11 @@ Shape* __setGeometry(const char *shape)
     Shape *prim = NULL;
     double massValue = 0.0;
     if(!strcmp(shape, "CUBE"))
-        prim = new ShapeBox(Vector3d(0,0,0));
+        prim = new ShapeBox(Vector3s(0,0,0));
     //	else if(!strcmp(shape, "CAPSULE"))
-    //		prim = new Capsule(Vector3d(0,0,0), massValue);
+    //		prim = new Capsule(Vector3s(0,0,0), massValue);
     else if(!strcmp(shape, "SPHERE") || !strcmp(shape, ""))
-        prim = new ShapeEllipsoid(Vector3d(0,0,0));
+        prim = new ShapeEllipsoid(Vector3s(0,0,0));
     else{
         // mass name instead of shape is specified
         //lookup mass by name
@@ -2441,7 +2441,7 @@ Shape* __setGeometry(const char *shape)
         }
         // create new ellipsoid primitive
         if(found)
-            prim = new ShapeEllipsoid(Vector3d(0,0,0));
+            prim = new ShapeEllipsoid(Vector3s(0,0,0));
     }
 
     /* SHAPE MASS IS DEPRECIATED **************************************************/

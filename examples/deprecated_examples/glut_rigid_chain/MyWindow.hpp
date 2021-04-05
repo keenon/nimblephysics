@@ -46,7 +46,7 @@ public:
   void timeStepping() override;
 
 private:
-  Eigen::VectorXd computeDamping();
+  Eigen::VectorXs computeDamping();
 };
 
 #endif // EXAMPLES_FORWARDSIM_MYWINDOW_HPP_

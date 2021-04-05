@@ -39,16 +39,16 @@ using namespace math;
 Controller::Controller(
     const dynamics::SkeletonPtr& _skel,
     constraint::ConstraintSolver* _collisionSolver,
-    double _t)
+    s_t _t)
 {
   mSkel = _skel;
   mCollisionHandle = _collisionSolver;
   mTimestep = _t;
   mFrame = 0;
   int nDof = mSkel->getNumDofs();
-  mKp = Eigen::MatrixXd::Identity(nDof, nDof);
-  mKd = Eigen::MatrixXd::Identity(nDof, nDof);
-  mConstrForces = Eigen::VectorXd::Zero(nDof);
+  mKp = Eigen::MatrixXs::Identity(nDof, nDof);
+  mKd = Eigen::MatrixXs::Identity(nDof, nDof);
+  mConstrForces = Eigen::VectorXs::Zero(nDof);
 
   mTorques.resize(nDof);
   mDesiredDofs.resize(nDof);
@@ -77,28 +77,28 @@ Controller::Controller(
 }
 
 void Controller::computeTorques(
-    const Eigen::VectorXd& _dof, const Eigen::VectorXd& _dofVel)
+    const Eigen::VectorXs& _dof, const Eigen::VectorXs& _dofVel)
 {
   // SPD tracking
   // std::size_t nDof = mSkel->getNumDofs();
-  Eigen::MatrixXd invM = (mSkel->getMassMatrix() + mKd * mTimestep).inverse();
-  Eigen::VectorXd p = -mKp * (_dof + _dofVel * mTimestep - mDesiredDofs);
-  Eigen::VectorXd d = -mKd * _dofVel;
-  Eigen::VectorXd qddot
+  Eigen::MatrixXs invM = (mSkel->getMassMatrix() + mKd * mTimestep).inverse();
+  Eigen::VectorXs p = -mKp * (_dof + _dofVel * mTimestep - mDesiredDofs);
+  Eigen::VectorXs d = -mKd * _dofVel;
+  Eigen::VectorXs qddot
       = invM * (-mSkel->getCoriolisAndGravityForces() + p + d + mConstrForces);
   mTorques = p + d - mKd * qddot * mTimestep;
 
   // ankle strategy for sagital plane
-  Eigen::Vector3d com = mSkel->getCOM();
-  Eigen::Vector3d cop = mSkel->getBodyNode("h_heel_left")->getTransform()
-                        * Eigen::Vector3d(0.05, 0, 0);
-  Eigen::Vector2d diff(com[0] - cop[0], com[2] - cop[2]);
+  Eigen::Vector3s com = mSkel->getCOM();
+  Eigen::Vector3s cop = mSkel->getBodyNode("h_heel_left")->getTransform()
+                        * Eigen::Vector3s(0.05, 0, 0);
+  Eigen::Vector2s diff(com[0] - cop[0], com[2] - cop[2]);
   if (diff[0] < 0.1)
   {
-    double offset = com[0] - cop[0];
-    double k1 = 20.0;
-    double k2 = 10.0;
-    double kd = 100.0;
+    s_t offset = com[0] - cop[0];
+    s_t k1 = 20.0;
+    s_t k2 = 10.0;
+    s_t kd = 100.0;
     mTorques[17] += -k1 * offset + kd * (mPreOffset - offset);
     mTorques[25] += -k2 * offset + kd * (mPreOffset - offset);
     mTorques[19] += -k1 * offset + kd * (mPreOffset - offset);

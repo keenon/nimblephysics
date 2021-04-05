@@ -47,11 +47,11 @@ void BackpropSnapshot(py::module& m)
       .def(
           ::py::init<
               dart::simulation::WorldPtr,
-              Eigen::VectorXd,
-              Eigen::VectorXd,
-              Eigen::VectorXd,
-              Eigen::VectorXd,
-              Eigen::VectorXd>(),
+              Eigen::VectorXs,
+              Eigen::VectorXs,
+              Eigen::VectorXs,
+              Eigen::VectorXs,
+              Eigen::VectorXs>(),
           ::py::arg("world"),
           ::py::arg("preStepPosition"),
           ::py::arg("preStepVelocity"),

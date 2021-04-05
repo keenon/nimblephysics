@@ -50,7 +50,7 @@ class DantzigLCPSolver : public LCPSolver
 {
 public:
   /// Constructor
-  explicit DantzigLCPSolver(double _timestep);
+  explicit DantzigLCPSolver(s_t _timestep);
 
   /// Constructor
   virtual ~DantzigLCPSolver();
@@ -61,14 +61,14 @@ public:
 #ifndef NDEBUG
 private:
   /// Return true if the matrix is symmetric
-  bool isSymmetric(std::size_t _n, double* _A);
+  bool isSymmetric(std::size_t _n, s_t* _A);
 
   /// Return true if the diagonla block of matrix is symmetric
-  bool isSymmetric(std::size_t _n, double* _A, std::size_t _begin, std::size_t _end);
+  bool isSymmetric(std::size_t _n, s_t* _A, std::size_t _begin, std::size_t _end);
 
   /// Print debug information
-  void print(std::size_t _n, double* _A, double* _x, double* _lo, double* _hi,
-             double* _b, double* w, int* _findex);
+  void print(std::size_t _n, s_t* _A, s_t* _x, s_t* _lo, s_t* _hi,
+             s_t* _b, s_t* w, int* _findex);
 #endif
 };
 

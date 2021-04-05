@@ -42,30 +42,30 @@
 class Controller
 {
 public:
-  Controller(dart::dynamics::SkeletonPtr _skel, double _t);
+  Controller(dart::dynamics::SkeletonPtr _skel, s_t _t);
   virtual ~Controller();
 
-  Eigen::VectorXd getTorques();
-  double getTorque(int _index);
-  void setDesiredDof(int _index, double _val);
+  Eigen::VectorXs getTorques();
+  s_t getTorque(int _index);
+  void setDesiredDof(int _index, s_t _val);
   void computeTorques();
   dart::dynamics::MetaSkeletonPtr getSkel();
-  Eigen::VectorXd getDesiredDofs();
-  Eigen::MatrixXd getKp();
-  Eigen::MatrixXd getKd();
+  Eigen::VectorXs getDesiredDofs();
+  Eigen::MatrixXs getKp();
+  Eigen::MatrixXs getKd();
 
 protected:
   dart::dynamics::MetaSkeletonPtr mSkel;
   dart::dynamics::BodyNodePtr mLeftHeel;
-  Eigen::VectorXd mTorques;
-  Eigen::VectorXd mDesiredDofs;
-  Eigen::MatrixXd mKp;
-  Eigen::MatrixXd mKd;
+  Eigen::VectorXs mTorques;
+  Eigen::VectorXs mDesiredDofs;
+  Eigen::MatrixXs mKp;
+  Eigen::MatrixXs mKd;
   std::size_t mLeftFoot[2];
   std::size_t mRightFoot[2];
   int mFrame;
-  double mTimestep;
-  double mPreOffset;
+  s_t mTimestep;
+  s_t mPreOffset;
 
   /// \brief SPD utilizes the current info about contact forces
 };

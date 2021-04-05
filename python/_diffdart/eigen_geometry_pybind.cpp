@@ -60,7 +60,7 @@ namespace {
 
 // N.B. Use a loose tolerance, so that we don't have to be super strict with
 // C++.
-const double kCheckTolerance = 1e-5;
+const s_t kCheckTolerance = 1e-5;
 
 template <typename T>
 void CheckRotMat(const Eigen::Matrix<T, 3, 3>& R)
@@ -122,12 +122,12 @@ void eigen_geometry(pybind11::module& parent_m)
 
   m.doc() = "Bindings for Eigen geometric types.";
 
-  using T = double;
+  using T = s_t;
 
   // Do not return references to matrices (e.g. `Eigen::Ref<>`) so that we have
   // tighter control over validation.
 
-  // Isometry3d.
+  // Isometry3s.
   // @note `linear` implies rotation, and `affine` implies translation.
   {
     using Class = Eigen::Transform<T, 3, Eigen::Isometry>;

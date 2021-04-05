@@ -34,9 +34,9 @@
 
 #include <string>
 
+#include "dart/dynamics/BodyNode.hpp"
 #include "dart/math/Geometry.hpp"
 #include "dart/math/Helpers.hpp"
-#include "dart/dynamics/BodyNode.hpp"
 
 namespace dart {
 namespace dynamics {
@@ -51,7 +51,7 @@ PrismaticJoint::~PrismaticJoint()
 void PrismaticJoint::setProperties(const Properties& _properties)
 {
   GenericJoint<math::R1Space>::setProperties(
-        static_cast<const GenericJoint<math::R1Space>::Properties&>(_properties));
+      static_cast<const GenericJoint<math::R1Space>::Properties&>(_properties));
   setProperties(static_cast<const UniqueProperties&>(_properties));
 }
 
@@ -76,7 +76,7 @@ PrismaticJoint::Properties PrismaticJoint::getPrismaticJointProperties() const
 //==============================================================================
 void PrismaticJoint::copy(const PrismaticJoint& _otherJoint)
 {
-  if(this == &_otherJoint)
+  if (this == &_otherJoint)
     return;
 
   setProperties(_otherJoint.getPrismaticJointProperties());
@@ -85,7 +85,7 @@ void PrismaticJoint::copy(const PrismaticJoint& _otherJoint)
 //==============================================================================
 void PrismaticJoint::copy(const PrismaticJoint* _otherJoint)
 {
-  if(nullptr == _otherJoint)
+  if (nullptr == _otherJoint)
     return;
 
   copy(*_otherJoint);
@@ -101,7 +101,7 @@ PrismaticJoint& PrismaticJoint::operator=(const PrismaticJoint& _otherJoint)
 //==============================================================================
 const std::string& PrismaticJoint::getType() const
 {
-    return getStaticType();
+  return getStaticType();
 }
 
 //==============================================================================
@@ -118,9 +118,9 @@ bool PrismaticJoint::isCyclic(std::size_t /*_index*/) const
 }
 
 //==============================================================================
-void PrismaticJoint::setAxis(const Eigen::Vector3d& _axis)
+void PrismaticJoint::setAxis(const Eigen::Vector3s& _axis)
 {
-  if(_axis == mAspectProperties.mAxis)
+  if (_axis == mAspectProperties.mAxis)
     return;
 
   mAspectProperties.mAxis = _axis.normalized();
@@ -130,7 +130,7 @@ void PrismaticJoint::setAxis(const Eigen::Vector3d& _axis)
 }
 
 //==============================================================================
-const Eigen::Vector3d& PrismaticJoint::getAxis() const
+const Eigen::Vector3s& PrismaticJoint::getAxis() const
 {
   return mAspectProperties.mAxis;
 }
@@ -140,9 +140,8 @@ GenericJoint<math::R1Space>::JacobianMatrix
 PrismaticJoint::getRelativeJacobianStatic(
     const GenericJoint<math::R1Space>::Vector& /*positions*/) const
 {
-  GenericJoint<math::R1Space>::JacobianMatrix jacobian
-      = math::AdTLinear(Joint::mAspectProperties.mT_ChildBodyToJoint,
-                        getAxis());
+  GenericJoint<math::R1Space>::JacobianMatrix jacobian = math::AdTLinear(
+      Joint::mAspectProperties.mT_ChildBodyToJoint, getAxis());
 
   // Verification
   assert(!math::isNan(jacobian));
@@ -179,7 +178,7 @@ void PrismaticJoint::updateDegreeOfFreedomNames()
 void PrismaticJoint::updateRelativeTransform() const
 {
   mT = Joint::mAspectProperties.mT_ParentBodyToJoint
-       * Eigen::Translation3d(getAxis() * getPositionsStatic())
+       * Eigen::Translation3s(getAxis() * getPositionsStatic())
        * Joint::mAspectProperties.mT_ChildBodyToJoint.inverse();
 
   // Verification
@@ -189,7 +188,7 @@ void PrismaticJoint::updateRelativeTransform() const
 //==============================================================================
 void PrismaticJoint::updateRelativeJacobian(bool _mandatory) const
 {
-  if(_mandatory)
+  if (_mandatory)
     mJacobian = getRelativeJacobianStatic(getPositionsStatic());
 }
 
@@ -197,8 +196,8 @@ void PrismaticJoint::updateRelativeJacobian(bool _mandatory) const
 void PrismaticJoint::updateRelativeJacobianTimeDeriv() const
 {
   // Time derivative of prismatic joint is always zero
-  assert(mJacobianDeriv == Eigen::Vector6d::Zero());
+  assert(mJacobianDeriv == Eigen::Vector6s::Zero());
 }
 
-}  // namespace dynamics
-}  // namespace dart
+} // namespace dynamics
+} // namespace dart

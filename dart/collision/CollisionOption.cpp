@@ -32,6 +32,8 @@
 
 #include "dart/collision/CollisionOption.hpp"
 
+#include "dart/math/MathTypes.hpp"
+
 namespace dart {
 namespace collision {
 
@@ -40,7 +42,7 @@ CollisionOption::CollisionOption(
     bool enableContact,
     std::size_t maxNumContacts,
     const std::shared_ptr<CollisionFilter>& collisionFilter,
-    double contactClippingDepth)
+    s_t contactClippingDepth)
   : enableContact(enableContact),
     maxNumContacts(maxNumContacts),
     collisionFilter(collisionFilter),

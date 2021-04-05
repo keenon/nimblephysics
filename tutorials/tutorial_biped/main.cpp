@@ -34,11 +34,11 @@
 #include <dart/gui/gui.hpp>
 #include <dart/utils/utils.hpp>
 
-const double default_speed_increment = 0.5;
+const s_t default_speed_increment = 0.5;
 
 const int default_ik_iterations = 4500;
 
-const double default_force = 50.0; // N
+const s_t default_force = 50.0; // N
 const int default_countdown = 100; // Number of timesteps for applying force
 
 using namespace dart::common;
@@ -58,10 +58,10 @@ public:
   {
     int nDofs = mBiped->getNumDofs();
 
-    mForces = Eigen::VectorXd::Zero(nDofs);
+    mForces = Eigen::VectorXs::Zero(nDofs);
 
-    mKp = Eigen::MatrixXd::Identity(nDofs, nDofs);
-    mKd = Eigen::MatrixXd::Identity(nDofs, nDofs);
+    mKp = Eigen::MatrixXs::Identity(nDofs, nDofs);
+    mKd = Eigen::MatrixXs::Identity(nDofs, nDofs);
 
     for (std::size_t i = 0; i < 6; ++i)
     {
@@ -79,7 +79,7 @@ public:
   }
 
   /// Reset the desired dof position to the current position
-  void setTargetPositions(const Eigen::VectorXd& pose)
+  void setTargetPositions(const Eigen::VectorXs& pose)
   {
     mTargetPositions = pose;
   }
@@ -114,7 +114,7 @@ public:
     // Lesson 6
   }
 
-  void changeWheelSpeed(double increment)
+  void changeWheelSpeed(s_t increment)
   {
     mSpeed += increment;
     std::cout << "wheel speed = " << mSpeed << std::endl;
@@ -125,22 +125,22 @@ protected:
   SkeletonPtr mBiped;
 
   /// Joint forces for the biped (output of the Controller)
-  Eigen::VectorXd mForces;
+  Eigen::VectorXs mForces;
 
   /// Control gains for the proportional error terms in the PD controller
-  Eigen::MatrixXd mKp;
+  Eigen::MatrixXs mKp;
 
   /// Control gains for the derivative error terms in the PD controller
-  Eigen::MatrixXd mKd;
+  Eigen::MatrixXs mKd;
 
   /// Target positions for the PD controllers
-  Eigen::VectorXd mTargetPositions;
+  Eigen::VectorXs mTargetPositions;
 
   /// For ankle strategy: Error in the previous timestep
-  double mPreOffset;
+  s_t mPreOffset;
 
   /// For velocity actuator: Current speed of the skateboard
-  double mSpeed;
+  s_t mSpeed;
 };
 
 class MyWindow : public SimWindow
@@ -200,13 +200,13 @@ public:
 
       if (mPositiveSign)
         bn->addExtForce(
-            default_force * Eigen::Vector3d::UnitX(),
+            default_force * Eigen::Vector3s::UnitX(),
             bn->getCOM(),
             false,
             false);
       else
         bn->addExtForce(
-            -default_force * Eigen::Vector3d::UnitX(),
+            -default_force * Eigen::Vector3s::UnitX(),
             bn->getCOM(),
             false,
             false);
@@ -255,10 +255,10 @@ void setVelocityAccuators(SkeletonPtr /*biped*/)
 }
 
 // Solve for a balanced pose using IK
-Eigen::VectorXd solveIK(SkeletonPtr biped)
+Eigen::VectorXs solveIK(SkeletonPtr biped)
 {
   // Lesson 7
-  Eigen::VectorXd newPose = biped->getPositions();
+  Eigen::VectorXs newPose = biped->getPositions();
   return newPose;
 }
 
@@ -271,10 +271,10 @@ SkeletonPtr createFloor()
       = floor->createJointAndBodyNodePair<WeldJoint>(nullptr).second;
 
   // Give the body a shape
-  double floor_width = 10.0;
-  double floor_height = 0.01;
+  s_t floor_width = 10.0;
+  s_t floor_height = 0.01;
   std::shared_ptr<BoxShape> box(
-      new BoxShape(Eigen::Vector3d(floor_width, floor_height, floor_width)));
+      new BoxShape(Eigen::Vector3s(floor_width, floor_height, floor_width)));
   auto shapeNode = body->createShapeNodeWith<
       VisualAspect,
       CollisionAspect,
@@ -282,8 +282,8 @@ SkeletonPtr createFloor()
   shapeNode->getVisualAspect()->setColor(dart::Color::Black());
 
   // Put the body into position
-  Eigen::Isometry3d tf(Eigen::Isometry3d::Identity());
-  tf.translation() = Eigen::Vector3d(0.0, -1.0, 0.0);
+  Eigen::Isometry3s tf(Eigen::Isometry3s::Identity());
+  tf.translation() = Eigen::Vector3s(0.0, -1.0, 0.0);
   body->getParentJoint()->setTransformFromParentBodyNode(tf);
 
   return floor;
@@ -303,11 +303,11 @@ int main(int argc, char* argv[])
   setVelocityAccuators(biped);
 
   // Lesson 7
-  Eigen::VectorXd balancedPose = solveIK(biped);
+  Eigen::VectorXs balancedPose = solveIK(biped);
   biped->setPositions(balancedPose);
 
   WorldPtr world = std::make_shared<World>();
-  world->setGravity(Eigen::Vector3d(0.0, -9.81, 0.0));
+  world->setGravity(Eigen::Vector3s(0.0, -9.81, 0.0));
 
   if (dart::collision::CollisionDetector::getFactory()->canCreate("bullet"))
   {

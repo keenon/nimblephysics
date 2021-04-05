@@ -38,20 +38,20 @@ namespace dart {
 namespace constraint {
 
 //==============================================================================
-void LCPSolver::setTimeStep(double _timeStep)
+void LCPSolver::setTimeStep(s_t _timeStep)
 {
   assert(_timeStep > 0.0);
   mTimeStep = _timeStep;
 }
 
 //==============================================================================
-double LCPSolver::getTimeStep() const
+s_t LCPSolver::getTimeStep() const
 {
   return mTimeStep;
 }
 
 //==============================================================================
-LCPSolver::LCPSolver(double _timeStep) : mTimeStep(_timeStep)
+LCPSolver::LCPSolver(s_t _timeStep) : mTimeStep(_timeStep)
 {
 }
 

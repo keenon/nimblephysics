@@ -57,7 +57,7 @@ int main(int argc, char* argv[])
     for (std::size_t j = 0; j < skel->getNumBodyNodes(); ++j)
     {
       dart::dynamics::BodyNode* bn = skel->getBodyNode(j);
-      Eigen::Vector3d color = dart::Color::Random();
+      Eigen::Vector3s color = dart::Color::Random();
       auto shapeNodes = bn->getShapeNodesWith<dart::dynamics::VisualAspect>();
       for (auto shapeNode : shapeNodes)
         shapeNode->getVisualAspect(true)->setColor(color);

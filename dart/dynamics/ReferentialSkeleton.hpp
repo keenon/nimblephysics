@@ -216,12 +216,12 @@ public:
   // Documentation inherited
   math::Jacobian getJacobian(
       const JacobianNode* _node,
-      const Eigen::Vector3d& _localOffset) const override;
+      const Eigen::Vector3s& _localOffset) const override;
 
   // Documentation inherited
   math::Jacobian getJacobian(
       const JacobianNode* _node,
-      const Eigen::Vector3d& _localOffset,
+      const Eigen::Vector3s& _localOffset,
       const Frame* _inCoordinatesOf) const override;
 
   // Documentation inherited
@@ -229,7 +229,7 @@ public:
 
   // Documentation inherited
   math::Jacobian getWorldJacobian(const JacobianNode* _node,
-      const Eigen::Vector3d& _localOffset) const override;
+      const Eigen::Vector3s& _localOffset) const override;
 
   // Documentation inherited
   math::LinearJacobian getLinearJacobian(
@@ -239,7 +239,7 @@ public:
   // Documentation inherited
   math::LinearJacobian getLinearJacobian(
       const JacobianNode* _node,
-      const Eigen::Vector3d& _localOffset,
+      const Eigen::Vector3s& _localOffset,
       const Frame* _inCoordinatesOf = Frame::World()) const override;
 
   // Documentation inherited
@@ -259,12 +259,12 @@ public:
   // Documentation inherited
   math::Jacobian getJacobianSpatialDeriv(
       const JacobianNode* _node,
-      const Eigen::Vector3d& _localOffset) const override;
+      const Eigen::Vector3s& _localOffset) const override;
 
   // Documentation inherited
   math::Jacobian getJacobianSpatialDeriv(
       const JacobianNode* _node,
-      const Eigen::Vector3d& _localOffset,
+      const Eigen::Vector3s& _localOffset,
       const Frame* _inCoordinatesOf) const override;
 
   // Documentation inherited
@@ -279,7 +279,7 @@ public:
   // Documentation inherited
   math::Jacobian getJacobianClassicDeriv(
       const JacobianNode* _node,
-      const Eigen::Vector3d& _localOffset,
+      const Eigen::Vector3s& _localOffset,
       const Frame* _inCoordinatesOf = Frame::World()) const override;
 
   // Documentation inherited
@@ -290,7 +290,7 @@ public:
   // Documentation inherited
   math::LinearJacobian getLinearJacobianDeriv(
       const JacobianNode* _node,
-      const Eigen::Vector3d& _localOffset,
+      const Eigen::Vector3s& _localOffset,
       const Frame* _inCoordinatesOf = Frame::World()) const override;
 
   // Documentation inherited
@@ -308,34 +308,34 @@ public:
   /// ReferentialSkeleton::getMass(), the total mass is computed upon request,
   /// so this is a linear-time O(N) operation. The Skeleton::getMass() version,
   /// however, is constant-time.
-  double getMass() const override;
+  s_t getMass() const override;
 
   // Documentation inherited
-  const Eigen::MatrixXd& getMassMatrix() const override;
+  const Eigen::MatrixXs& getMassMatrix() const override;
 
   // Documentation inherited
-  const Eigen::MatrixXd& getAugMassMatrix() const override;
+  const Eigen::MatrixXs& getAugMassMatrix() const override;
 
   // Documentation inherited
-  const Eigen::MatrixXd& getInvMassMatrix() const override;
+  const Eigen::MatrixXs& getInvMassMatrix() const override;
 
   // Documentation inherited
-  const Eigen::MatrixXd& getInvAugMassMatrix() const override;
+  const Eigen::MatrixXs& getInvAugMassMatrix() const override;
 
   // Documentation inherited
-  const Eigen::VectorXd& getCoriolisForces() const override;
+  const Eigen::VectorXs& getCoriolisForces() const override;
 
   // Documentation inherited
-  const Eigen::VectorXd& getGravityForces() const override;
+  const Eigen::VectorXs& getGravityForces() const override;
 
   // Documentation inherited
-  const Eigen::VectorXd& getCoriolisAndGravityForces() const override;
+  const Eigen::VectorXs& getCoriolisAndGravityForces() const override;
 
   // Documentation inherited
-  const Eigen::VectorXd& getExternalForces() const override;
+  const Eigen::VectorXs& getExternalForces() const override;
 
   // Documentation inherited
-  const Eigen::VectorXd& getConstraintForces() const override;
+  const Eigen::VectorXs& getConstraintForces() const override;
 
   // Documentation inherited
   void clearExternalForces() override;
@@ -344,10 +344,10 @@ public:
   void clearInternalForces() override;
 
   // Documentation inherited
-  double computeKineticEnergy() const override;
+  s_t computeKineticEnergy() const override;
 
   // Documentation inherited
-  double computePotentialEnergy() const override;
+  s_t computePotentialEnergy() const override;
 
   // Documentation inherited
   DART_DEPRECATED(6.0)
@@ -360,26 +360,26 @@ public:
   //----------------------------------------------------------------------------
 
   // Documentation inherited
-  Eigen::Vector3d getCOM(
+  Eigen::Vector3s getCOM(
       const Frame* _withRespectTo = Frame::World()) const override;
 
   // Documentation inherited
-  Eigen::Vector6d getCOMSpatialVelocity(
+  Eigen::Vector6s getCOMSpatialVelocity(
       const Frame* _relativeTo = Frame::World(),
       const Frame* _inCoordinatesOf = Frame::World()) const override;
 
   // Documentation inherited
-  Eigen::Vector3d getCOMLinearVelocity(
+  Eigen::Vector3s getCOMLinearVelocity(
       const Frame* _relativeTo = Frame::World(),
       const Frame* _inCoordinatesOf = Frame::World()) const override;
 
   // Documentation inherited
-  Eigen::Vector6d getCOMSpatialAcceleration(
+  Eigen::Vector6s getCOMSpatialAcceleration(
       const Frame* _relativeTo = Frame::World(),
       const Frame* _inCoordinatesOf = Frame::World()) const override;
 
   // Documentation inherited
-  Eigen::Vector3d getCOMLinearAcceleration(
+  Eigen::Vector3s getCOMLinearAcceleration(
       const Frame* _relativeTo = Frame::World(),
       const Frame* _inCoordinatesOf = Frame::World()) const override;
 
@@ -509,31 +509,31 @@ protected:
   std::unordered_map<const BodyNode*, IndexMap> mIndexMap;
 
   /// Cache for Mass Matrix
-  mutable Eigen::MatrixXd mM;
+  mutable Eigen::MatrixXs mM;
 
   /// Cache for Augmented Mass Matrix
-  mutable Eigen::MatrixXd mAugM;
+  mutable Eigen::MatrixXs mAugM;
 
   /// Cache for inverse Mass Matrix
-  mutable Eigen::MatrixXd mInvM;
+  mutable Eigen::MatrixXs mInvM;
 
   /// Cache for inverse Augmented Mass Matrix
-  mutable Eigen::MatrixXd mInvAugM;
+  mutable Eigen::MatrixXs mInvAugM;
 
   /// Cache for Coriolis vector
-  mutable Eigen::VectorXd mCvec;
+  mutable Eigen::VectorXs mCvec;
 
   /// Cache for gravity vector
-  mutable Eigen::VectorXd mG;
+  mutable Eigen::VectorXs mG;
 
   /// Cache for combined Coriolis and gravity vector
-  mutable Eigen::VectorXd mCg;
+  mutable Eigen::VectorXs mCg;
 
   /// Cache for external force vector
-  mutable Eigen::VectorXd mFext;
+  mutable Eigen::VectorXs mFext;
 
   /// Cache for constraint force vector
-  mutable Eigen::VectorXd mFc;
+  mutable Eigen::VectorXs mFc;
 
 private:
   /// Add a Skeleton to this ReferentialSkeleton, ignoring its Joint and

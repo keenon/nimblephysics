@@ -36,6 +36,8 @@
 #include <cstddef>
 #include <memory>
 
+#include "dart/math/MathTypes.hpp"
+
 namespace dart {
 namespace collision {
 
@@ -56,7 +58,7 @@ struct CollisionOption
   std::size_t maxNumContacts;
 
   /// The maximum depth, beyond which we clip collisions.
-  double contactClippingDepth;
+  s_t contactClippingDepth;
 
   /// CollisionFilter
   std::shared_ptr<CollisionFilter> collisionFilter;
@@ -66,7 +68,7 @@ struct CollisionOption
       bool enableContact = true,
       std::size_t maxNumContacts = 1000u,
       const std::shared_ptr<CollisionFilter>& collisionFilter = nullptr,
-      double contactClippingDepth = 0.03);
+      s_t contactClippingDepth = 0.03);
 };
 
 } // namespace collision

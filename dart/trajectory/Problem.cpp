@@ -55,14 +55,14 @@ void Problem::addConstraint(LossFn loss)
 //==============================================================================
 /// Register constant metadata, which will be passed along to the loss
 /// function, but will not be backpropagated into.
-void Problem::setMetadata(std::string key, Eigen::MatrixXd value)
+void Problem::setMetadata(std::string key, Eigen::MatrixXs value)
 {
   mMetadata[key] = value;
 }
 
 //==============================================================================
 /// This returns the whole map for metadata
-std::unordered_map<std::string, Eigen::MatrixXd>& Problem::getMetadataMap()
+std::unordered_map<std::string, Eigen::MatrixXs>& Problem::getMetadataMap()
 {
   return mMetadata;
 }
@@ -198,10 +198,10 @@ int Problem::getFlatDynamicProblemDim(
 /// This copies a shot down into a single flat vector
 void Problem::flatten(
     std::shared_ptr<simulation::World> world,
-    /* OUT */ Eigen::Ref<Eigen::VectorXd> flatStatic,
+    /* OUT */ Eigen::Ref<Eigen::VectorXs> flatStatic,
     // Subclasses use flatDynamic, but we don't because at this level of
     // abstraction we don't know about the temporal aspects of the problem.
-    /* OUT */ Eigen::Ref<Eigen::VectorXd> /* flatDynamic */,
+    /* OUT */ Eigen::Ref<Eigen::VectorXs> /* flatDynamic */,
     PerformanceLog* log) const
 {
   PerformanceLog* thisLog = nullptr;
@@ -226,7 +226,7 @@ void Problem::flatten(
 /// This copies a shot down into a single flat vector
 void Problem::flatten(
     std::shared_ptr<simulation::World> world,
-    /* OUT */ Eigen::Ref<Eigen::VectorXd> flat,
+    /* OUT */ Eigen::Ref<Eigen::VectorXs> flat,
     PerformanceLog* log) const
 {
   int staticDim = getFlatStaticProblemDim(world);
@@ -242,10 +242,10 @@ void Problem::flatten(
 /// This gets the parameters out of a flat vector
 void Problem::unflatten(
     std::shared_ptr<simulation::World> world,
-    const Eigen::Ref<const Eigen::VectorXd>& flatStatic,
+    const Eigen::Ref<const Eigen::VectorXs>& flatStatic,
     // Subclasses use flatDynamic, but we don't because at this level of
     // abstraction we don't know about the temporal aspects of the problem.
-    const Eigen::Ref<const Eigen::VectorXd>& /* flatDynamic */,
+    const Eigen::Ref<const Eigen::VectorXs>& /* flatDynamic */,
     PerformanceLog* log)
 {
   PerformanceLog* thisLog = nullptr;
@@ -270,7 +270,7 @@ void Problem::unflatten(
 /// This gets the parameters out of a flat vector
 void Problem::unflatten(
     std::shared_ptr<simulation::World> world,
-    const Eigen::Ref<const Eigen::VectorXd>& flat,
+    const Eigen::Ref<const Eigen::VectorXs>& flat,
     PerformanceLog* log)
 {
   int staticDim = getFlatStaticProblemDim(world);
@@ -287,7 +287,7 @@ void Problem::unflatten(
 /// optimization
 void Problem::getUpperBounds(
     std::shared_ptr<simulation::World> world,
-    /* OUT */ Eigen::Ref<Eigen::VectorXd> flat,
+    /* OUT */ Eigen::Ref<Eigen::VectorXs> flat,
     PerformanceLog* log) const
 {
   int staticDim = getFlatStaticProblemDim(world);
@@ -304,7 +304,7 @@ void Problem::getUpperBounds(
 /// optimization
 void Problem::getLowerBounds(
     std::shared_ptr<simulation::World> world,
-    /* OUT */ Eigen::Ref<Eigen::VectorXd> flat,
+    /* OUT */ Eigen::Ref<Eigen::VectorXs> flat,
     PerformanceLog* log) const
 {
   int staticDim = getFlatStaticProblemDim(world);
@@ -321,10 +321,10 @@ void Problem::getLowerBounds(
 /// optimization
 void Problem::getUpperBounds(
     std::shared_ptr<simulation::World> world,
-    /* OUT */ Eigen::Ref<Eigen::VectorXd> flatStatic,
+    /* OUT */ Eigen::Ref<Eigen::VectorXs> flatStatic,
     // Subclasses use flatDynamic, but we don't because at this level of
     // abstraction we don't know about the temporal aspects of the problem.
-    /* OUT */ Eigen::Ref<Eigen::VectorXd> /* flatDynamic */,
+    /* OUT */ Eigen::Ref<Eigen::VectorXs> /* flatDynamic */,
     PerformanceLog* log) const
 {
   PerformanceLog* thisLog = nullptr;
@@ -350,10 +350,10 @@ void Problem::getUpperBounds(
 /// optimization
 void Problem::getLowerBounds(
     std::shared_ptr<simulation::World> world,
-    /* OUT */ Eigen::Ref<Eigen::VectorXd> flatStatic,
+    /* OUT */ Eigen::Ref<Eigen::VectorXs> flatStatic,
     // Subclasses use flatDynamic, but we don't because at this level of
     // abstraction we don't know about the temporal aspects of the problem.
-    /* OUT */ Eigen::Ref<Eigen::VectorXd> /* flatDynamic */,
+    /* OUT */ Eigen::Ref<Eigen::VectorXs> /* flatDynamic */,
     PerformanceLog* log) const
 {
   PerformanceLog* thisLog = nullptr;
@@ -379,10 +379,10 @@ void Problem::getLowerBounds(
 /// optimization
 void Problem::getInitialGuess(
     std::shared_ptr<simulation::World> world,
-    /* OUT */ Eigen::Ref<Eigen::VectorXd> flatStatic,
+    /* OUT */ Eigen::Ref<Eigen::VectorXs> flatStatic,
     // Subclasses use flatDynamic, but we don't because at this level of
     // abstraction we don't know about the temporal aspects of the problem.
-    /* OUT */ Eigen::Ref<Eigen::VectorXd> /* flatDynamic */,
+    /* OUT */ Eigen::Ref<Eigen::VectorXs> /* flatDynamic */,
     PerformanceLog* log) const
 {
   PerformanceLog* thisLog = nullptr;
@@ -407,7 +407,7 @@ void Problem::getInitialGuess(
 /// This gets the bounds on the constraint functions (both knot points and any
 /// custom constraints)
 void Problem::getConstraintUpperBounds(
-    /* OUT */ Eigen::Ref<Eigen::VectorXd> flat, PerformanceLog* log) const
+    /* OUT */ Eigen::Ref<Eigen::VectorXs> flat, PerformanceLog* log) const
 {
   PerformanceLog* thisLog = nullptr;
 #ifdef LOG_PERFORMANCE_PROBLEM
@@ -435,7 +435,7 @@ void Problem::getConstraintUpperBounds(
 /// This gets the bounds on the constraint functions (both knot points and any
 /// custom constraints)
 void Problem::getConstraintLowerBounds(
-    /* OUT */ Eigen::Ref<Eigen::VectorXd> flat, PerformanceLog* log) const
+    /* OUT */ Eigen::Ref<Eigen::VectorXs> flat, PerformanceLog* log) const
 {
   PerformanceLog* thisLog = nullptr;
 #ifdef LOG_PERFORMANCE_PROBLEM
@@ -464,7 +464,7 @@ void Problem::getConstraintLowerBounds(
 /// optimization
 void Problem::getInitialGuess(
     std::shared_ptr<simulation::World> world,
-    /* OUT */ Eigen::Ref<Eigen::VectorXd> flat,
+    /* OUT */ Eigen::Ref<Eigen::VectorXs> flat,
     PerformanceLog* log) const
 {
   int staticDim = getFlatStaticProblemDim(world);
@@ -487,7 +487,7 @@ int Problem::getConstraintDim() const
 /// vector being passed in is only the size of mConstraints
 void Problem::computeConstraints(
     std::shared_ptr<simulation::World> world,
-    /* OUT */ Eigen::Ref<Eigen::VectorXd> constraints,
+    /* OUT */ Eigen::Ref<Eigen::VectorXs> constraints,
     PerformanceLog* log)
 {
   PerformanceLog* thisLog = nullptr;
@@ -519,7 +519,7 @@ void Problem::computeConstraints(
 /// This returns a matrix that's (getConstraintDim(), getFlatProblemDim()).
 void Problem::backpropJacobian(
     std::shared_ptr<simulation::World> world,
-    /* OUT */ Eigen::Ref<Eigen::MatrixXd> jac,
+    /* OUT */ Eigen::Ref<Eigen::MatrixXs> jac,
     PerformanceLog* log)
 {
   int staticDim = getFlatStaticProblemDim(world);
@@ -539,8 +539,8 @@ void Problem::backpropJacobian(
 /// This returns a matrix that's (getConstraintDim(), getFlatProblemDim()).
 void Problem::backpropJacobian(
     std::shared_ptr<simulation::World> world,
-    /* OUT */ Eigen::Ref<Eigen::MatrixXd> jacStatic,
-    /* OUT */ Eigen::Ref<Eigen::MatrixXd> jacDynamic,
+    /* OUT */ Eigen::Ref<Eigen::MatrixXs> jacStatic,
+    /* OUT */ Eigen::Ref<Eigen::MatrixXs> jacDynamic,
     PerformanceLog* log)
 {
   PerformanceLog* thisLog = nullptr;
@@ -556,10 +556,10 @@ void Problem::backpropJacobian(
   assert(jacDynamic.rows() == mConstraints.size());
   assert(jacDynamic.cols() == getFlatDynamicProblemDim(world));
 
-  Eigen::VectorXd gradStatic
-      = Eigen::VectorXd::Zero(getFlatStaticProblemDim(world));
-  Eigen::VectorXd gradDynamic
-      = Eigen::VectorXd::Zero(getFlatDynamicProblemDim(world));
+  Eigen::VectorXs gradStatic
+      = Eigen::VectorXs::Zero(getFlatStaticProblemDim(world));
+  Eigen::VectorXs gradDynamic
+      = Eigen::VectorXs::Zero(getFlatDynamicProblemDim(world));
   for (int i = 0; i < mConstraints.size(); i++)
   {
     mConstraints[i].getLossAndGradient(
@@ -711,8 +711,8 @@ void Problem::getJacobianSparsityStructureStatic(
 /// static and dynamic regions.
 void Problem::getSparseJacobian(
     std::shared_ptr<simulation::World> world,
-    Eigen::Ref<Eigen::VectorXd> sparseStatic,
-    Eigen::Ref<Eigen::VectorXd> sparseDynamic,
+    Eigen::Ref<Eigen::VectorXs> sparseStatic,
+    Eigen::Ref<Eigen::VectorXs> sparseDynamic,
     PerformanceLog* log)
 {
   PerformanceLog* thisLog = nullptr;
@@ -765,7 +765,7 @@ void Problem::getSparseJacobian(
 /// This writes the Jacobian to a sparse vector
 void Problem::getSparseJacobian(
     std::shared_ptr<simulation::World> world,
-    Eigen::Ref<Eigen::VectorXd> sparse,
+    Eigen::Ref<Eigen::VectorXs> sparse,
     PerformanceLog* log)
 {
   int nnzjStatic = getNumberNonZeroJacobianStatic(world);
@@ -783,7 +783,7 @@ void Problem::getSparseJacobian(
 /// computing the gradients of the loss function as part of the call
 void Problem::backpropGradient(
     std::shared_ptr<simulation::World> world,
-    /* OUT */ Eigen::Ref<Eigen::VectorXd> grad,
+    /* OUT */ Eigen::Ref<Eigen::VectorXs> grad,
     PerformanceLog* log)
 {
   PerformanceLog* thisLog = nullptr;
@@ -822,7 +822,7 @@ void Problem::backpropGradient(
 void Problem::backpropGradientWrt(
     std::shared_ptr<simulation::World> world,
     const TrajectoryRollout* gradWrtRollout,
-    /* OUT */ Eigen::Ref<Eigen::VectorXd> grad,
+    /* OUT */ Eigen::Ref<Eigen::VectorXs> grad,
     PerformanceLog* log)
 {
   int staticDim = getFlatStaticProblemDim(world);
@@ -837,7 +837,7 @@ void Problem::backpropGradientWrt(
 
 //==============================================================================
 /// Get the loss for the rollout
-double Problem::getLoss(
+s_t Problem::getLoss(
     std::shared_ptr<simulation::World> world, PerformanceLog* log)
 {
   PerformanceLog* thisLog = nullptr;
@@ -848,7 +848,7 @@ double Problem::getLoss(
   }
 #endif
 
-  double val = mLoss.getLoss(getRolloutCache(world, thisLog), thisLog);
+  s_t val = mLoss.getLoss(getRolloutCache(world, thisLog), thisLog);
 
 #ifdef LOG_PERFORMANCE_PROBLEM
   if (thisLog != nullptr)
@@ -866,7 +866,7 @@ double Problem::getLoss(
 /// Problem.
 void Problem::initializeStaticGradient(
     std::shared_ptr<simulation::World> world,
-    Eigen::Ref<Eigen::VectorXd> gradStatic,
+    Eigen::Ref<Eigen::VectorXs> gradStatic,
     PerformanceLog* log)
 {
   PerformanceLog* thisLog = nullptr;
@@ -892,7 +892,7 @@ void Problem::initializeStaticGradient(
 /// called for every timestep during backpropGradientWrt().
 void Problem::accumulateStaticGradient(
     std::shared_ptr<simulation::World> world,
-    Eigen::Ref<Eigen::VectorXd> gradStatic,
+    Eigen::Ref<Eigen::VectorXs> gradStatic,
     neural::LossGradient& thisTimestep,
     PerformanceLog* log)
 {
@@ -920,7 +920,7 @@ void Problem::accumulateStaticGradient(
 /// managed by Problem.
 void Problem::initializeStaticJacobianOfFinalState(
     std::shared_ptr<simulation::World> /* world */,
-    Eigen::Ref<Eigen::MatrixXd> jacStatic,
+    Eigen::Ref<Eigen::MatrixXs> jacStatic,
     PerformanceLog* log)
 {
   PerformanceLog* thisLog = nullptr;
@@ -947,7 +947,7 @@ void Problem::initializeStaticJacobianOfFinalState(
 /// SingleShot.
 void Problem::accumulateStaticJacobianOfFinalState(
     std::shared_ptr<simulation::World> /* world */,
-    Eigen::Ref<Eigen::MatrixXd> jacStatic,
+    Eigen::Ref<Eigen::MatrixXs> jacStatic,
     TimestepJacobians& thisTimestep,
     PerformanceLog* log)
 {
@@ -984,7 +984,7 @@ void Problem::accumulateStaticJacobianOfFinalState(
 /// etc.
 Eigen::VectorXi Problem::updateWithForces(
     std::shared_ptr<simulation::World> world,
-    Eigen::MatrixXd forces,
+    Eigen::MatrixXs forces,
     PerformanceLog* log)
 {
   PerformanceLog* thisLog = nullptr;
@@ -1105,26 +1105,26 @@ TrajectoryRollout* Problem::getGradientWrtRolloutCache(
 /// backpropGradient()
 void Problem::finiteDifferenceGradient(
     std::shared_ptr<simulation::World> world,
-    /* OUT */ Eigen::Ref<Eigen::VectorXd> grad)
+    /* OUT */ Eigen::Ref<Eigen::VectorXs> grad)
 {
   int dims = getFlatProblemDim(world);
-  Eigen::VectorXd flat = Eigen::VectorXd::Zero(dims);
+  Eigen::VectorXs flat = Eigen::VectorXs::Zero(dims);
   flatten(world, flat, nullptr);
 
   assert(grad.size() == dims);
 
-  const double EPS = 1e-6;
+  const s_t EPS = 1e-6;
 
   for (int i = 0; i < dims; i++)
   {
     flat(i) += EPS;
     unflatten(world, flat, nullptr);
-    double posLoss = mLoss.getLoss(getRolloutCache(world, nullptr), nullptr);
+    s_t posLoss = mLoss.getLoss(getRolloutCache(world, nullptr), nullptr);
     flat(i) -= EPS;
 
     flat(i) -= EPS;
     unflatten(world, flat, nullptr);
-    double negLoss = mLoss.getLoss(getRolloutCache(world, nullptr), nullptr);
+    s_t negLoss = mLoss.getLoss(getRolloutCache(world, nullptr), nullptr);
     flat(i) += EPS;
 
     grad(i) = (posLoss - negLoss) / (2 * EPS);
@@ -1155,22 +1155,22 @@ int Problem::getNumberNonZeroJacobian(std::shared_ptr<simulation::World> world)
 //==============================================================================
 /// This computes finite difference Jacobians analagous to backpropJacobians()
 void Problem::finiteDifferenceJacobian(
-    std::shared_ptr<simulation::World> world, Eigen::Ref<Eigen::MatrixXd> jac)
+    std::shared_ptr<simulation::World> world, Eigen::Ref<Eigen::MatrixXs> jac)
 {
   int dim = getFlatProblemDim(world);
   int numConstraints = getConstraintDim();
   assert(jac.cols() == dim);
   assert(jac.rows() == numConstraints);
 
-  Eigen::VectorXd originalConstraints = Eigen::VectorXd::Zero(numConstraints);
+  Eigen::VectorXs originalConstraints = Eigen::VectorXs::Zero(numConstraints);
   computeConstraints(world, originalConstraints, nullptr);
-  Eigen::VectorXd flat = Eigen::VectorXd::Zero(dim);
+  Eigen::VectorXs flat = Eigen::VectorXs::Zero(dim);
   flatten(world, flat, nullptr);
 
-  const double EPS = 1e-7;
+  const s_t EPS = 1e-7;
 
-  Eigen::VectorXd positiveConstraints = Eigen::VectorXd::Zero(numConstraints);
-  Eigen::VectorXd negativeConstraints = Eigen::VectorXd::Zero(numConstraints);
+  Eigen::VectorXs positiveConstraints = Eigen::VectorXs::Zero(numConstraints);
+  Eigen::VectorXs negativeConstraints = Eigen::VectorXs::Zero(numConstraints);
   for (int i = 0; i < dim; i++)
   {
     flat(i) += EPS;

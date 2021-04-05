@@ -102,13 +102,13 @@ void DegreeOfFreedom(py::module& m)
           })
       .def(
           "setCommand",
-          +[](dart::dynamics::DegreeOfFreedom* self, double _command) {
+          +[](dart::dynamics::DegreeOfFreedom* self, s_t _command) {
             self->setCommand(_command);
           },
           ::py::arg("command"))
       .def(
           "getCommand",
-          +[](const dart::dynamics::DegreeOfFreedom* self) -> double {
+          +[](const dart::dynamics::DegreeOfFreedom* self) -> s_t {
             return self->getCommand();
           })
       .def(
@@ -116,20 +116,20 @@ void DegreeOfFreedom(py::module& m)
           +[](dart::dynamics::DegreeOfFreedom* self) { self->resetCommand(); })
       .def(
           "setPosition",
-          +[](dart::dynamics::DegreeOfFreedom* self, double _position) {
+          +[](dart::dynamics::DegreeOfFreedom* self, s_t _position) {
             self->setPosition(_position);
           },
           ::py::arg("position"))
       .def(
           "getPosition",
-          +[](const dart::dynamics::DegreeOfFreedom* self) -> double {
+          +[](const dart::dynamics::DegreeOfFreedom* self) -> s_t {
             return self->getPosition();
           })
       .def(
           "setPositionLimits",
           +[](dart::dynamics::DegreeOfFreedom* self,
-              double _lowerLimit,
-              double _upperLimit) {
+              s_t _lowerLimit,
+              s_t _upperLimit) {
             self->setPositionLimits(_lowerLimit, _upperLimit);
           },
           ::py::arg("lowerLimit"),
@@ -137,36 +137,36 @@ void DegreeOfFreedom(py::module& m)
       .def(
           "setPositionLimits",
           +[](dart::dynamics::DegreeOfFreedom* self,
-              const std::pair<double, double>& _limits) {
+              const std::pair<s_t, s_t>& _limits) {
             self->setPositionLimits(_limits);
           },
           ::py::arg("limits"))
       .def(
           "getPositionLimits",
           +[](const dart::dynamics::DegreeOfFreedom* self)
-              -> std::pair<double, double> {
+              -> std::pair<s_t, s_t> {
             return self->getPositionLimits();
           })
       .def(
           "setPositionLowerLimit",
-          +[](dart::dynamics::DegreeOfFreedom* self, double _limit) {
+          +[](dart::dynamics::DegreeOfFreedom* self, s_t _limit) {
             self->setPositionLowerLimit(_limit);
           },
           ::py::arg("limit"))
       .def(
           "getPositionLowerLimit",
-          +[](const dart::dynamics::DegreeOfFreedom* self) -> double {
+          +[](const dart::dynamics::DegreeOfFreedom* self) -> s_t {
             return self->getPositionLowerLimit();
           })
       .def(
           "setPositionUpperLimit",
-          +[](dart::dynamics::DegreeOfFreedom* self, double _limit) {
+          +[](dart::dynamics::DegreeOfFreedom* self, s_t _limit) {
             self->setPositionUpperLimit(_limit);
           },
           ::py::arg("limit"))
       .def(
           "getPositionUpperLimit",
-          +[](const dart::dynamics::DegreeOfFreedom* self) -> double {
+          +[](const dart::dynamics::DegreeOfFreedom* self) -> s_t {
             return self->getPositionUpperLimit();
           })
       .def(
@@ -184,31 +184,31 @@ void DegreeOfFreedom(py::module& m)
           +[](dart::dynamics::DegreeOfFreedom* self) { self->resetPosition(); })
       .def(
           "setInitialPosition",
-          +[](dart::dynamics::DegreeOfFreedom* self, double _initial) {
+          +[](dart::dynamics::DegreeOfFreedom* self, s_t _initial) {
             self->setInitialPosition(_initial);
           },
           ::py::arg("initial"))
       .def(
           "getInitialPosition",
-          +[](const dart::dynamics::DegreeOfFreedom* self) -> double {
+          +[](const dart::dynamics::DegreeOfFreedom* self) -> s_t {
             return self->getInitialPosition();
           })
       .def(
           "setVelocity",
-          +[](dart::dynamics::DegreeOfFreedom* self, double _velocity) {
+          +[](dart::dynamics::DegreeOfFreedom* self, s_t _velocity) {
             self->setVelocity(_velocity);
           },
           ::py::arg("velocity"))
       .def(
           "getVelocity",
-          +[](const dart::dynamics::DegreeOfFreedom* self) -> double {
+          +[](const dart::dynamics::DegreeOfFreedom* self) -> s_t {
             return self->getVelocity();
           })
       .def(
           "setVelocityLimits",
           +[](dart::dynamics::DegreeOfFreedom* self,
-              double _lowerLimit,
-              double _upperLimit) {
+              s_t _lowerLimit,
+              s_t _upperLimit) {
             self->setVelocityLimits(_lowerLimit, _upperLimit);
           },
           ::py::arg("lowerLimit"),
@@ -216,58 +216,58 @@ void DegreeOfFreedom(py::module& m)
       .def(
           "setVelocityLimits",
           +[](dart::dynamics::DegreeOfFreedom* self,
-              const std::pair<double, double>& _limits) {
+              const std::pair<s_t, s_t>& _limits) {
             self->setVelocityLimits(_limits);
           },
           ::py::arg("limits"))
       .def(
           "getVelocityLimits",
           +[](const dart::dynamics::DegreeOfFreedom* self)
-              -> std::pair<double, double> {
+              -> std::pair<s_t, s_t> {
             return self->getVelocityLimits();
           })
       .def(
           "setVelocityLowerLimit",
-          +[](dart::dynamics::DegreeOfFreedom* self, double _limit) {
+          +[](dart::dynamics::DegreeOfFreedom* self, s_t _limit) {
             self->setVelocityLowerLimit(_limit);
           },
           ::py::arg("limit"))
       .def(
           "getVelocityLowerLimit",
-          +[](const dart::dynamics::DegreeOfFreedom* self) -> double {
+          +[](const dart::dynamics::DegreeOfFreedom* self) -> s_t {
             return self->getVelocityLowerLimit();
           })
       .def(
           "setVelocityUpperLimit",
-          +[](dart::dynamics::DegreeOfFreedom* self, double _limit) {
+          +[](dart::dynamics::DegreeOfFreedom* self, s_t _limit) {
             self->setVelocityUpperLimit(_limit);
           },
           ::py::arg("limit"))
       .def(
           "getVelocityUpperLimit",
-          +[](const dart::dynamics::DegreeOfFreedom* self) -> double {
+          +[](const dart::dynamics::DegreeOfFreedom* self) -> s_t {
             return self->getVelocityUpperLimit();
           })
       .def(
           "setPositionUpperLimit",
-          +[](dart::dynamics::DegreeOfFreedom* self, double _limit) {
+          +[](dart::dynamics::DegreeOfFreedom* self, s_t _limit) {
             self->setPositionUpperLimit(_limit);
           },
           ::py::arg("limit"))
       .def(
           "getPositionUpperLimit",
-          +[](const dart::dynamics::DegreeOfFreedom* self) -> double {
+          +[](const dart::dynamics::DegreeOfFreedom* self) -> s_t {
             return self->getPositionUpperLimit();
           })
       .def(
           "setPositionLowerLimit",
-          +[](dart::dynamics::DegreeOfFreedom* self, double _limit) {
+          +[](dart::dynamics::DegreeOfFreedom* self, s_t _limit) {
             self->setPositionLowerLimit(_limit);
           },
           ::py::arg("limit"))
       .def(
           "getPositionLowerLimit",
-          +[](const dart::dynamics::DegreeOfFreedom* self) -> double {
+          +[](const dart::dynamics::DegreeOfFreedom* self) -> s_t {
             return self->getPositionLowerLimit();
           })
       .def(
@@ -275,24 +275,24 @@ void DegreeOfFreedom(py::module& m)
           +[](dart::dynamics::DegreeOfFreedom* self) { self->resetVelocity(); })
       .def(
           "setInitialVelocity",
-          +[](dart::dynamics::DegreeOfFreedom* self, double _initial) {
+          +[](dart::dynamics::DegreeOfFreedom* self, s_t _initial) {
             self->setInitialVelocity(_initial);
           },
           ::py::arg("initial"))
       .def(
           "getInitialVelocity",
-          +[](const dart::dynamics::DegreeOfFreedom* self) -> double {
+          +[](const dart::dynamics::DegreeOfFreedom* self) -> s_t {
             return self->getInitialVelocity();
           })
       .def(
           "setAcceleration",
-          +[](dart::dynamics::DegreeOfFreedom* self, double _acceleration) {
+          +[](dart::dynamics::DegreeOfFreedom* self, s_t _acceleration) {
             self->setAcceleration(_acceleration);
           },
           ::py::arg("acceleration"))
       .def(
           "getAcceleration",
-          +[](const dart::dynamics::DegreeOfFreedom* self) -> double {
+          +[](const dart::dynamics::DegreeOfFreedom* self) -> s_t {
             return self->getAcceleration();
           })
       .def(
@@ -303,8 +303,8 @@ void DegreeOfFreedom(py::module& m)
       .def(
           "setAccelerationLimits",
           +[](dart::dynamics::DegreeOfFreedom* self,
-              double _lowerLimit,
-              double _upperLimit) {
+              s_t _lowerLimit,
+              s_t _upperLimit) {
             self->setAccelerationLimits(_lowerLimit, _upperLimit);
           },
           ::py::arg("lowerLimit"),
@@ -312,47 +312,47 @@ void DegreeOfFreedom(py::module& m)
       .def(
           "setAccelerationLimits",
           +[](dart::dynamics::DegreeOfFreedom* self,
-              const std::pair<double, double>& _limits) {
+              const std::pair<s_t, s_t>& _limits) {
             self->setAccelerationLimits(_limits);
           },
           ::py::arg("limits"))
       .def(
           "getAccelerationLimits",
           +[](const dart::dynamics::DegreeOfFreedom* self)
-              -> std::pair<double, double> {
+              -> std::pair<s_t, s_t> {
             return self->getAccelerationLimits();
           })
       .def(
           "setAccelerationLowerLimit",
-          +[](dart::dynamics::DegreeOfFreedom* self, double _limit) {
+          +[](dart::dynamics::DegreeOfFreedom* self, s_t _limit) {
             self->setAccelerationLowerLimit(_limit);
           },
           ::py::arg("limit"))
       .def(
           "getAccelerationLowerLimit",
-          +[](const dart::dynamics::DegreeOfFreedom* self) -> double {
+          +[](const dart::dynamics::DegreeOfFreedom* self) -> s_t {
             return self->getAccelerationLowerLimit();
           })
       .def(
           "setAccelerationUpperLimit",
-          +[](dart::dynamics::DegreeOfFreedom* self, double _limit) {
+          +[](dart::dynamics::DegreeOfFreedom* self, s_t _limit) {
             self->setAccelerationUpperLimit(_limit);
           },
           ::py::arg("limit"))
       .def(
           "getAccelerationUpperLimit",
-          +[](const dart::dynamics::DegreeOfFreedom* self) -> double {
+          +[](const dart::dynamics::DegreeOfFreedom* self) -> s_t {
             return self->getAccelerationUpperLimit();
           })
       .def(
           "setForce",
-          +[](dart::dynamics::DegreeOfFreedom* self, double _force) {
+          +[](dart::dynamics::DegreeOfFreedom* self, s_t _force) {
             self->setForce(_force);
           },
           ::py::arg("force"))
       .def(
           "getForce",
-          +[](const dart::dynamics::DegreeOfFreedom* self) -> double {
+          +[](const dart::dynamics::DegreeOfFreedom* self) -> s_t {
             return self->getForce();
           })
       .def(
@@ -361,8 +361,8 @@ void DegreeOfFreedom(py::module& m)
       .def(
           "setForceLimits",
           +[](dart::dynamics::DegreeOfFreedom* self,
-              double _lowerLimit,
-              double _upperLimit) {
+              s_t _lowerLimit,
+              s_t _upperLimit) {
             self->setForceLimits(_lowerLimit, _upperLimit);
           },
           ::py::arg("lowerLimit"),
@@ -370,45 +370,45 @@ void DegreeOfFreedom(py::module& m)
       .def(
           "setForceLimits",
           +[](dart::dynamics::DegreeOfFreedom* self,
-              const std::pair<double, double>& _limits) {
+              const std::pair<s_t, s_t>& _limits) {
             self->setForceLimits(_limits);
           },
           ::py::arg("limits"))
       .def(
           "getForceLimits",
           +[](const dart::dynamics::DegreeOfFreedom* self)
-              -> std::pair<double, double> { return self->getForceLimits(); })
+              -> std::pair<s_t, s_t> { return self->getForceLimits(); })
       .def(
           "setForceLowerLimit",
-          +[](dart::dynamics::DegreeOfFreedom* self, double _limit) {
+          +[](dart::dynamics::DegreeOfFreedom* self, s_t _limit) {
             self->setForceLowerLimit(_limit);
           },
           ::py::arg("limit"))
       .def(
           "getForceLowerLimit",
-          +[](const dart::dynamics::DegreeOfFreedom* self) -> double {
+          +[](const dart::dynamics::DegreeOfFreedom* self) -> s_t {
             return self->getForceLowerLimit();
           })
       .def(
           "setForceUpperLimit",
-          +[](dart::dynamics::DegreeOfFreedom* self, double _limit) {
+          +[](dart::dynamics::DegreeOfFreedom* self, s_t _limit) {
             self->setForceUpperLimit(_limit);
           },
           ::py::arg("limit"))
       .def(
           "getForceUpperLimit",
-          +[](const dart::dynamics::DegreeOfFreedom* self) -> double {
+          +[](const dart::dynamics::DegreeOfFreedom* self) -> s_t {
             return self->getForceUpperLimit();
           })
       .def(
           "setVelocityChange",
-          +[](dart::dynamics::DegreeOfFreedom* self, double _velocityChange) {
+          +[](dart::dynamics::DegreeOfFreedom* self, s_t _velocityChange) {
             self->setVelocityChange(_velocityChange);
           },
           ::py::arg("velocityChange"))
       .def(
           "getVelocityChange",
-          +[](const dart::dynamics::DegreeOfFreedom* self) -> double {
+          +[](const dart::dynamics::DegreeOfFreedom* self) -> s_t {
             return self->getVelocityChange();
           })
       .def(
@@ -418,13 +418,13 @@ void DegreeOfFreedom(py::module& m)
           })
       .def(
           "setConstraintImpulse",
-          +[](dart::dynamics::DegreeOfFreedom* self, double _impulse) {
+          +[](dart::dynamics::DegreeOfFreedom* self, s_t _impulse) {
             self->setConstraintImpulse(_impulse);
           },
           ::py::arg("impulse"))
       .def(
           "getConstraintImpulse",
-          +[](const dart::dynamics::DegreeOfFreedom* self) -> double {
+          +[](const dart::dynamics::DegreeOfFreedom* self) -> s_t {
             return self->getConstraintImpulse();
           })
       .def(
@@ -434,46 +434,46 @@ void DegreeOfFreedom(py::module& m)
           })
       .def(
           "setSpringStiffness",
-          +[](dart::dynamics::DegreeOfFreedom* self, double _k) {
+          +[](dart::dynamics::DegreeOfFreedom* self, s_t _k) {
             self->setSpringStiffness(_k);
           },
           ::py::arg("k"))
       .def(
           "getSpringStiffness",
-          +[](const dart::dynamics::DegreeOfFreedom* self) -> double {
+          +[](const dart::dynamics::DegreeOfFreedom* self) -> s_t {
             return self->getSpringStiffness();
           })
       .def(
           "setRestPosition",
-          +[](dart::dynamics::DegreeOfFreedom* self, double _q0) {
+          +[](dart::dynamics::DegreeOfFreedom* self, s_t _q0) {
             self->setRestPosition(_q0);
           },
           ::py::arg("q0"))
       .def(
           "getRestPosition",
-          +[](const dart::dynamics::DegreeOfFreedom* self) -> double {
+          +[](const dart::dynamics::DegreeOfFreedom* self) -> s_t {
             return self->getRestPosition();
           })
       .def(
           "setDampingCoefficient",
-          +[](dart::dynamics::DegreeOfFreedom* self, double _coeff) {
+          +[](dart::dynamics::DegreeOfFreedom* self, s_t _coeff) {
             self->setDampingCoefficient(_coeff);
           },
           ::py::arg("coeff"))
       .def(
           "getDampingCoefficient",
-          +[](const dart::dynamics::DegreeOfFreedom* self) -> double {
+          +[](const dart::dynamics::DegreeOfFreedom* self) -> s_t {
             return self->getDampingCoefficient();
           })
       .def(
           "setCoulombFriction",
-          +[](dart::dynamics::DegreeOfFreedom* self, double _friction) {
+          +[](dart::dynamics::DegreeOfFreedom* self, s_t _friction) {
             self->setCoulombFriction(_friction);
           },
           ::py::arg("friction"))
       .def(
           "getCoulombFriction",
-          +[](const dart::dynamics::DegreeOfFreedom* self) -> double {
+          +[](const dart::dynamics::DegreeOfFreedom* self) -> s_t {
             return self->getCoulombFriction();
           })
       .def(

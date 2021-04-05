@@ -52,7 +52,7 @@ using namespace dart::common;
 
 struct EmbeddedStateData
 {
-  double d;
+  s_t d;
   int i;
 
   EmbeddedStateData() : d(0.0), i(0)
@@ -353,7 +353,7 @@ public:
 
 };
 
-typedef StatefulAspect<double> DoubleAspect;
+typedef StatefulAspect<s_t> s_tAspect;
 typedef StatefulAspect<float>  FloatAspect;
 typedef StatefulAspect<char>   CharAspect;
 typedef StatefulAspect<int>    IntAspect;
@@ -594,13 +594,13 @@ void makePropertiesDifferent(AspectT* aspect, const AspectT* differentFrom)
 TEST(Aspect, StateAndProperties)
 {
   Composite comp1;
-  comp1.createAspect<DoubleAspect>();
+  comp1.createAspect<s_tAspect>();
   comp1.createAspect<FloatAspect>();
   comp1.createAspect<CharAspect>();
   comp1.createAspect<IntAspect>();
 
   Composite comp2;
-  comp2.createAspect<DoubleAspect>();
+  comp2.createAspect<s_tAspect>();
   comp2.createAspect<FloatAspect>();
 
   comp1.createAspect<StateAspectTest>();
@@ -609,25 +609,25 @@ TEST(Aspect, StateAndProperties)
 
   comp2.setCompositeState(comp1.getCompositeState());
 
-  EXPECT_EQ( comp1.get<DoubleAspect>()->mState.val,
-             comp2.get<DoubleAspect>()->mState.val );
+  EXPECT_EQ( comp1.get<s_tAspect>()->mState.val,
+             comp2.get<s_tAspect>()->mState.val );
 
   EXPECT_EQ( comp1.get<FloatAspect>()->mState.val,
              comp2.get<FloatAspect>()->mState.val );
 
-  makeStatesDifferent( comp2.get<DoubleAspect>(), comp1.get<DoubleAspect>() );
+  makeStatesDifferent( comp2.get<s_tAspect>(), comp1.get<s_tAspect>() );
   makeStatesDifferent( comp2.get<FloatAspect>(), comp1.get<FloatAspect>() );
 
-  EXPECT_NE( comp1.get<DoubleAspect>()->mState.val,
-             comp2.get<DoubleAspect>()->mState.val );
+  EXPECT_NE( comp1.get<s_tAspect>()->mState.val,
+             comp2.get<s_tAspect>()->mState.val );
 
   EXPECT_NE( comp1.get<FloatAspect>()->mState.val,
              comp2.get<FloatAspect>()->mState.val );
 
   comp1.setCompositeState( comp2.getCompositeState() );
 
-  EXPECT_EQ( comp1.get<DoubleAspect>()->mState.val,
-             comp2.get<DoubleAspect>()->mState.val );
+  EXPECT_EQ( comp1.get<s_tAspect>()->mState.val,
+             comp2.get<s_tAspect>()->mState.val );
 
   EXPECT_EQ( comp1.get<FloatAspect>()->mState.val,
              comp2.get<FloatAspect>()->mState.val );
@@ -640,25 +640,25 @@ TEST(Aspect, StateAndProperties)
 
   comp2.setCompositeProperties(comp1.getCompositeProperties());
 
-  EXPECT_EQ( comp1.get<DoubleAspect>()->mProperties.val,
-             comp2.get<DoubleAspect>()->mProperties.val );
+  EXPECT_EQ( comp1.get<s_tAspect>()->mProperties.val,
+             comp2.get<s_tAspect>()->mProperties.val );
 
   EXPECT_EQ( comp1.get<FloatAspect>()->mProperties.val,
              comp2.get<FloatAspect>()->mProperties.val );
 
-  makePropertiesDifferent( comp2.get<DoubleAspect>(), comp1.get<DoubleAspect>() );
+  makePropertiesDifferent( comp2.get<s_tAspect>(), comp1.get<s_tAspect>() );
   makePropertiesDifferent( comp2.get<FloatAspect>(), comp1.get<FloatAspect>() );
 
-  EXPECT_NE( comp1.get<DoubleAspect>()->mProperties.val,
-             comp2.get<DoubleAspect>()->mProperties.val );
+  EXPECT_NE( comp1.get<s_tAspect>()->mProperties.val,
+             comp2.get<s_tAspect>()->mProperties.val );
 
   EXPECT_NE( comp1.get<FloatAspect>()->mProperties.val,
              comp2.get<FloatAspect>()->mProperties.val );
 
   comp1.setCompositeProperties( comp2.getCompositeProperties() );
 
-  EXPECT_EQ( comp1.get<DoubleAspect>()->mProperties.val,
-             comp2.get<DoubleAspect>()->mProperties.val );
+  EXPECT_EQ( comp1.get<s_tAspect>()->mProperties.val,
+             comp2.get<s_tAspect>()->mProperties.val );
 
   EXPECT_EQ( comp1.get<FloatAspect>()->mProperties.val,
              comp2.get<FloatAspect>()->mProperties.val );
@@ -668,36 +668,36 @@ TEST(Aspect, StateAndProperties)
 
 
   // ---- Test Data Containers ----
-  Composite::MakeState<DoubleAspect, IntAspect, FloatAspect> state(
+  Composite::MakeState<s_tAspect, IntAspect, FloatAspect> state(
         comp1.getCompositeState());
 
-  EXPECT_EQ(comp1.get<DoubleAspect>()->mState.val,
-            state.DoubleAspect::State::val);
+  EXPECT_EQ(comp1.get<s_tAspect>()->mState.val,
+            state.s_tAspect::State::val);
   EXPECT_EQ(comp1.get<FloatAspect>()->mState.val,
             state.FloatAspect::State::val);
   EXPECT_EQ(comp1.get<IntAspect>()->mState.val,
             state.IntAspect::State::val);
 
 
-  Composite::MakeProperties<DoubleAspect, CharAspect, FloatAspect> properties(
+  Composite::MakeProperties<s_tAspect, CharAspect, FloatAspect> properties(
         comp2.getCompositeProperties());
 
-  EXPECT_EQ(comp1.get<DoubleAspect>()->mProperties.val,
-            properties.DoubleAspect::Properties::val);
+  EXPECT_EQ(comp1.get<s_tAspect>()->mProperties.val,
+            properties.s_tAspect::Properties::val);
   EXPECT_EQ(comp1.get<CharAspect>()->mProperties.val,
             properties.CharAspect::Properties::val);
   EXPECT_EQ(comp1.get<FloatAspect>()->mProperties.val,
             properties.FloatAspect::Properties::val);
 
 
-  DoubleAspect::State doubleState(2.5);
+  s_tAspect::State s_tState(2.5);
   FloatAspect::State floatState(4.7);
   IntAspect::State intState(7);
   CharAspect::State charState('h');
 
   // The constructor arguments should match the type order
-  Composite::MakeState<DoubleAspect, IntAspect, CharAspect, FloatAspect>(
-        doubleState, intState, charState, floatState);
+  Composite::MakeState<s_tAspect, IntAspect, CharAspect, FloatAspect>(
+        s_tState, intState, charState, floatState);
 
   // ---- Test copying and merging ----
   Composite::Properties c_properties_1(properties);
@@ -718,18 +718,18 @@ TEST(Aspect, Construction)
 {
   Composite comp;
 
-  comp.createAspect<DoubleAspect>();
+  comp.createAspect<s_tAspect>();
 
-  double s1 = dart::math::Random::uniform<double>(0, 100);
-  comp.createAspect<DoubleAspect>(s1);
-  EXPECT_EQ(comp.get<DoubleAspect>()->mState.val, s1);
+  s_t s1 = dart::math::Random::uniform<s_t>(0, 100);
+  comp.createAspect<s_tAspect>(s1);
+  EXPECT_EQ(comp.get<s_tAspect>()->mState.val, s1);
 
-  double s2 = dart::math::Random::uniform<double>(0, 100);
-  double p = dart::math::Random::uniform<double>(0, 100);
-  comp.createAspect<DoubleAspect>(s2, p);
-  EXPECT_NE(comp.get<DoubleAspect>()->mState.val, s1);
-  EXPECT_EQ(comp.get<DoubleAspect>()->mState.val, s2);
-  EXPECT_EQ(comp.get<DoubleAspect>()->mProperties.val, p);
+  s_t s2 = dart::math::Random::uniform<s_t>(0, 100);
+  s_t p = dart::math::Random::uniform<s_t>(0, 100);
+  comp.createAspect<s_tAspect>(s2, p);
+  EXPECT_NE(comp.get<s_tAspect>()->mState.val, s1);
+  EXPECT_EQ(comp.get<s_tAspect>()->mState.val, s2);
+  EXPECT_EQ(comp.get<s_tAspect>()->mProperties.val, p);
 }
 
 TEST(Aspect, Joints)
@@ -795,7 +795,7 @@ TEST(Aspect, BodyNodes)
       dart::dynamics::VisualAspect,
       dart::dynamics::CollisionAspect,
       dart::dynamics::DynamicsAspect>(
-        std::make_shared<dart::dynamics::BoxShape>(Eigen::Vector3d::Ones()));
+        std::make_shared<dart::dynamics::BoxShape>(Eigen::Vector3s::Ones()));
 
   EXPECT_EQ(bn->getNumShapeNodes(), 1u);
   EXPECT_EQ(bn->getNumShapeNodesWith<dart::dynamics::VisualAspect>(), 1u);
@@ -807,40 +807,40 @@ TEST(Aspect, Duplication)
 {
   Composite comp1, comp2;
 
-  comp1.createAspect<DoubleAspect>();
+  comp1.createAspect<s_tAspect>();
   comp1.createAspect<IntAspect>();
   comp1.createAspect<FloatAspect>();
   comp1.createAspect<CharAspect>();
 
-  comp2.createAspect<DoubleAspect>();
+  comp2.createAspect<s_tAspect>();
 
   comp2.duplicateAspects(&comp1);
 
-  EXPECT_FALSE(comp2.get<DoubleAspect>() == nullptr);
+  EXPECT_FALSE(comp2.get<s_tAspect>() == nullptr);
   EXPECT_FALSE(comp2.get<IntAspect>() == nullptr);
   EXPECT_FALSE(comp2.get<FloatAspect>() == nullptr);
   EXPECT_FALSE(comp2.get<CharAspect>() == nullptr);
 
-  Composite::MakeState<DoubleAspect, IntAspect, FloatAspect> state;
-  state.DoubleAspect::State::val = 1e-6;
+  Composite::MakeState<s_tAspect, IntAspect, FloatAspect> state;
+  state.s_tAspect::State::val = 1e-6;
   state.FloatAspect::State::val = 1.5;
   state.IntAspect::State::val = 456;
 
   comp1.setCompositeState(state);
 
-  EXPECT_EQ(comp1.get<DoubleAspect>()->mState.val, 1e-6);
+  EXPECT_EQ(comp1.get<s_tAspect>()->mState.val, 1e-6);
   EXPECT_EQ(comp1.get<FloatAspect>()->mState.val, 1.5);
   EXPECT_EQ(comp1.get<IntAspect>()->mState.val, 456);
 
   state = comp2.getCompositeState();
 
-  EXPECT_EQ(state.DoubleAspect::State::val, 0);
+  EXPECT_EQ(state.s_tAspect::State::val, 0);
   EXPECT_EQ(state.FloatAspect::State::val, 0);
   EXPECT_EQ(state.IntAspect::State::val, 0);
 
   state = comp1.getCompositeState();
 
-  EXPECT_EQ(state.DoubleAspect::State::val, 1e-6);
+  EXPECT_EQ(state.s_tAspect::State::val, 1e-6);
   EXPECT_EQ(state.FloatAspect::State::val, 1.5);
   EXPECT_EQ(state.IntAspect::State::val, 456);
 }

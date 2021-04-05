@@ -50,7 +50,7 @@ static int callCount2 = 0;
 void foo0() { callCount0++; }
 void foo1(int /*_val*/) { callCount1++; }
 void foo2(int /*_val1*/, float /*_val2*/) { callCount2++; }
-double foo3() { return 10.0; }
+s_t foo3() { return 10.0; }
 
 //==============================================================================
 class Viewer
@@ -68,7 +68,7 @@ TEST(Signal, Basic)
   Signal<void()> signal0;
   Signal<void(int)> signal1;
   Signal<void(int, float)> signal2;
-  Signal<double()> signal3;
+  Signal<s_t()> signal3;
 
   Connection connection0 = signal0.connect(&foo0);
   Connection connection1 = signal1.connect(&foo1);
@@ -298,16 +298,16 @@ void nameChangedCallback(const Entity* entity,
 //==============================================================================
 TEST(Signal, FrameSignals)
 {
-  Isometry3d tf1(Isometry3d::Identity());
-  tf1.translate(Vector3d(0.1,-0.1,0));
+  Isometry3s tf1(Isometry3s::Identity());
+  tf1.translate(Vector3s(0.1,-0.1,0));
 
-  Isometry3d tf2(Isometry3d::Identity());
-  tf2.translate(Vector3d(0,0.1,0));
-  tf2.rotate(AngleAxisd(45.0*M_PI/180.0, Vector3d(1,0,0)));
+  Isometry3s tf2(Isometry3s::Identity());
+  tf2.translate(Vector3s(0,0.1,0));
+  tf2.rotate(AngleAxis_s(45.0*M_PI/180.0, Vector3s(1,0,0)));
 
-  Isometry3d tf3(Isometry3d::Identity());
-  tf3.translate(Vector3d(0,0,0.1));
-  tf3.rotate(AngleAxisd(60*M_PI/180.0, Vector3d(0,1,0)));
+  Isometry3s tf3(Isometry3s::Identity());
+  tf3.translate(Vector3s(0,0,0.1));
+  tf3.rotate(AngleAxis_s(60*M_PI/180.0, Vector3s(0,1,0)));
 
   SimpleFrame F1(Frame::World(), "F1", tf1);
   SimpleFrame F2(&F1, "F2", tf2);

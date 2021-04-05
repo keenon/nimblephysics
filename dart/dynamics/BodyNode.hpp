@@ -173,34 +173,29 @@ public:
   void setCollidable(bool _isCollidable);
 
   /// Set the mass of the bodynode
-  void setMass(double mass);
+  void setMass(s_t mass);
 
   /// Return the mass of the bodynode
-  double getMass() const;
+  s_t getMass() const;
 
   /// Set moment of inertia defined around the center of mass
   ///
   /// Principal moments of inertia (_Ixx, _Iyy, _Izz) must be positive or zero
   /// values.
   void setMomentOfInertia(
-      double _Ixx,
-      double _Iyy,
-      double _Izz,
-      double _Ixy = 0.0,
-      double _Ixz = 0.0,
-      double _Iyz = 0.0);
+      s_t _Ixx,
+      s_t _Iyy,
+      s_t _Izz,
+      s_t _Ixy = 0.0,
+      s_t _Ixz = 0.0,
+      s_t _Iyz = 0.0);
 
   /// Return moment of inertia defined around the center of mass
   void getMomentOfInertia(
-      double& _Ixx,
-      double& _Iyy,
-      double& _Izz,
-      double& _Ixy,
-      double& _Ixz,
-      double& _Iyz) const;
+      s_t& _Ixx, s_t& _Iyy, s_t& _Izz, s_t& _Ixy, s_t& _Ixz, s_t& _Iyz) const;
 
   /// Return spatial inertia
-  const Eigen::Matrix6d& getSpatialInertia() const;
+  const Eigen::Matrix6s& getSpatialInertia() const;
 
   /// Set the inertia data for this BodyNode
   void setInertia(const Inertia& inertia);
@@ -216,55 +211,55 @@ public:
   const math::Inertia& getArticulatedInertiaImplicit() const;
 
   /// Set center of mass expressed in body frame
-  void setLocalCOM(const Eigen::Vector3d& _com);
+  void setLocalCOM(const Eigen::Vector3s& _com);
 
   /// Return center of mass expressed in body frame
-  const Eigen::Vector3d& getLocalCOM() const;
+  const Eigen::Vector3s& getLocalCOM() const;
 
   /// Return the center of mass with respect to an arbitrary Frame
-  Eigen::Vector3d getCOM(const Frame* _withRespectTo = Frame::World()) const;
+  Eigen::Vector3s getCOM(const Frame* _withRespectTo = Frame::World()) const;
 
   /// Return the linear velocity of the center of mass, expressed in terms of
   /// arbitrary Frames
-  Eigen::Vector3d getCOMLinearVelocity(
+  Eigen::Vector3s getCOMLinearVelocity(
       const Frame* _relativeTo = Frame::World(),
       const Frame* _inCoordinatesOf = Frame::World()) const;
 
   /// Return the spatial velocity of the center of mass, expressed in
   /// coordinates of this Frame and relative to the World Frame
-  Eigen::Vector6d getCOMSpatialVelocity() const;
+  Eigen::Vector6s getCOMSpatialVelocity() const;
 
   /// Return the spatial velocity of the center of mass, expressed in terms of
   /// arbitrary Frames
-  Eigen::Vector6d getCOMSpatialVelocity(
+  Eigen::Vector6s getCOMSpatialVelocity(
       const Frame* _relativeTo, const Frame* _inCoordinatesOf) const;
 
   /// Return the linear acceleration of the center of mass, expressed in terms
   /// of arbitary Frames
-  Eigen::Vector3d getCOMLinearAcceleration(
+  Eigen::Vector3s getCOMLinearAcceleration(
       const Frame* _relativeTo = Frame::World(),
       const Frame* _inCoordinatesOf = Frame::World()) const;
 
   /// Return the acceleration of the center of mass expressed in coordinates of
   /// this BodyNode Frame and relative to the World Frame
-  Eigen::Vector6d getCOMSpatialAcceleration() const;
+  Eigen::Vector6s getCOMSpatialAcceleration() const;
 
   /// Return the spatial acceleration of the center of mass, expressed in terms
   /// of arbitrary Frames
-  Eigen::Vector6d getCOMSpatialAcceleration(
+  Eigen::Vector6s getCOMSpatialAcceleration(
       const Frame* _relativeTo, const Frame* _inCoordinatesOf) const;
 
   /// Set coefficient of friction in range of [0, ~]
-  void setFrictionCoeff(double _coeff);
+  void setFrictionCoeff(s_t _coeff);
 
   /// Return frictional coefficient.
-  double getFrictionCoeff() const;
+  s_t getFrictionCoeff() const;
 
   /// Set coefficient of restitution in range of [0, 1]
-  void setRestitutionCoeff(double _coeff);
+  void setRestitutionCoeff(s_t _coeff);
 
   /// Return coefficient of restitution
-  double getRestitutionCoeff() const;
+  s_t getRestitutionCoeff() const;
 
   //--------------------------------------------------------------------------
   // Structural Properties
@@ -618,8 +613,8 @@ public:
   /// Create a Marker with the given fields
   Marker* createMarker(
       const std::string& name = "marker",
-      const Eigen::Vector3d& position = Eigen::Vector3d::Zero(),
-      const Eigen::Vector4d& color = Eigen::Vector4d::Constant(1.0));
+      const Eigen::Vector3s& position = Eigen::Vector3s::Zero(),
+      const Eigen::Vector4s& color = Eigen::Vector4s::Constant(1.0));
 
   /// Create a Marker given its basic properties
   Marker* createMarker(const Marker::BasicProperties& properties);
@@ -660,19 +655,19 @@ public:
 
   /// Get the transform of this BodyNode with respect to its parent BodyNode,
   /// which is also its parent Frame.
-  const Eigen::Isometry3d& getRelativeTransform() const override;
+  const Eigen::Isometry3s& getRelativeTransform() const override;
 
   // Documentation inherited
-  const Eigen::Vector6d& getRelativeSpatialVelocity() const override;
+  const Eigen::Vector6s& getRelativeSpatialVelocity() const override;
 
   // Documentation inherited
-  const Eigen::Vector6d& getRelativeSpatialAcceleration() const override;
+  const Eigen::Vector6s& getRelativeSpatialAcceleration() const override;
 
   // Documentation inherited
-  const Eigen::Vector6d& getPrimaryRelativeAcceleration() const override;
+  const Eigen::Vector6s& getPrimaryRelativeAcceleration() const override;
 
   /// Return the partial acceleration of this body
-  const Eigen::Vector6d& getPartialAcceleration() const override;
+  const Eigen::Vector6s& getPartialAcceleration() const override;
 
   /// Return the generalized Jacobian targeting the origin of this BodyNode. The
   /// Jacobian is expressed in the Frame of this BodyNode.
@@ -718,7 +713,7 @@ public:
   using TemplatedJacobianNode<BodyNode>::getJacobianClassicDeriv;
 
   /// Return the velocity change due to the constraint impulse
-  const Eigen::Vector6d& getBodyVelocityChange() const;
+  const Eigen::Vector6s& getBodyVelocityChange() const;
 
   /// Set whether this body node is colliding with other objects. Note that
   /// this status is set by the constraint solver during dynamics simulation but
@@ -740,27 +735,27 @@ public:
   /// application and the force in local coordinates are stored in mContacts.
   /// When conversion is needed, make sure the transformations are avaialble.
   void addExtForce(
-      const Eigen::Vector3d& _force,
-      const Eigen::Vector3d& _offset = Eigen::Vector3d::Zero(),
+      const Eigen::Vector3s& _force,
+      const Eigen::Vector3s& _offset = Eigen::Vector3s::Zero(),
       bool _isForceLocal = false,
       bool _isOffsetLocal = true);
 
   /// Set Applying linear Cartesian forces to this node.
   void setExtForce(
-      const Eigen::Vector3d& _force,
-      const Eigen::Vector3d& _offset = Eigen::Vector3d::Zero(),
+      const Eigen::Vector3s& _force,
+      const Eigen::Vector3s& _offset = Eigen::Vector3s::Zero(),
       bool _isForceLocal = false,
       bool _isOffsetLocal = true);
 
   /// Add applying Cartesian torque to the node.
   ///
   /// The torque in local coordinates is accumulated in mExtTorqueBody.
-  void addExtTorque(const Eigen::Vector3d& _torque, bool _isLocal = false);
+  void addExtTorque(const Eigen::Vector3s& _torque, bool _isLocal = false);
 
   /// Set applying Cartesian torque to the node.
   ///
   /// The torque in local coordinates is accumulated in mExtTorqueBody.
-  void setExtTorque(const Eigen::Vector3d& _torque, bool _isLocal = false);
+  void setExtTorque(const Eigen::Vector3s& _torque, bool _isLocal = false);
 
   /// Clean up structures that store external forces: mContacts, mFext,
   /// mExtForceBody and mExtTorqueBody.
@@ -774,17 +769,17 @@ public:
   virtual void clearInternalForces();
 
   ///
-  const Eigen::Vector6d& getExternalForceLocal() const;
+  const Eigen::Vector6s& getExternalForceLocal() const;
 
   ///
-  Eigen::Vector6d getExternalForceGlobal() const;
+  Eigen::Vector6s getExternalForceGlobal() const;
 
   /// Get spatial body force transmitted from the parent joint.
   ///
   /// The spatial body force is transmitted to this BodyNode from the parent
   /// body through the connecting joint. It is expressed in this BodyNode's
   /// frame.
-  const Eigen::Vector6d& getBodyForce() const;
+  const Eigen::Vector6s& getBodyForce() const;
 
   //----------------------------------------------------------------------------
   // Constraints
@@ -799,16 +794,16 @@ public:
 
   /// Set constraint impulse
   /// \param[in] _constImp Spatial constraint impulse w.r.t. body frame
-  void setConstraintImpulse(const Eigen::Vector6d& _constImp);
+  void setConstraintImpulse(const Eigen::Vector6s& _constImp);
 
   /// Add constraint impulse
   /// \param[in] _constImp Spatial constraint impulse w.r.t. body frame
-  void addConstraintImpulse(const Eigen::Vector6d& _constImp);
+  void addConstraintImpulse(const Eigen::Vector6s& _constImp);
 
   /// Add constraint impulse
   void addConstraintImpulse(
-      const Eigen::Vector3d& _constImp,
-      const Eigen::Vector3d& _offset,
+      const Eigen::Vector3s& _constImp,
+      const Eigen::Vector3s& _offset,
       bool _isImpulseLocal = false,
       bool _isOffsetLocal = true);
 
@@ -817,35 +812,35 @@ public:
   virtual void clearConstraintImpulse();
 
   /// Return constraint impulse
-  const Eigen::Vector6d& getConstraintImpulse() const;
+  const Eigen::Vector6s& getConstraintImpulse() const;
 
   //----------------------------------------------------------------------------
   // Energies
   //----------------------------------------------------------------------------
 
   /// Return Lagrangian of this body
-  double computeLagrangian(const Eigen::Vector3d& gravity) const;
+  s_t computeLagrangian(const Eigen::Vector3s& gravity) const;
 
   /// Return kinetic energy.
   DART_DEPRECATED(6.1)
-  virtual double getKineticEnergy() const;
+  virtual s_t getKineticEnergy() const;
 
   /// Return kinetic energy
-  double computeKineticEnergy() const;
+  s_t computeKineticEnergy() const;
 
   /// Return potential energy.
   DART_DEPRECATED(6.1)
-  virtual double getPotentialEnergy(const Eigen::Vector3d& _gravity) const;
+  virtual s_t getPotentialEnergy(const Eigen::Vector3s& _gravity) const;
 
   /// Return potential energy.
-  double computePotentialEnergy(const Eigen::Vector3d& gravity) const;
+  s_t computePotentialEnergy(const Eigen::Vector3s& gravity) const;
 
   /// Return linear momentum.
-  Eigen::Vector3d getLinearMomentum() const;
+  Eigen::Vector3s getLinearMomentum() const;
 
   /// Return angular momentum.
-  Eigen::Vector3d getAngularMomentum(
-      const Eigen::Vector3d& _pivot = Eigen::Vector3d::Zero());
+  Eigen::Vector3s getAngularMomentum(
+      const Eigen::Vector3s& _pivot = Eigen::Vector3s::Zero());
 
   //----------------------------------------------------------------------------
   // Notifications
@@ -884,7 +879,7 @@ public:
   void dirtyCoriolisForces();
 
   /// Returns the bias force used in Featherstone
-  const Eigen::Vector6d& getBiasForce() const;
+  const Eigen::Vector6s& getBiasForce() const;
 
   //----------------------------------------------------------------------------
   // Friendship
@@ -943,14 +938,13 @@ protected:
 
   /// Update articulated body inertia for forward dynamics.
   /// \param[in] _timeStep Rquired for implicit joint stiffness and damping.
-  virtual void updateArtInertia(double _timeStep) const;
+  virtual void updateArtInertia(s_t _timeStep) const;
 
   /// Update bias force associated with the articulated body inertia for forward
   /// dynamics.
   /// \param[in] _gravity Vector of gravitational acceleration
   /// \param[in] _timeStep Rquired for implicit joint stiffness and damping.
-  virtual void updateBiasForce(
-      const Eigen::Vector3d& _gravity, double _timeStep);
+  virtual void updateBiasForce(const Eigen::Vector3s& _gravity, s_t _timeStep);
 
   /// Update bias impulse associated with the articulated body inertia for
   /// impulse-based forward dynamics.
@@ -972,7 +966,7 @@ protected:
   /// body through the connecting joint. It is expressed in this BodyNode's
   /// frame.
   virtual void updateTransmittedForceID(
-      const Eigen::Vector3d& _gravity, bool _withExternalForces = false);
+      const Eigen::Vector3s& _gravity, bool _withExternalForces = false);
 
   /// Update spatial body force for forward dynamics.
   ///
@@ -992,18 +986,18 @@ protected:
 
   /// Update the joint force for inverse dynamics.
   virtual void updateJointForceID(
-      double _timeStep, bool _withDampingForces, bool _withSpringForces);
+      s_t _timeStep, bool _withDampingForces, bool _withSpringForces);
 
   /// Update the joint force for forward dynamics.
   virtual void updateJointForceFD(
-      double _timeStep, bool _withDampingForces, bool _withSpringForces);
+      s_t _timeStep, bool _withDampingForces, bool _withSpringForces);
 
   /// Update the joint impulse for forward dynamics.
   virtual void updateJointImpulseFD();
 
   /// Update constrained terms due to the constraint impulses for foward
   /// dynamics.
-  virtual void updateConstrainedTerms(double _timeStep);
+  virtual void updateConstrainedTerms(s_t _timeStep);
 
   /// \}
 
@@ -1013,37 +1007,37 @@ protected:
 
   ///
   virtual void updateMassMatrix();
-  virtual void aggregateMassMatrix(Eigen::MatrixXd& _MCol, std::size_t _col);
+  virtual void aggregateMassMatrix(Eigen::MatrixXs& _MCol, std::size_t _col);
   virtual void aggregateAugMassMatrix(
-      Eigen::MatrixXd& _MCol, std::size_t _col, double _timeStep);
+      Eigen::MatrixXs& _MCol, std::size_t _col, s_t _timeStep);
 
   ///
   virtual void updateInvMassMatrix();
   virtual void updateInvAugMassMatrix();
   virtual void aggregateInvMassMatrix(
-      Eigen::MatrixXd& _InvMCol, std::size_t _col);
+      Eigen::MatrixXs& _InvMCol, std::size_t _col);
   virtual void aggregateInvAugMassMatrix(
-      Eigen::MatrixXd& _InvMCol, std::size_t _col, double _timeStep);
+      Eigen::MatrixXs& _InvMCol, std::size_t _col, s_t _timeStep);
 
   ///
-  virtual void aggregateCoriolisForceVector(Eigen::VectorXd& _C);
+  virtual void aggregateCoriolisForceVector(Eigen::VectorXs& _C);
 
   ///
   virtual void aggregateGravityForceVector(
-      Eigen::VectorXd& _g, const Eigen::Vector3d& _gravity);
+      Eigen::VectorXs& _g, const Eigen::Vector3s& _gravity);
 
   ///
   virtual void updateCombinedVector();
   virtual void aggregateCombinedVector(
-      Eigen::VectorXd& _Cg, const Eigen::Vector3d& _gravity);
+      Eigen::VectorXs& _Cg, const Eigen::Vector3s& _gravity);
 
   /// Aggregate the external forces mFext in the generalized coordinates
   /// recursively
-  virtual void aggregateExternalForces(Eigen::VectorXd& _Fext);
+  virtual void aggregateExternalForces(Eigen::VectorXs& _Fext);
 
   ///
   virtual void aggregateSpatialToGeneralized(
-      Eigen::VectorXd& _generalized, const Eigen::Vector6d& _spatial);
+      Eigen::VectorXs& _generalized, const Eigen::Vector6s& _spatial);
 
   /// Update body Jacobian. getJacobian() calls this function if
   /// mIsBodyJacobianDirty is true.
@@ -1075,111 +1069,111 @@ protected:
 
   void computeJacobianOfMForward(neural::WithRespectTo* wrt);
   void computeJacobianOfMBackward(
-      neural::WithRespectTo* wrt, Eigen::MatrixXd& dCg);
+      neural::WithRespectTo* wrt, Eigen::MatrixXs& dCg);
 
   void computeJacobianOfCForward(neural::WithRespectTo* wrt);
   void computeJacobianOfCBackward(
       neural::WithRespectTo* wrt,
-      Eigen::MatrixXd& dCg,
-      const Eigen::Vector3d& gravity);
+      Eigen::MatrixXs& dCg,
+      const Eigen::Vector3s& gravity);
 
   void computeJacobianOfMinvXInit();
   void computeJacobianOfMinvXBackward();
-  void computeJacobianOfMinvXForward(Eigen::MatrixXd& DinvMx_Dq);
+  void computeJacobianOfMinvXForward(Eigen::MatrixXs& DinvMx_Dq);
 
 public:
   /// This checks the intermediate analytical results of
   /// computeJacobianOfCForward() against the finite differencing equivalents.
   void debugJacobianOfCForward(neural::WithRespectTo* wrt);
   /// This computes the Jacobian of spatial velocity with respect to wrt
-  Eigen::MatrixXd finiteDifferenceJacobianOfSpatialVelocity(
+  Eigen::MatrixXs finiteDifferenceJacobianOfSpatialVelocity(
       neural::WithRespectTo* wrt, bool useRidders = true);
   /// This computes the Jacobian of spatial velocity with respect
   /// to wrt using Ridders method
-  Eigen::MatrixXd finiteDifferenceRiddersJacobianOfSpatialVelocity(
+  Eigen::MatrixXs finiteDifferenceRiddersJacobianOfSpatialVelocity(
       neural::WithRespectTo* wrt);
   /// This computes the Jacobian of spatial acceleration (mCg_dV) with respect
   /// to wrt
-  Eigen::MatrixXd finiteDifferenceJacobianOfSpatialCoriolisAcceleration(
+  Eigen::MatrixXs finiteDifferenceJacobianOfSpatialCoriolisAcceleration(
       neural::WithRespectTo* wrt, bool useRidders = true);
   /// This computes the Jacobian of spatial acceleration (mCg_dV) with respect
   /// to wrt using Ridders method
-  Eigen::MatrixXd finiteDifferenceRiddersJacobianOfSpatialCoriolisAcceleration(
+  Eigen::MatrixXs finiteDifferenceRiddersJacobianOfSpatialCoriolisAcceleration(
       neural::WithRespectTo* wrt);
   /// This checks the intermediate analytical results of
   /// computeJacobianOfCBackword() against the finite differencing equivalents.
   void debugJacobianOfCBackward(neural::WithRespectTo* wrt);
   /// This computes the Jacobian of gravity force (mFgravity) with respect to
   /// wrt
-  Eigen::MatrixXd finiteDifferenceJacobianOfGravityForce(
+  Eigen::MatrixXs finiteDifferenceJacobianOfGravityForce(
       neural::WithRespectTo* wrt, bool useRidders = true);
   /// This computes the Jacobian of gravity force (mFgravity) with respect to
   /// wrt using Ridders method
-  Eigen::MatrixXd finiteDifferenceRiddersJacobianOfGravityForce(
+  Eigen::MatrixXs finiteDifferenceRiddersJacobianOfGravityForce(
       neural::WithRespectTo* wrt);
   /// This computes the Jacobian of body force (mCg_F) with respect to wrt
-  Eigen::MatrixXd finiteDifferenceJacobianOfBodyForce(
+  Eigen::MatrixXs finiteDifferenceJacobianOfBodyForce(
       neural::WithRespectTo* wrt, bool useRidders = true);
   /// This computes the Jacobian of body force (mCg_F) with respect to wrt
-  Eigen::MatrixXd finiteDifferenceRiddersJacobianOfBodyForce(
+  Eigen::MatrixXs finiteDifferenceRiddersJacobianOfBodyForce(
       neural::WithRespectTo* wrt);
   /// This computes the Jacobian of the ad(V, I*V) subexpression of body force
   /// (mCg_F) with respect to wrt
-  Eigen::MatrixXd finiteDifferenceJacobianOfBodyForceAdVIV(
+  Eigen::MatrixXs finiteDifferenceJacobianOfBodyForceAdVIV(
       neural::WithRespectTo* wrt, bool useRidders = true);
   /// This computes the Jacobian of the ad(V, I*V) subexpression of body force
   /// (mCg_F) with respect to wrt
-  Eigen::MatrixXd finiteDifferenceRiddersJacobianOfBodyForceAdVIV(
+  Eigen::MatrixXs finiteDifferenceRiddersJacobianOfBodyForceAdVIV(
       neural::WithRespectTo* wrt);
   /// This computes the Jacobian of the I*dV subexpression of body force (mCg_F)
   /// with respect to wrt
-  Eigen::MatrixXd finiteDifferenceJacobianOfBodyForceIdV(
+  Eigen::MatrixXs finiteDifferenceJacobianOfBodyForceIdV(
       neural::WithRespectTo* wrt, bool useRidders = true);
   /// This computes the Jacobian of the I*dV subexpression of body force (mCg_F)
   /// with respect to wrt
-  Eigen::MatrixXd finiteDifferenceRiddersJacobianOfBodyForceIdV(
+  Eigen::MatrixXs finiteDifferenceRiddersJacobianOfBodyForceIdV(
       neural::WithRespectTo* wrt);
   /// This checks the intermediate analytical results of
   /// computeJacobianOfMForward() against the finite differencing equivalents.
-  void debugJacobianOfMForward(neural::WithRespectTo* wrt, Eigen::VectorXd x);
+  void debugJacobianOfMForward(neural::WithRespectTo* wrt, Eigen::VectorXs x);
   /// This computes the Jacobian of the dV (mM_dV) as it's computed in the M
   /// computation
-  Eigen::MatrixXd finiteDifferenceJacobianOfMassSpatialAcceleration(
+  Eigen::MatrixXs finiteDifferenceJacobianOfMassSpatialAcceleration(
       neural::WithRespectTo* wrt, bool useRidders = true);
   /// This computes the Jacobian of the dV (mM_dV) as it's computed in the M
   /// computation
-  Eigen::MatrixXd finiteDifferenceRiddersJacobianOfMassSpatialAcceleration(
+  Eigen::MatrixXs finiteDifferenceRiddersJacobianOfMassSpatialAcceleration(
       neural::WithRespectTo* wrt);
   /// This checks the intermediate analytical results of
   /// computeJacobianOfMBackward() against the finite differencing equivalents.
   void debugJacobianOfMBackward(
-      neural::WithRespectTo* wrt, Eigen::VectorXd x, Eigen::MatrixXd dM);
+      neural::WithRespectTo* wrt, Eigen::VectorXs x, Eigen::MatrixXs dM);
   /// This computes the Jacobian of the F (mM_F) as it's computed in the M
   /// computation
-  Eigen::MatrixXd finiteDifferenceJacobianOfMassBodyForce(
+  Eigen::MatrixXs finiteDifferenceJacobianOfMassBodyForce(
       neural::WithRespectTo* wrt, bool useRidders = true);
   /// This computes the Jacobian of the F (mM_F) as it's computed in the M
   /// computation
-  Eigen::MatrixXd finiteDifferenceRiddersJacobianOfMassBodyForce(
+  Eigen::MatrixXs finiteDifferenceRiddersJacobianOfMassBodyForce(
       neural::WithRespectTo* wrt);
   /// This checks the intermediate analytical results of
   /// computeJacobianOfMinvXBackward() against the finite differencing
   /// equivalents.
   void debugJacobianOfMinvXBackward(
-      neural::WithRespectTo* wrt, Eigen::VectorXd x);
+      neural::WithRespectTo* wrt, Eigen::VectorXs x);
   /// This computes the Jacobian (tensor) of the articulate inertia
   /// (mArtInertia) as it's computed in the Minv computation
-  std::vector<Eigen::MatrixXd> finiteDifferenceJacobianOfInvMassArtInertia(
+  std::vector<Eigen::MatrixXs> finiteDifferenceJacobianOfInvMassArtInertia(
       neural::WithRespectTo* wrt, bool useRidders = true);
   /// This computes the Jacobian (tensor) of the articulate bias force (mInvM_c)
   /// as it's computed in the Minv computation
-  Eigen::MatrixXd finiteDifferenceJacobianOfInvMassArtBias(
+  Eigen::MatrixXs finiteDifferenceJacobianOfInvMassArtBias(
       neural::WithRespectTo* wrt, bool useRidders = true);
   /// This checks the intermediate analytical results of
   /// computeJacobianOfMinvXForward() against the finite differencing
   /// equivalents.
   void debugJacobianOfMinvXForward(
-      neural::WithRespectTo* wrt, Eigen::VectorXd x);
+      neural::WithRespectTo* wrt, Eigen::VectorXs x);
 
   // protected:
 public:
@@ -1265,7 +1259,7 @@ public:
   /// Partial spatial body acceleration due to parent joint's velocity
   ///
   /// Do not use directly! Use getPartialAcceleration() to access this quantity
-  mutable Eigen::Vector6d mPartialAcceleration;
+  mutable Eigen::Vector6s mPartialAcceleration;
   // TODO(JS): Rename with more informative name
 
   /// Is the partial acceleration vector dirty
@@ -1273,10 +1267,10 @@ public:
 
   /// Transmitted wrench from parent to the bodynode expressed in body-fixed
   /// frame
-  Eigen::Vector6d mF;
+  Eigen::Vector6s mF;
 
   /// Spatial gravity force
-  Eigen::Vector6d mFgravity;
+  Eigen::Vector6s mFgravity;
 
   /// Articulated body inertia
   ///
@@ -1289,33 +1283,33 @@ public:
   mutable math::Inertia mArtInertiaImplicit;
 
   /// Bias force
-  Eigen::Vector6d mBiasForce;
+  Eigen::Vector6s mBiasForce;
 
   /// Cache data for combined vector of the system.
-  Eigen::Vector6d mCg_dV;
-  Eigen::Vector6d mCg_F;
+  Eigen::Vector6s mCg_dV;
+  Eigen::Vector6s mCg_F;
 
   /// Cache data for gravity force vector of the system.
-  Eigen::Vector6d mG_F;
+  Eigen::Vector6s mG_F;
 
   /// Cache data for external force vector of the system.
-  Eigen::Vector6d mFext_F;
+  Eigen::Vector6s mFext_F;
 
   /// Cache data for mass matrix of the system.
-  Eigen::Vector6d mM_dV;
-  Eigen::Vector6d mM_F;
+  Eigen::Vector6s mM_dV;
+  Eigen::Vector6s mM_F;
 
   /// Cache data for inverse mass matrix of the system.
-  Eigen::Vector6d mInvM_c;
-  Eigen::Vector6d mInvM_U;
+  Eigen::Vector6s mInvM_c;
+  Eigen::Vector6s mInvM_U;
 
   /// Cache data for arbitrary spatial value
-  Eigen::Vector6d mArbitrarySpatial;
+  Eigen::Vector6s mArbitrarySpatial;
 
   //------------------------- Differential Dynamics ----------------------------
 
-  Eigen::Vector6d mMddq_dV;
-  Eigen::Vector6d mMddq_F;
+  Eigen::Vector6s mMddq_dV;
+  Eigen::Vector6s mMddq_F;
   math::Jacobian mMddq_dV_p;
   math::Jacobian mMddq_F_p;
 
@@ -1337,18 +1331,18 @@ public:
   //------------------------- Impulse-based Dyanmics ---------------------------
   /// Velocity change due to to external impulsive force exerted on
   ///        bodies of the parent skeleton.
-  Eigen::Vector6d mDelV;
+  Eigen::Vector6s mDelV;
 
   /// Impulsive bias force due to external impulsive force exerted on
   ///        bodies of the parent skeleton.
-  Eigen::Vector6d mBiasImpulse;
+  Eigen::Vector6s mBiasImpulse;
 
   /// Constraint impulse: contact impulse, dynamic joint impulse
-  Eigen::Vector6d mConstraintImpulse;
+  Eigen::Vector6s mConstraintImpulse;
 
   // TODO(JS): rename with more informative one
   /// Generalized impulsive body force w.r.t. body frame.
-  Eigen::Vector6d mImpF;
+  Eigen::Vector6s mImpF;
 
   /// Collision shape added signal
   ColShapeAddedSignal mColShapeAddedSignal;

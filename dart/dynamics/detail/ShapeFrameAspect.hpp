@@ -51,7 +51,7 @@ namespace detail {
 struct VisualAspectProperties
 {
   /// Color for the primitive shape
-  Eigen::Vector4d mRGBA;
+  Eigen::Vector4s mRGBA;
 
   bool mUseDefaultColor;
 
@@ -66,7 +66,7 @@ struct VisualAspectProperties
 
   /// Constructor
   VisualAspectProperties(
-      const Eigen::Vector4d& color = Eigen::Vector4d(0.5, 0.5, 0.5, 1.0),
+      const Eigen::Vector4s& color = Eigen::Vector4s(0.5, 0.5, 0.5, 1.0),
       const bool hidden = false,
       const bool castShadows = true,
       const bool receiveShadows = true);
@@ -93,14 +93,14 @@ struct CollisionAspectProperties
 struct DynamicsAspectProperties
 {
   /// Coefficient of friction
-  double mFrictionCoeff;
+  s_t mFrictionCoeff;
 
   /// Coefficient of restitution
-  double mRestitutionCoeff;
+  s_t mRestitutionCoeff;
 
   /// Constructor
   DynamicsAspectProperties(
-      const double frictionCoeff = 1.0, const double restitutionCoeff = 0.0);
+      const s_t frictionCoeff = 1.0, const s_t restitutionCoeff = 0.0);
 
   /// Destructor
   virtual ~DynamicsAspectProperties() = default;

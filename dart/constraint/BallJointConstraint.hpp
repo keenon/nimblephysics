@@ -50,7 +50,7 @@ public:
   /// \param[in] _body
   /// \param[in] _jointPos Joint position expressed in world frame
   BallJointConstraint(dynamics::BodyNode* _body,
-                      const Eigen::Vector3d& _jointPos);
+                      const Eigen::Vector3s& _jointPos);
 
 
   /// Constructor that takes two bodies and the joint position in the frame of
@@ -59,7 +59,7 @@ public:
   /// \param[in] _body2
   /// \param[in] _jointPos Joint position expressed in world frame
   BallJointConstraint(dynamics::BodyNode* _body1, dynamics::BodyNode* _body2,
-                      const Eigen::Vector3d& _jointPos);
+                      const Eigen::Vector3s& _jointPos);
 
   /// Destructor
   virtual ~BallJointConstraint();
@@ -79,7 +79,7 @@ protected:
   void applyUnitImpulse(std::size_t _index) override;
 
   // Documentation inherited
-  void getVelocityChange(double* _vel, bool _withCfm) override;
+  void getVelocityChange(s_t* _vel, bool _withCfm) override;
 
   // Documentation inherited
   void excite() override;
@@ -88,7 +88,7 @@ protected:
   void unexcite() override;
 
   // Documentation inherited
-  void applyImpulse(double* _lambda) override;
+  void applyImpulse(s_t* _lambda) override;
 
   // Documentation inherited
   bool isActive() const override;
@@ -102,23 +102,23 @@ protected:
 private:
   /// Offset from the origin of body frame 1 to the ball joint position where
   /// the offset is expressed in body frame 1
-  Eigen::Vector3d mOffset1;
+  Eigen::Vector3s mOffset1;
 
   /// Offset from the origin of body frame 2 to the ball joint position where
   /// the offset is expressed in body frame 2
-  Eigen::Vector3d mOffset2;
+  Eigen::Vector3s mOffset2;
 
   /// Position constraint violation expressed in body frame 1
-  Eigen::Vector3d mViolation;
+  Eigen::Vector3s mViolation;
 
   /// Linear map between constraint space and Cartesian space for body1
-  Eigen::Matrix<double, 3, 6> mJacobian1;
+  Eigen::Matrix<s_t, 3, 6> mJacobian1;
 
   /// Linear map between constraint space and Cartesian space for body2
-  Eigen::Matrix<double, 3, 6> mJacobian2;
+  Eigen::Matrix<s_t, 3, 6> mJacobian2;
 
   ///
-  double mOldX[3];
+  s_t mOldX[3];
 
   /// Index of applied impulse
   std::size_t mAppliedImpulseIndex;

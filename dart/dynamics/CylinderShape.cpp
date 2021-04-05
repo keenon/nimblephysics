@@ -39,7 +39,7 @@ namespace dart {
 namespace dynamics {
 
 //==============================================================================
-CylinderShape::CylinderShape(double _radius, double _height)
+CylinderShape::CylinderShape(s_t _radius, s_t _height)
   : Shape(CYLINDER),
     mRadius(_radius),
     mHeight(_height)
@@ -62,13 +62,13 @@ const std::string& CylinderShape::getStaticType()
 }
 
 //==============================================================================
-double CylinderShape::getRadius() const
+s_t CylinderShape::getRadius() const
 {
   return mRadius;
 }
 
 //==============================================================================
-void CylinderShape::setRadius(double _radius)
+void CylinderShape::setRadius(s_t _radius)
 {
   assert(0.0 < _radius);
   mRadius = _radius;
@@ -79,13 +79,13 @@ void CylinderShape::setRadius(double _radius)
 }
 
 //==============================================================================
-double CylinderShape::getHeight() const
+s_t CylinderShape::getHeight() const
 {
   return mHeight;
 }
 
 //==============================================================================
-void CylinderShape::setHeight(double _height)
+void CylinderShape::setHeight(s_t _height)
 {
   assert(0.0 < _height);
   mHeight = _height;
@@ -96,18 +96,18 @@ void CylinderShape::setHeight(double _height)
 }
 
 //==============================================================================
-double CylinderShape::computeVolume(double radius, double height)
+s_t CylinderShape::computeVolume(s_t radius, s_t height)
 {
-  return math::constantsd::pi() * std::pow(radius, 2) * height;
+  return math::constantsd::pi() * pow(radius, 2) * height;
 }
 
 //==============================================================================
-Eigen::Matrix3d CylinderShape::computeInertia(
-    double radius, double height, double mass)
+Eigen::Matrix3s CylinderShape::computeInertia(
+    s_t radius, s_t height, s_t mass)
 {
-  Eigen::Matrix3d inertia = Eigen::Matrix3d::Zero();
+  Eigen::Matrix3s inertia = Eigen::Matrix3s::Zero();
 
-  inertia(0, 0) = mass * (3.0 * std::pow(radius, 2) + std::pow(height, 2))
+  inertia(0, 0) = mass * (3.0 * pow(radius, 2) + pow(height, 2))
       / 12.0;
   inertia(1, 1) = inertia(0, 0);
   inertia(2, 2) = 0.5 * mass * radius * radius;
@@ -118,8 +118,8 @@ Eigen::Matrix3d CylinderShape::computeInertia(
 //==============================================================================
 void CylinderShape::updateBoundingBox() const
 {
-  mBoundingBox.setMin(Eigen::Vector3d(-mRadius, -mRadius, -mHeight * 0.5));
-  mBoundingBox.setMax(Eigen::Vector3d(mRadius, mRadius, mHeight * 0.5));
+  mBoundingBox.setMin(Eigen::Vector3s(-mRadius, -mRadius, -mHeight * 0.5));
+  mBoundingBox.setMax(Eigen::Vector3s(mRadius, mRadius, mHeight * 0.5));
   mIsBoundingBoxDirty = false;
 }
 
@@ -131,7 +131,7 @@ void CylinderShape::updateVolume() const
 }
 
 //==============================================================================
-Eigen::Matrix3d CylinderShape::computeInertia(double mass) const
+Eigen::Matrix3s CylinderShape::computeInertia(s_t mass) const
 {
   return computeInertia(mRadius, mHeight, mass);
 }

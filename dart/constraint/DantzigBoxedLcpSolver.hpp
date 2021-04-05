@@ -50,18 +50,18 @@ public:
   // Documentation inherited.
   bool solve(
       int n,
-      double* A,
-      double* x,
-      double* b,
+      s_t* A,
+      s_t* x,
+      s_t* b,
       int nub,
-      double* lo,
-      double* hi,
+      s_t* lo,
+      s_t* hi,
       int* findex,
       bool earlyTermination) override;
 
 #ifndef NDEBUG
   // Documentation inherited.
-  bool canSolve(int n, const double* A) override;
+  bool canSolve(int n, const s_t* A) override;
 #endif
 };
 

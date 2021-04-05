@@ -231,23 +231,23 @@ public:
   //----------------------------------------------------------------------------
 
   /// Set a single command
-  void setCommand(std::size_t _index, double _command);
+  void setCommand(std::size_t _index, s_t _command);
 
   /// Get a single command
-  double getCommand(std::size_t _index) const;
+  s_t getCommand(std::size_t _index) const;
 
   /// Set commands for all generalized coordinates
-  void setCommands(const Eigen::VectorXd& _commands);
+  void setCommands(const Eigen::VectorXs& _commands);
 
   /// Set commands for a subset of the generalized coordinates
   void setCommands(const std::vector<std::size_t>& _indices,
-                           const Eigen::VectorXd& _commands);
+                           const Eigen::VectorXs& _commands);
 
   /// Get commands for all generalized coordinates
-  Eigen::VectorXd getCommands() const;
+  Eigen::VectorXs getCommands() const;
 
   /// Get commands for a subset of the generalized coordinates
-  Eigen::VectorXd getCommands(const std::vector<std::size_t>& _indices) const;
+  Eigen::VectorXs getCommands(const std::vector<std::size_t>& _indices) const;
 
   /// Set all commands to zero
   void resetCommands();
@@ -259,65 +259,65 @@ public:
   //----------------------------------------------------------------------------
 
   /// Set the position of a single generalized coordinate
-  void setPosition(std::size_t index, double _position);
+  void setPosition(std::size_t index, s_t _position);
 
   /// Get the position of a single generalized coordinate
-  double getPosition(std::size_t _index) const;
+  s_t getPosition(std::size_t _index) const;
 
   /// Set the positions for all generalized coordinates
-  void setPositions(const Eigen::VectorXd& _positions);
+  void setPositions(const Eigen::VectorXs& _positions);
 
   /// Set the positions for a subset of the generalized coordinates
   void setPositions(const std::vector<std::size_t>& _indices,
-                    const Eigen::VectorXd& _positions);
+                    const Eigen::VectorXs& _positions);
 
   /// Get the positions for all generalized coordinates
-  Eigen::VectorXd getPositions() const;
+  Eigen::VectorXs getPositions() const;
 
   /// Get the positions for a subset of the generalized coordinates
-  Eigen::VectorXd getPositions(const std::vector<std::size_t>& _indices) const;
+  Eigen::VectorXs getPositions(const std::vector<std::size_t>& _indices) const;
 
   /// Set all positions to zero
   void resetPositions();
 
   /// Set the lower limit of a generalized coordinate's position
-  void setPositionLowerLimit(std::size_t _index, double _position);
+  void setPositionLowerLimit(std::size_t _index, s_t _position);
 
   /// Set the lower limits for all generalized coordinates
-  void setPositionLowerLimits(const Eigen::VectorXd& positions);
+  void setPositionLowerLimits(const Eigen::VectorXs& positions);
 
   /// Set the lower limits for a subset of the generalized coordinates
   void setPositionLowerLimits(const std::vector<std::size_t>& indices,
-                              const Eigen::VectorXd& positions);
+                              const Eigen::VectorXs& positions);
 
   /// Get the lower limit of a generalized coordinate's position
-  double getPositionLowerLimit(std::size_t _index) const;
+  s_t getPositionLowerLimit(std::size_t _index) const;
 
   /// Get the lower limits for all generalized coordinates
-  Eigen::VectorXd getPositionLowerLimits() const;
+  Eigen::VectorXs getPositionLowerLimits() const;
 
   /// Get the lower limits for a subset of the generalized coordinates
-  Eigen::VectorXd getPositionLowerLimits(
+  Eigen::VectorXs getPositionLowerLimits(
       const std::vector<std::size_t>& indices) const;
 
   /// Set the upper limit of a generalized coordainte's position
-  void setPositionUpperLimit(std::size_t _index, double _position);
+  void setPositionUpperLimit(std::size_t _index, s_t _position);
 
   /// Set the upper limits for all generalized coordinates
-  void setPositionUpperLimits(const Eigen::VectorXd& positions);
+  void setPositionUpperLimits(const Eigen::VectorXs& positions);
 
   /// Set the upper limits for a subset of the generalized coordinates
   void setPositionUpperLimits(const std::vector<std::size_t>& indices,
-                              const Eigen::VectorXd& positions);
+                              const Eigen::VectorXs& positions);
 
   /// Get the upper limit of a generalized coordinate's position
-  double getPositionUpperLimit(std::size_t _index) const;
+  s_t getPositionUpperLimit(std::size_t _index) const;
 
   /// Get the upper limits for all generalized coordinates
-  Eigen::VectorXd getPositionUpperLimits() const;
+  Eigen::VectorXs getPositionUpperLimits() const;
 
   /// Get the upper limits for a subset of the generalized coordinates
-  Eigen::VectorXd getPositionUpperLimits(
+  Eigen::VectorXs getPositionUpperLimits(
       const std::vector<std::size_t>& indices) const;
 
   /// \}
@@ -327,69 +327,69 @@ public:
   //----------------------------------------------------------------------------
 
   /// Set the velocity of a single generalized coordinate
-  void setVelocity(std::size_t _index, double _velocity);
+  void setVelocity(std::size_t _index, s_t _velocity);
 
   /// Get the velocity of a single generalized coordinate
-  double getVelocity(std::size_t _index) const;
+  s_t getVelocity(std::size_t _index) const;
 
   /// Set the velocities of all generalized coordinates
-  void setVelocities(const Eigen::VectorXd& _velocities);
+  void setVelocities(const Eigen::VectorXs& _velocities);
 
   /// Set the velocities of a subset of the generalized coordinates
   void setVelocities(const std::vector<std::size_t>& _indices,
-                     const Eigen::VectorXd& _velocities);
+                     const Eigen::VectorXs& _velocities);
 
   /// Get the velocities for all generalized coordinates
-  Eigen::VectorXd getVelocities() const;
+  Eigen::VectorXs getVelocities() const;
 
   /// Get the velocities for a subset of the generalized coordinates
-  Eigen::VectorXd getVelocities(const std::vector<std::size_t>& _indices) const;
+  Eigen::VectorXs getVelocities(const std::vector<std::size_t>& _indices) const;
 
   /// Set all velocities to zero
   void resetVelocities();
 
   /// Set the lower limit of a generalized coordinate's velocity
-  void setVelocityLowerLimit(std::size_t _index, double _velocity);
+  void setVelocityLowerLimit(std::size_t _index, s_t _velocity);
 
   /// Set the lower limits for all generalized coordinates's velocity
-  void setVelocityLowerLimits(const Eigen::VectorXd& velocities);
+  void setVelocityLowerLimits(const Eigen::VectorXs& velocities);
 
   /// Set the lower limits for a subset of the generalized coordinates's
   /// velocity
   void setVelocityLowerLimits(const std::vector<std::size_t>& indices,
-                              const Eigen::VectorXd& velocities);
+                              const Eigen::VectorXs& velocities);
 
   /// Get the lower limit of a generalized coordinate's velocity
-  double getVelocityLowerLimit(std::size_t _index);
+  s_t getVelocityLowerLimit(std::size_t _index);
 
   /// Get the lower limits for all generalized coordinates's velocity
-  Eigen::VectorXd getVelocityLowerLimits() const;
+  Eigen::VectorXs getVelocityLowerLimits() const;
 
   /// Get the lower limits for a subset of the generalized coordinates's
   /// velocity
-  Eigen::VectorXd getVelocityLowerLimits(
+  Eigen::VectorXs getVelocityLowerLimits(
       const std::vector<std::size_t>& indices) const;
 
   /// Set the upper limit of a generalized coordinate's velocity
-  void setVelocityUpperLimit(std::size_t _index, double _velocity);
+  void setVelocityUpperLimit(std::size_t _index, s_t _velocity);
 
   /// Set the upper limits for all generalized coordinates's velocity
-  void setVelocityUpperLimits(const Eigen::VectorXd& velocities);
+  void setVelocityUpperLimits(const Eigen::VectorXs& velocities);
 
   /// Set the upper limits for a subset of the generalized coordinates's
   /// velocity
   void setVelocityUpperLimits(const std::vector<std::size_t>& indices,
-                              const Eigen::VectorXd& velocities);
+                              const Eigen::VectorXs& velocities);
 
   /// Get the upper limit of a generalized coordinate's velocity
-  double getVelocityUpperLimit(std::size_t _index);
+  s_t getVelocityUpperLimit(std::size_t _index);
 
   /// Get the upper limits for all generalized coordinates's velocity
-  Eigen::VectorXd getVelocityUpperLimits() const;
+  Eigen::VectorXs getVelocityUpperLimits() const;
 
   /// Get the upper limits for a subset of the generalized coordinates's
   /// velocity
-  Eigen::VectorXd getVelocityUpperLimits(
+  Eigen::VectorXs getVelocityUpperLimits(
       const std::vector<std::size_t>& indices) const;
 
   /// \}
@@ -399,69 +399,69 @@ public:
   //----------------------------------------------------------------------------
 
   /// Set the acceleration of a single generalized coordinate
-  void setAcceleration(std::size_t _index, double _acceleration);
+  void setAcceleration(std::size_t _index, s_t _acceleration);
 
   /// Get the acceleration of a single generalized coordinate
-  double getAcceleration(std::size_t _index) const;
+  s_t getAcceleration(std::size_t _index) const;
 
   /// Set the accelerations of all generalized coordinates
-  void setAccelerations(const Eigen::VectorXd& _accelerations);
+  void setAccelerations(const Eigen::VectorXs& _accelerations);
 
   /// Set the accelerations of a subset of the generalized coordinates
   void setAccelerations(const std::vector<std::size_t>& _indices,
-                        const Eigen::VectorXd& _accelerations);
+                        const Eigen::VectorXs& _accelerations);
 
   /// Get the accelerations for all generalized coordinates
-  Eigen::VectorXd getAccelerations() const;
+  Eigen::VectorXs getAccelerations() const;
 
   /// Get the accelerations for a subset of the generalized coordinates
-  Eigen::VectorXd getAccelerations(const std::vector<std::size_t>& _indices) const;
+  Eigen::VectorXs getAccelerations(const std::vector<std::size_t>& _indices) const;
 
   /// Set all accelerations to zero
   void resetAccelerations();
 
   /// Set the lower limit of a generalized coordinate's acceleration
-  void setAccelerationLowerLimit(std::size_t _index, double _acceleration);
+  void setAccelerationLowerLimit(std::size_t _index, s_t _acceleration);
 
   /// Set the lower limits for all generalized coordinates's acceleration
-  void setAccelerationLowerLimits(const Eigen::VectorXd& accelerations);
+  void setAccelerationLowerLimits(const Eigen::VectorXs& accelerations);
 
   /// Set the lower limits for a subset of the generalized coordinates's
   /// acceleration
   void setAccelerationLowerLimits(const std::vector<std::size_t>& indices,
-                              const Eigen::VectorXd& accelerations);
+                              const Eigen::VectorXs& accelerations);
 
   /// Get the lower limit of a generalized coordinate's acceleration
-  double getAccelerationLowerLimit(std::size_t _index) const;
+  s_t getAccelerationLowerLimit(std::size_t _index) const;
 
   /// Get the lower limits for all generalized coordinates's acceleration
-  Eigen::VectorXd getAccelerationLowerLimits() const;
+  Eigen::VectorXs getAccelerationLowerLimits() const;
 
   /// Get the lower limits for a subset of the generalized coordinates's
   /// acceleration
-  Eigen::VectorXd getAccelerationLowerLimits(
+  Eigen::VectorXs getAccelerationLowerLimits(
       const std::vector<std::size_t>& indices) const;
 
   /// Set the upper limit of a generalized coordinate's acceleration
-  void setAccelerationUpperLimit(std::size_t _index, double _acceleration);
+  void setAccelerationUpperLimit(std::size_t _index, s_t _acceleration);
 
   /// Set the upper limits for all generalized coordinates's acceleration
-  void setAccelerationUpperLimits(const Eigen::VectorXd& accelerations);
+  void setAccelerationUpperLimits(const Eigen::VectorXs& accelerations);
 
   /// Set the upper limits for a subset of the generalized coordinates's
   /// acceleration
   void setAccelerationUpperLimits(const std::vector<std::size_t>& indices,
-                              const Eigen::VectorXd& accelerations);
+                              const Eigen::VectorXs& accelerations);
 
   /// Get the upper limit of a generalized coordinate's acceleration
-  double getAccelerationUpperLimit(std::size_t _index) const;
+  s_t getAccelerationUpperLimit(std::size_t _index) const;
 
   /// Get the upper limits for all generalized coordinates's acceleration
-  Eigen::VectorXd getAccelerationUpperLimits() const;
+  Eigen::VectorXs getAccelerationUpperLimits() const;
 
   /// Get the upper limits for a subset of the generalized coordinates's
   /// acceleration
-  Eigen::VectorXd getAccelerationUpperLimits(
+  Eigen::VectorXs getAccelerationUpperLimits(
       const std::vector<std::size_t>& indices) const;
 
   /// \}
@@ -471,65 +471,65 @@ public:
   //----------------------------------------------------------------------------
 
   /// Set the force of a single generalized coordinate
-  void setForce(std::size_t _index, double _force);
+  void setForce(std::size_t _index, s_t _force);
 
   /// Get the force of a single generalized coordinate
-  double getForce(std::size_t _index) const;
+  s_t getForce(std::size_t _index) const;
 
   /// Set the forces of all generalized coordinates
-  void setForces(const Eigen::VectorXd& _forces);
+  void setForces(const Eigen::VectorXs& _forces);
 
   /// Set the forces of a subset of the generalized coordinates
   void setForces(const std::vector<std::size_t>& _index,
-                 const Eigen::VectorXd& _forces);
+                 const Eigen::VectorXs& _forces);
 
   /// Get the forces for all generalized coordinates
-  Eigen::VectorXd getForces() const;
+  Eigen::VectorXs getForces() const;
 
   /// Get the forces for a subset of the generalized coordinates
-  Eigen::VectorXd getForces(const std::vector<std::size_t>& _indices) const;
+  Eigen::VectorXs getForces(const std::vector<std::size_t>& _indices) const;
 
   /// Set all forces of the generalized coordinates to zero
   void resetGeneralizedForces();
 
   /// Set the lower limit of a generalized coordinate's force
-  void setForceLowerLimit(std::size_t _index, double _force);
+  void setForceLowerLimit(std::size_t _index, s_t _force);
 
   /// Set the lower limits for all generalized coordinates's force
-  void setForceLowerLimits(const Eigen::VectorXd& forces);
+  void setForceLowerLimits(const Eigen::VectorXs& forces);
 
   /// Set the lower limits for a subset of the generalized coordinates's force
   void setForceLowerLimits(const std::vector<std::size_t>& indices,
-                           const Eigen::VectorXd& forces);
+                           const Eigen::VectorXs& forces);
 
   /// Get the lower limit of a generalized coordinate's force
-  double getForceLowerLimit(std::size_t _index) const;
+  s_t getForceLowerLimit(std::size_t _index) const;
 
   /// Get the lower limits for all generalized coordinates's force
-  Eigen::VectorXd getForceLowerLimits() const;
+  Eigen::VectorXs getForceLowerLimits() const;
 
   /// Get the lower limits for a subset of the generalized coordinates's force
-  Eigen::VectorXd getForceLowerLimits(
+  Eigen::VectorXs getForceLowerLimits(
       const std::vector<std::size_t>& indices) const;
 
   /// Set the upper limit of a generalized coordinate's force
-  void setForceUpperLimit(std::size_t _index, double _force);
+  void setForceUpperLimit(std::size_t _index, s_t _force);
 
   /// Set the upperlimits for all generalized coordinates's force
-  void setForceUpperLimits(const Eigen::VectorXd& forces);
+  void setForceUpperLimits(const Eigen::VectorXs& forces);
 
   /// Set the upper limits for a subset of the generalized coordinates's force
   void setForceUpperLimits(const std::vector<std::size_t>& indices,
-                           const Eigen::VectorXd& forces);
+                           const Eigen::VectorXs& forces);
 
   /// Get the upper limit of a generalized coordinate's force
-  double getForceUpperLimit(std::size_t _index) const;
+  s_t getForceUpperLimit(std::size_t _index) const;
 
   /// Get the upper limits for all generalized coordinates's force
-  Eigen::VectorXd getForceUpperLimits() const;
+  Eigen::VectorXs getForceUpperLimits() const;
 
   /// Get the upper limits for a subset of the generalized coordinates's force
-  Eigen::VectorXd getForceUpperLimits(
+  Eigen::VectorXs getForceUpperLimits(
       const std::vector<std::size_t>& indices) const;
 
   /// \}
@@ -539,17 +539,17 @@ public:
   //----------------------------------------------------------------------------
 
   /// Get the velocity changes for all the generalized coordinates
-  Eigen::VectorXd getVelocityChanges() const;
+  Eigen::VectorXs getVelocityChanges() const;
 
   //----------------------------------------------------------------------------
   /// \{ \name Constraint Impulse
   //----------------------------------------------------------------------------
 
   /// Set the constraint impulses for the generalized coordinates
-  void setJointConstraintImpulses(const Eigen::VectorXd& _impulses);
+  void setJointConstraintImpulses(const Eigen::VectorXs& _impulses);
 
   /// Get the constraint impulses for the generalized coordinates
-  Eigen::VectorXd getJointConstraintImpulses() const;
+  Eigen::VectorXs getJointConstraintImpulses() const;
 
 
   //----------------------------------------------------------------------------
@@ -579,14 +579,14 @@ public:
   /// in the Frame of the BodyNode.
   virtual math::Jacobian getJacobian(
       const JacobianNode* _node,
-      const Eigen::Vector3d& _localOffset) const = 0;
+      const Eigen::Vector3s& _localOffset) const = 0;
 
   /// Get the spatial Jacobian targeting an offset in a BodyNode. The _offset is
   /// expected in coordinates of the BodyNode Frame. You can specify a
   /// coordinate Frame to express the Jacobian in.
   virtual math::Jacobian getJacobian(
       const JacobianNode* _node,
-      const Eigen::Vector3d& _localOffset,
+      const Eigen::Vector3s& _localOffset,
       const Frame* _inCoordinatesOf) const = 0;
 
   /// Get the spatial Jacobian targeting an offset in a BodyNode relative to
@@ -595,7 +595,7 @@ public:
   /// express the Jacobian in.
   math::Jacobian getJacobian(
       const JacobianNode* _node,
-      const Eigen::Vector3d& _localOffset,
+      const Eigen::Vector3s& _localOffset,
       const JacobianNode* _relativeTo,
       const Frame* _inCoordinatesOf) const;
 
@@ -608,7 +608,7 @@ public:
   /// in the World Frame.
   virtual math::Jacobian getWorldJacobian(
       const JacobianNode* _node,
-      const Eigen::Vector3d& _localOffset) const = 0;
+      const Eigen::Vector3s& _localOffset) const = 0;
 
   /// Get the linear Jacobian targeting the origin of a BodyNode. You can
   /// specify a coordinate Frame to express the Jacobian in.
@@ -621,7 +621,7 @@ public:
   /// coordinate Frame to express the Jacobian in.
   virtual math::LinearJacobian getLinearJacobian(
       const JacobianNode* _node,
-      const Eigen::Vector3d& _localOffset,
+      const Eigen::Vector3s& _localOffset,
       const Frame* _inCoordinatesOf = Frame::World()) const = 0;
 
   /// Get the linear Jacobian targeting the origin of a BodyNode relative to
@@ -638,7 +638,7 @@ public:
   /// express the Jacobian in.
   math::LinearJacobian getLinearJacobian(
       const JacobianNode* _node,
-      const Eigen::Vector3d& _localOffset,
+      const Eigen::Vector3s& _localOffset,
       const JacobianNode* _relativeTo,
       const Frame* _inCoordinatesOf = Frame::World()) const;
 
@@ -678,14 +678,14 @@ public:
   /// The Jacobian is expressed in the Frame of the BodyNode.
   virtual math::Jacobian getJacobianSpatialDeriv(
       const JacobianNode* _node,
-      const Eigen::Vector3d& _localOffset) const = 0;
+      const Eigen::Vector3s& _localOffset) const = 0;
 
   /// Get the spatial Jacobian time derivative targeting an offset in a
   /// BodyNode. The _offset is expected in coordinates of the BodyNode Frame.
   /// You can specify a coordinate Frame to express the Jacobian in.
   virtual math::Jacobian getJacobianSpatialDeriv(
       const JacobianNode* _node,
-      const Eigen::Vector3d& _localOffset,
+      const Eigen::Vector3s& _localOffset,
       const Frame* _inCoordinatesOf) const = 0;
 
   /// Get the spatial Jacobian time derivative targeting the origin of a
@@ -702,7 +702,7 @@ public:
   /// coordinate Frame to express the Jacobian in.
   math::Jacobian getJacobianSpatialDeriv(
       const JacobianNode* _node,
-      const Eigen::Vector3d& _localOffset,
+      const Eigen::Vector3s& _localOffset,
       const JacobianNode* _relativeTo,
       const Frame* _inCoordinatesOf) const;
 
@@ -723,7 +723,7 @@ public:
   /// Frame. You can specify a coordinate Frame to express the Jacobian in.
   virtual math::Jacobian getJacobianClassicDeriv(
       const JacobianNode* _node,
-      const Eigen::Vector3d& _localOffset,
+      const Eigen::Vector3s& _localOffset,
       const Frame* _inCoordinatesOf = Frame::World()) const = 0;
 
   /// of a BodyNode. The _offset is expected in coordinates of the BodyNode
@@ -737,7 +737,7 @@ public:
   /// You can specify a coordinate Frame to express the Jacobian in.
   virtual math::LinearJacobian getLinearJacobianDeriv(
       const JacobianNode* _node,
-      const Eigen::Vector3d& _localOffset,
+      const Eigen::Vector3s& _localOffset,
       const Frame* _inCoordinatesOf = Frame::World()) const = 0;
 
   /// Get the angular Jacobian time derivative of a BodyNode. You can specify a
@@ -755,37 +755,37 @@ public:
   /// Get the total mass of all BodyNodes in this MetaSkeleton. Note that
   /// for the ReferentialSkeleton extension of MetaSkeleton, this will be an
   /// O(n) operation, while the Skeleton extension will be O(1).
-  virtual double getMass() const = 0;
+  virtual s_t getMass() const = 0;
 
   /// Get the Mass Matrix of the MetaSkeleton
-  virtual const Eigen::MatrixXd& getMassMatrix() const = 0;
+  virtual const Eigen::MatrixXs& getMassMatrix() const = 0;
 
   /// Get augmented mass matrix of the skeleton. This matrix is used in
   /// ConstraintDynamics to compute constraint forces. The matrix is
   /// M + h*D + h*h*K where D is diagonal joint damping coefficient matrix, K is
   /// diagonal joint stiffness matrix, and h is simulation time step.
-  virtual const Eigen::MatrixXd& getAugMassMatrix() const = 0;
+  virtual const Eigen::MatrixXs& getAugMassMatrix() const = 0;
 
   /// Get inverse of Mass Matrix of the MetaSkeleton.
-  virtual const Eigen::MatrixXd& getInvMassMatrix() const = 0;
+  virtual const Eigen::MatrixXs& getInvMassMatrix() const = 0;
 
   /// Get inverse of augmented Mass Matrix of the MetaSkeleton.
-  virtual const Eigen::MatrixXd& getInvAugMassMatrix() const = 0;
+  virtual const Eigen::MatrixXs& getInvAugMassMatrix() const = 0;
 
   /// Get Coriolis force vector of the MetaSkeleton's BodyNodes.
-  virtual const Eigen::VectorXd& getCoriolisForces() const = 0;
+  virtual const Eigen::VectorXs& getCoriolisForces() const = 0;
 
   /// Get gravity force vector of the MetaSkeleton.
-  virtual const Eigen::VectorXd& getGravityForces() const = 0;
+  virtual const Eigen::VectorXs& getGravityForces() const = 0;
 
   /// Get combined vector of Coriolis force and gravity force of the MetaSkeleton.
-  virtual const Eigen::VectorXd& getCoriolisAndGravityForces() const = 0;
+  virtual const Eigen::VectorXs& getCoriolisAndGravityForces() const = 0;
 
   /// Get external force vector of the MetaSkeleton.
-  virtual const Eigen::VectorXd& getExternalForces() const = 0;
+  virtual const Eigen::VectorXs& getExternalForces() const = 0;
 
   /// Get constraint force vector.
-  virtual const Eigen::VectorXd& getConstraintForces() const = 0;
+  virtual const Eigen::VectorXs& getConstraintForces() const = 0;
 
   /// Clear the external forces of the BodyNodes in this MetaSkeleton
   virtual void clearExternalForces() = 0;
@@ -794,21 +794,21 @@ public:
   virtual void clearInternalForces() = 0;
 
   /// Compute and return Lagrangian of this MetaSkeleton
-  double computeLagrangian() const;
+  s_t computeLagrangian() const;
 
   /// Get the kinetic energy of this MetaSkeleton
   DART_DEPRECATED(6.1)
-  double getKineticEnergy() const;
+  s_t getKineticEnergy() const;
 
   /// Get the kinetic energy of this MetaSkeleton
-  virtual double computeKineticEnergy() const = 0;
+  virtual s_t computeKineticEnergy() const = 0;
 
   /// Get the potential energy of this MetaSkeleton
   DART_DEPRECATED(6.1)
-  double getPotentialEnergy() const;
+  s_t getPotentialEnergy() const;
 
   /// Get the potential energy of this MetaSkeleton
-  virtual double computePotentialEnergy() const = 0;
+  virtual s_t computePotentialEnergy() const = 0;
 
   /// Clear collision flags of the BodyNodes in this MetaSkeleton
   DART_DEPRECATED(6.0)
@@ -822,30 +822,30 @@ public:
 
   /// Get the MetaSkeleton's COM with respect to any Frame (default is World
   /// Frame)
-  virtual Eigen::Vector3d getCOM(
+  virtual Eigen::Vector3s getCOM(
       const Frame* _withRespectTo = Frame::World()) const = 0;
 
   /// Get the Skeleton's COM spatial velocity in terms of any Frame (default is
   /// World Frame)
-  virtual Eigen::Vector6d getCOMSpatialVelocity(
+  virtual Eigen::Vector6s getCOMSpatialVelocity(
       const Frame* _relativeTo = Frame::World(),
       const Frame* _inCoordinatesOf = Frame::World()) const = 0;
 
   /// Get the Skeleton's COM linear velocity in terms of any Frame (default is
   /// World Frame)
-  virtual Eigen::Vector3d getCOMLinearVelocity(
+  virtual Eigen::Vector3s getCOMLinearVelocity(
       const Frame* _relativeTo = Frame::World(),
       const Frame* _inCoordinatesOf = Frame::World()) const = 0;
 
   /// Get the Skeleton's COM spatial acceleration in terms of any Frame (default
   /// is World Frame)
-  virtual Eigen::Vector6d getCOMSpatialAcceleration(
+  virtual Eigen::Vector6s getCOMSpatialAcceleration(
       const Frame* _relativeTo = Frame::World(),
       const Frame* _inCoordinatesOf = Frame::World()) const = 0;
 
   /// Get the MetaSkeleton's COM linear acceleration in terms of any Frame
   /// (default is World Frame)
-  virtual Eigen::Vector3d getCOMLinearAcceleration(
+  virtual Eigen::Vector3s getCOMLinearAcceleration(
       const Frame* _relativeTo = Frame::World(),
       const Frame* _inCoordinatesOf = Frame::World()) const = 0;
 

@@ -33,23 +33,23 @@
 #include <dart/dart.hpp>
 #include <dart/gui/gui.hpp>
 
-const double default_domino_height = 0.3;
-const double default_domino_width = 0.4 * default_domino_height;
-const double default_domino_depth = default_domino_width / 5.0;
+const s_t default_domino_height = 0.3;
+const s_t default_domino_width = 0.4 * default_domino_height;
+const s_t default_domino_depth = default_domino_width / 5.0;
 
-const double default_distance = default_domino_height / 2.0;
-const double default_angle = 20.0 * M_PI / 180.0;
+const s_t default_distance = default_domino_height / 2.0;
+const s_t default_angle = 20.0 * M_PI / 180.0;
 
-const double default_domino_density = 2.6e3; // kg/m^3
-const double default_domino_mass
+const s_t default_domino_density = 2.6e3; // kg/m^3
+const s_t default_domino_mass
     = default_domino_density * default_domino_height * default_domino_width
       * default_domino_depth;
 
-const double default_push_force = 8.0;  // N
+const s_t default_push_force = 8.0;  // N
 const int default_force_duration = 200; // # iterations
 const int default_push_duration = 1000; // # iterations
 
-const double defaultmEndEffectormOffset = 0.05;
+const s_t defaultmEndEffectormOffset = 0.05;
 
 using namespace dart::dynamics;
 using namespace dart::simulation;
@@ -104,28 +104,28 @@ protected:
   BodyNodePtr mEndEffector;
 
   /// Desired joint positions when not applying the operational space controller
-  Eigen::VectorXd mQDesired;
+  Eigen::VectorXs mQDesired;
 
   /// The offset of the end effector from the body origin of the last BodyNode
   /// in the manipulator
-  Eigen::Vector3d mOffset;
+  Eigen::Vector3s mOffset;
 
   /// Control gains for the proportional error terms in the PD controller
-  double mKpPD;
+  s_t mKpPD;
 
   /// Control gains for the derivative error terms in the PD controller
-  double mKdPD;
+  s_t mKdPD;
 
   /// Control gains for the proportional error terms in the operational
   /// space controller
-  double mKpOS;
+  s_t mKpOS;
 
   /// Control gains for the derivative error terms in the operational space
   /// controller
-  double mKdOS;
+  s_t mKdOS;
 
   /// Joint forces for the manipulator (output of the Controller)
-  Eigen::VectorXd mForces;
+  Eigen::VectorXs mForces;
 };
 
 class MyWindow : public dart::gui::glut::SimWindow
@@ -147,7 +147,7 @@ public:
 
   // Attempt to create a new domino. If the new domino would be in collision
   // with anything (other than the floor), then discard it.
-  void attemptToCreateDomino(double /*angle*/)
+  void attemptToCreateDomino(s_t /*angle*/)
   {
     // Create a new domino
     // Lesson 1a
@@ -239,10 +239,10 @@ protected:
   std::vector<SkeletonPtr> mDominoes;
 
   /// History of the angles that the user has specified
-  std::vector<double> mAngles;
+  std::vector<s_t> mAngles;
 
   /// Sum of all angles so far
-  double mTotalAngle;
+  s_t mTotalAngle;
 
   /// Set to true the first time spacebar is pressed
   bool mHasEverRun;
@@ -268,7 +268,7 @@ SkeletonPtr createDomino()
       = domino->createJointAndBodyNodePair<FreeJoint>(nullptr).second;
 
   // Create a shape for the domino
-  std::shared_ptr<BoxShape> box(new BoxShape(Eigen::Vector3d(
+  std::shared_ptr<BoxShape> box(new BoxShape(Eigen::Vector3s(
       default_domino_depth, default_domino_width, default_domino_height)));
   body->createShapeNodeWith<VisualAspect, CollisionAspect, DynamicsAspect>(box);
 
@@ -292,10 +292,10 @@ SkeletonPtr createFloor()
       = floor->createJointAndBodyNodePair<WeldJoint>(nullptr).second;
 
   // Give the body a shape
-  double floor_width = 10.0;
-  double floor_height = 0.01;
+  s_t floor_width = 10.0;
+  s_t floor_height = 0.01;
   std::shared_ptr<BoxShape> box(
-      new BoxShape(Eigen::Vector3d(floor_width, floor_width, floor_height)));
+      new BoxShape(Eigen::Vector3s(floor_width, floor_width, floor_height)));
   auto shapeNode = body->createShapeNodeWith<
       VisualAspect,
       CollisionAspect,
@@ -303,8 +303,8 @@ SkeletonPtr createFloor()
   shapeNode->getVisualAspect()->setColor(dart::Color::Black());
 
   // Put the body into position
-  Eigen::Isometry3d tf(Eigen::Isometry3d::Identity());
-  tf.translation() = Eigen::Vector3d(0.0, 0.0, -floor_height / 2.0);
+  Eigen::Isometry3s tf(Eigen::Isometry3s::Identity());
+  tf.translation() = Eigen::Vector3s(0.0, 0.0, -floor_height / 2.0);
   body->getParentJoint()->setTransformFromParentBodyNode(tf);
 
   return floor;

@@ -57,7 +57,7 @@ public:
   /// such as dart::simulation::World when the solver added.
   DART_DEPRECATED(6.8)
   BoxedLcpConstraintSolver(
-      double timeStep,
+      s_t timeStep,
       BoxedLcpSolverPtr boxedLcpSolver = nullptr,
       BoxedLcpSolverPtr secondaryBoxedLcpSolver = nullptr);
 
@@ -105,12 +105,12 @@ public:
   /// This gets the cached LCP solution, which is useful to be able to get/set
   /// because it can effect the forward solutions of physics problems because of
   /// our optimistic LCP-stabilization-to-acceptance approach.
-  virtual Eigen::VectorXd getCachedLCPSolution() override;
+  virtual Eigen::VectorXs getCachedLCPSolution() override;
 
   /// This gets the cached LCP solution, which is useful to be able to get/set
   /// because it can effect the forward solutions of physics problems because of
   /// our optimistic LCP-stabilization-to-acceptance approach.
-  virtual void setCachedLCPSolution(Eigen::VectorXd X) override;
+  virtual void setCachedLCPSolution(Eigen::VectorXs X) override;
 
 protected:
   // Documentation inherited.
@@ -128,38 +128,38 @@ protected:
   // change in DART 7 because it's API breaking change.
 
   /// Cache data for boxed LCP formulation
-  Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> mA;
+  Eigen::Matrix<s_t, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> mA;
 
   /// Cache data for boxed LCP formulation
-  Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>
+  Eigen::Matrix<s_t, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>
       mABackup;
 
   /// Cache data for boxed LCP formulation
-  Eigen::VectorXd mX;
+  Eigen::VectorXs mX;
 
   /// Cache data for boxed LCP formulation
-  Eigen::VectorXd mXBackup;
+  Eigen::VectorXs mXBackup;
 
   /// Cache data for boxed LCP formulation
-  Eigen::VectorXd mB;
+  Eigen::VectorXs mB;
 
   /// Cache data for boxed LCP formulation
-  Eigen::VectorXd mBBackup;
+  Eigen::VectorXs mBBackup;
 
   /// Cache data for boxed LCP formulation
-  Eigen::VectorXd mW;
+  Eigen::VectorXs mW;
 
   /// Cache data for boxed LCP formulation
-  Eigen::VectorXd mLo;
+  Eigen::VectorXs mLo;
 
   /// Cache data for boxed LCP formulation
-  Eigen::VectorXd mLoBackup;
+  Eigen::VectorXs mLoBackup;
 
   /// Cache data for boxed LCP formulation
-  Eigen::VectorXd mHi;
+  Eigen::VectorXs mHi;
 
   /// Cache data for boxed LCP formulation
-  Eigen::VectorXd mHiBackup;
+  Eigen::VectorXs mHiBackup;
 
   /// Cache data for boxed LCP formulation
   Eigen::VectorXi mFIndex;
@@ -173,21 +173,21 @@ protected:
 #ifndef NDEBUG
 private:
   /// Return true if the matrix is symmetric
-  bool isSymmetric(std::size_t n, double* A);
+  bool isSymmetric(std::size_t n, s_t* A);
 
   /// Return true if the diagonla block of matrix is symmetric
   bool isSymmetric(
-      std::size_t n, double* A, std::size_t begin, std::size_t end);
+      std::size_t n, s_t* A, std::size_t begin, std::size_t end);
 
   /// Print debug information
   void print(
       std::size_t n,
-      double* A,
-      double* x,
-      double* lo,
-      double* hi,
-      double* b,
-      double* w,
+      s_t* A,
+      s_t* x,
+      s_t* lo,
+      s_t* hi,
+      s_t* b,
+      s_t* w,
       int* findex);
 #endif
 };

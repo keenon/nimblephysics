@@ -49,10 +49,10 @@ public:
   using Function::Function;
 
   // Trampoline for virtual function
-  double eval(const Eigen::VectorXd& x) override
+  s_t eval(const Eigen::VectorXs& x) override
   {
     PYBIND11_OVERLOAD_PURE(
-        double,   // Return type
+        s_t,   // Return type
         Function, // Parent class
         eval,     // Name of function in C++ (must match Python name)
         x);
@@ -60,7 +60,7 @@ public:
 
   // Trampoline for virtual function
   void evalGradient(
-      const Eigen::VectorXd& x, Eigen::Map<Eigen::VectorXd> grad) override
+      const Eigen::VectorXs& x, Eigen::Map<Eigen::VectorXs> grad) override
   {
     PYBIND11_OVERLOAD(
         void,         // Return type
@@ -94,13 +94,13 @@ void Function(py::module& m)
       .def(
           "eval",
           +[](dart::optimizer::Function* self,
-              const Eigen::VectorXd& x) -> double { return self->eval(x); },
+              const Eigen::VectorXs& x) -> s_t { return self->eval(x); },
           ::py::arg("x"))
       .def(
           "evalGradient",
           +[](dart::optimizer::Function* self,
-              const Eigen::VectorXd& _x,
-              Eigen::VectorXd& _grad) { self->evalGradient(_x, _grad); },
+              const Eigen::VectorXs& _x,
+              Eigen::VectorXs& _grad) { self->evalGradient(_x, _grad); },
           ::py::arg("x"),
           ::py::arg("grad"));
 
@@ -114,7 +114,7 @@ void Function(py::module& m)
       .def(
           "eval",
           +[](dart::optimizer::NullFunction* self,
-              const Eigen::VectorXd& _arg0_) -> double {
+              const Eigen::VectorXs& _arg0_) -> s_t {
             return self->eval(_arg0_);
           },
           ::py::arg("arg0_"));
@@ -133,7 +133,7 @@ void Function(py::module& m)
       .def(
           "eval",
           +[](dart::optimizer::ModularFunction* self,
-              const Eigen::VectorXd& _x) -> double { return self->eval(_x); },
+              const Eigen::VectorXs& _x) -> s_t { return self->eval(_x); },
           ::py::arg("x"))
       .def(
           "setCostFunction",

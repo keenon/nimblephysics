@@ -10,19 +10,19 @@ namespace constraint {
 
 //==============================================================================
 bool LCPUtils::isLCPSolutionValid(
-    const Eigen::MatrixXd& mA,
-    const Eigen::VectorXd& mX,
-    const Eigen::VectorXd& mB,
-    const Eigen::VectorXd& mHi,
-    const Eigen::VectorXd& mLo,
+    const Eigen::MatrixXs& mA,
+    const Eigen::VectorXs& mX,
+    const Eigen::VectorXs& mB,
+    const Eigen::VectorXs& mHi,
+    const Eigen::VectorXs& mLo,
     const Eigen::VectorXi& mFIndex,
     bool ignoreFrictionIndices)
 {
-  Eigen::VectorXd v = mA * mX - mB;
+  Eigen::VectorXs v = mA * mX - mB;
   for (int i = 0; i < mX.size(); i++)
   {
-    double upperLimit = mHi(i);
-    double lowerLimit = mLo(i);
+    s_t upperLimit = mHi(i);
+    s_t lowerLimit = mLo(i);
     if (mFIndex(i) != -1)
     {
       if (ignoreFrictionIndices)
@@ -35,7 +35,7 @@ bool LCPUtils::isLCPSolutionValid(
       lowerLimit *= mX(mFIndex(i));
     }
 
-    const double tol = 1e-5;
+    const s_t tol = 1e-5;
 
     /// Solves constriant impulses for a constrained group. The LCP formulation
     /// setting that this function solve is A*x = b + w where each x[i], w[i]
@@ -47,19 +47,18 @@ bool LCPUtils::isLCPSolutionValid(
     // If force has a zero bound, and we're at a zero bound (this is common with
     // friction being upper-bounded by a near-zero normal force) then allow
     // velocity in either direction.
-    if (std::abs(lowerLimit) < tol && std::abs(upperLimit) < tol
-        && std::abs(mX(i)) < tol)
+    if (abs(lowerLimit) < tol && abs(upperLimit) < tol && abs(mX(i)) < tol)
     {
       // This is always allowed
     }
     // If force is at the lower bound, velocity must be >= 0
-    else if (std::abs(mX(i) - lowerLimit) < tol)
+    else if (abs(mX(i) - lowerLimit) < tol)
     {
       if (v(i) < -tol)
         return false;
     }
     // If force is at the upper bound, velocity must be <= 0
-    else if (std::abs(mX(i) - upperLimit) < tol)
+    else if (abs(mX(i) - upperLimit) < tol)
     {
       if (v(i) > tol)
         return false;
@@ -67,7 +66,7 @@ bool LCPUtils::isLCPSolutionValid(
     // If force is within bounds, then velocity must be zero
     else if (mX(i) > lowerLimit && mX(i) < upperLimit)
     {
-      if (std::abs(v(i)) > tol)
+      if (abs(v(i)) > tol)
         return false;
     }
     // If force is out of bounds, we're always illegal
@@ -84,11 +83,11 @@ bool LCPUtils::isLCPSolutionValid(
 /// This applies a simple algorithm to guess the solution to the LCP problem.
 /// It's not guaranteed to be correct, but it often can be if there is no
 /// sliding friction on this timestep.
-Eigen::VectorXd LCPUtils::guessSolution(
-    const Eigen::MatrixXd& mA,
-    const Eigen::VectorXd& mB,
-    const Eigen::VectorXd& /* mHi */,
-    const Eigen::VectorXd& /* mLo */,
+Eigen::VectorXs LCPUtils::guessSolution(
+    const Eigen::MatrixXs& mA,
+    const Eigen::VectorXs& mB,
+    const Eigen::VectorXs& /* mHi */,
+    const Eigen::VectorXs& /* mLo */,
     const Eigen::VectorXi& mFIndex)
 {
   std::vector<int> clampingIndices;
@@ -115,11 +114,11 @@ Eigen::VectorXd LCPUtils::guessSolution(
   }
   if (numClamping == 0)
   {
-    return Eigen::VectorXd::Zero(mB.size());
+    return Eigen::VectorXs::Zero(mB.size());
   }
   // Otherwise we have to map down to the clamping subset
-  Eigen::MatrixXd reducedA = Eigen::MatrixXd::Zero(numClamping, numClamping);
-  Eigen::VectorXd reducedB = Eigen::VectorXd::Zero(numClamping);
+  Eigen::MatrixXs reducedA = Eigen::MatrixXs::Zero(numClamping, numClamping);
+  Eigen::VectorXs reducedB = Eigen::VectorXs::Zero(numClamping);
   for (int row = 0; row < numClamping; row++)
   {
     reducedB(row) = mB(clampingIndices[row]);
@@ -130,9 +129,9 @@ Eigen::VectorXd LCPUtils::guessSolution(
   }
   // Then we solve the clamping subset, and map back out to the full problem
   // size
-  Eigen::VectorXd reducedX
+  Eigen::VectorXs reducedX
       = reducedA.completeOrthogonalDecomposition().solve(reducedB);
-  Eigen::VectorXd fullX = Eigen::VectorXd::Zero(mB.size());
+  Eigen::VectorXs fullX = Eigen::VectorXs::Zero(mB.size());
   for (int i = 0; i < numClamping; i++)
   {
     fullX(clampingIndices[i]) = reducedX(i);
@@ -142,21 +141,21 @@ Eigen::VectorXd LCPUtils::guessSolution(
 
 //==============================================================================
 /// This reduces an LCP problem by merging any near-identical contact points.
-Eigen::MatrixXd LCPUtils::reduce(
-    Eigen::MatrixXd& A,
-    Eigen::VectorXd& X,
-    Eigen::VectorXd& b,
-    Eigen::VectorXd& hi,
-    Eigen::VectorXd& lo,
+Eigen::MatrixXs LCPUtils::reduce(
+    Eigen::MatrixXs& A,
+    Eigen::VectorXs& X,
+    Eigen::VectorXs& b,
+    Eigen::VectorXs& hi,
+    Eigen::VectorXs& lo,
     Eigen::VectorXi& fIndex)
 {
-  Eigen::MatrixXd reducedA = A;
-  Eigen::VectorXd reducedX = X;
-  Eigen::VectorXd reducedB = b;
-  Eigen::VectorXd reducedHi = hi;
-  Eigen::VectorXd reducedLo = lo;
+  Eigen::MatrixXs reducedA = A;
+  Eigen::VectorXs reducedX = X;
+  Eigen::VectorXs reducedB = b;
+  Eigen::VectorXs reducedHi = hi;
+  Eigen::VectorXs reducedLo = lo;
   Eigen::VectorXi reducedFIndex = fIndex;
-  Eigen::MatrixXd mapOut = Eigen::MatrixXd::Identity(A.rows(), A.cols());
+  Eigen::MatrixXs mapOut = Eigen::MatrixXs::Identity(A.rows(), A.cols());
   // Step 1. Merge any duplicate columns, as long as we keep finding ones we can
   // merge
   while (true)
@@ -168,7 +167,7 @@ Eigen::MatrixXd LCPUtils::reduce(
       for (int b = a + 1; b < n; b++)
       {
         if ((reducedA.col(a) - reducedA.col(b)).squaredNorm() < MERGE_THRESHOLD
-            && (std::abs(reducedB(a) - reducedB(b)) < MERGE_THRESHOLD)
+            && (abs(reducedB(a) - reducedB(b)) < MERGE_THRESHOLD)
             && (reducedFIndex(a) == reducedFIndex(b))
             && (reducedHi(a) == reducedHi(b)) && (reducedLo(a) == reducedLo(b)))
         {
@@ -206,21 +205,21 @@ Eigen::MatrixXd LCPUtils::reduce(
 /// It returns a mapOut matrix, such that if you solve this LCP and then
 /// multiply the resulting x as mapOut*x, you'll get the solution to the
 /// original LCP, but with friction forces all 0.
-Eigen::MatrixXd LCPUtils::removeFriction(
-    Eigen::MatrixXd& A,
-    Eigen::VectorXd& X,
-    Eigen::VectorXd& b,
-    Eigen::VectorXd& hi,
-    Eigen::VectorXd& lo,
+Eigen::MatrixXs LCPUtils::removeFriction(
+    Eigen::MatrixXs& A,
+    Eigen::VectorXs& X,
+    Eigen::VectorXs& b,
+    Eigen::VectorXs& hi,
+    Eigen::VectorXs& lo,
     Eigen::VectorXi& fIndex)
 {
-  Eigen::MatrixXd reducedA = A;
-  Eigen::VectorXd reducedX = X;
-  Eigen::VectorXd reducedB = b;
-  Eigen::VectorXd reducedHi = hi;
-  Eigen::VectorXd reducedLo = lo;
+  Eigen::MatrixXs reducedA = A;
+  Eigen::VectorXs reducedX = X;
+  Eigen::VectorXs reducedB = b;
+  Eigen::VectorXs reducedHi = hi;
+  Eigen::VectorXs reducedLo = lo;
   Eigen::VectorXi reducedFIndex = fIndex;
-  Eigen::MatrixXd mapOut = Eigen::MatrixXd::Identity(A.rows(), A.cols());
+  Eigen::MatrixXs mapOut = Eigen::MatrixXs::Identity(A.rows(), A.cols());
 
   for (int i = fIndex.size() - 1; i >= 0; i--)
   {
@@ -250,20 +249,20 @@ Eigen::MatrixXd LCPUtils::removeFriction(
 //==============================================================================
 bool LCPUtils::solveDeduplicated(
     std::shared_ptr<BoxedLcpSolver>& solver,
-    const Eigen::MatrixXd& A,
-    Eigen::VectorXd& X,
-    const Eigen::VectorXd& b,
-    const Eigen::VectorXd& hi,
-    const Eigen::VectorXd& lo,
+    const Eigen::MatrixXs& A,
+    Eigen::VectorXs& X,
+    const Eigen::VectorXs& b,
+    const Eigen::VectorXs& hi,
+    const Eigen::VectorXs& lo,
     const Eigen::VectorXi& fIndex)
 {
-  Eigen::MatrixXd reducedA = A;
-  Eigen::VectorXd reducedX = X;
-  Eigen::VectorXd reducedB = b;
-  Eigen::VectorXd reducedHi = hi;
-  Eigen::VectorXd reducedLo = lo;
+  Eigen::MatrixXs reducedA = A;
+  Eigen::VectorXs reducedX = X;
+  Eigen::VectorXs reducedB = b;
+  Eigen::VectorXs reducedHi = hi;
+  Eigen::VectorXs reducedLo = lo;
   Eigen::VectorXi reducedFIndex = fIndex;
-  Eigen::MatrixXd mapOut = Eigen::MatrixXd::Identity(A.rows(), A.cols());
+  Eigen::MatrixXs mapOut = Eigen::MatrixXs::Identity(A.rows(), A.cols());
   // Step 1. Merge any duplicate columns, as long as we keep finding ones we can
   // merge
   while (true)
@@ -275,7 +274,7 @@ bool LCPUtils::solveDeduplicated(
       for (int b = a + 1; b < n; b++)
       {
         if ((reducedA.col(a) - reducedA.col(b)).squaredNorm() < MERGE_THRESHOLD
-            && (std::abs(reducedB(a) - reducedB(b)) < MERGE_THRESHOLD)
+            && (abs(reducedB(a) - reducedB(b)) < MERGE_THRESHOLD)
             && (reducedFIndex(a) == reducedFIndex(b))
             && (reducedHi(a) == reducedHi(b)) && (reducedLo(a) == reducedLo(b)))
         {
@@ -299,11 +298,11 @@ bool LCPUtils::solveDeduplicated(
     if (!foundDuplicates)
       break;
   }
-  Eigen::MatrixXd oldA = reducedA;
-  Eigen::VectorXd oldX = reducedX;
-  Eigen::VectorXd oldLo = reducedLo;
-  Eigen::VectorXd oldHi = reducedHi;
-  Eigen::VectorXd oldB = reducedB;
+  Eigen::MatrixXs oldA = reducedA;
+  Eigen::VectorXs oldX = reducedX;
+  Eigen::VectorXs oldLo = reducedLo;
+  Eigen::VectorXs oldHi = reducedHi;
+  Eigen::VectorXs oldB = reducedB;
   Eigen::VectorXi oldFIndex = reducedFIndex;
 
   // Step 2. Solve
@@ -347,29 +346,29 @@ bool LCPUtils::solveDeduplicated(
 void LCPUtils::mergeLCPColumns(
     int colA,
     int colB,
-    Eigen::MatrixXd& A,
-    Eigen::VectorXd& X,
-    Eigen::VectorXd& b,
-    Eigen::VectorXd& hi,
-    Eigen::VectorXd& lo,
+    Eigen::MatrixXs& A,
+    Eigen::VectorXs& X,
+    Eigen::VectorXs& b,
+    Eigen::VectorXs& hi,
+    Eigen::VectorXs& lo,
     Eigen::VectorXi& fIndex,
-    Eigen::MatrixXd& mapOut)
+    Eigen::MatrixXs& mapOut)
 {
   assert(colA < colB);
   assert((A.col(colA) - A.col(colB)).squaredNorm() < MERGE_THRESHOLD);
-  assert(std::abs(b(colA) - b(colB)) < MERGE_THRESHOLD);
+  assert(abs(b(colA) - b(colB)) < MERGE_THRESHOLD);
   assert(fIndex(colA) == fIndex(colB));
   assert(hi(colA) == hi(colB));
   assert(lo(colA) == lo(colB));
 
   int n = A.cols();
-  Eigen::MatrixXd newACols = Eigen::MatrixXd::Zero(n, n - 1);
-  Eigen::VectorXd newX = Eigen::VectorXd::Zero(n - 1);
-  Eigen::VectorXd newB = Eigen::VectorXd::Zero(n - 1);
-  Eigen::VectorXd newHi = Eigen::VectorXd::Zero(n - 1);
-  Eigen::VectorXd newLo = Eigen::VectorXd::Zero(n - 1);
+  Eigen::MatrixXs newACols = Eigen::MatrixXs::Zero(n, n - 1);
+  Eigen::VectorXs newX = Eigen::VectorXs::Zero(n - 1);
+  Eigen::VectorXs newB = Eigen::VectorXs::Zero(n - 1);
+  Eigen::VectorXs newHi = Eigen::VectorXs::Zero(n - 1);
+  Eigen::VectorXs newLo = Eigen::VectorXs::Zero(n - 1);
   Eigen::VectorXi newFIndex = Eigen::VectorXi::Zero(n - 1);
-  Eigen::MatrixXd newMapOut = Eigen::MatrixXd::Zero(mapOut.rows(), n - 1);
+  Eigen::MatrixXs newMapOut = Eigen::MatrixXs::Zero(mapOut.rows(), n - 1);
 
   // Map columns down
   for (int i = 0; i < n; i++)
@@ -418,7 +417,7 @@ void LCPUtils::mergeLCPColumns(
   }
 
   // Map rows down for A
-  Eigen::MatrixXd newA = Eigen::MatrixXd::Zero(n - 1, n - 1);
+  Eigen::MatrixXs newA = Eigen::MatrixXs::Zero(n - 1, n - 1);
   for (int i = 0; i < n; i++)
   {
     if (i == colB)
@@ -452,22 +451,22 @@ void LCPUtils::mergeLCPColumns(
 /// larger problem.
 void LCPUtils::dropLCPColumn(
     int col,
-    Eigen::MatrixXd& A,
-    Eigen::VectorXd& X,
-    Eigen::VectorXd& b,
-    Eigen::VectorXd& hi,
-    Eigen::VectorXd& lo,
+    Eigen::MatrixXs& A,
+    Eigen::VectorXs& X,
+    Eigen::VectorXs& b,
+    Eigen::VectorXs& hi,
+    Eigen::VectorXs& lo,
     Eigen::VectorXi& fIndex,
-    Eigen::MatrixXd& mapOut)
+    Eigen::MatrixXs& mapOut)
 {
   int n = A.cols();
-  Eigen::MatrixXd newACols = Eigen::MatrixXd::Zero(n, n - 1);
-  Eigen::VectorXd newX = Eigen::VectorXd::Zero(n - 1);
-  Eigen::VectorXd newB = Eigen::VectorXd::Zero(n - 1);
-  Eigen::VectorXd newHi = Eigen::VectorXd::Zero(n - 1);
-  Eigen::VectorXd newLo = Eigen::VectorXd::Zero(n - 1);
+  Eigen::MatrixXs newACols = Eigen::MatrixXs::Zero(n, n - 1);
+  Eigen::VectorXs newX = Eigen::VectorXs::Zero(n - 1);
+  Eigen::VectorXs newB = Eigen::VectorXs::Zero(n - 1);
+  Eigen::VectorXs newHi = Eigen::VectorXs::Zero(n - 1);
+  Eigen::VectorXs newLo = Eigen::VectorXs::Zero(n - 1);
   Eigen::VectorXi newFIndex = Eigen::VectorXi::Zero(n - 1);
-  Eigen::MatrixXd newMapOut = Eigen::MatrixXd::Zero(mapOut.rows(), n - 1);
+  Eigen::MatrixXs newMapOut = Eigen::MatrixXs::Zero(mapOut.rows(), n - 1);
 
   // Map columns down
   for (int i = 0; i < n; i++)
@@ -507,7 +506,7 @@ void LCPUtils::dropLCPColumn(
   }
 
   // Map rows down for A
-  Eigen::MatrixXd newA = Eigen::MatrixXd::Zero(n - 1, n - 1);
+  Eigen::MatrixXs newA = Eigen::MatrixXs::Zero(n - 1, n - 1);
   for (int i = 0; i < n; i++)
   {
     if (i == col)
@@ -534,15 +533,15 @@ void LCPUtils::dropLCPColumn(
 }
 
 //==============================================================================
-void printDoubleAsCode(double d)
+void printDoubleAsCode(s_t d)
 {
-  if (d == std::numeric_limits<double>::infinity())
+  if (d == std::numeric_limits<s_t>::infinity())
   {
-    std::cout << "std::numeric_limits<double>::infinity()";
+    std::cout << "std::numeric_limits<s_t>::infinity()";
   }
-  else if (d == -std::numeric_limits<double>::infinity())
+  else if (d == -std::numeric_limits<s_t>::infinity())
   {
-    std::cout << "-std::numeric_limits<double>::infinity()";
+    std::cout << "-std::numeric_limits<s_t>::infinity()";
   }
   else
   {
@@ -551,16 +550,16 @@ void printDoubleAsCode(double d)
 }
 
 void LCPUtils::printReplicationCode(
-    Eigen::MatrixXd A,
-    Eigen::VectorXd x,
-    Eigen::VectorXd lo,
-    Eigen::VectorXd hi,
-    Eigen::VectorXd b,
+    Eigen::MatrixXs A,
+    Eigen::VectorXs x,
+    Eigen::VectorXs lo,
+    Eigen::VectorXs hi,
+    Eigen::VectorXs b,
     Eigen::VectorXi fIndex)
 {
   std::cout << "Code to replicate:" << std::endl;
   std::cout << "--------------------" << std::endl;
-  std::cout << "Eigen::MatrixXd A = Eigen::MatrixXd::Zero(" << A.rows() << ","
+  std::cout << "Eigen::MatrixXs A = Eigen::MatrixXs::Zero(" << A.rows() << ","
             << A.cols() << ");" << std::endl;
   std::cout << "// clang-format off" << std::endl;
   std::cout << "A <<" << std::endl;
@@ -584,7 +583,7 @@ void LCPUtils::printReplicationCode(
     }
   }
   std::cout << "// clang-format on" << std::endl;
-  std::cout << "Eigen::VectorXd x = Eigen::VectorXd::Zero(" << x.size() << ");"
+  std::cout << "Eigen::VectorXs x = Eigen::VectorXs::Zero(" << x.size() << ");"
             << std::endl;
   std::cout << "x <<" << std::endl;
   for (int i = 0; i < x.size(); i++)
@@ -600,7 +599,7 @@ void LCPUtils::printReplicationCode(
       std::cout << ", ";
     }
   }
-  std::cout << "Eigen::VectorXd lo = Eigen::VectorXd::Zero(" << lo.size()
+  std::cout << "Eigen::VectorXs lo = Eigen::VectorXs::Zero(" << lo.size()
             << ");" << std::endl;
   std::cout << "lo <<" << std::endl;
   for (int i = 0; i < lo.size(); i++)
@@ -616,7 +615,7 @@ void LCPUtils::printReplicationCode(
       std::cout << ", ";
     }
   }
-  std::cout << "Eigen::VectorXd hi = Eigen::VectorXd::Zero(" << hi.size()
+  std::cout << "Eigen::VectorXs hi = Eigen::VectorXs::Zero(" << hi.size()
             << ");" << std::endl;
   std::cout << "hi <<" << std::endl;
   for (int i = 0; i < hi.size(); i++)
@@ -632,7 +631,7 @@ void LCPUtils::printReplicationCode(
       std::cout << ", ";
     }
   }
-  std::cout << "Eigen::VectorXd b = Eigen::VectorXd::Zero(" << b.size() << ");"
+  std::cout << "Eigen::VectorXs b = Eigen::VectorXs::Zero(" << b.size() << ");"
             << std::endl;
   std::cout << "b <<" << std::endl;
   for (int i = 0; i < b.size(); i++)

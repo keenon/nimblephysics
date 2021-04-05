@@ -22,8 +22,8 @@ class Bone
 public:
   string name;
   int parent;
-  Vector3d direction;
-  Vector3d axis_offset; // in degrees
+  Vector3s direction;
+  Vector3s axis_offset; // in degrees
   string offset_order;
 
   Quatd global_to_local;
@@ -32,23 +32,23 @@ public:
   double density;
   double length;
 
-  vector<Vector2d> torque_limits;
+  vector<Vector2s> torque_limits;
 
   string dof; // list of degrees of freedom -> 'xyz' -> rotation around 'x' 'y'
               // 'z'. 'a' -> angle-axis rotation [3 values]
 
-  Vector3d color;
+  Vector3s color;
 
   int frame_offset; // where in lists of per-frame data this fellow's data
                     // rests.
 
   // filled, but not yet taken advantage of
-  vector<Vector3d> euler_axes; // for v-file. Actual axes of joint rotation
+  vector<Vector3s> euler_axes; // for v-file. Actual axes of joint rotation
 
   //-------------------------
   // These are set every frame to reflect the bone's state.
-  // Vector3d current_base_position;
-  // Vector3d current_end_position;
+  // Vector3s current_base_position;
+  // Vector3s current_end_position;
   // Quatd current_rotation;
   //-------------------------
 
@@ -118,12 +118,12 @@ public:
   // (think 'xXyzYZ' -- rotate x, trans x, rot y, rot z, trans Y, trans Z)
   string order; // order of transformation for root bone
 
-  Vector3d position;    // position for root bone
+  Vector3s position;    // position for root bone
   string offset_order;  // order for axis offset rotation values
-  Vector3d axis_offset; // rotation for root bone (degrees)
+  Vector3s axis_offset; // rotation for root bone (degrees)
 
   // These track the present position/rotation info.
-  // Vector3d current_position;
+  // Vector3s current_position;
   // Quatd current_rotation;
 
   // parser info:

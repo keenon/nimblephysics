@@ -57,6 +57,7 @@
 
 #include "GradientTestUtils.hpp"
 #include "TestHelpers.hpp"
+#include "mpreal.h"
 #include "stdio.h"
 
 #define ALL_TESTS
@@ -125,26 +126,26 @@ TEST(GRADIENTS, PENDULUM_BLOCK)
   joint3 = pair.first;
   body3 = pair.second;
 
-  Eigen::Isometry3d offset(Eigen::Isometry3d::Identity());
-  offset.translation().noalias() = Eigen::Vector3d(0.0, 0.0, -1.0);
-  Eigen::Vector3d axis = Eigen::Vector3d(0.0, 1.0, 0.0);
+  Eigen::Isometry3s offset(Eigen::Isometry3s::Identity());
+  offset.translation().noalias() = Eigen::Vector3s(0.0, 0.0, -1.0);
+  Eigen::Vector3s axis = Eigen::Vector3s(0.0, 1.0, 0.0);
 
   // Joints
-  joint1->setTransformFromParentBodyNode(Eigen::Isometry3d::Identity());
-  joint1->setTransformFromChildBodyNode(Eigen::Isometry3d::Identity());
+  joint1->setTransformFromParentBodyNode(Eigen::Isometry3s::Identity());
+  joint1->setTransformFromChildBodyNode(Eigen::Isometry3s::Identity());
   joint1->setAxis(axis);
 
   joint2->setTransformFromParentBodyNode(offset);
-  joint2->setTransformFromChildBodyNode(Eigen::Isometry3d::Identity());
+  joint2->setTransformFromChildBodyNode(Eigen::Isometry3s::Identity());
   joint2->setAxis(axis);
 
   joint3->setTransformFromParentBodyNode(offset);
-  joint3->setTransformFromChildBodyNode(Eigen::Isometry3d::Identity());
+  joint3->setTransformFromChildBodyNode(Eigen::Isometry3s::Identity());
   joint3->setAxis(axis);
 
   // Add collisions to the last node of the chain
   std::shared_ptr<BoxShape> pendulumBox(
-      new BoxShape(Eigen::Vector3d(0.1, 0.1, 0.1)));
+      new BoxShape(Eigen::Vector3s(0.1, 0.1, 0.1)));
   body1->createShapeNodeWith<VisualAspect, CollisionAspect>(pendulumBox);
   body1->setFrictionCoeff(0);
   body2->createShapeNodeWith<VisualAspect, CollisionAspect>(pendulumBox);
@@ -153,7 +154,7 @@ TEST(GRADIENTS, PENDULUM_BLOCK)
   body3->setFrictionCoeff(0);
 
   // The block is to the right, drive the chain into the block
-  body2->setExtForce(Eigen::Vector3d(5.0, 0, 0));
+  body2->setExtForce(Eigen::Vector3s(5.0, 0, 0));
   world->addSkeleton(pendulum);
 
   ///////////////////////////////////////////////
@@ -167,14 +168,14 @@ TEST(GRADIENTS, PENDULUM_BLOCK)
       = block->createJointAndBodyNodePair<WeldJoint>(nullptr).second;
 
   // Give the body a shape
-  std::shared_ptr<BoxShape> box(new BoxShape(Eigen::Vector3d(1.0, 0.5, 0.5)));
+  std::shared_ptr<BoxShape> box(new BoxShape(Eigen::Vector3s(1.0, 0.5, 0.5)));
   auto shapeNode
       = body->createShapeNodeWith<VisualAspect, CollisionAspect>(box);
   shapeNode->getVisualAspect()->setColor(dart::Color::Black());
 
   // Put the body into position
-  Eigen::Isometry3d tf(Eigen::Isometry3d::Identity());
-  tf.translation() = Eigen::Vector3d(0.55, 0.0, -1.0);
+  Eigen::Isometry3s tf(Eigen::Isometry3s::Identity());
+  tf.translation() = Eigen::Vector3s(0.55, 0.0, -1.0);
   body->getParentJoint()->setTransformFromParentBodyNode(tf);
 
   world->addSkeleton(block);
@@ -185,9 +186,9 @@ TEST(GRADIENTS, PENDULUM_BLOCK)
 
   pendulum->computeForwardDynamics();
   pendulum->integrateVelocities(world->getTimeStep());
-  VectorXd timestepVel = pendulum->getVelocities();
+  VectorXs timestepVel = pendulum->getVelocities();
 
-  VectorXd worldVel = world->getVelocities();
+  VectorXs worldVel = world->getVelocities();
   // Test the classic formulation
   EXPECT_TRUE(verifyWorldGradients(world, worldVel));
 }
@@ -195,7 +196,7 @@ TEST(GRADIENTS, PENDULUM_BLOCK)
 
 // This is the margin so that finite-differencing over position doesn't break
 // contacts
-const double CONTACT_MARGIN = 1e-5;
+const s_t CONTACT_MARGIN = 1e-5;
 
 /******************************************************************************
 
@@ -215,8 +216,11 @@ There's a box with two DOFs, x and y axis, with a force driving it into the
 ground. The ground has configurable friction in this setup.
 
 */
-void testBlockWithFrictionCoeff(double frictionCoeff, double mass)
+void testBlockWithFrictionCoeff(s_t frictionCoeff, s_t mass)
 {
+  // set precision to 256 bits (s_t has only 53 bits)
+  mpfr::mpreal::set_default_prec(256);
+
   // World
   WorldPtr world = World::create();
 
@@ -232,16 +236,16 @@ void testBlockWithFrictionCoeff(double frictionCoeff, double mass)
   BodyNode* boxBody = pair.second;
 
   boxJoint->setXYPlane();
-  boxJoint->setTransformFromParentBodyNode(Eigen::Isometry3d::Identity());
-  boxJoint->setTransformFromChildBodyNode(Eigen::Isometry3d::Identity());
+  boxJoint->setTransformFromParentBodyNode(Eigen::Isometry3s::Identity());
+  boxJoint->setTransformFromChildBodyNode(Eigen::Isometry3s::Identity());
 
   std::shared_ptr<BoxShape> boxShape(
-      new BoxShape(Eigen::Vector3d(1.0, 1.0, 1.0)));
+      new BoxShape(Eigen::Vector3s(1.0, 1.0, 1.0)));
   boxBody->createShapeNodeWith<VisualAspect, CollisionAspect>(boxShape);
   boxBody->setFrictionCoeff(frictionCoeff);
 
   // Add a force driving the box down into the floor, and to the left
-  boxBody->addExtForce(Eigen::Vector3d(1, -1, 0));
+  boxBody->addExtForce(Eigen::Vector3s(1, -1, 0));
   // Prevent the mass matrix from being Identity
   boxBody->setMass(mass);
 
@@ -258,13 +262,13 @@ void testBlockWithFrictionCoeff(double frictionCoeff, double mass)
   WeldJoint* floorJoint = floorPair.first;
   BodyNode* floorBody = floorPair.second;
 
-  Eigen::Isometry3d floorPosition = Eigen::Isometry3d::Identity();
-  floorPosition.translation() = Eigen::Vector3d(0, -(1.0 - CONTACT_MARGIN), 0);
+  Eigen::Isometry3s floorPosition = Eigen::Isometry3s::Identity();
+  floorPosition.translation() = Eigen::Vector3s(0, -(1.0 - CONTACT_MARGIN), 0);
   floorJoint->setTransformFromParentBodyNode(floorPosition);
-  floorJoint->setTransformFromChildBodyNode(Eigen::Isometry3d::Identity());
+  floorJoint->setTransformFromChildBodyNode(Eigen::Isometry3s::Identity());
 
   std::shared_ptr<BoxShape> floorShape(
-      new BoxShape(Eigen::Vector3d(10.0, 1.0, 10.0)));
+      new BoxShape(Eigen::Vector3s(10.0, 1.0, 10.0)));
   floorBody->createShapeNodeWith<VisualAspect, CollisionAspect>(floorShape);
   floorBody->setFrictionCoeff(frictionCoeff);
 
@@ -276,10 +280,10 @@ void testBlockWithFrictionCoeff(double frictionCoeff, double mass)
 
   box->computeForwardDynamics();
   box->integrateVelocities(world->getTimeStep());
-  VectorXd timestepVel = box->getVelocities();
-  VectorXd timestepWorldVel = world->getVelocities();
+  VectorXs timestepVel = box->getVelocities();
+  VectorXs timestepWorldVel = world->getVelocities();
 
-  VectorXd worldVel = world->getVelocities();
+  VectorXs worldVel = world->getVelocities();
   // Test the classic formulation
   EXPECT_TRUE(verifyAnalyticalJacobians(world));
   EXPECT_TRUE(verifyVelGradients(world, worldVel));
@@ -346,7 +350,7 @@ void testSphereStack()
       = sphereA->createJointAndBodyNodePair<PrismaticJoint>(nullptr);
   PrismaticJoint* jointA = pairA.first;
   BodyNode* bodyA = pairA.second;
-  jointA->setAxis(Eigen::Vector3d::UnitY());
+  jointA->setAxis(Eigen::Vector3s::UnitY());
   bodyA->createShapeNodeWith<VisualAspect, CollisionAspect>(sphereShape);
   bodyA->setFrictionCoeff(0.0);
 
@@ -361,7 +365,7 @@ void testSphereStack()
       = sphereB->createJointAndBodyNodePair<PrismaticJoint>(nullptr);
   PrismaticJoint* jointB = pairB.first;
   BodyNode* bodyB = pairB.second;
-  jointB->setAxis(Eigen::Vector3d::UnitY());
+  jointB->setAxis(Eigen::Vector3s::UnitY());
   bodyB->createShapeNodeWith<VisualAspect, CollisionAspect>(sphereShape);
   bodyB->setFrictionCoeff(0.0);
 
@@ -375,42 +379,42 @@ void testSphereStack()
   // Run the tests
   ///////////////////////////////////////////////
 
-  VectorXd worldVel = world->getVelocities();
+  VectorXs worldVel = world->getVelocities();
   worldVel(0) = 0.01;
   worldVel(1) = -0.005;
   world->setVelocities(worldVel);
 
   /*
   std::shared_ptr<neural::BackpropSnapshot> snapshot =
-  neural::forwardPass(world, true); Eigen::MatrixXd forceVel =
+  neural::forwardPass(world, true); Eigen::MatrixXs forceVel =
   snapshot->getForceVelJacobian(world); std::cout << "force-vel" << std::endl <<
-  forceVel << std::endl; Eigen::MatrixXd velVel =
+  forceVel << std::endl; Eigen::MatrixXs velVel =
   snapshot->getVelVelJacobian(world); std::cout << "vel-vel" << std::endl <<
-  velVel << std::endl; Eigen::MatrixXd A_c =
+  velVel << std::endl; Eigen::MatrixXs A_c =
   snapshot->getClampingConstraintMatrix(world); std::cout << "A_c" << std::endl
-  << A_c << std::endl; Eigen::MatrixXd A_cc = snapshot->getClampingAMatrix();
+  << A_c << std::endl; Eigen::MatrixXs A_cc = snapshot->getClampingAMatrix();
   std::cout << "A_cc" << std::endl << A_cc << std::endl;
-  Eigen::MatrixXd Minv = snapshot->getInvMassMatrix(world);
+  Eigen::MatrixXs Minv = snapshot->getInvMassMatrix(world);
   std::cout << "Minv" << std::endl << Minv << std::endl;
-  Eigen::MatrixXd rel = Minv * A_c *
+  Eigen::MatrixXs rel = Minv * A_c *
   A_cc.completeOrthogonalDecomposition().pseudoInverse() * A_c.transpose();
   std::cout << "rel" << std::endl << rel << std::endl;
   // We want to push up the top sphere
-  Eigen::VectorXd lossWrtNextVel = Eigen::VectorXd::Zero(2);
+  Eigen::VectorXs lossWrtNextVel = Eigen::VectorXs::Zero(2);
   lossWrtNextVel(1) = 1.0;
   std::cout << "loss wrt v_t+1" << std::endl << lossWrtNextVel << std::endl;
   // Here are the resulting other losses
-  Eigen::VectorXd lossWrtForces = A_c.transpose() * lossWrtNextVel;
+  Eigen::VectorXs lossWrtForces = A_c.transpose() * lossWrtNextVel;
   std::cout << "loss wrt f_t" << std::endl << lossWrtForces << std::endl;
-  Eigen::VectorXd lossWrtVel = velVel.transpose() * lossWrtNextVel;
+  Eigen::VectorXs lossWrtVel = velVel.transpose() * lossWrtNextVel;
   std::cout << "loss wrt v_t" << std::endl << lossWrtVel << std::endl;
-  Eigen::VectorXd lossWrtControl = forceVel.transpose() * lossWrtNextVel;
+  Eigen::VectorXs lossWrtControl = forceVel.transpose() * lossWrtNextVel;
   std::cout << "loss wrt tau_t" << std::endl << lossWrtControl << std::endl;
   lossWrtControl(1) = 0.0;
   std::cout << "clipped loss wrt tau_t" << std::endl << lossWrtControl <<
-  std::endl; Eigen::VectorXd lossWrtNextVelRecovered = forceVel *
+  std::endl; Eigen::VectorXs lossWrtNextVelRecovered = forceVel *
   lossWrtControl; std::cout << "loss wrt v_t+1" << std::endl <<
-  lossWrtNextVelRecovered << std::endl; Eigen::VectorXd lossThroughLCP =
+  lossWrtNextVelRecovered << std::endl; Eigen::VectorXs lossThroughLCP =
   rel.transpose() * lossWrtNextVel; std::cout << "loss wrt v_t through LCP" <<
   std::endl << lossThroughLCP << std::endl;
   */
@@ -447,11 +451,11 @@ hard for the engine to handle.
 
 */
 void testTwoBlocks(
-    double leftPressingForce,
-    double rightPressingForce,
-    double frictionCoeff,
-    double leftMass,
-    double rightMass)
+    s_t leftPressingForce,
+    s_t rightPressingForce,
+    s_t frictionCoeff,
+    s_t leftMass,
+    s_t rightMass)
 {
   // World
   WorldPtr world = World::create();
@@ -467,14 +471,14 @@ void testTwoBlocks(
   PrismaticJoint* leftBoxJoint = leftBoxPair.first;
   BodyNode* leftBoxBody = leftBoxPair.second;
 
-  leftBoxJoint->setAxis(Eigen::Vector3d::UnitX());
-  Eigen::Isometry3d leftBoxPosition = Eigen::Isometry3d::Identity();
-  leftBoxPosition.translation() = Eigen::Vector3d(-0.5, 0, 0);
+  leftBoxJoint->setAxis(Eigen::Vector3s::UnitX());
+  Eigen::Isometry3s leftBoxPosition = Eigen::Isometry3s::Identity();
+  leftBoxPosition.translation() = Eigen::Vector3s(-0.5, 0, 0);
   leftBoxJoint->setTransformFromParentBodyNode(leftBoxPosition);
-  leftBoxJoint->setTransformFromChildBodyNode(Eigen::Isometry3d::Identity());
+  leftBoxJoint->setTransformFromChildBodyNode(Eigen::Isometry3s::Identity());
 
   std::shared_ptr<BoxShape> leftBoxShape(
-      new BoxShape(Eigen::Vector3d(1.0, 1.0, 1.0)));
+      new BoxShape(Eigen::Vector3s(1.0, 1.0, 1.0)));
   ShapeNode* leftBoxShapeNode
       = leftBoxBody->createShapeNodeWith<VisualAspect, CollisionAspect>(
           leftBoxShape);
@@ -482,7 +486,7 @@ void testTwoBlocks(
   leftBoxBody->setFrictionCoeff(frictionCoeff);
 
   // Add a force driving the box down into the floor, and to the right
-  leftBoxBody->addExtForce(Eigen::Vector3d(leftPressingForce, -1, 0));
+  leftBoxBody->addExtForce(Eigen::Vector3s(leftPressingForce, -1, 0));
   // Prevent the mass matrix from being Identity
   leftBoxBody->setMass(leftMass);
 
@@ -499,14 +503,14 @@ void testTwoBlocks(
   PrismaticJoint* rightBoxJoint = rightBoxPair.first;
   BodyNode* rightBoxBody = rightBoxPair.second;
 
-  rightBoxJoint->setAxis(Eigen::Vector3d::UnitX());
-  Eigen::Isometry3d rightBoxPosition = Eigen::Isometry3d::Identity();
-  rightBoxPosition.translation() = Eigen::Vector3d(0.5 - CONTACT_MARGIN, 0, 0);
+  rightBoxJoint->setAxis(Eigen::Vector3s::UnitX());
+  Eigen::Isometry3s rightBoxPosition = Eigen::Isometry3s::Identity();
+  rightBoxPosition.translation() = Eigen::Vector3s(0.5 - CONTACT_MARGIN, 0, 0);
   rightBoxJoint->setTransformFromParentBodyNode(rightBoxPosition);
-  rightBoxJoint->setTransformFromChildBodyNode(Eigen::Isometry3d::Identity());
+  rightBoxJoint->setTransformFromChildBodyNode(Eigen::Isometry3s::Identity());
 
   std::shared_ptr<BoxShape> rightBoxShape(
-      new BoxShape(Eigen::Vector3d(1.0, 2.0, 2.0)));
+      new BoxShape(Eigen::Vector3s(1.0, 2.0, 2.0)));
   ShapeNode* rightBoxShapeNode
       = rightBoxBody->createShapeNodeWith<VisualAspect, CollisionAspect>(
           rightBoxShape);
@@ -514,7 +518,7 @@ void testTwoBlocks(
   rightBoxShapeNode->setName("Right box shape");
 
   // Add a force driving the box down into the floor, and to the left
-  rightBoxBody->addExtForce(Eigen::Vector3d(-rightPressingForce, -1, 0));
+  rightBoxBody->addExtForce(Eigen::Vector3s(-rightPressingForce, -1, 0));
   // Prevent the mass matrix from being Identity
   rightBoxBody->setMass(rightMass);
 
@@ -526,13 +530,13 @@ void testTwoBlocks(
 
   leftBox->computeForwardDynamics();
   leftBox->integrateVelocities(world->getTimeStep());
-  VectorXd leftBoxVel = leftBox->getVelocities();
+  VectorXs leftBoxVel = leftBox->getVelocities();
 
   rightBox->computeForwardDynamics();
   rightBox->integrateVelocities(world->getTimeStep());
-  VectorXd rightBoxVel = rightBox->getVelocities();
+  VectorXs rightBoxVel = rightBox->getVelocities();
 
-  VectorXd worldVel = world->getVelocities();
+  VectorXs worldVel = world->getVelocities();
 
   /*
   world->getConstraintSolver()->solve();
@@ -598,7 +602,7 @@ ground. The ground and the block both have coefficients of restitution of 0.5.
 The ground has configurable friction in this setup.
 
 */
-void testBouncingBlockWithFrictionCoeff(double frictionCoeff, double mass)
+void testBouncingBlockWithFrictionCoeff(s_t frictionCoeff, s_t mass)
 {
   // World
   WorldPtr world = World::create();
@@ -615,16 +619,16 @@ void testBouncingBlockWithFrictionCoeff(double frictionCoeff, double mass)
   BodyNode* boxBody = pair.second;
 
   boxJoint->setXYPlane();
-  boxJoint->setTransformFromParentBodyNode(Eigen::Isometry3d::Identity());
-  boxJoint->setTransformFromChildBodyNode(Eigen::Isometry3d::Identity());
+  boxJoint->setTransformFromParentBodyNode(Eigen::Isometry3s::Identity());
+  boxJoint->setTransformFromChildBodyNode(Eigen::Isometry3s::Identity());
 
   std::shared_ptr<BoxShape> boxShape(
-      new BoxShape(Eigen::Vector3d(1.0, 1.0, 1.0)));
+      new BoxShape(Eigen::Vector3s(1.0, 1.0, 1.0)));
   boxBody->createShapeNodeWith<VisualAspect, CollisionAspect>(boxShape);
   boxBody->setFrictionCoeff(frictionCoeff);
 
   // Add a force driving the box to the left
-  boxBody->addExtForce(Eigen::Vector3d(1, -1, 0));
+  boxBody->addExtForce(Eigen::Vector3s(1, -1, 0));
   // Prevent the mass matrix from being Identity
   boxBody->setMass(mass);
   boxBody->setRestitutionCoeff(0.5);
@@ -644,13 +648,13 @@ void testBouncingBlockWithFrictionCoeff(double frictionCoeff, double mass)
   WeldJoint* floorJoint = floorPair.first;
   BodyNode* floorBody = floorPair.second;
 
-  Eigen::Isometry3d floorPosition = Eigen::Isometry3d::Identity();
-  floorPosition.translation() = Eigen::Vector3d(0, -(1.0 - CONTACT_MARGIN), 0);
+  Eigen::Isometry3s floorPosition = Eigen::Isometry3s::Identity();
+  floorPosition.translation() = Eigen::Vector3s(0, -(1.0 - CONTACT_MARGIN), 0);
   floorJoint->setTransformFromParentBodyNode(floorPosition);
-  floorJoint->setTransformFromChildBodyNode(Eigen::Isometry3d::Identity());
+  floorJoint->setTransformFromChildBodyNode(Eigen::Isometry3s::Identity());
 
   std::shared_ptr<BoxShape> floorShape(
-      new BoxShape(Eigen::Vector3d(10.0, 1.0, 10.0)));
+      new BoxShape(Eigen::Vector3s(10.0, 1.0, 10.0)));
   floorBody->createShapeNodeWith<VisualAspect, CollisionAspect>(floorShape);
   floorBody->setFrictionCoeff(1);
   floorBody->setRestitutionCoeff(1.0);
@@ -663,7 +667,7 @@ void testBouncingBlockWithFrictionCoeff(double frictionCoeff, double mass)
 
   box->computeForwardDynamics();
   box->integrateVelocities(world->getTimeStep());
-  VectorXd worldVel = world->getVelocities();
+  VectorXs worldVel = world->getVelocities();
 
   EXPECT_TRUE(verifyVelGradients(world, worldVel));
   EXPECT_TRUE(verifyAnalyticalBackprop(world));
@@ -697,7 +701,7 @@ the reverse pendulum, with a force driving it into the ground. The ground has
 configurable friction in this setup.
 
 */
-void testReversePendulumSledWithFrictionCoeff(double frictionCoeff)
+void testReversePendulumSledWithFrictionCoeff(s_t frictionCoeff)
 {
   // World
   WorldPtr world = World::create();
@@ -720,16 +724,16 @@ void testReversePendulumSledWithFrictionCoeff(double frictionCoeff)
   BodyNode* boxBody = pair.second;
 
   boxJoint->setXYPlane();
-  boxJoint->setTransformFromParentBodyNode(Eigen::Isometry3d::Identity());
-  boxJoint->setTransformFromChildBodyNode(Eigen::Isometry3d::Identity());
+  boxJoint->setTransformFromParentBodyNode(Eigen::Isometry3s::Identity());
+  boxJoint->setTransformFromChildBodyNode(Eigen::Isometry3s::Identity());
 
   std::shared_ptr<BoxShape> boxShape(
-      new BoxShape(Eigen::Vector3d(1.0, 1.0, 1.0)));
+      new BoxShape(Eigen::Vector3s(1.0, 1.0, 1.0)));
   boxBody->createShapeNodeWith<VisualAspect, CollisionAspect>(boxShape);
   boxBody->setFrictionCoeff(frictionCoeff);
 
   // Add a force driving the box down into the floor, and to the left
-  boxBody->addExtForce(Eigen::Vector3d(1, -10, 0));
+  boxBody->addExtForce(Eigen::Vector3s(1, -10, 0));
 
   // Create the reverse pendulum portion
 
@@ -743,14 +747,14 @@ void testReversePendulumSledWithFrictionCoeff(double frictionCoeff)
   RevoluteJoint* pendulumJoint = pendulumPair.first;
   BodyNode* pendulumBody = pendulumPair.second;
 
-  pendulumJoint->setTransformFromParentBodyNode(Eigen::Isometry3d::Identity());
-  Eigen::Isometry3d pendulumBodyPosition = Eigen::Isometry3d::Identity();
-  pendulumBodyPosition.translation() = Eigen::Vector3d(0, -1, 0);
+  pendulumJoint->setTransformFromParentBodyNode(Eigen::Isometry3s::Identity());
+  Eigen::Isometry3s pendulumBodyPosition = Eigen::Isometry3s::Identity();
+  pendulumBodyPosition.translation() = Eigen::Vector3s(0, -1, 0);
   pendulumJoint->setTransformFromChildBodyNode(pendulumBodyPosition);
-  pendulumJoint->setAxis(Eigen::Vector3d(0, 0, 1.0));
+  pendulumJoint->setAxis(Eigen::Vector3s(0, 0, 1.0));
   pendulumBody->setMass(200);
   std::shared_ptr<BoxShape> pendulumBodyShape(
-      new BoxShape(Eigen::Vector3d(0.5, 2.0, 0.5)));
+      new BoxShape(Eigen::Vector3s(0.5, 2.0, 0.5)));
   pendulumBody->createShapeNodeWith<VisualAspect>(pendulumBodyShape);
 
   world->addSkeleton(reversePendulumSled);
@@ -766,13 +770,13 @@ void testReversePendulumSledWithFrictionCoeff(double frictionCoeff)
   WeldJoint* floorJoint = floorPair.first;
   BodyNode* floorBody = floorPair.second;
 
-  Eigen::Isometry3d floorPosition = Eigen::Isometry3d::Identity();
-  floorPosition.translation() = Eigen::Vector3d(0, -(1.0 - 1e-2), 0);
+  Eigen::Isometry3s floorPosition = Eigen::Isometry3s::Identity();
+  floorPosition.translation() = Eigen::Vector3s(0, -(1.0 - 1e-2), 0);
   floorJoint->setTransformFromParentBodyNode(floorPosition);
-  floorJoint->setTransformFromChildBodyNode(Eigen::Isometry3d::Identity());
+  floorJoint->setTransformFromChildBodyNode(Eigen::Isometry3s::Identity());
 
   std::shared_ptr<BoxShape> floorShape(
-      new BoxShape(Eigen::Vector3d(10.0, 1.0, 10.0)));
+      new BoxShape(Eigen::Vector3s(10.0, 1.0, 10.0)));
   floorBody->createShapeNodeWith<VisualAspect, CollisionAspect>(floorShape);
   floorBody->setFrictionCoeff(frictionCoeff);
 
@@ -785,7 +789,7 @@ void testReversePendulumSledWithFrictionCoeff(double frictionCoeff)
   pendulumJoint->setPosition(0, 30 * 3.1415 / 180);
   reversePendulumSled->computeForwardDynamics();
   reversePendulumSled->integrateVelocities(world->getTimeStep());
-  VectorXd worldVel = world->getVelocities();
+  VectorXs worldVel = world->getVelocities();
 
   EXPECT_TRUE(verifyAnalyticalJacobians(world));
   EXPECT_TRUE(verifyVelGradients(world, worldVel));
@@ -820,11 +824,11 @@ ground. The ground and the block both have coefficients of restitution of 0.5.
 The ground has configurable friction in this setup.
 
 */
-void testBouncingBlockPosGradients(double frictionCoeff, double mass)
+void testBouncingBlockPosGradients(s_t frictionCoeff, s_t mass)
 {
   // World
   WorldPtr world = World::create();
-  world->setGravity(Eigen::Vector3d::Zero());
+  world->setGravity(Eigen::Vector3s::Zero());
 
   ///////////////////////////////////////////////
   // Create the box
@@ -838,16 +842,16 @@ void testBouncingBlockPosGradients(double frictionCoeff, double mass)
   BodyNode* boxBody = pair.second;
 
   boxJoint->setXYPlane();
-  boxJoint->setTransformFromParentBodyNode(Eigen::Isometry3d::Identity());
-  boxJoint->setTransformFromChildBodyNode(Eigen::Isometry3d::Identity());
+  boxJoint->setTransformFromParentBodyNode(Eigen::Isometry3s::Identity());
+  boxJoint->setTransformFromChildBodyNode(Eigen::Isometry3s::Identity());
 
   std::shared_ptr<BoxShape> boxShape(
-      new BoxShape(Eigen::Vector3d(1.0, 1.0, 1.0)));
+      new BoxShape(Eigen::Vector3s(1.0, 1.0, 1.0)));
   boxBody->createShapeNodeWith<VisualAspect, CollisionAspect>(boxShape);
   boxBody->setFrictionCoeff(frictionCoeff);
 
   // Add a force driving the box to the left
-  // boxBody->addExtForce(Eigen::Vector3d(1, -1, 0));
+  // boxBody->addExtForce(Eigen::Vector3s(1, -1, 0));
   // Prevent the mass matrix from being Identity
   boxBody->setMass(mass);
   boxBody->setRestitutionCoeff(0.5);
@@ -867,13 +871,13 @@ void testBouncingBlockPosGradients(double frictionCoeff, double mass)
   WeldJoint* floorJoint = floorPair.first;
   BodyNode* floorBody = floorPair.second;
 
-  Eigen::Isometry3d floorPosition = Eigen::Isometry3d::Identity();
-  floorPosition.translation() = Eigen::Vector3d(0, -(1.0 - 1e-5), 0);
+  Eigen::Isometry3s floorPosition = Eigen::Isometry3s::Identity();
+  floorPosition.translation() = Eigen::Vector3s(0, -(1.0 - 1e-5), 0);
   floorJoint->setTransformFromParentBodyNode(floorPosition);
-  floorJoint->setTransformFromChildBodyNode(Eigen::Isometry3d::Identity());
+  floorJoint->setTransformFromChildBodyNode(Eigen::Isometry3s::Identity());
 
   std::shared_ptr<BoxShape> floorShape(
-      new BoxShape(Eigen::Vector3d(10.0, 1.0, 10.0)));
+      new BoxShape(Eigen::Vector3s(10.0, 1.0, 10.0)));
   floorBody->createShapeNodeWith<VisualAspect, CollisionAspect>(floorShape);
   floorBody->setFrictionCoeff(1);
   floorBody->setRestitutionCoeff(1.0);
@@ -885,13 +889,13 @@ void testBouncingBlockPosGradients(double frictionCoeff, double mass)
   ///////////////////////////////////////////////
 
   // The analytical Jacobian needs us to be in actual contact
-  floorPosition.translation() = Eigen::Vector3d(0, -(1.0 - 1e-5), 0);
+  floorPosition.translation() = Eigen::Vector3s(0, -(1.0 - 1e-5), 0);
   neural::BackpropSnapshotPtr analyticalPtr = neural::forwardPass(world, true);
-  MatrixXd analytical = analyticalPtr->getPosPosJacobian(world);
+  MatrixXs analytical = analyticalPtr->getPosPosJacobian(world);
 
   // The FD Jacobian needs us to be just out of contact range, so the bounce can
   // occur on some step in computation
-  Eigen::MatrixXd bruteForce = Eigen::MatrixXd::Zero(2, 2);
+  Eigen::MatrixXs bruteForce = Eigen::MatrixXs::Zero(2, 2);
   // clang-format off
   bruteForce << 1, 0, 
                 0, -0.5;
@@ -952,7 +956,7 @@ void testMultigroup(int numGroups)
   for (std::size_t i = 0; i < numGroups; i++)
   {
     // This is where this group is going to be positioned along the x axis
-    double xOffset = i * 10;
+    s_t xOffset = i * 10;
 
     // Create the top box in the pair
 
@@ -964,17 +968,17 @@ void testMultigroup(int numGroups)
     BodyNode* topBoxBody = topBoxPair.second;
 
     topBoxJoint->setXYPlane();
-    Eigen::Isometry3d topBoxPosition = Eigen::Isometry3d::Identity();
+    Eigen::Isometry3s topBoxPosition = Eigen::Isometry3s::Identity();
     topBoxPosition.translation()
-        = Eigen::Vector3d(xOffset, 0.5 - CONTACT_MARGIN, 0);
+        = Eigen::Vector3s(xOffset, 0.5 - CONTACT_MARGIN, 0);
     topBoxJoint->setTransformFromParentBodyNode(topBoxPosition);
-    topBoxJoint->setTransformFromChildBodyNode(Eigen::Isometry3d::Identity());
+    topBoxJoint->setTransformFromChildBodyNode(Eigen::Isometry3s::Identity());
 
     std::shared_ptr<BoxShape> topBoxShape(
-        new BoxShape(Eigen::Vector3d(1.0, 1.0, 1.0)));
+        new BoxShape(Eigen::Vector3s(1.0, 1.0, 1.0)));
     topBoxBody->createShapeNodeWith<VisualAspect, CollisionAspect>(topBoxShape);
     topBoxBody->setFrictionCoeff(0.5);
-    topBoxBody->setExtForce(Eigen::Vector3d(0, -1.0, 0));
+    topBoxBody->setExtForce(Eigen::Vector3s(0, -1.0, 0));
 
     topBoxes.push_back(topBox);
 
@@ -988,18 +992,18 @@ void testMultigroup(int numGroups)
     BodyNode* bottomBoxBody = bottomBoxPair.second;
 
     bottomBoxJoint->setXYPlane();
-    Eigen::Isometry3d bottomBoxPosition = Eigen::Isometry3d::Identity();
-    bottomBoxPosition.translation() = Eigen::Vector3d(xOffset, -0.5, 0);
+    Eigen::Isometry3s bottomBoxPosition = Eigen::Isometry3s::Identity();
+    bottomBoxPosition.translation() = Eigen::Vector3s(xOffset, -0.5, 0);
     bottomBoxJoint->setTransformFromParentBodyNode(bottomBoxPosition);
     bottomBoxJoint->setTransformFromChildBodyNode(
-        Eigen::Isometry3d::Identity());
+        Eigen::Isometry3s::Identity());
 
     std::shared_ptr<BoxShape> bottomBoxShape(
-        new BoxShape(Eigen::Vector3d(2.0, 1.0, 2.0)));
+        new BoxShape(Eigen::Vector3s(2.0, 1.0, 2.0)));
     bottomBoxBody->createShapeNodeWith<VisualAspect, CollisionAspect>(
         bottomBoxShape);
     bottomBoxBody->setFrictionCoeff(1);
-    bottomBoxBody->setExtForce(Eigen::Vector3d(0, 1.0, 0));
+    bottomBoxBody->setExtForce(Eigen::Vector3s(0, 1.0, 0));
     // Make each group less symmetric
     bottomBoxBody->setMass(1.0 / (i + 1));
 
@@ -1021,7 +1025,7 @@ void testMultigroup(int numGroups)
   for (SkeletonPtr bottomBox : bottomBoxes)
     world->addSkeleton(bottomBox);
 
-  VectorXd worldVel = world->getVelocities();
+  VectorXs worldVel = world->getVelocities();
 
   EXPECT_TRUE(verifyVelGradients(world, worldVel));
   EXPECT_TRUE(verifyAnalyticalBackprop(world));
@@ -1062,7 +1066,7 @@ It's a robot arm, with a rotating base, with "numLinks" links and
 of the robot arm that it intersects with.
 */
 void testRobotArm(
-    std::size_t numLinks, double rotationRadians, int attachPoint = -1)
+    std::size_t numLinks, s_t rotationRadians, int attachPoint = -1)
 {
   // World
   WorldPtr world = World::create();
@@ -1075,14 +1079,14 @@ void testRobotArm(
   auto collision_detector
       = collision::CollisionDetector::getFactory()->create("dart");
   world->getConstraintSolver()->setCollisionDetector(collision_detector);
-  world->setGravity(Eigen::Vector3d(0, -9.81, 0));
+  world->setGravity(Eigen::Vector3s(0, -9.81, 0));
   world->setContactClippingDepth(1.);
 
   SkeletonPtr arm = Skeleton::create("arm");
   BodyNode* parent = nullptr;
 
   std::shared_ptr<BoxShape> boxShape(
-      new BoxShape(Eigen::Vector3d(1.0, 1.0, 1.0)));
+      new BoxShape(Eigen::Vector3s(1.0, 1.0, 1.0)));
 
   std::vector<BodyNode*> nodes;
 
@@ -1098,8 +1102,8 @@ void testRobotArm(
     nodes.push_back(jointPair.second);
     if (parent != nullptr)
     {
-      Eigen::Isometry3d armOffset = Eigen::Isometry3d::Identity();
-      armOffset.translation() = Eigen::Vector3d(0, 1.0, 0);
+      Eigen::Isometry3s armOffset = Eigen::Isometry3s::Identity();
+      armOffset.translation() = Eigen::Vector3s(0, 1.0, 0);
       jointPair.first->setTransformFromParentBodyNode(armOffset);
     }
     jointPair.second->setMass(1.0);
@@ -1118,17 +1122,17 @@ void testRobotArm(
   }
 
   std::shared_ptr<BoxShape> endShape(
-      new BoxShape(Eigen::Vector3d(1.0, 1.0, 1.0) * 1. / sqrt(2.0)));
+      new BoxShape(Eigen::Vector3s(1.0, 1.0, 1.0) * 1. / sqrt(2.0)));
   ShapeNode* endNode
       = parent->createShapeNodeWith<VisualAspect, CollisionAspect>(endShape);
   parent->setFrictionCoeff(1);
 
-  arm->setPositions(Eigen::VectorXd::Ones(arm->getNumDofs()) * rotationRadians);
+  arm->setPositions(Eigen::VectorXs::Ones(arm->getNumDofs()) * rotationRadians);
   world->addSkeleton(arm);
 
-  Eigen::Isometry3d worldTransform = parent->getWorldTransform();
-  Eigen::Matrix3d rotation
-      = math::eulerXYZToMatrix(Eigen::Vector3d(0, 45, -45) * 3.1415 / 180)
+  Eigen::Isometry3s worldTransform = parent->getWorldTransform();
+  Eigen::Matrix3s rotation
+      = math::eulerXYZToMatrix(Eigen::Vector3s(0, 45, -45) * 3.1415 / 180)
         * worldTransform.linear().transpose();
   endNode->setRelativeRotation(rotation);
 
@@ -1136,16 +1140,16 @@ void testRobotArm(
   std::pair<WeldJoint*, BodyNode*> jointPair
       = wall->createJointAndBodyNodePair<WeldJoint>(nullptr);
   std::shared_ptr<BoxShape> wallShape(
-      new BoxShape(Eigen::Vector3d(1.0, 10.0, 10.0)));
+      new BoxShape(Eigen::Vector3s(1.0, 10.0, 10.0)));
   // ShapeNode* wallNode =
   jointPair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(
       wallShape);
   world->addSkeleton(wall);
   // jointPair.second->setFrictionCoeff(0.0);
 
-  Eigen::Isometry3d wallLocalOffset = Eigen::Isometry3d::Identity();
+  Eigen::Isometry3s wallLocalOffset = Eigen::Isometry3s::Identity();
   wallLocalOffset.translation() = parent->getWorldTransform().translation()
-                                  + Eigen::Vector3d(-(1.0 - 1e-2), 0.0, 0.0);
+                                  + Eigen::Vector3s(-(1.0 - 1e-2), 0.0, 0.0);
   jointPair.first->setTransformFromParentBodyNode(wallLocalOffset);
 
   // arm->computeForwardDynamics();
@@ -1154,11 +1158,11 @@ void testRobotArm(
   // -0.323 at 5.0
   if (numLinks == 5)
   {
-    arm->setVelocities(Eigen::VectorXd::Ones(arm->getNumDofs()) * -0.05);
+    arm->setVelocities(Eigen::VectorXs::Ones(arm->getNumDofs()) * -0.05);
   }
   if (numLinks == 6 || numLinks == 3)
   {
-    arm->setVelocities(Eigen::VectorXd::Ones(arm->getNumDofs()) * 0.05);
+    arm->setVelocities(Eigen::VectorXs::Ones(arm->getNumDofs()) * 0.05);
   }
 
   // // Run collision detection
@@ -1175,14 +1179,14 @@ void testRobotArm(
   //             << wallNode->getWorldTransform().matrix() << std::endl;
   // }
 
-  Eigen::VectorXd worldVel = world->getVelocities();
+  Eigen::VectorXs worldVel = world->getVelocities();
 
   // // visual inspection code
-  // Eigen::VectorXd worldPos = world->getPositions();
+  // Eigen::VectorXs worldPos = world->getPositions();
   // server::GUIWebsocketServer server;
   // server.serve(8070);
   // server.renderWorld(world);
-  // Eigen::VectorXd animatePos = worldPos;
+  // Eigen::VectorXs animatePos = worldPos;
   // int i = 0;
   // realtime::Ticker ticker(0.01);
   // ticker.registerTickListener([&](long /* time */) {
@@ -1248,24 +1252,24 @@ It's a robot arm, with a rotating base, with "numLinks" links and
 "rotationDegree" position at each link. There's also a fixed plane at the end
 of the robot arm that it intersects with.
 */
-void testCartpole(double rotationRadians)
+void testCartpole(s_t rotationRadians)
 {
   // World
   WorldPtr world = World::create();
-  world->setGravity(Eigen::Vector3d(0, -9.81, 0));
+  world->setGravity(Eigen::Vector3s(0, -9.81, 0));
 
   SkeletonPtr cartpole = Skeleton::create("cartpole");
 
   std::pair<PrismaticJoint*, BodyNode*> sledPair
       = cartpole->createJointAndBodyNodePair<PrismaticJoint>(nullptr);
-  sledPair.first->setAxis(Eigen::Vector3d(1, 0, 0));
+  sledPair.first->setAxis(Eigen::Vector3s(1, 0, 0));
 
   std::pair<RevoluteJoint*, BodyNode*> armPair
       = cartpole->createJointAndBodyNodePair<RevoluteJoint>(sledPair.second);
-  armPair.first->setAxis(Eigen::Vector3d(0, 0, 1));
+  armPair.first->setAxis(Eigen::Vector3s(0, 0, 1));
 
-  Eigen::Isometry3d armOffset = Eigen::Isometry3d::Identity();
-  armOffset.translation() = Eigen::Vector3d(0, -0.5, 0);
+  Eigen::Isometry3s armOffset = Eigen::Isometry3s::Identity();
+  armOffset.translation() = Eigen::Vector3s(0, -0.5, 0);
   armPair.first->setTransformFromChildBodyNode(armOffset);
 
   /*
@@ -1294,14 +1298,14 @@ void testCartpole(double rotationRadians)
   cartpole->computeForwardDynamics();
   cartpole->integrateVelocities(world->getTimeStep());
 
-  VectorXd worldVel = world->getVelocities();
+  VectorXs worldVel = world->getVelocities();
 
   EXPECT_TRUE(verifyVelGradients(world, worldVel));
   EXPECT_TRUE(verifyWrtMass(world));
   EXPECT_TRUE(verifyAnalyticalBackprop(world));
   EXPECT_TRUE(verifyGradientBackprop(world, 20, [](WorldPtr world) {
-    Eigen::VectorXd pos = world->getPositions();
-    Eigen::VectorXd vel = world->getVelocities();
+    Eigen::VectorXs pos = world->getPositions();
+    Eigen::VectorXs vel = world->getVelocities();
     return (pos[0] * pos[0]) + (pos[1] * pos[1]) + (vel[0] * vel[0])
            + (vel[1] * vel[1]);
   }));
@@ -1322,7 +1326,7 @@ TEST(GRADIENTS, CARTPOLE_15_DEG)
 TEST(GRADIENTS, EMPTY_WORLD)
 {
   WorldPtr world = World::create();
-  VectorXd worldVel = world->getVelocities();
+  VectorXs worldVel = world->getVelocities();
   EXPECT_TRUE(verifyVelGradients(world, worldVel));
   EXPECT_TRUE(verifyAnalyticalBackprop(world));
 }
@@ -1332,7 +1336,7 @@ TEST(GRADIENTS, EMPTY_SKELETON)
   WorldPtr world = World::create();
   SkeletonPtr empty = Skeleton::create("empty");
   world->addSkeleton(empty);
-  VectorXd worldVel = world->getVelocities();
+  VectorXs worldVel = world->getVelocities();
   EXPECT_TRUE(verifyVelGradients(world, worldVel));
   EXPECT_TRUE(verifyAnalyticalBackprop(world));
 }
@@ -1342,16 +1346,16 @@ TEST(GRADIENTS, EMPTY_SKELETON)
 // Checking the trajectory optimizations
 ///////////////////////////////////////////////////////////////////////////////
 
-BodyNode* createTailSegment(BodyNode* parent, Eigen::Vector3d color)
+BodyNode* createTailSegment(BodyNode* parent, Eigen::Vector3s color)
 {
   std::pair<RevoluteJoint*, BodyNode*> poleJointPair
       = parent->createChildJointAndBodyNodePair<RevoluteJoint>();
   RevoluteJoint* poleJoint = poleJointPair.first;
   BodyNode* pole = poleJointPair.second;
-  poleJoint->setAxis(Eigen::Vector3d::UnitZ());
+  poleJoint->setAxis(Eigen::Vector3s::UnitZ());
 
   std::shared_ptr<BoxShape> shape(
-      new BoxShape(Eigen::Vector3d(0.05, 0.25, 0.05)));
+      new BoxShape(Eigen::Vector3s(0.05, 0.25, 0.05)));
   ShapeNode* poleShape
       = pole->createShapeNodeWith<VisualAspect, CollisionAspect>(shape);
   poleShape->getVisualAspect()->setColor(color);
@@ -1360,15 +1364,15 @@ BodyNode* createTailSegment(BodyNode* parent, Eigen::Vector3d color)
   poleJoint->setVelocityUpperLimit(0, 10000.0);
   poleJoint->setVelocityLowerLimit(0, -10000.0);
 
-  Eigen::Isometry3d poleOffset = Eigen::Isometry3d::Identity();
-  poleOffset.translation() = Eigen::Vector3d(0, -0.125, 0);
+  Eigen::Isometry3s poleOffset = Eigen::Isometry3s::Identity();
+  poleOffset.translation() = Eigen::Vector3s(0, -0.125, 0);
   poleJoint->setTransformFromChildBodyNode(poleOffset);
   poleJoint->setPosition(0, 90 * 3.1415 / 180);
 
   if (parent->getParentBodyNode() != nullptr)
   {
-    Eigen::Isometry3d childOffset = Eigen::Isometry3d::Identity();
-    childOffset.translation() = Eigen::Vector3d(0, 0.125, 0);
+    Eigen::Isometry3s childOffset = Eigen::Isometry3s::Identity();
+    childOffset.translation() = Eigen::Vector3s(0, 0.125, 0);
     poleJoint->setTransformFromParentBodyNode(childOffset);
   }
 
@@ -1379,7 +1383,7 @@ void testJumpWorm(bool offGround, bool interpenetration)
 {
   // World
   WorldPtr world = World::create();
-  world->setGravity(Eigen::Vector3d(0, -9.81, 0));
+  world->setGravity(Eigen::Vector3s(0, -9.81, 0));
 
   // Set up the LCP solver to be super super accurate, so our
   // finite-differencing tests don't fail due to LCP errors. This isn't
@@ -1396,10 +1400,10 @@ void testJumpWorm(bool offGround, bool interpenetration)
   TranslationalJoint2D* rootJoint = rootJointPair.first;
   BodyNode* root = rootJointPair.second;
 
-  std::shared_ptr<BoxShape> shape(new BoxShape(Eigen::Vector3d(0.1, 0.1, 0.1)));
+  std::shared_ptr<BoxShape> shape(new BoxShape(Eigen::Vector3s(0.1, 0.1, 0.1)));
   ShapeNode* rootVisual
       = root->createShapeNodeWith<VisualAspect, CollisionAspect>(shape);
-  Eigen::Vector3d black = Eigen::Vector3d::Zero();
+  Eigen::Vector3s black = Eigen::Vector3s::Zero();
   rootVisual->getVisualAspect()->setColor(black);
   rootJoint->setForceUpperLimit(0, 0);
   rootJoint->setForceLowerLimit(0, 0);
@@ -1411,14 +1415,14 @@ void testJumpWorm(bool offGround, bool interpenetration)
   rootJoint->setVelocityLowerLimit(1, -1000.0);
 
   BodyNode* tail1 = createTailSegment(
-      root, Eigen::Vector3d(182.0 / 255, 223.0 / 255, 144.0 / 255));
+      root, Eigen::Vector3s(182.0 / 255, 223.0 / 255, 144.0 / 255));
   BodyNode* tail2 = createTailSegment(
-      tail1, Eigen::Vector3d(223.0 / 255, 228.0 / 255, 163.0 / 255));
+      tail1, Eigen::Vector3s(223.0 / 255, 228.0 / 255, 163.0 / 255));
   // BodyNode* tail3 =
   createTailSegment(
-      tail2, Eigen::Vector3d(221.0 / 255, 193.0 / 255, 121.0 / 255));
+      tail2, Eigen::Vector3s(221.0 / 255, 193.0 / 255, 121.0 / 255));
 
-  Eigen::VectorXd pos = Eigen::VectorXd(5);
+  Eigen::VectorXs pos = Eigen::VectorXs(5);
   pos << 0, 0, 90, 90, 45;
   jumpworm->setPositions(pos * 3.1415 / 180);
 
@@ -1432,11 +1436,11 @@ void testJumpWorm(bool offGround, bool interpenetration)
       = floor->createJointAndBodyNodePair<WeldJoint>(nullptr);
   WeldJoint* floorJoint = floorJointPair.first;
   BodyNode* floorBody = floorJointPair.second;
-  Eigen::Isometry3d floorOffset = Eigen::Isometry3d::Identity();
-  floorOffset.translation() = Eigen::Vector3d(0, offGround ? -0.7 : -0.56, 0);
+  Eigen::Isometry3s floorOffset = Eigen::Isometry3s::Identity();
+  floorOffset.translation() = Eigen::Vector3s(0, offGround ? -0.7 : -0.56, 0);
   floorJoint->setTransformFromParentBodyNode(floorOffset);
   std::shared_ptr<BoxShape> floorShape(
-      new BoxShape(Eigen::Vector3d(2.5, 0.25, 0.5)));
+      new BoxShape(Eigen::Vector3s(2.5, 0.25, 0.5)));
   // ShapeNode* floorVisual =
   floorBody->createShapeNodeWith<VisualAspect, CollisionAspect>(floorShape);
   floorBody->setFrictionCoeff(0);
@@ -1451,21 +1455,21 @@ void testJumpWorm(bool offGround, bool interpenetration)
 
   if (interpenetration)
   {
-    Eigen::VectorXd initialPos = Eigen::VectorXd(5);
+    Eigen::VectorXs initialPos = Eigen::VectorXs(5);
     initialPos << 0.96352, -0.5623, -0.0912082, 0.037308, 0.147683;
     // Initial vel
-    Eigen::VectorXd initialVel = Eigen::VectorXd(5);
+    Eigen::VectorXs initialVel = Eigen::VectorXs(5);
     initialVel << 0.110462, 0.457093, 0.257748, 0.592256, 0.167432;
 
     world->setPositions(initialPos);
     world->setVelocities(initialVel);
 
     /*
-    Eigen::VectorXd brokenPos = Eigen::VectorXd::Zero(5);
+    Eigen::VectorXs brokenPos = Eigen::VectorXs::Zero(5);
     brokenPos << -0.0223332, -0.345524, 1.15215, 1.99026, 1.49591;
-    Eigen::VectorXd brokenVel = Eigen::VectorXd::Zero(5);
+    Eigen::VectorXs brokenVel = Eigen::VectorXs::Zero(5);
     brokenVel << -0.0635003, -2.1615, -1.19201, 1.19774, 2.11499;
-    Eigen::VectorXd brokenForce = Eigen::VectorXd::Zero(5);
+    Eigen::VectorXs brokenForce = Eigen::VectorXs::Zero(5);
     brokenForce << 0, 0, 0.00564396, -0.0037863, -0.00587224;
     world->setPositions(brokenPos);
     world->setVelocities(brokenVel);
@@ -1473,7 +1477,7 @@ void testJumpWorm(bool offGround, bool interpenetration)
     */
   }
 
-  Eigen::VectorXd vels = world->getVelocities();
+  Eigen::VectorXs vels = world->getVelocities();
 
   // renderWorld(world);
 
@@ -1485,14 +1489,14 @@ void testJumpWorm(bool offGround, bool interpenetration)
   // EXPECT_TRUE(verifyAnalyticalBackprop(world));
 
   /*
-  std::function<double(WorldPtr)> loss = [](WorldPtr world) {
-    Eigen::VectorXd pos = world->getPositions();
-    Eigen::VectorXd vel = world->getVelocities();
+  std::function<s_t(WorldPtr)> loss = [](WorldPtr world) {
+    Eigen::VectorXs pos = world->getPositions();
+    Eigen::VectorXs vel = world->getVelocities();
     return (pos[0] * pos[0]) + (pos[1] * pos[1]) + (vel[0] * vel[0])
            + (vel[1] * vel[1]);
   };
   // Test to make sure the loss lambda doesn't crash
-  double l = loss(world);
+  s_t l = loss(world);
   EXPECT_TRUE(verifyGradientBackprop(world, 50, loss));
   */
 }
@@ -1540,11 +1544,11 @@ ground. The ground has configurable friction in this setup.
 
 */
 void testFreeBlockWithFrictionCoeff(
-    double frictionCoeff, double mass, bool largeInitialVelocity)
+    s_t frictionCoeff, s_t mass, bool largeInitialVelocity)
 {
   // World
   WorldPtr world = World::create();
-  world->setGravity(Eigen::Vector3d::UnitY() * -9.81);
+  world->setGravity(Eigen::Vector3s::UnitY() * -9.81);
   world->setPenetrationCorrectionEnabled(false);
 
   // Set up the LCP solver to be super super accurate, so our
@@ -1566,18 +1570,18 @@ void testFreeBlockWithFrictionCoeff(
   FreeJoint* boxJoint = pair.first;
   BodyNode* boxBody = pair.second;
 
-  Eigen::Isometry3d fromParent = Eigen::Isometry3d::Identity();
-  fromParent.translation() = Eigen::Vector3d::UnitX();
+  Eigen::Isometry3s fromParent = Eigen::Isometry3s::Identity();
+  fromParent.translation() = Eigen::Vector3s::UnitX();
   boxJoint->setTransformFromParentBodyNode(fromParent);
 
-  Eigen::Isometry3d fromChild = Eigen::Isometry3d::Identity();
-  fromChild.translation() = Eigen::Vector3d::UnitX() * -2;
+  Eigen::Isometry3s fromChild = Eigen::Isometry3s::Identity();
+  fromChild.translation() = Eigen::Vector3s::UnitX() * -2;
   fromChild = fromChild.rotate(
-      Eigen::AngleAxis<double>(M_PI_2, Eigen::Vector3d::UnitX()));
+      Eigen::AngleAxis<s_t>(M_PI_2, Eigen::Vector3s::UnitX()));
   boxJoint->setTransformFromChildBodyNode(fromChild);
 
   std::shared_ptr<BoxShape> boxShape(
-      new BoxShape(Eigen::Vector3d(1.0, 1.0, 1.0)));
+      new BoxShape(Eigen::Vector3s(1.0, 1.0, 1.0)));
   boxBody->createShapeNodeWith<VisualAspect, CollisionAspect>(boxShape);
   boxBody->setFrictionCoeff(frictionCoeff);
   // Prevent the mass matrix from being Identity
@@ -1588,7 +1592,7 @@ void testFreeBlockWithFrictionCoeff(
   box->setPosition(1, 90 * M_PI / 180);
 
   // Add a force driving the box down into the floor, and to the left
-  boxBody->addExtForce(Eigen::Vector3d(1, -1, 0));
+  boxBody->addExtForce(Eigen::Vector3s(1, -1, 0));
 
   world->addSkeleton(box);
 
@@ -1617,13 +1621,13 @@ void testFreeBlockWithFrictionCoeff(
   WeldJoint* floorJoint = floorPair.first;
   BodyNode* floorBody = floorPair.second;
 
-  Eigen::Isometry3d floorPosition = Eigen::Isometry3d::Identity();
-  floorPosition.translation() = Eigen::Vector3d(0, -(1.0 - 1e-2), 0);
+  Eigen::Isometry3s floorPosition = Eigen::Isometry3s::Identity();
+  floorPosition.translation() = Eigen::Vector3s(0, -(1.0 - 1e-2), 0);
   floorJoint->setTransformFromParentBodyNode(floorPosition);
-  floorJoint->setTransformFromChildBodyNode(Eigen::Isometry3d::Identity());
+  floorJoint->setTransformFromChildBodyNode(Eigen::Isometry3s::Identity());
 
   std::shared_ptr<BoxShape> floorShape(
-      new BoxShape(Eigen::Vector3d(10.0, 1.0, 10.0)));
+      new BoxShape(Eigen::Vector3s(10.0, 1.0, 10.0)));
   floorBody->createShapeNodeWith<VisualAspect, CollisionAspect>(floorShape);
   floorBody->setFrictionCoeff(frictionCoeff);
 
@@ -1635,8 +1639,8 @@ void testFreeBlockWithFrictionCoeff(
 
   box->computeForwardDynamics();
   box->integrateVelocities(world->getTimeStep());
-  VectorXd timestepVel = box->getVelocities();
-  VectorXd timestepWorldVel = world->getVelocities();
+  VectorXs timestepVel = box->getVelocities();
+  VectorXs timestepWorldVel = world->getVelocities();
 
   world->step(true);
 
@@ -1656,7 +1660,7 @@ void testFreeBlockWithFrictionCoeff(
   }
   */
 
-  VectorXd worldVel = world->getVelocities();
+  VectorXs worldVel = world->getVelocities();
   // Test the classic formulation
   EXPECT_TRUE(verifyNextV(world));
 

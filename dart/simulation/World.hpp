@@ -123,16 +123,16 @@ public:
   const std::string& getName() const;
 
   /// Set gravity
-  void setGravity(const Eigen::Vector3d& _gravity);
+  void setGravity(const Eigen::Vector3s& _gravity);
 
   /// Get gravity
-  const Eigen::Vector3d& getGravity() const;
+  const Eigen::Vector3s& getGravity() const;
 
   /// Set time step
-  void setTimeStep(double _timeStep);
+  void setTimeStep(s_t _timeStep);
 
   /// Get time step
-  double getTimeStep() const;
+  s_t getTimeStep() const;
 
   //--------------------------------------------------------------------------
   // Structural Properties
@@ -221,127 +221,127 @@ public:
   void tuneMass(
       dynamics::BodyNode* node,
       neural::WrtMassBodyNodeEntryType type,
-      Eigen::VectorXd upperBound,
-      Eigen::VectorXd lowerBound);
+      Eigen::VectorXs upperBound,
+      Eigen::VectorXs lowerBound);
 
   /// Returns the size of the getLinkMasses() vector
   std::size_t getNumBodyNodes();
 
   /// Gets the position of all the skeletons in the world concatenated together
   /// as a single vector
-  Eigen::VectorXd getPositions();
+  Eigen::VectorXs getPositions();
 
   /// Gets the velocity of all the skeletons in the world concatenated together
   /// as a single vector
-  Eigen::VectorXd getVelocities();
+  Eigen::VectorXs getVelocities();
 
   /// Gets the acceleration of all the skeletons in the world concatenated
   /// together as a single vector
-  Eigen::VectorXd getAccelerations();
+  Eigen::VectorXs getAccelerations();
 
   /// Gets the torques of all the skeletons in the world concatenated together
   /// as a single vector
-  Eigen::VectorXd getExternalForces();
+  Eigen::VectorXs getExternalForces();
 
   /// Gets the masses of all the nodes in the world concatenated together as a
   /// single vector
-  Eigen::VectorXd getMasses();
+  Eigen::VectorXs getMasses();
 
   // This gives the vector of force upper limits for all the DOFs in this
   // world
-  Eigen::VectorXd getExternalForceUpperLimits();
+  Eigen::VectorXs getExternalForceUpperLimits();
 
   // This gives the vector of force lower limits for all the DOFs in this
   // world
-  Eigen::VectorXd getExternalForceLowerLimits();
+  Eigen::VectorXs getExternalForceLowerLimits();
 
   // This gives the vector of position upper limits for all the DOFs in this
   // world
-  Eigen::VectorXd getPositionUpperLimits();
+  Eigen::VectorXs getPositionUpperLimits();
 
   // This gives the vector of position lower limits for all the DOFs in this
   // world
-  Eigen::VectorXd getPositionLowerLimits();
+  Eigen::VectorXs getPositionLowerLimits();
 
   // This gives the vector of position upper limits for all the DOFs in this
   // world
-  Eigen::VectorXd getVelocityUpperLimits();
+  Eigen::VectorXs getVelocityUpperLimits();
 
   // This gives the vector of position lower limits for all the DOFs in this
   // world
-  Eigen::VectorXd getVelocityLowerLimits();
+  Eigen::VectorXs getVelocityLowerLimits();
 
   // This gives the vector of mass upper limits for all the registered bodies in
   // this world
-  Eigen::VectorXd getMassUpperLimits();
+  Eigen::VectorXs getMassUpperLimits();
 
   // This gives the vector of mass lower limits for all the registered bodies in
   // this world
-  Eigen::VectorXd getMassLowerLimits();
+  Eigen::VectorXs getMassLowerLimits();
 
   // This gets all the inertia matrices for all the links in all the skeletons
   // in the world mapped into a flat vector.
-  Eigen::VectorXd getLinkCOMs();
+  Eigen::VectorXs getLinkCOMs();
 
   // This gets all the inertia moment-of-inertia paremeters for all the links in
   // all the skeletons in this world concatenated together
-  Eigen::VectorXd getLinkMOIs();
+  Eigen::VectorXs getLinkMOIs();
 
   // This returns a vector of all the link masses for all the skeletons in the
   // world concatenated into a flat vector.
-  Eigen::VectorXd getLinkMasses();
+  Eigen::VectorXs getLinkMasses();
 
   /// Sets the position of all the skeletons in the world from a single
   /// concatenated state vector
-  void setPositions(Eigen::VectorXd position);
+  void setPositions(Eigen::VectorXs position);
 
   /// Sets the velocities of all the skeletons in the world from a single
   /// concatenated state vector
-  void setVelocities(Eigen::VectorXd velocity);
+  void setVelocities(Eigen::VectorXs velocity);
 
   /// Sets the accelerations of all the skeletons in the world from a single
   /// concatenated state vector
-  void setAccelerations(Eigen::VectorXd acceleration);
+  void setAccelerations(Eigen::VectorXs acceleration);
 
   /// Sets the forces of all the skeletons in the world from a single
   /// concatenated state vector
-  void setExternalForces(Eigen::VectorXd torques);
+  void setExternalForces(Eigen::VectorXs torques);
 
   // Sets the upper limits of all the joints from a single vector
-  void setExternalForceUpperLimits(Eigen::VectorXd limits);
+  void setExternalForceUpperLimits(Eigen::VectorXs limits);
 
   // Sets the lower limits of all the joints from a single vector
-  void setExternalForceLowerLimits(Eigen::VectorXd limits);
+  void setExternalForceLowerLimits(Eigen::VectorXs limits);
 
   // Sets the upper limits of all the joints from a single vector
-  void setPositionUpperLimits(Eigen::VectorXd limits);
+  void setPositionUpperLimits(Eigen::VectorXs limits);
 
   // Sets the lower limits of all the joints from a single vector
-  void setPositionLowerLimits(Eigen::VectorXd limits);
+  void setPositionLowerLimits(Eigen::VectorXs limits);
 
   // Sets the upper limits of all the joints from a single vector
-  void setVelocityUpperLimits(Eigen::VectorXd limits);
+  void setVelocityUpperLimits(Eigen::VectorXs limits);
 
   // Sets the lower limits of all the joints from a single vector
-  void setVelocityLowerLimits(Eigen::VectorXd limits);
+  void setVelocityLowerLimits(Eigen::VectorXs limits);
 
   // This sets all the masses for all the registered bodies in the world
-  void setMasses(Eigen::VectorXd masses);
+  void setMasses(Eigen::VectorXs masses);
 
   /// This gives the C(pos, vel) vector for all the skeletons in the world,
   /// without accounting for the external forces
-  Eigen::VectorXd getCoriolisAndGravityForces();
+  Eigen::VectorXs getCoriolisAndGravityForces();
 
   /// This gives the C(pos, vel) vector for all the skeletons in the world
-  Eigen::VectorXd getCoriolisAndGravityAndExternalForces();
+  Eigen::VectorXs getCoriolisAndGravityAndExternalForces();
 
   /// This constructs a mass matrix for the whole world, by creating a
   /// block-diagonal concatenation of each skeleton's mass matrix.
-  Eigen::MatrixXd getMassMatrix();
+  Eigen::MatrixXs getMassMatrix();
 
   /// This constructs an inverse mass matrix for the whole world, by creating a
   /// block-diagonal concatenation of each skeleton's inverse mass matrix.
-  Eigen::MatrixXd getInvMassMatrix();
+  Eigen::MatrixXs getInvMassMatrix();
 
   //--------------------------------------------------------------------------
   // Collision checking
@@ -382,10 +382,10 @@ public:
   void integrateVelocities();
 
   /// Set current time
-  void setTime(double _time);
+  void setTime(s_t _time);
 
   /// Get current time
-  double getTime() const;
+  s_t getTime() const;
 
   /// Get the number of simulated frames
   ///
@@ -421,21 +421,21 @@ public:
 
   /// Get the unconstrained velocities that we found in the last timestep,
   /// before we solved the LCP for constraints
-  const Eigen::VectorXd& getLastPreConstraintVelocity() const;
+  const Eigen::VectorXs& getLastPreConstraintVelocity() const;
 
   /// This gets the Jacobian relating how changing our current position will
   /// change our next position after a step. Intuitively, you'd expect this to
   /// just be an identity matrix, and often it is, but if we have any FreeJoints
   /// or BallJoints things get more complicated, because they actually use a
   /// complicated function to integrate to the next position.
-  Eigen::MatrixXd getPosPosJacobian() const;
+  Eigen::MatrixXs getPosPosJacobian() const;
 
   /// This gets the Jacobian relating how changing our current velocity will
   /// change our next position after a step. Intuitively, you'd expect this to
   /// just be an identity matrix * dt, and often it is, but if we have any
   /// FreeJoints or BallJoints things get more complicated, because they
   /// actually use a complicated function to integrate to the next position.
-  Eigen::MatrixXd getVelPosJacobian() const;
+  Eigen::MatrixXs getVelPosJacobian() const;
 
   /// True if we want to update p_{t+1} as f(p_t, v_t), rather than the old
   /// f(p_t, v_{t+1}). This makes it much easier to reason about
@@ -462,19 +462,19 @@ public:
   /// to prevent numerical accuracy issues during the backprop computations. We
   /// don't use this on most timesteps, so a relatively large CFM constant
   /// shouldn't affect simulation accuracy.
-  void setFallbackConstraintForceMixingConstant(double constant);
+  void setFallbackConstraintForceMixingConstant(s_t constant);
 
-  double getFallbackConstraintForceMixingConstant();
-
-  /// Contacts whose penetrationDepth is deeper than this depth will be ignored.
-  /// This is a simple solution to avoid extremely nasty situations with
-  /// impossibly deep inter-penetration during multiple shooting optimization.
-  void setContactClippingDepth(double depth);
+  s_t getFallbackConstraintForceMixingConstant();
 
   /// Contacts whose penetrationDepth is deeper than this depth will be ignored.
   /// This is a simple solution to avoid extremely nasty situations with
   /// impossibly deep inter-penetration during multiple shooting optimization.
-  double getContactClippingDepth();
+  void setContactClippingDepth(s_t depth);
+
+  /// Contacts whose penetrationDepth is deeper than this depth will be ignored.
+  /// This is a simple solution to avoid extremely nasty situations with
+  /// impossibly deep inter-penetration during multiple shooting optimization.
+  s_t getContactClippingDepth();
 
   /// This returns the object that we're using to keep track of which objects in
   /// the world need gradients through which kinds of mass.
@@ -494,12 +494,12 @@ public:
   /// This gets the cached LCP solution, which is useful to be able to get/set
   /// because it can effect the forward solutions of physics problems because of
   /// our optimistic LCP-stabilization-to-acceptance approach.
-  Eigen::VectorXd getCachedLCPSolution();
+  Eigen::VectorXs getCachedLCPSolution();
 
   /// This gets the cached LCP solution, which is useful to be able to get/set
   /// because it can effect the forward solutions of physics problems because of
   /// our optimistic LCP-stabilization-to-acceptance approach.
-  void setCachedLCPSolution(Eigen::VectorXd X);
+  void setCachedLCPSolution(Eigen::VectorXs X);
 
   /// If this is true, we use finite-differencing to compute all of the
   /// requested Jacobians. This override can be useful to verify if there's a
@@ -575,13 +575,13 @@ protected:
   std::size_t mDofs;
 
   /// Gravity
-  Eigen::Vector3d mGravity;
+  Eigen::Vector3s mGravity;
 
   /// Simulation time step
-  double mTimeStep;
+  s_t mTimeStep;
 
   /// Current simulation time
-  double mTime;
+  s_t mTime;
 
   /// Current simulation frame number
   int mFrame;
@@ -594,7 +594,7 @@ protected:
 
   /// This holds the unconstrained velocities that we found in the last
   /// timestep, before we solved the LCP for constraints
-  Eigen::VectorXd mLastPreConstraintVelocity;
+  Eigen::VectorXs mLastPreConstraintVelocity;
 
   /// True if we want to update p_{t+1} as f(p_t, v_t), rather than the old
   /// f(p_t, v_{t+1}). This makes it much easier to reason about
@@ -616,12 +616,12 @@ protected:
   /// to prevent numerical accuracy issues during the backprop computations. We
   /// don't use this on most timesteps, so a relatively large CFM constant
   /// shouldn't affect simulation accuracy.
-  double mFallbackConstraintForceMixingConstant;
+  s_t mFallbackConstraintForceMixingConstant;
 
   /// Contacts whose penetrationDepth is deeper than this depth will be ignored.
   /// This is a simple solution to avoid extremely nasty situations with
   /// impossibly deep inter-penetration during multiple shooting optimization.
-  double mContactClippingDepth;
+  s_t mContactClippingDepth;
 
   //--------------------------------------------------------------------------
   // Signals

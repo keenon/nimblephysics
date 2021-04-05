@@ -225,7 +225,7 @@ result: dart.trajectory.Solution = optimizer.optimize(trajectory)
 */
 // clang-format on
 
-BodyNode* createTailSegment(BodyNode* parent, Eigen::Vector3d color)
+BodyNode* createTailSegment(BodyNode* parent, Eigen::Vector3s color)
 {
   /*
   def createTailSegment(parent, color):
@@ -259,10 +259,10 @@ BodyNode* createTailSegment(BodyNode* parent, Eigen::Vector3d color)
       = parent->createChildJointAndBodyNodePair<RevoluteJoint>();
   RevoluteJoint* poleJoint = poleJointPair.first;
   BodyNode* pole = poleJointPair.second;
-  poleJoint->setAxis(Eigen::Vector3d::UnitZ());
+  poleJoint->setAxis(Eigen::Vector3s::UnitZ());
 
   std::shared_ptr<BoxShape> shape(
-      new BoxShape(Eigen::Vector3d(0.05, 0.25, 0.05)));
+      new BoxShape(Eigen::Vector3s(0.05, 0.25, 0.05)));
   ShapeNode* poleShape
       = pole->createShapeNodeWith<VisualAspect, CollisionAspect>(shape);
   poleShape->getVisualAspect()->setColor(color);
@@ -271,8 +271,8 @@ BodyNode* createTailSegment(BodyNode* parent, Eigen::Vector3d color)
   poleJoint->setVelocityUpperLimit(0, 10000.0);
   poleJoint->setVelocityLowerLimit(0, -10000.0);
 
-  Eigen::Isometry3d poleOffset = Eigen::Isometry3d::Identity();
-  poleOffset.translation() = Eigen::Vector3d(0, -0.125, 0);
+  Eigen::Isometry3s poleOffset = Eigen::Isometry3s::Identity();
+  poleOffset.translation() = Eigen::Vector3s(0, -0.125, 0);
   poleJoint->setTransformFromChildBodyNode(poleOffset);
   poleJoint->setPosition(0, 90 * 3.1415 / 180);
   poleJoint->setPositionUpperLimit(0, 180 * 3.1415 / 180);
@@ -280,22 +280,22 @@ BodyNode* createTailSegment(BodyNode* parent, Eigen::Vector3d color)
 
   if (parent->getParentBodyNode() != nullptr)
   {
-    Eigen::Isometry3d childOffset = Eigen::Isometry3d::Identity();
-    childOffset.translation() = Eigen::Vector3d(0, 0.125, 0);
+    Eigen::Isometry3s childOffset = Eigen::Isometry3s::Identity();
+    childOffset.translation() = Eigen::Vector3s(0, 0.125, 0);
     poleJoint->setTransformFromParentBodyNode(childOffset);
   }
 
   return pole;
 }
 
-std::shared_ptr<simulation::World> createWorld(double target_x, double target_y)
+std::shared_ptr<simulation::World> createWorld(s_t target_x, s_t target_y)
 {
   // Create a world
   std::shared_ptr<simulation::World> world = simulation::World::create();
 
   // Set gravity of the world
   // world->setPenetrationCorrectionEnabled(true);
-  world->setGravity(Eigen::Vector3d(0.0, -9.81, 0.0));
+  world->setGravity(Eigen::Vector3s(0.0, -9.81, 0.0));
 
   // Create projectile
 
@@ -306,11 +306,11 @@ std::shared_ptr<simulation::World> createWorld(double target_x, double target_y)
   BodyNode* projectileBody = projectileJointPair.second;
 
   std::shared_ptr<BoxShape> projectileShape(
-      new BoxShape(Eigen::Vector3d(0.1, 0.1, 0.1)));
+      new BoxShape(Eigen::Vector3s(0.1, 0.1, 0.1)));
   ShapeNode* projectileVisual
       = projectileBody->createShapeNodeWith<VisualAspect, CollisionAspect>(
           projectileShape);
-  projectileVisual->getVisualAspect()->setColor(Eigen::Vector3d(0.7, 0.7, 0.7));
+  projectileVisual->getVisualAspect()->setColor(Eigen::Vector3s(0.7, 0.7, 0.7));
   projectileVisual->getVisualAspect()->setCastShadows(false);
   projectileJoint->setForceUpperLimit(0, 0);
   projectileJoint->setForceLowerLimit(0, 0);
@@ -320,7 +320,7 @@ std::shared_ptr<simulation::World> createWorld(double target_x, double target_y)
   projectileJoint->setVelocityLowerLimit(0, -1000.0);
   projectileJoint->setVelocityUpperLimit(1, 1000.0);
   projectileJoint->setVelocityLowerLimit(1, -1000.0);
-  projectile->setPositions(Eigen::Vector2d(0, 0.1));
+  projectile->setPositions(Eigen::Vector2s(0, 0.1));
   world->addSkeleton(projectile);
 
   // Create catapult
@@ -331,19 +331,19 @@ std::shared_ptr<simulation::World> createWorld(double target_x, double target_y)
   WeldJoint* rootJoint = rootJointPair.first;
   BodyNode* root = rootJointPair.second;
 
-  Eigen::Isometry3d rootOffset = Eigen::Isometry3d::Identity();
-  rootOffset.translation() = Eigen::Vector3d(0.5, -0.45, 0);
+  Eigen::Isometry3s rootOffset = Eigen::Isometry3s::Identity();
+  rootOffset.translation() = Eigen::Vector3s(0.5, -0.45, 0);
   rootJoint->setTransformFromParentBodyNode(rootOffset);
 
   BodyNode* tail1 = createTailSegment(
-      root, Eigen::Vector3d(182.0 / 255, 223.0 / 255, 144.0 / 255));
+      root, Eigen::Vector3s(182.0 / 255, 223.0 / 255, 144.0 / 255));
   BodyNode* tail2 = createTailSegment(
-      tail1, Eigen::Vector3d(223.0 / 255, 228.0 / 255, 163.0 / 255));
+      tail1, Eigen::Vector3s(223.0 / 255, 228.0 / 255, 163.0 / 255));
   // BodyNode* tail3 =
   createTailSegment(
-      tail2, Eigen::Vector3d(221.0 / 255, 193.0 / 255, 121.0 / 255));
+      tail2, Eigen::Vector3s(221.0 / 255, 193.0 / 255, 121.0 / 255));
 
-  catapult->setPositions(Eigen::Vector3d(45, 0, 45) * 3.1415 / 180);
+  catapult->setPositions(Eigen::Vector3s(45, 0, 45) * 3.1415 / 180);
 
   world->addSkeleton(catapult);
 
@@ -354,15 +354,15 @@ std::shared_ptr<simulation::World> createWorld(double target_x, double target_y)
       = floor->createJointAndBodyNodePair<WeldJoint>(nullptr);
   WeldJoint* floorJoint = floorJointPair.first;
   BodyNode* floorBody = floorJointPair.second;
-  Eigen::Isometry3d floorOffset = Eigen::Isometry3d::Identity();
-  floorOffset.translation() = Eigen::Vector3d(1.2, -0.7, 0);
+  Eigen::Isometry3s floorOffset = Eigen::Isometry3s::Identity();
+  floorOffset.translation() = Eigen::Vector3s(1.2, -0.7, 0);
   floorJoint->setTransformFromParentBodyNode(floorOffset);
   std::shared_ptr<BoxShape> floorShape(
-      new BoxShape(Eigen::Vector3d(3.5, 0.25, 0.5)));
+      new BoxShape(Eigen::Vector3s(3.5, 0.25, 0.5)));
   ShapeNode* floorVisual
       = floorBody->createShapeNodeWith<VisualAspect, CollisionAspect>(
           floorShape);
-  floorVisual->getVisualAspect()->setColor(Eigen::Vector3d(0.5, 0.5, 0.5));
+  floorVisual->getVisualAspect()->setColor(Eigen::Vector3s(0.5, 0.5, 0.5));
   floorVisual->getVisualAspect()->setCastShadows(false);
 
   world->addSkeleton(floor);
@@ -374,14 +374,14 @@ std::shared_ptr<simulation::World> createWorld(double target_x, double target_y)
       = target->createJointAndBodyNodePair<WeldJoint>(nullptr);
   WeldJoint* targetJoint = targetJointPair.first;
   BodyNode* targetBody = targetJointPair.second;
-  Eigen::Isometry3d targetOffset = Eigen::Isometry3d::Identity();
-  targetOffset.translation() = Eigen::Vector3d(target_x, target_y, 0);
+  Eigen::Isometry3s targetOffset = Eigen::Isometry3s::Identity();
+  targetOffset.translation() = Eigen::Vector3s(target_x, target_y, 0);
   targetJoint->setTransformFromParentBodyNode(targetOffset);
   std::shared_ptr<BoxShape> targetShape(
-      new BoxShape(Eigen::Vector3d(0.1, 0.1, 0.1)));
+      new BoxShape(Eigen::Vector3s(0.1, 0.1, 0.1)));
   ShapeNode* targetVisual
       = targetBody->createShapeNodeWith<VisualAspect>(targetShape);
-  targetVisual->getVisualAspect()->setColor(Eigen::Vector3d(0.8, 0.5, 0.5));
+  targetVisual->getVisualAspect()->setColor(Eigen::Vector3s(0.8, 0.5, 0.5));
   targetVisual->getVisualAspect()->setCastShadows(false);
 
   world->addSkeleton(target);
@@ -392,8 +392,8 @@ std::shared_ptr<simulation::World> createWorld(double target_x, double target_y)
 // #ifdef ALL_TESTS
 TEST(CATAPULT_EXAMPLE, TESTS)
 {
-  double target_x = 2.2;
-  double target_y = 2.2;
+  s_t target_x = 2.2;
+  s_t target_y = 2.2;
 
   // Create a world
   std::shared_ptr<simulation::World> world = createWorld(target_x, target_y);
@@ -401,13 +401,13 @@ TEST(CATAPULT_EXAMPLE, TESTS)
   ///
   // This fails on pos-vel being too far off
   ///
-  Eigen::VectorXd brokenPos = Eigen::VectorXd::Zero(5);
+  Eigen::VectorXs brokenPos = Eigen::VectorXs::Zero(5);
   brokenPos << 8.86733, 1.2779, 3.069, 1.53746, 2.58821;
-  Eigen::VectorXd brokenVel = Eigen::VectorXd::Zero(5);
+  Eigen::VectorXs brokenVel = Eigen::VectorXs::Zero(5);
   brokenVel << 1.15962, 0.884694, 5.2078, 5.22604, 1.34678;
-  Eigen::VectorXd brokenForce = Eigen::VectorXd::Zero(5);
+  Eigen::VectorXs brokenForce = Eigen::VectorXs::Zero(5);
   brokenForce << 0, 0, -6.52332, -4.70401, 2.88616;
-  Eigen::VectorXd brokenLCPCache = Eigen::VectorXd::Zero(6);
+  Eigen::VectorXs brokenLCPCache = Eigen::VectorXs::Zero(6);
   brokenLCPCache << 0.079406, 0.0704275, 0, 0.079406, 0.0704275, 0;
   world->setPositions(brokenPos);
   world->setVelocities(brokenVel);
@@ -425,7 +425,7 @@ TEST(CATAPULT_EXAMPLE, TESTS)
   server.serve(8070);
   server.renderWorld(world);
 
-  Eigen::VectorXd animatePos = brokenPos;
+  Eigen::VectorXs animatePos = brokenPos;
   int i = 0;
   Ticker ticker(0.01);
   ticker.registerTickListener([&](long time) {
@@ -455,20 +455,20 @@ TEST(CATAPULT_EXAMPLE, TESTS)
 #ifdef ALL_TESTS
 TEST(CATAPULT_EXAMPLE, BROKEN_POINT)
 {
-  double target_x = 2.2;
-  double target_y = 2.2;
+  s_t target_x = 2.2;
+  s_t target_y = 2.2;
 
   // Create a world
   std::shared_ptr<simulation::World> world = createWorld(target_x, target_y);
 
   /*
-  Eigen::VectorXd brokenPos = Eigen::VectorXd::Zero(5);
+  Eigen::VectorXs brokenPos = Eigen::VectorXs::Zero(5);
   brokenPos << -7.4747, 9.43449, 2.12166, 2.98394, 2.34673;
-  Eigen::VectorXd brokenVel = Eigen::VectorXd::Zero(5);
+  Eigen::VectorXs brokenVel = Eigen::VectorXs::Zero(5);
   brokenVel << -2.84978, 1.03633, 0, 9.16668, 6.99675;
-  Eigen::VectorXd brokenForce = Eigen::VectorXd::Zero(5);
+  Eigen::VectorXs brokenForce = Eigen::VectorXs::Zero(5);
   brokenForce << 0, 0, -2.11163, -2.06504, -1.3781;
-  Eigen::VectorXd brokenLCPCache = Eigen::VectorXd::Zero(12);
+  Eigen::VectorXs brokenLCPCache = Eigen::VectorXs::Zero(12);
   brokenLCPCache << 0.0173545, 0.0132076, 0, 0.0173545, 0.0132076, 0, 0, 0, 0,
       0, 0, 0;
   world->setPositions(brokenPos);
@@ -477,13 +477,13 @@ TEST(CATAPULT_EXAMPLE, BROKEN_POINT)
   world->setCachedLCPSolution(brokenLCPCache);
   */
   /*
-  Eigen::VectorXd brokenPos = Eigen::VectorXd::Zero(5);
+  Eigen::VectorXs brokenPos = Eigen::VectorXs::Zero(5);
   brokenPos << 8.75823, -1.33554, 1.60919, 0.367526, 1.09027;
-  Eigen::VectorXd brokenVel = Eigen::VectorXd::Zero(5);
+  Eigen::VectorXs brokenVel = Eigen::VectorXs::Zero(5);
   brokenVel << 4.48639, -5.53436, 1.73472e-18, -1.03812e-17, -0.472044;
-  Eigen::VectorXd brokenForce = Eigen::VectorXd::Zero(5);
+  Eigen::VectorXs brokenForce = Eigen::VectorXs::Zero(5);
   brokenForce << 0, 0, 9.428, -1.14176, 0.947147;
-  Eigen::VectorXd brokenLCPCache = Eigen::VectorXd::Zero(6);
+  Eigen::VectorXs brokenLCPCache = Eigen::VectorXs::Zero(6);
   brokenLCPCache << 0.0491903, 0.00921924, 0, 0, 0, 0;
   world->setPositions(brokenPos);
   world->setVelocities(brokenVel);
@@ -495,13 +495,13 @@ TEST(CATAPULT_EXAMPLE, BROKEN_POINT)
   /// This used to fail to standardize the LCP properly
   ///
 
-  Eigen::VectorXd brokenPos = Eigen::VectorXd::Zero(5);
+  Eigen::VectorXs brokenPos = Eigen::VectorXs::Zero(5);
   brokenPos << 8.75828, -1.33554, 1.6092, 0.367528, 1.09028;
-  Eigen::VectorXd brokenVel = Eigen::VectorXd::Zero(5);
+  Eigen::VectorXs brokenVel = Eigen::VectorXs::Zero(5);
   brokenVel << 4.48642, -5.53436, -1.73472e-18, -2.35814e-18, -0.472011;
-  Eigen::VectorXd brokenForce = Eigen::VectorXd::Zero(5);
+  Eigen::VectorXs brokenForce = Eigen::VectorXs::Zero(5);
   brokenForce << 0, 0, 9.428, -1.14176, 0.947147;
-  Eigen::VectorXd brokenLCPCache = Eigen::VectorXd::Zero(6);
+  Eigen::VectorXs brokenLCPCache = Eigen::VectorXs::Zero(6);
   brokenLCPCache << 0.0245947, 0.00461058, 0, 0.0245947, 0.00461058, 0;
   world->setPositions(brokenPos);
   world->setVelocities(brokenVel);
@@ -513,13 +513,13 @@ TEST(CATAPULT_EXAMPLE, BROKEN_POINT)
   ///
   /// This used to fail on edge-edge gradients being computed incorrectly
   ///
-  Eigen::VectorXd brokenPos = Eigen::VectorXd::Zero(5);
+  Eigen::VectorXs brokenPos = Eigen::VectorXs::Zero(5);
   brokenPos << -0.13334, -0.178891, 1.07272, 0.130007, 0.436478;
-  Eigen::VectorXd brokenVel = Eigen::VectorXd::Zero(5);
+  Eigen::VectorXs brokenVel = Eigen::VectorXs::Zero(5);
   brokenVel << -0.433131, -0.847734, 2.55373, -1.13021, -1.61568;
-  Eigen::VectorXd brokenForce = Eigen::VectorXd::Zero(5);
+  Eigen::VectorXs brokenForce = Eigen::VectorXs::Zero(5);
   brokenForce << 0, 0, -0.17232, 6.83192, -0.275112;
-  Eigen::VectorXd brokenLCPCache = Eigen::VectorXd::Zero(12);
+  Eigen::VectorXs brokenLCPCache = Eigen::VectorXs::Zero(12);
   brokenLCPCache << 0, 0, 0, 0, 0, 0, 1.0778, 0.330749, 0, 1.0778, 0.330749, 0;
   world->setPositions(brokenPos);
   world->setVelocities(brokenVel);
@@ -531,13 +531,13 @@ TEST(CATAPULT_EXAMPLE, BROKEN_POINT)
   /// This used to fail on CLAMPING_THRESHOLD being too large in
   /// ConstraintGroupGradientMatrices.cpp
   ///
-  Eigen::VectorXd brokenPos = Eigen::VectorXd::Zero(5);
+  Eigen::VectorXs brokenPos = Eigen::VectorXs::Zero(5);
   brokenPos << -0.000646825, -0.0351094, 0.759088, 0.102786, 0.731049;
-  Eigen::VectorXd brokenVel = Eigen::VectorXd::Zero(5);
+  Eigen::VectorXs brokenVel = Eigen::VectorXs::Zero(5);
   brokenVel << -0.216819, -0.25626, 0.256483, 0.758835, -0.794271;
-  Eigen::VectorXd brokenForce = Eigen::VectorXd::Zero(5);
+  Eigen::VectorXs brokenForce = Eigen::VectorXs::Zero(5);
   brokenForce << 0, 0, 0.136721, 1.88135, 7.45379;
-  Eigen::VectorXd brokenLCPCache = Eigen::VectorXd::Zero(12);
+  Eigen::VectorXs brokenLCPCache = Eigen::VectorXs::Zero(12);
   brokenLCPCache << 0.00454883, -5.55535e-05, 0, 0.00454883, -5.55535e-05, 0, 0,
       0, 0, 0, 0, 0;
   world->setPositions(brokenPos);
@@ -554,7 +554,7 @@ TEST(CATAPULT_EXAMPLE, BROKEN_POINT)
   server.serve(8070);
   server.renderWorld(world);
 
-  Eigen::VectorXd animatePos = brokenPos;
+  Eigen::VectorXs animatePos = brokenPos;
   int i = 0;
   Ticker ticker(0.01);
   ticker.registerTickListener([&](long time) {
@@ -586,8 +586,8 @@ TEST(CATAPULT_EXAMPLE, BROKEN_POINT)
 #ifdef ALL_TESTS
 TEST(CATAPULT_EXAMPLE, FULL_TEST)
 {
-  double target_x = 2.2;
-  double target_y = 2.2;
+  s_t target_x = 2.2;
+  s_t target_y = 2.2;
 
   // Create a world
   std::shared_ptr<simulation::World> world = createWorld(target_x, target_y);
@@ -595,11 +595,11 @@ TEST(CATAPULT_EXAMPLE, FULL_TEST)
 
   TrajectoryLossFn loss =
       [target_x, target_y](const trajectory::TrajectoryRollout* rollout) {
-        const Eigen::VectorXd lastPos
+        const Eigen::VectorXs lastPos
             = rollout->getPosesConst().col(rollout->getPosesConst().cols() - 1);
 
-        double diffX = lastPos(0) - target_x;
-        double diffY = lastPos(1) - target_y;
+        s_t diffX = lastPos(0) - target_x;
+        s_t diffY = lastPos(1) - target_y;
 
         return diffX * diffX + diffY * diffY;
       };
@@ -610,10 +610,10 @@ TEST(CATAPULT_EXAMPLE, FULL_TEST)
             TrajectoryRollout* gradWrtRollout // OUT
         ) {
           int lastCol = rollout->getPosesConst().cols() - 1;
-          const Eigen::VectorXd lastPos = rollout->getPosesConst().col(lastCol);
+          const Eigen::VectorXs lastPos = rollout->getPosesConst().col(lastCol);
 
-          double diffX = lastPos(0) - target_x;
-          double diffY = lastPos(1) - target_y;
+          s_t diffX = lastPos(0) - target_x;
+          s_t diffY = lastPos(1) - target_y;
 
           gradWrtRollout->getPoses().setZero();
           gradWrtRollout->getVels().setZero();
@@ -637,10 +637,10 @@ TEST(CATAPULT_EXAMPLE, FULL_TEST)
       world,
       500,
       [target_x, target_y](std::shared_ptr<simulation::World> world) {
-        const Eigen::VectorXd lastPos = world->getPositions();
+        const Eigen::VectorXs lastPos = world->getPositions();
 
-        double diffX = lastPos(0) - target_x;
-        double diffY = lastPos(1) - target_y;
+        s_t diffX = lastPos(0) - target_x;
+        s_t diffY = lastPos(1) - target_y;
 
         return diffX * diffX + diffY * diffY;
       }));
@@ -670,9 +670,9 @@ TEST(CATAPULT_EXAMPLE, FULL_TEST)
   server.renderWorld(world);
 
   int i = 0;
-  const Eigen::MatrixXd poses
+  const Eigen::MatrixXs poses
       = result->getStep(result->getNumSteps() - 1).rollout->getPosesConst();
-  const Eigen::MatrixXd vels
+  const Eigen::MatrixXs vels
       = result->getStep(result->getNumSteps() - 1).rollout->getVelsConst();
 
   server.renderTrajectoryLines(world, poses);

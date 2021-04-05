@@ -46,14 +46,14 @@
 namespace dart {
 namespace constraint {
 
-double MimicMotorConstraint::mConstraintForceMixing = DART_CFM;
+s_t MimicMotorConstraint::mConstraintForceMixing = DART_CFM;
 
 //==============================================================================
 MimicMotorConstraint::MimicMotorConstraint(
     dynamics::Joint* joint,
     const dynamics::Joint* mimicJoint,
-    double multiplier,
-    double offset)
+    s_t multiplier,
+    s_t offset)
   : ConstraintBase(),
     mJoint(joint),
     mMimicJoint(mimicJoint),
@@ -89,7 +89,7 @@ MimicMotorConstraint::~MimicMotorConstraint()
 }
 
 //==============================================================================
-void MimicMotorConstraint::setConstraintForceMixing(double cfm)
+void MimicMotorConstraint::setConstraintForceMixing(s_t cfm)
 {
   // Clamp constraint force mixing parameter if it is out of the range
   if (cfm < 1e-9)
@@ -113,7 +113,7 @@ void MimicMotorConstraint::setConstraintForceMixing(double cfm)
 }
 
 //==============================================================================
-double MimicMotorConstraint::getConstraintForceMixing()
+s_t MimicMotorConstraint::getConstraintForceMixing()
 {
   return mConstraintForceMixing;
 }
@@ -127,10 +127,10 @@ void MimicMotorConstraint::update()
   std::size_t dof = mJoint->getNumDofs();
   for (std::size_t i = 0; i < dof; ++i)
   {
-    double timeStep = mJoint->getSkeleton()->getTimeStep();
-    double qError = mMimicJoint->getPosition(i) * mMultiplier + mOffset
+    s_t timeStep = mJoint->getSkeleton()->getTimeStep();
+    s_t qError = mMimicJoint->getPosition(i) * mMultiplier + mOffset
                     - mJoint->getPosition(i);
-    double desiredVelocity = math::clip(
+    s_t desiredVelocity = math::clip(
         qError / timeStep,
         mJoint->getVelocityLowerLimit(i),
         mJoint->getVelocityUpperLimit(i));
@@ -219,7 +219,7 @@ void MimicMotorConstraint::applyUnitImpulse(std::size_t index)
 }
 
 //==============================================================================
-void MimicMotorConstraint::getVelocityChange(double* delVel, bool withCfm)
+void MimicMotorConstraint::getVelocityChange(s_t* delVel, bool withCfm)
 {
   assert(delVel != nullptr && "Null pointer is not allowed.");
 
@@ -262,7 +262,7 @@ void MimicMotorConstraint::unexcite()
 }
 
 //==============================================================================
-void MimicMotorConstraint::applyImpulse(double* lambda)
+void MimicMotorConstraint::applyImpulse(s_t* lambda)
 {
   std::size_t localIndex = 0;
   std::size_t dof = mJoint->getNumDofs();

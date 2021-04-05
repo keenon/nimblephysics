@@ -45,9 +45,9 @@ namespace python {
   virtual const std::string& getRepresentationMapping() const = 0;
   virtual const std::vector<std::string>& getMappings() const = 0;
 
-  virtual Eigen::Ref<Eigen::MatrixXd> getPoses(const std::string& mapping) = 0;
-  virtual Eigen::Ref<Eigen::MatrixXd> getVels(const std::string& mapping) = 0;
-  virtual Eigen::Ref<Eigen::MatrixXd> getForces(const std::string& mapping) = 0;
+  virtual Eigen::Ref<Eigen::MatrixXs> getPoses(const std::string& mapping) = 0;
+  virtual Eigen::Ref<Eigen::MatrixXs> getVels(const std::string& mapping) = 0;
+  virtual Eigen::Ref<Eigen::MatrixXs> getForces(const std::string& mapping) = 0;
   */
 
 void TrajectoryRollout(py::module& m)

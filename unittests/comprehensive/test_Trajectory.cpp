@@ -80,7 +80,7 @@ TEST(TRAJECTORY, UNCONSTRAINED_BOX)
 {
   // World
   WorldPtr world = World::create();
-  world->setGravity(Eigen::Vector3d(0, -9.81, 0));
+  world->setGravity(Eigen::Vector3s(0, -9.81, 0));
 
   ///////////////////////////////////////////////
   // Create the box
@@ -94,16 +94,16 @@ TEST(TRAJECTORY, UNCONSTRAINED_BOX)
   BodyNode* boxBody = pair.second;
 
   boxJoint->setXYPlane();
-  boxJoint->setTransformFromParentBodyNode(Eigen::Isometry3d::Identity());
-  boxJoint->setTransformFromChildBodyNode(Eigen::Isometry3d::Identity());
+  boxJoint->setTransformFromParentBodyNode(Eigen::Isometry3s::Identity());
+  boxJoint->setTransformFromChildBodyNode(Eigen::Isometry3s::Identity());
 
   std::shared_ptr<BoxShape> boxShape(
-      new BoxShape(Eigen::Vector3d(1.0, 1.0, 1.0)));
+      new BoxShape(Eigen::Vector3s(1.0, 1.0, 1.0)));
   boxBody->createShapeNodeWith<VisualAspect, CollisionAspect>(boxShape);
   boxBody->setFrictionCoeff(0.0);
 
   // Add a force driving the box to the left
-  boxBody->addExtForce(Eigen::Vector3d(1, -1, 0));
+  boxBody->addExtForce(Eigen::Vector3s(1, -1, 0));
   // Prevent the mass matrix from being Identity
   boxBody->setMass(1.0);
   boxBody->setRestitutionCoeff(0.5);
@@ -133,13 +133,13 @@ TEST(TRAJECTORY, REVOLUTE_JOINT)
 {
   // World
   WorldPtr world = World::create();
-  world->setGravity(Eigen::Vector3d(0, -9.81, 0));
+  world->setGravity(Eigen::Vector3s(0, -9.81, 0));
 
   SkeletonPtr spinner = Skeleton::create("spinner");
 
   std::pair<RevoluteJoint*, BodyNode*> armPair
       = spinner->createJointAndBodyNodePair<RevoluteJoint>(nullptr);
-  armPair.first->setAxis(Eigen::Vector3d(0, 0, 1));
+  armPair.first->setAxis(Eigen::Vector3s(0, 0, 1));
 
   world->addSkeleton(spinner);
 
@@ -168,20 +168,20 @@ TEST(TRAJECTORY, TWO_LINK)
 {
   // World
   WorldPtr world = World::create();
-  world->setGravity(Eigen::Vector3d(0, -9.81, 0));
+  world->setGravity(Eigen::Vector3s(0, -9.81, 0));
 
   SkeletonPtr arm = Skeleton::create("arm");
 
   std::pair<RevoluteJoint*, BodyNode*> armPair
       = arm->createJointAndBodyNodePair<RevoluteJoint>(nullptr);
-  armPair.first->setAxis(Eigen::Vector3d(0, 0, 1));
+  armPair.first->setAxis(Eigen::Vector3s(0, 0, 1));
 
   // Add child arm
 
   std::pair<RevoluteJoint*, BodyNode*> elbowPair
       = arm->createJointAndBodyNodePair<RevoluteJoint>(armPair.second);
-  Eigen::Isometry3d elbowOffset = Eigen::Isometry3d::Identity();
-  elbowOffset.translation() = Eigen::Vector3d(0, 1.0, 0);
+  Eigen::Isometry3s elbowOffset = Eigen::Isometry3s::Identity();
+  elbowOffset.translation() = Eigen::Vector3s(0, 1.0, 0);
   elbowPair.first->setTransformFromParentBodyNode(elbowOffset);
 
   world->addSkeleton(arm);
@@ -212,13 +212,13 @@ TEST(TRAJECTORY, PRISMATIC)
 
   // World
   WorldPtr world = World::create();
-  world->setGravity(Eigen::Vector3d(0, -9.81, 0));
+  world->setGravity(Eigen::Vector3s(0, -9.81, 0));
 
   SkeletonPtr cartpole = Skeleton::create("cartpole");
 
   std::pair<PrismaticJoint*, BodyNode*> sledPair
       = cartpole->createJointAndBodyNodePair<PrismaticJoint>(nullptr);
-  sledPair.first->setAxis(Eigen::Vector3d(1, 1, 0));
+  sledPair.first->setAxis(Eigen::Vector3s(1, 1, 0));
 
   world->addSkeleton(cartpole);
 
@@ -251,28 +251,28 @@ TEST(TRAJECTORY, CARTPOLE)
 {
   // World
   WorldPtr world = World::create();
-  world->setGravity(Eigen::Vector3d(0, -9.81, 0));
+  world->setGravity(Eigen::Vector3s(0, -9.81, 0));
 
   SkeletonPtr cartpole = Skeleton::create("cartpole");
 
   std::pair<PrismaticJoint*, BodyNode*> sledPair
       = cartpole->createJointAndBodyNodePair<PrismaticJoint>(nullptr);
-  sledPair.first->setAxis(Eigen::Vector3d(1, 0, 0));
+  sledPair.first->setAxis(Eigen::Vector3s(1, 0, 0));
   std::shared_ptr<BoxShape> sledShapeBox(
-      new BoxShape(Eigen::Vector3d(0.05, 0.25, 0.05)));
+      new BoxShape(Eigen::Vector3s(0.05, 0.25, 0.05)));
   // ShapeNode* sledShape =
   sledPair.second->createShapeNodeWith<VisualAspect>(sledShapeBox);
 
   std::pair<RevoluteJoint*, BodyNode*> armPair
       = cartpole->createJointAndBodyNodePair<RevoluteJoint>(sledPair.second);
-  armPair.first->setAxis(Eigen::Vector3d(0, 0, 1));
+  armPair.first->setAxis(Eigen::Vector3s(0, 0, 1));
   std::shared_ptr<BoxShape> armShapeBox(
-      new BoxShape(Eigen::Vector3d(0.05, 0.25, 0.05)));
+      new BoxShape(Eigen::Vector3s(0.05, 0.25, 0.05)));
   // ShapeNode* armShape =
   armPair.second->createShapeNodeWith<VisualAspect>(armShapeBox);
 
-  Eigen::Isometry3d armOffset = Eigen::Isometry3d::Identity();
-  armOffset.translation() = Eigen::Vector3d(0, -0.5, 0);
+  Eigen::Isometry3s armOffset = Eigen::Isometry3s::Identity();
+  armOffset.translation() = Eigen::Vector3s(0, -0.5, 0);
   armPair.first->setTransformFromChildBodyNode(armOffset);
 
   world->addSkeleton(cartpole);
@@ -298,7 +298,7 @@ TEST(TRAJECTORY, CARTPOLE)
 
   TrajectoryLossFn loss = [](const TrajectoryRollout* rollout) {
     int steps = rollout->getPosesConst("identity").cols();
-    Eigen::VectorXd lastPos = rollout->getPosesConst("identity").col(steps - 1);
+    Eigen::VectorXs lastPos = rollout->getPosesConst("identity").col(steps - 1);
     return rollout->getVelsConst("identity").col(steps - 1).squaredNorm()
            + lastPos.squaredNorm()
            + rollout->getForcesConst("identity").squaredNorm();
@@ -320,7 +320,7 @@ TEST(TRAJECTORY, CARTPOLE)
       gradWrtRollout->getForces("identity").col(i)
           = 2 * rollout->getForcesConst("identity").col(i);
     }
-    Eigen::VectorXd lastPos = rollout->getPosesConst("identity").col(steps - 1);
+    Eigen::VectorXs lastPos = rollout->getPosesConst("identity").col(steps - 1);
     return rollout->getVelsConst("identity").col(steps - 1).squaredNorm()
            + lastPos.squaredNorm()
            + rollout->getForcesConst("identity").squaredNorm();
@@ -360,16 +360,16 @@ TEST(TRAJECTORY, CARTPOLE)
 }
 #endif
 
-BodyNode* createTailSegment(BodyNode* parent, Eigen::Vector3d color)
+BodyNode* createTailSegment(BodyNode* parent, Eigen::Vector3s color)
 {
   std::pair<RevoluteJoint*, BodyNode*> poleJointPair
       = parent->createChildJointAndBodyNodePair<RevoluteJoint>();
   RevoluteJoint* poleJoint = poleJointPair.first;
   BodyNode* pole = poleJointPair.second;
-  poleJoint->setAxis(Eigen::Vector3d::UnitZ());
+  poleJoint->setAxis(Eigen::Vector3s::UnitZ());
 
   std::shared_ptr<BoxShape> shape(
-      new BoxShape(Eigen::Vector3d(0.05, 0.25, 0.05)));
+      new BoxShape(Eigen::Vector3s(0.05, 0.25, 0.05)));
   ShapeNode* poleShape
       = pole->createShapeNodeWith<VisualAspect, CollisionAspect>(shape);
   poleShape->getVisualAspect()->setColor(color);
@@ -380,15 +380,15 @@ BodyNode* createTailSegment(BodyNode* parent, Eigen::Vector3d color)
   poleJoint->setPositionUpperLimit(0, 270 * 3.1415 / 180);
   poleJoint->setPositionLowerLimit(0, -270 * 3.1415 / 180);
 
-  Eigen::Isometry3d poleOffset = Eigen::Isometry3d::Identity();
-  poleOffset.translation() = Eigen::Vector3d(0, -0.125, 0);
+  Eigen::Isometry3s poleOffset = Eigen::Isometry3s::Identity();
+  poleOffset.translation() = Eigen::Vector3s(0, -0.125, 0);
   poleJoint->setTransformFromChildBodyNode(poleOffset);
   poleJoint->setPosition(0, 90 * 3.1415 / 180);
 
   if (parent->getParentBodyNode() != nullptr)
   {
-    Eigen::Isometry3d childOffset = Eigen::Isometry3d::Identity();
-    childOffset.translation() = Eigen::Vector3d(0, 0.125, 0);
+    Eigen::Isometry3s childOffset = Eigen::Isometry3s::Identity();
+    childOffset.translation() = Eigen::Vector3s(0, 0.125, 0);
     poleJoint->setTransformFromParentBodyNode(childOffset);
   }
 
@@ -400,7 +400,7 @@ TEST(TRAJECTORY, TUNE_SIMPLE_MASS)
 {
   // World
   WorldPtr world = World::create();
-  world->setGravity(Eigen::Vector3d(0, -9.81, 0));
+  world->setGravity(Eigen::Vector3s(0, -9.81, 0));
 
   world->setPenetrationCorrectionEnabled(false);
 
@@ -414,10 +414,10 @@ TEST(TRAJECTORY, TUNE_SIMPLE_MASS)
       = swing->createJointAndBodyNodePair<RevoluteJoint>();
   RevoluteJoint* poleJoint = poleJointPair.first;
   BodyNode* pole = poleJointPair.second;
-  poleJoint->setAxis(Eigen::Vector3d::UnitZ());
+  poleJoint->setAxis(Eigen::Vector3s::UnitZ());
 
   std::shared_ptr<BoxShape> shape(
-      new BoxShape(Eigen::Vector3d(0.05, 0.25, 0.05)));
+      new BoxShape(Eigen::Vector3s(0.05, 0.25, 0.05)));
   // ShapeNode* poleShape =
   pole->createShapeNodeWith<VisualAspect, CollisionAspect>(shape);
   poleJoint->setForceUpperLimit(0, 100.0);
@@ -428,16 +428,16 @@ TEST(TRAJECTORY, TUNE_SIMPLE_MASS)
   poleJoint->setPositionLowerLimit(0, -270 * 3.1415 / 180);
 
   // We're going to tune the full inertia properties of the swinging object
-  Eigen::VectorXd upperBounds = Eigen::VectorXd::Ones(3) * 2.0;
-  Eigen::VectorXd lowerBounds = Eigen::VectorXd::Ones(3) * -2.0;
+  Eigen::VectorXs upperBounds = Eigen::VectorXs::Ones(3) * 2.0;
+  Eigen::VectorXs lowerBounds = Eigen::VectorXs::Ones(3) * -2.0;
   world->getWrtMass()->registerNode(
       pole,
       neural::WrtMassBodyNodeEntryType::INERTIA_COM,
       upperBounds,
       lowerBounds);
 
-  Eigen::Isometry3d poleOffset = Eigen::Isometry3d::Identity();
-  poleOffset.translation() = Eigen::Vector3d(0, -0.125, 0);
+  Eigen::Isometry3s poleOffset = Eigen::Isometry3s::Identity();
+  poleOffset.translation() = Eigen::Vector3s(0, -0.125, 0);
   poleJoint->setTransformFromChildBodyNode(poleOffset);
   poleJoint->setPosition(0, 90 * 3.1415 / 180);
 
@@ -452,23 +452,23 @@ TEST(TRAJECTORY, TUNE_SIMPLE_MASS)
   int STEPS = 12;
   int SHOT_LENGTH = 3;
   int GOAL_STEP = 6;
-  double GOAL_AT_STEP = 0.1;
+  s_t GOAL_AT_STEP = 0.1;
 
   // Get the GOAL_STEP pose as close to GOAL_AT_STEP
   TrajectoryLossFn loss
       = [GOAL_STEP, GOAL_AT_STEP](const TrajectoryRollout* rollout) {
-          const Eigen::Ref<const Eigen::MatrixXd> poses
+          const Eigen::Ref<const Eigen::MatrixXs> poses
               = rollout->getPosesConst("identity");
-          double poseFive = poses(0, GOAL_STEP);
+          s_t poseFive = poses(0, GOAL_STEP);
           return (poseFive - GOAL_AT_STEP) * (poseFive - GOAL_AT_STEP);
         };
 
   // Get the initial pose and final pose as close to each other as possible
   TrajectoryLossFn loopConstraint = [](const TrajectoryRollout* rollout) {
-    const Eigen::Ref<const Eigen::MatrixXd> poses
+    const Eigen::Ref<const Eigen::MatrixXs> poses
         = rollout->getPosesConst("identity");
-    double firstPose = poses(0, 0);
-    double lastPose = poses(0, poses.cols() - 1);
+    s_t firstPose = poses(0, 0);
+    s_t lastPose = poses(0, poses.cols() - 1);
     return (firstPose - lastPose) * (firstPose - lastPose);
   };
 
@@ -494,10 +494,10 @@ TEST(TRAJECTORY, TUNE_SIMPLE_MASS)
   int n = shot.getFlatProblemDim(world);
   int constraintDim = shot.getConstraintDim();
   /*
-  Eigen::VectorXd flat = Eigen::VectorXd::Zero(n);
+  Eigen::VectorXs flat = Eigen::VectorXs::Zero(n);
   shot.Problem::flatten(world, flat);
   srand(2);
-  flat += Eigen::VectorXd::Random(n) * 0.01;
+  flat += Eigen::VectorXs::Random(n) * 0.01;
   std::cout << flat << std::endl;
   shot.Problem::unflatten(world, flat);
   shotPar.Problem::unflatten(world, flat);
@@ -509,13 +509,13 @@ TEST(TRAJECTORY, TUNE_SIMPLE_MASS)
 
   if (true)
   {
-    Eigen::VectorXd upperBound = Eigen::VectorXd::Zero(n);
-    Eigen::VectorXd lowerBound = Eigen::VectorXd::Zero(n);
+    Eigen::VectorXs upperBound = Eigen::VectorXs::Zero(n);
+    Eigen::VectorXs lowerBound = Eigen::VectorXs::Zero(n);
     shot.Problem::getUpperBounds(world, upperBound);
     shot.Problem::getLowerBounds(world, lowerBound);
 
-    Eigen::VectorXd upperBoundPar = Eigen::VectorXd::Zero(n);
-    Eigen::VectorXd lowerBoundPar = Eigen::VectorXd::Zero(n);
+    Eigen::VectorXs upperBoundPar = Eigen::VectorXs::Zero(n);
+    Eigen::VectorXs lowerBoundPar = Eigen::VectorXs::Zero(n);
     shotPar.Problem::getUpperBounds(worldPar, upperBoundPar);
     shotPar.Problem::getLowerBounds(worldPar, lowerBoundPar);
 
@@ -541,15 +541,15 @@ TEST(TRAJECTORY, TUNE_SIMPLE_MASS)
       return;
     }
 
-    Eigen::VectorXd constraintUpperBound = Eigen::VectorXd::Zero(constraintDim);
-    Eigen::VectorXd constraintLowerBound = Eigen::VectorXd::Zero(constraintDim);
+    Eigen::VectorXs constraintUpperBound = Eigen::VectorXs::Zero(constraintDim);
+    Eigen::VectorXs constraintLowerBound = Eigen::VectorXs::Zero(constraintDim);
     shot.getConstraintUpperBounds(constraintUpperBound);
     shot.getConstraintLowerBounds(constraintLowerBound);
 
-    Eigen::VectorXd constraintUpperBoundPar
-        = Eigen::VectorXd::Zero(constraintDim);
-    Eigen::VectorXd constraintLowerBoundPar
-        = Eigen::VectorXd::Zero(constraintDim);
+    Eigen::VectorXs constraintUpperBoundPar
+        = Eigen::VectorXs::Zero(constraintDim);
+    Eigen::VectorXs constraintLowerBoundPar
+        = Eigen::VectorXs::Zero(constraintDim);
     shotPar.getConstraintUpperBounds(constraintUpperBoundPar);
     shotPar.getConstraintLowerBounds(constraintLowerBoundPar);
 
@@ -584,9 +584,9 @@ TEST(TRAJECTORY, TUNE_SIMPLE_MASS)
 
   if (true)
   {
-    Eigen::VectorXd grad = Eigen::VectorXd::Zero(n);
+    Eigen::VectorXs grad = Eigen::VectorXs::Zero(n);
     shot.backpropGradient(world, grad);
-    Eigen::VectorXd gradPar = Eigen::VectorXd::Zero(n);
+    Eigen::VectorXs gradPar = Eigen::VectorXs::Zero(n);
     shotPar.backpropGradient(worldPar, gradPar);
 
     if (!equals(grad, gradPar, 0))
@@ -602,9 +602,9 @@ TEST(TRAJECTORY, TUNE_SIMPLE_MASS)
 
     int m = shot.getNumberNonZeroJacobian(world);
 
-    Eigen::VectorXd sparseJac = Eigen::VectorXd::Zero(m);
+    Eigen::VectorXs sparseJac = Eigen::VectorXs::Zero(m);
     shot.Problem::getSparseJacobian(world, sparseJac);
-    Eigen::VectorXd sparseJacPar = Eigen::VectorXd::Zero(m);
+    Eigen::VectorXs sparseJacPar = Eigen::VectorXs::Zero(m);
     shotPar.Problem::getSparseJacobian(worldPar, sparseJacPar);
 
     if (!equals(sparseJac, sparseJacPar, 0))
@@ -629,13 +629,13 @@ TEST(TRAJECTORY, TUNE_SIMPLE_MASS)
     int numConstraints = shot.getConstraintDim();
     std::cout << "numConstraints: " << numConstraints << std::endl;
 
-    Eigen::MatrixXd analyticalJacobian
-        = Eigen::MatrixXd::Zero(numConstraints, dim);
+    Eigen::MatrixXs analyticalJacobian
+        = Eigen::MatrixXs::Zero(numConstraints, dim);
     shot.Problem::backpropJacobian(world, analyticalJacobian);
-    Eigen::MatrixXd bruteForceJacobian
-        = Eigen::MatrixXd::Zero(numConstraints, dim);
+    Eigen::MatrixXs bruteForceJacobian
+        = Eigen::MatrixXs::Zero(numConstraints, dim);
     shot.finiteDifferenceJacobian(world, bruteForceJacobian);
-    double threshold = 1e-8;
+    s_t threshold = 1e-8;
     if (!equals(analyticalJacobian, bruteForceJacobian, threshold))
     {
       std::cout << "Jacobians don't match!" << std::endl;
@@ -651,8 +651,8 @@ TEST(TRAJECTORY, TUNE_SIMPLE_MASS)
       /*
       for (int i = 0; i < dim; i++)
       {
-        Eigen::VectorXd analyticalCol = analyticalJacobian.col(i);
-        Eigen::VectorXd bruteForceCol = bruteForceJacobian.col(i);
+        Eigen::VectorXs analyticalCol = analyticalJacobian.col(i);
+        Eigen::VectorXs bruteForceCol = bruteForceJacobian.col(i);
         if (!equals(analyticalCol, bruteForceCol, threshold))
         {
           std::cout << "ERROR at col " << shot.getFlatDimName(world, i) << " ("
@@ -683,8 +683,8 @@ TEST(TRAJECTORY, TUNE_SIMPLE_MASS)
   // Verify flat results
   /////////////////////////////////////////////////////////////////////
 
-  Eigen::VectorXd preFlat = Eigen::VectorXd::Zero(n);
-  Eigen::VectorXd preFlatPar = Eigen::VectorXd::Zero(n);
+  Eigen::VectorXs preFlat = Eigen::VectorXs::Zero(n);
+  Eigen::VectorXs preFlatPar = Eigen::VectorXs::Zero(n);
   shot.Problem::flatten(world, preFlat);
   shotPar.Problem::flatten(world, preFlatPar);
   if (!equals(preFlat, preFlatPar, 0))
@@ -723,8 +723,8 @@ TEST(TRAJECTORY, TUNE_SIMPLE_MASS)
 
   std::shared_ptr<Solution> recordPar = optimizer.optimize(&shotPar);
 
-  Eigen::VectorXd endFlat = Eigen::VectorXd::Zero(n);
-  Eigen::VectorXd endFlatPar = Eigen::VectorXd::Zero(n);
+  Eigen::VectorXs endFlat = Eigen::VectorXs::Zero(n);
+  Eigen::VectorXs endFlatPar = Eigen::VectorXs::Zero(n);
   shot.Problem::flatten(world, endFlat);
   shotPar.Problem::flatten(worldPar, endFlatPar);
   if (!equals(endFlat, endFlatPar, 0))
@@ -745,8 +745,8 @@ TEST(TRAJECTORY, TUNE_SIMPLE_MASS)
 
   for (int i = 0; i < record->getXs().size(); i++)
   {
-    Eigen::VectorXd x0 = record->getXs()[i];
-    Eigen::VectorXd x0Par = recordPar->getXs()[i];
+    Eigen::VectorXs x0 = record->getXs()[i];
+    Eigen::VectorXs x0Par = recordPar->getXs()[i];
     if (!equals(x0, x0Par, 0))
     {
       std::cout << "Xs at eval " << i << " don't match!" << std::endl;
@@ -765,8 +765,8 @@ TEST(TRAJECTORY, TUNE_SIMPLE_MASS)
 
   for (int i = 0; i < record->getLosses().size(); i++)
   {
-    double loss0 = record->getLosses()[i];
-    double loss0Par = recordPar->getLosses()[i];
+    s_t loss0 = record->getLosses()[i];
+    s_t loss0Par = recordPar->getLosses()[i];
     if (loss0 != loss0Par)
     {
       std::cout << "Losses at eval " << i << " don't match by "
@@ -776,8 +776,8 @@ TEST(TRAJECTORY, TUNE_SIMPLE_MASS)
 
   for (int i = 0; i < record->getGradients().size(); i++)
   {
-    Eigen::VectorXd grad0 = record->getGradients()[i];
-    Eigen::VectorXd grad0Par = recordPar->getGradients()[i];
+    Eigen::VectorXs grad0 = record->getGradients()[i];
+    Eigen::VectorXs grad0Par = recordPar->getGradients()[i];
     if (!equals(grad0, grad0Par, 0))
     {
       std::cout << "Gradients at eval " << i << " don't match!" << std::endl;
@@ -796,8 +796,8 @@ TEST(TRAJECTORY, TUNE_SIMPLE_MASS)
 
   for (int i = 0; i < record->getSparseJacobians().size(); i++)
   {
-    Eigen::VectorXd jac0 = record->getSparseJacobians()[i];
-    Eigen::VectorXd jac0Par = recordPar->getSparseJacobians()[i];
+    Eigen::VectorXs jac0 = record->getSparseJacobians()[i];
+    Eigen::VectorXs jac0Par = recordPar->getSparseJacobians()[i];
 
     Eigen::VectorXi jacRows = Eigen::VectorXi::Zero(jac0.size());
     Eigen::VectorXi jacCols = Eigen::VectorXi::Zero(jac0.size());
@@ -808,8 +808,8 @@ TEST(TRAJECTORY, TUNE_SIMPLE_MASS)
       std::cout << "Jacobians at eval " << i << " don't match!" << std::endl;
       for (int j = 0; j < jac0.size(); j++)
       {
-        double serial = jac0(j);
-        double parallel = jac0Par(j);
+        s_t serial = jac0(j);
+        s_t parallel = jac0Par(j);
         if (serial != parallel)
         {
           std::cout << "  Mismatch at " << jacRows(j) << "," << jacCols(j)
@@ -823,8 +823,8 @@ TEST(TRAJECTORY, TUNE_SIMPLE_MASS)
 
   for (int i = 0; i < record->getConstraintValues().size(); i++)
   {
-    Eigen::VectorXd con0 = record->getConstraintValues()[i];
-    Eigen::VectorXd con0Par = recordPar->getConstraintValues()[i];
+    Eigen::VectorXs con0 = record->getConstraintValues()[i];
+    Eigen::VectorXs con0Par = recordPar->getConstraintValues()[i];
     if (!equals(con0, con0Par, 0))
     {
       std::cout << "Constraints at eval " << i << " don't match!" << std::endl;
@@ -842,7 +842,7 @@ TEST(TRAJECTORY, RECOVER_MASS)
 {
   // World
   WorldPtr world = World::create();
-  world->setGravity(Eigen::Vector3d(0, -9.81, 0));
+  world->setGravity(Eigen::Vector3s(0, -9.81, 0));
 
   world->setPenetrationCorrectionEnabled(false);
 
@@ -858,13 +858,13 @@ TEST(TRAJECTORY, RECOVER_MASS)
   BodyNode* boxBody = boxJointPair.second;
 
   std::shared_ptr<BoxShape> shape(
-      new BoxShape(Eigen::Vector3d(0.05, 0.25, 0.05)));
+      new BoxShape(Eigen::Vector3s(0.05, 0.25, 0.05)));
   // ShapeNode* boxShape =
   boxBody->createShapeNodeWith<VisualAspect, CollisionAspect>(shape);
 
   // We're going to tune the full inertia properties of the swinging object
-  Eigen::VectorXd upperBounds = Eigen::VectorXd::Ones(1) * 5.0;
-  Eigen::VectorXd lowerBounds = Eigen::VectorXd::Ones(1) * 0.1;
+  Eigen::VectorXs upperBounds = Eigen::VectorXs::Ones(1) * 5.0;
+  Eigen::VectorXs lowerBounds = Eigen::VectorXs::Ones(1) * 0.1;
   world->getWrtMass()->registerNode(
       boxBody,
       neural::WrtMassBodyNodeEntryType::INERTIA_MASS,
@@ -880,19 +880,19 @@ TEST(TRAJECTORY, RECOVER_MASS)
   // to recover
   /////////////////////////////////////////////////////////////////////
 
-  double TRUE_MASS = 2.5;
+  s_t TRUE_MASS = 2.5;
   int STEPS = 12;
   int SHOT_LENGTH = 3;
   // int GOAL_STEP = 6;
-  // double GOAL_AT_STEP = 0.1;
+  // s_t GOAL_AT_STEP = 0.1;
 
   boxBody->setMass(TRUE_MASS);
-  Eigen::VectorXd knownForce = Eigen::VectorXd::Ones(1) * 0.1;
-  world->setPositions(Eigen::VectorXd::Zero(1));
-  world->setVelocities(Eigen::VectorXd::Zero(1));
+  Eigen::VectorXs knownForce = Eigen::VectorXs::Ones(1) * 0.1;
+  world->setPositions(Eigen::VectorXs::Zero(1));
+  world->setVelocities(Eigen::VectorXs::Zero(1));
   world->setTimeStep(1e-1);
 
-  Eigen::VectorXd originalPoses = Eigen::VectorXd::Zero(STEPS);
+  Eigen::VectorXs originalPoses = Eigen::VectorXs::Zero(STEPS);
   for (int i = 0; i < STEPS; i++)
   {
     world->setExternalForces(knownForce);
@@ -902,8 +902,8 @@ TEST(TRAJECTORY, RECOVER_MASS)
 
   // Reset position, scramble mass
 
-  world->setPositions(Eigen::VectorXd::Zero(1));
-  world->setVelocities(Eigen::VectorXd::Zero(1));
+  world->setPositions(Eigen::VectorXs::Zero(1));
+  world->setVelocities(Eigen::VectorXs::Zero(1));
   boxBody->setMass(0.5);
 
   /////////////////////////////////////////////////////////////////////
@@ -913,12 +913,12 @@ TEST(TRAJECTORY, RECOVER_MASS)
   // Get the GOAL_STEP pose as close to GOAL_AT_STEP
   TrajectoryLossFn loss
       = [originalPoses, STEPS](const TrajectoryRollout* rollout) {
-          const Eigen::Ref<const Eigen::MatrixXd> poses
+          const Eigen::Ref<const Eigen::MatrixXs> poses
               = rollout->getPosesConst("identity");
-          double sum = 0.0;
+          s_t sum = 0.0;
           for (int i = 0; i < STEPS; i++)
           {
-            double diff = 1e2 * (poses(0, i) - originalPoses(i));
+            s_t diff = 1e2 * (poses(0, i) - originalPoses(i));
             sum += diff * diff;
           }
           return sum;
@@ -953,7 +953,7 @@ TEST(TRAJECTORY, RECOVER_MASS)
   std::shared_ptr<Solution> record = optimizer.optimize(&shot);
 
   // We should have recovered the mass
-  double error = abs(boxBody->getMass() - TRUE_MASS);
+  s_t error = abs(boxBody->getMass() - TRUE_MASS);
   if (error > 1e-7)
   {
     std::cout << "Recovered mass: " << boxBody->getMass() << std::endl;
@@ -978,7 +978,7 @@ TEST(TRAJECTORY, CONSTRAINED_CYCLE)
 {
   // World
   WorldPtr world = World::create();
-  world->setGravity(Eigen::Vector3d(0, -9.81, 0));
+  world->setGravity(Eigen::Vector3s(0, -9.81, 0));
 
   world->setPenetrationCorrectionEnabled(false);
 
@@ -992,10 +992,10 @@ TEST(TRAJECTORY, CONSTRAINED_CYCLE)
       = loop->createJointAndBodyNodePair<RevoluteJoint>();
   RevoluteJoint* poleJoint = poleJointPair.first;
   BodyNode* pole = poleJointPair.second;
-  poleJoint->setAxis(Eigen::Vector3d::UnitZ());
+  poleJoint->setAxis(Eigen::Vector3s::UnitZ());
 
   std::shared_ptr<BoxShape> shape(
-      new BoxShape(Eigen::Vector3d(0.05, 0.25, 0.05)));
+      new BoxShape(Eigen::Vector3s(0.05, 0.25, 0.05)));
   // ShapeNode* poleShape =
   pole->createShapeNodeWith<VisualAspect, CollisionAspect>(shape);
   poleJoint->setForceUpperLimit(0, 100.0);
@@ -1005,8 +1005,8 @@ TEST(TRAJECTORY, CONSTRAINED_CYCLE)
   poleJoint->setPositionUpperLimit(0, 270 * 3.1415 / 180);
   poleJoint->setPositionLowerLimit(0, -270 * 3.1415 / 180);
 
-  Eigen::Isometry3d poleOffset = Eigen::Isometry3d::Identity();
-  poleOffset.translation() = Eigen::Vector3d(0, -0.125, 0);
+  Eigen::Isometry3s poleOffset = Eigen::Isometry3s::Identity();
+  poleOffset.translation() = Eigen::Vector3s(0, -0.125, 0);
   poleJoint->setTransformFromChildBodyNode(poleOffset);
   poleJoint->setPosition(0, 90 * 3.1415 / 180);
 
@@ -1021,23 +1021,23 @@ TEST(TRAJECTORY, CONSTRAINED_CYCLE)
   int STEPS = 12;
   int SHOT_LENGTH = 3;
   int GOAL_STEP = 6;
-  double GOAL_AT_STEP = 0.1;
+  s_t GOAL_AT_STEP = 0.1;
 
   // Get the GOAL_STEP pose as close to GOAL_AT_STEP
   TrajectoryLossFn loss
       = [GOAL_STEP, GOAL_AT_STEP](const TrajectoryRollout* rollout) {
-          const Eigen::Ref<const Eigen::MatrixXd> poses
+          const Eigen::Ref<const Eigen::MatrixXs> poses
               = rollout->getPosesConst("identity");
-          double poseFive = poses(0, GOAL_STEP);
+          s_t poseFive = poses(0, GOAL_STEP);
           return (poseFive - GOAL_AT_STEP) * (poseFive - GOAL_AT_STEP);
         };
 
   // Get the initial pose and final pose as close to each other as possible
   TrajectoryLossFn loopConstraint = [](const TrajectoryRollout* rollout) {
-    const Eigen::Ref<const Eigen::MatrixXd> poses
+    const Eigen::Ref<const Eigen::MatrixXs> poses
         = rollout->getPosesConst("identity");
-    double firstPose = poses(0, 0);
-    double lastPose = poses(0, poses.cols() - 1);
+    s_t firstPose = poses(0, 0);
+    s_t lastPose = poses(0, poses.cols() - 1);
     return (firstPose - lastPose) * (firstPose - lastPose);
   };
 
@@ -1061,20 +1061,20 @@ TEST(TRAJECTORY, CONSTRAINED_CYCLE)
   int numConstraints = shot.getConstraintDim();
   std::cout << "numConstraints: " << numConstraints << std::endl;
 
-  Eigen::MatrixXd analyticalJacobian
-      = Eigen::MatrixXd::Zero(numConstraints, dim);
+  Eigen::MatrixXs analyticalJacobian
+      = Eigen::MatrixXs::Zero(numConstraints, dim);
   shot.Problem::backpropJacobian(world, analyticalJacobian);
-  Eigen::MatrixXd bruteForceJacobian
-      = Eigen::MatrixXd::Zero(numConstraints, dim);
+  Eigen::MatrixXs bruteForceJacobian
+      = Eigen::MatrixXs::Zero(numConstraints, dim);
   shot.finiteDifferenceJacobian(world, bruteForceJacobian);
-  double threshold = 1e-8;
+  s_t threshold = 1e-8;
   if (!equals(analyticalJacobian, bruteForceJacobian, threshold))
   {
     std::cout << "Jacobians don't match!" << std::endl;
     for (int i = 0; i < dim; i++)
     {
-      Eigen::VectorXd analyticalCol = analyticalJacobian.col(i);
-      Eigen::VectorXd bruteForceCol = bruteForceJacobian.col(i);
+      Eigen::VectorXs analyticalCol = analyticalJacobian.col(i);
+      Eigen::VectorXs bruteForceCol = bruteForceJacobian.col(i);
       if (!equals(analyticalCol, bruteForceCol, threshold))
       {
         std::cout << "ERROR at col " << shot.getFlatDimName(world, i) << " ("
@@ -1121,7 +1121,7 @@ TEST(TRAJECTORY, JUMP_WORM)
 
   // World
   WorldPtr world = World::create();
-  world->setGravity(Eigen::Vector3d(0, -9.81, 0));
+  world->setGravity(Eigen::Vector3s(0, -9.81, 0));
 
   world->setPenetrationCorrectionEnabled(false);
 
@@ -1132,10 +1132,10 @@ TEST(TRAJECTORY, JUMP_WORM)
   TranslationalJoint2D* rootJoint = rootJointPair.first;
   BodyNode* root = rootJointPair.second;
 
-  std::shared_ptr<BoxShape> shape(new BoxShape(Eigen::Vector3d(0.1, 0.1, 0.1)));
+  std::shared_ptr<BoxShape> shape(new BoxShape(Eigen::Vector3s(0.1, 0.1, 0.1)));
   ShapeNode* rootVisual
       = root->createShapeNodeWith<VisualAspect, CollisionAspect>(shape);
-  Eigen::Vector3d black = Eigen::Vector3d::Zero();
+  Eigen::Vector3s black = Eigen::Vector3s::Zero();
   rootVisual->getVisualAspect()->setColor(black);
   rootJoint->setForceUpperLimit(0, 0);
   rootJoint->setForceLowerLimit(0, 0);
@@ -1151,14 +1151,14 @@ TEST(TRAJECTORY, JUMP_WORM)
   rootJoint->setPositionLowerLimit(1, -5);
 
   BodyNode* tail1 = createTailSegment(
-      root, Eigen::Vector3d(182.0 / 255, 223.0 / 255, 144.0 / 255));
+      root, Eigen::Vector3s(182.0 / 255, 223.0 / 255, 144.0 / 255));
   BodyNode* tail2 = createTailSegment(
-      tail1, Eigen::Vector3d(223.0 / 255, 228.0 / 255, 163.0 / 255));
+      tail1, Eigen::Vector3s(223.0 / 255, 228.0 / 255, 163.0 / 255));
   // BodyNode* tail3 =
   createTailSegment(
-      tail2, Eigen::Vector3d(221.0 / 255, 193.0 / 255, 121.0 / 255));
+      tail2, Eigen::Vector3s(221.0 / 255, 193.0 / 255, 121.0 / 255));
 
-  Eigen::VectorXd pos = Eigen::VectorXd(5);
+  Eigen::VectorXs pos = Eigen::VectorXs(5);
   pos << 0, 0, 90, 90, 45;
   jumpworm->setPositions(pos * 3.1415 / 180);
 
@@ -1172,11 +1172,11 @@ TEST(TRAJECTORY, JUMP_WORM)
       = floor->createJointAndBodyNodePair<WeldJoint>(nullptr);
   WeldJoint* floorJoint = floorJointPair.first;
   BodyNode* floorBody = floorJointPair.second;
-  Eigen::Isometry3d floorOffset = Eigen::Isometry3d::Identity();
-  floorOffset.translation() = Eigen::Vector3d(0, offGround ? -0.7 : -0.56, 0);
+  Eigen::Isometry3s floorOffset = Eigen::Isometry3s::Identity();
+  floorOffset.translation() = Eigen::Vector3s(0, offGround ? -0.7 : -0.56, 0);
   floorJoint->setTransformFromParentBodyNode(floorOffset);
   std::shared_ptr<BoxShape> floorShape(
-      new BoxShape(Eigen::Vector3d(2.5, 0.25, 0.5)));
+      new BoxShape(Eigen::Vector3s(2.5, 0.25, 0.5)));
   // ShapeNode* floorVisual =
   floorBody->createShapeNodeWith<VisualAspect, CollisionAspect>(floorShape);
   floorBody->setFrictionCoeff(0);
@@ -1184,18 +1184,18 @@ TEST(TRAJECTORY, JUMP_WORM)
   world->addSkeleton(floor);
 
   rootJoint->setVelocity(1, -0.1);
-  Eigen::VectorXd vels = world->getVelocities();
+  Eigen::VectorXs vels = world->getVelocities();
 
   TrajectoryLossFn loss = [](const TrajectoryRollout* rollout) {
-    const Eigen::Ref<const Eigen::MatrixXd> poses
+    const Eigen::Ref<const Eigen::MatrixXs> poses
         = rollout->getPosesConst("identity");
-    const Eigen::Ref<const Eigen::MatrixXd> vels
+    const Eigen::Ref<const Eigen::MatrixXs> vels
         = rollout->getVelsConst("identity");
-    const Eigen::Ref<const Eigen::MatrixXd> forces
+    const Eigen::Ref<const Eigen::MatrixXs> forces
         = rollout->getForcesConst("identity");
 
-    double maxPos = -1000;
-    double minPos = 1000;
+    s_t maxPos = -1000;
+    s_t minPos = 1000;
     for (int i = 0; i < poses.cols(); i++)
     {
       if (poses(1, i) > maxPos)
@@ -1207,12 +1207,12 @@ TEST(TRAJECTORY, JUMP_WORM)
         minPos = poses(1, i);
       }
     }
-    // double peakPosLoss = -(maxPos * maxPos) * (maxPos > 0 ? 1.0 : -1.0);
-    // double minPosLoss = -(minPos * minPos) * (minPos > 0 ? 1.0 : -1.0);
-    double endPos = poses(1, poses.cols() - 1);
-    double endPosLoss = -(endPos * endPos) * (endPos > 0 ? 1.0 : -1.0);
+    // s_t peakPosLoss = -(maxPos * maxPos) * (maxPos > 0 ? 1.0 : -1.0);
+    // s_t minPosLoss = -(minPos * minPos) * (minPos > 0 ? 1.0 : -1.0);
+    s_t endPos = poses(1, poses.cols() - 1);
+    s_t endPosLoss = -(endPos * endPos) * (endPos > 0 ? 1.0 : -1.0);
 
-    // double forceLoss = forces.squaredNorm();
+    // s_t forceLoss = forces.squaredNorm();
 
     // return endPosLoss * 100 + forceLoss * 1e-3;
     // return forceLoss;
@@ -1226,17 +1226,17 @@ TEST(TRAJECTORY, JUMP_WORM)
     gradWrtRollout->getPoses("identity").setZero();
     gradWrtRollout->getVels("identity").setZero();
     gradWrtRollout->getForces("identity").setZero();
-    const Eigen::Ref<const Eigen::MatrixXd> poses
+    const Eigen::Ref<const Eigen::MatrixXs> poses
         = rollout->getPosesConst("identity");
-    const Eigen::Ref<const Eigen::MatrixXd> vels
+    const Eigen::Ref<const Eigen::MatrixXs> vels
         = rollout->getVelsConst("identity");
-    const Eigen::Ref<const Eigen::MatrixXd> forces
+    const Eigen::Ref<const Eigen::MatrixXs> forces
         = rollout->getForcesConst("identity");
 
     gradWrtRollout->getPoses("identity")(1, poses.cols() - 1)
         = 2 * poses(1, poses.cols() - 1);
-    double endPos = poses(1, poses.cols() - 1);
-    double endPosLoss = -(endPos * endPos) * (endPos > 0 ? 1.0 : -1.0);
+    s_t endPos = poses(1, poses.cols() - 1);
+    s_t endPosLoss = -(endPos * endPos) * (endPos > 0 ? 1.0 : -1.0);
     return endPosLoss;
   };
 
@@ -1277,7 +1277,7 @@ TEST(TRAJECTORY, REOPTIMIZATION)
 
   // World
   WorldPtr world = World::create();
-  world->setGravity(Eigen::Vector3d(0, -9.81, 0));
+  world->setGravity(Eigen::Vector3s(0, -9.81, 0));
 
   world->setPenetrationCorrectionEnabled(false);
 
@@ -1288,10 +1288,10 @@ TEST(TRAJECTORY, REOPTIMIZATION)
   TranslationalJoint2D* rootJoint = rootJointPair.first;
   BodyNode* root = rootJointPair.second;
 
-  std::shared_ptr<BoxShape> shape(new BoxShape(Eigen::Vector3d(0.1, 0.1, 0.1)));
+  std::shared_ptr<BoxShape> shape(new BoxShape(Eigen::Vector3s(0.1, 0.1, 0.1)));
   ShapeNode* rootVisual
       = root->createShapeNodeWith<VisualAspect, CollisionAspect>(shape);
-  Eigen::Vector3d black = Eigen::Vector3d::Zero();
+  Eigen::Vector3s black = Eigen::Vector3s::Zero();
   rootVisual->getVisualAspect()->setColor(black);
   rootJoint->setForceUpperLimit(0, 0);
   rootJoint->setForceLowerLimit(0, 0);
@@ -1307,14 +1307,14 @@ TEST(TRAJECTORY, REOPTIMIZATION)
   rootJoint->setPositionLowerLimit(1, -5);
 
   BodyNode* tail1 = createTailSegment(
-      root, Eigen::Vector3d(182.0 / 255, 223.0 / 255, 144.0 / 255));
+      root, Eigen::Vector3s(182.0 / 255, 223.0 / 255, 144.0 / 255));
   BodyNode* tail2 = createTailSegment(
-      tail1, Eigen::Vector3d(223.0 / 255, 228.0 / 255, 163.0 / 255));
+      tail1, Eigen::Vector3s(223.0 / 255, 228.0 / 255, 163.0 / 255));
   // BodyNode* tail3 =
   createTailSegment(
-      tail2, Eigen::Vector3d(221.0 / 255, 193.0 / 255, 121.0 / 255));
+      tail2, Eigen::Vector3s(221.0 / 255, 193.0 / 255, 121.0 / 255));
 
-  Eigen::VectorXd pos = Eigen::VectorXd(5);
+  Eigen::VectorXs pos = Eigen::VectorXs(5);
   pos << 0, 0, 90, 90, 45;
   jumpworm->setPositions(pos * 3.1415 / 180);
 
@@ -1328,11 +1328,11 @@ TEST(TRAJECTORY, REOPTIMIZATION)
       = floor->createJointAndBodyNodePair<WeldJoint>(nullptr);
   WeldJoint* floorJoint = floorJointPair.first;
   BodyNode* floorBody = floorJointPair.second;
-  Eigen::Isometry3d floorOffset = Eigen::Isometry3d::Identity();
-  floorOffset.translation() = Eigen::Vector3d(0, offGround ? -0.7 : -0.56, 0);
+  Eigen::Isometry3s floorOffset = Eigen::Isometry3s::Identity();
+  floorOffset.translation() = Eigen::Vector3s(0, offGround ? -0.7 : -0.56, 0);
   floorJoint->setTransformFromParentBodyNode(floorOffset);
   std::shared_ptr<BoxShape> floorShape(
-      new BoxShape(Eigen::Vector3d(2.5, 0.25, 0.5)));
+      new BoxShape(Eigen::Vector3s(2.5, 0.25, 0.5)));
   // ShapeNode* floorVisual =
   floorBody->createShapeNodeWith<VisualAspect, CollisionAspect>(floorShape);
   floorBody->setFrictionCoeff(0);
@@ -1340,18 +1340,18 @@ TEST(TRAJECTORY, REOPTIMIZATION)
   world->addSkeleton(floor);
 
   rootJoint->setVelocity(1, -0.1);
-  Eigen::VectorXd vels = world->getVelocities();
+  Eigen::VectorXs vels = world->getVelocities();
 
   TrajectoryLossFn loss = [](const TrajectoryRollout* rollout) {
-    const Eigen::Ref<const Eigen::MatrixXd> poses
+    const Eigen::Ref<const Eigen::MatrixXs> poses
         = rollout->getPosesConst("identity");
-    const Eigen::Ref<const Eigen::MatrixXd> vels
+    const Eigen::Ref<const Eigen::MatrixXs> vels
         = rollout->getVelsConst("identity");
-    const Eigen::Ref<const Eigen::MatrixXd> forces
+    const Eigen::Ref<const Eigen::MatrixXs> forces
         = rollout->getForcesConst("identity");
 
-    double maxPos = -1000;
-    double minPos = 1000;
+    s_t maxPos = -1000;
+    s_t minPos = 1000;
     for (int i = 0; i < poses.cols(); i++)
     {
       if (poses(1, i) > maxPos)
@@ -1363,12 +1363,12 @@ TEST(TRAJECTORY, REOPTIMIZATION)
         minPos = poses(1, i);
       }
     }
-    // double peakPosLoss = -(maxPos * maxPos) * (maxPos > 0 ? 1.0 : -1.0);
-    // double minPosLoss = -(minPos * minPos) * (minPos > 0 ? 1.0 : -1.0);
-    double endPos = poses(1, poses.cols() - 1);
-    double endPosLoss = -(endPos * endPos) * (endPos > 0 ? 1.0 : -1.0);
+    // s_t peakPosLoss = -(maxPos * maxPos) * (maxPos > 0 ? 1.0 : -1.0);
+    // s_t minPosLoss = -(minPos * minPos) * (minPos > 0 ? 1.0 : -1.0);
+    s_t endPos = poses(1, poses.cols() - 1);
+    s_t endPosLoss = -(endPos * endPos) * (endPos > 0 ? 1.0 : -1.0);
 
-    // double forceLoss = forces.squaredNorm();
+    // s_t forceLoss = forces.squaredNorm();
 
     // return endPosLoss * 100 + forceLoss * 1e-3;
     // return forceLoss;
@@ -1382,17 +1382,17 @@ TEST(TRAJECTORY, REOPTIMIZATION)
     gradWrtRollout->getPoses("identity").setZero();
     gradWrtRollout->getVels("identity").setZero();
     gradWrtRollout->getForces("identity").setZero();
-    const Eigen::Ref<const Eigen::MatrixXd> poses
+    const Eigen::Ref<const Eigen::MatrixXs> poses
         = rollout->getPosesConst("identity");
-    const Eigen::Ref<const Eigen::MatrixXd> vels
+    const Eigen::Ref<const Eigen::MatrixXs> vels
         = rollout->getVelsConst("identity");
-    const Eigen::Ref<const Eigen::MatrixXd> forces
+    const Eigen::Ref<const Eigen::MatrixXs> forces
         = rollout->getForcesConst("identity");
 
     gradWrtRollout->getPoses("identity")(1, poses.cols() - 1)
         = 2 * poses(1, poses.cols() - 1);
-    double endPos = poses(1, poses.cols() - 1);
-    double endPosLoss = -(endPos * endPos) * (endPos > 0 ? 1.0 : -1.0);
+    s_t endPos = poses(1, poses.cols() - 1);
+    s_t endPosLoss = -(endPos * endPos) * (endPos > 0 ? 1.0 : -1.0);
     return endPosLoss;
   };
 

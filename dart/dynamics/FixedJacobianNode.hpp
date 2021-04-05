@@ -38,14 +38,12 @@
 namespace dart {
 namespace dynamics {
 
-class FixedJacobianNode :
-    public detail::FixedJacobianNodeCompositeBase,
-    public AccessoryNode<FixedJacobianNode>
+class FixedJacobianNode : public detail::FixedJacobianNodeCompositeBase,
+                          public AccessoryNode<FixedJacobianNode>
 {
 public:
-
   /// Set the current relative transform of this Fixed Frame
-  void setRelativeTransform(const Eigen::Isometry3d& newRelativeTf) override;
+  void setRelativeTransform(const Eigen::Isometry3s& newRelativeTf) override;
 
   // Documentation inherited
   bool dependsOn(std::size_t _genCoordIndex) const override;
@@ -113,12 +111,11 @@ public:
   /// \}
 
 protected:
-
   /// Constructor
-  FixedJacobianNode(BodyNode* parent, const Eigen::Isometry3d& transform);
+  FixedJacobianNode(BodyNode* parent, const Eigen::Isometry3s& transform);
 
   /// Tuple constructor
-  FixedJacobianNode(const std::tuple<BodyNode*, Eigen::Isometry3d>& args);
+  FixedJacobianNode(const std::tuple<BodyNode*, Eigen::Isometry3s>& args);
 
   /// Update the Jacobian of this Fixed Frame. getJacobian() calls this function
   /// if mIsBodyJacobianDirty is true.
@@ -160,12 +157,14 @@ protected:
 
     /// Spatial time derivative of Fixed Frame Jacobian
     ///
-    /// Do not use directly! Use getJacobianSpatialDeriv() to access this quantity
+    /// Do not use directly! Use getJacobianSpatialDeriv() to access this
+    /// quantity
     math::Jacobian mBodyJacobianSpatialDeriv;
 
     /// Classic time derivative of the Fixed Frame Jacobian
     ///
-    /// Do not use directly! Use getJacobianClassicDeriv() to access this quantity
+    /// Do not use directly! Use getJacobianClassicDeriv() to access this
+    /// quantity
     math::Jacobian mWorldJacobianClassicDeriv;
 
     // To get byte-aligned Eigen vectors
@@ -173,7 +172,6 @@ protected:
   };
 
   mutable Cache mCache;
-
 };
 
 } // namespace dynamics

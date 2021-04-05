@@ -37,6 +37,7 @@
 
 #include "dart/collision/SmartPointer.hpp"
 #include "dart/dynamics/SmartPointer.hpp"
+#include "dart/math/MathTypes.hpp"
 
 namespace dart {
 namespace collision {
@@ -86,16 +87,16 @@ struct Contact
   Contact();
 
   /// Contact point w.r.t. the world frame
-  Eigen::Vector3d point;
+  Eigen::Vector3s point;
 
   /// Contact normal vector from bodyNode2 to bodyNode1 w.r.t. the world frame
-  Eigen::Vector3d normal;
+  Eigen::Vector3s normal;
 
   /// Contact force acting on bodyNode1 w.r.t. the world frame
   ///
   /// The contact force acting on bodyNode2 is -force, which is the opposite
   /// direction of the force.
-  Eigen::Vector3d force;
+  Eigen::Vector3s force;
 
   /// First colliding collision object
   CollisionObject* collisionObject1;
@@ -104,7 +105,7 @@ struct Contact
   CollisionObject* collisionObject2;
 
   /// Penetration depth
-  double penetrationDepth;
+  s_t penetrationDepth;
 
   // TODO(JS): triID1 will be deprecated when we don't use fcl_mesh
   /// \brief
@@ -119,7 +120,7 @@ struct Contact
   void* userData;
 
   /// This holds the amount of force the LCP solved for for this contact
-  double lcpResult;
+  s_t lcpResult;
 
   /// This is necessary for computing gradients. This tells us what type of
   /// contact generated these contacts.
@@ -127,49 +128,49 @@ struct Contact
 
   /// This is only filled for (type == EDGE_EDGE) contacts. This is the closest
   /// point on edge A to edge B.
-  Eigen::Vector3d edgeAClosestPoint;
+  Eigen::Vector3s edgeAClosestPoint;
 
   /// This is only filled for (type == EDGE_EDGE) contacts. This is an arbitrary
   /// fixed point on edge A.
-  Eigen::Vector3d edgeAFixedPoint;
+  Eigen::Vector3s edgeAFixedPoint;
 
   /// This is only filled for (type == EDGE_EDGE) contacts. This is the
   /// direction of edge A
-  Eigen::Vector3d edgeADir;
+  Eigen::Vector3s edgeADir;
 
   /// This is only filled for (type == EDGE_EDGE) contacts. This is the closest
   /// point on edge B to edge A.
-  Eigen::Vector3d edgeBClosestPoint;
+  Eigen::Vector3s edgeBClosestPoint;
 
   /// This is only filled for (type == EDGE_EDGE) contacts. This is an arbitrary
   /// fixed point on edge B.
-  Eigen::Vector3d edgeBFixedPoint;
+  Eigen::Vector3s edgeBFixedPoint;
 
   /// This is only filled for (type == EDGE_EDGE) contacts. This is the
   /// direction of edge B
-  Eigen::Vector3d edgeBDir;
+  Eigen::Vector3s edgeBDir;
 
   /// This is only filled for (type == SPHERE_BOX || type == BOX_SPHERE)
   /// contacts. This holds the center-point of the sphere
-  Eigen::Vector3d sphereCenter;
+  Eigen::Vector3s sphereCenter;
 
   /// This is useful for SPHERE_FACE, SPHERE_EDGE, SPHERE_VERTEX, etc
-  double sphereRadius;
+  s_t sphereRadius;
 
   /// This is only filled for (type == PIPE_SPHERE || type == SPHERE_PIPE)
-  Eigen::Vector3d pipeDir;
+  Eigen::Vector3s pipeDir;
 
   /// This is only filled for (type == PIPE_SPHERE || type == SPHERE_PIPE)
-  Eigen::Vector3d pipeClosestPoint;
+  Eigen::Vector3s pipeClosestPoint;
 
   /// This is only filled for (type == PIPE_SPHERE || type == SPHERE_PIPE)
-  Eigen::Vector3d pipeFixedPoint;
+  Eigen::Vector3s pipeFixedPoint;
 
   /// This is only filled for (type == PIPE_SPHERE || type == SPHERE_PIPE)
-  double pipeRadius;
+  s_t pipeRadius;
 
   /// This is useful for SPHERE_VERTEX, PIPE_VERTEX, etc
-  Eigen::Vector3d vertexPoint;
+  Eigen::Vector3s vertexPoint;
 
   /// This is only useful for (type == SPHERE_BOX || type == BOX_SPHERE)
   /// contacts. If this is true, then the contact point is clamped on face1.
@@ -178,7 +179,7 @@ struct Contact
   /// This is only filled for (type == SPHERE_BOX || type == BOX_SPHERE)
   /// contacts. If (face1Locked) is true, then this means we don't move the
   /// contact point along this normal.
-  Eigen::Vector3d face1Normal;
+  Eigen::Vector3s face1Normal;
 
   /// This is only useful for (type == SPHERE_BOX || type == BOX_SPHERE)
   /// contacts. If this is true, then the contact point is clamped on face2.
@@ -187,7 +188,7 @@ struct Contact
   /// This is only filled for (type == SPHERE_BOX || type == BOX_SPHERE)
   /// contacts. If (face2Locked) is true, then this means we don't move the
   /// contact point along this normal.
-  Eigen::Vector3d face2Normal;
+  Eigen::Vector3s face2Normal;
 
   /// This is only useful for (type == SPHERE_BOX || type == BOX_SPHERE)
   /// contacts. If this is true, then the contact point is clamped on face3.
@@ -196,23 +197,23 @@ struct Contact
   /// This is only filled for (type == SPHERE_BOX || type == BOX_SPHERE)
   /// contacts. If (face3Locked) is true, then this means we don't move the
   /// contact point along this normal.
-  Eigen::Vector3d face3Normal;
+  Eigen::Vector3s face3Normal;
 
   /// This is only filled for (type == SPHERE_SPHERE) contacts. It's the center
   /// of the A sphere.
-  Eigen::Vector3d centerA;
+  Eigen::Vector3s centerA;
 
   /// This is only filled for (type == SPHERE_SPHERE) contacts. It's the radius
   /// of the A sphere.
-  double radiusA;
+  s_t radiusA;
 
   /// This is only filled for (type == SPHERE_SPHERE) contacts. It's the center
   /// of the B sphere.
-  Eigen::Vector3d centerB;
+  Eigen::Vector3s centerB;
 
   /// This is only filled for (type == SPHERE_SPHERE) contacts. It's the radius
   /// of the B sphere.
-  double radiusB;
+  s_t radiusB;
 
   /// Returns the epsilon to be used for determination of zero-length normal.
   constexpr static double getNormalEpsilon();
@@ -222,10 +223,10 @@ struct Contact
   constexpr static double getNormalEpsilonSquared();
 
   /// Returns true if the length of a normal is less than the epsilon.
-  static bool isZeroNormal(const Eigen::Vector3d& normal);
+  static bool isZeroNormal(const Eigen::Vector3s& normal);
 
   /// Returns !isZeroNormal().
-  static bool isNonZeroNormal(const Eigen::Vector3d& normal);
+  static bool isNonZeroNormal(const Eigen::Vector3s& normal);
 };
 
 } // namespace collision

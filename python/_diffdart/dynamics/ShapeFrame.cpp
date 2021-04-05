@@ -153,11 +153,11 @@ void ShapeFrame(py::module& m)
       .def(
           "setRGBA",
           +[](dart::dynamics::VisualAspect* self,
-              const Eigen::Vector4d& color) { self->setRGBA(color); },
+              const Eigen::Vector4s& color) { self->setRGBA(color); },
           ::py::arg("color"))
       .def(
           "getRGBA",
-          +[](dart::dynamics::VisualAspect* self) -> const Eigen::Vector4d& {
+          +[](dart::dynamics::VisualAspect* self) -> const Eigen::Vector4s& {
             return self->getRGBA();
           })
       .def(
@@ -196,38 +196,38 @@ void ShapeFrame(py::module& m)
       .def(
           "setColor",
           +[](dart::dynamics::VisualAspect* self,
-              const Eigen::Vector3d& color) { self->setColor(color); },
+              const Eigen::Vector3s& color) { self->setColor(color); },
           ::py::arg("color"))
       .def(
           "setColor",
           +[](dart::dynamics::VisualAspect* self,
-              const Eigen::Vector4d& color) { self->setColor(color); },
+              const Eigen::Vector4s& color) { self->setColor(color); },
           ::py::arg("color"))
       .def(
           "setRGB",
-          +[](dart::dynamics::VisualAspect* self, const Eigen::Vector3d& rgb) {
+          +[](dart::dynamics::VisualAspect* self, const Eigen::Vector3s& rgb) {
             self->setRGB(rgb);
           },
           ::py::arg("rgb"))
       .def(
           "setAlpha",
-          +[](dart::dynamics::VisualAspect* self, const double alpha) {
+          +[](dart::dynamics::VisualAspect* self, const s_t alpha) {
             self->setAlpha(alpha);
           },
           ::py::arg("alpha"))
       .def(
           "getColor",
-          +[](const dart::dynamics::VisualAspect* self) -> Eigen::Vector3d {
+          +[](const dart::dynamics::VisualAspect* self) -> Eigen::Vector3s {
             return self->getColor();
           })
       .def(
           "getRGB",
-          +[](const dart::dynamics::VisualAspect* self) -> Eigen::Vector3d {
+          +[](const dart::dynamics::VisualAspect* self) -> Eigen::Vector3s {
             return self->getRGB();
           })
       .def(
           "getAlpha",
-          +[](const dart::dynamics::VisualAspect* self) -> double {
+          +[](const dart::dynamics::VisualAspect* self) -> s_t {
             return self->getAlpha();
           })
       .def(
@@ -278,24 +278,24 @@ void ShapeFrame(py::module& m)
           ::py::arg("properties"))
       .def(
           "setFrictionCoeff",
-          +[](dart::dynamics::DynamicsAspect* self, const double& value) {
+          +[](dart::dynamics::DynamicsAspect* self, const s_t& value) {
             self->setFrictionCoeff(value);
           },
           ::py::arg("value"))
       .def(
           "getFrictionCoeff",
-          +[](const dart::dynamics::DynamicsAspect* self) -> double {
+          +[](const dart::dynamics::DynamicsAspect* self) -> s_t {
             return self->getFrictionCoeff();
           })
       .def(
           "setRestitutionCoeff",
-          +[](dart::dynamics::DynamicsAspect* self, const double& value) {
+          +[](dart::dynamics::DynamicsAspect* self, const s_t& value) {
             self->setRestitutionCoeff(value);
           },
           ::py::arg("value"))
       .def(
           "getRestitutionCoeff",
-          +[](const dart::dynamics::DynamicsAspect* self) -> double {
+          +[](const dart::dynamics::DynamicsAspect* self) -> s_t {
             return self->getRestitutionCoeff();
           });
 }

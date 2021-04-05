@@ -33,8 +33,8 @@ std::shared_ptr<simulation::World> loadWorld(const std::string& path);
 std::shared_ptr<dynamics::Skeleton> loadSkeleton(
     simulation::World* world,
     std::string path,
-    Eigen::Vector3d basePosition = Eigen::Vector3d::Zero(),
-    Eigen::Vector3d baseEulerAnglesXYZ = Eigen::Vector3d::Zero());
+    Eigen::Vector3s basePosition = Eigen::Vector3s::Zero(),
+    Eigen::Vector3s baseEulerAnglesXYZ = Eigen::Vector3s::Zero());
 
 /// This loads a mesh from a file
 std::shared_ptr<dynamics::MeshShape> loadMeshShape(std::string path);

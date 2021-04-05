@@ -36,6 +36,7 @@
 #include <vector>
 
 #include <Eigen/Dense>
+#include "dart/math/MathTypes.hpp"
 
 namespace dart {
 
@@ -50,7 +51,7 @@ class FileInfoDof
 {
 public:
   /// \brief Constructor
-  FileInfoDof(dynamics::Skeleton* _skel, double _fps = 120.0);
+  FileInfoDof(dynamics::Skeleton* _skel, s_t _fps = 120.0);
 
   /// \brief Destructor
   virtual ~FileInfoDof();
@@ -61,22 +62,22 @@ public:
   /// \brief Save file
   /// \note Down sampling not implemented yet
   bool saveFile(const char* _fileName, std::size_t _start, std::size_t _end,
-                double _sampleRate = 1.0);
+                s_t _sampleRate = 1.0);
 
   /// \brief Add Dof
-  void addDof(const Eigen::VectorXd& _dofs);
+  void addDof(const Eigen::VectorXs& _dofs);
 
   /// \brief Get Dof
-  double getDofAt(std::size_t _frame, std::size_t _id) const;
+  s_t getDofAt(std::size_t _frame, std::size_t _id) const;
 
   /// \brief Get pose at frame
-  Eigen::VectorXd getPoseAtFrame(int _frame) const;
+  Eigen::VectorXs getPoseAtFrame(int _frame) const;
 
   /// \brief Set frames per second
-  void setFPS(double _fps);
+  void setFPS(s_t _fps);
 
   /// \brief Get frames per second
-  double getFPS() const;
+  s_t getFPS() const;
 
   /// \brief Get number of frames
   int getNumFrames() const;
@@ -89,7 +90,7 @@ protected:
   dynamics::Skeleton* mSkel;
 
   /// \brief Frame rate
-  double mFPS;
+  s_t mFPS;
 
   /// \brief Number of frames
   std::size_t mNumFrames;
@@ -98,7 +99,7 @@ protected:
   char mFileName[256];
 
   /// \brief Dof data [frame][dofIndex]
-  std::vector<Eigen::VectorXd> mDofs;
+  std::vector<Eigen::VectorXs> mDofs;
 };
 
 }  // namespace utils

@@ -102,7 +102,7 @@ public:
   /// between the parent BodyNode and the child BodyNode frames when applied to
   /// an EulerJoint with the correct axis ordering.
   template <typename RotationType>
-  static Eigen::Vector3d convertToPositions(
+  static Eigen::Vector3s convertToPositions(
       const RotationType& _rotation, AxisOrder _ordering)
   {
     switch(_ordering)
@@ -114,7 +114,7 @@ public:
       default:
         dtwarn << "[EulerJoint::convertToPositions] Unsupported AxisOrder ("
                << static_cast<int>(_ordering) << "), returning a zero vector\n";
-        return Eigen::Vector3d::Zero();
+        return Eigen::Vector3s::Zero();
     }
   }
 
@@ -122,29 +122,29 @@ public:
   /// AxisOrder) which will use the AxisOrder belonging to the joint instance
   /// that it gets called on.
   template <typename RotationType>
-  Eigen::Vector3d convertToPositions(const RotationType& _rotation) const
+  Eigen::Vector3s convertToPositions(const RotationType& _rotation) const
   {
     return convertToPositions(_rotation, getAxisOrder());
   }
 
   /// Convert a set of Euler angle positions into a transform
-  static Eigen::Isometry3d convertToTransform(const Eigen::Vector3d& _positions,
+  static Eigen::Isometry3s convertToTransform(const Eigen::Vector3s& _positions,
                                            AxisOrder _ordering);
 
-  /// This is a version of EulerJoint::convertToRotation(const Eigen::Vector3d&,
+  /// This is a version of EulerJoint::convertToRotation(const Eigen::Vector3s&,
   /// AxisOrder) which will use the AxisOrder belonging to the joint instance
   /// that it gets called on.
-  Eigen::Isometry3d convertToTransform(const Eigen::Vector3d& _positions) const;
+  Eigen::Isometry3s convertToTransform(const Eigen::Vector3s& _positions) const;
 
   /// Convert a set of Euler angle positions into a rotation matrix
-  static Eigen::Matrix3d convertToRotation(const Eigen::Vector3d& _positions,
+  static Eigen::Matrix3s convertToRotation(const Eigen::Vector3s& _positions,
                                            AxisOrder _ordering);
 
-  Eigen::Matrix3d convertToRotation(const Eigen::Vector3d& _positions) const;
+  Eigen::Matrix3s convertToRotation(const Eigen::Vector3s& _positions) const;
 
   // Documentation inherited
-  Eigen::Matrix<double, 6, 3> getRelativeJacobianStatic(
-      const Eigen::Vector3d& _positions) const override;
+  Eigen::Matrix<s_t, 6, 3> getRelativeJacobianStatic(
+      const Eigen::Vector3s& _positions) const override;
 
   math::Jacobian getRelativeJacobianDeriv(std::size_t index) const override;
   math::Jacobian getRelativeJacobianTimeDerivDeriv(std::size_t index) const override;

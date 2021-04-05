@@ -60,13 +60,13 @@ namespace detail {
 //==============================================================================
 JointProperties::JointProperties(
     const std::string& _name,
-    const Eigen::Isometry3d& _T_ParentBodyToJoint,
-    const Eigen::Isometry3d& _T_ChildBodyToJoint,
+    const Eigen::Isometry3s& _T_ParentBodyToJoint,
+    const Eigen::Isometry3s& _T_ChildBodyToJoint,
     bool _isPositionLimitEnforced,
     ActuatorType _actuatorType,
     const Joint* _mimicJoint,
-    double _mimicMultiplier,
-    double _mimicOffset)
+    s_t _mimicMultiplier,
+    s_t _mimicOffset)
   : mName(_name),
     mT_ParentBodyToJoint(_T_ParentBodyToJoint),
     mT_ChildBodyToJoint(_T_ChildBodyToJoint),
@@ -206,7 +206,7 @@ Joint::ActuatorType Joint::getActuatorType() const
 
 //==============================================================================
 void Joint::setMimicJoint(
-    const Joint* _mimicJoint, double _mimicMultiplier, double _mimicOffset)
+    const Joint* _mimicJoint, s_t _mimicMultiplier, s_t _mimicOffset)
 {
   mAspectProperties.mMimicJoint = _mimicJoint;
   mAspectProperties.mMimicMultiplier = _mimicMultiplier;
@@ -220,13 +220,13 @@ const Joint* Joint::getMimicJoint() const
 }
 
 //==============================================================================
-double Joint::getMimicMultiplier() const
+s_t Joint::getMimicMultiplier() const
 {
   return mAspectProperties.mMimicMultiplier;
 }
 
 //==============================================================================
-double Joint::getMimicOffset() const
+s_t Joint::getMimicOffset() const
 {
   return mAspectProperties.mMimicOffset;
 }
@@ -298,25 +298,25 @@ std::shared_ptr<const Skeleton> Joint::getSkeleton() const
 }
 
 //==============================================================================
-const Eigen::Isometry3d& Joint::getLocalTransform() const
+const Eigen::Isometry3s& Joint::getLocalTransform() const
 {
   return getRelativeTransform();
 }
 
 //==============================================================================
-const Eigen::Vector6d& Joint::getLocalSpatialVelocity() const
+const Eigen::Vector6s& Joint::getLocalSpatialVelocity() const
 {
   return getRelativeSpatialVelocity();
 }
 
 //==============================================================================
-const Eigen::Vector6d& Joint::getLocalSpatialAcceleration() const
+const Eigen::Vector6s& Joint::getLocalSpatialAcceleration() const
 {
   return getRelativeSpatialAcceleration();
 }
 
 //==============================================================================
-const Eigen::Vector6d& Joint::getLocalPrimaryAcceleration() const
+const Eigen::Vector6s& Joint::getLocalPrimaryAcceleration() const
 {
   return getRelativePrimaryAcceleration();
 }
@@ -328,7 +328,7 @@ const math::Jacobian Joint::getLocalJacobian() const
 }
 
 //==============================================================================
-math::Jacobian Joint::getLocalJacobian(const Eigen::VectorXd& positions) const
+math::Jacobian Joint::getLocalJacobian(const Eigen::VectorXs& positions) const
 {
   return getRelativeJacobian(positions);
 }
@@ -340,7 +340,7 @@ const math::Jacobian Joint::getLocalJacobianTimeDeriv() const
 }
 
 //==============================================================================
-const Eigen::Isometry3d& Joint::getRelativeTransform() const
+const Eigen::Isometry3s& Joint::getRelativeTransform() const
 {
   if (mNeedTransformUpdate)
   {
@@ -352,7 +352,7 @@ const Eigen::Isometry3d& Joint::getRelativeTransform() const
 }
 
 //==============================================================================
-const Eigen::Vector6d& Joint::getRelativeSpatialVelocity() const
+const Eigen::Vector6s& Joint::getRelativeSpatialVelocity() const
 {
   if (mNeedSpatialVelocityUpdate)
   {
@@ -364,7 +364,7 @@ const Eigen::Vector6d& Joint::getRelativeSpatialVelocity() const
 }
 
 //==============================================================================
-const Eigen::Vector6d& Joint::getRelativeSpatialAcceleration() const
+const Eigen::Vector6s& Joint::getRelativeSpatialAcceleration() const
 {
   if (mNeedSpatialAccelerationUpdate)
   {
@@ -376,7 +376,7 @@ const Eigen::Vector6d& Joint::getRelativeSpatialAcceleration() const
 }
 
 //==============================================================================
-const Eigen::Vector6d& Joint::getRelativePrimaryAcceleration() const
+const Eigen::Vector6s& Joint::getRelativePrimaryAcceleration() const
 {
   if (mNeedPrimaryAccelerationUpdate)
   {
@@ -388,19 +388,19 @@ const Eigen::Vector6d& Joint::getRelativePrimaryAcceleration() const
 }
 
 //==============================================================================
-Eigen::MatrixXd Joint::finiteDifferenceRelativeJacobian()
+Eigen::MatrixXs Joint::finiteDifferenceRelativeJacobian()
 {
-  Eigen::Matrix<double, 6, Eigen::Dynamic> J
-      = Eigen::MatrixXd::Zero(6, getNumDofs());
-  const double EPS = 1e-5;
+  Eigen::Matrix<s_t, 6, Eigen::Dynamic> J
+      = Eigen::MatrixXs::Zero(6, getNumDofs());
+  const s_t EPS = 1e-5;
 
   for (int i = 0; i < getNumDofs(); i++)
   {
-    double original = getVelocity(i);
+    s_t original = getVelocity(i);
     setVelocity(i, original + EPS);
-    Eigen::Vector6d Vplus = getRelativeSpatialVelocity();
+    Eigen::Vector6s Vplus = getRelativeSpatialVelocity();
     setVelocity(i, original - EPS);
-    Eigen::Vector6d Vminus = getRelativeSpatialVelocity();
+    Eigen::Vector6s Vminus = getRelativeSpatialVelocity();
     setVelocity(i, original);
 
     J.col(i) = (Vplus - Vminus) / (2 * EPS);
@@ -410,26 +410,26 @@ Eigen::MatrixXd Joint::finiteDifferenceRelativeJacobian()
 }
 
 //==============================================================================
-Eigen::MatrixXd Joint::finiteDifferenceRelativeJacobianInPositionSpace(
+Eigen::MatrixXs Joint::finiteDifferenceRelativeJacobianInPositionSpace(
     bool useRidders)
 {
   if (useRidders)
   {
     return finiteDifferenceRiddersRelativeJacobianInPositionSpace();
   }
-  Eigen::Matrix<double, 6, Eigen::Dynamic> J
-      = Eigen::MatrixXd::Zero(6, getNumDofs());
-  const double EPS = 1e-5;
+  Eigen::Matrix<s_t, 6, Eigen::Dynamic> J
+      = Eigen::MatrixXs::Zero(6, getNumDofs());
+  const s_t EPS = 1e-5;
 
-  Eigen::Isometry3d T = getRelativeTransform();
+  Eigen::Isometry3s T = getRelativeTransform();
 
   for (int i = 0; i < getNumDofs(); i++)
   {
-    double original = getPosition(i);
+    s_t original = getPosition(i);
     setPosition(i, original + EPS);
-    Eigen::Vector6d Tplus = math::logMap(T.inverse() * getRelativeTransform());
+    Eigen::Vector6s Tplus = math::logMap(T.inverse() * getRelativeTransform());
     setPosition(i, original - EPS);
-    Eigen::Vector6d Tminus = math::logMap(T.inverse() * getRelativeTransform());
+    Eigen::Vector6s Tminus = math::logMap(T.inverse() * getRelativeTransform());
     setPosition(i, original);
 
     J.col(i) = (Tplus - Tminus) / (2 * EPS);
@@ -439,34 +439,34 @@ Eigen::MatrixXd Joint::finiteDifferenceRelativeJacobianInPositionSpace(
 }
 
 //==============================================================================
-Eigen::MatrixXd Joint::finiteDifferenceRiddersRelativeJacobianInPositionSpace()
+Eigen::MatrixXs Joint::finiteDifferenceRiddersRelativeJacobianInPositionSpace()
 {
-  Eigen::Matrix<double, 6, Eigen::Dynamic> J
-      = Eigen::MatrixXd::Zero(6, getNumDofs());
+  Eigen::Matrix<s_t, 6, Eigen::Dynamic> J
+      = Eigen::MatrixXs::Zero(6, getNumDofs());
 
-  Eigen::Isometry3d T = getRelativeTransform();
+  Eigen::Isometry3s T = getRelativeTransform();
 
-  double originalStepSize = 1e-2;
-  const double con = 1.4, con2 = (con * con);
-  const double safeThreshold = 2.0;
+  s_t originalStepSize = 1e-2;
+  const s_t con = 1.4, con2 = (con * con);
+  const s_t safeThreshold = 2.0;
   const int tabSize = 14;
 
   for (std::size_t i = 0; i < getNumDofs(); i++)
   {
     // Neville tableau of finite difference results
-    std::array<std::array<Eigen::VectorXd, tabSize>, tabSize> tab;
+    std::array<std::array<Eigen::VectorXs, tabSize>, tabSize> tab;
 
-    double original = getPosition(i);
+    s_t original = getPosition(i);
     setPosition(i, original + originalStepSize);
-    Eigen::Vector6d Tplus = math::logMap(T.inverse() * getRelativeTransform());
+    Eigen::Vector6s Tplus = math::logMap(T.inverse() * getRelativeTransform());
     setPosition(i, original - originalStepSize);
-    Eigen::Vector6d Tminus = math::logMap(T.inverse() * getRelativeTransform());
+    Eigen::Vector6s Tminus = math::logMap(T.inverse() * getRelativeTransform());
     setPosition(i, original);
 
     tab[0][0] = (Tplus - Tminus) / (2 * originalStepSize);
 
-    double stepSize = originalStepSize;
-    double bestError = std::numeric_limits<double>::max();
+    s_t stepSize = originalStepSize;
+    s_t bestError = std::numeric_limits<s_t>::max();
 
     // Iterate over smaller and smaller step sizes
     for (int iTab = 1; iTab < tabSize; iTab++)
@@ -474,16 +474,16 @@ Eigen::MatrixXd Joint::finiteDifferenceRiddersRelativeJacobianInPositionSpace()
       stepSize /= con;
 
       setPosition(i, original + stepSize);
-      Eigen::Vector6d Tplus
+      Eigen::Vector6s Tplus
           = math::logMap(T.inverse() * getRelativeTransform());
       setPosition(i, original - stepSize);
-      Eigen::Vector6d Tminus
+      Eigen::Vector6s Tminus
           = math::logMap(T.inverse() * getRelativeTransform());
       setPosition(i, original);
 
       tab[0][iTab] = (Tplus - Tminus) / (2 * stepSize);
 
-      double fac = con2;
+      s_t fac = con2;
       // Compute extrapolations of increasing orders, requiring no new
       // evaluations
       for (int jTab = 1; jTab <= iTab; jTab++)
@@ -491,7 +491,7 @@ Eigen::MatrixXd Joint::finiteDifferenceRiddersRelativeJacobianInPositionSpace()
         tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
                           / (fac - 1.0);
         fac = con2 * fac;
-        double currError = std::max(
+        s_t currError = max(
             (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
             (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
                 .array()
@@ -519,10 +519,10 @@ Eigen::MatrixXd Joint::finiteDifferenceRiddersRelativeJacobianInPositionSpace()
 //==============================================================================
 void Joint::debugRelativeJacobianInPositionSpace()
 {
-  Eigen::MatrixXd bruteForce
+  Eigen::MatrixXs bruteForce
       = finiteDifferenceRelativeJacobianInPositionSpace();
-  Eigen::MatrixXd analytical = getRelativeJacobianInPositionSpace();
-  const double threshold = 1e-9;
+  Eigen::MatrixXs analytical = getRelativeJacobianInPositionSpace();
+  const s_t threshold = 1e-9;
   if (((bruteForce - analytical).cwiseAbs().array() > threshold).any())
   {
     std::cout << "Relative Jacobian (in position space) disagrees on joint"
@@ -534,7 +534,7 @@ void Joint::debugRelativeJacobianInPositionSpace()
 }
 
 //==============================================================================
-Eigen::Vector6d Joint::getWorldAxisScrewForPosition(int dof) const
+Eigen::Vector6s Joint::getWorldAxisScrewForPosition(int dof) const
 {
   assert(dof >= 0 && dof < getNumDofs());
   return math::AdT(
@@ -543,7 +543,7 @@ Eigen::Vector6d Joint::getWorldAxisScrewForPosition(int dof) const
 }
 
 //==============================================================================
-Eigen::Vector6d Joint::getWorldAxisScrewForVelocity(int dof) const
+Eigen::Vector6s Joint::getWorldAxisScrewForVelocity(int dof) const
 {
   assert(dof >= 0 && dof < getNumDofs());
   return math::AdT(
@@ -631,13 +631,13 @@ bool Joint::checkSanity(bool _printWarnings) const
 }
 
 //==============================================================================
-double Joint::getPotentialEnergy() const
+s_t Joint::getPotentialEnergy() const
 {
   return computePotentialEnergy();
 }
 
 //==============================================================================
-void Joint::setTransformFromParentBodyNode(const Eigen::Isometry3d& _T)
+void Joint::setTransformFromParentBodyNode(const Eigen::Isometry3s& _T)
 {
   assert(math::verifyTransform(_T));
   mAspectProperties.mT_ParentBodyToJoint = _T;
@@ -645,7 +645,7 @@ void Joint::setTransformFromParentBodyNode(const Eigen::Isometry3d& _T)
 }
 
 //==============================================================================
-void Joint::setTransformFromChildBodyNode(const Eigen::Isometry3d& _T)
+void Joint::setTransformFromChildBodyNode(const Eigen::Isometry3s& _T)
 {
   assert(math::verifyTransform(_T));
   mAspectProperties.mT_ChildBodyToJoint = _T;
@@ -654,13 +654,13 @@ void Joint::setTransformFromChildBodyNode(const Eigen::Isometry3d& _T)
 }
 
 //==============================================================================
-const Eigen::Isometry3d& Joint::getTransformFromParentBodyNode() const
+const Eigen::Isometry3s& Joint::getTransformFromParentBodyNode() const
 {
   return mAspectProperties.mT_ParentBodyToJoint;
 }
 
 //==============================================================================
-const Eigen::Isometry3d& Joint::getTransformFromChildBodyNode() const
+const Eigen::Isometry3s& Joint::getTransformFromChildBodyNode() const
 {
   return mAspectProperties.mT_ChildBodyToJoint;
 }
@@ -668,10 +668,10 @@ const Eigen::Isometry3d& Joint::getTransformFromChildBodyNode() const
 //==============================================================================
 Joint::Joint()
   : mChildBodyNode(nullptr),
-    mT(Eigen::Isometry3d::Identity()),
-    mSpatialVelocity(Eigen::Vector6d::Zero()),
-    mSpatialAcceleration(Eigen::Vector6d::Zero()),
-    mPrimaryAcceleration(Eigen::Vector6d::Zero()),
+    mT(Eigen::Isometry3s::Identity()),
+    mSpatialVelocity(Eigen::Vector6s::Zero()),
+    mSpatialAcceleration(Eigen::Vector6s::Zero()),
+    mPrimaryAcceleration(Eigen::Vector6s::Zero()),
     mNeedTransformUpdate(true),
     mNeedSpatialVelocityUpdate(true),
     mNeedSpatialAccelerationUpdate(true),
@@ -732,10 +732,10 @@ void Joint::updateArticulatedInertia() const
 }
 
 //==============================================================================
-// Eigen::VectorXd Joint::getDampingForces() const
+// Eigen::VectorXs Joint::getDampingForces() const
 //{
 //  int numDofs = getNumDofs();
-//  Eigen::VectorXd dampingForce(numDofs);
+//  Eigen::VectorXs dampingForce(numDofs);
 
 //  for (int i = 0; i < numDofs; ++i)
 //    dampingForce(i) = -mDampingCoefficient[i] * getGenCoord(i)->getVel();
@@ -744,10 +744,10 @@ void Joint::updateArticulatedInertia() const
 //}
 
 //==============================================================================
-// Eigen::VectorXd Joint::getSpringForces(double _timeStep) const
+// Eigen::VectorXs Joint::getSpringForces(s_t _timeStep) const
 //{
 //  int dof = getNumDofs();
-//  Eigen::VectorXd springForce(dof);
+//  Eigen::VectorXs springForce(dof);
 //  for (int i = 0; i < dof; ++i)
 //  {
 //    springForce(i) =

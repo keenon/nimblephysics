@@ -34,14 +34,16 @@
 #define DART_DYNAMICS_CYLINDERSHAPE_HPP_
 
 #include "dart/dynamics/Shape.hpp"
+#include "dart/math/MathTypes.hpp"
 
 namespace dart {
 namespace dynamics {
 
-class CylinderShape : public Shape {
+class CylinderShape : public Shape
+{
 public:
   /// \brief Constructor.
-  CylinderShape(double _radius, double _height);
+  CylinderShape(s_t _radius, s_t _height);
 
   // Documentation inherited.
   const std::string& getType() const override;
@@ -50,26 +52,25 @@ public:
   static const std::string& getStaticType();
 
   /// \brief
-  double getRadius() const;
+  s_t getRadius() const;
 
   /// \brief
-  void setRadius(double _radius);
+  void setRadius(s_t _radius);
 
   /// \brief
-  double getHeight() const;
+  s_t getHeight() const;
 
   /// \brief
-  void setHeight(double _height);
+  void setHeight(s_t _height);
 
   /// \brief Compute volume from given properties
-  static double computeVolume(double radius, double height);
+  static s_t computeVolume(s_t radius, s_t height);
 
   /// \brief Compute moments of inertia of a cylinder
-  static Eigen::Matrix3d computeInertia(
-      double radius, double height, double mass);
+  static Eigen::Matrix3s computeInertia(s_t radius, s_t height, s_t mass);
 
   // Documentation inherited.
-  Eigen::Matrix3d computeInertia(double mass) const override;
+  Eigen::Matrix3s computeInertia(s_t mass) const override;
 
 protected:
   // Documentation inherited.
@@ -80,13 +81,13 @@ protected:
 
 private:
   /// \brief
-  double mRadius;
+  s_t mRadius;
 
   /// \brief Height along z-axis.
-  double mHeight;
+  s_t mHeight;
 };
 
-}  // namespace dynamics
-}  // namespace dart
+} // namespace dynamics
+} // namespace dart
 
-#endif  // DART_DYNAMICS_CYLINDERSHAPE_HPP_
+#endif // DART_DYNAMICS_CYLINDERSHAPE_HPP_

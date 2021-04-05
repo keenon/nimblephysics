@@ -42,7 +42,7 @@ int IdentityMapping::getMassDim()
 //==============================================================================
 void IdentityMapping::setPositions(
     std::shared_ptr<simulation::World> world,
-    const Eigen::Ref<Eigen::VectorXd>& positions)
+    const Eigen::Ref<Eigen::VectorXs>& positions)
 {
   world->setPositions(positions);
 }
@@ -50,7 +50,7 @@ void IdentityMapping::setPositions(
 //==============================================================================
 void IdentityMapping::setVelocities(
     std::shared_ptr<simulation::World> world,
-    const Eigen::Ref<Eigen::VectorXd>& velocities)
+    const Eigen::Ref<Eigen::VectorXs>& velocities)
 {
   world->setVelocities(velocities);
 }
@@ -58,7 +58,7 @@ void IdentityMapping::setVelocities(
 //==============================================================================
 void IdentityMapping::setForces(
     std::shared_ptr<simulation::World> world,
-    const Eigen::Ref<Eigen::VectorXd>& forces)
+    const Eigen::Ref<Eigen::VectorXs>& forces)
 {
   world->setExternalForces(forces);
 }
@@ -66,7 +66,7 @@ void IdentityMapping::setForces(
 //==============================================================================
 void IdentityMapping::setMasses(
     std::shared_ptr<simulation::World> world,
-    const Eigen::Ref<Eigen::VectorXd>& masses)
+    const Eigen::Ref<Eigen::VectorXs>& masses)
 {
   world->setMasses(masses);
 }
@@ -74,7 +74,7 @@ void IdentityMapping::setMasses(
 //==============================================================================
 void IdentityMapping::getPositionsInPlace(
     std::shared_ptr<simulation::World> world,
-    /* OUT */ Eigen::Ref<Eigen::VectorXd> positions)
+    /* OUT */ Eigen::Ref<Eigen::VectorXs> positions)
 {
   positions = world->getPositions();
 }
@@ -82,7 +82,7 @@ void IdentityMapping::getPositionsInPlace(
 //==============================================================================
 void IdentityMapping::getVelocitiesInPlace(
     std::shared_ptr<simulation::World> world,
-    /* OUT */ Eigen::Ref<Eigen::VectorXd> velocities)
+    /* OUT */ Eigen::Ref<Eigen::VectorXs> velocities)
 {
   velocities = world->getVelocities();
 }
@@ -90,7 +90,7 @@ void IdentityMapping::getVelocitiesInPlace(
 //==============================================================================
 void IdentityMapping::getForcesInPlace(
     std::shared_ptr<simulation::World> world,
-    /* OUT */ Eigen::Ref<Eigen::VectorXd> forces)
+    /* OUT */ Eigen::Ref<Eigen::VectorXs> forces)
 {
   forces = world->getExternalForces();
 }
@@ -98,7 +98,7 @@ void IdentityMapping::getForcesInPlace(
 //==============================================================================
 void IdentityMapping::getMassesInPlace(
     std::shared_ptr<simulation::World> world,
-    /* OUT */ Eigen::Ref<Eigen::VectorXd> masses)
+    /* OUT */ Eigen::Ref<Eigen::VectorXs> masses)
 {
   masses = world->getMasses();
 }
@@ -106,150 +106,150 @@ void IdentityMapping::getMassesInPlace(
 //==============================================================================
 /// This gets a Jacobian relating the changes in the outer positions (the
 /// "mapped" positions) to inner positions (the "real" positions)
-Eigen::MatrixXd IdentityMapping::getMappedPosToRealPosJac(
+Eigen::MatrixXs IdentityMapping::getMappedPosToRealPosJac(
     std::shared_ptr<simulation::World> /* world */)
 {
-  return Eigen::MatrixXd::Identity(mNumDofs, mNumDofs);
+  return Eigen::MatrixXs::Identity(mNumDofs, mNumDofs);
 }
 
 //==============================================================================
 /// This gets a Jacobian relating the changes in the inner positions (the
 /// "real" positions) to the corresponding outer positions (the "mapped"
 /// positions)
-Eigen::MatrixXd IdentityMapping::getRealPosToMappedPosJac(
+Eigen::MatrixXs IdentityMapping::getRealPosToMappedPosJac(
     std::shared_ptr<simulation::World> /* world */)
 {
-  return Eigen::MatrixXd::Identity(mNumDofs, mNumDofs);
+  return Eigen::MatrixXs::Identity(mNumDofs, mNumDofs);
 }
 
 //==============================================================================
 /// This gets a Jacobian relating the changes in the inner velocities (the
 /// "real" velocities) to the corresponding outer positions (the "mapped"
 /// positions)
-Eigen::MatrixXd IdentityMapping::getRealVelToMappedPosJac(
+Eigen::MatrixXs IdentityMapping::getRealVelToMappedPosJac(
     std::shared_ptr<simulation::World> /* world */)
 {
-  return Eigen::MatrixXd::Zero(mNumDofs, mNumDofs);
+  return Eigen::MatrixXs::Zero(mNumDofs, mNumDofs);
 }
 
 //==============================================================================
 /// This gets a Jacobian relating the changes in the outer velocity (the
 /// "mapped" velocity) to inner velocity (the "real" velocity)
-Eigen::MatrixXd IdentityMapping::getMappedVelToRealVelJac(
+Eigen::MatrixXs IdentityMapping::getMappedVelToRealVelJac(
     std::shared_ptr<simulation::World> /* world */)
 {
-  return Eigen::MatrixXd::Identity(mNumDofs, mNumDofs);
+  return Eigen::MatrixXs::Identity(mNumDofs, mNumDofs);
 }
 
 //==============================================================================
 /// This gets a Jacobian relating the changes in the inner velocity (the
 /// "real" velocity) to the corresponding outer velocity (the "mapped"
 /// velocity)
-Eigen::MatrixXd IdentityMapping::getRealVelToMappedVelJac(
+Eigen::MatrixXs IdentityMapping::getRealVelToMappedVelJac(
     std::shared_ptr<simulation::World> /* world */)
 {
-  return Eigen::MatrixXd::Identity(mNumDofs, mNumDofs);
+  return Eigen::MatrixXs::Identity(mNumDofs, mNumDofs);
 }
 
 //==============================================================================
 /// This gets a Jacobian relating the changes in the inner position (the
 /// "real" position) to the corresponding outer velocity (the "mapped"
 /// velocity)
-Eigen::MatrixXd IdentityMapping::getRealPosToMappedVelJac(
+Eigen::MatrixXs IdentityMapping::getRealPosToMappedVelJac(
     std::shared_ptr<simulation::World> /* world */)
 {
-  return Eigen::MatrixXd::Zero(mNumDofs, mNumDofs);
+  return Eigen::MatrixXs::Zero(mNumDofs, mNumDofs);
 }
 
 //==============================================================================
 /// This gets a Jacobian relating the changes in the outer force (the
 /// "mapped" force) to inner force (the "real" force)
-Eigen::MatrixXd IdentityMapping::getMappedForceToRealForceJac(
+Eigen::MatrixXs IdentityMapping::getMappedForceToRealForceJac(
     std::shared_ptr<simulation::World> /* world */)
 {
-  return Eigen::MatrixXd::Identity(mNumDofs, mNumDofs);
+  return Eigen::MatrixXs::Identity(mNumDofs, mNumDofs);
 }
 
 //==============================================================================
 /// This gets a Jacobian relating the changes in the inner force (the
 /// "real" force) to the corresponding outer force (the "mapped"
 /// force)
-Eigen::MatrixXd IdentityMapping::getRealForceToMappedForceJac(
+Eigen::MatrixXs IdentityMapping::getRealForceToMappedForceJac(
     std::shared_ptr<simulation::World> /* world */)
 {
-  return Eigen::MatrixXd::Identity(mNumDofs, mNumDofs);
+  return Eigen::MatrixXs::Identity(mNumDofs, mNumDofs);
 }
 
 //==============================================================================
 /// This gets a Jacobian relating the changes in the outer force (the
 /// "mapped" force) to inner force (the "real" force)
-Eigen::MatrixXd IdentityMapping::getMappedMassToRealMassJac(
+Eigen::MatrixXs IdentityMapping::getMappedMassToRealMassJac(
     std::shared_ptr<simulation::World> /* world */)
 {
-  return Eigen::MatrixXd::Identity(mMassDim, mMassDim);
+  return Eigen::MatrixXs::Identity(mMassDim, mMassDim);
 }
 
 //==============================================================================
 /// This gets a Jacobian relating the changes in the inner force (the
 /// "real" force) to the corresponding outer force (the "mapped"
 /// force)
-Eigen::MatrixXd IdentityMapping::getRealMassToMappedMassJac(
+Eigen::MatrixXs IdentityMapping::getRealMassToMappedMassJac(
     std::shared_ptr<simulation::World> /* world */)
 {
-  return Eigen::MatrixXd::Identity(mMassDim, mMassDim);
+  return Eigen::MatrixXs::Identity(mMassDim, mMassDim);
 }
 
 //==============================================================================
-Eigen::VectorXd IdentityMapping::getPositionLowerLimits(
+Eigen::VectorXs IdentityMapping::getPositionLowerLimits(
     std::shared_ptr<simulation::World> world)
 {
   return world->getPositionLowerLimits();
 }
 
 //==============================================================================
-Eigen::VectorXd IdentityMapping::getPositionUpperLimits(
+Eigen::VectorXs IdentityMapping::getPositionUpperLimits(
     std::shared_ptr<simulation::World> world)
 {
   return world->getPositionUpperLimits();
 }
 
 //==============================================================================
-Eigen::VectorXd IdentityMapping::getVelocityLowerLimits(
+Eigen::VectorXs IdentityMapping::getVelocityLowerLimits(
     std::shared_ptr<simulation::World> world)
 {
   return world->getVelocityLowerLimits();
 }
 
 //==============================================================================
-Eigen::VectorXd IdentityMapping::getVelocityUpperLimits(
+Eigen::VectorXs IdentityMapping::getVelocityUpperLimits(
     std::shared_ptr<simulation::World> world)
 {
   return world->getVelocityUpperLimits();
 }
 
 //==============================================================================
-Eigen::VectorXd IdentityMapping::getForceLowerLimits(
+Eigen::VectorXs IdentityMapping::getForceLowerLimits(
     std::shared_ptr<simulation::World> world)
 {
   return world->getExternalForceLowerLimits();
 }
 
 //==============================================================================
-Eigen::VectorXd IdentityMapping::getForceUpperLimits(
+Eigen::VectorXs IdentityMapping::getForceUpperLimits(
     std::shared_ptr<simulation::World> world)
 {
   return world->getExternalForceUpperLimits();
 }
 
 //==============================================================================
-Eigen::VectorXd IdentityMapping::getMassLowerLimits(
+Eigen::VectorXs IdentityMapping::getMassLowerLimits(
     std::shared_ptr<simulation::World> world)
 {
   return world->getMassLowerLimits();
 }
 
 //==============================================================================
-Eigen::VectorXd IdentityMapping::getMassUpperLimits(
+Eigen::VectorXs IdentityMapping::getMassUpperLimits(
     std::shared_ptr<simulation::World> world)
 {
   return world->getMassUpperLimits();

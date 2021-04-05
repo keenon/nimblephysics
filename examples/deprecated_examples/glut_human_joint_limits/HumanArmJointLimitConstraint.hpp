@@ -57,28 +57,28 @@ public:
   //----------------------------------------------------------------------------
 
   /// Set global error reduction parameter
-  static void setErrorAllowance(double allowance);
+  static void setErrorAllowance(s_t allowance);
 
   /// Get global error reduction parameter
-  static double getErrorAllowance();
+  static s_t getErrorAllowance();
 
   /// Set global error reduction parameter
-  static void setErrorReductionParameter(double erp);
+  static void setErrorReductionParameter(s_t erp);
 
   /// Get global error reduction parameter
-  static double getErrorReductionParameter();
+  static s_t getErrorReductionParameter();
 
   /// Set global error reduction parameter
-  static void setMaxErrorReductionVelocity(double erv);
+  static void setMaxErrorReductionVelocity(s_t erv);
 
   /// Get global error reduction parameter
-  static double getMaxErrorReductionVelocity();
+  static s_t getMaxErrorReductionVelocity();
 
   /// Set global constraint force mixing parameter
-  static void setConstraintForceMixing(double cfm);
+  static void setConstraintForceMixing(s_t cfm);
 
   /// Get global constraint force mixing parameter
-  static double getConstraintForceMixing();
+  static s_t getConstraintForceMixing();
 
   //----------------------------------------------------------------------------
   // Friendship
@@ -102,7 +102,7 @@ protected:
   void applyUnitImpulse(std::size_t index) override;
 
   // Documentation inherited
-  void getVelocityChange(double* delVel, bool withCfm) override;
+  void getVelocityChange(s_t* delVel, bool withCfm) override;
 
   // Documentation inherited
   void excite() override;
@@ -111,7 +111,7 @@ protected:
   void unexcite() override;
 
   // Documentation inherited
-  void applyImpulse(double* lambda) override;
+  void applyImpulse(s_t* lambda) override;
 
   // Documentation inherited
   dart::dynamics::SkeletonPtr getRootSkeleton() const override;
@@ -137,39 +137,39 @@ private:
   tiny_dnn::network<tiny_dnn::sequential> mNet;
 
   /// Gradient of the neural net function
-  Eigen::Vector4d mJacobian;
+  Eigen::Vector4s mJacobian;
 
   /// Index of applied impulse
   std::size_t mAppliedImpulseIndex;
 
   std::size_t mLifeTime;
 
-  double mViolation;
+  s_t mViolation;
 
-  double mNegativeVel;
+  s_t mNegativeVel;
 
-  double mOldX;
+  s_t mOldX;
 
-  double mUpperBound;
+  s_t mUpperBound;
 
-  double mLowerBound;
+  s_t mLowerBound;
 
   bool mActive;
 
   /// Global constraint error allowance
-  static double mErrorAllowance;
+  static s_t mErrorAllowance;
 
   /// Global constraint error redection parameter in the range of [0, 1]. The
   /// default is 0.01.
-  static double mErrorReductionParameter;
+  static s_t mErrorReductionParameter;
 
   /// Maximum error reduction velocity
-  static double mMaxErrorReductionVelocity;
+  static s_t mMaxErrorReductionVelocity;
 
   /// Global constraint force mixing parameter in the range of [1e-9, 1]. The
   /// default is 1e-5
   /// \sa http://www.ode.org/ode-latest-userguide.html#sec_3_8_0
-  static double mConstraintForceMixing;
+  static s_t mConstraintForceMixing;
 };
 
 #endif // EXAMPLES_HUMANJOINTLIMITS_HUMANLEGJOINTLIMITCONSTRAINT_HPP_

@@ -39,7 +39,7 @@ AtlasSimbiconWorldNode::AtlasSimbiconWorldNode(
     const dart::simulation::WorldPtr& world,
     const dart::dynamics::SkeletonPtr& atlas)
   : dart::gui::osg::RealTimeWorldNode(world),
-    mExternalForce(Eigen::Vector3d::Zero()),
+    mExternalForce(Eigen::Vector3s::Zero()),
     mForceDuration(0.0)
 {
   assert(world);
@@ -69,28 +69,28 @@ void AtlasSimbiconWorldNode::reset()
 }
 
 //==============================================================================
-void AtlasSimbiconWorldNode::pushForwardAtlas(double force, int frames)
+void AtlasSimbiconWorldNode::pushForwardAtlas(s_t force, int frames)
 {
   mExternalForce.x() = force;
   mForceDuration = frames;
 }
 
 //==============================================================================
-void AtlasSimbiconWorldNode::pushBackwardAtlas(double force, int frames)
+void AtlasSimbiconWorldNode::pushBackwardAtlas(s_t force, int frames)
 {
   mExternalForce.x() = -force;
   mForceDuration = frames;
 }
 
 //==============================================================================
-void AtlasSimbiconWorldNode::pushLeftAtlas(double force, int frames)
+void AtlasSimbiconWorldNode::pushLeftAtlas(s_t force, int frames)
 {
   mExternalForce.z() = force;
   mForceDuration = frames;
 }
 
 //==============================================================================
-void AtlasSimbiconWorldNode::pushRightAtlas(double force, int frames)
+void AtlasSimbiconWorldNode::pushRightAtlas(s_t force, int frames)
 {
   mExternalForce.z() = -force;
   mForceDuration = frames;

@@ -110,24 +110,24 @@ void ZeroDofJoint(py::module& m)
           "setCommand",
           +[](dart::dynamics::ZeroDofJoint* self,
               std::size_t _index,
-              double _command) { self->setCommand(_index, _command); },
+              s_t _command) { self->setCommand(_index, _command); },
           ::py::arg("index"),
           ::py::arg("command"))
       .def(
           "getCommand",
           +[](const dart::dynamics::ZeroDofJoint* self, std::size_t _index)
-              -> double { return self->getCommand(_index); },
+              -> s_t { return self->getCommand(_index); },
           ::py::arg("index"))
       .def(
           "setCommands",
           +[](dart::dynamics::ZeroDofJoint* self,
-              const Eigen::VectorXd& _commands) {
+              const Eigen::VectorXs& _commands) {
             self->setCommands(_commands);
           },
           ::py::arg("commands"))
       .def(
           "getCommands",
-          +[](const dart::dynamics::ZeroDofJoint* self) -> Eigen::VectorXd {
+          +[](const dart::dynamics::ZeroDofJoint* self) -> Eigen::VectorXs {
             return self->getCommands();
           })
       .def(
@@ -137,31 +137,31 @@ void ZeroDofJoint(py::module& m)
           "setPosition",
           +[](dart::dynamics::ZeroDofJoint* self,
               std::size_t _arg0_,
-              double _arg1_) { self->setPosition(_arg0_, _arg1_); },
+              s_t _arg1_) { self->setPosition(_arg0_, _arg1_); },
           ::py::arg("arg0_"),
           ::py::arg("arg1_"))
       .def(
           "getPosition",
           +[](const dart::dynamics::ZeroDofJoint* self, std::size_t _index)
-              -> double { return self->getPosition(_index); },
+              -> s_t { return self->getPosition(_index); },
           ::py::arg("index"))
       .def(
           "setPositions",
           +[](dart::dynamics::ZeroDofJoint* self,
-              const Eigen::VectorXd& _positions) {
+              const Eigen::VectorXs& _positions) {
             self->setPositions(_positions);
           },
           ::py::arg("positions"))
       .def(
           "getPositions",
-          +[](const dart::dynamics::ZeroDofJoint* self) -> Eigen::VectorXd {
+          +[](const dart::dynamics::ZeroDofJoint* self) -> Eigen::VectorXs {
             return self->getPositions();
           })
       .def(
           "setPositionLowerLimit",
           +[](dart::dynamics::ZeroDofJoint* self,
               std::size_t _index,
-              double _position) {
+              s_t _position) {
             self->setPositionLowerLimit(_index, _position);
           },
           ::py::arg("index"),
@@ -169,25 +169,25 @@ void ZeroDofJoint(py::module& m)
       .def(
           "getPositionLowerLimit",
           +[](const dart::dynamics::ZeroDofJoint* self, std::size_t _index)
-              -> double { return self->getPositionLowerLimit(_index); },
+              -> s_t { return self->getPositionLowerLimit(_index); },
           ::py::arg("index"))
       .def(
           "setPositionLowerLimits",
           +[](dart::dynamics::ZeroDofJoint* self,
-              const Eigen::VectorXd& lowerLimits) {
+              const Eigen::VectorXs& lowerLimits) {
             self->setPositionLowerLimits(lowerLimits);
           },
           ::py::arg("lowerLimits"))
       .def(
           "getPositionLowerLimits",
-          +[](const dart::dynamics::ZeroDofJoint* self) -> Eigen::VectorXd {
+          +[](const dart::dynamics::ZeroDofJoint* self) -> Eigen::VectorXs {
             return self->getPositionLowerLimits();
           })
       .def(
           "setPositionUpperLimit",
           +[](dart::dynamics::ZeroDofJoint* self,
               std::size_t index,
-              double position) {
+              s_t position) {
             self->setPositionUpperLimit(index, position);
           },
           ::py::arg("index"),
@@ -195,18 +195,18 @@ void ZeroDofJoint(py::module& m)
       .def(
           "getPositionUpperLimit",
           +[](const dart::dynamics::ZeroDofJoint* self, std::size_t index)
-              -> double { return self->getPositionUpperLimit(index); },
+              -> s_t { return self->getPositionUpperLimit(index); },
           ::py::arg("index"))
       .def(
           "setPositionUpperLimits",
           +[](dart::dynamics::ZeroDofJoint* self,
-              const Eigen::VectorXd& upperLimits) {
+              const Eigen::VectorXs& upperLimits) {
             self->setPositionUpperLimits(upperLimits);
           },
           ::py::arg("upperLimits"))
       .def(
           "getPositionUpperLimits",
-          +[](const dart::dynamics::ZeroDofJoint* self) -> Eigen::VectorXd {
+          +[](const dart::dynamics::ZeroDofJoint* self) -> Eigen::VectorXs {
             return self->getPositionUpperLimits();
           })
       .def(
@@ -227,55 +227,55 @@ void ZeroDofJoint(py::module& m)
           "setInitialPosition",
           +[](dart::dynamics::ZeroDofJoint* self,
               std::size_t _index,
-              double _initial) { self->setInitialPosition(_index, _initial); },
+              s_t _initial) { self->setInitialPosition(_index, _initial); },
           ::py::arg("index"),
           ::py::arg("initial"))
       .def(
           "getInitialPosition",
           +[](const dart::dynamics::ZeroDofJoint* self, std::size_t _index)
-              -> double { return self->getInitialPosition(_index); },
+              -> s_t { return self->getInitialPosition(_index); },
           ::py::arg("index"))
       .def(
           "setInitialPositions",
           +[](dart::dynamics::ZeroDofJoint* self,
-              const Eigen::VectorXd& _initial) {
+              const Eigen::VectorXs& _initial) {
             self->setInitialPositions(_initial);
           },
           ::py::arg("initial"))
       .def(
           "getInitialPositions",
-          +[](const dart::dynamics::ZeroDofJoint* self) -> Eigen::VectorXd {
+          +[](const dart::dynamics::ZeroDofJoint* self) -> Eigen::VectorXs {
             return self->getInitialPositions();
           })
       .def(
           "setVelocity",
           +[](dart::dynamics::ZeroDofJoint* self,
               std::size_t _index,
-              double _velocity) { self->setVelocity(_index, _velocity); },
+              s_t _velocity) { self->setVelocity(_index, _velocity); },
           ::py::arg("index"),
           ::py::arg("velocity"))
       .def(
           "getVelocity",
           +[](const dart::dynamics::ZeroDofJoint* self, std::size_t _index)
-              -> double { return self->getVelocity(_index); },
+              -> s_t { return self->getVelocity(_index); },
           ::py::arg("index"))
       .def(
           "setVelocities",
           +[](dart::dynamics::ZeroDofJoint* self,
-              const Eigen::VectorXd& _velocities) {
+              const Eigen::VectorXs& _velocities) {
             self->setVelocities(_velocities);
           },
           ::py::arg("velocities"))
       .def(
           "getVelocities",
-          +[](const dart::dynamics::ZeroDofJoint* self) -> Eigen::VectorXd {
+          +[](const dart::dynamics::ZeroDofJoint* self) -> Eigen::VectorXs {
             return self->getVelocities();
           })
       .def(
           "setVelocityLowerLimit",
           +[](dart::dynamics::ZeroDofJoint* self,
               std::size_t _index,
-              double _velocity) {
+              s_t _velocity) {
             self->setVelocityLowerLimit(_index, _velocity);
           },
           ::py::arg("index"),
@@ -283,25 +283,25 @@ void ZeroDofJoint(py::module& m)
       .def(
           "getVelocityLowerLimit",
           +[](const dart::dynamics::ZeroDofJoint* self, std::size_t _index)
-              -> double { return self->getVelocityLowerLimit(_index); },
+              -> s_t { return self->getVelocityLowerLimit(_index); },
           ::py::arg("index"))
       .def(
           "setVelocityLowerLimits",
           +[](dart::dynamics::ZeroDofJoint* self,
-              const Eigen::VectorXd& lowerLimits) {
+              const Eigen::VectorXs& lowerLimits) {
             self->setVelocityLowerLimits(lowerLimits);
           },
           ::py::arg("lowerLimits"))
       .def(
           "getVelocityLowerLimits",
-          +[](const dart::dynamics::ZeroDofJoint* self) -> Eigen::VectorXd {
+          +[](const dart::dynamics::ZeroDofJoint* self) -> Eigen::VectorXs {
             return self->getVelocityLowerLimits();
           })
       .def(
           "setVelocityUpperLimit",
           +[](dart::dynamics::ZeroDofJoint* self,
               std::size_t _index,
-              double _velocity) {
+              s_t _velocity) {
             self->setVelocityUpperLimit(_index, _velocity);
           },
           ::py::arg("index"),
@@ -309,18 +309,18 @@ void ZeroDofJoint(py::module& m)
       .def(
           "getVelocityUpperLimit",
           +[](const dart::dynamics::ZeroDofJoint* self, std::size_t _index)
-              -> double { return self->getVelocityUpperLimit(_index); },
+              -> s_t { return self->getVelocityUpperLimit(_index); },
           ::py::arg("index"))
       .def(
           "setVelocityUpperLimits",
           +[](dart::dynamics::ZeroDofJoint* self,
-              const Eigen::VectorXd& upperLimits) {
+              const Eigen::VectorXs& upperLimits) {
             self->setVelocityUpperLimits(upperLimits);
           },
           ::py::arg("upperLimits"))
       .def(
           "getVelocityUpperLimits",
-          +[](const dart::dynamics::ZeroDofJoint* self) -> Eigen::VectorXd {
+          +[](const dart::dynamics::ZeroDofJoint* self) -> Eigen::VectorXs {
             return self->getVelocityUpperLimits();
           })
       .def(
@@ -336,31 +336,31 @@ void ZeroDofJoint(py::module& m)
           "setInitialVelocity",
           +[](dart::dynamics::ZeroDofJoint* self,
               std::size_t _index,
-              double _initial) { self->setInitialVelocity(_index, _initial); },
+              s_t _initial) { self->setInitialVelocity(_index, _initial); },
           ::py::arg("index"),
           ::py::arg("initial"))
       .def(
           "getInitialVelocity",
           +[](const dart::dynamics::ZeroDofJoint* self, std::size_t _index)
-              -> double { return self->getInitialVelocity(_index); },
+              -> s_t { return self->getInitialVelocity(_index); },
           ::py::arg("index"))
       .def(
           "setInitialVelocities",
           +[](dart::dynamics::ZeroDofJoint* self,
-              const Eigen::VectorXd& _initial) {
+              const Eigen::VectorXs& _initial) {
             self->setInitialVelocities(_initial);
           },
           ::py::arg("initial"))
       .def(
           "getInitialVelocities",
-          +[](const dart::dynamics::ZeroDofJoint* self) -> Eigen::VectorXd {
+          +[](const dart::dynamics::ZeroDofJoint* self) -> Eigen::VectorXs {
             return self->getInitialVelocities();
           })
       .def(
           "setAcceleration",
           +[](dart::dynamics::ZeroDofJoint* self,
               std::size_t _index,
-              double _acceleration) {
+              s_t _acceleration) {
             self->setAcceleration(_index, _acceleration);
           },
           ::py::arg("index"),
@@ -368,18 +368,18 @@ void ZeroDofJoint(py::module& m)
       .def(
           "getAcceleration",
           +[](const dart::dynamics::ZeroDofJoint* self, std::size_t _index)
-              -> double { return self->getAcceleration(_index); },
+              -> s_t { return self->getAcceleration(_index); },
           ::py::arg("index"))
       .def(
           "setAccelerations",
           +[](dart::dynamics::ZeroDofJoint* self,
-              const Eigen::VectorXd& _accelerations) {
+              const Eigen::VectorXs& _accelerations) {
             self->setAccelerations(_accelerations);
           },
           ::py::arg("accelerations"))
       .def(
           "getAccelerations",
-          +[](const dart::dynamics::ZeroDofJoint* self) -> Eigen::VectorXd {
+          +[](const dart::dynamics::ZeroDofJoint* self) -> Eigen::VectorXs {
             return self->getAccelerations();
           })
       .def(
@@ -391,7 +391,7 @@ void ZeroDofJoint(py::module& m)
           "setAccelerationLowerLimit",
           +[](dart::dynamics::ZeroDofJoint* self,
               std::size_t _index,
-              double _acceleration) {
+              s_t _acceleration) {
             self->setAccelerationLowerLimit(_index, _acceleration);
           },
           ::py::arg("index"),
@@ -399,25 +399,25 @@ void ZeroDofJoint(py::module& m)
       .def(
           "getAccelerationLowerLimit",
           +[](const dart::dynamics::ZeroDofJoint* self, std::size_t _index)
-              -> double { return self->getAccelerationLowerLimit(_index); },
+              -> s_t { return self->getAccelerationLowerLimit(_index); },
           ::py::arg("index"))
       .def(
           "setAccelerationLowerLimits",
           +[](dart::dynamics::ZeroDofJoint* self,
-              const Eigen::VectorXd& lowerLimits) {
+              const Eigen::VectorXs& lowerLimits) {
             self->setAccelerationLowerLimits(lowerLimits);
           },
           ::py::arg("lowerLimits"))
       .def(
           "getAccelerationLowerLimits",
-          +[](const dart::dynamics::ZeroDofJoint* self) -> Eigen::VectorXd {
+          +[](const dart::dynamics::ZeroDofJoint* self) -> Eigen::VectorXs {
             return self->getAccelerationLowerLimits();
           })
       .def(
           "setAccelerationUpperLimit",
           +[](dart::dynamics::ZeroDofJoint* self,
               std::size_t _index,
-              double _acceleration) {
+              s_t _acceleration) {
             self->setAccelerationUpperLimit(_index, _acceleration);
           },
           ::py::arg("index"),
@@ -425,40 +425,40 @@ void ZeroDofJoint(py::module& m)
       .def(
           "getAccelerationUpperLimit",
           +[](const dart::dynamics::ZeroDofJoint* self, std::size_t _index)
-              -> double { return self->getAccelerationUpperLimit(_index); },
+              -> s_t { return self->getAccelerationUpperLimit(_index); },
           ::py::arg("index"))
       .def(
           "setAccelerationUpperLimits",
           +[](dart::dynamics::ZeroDofJoint* self,
-              const Eigen::VectorXd& upperLimits) {
+              const Eigen::VectorXs& upperLimits) {
             self->setAccelerationUpperLimits(upperLimits);
           },
           ::py::arg("upperLimits"))
       .def(
           "getAccelerationUpperLimits",
-          +[](const dart::dynamics::ZeroDofJoint* self) -> Eigen::VectorXd {
+          +[](const dart::dynamics::ZeroDofJoint* self) -> Eigen::VectorXs {
             return self->getAccelerationUpperLimits();
           })
       .def(
           "setForce",
           +[](dart::dynamics::ZeroDofJoint* self,
               std::size_t _index,
-              double _force) { self->setForce(_index, _force); },
+              s_t _force) { self->setForce(_index, _force); },
           ::py::arg("index"),
           ::py::arg("force"))
       .def(
           "getForce",
           +[](const dart::dynamics::ZeroDofJoint* self,
-              std::size_t _index) -> double { return self->getForce(_index); },
+              std::size_t _index) -> s_t { return self->getForce(_index); },
           ::py::arg("index"))
       .def(
           "setForces",
           +[](dart::dynamics::ZeroDofJoint* self,
-              const Eigen::VectorXd& _forces) { self->setForces(_forces); },
+              const Eigen::VectorXs& _forces) { self->setForces(_forces); },
           ::py::arg("forces"))
       .def(
           "getForces",
-          +[](const dart::dynamics::ZeroDofJoint* self) -> Eigen::VectorXd {
+          +[](const dart::dynamics::ZeroDofJoint* self) -> Eigen::VectorXs {
             return self->getForces();
           })
       .def(
@@ -468,55 +468,55 @@ void ZeroDofJoint(py::module& m)
           "setForceLowerLimit",
           +[](dart::dynamics::ZeroDofJoint* self,
               std::size_t _index,
-              double _force) { self->setForceLowerLimit(_index, _force); },
+              s_t _force) { self->setForceLowerLimit(_index, _force); },
           ::py::arg("index"),
           ::py::arg("force"))
       .def(
           "getForceLowerLimit",
           +[](const dart::dynamics::ZeroDofJoint* self, std::size_t _index)
-              -> double { return self->getForceLowerLimit(_index); },
+              -> s_t { return self->getForceLowerLimit(_index); },
           ::py::arg("index"))
       .def(
           "setForceLowerLimits",
           +[](dart::dynamics::ZeroDofJoint* self,
-              const Eigen::VectorXd& lowerLimits) {
+              const Eigen::VectorXs& lowerLimits) {
             self->setForceLowerLimits(lowerLimits);
           },
           ::py::arg("lowerLimits"))
       .def(
           "getForceLowerLimits",
-          +[](const dart::dynamics::ZeroDofJoint* self) -> Eigen::VectorXd {
+          +[](const dart::dynamics::ZeroDofJoint* self) -> Eigen::VectorXs {
             return self->getForceLowerLimits();
           })
       .def(
           "setForceUpperLimit",
           +[](dart::dynamics::ZeroDofJoint* self,
               std::size_t _index,
-              double _force) { self->setForceUpperLimit(_index, _force); },
+              s_t _force) { self->setForceUpperLimit(_index, _force); },
           ::py::arg("index"),
           ::py::arg("force"))
       .def(
           "getForceUpperLimit",
           +[](const dart::dynamics::ZeroDofJoint* self, std::size_t _index)
-              -> double { return self->getForceUpperLimit(_index); },
+              -> s_t { return self->getForceUpperLimit(_index); },
           ::py::arg("index"))
       .def(
           "setForceUpperLimits",
           +[](dart::dynamics::ZeroDofJoint* self,
-              const Eigen::VectorXd& upperLimits) {
+              const Eigen::VectorXs& upperLimits) {
             self->setForceUpperLimits(upperLimits);
           },
           ::py::arg("upperLimits"))
       .def(
           "getForceUpperLimits",
-          +[](const dart::dynamics::ZeroDofJoint* self) -> Eigen::VectorXd {
+          +[](const dart::dynamics::ZeroDofJoint* self) -> Eigen::VectorXs {
             return self->getForceUpperLimits();
           })
       .def(
           "setVelocityChange",
           +[](dart::dynamics::ZeroDofJoint* self,
               std::size_t _index,
-              double _velocityChange) {
+              s_t _velocityChange) {
             self->setVelocityChange(_index, _velocityChange);
           },
           ::py::arg("index"),
@@ -524,7 +524,7 @@ void ZeroDofJoint(py::module& m)
       .def(
           "getVelocityChange",
           +[](const dart::dynamics::ZeroDofJoint* self, std::size_t _index)
-              -> double { return self->getVelocityChange(_index); },
+              -> s_t { return self->getVelocityChange(_index); },
           ::py::arg("index"))
       .def(
           "resetVelocityChanges",
@@ -534,7 +534,7 @@ void ZeroDofJoint(py::module& m)
           "setConstraintImpulse",
           +[](dart::dynamics::ZeroDofJoint* self,
               std::size_t _index,
-              double _impulse) {
+              s_t _impulse) {
             self->setConstraintImpulse(_index, _impulse);
           },
           ::py::arg("index"),
@@ -542,7 +542,7 @@ void ZeroDofJoint(py::module& m)
       .def(
           "getConstraintImpulse",
           +[](const dart::dynamics::ZeroDofJoint* self, std::size_t _index)
-              -> double { return self->getConstraintImpulse(_index); },
+              -> s_t { return self->getConstraintImpulse(_index); },
           ::py::arg("index"))
       .def(
           "resetConstraintImpulses",
@@ -550,21 +550,21 @@ void ZeroDofJoint(py::module& m)
                   self) { self->resetConstraintImpulses(); })
       .def(
           "integratePositions",
-          +[](dart::dynamics::ZeroDofJoint* self, double _dt) {
+          +[](dart::dynamics::ZeroDofJoint* self, s_t _dt) {
             self->integratePositions(_dt);
           },
           ::py::arg("dt"))
       .def(
           "integrateVelocities",
-          +[](dart::dynamics::ZeroDofJoint* self, double _dt) {
+          +[](dart::dynamics::ZeroDofJoint* self, s_t _dt) {
             self->integrateVelocities(_dt);
           },
           ::py::arg("dt"))
       .def(
           "getPositionDifferences",
           +[](const dart::dynamics::ZeroDofJoint* self,
-              const Eigen::VectorXd& _q2,
-              const Eigen::VectorXd& _q1) -> Eigen::VectorXd {
+              const Eigen::VectorXs& _q2,
+              const Eigen::VectorXs& _q1) -> Eigen::VectorXs {
             return self->getPositionDifferences(_q2, _q1);
           },
           ::py::arg("q2"),
@@ -573,43 +573,43 @@ void ZeroDofJoint(py::module& m)
           "setSpringStiffness",
           +[](dart::dynamics::ZeroDofJoint* self,
               std::size_t _index,
-              double _k) { self->setSpringStiffness(_index, _k); },
+              s_t _k) { self->setSpringStiffness(_index, _k); },
           ::py::arg("index"),
           ::py::arg("k"))
       .def(
           "getSpringStiffness",
           +[](const dart::dynamics::ZeroDofJoint* self, std::size_t _index)
-              -> double { return self->getSpringStiffness(_index); },
+              -> s_t { return self->getSpringStiffness(_index); },
           ::py::arg("index"))
       .def(
           "setRestPosition",
           +[](dart::dynamics::ZeroDofJoint* self,
               std::size_t _index,
-              double _q0) { self->setRestPosition(_index, _q0); },
+              s_t _q0) { self->setRestPosition(_index, _q0); },
           ::py::arg("index"),
           ::py::arg("q0"))
       .def(
           "getRestPosition",
           +[](const dart::dynamics::ZeroDofJoint* self, std::size_t _index)
-              -> double { return self->getRestPosition(_index); },
+              -> s_t { return self->getRestPosition(_index); },
           ::py::arg("index"))
       .def(
           "setDampingCoefficient",
           +[](dart::dynamics::ZeroDofJoint* self,
               std::size_t _index,
-              double _d) { self->setDampingCoefficient(_index, _d); },
+              s_t _d) { self->setDampingCoefficient(_index, _d); },
           ::py::arg("index"),
           ::py::arg("d"))
       .def(
           "getDampingCoefficient",
           +[](const dart::dynamics::ZeroDofJoint* self, std::size_t _index)
-              -> double { return self->getDampingCoefficient(_index); },
+              -> s_t { return self->getDampingCoefficient(_index); },
           ::py::arg("index"))
       .def(
           "setCoulombFriction",
           +[](dart::dynamics::ZeroDofJoint* self,
               std::size_t _index,
-              double _friction) {
+              s_t _friction) {
             self->setCoulombFriction(_index, _friction);
           },
           ::py::arg("index"),
@@ -617,16 +617,16 @@ void ZeroDofJoint(py::module& m)
       .def(
           "getCoulombFriction",
           +[](const dart::dynamics::ZeroDofJoint* self, std::size_t _index)
-              -> double { return self->getCoulombFriction(_index); },
+              -> s_t { return self->getCoulombFriction(_index); },
           ::py::arg("index"))
       .def(
           "computePotentialEnergy",
-          +[](const dart::dynamics::ZeroDofJoint* self) -> double {
+          +[](const dart::dynamics::ZeroDofJoint* self) -> s_t {
             return self->computePotentialEnergy();
           })
       .def(
           "getBodyConstraintWrench",
-          +[](const dart::dynamics::ZeroDofJoint* self) -> Eigen::Vector6d {
+          +[](const dart::dynamics::ZeroDofJoint* self) -> Eigen::Vector6s {
             return self->getBodyConstraintWrench();
           });
 }

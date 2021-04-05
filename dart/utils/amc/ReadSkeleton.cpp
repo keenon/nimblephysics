@@ -724,7 +724,7 @@ class BoneDataDirectionHandler : public VectorHandler<double, 3>
   {
     if (!obj.in_bone)
     {
-      static Vector3d temp;
+      static Vector3s temp;
       cerr << "Got a direction while not in a begin/end pair" << endl;
       return temp;
     }

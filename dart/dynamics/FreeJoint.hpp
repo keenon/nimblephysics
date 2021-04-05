@@ -84,10 +84,10 @@ public:
   /// getTransformFromParentBodyNode() * _tf * getTransformFromChildBodyNode().inverse()
   /// between the parent BodyNode and the child BodyNode frames when applied to
   /// a FreeJoint.
-  static Eigen::Vector6d convertToPositions(const Eigen::Isometry3d& _tf);
+  static Eigen::Vector6s convertToPositions(const Eigen::Isometry3s& _tf);
 
   /// Convert a FreeJoint-style 6D vector into a transform
-  static Eigen::Isometry3d convertToTransform(const Eigen::Vector6d& _positions);
+  static Eigen::Isometry3s convertToTransform(const Eigen::Vector6s& _positions);
 
   /// If the given joint is a FreeJoint, then set the transform of the given
   /// Joint's child BodyNode so that its transform with respect to
@@ -96,14 +96,14 @@ public:
   /// \deprecated Deprecated in DART 6.9. Use setTransformOf() instead
   DART_DEPRECATED(6.9)
   static void setTransform(Joint* joint,
-                           const Eigen::Isometry3d& tf,
+                           const Eigen::Isometry3s& tf,
                            const Frame* withRespectTo = Frame::World());
 
   /// If the given joint is a FreeJoint, then set the transform of the given
   /// Joint's child BodyNode so that its transform with respect to
   /// "withRespecTo" is equal to "tf".
   static void setTransformOf(Joint* joint,
-                             const Eigen::Isometry3d& tf,
+                             const Eigen::Isometry3s& tf,
                              const Frame* withRespectTo = Frame::World());
 
   /// If the parent Joint of the given BodyNode is a FreeJoint, then set the
@@ -113,14 +113,14 @@ public:
   /// \deprecated Deprecated in DART 6.9. Use setTransformOf() instead
   DART_DEPRECATED(6.9)
   static void setTransform(BodyNode* bodyNode,
-                           const Eigen::Isometry3d& tf,
+                           const Eigen::Isometry3s& tf,
                            const Frame* withRespectTo = Frame::World());
 
   /// If the parent Joint of the given BodyNode is a FreeJoint, then set the
   /// transform of the given BodyNode so that its transform with respect to
   /// "withRespecTo" is equal to "tf".
   static void setTransformOf(BodyNode* bodyNode,
-                             const Eigen::Isometry3d& tf,
+                             const Eigen::Isometry3s& tf,
                              const Frame* withRespectTo = Frame::World());
 
   /// Apply setTransform(bodyNode, tf, withRespecTo) for all the root BodyNodes
@@ -131,7 +131,7 @@ public:
   /// \deprecated Deprecated in DART 6.9. Use setTransformOf() instead
   DART_DEPRECATED(6.9)
   static void setTransform(Skeleton* skeleton,
-                           const Eigen::Isometry3d& tf,
+                           const Eigen::Isometry3s& tf,
                            const Frame* withRespectTo = Frame::World(),
                            bool applyToAllRootBodies = true);
 
@@ -140,7 +140,7 @@ public:
   /// it will be applied to only the default root BodyNode that will be obtained
   /// by Skeleton::getRootBodyNode().
   static void setTransformOf(Skeleton* skeleton,
-                             const Eigen::Isometry3d& tf,
+                             const Eigen::Isometry3s& tf,
                              const Frame* withRespectTo = Frame::World(),
                              bool applyToAllRootBodies = true);
 
@@ -171,23 +171,23 @@ public:
   /// \param[in] accInCoordinatesOf The reference frame of
   /// "newSpatialAcceleration".
   void setSpatialMotion(
-      const Eigen::Isometry3d* newTransform,
+      const Eigen::Isometry3s* newTransform,
       const Frame* withRespectTo,
-      const Eigen::Vector6d* newSpatialVelocity,
+      const Eigen::Vector6s* newSpatialVelocity,
       const Frame* velRelativeTo,
       const Frame* velInCoordinatesOf,
-      const Eigen::Vector6d* newSpatialAcceleration,
+      const Eigen::Vector6s* newSpatialAcceleration,
       const Frame* accRelativeTo,
       const Frame* accInCoordinatesOf);
 
   /// Set the transform of the child BodyNode relative to the parent BodyNode
   /// \param[in] newTransform Desired transform of the child BodyNode.
-  void setRelativeTransform(const Eigen::Isometry3d& newTransform);
+  void setRelativeTransform(const Eigen::Isometry3s& newTransform);
 
   /// Set the transform of the child BodyNode relative to an arbitrary Frame.
   /// \param[in] newTransform Desired transform of the child BodyNode.
   /// \param[in] withRespectTo The relative Frame of "newTransform".
-  void setTransform(const Eigen::Isometry3d& newTransform,
+  void setTransform(const Eigen::Isometry3s& newTransform,
                     const Frame* withRespectTo = Frame::World());
 
   /// Set the spatial velocity of the child BodyNode relative to the parent
@@ -195,14 +195,14 @@ public:
   /// \param[in] newSpatialVelocity Desired spatial velocity of the child
   /// BodyNode. The reference frame of "newSpatialVelocity" is the child
   /// BodyNode.
-  void setRelativeSpatialVelocity(const Eigen::Vector6d& newSpatialVelocity);
+  void setRelativeSpatialVelocity(const Eigen::Vector6s& newSpatialVelocity);
 
   /// Set the spatial velocity of the child BodyNode relative to the parent
   /// BodyNode.
   /// \param[in] newSpatialVelocity Desired spatial velocity of the child
   /// BodyNode.
   /// \param[in] inCoordinatesOf The reference frame of "newSpatialVelocity".
-  void setRelativeSpatialVelocity(const Eigen::Vector6d& newSpatialVelocity,
+  void setRelativeSpatialVelocity(const Eigen::Vector6s& newSpatialVelocity,
                                   const Frame* inCoordinatesOf);
 
   /// Set the spatial velocity of the child BodyNode relative to an arbitrary
@@ -211,7 +211,7 @@ public:
   /// BodyNode.
   /// \param[in] relativeTo The relative frame of "newSpatialVelocity".
   /// \param[in] inCoordinatesOf The reference frame of "newSpatialVelocity".
-  void setSpatialVelocity(const Eigen::Vector6d& newSpatialVelocity,
+  void setSpatialVelocity(const Eigen::Vector6s& newSpatialVelocity,
                           const Frame* relativeTo,
                           const Frame* inCoordinatesOf);
 
@@ -224,7 +224,7 @@ public:
   /// \param[in] newLinearVelocity
   /// \param[in] relativeTo The relative frame of "newLinearVelocity".
   /// \param[in] inCoordinatesOf The reference frame of "newLinearVelocity".
-  void setLinearVelocity(const Eigen::Vector3d& newLinearVelocity,
+  void setLinearVelocity(const Eigen::Vector3s& newLinearVelocity,
                          const Frame* relativeTo = Frame::World(),
                          const Frame* inCoordinatesOf = Frame::World());
 
@@ -237,7 +237,7 @@ public:
   /// \param[in] newAngularVelocity
   /// \param[in] relativeTo The relative frame of "newAngularVelocity".
   /// \param[in] inCoordinatesOf The reference frame of "newAngularVelocity".
-  void setAngularVelocity(const Eigen::Vector3d& newAngularVelocity,
+  void setAngularVelocity(const Eigen::Vector3s& newAngularVelocity,
                           const Frame* relativeTo = Frame::World(),
                           const Frame* inCoordinatesOf = Frame::World());
 
@@ -247,7 +247,7 @@ public:
   /// BodyNode. The reference frame of "newSpatialAcceleration" is the child
   /// BodyNode.
   void setRelativeSpatialAcceleration(
-      const Eigen::Vector6d& newSpatialAcceleration);
+      const Eigen::Vector6s& newSpatialAcceleration);
 
   /// Set the spatial acceleration of the child BodyNode relative to the parent
   /// BodyNode.
@@ -256,7 +256,7 @@ public:
   /// \param[in] inCoordinatesOf The reference frame of
   /// "newSpatialAcceleration".
   void setRelativeSpatialAcceleration(
-      const Eigen::Vector6d& newSpatialAcceleration,
+      const Eigen::Vector6s& newSpatialAcceleration,
       const Frame* inCoordinatesOf);
 
   /// Set the spatial acceleration of the child BodyNode relative to an
@@ -266,7 +266,7 @@ public:
   /// \param[in] relativeTo The relative frame of "newSpatialAcceleration".
   /// \param[in] inCoordinatesOf The reference frame of
   /// "newSpatialAcceleration".
-  void setSpatialAcceleration(const Eigen::Vector6d& newSpatialAcceleration,
+  void setSpatialAcceleration(const Eigen::Vector6s& newSpatialAcceleration,
                               const Frame* relativeTo,
                               const Frame* inCoordinatesOf);
 
@@ -279,7 +279,7 @@ public:
   /// \param[in] newLinearAcceleration
   /// \param[in] relativeTo The relative frame of "newLinearAcceleration".
   /// \param[in] inCoordinatesOf The reference frame of "newLinearAcceleration".
-  void setLinearAcceleration(const Eigen::Vector3d& newLinearAcceleration,
+  void setLinearAcceleration(const Eigen::Vector3s& newLinearAcceleration,
                              const Frame* relativeTo = Frame::World(),
                              const Frame* inCoordinatesOf = Frame::World());
 
@@ -292,16 +292,16 @@ public:
   /// \param[in] newAngularAcceleration
   /// \param[in] relativeTo The relative frame of "newAngularAcceleration".
   /// \param[in] inCoordinatesOf The reference frame of "newAngularAcceleration".
-  void setAngularAcceleration(const Eigen::Vector3d& newAngularAcceleration,
+  void setAngularAcceleration(const Eigen::Vector3s& newAngularAcceleration,
                               const Frame* relativeTo = Frame::World(),
                               const Frame* inCoordinatesOf = Frame::World());
 
   // Documentation inherited
-  Eigen::Matrix6d getRelativeJacobianStatic(
-      const Eigen::Vector6d& _positions) const override;
+  Eigen::Matrix6s getRelativeJacobianStatic(
+      const Eigen::Vector6s& _positions) const override;
 
-  Eigen::Matrix6d finiteDifferenceRelativeJacobianStatic(
-      const Eigen::Vector6d& _positions) const;
+  Eigen::Matrix6s finiteDifferenceRelativeJacobianStatic(
+      const Eigen::Vector6s& _positions) const;
 
   math::Jacobian getRelativeJacobianDeriv(std::size_t index) const override;
   math::Jacobian finiteDifferenceRelativeJacobianDeriv(std::size_t index) const;
@@ -313,40 +313,40 @@ public:
   math::Jacobian finiteDifferenceRelativeJacobianTimeDerivDeriv2(std::size_t index) const;
 
   // Documentation inherited
-  Eigen::Matrix6d getRelativeJacobianInPositionSpaceStatic(
-      const Eigen::Vector6d& _positions) const override;
+  Eigen::Matrix6s getRelativeJacobianInPositionSpaceStatic(
+      const Eigen::Vector6s& _positions) const override;
 
   // Documentation inherited
-  Eigen::Vector6d getPositionDifferencesStatic(
-      const Eigen::Vector6d& _q2, const Eigen::Vector6d& _q1) const override;
+  Eigen::Vector6s getPositionDifferencesStatic(
+      const Eigen::Vector6s& _q2, const Eigen::Vector6s& _q1) const override;
 
   /*
   // This gets the world axis screw at the current position, without moving the joint.
-  Eigen::Vector6d getWorldAxisScrewForPosition(int dof) const override;
+  Eigen::Vector6s getWorldAxisScrewForPosition(int dof) const override;
   */
 
   // This computes the world axis screw at a given position, without moving the joint.
-  Eigen::Vector6d getWorldAxisScrewAt(Eigen::Vector6d pos, int dof) const;
+  Eigen::Vector6s getWorldAxisScrewAt(Eigen::Vector6s pos, int dof) const;
 
   // This estimates the new world screw axis at `axisDof` when we perturbe `rotateDof` by `eps`
-  Eigen::Vector6d estimatePerturbedScrewAxisForPosition(
+  Eigen::Vector6s estimatePerturbedScrewAxisForPosition(
     int axisDof,
     int rotateDof,
-    double eps);
+    s_t eps);
 
   // This estimates the new world screw axis at `axisDof` when we perturbe `rotateDof` by `eps`
-  Eigen::Vector6d estimatePerturbedScrewAxisForForce(
+  Eigen::Vector6s estimatePerturbedScrewAxisForForce(
     int axisDof,
     int rotateDof,
-    double eps);
+    s_t eps);
 
   // Returns the gradient of the screw axis with respect to the rotate dof
-  Eigen::Vector6d getScrewAxisGradientForPosition(
+  Eigen::Vector6s getScrewAxisGradientForPosition(
     int axisDof,
     int rotateDof);
 
   // Returns the gradient of the screw axis with respect to the rotate dof
-  Eigen::Vector6d getScrewAxisGradientForForce(
+  Eigen::Vector6s getScrewAxisGradientForForce(
     int axisDof,
     int rotateDof);
 
@@ -361,27 +361,27 @@ protected:
   using Base::getRelativeJacobianStatic;
 
   // Documentation inherited
-  void integratePositions(double _dt) override;
+  void integratePositions(s_t _dt) override;
 
 #ifndef DART_USE_IDENTITY_JACOBIAN
   // Documentation inherited
-  void integrateVelocities(double dt) override;
+  void integrateVelocities(s_t dt) override;
 #endif
 
   // Documentation inherited
-  Eigen::VectorXd integratePositionsExplicit(const Eigen::VectorXd& pos, const Eigen::VectorXd& vel, double dt) override;
+  Eigen::VectorXs integratePositionsExplicit(const Eigen::VectorXs& pos, const Eigen::VectorXs& vel, s_t dt) override;
 
   /// Returns d/dpos of integratePositionsExplicit()
-  Eigen::MatrixXd getPosPosJacobian(const Eigen::VectorXd& pos, const Eigen::VectorXd& vel, double _dt) override;
+  Eigen::MatrixXs getPosPosJacobian(const Eigen::VectorXs& pos, const Eigen::VectorXs& vel, s_t _dt) override;
 
   /// Returns d/dvel of integratePositionsExplicit()
-  Eigen::MatrixXd getVelPosJacobian(const Eigen::VectorXd& pos, const Eigen::VectorXd& vel, double _dt) override;
+  Eigen::MatrixXs getVelPosJacobian(const Eigen::VectorXs& pos, const Eigen::VectorXs& vel, s_t _dt) override;
 
   /// Returns d/dpos of integratePositionsExplicit() by finite differencing
-  Eigen::MatrixXd finiteDifferencePosPosJacobian(const Eigen::VectorXd& pos, const Eigen::VectorXd& vel, double _dt);
+  Eigen::MatrixXs finiteDifferencePosPosJacobian(const Eigen::VectorXs& pos, const Eigen::VectorXs& vel, s_t _dt);
 
   /// Returns d/dvel of integratePositionsExplicit() by finite differencing
-  Eigen::MatrixXd finiteDifferenceVelPosJacobian(const Eigen::VectorXd& pos, const Eigen::VectorXd& vel, double _dt);
+  Eigen::MatrixXs finiteDifferenceVelPosJacobian(const Eigen::VectorXs& pos, const Eigen::VectorXs& vel, s_t _dt);
 
   // Documentation inherited
   void updateDegreeOfFreedomNames() override;
@@ -398,12 +398,12 @@ protected:
 #ifdef DART_USE_IDENTITY_JACOBIAN
 protected:
   /// Access mQ, which is an auto-updating variable
-  const Eigen::Isometry3d& getQ() const;
+  const Eigen::Isometry3s& getQ() const;
 
   /// Transformation matrix dependent on generalized coordinates
   ///
   /// Do not use directly! Use getQ() to access this
-  mutable Eigen::Isometry3d mQ;
+  mutable Eigen::Isometry3s mQ;
 #endif
 
 public:

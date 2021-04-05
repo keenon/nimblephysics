@@ -32,31 +32,31 @@ const char* dart_world_get_name(WorldId world)
 }
 
 //==============================================================================
-void dart_world_set_gravity(WorldId world, double x, double y, double z)
+void dart_world_set_gravity(WorldId world, s_t x, s_t y, s_t z)
 {
-  CAST_WORLD(world)->setGravity(Eigen::Vector3d(x, y, z));
+  CAST_WORLD(world)->setGravity(Eigen::Vector3s(x, y, z));
 }
 
 //==============================================================================
-const double* dart_world_get_gravity(WorldId world)
+const s_t* dart_world_get_gravity(WorldId world)
 {
   return CAST_WORLD(world)->getGravity().data();
 }
 
 //==============================================================================
-double dart_world_get_gravity_x(WorldId world)
+s_t dart_world_get_gravity_x(WorldId world)
 {
   return CAST_WORLD(world)->getGravity().x();
 }
 
 //==============================================================================
-double dart_world_get_gravity_y(WorldId world)
+s_t dart_world_get_gravity_y(WorldId world)
 {
   return CAST_WORLD(world)->getGravity().y();
 }
 
 //==============================================================================
-double dart_world_get_gravity_z(WorldId world)
+s_t dart_world_get_gravity_z(WorldId world)
 {
   return CAST_WORLD(world)->getGravity().z();
 }

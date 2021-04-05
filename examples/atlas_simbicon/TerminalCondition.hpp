@@ -67,7 +67,7 @@ class TimerCondition : public TerminalCondition
 {
 public:
   /// \brief Constructor
-  TimerCondition(State* _state, double _duration);
+  TimerCondition(State* _state, s_t _duration);
 
   /// \brief Destructor
   virtual ~TimerCondition();
@@ -77,7 +77,7 @@ public:
 
 protected:
   /// \brief Duration
-  double mDuration;
+  s_t mDuration;
 };
 
 //==============================================================================

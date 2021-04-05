@@ -52,8 +52,8 @@ public:
   explicit MimicMotorConstraint(
       dynamics::Joint* joint,
       const dynamics::Joint* mimicJoint,
-      double multiplier = 1.0,
-      double offset = 0.0);
+      s_t multiplier = 1.0,
+      s_t offset = 0.0);
 
   /// Destructor
   ~MimicMotorConstraint() override;
@@ -63,10 +63,10 @@ public:
   //----------------------------------------------------------------------------
 
   /// Set global constraint force mixing parameter
-  static void setConstraintForceMixing(double cfm);
+  static void setConstraintForceMixing(s_t cfm);
 
   /// Get global constraint force mixing parameter
-  static double getConstraintForceMixing();
+  static s_t getConstraintForceMixing();
 
   //----------------------------------------------------------------------------
   // Friendship
@@ -90,7 +90,7 @@ protected:
   void applyUnitImpulse(std::size_t index) override;
 
   // Documentation inherited
-  void getVelocityChange(double* delVel, bool withCfm) override;
+  void getVelocityChange(s_t* delVel, bool withCfm) override;
 
   // Documentation inherited
   void excite() override;
@@ -99,7 +99,7 @@ protected:
   void unexcite() override;
 
   // Documentation inherited
-  void applyImpulse(double* lambda) override;
+  void applyImpulse(s_t* lambda) override;
 
   // Documentation inherited
   dynamics::SkeletonPtr getRootSkeleton() const override;
@@ -115,7 +115,7 @@ private:
   const dynamics::Joint* mMimicJoint;
 
   ///
-  double mMultiplier, mOffset;
+  s_t mMultiplier, mOffset;
 
   ///
   dynamics::BodyNode* mBodyNode;
@@ -132,21 +132,21 @@ private:
   bool mActive[6];
 
   ///
-  double mNegativeVelocityError[6];
+  s_t mNegativeVelocityError[6];
 
   ///
-  double mOldX[6];
+  s_t mOldX[6];
 
   ///
-  double mUpperBound[6];
+  s_t mUpperBound[6];
 
   ///
-  double mLowerBound[6];
+  s_t mLowerBound[6];
 
   /// Global constraint force mixing parameter in the range of [1e-9, 1]. The
   /// default is 1e-5
   /// \sa http://www.ode.org/ode-latest-userguide.html#sec_3_8_0
-  static double mConstraintForceMixing;
+  static s_t mConstraintForceMixing;
 };
 
 } // namespace constraint

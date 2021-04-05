@@ -45,8 +45,8 @@ std::shared_ptr<simulation::World> loadWorld(const std::string& path)
 std::shared_ptr<dynamics::Skeleton> loadSkeleton(
     simulation::World* world,
     std::string path,
-    Eigen::Vector3d basePosition,
-    Eigen::Vector3d baseEulerAnglesXYZ)
+    Eigen::Vector3s basePosition,
+    Eigen::Vector3s baseEulerAnglesXYZ)
 {
   std::shared_ptr<dynamics::Skeleton> skel = nullptr;
 
@@ -98,7 +98,7 @@ std::shared_ptr<dynamics::Skeleton> loadSkeleton(
 
   // Update all the root joints with the new specified transform
 
-  Eigen::Isometry3d baseTransform = Eigen::Isometry3d::Identity();
+  Eigen::Isometry3s baseTransform = Eigen::Isometry3s::Identity();
   baseTransform.translation() = basePosition;
   baseTransform.linear() = math::eulerXYZToMatrix(baseEulerAnglesXYZ);
   for (int i = 0; i < skel->getNumTrees(); i++)
@@ -138,7 +138,7 @@ std::shared_ptr<dynamics::MeshShape> loadMeshShape(std::string path)
       "file", std::make_shared<common::LocalResourceRetriever>());
   retriever->addSchemaRetriever("dart", utils::DartResourceRetriever::create());
   return std::make_shared<dynamics::MeshShape>(
-      Eigen::Vector3d::Ones(),
+      Eigen::Vector3s::Ones(),
       dynamics::MeshShape::loadMesh(path, retriever),
       path,
       retriever);

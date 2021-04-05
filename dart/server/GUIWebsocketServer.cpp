@@ -247,7 +247,7 @@ void GUIWebsocketServer::serve(int port)
     else if (args["type"].asString() == "slider_set_value")
     {
       std::string key = args["key"].asString();
-      double value = args["value"].asDouble();
+      s_t value = static_cast<s_t>(args["value"].asDouble());
       if (mSliders.find(key) != mSliders.end())
       {
         mSliders[key].value = value;
@@ -268,10 +268,10 @@ void GUIWebsocketServer::serve(int port)
     else if (args["type"].asString() == "drag")
     {
       std::string key = args["key"].asString();
-      Eigen::Vector3d pos = Eigen::Vector3d(
-          args["pos"][0].asDouble(),
-          args["pos"][1].asDouble(),
-          args["pos"][2].asDouble());
+      Eigen::Vector3s pos = Eigen::Vector3s(
+          static_cast<s_t>(args["pos"][0].asDouble()),
+          static_cast<s_t>(args["pos"][1].asDouble()),
+          static_cast<s_t>(args["pos"][2].asDouble()));
 
       for (auto handler : mDragListeners[key])
       {
@@ -519,18 +519,18 @@ GUIWebsocketServer& GUIWebsocketServer::renderWorld(
     for (int i = 0; i < result.getNumContacts(); i++)
     {
       const collision::Contact& contact = result.getContact(i);
-      double scale = renderForceMagnitudes ? contact.lcpResult * 10 : 2;
-      std::vector<Eigen::Vector3d> points;
+      s_t scale = renderForceMagnitudes ? contact.lcpResult * 10 : 2;
+      std::vector<Eigen::Vector3s> points;
       points.push_back(contact.point);
       points.push_back(contact.point + (contact.normal * scale));
       createLine(prefix + "__contact_" + std::to_string(i) + "_a", points);
-      std::vector<Eigen::Vector3d> pointsB;
+      std::vector<Eigen::Vector3s> pointsB;
       pointsB.push_back(contact.point);
       pointsB.push_back(contact.point - (contact.normal * scale));
       createLine(
           prefix + "__contact_" + std::to_string(i) + "_b",
           pointsB,
-          Eigen::Vector3d(0, 1, 0));
+          Eigen::Vector3s(0, 1, 0));
     }
   }
 
@@ -544,31 +544,31 @@ GUIWebsocketServer& GUIWebsocketServer::renderWorld(
 
 /// This is a high-level command that creates a basis
 GUIWebsocketServer& GUIWebsocketServer::renderBasis(
-    double scale,
+    s_t scale,
     const std::string& prefix,
-    const Eigen::Vector3d pos,
-    const Eigen::Vector3d euler)
+    const Eigen::Vector3s pos,
+    const Eigen::Vector3s euler)
 {
   const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
 
-  Eigen::Isometry3d T = Eigen::Isometry3d::Identity();
+  Eigen::Isometry3s T = Eigen::Isometry3s::Identity();
   T.translation() = pos;
   T.linear() = math::eulerXYZToMatrix(euler);
 
-  std::vector<Eigen::Vector3d> pointsX;
-  pointsX.push_back(T * Eigen::Vector3d::Zero());
-  pointsX.push_back(T * (Eigen::Vector3d::UnitX() * scale));
-  std::vector<Eigen::Vector3d> pointsY;
-  pointsY.push_back(T * Eigen::Vector3d::Zero());
-  pointsY.push_back(T * (Eigen::Vector3d::UnitY() * scale));
-  std::vector<Eigen::Vector3d> pointsZ;
-  pointsZ.push_back(T * Eigen::Vector3d::Zero());
-  pointsZ.push_back(T * (Eigen::Vector3d::UnitZ() * scale));
+  std::vector<Eigen::Vector3s> pointsX;
+  pointsX.push_back(T * Eigen::Vector3s::Zero());
+  pointsX.push_back(T * (Eigen::Vector3s::UnitX() * scale));
+  std::vector<Eigen::Vector3s> pointsY;
+  pointsY.push_back(T * Eigen::Vector3s::Zero());
+  pointsY.push_back(T * (Eigen::Vector3s::UnitY() * scale));
+  std::vector<Eigen::Vector3s> pointsZ;
+  pointsZ.push_back(T * Eigen::Vector3s::Zero());
+  pointsZ.push_back(T * (Eigen::Vector3s::UnitZ() * scale));
 
   deleteObjectsByPrefix(prefix + "__basis_");
-  createLine(prefix + "__basis_unitX", pointsX, Eigen::Vector3d::UnitX());
-  createLine(prefix + "__basis_unitY", pointsY, Eigen::Vector3d::UnitY());
-  createLine(prefix + "__basis_unitZ", pointsZ, Eigen::Vector3d::UnitZ());
+  createLine(prefix + "__basis_unitX", pointsX, Eigen::Vector3s::UnitX());
+  createLine(prefix + "__basis_unitY", pointsY, Eigen::Vector3s::UnitY());
+  createLine(prefix + "__basis_unitZ", pointsZ, Eigen::Vector3s::UnitZ());
 
   return *this;
 }
@@ -720,10 +720,10 @@ GUIWebsocketServer& GUIWebsocketServer::renderSkeleton(
         }
         else
         {
-          Eigen::Vector3d pos = shapeNode->getWorldTransform().translation();
-          Eigen::Vector3d euler
+          Eigen::Vector3s pos = shapeNode->getWorldTransform().translation();
+          Eigen::Vector3s euler
               = math::matrixToEulerXYZ(shapeNode->getWorldTransform().linear());
-          Eigen::Vector3d color = visual->getColor();
+          Eigen::Vector3s color = visual->getColor();
           // std::cout << "Color " << shapeName << ":" << color << std::endl;
 
           if (getObjectPosition(shapeName) != pos)
@@ -750,7 +750,7 @@ GUIWebsocketServer& GUIWebsocketServer::renderSkeleton(
 /// lines in the world, one per body
 GUIWebsocketServer& GUIWebsocketServer::renderTrajectoryLines(
     std::shared_ptr<simulation::World> world,
-    Eigen::MatrixXd positions,
+    Eigen::MatrixXs positions,
     std::string prefix)
 {
   const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
@@ -760,8 +760,8 @@ GUIWebsocketServer& GUIWebsocketServer::renderTrajectoryLines(
   bool oldAutoflush = mAutoflush;
   mAutoflush = false;
 
-  std::unordered_map<std::string, std::vector<Eigen::Vector3d>> paths;
-  std::unordered_map<std::string, Eigen::Vector3d> colors;
+  std::unordered_map<std::string, std::vector<Eigen::Vector3s>> paths;
+  std::unordered_map<std::string, Eigen::Vector3s> colors;
 
   neural::RestorableSnapshot snapshot(world);
   for (int t = 0; t < positions.cols(); t++)
@@ -829,10 +829,10 @@ GUIWebsocketServer& GUIWebsocketServer::clear()
 /// This creates a box in the web GUI under a specified key
 GUIWebsocketServer& GUIWebsocketServer::createBox(
     std::string key,
-    const Eigen::Vector3d& size,
-    const Eigen::Vector3d& pos,
-    const Eigen::Vector3d& euler,
-    const Eigen::Vector3d& color,
+    const Eigen::Vector3s& size,
+    const Eigen::Vector3s& pos,
+    const Eigen::Vector3s& euler,
+    const Eigen::Vector3s& color,
     bool castShadows,
     bool receiveShadows)
 {
@@ -857,9 +857,9 @@ GUIWebsocketServer& GUIWebsocketServer::createBox(
 /// This creates a sphere in the web GUI under a specified key
 GUIWebsocketServer& GUIWebsocketServer::createSphere(
     std::string key,
-    double radius,
-    const Eigen::Vector3d& pos,
-    const Eigen::Vector3d& color,
+    s_t radius,
+    const Eigen::Vector3s& pos,
+    const Eigen::Vector3s& color,
     bool castShadows,
     bool receiveShadows)
 {
@@ -883,11 +883,11 @@ GUIWebsocketServer& GUIWebsocketServer::createSphere(
 /// This creates a capsule in the web GUI under a specified key
 GUIWebsocketServer& GUIWebsocketServer::createCapsule(
     std::string key,
-    double radius,
-    double height,
-    const Eigen::Vector3d& pos,
-    const Eigen::Vector3d& euler,
-    const Eigen::Vector3d& color,
+    s_t radius,
+    s_t height,
+    const Eigen::Vector3s& pos,
+    const Eigen::Vector3s& euler,
+    const Eigen::Vector3s& color,
     bool castShadows,
     bool receiveShadows)
 {
@@ -913,8 +913,8 @@ GUIWebsocketServer& GUIWebsocketServer::createCapsule(
 /// This creates a line in the web GUI under a specified key
 GUIWebsocketServer& GUIWebsocketServer::createLine(
     std::string key,
-    const std::vector<Eigen::Vector3d>& points,
-    const Eigen::Vector3d& color)
+    const std::vector<Eigen::Vector3s>& points,
+    const Eigen::Vector3s& color)
 {
   const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
 
@@ -934,16 +934,16 @@ GUIWebsocketServer& GUIWebsocketServer::createLine(
 /// data
 GUIWebsocketServer& GUIWebsocketServer::createMesh(
     std::string key,
-    const std::vector<Eigen::Vector3d>& vertices,
-    const std::vector<Eigen::Vector3d>& vertexNormals,
+    const std::vector<Eigen::Vector3s>& vertices,
+    const std::vector<Eigen::Vector3s>& vertexNormals,
     const std::vector<Eigen::Vector3i>& faces,
-    const std::vector<Eigen::Vector2d>& uv,
+    const std::vector<Eigen::Vector2s>& uv,
     const std::vector<std::string>& textures,
     const std::vector<int>& textureStartIndices,
-    const Eigen::Vector3d& pos,
-    const Eigen::Vector3d& euler,
-    const Eigen::Vector3d& scale,
-    const Eigen::Vector3d& color,
+    const Eigen::Vector3s& pos,
+    const Eigen::Vector3s& euler,
+    const Eigen::Vector3s& scale,
+    const Eigen::Vector3s& color,
     bool castShadows,
     bool receiveShadows)
 {
@@ -977,19 +977,19 @@ GUIWebsocketServer& GUIWebsocketServer::createMeshASSIMP(
     const std::string& key,
     const aiScene* mesh,
     const std::string& meshPath,
-    const Eigen::Vector3d& pos,
-    const Eigen::Vector3d& euler,
-    const Eigen::Vector3d& scale,
-    const Eigen::Vector3d& color,
+    const Eigen::Vector3s& pos,
+    const Eigen::Vector3s& euler,
+    const Eigen::Vector3s& scale,
+    const Eigen::Vector3s& color,
     bool castShadows,
     bool receiveShadows)
 {
   const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
 
-  std::vector<Eigen::Vector3d> vertices;
-  std::vector<Eigen::Vector3d> vertexNormals;
+  std::vector<Eigen::Vector3s> vertices;
+  std::vector<Eigen::Vector3s> vertexNormals;
   std::vector<Eigen::Vector3i> faces;
-  std::vector<Eigen::Vector2d> uv;
+  std::vector<Eigen::Vector2s> uv;
   std::vector<std::string> textures;
   std::vector<int> textureStartIndices;
 
@@ -1076,10 +1076,10 @@ GUIWebsocketServer& GUIWebsocketServer::createMeshASSIMP(
 GUIWebsocketServer& GUIWebsocketServer::createMeshFromShape(
     const std::string& key,
     const std::shared_ptr<dynamics::MeshShape> mesh,
-    const Eigen::Vector3d& pos,
-    const Eigen::Vector3d& euler,
-    const Eigen::Vector3d& scale,
-    const Eigen::Vector3d& color,
+    const Eigen::Vector3s& pos,
+    const Eigen::Vector3s& euler,
+    const Eigen::Vector3s& scale,
+    const Eigen::Vector3s& color,
     bool castShadows,
     bool receiveShadows)
 {
@@ -1150,8 +1150,8 @@ bool GUIWebsocketServer::hasObject(const std::string& key)
 }
 
 /// This returns the position of an object, if we've got it (and it's not a
-/// line). Otherwise it returns Vector3d::Zero().
-Eigen::Vector3d GUIWebsocketServer::getObjectPosition(const std::string& key)
+/// line). Otherwise it returns Vector3s::Zero().
+Eigen::Vector3s GUIWebsocketServer::getObjectPosition(const std::string& key)
 {
   const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
 
@@ -1163,12 +1163,12 @@ Eigen::Vector3d GUIWebsocketServer::getObjectPosition(const std::string& key)
     return mCapsules[key].pos;
   if (mMeshes.find(key) != mMeshes.end())
     return mMeshes[key].pos;
-  return Eigen::Vector3d::Zero();
+  return Eigen::Vector3s::Zero();
 }
 
 /// This returns the rotation of an object, if we've got it (and it's not a
-/// line or a sphere). Otherwise it returns Vector3d::Zero().
-Eigen::Vector3d GUIWebsocketServer::getObjectRotation(const std::string& key)
+/// line or a sphere). Otherwise it returns Vector3s::Zero().
+Eigen::Vector3s GUIWebsocketServer::getObjectRotation(const std::string& key)
 {
   const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
 
@@ -1178,12 +1178,12 @@ Eigen::Vector3d GUIWebsocketServer::getObjectRotation(const std::string& key)
     return mCapsules[key].euler;
   if (mMeshes.find(key) != mMeshes.end())
     return mMeshes[key].euler;
-  return Eigen::Vector3d::Zero();
+  return Eigen::Vector3s::Zero();
 }
 
 /// This returns the color of an object, if we've got it. Otherwise it returns
-/// Vector3d::Zero().
-Eigen::Vector3d GUIWebsocketServer::getObjectColor(const std::string& key)
+/// Vector3s::Zero().
+Eigen::Vector3s GUIWebsocketServer::getObjectColor(const std::string& key)
 {
   const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
 
@@ -1197,12 +1197,12 @@ Eigen::Vector3d GUIWebsocketServer::getObjectColor(const std::string& key)
     return mLines[key].color;
   if (mMeshes.find(key) != mMeshes.end())
     return mMeshes[key].color;
-  return Eigen::Vector3d::Zero();
+  return Eigen::Vector3s::Zero();
 }
 
 /// This moves an object (e.g. box, sphere, line) to a specified position
 GUIWebsocketServer& GUIWebsocketServer::setObjectPosition(
-    const std::string& key, const Eigen::Vector3d& pos)
+    const std::string& key, const Eigen::Vector3s& pos)
 {
   const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
 
@@ -1235,7 +1235,7 @@ GUIWebsocketServer& GUIWebsocketServer::setObjectPosition(
 
 /// This moves an object (e.g. box, sphere, line) to a specified orientation
 GUIWebsocketServer& GUIWebsocketServer::setObjectRotation(
-    const std::string& key, const Eigen::Vector3d& euler)
+    const std::string& key, const Eigen::Vector3s& euler)
 {
   const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
 
@@ -1264,7 +1264,7 @@ GUIWebsocketServer& GUIWebsocketServer::setObjectRotation(
 
 /// This changes an object (e.g. box, sphere, line) color
 GUIWebsocketServer& GUIWebsocketServer::setObjectColor(
-    const std::string& key, const Eigen::Vector3d& color)
+    const std::string& key, const Eigen::Vector3s& color)
 {
   const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
 
@@ -1303,7 +1303,7 @@ GUIWebsocketServer& GUIWebsocketServer::setObjectColor(
 /// "listener" whenever the object is dragged with the desired drag
 /// coordinates
 GUIWebsocketServer& GUIWebsocketServer::registerDragListener(
-    const std::string& key, std::function<void(Eigen::Vector3d)> listener)
+    const std::string& key, std::function<void(Eigen::Vector3s)> listener)
 {
   const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
 
@@ -1546,12 +1546,12 @@ GUIWebsocketServer& GUIWebsocketServer::createSlider(
     const std::string& key,
     const Eigen::Vector2i& fromTopLeft,
     const Eigen::Vector2i& size,
-    double min,
-    double max,
-    double value,
+    s_t min,
+    s_t max,
+    s_t value,
     bool onlyInts,
     bool horizontal,
-    std::function<void(double)> onChange)
+    std::function<void(s_t)> onChange)
 {
   const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
 
@@ -1576,7 +1576,7 @@ GUIWebsocketServer& GUIWebsocketServer::createSlider(
 
 /// This changes the contents of text on the screen
 GUIWebsocketServer& GUIWebsocketServer::setSliderValue(
-    const std::string& key, double value)
+    const std::string& key, s_t value)
 {
   const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
 
@@ -1602,7 +1602,7 @@ GUIWebsocketServer& GUIWebsocketServer::setSliderValue(
 
 /// This changes the contents of text on the screen
 GUIWebsocketServer& GUIWebsocketServer::setSliderMin(
-    const std::string& key, double min)
+    const std::string& key, s_t min)
 {
   const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
 
@@ -1628,7 +1628,7 @@ GUIWebsocketServer& GUIWebsocketServer::setSliderMin(
 
 /// This changes the contents of text on the screen
 GUIWebsocketServer& GUIWebsocketServer::setSliderMax(
-    const std::string& key, double max)
+    const std::string& key, s_t max)
 {
   const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
 
@@ -1657,12 +1657,12 @@ GUIWebsocketServer& GUIWebsocketServer::createPlot(
     const std::string& key,
     const Eigen::Vector2i& fromTopLeft,
     const Eigen::Vector2i& size,
-    const std::vector<double>& xs,
-    double minX,
-    double maxX,
-    const std::vector<double>& ys,
-    double minY,
-    double maxY,
+    const std::vector<s_t>& xs,
+    s_t minX,
+    s_t maxX,
+    const std::vector<s_t>& ys,
+    s_t minY,
+    s_t maxY,
     const std::string& type)
 {
   const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
@@ -1689,12 +1689,12 @@ GUIWebsocketServer& GUIWebsocketServer::createPlot(
 /// This changes the contents of a plot, along with its display limits
 GUIWebsocketServer& GUIWebsocketServer::setPlotData(
     const std::string& key,
-    const std::vector<double>& xs,
-    double minX,
-    double maxX,
-    const std::vector<double>& ys,
-    double minY,
-    double maxY)
+    const std::vector<s_t>& xs,
+    s_t minX,
+    s_t maxX,
+    const std::vector<s_t>& ys,
+    s_t minY,
+    s_t maxY)
 {
   const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
 
@@ -1886,7 +1886,7 @@ void GUIWebsocketServer::encodeCreateLine(std::stringstream& json, Line& line)
   json << "{ \"type\": \"create_line\", \"key\": \"" << line.key;
   json << "\", \"points\": [";
   bool firstPoint = true;
-  for (Eigen::Vector3d& point : line.points)
+  for (Eigen::Vector3s& point : line.points)
   {
     if (firstPoint)
       firstPoint = false;
@@ -1904,7 +1904,7 @@ void GUIWebsocketServer::encodeCreateMesh(std::stringstream& json, Mesh& mesh)
   json << "{ \"type\": \"create_mesh\", \"key\": \"" << mesh.key;
   json << "\", \"vertices\": [";
   bool firstPoint = true;
-  for (Eigen::Vector3d& vertex : mesh.vertices)
+  for (Eigen::Vector3s& vertex : mesh.vertices)
   {
     if (firstPoint)
       firstPoint = false;
@@ -1914,7 +1914,7 @@ void GUIWebsocketServer::encodeCreateMesh(std::stringstream& json, Mesh& mesh)
   }
   json << "], \"vertex_normals\": [";
   firstPoint = true;
-  for (Eigen::Vector3d& normal : mesh.vertexNormals)
+  for (Eigen::Vector3s& normal : mesh.vertexNormals)
   {
     if (firstPoint)
       firstPoint = false;
@@ -1934,7 +1934,7 @@ void GUIWebsocketServer::encodeCreateMesh(std::stringstream& json, Mesh& mesh)
   }
   json << "], \"uv\": [";
   firstPoint = true;
-  for (Eigen::Vector2d& uv : mesh.uv)
+  for (Eigen::Vector2s& uv : mesh.uv)
   {
     if (firstPoint)
       firstPoint = false;

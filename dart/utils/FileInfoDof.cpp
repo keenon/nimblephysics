@@ -44,7 +44,7 @@ namespace dart {
 namespace utils {
 
 //==============================================================================
-FileInfoDof::FileInfoDof(dynamics::Skeleton* _skel, double _fps)
+FileInfoDof::FileInfoDof(dynamics::Skeleton* _skel, s_t _fps)
   : mSkel(_skel), mFPS(_fps), mNumFrames(0)
 {
   std::strcpy(mFileName, "");
@@ -90,7 +90,7 @@ bool FileInfoDof::loadFile(const char* _fName)
     mDofs[j].resize(nDof);
     for (std::size_t i = 0; i < nDof; i++)
     {
-      double val;
+      s_t val;
       inFile >> val;
       mDofs[j][i] = val;
     }
@@ -112,7 +112,7 @@ bool FileInfoDof::loadFile(const char* _fName)
 
 //==============================================================================
 bool FileInfoDof::saveFile(const char* _fName, std::size_t _start, std::size_t _end,
-                           double /*_sampleRate*/ )
+                           s_t /*_sampleRate*/ )
 {
   if (_end < _start) return false;
 
@@ -155,31 +155,31 @@ bool FileInfoDof::saveFile(const char* _fName, std::size_t _start, std::size_t _
 }
 
 //==============================================================================
-void FileInfoDof::addDof(const Eigen::VectorXd& _dofs)
+void FileInfoDof::addDof(const Eigen::VectorXs& _dofs)
 {
   mDofs.push_back(_dofs); mNumFrames++;
 }
 
 //==============================================================================
-double FileInfoDof::getDofAt(std::size_t _frame, std::size_t _id) const
+s_t FileInfoDof::getDofAt(std::size_t _frame, std::size_t _id) const
 {
   assert(_frame<mNumFrames); return mDofs.at(_frame)[_id];
 }
 
 //==============================================================================
-Eigen::VectorXd FileInfoDof::getPoseAtFrame(int _frame) const
+Eigen::VectorXs FileInfoDof::getPoseAtFrame(int _frame) const
 {
   return mDofs.at(_frame);
 }
 
 //==============================================================================
-void FileInfoDof::setFPS(double _fps)
+void FileInfoDof::setFPS(s_t _fps)
 {
   mFPS = _fps;
 }
 
 //==============================================================================
-double FileInfoDof::getFPS() const
+s_t FileInfoDof::getFPS() const
 {
   return mFPS;
 }

@@ -5,8 +5,7 @@ namespace trajectory {
 
 //==============================================================================
 void Optimizer::registerIntermediateCallback(
-    std::function<bool(Problem* problem, int, double primal, double dual)>
-        callback)
+    std::function<bool(Problem* problem, int, s_t primal, s_t dual)> callback)
 {
   mIntermediateCallbacks.push_back(callback);
 }

@@ -69,78 +69,92 @@ constexpr T toDegree(const T& radian)
 
 /// \brief a cross b = (CR*a) dot b
 /// const Matd CR(2,2,0.0,-1.0,1.0,0.0);
-const Eigen::Matrix2d CR((Eigen::Matrix2d() << 0.0, -1.0, 1.0, 0.0).finished());
+const Eigen::Matrix2s CR((Eigen::Matrix2s() << 0.0, -1.0, 1.0, 0.0).finished());
 
-inline int delta(int _i, int _j) {
+inline int delta(int _i, int _j)
+{
   if (_i == _j)
     return 1;
   return 0;
 }
 
-template <typename T> inline constexpr
-int sign(T x, std::false_type)
+template <typename T>
+inline constexpr int sign(T x, std::false_type)
 {
   return static_cast<T>(0) < x;
 }
 
-template <typename T> inline constexpr
-int sign(T x, std::true_type)
+template <typename T>
+inline constexpr int sign(T x, std::true_type)
 {
   return (static_cast<T>(0) < x) - (x < static_cast<T>(0));
 }
 
-template <typename T> inline constexpr
-int sign(T x)
+template <typename T>
+inline constexpr int sign(T x)
 {
   return sign(x, std::is_signed<T>());
 }
 
-inline double sqr(double _x) {
-  return _x*_x;
+inline s_t sqr(s_t _x)
+{
+  return _x * _x;
 }
 
-inline double Tsinc(double _theta) {
-  return 0.5-sqrt(_theta)/48;
+inline s_t Tsinc(s_t _theta)
+{
+  return 0.5 - sqrt(_theta) / 48;
 }
 
-inline bool isZero(double _theta) {
-  return (std::abs(_theta) < 1e-6);
+inline bool isZero(s_t _theta)
+{
+  return (abs(_theta) < 1e-6);
 }
 
-inline double asinh(double _X) {
+inline s_t asinh(s_t _X)
+{
   return log(_X + sqrt(_X * _X + 1));
 }
 
-inline double acosh(double _X) {
+inline s_t acosh(s_t _X)
+{
   return log(_X + sqrt(_X * _X - 1));
 }
 
-inline double atanh(double _X) {
-  return log((1 + _X)/(1 - _X))/ 2;
+inline s_t atanh(s_t _X)
+{
+  return log((1 + _X) / (1 - _X)) / 2;
 }
 
-inline double asech(double _X) {
+inline s_t asech(s_t _X)
+{
   return log((sqrt(-_X * _X + 1) + 1) / _X);
 }
 
-inline double acosech(double _X) {
-  return log((sign(_X) * sqrt(_X * _X + 1) +1) / _X);
+inline s_t acosech(s_t _X)
+{
+  return log((sign(_X) * sqrt(_X * _X + 1) + 1) / _X);
 }
 
-inline double acotanh(double _X) {
+inline s_t acotanh(s_t _X)
+{
   return log((_X + 1) / (_X - 1)) / 2;
 }
 
-inline double round(double _x) {
+#ifndef DART_USE_ARBITRARY_PRECISION
+inline s_t round(s_t _x)
+{
   return floor(_x + 0.5);
 }
+#endif
 
-inline double round2(double _x) {
-  int gintx = static_cast<int>(std::floor(_x));
+inline s_t round2(s_t _x)
+{
+  int gintx = static_cast<int>(floor(_x));
   if (_x - gintx < 0.5)
-    return static_cast<double>(gintx);
+    return static_cast<s_t>(gintx);
   else
-    return static_cast<double>(gintx + 1.0);
+    return static_cast<s_t>(gintx + 1.0);
 }
 
 template <typename T>
@@ -158,28 +172,36 @@ inline typename DerivedA::PlainObject clip(
   return lower.cwiseMax(val.cwiseMin(upper));
 }
 
-inline bool isEqual(double _x, double _y) {
-  return (std::abs(_x - _y) < 1e-6);
+inline bool isEqual(s_t _x, s_t _y)
+{
+  return (abs(_x - _y) < 1e-6);
 }
 
 // check if it is an integer
-inline bool isInt(double _x) {
+inline bool isInt(s_t _x)
+{
   if (isEqual(round(_x), _x))
     return true;
   return false;
 }
 
 /// \brief Returns whether _v is a NaN (Not-A-Number) value
-inline bool isNan(double _v) {
+inline bool isNan(s_t _v)
+{
 #ifdef _WIN32
   return _isnan(_v) != 0;
 #else
+#ifdef DART_USE_ARBITRARY_PRECISION
+  return isnan(_v);
+#else
   return std::isnan(_v);
+#endif
 #endif
 }
 
 /// \brief Returns whether _m is a NaN (Not-A-Number) matrix
-inline bool isNan(const Eigen::MatrixXd& _m) {
+inline bool isNan(const Eigen::MatrixXs& _m)
+{
   for (int i = 0; i < _m.rows(); ++i)
     for (int j = 0; j < _m.cols(); ++j)
       if (isNan(_m(i, j)))
@@ -190,17 +212,23 @@ inline bool isNan(const Eigen::MatrixXd& _m) {
 
 /// \brief Returns whether _v is an infinity value (either positive infinity or
 /// negative infinity).
-inline bool isInf(double _v) {
+inline bool isInf(s_t _v)
+{
 #ifdef _WIN32
   return !_finite(_v);
 #else
+#ifdef DART_USE_ARBITRARY_PRECISION
+  return isinf(_v);
+#else
   return std::isinf(_v);
+#endif
 #endif
 }
 
 /// \brief Returns whether _m is an infinity matrix (either positive infinity or
 /// negative infinity).
-inline bool isInf(const Eigen::MatrixXd& _m) {
+inline bool isInf(const Eigen::MatrixXs& _m)
+{
   for (int i = 0; i < _m.rows(); ++i)
     for (int j = 0; j < _m.cols(); ++j)
       if (isInf(_m(i, j)))
@@ -210,18 +238,23 @@ inline bool isInf(const Eigen::MatrixXd& _m) {
 }
 
 /// \brief Returns whether _m is symmetric or not
-inline bool isSymmetric(const Eigen::MatrixXd& _m, double _tol = 1e-6) {
+inline bool isSymmetric(const Eigen::MatrixXs& _m, s_t _tol = 1e-6)
+{
   std::size_t rows = _m.rows();
   std::size_t cols = _m.cols();
 
   if (rows != cols)
     return false;
 
-  for (std::size_t i = 0; i < rows; ++i) {
-    for (std::size_t j = i + 1; j < cols; ++j) {
-      if (std::abs(_m(i, j) - _m(j, i)) > _tol) {
+  for (std::size_t i = 0; i < rows; ++i)
+  {
+    for (std::size_t j = i + 1; j < cols; ++j)
+    {
+      if (abs(_m(i, j) - _m(j, i)) > _tol)
+      {
         std::cout << "A: " << std::endl;
-        for (std::size_t k = 0; k < rows; ++k) {
+        for (std::size_t k = 0; k < rows; ++k)
+        {
           for (std::size_t l = 0; l < cols; ++l)
             std::cout << std::setprecision(4) << _m(k, l) << " ";
           std::cout << std::endl;
@@ -237,7 +270,8 @@ inline bool isSymmetric(const Eigen::MatrixXd& _m, double _tol = 1e-6) {
   return true;
 }
 
-inline unsigned seedRand() {
+inline unsigned seedRand()
+{
   time_t now = time(0);
   unsigned char* p = reinterpret_cast<unsigned char*>(&now);
   unsigned seed = 0;
@@ -252,46 +286,46 @@ inline unsigned seedRand() {
 
 /// \deprecated Please use Random::uniform() instead.
 DART_DEPRECATED(6.7)
-inline double random(double _min, double _max) {
-  return _min + ((static_cast<double>(rand()) / (RAND_MAX + 1.0))
-                * (_max - _min));
+inline s_t random(s_t _min, s_t _max)
+{
+  return _min + ((static_cast<s_t>(rand()) / (RAND_MAX + 1.0)) * (_max - _min));
 }
 
 /// \deprecated Please use Random::uniform() instead.
-template<int N>
+template <int N>
 DART_DEPRECATED(6.7)
-Eigen::Matrix<double, N, 1> randomVector(double _min, double _max)
+Eigen::Matrix<s_t, N, 1> randomVector(s_t _min, s_t _max)
 {
-  Eigen::Matrix<double, N, 1> v;
-DART_SUPPRESS_DEPRECATED_BEGIN
-  for(std::size_t i=0; i<N; ++i)
+  Eigen::Matrix<s_t, N, 1> v;
+  DART_SUPPRESS_DEPRECATED_BEGIN
+  for (std::size_t i = 0; i < N; ++i)
     v[i] = random(_min, _max);
-DART_SUPPRESS_DEPRECATED_END
+  DART_SUPPRESS_DEPRECATED_END
 
   return v;
 }
 
 /// \deprecated Please use Random::uniform() instead.
-template<int N>
+template <int N>
 DART_DEPRECATED(6.7)
-Eigen::Matrix<double, N, 1> randomVector(double _limit)
+Eigen::Matrix<s_t, N, 1> randomVector(s_t _limit)
 {
-DART_SUPPRESS_DEPRECATED_BEGIN
-  return randomVector<N>(-std::abs(_limit), std::abs(_limit));
-DART_SUPPRESS_DEPRECATED_END
+  DART_SUPPRESS_DEPRECATED_BEGIN
+  return randomVector<N>(-abs(_limit), abs(_limit));
+  DART_SUPPRESS_DEPRECATED_END
 }
 
 //==============================================================================
 /// \deprecated Please use Random::uniform() instead.
 DART_DEPRECATED(6.7)
-inline Eigen::VectorXd randomVectorXd(std::size_t size, double min, double max)
+inline Eigen::VectorXs randomVectorXs(std::size_t size, s_t min, s_t max)
 {
-  Eigen::VectorXd v = Eigen::VectorXd::Zero(size);
+  Eigen::VectorXs v = Eigen::VectorXs::Zero(size);
 
-DART_SUPPRESS_DEPRECATED_BEGIN
+  DART_SUPPRESS_DEPRECATED_BEGIN
   for (std::size_t i = 0; i < size; ++i)
     v[i] = random(min, max);
-DART_SUPPRESS_DEPRECATED_END
+  DART_SUPPRESS_DEPRECATED_END
 
   return v;
 }
@@ -299,165 +333,168 @@ DART_SUPPRESS_DEPRECATED_END
 //==============================================================================
 /// \deprecated Please use Random::uniform() instead.
 DART_DEPRECATED(6.7)
-inline Eigen::VectorXd randomVectorXd(std::size_t size, double limit)
+inline Eigen::VectorXs randomVectorXs(std::size_t size, s_t limit)
 {
-DART_SUPPRESS_DEPRECATED_BEGIN
-  return randomVectorXd(size, -std::abs(limit), std::abs(limit));
-DART_SUPPRESS_DEPRECATED_END
+  DART_SUPPRESS_DEPRECATED_BEGIN
+  return randomVectorXs(size, -abs(limit), abs(limit));
+  DART_SUPPRESS_DEPRECATED_END
 }
 
 namespace suffixes {
 
+#ifndef DART_USE_ARBITRARY_PRECISION
 //==============================================================================
-constexpr double operator"" _pi(long double x)
+constexpr s_t operator"" _pi(long s_t x)
 {
-  return x * constants<double>::pi();
+  return x * constants<s_t>::pi();
 }
 
 //==============================================================================
-constexpr double operator"" _pi(unsigned long long int x)
+constexpr s_t operator"" _pi(unsigned long long int x)
 {
-  return operator"" _pi(static_cast<long double>(x));
+  return operator"" _pi(static_cast<long s_t>(x));
 }
 
 //==============================================================================
-constexpr double operator"" _rad(long double angle)
+constexpr s_t operator"" _rad(long s_t angle)
 {
   return angle;
 }
 
 //==============================================================================
-constexpr double operator"" _rad(unsigned long long int angle)
+constexpr s_t operator"" _rad(unsigned long long int angle)
 {
-  return operator"" _rad(static_cast<long double>(angle));
+  return operator"" _rad(static_cast<long s_t>(angle));
 }
 
 //==============================================================================
-constexpr double operator"" _deg(long double angle)
+constexpr s_t operator"" _deg(long s_t angle)
 {
   return toRadian(angle);
 }
 
 //==============================================================================
-constexpr double operator"" _deg(unsigned long long int angle)
+constexpr s_t operator"" _deg(unsigned long long int angle)
 {
-  return operator"" _deg(static_cast<long double>(angle));
+  return operator"" _deg(static_cast<long s_t>(angle));
+}
+#endif
+
+} // namespace suffixes
+
+} // namespace math
+
+namespace Color {
+
+inline Eigen::Vector4s Red(s_t alpha)
+{
+  return Eigen::Vector4s(0.9, 0.1, 0.1, alpha);
 }
 
-}  // namespace suffixes
-
-}  // namespace math
-
-namespace Color
+inline Eigen::Vector3s Red()
 {
-
-inline Eigen::Vector4d Red(double alpha)
-{
-  return Eigen::Vector4d(0.9, 0.1, 0.1, alpha);
+  return Eigen::Vector3s(0.9, 0.1, 0.1);
 }
 
-inline Eigen::Vector3d Red()
+inline Eigen::Vector3s Fuchsia()
 {
-  return Eigen::Vector3d(0.9, 0.1, 0.1);
+  return Eigen::Vector3s(1.0, 0.0, 0.5);
 }
 
-inline Eigen::Vector3d Fuchsia()
+inline Eigen::Vector4s Fuchsia(s_t alpha)
 {
-  return Eigen::Vector3d(1.0, 0.0, 0.5);
+  return Eigen::Vector4s(1.0, 0.0, 0.5, alpha);
 }
 
-inline Eigen::Vector4d Fuchsia(double alpha)
+inline Eigen::Vector4s Orange(s_t alpha)
 {
-  return Eigen::Vector4d(1.0, 0.0, 0.5, alpha);
+  return Eigen::Vector4s(1.0, 0.63, 0.0, alpha);
 }
 
-inline Eigen::Vector4d Orange(double alpha)
+inline Eigen::Vector3s Orange()
 {
-  return Eigen::Vector4d(1.0, 0.63, 0.0, alpha);
+  return Eigen::Vector3s(1.0, 0.63, 0.0);
 }
 
-inline Eigen::Vector3d Orange()
+inline Eigen::Vector4s Green(s_t alpha)
 {
-  return Eigen::Vector3d(1.0, 0.63, 0.0);
+  return Eigen::Vector4s(0.1, 0.9, 0.1, alpha);
 }
 
-inline Eigen::Vector4d Green(double alpha)
+inline Eigen::Vector3s Green()
 {
-  return Eigen::Vector4d(0.1, 0.9, 0.1, alpha);
+  return Eigen::Vector3s(0.1, 0.9, 0.1);
 }
 
-inline Eigen::Vector3d Green()
+inline Eigen::Vector4s Blue(s_t alpha)
 {
-  return Eigen::Vector3d(0.1, 0.9, 0.1);
+  return Eigen::Vector4s(0.1, 0.1, 0.9, alpha);
 }
 
-inline Eigen::Vector4d Blue(double alpha)
+inline Eigen::Vector3s Blue()
 {
-  return Eigen::Vector4d(0.1, 0.1, 0.9, alpha);
+  return Eigen::Vector3s(0.1, 0.1, 0.9);
 }
 
-inline Eigen::Vector3d Blue()
+inline Eigen::Vector4s White(s_t alpha)
 {
-  return Eigen::Vector3d(0.1, 0.1, 0.9);
+  return Eigen::Vector4s(1.0, 1.0, 1.0, alpha);
 }
 
-inline Eigen::Vector4d White(double alpha)
+inline Eigen::Vector3s White()
 {
-  return Eigen::Vector4d(1.0, 1.0, 1.0, alpha);
+  return Eigen::Vector3s(1.0, 1.0, 1.0);
 }
 
-inline Eigen::Vector3d White()
+inline Eigen::Vector4s Black(s_t alpha)
 {
-  return Eigen::Vector3d(1.0, 1.0, 1.0);
+  return Eigen::Vector4s(0.05, 0.05, 0.05, alpha);
 }
 
-inline Eigen::Vector4d Black(double alpha)
+inline Eigen::Vector3s Black()
 {
-  return Eigen::Vector4d(0.05, 0.05, 0.05, alpha);
+  return Eigen::Vector3s(0.05, 0.05, 0.05);
 }
 
-inline Eigen::Vector3d Black()
+inline Eigen::Vector4s LightGray(s_t alpha)
 {
-  return Eigen::Vector3d(0.05, 0.05, 0.05);
+  return Eigen::Vector4s(0.9, 0.9, 0.9, alpha);
 }
 
-inline Eigen::Vector4d LightGray(double alpha)
+inline Eigen::Vector3s LightGray()
 {
-  return Eigen::Vector4d(0.9, 0.9, 0.9, alpha);
+  return Eigen::Vector3s(0.9, 0.9, 0.9);
 }
 
-inline Eigen::Vector3d LightGray()
+inline Eigen::Vector4s Gray(s_t alpha)
 {
-  return Eigen::Vector3d(0.9, 0.9, 0.9);
+  return Eigen::Vector4s(0.6, 0.6, 0.6, alpha);
 }
 
-inline Eigen::Vector4d Gray(double alpha)
+inline Eigen::Vector3s Gray()
 {
-  return Eigen::Vector4d(0.6, 0.6, 0.6, alpha);
+  return Eigen::Vector3s(0.6, 0.6, 0.6);
 }
 
-inline Eigen::Vector3d Gray()
+inline Eigen::Vector4s Random(s_t alpha)
 {
-  return Eigen::Vector3d(0.6, 0.6, 0.6);
+  return Eigen::Vector4s(
+      math::Random::uniform(0.0, 1.0),
+      math::Random::uniform(0.0, 1.0),
+      math::Random::uniform(0.0, 1.0),
+      alpha);
 }
 
-inline Eigen::Vector4d Random(double alpha)
+inline Eigen::Vector3s Random()
 {
-  return Eigen::Vector4d(math::Random::uniform(0.0, 1.0),
-                         math::Random::uniform(0.0, 1.0),
-                         math::Random::uniform(0.0, 1.0),
-                         alpha);
-}
-
-inline Eigen::Vector3d Random()
-{
-  return Eigen::Vector3d(math::Random::uniform(0.0, 1.0),
-                         math::Random::uniform(0.0, 1.0),
-                         math::Random::uniform(0.0, 1.0));
+  return Eigen::Vector3s(
+      math::Random::uniform(0.0, 1.0),
+      math::Random::uniform(0.0, 1.0),
+      math::Random::uniform(0.0, 1.0));
 }
 
 } // namespace Color
 
-}  // namespace dart
+} // namespace dart
 
-#endif  // DART_MATH_HELPERS_HPP_
+#endif // DART_MATH_HELPERS_HPP_

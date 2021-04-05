@@ -54,10 +54,10 @@ void MyWindow::timeStepping()
 {
   if (mCircleTask)
   {
-    static double time = 0.0;
-    const double dt = 0.0005;
-    const double radius = 0.6;
-    Eigen::Vector3d center = Eigen::Vector3d(0.0, 0.1, 0.0);
+    static s_t time = 0.0;
+    const s_t dt = 0.0005;
+    const s_t radius = 0.6;
+    Eigen::Vector3s center = Eigen::Vector3s(0.0, 0.1, 0.0);
 
     mTargetPosition = center;
     mTargetPosition[0] = radius * std::sin(time);
@@ -80,10 +80,10 @@ void MyWindow::drawWorld() const
   // Draw the target position
   if (mRI)
   {
-    mRI->setPenColor(Eigen::Vector3d(0.8, 0.2, 0.2));
+    mRI->setPenColor(Eigen::Vector3s(0.8, 0.2, 0.2));
     mRI->pushMatrix();
     mRI->translate(mTargetPosition);
-    mRI->drawEllipsoid(Eigen::Vector3d(0.05, 0.05, 0.05));
+    mRI->drawEllipsoid(Eigen::Vector3s(0.05, 0.05, 0.05));
     mRI->popMatrix();
   }
 
@@ -94,7 +94,7 @@ void MyWindow::drawWorld() const
 //==============================================================================
 void MyWindow::keyboard(unsigned char _key, int _x, int _y)
 {
-  double incremental = 0.01;
+  s_t incremental = 0.01;
 
   switch (_key)
   {

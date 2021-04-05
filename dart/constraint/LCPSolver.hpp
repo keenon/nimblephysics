@@ -33,6 +33,8 @@
 #ifndef DART_CONSTRAINT_LCPSOLVER_HPP_
 #define DART_CONSTRAINT_LCPSOLVER_HPP_
 
+#include "dart/math/MathTypes.hpp"
+
 namespace dart {
 namespace constraint {
 
@@ -48,25 +50,24 @@ public:
   virtual void solve(ConstrainedGroup* _group) = 0;
 
   /// Set time step
-  void setTimeStep(double _timeStep);
+  void setTimeStep(s_t _timeStep);
 
   /// Return time step
-  double getTimeStep() const;
+  s_t getTimeStep() const;
 
   /// Destructor
   virtual ~LCPSolver();
 
 protected:
   /// Constructor
-  LCPSolver(double _timeStep);
+  LCPSolver(s_t _timeStep);
 
 protected:
   /// Simulation time step
-  double mTimeStep;
+  s_t mTimeStep;
 };
 
 } // namespace constraint
 } // namespace dart
 
-#endif  // DART_CONSTRAINT_LCPSOLVER_HPP_
-
+#endif // DART_CONSTRAINT_LCPSOLVER_HPP_

@@ -67,20 +67,20 @@ public:
   StateMachine* getCurrentState();
 
   /// \brief Change state to _stateMachine
-  void changeStateMachine(StateMachine* _stateMachine, double _currentTime);
+  void changeStateMachine(StateMachine* _stateMachine, s_t _currentTime);
 
   /// \brief Change state machine to a state machine whose names is _name
-  void changeStateMachine(const std::string& _name, double _currentTime);
+  void changeStateMachine(const std::string& _name, s_t _currentTime);
 
   /// \brief Change state machine to a state machine whose index is _idx
-  void changeStateMachine(std::size_t _idx, double _currentTime);
+  void changeStateMachine(std::size_t _idx, s_t _currentTime);
 
   /// \brief Get true iff this controller is currently allowing to control the
   /// Atlas robot
   bool isAllowingControl() const;
 
   /// \brief Keyboard control
-  void keyboard(unsigned char _key, int _x, int _y, double _currentTime);
+  void keyboard(unsigned char _key, int _x, int _y, s_t _currentTime);
 
   /// \brief Print debug information
   void printDebugInfo() const;
@@ -144,10 +144,10 @@ protected:
   std::size_t mSagitalRightHip;
 
   /// \brief Lower bound for emergency stop
-  double mMinPelvisHeight;
+  s_t mMinPelvisHeight;
 
   /// \brief Upper bound for emergency stop
-  double mMaxPelvisHeight;
+  s_t mMaxPelvisHeight;
 
 private:
   /// \brief Check if this controller contains _stateMachine

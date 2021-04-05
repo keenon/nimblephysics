@@ -2,19 +2,21 @@
 
 #include <iostream>
 
+#include "dart/math/MathTypes.hpp"
+
 namespace dart {
 namespace realtime {
 
-Observation::Observation(long time, Eigen::VectorXd pos, Eigen::VectorXd vel)
+Observation::Observation(long time, Eigen::VectorXs pos, Eigen::VectorXs vel)
   : time(time), pos(pos), vel(vel)
 {
 }
 
 ObservationLog::ObservationLog(
     long startTime,
-    Eigen::VectorXd initialPos,
-    Eigen::VectorXd initialVel,
-    Eigen::VectorXd initialMass)
+    Eigen::VectorXs initialPos,
+    Eigen::VectorXs initialVel,
+    Eigen::VectorXs initialMass)
   : mDofs(initialPos.size()), mMassDim(initialMass.size()), mMass(initialMass)
 {
   mObservations.emplace_back(startTime, initialPos, initialVel);
@@ -22,10 +24,10 @@ ObservationLog::ObservationLog(
 
 void ObservationLog::observe(
     long time,
-    Eigen::VectorXd pos,
-    Eigen::VectorXd vel,
+    Eigen::VectorXs pos,
+    Eigen::VectorXs vel,
     // TODO(keenon): Support mass observations
-    Eigen::VectorXd /* mass */)
+    Eigen::VectorXs /* mass */)
 {
   mObservations.emplace_back(time, pos, vel);
 }
@@ -43,7 +45,7 @@ Observation ObservationLog::getClosestObservationBefore(long time)
   return mObservations[0];
 }
 
-Eigen::VectorXd ObservationLog::getMass()
+Eigen::VectorXs ObservationLog::getMass()
 {
   return mMass;
 }

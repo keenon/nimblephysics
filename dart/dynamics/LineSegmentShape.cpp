@@ -38,7 +38,7 @@ namespace dart {
 namespace dynamics {
 
 //==============================================================================
-const Eigen::Vector3d LineSegmentShape::mDummyVertex = Eigen::Vector3d::Zero();
+const Eigen::Vector3s LineSegmentShape::mDummyVertex = Eigen::Vector3s::Zero();
 
 //==============================================================================
 LineSegmentShape::LineSegmentShape(float _thickness)
@@ -57,8 +57,8 @@ LineSegmentShape::LineSegmentShape(float _thickness)
 }
 
 //==============================================================================
-LineSegmentShape::LineSegmentShape(const Eigen::Vector3d& _v1,
-                                   const Eigen::Vector3d& _v2,
+LineSegmentShape::LineSegmentShape(const Eigen::Vector3s& _v1,
+                                   const Eigen::Vector3s& _v2,
                                    float _thickness)
   : Shape(),
     mThickness(_thickness)
@@ -110,7 +110,7 @@ float LineSegmentShape::getThickness() const
 }
 
 //==============================================================================
-std::size_t LineSegmentShape::addVertex(const Eigen::Vector3d& _v)
+std::size_t LineSegmentShape::addVertex(const Eigen::Vector3s& _v)
 {
   std::size_t parent = mVertices.size();
   if(parent > 0)
@@ -121,7 +121,7 @@ std::size_t LineSegmentShape::addVertex(const Eigen::Vector3d& _v)
 }
 
 //==============================================================================
-std::size_t LineSegmentShape::addVertex(const Eigen::Vector3d& _v, std::size_t _parent)
+std::size_t LineSegmentShape::addVertex(const Eigen::Vector3s& _v, std::size_t _parent)
 {
   std::size_t index = mVertices.size();
   mVertices.push_back(_v);
@@ -129,12 +129,12 @@ std::size_t LineSegmentShape::addVertex(const Eigen::Vector3d& _v, std::size_t _
   if(_parent > mVertices.size())
   {
     if(mVertices.size() == 0)
-      dtwarn << "[LineSegmentShape::addVertex(const Eigen::Vector3d&, std::size_t)] "
+      dtwarn << "[LineSegmentShape::addVertex(const Eigen::Vector3s&, std::size_t)] "
              << "Attempting to add a vertex to be a child of vertex #"
              << _parent << ", but no vertices exist yet. No connection will be "
              << "created for the new vertex yet.\n";
     else
-      dtwarn << "[LineSegmentShape::addVertex(const Eigen::Vector3d&, std::size_t)] "
+      dtwarn << "[LineSegmentShape::addVertex(const Eigen::Vector3s&, std::size_t)] "
              << "Attempting to add a vertex to be a child of vertex #"
              << _parent << ", but the vertex indices only go up to "
              << mVertices.size()-1 << ". No connection will be created for the "
@@ -171,7 +171,7 @@ void LineSegmentShape::removeVertex(std::size_t _idx)
 }
 
 //==============================================================================
-void LineSegmentShape::setVertex(std::size_t _idx, const Eigen::Vector3d& _v)
+void LineSegmentShape::setVertex(std::size_t _idx, const Eigen::Vector3s& _v)
 {
   if(_idx >= mVertices.size())
   {
@@ -191,7 +191,7 @@ void LineSegmentShape::setVertex(std::size_t _idx, const Eigen::Vector3d& _v)
 }
 
 //==============================================================================
-const Eigen::Vector3d& LineSegmentShape::getVertex(std::size_t _idx) const
+const Eigen::Vector3s& LineSegmentShape::getVertex(std::size_t _idx) const
 {
   if(_idx < mVertices.size())
     return mVertices[_idx];
@@ -212,7 +212,7 @@ const Eigen::Vector3d& LineSegmentShape::getVertex(std::size_t _idx) const
 }
 
 //==============================================================================
-const std::vector<Eigen::Vector3d>& LineSegmentShape::getVertices() const
+const std::vector<Eigen::Vector3s>& LineSegmentShape::getVertices() const
 {
   return mVertices;
 }
@@ -289,60 +289,60 @@ LineSegmentShape::getConnections() const
 }
 
 //==============================================================================
-Eigen::Matrix3d LineSegmentShape::computeInertia(double _mass) const
+Eigen::Matrix3s LineSegmentShape::computeInertia(s_t _mass) const
 {
-  Eigen::Matrix3d inertia = Eigen::Matrix3d::Zero();
+  Eigen::Matrix3s inertia = Eigen::Matrix3s::Zero();
 
-  double totalLength = 0;
+  s_t totalLength = 0;
   for(const Eigen::Vector2i& c : mConnections)
   {
-    const Eigen::Vector3d& v0 = mVertices[c[0]];
-    const Eigen::Vector3d& v1 = mVertices[c[1]];
+    const Eigen::Vector3s& v0 = mVertices[c[0]];
+    const Eigen::Vector3s& v1 = mVertices[c[1]];
 
     totalLength += (v1-v0).norm();
   }
 
   for(const Eigen::Vector2i& c : mConnections)
   {
-    const Eigen::Vector3d& v0 = mVertices[c[0]];
-    const Eigen::Vector3d& v1 = mVertices[c[1]];
+    const Eigen::Vector3s& v0 = mVertices[c[0]];
+    const Eigen::Vector3s& v1 = mVertices[c[1]];
 
-    double radius = 1e-6;
-    double height = (v1-v0).norm();
+    s_t radius = 1e-6;
+    s_t height = (v1-v0).norm();
 
-    double partialMass = _mass * height/totalLength;
+    s_t partialMass = _mass * height/totalLength;
 
-    Eigen::Matrix3d partialInertia = Eigen::Matrix3d::Zero();
+    Eigen::Matrix3s partialInertia = Eigen::Matrix3s::Zero();
     partialInertia(0, 0) = partialMass * (3.0 * radius*radius + height*height) / 12.0;
     partialInertia(1, 1) = partialInertia(0, 0);
     partialInertia(2, 2) = 0.5 * _mass * radius * radius;
 
-    Eigen::Vector3d v = v1-v0;
-    Eigen::Vector3d axis;
-    double angle;
+    Eigen::Vector3s v = v1-v0;
+    Eigen::Vector3s axis;
+    s_t angle;
     if(v.norm() == 0)
     {
       angle = 0;
-      axis = Eigen::Vector3d::UnitX();
+      axis = Eigen::Vector3s::UnitX();
     }
     else
     {
       v.normalize();
-      Eigen::Vector3d axis = Eigen::Vector3d::UnitZ().cross(v);
+      Eigen::Vector3s axis = Eigen::Vector3s::UnitZ().cross(v);
       if(axis.norm() == 0)
       {
         angle = 0;
-        axis = Eigen::Vector3d::UnitX();
+        axis = Eigen::Vector3s::UnitX();
       }
       else
       {
         axis.normalize();
-        angle = acos(Eigen::Vector3d::UnitZ().dot(v));
+        angle = acos(Eigen::Vector3s::UnitZ().dot(v));
       }
     }
 
-    Eigen::AngleAxisd R(angle, axis);
-    Eigen::Vector3d center = (v1+v0)/2.0;
+    Eigen::AngleAxis_s R(angle, axis);
+    Eigen::Vector3s center = (v1+v0)/2.0;
     inertia += R.matrix()
         * math::parallelAxisTheorem(partialInertia, center, partialMass)
         * R.matrix().transpose();
@@ -356,16 +356,16 @@ void LineSegmentShape::updateBoundingBox() const
 {
   if (mVertices.empty())
   {
-    mBoundingBox.setMin(Eigen::Vector3d::Zero());
-    mBoundingBox.setMax(Eigen::Vector3d::Zero());
+    mBoundingBox.setMin(Eigen::Vector3s::Zero());
+    mBoundingBox.setMax(Eigen::Vector3s::Zero());
     mIsBoundingBoxDirty = false;
     return;
   }
 
-  Eigen::Vector3d min
-      = Eigen::Vector3d::Constant(std::numeric_limits<double>::infinity());
-  Eigen::Vector3d max
-      = Eigen::Vector3d::Constant(-std::numeric_limits<double>::infinity());
+  Eigen::Vector3s min
+      = Eigen::Vector3s::Constant(std::numeric_limits<s_t>::infinity());
+  Eigen::Vector3s max
+      = Eigen::Vector3s::Constant(-std::numeric_limits<s_t>::infinity());
 
   for (const auto& vertex : mVertices)
   {

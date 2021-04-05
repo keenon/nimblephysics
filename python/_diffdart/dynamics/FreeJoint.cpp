@@ -77,12 +77,12 @@ void FreeJoint(py::module& m)
       .def(
           "setSpatialMotion",
           +[](dart::dynamics::FreeJoint* self,
-              const Eigen::Isometry3d* newTransform,
+              const Eigen::Isometry3s* newTransform,
               const dart::dynamics::Frame* withRespectTo,
-              const Eigen::Vector6d* newSpatialVelocity,
+              const Eigen::Vector6s* newSpatialVelocity,
               const dart::dynamics::Frame* velRelativeTo,
               const dart::dynamics::Frame* velInCoordinatesOf,
-              const Eigen::Vector6d* newSpatialAcceleration,
+              const Eigen::Vector6s* newSpatialAcceleration,
               const dart::dynamics::Frame* accRelativeTo,
               const dart::dynamics::Frame* accInCoordinatesOf) {
             self->setSpatialMotion(
@@ -106,21 +106,21 @@ void FreeJoint(py::module& m)
       .def(
           "setRelativeTransform",
           +[](dart::dynamics::FreeJoint* self,
-              const Eigen::Isometry3d& newTransform) {
+              const Eigen::Isometry3s& newTransform) {
             self->setRelativeTransform(newTransform);
           },
           ::py::arg("newTransform"))
       .def(
           "setTransform",
           +[](dart::dynamics::FreeJoint* self,
-              const Eigen::Isometry3d& newTransform) {
+              const Eigen::Isometry3s& newTransform) {
             self->setTransform(newTransform);
           },
           ::py::arg("newTransform"))
       .def(
           "setTransform",
           +[](dart::dynamics::FreeJoint* self,
-              const Eigen::Isometry3d& newTransform,
+              const Eigen::Isometry3s& newTransform,
               const dart::dynamics::Frame* withRespectTo) {
             self->setTransform(newTransform, withRespectTo);
           },
@@ -129,14 +129,14 @@ void FreeJoint(py::module& m)
       .def(
           "setRelativeSpatialVelocity",
           +[](dart::dynamics::FreeJoint* self,
-              const Eigen::Vector6d& newSpatialVelocity) {
+              const Eigen::Vector6s& newSpatialVelocity) {
             self->setRelativeSpatialVelocity(newSpatialVelocity);
           },
           ::py::arg("newSpatialVelocity"))
       .def(
           "setRelativeSpatialVelocity",
           +[](dart::dynamics::FreeJoint* self,
-              const Eigen::Vector6d& newSpatialVelocity,
+              const Eigen::Vector6s& newSpatialVelocity,
               const dart::dynamics::Frame* inCoordinatesOf) {
             self->setRelativeSpatialVelocity(
                 newSpatialVelocity, inCoordinatesOf);
@@ -146,7 +146,7 @@ void FreeJoint(py::module& m)
       .def(
           "setSpatialVelocity",
           +[](dart::dynamics::FreeJoint* self,
-              const Eigen::Vector6d& newSpatialVelocity,
+              const Eigen::Vector6s& newSpatialVelocity,
               const dart::dynamics::Frame* relativeTo,
               const dart::dynamics::Frame* inCoordinatesOf) {
             self->setSpatialVelocity(
@@ -158,14 +158,14 @@ void FreeJoint(py::module& m)
       .def(
           "setLinearVelocity",
           +[](dart::dynamics::FreeJoint* self,
-              const Eigen::Vector3d& newLinearVelocity) {
+              const Eigen::Vector3s& newLinearVelocity) {
             self->setLinearVelocity(newLinearVelocity);
           },
           ::py::arg("newLinearVelocity"))
       .def(
           "setLinearVelocity",
           +[](dart::dynamics::FreeJoint* self,
-              const Eigen::Vector3d& newLinearVelocity,
+              const Eigen::Vector3s& newLinearVelocity,
               const dart::dynamics::Frame* relativeTo) {
             self->setLinearVelocity(newLinearVelocity, relativeTo);
           },
@@ -174,7 +174,7 @@ void FreeJoint(py::module& m)
       .def(
           "setLinearVelocity",
           +[](dart::dynamics::FreeJoint* self,
-              const Eigen::Vector3d& newLinearVelocity,
+              const Eigen::Vector3s& newLinearVelocity,
               const dart::dynamics::Frame* relativeTo,
               const dart::dynamics::Frame* inCoordinatesOf) {
             self->setLinearVelocity(
@@ -186,14 +186,14 @@ void FreeJoint(py::module& m)
       .def(
           "setAngularVelocity",
           +[](dart::dynamics::FreeJoint* self,
-              const Eigen::Vector3d& newAngularVelocity) {
+              const Eigen::Vector3s& newAngularVelocity) {
             self->setAngularVelocity(newAngularVelocity);
           },
           ::py::arg("newAngularVelocity"))
       .def(
           "setAngularVelocity",
           +[](dart::dynamics::FreeJoint* self,
-              const Eigen::Vector3d& newAngularVelocity,
+              const Eigen::Vector3s& newAngularVelocity,
               const dart::dynamics::Frame* relativeTo) {
             self->setAngularVelocity(newAngularVelocity, relativeTo);
           },
@@ -202,7 +202,7 @@ void FreeJoint(py::module& m)
       .def(
           "setAngularVelocity",
           +[](dart::dynamics::FreeJoint* self,
-              const Eigen::Vector3d& newAngularVelocity,
+              const Eigen::Vector3s& newAngularVelocity,
               const dart::dynamics::Frame* relativeTo,
               const dart::dynamics::Frame* inCoordinatesOf) {
             self->setAngularVelocity(
@@ -214,14 +214,14 @@ void FreeJoint(py::module& m)
       .def(
           "setRelativeSpatialAcceleration",
           +[](dart::dynamics::FreeJoint* self,
-              const Eigen::Vector6d& newSpatialAcceleration) {
+              const Eigen::Vector6s& newSpatialAcceleration) {
             self->setRelativeSpatialAcceleration(newSpatialAcceleration);
           },
           ::py::arg("newSpatialAcceleration"))
       .def(
           "setRelativeSpatialAcceleration",
           +[](dart::dynamics::FreeJoint* self,
-              const Eigen::Vector6d& newSpatialAcceleration,
+              const Eigen::Vector6s& newSpatialAcceleration,
               const dart::dynamics::Frame* inCoordinatesOf) {
             self->setRelativeSpatialAcceleration(
                 newSpatialAcceleration, inCoordinatesOf);
@@ -231,7 +231,7 @@ void FreeJoint(py::module& m)
       .def(
           "setSpatialAcceleration",
           +[](dart::dynamics::FreeJoint* self,
-              const Eigen::Vector6d& newSpatialAcceleration,
+              const Eigen::Vector6s& newSpatialAcceleration,
               const dart::dynamics::Frame* relativeTo,
               const dart::dynamics::Frame* inCoordinatesOf) {
             self->setSpatialAcceleration(
@@ -243,14 +243,14 @@ void FreeJoint(py::module& m)
       .def(
           "setLinearAcceleration",
           +[](dart::dynamics::FreeJoint* self,
-              const Eigen::Vector3d& newLinearAcceleration) {
+              const Eigen::Vector3s& newLinearAcceleration) {
             self->setLinearAcceleration(newLinearAcceleration);
           },
           ::py::arg("newLinearAcceleration"))
       .def(
           "setLinearAcceleration",
           +[](dart::dynamics::FreeJoint* self,
-              const Eigen::Vector3d& newLinearAcceleration,
+              const Eigen::Vector3s& newLinearAcceleration,
               const dart::dynamics::Frame* relativeTo) {
             self->setLinearAcceleration(newLinearAcceleration, relativeTo);
           },
@@ -259,7 +259,7 @@ void FreeJoint(py::module& m)
       .def(
           "setLinearAcceleration",
           +[](dart::dynamics::FreeJoint* self,
-              const Eigen::Vector3d& newLinearAcceleration,
+              const Eigen::Vector3s& newLinearAcceleration,
               const dart::dynamics::Frame* relativeTo,
               const dart::dynamics::Frame* inCoordinatesOf) {
             self->setLinearAcceleration(
@@ -271,14 +271,14 @@ void FreeJoint(py::module& m)
       .def(
           "setAngularAcceleration",
           +[](dart::dynamics::FreeJoint* self,
-              const Eigen::Vector3d& newAngularAcceleration) {
+              const Eigen::Vector3s& newAngularAcceleration) {
             self->setAngularAcceleration(newAngularAcceleration);
           },
           ::py::arg("newAngularAcceleration"))
       .def(
           "setAngularAcceleration",
           +[](dart::dynamics::FreeJoint* self,
-              const Eigen::Vector3d& newAngularAcceleration,
+              const Eigen::Vector3s& newAngularAcceleration,
               const dart::dynamics::Frame* relativeTo) {
             self->setAngularAcceleration(newAngularAcceleration, relativeTo);
           },
@@ -287,7 +287,7 @@ void FreeJoint(py::module& m)
       .def(
           "setAngularAcceleration",
           +[](dart::dynamics::FreeJoint* self,
-              const Eigen::Vector3d& newAngularAcceleration,
+              const Eigen::Vector3s& newAngularAcceleration,
               const dart::dynamics::Frame* relativeTo,
               const dart::dynamics::Frame* inCoordinatesOf) {
             self->setAngularAcceleration(
@@ -299,15 +299,15 @@ void FreeJoint(py::module& m)
       .def(
           "getRelativeJacobianStatic",
           +[](const dart::dynamics::FreeJoint* self,
-              const Eigen::Vector6d& _positions) -> Eigen::Matrix6d {
+              const Eigen::Vector6s& _positions) -> Eigen::Matrix6s {
             return self->getRelativeJacobianStatic(_positions);
           },
           ::py::arg("positions"))
       .def(
           "getPositionDifferencesStatic",
           +[](const dart::dynamics::FreeJoint* self,
-              const Eigen::Vector6d& _q2,
-              const Eigen::Vector6d& _q1) -> Eigen::Vector6d {
+              const Eigen::Vector6s& _q2,
+              const Eigen::Vector6s& _q1) -> Eigen::Vector6s {
             return self->getPositionDifferencesStatic(_q2, _q1);
           },
           ::py::arg("q2"),
@@ -320,19 +320,19 @@ void FreeJoint(py::module& m)
           ::py::return_value_policy::reference_internal)
       .def_static(
           "convertToPositions",
-          +[](const Eigen::Isometry3d& _tf) -> Eigen::Vector6d {
+          +[](const Eigen::Isometry3s& _tf) -> Eigen::Vector6s {
             return dart::dynamics::FreeJoint::convertToPositions(_tf);
           },
           ::py::arg("tf"))
       .def_static(
           "convertToTransform",
-          +[](const Eigen::Vector6d& _positions) -> Eigen::Isometry3d {
+          +[](const Eigen::Vector6s& _positions) -> Eigen::Isometry3s {
             return dart::dynamics::FreeJoint::convertToTransform(_positions);
           },
           ::py::arg("positions"))
       .def_static(
           "setTransformOf",
-          +[](dart::dynamics::Joint* joint, const Eigen::Isometry3d& tf) {
+          +[](dart::dynamics::Joint* joint, const Eigen::Isometry3s& tf) {
             dart::dynamics::FreeJoint::setTransformOf(joint, tf);
           },
           ::py::arg("joint"),
@@ -340,7 +340,7 @@ void FreeJoint(py::module& m)
       .def_static(
           "setTransformOf",
           +[](dart::dynamics::Joint* joint,
-              const Eigen::Isometry3d& tf,
+              const Eigen::Isometry3s& tf,
               const dart::dynamics::Frame* withRespectTo) {
             dart::dynamics::FreeJoint::setTransformOf(joint, tf, withRespectTo);
           },
@@ -349,7 +349,7 @@ void FreeJoint(py::module& m)
           ::py::arg("withRespectTo"))
       .def_static(
           "setTransformOf",
-          +[](dart::dynamics::BodyNode* bodyNode, const Eigen::Isometry3d& tf) {
+          +[](dart::dynamics::BodyNode* bodyNode, const Eigen::Isometry3s& tf) {
             dart::dynamics::FreeJoint::setTransformOf(bodyNode, tf);
           },
           ::py::arg("bodyNode"),
@@ -357,7 +357,7 @@ void FreeJoint(py::module& m)
       .def_static(
           "setTransformOf",
           +[](dart::dynamics::BodyNode* bodyNode,
-              const Eigen::Isometry3d& tf,
+              const Eigen::Isometry3s& tf,
               const dart::dynamics::Frame* withRespectTo) {
             dart::dynamics::FreeJoint::setTransformOf(
                 bodyNode, tf, withRespectTo);
@@ -367,7 +367,7 @@ void FreeJoint(py::module& m)
           ::py::arg("withRespectTo"))
       .def_static(
           "setTransformOf",
-          +[](dart::dynamics::Skeleton* skeleton, const Eigen::Isometry3d& tf) {
+          +[](dart::dynamics::Skeleton* skeleton, const Eigen::Isometry3s& tf) {
             dart::dynamics::FreeJoint::setTransformOf(skeleton, tf);
           },
           ::py::arg("skeleton"),
@@ -375,7 +375,7 @@ void FreeJoint(py::module& m)
       .def_static(
           "setTransformOf",
           +[](dart::dynamics::Skeleton* skeleton,
-              const Eigen::Isometry3d& tf,
+              const Eigen::Isometry3s& tf,
               const dart::dynamics::Frame* withRespectTo) {
             dart::dynamics::FreeJoint::setTransformOf(
                 skeleton, tf, withRespectTo);
@@ -386,7 +386,7 @@ void FreeJoint(py::module& m)
       .def_static(
           "setTransformOf",
           +[](dart::dynamics::Skeleton* skeleton,
-              const Eigen::Isometry3d& tf,
+              const Eigen::Isometry3s& tf,
               const dart::dynamics::Frame* withRespectTo,
               bool applyToAllRootBodies) {
             dart::dynamics::FreeJoint::setTransformOf(

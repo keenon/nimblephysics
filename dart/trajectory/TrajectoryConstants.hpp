@@ -10,14 +10,14 @@ namespace trajectory {
 
 struct TimestepJacobians
 {
-  Eigen::MatrixXd posPos;
-  Eigen::MatrixXd velPos;
-  Eigen::MatrixXd forcePos;
-  Eigen::MatrixXd massPos;
-  Eigen::MatrixXd posVel;
-  Eigen::MatrixXd velVel;
-  Eigen::MatrixXd forceVel;
-  Eigen::MatrixXd massVel;
+  Eigen::MatrixXs posPos;
+  Eigen::MatrixXs velPos;
+  Eigen::MatrixXs forcePos;
+  Eigen::MatrixXs massPos;
+  Eigen::MatrixXs posVel;
+  Eigen::MatrixXs velVel;
+  Eigen::MatrixXs forceVel;
+  Eigen::MatrixXs massVel;
 };
 
 } // namespace trajectory

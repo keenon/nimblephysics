@@ -5,16 +5,17 @@
 
 #include <Eigen/Dense>
 
+#include "dart/math/MathTypes.hpp"
 namespace dart {
 namespace realtime {
 
 struct Observation
 {
   long time;
-  Eigen::VectorXd pos;
-  Eigen::VectorXd vel;
+  Eigen::VectorXs pos;
+  Eigen::VectorXs vel;
 
-  Observation(long time, Eigen::VectorXd pos, Eigen::VectorXd vel);
+  Observation(long time, Eigen::VectorXs pos, Eigen::VectorXs vel);
 };
 
 class ObservationLog
@@ -22,19 +23,19 @@ class ObservationLog
 public:
   ObservationLog(
       long startTime,
-      Eigen::VectorXd initialPos,
-      Eigen::VectorXd initialVel,
-      Eigen::VectorXd initialMass);
+      Eigen::VectorXs initialPos,
+      Eigen::VectorXs initialVel,
+      Eigen::VectorXs initialMass);
 
   void observe(
       long time,
-      Eigen::VectorXd pos,
-      Eigen::VectorXd vel,
-      Eigen::VectorXd mass);
+      Eigen::VectorXs pos,
+      Eigen::VectorXs vel,
+      Eigen::VectorXs mass);
 
   Observation getClosestObservationBefore(long time);
 
-  Eigen::VectorXd getMass();
+  Eigen::VectorXs getMass();
 
   void discardBefore(long time);
 
@@ -42,7 +43,7 @@ protected:
   int mDofs;
   int mMassDim;
   std::vector<Observation> mObservations;
-  Eigen::VectorXd mMass;
+  Eigen::VectorXs mMass;
 };
 
 } // namespace realtime

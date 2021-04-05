@@ -112,25 +112,25 @@ public:
   /// \param[in] _transAxis2 Another orthogonal translation axis
   /// \param[in] _renameDofs If true, the names of dofs in this joint will be
   /// renmaed according to the plane type.
-  void setArbitraryPlane(const Eigen::Vector3d& _transAxis1,
-                         const Eigen::Vector3d& _transAxis2,
+  void setArbitraryPlane(const Eigen::Vector3s& _transAxis1,
+                         const Eigen::Vector3s& _transAxis2,
                          bool _renameDofs = true);
 
   /// Return plane type
   PlaneType getPlaneType() const;
 
   /// Return rotational axis
-  const Eigen::Vector3d& getRotationalAxis() const;
+  const Eigen::Vector3s& getRotationalAxis() const;
 
   /// Return first translational axis
-  const Eigen::Vector3d& getTranslationalAxis1() const;
+  const Eigen::Vector3s& getTranslationalAxis1() const;
 
   /// Return second translational axis
-  const Eigen::Vector3d& getTranslationalAxis2() const;
+  const Eigen::Vector3s& getTranslationalAxis2() const;
 
   // Documentation inherited
-  Eigen::Matrix<double, 6, 3> getRelativeJacobianStatic(
-      const Eigen::Vector3d& _positions) const override;
+  Eigen::Matrix<s_t, 6, 3> getRelativeJacobianStatic(
+      const Eigen::Vector3s& _positions) const override;
 
 protected:
 

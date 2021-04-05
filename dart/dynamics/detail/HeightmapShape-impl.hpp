@@ -46,8 +46,8 @@ template <typename S>
 HeightmapShape<S>::HeightmapShape() : Shape(HEIGHTMAP), mScale(1, 1, 1)
 {
   static_assert(
-      std::is_same<S, float>::value || std::is_same<S, double>::value,
-      "Height field needs to be double or float");
+      std::is_same<S, float>::value || std::is_same<S, s_t>::value,
+      "Height field needs to be s_t or float");
 }
 
 //==============================================================================
@@ -179,14 +179,14 @@ std::size_t HeightmapShape<S>::getDepth() const
 
 //==============================================================================
 template <typename S>
-void HeightmapShape<S>::notifyColorUpdated(const Eigen::Vector4d& /*color*/)
+void HeightmapShape<S>::notifyColorUpdated(const Eigen::Vector4s& /*color*/)
 {
   incrementVersion();
 }
 
 //==============================================================================
 template <typename S>
-Eigen::Matrix3d HeightmapShape<S>::computeInertia(double mass) const
+Eigen::Matrix3s HeightmapShape<S>::computeInertia(s_t mass) const
 {
   if (mIsBoundingBoxDirty)
   {
@@ -198,21 +198,21 @@ Eigen::Matrix3d HeightmapShape<S>::computeInertia(double mass) const
 //==============================================================================
 template <typename S>
 void HeightmapShape<S>::computeBoundingBox(
-    Eigen::Vector3d& min, Eigen::Vector3d& max) const
+    Eigen::Vector3s& min, Eigen::Vector3s& max) const
 {
-  const double dimX = getWidth() * mScale.x();
-  const double dimY = getDepth() * mScale.y();
-  const double dimZ = (mMaxHeight - mMinHeight) * mScale.z();
-  min = Eigen::Vector3d(-dimX * 0.5, -dimY * 0.5, mMinHeight * mScale.z());
-  max = min + Eigen::Vector3d(dimX, dimY, dimZ);
+  const s_t dimX = getWidth() * mScale.x();
+  const s_t dimY = getDepth() * mScale.y();
+  const s_t dimZ = (mMaxHeight - mMinHeight) * mScale.z();
+  min = Eigen::Vector3s(-dimX * 0.5, -dimY * 0.5, mMinHeight * mScale.z());
+  max = min + Eigen::Vector3s(dimX, dimY, dimZ);
 }
 
 //==============================================================================
 template <typename S>
 void HeightmapShape<S>::updateBoundingBox() const
 {
-  Eigen::Vector3d min;
-  Eigen::Vector3d max;
+  Eigen::Vector3s min;
+  Eigen::Vector3s max;
   computeBoundingBox(min, max);
   mBoundingBox.setMin(min);
   mBoundingBox.setMax(max);
@@ -224,7 +224,7 @@ template <typename S>
 void HeightmapShape<S>::updateVolume() const
 {
   updateBoundingBox();
-  const Eigen::Vector3d size = mBoundingBox.getMax() - mBoundingBox.getMin();
+  const Eigen::Vector3s size = mBoundingBox.getMax() - mBoundingBox.getMin();
   mVolume = size.x() * size.y() * size.z();
   mIsVolumeDirty = false;
 }

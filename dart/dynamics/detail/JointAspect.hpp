@@ -36,6 +36,8 @@
 #include <Eigen/Core>
 #include <Eigen/Geometry>
 
+#include "dart/math/MathTypes.hpp"
+
 namespace dart {
 namespace dynamics {
 namespace detail {
@@ -114,10 +116,10 @@ struct JointProperties
   std::string mName;
 
   /// Transformation from parent BodyNode to this Joint
-  Eigen::Isometry3d mT_ParentBodyToJoint;
+  Eigen::Isometry3s mT_ParentBodyToJoint;
 
   /// Transformation from child BodyNode to this Joint
-  Eigen::Isometry3d mT_ChildBodyToJoint;
+  Eigen::Isometry3s mT_ChildBodyToJoint;
 
   /// True if the joint limits should be enforced in dynamic simulation
   bool mIsPositionLimitEnforced;
@@ -129,19 +131,20 @@ struct JointProperties
   const Joint* mMimicJoint;
 
   /// Mimic joint properties
-  double mMimicMultiplier, mMimicOffset;
+  s_t mMimicMultiplier, mMimicOffset;
 
   /// Constructor
-  JointProperties(const std::string& _name = "Joint",
-             const Eigen::Isometry3d& _T_ParentBodyToJoint =
-                                 Eigen::Isometry3d::Identity(),
-             const Eigen::Isometry3d& _T_ChildBodyToJoint =
-                                 Eigen::Isometry3d::Identity(),
-             bool _isPositionLimitEnforced = false,
-             ActuatorType _actuatorType = DefaultActuatorType,
-             const Joint* _mimicJoint = nullptr,
-             double _mimicMultiplier = 1.0,
-             double _mimicOffset = 0.0);
+  JointProperties(
+      const std::string& _name = "Joint",
+      const Eigen::Isometry3s& _T_ParentBodyToJoint
+      = Eigen::Isometry3s::Identity(),
+      const Eigen::Isometry3s& _T_ChildBodyToJoint
+      = Eigen::Isometry3s::Identity(),
+      bool _isPositionLimitEnforced = false,
+      ActuatorType _actuatorType = DefaultActuatorType,
+      const Joint* _mimicJoint = nullptr,
+      s_t _mimicMultiplier = 1.0,
+      s_t _mimicOffset = 0.0);
 
   virtual ~JointProperties() = default;
 

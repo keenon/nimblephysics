@@ -140,16 +140,16 @@ public:
   //----------------------------------------------------------------------------
 
   // Documentation inherited
-  void setCommand(std::size_t index, double command) override;
+  void setCommand(std::size_t index, s_t command) override;
 
   // Documentation inherited
-  double getCommand(std::size_t index) const override;
+  s_t getCommand(std::size_t index) const override;
 
   // Documentation inherited
-  void setCommands(const Eigen::VectorXd& commands) override;
+  void setCommands(const Eigen::VectorXs& commands) override;
 
   // Documentation inherited
-  Eigen::VectorXd getCommands() const override;
+  Eigen::VectorXs getCommands() const override;
 
   // Documentation inherited
   void resetCommands() override;
@@ -161,40 +161,40 @@ public:
   //----------------------------------------------------------------------------
 
   // Documentation inherited
-  void setPosition(std::size_t index, double position) override;
+  void setPosition(std::size_t index, s_t position) override;
 
   // Documentation inherited
-  double getPosition(std::size_t index) const override;
+  s_t getPosition(std::size_t index) const override;
 
   // Documentation inherited
-  void setPositions(const Eigen::VectorXd& positions) override;
+  void setPositions(const Eigen::VectorXs& positions) override;
 
   // Documentation inherited
-  Eigen::VectorXd getPositions() const override;
+  Eigen::VectorXs getPositions() const override;
 
   // Documentation inherited
-  void setPositionLowerLimit(std::size_t index, double position) override;
+  void setPositionLowerLimit(std::size_t index, s_t position) override;
 
   // Documentation inherited
-  double getPositionLowerLimit(std::size_t index) const override;
+  s_t getPositionLowerLimit(std::size_t index) const override;
 
   // Documentation inherited
-  void setPositionLowerLimits(const Eigen::VectorXd& lowerLimits) override;
+  void setPositionLowerLimits(const Eigen::VectorXs& lowerLimits) override;
 
   // Documentation inherited
-  Eigen::VectorXd getPositionLowerLimits() const override;
+  Eigen::VectorXs getPositionLowerLimits() const override;
 
   // Documentation inherited
-  void setPositionUpperLimit(std::size_t index, double position) override;
+  void setPositionUpperLimit(std::size_t index, s_t position) override;
 
   // Documentation inherited
-  double getPositionUpperLimit(std::size_t index) const override;
+  s_t getPositionUpperLimit(std::size_t index) const override;
 
   // Documentation inherited
-  void setPositionUpperLimits(const Eigen::VectorXd& upperLimits) override;
+  void setPositionUpperLimits(const Eigen::VectorXs& upperLimits) override;
 
   // Documentation inherited
-  Eigen::VectorXd getPositionUpperLimits() const override;
+  Eigen::VectorXs getPositionUpperLimits() const override;
 
   // Documentation inherited
   bool hasPositionLimit(std::size_t index) const override;
@@ -206,16 +206,16 @@ public:
   void resetPositions() override;
 
   // Documentation inherited
-  void setInitialPosition(std::size_t index, double initial) override;
+  void setInitialPosition(std::size_t index, s_t initial) override;
 
   // Documentation inherited
-  double getInitialPosition(std::size_t index) const override;
+  s_t getInitialPosition(std::size_t index) const override;
 
   // Documentation inherited
-  void setInitialPositions(const Eigen::VectorXd& initial) override;
+  void setInitialPositions(const Eigen::VectorXs& initial) override;
 
   // Documentation inherited
-  Eigen::VectorXd getInitialPositions() const override;
+  Eigen::VectorXs getInitialPositions() const override;
 
   /// \}
 
@@ -254,40 +254,40 @@ public:
   //----------------------------------------------------------------------------
 
   // Documentation inherited
-  void setVelocity(std::size_t index, double velocity) override;
+  void setVelocity(std::size_t index, s_t velocity) override;
 
   // Documentation inherited
-  double getVelocity(std::size_t index) const override;
+  s_t getVelocity(std::size_t index) const override;
 
   // Documentation inherited
-  void setVelocities(const Eigen::VectorXd& velocities) override;
+  void setVelocities(const Eigen::VectorXs& velocities) override;
 
   // Documentation inherited
-  Eigen::VectorXd getVelocities() const override;
+  Eigen::VectorXs getVelocities() const override;
 
   // Documentation inherited
-  void setVelocityLowerLimit(std::size_t index, double velocity) override;
+  void setVelocityLowerLimit(std::size_t index, s_t velocity) override;
 
   // Documentation inherited
-  double getVelocityLowerLimit(std::size_t index) const override;
+  s_t getVelocityLowerLimit(std::size_t index) const override;
 
   // Documentation inherited
-  void setVelocityLowerLimits(const Eigen::VectorXd& lowerLimits) override;
+  void setVelocityLowerLimits(const Eigen::VectorXs& lowerLimits) override;
 
   // Documentation inherited
-  Eigen::VectorXd getVelocityLowerLimits() const override;
+  Eigen::VectorXs getVelocityLowerLimits() const override;
 
   // Documentation inherited
-  void setVelocityUpperLimit(std::size_t index, double velocity) override;
+  void setVelocityUpperLimit(std::size_t index, s_t velocity) override;
 
   // Documentation inherited
-  double getVelocityUpperLimit(std::size_t index) const override;
+  s_t getVelocityUpperLimit(std::size_t index) const override;
 
   // Documentation inherited
-  void setVelocityUpperLimits(const Eigen::VectorXd& upperLimits) override;
+  void setVelocityUpperLimits(const Eigen::VectorXs& upperLimits) override;
 
   // Documentation inherited
-  Eigen::VectorXd getVelocityUpperLimits() const override;
+  Eigen::VectorXs getVelocityUpperLimits() const override;
 
   // Documentation inherited
   void resetVelocity(std::size_t index) override;
@@ -296,16 +296,16 @@ public:
   void resetVelocities() override;
 
   // Documentation inherited
-  void setInitialVelocity(std::size_t index, double initial) override;
+  void setInitialVelocity(std::size_t index, s_t initial) override;
 
   // Documentation inherited
-  double getInitialVelocity(std::size_t index) const override;
+  s_t getInitialVelocity(std::size_t index) const override;
 
   // Documentation inherited
-  void setInitialVelocities(const Eigen::VectorXd& initial) override;
+  void setInitialVelocities(const Eigen::VectorXs& initial) override;
 
   // Documentation inherited
-  Eigen::VectorXd getInitialVelocities() const override;
+  Eigen::VectorXs getInitialVelocities() const override;
 
   /// \}
 
@@ -314,41 +314,40 @@ public:
   //----------------------------------------------------------------------------
 
   // Documentation inherited
-  void setAcceleration(std::size_t index, double acceleration) override;
+  void setAcceleration(std::size_t index, s_t acceleration) override;
 
   // Documentation inherited
-  double getAcceleration(std::size_t index) const override;
+  s_t getAcceleration(std::size_t index) const override;
 
   // Documentation inherited
-  void setAccelerations(const Eigen::VectorXd& accelerations) override;
+  void setAccelerations(const Eigen::VectorXs& accelerations) override;
 
   // Documentation inherited
-  Eigen::VectorXd getAccelerations() const override;
+  Eigen::VectorXs getAccelerations() const override;
 
   // Documentation inherited
-  void setAccelerationLowerLimit(size_t index, double acceleration) override;
+  void setAccelerationLowerLimit(size_t index, s_t acceleration) override;
 
   // Documentation inherited
-  double getAccelerationLowerLimit(std::size_t index) const override;
+  s_t getAccelerationLowerLimit(std::size_t index) const override;
 
   // Documentation inherited
-  void setAccelerationLowerLimits(const Eigen::VectorXd& lowerLimits) override;
+  void setAccelerationLowerLimits(const Eigen::VectorXs& lowerLimits) override;
 
   // Documentation inherited
-  Eigen::VectorXd getAccelerationLowerLimits() const override;
+  Eigen::VectorXs getAccelerationLowerLimits() const override;
 
   // Documentation inherited
-  void setAccelerationUpperLimit(
-      std::size_t index, double acceleration) override;
+  void setAccelerationUpperLimit(std::size_t index, s_t acceleration) override;
 
   // Documentation inherited
-  double getAccelerationUpperLimit(std::size_t index) const override;
+  s_t getAccelerationUpperLimit(std::size_t index) const override;
 
   // Documentation inherited
-  void setAccelerationUpperLimits(const Eigen::VectorXd& upperLimits) override;
+  void setAccelerationUpperLimits(const Eigen::VectorXs& upperLimits) override;
 
   // Documentation inherited
-  Eigen::VectorXd getAccelerationUpperLimits() const override;
+  Eigen::VectorXs getAccelerationUpperLimits() const override;
 
   // Documentation inherited
   void resetAccelerations() override;
@@ -360,40 +359,40 @@ public:
   //----------------------------------------------------------------------------
 
   // Documentation inherited
-  void setForce(std::size_t index, double force) override;
+  void setForce(std::size_t index, s_t force) override;
 
   // Documentation inherited
-  double getForce(std::size_t index) const override;
+  s_t getForce(std::size_t index) const override;
 
   // Documentation inherited
-  void setForces(const Eigen::VectorXd& forces) override;
+  void setForces(const Eigen::VectorXs& forces) override;
 
   // Documentation inherited
-  Eigen::VectorXd getForces() const override;
+  Eigen::VectorXs getForces() const override;
 
   // Documentation inherited
-  void setForceLowerLimit(size_t index, double force) override;
+  void setForceLowerLimit(size_t index, s_t force) override;
 
   // Documentation inherited
-  double getForceLowerLimit(std::size_t index) const override;
+  s_t getForceLowerLimit(std::size_t index) const override;
 
   // Documentation inherited
-  void setForceLowerLimits(const Eigen::VectorXd& lowerLimits) override;
+  void setForceLowerLimits(const Eigen::VectorXs& lowerLimits) override;
 
   // Documentation inherited
-  Eigen::VectorXd getForceLowerLimits() const override;
+  Eigen::VectorXs getForceLowerLimits() const override;
 
   // Documentation inherited
-  void setForceUpperLimit(size_t index, double force) override;
+  void setForceUpperLimit(size_t index, s_t force) override;
 
   // Documentation inherited
-  double getForceUpperLimit(size_t index) const override;
+  s_t getForceUpperLimit(size_t index) const override;
 
   // Documentation inherited
-  void setForceUpperLimits(const Eigen::VectorXd& upperLimits) override;
+  void setForceUpperLimits(const Eigen::VectorXs& upperLimits) override;
 
   // Documentation inherited
-  Eigen::VectorXd getForceUpperLimits() const override;
+  Eigen::VectorXs getForceUpperLimits() const override;
 
   // Documentation inherited
   void resetForces() override;
@@ -405,10 +404,10 @@ public:
   //----------------------------------------------------------------------------
 
   // Documentation inherited
-  void setVelocityChange(std::size_t index, double velocityChange) override;
+  void setVelocityChange(std::size_t index, s_t velocityChange) override;
 
   // Documentation inherited
-  double getVelocityChange(std::size_t index) const override;
+  s_t getVelocityChange(std::size_t index) const override;
 
   // Documentation inherited
   void resetVelocityChanges() override;
@@ -420,10 +419,10 @@ public:
   //----------------------------------------------------------------------------
 
   // Documentation inherited
-  void setConstraintImpulse(std::size_t index, double impulse) override;
+  void setConstraintImpulse(std::size_t index, s_t impulse) override;
 
   // Documentation inherited
-  double getConstraintImpulse(std::size_t index) const override;
+  s_t getConstraintImpulse(std::size_t index) const override;
 
   // Documentation inherited
   void resetConstraintImpulses() override;
@@ -435,23 +434,26 @@ public:
   //----------------------------------------------------------------------------
 
   // Documentation inherited
-  void integratePositions(double dt) override;
+  void integratePositions(s_t dt) override;
 
   // Documentation inherited
-  void integrateVelocities(double dt) override;
+  void integrateVelocities(s_t dt) override;
 
   // Documentation inherited
-  Eigen::VectorXd integratePositionsExplicit(const Eigen::VectorXd& pos, const Eigen::VectorXd& vel, double dt) override;
+  Eigen::VectorXs integratePositionsExplicit(
+      const Eigen::VectorXs& pos, const Eigen::VectorXs& vel, s_t dt) override;
 
   /// Returns d/dpos of integratePositionsExplicit()
-  Eigen::MatrixXd getPosPosJacobian(const Eigen::VectorXd& pos, const Eigen::VectorXd& vel, double _dt) override;
+  Eigen::MatrixXs getPosPosJacobian(
+      const Eigen::VectorXs& pos, const Eigen::VectorXs& vel, s_t _dt) override;
 
   /// Returns d/dvel of integratePositionsExplicit()
-  Eigen::MatrixXd getVelPosJacobian(const Eigen::VectorXd& pos, const Eigen::VectorXd& vel, double _dt) override;
+  Eigen::MatrixXs getVelPosJacobian(
+      const Eigen::VectorXs& pos, const Eigen::VectorXs& vel, s_t _dt) override;
 
   // Documentation inherited
-  Eigen::VectorXd getPositionDifferences(
-      const Eigen::VectorXd& q2, const Eigen::VectorXd& q1) const override;
+  Eigen::VectorXs getPositionDifferences(
+      const Eigen::VectorXs& q2, const Eigen::VectorXs& q1) const override;
 
   /// Fixed-size version of getPositionDifferences()
   virtual Vector getPositionDifferencesStatic(
@@ -464,28 +466,28 @@ public:
   //----------------------------------------------------------------------------
 
   // Documentation inherited
-  void setSpringStiffness(std::size_t index, double k) override;
+  void setSpringStiffness(std::size_t index, s_t k) override;
 
   // Documentation inherited
-  double getSpringStiffness(std::size_t index) const override;
+  s_t getSpringStiffness(std::size_t index) const override;
 
   // Documentation inherited
-  void setRestPosition(std::size_t index, double q0) override;
+  void setRestPosition(std::size_t index, s_t q0) override;
 
   // Documentation inherited
-  double getRestPosition(std::size_t index) const override;
+  s_t getRestPosition(std::size_t index) const override;
 
   // Documentation inherited
-  void setDampingCoefficient(std::size_t index, double coeff) override;
+  void setDampingCoefficient(std::size_t index, s_t coeff) override;
 
   // Documentation inherited
-  double getDampingCoefficient(std::size_t index) const override;
+  s_t getDampingCoefficient(std::size_t index) const override;
 
   // Documentation inherited
-  void setCoulombFriction(std::size_t index, double friction) override;
+  void setCoulombFriction(std::size_t index, s_t friction) override;
 
   // Documentation inherited
-  double getCoulombFriction(std::size_t index) const override;
+  s_t getCoulombFriction(std::size_t index) const override;
 
   /// \}
 
@@ -494,12 +496,12 @@ public:
   //----------------------------------------------------------------------------
 
   // Documentation inherited
-  double computePotentialEnergy() const override;
+  s_t computePotentialEnergy() const override;
 
   /// \}
 
   // Documentation inherited
-  Eigen::Vector6d getBodyConstraintWrench() const override;
+  Eigen::Vector6s getBodyConstraintWrench() const override;
 
   //----------------------------------------------------------------------------
   /// \{ \name Joint Jacobians
@@ -514,7 +516,7 @@ public:
 
   // Documentation inherited
   math::Jacobian getRelativeJacobian(
-      const Eigen::VectorXd& _positions) const override;
+      const Eigen::VectorXs& _positions) const override;
 
   /// Fixed-size version of getRelativeJacobian(positions)
   virtual JacobianMatrix getRelativeJacobianStatic(
@@ -531,26 +533,28 @@ public:
   getRelativeJacobianInPositionSpaceStatic() const;
 
   /// Get spatial Jacobian of the child BodyNode relative to the parent BodyNode
-  /// expressed in the child BodyNode frame, in the `q` vector space. This is 
-  /// generally the same as the getRelativeJacobian() for the `dq` vector space, 
-  /// because `q` and `dq` are generally in the same vector space. However, for 
+  /// expressed in the child BodyNode frame, in the `q` vector space. This is
+  /// generally the same as the getRelativeJacobian() for the `dq` vector space,
+  /// because `q` and `dq` are generally in the same vector space. However, for
   /// BallJoint and FreeJoint these are different values.
-  virtual const math::Jacobian getRelativeJacobianInPositionSpace() const override;
+  virtual const math::Jacobian getRelativeJacobianInPositionSpace()
+      const override;
 
   /// Fixed-size version of getRelativeJacobianInPositionSpace(positions)
   virtual JacobianMatrix getRelativeJacobianInPositionSpaceStatic(
       const Vector& positions) const;
 
   /// Get spatial Jacobian of the child BodyNode relative to the parent BodyNode
-  /// expressed in the child BodyNode frame, in the `q` vector space. This is 
-  /// generally the same as the getRelativeJacobian() for the `dq` vector space, 
-  /// because `q` and `dq` are generally in the same vector space. However, for 
+  /// expressed in the child BodyNode frame, in the `q` vector space. This is
+  /// generally the same as the getRelativeJacobian() for the `dq` vector space,
+  /// because `q` and `dq` are generally in the same vector space. However, for
   /// BallJoint and FreeJoint these are different values.
   virtual math::Jacobian getRelativeJacobianInPositionSpace(
-      const Eigen::VectorXd& positions) const override;
+      const Eigen::VectorXs& positions) const override;
 
   /// Provide a default implementation to update the relative Jacobian
-  virtual void updateRelativeJacobianInPositionSpace(bool mandatory = true) const override;
+  virtual void updateRelativeJacobianInPositionSpace(
+      bool mandatory = true) const override;
 
   /// \}
 
@@ -558,13 +562,13 @@ public:
   /// \{ \name Skeleton Jacobians
   //----------------------------------------------------------------------------
 
-  const Eigen::MatrixXd getSpatialVelocityJacobianWrtPosition();
+  const Eigen::MatrixXs getSpatialVelocityJacobianWrtPosition();
 
-  const Eigen::MatrixXd getSpatialAccelerationJacobianWrtPosition();
+  const Eigen::MatrixXs getSpatialAccelerationJacobianWrtPosition();
 
-  const Eigen::MatrixXd getSpatialVelocityJacobianWrtVelocity();
+  const Eigen::MatrixXs getSpatialVelocityJacobianWrtVelocity();
 
-  const Eigen::MatrixXd getSpatialAccelerationJacobianWrtVelocity();
+  const Eigen::MatrixXs getSpatialAccelerationJacobianWrtVelocity();
 
   /// \}
 
@@ -595,91 +599,91 @@ protected:
   void updateRelativePrimaryAcceleration() const override;
 
   // Documentation inherited
-  void addVelocityTo(Eigen::Vector6d& vel) override;
+  void addVelocityTo(Eigen::Vector6s& vel) override;
 
   // Documentation inherited
   void setPartialAccelerationTo(
-      Eigen::Vector6d& partialAcceleration,
-      const Eigen::Vector6d& childVelocity) override;
+      Eigen::Vector6s& partialAcceleration,
+      const Eigen::Vector6s& childVelocity) override;
 
   // Documentation inherited
-  void addAccelerationTo(Eigen::Vector6d& acc) override;
+  void addAccelerationTo(Eigen::Vector6s& acc) override;
 
   // Documentation inherited
-  void addVelocityChangeTo(Eigen::Vector6d& velocityChange) override;
+  void addVelocityChangeTo(Eigen::Vector6s& velocityChange) override;
 
   // Documentation inherited
   void addChildArtInertiaTo(
-      Eigen::Matrix6d& parentArtInertia,
-      const Eigen::Matrix6d& childArtInertia) override;
+      Eigen::Matrix6s& parentArtInertia,
+      const Eigen::Matrix6s& childArtInertia) override;
 
   // Documentation inherited
   void addChildArtInertiaImplicitTo(
-      Eigen::Matrix6d& parentArtInertiaImplicit,
-      const Eigen::Matrix6d& childArtInertiaImplicit) override;
+      Eigen::Matrix6s& parentArtInertiaImplicit,
+      const Eigen::Matrix6s& childArtInertiaImplicit) override;
 
   // Documentation inherited
-  void updateInvProjArtInertia(const Eigen::Matrix6d& artInertia) override;
+  void updateInvProjArtInertia(const Eigen::Matrix6s& artInertia) override;
 
   // Documentation inherited
   void updateInvProjArtInertiaImplicit(
-      const Eigen::Matrix6d& artInertia, double timeStep) override;
+      const Eigen::Matrix6s& artInertia, s_t timeStep) override;
 
   // Documentation inherited
   void addChildBiasForceTo(
-      Eigen::Vector6d& parentBiasForce,
-      const Eigen::Matrix6d& childArtInertia,
-      const Eigen::Vector6d& childBiasForce,
-      const Eigen::Vector6d& childPartialAcc) override;
+      Eigen::Vector6s& parentBiasForce,
+      const Eigen::Matrix6s& childArtInertia,
+      const Eigen::Vector6s& childBiasForce,
+      const Eigen::Vector6s& childPartialAcc) override;
 
   // Documentation inherited
   void addChildBiasImpulseTo(
-      Eigen::Vector6d& parentBiasImpulse,
-      const Eigen::Matrix6d& childArtInertia,
-      const Eigen::Vector6d& childBiasImpulse) override;
+      Eigen::Vector6s& parentBiasImpulse,
+      const Eigen::Matrix6s& childArtInertia,
+      const Eigen::Vector6s& childBiasImpulse) override;
 
   // Documentation inherited
   void updateTotalForce(
-      const Eigen::Vector6d& bodyForce, double timeStep) override;
+      const Eigen::Vector6s& bodyForce, s_t timeStep) override;
 
   // Documentation inherited
-  void updateTotalImpulse(const Eigen::Vector6d& bodyImpulse) override;
+  void updateTotalImpulse(const Eigen::Vector6s& bodyImpulse) override;
 
   // Documentation inherited
   void resetTotalImpulses() override;
 
   // Documentation inherited
   void updateAcceleration(
-      const Eigen::Matrix6d& artInertia,
-      const Eigen::Vector6d& spatialAcc) override;
+      const Eigen::Matrix6s& artInertia,
+      const Eigen::Vector6s& spatialAcc) override;
 
   // Documentation inherited
   void updateVelocityChange(
-      const Eigen::Matrix6d& artInertia,
-      const Eigen::Vector6d& velocityChange) override;
+      const Eigen::Matrix6s& artInertia,
+      const Eigen::Vector6s& velocityChange) override;
 
   // Documentation inherited
   void updateForceID(
-      const Eigen::Vector6d& bodyForce,
-      double timeStep,
+      const Eigen::Vector6s& bodyForce,
+      s_t timeStep,
       bool withDampingForces,
       bool withSpringForces) override;
 
   // Documentation inherited
   void updateForceFD(
-      const Eigen::Vector6d& bodyForce,
-      double timeStep,
+      const Eigen::Vector6s& bodyForce,
+      s_t timeStep,
       bool withDampingForcese,
       bool withSpringForces) override;
 
   // Documentation inherited
-  void updateImpulseID(const Eigen::Vector6d& bodyImpulse) override;
+  void updateImpulseID(const Eigen::Vector6s& bodyImpulse) override;
 
   // Documentation inherited
-  void updateImpulseFD(const Eigen::Vector6d& bodyImpulse) override;
+  void updateImpulseFD(const Eigen::Vector6s& bodyImpulse) override;
 
   // Documentation inherited
-  void updateConstrainedTerms(double timeStep) override;
+  void updateConstrainedTerms(s_t timeStep) override;
 
   /// \}
 
@@ -689,40 +693,40 @@ protected:
 
   // Documentation inherited
   void addChildBiasForceForInvMassMatrix(
-      Eigen::Vector6d& parentBiasForce,
-      const Eigen::Matrix6d& childArtInertia,
-      const Eigen::Vector6d& childBiasForce) override;
+      Eigen::Vector6s& parentBiasForce,
+      const Eigen::Matrix6s& childArtInertia,
+      const Eigen::Vector6s& childBiasForce) override;
 
   // Documentation inherited
   void addChildBiasForceForInvAugMassMatrix(
-      Eigen::Vector6d& parentBiasForce,
-      const Eigen::Matrix6d& childArtInertia,
-      const Eigen::Vector6d& childBiasForce) override;
+      Eigen::Vector6s& parentBiasForce,
+      const Eigen::Matrix6s& childArtInertia,
+      const Eigen::Vector6s& childBiasForce) override;
 
   // Documentation inherited
   void updateTotalForceForInvMassMatrix(
-      const Eigen::Vector6d& bodyForce) override;
+      const Eigen::Vector6s& bodyForce) override;
 
   // Documentation inherited
   void getInvMassMatrixSegment(
-      Eigen::MatrixXd& invMassMat,
+      Eigen::MatrixXs& invMassMat,
       const size_t col,
-      const Eigen::Matrix6d& artInertia,
-      const Eigen::Vector6d& spatialAcc) override;
+      const Eigen::Matrix6s& artInertia,
+      const Eigen::Vector6s& spatialAcc) override;
 
   // Documentation inherited
   void getInvAugMassMatrixSegment(
-      Eigen::MatrixXd& invMassMat,
+      Eigen::MatrixXs& invMassMat,
       const size_t col,
-      const Eigen::Matrix6d& artInertia,
-      const Eigen::Vector6d& spatialAcc) override;
+      const Eigen::Matrix6s& artInertia,
+      const Eigen::Vector6s& spatialAcc) override;
 
   // Documentation inherited
-  void addInvMassMatrixSegmentTo(Eigen::Vector6d& acc) override;
+  void addInvMassMatrixSegmentTo(Eigen::Vector6s& acc) override;
 
   // Documentation inherited
-  Eigen::VectorXd getSpatialToGeneralized(
-      const Eigen::Vector6d& spatial) override;
+  Eigen::VectorXs getSpatialToGeneralized(
+      const Eigen::Vector6s& spatial) override;
 
   /// \}
 
@@ -755,8 +759,8 @@ protected:
 
   /// Spatial Jacobian expressed in the child body frame
   ///
-  /// Do not use directly! Use getRelativeJacobianInPositionSpaceStatic() to access this
-  /// quantity
+  /// Do not use directly! Use getRelativeJacobianInPositionSpaceStatic() to
+  /// access this quantity
   mutable JacobianMatrix mJacobianInPositionSpace;
 
   /// Time derivative of spatial Jacobian expressed in the child body frame
@@ -797,22 +801,20 @@ protected:
   /// \{ \name Differential Dynamics
   //----------------------------------------------------------------------------
 
-  Eigen::VectorXd getAlpha() const override;
+  Eigen::VectorXs getAlpha() const override;
   math::Inertia computePi(const math::Inertia& AI) const override;
-  Eigen::Vector6d computeBeta(
-      const math::Inertia& AI, const Eigen::Vector6d& AB) const override;
+  Eigen::Vector6s computeBeta(
+      const math::Inertia& AI, const Eigen::Vector6s& AB) const override;
 
   void computeJacobianOfMinvX_init() override;
   void computeJacobianOfMinvX_A(
-      const math::Inertia& AI,
-      const Eigen::Vector6d& AB) override;
-  Eigen::MatrixXd computeJacobianOfMinvX_B(
-      const math::Inertia& AI) override;
+      const math::Inertia& AI, const Eigen::Vector6s& AB) override;
+  Eigen::MatrixXs computeJacobianOfMinvX_B(const math::Inertia& AI) override;
 
   std::size_t mNumSkeletonDofs;
   std::vector<Matrix> mInvM_Dpsi_Dq;
-  Eigen::MatrixXd mInvM_Dalpha_Dq;
-  Eigen::MatrixXd mInvM_DInvM_Dq;
+  Eigen::MatrixXs mInvM_Dalpha_Dq;
+  Eigen::MatrixXs mInvM_DInvM_Dq;
 
   /// \}
 
@@ -822,78 +824,77 @@ private:
   //----------------------------------------------------------------------------
 
   void addChildArtInertiaToDynamic(
-      Eigen::Matrix6d& parentArtInertia,
-      const Eigen::Matrix6d& childArtInertia);
+      Eigen::Matrix6s& parentArtInertia,
+      const Eigen::Matrix6s& childArtInertia);
 
   void addChildArtInertiaToKinematic(
-      Eigen::Matrix6d& parentArtInertia,
-      const Eigen::Matrix6d& childArtInertia);
+      Eigen::Matrix6s& parentArtInertia,
+      const Eigen::Matrix6s& childArtInertia);
 
   void addChildArtInertiaImplicitToDynamic(
-      Eigen::Matrix6d& parentArtInertia,
-      const Eigen::Matrix6d& childArtInertia);
+      Eigen::Matrix6s& parentArtInertia,
+      const Eigen::Matrix6s& childArtInertia);
 
   void addChildArtInertiaImplicitToKinematic(
-      Eigen::Matrix6d& parentArtInertia,
-      const Eigen::Matrix6d& childArtInertia);
+      Eigen::Matrix6s& parentArtInertia,
+      const Eigen::Matrix6s& childArtInertia);
 
-  void updateInvProjArtInertiaDynamic(const Eigen::Matrix6d& artInertia);
+  void updateInvProjArtInertiaDynamic(const Eigen::Matrix6s& artInertia);
 
-  void updateInvProjArtInertiaKinematic(const Eigen::Matrix6d& artInertia);
+  void updateInvProjArtInertiaKinematic(const Eigen::Matrix6s& artInertia);
 
   void updateInvProjArtInertiaImplicitDynamic(
-      const Eigen::Matrix6d& artInertia, double timeStep);
+      const Eigen::Matrix6s& artInertia, s_t timeStep);
 
   void updateInvProjArtInertiaImplicitKinematic(
-      const Eigen::Matrix6d& artInertia, double timeStep);
+      const Eigen::Matrix6s& artInertia, s_t timeStep);
 
   void addChildBiasForceToDynamic(
-      Eigen::Vector6d& parentBiasForce,
-      const Eigen::Matrix6d& childArtInertia,
-      const Eigen::Vector6d& childBiasForce,
-      const Eigen::Vector6d& childPartialAcc);
+      Eigen::Vector6s& parentBiasForce,
+      const Eigen::Matrix6s& childArtInertia,
+      const Eigen::Vector6s& childBiasForce,
+      const Eigen::Vector6s& childPartialAcc);
 
   void addChildBiasForceToKinematic(
-      Eigen::Vector6d& parentBiasForce,
-      const Eigen::Matrix6d& childArtInertia,
-      const Eigen::Vector6d& childBiasForce,
-      const Eigen::Vector6d& childPartialAcc);
+      Eigen::Vector6s& parentBiasForce,
+      const Eigen::Matrix6s& childArtInertia,
+      const Eigen::Vector6s& childBiasForce,
+      const Eigen::Vector6s& childPartialAcc);
 
   void addChildBiasImpulseToDynamic(
-      Eigen::Vector6d& parentBiasImpulse,
-      const Eigen::Matrix6d& childArtInertia,
-      const Eigen::Vector6d& childBiasImpulse);
+      Eigen::Vector6s& parentBiasImpulse,
+      const Eigen::Matrix6s& childArtInertia,
+      const Eigen::Vector6s& childBiasImpulse);
 
   void addChildBiasImpulseToKinematic(
-      Eigen::Vector6d& parentBiasImpulse,
-      const Eigen::Matrix6d& childArtInertia,
-      const Eigen::Vector6d& childBiasImpulse);
+      Eigen::Vector6s& parentBiasImpulse,
+      const Eigen::Matrix6s& childArtInertia,
+      const Eigen::Vector6s& childBiasImpulse);
 
-  void updateTotalForceDynamic(
-      const Eigen::Vector6d& bodyForce, double timeStep);
+  void updateTotalForceDynamic(const Eigen::Vector6s& bodyForce, s_t timeStep);
 
   void updateTotalForceKinematic(
-      const Eigen::Vector6d& bodyForce, double timeStep);
+      const Eigen::Vector6s& bodyForce, s_t timeStep);
 
-  void updateTotalImpulseDynamic(const Eigen::Vector6d& bodyImpulse);
+  void updateTotalImpulseDynamic(const Eigen::Vector6s& bodyImpulse);
 
-  void updateTotalImpulseKinematic(const Eigen::Vector6d& bodyImpulse);
+  void updateTotalImpulseKinematic(const Eigen::Vector6s& bodyImpulse);
 
   void updateAccelerationDynamic(
-      const Eigen::Matrix6d& artInertia, const Eigen::Vector6d& spatialAcc);
+      const Eigen::Matrix6s& artInertia, const Eigen::Vector6s& spatialAcc);
 
   void updateAccelerationKinematic(
-      const Eigen::Matrix6d& artInertia, const Eigen::Vector6d& spatialAcc);
+      const Eigen::Matrix6s& artInertia, const Eigen::Vector6s& spatialAcc);
 
   void updateVelocityChangeDynamic(
-      const Eigen::Matrix6d& artInertia, const Eigen::Vector6d& velocityChange);
+      const Eigen::Matrix6s& artInertia, const Eigen::Vector6s& velocityChange);
 
   void updateVelocityChangeKinematic(
-      const Eigen::Matrix6d& artInertia, const Eigen::Vector6d& velocityChange);
+      const Eigen::Matrix6s& artInertia, const Eigen::Vector6s& velocityChange);
 
-  void updateConstrainedTermsDynamic(double timeStep);
+  void updateConstrainedTermsDynamic(s_t timeStep);
 
-  void updateConstrainedTermsKinematic(double timeStep);
+  void updateConstrainedTermsKinematic(s_t timeStep);
 
   /// \}
 };

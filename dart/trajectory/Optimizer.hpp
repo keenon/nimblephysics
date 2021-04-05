@@ -5,6 +5,8 @@
 #include <memory>
 #include <vector>
 
+#include "dart/math/MathTypes.hpp"
+
 namespace dart {
 namespace trajectory {
 
@@ -24,12 +26,11 @@ public:
   /// step of optimization. If any callback returns false on a given step, then
   /// the optimizer will terminate early.
   void registerIntermediateCallback(
-      std::function<bool(Problem* problem, int, double primal, double dual)>
+      std::function<bool(Problem* problem, int, s_t primal, s_t dual)>
           callback);
 
 protected:
-  std::vector<
-      std::function<bool(Problem* problem, int, double primal, double dual)>>
+  std::vector<std::function<bool(Problem* problem, int, s_t primal, s_t dual)>>
       mIntermediateCallbacks;
 };
 

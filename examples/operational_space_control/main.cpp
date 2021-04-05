@@ -66,15 +66,15 @@ public:
       mRobot->getJoint(i)->setDampingCoefficient(0, 0.5);
     }
 
-    mOffset = Eigen::Vector3d(0.05, 0, 0);
+    mOffset = Eigen::Vector3s(0.05, 0, 0);
 
     // Create target Frame
-    Eigen::Isometry3d tf = mEndEffector->getWorldTransform();
+    Eigen::Isometry3s tf = mEndEffector->getWorldTransform();
     tf.pretranslate(mOffset);
     mTarget = std::make_shared<SimpleFrame>(Frame::World(), "target", tf);
     ShapePtr ball(new SphereShape(0.025));
     mTarget->setShape(ball);
-    mTarget->getVisualAspect(true)->setColor(Eigen::Vector3d(0.9, 0, 0));
+    mTarget->getVisualAspect(true)->setColor(Eigen::Vector3s(0.9, 0, 0));
     mWorld->addSimpleFrame(mTarget);
 
     mOffset
@@ -84,26 +84,26 @@ public:
   // Triggered at the beginning of each simulation step
   void customPreStep() override
   {
-    Eigen::MatrixXd M = mRobot->getMassMatrix();
+    Eigen::MatrixXs M = mRobot->getMassMatrix();
 
     LinearJacobian J = mEndEffector->getLinearJacobian(mOffset);
-    Eigen::MatrixXd pinv_J
+    Eigen::MatrixXs pinv_J
         = J.transpose()
-          * (J * J.transpose() + 0.0025 * Eigen::Matrix3d::Identity())
+          * (J * J.transpose() + 0.0025 * Eigen::Matrix3s::Identity())
                 .inverse();
 
     LinearJacobian dJ = mEndEffector->getLinearJacobianDeriv(mOffset);
-    Eigen::MatrixXd pinv_dJ
+    Eigen::MatrixXs pinv_dJ
         = dJ.transpose()
-          * (dJ * dJ.transpose() + 0.0025 * Eigen::Matrix3d::Identity())
+          * (dJ * dJ.transpose() + 0.0025 * Eigen::Matrix3s::Identity())
                 .inverse();
 
-    Eigen::Vector3d e = mTarget->getWorldTransform().translation()
+    Eigen::Vector3s e = mTarget->getWorldTransform().translation()
                         - mEndEffector->getWorldTransform() * mOffset;
 
-    Eigen::Vector3d de = -mEndEffector->getLinearVelocity(mOffset);
+    Eigen::Vector3s de = -mEndEffector->getLinearVelocity(mOffset);
 
-    Eigen::VectorXd Cg = mRobot->getCoriolisAndGravityForces();
+    Eigen::VectorXs Cg = mRobot->getCoriolisAndGravityForces();
 
     mForces = M * (pinv_J * mKp * de + pinv_dJ * mKp * e) + Cg
               + mKd * pinv_J * mKp * e;
@@ -137,10 +137,10 @@ protected:
   BodyNode* mEndEffector;
   SimpleFramePtr mTarget;
 
-  Eigen::Vector3d mOffset;
-  Eigen::Matrix3d mKp;
-  Eigen::MatrixXd mKd;
-  Eigen::VectorXd mForces;
+  Eigen::Vector3s mOffset;
+  Eigen::Matrix3s mKp;
+  Eigen::MatrixXs mKd;
+  Eigen::VectorXs mForces;
 };
 
 class ConstraintEventHandler : public ::osgGA::GUIEventHandler
@@ -229,7 +229,7 @@ public:
     }
     else if (constraintDofs == 1)
     {
-      Eigen::Vector3d v(Eigen::Vector3d::Zero());
+      Eigen::Vector3s v(Eigen::Vector3s::Zero());
       for (std::size_t i = 0; i < 3; ++i)
         if (mConstrained[i])
           v[i] = 1.0;
@@ -238,7 +238,7 @@ public:
     }
     else if (constraintDofs == 2)
     {
-      Eigen::Vector3d v(Eigen::Vector3d::Zero());
+      Eigen::Vector3s v(Eigen::Vector3s::Zero());
       for (std::size_t i = 0; i < 3; ++i)
         if (!mConstrained[i])
           v[i] = 1.0;
@@ -303,7 +303,7 @@ int main()
 
   // Rotate the robot so that z is upwards (default transform is not Identity)
   robot->getJoint(0)->setTransformFromParentBodyNode(
-      Eigen::Isometry3d::Identity());
+      Eigen::Isometry3s::Identity());
 
   // Load the ground
   dart::dynamics::SkeletonPtr ground
@@ -311,10 +311,10 @@ int main()
   world->addSkeleton(ground);
 
   // Rotate and move the ground so that z is upwards
-  Eigen::Isometry3d ground_tf
+  Eigen::Isometry3s ground_tf
       = ground->getJoint(0)->getTransformFromParentBodyNode();
-  ground_tf.pretranslate(Eigen::Vector3d(0, 0, 0.5));
-  ground_tf.rotate(Eigen::AngleAxisd(M_PI / 2, Eigen::Vector3d(1, 0, 0)));
+  ground_tf.pretranslate(Eigen::Vector3s(0, 0, 0.5));
+  ground_tf.rotate(Eigen::AngleAxis_s(M_PI / 2, Eigen::Vector3s(1, 0, 0)));
   ground->getJoint(0)->setTransformFromParentBodyNode(ground_tf);
 
   // Create an instance of our customized WorldNode

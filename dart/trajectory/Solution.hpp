@@ -28,14 +28,14 @@ struct OptimizationStep
 {
   int index;
   std::shared_ptr<TrajectoryRollout> rollout;
-  double loss;
-  double constraintViolation;
+  s_t loss;
+  s_t constraintViolation;
 
   OptimizationStep(
       int index,
       const TrajectoryRollout* rollout,
-      double loss,
-      double constraintViolation)
+      s_t loss,
+      s_t constraintViolation)
     : index(index),
       rollout(std::make_shared<TrajectoryRolloutReal>(rollout)),
       loss(loss),
@@ -56,28 +56,28 @@ public:
   void registerIteration(
       int index,
       const TrajectoryRollout* rollout,
-      double loss,
-      double constraintViolation);
+      s_t loss,
+      s_t constraintViolation);
 
   /// This only gets called if we're saving full debug info, but it stores every
   /// x that we receive during optimization
-  void registerX(Eigen::VectorXd x);
+  void registerX(Eigen::VectorXs x);
 
   /// This only gets called if we're saving full debug info, but it stores every
   /// loss evaluation that we produce during optimization
-  void registerLoss(double loss);
+  void registerLoss(s_t loss);
 
   /// This only gets called if we're saving full debug info, but it stores every
   /// gradient that we produce during optimization
-  void registerGradient(Eigen::VectorXd grad);
+  void registerGradient(Eigen::VectorXs grad);
 
   /// This only gets called if we're saving full debug info, but it stores every
   /// constraint value that we produce during optimization
-  void registerConstraintValues(Eigen::VectorXd g);
+  void registerConstraintValues(Eigen::VectorXs g);
 
   /// This only gets called if we're saving full debug info, but it stores every
   /// jacobian that we produce during optimization
-  void registerSparseJac(Eigen::VectorXd jac);
+  void registerSparseJac(Eigen::VectorXs jac);
 
   /// Returns the number of steps that were registered
   int getNumSteps();
@@ -98,23 +98,23 @@ public:
 
   /// This gets the x's we've recorded. This will be empty unless we've
   /// called optimizer.setRecordFullDebugInfo(true)
-  std::vector<Eigen::VectorXd>& getXs();
+  std::vector<Eigen::VectorXs>& getXs();
 
   /// This gets the losses we've recorded. This will be empty unless we've
   /// called optimizer.setRecordFullDebugInfo(true)
-  std::vector<double>& getLosses();
+  std::vector<s_t>& getLosses();
 
   /// This gets the gradients we've recorded. This will be empty unless we've
   /// called optimizer.setRecordFullDebugInfo(true)
-  std::vector<Eigen::VectorXd>& getGradients();
+  std::vector<Eigen::VectorXs>& getGradients();
 
   /// This gets the gradients we've recorded. This will be empty unless we've
   /// called optimizer.setRecordFullDebugInfo(true)
-  std::vector<Eigen::VectorXd>& getConstraintValues();
+  std::vector<Eigen::VectorXs>& getConstraintValues();
 
   /// This gets the gradients we've recorded. This will be empty unless we've
   /// called optimizer.setRecordFullDebugInfo(true)
-  std::vector<Eigen::VectorXd>& getSparseJacobians();
+  std::vector<Eigen::VectorXs>& getSparseJacobians();
 
   /// This registers all the pieces we need in order to be able to re-optimize
   /// this problem efficiently.
@@ -129,11 +129,11 @@ protected:
   bool mSuccess;
   std::vector<OptimizationStep> mSteps;
   performance::PerformanceLog* mPerfLog;
-  std::vector<Eigen::VectorXd> mXs;
-  std::vector<double> mLosses;
-  std::vector<Eigen::VectorXd> mGradients;
-  std::vector<Eigen::VectorXd> mConstraintValues;
-  std::vector<Eigen::VectorXd> mSparseJacobians;
+  std::vector<Eigen::VectorXs> mXs;
+  std::vector<s_t> mLosses;
+  std::vector<Eigen::VectorXs> mGradients;
+  std::vector<Eigen::VectorXs> mConstraintValues;
+  std::vector<Eigen::VectorXs> mSparseJacobians;
   // In order to re-optimize
   SmartPtr<Ipopt::IpoptApplication> mIpopt;
   SmartPtr<trajectory::IPOptShotWrapper> mIpoptProblem;

@@ -78,14 +78,14 @@ public:
   ///
   /// This template function can generate different scalar types of random
   /// numbers as:
-  /// - Floating-point number: \c float, \c double, \c long double
+  /// - Floating-point number: \c float, \c s_t, \c long s_t
   /// - Integer number: [\c unsigned] \c short, [\c unsigned] \c int,
   ///   [\c unsigned] \c long, [\c unsigned] \c long \c long
   ///
   /// and vectors and matrices as:
-  /// - Fixed-size: Eigen::Vector3i, Eigen::Vector3d, Eigen::Matrix4d, and so
+  /// - Fixed-size: Eigen::Vector3i, Eigen::Vector3s, Eigen::Matrix4d, and so
   ///   on.
-  /// - Dynamic-size: Eigen::VectorXi, Eigen::VectorXd, Eigen::MatrixXd, and so
+  /// - Dynamic-size: Eigen::VectorXi, Eigen::VectorXs, Eigen::MatrixXs, and so
   ///   on.
   ///
   /// Example:
@@ -94,15 +94,15 @@ public:
   /// int intVal1 = Random::uniform(0, 10);
   /// int intVal2 = Random::uniform<int>(0, 10);
   ///
-  /// // Generate a random double in [0.0, 10.0)
-  /// double dblVal1 = Random::uniform(0.0, 10.0);
-  /// double dblVal2 = Random::uniform<double>(0, 10);
+  /// // Generate a random s_t in [0.0, 10.0)
+  /// s_t dblVal1 = Random::uniform(0.0, 10.0);
+  /// s_t dblVal2 = Random::uniform<s_t>(0, 10);
   ///
   /// // Generate a random vector in [lb, ub)
-  /// Eigen::Vector3d lb = Eigen::Vector3d::Constant(1);
-  /// Eigen::Vector3d ub = Eigen::Vector3d::Constant(4);
-  /// Eigen::Vector3d vecVal1 = Random::uniform(lb, ub);
-  /// Eigen::Vector3d vecVal2 = Random::uniform<Eigen::Vector3d>(lb, ub);
+  /// Eigen::Vector3s lb = Eigen::Vector3s::Constant(1);
+  /// Eigen::Vector3s ub = Eigen::Vector3s::Constant(4);
+  /// Eigen::Vector3s vecVal1 = Random::uniform(lb, ub);
+  /// Eigen::Vector3s vecVal2 = Random::uniform<Eigen::Vector3s>(lb, ub);
   ///
   /// // Generate a random matrix in [lb, ub)
   /// Eigen::Matrix4f lb = Eigen::Matrix4f::Constant(1);
@@ -137,7 +137,7 @@ public:
   /// \code
   /// // Generate random vectors
   /// Eigen::VectorXi vecXi = Random::uniform<Eigen::VectorXi>(0, 10);
-  /// Eigen::VectorXd vecXd = Random::uniform<Eigen::VectorXd>(0.0, 10.0);
+  /// Eigen::VectorXs vecXd = Random::uniform<Eigen::VectorXs>(0.0, 10.0);
   /// \endcode
   ///
   /// \tparam FixedSizeT The type of fixed-size vector or fixed-size matrix.
@@ -157,7 +157,7 @@ public:
   /// \code
   /// // Generate random matrices
   /// Eigen::MatrixXi matXi = Random::uniform<Eigen::MatrixXi>(0, 10);
-  /// Eigen::MatrixXd matXd = Random::uniform<Eigen::MatrixXd>(0.0, 10.0);
+  /// Eigen::MatrixXs matXd = Random::uniform<Eigen::MatrixXs>(0.0, 10.0);
   /// \endcode
   ///
   /// \tparam DynamicSizeVectorT The type of dynamic-size vector.
@@ -192,7 +192,7 @@ public:
   ///
   /// This template function can generate different scalar types of random
   /// numbers as:
-  /// - Floating-point number: \c float, \c double, \c long double
+  /// - Floating-point number: \c float, \c s_t, \c long s_t
   /// - Integer number: [\c unsigned] \c short, [\c unsigned] \c int,
   ///   [\c unsigned] \c long, [\c unsigned] \c long \c long
   ///
@@ -201,8 +201,8 @@ public:
   /// // Generate a random int
   /// int intVal = Random::normal(0, 10);
   ///
-  /// // Generate a random double
-  /// double dblVal = Random::normal(0.0, 10.0);
+  /// // Generate a random s_t
+  /// s_t dblVal = Random::normal(0.0, 10.0);
   /// \endcode
   ///
   /// \param[in] mean Mean of the normal distribution.

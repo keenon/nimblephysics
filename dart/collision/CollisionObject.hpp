@@ -37,6 +37,7 @@
 
 #include "dart/collision/SmartPointer.hpp"
 #include "dart/dynamics/SmartPointer.hpp"
+#include "dart/math/MathTypes.hpp"
 
 namespace dart {
 namespace collision {
@@ -44,7 +45,6 @@ namespace collision {
 class CollisionObject
 {
 public:
-
   friend class CollisionGroup;
 
   /// Destructor
@@ -63,13 +63,13 @@ public:
   dynamics::ConstShapePtr getShape() const;
 
   /// Return the transformation of this CollisionObject in world coordinates
-  const Eigen::Isometry3d& getTransform() const;
+  const Eigen::Isometry3s& getTransform() const;
 
 protected:
-
   /// Contructor
-  CollisionObject(CollisionDetector* collisionDetector,
-                  const dynamics::ShapeFrame* shapeFrame);
+  CollisionObject(
+      CollisionDetector* collisionDetector,
+      const dynamics::ShapeFrame* shapeFrame);
 
   /// Update the collision object of the collision detection engine. This
   /// function will be called ahead of every collision checking by
@@ -77,16 +77,14 @@ protected:
   virtual void updateEngineData() = 0;
 
 protected:
-
   /// Collision detector
   CollisionDetector* mCollisionDetector;
 
   /// ShapeFrame
   const dynamics::ShapeFrame* mShapeFrame;
-
 };
 
-}  // namespace collision
-}  // namespace dart
+} // namespace collision
+} // namespace dart
 
-#endif  // DART_COLLISION_COLLISIONOBJECT_HPP_
+#endif // DART_COLLISION_COLLISIONOBJECT_HPP_

@@ -60,7 +60,7 @@ namespace constraint {
 using namespace dynamics;
 
 //==============================================================================
-ConstraintSolver::ConstraintSolver(double timeStep)
+ConstraintSolver::ConstraintSolver(s_t timeStep)
   : mCollisionDetector(collision::DARTCollisionDetector::create()),
     mCollisionGroup(mCollisionDetector->createCollisionGroupAsSharedPtr()),
     mCollisionOption(collision::CollisionOption(
@@ -263,14 +263,14 @@ void ConstraintSolver::clearLastCollisionResult()
 }
 
 //==============================================================================
-void ConstraintSolver::setTimeStep(double _timeStep)
+void ConstraintSolver::setTimeStep(s_t _timeStep)
 {
   assert(_timeStep > 0.0 && "Time step should be positive value.");
   mTimeStep = _timeStep;
 }
 
 //==============================================================================
-double ConstraintSolver::getTimeStep() const
+s_t ConstraintSolver::getTimeStep() const
 {
   return mTimeStep;
 }
@@ -433,27 +433,27 @@ bool ConstraintSolver::getPenetrationCorrectionEnabled()
 }
 
 //==============================================================================
-Eigen::VectorXd ConstraintSolver::getCachedLCPSolution()
+Eigen::VectorXs ConstraintSolver::getCachedLCPSolution()
 {
   assert(false && "You should never call getCachedLCPSolution() on the root ConstraintSolver, only on BoxedLCPConstraintSolver!");
-  return Eigen::VectorXd::Zero(0);
+  return Eigen::VectorXs::Zero(0);
 }
 
 //==============================================================================
-void ConstraintSolver::setCachedLCPSolution(Eigen::VectorXd /* X */)
+void ConstraintSolver::setCachedLCPSolution(Eigen::VectorXs /* X */)
 {
   assert(false && "You should never call setCachedLCPSolution() on the root ConstraintSolver, only on BoxedLCPConstraintSolver!");
 }
 
 //==============================================================================
-void ConstraintSolver::setContactClippingDepth(double depth)
+void ConstraintSolver::setContactClippingDepth(s_t depth)
 {
   mContactClippingDepth = depth;
   mCollisionOption.contactClippingDepth = depth;
 }
 
 //==============================================================================
-double ConstraintSolver::getContactClippingDepth()
+s_t ConstraintSolver::getContactClippingDepth()
 {
   return mContactClippingDepth;
 }

@@ -79,8 +79,8 @@ TEST(SdfParser, ParsingSDFFiles)
   // Create a list of sdf files to test with where the sdf files contains World
   std::vector<std::string> worldFiles;
   worldFiles.push_back("dart://sample/sdf/benchmark.world");
-  worldFiles.push_back("dart://sample/sdf/double_pendulum.world");
-  worldFiles.push_back("dart://sample/sdf/double_pendulum_with_base.world");
+  worldFiles.push_back("dart://sample/sdf/s_t_pendulum.world");
+  worldFiles.push_back("dart://sample/sdf/s_t_pendulum_with_base.world");
   worldFiles.push_back("dart://sample/sdf/empty.world");
   worldFiles.push_back("dart://sample/sdf/ground.world");
   worldFiles.push_back("dart://sample/sdf/test/single_bodynode_skeleton.world");
@@ -129,9 +129,9 @@ TEST(SdfParser, ReadMaterial)
 
   for (auto shapenode : bodynode->getShapeNodes()) {
     if (shapenode->has<dart::dynamics::VisualAspect>()) {
-      Eigen::Vector4d color = shapenode->getVisualAspect()->getRGBA();
-      Eigen::Vector4d expected_color(0.5, 0.6, 0.8, 1.0);
-      double diff = (color - expected_color).norm();
+      Eigen::Vector4s color = shapenode->getVisualAspect()->getRGBA();
+      Eigen::Vector4s expected_color(0.5, 0.6, 0.8, 1.0);
+      s_t diff = (color - expected_color).norm();
       EXPECT_LT(diff, 1e-4);
     }
   }

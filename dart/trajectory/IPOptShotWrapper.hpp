@@ -184,7 +184,7 @@ public:
   /// step of optimization. If any callback returns false on a given step, then
   /// the optimizer will terminate early.
   void registerIntermediateCallback(
-      std::function<bool(Problem* problem, int, double primal, double dual)>
+      std::function<bool(Problem* problem, int, s_t primal, s_t dual)>
           callback);
 
 private:
@@ -209,8 +209,7 @@ private:
   Eigen::VectorXd mSaved_zL;
   Eigen::VectorXd mSaved_lambda;
 
-  std::vector<
-      std::function<bool(Problem* problem, int, double primal, double dual)>>
+  std::vector<std::function<bool(Problem* problem, int, s_t primal, s_t dual)>>
       mIntermediateCallbacks;
 };
 

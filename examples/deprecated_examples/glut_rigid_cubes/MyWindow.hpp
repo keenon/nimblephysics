@@ -51,7 +51,7 @@ public:
 
 private:
   /// \brief
-  Eigen::Vector3d mForce;
+  Eigen::Vector3s mForce;
 };
 
 #endif // EXAMPLES_CUBES_MYWINDOW_HPP_

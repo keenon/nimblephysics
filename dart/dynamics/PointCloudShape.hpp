@@ -68,7 +68,7 @@ public:
   /// Constructor
   ///
   /// \param[in] visualSize The size of cube that represents each point.
-  explicit PointCloudShape(double visualSize = 0.01);
+  explicit PointCloudShape(s_t visualSize = 0.01);
 
   /// Destructor
   ~PointCloudShape() override = default;
@@ -77,7 +77,7 @@ public:
   const std::string& getType() const override;
 
   // Documentation inherited.
-  Eigen::Matrix3d computeInertia(double mass) const override;
+  Eigen::Matrix3s computeInertia(s_t mass) const override;
 
   /// Returns shape type for this class
   static const std::string& getStaticType();
@@ -86,13 +86,13 @@ public:
   void reserve(std::size_t size);
 
   /// Adds a point to this point cloud.
-  void addPoint(const Eigen::Vector3d& point);
+  void addPoint(const Eigen::Vector3s& point);
 
   /// Adds points to this point cloud.
-  void addPoint(const std::vector<Eigen::Vector3d>& points);
+  void addPoint(const std::vector<Eigen::Vector3s>& points);
 
   /// Replaces points with \c points.
-  void setPoint(const std::vector<Eigen::Vector3d>& points);
+  void setPoint(const std::vector<Eigen::Vector3s>& points);
 
 #if HAVE_OCTOMAP
   /// Replaces points with \c pointCloud.
@@ -103,7 +103,7 @@ public:
 #endif
 
   /// Returns the list of points.
-  const std::vector<Eigen::Vector3d>& getPoints() const;
+  const std::vector<Eigen::Vector3s>& getPoints() const;
 
   /// Returns the number of points.
   std::size_t getNumPoints() const;
@@ -126,31 +126,31 @@ public:
   /// Sets the overall color.
   ///
   /// This function resizes the colors to one.
-  void setOverallColor(const Eigen::Vector4d& color);
+  void setOverallColor(const Eigen::Vector4s& color);
 
   /// Returns the overall color.
-  Eigen::Vector4d getOverallColor() const;
+  Eigen::Vector4s getOverallColor() const;
 
   /// Sets the point cloud colors.
   ///
   /// The count of colors should be the same with points. It's undefined
   /// behavior, otherwise.
   void setColors(const std::vector<
-                 Eigen::Vector4d,
-                 Eigen::aligned_allocator<Eigen::Vector4d>>& colors);
+                 Eigen::Vector4s,
+                 Eigen::aligned_allocator<Eigen::Vector4s>>& colors);
 
   /// Returns the point cloud colors.
-  const std::vector<Eigen::Vector4d, Eigen::aligned_allocator<Eigen::Vector4d>>&
+  const std::vector<Eigen::Vector4s, Eigen::aligned_allocator<Eigen::Vector4s>>&
   getColors() const;
 
   /// Sets size of visual object that represents each point.
-  void setVisualSize(double size);
+  void setVisualSize(s_t size);
 
   /// Returns size of visual object that represents each point.
-  double getVisualSize() const;
+  s_t getVisualSize() const;
 
   // Documentation inherited.
-  void notifyColorUpdated(const Eigen::Vector4d& color) override;
+  void notifyColorUpdated(const Eigen::Vector4s& color) override;
 
 protected:
   // Documentation inherited.
@@ -160,7 +160,7 @@ protected:
   void updateBoundingBox() const override;
 
   /// List of points
-  std::vector<Eigen::Vector3d> mPoints;
+  std::vector<Eigen::Vector3s> mPoints;
 
   /// The point shape type.
   PointShapeType mPointShapeType;
@@ -169,11 +169,11 @@ protected:
   ColorMode mColorMode;
 
   /// List of colors
-  std::vector<Eigen::Vector4d, Eigen::aligned_allocator<Eigen::Vector4d>>
+  std::vector<Eigen::Vector4s, Eigen::aligned_allocator<Eigen::Vector4s>>
       mColors;
 
   /// The size of visual object that represents each point.
-  double mVisualSize;
+  s_t mVisualSize;
 };
 
 } // namespace dynamics

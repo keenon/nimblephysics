@@ -33,7 +33,7 @@ TEST(DARTCollide, ATLAS_5_HIP_FOOT)
 
   // Set gravity of the world
   world->setPenetrationCorrectionEnabled(false);
-  world->setGravity(Eigen::Vector3d(0.0, -9.81, 0));
+  world->setGravity(Eigen::Vector3s(0.0, -9.81, 0));
 
   // Set up the LCP solver to be super super accurate, so our
   // finite-differencing tests don't fail due to LCP errors. This isn't
@@ -51,18 +51,18 @@ TEST(DARTCollide, ATLAS_5_HIP_FOOT)
   retriever->addSchemaRetriever("dart", utils::DartResourceRetriever::create());
   std::string leftFootPath = "dart://sample/sdf/atlas/l_foot.dae";
   dynamics::ShapePtr leftFootMesh = std::make_shared<dynamics::MeshShape>(
-      Eigen::Vector3d::Ones(),
+      Eigen::Vector3s::Ones(),
       dynamics::MeshShape::loadMesh(leftFootPath, retriever),
       leftFootPath,
       retriever);
   std::string rightFootPath = "dart://sample/sdf/atlas/r_foot.dae";
   dynamics::ShapePtr rightFootMesh = std::make_shared<dynamics::MeshShape>(
-      Eigen::Vector3d::Ones(),
+      Eigen::Vector3s::Ones(),
       dynamics::MeshShape::loadMesh(rightFootPath, retriever),
       rightFootPath,
       retriever);
   std::shared_ptr<BoxShape> rootShape(
-      new BoxShape(Eigen::Vector3d::Ones() * 0.5));
+      new BoxShape(Eigen::Vector3s::Ones() * 0.5));
 
   // Set up matrices
 
@@ -73,7 +73,7 @@ TEST(DARTCollide, ATLAS_5_HIP_FOOT)
                               0,          -1, 1.11022e-16,      -0.089,
                               0,           0,           0,           1;
   // clang-format on
-  Eigen::Vector3d l_leg_hpx_Axis = Eigen::Vector3d::UnitX();
+  Eigen::Vector3s l_leg_hpx_Axis = Eigen::Vector3s::UnitX();
   Eigen::Matrix4d r_leg_hpx_WorldTransform;
   // clang-format off
   r_leg_hpx_WorldTransform << 1,           0,           0,           0,
@@ -81,7 +81,7 @@ TEST(DARTCollide, ATLAS_5_HIP_FOOT)
                               0,          -1, 1.11022e-16,       0.089,
                               0,           0,           0,           1;
   // clang-format on
-  Eigen::Vector3d r_leg_hpx_Axis = Eigen::Vector3d::UnitX();
+  Eigen::Vector3s r_leg_hpx_Axis = Eigen::Vector3s::UnitX();
   Eigen::Matrix4d l_foot_WorldTransform;
   // clang-format off
   l_foot_WorldTransform << 1,           0,           0,           0,
@@ -100,12 +100,12 @@ TEST(DARTCollide, ATLAS_5_HIP_FOOT)
   std::shared_ptr<dynamics::Skeleton> singleJointAtlas
       = dynamics::Skeleton::create();
 
-  Eigen::Isometry3d leftHipPos = Eigen::Isometry3d(l_leg_hpx_WorldTransform);
-  Eigen::Isometry3d rightHipPos = Eigen::Isometry3d(r_leg_hpx_WorldTransform);
-  Eigen::Isometry3d leftFootPos = Eigen::Isometry3d(l_foot_WorldTransform);
-  Eigen::Isometry3d rightFootPos = Eigen::Isometry3d(r_foot_WorldTransform);
-  Eigen::Isometry3d leftHipToLeftFoot = leftHipPos.inverse() * leftFootPos;
-  Eigen::Isometry3d rightHipToRightFoot = rightHipPos.inverse() * rightFootPos;
+  Eigen::Isometry3s leftHipPos = Eigen::Isometry3s(l_leg_hpx_WorldTransform);
+  Eigen::Isometry3s rightHipPos = Eigen::Isometry3s(r_leg_hpx_WorldTransform);
+  Eigen::Isometry3s leftFootPos = Eigen::Isometry3s(l_foot_WorldTransform);
+  Eigen::Isometry3s rightFootPos = Eigen::Isometry3s(r_foot_WorldTransform);
+  Eigen::Isometry3s leftHipToLeftFoot = leftHipPos.inverse() * leftFootPos;
+  Eigen::Isometry3s rightHipToRightFoot = rightHipPos.inverse() * rightFootPos;
 
   // Create root box
 
@@ -158,7 +158,7 @@ TEST(DARTCollide, ATLAS_5_HIP_FOOT)
   // singleJointAtlas->setVelocity(2, 0.01);
 
   world->step();
-  Eigen::VectorXd worldVel = world->getVelocities();
+  Eigen::VectorXs worldVel = world->getVelocities();
 
   // Run the tests
 
@@ -184,7 +184,7 @@ TEST(DARTCollide, ATLAS_5_HIP_FOOT)
 
   Ticker ticker(0.01);
   ticker.registerTickListener([&](long time) {
-    double diff = sin(((double)time / 2000));
+    s_t diff = sin(((s_t)time / 2000));
     singleJointAtlas->setPosition(6, diff);
     singleJointAtlas->setPosition(7, -diff);
     // world->step();
@@ -206,7 +206,7 @@ void testAtlas(bool withGroundContact)
 
   // Set gravity of the world
   world->setPenetrationCorrectionEnabled(false);
-  world->setGravity(Eigen::Vector3d(0.0, -9.81, 0));
+  world->setGravity(Eigen::Vector3s(0.0, -9.81, 0));
 
   // Set up the LCP solver to be super super accurate, so our
   // finite-differencing tests don't fail due to LCP errors. This isn't
@@ -234,10 +234,10 @@ void testAtlas(bool withGroundContact)
   // Set initial configuration for Atlas robot
   atlas->setPosition(0, -0.5 * dart::math::constantsd::pi());
   atlas->setPosition(4, -0.01);
-  Eigen::VectorXd originalPos = atlas->getPositions();
-  Eigen::VectorXd worldVel = world->getVelocities();
+  Eigen::VectorXs originalPos = atlas->getPositions();
+  Eigen::VectorXs worldVel = world->getVelocities();
 
-  atlas->setVelocities(Eigen::VectorXd::Zero(atlas->getNumDofs()));
+  atlas->setVelocities(Eigen::VectorXs::Zero(atlas->getNumDofs()));
   // Give a tiny bit of lateral motion, to keep the friction away from
   // non-differentiable points that can have lots of valid gradients
   // atlas->setVelocity(3, 0.01);

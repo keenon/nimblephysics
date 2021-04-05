@@ -45,62 +45,62 @@ public:
   Controller(
       const dart::dynamics::SkeletonPtr& _skel,
       dart::constraint::ConstraintSolver* _collisionSolver,
-      double _t);
+      s_t _t);
   virtual ~Controller()
   {
   }
 
-  Eigen::VectorXd getTorques()
+  Eigen::VectorXs getTorques()
   {
     return mTorques;
   }
-  double getTorque(int _index)
+  s_t getTorque(int _index)
   {
     return mTorques[_index];
   }
-  void setDesiredDof(int _index, double _val)
+  void setDesiredDof(int _index, s_t _val)
   {
     mDesiredDofs[_index] = _val;
   }
   void computeTorques(
-      const Eigen::VectorXd& _dof, const Eigen::VectorXd& _dofVel);
+      const Eigen::VectorXs& _dof, const Eigen::VectorXs& _dofVel);
   dart::dynamics::SkeletonPtr getSkel()
   {
     return mSkel;
   }
-  Eigen::VectorXd getDesiredDofs()
+  Eigen::VectorXs getDesiredDofs()
   {
     return mDesiredDofs;
   }
-  Eigen::MatrixXd getKp()
+  Eigen::MatrixXs getKp()
   {
     return mKp;
   }
-  Eigen::MatrixXd getKd()
+  Eigen::MatrixXs getKd()
   {
     return mKd;
   }
-  void setConstrForces(const Eigen::VectorXd& _constrForce)
+  void setConstrForces(const Eigen::VectorXs& _constrForce)
   {
     mConstrForces = _constrForce;
   }
 
 protected:
-  bool computeCoP(dart::dynamics::BodyNode* _node, Eigen::Vector3d* _cop);
-  Eigen::Vector3d evalLinMomentum(const Eigen::VectorXd& _dofVel);
-  Eigen::Vector3d evalAngMomentum(const Eigen::VectorXd& _dofVel);
-  Eigen::VectorXd adjustAngMomentum(
-      Eigen::VectorXd _deltaMomentum, Eigen::VectorXd _controlledAxis);
+  bool computeCoP(dart::dynamics::BodyNode* _node, Eigen::Vector3s* _cop);
+  Eigen::Vector3s evalLinMomentum(const Eigen::VectorXs& _dofVel);
+  Eigen::Vector3s evalAngMomentum(const Eigen::VectorXs& _dofVel);
+  Eigen::VectorXs adjustAngMomentum(
+      Eigen::VectorXs _deltaMomentum, Eigen::VectorXs _controlledAxis);
   dart::dynamics::SkeletonPtr mSkel;
   dart::constraint::ConstraintSolver* mCollisionHandle;
-  Eigen::VectorXd mTorques;
-  Eigen::VectorXd mDesiredDofs;
-  Eigen::MatrixXd mKp;
-  Eigen::MatrixXd mKd;
+  Eigen::VectorXs mTorques;
+  Eigen::VectorXs mDesiredDofs;
+  Eigen::MatrixXs mKp;
+  Eigen::MatrixXs mKd;
   int mFrame;
-  double mTimestep;
-  double mPreOffset;
-  Eigen::VectorXd
+  s_t mTimestep;
+  s_t mPreOffset;
+  Eigen::VectorXs
       mConstrForces; // SPD utilizes the current info about contact forces
 };
 

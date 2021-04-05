@@ -54,12 +54,12 @@ void DantzigBoxedLcpSolver(py::module& m)
           "solve",
           +[](dart::constraint::DantzigBoxedLcpSolver* self,
               int n,
-              double* A,
-              double* x,
-              double* b,
+              s_t* A,
+              s_t* x,
+              s_t* b,
               int nub,
-              double* lo,
-              double* hi,
+              s_t* lo,
+              s_t* hi,
               int* findex,
               bool earlyTermination) -> bool {
             return self->solve(

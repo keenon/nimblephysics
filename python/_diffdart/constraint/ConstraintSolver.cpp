@@ -106,13 +106,13 @@ void ConstraintSolver(py::module& m)
           })
       .def(
           "setTimeStep",
-          +[](dart::constraint::ConstraintSolver* self, double _timeStep) {
+          +[](dart::constraint::ConstraintSolver* self, s_t _timeStep) {
             self->setTimeStep(_timeStep);
           },
           ::py::arg("timeStep"))
       .def(
           "getTimeStep",
-          +[](const dart::constraint::ConstraintSolver* self) -> double {
+          +[](const dart::constraint::ConstraintSolver* self) -> s_t {
             return self->getTimeStep();
           })
       .def(

@@ -34,6 +34,7 @@
 #define DART_DYNAMICS_ELLIPSOIDSHAPE_HPP_
 
 #include "dart/dynamics/Shape.hpp"
+#include "dart/math/MathTypes.hpp"
 
 namespace dart {
 namespace dynamics {
@@ -42,7 +43,7 @@ class EllipsoidShape : public Shape
 {
 public:
   /// \brief Constructor.
-  explicit EllipsoidShape(const Eigen::Vector3d& diameters);
+  explicit EllipsoidShape(const Eigen::Vector3s& diameters);
   // TODO(JS): In order to follow the commonly used convention, change the
   // constructor to take radii instead of diameters in DART 7.
 
@@ -58,38 +59,38 @@ public:
   /// \brief Set diameters of this ellipsoid.
   /// \deprecated Deprecated in 6.2. Please use setDiameters() instead.
   DART_DEPRECATED(6.2)
-  void setSize(const Eigen::Vector3d& diameters);
+  void setSize(const Eigen::Vector3s& diameters);
 
   /// \brief Get diameters of this ellipsoid.
   /// \deprecated Deprecated in 6.2. Please use getDiameters() instead.
   DART_DEPRECATED(6.2)
-  const Eigen::Vector3d& getSize() const;
+  const Eigen::Vector3s& getSize() const;
 
   /// \brief Set diameters of this ellipsoid.
-  void setDiameters(const Eigen::Vector3d& diameters);
+  void setDiameters(const Eigen::Vector3s& diameters);
 
   /// \brief Get diameters of this ellipsoid.
-  const Eigen::Vector3d& getDiameters() const;
+  const Eigen::Vector3s& getDiameters() const;
 
   /// Set radii of this ellipsoid.
-  void setRadii(const Eigen::Vector3d& radii);
+  void setRadii(const Eigen::Vector3s& radii);
 
   /// Get radii of this ellipsoid.
-  const Eigen::Vector3d getRadii() const;
+  const Eigen::Vector3s getRadii() const;
 
   /// \brief Compute volume from given properties
-  static double computeVolume(const Eigen::Vector3d& diameters);
+  static s_t computeVolume(const Eigen::Vector3s& diameters);
   // TODO(JS): In order to follow the commonly used convention, change to take
   // radii instead of diameters in DART 7.
 
   /// \brief Compute moments of inertia of a ellipsoid
-  static Eigen::Matrix3d computeInertia(
-      const Eigen::Vector3d& diameters, double mass);
+  static Eigen::Matrix3s computeInertia(
+      const Eigen::Vector3s& diameters, s_t mass);
   // TODO(JS): In order to follow the commonly used convention, change to take
   // radii instead of diameters in DART 7.
 
   // Documentation inherited.
-  Eigen::Matrix3d computeInertia(double mass) const override;
+  Eigen::Matrix3s computeInertia(s_t mass) const override;
 
   /// \brief True if all the radii are exactly eqaul.
   bool isSphere(void) const;
@@ -103,10 +104,10 @@ protected:
 
 private:
   /// \brief Diameters of this ellipsoid
-  Eigen::Vector3d mDiameters;
+  Eigen::Vector3s mDiameters;
 };
 
-}  // namespace dynamics
-}  // namespace dart
+} // namespace dynamics
+} // namespace dart
 
-#endif  // DART_DYNAMICS_ELLIPSOIDSHAPE_HPP_
+#endif // DART_DYNAMICS_ELLIPSOIDSHAPE_HPP_

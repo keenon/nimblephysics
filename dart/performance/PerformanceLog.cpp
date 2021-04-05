@@ -245,12 +245,21 @@ int FinalizedPerformanceLog::getNumRuns()
 }
 
 //==============================================================================
-double FinalizedPerformanceLog::getMeanRuntime()
+s_t FinalizedPerformanceLog::getMeanRuntime()
 {
-  double sum = 0.0;
+  s_t sum = 0.0;
   for (uint64_t run : mRuns)
     sum += run;
   return sum / mRuns.size();
+}
+
+//==============================================================================
+uint64_t FinalizedPerformanceLog::getTotalRuntime()
+{
+  uint64_t sum = 0.0;
+  for (uint64_t run : mRuns)
+    sum += run;
+  return sum;
 }
 
 //==============================================================================
@@ -260,7 +269,7 @@ std::string FinalizedPerformanceLog::prettyPrint()
 {
   std::stringstream stream;
   stream << std::setprecision(3);
-  recursivePrettyPrint(0, getNumRuns() * getMeanRuntime(), 1.0, stream);
+  recursivePrettyPrint(0, getTotalRuntime(), static_cast<s_t>(1.0), stream);
   return stream.str();
 }
 
@@ -270,7 +279,7 @@ std::string FinalizedPerformanceLog::prettyPrint()
 std::string FinalizedPerformanceLog::toJson()
 {
   std::stringstream stream;
-  recursivePrettyPrint(0, getNumRuns() * getMeanRuntime(), 1.0, stream);
+  recursivePrettyPrint(0, getTotalRuntime(), static_cast<s_t>(1.0), stream);
   return stream.str();
 }
 
@@ -279,14 +288,14 @@ std::string FinalizedPerformanceLog::toJson()
 void FinalizedPerformanceLog::recursivePrettyPrint(
     int tabs,
     long parentTotalCycles,
-    double parentPercentage,
+    s_t parentPercentage,
     std::stringstream& stream)
 {
   for (int i = 0; i < tabs; i++)
     stream << "  ";
-  long totalCycles = getNumRuns() * getMeanRuntime();
-  double percentage
-      = ((double)totalCycles / parentTotalCycles) * parentPercentage;
+  long totalCycles = getTotalRuntime();
+  s_t percentage
+      = (static_cast<s_t>(totalCycles) / parentTotalCycles) * parentPercentage;
 
   stream << (percentage * 100) << "%: " << mName << " (" << getNumRuns()
          << " runs at mean " << getMeanRuntime() << " cycles = " << totalCycles

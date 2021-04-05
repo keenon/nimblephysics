@@ -96,7 +96,7 @@ void debugDofs(SkeletonPtr skel)
  * condition, and would break downstream computations.
  */
 bool verifyClassicClampingConstraintMatrix(
-    WorldPtr world, VectorXd proposedVelocities)
+    WorldPtr world, VectorXs proposedVelocities)
 {
   world->setVelocities(proposedVelocities);
 
@@ -120,25 +120,25 @@ bool verifyClassicClampingConstraintMatrix(
   // constraints. If we subtract out that components and re-run the solver, we
   // should see no constraint forces.
 
-  Eigen::MatrixXd A_c = classicPtr->getClampingConstraintMatrix(world);
+  Eigen::MatrixXs A_c = classicPtr->getClampingConstraintMatrix(world);
   if (A_c.size() == 0)
   {
     // this means that there's no clamping contacts
     return true;
   }
 
-  Eigen::MatrixXd A_cInv;
+  Eigen::MatrixXs A_cInv;
   if (A_c.size() > 0)
   {
     A_cInv = A_c.completeOrthogonalDecomposition().pseudoInverse();
   }
   else
   {
-    A_cInv = Eigen::MatrixXd::Zero(0, 0);
+    A_cInv = Eigen::MatrixXs::Zero(0, 0);
   }
-  MatrixXd mapper = A_cInv.eval().transpose() * A_c.transpose();
-  VectorXd violationVelocities = mapper * proposedVelocities;
-  VectorXd cleanVelocities = proposedVelocities - violationVelocities;
+  MatrixXs mapper = A_cInv.eval().transpose() * A_c.transpose();
+  VectorXs violationVelocities = mapper * proposedVelocities;
+  VectorXs cleanVelocities = proposedVelocities - violationVelocities;
 
   world->setVelocities(cleanVelocities);
   // Populate the constraint matrices, without taking a time step or integrating
@@ -154,8 +154,8 @@ bool verifyClassicClampingConstraintMatrix(
     if (!grad)
       continue;
 
-    VectorXd cleanContactImpulses = grad->getContactConstraintImpulses();
-    VectorXd zero = VectorXd::Zero(cleanContactImpulses.size());
+    VectorXs cleanContactImpulses = grad->getContactConstraintImpulses();
+    VectorXs zero = VectorXs::Zero(cleanContactImpulses.size());
     if (!equals(cleanContactImpulses, zero, 1e-9))
     {
       std::cout << "world A_c: " << std::endl << A_c << std::endl;
@@ -191,18 +191,18 @@ bool verifyClassicClampingConstraintMatrix(
  * classic formulation.
  */
 bool verifyMassedClampingConstraintMatrix(
-    WorldPtr world, VectorXd proposedVelocities)
+    WorldPtr world, VectorXs proposedVelocities)
 {
   world->setVelocities(proposedVelocities);
 
   neural::BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
-  Eigen::MatrixXd A_c = classicPtr->getClampingConstraintMatrix(world);
-  Eigen::MatrixXd V_c = classicPtr->getMassedClampingConstraintMatrix(world);
-  Eigen::MatrixXd M = classicPtr->getMassMatrix(world);
-  Eigen::MatrixXd Minv = classicPtr->getInvMassMatrix(world);
+  Eigen::MatrixXs A_c = classicPtr->getClampingConstraintMatrix(world);
+  Eigen::MatrixXs V_c = classicPtr->getMassedClampingConstraintMatrix(world);
+  Eigen::MatrixXs M = classicPtr->getMassMatrix(world);
+  Eigen::MatrixXs Minv = classicPtr->getInvMassMatrix(world);
 
-  Eigen::MatrixXd A_c_recovered = M * V_c;
-  Eigen::MatrixXd V_c_recovered = Minv * A_c;
+  Eigen::MatrixXs A_c_recovered = M * V_c;
+  Eigen::MatrixXs V_c_recovered = Minv * A_c;
 
   if (!equals(A_c, A_c_recovered, 1e-8) || !equals(V_c, V_c_recovered, 1e-8))
   {
@@ -210,12 +210,12 @@ bool verifyMassedClampingConstraintMatrix(
     std::cout << "A_c: " << std::endl << A_c << std::endl;
     std::cout << "A_c recovered = M * V_c: " << std::endl
               << A_c_recovered << std::endl;
-    Eigen::MatrixXd diff = A_c - A_c_recovered;
+    Eigen::MatrixXs diff = A_c - A_c_recovered;
     std::vector<std::shared_ptr<DifferentiableContactConstraint>> constraints
         = classicPtr->getClampingConstraints();
     for (int i = 0; i < diff.cols(); i++)
     {
-      Eigen::VectorXd diffCol = diff.col(i);
+      Eigen::VectorXs diffCol = diff.col(i);
       if (diffCol.norm() > 1e-8)
       {
         std::cout << "Disagreement on column " << i << std::endl;
@@ -224,16 +224,16 @@ bool verifyMassedClampingConstraintMatrix(
             = constraints[i];
         std::cout << "Contact type: " << constraint->getContactType()
                   << std::endl;
-        Eigen::VectorXd worldPos = constraint->getContactWorldPosition();
+        Eigen::VectorXs worldPos = constraint->getContactWorldPosition();
         std::cout << "Contact pos: " << std::endl << worldPos << std::endl;
-        Eigen::VectorXd worldNormal = constraint->getContactWorldNormal();
+        Eigen::VectorXs worldNormal = constraint->getContactWorldNormal();
         std::cout << "Contact normal: " << std::endl
                   << worldNormal << std::endl;
 
         assert(diffCol.size() == world->getNumDofs());
         for (int j = 0; j < world->getNumDofs(); j++)
         {
-          if (std::abs(diffCol(j)) > 1e-8)
+          if (abs(diffCol(j)) > 1e-8)
           {
             std::cout << "Error at DOF " << j << " ("
                       << world->getDofs()[j]->getName() << "): " << diffCol(j)
@@ -259,18 +259,18 @@ bool verifyMassedClampingConstraintMatrix(
  * classic formulation.
  */
 bool verifyMassedUpperBoundConstraintMatrix(
-    WorldPtr world, VectorXd proposedVelocities)
+    WorldPtr world, VectorXs proposedVelocities)
 {
   world->setVelocities(proposedVelocities);
 
   neural::BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
-  Eigen::MatrixXd A_ub = classicPtr->getUpperBoundConstraintMatrix(world);
-  Eigen::MatrixXd V_ub = classicPtr->getMassedUpperBoundConstraintMatrix(world);
-  Eigen::MatrixXd M = classicPtr->getMassMatrix(world);
-  Eigen::MatrixXd Minv = classicPtr->getInvMassMatrix(world);
+  Eigen::MatrixXs A_ub = classicPtr->getUpperBoundConstraintMatrix(world);
+  Eigen::MatrixXs V_ub = classicPtr->getMassedUpperBoundConstraintMatrix(world);
+  Eigen::MatrixXs M = classicPtr->getMassMatrix(world);
+  Eigen::MatrixXs Minv = classicPtr->getInvMassMatrix(world);
 
-  Eigen::MatrixXd A_ub_recovered = M * V_ub;
-  Eigen::MatrixXd V_ub_recovered = Minv * A_ub;
+  Eigen::MatrixXs A_ub_recovered = M * V_ub;
+  Eigen::MatrixXs V_ub_recovered = Minv * A_ub;
 
   if (!equals(A_ub, A_ub_recovered, 1e-8)
       || !equals(V_ub, V_ub_recovered, 1e-8))
@@ -286,7 +286,7 @@ bool verifyMassedUpperBoundConstraintMatrix(
  * This tests that P_c is getting computed correctly.
  */
 bool verifyClassicProjectionIntoClampsMatrix(
-    WorldPtr world, VectorXd proposedVelocities)
+    WorldPtr world, VectorXs proposedVelocities)
 {
   world->setVelocities(proposedVelocities);
 
@@ -312,31 +312,31 @@ bool verifyClassicProjectionIntoClampsMatrix(
 
   // Compute the offset required from the penetration correction velocities
 
-  VectorXd penetrationCorrectionVelocities
+  VectorXs penetrationCorrectionVelocities
       = classicPtr->getPenetrationCorrectionVelocities();
-  Eigen::MatrixXd A_c = classicPtr->getClampingConstraintMatrix(world);
-  Eigen::MatrixXd V_c = classicPtr->getMassedClampingConstraintMatrix(world);
-  Eigen::MatrixXd V_ub = classicPtr->getMassedUpperBoundConstraintMatrix(world);
-  Eigen::MatrixXd E = classicPtr->getUpperBoundMappingMatrix();
-  double dt = world->getTimeStep();
-  // Eigen::MatrixXd b = classicPtr->getClampingConstraintRelativeVels();
-  Eigen::MatrixXd constraintForceToImpliedTorques = V_c + (V_ub * E);
-  Eigen::MatrixXd forceToVel
+  Eigen::MatrixXs A_c = classicPtr->getClampingConstraintMatrix(world);
+  Eigen::MatrixXs V_c = classicPtr->getMassedClampingConstraintMatrix(world);
+  Eigen::MatrixXs V_ub = classicPtr->getMassedUpperBoundConstraintMatrix(world);
+  Eigen::MatrixXs E = classicPtr->getUpperBoundMappingMatrix();
+  s_t dt = world->getTimeStep();
+  // Eigen::MatrixXs b = classicPtr->getClampingConstraintRelativeVels();
+  Eigen::MatrixXs constraintForceToImpliedTorques = V_c + (V_ub * E);
+  Eigen::MatrixXs forceToVel
       = A_c.eval().transpose() * constraintForceToImpliedTorques;
-  Eigen::MatrixXd velToForce = Eigen::MatrixXd::Zero(0, 0);
+  Eigen::MatrixXs velToForce = Eigen::MatrixXs::Zero(0, 0);
   VectorXi mappings = classicPtr->getContactConstraintMappings();
   if (forceToVel.size() > 0)
   {
     velToForce = forceToVel.completeOrthogonalDecomposition().pseudoInverse();
   }
-  VectorXd penetrationOffset
+  VectorXs penetrationOffset
       = (velToForce * penetrationCorrectionVelocities) / world->getTimeStep();
 
   // Get the actual constraint forces
 
-  VectorXd fReal
+  VectorXs fReal
       = classicPtr->getContactConstraintImpulses() / world->getTimeStep();
-  VectorXd f_cReal = Eigen::VectorXd::Zero(A_c.cols());
+  VectorXs f_cReal = Eigen::VectorXs::Zero(A_c.cols());
   std::size_t pointer = 0;
   for (std::size_t i = 0; i < mappings.size(); i++)
   {
@@ -351,24 +351,24 @@ bool verifyClassicProjectionIntoClampsMatrix(
   // constraint forces. We center the approximation around our old solution,
   // because A_c can be low-rank and so many solutions are possible.
 
-  MatrixXd P_c = classicPtr->getProjectionIntoClampsMatrix(world);
-  VectorXd contactVel
+  MatrixXs P_c = classicPtr->getProjectionIntoClampsMatrix(world);
+  VectorXs contactVel
       = (-1.0 / dt) * A_c.transpose() * classicPtr->getPreConstraintVelocity();
-  VectorXd contactVelFromForce = forceToVel * f_cReal;
-  VectorXd centeredVel = contactVel - contactVelFromForce;
-  VectorXd eps = -1 * velToForce * centeredVel;
-  VectorXd f_c = f_cReal + eps;
+  VectorXs contactVelFromForce = forceToVel * f_cReal;
+  VectorXs centeredVel = contactVel - contactVelFromForce;
+  VectorXs eps = -1 * velToForce * centeredVel;
+  VectorXs f_c = f_cReal + eps;
 
   // Sum the two constraints forces together
 
-  VectorXd f_cPrime = f_c + penetrationOffset;
+  VectorXs f_cPrime = f_c + penetrationOffset;
 
   // The analytical constraint forces are a shorter vector than the actual
   // constraint forces, since the analytical constraint forces are only
   // computing the constraints that are clamping. So we need to check equality
   // while taking into account that mapping.
 
-  VectorXd analyticalError = VectorXd(f_c.size());
+  VectorXs analyticalError = VectorXs(f_c.size());
   pointer = 0;
   for (std::size_t i = 0; i < mappings.size(); i++)
   {
@@ -381,7 +381,7 @@ bool verifyClassicProjectionIntoClampsMatrix(
 
   // Check that the analytical error is zero
 
-  VectorXd zero = VectorXd::Zero(analyticalError.size());
+  VectorXs zero = VectorXs::Zero(analyticalError.size());
   // We can crunch down this error by making the
   // BoxedLcpConstraintSolver::makeHyperAccurateAndVerySlow() even more
   // aggressive in tightening errors on the LCP, but that's very slow.
@@ -393,10 +393,10 @@ bool verifyClassicProjectionIntoClampsMatrix(
     std::cout << "analyticalError: " << std::endl
               << analyticalError << std::endl;
 
-    Eigen::MatrixXd Q = classicPtr->mGradientMatrices[0]->mA;
-    Eigen::MatrixXd A = classicPtr->mGradientMatrices[0]->mAllConstraintMatrix;
-    Eigen::MatrixXd A_ub = classicPtr->getUpperBoundConstraintMatrix(world);
-    Eigen::VectorXd bReal = classicPtr->mGradientMatrices[0]->mB;
+    Eigen::MatrixXs Q = classicPtr->mGradientMatrices[0]->mA;
+    Eigen::MatrixXs A = classicPtr->mGradientMatrices[0]->mAllConstraintMatrix;
+    Eigen::MatrixXs A_ub = classicPtr->getUpperBoundConstraintMatrix(world);
+    Eigen::VectorXs bReal = classicPtr->mGradientMatrices[0]->mB;
     // int numContacts = bReal.size();
 
     /////////////////////////////////////////////////////
@@ -404,24 +404,24 @@ bool verifyClassicProjectionIntoClampsMatrix(
     /////////////////////////////////////////////////////
 
     // We expect these to be equal
-    Eigen::VectorXd tau = (A_c + A_ub * E) * f_cReal;
-    Eigen::VectorXd tauReal = A * fReal;
+    Eigen::VectorXs tau = (A_c + A_ub * E) * f_cReal;
+    Eigen::VectorXs tauReal = A * fReal;
 
-    Eigen::MatrixXd compareTaus = Eigen::MatrixXd::Zero(tau.size(), 2);
+    Eigen::MatrixXs compareTaus = Eigen::MatrixXs::Zero(tau.size(), 2);
     compareTaus.col(0) = tau;
     compareTaus.col(1) = tauReal;
     std::cout << "(A_c + A_ub * E) * f_cReal  :::   A * fReal" << std::endl
               << compareTaus << std::endl;
 
     // We expect these to be equal
-    Eigen::VectorXd v = A.transpose() * (V_c + V_ub * E) * f_cReal;
-    Eigen::VectorXd vReal = Q * fReal;
+    Eigen::VectorXs v = A.transpose() * (V_c + V_ub * E) * f_cReal;
+    Eigen::VectorXs vReal = Q * fReal;
 
-    Eigen::MatrixXd compareVs = Eigen::MatrixXd::Zero(v.size(), 6);
+    Eigen::MatrixXs compareVs = Eigen::MatrixXs::Zero(v.size(), 6);
     compareVs.col(0) = v;
     compareVs.col(1) = vReal;
     compareVs.col(2) = bReal / dt;
-    compareVs.col(3) = mappings.cast<double>();
+    compareVs.col(3) = mappings.cast<s_t>();
     compareVs.col(4) = fReal;
     compareVs.col(5) = vReal - bReal / dt;
     std::cout << "A^T * (V_c + V_ub * E) * f_cReal  :::   Q * fReal  :::   "
@@ -430,19 +430,19 @@ bool verifyClassicProjectionIntoClampsMatrix(
               << compareVs << std::endl;
 
     // Why doesn't least squares over Q find the right solution?
-    Eigen::FullPivLU<Eigen::MatrixXd> lu_decompQ(Q);
+    Eigen::FullPivLU<Eigen::MatrixXs> lu_decompQ(Q);
     std::cout << "Dimension of Q: " << Q.rows() << "x" << Q.cols() << std::endl;
     std::cout << "Rank of Q: " << lu_decompQ.rank() << std::endl;
-    double dist = (vReal - (bReal / dt)).norm();
+    s_t dist = (vReal - (bReal / dt)).norm();
 
-    Eigen::VectorXd eps
+    Eigen::VectorXs eps
         = Q.completeOrthogonalDecomposition().solve(bReal / dt - Q * fReal);
-    Eigen::VectorXd centeredApprox = fReal + eps;
-    double distApprox = (Q * centeredApprox - (bReal / dt)).norm();
+    Eigen::VectorXs centeredApprox = fReal + eps;
+    s_t distApprox = (Q * centeredApprox - (bReal / dt)).norm();
 
     std::cout << "Dist of fReal: " << dist << std::endl;
     std::cout << "Dist of best approx: " << distApprox << std::endl;
-    Eigen::MatrixXd compareSolves = Eigen::MatrixXd::Zero(vReal.size(), 6);
+    Eigen::MatrixXs compareSolves = Eigen::MatrixXs::Zero(vReal.size(), 6);
     compareSolves.col(0) = (vReal - (bReal / dt));
     compareSolves.col(1) = (Q * centeredApprox - (bReal / dt));
     compareSolves.col(2) = vReal;
@@ -455,9 +455,9 @@ bool verifyClassicProjectionIntoClampsMatrix(
               << compareSolves << std::endl;
 
     // We'd like to try to recover the original forces
-    // Eigen::MatrixXd R = A.transpose() * (V_c + V_ub * E);
-    Eigen::MatrixXd R = A.transpose() * (V_c + V_ub * E);
-    Eigen::FullPivLU<Eigen::MatrixXd> lu_decompR(R);
+    // Eigen::MatrixXs R = A.transpose() * (V_c + V_ub * E);
+    Eigen::MatrixXs R = A.transpose() * (V_c + V_ub * E);
+    Eigen::FullPivLU<Eigen::MatrixXs> lu_decompR(R);
     std::cout << "Dimension of R: " << R.rows() << "x" << R.cols() << std::endl;
     std::cout << "Rank of R: " << lu_decompR.rank() << std::endl;
     /*
@@ -469,20 +469,20 @@ bool verifyClassicProjectionIntoClampsMatrix(
               << lu_decomp.image(R) << std::endl;
     */
 
-    Eigen::VectorXd random = Eigen::VectorXd::Random(R.cols());
+    Eigen::VectorXs random = Eigen::VectorXs::Random(R.cols());
 
-    Eigen::MatrixXd errorFwd
+    Eigen::MatrixXs errorFwd
         = random
           - R.bdcSvd(Eigen::ComputeThinU | Eigen::ComputeThinV)
                 .solve(R * random);
-    Eigen::MatrixXd errorBack
+    Eigen::MatrixXs errorBack
         = random
           - R.transpose()
                 * R.transpose()
                       .bdcSvd(Eigen::ComputeThinU | Eigen::ComputeThinV)
                       .solve(random);
 
-    Eigen::MatrixXd compareRecovery = Eigen::MatrixXd::Zero(errorFwd.size(), 2);
+    Eigen::MatrixXs compareRecovery = Eigen::MatrixXs::Zero(errorFwd.size(), 2);
     compareRecovery.col(0) = errorBack;
     compareRecovery.col(1) = errorFwd;
     std::cout << "random - R^T*R^{-T}*random ::: random - R^{-1}*R*random"
@@ -515,8 +515,8 @@ bool verifyClassicProjectionIntoClampsMatrix(
     // Show the constraint forces at each of the contact points
 
     /*
-    Eigen::MatrixXd comparison
-        = Eigen::MatrixXd::Zero(contactConstraintForces.size(), 2);
+    Eigen::MatrixXs comparison
+        = Eigen::MatrixXs::Zero(contactConstraintForces.size(), 2);
     comparison.col(0) = contactConstraintForces;
     comparison.col(1) = mappedAnalyticalConstraintForces;
     std::cout
@@ -527,17 +527,17 @@ bool verifyClassicProjectionIntoClampsMatrix(
 
     // Show the contact accels
 
-    Eigen::VectorXd realContactAccels
+    Eigen::VectorXs realContactAccels
         = classicPtr->mGradientMatrices[0]->mA * contactConstraintForces;
-    Eigen::VectorXd analyticalContactAccels
+    Eigen::VectorXs analyticalContactAccels
         = classicPtr->mGradientMatrices[0]->mA
           * mappedAnalyticalConstraintForces;
-    Eigen::MatrixXd jointTorqueComparison
-        = Eigen::MatrixXd::Zero(realContactAccels.size(), 9);
-    double dt = world->getTimeStep();
+    Eigen::MatrixXs jointTorqueComparison
+        = Eigen::MatrixXs::Zero(realContactAccels.size(), 9);
+    s_t dt = world->getTimeStep();
     jointTorqueComparison.col(0) = realContactAccels;
     jointTorqueComparison.col(1) = analyticalContactAccels;
-    jointTorqueComparison.col(2) = mappings.cast<double>();
+    jointTorqueComparison.col(2) = mappings.cast<s_t>();
     jointTorqueComparison.col(3) = classicPtr->mGradientMatrices[0]->mX;
     jointTorqueComparison.col(4) = classicPtr->mGradientMatrices[0]->mA
                                    * classicPtr->mGradientMatrices[0]->mX;
@@ -561,12 +561,12 @@ bool verifyClassicProjectionIntoClampsMatrix(
     // Show the resulting joint accelerations
 
     /*
-    Eigen::VectorXd realAccel
+    Eigen::VectorXs realAccel
         = world->getInvMassMatrix() * contactConstraintForces;
-    Eigen::VectorXd analyticalAccel
+    Eigen::VectorXs analyticalAccel
         = world->getInvMassMatrix() * mappedAnalyticalConstraintForces;
-    Eigen::MatrixXd accelComparison
-        = Eigen::MatrixXd::Zero(realAccel.size(), 2);
+    Eigen::MatrixXs accelComparison
+        = Eigen::MatrixXs::Zero(realAccel.size(), 2);
     accelComparison.col(0) = realAccel;
     accelComparison.col(1) = analyticalAccel;
     std::cout << "Real accel - Analytical accel: " << std::endl
@@ -586,7 +586,7 @@ bool verifyClassicProjectionIntoClampsMatrix(
  * This tests that P_c is getting computed correctly.
  */
 bool verifyMassedProjectionIntoClampsMatrix(
-    WorldPtr world, VectorXd proposedVelocities)
+    WorldPtr world, VectorXs proposedVelocities)
 {
   world->setVelocities(proposedVelocities);
 
@@ -601,24 +601,24 @@ bool verifyMassedProjectionIntoClampsMatrix(
     return false;
   }
 
-  Eigen::MatrixXd P_c = classicPtr->getProjectionIntoClampsMatrix(world);
+  Eigen::MatrixXs P_c = classicPtr->getProjectionIntoClampsMatrix(world);
 
   // Reconstruct P_c without the massed shortcut
-  Eigen::MatrixXd A_c = classicPtr->getClampingConstraintMatrix(world);
-  Eigen::MatrixXd A_ub = classicPtr->getUpperBoundConstraintMatrix(world);
-  Eigen::MatrixXd E = classicPtr->getUpperBoundMappingMatrix();
+  Eigen::MatrixXs A_c = classicPtr->getClampingConstraintMatrix(world);
+  Eigen::MatrixXs A_ub = classicPtr->getUpperBoundConstraintMatrix(world);
+  Eigen::MatrixXs E = classicPtr->getUpperBoundMappingMatrix();
 
-  Eigen::MatrixXd constraintForceToImpliedTorques = A_c + (A_ub * E);
-  Eigen::MatrixXd forceToVel = A_c.eval().transpose()
+  Eigen::MatrixXs constraintForceToImpliedTorques = A_c + (A_ub * E);
+  Eigen::MatrixXs forceToVel = A_c.eval().transpose()
                                * classicPtr->getInvMassMatrix(world)
                                * constraintForceToImpliedTorques;
-  Eigen::MatrixXd velToForce = Eigen::MatrixXd::Zero(0, 0);
+  Eigen::MatrixXs velToForce = Eigen::MatrixXs::Zero(0, 0);
   if (forceToVel.size() > 0)
   {
     velToForce = forceToVel.completeOrthogonalDecomposition().pseudoInverse();
   }
-  Eigen::MatrixXd bounce = classicPtr->getBounceDiagonals().asDiagonal();
-  Eigen::MatrixXd P_c_recovered
+  Eigen::MatrixXs bounce = classicPtr->getBounceDiagonals().asDiagonal();
+  Eigen::MatrixXs P_c_recovered
       = (1.0 / world->getTimeStep()) * velToForce * bounce * A_c.transpose();
 
   if (!equals(P_c, P_c_recovered, 1e-8))
@@ -632,7 +632,7 @@ bool verifyMassedProjectionIntoClampsMatrix(
   return true;
 }
 
-bool verifyVelVelJacobian(WorldPtr world, VectorXd proposedVelocities)
+bool verifyVelVelJacobian(WorldPtr world, VectorXs proposedVelocities)
 {
   world->setVelocities(proposedVelocities);
 
@@ -646,8 +646,8 @@ bool verifyVelVelJacobian(WorldPtr world, VectorXd proposedVelocities)
     return false;
   }
 
-  MatrixXd analytical = classicPtr->getVelVelJacobian(world);
-  MatrixXd bruteForce = classicPtr->finiteDifferenceVelVelJacobian(world);
+  MatrixXs analytical = classicPtr->getVelVelJacobian(world);
+  MatrixXs bruteForce = classicPtr->finiteDifferenceVelVelJacobian(world);
 
   // atlas run as 1.6e-08 error
   if (!equals(analytical, bruteForce, 1e-8))
@@ -681,27 +681,27 @@ bool verifyAnalyticalConstraintMatrixEstimates(WorldPtr world)
 {
   neural::BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
 
-  Eigen::MatrixXd original = classicPtr->getClampingConstraintMatrix(world);
+  Eigen::MatrixXs original = classicPtr->getClampingConstraintMatrix(world);
 
-  double EPS = 1e-5;
+  s_t EPS = 1e-5;
 
   for (int i = 0; i < 100; i++)
   {
-    Eigen::VectorXd diff = Eigen::VectorXd::Random(world->getNumDofs());
+    Eigen::VectorXs diff = Eigen::VectorXs::Random(world->getNumDofs());
 
-    Eigen::MatrixXd analyticalPos;
-    Eigen::MatrixXd analyticalNeg;
-    Eigen::MatrixXd bruteForcePos;
-    Eigen::MatrixXd bruteForceNeg;
+    Eigen::MatrixXs analyticalPos;
+    Eigen::MatrixXs analyticalNeg;
+    Eigen::MatrixXs bruteForcePos;
+    Eigen::MatrixXs bruteForceNeg;
 
-    double epsPos = EPS;
+    s_t epsPos = EPS;
     while (true)
     {
-      Eigen::VectorXd pos = world->getPositions() + diff * epsPos;
+      Eigen::VectorXs pos = world->getPositions() + diff * epsPos;
 
-      Eigen::MatrixXd analytical
+      Eigen::MatrixXs analytical
           = classicPtr->estimateClampingConstraintMatrixAt(world, pos);
-      Eigen::MatrixXd bruteForce
+      Eigen::MatrixXs bruteForce
           = classicPtr->getClampingConstraintMatrixAt(world, pos);
 
       if (bruteForce.cols() == original.cols()
@@ -714,14 +714,14 @@ bool verifyAnalyticalConstraintMatrixEstimates(WorldPtr world)
       epsPos *= 0.5;
     }
 
-    double epsNeg = EPS;
+    s_t epsNeg = EPS;
     while (true)
     {
-      Eigen::VectorXd pos = world->getPositions() + diff * epsNeg;
+      Eigen::VectorXs pos = world->getPositions() + diff * epsNeg;
 
-      Eigen::MatrixXd analytical
+      Eigen::MatrixXs analytical
           = classicPtr->estimateClampingConstraintMatrixAt(world, pos);
-      Eigen::MatrixXd bruteForce
+      Eigen::MatrixXs bruteForce
           = classicPtr->getClampingConstraintMatrixAt(world, pos);
 
       if (bruteForce.cols() == original.cols()
@@ -734,9 +734,9 @@ bool verifyAnalyticalConstraintMatrixEstimates(WorldPtr world)
       epsNeg *= 0.5;
     }
 
-    Eigen::MatrixXd analyticalDiff
+    Eigen::MatrixXs analyticalDiff
         = (analyticalPos - analyticalNeg) / (epsPos + epsNeg);
-    Eigen::MatrixXd bruteForceDiff
+    Eigen::MatrixXs bruteForceDiff
         = (bruteForcePos - bruteForceNeg) / (epsPos + epsNeg);
 
     // I'm surprised by how quickly the gradient can change
@@ -765,9 +765,9 @@ bool verifyPerturbedF_c(WorldPtr world)
   neural::BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
   // assert(classicPtr->areResultsStandardized());
 
-  Eigen::VectorXd original = world->getPositions();
-  const double EPS = 1e-6;
-  std::vector<std::pair<int, double>> testPairs;
+  Eigen::VectorXs original = world->getPositions();
+  const s_t EPS = 1e-6;
+  std::vector<std::pair<int, s_t>> testPairs;
   for (int i = 0; i < world->getNumDofs(); i++)
   {
     testPairs.emplace_back(i, EPS);
@@ -778,8 +778,8 @@ bool verifyPerturbedF_c(WorldPtr world)
   for (auto pair : testPairs)
   {
     int i = pair.first;
-    Eigen::VectorXd perturbedPos = original;
-    double eps = pair.second;
+    Eigen::VectorXs perturbedPos = original;
+    s_t eps = pair.second;
 
     neural::BackpropSnapshotPtr perturbedPtr;
 
@@ -810,7 +810,7 @@ bool verifyPerturbedF_c(WorldPtr world)
       std::cout << "Original num upper bound: "
                 << classicPtr->getNumUpperBound() << std::endl;
       eps *= 0.5;
-      if (std::abs(eps) < 1e-15)
+      if (abs(eps) < 1e-15)
       {
         std::cout << "Couldn't find a numerically stable epsilon small enough "
                      "to satisfy criteria when finite differencing. Maybe the "
@@ -821,22 +821,22 @@ bool verifyPerturbedF_c(WorldPtr world)
       }
     }
 
-    Eigen::MatrixXd realA_c
+    Eigen::MatrixXs realA_c
         = perturbedPtr->getMassMatrix(world)
           * perturbedPtr->getMassedClampingConstraintMatrix(world);
     // realA_c = perturbedPtr->getClampingConstraintMatrix(world);
-    Eigen::MatrixXd realA_ub
+    Eigen::MatrixXs realA_ub
         = perturbedPtr->getUpperBoundConstraintMatrix(world);
-    Eigen::MatrixXd realE = perturbedPtr->getUpperBoundMappingMatrix();
-    Eigen::MatrixXd realQ = perturbedPtr->getClampingAMatrix();
-    Eigen::VectorXd realB = perturbedPtr->getClampingConstraintRelativeVels();
-    Eigen::VectorXd realV = perturbedPtr->getPreConstraintVelocity();
+    Eigen::MatrixXs realE = perturbedPtr->getUpperBoundMappingMatrix();
+    Eigen::MatrixXs realQ = perturbedPtr->getClampingAMatrix();
+    Eigen::VectorXs realB = perturbedPtr->getClampingConstraintRelativeVels();
+    Eigen::VectorXs realV = perturbedPtr->getPreConstraintVelocity();
 
-    Eigen::MatrixXd A_c
+    Eigen::MatrixXs A_c
         = classicPtr->estimateClampingConstraintMatrixAt(world, perturbedPos);
-    Eigen::MatrixXd A_ub
+    Eigen::MatrixXs A_ub
         = classicPtr->estimateUpperBoundConstraintMatrixAt(world, perturbedPos);
-    Eigen::MatrixXd E = classicPtr->getUpperBoundMappingMatrix();
+    Eigen::MatrixXs E = classicPtr->getUpperBoundMappingMatrix();
 
     if (A_c.cols() > 0 && !equals(realA_c, A_c, 1e-10))
     {
@@ -910,10 +910,10 @@ bool verifyPerturbedF_c(WorldPtr world)
       return false;
     }
 
-    Eigen::MatrixXd analyticalQ = Eigen::MatrixXd::Zero(A_c.cols(), A_c.cols());
+    Eigen::MatrixXs analyticalQ = Eigen::MatrixXs::Zero(A_c.cols(), A_c.cols());
     classicPtr->computeLCPConstraintMatrixClampingSubset(
         world, analyticalQ, A_c, A_ub, E);
-    Eigen::VectorXd analyticalB = Eigen::VectorXd(A_c.cols());
+    Eigen::VectorXs analyticalB = Eigen::VectorXs(A_c.cols());
     classicPtr->computeLCPOffsetClampingSubset(world, analyticalB, A_c);
 
     if (!equals(realB, analyticalB, 1e-9))
@@ -964,9 +964,9 @@ bool verifyPerturbedF_c(WorldPtr world)
 
     if (A_c.cols() > 0)
     {
-      Eigen::MatrixXd analyticalQinv
+      Eigen::MatrixXs analyticalQinv
           = analyticalQ.completeOrthogonalDecomposition().pseudoInverse();
-      Eigen::MatrixXd realQinv
+      Eigen::MatrixXs realQinv
           = realQ.completeOrthogonalDecomposition().pseudoInverse();
 
       // The inverted Q's can have enormous terms (like 5000), which means we
@@ -977,8 +977,7 @@ bool verifyPerturbedF_c(WorldPtr world)
               analyticalQinv,
               1e-10
                   * std::max(
-                      std::abs(realQinv.maxCoeff()),
-                      std::abs(realQinv.minCoeff()))))
+                      abs(realQinv.maxCoeff()), abs(realQinv.minCoeff()))))
       {
         if (realQ.rows() >= 6)
         {
@@ -1025,13 +1024,13 @@ bool verifyPerturbedF_c(WorldPtr world)
       }
       */
 
-      Eigen::VectorXd analyticalF_c
+      Eigen::VectorXs analyticalF_c
           = analyticalQ.completeOrthogonalDecomposition().solve(analyticalB);
-      Eigen::VectorXd realF_c = perturbedPtr->getClampingConstraintImpulses();
+      Eigen::VectorXs realF_c = perturbedPtr->getClampingConstraintImpulses();
       // realQ == Q only when A_ub is empty
       if (A_ub.cols() == 0)
       {
-        Eigen::VectorXd cleanRealF_c
+        Eigen::VectorXs cleanRealF_c
             = realQ.completeOrthogonalDecomposition().solve(realB);
         /// These don't have to be numerically equivalent when there are
         /// multiple collision islands
@@ -1049,7 +1048,7 @@ bool verifyPerturbedF_c(WorldPtr world)
       }
       if (!equals(analyticalF_c, realF_c, 1e-9))
       {
-        Eigen::MatrixXd comparison = Eigen::MatrixXd::Zero(realF_c.size(), 4);
+        Eigen::MatrixXs comparison = Eigen::MatrixXs::Zero(realF_c.size(), 4);
         comparison.col(0) = realF_c;
         comparison.col(1) = analyticalF_c;
         comparison.col(2) = (realF_c - analyticalF_c);
@@ -1061,7 +1060,7 @@ bool verifyPerturbedF_c(WorldPtr world)
                   << std::endl
                   << comparison << std::endl;
 
-        Eigen::MatrixXd comparisonB = Eigen::MatrixXd::Zero(realB.size(), 4);
+        Eigen::MatrixXs comparisonB = Eigen::MatrixXs::Zero(realB.size(), 4);
         comparisonB.col(0) = realB;
         comparisonB.col(1) = analyticalQ * analyticalF_c;
         comparisonB.col(2) = (realB - (analyticalQ * analyticalF_c));
@@ -1127,20 +1126,20 @@ bool verifyF_c(WorldPtr world)
   }
   */
 
-  Eigen::VectorXd original = world->getPositions();
+  Eigen::VectorXs original = world->getPositions();
 
-  // const double EPS = 1e-6;
+  // const s_t EPS = 1e-6;
 
-  Eigen::MatrixXd A_c = classicPtr->getClampingConstraintMatrix(world);
-  Eigen::MatrixXd A_ub = classicPtr->getUpperBoundConstraintMatrix(world);
-  Eigen::MatrixXd E = classicPtr->getUpperBoundMappingMatrix();
+  Eigen::MatrixXs A_c = classicPtr->getClampingConstraintMatrix(world);
+  Eigen::MatrixXs A_ub = classicPtr->getUpperBoundConstraintMatrix(world);
+  Eigen::MatrixXs E = classicPtr->getUpperBoundMappingMatrix();
 
   world->setPositions(original);
 
-  Eigen::VectorXd ones = Eigen::VectorXd::Ones(A_c.cols());
-  Eigen::MatrixXd analyticalA_cJac
+  Eigen::VectorXs ones = Eigen::VectorXs::Ones(A_c.cols());
+  Eigen::MatrixXs analyticalA_cJac
       = classicPtr->getJacobianOfClampingConstraints(world, ones);
-  Eigen::MatrixXd bruteForceA_cJac
+  Eigen::MatrixXs bruteForceA_cJac
       = classicPtr->finiteDifferenceJacobianOfClampingConstraints(world, ones);
 
   assert(
@@ -1175,10 +1174,10 @@ bool verifyF_c(WorldPtr world)
     return false;
   }
 
-  ones = Eigen::VectorXd::Ones(A_c.rows());
-  Eigen::MatrixXd analyticalA_cTJac
+  ones = Eigen::VectorXs::Ones(A_c.rows());
+  Eigen::MatrixXs analyticalA_cTJac
       = classicPtr->getJacobianOfClampingConstraintsTranspose(world, ones);
-  Eigen::MatrixXd bruteForceA_cTJac
+  Eigen::MatrixXs bruteForceA_cTJac
       = classicPtr->finiteDifferenceJacobianOfClampingConstraintsTranspose(
           world, ones);
 
@@ -1218,14 +1217,14 @@ bool verifyF_c(WorldPtr world)
 
   if (A_c.cols() > 0)
   {
-    Eigen::MatrixXd realQ = classicPtr->getClampingAMatrix();
-    Eigen::VectorXd realB = classicPtr->getClampingConstraintRelativeVels();
+    Eigen::MatrixXs realQ = classicPtr->getClampingAMatrix();
+    Eigen::VectorXs realB = classicPtr->getClampingConstraintRelativeVels();
 
-    Eigen::VectorXd x
+    Eigen::VectorXs x
         = A_c * realQ.completeOrthogonalDecomposition().solve(realB);
-    Eigen::MatrixXd analyticalMinv_fJac
+    Eigen::MatrixXs analyticalMinv_fJac
         = classicPtr->getJacobianOfMinv(world, x, WithRespectTo::POSITION);
-    Eigen::MatrixXd bruteForceMinv_fJac
+    Eigen::MatrixXs bruteForceMinv_fJac
         = classicPtr->finiteDifferenceJacobianOfMinv(
             world, x, WithRespectTo::POSITION);
 
@@ -1247,10 +1246,10 @@ bool verifyF_c(WorldPtr world)
 
       // The first step of the computation for Minv involves finding the Jac for
       // M
-      Eigen::VectorXd v = classicPtr->getInvMassMatrix(world) * x;
-      Eigen::MatrixXd bruteForceMvJac = classicPtr->finiteDifferenceJacobianOfM(
+      Eigen::VectorXs v = classicPtr->getInvMassMatrix(world) * x;
+      Eigen::MatrixXs bruteForceMvJac = classicPtr->finiteDifferenceJacobianOfM(
           world, v, WithRespectTo::POSITION);
-      Eigen::MatrixXd analyticalMvJac
+      Eigen::MatrixXs analyticalMvJac
           = classicPtr->getJacobianOfM(world, v, WithRespectTo::POSITION);
       if (!equals(analyticalMvJac, bruteForceMvJac, 1e-8))
       {
@@ -1288,11 +1287,11 @@ bool verifyF_c(WorldPtr world)
       }
     }
 
-    Eigen::MatrixXd Minv = world->getInvMassMatrix();
-    Eigen::MatrixXd A_c_ub_E = A_c + A_ub * E;
-    Eigen::MatrixXd bruteForceQbJac = classicPtr->finiteDifferenceJacobianOfQb(
+    Eigen::MatrixXs Minv = world->getInvMassMatrix();
+    Eigen::MatrixXs A_c_ub_E = A_c + A_ub * E;
+    Eigen::MatrixXs bruteForceQbJac = classicPtr->finiteDifferenceJacobianOfQb(
         world, realB, WithRespectTo::POSITION);
-    Eigen::MatrixXd analyticalQbJac = classicPtr->dQ_WithUB(
+    Eigen::MatrixXs analyticalQbJac = classicPtr->dQ_WithUB(
         world, Minv, A_c, E, A_c_ub_E, realB, WithRespectTo::POSITION);
 
     if (!equals(analyticalQbJac, bruteForceQbJac, 4e-8))
@@ -1325,11 +1324,11 @@ bool verifyF_c(WorldPtr world)
                   << (bruteForceQbJac - analyticalQbJac) << std::endl;
       }
 
-      Eigen::MatrixXd diff = bruteForceQbJac - analyticalQbJac;
+      Eigen::MatrixXs diff = bruteForceQbJac - analyticalQbJac;
       for (int i = 0; i < world->getNumDofs(); i++)
       {
-        double maxError = std::max(
-            std::abs(diff.col(i).minCoeff()), std::abs(diff.col(i).maxCoeff()));
+        s_t maxError = std::max(
+            abs(diff.col(i).minCoeff()), abs(diff.col(i).maxCoeff()));
         dynamics::DegreeOfFreedom* dof = world->getDofs()[i];
 
         std::cout << "col[" << i << "] joint \"" << dof->getJoint()->getName()
@@ -1341,11 +1340,11 @@ bool verifyF_c(WorldPtr world)
       return false;
     }
 
-    Eigen::MatrixXd bruteForceQinvBJac
+    Eigen::MatrixXs bruteForceQinvBJac
         = classicPtr
               ->finiteDifferenceJacobianOfLCPConstraintMatrixClampingSubset(
                   world, realB, WithRespectTo::POSITION);
-    Eigen::MatrixXd analyticalQinvBJac
+    Eigen::MatrixXs analyticalQinvBJac
         = classicPtr->getJacobianOfLCPConstraintMatrixClampingSubset(
             world, realB, WithRespectTo::POSITION);
 
@@ -1385,11 +1384,11 @@ bool verifyF_c(WorldPtr world)
                   << (bruteForceQinvBJac - analyticalQinvBJac) << std::endl;
       }
 
-      Eigen::MatrixXd diff = bruteForceQinvBJac - analyticalQinvBJac;
+      Eigen::MatrixXs diff = bruteForceQinvBJac - analyticalQinvBJac;
       for (int i = 0; i < world->getNumDofs(); i++)
       {
-        double maxError = std::max(
-            std::abs(diff.col(i).minCoeff()), std::abs(diff.col(i).maxCoeff()));
+        s_t maxError = std::max(
+            abs(diff.col(i).minCoeff()), abs(diff.col(i).maxCoeff()));
         dynamics::DegreeOfFreedom* dof = world->getDofs()[i];
 
         std::cout << "col[" << i << "] joint \"" << dof->getJoint()->getName()
@@ -1404,15 +1403,15 @@ bool verifyF_c(WorldPtr world)
     /*
     // Suspicious inputs to check if dB is broken:
 
-    Eigen::MatrixXd dMinv_f = getJacobianOfMinv(world, f, wrt);
-    Eigen::MatrixXd dA_c_f
+    Eigen::MatrixXs dMinv_f = getJacobianOfMinv(world, f, wrt);
+    Eigen::MatrixXs dA_c_f
         = getJacobianOfClampingConstraintsTranspose(world, v_f);
     */
 
-    Eigen::MatrixXd bruteForceJacB
+    Eigen::MatrixXs bruteForceJacB
         = classicPtr->finiteDifferenceJacobianOfLCPOffsetClampingSubset(
             world, WithRespectTo::POSITION);
-    Eigen::MatrixXd analyticalJacB
+    Eigen::MatrixXs analyticalJacB
         = classicPtr->getJacobianOfLCPOffsetClampingSubset(
             world, WithRespectTo::POSITION);
 
@@ -1457,13 +1456,13 @@ bool verifyF_c(WorldPtr world)
       return false;
     }
 
-    Eigen::MatrixXd bruteForceEstimatedJac
+    Eigen::MatrixXs bruteForceEstimatedJac
         = classicPtr->finiteDifferenceJacobianOfEstimatedConstraintForce(
             world, WithRespectTo::POSITION);
-    Eigen::MatrixXd bruteForceJac
+    Eigen::MatrixXs bruteForceJac
         = classicPtr->finiteDifferenceJacobianOfConstraintForce(
             world, WithRespectTo::POSITION);
-    Eigen::MatrixXd analyticalJac = classicPtr->getJacobianOfConstraintForce(
+    Eigen::MatrixXs analyticalJac = classicPtr->getJacobianOfConstraintForce(
         world, WithRespectTo::POSITION);
 
     assert(
@@ -1733,19 +1732,19 @@ bool verifyConstraintForceJac(WorldPtr world)
   RestorableSnapshot snapshot(world);
 
   neural::BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
-  Eigen::MatrixXd A_c = classicPtr->getClampingConstraintMatrix(world);
-  Eigen::MatrixXd A_ub = classicPtr->getUpperBoundConstraintMatrix(world);
-  Eigen::MatrixXd E = classicPtr->getUpperBoundMappingMatrix();
+  Eigen::MatrixXs A_c = classicPtr->getClampingConstraintMatrix(world);
+  Eigen::MatrixXs A_ub = classicPtr->getUpperBoundConstraintMatrix(world);
+  Eigen::MatrixXs E = classicPtr->getUpperBoundMappingMatrix();
 
   /*
-  Eigen::MatrixXd bruteForceJac
+  Eigen::MatrixXs bruteForceJac
       = classicPtr->finiteDifferenceJacobianOfConstraintForce(
           world, WithRespectTo::POSITION);
   */
-  Eigen::MatrixXd bruteForceJac
+  Eigen::MatrixXs bruteForceJac
       = classicPtr->finiteDifferenceJacobianOfEstimatedConstraintForce(
           world, WithRespectTo::POSITION);
-  Eigen::MatrixXd analyticalJac = classicPtr->getJacobianOfConstraintForce(
+  Eigen::MatrixXs analyticalJac = classicPtr->getJacobianOfConstraintForce(
       world, WithRespectTo::POSITION);
   if (!equals(analyticalJac, bruteForceJac, 1e-8))
   {
@@ -1769,22 +1768,22 @@ bool verifyConstraintForceJac(WorldPtr world)
 struct VelocityTest
 {
   bool standardized;
-  Eigen::VectorXd realNextVel;
-  Eigen::VectorXd realNextVelPreSolve;
-  Eigen::VectorXd realNextVelDeltaVFromF;
-  Eigen::VectorXd predictedNextVel;
-  Eigen::VectorXd predictedNextVelPreSolve;
-  Eigen::VectorXd predictedNextVelDeltaVFromF;
-  Eigen::VectorXd preStepVelocity;
-  Eigen::VectorXd realF_c;
-  Eigen::VectorXd predictedF_c;
-  Eigen::MatrixXd realQ;
-  Eigen::MatrixXd predictedQ;
-  Eigen::VectorXd realB;
-  Eigen::VectorXd predictedB;
-  Eigen::VectorXd realX;
-  Eigen::VectorXd predictedX;
-  Eigen::MatrixXd Minv;
+  Eigen::VectorXs realNextVel;
+  Eigen::VectorXs realNextVelPreSolve;
+  Eigen::VectorXs realNextVelDeltaVFromF;
+  Eigen::VectorXs predictedNextVel;
+  Eigen::VectorXs predictedNextVelPreSolve;
+  Eigen::VectorXs predictedNextVelDeltaVFromF;
+  Eigen::VectorXs preStepVelocity;
+  Eigen::VectorXs realF_c;
+  Eigen::VectorXs predictedF_c;
+  Eigen::MatrixXs realQ;
+  Eigen::MatrixXs predictedQ;
+  Eigen::VectorXs realB;
+  Eigen::VectorXs predictedB;
+  Eigen::VectorXs realX;
+  Eigen::VectorXs predictedX;
+  Eigen::MatrixXs Minv;
 };
 
 VelocityTest runVelocityTest(WorldPtr world)
@@ -1798,29 +1797,29 @@ VelocityTest runVelocityTest(WorldPtr world)
     skel->computeForwardDynamics();
     skel->integrateVelocities(world->getTimeStep());
   }
-  Eigen::VectorXd realNextVelPreSolve = world->getVelocities();
+  Eigen::VectorXs realNextVelPreSolve = world->getVelocities();
   snapshot.restore();
 
-  Eigen::VectorXd preStepVelocity = world->getVelocities();
+  Eigen::VectorXs preStepVelocity = world->getVelocities();
 
-  Eigen::VectorXd realNextVel = classicPtr->getPostStepVelocity();
-  Eigen::VectorXd realNextVelDeltaVFromF = realNextVel - realNextVelPreSolve;
+  Eigen::VectorXs realNextVel = classicPtr->getPostStepVelocity();
+  Eigen::VectorXs realNextVelDeltaVFromF = realNextVel - realNextVelPreSolve;
 
-  Eigen::MatrixXd A_c = classicPtr->getClampingConstraintMatrix(world);
-  Eigen::MatrixXd A_ub = classicPtr->getUpperBoundConstraintMatrix(world);
-  Eigen::MatrixXd E = classicPtr->getUpperBoundMappingMatrix();
-  Eigen::MatrixXd A_c_ub_E = A_c + A_ub * E;
-  Eigen::VectorXd tau = world->getExternalForces();
-  double dt = world->getTimeStep();
+  Eigen::MatrixXs A_c = classicPtr->getClampingConstraintMatrix(world);
+  Eigen::MatrixXs A_ub = classicPtr->getUpperBoundConstraintMatrix(world);
+  Eigen::MatrixXs E = classicPtr->getUpperBoundMappingMatrix();
+  Eigen::MatrixXs A_c_ub_E = A_c + A_ub * E;
+  Eigen::VectorXs tau = world->getExternalForces();
+  s_t dt = world->getTimeStep();
 
-  Eigen::MatrixXd Minv = world->getInvMassMatrix();
-  Eigen::VectorXd C = world->getCoriolisAndGravityAndExternalForces();
-  Eigen::VectorXd f_c
+  Eigen::MatrixXs Minv = world->getInvMassMatrix();
+  Eigen::VectorXs C = world->getCoriolisAndGravityAndExternalForces();
+  Eigen::VectorXs f_c
       = classicPtr->estimateClampingConstraintImpulses(world, A_c, A_ub, E);
 
   /*
-  Eigen::VectorXd b = Eigen::VectorXd(A_c.cols());
-  Eigen::MatrixXd Q = Eigen::MatrixXd::Zero(A_c.cols(), A_c.cols());
+  Eigen::VectorXs b = Eigen::VectorXs(A_c.cols());
+  Eigen::MatrixXs Q = Eigen::MatrixXs::Zero(A_c.cols(), A_c.cols());
   classicPtr->computeLCPOffsetClampingSubset(world, b, A_c);
   classicPtr->computeLCPConstraintMatrixClampingSubset(world, Q, A_c);
   std::cout << "Real B: " << std::endl
@@ -1831,34 +1830,34 @@ VelocityTest runVelocityTest(WorldPtr world)
   std::cout << "Analytical A: " << std::endl << Q << std::endl;
   */
 
-  Eigen::VectorXd allRealImpulses = classicPtr->getContactConstraintImpulses();
+  Eigen::VectorXs allRealImpulses = classicPtr->getContactConstraintImpulses();
   /*
-  Eigen::VectorXd velChange = Eigen::VectorXd::Zero(world->getNumDofs());
+  Eigen::VectorXs velChange = Eigen::VectorXs::Zero(world->getNumDofs());
   for (int i = 0; i < allRealImpulses.size(); i++)
   {
     velChange += allRealImpulses(i)
                  * classicPtr->mGradientMatrices[0]->mMassedImpulseTests[i];
   }
   */
-  Eigen::VectorXd velDueToIllegal
+  Eigen::VectorXs velDueToIllegal
       = classicPtr->getVelocityDueToIllegalImpulses();
   velDueToIllegal.setZero();
 
-  Eigen::VectorXd realImpulses = classicPtr->getClampingConstraintImpulses();
+  Eigen::VectorXs realImpulses = classicPtr->getClampingConstraintImpulses();
 
-  Eigen::VectorXd preSolveV = preStepVelocity + dt * Minv * (tau - C);
+  Eigen::VectorXs preSolveV = preStepVelocity + dt * Minv * (tau - C);
 
-  Eigen::VectorXd f_cDeltaV;
+  Eigen::VectorXs f_cDeltaV;
   if (A_c.cols() == 0)
   {
-    f_cDeltaV = Eigen::VectorXd::Zero(preSolveV.size());
+    f_cDeltaV = Eigen::VectorXs::Zero(preSolveV.size());
   }
   else
   {
     f_cDeltaV = Minv * A_c_ub_E * f_c + velDueToIllegal;
   }
-  Eigen::VectorXd realF_cDeltaV = Minv * A_c_ub_E * realImpulses;
-  Eigen::VectorXd postSolveV = preSolveV + f_cDeltaV;
+  Eigen::VectorXs realF_cDeltaV = Minv * A_c_ub_E * realImpulses;
+  Eigen::VectorXs postSolveV = preSolveV + f_cDeltaV;
 
   /*
   std::cout << "Real f_c delta V:" << std::endl << realF_cDeltaV << std::endl;
@@ -1901,13 +1900,13 @@ bool verifyNextV(WorldPtr world)
 
   // VelocityTest originalTest = runVelocityTest(world);
 
-  Eigen::VectorXd forces = world->getExternalForces();
+  Eigen::VectorXs forces = world->getExternalForces();
 
-  const double EPSILON = 1e-6;
+  const s_t EPSILON = 1e-6;
 
   for (std::size_t i = 0; i < world->getNumDofs(); i++)
   {
-    Eigen::VectorXd tweakedForce = Eigen::VectorXd(forces);
+    Eigen::VectorXs tweakedForce = Eigen::VectorXs(forces);
     tweakedForce(i) -= EPSILON;
 
     // snapshot.restore();
@@ -1977,12 +1976,12 @@ bool verifyScratch(WorldPtr world, WithRespectTo* wrt)
 {
   neural::BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
 
-  MatrixXd analytical = classicPtr->getScratchAnalytical(world, wrt);
-  MatrixXd bruteForce = classicPtr->getScratchFiniteDifference(world, wrt);
+  MatrixXs analytical = classicPtr->getScratchAnalytical(world, wrt);
+  MatrixXs bruteForce = classicPtr->getScratchFiniteDifference(world, wrt);
 
   /*
-  MatrixXd posVelAnalytical = classicPtr->getPosVelJacobian(world);
-  MatrixXd posVelFd = classicPtr->finiteDifferencePosVelJacobian(world);
+  MatrixXs posVelAnalytical = classicPtr->getPosVelJacobian(world);
+  MatrixXs posVelFd = classicPtr->finiteDifferencePosVelJacobian(world);
   */
   if (!equals(world->getPositions(), classicPtr->getPreStepPosition()))
   {
@@ -2018,24 +2017,24 @@ bool verifyScratch(WorldPtr world, WithRespectTo* wrt)
   return true;
 }
 
-Eigen::Vector6d getLinearScratchScrew()
+Eigen::Vector6s getLinearScratchScrew()
 {
-  Eigen::Vector6d linearScratchScrew;
+  Eigen::Vector6s linearScratchScrew;
   linearScratchScrew << 0.1, 0.2, 0.3, 0.4, 0.5, 0.6;
   return linearScratchScrew;
 }
 
-Eigen::Vector6d getLinearScratchForce()
+Eigen::Vector6s getLinearScratchForce()
 {
-  Eigen::Vector6d linearScratchForce;
+  Eigen::Vector6s linearScratchForce;
   linearScratchForce << 0.1, 0.2, 0.3, 0.4, 0.5, 0.6;
   return linearScratchForce;
 }
 
-double linearScratch(double input)
+s_t linearScratch(s_t input)
 {
-  Eigen::Isometry3d transform = math::expMap(getLinearScratchScrew() * input);
-  Eigen::Vector6d forceInFrame
+  Eigen::Isometry3s transform = math::expMap(getLinearScratchScrew() * input);
+  Eigen::Vector6s forceInFrame
       = math::dAdInvT(transform, getLinearScratchForce());
   std::cout << "Force in frame: " << std::endl << forceInFrame << std::endl;
   std::cout << "screw: " << std::endl << getLinearScratchScrew() << std::endl;
@@ -2044,23 +2043,23 @@ double linearScratch(double input)
   return forceInFrame.dot(getLinearScratchScrew());
 }
 
-double bruteForceLinearScratch(double startingPoint)
+s_t bruteForceLinearScratch(s_t startingPoint)
 {
-  const double EPS = 1e-6;
+  const s_t EPS = 1e-6;
   return (linearScratch(startingPoint + EPS) - linearScratch(startingPoint))
          / EPS;
 }
 
-double analyticalLinearScratch(double /* point */)
+s_t analyticalLinearScratch(s_t /* point */)
 {
   return 1.0;
 }
 
 bool verifyLinearScratch()
 {
-  double point = 0.76;
-  double bruteForce = bruteForceLinearScratch(point);
-  double analytical = analyticalLinearScratch(point);
+  s_t point = 0.76;
+  s_t bruteForce = bruteForceLinearScratch(point);
+  s_t analytical = analyticalLinearScratch(point);
   if (abs(bruteForce - analytical) > 1e-12)
   {
     std::cout << "Brute force linear scratch:" << std::endl
@@ -2074,23 +2073,23 @@ bool verifyLinearScratch()
 }
 
 bool verifyJacobianOfProjectionIntoClampsMatrix(
-    WorldPtr world, VectorXd proposedVelocities, WithRespectTo* wrt)
+    WorldPtr world, VectorXs proposedVelocities, WithRespectTo* wrt)
 {
   world->setVelocities(proposedVelocities);
 
   neural::BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
 
-  MatrixXd analytical = classicPtr->getJacobianOfProjectionIntoClampsMatrix(
+  MatrixXs analytical = classicPtr->getJacobianOfProjectionIntoClampsMatrix(
       world, proposedVelocities * 10, wrt);
-  MatrixXd bruteForce
+  MatrixXs bruteForce
       = classicPtr->finiteDifferenceJacobianOfProjectionIntoClampsMatrix(
           world, proposedVelocities * 10, wrt);
 
   // These individual values can be quite large, on the order of 1e+4, so we
   // normalize by size before checking for error, because 1e-8 on a 1e+4 value
   // (12 digits of precision) may be unattainable
-  MatrixXd zero = MatrixXd::Zero(analytical.rows(), analytical.cols());
-  MatrixXd normalizedDiff
+  MatrixXs zero = MatrixXs::Zero(analytical.rows(), analytical.cols());
+  MatrixXs normalizedDiff
       = (analytical - bruteForce) / (0.001 + analytical.norm());
 
   if (!equals(normalizedDiff, zero, 1e-8))
@@ -2110,15 +2109,15 @@ bool verifyJacobianOfProjectionIntoClampsMatrix(
 
 bool verifyJointVelocityJacobians(WorldPtr world)
 {
-  double threshold = 1e-9;
+  s_t threshold = 1e-9;
   for (int i = 0; i < world->getNumSkeletons(); i++)
   {
     auto skel = world->getSkeleton(i);
     for (int j = 0; j < skel->getNumJoints(); j++)
     {
-      Eigen::MatrixXd fd
+      Eigen::MatrixXs fd
           = skel->getJoint(i)->finiteDifferenceRelativeJacobian();
-      Eigen::MatrixXd analytical = skel->getJoint(i)->getRelativeJacobian();
+      Eigen::MatrixXs analytical = skel->getJoint(i)->getRelativeJacobian();
       if (!equals(fd, analytical, threshold))
       {
         std::cout << "Velocity jacabians disagree on skeleton \""
@@ -2135,16 +2134,16 @@ bool verifyJointVelocityJacobians(WorldPtr world)
 
 bool verifyJointPositionJacobians(WorldPtr world)
 {
-  double threshold = 1e-9;
+  s_t threshold = 1e-9;
   for (int i = 0; i < world->getNumSkeletons(); i++)
   {
     auto skel = world->getSkeleton(i);
     for (int j = 0; j < skel->getNumJoints(); j++)
     {
-      Eigen::MatrixXd fd
+      Eigen::MatrixXs fd
           = skel->getJoint(i)
                 ->finiteDifferenceRelativeJacobianInPositionSpace();
-      Eigen::MatrixXd analytical
+      Eigen::MatrixXs analytical
           = skel->getJoint(i)->getRelativeJacobianInPositionSpace();
       if (!equals(fd, analytical, threshold))
       {
@@ -2177,12 +2176,12 @@ bool verifyFeatherstoneJacobians(WorldPtr world)
     {
       skel->getBodyNode(j)->debugJacobianOfCBackward(WithRespectTo::POSITION);
     }
-    Eigen::VectorXd x = Eigen::VectorXd::Random(skel->getNumDofs());
+    Eigen::VectorXs x = Eigen::VectorXs::Random(skel->getNumDofs());
     for (int j = 0; j < skel->getNumBodyNodes(); j++)
     {
       skel->getBodyNode(j)->debugJacobianOfMForward(WithRespectTo::POSITION, x);
     }
-    Eigen::MatrixXd MinvX
+    Eigen::MatrixXs MinvX
         = skel->finiteDifferenceJacobianOfM(x, WithRespectTo::POSITION);
     for (int j = skel->getNumBodyNodes() - 1; j >= 0; j--)
     {
@@ -2193,7 +2192,7 @@ bool verifyFeatherstoneJacobians(WorldPtr world)
   return true;
 }
 
-bool verifyPosVelJacobian(WorldPtr world, VectorXd proposedVelocities)
+bool verifyPosVelJacobian(WorldPtr world, VectorXs proposedVelocities)
 {
   world->setVelocities(proposedVelocities);
 
@@ -2207,8 +2206,8 @@ bool verifyPosVelJacobian(WorldPtr world, VectorXd proposedVelocities)
     return false;
   }
 
-  MatrixXd analytical = classicPtr->getPosVelJacobian(world);
-  MatrixXd bruteForce = classicPtr->finiteDifferencePosVelJacobian(world);
+  MatrixXs analytical = classicPtr->getPosVelJacobian(world);
+  MatrixXs bruteForce = classicPtr->finiteDifferencePosVelJacobian(world);
 
   // Everything except Atlas passes this in 1e-8, but atlas runs closer to
   // 6e-8 max error. I'm going to cheerfully assume that this is just due to
@@ -2230,7 +2229,7 @@ bool verifyPosVelJacobian(WorldPtr world, VectorXd proposedVelocities)
   return true;
 }
 
-bool verifyForceVelJacobian(WorldPtr world, VectorXd proposedVelocities)
+bool verifyForceVelJacobian(WorldPtr world, VectorXs proposedVelocities)
 {
   world->setVelocities(proposedVelocities);
   neural::BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
@@ -2248,8 +2247,8 @@ bool verifyForceVelJacobian(WorldPtr world, VectorXd proposedVelocities)
               << std::endl;
   }
 
-  MatrixXd analytical = classicPtr->getForceVelJacobian(world);
-  MatrixXd bruteForce = classicPtr->finiteDifferenceForceVelJacobian(world);
+  MatrixXs analytical = classicPtr->getForceVelJacobian(world);
+  MatrixXs bruteForce = classicPtr->finiteDifferenceForceVelJacobian(world);
 
   // Atlas runs at 1.5e-8 error
   if (!equals(analytical, bruteForce, 1e-8))
@@ -2269,7 +2268,7 @@ bool verifyForceVelJacobian(WorldPtr world, VectorXd proposedVelocities)
   return true;
 }
 
-bool verifyRecoveredLCPConstraints(WorldPtr world, VectorXd proposedVelocities)
+bool verifyRecoveredLCPConstraints(WorldPtr world, VectorXs proposedVelocities)
 {
   world->setVelocities(proposedVelocities);
   bool oldPenetrationCorrection = world->getPenetrationCorrectionEnabled();
@@ -2282,20 +2281,20 @@ bool verifyRecoveredLCPConstraints(WorldPtr world, VectorXd proposedVelocities)
   if (classicPtr->mGradientMatrices.size() > 1)
     return true;
 
-  MatrixXd A_c = classicPtr->getClampingConstraintMatrix(world);
-  MatrixXd A_ub = classicPtr->getUpperBoundConstraintMatrix(world);
-  MatrixXd E = classicPtr->getUpperBoundMappingMatrix();
+  MatrixXs A_c = classicPtr->getClampingConstraintMatrix(world);
+  MatrixXs A_ub = classicPtr->getUpperBoundConstraintMatrix(world);
+  MatrixXs E = classicPtr->getUpperBoundMappingMatrix();
 
   if (A_c.cols() == 0)
     return true;
 
-  MatrixXd Q = Eigen::MatrixXd::Zero(A_c.cols(), A_c.cols());
+  MatrixXs Q = Eigen::MatrixXs::Zero(A_c.cols(), A_c.cols());
   classicPtr->computeLCPConstraintMatrixClampingSubset(world, Q, A_c, A_ub, E);
-  Eigen::MatrixXd realQ = classicPtr->getClampingAMatrix();
+  Eigen::MatrixXs realQ = classicPtr->getClampingAMatrix();
 
-  Eigen::VectorXd b = Eigen::VectorXd::Zero(A_c.cols());
+  Eigen::VectorXs b = Eigen::VectorXs::Zero(A_c.cols());
   classicPtr->computeLCPOffsetClampingSubset(world, b, A_c);
-  Eigen::VectorXd realB = classicPtr->getClampingConstraintRelativeVels();
+  Eigen::VectorXs realB = classicPtr->getClampingConstraintRelativeVels();
   /* + (A_c.completeOrthogonalDecomposition().solve(
       classicPtr->getVelocityDueToIllegalImpulses())); */
 
@@ -2325,9 +2324,9 @@ bool verifyRecoveredLCPConstraints(WorldPtr world, VectorXd proposedVelocities)
     }
   }
 
-  Eigen::VectorXd realX = classicPtr->getClampingConstraintImpulses();
+  Eigen::VectorXs realX = classicPtr->getClampingConstraintImpulses();
   // Q can be low rank, so we center the solution on "realX"
-  Eigen::VectorXd X
+  Eigen::VectorXs X
       = Q.completeOrthogonalDecomposition().solve(b - Q * realX) + realX;
 
   // If we make it this far, it's possible for our computed X to have errors
@@ -2345,7 +2344,7 @@ bool verifyRecoveredLCPConstraints(WorldPtr world, VectorXd proposedVelocities)
   return true;
 }
 
-bool verifyVelGradients(WorldPtr world, VectorXd worldVel)
+bool verifyVelGradients(WorldPtr world, VectorXs worldVel)
 {
   // return verifyScratch(world, WithRespectTo::VELOCITY);
   // return verifyConstraintForceJac(world);
@@ -2373,7 +2372,7 @@ bool verifyVelGradients(WorldPtr world, VectorXd worldVel)
 }
 
 bool verifyPosPosJacobianApproximation(
-    WorldPtr world, std::size_t subdivisions, double tolerance)
+    WorldPtr world, std::size_t subdivisions, s_t tolerance)
 {
   neural::BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
 
@@ -2385,8 +2384,8 @@ bool verifyPosPosJacobianApproximation(
     return false;
   }
 
-  MatrixXd analytical = classicPtr->getPosPosJacobian(world);
-  MatrixXd bruteForce
+  MatrixXs analytical = classicPtr->getPosPosJacobian(world);
+  MatrixXs bruteForce
       = classicPtr->finiteDifferencePosPosJacobian(world, subdivisions);
 
   if (!equals(analytical, bruteForce, tolerance))
@@ -2401,7 +2400,7 @@ bool verifyPosPosJacobianApproximation(
 }
 
 bool verifyVelPosJacobianApproximation(
-    WorldPtr world, std::size_t subdivisions, double tolerance)
+    WorldPtr world, std::size_t subdivisions, s_t tolerance)
 {
   neural::BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
 
@@ -2413,8 +2412,8 @@ bool verifyVelPosJacobianApproximation(
     return false;
   }
 
-  MatrixXd analytical = classicPtr->getVelPosJacobian(world);
-  MatrixXd bruteForce
+  MatrixXs analytical = classicPtr->getVelPosJacobian(world);
+  MatrixXs bruteForce
       = classicPtr->finiteDifferenceVelPosJacobian(world, subdivisions);
 
   if (!equals(analytical, bruteForce, tolerance))
@@ -2428,8 +2427,7 @@ bool verifyVelPosJacobianApproximation(
   return true;
 }
 
-bool verifyPosGradients(
-    WorldPtr world, std::size_t subdivisions, double tolerance)
+bool verifyPosGradients(WorldPtr world, std::size_t subdivisions, s_t tolerance)
 {
   return (
       verifyPosPosJacobianApproximation(world, subdivisions, tolerance)
@@ -2452,8 +2450,8 @@ bool verifyConstraintGroupSubJacobians(
     std::shared_ptr<ConstrainedGroupGradientMatrices> group
         = classicPtr->mGradientMatrices[0];
 
-    Eigen::MatrixXd groupPosPos = group->getPosPosJacobian(world);
-    Eigen::MatrixXd worldPosPos = classicPtr->getPosPosJacobian(world);
+    Eigen::MatrixXs groupPosPos = group->getPosPosJacobian(world);
+    Eigen::MatrixXs worldPosPos = classicPtr->getPosPosJacobian(world);
     if (!equals(groupPosPos, worldPosPos, 0))
     {
       std::cout << "ConstrainedGroupGradientMatrices and BackpropSnapshotPtr "
@@ -2466,8 +2464,8 @@ bool verifyConstraintGroupSubJacobians(
       return false;
     }
 
-    Eigen::MatrixXd groupVelPos = group->getVelPosJacobian(world);
-    Eigen::MatrixXd worldVelPos = classicPtr->getVelPosJacobian(world);
+    Eigen::MatrixXs groupVelPos = group->getVelPosJacobian(world);
+    Eigen::MatrixXs worldVelPos = classicPtr->getVelPosJacobian(world);
     if (!equals(groupVelPos, worldVelPos, 1e-10))
     {
       std::cout << "ConstrainedGroupGradientMatrices and BackpropSnapshotPtr "
@@ -2480,8 +2478,8 @@ bool verifyConstraintGroupSubJacobians(
       return false;
     }
 
-    Eigen::MatrixXd groupPosVel = group->getPosVelJacobian(world);
-    Eigen::MatrixXd worldPosVel = classicPtr->getPosVelJacobian(world);
+    Eigen::MatrixXs groupPosVel = group->getPosVelJacobian(world);
+    Eigen::MatrixXs worldPosVel = classicPtr->getPosVelJacobian(world);
     if (!equals(groupPosVel, worldPosVel, 0))
     {
       std::cout << "ConstrainedGroupGradientMatrices and BackpropSnapshotPtr "
@@ -2495,31 +2493,31 @@ bool verifyConstraintGroupSubJacobians(
                 << worldPosVel - groupPosVel << std::endl;
 
       // Find the constrained group variables
-      const Eigen::MatrixXd& groupA_c = group->getClampingConstraintMatrix();
-      const Eigen::MatrixXd& groupA_ub = group->getUpperBoundConstraintMatrix();
-      const Eigen::MatrixXd& groupE = group->getUpperBoundMappingMatrix();
-      Eigen::MatrixXd groupA_c_ub_E = groupA_c + groupA_ub * groupE;
-      Eigen::VectorXd groupTau = group->mPreStepTorques;
-      Eigen::VectorXd groupC
+      const Eigen::MatrixXs& groupA_c = group->getClampingConstraintMatrix();
+      const Eigen::MatrixXs& groupA_ub = group->getUpperBoundConstraintMatrix();
+      const Eigen::MatrixXs& groupE = group->getUpperBoundMappingMatrix();
+      Eigen::MatrixXs groupA_c_ub_E = groupA_c + groupA_ub * groupE;
+      Eigen::VectorXs groupTau = group->mPreStepTorques;
+      Eigen::VectorXs groupC
           = group->getCoriolisAndGravityAndExternalForces(world);
-      const Eigen::VectorXd& groupF_c = group->getClampingConstraintImpulses();
-      double dt = world->getTimeStep();
-      Eigen::MatrixXd group_dM = group->getJacobianOfMinv(
+      const Eigen::VectorXs& groupF_c = group->getClampingConstraintImpulses();
+      s_t dt = world->getTimeStep();
+      Eigen::MatrixXs group_dM = group->getJacobianOfMinv(
           world,
           dt * (groupTau - groupC) + groupA_c_ub_E * groupF_c,
           WithRespectTo::POSITION);
       // Do the same thing with the backprop snapshot
-      const Eigen::MatrixXd& worldA_c
+      const Eigen::MatrixXs& worldA_c
           = classicPtr->getClampingConstraintMatrix(world);
-      const Eigen::MatrixXd& worldA_ub
+      const Eigen::MatrixXs& worldA_ub
           = classicPtr->getUpperBoundConstraintMatrix(world);
-      const Eigen::MatrixXd& worldE = classicPtr->getUpperBoundMappingMatrix();
-      Eigen::MatrixXd worldA_c_ub_E = worldA_c + worldA_ub * worldE;
-      Eigen::VectorXd worldTau = classicPtr->getPreStepTorques();
-      Eigen::VectorXd worldC = world->getCoriolisAndGravityAndExternalForces();
-      const Eigen::VectorXd& worldF_c
+      const Eigen::MatrixXs& worldE = classicPtr->getUpperBoundMappingMatrix();
+      Eigen::MatrixXs worldA_c_ub_E = worldA_c + worldA_ub * worldE;
+      Eigen::VectorXs worldTau = classicPtr->getPreStepTorques();
+      Eigen::VectorXs worldC = world->getCoriolisAndGravityAndExternalForces();
+      const Eigen::VectorXs& worldF_c
           = classicPtr->getClampingConstraintImpulses();
-      Eigen::MatrixXd world_dM = classicPtr->getJacobianOfMinv(
+      Eigen::MatrixXs world_dM = classicPtr->getJacobianOfMinv(
           world,
           dt * (worldTau - worldC) + worldA_c_ub_E * worldF_c,
           WithRespectTo::POSITION);
@@ -2532,9 +2530,9 @@ bool verifyConstraintGroupSubJacobians(
       std::cout << "Group f_c: " << std::endl << groupF_c << std::endl;
       std::cout << "Diff: " << std::endl << worldF_c - groupF_c << std::endl;
 
-      Eigen::MatrixXd group_dA_c
+      Eigen::MatrixXs group_dA_c
           = group->getJacobianOfClampingConstraints(world, groupF_c);
-      Eigen::MatrixXd world_dA_c
+      Eigen::MatrixXs world_dA_c
           = classicPtr->getJacobianOfClampingConstraints(world, worldF_c);
 
       std::cout << "World dA_c: " << std::endl << world_dA_c << std::endl;
@@ -2542,9 +2540,9 @@ bool verifyConstraintGroupSubJacobians(
       std::cout << "Diff: " << std::endl
                 << world_dA_c - group_dA_c << std::endl;
 
-      Eigen::MatrixXd group_dF_c
+      Eigen::MatrixXs group_dF_c
           = group->getJacobianOfConstraintForce(world, WithRespectTo::POSITION);
-      Eigen::MatrixXd world_dF_c = classicPtr->getJacobianOfConstraintForce(
+      Eigen::MatrixXs world_dF_c = classicPtr->getJacobianOfConstraintForce(
           world, WithRespectTo::POSITION);
 
       std::cout << "World dF_c: " << std::endl << world_dF_c << std::endl;
@@ -2552,13 +2550,13 @@ bool verifyConstraintGroupSubJacobians(
       std::cout << "Diff: " << std::endl
                 << world_dF_c - group_dF_c << std::endl;
 
-      Eigen::VectorXd group_b = group->getClampingConstraintRelativeVels();
-      Eigen::MatrixXd group_dQ_b
+      Eigen::VectorXs group_b = group->getClampingConstraintRelativeVels();
+      Eigen::MatrixXs group_dQ_b
           = group->getJacobianOfLCPConstraintMatrixClampingSubset(
               world, group_b, WithRespectTo::POSITION);
 
-      Eigen::VectorXd world_b = classicPtr->getClampingConstraintRelativeVels();
-      Eigen::MatrixXd world_dQ_b
+      Eigen::VectorXs world_b = classicPtr->getClampingConstraintRelativeVels();
+      Eigen::MatrixXs world_dQ_b
           = classicPtr->getJacobianOfLCPConstraintMatrixClampingSubset(
               world, world_b, WithRespectTo::POSITION);
 
@@ -2571,9 +2569,9 @@ bool verifyConstraintGroupSubJacobians(
       std::cout << "Diff: " << std::endl
                 << world_dQ_b - group_dQ_b << std::endl;
 
-      Eigen::MatrixXd group_dB = group->getJacobianOfLCPOffsetClampingSubset(
+      Eigen::MatrixXs group_dB = group->getJacobianOfLCPOffsetClampingSubset(
           world, WithRespectTo::POSITION);
-      Eigen::MatrixXd world_dB
+      Eigen::MatrixXs world_dB
           = classicPtr->getJacobianOfLCPOffsetClampingSubset(
               world, WithRespectTo::POSITION);
 
@@ -2581,9 +2579,9 @@ bool verifyConstraintGroupSubJacobians(
       std::cout << "Group dB: " << std::endl << group_dB << std::endl;
       std::cout << "Diff: " << std::endl << world_dB - group_dB << std::endl;
 
-      Eigen::MatrixXd group_posC
+      Eigen::MatrixXs group_posC
           = group->getJacobianOfC(world, WithRespectTo::POSITION);
-      Eigen::MatrixXd world_posC
+      Eigen::MatrixXs world_posC
           = classicPtr->getJacobianOfC(world, WithRespectTo::POSITION);
 
       std::cout << "World pos-C: " << std::endl << world_posC << std::endl;
@@ -2594,8 +2592,8 @@ bool verifyConstraintGroupSubJacobians(
       return false;
     }
 
-    Eigen::MatrixXd groupVelVel = group->getVelVelJacobian(world);
-    Eigen::MatrixXd worldVelVel = classicPtr->getVelVelJacobian(world);
+    Eigen::MatrixXs groupVelVel = group->getVelVelJacobian(world);
+    Eigen::MatrixXs worldVelVel = classicPtr->getVelVelJacobian(world);
     if (!equals(groupVelVel, worldVelVel, 0))
     {
       std::cout << "ConstrainedGroupGradientMatrices and BackpropSnapshotPtr "
@@ -2611,8 +2609,8 @@ bool verifyConstraintGroupSubJacobians(
       return false;
     }
 
-    Eigen::MatrixXd groupForceVel = group->getForceVelJacobian(world);
-    Eigen::MatrixXd worldForceVel = classicPtr->getForceVelJacobian(world);
+    Eigen::MatrixXs groupForceVel = group->getForceVelJacobian(world);
+    Eigen::MatrixXs worldForceVel = classicPtr->getForceVelJacobian(world);
     if (!equals(groupForceVel, worldForceVel, 0))
     {
       std::cout << "ConstrainedGroupGradientMatrices and BackpropSnapshotPtr "
@@ -2637,7 +2635,7 @@ bool verifyConstraintGroupSubJacobians(
 bool verifyAnalyticalBackpropInstance(
     WorldPtr world,
     const neural::BackpropSnapshotPtr& classicPtr,
-    const VectorXd& phaseSpace)
+    const VectorXs& phaseSpace)
 {
   LossGradient nextTimeStep;
   nextTimeStep.lossWrtPosition = phaseSpace.segment(0, phaseSpace.size() / 2);
@@ -2666,7 +2664,7 @@ bool verifyAnalyticalBackpropInstance(
   // Compute "brute force" backprop using full Jacobians
 
   // p_t
-  VectorXd lossWrtThisPosition =
+  VectorXs lossWrtThisPosition =
       // p_t --> p_t+1
       (classicPtr->getPosPosJacobian(world).transpose()
        * nextTimeStep.lossWrtPosition)
@@ -2675,7 +2673,7 @@ bool verifyAnalyticalBackpropInstance(
          * nextTimeStep.lossWrtVelocity);
 
   // v_t
-  VectorXd lossWrtThisVelocity =
+  VectorXs lossWrtThisVelocity =
       // v_t --> v_t+1
       (classicPtr->getVelVelJacobian(world).transpose()
        * nextTimeStep.lossWrtVelocity)
@@ -2684,22 +2682,22 @@ bool verifyAnalyticalBackpropInstance(
          * nextTimeStep.lossWrtPosition);
 
   // f_t
-  VectorXd lossWrtThisTorque =
+  VectorXs lossWrtThisTorque =
       // f_t --> v_t+1
       classicPtr->getForceVelJacobian(world).transpose()
       * nextTimeStep.lossWrtVelocity;
 
   // Trim gradients to the box constraints
 
-  Eigen::VectorXd pos = world->getPositions();
-  Eigen::VectorXd posUpperLimits = world->getPositionUpperLimits();
-  Eigen::VectorXd posLowerLimits = world->getPositionLowerLimits();
-  Eigen::VectorXd vels = world->getVelocities();
-  Eigen::VectorXd velUpperLimits = world->getVelocityUpperLimits();
-  Eigen::VectorXd velLowerLimits = world->getVelocityLowerLimits();
-  Eigen::VectorXd forces = world->getExternalForces();
-  Eigen::VectorXd forceUpperLimits = world->getExternalForceUpperLimits();
-  Eigen::VectorXd forceLowerLimits = world->getExternalForceLowerLimits();
+  Eigen::VectorXs pos = world->getPositions();
+  Eigen::VectorXs posUpperLimits = world->getPositionUpperLimits();
+  Eigen::VectorXs posLowerLimits = world->getPositionLowerLimits();
+  Eigen::VectorXs vels = world->getVelocities();
+  Eigen::VectorXs velUpperLimits = world->getVelocityUpperLimits();
+  Eigen::VectorXs velLowerLimits = world->getVelocityLowerLimits();
+  Eigen::VectorXs forces = world->getExternalForces();
+  Eigen::VectorXs forceUpperLimits = world->getExternalForceUpperLimits();
+  Eigen::VectorXs forceLowerLimits = world->getExternalForceLowerLimits();
   for (int i = 0; i < world->getNumDofs(); i++)
   {
     // Clip position gradients
@@ -2766,20 +2764,20 @@ bool verifyAnalyticalBackpropInstance(
     {
       std::cout << "-----" << std::endl;
 
-      Eigen::MatrixXd velVelJac = classicPtr->getVelVelJacobian(world);
+      Eigen::MatrixXs velVelJac = classicPtr->getVelVelJacobian(world);
 
-      Eigen::MatrixXd A_c = classicPtr->getClampingConstraintMatrix(world);
-      Eigen::MatrixXd A_ub = classicPtr->getUpperBoundConstraintMatrix(world);
-      Eigen::MatrixXd V_c
+      Eigen::MatrixXs A_c = classicPtr->getClampingConstraintMatrix(world);
+      Eigen::MatrixXs A_ub = classicPtr->getUpperBoundConstraintMatrix(world);
+      Eigen::MatrixXs V_c
           = classicPtr->getMassedClampingConstraintMatrix(world);
-      Eigen::MatrixXd V_ub
+      Eigen::MatrixXs V_ub
           = classicPtr->getMassedUpperBoundConstraintMatrix(world);
-      Eigen::MatrixXd B = classicPtr->getBounceDiagonals().asDiagonal();
-      Eigen::MatrixXd E = classicPtr->getUpperBoundMappingMatrix();
-      Eigen::MatrixXd P_c = classicPtr->getProjectionIntoClampsMatrix(world);
-      Eigen::MatrixXd Minv = classicPtr->getInvMassMatrix(world);
-      Eigen::MatrixXd parts1 = A_c + A_ub * E;
-      Eigen::MatrixXd parts2 = world->getTimeStep() * Minv * parts1 * P_c;
+      Eigen::MatrixXs B = classicPtr->getBounceDiagonals().asDiagonal();
+      Eigen::MatrixXs E = classicPtr->getUpperBoundMappingMatrix();
+      Eigen::MatrixXs P_c = classicPtr->getProjectionIntoClampsMatrix(world);
+      Eigen::MatrixXs Minv = classicPtr->getInvMassMatrix(world);
+      Eigen::MatrixXs parts1 = A_c + A_ub * E;
+      Eigen::MatrixXs parts2 = world->getTimeStep() * Minv * parts1 * P_c;
 
       std::cout << "Brute force A_c*z:" << std::endl
                 << parts2.transpose() * nextTimeStep.lossWrtVelocity
@@ -2787,16 +2785,16 @@ bool verifyAnalyticalBackpropInstance(
 
       // Classic formulation
 
-      Eigen::MatrixXd classicInnerPart
+      Eigen::MatrixXs classicInnerPart
           = A_c.transpose().eval() * Minv * (A_c + A_ub * E);
       if (classicInnerPart.size() > 0)
       {
-        Eigen::MatrixXd classicInnerPartInv
+        Eigen::MatrixXs classicInnerPartInv
             = classicInnerPart.completeOrthogonalDecomposition()
                   .pseudoInverse();
-        Eigen::MatrixXd classicRightPart = B * A_c.transpose().eval();
-        Eigen::MatrixXd classicLeftPart = Minv * (A_c + A_ub * E);
-        Eigen::MatrixXd classicComplete
+        Eigen::MatrixXs classicRightPart = B * A_c.transpose().eval();
+        Eigen::MatrixXs classicLeftPart = Minv * (A_c + A_ub * E);
+        Eigen::MatrixXs classicComplete
             = classicLeftPart * classicInnerPart * classicRightPart;
 
         std::cout << "Classic brute force A_c*z:" << std::endl
@@ -2805,13 +2803,13 @@ bool verifyAnalyticalBackpropInstance(
 
         // Massed formulation
 
-        Eigen::MatrixXd massedInnerPart
+        Eigen::MatrixXs massedInnerPart
             = A_c.transpose().eval() * (V_c + V_ub * E);
-        Eigen::MatrixXd massedInnerPartInv
+        Eigen::MatrixXs massedInnerPartInv
             = massedInnerPart.completeOrthogonalDecomposition().pseudoInverse();
-        Eigen::MatrixXd massedRightPart = B * A_c.transpose().eval();
-        Eigen::MatrixXd massedLeftPart = V_c + V_ub * E;
-        Eigen::MatrixXd massedComplete
+        Eigen::MatrixXs massedRightPart = B * A_c.transpose().eval();
+        Eigen::MatrixXs massedLeftPart = V_c + V_ub * E;
+        Eigen::MatrixXs massedComplete
             = massedLeftPart * massedInnerPart * massedRightPart;
 
         std::cout << "Massed brute force A_c*z:" << std::endl
@@ -2851,7 +2849,7 @@ bool verifyAnalyticalBackpropInstance(
                     << massedRightPart << std::endl;
         }
       }
-      Eigen::MatrixXd V_c_recovered = Minv * A_c;
+      Eigen::MatrixXs V_c_recovered = Minv * A_c;
       if (!equals(V_c_recovered, V_c, 1e-8))
       {
         std::cout << "Mismatch at V_c == Minv * A_c!" << std::endl;
@@ -2860,7 +2858,7 @@ bool verifyAnalyticalBackpropInstance(
         std::cout << "Minv:" << std::endl << Minv << std::endl;
         std::cout << "Minv * A_c:" << std::endl << V_c_recovered << std::endl;
       }
-      Eigen::MatrixXd V_ub_recovered = Minv * A_ub;
+      Eigen::MatrixXs V_ub_recovered = Minv * A_ub;
       if (!equals(V_ub_recovered, V_ub, 1e-8))
       {
         std::cout << "Mismatch at V_ub == Minv * A_ub!" << std::endl;
@@ -2953,7 +2951,7 @@ bool verifyAnalyticalBackprop(WorldPtr world)
   if (!verifyConstraintGroupSubJacobians(world, classicPtr))
     return false;
 
-  VectorXd phaseSpace = VectorXd::Zero(world->getNumDofs() * 2);
+  VectorXs phaseSpace = VectorXs::Zero(world->getNumDofs() * 2);
 
   // Test a "1" in each dimension of the phase space separately
   for (int i = (world->getNumDofs() * 2) - 1; i >= 0; i--)
@@ -2966,12 +2964,12 @@ bool verifyAnalyticalBackprop(WorldPtr world)
   }
 
   // Test all "0"s
-  phaseSpace = VectorXd::Zero(world->getNumDofs() * 2);
+  phaseSpace = VectorXs::Zero(world->getNumDofs() * 2);
   if (!verifyAnalyticalBackpropInstance(world, classicPtr, phaseSpace))
     return false;
 
   // Test all "1"s
-  phaseSpace = VectorXd::Ones(world->getNumDofs() * 2);
+  phaseSpace = VectorXs::Ones(world->getNumDofs() * 2);
   if (!verifyAnalyticalBackpropInstance(world, classicPtr, phaseSpace))
     return false;
 
@@ -2979,30 +2977,30 @@ bool verifyAnalyticalBackprop(WorldPtr world)
 }
 
 LossGradient computeBruteForceGradient(
-    WorldPtr world, std::size_t timesteps, std::function<double(WorldPtr)> loss)
+    WorldPtr world, std::size_t timesteps, std::function<s_t(WorldPtr)> loss)
 {
   RestorableSnapshot snapshot(world);
 
   std::size_t n = world->getNumDofs();
   LossGradient grad;
-  grad.lossWrtPosition = Eigen::VectorXd(n);
-  grad.lossWrtVelocity = Eigen::VectorXd(n);
-  grad.lossWrtTorque = Eigen::VectorXd(n);
+  grad.lossWrtPosition = Eigen::VectorXs(n);
+  grad.lossWrtVelocity = Eigen::VectorXs(n);
+  grad.lossWrtTorque = Eigen::VectorXs(n);
 
   for (std::size_t k = 0; k < timesteps; k++)
     world->step();
-  double defaultLoss = loss(world);
+  s_t defaultLoss = loss(world);
   snapshot.restore();
 
-  Eigen::VectorXd originalPos = world->getPositions();
-  Eigen::VectorXd originalVel = world->getVelocities();
-  Eigen::VectorXd originalForce = world->getExternalForces();
+  Eigen::VectorXs originalPos = world->getPositions();
+  Eigen::VectorXs originalVel = world->getVelocities();
+  Eigen::VectorXs originalForce = world->getExternalForces();
 
-  double EPSILON = 1e-7;
+  s_t EPSILON = 1e-7;
 
   for (std::size_t i = 0; i < n; i++)
   {
-    Eigen::VectorXd tweakedPos = originalPos;
+    Eigen::VectorXs tweakedPos = originalPos;
     tweakedPos(i) += EPSILON;
 
     snapshot.restore();
@@ -3011,7 +3009,7 @@ LossGradient computeBruteForceGradient(
       world->step(true);
     grad.lossWrtPosition(i) = (loss(world) - defaultLoss) / EPSILON;
 
-    Eigen::VectorXd tweakedVel = originalVel;
+    Eigen::VectorXs tweakedVel = originalVel;
     tweakedVel(i) += EPSILON;
 
     snapshot.restore();
@@ -3020,7 +3018,7 @@ LossGradient computeBruteForceGradient(
       world->step(true);
     grad.lossWrtVelocity(i) = (loss(world) - defaultLoss) / EPSILON;
 
-    Eigen::VectorXd tweakedForce = originalForce;
+    Eigen::VectorXs tweakedForce = originalForce;
     tweakedForce(i) += EPSILON;
 
     snapshot.restore();
@@ -3035,7 +3033,7 @@ LossGradient computeBruteForceGradient(
 }
 
 bool verifyGradientBackprop(
-    WorldPtr world, std::size_t timesteps, std::function<double(WorldPtr)> loss)
+    WorldPtr world, std::size_t timesteps, std::function<s_t(WorldPtr)> loss)
 {
   RestorableSnapshot snapshot(world);
 
@@ -3067,32 +3065,32 @@ bool verifyGradientBackprop(
         = computeBruteForceGradient(world, numSteps, loss);
 
     // p_t+1 <-- p_t
-    Eigen::MatrixXd posPos = backpropSnapshots[i]->getPosPosJacobian(world);
+    Eigen::MatrixXs posPos = backpropSnapshots[i]->getPosPosJacobian(world);
     // v_t+1 <-- p_t
-    Eigen::MatrixXd posVel = backpropSnapshots[i]->getPosVelJacobian(world);
+    Eigen::MatrixXs posVel = backpropSnapshots[i]->getPosVelJacobian(world);
     // p_t+1 <-- v_t
-    Eigen::MatrixXd velPos = backpropSnapshots[i]->getVelPosJacobian(world);
+    Eigen::MatrixXs velPos = backpropSnapshots[i]->getVelPosJacobian(world);
     // v_t+1 <-- v_t
-    Eigen::MatrixXd velVel = backpropSnapshots[i]->getVelVelJacobian(world);
+    Eigen::MatrixXs velVel = backpropSnapshots[i]->getVelVelJacobian(world);
 
     // p_t+1 <-- p_t
-    Eigen::MatrixXd posPosFD
+    Eigen::MatrixXs posPosFD
         = backpropSnapshots[i]->finiteDifferencePosPosJacobian(world, 1);
     // v_t+1 <-- p_t
-    Eigen::MatrixXd posVelFD
+    Eigen::MatrixXs posVelFD
         = backpropSnapshots[i]->finiteDifferencePosVelJacobian(world);
     // p_t+1 <-- v_t
-    Eigen::MatrixXd velPosFD
+    Eigen::MatrixXs velPosFD
         = backpropSnapshots[i]->finiteDifferenceVelPosJacobian(world, 1);
     // v_t+1 <-- v_t
-    Eigen::MatrixXd velVelFD
+    Eigen::MatrixXs velVelFD
         = backpropSnapshots[i]->finiteDifferenceVelVelJacobian(world);
 
     /*
-    double diffPosPos = (posPos - posPosFD).norm();
-    double diffPosVel = (posVel - posVelFD).norm();
-    double diffVelPos = (velPos - velPosFD).norm();
-    double diffVelVel = (velVel - velVelFD).norm();
+    s_t diffPosPos = (posPos - posPosFD).norm();
+    s_t diffPosVel = (posVel - posVelFD).norm();
+    s_t diffVelPos = (velPos - velPosFD).norm();
+    s_t diffVelVel = (velVel - velVelFD).norm();
     */
 
     /*
@@ -3180,20 +3178,20 @@ bool verifyGradientBackprop(
 }
 
 bool verifyWorldSpaceToVelocitySpatial(
-    WorldPtr world, Eigen::VectorXd position, Eigen::VectorXd velocity)
+    WorldPtr world, Eigen::VectorXs position, Eigen::VectorXs velocity)
 {
   // Verify that the velocity conversion works properly
   world->setPositions(position);
   world->setVelocities(velocity);
 
   std::vector<dynamics::BodyNode*> bodyNodes = world->getAllBodyNodes();
-  Eigen::MatrixXd worldVelMatrix = convertJointSpaceToWorldSpace(
+  Eigen::MatrixXs worldVelMatrix = convertJointSpaceToWorldSpace(
       world, velocity, bodyNodes, ConvertToSpace::VEL_SPATIAL, false);
   if (worldVelMatrix.cols() != 1)
     return false;
-  Eigen::VectorXd worldVel = worldVelMatrix.col(0);
+  Eigen::VectorXs worldVel = worldVelMatrix.col(0);
 
-  Eigen::VectorXd bruteWorldVel = Eigen::VectorXd::Zero(worldVel.size());
+  Eigen::VectorXs bruteWorldVel = Eigen::VectorXs::Zero(worldVel.size());
   std::size_t cursor = 0;
   for (std::size_t i = 0; i < world->getNumSkeletons(); i++)
   {
@@ -3203,10 +3201,10 @@ bool verifyWorldSpaceToVelocitySpatial(
     for (std::size_t k = 0; k < skel->getNumBodyNodes(); k++)
     {
       BodyNode* node = skel->getBodyNode(k);
-      Eigen::Vector6d bruteVel
+      Eigen::Vector6s bruteVel
           = math::AdR(node->getWorldTransform(), node->getSpatialVelocity());
       /*
-      Eigen::Vector6d analyticalVel = worldVel.segment(cursor, 6);
+      Eigen::Vector6s analyticalVel = worldVel.segment(cursor, 6);
       std::cout << "Body " << k << std::endl << bruteVel << std::endl;
       std::cout << "Analytical " << k << std::endl
                 << analyticalVel << std::endl;
@@ -3230,20 +3228,20 @@ bool verifyWorldSpaceToVelocitySpatial(
 }
 
 bool verifyWorldSpaceToLinearVelocity(
-    WorldPtr world, Eigen::VectorXd position, Eigen::VectorXd velocity)
+    WorldPtr world, Eigen::VectorXs position, Eigen::VectorXs velocity)
 {
   // Verify that the velocity conversion works properly
   world->setPositions(position);
   world->setVelocities(velocity);
 
   std::vector<dynamics::BodyNode*> bodyNodes = world->getAllBodyNodes();
-  Eigen::MatrixXd worldVelMatrix = convertJointSpaceToWorldSpace(
+  Eigen::MatrixXs worldVelMatrix = convertJointSpaceToWorldSpace(
       world, velocity, bodyNodes, ConvertToSpace::VEL_LINEAR, false);
   if (worldVelMatrix.cols() != 1)
     return false;
-  Eigen::VectorXd worldVel = worldVelMatrix.col(0);
+  Eigen::VectorXs worldVel = worldVelMatrix.col(0);
 
-  Eigen::VectorXd bruteWorldVel = Eigen::VectorXd::Zero(worldVel.size());
+  Eigen::VectorXs bruteWorldVel = Eigen::VectorXs::Zero(worldVel.size());
   std::size_t cursor = 0;
   for (std::size_t i = 0; i < world->getNumSkeletons(); i++)
   {
@@ -3253,12 +3251,12 @@ bool verifyWorldSpaceToLinearVelocity(
     for (std::size_t k = 0; k < skel->getNumBodyNodes(); k++)
     {
       BodyNode* node = skel->getBodyNode(k);
-      Eigen::Vector3d bruteVel
+      Eigen::Vector3s bruteVel
           = math::AdR(node->getWorldTransform(), node->getSpatialVelocity())
                 .tail<3>();
 
       /*
-      Eigen::Vector3d analyticalVel = worldVel.segment(cursor, 3);
+      Eigen::Vector3s analyticalVel = worldVel.segment(cursor, 3);
       std::cout << "Body " << k << std::endl << bruteVel << std::endl;
       std::cout << "Analytical " << k << std::endl
                 << analyticalVel << std::endl;
@@ -3281,30 +3279,30 @@ bool verifyWorldSpaceToLinearVelocity(
 }
 
 bool verifyWorldSpaceToPositionCOM(
-    WorldPtr world, Eigen::VectorXd position, Eigen::VectorXd velocity)
+    WorldPtr world, Eigen::VectorXs position, Eigen::VectorXs velocity)
 {
   // Verify that the velocity conversion works properly
   world->setPositions(position);
   world->setVelocities(velocity);
 
   std::vector<dynamics::BodyNode*> bodyNodes = world->getAllBodyNodes();
-  Eigen::MatrixXd worldPosMatrix = convertJointSpaceToWorldSpace(
+  Eigen::MatrixXs worldPosMatrix = convertJointSpaceToWorldSpace(
       world, position, bodyNodes, ConvertToSpace::COM_POS, false);
   if (worldPosMatrix.cols() != 1)
     return false;
-  Eigen::VectorXd worldPos = worldPosMatrix.col(0);
+  Eigen::VectorXs worldPos = worldPosMatrix.col(0);
 
-  Eigen::VectorXd bruteWorldCOMPos = Eigen::VectorXd::Zero(worldPos.size());
+  Eigen::VectorXs bruteWorldCOMPos = Eigen::VectorXs::Zero(worldPos.size());
   std::size_t cursor = 0;
   for (std::size_t i = 0; i < world->getNumSkeletons(); i++)
   {
     SkeletonPtr skel = world->getSkeleton(i);
     // std::cout << "Vels: " << std::endl << skel->getVelocities() <<
     // std::endl;
-    Eigen::Vector3d bruteCOMPos = skel->getCOM();
+    Eigen::Vector3s bruteCOMPos = skel->getCOM();
 
     /*
-    Eigen::Vector3d analyticalVel = worldPos.segment(cursor, 3);
+    Eigen::Vector3s analyticalVel = worldPos.segment(cursor, 3);
     std::cout << "Body " << k << std::endl << bruteVel << std::endl;
     std::cout << "Analytical " << k << std::endl
               << analyticalVel << std::endl;
@@ -3326,32 +3324,32 @@ bool verifyWorldSpaceToPositionCOM(
 }
 
 bool verifyWorldSpaceToVelocityCOMLinear(
-    WorldPtr world, Eigen::VectorXd position, Eigen::VectorXd velocity)
+    WorldPtr world, Eigen::VectorXs position, Eigen::VectorXs velocity)
 {
   // Verify that the velocity conversion works properly
   world->setPositions(position);
   world->setVelocities(velocity);
 
   std::vector<dynamics::BodyNode*> bodyNodes = world->getAllBodyNodes();
-  Eigen::MatrixXd worldVelMatrix = convertJointSpaceToWorldSpace(
+  Eigen::MatrixXs worldVelMatrix = convertJointSpaceToWorldSpace(
       world, velocity, bodyNodes, ConvertToSpace::COM_VEL_LINEAR, false);
   if (worldVelMatrix.cols() != 1)
     return false;
-  Eigen::VectorXd worldVel = worldVelMatrix.col(0);
+  Eigen::VectorXs worldVel = worldVelMatrix.col(0);
 
-  Eigen::VectorXd bruteWorldCOMVel = Eigen::VectorXd::Zero(worldVel.size());
+  Eigen::VectorXs bruteWorldCOMVel = Eigen::VectorXs::Zero(worldVel.size());
   std::size_t cursor = 0;
   for (std::size_t i = 0; i < world->getNumSkeletons(); i++)
   {
     SkeletonPtr skel = world->getSkeleton(i);
     // std::cout << "Vels: " << std::endl << skel->getVelocities() <<
     // std::endl;
-    Eigen::Vector3d bruteCOMVel = Eigen::Vector3d::Zero();
-    double totalMass = 0.0;
+    Eigen::Vector3s bruteCOMVel = Eigen::Vector3s::Zero();
+    s_t totalMass = 0.0;
     for (std::size_t k = 0; k < skel->getNumBodyNodes(); k++)
     {
       BodyNode* node = skel->getBodyNode(k);
-      Eigen::Vector3d bruteVel
+      Eigen::Vector3s bruteVel
           = math::AdR(node->getWorldTransform(), node->getSpatialVelocity())
                 .tail<3>();
       bruteCOMVel += bruteVel * node->getMass();
@@ -3360,7 +3358,7 @@ bool verifyWorldSpaceToVelocityCOMLinear(
     bruteCOMVel /= totalMass;
 
     /*
-    Eigen::Vector3d analyticalVel = worldVel.segment(cursor, 3);
+    Eigen::Vector3s analyticalVel = worldVel.segment(cursor, 3);
     std::cout << "Body " << k << std::endl << bruteVel << std::endl;
     std::cout << "Analytical " << k << std::endl
               << analyticalVel << std::endl;
@@ -3382,32 +3380,32 @@ bool verifyWorldSpaceToVelocityCOMLinear(
 }
 
 bool verifyWorldSpaceToVelocityCOMSpatial(
-    WorldPtr world, Eigen::VectorXd position, Eigen::VectorXd velocity)
+    WorldPtr world, Eigen::VectorXs position, Eigen::VectorXs velocity)
 {
   // Verify that the velocity conversion works properly
   world->setPositions(position);
   world->setVelocities(velocity);
 
   std::vector<dynamics::BodyNode*> bodyNodes = world->getAllBodyNodes();
-  Eigen::MatrixXd worldVelMatrix = convertJointSpaceToWorldSpace(
+  Eigen::MatrixXs worldVelMatrix = convertJointSpaceToWorldSpace(
       world, velocity, bodyNodes, ConvertToSpace::COM_VEL_SPATIAL, false);
   if (worldVelMatrix.cols() != 1)
     return false;
-  Eigen::VectorXd worldVel = worldVelMatrix.col(0);
+  Eigen::VectorXs worldVel = worldVelMatrix.col(0);
 
-  Eigen::VectorXd bruteWorldCOMVel = Eigen::VectorXd::Zero(worldVel.size());
+  Eigen::VectorXs bruteWorldCOMVel = Eigen::VectorXs::Zero(worldVel.size());
   std::size_t cursor = 0;
   for (std::size_t i = 0; i < world->getNumSkeletons(); i++)
   {
     SkeletonPtr skel = world->getSkeleton(i);
     // std::cout << "Vels: " << std::endl << skel->getVelocities() <<
     // std::endl;
-    Eigen::Vector6d bruteCOMVel = Eigen::Vector6d::Zero();
-    double totalMass = 0.0;
+    Eigen::Vector6s bruteCOMVel = Eigen::Vector6s::Zero();
+    s_t totalMass = 0.0;
     for (std::size_t k = 0; k < skel->getNumBodyNodes(); k++)
     {
       BodyNode* node = skel->getBodyNode(k);
-      Eigen::Vector6d bruteVel
+      Eigen::Vector6s bruteVel
           = math::AdR(node->getWorldTransform(), node->getSpatialVelocity());
       bruteCOMVel += bruteVel * node->getMass();
       totalMass += node->getMass();
@@ -3415,7 +3413,7 @@ bool verifyWorldSpaceToVelocityCOMSpatial(
     bruteCOMVel /= totalMass;
 
     /*
-    Eigen::Vector6d analyticalVel = worldVel.segment(cursor, 6);
+    Eigen::Vector6s analyticalVel = worldVel.segment(cursor, 6);
     std::cout << "Body " << k << std::endl << bruteVel << std::endl;
     std::cout << "Analytical " << k << std::endl
               << analyticalVel << std::endl;
@@ -3437,7 +3435,7 @@ bool verifyWorldSpaceToVelocityCOMSpatial(
 }
 
 bool verifyBackpropWorldSpacePositionToSpatial(
-    WorldPtr world, Eigen::VectorXd position, Eigen::VectorXd velocity)
+    WorldPtr world, Eigen::VectorXs position, Eigen::VectorXs velocity)
 {
   // Verify that the velocity conversion works properly
   world->setPositions(position);
@@ -3451,18 +3449,18 @@ bool verifyBackpropWorldSpacePositionToSpatial(
   // Shuffle the remaining elements
   std::random_shuffle(bodyNodes.begin(), bodyNodes.end());
 
-  Eigen::VectorXd originalWorldPos = convertJointSpaceToWorldSpace(
+  Eigen::VectorXs originalWorldPos = convertJointSpaceToWorldSpace(
       world, position, bodyNodes, ConvertToSpace::POS_SPATIAL, false);
 
-  Eigen::VectorXd perturbation
-      = Eigen::VectorXd::Random(position.size()) * 1e-6;
-  Eigen::VectorXd perturbedPos = position + perturbation;
+  Eigen::VectorXs perturbation
+      = Eigen::VectorXs::Random(position.size()) * 1e-6;
+  Eigen::VectorXs perturbedPos = position + perturbation;
 
-  Eigen::VectorXd perturbedWorldPos = convertJointSpaceToWorldSpace(
+  Eigen::VectorXs perturbedWorldPos = convertJointSpaceToWorldSpace(
       world, perturbedPos, bodyNodes, ConvertToSpace::POS_SPATIAL, false);
-  Eigen::MatrixXd skelSpatialJac
+  Eigen::MatrixXs skelSpatialJac
       = jointPosToWorldSpatialJacobian(world->getSkeleton(0), bodyNodes);
-  Eigen::VectorXd expectedPerturbation = skelSpatialJac * perturbation;
+  Eigen::VectorXs expectedPerturbation = skelSpatialJac * perturbation;
 
   /*
   std::cout << "World perturbation: " << std::endl
@@ -3471,16 +3469,16 @@ bool verifyBackpropWorldSpacePositionToSpatial(
             << expectedPerturbation << std::endl;
             */
 
-  Eigen::VectorXd worldPerturbation = perturbedWorldPos - originalWorldPos;
-  Eigen::VectorXd recoveredPerturbation = convertJointSpaceToWorldSpace(
+  Eigen::VectorXs worldPerturbation = perturbedWorldPos - originalWorldPos;
+  Eigen::VectorXs recoveredPerturbation = convertJointSpaceToWorldSpace(
       world, worldPerturbation, bodyNodes, ConvertToSpace::POS_SPATIAL, true);
 
   if (!equals(perturbation, recoveredPerturbation, 1e-8))
   {
     std::cout << "backprop() POS_SPATIAL failed!" << std::endl;
-    Eigen::MatrixXd skelSpatialJac2 = jointPosToWorldSpatialJacobian(
+    Eigen::MatrixXs skelSpatialJac2 = jointPosToWorldSpatialJacobian(
         world->getSkeleton(0), world->getSkeleton(0)->getBodyNodes());
-    Eigen::MatrixXd perturbations(worldPerturbation.size(), 2);
+    Eigen::MatrixXs perturbations(worldPerturbation.size(), 2);
     perturbations << worldPerturbation, expectedPerturbation;
     std::cout << "World perturbation | expected perturbation: " << std::endl
               << perturbations << std::endl;
@@ -3494,7 +3492,7 @@ bool verifyBackpropWorldSpacePositionToSpatial(
 }
 
 bool verifyBackpropWorldSpaceVelocityToSpatial(
-    WorldPtr world, Eigen::VectorXd position, Eigen::VectorXd velocity)
+    WorldPtr world, Eigen::VectorXs position, Eigen::VectorXs velocity)
 {
   // Verify that the velocity conversion works properly
   world->setPositions(position);
@@ -3507,18 +3505,18 @@ bool verifyBackpropWorldSpaceVelocityToSpatial(
   // Shuffle the remaining elements
   std::random_shuffle(bodyNodes.begin(), bodyNodes.end());
 
-  Eigen::VectorXd originalWorldVel = convertJointSpaceToWorldSpace(
+  Eigen::VectorXs originalWorldVel = convertJointSpaceToWorldSpace(
       world, velocity, bodyNodes, ConvertToSpace::VEL_SPATIAL, false);
 
-  Eigen::VectorXd perturbation
-      = Eigen::VectorXd::Random(position.size()) * 1e-6;
-  Eigen::VectorXd perturbedVel = velocity + perturbation;
+  Eigen::VectorXs perturbation
+      = Eigen::VectorXs::Random(position.size()) * 1e-6;
+  Eigen::VectorXs perturbedVel = velocity + perturbation;
 
-  Eigen::VectorXd perturbedWorldVel = convertJointSpaceToWorldSpace(
+  Eigen::VectorXs perturbedWorldVel = convertJointSpaceToWorldSpace(
       world, perturbedVel, bodyNodes, ConvertToSpace::VEL_SPATIAL, false);
 
-  Eigen::VectorXd worldPerturbation = perturbedWorldVel - originalWorldVel;
-  Eigen::VectorXd recoveredPerturbation = convertJointSpaceToWorldSpace(
+  Eigen::VectorXs worldPerturbation = perturbedWorldVel - originalWorldVel;
+  Eigen::VectorXs recoveredPerturbation = convertJointSpaceToWorldSpace(
       world, worldPerturbation, bodyNodes, ConvertToSpace::VEL_SPATIAL, true);
 
   if (!equals(perturbation, recoveredPerturbation, 1e-8))
@@ -3548,7 +3546,7 @@ enum MappingTestComponent
   FORCE
 };
 
-Eigen::VectorXd getTestComponentWorld(
+Eigen::VectorXs getTestComponentWorld(
     WorldPtr world, MappingTestComponent component)
 {
   if (component == MappingTestComponent::POSITION)
@@ -3563,7 +3561,7 @@ Eigen::VectorXd getTestComponentWorld(
 }
 
 void setTestComponentWorld(
-    WorldPtr world, MappingTestComponent component, const Eigen::VectorXd& val)
+    WorldPtr world, MappingTestComponent component, const Eigen::VectorXs& val)
 {
   if (component == MappingTestComponent::POSITION)
     world->setPositions(val);
@@ -3575,7 +3573,7 @@ void setTestComponentWorld(
     assert(false && "Unrecognized component value in getTestComponent()");
 }
 
-Eigen::VectorXd getTestComponentMapping(
+Eigen::VectorXs getTestComponentMapping(
     std::shared_ptr<Mapping> mapping,
     WorldPtr world,
     MappingTestComponent component)
@@ -3607,7 +3605,7 @@ int getTestComponentMappingDim(
   return 0;
 }
 
-Eigen::MatrixXd getTestComponentMappingIntoJac(
+Eigen::MatrixXs getTestComponentMappingIntoJac(
     std::shared_ptr<Mapping> mapping,
     WorldPtr world,
     MappingTestComponent component,
@@ -3634,7 +3632,7 @@ Eigen::MatrixXd getTestComponentMappingIntoJac(
   throw std::runtime_error{"Execution should never reach this point"};
 }
 
-Eigen::MatrixXd getTestComponentMappingOutJac(
+Eigen::MatrixXs getTestComponentMappingOutJac(
     std::shared_ptr<Mapping> mapping,
     WorldPtr world,
     MappingTestComponent component)
@@ -3654,7 +3652,7 @@ void setTestComponentMapping(
     std::shared_ptr<Mapping> mapping,
     WorldPtr world,
     MappingTestComponent component,
-    Eigen::VectorXd val)
+    Eigen::VectorXs val)
 {
   if (component == MappingTestComponent::POSITION)
     mapping->setPositions(world, val);
@@ -3690,25 +3688,25 @@ bool verifyMappingSetGet(
   // that are better
   for (int i = 0; i < 5; i++)
   {
-    Eigen::VectorXd target = Eigen::VectorXd::Random(mapping->getPosDim());
-    double originalLoss;
+    Eigen::VectorXs target = Eigen::VectorXs::Random(mapping->getPosDim());
+    s_t originalLoss;
 
     setTestComponentMapping(mapping, world, component, target);
-    Eigen::VectorXd original = getTestComponentWorld(world, component);
-    Eigen::VectorXd originalMapped
+    Eigen::VectorXs original = getTestComponentWorld(world, component);
+    Eigen::VectorXs originalMapped
         = getTestComponentMapping(mapping, world, component);
     originalLoss = (originalMapped - target).squaredNorm();
 
     // Try a bunch of near neighbor perturbations
     for (int j = 0; j < 20; j++)
     {
-      Eigen::VectorXd randomPerturbations
-          = Eigen::VectorXd::Random(world->getNumDofs()) * 0.001;
+      Eigen::VectorXs randomPerturbations
+          = Eigen::VectorXs::Random(world->getNumDofs()) * 0.001;
 
       setTestComponentWorld(world, component, original + randomPerturbations);
-      Eigen::VectorXd newMapped
+      Eigen::VectorXs newMapped
           = getTestComponentMapping(mapping, world, component);
-      double newLoss = (newMapped - target).squaredNorm();
+      s_t newLoss = (newMapped - target).squaredNorm();
 
       if (newLoss < originalLoss)
       {
@@ -3741,28 +3739,28 @@ bool verifyMappingIntoJacobian(
   RestorableSnapshot snapshot(world);
 
   int mappedDim = getTestComponentMappingDim(mapping, world, component);
-  Eigen::MatrixXd analytical
+  Eigen::MatrixXs analytical
       = getTestComponentMappingIntoJac(mapping, world, component, wrt);
-  Eigen::MatrixXd bruteForce
-      = Eigen::MatrixXd::Zero(mappedDim, world->getNumDofs());
+  Eigen::MatrixXs bruteForce
+      = Eigen::MatrixXs::Zero(mappedDim, world->getNumDofs());
 
-  Eigen::VectorXd originalWorld = getTestComponentWorld(world, wrt);
-  Eigen::VectorXd originalMapped
+  Eigen::VectorXs originalWorld = getTestComponentWorld(world, wrt);
+  Eigen::VectorXs originalMapped
       = getTestComponentMapping(mapping, world, component);
 
-  const double EPS = 1e-5;
+  const s_t EPS = 1e-5;
   for (int i = 0; i < world->getNumDofs(); i++)
   {
-    Eigen::VectorXd perturbedWorld = originalWorld;
+    Eigen::VectorXs perturbedWorld = originalWorld;
     perturbedWorld(i) += EPS;
     setTestComponentWorld(world, wrt, perturbedWorld);
-    Eigen::VectorXd perturbedMappedPos
+    Eigen::VectorXs perturbedMappedPos
         = getTestComponentMapping(mapping, world, component);
 
     perturbedWorld = originalWorld;
     perturbedWorld(i) -= EPS;
     setTestComponentWorld(world, wrt, perturbedWorld);
-    Eigen::VectorXd perturbedMappedNeg
+    Eigen::VectorXs perturbedMappedNeg
         = getTestComponentMapping(mapping, world, component);
 
     bruteForce.col(i) = (perturbedMappedPos - perturbedMappedNeg) / (2 * EPS);
@@ -3793,32 +3791,32 @@ bool verifyMappingOutJacobian(
 
   // If we have tiny singular values, then this matrix won't perfectly invert,
   // and we can skip this test.
-  Eigen::MatrixXd analyticalInto
+  Eigen::MatrixXs analyticalInto
       = getTestComponentMappingIntoJac(mapping, world, component, component);
   if (math::hasTinySingularValues(analyticalInto))
     return true;
 
-  Eigen::MatrixXd analytical
+  Eigen::MatrixXs analytical
       = getTestComponentMappingOutJac(mapping, world, component);
-  Eigen::MatrixXd bruteForce
-      = Eigen::MatrixXd::Zero(world->getNumDofs(), mappedDim);
+  Eigen::MatrixXs bruteForce
+      = Eigen::MatrixXs::Zero(world->getNumDofs(), mappedDim);
 
-  Eigen::VectorXd originalWorld = getTestComponentWorld(world, component);
-  Eigen::VectorXd originalMapped
+  Eigen::VectorXs originalWorld = getTestComponentWorld(world, component);
+  Eigen::VectorXs originalMapped
       = getTestComponentMapping(mapping, world, component);
 
-  const double EPS = 1e-5;
+  const s_t EPS = 1e-5;
   for (int i = 0; i < mappedDim; i++)
   {
-    Eigen::VectorXd perturbedMapped = originalMapped;
+    Eigen::VectorXs perturbedMapped = originalMapped;
     perturbedMapped(i) += EPS;
     setTestComponentMapping(mapping, world, component, perturbedMapped);
-    Eigen::VectorXd perturbedWorldPos = getTestComponentWorld(world, component);
+    Eigen::VectorXs perturbedWorldPos = getTestComponentWorld(world, component);
 
     perturbedMapped = originalMapped;
     perturbedMapped(i) -= EPS;
     setTestComponentMapping(mapping, world, component, perturbedMapped);
-    Eigen::VectorXd perturbedWorldNeg = getTestComponentWorld(world, component);
+    Eigen::VectorXs perturbedWorldNeg = getTestComponentWorld(world, component);
 
     bruteForce.col(i) = (perturbedWorldPos - perturbedWorldNeg) / (2 * EPS);
   }
@@ -3842,7 +3840,7 @@ bool verifyMappingOutJacobian(
   return true;
 }
 
-Eigen::MatrixXd getTimestepJacobian(
+Eigen::MatrixXs getTimestepJacobian(
     WorldPtr world,
     std::shared_ptr<MappedBackpropSnapshot> snapshot,
     MappingTestComponent inComponent,
@@ -3894,7 +3892,7 @@ bool verifyMappedStepJacobian(
 {
   // If we have tiny singular values, then this matrix won't perfectly invert,
   // and we can skip this test.
-  Eigen::MatrixXd analyticalInto = getTestComponentMappingIntoJac(
+  Eigen::MatrixXs analyticalInto = getTestComponentMappingIntoJac(
       mapping, world, inComponent, inComponent);
   if (math::hasTinySingularValues(analyticalInto))
     return true;
@@ -3906,25 +3904,25 @@ bool verifyMappedStepJacobian(
   std::shared_ptr<MappedBackpropSnapshot> mappedSnapshot
       = neural::mappedForwardPass(world, "identity", mappings, true);
 
-  Eigen::MatrixXd analytical
+  Eigen::MatrixXs analytical
       = getTimestepJacobian(world, mappedSnapshot, inComponent, outComponent);
   int inDim = getTestComponentMappingDim(mapping, world, inComponent);
   int outDim = getTestComponentMappingDim(mapping, world, outComponent);
 
-  Eigen::MatrixXd bruteForce = Eigen::MatrixXd::Zero(outDim, inDim);
+  Eigen::MatrixXs bruteForce = Eigen::MatrixXs::Zero(outDim, inDim);
 
-  Eigen::VectorXd originalMapped
+  Eigen::VectorXs originalMapped
       = getTestComponentMapping(mapping, world, inComponent);
 
-  const double EPS = 1e-7;
+  const s_t EPS = 1e-7;
   for (int i = 0; i < inDim; i++)
   {
     snapshot.restore();
-    Eigen::VectorXd perturbedMapped = originalMapped;
+    Eigen::VectorXs perturbedMapped = originalMapped;
     perturbedMapped(i) += EPS;
     setTestComponentMapping(mapping, world, inComponent, perturbedMapped);
     world->step();
-    Eigen::VectorXd perturbedMappedPos
+    Eigen::VectorXs perturbedMappedPos
         = getTestComponentMapping(mapping, world, outComponent);
 
     snapshot.restore();
@@ -3932,7 +3930,7 @@ bool verifyMappedStepJacobian(
     perturbedMapped(i) -= EPS;
     setTestComponentMapping(mapping, world, inComponent, perturbedMapped);
     world->step();
-    Eigen::VectorXd perturbedMappedNeg
+    Eigen::VectorXs perturbedMappedNeg
         = getTestComponentMapping(mapping, world, outComponent);
 
     bruteForce.col(i) = (perturbedMappedPos - perturbedMappedNeg) / (2 * EPS);
@@ -3955,7 +3953,7 @@ bool verifyMappedStepJacobian(
 
     // Check the components of the analytical Jacobian are correct too
     snapshot.restore();
-    Eigen::MatrixXd outMap
+    Eigen::MatrixXs outMap
         = getTestComponentMappingOutJac(mapping, world, inComponent);
     verifyMappingOutJacobian(world, mapping, inComponent);
     world->step();
@@ -4161,7 +4159,7 @@ bool verifyIdentityMapping(WorldPtr world)
   return verifyMapping(world, mapping);
 }
 
-bool verifyClosestIKPosition(WorldPtr world, Eigen::VectorXd position)
+bool verifyClosestIKPosition(WorldPtr world, Eigen::VectorXs position)
 {
   RestorableSnapshot snapshot(world);
 
@@ -4183,21 +4181,21 @@ bool verifyClosestIKPosition(WorldPtr world, Eigen::VectorXd position)
       mapping.addLinearBodyNode(node);
     }
 
-    Eigen::VectorXd targetPos = Eigen::VectorXd::Random(mapping.getPosDim());
+    Eigen::VectorXs targetPos = Eigen::VectorXs::Random(mapping.getPosDim());
     mapping.setPositions(world, targetPos);
-    Eigen::VectorXd originalMapped = mapping.getPositions(world);
-    Eigen::VectorXd originalWorld = world->getPositions();
+    Eigen::VectorXs originalMapped = mapping.getPositions(world);
+    Eigen::VectorXs originalWorld = world->getPositions();
 
-    double originalLoss = (originalMapped - targetPos).squaredNorm();
+    s_t originalLoss = (originalMapped - targetPos).squaredNorm();
 
     // Try a bunch of near neighbor perturbations
     for (int i = 0; i < 20; i++)
     {
-      Eigen::VectorXd randomPerturbations
-          = Eigen::VectorXd::Random(world->getNumDofs()) * 0.001;
+      Eigen::VectorXs randomPerturbations
+          = Eigen::VectorXs::Random(world->getNumDofs()) * 0.001;
       world->setPositions(originalWorld + randomPerturbations);
-      Eigen::VectorXd newMapped = mapping.getPositions(world);
-      double newLoss = (newMapped - targetPos).squaredNorm();
+      Eigen::VectorXs newMapped = mapping.getPositions(world);
+      s_t newLoss = (newMapped - targetPos).squaredNorm();
 
       if (newLoss < originalLoss)
       {
@@ -4221,7 +4219,7 @@ bool verifyClosestIKPosition(WorldPtr world, Eigen::VectorXd position)
   return true;
 }
 
-bool verifyClosestIKVelocity(WorldPtr world, Eigen::VectorXd velocity)
+bool verifyClosestIKVelocity(WorldPtr world, Eigen::VectorXs velocity)
 {
   RestorableSnapshot snapshot(world);
 
@@ -4243,19 +4241,18 @@ bool verifyClosestIKVelocity(WorldPtr world, Eigen::VectorXd velocity)
       mapping.addLinearBodyNode(node);
     }
 
-    Eigen::VectorXd targetVel = Eigen::VectorXd::Random(mapping.getVelDim());
+    Eigen::VectorXs targetVel = Eigen::VectorXs::Random(mapping.getVelDim());
     mapping.setVelocities(world, targetVel);
 
-    double originalLoss
-        = (mapping.getVelocities(world) - targetVel).squaredNorm();
+    s_t originalLoss = (mapping.getVelocities(world) - targetVel).squaredNorm();
 
     // Try a bunch of near neighbor perturbations
     for (int i = 0; i < 20; i++)
     {
-      Eigen::VectorXd randomPerturbations
-          = Eigen::VectorXd::Random(world->getNumDofs()) * 0.001;
+      Eigen::VectorXs randomPerturbations
+          = Eigen::VectorXs::Random(world->getNumDofs()) * 0.001;
       world->setVelocities(velocity + randomPerturbations);
-      double newLoss = (mapping.getVelocities(world) - targetVel).squaredNorm();
+      s_t newLoss = (mapping.getVelocities(world) - targetVel).squaredNorm();
 
       if (newLoss < originalLoss)
       {
@@ -4275,7 +4272,7 @@ bool verifyClosestIKVelocity(WorldPtr world, Eigen::VectorXd velocity)
 }
 
 bool verifyLinearJacobian(
-    WorldPtr world, Eigen::VectorXd position, Eigen::VectorXd velocity)
+    WorldPtr world, Eigen::VectorXs position, Eigen::VectorXs velocity)
 {
   for (int i = 0; i < world->getNumSkeletons(); i++)
   {
@@ -4295,27 +4292,27 @@ bool verifyLinearJacobian(
       mapping.addLinearBodyNode(node);
     }
 
-    Eigen::MatrixXd analytical = mapping.getRealPosToMappedPosJac(world);
+    Eigen::MatrixXs analytical = mapping.getRealPosToMappedPosJac(world);
 
     // Compute a brute force version
-    Eigen::VectorXd originalPos = skel->getPositions();
-    Eigen::VectorXd originalVel = skel->getVelocities();
-    Eigen::VectorXd originalWorldPos = mapping.getPositions(world);
-    Eigen::VectorXd originalWorldVel = mapping.getVelocities(world);
-    Eigen::MatrixXd bruteForce
-        = Eigen::MatrixXd::Zero(analytical.rows(), analytical.cols());
-    const double EPS = 1e-5;
+    Eigen::VectorXs originalPos = skel->getPositions();
+    Eigen::VectorXs originalVel = skel->getVelocities();
+    Eigen::VectorXs originalWorldPos = mapping.getPositions(world);
+    Eigen::VectorXs originalWorldVel = mapping.getVelocities(world);
+    Eigen::MatrixXs bruteForce
+        = Eigen::MatrixXs::Zero(analytical.rows(), analytical.cols());
+    const s_t EPS = 1e-5;
     for (int j = 0; j < skel->getNumDofs(); j++)
     {
-      Eigen::VectorXd perturbedPos = originalPos;
+      Eigen::VectorXs perturbedPos = originalPos;
       perturbedPos(j) += EPS;
       skel->setPositions(perturbedPos);
-      Eigen::VectorXd posColumn = mapping.getPositions(world);
+      Eigen::VectorXs posColumn = mapping.getPositions(world);
 
-      Eigen::VectorXd perturbedNeg = originalPos;
+      Eigen::VectorXs perturbedNeg = originalPos;
       perturbedNeg(j) -= EPS;
       skel->setPositions(perturbedNeg);
-      Eigen::VectorXd negColumn = mapping.getPositions(world);
+      Eigen::VectorXs negColumn = mapping.getPositions(world);
 
       skel->setPositions(originalPos);
 
@@ -4337,7 +4334,7 @@ bool verifyLinearJacobian(
 }
 
 bool verifySpatialJacobian(
-    WorldPtr world, Eigen::VectorXd position, Eigen::VectorXd velocity)
+    WorldPtr world, Eigen::VectorXs position, Eigen::VectorXs velocity)
 {
   world->setPositions(position);
   world->setVelocities(velocity);
@@ -4356,29 +4353,29 @@ bool verifySpatialJacobian(
       mapping.addSpatialBodyNode(node);
     }
 
-    Eigen::MatrixXd analytical = mapping.getRealPosToMappedPosJac(world);
+    Eigen::MatrixXs analytical = mapping.getRealPosToMappedPosJac(world);
 
     // Compute a brute force version
-    Eigen::VectorXd originalPos = skel->getPositions();
-    Eigen::VectorXd originalVel = skel->getVelocities();
-    Eigen::VectorXd originalWorldPos = mapping.getPositions(world);
-    Eigen::VectorXd originalWorldVel = mapping.getVelocities(world);
-    Eigen::MatrixXd bruteForce
-        = Eigen::MatrixXd::Zero(analytical.rows(), analytical.cols());
-    const double EPS = 1e-6;
+    Eigen::VectorXs originalPos = skel->getPositions();
+    Eigen::VectorXs originalVel = skel->getVelocities();
+    Eigen::VectorXs originalWorldPos = mapping.getPositions(world);
+    Eigen::VectorXs originalWorldVel = mapping.getVelocities(world);
+    Eigen::MatrixXs bruteForce
+        = Eigen::MatrixXs::Zero(analytical.rows(), analytical.cols());
+    const s_t EPS = 1e-6;
     for (int j = 0; j < skel->getNumDofs(); j++)
     {
-      Eigen::VectorXd perturbedPos = originalPos;
+      Eigen::VectorXs perturbedPos = originalPos;
       perturbedPos(j) += EPS;
       skel->setPositions(perturbedPos);
-      Eigen::VectorXd plusPos = mapping.getPositions(world);
+      Eigen::VectorXs plusPos = mapping.getPositions(world);
 
       perturbedPos = originalPos;
       perturbedPos(j) -= EPS;
       skel->setPositions(perturbedPos);
-      Eigen::VectorXd minusPos = mapping.getPositions(world);
+      Eigen::VectorXs minusPos = mapping.getPositions(world);
 
-      Eigen::VectorXd posColumn = (plusPos - minusPos) / (2 * EPS);
+      Eigen::VectorXs posColumn = (plusPos - minusPos) / (2 * EPS);
 
       skel->setPositions(originalPos);
 
@@ -4399,7 +4396,7 @@ bool verifySpatialJacobian(
 }
 
 bool verifyBackpropWorldSpacePositionToPosition(
-    WorldPtr world, Eigen::VectorXd position, Eigen::VectorXd velocity)
+    WorldPtr world, Eigen::VectorXs position, Eigen::VectorXs velocity)
 {
   // Verify that the velocity conversion works properly
   world->setPositions(position);
@@ -4417,26 +4414,26 @@ bool verifyBackpropWorldSpacePositionToPosition(
   {
     spatialMapping.addSpatialBodyNode(node);
   }
-  Eigen::VectorXd originalWorldPos = linearMapping.getPositions(world);
-  Eigen::VectorXd originalWorldSpatial = spatialMapping.getPositions(world);
+  Eigen::VectorXs originalWorldPos = linearMapping.getPositions(world);
+  Eigen::VectorXs originalWorldSpatial = spatialMapping.getPositions(world);
 
-  Eigen::VectorXd perturbation
-      = Eigen::VectorXd::Random(position.size()) * 1e-4;
-  Eigen::VectorXd perturbedPos = position + perturbation;
+  Eigen::VectorXs perturbation
+      = Eigen::VectorXs::Random(position.size()) * 1e-4;
+  Eigen::VectorXs perturbedPos = position + perturbation;
 
-  Eigen::MatrixXd skelLinearJac = linearMapping.getRealPosToMappedPosJac(world);
-  Eigen::VectorXd expectedPerturbation = skelLinearJac * perturbation;
+  Eigen::MatrixXs skelLinearJac = linearMapping.getRealPosToMappedPosJac(world);
+  Eigen::VectorXs expectedPerturbation = skelLinearJac * perturbation;
 
-  Eigen::MatrixXd skelSpatialJac
+  Eigen::MatrixXs skelSpatialJac
       = spatialMapping.getRealPosToMappedPosJac(world);
-  Eigen::VectorXd expectedPerturbationSpatial = skelSpatialJac * perturbation;
+  Eigen::VectorXs expectedPerturbationSpatial = skelSpatialJac * perturbation;
 
   world->setPositions(perturbedPos);
-  Eigen::VectorXd perturbedWorldPos = linearMapping.getPositions(world);
-  Eigen::VectorXd perturbedWorldSpatial = spatialMapping.getPositions(world);
+  Eigen::VectorXs perturbedWorldPos = linearMapping.getPositions(world);
+  Eigen::VectorXs perturbedWorldSpatial = spatialMapping.getPositions(world);
 
-  Eigen::VectorXd worldPerturbation = perturbedWorldPos - originalWorldPos;
-  Eigen::VectorXd worldPerturbationSpatial
+  Eigen::VectorXs worldPerturbation = perturbedWorldPos - originalWorldPos;
+  Eigen::VectorXs worldPerturbationSpatial
       = perturbedWorldSpatial - originalWorldSpatial;
 
   if (!equals(worldPerturbation, expectedPerturbation, 1e-5)
@@ -4460,7 +4457,7 @@ bool verifyBackpropWorldSpacePositionToPosition(
 }
 
 bool verifyBackpropWorldSpaceVelocityToPosition(
-    WorldPtr world, Eigen::VectorXd position, Eigen::VectorXd velocity)
+    WorldPtr world, Eigen::VectorXs position, Eigen::VectorXs velocity)
 {
   // Verify that the velocity conversion works properly
   world->setPositions(position);
@@ -4468,37 +4465,37 @@ bool verifyBackpropWorldSpaceVelocityToPosition(
 
   std::vector<dynamics::BodyNode*> bodyNodes
       = world->getSkeleton(0)->getBodyNodes();
-  Eigen::VectorXd originalWorldVel = convertJointSpaceToWorldSpace(
+  Eigen::VectorXs originalWorldVel = convertJointSpaceToWorldSpace(
       world, velocity, bodyNodes, ConvertToSpace::VEL_LINEAR, false);
-  Eigen::VectorXd originalWorldSpatial = convertJointSpaceToWorldSpace(
+  Eigen::VectorXs originalWorldSpatial = convertJointSpaceToWorldSpace(
       world, velocity, bodyNodes, ConvertToSpace::VEL_SPATIAL, false);
 
-  Eigen::VectorXd perturbation
-      = Eigen::VectorXd::Random(velocity.size()) * 1e-4;
-  Eigen::VectorXd perturbedVel = velocity + perturbation;
+  Eigen::VectorXs perturbation
+      = Eigen::VectorXs::Random(velocity.size()) * 1e-4;
+  Eigen::VectorXs perturbedVel = velocity + perturbation;
 
-  Eigen::MatrixXd skelLinearJac = jointVelToWorldLinearJacobian(
+  Eigen::MatrixXs skelLinearJac = jointVelToWorldLinearJacobian(
       world->getSkeleton(0), world->getSkeleton(0)->getBodyNodes());
-  Eigen::VectorXd expectedPerturbation = skelLinearJac * perturbation;
+  Eigen::VectorXs expectedPerturbation = skelLinearJac * perturbation;
 
-  Eigen::MatrixXd skelSpatialJac = jointVelToWorldSpatialJacobian(
+  Eigen::MatrixXs skelSpatialJac = jointVelToWorldSpatialJacobian(
       world->getSkeleton(0), world->getSkeleton(0)->getBodyNodes());
-  Eigen::VectorXd expectedPerturbationSpatial = skelSpatialJac * perturbation;
+  Eigen::VectorXs expectedPerturbationSpatial = skelSpatialJac * perturbation;
 
-  Eigen::VectorXd perturbedWorldVel = convertJointSpaceToWorldSpace(
+  Eigen::VectorXs perturbedWorldVel = convertJointSpaceToWorldSpace(
       world, perturbedVel, bodyNodes, ConvertToSpace::VEL_LINEAR, false);
-  Eigen::VectorXd perturbedWorldSpatial = convertJointSpaceToWorldSpace(
+  Eigen::VectorXs perturbedWorldSpatial = convertJointSpaceToWorldSpace(
       world, perturbedVel, bodyNodes, ConvertToSpace::VEL_SPATIAL, false);
 
-  Eigen::VectorXd worldPerturbation = perturbedWorldVel - originalWorldVel;
-  Eigen::VectorXd worldPerturbationSpatial
+  Eigen::VectorXs worldPerturbation = perturbedWorldVel - originalWorldVel;
+  Eigen::VectorXs worldPerturbationSpatial
       = perturbedWorldSpatial - originalWorldSpatial;
 
-  Eigen::VectorXd recoveredPerturbation = convertJointSpaceToWorldSpace(
+  Eigen::VectorXs recoveredPerturbation = convertJointSpaceToWorldSpace(
       world, worldPerturbation, bodyNodes, ConvertToSpace::VEL_LINEAR, true);
 
-  Eigen::VectorXd expectedPerturbationFromSpatial
-      = Eigen::VectorXd(expectedPerturbationSpatial.size() / 2);
+  Eigen::VectorXs expectedPerturbationFromSpatial
+      = Eigen::VectorXs(expectedPerturbationSpatial.size() / 2);
   for (int i = 0; i < expectedPerturbationSpatial.size() / 6; i++)
   {
     expectedPerturbationFromSpatial.segment(i * 3, 3)
@@ -4506,13 +4503,13 @@ bool verifyBackpropWorldSpaceVelocityToPosition(
               .translation();
   }
 
-  Eigen::MatrixXd perturbations
-      = Eigen::MatrixXd::Zero(worldPerturbation.size(), 3);
+  Eigen::MatrixXs perturbations
+      = Eigen::MatrixXs::Zero(worldPerturbation.size(), 3);
   perturbations << worldPerturbation, expectedPerturbation,
       expectedPerturbationFromSpatial;
 
-  Eigen::MatrixXd perturbationsSpatial
-      = Eigen::MatrixXd::Zero(worldPerturbationSpatial.size(), 2);
+  Eigen::MatrixXs perturbationsSpatial
+      = Eigen::MatrixXs::Zero(worldPerturbationSpatial.size(), 2);
   perturbationsSpatial << worldPerturbationSpatial, expectedPerturbationSpatial;
 
   if (!equals(worldPerturbation, expectedPerturbation, 1e-5))
@@ -4544,7 +4541,7 @@ bool verifyBackpropWorldSpaceVelocityToPosition(
 }
 
 bool verifyBackpropWorldSpacePositionToCOM(
-    WorldPtr world, Eigen::VectorXd position, Eigen::VectorXd velocity)
+    WorldPtr world, Eigen::VectorXs position, Eigen::VectorXs velocity)
 {
   // Verify that the velocity conversion works properly
   world->setPositions(position);
@@ -4552,21 +4549,21 @@ bool verifyBackpropWorldSpacePositionToCOM(
 
   std::vector<dynamics::BodyNode*> bodyNodes
       = world->getSkeleton(0)->getBodyNodes();
-  Eigen::VectorXd originalWorldPos = convertJointSpaceToWorldSpace(
+  Eigen::VectorXs originalWorldPos = convertJointSpaceToWorldSpace(
       world, position, bodyNodes, ConvertToSpace::COM_POS, false);
 
-  Eigen::VectorXd perturbation
-      = Eigen::VectorXd::Random(velocity.size()) * 1e-4;
-  Eigen::VectorXd perturbedPos = position + perturbation;
+  Eigen::VectorXs perturbation
+      = Eigen::VectorXs::Random(velocity.size()) * 1e-4;
+  Eigen::VectorXs perturbedPos = position + perturbation;
 
-  Eigen::MatrixXd skelLinearJac
+  Eigen::MatrixXs skelLinearJac
       = world->getSkeleton(0)->getCOMPositionJacobian().bottomRows<3>();
-  Eigen::VectorXd expectedPerturbation = skelLinearJac * perturbation;
+  Eigen::VectorXs expectedPerturbation = skelLinearJac * perturbation;
 
-  Eigen::VectorXd perturbedWorldPos = convertJointSpaceToWorldSpace(
+  Eigen::VectorXs perturbedWorldPos = convertJointSpaceToWorldSpace(
       world, perturbedPos, bodyNodes, ConvertToSpace::COM_POS, false);
 
-  Eigen::VectorXd worldPerturbation = perturbedWorldPos - originalWorldPos;
+  Eigen::VectorXs worldPerturbation = perturbedWorldPos - originalWorldPos;
 
   if (!equals(worldPerturbation, expectedPerturbation, 1e-5))
   {
@@ -4590,7 +4587,7 @@ bool verifyBackpropWorldSpacePositionToCOM(
 }
 
 bool verifyBackpropWorldSpaceVelocityToCOMLinear(
-    WorldPtr world, Eigen::VectorXd position, Eigen::VectorXd velocity)
+    WorldPtr world, Eigen::VectorXs position, Eigen::VectorXs velocity)
 {
   // Verify that the velocity conversion works properly
   world->setPositions(position);
@@ -4598,20 +4595,20 @@ bool verifyBackpropWorldSpaceVelocityToCOMLinear(
 
   std::vector<dynamics::BodyNode*> bodyNodes
       = world->getSkeleton(0)->getBodyNodes();
-  Eigen::VectorXd originalWorldVel = convertJointSpaceToWorldSpace(
+  Eigen::VectorXs originalWorldVel = convertJointSpaceToWorldSpace(
       world, velocity, bodyNodes, ConvertToSpace::COM_VEL_LINEAR, false);
 
-  Eigen::VectorXd perturbation
-      = Eigen::VectorXd::Random(velocity.size()) * 1e-4;
-  Eigen::VectorXd perturbedVel = velocity + perturbation;
+  Eigen::VectorXs perturbation
+      = Eigen::VectorXs::Random(velocity.size()) * 1e-4;
+  Eigen::VectorXs perturbedVel = velocity + perturbation;
 
-  Eigen::MatrixXd skelLinearJac = world->getSkeleton(0)->getCOMLinearJacobian();
-  Eigen::VectorXd expectedPerturbation = skelLinearJac * perturbation;
+  Eigen::MatrixXs skelLinearJac = world->getSkeleton(0)->getCOMLinearJacobian();
+  Eigen::VectorXs expectedPerturbation = skelLinearJac * perturbation;
 
-  Eigen::VectorXd perturbedWorldVel = convertJointSpaceToWorldSpace(
+  Eigen::VectorXs perturbedWorldVel = convertJointSpaceToWorldSpace(
       world, perturbedVel, bodyNodes, ConvertToSpace::COM_VEL_LINEAR, false);
 
-  Eigen::VectorXd worldPerturbation = perturbedWorldVel - originalWorldVel;
+  Eigen::VectorXs worldPerturbation = perturbedWorldVel - originalWorldVel;
 
   if (!equals(worldPerturbation, expectedPerturbation, 1e-5))
   {
@@ -4635,7 +4632,7 @@ bool verifyBackpropWorldSpaceVelocityToCOMLinear(
 }
 
 bool verifyBackpropWorldSpaceVelocityToCOMSpatial(
-    WorldPtr world, Eigen::VectorXd position, Eigen::VectorXd velocity)
+    WorldPtr world, Eigen::VectorXs position, Eigen::VectorXs velocity)
 {
   // Verify that the velocity conversion works properly
   world->setPositions(position);
@@ -4643,20 +4640,20 @@ bool verifyBackpropWorldSpaceVelocityToCOMSpatial(
 
   std::vector<dynamics::BodyNode*> bodyNodes
       = world->getSkeleton(0)->getBodyNodes();
-  Eigen::VectorXd originalWorldVel = convertJointSpaceToWorldSpace(
+  Eigen::VectorXs originalWorldVel = convertJointSpaceToWorldSpace(
       world, velocity, bodyNodes, ConvertToSpace::COM_VEL_SPATIAL, false);
 
-  Eigen::VectorXd perturbation
-      = Eigen::VectorXd::Random(velocity.size()) * 1e-4;
-  Eigen::VectorXd perturbedVel = velocity + perturbation;
+  Eigen::VectorXs perturbation
+      = Eigen::VectorXs::Random(velocity.size()) * 1e-4;
+  Eigen::VectorXs perturbedVel = velocity + perturbation;
 
-  Eigen::MatrixXd skelLinearJac = world->getSkeleton(0)->getCOMJacobian();
-  Eigen::VectorXd expectedPerturbation = skelLinearJac * perturbation;
+  Eigen::MatrixXs skelLinearJac = world->getSkeleton(0)->getCOMJacobian();
+  Eigen::VectorXs expectedPerturbation = skelLinearJac * perturbation;
 
-  Eigen::VectorXd perturbedWorldVel = convertJointSpaceToWorldSpace(
+  Eigen::VectorXs perturbedWorldVel = convertJointSpaceToWorldSpace(
       world, perturbedVel, bodyNodes, ConvertToSpace::COM_VEL_SPATIAL, false);
 
-  Eigen::VectorXd worldPerturbation = perturbedWorldVel - originalWorldVel;
+  Eigen::VectorXs worldPerturbation = perturbedWorldVel - originalWorldVel;
 
   if (!equals(worldPerturbation, expectedPerturbation, 1e-5))
   {
@@ -4680,7 +4677,7 @@ bool verifyBackpropWorldSpaceVelocityToCOMSpatial(
 }
 
 bool verifyWorldSpaceTransformInstance(
-    WorldPtr world, Eigen::VectorXd position, Eigen::VectorXd velocity)
+    WorldPtr world, Eigen::VectorXs position, Eigen::VectorXs velocity)
 {
   if (!verifyLinearJacobian(world, position, velocity))
     return false;
@@ -4720,10 +4717,10 @@ bool verifyWorldSpaceTransformInstance(
 bool verifyWorldSpaceTransform(WorldPtr world)
 {
   int timesteps = 7;
-  Eigen::MatrixXd jointPoses
-      = Eigen::MatrixXd::Random(world->getNumDofs(), timesteps);
-  Eigen::MatrixXd jointVels
-      = Eigen::MatrixXd::Random(world->getNumDofs(), timesteps);
+  Eigen::MatrixXs jointPoses
+      = Eigen::MatrixXs::Random(world->getNumDofs(), timesteps);
+  Eigen::MatrixXs jointVels
+      = Eigen::MatrixXs::Random(world->getNumDofs(), timesteps);
 
   for (int i = 0; i < timesteps; i++)
   {
@@ -4734,12 +4731,12 @@ bool verifyWorldSpaceTransform(WorldPtr world)
 
   // Verify that nothing crashes when we run a batch
   std::vector<dynamics::BodyNode*> bodyNodes = world->getAllBodyNodes();
-  Eigen::MatrixXd worldPos = convertJointSpaceToWorldSpace(
+  Eigen::MatrixXs worldPos = convertJointSpaceToWorldSpace(
       world, jointPoses, bodyNodes, ConvertToSpace::POS_LINEAR, false);
-  Eigen::MatrixXd worldVel = convertJointSpaceToWorldSpace(
+  Eigen::MatrixXs worldVel = convertJointSpaceToWorldSpace(
       world, jointVels, bodyNodes, ConvertToSpace::VEL_LINEAR, false);
 
-  Eigen::MatrixXd backprop = convertJointSpaceToWorldSpace(
+  Eigen::MatrixXs backprop = convertJointSpaceToWorldSpace(
       world, worldPos * 5, bodyNodes, ConvertToSpace::POS_LINEAR, false, true);
 
   return true;
@@ -4749,21 +4746,21 @@ bool verifyAnalyticalA_c(WorldPtr world)
 {
   RestorableSnapshot snapshot(world);
 
-  Eigen::VectorXd truePreStep = world->getPositions();
+  Eigen::VectorXs truePreStep = world->getPositions();
   BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
 
   std::vector<std::shared_ptr<DifferentiableContactConstraint>> constraints
       = classicPtr->getClampingConstraints();
-  Eigen::MatrixXd A_c = classicPtr->getMassMatrix(world)
+  Eigen::MatrixXs A_c = classicPtr->getMassMatrix(world)
                         * classicPtr->getMassedClampingConstraintMatrix(world);
 
-  Eigen::VectorXd preStepPos = classicPtr->getPreStepPosition();
-  Eigen::VectorXd postStepPos = classicPtr->getPostStepPosition();
+  Eigen::VectorXs preStepPos = classicPtr->getPreStepPosition();
+  Eigen::VectorXs postStepPos = classicPtr->getPostStepPosition();
   world->setPositions(classicPtr->getPreStepPosition());
   for (int i = 0; i < classicPtr->getNumClamping(); i++)
   {
-    Eigen::VectorXd trueCol = A_c.col(i);
-    Eigen::VectorXd analyticalCol
+    Eigen::VectorXs trueCol = A_c.col(i);
+    Eigen::VectorXs analyticalCol
         = constraints[i]->getConstraintForces(world.get());
     if (!equals(trueCol, analyticalCol, 5e-10))
     {
@@ -4784,22 +4781,22 @@ bool verifyAnalyticalA_ub(WorldPtr world)
 {
   RestorableSnapshot snapshot(world);
 
-  Eigen::VectorXd truePreStep = world->getPositions();
+  Eigen::VectorXs truePreStep = world->getPositions();
   BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
 
   std::vector<std::shared_ptr<DifferentiableContactConstraint>> constraints
       = classicPtr->getUpperBoundConstraints();
-  Eigen::MatrixXd A_ub
+  Eigen::MatrixXs A_ub
       = classicPtr->getMassMatrix(world)
         * classicPtr->getMassedUpperBoundConstraintMatrix(world);
 
-  Eigen::VectorXd preStepPos = classicPtr->getPreStepPosition();
-  Eigen::VectorXd postStepPos = classicPtr->getPostStepPosition();
+  Eigen::VectorXs preStepPos = classicPtr->getPreStepPosition();
+  Eigen::VectorXs postStepPos = classicPtr->getPostStepPosition();
   world->setPositions(classicPtr->getPreStepPosition());
   for (int i = 0; i < classicPtr->getNumUpperBound(); i++)
   {
-    Eigen::VectorXd trueCol = A_ub.col(i);
-    Eigen::VectorXd analyticalCol
+    Eigen::VectorXs trueCol = A_ub.col(i);
+    Eigen::VectorXs analyticalCol
         = constraints[i]->getConstraintForces(world.get());
     if (!equals(trueCol, analyticalCol, 5e-9))
     {
@@ -4907,7 +4904,7 @@ bool verifyAnalyticalContactForceJacobians(WorldPtr world)
   return true;
 }
 
-bool equals(EdgeData e1, EdgeData e2, double threshold)
+bool equals(EdgeData e1, EdgeData e2, s_t threshold)
 {
   return equals(e1.edgeAPos, e2.edgeAPos, threshold)
          && equals(e1.edgeADir, e2.edgeADir, threshold)
@@ -4922,14 +4919,14 @@ bool verifyPerturbedContactEdges(WorldPtr world)
   BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
   std::vector<std::shared_ptr<DifferentiableContactConstraint>> constraints
       = classicPtr->getClampingConstraints();
-  const double EPS = 1e-5;
+  const s_t EPS = 1e-5;
   for (int k = 0; k < constraints.size(); k++)
   {
     if (constraints[k]->getContactType() == EDGE_EDGE)
     {
       EdgeData original = constraints[k]->getEdges();
       /*
-      Eigen::Vector3d originalIntersectionPoint = math::getContactPoint(
+      Eigen::Vector3s originalIntersectionPoint = math::getContactPoint(
           original.edgeAPos,
           original.edgeADir,
           original.edgeBPos,
@@ -4950,23 +4947,23 @@ bool verifyPerturbedContactEdges(WorldPtr world)
           EdgeData analyticalNeg
               = constraints[k]->estimatePerturbedEdges(skel, j, -EPS);
 
-          Eigen::Vector3d bruteIntersection = math::getContactPoint(
+          Eigen::Vector3s bruteIntersection = math::getContactPoint(
               bruteForce.edgeAPos,
               bruteForce.edgeADir,
               bruteForce.edgeBPos,
               bruteForce.edgeBDir);
-          Eigen::Vector3d bruteIntersectionNeg = math::getContactPoint(
+          Eigen::Vector3s bruteIntersectionNeg = math::getContactPoint(
               bruteForceNeg.edgeAPos,
               bruteForceNeg.edgeADir,
               bruteForceNeg.edgeBPos,
               bruteForceNeg.edgeBDir);
-          Eigen::Vector3d analyticalIntersection = math::getContactPoint(
+          Eigen::Vector3s analyticalIntersection = math::getContactPoint(
               bruteForce.edgeAPos,
               bruteForce.edgeADir,
               bruteForce.edgeBPos,
               bruteForce.edgeBDir);
 
-          double estimateThreshold = 1e-10;
+          s_t estimateThreshold = 1e-10;
 
           // Check the intersection point first, because the actual input
           // points can be different if the collision detector decided to use
@@ -5131,7 +5128,7 @@ bool verifyPerturbedContactEdges(WorldPtr world)
             return false;
           }
 
-          Eigen::Vector3d analyticalIntersectionGradient
+          Eigen::Vector3s analyticalIntersectionGradient
               = math::getContactPointGradient(
                   original.edgeAPos,
                   analyticalGradient.edgeAPos,
@@ -5142,7 +5139,7 @@ bool verifyPerturbedContactEdges(WorldPtr world)
                   original.edgeBDir,
                   analyticalGradient.edgeBDir);
 
-          Eigen::Vector3d finiteDifferenceIntersectionGradient
+          Eigen::Vector3s finiteDifferenceIntersectionGradient
               = (bruteIntersection - bruteIntersectionNeg) / (2 * EPS);
 
           estimateThreshold = 1e-8;
@@ -5190,7 +5187,7 @@ bool verifyPerturbedContactEdges(WorldPtr world)
 }
 
 bool verifyTranlationalLCPInvariance(
-    WorldPtr world, int dofIndex, double perturbBy)
+    WorldPtr world, int dofIndex, s_t perturbBy)
 {
   RestorableSnapshot snapshot(world);
 
@@ -5199,16 +5196,16 @@ bool verifyTranlationalLCPInvariance(
   dof->setPosition(dof->getPosition() + perturbBy);
   BackpropSnapshotPtr perturbedPtr = neural::forwardPass(world, true);
 
-  Eigen::MatrixXd perturbedA = perturbedPtr->mGradientMatrices[0]->mA;
-  Eigen::MatrixXd originalA = originalPtr->mGradientMatrices[0]->mA;
+  Eigen::MatrixXs perturbedA = perturbedPtr->mGradientMatrices[0]->mA;
+  Eigen::MatrixXs originalA = originalPtr->mGradientMatrices[0]->mA;
   std::cout << "Original A:" << std::endl << originalA << std::endl;
   std::cout << "Perturbed A:" << std::endl << perturbedA << std::endl;
   std::cout << "Diff:" << std::endl << (originalA - perturbedA) << std::endl;
 
-  Eigen::MatrixXd perturbedA_c
+  Eigen::MatrixXs perturbedA_c
       = perturbedPtr->mGradientMatrices[0]->getFullConstraintMatrix(
           world.get());
-  Eigen::MatrixXd originalA_c
+  Eigen::MatrixXs originalA_c
       = originalPtr->mGradientMatrices[0]->getFullConstraintMatrix(world.get());
   std::cout << "Original A_c:" << std::endl << originalA_c << std::endl;
   std::cout << "Perturbed A_c:" << std::endl << perturbedA_c << std::endl;
@@ -5224,14 +5221,14 @@ bool verifyTranlationalLCPInvariance(
             << originalConstraint->getContactWorldForceGradient(dof)
             << std::endl;
 
-  Eigen::VectorXd perturbedB = perturbedPtr->mGradientMatrices[0]->mB;
-  Eigen::VectorXd originalB = originalPtr->mGradientMatrices[0]->mB;
+  Eigen::VectorXs perturbedB = perturbedPtr->mGradientMatrices[0]->mB;
+  Eigen::VectorXs originalB = originalPtr->mGradientMatrices[0]->mB;
   std::cout << "Original B:" << std::endl << originalB << std::endl;
   std::cout << "Perturbed B:" << std::endl << perturbedB << std::endl;
   std::cout << "Diff:" << std::endl << (originalB - perturbedB) << std::endl;
 
-  Eigen::VectorXd perturbedX = perturbedPtr->mGradientMatrices[0]->mX;
-  Eigen::VectorXd originalX = originalPtr->mGradientMatrices[0]->mX;
+  Eigen::VectorXs perturbedX = perturbedPtr->mGradientMatrices[0]->mX;
+  Eigen::VectorXs originalX = originalPtr->mGradientMatrices[0]->mX;
   std::cout << "Original X:" << std::endl << originalX << std::endl;
   std::cout << "Perturbed X:" << std::endl << perturbedX << std::endl;
   std::cout << "Diff:" << std::endl << (originalX - perturbedX) << std::endl;
@@ -5255,8 +5252,8 @@ bool verifyPerturbedContactPositions(
     return false;
   }
 
-  // const double EPS = 1e-4;
-  const double EPS = 1e-6;
+  // const s_t EPS = 1e-4;
+  const s_t EPS = 1e-6;
   for (int i = 0; i < world->getNumSkeletons(); i++)
   {
     auto skel = world->getSkeleton(i);
@@ -5264,11 +5261,11 @@ bool verifyPerturbedContactPositions(
     {
       for (int k = 0; k < constraints.size(); k++)
       {
-        Eigen::Vector3d pos = constraints[k]->getContactWorldPosition();
-        Eigen::Vector3d normal = constraints[k]->getContactWorldNormal();
-        Eigen::Vector3d analytical
+        Eigen::Vector3s pos = constraints[k]->getContactWorldPosition();
+        Eigen::Vector3s normal = constraints[k]->getContactWorldNormal();
+        Eigen::Vector3s analytical
             = constraints[k]->estimatePerturbedContactPosition(skel, j, EPS);
-        Eigen::Vector3d bruteForce
+        Eigen::Vector3s bruteForce
             = constraints[k]->bruteForcePerturbedContactPosition(
                 world, skel, j, EPS);
         // our EPS is only 1e-7, so tolerances have to be tight on our tests
@@ -5289,10 +5286,10 @@ bool verifyPerturbedContactPositions(
           std::cout << "Brute Force Contact Pos Diff:" << std::endl
                     << (bruteForce - pos) << std::endl;
 
-          Eigen::Vector6d worldTwist
+          Eigen::Vector6s worldTwist
               = constraints[k]->getWorldScrewAxisForPosition(skel, j);
-          Eigen::Isometry3d rotation = math::expMap(worldTwist * EPS);
-          Eigen::Vector3d perturbedContactPos = rotation * pos;
+          Eigen::Isometry3s rotation = math::expMap(worldTwist * EPS);
+          Eigen::Vector3s perturbedContactPos = rotation * pos;
           std::cout << "World Screw:" << std::endl << worldTwist << std::endl;
           std::cout << "Transform:" << std::endl
                     << rotation.matrix() << std::endl;
@@ -5323,23 +5320,23 @@ bool verifyPerturbedContactPositions(
 
           /*
           // Uncomment for a breakpoint
-          Eigen::Vector3d analytical
+          Eigen::Vector3s analytical
               = constraints[k]->estimatePerturbedContactPosition(skel, j, EPS);
           */
           return false;
         }
 
-        Eigen::Vector3d bruteForceNeg
+        Eigen::Vector3s bruteForceNeg
             = constraints[k]->bruteForcePerturbedContactPosition(
                 world, skel, j, -EPS);
-        Eigen::Vector3d analyticalNeg
+        Eigen::Vector3s analyticalNeg
             = constraints[k]->estimatePerturbedContactPosition(skel, j, -EPS);
 
-        Eigen::Vector3d finiteDifferenceGradient
+        Eigen::Vector3s finiteDifferenceGradient
             = (bruteForce - bruteForceNeg) / (2 * EPS);
-        Eigen::Vector3d finiteDifferenceAnalyticalGradient
+        Eigen::Vector3s finiteDifferenceAnalyticalGradient
             = (analytical - analyticalNeg) / (2 * EPS);
-        Eigen::Vector3d analyticalGradient
+        Eigen::Vector3s analyticalGradient
             = constraints[k]->getContactPositionGradient(skel->getDof(j));
         if (!equals(analyticalGradient, finiteDifferenceGradient, 1e-8))
         {
@@ -5383,7 +5380,7 @@ bool verifyPerturbedContactNormals(WorldPtr world)
   BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
   std::vector<std::shared_ptr<DifferentiableContactConstraint>> constraints
       = classicPtr->getClampingConstraints();
-  const double EPS = 1e-6;
+  const s_t EPS = 1e-6;
   for (int i = 0; i < world->getNumSkeletons(); i++)
   {
     auto skel = world->getSkeleton(i);
@@ -5391,11 +5388,11 @@ bool verifyPerturbedContactNormals(WorldPtr world)
     {
       for (int k = 0; k < constraints.size(); k++)
       {
-        Eigen::Vector3d pos = constraints[k]->getContactWorldPosition();
-        Eigen::Vector3d normal = constraints[k]->getContactWorldNormal();
-        Eigen::Vector3d analytical
+        Eigen::Vector3s pos = constraints[k]->getContactWorldPosition();
+        Eigen::Vector3s normal = constraints[k]->getContactWorldNormal();
+        Eigen::Vector3s analytical
             = constraints[k]->estimatePerturbedContactNormal(skel, j, EPS);
-        Eigen::Vector3d bruteForce
+        Eigen::Vector3s bruteForce
             = constraints[k]->bruteForcePerturbedContactNormal(
                 world, skel, j, EPS);
         if (!equals(analytical, bruteForce, 1e-9))
@@ -5424,17 +5421,17 @@ bool verifyPerturbedContactNormals(WorldPtr world)
           return false;
         }
 
-        Eigen::Vector3d bruteForceNeg
+        Eigen::Vector3s bruteForceNeg
             = constraints[k]->bruteForcePerturbedContactNormal(
                 world, skel, j, -EPS);
 
-        Eigen::Vector3d finiteDifferenceGradient
+        Eigen::Vector3s finiteDifferenceGradient
             = (bruteForce - bruteForceNeg) / (2 * EPS);
-        Eigen::Vector3d analyticalGradient
+        Eigen::Vector3s analyticalGradient
             = constraints[k]->getContactNormalGradient(skel->getDof(j));
         if (!equals(analyticalGradient, finiteDifferenceGradient, 1e-9))
         {
-          Eigen::Vector3d analyticalGradient
+          Eigen::Vector3s analyticalGradient
               = constraints[k]->getContactNormalGradient(skel->getDof(j));
           std::cout << "Failed contact normal gradient!" << std::endl;
           std::cout << "Skel:" << std::endl << skel->getName() << std::endl;
@@ -5460,7 +5457,7 @@ bool verifyPerturbedContactForceDirections(WorldPtr world)
   BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
   std::vector<std::shared_ptr<DifferentiableContactConstraint>> constraints
       = classicPtr->getClampingConstraints();
-  const double EPS = 1e-6;
+  const s_t EPS = 1e-6;
   for (int i = 0; i < world->getNumSkeletons(); i++)
   {
     auto skel = world->getSkeleton(i);
@@ -5468,12 +5465,12 @@ bool verifyPerturbedContactForceDirections(WorldPtr world)
     {
       for (int k = 0; k < constraints.size(); k++)
       {
-        Eigen::Vector3d normal = constraints[k]->getContactWorldNormal();
-        Eigen::Vector3d dir = constraints[k]->getContactWorldForceDirection();
-        Eigen::Vector3d analytical
+        Eigen::Vector3s normal = constraints[k]->getContactWorldNormal();
+        Eigen::Vector3s dir = constraints[k]->getContactWorldForceDirection();
+        Eigen::Vector3s analytical
             = constraints[k]->estimatePerturbedContactForceDirection(
                 skel, j, EPS);
-        Eigen::Vector3d bruteForce
+        Eigen::Vector3s bruteForce
             = constraints[k]->bruteForcePerturbedContactForceDirection(
                 world, skel, j, EPS);
         if (!equals(analytical, bruteForce, 1e-8))
@@ -5487,9 +5484,9 @@ bool verifyPerturbedContactForceDirections(WorldPtr world)
           int jointIndex = dof->getIndexInJoint();
           math::Jacobian relativeJac = dof->getJoint()->getRelativeJacobian();
           dynamics::BodyNode* childNode = dof->getChildBodyNode();
-          Eigen::Isometry3d transform = childNode->getWorldTransform();
-          Eigen::Vector6d localTwist = relativeJac.col(jointIndex);
-          Eigen::Vector6d worldTwist = math::AdT(transform, localTwist);
+          Eigen::Isometry3s transform = childNode->getWorldTransform();
+          Eigen::Vector6s localTwist = relativeJac.col(jointIndex);
+          Eigen::Vector6s worldTwist = math::AdT(transform, localTwist);
 
           std::cout << "local twist:" << std::endl << localTwist << std::endl;
           std::cout << "world twist:" << std::endl << worldTwist << std::endl;
@@ -5510,12 +5507,12 @@ bool verifyPerturbedContactForceDirections(WorldPtr world)
           return false;
         }
 
-        Eigen::Vector3d bruteForceNeg
+        Eigen::Vector3s bruteForceNeg
             = constraints[k]->bruteForcePerturbedContactForceDirection(
                 world, skel, j, -EPS);
-        Eigen::Vector3d finiteDifferenceGradient
+        Eigen::Vector3s finiteDifferenceGradient
             = (bruteForce - bruteForceNeg) / (2 * EPS);
-        Eigen::Vector3d analyticalGradient
+        Eigen::Vector3s analyticalGradient
             = constraints[k]->getContactForceGradient(skel->getDof(j));
         if (!equals(analyticalGradient, finiteDifferenceGradient, 1e-9))
         {
@@ -5554,7 +5551,7 @@ bool verifyPerturbedScrewAxisForPosition(WorldPtr world)
   BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
   std::vector<std::shared_ptr<DifferentiableContactConstraint>> constraints
       = classicPtr->getClampingConstraints();
-  const double EPS = 5e-9;
+  const s_t EPS = 5e-9;
   std::vector<DegreeOfFreedom*> dofs = world->getDofs();
   for (int j = 0; j < dofs.size(); j++)
   {
@@ -5564,12 +5561,12 @@ bool verifyPerturbedScrewAxisForPosition(WorldPtr world)
       DegreeOfFreedom* wrt = dofs[k];
       for (int q = 0; q < constraints.size(); q++)
       {
-        Eigen::Vector6d original
+        Eigen::Vector6s original
             = constraints[q]->getWorldScrewAxisForPosition(axis);
-        Eigen::Vector6d analytical
+        Eigen::Vector6s analytical
             = constraints[q]->estimatePerturbedScrewAxisForPosition(
                 axis, wrt, EPS);
-        Eigen::Vector6d bruteForce
+        Eigen::Vector6s bruteForce
             = constraints[q]->bruteForceScrewAxisForPosition(axis, wrt, EPS);
 
         if (!equals(analytical, bruteForce, 1e-9))
@@ -5604,17 +5601,17 @@ bool verifyPerturbedScrewAxisForPosition(WorldPtr world)
         ///////////////////////////////////////////////////////
 
         /*
-        Eigen::Vector6d analyticalNeg
+        Eigen::Vector6s analyticalNeg
             = constraints[q]->estimatePerturbedScrewAxisForPosition(
                 axis, wrt, -EPS);
-        Eigen::Vector6d bruteForceNeg
+        Eigen::Vector6s bruteForceNeg
             = constraints[q]->bruteForceScrewAxisForPosition(axis, wrt, -EPS);
 
-        Eigen::Vector6d finiteDifferenceGradient
+        Eigen::Vector6s finiteDifferenceGradient
             = (bruteForce - bruteForceNeg) / (2 * EPS);
-        Eigen::Vector6d finiteDifferenceAnalyticalGradient
+        Eigen::Vector6s finiteDifferenceAnalyticalGradient
             = (analytical - analyticalNeg) / (2 * EPS);
-        Eigen::Vector6d analyticalGradient
+        Eigen::Vector6s analyticalGradient
             = constraints[q]->getScrewAxisForPositionGradient(axis, wrt);
         if (!equals(analyticalGradient, finiteDifferenceGradient, 1e-8))
         {
@@ -5653,7 +5650,7 @@ bool verifyPerturbedScrewAxisForForce(WorldPtr world)
   BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
   std::vector<std::shared_ptr<DifferentiableContactConstraint>> constraints
       = classicPtr->getClampingConstraints();
-  const double EPS = 1e-6;
+  const s_t EPS = 1e-6;
   std::vector<DegreeOfFreedom*> dofs = world->getDofs();
   for (int j = 0; j < dofs.size(); j++)
   {
@@ -5663,12 +5660,12 @@ bool verifyPerturbedScrewAxisForForce(WorldPtr world)
       DegreeOfFreedom* wrt = dofs[k];
       for (int q = 0; q < constraints.size(); q++)
       {
-        Eigen::Vector6d original
+        Eigen::Vector6s original
             = constraints[q]->getWorldScrewAxisForForce(axis);
-        Eigen::Vector6d analytical
+        Eigen::Vector6s analytical
             = constraints[q]->estimatePerturbedScrewAxisForForce(
                 axis, wrt, EPS);
-        Eigen::Vector6d bruteForce
+        Eigen::Vector6s bruteForce
             = constraints[q]->bruteForceScrewAxisForForce(axis, wrt, EPS);
 
         if (!equals(analytical, bruteForce, 1e-9))
@@ -5696,17 +5693,17 @@ bool verifyPerturbedScrewAxisForForce(WorldPtr world)
           return false;
         }
 
-        Eigen::Vector6d analyticalNeg
+        Eigen::Vector6s analyticalNeg
             = constraints[q]->estimatePerturbedScrewAxisForForce(
                 axis, wrt, -EPS);
-        Eigen::Vector6d bruteForceNeg
+        Eigen::Vector6s bruteForceNeg
             = constraints[q]->bruteForceScrewAxisForForce(axis, wrt, -EPS);
 
-        Eigen::Vector6d finiteDifferenceGradient
+        Eigen::Vector6s finiteDifferenceGradient
             = (bruteForce - bruteForceNeg) / (2 * EPS);
-        Eigen::Vector6d finiteDifferenceAnalyticalGradient
+        Eigen::Vector6s finiteDifferenceAnalyticalGradient
             = (analytical - analyticalNeg) / (2 * EPS);
-        Eigen::Vector6d analyticalGradient
+        Eigen::Vector6s analyticalGradient
             = constraints[q]->getScrewAxisForForceGradient(axis, wrt);
         if (!equals(analyticalGradient, finiteDifferenceGradient, 1e-8))
         {
@@ -5745,7 +5742,7 @@ bool verifyAnalyticalConstraintDerivatives(WorldPtr world)
 {
   BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
 
-  const double EPS = 1e-7;
+  const s_t EPS = 1e-7;
 
   std::vector<DegreeOfFreedom*> dofs = world->getDofs();
   std::vector<std::shared_ptr<DifferentiableContactConstraint>> constraints
@@ -5758,32 +5755,32 @@ bool verifyAnalyticalConstraintDerivatives(WorldPtr world)
       {
         DegreeOfFreedom* rotate = dofs[j];
         DegreeOfFreedom* axis = dofs[k];
-        double originalValue = constraints[i]->getConstraintForce(axis);
+        s_t originalValue = constraints[i]->getConstraintForce(axis);
 
-        double analytical
+        s_t analytical
             = constraints[i]->getConstraintForceDerivative(axis, rotate);
 
-        double originalPosition = rotate->getPosition();
+        s_t originalPosition = rotate->getPosition();
         rotate->setPosition(originalPosition + EPS);
         BackpropSnapshotPtr newPtr = neural::forwardPass(world, true);
-        double newValue
+        s_t newValue
             = constraints[i]->getPeerConstraint(newPtr)->getConstraintForce(
                 axis);
 
         rotate->setPosition(originalPosition - EPS);
         BackpropSnapshotPtr newPtrNeg = neural::forwardPass(world, true);
-        double newValueNeg
+        s_t newValueNeg
             = constraints[i]->getPeerConstraint(newPtrNeg)->getConstraintForce(
                 axis);
 
         rotate->setPosition(originalPosition);
 
-        Eigen::Vector6d gradientOfWorldForce
+        Eigen::Vector6s gradientOfWorldForce
             = constraints[i]->getContactWorldForceGradient(rotate);
-        Eigen::Vector6d worldTwist
+        Eigen::Vector6s worldTwist
             = constraints[i]->getWorldScrewAxisForForce(axis);
 
-        double bruteForce = (newValue - newValueNeg) / (2 * EPS);
+        s_t bruteForce = (newValue - newValueNeg) / (2 * EPS);
 
         if (abs(analytical - bruteForce) > 1e-8)
         {
@@ -5803,7 +5800,7 @@ bool verifyAnalyticalConstraintDerivatives(WorldPtr world)
                     << worldTwist << std::endl;
           /*
           // Uncomment for a breakpoint
-          double analytical
+          s_t analytical
               = constraints[i]->getConstraintForceDerivative(axis, rotate);
           */
           return false;
@@ -5822,11 +5819,11 @@ bool verifyAnalyticalA_cJacobian(WorldPtr world)
       = classicPtr->getClampingConstraints();
   for (int i = 0; i < constraints.size(); i++)
   {
-    Eigen::MatrixXd analytical
+    Eigen::MatrixXs analytical
         = constraints[i]->getConstraintForcesJacobian(world);
-    Eigen::MatrixXd bruteForce
+    Eigen::MatrixXs bruteForce
         = constraints[i]->bruteForceConstraintForcesJacobian(world);
-    Eigen::VectorXd A_cCol = constraints[i]->getConstraintForces(world.get());
+    Eigen::VectorXs A_cCol = constraints[i]->getConstraintForces(world.get());
     if (!equals(analytical, bruteForce, 1e-8))
     {
       std::cout << "A_c col:" << std::endl << A_cCol << std::endl;
@@ -5852,9 +5849,9 @@ bool verifyAnalyticalA_cJacobian(WorldPtr world)
       for (int k = 0; k < world->getNumSkeletons(); k++)
       {
         auto skel = world->getSkeleton(k);
-        Eigen::MatrixXd gold
+        Eigen::MatrixXs gold
             = analytical.block(row, col, skel->getNumDofs(), wrt->getNumDofs());
-        Eigen::MatrixXd chunk
+        Eigen::MatrixXs chunk
             = constraints[i]->getConstraintForcesJacobian(skel, wrt);
         if (!equals(gold, chunk, 1e-9))
         {
@@ -5879,9 +5876,9 @@ bool verifyAnalyticalA_cJacobian(WorldPtr world)
         skels.push_back(world->getSkeleton(k));
       }
 
-      Eigen::MatrixXd gold
+      Eigen::MatrixXs gold
           = analytical.block(0, col, world->getNumDofs(), wrt->getNumDofs());
-      Eigen::MatrixXd chunk
+      Eigen::MatrixXs chunk
           = constraints[i]->getConstraintForcesJacobian(skels, wrt);
       if (!equals(gold, chunk, 1e-9))
       {
@@ -5905,7 +5902,7 @@ bool verifyAnalyticalA_cJacobian(WorldPtr world)
       skels.push_back(world->getSkeleton(j));
     }
 
-    Eigen::MatrixXd skelAnalytical
+    Eigen::MatrixXs skelAnalytical
         = constraints[i]->getConstraintForcesJacobian(world, skels);
     if (!equals(analytical, skelAnalytical, 1e-9))
     {
@@ -5932,11 +5929,11 @@ bool verifyAnalyticalA_ubJacobian(WorldPtr world)
       = classicPtr->getUpperBoundConstraints();
   for (int i = 0; i < constraints.size(); i++)
   {
-    Eigen::MatrixXd analytical
+    Eigen::MatrixXs analytical
         = constraints[i]->getConstraintForcesJacobian(world);
-    Eigen::MatrixXd bruteForce
+    Eigen::MatrixXs bruteForce
         = constraints[i]->bruteForceConstraintForcesJacobian(world);
-    Eigen::VectorXd A_ubCol = constraints[i]->getConstraintForces(world.get());
+    Eigen::VectorXs A_ubCol = constraints[i]->getConstraintForces(world.get());
     if (!equals(analytical, bruteForce, 1e-8))
     {
       std::cout << "A_ub col:" << std::endl << A_ubCol << std::endl;
@@ -5962,9 +5959,9 @@ bool verifyAnalyticalA_ubJacobian(WorldPtr world)
       for (int k = 0; k < world->getNumSkeletons(); k++)
       {
         auto skel = world->getSkeleton(k);
-        Eigen::MatrixXd gold
+        Eigen::MatrixXs gold
             = analytical.block(row, col, skel->getNumDofs(), wrt->getNumDofs());
-        Eigen::MatrixXd chunk
+        Eigen::MatrixXs chunk
             = constraints[i]->getConstraintForcesJacobian(skel, wrt);
         if (!equals(gold, chunk, 1e-9))
         {
@@ -5989,9 +5986,9 @@ bool verifyAnalyticalA_ubJacobian(WorldPtr world)
         skels.push_back(world->getSkeleton(k));
       }
 
-      Eigen::MatrixXd gold
+      Eigen::MatrixXs gold
           = analytical.block(0, col, world->getNumDofs(), wrt->getNumDofs());
-      Eigen::MatrixXd chunk
+      Eigen::MatrixXs chunk
           = constraints[i]->getConstraintForcesJacobian(skels, wrt);
       if (!equals(gold, chunk, 1e-9))
       {
@@ -6015,7 +6012,7 @@ bool verifyAnalyticalA_ubJacobian(WorldPtr world)
       skels.push_back(world->getSkeleton(j));
     }
 
-    Eigen::MatrixXd skelAnalytical
+    Eigen::MatrixXs skelAnalytical
         = constraints[i]->getConstraintForcesJacobian(world, skels);
     if (!equals(analytical, skelAnalytical, 1e-9))
     {
@@ -6038,11 +6035,11 @@ bool verifyJacobianOfClampingConstraints(WorldPtr world)
 {
   BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
 
-  Eigen::VectorXd f0 = Eigen::VectorXd::Random(classicPtr->getNumClamping());
+  Eigen::VectorXs f0 = Eigen::VectorXs::Random(classicPtr->getNumClamping());
 
-  Eigen::MatrixXd analytical
+  Eigen::MatrixXs analytical
       = classicPtr->getJacobianOfClampingConstraints(world, f0);
-  Eigen::MatrixXd bruteForce
+  Eigen::MatrixXs bruteForce
       = classicPtr->finiteDifferenceJacobianOfClampingConstraints(world, f0);
 
   if (!equals(analytical, bruteForce, 1e-8))
@@ -6055,12 +6052,12 @@ bool verifyJacobianOfClampingConstraints(WorldPtr world)
 
     for (int i = 0; i < f0.size(); i++)
     {
-      Eigen::VectorXd oneHot = Eigen::VectorXd::Zero(f0.size());
+      Eigen::VectorXs oneHot = Eigen::VectorXs::Zero(f0.size());
       oneHot(i) = 1.0;
 
-      Eigen::MatrixXd analyticalOneHot
+      Eigen::MatrixXs analyticalOneHot
           = classicPtr->getJacobianOfClampingConstraints(world, oneHot);
-      Eigen::MatrixXd bruteForceOneHot
+      Eigen::MatrixXs bruteForceOneHot
           = classicPtr->finiteDifferenceJacobianOfClampingConstraints(
               world, oneHot);
       if (!equals(analyticalOneHot, bruteForceOneHot, 1e-8))
@@ -6085,11 +6082,11 @@ bool verifyJacobianOfClampingConstraintsTranspose(WorldPtr world)
 {
   BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
 
-  Eigen::VectorXd v0 = Eigen::VectorXd::Random(world->getNumDofs());
+  Eigen::VectorXs v0 = Eigen::VectorXs::Random(world->getNumDofs());
 
-  Eigen::MatrixXd analytical
+  Eigen::MatrixXs analytical
       = classicPtr->getJacobianOfClampingConstraintsTranspose(world, v0);
-  Eigen::MatrixXd bruteForce
+  Eigen::MatrixXs bruteForce
       = classicPtr->finiteDifferenceJacobianOfClampingConstraintsTranspose(
           world, v0);
 
@@ -6110,11 +6107,11 @@ bool verifyJacobianOfUpperBoundConstraints(WorldPtr world)
 {
   BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
 
-  Eigen::VectorXd f0 = Eigen::VectorXd::Random(classicPtr->getNumUpperBound());
+  Eigen::VectorXs f0 = Eigen::VectorXs::Random(classicPtr->getNumUpperBound());
 
-  Eigen::MatrixXd analytical
+  Eigen::MatrixXs analytical
       = classicPtr->getJacobianOfUpperBoundConstraints(world, f0);
-  Eigen::MatrixXd bruteForce
+  Eigen::MatrixXs bruteForce
       = classicPtr->finiteDifferenceJacobianOfUpperBoundConstraints(world, f0);
 
   if (!equals(analytical, bruteForce, 1e-8))
@@ -6130,7 +6127,7 @@ bool verifyJacobianOfUpperBoundConstraints(WorldPtr world)
 
 bool verifyPositionScrews(WorldPtr world)
 {
-  double EPS = 1e-4;
+  s_t EPS = 1e-4;
 
   std::vector<dynamics::DegreeOfFreedom*> dofs = world->getDofs();
   for (int dofIndex = 0; dofIndex < dofs.size(); dofIndex++)
@@ -6138,21 +6135,21 @@ bool verifyPositionScrews(WorldPtr world)
     dynamics::DegreeOfFreedom* dof = dofs[dofIndex];
 
     // dynamics::BodyNode* node = dof->getChildBodyNode();
-    // Eigen::Isometry3d originalTransform = node->getWorldTransform();
+    // Eigen::Isometry3s originalTransform = node->getWorldTransform();
 
     // get world twist
     int jointIndex = dof->getIndexInJoint();
     dynamics::BodyNode* childNode = dof->getChildBodyNode();
-    Eigen::Isometry3d transform = childNode->getWorldTransform();
-    Eigen::Vector6d worldTwist
+    Eigen::Isometry3s transform = childNode->getWorldTransform();
+    Eigen::Vector6s worldTwist
         = dof->getJoint()->getWorldAxisScrewForPosition(jointIndex);
 
-    double pos = dof->getPosition();
+    s_t pos = dof->getPosition();
     dof->setPosition(pos + EPS);
 
-    Eigen::Matrix4d analyticalPerturbRotation
+    Eigen::Matrix4s analyticalPerturbRotation
         = (math::expMap(worldTwist * EPS) * transform).matrix();
-    Eigen::Matrix4d realPerturbRotation
+    Eigen::Matrix4s realPerturbRotation
         = childNode->getWorldTransform().matrix();
 
     // Reset
@@ -6166,7 +6163,7 @@ bool verifyPositionScrews(WorldPtr world)
                 << analyticalPerturbRotation << std::endl;
       std::cout << "Real perturbations" << std::endl
                 << realPerturbRotation << std::endl;
-      Eigen::Matrix4d diff = analyticalPerturbRotation - realPerturbRotation;
+      Eigen::Matrix4s diff = analyticalPerturbRotation - realPerturbRotation;
       std::cout << "Diff" << std::endl << diff << std::endl;
       std::cout << "Screw: " << worldTwist << std::endl;
       std::cout << "Original transform" << std::endl
@@ -6187,7 +6184,7 @@ bool verifyPositionScrews(WorldPtr world)
 
 bool verifyVelocityScrews(WorldPtr world)
 {
-  double EPS = 1e-4;
+  s_t EPS = 1e-4;
 
   for (int i = 0; i < world->getNumSkeletons(); i++)
   {
@@ -6202,26 +6199,26 @@ bool verifyVelocityScrews(WorldPtr world)
       {
         dynamics::BodyNode* node = skel->getBodyNode(j);
 
-        double originalVel = dof->getVelocity();
-        // Eigen::Vector6d originalSpatialVel = node->getSpatialVelocity();
+        s_t originalVel = dof->getVelocity();
+        // Eigen::Vector6s originalSpatialVel = node->getSpatialVelocity();
 
         dof->setVelocity(originalVel + EPS);
-        Eigen::Vector6d plusVel = node->getSpatialVelocity();
+        Eigen::Vector6s plusVel = node->getSpatialVelocity();
 
         dof->setVelocity(originalVel - EPS);
-        Eigen::Vector6d minusVel = node->getSpatialVelocity();
+        Eigen::Vector6s minusVel = node->getSpatialVelocity();
 
         dof->setVelocity(originalVel);
 
-        // Doing this double-sided should be unnecessary, because it should be
+        // Doing this s_t-sided should be unnecessary, because it should be
         // exactly linear (in theory).
-        Eigen::Vector6d bruteForceDiff = (plusVel - minusVel) / (2 * EPS);
+        Eigen::Vector6s bruteForceDiff = (plusVel - minusVel) / (2 * EPS);
 
-        Eigen::Vector6d bruteForceWorldJac
+        Eigen::Vector6s bruteForceWorldJac
             = math::AdT(node->getWorldTransform(), bruteForceDiff);
 
         int jointIndex = dof->getIndexInJoint();
-        Eigen::Vector6d analyticalWorldJac
+        Eigen::Vector6s analyticalWorldJac
             = dof->getJoint()->getWorldAxisScrewForVelocity(jointIndex);
         if (!dof->isParentOf(node))
           analyticalWorldJac.setZero();
@@ -6287,15 +6284,15 @@ bool verifyNoMultistepIntereference(WorldPtr world, int steps)
   BackpropSnapshotPtr dirtyPtr = neural::forwardPass(world);
   BackpropSnapshotPtr cleanPtr = neural::forwardPass(clean);
 
-  Eigen::MatrixXd dirtyVelVel = dirtyPtr->getVelVelJacobian(world);
-  Eigen::MatrixXd dirtyVelPos = dirtyPtr->getVelPosJacobian(world);
-  Eigen::MatrixXd dirtyPosVel = dirtyPtr->getPosVelJacobian(world);
-  Eigen::MatrixXd dirtyPosPos = dirtyPtr->getPosPosJacobian(world);
+  Eigen::MatrixXs dirtyVelVel = dirtyPtr->getVelVelJacobian(world);
+  Eigen::MatrixXs dirtyVelPos = dirtyPtr->getVelPosJacobian(world);
+  Eigen::MatrixXs dirtyPosVel = dirtyPtr->getPosVelJacobian(world);
+  Eigen::MatrixXs dirtyPosPos = dirtyPtr->getPosPosJacobian(world);
 
-  Eigen::MatrixXd cleanVelVel = cleanPtr->getVelVelJacobian(clean);
-  Eigen::MatrixXd cleanVelPos = cleanPtr->getVelPosJacobian(clean);
-  Eigen::MatrixXd cleanPosVel = cleanPtr->getPosVelJacobian(clean);
-  Eigen::MatrixXd cleanPosPos = cleanPtr->getPosPosJacobian(clean);
+  Eigen::MatrixXs cleanVelVel = cleanPtr->getVelVelJacobian(clean);
+  Eigen::MatrixXs cleanVelPos = cleanPtr->getVelPosJacobian(clean);
+  Eigen::MatrixXs cleanPosVel = cleanPtr->getPosVelJacobian(clean);
+  Eigen::MatrixXs cleanPosPos = cleanPtr->getPosPosJacobian(clean);
 
   // These Jacobians should match EXACTLY. If not, then something funky is
   // happening with memory getting reused.
@@ -6319,8 +6316,8 @@ bool verifyVelJacobianWrt(WorldPtr world, WithRespectTo* wrt)
 {
   neural::BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
 
-  MatrixXd analytical = classicPtr->getVelJacobianWrt(world, wrt);
-  MatrixXd bruteForce = classicPtr->finiteDifferenceVelJacobianWrt(world, wrt);
+  MatrixXs analytical = classicPtr->getVelJacobianWrt(world, wrt);
+  MatrixXs bruteForce = classicPtr->finiteDifferenceVelJacobianWrt(world, wrt);
 
   if (!equals(analytical, bruteForce, 5e-7))
   {
@@ -6339,8 +6336,8 @@ bool verifyPosJacobianWrt(WorldPtr world, WithRespectTo* wrt)
 {
   neural::BackpropSnapshotPtr classicPtr = neural::forwardPass(world, true);
 
-  MatrixXd analytical = classicPtr->getPosJacobianWrt(world, wrt);
-  MatrixXd bruteForce = classicPtr->finiteDifferencePosJacobianWrt(world, wrt);
+  MatrixXs analytical = classicPtr->getPosJacobianWrt(world, wrt);
+  MatrixXs bruteForce = classicPtr->finiteDifferencePosJacobianWrt(world, wrt);
 
   if (!equals(analytical, bruteForce, 1e-8))
   {
@@ -6368,9 +6365,9 @@ bool verifyWrtMapping(WorldPtr world, WithRespectTo* wrt)
 
   for (int i = 0; i < 10; i++)
   {
-    Eigen::VectorXd randMapping = Eigen::VectorXd::Random(dim).cwiseAbs();
+    Eigen::VectorXs randMapping = Eigen::VectorXs::Random(dim).cwiseAbs();
     wrt->set(world.get(), randMapping);
-    Eigen::VectorXd recoveredMapping = wrt->get(world.get());
+    Eigen::VectorXs recoveredMapping = wrt->get(world.get());
     if (!equals(randMapping, recoveredMapping))
     {
       std::cout << "Didn't recover WRT mapping" << std::endl;
@@ -6403,8 +6400,8 @@ bool verifyWrtMass(WorldPtr world)
     {
       for (int j = 0; j < skel->getNumBodyNodes(); j++)
       {
-        Eigen::VectorXd lowerBound = Eigen::VectorXd::Ones(1) * 0.1;
-        Eigen::VectorXd upperBound = Eigen::VectorXd::Ones(1) * 1000;
+        Eigen::VectorXs lowerBound = Eigen::VectorXs::Ones(1) * 0.1;
+        Eigen::VectorXs upperBound = Eigen::VectorXs::Ones(1) * 1000;
         massMapping.registerNode(
             skel->getBodyNode(j), INERTIA_MASS, upperBound, lowerBound);
       }
@@ -6427,8 +6424,8 @@ bool verifyWrtMass(WorldPtr world)
     auto skel = world->getSkeleton(i);
     for (int j = 0; j < skel->getNumBodyNodes(); j++)
     {
-      Eigen::VectorXd lowerBound = Eigen::VectorXd::Ones(6) * 0.1;
-      Eigen::VectorXd upperBound = Eigen::VectorXd::Ones(6) * 1000;
+      Eigen::VectorXs lowerBound = Eigen::VectorXs::Ones(6) * 0.1;
+      Eigen::VectorXs upperBound = Eigen::VectorXs::Ones(6) * 1000;
       inertiaMapping.registerNode(
           skel->getBodyNode(j), INERTIA_FULL, upperBound, lowerBound);
     }
@@ -6449,9 +6446,9 @@ bool verifyTrajectory(
 {
   const trajectory::TrajectoryRollout* rollout
       = trajectory->getRolloutCache(world);
-  Eigen::MatrixXd poses = rollout->getPosesConst();
-  Eigen::MatrixXd vels = rollout->getVelsConst();
-  Eigen::MatrixXd forces = rollout->getForcesConst();
+  Eigen::MatrixXs poses = rollout->getPosesConst();
+  Eigen::MatrixXs vels = rollout->getVelsConst();
+  Eigen::MatrixXs forces = rollout->getForcesConst();
 
   for (int i = 0; i < poses.cols(); i++)
   {

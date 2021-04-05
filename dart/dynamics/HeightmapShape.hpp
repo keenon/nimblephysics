@@ -40,7 +40,7 @@ namespace dynamics {
 
 /// Shape for a height map.
 ///
-/// \tparam S_ Data type used for height map. At this point, only double and
+/// \tparam S_ Data type used for height map. At this point, only s_t and
 /// float are supported. Short and char can be added at a later point.
 template <typename S_>
 class HeightmapShape : public Shape
@@ -69,7 +69,7 @@ public:
   /// This base class computes the intertia based on the bounding box.
   /// Subclasses may choose to provide a more accurate computation of the
   /// inertia.
-  Eigen::Matrix3d computeInertia(double mass) const override;
+  Eigen::Matrix3s computeInertia(s_t mass) const override;
 
   /// Sets scale of this heightmap.
   /// \param[in] scale Scale of the height map.
@@ -147,7 +147,7 @@ public:
   S getMaxHeight() const;
 
   /// Set the color of this arrow
-  void notifyColorUpdated(const Eigen::Vector4d& color) override;
+  void notifyColorUpdated(const Eigen::Vector4s& color) override;
 
 protected:
   // Documentation inherited.
@@ -163,7 +163,7 @@ protected:
   /// Computes the bounding box of the height field.
   /// \param[out] min Mininum of box
   /// \param[out] max Maxinum of box
-  void computeBoundingBox(Eigen::Vector3d& min, Eigen::Vector3d& max) const;
+  void computeBoundingBox(Eigen::Vector3s& min, Eigen::Vector3s& max) const;
 
 private:
   /// Scale of the heightmap
@@ -182,7 +182,7 @@ private:
 };
 
 using HeightmapShapef = HeightmapShape<float>;
-using HeightmapShaped = HeightmapShape<double>;
+using HeightmapShaped = HeightmapShape<s_t>;
 
 } // namespace dynamics
 } // namespace dart

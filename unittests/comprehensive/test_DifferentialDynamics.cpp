@@ -71,7 +71,7 @@ protected:
 void DifferentialDynamics::SetUp()
 {
   // fileList.push_back("dart://sample/skel/test/single_pendulum_ball_joint.skel");
-  // fileList.push_back("dart://sample/skel/test/double_pendulum_ball_joint.skel");
+  // fileList.push_back("dart://sample/skel/test/s_t_pendulum_ball_joint.skel");
   // fileList.push_back("dart://sample/skel/test/single_rigid_body.skel");
   // Create a list of skel files to test with
   //  fileList.push_back("dart://sample/skel/test/chainwhipa.skel");
@@ -80,10 +80,10 @@ void DifferentialDynamics::SetUp()
       "dart://sample/skel/test/single_pendulum_euler_joint.skel");
   fileList.push_back("dart://sample/skel/test/single_pendulum_ball_joint.skel");
   fileList.push_back("dart://sample/skel/test/single_rigid_body.skel");
-  fileList.push_back("dart://sample/skel/test/double_pendulum.skel");
+  fileList.push_back("dart://sample/skel/test/s_t_pendulum.skel");
   fileList.push_back(
-      "dart://sample/skel/test/double_pendulum_euler_joint.skel");
-  fileList.push_back("dart://sample/skel/test/double_pendulum_ball_joint.skel");
+      "dart://sample/skel/test/s_t_pendulum_euler_joint.skel");
+  fileList.push_back("dart://sample/skel/test/s_t_pendulum_ball_joint.skel");
   fileList.push_back(
       "dart://sample/skel/test/serial_chain_revolute_joint.skel");
   //    fileList.push_back("dart://sample/skel/test/serial_chain_eulerxyz_joint.skel");
@@ -159,15 +159,15 @@ TEST_F(DifferentialDynamics, compareEquationsOfMotion)
   int nRandomItr = 100;
 #endif
 
-  const double pi = constantsd::pi();
+  const s_t pi = constantsd::pi();
 
   // Lower and upper bound of configuration for system
-  double qLB = -0.25 * pi;
-  double qUB = 0.25 * pi;
-  double dqLB = -0.25 * pi;
-  double dqUB = 0.25 * pi;
-  double ddqLB = -0.25 * pi;
-  double ddqUB = 0.25 * pi;
+  s_t qLB = -0.25 * pi;
+  s_t qUB = 0.25 * pi;
+  s_t dqLB = -0.25 * pi;
+  s_t dqUB = 0.25 * pi;
+  s_t ddqLB = -0.25 * pi;
+  s_t ddqUB = 0.25 * pi;
 
   simulation::WorldPtr world;
 
@@ -181,10 +181,10 @@ TEST_F(DifferentialDynamics, compareEquationsOfMotion)
 
     // TODO(keenon): remove all this special treatment when we remove finite
     // differencing for FreeJoint and BallJoint
-    double abs_tol_C = 1e-8;
-    double rel_tol_C = 1e-3; // 0.1 %
-    double abs_tol_invM = 1e-8;
-    double rel_tol_invM = 1e-3; // 0.1 %
+    s_t abs_tol_C = 1e-8;
+    s_t rel_tol_C = 1e-3; // 0.1 %
+    s_t abs_tol_invM = 1e-8;
+    s_t rel_tol_invM = 1e-3; // 0.1 %
     /*
     if (uri.toString() == "dart://sample/skel/test/chainwhipa.skel")
     {
@@ -196,7 +196,7 @@ TEST_F(DifferentialDynamics, compareEquationsOfMotion)
     }
     else if (
         uri.toString()
-        == "dart://sample/skel/test/double_pendulum_ball_joint.skel")
+        == "dart://sample/skel/test/s_t_pendulum_ball_joint.skel")
     {
       abs_tol_invM = 2e-5;
       rel_tol_invM = 5e-3; // 0.5 %
@@ -233,7 +233,7 @@ TEST_F(DifferentialDynamics, compareEquationsOfMotion)
     // Check whether multiplication of mass matrix and its inverse is identity
     // matrix.
     world = utils::SkelParser::readWorld(uri);
-    // world->setGravity(Eigen::Vector3d::Zero());  // TODO(JS): Remove
+    // world->setGravity(Eigen::Vector3s::Zero());  // TODO(JS): Remove
     EXPECT_TRUE(world != nullptr);
 
     for (std::size_t i = 0; i < world->getNumSkeletons(); ++i)
@@ -244,9 +244,9 @@ TEST_F(DifferentialDynamics, compareEquationsOfMotion)
       const int dof = static_cast<int>(skel->getNumDofs());
 
       // Generate a random state
-      VectorXd q = VectorXd::Zero(dof);
-      VectorXd dq = VectorXd::Zero(dof);
-      VectorXd ddq = VectorXd::Zero(dof);
+      VectorXs q = VectorXs::Zero(dof);
+      VectorXs dq = VectorXs::Zero(dof);
+      VectorXs ddq = VectorXs::Zero(dof);
 
       for (int j = 0; j < nRandomItr; ++j)
       {
@@ -261,7 +261,7 @@ TEST_F(DifferentialDynamics, compareEquationsOfMotion)
         skel->setAccelerations(ddq);
 
         for (int i = 0; i < skel->getNumJoints(); i++) {
-          // Eigen::Isometry3d Tparent = Eigen::Isometry3d::Identity();
+          // Eigen::Isometry3s Tparent = Eigen::Isometry3s::Identity();
           // Tparent.translation()(2) = 1.0;
           // skel->getJoint(i)->setTransformFromParentBodyNode(Tparent);
           // skel->getJoint(i)->setTransformFromChildBodyNode(Tparent);
@@ -270,10 +270,10 @@ TEST_F(DifferentialDynamics, compareEquationsOfMotion)
 
         // Test derivative of DM/dq*x
         {
-          Eigen::VectorXd x = Eigen::VectorXd::Random(dof);
-          Eigen::MatrixXd DMX_Dq_numerical = skel->finiteDifferenceJacobianOfM(
+          Eigen::VectorXs x = Eigen::VectorXs::Random(dof);
+          Eigen::MatrixXs DMX_Dq_numerical = skel->finiteDifferenceJacobianOfM(
               x, neural::WithRespectTo::POSITION);
-          Eigen::MatrixXd DMX_Dq_analytic
+          Eigen::MatrixXs DMX_Dq_analytic
               = skel->getJacobianOfM(x, neural::WithRespectTo::POSITION);
           const bool res = equals(
               DMX_Dq_analytic, DMX_Dq_numerical, abs_tol_invM, rel_tol_invM);
@@ -325,9 +325,9 @@ TEST_F(DifferentialDynamics, compareEquationsOfMotion)
 
         // Test derivative of Coriolis matrix w.r.t. position
         {
-          Eigen::MatrixXd C_q_numerical = skel->finiteDifferenceJacobianOfC(
+          Eigen::MatrixXs C_q_numerical = skel->finiteDifferenceJacobianOfC(
               neural::WithRespectTo::POSITION);
-          Eigen::MatrixXd C_q_analytic
+          Eigen::MatrixXs C_q_analytic
               = skel->getJacobianOfC(neural::WithRespectTo::POSITION);
 
           const bool res
@@ -361,10 +361,10 @@ TEST_F(DifferentialDynamics, compareEquationsOfMotion)
 
         // Test derivative of inverse dynamics w.r.t. position
         {
-          Eigen::VectorXd x = Eigen::VectorXd::Random(dof);
-          Eigen::MatrixXd DID_Dq_numerical = skel->finiteDifferenceJacobianOfID(
+          Eigen::VectorXs x = Eigen::VectorXs::Random(dof);
+          Eigen::MatrixXs DID_Dq_numerical = skel->finiteDifferenceJacobianOfID(
               x, neural::WithRespectTo::POSITION);
-          Eigen::MatrixXd DID_Dq_analytic
+          Eigen::MatrixXs DID_Dq_analytic
               = skel->getJacobianOfID(x, neural::WithRespectTo::POSITION);
           const bool res = equals(
               DID_Dq_analytic, DID_Dq_numerical, abs_tol_invM, rel_tol_invM);
@@ -393,11 +393,11 @@ TEST_F(DifferentialDynamics, compareEquationsOfMotion)
 
         // Test derivative of inverse dynamics w.r.t. velocity
         {
-          Eigen::VectorXd x = Eigen::VectorXd::Random(dof);
-          Eigen::MatrixXd DID_Ddq_numerical
+          Eigen::VectorXs x = Eigen::VectorXs::Random(dof);
+          Eigen::MatrixXs DID_Ddq_numerical
               = skel->finiteDifferenceJacobianOfID(
                   x, neural::WithRespectTo::VELOCITY);
-          Eigen::MatrixXd DID_Ddq_analytic
+          Eigen::MatrixXs DID_Ddq_analytic
               = skel->getJacobianOfID(x, neural::WithRespectTo::VELOCITY);
           const bool res = equals(
               DID_Ddq_analytic, DID_Ddq_numerical, abs_tol_invM, rel_tol_invM);
@@ -426,10 +426,10 @@ TEST_F(DifferentialDynamics, compareEquationsOfMotion)
 
         // Test derivative of inverse dynamics w.r.t. force
         {
-          Eigen::VectorXd x = Eigen::VectorXd::Random(dof);
-          Eigen::MatrixXd DID_Df_numerical = skel->finiteDifferenceJacobianOfID(
+          Eigen::VectorXs x = Eigen::VectorXs::Random(dof);
+          Eigen::MatrixXs DID_Df_numerical = skel->finiteDifferenceJacobianOfID(
               x, neural::WithRespectTo::FORCE);
-          Eigen::MatrixXd DID_Df_analytic
+          Eigen::MatrixXs DID_Df_analytic
               = skel->getJacobianOfID(x, neural::WithRespectTo::FORCE);
           const bool res = equals(
               DID_Df_analytic, DID_Df_numerical, abs_tol_invM, rel_tol_invM);
@@ -458,9 +458,9 @@ TEST_F(DifferentialDynamics, compareEquationsOfMotion)
 
         // Test derivative of Coriolis matrix w.r.t. velocity
         {
-          Eigen::MatrixXd C_dq_analytic
+          Eigen::MatrixXs C_dq_analytic
               = skel->getJacobianOfC(neural::WithRespectTo::VELOCITY);
-          Eigen::MatrixXd dC_numerical = skel->finiteDifferenceJacobianOfC(
+          Eigen::MatrixXs dC_numerical = skel->finiteDifferenceJacobianOfC(
               neural::WithRespectTo::VELOCITY);
 
           const bool res
@@ -495,11 +495,11 @@ TEST_F(DifferentialDynamics, compareEquationsOfMotion)
         // TODO: uncomment this if we ever start using the Direct Minv Jacobian again
         // Test derivative of M^{-1}x w.r.t. position/velocity/acceleration
         {
-          Eigen::VectorXd x = Eigen::VectorXd::Random(dof);
-          Eigen::MatrixXd DMinvX_Dq_numerical
+          Eigen::VectorXs x = Eigen::VectorXs::Random(dof);
+          Eigen::MatrixXs DMinvX_Dq_numerical
               = skel->finiteDifferenceJacobianOfMinv(
                   x, neural::WithRespectTo::POSITION);
-          Eigen::MatrixXd DMinvX_Dq_analytic = skel->getJacobianOfMinv_Direct(
+          Eigen::MatrixXs DMinvX_Dq_analytic = skel->getJacobianOfMinv_Direct(
               x, neural::WithRespectTo::POSITION);
           const bool res = equals(
               DMinvX_Dq_analytic,
@@ -552,11 +552,11 @@ TEST_F(DifferentialDynamics, compareEquationsOfMotion)
 
         // Test derivative of M^{-1}x (ID) w.r.t. position/velocity/acceleration
         {
-          Eigen::VectorXd x = Eigen::VectorXd::Random(dof);
-          Eigen::MatrixXd DMinvX_Dq_numerical
+          Eigen::VectorXs x = Eigen::VectorXs::Random(dof);
+          Eigen::MatrixXs DMinvX_Dq_numerical
               = skel->finiteDifferenceJacobianOfMinv(
                   x, neural::WithRespectTo::POSITION);
-          Eigen::MatrixXd DMinvX_Dq_analytic
+          Eigen::MatrixXs DMinvX_Dq_analytic
               = skel->getJacobianOfMinv_ID(x, neural::WithRespectTo::POSITION);
           const bool res = equals(
               DMinvX_Dq_analytic,
@@ -601,9 +601,9 @@ TEST_F(DifferentialDynamics, compareEquationsOfMotion)
 
         // Test derivative of forward dynamics w.r.t. position
         {
-          Eigen::MatrixXd DFD_Dq_numerical = skel->finiteDifferenceJacobianOfFD(
+          Eigen::MatrixXs DFD_Dq_numerical = skel->finiteDifferenceJacobianOfFD(
               neural::WithRespectTo::POSITION);
-          Eigen::MatrixXd DFD_Dq_analytic
+          Eigen::MatrixXs DFD_Dq_analytic
               = skel->getJacobianOfFD(neural::WithRespectTo::POSITION);
           const bool res = equals(
               DFD_Dq_analytic, DFD_Dq_numerical, abs_tol_invM, rel_tol_invM);

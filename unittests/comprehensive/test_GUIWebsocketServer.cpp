@@ -71,7 +71,7 @@ TEST(REALTIME, GUI_SERVER)
 
   // Set gravity of the world
   // world->setPenetrationCorrectionEnabled(true);
-  world->setGravity(Eigen::Vector3d(0.0, -9.81, 0.0));
+  world->setGravity(Eigen::Vector3s(0.0, -9.81, 0.0));
 
   // Load ground and Atlas robot and add them to the world
   dart::utils::DartLoader urdfLoader;
@@ -122,23 +122,23 @@ TEST(REALTIME, GUI_SERVER)
   server
       .createBox(
           "box1",
-          Eigen::Vector3d(1, 1, 1),
-          Eigen::Vector3d::Zero(),
-          Eigen::Vector3d::Zero(),
-          Eigen::Vector3d(0.5, 0.7, 0.5))
-      .setObjectPosition("box1", Eigen::Vector3d(2, 2, 2))
+          Eigen::Vector3s(1, 1, 1),
+          Eigen::Vector3s::Zero(),
+          Eigen::Vector3s::Zero(),
+          Eigen::Vector3s(0.5, 0.7, 0.5))
+      .setObjectPosition("box1", Eigen::Vector3s(2, 2, 2))
       .flush();
   server.createSphere(
-      "ball1", 0.5, Eigen::Vector3d(1, 1, 1), Eigen::Vector3d(0.5, 0.5, 0.7));
+      "ball1", 0.5, Eigen::Vector3s(1, 1, 1), Eigen::Vector3s(0.5, 0.5, 0.7));
 
-  std::vector<Eigen::Vector3d> linePoints;
-  linePoints.push_back(Eigen::Vector3d::Zero());
-  linePoints.push_back(Eigen::Vector3d(0.5, 0.5, 0.7));
-  linePoints.push_back(Eigen::Vector3d(1, 1, 1));
+  std::vector<Eigen::Vector3s> linePoints;
+  linePoints.push_back(Eigen::Vector3s::Zero());
+  linePoints.push_back(Eigen::Vector3s(0.5, 0.5, 0.7));
+  linePoints.push_back(Eigen::Vector3s(1, 1, 1));
 
-  server.createLine("line", linePoints, Eigen::Vector3d(0.7, 0.5, 0.5)).flush();
+  server.createLine("line", linePoints, Eigen::Vector3s(0.7, 0.5, 0.5)).flush();
 
-  server.registerDragListener("box1", [&](Eigen::Vector3d pos) {
+  server.registerDragListener("box1", [&](Eigen::Vector3s pos) {
     server.setObjectPosition("box1", pos).flush();
   });
 
@@ -161,7 +161,7 @@ TEST(REALTIME, GUI_SERVER)
       0,
       true,
       true,
-      [&](double val) { std::cout << "Slider moved to " << val << std::endl; });
+      [&](s_t val) { std::cout << "Slider moved to " << val << std::endl; });
 
   server.createSlider(
       "vert_slider",
@@ -172,12 +172,12 @@ TEST(REALTIME, GUI_SERVER)
       0,
       true,
       false,
-      [&](double val) {
+      [&](s_t val) {
         std::cout << "Vertical slider moved to " << val << std::endl;
       });
 
-  std::vector<double> xs;
-  std::vector<double> ys;
+  std::vector<s_t> xs;
+  std::vector<s_t> ys;
   for (int i = 0; i < 10; i++)
   {
     xs.push_back(i);
@@ -200,8 +200,8 @@ TEST(REALTIME, GUI_SERVER)
   });
 
   server.registerKeydownListener([&](std::string key) {
-    // double v = ((double)rand() / RAND_MAX) * 3;
-    // server.setObjectPosition("box1", Eigen::Vector3d(v, v, v)).flush();
+    // s_t v = ((s_t)rand() / RAND_MAX) * 3;
+    // server.setObjectPosition("box1", Eigen::Vector3s(v, v, v)).flush();
     std::cout << "Pressed key " << key << std::endl;
   });
   */
@@ -216,8 +216,8 @@ TEST(REALTIME, GUI_SERVER)
   {
     // spin
     // cartpole->setPosition(0, 0.0);
-    // cartpole->setForces(Eigen::VectorXd::Zero(cartpole->getNumDofs()));
-    // cartpole->setPositions(Eigen::VectorXd::Zero(cartpole->getNumDofs()));
+    // cartpole->setForces(Eigen::VectorXs::Zero(cartpole->getNumDofs()));
+    // cartpole->setPositions(Eigen::VectorXs::Zero(cartpole->getNumDofs()));
   }
 }
 #endif

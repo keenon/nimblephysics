@@ -59,65 +59,65 @@ public:
 
   };
 
-  Inertia(double _mass=1, const Eigen::Vector3d& _com = Eigen::Vector3d::Zero(),
-          const Eigen::Matrix3d& _momentOfInertia = Eigen::Matrix3d::Identity());
+  Inertia(s_t _mass=1, const Eigen::Vector3s& _com = Eigen::Vector3s::Zero(),
+          const Eigen::Matrix3s& _momentOfInertia = Eigen::Matrix3s::Identity());
 
-  Inertia(const Eigen::Matrix6d& _spatialInertiaTensor);
+  Inertia(const Eigen::Matrix6s& _spatialInertiaTensor);
 
-  Inertia(double _mass,
-          double _comX, double _comY, double _comZ,
-          double _Ixx, double _Iyy, double _Izz,
-          double _Ixy, double _Ixz, double _Iyz);
+  Inertia(s_t _mass,
+          s_t _comX, s_t _comY, s_t _comZ,
+          s_t _Ixx, s_t _Iyy, s_t _Izz,
+          s_t _Ixy, s_t _Ixz, s_t _Iyz);
 
   /// Set an inertial parameter
-  void setParameter(Param _param, double _value);
+  void setParameter(Param _param, s_t _value);
 
   /// Get an inertial parameter
-  double getParameter(Param _param) const;
+  s_t getParameter(Param _param) const;
 
   /// Set the mass
-  void setMass(double _mass);
+  void setMass(s_t _mass);
 
   /// Get the mass
-  double getMass() const;
+  s_t getMass() const;
 
   /// Set the center of mass with respect to the Body-fixed frame
-  void setLocalCOM(const Eigen::Vector3d& _com);
+  void setLocalCOM(const Eigen::Vector3s& _com);
 
   /// Get the center of mass with respect to the Body-fixed frame
-  const Eigen::Vector3d& getLocalCOM() const;
+  const Eigen::Vector3s& getLocalCOM() const;
 
   /// Set the moment of inertia (about the center of mass). Note that only the
   /// top-right corner of the matrix will be used, because a well-formed inertia
   /// matrix is always symmetric.
-  void setMoment(const Eigen::Matrix3d& _moment);
+  void setMoment(const Eigen::Matrix3s& _moment);
 
   /// Set the moment of inertia (about the center of mass)
-  void setMoment(double _Ixx, double _Iyy, double _Izz,
-                 double _Ixy, double _Ixz, double _Iyz);
+  void setMoment(s_t _Ixx, s_t _Iyy, s_t _Izz,
+                 s_t _Ixy, s_t _Ixz, s_t _Iyz);
 
   /// Get the moment of inertia
-  Eigen::Matrix3d getMoment() const;
+  Eigen::Matrix3s getMoment() const;
 
   /// Set the spatial tensor
-  void setSpatialTensor(const Eigen::Matrix6d& _spatial);
+  void setSpatialTensor(const Eigen::Matrix6s& _spatial);
 
   /// Get the spatial inertia tensor
-  const Eigen::Matrix6d& getSpatialTensor() const;
+  const Eigen::Matrix6s& getSpatialTensor() const;
 
   /// Returns true iff _moment is a physically valid moment of inertia
-  static bool verifyMoment(const Eigen::Matrix3d& _moment,
+  static bool verifyMoment(const Eigen::Matrix3s& _moment,
                            bool _printWarnings = true,
-                           double _tolerance = 1e-8);
+                           s_t _tolerance = 1e-8);
 
   /// Returns true iff _spatial is a physically valid spatial inertia tensor
-  static bool verifySpatialTensor(const Eigen::Matrix6d& _spatial,
+  static bool verifySpatialTensor(const Eigen::Matrix6s& _spatial,
                                   bool _printWarnings = true,
-                                  double _tolerance = 1e-8);
+                                  s_t _tolerance = 1e-8);
 
   /// Returns true iff this Inertia object is physically valid
   bool verify(bool _printWarnings = true,
-              double _tolerance = 1e-8) const;
+              s_t _tolerance = 1e-8) const;
 
   /// Check for equality
   bool operator==(const Inertia& other) const;
@@ -131,16 +131,16 @@ protected:
   void computeParameters();
 
   /// Overall mass
-  double mMass;
+  s_t mMass;
 
   /// Center of mass in the Body frame
-  Eigen::Vector3d mCenterOfMass;
+  Eigen::Vector3s mCenterOfMass;
 
   /// The six parameters of the moment of inertia located at the center of mass
-  std::array<double,6> mMoment;
+  std::array<s_t,6> mMoment;
 
   /// Cache for generalized spatial inertia of the Body
-  Eigen::Matrix6d mSpatialTensor;
+  Eigen::Matrix6s mSpatialTensor;
 
 public:
   // To get byte-aligned Eigen vectors

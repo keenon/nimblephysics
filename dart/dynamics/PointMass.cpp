@@ -49,10 +49,10 @@ namespace dynamics {
 
 //==============================================================================
 PointMass::State::State(
-    const Vector3d& positions,
-    const Vector3d& velocities,
-    const Vector3d& accelerations,
-    const Vector3d& forces)
+    const Vector3s& positions,
+    const Vector3s& velocities,
+    const Vector3s& accelerations,
+    const Vector3s& forces)
   : mPositions(positions),
     mVelocities(velocities),
     mAccelerations(accelerations),
@@ -74,17 +74,17 @@ bool PointMass::State::operator ==(const PointMass::State& other) const
 
 //==============================================================================
 PointMass::Properties::Properties(
-    const Vector3d& _X0,
-    double _mass,
+    const Vector3s& _X0,
+    s_t _mass,
     const std::vector<std::size_t>& _connections,
-    const Vector3d& _positionLowerLimits,
-    const Vector3d& _positionUpperLimits,
-    const Vector3d& _velocityLowerLimits,
-    const Vector3d& _velocityUpperLimits,
-    const Vector3d& _accelerationLowerLimits,
-    const Vector3d& _accelerationUpperLimits,
-    const Vector3d& _forceLowerLimits,
-    const Vector3d& _forceUpperLimits)
+    const Vector3s& _positionLowerLimits,
+    const Vector3s& _positionUpperLimits,
+    const Vector3s& _velocityLowerLimits,
+    const Vector3s& _velocityUpperLimits,
+    const Vector3s& _accelerationLowerLimits,
+    const Vector3s& _accelerationUpperLimits,
+    const Vector3s& _forceLowerLimits,
+    const Vector3s& _forceUpperLimits)
   : mX0(_X0),
     mMass(_mass),
     mConnectedPointMassIndices(_connections),
@@ -101,13 +101,13 @@ PointMass::Properties::Properties(
 }
 
 //==============================================================================
-void PointMass::Properties::setRestingPosition(const Vector3d &_x)
+void PointMass::Properties::setRestingPosition(const Vector3s &_x)
 {
   mX0 = _x;
 }
 
 //==============================================================================
-void PointMass::Properties::setMass(double _mass)
+void PointMass::Properties::setMass(s_t _mass)
 {
   mMass = _mass;
 }
@@ -141,33 +141,33 @@ bool PointMass::Properties::operator !=(const PointMass::Properties& other) cons
 PointMass::PointMass(SoftBodyNode* _softBodyNode)
   : // mIndexInSkeleton(Eigen::Matrix<std::size_t, 3, 1>::Zero()),
     mParentSoftBodyNode(_softBodyNode),
-    mPositionDeriv(Eigen::Vector3d::Zero()),
-    mVelocitiesDeriv(Eigen::Vector3d::Zero()),
-    mAccelerationsDeriv(Eigen::Vector3d::Zero()),
-    mForcesDeriv(Eigen::Vector3d::Zero()),
-    mVelocityChanges(Eigen::Vector3d::Zero()),
-    // mImpulse(Eigen::Vector3d::Zero()),
-    mConstraintImpulses(Eigen::Vector3d::Zero()),
-    mW(Eigen::Vector3d::Zero()),
-    mX(Eigen::Vector3d::Zero()),
-    mV(Eigen::Vector3d::Zero()),
-    mEta(Eigen::Vector3d::Zero()),
-    mAlpha(Eigen::Vector3d::Zero()),
-    mBeta(Eigen::Vector3d::Zero()),
-    mA(Eigen::Vector3d::Zero()),
-    mF(Eigen::Vector3d::Zero()),
+    mPositionDeriv(Eigen::Vector3s::Zero()),
+    mVelocitiesDeriv(Eigen::Vector3s::Zero()),
+    mAccelerationsDeriv(Eigen::Vector3s::Zero()),
+    mForcesDeriv(Eigen::Vector3s::Zero()),
+    mVelocityChanges(Eigen::Vector3s::Zero()),
+    // mImpulse(Eigen::Vector3s::Zero()),
+    mConstraintImpulses(Eigen::Vector3s::Zero()),
+    mW(Eigen::Vector3s::Zero()),
+    mX(Eigen::Vector3s::Zero()),
+    mV(Eigen::Vector3s::Zero()),
+    mEta(Eigen::Vector3s::Zero()),
+    mAlpha(Eigen::Vector3s::Zero()),
+    mBeta(Eigen::Vector3s::Zero()),
+    mA(Eigen::Vector3s::Zero()),
+    mF(Eigen::Vector3s::Zero()),
     mPsi(0.0),
     mImplicitPsi(0.0),
     mPi(0.0),
     mImplicitPi(0.0),
-    mB(Eigen::Vector3d::Zero()),
-    mFext(Eigen::Vector3d::Zero()),
+    mB(Eigen::Vector3s::Zero()),
+    mFext(Eigen::Vector3s::Zero()),
     mIsColliding(false),
-    mDelV(Eigen::Vector3d::Zero()),
-    mImpB(Eigen::Vector3d::Zero()),
-    mImpAlpha(Eigen::Vector3d::Zero()),
-    mImpBeta(Eigen::Vector3d::Zero()),
-    mImpF(Eigen::Vector3d::Zero()),
+    mDelV(Eigen::Vector3s::Zero()),
+    mImpB(Eigen::Vector3s::Zero()),
+    mImpAlpha(Eigen::Vector3s::Zero()),
+    mImpBeta(Eigen::Vector3s::Zero()),
+    mImpF(Eigen::Vector3s::Zero()),
     mNotifier(_softBodyNode->mNotifier)
 {
   assert(mParentSoftBodyNode != nullptr);
@@ -199,10 +199,10 @@ std::size_t PointMass::getIndexInSoftBodyNode() const
 }
 
 //==============================================================================
-void PointMass::setMass(double _mass)
+void PointMass::setMass(s_t _mass)
 {
   assert(0.0 < _mass);
-  double& mMass = mParentSoftBodyNode->mAspectProperties.mPointProps[mIndex].mMass;
+  s_t& mMass = mParentSoftBodyNode->mAspectProperties.mPointProps[mIndex].mMass;
   if(_mass == mMass)
     return;
 
@@ -211,34 +211,34 @@ void PointMass::setMass(double _mass)
 }
 
 //==============================================================================
-double PointMass::getMass() const
+s_t PointMass::getMass() const
 {
   return mParentSoftBodyNode->mAspectProperties.mPointProps[mIndex].mMass;
 }
 
 //==============================================================================
-double PointMass::getPsi() const
+s_t PointMass::getPsi() const
 {
   mParentSoftBodyNode->checkArticulatedInertiaUpdate();
   return mPsi;
 }
 
 //==============================================================================
-double PointMass::getImplicitPsi() const
+s_t PointMass::getImplicitPsi() const
 {
   mParentSoftBodyNode->checkArticulatedInertiaUpdate();
   return mImplicitPsi;
 }
 
 //==============================================================================
-double PointMass::getPi() const
+s_t PointMass::getPi() const
 {
   mParentSoftBodyNode->checkArticulatedInertiaUpdate();
   return mPi;
 }
 
 //==============================================================================
-double PointMass::getImplicitPi() const
+s_t PointMass::getImplicitPi() const
 {
   mParentSoftBodyNode->checkArticulatedInertiaUpdate();
   return mImplicitPi;
@@ -312,7 +312,7 @@ std::size_t PointMass::getNumDofs() const
 //}
 
 //==============================================================================
-void PointMass::setPosition(std::size_t _index, double _position)
+void PointMass::setPosition(std::size_t _index, s_t _position)
 {
   assert(_index < 3);
 
@@ -321,7 +321,7 @@ void PointMass::setPosition(std::size_t _index, double _position)
 }
 
 //==============================================================================
-double PointMass::getPosition(std::size_t _index) const
+s_t PointMass::getPosition(std::size_t _index) const
 {
   assert(_index < 3);
 
@@ -329,14 +329,14 @@ double PointMass::getPosition(std::size_t _index) const
 }
 
 //==============================================================================
-void PointMass::setPositions(const Vector3d& _positions)
+void PointMass::setPositions(const Vector3s& _positions)
 {
   getState().mPositions = _positions;
   mNotifier->dirtyTransform();
 }
 
 //==============================================================================
-const Vector3d& PointMass::getPositions() const
+const Vector3s& PointMass::getPositions() const
 {
   return getState().mPositions;
 }
@@ -349,7 +349,7 @@ void PointMass::resetPositions()
 }
 
 //==============================================================================
-void PointMass::setVelocity(std::size_t _index, double _velocity)
+void PointMass::setVelocity(std::size_t _index, s_t _velocity)
 {
   assert(_index < 3);
 
@@ -358,7 +358,7 @@ void PointMass::setVelocity(std::size_t _index, double _velocity)
 }
 
 //==============================================================================
-double PointMass::getVelocity(std::size_t _index) const
+s_t PointMass::getVelocity(std::size_t _index) const
 {
   assert(_index < 3);
 
@@ -366,14 +366,14 @@ double PointMass::getVelocity(std::size_t _index) const
 }
 
 //==============================================================================
-void PointMass::setVelocities(const Vector3d& _velocities)
+void PointMass::setVelocities(const Vector3s& _velocities)
 {
   getState().mVelocities = _velocities;
   mNotifier->dirtyVelocity();
 }
 
 //==============================================================================
-const Vector3d& PointMass::getVelocities() const
+const Vector3s& PointMass::getVelocities() const
 {
   return getState().mVelocities;
 }
@@ -386,7 +386,7 @@ void PointMass::resetVelocities()
 }
 
 //==============================================================================
-void PointMass::setAcceleration(std::size_t _index, double _acceleration)
+void PointMass::setAcceleration(std::size_t _index, s_t _acceleration)
 {
   assert(_index < 3);
 
@@ -395,7 +395,7 @@ void PointMass::setAcceleration(std::size_t _index, double _acceleration)
 }
 
 //==============================================================================
-double PointMass::getAcceleration(std::size_t _index) const
+s_t PointMass::getAcceleration(std::size_t _index) const
 {
  assert(_index < 3);
 
@@ -403,20 +403,20 @@ double PointMass::getAcceleration(std::size_t _index) const
 }
 
 //==============================================================================
-void PointMass::setAccelerations(const Eigen::Vector3d& _accelerations)
+void PointMass::setAccelerations(const Eigen::Vector3s& _accelerations)
 {
   getState().mAccelerations = _accelerations;
   mNotifier->dirtyAcceleration();
 }
 
 //==============================================================================
-const Vector3d& PointMass::getAccelerations() const
+const Vector3s& PointMass::getAccelerations() const
 {
   return getState().mAccelerations;
 }
 
 //==============================================================================
-const Vector3d& PointMass::getPartialAccelerations() const
+const Vector3s& PointMass::getPartialAccelerations() const
 {
   if(mNotifier->needsPartialAccelerationUpdate())
     mParentSoftBodyNode->updatePartialAcceleration();
@@ -431,7 +431,7 @@ void PointMass::resetAccelerations()
 }
 
 //==============================================================================
-void PointMass::setForce(std::size_t _index, double _force)
+void PointMass::setForce(std::size_t _index, s_t _force)
 {
   assert(_index < 3);
 
@@ -439,7 +439,7 @@ void PointMass::setForce(std::size_t _index, double _force)
 }
 
 //==============================================================================
-double PointMass::getForce(std::size_t _index)
+s_t PointMass::getForce(std::size_t _index)
 {
   assert(_index < 3);
 
@@ -447,13 +447,13 @@ double PointMass::getForce(std::size_t _index)
 }
 
 //==============================================================================
-void PointMass::setForces(const Vector3d& _forces)
+void PointMass::setForces(const Vector3s& _forces)
 {
   getState().mForces = _forces;
 }
 
 //==============================================================================
-const Vector3d& PointMass::getForces() const
+const Vector3s& PointMass::getForces() const
 {
   return getState().mForces;
 }
@@ -465,7 +465,7 @@ void PointMass::resetForces()
 }
 
 //==============================================================================
-void PointMass::setVelocityChange(std::size_t _index, double _velocityChange)
+void PointMass::setVelocityChange(std::size_t _index, s_t _velocityChange)
 {
   assert(_index < 3);
 
@@ -473,7 +473,7 @@ void PointMass::setVelocityChange(std::size_t _index, double _velocityChange)
 }
 
 //==============================================================================
-double PointMass::getVelocityChange(std::size_t _index)
+s_t PointMass::getVelocityChange(std::size_t _index)
 {
   assert(_index < 3);
 
@@ -487,7 +487,7 @@ void PointMass::resetVelocityChanges()
 }
 
 //==============================================================================
-void PointMass::setConstraintImpulse(std::size_t _index, double _impulse)
+void PointMass::setConstraintImpulse(std::size_t _index, s_t _impulse)
 {
   assert(_index < 3);
 
@@ -495,7 +495,7 @@ void PointMass::setConstraintImpulse(std::size_t _index, double _impulse)
 }
 
 //==============================================================================
-double PointMass::getConstraintImpulse(std::size_t _index)
+s_t PointMass::getConstraintImpulse(std::size_t _index)
 {
   assert(_index < 3);
 
@@ -509,19 +509,19 @@ void PointMass::resetConstraintImpulses()
 }
 
 //==============================================================================
-void PointMass::integratePositions(double _dt)
+void PointMass::integratePositions(s_t _dt)
 {
   setPositions( getPositions() + getVelocities() * _dt );
 }
 
 //==============================================================================
-void PointMass::integrateVelocities(double _dt)
+void PointMass::integrateVelocities(s_t _dt)
 {
   setVelocities( getVelocities() + getAccelerations() * _dt );
 }
 
 //==============================================================================
-void PointMass::addExtForce(const Eigen::Vector3d& _force, bool _isForceLocal)
+void PointMass::addExtForce(const Eigen::Vector3s& _force, bool _isForceLocal)
 {
   if (_isForceLocal)
   {
@@ -541,7 +541,7 @@ void PointMass::clearExtForce()
 }
 
 //==============================================================================
-void PointMass::setConstraintImpulse(const Eigen::Vector3d& _constImp,
+void PointMass::setConstraintImpulse(const Eigen::Vector3s& _constImp,
                                      bool _isLocal)
 {
   if (_isLocal)
@@ -550,14 +550,14 @@ void PointMass::setConstraintImpulse(const Eigen::Vector3d& _constImp,
   }
   else
   {
-    const Matrix3d Rt
+    const Matrix3s Rt
         = mParentSoftBodyNode->getWorldTransform().linear().transpose();
     mConstraintImpulses = Rt * _constImp;
   }
 }
 
 //==============================================================================
-void PointMass::addConstraintImpulse(const Eigen::Vector3d& _constImp,
+void PointMass::addConstraintImpulse(const Eigen::Vector3s& _constImp,
                                      bool _isLocal)
 {
   if (_isLocal)
@@ -566,14 +566,14 @@ void PointMass::addConstraintImpulse(const Eigen::Vector3d& _constImp,
   }
   else
   {
-    const Matrix3d Rt
+    const Matrix3s Rt
         = mParentSoftBodyNode->getWorldTransform().linear().transpose();
     mConstraintImpulses.noalias() += Rt * _constImp;
   }
 }
 
 //==============================================================================
-Eigen::Vector3d PointMass::getConstraintImpulses() const
+Eigen::Vector3s PointMass::getConstraintImpulses() const
 {
   return mConstraintImpulses;
 }
@@ -591,10 +591,10 @@ void PointMass::clearConstraintImpulse()
 }
 
 //==============================================================================
-void PointMass::setRestingPosition(const Eigen::Vector3d& _p)
+void PointMass::setRestingPosition(const Eigen::Vector3s& _p)
 {
 
-  Eigen::Vector3d& mRest =
+  Eigen::Vector3s& mRest =
       mParentSoftBodyNode->mAspectProperties.mPointProps[mIndex].mX0;
   if(_p == mRest)
     return;
@@ -605,13 +605,13 @@ void PointMass::setRestingPosition(const Eigen::Vector3d& _p)
 }
 
 //==============================================================================
-const Eigen::Vector3d& PointMass::getRestingPosition() const
+const Eigen::Vector3s& PointMass::getRestingPosition() const
 {
   return mParentSoftBodyNode->mAspectProperties.mPointProps[mIndex].mX0;
 }
 
 //==============================================================================
-const Eigen::Vector3d& PointMass::getLocalPosition() const
+const Eigen::Vector3s& PointMass::getLocalPosition() const
 {
   if(mNotifier->needsTransformUpdate())
     mParentSoftBodyNode->updateTransform();
@@ -619,7 +619,7 @@ const Eigen::Vector3d& PointMass::getLocalPosition() const
 }
 
 //==============================================================================
-const Eigen::Vector3d& PointMass::getWorldPosition() const
+const Eigen::Vector3s& PointMass::getWorldPosition() const
 {
   if(mNotifier && mNotifier->needsTransformUpdate())
     mParentSoftBodyNode->updateTransform();
@@ -627,36 +627,36 @@ const Eigen::Vector3d& PointMass::getWorldPosition() const
 }
 
 //==============================================================================
-Eigen::Matrix<double, 3, Eigen::Dynamic> PointMass::getBodyJacobian()
+Eigen::Matrix<s_t, 3, Eigen::Dynamic> PointMass::getBodyJacobian()
 {
   assert(mParentSoftBodyNode != nullptr);
 
   int dof = mParentSoftBodyNode->getNumDependentGenCoords();
   int totalDof = mParentSoftBodyNode->getNumDependentGenCoords() + 3;
 
-  Eigen::Matrix<double, 3, Eigen::Dynamic> J
-      = Eigen::MatrixXd::Zero(3, totalDof);
+  Eigen::Matrix<s_t, 3, Eigen::Dynamic> J
+      = Eigen::MatrixXs::Zero(3, totalDof);
 
-  Eigen::Isometry3d T = Eigen::Isometry3d::Identity();
+  Eigen::Isometry3s T = Eigen::Isometry3s::Identity();
   T.translation() = getLocalPosition();
 
   J.leftCols(dof)
       = math::AdInvTJac(
           T, mParentSoftBodyNode->getJacobian()).bottomRows<3>();
-  J.rightCols<3>() = Eigen::Matrix3d::Identity();
+  J.rightCols<3>() = Eigen::Matrix3s::Identity();
 
   return J;
 }
 
 //==============================================================================
-Eigen::Matrix<double, 3, Eigen::Dynamic> PointMass::getWorldJacobian()
+Eigen::Matrix<s_t, 3, Eigen::Dynamic> PointMass::getWorldJacobian()
 {
   return mParentSoftBodyNode->getWorldTransform().linear()
       * getBodyJacobian();
 }
 
 //==============================================================================
-const Eigen::Vector3d& PointMass::getBodyVelocityChange() const
+const Eigen::Vector3s& PointMass::getBodyVelocityChange() const
 {
   return mDelV;
 }
@@ -687,7 +687,7 @@ const SoftBodyNode* PointMass::getParentSoftBodyNode() const
 //}
 
 //==============================================================================
-const Eigen::Vector3d&PointMass::getBodyVelocity() const
+const Eigen::Vector3s&PointMass::getBodyVelocity() const
 {
   if(mNotifier->needsVelocityUpdate())
     mParentSoftBodyNode->updateVelocity();
@@ -695,13 +695,13 @@ const Eigen::Vector3d&PointMass::getBodyVelocity() const
 }
 
 //==============================================================================
-Eigen::Vector3d PointMass::getWorldVelocity() const
+Eigen::Vector3s PointMass::getWorldVelocity() const
 {
   return mParentSoftBodyNode->getWorldTransform().linear() * getBodyVelocity();
 }
 
 //==============================================================================
-const Eigen::Vector3d& PointMass::getBodyAcceleration() const
+const Eigen::Vector3s& PointMass::getBodyAcceleration() const
 {
   if(mNotifier->needsAccelerationUpdate())
     mParentSoftBodyNode->updateAccelerationID();
@@ -709,7 +709,7 @@ const Eigen::Vector3d& PointMass::getBodyAcceleration() const
 }
 
 //==============================================================================
-Eigen::Vector3d PointMass::getWorldAcceleration() const
+Eigen::Vector3s PointMass::getWorldAcceleration() const
 {
   return mParentSoftBodyNode->getWorldTransform().linear() * getBodyAcceleration();
 }
@@ -728,7 +728,7 @@ void PointMass::updateTransform() const
   assert(!math::isNan(mX));
 
   // World translation
-  const Eigen::Isometry3d& parentW = mParentSoftBodyNode->getWorldTransform();
+  const Eigen::Isometry3s& parentW = mParentSoftBodyNode->getWorldTransform();
   mW = parentW.translation() + parentW.linear() * mX;
   assert(!math::isNan(mW));
 }
@@ -737,7 +737,7 @@ void PointMass::updateTransform() const
 void PointMass::updateVelocity() const
 {
   // v = w(parent) x mX + v(parent) + dq
-  const Eigen::Vector6d& v_parent = mParentSoftBodyNode->getSpatialVelocity();
+  const Eigen::Vector6s& v_parent = mParentSoftBodyNode->getSpatialVelocity();
   mV = v_parent.head<3>().cross(getLocalPosition()) + v_parent.tail<3>()
        + getVelocities();
   assert(!math::isNan(mV));
@@ -747,7 +747,7 @@ void PointMass::updateVelocity() const
 void PointMass::updatePartialAcceleration() const
 {
   // eta = w(parent) x dq
-  const Eigen::Vector3d& dq = getVelocities();
+  const Eigen::Vector3s& dq = getVelocities();
   mEta = mParentSoftBodyNode->getSpatialVelocity().head<3>().cross(dq);
   assert(!math::isNan(mEta));
 }
@@ -756,14 +756,14 @@ void PointMass::updatePartialAcceleration() const
 void PointMass::updateAccelerationID() const
 {
   // dv = dw(parent) x mX + dv(parent) + eata + ddq
-  const Eigen::Vector6d& a_parent = mParentSoftBodyNode->getSpatialAcceleration();
+  const Eigen::Vector6s& a_parent = mParentSoftBodyNode->getSpatialAcceleration();
   mA = a_parent.head<3>().cross(getLocalPosition()) + a_parent.tail<3>()
        + getPartialAccelerations() + getAccelerations();
   assert(!math::isNan(mA));
 }
 
 //==============================================================================
-void PointMass::updateTransmittedForceID(const Eigen::Vector3d& _gravity,
+void PointMass::updateTransmittedForceID(const Eigen::Vector3s& _gravity,
                                          bool /*_withExternalForces*/)
 {
   // f = m*dv + w(parent) x m*v - fext
@@ -779,7 +779,7 @@ void PointMass::updateTransmittedForceID(const Eigen::Vector3d& _gravity,
 }
 
 //==============================================================================
-void PointMass::updateArtInertiaFD(double _timeStep) const
+void PointMass::updateArtInertiaFD(s_t _timeStep) const
 {
   // Articulated inertia
   // - Do nothing
@@ -804,9 +804,9 @@ void PointMass::updateArtInertiaFD(double _timeStep) const
 }
 
 //==============================================================================
-void PointMass::updateJointForceID(double /*_timeStep*/,
-                                   double /*_withDampingForces*/,
-                                   double /*_withSpringForces*/)
+void PointMass::updateJointForceID(s_t /*_timeStep*/,
+                                   s_t /*_withDampingForces*/,
+                                   s_t /*_withSpringForces*/)
 {
   // tau = f
   getState().mForces = mF;
@@ -814,7 +814,7 @@ void PointMass::updateJointForceID(double /*_timeStep*/,
 }
 
 //==============================================================================
-void PointMass::updateBiasForceFD(double _dt, const Eigen::Vector3d& _gravity)
+void PointMass::updateBiasForceFD(s_t _dt, const Eigen::Vector3s& _gravity)
 {
   // B = w(parent) x m*v - fext - fgravity
   // - w(parent) x m*v - fext
@@ -832,9 +832,9 @@ void PointMass::updateBiasForceFD(double _dt, const Eigen::Vector3d& _gravity)
   const State& state = getState();
 
   // Cache data: alpha
-  double kv = mParentSoftBodyNode->getVertexSpringStiffness();
-  double ke = mParentSoftBodyNode->getEdgeSpringStiffness();
-  double kd = mParentSoftBodyNode->getDampingCoefficient();
+  s_t kv = mParentSoftBodyNode->getVertexSpringStiffness();
+  s_t ke = mParentSoftBodyNode->getEdgeSpringStiffness();
+  s_t kd = mParentSoftBodyNode->getDampingCoefficient();
   int nN = getNumConnectedPointMasses();
   mAlpha = state.mForces
            - (kv + nN * ke) * getPositions()
@@ -858,9 +858,9 @@ void PointMass::updateBiasForceFD(double _dt, const Eigen::Vector3d& _gravity)
 void PointMass::updateAccelerationFD()
 {
   // ddq = imp_psi*(alpha - m*(dw(parent) x mX + dv(parent))
-  const Eigen::Vector3d& X = getLocalPosition();
-  const Eigen::Vector6d& a_parent = mParentSoftBodyNode->getSpatialAcceleration();
-  Eigen::Vector3d ddq =
+  const Eigen::Vector3s& X = getLocalPosition();
+  const Eigen::Vector6s& a_parent = mParentSoftBodyNode->getSpatialAcceleration();
+  Eigen::Vector3s ddq =
       getImplicitPsi()
       * (mAlpha - getMass() * (a_parent.head<3>().cross(X) + a_parent.tail<3>()));
   setAccelerations(ddq);
@@ -908,19 +908,19 @@ void PointMass::updateBiasImpulseFD()
 //==============================================================================
 void PointMass::updateVelocityChangeFD()
 {
-  //  Eigen::Vector3d del_dq
+  //  Eigen::Vector3s del_dq
   //      = mPsi
   //        * (mImpAlpha - mMass
   //           * (mParentSoftBodyNode->getBodyVelocityChange().head<3>().cross(mX)
   //              + mParentSoftBodyNode->getBodyVelocityChange().tail<3>()));
 
-  const Eigen::Vector3d& X = getLocalPosition();
-  Eigen::Vector3d del_dq
+  const Eigen::Vector3s& X = getLocalPosition();
+  Eigen::Vector3s del_dq
       = getPsi() * mImpAlpha
         - mParentSoftBodyNode->getBodyVelocityChange().head<3>().cross(X)
         - mParentSoftBodyNode->getBodyVelocityChange().tail<3>();
 
-  //  del_dq = Eigen::Vector3d::Zero();
+  //  del_dq = Eigen::Vector3s::Zero();
 
   mVelocityChanges = del_dq;
   assert(!math::isNan(del_dq));
@@ -941,7 +941,7 @@ void PointMass::updateTransmittedImpulse()
 }
 
 //==============================================================================
-void PointMass::updateConstrainedTermsFD(double _timeStep)
+void PointMass::updateConstrainedTermsFD(s_t _timeStep)
 {
   // 1. dq = dq + del_dq
   setVelocities( getVelocities() + mVelocityChanges );
@@ -961,7 +961,7 @@ void PointMass::updateConstrainedTermsFD(double _timeStep)
 }
 
 //==============================================================================
-void PointMass::aggregateMassMatrix(MatrixXd& /*_MCol*/, int /*_col*/)
+void PointMass::aggregateMassMatrix(MatrixXs& /*_MCol*/, int /*_col*/)
 {
   // TODO(JS): Not implemented
 //  // Assign
@@ -972,8 +972,8 @@ void PointMass::aggregateMassMatrix(MatrixXd& /*_MCol*/, int /*_col*/)
 }
 
 //==============================================================================
-void PointMass::aggregateAugMassMatrix(Eigen::MatrixXd& /*_MCol*/, int /*_col*/,
-                                       double /*_timeStep*/)
+void PointMass::aggregateAugMassMatrix(Eigen::MatrixXs& /*_MCol*/, int /*_col*/,
+                                       s_t /*_timeStep*/)
 {
   // TODO(JS): Not implemented
 //  // Assign
@@ -981,8 +981,8 @@ void PointMass::aggregateAugMassMatrix(Eigen::MatrixXd& /*_MCol*/, int /*_col*/,
 //  int iStart = mIndexInSkeleton[0];
 //  mM_F.noalias() = mMass * mM_dV;
 
-//  double d = mParentSoftBodyNode->getDampingCoefficient();
-//  double kv = mParentSoftBodyNode->getVertexSpringStiffness();
+//  s_t d = mParentSoftBodyNode->getDampingCoefficient();
+//  s_t kv = mParentSoftBodyNode->getVertexSpringStiffness();
 //  _MCol->block<3, 1>(iStart, _col).noalias()
 //      = mM_F + (_timeStep * _timeStep * kv + _timeStep * d) * mAccelerations;
 }
@@ -1000,7 +1000,7 @@ void PointMass::updateInvAugMassMatrix()
 }
 
 //==============================================================================
-void PointMass::aggregateInvMassMatrix(Eigen::MatrixXd& /*_MInvCol*/,
+void PointMass::aggregateInvMassMatrix(Eigen::MatrixXs& /*_MInvCol*/,
                                        int /*_col*/)
 {
   // TODO(JS): Not implemented
@@ -1014,9 +1014,9 @@ void PointMass::aggregateInvMassMatrix(Eigen::MatrixXd& /*_MInvCol*/,
 }
 
 //==============================================================================
-void PointMass::aggregateInvAugMassMatrix(Eigen::MatrixXd& /*_MInvCol*/,
+void PointMass::aggregateInvAugMassMatrix(Eigen::MatrixXs& /*_MInvCol*/,
                                           int /*_col*/,
-                                          double /*_timeStep*/)
+                                          s_t /*_timeStep*/)
 {
   // TODO(JS): Not implemented
 //  // Assign
@@ -1030,8 +1030,8 @@ void PointMass::aggregateInvAugMassMatrix(Eigen::MatrixXd& /*_MInvCol*/,
 }
 
 //==============================================================================
-void PointMass::aggregateGravityForceVector(VectorXd& /*_g*/,
-                                            const Eigen::Vector3d& /*_gravity*/)
+void PointMass::aggregateGravityForceVector(VectorXs& /*_g*/,
+                                            const Eigen::Vector3s& /*_gravity*/)
 {
   // TODO(JS): Not implemented
 //  mG_F = mMass * (mParentSoftBodyNode->getWorldTransform().linear().transpose()
@@ -1052,8 +1052,8 @@ void PointMass::updateCombinedVector()
 }
 
 //==============================================================================
-void PointMass::aggregateCombinedVector(Eigen::VectorXd& /*_Cg*/,
-                                        const Eigen::Vector3d& /*_gravity*/)
+void PointMass::aggregateCombinedVector(Eigen::VectorXs& /*_Cg*/,
+                                        const Eigen::Vector3s& /*_gravity*/)
 {
   // TODO(JS): Not implemented
 //  mCg_F.noalias() = mMass * mCg_dV;
@@ -1069,7 +1069,7 @@ void PointMass::aggregateCombinedVector(Eigen::VectorXd& /*_Cg*/,
 }
 
 //==============================================================================
-void PointMass::aggregateExternalForces(VectorXd& /*_Fext*/)
+void PointMass::aggregateExternalForces(VectorXs& /*_Fext*/)
 {
   // TODO(JS): Not implemented
 //  int iStart = mIndexInSkeleton[0];

@@ -23,31 +23,31 @@ using namespace simulation;
 TEST(ScrewGeometry, EXP_JAC)
 {
   srand(42);
-  double EPS = 0.001;
+  s_t EPS = 0.001;
 
-  Eigen::Vector3d axis = Eigen::Vector3d::UnitX();
-  Eigen::Matrix3d originalRotation = math::expMapRot(axis);
+  Eigen::Vector3s axis = Eigen::Vector3s::UnitX();
+  Eigen::Matrix3s originalRotation = math::expMapRot(axis);
 
-  Eigen::Vector3d perturb = Eigen::Vector3d::UnitY();
-  Eigen::Matrix3d perturbedRotation = math::expMapRot(axis + perturb * EPS);
-  Eigen::Matrix3d perturbation
+  Eigen::Vector3s perturb = Eigen::Vector3s::UnitY();
+  Eigen::Matrix3s perturbedRotation = math::expMapRot(axis + perturb * EPS);
+  Eigen::Matrix3s perturbation
       = originalRotation.transpose() * perturbedRotation;
-  Eigen::Vector3d perturbPlus = math::logMap(perturbation);
+  Eigen::Vector3s perturbPlus = math::logMap(perturbation);
 
   std::cout << "Perturb: " << std::endl << perturb << std::endl;
   std::cout << "+Perturb Recovered: " << std::endl << perturbPlus << std::endl;
 
   perturbedRotation = math::expMapRot(axis - perturb * EPS);
   perturbation = originalRotation.transpose() * perturbedRotation;
-  Eigen::Vector3d perturbMinus = math::logMap(perturbation);
+  Eigen::Vector3s perturbMinus = math::logMap(perturbation);
 
   std::cout << "-Perturb Recovered: " << std::endl << perturbMinus << std::endl;
 
-  Eigen::Vector3d perturbGrad = (perturbPlus - perturbMinus) / (2 * EPS);
+  Eigen::Vector3s perturbGrad = (perturbPlus - perturbMinus) / (2 * EPS);
 
   std::cout << "Perturb Grad: " << std::endl << perturbGrad << std::endl;
 
-  Eigen::Matrix3d perturbationRecovered = math::expMapRot(perturbGrad * EPS);
+  Eigen::Matrix3s perturbationRecovered = math::expMapRot(perturbGrad * EPS);
 
   std::cout << "Perturbation: " << std::endl << perturbation << std::endl;
   std::cout << "Perturbation Recovered: " << std::endl
@@ -74,7 +74,7 @@ ground. The ground has configurable friction in this setup.
 
 */
 void testFreeBlockWithFrictionCoeff(
-    double frictionCoeff, double mass, bool freeJoint)
+    s_t frictionCoeff, s_t mass, bool freeJoint)
 {
   // World
   WorldPtr world = World::create();
@@ -105,21 +105,21 @@ void testFreeBlockWithFrictionCoeff(
   Joint* boxJoint = pair.first;
   BodyNode* boxBody = pair.second;
 
-  Eigen::Isometry3d fromParent = Eigen::Isometry3d::Identity();
-  fromParent.translation() = Eigen::Vector3d::UnitX() * 2;
+  Eigen::Isometry3s fromParent = Eigen::Isometry3s::Identity();
+  fromParent.translation() = Eigen::Vector3s::UnitX() * 2;
   boxJoint->setTransformFromParentBodyNode(fromParent);
 
-  Eigen::Isometry3d fromChild = Eigen::Isometry3d::Identity();
-  fromChild.translation() = Eigen::Vector3d::UnitX();
+  Eigen::Isometry3s fromChild = Eigen::Isometry3s::Identity();
+  fromChild.translation() = Eigen::Vector3s::UnitX();
   boxJoint->setTransformFromChildBodyNode(fromChild);
 
   std::shared_ptr<BoxShape> boxShape(
-      new BoxShape(Eigen::Vector3d(1.0, 1.0, 1.0)));
+      new BoxShape(Eigen::Vector3s(1.0, 1.0, 1.0)));
   boxBody->createShapeNodeWith<VisualAspect, CollisionAspect>(boxShape);
   boxBody->setFrictionCoeff(frictionCoeff);
 
   // Add a force driving the box down into the floor, and to the left
-  boxBody->addExtForce(Eigen::Vector3d(1, -1, 0));
+  boxBody->addExtForce(Eigen::Vector3s(1, -1, 0));
   // Prevent the mass matrix from being Identity
   boxBody->setMass(mass);
 
@@ -157,13 +157,13 @@ void testFreeBlockWithFrictionCoeff(
   WeldJoint* floorJoint = floorPair.first;
   BodyNode* floorBody = floorPair.second;
 
-  Eigen::Isometry3d floorPosition = Eigen::Isometry3d::Identity();
-  floorPosition.translation() = Eigen::Vector3d(0, -(1.0 - 1e-2), 0);
+  Eigen::Isometry3s floorPosition = Eigen::Isometry3s::Identity();
+  floorPosition.translation() = Eigen::Vector3s(0, -(1.0 - 1e-2), 0);
   floorJoint->setTransformFromParentBodyNode(floorPosition);
-  floorJoint->setTransformFromChildBodyNode(Eigen::Isometry3d::Identity());
+  floorJoint->setTransformFromChildBodyNode(Eigen::Isometry3s::Identity());
 
   std::shared_ptr<BoxShape> floorShape(
-      new BoxShape(Eigen::Vector3d(10.0, 1.0, 10.0)));
+      new BoxShape(Eigen::Vector3s(10.0, 1.0, 10.0)));
   floorBody->createShapeNodeWith<VisualAspect, CollisionAspect>(floorShape);
   floorBody->setFrictionCoeff(frictionCoeff);
 
@@ -175,8 +175,8 @@ void testFreeBlockWithFrictionCoeff(
 
   box->computeForwardDynamics();
   box->integrateVelocities(world->getTimeStep());
-  Eigen::VectorXd timestepVel = box->getVelocities();
-  Eigen::VectorXd timestepWorldVel = world->getVelocities();
+  Eigen::VectorXs timestepVel = box->getVelocities();
+  Eigen::VectorXs timestepWorldVel = world->getVelocities();
 
   // world->step();
 
@@ -190,7 +190,7 @@ void testFreeBlockWithFrictionCoeff(
   }
   */
 
-  Eigen::VectorXd worldVel = world->getVelocities();
+  Eigen::VectorXs worldVel = world->getVelocities();
   // Test the classic formulation
   EXPECT_TRUE(verifyPerturbedScrewAxisForForce(world));
   /*
@@ -221,7 +221,7 @@ TEST(GRADIENTS, FREE_VELOCITY_INTEGRATION)
 {
   // World
   WorldPtr world = World::create();
-  world->setGravity(Eigen::Vector3d::UnitY());
+  world->setGravity(Eigen::Vector3s::UnitY());
 
   SkeletonPtr box = Skeleton::create("box");
 
@@ -230,13 +230,13 @@ TEST(GRADIENTS, FREE_VELOCITY_INTEGRATION)
   Joint* boxJoint = pair.first;
   BodyNode* boxBody = pair.second;
 
-  // boxBody->addExtForce(Eigen::Vector3d(1, -1, 0));
+  // boxBody->addExtForce(Eigen::Vector3s(1, -1, 0));
 
   world->addSkeleton(box);
 
   std::cout << world->getMassMatrix() << std::endl;
 
-  Eigen::Vector6d vel = Eigen::Vector6d::Zero();
+  Eigen::Vector6s vel = Eigen::Vector6s::Zero();
   vel(0) = 1.0;
   vel(4) = 1.0;
   world->setVelocities(vel);
@@ -244,7 +244,7 @@ TEST(GRADIENTS, FREE_VELOCITY_INTEGRATION)
   world->step();
   world->step();
   BackpropSnapshotPtr snapshot = neural::forwardPass(world, true);
-  Eigen::MatrixXd jacC
+  Eigen::MatrixXs jacC
       = snapshot->getJacobianOfC(world, WithRespectTo::POSITION);
 
   // verifyF_c(world);
@@ -256,25 +256,25 @@ TEST(GRADIENTS, FREE_VELOCITY_INTEGRATION)
 #ifdef ALL_TESTS
 TEST(GRADIENTS, NORMALIZED_SCREW_GRADIENT_ROTATE_X)
 {
-  Eigen::Vector6d screwX = Eigen::Vector6d::Zero();
+  Eigen::Vector6s screwX = Eigen::Vector6s::Zero();
   screwX(0) = 1.0;
-  Eigen::Vector3d point = Eigen::Vector3d::UnitY();
+  Eigen::Vector3s point = Eigen::Vector3s::UnitY();
   // if we rotate point by screwX, it should move in the negative Z direction
-  double theta = -90 * 3.1415926535 / 180;
+  s_t theta = -90 * 3.1415926535 / 180;
   // This should be at (0, 0, 1) = UnitZ()
-  Eigen::Vector3d rotatedPoint = math::expMap(screwX * theta) * point;
-  Eigen::Vector3d expectedPoint = -Eigen::Vector3d::UnitZ();
+  Eigen::Vector3s rotatedPoint = math::expMap(screwX * theta) * point;
+  Eigen::Vector3s expectedPoint = -Eigen::Vector3s::UnitZ();
   EXPECT_TRUE(equals(rotatedPoint, expectedPoint, 1e-6));
 
-  double EPS = 1e-7;
-  Eigen::Vector3d perturbedPos = math::expMap(screwX * (theta + EPS)) * point;
-  Eigen::Vector3d perturbedNeg = math::expMap(screwX * (theta - EPS)) * point;
-  Eigen::Vector3d bruteForceGradient
+  s_t EPS = 1e-7;
+  Eigen::Vector3s perturbedPos = math::expMap(screwX * (theta + EPS)) * point;
+  Eigen::Vector3s perturbedNeg = math::expMap(screwX * (theta - EPS)) * point;
+  Eigen::Vector3s bruteForceGradient
       = (perturbedPos - perturbedNeg) / (2 * EPS);
-  Eigen::Vector3d expectedGradient = Eigen::Vector3d::UnitY();
+  Eigen::Vector3s expectedGradient = Eigen::Vector3s::UnitY();
   EXPECT_TRUE(equals(bruteForceGradient, expectedGradient, 1e-9));
 
-  Eigen::Vector3d analyticalGradient
+  Eigen::Vector3s analyticalGradient
       = math::gradientWrtTheta(screwX, point, theta);
   EXPECT_TRUE(equals(analyticalGradient, expectedGradient, 1e-9));
 }
@@ -285,21 +285,21 @@ TEST(GRADIENTS, NORMALIZED_SCREW_GRADIENT_RANDOM_THETA_ZERO)
 {
   for (int i = 0; i < 20; i++)
   {
-    Eigen::Vector6d screwRand = Eigen::Vector6d::Random();
+    Eigen::Vector6s screwRand = Eigen::Vector6s::Random();
     screwRand.head<3>() = screwRand.head<3>().normalized();
 
-    Eigen::Vector3d point = Eigen::Vector3d::UnitY();
-    double theta = 0;
+    Eigen::Vector3s point = Eigen::Vector3s::UnitY();
+    s_t theta = 0;
 
-    double EPS = 1e-7;
-    Eigen::Vector3d perturbedPos
+    s_t EPS = 1e-7;
+    Eigen::Vector3s perturbedPos
         = math::expMap(screwRand * (theta + EPS)) * point;
-    Eigen::Vector3d perturbedNeg
+    Eigen::Vector3s perturbedNeg
         = math::expMap(screwRand * (theta - EPS)) * point;
-    Eigen::Vector3d bruteForceGradient
+    Eigen::Vector3s bruteForceGradient
         = (perturbedPos - perturbedNeg) / (2 * EPS);
 
-    Eigen::Vector3d analyticalGradient
+    Eigen::Vector3s analyticalGradient
         = math::gradientWrtTheta(screwRand, point, theta);
     EXPECT_TRUE(equals(analyticalGradient, bruteForceGradient, 1e-9));
   }
@@ -311,21 +311,21 @@ TEST(GRADIENTS, UNNORMALIZED_SCREW_GRADIENT_RANDOM_THETA_ZERO)
 {
   for (int i = 0; i < 20; i++)
   {
-    Eigen::Vector6d screwRand = Eigen::Vector6d::Random();
+    Eigen::Vector6s screwRand = Eigen::Vector6s::Random();
     // screwRand.head<3>() = screwRand.head<3>().normalized();
 
-    Eigen::Vector3d point = Eigen::Vector3d::UnitY();
-    double theta = 0;
+    Eigen::Vector3s point = Eigen::Vector3s::UnitY();
+    s_t theta = 0;
 
-    double EPS = 1e-7;
-    Eigen::Vector3d perturbedPos
+    s_t EPS = 1e-7;
+    Eigen::Vector3s perturbedPos
         = math::expMap(screwRand * (theta + EPS)) * point;
-    Eigen::Vector3d perturbedNeg
+    Eigen::Vector3s perturbedNeg
         = math::expMap(screwRand * (theta - EPS)) * point;
-    Eigen::Vector3d bruteForceGradient
+    Eigen::Vector3s bruteForceGradient
         = (perturbedPos - perturbedNeg) / (2 * EPS);
 
-    Eigen::Vector3d analyticalGradient
+    Eigen::Vector3s analyticalGradient
         = math::gradientWrtTheta(screwRand, point, theta);
     EXPECT_TRUE(equals(analyticalGradient, bruteForceGradient, 1e-9));
   }
@@ -337,21 +337,21 @@ TEST(GRADIENTS, NORMALIZED_SCREW_GRADIENT_RANDOM_THETA_RANDOM)
 {
   for (int i = 0; i < 20; i++)
   {
-    Eigen::Vector6d screwRand = Eigen::Vector6d::Random();
+    Eigen::Vector6s screwRand = Eigen::Vector6s::Random();
     screwRand.head<3>() = screwRand.head<3>().normalized();
 
-    Eigen::Vector3d point = Eigen::Vector3d::UnitY();
-    double theta = rand() * 2 * 3.1415926535;
+    Eigen::Vector3s point = Eigen::Vector3s::UnitY();
+    s_t theta = rand() * 2 * 3.1415926535;
 
-    double EPS = 1e-7;
-    Eigen::Vector3d perturbedPos
+    s_t EPS = 1e-7;
+    Eigen::Vector3s perturbedPos
         = math::expMap(screwRand * (theta + EPS)) * point;
-    Eigen::Vector3d perturbedNeg
+    Eigen::Vector3s perturbedNeg
         = math::expMap(screwRand * (theta - EPS)) * point;
-    Eigen::Vector3d bruteForceGradient
+    Eigen::Vector3s bruteForceGradient
         = (perturbedPos - perturbedNeg) / (2 * EPS);
 
-    Eigen::Vector3d analyticalGradient
+    Eigen::Vector3s analyticalGradient
         = math::gradientWrtTheta(screwRand, point, theta);
     EXPECT_TRUE(equals(analyticalGradient, bruteForceGradient, 1e-9));
   }

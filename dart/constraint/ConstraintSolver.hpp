@@ -68,7 +68,7 @@ public:
   /// doesn't take timespte. Timestep should be set by the owner of this solver
   /// such as dart::simulation::World when the solver added.
   DART_DEPRECATED(6.8)
-  explicit ConstraintSolver(double timeStep);
+  explicit ConstraintSolver(s_t timeStep);
 
   // TODO(JS): Remove timeStep. The timestep can be set by world when a
   // constraint solver is assigned to a world.
@@ -132,10 +132,10 @@ public:
   void clearLastCollisionResult();
 
   /// Set time step
-  virtual void setTimeStep(double _timeStep);
+  virtual void setTimeStep(s_t _timeStep);
 
   /// Get time step
-  double getTimeStep() const;
+  s_t getTimeStep() const;
 
   /// Set collision detector. This function acquires ownership of the
   /// CollisionDetector passed as an argument. This method is deprecated in
@@ -204,22 +204,22 @@ public:
   /// This gets the cached LCP solution, which is useful to be able to get/set
   /// because it can effect the forward solutions of physics problems because of
   /// our optimistic LCP-stabilization-to-acceptance approach.
-  virtual Eigen::VectorXd getCachedLCPSolution();
+  virtual Eigen::VectorXs getCachedLCPSolution();
 
   /// This gets the cached LCP solution, which is useful to be able to get/set
   /// because it can effect the forward solutions of physics problems because of
   /// our optimistic LCP-stabilization-to-acceptance approach.
-  virtual void setCachedLCPSolution(Eigen::VectorXd X);
+  virtual void setCachedLCPSolution(Eigen::VectorXs X);
 
   /// Contacts whose penetrationDepth is deeper than this depth will be ignored.
   /// This is a simple solution to avoid extremely nasty situations with
   /// impossibly deep inter-penetration during multiple shooting optimization.
-  void setContactClippingDepth(double depth);
+  void setContactClippingDepth(s_t depth);
 
   /// Contacts whose penetrationDepth is deeper than this depth will be ignored.
   /// This is a simple solution to avoid extremely nasty situations with
   /// impossibly deep inter-penetration during multiple shooting optimization.
-  double getContactClippingDepth();
+  s_t getContactClippingDepth();
 
 protected:
   // TODO(JS): Docstring
@@ -266,7 +266,7 @@ protected:
   collision::CollisionResult mCollisionResult;
 
   /// Time step
-  double mTimeStep;
+  s_t mTimeStep;
 
   /// Skeleton list
   std::vector<dynamics::SkeletonPtr> mSkeletons;
@@ -308,7 +308,7 @@ protected:
   /// Contacts whose penetrationDepth is deeper than this depth will be ignored.
   /// This is a simple solution to avoid extremely nasty situations with
   /// impossibly deep inter-penetration during multiple shooting optimization.
-  double mContactClippingDepth;
+  s_t mContactClippingDepth;
 };
 
 } // namespace constraint

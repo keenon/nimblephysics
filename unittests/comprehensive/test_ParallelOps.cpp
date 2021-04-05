@@ -165,7 +165,7 @@ TEST(WEB, SIMPLE_BOX)
 {
   // World
   WorldPtr world = World::create();
-  world->setGravity(Eigen::Vector3d(0, -9.81, 0));
+  world->setGravity(Eigen::Vector3s(0, -9.81, 0));
 
   ///////////////////////////////////////////////
   // Create the box
@@ -179,16 +179,16 @@ TEST(WEB, SIMPLE_BOX)
   BodyNode* boxBody = pair.second;
 
   boxJoint->setXYPlane();
-  boxJoint->setTransformFromParentBodyNode(Eigen::Isometry3d::Identity());
-  boxJoint->setTransformFromChildBodyNode(Eigen::Isometry3d::Identity());
+  boxJoint->setTransformFromParentBodyNode(Eigen::Isometry3s::Identity());
+  boxJoint->setTransformFromChildBodyNode(Eigen::Isometry3s::Identity());
 
   std::shared_ptr<BoxShape> boxShape(
-      new BoxShape(Eigen::Vector3d(1.0, 1.0, 1.0)));
+      new BoxShape(Eigen::Vector3s(1.0, 1.0, 1.0)));
   boxBody->createShapeNodeWith<VisualAspect, CollisionAspect>(boxShape);
   boxBody->setFrictionCoeff(0.0);
 
   // Add a force driving the box to the left
-  boxBody->addExtForce(Eigen::Vector3d(1, -1, 0));
+  boxBody->addExtForce(Eigen::Vector3s(1, -1, 0));
   // Prevent the mass matrix from being Identity
   boxBody->setMass(1.0);
   boxBody->setRestitutionCoeff(0.5);
@@ -204,16 +204,16 @@ TEST(WEB, SIMPLE_BOX)
   EXPECT_TRUE(checkOutOfOrderBackprop(world));
 }
 
-BodyNode* createTailSegment(BodyNode* parent, Eigen::Vector3d color)
+BodyNode* createTailSegment(BodyNode* parent, Eigen::Vector3s color)
 {
   std::pair<RevoluteJoint*, BodyNode*> poleJointPair
       = parent->createChildJointAndBodyNodePair<RevoluteJoint>();
   RevoluteJoint* poleJoint = poleJointPair.first;
   BodyNode* pole = poleJointPair.second;
-  poleJoint->setAxis(Eigen::Vector3d::UnitZ());
+  poleJoint->setAxis(Eigen::Vector3s::UnitZ());
 
   std::shared_ptr<BoxShape> shape(
-      new BoxShape(Eigen::Vector3d(0.05, 0.25, 0.05)));
+      new BoxShape(Eigen::Vector3s(0.05, 0.25, 0.05)));
   ShapeNode* poleShape
       = pole->createShapeNodeWith<VisualAspect, CollisionAspect>(shape);
   poleShape->getVisualAspect()->setColor(color);
@@ -224,15 +224,15 @@ BodyNode* createTailSegment(BodyNode* parent, Eigen::Vector3d color)
   poleJoint->setPositionUpperLimit(0, 270 * 3.1415 / 180);
   poleJoint->setPositionLowerLimit(0, -270 * 3.1415 / 180);
 
-  Eigen::Isometry3d poleOffset = Eigen::Isometry3d::Identity();
-  poleOffset.translation() = Eigen::Vector3d(0, -0.125, 0);
+  Eigen::Isometry3s poleOffset = Eigen::Isometry3s::Identity();
+  poleOffset.translation() = Eigen::Vector3s(0, -0.125, 0);
   poleJoint->setTransformFromChildBodyNode(poleOffset);
   poleJoint->setPosition(0, 90 * 3.1415 / 180);
 
   if (parent->getParentBodyNode() != nullptr)
   {
-    Eigen::Isometry3d childOffset = Eigen::Isometry3d::Identity();
-    childOffset.translation() = Eigen::Vector3d(0, 0.125, 0);
+    Eigen::Isometry3s childOffset = Eigen::Isometry3s::Identity();
+    childOffset.translation() = Eigen::Vector3s(0, 0.125, 0);
     poleJoint->setTransformFromParentBodyNode(childOffset);
   }
 
@@ -245,7 +245,7 @@ TEST(TRAJECTORY, JUMP_WORM)
 
   // World
   WorldPtr world = World::create();
-  world->setGravity(Eigen::Vector3d(0, -9.81, 0));
+  world->setGravity(Eigen::Vector3s(0, -9.81, 0));
 
   world->setPenetrationCorrectionEnabled(false);
 
@@ -256,10 +256,10 @@ TEST(TRAJECTORY, JUMP_WORM)
   TranslationalJoint2D* rootJoint = rootJointPair.first;
   BodyNode* root = rootJointPair.second;
 
-  std::shared_ptr<BoxShape> shape(new BoxShape(Eigen::Vector3d(0.1, 0.1, 0.1)));
+  std::shared_ptr<BoxShape> shape(new BoxShape(Eigen::Vector3s(0.1, 0.1, 0.1)));
   ShapeNode* rootVisual
       = root->createShapeNodeWith<VisualAspect, CollisionAspect>(shape);
-  Eigen::Vector3d black = Eigen::Vector3d::Zero();
+  Eigen::Vector3s black = Eigen::Vector3s::Zero();
   rootVisual->getVisualAspect()->setColor(black);
   rootJoint->setForceUpperLimit(0, 0);
   rootJoint->setForceLowerLimit(0, 0);
@@ -275,14 +275,14 @@ TEST(TRAJECTORY, JUMP_WORM)
   rootJoint->setPositionLowerLimit(1, -5);
 
   BodyNode* tail1 = createTailSegment(
-      root, Eigen::Vector3d(182.0 / 255, 223.0 / 255, 144.0 / 255));
+      root, Eigen::Vector3s(182.0 / 255, 223.0 / 255, 144.0 / 255));
   BodyNode* tail2 = createTailSegment(
-      tail1, Eigen::Vector3d(223.0 / 255, 228.0 / 255, 163.0 / 255));
+      tail1, Eigen::Vector3s(223.0 / 255, 228.0 / 255, 163.0 / 255));
   // BodyNode* tail3 =
   createTailSegment(
-      tail2, Eigen::Vector3d(221.0 / 255, 193.0 / 255, 121.0 / 255));
+      tail2, Eigen::Vector3s(221.0 / 255, 193.0 / 255, 121.0 / 255));
 
-  Eigen::VectorXd pos = Eigen::VectorXd(5);
+  Eigen::VectorXs pos = Eigen::VectorXs(5);
   pos << 0, 0, 90, 90, 45;
   jumpworm->setPositions(pos * 3.1415 / 180);
 
@@ -296,11 +296,11 @@ TEST(TRAJECTORY, JUMP_WORM)
       = floor->createJointAndBodyNodePair<WeldJoint>(nullptr);
   WeldJoint* floorJoint = floorJointPair.first;
   BodyNode* floorBody = floorJointPair.second;
-  Eigen::Isometry3d floorOffset = Eigen::Isometry3d::Identity();
-  floorOffset.translation() = Eigen::Vector3d(0, offGround ? -0.7 : -0.56, 0);
+  Eigen::Isometry3s floorOffset = Eigen::Isometry3s::Identity();
+  floorOffset.translation() = Eigen::Vector3s(0, offGround ? -0.7 : -0.56, 0);
   floorJoint->setTransformFromParentBodyNode(floorOffset);
   std::shared_ptr<BoxShape> floorShape(
-      new BoxShape(Eigen::Vector3d(2.5, 0.25, 0.5)));
+      new BoxShape(Eigen::Vector3s(2.5, 0.25, 0.5)));
   // ShapeNode* floorVisual =
   floorBody->createShapeNodeWith<VisualAspect, CollisionAspect>(floorShape);
   floorBody->setFrictionCoeff(0);
@@ -308,18 +308,18 @@ TEST(TRAJECTORY, JUMP_WORM)
   world->addSkeleton(floor);
 
   rootJoint->setVelocity(1, -0.1);
-  Eigen::VectorXd vels = world->getVelocities();
+  Eigen::VectorXs vels = world->getVelocities();
 
   TrajectoryLossFn loss = [](const TrajectoryRollout* rollout) {
-    const Eigen::Ref<const Eigen::MatrixXd> poses
+    const Eigen::Ref<const Eigen::MatrixXs> poses
         = rollout->getPosesConst("identity");
-    const Eigen::Ref<const Eigen::MatrixXd> vels
+    const Eigen::Ref<const Eigen::MatrixXs> vels
         = rollout->getVelsConst("identity");
-    const Eigen::Ref<const Eigen::MatrixXd> forces
+    const Eigen::Ref<const Eigen::MatrixXs> forces
         = rollout->getForcesConst("identity");
 
-    double maxPos = -1000;
-    double minPos = 1000;
+    s_t maxPos = -1000;
+    s_t minPos = 1000;
     for (int i = 0; i < poses.cols(); i++)
     {
       if (poses(1, i) > maxPos)
@@ -331,12 +331,12 @@ TEST(TRAJECTORY, JUMP_WORM)
         minPos = poses(1, i);
       }
     }
-    // double peakPosLoss = -(maxPos * maxPos) * (maxPos > 0 ? 1.0 : -1.0);
-    // double minPosLoss = -(minPos * minPos) * (minPos > 0 ? 1.0 : -1.0);
-    double endPos = poses(1, poses.cols() - 1);
-    double endPosLoss = -(endPos * endPos) * (endPos > 0 ? 1.0 : -1.0);
+    // s_t peakPosLoss = -(maxPos * maxPos) * (maxPos > 0 ? 1.0 : -1.0);
+    // s_t minPosLoss = -(minPos * minPos) * (minPos > 0 ? 1.0 : -1.0);
+    s_t endPos = poses(1, poses.cols() - 1);
+    s_t endPosLoss = -(endPos * endPos) * (endPos > 0 ? 1.0 : -1.0);
 
-    // double forceLoss = forces.squaredNorm();
+    // s_t forceLoss = forces.squaredNorm();
 
     // return endPosLoss * 100 + forceLoss * 1e-3;
     // return forceLoss;
@@ -350,17 +350,17 @@ TEST(TRAJECTORY, JUMP_WORM)
           gradWrtRollout->getPoses("identity").setZero();
           gradWrtRollout->getVels("identity").setZero();
           gradWrtRollout->getForces("identity").setZero();
-          const Eigen::Ref<const Eigen::MatrixXd> poses
+          const Eigen::Ref<const Eigen::MatrixXs> poses
               = rollout->getPosesConst("identity");
-          const Eigen::Ref<const Eigen::MatrixXd> vels
+          const Eigen::Ref<const Eigen::MatrixXs> vels
               = rollout->getVelsConst("identity");
-          const Eigen::Ref<const Eigen::MatrixXd> forces
+          const Eigen::Ref<const Eigen::MatrixXs> forces
               = rollout->getForcesConst("identity");
 
           gradWrtRollout->getPoses("identity")(1, poses.cols() - 1)
               = 2 * poses(1, poses.cols() - 1);
-          double endPos = poses(1, poses.cols() - 1);
-          double endPosLoss = -(endPos * endPos) * (endPos > 0 ? 1.0 : -1.0);
+          s_t endPos = poses(1, poses.cols() - 1);
+          s_t endPosLoss = -(endPos * endPos) * (endPos > 0 ? 1.0 : -1.0);
           return endPosLoss;
         };
 
@@ -391,10 +391,10 @@ TEST(TRAJECTORY, JUMP_WORM)
   // shot.setParallelOperationsEnabled(true);
   std::shared_ptr<Solution> record2 = optimizer.optimize(&shot2);
 
-  double loss1 = shot.getLoss(world);
-  double loss2 = shot2.getLoss(world);
+  s_t loss1 = shot.getLoss(world);
+  s_t loss2 = shot2.getLoss(world);
 
-  EXPECT_DOUBLE_EQ(loss1, loss2);
+  EXPECT_s_t_EQ(loss1, loss2);
 
   std::vector<MappedBackpropSnapshotPtr> snapshots1 = shot.getSnapshots(world);
   std::vector<MappedBackpropSnapshotPtr> snapshots2 = shot2.getSnapshots(world);
@@ -457,30 +457,30 @@ TEST(TRAJECTORY, JUMP_WORM)
       world->setVelocities(b1->getPreStepVelocity());
       world->setExternalForces(b1->getPreStepTorques());
 
-      Eigen::MatrixXd A_c1 = b1->getClampingConstraintMatrix(world);
-      Eigen::MatrixXd A_ub1 = b1->getUpperBoundConstraintMatrix(world);
-      Eigen::MatrixXd E1 = b1->getUpperBoundMappingMatrix();
-      Eigen::MatrixXd A_c_ub_E1 = A_c1 + A_ub1 * E1;
+      Eigen::MatrixXs A_c1 = b1->getClampingConstraintMatrix(world);
+      Eigen::MatrixXs A_ub1 = b1->getUpperBoundConstraintMatrix(world);
+      Eigen::MatrixXs E1 = b1->getUpperBoundMappingMatrix();
+      Eigen::MatrixXs A_c_ub_E1 = A_c1 + A_ub1 * E1;
 
-      Eigen::MatrixXd A_c2 = b2->getClampingConstraintMatrix(world);
-      Eigen::MatrixXd A_ub2 = b2->getUpperBoundConstraintMatrix(world);
-      Eigen::MatrixXd E2 = b2->getUpperBoundMappingMatrix();
-      Eigen::MatrixXd A_c_ub_E2 = A_c2 + A_ub2 * E2;
+      Eigen::MatrixXs A_c2 = b2->getClampingConstraintMatrix(world);
+      Eigen::MatrixXs A_ub2 = b2->getUpperBoundConstraintMatrix(world);
+      Eigen::MatrixXs E2 = b2->getUpperBoundMappingMatrix();
+      Eigen::MatrixXs A_c_ub_E2 = A_c2 + A_ub2 * E2;
 
       if (!equals(A_c_ub_E1, A_c_ub_E2, 0.0))
       {
         std::cout << "   A_c_ub_E off" << std::endl;
       }
 
-      Eigen::VectorXd tau = world->getExternalForces();
-      Eigen::VectorXd C = world->getCoriolisAndGravityAndExternalForces();
-      Eigen::VectorXd f_c1 = b1->getClampingConstraintImpulses();
-      Eigen::VectorXd f_c2 = b2->getClampingConstraintImpulses();
-      double dt = world->getTimeStep();
+      Eigen::VectorXs tau = world->getExternalForces();
+      Eigen::VectorXs C = world->getCoriolisAndGravityAndExternalForces();
+      Eigen::VectorXs f_c1 = b1->getClampingConstraintImpulses();
+      Eigen::VectorXs f_c2 = b2->getClampingConstraintImpulses();
+      s_t dt = world->getTimeStep();
 
-      Eigen::MatrixXd dM1 = b1->getJacobianOfMinv(
+      Eigen::MatrixXs dM1 = b1->getJacobianOfMinv(
           world, dt * (tau - C) + A_c_ub_E1 * f_c1, WithRespectTo::POSITION);
-      Eigen::MatrixXd dM2 = b2->getJacobianOfMinv(
+      Eigen::MatrixXs dM2 = b2->getJacobianOfMinv(
           world, dt * (tau - C) + A_c_ub_E2 * f_c2, WithRespectTo::POSITION);
 
       if (!equals(dM1, dM2, 0.0))
@@ -488,18 +488,18 @@ TEST(TRAJECTORY, JUMP_WORM)
         std::cout << "   dM off" << std::endl;
       }
 
-      Eigen::MatrixXd Minv = world->getInvMassMatrix();
-      Eigen::MatrixXd dC1 = b1->getJacobianOfC(world, WithRespectTo::POSITION);
-      Eigen::MatrixXd dC2 = b2->getJacobianOfC(world, WithRespectTo::POSITION);
+      Eigen::MatrixXs Minv = world->getInvMassMatrix();
+      Eigen::MatrixXs dC1 = b1->getJacobianOfC(world, WithRespectTo::POSITION);
+      Eigen::MatrixXs dC2 = b2->getJacobianOfC(world, WithRespectTo::POSITION);
 
       if (!equals(dC1, dC2, 0.0))
       {
         std::cout << "   dC off" << std::endl;
       }
 
-      Eigen::MatrixXd dF_c1
+      Eigen::MatrixXs dF_c1
           = b1->getJacobianOfConstraintForce(world, WithRespectTo::POSITION);
-      Eigen::MatrixXd dF_c2
+      Eigen::MatrixXs dF_c2
           = b2->getJacobianOfConstraintForce(world, WithRespectTo::POSITION);
 
       std::vector<std::shared_ptr<DifferentiableContactConstraint>> contacts1
@@ -513,16 +513,16 @@ TEST(TRAJECTORY, JUMP_WORM)
         std::cout << "   contact num off: " << contacts1.size() << " vs "
                   << contacts2.size() << std::endl;
       }
-      Eigen::MatrixXd mA1 = b1->mGradientMatrices[0]->mA;
-      Eigen::MatrixXd mA2 = b2->mGradientMatrices[0]->mA;
+      Eigen::MatrixXs mA1 = b1->mGradientMatrices[0]->mA;
+      Eigen::MatrixXs mA2 = b2->mGradientMatrices[0]->mA;
       if (!equals(mA1, mA2, 0.0))
       {
         std::cout << "   mA off" << std::endl;
         std::cout << "mA1: " << mA1 << std::endl;
         std::cout << "mA2: " << mA2 << std::endl;
       }
-      Eigen::MatrixXd mB1 = b1->mGradientMatrices[0]->mB;
-      Eigen::MatrixXd mB2 = b2->mGradientMatrices[0]->mB;
+      Eigen::MatrixXs mB1 = b1->mGradientMatrices[0]->mB;
+      Eigen::MatrixXs mB2 = b2->mGradientMatrices[0]->mB;
       if (!equals(mB1, mB2, 0.0))
       {
         std::cout << "   mB off" << std::endl;
@@ -531,8 +531,8 @@ TEST(TRAJECTORY, JUMP_WORM)
       }
 
       // Check LCP solution is the same
-      Eigen::VectorXd mX1 = b1->getContactConstraintImpulses();
-      Eigen::VectorXd mX2 = b2->getContactConstraintImpulses();
+      Eigen::VectorXs mX1 = b1->getContactConstraintImpulses();
+      Eigen::VectorXs mX2 = b2->getContactConstraintImpulses();
       if (!equals(mX1, mX2, 0.0))
       {
         std::cout << "   mX off" << std::endl;
@@ -544,70 +544,70 @@ TEST(TRAJECTORY, JUMP_WORM)
       {
         std::cout << "   dF_c off" << std::endl;
 
-        Eigen::MatrixXd Q1 = b1->getClampingAMatrix();
-        Eigen::MatrixXd Q2 = b2->getClampingAMatrix();
+        Eigen::MatrixXs Q1 = b1->getClampingAMatrix();
+        Eigen::MatrixXs Q2 = b2->getClampingAMatrix();
         if (!equals(Q1, Q2, 0.0))
         {
           std::cout << "      Q off" << std::endl;
         }
 
-        Eigen::MatrixXd dB1 = b1->getJacobianOfLCPOffsetClampingSubset(
+        Eigen::MatrixXs dB1 = b1->getJacobianOfLCPOffsetClampingSubset(
             world, WithRespectTo::POSITION);
-        Eigen::MatrixXd dB2 = b2->getJacobianOfLCPOffsetClampingSubset(
+        Eigen::MatrixXs dB2 = b2->getJacobianOfLCPOffsetClampingSubset(
             world, WithRespectTo::POSITION);
         if (!equals(dB1, dB2, 0.0))
         {
           std::cout << "      dB off" << std::endl;
 
-          Eigen::MatrixXd Minv1 = b1->getInvMassMatrix(world);
-          Eigen::MatrixXd Minv2 = b2->getInvMassMatrix(world);
+          Eigen::MatrixXs Minv1 = b1->getInvMassMatrix(world);
+          Eigen::MatrixXs Minv2 = b2->getInvMassMatrix(world);
           if (!equals(Minv1, Minv2, 0.0))
           {
             std::cout << "         Minv off" << std::endl;
           }
 
-          Eigen::MatrixXd dC1
+          Eigen::MatrixXs dC1
               = b1->getJacobianOfC(world, WithRespectTo::POSITION);
-          Eigen::MatrixXd dC2
+          Eigen::MatrixXs dC2
               = b2->getJacobianOfC(world, WithRespectTo::POSITION);
           if (!equals(dC1, dC2, 0.0))
           {
             std::cout << "         dC off" << std::endl;
           }
 
-          Eigen::VectorXd C1 = world->getCoriolisAndGravityAndExternalForces();
-          Eigen::VectorXd C2 = world->getCoriolisAndGravityAndExternalForces();
+          Eigen::VectorXs C1 = world->getCoriolisAndGravityAndExternalForces();
+          Eigen::VectorXs C2 = world->getCoriolisAndGravityAndExternalForces();
           if (!equals(C1, C2, 0.0))
           {
             std::cout << "         C off" << std::endl;
           }
 
-          Eigen::VectorXd f1 = b1->getPreStepTorques() - C1;
-          Eigen::VectorXd f2 = b1->getPreStepTorques() - C2;
+          Eigen::VectorXs f1 = b1->getPreStepTorques() - C1;
+          Eigen::VectorXs f2 = b1->getPreStepTorques() - C2;
           if (!equals(f1, f2, 0.0))
           {
             std::cout << "         f off" << std::endl;
           }
 
-          Eigen::MatrixXd dMinv_f1
+          Eigen::MatrixXs dMinv_f1
               = b1->getJacobianOfMinv(world, f1, WithRespectTo::POSITION);
-          Eigen::MatrixXd dMinv_f2
+          Eigen::MatrixXs dMinv_f2
               = b2->getJacobianOfMinv(world, f2, WithRespectTo::POSITION);
           if (!equals(dMinv_f1, dMinv_f2, 0.0))
           {
             std::cout << "         dMinv_f off" << std::endl;
           }
 
-          Eigen::VectorXd v_f1 = b1->getPreConstraintVelocity();
-          Eigen::VectorXd v_f2 = b2->getPreConstraintVelocity();
+          Eigen::VectorXs v_f1 = b1->getPreConstraintVelocity();
+          Eigen::VectorXs v_f2 = b2->getPreConstraintVelocity();
           if (!equals(v_f1, v_f2, 0.0))
           {
             std::cout << "         v_f off" << std::endl;
           }
 
-          Eigen::MatrixXd dA_c_f1
+          Eigen::MatrixXs dA_c_f1
               = b1->getJacobianOfClampingConstraintsTranspose(world, v_f1);
-          Eigen::MatrixXd dA_c_f2
+          Eigen::MatrixXs dA_c_f2
               = b2->getJacobianOfClampingConstraintsTranspose(world, v_f2);
           if (!equals(dA_c_f1, dA_c_f2, 0.0))
           {
@@ -625,10 +625,10 @@ TEST(TRAJECTORY, JUMP_WORM)
 
             for (int i = 0; i < con1.size(); i++)
             {
-              Eigen::VectorXd col1
+              Eigen::VectorXs col1
                   = con1[i]->getConstraintForcesJacobian(world).transpose()
                     * v_f1;
-              Eigen::VectorXd col2
+              Eigen::VectorXs col2
                   = con2[i]->getConstraintForcesJacobian(world).transpose()
                     * v_f2;
               if (!equals(col1, col2, 0.0))
@@ -671,22 +671,22 @@ TEST(TRAJECTORY, JUMP_WORM)
                   }
                 }
 
-                Eigen::Vector6d force1 = con1[i]->getWorldForce();
-                Eigen::Vector6d force2 = con2[i]->getWorldForce();
+                Eigen::Vector6s force1 = con1[i]->getWorldForce();
+                Eigen::Vector6s force2 = con2[i]->getWorldForce();
                 if (!equals(force1, force2, 0.0))
                 {
                   std::cout << "               force off" << std::endl;
                 }
 
-                Eigen::MatrixXd result1 = Eigen::MatrixXd::Zero(dim, dim);
-                Eigen::MatrixXd result2 = Eigen::MatrixXd::Zero(dim, dim);
+                Eigen::MatrixXs result1 = Eigen::MatrixXs::Zero(dim, dim);
+                Eigen::MatrixXs result2 = Eigen::MatrixXs::Zero(dim, dim);
 
                 std::vector<dynamics::DegreeOfFreedom*> dofs = world->getDofs();
                 for (int row = 0; row < dim; row++)
                 {
-                  Eigen::Vector6d axis1
+                  Eigen::Vector6s axis1
                       = con1[i]->getWorldScrewAxisForPosition(dofs[row]);
-                  Eigen::Vector6d axis2
+                  Eigen::Vector6s axis2
                       = con2[i]->getWorldScrewAxisForPosition(dofs[row]);
                   if (!equals(axis1, axis2, 0.0))
                   {
@@ -697,10 +697,10 @@ TEST(TRAJECTORY, JUMP_WORM)
                   for (int wrt = 0; wrt < dim; wrt++)
                   {
                     // DifferentiableContactConstraint
-                    Eigen::Vector6d screwAxisGradient1
+                    Eigen::Vector6s screwAxisGradient1
                         = con1[i]->getScrewAxisForPositionGradient(
                             dofs[row], dofs[wrt]);
-                    Eigen::Vector6d screwAxisGradient2
+                    Eigen::Vector6s screwAxisGradient2
                         = con2[i]->getScrewAxisForPositionGradient(
                             dofs[row], dofs[wrt]);
                     if (!equals(screwAxisGradient1, screwAxisGradient2, 0.0))
@@ -709,8 +709,8 @@ TEST(TRAJECTORY, JUMP_WORM)
                                 << wrt << " off" << std::endl;
                     }
 
-                    Eigen::Vector6d forceGradient1 = forceJac1.col(wrt);
-                    Eigen::Vector6d forceGradient2 = forceJac2.col(wrt);
+                    Eigen::Vector6s forceGradient1 = forceJac1.col(wrt);
+                    Eigen::Vector6s forceGradient2 = forceJac2.col(wrt);
 
                     if (!equals(forceGradient1, forceGradient2, 0.0))
                     {
@@ -718,8 +718,8 @@ TEST(TRAJECTORY, JUMP_WORM)
                                 << wrt << " off" << std::endl;
                     }
 
-                    double multiple1 = con1[i]->getForceMultiple(dofs[row]);
-                    double multiple2 = con2[i]->getForceMultiple(dofs[row]);
+                    s_t multiple1 = con1[i]->getForceMultiple(dofs[row]);
+                    s_t multiple2 = con2[i]->getForceMultiple(dofs[row]);
 
                     if (multiple1 != multiple2)
                     {
@@ -740,17 +740,17 @@ TEST(TRAJECTORY, JUMP_WORM)
           }
         }
 
-        Eigen::VectorXd b_1 = b1->getClampingConstraintRelativeVels();
-        Eigen::VectorXd b_2 = b2->getClampingConstraintRelativeVels();
+        Eigen::VectorXs b_1 = b1->getClampingConstraintRelativeVels();
+        Eigen::VectorXs b_2 = b2->getClampingConstraintRelativeVels();
         if (!equals(b_1, b_2, 0.0))
         {
           std::cout << "      b off" << std::endl;
         }
 
-        Eigen::MatrixXd dQ_b1
+        Eigen::MatrixXs dQ_b1
             = b1->getJacobianOfLCPConstraintMatrixClampingSubset(
                 world, b_1, WithRespectTo::POSITION);
-        Eigen::MatrixXd dQ_b2
+        Eigen::MatrixXs dQ_b2
             = b2->getJacobianOfLCPConstraintMatrixClampingSubset(
                 world, b_2, WithRespectTo::POSITION);
         if (!equals(dQ_b1, dQ_b2, 0.0))

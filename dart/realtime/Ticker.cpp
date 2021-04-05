@@ -5,7 +5,7 @@
 namespace dart {
 namespace realtime {
 
-Ticker::Ticker(double secondsPerTick)
+Ticker::Ticker(s_t secondsPerTick)
   : mRunning(false), mSecondsPerTick(secondsPerTick)
 {
 }
@@ -47,7 +47,7 @@ void Ticker::mainLoop()
 {
   while (mRunning)
   {
-    int interval = (int)(mSecondsPerTick * 1000);
+    int interval = (int)round(mSecondsPerTick * 1000);
     auto x = std::chrono::steady_clock::now()
              + std::chrono::milliseconds(interval);
     long millis = timeSinceEpochMillis();

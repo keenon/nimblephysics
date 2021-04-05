@@ -6,7 +6,7 @@ namespace dart {
 namespace realtime {
 
 /// This calls getForce() with the current system clock as the time parameter
-Eigen::VectorXd MPC::getForceNow()
+Eigen::VectorXs MPC::getForceNow()
 {
   return getForce(timeSinceEpochMillis());
 }
@@ -14,7 +14,7 @@ Eigen::VectorXd MPC::getForceNow()
 /// This calls recordGroundTruthState() with the current system clock as the
 /// time parameter
 void MPC::recordGroundTruthStateNow(
-    Eigen::VectorXd pos, Eigen::VectorXd vel, Eigen::VectorXd mass)
+    Eigen::VectorXs pos, Eigen::VectorXs vel, Eigen::VectorXs mass)
 {
   recordGroundTruthState(timeSinceEpochMillis(), pos, vel, mass);
 }

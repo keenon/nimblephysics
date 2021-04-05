@@ -58,20 +58,20 @@ void Optimizer(py::module& m)
                   dart::trajectory::Problem*  problem,
                   // clang-format on
                   int,
-                  double primal,
-                  double dual)> callback) -> void {
+                  s_t primal,
+                  s_t dual)> callback) -> void {
             std::function<bool(
                 // clang-format off
                 dart::trajectory::Problem* problem,
                 // clang-format on
                 int,
-                double primal,
-                double dual)>
+                s_t primal,
+                s_t dual)>
                 wrappedCallback = [callback](
                                       dart::trajectory::Problem* problem,
                                       int step,
-                                      double primal,
-                                      double dual) {
+                                      s_t primal,
+                                      s_t dual) {
                   /* Acquire GIL before calling Python code */
                   py::gil_scoped_acquire acquire;
                   try

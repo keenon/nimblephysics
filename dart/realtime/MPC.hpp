@@ -17,10 +17,10 @@ public:
 
   /// This gets the force to apply to the world at this instant. If we haven't
   /// computed anything for this instant yet, this just returns 0s.
-  virtual Eigen::VectorXd getForce(long now) = 0;
+  virtual Eigen::VectorXs getForce(long now) = 0;
 
   /// This calls getForce() with the current system clock as the time parameter
-  virtual Eigen::VectorXd getForceNow();
+  virtual Eigen::VectorXs getForceNow();
 
   /// This returns how many millis we have left until we've run out of plan.
   /// This can be a negative number, if we've run past our plan.
@@ -30,13 +30,13 @@ public:
   /// and inference. This resets the error in our model just assuming the world
   /// is exactly following our simulation.
   virtual void recordGroundTruthState(
-      long time, Eigen::VectorXd pos, Eigen::VectorXd vel, Eigen::VectorXd mass)
+      long time, Eigen::VectorXs pos, Eigen::VectorXs vel, Eigen::VectorXs mass)
       = 0;
 
   /// This calls recordGroundTruthState() with the current system clock as the
   /// time parameter
   virtual void recordGroundTruthStateNow(
-      Eigen::VectorXd pos, Eigen::VectorXd vel, Eigen::VectorXd mass);
+      Eigen::VectorXs pos, Eigen::VectorXs vel, Eigen::VectorXs mass);
 
   /// This starts our main thread and begins running optimizations
   virtual void start() = 0;

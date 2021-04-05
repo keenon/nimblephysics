@@ -86,7 +86,7 @@ Controller::~Controller()
 }
 
 //==============================================================================
-void Controller::update(double /*_currentTime*/)
+void Controller::update(s_t /*_currentTime*/)
 {
   // Compute control force
   mCurrentStateMachine->computeControlForce(mAtlasRobot->getTimeStep());
@@ -105,7 +105,7 @@ StateMachine* Controller::getCurrentState()
 
 //==============================================================================
 void Controller::changeStateMachine(
-    StateMachine* _stateMachine, double _currentTime)
+    StateMachine* _stateMachine, s_t _currentTime)
 {
   assert(
       _containStateMachine(_stateMachine)
@@ -131,7 +131,7 @@ void Controller::changeStateMachine(
 }
 
 //==============================================================================
-void Controller::changeStateMachine(const string& _name, double _currentTime)
+void Controller::changeStateMachine(const string& _name, s_t _currentTime)
 {
   // _state should be in mStates
   StateMachine* stateMachine = _findStateMachine(_name);
@@ -142,7 +142,7 @@ void Controller::changeStateMachine(const string& _name, double _currentTime)
 }
 
 //==============================================================================
-void Controller::changeStateMachine(std::size_t _idx, double _currentTime)
+void Controller::changeStateMachine(std::size_t _idx, s_t _currentTime)
 {
   assert(_idx <= mStateMachines.size() && "Invalid index of StateMachine.");
 
@@ -151,7 +151,7 @@ void Controller::changeStateMachine(std::size_t _idx, double _currentTime)
 
 //==============================================================================
 void Controller::keyboard(
-    unsigned char _key, int /*_x*/, int /*_y*/, double _currentTime)
+    unsigned char _key, int /*_x*/, int /*_y*/, s_t _currentTime)
 {
   switch (_key)
   {
@@ -371,22 +371,22 @@ StateMachine* Controller::_createWalkingInPlaceStateMachine()
 {
   using namespace dart::math::suffixes;
 
-  const double cd = 0.5;
-  const double cv = 0.2;
+  const s_t cd = 0.5;
+  const s_t cv = 0.2;
 
-  const double pelvis = -4.75_deg; // angle b/w pelvis and torso
+  const s_t pelvis = -4.75_deg; // angle b/w pelvis and torso
 
-  const double swh02 = 0.50;  // swing hip
-  const double swk02 = -1.10; // swing knee
-  const double swa02 = 0.60;  // swing angle
-  const double stk02 = -0.05; // stance knee
-  const double sta02 = 0.00;  // stance ankle
+  const s_t swh02 = 0.50;  // swing hip
+  const s_t swk02 = -1.10; // swing knee
+  const s_t swa02 = 0.60;  // swing angle
+  const s_t stk02 = -0.05; // stance knee
+  const s_t sta02 = 0.00;  // stance ankle
 
-  const double swh13 = -0.10; // swing hip
-  const double swk13 = -0.05; // swing knee
-  const double swa13 = 0.15;  // swing angle
-  const double stk13 = -0.10; // stance knee
-  const double sta13 = 0.00;  // stance ankle
+  const s_t swh13 = -0.10; // swing hip
+  const s_t swk13 = -0.05; // swing knee
+  const s_t swa13 = 0.15;  // swing angle
+  const s_t stk13 = -0.10; // stance knee
+  const s_t sta13 = 0.00;  // stance ankle
 
   StateMachine* sm = new StateMachine("walking in place");
 
@@ -578,22 +578,22 @@ StateMachine* Controller::_createWalkingStateMachine()
 {
   using namespace dart::math::suffixes;
 
-  const double cd = 0.5;
-  const double cv = 0.2;
+  const s_t cd = 0.5;
+  const s_t cv = 0.2;
 
-  const double pelvis = -10.0_deg; // angle b/w pelvis and torso
+  const s_t pelvis = -10.0_deg; // angle b/w pelvis and torso
 
-  const double swh02 = 0.50;  // swing hip
-  const double swk02 = -1.10; // swing knee
-  const double swa02 = 0.60;  // swing angle
-  const double stk02 = -0.05; // stance knee
-  const double sta02 = 0.00;  // stance ankle
+  const s_t swh02 = 0.50;  // swing hip
+  const s_t swk02 = -1.10; // swing knee
+  const s_t swa02 = 0.60;  // swing angle
+  const s_t stk02 = -0.05; // stance knee
+  const s_t sta02 = 0.00;  // stance ankle
 
-  const double swh13 = -0.10; // swing hip
-  const double swk13 = -0.05; // swing knee
-  const double swa13 = 0.15;  // swing angle
-  const double stk13 = -0.10; // stance knee
-  const double sta13 = 0.00;  // stance ankle
+  const s_t swh13 = -0.10; // swing hip
+  const s_t swk13 = -0.05; // swing knee
+  const s_t swa13 = 0.15;  // swing angle
+  const s_t stk13 = -0.10; // stance knee
+  const s_t sta13 = 0.00;  // stance ankle
 
   StateMachine* sm = new StateMachine("walking");
 
@@ -785,16 +785,16 @@ StateMachine* Controller::_createRunningStateMachine()
 {
   using namespace dart::math::suffixes;
 
-  const double cd = 0.5;
-  const double cv = 0.2;
+  const s_t cd = 0.5;
+  const s_t cv = 0.2;
 
-  const double pelvis = -10.0_deg; // angle b/w pelvis and torso
+  const s_t pelvis = -10.0_deg; // angle b/w pelvis and torso
 
-  const double swh01 = 0.50;  // swing hip
-  const double swk01 = -1.10; // swing knee
-  const double swa01 = 0.60;  // swing angle
-  const double stk01 = -0.05; // stance knee
-  const double sta01 = 0.00;  // stance ankle
+  const s_t swh01 = 0.50;  // swing hip
+  const s_t swk01 = -1.10; // swing knee
+  const s_t swa01 = 0.60;  // swing angle
+  const s_t stk01 = -0.05; // stance knee
+  const s_t sta01 = 0.00;  // stance ankle
 
   StateMachine* sm = new StateMachine("running");
 

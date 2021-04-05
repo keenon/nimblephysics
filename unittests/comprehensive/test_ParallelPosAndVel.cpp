@@ -59,12 +59,12 @@ using namespace server;
 using namespace realtime;
 
 // #ifdef ALL_TESTS
-TEST(PARALLEL_POS_AND_VEL, DOUBLE_PENDULUM)
+TEST(PARALLEL_POS_AND_VEL, s_t_PENDULUM)
 {
   // Create a world
   std::shared_ptr<simulation::World> world = dart::utils::SkelParser::readWorld(
-      "dart://sample/skel/inverted_double_pendulum.skel");
-  world->setPositions(Eigen::Vector3d(0, M_PI, 0));
+      "dart://sample/skel/inverted_s_t_pendulum.skel");
+  world->setPositions(Eigen::Vector3s(0, M_PI, 0));
   // TODO: if we set this to "true", then the model velocity explodes over time
   // with no input from us. This is a simple and obvious example of a bad
   // result.
@@ -89,15 +89,15 @@ TEST(PARALLEL_POS_AND_VEL, DOUBLE_PENDULUM)
   ticker.registerTickListener([&](long time) {
     if (server.isKeyDown("a"))
     {
-      world->setExternalForces(Eigen::Vector3d(-1, 0, 0));
+      world->setExternalForces(Eigen::Vector3s(-1, 0, 0));
     }
     else if (server.isKeyDown("e"))
     {
-      world->setExternalForces(Eigen::Vector3d(1, 0, 0));
+      world->setExternalForces(Eigen::Vector3s(1, 0, 0));
     }
     else
     {
-      world->setExternalForces(Eigen::Vector3d(0, 0, 0));
+      world->setExternalForces(Eigen::Vector3s(0, 0, 0));
     }
     world->step();
     server.renderWorld(world);

@@ -33,22 +33,22 @@
 #include <dart/dart.hpp>
 #include <dart/gui/gui.hpp>
 
-const double default_height = 1.0; // m
-const double default_width = 0.2;  // m
-const double default_depth = 0.2;  // m
+const s_t default_height = 1.0; // m
+const s_t default_width = 0.2;  // m
+const s_t default_depth = 0.2;  // m
 
-const double default_torque = 15.0; // N-m
-const double default_force = 15.0;  // N
+const s_t default_torque = 15.0; // N-m
+const s_t default_force = 15.0;  // N
 const int default_countdown = 200;  // Number of timesteps for applying force
 
-const double default_rest_position = 0.0;
-const double delta_rest_position = 10.0 * M_PI / 180.0;
+const s_t default_rest_position = 0.0;
+const s_t delta_rest_position = 10.0 * M_PI / 180.0;
 
-const double default_stiffness = 0.0;
-const double delta_stiffness = 10;
+const s_t default_stiffness = 0.0;
+const s_t delta_stiffness = 10;
 
-const double default_damping = 5.0;
-const double delta_damping = 1.0;
+const s_t default_damping = 5.0;
+const s_t delta_damping = 1.0;
 
 using namespace dart::dynamics;
 using namespace dart::simulation;
@@ -73,8 +73,8 @@ public:
     ArrowShape::Properties arrow_properties;
     arrow_properties.mRadius = 0.05;
     mArrow = std::shared_ptr<ArrowShape>(new ArrowShape(
-        Eigen::Vector3d(-default_height, 0.0, default_height / 2.0),
-        Eigen::Vector3d(-default_width / 2.0, 0.0, default_height / 2.0),
+        Eigen::Vector3s(-default_height, 0.0, default_height / 2.0),
+        Eigen::Vector3s(-default_width / 2.0, 0.0, default_height / 2.0),
         arrow_properties,
         dart::Color::Orange(1.0)));
   }
@@ -85,14 +85,14 @@ public:
     if (mPositiveSign)
     {
       mArrow->setPositions(
-          Eigen::Vector3d(-default_height, 0.0, default_height / 2.0),
-          Eigen::Vector3d(-default_width / 2.0, 0.0, default_height / 2.0));
+          Eigen::Vector3s(-default_height, 0.0, default_height / 2.0),
+          Eigen::Vector3s(-default_width / 2.0, 0.0, default_height / 2.0));
     }
     else
     {
       mArrow->setPositions(
-          Eigen::Vector3d(default_height, 0.0, default_height / 2.0),
-          Eigen::Vector3d(default_width / 2.0, 0.0, default_height / 2.0));
+          Eigen::Vector3s(default_height, 0.0, default_height / 2.0),
+          Eigen::Vector3s(default_width / 2.0, 0.0, default_height / 2.0));
     }
   }
 
@@ -102,16 +102,16 @@ public:
       mForceCountDown[index] = default_countdown;
   }
 
-  void changeRestPosition(double delta)
+  void changeRestPosition(s_t delta)
   {
     for (std::size_t i = 0; i < mPendulum->getNumDofs(); ++i)
     {
       DegreeOfFreedom* dof = mPendulum->getDof(i);
-      double q0 = dof->getRestPosition() + delta;
+      s_t q0 = dof->getRestPosition() + delta;
 
       // The system becomes numerically unstable when the rest position exceeds
       // 90 degrees
-      if (std::abs(q0) > 90.0 * M_PI / 180.0)
+      if (abs(q0) > 90.0 * M_PI / 180.0)
         q0 = (q0 > 0) ? (90.0 * M_PI / 180.0) : -(90.0 * M_PI / 180.0);
 
       dof->setRestPosition(q0);
@@ -122,24 +122,24 @@ public:
     mPendulum->getDof(2)->setRestPosition(0.0);
   }
 
-  void changeStiffness(double delta)
+  void changeStiffness(s_t delta)
   {
     for (std::size_t i = 0; i < mPendulum->getNumDofs(); ++i)
     {
       DegreeOfFreedom* dof = mPendulum->getDof(i);
-      double stiffness = dof->getSpringStiffness() + delta;
+      s_t stiffness = dof->getSpringStiffness() + delta;
       if (stiffness < 0.0)
         stiffness = 0.0;
       dof->setSpringStiffness(stiffness);
     }
   }
 
-  void changeDamping(double delta)
+  void changeDamping(s_t delta)
   {
     for (std::size_t i = 0; i < mPendulum->getNumDofs(); ++i)
     {
       DegreeOfFreedom* dof = mPendulum->getDof(i);
-      double damping = dof->getDampingCoefficient() + delta;
+      s_t damping = dof->getDampingCoefficient() + delta;
       if (damping < 0.0)
         damping = 0.0;
       dof->setDampingCoefficient(damping);
@@ -153,8 +153,8 @@ public:
     BodyNode* tip = mPendulum->getBodyNode(mPendulum->getNumBodyNodes() - 1);
 
     // Attach the last link to the world
-    Eigen::Vector3d location
-        = tip->getTransform() * Eigen::Vector3d(0.0, 0.0, default_height);
+    Eigen::Vector3s location
+        = tip->getTransform() * Eigen::Vector3s(0.0, 0.0, default_height);
     mBallConstraint = std::make_shared<dart::constraint::BallJointConstraint>(
         tip, location);
     mWorld->getConstraintSolver()->addConstraint(mBallConstraint);
@@ -293,8 +293,8 @@ public:
         {
           BodyNode* bn = mPendulum->getBodyNode(i);
 
-          Eigen::Vector3d force = default_force * Eigen::Vector3d::UnitX();
-          Eigen::Vector3d location(
+          Eigen::Vector3s force = default_force * Eigen::Vector3s::UnitX();
+          Eigen::Vector3s location(
               -default_width / 2.0, 0.0, default_height / 2.0);
           if (!mPositiveSign)
           {
@@ -341,7 +341,7 @@ void setGeometry(const BodyNodePtr& bn)
 {
   // Create a BoxShape to be used for both visualization and collision checking
   std::shared_ptr<BoxShape> box(new BoxShape(
-      Eigen::Vector3d(default_width, default_depth, default_height)));
+      Eigen::Vector3s(default_width, default_depth, default_height)));
 
   // Create a shape node for visualization and collision checking
   auto shapeNode
@@ -350,8 +350,8 @@ void setGeometry(const BodyNodePtr& bn)
   shapeNode->getVisualAspect()->setColor(dart::Color::Blue());
 
   // Set the location of the shape node
-  Eigen::Isometry3d box_tf(Eigen::Isometry3d::Identity());
-  Eigen::Vector3d center = Eigen::Vector3d(0, 0, default_height / 2.0);
+  Eigen::Isometry3s box_tf(Eigen::Isometry3s::Identity());
+  Eigen::Vector3s center = Eigen::Vector3s(0, 0, default_height / 2.0);
   box_tf.translation() = center;
   shapeNode->setRelativeTransform(box_tf);
 
@@ -363,9 +363,9 @@ BodyNode* makeRootBody(const SkeletonPtr& pendulum, const std::string& name)
 {
   BallJoint::Properties properties;
   properties.mName = name + "_joint";
-  properties.mRestPositions = Eigen::Vector3d::Constant(default_rest_position);
-  properties.mSpringStiffnesses = Eigen::Vector3d::Constant(default_stiffness);
-  properties.mDampingCoefficients = Eigen::Vector3d::Constant(default_damping);
+  properties.mRestPositions = Eigen::Vector3s::Constant(default_rest_position);
+  properties.mSpringStiffnesses = Eigen::Vector3s::Constant(default_stiffness);
+  properties.mDampingCoefficients = Eigen::Vector3s::Constant(default_damping);
 
   auto bodyProp = BodyNode::Properties(BodyNode::AspectProperties(name));
   BodyNodePtr bn = pendulum
@@ -374,9 +374,9 @@ BodyNode* makeRootBody(const SkeletonPtr& pendulum, const std::string& name)
                        .second;
 
   // Make a shape for the Joint
-  const double& R = default_width;
+  const s_t& R = default_width;
   std::shared_ptr<EllipsoidShape> ball(
-      new EllipsoidShape(sqrt(2) * Eigen::Vector3d(R, R, R)));
+      new EllipsoidShape(sqrt(2) * Eigen::Vector3s(R, R, R)));
   auto shapeNode = bn->createShapeNodeWith<VisualAspect>(ball);
   shapeNode->getVisualAspect()->setColor(dart::Color::Blue());
 
@@ -392,9 +392,9 @@ BodyNode* addBody(
   // Set up the properties for the Joint
   RevoluteJoint::Properties properties;
   properties.mName = name + "_joint";
-  properties.mAxis = Eigen::Vector3d::UnitY();
+  properties.mAxis = Eigen::Vector3s::UnitY();
   properties.mT_ParentBodyToJoint.translation()
-      = Eigen::Vector3d(0, 0, default_height);
+      = Eigen::Vector3s(0, 0, default_height);
   properties.mRestPositions[0] = default_rest_position;
   properties.mSpringStiffnesses[0] = default_stiffness;
   properties.mDampingCoefficients[0] = default_damping;
@@ -406,14 +406,14 @@ BodyNode* addBody(
                        .second;
 
   // Make a shape for the Joint
-  const double R = default_width / 2.0;
-  const double h = default_depth;
+  const s_t R = default_width / 2.0;
+  const s_t h = default_depth;
   std::shared_ptr<CylinderShape> cyl(new CylinderShape(R, h));
 
   // Line up the cylinder with the Joint axis
-  Eigen::Isometry3d tf(Eigen::Isometry3d::Identity());
+  Eigen::Isometry3s tf(Eigen::Isometry3s::Identity());
   tf.linear() = dart::math::eulerXYZToMatrix(
-      Eigen::Vector3d(90.0 * M_PI / 180.0, 0, 0));
+      Eigen::Vector3s(90.0 * M_PI / 180.0, 0, 0));
 
   auto shapeNode = bn->createShapeNodeWith<VisualAspect>(cyl);
   shapeNode->getVisualAspect()->setColor(dart::Color::Blue());

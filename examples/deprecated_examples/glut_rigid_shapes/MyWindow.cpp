@@ -68,13 +68,13 @@ void MyWindow::drawWorld() const
 }
 
 //==============================================================================
-Isometry3d getRandomTransform()
+Isometry3s getRandomTransform()
 {
-  Isometry3d T = Isometry3d::Identity();
+  Isometry3s T = Isometry3s::Identity();
 
-  const Vector3d rotation = math::Random::uniform<Vector3d>(
+  const Vector3s rotation = math::Random::uniform<Vector3s>(
       -math::constantsd::pi(), math::constantsd::pi());
-  const Vector3d position = Vector3d(
+  const Vector3s position = Vector3s(
       math::Random::uniform(-1.0, 1.0),
       math::Random::uniform(0.5, 1.0),
       math::Random::uniform(-1.0, 1.0));
@@ -125,21 +125,21 @@ void MyWindow::keyboard(unsigned char key, int x, int y)
     case 'Q':
     {
       spawnBox(
-          getRandomTransform(), math::Random::uniform<Vector3d>(0.05, 0.25));
+          getRandomTransform(), math::Random::uniform<Vector3s>(0.05, 0.25));
       break;
     }
     case 'w': // Spawn an ellipsoid
     case 'W':
     {
       spawnEllipsoid(
-          getRandomTransform(), math::Random::uniform<Vector3d>(0.025, 0.125));
+          getRandomTransform(), math::Random::uniform<Vector3s>(0.025, 0.125));
       break;
     }
     case 'e': // Spawn an cylinder
     case 'E':
     {
-      const double radius = math::Random::uniform(0.05, 0.25);
-      const double height = math::Random::uniform(0.1, 0.5);
+      const s_t radius = math::Random::uniform(0.05, 0.25);
+      const s_t height = math::Random::uniform(0.1, 0.5);
       spawnCylinder(getRandomTransform(), radius, height);
       break;
     }
@@ -161,7 +161,7 @@ void MyWindow::keyboard(unsigned char key, int x, int y)
 
 //==============================================================================
 void MyWindow::spawnBox(
-    const Eigen::Isometry3d& _T, const Eigen::Vector3d& _size, double _mass)
+    const Eigen::Isometry3s& _T, const Eigen::Vector3s& _size, s_t _mass)
 {
   dynamics::SkeletonPtr newSkeleton = dynamics::Skeleton::create();
 
@@ -182,14 +182,14 @@ void MyWindow::spawnBox(
       dynamics::CollisionAspect,
       dynamics::DynamicsAspect>(newShape);
   shapeNode->getVisualAspect()->setColor(
-      math::Random::uniform<Vector3d>(0.0, 1.0));
+      math::Random::uniform<Vector3s>(0.0, 1.0));
 
   mWorld->addSkeleton(newSkeleton);
 }
 
 //==============================================================================
 void MyWindow::spawnEllipsoid(
-    const Eigen::Isometry3d& _T, const Eigen::Vector3d& _radii, double _mass)
+    const Eigen::Isometry3s& _T, const Eigen::Vector3s& _radii, s_t _mass)
 {
   dynamics::SkeletonPtr newSkeleton = dynamics::Skeleton::create();
 
@@ -210,14 +210,14 @@ void MyWindow::spawnEllipsoid(
       dynamics::CollisionAspect,
       dynamics::DynamicsAspect>(newShape);
   shapeNode->getVisualAspect()->setColor(
-      math::Random::uniform<Vector3d>(0.0, 1.0));
+      math::Random::uniform<Vector3s>(0.0, 1.0));
 
   mWorld->addSkeleton(newSkeleton);
 }
 
 //==============================================================================
 void MyWindow::spawnCylinder(
-    const Eigen::Isometry3d& _T, double _radius, double _height, double _mass)
+    const Eigen::Isometry3s& _T, s_t _radius, s_t _height, s_t _mass)
 {
   dynamics::SkeletonPtr newSkeleton = dynamics::Skeleton::create();
 
@@ -238,7 +238,7 @@ void MyWindow::spawnCylinder(
       dynamics::CollisionAspect,
       dynamics::DynamicsAspect>(newShape);
   shapeNode->getVisualAspect()->setColor(
-      math::Random::uniform<Vector3d>(0.0, 1.0));
+      math::Random::uniform<Vector3s>(0.0, 1.0));
 
   mWorld->addSkeleton(newSkeleton);
 }

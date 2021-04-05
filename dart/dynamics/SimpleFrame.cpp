@@ -39,15 +39,15 @@ namespace dynamics {
 
 //==============================================================================
 SimpleFrame::SimpleFrame(Frame* _refFrame, const std::string& _name,
-                         const Eigen::Isometry3d& _relativeTransform)
+                         const Eigen::Isometry3s& _relativeTransform)
   : Entity(ConstructFrame),
     Frame(_refFrame),
     Detachable(),
     ShapeFrame(_refFrame),
     mRelativeTf(_relativeTransform),
-    mRelativeVelocity(Eigen::Vector6d::Zero()),
-    mRelativeAcceleration(Eigen::Vector6d::Zero()),
-    mPartialAcceleration(Eigen::Vector6d::Zero())
+    mRelativeVelocity(Eigen::Vector6s::Zero()),
+    mRelativeAcceleration(Eigen::Vector6s::Zero()),
+    mPartialAcceleration(Eigen::Vector6s::Zero())
 {
   setName(_name);
 }
@@ -59,10 +59,10 @@ SimpleFrame::SimpleFrame(const SimpleFrame& _otherFrame, Frame* _refFrame)
     Frame(_refFrame),
     Detachable(),
     ShapeFrame(_refFrame),
-    mRelativeTf(Eigen::Isometry3d::Identity()),
-    mRelativeVelocity(Eigen::Vector6d::Zero()),
-    mRelativeAcceleration(Eigen::Vector6d::Zero()),
-    mPartialAcceleration(Eigen::Vector6d::Zero())
+    mRelativeTf(Eigen::Isometry3s::Identity()),
+    mRelativeVelocity(Eigen::Vector6s::Zero()),
+    mRelativeAcceleration(Eigen::Vector6s::Zero()),
+    mPartialAcceleration(Eigen::Vector6s::Zero())
 {
   copy(_otherFrame, _refFrame);
   duplicateAspects(&_otherFrame);
@@ -118,10 +118,10 @@ void SimpleFrame::copy(const Frame* _otherFrame, Frame* _refFrame,
   if( (this == _otherFrame) && (_refFrame == getParentFrame()) )
     return;
 
-  Eigen::Isometry3d relativeTf = _otherFrame->getTransform(_refFrame);
-  Eigen::Vector6d relativeVelocity =
+  Eigen::Isometry3s relativeTf = _otherFrame->getTransform(_refFrame);
+  Eigen::Vector6s relativeVelocity =
       _otherFrame->getSpatialVelocity(_refFrame, Frame::World());
-  Eigen::Vector6d relativeAcceleration =
+  Eigen::Vector6s relativeAcceleration =
       _otherFrame->getSpatialAcceleration(_refFrame, Frame::World());
 
   setParentFrame(_refFrame);
@@ -150,35 +150,35 @@ SimpleFrame& SimpleFrame::operator=(const SimpleFrame& _otherFrame)
 
 //==============================================================================
 std::shared_ptr<SimpleFrame> SimpleFrame::spawnChildSimpleFrame(
-    const std::string& name, const Eigen::Isometry3d& relativeTransform)
+    const std::string& name, const Eigen::Isometry3s& relativeTransform)
 {
   return std::make_shared<SimpleFrame>(this, name, relativeTransform);
 }
 
 //==============================================================================
 void SimpleFrame::setRelativeTransform(
-    const Eigen::Isometry3d& _newRelTransform)
+    const Eigen::Isometry3s& _newRelTransform)
 {
   mRelativeTf = _newRelTransform;
   dirtyTransform();
 }
 
 //==============================================================================
-void SimpleFrame::setRelativeTranslation(const Eigen::Vector3d& _newTranslation)
+void SimpleFrame::setRelativeTranslation(const Eigen::Vector3s& _newTranslation)
 {
   mRelativeTf.translation() = _newTranslation;
   dirtyTransform();
 }
 
 //==============================================================================
-void SimpleFrame::setRelativeRotation(const Eigen::Matrix3d& _newRotation)
+void SimpleFrame::setRelativeRotation(const Eigen::Matrix3s& _newRotation)
 {
   mRelativeTf.linear() = _newRotation;
   dirtyTransform();
 }
 
 //==============================================================================
-void SimpleFrame::setTransform(const Eigen::Isometry3d& _newTransform,
+void SimpleFrame::setTransform(const Eigen::Isometry3s& _newTransform,
                                const Frame* _withRespectTo)
 {
   setRelativeTransform(
@@ -186,7 +186,7 @@ void SimpleFrame::setTransform(const Eigen::Isometry3d& _newTransform,
 }
 
 //==============================================================================
-void SimpleFrame::setTranslation(const Eigen::Vector3d& _newTranslation,
+void SimpleFrame::setTranslation(const Eigen::Vector3s& _newTranslation,
                                  const Frame* _withRespectTo)
 {
   setRelativeTranslation(
@@ -194,7 +194,7 @@ void SimpleFrame::setTranslation(const Eigen::Vector3d& _newTranslation,
 }
 
 //==============================================================================
-void SimpleFrame::setRotation(const Eigen::Matrix3d& _newRotation,
+void SimpleFrame::setRotation(const Eigen::Matrix3s& _newRotation,
                               const Frame* _withRespectTo)
 {
   setRelativeRotation(
@@ -203,14 +203,14 @@ void SimpleFrame::setRotation(const Eigen::Matrix3d& _newRotation,
 }
 
 //==============================================================================
-const Eigen::Isometry3d& SimpleFrame::getRelativeTransform() const
+const Eigen::Isometry3s& SimpleFrame::getRelativeTransform() const
 {
   return mRelativeTf;
 }
 
 //==============================================================================
 void SimpleFrame::setRelativeSpatialVelocity(
-    const Eigen::Vector6d& _newSpatialVelocity)
+    const Eigen::Vector6s& _newSpatialVelocity)
 {
   mRelativeVelocity = _newSpatialVelocity;
   dirtyVelocity();
@@ -218,7 +218,7 @@ void SimpleFrame::setRelativeSpatialVelocity(
 
 //==============================================================================
 void SimpleFrame::setRelativeSpatialVelocity(
-    const Eigen::Vector6d& _newSpatialVelocity, const Frame* _inCoordinatesOf)
+    const Eigen::Vector6s& _newSpatialVelocity, const Frame* _inCoordinatesOf)
 {
   if(this == _inCoordinatesOf)
     setRelativeSpatialVelocity(_newSpatialVelocity);
@@ -228,14 +228,14 @@ void SimpleFrame::setRelativeSpatialVelocity(
 }
 
 //==============================================================================
-const Eigen::Vector6d& SimpleFrame::getRelativeSpatialVelocity() const
+const Eigen::Vector6s& SimpleFrame::getRelativeSpatialVelocity() const
 {
   return mRelativeVelocity;
 }
 
 //==============================================================================
 void SimpleFrame::setRelativeSpatialAcceleration(
-    const Eigen::Vector6d &_newSpatialAcceleration)
+    const Eigen::Vector6s &_newSpatialAcceleration)
 {
   mRelativeAcceleration = _newSpatialAcceleration;
   dirtyAcceleration();
@@ -243,7 +243,7 @@ void SimpleFrame::setRelativeSpatialAcceleration(
 
 //==============================================================================
 void SimpleFrame::setRelativeSpatialAcceleration(
-    const Eigen::Vector6d& _newSpatialAcceleration,
+    const Eigen::Vector6s& _newSpatialAcceleration,
     const Frame* _inCoordinatesOf)
 {
   if(this == _inCoordinatesOf)
@@ -255,19 +255,19 @@ void SimpleFrame::setRelativeSpatialAcceleration(
 }
 
 //==============================================================================
-const Eigen::Vector6d& SimpleFrame::getRelativeSpatialAcceleration() const
+const Eigen::Vector6s& SimpleFrame::getRelativeSpatialAcceleration() const
 {
   return mRelativeAcceleration;
 }
 
 //==============================================================================
-const Eigen::Vector6d& SimpleFrame::getPrimaryRelativeAcceleration() const
+const Eigen::Vector6s& SimpleFrame::getPrimaryRelativeAcceleration() const
 {
   return mRelativeAcceleration;
 }
 
 //==============================================================================
-const Eigen::Vector6d& SimpleFrame::getPartialAcceleration() const
+const Eigen::Vector6s& SimpleFrame::getPartialAcceleration() const
 {
   mPartialAcceleration = math::ad(getSpatialVelocity(),
                                   getRelativeSpatialVelocity());
@@ -276,12 +276,12 @@ const Eigen::Vector6d& SimpleFrame::getPartialAcceleration() const
 
 //==============================================================================
 void SimpleFrame::setClassicDerivatives(
-    const Eigen::Vector3d& _linearVelocity,
-    const Eigen::Vector3d& _angularVelocity,
-    const Eigen::Vector3d& _linearAcceleration,
-    const Eigen::Vector3d& _angularAcceleration)
+    const Eigen::Vector3s& _linearVelocity,
+    const Eigen::Vector3s& _angularVelocity,
+    const Eigen::Vector3s& _linearAcceleration,
+    const Eigen::Vector3s& _angularAcceleration)
 {
-  Eigen::Vector6d v, a;
+  Eigen::Vector6s v, a;
   v << _angularVelocity,
        _linearVelocity;
 

@@ -6,6 +6,7 @@
 
 #include <Eigen/Dense>
 
+#include "dart/math/MathTypes.hpp"
 #include "dart/realtime/VectorLog.hpp"
 
 namespace dart {
@@ -52,24 +53,24 @@ public:
   /// This registers a function that can be used to estimate the initial state
   /// for the inference system from recent sensor history and the timestamp
   void setInitialPosEstimator(
-      std::function<Eigen::VectorXd(Eigen::MatrixXd, long)>
+      std::function<Eigen::VectorXs(Eigen::MatrixXs, long)>
           initialPosEstimator);
 
   /// This returns the current problem definition that MPC is using
   std::shared_ptr<trajectory::Problem> getProblem();
 
   /// This logs that the sensor output is a specific vector now
-  void registerSensorsNow(Eigen::VectorXd sensors);
+  void registerSensorsNow(Eigen::VectorXs sensors);
 
   /// This logs that the controls are a specific vector now
-  void registerControlsNow(Eigen::VectorXd sensors);
+  void registerControlsNow(Eigen::VectorXs sensors);
 
   /// This logs that the sensor output was a specific vector at a specific
   /// moment
-  void registerSensors(long now, Eigen::VectorXd sensors);
+  void registerSensors(long now, Eigen::VectorXs sensors);
 
   /// This logs that our controls were this value at this time
-  void registerControls(long now, Eigen::VectorXd controls);
+  void registerControls(long now, Eigen::VectorXs controls);
 
   /// This starts our main thread and begins running optimizations
   void start();
@@ -83,7 +84,7 @@ public:
   /// This registers a listener to get called when we finish replanning
   void registerInferListener(
       std::function<
-          void(long, Eigen::VectorXd, Eigen::VectorXd, Eigen::VectorXd, long)>
+          void(long, Eigen::VectorXs, Eigen::VectorXs, Eigen::VectorXs, long)>
           inferListener);
 
 protected:
@@ -105,12 +106,12 @@ protected:
 
   // These are listeners that get called when we finish replanning
   std::vector<std::function<void(
-      long, Eigen::VectorXd, Eigen::VectorXd, Eigen::VectorXd, long)> >
+      long, Eigen::VectorXs, Eigen::VectorXs, Eigen::VectorXs, long)> >
       mInferListeners;
 
   // This is the function that estimates our initial state before launching
   // learning
-  std::function<Eigen::VectorXd(Eigen::MatrixXd, long)> mInitialPosEstimator;
+  std::function<Eigen::VectorXs(Eigen::MatrixXs, long)> mInitialPosEstimator;
 };
 
 } // namespace realtime

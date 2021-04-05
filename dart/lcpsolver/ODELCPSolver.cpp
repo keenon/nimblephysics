@@ -34,10 +34,9 @@
 
 #include <cstdio>
 
+#include "dart/common/StlHelpers.hpp"
 #include "dart/external/odelcpsolver/lcp.h"
 #include "dart/external/odelcpsolver/misc.h"
-
-#include "dart/common/StlHelpers.hpp"
 #include "dart/lcpsolver/Lemke.hpp"
 
 namespace dart {
@@ -57,9 +56,9 @@ ODELCPSolver::~ODELCPSolver()
 
 //==============================================================================
 bool ODELCPSolver::Solve(
-    const Eigen::MatrixXd& _A,
-    const Eigen::VectorXd& _b,
-    Eigen::VectorXd* _x,
+    const Eigen::MatrixXs& _A,
+    const Eigen::VectorXs& _b,
+    Eigen::VectorXs* _x,
     int _numContacts,
     double _mu,
     int _numDir,
@@ -93,12 +92,12 @@ bool ODELCPSolver::Solve(
     {
       for (int j = 0; j < n; ++j)
       {
-        A[i * nSkip + j] = _A(i, j);
+        A[i * nSkip + j] = static_cast<double>(_A(i, j));
       }
     }
     for (int i = 0; i < n; ++i)
     {
-      b[i] = -_b[i];
+      b[i] = -static_cast<double>(_b[i]);
       x[i] = w[i] = lo[i] = 0;
       hi[i] = dInfinity;
       findex[i] = -1;
@@ -127,10 +126,10 @@ bool ODELCPSolver::Solve(
     //        cout << "w[i] " << i << " is zero, but x is " << x[i] << endl;
     //    }
 
-    *_x = Eigen::VectorXd(n);
+    *_x = Eigen::VectorXs(n);
     for (int i = 0; i < n; ++i)
     {
-      (*_x)[i] = x[i];
+      (*_x)[i] = static_cast<double>(x[i]);
     }
 
     // checkIfSolution(reducedA, reducedb, _x);
@@ -148,18 +147,18 @@ bool ODELCPSolver::Solve(
 
 //==============================================================================
 void ODELCPSolver::transferToODEFormulation(
-    const Eigen::MatrixXd& _A,
-    const Eigen::VectorXd& _b,
-    Eigen::MatrixXd* _AOut,
-    Eigen::VectorXd* _bOut,
+    const Eigen::MatrixXs& _A,
+    const Eigen::VectorXs& _b,
+    Eigen::MatrixXs* _AOut,
+    Eigen::VectorXs* _bOut,
     int _numDir,
     int _numContacts)
 {
   int numOtherConstrs = _A.rows() - _numContacts * (2 + _numDir);
   int n = _numContacts * 3 + numOtherConstrs;
-  Eigen::MatrixXd AIntermediate = Eigen::MatrixXd::Zero(n, _A.cols());
-  *_AOut = Eigen::MatrixXd::Zero(n, n);
-  *_bOut = Eigen::VectorXd::Zero(n);
+  Eigen::MatrixXs AIntermediate = Eigen::MatrixXs::Zero(n, _A.cols());
+  *_AOut = Eigen::MatrixXs::Zero(n, n);
+  *_bOut = Eigen::VectorXs::Zero(n);
   int offset = _numDir / 4;
   for (int i = 0; i < _numContacts; ++i)
   {
@@ -195,14 +194,14 @@ void ODELCPSolver::transferToODEFormulation(
 
 //==============================================================================
 void ODELCPSolver::transferSolFromODEFormulation(
-    const Eigen::VectorXd& _x,
-    Eigen::VectorXd* _xOut,
+    const Eigen::VectorXs& _x,
+    Eigen::VectorXs* _xOut,
     int _numDir,
     int _numContacts)
 {
   int numOtherConstrs = _x.size() - _numContacts * 3;
   *_xOut
-      = Eigen::VectorXd::Zero(_numContacts * (2 + _numDir) + numOtherConstrs);
+      = Eigen::VectorXs::Zero(_numContacts * (2 + _numDir) + numOtherConstrs);
 
   _xOut->head(_numContacts) = _x.head(_numContacts);
 
@@ -219,19 +218,19 @@ void ODELCPSolver::transferSolFromODEFormulation(
 
 //==============================================================================
 bool ODELCPSolver::checkIfSolution(
-    const Eigen::MatrixXd& _A,
-    const Eigen::VectorXd& _b,
-    const Eigen::VectorXd& _x)
+    const Eigen::MatrixXs& _A,
+    const Eigen::VectorXs& _b,
+    const Eigen::VectorXs& _x)
 {
-  const double threshold = 1e-4;
+  const s_t threshold = 1e-4;
   int n = _x.size();
 
-  Eigen::VectorXd w = _A * _x + _b;
+  Eigen::VectorXs w = _A * _x + _b;
   for (int i = 0; i < n; ++i)
   {
     if (w(i) < -threshold || _x(i) < -threshold)
       return false;
-    if (std::abs(w(i) * _x(i)) > threshold)
+    if (abs(w(i) * _x(i)) > threshold)
       return false;
   }
   return true;

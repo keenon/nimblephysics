@@ -55,7 +55,7 @@ TerminalCondition::~TerminalCondition()
 }
 
 //==============================================================================
-TimerCondition::TimerCondition(State* _state, double _duration)
+TimerCondition::TimerCondition(State* _state, s_t _duration)
   : TerminalCondition(_state), mDuration(_duration)
 {
 }

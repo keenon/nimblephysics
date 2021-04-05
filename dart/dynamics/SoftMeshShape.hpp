@@ -71,7 +71,7 @@ public:
   void update();
 
   // Documentation inherited.
-  Eigen::Matrix3d computeInertia(double mass) const override;
+  Eigen::Matrix3s computeInertia(s_t mass) const override;
 
 protected:
   // Documentation inherited.

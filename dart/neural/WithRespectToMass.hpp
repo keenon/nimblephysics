@@ -40,9 +40,9 @@ struct WrtMassBodyNodyEntry
 
   int dim();
 
-  void get(dynamics::Skeleton* skel, Eigen::Ref<Eigen::VectorXd> out);
+  void get(dynamics::Skeleton* skel, Eigen::Ref<Eigen::VectorXs> out);
 
-  void set(dynamics::Skeleton* skel, const Eigen::Ref<Eigen::VectorXd>& val);
+  void set(dynamics::Skeleton* skel, const Eigen::Ref<Eigen::VectorXs>& val);
 };
 
 class WithRespectToMass : public WithRespectTo
@@ -55,8 +55,8 @@ public:
   WrtMassBodyNodyEntry& registerNode(
       dynamics::BodyNode* node,
       WrtMassBodyNodeEntryType type,
-      Eigen::VectorXd upperBound,
-      Eigen::VectorXd lowerBound);
+      Eigen::VectorXs upperBound,
+      Eigen::VectorXs lowerBound);
 
   /// This returns the entry object corresponding to this node. Throws an
   /// assertion if this node doesn't exist
@@ -67,16 +67,16 @@ public:
   //////////////////////////////////////////////////////////////
 
   /// This returns this WRT from the world as a vector
-  Eigen::VectorXd get(simulation::World* world) override;
+  Eigen::VectorXs get(simulation::World* world) override;
 
   /// This returns this WRT from a skeleton as a vector
-  Eigen::VectorXd get(dynamics::Skeleton* skel) override;
+  Eigen::VectorXs get(dynamics::Skeleton* skel) override;
 
   /// This sets the world's state based on our WRT
-  void set(simulation::World* world, Eigen::VectorXd value) override;
+  void set(simulation::World* world, Eigen::VectorXs value) override;
 
   /// This sets the skeleton's state based on our WRT
-  void set(dynamics::Skeleton* skel, Eigen::VectorXd value) override;
+  void set(dynamics::Skeleton* skel, Eigen::VectorXs value) override;
 
   /// This gives the dimensions of the WRT
   int dim(simulation::World* world) override;
@@ -86,16 +86,16 @@ public:
 
   /// This gives a vector of upper bound values for this WRT, given state in the
   /// world
-  Eigen::VectorXd upperBound(simulation::World* world) override;
+  Eigen::VectorXs upperBound(simulation::World* world) override;
 
   /// This gives a vector of lower bound values for this WRT, given state in the
   /// world
-  Eigen::VectorXd lowerBound(simulation::World* world) override;
+  Eigen::VectorXs lowerBound(simulation::World* world) override;
 
 protected:
   std::unordered_map<std::string, std::vector<WrtMassBodyNodyEntry>> mEntries;
-  Eigen::VectorXd mUpperBounds;
-  Eigen::VectorXd mLowerBounds;
+  Eigen::VectorXs mUpperBounds;
+  Eigen::VectorXs mLowerBounds;
 };
 
 } // namespace neural

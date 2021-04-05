@@ -40,7 +40,7 @@ performance::PerformanceLog* Solution::getPerfLog()
 //==============================================================================
 /// This gets the x's we've recorded. This will be empty unless we've
 /// called optimizer.setRecordFullDebugInfo(true)
-std::vector<Eigen::VectorXd>& Solution::getXs()
+std::vector<Eigen::VectorXs>& Solution::getXs()
 {
   return mXs;
 }
@@ -48,7 +48,7 @@ std::vector<Eigen::VectorXd>& Solution::getXs()
 //==============================================================================
 /// This gets the losses we've recorded. This will be empty unless we've
 /// called optimizer.setRecordFullDebugInfo(true)
-std::vector<double>& Solution::getLosses()
+std::vector<s_t>& Solution::getLosses()
 {
   return mLosses;
 }
@@ -56,7 +56,7 @@ std::vector<double>& Solution::getLosses()
 //==============================================================================
 /// This gets the gradients we've recorded. This will be empty unless we've
 /// called optimizer.setRecordFullDebugInfo(true)
-std::vector<Eigen::VectorXd>& Solution::getGradients()
+std::vector<Eigen::VectorXs>& Solution::getGradients()
 {
   return mGradients;
 }
@@ -64,7 +64,7 @@ std::vector<Eigen::VectorXd>& Solution::getGradients()
 //==============================================================================
 /// This gets the gradients we've recorded. This will be empty unless we've
 /// called optimizer.setRecordFullDebugInfo(true)
-std::vector<Eigen::VectorXd>& Solution::getConstraintValues()
+std::vector<Eigen::VectorXs>& Solution::getConstraintValues()
 {
   return mConstraintValues;
 }
@@ -72,7 +72,7 @@ std::vector<Eigen::VectorXd>& Solution::getConstraintValues()
 //==============================================================================
 /// This gets the gradients we've recorded. This will be empty unless we've
 /// called optimizer.setRecordFullDebugInfo(true)
-std::vector<Eigen::VectorXd>& Solution::getSparseJacobians()
+std::vector<Eigen::VectorXs>& Solution::getSparseJacobians()
 {
   return mSparseJacobians;
 }
@@ -126,8 +126,8 @@ void Solution::setSuccess(bool success)
 void Solution::registerIteration(
     int index,
     const TrajectoryRollout* rollout,
-    double loss,
-    double constraintViolation)
+    s_t loss,
+    s_t constraintViolation)
 {
   mSteps.emplace_back(index, rollout, loss, constraintViolation);
 }
@@ -135,7 +135,7 @@ void Solution::registerIteration(
 //==============================================================================
 /// This only gets called if we're saving full debug info, but it stores every
 /// x that we receive during optimization
-void Solution::registerX(Eigen::VectorXd x)
+void Solution::registerX(Eigen::VectorXs x)
 {
   mXs.push_back(x);
 }
@@ -143,7 +143,7 @@ void Solution::registerX(Eigen::VectorXd x)
 //==============================================================================
 /// This only gets called if we're saving full debug info, but it stores every
 /// loss evaluation that we produce during optimization
-void Solution::registerLoss(double loss)
+void Solution::registerLoss(s_t loss)
 {
   mLosses.push_back(loss);
 }
@@ -151,7 +151,7 @@ void Solution::registerLoss(double loss)
 //==============================================================================
 /// This only gets called if we're saving full debug info, but it stores every
 /// gradient that we produce during optimization
-void Solution::registerGradient(Eigen::VectorXd grad)
+void Solution::registerGradient(Eigen::VectorXs grad)
 {
   mGradients.push_back(grad);
 }
@@ -159,7 +159,7 @@ void Solution::registerGradient(Eigen::VectorXd grad)
 //==============================================================================
 /// This only gets called if we're saving full debug info, but it stores every
 /// constraint value that we produce during optimization
-void Solution::registerConstraintValues(Eigen::VectorXd g)
+void Solution::registerConstraintValues(Eigen::VectorXs g)
 {
   mConstraintValues.push_back(g);
 }
@@ -167,7 +167,7 @@ void Solution::registerConstraintValues(Eigen::VectorXd g)
 //==============================================================================
 /// This only gets called if we're saving full debug info, but it stores every
 /// jacobian that we produce during optimization
-void Solution::registerSparseJac(Eigen::VectorXd jac)
+void Solution::registerSparseJac(Eigen::VectorXs jac)
 {
   mSparseJacobians.push_back(jac);
 }
@@ -198,7 +198,7 @@ std::string Solution::toJson(std::shared_ptr<simulation::World> world)
   json << world->toJson();
 
   std::vector<dynamics::BodyNode*> bodies = world->getAllBodyNodes();
-  Eigen::VectorXd originalWorldPos = world->getPositions();
+  Eigen::VectorXs originalWorldPos = world->getPositions();
 
   json << ",\"record\": [";
   for (int i = 0; i < getNumSteps(); i++)

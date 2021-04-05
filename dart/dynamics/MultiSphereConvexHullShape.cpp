@@ -88,7 +88,7 @@ void MultiSphereConvexHullShape::addSphere(const MultiSphereConvexHullShape::Sph
 }
 
 //==============================================================================
-void MultiSphereConvexHullShape::addSphere(double radius, const Eigen::Vector3d& position)
+void MultiSphereConvexHullShape::addSphere(s_t radius, const Eigen::Vector3s& position)
 {
   addSphere(std::make_pair(radius, position));
 }
@@ -117,7 +117,7 @@ const MultiSphereConvexHullShape::Spheres& MultiSphereConvexHullShape::getSphere
 }
 
 //==============================================================================
-Eigen::Matrix3d MultiSphereConvexHullShape::computeInertia(double mass) const
+Eigen::Matrix3s MultiSphereConvexHullShape::computeInertia(s_t mass) const
 {
   // Use bounding box to represent the mesh
   return BoxShape::computeInertia(getBoundingBox().computeFullExtents(), mass);
@@ -126,15 +126,15 @@ Eigen::Matrix3d MultiSphereConvexHullShape::computeInertia(double mass) const
 //==============================================================================
 void MultiSphereConvexHullShape::updateBoundingBox() const
 {
-  Eigen::Vector3d min
-      = Eigen::Vector3d::Constant(std::numeric_limits<double>::max());
-  Eigen::Vector3d max = -min;
+  Eigen::Vector3s min
+      = Eigen::Vector3s::Constant(std::numeric_limits<s_t>::max());
+  Eigen::Vector3s max = -min;
 
   for (const auto& sphere : mSpheres)
   {
     const auto& radius = sphere.first;
-    const Eigen::Vector3d& pos = sphere.second;
-    const Eigen::Vector3d extent = Eigen::Vector3d::Constant(radius);
+    const Eigen::Vector3s& pos = sphere.second;
+    const Eigen::Vector3s extent = Eigen::Vector3s::Constant(radius);
 
     min = min.cwiseMin(pos - extent);
     max = max.cwiseMax(pos + extent);

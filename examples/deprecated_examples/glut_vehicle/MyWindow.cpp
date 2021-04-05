@@ -51,9 +51,9 @@ void MyWindow::timeStepping()
 
   std::size_t dof = vehicle->getNumDofs();
 
-  Eigen::VectorXd q = vehicle->getPositions();
-  Eigen::VectorXd dq = vehicle->getVelocities();
-  Eigen::VectorXd tau = Eigen::VectorXd::Zero(dof);
+  Eigen::VectorXs q = vehicle->getPositions();
+  Eigen::VectorXs dq = vehicle->getVelocities();
+  Eigen::VectorXs tau = Eigen::VectorXs::Zero(dof);
 
   tau[6] = -mK * (q[6] - mSteeringWheelAngle) - mD * dq[6];
   tau[8] = -mK * (q[8] - mSteeringWheelAngle) - mD * dq[8];

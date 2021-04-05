@@ -42,9 +42,9 @@ namespace dynamics {
 namespace {
 
 //==============================================================================
-Eigen::Vector3d toVector3d(const octomap::point3d& point)
+Eigen::Vector3s toVector3s(const octomap::point3d& point)
 {
-  return Eigen::Vector3f(point.x(), point.y(), point.z()).cast<double>();
+  return Eigen::Vector3f(point.x(), point.y(), point.z()).cast<s_t>();
 }
 
 } // namespace
@@ -52,7 +52,7 @@ Eigen::Vector3d toVector3d(const octomap::point3d& point)
 #endif // HAVE_OCTOMAP
 
 //==============================================================================
-PointCloudShape::PointCloudShape(double visualSize)
+PointCloudShape::PointCloudShape(s_t visualSize)
   : Shape(),
     mPointShapeType(BOX),
     mColorMode(USE_SHAPE_COLOR),
@@ -68,9 +68,9 @@ const std::string& PointCloudShape::getType() const
 }
 
 //==============================================================================
-Eigen::Matrix3d PointCloudShape::computeInertia(double /*mass*/) const
+Eigen::Matrix3s PointCloudShape::computeInertia(s_t /*mass*/) const
 {
-  return Eigen::Matrix3d::Identity();
+  return Eigen::Matrix3s::Identity();
 }
 
 //==============================================================================
@@ -87,14 +87,14 @@ void PointCloudShape::reserve(std::size_t size)
 }
 
 //==============================================================================
-void PointCloudShape::addPoint(const Eigen::Vector3d& point)
+void PointCloudShape::addPoint(const Eigen::Vector3s& point)
 {
   mPoints.emplace_back(point);
   incrementVersion();
 }
 
 //==============================================================================
-void PointCloudShape::addPoint(const std::vector<Eigen::Vector3d>& points)
+void PointCloudShape::addPoint(const std::vector<Eigen::Vector3s>& points)
 {
   mPoints.reserve(mPoints.size() + points.size());
   for (const auto& point : points)
@@ -103,7 +103,7 @@ void PointCloudShape::addPoint(const std::vector<Eigen::Vector3d>& points)
 }
 
 //==============================================================================
-void PointCloudShape::setPoint(const std::vector<Eigen::Vector3d>& points)
+void PointCloudShape::setPoint(const std::vector<Eigen::Vector3s>& points)
 {
   mPoints = points;
   incrementVersion();
@@ -115,7 +115,7 @@ void PointCloudShape::setPoints(octomap::Pointcloud& pointCloud)
 {
   mPoints.resize(pointCloud.size());
   for (auto i = 0u; i < mPoints.size(); ++i)
-    mPoints[i] = toVector3d(pointCloud[i]);
+    mPoints[i] = toVector3s(pointCloud[i]);
   incrementVersion();
 }
 
@@ -124,13 +124,13 @@ void PointCloudShape::addPoints(octomap::Pointcloud& pointCloud)
 {
   mPoints.reserve(mPoints.size() + pointCloud.size());
   for (const auto& point : pointCloud)
-    mPoints.emplace_back(toVector3d(point));
+    mPoints.emplace_back(toVector3s(point));
   incrementVersion();
 }
 #endif
 
 //==============================================================================
-const std::vector<Eigen::Vector3d>& PointCloudShape::getPoints() const
+const std::vector<Eigen::Vector3s>& PointCloudShape::getPoints() const
 {
   return mPoints;
 }
@@ -176,21 +176,21 @@ PointCloudShape::ColorMode PointCloudShape::getColorMode() const
 }
 
 //==============================================================================
-void PointCloudShape::setOverallColor(const Eigen::Vector4d& color)
+void PointCloudShape::setOverallColor(const Eigen::Vector4s& color)
 {
   mColors.resize(1);
   mColors[0] = color;
 }
 
 //==============================================================================
-Eigen::Vector4d PointCloudShape::getOverallColor() const
+Eigen::Vector4s PointCloudShape::getOverallColor() const
 {
   if (mColors.empty())
   {
     dtwarn << "[PointCloudShape] Attempt to get the overall color when the "
            << "color array is empty. Returning (RGBA: [0.5, 0.5, 0.5, 0.5]) "
            << "color\n";
-    return Eigen::Vector4d(0.5, 0.5, 0.5, 0.5);
+    return Eigen::Vector4s(0.5, 0.5, 0.5, 0.5);
   }
 
   if (mColors.size() > 1)
@@ -206,34 +206,34 @@ Eigen::Vector4d PointCloudShape::getOverallColor() const
 //==============================================================================
 void PointCloudShape::setColors(
     const std::vector<
-        Eigen::Vector4d,
-        Eigen::aligned_allocator<Eigen::Vector4d> >& colors)
+        Eigen::Vector4s,
+        Eigen::aligned_allocator<Eigen::Vector4s> >& colors)
 {
   mColors = colors;
 }
 
 //==============================================================================
-const std::vector<Eigen::Vector4d, Eigen::aligned_allocator<Eigen::Vector4d> >&
+const std::vector<Eigen::Vector4s, Eigen::aligned_allocator<Eigen::Vector4s> >&
 PointCloudShape::getColors() const
 {
   return mColors;
 }
 
 //==============================================================================
-void PointCloudShape::setVisualSize(double size)
+void PointCloudShape::setVisualSize(s_t size)
 {
   mVisualSize = size;
   incrementVersion();
 }
 
 //==============================================================================
-double PointCloudShape::getVisualSize() const
+s_t PointCloudShape::getVisualSize() const
 {
   return mVisualSize;
 }
 
 //==============================================================================
-void PointCloudShape::notifyColorUpdated(const Eigen::Vector4d& /*color*/)
+void PointCloudShape::notifyColorUpdated(const Eigen::Vector4s& /*color*/)
 {
   incrementVersion();
 }
@@ -250,16 +250,16 @@ void PointCloudShape::updateBoundingBox() const
 {
   if (mPoints.empty())
   {
-    mBoundingBox.setMin(Eigen::Vector3d::Zero());
-    mBoundingBox.setMax(Eigen::Vector3d::Zero());
+    mBoundingBox.setMin(Eigen::Vector3s::Zero());
+    mBoundingBox.setMax(Eigen::Vector3s::Zero());
     mIsBoundingBoxDirty = false;
     return;
   }
 
-  Eigen::Vector3d min
-      = Eigen::Vector3d::Constant(std::numeric_limits<double>::infinity());
-  Eigen::Vector3d max
-      = Eigen::Vector3d::Constant(-std::numeric_limits<double>::infinity());
+  Eigen::Vector3s min
+      = Eigen::Vector3s::Constant(std::numeric_limits<s_t>::infinity());
+  Eigen::Vector3s max
+      = Eigen::Vector3s::Constant(-std::numeric_limits<s_t>::infinity());
 
   for (const auto& vertex : mPoints)
   {

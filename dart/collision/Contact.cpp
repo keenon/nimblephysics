@@ -37,9 +37,9 @@ namespace collision {
 
 //==============================================================================
 Contact::Contact()
-  : point(Eigen::Vector3d::Zero()),
-    normal(Eigen::Vector3d::Zero()),
-    force(Eigen::Vector3d::Zero()),
+  : point(Eigen::Vector3s::Zero()),
+    normal(Eigen::Vector3s::Zero()),
+    force(Eigen::Vector3s::Zero()),
     collisionObject1(nullptr),
     collisionObject2(nullptr),
     penetrationDepth(0),
@@ -50,28 +50,28 @@ Contact::Contact()
     type(ContactType::UNSUPPORTED),
     // Poison all of the gradient related metadata to make it easier to detect
     // using uninitialized values
-    edgeAClosestPoint(Eigen::Vector3d::Constant(NAN)),
-    edgeAFixedPoint(Eigen::Vector3d::Constant(NAN)),
-    edgeADir(Eigen::Vector3d::Constant(NAN)),
-    edgeBClosestPoint(Eigen::Vector3d::Constant(NAN)),
-    edgeBFixedPoint(Eigen::Vector3d::Constant(NAN)),
-    edgeBDir(Eigen::Vector3d::Constant(NAN)),
-    sphereCenter(Eigen::Vector3d::Constant(NAN)),
+    edgeAClosestPoint(Eigen::Vector3s::Constant(NAN)),
+    edgeAFixedPoint(Eigen::Vector3s::Constant(NAN)),
+    edgeADir(Eigen::Vector3s::Constant(NAN)),
+    edgeBClosestPoint(Eigen::Vector3s::Constant(NAN)),
+    edgeBFixedPoint(Eigen::Vector3s::Constant(NAN)),
+    edgeBDir(Eigen::Vector3s::Constant(NAN)),
+    sphereCenter(Eigen::Vector3s::Constant(NAN)),
     sphereRadius(NAN),
-    pipeDir(Eigen::Vector3d::Constant(NAN)),
-    pipeClosestPoint(Eigen::Vector3d::Constant(NAN)),
-    pipeFixedPoint(Eigen::Vector3d::Constant(NAN)),
+    pipeDir(Eigen::Vector3s::Constant(NAN)),
+    pipeClosestPoint(Eigen::Vector3s::Constant(NAN)),
+    pipeFixedPoint(Eigen::Vector3s::Constant(NAN)),
     pipeRadius(NAN),
-    vertexPoint(Eigen::Vector3d::Constant(NAN)),
+    vertexPoint(Eigen::Vector3s::Constant(NAN)),
     face1Locked(false),
-    face1Normal(Eigen::Vector3d::Constant(NAN)),
+    face1Normal(Eigen::Vector3s::Constant(NAN)),
     face2Locked(false),
-    face2Normal(Eigen::Vector3d::Constant(NAN)),
+    face2Normal(Eigen::Vector3s::Constant(NAN)),
     face3Locked(false),
-    face3Normal(Eigen::Vector3d::Constant(NAN)),
-    centerA(Eigen::Vector3d::Constant(NAN)),
+    face3Normal(Eigen::Vector3s::Constant(NAN)),
+    centerA(Eigen::Vector3s::Constant(NAN)),
     radiusA(NAN),
-    centerB(Eigen::Vector3d::Constant(NAN)),
+    centerB(Eigen::Vector3s::Constant(NAN)),
     radiusB(NAN)
 {
   // TODO(MXG): Consider using NaN instead of zero for uninitialized quantities
@@ -79,16 +79,16 @@ Contact::Contact()
 }
 
 //==============================================================================
-bool Contact::isZeroNormal(const Eigen::Vector3d& normal)
+bool Contact::isZeroNormal(const Eigen::Vector3s& normal)
 {
-  if (normal.squaredNorm() < getNormalEpsilonSquared())
+  if (normal.squaredNorm() < static_cast<s_t>(getNormalEpsilonSquared()))
     return true;
   else
     return false;
 }
 
 //==============================================================================
-bool Contact::isNonZeroNormal(const Eigen::Vector3d& normal)
+bool Contact::isNonZeroNormal(const Eigen::Vector3s& normal)
 {
   return !isZeroNormal(normal);
 }

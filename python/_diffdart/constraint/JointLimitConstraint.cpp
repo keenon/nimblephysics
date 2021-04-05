@@ -50,51 +50,51 @@ void JointLimitConstraint(py::module& m)
       .def(::py::init<dart::dynamics::Joint*>(), ::py::arg("joint"))
       .def_static(
           "setErrorAllowance",
-          +[](double _allowance) {
+          +[](s_t _allowance) {
             dart::constraint::JointLimitConstraint::setErrorAllowance(
                 _allowance);
           },
           ::py::arg("allowance"))
       .def_static(
           "getErrorAllowance",
-          +[]() -> double {
+          +[]() -> s_t {
             return dart::constraint::JointLimitConstraint::getErrorAllowance();
           })
       .def_static(
           "setErrorReductionParameter",
-          +[](double _erp) {
+          +[](s_t _erp) {
             dart::constraint::JointLimitConstraint::setErrorReductionParameter(
                 _erp);
           },
           ::py::arg("erp"))
       .def_static(
           "getErrorReductionParameter",
-          +[]() -> double {
+          +[]() -> s_t {
             return dart::constraint::JointLimitConstraint::
                 getErrorReductionParameter();
           })
       .def_static(
           "setMaxErrorReductionVelocity",
-          +[](double _erv) {
+          +[](s_t _erv) {
             dart::constraint::JointLimitConstraint::
                 setMaxErrorReductionVelocity(_erv);
           },
           ::py::arg("erv"))
       .def_static(
           "getMaxErrorReductionVelocity",
-          +[]() -> double {
+          +[]() -> s_t {
             return dart::constraint::JointLimitConstraint::
                 getMaxErrorReductionVelocity();
           })
       .def_static(
           "setConstraintForceMixing",
-          +[](double _cfm) {
+          +[](s_t _cfm) {
             dart::constraint::JointLimitConstraint::setConstraintForceMixing(
                 _cfm);
           },
           ::py::arg("cfm"))
       .def_static(
-          "getConstraintForceMixing", +[]() -> double {
+          "getConstraintForceMixing", +[]() -> s_t {
             return dart::constraint::JointLimitConstraint::
                 getConstraintForceMixing();
           });

@@ -45,7 +45,7 @@ TEST(ConstrainedGroupGradientMatrices, SIMPLE_MERGE)
 {
   int numDofs = 2;
   int numConstraints = 4;
-  double timestep = 0.001;
+  s_t timestep = 0.001;
 
   ConstrainedGroupGradientMatrices matrices(numDofs, numConstraints, timestep);
 
@@ -56,35 +56,35 @@ TEST(ConstrainedGroupGradientMatrices, SIMPLE_MERGE)
   matrices.mockRegisterConstraint(0.0, 0.0);
 
   // Register 2 constraints with similar impulse tests
-  Eigen::VectorXd i1(2);
+  Eigen::VectorXs i1(2);
   i1 << 0.0, 1.0;
   matrices.mockMeasureConstraintImpulse(i1);
-  Eigen::VectorXd i2(2);
+  Eigen::VectorXs i2(2);
   i2 << 0.01, 0.99;
   matrices.mockMeasureConstraintImpulse(i2);
 
   // Register another 2 constraints with similar impulse tests
-  Eigen::VectorXd i3(2);
+  Eigen::VectorXs i3(2);
   i3 << 1.0, 0.0;
   matrices.mockMeasureConstraintImpulse(i3);
-  Eigen::VectorXd i4(2);
+  Eigen::VectorXs i4(2);
   i4 << 0.99, 0.01;
   matrices.mockMeasureConstraintImpulse(i4);
 
   // Regester mock LCP results
-  Eigen::VectorXd X(4);
+  Eigen::VectorXs X(4);
   X << 0.99, 1, 0.99, 1;
-  Eigen::VectorXd lo(4);
+  Eigen::VectorXs lo(4);
   lo << 0.0, 0.0, 0.0, 0.0;
-  Eigen::VectorXd hi(4);
+  Eigen::VectorXs hi(4);
   hi << 1000, 1000, 1000, 1000;
   Eigen::VectorXi fIndex(4);
   fIndex << -1, -1, 0, 1;
-  Eigen::VectorXd b(4);
+  Eigen::VectorXs b(4);
   b << 0.0, 0.0, 0.0, 0.0;
-  Eigen::VectorXd aColNorms(4);
+  Eigen::VectorXs aColNorms(4);
   aColNorms << 1.0, 1.0, 1.0, 1.0;
-  Eigen::MatrixXd A(4, 4);
+  Eigen::MatrixXs A(4, 4);
   A << 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
       1.0, 1.0;
   matrices.registerLCPResults(X, hi, lo, fIndex, b, aColNorms, A, 0.0, false);
@@ -102,27 +102,27 @@ TEST(ConstrainedGroupGradientMatrices, SIMPLE_MERGE)
   EXPECT_TRUE(matrices.mRestitutionCoeffs.size() == 2);
   EXPECT_TRUE(matrices.mPenetrationCorrectionVelocities.size() == 2);
 
-  Eigen::VectorXd c1 = (i1 + i2) / 2;
-  Eigen::VectorXd c2 = (i3 + i4) / 2;
+  Eigen::VectorXs c1 = (i1 + i2) / 2;
+  Eigen::VectorXs c2 = (i3 + i4) / 2;
   EXPECT_TRUE(equals(c1, matrices.mMassedImpulseTests[0]));
   EXPECT_TRUE(equals(c2, matrices.mMassedImpulseTests[1]));
 
-  Eigen::VectorXd newX(2);
+  Eigen::VectorXs newX(2);
   newX << 1.99, 1.99;
   EXPECT_TRUE(equals(newX, matrices.mX));
-  Eigen::VectorXd newLo(2);
+  Eigen::VectorXs newLo(2);
   newLo << 0.0, 0.0;
   EXPECT_TRUE(equals(newLo, matrices.mLo));
-  Eigen::VectorXd newHi(2);
+  Eigen::VectorXs newHi(2);
   newHi << 1000.0, 1000.0;
   EXPECT_TRUE(equals(newHi, matrices.mHi));
   Eigen::VectorXi newFIndex(2);
   newFIndex << -1, 0;
   EXPECT_TRUE(equals(newFIndex, matrices.mFIndex));
-  Eigen::VectorXd newB(2);
+  Eigen::VectorXs newB(2);
   newB << 0.0, 0.0;
   EXPECT_TRUE(equals(newB, matrices.mB));
-  Eigen::VectorXd newACols(2);
+  Eigen::VectorXs newACols(2);
   newACols << 1.0, 1.0;
   EXPECT_TRUE(equals(newACols, matrices.mAColNorms));
 }

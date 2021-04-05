@@ -44,7 +44,7 @@
 namespace dart {
 namespace constraint {
 
-double JointCoulombFrictionConstraint::mConstraintForceMixing = DART_CFM;
+s_t JointCoulombFrictionConstraint::mConstraintForceMixing = DART_CFM;
 
 //==============================================================================
 JointCoulombFrictionConstraint::JointCoulombFrictionConstraint(
@@ -78,7 +78,7 @@ JointCoulombFrictionConstraint::~JointCoulombFrictionConstraint()
 }
 
 //==============================================================================
-void JointCoulombFrictionConstraint::setConstraintForceMixing(double _cfm)
+void JointCoulombFrictionConstraint::setConstraintForceMixing(s_t _cfm)
 {
   // Clamp constraint force mixing parameter if it is out of the range
   if (_cfm < 1e-9)
@@ -98,7 +98,7 @@ void JointCoulombFrictionConstraint::setConstraintForceMixing(double _cfm)
 }
 
 //==============================================================================
-double JointCoulombFrictionConstraint::getConstraintForceMixing()
+s_t JointCoulombFrictionConstraint::getConstraintForceMixing()
 {
   return mConstraintForceMixing;
 }
@@ -116,7 +116,7 @@ void JointCoulombFrictionConstraint::update()
 
     if (mNegativeVel[i] != 0.0)
     {
-      double timeStep = mJoint->getSkeleton()->getTimeStep();
+      s_t timeStep = mJoint->getSkeleton()->getTimeStep();
       // TODO: There are multiple ways to get time step (or its inverse).
       //   - ContactConstraint get it from the constructor parameter
       //   - Skeleton has it itself.
@@ -205,7 +205,7 @@ void JointCoulombFrictionConstraint::applyUnitImpulse(std::size_t _index)
 }
 
 //==============================================================================
-void JointCoulombFrictionConstraint::getVelocityChange(double* _delVel,
+void JointCoulombFrictionConstraint::getVelocityChange(s_t* _delVel,
                                                        bool _withCfm)
 {
   assert(_delVel != nullptr && "Null pointer is not allowed.");
@@ -249,7 +249,7 @@ void JointCoulombFrictionConstraint::unexcite()
 }
 
 //==============================================================================
-void JointCoulombFrictionConstraint::applyImpulse(double* _lambda)
+void JointCoulombFrictionConstraint::applyImpulse(s_t* _lambda)
 {
   std::size_t localIndex = 0;
   std::size_t dof = mJoint->getNumDofs();

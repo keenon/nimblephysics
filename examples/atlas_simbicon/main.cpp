@@ -56,7 +56,7 @@ int main()
   atlas->setPosition(0, -0.5 * dart::math::constantsd::pi());
 
   // Set gravity of the world
-  world->setGravity(Eigen::Vector3d(0.0, -9.81, 0.0));
+  world->setGravity(Eigen::Vector3s(0.0, -9.81, 0.0));
 
   // Wrap a WorldNode around it
   osg::ref_ptr<AtlasSimbiconWorldNode> node

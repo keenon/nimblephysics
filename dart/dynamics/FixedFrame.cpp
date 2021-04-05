@@ -38,7 +38,7 @@ namespace dynamics {
 namespace detail {
 
 //==============================================================================
-FixedFrameProperties::FixedFrameProperties(const Eigen::Isometry3d& relativeTf)
+FixedFrameProperties::FixedFrameProperties(const Eigen::Isometry3s& relativeTf)
   : mRelativeTf(relativeTf)
 {
   // Do nothing
@@ -47,13 +47,12 @@ FixedFrameProperties::FixedFrameProperties(const Eigen::Isometry3d& relativeTf)
 } // namespace detail
 
 //==============================================================================
-const Eigen::Vector6d FixedFrame::mZero = Eigen::Vector6d::Zero();
+const Eigen::Vector6s FixedFrame::mZero = Eigen::Vector6s::Zero();
 
 //==============================================================================
-FixedFrame::FixedFrame(Frame* refFrame,
-                       const Eigen::Isometry3d& relativeTransform)
-  : Entity(refFrame, false),
-    Frame(refFrame)
+FixedFrame::FixedFrame(
+    Frame* refFrame, const Eigen::Isometry3s& relativeTransform)
+  : Entity(refFrame, false), Frame(refFrame)
 {
   createAspect<Aspect>(AspectProperties(relativeTransform));
 }
@@ -71,9 +70,9 @@ void FixedFrame::setAspectProperties(const AspectProperties& properties)
 }
 
 //==============================================================================
-void FixedFrame::setRelativeTransform(const Eigen::Isometry3d& transform)
+void FixedFrame::setRelativeTransform(const Eigen::Isometry3s& transform)
 {
-  if(transform.matrix() == mAspectProperties.mRelativeTf.matrix())
+  if (transform.matrix() == mAspectProperties.mRelativeTf.matrix())
     return;
 
   mAspectProperties.mRelativeTf = transform;
@@ -82,38 +81,37 @@ void FixedFrame::setRelativeTransform(const Eigen::Isometry3d& transform)
 }
 
 //==============================================================================
-const Eigen::Isometry3d& FixedFrame::getRelativeTransform() const
+const Eigen::Isometry3s& FixedFrame::getRelativeTransform() const
 {
   return mAspectProperties.mRelativeTf;
 }
 
 //==============================================================================
-const Eigen::Vector6d& FixedFrame::getRelativeSpatialVelocity() const
+const Eigen::Vector6s& FixedFrame::getRelativeSpatialVelocity() const
 {
   return mZero;
 }
 
 //==============================================================================
-const Eigen::Vector6d& FixedFrame::getRelativeSpatialAcceleration() const
+const Eigen::Vector6s& FixedFrame::getRelativeSpatialAcceleration() const
 {
   return mZero;
 }
 
 //==============================================================================
-const Eigen::Vector6d& FixedFrame::getPrimaryRelativeAcceleration() const
+const Eigen::Vector6s& FixedFrame::getPrimaryRelativeAcceleration() const
 {
   return mZero;
 }
 
 //==============================================================================
-const Eigen::Vector6d& FixedFrame::getPartialAcceleration() const
+const Eigen::Vector6s& FixedFrame::getPartialAcceleration() const
 {
   return mZero;
 }
 
 //==============================================================================
-FixedFrame::FixedFrame()
-  : FixedFrame(ConstructAbstract)
+FixedFrame::FixedFrame() : FixedFrame(ConstructAbstract)
 {
   // Delegates to the abstract constructor
 }

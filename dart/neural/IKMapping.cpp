@@ -64,21 +64,21 @@ int IKMapping::getMassDim()
 // #define DART_NEURAL_LOG_IK_OUTPUT
 void IKMapping::setPositions(
     std::shared_ptr<simulation::World> world,
-    const Eigen::Ref<Eigen::VectorXd>& positions)
+    const Eigen::Ref<Eigen::VectorXs>& positions)
 {
   // Reset to 0, so that solutions are always deterministic even if IK is
   // under/over specified
-  world->setPositions(Eigen::VectorXd::Zero(world->getNumDofs()));
+  world->setPositions(Eigen::VectorXs::Zero(world->getNumDofs()));
   // Run simple IK to try to get as close as possible. Completely possible that
   // the requested positions are infeasible, in which case we'll just do a best
   // guess.
-  double error = std::numeric_limits<double>::infinity();
-  double lr = 1.0;
+  s_t error = std::numeric_limits<s_t>::infinity();
+  s_t lr = 1.0;
   for (int i = 0; i < 150; i++)
   {
-    Eigen::VectorXd diff = positions - getPositions(world);
-    double newError = diff.squaredNorm();
-    double errorChange = newError - error;
+    Eigen::VectorXs diff = positions - getPositions(world);
+    s_t newError = diff.squaredNorm();
+    s_t errorChange = newError - error;
     error = newError;
 #ifdef DART_NEURAL_LOG_IK_OUTPUT
     std::cout << "IK iteration " << i << " loss: " << error
@@ -104,9 +104,9 @@ void IKMapping::setPositions(
 #endif
       break;
     }
-    Eigen::MatrixXd J = getPosJacobianInverse(world);
-    Eigen::VectorXd delta = J * diff; // math::dampedPInv(J, diff, 0.05);
-    double MAX = 100;
+    Eigen::MatrixXs J = getPosJacobianInverse(world);
+    Eigen::VectorXs delta = J * diff; // math::dampedPInv(J, diff, 0.05);
+    s_t MAX = 100;
     if (delta.norm() > MAX)
     {
       delta.normalize();
@@ -128,7 +128,7 @@ void IKMapping::setPositions(
 //==============================================================================
 void IKMapping::setVelocities(
     std::shared_ptr<simulation::World> world,
-    const Eigen::Ref<Eigen::VectorXd>& velocities)
+    const Eigen::Ref<Eigen::VectorXs>& velocities)
 {
   world->setVelocities(getMappedVelToRealVelJac(world) * velocities);
 }
@@ -136,7 +136,7 @@ void IKMapping::setVelocities(
 //==============================================================================
 void IKMapping::setForces(
     std::shared_ptr<simulation::World> world,
-    const Eigen::Ref<Eigen::VectorXd>& forces)
+    const Eigen::Ref<Eigen::VectorXs>& forces)
 {
   world->setExternalForces(getMappedForceToRealForceJac(world) * forces);
 }
@@ -144,7 +144,7 @@ void IKMapping::setForces(
 //==============================================================================
 void IKMapping::setMasses(
     std::shared_ptr<simulation::World> world,
-    const Eigen::Ref<Eigen::VectorXd>& masses)
+    const Eigen::Ref<Eigen::VectorXs>& masses)
 {
   world->setMasses(masses);
 }
@@ -152,7 +152,7 @@ void IKMapping::setMasses(
 //==============================================================================
 void IKMapping::getPositionsInPlace(
     std::shared_ptr<simulation::World> world,
-    /* OUT */ Eigen::Ref<Eigen::VectorXd> positions)
+    /* OUT */ Eigen::Ref<Eigen::VectorXs> positions)
 {
   assert(positions.size() == getPosDim());
   int cursor = 0;
@@ -165,7 +165,7 @@ void IKMapping::getPositionsInPlace(
     {
       // Get the body node in this world
       dynamics::BodyNode* node = skel->getBodyNode(entry.bodyNodeOffset);
-      Eigen::Isometry3d T = node->getWorldTransform();
+      Eigen::Isometry3s T = node->getWorldTransform();
       if (entry.type == NODE_ANGULAR || entry.type == NODE_SPATIAL)
       {
         positions.segment<3>(cursor) = math::logMap(T.linear());
@@ -189,7 +189,7 @@ void IKMapping::getPositionsInPlace(
 //==============================================================================
 void IKMapping::getVelocitiesInPlace(
     std::shared_ptr<simulation::World> world,
-    /* OUT */ Eigen::Ref<Eigen::VectorXd> velocities)
+    /* OUT */ Eigen::Ref<Eigen::VectorXs> velocities)
 {
   assert(velocities.size() == getVelDim());
   int cursor = 0;
@@ -245,7 +245,7 @@ void IKMapping::getVelocitiesInPlace(
 //==============================================================================
 void IKMapping::getForcesInPlace(
     std::shared_ptr<simulation::World> world,
-    /* OUT */ Eigen::Ref<Eigen::VectorXd> forces)
+    /* OUT */ Eigen::Ref<Eigen::VectorXs> forces)
 {
   assert(forces.size() == getForceDim());
   forces = getRealForceToMappedForceJac(world) * world->getExternalForces();
@@ -254,7 +254,7 @@ void IKMapping::getForcesInPlace(
 //==============================================================================
 void IKMapping::getMassesInPlace(
     std::shared_ptr<simulation::World> world,
-    /* OUT */ Eigen::Ref<Eigen::VectorXd> masses)
+    /* OUT */ Eigen::Ref<Eigen::VectorXs> masses)
 {
   assert(masses.size() == getMassDim());
   masses = world->getMasses();
@@ -263,7 +263,7 @@ void IKMapping::getMassesInPlace(
 //==============================================================================
 /// This gets a Jacobian relating the changes in the outer positions (the
 /// "mapped" positions) to inner positions (the "real" positions)
-Eigen::MatrixXd IKMapping::getMappedPosToRealPosJac(
+Eigen::MatrixXs IKMapping::getMappedPosToRealPosJac(
     std::shared_ptr<simulation::World> world)
 {
   return getPosJacobianInverse(world);
@@ -273,7 +273,7 @@ Eigen::MatrixXd IKMapping::getMappedPosToRealPosJac(
 /// This gets a Jacobian relating the changes in the inner positions (the
 /// "real" positions) to the corresponding outer positions (the "mapped"
 /// positions)
-Eigen::MatrixXd IKMapping::getRealPosToMappedPosJac(
+Eigen::MatrixXs IKMapping::getRealPosToMappedPosJac(
     std::shared_ptr<simulation::World> world)
 {
   return getPosJacobian(world);
@@ -283,16 +283,16 @@ Eigen::MatrixXd IKMapping::getRealPosToMappedPosJac(
 /// This gets a Jacobian relating the changes in the inner velocities (the
 /// "real" velocities) to the corresponding outer positions (the "mapped"
 /// positions)
-Eigen::MatrixXd IKMapping::getRealVelToMappedPosJac(
+Eigen::MatrixXs IKMapping::getRealVelToMappedPosJac(
     std::shared_ptr<simulation::World> world)
 {
-  return Eigen::MatrixXd::Zero(getDim(), world->getNumDofs());
+  return Eigen::MatrixXs::Zero(getDim(), world->getNumDofs());
 }
 
 //==============================================================================
 /// This gets a Jacobian relating the changes in the outer velocity (the
 /// "mapped" velocity) to inner velocity (the "real" velocity)
-Eigen::MatrixXd IKMapping::getMappedVelToRealVelJac(
+Eigen::MatrixXs IKMapping::getMappedVelToRealVelJac(
     std::shared_ptr<simulation::World> world)
 {
   return getVelJacobianInverse(world);
@@ -302,7 +302,7 @@ Eigen::MatrixXd IKMapping::getMappedVelToRealVelJac(
 /// This gets a Jacobian relating the changes in the inner velocity (the
 /// "real" velocity) to the corresponding outer velocity (the "mapped"
 /// velocity)
-Eigen::MatrixXd IKMapping::getRealVelToMappedVelJac(
+Eigen::MatrixXs IKMapping::getRealVelToMappedVelJac(
     std::shared_ptr<simulation::World> world)
 {
   return getVelJacobian(world);
@@ -312,7 +312,7 @@ Eigen::MatrixXd IKMapping::getRealVelToMappedVelJac(
 /// This gets a Jacobian relating the changes in the inner position (the
 /// "real" position) to the corresponding outer velocity (the "mapped"
 /// velocity)
-Eigen::MatrixXd IKMapping::getRealPosToMappedVelJac(
+Eigen::MatrixXs IKMapping::getRealPosToMappedVelJac(
     std::shared_ptr<simulation::World> world)
 {
   // Original formula:
@@ -323,7 +323,7 @@ Eigen::MatrixXd IKMapping::getRealPosToMappedVelJac(
 //==============================================================================
 /// This gets a Jacobian relating the changes in the outer force (the
 /// "mapped" force) to inner force (the "real" force)
-Eigen::MatrixXd IKMapping::getMappedForceToRealForceJac(
+Eigen::MatrixXs IKMapping::getMappedForceToRealForceJac(
     std::shared_ptr<simulation::World> world)
 {
   return getVelJacobian(world).transpose();
@@ -333,7 +333,7 @@ Eigen::MatrixXd IKMapping::getMappedForceToRealForceJac(
 /// This gets a Jacobian relating the changes in the inner force (the
 /// "real" force) to the corresponding outer force (the "mapped"
 /// force)
-Eigen::MatrixXd IKMapping::getRealForceToMappedForceJac(
+Eigen::MatrixXs IKMapping::getRealForceToMappedForceJac(
     std::shared_ptr<simulation::World> world)
 {
   return getVelJacobianInverse(world).transpose();
@@ -342,20 +342,20 @@ Eigen::MatrixXd IKMapping::getRealForceToMappedForceJac(
 //==============================================================================
 /// This gets a Jacobian relating the changes in the outer mass (the
 /// "mapped" mass) to inner mass (the "real" mass)
-Eigen::MatrixXd IKMapping::getMappedMassToRealMassJac(
+Eigen::MatrixXs IKMapping::getMappedMassToRealMassJac(
     std::shared_ptr<simulation::World> /* world */)
 {
-  return Eigen::MatrixXd::Identity(mMassDim, mMassDim);
+  return Eigen::MatrixXs::Identity(mMassDim, mMassDim);
 }
 
 //==============================================================================
 /// This gets a Jacobian relating the changes in the inner mass (the
 /// "real" mass) to the corresponding outer mass (the "mapped"
 /// mass)
-Eigen::MatrixXd IKMapping::getRealMassToMappedMassJac(
+Eigen::MatrixXs IKMapping::getRealMassToMappedMassJac(
     std::shared_ptr<simulation::World> /* world */)
 {
-  return Eigen::MatrixXd::Identity(mMassDim, mMassDim);
+  return Eigen::MatrixXs::Identity(mMassDim, mMassDim);
 }
 
 //==============================================================================
@@ -375,12 +375,12 @@ int IKMapping::getDim()
 //==============================================================================
 /// Computes a Jacobian that transforms changes in joint angle to changes in
 /// IK body positions (expressed in log space).
-Eigen::MatrixXd IKMapping::getPosJacobian(
+Eigen::MatrixXs IKMapping::getPosJacobian(
     std::shared_ptr<simulation::World> world)
 {
   int rows = getDim();
   int cols = world->getNumDofs();
-  Eigen::MatrixXd jac = Eigen::MatrixXd::Zero(rows, cols);
+  Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(rows, cols);
   int cursor = 0;
   for (IKMappingEntry& entry : mEntries)
   {
@@ -424,10 +424,10 @@ Eigen::MatrixXd IKMapping::getPosJacobian(
 }
 
 /// Computes the pseudo-inverse of the Jacobian
-Eigen::MatrixXd IKMapping::getPosJacobianInverse(
+Eigen::MatrixXs IKMapping::getPosJacobianInverse(
     std::shared_ptr<simulation::World> world)
 {
-  Eigen::MatrixXd J = getPosJacobian(world);
+  Eigen::MatrixXs J = getPosJacobian(world);
   return math::clippedSingularsPinv(J);
   /*
   return J.completeOrthogonalDecomposition().pseudoInverse();
@@ -436,12 +436,12 @@ Eigen::MatrixXd IKMapping::getPosJacobianInverse(
 
 /// Computes a Jacobian that transforms changes in joint vel to changes in
 /// IK body vels (expressed in log space).
-Eigen::MatrixXd IKMapping::getVelJacobian(
+Eigen::MatrixXs IKMapping::getVelJacobian(
     std::shared_ptr<simulation::World> world)
 {
   int rows = getDim();
   int cols = world->getNumDofs();
-  Eigen::MatrixXd jac = Eigen::MatrixXd::Zero(rows, cols);
+  Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(rows, cols);
   int cursor = 0;
   for (IKMappingEntry& entry : mEntries)
   {
@@ -483,7 +483,7 @@ Eigen::MatrixXd IKMapping::getVelJacobian(
 }
 
 /// Computes the pseudo-inverse of the vel Jacobian
-Eigen::MatrixXd IKMapping::getVelJacobianInverse(
+Eigen::MatrixXs IKMapping::getVelJacobianInverse(
     std::shared_ptr<simulation::World> world)
 {
   return getVelJacobian(world)
@@ -492,7 +492,7 @@ Eigen::MatrixXd IKMapping::getVelJacobianInverse(
 }
 
 /// Computes a Jacobian of J(x)*vel wrt pos
-Eigen::MatrixXd IKMapping::getJacobianOfJacVelWrtPosition(
+Eigen::MatrixXs IKMapping::getJacobianOfJacVelWrtPosition(
     std::shared_ptr<simulation::World> world)
 {
   // TODO: replace me with an analytical solution
@@ -500,29 +500,29 @@ Eigen::MatrixXd IKMapping::getJacobianOfJacVelWrtPosition(
 }
 
 /// The brute force version of getJacobianOfJacobianWrtPosition()
-Eigen::MatrixXd IKMapping::bruteForceJacobianOfJacVelWrtPosition(
+Eigen::MatrixXs IKMapping::bruteForceJacobianOfJacVelWrtPosition(
     std::shared_ptr<simulation::World> world)
 {
   RestorableSnapshot snapshot(world);
 
-  Eigen::VectorXd originalPosition = world->getPositions();
-  Eigen::VectorXd originalVel = world->getVelocities();
-  const double EPS = 1e-6;
+  Eigen::VectorXs originalPosition = world->getPositions();
+  Eigen::VectorXs originalVel = world->getVelocities();
+  const s_t EPS = 1e-6;
   int n = world->getNumDofs();
   int m = getDim();
-  Eigen::MatrixXd jac = Eigen::MatrixXd::Zero(m, n);
+  Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(m, n);
 
   for (int i = 0; i < n; i++)
   {
-    Eigen::VectorXd perturbedPosition = originalPosition;
+    Eigen::VectorXs perturbedPosition = originalPosition;
     perturbedPosition(i) += EPS;
     world->setPositions(perturbedPosition);
-    Eigen::VectorXd pos = getVelJacobian(world) * originalVel;
+    Eigen::VectorXs pos = getVelJacobian(world) * originalVel;
 
     perturbedPosition = originalPosition;
     perturbedPosition(i) -= EPS;
     world->setPositions(perturbedPosition);
-    Eigen::VectorXd neg = getVelJacobian(world) * originalVel;
+    Eigen::VectorXs neg = getVelJacobian(world) * originalVel;
 
     jac.col(i) = (pos - neg) / (2 * EPS);
   }
@@ -532,62 +532,62 @@ Eigen::MatrixXd IKMapping::bruteForceJacobianOfJacVelWrtPosition(
 }
 
 //==============================================================================
-Eigen::VectorXd IKMapping::getPositionLowerLimits(
+Eigen::VectorXs IKMapping::getPositionLowerLimits(
     std::shared_ptr<simulation::World> /* world */)
 {
-  return Eigen::VectorXd::Ones(getPosDim())
-         * -std::numeric_limits<double>::infinity();
+  return Eigen::VectorXs::Ones(getPosDim())
+         * -std::numeric_limits<s_t>::infinity();
 }
 
 //==============================================================================
-Eigen::VectorXd IKMapping::getPositionUpperLimits(
+Eigen::VectorXs IKMapping::getPositionUpperLimits(
     std::shared_ptr<simulation::World> /* world */)
 {
-  return Eigen::VectorXd::Ones(getPosDim())
-         * std::numeric_limits<double>::infinity();
+  return Eigen::VectorXs::Ones(getPosDim())
+         * std::numeric_limits<s_t>::infinity();
 }
 
 //==============================================================================
-Eigen::VectorXd IKMapping::getVelocityLowerLimits(
+Eigen::VectorXs IKMapping::getVelocityLowerLimits(
     std::shared_ptr<simulation::World> /* world */)
 {
-  return Eigen::VectorXd::Ones(getVelDim())
-         * -std::numeric_limits<double>::infinity();
+  return Eigen::VectorXs::Ones(getVelDim())
+         * -std::numeric_limits<s_t>::infinity();
 }
 
 //==============================================================================
-Eigen::VectorXd IKMapping::getVelocityUpperLimits(
+Eigen::VectorXs IKMapping::getVelocityUpperLimits(
     std::shared_ptr<simulation::World> /* world */)
 {
-  return Eigen::VectorXd::Ones(getVelDim())
-         * std::numeric_limits<double>::infinity();
+  return Eigen::VectorXs::Ones(getVelDim())
+         * std::numeric_limits<s_t>::infinity();
 }
 
 //==============================================================================
-Eigen::VectorXd IKMapping::getForceLowerLimits(
+Eigen::VectorXs IKMapping::getForceLowerLimits(
     std::shared_ptr<simulation::World> /* world */)
 {
-  return Eigen::VectorXd::Ones(getForceDim())
-         * -std::numeric_limits<double>::infinity();
+  return Eigen::VectorXs::Ones(getForceDim())
+         * -std::numeric_limits<s_t>::infinity();
 }
 
 //==============================================================================
-Eigen::VectorXd IKMapping::getForceUpperLimits(
+Eigen::VectorXs IKMapping::getForceUpperLimits(
     std::shared_ptr<simulation::World> /* world */)
 {
-  return Eigen::VectorXd::Ones(getForceDim())
-         * std::numeric_limits<double>::infinity();
+  return Eigen::VectorXs::Ones(getForceDim())
+         * std::numeric_limits<s_t>::infinity();
 }
 
 //==============================================================================
-Eigen::VectorXd IKMapping::getMassLowerLimits(
+Eigen::VectorXs IKMapping::getMassLowerLimits(
     std::shared_ptr<simulation::World> world)
 {
   return world->getMassLowerLimits();
 }
 
 //==============================================================================
-Eigen::VectorXd IKMapping::getMassUpperLimits(
+Eigen::VectorXs IKMapping::getMassUpperLimits(
     std::shared_ptr<simulation::World> world)
 {
   return world->getMassUpperLimits();

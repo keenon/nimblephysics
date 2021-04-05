@@ -38,7 +38,7 @@ namespace dart {
 namespace dynamics {
 
 //==============================================================================
-EllipsoidShape::EllipsoidShape(const Eigen::Vector3d& diameters)
+EllipsoidShape::EllipsoidShape(const Eigen::Vector3s& diameters)
   : Shape(ELLIPSOID)
 {
   setDiameters(diameters);
@@ -64,19 +64,19 @@ const std::string& EllipsoidShape::getStaticType()
 }
 
 //==============================================================================
-void EllipsoidShape::setSize(const Eigen::Vector3d& diameters)
+void EllipsoidShape::setSize(const Eigen::Vector3s& diameters)
 {
   setDiameters(diameters);
 }
 
 //==============================================================================
-const Eigen::Vector3d& EllipsoidShape::getSize() const
+const Eigen::Vector3s& EllipsoidShape::getSize() const
 {
   return getDiameters();
 }
 
 //==============================================================================
-void EllipsoidShape::setDiameters(const Eigen::Vector3d& diameters)
+void EllipsoidShape::setDiameters(const Eigen::Vector3s& diameters)
 {
   assert(diameters[0] > 0.0);
   assert(diameters[1] > 0.0);
@@ -91,13 +91,13 @@ void EllipsoidShape::setDiameters(const Eigen::Vector3d& diameters)
 }
 
 //==============================================================================
-const Eigen::Vector3d& EllipsoidShape::getDiameters() const
+const Eigen::Vector3s& EllipsoidShape::getDiameters() const
 {
   return mDiameters;
 }
 
 //==============================================================================
-void EllipsoidShape::setRadii(const Eigen::Vector3d& radii)
+void EllipsoidShape::setRadii(const Eigen::Vector3s& radii)
 {
   mDiameters = radii * 2.0;
 
@@ -108,39 +108,39 @@ void EllipsoidShape::setRadii(const Eigen::Vector3d& radii)
 }
 
 //==============================================================================
-const Eigen::Vector3d EllipsoidShape::getRadii() const
+const Eigen::Vector3s EllipsoidShape::getRadii() const
 {
   return mDiameters / 2.0;
 }
 
 //==============================================================================
-double EllipsoidShape::computeVolume(const Eigen::Vector3d& diameters)
+s_t EllipsoidShape::computeVolume(const Eigen::Vector3s& diameters)
 {
   // 4/3* Pi* a/2* b/2* c/2
-  return math::constantsd::pi()
-      * diameters[0] * diameters[1] * diameters[2] / 6.0;
+  return math::constantsd::pi() * diameters[0] * diameters[1] * diameters[2]
+         / 6.0;
 }
 
 //==============================================================================
-Eigen::Matrix3d EllipsoidShape::computeInertia(
-    const Eigen::Vector3d& diameters, double mass)
+Eigen::Matrix3s EllipsoidShape::computeInertia(
+    const Eigen::Vector3s& diameters, s_t mass)
 {
-  Eigen::Matrix3d inertia = Eigen::Matrix3d::Identity();
+  Eigen::Matrix3s inertia = Eigen::Matrix3s::Identity();
 
   const auto coeff = mass / 20.0;
-  const auto AA = std::pow(diameters[0], 2);
-  const auto BB = std::pow(diameters[1], 2);
-  const auto CC = std::pow(diameters[2], 2);
+  const auto AA = pow(diameters[0], 2);
+  const auto BB = pow(diameters[1], 2);
+  const auto CC = pow(diameters[2], 2);
 
-  inertia(0, 0) = coeff*(BB + CC);
-  inertia(1, 1) = coeff*(AA + CC);
-  inertia(2, 2) = coeff*(AA + BB);
+  inertia(0, 0) = coeff * (BB + CC);
+  inertia(1, 1) = coeff * (AA + CC);
+  inertia(2, 2) = coeff * (AA + BB);
 
   return inertia;
 }
 
 //==============================================================================
-Eigen::Matrix3d EllipsoidShape::computeInertia(double mass) const
+Eigen::Matrix3s EllipsoidShape::computeInertia(s_t mass) const
 {
   return computeInertia(mDiameters, mass);
 }
@@ -169,5 +169,5 @@ void EllipsoidShape::updateVolume() const
   mIsVolumeDirty = false;
 }
 
-}  // namespace dynamics
-}  // namespace dart
+} // namespace dynamics
+} // namespace dart

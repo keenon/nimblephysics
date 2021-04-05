@@ -49,7 +49,7 @@ public:
   LineSegmentShape(float _thickness = 1.0f);
 
   /// Constructor for creating a simple line segment that connects two vertices
-  LineSegmentShape(const Eigen::Vector3d& _v1, const Eigen::Vector3d& _v2,
+  LineSegmentShape(const Eigen::Vector3s& _v1, const Eigen::Vector3s& _v2,
                    float _thickness = 1.0f);
 
   // Documentation inherited.
@@ -65,10 +65,10 @@ public:
   float getThickness() const;
 
   /// Add a vertex as a child to the last vertex that was added
-  std::size_t addVertex(const Eigen::Vector3d& _v);
+  std::size_t addVertex(const Eigen::Vector3s& _v);
 
   /// Add a vertex as a child to the specified vertex
-  std::size_t addVertex(const Eigen::Vector3d& _v, std::size_t _parent);
+  std::size_t addVertex(const Eigen::Vector3s& _v, std::size_t _parent);
 
   /// Remove a vertex from the list of vertices. IMPORTANT: Note that this
   /// alters the indices of all vertices that follow it in the list, which also
@@ -78,14 +78,14 @@ public:
   void removeVertex(std::size_t _idx);
 
   /// Change the location of the specified vertex
-  void setVertex(std::size_t _idx, const Eigen::Vector3d& _v);
+  void setVertex(std::size_t _idx, const Eigen::Vector3s& _v);
 
   /// Get the location of the specified vertex. Returns a zero vector if an
   /// out-of-bounds vertex is requested.
-  const Eigen::Vector3d& getVertex(std::size_t _idx) const;
+  const Eigen::Vector3s& getVertex(std::size_t _idx) const;
 
   /// Get all the vertices
-  const std::vector<Eigen::Vector3d>& getVertices() const;
+  const std::vector<Eigen::Vector3s>& getVertices() const;
 
   /// Create a connection between the two specified vertices
   void addConnection(std::size_t _idx1, std::size_t _idx2);
@@ -104,7 +104,7 @@ public:
 
   /// The returned inertia matrix will be like a very thin cylinder. The _mass
   /// will be evenly distributed across all lines.
-  Eigen::Matrix3d computeInertia(double mass) const override;
+  Eigen::Matrix3s computeInertia(s_t mass) const override;
 
   // TODO(MXG): Consider supporting colors-per-vertex
 
@@ -119,14 +119,14 @@ protected:
   float mThickness;
 
   /// Vector of vertices
-  std::vector<Eigen::Vector3d> mVertices;
+  std::vector<Eigen::Vector3s> mVertices;
 
   /// Vector of connections
   common::aligned_vector<Eigen::Vector2i> mConnections;
 
   /// A dummy vertex that can be returned when an out-of-bounds vertex is
   /// requested
-  static const Eigen::Vector3d mDummyVertex;
+  static const Eigen::Vector3s mDummyVertex;
 };
 
 } // namespace dynamics

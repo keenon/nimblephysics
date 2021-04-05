@@ -68,29 +68,29 @@ public:
   //------------------------------- Control ------------------------------------
   /// \brief Initiate state. This is called when the contoller change the
   ///        current state machine to this.
-  void begin(double _currentTime);
+  void begin(s_t _currentTime);
 
   /// \brief Compute control force and apply it to Atlas robot
-  void computeControlForce(double _dt);
+  void computeControlForce(s_t _dt);
 
   /// \brief Finalize state. This is called when the state machine stransite
   ///        from this state to the next state.
-  void end(double _currentTime);
+  void end(s_t _currentTime);
 
   /// \brief Get current state
   State* getCurrentState();
 
   /// \brief Transite to the next state manually
-  void transiteToNextState(double _currentTime);
+  void transiteToNextState(s_t _currentTime);
 
   /// \brief Change state to _state
-  void transiteTo(State* _state, double _currentTime);
+  void transiteTo(State* _state, s_t _currentTime);
 
   /// \brief Change state to a state whose names is _stateName
-  void transiteTo(std::string& _stateName, double _currentTime);
+  void transiteTo(std::string& _stateName, s_t _currentTime);
 
   /// \brief Change state to a state whose index is _idx
-  void transiteTo(std::size_t _idx, double _currentTime);
+  void transiteTo(std::size_t _idx, s_t _currentTime);
 
   /// \brief Set the verbosity
   void setVerbosity(bool verbosity);
@@ -106,16 +106,16 @@ protected:
   State* mCurrentState;
 
   /// \brief Started time
-  double mBeginTime;
+  s_t mBeginTime;
 
   /// \brief Stopped time
-  double mEndTime;
+  s_t mEndTime;
 
   /// \brief Frame number
   int mFrame;
 
   /// \brief Elapsed time which is stopped time minus started time
-  double mElapsedTime;
+  s_t mElapsedTime;
 
 private:
   /// \brief Check if this state machine contains _state

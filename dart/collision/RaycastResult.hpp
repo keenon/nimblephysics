@@ -34,7 +34,10 @@
 #define DART_COLLISION_RAYCASTRESULT_HPP_
 
 #include <vector>
+
 #include <Eigen/Dense>
+
+#include "dart/math/MathTypes.hpp"
 
 namespace dart {
 namespace collision {
@@ -47,10 +50,10 @@ struct RayHit
   const CollisionObject* mCollisionObject;
 
   /// The normal at the hit point in the world coordinates
-  Eigen::Vector3d mNormal;
+  Eigen::Vector3s mNormal;
 
   /// The hit point in the world coordinates
-  Eigen::Vector3d mPoint;
+  Eigen::Vector3s mPoint;
 
   /// The fraction from "from" point to "to" point
   double mFraction;

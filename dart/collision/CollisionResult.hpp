@@ -67,7 +67,7 @@ public:
   /// This sorts the list of contacts by the contact position dotted with some
   /// random direction. This makes it much easier to compare sets of
   /// CollisionResults.
-  void sortContacts(Eigen::Vector3d& randDirection);
+  void sortContacts(Eigen::Vector3s& randDirection);
 
   /// Return contacts
   const std::vector<Contact>& getContacts() const;

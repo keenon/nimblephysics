@@ -34,7 +34,7 @@
 
 MyWindow::MyWindow() : SimWindow()
 {
-  mForce = Eigen::Vector3d::Zero();
+  mForce = Eigen::Vector3s::Zero();
 }
 
 MyWindow::~MyWindow()

@@ -43,12 +43,12 @@ int main(int argc, char* argv[])
   assert(myWorld != nullptr);
 
   // create and initialize the world
-  Eigen::Vector3d gravity(0.0, -9.81, 0.0);
+  Eigen::Vector3s gravity(0.0, -9.81, 0.0);
   myWorld->setGravity(gravity);
   myWorld->setTimeStep(1.0 / 2000);
 
   int dof = myWorld->getSkeleton(0)->getNumDofs();
-  Eigen::VectorXd initPose(dof);
+  Eigen::VectorXs initPose(dof);
   for (int i = 0; i < dof; i++)
     initPose[i] = dart::math::Random::uniform(-0.5, 0.5);
   myWorld->getSkeleton(0)->setPositions(initPose);

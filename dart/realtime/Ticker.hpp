@@ -5,13 +5,15 @@
 #include <thread>
 #include <vector>
 
+#include "dart/math/MathTypes.hpp"
+
 namespace dart {
 namespace realtime {
 
 class Ticker
 {
 public:
-  Ticker(double secondsPerTick);
+  Ticker(s_t secondsPerTick);
   ~Ticker();
   void registerTickListener(std::function<void(long)> listener);
   /// Remove all tick listeners, without deleting the Ticker
@@ -24,7 +26,7 @@ protected:
   void mainLoop();
   bool mRunning;
 
-  double mSecondsPerTick;
+  s_t mSecondsPerTick;
   std::thread* mMainThread;
   std::vector<std::function<void(long)>> mListeners;
 };

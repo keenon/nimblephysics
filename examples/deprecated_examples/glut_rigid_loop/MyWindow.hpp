@@ -53,7 +53,7 @@ public:
   //  void keyboard(unsigned char key, int x, int y) override;
 
 private:
-  Eigen::VectorXd computeDamping();
+  Eigen::VectorXs computeDamping();
 };
 
 #endif // EXAMPLES_CLOSEDLOOP_MYWINDOW_HPP_

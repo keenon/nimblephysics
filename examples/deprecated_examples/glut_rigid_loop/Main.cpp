@@ -50,13 +50,13 @@ int main(int argc, char* argv[])
   assert(myWorld != nullptr);
 
   // create and initialize the world
-  Eigen::Vector3d gravity(0.0, -9.81, 0.0);
+  Eigen::Vector3s gravity(0.0, -9.81, 0.0);
   myWorld->setGravity(gravity);
   myWorld->setTimeStep(1.0 / 2000);
 
   int dof = myWorld->getSkeleton(0)->getNumDofs();
 
-  Eigen::VectorXd initPose(dof);
+  Eigen::VectorXs initPose(dof);
   initPose.setZero();
   initPose[20] = 3.14159 * 0.4;
   initPose[23] = 3.14159 * 0.4;
@@ -68,11 +68,11 @@ int main(int argc, char* argv[])
   BodyNode* bd1 = myWorld->getSkeleton(0)->getBodyNode("link 6");
   BodyNode* bd2 = myWorld->getSkeleton(0)->getBodyNode("link 10");
   bd1->getShapeNode(0)->getVisualAspect()->setColor(
-      Eigen::Vector3d(1.0, 0.0, 0.0));
+      Eigen::Vector3s(1.0, 0.0, 0.0));
   bd2->getShapeNode(0)->getVisualAspect()->setColor(
-      Eigen::Vector3d(1.0, 0.0, 0.0));
-  Eigen::Vector3d offset(0.0, 0.025, 0.0);
-  Eigen::Vector3d jointPos = bd1->getTransform() * offset;
+      Eigen::Vector3s(1.0, 0.0, 0.0));
+  Eigen::Vector3s offset(0.0, 0.025, 0.0);
+  Eigen::Vector3s jointPos = bd1->getTransform() * offset;
   BallJointConstraintPtr cl
       = std::make_shared<BallJointConstraint>(bd1, bd2, jointPos);
   // WeldJointConstraint *cl = new WeldJointConstraint(bd1, bd2);

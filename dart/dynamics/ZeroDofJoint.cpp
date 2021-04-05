@@ -134,13 +134,13 @@ std::size_t ZeroDofJoint::getIndexInTree(std::size_t _index) const
 }
 
 //==============================================================================
-void ZeroDofJoint::setCommand(std::size_t /*_index*/, double /*_command*/)
+void ZeroDofJoint::setCommand(std::size_t /*_index*/, s_t /*_command*/)
 {
   // Do nothing
 }
 
 //==============================================================================
-double ZeroDofJoint::getCommand(std::size_t _index) const
+s_t ZeroDofJoint::getCommand(std::size_t _index) const
 {
   dterr << "[ZeroDofJoint::getCommand]: index[" << _index << "] out of range"
         << std::endl;
@@ -149,15 +149,15 @@ double ZeroDofJoint::getCommand(std::size_t _index) const
 }
 
 //==============================================================================
-void ZeroDofJoint::setCommands(const Eigen::VectorXd& /*_commands*/)
+void ZeroDofJoint::setCommands(const Eigen::VectorXs& /*_commands*/)
 {
   // Do nothing
 }
 
 //==============================================================================
-Eigen::VectorXd ZeroDofJoint::getCommands() const
+Eigen::VectorXs ZeroDofJoint::getCommands() const
 {
-  return Eigen::Matrix<double, 0, 1>();
+  return Eigen::Matrix<s_t, 0, 1>();
 }
 
 //==============================================================================
@@ -167,13 +167,13 @@ void ZeroDofJoint::resetCommands()
 }
 
 //==============================================================================
-void ZeroDofJoint::setPosition(std::size_t, double)
+void ZeroDofJoint::setPosition(std::size_t, s_t)
 {
   // Do nothing
 }
 
 //==============================================================================
-double ZeroDofJoint::getPosition(std::size_t _index) const
+s_t ZeroDofJoint::getPosition(std::size_t _index) const
 {
   dterr << "getPosition index[" << _index << "] out of range"
     << std::endl;
@@ -182,67 +182,67 @@ double ZeroDofJoint::getPosition(std::size_t _index) const
 }
 
 //==============================================================================
-void ZeroDofJoint::setPositions(const Eigen::VectorXd& /*_positions*/)
+void ZeroDofJoint::setPositions(const Eigen::VectorXs& /*_positions*/)
 {
   // Do nothing
 }
 
 //==============================================================================
-Eigen::VectorXd ZeroDofJoint::getPositions() const
+Eigen::VectorXs ZeroDofJoint::getPositions() const
 {
-  return Eigen::Matrix<double, 0, 1>();
+  return Eigen::Matrix<s_t, 0, 1>();
 }
 
 //==============================================================================
 void ZeroDofJoint::setPositionLowerLimit(std::size_t /*_index*/,
-                                         double /*_position*/)
+                                         s_t /*_position*/)
 {
   // Do nothing
 }
 
 //==============================================================================
-double ZeroDofJoint::getPositionLowerLimit(std::size_t /*_index*/) const
+s_t ZeroDofJoint::getPositionLowerLimit(std::size_t /*_index*/) const
 {
   return 0.0;
 }
 
 //==============================================================================
 void ZeroDofJoint::setPositionLowerLimits(
-    const Eigen::VectorXd& /*lowerLimits*/)
+    const Eigen::VectorXs& /*lowerLimits*/)
 {
   // Do nothing
 }
 
 //==============================================================================
-Eigen::VectorXd ZeroDofJoint::getPositionLowerLimits() const
+Eigen::VectorXs ZeroDofJoint::getPositionLowerLimits() const
 {
-  return Eigen::VectorXd::Zero(0);
+  return Eigen::VectorXs::Zero(0);
 }
 
 //==============================================================================
 void ZeroDofJoint::setPositionUpperLimit(std::size_t /*_index*/,
-                                         double /*_position*/)
+                                         s_t /*_position*/)
 {
   // Do nothing
 }
 
 //==============================================================================
-double ZeroDofJoint::getPositionUpperLimit(std::size_t /*_index*/) const
+s_t ZeroDofJoint::getPositionUpperLimit(std::size_t /*_index*/) const
 {
   return 0.0;
 }
 
 //==============================================================================
 void ZeroDofJoint::setPositionUpperLimits(
-    const Eigen::VectorXd& /*upperLimits*/)
+    const Eigen::VectorXs& /*upperLimits*/)
 {
   // Do nothing
 }
 
 //==============================================================================
-Eigen::VectorXd ZeroDofJoint::getPositionUpperLimits() const
+Eigen::VectorXs ZeroDofJoint::getPositionUpperLimits() const
 {
-  return Eigen::VectorXd::Zero(0);
+  return Eigen::VectorXs::Zero(0);
 }
 
 //==============================================================================
@@ -264,101 +264,101 @@ void ZeroDofJoint::resetPositions()
 }
 
 //==============================================================================
-void ZeroDofJoint::setInitialPosition(std::size_t /*_index*/, double /*_initial*/)
+void ZeroDofJoint::setInitialPosition(std::size_t /*_index*/, s_t /*_initial*/)
 {
   // Do nothing
 }
 
 //==============================================================================
-double ZeroDofJoint::getInitialPosition(std::size_t /*_index*/) const
+s_t ZeroDofJoint::getInitialPosition(std::size_t /*_index*/) const
 {
   return 0.0;
 }
 
 //==============================================================================
-void ZeroDofJoint::setInitialPositions(const Eigen::VectorXd& /*_initial*/)
+void ZeroDofJoint::setInitialPositions(const Eigen::VectorXs& /*_initial*/)
 {
   // Do nothing
 }
 
 //==============================================================================
-Eigen::VectorXd ZeroDofJoint::getInitialPositions() const
+Eigen::VectorXs ZeroDofJoint::getInitialPositions() const
 {
-  return Eigen::VectorXd();
+  return Eigen::VectorXs();
 }
 
 //==============================================================================
-void ZeroDofJoint::setVelocity(std::size_t /*_index*/, double /*_velocity*/)
+void ZeroDofJoint::setVelocity(std::size_t /*_index*/, s_t /*_velocity*/)
 {
   // Do nothing
 }
 
 //==============================================================================
-double ZeroDofJoint::getVelocity(std::size_t /*_index*/) const
+s_t ZeroDofJoint::getVelocity(std::size_t /*_index*/) const
 {
   return 0.0;
 }
 
 //==============================================================================
-void ZeroDofJoint::setVelocities(const Eigen::VectorXd& /*_velocities*/)
+void ZeroDofJoint::setVelocities(const Eigen::VectorXs& /*_velocities*/)
 {
   // Do nothing
 }
 
 //==============================================================================
-Eigen::VectorXd ZeroDofJoint::getVelocities() const
+Eigen::VectorXs ZeroDofJoint::getVelocities() const
 {
-  return Eigen::Matrix<double, 0, 1>();
+  return Eigen::Matrix<s_t, 0, 1>();
 }
 
 //==============================================================================
 void ZeroDofJoint::setVelocityLowerLimit(std::size_t /*_index*/,
-                                         double /*_velocity*/)
+                                         s_t /*_velocity*/)
 {
   // Do nothing
 }
 
 //==============================================================================
-double ZeroDofJoint::getVelocityLowerLimit(std::size_t /*_index*/) const
+s_t ZeroDofJoint::getVelocityLowerLimit(std::size_t /*_index*/) const
 {
   return 0.0;
 }
 
 //==============================================================================
-void ZeroDofJoint::setVelocityLowerLimits(const Eigen::VectorXd& /*lowerLimits*/)
+void ZeroDofJoint::setVelocityLowerLimits(const Eigen::VectorXs& /*lowerLimits*/)
 {
   // Do nothing
 }
 
 //==============================================================================
-Eigen::VectorXd ZeroDofJoint::getVelocityLowerLimits() const
+Eigen::VectorXs ZeroDofJoint::getVelocityLowerLimits() const
 {
-  return Eigen::VectorXd::Zero(0);
+  return Eigen::VectorXs::Zero(0);
 }
 
 //==============================================================================
 void ZeroDofJoint::setVelocityUpperLimit(std::size_t /*_index*/,
-                                         double /*_velocity*/)
+                                         s_t /*_velocity*/)
 {
   // Do nothing
 }
 
 //==============================================================================
-double ZeroDofJoint::getVelocityUpperLimit(std::size_t /*_index*/) const
+s_t ZeroDofJoint::getVelocityUpperLimit(std::size_t /*_index*/) const
 {
   return 0.0;
 }
 
 //==============================================================================
-void ZeroDofJoint::setVelocityUpperLimits(const Eigen::VectorXd& /*upperLimits*/)
+void ZeroDofJoint::setVelocityUpperLimits(const Eigen::VectorXs& /*upperLimits*/)
 {
   // Do nothing
 }
 
 //==============================================================================
-Eigen::VectorXd ZeroDofJoint::getVelocityUpperLimits() const
+Eigen::VectorXs ZeroDofJoint::getVelocityUpperLimits() const
 {
-  return Eigen::VectorXd::Zero(0);
+  return Eigen::VectorXs::Zero(0);
 }
 
 //==============================================================================
@@ -374,51 +374,51 @@ void ZeroDofJoint::resetVelocities()
 }
 
 //==============================================================================
-void ZeroDofJoint::setInitialVelocity(std::size_t /*_index*/, double /*_initial*/)
+void ZeroDofJoint::setInitialVelocity(std::size_t /*_index*/, s_t /*_initial*/)
 {
   // Do nothing
 }
 
 //==============================================================================
-double ZeroDofJoint::getInitialVelocity(std::size_t /*_index*/) const
+s_t ZeroDofJoint::getInitialVelocity(std::size_t /*_index*/) const
 {
   return 0.0;
 }
 
 //==============================================================================
-void ZeroDofJoint::setInitialVelocities(const Eigen::VectorXd& /*_initial*/)
+void ZeroDofJoint::setInitialVelocities(const Eigen::VectorXs& /*_initial*/)
 {
   // Do nothing
 }
 
 //==============================================================================
-Eigen::VectorXd ZeroDofJoint::getInitialVelocities() const
+Eigen::VectorXs ZeroDofJoint::getInitialVelocities() const
 {
-  return Eigen::VectorXd();
+  return Eigen::VectorXs();
 }
 
 //==============================================================================
-void ZeroDofJoint::setAcceleration(std::size_t /*_index*/, double /*_acceleration*/)
+void ZeroDofJoint::setAcceleration(std::size_t /*_index*/, s_t /*_acceleration*/)
 {
   // Do nothing
 }
 
 //==============================================================================
-double ZeroDofJoint::getAcceleration(std::size_t /*_index*/) const
+s_t ZeroDofJoint::getAcceleration(std::size_t /*_index*/) const
 {
   return 0.0;
 }
 
 //==============================================================================
-void ZeroDofJoint::setAccelerations(const Eigen::VectorXd& /*_accelerations*/)
+void ZeroDofJoint::setAccelerations(const Eigen::VectorXs& /*_accelerations*/)
 {
   // Do nothing
 }
 
 //==============================================================================
-Eigen::VectorXd ZeroDofJoint::getAccelerations() const
+Eigen::VectorXs ZeroDofJoint::getAccelerations() const
 {
-  return Eigen::Matrix<double, 0, 1>();
+  return Eigen::Matrix<s_t, 0, 1>();
 }
 
 //==============================================================================
@@ -429,76 +429,76 @@ void ZeroDofJoint::resetAccelerations()
 
 //==============================================================================
 void ZeroDofJoint::setAccelerationLowerLimit(std::size_t /*_index*/,
-                                             double /*_acceleration*/)
+                                             s_t /*_acceleration*/)
 {
   // Do nothing
 }
 
 //==============================================================================
-double ZeroDofJoint::getAccelerationLowerLimit(std::size_t /*_index*/) const
+s_t ZeroDofJoint::getAccelerationLowerLimit(std::size_t /*_index*/) const
 {
   return 0.0;
 }
 
 //==============================================================================
-void ZeroDofJoint::setAccelerationLowerLimits(const Eigen::VectorXd& /*lowerLimits*/)
+void ZeroDofJoint::setAccelerationLowerLimits(const Eigen::VectorXs& /*lowerLimits*/)
 {
   // Do nothing
 }
 
 //==============================================================================
-Eigen::VectorXd ZeroDofJoint::getAccelerationLowerLimits() const
+Eigen::VectorXs ZeroDofJoint::getAccelerationLowerLimits() const
 {
-  return Eigen::VectorXd::Zero(0);
+  return Eigen::VectorXs::Zero(0);
 }
 
 //==============================================================================
 void ZeroDofJoint::setAccelerationUpperLimit(std::size_t /*_index*/,
-                                             double /*_acceleration*/)
+                                             s_t /*_acceleration*/)
 {
   // Do nothing
 }
 
 //==============================================================================
-double ZeroDofJoint::getAccelerationUpperLimit(std::size_t /*_index*/) const
+s_t ZeroDofJoint::getAccelerationUpperLimit(std::size_t /*_index*/) const
 {
   return 0.0;
 }
 
 //==============================================================================
-void ZeroDofJoint::setAccelerationUpperLimits(const Eigen::VectorXd& /*upperLimits*/)
+void ZeroDofJoint::setAccelerationUpperLimits(const Eigen::VectorXs& /*upperLimits*/)
 {
   // Do nothing
 }
 
 //==============================================================================
-Eigen::VectorXd ZeroDofJoint::getAccelerationUpperLimits() const
+Eigen::VectorXs ZeroDofJoint::getAccelerationUpperLimits() const
 {
-  return Eigen::VectorXd::Zero(0);
+  return Eigen::VectorXs::Zero(0);
 }
 
 //==============================================================================
-void ZeroDofJoint::setForce(std::size_t /*_index*/, double /*_force*/)
+void ZeroDofJoint::setForce(std::size_t /*_index*/, s_t /*_force*/)
 {
   // Do nothing
 }
 
 //==============================================================================
-double ZeroDofJoint::getForce(std::size_t /*_index*/) const
+s_t ZeroDofJoint::getForce(std::size_t /*_index*/) const
 {
   return 0.0;
 }
 
 //==============================================================================
-void ZeroDofJoint::setForces(const Eigen::VectorXd& /*_forces*/)
+void ZeroDofJoint::setForces(const Eigen::VectorXs& /*_forces*/)
 {
   // Do nothing
 }
 
 //==============================================================================
-Eigen::VectorXd ZeroDofJoint::getForces() const
+Eigen::VectorXs ZeroDofJoint::getForces() const
 {
-  return Eigen::Matrix<double, 0, 1>();
+  return Eigen::Matrix<s_t, 0, 1>();
 }
 
 //==============================================================================
@@ -508,62 +508,62 @@ void ZeroDofJoint::resetForces()
 }
 
 //==============================================================================
-void ZeroDofJoint::setForceLowerLimit(std::size_t /*_index*/, double /*_force*/)
+void ZeroDofJoint::setForceLowerLimit(std::size_t /*_index*/, s_t /*_force*/)
 {
   // Do nothing
 }
 
 //==============================================================================
-double ZeroDofJoint::getForceLowerLimit(std::size_t /*_index*/) const
+s_t ZeroDofJoint::getForceLowerLimit(std::size_t /*_index*/) const
 {
   return 0.0;
 }
 
 //==============================================================================
-void ZeroDofJoint::setForceLowerLimits(const Eigen::VectorXd& /*lowerLimits*/)
+void ZeroDofJoint::setForceLowerLimits(const Eigen::VectorXs& /*lowerLimits*/)
 {
   // Do nothing
 }
 
 //==============================================================================
-Eigen::VectorXd ZeroDofJoint::getForceLowerLimits() const
+Eigen::VectorXs ZeroDofJoint::getForceLowerLimits() const
 {
-  return Eigen::VectorXd::Zero(0);
+  return Eigen::VectorXs::Zero(0);
 }
 
 //==============================================================================
-void ZeroDofJoint::setForceUpperLimit(std::size_t /*_index*/, double /*_force*/)
+void ZeroDofJoint::setForceUpperLimit(std::size_t /*_index*/, s_t /*_force*/)
 {
   // Do nothing
 }
 
 //==============================================================================
-double ZeroDofJoint::getForceUpperLimit(std::size_t /*_index*/) const
+s_t ZeroDofJoint::getForceUpperLimit(std::size_t /*_index*/) const
 {
   return 0.0;
 }
 
 //==============================================================================
-void ZeroDofJoint::setForceUpperLimits(const Eigen::VectorXd& /*upperLimits*/)
+void ZeroDofJoint::setForceUpperLimits(const Eigen::VectorXs& /*upperLimits*/)
 {
   // Do nothing
 }
 
 //==============================================================================
-Eigen::VectorXd ZeroDofJoint::getForceUpperLimits() const
+Eigen::VectorXs ZeroDofJoint::getForceUpperLimits() const
 {
-  return Eigen::VectorXd::Zero(0);
+  return Eigen::VectorXs::Zero(0);
 }
 
 //==============================================================================
 void ZeroDofJoint::setVelocityChange(std::size_t /*_index*/,
-                                     double /*_velocityChange*/)
+                                     s_t /*_velocityChange*/)
 {
   // Do nothing
 }
 
 //==============================================================================
-double ZeroDofJoint::getVelocityChange(std::size_t /*_index*/) const
+s_t ZeroDofJoint::getVelocityChange(std::size_t /*_index*/) const
 {
   return 0.0;
 }
@@ -575,13 +575,13 @@ void ZeroDofJoint::resetVelocityChanges()
 }
 
 //==============================================================================
-void ZeroDofJoint::setConstraintImpulse(std::size_t /*_index*/, double /*_impulse*/)
+void ZeroDofJoint::setConstraintImpulse(std::size_t /*_index*/, s_t /*_impulse*/)
 {
   // Do nothing
 }
 
 //==============================================================================
-double ZeroDofJoint::getConstraintImpulse(std::size_t /*_index*/) const
+s_t ZeroDofJoint::getConstraintImpulse(std::size_t /*_index*/) const
 {
   return 0.0;
 }
@@ -593,97 +593,97 @@ void ZeroDofJoint::resetConstraintImpulses()
 }
 
 //==============================================================================
-void ZeroDofJoint::integratePositions(double /*_dt*/)
+void ZeroDofJoint::integratePositions(s_t /*_dt*/)
 {
   // Do nothing
 }
 
 //==============================================================================
-void ZeroDofJoint::integrateVelocities(double /*_dt*/)
+void ZeroDofJoint::integrateVelocities(s_t /*_dt*/)
 {
   // Do nothing
 }
 
 //==============================================================================
 // Documentation inherited
-Eigen::VectorXd ZeroDofJoint::integratePositionsExplicit(const Eigen::VectorXd& pos, const Eigen::VectorXd& /* vel */, double /* dt */)
+Eigen::VectorXs ZeroDofJoint::integratePositionsExplicit(const Eigen::VectorXs& pos, const Eigen::VectorXs& /* vel */, s_t /* dt */)
 {
   return pos;
 }
 
 //==============================================================================
 /// Returns d/dpos of integratePositionsExplicit()
-Eigen::MatrixXd ZeroDofJoint::getPosPosJacobian(const Eigen::VectorXd& /* pos */, const Eigen::VectorXd& /* vel */, double /* _dt */)
+Eigen::MatrixXs ZeroDofJoint::getPosPosJacobian(const Eigen::VectorXs& /* pos */, const Eigen::VectorXs& /* vel */, s_t /* _dt */)
 {
-  return Eigen::MatrixXd::Zero(0,0);
+  return Eigen::MatrixXs::Zero(0,0);
 }
 
 //==============================================================================
 /// Returns d/dvel of integratePositionsExplicit()
-Eigen::MatrixXd ZeroDofJoint::getVelPosJacobian(const Eigen::VectorXd& /* pos */, const Eigen::VectorXd& /* vel */, double /* _dt */)
+Eigen::MatrixXs ZeroDofJoint::getVelPosJacobian(const Eigen::VectorXs& /* pos */, const Eigen::VectorXs& /* vel */, s_t /* _dt */)
 {
-  return Eigen::MatrixXd::Zero(0,0);
+  return Eigen::MatrixXs::Zero(0,0);
 }
 
 
 //==============================================================================
-Eigen::VectorXd ZeroDofJoint::getPositionDifferences(
-    const Eigen::VectorXd& /*_q2*/,
-    const Eigen::VectorXd& /*_q1*/) const
+Eigen::VectorXs ZeroDofJoint::getPositionDifferences(
+    const Eigen::VectorXs& /*_q2*/,
+    const Eigen::VectorXs& /*_q1*/) const
 {
-  return Eigen::VectorXd::Zero(0);
+  return Eigen::VectorXs::Zero(0);
 }
 
 //==============================================================================
-void ZeroDofJoint::setSpringStiffness(std::size_t /*_index*/, double /*_k*/)
-{
-  // Do nothing
-}
-
-//==============================================================================
-double ZeroDofJoint::getSpringStiffness(std::size_t /*_index*/) const
-{
-  return 0.0;
-}
-
-//==============================================================================
-void ZeroDofJoint::setRestPosition(std::size_t /*_index*/, double /*_q0*/)
+void ZeroDofJoint::setSpringStiffness(std::size_t /*_index*/, s_t /*_k*/)
 {
   // Do nothing
 }
 
 //==============================================================================
-double ZeroDofJoint::getRestPosition(std::size_t /*_index*/) const
+s_t ZeroDofJoint::getSpringStiffness(std::size_t /*_index*/) const
 {
   return 0.0;
 }
 
 //==============================================================================
-void ZeroDofJoint::setDampingCoefficient(std::size_t /*_index*/, double /*_d*/)
+void ZeroDofJoint::setRestPosition(std::size_t /*_index*/, s_t /*_q0*/)
 {
   // Do nothing
 }
 
 //==============================================================================
-double ZeroDofJoint::getDampingCoefficient(std::size_t /*_index*/) const
+s_t ZeroDofJoint::getRestPosition(std::size_t /*_index*/) const
 {
   return 0.0;
 }
 
 //==============================================================================
-void ZeroDofJoint::setCoulombFriction(std::size_t /*_index*/, double /*_friction*/)
+void ZeroDofJoint::setDampingCoefficient(std::size_t /*_index*/, s_t /*_d*/)
 {
   // Do nothing
 }
 
 //==============================================================================
-double ZeroDofJoint::getCoulombFriction(std::size_t /*_index*/) const
+s_t ZeroDofJoint::getDampingCoefficient(std::size_t /*_index*/) const
 {
   return 0.0;
 }
 
 //==============================================================================
-double ZeroDofJoint::computePotentialEnergy() const
+void ZeroDofJoint::setCoulombFriction(std::size_t /*_index*/, s_t /*_friction*/)
+{
+  // Do nothing
+}
+
+//==============================================================================
+s_t ZeroDofJoint::getCoulombFriction(std::size_t /*_index*/) const
+{
+  return 0.0;
+}
+
+//==============================================================================
+s_t ZeroDofJoint::computePotentialEnergy() const
 {
   return 0.0;
 }
@@ -707,7 +707,7 @@ void ZeroDofJoint::updateDegreeOfFreedomNames()
 }
 
 //==============================================================================
-Eigen::Vector6d ZeroDofJoint::getBodyConstraintWrench() const
+Eigen::Vector6s ZeroDofJoint::getBodyConstraintWrench() const
 {
   assert(mChildBodyNode);
   return mChildBodyNode->getBodyForce();
@@ -716,32 +716,32 @@ Eigen::Vector6d ZeroDofJoint::getBodyConstraintWrench() const
 //==============================================================================
 const math::Jacobian ZeroDofJoint::getRelativeJacobian() const
 {
-  return Eigen::Matrix<double, 6, 0>();
+  return Eigen::Matrix<s_t, 6, 0>();
 }
 
 //==============================================================================
 math::Jacobian ZeroDofJoint::getRelativeJacobian(
-    const Eigen::VectorXd& /*_positions*/) const
+    const Eigen::VectorXs& /*_positions*/) const
 {
-  return Eigen::Matrix<double, 6, 0>();
+  return Eigen::Matrix<s_t, 6, 0>();
 }
 
 //==============================================================================
 const math::Jacobian ZeroDofJoint::getRelativeJacobianTimeDeriv() const
 {
-  return Eigen::Matrix<double, 6, 0>();
+  return Eigen::Matrix<s_t, 6, 0>();
 }
 
 //==============================================================================
-Eigen::Vector6d ZeroDofJoint::getWorldAxisScrewForPosition(int /* dof */) const {
+Eigen::Vector6s ZeroDofJoint::getWorldAxisScrewForPosition(int /* dof */) const {
   assert(false && "You can't getWorldAxisScrew() on a joint with no degrees of freedom");
-  return Eigen::Vector6d::Zero();
+  return Eigen::Vector6s::Zero();
 }
 
 //==============================================================================
-Eigen::Vector6d ZeroDofJoint::getWorldAxisScrewForVelocity(int /* dof */) const {
+Eigen::Vector6s ZeroDofJoint::getWorldAxisScrewForVelocity(int /* dof */) const {
   assert(false && "You can't getWorldAxisScrew() on a joint with no degrees of freedom");
-  return Eigen::Vector6d::Zero();
+  return Eigen::Vector6s::Zero();
 }
 
 //==============================================================================
@@ -751,7 +751,7 @@ const math::Jacobian ZeroDofJoint::getRelativeJacobianInPositionSpace() const {
 
 //==============================================================================
 math::Jacobian ZeroDofJoint::getRelativeJacobianInPositionSpace(
-    const Eigen::VectorXd& _positions) const {
+    const Eigen::VectorXs& _positions) const {
   return getRelativeJacobian(_positions);
 }
 
@@ -761,35 +761,35 @@ void ZeroDofJoint::updateRelativeJacobianInPositionSpace(bool /* mandatory */) c
 }
 
 //==============================================================================
-void ZeroDofJoint::addVelocityTo(Eigen::Vector6d& /*_vel*/)
+void ZeroDofJoint::addVelocityTo(Eigen::Vector6s& /*_vel*/)
 {
   // Do nothing
 }
 
 //==============================================================================
-void ZeroDofJoint::addVelocityChangeTo(Eigen::Vector6d& /*_velocityChange*/)
+void ZeroDofJoint::addVelocityChangeTo(Eigen::Vector6s& /*_velocityChange*/)
 {
   // Do nothing
 }
 
 //==============================================================================
 void ZeroDofJoint::setPartialAccelerationTo(
-    Eigen::Vector6d& _partialAcceleration,
-    const Eigen::Vector6d& /*_childVelocity*/)
+    Eigen::Vector6s& _partialAcceleration,
+    const Eigen::Vector6s& /*_childVelocity*/)
 {
   _partialAcceleration.setZero();
 }
 
 //==============================================================================
-void ZeroDofJoint::addAccelerationTo(Eigen::Vector6d& /*_acc*/)
+void ZeroDofJoint::addAccelerationTo(Eigen::Vector6s& /*_acc*/)
 {
   // Do nothing
 }
 
 //==============================================================================
 void ZeroDofJoint::addChildArtInertiaTo(
-    Eigen::Matrix6d& _parentArtInertia,
-    const Eigen::Matrix6d& _childArtInertia)
+    Eigen::Matrix6s& _parentArtInertia,
+    const Eigen::Matrix6s& _childArtInertia)
 {
   // Add child body's articulated inertia to parent body's articulated inertia.
   // Note that mT should be updated.
@@ -799,7 +799,7 @@ void ZeroDofJoint::addChildArtInertiaTo(
 
 //==============================================================================
 void ZeroDofJoint::addChildArtInertiaImplicitTo(
-    Eigen::Matrix6d& _parentArtInertia, const Eigen::Matrix6d& _childArtInertia)
+    Eigen::Matrix6s& _parentArtInertia, const Eigen::Matrix6s& _childArtInertia)
 {
   // Add child body's articulated inertia to parent body's articulated inertia.
   // Note that mT should be updated.
@@ -809,25 +809,25 @@ void ZeroDofJoint::addChildArtInertiaImplicitTo(
 
 //==============================================================================
 void ZeroDofJoint::updateInvProjArtInertia(
-    const Eigen::Matrix6d& /*_artInertia*/)
+    const Eigen::Matrix6s& /*_artInertia*/)
 {
   // Do nothing
 }
 
 //==============================================================================
 void ZeroDofJoint::updateInvProjArtInertiaImplicit(
-    const Eigen::Matrix6d& /*_artInertia*/,
-    double /*_timeStep*/)
+    const Eigen::Matrix6s& /*_artInertia*/,
+    s_t /*_timeStep*/)
 {
   // Do nothing
 }
 
 //==============================================================================
 void ZeroDofJoint::addChildBiasForceTo(
-    Eigen::Vector6d& _parentBiasForce,
-    const Eigen::Matrix6d& _childArtInertia,
-    const Eigen::Vector6d& _childBiasForce,
-    const Eigen::Vector6d& _childPartialAcc)
+    Eigen::Vector6s& _parentBiasForce,
+    const Eigen::Matrix6s& _childArtInertia,
+    const Eigen::Vector6s& _childBiasForce,
+    const Eigen::Vector6s& _childPartialAcc)
 {
   // Add child body's bias force to parent body's bias force. Note that mT
   // should be updated.
@@ -837,9 +837,9 @@ void ZeroDofJoint::addChildBiasForceTo(
 
 //==============================================================================
 void ZeroDofJoint::addChildBiasImpulseTo(
-    Eigen::Vector6d& _parentBiasImpulse,
-    const Eigen::Matrix6d& /*_childArtInertia*/,
-    const Eigen::Vector6d& _childBiasImpulse)
+    Eigen::Vector6s& _parentBiasImpulse,
+    const Eigen::Matrix6s& /*_childArtInertia*/,
+    const Eigen::Vector6s& _childBiasImpulse)
 {
   // Add child body's bias force to parent body's bias impulse. Note that mT
   // should be updated.
@@ -847,14 +847,14 @@ void ZeroDofJoint::addChildBiasImpulseTo(
 }
 
 //==============================================================================
-void ZeroDofJoint::updateTotalForce(const Eigen::Vector6d& /*_bodyForce*/,
-                                    double /*_timeStep*/)
+void ZeroDofJoint::updateTotalForce(const Eigen::Vector6s& /*_bodyForce*/,
+                                    s_t /*_timeStep*/)
 {
   // Do nothing
 }
 
 //==============================================================================
-void ZeroDofJoint::updateTotalImpulse(const Eigen::Vector6d& /*_bodyImpulse*/)
+void ZeroDofJoint::updateTotalImpulse(const Eigen::Vector6s& /*_bodyImpulse*/)
 {
   // Do nothing
 }
@@ -866,23 +866,23 @@ void ZeroDofJoint::resetTotalImpulses()
 }
 
 //==============================================================================
-void ZeroDofJoint::updateAcceleration(const Eigen::Matrix6d& /*_artInertia*/,
-                                      const Eigen::Vector6d& /*_spatialAcc*/)
+void ZeroDofJoint::updateAcceleration(const Eigen::Matrix6s& /*_artInertia*/,
+                                      const Eigen::Vector6s& /*_spatialAcc*/)
 {
   // Do nothing
 }
 
 //==============================================================================
 void ZeroDofJoint::updateVelocityChange(
-    const Eigen::Matrix6d& /*_artInertia*/,
-    const Eigen::Vector6d& /*_velocityChange*/)
+    const Eigen::Matrix6s& /*_artInertia*/,
+    const Eigen::Vector6s& /*_velocityChange*/)
 {
   // Do nothing
 }
 
 //==============================================================================
-void ZeroDofJoint::updateForceID(const Eigen::Vector6d& /*_bodyForce*/,
-                                 double /*_timeStep*/,
+void ZeroDofJoint::updateForceID(const Eigen::Vector6s& /*_bodyForce*/,
+                                 s_t /*_timeStep*/,
                                  bool /*_withDampingForces*/,
                                  bool /*_withSpringForces*/)
 {
@@ -890,8 +890,8 @@ void ZeroDofJoint::updateForceID(const Eigen::Vector6d& /*_bodyForce*/,
 }
 
 //==============================================================================
-void ZeroDofJoint::updateForceFD(const Eigen::Vector6d& /*_bodyForce*/,
-                                 double /*_timeStep*/,
+void ZeroDofJoint::updateForceFD(const Eigen::Vector6s& /*_bodyForce*/,
+                                 s_t /*_timeStep*/,
                                  bool /*_withDampingForces*/,
                                  bool /*_withSpringForces*/)
 {
@@ -899,80 +899,80 @@ void ZeroDofJoint::updateForceFD(const Eigen::Vector6d& /*_bodyForce*/,
 }
 
 //==============================================================================
-void ZeroDofJoint::updateImpulseID(const Eigen::Vector6d& /*_bodyImpulse*/)
+void ZeroDofJoint::updateImpulseID(const Eigen::Vector6s& /*_bodyImpulse*/)
 {
   // Do nothing
 }
 
 //==============================================================================
-void ZeroDofJoint::updateImpulseFD(const Eigen::Vector6d& /*_bodyImpulse*/)
+void ZeroDofJoint::updateImpulseFD(const Eigen::Vector6s& /*_bodyImpulse*/)
 {
   // Do nothing
 }
 
 //==============================================================================
-void ZeroDofJoint::updateConstrainedTerms(double /*_timeStep*/)
+void ZeroDofJoint::updateConstrainedTerms(s_t /*_timeStep*/)
 {
   // Do nothing
 }
 
 //==============================================================================
 void ZeroDofJoint::addChildBiasForceForInvMassMatrix(
-    Eigen::Vector6d& /*_parentBiasForce*/,
-    const Eigen::Matrix6d& /*_childArtInertia*/,
-    const Eigen::Vector6d& /*_childBiasForce*/)
+    Eigen::Vector6s& /*_parentBiasForce*/,
+    const Eigen::Matrix6s& /*_childArtInertia*/,
+    const Eigen::Vector6s& /*_childBiasForce*/)
 {
   // TODO(JS)
 }
 
 //==============================================================================
 void ZeroDofJoint::addChildBiasForceForInvAugMassMatrix(
-    Eigen::Vector6d& /*_parentBiasForce*/,
-    const Eigen::Matrix6d& /*_childArtInertia*/,
-    const Eigen::Vector6d& /*_childBiasForce*/)
+    Eigen::Vector6s& /*_parentBiasForce*/,
+    const Eigen::Matrix6s& /*_childArtInertia*/,
+    const Eigen::Vector6s& /*_childBiasForce*/)
 {
   // TODO(JS)
 }
 
 //==============================================================================
 void ZeroDofJoint::updateTotalForceForInvMassMatrix(
-    const Eigen::Vector6d& /*_bodyForce*/)
+    const Eigen::Vector6s& /*_bodyForce*/)
 {
   // TODO(JS)
 }
 
 //==============================================================================
 void ZeroDofJoint::getInvMassMatrixSegment(
-    Eigen::MatrixXd& /*_invMassMat*/,
+    Eigen::MatrixXs& /*_invMassMat*/,
     const std::size_t /*_col*/,
-    const Eigen::Matrix6d& /*_artInertia*/,
-    const Eigen::Vector6d& /*_spatialAcc*/)
+    const Eigen::Matrix6s& /*_artInertia*/,
+    const Eigen::Vector6s& /*_spatialAcc*/)
 {
   // TODO(JS)
 }
 
 //==============================================================================
 void ZeroDofJoint::getInvAugMassMatrixSegment(
-    Eigen::MatrixXd& /*_invMassMat*/,
+    Eigen::MatrixXs& /*_invMassMat*/,
     const std::size_t /*_col*/,
-    const Eigen::Matrix6d& /*_artInertia*/,
-    const Eigen::Vector6d& /*_spatialAcc*/)
+    const Eigen::Matrix6s& /*_artInertia*/,
+    const Eigen::Vector6s& /*_spatialAcc*/)
 {
   // TODO(JS)
 }
 
 //==============================================================================
-void ZeroDofJoint::addInvMassMatrixSegmentTo(Eigen::Vector6d& /*_acc*/)
+void ZeroDofJoint::addInvMassMatrixSegmentTo(Eigen::Vector6s& /*_acc*/)
 {
   // TODO(JS)
 }
 
 //==============================================================================
-Eigen::VectorXd ZeroDofJoint::getSpatialToGeneralized(
-    const Eigen::Vector6d& /*_spatial*/)
+Eigen::VectorXs ZeroDofJoint::getSpatialToGeneralized(
+    const Eigen::Vector6s& /*_spatial*/)
 {
   // Return zero size vector
-  return Eigen::VectorXd::Zero(0);
+  return Eigen::VectorXs::Zero(0);
 }
 
 }  // namespace dynamics

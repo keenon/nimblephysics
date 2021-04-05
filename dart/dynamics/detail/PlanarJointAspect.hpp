@@ -68,13 +68,13 @@ struct PlanarJointUniqueProperties
   PlaneType mPlaneType;
 
   /// First translational axis
-  Eigen::Vector3d mTransAxis1;
+  Eigen::Vector3s mTransAxis1;
 
   /// Second translational axis
-  Eigen::Vector3d mTransAxis2;
+  Eigen::Vector3s mTransAxis2;
 
   /// Rotational axis
-  Eigen::Vector3d mRotAxis;
+  Eigen::Vector3s mRotAxis;
 
   /// Constructor for pre-defined plane types. Defaults to the XY plane if
   /// PlaneType::ARBITRARY is specified.
@@ -82,8 +82,8 @@ struct PlanarJointUniqueProperties
 
   /// Constructor for arbitrary plane types. mPlaneType will be set to
   /// PlaneType::ARBITRARY
-  PlanarJointUniqueProperties(const Eigen::Vector3d& _transAxis1,
-                   const Eigen::Vector3d& _transAxis2);
+  PlanarJointUniqueProperties(const Eigen::Vector3s& _transAxis1,
+                   const Eigen::Vector3s& _transAxis2);
 
   /// Copy-constructor, customized for robustness
   PlanarJointUniqueProperties(const PlanarJointUniqueProperties& other);
@@ -100,8 +100,8 @@ struct PlanarJointUniqueProperties
   void setZXPlane();
 
   /// Set plane type as arbitrary plane with two orthogonal translational axes
-  void setArbitraryPlane(const Eigen::Vector3d& _transAxis1,
-                         const Eigen::Vector3d& _transAxis2);
+  void setArbitraryPlane(const Eigen::Vector3s& _transAxis1,
+                         const Eigen::Vector3s& _transAxis2);
 };
 
 //==============================================================================

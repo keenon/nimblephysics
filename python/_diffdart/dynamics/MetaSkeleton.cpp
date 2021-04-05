@@ -241,18 +241,18 @@ void MetaSkeleton(py::module& m)
           "setCommand",
           +[](dart::dynamics::MetaSkeleton* self,
               std::size_t _index,
-              double _command) { self->setCommand(_index, _command); },
+              s_t _command) { self->setCommand(_index, _command); },
           ::py::arg("index"),
           ::py::arg("command"))
       .def(
           "getCommand",
           +[](const dart::dynamics::MetaSkeleton* self, std::size_t _index)
-              -> double { return self->getCommand(_index); },
+              -> s_t { return self->getCommand(_index); },
           ::py::arg("index"))
       .def(
           "setCommands",
           +[](dart::dynamics::MetaSkeleton* self,
-              const Eigen::VectorXd& _commands) {
+              const Eigen::VectorXs& _commands) {
             self->setCommands(_commands);
           },
           ::py::arg("commands"))
@@ -260,20 +260,20 @@ void MetaSkeleton(py::module& m)
           "setCommands",
           +[](dart::dynamics::MetaSkeleton* self,
               const std::vector<std::size_t>& _indices,
-              const Eigen::VectorXd& _commands) {
+              const Eigen::VectorXs& _commands) {
             self->setCommands(_indices, _commands);
           },
           ::py::arg("indices"),
           ::py::arg("commands"))
       .def(
           "getCommands",
-          +[](const dart::dynamics::MetaSkeleton* self) -> Eigen::VectorXd {
+          +[](const dart::dynamics::MetaSkeleton* self) -> Eigen::VectorXs {
             return self->getCommands();
           })
       .def(
           "getCommands",
           +[](const dart::dynamics::MetaSkeleton* self,
-              const std::vector<std::size_t>& _indices) -> Eigen::VectorXd {
+              const std::vector<std::size_t>& _indices) -> Eigen::VectorXs {
             return self->getCommands(_indices);
           },
           ::py::arg("indices"))
@@ -284,18 +284,18 @@ void MetaSkeleton(py::module& m)
           "setPosition",
           +[](dart::dynamics::MetaSkeleton* self,
               std::size_t index,
-              double _position) { self->setPosition(index, _position); },
+              s_t _position) { self->setPosition(index, _position); },
           ::py::arg("index"),
           ::py::arg("position"))
       .def(
           "getPosition",
           +[](const dart::dynamics::MetaSkeleton* self, std::size_t _index)
-              -> double { return self->getPosition(_index); },
+              -> s_t { return self->getPosition(_index); },
           ::py::arg("index"))
       .def(
           "setPositions",
           +[](dart::dynamics::MetaSkeleton* self,
-              const Eigen::VectorXd& _positions) {
+              const Eigen::VectorXs& _positions) {
             self->setPositions(_positions);
           },
           ::py::arg("positions"))
@@ -303,20 +303,20 @@ void MetaSkeleton(py::module& m)
           "setPositions",
           +[](dart::dynamics::MetaSkeleton* self,
               const std::vector<std::size_t>& _indices,
-              const Eigen::VectorXd& _positions) {
+              const Eigen::VectorXs& _positions) {
             self->setPositions(_indices, _positions);
           },
           ::py::arg("indices"),
           ::py::arg("positions"))
       .def(
           "getPositions",
-          +[](const dart::dynamics::MetaSkeleton* self) -> Eigen::VectorXd {
+          +[](const dart::dynamics::MetaSkeleton* self) -> Eigen::VectorXs {
             return self->getPositions();
           })
       .def(
           "getPositions",
           +[](const dart::dynamics::MetaSkeleton* self,
-              const std::vector<std::size_t>& _indices) -> Eigen::VectorXd {
+              const std::vector<std::size_t>& _indices) -> Eigen::VectorXs {
             return self->getPositions(_indices);
           },
           ::py::arg("indices"))
@@ -327,7 +327,7 @@ void MetaSkeleton(py::module& m)
           "setPositionLowerLimit",
           +[](dart::dynamics::MetaSkeleton* self,
               std::size_t _index,
-              double _position) {
+              s_t _position) {
             self->setPositionLowerLimit(_index, _position);
           },
           ::py::arg("index"),
@@ -335,7 +335,7 @@ void MetaSkeleton(py::module& m)
       .def(
           "setPositionLowerLimits",
           +[](dart::dynamics::MetaSkeleton* self,
-              const Eigen::VectorXd& positions) {
+              const Eigen::VectorXs& positions) {
             self->setPositionLowerLimits(positions);
           },
           ::py::arg("positions"))
@@ -343,7 +343,7 @@ void MetaSkeleton(py::module& m)
           "setPositionLowerLimits",
           +[](dart::dynamics::MetaSkeleton* self,
               const std::vector<std::size_t>& indices,
-              const Eigen::VectorXd& positions) {
+              const Eigen::VectorXs& positions) {
             self->setPositionLowerLimits(indices, positions);
           },
           ::py::arg("indices"),
@@ -351,17 +351,17 @@ void MetaSkeleton(py::module& m)
       .def(
           "getPositionLowerLimit",
           +[](const dart::dynamics::MetaSkeleton* self, std::size_t _index)
-              -> double { return self->getPositionLowerLimit(_index); },
+              -> s_t { return self->getPositionLowerLimit(_index); },
           ::py::arg("index"))
       .def(
           "getPositionLowerLimits",
-          +[](const dart::dynamics::MetaSkeleton* self) -> Eigen::VectorXd {
+          +[](const dart::dynamics::MetaSkeleton* self) -> Eigen::VectorXs {
             return self->getPositionLowerLimits();
           })
       .def(
           "getPositionLowerLimits",
           +[](const dart::dynamics::MetaSkeleton* self,
-              const std::vector<std::size_t>& indices) -> Eigen::VectorXd {
+              const std::vector<std::size_t>& indices) -> Eigen::VectorXs {
             return self->getPositionLowerLimits(indices);
           },
           ::py::arg("indices"))
@@ -369,7 +369,7 @@ void MetaSkeleton(py::module& m)
           "setPositionUpperLimit",
           +[](dart::dynamics::MetaSkeleton* self,
               std::size_t _index,
-              double _position) {
+              s_t _position) {
             self->setPositionUpperLimit(_index, _position);
           },
           ::py::arg("index"),
@@ -377,7 +377,7 @@ void MetaSkeleton(py::module& m)
       .def(
           "setPositionUpperLimits",
           +[](dart::dynamics::MetaSkeleton* self,
-              const Eigen::VectorXd& positions) {
+              const Eigen::VectorXs& positions) {
             self->setPositionUpperLimits(positions);
           },
           ::py::arg("positions"))
@@ -385,7 +385,7 @@ void MetaSkeleton(py::module& m)
           "setPositionUpperLimits",
           +[](dart::dynamics::MetaSkeleton* self,
               const std::vector<std::size_t>& indices,
-              const Eigen::VectorXd& positions) {
+              const Eigen::VectorXs& positions) {
             self->setPositionUpperLimits(indices, positions);
           },
           ::py::arg("indices"),
@@ -393,17 +393,17 @@ void MetaSkeleton(py::module& m)
       .def(
           "getPositionUpperLimit",
           +[](const dart::dynamics::MetaSkeleton* self, std::size_t _index)
-              -> double { return self->getPositionUpperLimit(_index); },
+              -> s_t { return self->getPositionUpperLimit(_index); },
           ::py::arg("index"))
       .def(
           "getPositionUpperLimits",
-          +[](const dart::dynamics::MetaSkeleton* self) -> Eigen::VectorXd {
+          +[](const dart::dynamics::MetaSkeleton* self) -> Eigen::VectorXs {
             return self->getPositionUpperLimits();
           })
       .def(
           "getPositionUpperLimits",
           +[](const dart::dynamics::MetaSkeleton* self,
-              const std::vector<std::size_t>& indices) -> Eigen::VectorXd {
+              const std::vector<std::size_t>& indices) -> Eigen::VectorXs {
             return self->getPositionUpperLimits(indices);
           },
           ::py::arg("indices"))
@@ -411,18 +411,18 @@ void MetaSkeleton(py::module& m)
           "setVelocity",
           +[](dart::dynamics::MetaSkeleton* self,
               std::size_t _index,
-              double _velocity) { self->setVelocity(_index, _velocity); },
+              s_t _velocity) { self->setVelocity(_index, _velocity); },
           ::py::arg("index"),
           ::py::arg("velocity"))
       .def(
           "getVelocity",
           +[](const dart::dynamics::MetaSkeleton* self, std::size_t _index)
-              -> double { return self->getVelocity(_index); },
+              -> s_t { return self->getVelocity(_index); },
           ::py::arg("index"))
       .def(
           "setVelocities",
           +[](dart::dynamics::MetaSkeleton* self,
-              const Eigen::VectorXd& _velocities) {
+              const Eigen::VectorXs& _velocities) {
             self->setVelocities(_velocities);
           },
           ::py::arg("velocities"))
@@ -430,20 +430,20 @@ void MetaSkeleton(py::module& m)
           "setVelocities",
           +[](dart::dynamics::MetaSkeleton* self,
               const std::vector<std::size_t>& _indices,
-              const Eigen::VectorXd& _velocities) {
+              const Eigen::VectorXs& _velocities) {
             self->setVelocities(_indices, _velocities);
           },
           ::py::arg("indices"),
           ::py::arg("velocities"))
       .def(
           "getVelocities",
-          +[](const dart::dynamics::MetaSkeleton* self) -> Eigen::VectorXd {
+          +[](const dart::dynamics::MetaSkeleton* self) -> Eigen::VectorXs {
             return self->getVelocities();
           })
       .def(
           "getVelocities",
           +[](const dart::dynamics::MetaSkeleton* self,
-              const std::vector<std::size_t>& _indices) -> Eigen::VectorXd {
+              const std::vector<std::size_t>& _indices) -> Eigen::VectorXs {
             return self->getVelocities(_indices);
           },
           ::py::arg("indices"))
@@ -454,7 +454,7 @@ void MetaSkeleton(py::module& m)
           "setVelocityLowerLimit",
           +[](dart::dynamics::MetaSkeleton* self,
               std::size_t _index,
-              double _velocity) {
+              s_t _velocity) {
             self->setVelocityLowerLimit(_index, _velocity);
           },
           ::py::arg("index"),
@@ -462,7 +462,7 @@ void MetaSkeleton(py::module& m)
       .def(
           "setVelocityLowerLimits",
           +[](dart::dynamics::MetaSkeleton* self,
-              const Eigen::VectorXd& velocities) {
+              const Eigen::VectorXs& velocities) {
             self->setVelocityLowerLimits(velocities);
           },
           ::py::arg("velocities"))
@@ -470,7 +470,7 @@ void MetaSkeleton(py::module& m)
           "setVelocityLowerLimits",
           +[](dart::dynamics::MetaSkeleton* self,
               const std::vector<std::size_t>& indices,
-              const Eigen::VectorXd& velocities) {
+              const Eigen::VectorXs& velocities) {
             self->setVelocityLowerLimits(indices, velocities);
           },
           ::py::arg("indices"),
@@ -478,17 +478,17 @@ void MetaSkeleton(py::module& m)
       .def(
           "getVelocityLowerLimit",
           +[](dart::dynamics::MetaSkeleton* self, std::size_t _index)
-              -> double { return self->getVelocityLowerLimit(_index); },
+              -> s_t { return self->getVelocityLowerLimit(_index); },
           ::py::arg("index"))
       .def(
           "getVelocityLowerLimits",
-          +[](const dart::dynamics::MetaSkeleton* self) -> Eigen::VectorXd {
+          +[](const dart::dynamics::MetaSkeleton* self) -> Eigen::VectorXs {
             return self->getVelocityLowerLimits();
           })
       .def(
           "getVelocityLowerLimits",
           +[](const dart::dynamics::MetaSkeleton* self,
-              const std::vector<std::size_t>& indices) -> Eigen::VectorXd {
+              const std::vector<std::size_t>& indices) -> Eigen::VectorXs {
             return self->getVelocityLowerLimits(indices);
           },
           ::py::arg("indices"))
@@ -496,7 +496,7 @@ void MetaSkeleton(py::module& m)
           "setVelocityUpperLimit",
           +[](dart::dynamics::MetaSkeleton* self,
               std::size_t _index,
-              double _velocity) {
+              s_t _velocity) {
             self->setVelocityUpperLimit(_index, _velocity);
           },
           ::py::arg("index"),
@@ -504,7 +504,7 @@ void MetaSkeleton(py::module& m)
       .def(
           "setVelocityUpperLimits",
           +[](dart::dynamics::MetaSkeleton* self,
-              const Eigen::VectorXd& velocities) {
+              const Eigen::VectorXs& velocities) {
             self->setVelocityUpperLimits(velocities);
           },
           ::py::arg("velocities"))
@@ -512,7 +512,7 @@ void MetaSkeleton(py::module& m)
           "setVelocityUpperLimits",
           +[](dart::dynamics::MetaSkeleton* self,
               const std::vector<std::size_t>& indices,
-              const Eigen::VectorXd& velocities) {
+              const Eigen::VectorXs& velocities) {
             self->setVelocityUpperLimits(indices, velocities);
           },
           ::py::arg("indices"),
@@ -520,17 +520,17 @@ void MetaSkeleton(py::module& m)
       .def(
           "getVelocityUpperLimit",
           +[](dart::dynamics::MetaSkeleton* self, std::size_t _index)
-              -> double { return self->getVelocityUpperLimit(_index); },
+              -> s_t { return self->getVelocityUpperLimit(_index); },
           ::py::arg("index"))
       .def(
           "getVelocityUpperLimits",
-          +[](const dart::dynamics::MetaSkeleton* self) -> Eigen::VectorXd {
+          +[](const dart::dynamics::MetaSkeleton* self) -> Eigen::VectorXs {
             return self->getVelocityUpperLimits();
           })
       .def(
           "getVelocityUpperLimits",
           +[](const dart::dynamics::MetaSkeleton* self,
-              const std::vector<std::size_t>& indices) -> Eigen::VectorXd {
+              const std::vector<std::size_t>& indices) -> Eigen::VectorXs {
             return self->getVelocityUpperLimits(indices);
           },
           ::py::arg("indices"))
@@ -538,7 +538,7 @@ void MetaSkeleton(py::module& m)
           "setAcceleration",
           +[](dart::dynamics::MetaSkeleton* self,
               std::size_t _index,
-              double _acceleration) {
+              s_t _acceleration) {
             self->setAcceleration(_index, _acceleration);
           },
           ::py::arg("index"),
@@ -546,12 +546,12 @@ void MetaSkeleton(py::module& m)
       .def(
           "getAcceleration",
           +[](const dart::dynamics::MetaSkeleton* self, std::size_t _index)
-              -> double { return self->getAcceleration(_index); },
+              -> s_t { return self->getAcceleration(_index); },
           ::py::arg("index"))
       .def(
           "setAccelerations",
           +[](dart::dynamics::MetaSkeleton* self,
-              const Eigen::VectorXd& _accelerations) {
+              const Eigen::VectorXs& _accelerations) {
             self->setAccelerations(_accelerations);
           },
           ::py::arg("accelerations"))
@@ -559,20 +559,20 @@ void MetaSkeleton(py::module& m)
           "setAccelerations",
           +[](dart::dynamics::MetaSkeleton* self,
               const std::vector<std::size_t>& _indices,
-              const Eigen::VectorXd& _accelerations) {
+              const Eigen::VectorXs& _accelerations) {
             self->setAccelerations(_indices, _accelerations);
           },
           ::py::arg("indices"),
           ::py::arg("accelerations"))
       .def(
           "getAccelerations",
-          +[](const dart::dynamics::MetaSkeleton* self) -> Eigen::VectorXd {
+          +[](const dart::dynamics::MetaSkeleton* self) -> Eigen::VectorXs {
             return self->getAccelerations();
           })
       .def(
           "getAccelerations",
           +[](const dart::dynamics::MetaSkeleton* self,
-              const std::vector<std::size_t>& _indices) -> Eigen::VectorXd {
+              const std::vector<std::size_t>& _indices) -> Eigen::VectorXs {
             return self->getAccelerations(_indices);
           },
           ::py::arg("indices"))
@@ -584,7 +584,7 @@ void MetaSkeleton(py::module& m)
           "setAccelerationLowerLimit",
           +[](dart::dynamics::MetaSkeleton* self,
               std::size_t _index,
-              double _acceleration) {
+              s_t _acceleration) {
             self->setAccelerationLowerLimit(_index, _acceleration);
           },
           ::py::arg("index"),
@@ -592,7 +592,7 @@ void MetaSkeleton(py::module& m)
       .def(
           "setAccelerationLowerLimits",
           +[](dart::dynamics::MetaSkeleton* self,
-              const Eigen::VectorXd& accelerations) {
+              const Eigen::VectorXs& accelerations) {
             self->setAccelerationLowerLimits(accelerations);
           },
           ::py::arg("accelerations"))
@@ -600,7 +600,7 @@ void MetaSkeleton(py::module& m)
           "setAccelerationLowerLimits",
           +[](dart::dynamics::MetaSkeleton* self,
               const std::vector<std::size_t>& indices,
-              const Eigen::VectorXd& accelerations) {
+              const Eigen::VectorXs& accelerations) {
             self->setAccelerationLowerLimits(indices, accelerations);
           },
           ::py::arg("indices"),
@@ -608,17 +608,17 @@ void MetaSkeleton(py::module& m)
       .def(
           "getAccelerationLowerLimit",
           +[](const dart::dynamics::MetaSkeleton* self, std::size_t _index)
-              -> double { return self->getAccelerationLowerLimit(_index); },
+              -> s_t { return self->getAccelerationLowerLimit(_index); },
           ::py::arg("index"))
       .def(
           "getAccelerationLowerLimits",
-          +[](const dart::dynamics::MetaSkeleton* self) -> Eigen::VectorXd {
+          +[](const dart::dynamics::MetaSkeleton* self) -> Eigen::VectorXs {
             return self->getAccelerationLowerLimits();
           })
       .def(
           "getAccelerationLowerLimits",
           +[](const dart::dynamics::MetaSkeleton* self,
-              const std::vector<std::size_t>& indices) -> Eigen::VectorXd {
+              const std::vector<std::size_t>& indices) -> Eigen::VectorXs {
             return self->getAccelerationLowerLimits(indices);
           },
           ::py::arg("indices"))
@@ -626,7 +626,7 @@ void MetaSkeleton(py::module& m)
           "setAccelerationUpperLimit",
           +[](dart::dynamics::MetaSkeleton* self,
               std::size_t _index,
-              double _acceleration) {
+              s_t _acceleration) {
             self->setAccelerationUpperLimit(_index, _acceleration);
           },
           ::py::arg("index"),
@@ -634,7 +634,7 @@ void MetaSkeleton(py::module& m)
       .def(
           "setAccelerationUpperLimits",
           +[](dart::dynamics::MetaSkeleton* self,
-              const Eigen::VectorXd& accelerations) {
+              const Eigen::VectorXs& accelerations) {
             self->setAccelerationUpperLimits(accelerations);
           },
           ::py::arg("accelerations"))
@@ -642,7 +642,7 @@ void MetaSkeleton(py::module& m)
           "setAccelerationUpperLimits",
           +[](dart::dynamics::MetaSkeleton* self,
               const std::vector<std::size_t>& indices,
-              const Eigen::VectorXd& accelerations) {
+              const Eigen::VectorXs& accelerations) {
             self->setAccelerationUpperLimits(indices, accelerations);
           },
           ::py::arg("indices"),
@@ -650,17 +650,17 @@ void MetaSkeleton(py::module& m)
       .def(
           "getAccelerationUpperLimit",
           +[](const dart::dynamics::MetaSkeleton* self, std::size_t _index)
-              -> double { return self->getAccelerationUpperLimit(_index); },
+              -> s_t { return self->getAccelerationUpperLimit(_index); },
           ::py::arg("index"))
       .def(
           "getAccelerationUpperLimits",
-          +[](const dart::dynamics::MetaSkeleton* self) -> Eigen::VectorXd {
+          +[](const dart::dynamics::MetaSkeleton* self) -> Eigen::VectorXs {
             return self->getAccelerationUpperLimits();
           })
       .def(
           "getAccelerationUpperLimits",
           +[](const dart::dynamics::MetaSkeleton* self,
-              const std::vector<std::size_t>& indices) -> Eigen::VectorXd {
+              const std::vector<std::size_t>& indices) -> Eigen::VectorXs {
             return self->getAccelerationUpperLimits(indices);
           },
           ::py::arg("indices"))
@@ -668,37 +668,37 @@ void MetaSkeleton(py::module& m)
           "setForce",
           +[](dart::dynamics::MetaSkeleton* self,
               std::size_t _index,
-              double _force) { self->setForce(_index, _force); },
+              s_t _force) { self->setForce(_index, _force); },
           ::py::arg("index"),
           ::py::arg("force"))
       .def(
           "getForce",
           +[](const dart::dynamics::MetaSkeleton* self,
-              std::size_t _index) -> double { return self->getForce(_index); },
+              std::size_t _index) -> s_t { return self->getForce(_index); },
           ::py::arg("index"))
       .def(
           "setForces",
           +[](dart::dynamics::MetaSkeleton* self,
-              const Eigen::VectorXd& _forces) { self->setForces(_forces); },
+              const Eigen::VectorXs& _forces) { self->setForces(_forces); },
           ::py::arg("forces"))
       .def(
           "setForces",
           +[](dart::dynamics::MetaSkeleton* self,
               const std::vector<std::size_t>& _index,
-              const Eigen::VectorXd& _forces) {
+              const Eigen::VectorXs& _forces) {
             self->setForces(_index, _forces);
           },
           ::py::arg("index"),
           ::py::arg("forces"))
       .def(
           "getForces",
-          +[](const dart::dynamics::MetaSkeleton* self) -> Eigen::VectorXd {
+          +[](const dart::dynamics::MetaSkeleton* self) -> Eigen::VectorXs {
             return self->getForces();
           })
       .def(
           "getForces",
           +[](const dart::dynamics::MetaSkeleton* self,
-              const std::vector<std::size_t>& _indices) -> Eigen::VectorXd {
+              const std::vector<std::size_t>& _indices) -> Eigen::VectorXs {
             return self->getForces(_indices);
           },
           ::py::arg("indices"))
@@ -710,13 +710,13 @@ void MetaSkeleton(py::module& m)
           "setForceLowerLimit",
           +[](dart::dynamics::MetaSkeleton* self,
               std::size_t _index,
-              double _force) { self->setForceLowerLimit(_index, _force); },
+              s_t _force) { self->setForceLowerLimit(_index, _force); },
           ::py::arg("index"),
           ::py::arg("force"))
       .def(
           "setForceLowerLimits",
           +[](dart::dynamics::MetaSkeleton* self,
-              const Eigen::VectorXd& forces) {
+              const Eigen::VectorXs& forces) {
             self->setForceLowerLimits(forces);
           },
           ::py::arg("forces"))
@@ -724,7 +724,7 @@ void MetaSkeleton(py::module& m)
           "setForceLowerLimits",
           +[](dart::dynamics::MetaSkeleton* self,
               const std::vector<std::size_t>& indices,
-              const Eigen::VectorXd& forces) {
+              const Eigen::VectorXs& forces) {
             self->setForceLowerLimits(indices, forces);
           },
           ::py::arg("indices"),
@@ -732,17 +732,17 @@ void MetaSkeleton(py::module& m)
       .def(
           "getForceLowerLimit",
           +[](const dart::dynamics::MetaSkeleton* self, std::size_t _index)
-              -> double { return self->getForceLowerLimit(_index); },
+              -> s_t { return self->getForceLowerLimit(_index); },
           ::py::arg("index"))
       .def(
           "getForceLowerLimits",
-          +[](const dart::dynamics::MetaSkeleton* self) -> Eigen::VectorXd {
+          +[](const dart::dynamics::MetaSkeleton* self) -> Eigen::VectorXs {
             return self->getForceLowerLimits();
           })
       .def(
           "getForceLowerLimits",
           +[](const dart::dynamics::MetaSkeleton* self,
-              const std::vector<std::size_t>& indices) -> Eigen::VectorXd {
+              const std::vector<std::size_t>& indices) -> Eigen::VectorXs {
             return self->getForceLowerLimits(indices);
           },
           ::py::arg("indices"))
@@ -750,13 +750,13 @@ void MetaSkeleton(py::module& m)
           "setForceUpperLimit",
           +[](dart::dynamics::MetaSkeleton* self,
               std::size_t _index,
-              double _force) { self->setForceUpperLimit(_index, _force); },
+              s_t _force) { self->setForceUpperLimit(_index, _force); },
           ::py::arg("index"),
           ::py::arg("force"))
       .def(
           "setForceUpperLimits",
           +[](dart::dynamics::MetaSkeleton* self,
-              const Eigen::VectorXd& forces) {
+              const Eigen::VectorXs& forces) {
             self->setForceUpperLimits(forces);
           },
           ::py::arg("forces"))
@@ -764,7 +764,7 @@ void MetaSkeleton(py::module& m)
           "setForceUpperLimits",
           +[](dart::dynamics::MetaSkeleton* self,
               const std::vector<std::size_t>& indices,
-              const Eigen::VectorXd& forces) {
+              const Eigen::VectorXs& forces) {
             self->setForceUpperLimits(indices, forces);
           },
           ::py::arg("indices"),
@@ -772,35 +772,35 @@ void MetaSkeleton(py::module& m)
       .def(
           "getForceUpperLimit",
           +[](const dart::dynamics::MetaSkeleton* self, std::size_t _index)
-              -> double { return self->getForceUpperLimit(_index); },
+              -> s_t { return self->getForceUpperLimit(_index); },
           ::py::arg("index"))
       .def(
           "getForceUpperLimits",
-          +[](const dart::dynamics::MetaSkeleton* self) -> Eigen::VectorXd {
+          +[](const dart::dynamics::MetaSkeleton* self) -> Eigen::VectorXs {
             return self->getForceUpperLimits();
           })
       .def(
           "getForceUpperLimits",
           +[](const dart::dynamics::MetaSkeleton* self,
-              const std::vector<std::size_t>& indices) -> Eigen::VectorXd {
+              const std::vector<std::size_t>& indices) -> Eigen::VectorXs {
             return self->getForceUpperLimits(indices);
           },
           ::py::arg("indices"))
       .def(
           "getVelocityChanges",
-          +[](const dart::dynamics::MetaSkeleton* self) -> Eigen::VectorXd {
+          +[](const dart::dynamics::MetaSkeleton* self) -> Eigen::VectorXs {
             return self->getVelocityChanges();
           })
       .def(
           "setJointConstraintImpulses",
           +[](dart::dynamics::MetaSkeleton* self,
-              const Eigen::VectorXd& _impulses) {
+              const Eigen::VectorXs& _impulses) {
             self->setJointConstraintImpulses(_impulses);
           },
           ::py::arg("impulses"))
       .def(
           "getJointConstraintImpulses",
-          +[](const dart::dynamics::MetaSkeleton* self) -> Eigen::VectorXd {
+          +[](const dart::dynamics::MetaSkeleton* self) -> Eigen::VectorXs {
             return self->getJointConstraintImpulses();
           })
       .def(
@@ -835,7 +835,7 @@ void MetaSkeleton(py::module& m)
           "getJacobian",
           +[](const dart::dynamics::MetaSkeleton* self,
               const dart::dynamics::JacobianNode* _node,
-              const Eigen::Vector3d& _localOffset) -> dart::math::Jacobian {
+              const Eigen::Vector3s& _localOffset) -> dart::math::Jacobian {
             return self->getJacobian(_node, _localOffset);
           },
           ::py::arg("node"),
@@ -844,7 +844,7 @@ void MetaSkeleton(py::module& m)
           "getJacobian",
           +[](const dart::dynamics::MetaSkeleton* self,
               const dart::dynamics::JacobianNode* _node,
-              const Eigen::Vector3d& _localOffset,
+              const Eigen::Vector3s& _localOffset,
               const dart::dynamics::Frame* _inCoordinatesOf)
               -> dart::math::Jacobian {
             return self->getJacobian(_node, _localOffset, _inCoordinatesOf);
@@ -856,7 +856,7 @@ void MetaSkeleton(py::module& m)
           "getJacobian",
           +[](const dart::dynamics::MetaSkeleton* self,
               const dart::dynamics::JacobianNode* _node,
-              const Eigen::Vector3d& _localOffset,
+              const Eigen::Vector3s& _localOffset,
               const dart::dynamics::JacobianNode* _relativeTo,
               const dart::dynamics::Frame* _inCoordinatesOf)
               -> dart::math::Jacobian {
@@ -877,7 +877,7 @@ void MetaSkeleton(py::module& m)
           "getWorldJacobian",
           +[](const dart::dynamics::MetaSkeleton* self,
               const dart::dynamics::JacobianNode* _node,
-              const Eigen::Vector3d& _localOffset) -> dart::math::Jacobian {
+              const Eigen::Vector3s& _localOffset) -> dart::math::Jacobian {
             return self->getWorldJacobian(_node, _localOffset);
           },
           ::py::arg("node"),
@@ -904,7 +904,7 @@ void MetaSkeleton(py::module& m)
           "getLinearJacobian",
           +[](const dart::dynamics::MetaSkeleton* self,
               const dart::dynamics::JacobianNode* _node,
-              const Eigen::Vector3d& _localOffset)
+              const Eigen::Vector3s& _localOffset)
               -> dart::math::LinearJacobian {
             return self->getLinearJacobian(_node, _localOffset);
           },
@@ -914,7 +914,7 @@ void MetaSkeleton(py::module& m)
           "getLinearJacobian",
           +[](const dart::dynamics::MetaSkeleton* self,
               const dart::dynamics::JacobianNode* _node,
-              const Eigen::Vector3d& _localOffset,
+              const Eigen::Vector3s& _localOffset,
               const dart::dynamics::Frame* _inCoordinatesOf)
               -> dart::math::LinearJacobian {
             return self->getLinearJacobian(
@@ -950,7 +950,7 @@ void MetaSkeleton(py::module& m)
           "getLinearJacobian",
           +[](const dart::dynamics::MetaSkeleton* self,
               const dart::dynamics::JacobianNode* _node,
-              const Eigen::Vector3d& _localOffset,
+              const Eigen::Vector3s& _localOffset,
               const dart::dynamics::JacobianNode* _relativeTo)
               -> dart::math::LinearJacobian {
             return self->getLinearJacobian(_node, _localOffset, _relativeTo);
@@ -962,7 +962,7 @@ void MetaSkeleton(py::module& m)
           "getLinearJacobian",
           +[](const dart::dynamics::MetaSkeleton* self,
               const dart::dynamics::JacobianNode* _node,
-              const Eigen::Vector3d& _localOffset,
+              const Eigen::Vector3s& _localOffset,
               const dart::dynamics::JacobianNode* _relativeTo,
               const dart::dynamics::Frame* _inCoordinatesOf)
               -> dart::math::LinearJacobian {
@@ -1036,7 +1036,7 @@ void MetaSkeleton(py::module& m)
           "getJacobianSpatialDeriv",
           +[](const dart::dynamics::MetaSkeleton* self,
               const dart::dynamics::JacobianNode* _node,
-              const Eigen::Vector3d& _localOffset) -> dart::math::Jacobian {
+              const Eigen::Vector3s& _localOffset) -> dart::math::Jacobian {
             return self->getJacobianSpatialDeriv(_node, _localOffset);
           },
           ::py::arg("node"),
@@ -1045,7 +1045,7 @@ void MetaSkeleton(py::module& m)
           "getJacobianSpatialDeriv",
           +[](const dart::dynamics::MetaSkeleton* self,
               const dart::dynamics::JacobianNode* _node,
-              const Eigen::Vector3d& _localOffset,
+              const Eigen::Vector3s& _localOffset,
               const dart::dynamics::Frame* _inCoordinatesOf)
               -> dart::math::Jacobian {
             return self->getJacobianSpatialDeriv(
@@ -1071,7 +1071,7 @@ void MetaSkeleton(py::module& m)
           "getJacobianSpatialDeriv",
           +[](const dart::dynamics::MetaSkeleton* self,
               const dart::dynamics::JacobianNode* _node,
-              const Eigen::Vector3d& _localOffset,
+              const Eigen::Vector3s& _localOffset,
               const dart::dynamics::JacobianNode* _relativeTo,
               const dart::dynamics::Frame* _inCoordinatesOf)
               -> dart::math::Jacobian {
@@ -1104,7 +1104,7 @@ void MetaSkeleton(py::module& m)
           "getJacobianClassicDeriv",
           +[](const dart::dynamics::MetaSkeleton* self,
               const dart::dynamics::JacobianNode* _node,
-              const Eigen::Vector3d& _localOffset) -> dart::math::Jacobian {
+              const Eigen::Vector3s& _localOffset) -> dart::math::Jacobian {
             return self->getJacobianClassicDeriv(_node, _localOffset);
           },
           ::py::arg("node"),
@@ -1113,7 +1113,7 @@ void MetaSkeleton(py::module& m)
           "getJacobianClassicDeriv",
           +[](const dart::dynamics::MetaSkeleton* self,
               const dart::dynamics::JacobianNode* _node,
-              const Eigen::Vector3d& _localOffset,
+              const Eigen::Vector3s& _localOffset,
               const dart::dynamics::Frame* _inCoordinatesOf)
               -> dart::math::Jacobian {
             return self->getJacobianClassicDeriv(
@@ -1144,7 +1144,7 @@ void MetaSkeleton(py::module& m)
           "getLinearJacobianDeriv",
           +[](const dart::dynamics::MetaSkeleton* self,
               const dart::dynamics::JacobianNode* _node,
-              const Eigen::Vector3d& _localOffset)
+              const Eigen::Vector3s& _localOffset)
               -> dart::math::LinearJacobian {
             return self->getLinearJacobianDeriv(_node, _localOffset);
           },
@@ -1154,7 +1154,7 @@ void MetaSkeleton(py::module& m)
           "getLinearJacobianDeriv",
           +[](const dart::dynamics::MetaSkeleton* self,
               const dart::dynamics::JacobianNode* _node,
-              const Eigen::Vector3d& _localOffset,
+              const Eigen::Vector3s& _localOffset,
               const dart::dynamics::Frame* _inCoordinatesOf)
               -> dart::math::LinearJacobian {
             return self->getLinearJacobianDeriv(
@@ -1184,42 +1184,42 @@ void MetaSkeleton(py::module& m)
       .def(
           "getMass",
           +[](const dart::dynamics::MetaSkeleton* self)
-              -> double { return self->getMass(); })
+              -> s_t { return self->getMass(); })
       .def(
           "getMassMatrix",
           +[](const dart::dynamics::MetaSkeleton* self)
-              -> const Eigen::MatrixXd& { return self->getMassMatrix(); })
+              -> const Eigen::MatrixXs& { return self->getMassMatrix(); })
       .def(
           "getAugMassMatrix",
           +[](const dart::dynamics::MetaSkeleton* self)
-              -> const Eigen::MatrixXd& { return self->getAugMassMatrix(); })
+              -> const Eigen::MatrixXs& { return self->getAugMassMatrix(); })
       .def(
           "getInvMassMatrix",
           +[](const dart::dynamics::MetaSkeleton* self)
-              -> const Eigen::MatrixXd& { return self->getInvMassMatrix(); })
+              -> const Eigen::MatrixXs& { return self->getInvMassMatrix(); })
       .def(
           "getCoriolisForces",
-          +[](dart::dynamics::MetaSkeleton* self) -> const Eigen::VectorXd& {
+          +[](dart::dynamics::MetaSkeleton* self) -> const Eigen::VectorXs& {
             return self->getCoriolisForces();
           })
       .def(
           "getGravityForces",
-          +[](dart::dynamics::MetaSkeleton* self) -> const Eigen::VectorXd& {
+          +[](dart::dynamics::MetaSkeleton* self) -> const Eigen::VectorXs& {
             return self->getCoriolisForces();
           })
       .def(
           "getCoriolisAndGravityForces",
-          +[](dart::dynamics::MetaSkeleton* self) -> const Eigen::VectorXd& {
+          +[](dart::dynamics::MetaSkeleton* self) -> const Eigen::VectorXs& {
             return self->getCoriolisAndGravityForces();
           })
       .def(
           "getExternalForces",
-          +[](dart::dynamics::MetaSkeleton* self) -> const Eigen::VectorXd& {
+          +[](dart::dynamics::MetaSkeleton* self) -> const Eigen::VectorXs& {
             return self->getCoriolisAndGravityForces();
           })
       .def(
           "getConstraintForces",
-          +[](dart::dynamics::MetaSkeleton* self) -> const Eigen::VectorXd& {
+          +[](dart::dynamics::MetaSkeleton* self) -> const Eigen::VectorXs& {
             return self->getConstraintForces();
           })
       .def(
@@ -1232,40 +1232,40 @@ void MetaSkeleton(py::module& m)
                   self) { self->clearInternalForces(); })
       .def(
           "computeLagrangian",
-          +[](const dart::dynamics::MetaSkeleton* self) -> double {
+          +[](const dart::dynamics::MetaSkeleton* self) -> s_t {
             return self->computeLagrangian();
           })
       .def(
           "computeKineticEnergy",
-          +[](const dart::dynamics::MetaSkeleton* self) -> double {
+          +[](const dart::dynamics::MetaSkeleton* self) -> s_t {
             return self->computeKineticEnergy();
           })
       .def(
           "computePotentialEnergy",
-          +[](const dart::dynamics::MetaSkeleton* self) -> double {
+          +[](const dart::dynamics::MetaSkeleton* self) -> s_t {
             return self->computePotentialEnergy();
           })
       .def(
           "getCOM",
-          +[](const dart::dynamics::MetaSkeleton* self) -> Eigen::Vector3d {
+          +[](const dart::dynamics::MetaSkeleton* self) -> Eigen::Vector3s {
             return self->getCOM();
           })
       .def(
           "getCOM",
           +[](const dart::dynamics::MetaSkeleton* self,
-              const dart::dynamics::Frame* _withRespectTo) -> Eigen::Vector3d {
+              const dart::dynamics::Frame* _withRespectTo) -> Eigen::Vector3s {
             return self->getCOM(_withRespectTo);
           },
           ::py::arg("withRespectTo"))
       .def(
           "getCOMSpatialVelocity",
-          +[](const dart::dynamics::MetaSkeleton* self) -> Eigen::Vector6d {
+          +[](const dart::dynamics::MetaSkeleton* self) -> Eigen::Vector6s {
             return self->getCOMSpatialVelocity();
           })
       .def(
           "getCOMSpatialVelocity",
           +[](const dart::dynamics::MetaSkeleton* self,
-              const dart::dynamics::Frame* _relativeTo) -> Eigen::Vector6d {
+              const dart::dynamics::Frame* _relativeTo) -> Eigen::Vector6s {
             return self->getCOMSpatialVelocity(_relativeTo);
           },
           ::py::arg("relativeTo"))
@@ -1274,20 +1274,20 @@ void MetaSkeleton(py::module& m)
           +[](const dart::dynamics::MetaSkeleton* self,
               const dart::dynamics::Frame* _relativeTo,
               const dart::dynamics::Frame* _inCoordinatesOf)
-              -> Eigen::Vector6d {
+              -> Eigen::Vector6s {
             return self->getCOMSpatialVelocity(_relativeTo, _inCoordinatesOf);
           },
           ::py::arg("relativeTo"),
           ::py::arg("inCoordinatesOf"))
       .def(
           "getCOMLinearVelocity",
-          +[](const dart::dynamics::MetaSkeleton* self) -> Eigen::Vector3d {
+          +[](const dart::dynamics::MetaSkeleton* self) -> Eigen::Vector3s {
             return self->getCOMLinearVelocity();
           })
       .def(
           "getCOMLinearVelocity",
           +[](const dart::dynamics::MetaSkeleton* self,
-              const dart::dynamics::Frame* _relativeTo) -> Eigen::Vector3d {
+              const dart::dynamics::Frame* _relativeTo) -> Eigen::Vector3s {
             return self->getCOMLinearVelocity(_relativeTo);
           },
           ::py::arg("relativeTo"))
@@ -1296,20 +1296,20 @@ void MetaSkeleton(py::module& m)
           +[](const dart::dynamics::MetaSkeleton* self,
               const dart::dynamics::Frame* _relativeTo,
               const dart::dynamics::Frame* _inCoordinatesOf)
-              -> Eigen::Vector3d {
+              -> Eigen::Vector3s {
             return self->getCOMLinearVelocity(_relativeTo, _inCoordinatesOf);
           },
           ::py::arg("relativeTo"),
           ::py::arg("inCoordinatesOf"))
       .def(
           "getCOMSpatialAcceleration",
-          +[](const dart::dynamics::MetaSkeleton* self) -> Eigen::Vector6d {
+          +[](const dart::dynamics::MetaSkeleton* self) -> Eigen::Vector6s {
             return self->getCOMSpatialAcceleration();
           })
       .def(
           "getCOMSpatialAcceleration",
           +[](const dart::dynamics::MetaSkeleton* self,
-              const dart::dynamics::Frame* _relativeTo) -> Eigen::Vector6d {
+              const dart::dynamics::Frame* _relativeTo) -> Eigen::Vector6s {
             return self->getCOMSpatialAcceleration(_relativeTo);
           },
           ::py::arg("relativeTo"))
@@ -1318,7 +1318,7 @@ void MetaSkeleton(py::module& m)
           +[](const dart::dynamics::MetaSkeleton* self,
               const dart::dynamics::Frame* _relativeTo,
               const dart::dynamics::Frame* _inCoordinatesOf)
-              -> Eigen::Vector6d {
+              -> Eigen::Vector6s {
             return self->getCOMSpatialAcceleration(
                 _relativeTo, _inCoordinatesOf);
           },
@@ -1326,13 +1326,13 @@ void MetaSkeleton(py::module& m)
           ::py::arg("inCoordinatesOf"))
       .def(
           "getCOMLinearAcceleration",
-          +[](const dart::dynamics::MetaSkeleton* self) -> Eigen::Vector3d {
+          +[](const dart::dynamics::MetaSkeleton* self) -> Eigen::Vector3s {
             return self->getCOMLinearAcceleration();
           })
       .def(
           "getCOMLinearAcceleration",
           +[](const dart::dynamics::MetaSkeleton* self,
-              const dart::dynamics::Frame* _relativeTo) -> Eigen::Vector3d {
+              const dart::dynamics::Frame* _relativeTo) -> Eigen::Vector3s {
             return self->getCOMLinearAcceleration(_relativeTo);
           },
           ::py::arg("relativeTo"))
@@ -1341,7 +1341,7 @@ void MetaSkeleton(py::module& m)
           +[](const dart::dynamics::MetaSkeleton* self,
               const dart::dynamics::Frame* _relativeTo,
               const dart::dynamics::Frame* _inCoordinatesOf)
-              -> Eigen::Vector3d {
+              -> Eigen::Vector3s {
             return self->getCOMLinearAcceleration(
                 _relativeTo, _inCoordinatesOf);
           },

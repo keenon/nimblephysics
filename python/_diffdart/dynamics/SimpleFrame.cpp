@@ -58,7 +58,7 @@ void SimpleFrame(py::module& m)
           ::py::init<
               dart::dynamics::Frame*,
               const std::string&,
-              const Eigen::Isometry3d&>(),
+              const Eigen::Isometry3s&>(),
           ::py::arg("refFrame"),
           ::py::arg("name"),
           ::py::arg("relativeTransform"))
@@ -132,7 +132,7 @@ void SimpleFrame(py::module& m)
           "spawnChildSimpleFrame",
           +[](dart::dynamics::SimpleFrame* self,
               const std::string& name,
-              const Eigen::Isometry3d& relativeTransform)
+              const Eigen::Isometry3s& relativeTransform)
               -> std::shared_ptr<dart::dynamics::SimpleFrame> {
             return self->spawnChildSimpleFrame(name, relativeTransform);
           },
@@ -141,35 +141,35 @@ void SimpleFrame(py::module& m)
       .def(
           "setRelativeTransform",
           +[](dart::dynamics::SimpleFrame* self,
-              const Eigen::Isometry3d& _newRelTransform) {
+              const Eigen::Isometry3s& _newRelTransform) {
             self->setRelativeTransform(_newRelTransform);
           },
           ::py::arg("newRelTransform"))
       .def(
           "setRelativeTranslation",
           +[](dart::dynamics::SimpleFrame* self,
-              const Eigen::Vector3d& _newTranslation) {
+              const Eigen::Vector3s& _newTranslation) {
             self->setRelativeTranslation(_newTranslation);
           },
           ::py::arg("newTranslation"))
       .def(
           "setRelativeRotation",
           +[](dart::dynamics::SimpleFrame* self,
-              const Eigen::Matrix3d& _newRotation) {
+              const Eigen::Matrix3s& _newRotation) {
             self->setRelativeRotation(_newRotation);
           },
           ::py::arg("newRotation"))
       .def(
           "setTransform",
           +[](dart::dynamics::SimpleFrame* self,
-              const Eigen::Isometry3d& _newTransform) {
+              const Eigen::Isometry3s& _newTransform) {
             self->setTransform(_newTransform);
           },
           ::py::arg("newTransform"))
       .def(
           "setTransform",
           +[](dart::dynamics::SimpleFrame* self,
-              const Eigen::Isometry3d& _newTransform,
+              const Eigen::Isometry3s& _newTransform,
               const dart::dynamics::Frame* _withRespectTo) {
             self->setTransform(_newTransform, _withRespectTo);
           },
@@ -178,14 +178,14 @@ void SimpleFrame(py::module& m)
       .def(
           "setTranslation",
           +[](dart::dynamics::SimpleFrame* self,
-              const Eigen::Vector3d& _newTranslation) {
+              const Eigen::Vector3s& _newTranslation) {
             self->setTranslation(_newTranslation);
           },
           ::py::arg("newTranslation"))
       .def(
           "setTranslation",
           +[](dart::dynamics::SimpleFrame* self,
-              const Eigen::Vector3d& _newTranslation,
+              const Eigen::Vector3s& _newTranslation,
               const dart::dynamics::Frame* _withRespectTo) {
             self->setTranslation(_newTranslation, _withRespectTo);
           },
@@ -194,14 +194,14 @@ void SimpleFrame(py::module& m)
       .def(
           "setRotation",
           +[](dart::dynamics::SimpleFrame* self,
-              const Eigen::Matrix3d& _newRotation) {
+              const Eigen::Matrix3s& _newRotation) {
             self->setRotation(_newRotation);
           },
           ::py::arg("newRotation"))
       .def(
           "setRotation",
           +[](dart::dynamics::SimpleFrame* self,
-              const Eigen::Matrix3d& _newRotation,
+              const Eigen::Matrix3s& _newRotation,
               const dart::dynamics::Frame* _withRespectTo) {
             self->setRotation(_newRotation, _withRespectTo);
           },
@@ -210,14 +210,14 @@ void SimpleFrame(py::module& m)
       .def(
           "setRelativeSpatialVelocity",
           +[](dart::dynamics::SimpleFrame* self,
-              const Eigen::Vector6d& _newSpatialVelocity) {
+              const Eigen::Vector6s& _newSpatialVelocity) {
             self->setRelativeSpatialVelocity(_newSpatialVelocity);
           },
           ::py::arg("newSpatialVelocity"))
       .def(
           "setRelativeSpatialVelocity",
           +[](dart::dynamics::SimpleFrame* self,
-              const Eigen::Vector6d& _newSpatialVelocity,
+              const Eigen::Vector6s& _newSpatialVelocity,
               const dart::dynamics::Frame* _inCoordinatesOf) {
             self->setRelativeSpatialVelocity(
                 _newSpatialVelocity, _inCoordinatesOf);
@@ -227,14 +227,14 @@ void SimpleFrame(py::module& m)
       .def(
           "setRelativeSpatialAcceleration",
           +[](dart::dynamics::SimpleFrame* self,
-              const Eigen::Vector6d& _newSpatialAcceleration) {
+              const Eigen::Vector6s& _newSpatialAcceleration) {
             self->setRelativeSpatialAcceleration(_newSpatialAcceleration);
           },
           ::py::arg("newSpatialAcceleration"))
       .def(
           "setRelativeSpatialAcceleration",
           +[](dart::dynamics::SimpleFrame* self,
-              const Eigen::Vector6d& _newSpatialAcceleration,
+              const Eigen::Vector6s& _newSpatialAcceleration,
               const dart::dynamics::Frame* _inCoordinatesOf) {
             self->setRelativeSpatialAcceleration(
                 _newSpatialAcceleration, _inCoordinatesOf);
@@ -249,15 +249,15 @@ void SimpleFrame(py::module& m)
       .def(
           "setClassicDerivatives",
           +[](dart::dynamics::SimpleFrame* self,
-              const Eigen::Vector3d& _linearVelocity) {
+              const Eigen::Vector3s& _linearVelocity) {
             self->setClassicDerivatives(_linearVelocity);
           },
           ::py::arg("linearVelocity"))
       .def(
           "setClassicDerivatives",
           +[](dart::dynamics::SimpleFrame* self,
-              const Eigen::Vector3d& _linearVelocity,
-              const Eigen::Vector3d& _angularVelocity) {
+              const Eigen::Vector3s& _linearVelocity,
+              const Eigen::Vector3s& _angularVelocity) {
             self->setClassicDerivatives(_linearVelocity, _angularVelocity);
           },
           ::py::arg("linearVelocity"),
@@ -265,9 +265,9 @@ void SimpleFrame(py::module& m)
       .def(
           "setClassicDerivatives",
           +[](dart::dynamics::SimpleFrame* self,
-              const Eigen::Vector3d& _linearVelocity,
-              const Eigen::Vector3d& _angularVelocity,
-              const Eigen::Vector3d& _linearAcceleration) {
+              const Eigen::Vector3s& _linearVelocity,
+              const Eigen::Vector3s& _angularVelocity,
+              const Eigen::Vector3s& _linearAcceleration) {
             self->setClassicDerivatives(
                 _linearVelocity, _angularVelocity, _linearAcceleration);
           },
@@ -277,10 +277,10 @@ void SimpleFrame(py::module& m)
       .def(
           "setClassicDerivatives",
           +[](dart::dynamics::SimpleFrame* self,
-              const Eigen::Vector3d& _linearVelocity,
-              const Eigen::Vector3d& _angularVelocity,
-              const Eigen::Vector3d& _linearAcceleration,
-              const Eigen::Vector3d& _angularAcceleration) {
+              const Eigen::Vector3s& _linearVelocity,
+              const Eigen::Vector3s& _angularVelocity,
+              const Eigen::Vector3s& _linearAcceleration,
+              const Eigen::Vector3s& _angularAcceleration) {
             self->setClassicDerivatives(
                 _linearVelocity,
                 _angularVelocity,

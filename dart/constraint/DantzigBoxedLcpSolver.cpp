@@ -53,18 +53,50 @@ const std::string& DantzigBoxedLcpSolver::getStaticType()
 //==============================================================================
 bool DantzigBoxedLcpSolver::solve(
     int n,
-    double* A,
-    double* x,
-    double* b,
+    s_t* A,
+    s_t* x,
+    s_t* b,
     int /*nub*/,
-    double* lo,
-    double* hi,
+    s_t* lo,
+    s_t* hi,
     int* findex,
     bool earlyTermination)
 {
   try
   {
+    int nSkip = dPAD(n);
+#ifdef DART_USE_ARBITRARY_PRECISION
+    double* A_d = new double[n * nSkip];
+    double* x_d = new double[n];
+    double* b_d = new double[n];
+    double* lo_d = new double[n];
+    double* hi_d = new double[n];
+    for (int i = 0; i < n; i++)
+    {
+      for (int j = 0; j < nSkip; j++)
+      {
+        A_d[i * nSkip + j] = static_cast<double>(A[i * nSkip + j]);
+      }
+      x_d[i] = static_cast<double>(x[i]);
+      b_d[i] = static_cast<double>(b[i]);
+      lo_d[i] = static_cast<double>(lo[i]);
+      hi_d[i] = static_cast<double>(hi[i]);
+    }
+    bool ret = dSolveLCP(
+        n, A_d, x_d, b_d, nullptr, 0, lo_d, hi_d, findex, earlyTermination);
+    for (int i = 0; i < n; i++)
+    {
+      x[i] = static_cast<s_t>(x_d[i]);
+    }
+    delete[] A_d;
+    delete[] x_d;
+    delete[] b_d;
+    delete[] lo_d;
+    delete[] hi_d;
+    return ret;
+#else
     return dSolveLCP(n, A, x, b, nullptr, 0, lo, hi, findex, earlyTermination);
+#endif
   }
   catch (...)
   {
@@ -76,7 +108,7 @@ bool DantzigBoxedLcpSolver::solve(
 
 #ifndef NDEBUG
 //==============================================================================
-bool DantzigBoxedLcpSolver::canSolve(int /*n*/, const double* /*A*/)
+bool DantzigBoxedLcpSolver::canSolve(int /*n*/, const s_t* /*A*/)
 {
   // TODO(JS): Not implemented.
   return true;

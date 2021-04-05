@@ -39,7 +39,6 @@
 #include "dart/common/NameManager.hpp"
 #include "dart/common/VersionCounter.hpp"
 #include "dart/dynamics/EndEffector.hpp"
-#include "dart/dynamics/HierarchicalIK.hpp"
 #include "dart/dynamics/Joint.hpp"
 #include "dart/dynamics/Marker.hpp"
 #include "dart/dynamics/MetaSkeleton.hpp"
@@ -94,45 +93,45 @@ public:
   };
 
   /// The Configuration struct represents the joint configuration of a Skeleton.
-  /// The size of each Eigen::VectorXd member in this struct must be equal to
+  /// The size of each Eigen::VectorXs member in this struct must be equal to
   /// the number of degrees of freedom in the Skeleton or it must be zero. We
-  /// assume that any Eigen::VectorXd member with zero entries should be
+  /// assume that any Eigen::VectorXs member with zero entries should be
   /// ignored.
   struct Configuration
   {
     Configuration(
-        const Eigen::VectorXd& positions = Eigen::VectorXd(),
-        const Eigen::VectorXd& velocities = Eigen::VectorXd(),
-        const Eigen::VectorXd& accelerations = Eigen::VectorXd(),
-        const Eigen::VectorXd& forces = Eigen::VectorXd(),
-        const Eigen::VectorXd& commands = Eigen::VectorXd());
+        const Eigen::VectorXs& positions = Eigen::VectorXs(),
+        const Eigen::VectorXs& velocities = Eigen::VectorXs(),
+        const Eigen::VectorXs& accelerations = Eigen::VectorXs(),
+        const Eigen::VectorXs& forces = Eigen::VectorXs(),
+        const Eigen::VectorXs& commands = Eigen::VectorXs());
 
     Configuration(
         const std::vector<std::size_t>& indices,
-        const Eigen::VectorXd& positions = Eigen::VectorXd(),
-        const Eigen::VectorXd& velocities = Eigen::VectorXd(),
-        const Eigen::VectorXd& accelerations = Eigen::VectorXd(),
-        const Eigen::VectorXd& forces = Eigen::VectorXd(),
-        const Eigen::VectorXd& commands = Eigen::VectorXd());
+        const Eigen::VectorXs& positions = Eigen::VectorXs(),
+        const Eigen::VectorXs& velocities = Eigen::VectorXs(),
+        const Eigen::VectorXs& accelerations = Eigen::VectorXs(),
+        const Eigen::VectorXs& forces = Eigen::VectorXs(),
+        const Eigen::VectorXs& commands = Eigen::VectorXs());
 
     /// A list of degree of freedom indices that each entry in the
-    /// Eigen::VectorXd members correspond to.
+    /// Eigen::VectorXs members correspond to.
     std::vector<std::size_t> mIndices;
 
     /// Joint positions
-    Eigen::VectorXd mPositions;
+    Eigen::VectorXs mPositions;
 
     /// Joint velocities
-    Eigen::VectorXd mVelocities;
+    Eigen::VectorXs mVelocities;
 
     /// Joint accelerations
-    Eigen::VectorXd mAccelerations;
+    Eigen::VectorXs mAccelerations;
 
     /// Joint forces
-    Eigen::VectorXd mForces;
+    Eigen::VectorXs mForces;
 
     /// Joint commands
-    Eigen::VectorXd mCommands;
+    Eigen::VectorXs mCommands;
 
     /// Equality comparison operator
     bool operator==(const Configuration& other) const;
@@ -312,17 +311,17 @@ public:
 
   /// Set time step. This timestep is used for implicit joint damping
   /// force.
-  void setTimeStep(double _timeStep);
+  void setTimeStep(s_t _timeStep);
 
   /// Get time step.
-  double getTimeStep() const;
+  s_t getTimeStep() const;
 
   /// Set 3-dim gravitational acceleration. The gravity is used for
   /// calculating gravity force vector of the skeleton.
-  void setGravity(const Eigen::Vector3d& _gravity);
+  void setGravity(const Eigen::Vector3s& _gravity);
 
   /// Get 3-dim gravitational acceleration.
-  const Eigen::Vector3d& getGravity() const;
+  const Eigen::Vector3s& getGravity() const;
 
   /// \}
 
@@ -529,30 +528,6 @@ public:
   /// indexing.
   bool checkIndexingConsistency() const;
 
-  /// Get a pointer to a WholeBodyIK module for this Skeleton. If _createIfNull
-  /// is true, then the IK module will be generated if one does not already
-  /// exist.
-  const std::shared_ptr<WholeBodyIK>& getIK(bool _createIfNull = false);
-
-  /// Get a pointer to a WholeBodyIK module for this Skeleton. The IK module
-  /// will be generated if one does not already exist. This function is actually
-  /// the same as getIK(true).
-  const std::shared_ptr<WholeBodyIK>& getOrCreateIK();
-
-  /// Get a pointer to a WholeBodyIK module for this Skeleton. Because this is a
-  /// const function, a new IK module cannot be created if one does not already
-  /// exist.
-  std::shared_ptr<const WholeBodyIK> getIK() const;
-
-  /// Create a new WholeBodyIK module for this Skeleton. If an IK module already
-  /// exists in this Skeleton, it will be destroyed and replaced by a brand new
-  /// one.
-  const std::shared_ptr<WholeBodyIK>& createIK();
-
-  /// Wipe away the WholeBodyIK module for this Skeleton, leaving it as a
-  /// nullptr
-  void clearIK();
-
   DART_BAKE_SPECIALIZED_NODE_SKEL_DECLARATIONS(Marker)
 
   DART_BAKE_SPECIALIZED_NODE_SKEL_DECLARATIONS(ShapeNode)
@@ -589,11 +564,11 @@ public:
   /// This gives the vel-X Jacobian (in the absence of constraints) for this
   /// skeleton. This is useful for backprop if this skeleton isn't part of
   /// constrained group.
-  Eigen::MatrixXd getUnconstrainedVelJacobianWrt(
-      double dt, neural::WithRespectTo* wrt);
+  Eigen::MatrixXs getUnconstrainedVelJacobianWrt(
+      s_t dt, neural::WithRespectTo* wrt);
 
   /// This gives the unconstrained Jacobian giving the difference in C(pos, vel)
-  Eigen::MatrixXd getVelCJacobian();
+  Eigen::MatrixXs getVelCJacobian();
 
 #ifdef DART_DEBUG_ANALYTICAL_DERIV
   struct DiffC
@@ -602,10 +577,10 @@ public:
     {
       math::Jacobian S;
 
-      Eigen::Vector6d V;
-      Eigen::Vector6d dV;
-      Eigen::Vector6d F;
-      Eigen::VectorXd tau;
+      Eigen::Vector6s V;
+      Eigen::Vector6s dV;
+      Eigen::Vector6s F;
+      Eigen::VectorXs tau;
 
       void init();
     };
@@ -629,18 +604,18 @@ public:
 
   /// This gives the unconstrained Jacobian of C(pos, vel) using the derivative
   /// f the inverse dynamics
-  Eigen::MatrixXd getJacobianOfC(neural::WithRespectTo* wrt);
+  Eigen::MatrixXs getJacobianOfC(neural::WithRespectTo* wrt);
 
   /// This gives the unconstrained Jacobian of M*x using the derivative of the
   /// inverse dynamics
-  Eigen::MatrixXd getJacobianOfM(
-      const Eigen::VectorXd& x, neural::WithRespectTo* wrt);
+  Eigen::MatrixXs getJacobianOfM(
+      const Eigen::VectorXs& x, neural::WithRespectTo* wrt);
 
   /// This gives the unconstrained Jacobian of M*x using the derivative of the
   /// inverse dynamics
   /// @warning SLOW: Only for testing
-  Eigen::MatrixXd getJacobianOfID(
-      const Eigen::VectorXd& x, neural::WithRespectTo* wrt);
+  Eigen::MatrixXs getJacobianOfID(
+      const Eigen::VectorXs& x, neural::WithRespectTo* wrt);
 
 #ifdef DART_DEBUG_ANALYTICAL_DERIV
   struct DiffMinv
@@ -650,14 +625,14 @@ public:
       math::Jacobian S;
 
       math::Inertia AI;
-      Eigen::Vector6d AB;
-      Eigen::MatrixXd psi;
+      Eigen::Vector6s AB;
+      Eigen::MatrixXs psi;
       math::Inertia Pi;
-      Eigen::VectorXd alpha;
-      Eigen::Vector6d beta;
+      Eigen::VectorXs alpha;
+      Eigen::Vector6s beta;
 
-      Eigen::VectorXd ddq;
-      Eigen::Vector6d dV;
+      Eigen::VectorXs ddq;
+      Eigen::Vector6s dV;
 
       void init();
     };
@@ -680,87 +655,86 @@ public:
 #endif
 
   /// This gives the unconstrained Jacobian of M^{-1}f
-  Eigen::MatrixXd getJacobianOfMinv(
-      const Eigen::VectorXd& f, neural::WithRespectTo* wrt);
+  Eigen::MatrixXs getJacobianOfMinv(
+      const Eigen::VectorXs& f, neural::WithRespectTo* wrt);
 
   /// This gives the unconstrained Jacobian of M^{-1}f using the derivative of
   /// the inverse dynamics.
   /// @note This function is about 2.33 times faster than
   /// getJacobianOfMinv_Direct() for a 10 degrees-of-freedom serial chain robot.
-  Eigen::MatrixXd getJacobianOfMinv_ID(
-      const Eigen::VectorXd& f, neural::WithRespectTo* wrt);
+  Eigen::MatrixXs getJacobianOfMinv_ID(
+      const Eigen::VectorXs& f, neural::WithRespectTo* wrt);
 
   /// This gives the unconstrained Jacobian of M^{-1}f using the derivative of
   /// the forward dynamics (supposedly slower than getJacobianOfMinv_ID).
-  Eigen::MatrixXd getJacobianOfMinv_Direct(
-      const Eigen::VectorXd& f, neural::WithRespectTo* wrt);
+  Eigen::MatrixXs getJacobianOfMinv_Direct(
+      const Eigen::VectorXs& f, neural::WithRespectTo* wrt);
 
   /// This gives the unconstrained Jacobian of the forward dynamics.
   /// @warning SLOW: Only for testing
-  Eigen::MatrixXd getJacobianOfFD(neural::WithRespectTo* wrt);
+  Eigen::MatrixXs getJacobianOfFD(neural::WithRespectTo* wrt);
 
   /// VERY SLOW: Only for testing. This computes the unconstrained Jacobian
   /// giving the difference in M(pos) for finite changes
-  Eigen::MatrixXd finiteDifferenceJacobianOfM(
-      const Eigen::VectorXd& f,
+  Eigen::MatrixXs finiteDifferenceJacobianOfM(
+      const Eigen::VectorXs& f,
       neural::WithRespectTo* wrt,
       bool useRidders = true);
 
   /// VERY SLOW: Only for testing. This computes the unconstrained Jacobian
   /// giving the difference in M(pos) for finite changes
-  Eigen::MatrixXd finiteDifferenceRiddersJacobianOfM(
-      const Eigen::VectorXd& f, neural::WithRespectTo* wrt);
+  Eigen::MatrixXs finiteDifferenceRiddersJacobianOfM(
+      const Eigen::VectorXs& f, neural::WithRespectTo* wrt);
 
   /// VERY SLOW: Only for testing. This computes the unconstrained Jacobian
   /// giving the difference in C(pos, vel) for finite changes
-  Eigen::MatrixXd finiteDifferenceJacobianOfC(
+  Eigen::MatrixXs finiteDifferenceJacobianOfC(
       neural::WithRespectTo* wrt, bool useRidders = true);
 
   /// VERY SLOW: Only for testing. This computes the unconstrained Jacobian
   /// giving the difference in M*f + C(pos, vel) for finite changes
-  Eigen::MatrixXd finiteDifferenceJacobianOfID(
-      const Eigen::VectorXd& f,
+  Eigen::MatrixXs finiteDifferenceJacobianOfID(
+      const Eigen::VectorXs& f,
       neural::WithRespectTo* wrt,
       bool useRidders = true);
 
   /// VERY SLOW: Only for testing. This computes the unconstrained Jacobian
   /// giving the difference in M*f + C(pos, vel) for finite changes
-  Eigen::MatrixXd finiteDifferenceRiddersJacobianOfID(
-      const Eigen::VectorXd& f,
-      neural::WithRespectTo* wrt);
+  Eigen::MatrixXs finiteDifferenceRiddersJacobianOfID(
+      const Eigen::VectorXs& f, neural::WithRespectTo* wrt);
 
   /// VERY SLOW: Only for testing. This computes the unconstrained Jacobian
   /// giving the difference in C(pos, vel) for finite changes, using Ridders
-  Eigen::MatrixXd finiteDifferenceRiddersJacobianOfC(
+  Eigen::MatrixXs finiteDifferenceRiddersJacobianOfC(
       neural::WithRespectTo* wrt);
 
   /// VERY SLOW: Only for testing. This computes the unconstrained Jacobian
   /// giving the difference in M^{-1}f for finite changes
-  Eigen::MatrixXd finiteDifferenceJacobianOfMinv(
-      const Eigen::VectorXd& f,
+  Eigen::MatrixXs finiteDifferenceJacobianOfMinv(
+      const Eigen::VectorXs& f,
       neural::WithRespectTo* wrt,
       bool useRidders = true);
 
   /// VERY SLOW: Only for testing. This computes the unconstrained Jacobian
   /// giving the difference in M^{-1}f for finite changes, using Ridders
-  Eigen::MatrixXd finiteDifferenceRiddersJacobianOfMinv(
-      Eigen::VectorXd f, neural::WithRespectTo* wrt);
+  Eigen::MatrixXs finiteDifferenceRiddersJacobianOfMinv(
+      Eigen::VectorXs f, neural::WithRespectTo* wrt);
 
   /// VERY SLOW: Only for testing. This computes the unconstrained Jacobian
   /// giving the difference in C(pos, vel) for finite changes in vel
-  Eigen::MatrixXd finiteDifferenceVelCJacobian(bool useRidders = true);
+  Eigen::MatrixXs finiteDifferenceVelCJacobian(bool useRidders = true);
 
   /// VERY SLOW: Only for testing. This computes the unconstrained Jacobian
   /// giving the difference in C(pos, vel) for finite changes in vel
-  Eigen::MatrixXd finiteDifferenceRiddersVelCJacobian();
+  Eigen::MatrixXs finiteDifferenceRiddersVelCJacobian();
 
-  Eigen::MatrixXd finiteDifferenceJacobianOfFD(
+  Eigen::MatrixXs finiteDifferenceJacobianOfFD(
       neural::WithRespectTo* wrt, bool useRidders = true);
 
-  Eigen::MatrixXd finiteDifferenceRiddersJacobianOfFD(
+  Eigen::MatrixXs finiteDifferenceRiddersJacobianOfFD(
       neural::WithRespectTo* wrt);
 
-  Eigen::VectorXd getDynamicsForces();
+  Eigen::VectorXs getDynamicsForces();
 
   //----------------------------------------------------------------------------
   // Trajectory optimization
@@ -768,27 +742,27 @@ public:
 
   // This gives the vector of force upper limits for all the DOFs in this
   // skeleton
-  Eigen::VectorXd getForceUpperLimits();
+  Eigen::VectorXs getForceUpperLimits();
 
   // This gives the vector of force lower limits for all the DOFs in this
   // skeleton
-  Eigen::VectorXd getForceLowerLimits();
+  Eigen::VectorXs getForceLowerLimits();
 
   // This gives the vector of position upper limits for all the DOFs in this
   // skeleton
-  Eigen::VectorXd getPositionUpperLimits();
+  Eigen::VectorXs getPositionUpperLimits();
 
   // This gives the vector of position lower limits for all the DOFs in this
   // skeleton
-  Eigen::VectorXd getPositionLowerLimits();
+  Eigen::VectorXs getPositionLowerLimits();
 
   // This gives the vector of velocity upper limits for all the DOFs in this
   // skeleton
-  Eigen::VectorXd getVelocityUpperLimits();
+  Eigen::VectorXs getVelocityUpperLimits();
 
   // This gives the vector of velocity lower limits for all the DOFs in this
   // skeleton
-  Eigen::VectorXd getVelocityLowerLimits();
+  Eigen::VectorXs getVelocityLowerLimits();
 
   /// Returns the size of the getLinkCOMs() vector
   std::size_t getLinkCOMDims();
@@ -801,82 +775,82 @@ public:
 
   // This gets all the inertia center-of-mass vectors for all the links in this
   // skeleton concatenated together
-  Eigen::VectorXd getLinkCOMs();
+  Eigen::VectorXs getLinkCOMs();
 
   // This gets all the inertia moment-of-inertia paremeters for all the links in
   // this skeleton concatenated together
-  Eigen::VectorXd getLinkMOIs();
+  Eigen::VectorXs getLinkMOIs();
 
   // This returns a vector of all the link masses for all the links in this
   // skeleton concatenated into a flat vector.
-  Eigen::VectorXd getLinkMasses();
+  Eigen::VectorXs getLinkMasses();
 
   // Sets the upper limits of all the joints from a single vector
-  void setForceUpperLimits(Eigen::VectorXd limits);
+  void setForceUpperLimits(Eigen::VectorXs limits);
 
   // Sets the lower limits of all the joints from a single vector
-  void setForceLowerLimits(Eigen::VectorXd limits);
+  void setForceLowerLimits(Eigen::VectorXs limits);
 
   // Sets the upper limits of all the joints from a single vector
-  void setPositionUpperLimits(Eigen::VectorXd limits);
+  void setPositionUpperLimits(Eigen::VectorXs limits);
 
   // Sets the lower limits of all the joints from a single vector
-  void setPositionLowerLimits(Eigen::VectorXd limits);
+  void setPositionLowerLimits(Eigen::VectorXs limits);
 
   // Sets the upper limits of all the joints from a single vector
-  void setVelocityUpperLimits(Eigen::VectorXd limits);
+  void setVelocityUpperLimits(Eigen::VectorXs limits);
 
   // Sets the lower limits of all the joints from a single vector
-  void setVelocityLowerLimits(Eigen::VectorXd limits);
+  void setVelocityLowerLimits(Eigen::VectorXs limits);
 
   // This sets all the inertia center-of-mass vectors for all the links in this
   // skeleton concatenated together
-  void setLinkCOMs(Eigen::VectorXd coms);
+  void setLinkCOMs(Eigen::VectorXs coms);
 
   // This sets all the inertia moment-of-inertia paremeters for all the links in
   // this skeleton concatenated together
-  void setLinkMOIs(Eigen::VectorXd mois);
+  void setLinkMOIs(Eigen::VectorXs mois);
 
   // This returns a vector of all the link masses for all the links in this
   // skeleton concatenated into a flat vector.
-  void setLinkMasses(Eigen::VectorXd masses);
+  void setLinkMasses(Eigen::VectorXs masses);
 
   //----------------------------------------------------------------------------
   // Integration and finite difference
   //----------------------------------------------------------------------------
 
   // Documentation inherited
-  void integratePositions(double _dt);
+  void integratePositions(s_t _dt);
 
   // This will do whatever math is necessary to move pos by vel*dt. This isn't
   // always a straight linear addition, in we're using spatial coordinates for
   // some of the joints.
-  Eigen::VectorXd integratePositionsExplicit(
-      Eigen::VectorXd pos, Eigen::VectorXd vel, double dt);
+  Eigen::VectorXs integratePositionsExplicit(
+      Eigen::VectorXs pos, Eigen::VectorXs vel, s_t dt);
 
   // This is d/dpos integratePositionsExplicit()
-  Eigen::MatrixXd getPosPosJac(
-      Eigen::VectorXd pos, Eigen::VectorXd vel, double dt);
+  Eigen::MatrixXs getPosPosJac(
+      Eigen::VectorXs pos, Eigen::VectorXs vel, s_t dt);
 
   // This is d/dvel integratePositionsExplicit()
-  Eigen::MatrixXd getVelPosJac(
-      Eigen::VectorXd pos, Eigen::VectorXd vel, double dt);
+  Eigen::MatrixXs getVelPosJac(
+      Eigen::VectorXs pos, Eigen::VectorXs vel, s_t dt);
 
   // Documentation inherited
-  void integrateVelocities(double _dt);
+  void integrateVelocities(s_t _dt);
 
   /// Return the difference of two generalized positions which are measured in
   /// the configuration space of this Skeleton. If the configuration space is
   /// Euclidean space, this function returns _q2 - _q1. Otherwise, it depends on
   /// the type of the configuration space.
-  Eigen::VectorXd getPositionDifferences(
-      const Eigen::VectorXd& _q2, const Eigen::VectorXd& _q1) const;
+  Eigen::VectorXs getPositionDifferences(
+      const Eigen::VectorXs& _q2, const Eigen::VectorXs& _q1) const;
 
   /// Return the difference of two generalized velocities or accelerations which
   /// are measured in the tangent space at the identity. Since the tangent
   /// spaces are vector spaces, this function always returns _dq2 - _dq1.
-  Eigen::VectorXd getVelocityDifferences(
-      const Eigen::VectorXd& _dq2, const Eigen::VectorXd& _dq1) const;
+  Eigen::VectorXs getVelocityDifferences(
+      const Eigen::VectorXs& _dq2, const Eigen::VectorXs& _dq1) const;
 
   //----------------------------------------------------------------------------
   /// \{ \name Support Polygon
@@ -903,21 +877,21 @@ public:
   /// These axes are needed in order to map the points on a support polygon
   /// into 3D space. If gravity is along the z-direction, then these axes will
   /// simply be <1,0,0> and <0,1,0>.
-  const std::pair<Eigen::Vector3d, Eigen::Vector3d>& getSupportAxes() const;
+  const std::pair<Eigen::Vector3s, Eigen::Vector3s>& getSupportAxes() const;
 
   /// Same as getSupportAxes(), but it corresponds to the support polygon of the
   /// specified tree within this Skeleton
-  const std::pair<Eigen::Vector3d, Eigen::Vector3d>& getSupportAxes(
+  const std::pair<Eigen::Vector3s, Eigen::Vector3s>& getSupportAxes(
       std::size_t _treeIdx) const;
 
   /// Get the centroid of the support polygon for this Skeleton. If the support
   /// polygon is an empty set, the components of this vector will be nan.
-  const Eigen::Vector2d& getSupportCentroid() const;
+  const Eigen::Vector2s& getSupportCentroid() const;
 
   /// Get the centroid of the support polygon for a tree in this Skeleton. If
   /// the support polygon is an empty set, the components of this vector will be
   /// nan.
-  const Eigen::Vector2d& getSupportCentroid(std::size_t _treeIdx) const;
+  const Eigen::Vector2s& getSupportCentroid(std::size_t _treeIdx) const;
 
   /// The version number of a support polygon will be incremented each time the
   /// support polygon needs to be recomputed. This number can be used to
@@ -997,7 +971,7 @@ public:
   /// \brief Update bias impulses due to impulse [_imp] on body node [_bodyNode]
   /// \param _bodyNode Body node contraint impulse, _imp, is applied
   /// \param _imp Constraint impulse expressed in body frame of _bodyNode
-  void updateBiasImpulse(BodyNode* _bodyNode, const Eigen::Vector6d& _imp);
+  void updateBiasImpulse(BodyNode* _bodyNode, const Eigen::Vector6s& _imp);
 
   /// \brief Update bias impulses due to impulse [_imp] on body node [_bodyNode]
   /// \param _bodyNode1 Body node contraint impulse, _imp1, is applied
@@ -1006,15 +980,15 @@ public:
   /// \param _imp2 Constraint impulse expressed in body frame of _bodyNode2
   void updateBiasImpulse(
       BodyNode* _bodyNode1,
-      const Eigen::Vector6d& _imp1,
+      const Eigen::Vector6s& _imp1,
       BodyNode* _bodyNode2,
-      const Eigen::Vector6d& _imp2);
+      const Eigen::Vector6s& _imp2);
 
   /// \brief Update bias impulses due to impulse[_imp] on body node [_bodyNode]
   void updateBiasImpulse(
       SoftBodyNode* _softBodyNode,
       PointMass* _pointMass,
-      const Eigen::Vector3d& _imp);
+      const Eigen::Vector3s& _imp);
 
   /// \brief Update velocity changes in body nodes and joints due to applied
   /// impulse
@@ -1048,12 +1022,12 @@ public:
   // Documentation inherited
   math::Jacobian getJacobian(
       const JacobianNode* _node,
-      const Eigen::Vector3d& _localOffset) const override;
+      const Eigen::Vector3s& _localOffset) const override;
 
   // Documentation inherited
   math::Jacobian getJacobian(
       const JacobianNode* _node,
-      const Eigen::Vector3d& _localOffset,
+      const Eigen::Vector3s& _localOffset,
       const Frame* _inCoordinatesOf) const override;
 
   // Documentation inherited
@@ -1065,7 +1039,7 @@ public:
   // Documentation inherited
   math::Jacobian getWorldJacobian(
       const JacobianNode* _node,
-      const Eigen::Vector3d& _localOffset) const override;
+      const Eigen::Vector3s& _localOffset) const override;
 
   // Documentation inherited
   math::LinearJacobian getLinearJacobian(
@@ -1075,7 +1049,7 @@ public:
   // Documentation inherited
   math::LinearJacobian getLinearJacobian(
       const JacobianNode* _node,
-      const Eigen::Vector3d& _localOffset,
+      const Eigen::Vector3s& _localOffset,
       const Frame* _inCoordinatesOf = Frame::World()) const override;
 
   // Documentation inherited
@@ -1094,12 +1068,12 @@ public:
   // Documentation inherited
   math::Jacobian getJacobianSpatialDeriv(
       const JacobianNode* _node,
-      const Eigen::Vector3d& _localOffset) const override;
+      const Eigen::Vector3s& _localOffset) const override;
 
   // Documentation inherited
   math::Jacobian getJacobianSpatialDeriv(
       const JacobianNode* _node,
-      const Eigen::Vector3d& _localOffset,
+      const Eigen::Vector3s& _localOffset,
       const Frame* _inCoordinatesOf) const override;
 
   // Documentation inherited
@@ -1113,7 +1087,7 @@ public:
   // Documentation inherited
   math::Jacobian getJacobianClassicDeriv(
       const JacobianNode* _node,
-      const Eigen::Vector3d& _localOffset,
+      const Eigen::Vector3s& _localOffset,
       const Frame* _inCoordinatesOf = Frame::World()) const override;
 
   // Documentation inherited
@@ -1124,7 +1098,7 @@ public:
   // Documentation inherited
   math::LinearJacobian getLinearJacobianDeriv(
       const JacobianNode* _node,
-      const Eigen::Vector3d& _localOffset,
+      const Eigen::Vector3s& _localOffset,
       const Frame* _inCoordinatesOf = Frame::World()) const override;
 
   // Documentation inherited
@@ -1141,75 +1115,75 @@ public:
   /// Get total mass of the skeleton. The total mass is calculated as BodyNodes
   /// are added and is updated as BodyNode mass is changed, so this is a
   /// constant-time O(1) operation for the Skeleton class.
-  double getMass() const override;
+  s_t getMass() const override;
 
   /// Get the mass matrix of a specific tree in the Skeleton
-  const Eigen::MatrixXd& getMassMatrix(std::size_t _treeIdx) const;
+  const Eigen::MatrixXs& getMassMatrix(std::size_t _treeIdx) const;
 
   // Documentation inherited
-  const Eigen::MatrixXd& getMassMatrix() const override;
+  const Eigen::MatrixXs& getMassMatrix() const override;
 
   /// Get the augmented mass matrix of a specific tree in the Skeleton
-  const Eigen::MatrixXd& getAugMassMatrix(std::size_t _treeIdx) const;
+  const Eigen::MatrixXs& getAugMassMatrix(std::size_t _treeIdx) const;
 
   // Documentation inherited
-  const Eigen::MatrixXd& getAugMassMatrix() const override;
+  const Eigen::MatrixXs& getAugMassMatrix() const override;
 
   /// Get the inverse mass matrix of a specific tree in the Skeleton
-  const Eigen::MatrixXd& getInvMassMatrix(std::size_t _treeIdx) const;
+  const Eigen::MatrixXs& getInvMassMatrix(std::size_t _treeIdx) const;
 
   // Documentation inherited
-  const Eigen::MatrixXd& getInvMassMatrix() const override;
+  const Eigen::MatrixXs& getInvMassMatrix() const override;
 
   /// Get the inverse augmented mass matrix of a tree
-  const Eigen::MatrixXd& getInvAugMassMatrix(std::size_t _treeIdx) const;
+  const Eigen::MatrixXs& getInvAugMassMatrix(std::size_t _treeIdx) const;
 
   // Documentation inherited
-  const Eigen::MatrixXd& getInvAugMassMatrix() const override;
+  const Eigen::MatrixXs& getInvAugMassMatrix() const override;
 
   // Returns the value of M*x, left multiplying x by the mass matrix. This is
   // O(n) compared with O(n^2) to form the complete mass matrix and then
   // multiply.
-  Eigen::VectorXd multiplyByImplicitMassMatrix(Eigen::VectorXd x);
+  Eigen::VectorXs multiplyByImplicitMassMatrix(Eigen::VectorXs x);
 
   // Returns the value of M_inv*x, left multiplying x by the inverse mass
   // matrix. This is O(n) compared with O(n^2) to form the complete inverse mass
   // matrix and then multiply.
-  Eigen::VectorXd multiplyByImplicitInvMassMatrix(Eigen::VectorXd x);
+  Eigen::VectorXs multiplyByImplicitInvMassMatrix(Eigen::VectorXs x);
 
   /// Get the Coriolis force vector of a tree in this Skeleton
-  const Eigen::VectorXd& getCoriolisForces(std::size_t _treeIdx) const;
+  const Eigen::VectorXs& getCoriolisForces(std::size_t _treeIdx) const;
 
   // Documentation inherited
-  const Eigen::VectorXd& getCoriolisForces() const override;
+  const Eigen::VectorXs& getCoriolisForces() const override;
 
   /// Get the gravity forces for a tree in this Skeleton
-  const Eigen::VectorXd& getGravityForces(std::size_t _treeIdx) const;
+  const Eigen::VectorXs& getGravityForces(std::size_t _treeIdx) const;
 
   // Documentation inherited
-  const Eigen::VectorXd& getGravityForces() const override;
+  const Eigen::VectorXs& getGravityForces() const override;
 
   /// Get the combined vector of Coriolis force and gravity force of a tree
-  const Eigen::VectorXd& getCoriolisAndGravityForces(
+  const Eigen::VectorXs& getCoriolisAndGravityForces(
       std::size_t _treeIdx) const;
 
   // Documentation inherited
-  const Eigen::VectorXd& getCoriolisAndGravityForces() const override;
+  const Eigen::VectorXs& getCoriolisAndGravityForces() const override;
 
   /// Get the external force vector of a tree in the Skeleton
-  const Eigen::VectorXd& getExternalForces(std::size_t _treeIdx) const;
+  const Eigen::VectorXs& getExternalForces(std::size_t _treeIdx) const;
 
   // Documentation inherited
-  const Eigen::VectorXd& getExternalForces() const override;
+  const Eigen::VectorXs& getExternalForces() const override;
 
   /// Get damping force of the skeleton.
-  //  const Eigen::VectorXd& getDampingForceVector();
+  //  const Eigen::VectorXs& getDampingForceVector();
 
   /// Get constraint force vector for a tree
-  const Eigen::VectorXd& getConstraintForces(std::size_t _treeIdx) const;
+  const Eigen::VectorXs& getConstraintForces(std::size_t _treeIdx) const;
 
   /// Get constraint force vector
-  const Eigen::VectorXd& getConstraintForces() const override;
+  const Eigen::VectorXs& getConstraintForces() const override;
 
   // Documentation inherited
   void clearExternalForces() override;
@@ -1234,10 +1208,10 @@ public:
   void dirtySupportPolygon(std::size_t _treeIdx);
 
   // Documentation inherited
-  double computeKineticEnergy() const override;
+  s_t computeKineticEnergy() const override;
 
   // Documentation inherited
-  double computePotentialEnergy() const override;
+  s_t computePotentialEnergy() const override;
 
   // Documentation inherited
   DART_DEPRECATED(6.0)
@@ -1250,30 +1224,30 @@ public:
   //----------------------------------------------------------------------------
 
   /// Get the Skeleton's COM with respect to any Frame (default is World Frame)
-  Eigen::Vector3d getCOM(
+  Eigen::Vector3s getCOM(
       const Frame* _withRespectTo = Frame::World()) const override;
 
   /// Get the Skeleton's COM spatial velocity in terms of any Frame (default is
   /// World Frame)
-  Eigen::Vector6d getCOMSpatialVelocity(
+  Eigen::Vector6s getCOMSpatialVelocity(
       const Frame* _relativeTo = Frame::World(),
       const Frame* _inCoordinatesOf = Frame::World()) const override;
 
   /// Get the Skeleton's COM linear velocity in terms of any Frame (default is
   /// World Frame)
-  Eigen::Vector3d getCOMLinearVelocity(
+  Eigen::Vector3s getCOMLinearVelocity(
       const Frame* _relativeTo = Frame::World(),
       const Frame* _inCoordinatesOf = Frame::World()) const override;
 
   /// Get the Skeleton's COM spatial acceleration in terms of any Frame (default
   /// is World Frame)
-  Eigen::Vector6d getCOMSpatialAcceleration(
+  Eigen::Vector6s getCOMSpatialAcceleration(
       const Frame* _relativeTo = Frame::World(),
       const Frame* _inCoordinatesOf = Frame::World()) const override;
 
   /// Get the Skeleton's COM linear acceleration in terms of any Frame (default
   /// is World Frame)
-  Eigen::Vector3d getCOMLinearAcceleration(
+  Eigen::Vector3s getCOMLinearAcceleration(
       const Frame* _relativeTo = Frame::World(),
       const Frame* _inCoordinatesOf = Frame::World()) const override;
 
@@ -1478,7 +1452,7 @@ protected:
   void updateExternalForces() const;
 
   /// Compute the constraint force vector for a tree
-  const Eigen::VectorXd& computeConstraintForces(DataCache& cache) const;
+  const Eigen::VectorXs& computeConstraintForces(DataCache& cache) const;
 
   //  /// Update damping force vector.
   //  virtual void updateDampingForceVector();
@@ -1511,9 +1485,6 @@ protected:
 
   /// NameManager for tracking SoftBodyNodes
   dart::common::NameManager<SoftBodyNode*> mNameMgrForSoftBodyNodes;
-
-  /// WholeBodyIK module for this Skeleton
-  std::shared_ptr<WholeBodyIK> mWholeBodyIK;
 
   struct DirtyFlags
   {
@@ -1578,32 +1549,32 @@ protected:
     std::vector<const DegreeOfFreedom*> mConstDofs;
 
     /// Mass matrix cache
-    Eigen::MatrixXd mM;
+    Eigen::MatrixXs mM;
 
     /// Mass matrix for the skeleton.
-    Eigen::MatrixXd mAugM;
+    Eigen::MatrixXs mAugM;
 
     /// Inverse of mass matrix for the skeleton.
-    Eigen::MatrixXd mInvM;
+    Eigen::MatrixXs mInvM;
 
     /// Inverse of augmented mass matrix for the skeleton.
-    Eigen::MatrixXd mInvAugM;
+    Eigen::MatrixXs mInvAugM;
 
     /// Coriolis vector for the skeleton which is C(q,dq)*dq.
-    Eigen::VectorXd mCvec;
+    Eigen::VectorXs mCvec;
 
     /// Gravity vector for the skeleton; computed in nonrecursive
     /// dynamics only.
-    Eigen::VectorXd mG;
+    Eigen::VectorXs mG;
 
     /// Combined coriolis and gravity vector which is C(q, dq)*dq + g(q).
-    Eigen::VectorXd mCg;
+    Eigen::VectorXs mCg;
 
     /// External force vector for the skeleton.
-    Eigen::VectorXd mFext;
+    Eigen::VectorXs mFext;
 
     /// Constraint force vector.
-    Eigen::VectorXd mFc;
+    Eigen::VectorXs mFc;
 
     /// Support polygon
     math::SupportPolygon mSupportPolygon;
@@ -1614,13 +1585,13 @@ protected:
 
     /// A pair of vectors which map the 2D coordinates of the support polygon
     /// into 3D space
-    std::pair<Eigen::Vector3d, Eigen::Vector3d> mSupportAxes;
+    std::pair<Eigen::Vector3s, Eigen::Vector3s> mSupportAxes;
 
     /// Support geometry -- only used for temporary storage purposes
     math::SupportGeometry mSupportGeometry;
 
     /// Centroid of the support polygon
-    Eigen::Vector2d mSupportCentroid;
+    Eigen::Vector2s mSupportCentroid;
 
     /// A map of the parent relationships between dofs in this skeleton.
     Eigen::MatrixXi mParentMap;
@@ -1644,7 +1615,7 @@ protected:
   SpecializedTreeNodes mSpecializedTreeNodes;
 
   /// Total mass.
-  double mTotalMass;
+  s_t mTotalMass;
 
   // TODO(JS): Better naming
   /// Flag for status of impulse testing.

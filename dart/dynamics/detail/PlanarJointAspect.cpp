@@ -57,8 +57,8 @@ PlanarJointUniqueProperties::PlanarJointUniqueProperties(PlaneType _planeType)
 
 //==============================================================================
 PlanarJointUniqueProperties::PlanarJointUniqueProperties(
-    const Eigen::Vector3d& _transAxis1,
-    const Eigen::Vector3d& _transAxis2)
+    const Eigen::Vector3s& _transAxis1,
+    const Eigen::Vector3s& _transAxis2)
 {
   setArbitraryPlane(_transAxis1, _transAxis2);
 }
@@ -88,33 +88,33 @@ PlanarJointUniqueProperties::PlanarJointUniqueProperties(
 void PlanarJointUniqueProperties::setXYPlane()
 {
   mPlaneType  = PlaneType::XY;
-  mRotAxis    = Eigen::Vector3d::UnitZ();
-  mTransAxis1 = Eigen::Vector3d::UnitX();
-  mTransAxis2 = Eigen::Vector3d::UnitY();
+  mRotAxis    = Eigen::Vector3s::UnitZ();
+  mTransAxis1 = Eigen::Vector3s::UnitX();
+  mTransAxis2 = Eigen::Vector3s::UnitY();
 }
 
 //==============================================================================
 void PlanarJointUniqueProperties::setYZPlane()
 {
   mPlaneType  = PlaneType::YZ;
-  mRotAxis    = Eigen::Vector3d::UnitX();
-  mTransAxis1 = Eigen::Vector3d::UnitY();
-  mTransAxis2 = Eigen::Vector3d::UnitZ();
+  mRotAxis    = Eigen::Vector3s::UnitX();
+  mTransAxis1 = Eigen::Vector3s::UnitY();
+  mTransAxis2 = Eigen::Vector3s::UnitZ();
 }
 
 //==============================================================================
 void PlanarJointUniqueProperties::setZXPlane()
 {
   mPlaneType  = PlaneType::ZX;
-  mRotAxis    = Eigen::Vector3d::UnitY();
-  mTransAxis1 = Eigen::Vector3d::UnitZ();
-  mTransAxis2 = Eigen::Vector3d::UnitX();
+  mRotAxis    = Eigen::Vector3s::UnitY();
+  mTransAxis1 = Eigen::Vector3s::UnitZ();
+  mTransAxis2 = Eigen::Vector3s::UnitX();
 }
 
 //==============================================================================
 void PlanarJointUniqueProperties::setArbitraryPlane(
-    const Eigen::Vector3d& _transAxis1,
-    const Eigen::Vector3d& _transAxis2)
+    const Eigen::Vector3s& _transAxis1,
+    const Eigen::Vector3s& _transAxis2)
 {
   // Set plane type as arbitrary plane
   mPlaneType = PlaneType::ARBITRARY;
@@ -126,9 +126,9 @@ void PlanarJointUniqueProperties::setArbitraryPlane(
   mTransAxis2 = _transAxis2.normalized();
 
   // Orthogonalize translational axes
-  double dotProduct = mTransAxis1.dot(mTransAxis2);
-  assert(std::abs(dotProduct) < 1.0 - 1e-6);
-  if (std::abs(dotProduct) > 1e-6)
+  s_t dotProduct = mTransAxis1.dot(mTransAxis2);
+  assert(abs(dotProduct) < 1.0 - 1e-6);
+  if (abs(dotProduct) > 1e-6)
     mTransAxis2 = (mTransAxis2 - dotProduct * mTransAxis1).normalized();
 
   // Rotational axis

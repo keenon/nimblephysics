@@ -118,13 +118,13 @@ bool ConstraintBase::isContactConstraint() const
 }
 
 //==============================================================================
-double ConstraintBase::getCoefficientOfRestitution()
+s_t ConstraintBase::getCoefficientOfRestitution()
 {
   return 0;
 }
 
 //==============================================================================
-double ConstraintBase::getPenetrationCorrectionVelocity()
+s_t ConstraintBase::getPenetrationCorrectionVelocity()
 {
   return 0;
 }

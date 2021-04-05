@@ -8,7 +8,7 @@ ControlLog::ControlLog(int dim, int millisPerStep)
 {
 }
 
-void ControlLog::record(long time, Eigen::VectorXd control)
+void ControlLog::record(long time, Eigen::VectorXs control)
 {
   if (time > mLogEnd)
     mLogEnd = time;
@@ -20,7 +20,7 @@ void ControlLog::record(long time, Eigen::VectorXd control)
   else
   {
     long logEnd = mLogStart + ((mLog.size() - 1) * mMillisPerStep);
-    int steps = (int)floor((double)(time - logEnd) / mMillisPerStep);
+    int steps = (int)floor((s_t)(time - logEnd) / mMillisPerStep);
     // This means we're recording backwards in time, which shouldn't be allowed.
     if (steps < 0)
     {
@@ -39,7 +39,7 @@ void ControlLog::record(long time, Eigen::VectorXd control)
     // Otherwise, we need to extend the last recorded force until just before
     // this timestep, on the assumption that the motors have been executing that
     // command until they were updated.
-    Eigen::VectorXd last = mLog[mLog.size() - 1];
+    Eigen::VectorXs last = mLog[mLog.size() - 1];
     for (int i = 0; i < steps - 1; i++)
     {
       mLog.push_back(last);
@@ -53,15 +53,15 @@ long ControlLog::last()
   return mLogEnd;
 }
 
-Eigen::VectorXd ControlLog::get(long time)
+Eigen::VectorXs ControlLog::get(long time)
 {
   // If we haven't recorded anything yet, default to 0
   if (mLog.size() == 0)
   {
-    return Eigen::VectorXd::Zero(mDim);
+    return Eigen::VectorXs::Zero(mDim);
   }
 
-  int steps = (int)floor((double)(time - mLogStart) / mMillisPerStep);
+  int steps = (int)floor((s_t)(time - mLogStart) / mMillisPerStep);
   // If we're out of bounds in the past, extend our initial force
   if (steps <= 0)
     return mLog[0];
@@ -76,12 +76,12 @@ void ControlLog::discardBefore(long time)
 {
   if (time <= mLogStart || mLog.size() == 0)
     return;
-  int discardSteps = (int)ceil((double)(time - mLogStart) / mMillisPerStep);
+  int discardSteps = (int)ceil((s_t)(time - mLogStart) / mMillisPerStep);
   // This means we're throwing out the whole log, just extrapolate the last
   // known force
   if (discardSteps >= mLog.size())
   {
-    Eigen::VectorXd last = mLog[mLog.size() - 1];
+    Eigen::VectorXs last = mLog[mLog.size() - 1];
     mLog.clear();
     mLog.push_back(last);
     mLogStart = time;
@@ -89,7 +89,7 @@ void ControlLog::discardBefore(long time)
   }
   // Otherwise we're just snipping part of the log, so copy just the bit we care
   // about, and throw away the rest
-  std::vector<Eigen::VectorXd> trimmedLog;
+  std::vector<Eigen::VectorXs> trimmedLog;
   for (int i = discardSteps; i < mLog.size(); i++)
   {
     trimmedLog.push_back(mLog[i]);
@@ -101,9 +101,9 @@ void ControlLog::discardBefore(long time)
 void ControlLog::setMillisPerStep(int newMillisPerStep)
 {
   int duration = mLog.size() * mMillisPerStep;
-  int newSteps = (int)ceil((double)duration / newMillisPerStep);
+  int newSteps = (int)ceil((s_t)duration / newMillisPerStep);
 
-  std::vector<Eigen::VectorXd> newLog;
+  std::vector<Eigen::VectorXs> newLog;
   for (int i = 0; i < newSteps; i++)
   {
     newLog.push_back(get(mLogStart + i * newMillisPerStep));

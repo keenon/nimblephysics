@@ -82,8 +82,8 @@ dynamics::SimpleFramePtr createHeightmapFrame(
 {
   auto terrainFrame = SimpleFrame::createShared(Frame::World());
   auto tf = terrainFrame->getRelativeTransform();
-  tf.translation()[0] = -static_cast<double>(xSize) / 2.0;
-  tf.translation()[1] = +static_cast<double>(ySize) / 2.0;
+  tf.translation()[0] = -static_cast<s_t>(xSize) / 2.0;
+  tf.translation()[1] = +static_cast<s_t>(ySize) / 2.0;
   terrainFrame->setRelativeTransform(tf);
 
   terrainFrame->createVisualAspect();
@@ -147,8 +147,8 @@ public:
         mXResolution, mYResolution, mXSize, mYSize, mZMin, mZMax));
 
     auto tf = mTerrain->getRelativeTransform();
-    tf.translation()[0] = -static_cast<double>(mXSize) / 2.0;
-    tf.translation()[1] = +static_cast<double>(mYSize) / 2.0;
+    tf.translation()[0] = -static_cast<s_t>(mXSize) / 2.0;
+    tf.translation()[1] = +static_cast<s_t>(mYSize) / 2.0;
     mTerrain->setRelativeTransform(tf);
   }
 
@@ -294,10 +294,10 @@ public:
         color[3] = static_cast<float>(visualColor[3]);
         if (ImGui::ColorEdit4("Color##Heightmap", color))
         {
-          visualColor[0] = static_cast<double>(color[0]);
-          visualColor[1] = static_cast<double>(color[1]);
-          visualColor[2] = static_cast<double>(color[2]);
-          visualColor[3] = static_cast<double>(color[3]);
+          visualColor[0] = static_cast<s_t>(color[0]);
+          visualColor[1] = static_cast<s_t>(color[1]);
+          visualColor[2] = static_cast<s_t>(color[2]);
+          visualColor[3] = static_cast<s_t>(color[3]);
           visualAspect->setColor(visualColor);
         }
       }
@@ -332,13 +332,13 @@ public:
           ImGui::Columns(3);
           offset = mGrid->getOffset().cast<float>();
           if (ImGui::InputFloat("X", &offset[0], 0.1f, 0.5f, "%.1f"))
-            mGrid->setOffset(offset.cast<double>());
+            mGrid->setOffset(offset.cast<s_t>());
           ImGui::NextColumn();
           if (ImGui::InputFloat("Y", &offset[1], 0.1f, 0.5f, "%.1f"))
-            mGrid->setOffset(offset.cast<double>());
+            mGrid->setOffset(offset.cast<s_t>());
           ImGui::NextColumn();
           if (ImGui::InputFloat("Z", &offset[2], 0.1f, 0.5f, "%.1f"))
-            mGrid->setOffset(offset.cast<double>());
+            mGrid->setOffset(offset.cast<s_t>());
           ImGui::Columns(1);
 
           static int cellCount;
@@ -354,7 +354,7 @@ public:
           cellStepSize = static_cast<float>(mGrid->getMinorLineStepSize());
           if (ImGui::InputFloat("Line Step Size", &cellStepSize, 0.001f, 0.1f))
           {
-            mGrid->setMinorLineStepSize(static_cast<double>(cellStepSize));
+            mGrid->setMinorLineStepSize(static_cast<s_t>(cellStepSize));
           }
 
           static int minorLinesPerMajorLine;
@@ -392,9 +392,9 @@ public:
           majorColor[2] = static_cast<float>(internalmajorColor.z());
           if (ImGui::ColorEdit3("Major Line Color", majorColor))
           {
-            internalmajorColor[0] = static_cast<double>(majorColor[0]);
-            internalmajorColor[1] = static_cast<double>(majorColor[1]);
-            internalmajorColor[2] = static_cast<double>(majorColor[2]);
+            internalmajorColor[0] = static_cast<s_t>(majorColor[0]);
+            internalmajorColor[1] = static_cast<s_t>(majorColor[1]);
+            internalmajorColor[2] = static_cast<s_t>(majorColor[2]);
             mGrid->setMajorLineColor(internalmajorColor);
           }
 
@@ -413,9 +413,9 @@ public:
           minorColor[2] = static_cast<float>(internalMinorColor.z());
           if (ImGui::ColorEdit3("Minor Line Color", minorColor))
           {
-            internalMinorColor[0] = static_cast<double>(minorColor[0]);
-            internalMinorColor[1] = static_cast<double>(minorColor[1]);
-            internalMinorColor[2] = static_cast<double>(minorColor[2]);
+            internalMinorColor[0] = static_cast<s_t>(minorColor[0]);
+            internalMinorColor[1] = static_cast<s_t>(minorColor[1]);
+            internalMinorColor[2] = static_cast<s_t>(minorColor[2]);
             mGrid->setMinorLineColor(internalMinorColor);
           }
         }
@@ -441,7 +441,7 @@ protected:
 int main()
 {
   auto world = dart::simulation::World::create();
-  world->setGravity(Eigen::Vector3d::Zero());
+  world->setGravity(Eigen::Vector3s::Zero());
 
   auto terrain = createHeightmapFrame<float>(100u, 100u, 2.f, 2.f, 0.f, 0.1f);
   world->addSimpleFrame(terrain);

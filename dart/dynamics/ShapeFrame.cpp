@@ -39,7 +39,7 @@ namespace detail {
 
 //==============================================================================
 VisualAspectProperties::VisualAspectProperties(
-    const Eigen::Vector4d& color,
+    const Eigen::Vector4s& color,
     const bool hidden,
     const bool castShadows,
     const bool receiveShadows)
@@ -60,7 +60,7 @@ CollisionAspectProperties::CollisionAspectProperties(const bool collidable)
 
 //==============================================================================
 DynamicsAspectProperties::DynamicsAspectProperties(
-    const double frictionCoeff, const double restitutionCoeff)
+    const s_t frictionCoeff, const s_t restitutionCoeff)
   : mFrictionCoeff(frictionCoeff), mRestitutionCoeff(restitutionCoeff)
 {
   // Do nothing
@@ -83,7 +83,7 @@ VisualAspect::VisualAspect(const PropertiesData& properties)
 }
 
 //==============================================================================
-void VisualAspect::setRGBA(const Eigen::Vector4d& color)
+void VisualAspect::setRGBA(const Eigen::Vector4s& color)
 {
   mProperties.mRGBA = color;
 
@@ -115,28 +115,28 @@ bool VisualAspect::getReceiveShadows()
 }
 
 //==============================================================================
-void VisualAspect::setColor(const Eigen::Vector3d& color)
+void VisualAspect::setColor(const Eigen::Vector3s& color)
 {
   setRGB(color);
 }
 
 //==============================================================================
-void VisualAspect::setColor(const Eigen::Vector4d& color)
+void VisualAspect::setColor(const Eigen::Vector4s& color)
 {
   setRGBA(color);
 }
 
 //==============================================================================
-void VisualAspect::setRGB(const Eigen::Vector3d& rgb)
+void VisualAspect::setRGB(const Eigen::Vector3s& rgb)
 {
-  Eigen::Vector4d rgba = getRGBA();
+  Eigen::Vector4s rgba = getRGBA();
   rgba.head<3>() = rgb;
 
   setRGBA(rgba);
 }
 
 //==============================================================================
-void VisualAspect::setAlpha(const double alpha)
+void VisualAspect::setAlpha(const s_t alpha)
 {
   mProperties.mRGBA[3] = alpha;
 
@@ -146,19 +146,19 @@ void VisualAspect::setAlpha(const double alpha)
 }
 
 //==============================================================================
-Eigen::Vector3d VisualAspect::getColor() const
+Eigen::Vector3s VisualAspect::getColor() const
 {
   return getRGB();
 }
 
 //==============================================================================
-Eigen::Vector3d VisualAspect::getRGB() const
+Eigen::Vector3s VisualAspect::getRGB() const
 {
   return getRGBA().head<3>();
 }
 
 //==============================================================================
-double VisualAspect::getAlpha() const
+s_t VisualAspect::getAlpha() const
 {
   return getRGBA()[3];
 }

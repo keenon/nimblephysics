@@ -29,18 +29,18 @@ class BackpropSnapshot;
 // the mapped space.
 struct PreStepMapping
 {
-  Eigen::VectorXd pos;
-  Eigen::MatrixXd posOutJac;
+  Eigen::VectorXs pos;
+  Eigen::MatrixXs posOutJac;
 
-  Eigen::VectorXd vel;
-  Eigen::MatrixXd velOutJac;
+  Eigen::VectorXs vel;
+  Eigen::MatrixXs velOutJac;
 
-  Eigen::VectorXd force;
-  Eigen::MatrixXd forceOutJac;
-  Eigen::MatrixXd forceInJac;
+  Eigen::VectorXs force;
+  Eigen::MatrixXs forceOutJac;
+  Eigen::MatrixXs forceInJac;
 
-  Eigen::VectorXd mass;
-  Eigen::MatrixXd massOutJac;
+  Eigen::VectorXs mass;
+  Eigen::MatrixXs massOutJac;
 
   PreStepMapping(
       std::shared_ptr<simulation::World> world,
@@ -67,13 +67,13 @@ struct PreStepMapping
 // space where we took the step.
 struct PostStepMapping
 {
-  Eigen::VectorXd pos;
-  Eigen::MatrixXd posInJacWrtPos;
-  Eigen::MatrixXd posInJacWrtVel;
+  Eigen::VectorXs pos;
+  Eigen::MatrixXs posInJacWrtPos;
+  Eigen::MatrixXs posInJacWrtVel;
 
-  Eigen::VectorXd vel;
-  Eigen::MatrixXd velInJacWrtPos;
-  Eigen::MatrixXd velInJacWrtVel;
+  Eigen::VectorXs vel;
+  Eigen::MatrixXs velInJacWrtPos;
+  Eigen::MatrixXs velInJacWrtVel;
 
   PostStepMapping(
       std::shared_ptr<simulation::World> world,
@@ -104,32 +104,32 @@ public:
   const std::vector<std::string>& getMappings();
   const std::string& getRepresentation();
 
-  Eigen::MatrixXd getPosPosJacobian(
+  Eigen::MatrixXs getPosPosJacobian(
       std::shared_ptr<simulation::World> world,
       const std::string& mapBefore,
       const std::string& mapAfter,
       PerformanceLog* perfLog = nullptr);
-  Eigen::MatrixXd getPosVelJacobian(
+  Eigen::MatrixXs getPosVelJacobian(
       std::shared_ptr<simulation::World> world,
       const std::string& mapBefore,
       const std::string& mapAfter,
       PerformanceLog* perfLog = nullptr);
-  Eigen::MatrixXd getVelPosJacobian(
+  Eigen::MatrixXs getVelPosJacobian(
       std::shared_ptr<simulation::World> world,
       const std::string& mapBefore,
       const std::string& mapAfter,
       PerformanceLog* perfLog = nullptr);
-  Eigen::MatrixXd getVelVelJacobian(
+  Eigen::MatrixXs getVelVelJacobian(
       std::shared_ptr<simulation::World> world,
       const std::string& mapBefore,
       const std::string& mapAfter,
       PerformanceLog* perfLog = nullptr);
-  Eigen::MatrixXd getForceVelJacobian(
+  Eigen::MatrixXs getForceVelJacobian(
       std::shared_ptr<simulation::World> world,
       const std::string& mapBefore,
       const std::string& mapAfter,
       PerformanceLog* perfLog = nullptr);
-  Eigen::MatrixXd getMassVelJacobian(
+  Eigen::MatrixXs getMassVelJacobian(
       std::shared_ptr<simulation::World> world,
       const std::string& mapBefore,
       const std::string& mapAfter,
@@ -150,40 +150,40 @@ public:
   /// Returns a concatenated vector of all the Skeletons' position()'s in the
   /// World, in order in which the Skeletons appear in the World's
   /// getSkeleton(i) returns them, BEFORE the timestep.
-  const Eigen::VectorXd& getPreStepPosition(const std::string& mapping = "identity");
+  const Eigen::VectorXs& getPreStepPosition(const std::string& mapping = "identity");
 
   /// Returns a concatenated vector of all the Skeletons' velocity()'s in the
   /// World, in order in which the Skeletons appear in the World's
   /// getSkeleton(i) returns them, BEFORE the timestep.
-  const Eigen::VectorXd& getPreStepVelocity(const std::string& mapping = "identity");
+  const Eigen::VectorXs& getPreStepVelocity(const std::string& mapping = "identity");
 
   /// Returns a concatenated vector of all the joint torques that were applied
   /// during the forward pass, BEFORE the timestep.
-  const Eigen::VectorXd& getPreStepTorques(const std::string& mapping = "identity");
+  const Eigen::VectorXs& getPreStepTorques(const std::string& mapping = "identity");
 
   /// Returns the LCP's cached solution from before the step
-  const Eigen::VectorXd& getPreStepLCPCache();
+  const Eigen::VectorXs& getPreStepLCPCache();
 
   /// Returns a concatenated vector of all the Skeletons' position()'s in the
   /// World, in order in which the Skeletons appear in the World's
   /// getSkeleton(i) returns them, AFTER the timestep.
-  const Eigen::VectorXd& getPostStepPosition(const std::string& mapping);
+  const Eigen::VectorXs& getPostStepPosition(const std::string& mapping);
 
   /// Returns a concatenated vector of all the Skeletons' velocity()'s in the
   /// World, in order in which the Skeletons appear in the World's
   /// getSkeleton(i) returns them, AFTER the timestep.
-  const Eigen::VectorXd& getPostStepVelocity(const std::string& mapping);
+  const Eigen::VectorXs& getPostStepVelocity(const std::string& mapping);
 
   /// Returns a concatenated vector of all the joint torques that were applied
   /// during the forward pass, AFTER the timestep.
-  const Eigen::VectorXd& getPostStepTorques(const std::string& mapping);
+  const Eigen::VectorXs& getPostStepTorques(const std::string& mapping);
 
   /// Returns the underlying BackpropSnapshot, without the mappings
   std::shared_ptr<BackpropSnapshot> getUnderlyingSnapshot();
 
   /// This computes and returns the whole vel-vel jacobian by finite
   /// differences. This is SUPER SLOW, and is only here for testing.
-  Eigen::MatrixXd finiteDifferenceVelVelJacobian(
+  Eigen::MatrixXs finiteDifferenceVelVelJacobian(
       simulation::WorldPtr world,
       const std::string& mapBefore,
       const std::string& mapAfter,
@@ -191,14 +191,14 @@ public:
 
   /// This computes and returns the whole vel-vel jacobian by finite
   /// differences. This is SUPER SLOW, and is only here for testing.
-  Eigen::MatrixXd finiteDifferenceRiddersVelVelJacobian(
+  Eigen::MatrixXs finiteDifferenceRiddersVelVelJacobian(
       simulation::WorldPtr world,
       const std::string& mapBefore,
       const std::string& mapAfter);      
 
   /// This computes and returns the whole pos-C(pos,vel) jacobian by finite
   /// differences. This is SUPER SUPER SLOW, and is only here for testing.
-  Eigen::MatrixXd finiteDifferencePosVelJacobian(
+  Eigen::MatrixXs finiteDifferencePosVelJacobian(
       simulation::WorldPtr world,
       const std::string& mapBefore,
       const std::string& mapAfter,
@@ -206,14 +206,14 @@ public:
 
   /// This computes and returns the whole pos-C(pos,vel) jacobian by finite
   /// differences. This is SUPER SUPER SLOW, and is only here for testing.
-  Eigen::MatrixXd finiteDifferenceRiddersPosVelJacobian(
+  Eigen::MatrixXs finiteDifferenceRiddersPosVelJacobian(
       simulation::WorldPtr world,
       const std::string& mapBefore,
       const std::string& mapAfter);
 
   /// This computes and returns the whole force-vel jacobian by finite
   /// differences. This is SUPER SLOW, and is only here for testing.
-  Eigen::MatrixXd finiteDifferenceForceVelJacobian(
+  Eigen::MatrixXs finiteDifferenceForceVelJacobian(
       simulation::WorldPtr world,
       const std::string& mapBefore,
       const std::string& mapAfter,
@@ -221,13 +221,13 @@ public:
 
   /// This computes and returns the whole force-vel jacobian by finite
   /// differences. This is SUPER SLOW, and is only here for testing.
-  Eigen::MatrixXd finiteDifferenceRiddersForceVelJacobian(
+  Eigen::MatrixXs finiteDifferenceRiddersForceVelJacobian(
       simulation::WorldPtr world,
       const std::string& mapBefore,
       const std::string& mapAfter);
 
   /// This computes a finite differenced Jacobian for pos_t->mapped_pos_{t+1}
-  Eigen::MatrixXd finiteDifferencePosPosJacobian(
+  Eigen::MatrixXs finiteDifferencePosPosJacobian(
       std::shared_ptr<simulation::World> world,
       const std::string& mapBefore,
       const std::string& mapAfter,
@@ -235,7 +235,7 @@ public:
       bool useRidders = true);
 
     /// This computes a finite differenced Jacobian for pos_t->mapped_pos_{t+1}
-  Eigen::MatrixXd finiteDifferenceRiddersPosPosJacobian(
+  Eigen::MatrixXs finiteDifferenceRiddersPosPosJacobian(
       std::shared_ptr<simulation::World> world,
       const std::string& mapBefore,
       const std::string& mapAfter,
@@ -243,7 +243,7 @@ public:
 
   /// This computes and returns the whole vel-pos jacobian by finite
   /// differences. This is SUPER SUPER SLOW, and is only here for testing.
-  Eigen::MatrixXd finiteDifferenceVelPosJacobian(
+  Eigen::MatrixXs finiteDifferenceVelPosJacobian(
       simulation::WorldPtr world,
       const std::string& mapBefore,
       const std::string& mapAfter,
@@ -252,7 +252,7 @@ public:
 
   /// This computes and returns the whole vel-pos jacobian by finite
   /// differences. This is SUPER SUPER SLOW, and is only here for testing.
-  Eigen::MatrixXd finiteDifferenceRiddersVelPosJacobian(
+  Eigen::MatrixXs finiteDifferenceRiddersVelPosJacobian(
       simulation::WorldPtr world,
       const std::string& mapBefore,
       const std::string& mapAfter,

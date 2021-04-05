@@ -43,7 +43,7 @@ using namespace simulation;
 using namespace neural;
 using namespace trajectory;
 
-bool equals(TimestepJacobians a, TimestepJacobians b, double threshold)
+bool equals(TimestepJacobians a, TimestepJacobians b, s_t threshold)
 {
   return equals(a.forcePos, b.forcePos, threshold)
          && equals(a.forceVel, b.forceVel, threshold)
@@ -54,9 +54,9 @@ bool equals(TimestepJacobians a, TimestepJacobians b, double threshold)
 }
 
 void debugMatrices(
-    Eigen::MatrixXd analytical,
-    Eigen::MatrixXd bruteForce,
-    double threshold,
+    Eigen::MatrixXs analytical,
+    Eigen::MatrixXs bruteForce,
+    s_t threshold,
     std::string name)
 {
   if (!equals(analytical, bruteForce, threshold))
@@ -68,7 +68,7 @@ void debugMatrices(
   }
 }
 
-bool verifySingleStep(WorldPtr world, double EPS)
+bool verifySingleStep(WorldPtr world, s_t EPS)
 {
   LossFn lossFn = LossFn();
   SingleShot shot(world, lossFn, 1);
@@ -77,15 +77,15 @@ bool verifySingleStep(WorldPtr world, double EPS)
   TimestepJacobians bruteForceJacobians
       = shot.finiteDifferenceStartStateJacobians(world, EPS);
   BackpropSnapshotPtr ptr = neural::forwardPass(world, true);
-  Eigen::MatrixXd velVelAnalytical = ptr->getVelVelJacobian(world);
-  Eigen::MatrixXd velVelFD = ptr->finiteDifferenceVelVelJacobian(world);
+  Eigen::MatrixXs velVelAnalytical = ptr->getVelVelJacobian(world);
+  Eigen::MatrixXs velVelFD = ptr->finiteDifferenceVelVelJacobian(world);
 
-  Eigen::MatrixXd forceVel = ptr->getForceVelJacobian(world);
-  Eigen::MatrixXd forceVelFD = ptr->finiteDifferenceForceVelJacobian(world);
+  Eigen::MatrixXs forceVel = ptr->getForceVelJacobian(world);
+  Eigen::MatrixXs forceVelFD = ptr->finiteDifferenceForceVelJacobian(world);
 
-  Eigen::MatrixXd velCJacobian = ptr->getVelCJacobian(world);
+  Eigen::MatrixXs velCJacobian = ptr->getVelCJacobian(world);
 
-  double threshold = 1e-8;
+  s_t threshold = 1e-8;
 
   if (!equals(analyticalJacobians.velVel, bruteForceJacobians.velVel, threshold)
       || !equals(velVelAnalytical, velVelFD, threshold)
@@ -112,7 +112,7 @@ bool verifySingleStep(WorldPtr world, double EPS)
 bool verifySingleShot(
     WorldPtr world,
     int maxSteps,
-    double /* EPS */,
+    s_t /* EPS */,
     bool useFdJacs,
     std::shared_ptr<Mapping> mapping)
 {
@@ -126,7 +126,7 @@ bool verifySingleShot(
       shot.switchRepresentationMapping(world, "custom");
     }
 
-    double threshold = 1e-8;
+    s_t threshold = 1e-8;
     std::vector<MappedBackpropSnapshotPtr> ptrs = shot.getSnapshots(world);
     /*
     for (int j = 0; j < ptrs.size(); j++)
@@ -252,15 +252,15 @@ bool verifyShotJacobian(
   // Random initialization
   /*
   srand(42);
-  Eigen::VectorXd randomInit = Eigen::VectorXd::Random(dim);
+  Eigen::VectorXs randomInit = Eigen::VectorXs::Random(dim);
   shot.unflatten(randomInit);
   */
 
-  Eigen::MatrixXd analyticalJacobian = Eigen::MatrixXd::Zero(stateSize, dim);
+  Eigen::MatrixXs analyticalJacobian = Eigen::MatrixXs::Zero(stateSize, dim);
   shot.backpropJacobianOfFinalState(world, analyticalJacobian);
-  Eigen::MatrixXd bruteForceJacobian = Eigen::MatrixXd::Zero(stateSize, dim);
+  Eigen::MatrixXs bruteForceJacobian = Eigen::MatrixXs::Zero(stateSize, dim);
   shot.finiteDifferenceJacobianOfFinalState(world, bruteForceJacobian);
-  double threshold = 1e-8;
+  s_t threshold = 1e-8;
   if (!equals(analyticalJacobian, bruteForceJacobian, threshold))
   {
     std::cout << "Jacobians don't match!" << std::endl;
@@ -286,19 +286,19 @@ bool verifyShotGradient(
   // Random initialization
   /*
   srand(42);
-  Eigen::VectorXd randomInit = Eigen::VectorXd::Random(dim);
+  Eigen::VectorXs randomInit = Eigen::VectorXs::Random(dim);
   shot.unflatten(randomInit);
   */
 
-  Eigen::VectorXd analyticalGrad = Eigen::VectorXd::Zero(dim);
+  Eigen::VectorXs analyticalGrad = Eigen::VectorXs::Zero(dim);
   shot.backpropGradient(world, analyticalGrad);
-  Eigen::VectorXd bruteForceGrad = Eigen::VectorXd::Zero(dim);
+  Eigen::VectorXs bruteForceGrad = Eigen::VectorXs::Zero(dim);
   shot.finiteDifferenceGradient(world, bruteForceGrad);
 
   // This threshold is just barely enough for the cartpole example, but the
   // fluctuation appears due to tuning EPS values for finite differencing, which
   // means I think we're within safe ranges of correct.
-  double threshold = 2e-8;
+  s_t threshold = 2e-8;
   if (!equals(analyticalGrad, bruteForceGrad, threshold))
   {
     std::cout << "Gradients don't match!" << std::endl;
@@ -328,29 +328,29 @@ bool verifyMultiShotJacobian(
   // Random initialization
   /*
   srand(42);
-  Eigen::VectorXd randomInit = Eigen::VectorXd::Random(dim);
+  Eigen::VectorXs randomInit = Eigen::VectorXs::Random(dim);
   shot.unflatten(randomInit);
   */
 
   /*
-  Eigen::VectorXd pos = randomInit.segment(20, 5);
-  Eigen::VectorXd vel = randomInit.segment(25, 5);
+  Eigen::VectorXs pos = randomInit.segment(20, 5);
+  Eigen::VectorXs vel = randomInit.segment(25, 5);
   */
 
-  Eigen::MatrixXd analyticalJacobian
-      = Eigen::MatrixXd::Zero(numConstraints, dim);
+  Eigen::MatrixXs analyticalJacobian
+      = Eigen::MatrixXs::Zero(numConstraints, dim);
   shot.Problem::backpropJacobian(world, analyticalJacobian);
-  Eigen::MatrixXd bruteForceJacobian
-      = Eigen::MatrixXd::Zero(numConstraints, dim);
+  Eigen::MatrixXs bruteForceJacobian
+      = Eigen::MatrixXs::Zero(numConstraints, dim);
   shot.finiteDifferenceJacobian(world, bruteForceJacobian);
-  double threshold = 1e-8;
+  s_t threshold = 1e-8;
   if (!equals(analyticalJacobian, bruteForceJacobian, threshold))
   {
     std::cout << "Jacobians don't match!" << std::endl;
     for (int i = 0; i < dim; i++)
     {
-      Eigen::VectorXd analyticalCol = analyticalJacobian.col(i);
-      Eigen::VectorXd bruteForceCol = bruteForceJacobian.col(i);
+      Eigen::VectorXs analyticalCol = analyticalJacobian.col(i);
+      Eigen::VectorXs bruteForceCol = bruteForceJacobian.col(i);
       if (!equals(analyticalCol, bruteForceCol, threshold))
       {
         std::cout << "ERROR at col " << shot.getFlatDimName(world, i) << " ("
@@ -379,30 +379,30 @@ bool verifySparseJacobian(WorldPtr world, MultiShot& shot)
   // Random initialization
   /*
   srand(42);
-  Eigen::VectorXd randomInit = Eigen::VectorXd::Random(dim);
+  Eigen::VectorXs randomInit = Eigen::VectorXs::Random(dim);
   shot.unflatten(randomInit);
   */
 
   int dim = shot.getFlatProblemDim(world);
   int numConstraints = shot.getConstraintDim();
-  Eigen::MatrixXd analyticalJacobian
-      = Eigen::MatrixXd::Zero(numConstraints, dim);
+  Eigen::MatrixXs analyticalJacobian
+      = Eigen::MatrixXs::Zero(numConstraints, dim);
   shot.Problem::backpropJacobian(world, analyticalJacobian);
-  Eigen::MatrixXd sparseRecoveredJacobian
-      = Eigen::MatrixXd::Zero(numConstraints, dim);
+  Eigen::MatrixXs sparseRecoveredJacobian
+      = Eigen::MatrixXs::Zero(numConstraints, dim);
 
   int numSparse = shot.getNumberNonZeroJacobian(world);
   Eigen::VectorXi rows = Eigen::VectorXi::Zero(numSparse);
   Eigen::VectorXi cols = Eigen::VectorXi::Zero(numSparse);
   shot.getJacobianSparsityStructure(world, rows, cols);
-  Eigen::VectorXd sparseValues = Eigen::VectorXd::Zero(numSparse);
+  Eigen::VectorXs sparseValues = Eigen::VectorXs::Zero(numSparse);
   shot.Problem::getSparseJacobian(world, sparseValues);
   for (int i = 0; i < numSparse; i++)
   {
     sparseRecoveredJacobian(rows(i), cols(i)) = sparseValues(i);
   }
 
-  double threshold = 0;
+  s_t threshold = 0;
   if (!equals(analyticalJacobian, sparseRecoveredJacobian, threshold))
   {
     std::cout << "Sparse jacobians don't match!" << std::endl;
@@ -419,8 +419,8 @@ bool verifySparseJacobian(WorldPtr world, MultiShot& shot)
 
     for (int i = 0; i < dim; i++)
     {
-      Eigen::VectorXd analyticalCol = analyticalJacobian.col(i);
-      Eigen::VectorXd sparseRecoveredCol = sparseRecoveredJacobian.col(i);
+      Eigen::VectorXs analyticalCol = analyticalJacobian.col(i);
+      Eigen::VectorXs sparseRecoveredCol = sparseRecoveredJacobian.col(i);
       if (!equals(analyticalCol, sparseRecoveredCol, threshold))
       {
         std::cout << "ERROR at col " << shot.getFlatDimName(world, i) << " ("
@@ -470,21 +470,21 @@ bool verifyMultiShotGradient(
   // Random initialization
   /*
   srand(42);
-  Eigen::VectorXd randomInit = Eigen::VectorXd::Random(dim);
+  Eigen::VectorXs randomInit = Eigen::VectorXs::Random(dim);
   shot.unflatten(randomInit);
   */
 
   int dim = shot.getFlatProblemDim(world);
 
-  Eigen::VectorXd analyticalGrad = Eigen::VectorXd::Zero(dim);
+  Eigen::VectorXs analyticalGrad = Eigen::VectorXs::Zero(dim);
   shot.backpropGradient(world, analyticalGrad);
-  Eigen::VectorXd bruteForceGrad = Eigen::VectorXd::Zero(dim);
+  Eigen::VectorXs bruteForceGrad = Eigen::VectorXs::Zero(dim);
   shot.finiteDifferenceGradient(world, bruteForceGrad);
 
   // This threshold is just barely enough for the cartpole example, but the
   // fluctuation appears due to tuning EPS values for finite differencing, which
   // means I think we're within safe ranges of correct.
-  double threshold = 2e-8;
+  s_t threshold = 2e-8;
   if (!equals(analyticalGrad, bruteForceGrad, threshold))
   {
     std::cout << "Gradients don't match!" << std::endl;
@@ -503,7 +503,7 @@ bool verifyMultiShotJacobianCustomConstraint(
     int shotLength,
     TrajectoryLossFn constraint,
     TrajectoryLossFnAndGrad constraintGrad,
-    double constraintValue)
+    s_t constraintValue)
 {
   LossFn lossFn = LossFn();
   MultiShot shot(world, lossFn, steps, shotLength, true);
@@ -516,20 +516,20 @@ bool verifyMultiShotJacobianCustomConstraint(
   int dim = shot.getFlatProblemDim(world);
   int numConstraints = shot.getConstraintDim();
 
-  Eigen::MatrixXd analyticalJacobian
-      = Eigen::MatrixXd::Zero(numConstraints, dim);
+  Eigen::MatrixXs analyticalJacobian
+      = Eigen::MatrixXs::Zero(numConstraints, dim);
   shot.Problem::backpropJacobian(world, analyticalJacobian);
-  Eigen::MatrixXd bruteForceJacobian
-      = Eigen::MatrixXd::Zero(numConstraints, dim);
+  Eigen::MatrixXs bruteForceJacobian
+      = Eigen::MatrixXs::Zero(numConstraints, dim);
   shot.finiteDifferenceJacobian(world, bruteForceJacobian);
-  double threshold = 1e-8;
+  s_t threshold = 1e-8;
   if (!equals(analyticalJacobian, bruteForceJacobian, threshold))
   {
     std::cout << "Jacobians don't match!" << std::endl;
     for (int i = 0; i < dim; i++)
     {
-      Eigen::VectorXd analyticalCol = analyticalJacobian.col(i);
-      Eigen::VectorXd bruteForceCol = bruteForceJacobian.col(i);
+      Eigen::VectorXs analyticalCol = analyticalJacobian.col(i);
+      Eigen::VectorXs bruteForceCol = bruteForceJacobian.col(i);
       if (!equals(analyticalCol, bruteForceCol, threshold))
       {
         std::cout << "ERROR at col " << shot.getFlatDimName(world, i) << " ("
@@ -581,7 +581,7 @@ bool verifyChangeRepresentationToIK(
   TrajectoryRolloutReal recoveredIdentityRollout = TrajectoryRolloutReal(&shot);
   shot.getStates(world, &recoveredIdentityRollout, nullptr, true);
 
-  double threshold = 1e-8;
+  s_t threshold = 1e-8;
 
   if (shouldBeLosslessInto)
   {
@@ -592,12 +592,12 @@ bool verifyChangeRepresentationToIK(
       world->setExternalForces(
           initialIdentityRollout.getForces("identity").col(i));
 
-      Eigen::VectorXd manualMappedPos = newRepresentation->getPositions(world);
-      Eigen::VectorXd manualMappedVel = newRepresentation->getVelocities(world);
-      Eigen::VectorXd manualMappedForce = newRepresentation->getForces(world);
-      Eigen::VectorXd mappedPos = mappedRollout.getPoses("custom").col(i);
-      Eigen::VectorXd mappedVel = mappedRollout.getVels("custom").col(i);
-      Eigen::VectorXd mappedForce = mappedRollout.getForces("custom").col(i);
+      Eigen::VectorXs manualMappedPos = newRepresentation->getPositions(world);
+      Eigen::VectorXs manualMappedVel = newRepresentation->getVelocities(world);
+      Eigen::VectorXs manualMappedForce = newRepresentation->getForces(world);
+      Eigen::VectorXs mappedPos = mappedRollout.getPoses("custom").col(i);
+      Eigen::VectorXs mappedVel = mappedRollout.getVels("custom").col(i);
+      Eigen::VectorXs mappedForce = mappedRollout.getForces("custom").col(i);
 
       if (!equals(mappedPos, manualMappedPos, threshold)
           || !equals(mappedVel, manualMappedVel, threshold)
@@ -616,22 +616,22 @@ bool verifyChangeRepresentationToIK(
   {
     for (int i = 0; i < steps; i++)
     {
-      Eigen::VectorXd mappedPos = mappedRollout.getPoses("custom").col(i);
-      Eigen::VectorXd mappedVel = mappedRollout.getVels("custom").col(i);
-      Eigen::VectorXd mappedForce = mappedRollout.getForces("custom").col(i);
+      Eigen::VectorXs mappedPos = mappedRollout.getPoses("custom").col(i);
+      Eigen::VectorXs mappedVel = mappedRollout.getVels("custom").col(i);
+      Eigen::VectorXs mappedForce = mappedRollout.getForces("custom").col(i);
       newRepresentation->setPositions(world, mappedPos);
       newRepresentation->setVelocities(world, mappedVel);
       newRepresentation->setForces(world, mappedForce);
 
-      Eigen::VectorXd recoveredPos
+      Eigen::VectorXs recoveredPos
           = recoveredIdentityRollout.getPoses("identity").col(i);
-      Eigen::VectorXd recoveredVel
+      Eigen::VectorXs recoveredVel
           = recoveredIdentityRollout.getVels("identity").col(i);
-      Eigen::VectorXd recoveredForce
+      Eigen::VectorXs recoveredForce
           = recoveredIdentityRollout.getForces("identity").col(i);
-      Eigen::VectorXd manualRecoveredPos = world->getPositions();
-      Eigen::VectorXd manualRecoveredVel = world->getVelocities();
-      Eigen::VectorXd manualRecoveredForce = world->getExternalForces();
+      Eigen::VectorXs manualRecoveredPos = world->getPositions();
+      Eigen::VectorXs manualRecoveredVel = world->getVelocities();
+      Eigen::VectorXs manualRecoveredForce = world->getExternalForces();
 
       if (!equals(recoveredPos, manualRecoveredPos, threshold)
           || !equals(recoveredVel, manualRecoveredVel, threshold)

@@ -50,7 +50,7 @@ public:
   virtual ~Controller();
 
   /// \brief
-  void update(const Eigen::Vector3d& _targetPosition);
+  void update(const Eigen::Vector3s& _targetPosition);
 
   /// \brief Get robot
   dart::dynamics::SkeletonPtr getRobot() const;
@@ -69,13 +69,13 @@ private:
   dart::dynamics::BodyNode* mEndEffector;
 
   /// \brief Control forces
-  Eigen::VectorXd mForces;
+  Eigen::VectorXs mForces;
 
   /// \brief Proportional gain for the virtual spring forces at the end effector
-  Eigen::Matrix3d mKp;
+  Eigen::Matrix3s mKp;
 
   /// \brief Derivative gain for the virtual spring forces at the end effector
-  Eigen::Matrix3d mKv;
+  Eigen::Matrix3s mKv;
 };
 
 #endif // EXAMPLES_OPERATIONALSPACECONTROL_CONTROLLER_HPP_

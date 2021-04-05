@@ -23,15 +23,15 @@ TEST(JOINT_JACOBIANS, REVOLUTE_JOINT)
   std::pair<RevoluteJoint*, BodyNode*> pair
       = box->createJointAndBodyNodePair<RevoluteJoint>(nullptr);
   RevoluteJoint* boxJoint = pair.first;
-  boxJoint->setAxis(Eigen::Vector3d::Random());
+  boxJoint->setAxis(Eigen::Vector3s::Random());
 
-  Eigen::Isometry3d fromParent = Eigen::Isometry3d::Identity();
-  fromParent.translation() = Eigen::Vector3d::UnitX();
+  Eigen::Isometry3s fromParent = Eigen::Isometry3s::Identity();
+  fromParent.translation() = Eigen::Vector3s::UnitX();
   boxJoint->setTransformFromParentBodyNode(fromParent);
 
-  Eigen::Isometry3d fromChild = Eigen::Isometry3d::Identity();
-  fromChild.translation() = Eigen::Vector3d::UnitX() * -3;
-  fromChild = fromChild.rotate(Eigen::AngleAxis<double>(M_PI_2, Eigen::Vector3d::UnitX()));
+  Eigen::Isometry3s fromChild = Eigen::Isometry3s::Identity();
+  fromChild.translation() = Eigen::Vector3s::UnitX() * -3;
+  fromChild = fromChild.rotate(Eigen::AngleAxis<s_t>(M_PI_2, Eigen::Vector3s::UnitX()));
   boxJoint->setTransformFromChildBodyNode(fromChild);
   world->addSkeleton(box);
 
@@ -49,17 +49,17 @@ TEST(JOINT_JACOBIANS, FREE_JOINT)
       = box->createJointAndBodyNodePair<FreeJoint>(nullptr);
   FreeJoint* boxJoint = pair.first;
 
-  Eigen::Isometry3d fromParent = Eigen::Isometry3d::Identity();
-  // fromParent.translation() = Eigen::Vector3d::UnitX();
+  Eigen::Isometry3s fromParent = Eigen::Isometry3s::Identity();
+  // fromParent.translation() = Eigen::Vector3s::UnitX();
   boxJoint->setTransformFromParentBodyNode(fromParent);
 
-  Eigen::Isometry3d fromChild = Eigen::Isometry3d::Identity();
-  // fromChild.translation() = Eigen::Vector3d::UnitX() * -3;
-  // fromChild = fromChild.rotate(Eigen::AngleAxis<double>(M_PI_2, Eigen::Vector3d::UnitX()));
+  Eigen::Isometry3s fromChild = Eigen::Isometry3s::Identity();
+  // fromChild.translation() = Eigen::Vector3s::UnitX() * -3;
+  // fromChild = fromChild.rotate(Eigen::AngleAxis<s_t>(M_PI_2, Eigen::Vector3s::UnitX()));
   boxJoint->setTransformFromChildBodyNode(fromChild);
   world->addSkeleton(box);
 
-  // box->setPositions(Eigen::Vector6d::Random());
+  // box->setPositions(Eigen::Vector6s::Random());
 
   EXPECT_TRUE(verifyJointVelocityJacobians(world));
   EXPECT_TRUE(verifyJointPositionJacobians(world));

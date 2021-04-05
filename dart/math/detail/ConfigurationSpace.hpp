@@ -93,7 +93,7 @@ struct toEuclideanPointImpl<SE3Space>
   static typename SE3Space::EuclideanPoint run(
       const typename SE3Space::Point& point)
   {
-    Eigen::Vector6d x;
+    Eigen::Vector6s x;
 
     x.head<3>() = math::logMap(point.linear());
     x.tail<3>() = point.translation();
@@ -131,7 +131,7 @@ struct toManifoldPointImpl<SE3Space>
   static typename SE3Space::Point run(
       const typename SE3Space::EuclideanPoint& point)
   {
-    Eigen::Isometry3d tf(Eigen::Isometry3d::Identity());
+    Eigen::Isometry3s tf(Eigen::Isometry3s::Identity());
 
     tf.linear() = math::expMapRot(point.head<3>());
     tf.translation() = point.tail<3>();
@@ -147,7 +147,7 @@ struct integratePositionImpl
   static typename SpaceT::Point run(
       const typename SpaceT::Point& pos,
       const typename SpaceT::Vector& vel,
-      double dt)
+      s_t dt)
   {
     return pos + dt * vel;
   }
@@ -160,7 +160,7 @@ struct integratePositionImpl<SO3Space>
   static typename SO3Space::Point run(
       const typename SO3Space::Point& pos,
       const typename SO3Space::Vector& vel,
-      double dt)
+      s_t dt)
   {
     return pos * toManifoldPoint<SO3Space>(vel * dt);
   }
@@ -173,7 +173,7 @@ struct integratePositionImpl<SE3Space>
   static typename SE3Space::Point run(
       const typename SE3Space::Point& pos,
       const typename SE3Space::Vector& vel,
-      double dt)
+      s_t dt)
   {
     return pos * toManifoldPoint<SE3Space>(vel * dt);
   }
@@ -216,7 +216,7 @@ template <typename SpaceT>
 typename SpaceT::Point integratePosition(
     const typename SpaceT::Point& pos,
     const typename SpaceT::Vector& vel,
-    double dt)
+    s_t dt)
 {
   return detail::integratePositionImpl<SpaceT>::run(pos, vel, dt);
 }
@@ -226,7 +226,7 @@ template <typename SpaceT>
 typename SpaceT::Vector integrateVelocity(
     const typename SpaceT::Vector& vel,
     const typename SpaceT::Vector& acc,
-    double dt)
+    s_t dt)
 {
   return vel + acc * dt;
 }

@@ -37,14 +37,14 @@ public:
 
   void setIterationLimit(int iterationLimit);
 
-  void setTolerance(double tolerance);
+  void setTolerance(s_t tolerance);
 
-  void setLearningRate(double learningRate);
+  void setLearningRate(s_t learningRate);
 
 protected:
   int mIterationLimit;
-  double mTolerance;
-  double mLearningRate;
+  s_t mTolerance;
+  s_t mLearningRate;
 };
 
 } // namespace trajectory

@@ -14,46 +14,46 @@ class LCPUtils
 {
 public:
   static bool isLCPSolutionValid(
-      const Eigen::MatrixXd& mA,
-      const Eigen::VectorXd& mX,
-      const Eigen::VectorXd& mB,
-      const Eigen::VectorXd& mHi,
-      const Eigen::VectorXd& mLo,
+      const Eigen::MatrixXs& mA,
+      const Eigen::VectorXs& mX,
+      const Eigen::VectorXs& mB,
+      const Eigen::VectorXs& mHi,
+      const Eigen::VectorXs& mLo,
       const Eigen::VectorXi& mFIndex,
       bool ignoreFrictionIndices);
 
   /// This applies a simple algorithm to guess the solution to the LCP problem.
   /// It's not guaranteed to be correct, but it often can be if there is no
   /// sliding friction on this timestep.
-  static Eigen::VectorXd guessSolution(
-      const Eigen::MatrixXd& mA,
-      const Eigen::VectorXd& mB,
-      const Eigen::VectorXd& mHi,
-      const Eigen::VectorXd& mLo,
+  static Eigen::VectorXs guessSolution(
+      const Eigen::MatrixXs& mA,
+      const Eigen::VectorXs& mB,
+      const Eigen::VectorXs& mHi,
+      const Eigen::VectorXs& mLo,
       const Eigen::VectorXi& mFIndex);
 
   /// This reduces an LCP problem by merging any near-identical contact points.
   /// It returns a mapOut matrix, such that if you solve this LCP and then
   /// multiply the resulting x as mapOut*x, you'll get the solution to the
   /// original LCP.
-  static Eigen::MatrixXd reduce(
-      Eigen::MatrixXd& A,
-      Eigen::VectorXd& X,
-      Eigen::VectorXd& b,
-      Eigen::VectorXd& hi,
-      Eigen::VectorXd& lo,
+  static Eigen::MatrixXs reduce(
+      Eigen::MatrixXs& A,
+      Eigen::VectorXs& X,
+      Eigen::VectorXs& b,
+      Eigen::VectorXs& hi,
+      Eigen::VectorXs& lo,
       Eigen::VectorXi& fIndex);
 
   /// This cuts a problem down to just the normal forces, ignoring friction.
   /// It returns a mapOut matrix, such that if you solve this LCP and then
   /// multiply the resulting x as mapOut*x, you'll get the solution to the
   /// original LCP, but with friction forces all 0.
-  static Eigen::MatrixXd removeFriction(
-      Eigen::MatrixXd& A,
-      Eigen::VectorXd& X,
-      Eigen::VectorXd& b,
-      Eigen::VectorXd& hi,
-      Eigen::VectorXd& lo,
+  static Eigen::MatrixXs removeFriction(
+      Eigen::MatrixXs& A,
+      Eigen::VectorXs& X,
+      Eigen::VectorXs& b,
+      Eigen::VectorXs& hi,
+      Eigen::VectorXs& lo,
       Eigen::VectorXi& fIndex);
 
   /// This solves the LCP problem by first automatically de-duplicating columns
@@ -62,11 +62,11 @@ public:
   /// re-inflating the solution to the reduced problem.
   static bool solveDeduplicated(
       std::shared_ptr<BoxedLcpSolver>& solver,
-      const Eigen::MatrixXd& A,
-      Eigen::VectorXd& X,
-      const Eigen::VectorXd& b,
-      const Eigen::VectorXd& hi,
-      const Eigen::VectorXd& lo,
+      const Eigen::MatrixXs& A,
+      Eigen::VectorXs& X,
+      const Eigen::VectorXs& b,
+      const Eigen::VectorXs& hi,
+      const Eigen::VectorXs& lo,
       const Eigen::VectorXi& fIndex);
 
   /// This will modify the LCP problem formulation to merge two columns
@@ -78,13 +78,13 @@ public:
   static void mergeLCPColumns(
       int colA,
       int colB,
-      Eigen::MatrixXd& A,
-      Eigen::VectorXd& X,
-      Eigen::VectorXd& b,
-      Eigen::VectorXd& hi,
-      Eigen::VectorXd& lo,
+      Eigen::MatrixXs& A,
+      Eigen::VectorXs& X,
+      Eigen::VectorXs& b,
+      Eigen::VectorXs& hi,
+      Eigen::VectorXs& lo,
       Eigen::VectorXi& fIndex,
-      Eigen::MatrixXd& mapOut);
+      Eigen::MatrixXs& mapOut);
 
   /// This will modify the LCP problem formulation to drop a column
   /// and rewrite and resize all the matrices appropriately.
@@ -93,21 +93,21 @@ public:
   /// larger problem.
   static void dropLCPColumn(
       int col,
-      Eigen::MatrixXd& A,
-      Eigen::VectorXd& X,
-      Eigen::VectorXd& b,
-      Eigen::VectorXd& hi,
-      Eigen::VectorXd& lo,
+      Eigen::MatrixXs& A,
+      Eigen::VectorXs& X,
+      Eigen::VectorXs& b,
+      Eigen::VectorXs& hi,
+      Eigen::VectorXs& lo,
       Eigen::VectorXi& fIndex,
-      Eigen::MatrixXd& mapOut);
+      Eigen::MatrixXs& mapOut);
 
   /// Print replication code info
   static void printReplicationCode(
-      Eigen::MatrixXd A,
-      Eigen::VectorXd x,
-      Eigen::VectorXd lo,
-      Eigen::VectorXd hi,
-      Eigen::VectorXd b,
+      Eigen::MatrixXs A,
+      Eigen::VectorXs x,
+      Eigen::VectorXs lo,
+      Eigen::VectorXs hi,
+      Eigen::VectorXs b,
       Eigen::VectorXi fIndex);
 };
 

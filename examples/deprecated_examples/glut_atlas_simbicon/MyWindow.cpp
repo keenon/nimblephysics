@@ -38,7 +38,7 @@
 MyWindow::MyWindow(Controller* _controller)
   : SimWindow(), mController(_controller)
 {
-  mForce = Eigen::Vector3d::Zero();
+  mForce = Eigen::Vector3s::Zero();
   mImpulseDuration = 0.0;
 }
 
@@ -83,12 +83,12 @@ void MyWindow::drawSkels()
   // draw arrow
   if (mImpulseDuration > 0)
   {
-    Eigen::Vector3d poa = mWorld->getSkeleton("drc_skeleton")
+    Eigen::Vector3s poa = mWorld->getSkeleton("drc_skeleton")
                               ->getBodyNode("pelvis")
                               ->getTransform()
-                          * Eigen::Vector3d(0.0, 0.0, 0.0);
-    Eigen::Vector3d start = poa - mForce / 500.0;
-    double len = mForce.norm() / 500.0;
+                          * Eigen::Vector3s(0.0, 0.0, 0.0);
+    Eigen::Vector3s start = poa - mForce / 500.0;
+    s_t len = mForce.norm() / 500.0;
     dart::gui::drawArrow3D(start, mForce, len, 0.05, 0.1);
   }
 }

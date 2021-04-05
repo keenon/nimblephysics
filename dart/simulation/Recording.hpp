@@ -81,32 +81,32 @@ public:
 
   /// \brief Get skeleton configurations whose index is _skelIdx at frame number
   /// _frameIdx
-  Eigen::VectorXd getConfig(int _frameIdx, int _skelIdx) const;
+  Eigen::VectorXs getConfig(int _frameIdx, int _skelIdx) const;
 
   /// \brief Get _dofIdx-th single configruation of a skeleton whose index is
   /// _skelIdx at frame number _frameIdx
-  double getGenCoord(int _frameIdx, int _skelIdx, int _dofIdx) const;
+  s_t getGenCoord(int _frameIdx, int _skelIdx, int _dofIdx) const;
 
   /// \brief Get contact point whose index is _contactIdx at frame number
   /// _frameIdx
-  Eigen::Vector3d getContactPoint(int _frameIdx, int _contactIdx) const;
+  Eigen::Vector3s getContactPoint(int _frameIdx, int _contactIdx) const;
 
   /// \brief Get contact force whose index is _contactIdx at frame number
   /// _frameIdx
-  Eigen::Vector3d getContactForce(int _frameIdx, int _contactIdx) const;
+  Eigen::Vector3s getContactForce(int _frameIdx, int _contactIdx) const;
 
   /// \brief Clear the saved histories
   void clear();  
 
   /// \brief Add state
-  void addState(const Eigen::VectorXd& _state);
+  void addState(const Eigen::VectorXs& _state);
 
   /// \brief Update list for number of generalized coordinates
   void updateNumGenCoords(const std::vector<dynamics::SkeletonPtr>& _skeletons);
 
 private:
   /// \brief Baked states
-  std::vector<Eigen::VectorXd> mBakedStates;
+  std::vector<Eigen::VectorXs> mBakedStates;
 
   /// \brief Number of generalized coordinates for skeletons
   std::vector<int> mNumGenCoordsForSkeletons;

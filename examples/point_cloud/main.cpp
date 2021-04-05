@@ -96,8 +96,8 @@ public:
       return;
 
     // Set robot pose
-    Eigen::VectorXd pos = mRobot->getPositions();
-    pos += 0.01 * Eigen::VectorXd::Random(pos.size());
+    Eigen::VectorXs pos = mRobot->getPositions();
+    pos += 0.01 * Eigen::VectorXs::Random(pos.size());
     mRobot->setPositions(pos);
 
     // Generate point cloud from robot meshes
@@ -111,17 +111,17 @@ public:
       case SAMPLE_IN_BOX:
         pointCloud = generatePointCloudInBox(
             numPoints,
-            Eigen::Vector3d::Constant(-0.5),
-            Eigen::Vector3d::Constant(0.5));
+            Eigen::Vector3s::Constant(-0.5),
+            Eigen::Vector3s::Constant(0.5));
         break;
     }
 
     // Update sensor position
-    static double time = 0.0;
-    const double dt = 0.001;
-    const double radius = 1.0;
-    Eigen::Vector3d center = Eigen::Vector3d(0.0, 0.1, 0.0);
-    Eigen::Vector3d sensorPos = center;
+    static s_t time = 0.0;
+    const s_t dt = 0.001;
+    const s_t radius = 1.0;
+    Eigen::Vector3s center = Eigen::Vector3s(0.0, 0.1, 0.0);
+    Eigen::Vector3s sensorPos = center;
     sensorPos[0] = radius * std::sin(time);
     sensorPos[1] = radius * std::cos(time);
     sensorPos[2] = 0.5 + 0.25 * std::sin(time * 2.0);
@@ -214,9 +214,9 @@ protected:
           = math::Random::uniform<unsigned int>(0, numVertices - 1);
       auto vertex = assimpMesh->mVertices[vertexIndex];
 
-      Eigen::Isometry3d tf = shapeNode->getWorldTransform();
-      Eigen::Vector3d eigenVertex
-          = Eigen::Vector3f(vertex.x, vertex.y, vertex.z).cast<double>();
+      Eigen::Isometry3s tf = shapeNode->getWorldTransform();
+      Eigen::Vector3s eigenVertex
+          = Eigen::Vector3f(vertex.x, vertex.y, vertex.z).cast<s_t>();
       eigenVertex = tf * eigenVertex;
 
       pointCloud.push_back(
@@ -231,15 +231,15 @@ protected:
 
   octomap::Pointcloud generatePointCloudInBox(
       std::size_t numPoints,
-      const Eigen::Vector3d& min = Eigen::Vector3d::Constant(-0.5),
-      const Eigen::Vector3d& max = Eigen::Vector3d::Constant(0.5))
+      const Eigen::Vector3s& min = Eigen::Vector3s::Constant(-0.5),
+      const Eigen::Vector3s& max = Eigen::Vector3s::Constant(0.5))
   {
     octomap::Pointcloud pointCloud;
     pointCloud.reserve(numPoints);
 
     for (auto i = 0u; i < numPoints; ++i)
     {
-      const Eigen::Vector3d point = math::Random::uniform(min, max);
+      const Eigen::Vector3s point = math::Random::uniform(min, max);
       pointCloud.push_back(
           static_cast<float>(point.x()),
           static_cast<float>(point.y()),
@@ -249,21 +249,21 @@ protected:
     return pointCloud;
   }
 
-  std::vector<Eigen::Vector4d, Eigen::aligned_allocator<Eigen::Vector4d>>
+  std::vector<Eigen::Vector4s, Eigen::aligned_allocator<Eigen::Vector4s>>
   generatePointCloudColors(const octomap::Pointcloud& pointCloud)
   {
     const auto& points = mPointCloudShape->getPoints();
-    double minZ = std::numeric_limits<double>::max();
-    double maxZ = std::numeric_limits<double>::min();
+    s_t minZ = std::numeric_limits<s_t>::max();
+    s_t maxZ = std::numeric_limits<s_t>::min();
     for (const auto& point : points)
     {
       minZ = std::min(minZ, point.z());
       maxZ = std::max(maxZ, point.z());
     }
-    double diffZ
-        = std::max(std::abs(maxZ - minZ), std::numeric_limits<double>::min());
+    s_t diffZ
+        = std::max(abs(maxZ - minZ), std::numeric_limits<s_t>::min());
 
-    std::vector<Eigen::Vector4d, Eigen::aligned_allocator<Eigen::Vector4d>>
+    std::vector<Eigen::Vector4s, Eigen::aligned_allocator<Eigen::Vector4s>>
         colors;
     colors.reserve(pointCloud.size());
     for (const auto& point : pointCloud)
@@ -275,7 +275,7 @@ protected:
       r = math::clip(r, 0.1f, 0.9f);
       g = math::clip(g, 0.1f, 0.9f);
       b = math::clip(b, 0.1f, 0.9f);
-      colors.emplace_back(Eigen::Vector4f(r, g, b, 0.75).cast<double>());
+      colors.emplace_back(Eigen::Vector4f(r, g, b, 0.75).cast<s_t>());
     }
 
     return colors;
@@ -431,7 +431,7 @@ public:
           if (colorMode == 0)
           {
             auto visual = mNode->getPointCloudVisualAspect();
-            Eigen::Vector4d rgba = visual->getRGBA();
+            Eigen::Vector4s rgba = visual->getRGBA();
             float color_rbga[4];
             color_rbga[0] = static_cast<float>(rgba[0]);
             color_rbga[1] = static_cast<float>(rgba[1]);
@@ -439,10 +439,10 @@ public:
             color_rbga[3] = static_cast<float>(rgba[3]);
             if (ImGui::ColorEdit4("Color", color_rbga))
             {
-              rgba[0] = static_cast<double>(color_rbga[0]);
-              rgba[1] = static_cast<double>(color_rbga[1]);
-              rgba[2] = static_cast<double>(color_rbga[2]);
-              rgba[3] = static_cast<double>(color_rbga[3]);
+              rgba[0] = static_cast<s_t>(color_rbga[0]);
+              rgba[1] = static_cast<s_t>(color_rbga[1]);
+              rgba[2] = static_cast<s_t>(color_rbga[2]);
+              rgba[3] = static_cast<s_t>(color_rbga[3]);
               visual->setRGBA(rgba);
             }
           }
@@ -480,7 +480,7 @@ public:
           {
             if (visualSize < 0.01f)
               visualSize = 0.01f;
-            pointCloudShape->setVisualSize(static_cast<double>(visualSize));
+            pointCloudShape->setVisualSize(static_cast<s_t>(visualSize));
           }
         }
 
@@ -498,7 +498,7 @@ public:
         if (vgShow)
         {
           auto visual = mNode->getVoxelGridVisualAspect();
-          Eigen::Vector4d rgba = visual->getRGBA();
+          Eigen::Vector4s rgba = visual->getRGBA();
           float color_rbga[4];
           color_rbga[0] = static_cast<float>(rgba[0]);
           color_rbga[1] = static_cast<float>(rgba[1]);
@@ -506,10 +506,10 @@ public:
           color_rbga[3] = static_cast<float>(rgba[3]);
           if (ImGui::ColorEdit4("Voxel grid color", color_rbga))
           {
-            rgba[0] = static_cast<double>(color_rbga[0]);
-            rgba[1] = static_cast<double>(color_rbga[1]);
-            rgba[2] = static_cast<double>(color_rbga[2]);
-            rgba[3] = static_cast<double>(color_rbga[3]);
+            rgba[0] = static_cast<s_t>(color_rbga[0]);
+            rgba[1] = static_cast<s_t>(color_rbga[1]);
+            rgba[2] = static_cast<s_t>(color_rbga[2]);
+            rgba[3] = static_cast<s_t>(color_rbga[3]);
             visual->setRGBA(rgba);
           }
         }
@@ -543,13 +543,13 @@ public:
           ImGui::Columns(3);
           offset = mGrid->getOffset().cast<float>();
           if (ImGui::InputFloat("X", &offset[0], 0.1f, 0.5f, "%.1f"))
-            mGrid->setOffset(offset.cast<double>());
+            mGrid->setOffset(offset.cast<s_t>());
           ImGui::NextColumn();
           if (ImGui::InputFloat("Y", &offset[1], 0.1f, 0.5f, "%.1f"))
-            mGrid->setOffset(offset.cast<double>());
+            mGrid->setOffset(offset.cast<s_t>());
           ImGui::NextColumn();
           if (ImGui::InputFloat("Z", &offset[2], 0.1f, 0.5f, "%.1f"))
-            mGrid->setOffset(offset.cast<double>());
+            mGrid->setOffset(offset.cast<s_t>());
           ImGui::Columns(1);
 
           static int cellCount;
@@ -565,7 +565,7 @@ public:
           cellStepSize = static_cast<float>(mGrid->getMinorLineStepSize());
           if (ImGui::InputFloat("Line Step Size", &cellStepSize, 0.001f, 0.1f))
           {
-            mGrid->setMinorLineStepSize(static_cast<double>(cellStepSize));
+            mGrid->setMinorLineStepSize(static_cast<s_t>(cellStepSize));
           }
 
           static int minorLinesPerMajorLine;
@@ -603,9 +603,9 @@ public:
           majorColor[2] = static_cast<float>(internalmajorColor.z());
           if (ImGui::ColorEdit3("Major Line Color", majorColor))
           {
-            internalmajorColor[0] = static_cast<double>(majorColor[0]);
-            internalmajorColor[1] = static_cast<double>(majorColor[1]);
-            internalmajorColor[2] = static_cast<double>(majorColor[2]);
+            internalmajorColor[0] = static_cast<s_t>(majorColor[0]);
+            internalmajorColor[1] = static_cast<s_t>(majorColor[1]);
+            internalmajorColor[2] = static_cast<s_t>(majorColor[2]);
             mGrid->setMajorLineColor(internalmajorColor);
           }
 
@@ -624,9 +624,9 @@ public:
           minorColor[2] = static_cast<float>(internalMinorColor.z());
           if (ImGui::ColorEdit3("Minor Line Color", minorColor))
           {
-            internalMinorColor[0] = static_cast<double>(minorColor[0]);
-            internalMinorColor[1] = static_cast<double>(minorColor[1]);
-            internalMinorColor[2] = static_cast<double>(minorColor[2]);
+            internalMinorColor[0] = static_cast<s_t>(minorColor[0]);
+            internalMinorColor[1] = static_cast<s_t>(minorColor[1]);
+            internalMinorColor[2] = static_cast<s_t>(minorColor[2]);
             mGrid->setMinorLineColor(internalMinorColor);
           }
         }
@@ -652,7 +652,7 @@ dynamics::SkeletonPtr createRobot(const std::string& name)
 
   // Rotate the robot so that z is upwards (default transform is not Identity)
   robot->getJoint(0)->setTransformFromParentBodyNode(
-      Eigen::Isometry3d::Identity());
+      Eigen::Isometry3s::Identity());
 
   robot->setName(name);
 
@@ -666,16 +666,16 @@ dynamics::SkeletonPtr createGround()
   auto ground = urdfParser.parseSkeleton("dart://sample/urdf/KR5/ground.urdf");
 
   // Rotate and move the ground so that z is upwards
-  Eigen::Isometry3d ground_tf
+  Eigen::Isometry3s ground_tf
       = ground->getJoint(0)->getTransformFromParentBodyNode();
-  ground_tf.pretranslate(Eigen::Vector3d(0, 0, 0.5));
-  ground_tf.rotate(Eigen::AngleAxisd(M_PI / 2, Eigen::Vector3d(1, 0, 0)));
+  ground_tf.pretranslate(Eigen::Vector3s(0, 0, 0.5));
+  ground_tf.rotate(Eigen::AngleAxis_s(M_PI / 2, Eigen::Vector3s(1, 0, 0)));
   ground->getJoint(0)->setTransformFromParentBodyNode(ground_tf);
 
   return ground;
 }
 
-dynamics::SimpleFramePtr createVoxelFrame(double resolution = 0.01)
+dynamics::SimpleFramePtr createVoxelFrame(s_t resolution = 0.01)
 {
   auto voxelShape
       = ::std::make_shared<dart::dynamics::VoxelGridShape>(resolution);
@@ -719,7 +719,7 @@ dynamics::SimpleFramePtr createSensorFrame()
 int main()
 {
   auto world = dart::simulation::World::create();
-  world->setGravity(Eigen::Vector3d::Zero());
+  world->setGravity(Eigen::Vector3s::Zero());
 
   auto robot = createRobot(robotName);
   world->addSkeleton(robot);

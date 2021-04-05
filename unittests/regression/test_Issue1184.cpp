@@ -49,7 +49,7 @@ TEST(Issue1184, Accuracy)
   struct ShapeInfo
   {
     dart::dynamics::ShapePtr shape;
-    double offset;
+    s_t offset;
   };
 
   std::function<ShapeInfo()> makePlaneGround =
@@ -57,29 +57,29 @@ TEST(Issue1184, Accuracy)
   {
     return ShapeInfo{
       std::make_shared<dart::dynamics::PlaneShape>(
-            Eigen::Vector3d::UnitZ(), 0.0),
+            Eigen::Vector3s::UnitZ(), 0.0),
       0.0};
   };
 
   std::function<ShapeInfo()> makeBoxGround =
       []()
   {
-    const double thickness = 0.1;
+    const s_t thickness = 0.1;
     return ShapeInfo{
       std::make_shared<dart::dynamics::BoxShape>(
-            Eigen::Vector3d(100.0, 100.0, thickness)),
+            Eigen::Vector3s(100.0, 100.0, thickness)),
       -thickness/2.0};
   };
 
-  std::function<dart::dynamics::ShapePtr(double)> makeBoxObject =
-      [](const double s) -> dart::dynamics::ShapePtr
+  std::function<dart::dynamics::ShapePtr(s_t)> makeBoxObject =
+      [](const s_t s) -> dart::dynamics::ShapePtr
   {
     return std::make_shared<dart::dynamics::BoxShape>(
-          Eigen::Vector3d::Constant(2*s));
+          Eigen::Vector3s::Constant(2*s));
   };
 
-  std::function<dart::dynamics::ShapePtr(double)> makeSphereObject =
-      [](const double s) -> dart::dynamics::ShapePtr
+  std::function<dart::dynamics::ShapePtr(s_t)> makeSphereObject =
+      [](const s_t s) -> dart::dynamics::ShapePtr
   {
     return std::make_shared<dart::dynamics::SphereShape>(s);
   };
@@ -90,22 +90,22 @@ TEST(Issue1184, Accuracy)
   const auto objectShapeFunctions = {makeSphereObject};
   const auto halfsizes = {10.0};
   const auto fallingModes = {true};
-  const double dropHeight = 0.1;
-  const double tolerance = 1e-3;
+  const s_t dropHeight = 0.1;
+  const s_t tolerance = 1e-3;
 #else
   const auto groundInfoFunctions = {makePlaneGround, makeBoxGround};
   const auto objectShapeFunctions = {makeBoxObject, makeSphereObject};
   const auto halfsizes = {0.25, 1.0, 5.0, 10.0, 20.0};
   const auto fallingModes = {true, false};
-  const double dropHeight = 1.0;
-  const double tolerance = 1e-3;
+  const s_t dropHeight = 1.0;
+  const s_t tolerance = 1e-3;
 #endif
 
   for(const auto& groundInfoFunction : groundInfoFunctions)
   {
     for(const auto& objectShapeFunction : objectShapeFunctions)
     {
-      for(const double halfsize : halfsizes)
+      for(const s_t halfsize : halfsizes)
       {
         for(const bool falling : fallingModes)
         {
@@ -113,9 +113,9 @@ TEST(Issue1184, Accuracy)
           world->getConstraintSolver()->setCollisionDetector(
                 dart::collision::BulletCollisionDetector::create());
 
-          Eigen::Isometry3d tf_object = Eigen::Isometry3d::Identity();
-          const double initialHeight = falling? dropHeight+halfsize : halfsize;
-          tf_object.translate(initialHeight*Eigen::Vector3d::UnitZ());
+          Eigen::Isometry3s tf_object = Eigen::Isometry3s::Identity();
+          const s_t initialHeight = falling? dropHeight+halfsize : halfsize;
+          tf_object.translate(initialHeight*Eigen::Vector3s::UnitZ());
 
           auto object = dart::dynamics::Skeleton::create("ball");
           object->createJointAndBodyNodePair<dart::dynamics::FreeJoint>()
@@ -136,26 +136,26 @@ TEST(Issue1184, Accuracy)
                 dart::dynamics::VisualAspect,
                 dart::dynamics::CollisionAspect>(groundInfo.shape);
 
-          Eigen::Isometry3d tf_ground = Eigen::Isometry3d::Identity();
-          tf_ground.translate(groundInfo.offset*Eigen::Vector3d::UnitZ());
+          Eigen::Isometry3s tf_ground = Eigen::Isometry3s::Identity();
+          tf_ground.translate(groundInfo.offset*Eigen::Vector3s::UnitZ());
           ground->getJoint(0)->setTransformFromParentBodyNode(tf_ground);
 
           world->addSkeleton(ground);
 
           // time until the object will strike
-          const double t_strike = falling?
+          const s_t t_strike = falling?
               sqrt(-2.0*dropHeight/world->getGravity()[2]) : 0.0;
 
           // give the object some time to settle
-          const double min_time = 0.5;
-          const double t_limit = 30.0*t_strike + min_time;
+          const s_t min_time = 0.5;
+          const s_t t_limit = 30.0*t_strike + min_time;
 
-          double lowestHeight = std::numeric_limits<double>::infinity();
-          double time = 0.0;
+          s_t lowestHeight = std::numeric_limits<s_t>::infinity();
+          s_t time = 0.0;
           while(time < t_limit)
           {
             world->step();
-            const double currentHeight =
+            const s_t currentHeight =
                 object->getBodyNode(0)->getTransform().translation()[2];
 
             if(currentHeight < lowestHeight)
@@ -172,7 +172,7 @@ TEST(Issue1184, Accuracy)
               << "\nground type: " << groundInfo.shape->getType()
               << "\nfalling: " << falling << "\n";
 
-          const double finalHeight =
+          const s_t finalHeight =
               object->getBodyNode(0)->getTransform().translation()[2];
 
           EXPECT_NEAR(halfsize, finalHeight, tolerance)

@@ -34,6 +34,7 @@
 #define DART_DYNAMICS_CONESHAPE_HPP_
 
 #include "dart/dynamics/Shape.hpp"
+#include "dart/math/MathTypes.hpp"
 
 namespace dart {
 namespace dynamics {
@@ -43,11 +44,10 @@ namespace dynamics {
 class ConeShape : public Shape
 {
 public:
-
   /// Constructor.
   /// \param[in] radius Radius of the circular base.
   /// \param[in] height Lateral height of the cone.
-  ConeShape(double radius, double height);
+  ConeShape(s_t radius, s_t height);
 
   // Documentation inherited.
   const std::string& getType() const override;
@@ -56,21 +56,21 @@ public:
   static const std::string& getStaticType();
 
   /// Get the radius of the circular base.
-  double getRadius() const;
+  s_t getRadius() const;
 
   /// Set the radius of the circular base.
-  void setRadius(double radius);
+  void setRadius(s_t radius);
 
   /// Get the lateral height of the cone.
-  double getHeight() const;
+  s_t getHeight() const;
 
   /// Set the lateral height of the cone.
-  void setHeight(double height);
+  void setHeight(s_t height);
 
   /// Compute volume from given properties.
   /// \param[in] radius Radius of the circular base.
   /// \param[in] height Lateral height of the cone.
-  static double computeVolume(double radius, double height);
+  static s_t computeVolume(s_t radius, s_t height);
 
   /// Compute moments of inertia of a cone at the center of geometric center
   /// (half of the z-axis segment between the tip and the center of the base
@@ -78,11 +78,10 @@ public:
   /// \param[in] radius Radius of the circular base.
   /// \param[in] height Lateral height of the cone.
   /// \param[in] mass The mass of the cone.
-  static Eigen::Matrix3d computeInertia(
-      double radius, double height, double mass);
+  static Eigen::Matrix3s computeInertia(s_t radius, s_t height, s_t mass);
 
   // Documentation inherited.
-  Eigen::Matrix3d computeInertia(double mass) const override;
+  Eigen::Matrix3s computeInertia(s_t mass) const override;
 
 protected:
   // Documentation inherited.
@@ -93,14 +92,13 @@ protected:
 
 private:
   /// Radius of the circular base.
-  double mRadius;
+  s_t mRadius;
 
   /// Height of the cylindrical part.
-  double mHeight;
-
+  s_t mHeight;
 };
 
-}  // namespace dynamics
-}  // namespace dart
+} // namespace dynamics
+} // namespace dart
 
-#endif  // DART_DYNAMICS_CONESHAPE_HPP_
+#endif // DART_DYNAMICS_CONESHAPE_HPP_

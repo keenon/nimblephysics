@@ -39,41 +39,41 @@ int main()
 {
   dart::simulation::WorldPtr world(new dart::simulation::World);
 
-  Eigen::Isometry3d tf(Eigen::Isometry3d::Identity());
+  Eigen::Isometry3s tf(Eigen::Isometry3s::Identity());
 
-  tf.translation() = Eigen::Vector3d(4, -4, 0);
+  tf.translation() = Eigen::Vector3s(4, -4, 0);
   dart::gui::osg::InteractiveFramePtr frame(
       new dart::gui::osg::InteractiveFrame(
           Frame::World(), "interactive frame", tf, 2.0));
   world->addSimpleFrame(frame);
 
-  tf.translation() = Eigen::Vector3d(-4, 4, 0);
+  tf.translation() = Eigen::Vector3s(-4, 4, 0);
   SimpleFramePtr draggable(new SimpleFrame(frame.get(), "draggable", tf));
-  draggable->setShape(std::make_shared<BoxShape>(Eigen::Vector3d(1, 1, 1)));
+  draggable->setShape(std::make_shared<BoxShape>(Eigen::Vector3s(1, 1, 1)));
   world->addSimpleFrame(draggable);
 
-  tf.translation() = Eigen::Vector3d(8.0, 0.0, 0.0);
+  tf.translation() = Eigen::Vector3s(8.0, 0.0, 0.0);
   SimpleFramePtr x_marker(new SimpleFrame(Frame::World(), "X", tf));
   std::shared_ptr<BoxShape> x_shape(
-      new BoxShape(Eigen::Vector3d(0.2, 0.2, 0.2)));
+      new BoxShape(Eigen::Vector3s(0.2, 0.2, 0.2)));
   x_marker->setShape(x_shape);
-  x_marker->getVisualAspect(true)->setColor(Eigen::Vector3d(0.9, 0.0, 0.0));
+  x_marker->getVisualAspect(true)->setColor(Eigen::Vector3s(0.9, 0.0, 0.0));
   world->addSimpleFrame(x_marker);
 
-  tf.translation() = Eigen::Vector3d(0.0, 8.0, 0.0);
+  tf.translation() = Eigen::Vector3s(0.0, 8.0, 0.0);
   SimpleFramePtr y_marker(new SimpleFrame(Frame::World(), "Y", tf));
   std::shared_ptr<BoxShape> y_shape(
-      new BoxShape(Eigen::Vector3d(0.2, 0.2, 0.2)));
+      new BoxShape(Eigen::Vector3s(0.2, 0.2, 0.2)));
   y_marker->setShape(y_shape);
-  y_marker->getVisualAspect(true)->setColor(Eigen::Vector3d(0.0, 0.9, 0.0));
+  y_marker->getVisualAspect(true)->setColor(Eigen::Vector3s(0.0, 0.9, 0.0));
   world->addSimpleFrame(y_marker);
 
-  tf.translation() = Eigen::Vector3d(0.0, 0.0, 8.0);
+  tf.translation() = Eigen::Vector3s(0.0, 0.0, 8.0);
   SimpleFramePtr z_marker(new SimpleFrame(Frame::World(), "Z", tf));
   std::shared_ptr<BoxShape> z_shape(
-      new BoxShape(Eigen::Vector3d(0.2, 0.2, 0.2)));
+      new BoxShape(Eigen::Vector3s(0.2, 0.2, 0.2)));
   z_marker->setShape(z_shape);
-  z_marker->getVisualAspect(true)->setColor(Eigen::Vector3d(0.0, 0.0, 0.9));
+  z_marker->getVisualAspect(true)->setColor(Eigen::Vector3s(0.0, 0.0, 0.9));
   world->addSimpleFrame(z_marker);
 
   ::osg::ref_ptr<dart::gui::osg::WorldNode> node

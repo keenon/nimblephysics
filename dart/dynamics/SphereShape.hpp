@@ -42,7 +42,7 @@ class SphereShape : public Shape
 {
 public:
   /// Constructor.
-  explicit SphereShape(double radius);
+  explicit SphereShape(s_t radius);
 
   /// Destructor.
   virtual ~SphereShape();
@@ -54,19 +54,19 @@ public:
   static const std::string& getStaticType();
 
   /// Set radius of this box.
-  void setRadius(double radius);
+  void setRadius(s_t radius);
 
   /// Get radius of this box.
-  double getRadius() const;
+  s_t getRadius() const;
 
   /// Compute volume from given properties
-  static double computeVolume(double radius);
+  static s_t computeVolume(s_t radius);
 
   /// Compute moments of inertia of a Sphere
-  static Eigen::Matrix3d computeInertia(double radius, double mass);
+  static Eigen::Matrix3s computeInertia(s_t radius, s_t mass);
 
   // Documentation inherited.
-  Eigen::Matrix3d computeInertia(double mass) const override;
+  Eigen::Matrix3s computeInertia(s_t mass) const override;
 
 protected:
   // Documentation inherited.
@@ -77,7 +77,7 @@ protected:
 
 private:
   /// Radius of this Sphere
-  double mRadius;
+  s_t mRadius;
 };
 
 }  // namespace dynamics

@@ -39,7 +39,7 @@ int WrtMassBodyNodyEntry::dim()
 
 //==============================================================================
 void WrtMassBodyNodyEntry::set(
-    dynamics::Skeleton* skel, const Eigen::Ref<Eigen::VectorXd>& value)
+    dynamics::Skeleton* skel, const Eigen::Ref<Eigen::VectorXs>& value)
 {
   dynamics::BodyNode* node = skel->getBodyNode(linkName);
   if (type == INERTIA_MASS)
@@ -115,7 +115,7 @@ void WrtMassBodyNodyEntry::set(
 
 //==============================================================================
 void WrtMassBodyNodyEntry::get(
-    dynamics::Skeleton* skel, Eigen::Ref<Eigen::VectorXd> out)
+    dynamics::Skeleton* skel, Eigen::Ref<Eigen::VectorXs> out)
 {
   dynamics::BodyNode* node = skel->getBodyNode(linkName);
   if (type == INERTIA_MASS)
@@ -130,7 +130,7 @@ void WrtMassBodyNodyEntry::get(
     return;
   }
 
-  Eigen::MatrixXd moment = node->getInertia().getMoment();
+  Eigen::MatrixXs moment = node->getInertia().getMoment();
   if (type == INERTIA_DIAGONAL)
   {
     out(0) = moment(0, 0); // I_XX
@@ -162,8 +162,8 @@ void WrtMassBodyNodyEntry::get(
 WrtMassBodyNodyEntry& WithRespectToMass::registerNode(
     dynamics::BodyNode* node,
     WrtMassBodyNodeEntryType type,
-    Eigen::VectorXd upperBound,
-    Eigen::VectorXd lowerBound)
+    Eigen::VectorXs upperBound,
+    Eigen::VectorXs lowerBound)
 {
   std::string skelName = node->getSkeleton()->getName();
   std::vector<WrtMassBodyNodyEntry>& skelEntries = mEntries[skelName];
@@ -182,15 +182,15 @@ WrtMassBodyNodyEntry& WithRespectToMass::registerNode(
   assert(mUpperBounds.size() == mLowerBounds.size());
 
   // Append to the lower bound vector
-  Eigen::VectorXd newMassLowerBound
-      = Eigen::VectorXd::Zero(mLowerBounds.size() + dim);
+  Eigen::VectorXs newMassLowerBound
+      = Eigen::VectorXs::Zero(mLowerBounds.size() + dim);
   newMassLowerBound.segment(0, mLowerBounds.size()) = mLowerBounds;
   newMassLowerBound.segment(mLowerBounds.size(), dim) = lowerBound;
   mLowerBounds = newMassLowerBound;
 
   // Append to the upper bound vector
-  Eigen::VectorXd newMassUpperBound
-      = Eigen::VectorXd::Zero(mUpperBounds.size() + dim);
+  Eigen::VectorXs newMassUpperBound
+      = Eigen::VectorXs::Zero(mUpperBounds.size() + dim);
   newMassUpperBound.segment(0, mUpperBounds.size()) = mUpperBounds;
   newMassUpperBound.segment(mUpperBounds.size(), dim) = upperBound;
   mUpperBounds = newMassUpperBound;
@@ -221,10 +221,10 @@ WrtMassBodyNodyEntry& WithRespectToMass::getNode(dynamics::BodyNode* node)
 
 //==============================================================================
 /// This returns this WRT from the world as a vector
-Eigen::VectorXd WithRespectToMass::get(simulation::World* world)
+Eigen::VectorXs WithRespectToMass::get(simulation::World* world)
 {
   int worldDim = dim(world);
-  Eigen::VectorXd result = Eigen::VectorXd::Zero(worldDim);
+  Eigen::VectorXs result = Eigen::VectorXs::Zero(worldDim);
   int cursor = 0;
   for (int i = 0; i < world->getNumSkeletons(); i++)
   {
@@ -239,14 +239,14 @@ Eigen::VectorXd WithRespectToMass::get(simulation::World* world)
 
 //==============================================================================
 /// This returns this WRT from this skeleton as a vector
-Eigen::VectorXd WithRespectToMass::get(dynamics::Skeleton* skel)
+Eigen::VectorXs WithRespectToMass::get(dynamics::Skeleton* skel)
 {
   std::vector<WrtMassBodyNodyEntry>& skelEntries = mEntries[skel->getName()];
   if (skelEntries.size() == 0)
-    return Eigen::VectorXd::Zero(0);
+    return Eigen::VectorXs::Zero(0);
   int cursor = 0;
   int skelDim = dim(skel);
-  Eigen::VectorXd result = Eigen::VectorXd::Zero(skelDim);
+  Eigen::VectorXs result = Eigen::VectorXs::Zero(skelDim);
   for (WrtMassBodyNodyEntry& entry : skelEntries)
   {
     entry.get(skel, result.segment(cursor, entry.dim()));
@@ -258,7 +258,7 @@ Eigen::VectorXd WithRespectToMass::get(dynamics::Skeleton* skel)
 
 //==============================================================================
 /// This sets the world's state based on our WRT
-void WithRespectToMass::set(simulation::World* world, Eigen::VectorXd value)
+void WithRespectToMass::set(simulation::World* world, Eigen::VectorXs value)
 {
   int cursor = 0;
   for (int i = 0; i < world->getNumSkeletons(); i++)
@@ -273,7 +273,7 @@ void WithRespectToMass::set(simulation::World* world, Eigen::VectorXd value)
 
 //==============================================================================
 /// This sets the skeleton's state based on our WRT
-void WithRespectToMass::set(dynamics::Skeleton* skel, Eigen::VectorXd value)
+void WithRespectToMass::set(dynamics::Skeleton* skel, Eigen::VectorXs value)
 {
   std::vector<WrtMassBodyNodyEntry>& skelEntries = mEntries[skel->getName()];
   if (skelEntries.size() == 0)
@@ -314,14 +314,14 @@ int WithRespectToMass::dim(dynamics::Skeleton* skel)
 
 /// This gives a vector of upper bound values for this WRT, given state in the
 /// world
-Eigen::VectorXd WithRespectToMass::upperBound(simulation::World* /* world */)
+Eigen::VectorXs WithRespectToMass::upperBound(simulation::World* /* world */)
 {
   return mUpperBounds;
 }
 
 /// This gives a vector of lower bound values for this WRT, given state in the
 /// world
-Eigen::VectorXd WithRespectToMass::lowerBound(simulation::World* /* world */)
+Eigen::VectorXs WithRespectToMass::lowerBound(simulation::World* /* world */)
 {
   return mLowerBounds;
 }

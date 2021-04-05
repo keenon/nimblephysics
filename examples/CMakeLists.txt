@@ -7,13 +7,11 @@ add_subdirectory(hello_world)
 add_subdirectory(speed_test)
 
 # OSG renderer examples
-add_subdirectory(atlas_puppet)
 add_subdirectory(atlas_simbicon)
 add_subdirectory(box_stacking)
 add_subdirectory(drag_and_drop)
 add_subdirectory(empty)
 add_subdirectory(heightmap)
-add_subdirectory(hubo_puppet)
 add_subdirectory(imgui)
 add_subdirectory(operational_space_control)
 if(HAVE_OCTOMAP)
@@ -21,7 +19,6 @@ if(HAVE_OCTOMAP)
 endif()
 add_subdirectory(soft_bodies)
 add_subdirectory(tinkertoy)
-add_subdirectory(wam_ikfast)
 
 # Deprecated examples
 add_subdirectory(deprecated_examples)

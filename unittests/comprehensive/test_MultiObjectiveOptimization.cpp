@@ -18,8 +18,8 @@ using dart::optimizer::UniqueFunctionPtr;
 
 //==============================================================================
 static int dimension = 10;
-static Eigen::VectorXd lowerLimits = Eigen::VectorXd::Zero(dimension);
-static Eigen::VectorXd upperLimits = Eigen::VectorXd::Constant(dimension, 1.0);
+static Eigen::VectorXs lowerLimits = Eigen::VectorXs::Zero(dimension);
+static Eigen::VectorXs upperLimits = Eigen::VectorXs::Constant(dimension, 1.0);
 
 class ZDT1 : public MultiObjectiveProblem
 {
@@ -34,13 +34,13 @@ public:
     return 2u;
   }
 
-  Eigen::VectorXd evaluateObjectives(const Eigen::VectorXd& x) const override
+  Eigen::VectorXs evaluateObjectives(const Eigen::VectorXs& x) const override
   {
-    Eigen::VectorXd ret(getObjectiveDimension());
+    Eigen::VectorXs ret(getObjectiveDimension());
 
     ret[0] = x[0];
 
-    const double g = 1.0 + 9 * (x.sum() - x[0]) / double(dimension - 1);
+    const s_t g = 1.0 + 9 * (x.sum() - x[0]) / s_t(dimension - 1);
     ret[1] = g * (1.0 - std::sqrt(x[0] / g));
 
     return ret;
@@ -55,7 +55,7 @@ class Func1 : public Function
 public:
   Func1() = default;
 
-  double eval(const Eigen::VectorXd& x) override
+  s_t eval(const Eigen::VectorXs& x) override
   {
     return x[0];
   }
@@ -77,9 +77,9 @@ class Func2 : public Function
 public:
   Func2() = default;
 
-  double eval(const Eigen::VectorXd& x) override
+  s_t eval(const Eigen::VectorXs& x) override
   {
-    double g = 1.0 + 9 * (x.sum() - x[0]) / double(dimension - 1);
+    s_t g = 1.0 + 9 * (x.sum() - x[0]) / s_t(dimension - 1);
     return g * (1.0 - std::sqrt(x[0] / g));
   }
 

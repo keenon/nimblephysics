@@ -79,20 +79,20 @@ using namespace proto;
 
 TEST(PROTO, SERIALIZE_VECTOR)
 {
-  Eigen::VectorXd original = Eigen::VectorXd::Random(10);
-  proto::VectorXd proto;
+  Eigen::VectorXs original = Eigen::VectorXs::Random(10);
+  proto::VectorXs proto;
   serializeVector(proto, original);
-  Eigen::VectorXd recovered = deserializeVector(proto);
+  Eigen::VectorXs recovered = deserializeVector(proto);
 
   EXPECT_TRUE(equals(original, recovered, 0.0));
 }
 
 TEST(PROTO, SERIALIZE_MATRIX)
 {
-  Eigen::MatrixXd original = Eigen::MatrixXd::Random(10, 5);
-  proto::MatrixXd proto;
+  Eigen::MatrixXs original = Eigen::MatrixXs::Random(10, 5);
+  proto::MatrixXs proto;
   serializeMatrix(proto, original);
-  Eigen::MatrixXd recovered = deserializeMatrix(proto);
+  Eigen::MatrixXs recovered = deserializeMatrix(proto);
 
   EXPECT_TRUE(equals(original, recovered, 0.0));
 }
@@ -103,22 +103,22 @@ TEST(PROTO, SERIALIZE_ROLLOUT)
   int steps = 10;
 
   std::string representationMapping = "identity";
-  std::unordered_map<std::string, Eigen::MatrixXd> pos;
-  std::unordered_map<std::string, Eigen::MatrixXd> vel;
-  std::unordered_map<std::string, Eigen::MatrixXd> force;
-  Eigen::VectorXd mass = Eigen::VectorXd::Random(dofs);
-  std::unordered_map<std::string, Eigen::MatrixXd> metadata;
+  std::unordered_map<std::string, Eigen::MatrixXs> pos;
+  std::unordered_map<std::string, Eigen::MatrixXs> vel;
+  std::unordered_map<std::string, Eigen::MatrixXs> force;
+  Eigen::VectorXs mass = Eigen::VectorXs::Random(dofs);
+  std::unordered_map<std::string, Eigen::MatrixXs> metadata;
 
-  pos["identity"] = Eigen::MatrixXd::Random(dofs, steps);
-  pos["mapped"] = Eigen::MatrixXd::Random(dofs, steps);
-  vel["identity"] = Eigen::MatrixXd::Random(dofs, steps);
-  vel["mapped"] = Eigen::MatrixXd::Random(dofs, steps);
-  force["identity"] = Eigen::MatrixXd::Random(dofs, steps);
-  force["mapped"] = Eigen::MatrixXd::Random(dofs, steps);
+  pos["identity"] = Eigen::MatrixXs::Random(dofs, steps);
+  pos["mapped"] = Eigen::MatrixXs::Random(dofs, steps);
+  vel["identity"] = Eigen::MatrixXs::Random(dofs, steps);
+  vel["mapped"] = Eigen::MatrixXs::Random(dofs, steps);
+  force["identity"] = Eigen::MatrixXs::Random(dofs, steps);
+  force["mapped"] = Eigen::MatrixXs::Random(dofs, steps);
 
-  metadata["1"] = Eigen::MatrixXd::Random(dofs, steps);
-  metadata["2"] = Eigen::MatrixXd::Random(dofs, steps);
-  metadata["3"] = Eigen::MatrixXd::Random(dofs, steps);
+  metadata["1"] = Eigen::MatrixXs::Random(dofs, steps);
+  metadata["2"] = Eigen::MatrixXs::Random(dofs, steps);
+  metadata["3"] = Eigen::MatrixXs::Random(dofs, steps);
 
   TrajectoryRolloutReal rollout = TrajectoryRolloutReal(
       representationMapping, pos, vel, force, mass, metadata);

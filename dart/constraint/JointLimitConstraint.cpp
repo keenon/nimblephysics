@@ -34,25 +34,24 @@
 
 #include <iostream>
 
-#include "dart/external/odelcpsolver/lcp.h"
-
 #include "dart/common/Console.hpp"
 #include "dart/dynamics/BodyNode.hpp"
 #include "dart/dynamics/Joint.hpp"
 #include "dart/dynamics/Skeleton.hpp"
+#include "dart/external/odelcpsolver/lcp.h"
 
 #define DART_ERROR_ALLOWANCE 0.0
-#define DART_ERP     0.01
+#define DART_ERP 0.01
 #define DART_MAX_ERV 1e+1
-#define DART_CFM     1e-9
+#define DART_CFM 1e-9
 
 namespace dart {
 namespace constraint {
 
-double JointLimitConstraint::mErrorAllowance            = DART_ERROR_ALLOWANCE;
-double JointLimitConstraint::mErrorReductionParameter   = DART_ERP;
-double JointLimitConstraint::mMaxErrorReductionVelocity = DART_MAX_ERV;
-double JointLimitConstraint::mConstraintForceMixing     = DART_CFM;
+s_t JointLimitConstraint::mErrorAllowance = DART_ERROR_ALLOWANCE;
+s_t JointLimitConstraint::mErrorReductionParameter = DART_ERP;
+s_t JointLimitConstraint::mMaxErrorReductionVelocity = DART_MAX_ERV;
+s_t JointLimitConstraint::mConstraintForceMixing = DART_CFM;
 
 //==============================================================================
 JointLimitConstraint::JointLimitConstraint(dynamics::Joint* _joint)
@@ -85,7 +84,7 @@ JointLimitConstraint::~JointLimitConstraint()
 }
 
 //==============================================================================
-void JointLimitConstraint::setErrorAllowance(double _allowance)
+void JointLimitConstraint::setErrorAllowance(s_t _allowance)
 {
   // Clamp error reduction parameter if it is out of the range
   if (_allowance < 0.0)
@@ -100,13 +99,13 @@ void JointLimitConstraint::setErrorAllowance(double _allowance)
 }
 
 //==============================================================================
-double JointLimitConstraint::getErrorAllowance()
+s_t JointLimitConstraint::getErrorAllowance()
 {
   return mErrorAllowance;
 }
 
 //==============================================================================
-void JointLimitConstraint::setErrorReductionParameter(double _erp)
+void JointLimitConstraint::setErrorReductionParameter(s_t _erp)
 {
   // Clamp error reduction parameter if it is out of the range [0, 1]
   if (_erp < 0.0)
@@ -126,13 +125,13 @@ void JointLimitConstraint::setErrorReductionParameter(double _erp)
 }
 
 //==============================================================================
-double JointLimitConstraint::getErrorReductionParameter()
+s_t JointLimitConstraint::getErrorReductionParameter()
 {
   return mErrorReductionParameter;
 }
 
 //==============================================================================
-void JointLimitConstraint::setMaxErrorReductionVelocity(double _erv)
+void JointLimitConstraint::setMaxErrorReductionVelocity(s_t _erv)
 {
   // Clamp maximum error reduction velocity if it is out of the range
   if (_erv < 0.0)
@@ -147,25 +146,27 @@ void JointLimitConstraint::setMaxErrorReductionVelocity(double _erv)
 }
 
 //==============================================================================
-double JointLimitConstraint::getMaxErrorReductionVelocity()
+s_t JointLimitConstraint::getMaxErrorReductionVelocity()
 {
   return mMaxErrorReductionVelocity;
 }
 
 //==============================================================================
-void JointLimitConstraint::setConstraintForceMixing(double _cfm)
+void JointLimitConstraint::setConstraintForceMixing(s_t _cfm)
 {
   // Clamp constraint force mixing parameter if it is out of the range
   if (_cfm < 1e-9)
   {
     dtwarn << "Constraint force mixing parameter[" << _cfm
-           << "] is lower than 1e-9. " << "It is set to 1e-9." << std::endl;
+           << "] is lower than 1e-9. "
+           << "It is set to 1e-9." << std::endl;
     mConstraintForceMixing = 1e-9;
   }
   if (_cfm > 1.0)
   {
     dtwarn << "Constraint force mixing parameter[" << _cfm
-           << "] is greater than 1.0. " << "It is set to 1.0." << std::endl;
+           << "] is greater than 1.0. "
+           << "It is set to 1.0." << std::endl;
     mConstraintForceMixing = 1.0;
   }
 
@@ -173,7 +174,7 @@ void JointLimitConstraint::setConstraintForceMixing(double _cfm)
 }
 
 //==============================================================================
-double JointLimitConstraint::getConstraintForceMixing()
+s_t JointLimitConstraint::getConstraintForceMixing()
 {
   return mConstraintForceMixing;
 }
@@ -249,7 +250,7 @@ void JointLimitConstraint::getInformation(ConstraintInfo* _lcp)
 
     assert(_lcp->w[index] == 0.0);
 
-    double bouncingVel = -mViolation[i];
+    s_t bouncingVel = -mViolation[i];
 
     if (bouncingVel > 0.0)
       bouncingVel = -mErrorAllowance;
@@ -316,13 +317,13 @@ void JointLimitConstraint::applyUnitImpulse(std::size_t _index)
 }
 
 //==============================================================================
-void JointLimitConstraint::getVelocityChange(double* _delVel, bool _withCfm)
+void JointLimitConstraint::getVelocityChange(s_t* _delVel, bool _withCfm)
 {
   assert(_delVel != nullptr && "Null pointer is not allowed.");
 
   std::size_t localIndex = 0;
   std::size_t dof = mJoint->getNumDofs();
-  for (std::size_t i = 0; i < dof ; ++i)
+  for (std::size_t i = 0; i < dof; ++i)
   {
     if (mActive[i] == false)
       continue;
@@ -339,8 +340,8 @@ void JointLimitConstraint::getVelocityChange(double* _delVel, bool _withCfm)
   // varaible in ODE
   if (_withCfm)
   {
-    _delVel[mAppliedImpulseIndex] += _delVel[mAppliedImpulseIndex]
-                                     * mConstraintForceMixing;
+    _delVel[mAppliedImpulseIndex]
+        += _delVel[mAppliedImpulseIndex] * mConstraintForceMixing;
   }
 
   assert(localIndex == mDim);
@@ -359,17 +360,17 @@ void JointLimitConstraint::unexcite()
 }
 
 //==============================================================================
-void JointLimitConstraint::applyImpulse(double* _lambda)
+void JointLimitConstraint::applyImpulse(s_t* _lambda)
 {
   std::size_t localIndex = 0;
   std::size_t dof = mJoint->getNumDofs();
-  for (std::size_t i = 0; i < dof ; ++i)
+  for (std::size_t i = 0; i < dof; ++i)
   {
     if (mActive[i] == false)
       continue;
 
     mJoint->setConstraintImpulse(
-          i, mJoint->getConstraintImpulse(i) + _lambda[localIndex]);
+        i, mJoint->getConstraintImpulse(i) + _lambda[localIndex]);
 
     mOldX[i] = _lambda[localIndex];
 

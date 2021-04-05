@@ -16,13 +16,13 @@ void vec2iToJson(std::stringstream& json, const Eigen::Vector2i& vec)
 }
 
 //==============================================================================
-void vec2dToJson(std::stringstream& json, const Eigen::Vector2d& vec)
+void vec2dToJson(std::stringstream& json, const Eigen::Vector2s& vec)
 {
   json << "[" << vec(0) << "," << vec(1) << "]";
 }
 
 //==============================================================================
-void vec3ToJson(std::stringstream& json, const Eigen::Vector3d& vec)
+void vec3ToJson(std::stringstream& json, const Eigen::Vector3s& vec)
 {
   json << "[" << vec(0) << "," << vec(1) << "," << vec(2) << "]";
 }
@@ -34,7 +34,7 @@ void vec3iToJson(std::stringstream& json, const Eigen::Vector3i& vec)
 }
 
 //==============================================================================
-void vecXToJson(std::stringstream& json, const Eigen::VectorXd& vec)
+void vecXToJson(std::stringstream& json, const Eigen::VectorXs& vec)
 {
   json << "[";
   for (int i = 0; i < vec.size(); i++)
@@ -47,12 +47,12 @@ void vecXToJson(std::stringstream& json, const Eigen::VectorXd& vec)
 }
 
 //==============================================================================
-void vecToJson(std::stringstream& json, const std::vector<double>& vec)
+void vecToJson(std::stringstream& json, const std::vector<s_t>& vec)
 {
   json << "[";
   for (int i = 0; i < vec.size(); i++)
   {
-    if (std::isfinite(vec[i]))
+    if (isfinite(vec[i]))
     {
       json << vec[i];
     }

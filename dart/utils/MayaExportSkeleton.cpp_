@@ -108,17 +108,17 @@ namespace utils {
             if(_b->getNumShapes() == 0) return false; // an dummy node
             Shape *prim = _b->getShape(0);
         
-            Vector3d dim = prim->getDim();
+            Vector3s dim = prim->getDim();
             string ngeom = _prefix+_b->getName()+_suffix; ngeom+=mSuffixGeom; 
 
             // transform
             string name1 = _prefix+_b->getName()+_suffix; name1+=mSuffixPrim;
             string name2 = _prefix+_b->getName()+_suffix; name2+=mSuffixShape;
             _outFile<<"createNode transform -n \""<<name1.c_str()<<"\" -p \""<<_prefix+_b->getName()+_suffix<<"\";"<<endl;
-            Vector3d off = _b->getLocalCOM(); //prim->getLocalCOM();
+            Vector3s off = _b->getLocalCOM(); //prim->getLocalCOM();
             //if(prim->getShapeType()==Shape::P_CYLINDER) {
             //    GeomCylinder *cyl = static_cast<GeomCylinder*>(prim->getGeom());
-            //    Vector3d ax = cyl->getOrientation();
+            //    Vector3s ax = cyl->getOrientation();
             //    off = off + 0.5*dim[1]*ax;	// to offset opengl and maya coordinate origin
             //}
             _outFile<<"\t setAttr \".t\" -type \"double3\" "<<off[0]<<" "<<off[1]<<" "<<off[2]<<";"<<endl;
@@ -151,7 +151,7 @@ namespace utils {
                 //case Shape::P_CYLINDER:
                 //    {
                 //        GeomCylinder *cyl = static_cast<GeomCylinder*>(prim->getGeom());
-                //        Vector3d ax = cyl->getOrientation();
+                //        Vector3s ax = cyl->getOrientation();
                 //        _outFile<<"createNode polyCylinder -n \""<<ngeom.c_str()<<"\";"<<endl;
                 //        _outFile<<"\t setAttr \".r\" "<<dim[0]/2<<";"<<endl;	// radius
                 //        _outFile<<"\t setAttr \".h\" "<<dim[1]<<";"<<endl;	// height
@@ -190,7 +190,7 @@ namespace utils {
 
             // write the attributes
             _outFile<<"\t addAttr -ci true -sn \"liw\" -ln \"lockInfluenceWeights\" -bt \"lock\" -min 0 -max 1 -at \"bool\";"<<endl;
-            Vector3d tdofs = Vector3d::Zero();
+            Vector3s tdofs = Vector3s::Zero();
             for(int i=0; i<_b->getParentJoint()->getNumTransforms(); i++){
                 Transformation *tf = _b->getParentJoint()->getTransform(i);
                 // since the joint cannot store translation dofs, this has to be added together for dofs as well
@@ -201,7 +201,7 @@ namespace utils {
                     tdofs[2]+=tf->getDof(2)->getValue();
                 }
             }
-            if(tdofs!=Vector3d::Zero()) _outFile<<"\t setAttr \".t\" -type \"double3\" "<<tdofs[0]<<" "<<tdofs[1]<<" "<<tdofs[2]<<";\n";
+            if(tdofs!=Vector3s::Zero()) _outFile<<"\t setAttr \".t\" -type \"double3\" "<<tdofs[0]<<" "<<tdofs[1]<<" "<<tdofs[2]<<";\n";
 
             // write out the rotation order (expmap "xyz" order: see anim export also)
             string rot = "";
@@ -259,19 +259,19 @@ namespace utils {
 
             // collect all constant rotations and write out in default "xyz" order
             // collect all variable rotations and write out in ".ro" order
-            Matrix3d rotdofs = Matrix3d::Identity();
-            Matrix3d rotcons = Matrix3d::Identity();
+            Matrix3s rotdofs = Matrix3s::Identity();
+            Matrix3s rotcons = Matrix3s::Identity();
             if(rotException){
                 for(int i=_b->getParentJoint()->getNumTransforms()-1; i>=0; i--){
                     Transformation *tf = _b->getParentJoint()->getTransform(i);
-                    Matrix3d *rotPtr = NULL;
+                    Matrix3s *rotPtr = NULL;
                     if(i>=separateRots) rotPtr = &rotdofs; else rotPtr = &rotcons;
                     if(tf->getType()==Transformation::T_ROTATEX) *rotPtr = dart_math::eulerToMatrixX(tf->getDof(0)->getValue())*(*rotPtr);
                     if(tf->getType()==Transformation::T_ROTATEY) *rotPtr = dart_math::eulerToMatrixY(tf->getDof(0)->getValue())*(*rotPtr);
                     if(tf->getType()==Transformation::T_ROTATEZ) *rotPtr = dart_math::eulerToMatrixZ(tf->getDof(0)->getValue())*(*rotPtr);
                     if(tf->getType()==Transformation::T_ROTATEEXPMAP) {
-                        Vector3d exmap(tf->getDof(0)->getValue(), tf->getDof(1)->getValue(), tf->getDof(2)->getValue());
-                        Quaterniond q = dart_math::expToQuat(exmap);
+                        Vector3s exmap(tf->getDof(0)->getValue(), tf->getDof(1)->getValue(), tf->getDof(2)->getValue());
+                        Quaternion_s q = dart_math::expToQuat(exmap);
                         *rotPtr = dart_math::quatToMatrix(q)*(*rotPtr);
                     }
                 }
@@ -280,14 +280,14 @@ namespace utils {
                 for(int i=_b->getParentJoint()->getNumTransforms()-1; i>=0; i--){
                     Transformation *tf = _b->getParentJoint()->getTransform(i);
                     //if(tf->getVariable()) continue;	// only constant dofs should contribute to the ".jo" attribute; rest to ".r"
-                    Matrix3d *rotPtr = NULL;
+                    Matrix3s *rotPtr = NULL;
                     if(tf->isVariable()) rotPtr = &rotdofs; else rotPtr = &rotcons;
                     if(tf->getType()==Transformation::T_ROTATEX) *rotPtr = dart_math::eulerToMatrixX(tf->getDof(0)->getValue())*(*rotPtr);
                     if(tf->getType()==Transformation::T_ROTATEY) *rotPtr = dart_math::eulerToMatrixY(tf->getDof(0)->getValue())*(*rotPtr);
                     if(tf->getType()==Transformation::T_ROTATEZ) *rotPtr = dart_math::eulerToMatrixZ(tf->getDof(0)->getValue())*(*rotPtr);
                     if(tf->getType()==Transformation::T_ROTATEEXPMAP) {
-                        Vector3d exmap(tf->getDof(0)->getValue(), tf->getDof(1)->getValue(), tf->getDof(2)->getValue());
-                        Quaterniond q = dart_math::expToQuat(exmap);
+                        Vector3s exmap(tf->getDof(0)->getValue(), tf->getDof(1)->getValue(), tf->getDof(2)->getValue());
+                        Quaternion_s q = dart_math::expToQuat(exmap);
                         *rotPtr = dart_math::quatToMatrix(q)*(*rotPtr);
                     }
                 }
@@ -301,8 +301,8 @@ namespace utils {
                 else if(ro==3) rotorder=dart_math::XZY;
                 else if(ro==4) rotorder=dart_math::YXZ;
                 else if(ro==5) rotorder=dart_math::ZYX;
-                Vector3d edofs= dart_math::matrixToEuler(rotdofs, rotorder)*180/M_PI;	// convert to degrees
-                if(rotdofs != Matrix3d::Identity()) {
+                Vector3s edofs= dart_math::matrixToEuler(rotdofs, rotorder)*180/M_PI;	// convert to degrees
+                if(rotdofs != Matrix3s::Identity()) {
                     // write in the correct order
                     double ax, ay, az;
                     // x
@@ -322,8 +322,8 @@ namespace utils {
             }
 
             // constant dofs: ".jo"
-            Vector3d econs = dart_math::matrixToEuler(rotcons, dart_math::XYZ)*180/M_PI;	// convert to degrees
-            if(rotcons!=Matrix3d::Identity()) _outFile<<"\t setAttr \".jo\" -type \"double3\" "<<econs[0]<<" "<<econs[1]<<" "<<econs[2]<<";"<<endl;
+            Vector3s econs = dart_math::matrixToEuler(rotcons, dart_math::XYZ)*180/M_PI;	// convert to degrees
+            if(rotcons!=Matrix3s::Identity()) _outFile<<"\t setAttr \".jo\" -type \"double3\" "<<econs[0]<<" "<<econs[1]<<" "<<econs[2]<<";"<<endl;
 
             // repeat the same for children
             for(int i=0; i<_b->getNumChildJoints(); i++){

@@ -94,7 +94,7 @@ void StateMachine::setInitialState(State* _state)
 }
 
 //==============================================================================
-void StateMachine::begin(double _currentTime)
+void StateMachine::begin(s_t _currentTime)
 {
   //  dtmsg << "StateMachine [" << getName() << "]: begin()." << endl;
 
@@ -104,7 +104,7 @@ void StateMachine::begin(double _currentTime)
 }
 
 //==============================================================================
-void StateMachine::computeControlForce(double _dt)
+void StateMachine::computeControlForce(s_t _dt)
 {
   assert(mCurrentState != nullptr && "Invaild current state.");
 
@@ -120,7 +120,7 @@ void StateMachine::computeControlForce(double _dt)
 }
 
 //==============================================================================
-void StateMachine::end(double _currentTime)
+void StateMachine::end(s_t _currentTime)
 {
   mEndTime = _currentTime;
 
@@ -134,13 +134,13 @@ State* StateMachine::getCurrentState()
 }
 
 //==============================================================================
-void StateMachine::transiteToNextState(double _currentTime)
+void StateMachine::transiteToNextState(s_t _currentTime)
 {
   transiteTo(mCurrentState->getNextState(), _currentTime);
 }
 
 //==============================================================================
-void StateMachine::transiteTo(State* _state, double _currentTime)
+void StateMachine::transiteTo(State* _state, s_t _currentTime)
 {
   assert(_containState(_state) && "_state should be in mStates");
 
@@ -159,7 +159,7 @@ void StateMachine::transiteTo(State* _state, double _currentTime)
 }
 
 //==============================================================================
-void StateMachine::transiteTo(string& _stateName, double _currentTime)
+void StateMachine::transiteTo(string& _stateName, s_t _currentTime)
 {
   // _state should be in mStates
   State* state = _findState(_stateName);
@@ -170,7 +170,7 @@ void StateMachine::transiteTo(string& _stateName, double _currentTime)
 }
 
 //==============================================================================
-void StateMachine::transiteTo(std::size_t _idx, double _currentTime)
+void StateMachine::transiteTo(std::size_t _idx, s_t _currentTime)
 {
   assert(_idx <= mStates.size() && "Invalid index of State.");
 

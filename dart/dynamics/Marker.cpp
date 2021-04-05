@@ -48,10 +48,9 @@ constexpr Marker::ConstraintType Marker::SOFT;
 namespace detail {
 
 //==============================================================================
-MarkerProperties::MarkerProperties(const Eigen::Vector4d& color,
-                                   ConstraintType type)
-  : mColor(color),
-    mType(type)
+MarkerProperties::MarkerProperties(
+    const Eigen::Vector4s& color, ConstraintType type)
+  : mColor(color), mType(type)
 {
   // Do nothing
 }
@@ -78,21 +77,21 @@ const BodyNode* Marker::getBodyNode() const
 }
 
 //==============================================================================
-Eigen::Vector3d Marker::getLocalPosition() const
+Eigen::Vector3s Marker::getLocalPosition() const
 {
   return getRelativeTransform().translation();
 }
 
 //==============================================================================
-void Marker::setLocalPosition(const Eigen::Vector3d& offset)
+void Marker::setLocalPosition(const Eigen::Vector3s& offset)
 {
-  Eigen::Isometry3d tf = getRelativeTransform();
+  Eigen::Isometry3s tf = getRelativeTransform();
   tf.translation() = offset;
   setRelativeTransform(tf);
 }
 
 //==============================================================================
-Eigen::Vector3d Marker::getWorldPosition() const
+Eigen::Vector3s Marker::getWorldPosition() const
 {
   return getWorldTransform().translation();
 }
@@ -106,7 +105,7 @@ int Marker::getID() const
 //==============================================================================
 void Marker::setConstraintType(Marker::ConstraintType type)
 {
-  if(type == mAspectProperties.mType)
+  if (type == mAspectProperties.mType)
     return;
 
   mAspectProperties.mType = type;
@@ -120,9 +119,9 @@ Marker::ConstraintType Marker::getConstraintType() const
 }
 
 //==============================================================================
-void Marker::setColor(const Eigen::Vector4d& color)
+void Marker::setColor(const Eigen::Vector4s& color)
 {
-  if(color == mAspectProperties.mColor)
+  if (color == mAspectProperties.mColor)
     return;
 
   mAspectProperties.mColor = color;
@@ -130,7 +129,7 @@ void Marker::setColor(const Eigen::Vector4d& color)
 }
 
 //==============================================================================
-const Eigen::Vector4d& Marker::getColor() const
+const Eigen::Vector4s& Marker::getColor() const
 {
   return mAspectProperties.mColor;
 }
@@ -141,8 +140,9 @@ Marker::Marker(BodyNode* parent, const BasicProperties& properties)
     Frame(parent),
     FixedFrame(parent, properties.mRelativeTf),
     common::EmbedPropertiesOnTopOf<
-        Marker, detail::MarkerProperties, FixedJacobianNode>(
-      parent, properties.mRelativeTf),
+        Marker,
+        detail::MarkerProperties,
+        FixedJacobianNode>(parent, properties.mRelativeTf),
     mID(Marker::msMarkerCount++)
 {
   createAspect<Aspect>();
@@ -155,11 +155,8 @@ Node* Marker::cloneNode(BodyNode* parent) const
   Marker* marker = new Marker(parent, BasicProperties());
   marker->duplicateAspects(this);
 
-  if(mIK)
-    marker->mIK = mIK->clone(marker);
-
   return marker;
 }
 
-}  // namespace dynamics
-}  // namespace dart
+} // namespace dynamics
+} // namespace dart

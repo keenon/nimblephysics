@@ -35,25 +35,28 @@
 #include <fstream>
 #include <iostream>
 #include <sstream>
-#include <gtest/gtest.h>
+
 #include <Eigen/Dense>
-#include "TestHelpers.hpp"
-#include "dart/config.hpp"
+#include <gtest/gtest.h>
+
 #include "dart/common/Console.hpp"
-#include "dart/optimizer/Function.hpp"
-#include "dart/optimizer/Problem.hpp"
-#include "dart/optimizer/GradientDescentSolver.hpp"
-#include "dart/dynamics/Skeleton.hpp"
+#include "dart/config.hpp"
 #include "dart/dynamics/FreeJoint.hpp"
 #include "dart/dynamics/InverseKinematics.hpp"
+#include "dart/dynamics/Skeleton.hpp"
+#include "dart/optimizer/Function.hpp"
+#include "dart/optimizer/GradientDescentSolver.hpp"
+#include "dart/optimizer/Problem.hpp"
+
+#include "TestHelpers.hpp"
 #if HAVE_NLOPT
-  #include "dart/optimizer/nlopt/NloptSolver.hpp"
+#include "dart/optimizer/nlopt/NloptSolver.hpp"
 #endif
 #if HAVE_IPOPT
-  #include "dart/optimizer/ipopt/IpoptSolver.hpp"
+#include "dart/optimizer/ipopt/IpoptSolver.hpp"
 #endif
 #if HAVE_SNOPT
-  #include "dart/optimizer/snopt/SnoptSolver.hpp"
+#include "dart/optimizer/snopt/SnoptSolver.hpp"
 #endif
 
 using namespace std;
@@ -67,20 +70,24 @@ class SampleObjFunc : public Function
 {
 public:
   /// \brief Constructor
-  SampleObjFunc() : Function() {}
+  SampleObjFunc() : Function()
+  {
+  }
 
   /// \brief Destructor
-  virtual ~SampleObjFunc() {}
+  virtual ~SampleObjFunc()
+  {
+  }
 
   /// \copydoc Function::eval
-  double eval(const Eigen::VectorXd& _x) override
+  s_t eval(const Eigen::VectorXs& _x) override
   {
     return std::sqrt(_x[1]);
   }
 
   /// \copydoc Function::evalGradient
-  void evalGradient(const Eigen::VectorXd& _x,
-                    Eigen::Map<Eigen::VectorXd> _grad) override
+  void evalGradient(
+      const Eigen::VectorXs& _x, Eigen::Map<Eigen::VectorXs> _grad) override
   {
     _grad[0] = 0.0;
     _grad[1] = 0.5 / std::sqrt(_x[1]);
@@ -92,31 +99,35 @@ class SampleConstFunc : public Function
 {
 public:
   /// \brief Constructor
-  SampleConstFunc(double _a, double _b) : Function(), mA(_a), mB(_b) {}
+  SampleConstFunc(s_t _a, s_t _b) : Function(), mA(_a), mB(_b)
+  {
+  }
 
   /// \brief Destructor
-  virtual ~SampleConstFunc() {}
+  virtual ~SampleConstFunc()
+  {
+  }
 
   /// \copydoc Function::eval
-  double eval(const Eigen::VectorXd& _x) override
+  s_t eval(const Eigen::VectorXs& _x) override
   {
-    return ((mA*_x[0] + mB) * (mA*_x[0] + mB) * (mA*_x[0] + mB) - _x[1]);
+    return ((mA * _x[0] + mB) * (mA * _x[0] + mB) * (mA * _x[0] + mB) - _x[1]);
   }
 
   /// \copydoc Function::evalGradient
-  void evalGradient(const Eigen::VectorXd& _x,
-                    Eigen::Map<Eigen::VectorXd> _grad) override
+  void evalGradient(
+      const Eigen::VectorXs& _x, Eigen::Map<Eigen::VectorXs> _grad) override
   {
-    _grad[0] = 3 * mA * (mA*_x[0] + mB) * (mA*_x[0] + mB);
+    _grad[0] = 3 * mA * (mA * _x[0] + mB) * (mA * _x[0] + mB);
     _grad[1] = -1.0;
   }
 
 private:
   /// \brief Data
-  double mA;
+  s_t mA;
 
   /// \brief Data
-  double mB;
+  s_t mB;
 };
 
 //==============================================================================
@@ -124,8 +135,8 @@ TEST(Optimizer, GradientDescent)
 {
   std::shared_ptr<Problem> prob = std::make_shared<Problem>(2);
 
-  prob->setLowerBounds(Eigen::Vector2d(-HUGE_VAL, 0));
-  prob->setInitialGuess(Eigen::Vector2d(1.234, 5.678));
+  prob->setLowerBounds(Eigen::Vector2s(-HUGE_VAL, 0));
+  prob->setInitialGuess(Eigen::Vector2s(1.234, 5.678));
 
   FunctionPtr obj = std::make_shared<SampleObjFunc>();
   prob->setObjective(obj);
@@ -133,8 +144,8 @@ TEST(Optimizer, GradientDescent)
   GradientDescentSolver solver(prob);
   EXPECT_TRUE(solver.solve());
 
-  double minF = prob->getOptimumValue();
-  Eigen::VectorXd optX = prob->getOptimalSolution();
+  s_t minF = prob->getOptimumValue();
+  Eigen::VectorXs optX = prob->getOptimalSolution();
 
   EXPECT_NEAR(minF, 0, 1e-6);
   EXPECT_EQ(optX.size(), static_cast<int>(prob->getDimension()));
@@ -150,13 +161,13 @@ TEST(Optimizer, BasicNlopt)
 
   std::shared_ptr<Problem> prob = std::make_shared<Problem>(2);
 
-  prob->setLowerBounds(Eigen::Vector2d(-HUGE_VAL, 0));
-  prob->setInitialGuess(Eigen::Vector2d(1.234, 5.678));
+  prob->setLowerBounds(Eigen::Vector2s(-HUGE_VAL, 0));
+  prob->setInitialGuess(Eigen::Vector2s(1.234, 5.678));
 
   FunctionPtr obj = std::make_shared<SampleObjFunc>();
   prob->setObjective(obj);
 
-  FunctionPtr const1 = std::make_shared<SampleConstFunc>( 2, 0);
+  FunctionPtr const1 = std::make_shared<SampleConstFunc>(2, 0);
   FunctionPtr const2 = std::make_shared<SampleConstFunc>(-1, 1);
   prob->addIneqConstraint(const1);
   prob->addIneqConstraint(const2);
@@ -164,8 +175,8 @@ TEST(Optimizer, BasicNlopt)
   NloptSolver solver(prob, NloptSolver::LD_MMA);
   EXPECT_TRUE(solver.solve());
 
-  double minF = prob->getOptimumValue();
-  Eigen::VectorXd optX = prob->getOptimalSolution();
+  s_t minF = prob->getOptimumValue();
+  Eigen::VectorXs optX = prob->getOptimalSolution();
 
   EXPECT_NEAR(minF, 0.544330847, 1e-6);
   EXPECT_EQ(static_cast<std::size_t>(optX.size()), prob->getDimension());
@@ -180,13 +191,13 @@ TEST(Optimizer, BasicIpopt)
 {
   std::shared_ptr<Problem> prob = std::make_shared<Problem>(2);
 
-  prob->setLowerBounds(Eigen::Vector2d(-HUGE_VAL, 0));
-  prob->setInitialGuess(Eigen::Vector2d(1.234, 5.678));
+  prob->setLowerBounds(Eigen::Vector2s(-HUGE_VAL, 0));
+  prob->setInitialGuess(Eigen::Vector2s(1.234, 5.678));
 
   FunctionPtr obj = std::make_shared<SampleObjFunc>();
   prob->setObjective(obj);
 
-  FunctionPtr const1 = std::make_shared<SampleConstFunc>( 2, 0);
+  FunctionPtr const1 = std::make_shared<SampleConstFunc>(2, 0);
   FunctionPtr const2 = std::make_shared<SampleConstFunc>(-1, 1);
   prob->addIneqConstraint(const1);
   prob->addIneqConstraint(const2);
@@ -194,8 +205,8 @@ TEST(Optimizer, BasicIpopt)
   IpoptSolver solver(prob);
   solver.solve();
 
-  double minF = prob->getOptimumValue();
-  Eigen::VectorXd optX = prob->getOptimalSolution();
+  s_t minF = prob->getOptimumValue();
+  Eigen::VectorXs optX = prob->getOptimalSolution();
 
   EXPECT_NEAR(minF, 0.544330847, 1e-6);
   EXPECT_EQ(static_cast<std::size_t>(optX.size()), prob->getDimension());
@@ -214,8 +225,8 @@ TEST(Optimizer, BasicSnopt)
 #endif
 
 //==============================================================================
-bool compareStringAndFile(const std::string& content,
-                          const std::string& fileName)
+bool compareStringAndFile(
+    const std::string& content, const std::string& fileName)
 {
   std::ifstream ifs(fileName, std::ifstream::in);
   EXPECT_TRUE(ifs.is_open());
@@ -242,8 +253,8 @@ TEST(Optimizer, OutStream)
 {
   std::shared_ptr<Problem> prob = std::make_shared<Problem>(2);
 
-  prob->setLowerBounds(Eigen::Vector2d(-HUGE_VAL, 0));
-  prob->setInitialGuess(Eigen::Vector2d(1.234, 5.678));
+  prob->setLowerBounds(Eigen::Vector2s(-HUGE_VAL, 0));
+  prob->setInitialGuess(Eigen::Vector2s(1.234, 5.678));
 
   FunctionPtr obj = std::make_shared<SampleObjFunc>();
   prob->setObjective(obj);

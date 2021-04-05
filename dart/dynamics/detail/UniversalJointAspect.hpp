@@ -49,11 +49,11 @@ namespace detail {
 //==============================================================================
 struct UniversalJointUniqueProperties
 {
-  std::array<Eigen::Vector3d,2> mAxis;
+  std::array<Eigen::Vector3s,2> mAxis;
 
   UniversalJointUniqueProperties(
-      const Eigen::Vector3d& _axis1 = Eigen::Vector3d::UnitX(),
-      const Eigen::Vector3d& _axis2 = Eigen::Vector3d::UnitY());
+      const Eigen::Vector3s& _axis1 = Eigen::Vector3s::UnitX(),
+      const Eigen::Vector3s& _axis2 = Eigen::Vector3s::UnitY());
 
   virtual ~UniversalJointUniqueProperties() = default;
 };

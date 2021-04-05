@@ -189,5 +189,5 @@ void AtlasSimbiconWidget::setGravity(float gravity)
     return;
 
   mGravityAcc = gravity;
-  mNode->getWorld()->setGravity(-mGravityAcc * Eigen::Vector3d::UnitY());
+  mNode->getWorld()->setGravity(-mGravityAcc * Eigen::Vector3s::UnitY());
 }

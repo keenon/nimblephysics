@@ -53,7 +53,7 @@ public:
   /// Constructor
   ContactConstraint(
       collision::Contact& contact,
-      double timeStep,
+      s_t timeStep,
       bool penetrationCorrectionEnabled);
 
   /// Destructor
@@ -64,34 +64,34 @@ public:
   //----------------------------------------------------------------------------
 
   /// Set global error reduction parameter
-  static void setErrorAllowance(double allowance);
+  static void setErrorAllowance(s_t allowance);
 
   /// Get global error reduction parameter
-  static double getErrorAllowance();
+  static s_t getErrorAllowance();
 
   /// Set global error reduction parameter
-  static void setErrorReductionParameter(double erp);
+  static void setErrorReductionParameter(s_t erp);
 
   /// Get global error reduction parameter
-  static double getErrorReductionParameter();
+  static s_t getErrorReductionParameter();
 
   /// Set global error reduction parameter
-  static void setMaxErrorReductionVelocity(double erv);
+  static void setMaxErrorReductionVelocity(s_t erv);
 
   /// Get global error reduction parameter
-  static double getMaxErrorReductionVelocity();
+  static s_t getMaxErrorReductionVelocity();
 
   /// Set global constraint force mixing parameter
-  static void setConstraintForceMixing(double cfm);
+  static void setConstraintForceMixing(s_t cfm);
 
   /// Get global constraint force mixing parameter
-  static double getConstraintForceMixing();
+  static s_t getConstraintForceMixing();
 
   /// Set first frictional direction
-  void setFrictionDirection(const Eigen::Vector3d& dir);
+  void setFrictionDirection(const Eigen::Vector3s& dir);
 
   /// Get first frictional direction
-  const Eigen::Vector3d& getFrictionDirection1() const;
+  const Eigen::Vector3s& getFrictionDirection1() const;
 
   // Returns the contact
   const collision::Contact& getContact() const;
@@ -124,7 +124,7 @@ protected:
   void applyUnitImpulse(std::size_t index) override;
 
   // Documentation inherited
-  void getVelocityChange(double* vel, bool withCfm) override;
+  void getVelocityChange(s_t* vel, bool withCfm) override;
 
   // Documentation inherited
   void excite() override;
@@ -133,7 +133,7 @@ protected:
   void unexcite() override;
 
   // Documentation inherited
-  void applyImpulse(double* lambda) override;
+  void applyImpulse(s_t* lambda) override;
 
   // Documentation inherited
   dynamics::SkeletonPtr getRootSkeleton() const override;
@@ -153,33 +153,33 @@ public:
 
   /// Returns 0 if this constraint isn't bouncing, otherwise returns the
   /// coefficient of restitution
-  double getCoefficientOfRestitution() override;
+  s_t getCoefficientOfRestitution() override;
 
   /// Returns 0 if this constraint isn't using the "bouncing" hack to correct
   /// penetration. Otherwise, this returns the velocity being used by the
   /// penetration correction hack.
-  double getPenetrationCorrectionVelocity() override;
+  s_t getPenetrationCorrectionVelocity() override;
 
-  using TangentBasisMatrix = Eigen::Matrix<double, 3, 2>;
+  using TangentBasisMatrix = Eigen::Matrix<s_t, 3, 2>;
 
   /// Get change in relative velocity at contact point due to external impulse
   /// \param[out] relVel Change in relative velocity at contact point of the
   /// two colliding bodies.
-  void getRelVelocity(double* relVel);
+  void getRelVelocity(s_t* relVel);
 
   ///
   void updateFirstFrictionalDirection();
 
-  TangentBasisMatrix getTangentBasisMatrixODE(const Eigen::Vector3d& n);
+  TangentBasisMatrix getTangentBasisMatrixODE(const Eigen::Vector3s& n);
 
   /// This returns the gradient of each element of the Tangent basis matrix, if
   /// `g` is the gradient of `n` with respect to whatever scalar we care about.
   TangentBasisMatrix getTangentBasisMatrixODEGradient(
-      const Eigen::Vector3d& n, const Eigen::Vector3d& g);
+      const Eigen::Vector3s& n, const Eigen::Vector3s& g);
 
 private:
   /// Time step
-  double mTimeStep;
+  s_t mTimeStep;
 
   /// Fircst body node
   dynamics::BodyNodePtr mBodyNodeA;
@@ -191,16 +191,16 @@ private:
   collision::Contact& mContact;
 
   /// First frictional direction
-  Eigen::Vector3d mFirstFrictionalDirection;
+  Eigen::Vector3s mFirstFrictionalDirection;
 
   /// Coefficient of Friction
-  double mFrictionCoeff;
+  s_t mFrictionCoeff;
 
   /// Coefficient of restitution
-  double mRestitutionCoeff;
+  s_t mRestitutionCoeff;
 
   /// This is the component of the contact force due to penetration correction
-  double mPenetrationCorrectionVelocity;
+  s_t mPenetrationCorrectionVelocity;
 
   /// True if we are going fast enough to bounce, used for gradient computation
   bool mDidBounce;
@@ -212,10 +212,10 @@ private:
   bool mPenetrationCorrectionEnabled;
 
   /// Local body jacobians for mBodyNode1
-  Eigen::Matrix<double, 6, Eigen::Dynamic> mSpatialNormalA;
+  Eigen::Matrix<s_t, 6, Eigen::Dynamic> mSpatialNormalA;
 
   /// Local body jacobians for mBodyNode2
-  Eigen::Matrix<double, 6, Eigen::Dynamic> mSpatialNormalB;
+  Eigen::Matrix<s_t, 6, Eigen::Dynamic> mSpatialNormalB;
 
   ///
   bool mIsFrictionOn;
@@ -230,19 +230,19 @@ private:
   bool mActive;
 
   /// Global constraint error allowance
-  static double mErrorAllowance;
+  static s_t mErrorAllowance;
 
   /// Global constraint error redection parameter in the range of [0, 1]. The
   /// default is 0.01.
-  static double mErrorReductionParameter;
+  static s_t mErrorReductionParameter;
 
   /// Maximum error reduction velocity
-  static double mMaxErrorReductionVelocity;
+  static s_t mMaxErrorReductionVelocity;
 
   /// Global constraint force mixing parameter in the range of [1e-9, 1]. The
   /// default is 1e-5
   /// \sa http://www.ode.org/ode-latest-userguide.html#sec_3_8_0
-  static double mConstraintForceMixing;
+  static s_t mConstraintForceMixing;
 };
 // TODO(JS): Create SelfContactConstraint.
 

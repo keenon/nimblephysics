@@ -212,7 +212,7 @@ void TinkertoyWidget::setGravity(bool gravity)
   mGravity = gravity;
 
   if (mGravity)
-    mNode->getWorld()->setGravity(-9.81 * Eigen::Vector3d::UnitZ());
+    mNode->getWorld()->setGravity(-9.81 * Eigen::Vector3s::UnitZ());
   else
-    mNode->getWorld()->setGravity(Eigen::Vector3d::Zero());
+    mNode->getWorld()->setGravity(Eigen::Vector3s::Zero());
 }

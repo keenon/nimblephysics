@@ -35,18 +35,20 @@
 
 #include <Eigen/Dense>
 
+#include "dart/math/MathTypes.hpp"
+
 namespace dart {
 namespace lcpsolver {
 
 /// \brief
 int Lemke(
-    const Eigen::MatrixXd& _M, const Eigen::VectorXd& _q, Eigen::VectorXd* _z);
+    const Eigen::MatrixXs& _M, const Eigen::VectorXs& _q, Eigen::VectorXs* _z);
 
 /// \brief
 bool validate(
-    const Eigen::MatrixXd& _M,
-    const Eigen::VectorXd& _z,
-    const Eigen::VectorXd& _q);
+    const Eigen::MatrixXs& _M,
+    const Eigen::VectorXs& _z,
+    const Eigen::VectorXs& _q);
 
 } // namespace lcpsolver
 } // namespace dart

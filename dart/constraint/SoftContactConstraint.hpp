@@ -58,7 +58,7 @@ class SoftContactConstraint : public ConstraintBase
 {
 public:
   /// Constructor
-  SoftContactConstraint(collision::Contact& _contact, double _timeStep);
+  SoftContactConstraint(collision::Contact& _contact, s_t _timeStep);
 
   /// Destructor
   virtual ~SoftContactConstraint();
@@ -68,34 +68,34 @@ public:
   //----------------------------------------------------------------------------
 
   /// Set global error reduction parameter
-  static void setErrorAllowance(double _allowance);
+  static void setErrorAllowance(s_t _allowance);
 
   /// Get global error reduction parameter
-  static double getErrorAllowance();
+  static s_t getErrorAllowance();
 
   /// Set global error reduction parameter
-  static void setErrorReductionParameter(double _erp);
+  static void setErrorReductionParameter(s_t _erp);
 
   /// Get global error reduction parameter
-  static double getErrorReductionParameter();
+  static s_t getErrorReductionParameter();
 
   /// Set global error reduction parameter
-  static void setMaxErrorReductionVelocity(double _erv);
+  static void setMaxErrorReductionVelocity(s_t _erv);
 
   /// Get global error reduction parameter
-  static double getMaxErrorReductionVelocity();
+  static s_t getMaxErrorReductionVelocity();
 
   /// Set global constraint force mixing parameter
-  static void setConstraintForceMixing(double _cfm);
+  static void setConstraintForceMixing(s_t _cfm);
 
   /// Get global constraint force mixing parameter
-  static double getConstraintForceMixing();
+  static s_t getConstraintForceMixing();
 
   /// Set first frictional direction
-  void setFrictionDirection(const Eigen::Vector3d& _dir);
+  void setFrictionDirection(const Eigen::Vector3s& _dir);
 
   /// Get first frictional direction
-  const Eigen::Vector3d& getFrictionDirection1() const;
+  const Eigen::Vector3s& getFrictionDirection1() const;
 
   //----------------------------------------------------------------------------
   // Friendship
@@ -119,7 +119,7 @@ protected:
   void applyUnitImpulse(std::size_t _idx) override;
 
   // Documentation inherited
-  void getVelocityChange(double* _vel, bool _withCfm) override;
+  void getVelocityChange(s_t* _vel, bool _withCfm) override;
 
   // Documentation inherited
   void excite() override;
@@ -128,7 +128,7 @@ protected:
   void unexcite() override;
 
   // Documentation inherited
-  void applyImpulse(double* _lambda) override;
+  void applyImpulse(s_t* _lambda) override;
 
   // Documentation inherited
   dynamics::SkeletonPtr getRootSkeleton() const override;
@@ -143,19 +143,19 @@ private:
   /// Get change in relative velocity at contact point due to external impulse
   /// \param[out] _vel Change in relative velocity at contact point of the two
   ///                  colliding bodies
-  void getRelVelocity(double* _vel);
+  void getRelVelocity(s_t* _vel);
 
   ///
   void updateFirstFrictionalDirection();
 
   ///
-  Eigen::MatrixXd getTangentBasisMatrixODE(const Eigen::Vector3d& _n);
+  Eigen::MatrixXs getTangentBasisMatrixODE(const Eigen::Vector3s& _n);
 
   /// Find the nearest point mass from _point in a face, of which id is _faceId
   /// in _softBodyNode.
   dynamics::PointMass* selectCollidingPointMass(
       dynamics::SoftBodyNode* _softBodyNode,
-      const Eigen::Vector3d& _point,
+      const Eigen::Vector3s& _point,
       int _faceId) const;
 
   /// Find the nearest point mass from _point in a face, of which id is _faceId
@@ -163,12 +163,12 @@ private:
   /// SoftBodyNode.
   const dynamics::PointMass* selectCollidingPointMass(
       const dynamics::SoftBodyNode* _softBodyNode,
-      const Eigen::Vector3d& _point,
+      const Eigen::Vector3s& _point,
       int _faceId) const;
 
 private:
   /// Time step
-  double mTimeStep;
+  s_t mTimeStep;
 
   /// Fircst body node
   dynamics::BodyNode* mBodyNode1;
@@ -196,25 +196,25 @@ private:
   collision::SoftCollisionInfo* mSoftCollInfo;
 
   /// First frictional direction
-  Eigen::Vector3d mFirstFrictionalDirection;
+  Eigen::Vector3s mFirstFrictionalDirection;
 
   /// Coefficient of Friction
-  double mFrictionCoeff;
+  s_t mFrictionCoeff;
 
   /// Coefficient of restitution
-  double mRestitutionCoeff;
+  s_t mRestitutionCoeff;
 
   /// Local body jacobians for mBodyNode1
-  common::aligned_vector<Eigen::Vector6d> mJacobians1;
+  common::aligned_vector<Eigen::Vector6s> mJacobians1;
 
   /// Local body jacobians for mBodyNode2
-  common::aligned_vector<Eigen::Vector6d> mJacobians2;
+  common::aligned_vector<Eigen::Vector6s> mJacobians2;
 
   /// Contact normal expressed in body frame of the first body node
-  Eigen::Vector3d mBodyDirection1;
+  Eigen::Vector3s mBodyDirection1;
 
   /// Contact normal expressed in body frame of the second body node
-  Eigen::Vector3d mBodyDirection2;
+  Eigen::Vector3s mBodyDirection2;
 
   ///
   bool mIsFrictionOn;
@@ -229,19 +229,19 @@ private:
   bool mActive;
 
   /// Global constraint error allowance
-  static double mErrorAllowance;
+  static s_t mErrorAllowance;
 
   /// Global constraint error redection parameter in the range of [0, 1]. The
   /// default is 0.01.
-  static double mErrorReductionParameter;
+  static s_t mErrorReductionParameter;
 
   /// Maximum error reduction velocity
-  static double mMaxErrorReductionVelocity;
+  static s_t mMaxErrorReductionVelocity;
 
   /// Global constraint force mixing parameter in the range of [1e-9, 1]. The
   /// default is 1e-5
   /// \sa http://www.ode.org/ode-latest-userguide.html#sec_3_8_0
-  static double mConstraintForceMixing;
+  static s_t mConstraintForceMixing;
 };
 
 } // namespace constraint

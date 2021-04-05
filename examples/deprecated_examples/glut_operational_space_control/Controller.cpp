@@ -68,29 +68,29 @@ Controller::~Controller()
 }
 
 //==============================================================================
-void Controller::update(const Eigen::Vector3d& _targetPosition)
+void Controller::update(const Eigen::Vector3s& _targetPosition)
 {
   using namespace dart;
 
   // Get equation of motions
-  Eigen::Vector3d x = mEndEffector->getTransform().translation();
-  Eigen::Vector3d dx = mEndEffector->getLinearVelocity();
-  Eigen::MatrixXd invM = mRobot->getInvMassMatrix();                 // n x n
-  Eigen::VectorXd Cg = mRobot->getCoriolisAndGravityForces();        // n x 1
+  Eigen::Vector3s x = mEndEffector->getTransform().translation();
+  Eigen::Vector3s dx = mEndEffector->getLinearVelocity();
+  Eigen::MatrixXs invM = mRobot->getInvMassMatrix();                 // n x n
+  Eigen::VectorXs Cg = mRobot->getCoriolisAndGravityForces();        // n x 1
   math::LinearJacobian Jv = mEndEffector->getLinearJacobian();       // 3 x n
   math::LinearJacobian dJv = mEndEffector->getLinearJacobianDeriv(); // 3 x n
-  Eigen::VectorXd dq = mRobot->getVelocities();                      // n x 1
+  Eigen::VectorXs dq = mRobot->getVelocities();                      // n x 1
 
   // Compute operational space values
-  Eigen::MatrixXd A = Jv * invM;                   // 3 x n
-  Eigen::Vector3d b = /*-(A*Cg) + */ dJv * dq;     // 3 x 1
-  Eigen::MatrixXd M2 = Jv * invM * Jv.transpose(); // 3 x 3
+  Eigen::MatrixXs A = Jv * invM;                   // 3 x n
+  Eigen::Vector3s b = /*-(A*Cg) + */ dJv * dq;     // 3 x 1
+  Eigen::MatrixXs M2 = Jv * invM * Jv.transpose(); // 3 x 3
 
   // Compute virtual operational space spring force at the end effector
-  Eigen::Vector3d f = -mKp * (x - _targetPosition) - mKv * dx;
+  Eigen::Vector3s f = -mKp * (x - _targetPosition) - mKv * dx;
 
   // Compute desired operational space acceleration given f
-  Eigen::Vector3d desired_ddx = b + M2 * f;
+  Eigen::Vector3s desired_ddx = b + M2 * f;
 
   // Gravity compensation
   mForces = Cg;

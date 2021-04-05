@@ -55,9 +55,9 @@ std::vector<common::Uri> getFileList()
   fileList.push_back("dart://sample/skel/test/single_pendulum.skel");
   fileList.push_back("dart://sample/skel/test/single_pendulum_euler_joint.skel");
   fileList.push_back("dart://sample/skel/test/single_pendulum_ball_joint.skel");
-  fileList.push_back("dart://sample/skel/test/double_pendulum.skel");
-  fileList.push_back("dart://sample/skel/test/double_pendulum_euler_joint.skel");
-  fileList.push_back("dart://sample/skel/test/double_pendulum_ball_joint.skel");
+  fileList.push_back("dart://sample/skel/test/s_t_pendulum.skel");
+  fileList.push_back("dart://sample/skel/test/s_t_pendulum_euler_joint.skel");
+  fileList.push_back("dart://sample/skel/test/s_t_pendulum_ball_joint.skel");
   fileList.push_back("dart://sample/skel/test/serial_chain_revolute_joint.skel");
   fileList.push_back("dart://sample/skel/test/serial_chain_eulerxyz_joint.skel");
   fileList.push_back("dart://sample/skel/test/serial_chain_ball_joint.skel");
@@ -135,17 +135,17 @@ TEST(MetaSkeleton, Referential)
         EXPECT_TRUE(tree->getDof(tree->getIndexOf(dof)) == dof);
       }
 
-      Eigen::VectorXd q = tree->getPositions();
-      Eigen::VectorXd dq = tree->getVelocities();
-      Eigen::VectorXd ddq = tree->getAccelerations();
+      Eigen::VectorXs q = tree->getPositions();
+      Eigen::VectorXs dq = tree->getVelocities();
+      Eigen::VectorXs ddq = tree->getAccelerations();
 
       for(std::size_t k=0; k<numIterations; ++k)
       {
         for(int r=0; r<q.size(); ++r)
         {
-          q[r] = math::Random::uniform<double>(-10, 10);
-          dq[r] = math::Random::uniform<double>(-10, 10);
-          ddq[r] = math::Random::uniform<double>(-10, 10);
+          q[r] = math::Random::uniform<s_t>(-10, 10);
+          dq[r] = math::Random::uniform<s_t>(-10, 10);
+          ddq[r] = math::Random::uniform<s_t>(-10, 10);
         }
 
         tree->setPositions(q);
@@ -156,32 +156,32 @@ TEST(MetaSkeleton, Referential)
         EXPECT_TRUE( equals(dq, tree->getVelocities(), 0.0) );
         EXPECT_TRUE( equals(ddq, tree->getAccelerations(), 0.0) );
 
-        const Eigen::MatrixXd& skelMassMatrix = skeleton->getMassMatrix();
-        const Eigen::MatrixXd& treeMassMatrix = tree->getMassMatrix();
+        const Eigen::MatrixXs& skelMassMatrix = skeleton->getMassMatrix();
+        const Eigen::MatrixXs& treeMassMatrix = tree->getMassMatrix();
 
-        const Eigen::MatrixXd& skelAugM = skeleton->getAugMassMatrix();
-        const Eigen::MatrixXd& treeAugM = tree->getAugMassMatrix();
+        const Eigen::MatrixXs& skelAugM = skeleton->getAugMassMatrix();
+        const Eigen::MatrixXs& treeAugM = tree->getAugMassMatrix();
 
-        const Eigen::MatrixXd& skelInvM = skeleton->getInvMassMatrix();
-        const Eigen::MatrixXd& treeInvM = tree->getInvMassMatrix();
+        const Eigen::MatrixXs& skelInvM = skeleton->getInvMassMatrix();
+        const Eigen::MatrixXs& treeInvM = tree->getInvMassMatrix();
 
-        const Eigen::MatrixXd& skelInvAugM = skeleton->getInvAugMassMatrix();
-        const Eigen::MatrixXd& treeInvAugM = tree->getInvAugMassMatrix();
+        const Eigen::MatrixXs& skelInvAugM = skeleton->getInvAugMassMatrix();
+        const Eigen::MatrixXs& treeInvAugM = tree->getInvAugMassMatrix();
 
-        const Eigen::VectorXd& skelCvec = skeleton->getCoriolisForces();
-        const Eigen::VectorXd& treeCvec = tree->getCoriolisForces();
+        const Eigen::VectorXs& skelCvec = skeleton->getCoriolisForces();
+        const Eigen::VectorXs& treeCvec = tree->getCoriolisForces();
 
-        const Eigen::VectorXd& skelFg = skeleton->getGravityForces();
-        const Eigen::VectorXd& treeFg = tree->getGravityForces();
+        const Eigen::VectorXs& skelFg = skeleton->getGravityForces();
+        const Eigen::VectorXs& treeFg = tree->getGravityForces();
 
-        const Eigen::VectorXd& skelCg = skeleton->getCoriolisAndGravityForces();
-        const Eigen::VectorXd& treeCg = tree->getCoriolisAndGravityForces();
+        const Eigen::VectorXs& skelCg = skeleton->getCoriolisAndGravityForces();
+        const Eigen::VectorXs& treeCg = tree->getCoriolisAndGravityForces();
 
-        const Eigen::VectorXd& skelFext = skeleton->getExternalForces();
-        const Eigen::VectorXd& treeFext = tree->getExternalForces();
+        const Eigen::VectorXs& skelFext = skeleton->getExternalForces();
+        const Eigen::VectorXs& treeFext = tree->getExternalForces();
 
-        const Eigen::VectorXd& skelFc = skeleton->getConstraintForces();
-        const Eigen::VectorXd& treeFc = tree->getConstraintForces();
+        const Eigen::VectorXs& skelFc = skeleton->getConstraintForces();
+        const Eigen::VectorXs& treeFc = tree->getConstraintForces();
 
         const std::size_t nDofs = tree->getNumDofs();
         for(std::size_t r1=0; r1<nDofs; ++r1)
@@ -209,8 +209,8 @@ TEST(MetaSkeleton, Referential)
         for(std::size_t m=0; m<numBodyNodes; ++m)
         {
           const BodyNode* bn = tree->getBodyNode(m);
-          const Eigen::MatrixXd Jtree = tree->getJacobian(bn);
-          const Eigen::MatrixXd Jskel = skeleton->getJacobian(bn);
+          const Eigen::MatrixXs Jtree = tree->getJacobian(bn);
+          const Eigen::MatrixXs Jskel = skeleton->getJacobian(bn);
 
           for(std::size_t r2=0; r2<nDofs; ++r2)
           {

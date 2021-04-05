@@ -174,8 +174,8 @@ private:
     common::ResourceRetrieverPtr getResourceRetriever(
       const common::ResourceRetrieverPtr& _resourceRetriever);
 
-    static Eigen::Isometry3d toEigen(const urdf::Pose& _pose);
-    static Eigen::Vector3d toEigen(const urdf::Vector3& _vector);
+    static Eigen::Isometry3s toEigen(const urdf::Pose& _pose);
+    static Eigen::Vector3s toEigen(const urdf::Vector3& _vector);
 
     static bool readFileToString(
       const common::ResourceRetrieverPtr& _resourceRetriever,

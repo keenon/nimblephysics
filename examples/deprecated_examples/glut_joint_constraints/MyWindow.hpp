@@ -46,7 +46,7 @@ class MyWindow : public dart::gui::glut::SimWindow
 public:
   MyWindow() : SimWindow()
   {
-    mForce = Eigen::Vector3d::Zero();
+    mForce = Eigen::Vector3s::Zero();
     mController = nullptr;
     mWeldJoint = nullptr;
     mImpulseDuration = 0;
@@ -68,7 +68,7 @@ public:
   }
 
 private:
-  Eigen::Vector3d mForce;
+  Eigen::Vector3s mForce;
   Controller* mController;
   dart::constraint::WeldJointConstraintPtr mWeldJoint;
   int mImpulseDuration;
@@ -105,9 +105,9 @@ _m2) MyWindow(dynamics::SkeletonDynamics* _mList = 0, ...): Win3D() {
         mPersp = 45.f;
         mTrans[1] = 300.f;
 
-        mGravity = Eigen::Vector3d(0.0, -9.8, 0.0);
+        mGravity = Eigen::Vector3s(0.0, -9.8, 0.0);
         mTimeStep = 1.0/1000.0;
-        mForce = Eigen::Vector3d::Zero();
+        mForce = Eigen::Vector3s::Zero();
 
         if (_mList) {
             mSkels.push_back(_mList);
@@ -135,9 +135,9 @@ dynamics::SkeletonDynamics*); if(skel) mSkels.push_back(skel); else break;
     virtual void displayTimer(int _val);
 
     // Needed for integration
-    virtual Eigen::VectorXd getState();
-    virtual Eigen::VectorXd evalDeriv();
-    virtual void setState(const Eigen::VectorXd &state);
+    virtual Eigen::VectorXs getState();
+    virtual Eigen::VectorXs evalDeriv();
+    virtual void setState(const Eigen::VectorXs &state);
 
  protected:
     int mSimFrame;
@@ -147,15 +147,15 @@ dynamics::SkeletonDynamics*); if(skel) mSkels.push_back(skel); else break;
     bool mShowMarkers;
     integration::EulerIntegrator mIntegrator;
     //    integration::RK4Integrator mIntegrator;
-    std::vector<Eigen::VectorXd> mBakedStates;
+    std::vector<Eigen::VectorXs> mBakedStates;
 
     std::vector<dynamics::SkeletonDynamics*> mSkels;
     dynamics::ContactDynamics *mCollisionHandle;
-    std::vector<Eigen::VectorXd> mDofVels;
-    std::vector<Eigen::VectorXd> mDofs;
-    double mTimeStep;
-    Eigen::Vector3d mGravity;
-    Eigen::Vector3d mForce;
+    std::vector<Eigen::VectorXs> mDofVels;
+    std::vector<Eigen::VectorXs> mDofs;
+    s_t mTimeStep;
+    Eigen::Vector3s mGravity;
+    Eigen::Vector3s mForce;
     std::vector<int> mIndices;
     Controller *mController;
     int mImpulseDuration;

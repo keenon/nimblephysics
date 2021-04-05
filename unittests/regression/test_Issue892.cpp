@@ -40,18 +40,18 @@ using namespace dart::dynamics;
 using namespace dart::simulation;
 
 //==============================================================================
-SkeletonPtr createBox(double offset, double angle, std::string name)
+SkeletonPtr createBox(s_t offset, s_t angle, std::string name)
 {
   SkeletonPtr box = Skeleton::create(name);
   RevoluteJoint::Properties props;
-  props.mAxis = Eigen::Vector3d::UnitY();
-  props.mT_ParentBodyToJoint.translation() = Eigen::Vector3d(offset, 0.0, 0.0);
-  props.mT_ChildBodyToJoint.translation() = Eigen::Vector3d(0.0, 0.0, -0.4);
+  props.mAxis = Eigen::Vector3s::UnitY();
+  props.mT_ParentBodyToJoint.translation() = Eigen::Vector3s(offset, 0.0, 0.0);
+  props.mT_ChildBodyToJoint.translation() = Eigen::Vector3s(0.0, 0.0, -0.4);
 
   BodyNode* bn
       = box->createJointAndBodyNodePair<RevoluteJoint>(nullptr, props).second;
 
-  auto shape = std::make_shared<BoxShape>(Eigen::Vector3d(0.2, 0.1, 1.0));
+  auto shape = std::make_shared<BoxShape>(Eigen::Vector3s(0.2, 0.1, 1.0));
   bn->createShapeNodeWith<VisualAspect, CollisionAspect, DynamicsAspect>(shape);
 
   box->getDof(0)->setPosition(-angle);

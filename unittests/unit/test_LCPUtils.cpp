@@ -50,18 +50,18 @@ using namespace dart::constraint;
 #ifdef ALL_TESTS
 TEST(LCP_UTILS, MERGE_COLS)
 {
-  Eigen::VectorXd aFacBlock = Eigen::VectorXd::Random(2);
-  Eigen::VectorXd aFac = Eigen::VectorXd::Zero(4);
+  Eigen::VectorXs aFacBlock = Eigen::VectorXs::Random(2);
+  Eigen::VectorXs aFac = Eigen::VectorXs::Zero(4);
   aFac.segment(0, 2) = aFacBlock;
   aFac.segment(2, 2) = aFacBlock;
-  Eigen::MatrixXd A = aFac * aFac.transpose();
-  Eigen::VectorXd x = Eigen::VectorXd::Random(4);
-  Eigen::VectorXd b = Eigen::VectorXd::Random(4);
+  Eigen::MatrixXs A = aFac * aFac.transpose();
+  Eigen::VectorXs x = Eigen::VectorXs::Random(4);
+  Eigen::VectorXs b = Eigen::VectorXs::Random(4);
   b.segment(2, 2) = b.segment(0, 2);
-  Eigen::VectorXd hi = Eigen::VectorXd::Ones(4) * 1000;
-  Eigen::VectorXd lo = Eigen::VectorXd::Zero(4);
+  Eigen::VectorXs hi = Eigen::VectorXs::Ones(4) * 1000;
+  Eigen::VectorXs lo = Eigen::VectorXs::Zero(4);
   Eigen::VectorXi fIndex = Eigen::VectorXi::Ones(4) * -1;
-  Eigen::MatrixXd mapOut = Eigen::MatrixXd::Identity(4, 4);
+  Eigen::MatrixXs mapOut = Eigen::MatrixXs::Identity(4, 4);
   // set up friction forces
   hi(1) = 1.0;
   hi(3) = 1.0;
@@ -70,13 +70,13 @@ TEST(LCP_UTILS, MERGE_COLS)
   fIndex(1) = 0;
   fIndex(3) = 2;
 
-  Eigen::MatrixXd oldA = A;
-  Eigen::VectorXd oldX = x;
-  Eigen::VectorXd oldB = b;
-  Eigen::VectorXd oldHi = hi;
-  Eigen::VectorXd oldLo = lo;
+  Eigen::MatrixXs oldA = A;
+  Eigen::VectorXs oldX = x;
+  Eigen::VectorXs oldB = b;
+  Eigen::VectorXs oldHi = hi;
+  Eigen::VectorXs oldLo = lo;
   Eigen::VectorXi oldFIndex = fIndex;
-  Eigen::MatrixXd oldMapOut = mapOut;
+  Eigen::MatrixXs oldMapOut = mapOut;
 
   DantzigBoxedLcpSolver lcpSolver;
   /*
@@ -124,19 +124,19 @@ TEST(LCP_UTILS, MERGE_COLS)
 TEST(LCP_UTILS, SOLVE_MERGED)
 {
   srand(42);
-  Eigen::VectorXd aFacBlock = Eigen::VectorXd::Random(2);
-  Eigen::VectorXd aFac = Eigen::VectorXd::Zero(4);
+  Eigen::VectorXs aFacBlock = Eigen::VectorXs::Random(2);
+  Eigen::VectorXs aFac = Eigen::VectorXs::Zero(4);
   aFac.segment(0, 2) = aFacBlock;
   aFac.segment(2, 2) = aFacBlock;
-  Eigen::MatrixXd A = aFac * aFac.transpose();
-  Eigen::VectorXd x = Eigen::VectorXd::Random(4);
+  Eigen::MatrixXs A = aFac * aFac.transpose();
+  Eigen::VectorXs x = Eigen::VectorXs::Random(4);
   x.segment(2, 2) = x.segment(0, 2);
-  Eigen::VectorXd b = A * x;
-  x = Eigen::VectorXd::Random(4);
-  Eigen::VectorXd hi = Eigen::VectorXd::Ones(4) * 1000;
-  Eigen::VectorXd lo = Eigen::VectorXd::Zero(4);
+  Eigen::VectorXs b = A * x;
+  x = Eigen::VectorXs::Random(4);
+  Eigen::VectorXs hi = Eigen::VectorXs::Ones(4) * 1000;
+  Eigen::VectorXs lo = Eigen::VectorXs::Zero(4);
   Eigen::VectorXi fIndex = Eigen::VectorXi::Ones(4) * -1;
-  Eigen::MatrixXd mapOut = Eigen::MatrixXd::Identity(4, 4);
+  Eigen::MatrixXs mapOut = Eigen::MatrixXs::Identity(4, 4);
   // set up friction forces
   hi(1) = 1.0;
   hi(3) = 1.0;
@@ -145,13 +145,13 @@ TEST(LCP_UTILS, SOLVE_MERGED)
   fIndex(1) = 0;
   fIndex(3) = 2;
 
-  Eigen::MatrixXd oldA = A;
-  Eigen::VectorXd oldX = x;
-  Eigen::VectorXd oldB = b;
-  Eigen::VectorXd oldHi = hi;
-  Eigen::VectorXd oldLo = lo;
+  Eigen::MatrixXs oldA = A;
+  Eigen::VectorXs oldX = x;
+  Eigen::VectorXs oldB = b;
+  Eigen::VectorXs oldHi = hi;
+  Eigen::VectorXs oldLo = lo;
   Eigen::VectorXi oldFIndex = fIndex;
-  Eigen::MatrixXd oldMapOut = mapOut;
+  Eigen::MatrixXs oldMapOut = mapOut;
 
   std::shared_ptr<BoxedLcpSolver> lcpSolver
       = std::make_shared<DantzigBoxedLcpSolver>();
@@ -228,7 +228,7 @@ TEST(LCP_UTILS, LCP_FAILURE_2)
   -0.0124998
   0.0124996
   */
-  Eigen::MatrixXd A = Eigen::MatrixXd::Zero(6, 6);
+  Eigen::MatrixXs A = Eigen::MatrixXs::Zero(6, 6);
   // clang-format off
   A <<
   0.348223,  0.12244,  0,  0.223228,  0.122446,  0,
@@ -238,21 +238,21 @@ TEST(LCP_UTILS, LCP_FAILURE_2)
   0.122446,  0.630938,  0,  0.372434,  0.630926,  0,
   0,  0,  0,  0,  0,  0;
   // clang-format on
-  Eigen::VectorXd x = Eigen::VectorXd::Zero(6);
+  Eigen::VectorXs x = Eigen::VectorXs::Zero(6);
   x << 0, 0, 0, 0.00965809, 0.00965809, 0;
-  Eigen::VectorXd lo = Eigen::VectorXd::Zero(6);
+  Eigen::VectorXs lo = Eigen::VectorXs::Zero(6);
   lo << 0, -1, -1, 0, -1, -1;
-  Eigen::VectorXd hi = Eigen::VectorXd::Zero(6);
-  hi << std::numeric_limits<double>::infinity(), 1, 1,
-      std::numeric_limits<double>::infinity(), 1, 1;
-  Eigen::VectorXd b = Eigen::VectorXd::Zero(6);
+  Eigen::VectorXs hi = Eigen::VectorXs::Zero(6);
+  hi << std::numeric_limits<s_t>::infinity(), 1, 1,
+      std::numeric_limits<s_t>::infinity(), 1, 1;
+  Eigen::VectorXs b = Eigen::VectorXs::Zero(6);
   b << -0.0124998, 0.0250006, 0, 0.0124996, 0.0249994, 0;
   Eigen::VectorXi fIndex = Eigen::VectorXi::Zero(6);
   fIndex << -1, 0, 0, -1, 3, 3;
 
   int n = x.size();
-  Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> APadded
-      = Eigen::MatrixXd::Zero(n, dPAD(n));
+  Eigen::Matrix<s_t, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> APadded
+      = Eigen::MatrixXs::Zero(n, dPAD(n));
   APadded.block(0, 0, n, n) = A;
 
   std::cout << "A:" << std::endl << A << std::endl;
@@ -266,9 +266,9 @@ TEST(LCP_UTILS, LCP_FAILURE_2)
       PgsBoxedLcpSolver::Option(50000, 1e-15, 1e-12, 1e-10, false));
   // x = LCPUtils::guessSolution(A, b, hi, lo, fIndex);
 
-  Eigen::VectorXd bBackup = b;
-  Eigen::VectorXd hiBackup = hi;
-  Eigen::VectorXd loBackup = lo;
+  Eigen::VectorXs bBackup = b;
+  Eigen::VectorXs hiBackup = hi;
+  Eigen::VectorXs loBackup = lo;
   Eigen::VectorXi fIndexBackup = fIndex;
 
   /*
@@ -292,16 +292,16 @@ TEST(LCP_UTILS, LCP_FAILURE_2)
 
   // Try cutting out all the friction indices
 
-  Eigen::MatrixXd reducedA = A;
-  Eigen::VectorXd reducedX = x;
-  Eigen::VectorXd reducedLo = lo;
-  Eigen::VectorXd reducedHi = hi;
-  Eigen::VectorXd reducedB = b;
+  Eigen::MatrixXs reducedA = A;
+  Eigen::VectorXs reducedX = x;
+  Eigen::VectorXs reducedLo = lo;
+  Eigen::VectorXs reducedHi = hi;
+  Eigen::VectorXs reducedB = b;
   Eigen::VectorXi reducedFIndex = fIndex;
-  Eigen::MatrixXd mapOut = LCPUtils::removeFriction(
+  Eigen::MatrixXs mapOut = LCPUtils::removeFriction(
       reducedA, reducedX, reducedLo, reducedHi, reducedB, reducedFIndex);
 
-  Eigen::MatrixXd J = Eigen::MatrixXd(3, 2);
+  Eigen::MatrixXs J = Eigen::MatrixXs(3, 2);
   // clang-format off
   J << -1.11606,   -1.61605,
        -0.250031,  -0.75002,
@@ -309,8 +309,8 @@ TEST(LCP_UTILS, LCP_FAILURE_2)
   // clang-format on
 
   int reducedN = reducedX.size();
-  Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>
-      reducedAPadded = Eigen::MatrixXd::Zero(reducedN, dPAD(reducedN));
+  Eigen::Matrix<s_t, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>
+      reducedAPadded = Eigen::MatrixXs::Zero(reducedN, dPAD(reducedN));
   reducedAPadded.block(0, 0, reducedN, reducedN) = reducedA;
 
   std::cout << "reduced A:" << std::endl << reducedA << std::endl;
@@ -345,7 +345,7 @@ TEST(LCP_UTILS, LCP_FAILURE_2)
 
   /*
   DantzigBoxedLcpSolver dLcpSolver;
-  Eigen::VectorXd dantzigX = Eigen::VectorXd::Zero(2);
+  Eigen::VectorXs dantzigX = Eigen::VectorXs::Zero(2);
   bool success = dLcpSolver.solve(
       reducedN,
       reducedAPadded.data(),
@@ -369,7 +369,7 @@ TEST(LCP_UTILS, LCP_FAILURE_2)
 #ifdef ALL_TESTS
 TEST(LCP_UTILS, LCP_FAILURE)
 {
-  Eigen::MatrixXd A = Eigen::MatrixXd::Zero(6, 6);
+  Eigen::MatrixXs A = Eigen::MatrixXs::Zero(6, 6);
   // clang-format off
   A <<
   2.5,  0,  -0.00500001,  1.5,  0,  -0.00499901,
@@ -379,21 +379,21 @@ TEST(LCP_UTILS, LCP_FAILURE)
   0,  1.9901,  0,  0,  2.9901,  0,
   -0.00499901,  0,  2.4901,  0.00499999,  0,  2.4901;
   // clang-format on
-  Eigen::VectorXd x = Eigen::VectorXd::Zero(6);
+  Eigen::VectorXs x = Eigen::VectorXs::Zero(6);
   x << 0, 0, 0, 0, 0, 0;
-  Eigen::VectorXd lo = Eigen::VectorXd::Zero(6);
+  Eigen::VectorXs lo = Eigen::VectorXs::Zero(6);
   lo << 0, -10000, -10000, 0, -10000, -10000;
-  Eigen::VectorXd hi = Eigen::VectorXd::Zero(6);
-  hi << std::numeric_limits<double>::infinity(), 10000, 10000,
-      std::numeric_limits<double>::infinity(), 10000, 10000;
-  Eigen::VectorXd b = Eigen::VectorXd::Zero(6);
+  Eigen::VectorXs hi = Eigen::VectorXs::Zero(6);
+  hi << std::numeric_limits<s_t>::infinity(), 10000, 10000,
+      std::numeric_limits<s_t>::infinity(), 10000, 10000;
+  Eigen::VectorXs b = Eigen::VectorXs::Zero(6);
   b << 0.01, 0, -1e-08, 0.01, 0, -1e-08;
   Eigen::VectorXi fIndex = Eigen::VectorXi::Zero(6);
   fIndex << -1, 0, 0, -1, 3, 3;
 
   int n = x.size();
-  Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> APadded
-      = Eigen::MatrixXd::Zero(n, dPAD(n));
+  Eigen::Matrix<s_t, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> APadded
+      = Eigen::MatrixXs::Zero(n, dPAD(n));
   APadded.block(0, 0, n, n) = A;
 
   x = LCPUtils::guessSolution(A, b, hi, lo, fIndex);
@@ -412,7 +412,7 @@ TEST(LCP_UTILS, LCP_FAILURE)
       fIndex.data(),
       false);
 
-  Eigen::VectorXd v = A * x - b;
+  Eigen::VectorXs v = A * x - b;
   // x = A.completeOrthogonalDecomposition().solve(b);
 
   EXPECT_TRUE(LCPUtils::isLCPSolutionValid(A, x, b, hi, lo, fIndex, false));
@@ -422,7 +422,7 @@ TEST(LCP_UTILS, LCP_FAILURE)
 #ifdef ALL_TESTS
 TEST(LCP_UTILS, REAL_LIFE_FAILURE_1)
 {
-  Eigen::MatrixXd A = Eigen::MatrixXd::Zero(6, 6);
+  Eigen::MatrixXs A = Eigen::MatrixXs::Zero(6, 6);
   // clang-format off
   A <<
   0.0424296,  -0.0139791,  0,  0.0424296,  -0.0139791,  0,
@@ -432,28 +432,28 @@ TEST(LCP_UTILS, REAL_LIFE_FAILURE_1)
   -0.0139791,  0.0698999,  0,  -0.0139791,  0.0698999,  0,
   0,  0,  0,  0,  0,  0;
   // clang-format on
-  Eigen::VectorXd x = Eigen::VectorXd::Zero(6);
+  Eigen::VectorXs x = Eigen::VectorXs::Zero(6);
   x << 0, 0, 0, 0, 0, 0;
-  Eigen::VectorXd lo = Eigen::VectorXd::Zero(6);
+  Eigen::VectorXs lo = Eigen::VectorXs::Zero(6);
   lo << 0, -1, -1, 0, -1, -1;
-  Eigen::VectorXd hi = Eigen::VectorXd::Zero(6);
-  hi << std::numeric_limits<double>::infinity(), 1, 1,
-      std::numeric_limits<double>::infinity(), 1, 1;
-  Eigen::VectorXd b = Eigen::VectorXd::Zero(6);
+  Eigen::VectorXs hi = Eigen::VectorXs::Zero(6);
+  hi << std::numeric_limits<s_t>::infinity(), 1, 1,
+      std::numeric_limits<s_t>::infinity(), 1, 1;
+  Eigen::VectorXs b = Eigen::VectorXs::Zero(6);
   b << 1.67162, 2.08376, 0, 1.67162, 2.08376, 0;
   Eigen::VectorXi fIndex = Eigen::VectorXi::Zero(6);
   fIndex << -1, 0, 0, -1, 3, 3;
 
-  Eigen::MatrixXd reducedA = A;
-  Eigen::VectorXd reducedX = x;
-  Eigen::VectorXd reducedLo = lo;
-  Eigen::VectorXd reducedHi = hi;
-  Eigen::VectorXd reducedB = b;
+  Eigen::MatrixXs reducedA = A;
+  Eigen::VectorXs reducedX = x;
+  Eigen::VectorXs reducedLo = lo;
+  Eigen::VectorXs reducedHi = hi;
+  Eigen::VectorXs reducedB = b;
   Eigen::VectorXi reducedFIndex = fIndex;
-  Eigen::MatrixXd mapOutOrig = LCPUtils::reduce(
+  Eigen::MatrixXs mapOutOrig = LCPUtils::reduce(
       reducedA, reducedX, reducedLo, reducedHi, reducedB, reducedFIndex);
 
-  Eigen::MatrixXd mapOut = Eigen::MatrixXd::Identity(A.rows(), A.cols());
+  Eigen::MatrixXs mapOut = Eigen::MatrixXs::Identity(A.rows(), A.cols());
 
   LCPUtils::mergeLCPColumns(0, 3, A, x, b, hi, lo, fIndex, mapOut);
   LCPUtils::mergeLCPColumns(1, 3, A, x, b, hi, lo, fIndex, mapOut);
@@ -466,20 +466,20 @@ TEST(LCP_UTILS, REAL_LIFE_FAILURE_1)
 #ifdef ALL_TESTS
 TEST(LCP_UTILS, REAL_LIFE_FAILURE_2)
 {
-  Eigen::MatrixXd A = Eigen::MatrixXd::Zero(3, 3);
+  Eigen::MatrixXs A = Eigen::MatrixXs::Zero(3, 3);
   // clang-format off
   A <<
   1,  -0.0279582,  0,
   -0.329466,  0.1398,  0,
   0,  0,  0;
   // clang-format on
-  Eigen::VectorXd x = Eigen::VectorXd::Zero(3);
+  Eigen::VectorXs x = Eigen::VectorXs::Zero(3);
   x << 19.6988, 0, 0;
-  Eigen::VectorXd lo = Eigen::VectorXd::Zero(3);
+  Eigen::VectorXs lo = Eigen::VectorXs::Zero(3);
   lo << 0, -1, -1;
-  Eigen::VectorXd hi = Eigen::VectorXd::Zero(3);
-  hi << std::numeric_limits<double>::infinity(), 1, 1;
-  Eigen::VectorXd b = Eigen::VectorXd::Zero(3);
+  Eigen::VectorXs hi = Eigen::VectorXs::Zero(3);
+  hi << std::numeric_limits<s_t>::infinity(), 1, 1;
+  Eigen::VectorXs b = Eigen::VectorXs::Zero(3);
   b << 19.6988, 2.08376, 0;
   Eigen::VectorXi fIndex = Eigen::VectorXi::Zero(3);
   fIndex << -1, 0, 0;
@@ -490,7 +490,7 @@ TEST(LCP_UTILS, REAL_LIFE_FAILURE_2)
 #ifdef ALL_TESTS
 TEST(LCP_UTILS, REAL_LIFE_FAILURE_3)
 {
-  Eigen::MatrixXd A = Eigen::MatrixXd::Zero(6, 6);
+  Eigen::MatrixXs A = Eigen::MatrixXs::Zero(6, 6);
   // clang-format off
   A <<
   0.0424296,  -0.0139791,  0,  0.0424296,  -0.0139791,  0,
@@ -500,37 +500,37 @@ TEST(LCP_UTILS, REAL_LIFE_FAILURE_3)
   -0.0139791,  0.0698999,  0,  -0.0139791,  0.0698999,  0,
   0,  0,  0,  0,  0,  0;
   // clang-format on
-  Eigen::VectorXd x = Eigen::VectorXd::Zero(6);
+  Eigen::VectorXs x = Eigen::VectorXs::Zero(6);
   x << 0, 0, 0, 0, 0, 0;
-  Eigen::VectorXd lo = Eigen::VectorXd::Zero(6);
+  Eigen::VectorXs lo = Eigen::VectorXs::Zero(6);
   lo << 0, -1, -1, 0, -1, -1;
-  Eigen::VectorXd hi = Eigen::VectorXd::Zero(6);
-  hi << std::numeric_limits<double>::infinity(), 1, 1,
-      std::numeric_limits<double>::infinity(), 1, 1;
-  Eigen::VectorXd b = Eigen::VectorXd::Zero(6);
+  Eigen::VectorXs hi = Eigen::VectorXs::Zero(6);
+  hi << std::numeric_limits<s_t>::infinity(), 1, 1,
+      std::numeric_limits<s_t>::infinity(), 1, 1;
+  Eigen::VectorXs b = Eigen::VectorXs::Zero(6);
   b << 1.67162, 2.08376, 0, 1.67162, 2.08376, 0;
   Eigen::VectorXi fIndex = Eigen::VectorXi::Zero(6);
   fIndex << -1, 0, 0, -1, 3, 3;
 
-  Eigen::MatrixXd reducedA = A;
-  Eigen::VectorXd reducedX = x;
-  Eigen::VectorXd reducedLo = lo;
-  Eigen::VectorXd reducedHi = hi;
-  Eigen::VectorXd reducedB = b;
+  Eigen::MatrixXs reducedA = A;
+  Eigen::VectorXs reducedX = x;
+  Eigen::VectorXs reducedLo = lo;
+  Eigen::VectorXs reducedHi = hi;
+  Eigen::VectorXs reducedB = b;
   Eigen::VectorXi reducedFIndex = fIndex;
-  Eigen::MatrixXd mapOut = LCPUtils::reduce(
+  Eigen::MatrixXs mapOut = LCPUtils::reduce(
       reducedA, reducedX, reducedLo, reducedHi, reducedB, reducedFIndex);
   DantzigBoxedLcpSolver lcpSolver;
   int reducedN = reducedX.size();
-  Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>
-      reducedAPadded = Eigen::MatrixXd::Zero(reducedN, dPAD(reducedN));
+  Eigen::Matrix<s_t, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>
+      reducedAPadded = Eigen::MatrixXs::Zero(reducedN, dPAD(reducedN));
   reducedAPadded.block(0, 0, reducedN, reducedN) = reducedA;
 
-  Eigen::VectorXd proposedX
+  Eigen::VectorXs proposedX
       = reducedA.completeOrthogonalDecomposition().solve(reducedB);
-  Eigen::VectorXd diff = reducedA * proposedX - reducedB;
+  Eigen::VectorXs diff = reducedA * proposedX - reducedB;
 
-  Eigen::VectorXd reducedBSaved = reducedB;
+  Eigen::VectorXs reducedBSaved = reducedB;
 
   lcpSolver.solve(
       reducedN,
@@ -543,9 +543,9 @@ TEST(LCP_UTILS, REAL_LIFE_FAILURE_3)
       reducedFIndex.data(),
       false);
 
-  Eigen::VectorXd smallV = reducedA * reducedX - reducedBSaved;
-  Eigen::VectorXd fullResult = mapOut * reducedX;
-  Eigen::VectorXd bigV = A * fullResult - b;
+  Eigen::VectorXs smallV = reducedA * reducedX - reducedBSaved;
+  Eigen::VectorXs fullResult = mapOut * reducedX;
+  Eigen::VectorXs bigV = A * fullResult - b;
 
   EXPECT_TRUE(
       LCPUtils::isLCPSolutionValid(A, fullResult, b, hi, lo, fIndex, false));
@@ -556,7 +556,7 @@ TEST(LCP_UTILS, REAL_LIFE_FAILURE_3)
 #ifdef ALL_TESTS
 TEST(LCP_UTILS, REAL_LIFE_FAILURE_4)
 {
-  Eigen::MatrixXd A = Eigen::MatrixXd::Zero(6, 6);
+  Eigen::MatrixXs A = Eigen::MatrixXs::Zero(6, 6);
   // clang-format off
   A <<
   0.0923023,  0.0247589,  0,  0.0923023,  0.0247589,  0,
@@ -567,21 +567,21 @@ TEST(LCP_UTILS, REAL_LIFE_FAILURE_4)
   0,  0,  0,  0,  0,  0;
   // clang-format on
   /*
-  Eigen::VectorXd x = Eigen::VectorXd::Zero(6);
+  Eigen::VectorXs x = Eigen::VectorXs::Zero(6);
   x << 0.0251303, -0.0198151, 0, 0.0251303, -0.0198151, 0;
   */
-  Eigen::VectorXd x = Eigen::VectorXd::Zero(6);
+  Eigen::VectorXs x = Eigen::VectorXs::Zero(6);
   x << 0.0270786, -0.0270786, 0, 0.0270786, -0.0270786, 0;
-  Eigen::VectorXd lo = Eigen::VectorXd::Zero(6);
+  Eigen::VectorXs lo = Eigen::VectorXs::Zero(6);
   lo << 0, -1, -1, 0, -1, -1;
-  Eigen::VectorXd hi = Eigen::VectorXd::Zero(6);
-  hi << std::numeric_limits<double>::infinity(), 1, 1,
-      std::numeric_limits<double>::infinity(), 1, 1;
-  Eigen::VectorXd b = Eigen::VectorXd::Zero(6);
+  Eigen::VectorXs hi = Eigen::VectorXs::Zero(6);
+  hi << std::numeric_limits<s_t>::infinity(), 1, 1,
+      std::numeric_limits<s_t>::infinity(), 1, 1;
+  Eigen::VectorXs b = Eigen::VectorXs::Zero(6);
   b << 0.00365796, 0.000140769, 0, 0.00365796, 0.000140769, 0;
   Eigen::VectorXi fIndex = Eigen::VectorXi::Zero(6);
   fIndex << -1, 0, 0, -1, 3, 3;
-  Eigen::MatrixXd mapOut = Eigen::MatrixXd::Identity(6, 6);
+  Eigen::MatrixXs mapOut = Eigen::MatrixXs::Identity(6, 6);
 
   bool isSolutionValid
       = LCPUtils::isLCPSolutionValid(A, x, b, hi, lo, fIndex, false);
@@ -592,8 +592,8 @@ TEST(LCP_UTILS, REAL_LIFE_FAILURE_4)
   LCPUtils::mergeLCPColumns(2, 3, A, x, b, hi, lo, fIndex, mapOut);
   LCPUtils::printReplicationCode(A, x, lo, hi, b, fIndex);
 
-  Eigen::VectorXd out = A.completeOrthogonalDecomposition().solve(b);
-  Eigen::VectorXd outBig = mapOut * out;
+  Eigen::VectorXs out = A.completeOrthogonalDecomposition().solve(b);
+  Eigen::VectorXs outBig = mapOut * out;
 
   std::cout << "solved X: " << std::endl << out << std::endl;
   std::cout << "solved full X: " << std::endl << outBig << std::endl;
@@ -602,23 +602,23 @@ TEST(LCP_UTILS, REAL_LIFE_FAILURE_4)
   std::cout << "is solution valid: " << isSolutionValid << std::endl;
   std::cout << "original X: " << std::endl << x << std::endl;
   std::cout << "original full X: " << std::endl << mapOut * x << std::endl;
-  Eigen::VectorXd diff = A * x - b;
+  Eigen::VectorXs diff = A * x - b;
   std::cout << "original LCP diff: " << std::endl << diff << std::endl;
   std::cout << "solved LCP diff: " << std::endl << A * out - b << std::endl;
-  Eigen::VectorXd outWithGap
+  Eigen::VectorXs outWithGap
       = A.completeOrthogonalDecomposition().solve(b + diff);
   std::cout << "solved LCP with gap: " << std::endl
             << A * outWithGap - b << std::endl;
   std::cout << "original full X: " << std::endl
             << mapOut * outWithGap << std::endl;
 
-  Eigen::VectorXd sum = Eigen::VectorXd::Zero(3);
+  Eigen::VectorXs sum = Eigen::VectorXs::Zero(3);
   sum += A.col(0);
   sum += A.col(1);
-  Eigen::VectorXd res = sum.completeOrthogonalDecomposition().solve(b);
+  Eigen::VectorXs res = sum.completeOrthogonalDecomposition().solve(b);
   std::cout << "res: " << std::endl << res << std::endl;
 
-  Eigen::Vector3d boundedResult = Eigen::Vector3d(res(0), res(0), 0);
+  Eigen::Vector3s boundedResult = Eigen::Vector3s(res(0), res(0), 0);
   std::cout << "bounded result LCP diff: " << std::endl
             << A * boundedResult - b << std::endl;
 
@@ -630,8 +630,8 @@ TEST(LCP_UTILS, REAL_LIFE_FAILURE_4)
   accurateAndSlowSolver->setOption(
       PgsBoxedLcpSolver::Option(50000, 1e-15, 1e-12, 1e-10, false));
   int reducedN = x.size();
-  Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>
-      reducedAPadded = Eigen::MatrixXd::Zero(reducedN, dPAD(reducedN));
+  Eigen::Matrix<s_t, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>
+      reducedAPadded = Eigen::MatrixXs::Zero(reducedN, dPAD(reducedN));
   reducedAPadded.block(0, 0, reducedN, reducedN) = A;
   accurateAndSlowSolver->solve(
       reducedN,
@@ -655,7 +655,7 @@ TEST(LCP_UTILS, REAL_LIFE_FAILURE_4)
 #ifdef ALL_TESTS
 TEST(LCP_UTILS, REAL_LIFE_FAILURE_5)
 {
-  Eigen::MatrixXd A = Eigen::MatrixXd::Zero(12, 12);
+  Eigen::MatrixXs A = Eigen::MatrixXs::Zero(12, 12);
   // clang-format off
   A <<
   1.0591,  -0.0531116,  0,  1.0591,  -0.0531116,  0,  1.06715,  -0.0532007,  0,  1.06715,  -0.0532007,  0,
@@ -671,16 +671,16 @@ TEST(LCP_UTILS, REAL_LIFE_FAILURE_5)
   -0.0532007,  1.05188,  0,  -0.0532007,  1.05188,  0,  -0.0550241,  1.0519,  0,  -0.0550241,  1.0519,  0,
   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0;
   // clang-format on
-  Eigen::VectorXd x = Eigen::VectorXd::Zero(12);
+  Eigen::VectorXs x = Eigen::VectorXs::Zero(12);
   x << 0.00426985, 7.49341e-05, 0, 0.00426985, 7.49341e-05, 0, 0, 0, 0, 0, 0, 0;
-  Eigen::VectorXd lo = Eigen::VectorXd::Zero(12);
+  Eigen::VectorXs lo = Eigen::VectorXs::Zero(12);
   lo << 0, -1, -1, 0, -1, -1, 0, -1, -1, 0, -1, -1;
-  Eigen::VectorXd hi = Eigen::VectorXd::Zero(12);
-  hi << std::numeric_limits<double>::infinity(), 1, 1,
-      std::numeric_limits<double>::infinity(), 1, 1,
-      std::numeric_limits<double>::infinity(), 1, 1,
-      std::numeric_limits<double>::infinity(), 1, 1;
-  Eigen::VectorXd b = Eigen::VectorXd::Zero(12);
+  Eigen::VectorXs hi = Eigen::VectorXs::Zero(12);
+  hi << std::numeric_limits<s_t>::infinity(), 1, 1,
+      std::numeric_limits<s_t>::infinity(), 1, 1,
+      std::numeric_limits<s_t>::infinity(), 1, 1,
+      std::numeric_limits<s_t>::infinity(), 1, 1;
+  Eigen::VectorXs b = Eigen::VectorXs::Zero(12);
   b << 0.0090364, -0.000295916, 0, 0.0090364, -0.000295916, 0, -0.0139171,
       -4.19424e-05, 0, -0.0139171, -4.19424e-05, 0;
   Eigen::VectorXi fIndex = Eigen::VectorXi::Zero(12);
@@ -697,7 +697,7 @@ TEST(LCP_UTILS, REAL_LIFE_FAILURE_6)
 #ifdef ALL_TESTS
 TEST(LCP_UTILS, BLOCK_SYMMETRIC_CASE)
 {
-  Eigen::MatrixXd A = Eigen::MatrixXd::Zero(6, 6);
+  Eigen::MatrixXs A = Eigen::MatrixXs::Zero(6, 6);
   // clang-format off
   A <<
   0.0923029,  0.0247581,  0,  0.0923029,  0.0247581,  0,
@@ -707,19 +707,19 @@ TEST(LCP_UTILS, BLOCK_SYMMETRIC_CASE)
   0.0247581,  0.0137368,  0,  0.0247581,  0.0137368,  0,
   0,  0,  0,  0,  0,  0;
   // clang-format on
-  Eigen::VectorXd x = Eigen::VectorXd::Zero(6);
+  Eigen::VectorXs x = Eigen::VectorXs::Zero(6);
   x << 0.0491903, 0.00921924, 0, 0, 0, 0;
-  Eigen::VectorXd lo = Eigen::VectorXd::Zero(6);
+  Eigen::VectorXs lo = Eigen::VectorXs::Zero(6);
   lo << 0, -1, -1, 0, -1, -1;
-  Eigen::VectorXd hi = Eigen::VectorXd::Zero(6);
-  hi << std::numeric_limits<double>::infinity(), 1, 1,
-      std::numeric_limits<double>::infinity(), 1, 1;
-  Eigen::VectorXd b = Eigen::VectorXd::Zero(6);
+  Eigen::VectorXs hi = Eigen::VectorXs::Zero(6);
+  hi << std::numeric_limits<s_t>::infinity(), 1, 1,
+      std::numeric_limits<s_t>::infinity(), 1, 1;
+  Eigen::VectorXs b = Eigen::VectorXs::Zero(6);
   b << 0.00365797, 0.000140734, 0, 0.00365797, 0.000140734, 0;
   Eigen::VectorXi fIndex = Eigen::VectorXi::Zero(6);
   fIndex << -1, 0, 0, -1, 3, 3;
 
-  JacobiSVD<MatrixXd> svd(A, ComputeThinU | ComputeThinV);
+  JacobiSVD<MatrixXs> svd(A, ComputeThinU | ComputeThinV);
   // A = U^T * S * V
   std::cout << "Singular values" << std::endl
             << svd.singularValues() << std::endl;
@@ -732,26 +732,26 @@ TEST(LCP_UTILS, BLOCK_SYMMETRIC_CASE)
 
   // Where V can be rectangular
 
-  Eigen::VectorXd Vx = svd.matrixV() * b;
+  Eigen::VectorXs Vx = svd.matrixV() * b;
   std::cout << "V*b:" << std::endl << Vx << std::endl;
-  Eigen::VectorXd SVx = svd.singularValues().asDiagonal() * Vx;
+  Eigen::VectorXs SVx = svd.singularValues().asDiagonal() * Vx;
   std::cout << "S*V*b:" << std::endl << SVx << std::endl;
-  Eigen::VectorXd UTSVx = svd.matrixU().transpose() * SVx;
+  Eigen::VectorXs UTSVx = svd.matrixU().transpose() * SVx;
   std::cout << "U^T*S*V*b:" << std::endl << UTSVx << std::endl;
 
-  Eigen::VectorXd filter = Eigen::VectorXd::Zero(svd.singularValues().size());
+  Eigen::VectorXs filter = Eigen::VectorXs::Zero(svd.singularValues().size());
   for (int i = 0; i < svd.singularValues().size(); i++)
   {
-    if (std::abs(svd.singularValues()(i)) > 1e-4)
+    if (abs(svd.singularValues()(i)) > 1e-4)
     {
       filter(i) = 1.0;
     }
   }
 
   // If A was full rank, this would be the identity matrix
-  Eigen::MatrixXd fA
+  Eigen::MatrixXs fA
       = svd.matrixU().transpose() * filter.asDiagonal() * svd.matrixU();
-  Eigen::VectorXd fx = fA * x;
+  Eigen::VectorXs fx = fA * x;
   std::cout << "x:" << std::endl << x << std::endl;
   std::cout << "A * x:" << std::endl << A * x << std::endl;
   std::cout << "filtered x:" << std::endl << fx << std::endl;

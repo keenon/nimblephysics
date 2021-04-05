@@ -54,7 +54,7 @@ namespace constraint {
 
 //==============================================================================
 BoxedLcpConstraintSolver::BoxedLcpConstraintSolver(
-    double timeStep,
+    s_t timeStep,
     BoxedLcpSolverPtr boxedLcpSolver,
     BoxedLcpSolverPtr secondaryBoxedLcpSolver)
   : BoxedLcpConstraintSolver(
@@ -171,7 +171,7 @@ ConstBoxedLcpSolverPtr BoxedLcpConstraintSolver::getSecondaryBoxedLcpSolver()
 /// This gets the cached LCP solution, which is useful to be able to get/set
 /// because it can effect the forward solutions of physics problems because of
 /// our optimistic LCP-stabilization-to-acceptance approach.
-Eigen::VectorXd BoxedLcpConstraintSolver::getCachedLCPSolution()
+Eigen::VectorXs BoxedLcpConstraintSolver::getCachedLCPSolution()
 {
   return mX;
 }
@@ -179,7 +179,7 @@ Eigen::VectorXd BoxedLcpConstraintSolver::getCachedLCPSolution()
 /// This gets the cached LCP solution, which is useful to be able to get/set
 /// because it can effect the forward solutions of physics problems because of
 /// our optimistic LCP-stabilization-to-acceptance approach.
-void BoxedLcpConstraintSolver::setCachedLCPSolution(Eigen::VectorXd X)
+void BoxedLcpConstraintSolver::setCachedLCPSolution(Eigen::VectorXs X)
 {
   mX = X;
 }
@@ -252,7 +252,7 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(
     // Fill a matrix by impulse tests: A
     constraint->excite();
 
-    double* impulses = new double[constraint->getDimension()];
+    s_t* impulses = new s_t[constraint->getDimension()];
     for (std::size_t j = 0; j < constraint->getDimension(); ++j)
     {
       // Adjust findex for global index
@@ -352,7 +352,7 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(
   // solution. We have to use fairly large constants for CFM to prevent
   // numerical issues during backprop, so we'd rather not use it at all, if we
   // can avoid it.
-  double cfm = 0.0;
+  s_t cfm = 0.0;
 
   // Solve LCP using the primary solver and fallback to secondary solver when
   // the parimary solver failed.
@@ -369,18 +369,18 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(
   }
   // Always make backups of these variables, regardless of whether we're using
   // a secondary solver, because we need them for gradients
-  Eigen::VectorXd loGradientBackup = mLo;
-  Eigen::VectorXd hiGradientBackup = mHi;
+  Eigen::VectorXs loGradientBackup = mLo;
+  Eigen::VectorXs hiGradientBackup = mHi;
   Eigen::VectorXi fIndexGradientBackup = mFIndex;
-  Eigen::VectorXd bGradientBackup = mB;
-  Eigen::VectorXd aColNormGradientBackup = Eigen::VectorXd::Zero(n);
+  Eigen::VectorXs bGradientBackup = mB;
+  Eigen::VectorXs aColNormGradientBackup = Eigen::VectorXs::Zero(n);
   for (std::size_t i = 0; i < n; i++)
   {
     aColNormGradientBackup(i) = mA.col(i).squaredNorm();
   }
   // mA can actually be non-square, for efficiency reasons, so we make sure we
   // keep just the square block.
-  Eigen::MatrixXd aGradientBackup = mA.block(0, 0, n, n);
+  Eigen::MatrixXs aGradientBackup = mA.block(0, 0, n, n);
 
   bool success = false;
   bool shortCircuitLCP = false;
@@ -438,13 +438,13 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(
     const bool earlyTermination = (mSecondaryBoxedLcpSolver != nullptr);
     assert(mBoxedLcpSolver);
 
-    Eigen::MatrixXd mAReduced = mA.block(0, 0, n, n);
-    Eigen::VectorXd mXReduced = mX;
-    Eigen::VectorXd mBReduced = mB;
-    Eigen::VectorXd mHiReduced = mHi;
-    Eigen::VectorXd mLoReduced = mLo;
+    Eigen::MatrixXs mAReduced = mA.block(0, 0, n, n);
+    Eigen::VectorXs mXReduced = mX;
+    Eigen::VectorXs mBReduced = mB;
+    Eigen::VectorXs mHiReduced = mHi;
+    Eigen::VectorXs mLoReduced = mLo;
     Eigen::VectorXi mFIndexReduced = mFIndex;
-    Eigen::MatrixXd mapOut = LCPUtils::reduce(
+    Eigen::MatrixXs mapOut = LCPUtils::reduce(
         mAReduced,
         mXReduced,
         mBReduced,
@@ -452,8 +452,8 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(
         mLoReduced,
         mFIndexReduced);
     int reducedN = mXReduced.size();
-    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>
-        reducedAPadded = Eigen::MatrixXd::Zero(reducedN, dPAD(reducedN));
+    Eigen::Matrix<s_t, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>
+        reducedAPadded = Eigen::MatrixXs::Zero(reducedN, dPAD(reducedN));
     reducedAPadded.block(0, 0, reducedN, reducedN) = mAReduced;
 
     success = mBoxedLcpSolver->solve(
@@ -516,21 +516,21 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(
     cfm = world->getFallbackConstraintForceMixingConstant();
     // Apple the constraint force mixing
     mABackup.diagonal()
-        += Eigen::VectorXd::Ones(mABackup.diagonal().size()) * cfm;
+        += Eigen::VectorXs::Ones(mABackup.diagonal().size()) * cfm;
     aGradientBackup.diagonal()
-        += Eigen::VectorXd::Ones(aGradientBackup.diagonal().size()) * cfm;
+        += Eigen::VectorXs::Ones(aGradientBackup.diagonal().size()) * cfm;
   }
 
   // If Dantzig failed to solve the problem, fall back to PGS
   if (!success && mSecondaryBoxedLcpSolver)
   {
-    Eigen::MatrixXd mAReduced = mABackup.block(0, 0, n, n);
-    Eigen::VectorXd mXReduced = mXBackup;
-    Eigen::VectorXd mBReduced = mBBackup;
-    Eigen::VectorXd mHiReduced = mHiBackup;
-    Eigen::VectorXd mLoReduced = mLoBackup;
+    Eigen::MatrixXs mAReduced = mABackup.block(0, 0, n, n);
+    Eigen::VectorXs mXReduced = mXBackup;
+    Eigen::VectorXs mBReduced = mBBackup;
+    Eigen::VectorXs mHiReduced = mHiBackup;
+    Eigen::VectorXs mLoReduced = mLoBackup;
     Eigen::VectorXi mFIndexReduced = mFIndexBackup;
-    Eigen::MatrixXd mapOut = LCPUtils::reduce(
+    Eigen::MatrixXs mapOut = LCPUtils::reduce(
         mAReduced,
         mXReduced,
         mBReduced,
@@ -538,8 +538,8 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(
         mLoReduced,
         mFIndexReduced);
     int reducedN = mXReduced.size();
-    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>
-        reducedAPadded = Eigen::MatrixXd::Zero(reducedN, dPAD(reducedN));
+    Eigen::Matrix<s_t, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>
+        reducedAPadded = Eigen::MatrixXs::Zero(reducedN, dPAD(reducedN));
     reducedAPadded.block(0, 0, reducedN, reducedN) = mAReduced;
 
     success = mSecondaryBoxedLcpSolver->solve(
@@ -582,13 +582,13 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(
   {
     hadToIgnoreFrictionToSolve = true;
 
-    Eigen::MatrixXd mAReduced = mABackup.block(0, 0, n, n);
-    Eigen::VectorXd mXReduced = mXBackup;
-    Eigen::VectorXd mBReduced = mBBackup;
-    Eigen::VectorXd mHiReduced = mHiBackup;
-    Eigen::VectorXd mLoReduced = mLoBackup;
+    Eigen::MatrixXs mAReduced = mABackup.block(0, 0, n, n);
+    Eigen::VectorXs mXReduced = mXBackup;
+    Eigen::VectorXs mBReduced = mBBackup;
+    Eigen::VectorXs mHiReduced = mHiBackup;
+    Eigen::VectorXs mLoReduced = mLoBackup;
     Eigen::VectorXi mFIndexReduced = mFIndexBackup;
-    Eigen::MatrixXd mapOut = LCPUtils::removeFriction(
+    Eigen::MatrixXs mapOut = LCPUtils::removeFriction(
         mAReduced,
         mXReduced,
         mBReduced,
@@ -596,8 +596,8 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(
         mLoReduced,
         mFIndexReduced);
     int reducedN = mXReduced.size();
-    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>
-        reducedAPadded = Eigen::MatrixXd::Zero(reducedN, dPAD(reducedN));
+    Eigen::Matrix<s_t, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>
+        reducedAPadded = Eigen::MatrixXs::Zero(reducedN, dPAD(reducedN));
     reducedAPadded.block(0, 0, reducedN, reducedN) = mAReduced;
     // Prefer using PGS to Dantzig at this point, if it's available
     if (mSecondaryBoxedLcpSolver)
@@ -712,14 +712,14 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(
 
 //==============================================================================
 #ifndef NDEBUG
-bool BoxedLcpConstraintSolver::isSymmetric(std::size_t n, double* A)
+bool BoxedLcpConstraintSolver::isSymmetric(std::size_t n, s_t* A)
 {
   std::size_t nSkip = dPAD(n);
   for (std::size_t i = 0; i < n; ++i)
   {
     for (std::size_t j = 0; j < n; ++j)
     {
-      if (std::abs(A[nSkip * i + j] - A[nSkip * j + i]) > 1e-6)
+      if (abs(A[nSkip * i + j] - A[nSkip * j + i]) > 1e-6)
       {
         std::cout << "A: " << std::endl;
         for (std::size_t k = 0; k < n; ++k)
@@ -745,14 +745,14 @@ bool BoxedLcpConstraintSolver::isSymmetric(std::size_t n, double* A)
 
 //==============================================================================
 bool BoxedLcpConstraintSolver::isSymmetric(
-    std::size_t n, double* A, std::size_t begin, std::size_t end)
+    std::size_t n, s_t* A, std::size_t begin, std::size_t end)
 {
   std::size_t nSkip = dPAD(n);
   for (std::size_t i = begin; i <= end; ++i)
   {
     for (std::size_t j = begin; j <= end; ++j)
     {
-      if (std::abs(A[nSkip * i + j] - A[nSkip * j + i]) > 1e-6)
+      if (abs(A[nSkip * i + j] - A[nSkip * j + i]) > 1e-6)
       {
         std::cout << "A: " << std::endl;
         for (std::size_t k = 0; k < n; ++k)
@@ -779,12 +779,12 @@ bool BoxedLcpConstraintSolver::isSymmetric(
 //==============================================================================
 void BoxedLcpConstraintSolver::print(
     std::size_t n,
-    double* A,
-    double* x,
-    double* /*lo*/,
-    double* /*hi*/,
-    double* b,
-    double* w,
+    s_t* A,
+    s_t* x,
+    s_t* /*lo*/,
+    s_t* /*hi*/,
+    s_t* b,
+    s_t* w,
     int* findex)
 {
   std::size_t nSkip = dPAD(n);
@@ -840,7 +840,7 @@ void BoxedLcpConstraintSolver::print(
   }
   std::cout << std::endl;
 
-  double* Ax = new double[n];
+  s_t* Ax = new s_t[n];
 
   for (std::size_t i = 0; i < n; ++i)
   {

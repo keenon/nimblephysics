@@ -50,14 +50,14 @@ namespace detail {
 struct ScrewJointUniqueProperties
 {
   /// Rotational axis
-  Eigen::Vector3d mAxis;
+  Eigen::Vector3s mAxis;
 
   /// Translational pitch
-  double mPitch;
+  s_t mPitch;
 
   ScrewJointUniqueProperties(
-      const Eigen::Vector3d& _axis = Eigen::Vector3d::UnitZ(),
-      double _pitch = 0.1);
+      const Eigen::Vector3s& _axis = Eigen::Vector3s::UnitZ(),
+      s_t _pitch = 0.1);
 
   virtual ~ScrewJointUniqueProperties() = default;
 };

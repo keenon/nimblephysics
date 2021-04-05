@@ -53,10 +53,10 @@ public:
   WeldJointConstraint(dynamics::BodyNode* _body1, dynamics::BodyNode* _body2);
 
   /// Set the relative transform that this WeldJointConstraint will enforce
-  void setRelativeTransform(const Eigen::Isometry3d& _tf);
+  void setRelativeTransform(const Eigen::Isometry3s& _tf);
 
   /// Get the relative transform that this WeldJointConstraint will enforce
-  const Eigen::Isometry3d& getRelativeTransform() const;
+  const Eigen::Isometry3s& getRelativeTransform() const;
 
   /// Destructor
   virtual ~WeldJointConstraint();
@@ -76,7 +76,7 @@ protected:
   void applyUnitImpulse(std::size_t _index) override;
 
   // Documentation inherited
-  void getVelocityChange(double* _vel, bool _withCfm) override;
+  void getVelocityChange(s_t* _vel, bool _withCfm) override;
 
   // Documentation inherited
   void excite() override;
@@ -85,7 +85,7 @@ protected:
   void unexcite() override;
 
   // Documentation inherited
-  void applyImpulse(double* _lambda) override;
+  void applyImpulse(s_t* _lambda) override;
 
   // Documentation inherited
   bool isActive() const override;
@@ -98,19 +98,19 @@ protected:
 
 private:
   ///
-  Eigen::Isometry3d mRelativeTransform;
+  Eigen::Isometry3s mRelativeTransform;
 
   ///
-  Eigen::Vector6d mViolation;
+  Eigen::Vector6s mViolation;
 
   ///
-  const Eigen::Matrix6d mJacobian1;
+  const Eigen::Matrix6s mJacobian1;
 
   ///
-  Eigen::Matrix6d mJacobian2;
+  Eigen::Matrix6s mJacobian2;
 
   ///
-  double mOldX[6];
+  s_t mOldX[6];
 
   /// Index of applied impulse
   std::size_t mAppliedImpulseIndex;

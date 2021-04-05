@@ -46,23 +46,23 @@ void Contact(py::module& m)
       .def(::py::init<>())
       .def_static(
           "getNormalEpsilon",
-          +[]() -> double {
+          +[]() -> s_t {
             return dart::collision::Contact::getNormalEpsilon();
           })
       .def_static(
           "getNormalEpsilonSquared",
-          +[]() -> double {
+          +[]() -> s_t {
             return dart::collision::Contact::getNormalEpsilonSquared();
           })
       .def_static(
           "isZeroNormal",
-          +[](const Eigen::Vector3d& normal) -> bool {
+          +[](const Eigen::Vector3s& normal) -> bool {
             return dart::collision::Contact::isZeroNormal(normal);
           },
           ::py::arg("normal"))
       .def_static(
           "isNonZeroNormal",
-          +[](const Eigen::Vector3d& normal) -> bool {
+          +[](const Eigen::Vector3s& normal) -> bool {
             return dart::collision::Contact::isNonZeroNormal(normal);
           },
           ::py::arg("normal"))

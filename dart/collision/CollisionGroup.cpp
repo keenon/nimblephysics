@@ -222,8 +222,8 @@ double CollisionGroup::distance(
 
 //==============================================================================
 bool CollisionGroup::raycast(
-    const Eigen::Vector3d& from,
-    const Eigen::Vector3d& to,
+    const Eigen::Vector3s& from,
+    const Eigen::Vector3s& to,
     const RaycastOption& option,
     RaycastResult* result)
 {

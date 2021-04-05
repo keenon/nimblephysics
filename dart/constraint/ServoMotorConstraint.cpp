@@ -46,7 +46,7 @@
 namespace dart {
 namespace constraint {
 
-double ServoMotorConstraint::mConstraintForceMixing = DART_CFM;
+s_t ServoMotorConstraint::mConstraintForceMixing = DART_CFM;
 
 //==============================================================================
 ServoMotorConstraint::ServoMotorConstraint(dynamics::Joint* joint)
@@ -79,7 +79,7 @@ ServoMotorConstraint::~ServoMotorConstraint()
 }
 
 //==============================================================================
-void ServoMotorConstraint::setConstraintForceMixing(double cfm)
+void ServoMotorConstraint::setConstraintForceMixing(s_t cfm)
 {
   // Clamp constraint force mixing parameter if it is out of the range
   if (cfm < 1e-9)
@@ -101,7 +101,7 @@ void ServoMotorConstraint::setConstraintForceMixing(double cfm)
 }
 
 //==============================================================================
-double ServoMotorConstraint::getConstraintForceMixing()
+s_t ServoMotorConstraint::getConstraintForceMixing()
 {
   return mConstraintForceMixing;
 }
@@ -119,7 +119,7 @@ void ServoMotorConstraint::update()
 
     if (mNegativeVelocityError[i] != 0.0)
     {
-      double timeStep = mJoint->getSkeleton()->getTimeStep();
+      s_t timeStep = mJoint->getSkeleton()->getTimeStep();
       // TODO: There are multiple ways to get time step (or its inverse).
       //   - ContactConstraint get it from the constructor parameter
       //   - Skeleton has it itself.
@@ -208,7 +208,7 @@ void ServoMotorConstraint::applyUnitImpulse(std::size_t index)
 }
 
 //==============================================================================
-void ServoMotorConstraint::getVelocityChange(double* delVel, bool withCfm)
+void ServoMotorConstraint::getVelocityChange(s_t* delVel, bool withCfm)
 {
   assert(delVel != nullptr && "Null pointer is not allowed.");
 
@@ -251,7 +251,7 @@ void ServoMotorConstraint::unexcite()
 }
 
 //==============================================================================
-void ServoMotorConstraint::applyImpulse(double* lambda)
+void ServoMotorConstraint::applyImpulse(s_t* lambda)
 {
   std::size_t localIndex = 0;
   std::size_t dof = mJoint->getNumDofs();

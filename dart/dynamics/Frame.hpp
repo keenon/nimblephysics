@@ -68,7 +68,7 @@ public:
   static Frame* World();
 
   // Shared pointer version for Pythong binding. In the current binding setting,
-  // Frame is always held in std::shared_ptr. This means it will double free
+  // Frame is always held in std::shared_ptr. This means it will s_t free
   // when Frame* World() is used because Frame* World() returns a raw pointer of
   // static instance. This workaround wouldn't heart the performance too much
   // because it only creates one additional WorldFrame instance and one
@@ -80,19 +80,19 @@ public:
   //--------------------------------------------------------------------------
 
   /// Get the transform of this Frame with respect to its parent Frame
-  virtual const Eigen::Isometry3d& getRelativeTransform() const = 0;
+  virtual const Eigen::Isometry3s& getRelativeTransform() const = 0;
 
   /// Get the transform of this Frame with respect to the World Frame
-  const Eigen::Isometry3d& getWorldTransform() const;
+  const Eigen::Isometry3s& getWorldTransform() const;
 
   /// Get the transform of this Frame with respect to some other Frame
-  Eigen::Isometry3d getTransform(
+  Eigen::Isometry3s getTransform(
       const Frame* _withRespectTo = Frame::World()) const;
 
   /// Get the transform of this Frame with respect to some other Frame. It can
   /// be expressed in the coordinates of any Frame.
-  Eigen::Isometry3d getTransform(const Frame* withRespectTo,
-                                 const Frame* inCoordinatesOf) const;
+  Eigen::Isometry3s getTransform(
+      const Frame* withRespectTo, const Frame* inCoordinatesOf) const;
 
   //-------------------------------------------------------------------------
   // Velocity
@@ -100,43 +100,44 @@ public:
 
   /// Get the spatial velocity of this Frame relative to its parent Frame, in
   /// its own coordinates.
-  virtual const Eigen::Vector6d& getRelativeSpatialVelocity() const = 0;
+  virtual const Eigen::Vector6s& getRelativeSpatialVelocity() const = 0;
 
   /// Get the total spatial velocity of this Frame in the coordinates of this
   /// Frame.
-  const Eigen::Vector6d& getSpatialVelocity() const;
+  const Eigen::Vector6s& getSpatialVelocity() const;
 
   /// Get the spatial velocity of this Frame relative to some other Frame. It
   /// can be expressed in the coordinates of any Frame.
-  Eigen::Vector6d getSpatialVelocity(const Frame* _relativeTo,
-                                     const Frame* _inCoordinatesOf) const;
+  Eigen::Vector6s getSpatialVelocity(
+      const Frame* _relativeTo, const Frame* _inCoordinatesOf) const;
 
   /// Get the spatial velocity of a fixed point in this Frame. The velocity is
   /// in coordinates of this Frame and is relative to the World Frame.
-  Eigen::Vector6d getSpatialVelocity(const Eigen::Vector3d& _offset) const;
+  Eigen::Vector6s getSpatialVelocity(const Eigen::Vector3s& _offset) const;
 
   /// Get the spatial velocity of a fixed point in this Frame.
-  Eigen::Vector6d getSpatialVelocity(const Eigen::Vector3d& _offset,
-                                     const Frame* _relativeTo,
-                                     const Frame* _inCoordinatesOf) const;
+  Eigen::Vector6s getSpatialVelocity(
+      const Eigen::Vector3s& _offset,
+      const Frame* _relativeTo,
+      const Frame* _inCoordinatesOf) const;
 
   /// Get the linear portion of classical velocity of this Frame relative to
   /// some other Frame. It can be expressed in the coordinates of any Frame.
-  Eigen::Vector3d getLinearVelocity(
+  Eigen::Vector3s getLinearVelocity(
       const Frame* _relativeTo = Frame::World(),
       const Frame* _inCoordinatesOf = Frame::World()) const;
 
   /// Get the linear velocity of a point that is fixed in this Frame. You can
   /// specify a relative Frame, and it can be expressed in the coordinates of
   /// any Frame.
-  Eigen::Vector3d getLinearVelocity(
-      const Eigen::Vector3d& _offset,
+  Eigen::Vector3s getLinearVelocity(
+      const Eigen::Vector3s& _offset,
       const Frame* _relativeTo = Frame::World(),
       const Frame* _inCoordinatesOf = Frame::World()) const;
 
   /// Get the angular portion of classical velocity of this Frame relative to
   /// some other Frame. It can be expressed in the coordinates of any Frame.
-  Eigen::Vector3d getAngularVelocity(
+  Eigen::Vector3s getAngularVelocity(
       const Frame* _relativeTo = Frame::World(),
       const Frame* _inCoordinatesOf = Frame::World()) const;
 
@@ -146,60 +147,62 @@ public:
 
   /// Get the spatial acceleration of this Frame relative to its parent Frame,
   /// in the coordinates of this Frame.
-  virtual const Eigen::Vector6d& getRelativeSpatialAcceleration() const = 0;
+  virtual const Eigen::Vector6s& getRelativeSpatialAcceleration() const = 0;
 
   /// The Featherstone ABI algorithm exploits a component of the spatial
   /// acceleration which we refer to as the partial acceleration, accessible
   /// by getPartialAcceleration(). We save operations during our forward
   /// kinematics by computing and storing the partial acceleration separately
-  /// from the rest of the Frame's acceleration. getPrimaryRelativeAcceleration()
-  /// will return the portion of the relative spatial acceleration that is not
-  /// contained in the partial acceleration. To get the full spatial
-  /// acceleration of this Frame relative to its parent Frame, use
-  /// getRelativeSpatialAcceleration(). To get the full spatial acceleration
-  /// of this Frame relative to the World Frame, use getSpatialAcceleration().
-  virtual const Eigen::Vector6d& getPrimaryRelativeAcceleration() const = 0;
+  /// from the rest of the Frame's acceleration.
+  /// getPrimaryRelativeAcceleration() will return the portion of the relative
+  /// spatial acceleration that is not contained in the partial acceleration. To
+  /// get the full spatial acceleration of this Frame relative to its parent
+  /// Frame, use getRelativeSpatialAcceleration(). To get the full spatial
+  /// acceleration of this Frame relative to the World Frame, use
+  /// getSpatialAcceleration().
+  virtual const Eigen::Vector6s& getPrimaryRelativeAcceleration() const = 0;
 
   /// The Featherstone ABI algorithm exploits a component of the spatial
   /// acceleration which we refer to as the partial acceleration. This function
   /// returns that component of acceleration.
-  virtual const Eigen::Vector6d& getPartialAcceleration() const = 0;
+  virtual const Eigen::Vector6s& getPartialAcceleration() const = 0;
 
   /// Get the total spatial acceleration of this Frame in the coordinates of
   /// this Frame.
-  const Eigen::Vector6d& getSpatialAcceleration() const;
+  const Eigen::Vector6s& getSpatialAcceleration() const;
 
   /// Get the spatial acceleration of this Frame relative to some other Frame.
   /// It can be expressed in the coordinates of any Frame.
-  Eigen::Vector6d getSpatialAcceleration(const Frame* _relativeTo,
-                                         const Frame* _inCoordinatesOf) const;
+  Eigen::Vector6s getSpatialAcceleration(
+      const Frame* _relativeTo, const Frame* _inCoordinatesOf) const;
 
   /// Get the spatial acceleration of a fixed point in this Frame. The
   /// acceleration is in coordinates of this Frame and is relative to the World
   /// Frame.
-  Eigen::Vector6d getSpatialAcceleration(const Eigen::Vector3d& _offset) const;
+  Eigen::Vector6s getSpatialAcceleration(const Eigen::Vector3s& _offset) const;
 
   /// Get the spatial acceleration of a fixed point in this Frame
-  Eigen::Vector6d getSpatialAcceleration(const Eigen::Vector3d& _offset,
-                                         const Frame* _relativeTo,
-                                         const Frame* _inCoordinatesOf) const;
+  Eigen::Vector6s getSpatialAcceleration(
+      const Eigen::Vector3s& _offset,
+      const Frame* _relativeTo,
+      const Frame* _inCoordinatesOf) const;
 
   /// Get the linear portion of classical acceleration of this Frame relative to
   /// some other Frame. It can be expressed in the coordinates of any Frame.
-  Eigen::Vector3d getLinearAcceleration(
-      const Frame* _relativeTo=Frame::World(),
-      const Frame* _inCoordinatesOf=Frame::World()) const;
+  Eigen::Vector3s getLinearAcceleration(
+      const Frame* _relativeTo = Frame::World(),
+      const Frame* _inCoordinatesOf = Frame::World()) const;
 
-  Eigen::Vector3d getLinearAcceleration(
-      const Eigen::Vector3d& _offset,
-      const Frame* _relativeTo=Frame::World(),
-      const Frame* _inCoordinatesOf=Frame::World()) const;
+  Eigen::Vector3s getLinearAcceleration(
+      const Eigen::Vector3s& _offset,
+      const Frame* _relativeTo = Frame::World(),
+      const Frame* _inCoordinatesOf = Frame::World()) const;
 
   /// Get the angular portion of classical acceleration of this Frame relative
   /// to some other Frame. It can be expressed in the coordinates of any Frame.
-  Eigen::Vector3d getAngularAcceleration(
-      const Frame* _relativeTo=Frame::World(),
-      const Frame* _inCoordinatesOf=Frame::World()) const;
+  Eigen::Vector3s getAngularAcceleration(
+      const Frame* _relativeTo = Frame::World(),
+      const Frame* _inCoordinatesOf = Frame::World()) const;
 
   //--------------------------------------------------------------------------
   // Relationships
@@ -259,10 +262,12 @@ public:
   virtual void dirtyAcceleration() override;
 
 protected:
-
   /// Used when constructing a pure abstract class, because calling the Frame
   /// constructor is just a formality
-  enum ConstructAbstractTag { ConstructAbstract };
+  enum ConstructAbstractTag
+  {
+    ConstructAbstract
+  };
 
   /// Constructor for typical usage
   explicit Frame(Frame* _refFrame);
@@ -286,9 +291,11 @@ protected:
   virtual void processRemovedEntity(Entity* _oldChildEntity);
 
 private:
-
   /// Used when constructing the World
-  enum ConstructWorldTag { ConstructWorld };
+  enum ConstructWorldTag
+  {
+    ConstructWorld
+  };
 
   /// Constructor only to be used by the WorldFrame class
   explicit Frame(ConstructWorldTag);
@@ -298,17 +305,17 @@ protected:
   /// auto-updating to happen in the const member getWorldTransform() function
   ///
   /// Do not use directly! Use getWorldTransform() to access this quantity
-  mutable Eigen::Isometry3d mWorldTransform;
+  mutable Eigen::Isometry3s mWorldTransform;
 
   /// Total velocity of this Frame, in the coordinates of this Frame
   ///
   /// Do not use directly! Use getSpatialVelocity() to access this quantity
-  mutable Eigen::Vector6d mVelocity;
+  mutable Eigen::Vector6s mVelocity;
 
   /// Total acceleration of this Frame, in the coordinates of this Frame
   ///
   /// Do not use directly! Use getSpatialAcceleration() to access this quantity
-  mutable Eigen::Vector6d mAcceleration;
+  mutable Eigen::Vector6s mAcceleration;
 
   /// Container of this Frame's child Frames.
   std::set<Frame*> mChildFrames;
@@ -338,19 +345,19 @@ public:
   friend class Frame;
 
   /// Always returns the Identity Transform
-  const Eigen::Isometry3d& getRelativeTransform() const override final;
+  const Eigen::Isometry3s& getRelativeTransform() const override final;
 
   /// Always returns a zero vector
-  const Eigen::Vector6d& getRelativeSpatialVelocity() const override final;
+  const Eigen::Vector6s& getRelativeSpatialVelocity() const override final;
 
   /// Always returns a zero vector
-  const Eigen::Vector6d& getRelativeSpatialAcceleration() const override final;
+  const Eigen::Vector6s& getRelativeSpatialAcceleration() const override final;
 
   /// Always returns a zero vector
-  const Eigen::Vector6d& getPrimaryRelativeAcceleration() const override final;
+  const Eigen::Vector6s& getPrimaryRelativeAcceleration() const override final;
 
   /// Always returns a zero vector
-  const Eigen::Vector6d& getPartialAcceleration() const override final;
+  const Eigen::Vector6s& getPartialAcceleration() const override final;
 
   const std::string& setName(const std::string& name) override final;
 
@@ -362,10 +369,10 @@ private:
 
 private:
   /// This is set to Identity and never changes
-  const Eigen::Isometry3d mRelativeTf;
+  const Eigen::Isometry3s mRelativeTf;
 
   /// This is set to a Zero vector and never changes
-  static const Eigen::Vector6d mZero;
+  static const Eigen::Vector6s mZero;
 
 public:
   // To get byte-aligned Eigen vectors

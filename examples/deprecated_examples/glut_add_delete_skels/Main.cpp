@@ -43,7 +43,7 @@ int main(int argc, char* argv[])
   dart::simulation::WorldPtr myWorld
       = dart::utils::SkelParser::readWorld("dart://sample/skel/ground.skel");
   assert(myWorld != nullptr);
-  Eigen::Vector3d gravity(0.0, -9.81, 0.0);
+  Eigen::Vector3s gravity(0.0, -9.81, 0.0);
   myWorld->setGravity(gravity);
 
   // create a window and link it to the world

@@ -50,13 +50,13 @@ void JointCoulombFrictionConstraint(py::module& m)
       .def(::py::init<dart::dynamics::Joint*>(), ::py::arg("joint"))
       .def_static(
           "setConstraintForceMixing",
-          +[](double _cfm) {
+          +[](s_t _cfm) {
             dart::constraint::JointCoulombFrictionConstraint::
                 setConstraintForceMixing(_cfm);
           },
           ::py::arg("cfm"))
       .def_static(
-          "getConstraintForceMixing", +[]() -> double {
+          "getConstraintForceMixing", +[]() -> s_t {
             return dart::constraint::JointCoulombFrictionConstraint::
                 getConstraintForceMixing();
           });

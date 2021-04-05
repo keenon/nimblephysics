@@ -21,7 +21,7 @@ using namespace dynamics;
 namespace utils {
 namespace amc {
 
-std::pair<std::shared_ptr<dynamics::Skeleton>, Eigen::MatrixXd>
+std::pair<std::shared_ptr<dynamics::Skeleton>, Eigen::MatrixXs>
 AMCParser::loadAMC(const std::string& asfPath, const std::string& amcPath)
 {
   ::Library::Skeleton amcSkel;
@@ -31,12 +31,12 @@ AMCParser::loadAMC(const std::string& asfPath, const std::string& amcPath)
 
   std::shared_ptr<dynamics::Skeleton> skel = dynamics::Skeleton::create("name");
 
-  std::shared_ptr<BoxShape> box(new BoxShape(Eigen::Vector3d(0.1, 0.1, 0.1)));
+  std::shared_ptr<BoxShape> box(new BoxShape(Eigen::Vector3s(0.1, 0.1, 0.1)));
 
   auto rootPair = skel->createJointAndBodyNodePair<dynamics::FreeJoint>();
   ShapeNode* rootShape
       = rootPair.second->createShapeNodeWith<VisualAspect>(box);
-  rootShape->getVisualAspect()->setColor(Eigen::Vector3d(0.5, 0.5, 0.5));
+  rootShape->getVisualAspect()->setColor(Eigen::Vector3s(0.5, 0.5, 0.5));
 
   std::vector<dynamics::BodyNode*> nodes;
   for (::Library::Bone& bone : amcSkel.bones)
@@ -47,10 +47,10 @@ AMCParser::loadAMC(const std::string& asfPath, const std::string& amcPath)
         = skel->createJointAndBodyNodePair<dynamics::FreeJoint>(parent);
     ShapeNode* linkShape
         = linkPair.second->createShapeNodeWith<VisualAspect>(box);
-    linkShape->getVisualAspect()->setColor(Eigen::Vector3d(0.5, 0.5, 0.5));
+    linkShape->getVisualAspect()->setColor(Eigen::Vector3s(0.5, 0.5, 0.5));
 
-    Eigen::Isometry3d transformFromParent = Eigen::Isometry3d::Identity();
-    transformFromParent.translation() = Eigen::Vector3d(
+    Eigen::Isometry3s transformFromParent = Eigen::Isometry3s::Identity();
+    transformFromParent.translation() = Eigen::Vector3s(
         bone.direction.x * bone.length,
         bone.direction.y * bone.length,
         bone.direction.z * bone.length);
@@ -62,8 +62,8 @@ AMCParser::loadAMC(const std::string& asfPath, const std::string& amcPath)
     nodes.push_back(linkPair.second);
   }
 
-  Eigen::MatrixXd animation = Eigen::MatrixXd::Zero(10, 10);
-  return std::pair<std::shared_ptr<dynamics::Skeleton>, Eigen::MatrixXd>(
+  Eigen::MatrixXs animation = Eigen::MatrixXs::Zero(10, 10);
+  return std::pair<std::shared_ptr<dynamics::Skeleton>, Eigen::MatrixXs>(
       skel, animation);
 }
 

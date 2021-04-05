@@ -31,54 +31,16 @@
  */
 
 #include "dart/dynamics/JacobianNode.hpp"
+
 #include "dart/dynamics/BodyNode.hpp"
-#include "dart/dynamics/InverseKinematics.hpp"
 
 namespace dart {
 namespace dynamics {
 
 //==============================================================================
-// This destructor needs to be defined somewhere that the definition of
-// InverseKinematics is visible, because it's needed by the
-// std::unique_ptr<InverseKinematics> class member
 JacobianNode::~JacobianNode()
 {
   mBodyNode->mChildJacobianNodes.erase(this);
-}
-
-//==============================================================================
-const std::shared_ptr<InverseKinematics>&
-JacobianNode::getIK(bool _createIfNull)
-{
-  if(nullptr == mIK && _createIfNull)
-    createIK();
-
-  return mIK;
-}
-
-//==============================================================================
-const std::shared_ptr<InverseKinematics>& JacobianNode::getOrCreateIK()
-{
-  return getIK(true);
-}
-
-//==============================================================================
-std::shared_ptr<const InverseKinematics> JacobianNode::getIK() const
-{
-  return const_cast<JacobianNode*>(this)->getIK(false);
-}
-
-//==============================================================================
-const std::shared_ptr<InverseKinematics>& JacobianNode::createIK()
-{
-  mIK = InverseKinematics::create(this);
-  return mIK;
-}
-
-//==============================================================================
-void JacobianNode::clearIK()
-{
-  mIK = nullptr;
 }
 
 //==============================================================================
@@ -92,7 +54,7 @@ JacobianNode::JacobianNode(BodyNode* bn)
     mIsBodyJacobianSpatialDerivDirty(true),
     mIsWorldJacobianClassicDerivDirty(true)
 {
-  if(this != bn)
+  if (this != bn)
     bn->mChildJacobianNodes.insert(this);
 }
 
@@ -107,14 +69,14 @@ void JacobianNode::dirtyJacobian()
 {
   // mIsWorldJacobianDirty depends on mIsBodyJacobianDirty, so we only need to
   // check mIsBodyJacobianDirty if we want to terminate.
-  if(mIsBodyJacobianDirty)
+  if (mIsBodyJacobianDirty)
     return;
 
   mIsBodyJacobianDirty = true;
   mIsBodyJacobianInPositionSpaceDirty = true;
   mIsWorldJacobianDirty = true;
 
-  for(JacobianNode* child : mChildJacobianNodes)
+  for (JacobianNode* child : mChildJacobianNodes)
     child->dirtyJacobian();
 }
 
@@ -129,13 +91,13 @@ void JacobianNode::dirtyJacobianDeriv()
 {
   // These two flags are independent of each other, so we must check that both
   // are true if we want to terminate early.
-  if(mIsBodyJacobianSpatialDerivDirty && mIsWorldJacobianClassicDerivDirty)
+  if (mIsBodyJacobianSpatialDerivDirty && mIsWorldJacobianClassicDerivDirty)
     return;
 
   mIsBodyJacobianSpatialDerivDirty = true;
   mIsWorldJacobianClassicDerivDirty = true;
 
-  for(JacobianNode* child : mChildJacobianNodes)
+  for (JacobianNode* child : mChildJacobianNodes)
     child->dirtyJacobianDeriv();
 }
 

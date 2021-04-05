@@ -34,8 +34,9 @@
 #define DART_MATH_CONFIGURATIONSPACE_HPP_
 
 #include <Eigen/Dense>
-#include "dart/math/MathTypes.hpp"
+
 #include "dart/math/Geometry.hpp"
+#include "dart/math/MathTypes.hpp"
 
 namespace dart {
 namespace math {
@@ -49,11 +50,11 @@ struct RealVectorSpace
 
   using TangentSpace = RealVectorSpace<NumDofs>;
 
-  using Point          = Eigen::Matrix<double, NumDofs, 1>;
-  using EuclideanPoint = Eigen::Matrix<double, NumDofs, 1>;
-  using Vector         = Eigen::Matrix<double, NumDofs, 1>;
-  using Matrix         = Eigen::Matrix<double, NumDofs, NumDofs>;
-  using JacobianMatrix = Eigen::Matrix<double, 6, NumDofs>;
+  using Point = Eigen::Matrix<s_t, NumDofs, 1>;
+  using EuclideanPoint = Eigen::Matrix<s_t, NumDofs, 1>;
+  using Vector = Eigen::Matrix<s_t, NumDofs, 1>;
+  using Matrix = Eigen::Matrix<s_t, NumDofs, NumDofs>;
+  using JacobianMatrix = Eigen::Matrix<s_t, 6, NumDofs>;
 };
 
 //==============================================================================
@@ -81,11 +82,11 @@ struct SO3Space
 
   using TangentSpace = RealVectorSpace<NumDofs>;
 
-  using Point          = Eigen::Matrix3d;
-  using EuclideanPoint = Eigen::Vector3d;
-  using Vector         = Eigen::Vector3d;
-  using Matrix         = Eigen::Matrix3d;
-  using JacobianMatrix = Eigen::Matrix<double, 6, NumDofs>;
+  using Point = Eigen::Matrix3s;
+  using EuclideanPoint = Eigen::Vector3s;
+  using Vector = Eigen::Vector3s;
+  using Matrix = Eigen::Matrix3s;
+  using JacobianMatrix = Eigen::Matrix<s_t, 6, NumDofs>;
 };
 
 //==============================================================================
@@ -96,14 +97,16 @@ struct SE3Space
 
   using TangentSpace = RealVectorSpace<NumDofs>;
 
-  using Point          = Eigen::Isometry3d;
-  using EuclideanPoint = Eigen::Vector6d;
-  using Vector         = Eigen::Vector6d;
-  using Matrix         = Eigen::Matrix6d;
-  using JacobianMatrix = Eigen::Matrix6d;
+  using Point = Eigen::Isometry3s;
+  using EuclideanPoint = Eigen::Vector6s;
+  using Vector = Eigen::Vector6s;
+  using Matrix = Eigen::Matrix6s;
+  using JacobianMatrix = Eigen::Matrix6s;
 };
 
-struct MapsToManifoldPoint {};
+struct MapsToManifoldPoint
+{
+};
 
 //==============================================================================
 template <typename SpaceT>
@@ -111,27 +114,27 @@ typename SpaceT::Matrix inverse(const typename SpaceT::Matrix& mat);
 
 //==============================================================================
 template <typename SpaceT>
-typename SpaceT::EuclideanPoint
-toEuclideanPoint(const typename SpaceT::Point& point);
+typename SpaceT::EuclideanPoint toEuclideanPoint(
+    const typename SpaceT::Point& point);
 
 //==============================================================================
 template <typename SpaceT>
-typename SpaceT::Point
-toManifoldPoint(const typename SpaceT::EuclideanPoint& point);
+typename SpaceT::Point toManifoldPoint(
+    const typename SpaceT::EuclideanPoint& point);
 
 //==============================================================================
 template <typename SpaceT>
 typename SpaceT::Point integratePosition(
     const typename SpaceT::Point& pos,
     const typename SpaceT::Vector& vel,
-    double dt);
+    s_t dt);
 
 //==============================================================================
 template <typename SpaceT>
 typename SpaceT::Vector integrateVelocity(
     const typename SpaceT::Vector& vel,
     const typename SpaceT::Vector& acc,
-    double dt);
+    s_t dt);
 
 } // namespace math
 } // namespace dart

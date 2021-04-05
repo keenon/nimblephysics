@@ -35,38 +35,38 @@
 #include <dart/dart.hpp>
 #include <dart/gui/gui.hpp>
 
-const double default_shape_density = 1000;  // kg/m^3
-const double default_shape_height = 0.1;    // m
-const double default_shape_width = 0.03;    // m
-const double default_skin_thickness = 1e-3; // m
+const s_t default_shape_density = 1000;  // kg/m^3
+const s_t default_shape_height = 0.1;    // m
+const s_t default_shape_width = 0.03;    // m
+const s_t default_skin_thickness = 1e-3; // m
 
-const double default_start_height = 0.4; // m
+const s_t default_start_height = 0.4; // m
 
-const double minimum_start_v = 2.5; // m/s
-const double maximum_start_v = 4.0; // m/s
-const double default_start_v = 3.5; // m/s
+const s_t minimum_start_v = 2.5; // m/s
+const s_t maximum_start_v = 4.0; // m/s
+const s_t default_start_v = 3.5; // m/s
 
-const double minimum_launch_angle = 30.0 * M_PI / 180.0; // rad
-const double maximum_launch_angle = 70.0 * M_PI / 180.0; // rad
-const double default_launch_angle = 45.0 * M_PI / 180.0; // rad
+const s_t minimum_launch_angle = 30.0 * M_PI / 180.0; // rad
+const s_t maximum_launch_angle = 70.0 * M_PI / 180.0; // rad
+const s_t default_launch_angle = 45.0 * M_PI / 180.0; // rad
 
-const double maximum_start_w = 6 * M_PI; // rad/s
-const double default_start_w = 3 * M_PI; // rad/s
+const s_t maximum_start_w = 6 * M_PI; // rad/s
+const s_t default_start_w = 3 * M_PI; // rad/s
 
-const double ring_spring_stiffness = 0.5;
-const double ring_damping_coefficient = 0.05;
-const double default_damping_coefficient = 0.001;
+const s_t ring_spring_stiffness = 0.5;
+const s_t ring_damping_coefficient = 0.05;
+const s_t default_damping_coefficient = 0.001;
 
-const double default_ground_width = 2;
-const double default_wall_thickness = 0.1;
-const double default_wall_height = 1;
-const double default_spawn_range = 0.9 * default_ground_width / 2;
+const s_t default_ground_width = 2;
+const s_t default_wall_thickness = 0.1;
+const s_t default_wall_height = 1;
+const s_t default_spawn_range = 0.9 * default_ground_width / 2;
 
-const double default_restitution = 0.6;
+const s_t default_restitution = 0.6;
 
-const double default_vertex_stiffness = 1000.0;
-const double default_edge_stiffness = 1.0;
-const double default_soft_damping = 5.0;
+const s_t default_vertex_stiffness = 1000.0;
+const s_t default_edge_stiffness = 1.0;
+const s_t default_soft_damping = 5.0;
 
 using namespace dart::dynamics;
 using namespace dart::simulation;
@@ -246,7 +246,7 @@ protected:
   // std library objects that allow us to generate high-quality random numbers
   std::random_device mRD;
   std::mt19937 mMT;
-  std::uniform_real_distribution<double> mDistribution;
+  std::uniform_real_distribution<s_t> mDistribution;
 
   /// History of the active JointConstraints so that we can properly delete them
   /// when a Skeleton gets removed
@@ -336,7 +336,7 @@ BodyNode* addSoftBody(
   return bn;
 }
 
-void setAllColors(const SkeletonPtr& object, const Eigen::Vector3d& color)
+void setAllColors(const SkeletonPtr& object, const Eigen::Vector3s& color)
 {
   // Set the color of all the shapes in the object
   for (std::size_t i = 0; i < object->getNumBodyNodes(); ++i)
@@ -428,12 +428,12 @@ SkeletonPtr createGround()
 
   BodyNode* bn = ground->createJointAndBodyNodePair<WeldJoint>().second;
 
-  std::shared_ptr<BoxShape> shape = std::make_shared<BoxShape>(Eigen::Vector3d(
+  std::shared_ptr<BoxShape> shape = std::make_shared<BoxShape>(Eigen::Vector3s(
       default_ground_width, default_ground_width, default_wall_thickness));
   auto shapeNode
       = bn->createShapeNodeWith<VisualAspect, CollisionAspect, DynamicsAspect>(
           shape);
-  shapeNode->getVisualAspect()->setColor(Eigen::Vector3d(1.0, 1.0, 1.0));
+  shapeNode->getVisualAspect()->setColor(Eigen::Vector3s(1.0, 1.0, 1.0));
 
   return ground;
 }
@@ -444,15 +444,15 @@ SkeletonPtr createWall()
 
   BodyNode* bn = wall->createJointAndBodyNodePair<WeldJoint>().second;
 
-  std::shared_ptr<BoxShape> shape = std::make_shared<BoxShape>(Eigen::Vector3d(
+  std::shared_ptr<BoxShape> shape = std::make_shared<BoxShape>(Eigen::Vector3s(
       default_wall_thickness, default_ground_width, default_wall_height));
   auto shapeNode
       = bn->createShapeNodeWith<VisualAspect, CollisionAspect, DynamicsAspect>(
           shape);
-  shapeNode->getVisualAspect()->setColor(Eigen::Vector3d(0.8, 0.8, 0.8));
+  shapeNode->getVisualAspect()->setColor(Eigen::Vector3s(0.8, 0.8, 0.8));
 
-  Eigen::Isometry3d tf(Eigen::Isometry3d::Identity());
-  tf.translation() = Eigen::Vector3d(
+  Eigen::Isometry3s tf(Eigen::Isometry3s::Identity());
+  tf.translation() = Eigen::Vector3s(
       (default_ground_width + default_wall_thickness) / 2.0,
       0.0,
       (default_wall_height - default_wall_thickness) / 2.0);

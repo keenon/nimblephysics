@@ -34,6 +34,7 @@
 #define DART_DYNAMICS_BOXSHAPE_HPP_
 
 #include "dart/dynamics/Shape.hpp"
+#include "dart/math/MathTypes.hpp"
 
 namespace dart {
 namespace dynamics {
@@ -42,7 +43,7 @@ class BoxShape : public Shape
 {
 public:
   /// \brief Constructor.
-  explicit BoxShape(const Eigen::Vector3d& _size);
+  explicit BoxShape(const Eigen::Vector3s& _size);
 
   /// \brief Destructor.
   virtual ~BoxShape();
@@ -54,20 +55,19 @@ public:
   static const std::string& getStaticType();
 
   /// \brief Set size of this box.
-  void setSize(const Eigen::Vector3d& _size);
+  void setSize(const Eigen::Vector3s& _size);
 
   /// \brief Get size of this box.
-  const Eigen::Vector3d& getSize() const;
+  const Eigen::Vector3s& getSize() const;
 
   /// \brief Compute volume from given properties
-  static double computeVolume(const Eigen::Vector3d& size);
+  static s_t computeVolume(const Eigen::Vector3s& size);
 
   /// \brief Compute moments of inertia of a box
-  static Eigen::Matrix3d computeInertia(const Eigen::Vector3d& size,
-                                        double mass);
+  static Eigen::Matrix3s computeInertia(const Eigen::Vector3s& size, s_t mass);
 
   // Documentation inherited.
-  Eigen::Matrix3d computeInertia(double mass) const override;
+  Eigen::Matrix3s computeInertia(s_t mass) const override;
 
 protected:
   // Documentation inherited.
@@ -78,10 +78,10 @@ protected:
 
 private:
   /// \brief Side lengths of the box
-  Eigen::Vector3d mSize;
+  Eigen::Vector3s mSize;
 };
 
-}  // namespace dynamics
-}  // namespace dart
+} // namespace dynamics
+} // namespace dart
 
-#endif  // DART_DYNAMICS_BOXSHAPE_HPP_
+#endif // DART_DYNAMICS_BOXSHAPE_HPP_

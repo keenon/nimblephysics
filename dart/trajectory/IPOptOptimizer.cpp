@@ -50,7 +50,7 @@ std::shared_ptr<Solution> IPOptOptimizer::optimize(
   // Change some options
   // Note: The following choices are only examples, they might not be
   //       suitable for your optimization problem.
-  app->Options()->SetNumericValue("tol", mTolerance);
+  app->Options()->SetNumericValue("tol", static_cast<double>(mTolerance));
   app->Options()->SetStringValue(
       "linear_solver",
       "mumps"); // ma27, ma55, ma77, ma86, ma97, parsido, wsmp, mumps, custom
@@ -160,7 +160,7 @@ void IPOptOptimizer::setIterationLimit(int iterationLimit)
 }
 
 //==============================================================================
-void IPOptOptimizer::setTolerance(double tolerance)
+void IPOptOptimizer::setTolerance(s_t tolerance)
 {
   mTolerance = tolerance;
 }

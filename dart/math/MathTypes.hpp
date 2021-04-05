@@ -47,9 +47,16 @@
 #define DART_USE_ARBITRARY_PRECISION
 
 #ifdef DART_USE_ARBITRARY_PRECISION
-typedef mpfr::mpreal dnum_t;
+typedef mpfr::mpreal s_t;
 #else
-typedef double dnum_t;
+typedef s_t s_t;
+using abs = std::abs;
+using max = std::max;
+using floor = std::floor;
+using ceil = std::ceil;
+using isfinite = std::isfinite;
+using pow = std::pow;
+using isnan = std::isnan;
 #endif
 
 //------------------------------------------------------------------------------
@@ -57,22 +64,40 @@ typedef double dnum_t;
 //------------------------------------------------------------------------------
 namespace Eigen {
 
-using Vector6d = Matrix<double, 6, 1>;
-using Matrix6d = Matrix<double, 6, 6>;
+using Vector6s = Matrix<s_t, 6, 1>;
+using Matrix6s = Matrix<s_t, 6, 6>;
 
-inline Vector6d compose(
-    const Eigen::Vector3d& _angular, const Eigen::Vector3d& _linear)
+typedef Matrix<s_t, Dynamic, Dynamic> MatrixXs;
+typedef Matrix<s_t, Dynamic, 1> VectorXs;
+typedef Matrix<s_t, 2, 1> Vector2s;
+typedef Matrix<s_t, 3, 1> Vector3s;
+typedef Matrix<s_t, 4, 1> Vector4s;
+typedef Matrix<s_t, 5, 1> Vector5s;
+typedef Matrix<s_t, 6, 1> Vector6s;
+typedef Matrix<s_t, 2, 2> Matrix2s;
+typedef Matrix<s_t, 3, 3> Matrix3s;
+typedef Matrix<s_t, 4, 4> Matrix4s;
+typedef Matrix<s_t, 5, 5> Matrix5s;
+typedef Matrix<s_t, 6, 6> Matrix6s;
+typedef Transform<s_t, 2, Isometry> Isometry2s;
+typedef Transform<s_t, 3, Isometry> Isometry3s;
+typedef Quaternion<s_t> Quaternion_s;
+typedef AngleAxis<s_t> AngleAxis_s;
+typedef Translation<s_t, 3> Translation3s;
+
+inline Vector6s compose(
+    const Eigen::Vector3s& _angular, const Eigen::Vector3s& _linear)
 {
-  Vector6d composition;
+  Vector6s composition;
   composition << _angular, _linear;
   return composition;
 }
 
 // Deprecated
-using EIGEN_V_VEC3D = std::vector<Eigen::Vector3d>;
+using EIGEN_V_VEC3D = std::vector<Eigen::Vector3s>;
 
 // Deprecated
-using EIGEN_VV_VEC3D = std::vector<std::vector<Eigen::Vector3d>>;
+using EIGEN_VV_VEC3D = std::vector<std::vector<Eigen::Vector3s>>;
 
 #if EIGEN_VERSION_AT_LEAST(3, 2, 1) && EIGEN_VERSION_AT_MOST(3, 2, 8)
 
@@ -119,10 +144,10 @@ std::shared_ptr<_Tp> make_aligned_shared(_Args&&... __args)
 namespace dart {
 namespace math {
 
-using Inertia = Eigen::Matrix6d;
-using LinearJacobian = Eigen::Matrix<double, 3, Eigen::Dynamic>;
-using AngularJacobian = Eigen::Matrix<double, 3, Eigen::Dynamic>;
-using Jacobian = Eigen::Matrix<double, 6, Eigen::Dynamic>;
+using Inertia = Eigen::Matrix6s;
+using LinearJacobian = Eigen::Matrix<s_t, 3, Eigen::Dynamic>;
+using AngularJacobian = Eigen::Matrix<s_t, 3, Eigen::Dynamic>;
+using Jacobian = Eigen::Matrix<s_t, 6, Eigen::Dynamic>;
 
 } // namespace math
 } // namespace dart

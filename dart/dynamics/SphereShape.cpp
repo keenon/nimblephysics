@@ -38,8 +38,7 @@ namespace dart {
 namespace dynamics {
 
 //==============================================================================
-SphereShape::SphereShape(double radius)
-  : Shape(SPHERE)
+SphereShape::SphereShape(s_t radius) : Shape(SPHERE)
 {
   setRadius(radius);
 }
@@ -64,7 +63,7 @@ const std::string& SphereShape::getStaticType()
 }
 
 //==============================================================================
-void SphereShape::setRadius(double radius)
+void SphereShape::setRadius(s_t radius)
 {
   assert(radius > 0.0);
 
@@ -77,23 +76,23 @@ void SphereShape::setRadius(double radius)
 }
 
 //==============================================================================
-double SphereShape::getRadius() const
+s_t SphereShape::getRadius() const
 {
   return mRadius;
 }
 
 //==============================================================================
-double SphereShape::computeVolume(double radius)
+s_t SphereShape::computeVolume(s_t radius)
 {
-  return math::constantsd::pi() * 4.0 / 3.0 * std::pow(radius, 3) ;
+  return math::constantsd::pi() * 4.0 / 3.0 * pow(radius, 3);
 }
 
 //==============================================================================
-Eigen::Matrix3d SphereShape::computeInertia(double radius, double mass)
+Eigen::Matrix3s SphereShape::computeInertia(s_t radius, s_t mass)
 {
-  Eigen::Matrix3d inertia = Eigen::Matrix3d::Identity();
+  Eigen::Matrix3s inertia = Eigen::Matrix3s::Identity();
 
-  inertia(0, 0) = 2.0 / 5.0 * mass * std::pow(radius, 2);
+  inertia(0, 0) = 2.0 / 5.0 * mass * pow(radius, 2);
   inertia(1, 1) = inertia(0, 0);
   inertia(2, 2) = inertia(0, 0);
 
@@ -101,7 +100,7 @@ Eigen::Matrix3d SphereShape::computeInertia(double radius, double mass)
 }
 
 //==============================================================================
-Eigen::Matrix3d SphereShape::computeInertia(double mass) const
+Eigen::Matrix3s SphereShape::computeInertia(s_t mass) const
 {
   return computeInertia(mRadius, mass);
 }
@@ -109,8 +108,8 @@ Eigen::Matrix3d SphereShape::computeInertia(double mass) const
 //==============================================================================
 void SphereShape::updateBoundingBox() const
 {
-  mBoundingBox.setMin(Eigen::Vector3d::Constant(-mRadius));
-  mBoundingBox.setMax(Eigen::Vector3d::Constant(mRadius));
+  mBoundingBox.setMin(Eigen::Vector3s::Constant(-mRadius));
+  mBoundingBox.setMax(Eigen::Vector3s::Constant(mRadius));
   mIsBoundingBoxDirty = false;
 }
 
@@ -121,5 +120,5 @@ void SphereShape::updateVolume() const
   mIsVolumeDirty = false;
 }
 
-}  // namespace dynamics
-}  // namespace dart
+} // namespace dynamics
+} // namespace dart

@@ -63,22 +63,22 @@ public:
 
   /// Spawn a box into the world
   void spawnBox(
-      const Eigen::Isometry3d& _T,
-      const Eigen::Vector3d& _size = Eigen::Vector3d(0.1, 0.1, 0.1),
-      double _mass = 10);
+      const Eigen::Isometry3s& _T,
+      const Eigen::Vector3s& _size = Eigen::Vector3s(0.1, 0.1, 0.1),
+      s_t _mass = 10);
 
   /// Spawn a ellipsoid into the world
   void spawnEllipsoid(
-      const Eigen::Isometry3d& _T,
-      const Eigen::Vector3d& _radii = Eigen::Vector3d(0.1, 0.1, 0.1),
-      double _mass = 10);
+      const Eigen::Isometry3s& _T,
+      const Eigen::Vector3s& _radii = Eigen::Vector3s(0.1, 0.1, 0.1),
+      s_t _mass = 10);
 
   /// Spawn a cylinder into the world
   void spawnCylinder(
-      const Eigen::Isometry3d& _T,
-      double _radius = 0.05,
-      double _height = 0.10,
-      double _mass = 10);
+      const Eigen::Isometry3s& _T,
+      s_t _radius = 0.05,
+      s_t _height = 0.10,
+      s_t _mass = 10);
 };
 
 #endif // EXAMPLES_RIGIDSHAPES_MYWINDOW_HPP_

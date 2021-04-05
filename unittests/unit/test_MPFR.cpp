@@ -101,7 +101,7 @@ TEST(MPFR, EIGEN)
   using std::cout;
   using std::endl;
 
-  // set precision to 256 bits (double has only 53 bits)
+  // set precision to 256 bits (s_t has only 53 bits)
   mpreal::set_default_prec(256);
   // Declare matrix and vector types with multi-precision scalar type
   typedef Matrix<mpreal, Dynamic, Dynamic> MatrixXmp;
@@ -115,14 +115,14 @@ TEST(MPFR, EIGEN)
   std::cout << "relative error: " << (A * x - b).norm() / b.norm() << std::endl;
 }
 
-TEST(MPFR, EIGEN_DOUBLE_AND_BACK)
+TEST(MPFR, EIGEN_s_t_AND_BACK)
 {
   using namespace Eigen;
   using mpfr::mpreal;
   using std::cout;
   using std::endl;
 
-  // set precision to 256 bits (double has only 53 bits)
+  // set precision to 256 bits (s_t has only 53 bits)
   mpreal::set_default_prec(256);
   // Declare matrix and vector types with multi-precision scalar type
   typedef Matrix<mpreal, Dynamic, Dynamic> MatrixXmp;
@@ -135,10 +135,10 @@ TEST(MPFR, EIGEN_DOUBLE_AND_BACK)
   VectorXmp x = A.lu().solve(b);
   std::cout << "relative error: " << (A * x - b).norm() / b.norm() << std::endl;
 
-  Eigen::MatrixXd A_lb = A.cast<double>();
-  Eigen::VectorXd b_lp = b.cast<double>();
-  Eigen::VectorXd x_lp = x.cast<double>();
-  Eigen::VectorXd x_lp_solve = A_lb.lu().solve(b_lp);
+  Eigen::MatrixXs A_lb = A.cast<s_t>();
+  Eigen::VectorXs b_lp = b.cast<s_t>();
+  Eigen::VectorXs x_lp = x.cast<s_t>();
+  Eigen::VectorXs x_lp_solve = A_lb.lu().solve(b_lp);
 
   VectorXmp diff = x_lp_solve.cast<mpreal>() - x;
   std::cout << "comparative diff: " << diff.norm() << std::endl;

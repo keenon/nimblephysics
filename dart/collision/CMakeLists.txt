@@ -14,7 +14,6 @@ set(
   header_names
   ${header_names}
   dart/dart.hpp
-  fcl/fcl.hpp
 )
 dart_generate_include_header_file(
   "${CMAKE_CURRENT_BINARY_DIR}/collision.hpp"
@@ -36,9 +35,6 @@ install(
 
 # Add subdirectories
 add_subdirectory(dart)
-add_subdirectory(fcl)
-# add_subdirectory(ode)
-# add_subdirectory(bullet)
 
 dart_format_add(
   RaycastOption.hpp

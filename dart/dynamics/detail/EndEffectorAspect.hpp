@@ -51,10 +51,10 @@ struct EndEffectorProperties
   /// The default relative transform for the EndEffector. If the relative
   /// transform of the EndEffector is ever changed, you can call
   /// resetRelativeTransform() to return the relative transform to this one.
-  Eigen::Isometry3d mDefaultTransform;
+  Eigen::Isometry3s mDefaultTransform;
 
   EndEffectorProperties(
-      const Eigen::Isometry3d& defaultTf = Eigen::Isometry3d::Identity());
+      const Eigen::Isometry3s& defaultTf = Eigen::Isometry3s::Identity());
 
   // To get byte-aligned Eigen vectors
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW

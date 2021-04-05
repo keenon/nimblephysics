@@ -62,12 +62,12 @@ int main(int argc, char* argv[])
   myWorld->addSkeleton(ground);
 
   // Set initial configuration for Atlas robot
-  VectorXd q = atlas->getPositions();
+  VectorXs q = atlas->getPositions();
   q[0] = -0.5 * constantsd::pi();
   atlas->setPositions(q);
 
   // Set gravity of the world
-  myWorld->setGravity(Vector3d(0.0, -9.81, 0.0));
+  myWorld->setGravity(Vector3s(0.0, -9.81, 0.0));
 
   // Create a window and link it to the world
   MyWindow window(new Controller(atlas, myWorld->getConstraintSolver()));

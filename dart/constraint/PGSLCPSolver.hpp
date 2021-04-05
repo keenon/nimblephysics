@@ -49,7 +49,7 @@ class PGSLCPSolver : public LCPSolver
 {
 public:
   /// Constructor
-  explicit PGSLCPSolver(double _timestep);
+  explicit PGSLCPSolver(s_t _timestep);
 
   /// Constructor
   virtual ~PGSLCPSolver();
@@ -60,31 +60,31 @@ public:
 #ifndef NDEBUG
 private:
   /// Return true if the matrix is symmetric
-  bool isSymmetric(std::size_t _n, double* _A);
+  bool isSymmetric(std::size_t _n, s_t* _A);
 
   /// Return true if the diagonla block of matrix is symmetric
-  bool isSymmetric(std::size_t _n, double* _A, std::size_t _begin, std::size_t _end);
+  bool isSymmetric(std::size_t _n, s_t* _A, std::size_t _begin, std::size_t _end);
 
   /// Print debug information
-  void print(std::size_t _n, double* _A, double* _x, double* _lo, double* _hi,
-             double* _b, double* w, int* _findex);
+  void print(std::size_t _n, s_t* _A, s_t* _x, s_t* _lo, s_t* _hi,
+             s_t* _b, s_t* w, int* _findex);
 #endif
 };
 
 struct PGSOption
 {
   int itermax;
-  double sor_w;
-  double eps_ea;
-  double eps_res;
-  double eps_div;
+  s_t sor_w;
+  s_t eps_ea;
+  s_t eps_res;
+  s_t eps_div;
 
   void setDefault();
 };
 
-bool solvePGS(int n, int nskip, int /*nub*/, double* A,
-                            double* x, double * b,
-                            double * lo, double * hi, int * findex,
+bool solvePGS(int n, int nskip, int /*nub*/, s_t* A,
+                            s_t* x, s_t * b,
+                            s_t * lo, s_t * hi, int * findex,
                             PGSOption * option);
 
 

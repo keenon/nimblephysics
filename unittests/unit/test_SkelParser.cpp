@@ -52,41 +52,41 @@ TEST(SkelParser, DataStructure)
   int valInt = -3;
   unsigned int valUInt = 1;
   float valFloat = -3.140f;
-  double valDouble = 1.4576640;
+  s_t vals_t = 1.4576640;
   char valChar = 'd';
-  Eigen::Vector2d valVector2d = Eigen::Vector2d::Random();
-  Eigen::Vector3d valVector3d = Eigen::Vector3d::Random();
+  Eigen::Vector2s valVector2s = Eigen::Vector2s::Random();
+  Eigen::Vector3s valVector3s = Eigen::Vector3s::Random();
   Eigen::Vector3i valVector3i = Eigen::Vector3i::Random();
-  Eigen::Vector6d valVector6d = Eigen::Vector6d::Random();
-  Eigen::VectorXd valVectorXd = Eigen::VectorXd::Random(10);
-  Eigen::Isometry3d valIsometry3d = Eigen::Isometry3d::Identity();
+  Eigen::Vector6s valVector6s = Eigen::Vector6s::Random();
+  Eigen::VectorXs valVectorXs = Eigen::VectorXs::Random(10);
+  Eigen::Isometry3s valIsometry3s = Eigen::Isometry3s::Identity();
 
   std::string strBool = toString(valBool);
   std::string strInt = toString(valInt);
   std::string strUInt = toString(valUInt);
   std::string strFloat = toString(valFloat);
-  std::string strDouble = toString(valDouble);
+  std::string strs_t = toString(vals_t);
   std::string strChar = toString(valChar);
-  std::string strVector2d = toString(valVector2d);
-  std::string strVector3d = toString(valVector3d);
+  std::string strVector2s = toString(valVector2s);
+  std::string strVector3s = toString(valVector3s);
   std::string strVector3i = toString(valVector3i);
-  std::string strVector6d = toString(valVector6d);
-  std::string strVectorXd = toString(valVectorXd);
-  std::string strIsometry3d = toString(valIsometry3d);
+  std::string strVector6s = toString(valVector6s);
+  std::string strVectorXs = toString(valVectorXs);
+  std::string strIsometry3s = toString(valIsometry3s);
 
   EXPECT_EQ(valBool, toBool(strBool));
   EXPECT_EQ(valInt, toInt(strInt));
   EXPECT_EQ(valUInt, toUInt(strUInt));
   EXPECT_EQ(valFloat, toFloat(strFloat));
-  EXPECT_EQ(valDouble, toDouble(strDouble));
+  EXPECT_EQ(vals_t, tos_t(strs_t));
   EXPECT_EQ(valChar, toChar(strChar));
-  EXPECT_TRUE(equals(valVector2d, toVector2d(strVector2d)));
-  EXPECT_TRUE(equals(valVector3d, toVector3d(strVector3d)));
+  EXPECT_TRUE(equals(valVector2s, toVector2s(strVector2s)));
+  EXPECT_TRUE(equals(valVector3s, toVector3s(strVector3s)));
   EXPECT_EQ(valVector3i, toVector3i(strVector3i));
-  EXPECT_TRUE(equals(valVector6d, toVector6d(strVector6d)));
-  EXPECT_TRUE(equals(valVectorXd, toVectorXd(strVectorXd)));
+  EXPECT_TRUE(equals(valVector6s, toVector6s(strVector6s)));
+  EXPECT_TRUE(equals(valVectorXs, toVectorXs(strVectorXs)));
   EXPECT_TRUE(
-      equals(valIsometry3d.matrix(), toIsometry3d(strIsometry3d).matrix()));
+      equals(valIsometry3s.matrix(), toIsometry3s(strIsometry3s).matrix()));
 }
 
 //==============================================================================
@@ -227,30 +227,30 @@ TEST(SkelParser, PlanarJoint)
   EXPECT_EQ(planarJoint3->getPlaneType(), PlanarJoint::PlaneType::ZX);
   EXPECT_EQ(planarJoint4->getPlaneType(), PlanarJoint::PlaneType::ARBITRARY);
 
-  EXPECT_EQ(planarJoint1->getTranslationalAxis1(), Eigen::Vector3d::UnitX());
-  EXPECT_EQ(planarJoint2->getTranslationalAxis1(), Eigen::Vector3d::UnitY());
-  EXPECT_EQ(planarJoint3->getTranslationalAxis1(), Eigen::Vector3d::UnitZ());
-  EXPECT_EQ(planarJoint4->getTranslationalAxis1(), Eigen::Vector3d::UnitX());
+  EXPECT_EQ(planarJoint1->getTranslationalAxis1(), Eigen::Vector3s::UnitX());
+  EXPECT_EQ(planarJoint2->getTranslationalAxis1(), Eigen::Vector3s::UnitY());
+  EXPECT_EQ(planarJoint3->getTranslationalAxis1(), Eigen::Vector3s::UnitZ());
+  EXPECT_EQ(planarJoint4->getTranslationalAxis1(), Eigen::Vector3s::UnitX());
 
-  EXPECT_EQ(planarJoint1->getTranslationalAxis2(), Eigen::Vector3d::UnitY());
-  EXPECT_EQ(planarJoint2->getTranslationalAxis2(), Eigen::Vector3d::UnitZ());
-  EXPECT_EQ(planarJoint3->getTranslationalAxis2(), Eigen::Vector3d::UnitX());
-  EXPECT_EQ(planarJoint4->getTranslationalAxis2(), Eigen::Vector3d::UnitY());
+  EXPECT_EQ(planarJoint1->getTranslationalAxis2(), Eigen::Vector3s::UnitY());
+  EXPECT_EQ(planarJoint2->getTranslationalAxis2(), Eigen::Vector3s::UnitZ());
+  EXPECT_EQ(planarJoint3->getTranslationalAxis2(), Eigen::Vector3s::UnitX());
+  EXPECT_EQ(planarJoint4->getTranslationalAxis2(), Eigen::Vector3s::UnitY());
 
-  EXPECT_EQ(planarJoint1->getRotationalAxis(), Eigen::Vector3d::UnitZ());
-  EXPECT_EQ(planarJoint2->getRotationalAxis(), Eigen::Vector3d::UnitX());
-  EXPECT_EQ(planarJoint3->getRotationalAxis(), Eigen::Vector3d::UnitY());
-  EXPECT_EQ(planarJoint4->getRotationalAxis(), Eigen::Vector3d::UnitZ());
+  EXPECT_EQ(planarJoint1->getRotationalAxis(), Eigen::Vector3s::UnitZ());
+  EXPECT_EQ(planarJoint2->getRotationalAxis(), Eigen::Vector3s::UnitX());
+  EXPECT_EQ(planarJoint3->getRotationalAxis(), Eigen::Vector3s::UnitY());
+  EXPECT_EQ(planarJoint4->getRotationalAxis(), Eigen::Vector3s::UnitZ());
 
-  EXPECT_EQ(planarJoint1->getPositions(), Eigen::Vector3d(1, 2, 3));
-  EXPECT_EQ(planarJoint2->getPositions(), Eigen::Vector3d(1, 2, 3));
-  EXPECT_EQ(planarJoint3->getPositions(), Eigen::Vector3d(1, 2, 3));
-  EXPECT_EQ(planarJoint4->getPositions(), Eigen::Vector3d(1, 2, 3));
+  EXPECT_EQ(planarJoint1->getPositions(), Eigen::Vector3s(1, 2, 3));
+  EXPECT_EQ(planarJoint2->getPositions(), Eigen::Vector3s(1, 2, 3));
+  EXPECT_EQ(planarJoint3->getPositions(), Eigen::Vector3s(1, 2, 3));
+  EXPECT_EQ(planarJoint4->getPositions(), Eigen::Vector3s(1, 2, 3));
 
-  EXPECT_EQ(planarJoint1->getVelocities(), Eigen::Vector3d(4, 5, 6));
-  EXPECT_EQ(planarJoint2->getVelocities(), Eigen::Vector3d(4, 5, 6));
-  EXPECT_EQ(planarJoint3->getVelocities(), Eigen::Vector3d(4, 5, 6));
-  EXPECT_EQ(planarJoint4->getVelocities(), Eigen::Vector3d(4, 5, 6));
+  EXPECT_EQ(planarJoint1->getVelocities(), Eigen::Vector3s(4, 5, 6));
+  EXPECT_EQ(planarJoint2->getVelocities(), Eigen::Vector3s(4, 5, 6));
+  EXPECT_EQ(planarJoint3->getVelocities(), Eigen::Vector3s(4, 5, 6));
+  EXPECT_EQ(planarJoint4->getVelocities(), Eigen::Vector3s(4, 5, 6));
 
   EXPECT_EQ(planarJoint1->getDampingCoefficient(0), 1);
   EXPECT_EQ(planarJoint2->getDampingCoefficient(0), 1);
@@ -468,7 +468,7 @@ TEST(SkelParser, Shapes)
   shape = skel->getBodyNode(0)->getShapeNode(0)->getShape();
   EXPECT_TRUE(shape->is<BoxShape>());
   auto boxShape = std::static_pointer_cast<BoxShape>(shape);
-  EXPECT_EQ(boxShape->getSize(), Eigen::Vector3d(0.1, 0.05, 0.1));
+  EXPECT_EQ(boxShape->getSize(), Eigen::Vector3s(0.1, 0.05, 0.1));
 
   // Sphere
   skel = world->getSkeleton("sphere skeleton");
@@ -484,7 +484,7 @@ TEST(SkelParser, Shapes)
   shape = skel->getBodyNode(0)->getShapeNode(0)->getShape();
   EXPECT_TRUE(shape->is<EllipsoidShape>());
   auto ellipsoidShape = std::static_pointer_cast<EllipsoidShape>(shape);
-  EXPECT_EQ(ellipsoidShape->getDiameters(), Eigen::Vector3d(0.05, 0.10, 0.15));
+  EXPECT_EQ(ellipsoidShape->getDiameters(), Eigen::Vector3s(0.05, 0.10, 0.15));
 
   // Cylinder
   skel = world->getSkeleton("cylinder skeleton");
@@ -523,9 +523,9 @@ TEST(SkelParser, Shapes)
   EXPECT_EQ(multiSphereShape->getNumSpheres(), 2u);
   const auto& spheres = multiSphereShape->getSpheres();
   EXPECT_EQ(spheres[0].first, 0.05);
-  EXPECT_EQ(spheres[0].second, Eigen::Vector3d(-0.075, 0.0, 0.0));
+  EXPECT_EQ(spheres[0].second, Eigen::Vector3s(-0.075, 0.0, 0.0));
   EXPECT_EQ(spheres[1].first, 0.075);
-  EXPECT_EQ(spheres[1].second, Eigen::Vector3d(+0.075, 0.0, 0.0));
+  EXPECT_EQ(spheres[1].second, Eigen::Vector3s(+0.075, 0.0, 0.0));
 
   // Mesh
   skel = world->getSkeleton("mesh skeleton");

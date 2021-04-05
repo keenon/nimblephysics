@@ -51,7 +51,7 @@ int main(int argc, char* argv[])
   world->addSkeleton(robot);
 
   // create and initialize the world
-  Eigen::Vector3d gravity(0.0, -9.81, 0.0);
+  Eigen::Vector3s gravity(0.0, -9.81, 0.0);
   world->setGravity(gravity);
   world->setTimeStep(1.0 / 1000);
 

@@ -42,10 +42,10 @@ namespace detail {
 struct FixedFrameProperties
 {
   /// The relative transform of the FixedFrame
-  Eigen::Isometry3d mRelativeTf;
+  Eigen::Isometry3s mRelativeTf;
 
   FixedFrameProperties(
-      const Eigen::Isometry3d& relativeTf = Eigen::Isometry3d::Identity());
+      const Eigen::Isometry3s& relativeTf = Eigen::Isometry3s::Identity());
 
   // To get byte-aligned Eigen vectors
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW

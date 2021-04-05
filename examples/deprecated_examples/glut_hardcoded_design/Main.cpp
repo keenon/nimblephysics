@@ -49,18 +49,18 @@ int main(int argc, char* argv[])
   // Create Left Leg skeleton
   dart::dynamics::SkeletonPtr LeftLegSkel = dart::dynamics::Skeleton::create();
 
-  double mass = 1.0;
+  s_t mass = 1.0;
 
   // BodyNode 1: Left Hip Yaw (LHY)
   dart::dynamics::BodyNode::Properties body;
   body.mName = "LHY";
   dart::dynamics::ShapePtr shape(
-      new dart::dynamics::BoxShape(Eigen::Vector3d(0.3, 0.3, 1.0)));
+      new dart::dynamics::BoxShape(Eigen::Vector3s(0.3, 0.3, 1.0)));
   body.mInertia.setMass(mass);
 
   dart::dynamics::RevoluteJoint::Properties joint;
   joint.mName = "LHY";
-  joint.mAxis = Eigen::Vector3d(0.0, 0.0, 1.0);
+  joint.mAxis = Eigen::Vector3s(0.0, 0.0, 1.0);
   joint.mPositionLowerLimits[0] = -dart::math::constantsd::pi();
   joint.mPositionUpperLimits[0] = dart::math::constantsd::pi();
 
@@ -79,7 +79,7 @@ int main(int argc, char* argv[])
                                                  // container
   body.mName = "LHR";
   shape = dart::dynamics::ShapePtr(
-      new dart::dynamics::BoxShape(Eigen::Vector3d(0.3, 0.3, 1.0)));
+      new dart::dynamics::BoxShape(Eigen::Vector3s(0.3, 0.3, 1.0)));
 
   joint.mName = "LHR";
   joint.mT_ParentBodyToJoint = Eigen::Translation3d(0.0, 0.0, 0.5);
@@ -89,12 +89,12 @@ int main(int argc, char* argv[])
   std::pair<dart::dynamics::RevoluteJoint*, dart::dynamics::BodyNode*> pair1
       = LeftLegSkel->createJointAndBodyNodePair<dart::dynamics::RevoluteJoint>(
           parent, joint, body);
-  pair1.first->setAxis(Eigen::Vector3d(1.0, 0.0, 0.0));
+  pair1.first->setAxis(Eigen::Vector3s(1.0, 0.0, 0.0));
   auto shapeNode1 = pair1.second->createShapeNodeWith<
       dart::dynamics::VisualAspect,
       dart::dynamics::CollisionAspect,
       dart::dynamics::DynamicsAspect>(shape);
-  shapeNode1->setRelativeTranslation(Eigen::Vector3d(0.0, 0.0, 0.5));
+  shapeNode1->setRelativeTranslation(Eigen::Vector3s(0.0, 0.0, 0.5));
   pair1.second->setLocalCOM(shapeNode1->getRelativeTranslation());
   pair1.second->setMass(mass);
 
@@ -103,10 +103,10 @@ int main(int argc, char* argv[])
                                                  // container
   body.mName = "LHP";
   shape = dart::dynamics::ShapePtr(
-      new dart::dynamics::BoxShape(Eigen::Vector3d(0.3, 0.3, 1.0)));
+      new dart::dynamics::BoxShape(Eigen::Vector3s(0.3, 0.3, 1.0)));
 
   joint.mName = "LHP";
-  joint.mAxis = Eigen::Vector3d(0.0, 1.0, 0.0);
+  joint.mAxis = Eigen::Vector3s(0.0, 1.0, 0.0);
   joint.mT_ParentBodyToJoint = Eigen::Translation3d(0.0, 0.0, 1.0);
 
   // Or you can completely ignore the return value of this function
@@ -117,7 +117,7 @@ int main(int argc, char* argv[])
       dart::dynamics::VisualAspect,
       dart::dynamics::CollisionAspect,
       dart::dynamics::DynamicsAspect>(shape);
-  shapeNode2->setRelativeTranslation(Eigen::Vector3d(0.0, 0.0, 0.5));
+  shapeNode2->setRelativeTranslation(Eigen::Vector3s(0.0, 0.0, 0.5));
   pair2.second->setLocalCOM(shapeNode2->getRelativeTranslation());
   pair2.second->setMass(mass);
 

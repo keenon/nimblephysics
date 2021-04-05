@@ -86,16 +86,16 @@ public:
   bool isCyclic(std::size_t _index) const override;
 
   ///
-  void setAxis(const Eigen::Vector3d& _axis);
+  void setAxis(const Eigen::Vector3s& _axis);
 
   ///
-  const Eigen::Vector3d& getAxis() const;
+  const Eigen::Vector3s& getAxis() const;
 
   ///
-  void setPitch(double _pitch);
+  void setPitch(s_t _pitch);
 
   ///
-  double getPitch() const;
+  s_t getPitch() const;
 
   // Documentation inherited
   GenericJoint<math::R1Space>::JacobianMatrix getRelativeJacobianStatic(

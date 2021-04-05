@@ -57,7 +57,7 @@ using namespace simulation;
 // #define ALL_TESTS
 
 /******************************************************************************/
-Eigen::Matrix4d toMatrixForm(const Eigen::Vector6d& v)
+Eigen::Matrix4d toMatrixForm(const Eigen::Vector6s& v)
 {
   Eigen::Matrix4d result = Eigen::Matrix4d::Zero();
 
@@ -76,24 +76,24 @@ Eigen::Matrix4d toMatrixForm(const Eigen::Vector6d& v)
 }
 
 /******************************************************************************/
-Eigen::Vector6d fromMatrixForm(const Eigen::Matrix4d& m)
+Eigen::Vector6s fromMatrixForm(const Eigen::Matrix4d& m)
 {
-  Eigen::Vector6d ret;
+  Eigen::Vector6s ret;
   ret << m(2, 1), m(0, 2), m(1, 0), m(0, 3), m(1, 3), m(2, 3);
   return ret;
 }
 
 /******************************************************************************/
-void testEulerAngles(const Eigen::Vector3d& angle)
+void testEulerAngles(const Eigen::Vector3s& angle)
 {
-  Eigen::Matrix3d mat1;
-  Eigen::Matrix3d mat2;
+  Eigen::Matrix3s mat1;
+  Eigen::Matrix3s mat2;
 
   // XYX
   mat1 = math::eulerXYXToMatrix(angle);
-  mat2 = Eigen::AngleAxisd(angle(0), Eigen::Vector3d::UnitX())
-         * Eigen::AngleAxisd(angle(1), Eigen::Vector3d::UnitY())
-         * Eigen::AngleAxisd(angle(2), Eigen::Vector3d::UnitX());
+  mat2 = Eigen::AngleAxis_s(angle(0), Eigen::Vector3s::UnitX())
+         * Eigen::AngleAxis_s(angle(1), Eigen::Vector3s::UnitY())
+         * Eigen::AngleAxis_s(angle(2), Eigen::Vector3s::UnitX());
 
   EXPECT_TRUE(math::verifyRotation(mat1));
   EXPECT_TRUE(math::verifyRotation(mat2));
@@ -102,9 +102,9 @@ void testEulerAngles(const Eigen::Vector3d& angle)
 
   // XYZ
   mat1 = math::eulerXYZToMatrix(angle);
-  mat2 = Eigen::AngleAxisd(angle(0), Eigen::Vector3d::UnitX())
-         * Eigen::AngleAxisd(angle(1), Eigen::Vector3d::UnitY())
-         * Eigen::AngleAxisd(angle(2), Eigen::Vector3d::UnitZ());
+  mat2 = Eigen::AngleAxis_s(angle(0), Eigen::Vector3s::UnitX())
+         * Eigen::AngleAxis_s(angle(1), Eigen::Vector3s::UnitY())
+         * Eigen::AngleAxis_s(angle(2), Eigen::Vector3s::UnitZ());
 
   EXPECT_TRUE(math::verifyRotation(mat1));
   EXPECT_TRUE(math::verifyRotation(mat2));
@@ -113,9 +113,9 @@ void testEulerAngles(const Eigen::Vector3d& angle)
 
   // XZX
   mat1 = math::eulerXZXToMatrix(angle);
-  mat2 = Eigen::AngleAxisd(angle(0), Eigen::Vector3d::UnitX())
-         * Eigen::AngleAxisd(angle(1), Eigen::Vector3d::UnitZ())
-         * Eigen::AngleAxisd(angle(2), Eigen::Vector3d::UnitX());
+  mat2 = Eigen::AngleAxis_s(angle(0), Eigen::Vector3s::UnitX())
+         * Eigen::AngleAxis_s(angle(1), Eigen::Vector3s::UnitZ())
+         * Eigen::AngleAxis_s(angle(2), Eigen::Vector3s::UnitX());
 
   EXPECT_TRUE(math::verifyRotation(mat1));
   EXPECT_TRUE(math::verifyRotation(mat2));
@@ -124,9 +124,9 @@ void testEulerAngles(const Eigen::Vector3d& angle)
 
   // XZY
   mat1 = math::eulerXZYToMatrix(angle);
-  mat2 = Eigen::AngleAxisd(angle(0), Eigen::Vector3d::UnitX())
-         * Eigen::AngleAxisd(angle(1), Eigen::Vector3d::UnitZ())
-         * Eigen::AngleAxisd(angle(2), Eigen::Vector3d::UnitY());
+  mat2 = Eigen::AngleAxis_s(angle(0), Eigen::Vector3s::UnitX())
+         * Eigen::AngleAxis_s(angle(1), Eigen::Vector3s::UnitZ())
+         * Eigen::AngleAxis_s(angle(2), Eigen::Vector3s::UnitY());
 
   EXPECT_TRUE(math::verifyRotation(mat1));
   EXPECT_TRUE(math::verifyRotation(mat2));
@@ -135,9 +135,9 @@ void testEulerAngles(const Eigen::Vector3d& angle)
 
   // YXY
   mat1 = math::eulerYXYToMatrix(angle);
-  mat2 = Eigen::AngleAxisd(angle(0), Eigen::Vector3d::UnitY())
-         * Eigen::AngleAxisd(angle(1), Eigen::Vector3d::UnitX())
-         * Eigen::AngleAxisd(angle(2), Eigen::Vector3d::UnitY());
+  mat2 = Eigen::AngleAxis_s(angle(0), Eigen::Vector3s::UnitY())
+         * Eigen::AngleAxis_s(angle(1), Eigen::Vector3s::UnitX())
+         * Eigen::AngleAxis_s(angle(2), Eigen::Vector3s::UnitY());
 
   EXPECT_TRUE(math::verifyRotation(mat1));
   EXPECT_TRUE(math::verifyRotation(mat2));
@@ -146,9 +146,9 @@ void testEulerAngles(const Eigen::Vector3d& angle)
 
   // YXZ
   mat1 = math::eulerYXZToMatrix(angle);
-  mat2 = Eigen::AngleAxisd(angle(0), Eigen::Vector3d::UnitY())
-         * Eigen::AngleAxisd(angle(1), Eigen::Vector3d::UnitX())
-         * Eigen::AngleAxisd(angle(2), Eigen::Vector3d::UnitZ());
+  mat2 = Eigen::AngleAxis_s(angle(0), Eigen::Vector3s::UnitY())
+         * Eigen::AngleAxis_s(angle(1), Eigen::Vector3s::UnitX())
+         * Eigen::AngleAxis_s(angle(2), Eigen::Vector3s::UnitZ());
 
   EXPECT_TRUE(math::verifyRotation(mat1));
   EXPECT_TRUE(math::verifyRotation(mat2));
@@ -157,9 +157,9 @@ void testEulerAngles(const Eigen::Vector3d& angle)
 
   // YZX
   mat1 = math::eulerYZXToMatrix(angle);
-  mat2 = Eigen::AngleAxisd(angle(0), Eigen::Vector3d::UnitY())
-         * Eigen::AngleAxisd(angle(1), Eigen::Vector3d::UnitZ())
-         * Eigen::AngleAxisd(angle(2), Eigen::Vector3d::UnitX());
+  mat2 = Eigen::AngleAxis_s(angle(0), Eigen::Vector3s::UnitY())
+         * Eigen::AngleAxis_s(angle(1), Eigen::Vector3s::UnitZ())
+         * Eigen::AngleAxis_s(angle(2), Eigen::Vector3s::UnitX());
 
   EXPECT_TRUE(math::verifyRotation(mat1));
   EXPECT_TRUE(math::verifyRotation(mat2));
@@ -168,9 +168,9 @@ void testEulerAngles(const Eigen::Vector3d& angle)
 
   // YZY
   mat1 = math::eulerYZYToMatrix(angle);
-  mat2 = Eigen::AngleAxisd(angle(0), Eigen::Vector3d::UnitY())
-         * Eigen::AngleAxisd(angle(1), Eigen::Vector3d::UnitZ())
-         * Eigen::AngleAxisd(angle(2), Eigen::Vector3d::UnitY());
+  mat2 = Eigen::AngleAxis_s(angle(0), Eigen::Vector3s::UnitY())
+         * Eigen::AngleAxis_s(angle(1), Eigen::Vector3s::UnitZ())
+         * Eigen::AngleAxis_s(angle(2), Eigen::Vector3s::UnitY());
 
   EXPECT_TRUE(math::verifyRotation(mat1));
   EXPECT_TRUE(math::verifyRotation(mat2));
@@ -179,9 +179,9 @@ void testEulerAngles(const Eigen::Vector3d& angle)
 
   // ZXY
   mat1 = math::eulerZXYToMatrix(angle);
-  mat2 = Eigen::AngleAxisd(angle(0), Eigen::Vector3d::UnitZ())
-         * Eigen::AngleAxisd(angle(1), Eigen::Vector3d::UnitX())
-         * Eigen::AngleAxisd(angle(2), Eigen::Vector3d::UnitY());
+  mat2 = Eigen::AngleAxis_s(angle(0), Eigen::Vector3s::UnitZ())
+         * Eigen::AngleAxis_s(angle(1), Eigen::Vector3s::UnitX())
+         * Eigen::AngleAxis_s(angle(2), Eigen::Vector3s::UnitY());
 
   EXPECT_TRUE(math::verifyRotation(mat1));
   EXPECT_TRUE(math::verifyRotation(mat2));
@@ -190,9 +190,9 @@ void testEulerAngles(const Eigen::Vector3d& angle)
 
   // ZYX
   mat1 = math::eulerZYXToMatrix(angle);
-  mat2 = Eigen::AngleAxisd(angle(0), Eigen::Vector3d::UnitZ())
-         * Eigen::AngleAxisd(angle(1), Eigen::Vector3d::UnitY())
-         * Eigen::AngleAxisd(angle(2), Eigen::Vector3d::UnitX());
+  mat2 = Eigen::AngleAxis_s(angle(0), Eigen::Vector3s::UnitZ())
+         * Eigen::AngleAxis_s(angle(1), Eigen::Vector3s::UnitY())
+         * Eigen::AngleAxis_s(angle(2), Eigen::Vector3s::UnitX());
 
   EXPECT_TRUE(math::verifyRotation(mat1));
   EXPECT_TRUE(math::verifyRotation(mat2));
@@ -201,9 +201,9 @@ void testEulerAngles(const Eigen::Vector3d& angle)
 
   // ZXZ
   mat1 = math::eulerZXZToMatrix(angle);
-  mat2 = Eigen::AngleAxisd(angle(0), Eigen::Vector3d::UnitZ())
-         * Eigen::AngleAxisd(angle(1), Eigen::Vector3d::UnitX())
-         * Eigen::AngleAxisd(angle(2), Eigen::Vector3d::UnitZ());
+  mat2 = Eigen::AngleAxis_s(angle(0), Eigen::Vector3s::UnitZ())
+         * Eigen::AngleAxis_s(angle(1), Eigen::Vector3s::UnitX())
+         * Eigen::AngleAxis_s(angle(2), Eigen::Vector3s::UnitZ());
 
   EXPECT_TRUE(math::verifyRotation(mat1));
   EXPECT_TRUE(math::verifyRotation(mat2));
@@ -212,9 +212,9 @@ void testEulerAngles(const Eigen::Vector3d& angle)
 
   // ZYZ
   mat1 = math::eulerZYZToMatrix(angle);
-  mat2 = Eigen::AngleAxisd(angle(0), Eigen::Vector3d::UnitZ())
-         * Eigen::AngleAxisd(angle(1), Eigen::Vector3d::UnitY())
-         * Eigen::AngleAxisd(angle(2), Eigen::Vector3d::UnitZ());
+  mat2 = Eigen::AngleAxis_s(angle(0), Eigen::Vector3s::UnitZ())
+         * Eigen::AngleAxis_s(angle(1), Eigen::Vector3s::UnitY())
+         * Eigen::AngleAxis_s(angle(2), Eigen::Vector3s::UnitZ());
 
   EXPECT_TRUE(math::verifyRotation(mat1));
   EXPECT_TRUE(math::verifyRotation(mat2));
@@ -226,23 +226,23 @@ void testEulerAngles(const Eigen::Vector3d& angle)
 #ifdef ALL_TESTS
 TEST(LIE_GROUP_OPERATORS, SIMPLE_SCREW_ROTATION_ONLY_GRADIENT_90)
 {
-  Eigen::Vector6d screwX = Eigen::Vector6d::Zero();
+  Eigen::Vector6s screwX = Eigen::Vector6s::Zero();
   screwX(0) = 1.0;
-  Eigen::Vector3d point = Eigen::Vector3d::UnitY();
+  Eigen::Vector3s point = Eigen::Vector3s::UnitY();
   // if we rotate point by screwX, it should move in the positive Z direction
-  double theta = 90 * 3.1415926535 / 180;
+  s_t theta = 90 * 3.1415926535 / 180;
   // This should be at (0, 0, 1) = UnitZ()
-  Eigen::Vector3d rotatedPoint = math::expMap(screwX * theta) * point;
-  Eigen::Vector3d expectedPoint = Eigen::Vector3d::UnitZ();
+  Eigen::Vector3s rotatedPoint = math::expMap(screwX * theta) * point;
+  Eigen::Vector3s expectedPoint = Eigen::Vector3s::UnitZ();
   EXPECT_TRUE(equals(rotatedPoint, expectedPoint, 1e-6));
 
-  double EPS = 1e-7;
-  Eigen::Vector3d perturbedPoint = math::expMap(screwX * (theta + EPS)) * point;
-  Eigen::Vector3d bruteForceGradient = (perturbedPoint - rotatedPoint) / EPS;
-  Eigen::Vector3d expectedGradient = -Eigen::Vector3d::UnitY();
+  s_t EPS = 1e-7;
+  Eigen::Vector3s perturbedPoint = math::expMap(screwX * (theta + EPS)) * point;
+  Eigen::Vector3s bruteForceGradient = (perturbedPoint - rotatedPoint) / EPS;
+  Eigen::Vector3s expectedGradient = -Eigen::Vector3s::UnitY();
   EXPECT_TRUE(equals(bruteForceGradient, expectedGradient, 1e-6));
 
-  Eigen::Vector3d analyticalGradient
+  Eigen::Vector3s analyticalGradient
       = math::gradientWrtTheta(screwX, point, theta);
   EXPECT_TRUE(equals(analyticalGradient, expectedGradient, 1e-6));
 }
@@ -251,23 +251,23 @@ TEST(LIE_GROUP_OPERATORS, SIMPLE_SCREW_ROTATION_ONLY_GRADIENT_90)
 #ifdef ALL_TESTS
 TEST(LIE_GROUP_OPERATORS, SIMPLE_SCREW_ROTATION_ONLY_NEGATIVE_THETA)
 {
-  Eigen::Vector6d screwX = Eigen::Vector6d::Zero();
+  Eigen::Vector6s screwX = Eigen::Vector6s::Zero();
   screwX(0) = 1.0;
-  Eigen::Vector3d point = Eigen::Vector3d::UnitY();
+  Eigen::Vector3s point = Eigen::Vector3s::UnitY();
   // if we rotate point by screwX, it should move in the negative Z direction
-  double theta = -90 * 3.1415926535 / 180;
+  s_t theta = -90 * 3.1415926535 / 180;
   // This should be at (0, 0, 1) = UnitZ()
-  Eigen::Vector3d rotatedPoint = math::expMap(screwX * theta) * point;
-  Eigen::Vector3d expectedPoint = -Eigen::Vector3d::UnitZ();
+  Eigen::Vector3s rotatedPoint = math::expMap(screwX * theta) * point;
+  Eigen::Vector3s expectedPoint = -Eigen::Vector3s::UnitZ();
   EXPECT_TRUE(equals(rotatedPoint, expectedPoint, 1e-6));
 
-  double EPS = 1e-7;
-  Eigen::Vector3d perturbedPoint = math::expMap(screwX * (theta + EPS)) * point;
-  Eigen::Vector3d bruteForceGradient = (perturbedPoint - rotatedPoint) / EPS;
-  Eigen::Vector3d expectedGradient = Eigen::Vector3d::UnitY();
+  s_t EPS = 1e-7;
+  Eigen::Vector3s perturbedPoint = math::expMap(screwX * (theta + EPS)) * point;
+  Eigen::Vector3s bruteForceGradient = (perturbedPoint - rotatedPoint) / EPS;
+  Eigen::Vector3s expectedGradient = Eigen::Vector3s::UnitY();
   EXPECT_TRUE(equals(bruteForceGradient, expectedGradient, 1e-6));
 
-  Eigen::Vector3d analyticalGradient
+  Eigen::Vector3s analyticalGradient
       = math::gradientWrtTheta(screwX, point, theta);
   EXPECT_TRUE(equals(analyticalGradient, expectedGradient, 1e-6));
 }
@@ -276,24 +276,24 @@ TEST(LIE_GROUP_OPERATORS, SIMPLE_SCREW_ROTATION_ONLY_NEGATIVE_THETA)
 #ifdef ALL_TESTS
 TEST(LIE_GROUP_OPERATORS, SIMPLE_SCREW_ROTATION_ONLY_GRADIENT_30)
 {
-  Eigen::Vector6d screwX = Eigen::Vector6d::Zero();
+  Eigen::Vector6s screwX = Eigen::Vector6s::Zero();
   screwX(0) = 1.0;
-  Eigen::Vector3d point = Eigen::Vector3d::UnitY();
+  Eigen::Vector3s point = Eigen::Vector3s::UnitY();
   // if we rotate point by screwX, it should move in the positive Z direction
-  double theta = 30 * 3.1415926535 / 180;
+  s_t theta = 30 * 3.1415926535 / 180;
   // This should be at (0, 0, 1) = UnitZ()
-  Eigen::Vector3d rotatedPoint = math::expMap(screwX * theta) * point;
-  Eigen::Vector3d expectedPoint = Eigen::Vector3d(0, cos(theta), sin(theta));
+  Eigen::Vector3s rotatedPoint = math::expMap(screwX * theta) * point;
+  Eigen::Vector3s expectedPoint = Eigen::Vector3s(0, cos(theta), sin(theta));
   EXPECT_TRUE(equals(rotatedPoint, expectedPoint, 1e-6));
 
-  double EPS = 1e-7;
-  Eigen::Vector3d perturbedPoint = math::expMap(screwX * (theta + EPS)) * point;
-  Eigen::Vector3d bruteForceGradient = (perturbedPoint - rotatedPoint) / EPS;
-  Eigen::Vector3d expectedGradient
-      = Eigen::Vector3d(0, -sin(theta), cos(theta));
+  s_t EPS = 1e-7;
+  Eigen::Vector3s perturbedPoint = math::expMap(screwX * (theta + EPS)) * point;
+  Eigen::Vector3s bruteForceGradient = (perturbedPoint - rotatedPoint) / EPS;
+  Eigen::Vector3s expectedGradient
+      = Eigen::Vector3s(0, -sin(theta), cos(theta));
   EXPECT_TRUE(equals(bruteForceGradient, expectedGradient, 1e-6));
 
-  Eigen::Vector3d analyticalGradient
+  Eigen::Vector3s analyticalGradient
       = math::gradientWrtTheta(screwX, point, theta);
   EXPECT_TRUE(equals(analyticalGradient, expectedGradient, 1e-6));
 }
@@ -302,26 +302,26 @@ TEST(LIE_GROUP_OPERATORS, SIMPLE_SCREW_ROTATION_ONLY_GRADIENT_30)
 #ifdef ALL_TESTS
 TEST(LIE_GROUP_OPERATORS, SIMPLE_SCREW_ROTATION_ONLY_3D)
 {
-  Eigen::Vector6d screw = Eigen::Vector6d::Zero();
+  Eigen::Vector6s screw = Eigen::Vector6s::Zero();
   screw(0) = 1.0;
   screw(1) = 1.0;
   screw(2) = 1.0;
   screw.normalize();
-  Eigen::Vector3d point = Eigen::Vector3d::UnitX();
+  Eigen::Vector3s point = Eigen::Vector3s::UnitX();
   // if we rotate point by screw, it should move to the unit Z direction
-  double theta = 120 * 3.1415926535 / 180;
+  s_t theta = 120 * 3.1415926535 / 180;
   // This should be at (0, 0, 1) = UnitZ()
-  Eigen::Vector3d rotatedPoint = math::expMap(screw * theta) * point;
-  Eigen::Vector3d expectedPoint = Eigen::Vector3d::UnitY();
+  Eigen::Vector3s rotatedPoint = math::expMap(screw * theta) * point;
+  Eigen::Vector3s expectedPoint = Eigen::Vector3s::UnitY();
   EXPECT_TRUE(equals(rotatedPoint, expectedPoint, 1e-6));
 
-  double EPS = 1e-7;
-  Eigen::Vector3d perturbedPoint = math::expMap(screw * (theta + EPS)) * point;
-  Eigen::Vector3d bruteForceGradient = (perturbedPoint - rotatedPoint) / EPS;
-  Eigen::Vector3d expectedGradient = Eigen::Vector3d(-1, 0, 1) * sqrt(3) / 3;
+  s_t EPS = 1e-7;
+  Eigen::Vector3s perturbedPoint = math::expMap(screw * (theta + EPS)) * point;
+  Eigen::Vector3s bruteForceGradient = (perturbedPoint - rotatedPoint) / EPS;
+  Eigen::Vector3s expectedGradient = Eigen::Vector3s(-1, 0, 1) * sqrt(3) / 3;
   EXPECT_TRUE(equals(bruteForceGradient, expectedGradient, 1e-6));
 
-  Eigen::Vector3d analyticalGradient
+  Eigen::Vector3s analyticalGradient
       = math::gradientWrtTheta(screw, point, theta);
   EXPECT_TRUE(equals(analyticalGradient, expectedGradient, 1e-6));
 }
@@ -330,22 +330,22 @@ TEST(LIE_GROUP_OPERATORS, SIMPLE_SCREW_ROTATION_ONLY_3D)
 #ifdef ALL_TESTS
 TEST(LIE_GROUP_OPERATORS, SIMPLE_SCREW_TRANSLATION_ONLY_GRADIENT)
 {
-  Eigen::Vector6d screwX = Eigen::Vector6d::Zero();
+  Eigen::Vector6s screwX = Eigen::Vector6s::Zero();
   screwX(3) = 1.0;
-  Eigen::Vector3d point = Eigen::Vector3d::UnitX();
-  double theta = 1.0;
+  Eigen::Vector3s point = Eigen::Vector3s::UnitX();
+  s_t theta = 1.0;
   // This should be at (2, 0, 0) = 2 * UnitX()
-  Eigen::Vector3d rotatedPoint = math::expMap(screwX * theta) * point;
-  Eigen::Vector3d expectedPoint = 2 * Eigen::Vector3d::UnitX();
+  Eigen::Vector3s rotatedPoint = math::expMap(screwX * theta) * point;
+  Eigen::Vector3s expectedPoint = 2 * Eigen::Vector3s::UnitX();
   EXPECT_TRUE(equals(rotatedPoint, expectedPoint, 1e-6));
 
-  double EPS = 1e-7;
-  Eigen::Vector3d perturbedPoint = math::expMap(screwX * (theta + EPS)) * point;
-  Eigen::Vector3d bruteForceGradient = (perturbedPoint - rotatedPoint) / EPS;
-  Eigen::Vector3d expectedGradient = Eigen::Vector3d::UnitX();
+  s_t EPS = 1e-7;
+  Eigen::Vector3s perturbedPoint = math::expMap(screwX * (theta + EPS)) * point;
+  Eigen::Vector3s bruteForceGradient = (perturbedPoint - rotatedPoint) / EPS;
+  Eigen::Vector3s expectedGradient = Eigen::Vector3s::UnitX();
   EXPECT_TRUE(equals(bruteForceGradient, expectedGradient, 1e-6));
 
-  Eigen::Vector3d analyticalGradient
+  Eigen::Vector3s analyticalGradient
       = math::gradientWrtTheta(screwX, point, theta);
   EXPECT_TRUE(equals(analyticalGradient, expectedGradient, 1e-6));
 }
@@ -354,25 +354,25 @@ TEST(LIE_GROUP_OPERATORS, SIMPLE_SCREW_TRANSLATION_ONLY_GRADIENT)
 #ifdef ALL_TESTS
 TEST(LIE_GROUP_OPERATORS, COMPLEX_SCREW_MIXED_ROTATION_AND_TRANSLATION)
 {
-  Eigen::Vector6d screwX = Eigen::Vector6d::Zero();
+  Eigen::Vector6s screwX = Eigen::Vector6s::Zero();
   screwX(0) = 1.0;
   screwX(5) = -1.0;
-  Eigen::Vector3d point = Eigen::Vector3d::Zero();
+  Eigen::Vector3s point = Eigen::Vector3s::Zero();
   // if we rotate point by screwX, it should move in the positive Z direction,
   // and up
-  double theta = 90 * 3.1415926535 / 180;
+  s_t theta = 90 * 3.1415926535 / 180;
   // This should be at (0, 0, 1) = UnitZ()
-  Eigen::Vector3d rotatedPoint = math::expMap(screwX * theta) * point;
-  Eigen::Vector3d expectedPoint = Eigen::Vector3d(0, 1, -1);
+  Eigen::Vector3s rotatedPoint = math::expMap(screwX * theta) * point;
+  Eigen::Vector3s expectedPoint = Eigen::Vector3s(0, 1, -1);
   EXPECT_TRUE(equals(rotatedPoint, expectedPoint, 1e-6));
 
-  double EPS = 1e-7;
-  Eigen::Vector3d perturbedPoint = math::expMap(screwX * (theta + EPS)) * point;
-  Eigen::Vector3d bruteForceGradient = (perturbedPoint - rotatedPoint) / EPS;
-  Eigen::Vector3d expectedGradient = Eigen::Vector3d::UnitY();
+  s_t EPS = 1e-7;
+  Eigen::Vector3s perturbedPoint = math::expMap(screwX * (theta + EPS)) * point;
+  Eigen::Vector3s bruteForceGradient = (perturbedPoint - rotatedPoint) / EPS;
+  Eigen::Vector3s expectedGradient = Eigen::Vector3s::UnitY();
   EXPECT_TRUE(equals(bruteForceGradient, expectedGradient, 1e-6));
 
-  Eigen::Vector3d analyticalGradient
+  Eigen::Vector3s analyticalGradient
       = math::gradientWrtTheta(screwX, point, theta);
   EXPECT_TRUE(equals(analyticalGradient, expectedGradient, 1e-6));
 }
@@ -384,11 +384,11 @@ TEST(LIE_GROUP_OPERATORS, RANDOM_SCREWS)
   // Make the experiments repeatable
   srand(42);
 
-  double EPS = 1e-9;
+  s_t EPS = 1e-9;
 
   for (int i = 0; i < 300; i++)
   {
-    Eigen::Vector6d screw = Eigen::Vector6d::Random(6);
+    Eigen::Vector6s screw = Eigen::Vector6s::Random(6);
     // First hundred: rotation only
     if (i < 100)
     {
@@ -407,15 +407,15 @@ TEST(LIE_GROUP_OPERATORS, RANDOM_SCREWS)
     }
 
     // random theta between [-1, 1]
-    double theta = ((double)rand() / RAND_MAX) * 2 - 1;
+    s_t theta = ((s_t)rand() / RAND_MAX) * 2 - 1;
 
-    Eigen::Vector3d point = Eigen::Vector3d::Random(3);
+    Eigen::Vector3s point = Eigen::Vector3s::Random(3);
 
-    Eigen::Vector3d rotatedPoint = math::expMap(screw * theta) * point;
-    Eigen::Vector3d perturbedPoint
+    Eigen::Vector3s rotatedPoint = math::expMap(screw * theta) * point;
+    Eigen::Vector3s perturbedPoint
         = math::expMap(screw * (theta + EPS)) * point;
-    Eigen::Vector3d bruteForceGradient = (perturbedPoint - rotatedPoint) / EPS;
-    Eigen::Vector3d analyticalGradient
+    Eigen::Vector3s bruteForceGradient = (perturbedPoint - rotatedPoint) / EPS;
+    Eigen::Vector3s analyticalGradient
         = math::gradientWrtTheta(screw, point, theta);
     EXPECT_TRUE(equals(analyticalGradient, bruteForceGradient, 1e-6));
     if (!equals(analyticalGradient, bruteForceGradient, 1e-6))
@@ -441,23 +441,23 @@ TEST(LIE_GROUP_OPERATORS, RANDOM_ROTATIONS)
   // Make the experiments repeatable
   srand(42);
 
-  double EPS = 1e-9;
+  s_t EPS = 1e-9;
 
   for (int i = 0; i < 300; i++)
   {
-    Eigen::Vector3d axis = Eigen::Vector3d::Random(3);
+    Eigen::Vector3s axis = Eigen::Vector3s::Random(3);
     axis.normalize();
 
     // random theta between [-1, 1]
-    double theta = ((double)rand() / RAND_MAX) * 2 - 1;
+    s_t theta = ((s_t)rand() / RAND_MAX) * 2 - 1;
 
-    Eigen::Vector3d point = Eigen::Vector3d::Random(3);
+    Eigen::Vector3s point = Eigen::Vector3s::Random(3);
 
-    Eigen::Vector3d rotatedPoint = math::expMapRot(axis * theta) * point;
-    Eigen::Vector3d perturbedPoint
+    Eigen::Vector3s rotatedPoint = math::expMapRot(axis * theta) * point;
+    Eigen::Vector3s perturbedPoint
         = math::expMapRot(axis * (theta + EPS)) * point;
-    Eigen::Vector3d bruteForceGradient = (perturbedPoint - rotatedPoint) / EPS;
-    Eigen::Vector3d analyticalGradient
+    Eigen::Vector3s bruteForceGradient = (perturbedPoint - rotatedPoint) / EPS;
+    Eigen::Vector3s analyticalGradient
         = math::gradientWrtThetaPureRotation(axis, point, theta);
     EXPECT_TRUE(equals(analyticalGradient, bruteForceGradient, 1e-6));
     if (!equals(analyticalGradient, bruteForceGradient, 1e-6))
@@ -479,30 +479,30 @@ TEST(LIE_GROUP_OPERATORS, RANDOM_ROTATIONS)
 
 /******************************************************************************/
 bool verifyContactPoint(
-    const Eigen::Vector3d& edgeAPoint,
-    const Eigen::Vector3d& edgeAPointGradient,
-    const Eigen::Vector3d& edgeADir,
-    const Eigen::Vector3d& edgeADirGradient,
-    const Eigen::Vector3d& edgeBPoint,
-    const Eigen::Vector3d& edgeBPointGradient,
-    const Eigen::Vector3d& edgeBDir,
-    const Eigen::Vector3d& edgeBDirGradient)
+    const Eigen::Vector3s& edgeAPoint,
+    const Eigen::Vector3s& edgeAPointGradient,
+    const Eigen::Vector3s& edgeADir,
+    const Eigen::Vector3s& edgeADirGradient,
+    const Eigen::Vector3s& edgeBPoint,
+    const Eigen::Vector3s& edgeBPointGradient,
+    const Eigen::Vector3s& edgeBDir,
+    const Eigen::Vector3s& edgeBDirGradient)
 {
-  const double EPS = 1e-6;
-  Eigen::Vector3d original
+  const s_t EPS = 1e-6;
+  Eigen::Vector3s original
       = getContactPoint(edgeAPoint, edgeADir, edgeBPoint, edgeBDir);
-  Eigen::Vector3d perturbedPos = getContactPoint(
+  Eigen::Vector3s perturbedPos = getContactPoint(
       edgeAPoint + edgeAPointGradient * EPS,
       edgeADir + edgeADirGradient * EPS,
       edgeBPoint + edgeBPointGradient * EPS,
       edgeBDir + edgeBDirGradient * EPS);
-  Eigen::Vector3d perturbedNeg = getContactPoint(
+  Eigen::Vector3s perturbedNeg = getContactPoint(
       edgeAPoint - edgeAPointGradient * EPS,
       edgeADir - edgeADirGradient * EPS,
       edgeBPoint - edgeBPointGradient * EPS,
       edgeBDir - edgeBDirGradient * EPS);
-  Eigen::Vector3d finiteDiff = (perturbedPos - perturbedNeg) / (2 * EPS);
-  Eigen::Vector3d analytical = getContactPointGradient(
+  Eigen::Vector3s finiteDiff = (perturbedPos - perturbedNeg) / (2 * EPS);
+  Eigen::Vector3s analytical = getContactPointGradient(
       edgeAPoint,
       edgeAPointGradient,
       edgeADir,
@@ -539,16 +539,16 @@ bool verifyContactPoint(
 #ifdef ALL_TESTS
 TEST(COLLISION_GEOM, EDGE_EDGE_GRADIENT)
 {
-  Eigen::Vector3d edgeAPoint = Eigen::Vector3d(1, 0, 0);
-  Eigen::Vector3d edgeAPointGradient = Eigen::Vector3d::Zero();
-  Eigen::Vector3d edgeADir = Eigen::Vector3d(-1, 0, 0);
-  Eigen::Vector3d edgeADirGradient = Eigen::Vector3d::Zero();
-  Eigen::Vector3d edgeBPoint = Eigen::Vector3d(0, 1, 0);
-  Eigen::Vector3d edgeBPointGradient = Eigen::Vector3d::Zero();
-  Eigen::Vector3d edgeBDir = Eigen::Vector3d(0, -1, 0);
-  Eigen::Vector3d edgeBDirGradient = Eigen::Vector3d::Zero();
+  Eigen::Vector3s edgeAPoint = Eigen::Vector3s(1, 0, 0);
+  Eigen::Vector3s edgeAPointGradient = Eigen::Vector3s::Zero();
+  Eigen::Vector3s edgeADir = Eigen::Vector3s(-1, 0, 0);
+  Eigen::Vector3s edgeADirGradient = Eigen::Vector3s::Zero();
+  Eigen::Vector3s edgeBPoint = Eigen::Vector3s(0, 1, 0);
+  Eigen::Vector3s edgeBPointGradient = Eigen::Vector3s::Zero();
+  Eigen::Vector3s edgeBDir = Eigen::Vector3s(0, -1, 0);
+  Eigen::Vector3s edgeBDirGradient = Eigen::Vector3s::Zero();
 
-  Eigen::Vector3d expectedContactPoint = Eigen::Vector3d::Zero();
+  Eigen::Vector3s expectedContactPoint = Eigen::Vector3s::Zero();
 
   EXPECT_TRUE(equals(
       getContactPoint(edgeAPoint, edgeADir, edgeBPoint, edgeBDir),
@@ -557,7 +557,7 @@ TEST(COLLISION_GEOM, EDGE_EDGE_GRADIENT)
 
   // Start with the trivial case, 0 -> 0
 
-  Eigen::Vector3d expectedGradient = Eigen::Vector3d::Zero();
+  Eigen::Vector3s expectedGradient = Eigen::Vector3s::Zero();
   EXPECT_TRUE(equals(
       getContactPointGradient(
           edgeAPoint,
@@ -631,14 +631,14 @@ TEST(COLLISION_GEOM, EDGE_EDGE_GRADIENT)
   // If the direction of A is moving, then the overall gradient should move in
   // the same direction
 
-  edgeAPointGradient = Eigen::Vector3d::Zero();
-  edgeBPointGradient = Eigen::Vector3d::Zero();
-  edgeADirGradient = Eigen::Vector3d(0, 0, 1);
+  edgeAPointGradient = Eigen::Vector3s::Zero();
+  edgeBPointGradient = Eigen::Vector3s::Zero();
+  edgeADirGradient = Eigen::Vector3s(0, 0, 1);
   // It's divided by 2 because we're only moving half the average, the B point
   // doesn't move
   expectedGradient = edgeADirGradient / 2;
 
-  Eigen::Vector3d result = getContactPointGradient(
+  Eigen::Vector3s result = getContactPointGradient(
       edgeAPoint,
       edgeAPointGradient,
       edgeADir,
@@ -657,47 +657,47 @@ TEST(COLLISION_GEOM, RANDOM_EDGE_EDGE_GRADIENTS)
 {
   for (int i = 0; i < 700; i++)
   {
-    Eigen::Vector3d edgeAPoint = Eigen::Vector3d::Random();
-    Eigen::Vector3d edgeAPointGradient = Eigen::Vector3d::Zero();
-    Eigen::Vector3d edgeADir = Eigen::Vector3d::Random();
-    Eigen::Vector3d edgeADirGradient = Eigen::Vector3d::Zero();
-    Eigen::Vector3d edgeBPoint = Eigen::Vector3d::Random();
-    Eigen::Vector3d edgeBPointGradient = Eigen::Vector3d::Zero();
-    Eigen::Vector3d edgeBDir = Eigen::Vector3d::Random();
-    Eigen::Vector3d edgeBDirGradient = Eigen::Vector3d::Zero();
+    Eigen::Vector3s edgeAPoint = Eigen::Vector3s::Random();
+    Eigen::Vector3s edgeAPointGradient = Eigen::Vector3s::Zero();
+    Eigen::Vector3s edgeADir = Eigen::Vector3s::Random();
+    Eigen::Vector3s edgeADirGradient = Eigen::Vector3s::Zero();
+    Eigen::Vector3s edgeBPoint = Eigen::Vector3s::Random();
+    Eigen::Vector3s edgeBPointGradient = Eigen::Vector3s::Zero();
+    Eigen::Vector3s edgeBDir = Eigen::Vector3s::Random();
+    Eigen::Vector3s edgeBDirGradient = Eigen::Vector3s::Zero();
 
     if (i < 100)
     {
-      edgeAPointGradient = Eigen::Vector3d::Random();
+      edgeAPointGradient = Eigen::Vector3s::Random();
     }
     else if (i < 200)
     {
-      edgeBPointGradient = Eigen::Vector3d::Random();
+      edgeBPointGradient = Eigen::Vector3s::Random();
     }
     else if (i < 300)
     {
-      edgeADirGradient = Eigen::Vector3d::Random();
+      edgeADirGradient = Eigen::Vector3s::Random();
     }
     else if (i < 400)
     {
-      edgeBDirGradient = Eigen::Vector3d::Random();
+      edgeBDirGradient = Eigen::Vector3s::Random();
     }
     else if (i < 500)
     {
-      edgeAPointGradient = Eigen::Vector3d::Random();
-      edgeADirGradient = Eigen::Vector3d::Random();
+      edgeAPointGradient = Eigen::Vector3s::Random();
+      edgeADirGradient = Eigen::Vector3s::Random();
     }
     else if (i < 600)
     {
-      edgeBPointGradient = Eigen::Vector3d::Random();
-      edgeBDirGradient = Eigen::Vector3d::Random();
+      edgeBPointGradient = Eigen::Vector3s::Random();
+      edgeBDirGradient = Eigen::Vector3s::Random();
     }
     else if (i < 700)
     {
-      edgeAPointGradient = Eigen::Vector3d::Random();
-      edgeADirGradient = Eigen::Vector3d::Random();
-      edgeBPointGradient = Eigen::Vector3d::Random();
-      edgeBDirGradient = Eigen::Vector3d::Random();
+      edgeAPointGradient = Eigen::Vector3s::Random();
+      edgeADirGradient = Eigen::Vector3s::Random();
+      edgeBPointGradient = Eigen::Vector3s::Random();
+      edgeBDirGradient = Eigen::Vector3s::Random();
     }
 
     bool result = verifyContactPoint(
@@ -718,25 +718,25 @@ TEST(COLLISION_GEOM, RANDOM_EDGE_EDGE_GRADIENTS)
 
 /******************************************************************************/
 bool verifyClosestPoint(
-    const Eigen::Vector3d& edgePoint,
-    const Eigen::Vector3d& edgePointGradient,
-    const Eigen::Vector3d& edgeDir,
-    const Eigen::Vector3d& edgeDirGradient,
-    const Eigen::Vector3d& goalPoint,
-    const Eigen::Vector3d& goalPointGradient)
+    const Eigen::Vector3s& edgePoint,
+    const Eigen::Vector3s& edgePointGradient,
+    const Eigen::Vector3s& edgeDir,
+    const Eigen::Vector3s& edgeDirGradient,
+    const Eigen::Vector3s& goalPoint,
+    const Eigen::Vector3s& goalPointGradient)
 {
-  const double EPS = 1e-6;
-  Eigen::Vector3d original = closestPointOnLine(edgePoint, edgeDir, goalPoint);
-  Eigen::Vector3d perturbedPos = closestPointOnLine(
+  const s_t EPS = 1e-6;
+  Eigen::Vector3s original = closestPointOnLine(edgePoint, edgeDir, goalPoint);
+  Eigen::Vector3s perturbedPos = closestPointOnLine(
       edgePoint + edgePointGradient * EPS,
       edgeDir + edgeDirGradient * EPS,
       goalPoint + goalPointGradient * EPS);
-  Eigen::Vector3d perturbedNeg = closestPointOnLine(
+  Eigen::Vector3s perturbedNeg = closestPointOnLine(
       edgePoint - edgePointGradient * EPS,
       edgeDir - edgeDirGradient * EPS,
       goalPoint - goalPointGradient * EPS);
-  Eigen::Vector3d finiteDiff = (perturbedPos - perturbedNeg) / (2 * EPS);
-  Eigen::Vector3d analytical = closestPointOnLineGradient(
+  Eigen::Vector3s finiteDiff = (perturbedPos - perturbedNeg) / (2 * EPS);
+  Eigen::Vector3s analytical = closestPointOnLineGradient(
       edgePoint,
       edgePointGradient,
       edgeDir,
@@ -770,40 +770,40 @@ TEST(COLLISION_GEOM, RANDOM_CLOSEST_POINT_GRADIENTS)
 {
   for (int i = 0; i < 700; i++)
   {
-    Eigen::Vector3d edgePoint = Eigen::Vector3d::Random();
-    Eigen::Vector3d edgePointGradient = Eigen::Vector3d::Zero();
-    Eigen::Vector3d edgeDir = Eigen::Vector3d::Random();
-    Eigen::Vector3d edgeDirGradient = Eigen::Vector3d::Zero();
-    Eigen::Vector3d goalPoint = Eigen::Vector3d::Random();
-    Eigen::Vector3d goalPointGradient = Eigen::Vector3d::Zero();
+    Eigen::Vector3s edgePoint = Eigen::Vector3s::Random();
+    Eigen::Vector3s edgePointGradient = Eigen::Vector3s::Zero();
+    Eigen::Vector3s edgeDir = Eigen::Vector3s::Random();
+    Eigen::Vector3s edgeDirGradient = Eigen::Vector3s::Zero();
+    Eigen::Vector3s goalPoint = Eigen::Vector3s::Random();
+    Eigen::Vector3s goalPointGradient = Eigen::Vector3s::Zero();
 
     if (i < 100)
     {
-      edgePointGradient = Eigen::Vector3d::Random();
+      edgePointGradient = Eigen::Vector3s::Random();
     }
     else if (i < 200)
     {
-      edgeDirGradient = Eigen::Vector3d::Random();
+      edgeDirGradient = Eigen::Vector3s::Random();
     }
     else if (i < 300)
     {
-      goalPointGradient = Eigen::Vector3d::Random();
+      goalPointGradient = Eigen::Vector3s::Random();
     }
     else if (i < 400)
     {
-      edgePointGradient = Eigen::Vector3d::Random();
-      edgeDirGradient = Eigen::Vector3d::Random();
+      edgePointGradient = Eigen::Vector3s::Random();
+      edgeDirGradient = Eigen::Vector3s::Random();
     }
     else if (i < 600)
     {
-      edgePointGradient = Eigen::Vector3d::Random();
-      goalPointGradient = Eigen::Vector3d::Random();
+      edgePointGradient = Eigen::Vector3s::Random();
+      goalPointGradient = Eigen::Vector3s::Random();
     }
     else if (i < 700)
     {
-      edgePointGradient = Eigen::Vector3d::Random();
-      edgeDirGradient = Eigen::Vector3d::Random();
-      goalPointGradient = Eigen::Vector3d::Random();
+      edgePointGradient = Eigen::Vector3s::Random();
+      edgeDirGradient = Eigen::Vector3s::Random();
+      goalPointGradient = Eigen::Vector3s::Random();
     }
 
     bool result = verifyClosestPoint(
@@ -830,7 +830,7 @@ TEST(LIE_GROUP_OPERATORS, EULER_ANGLES)
   int numTest = 1;
   for (int i = 0; i < numTest; ++i)
   {
-    Eigen::Vector3d angle = Eigen::Vector3d::Random();
+    Eigen::Vector3s angle = Eigen::Vector3s::Random();
     testEulerAngles(angle);
   }
 }
@@ -846,26 +846,26 @@ TEST(LIE_GROUP_OPERATORS, EXPONENTIAL_MAPPINGS)
   // Exp
   for (int i = 0; i < numTest; ++i)
   {
-    Eigen::Vector6d s = Eigen::Vector6d::Random();
-    Eigen::Isometry3d Exp_s = math::expMap(s);
+    Eigen::Vector6s s = Eigen::Vector6s::Random();
+    Eigen::Isometry3s Exp_s = math::expMap(s);
     Eigen::Matrix4d Exp_s_2 = Eigen::Matrix4d::Identity();
 
-    double theta = s.head<3>().norm();
-    Eigen::Matrix3d R = Matrix3d::Zero();
-    Eigen::Matrix3d qss = math::makeSkewSymmetric(s.head<3>());
-    Eigen::Matrix3d qss2 = qss * qss;
-    Eigen::Matrix3d P = Eigen::Matrix3d::Zero();
+    s_t theta = s.head<3>().norm();
+    Eigen::Matrix3s R = Matrix3s::Zero();
+    Eigen::Matrix3s qss = math::makeSkewSymmetric(s.head<3>());
+    Eigen::Matrix3s qss2 = qss * qss;
+    Eigen::Matrix3s P = Eigen::Matrix3s::Zero();
 
     if (theta < EPSILON_EXPMAP_THETA)
     {
-      R = Matrix3d::Identity() + qss + 0.5 * qss2;
-      P = Matrix3d::Identity() + 0.5 * qss + (1 / 6) * qss2;
+      R = Matrix3s::Identity() + qss + 0.5 * qss2;
+      P = Matrix3s::Identity() + 0.5 * qss + (1 / 6) * qss2;
     }
     else
     {
-      R = Matrix3d::Identity() + (sin(theta) / theta) * qss
+      R = Matrix3s::Identity() + (sin(theta) / theta) * qss
           + ((1 - cos(theta)) / (theta * theta)) * qss2;
-      P = Matrix3d::Identity() + ((1 - cos(theta)) / (theta * theta)) * qss
+      P = Matrix3s::Identity() + ((1 - cos(theta)) / (theta * theta)) * qss
           + ((theta - sin(theta)) / (theta * theta * theta)) * qss2;
     }
 
@@ -881,27 +881,27 @@ TEST(LIE_GROUP_OPERATORS, EXPONENTIAL_MAPPINGS)
   // ExpAngular
   for (int i = 0; i < numTest; ++i)
   {
-    Eigen::Vector6d s = Eigen::Vector6d::Random();
-    s.tail<3>() = Eigen::Vector3d::Zero();
-    Eigen::Isometry3d Exp_s = math::expAngular(s.head<3>());
+    Eigen::Vector6s s = Eigen::Vector6s::Random();
+    s.tail<3>() = Eigen::Vector3s::Zero();
+    Eigen::Isometry3s Exp_s = math::expAngular(s.head<3>());
     Eigen::Matrix4d Exp_s_2 = Eigen::Matrix4d::Identity();
 
-    double theta = s.head<3>().norm();
-    Eigen::Matrix3d R = Matrix3d::Zero();
-    Eigen::Matrix3d qss = math::makeSkewSymmetric(s.head<3>());
-    Eigen::Matrix3d qss2 = qss * qss;
-    Eigen::Matrix3d P = Eigen::Matrix3d::Zero();
+    s_t theta = s.head<3>().norm();
+    Eigen::Matrix3s R = Matrix3s::Zero();
+    Eigen::Matrix3s qss = math::makeSkewSymmetric(s.head<3>());
+    Eigen::Matrix3s qss2 = qss * qss;
+    Eigen::Matrix3s P = Eigen::Matrix3s::Zero();
 
     if (theta < EPSILON_EXPMAP_THETA)
     {
-      R = Matrix3d::Identity() + qss + 0.5 * qss2;
-      P = Matrix3d::Identity() + 0.5 * qss + (1 / 6) * qss2;
+      R = Matrix3s::Identity() + qss + 0.5 * qss2;
+      P = Matrix3s::Identity() + 0.5 * qss + (1 / 6) * qss2;
     }
     else
     {
-      R = Matrix3d::Identity() + (sin(theta) / theta) * qss
+      R = Matrix3s::Identity() + (sin(theta) / theta) * qss
           + ((1 - cos(theta)) / (theta * theta)) * qss2;
-      P = Matrix3d::Identity() + ((1 - cos(theta)) / (theta * theta)) * qss
+      P = Matrix3s::Identity() + ((1 - cos(theta)) / (theta * theta)) * qss
           + ((theta - sin(theta)) / (theta * theta * theta)) * qss2;
     }
 
@@ -917,27 +917,27 @@ TEST(LIE_GROUP_OPERATORS, EXPONENTIAL_MAPPINGS)
   // ExpLinear
   for (int i = 0; i < numTest; ++i)
   {
-    Eigen::Vector6d s = Eigen::Vector6d::Random();
-    s.head<3>() = Eigen::Vector3d::Zero();
-    Eigen::Isometry3d Exp_s(Eigen::Translation3d(s.tail<3>()));
+    Eigen::Vector6s s = Eigen::Vector6s::Random();
+    s.head<3>() = Eigen::Vector3s::Zero();
+    Eigen::Isometry3s Exp_s(Eigen::Translation3d(s.tail<3>()));
     Eigen::Matrix4d Exp_s_2 = Eigen::Matrix4d::Identity();
 
-    double theta = s.head<3>().norm();
-    Eigen::Matrix3d R = Matrix3d::Zero();
-    Eigen::Matrix3d qss = math::makeSkewSymmetric(s.head<3>());
-    Eigen::Matrix3d qss2 = qss * qss;
-    Eigen::Matrix3d P = Eigen::Matrix3d::Zero();
+    s_t theta = s.head<3>().norm();
+    Eigen::Matrix3s R = Matrix3s::Zero();
+    Eigen::Matrix3s qss = math::makeSkewSymmetric(s.head<3>());
+    Eigen::Matrix3s qss2 = qss * qss;
+    Eigen::Matrix3s P = Eigen::Matrix3s::Zero();
 
     if (theta < EPSILON_EXPMAP_THETA)
     {
-      R = Matrix3d::Identity() + qss + 0.5 * qss2;
-      P = Matrix3d::Identity() + 0.5 * qss + (1 / 6) * qss2;
+      R = Matrix3s::Identity() + qss + 0.5 * qss2;
+      P = Matrix3s::Identity() + 0.5 * qss + (1 / 6) * qss2;
     }
     else
     {
-      R = Matrix3d::Identity() + (sin(theta) / theta) * qss
+      R = Matrix3s::Identity() + (sin(theta) / theta) * qss
           + ((1 - cos(theta)) / (theta * theta)) * qss2;
-      P = Matrix3d::Identity() + ((1 - cos(theta)) / (theta * theta)) * qss
+      P = Matrix3s::Identity() + ((1 - cos(theta)) / (theta * theta)) * qss
           + ((theta - sin(theta)) / (theta * theta * theta)) * qss2;
     }
 
@@ -951,28 +951,28 @@ TEST(LIE_GROUP_OPERATORS, EXPONENTIAL_MAPPINGS)
   }
   // Exponential mapping test with high values
   int numExpTests = 100;
-  double min = -1e+128;
-  double max = +1e+128;
+  s_t min = -1e+128;
+  s_t max = +1e+128;
 
   for (int idxTest = 0; idxTest < numExpTests; ++idxTest)
   {
-    Eigen::Vector3d randomS = Eigen::Vector3d::Zero();
+    Eigen::Vector3s randomS = Eigen::Vector3s::Zero();
 
     for (int i = 0; i < 3; ++i)
       randomS[i] = Random::uniform(min, max);
 
-    Eigen::Isometry3d T = math::expAngular(randomS);
+    Eigen::Isometry3s T = math::expAngular(randomS);
     EXPECT_TRUE(math::verifyTransform(T));
   }
 
   for (int idxTest = 0; idxTest < numExpTests; ++idxTest)
   {
-    Eigen::Vector6d randomS = Eigen::Vector6d::Zero();
+    Eigen::Vector6s randomS = Eigen::Vector6s::Zero();
 
     for (int i = 0; i < 6; ++i)
       randomS[i] = Random::uniform(min, max);
 
-    Eigen::Isometry3d T = math::expMap(randomS);
+    Eigen::Isometry3s T = math::expMap(randomS);
     EXPECT_TRUE(math::verifyTransform(T));
   }
 }
@@ -987,27 +987,27 @@ TEST(LIE_GROUP_OPERATORS, ADJOINT_MAPPINGS)
   // AdT(V) == T * V * InvT
   for (int i = 0; i < numTest; ++i)
   {
-    Eigen::Vector6d t = Eigen::Vector6d::Random();
-    Eigen::Isometry3d T = math::expMap(t);
-    Eigen::Vector6d V = Eigen::Vector6d::Random();
+    Eigen::Vector6s t = Eigen::Vector6s::Random();
+    Eigen::Isometry3s T = math::expMap(t);
+    Eigen::Vector6s V = Eigen::Vector6s::Random();
 
-    Eigen::Vector6d AdTV = AdT(T, V);
+    Eigen::Vector6s AdTV = AdT(T, V);
 
     // Ad(T, V) = T * [V] * InvT
     Eigen::Matrix4d T_V_InvT
         = T.matrix() * toMatrixForm(V) * T.inverse().matrix();
-    Eigen::Vector6d T_V_InvT_se3 = fromMatrixForm(T_V_InvT);
+    Eigen::Vector6s T_V_InvT_se3 = fromMatrixForm(T_V_InvT);
 
     for (int j = 0; j < 6; ++j)
       EXPECT_NEAR(AdTV(j), T_V_InvT_se3(j), LIE_GROUP_OPT_TOL);
 
     // Ad(T, V) = [R 0; [p]R R] * V
-    Eigen::Matrix6d AdTMatrix = Eigen::Matrix6d::Zero();
+    Eigen::Matrix6s AdTMatrix = Eigen::Matrix6s::Zero();
     AdTMatrix.topLeftCorner<3, 3>() = T.linear();
     AdTMatrix.bottomRightCorner<3, 3>() = T.linear();
     AdTMatrix.bottomLeftCorner<3, 3>()
         = math::makeSkewSymmetric(T.translation()) * T.linear();
-    Eigen::Vector6d AdTMatrix_V = AdTMatrix * V;
+    Eigen::Vector6s AdTMatrix_V = AdTMatrix * V;
     for (int j = 0; j < 6; ++j)
       EXPECT_NEAR(AdTV(j), AdTMatrix_V(j), LIE_GROUP_OPT_TOL);
   }
@@ -1015,14 +1015,14 @@ TEST(LIE_GROUP_OPERATORS, ADJOINT_MAPPINGS)
   // AdR == AdT([R 0; 0 1], V)
   for (int i = 0; i < numTest; ++i)
   {
-    Eigen::Vector6d t = Eigen::Vector6d::Random();
-    Eigen::Isometry3d T = math::expMap(t);
-    Eigen::Isometry3d R = Eigen::Isometry3d::Identity();
+    Eigen::Vector6s t = Eigen::Vector6s::Random();
+    Eigen::Isometry3s T = math::expMap(t);
+    Eigen::Isometry3s R = Eigen::Isometry3s::Identity();
     R.linear() = T.linear();
-    Eigen::Vector6d V = Eigen::Vector6d::Random();
+    Eigen::Vector6s V = Eigen::Vector6s::Random();
 
-    Eigen::Vector6d AdTV = AdT(R, V);
-    Eigen::Vector6d AdRV = AdR(T, V);
+    Eigen::Vector6s AdTV = AdT(R, V);
+    Eigen::Vector6s AdRV = AdR(T, V);
 
     for (int j = 0; j < 6; ++j)
       EXPECT_NEAR(AdTV(j), AdRV(j), LIE_GROUP_OPT_TOL);
@@ -1031,14 +1031,14 @@ TEST(LIE_GROUP_OPERATORS, ADJOINT_MAPPINGS)
   // AdTAngular == AdT(T, se3(w, 0))
   for (int i = 0; i < numTest; ++i)
   {
-    Eigen::Vector6d t = Eigen::Vector6d::Random();
-    Eigen::Isometry3d T = math::expMap(t);
-    Eigen::Vector3d w = Eigen::Vector3d::Random();
-    Eigen::Vector6d V = Eigen::Vector6d::Zero();
+    Eigen::Vector6s t = Eigen::Vector6s::Random();
+    Eigen::Isometry3s T = math::expMap(t);
+    Eigen::Vector3s w = Eigen::Vector3s::Random();
+    Eigen::Vector6s V = Eigen::Vector6s::Zero();
     V.head<3>() = w;
 
-    Eigen::Vector6d AdTV = AdT(T, V);
-    Eigen::Vector6d AdTAng = AdTAngular(T, w);
+    Eigen::Vector6s AdTV = AdT(T, V);
+    Eigen::Vector6s AdTAng = AdTAngular(T, w);
 
     for (int j = 0; j < 6; ++j)
       EXPECT_NEAR(AdTV(j), AdTAng(j), LIE_GROUP_OPT_TOL);
@@ -1047,14 +1047,14 @@ TEST(LIE_GROUP_OPERATORS, ADJOINT_MAPPINGS)
   // AdTLinear == AdT(T, se3(w, 0))
   for (int i = 0; i < numTest; ++i)
   {
-    Eigen::Vector6d t = Eigen::Vector6d::Random();
-    Eigen::Isometry3d T = math::expMap(t);
-    Eigen::Vector3d v = Eigen::Vector3d::Random();
-    Eigen::Vector6d V = Eigen::Vector6d::Zero();
+    Eigen::Vector6s t = Eigen::Vector6s::Random();
+    Eigen::Isometry3s T = math::expMap(t);
+    Eigen::Vector3s v = Eigen::Vector3s::Random();
+    Eigen::Vector6s V = Eigen::Vector6s::Zero();
     V.tail<3>() = v;
 
-    Eigen::Vector6d AdTV = AdT(T, V);
-    Eigen::Vector6d AdTLin = AdTLinear(T, v);
+    Eigen::Vector6s AdTV = AdT(T, V);
+    Eigen::Vector6s AdTLin = AdTLinear(T, v);
 
     for (int j = 0; j < 6; ++j)
       EXPECT_NEAR(AdTV(j), AdTLin(j), LIE_GROUP_OPT_TOL);
@@ -1063,14 +1063,14 @@ TEST(LIE_GROUP_OPERATORS, ADJOINT_MAPPINGS)
   // AdTJac
   for (int i = 0; i < numTest; ++i)
   {
-    Eigen::Vector6d t = Eigen::Vector6d::Random();
-    Eigen::Isometry3d T = math::expMap(t);
-    Eigen::Vector3d v = Eigen::Vector3d::Random();
-    Eigen::Vector6d V = Eigen::Vector6d::Zero();
+    Eigen::Vector6s t = Eigen::Vector6s::Random();
+    Eigen::Isometry3s T = math::expMap(t);
+    Eigen::Vector3s v = Eigen::Vector3s::Random();
+    Eigen::Vector6s V = Eigen::Vector6s::Zero();
     V.tail<3>() = v;
 
-    Eigen::Vector6d AdTV = AdT(T, V);
-    Eigen::Vector6d AdTLin = AdTLinear(T, v);
+    Eigen::Vector6s AdTV = AdT(T, V);
+    Eigen::Vector6s AdTLin = AdTLinear(T, v);
 
     for (int j = 0; j < 6; ++j)
       EXPECT_NEAR(AdTV(j), AdTLin(j), LIE_GROUP_OPT_TOL);
@@ -1079,13 +1079,13 @@ TEST(LIE_GROUP_OPERATORS, ADJOINT_MAPPINGS)
   // AdInvT
   for (int i = 0; i < numTest; ++i)
   {
-    Eigen::Vector6d t = Eigen::Vector6d::Random();
-    Eigen::Isometry3d T = math::expMap(t);
-    Eigen::Isometry3d InvT = T.inverse();
-    Eigen::Vector6d V = Eigen::Vector6d::Random();
+    Eigen::Vector6s t = Eigen::Vector6s::Random();
+    Eigen::Isometry3s T = math::expMap(t);
+    Eigen::Isometry3s InvT = T.inverse();
+    Eigen::Vector6s V = Eigen::Vector6s::Random();
 
-    Eigen::Vector6d Ad_InvT = AdT(InvT, V);
-    Eigen::Vector6d AdInv_T = AdInvT(T, V);
+    Eigen::Vector6s Ad_InvT = AdT(InvT, V);
+    Eigen::Vector6s AdInv_T = AdInvT(T, V);
 
     for (int j = 0; j < 6; ++j)
       EXPECT_NEAR(Ad_InvT(j), AdInv_T(j), LIE_GROUP_OPT_TOL);
@@ -1094,16 +1094,16 @@ TEST(LIE_GROUP_OPERATORS, ADJOINT_MAPPINGS)
   // AdInvRLinear
   for (int i = 0; i < numTest; ++i)
   {
-    Eigen::Vector6d t = Eigen::Vector6d::Random();
-    Eigen::Isometry3d T = math::expMap(t);
-    Eigen::Vector3d v = Eigen::Vector3d::Random();
-    Eigen::Vector6d V = Eigen::Vector6d::Zero();
+    Eigen::Vector6s t = Eigen::Vector6s::Random();
+    Eigen::Isometry3s T = math::expMap(t);
+    Eigen::Vector3s v = Eigen::Vector3s::Random();
+    Eigen::Vector6s V = Eigen::Vector6s::Zero();
     V.tail<3>() = v;
-    Eigen::Isometry3d R = Eigen::Isometry3d::Identity();
+    Eigen::Isometry3s R = Eigen::Isometry3s::Identity();
     R.linear() = T.linear();
 
-    Eigen::Vector6d AdT_ = AdT(R.inverse(), V);
-    Eigen::Vector6d AdInvRLinear_ = AdInvRLinear(T, v);
+    Eigen::Vector6s AdT_ = AdT(R.inverse(), V);
+    Eigen::Vector6s AdInvRLinear_ = AdInvRLinear(T, v);
 
     for (int j = 0; j < 6; ++j)
       EXPECT_NEAR(AdT_(j), AdInvRLinear_(j), LIE_GROUP_OPT_TOL);
@@ -1112,19 +1112,19 @@ TEST(LIE_GROUP_OPERATORS, ADJOINT_MAPPINGS)
   // dAdT
   for (int i = 0; i < numTest; ++i)
   {
-    Eigen::Vector6d t = Eigen::Vector6d::Random();
-    Eigen::Isometry3d T = math::expMap(t);
-    Eigen::Vector6d F = Eigen::Vector6d::Random();
+    Eigen::Vector6s t = Eigen::Vector6s::Random();
+    Eigen::Isometry3s T = math::expMap(t);
+    Eigen::Vector6s F = Eigen::Vector6s::Random();
 
-    Eigen::Vector6d dAdTF = dAdT(T, F);
+    Eigen::Vector6s dAdTF = dAdT(T, F);
 
     // dAd(T, F) = [R 0; [p]R R]^T * F
-    Eigen::Matrix6d AdTMatrix = Eigen::Matrix6d::Zero();
+    Eigen::Matrix6s AdTMatrix = Eigen::Matrix6s::Zero();
     AdTMatrix.topLeftCorner<3, 3>() = T.linear();
     AdTMatrix.bottomRightCorner<3, 3>() = T.linear();
     AdTMatrix.bottomLeftCorner<3, 3>()
         = math::makeSkewSymmetric(T.translation()) * T.linear();
-    Eigen::Vector6d AdTTransMatrix_V = AdTMatrix.transpose() * F;
+    Eigen::Vector6s AdTTransMatrix_V = AdTMatrix.transpose() * F;
     for (int j = 0; j < 6; ++j)
       EXPECT_NEAR(dAdTF(j), AdTTransMatrix_V(j), LIE_GROUP_OPT_TOL);
   }
@@ -1132,26 +1132,26 @@ TEST(LIE_GROUP_OPERATORS, ADJOINT_MAPPINGS)
   // dAdInvT
   for (int i = 0; i < numTest; ++i)
   {
-    Eigen::Vector6d t = Eigen::Vector6d::Random();
-    Eigen::Isometry3d T = math::expMap(t);
-    Eigen::Isometry3d InvT = T.inverse();
-    Eigen::Vector6d F = Eigen::Vector6d::Random();
+    Eigen::Vector6s t = Eigen::Vector6s::Random();
+    Eigen::Isometry3s T = math::expMap(t);
+    Eigen::Isometry3s InvT = T.inverse();
+    Eigen::Vector6s F = Eigen::Vector6s::Random();
 
-    Eigen::Vector6d dAdInvT_F = dAdInvT(T, F);
+    Eigen::Vector6s dAdInvT_F = dAdInvT(T, F);
 
     //
-    Eigen::Vector6d dAd_InvTF = dAdT(InvT, F);
+    Eigen::Vector6s dAd_InvTF = dAdT(InvT, F);
 
     for (int j = 0; j < 6; ++j)
       EXPECT_NEAR(dAdInvT_F(j), dAd_InvTF(j), LIE_GROUP_OPT_TOL);
 
     // dAd(T, F) = [R 0; [p]R R]^T * F
-    Eigen::Matrix6d AdInvTMatrix = Eigen::Matrix6d::Zero();
+    Eigen::Matrix6s AdInvTMatrix = Eigen::Matrix6s::Zero();
     AdInvTMatrix.topLeftCorner<3, 3>() = InvT.linear();
     AdInvTMatrix.bottomRightCorner<3, 3>() = InvT.linear();
     AdInvTMatrix.bottomLeftCorner<3, 3>()
         = math::makeSkewSymmetric(InvT.translation()) * InvT.linear();
-    Eigen::Vector6d AdInvTTransMatrix_V = AdInvTMatrix.transpose() * F;
+    Eigen::Vector6s AdInvTTransMatrix_V = AdInvTMatrix.transpose() * F;
     for (int j = 0; j < 6; ++j)
       EXPECT_NEAR(dAdInvT_F(j), AdInvTTransMatrix_V(j), LIE_GROUP_OPT_TOL);
   }
@@ -1159,17 +1159,17 @@ TEST(LIE_GROUP_OPERATORS, ADJOINT_MAPPINGS)
   // dAdInvR
   for (int i = 0; i < numTest; ++i)
   {
-    Eigen::Vector6d t = Eigen::Vector6d::Random();
-    Eigen::Isometry3d T = math::expMap(t);
-    Eigen::Isometry3d InvT = T.inverse();
-    Eigen::Isometry3d InvR = Eigen::Isometry3d::Identity();
+    Eigen::Vector6s t = Eigen::Vector6s::Random();
+    Eigen::Isometry3s T = math::expMap(t);
+    Eigen::Isometry3s InvT = T.inverse();
+    Eigen::Isometry3s InvR = Eigen::Isometry3s::Identity();
     InvR.linear() = InvT.linear();
-    Eigen::Vector6d F = Eigen::Vector6d::Random();
+    Eigen::Vector6s F = Eigen::Vector6s::Random();
 
-    Eigen::Vector6d dAdInvR_F = dAdInvR(T, F);
+    Eigen::Vector6s dAdInvR_F = dAdInvR(T, F);
 
     //
-    Eigen::Vector6d dAd_InvTF = dAdT(InvR, F);
+    Eigen::Vector6s dAd_InvTF = dAdT(InvR, F);
 
     for (int j = 0; j < 6; ++j)
       EXPECT_NEAR(dAdInvR_F(j), dAd_InvTF(j), LIE_GROUP_OPT_TOL);
@@ -1178,17 +1178,17 @@ TEST(LIE_GROUP_OPERATORS, ADJOINT_MAPPINGS)
   // ad
   for (int i = 0; i < numTest; ++i)
   {
-    Eigen::Vector6d V = Eigen::Vector6d::Random();
-    Eigen::Vector6d W = Eigen::Vector6d::Random();
+    Eigen::Vector6s V = Eigen::Vector6s::Random();
+    Eigen::Vector6s W = Eigen::Vector6s::Random();
 
-    Eigen::Vector6d ad_V_W = ad(V, W);
+    Eigen::Vector6s ad_V_W = ad(V, W);
 
     //
-    Eigen::Matrix6d adV_Matrix = Eigen::Matrix6d::Zero();
+    Eigen::Matrix6s adV_Matrix = Eigen::Matrix6s::Zero();
     adV_Matrix.topLeftCorner<3, 3>() = math::makeSkewSymmetric(V.head<3>());
     adV_Matrix.bottomRightCorner<3, 3>() = math::makeSkewSymmetric(V.head<3>());
     adV_Matrix.bottomLeftCorner<3, 3>() = math::makeSkewSymmetric(V.tail<3>());
-    Eigen::Vector6d adV_Matrix_W = adV_Matrix * W;
+    Eigen::Vector6s adV_Matrix_W = adV_Matrix * W;
 
     for (int j = 0; j < 6; ++j)
       EXPECT_NEAR(ad_V_W(j), adV_Matrix_W(j), LIE_GROUP_OPT_TOL);
@@ -1197,18 +1197,18 @@ TEST(LIE_GROUP_OPERATORS, ADJOINT_MAPPINGS)
   // dad
   for (int i = 0; i < numTest; ++i)
   {
-    Eigen::Vector6d V = Eigen::Vector6d::Random();
-    Eigen::Vector6d F = Eigen::Vector6d::Random();
+    Eigen::Vector6s V = Eigen::Vector6s::Random();
+    Eigen::Vector6s F = Eigen::Vector6s::Random();
 
-    Eigen::Vector6d dad_V_F = dad(V, F);
+    Eigen::Vector6s dad_V_F = dad(V, F);
 
     //
-    Eigen::Matrix6d dadV_Matrix = Eigen::Matrix6d::Zero();
+    Eigen::Matrix6s dadV_Matrix = Eigen::Matrix6s::Zero();
     dadV_Matrix.topLeftCorner<3, 3>() = math::makeSkewSymmetric(V.head<3>());
     dadV_Matrix.bottomRightCorner<3, 3>()
         = math::makeSkewSymmetric(V.head<3>());
     dadV_Matrix.bottomLeftCorner<3, 3>() = math::makeSkewSymmetric(V.tail<3>());
-    Eigen::Vector6d dadV_Matrix_F = dadV_Matrix.transpose() * F;
+    Eigen::Vector6s dadV_Matrix_F = dadV_Matrix.transpose() * F;
 
     for (int j = 0; j < 6; ++j)
       EXPECT_NEAR(dad_V_F(j), dadV_Matrix_F(j), LIE_GROUP_OPT_TOL);

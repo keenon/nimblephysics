@@ -54,7 +54,7 @@ void Random(py::module& m)
           +[]() -> unsigned int { return dart::math::Random::getSeed(); })
       .def_static(
           "uniform",
-          +[](double min, double max) -> double {
+          +[](s_t min, s_t max) -> s_t {
             return dart::math::Random::uniform(min, max);
           },
           ::py::arg("min"),

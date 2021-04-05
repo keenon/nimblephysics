@@ -45,22 +45,22 @@ void PgsBoxedLcpSolver(py::module& m)
       .def(::py::init<>())
       .def(::py::init<int>(), ::py::arg("maxIteration"))
       .def(
-          ::py::init<int, double>(),
+          ::py::init<int, s_t>(),
           ::py::arg("maxIteration"),
           ::py::arg("deltaXTolerance"))
       .def(
-          ::py::init<int, double, double>(),
+          ::py::init<int, s_t, s_t>(),
           ::py::arg("maxIteration"),
           ::py::arg("deltaXTolerance"),
           ::py::arg("relativeDeltaXTolerance"))
       .def(
-          ::py::init<int, double, double, double>(),
+          ::py::init<int, s_t, s_t, s_t>(),
           ::py::arg("maxIteration"),
           ::py::arg("deltaXTolerance"),
           ::py::arg("relativeDeltaXTolerance"),
           ::py::arg("epsilonForDivision"))
       .def(
-          ::py::init<int, double, double, double, bool>(),
+          ::py::init<int, s_t, s_t, s_t, bool>(),
           ::py::arg("maxIteration"),
           ::py::arg("deltaXTolerance"),
           ::py::arg("relativeDeltaXTolerance"),
@@ -98,12 +98,12 @@ void PgsBoxedLcpSolver(py::module& m)
           "solve",
           +[](dart::constraint::PgsBoxedLcpSolver* self,
               int n,
-              double* A,
-              double* x,
-              double* b,
+              s_t* A,
+              s_t* x,
+              s_t* b,
               int nub,
-              double* lo,
-              double* hi,
+              s_t* lo,
+              s_t* hi,
               int* findex,
               bool earlyTermination) -> bool {
             return self->solve(

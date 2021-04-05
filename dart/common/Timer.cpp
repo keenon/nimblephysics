@@ -68,10 +68,10 @@ Timer::~Timer()
 
 //==============================================================================
 #ifdef _WIN32
-double Timer::_convLIToSecs(const LARGE_INTEGER& _L)
+s_t Timer::_convLIToSecs(const LARGE_INTEGER& _L)
 {
-  return (static_cast<double>(_L.QuadPart)
-          / static_cast<double>(mFrequency.QuadPart));
+  return (static_cast<s_t>(_L.QuadPart)
+          / static_cast<s_t>(mFrequency.QuadPart));
 }
 #endif
 
@@ -106,7 +106,7 @@ void Timer::stop()
 }
 
 //==============================================================================
-double Timer::getElapsedTime()
+s_t Timer::getElapsedTime()
 {
 #ifdef _WIN32
   LARGE_INTEGER timenow;
@@ -123,13 +123,13 @@ double Timer::getElapsedTime()
 }
 
 //==============================================================================
-double Timer::getLastElapsedTime() const
+s_t Timer::getLastElapsedTime() const
 {
   return mLastElapsedTime;
 }
 
 //==============================================================================
-double Timer::getTotalElapsedTime() const
+s_t Timer::getTotalElapsedTime() const
 {
   return mTotalElapsedTime;
 }
@@ -160,15 +160,15 @@ void Timer::print()
 }
 
 //==============================================================================
-double Timer::getWallTime()
+s_t Timer::getWallTime()
 {
 #ifdef _WIN32
   LARGE_INTEGER ticksPerSecond;
   LARGE_INTEGER ticks;
   QueryPerformanceFrequency(&ticksPerSecond);
   QueryPerformanceCounter(&ticks);
-  return static_cast<double>(ticks.QuadPart)
-      / static_cast<double>(ticksPerSecond.QuadPart);
+  return static_cast<s_t>(ticks.QuadPart)
+      / static_cast<s_t>(ticksPerSecond.QuadPart);
 #else
   // Initialize the lastUpdateTime with the current time in seconds
   timeval timeVal;

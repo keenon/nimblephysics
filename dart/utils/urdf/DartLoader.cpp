@@ -177,7 +177,7 @@ simulation::WorldPtr DartLoader::parseWorldString(
 
     // Initialize position and RPY
     dynamics::Joint* rootJoint = skeleton->getRootBodyNode()->getParentJoint();
-    Eigen::Isometry3d transform = toEigen(worldInterface->models[i].origin);
+    Eigen::Isometry3s transform = toEigen(worldInterface->models[i].origin);
 
     if (dynamic_cast<dynamics::FreeJoint*>(rootJoint))
       rootJoint->setPositions(dynamics::FreeJoint::convertToPositions(transform));
@@ -514,11 +514,11 @@ bool DartLoader::createDartNodeProperties(
     node.mInertia.setLocalCOM(toEigen(origin.position));
     node.mInertia.setMass(_lk->inertial->mass);
 
-    Eigen::Matrix3d J;
+    Eigen::Matrix3s J;
     J << _lk->inertial->ixx, _lk->inertial->ixy, _lk->inertial->ixz,
          _lk->inertial->ixy, _lk->inertial->iyy, _lk->inertial->iyz,
          _lk->inertial->ixz, _lk->inertial->iyz, _lk->inertial->izz;
-    Eigen::Matrix3d R(Eigen::Quaterniond(origin.rotation.w, origin.rotation.x,
+    Eigen::Matrix3s R(Eigen::Quaternion_s(origin.rotation.w, origin.rotation.x,
                                          origin.rotation.y, origin.rotation.z));
     J = R * J * R.transpose();
 
@@ -543,7 +543,7 @@ void setMaterial(
     if(m_it != model->materials_.end())
       urdf_color = m_it->second->color;
 
-    const Eigen::Vector4d color(
+    const Eigen::Vector4s color(
         static_cast<double>(urdf_color.r),
         static_cast<double>(urdf_color.g),
         static_cast<double>(urdf_color.b),
@@ -621,7 +621,7 @@ dynamics::ShapePtr DartLoader::createShape(
   else if(urdf::Box* box = dynamic_cast<urdf::Box*>(_vizOrCol->geometry.get()))
   {
     shape = dynamics::ShapePtr(new dynamics::BoxShape(
-                  Eigen::Vector3d(box->dim.x, box->dim.y, box->dim.z)));
+                  Eigen::Vector3s(box->dim.x, box->dim.y, box->dim.z)));
   }
   // Cylinder
   else if(urdf::Cylinder* cylinder = dynamic_cast<urdf::Cylinder*>(_vizOrCol->geometry.get()))
@@ -649,7 +649,7 @@ dynamics::ShapePtr DartLoader::createShape(
     if (!scene)
       return nullptr;
 
-    const Eigen::Vector3d scale(mesh->scale.x, mesh->scale.y, mesh->scale.z);
+    const Eigen::Vector3s scale(mesh->scale.x, mesh->scale.y, mesh->scale.z);
     shape = std::make_shared<dynamics::MeshShape>(
       scale, scene, resolvedUri, _resourceRetriever);
   }
@@ -686,16 +686,16 @@ template dynamics::ShapePtr DartLoader::createShape<urdf::Collision>(
 /**
  * @function pose2Affine3d
  */
-Eigen::Isometry3d DartLoader::toEigen(const urdf::Pose& _pose) {
+Eigen::Isometry3s DartLoader::toEigen(const urdf::Pose& _pose) {
     Eigen::Quaterniond quat;
     _pose.rotation.getQuaternion(quat.x(), quat.y(), quat.z(), quat.w());
-    Eigen::Isometry3d transform(quat);
-    transform.translation() = Eigen::Vector3d(_pose.position.x, _pose.position.y, _pose.position.z);
+    Eigen::Isometry3s transform(quat.cast<s_t>());
+    transform.translation() = Eigen::Vector3s(_pose.position.x, _pose.position.y, _pose.position.z);
     return transform;
 }
 
-Eigen::Vector3d DartLoader::toEigen(const urdf::Vector3& _vector) {
-    return Eigen::Vector3d(_vector.x, _vector.y, _vector.z);
+Eigen::Vector3s DartLoader::toEigen(const urdf::Vector3& _vector) {
+    return Eigen::Vector3s(_vector.x, _vector.y, _vector.z);
 }
 
 } // namespace utils

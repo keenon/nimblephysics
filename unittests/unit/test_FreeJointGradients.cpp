@@ -23,24 +23,24 @@ using namespace realtime;
 
 #define ALL_TESTS
 
-Eigen::MatrixXd skelPosPosJacFD(
+Eigen::MatrixXs skelPosPosJacFD(
     std::shared_ptr<dynamics::Skeleton> skel,
-    Eigen::VectorXd pos,
-    Eigen::VectorXd vel,
-    double dt)
+    Eigen::VectorXs pos,
+    Eigen::VectorXs vel,
+    s_t dt)
 {
   int dofs = skel->getNumDofs();
-  Eigen::MatrixXd jac = Eigen::MatrixXd::Zero(dofs, dofs);
-  double EPS = 1e-7;
+  Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(dofs, dofs);
+  s_t EPS = 1e-7;
   for (int i = 0; i < dofs; i++)
   {
-    Eigen::VectorXd perturbed = pos;
+    Eigen::VectorXs perturbed = pos;
     perturbed(i) += EPS;
-    Eigen::VectorXd plus = skel->integratePositionsExplicit(perturbed, vel, dt);
+    Eigen::VectorXs plus = skel->integratePositionsExplicit(perturbed, vel, dt);
 
     perturbed = pos;
     perturbed(i) -= EPS;
-    Eigen::VectorXd minus
+    Eigen::VectorXs minus
         = skel->integratePositionsExplicit(perturbed, vel, dt);
 
     jac.col(i) = (plus - minus) / (2 * EPS);
@@ -49,24 +49,24 @@ Eigen::MatrixXd skelPosPosJacFD(
   return jac;
 }
 
-Eigen::MatrixXd skelVelPosJacFD(
+Eigen::MatrixXs skelVelPosJacFD(
     std::shared_ptr<dynamics::Skeleton> skel,
-    Eigen::VectorXd pos,
-    Eigen::VectorXd vel,
-    double dt)
+    Eigen::VectorXs pos,
+    Eigen::VectorXs vel,
+    s_t dt)
 {
   int dofs = skel->getNumDofs();
-  Eigen::MatrixXd jac = Eigen::MatrixXd::Zero(dofs, dofs);
-  double EPS = 1e-7;
+  Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(dofs, dofs);
+  s_t EPS = 1e-7;
   for (int i = 0; i < dofs; i++)
   {
-    Eigen::VectorXd perturbed = vel;
+    Eigen::VectorXs perturbed = vel;
     perturbed(i) += EPS;
-    Eigen::VectorXd plus = skel->integratePositionsExplicit(pos, perturbed, dt);
+    Eigen::VectorXs plus = skel->integratePositionsExplicit(pos, perturbed, dt);
 
     perturbed = vel;
     perturbed(i) -= EPS;
-    Eigen::VectorXd minus
+    Eigen::VectorXs minus
         = skel->integratePositionsExplicit(pos, perturbed, dt);
 
     jac.col(i) = (plus - minus) / (2 * EPS);
@@ -86,18 +86,18 @@ TEST(FreeJointGradients, ATLAS_JACOBIANS)
   world->addSkeleton(atlas);
 
   int dofs = atlas->getNumDofs();
-  double dt = 0.01;
+  s_t dt = 0.01;
   for (int i = 0; i < 10; i++)
   {
-    Eigen::VectorXd pos = Eigen::VectorXd::Random(dofs);
-    Eigen::VectorXd vel = Eigen::VectorXd::Random(dofs);
+    Eigen::VectorXs pos = Eigen::VectorXs::Random(dofs);
+    Eigen::VectorXs vel = Eigen::VectorXs::Random(dofs);
 
-    Eigen::MatrixXd posPosAnalytical = atlas->getPosPosJac(pos, vel, dt);
-    Eigen::MatrixXd velPosAnalytical = atlas->getVelPosJac(pos, vel, dt);
-    Eigen::MatrixXd posPosFD = skelPosPosJacFD(atlas, pos, vel, dt);
-    Eigen::MatrixXd velPosFD = skelVelPosJacFD(atlas, pos, vel, dt);
+    Eigen::MatrixXs posPosAnalytical = atlas->getPosPosJac(pos, vel, dt);
+    Eigen::MatrixXs velPosAnalytical = atlas->getVelPosJac(pos, vel, dt);
+    Eigen::MatrixXs posPosFD = skelPosPosJacFD(atlas, pos, vel, dt);
+    Eigen::MatrixXs velPosFD = skelVelPosJacFD(atlas, pos, vel, dt);
 
-    const double tol = 3e-9;
+    const s_t tol = 3e-9;
 
     if (!equals(posPosAnalytical, posPosFD, tol))
     {
@@ -143,20 +143,20 @@ TEST(FreeJointGradients, INTEGRATE_POSITIONS_EXPLICIT)
   world->addSkeleton(atlas);
 
   int dofs = atlas->getNumDofs();
-  double dt = 0.01;
+  s_t dt = 0.01;
   for (int i = 0; i < 1000; i++)
   {
-    Eigen::VectorXd pos = Eigen::VectorXd::Random(dofs);
-    Eigen::VectorXd vel = Eigen::VectorXd::Random(dofs);
+    Eigen::VectorXs pos = Eigen::VectorXs::Random(dofs);
+    Eigen::VectorXs vel = Eigen::VectorXs::Random(dofs);
     atlas->setPositions(pos);
     atlas->setVelocities(vel);
     atlas->integratePositions(dt);
-    Eigen::VectorXd implicitNextPos = atlas->getPositions();
+    Eigen::VectorXs implicitNextPos = atlas->getPositions();
 
     // Scramble positions
-    atlas->setPositions(Eigen::VectorXd::Random(dofs));
-    atlas->setVelocities(Eigen::VectorXd::Random(dofs));
-    Eigen::VectorXd explicitNextPos
+    atlas->setPositions(Eigen::VectorXs::Random(dofs));
+    atlas->setVelocities(Eigen::VectorXs::Random(dofs));
+    Eigen::VectorXs explicitNextPos
         = atlas->integratePositionsExplicit(pos, vel, dt);
 
     EXPECT_TRUE(implicitNextPos.isApprox(explicitNextPos, 1e-10));
@@ -165,23 +165,23 @@ TEST(FreeJointGradients, INTEGRATE_POSITIONS_EXPLICIT)
 #endif
 
 //==============================================================================
-Eigen::Vector6d integratePos(
-    Eigen::Vector6d pos, Eigen::Vector6d vel, double dt)
+Eigen::Vector6s integratePos(
+    Eigen::Vector6s pos, Eigen::Vector6s vel, s_t dt)
 {
-  const Eigen::Isometry3d mQ = FreeJoint::convertToTransform(pos);
-  const Eigen::Isometry3d Qnext = mQ * FreeJoint::convertToTransform(vel * dt);
+  const Eigen::Isometry3s mQ = FreeJoint::convertToTransform(pos);
+  const Eigen::Isometry3s Qnext = mQ * FreeJoint::convertToTransform(vel * dt);
 
   return FreeJoint::convertToPositions(Qnext);
 }
 
-Eigen::Vector6d integratePosByParts(
-    Eigen::Vector6d pos, Eigen::Vector6d vel, double dt)
+Eigen::Vector6s integratePosByParts(
+    Eigen::Vector6s pos, Eigen::Vector6s vel, s_t dt)
 {
-  const Eigen::Matrix3d mR = BallJoint::convertToRotation(pos.head<3>());
-  const Eigen::Matrix3d Rnext
+  const Eigen::Matrix3s mR = BallJoint::convertToRotation(pos.head<3>());
+  const Eigen::Matrix3s Rnext
       = mR * BallJoint::convertToRotation(vel.head<3>() * dt);
 
-  Eigen::Vector6d ret = Eigen::Vector6d::Zero();
+  Eigen::Vector6s ret = Eigen::Vector6s::Zero();
   ret.head<3>() = BallJoint::convertToPositions(Rnext);
   ret.tail<3>() = pos.tail<3>() + (mR * vel.tail<3>() * dt);
 
@@ -192,43 +192,43 @@ Eigen::Vector6d integratePosByParts(
 #ifdef ALL_TESTS
 TEST(FreeJointGradients, FREE_JOINT_BY_PARTS)
 {
-  double dt = 0.01;
+  s_t dt = 0.01;
 
   for (int i = 0; i < 1000; i++)
   {
-    Eigen::Vector6d pos = Eigen::Vector6d::Random();
-    Eigen::Vector6d vel = Eigen::Vector6d::Random();
-    Eigen::Vector6d nextPos = integratePos(pos, vel, dt);
-    Eigen::Vector6d nextPosByParts = integratePosByParts(pos, vel, dt);
+    Eigen::Vector6s pos = Eigen::Vector6s::Random();
+    Eigen::Vector6s vel = Eigen::Vector6s::Random();
+    Eigen::Vector6s nextPos = integratePos(pos, vel, dt);
+    Eigen::Vector6s nextPosByParts = integratePosByParts(pos, vel, dt);
 
     EXPECT_TRUE(nextPosByParts.isApprox(nextPos, 1e-9));
   }
 }
 #endif
 
-Eigen::Vector3d rotateBall(Eigen::Vector3d pos, Eigen::Vector3d vel, double dt)
+Eigen::Vector3s rotateBall(Eigen::Vector3s pos, Eigen::Vector3s vel, s_t dt)
 {
-  const Eigen::Matrix3d mR = BallJoint::convertToRotation(pos.head<3>());
-  const Eigen::Matrix3d Rnext
+  const Eigen::Matrix3s mR = BallJoint::convertToRotation(pos.head<3>());
+  const Eigen::Matrix3s Rnext
       = mR * BallJoint::convertToRotation(vel.head<3>() * dt);
   return BallJoint::convertToPositions(Rnext);
 }
 
-Eigen::Matrix3d rotatePosPosJacFD(
-    Eigen::Vector3d pos, Eigen::Vector3d vel, double dt)
+Eigen::Matrix3s rotatePosPosJacFD(
+    Eigen::Vector3s pos, Eigen::Vector3s vel, s_t dt)
 {
-  Eigen::Matrix3d jac = Eigen::Matrix3d::Zero();
+  Eigen::Matrix3s jac = Eigen::Matrix3s::Zero();
 
-  const double EPS = 1e-7;
+  const s_t EPS = 1e-7;
   for (int i = 0; i < 3; i++)
   {
-    Eigen::Vector3d perturbed = pos;
+    Eigen::Vector3s perturbed = pos;
     perturbed(i) += EPS;
-    Eigen::Vector3d outPos = rotateBall(perturbed, vel, dt);
+    Eigen::Vector3s outPos = rotateBall(perturbed, vel, dt);
 
     perturbed = pos;
     perturbed(i) -= EPS;
-    Eigen::Vector3d outNeg = rotateBall(perturbed, vel, dt);
+    Eigen::Vector3s outNeg = rotateBall(perturbed, vel, dt);
 
     jac.col(i) = (outPos - outNeg) / (2 * EPS);
   }
@@ -236,21 +236,21 @@ Eigen::Matrix3d rotatePosPosJacFD(
   return jac;
 }
 
-Eigen::Matrix3d rotateVelPosJacFD(
-    Eigen::Vector3d pos, Eigen::Vector3d vel, double dt)
+Eigen::Matrix3s rotateVelPosJacFD(
+    Eigen::Vector3s pos, Eigen::Vector3s vel, s_t dt)
 {
-  Eigen::Matrix3d jac = Eigen::Matrix3d::Zero();
+  Eigen::Matrix3s jac = Eigen::Matrix3s::Zero();
 
-  const double EPS = 1e-7;
+  const s_t EPS = 1e-7;
   for (int i = 0; i < 3; i++)
   {
-    Eigen::Vector3d perturbed = vel;
+    Eigen::Vector3s perturbed = vel;
     perturbed(i) += EPS;
-    Eigen::Vector3d outPos = rotateBall(pos, perturbed, dt);
+    Eigen::Vector3s outPos = rotateBall(pos, perturbed, dt);
 
     perturbed = vel;
     perturbed(i) -= EPS;
-    Eigen::Vector3d outNeg = rotateBall(pos, perturbed, dt);
+    Eigen::Vector3s outNeg = rotateBall(pos, perturbed, dt);
 
     jac.col(i) = (outPos - outNeg) / (2 * EPS);
   }
@@ -262,9 +262,9 @@ Eigen::Matrix3d rotateVelPosJacFD(
 #ifdef ALL_TESTS
 TEST(FreeJointGradients, ROTATION_JOINT_JAC)
 {
-  double dt = 0.01;
-  Eigen::Vector3d pos = Eigen::Vector3d::UnitX();
-  Eigen::Vector3d vel = Eigen::Vector3d::UnitY();
+  s_t dt = 0.01;
+  Eigen::Vector3s pos = Eigen::Vector3s::UnitX();
+  Eigen::Vector3s vel = Eigen::Vector3s::UnitY();
 
   // Just check these don't crash
   rotatePosPosJacFD(pos, vel, dt);
@@ -282,10 +282,10 @@ TEST(FreeJointGradients, GUI_EXPLORE)
 
   // Set gravity of the world
   // world->setPenetrationCorrectionEnabled(true);
-  world->setGravity(Eigen::Vector3d(0.0, -9.81, 0));
+  world->setGravity(Eigen::Vector3s(0.0, -9.81, 0));
 
   std::shared_ptr<BoxShape> boxShape(
-      new BoxShape(Eigen::Vector3d(1.0, 1.0, 1.0)));
+      new BoxShape(Eigen::Vector3s(1.0, 1.0, 1.0)));
 
   std::shared_ptr<dynamics::Skeleton> box = dynamics::Skeleton::create("box");
   auto pair = box->createJointAndBodyNodePair<dynamics::FreeJoint>();
@@ -297,11 +297,11 @@ TEST(FreeJointGradients, GUI_EXPLORE)
   auto groundPair
       = groundBox->createJointAndBodyNodePair<dynamics::WeldJoint>();
   std::shared_ptr<BoxShape> groundShape(
-      new BoxShape(Eigen::Vector3d(10.0, 1.0, 10.0)));
+      new BoxShape(Eigen::Vector3s(10.0, 1.0, 10.0)));
   groundPair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(
       groundShape);
   groundPair.second->setFrictionCoeff(1.0);
-  Eigen::Isometry3d groundTransform = Eigen::Isometry3d::Identity();
+  Eigen::Isometry3s groundTransform = Eigen::Isometry3s::Identity();
   groundTransform.translation()(1) = -0.999;
   groundPair.first->setTransformFromParentBodyNode(groundTransform);
 
@@ -315,33 +315,33 @@ TEST(FreeJointGradients, GUI_EXPLORE)
 
   world->step();
 
-  std::vector<Eigen::Vector3d> pointsX;
-  pointsX.push_back(Eigen::Vector3d::Zero());
-  pointsX.push_back(Eigen::Vector3d::UnitX() * 10);
-  std::vector<Eigen::Vector3d> pointsY;
-  pointsY.push_back(Eigen::Vector3d::Zero());
-  pointsY.push_back(Eigen::Vector3d::UnitY() * 10);
-  std::vector<Eigen::Vector3d> pointsZ;
-  pointsZ.push_back(Eigen::Vector3d::Zero());
-  pointsZ.push_back(Eigen::Vector3d::UnitZ() * 10);
+  std::vector<Eigen::Vector3s> pointsX;
+  pointsX.push_back(Eigen::Vector3s::Zero());
+  pointsX.push_back(Eigen::Vector3s::UnitX() * 10);
+  std::vector<Eigen::Vector3s> pointsY;
+  pointsY.push_back(Eigen::Vector3s::Zero());
+  pointsY.push_back(Eigen::Vector3s::UnitY() * 10);
+  std::vector<Eigen::Vector3s> pointsZ;
+  pointsZ.push_back(Eigen::Vector3s::Zero());
+  pointsZ.push_back(Eigen::Vector3s::UnitZ() * 10);
 
   server::GUIWebsocketServer server;
   server.renderWorld(world);
-  server.createLine("unitX", pointsX, Eigen::Vector3d::UnitX());
-  server.createLine("unitY", pointsY, Eigen::Vector3d::UnitY());
-  server.createLine("unitZ", pointsZ, Eigen::Vector3d::UnitZ());
+  server.createLine("unitX", pointsX, Eigen::Vector3s::UnitX());
+  server.createLine("unitY", pointsY, Eigen::Vector3s::UnitY());
+  server.createLine("unitZ", pointsZ, Eigen::Vector3s::UnitZ());
   server.serve(8070);
 
   Ticker ticker(0.01);
   ticker.registerTickListener([&](long time) {
-    double diff = sin(((double)time / 2000));
+    s_t diff = sin(((s_t)time / 2000));
     diff = diff * diff;
     // atlas->setPosition(0, diff * dart::math::constantsd::pi());
-    // double diff2 = sin(((double)time / 4000));
+    // s_t diff2 = sin(((s_t)time / 4000));
     // atlas->setPosition(4, diff2 * 1);
 
-    Eigen::Isometry3d fromRoot = Eigen::Isometry3d::Identity();
-    fromRoot.translation() = Eigen::Vector3d::UnitZ() * diff;
+    Eigen::Isometry3s fromRoot = Eigen::Isometry3s::Identity();
+    fromRoot.translation() = Eigen::Vector3s::UnitZ() * diff;
     pair.first->setTransformFromParentBodyNode(fromRoot);
 
     server.renderWorld(world);

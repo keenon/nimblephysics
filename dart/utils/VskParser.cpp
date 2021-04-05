@@ -57,8 +57,8 @@ namespace {
 using BodyPropPtr  = std::shared_ptr<dynamics::BodyNode::Properties>;
 using JointPropPtr = std::shared_ptr<dynamics::Joint::Properties>;
 
-using ParameterMap     = std::map<std::string, double>;
-using BodyNodeColorMap = std::map<dynamics::BodyNode*, Eigen::Vector3d>;
+using ParameterMap     = std::map<std::string, s_t>;
+using BodyNodeColorMap = std::map<dynamics::BodyNode*, Eigen::Vector3s>;
 
 struct VskData
 {
@@ -67,7 +67,7 @@ struct VskData
   VskParser::Options options;
 };
 
-const double vsk_scale = 1.0e-3;
+const s_t vsk_scale = 1.0e-3;
 
 const std::vector<std::string> vskJointTypes
   = {"JointFree", "JointBall", "JointHardySpicer", "JointHinge", "JointDummy"};
@@ -92,37 +92,37 @@ bool readShape(const tinyxml2::XMLElement* shapeEle,
 bool readJoint(const std::string& jointType,
                const tinyxml2::XMLElement* jointEle,
                JointPropPtr& jointProperties,
-               const Eigen::Isometry3d& tfFromParent,
+               const Eigen::Isometry3s& tfFromParent,
                const VskData& vskData);
 
 bool readJointFree(const tinyxml2::XMLElement* jointEle,
                    JointPropPtr& jointProperties,
-                   const Eigen::Isometry3d& tfFromParent,
+                   const Eigen::Isometry3s& tfFromParent,
                    const VskData& vskData);
 
 bool readJointBall(const tinyxml2::XMLElement* jointEle,
                    JointPropPtr& jointProperties,
-                   const Eigen::Isometry3d& tfFromParent,
+                   const Eigen::Isometry3s& tfFromParent,
                    const VskData& vskData);
 
 bool readJointHardySpicer(const tinyxml2::XMLElement* jointEle,
                           JointPropPtr& jointProperties,
-                          const Eigen::Isometry3d& tfFromParent,
+                          const Eigen::Isometry3s& tfFromParent,
                           const VskData& vskData);
 
 bool readJointHinge(const tinyxml2::XMLElement* jointEle,
                     JointPropPtr& jointProperties,
-                    const Eigen::Isometry3d& tfFromParent,
+                    const Eigen::Isometry3s& tfFromParent,
                     const VskData& vskData);
 
 bool readJointDummy(const tinyxml2::XMLElement* jointEle,
                     JointPropPtr& jointProperties,
-                    const Eigen::Isometry3d& tfFromParent,
+                    const Eigen::Isometry3s& tfFromParent,
                     const VskData& vskData);
 
-Eigen::Vector3d readColorAttribute(const tinyxml2::XMLElement* element,
+Eigen::Vector3s readColorAttribute(const tinyxml2::XMLElement* element,
                                    const ParameterMap& parameterMap,
-                                   const Eigen::Vector3d& defaultColor);
+                                   const Eigen::Vector3s& defaultColor);
 
 template <typename JointType>
 std::pair<dynamics::Joint*, dynamics::BodyNode*> createJointAndBodyNodePair(
@@ -159,13 +159,13 @@ common::ResourceRetrieverPtr getRetriever(
 //==============================================================================
 VskParser::Options::Options(
     const common::ResourceRetrieverPtr& newRetrieverOrNullptr,
-    const Eigen::Vector3d& newDefaultEllipsoidSize,
-    double newThicknessRatio,
-    double newDensity,
-    double newJointPositionLowerLimit,
-    double newJointPositionUpperLimit,
-    double newJointDampingCoefficient,
-    double newJointFriction,
+    const Eigen::Vector3s& newDefaultEllipsoidSize,
+    s_t newThicknessRatio,
+    s_t newDensity,
+    s_t newJointPositionLowerLimit,
+    s_t newJointPositionUpperLimit,
+    s_t newJointDampingCoefficient,
+    s_t newJointFriction,
     bool newRemoveEndBodyNodes)
   : retrieverOrNullptr(newRetrieverOrNullptr),
     defaultEllipsoidSize(newDefaultEllipsoidSize),
@@ -280,7 +280,7 @@ bool readParameters(tinyxml2::XMLElement* parametersEle, ParameterMap& paramMap)
   {
     const std::string pname
         = getAttributeString(param.get(), "NAME");
-    const double val = getAttributeDouble(param.get(), "VALUE");
+    const s_t val = getAttributeDouble(param.get(), "VALUE");
 
     paramMap[pname] = val;
   }
@@ -297,7 +297,7 @@ bool readSkeletonElement(const tinyxml2::XMLElement* skeletonEle,
 
   if (hasAttribute(skeletonEle, "DENSITY"))
   {
-    double density = getAttributeDouble(skeletonEle, "DENSITY");
+    s_t density = getAttributeDouble(skeletonEle, "DENSITY");
     vskData.options.density = density;
   }
 
@@ -313,7 +313,7 @@ bool readSkeletonElement(const tinyxml2::XMLElement* skeletonEle,
 }
 
 //==============================================================================
-double getParameter(const ParameterMap& ParameterMap,
+s_t getParameter(const ParameterMap& ParameterMap,
                     const std::string& paramNameOrValue)
 {
   assert(!paramNameOrValue.empty());
@@ -339,7 +339,7 @@ double getParameter(const ParameterMap& ParameterMap,
 
 //==============================================================================
 template <std::size_t NumParams>
-Eigen::Matrix<double, NumParams, 1> getParameters(
+Eigen::Matrix<s_t, NumParams, 1> getParameters(
     const ParameterMap& ParameterMap,
     const std::string& paramNamesOrValues)
 {
@@ -348,7 +348,7 @@ Eigen::Matrix<double, NumParams, 1> getParameters(
 
   assert(tokens.size() == NumParams);
 
-  Eigen::Matrix<double, NumParams, 1> result;
+  Eigen::Matrix<s_t, NumParams, 1> result;
 
   for (std::size_t i = 0; i < NumParams; ++i)
     result[i] = getParameter(ParameterMap, tokens[i]);
@@ -358,7 +358,7 @@ Eigen::Matrix<double, NumParams, 1> getParameters(
 
 //==============================================================================
 template <std::size_t NumParams>
-Eigen::Matrix<double, NumParams, 1> readAttributeVector(
+Eigen::Matrix<s_t, NumParams, 1> readAttributeVector(
     const tinyxml2::XMLElement* element,
     const std::string& name,
     const ParameterMap& parameterMap)
@@ -380,7 +380,7 @@ bool readSegment(const tinyxml2::XMLElement* segment,
   // Attribute: POSITION
   // The position of the segment's joint attaching it to its parent in the
   // reference coordinate system of the parent segment.
-  Eigen::Vector3d position = Eigen::Vector3d::Zero();
+  Eigen::Vector3s position = Eigen::Vector3s::Zero();
   if (hasAttribute(segment, "POSITION"))
   {
     position = readAttributeVector<3>(segment, "POSITION",
@@ -389,7 +389,7 @@ bool readSegment(const tinyxml2::XMLElement* segment,
   }
 
   // Attribute: ORIENTATION
-  Eigen::Vector3d orientation = Eigen::Vector3d::Zero();
+  Eigen::Vector3s orientation = Eigen::Vector3s::Zero();
   if (hasAttribute(segment, "ORIENTATION"))
   {
     orientation = readAttributeVector<3>(segment, "ORIENTATION",
@@ -397,18 +397,18 @@ bool readSegment(const tinyxml2::XMLElement* segment,
   }
 
   // Attribute: BOUNDS
-  Eigen::Vector6d bounds = Eigen::Vector6d::Zero();
+  Eigen::Vector6s bounds = Eigen::Vector6s::Zero();
   if (hasAttribute(segment, "BOUNDS"))
     bounds = readAttributeVector<6>(segment, "BOUNDS", vskData.parameterMap);
 
   // Attribute: RGB
-  Eigen::Vector3d rgb = readColorAttribute(segment, vskData.parameterMap,
-                                           Eigen::Vector3d::Constant(0.5));
+  Eigen::Vector3s rgb = readColorAttribute(segment, vskData.parameterMap,
+                                           Eigen::Vector3s::Constant(0.5));
 
   dynamics::BodyNode::Properties bodyNodeProperties;
   bodyNodeProperties.mName = name;
 
-  Eigen::Isometry3d tfFromParent;
+  Eigen::Isometry3s tfFromParent;
   tfFromParent.translation() = position;
   tfFromParent.linear()      = math::expMapRot(orientation);
 
@@ -450,7 +450,7 @@ bool readSegment(const tinyxml2::XMLElement* segment,
   if (hasAttribute(segment, "MASS"))
   {
     // Assign the given mass
-    double mass = getAttributeDouble(segment, "MASS");
+    s_t mass = getAttributeDouble(segment, "MASS");
     bodyNode->setMass(mass);
   }
   else
@@ -488,7 +488,7 @@ bool readShape(const tinyxml2::XMLElement* shapeEle,
   if (hasAttribute(shapeEle, "TYPE"))
     type = getAttributeString(shapeEle, "TYPE");
 
-  Eigen::Vector3d size;
+  Eigen::Vector3s size;
   if (hasAttribute(shapeEle, "SIZE"))
   {
     size = readAttributeVector<3>(shapeEle, "SIZE", vskData.parameterMap);
@@ -496,17 +496,17 @@ bool readShape(const tinyxml2::XMLElement* shapeEle,
   else
   {
     dynamics::Joint*    joint    = bodyNode->getParentJoint();
-    Eigen::Isometry3d   tf       = joint->getTransformFromParentBodyNode();
+    Eigen::Isometry3s   tf       = joint->getTransformFromParentBodyNode();
     size[0] = tf.translation().norm();
     size[1] = size[2] = vskData.options.thicknessRatio * size[0];
   }
 
   dynamics::Joint*    joint  = bodyNode->getParentJoint();
   dynamics::BodyNode* parent = bodyNode->getParentBodyNode();
-  Eigen::Isometry3d   tf     = joint->getTransformFromParentBodyNode();
+  Eigen::Isometry3s   tf     = joint->getTransformFromParentBodyNode();
 
   // Determine the local transform of the shape
-  Eigen::Isometry3d localTransform = Eigen::Isometry3d::Identity();
+  Eigen::Isometry3s localTransform = Eigen::Isometry3s::Identity();
   localTransform.linear() = math::computeRotation(tf.translation(),
                                                   math::AxisType::AXIS_X);
   localTransform.translation() = 0.5 * tf.translation();
@@ -544,7 +544,7 @@ bool readShape(const tinyxml2::XMLElement* shapeEle,
 bool readJoint(const std::string& jointType,
                const tinyxml2::XMLElement* jointEle,
                JointPropPtr& jointProperties,
-               const Eigen::Isometry3d& tfFromParent,
+               const Eigen::Isometry3s& tfFromParent,
                const VskData& vskData)
 {
   if (jointType == "JointFree")
@@ -582,13 +582,13 @@ bool readJoint(const std::string& jointType,
 //==============================================================================
 bool readJointFree(const tinyxml2::XMLElement* /*jointEle*/,
                    JointPropPtr& jointProperties,
-                   const Eigen::Isometry3d& tfFromParent,
+                   const Eigen::Isometry3s& tfFromParent,
                    const VskData& /*vskData*/)
 {
   dynamics::FreeJoint::Properties properties;
 
   properties.mT_ParentBodyToJoint = tfFromParent;
-  properties.mT_ChildBodyToJoint = Eigen::Isometry3d::Identity();
+  properties.mT_ChildBodyToJoint = Eigen::Isometry3s::Identity();
 
   jointProperties = dynamics::FreeJoint::Properties::createShared(properties);
 
@@ -598,21 +598,21 @@ bool readJointFree(const tinyxml2::XMLElement* /*jointEle*/,
 //==============================================================================
 bool readJointBall(const tinyxml2::XMLElement* /*jointEle*/,
                    JointPropPtr& jointProperties,
-                   const Eigen::Isometry3d& tfFromParent,
+                   const Eigen::Isometry3s& tfFromParent,
                    const VskData& vskData)
 {
   dynamics::BallJoint::Properties properties;
 
   properties.mT_ParentBodyToJoint = tfFromParent;
-  properties.mT_ChildBodyToJoint = Eigen::Isometry3d::Identity();
-  properties.mDampingCoefficients = Eigen::Vector3d::Constant(
+  properties.mT_ChildBodyToJoint = Eigen::Isometry3s::Identity();
+  properties.mDampingCoefficients = Eigen::Vector3s::Constant(
         vskData.options.jointDampingCoefficient);
-  properties.mPositionLowerLimits = Eigen::Vector3d::Constant(
+  properties.mPositionLowerLimits = Eigen::Vector3s::Constant(
         vskData.options.jointPositionLowerLimit);
-  properties.mPositionUpperLimits = Eigen::Vector3d::Constant(
+  properties.mPositionUpperLimits = Eigen::Vector3s::Constant(
         vskData.options.jointPositionUpperLimit);
   properties.mIsPositionLimitEnforced = true;
-  properties.mFrictions = Eigen::Vector3d::Constant(
+  properties.mFrictions = Eigen::Vector3s::Constant(
         vskData.options.jointFriction);
 
   jointProperties = dynamics::BallJoint::Properties::createShared(properties);
@@ -623,34 +623,34 @@ bool readJointBall(const tinyxml2::XMLElement* /*jointEle*/,
 //==============================================================================
 bool readJointHardySpicer(const tinyxml2::XMLElement* jointEle,
                           JointPropPtr& jointProperties,
-                          const Eigen::Isometry3d& tfFromParent,
+                          const Eigen::Isometry3s& tfFromParent,
                           const VskData& vskData)
 {
   dynamics::UniversalJoint::Properties properties;
 
   // Attribute: AXIS-PAIR
-  Eigen::Vector3d axis1 = Eigen::Vector3d::UnitX();
-  Eigen::Vector3d axis2 = Eigen::Vector3d::UnitY();
+  Eigen::Vector3s axis1 = Eigen::Vector3s::UnitX();
+  Eigen::Vector3s axis2 = Eigen::Vector3s::UnitY();
   if (hasAttribute(jointEle, "AXIS-PAIR"))
   {
-    Eigen::Vector6d axisPair
+    Eigen::Vector6s axisPair
         = readAttributeVector<6>(jointEle, "AXIS-PAIR", vskData.parameterMap);
     axis1 = axisPair.head<3>();
     axis2 = axisPair.tail<3>();
   }
 
   properties.mT_ParentBodyToJoint = tfFromParent;
-  properties.mT_ChildBodyToJoint = Eigen::Isometry3d::Identity();
+  properties.mT_ChildBodyToJoint = Eigen::Isometry3s::Identity();
   properties.mAxis[0] = axis1;
   properties.mAxis[1] = axis2;
-  properties.mDampingCoefficients = Eigen::Vector2d::Constant(
+  properties.mDampingCoefficients = Eigen::Vector2s::Constant(
         vskData.options.jointDampingCoefficient);
-  properties.mPositionLowerLimits = Eigen::Vector2d::Constant(
+  properties.mPositionLowerLimits = Eigen::Vector2s::Constant(
         vskData.options.jointPositionLowerLimit);
-  properties.mPositionUpperLimits = Eigen::Vector2d::Constant(
+  properties.mPositionUpperLimits = Eigen::Vector2s::Constant(
         vskData.options.jointPositionUpperLimit);
   properties.mIsPositionLimitEnforced = true;
-  properties.mFrictions = Eigen::Vector2d::Constant(
+  properties.mFrictions = Eigen::Vector2s::Constant(
         vskData.options.jointFriction);
 
   jointProperties
@@ -662,18 +662,18 @@ bool readJointHardySpicer(const tinyxml2::XMLElement* jointEle,
 //==============================================================================
 bool readJointHinge(const tinyxml2::XMLElement* jointEle,
                     JointPropPtr& jointProperties,
-                    const Eigen::Isometry3d& tfFromParent,
+                    const Eigen::Isometry3s& tfFromParent,
                     const VskData& vskData)
 {
   dynamics::RevoluteJoint::Properties properties;
 
   // Attribute: AXIS
-  Eigen::Vector3d axis = Eigen::Vector3d::UnitX();
+  Eigen::Vector3s axis = Eigen::Vector3s::UnitX();
   if (hasAttribute(jointEle, "AXIS"))
     axis = readAttributeVector<3>(jointEle, "AXIS", vskData.parameterMap);
 
   properties.mT_ParentBodyToJoint = tfFromParent;
-  properties.mT_ChildBodyToJoint = Eigen::Isometry3d::Identity();
+  properties.mT_ChildBodyToJoint = Eigen::Isometry3s::Identity();
   properties.mAxis = axis;
   properties.mDampingCoefficients[0] = vskData.options.jointDampingCoefficient;
   properties.mPositionLowerLimits[0] = vskData.options.jointPositionLowerLimit;
@@ -690,13 +690,13 @@ bool readJointHinge(const tinyxml2::XMLElement* jointEle,
 //==============================================================================
 bool readJointDummy(const tinyxml2::XMLElement* /*jointEle*/,
                     JointPropPtr& jointProperties,
-                    const Eigen::Isometry3d& tfFromParent,
+                    const Eigen::Isometry3s& tfFromParent,
                     const VskData& /*vskData*/)
 {
   dynamics::WeldJoint::Properties properties;
 
   properties.mT_ParentBodyToJoint = tfFromParent;
-  properties.mT_ChildBodyToJoint = Eigen::Isometry3d::Identity();
+  properties.mT_ChildBodyToJoint = Eigen::Isometry3s::Identity();
 
   jointProperties = dynamics::WeldJoint::Properties::createShared(properties);
 
@@ -704,9 +704,9 @@ bool readJointDummy(const tinyxml2::XMLElement* /*jointEle*/,
 }
 
 //==============================================================================
-Eigen::Vector3d readColorAttribute(const tinyxml2::XMLElement* element,
+Eigen::Vector3s readColorAttribute(const tinyxml2::XMLElement* element,
                                    const ParameterMap& parameterMap,
-                                   const Eigen::Vector3d& defaultColor)
+                                   const Eigen::Vector3s& defaultColor)
 {
   if (hasAttribute(element, "RGB"))
     return readAttributeVector<3>(element, "RGB", parameterMap) / 255.0;
@@ -817,7 +817,7 @@ bool readMarker(const tinyxml2::XMLElement* markerEle,
   const std::string name = getAttributeString(markerEle, "NAME");
 
   // Attribute: POSITION
-  Eigen::Vector3d position = Eigen::Vector3d::Zero();
+  Eigen::Vector3s position = Eigen::Vector3s::Zero();
   if (hasAttribute(markerEle, "POSITION"))
   {
     position = readAttributeVector<3>(markerEle, "POSITION",
@@ -829,16 +829,16 @@ bool readMarker(const tinyxml2::XMLElement* markerEle,
   const std::string segment = getAttributeString(markerEle, "SEGMENT");
 
   // Attribute: COVARIANCE
-  // Eigen::VectorXd covariance
-  //     = getAttribute<Eigen::VectorXd>(markerEle, "COVARIANCE");
+  // Eigen::VectorXs covariance
+  //     = getAttribute<Eigen::VectorXs>(markerEle, "COVARIANCE");
 
   // Attribute: RGB
-  Eigen::Vector4d rgba = Eigen::Vector4d::Ones();
+  Eigen::Vector4s rgba = Eigen::Vector4s::Ones();
   rgba.head<3>() = readColorAttribute(markerEle, vskData.parameterMap,
-                                      Eigen::Vector3d::Constant(0.5));
+                                      Eigen::Vector3s::Constant(0.5));
 
   // Attribute: RADIUS
-  // double radius = 0.01;
+  // s_t radius = 0.01;
   // if (hasAttribute(markerEle, "RADIUS"))
   //   radius = getAttributeDouble(markerEle, "RADIUS");
 
@@ -865,8 +865,8 @@ bool readStick(const tinyxml2::XMLElement* /*stickEle*/,
   // std::string marker2 = getAttributeString(stickEle, "MARKER2");
 
   // Attribute: RGB
-  // Eigen::Vector3d rgb = readColorAttribute(segment, vskData.parameterMap,
-  //                                          Eigen::Vector3d(0.5, 0.5, 0.5));
+  // Eigen::Vector3s rgb = readColorAttribute(segment, vskData.parameterMap,
+  //                                          Eigen::Vector3s(0.5, 0.5, 0.5));
 
   return true;
 }
@@ -879,7 +879,7 @@ void generateShapes(const dynamics::SkeletonPtr& skel, VskData& vskData)
   {
     dynamics::BodyNode* bodyNode = skel->getBodyNode(i);
     dynamics::Joint*    joint    = skel->getJoint(i);
-    Eigen::Isometry3d   tf       = joint->getTransformFromParentBodyNode();
+    Eigen::Isometry3s   tf       = joint->getTransformFromParentBodyNode();
     dynamics::BodyNode* parent   = bodyNode->getParentBodyNode();
 
     // Don't add a shape for a body doesn't have parent or a body is too close
@@ -895,12 +895,12 @@ void generateShapes(const dynamics::SkeletonPtr& skel, VskData& vskData)
     // Determine the diameters of the ellipsoid shape. The diameter along X-axis
     // is the distance between the parent body and the current body. Other
     // diameters are 35% of the distance.
-    Eigen::Vector3d size;
+    Eigen::Vector3s size;
     size[0] = tf.translation().norm();
     size[1] = size[2] = vskData.options.thicknessRatio * size[0];
 
     // Determine the local transform of the shape
-    Eigen::Isometry3d localTransform = Eigen::Isometry3d::Identity();
+    Eigen::Isometry3s localTransform = Eigen::Isometry3s::Identity();
     localTransform.linear() = math::computeRotation(tf.translation(),
                                                     math::AxisType::AXIS_X);
     localTransform.translation() = 0.5 * tf.translation();
@@ -937,22 +937,22 @@ void generateShapes(const dynamics::SkeletonPtr& skel, VskData& vskData)
   }
 
   // Update mass and moments of inertia of the bodies based on the their shapes
-  const double& density = vskData.options.density;
+  const s_t& density = vskData.options.density;
   for (std::size_t i = 0; i < skel->getNumBodyNodes(); ++i)
   {
     dynamics::BodyNode* bodyNode = skel->getBodyNode(i);
 
-    double totalMass = 0.0;
-    Eigen::Matrix3d totalMoi = Eigen::Matrix3d::Zero();
+    s_t totalMass = 0.0;
+    Eigen::Matrix3s totalMoi = Eigen::Matrix3s::Zero();
     auto numShapeNodes = bodyNode->getNumNodes<dynamics::ShapeNode>();
 
     for (auto j = 0u; j < numShapeNodes; ++j)
     {
       auto shapeNode = bodyNode->getNode<dynamics::ShapeNode>(j);
       auto shape     = shapeNode->getShape();
-      const double             mass    = density * shape->getVolume();
-      const Eigen::Isometry3d& localTf = shapeNode->getRelativeTransform();
-      const Eigen::Matrix3d    moi     = shape->computeInertia(mass);
+      const s_t             mass    = density * shape->getVolume();
+      const Eigen::Isometry3s& localTf = shapeNode->getRelativeTransform();
+      const Eigen::Matrix3s    moi     = shape->computeInertia(mass);
 
       totalMass += mass;
       totalMoi  += math::parallelAxisTheorem(moi, localTf.translation(), mass);
@@ -962,8 +962,8 @@ void generateShapes(const dynamics::SkeletonPtr& skel, VskData& vskData)
 
     if (bodyNode->getMass() > 1e-5)
     {
-      const double givenMass = bodyNode->getMass();
-      const double ratio = givenMass / totalMass;
+      const s_t givenMass = bodyNode->getMass();
+      const s_t ratio = givenMass / totalMass;
       totalMass = givenMass;
       totalMoi *= ratio;
     }
@@ -979,10 +979,10 @@ void generateShapes(const dynamics::SkeletonPtr& skel, VskData& vskData)
              << "simulation.\n";
 
       totalMass = 1.0;
-      totalMoi = Eigen::Matrix3d::Identity();
+      totalMoi = Eigen::Matrix3s::Identity();
     }
 
-    const dynamics::Inertia inertia(totalMass, Eigen::Vector3d::Zero(),
+    const dynamics::Inertia inertia(totalMass, Eigen::Vector3s::Zero(),
                                     totalMoi);
     bodyNode->setInertia(inertia);
   }

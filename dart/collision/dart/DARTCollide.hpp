@@ -79,20 +79,20 @@ enum PinToFace
 int collideBoxBox(
     CollisionObject* o1,
     CollisionObject* o2,
-    const Eigen::Vector3d& size0,
-    const Eigen::Isometry3d& T0,
-    const Eigen::Vector3d& size1,
-    const Eigen::Isometry3d& T1,
+    const Eigen::Vector3s& size0,
+    const Eigen::Isometry3s& T0,
+    const Eigen::Vector3s& size1,
+    const Eigen::Isometry3s& T1,
     const CollisionOption& option,
     CollisionResult& result);
 
 int collideBoxSphere(
     CollisionObject* o1,
     CollisionObject* o2,
-    const Eigen::Vector3d& size0,
-    const Eigen::Isometry3d& T0,
-    const double& r1,
-    const Eigen::Isometry3d& T1,
+    const Eigen::Vector3s& size0,
+    const Eigen::Isometry3s& T0,
+    const s_t& r1,
+    const Eigen::Isometry3s& T1,
     const CollisionOption& option,
     CollisionResult& result,
     ClipSphereHalfspace halfspace = ClipSphereHalfspace::BOTH);
@@ -100,10 +100,10 @@ int collideBoxSphere(
 int collideSphereBox(
     CollisionObject* o1,
     CollisionObject* o2,
-    const double& r0,
-    const Eigen::Isometry3d& T0,
-    const Eigen::Vector3d& size1,
-    const Eigen::Isometry3d& T1,
+    const s_t& r0,
+    const Eigen::Isometry3s& T0,
+    const Eigen::Vector3s& size1,
+    const Eigen::Isometry3s& T1,
     const CollisionOption& option,
     CollisionResult& result,
     ClipSphereHalfspace halfspace = ClipSphereHalfspace::BOTH);
@@ -111,10 +111,10 @@ int collideSphereBox(
 int collideSphereSphere(
     CollisionObject* o1,
     CollisionObject* o2,
-    const double& r0,
-    const Eigen::Isometry3d& c0,
-    const double& r1,
-    const Eigen::Isometry3d& c1,
+    const s_t& r0,
+    const Eigen::Isometry3s& c0,
+    const s_t& r1,
+    const Eigen::Isometry3s& c1,
     const CollisionOption& option,
     CollisionResult& result,
     ClipSphereHalfspace halfspace0 = ClipSphereHalfspace::BOTH,
@@ -123,10 +123,10 @@ int collideSphereSphere(
 int collideBoxBoxAsMesh(
     CollisionObject* o1,
     CollisionObject* o2,
-    const Eigen::Vector3d& size0,
-    const Eigen::Isometry3d& T0,
-    const Eigen::Vector3d& size1,
-    const Eigen::Isometry3d& T1,
+    const Eigen::Vector3s& size0,
+    const Eigen::Isometry3s& T0,
+    const Eigen::Vector3s& size1,
+    const Eigen::Isometry3s& T1,
     const CollisionOption& option,
     CollisionResult& result);
 
@@ -134,21 +134,21 @@ int collideMeshBox(
     CollisionObject* o1,
     CollisionObject* o2,
     const aiScene* mesh0,
-    const Eigen::Vector3d& size0,
-    const Eigen::Isometry3d& c0,
-    const Eigen::Vector3d& size1,
-    const Eigen::Isometry3d& c1,
+    const Eigen::Vector3s& size0,
+    const Eigen::Isometry3s& c0,
+    const Eigen::Vector3s& size1,
+    const Eigen::Isometry3s& c1,
     const CollisionOption& option,
     CollisionResult& result);
 
 int collideBoxMesh(
     CollisionObject* o1,
     CollisionObject* o2,
-    const Eigen::Vector3d& size0,
-    const Eigen::Isometry3d& c0,
+    const Eigen::Vector3s& size0,
+    const Eigen::Isometry3s& c0,
     const aiScene* mesh1,
-    const Eigen::Vector3d& size1,
-    const Eigen::Isometry3d& c1,
+    const Eigen::Vector3s& size1,
+    const Eigen::Isometry3s& c1,
     const CollisionOption& option,
     CollisionResult& result);
 
@@ -156,10 +156,10 @@ int collideMeshSphere(
     CollisionObject* o1,
     CollisionObject* o2,
     const aiScene* mesh0,
-    const Eigen::Vector3d& size0,
-    const Eigen::Isometry3d& c0,
-    const double& r1,
-    const Eigen::Isometry3d& c1,
+    const Eigen::Vector3s& size0,
+    const Eigen::Isometry3s& c0,
+    const s_t& r1,
+    const Eigen::Isometry3s& c1,
     const CollisionOption& option,
     CollisionResult& result,
     ClipSphereHalfspace halfspace = ClipSphereHalfspace::BOTH);
@@ -167,11 +167,11 @@ int collideMeshSphere(
 int collideSphereMesh(
     CollisionObject* o1,
     CollisionObject* o2,
-    const double& r0,
-    const Eigen::Isometry3d& c0,
+    const s_t& r0,
+    const Eigen::Isometry3s& c0,
     const aiScene* mesh1,
-    const Eigen::Vector3d& size1,
-    const Eigen::Isometry3d& c1,
+    const Eigen::Vector3s& size1,
+    const Eigen::Isometry3s& c1,
     const CollisionOption& option,
     CollisionResult& result,
     ClipSphereHalfspace halfspace = ClipSphereHalfspace::BOTH);
@@ -180,67 +180,67 @@ int collideMeshMesh(
     CollisionObject* o1,
     CollisionObject* o2,
     const aiScene* mesh0,
-    const Eigen::Vector3d& size0,
-    const Eigen::Isometry3d& c0,
+    const Eigen::Vector3s& size0,
+    const Eigen::Isometry3s& c0,
     const aiScene* mesh1,
-    const Eigen::Vector3d& size1,
-    const Eigen::Isometry3d& c1,
+    const Eigen::Vector3s& size1,
+    const Eigen::Isometry3s& c1,
     const CollisionOption& option,
     CollisionResult& result);
 
 int collideCapsuleCapsule(
     CollisionObject* o1,
     CollisionObject* o2,
-    double height0,
-    double radius0,
-    const Eigen::Isometry3d& T0,
-    double height1,
-    double radius1,
-    const Eigen::Isometry3d& T1,
+    s_t height0,
+    s_t radius0,
+    const Eigen::Isometry3s& T0,
+    s_t height1,
+    s_t radius1,
+    const Eigen::Isometry3s& T1,
     const CollisionOption& option,
     CollisionResult& result);
 
 int collideSphereCapsule(
     CollisionObject* o1,
     CollisionObject* o2,
-    double radius0,
-    const Eigen::Isometry3d& T0,
-    double height1,
-    double radius1,
-    const Eigen::Isometry3d& T1,
+    s_t radius0,
+    const Eigen::Isometry3s& T0,
+    s_t height1,
+    s_t radius1,
+    const Eigen::Isometry3s& T1,
     const CollisionOption& option,
     CollisionResult& result);
 
 int collideCapsuleSphere(
     CollisionObject* o1,
     CollisionObject* o2,
-    double height0,
-    double radius0,
-    const Eigen::Isometry3d& T0,
-    double radius1,
-    const Eigen::Isometry3d& T1,
+    s_t height0,
+    s_t radius0,
+    const Eigen::Isometry3s& T0,
+    s_t radius1,
+    const Eigen::Isometry3s& T1,
     const CollisionOption& option,
     CollisionResult& result);
 
 int collideBoxCapsule(
     CollisionObject* o1,
     CollisionObject* o2,
-    const Eigen::Vector3d& size0,
-    const Eigen::Isometry3d& T0,
-    double height1,
-    double radius1,
-    const Eigen::Isometry3d& T1,
+    const Eigen::Vector3s& size0,
+    const Eigen::Isometry3s& T0,
+    s_t height1,
+    s_t radius1,
+    const Eigen::Isometry3s& T1,
     const CollisionOption& option,
     CollisionResult& result);
 
 int collideCapsuleBox(
     CollisionObject* o1,
     CollisionObject* o2,
-    double height0,
-    double radius0,
-    const Eigen::Isometry3d& T0,
-    const Eigen::Vector3d& size1,
-    const Eigen::Isometry3d& T1,
+    s_t height0,
+    s_t radius0,
+    const Eigen::Isometry3s& T0,
+    const Eigen::Vector3s& size1,
+    const Eigen::Isometry3s& T1,
     const CollisionOption& option,
     CollisionResult& result);
 
@@ -248,34 +248,34 @@ int collideMeshCapsule(
     CollisionObject* o1,
     CollisionObject* o2,
     const aiScene* mesh0,
-    const Eigen::Vector3d& size0,
-    const Eigen::Isometry3d& T0,
-    double height1,
-    double radius1,
-    const Eigen::Isometry3d& T1,
+    const Eigen::Vector3s& size0,
+    const Eigen::Isometry3s& T0,
+    s_t height1,
+    s_t radius1,
+    const Eigen::Isometry3s& T1,
     const CollisionOption& option,
     CollisionResult& result);
 
 int collideCapsuleMesh(
     CollisionObject* o1,
     CollisionObject* o2,
-    double height0,
-    double radius0,
-    const Eigen::Isometry3d& T0,
+    s_t height0,
+    s_t radius0,
+    const Eigen::Isometry3s& T0,
     const aiScene* mesh1,
-    const Eigen::Vector3d& size1,
-    const Eigen::Isometry3d& T1,
+    const Eigen::Vector3s& size1,
+    const Eigen::Isometry3s& T1,
     const CollisionOption& option,
     CollisionResult& result);
 
 int collideCylinderSphere(
     CollisionObject* o1,
     CollisionObject* o2,
-    const double& cyl_rad,
-    const double& half_height,
-    const Eigen::Isometry3d& T0,
-    const double& sphere_rad,
-    const Eigen::Isometry3d& T1,
+    const s_t& cyl_rad,
+    const s_t& half_height,
+    const Eigen::Isometry3s& T0,
+    const s_t& sphere_rad,
+    const Eigen::Isometry3s& T1,
     const CollisionOption& option,
     CollisionResult& result,
     ClipSphereHalfspace halfspace = ClipSphereHalfspace::BOTH);
@@ -283,11 +283,11 @@ int collideCylinderSphere(
 int collideCylinderPlane(
     CollisionObject* o1,
     CollisionObject* o2,
-    const double& cyl_rad,
-    const double& half_height,
-    const Eigen::Isometry3d& T0,
-    const Eigen::Vector3d& plane_normal,
-    const Eigen::Isometry3d& T1,
+    const s_t& cyl_rad,
+    const s_t& half_height,
+    const Eigen::Isometry3s& T0,
+    const Eigen::Vector3s& plane_normal,
+    const Eigen::Isometry3s& T1,
     const CollisionOption& option,
     CollisionResult& result);
 
@@ -305,28 +305,28 @@ ccd_vec3_t& getCachedCcdDir(CollisionObject* o1, CollisionObject* o2);
 // all relevant info about the object.
 struct ccdBox
 {
-  const Eigen::Vector3d* size;
-  const Eigen::Isometry3d* transform;
+  const Eigen::Vector3s* size;
+  const Eigen::Isometry3s* transform;
 };
 
 struct ccdSphere
 {
-  double radius;
-  const Eigen::Isometry3d* transform;
+  s_t radius;
+  const Eigen::Isometry3s* transform;
 };
 
 struct ccdMesh
 {
   const aiScene* mesh;
-  const Eigen::Isometry3d* transform;
-  const Eigen::Vector3d* scale;
+  const Eigen::Isometry3s* transform;
+  const Eigen::Vector3s* scale;
 };
 
 struct ccdCapsule
 {
-  double radius;
-  double height;
-  const Eigen::Isometry3d* transform;
+  s_t radius;
+  s_t height;
+  const Eigen::Isometry3s* transform;
 };
 
 // We also need to define "support" functions that will find the furthest point
@@ -352,9 +352,9 @@ void ccdCenterCapsule(const void* _obj, ccd_vec3_t* _center);
 // able to get all the vertices that are within some small epsilon of being on
 // the "witness" plane returned by ccd.
 
-std::vector<Eigen::Vector3d> ccdPointsAtWitnessBox(
+std::vector<Eigen::Vector3s> ccdPointsAtWitnessBox(
     ccdBox* box, ccd_vec3_t* dir, bool neg);
-std::vector<Eigen::Vector3d> ccdPointsAtWitnessMesh(
+std::vector<Eigen::Vector3s> ccdPointsAtWitnessMesh(
     ccdMesh* mesh, ccd_vec3_t* dir, bool neg);
 
 /// This is responsible for creating and annotating all the contact objects with
@@ -364,8 +364,8 @@ int createMeshMeshContacts(
     CollisionObject* o2,
     CollisionResult& result,
     ccd_vec3_t* dir,
-    const std::vector<Eigen::Vector3d>& pointsAWitness,
-    const std::vector<Eigen::Vector3d>& pointsBWitness);
+    const std::vector<Eigen::Vector3s>& pointsAWitness,
+    const std::vector<Eigen::Vector3s>& pointsBWitness);
 
 /// This is responsible for creating and annotating all the contact objects with
 /// all the metadata we need in order to get accurate gradients.
@@ -374,9 +374,9 @@ int createMeshSphereContact(
     CollisionObject* o2,
     CollisionResult& result,
     ccd_vec3_t* dir,
-    const std::vector<Eigen::Vector3d>& meshPointsWitness,
-    const Eigen::Vector3d& sphereCenter,
-    double sphereRadius,
+    const std::vector<Eigen::Vector3s>& meshPointsWitness,
+    const Eigen::Vector3s& sphereCenter,
+    s_t sphereRadius,
     ClipSphereHalfspace halfspace = ClipSphereHalfspace::BOTH);
 
 /// This is responsible for creating and annotating all the contact objects with
@@ -386,9 +386,9 @@ int createSphereMeshContact(
     CollisionObject* o2,
     CollisionResult& result,
     ccd_vec3_t* dir,
-    const Eigen::Vector3d& sphereCenter,
-    double sphereRadius,
-    const std::vector<Eigen::Vector3d>& meshPointsWitness,
+    const Eigen::Vector3s& sphereCenter,
+    s_t sphereRadius,
+    const std::vector<Eigen::Vector3s>& meshPointsWitness,
     ClipSphereHalfspace halfspace = ClipSphereHalfspace::BOTH);
 
 /*
@@ -396,65 +396,64 @@ int createSphereMeshContact(
 /// contained within the convex shape. This sorts the shape by angle from
 the
 /// center, and trims out any points that lie inside the convex polygon.
-void prepareConvex2DShape(std::vector<Eigen::Vector2d>& shape);
+void prepareConvex2DShape(std::vector<Eigen::Vector2s>& shape);
 
 /// This checks whether a 2D shape contains a point. This assumes that shape
 was
 /// sorted using prepareConvex2DShape().
 bool convex2DShapeContains(
-    const Eigen::Vector2d& point, const std::vector<Eigen::Vector2d>&
+    const Eigen::Vector2s& point, const std::vector<Eigen::Vector2s>&
 shape);
 */
 
 /// This trims out any points that lie inside the convex polygon, without
 /// changing the order.
 void keepOnlyConvex2DHull(
-    std::vector<Eigen::Vector3d>& shape,
-    const Eigen::Vector3d& origin,
-    const Eigen::Vector3d& basis2dX,
-    const Eigen::Vector3d& basis2dY);
+    std::vector<Eigen::Vector3s>& shape,
+    const Eigen::Vector3s& origin,
+    const Eigen::Vector3s& basis2dX,
+    const Eigen::Vector3s& basis2dY);
 
 /// This is necessary preparation for rapidly checking if another point is
 /// contained within the convex shape. This sorts the shape by angle from
 /// the center, and trims out any points that lie inside the convex polygon.
 void prepareConvex2DShape(
-    std::vector<Eigen::Vector3d>& shape,
-    const Eigen::Vector3d& origin,
-    const Eigen::Vector3d& basis2dX,
-    const Eigen::Vector3d& basis2dY);
+    std::vector<Eigen::Vector3s>& shape,
+    const Eigen::Vector3s& origin,
+    const Eigen::Vector3s& basis2dX,
+    const Eigen::Vector3s& basis2dY);
 
 /// This checks whether a 2D shape contains a point. This assumes that shape was
 /// sorted using prepareConvex2DShape().
 bool convex2DShapeContains(
-    const Eigen::Vector3d& point,
-    const std::vector<Eigen::Vector3d>& shape,
-    const Eigen::Vector3d& origin,
-    const Eigen::Vector3d& basis2dX,
-    const Eigen::Vector3d& basis2dY);
+    const Eigen::Vector3s& point,
+    const std::vector<Eigen::Vector3s>& shape,
+    const Eigen::Vector3s& origin,
+    const Eigen::Vector3s& basis2dX,
+    const Eigen::Vector3s& basis2dY);
 
 /// This transforms a 3D point down to a 2D point in the given 3D plane
-Eigen::Vector2d pointInPlane(
-    const Eigen::Vector3d& point,
-    const Eigen::Vector3d& origin,
-    const Eigen::Vector3d& basis2dX,
-    const Eigen::Vector3d& basis2dY);
+Eigen::Vector2s pointInPlane(
+    const Eigen::Vector3s& point,
+    const Eigen::Vector3s& origin,
+    const Eigen::Vector3s& basis2dX,
+    const Eigen::Vector3s& basis2dY);
 
-double angle2D(const Eigen::Vector2d& from, const Eigen::Vector2d& to);
+s_t angle2D(const Eigen::Vector2s& from, const Eigen::Vector2s& to);
 
 // This implements the "2D cross product" as redefined here:
 // https://stackoverflow.com/a/565282/13177487
-inline double crossProduct2D(
-    const Eigen::Vector2d& v, const Eigen::Vector2d& w);
+inline s_t crossProduct2D(const Eigen::Vector2s& v, const Eigen::Vector2s& w);
 
 /// This returns true if the two line segments defined by (p0,p1) and (q0,q1)
 /// intersect. If they do intersect, this writes the intersection point to
 /// `out`.
 bool get2DLineIntersection(
-    const Eigen::Vector2d& p0,
-    const Eigen::Vector2d& p1,
-    const Eigen::Vector2d& q0,
-    const Eigen::Vector2d& q1,
-    Eigen::Vector2d& out);
+    const Eigen::Vector2s& p0,
+    const Eigen::Vector2s& p1,
+    const Eigen::Vector2s& q0,
+    const Eigen::Vector2s& q1,
+    Eigen::Vector2s& out);
 
 /// This sets the default settings for CCD in a single spot in the DARTCollide
 /// code, so it's easy to tweak settings across all collision pairs.

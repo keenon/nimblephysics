@@ -5,6 +5,8 @@
 
 #include <Eigen/Dense>
 
+#include "dart/math/MathTypes.hpp"
+
 namespace dart {
 namespace realtime {
 
@@ -13,11 +15,11 @@ class ControlLog
 public:
   ControlLog(int dim, int millisPerStep);
 
-  void record(long time, Eigen::VectorXd control);
+  void record(long time, Eigen::VectorXs control);
 
   long last();
 
-  Eigen::VectorXd get(long time);
+  Eigen::VectorXs get(long time);
 
   void discardBefore(long time);
 
@@ -28,7 +30,7 @@ protected:
   int mMillisPerStep;
   long mLogStart;
   long mLogEnd;
-  std::vector<Eigen::VectorXd> mLog;
+  std::vector<Eigen::VectorXs> mLog;
 };
 
 } // namespace realtime

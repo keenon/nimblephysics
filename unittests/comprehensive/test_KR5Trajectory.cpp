@@ -84,31 +84,31 @@ using namespace server;
 using namespace realtime;
 
 std::shared_ptr<simulation::World> createWorld(
-    double target_x, double target_y, double target_z)
+    s_t target_x, s_t target_y, s_t target_z)
 {
   // Create a world
   std::shared_ptr<simulation::World> world = simulation::World::create();
 
   // Set gravity of the world
-  world->setGravity(Eigen::Vector3d(0.0, -9.81, 0.0));
+  world->setGravity(Eigen::Vector3s(0.0, -9.81, 0.0));
 
   std::shared_ptr<dynamics::Skeleton> KR5
       = dart::utils::UniversalLoader::loadSkeleton(
           world.get(), "dart://sample/urdf/KR5/KR5 sixx R650.urdf");
 
-  world->setPositionUpperLimits(Eigen::VectorXd::Ones(world->getNumDofs()) * 5);
+  world->setPositionUpperLimits(Eigen::VectorXs::Ones(world->getNumDofs()) * 5);
   world->setPositionLowerLimits(
-      Eigen::VectorXd::Ones(world->getNumDofs()) * -5);
+      Eigen::VectorXs::Ones(world->getNumDofs()) * -5);
 
   world->setExternalForceUpperLimits(
-      Eigen::VectorXd::Ones(world->getNumDofs()) * 20);
+      Eigen::VectorXs::Ones(world->getNumDofs()) * 20);
   world->setExternalForceLowerLimits(
-      Eigen::VectorXd::Ones(world->getNumDofs()) * -20);
+      Eigen::VectorXs::Ones(world->getNumDofs()) * -20);
 
   world->setVelocityUpperLimits(
-      Eigen::VectorXd::Ones(world->getNumDofs()) * 20);
+      Eigen::VectorXs::Ones(world->getNumDofs()) * 20);
   world->setVelocityLowerLimits(
-      Eigen::VectorXd::Ones(world->getNumDofs()) * -20);
+      Eigen::VectorXs::Ones(world->getNumDofs()) * -20);
 
   // Create target
 
@@ -117,14 +117,14 @@ std::shared_ptr<simulation::World> createWorld(
       = target->createJointAndBodyNodePair<WeldJoint>(nullptr);
   WeldJoint* targetJoint = targetJointPair.first;
   BodyNode* targetBody = targetJointPair.second;
-  Eigen::Isometry3d targetOffset = Eigen::Isometry3d::Identity();
-  targetOffset.translation() = Eigen::Vector3d(target_x, target_y, target_z);
+  Eigen::Isometry3s targetOffset = Eigen::Isometry3s::Identity();
+  targetOffset.translation() = Eigen::Vector3s(target_x, target_y, target_z);
   targetJoint->setTransformFromParentBodyNode(targetOffset);
   std::shared_ptr<BoxShape> targetShape(
-      new BoxShape(Eigen::Vector3d(0.1, 0.1, 0.1)));
+      new BoxShape(Eigen::Vector3s(0.1, 0.1, 0.1)));
   ShapeNode* targetVisual
       = targetBody->createShapeNodeWith<VisualAspect>(targetShape);
-  targetVisual->getVisualAspect()->setColor(Eigen::Vector3d(0.8, 0.5, 0.5));
+  targetVisual->getVisualAspect()->setColor(Eigen::Vector3s(0.8, 0.5, 0.5));
   targetVisual->getVisualAspect()->setCastShadows(false);
 
   world->addSkeleton(target);
@@ -135,22 +135,22 @@ std::shared_ptr<simulation::World> createWorld(
 #ifdef ALL_TESTS
 TEST(KR5_EXAMPLE, BROKEN_POINT)
 {
-  double target_x = 2.2;
-  double target_y = 2.2;
-  double target_z = 2.2;
+  s_t target_x = 2.2;
+  s_t target_y = 2.2;
+  s_t target_z = 2.2;
 
   // Create a world
   std::shared_ptr<simulation::World> world
       = createWorld(target_x, target_y, target_z);
 
   /*
-  Eigen::VectorXd brokenPos = Eigen::VectorXd::Zero(5);
+  Eigen::VectorXs brokenPos = Eigen::VectorXs::Zero(5);
   brokenPos << -7.4747, 9.43449, 2.12166, 2.98394, 2.34673;
-  Eigen::VectorXd brokenVel = Eigen::VectorXd::Zero(5);
+  Eigen::VectorXs brokenVel = Eigen::VectorXs::Zero(5);
   brokenVel << -2.84978, 1.03633, 0, 9.16668, 6.99675;
-  Eigen::VectorXd brokenForce = Eigen::VectorXd::Zero(5);
+  Eigen::VectorXs brokenForce = Eigen::VectorXs::Zero(5);
   brokenForce << 0, 0, -2.11163, -2.06504, -1.3781;
-  Eigen::VectorXd brokenLCPCache = Eigen::VectorXd::Zero(12);
+  Eigen::VectorXs brokenLCPCache = Eigen::VectorXs::Zero(12);
   brokenLCPCache << 0.0173545, 0.0132076, 0, 0.0173545, 0.0132076, 0, 0, 0, 0,
       0, 0, 0;
   world->setPositions(brokenPos);
@@ -159,13 +159,13 @@ TEST(KR5_EXAMPLE, BROKEN_POINT)
   world->setCachedLCPSolution(brokenLCPCache);
   */
   /*
-  Eigen::VectorXd brokenPos = Eigen::VectorXd::Zero(5);
+  Eigen::VectorXs brokenPos = Eigen::VectorXs::Zero(5);
   brokenPos << 8.75823, -1.33554, 1.60919, 0.367526, 1.09027;
-  Eigen::VectorXd brokenVel = Eigen::VectorXd::Zero(5);
+  Eigen::VectorXs brokenVel = Eigen::VectorXs::Zero(5);
   brokenVel << 4.48639, -5.53436, 1.73472e-18, -1.03812e-17, -0.472044;
-  Eigen::VectorXd brokenForce = Eigen::VectorXd::Zero(5);
+  Eigen::VectorXs brokenForce = Eigen::VectorXs::Zero(5);
   brokenForce << 0, 0, 9.428, -1.14176, 0.947147;
-  Eigen::VectorXd brokenLCPCache = Eigen::VectorXd::Zero(6);
+  Eigen::VectorXs brokenLCPCache = Eigen::VectorXs::Zero(6);
   brokenLCPCache << 0.0491903, 0.00921924, 0, 0, 0, 0;
   world->setPositions(brokenPos);
   world->setVelocities(brokenVel);
@@ -177,13 +177,13 @@ TEST(KR5_EXAMPLE, BROKEN_POINT)
   /// This used to fail to standardize the LCP properly
   ///
 
-  Eigen::VectorXd brokenPos = Eigen::VectorXd::Zero(5);
+  Eigen::VectorXs brokenPos = Eigen::VectorXs::Zero(5);
   brokenPos << 8.75828, -1.33554, 1.6092, 0.367528, 1.09028;
-  Eigen::VectorXd brokenVel = Eigen::VectorXd::Zero(5);
+  Eigen::VectorXs brokenVel = Eigen::VectorXs::Zero(5);
   brokenVel << 4.48642, -5.53436, -1.73472e-18, -2.35814e-18, -0.472011;
-  Eigen::VectorXd brokenForce = Eigen::VectorXd::Zero(5);
+  Eigen::VectorXs brokenForce = Eigen::VectorXs::Zero(5);
   brokenForce << 0, 0, 9.428, -1.14176, 0.947147;
-  Eigen::VectorXd brokenLCPCache = Eigen::VectorXd::Zero(6);
+  Eigen::VectorXs brokenLCPCache = Eigen::VectorXs::Zero(6);
   brokenLCPCache << 0.0245947, 0.00461058, 0, 0.0245947, 0.00461058, 0;
   world->setPositions(brokenPos);
   world->setVelocities(brokenVel);
@@ -195,13 +195,13 @@ TEST(KR5_EXAMPLE, BROKEN_POINT)
   ///
   /// This used to fail on edge-edge gradients being computed incorrectly
   ///
-  Eigen::VectorXd brokenPos = Eigen::VectorXd::Zero(5);
+  Eigen::VectorXs brokenPos = Eigen::VectorXs::Zero(5);
   brokenPos << -0.13334, -0.178891, 1.07272, 0.130007, 0.436478;
-  Eigen::VectorXd brokenVel = Eigen::VectorXd::Zero(5);
+  Eigen::VectorXs brokenVel = Eigen::VectorXs::Zero(5);
   brokenVel << -0.433131, -0.847734, 2.55373, -1.13021, -1.61568;
-  Eigen::VectorXd brokenForce = Eigen::VectorXd::Zero(5);
+  Eigen::VectorXs brokenForce = Eigen::VectorXs::Zero(5);
   brokenForce << 0, 0, -0.17232, 6.83192, -0.275112;
-  Eigen::VectorXd brokenLCPCache = Eigen::VectorXd::Zero(12);
+  Eigen::VectorXs brokenLCPCache = Eigen::VectorXs::Zero(12);
   brokenLCPCache << 0, 0, 0, 0, 0, 0, 1.0778, 0.330749, 0, 1.0778, 0.330749, 0;
   world->setPositions(brokenPos);
   world->setVelocities(brokenVel);
@@ -213,13 +213,13 @@ TEST(KR5_EXAMPLE, BROKEN_POINT)
   /// This used to fail on CLAMPING_THRESHOLD being too large in
   /// ConstraintGroupGradientMatrices.cpp
   ///
-  Eigen::VectorXd brokenPos = Eigen::VectorXd::Zero(5);
+  Eigen::VectorXs brokenPos = Eigen::VectorXs::Zero(5);
   brokenPos << -0.000646825, -0.0351094, 0.759088, 0.102786, 0.731049;
-  Eigen::VectorXd brokenVel = Eigen::VectorXd::Zero(5);
+  Eigen::VectorXs brokenVel = Eigen::VectorXs::Zero(5);
   brokenVel << -0.216819, -0.25626, 0.256483, 0.758835, -0.794271;
-  Eigen::VectorXd brokenForce = Eigen::VectorXd::Zero(5);
+  Eigen::VectorXs brokenForce = Eigen::VectorXs::Zero(5);
   brokenForce << 0, 0, 0.136721, 1.88135, 7.45379;
-  Eigen::VectorXd brokenLCPCache = Eigen::VectorXd::Zero(12);
+  Eigen::VectorXs brokenLCPCache = Eigen::VectorXs::Zero(12);
   brokenLCPCache << 0.00454883, -5.55535e-05, 0, 0.00454883, -5.55535e-05, 0, 0,
       0, 0, 0, 0, 0;
   world->setPositions(brokenPos);
@@ -236,7 +236,7 @@ TEST(KR5_EXAMPLE, BROKEN_POINT)
   server.serve(8070);
   server.renderWorld(world);
 
-  Eigen::VectorXd animatePos = brokenPos;
+  Eigen::VectorXs animatePos = brokenPos;
   int i = 0;
   Ticker ticker(0.01);
   ticker.registerTickListener([&](long time) {
@@ -268,9 +268,9 @@ TEST(KR5_EXAMPLE, BROKEN_POINT)
 // #ifdef ALL_TESTS
 TEST(KR5_EXAMPLE, FULL_TEST)
 {
-  double target_x = 2.2;
-  double target_y = 2.2;
-  double target_z = 2.2;
+  s_t target_x = 2.2;
+  s_t target_y = 2.2;
+  s_t target_z = 2.2;
 
   // Create a world
   std::shared_ptr<simulation::World> world
@@ -280,27 +280,27 @@ TEST(KR5_EXAMPLE, FULL_TEST)
 
   TrajectoryLossFn loss = [target_x, target_y, target_z](
                               const trajectory::TrajectoryRollout* rollout) {
-    const Eigen::VectorXd lastPos
+    const Eigen::VectorXs lastPos
         = rollout->getPosesConst("ik").col(rollout->getPosesConst().cols() - 1);
-    const Eigen::VectorXd lastVel
+    const Eigen::VectorXs lastVel
         = rollout->getVelsConst("ik").col(rollout->getPosesConst().cols() - 1);
 
-    double diffX = lastPos(0) - target_x;
-    double diffY = lastPos(1) - target_y;
-    double diffZ = lastPos(2) - target_z;
+    s_t diffX = lastPos(0) - target_x;
+    s_t diffY = lastPos(1) - target_y;
+    s_t diffZ = lastPos(2) - target_z;
 
-    double ikPosLoss = diffX * diffX + diffY * diffY + diffZ * diffZ;
-    double ikVelLoss = lastVel(0) * lastVel(0) + lastVel(1) * lastVel(1)
+    s_t ikPosLoss = diffX * diffX + diffY * diffY + diffZ * diffZ;
+    s_t ikVelLoss = lastVel(0) * lastVel(0) + lastVel(1) * lastVel(1)
                        + lastVel(2) * lastVel(2);
 
-    double forcesLoss = 0.0;
+    s_t forcesLoss = 0.0;
     /*
-    Eigen::MatrixXd forces = rollout->getVelsConst();
+    Eigen::MatrixXs forces = rollout->getVelsConst();
     for (int i = 0; i < forces.cols(); i++)
     {
       for (int j = 0; j < forces.rows(); j++)
       {
-        double scaling = 0.5 / (forces.rows() * forces.cols());
+        s_t scaling = 0.5 / (forces.rows() * forces.cols());
         forcesLoss += forces(j, i) * forces(j, i) * scaling;
       }
     }
@@ -315,13 +315,13 @@ TEST(KR5_EXAMPLE, FULL_TEST)
             TrajectoryRollout* gradWrtRollout // OUT
         ) {
           int lastCol = rollout->getPosesConst("ik").cols() - 1;
-          const Eigen::VectorXd lastPos = rollout->getPosesConst().col(lastCol);
+          const Eigen::VectorXs lastPos = rollout->getPosesConst().col(lastCol);
 
           // Do the IK loss and gradient
 
-          double diffX = lastPos(0) - target_x;
-          double diffY = lastPos(1) - target_y;
-          double diffZ = lastPos(2) - target_z;
+          s_t diffX = lastPos(0) - target_x;
+          s_t diffY = lastPos(1) - target_y;
+          s_t diffZ = lastPos(2) - target_z;
 
           gradWrtRollout->getPoses("ik").setZero();
           gradWrtRollout->getPoses("ik")(0, lastCol) = 2 * diffX;
@@ -330,7 +330,7 @@ TEST(KR5_EXAMPLE, FULL_TEST)
           gradWrtRollout->getVels("ik").setZero();
           gradWrtRollout->getForces("ik").setZero();
 
-          double ikLoss = diffX * diffX + diffY * diffY + diffZ * diffZ;
+          s_t ikLoss = diffX * diffX + diffY * diffY + diffZ * diffZ;
 
           // Do the ordinary force loss and gradient
 
@@ -338,13 +338,13 @@ TEST(KR5_EXAMPLE, FULL_TEST)
           gradWrtRollout->getVels().setZero();
           gradWrtRollout->getForces().setZero();
 
-          Eigen::MatrixXd forces = rollout->getVelsConst();
-          double forcesLoss = 0.0;
+          Eigen::MatrixXs forces = rollout->getVelsConst();
+          s_t forcesLoss = 0.0;
           for (int i = 0; i < forces.cols(); i++)
           {
             for (int j = 0; j < forces.rows(); j++)
             {
-              double scaling = 0.5 / (forces.rows() * forces.cols());
+              s_t scaling = 0.5 / (forces.rows() * forces.cols());
               forcesLoss += forces(j, i) * forces(j, i) * scaling;
               gradWrtRollout->getVels()(j, i) = 2 * forces(j, i) * scaling;
             }
@@ -381,10 +381,10 @@ TEST(KR5_EXAMPLE, FULL_TEST)
       world,
       500,
       [target_x, target_y](std::shared_ptr<simulation::World> world) {
-        const Eigen::VectorXd lastPos = world->getPositions();
+        const Eigen::VectorXs lastPos = world->getPositions();
 
-        double diffX = lastPos(0) - target_x;
-        double diffY = lastPos(1) - target_y;
+        s_t diffX = lastPos(0) - target_x;
+        s_t diffY = lastPos(1) - target_y;
 
         return diffX * diffX + diffY * diffY;
       }));
@@ -411,11 +411,11 @@ TEST(KR5_EXAMPLE, FULL_TEST)
   optimizer.setIterationLimit(20);
   optimizer.registerIntermediateCallback([&](trajectory::Problem* problem,
                                              int /* step */,
-                                             double /* primal */,
-                                             double /* dual */) {
-    const Eigen::MatrixXd poses
+                                             s_t /* primal */,
+                                             s_t /* dual */) {
+    const Eigen::MatrixXs poses
         = problem->getRolloutCache(world)->getPosesConst();
-    const Eigen::MatrixXd vels
+    const Eigen::MatrixXs vels
         = problem->getRolloutCache(world)->getVelsConst();
     std::cout << "Rendering trajectory lines" << std::endl;
     server.renderTrajectoryLines(world, poses);
@@ -426,9 +426,9 @@ TEST(KR5_EXAMPLE, FULL_TEST)
   std::shared_ptr<trajectory::Solution> result
       = optimizer.optimize(trajectory.get());
 
-  const Eigen::MatrixXd poses
+  const Eigen::MatrixXs poses
       = result->getStep(result->getNumSteps() - 1).rollout->getPosesConst();
-  const Eigen::MatrixXd vels
+  const Eigen::MatrixXs vels
       = result->getStep(result->getNumSteps() - 1).rollout->getVelsConst();
 
   server.renderTrajectoryLines(world, poses);

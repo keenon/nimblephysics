@@ -81,13 +81,13 @@ public:
   const BodyNode* getBodyNode() const;
 
   /// Get position of this marker in the parent body node coordinates
-  Eigen::Vector3d getLocalPosition() const;
+  Eigen::Vector3s getLocalPosition() const;
 
   /// Set position of this marker in the parent body node coordinates
-  void setLocalPosition(const Eigen::Vector3d& offset);
+  void setLocalPosition(const Eigen::Vector3s& offset);
 
   /// Get position in the world coordinates
-  Eigen::Vector3d getWorldPosition() const;
+  Eigen::Vector3s getWorldPosition() const;
 
   /// Get global unique ID
   int getID() const;
@@ -99,10 +99,10 @@ public:
   ConstraintType getConstraintType() const;
 
   /// Set the color of this Marker
-  void setColor(const Eigen::Vector4d& color);
+  void setColor(const Eigen::Vector4s& color);
 
   /// Return color of this Marker
-  const Eigen::Vector4d& getColor() const;
+  const Eigen::Vector4s& getColor() const;
 
   friend class BodyNode;
 

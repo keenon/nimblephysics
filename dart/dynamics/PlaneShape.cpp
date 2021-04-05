@@ -36,7 +36,7 @@ namespace dart {
 namespace dynamics {
 
 //==============================================================================
-PlaneShape::PlaneShape(const Eigen::Vector3d& _normal, double _offset)
+PlaneShape::PlaneShape(const Eigen::Vector3s& _normal, s_t _offset)
   : Shape(PLANE),
     mNormal(_normal.normalized()),
     mOffset(_offset)
@@ -44,8 +44,8 @@ PlaneShape::PlaneShape(const Eigen::Vector3d& _normal, double _offset)
 }
 
 //==============================================================================
-PlaneShape::PlaneShape(const Eigen::Vector3d& _normal,
-                       const Eigen::Vector3d& _point)
+PlaneShape::PlaneShape(const Eigen::Vector3s& _normal,
+                       const Eigen::Vector3s& _point)
   : Shape(),
     mNormal(_normal.normalized()),
     mOffset(mNormal.dot(_point))
@@ -66,13 +66,13 @@ const std::string& PlaneShape::getStaticType()
 }
 
 //==============================================================================
-Eigen::Matrix3d PlaneShape::computeInertia(double /*mass*/) const
+Eigen::Matrix3s PlaneShape::computeInertia(s_t /*mass*/) const
 {
-  return Eigen::Matrix3d::Zero();
+  return Eigen::Matrix3s::Zero();
 }
 
 //==============================================================================
-void PlaneShape::setNormal(const Eigen::Vector3d& _normal)
+void PlaneShape::setNormal(const Eigen::Vector3s& _normal)
 {
   mNormal = _normal.normalized();
 
@@ -80,13 +80,13 @@ void PlaneShape::setNormal(const Eigen::Vector3d& _normal)
 }
 
 //==============================================================================
-const Eigen::Vector3d& PlaneShape::getNormal() const
+const Eigen::Vector3s& PlaneShape::getNormal() const
 {
   return mNormal;
 }
 
 //==============================================================================
-void PlaneShape::setOffset(double _offset)
+void PlaneShape::setOffset(s_t _offset)
 {
   mOffset = _offset;
 
@@ -94,35 +94,35 @@ void PlaneShape::setOffset(double _offset)
 }
 
 //==============================================================================
-double PlaneShape::getOffset() const
+s_t PlaneShape::getOffset() const
 {
   return mOffset;
 }
 
 //==============================================================================
-void PlaneShape::setNormalAndOffset(const Eigen::Vector3d& _normal,
-                                    double _offset)
+void PlaneShape::setNormalAndOffset(const Eigen::Vector3s& _normal,
+                                    s_t _offset)
 {
   setNormal(_normal);
   setOffset(_offset);
 }
 
 //==============================================================================
-void PlaneShape::setNormalAndPoint(const Eigen::Vector3d& _normal,
-                                   const Eigen::Vector3d& _point)
+void PlaneShape::setNormalAndPoint(const Eigen::Vector3s& _normal,
+                                   const Eigen::Vector3s& _point)
 {
   setNormal(_normal);
   setOffset(mNormal.dot(_point));
 }
 
 //==============================================================================
-double PlaneShape::computeDistance(const Eigen::Vector3d& _point) const
+s_t PlaneShape::computeDistance(const Eigen::Vector3s& _point) const
 {
-  return std::abs(computeSignedDistance(_point));
+  return abs(computeSignedDistance(_point));
 }
 
 //==============================================================================
-double PlaneShape::computeSignedDistance(const Eigen::Vector3d& _point) const
+s_t PlaneShape::computeSignedDistance(const Eigen::Vector3s& _point) const
 {
   return mNormal.dot(_point) - mOffset;
 }
@@ -131,9 +131,9 @@ double PlaneShape::computeSignedDistance(const Eigen::Vector3d& _point) const
 void PlaneShape::updateBoundingBox() const
 {
   mBoundingBox.setMin(
-      Eigen::Vector3d::Constant(-std::numeric_limits<double>::infinity()));
+      Eigen::Vector3s::Constant(-std::numeric_limits<s_t>::infinity()));
   mBoundingBox.setMax(
-      Eigen::Vector3d::Constant(std::numeric_limits<double>::infinity()));
+      Eigen::Vector3s::Constant(std::numeric_limits<s_t>::infinity()));
 
   mIsBoundingBoxDirty = false;
 }

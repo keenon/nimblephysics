@@ -47,7 +47,7 @@ public:
   /// Constructor.
   /// \param[in] radius Radius of the capsule.
   /// \param[in] height Height of the cylindrical part.
-  CapsuleShape(double radius, double height);
+  CapsuleShape(s_t radius, s_t height);
 
   // Documentation inherited.
   const std::string& getType() const override;
@@ -56,31 +56,31 @@ public:
   static const std::string& getStaticType();
 
   /// Get the radius of the capsule.
-  double getRadius() const;
+  s_t getRadius() const;
 
   /// Set the radius of the capsule.
-  void setRadius(double radius);
+  void setRadius(s_t radius);
 
   /// Get the height of the cylindrical part.
-  double getHeight() const;
+  s_t getHeight() const;
 
   /// Set the height of the cylindrical part.
-  void setHeight(double height);
+  void setHeight(s_t height);
 
   /// Compute volume from given properties.
   /// \param[in] radius Radius of the capsule.
   /// \param[in] height Height of the cylindrical part.
-  static double computeVolume(double radius, double height);
+  static s_t computeVolume(s_t radius, s_t height);
 
   /// Compute moments of inertia of a capsule
   /// \param[in] radius Radius of the capsule.
   /// \param[in] height Height of the cylindrical part.
   /// \param[in] mass Mass of the capsule.
-  static Eigen::Matrix3d computeInertia(
-      double radius, double height, double mass);
+  static Eigen::Matrix3s computeInertia(
+      s_t radius, s_t height, s_t mass);
 
   // Documentation inherited.
-  Eigen::Matrix3d computeInertia(double mass) const override;
+  Eigen::Matrix3s computeInertia(s_t mass) const override;
 
 protected:
   // Documentation inherited.
@@ -91,10 +91,10 @@ protected:
 
 private:
   /// Radius of the capsule.
-  double mRadius;
+  s_t mRadius;
 
   /// Height of the cylindrical part.
-  double mHeight;
+  s_t mHeight;
 
 };
 

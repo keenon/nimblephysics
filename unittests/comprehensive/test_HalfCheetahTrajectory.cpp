@@ -93,16 +93,16 @@ TEST(HALF_CHEETAH, NUMERICAL_INSTABILITY)
       = dart::utils::UniversalLoader::loadWorld(
           "dart://sample/skel/half_cheetah.skel");
   // world->setSlowDebugResultsAgainstFD(true);
-  Eigen::VectorXd brokenPos = Eigen::VectorXd::Zero(9);
+  Eigen::VectorXs brokenPos = Eigen::VectorXs::Zero(9);
   brokenPos << -5.15992, -0.210083, 8.27897, -0.00318367, 0.513758, -0.0286844,
       0.587853, 0.0282165, 0.486934;
-  Eigen::VectorXd brokenVel = Eigen::VectorXd::Zero(9);
+  Eigen::VectorXs brokenVel = Eigen::VectorXs::Zero(9);
   brokenVel << -2.22286, -6.07728, 0.890211, 9.22385, 3.00743, 1.34837, 9.61029,
       -2.97553, 9.96726;
-  Eigen::VectorXd brokenForce = Eigen::VectorXd::Zero(9);
+  Eigen::VectorXs brokenForce = Eigen::VectorXs::Zero(9);
   brokenForce << 0, 0, 3.15531, -8.41413, -6.37498, -5.82503, -7.75906, 9.98554,
       7.19786;
-  Eigen::VectorXd brokenLCPCache = Eigen::VectorXd::Zero(0);
+  Eigen::VectorXs brokenLCPCache = Eigen::VectorXs::Zero(0);
   world->setPositions(brokenPos);
   world->setVelocities(brokenVel);
   world->setExternalForces(brokenForce);
@@ -124,16 +124,16 @@ TEST(HALF_CHEETAH, BROKEN_POINT)
       = dart::utils::UniversalLoader::loadWorld(
           "dart://sample/skel/half_cheetah.skel");
   // world->setSlowDebugResultsAgainstFD(true);
-  Eigen::VectorXd brokenPos = Eigen::VectorXd::Zero(9);
+  Eigen::VectorXs brokenPos = Eigen::VectorXs::Zero(9);
   brokenPos << 3.21866, -0.465303, 5.9565, -0.487295, -0.969093, 0.0792724,
       -0.235988, -0.109183, 0.0769134;
-  Eigen::VectorXd brokenVel = Eigen::VectorXd::Zero(9);
+  Eigen::VectorXs brokenVel = Eigen::VectorXs::Zero(9);
   brokenVel << 4.32527, -4.96436, 12.677, 6.0086, -21.5535, 6.76575, 25.5498,
       -86.1003, 38.0762;
-  Eigen::VectorXd brokenForce = Eigen::VectorXd::Zero(9);
+  Eigen::VectorXs brokenForce = Eigen::VectorXs::Zero(9);
   brokenForce << -0, -0, -0.398301, -2.15491, -6.51447, 23.0772, 7.68141,
       -30.2488, 9.71529;
-  Eigen::VectorXd brokenLCPCache = Eigen::VectorXd::Zero(3);
+  Eigen::VectorXs brokenLCPCache = Eigen::VectorXs::Zero(3);
   brokenLCPCache << 11.9108, 11.8521, 0;
   world->setPositions(brokenPos);
   world->setVelocities(brokenVel);
@@ -156,16 +156,16 @@ TEST(HALF_CHEETAH, CAPSULE_INTER_PENETRATION)
       = dart::utils::UniversalLoader::loadWorld(
           "dart://sample/skel/half_cheetah.skel");
   // world->setSlowDebugResultsAgainstFD(true);
-  Eigen::VectorXd brokenPos = Eigen::VectorXd::Zero(9);
+  Eigen::VectorXs brokenPos = Eigen::VectorXs::Zero(9);
   brokenPos << -8.71924, -0.0564965, -7.58459, 0.291652, -0.587514, 0.200843,
       0.255774, 0.802592, -0.201628;
-  Eigen::VectorXd brokenVel = Eigen::VectorXd::Zero(9);
+  Eigen::VectorXs brokenVel = Eigen::VectorXs::Zero(9);
   brokenVel << 2.85676, 8.95689, -1.45436, -8.77701, -3.59597, -2.06459,
       -7.10815, 3.59627, -20.2623;
-  Eigen::VectorXd brokenForce = Eigen::VectorXd::Zero(9);
+  Eigen::VectorXs brokenForce = Eigen::VectorXs::Zero(9);
   brokenForce << 0, 0, 0.193621, -9.13741, 9.79953, 5.09491, -1.46957, -8.3705,
       -9.74503;
-  Eigen::VectorXd brokenLCPCache = Eigen::VectorXd::Zero(0);
+  Eigen::VectorXs brokenLCPCache = Eigen::VectorXs::Zero(0);
   world->setPositions(brokenPos);
   world->setVelocities(brokenVel);
   world->setExternalForces(brokenForce);
@@ -201,16 +201,16 @@ TEST(HALF_CHEETAH, POS_VEL_ERRORS)
       = dart::utils::UniversalLoader::loadWorld(
           "dart://sample/skel/half_cheetah.skel");
   // world->setSlowDebugResultsAgainstFD(true);
-  Eigen::VectorXd brokenPos = Eigen::VectorXd::Zero(9);
+  Eigen::VectorXs brokenPos = Eigen::VectorXs::Zero(9);
   brokenPos << -8.71924, -0.0564965, -7.58459, 0.291652, -0.587514, 0.200843,
       0.255774, 0.802592, -0.201628;
-  Eigen::VectorXd brokenVel = Eigen::VectorXd::Zero(9);
+  Eigen::VectorXs brokenVel = Eigen::VectorXs::Zero(9);
   brokenVel << 2.85676, 8.95689, -1.45436, -8.77701, -3.59597, -2.06459,
       -7.10815, 3.59627, -20.2623;
-  Eigen::VectorXd brokenForce = Eigen::VectorXd::Zero(9);
+  Eigen::VectorXs brokenForce = Eigen::VectorXs::Zero(9);
   brokenForce << 0, 0, 0.193621, -9.13741, 9.79953, 5.09491, -1.46957, -8.3705,
       -9.74503;
-  Eigen::VectorXd brokenLCPCache = Eigen::VectorXd::Zero(0);
+  Eigen::VectorXs brokenLCPCache = Eigen::VectorXs::Zero(0);
   world->setPositions(brokenPos);
   world->setVelocities(brokenVel);
   world->setExternalForces(brokenForce);
@@ -252,8 +252,8 @@ TEST(HALF_CHEETAH, FULL_TEST)
     std::cout << "DOF: " << dof->getName() << std::endl;
   }
 
-  Eigen::VectorXd forceLimits
-      = Eigen::VectorXd::Ones(world->getNumDofs()) * 100;
+  Eigen::VectorXs forceLimits
+      = Eigen::VectorXs::Ones(world->getNumDofs()) * 100;
   forceLimits(0) = 0;
   forceLimits(1) = 0;
   world->setExternalForceUpperLimits(forceLimits);
@@ -265,33 +265,33 @@ TEST(HALF_CHEETAH, FULL_TEST)
 
   // Create target
 
-  double target_x = 0.5;
-  double target_y = 0.5;
+  s_t target_x = 0.5;
+  s_t target_y = 0.5;
 
   SkeletonPtr target = Skeleton::create("target");
   std::pair<WeldJoint*, BodyNode*> targetJointPair
       = target->createJointAndBodyNodePair<WeldJoint>(nullptr);
   WeldJoint* targetJoint = targetJointPair.first;
   BodyNode* targetBody = targetJointPair.second;
-  Eigen::Isometry3d targetOffset = Eigen::Isometry3d::Identity();
-  targetOffset.translation() = Eigen::Vector3d(target_x, target_y, 0.0);
+  Eigen::Isometry3s targetOffset = Eigen::Isometry3s::Identity();
+  targetOffset.translation() = Eigen::Vector3s(target_x, target_y, 0.0);
   targetJoint->setTransformFromParentBodyNode(targetOffset);
   std::shared_ptr<BoxShape> targetShape(
-      new BoxShape(Eigen::Vector3d(0.1, 0.1, 0.1)));
+      new BoxShape(Eigen::Vector3s(0.1, 0.1, 0.1)));
   ShapeNode* targetVisual
       = targetBody->createShapeNodeWith<VisualAspect>(targetShape);
-  targetVisual->getVisualAspect()->setColor(Eigen::Vector3d(0.8, 0.5, 0.5));
+  targetVisual->getVisualAspect()->setColor(Eigen::Vector3s(0.8, 0.5, 0.5));
   targetVisual->getVisualAspect()->setCastShadows(false);
 
   world->addSkeleton(target);
 
   trajectory::LossFn loss(
       [target_x, target_y](const trajectory::TrajectoryRollout* rollout) {
-        const Eigen::VectorXd lastPos
+        const Eigen::VectorXs lastPos
             = rollout->getPosesConst().col(rollout->getPosesConst().cols() - 1);
 
-        double diffX = lastPos(0) - target_x;
-        double diffY = lastPos(1) - target_y;
+        s_t diffX = lastPos(0) - target_x;
+        s_t diffY = lastPos(1) - target_y;
 
         return diffX * diffX + diffY * diffY;
       });
@@ -307,11 +307,11 @@ TEST(HALF_CHEETAH, FULL_TEST)
   optimizer.setIterationLimit(500);
   optimizer.registerIntermediateCallback([&](trajectory::Problem* problem,
                                              int /* step */,
-                                             double /* primal */,
-                                             double /* dual */) {
-    const Eigen::MatrixXd poses
+                                             s_t /* primal */,
+                                             s_t /* dual */) {
+    const Eigen::MatrixXs poses
         = problem->getRolloutCache(world)->getPosesConst();
-    const Eigen::MatrixXd vels
+    const Eigen::MatrixXs vels
         = problem->getRolloutCache(world)->getVelsConst();
     std::cout << "Rendering trajectory lines" << std::endl;
     server.renderTrajectoryLines(world, poses);
@@ -323,9 +323,9 @@ TEST(HALF_CHEETAH, FULL_TEST)
       = optimizer.optimize(trajectory.get());
 
   int i = 0;
-  const Eigen::MatrixXd poses
+  const Eigen::MatrixXs poses
       = result->getStep(result->getNumSteps() - 1).rollout->getPosesConst();
-  const Eigen::MatrixXd vels
+  const Eigen::MatrixXs vels
       = result->getStep(result->getNumSteps() - 1).rollout->getVelsConst();
 
   server.renderTrajectoryLines(world, poses);
@@ -352,48 +352,48 @@ TEST(HALF_CHEETAH, FULL_TEST)
   }
 
   /*
-  Eigen::VectorXd forceLimits = Eigen::VectorXd::Ones(atlas->getNumDofs()) * 30;
+  Eigen::VectorXs forceLimits = Eigen::VectorXs::Ones(atlas->getNumDofs()) * 30;
   forceLimits.segment<6>(0).setZero();
   atlas->setForceUpperLimits(forceLimits);
   atlas->setForceLowerLimits(forceLimits * -1);
-  Eigen::VectorXd posLimits = Eigen::VectorXd::Ones(atlas->getNumDofs()) * 200;
+  Eigen::VectorXs posLimits = Eigen::VectorXs::Ones(atlas->getNumDofs()) * 200;
   atlas->setPositionUpperLimits(posLimits);
   atlas->setPositionLowerLimits(posLimits * -1);
-  Eigen::VectorXd velLimits = Eigen::VectorXd::Ones(atlas->getNumDofs()) * 1000;
+  Eigen::VectorXs velLimits = Eigen::VectorXs::Ones(atlas->getNumDofs()) * 1000;
   atlas->setVelocityUpperLimits(velLimits);
   atlas->setVelocityLowerLimits(velLimits * -1);
 
   // Create target
 
-  double target_x = 0.5;
-  double target_y = 0.5;
-  double target_z = 0.0;
+  s_t target_x = 0.5;
+  s_t target_y = 0.5;
+  s_t target_z = 0.0;
 
   SkeletonPtr target = Skeleton::create("target");
   std::pair<WeldJoint*, BodyNode*> targetJointPair
       = target->createJointAndBodyNodePair<WeldJoint>(nullptr);
   WeldJoint* targetJoint = targetJointPair.first;
   BodyNode* targetBody = targetJointPair.second;
-  Eigen::Isometry3d targetOffset = Eigen::Isometry3d::Identity();
-  targetOffset.translation() = Eigen::Vector3d(target_x, target_y, target_z);
+  Eigen::Isometry3s targetOffset = Eigen::Isometry3s::Identity();
+  targetOffset.translation() = Eigen::Vector3s(target_x, target_y, target_z);
   targetJoint->setTransformFromParentBodyNode(targetOffset);
   std::shared_ptr<BoxShape> targetShape(
-      new BoxShape(Eigen::Vector3d(0.1, 0.1, 0.1)));
+      new BoxShape(Eigen::Vector3s(0.1, 0.1, 0.1)));
   ShapeNode* targetVisual
       = targetBody->createShapeNodeWith<VisualAspect>(targetShape);
-  targetVisual->getVisualAspect()->setColor(Eigen::Vector3d(0.8, 0.5, 0.5));
+  targetVisual->getVisualAspect()->setColor(Eigen::Vector3s(0.8, 0.5, 0.5));
   targetVisual->getVisualAspect()->setCastShadows(false);
 
   world->addSkeleton(target);
 
   trajectory::LossFn loss([target_x, target_y, target_z](
                               const trajectory::TrajectoryRollout* rollout) {
-    const Eigen::VectorXd lastPos = rollout->getPosesConst("ik").col(
+    const Eigen::VectorXs lastPos = rollout->getPosesConst("ik").col(
         rollout->getPosesConst("ik").cols() - 1);
 
-    double diffX = lastPos(0) - target_x;
-    double diffY = lastPos(1) - target_y;
-    double diffZ = lastPos(2) - target_z;
+    s_t diffX = lastPos(0) - target_x;
+    s_t diffY = lastPos(1) - target_y;
+    s_t diffZ = lastPos(2) - target_z;
 
     return diffX * diffX + diffY * diffY + diffZ * diffZ;
   });
@@ -413,20 +413,20 @@ TEST(HALF_CHEETAH, FULL_TEST)
   server.serve(8070);
   server.renderWorld(world);
 
-  Eigen::VectorXd atlasPos = world->getPositions();
+  Eigen::VectorXs atlasPos = world->getPositions();
   */
   /*
   for (int i = 0; i < 1000; i++)
   {
-    Eigen::VectorXd pos = ikMapping->getPositions(world);
-    Eigen::MatrixXd jac = ikMapping->getMappedPosToRealPosJac(world);
-    double diffX = pos(0) - target_x;
-    double diffY = pos(1) - target_y;
+    Eigen::VectorXs pos = ikMapping->getPositions(world);
+    Eigen::MatrixXs jac = ikMapping->getMappedPosToRealPosJac(world);
+    s_t diffX = pos(0) - target_x;
+    s_t diffY = pos(1) - target_y;
 
-    Eigen::Vector3d grad = Eigen::Vector3d(2.0 * diffX, 2.0 * diffY, 0.0);
-    double loss = diffX * diffX + diffY * diffY;
+    Eigen::Vector3s grad = Eigen::Vector3s(2.0 * diffX, 2.0 * diffY, 0.0);
+    s_t loss = diffX * diffX + diffY * diffY;
 
-    Eigen::VectorXd posDiff = jac * grad;
+    Eigen::VectorXs posDiff = jac * grad;
     atlasPos -= posDiff * 0.001;
     world->setPositions(atlasPos);
     server.renderWorld(world);
@@ -435,23 +435,23 @@ TEST(HALF_CHEETAH, FULL_TEST)
 
   /*
   server.renderBasis(
-      10.0, "basis", Eigen::Vector3d::Zero(), Eigen::Vector3d::Zero());
+      10.0, "basis", Eigen::Vector3s::Zero(), Eigen::Vector3s::Zero());
       */
 
   /*
   Ticker ticker(0.1);
   ticker.registerTickListener([&](long time) {
-    Eigen::VectorXd pos = ikMapping->getPositions(world);
-    Eigen::MatrixXd jac = ikMapping->getMappedPosToRealPosJac(world);
-    double diffX = pos(0) - target_x;
-    double diffY = pos(1) - target_y;
-    double diffZ = pos(2) - target_z;
+    Eigen::VectorXs pos = ikMapping->getPositions(world);
+    Eigen::MatrixXs jac = ikMapping->getMappedPosToRealPosJac(world);
+    s_t diffX = pos(0) - target_x;
+    s_t diffY = pos(1) - target_y;
+    s_t diffZ = pos(2) - target_z;
 
-    Eigen::Vector3d grad
-        = Eigen::Vector3d(2.0 * diffX, 2.0 * diffY, 2.0 * diffZ);
-    double loss = diffX * diffX + diffY * diffY + diffZ * diffZ;
+    Eigen::Vector3s grad
+        = Eigen::Vector3s(2.0 * diffX, 2.0 * diffY, 2.0 * diffZ);
+    s_t loss = diffX * diffX + diffY * diffY + diffZ * diffZ;
 
-    Eigen::VectorXd posDiff = jac * grad;
+    Eigen::VectorXs posDiff = jac * grad;
     posDiff.segment(0, 6).setZero();
     atlasPos -= posDiff * 0.01;
     world->setPositions(atlasPos);
@@ -468,10 +468,10 @@ TEST(HALF_CHEETAH, FULL_TEST)
   optimizer.setCheckDerivatives(false);
   optimizer.setIterationLimit(500);
   optimizer.registerIntermediateCallback(
-      [&](trajectory::Problem* problem, int step, double primal, double dual) {
-        const Eigen::MatrixXd poses
+      [&](trajectory::Problem* problem, int step, s_t primal, s_t dual) {
+        const Eigen::MatrixXs poses
             = problem->getRolloutCache(world)->getPosesConst();
-        const Eigen::MatrixXd vels
+        const Eigen::MatrixXs vels
             = problem->getRolloutCache(world)->getVelsConst();
         std::cout << "Rendering trajectory lines" << std::endl;
         server.renderTrajectoryLines(world, poses);
@@ -483,9 +483,9 @@ TEST(HALF_CHEETAH, FULL_TEST)
       = optimizer.optimize(trajectory.get());
 
   int i = 0;
-  const Eigen::MatrixXd poses
+  const Eigen::MatrixXs poses
       = result->getStep(result->getNumSteps() - 1).rollout->getPosesConst();
-  const Eigen::MatrixXd vels
+  const Eigen::MatrixXs vels
       = result->getStep(result->getNumSteps() - 1).rollout->getVelsConst();
 
   server.renderTrajectoryLines(world, poses);

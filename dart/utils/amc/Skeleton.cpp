@@ -28,7 +28,7 @@ void unroll(vector<vector<int> > const& list, vector<int>& target, int row = 0)
   }
 }
 
-Quatd ordered_rotation(string const& order, Vector3d const& rotation);
+Quatd ordered_rotation(string const& order, Vector3s const& rotation);
 
 } // namespace
 
@@ -140,7 +140,7 @@ bool Skeleton::check_parse()
 }
 
 namespace {
-Quatd ordered_rotation(string const& order, Vector3d const& rot)
+Quatd ordered_rotation(string const& order, Vector3s const& rot)
 {
   Quatd ret;
   ret.clear();
@@ -175,9 +175,9 @@ Quatd ordered_rotation(string const& order, Vector3d const& rot)
 }
 
 /*
-Vector3d get_dof_trans(string const& dof, double const* info, int start_pos)
+Vector3s get_dof_trans(string const& dof, double const* info, int start_pos)
 {
-  Vector3d trans;
+  Vector3s trans;
   trans.x = trans.y = trans.z = 0;
   info += start_pos;
   for (unsigned int i = 0; i != dof.size(); ++i)
@@ -215,7 +215,7 @@ Vector3d get_dof_trans(string const& dof, double const* info, int start_pos)
 }
 
 void put_dof_trans(
-    string const& dof, Vector3d const& trans, double* info, int start_pos)
+    string const& dof, Vector3s const& trans, double* info, int start_pos)
 {
   info += start_pos;
   for (unsigned int i = 0; i != dof.size(); ++i)
@@ -275,7 +275,7 @@ Quatd get_dof_rot(string const& dof, double const* info, int start_pos)
             rotation(d * M_PI / 180.0, make_vector(0.0, 0.0, 1.0)), ret);
         break;
       case 'a': {
-        Vector3d axis = *(Vector3d*)info;
+        Vector3s axis = *(Vector3s*)info;
         info += 2;
         ret = multiply(rotation(length(axis), normalize(axis)), ret);
         break;
@@ -300,10 +300,10 @@ Quatd get_dof_rot(string const& dof, double const* info, int start_pos)
 
 namespace {
 // axis & probe should be orthonormal.
-double get_rotation(Vector3d axis, Vector3d probe, Quatd const& rot)
+double get_rotation(Vector3s axis, Vector3s probe, Quatd const& rot)
 {
-  Vector3d perp = cross_product(axis, probe);
-  Vector3d rotated = rotate(probe, rot);
+  Vector3s perp = cross_product(axis, probe);
+  Vector3s rotated = rotate(probe, rot);
   rotated = normalize(rotated - axis * (axis * rotated));
   return atan2(rotated * perp, rotated * probe);
 }
@@ -314,8 +314,8 @@ void put_dof_rot(
     string const& dof, Quatd const& rot, double* info, int start_pos)
 {
   unsigned int ind[3];
-  Vector3d vec[3];
-  Vector3d perp[3];
+  Vector3s vec[3];
+  Vector3s perp[3];
   // double q[4];
   // q[0] = rot.w;
   unsigned int count = 0;
@@ -348,7 +348,7 @@ void put_dof_rot(
         // Something special here, I guess.
         {
           // If axis angle isn't the only DOF, you're probably sodded.
-          Vector3d& vec = *(Vector3d*)(&info[i + start_pos]);
+          Vector3s& vec = *(Vector3s*)(&info[i + start_pos]);
           double xyzl = length(rot.xyz);
           double theta;
           if (xyzl != 0.0 && rot.w != 0)
@@ -404,9 +404,9 @@ void put_dof_rot(
     // rot is a quaternion
     // vec[0], vec[1], vec[2] are axes, orthonormal
     // create Euler angles in info around these axes
-    Vector3d new0 = rotate(vec[0], rot);
-    Vector3d new1 = rotate(vec[1], rot);
-    Vector3d new2 = rotate(vec[2], rot);
+    Vector3s new0 = rotate(vec[0], rot);
+    Vector3s new1 = rotate(vec[1], rot);
+    Vector3s new2 = rotate(vec[2], rot);
     double ang0 = atan2(new1 * vec[2], new2 * vec[2]);
     double ang1 = -atan2(
         new0 * vec[2], sqrt(pow(new0 * vec[0], 2) + pow(new0 * vec[1], 2)));
@@ -436,7 +436,7 @@ const &positions, Character::StateDelta &delta) const { delta.clear(); if
   }
   Quatd orientation_from, orientation_to;
   orientation_from = orientation_to = ordered_rotation(offset_order,
-axis_offset); Vector3d position_from, position_to; position_from = position_to =
+axis_offset); Vector3s position_from, position_to; position_from = position_to =
 position; position_from += get_dof_trans(order, &(positions[0]), frame_size *
 frame_from); position_to += get_dof_trans(order, &(positions[0]), frame_size *
 frame_to);

@@ -41,8 +41,8 @@
 namespace dart {
 namespace lcpsolver {
 
-// double RandDouble(double _low, double _high) {
-//  double temp;
+// s_t RandDouble(double _low, double _high) {
+//  s_t temp;
 
 //  /* swap low & high around if the user makes no sense */
 //  if (_low > _high) {
@@ -52,48 +52,48 @@ namespace lcpsolver {
 //  }
 
 //  /* calculate the random number & return it */
-//  temp = (rand() / (static_cast<double>(RAND_MAX) + 1.0))
+//  temp = (rand() / (static_cast<s_t>(RAND_MAX) + 1.0))
 //         * (_high - _low) + _low;
 //  return temp;
 // }
 
 //==============================================================================
 int Lemke(
-    const Eigen::MatrixXd& _M, const Eigen::VectorXd& _q, Eigen::VectorXd* _z)
+    const Eigen::MatrixXs& _M, const Eigen::VectorXs& _q, Eigen::VectorXs* _z)
 {
   int n = _q.size();
 
-  const double zer_tol = 1e-5;
-  const double piv_tol = 1e-8;
+  const s_t zer_tol = 1e-5;
+  const s_t piv_tol = 1e-8;
   int maxiter = 1000;
   int err = 0;
 
   if (_q.minCoeff() >= 0)
   {
     // LOG(INFO) << "Trivial solution exists.";
-    *_z = Eigen::VectorXd::Zero(n);
+    *_z = Eigen::VectorXs::Zero(n);
     return err;
   }
 
   // solve trivial case for n=1
   //   if (n==1){
   //     if (_M(0)>0){
-  //         *_z = (- _q(0)/_M(0) )*Eigen::VectorXd::Ones(n);
+  //         *_z = (- _q(0)/_M(0) )*Eigen::VectorXs::Ones(n);
   //         return err;
   //     } else {
-  //         *_z = Eigen::VectorXd::Zero(n);
+  //         *_z = Eigen::VectorXs::Zero(n);
   //         err = 4; // no solution
   //         return err;
   //     }
   //   }
 
-  *_z = Eigen::VectorXd::Zero(2 * n);
+  *_z = Eigen::VectorXs::Zero(2 * n);
   int iter = 0;
-  // double theta = 0;
-  double ratio = 0;
+  // s_t theta = 0;
+  s_t ratio = 0;
   int leaving = 0;
-  Eigen::VectorXd Be = Eigen::VectorXd::Constant(n, 1);
-  Eigen::VectorXd x = _q;
+  Eigen::VectorXs Be = Eigen::VectorXs::Constant(n, 1);
+  Eigen::VectorXs x = _q;
   std::vector<int> bas;
   std::vector<int> nonbas;
 
@@ -110,11 +110,11 @@ int Lemke(
     nonbas.push_back(i);
   }
 
-  Eigen::MatrixXd B = -Eigen::MatrixXd::Identity(n, n);
+  Eigen::MatrixXs B = -Eigen::MatrixXs::Identity(n, n);
 
   if (!bas.empty())
   {
-    Eigen::MatrixXd B_copy = B;
+    Eigen::MatrixXs B_copy = B;
     for (std::size_t i = 0; i < bas.size(); ++i)
     {
       B.col(i) = _M.col(bas[i]);
@@ -124,12 +124,12 @@ int Lemke(
       B.col(bas.size() + i) = B_copy.col(nonbas[i]);
     }
     // TODO: check the condition number to return err = 3
-    Eigen::JacobiSVD<Eigen::MatrixXd> svd(B);
-    double cond = svd.singularValues()(0)
-                  / svd.singularValues()(svd.singularValues().size() - 1);
+    Eigen::JacobiSVD<Eigen::MatrixXs> svd(B);
+    s_t cond = svd.singularValues()(0)
+               / svd.singularValues()(svd.singularValues().size() - 1);
     if (cond > 1e16)
     {
-      (*_z) = Eigen::VectorXd::Zero(n);
+      (*_z) = Eigen::VectorXs::Zero(n);
       err = 3;
       return err;
     }
@@ -139,7 +139,7 @@ int Lemke(
   // Check if initial basis provides solution
   if (x.minCoeff() >= 0)
   {
-    Eigen::VectorXd __z = Eigen::VectorXd::Zero(2 * n);
+    Eigen::VectorXs __z = Eigen::VectorXs::Zero(2 * n);
     for (std::size_t i = 0; i < bas.size(); ++i)
     {
       (__z).row(bas[i]) = x.row(i);
@@ -149,9 +149,9 @@ int Lemke(
   }
 
   // Determine initial leaving variable
-  Eigen::VectorXd minuxX = -x;
+  Eigen::VectorXs minuxX = -x;
   int lvindex;
-  double tval = minuxX.maxCoeff(&lvindex);
+  s_t tval = minuxX.maxCoeff(&lvindex);
   for (std::size_t i = 0; i < nonbas.size(); ++i)
   {
     bas.push_back(nonbas[i] + n);
@@ -160,7 +160,7 @@ int Lemke(
 
   bas[lvindex] = t; // pivoting in the artificial variable
 
-  Eigen::VectorXd U = Eigen::VectorXd::Zero(n);
+  Eigen::VectorXs U = Eigen::VectorXs::Zero(n);
   for (int i = 0; i < n; ++i)
   {
     if (x[i] < 0)
@@ -180,7 +180,7 @@ int Lemke(
     else if (leaving < n)
     {
       entering = n + leaving;
-      Be = Eigen::VectorXd::Zero(n);
+      Be = Eigen::VectorXs::Zero(n);
       Be[leaving] = -1;
     }
     else
@@ -189,7 +189,7 @@ int Lemke(
       Be = _M.col(entering);
     }
 
-    Eigen::VectorXd d = B.householderQr().solve(Be);
+    Eigen::VectorXs d = B.householderQr().solve(Be);
 
     // Find new leaving variable
     std::vector<int> j;
@@ -205,15 +205,15 @@ int Lemke(
     }
 
     std::size_t jSize = j.size();
-    Eigen::VectorXd minRatio(jSize);
+    Eigen::VectorXs minRatio(jSize);
     for (std::size_t i = 0; i < jSize; ++i)
     {
       minRatio[i] = (x[j[i]] + zer_tol) / d[j[i]];
     }
-    double theta = minRatio.minCoeff();
+    s_t theta = minRatio.minCoeff();
 
     std::vector<int> tmpJ;
-    std::vector<double> tmpd;
+    std::vector<s_t> tmpd;
     for (std::size_t i = 0; i < jSize; ++i)
     {
       if (x[j[i]] / d[j[i]] <= theta)
@@ -308,18 +308,18 @@ int Lemke(
       }
     }
 
-    Eigen::VectorXd __z = _z->head(n);
+    Eigen::VectorXs __z = _z->head(n);
     *_z = __z;
 
     if (!validate(_M, *_z, _q))
     {
-      // _z = VectorXd::Zero(n);
+      // _z = VectorXs::Zero(n);
       err = 3;
     }
   }
   else
   {
-    *_z = Eigen::VectorXd::Zero(n); // solve failed, return a 0 vector
+    *_z = Eigen::VectorXs::Zero(n); // solve failed, return a 0 vector
   }
 
   //  if (err == 1)
@@ -337,19 +337,19 @@ int Lemke(
 
 //==============================================================================
 bool validate(
-    const Eigen::MatrixXd& _M,
-    const Eigen::VectorXd& _z,
-    const Eigen::VectorXd& _q)
+    const Eigen::MatrixXs& _M,
+    const Eigen::VectorXs& _z,
+    const Eigen::VectorXs& _q)
 {
-  const double threshold = 1e-4;
+  const s_t threshold = 1e-4;
   int n = _z.size();
 
-  Eigen::VectorXd w = _M * _z + _q;
+  Eigen::VectorXs w = _M * _z + _q;
   for (int i = 0; i < n; ++i)
   {
     if (w(i) < -threshold || _z(i) < -threshold)
       return false;
-    if (std::abs(w(i) * _z(i)) > threshold)
+    if (abs(w(i) * _z(i)) > threshold)
       return false;
   }
   return true;

@@ -31,8 +31,8 @@ SSID::SSID(
 {
   int dofs = world->getNumDofs();
   mInitialPosEstimator
-      = [dofs](Eigen::MatrixXd /* sensors */, long /* time */) {
-          return Eigen::VectorXd::Zero(dofs);
+      = [dofs](Eigen::MatrixXs /* sensors */, long /* time */) {
+          return Eigen::VectorXs::Zero(dofs);
         };
 
   std::shared_ptr<IPOptOptimizer> ipoptOptimizer
@@ -80,7 +80,7 @@ void SSID::setProblem(std::shared_ptr<trajectory::Problem> problem)
 /// This registers a function that can be used to estimate the initial state
 /// for the inference system from recent sensor history and the timestamp
 void SSID::setInitialPosEstimator(
-    std::function<Eigen::VectorXd(Eigen::MatrixXd, long)> initialPosEstimator)
+    std::function<Eigen::VectorXs(Eigen::MatrixXs, long)> initialPosEstimator)
 {
   mInitialPosEstimator = initialPosEstimator;
 }
@@ -92,26 +92,26 @@ std::shared_ptr<trajectory::Problem> SSID::getProblem()
 }
 
 /// This logs that the sensor output is a specific vector now
-void SSID::registerSensorsNow(Eigen::VectorXd sensors)
+void SSID::registerSensorsNow(Eigen::VectorXs sensors)
 {
   return registerSensors(timeSinceEpochMillis(), sensors);
 }
 
 /// This logs that the controls are a specific vector now
-void SSID::registerControlsNow(Eigen::VectorXd controls)
+void SSID::registerControlsNow(Eigen::VectorXs controls)
 {
   return registerControls(timeSinceEpochMillis(), controls);
 }
 
 /// This logs that the sensor output was a specific vector at a specific
 /// moment
-void SSID::registerSensors(long now, Eigen::VectorXd sensors)
+void SSID::registerSensors(long now, Eigen::VectorXs sensors)
 {
   mSensorLog.record(now, sensors);
 }
 
 /// This logs that our controls were this value at this time
-void SSID::registerControls(long now, Eigen::VectorXd controls)
+void SSID::registerControls(long now, Eigen::VectorXs controls)
 {
   mControlLog.record(now, controls);
 }
@@ -139,8 +139,9 @@ void SSID::runInference(long startTime)
 {
   long startComputeWallTime = timeSinceEpochMillis();
 
-  int millisPerStep = (mWorld->getTimeStep() * 1000);
-  int steps = ceil((double)mPlanningHistoryMillis / millisPerStep);
+  int millisPerStep = static_cast<int>(ceil(mWorld->getTimeStep() * 1000.0));
+  int steps = static_cast<int>(
+      ceil(static_cast<s_t>(mPlanningHistoryMillis) / millisPerStep));
 
   if (!mProblem)
   {
@@ -152,7 +153,7 @@ void SSID::runInference(long startTime)
 
   // Every turn, we need to pin all the forces
 
-  Eigen::MatrixXd forceHistory = mControlLog.getValues(
+  Eigen::MatrixXs forceHistory = mControlLog.getValues(
       startTime - mPlanningHistoryMillis, steps, millisPerStep);
   for (int i = 0; i < steps; i++)
   {
@@ -161,7 +162,7 @@ void SSID::runInference(long startTime)
 
   // We also need to set all the sensor history into metadata
 
-  Eigen::MatrixXd sensorHistory = mSensorLog.getValues(
+  Eigen::MatrixXs sensorHistory = mSensorLog.getValues(
       startTime - mPlanningHistoryMillis, steps, millisPerStep);
   mProblem->setMetadata("forces", forceHistory);
   mProblem->setMetadata("sensors", sensorHistory);
@@ -177,9 +178,9 @@ void SSID::runInference(long startTime)
   const trajectory::TrajectoryRollout* cache
       = mProblem->getRolloutCache(mWorld);
 
-  Eigen::VectorXd pos = cache->getPosesConst().col(steps - 1);
-  Eigen::VectorXd vel = cache->getVelsConst().col(steps - 1);
-  Eigen::VectorXd mass = mWorld->getMasses();
+  Eigen::VectorXs pos = cache->getPosesConst().col(steps - 1);
+  Eigen::VectorXs vel = cache->getVelsConst().col(steps - 1);
+  Eigen::VectorXs mass = mWorld->getMasses();
 
   for (auto listener : mInferListeners)
   {
@@ -190,7 +191,7 @@ void SSID::runInference(long startTime)
 /// This registers a listener to get called when we finish replanning
 void SSID::registerInferListener(
     std::function<
-        void(long, Eigen::VectorXd, Eigen::VectorXd, Eigen::VectorXd, long)>
+        void(long, Eigen::VectorXs, Eigen::VectorXs, Eigen::VectorXs, long)>
         inferListener)
 {
   mInferListeners.push_back(inferListener);

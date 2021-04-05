@@ -57,16 +57,16 @@ public:
 
 private:
   /// \brief
-  double mBackWheelVelocity;
+  s_t mBackWheelVelocity;
 
   /// \brief
-  double mSteeringWheelAngle;
+  s_t mSteeringWheelAngle;
 
   /// \brief
-  double mK;
+  s_t mK;
 
   /// \brief
-  double mD;
+  s_t mD;
 };
 
 #endif // EXAMPLES_VEHICLE_MYWINDOW_HPP_

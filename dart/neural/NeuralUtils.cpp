@@ -17,7 +17,7 @@ namespace neural {
 
 //==============================================================================
 std::shared_ptr<ConstrainedGroupGradientMatrices> createGradientMatrices(
-    constraint::ConstrainedGroup& group, double timeStep)
+    constraint::ConstrainedGroup& group, s_t timeStep)
 {
   return std::make_shared<ConstrainedGroupGradientMatrices>(group, timeStep);
 }
@@ -33,10 +33,10 @@ std::shared_ptr<BackpropSnapshot> forwardPass(
   }
 
   // Record the current input vector
-  Eigen::VectorXd preStepPosition = world->getPositions();
-  Eigen::VectorXd preStepVelocity = world->getVelocities();
-  Eigen::VectorXd preStepTorques = world->getExternalForces();
-  Eigen::VectorXd preStepLCPCache = world->getCachedLCPSolution();
+  Eigen::VectorXs preStepPosition = world->getPositions();
+  Eigen::VectorXs preStepVelocity = world->getVelocities();
+  Eigen::VectorXs preStepTorques = world->getExternalForces();
+  Eigen::VectorXs preStepLCPCache = world->getCachedLCPSolution();
 
   // Set the gradient mode we're going to use to calculate gradients
   bool oldGradientEnabled = world->getConstraintSolver()->getGradientEnabled();
@@ -81,10 +81,10 @@ std::shared_ptr<MappedBackpropSnapshot> mappedForwardPass(
   }
 
   // Record the current input vector in mapped space
-  Eigen::VectorXd preStepPosition = world->getPositions();
-  Eigen::VectorXd preStepVelocity = world->getVelocities();
-  Eigen::VectorXd preStepTorques = world->getExternalForces();
-  Eigen::VectorXd preStepLCPCache = world->getCachedLCPSolution();
+  Eigen::VectorXs preStepPosition = world->getPositions();
+  Eigen::VectorXs preStepVelocity = world->getVelocities();
+  Eigen::VectorXs preStepTorques = world->getExternalForces();
+  Eigen::VectorXs preStepLCPCache = world->getCachedLCPSolution();
 
   // Record the Jacobians for mapping out from mapped space to world space
   // pre-step
@@ -133,12 +133,12 @@ std::shared_ptr<MappedBackpropSnapshot> mappedForwardPass(
 }
 
 //==============================================================================
-Eigen::MatrixXd jointPosToWorldSpatialJacobian(
+Eigen::MatrixXs jointPosToWorldSpatialJacobian(
     const std::shared_ptr<dynamics::Skeleton>& skel,
     const std::vector<dynamics::BodyNode*>& nodes)
 {
   int dofs = skel->getNumDofs();
-  Eigen::MatrixXd jac = Eigen::MatrixXd::Zero(nodes.size() * 6, dofs);
+  Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(nodes.size() * 6, dofs);
   for (int i = 0; i < nodes.size(); i++)
   {
     jac.block(i * 6, 0, 6, dofs) = skel->getWorldPositionJacobian(
@@ -148,12 +148,12 @@ Eigen::MatrixXd jointPosToWorldSpatialJacobian(
 }
 
 //==============================================================================
-Eigen::MatrixXd jointPosToWorldLinearJacobian(
+Eigen::MatrixXs jointPosToWorldLinearJacobian(
     const std::shared_ptr<dynamics::Skeleton>& skel,
     const std::vector<dynamics::BodyNode*>& nodes)
 {
   int dofs = skel->getNumDofs();
-  Eigen::MatrixXd jac = Eigen::MatrixXd::Zero(nodes.size() * 3, dofs);
+  Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(nodes.size() * 3, dofs);
   for (int i = 0; i < nodes.size(); i++)
   {
     jac.block(i * 3, 0, 3, dofs)
@@ -165,12 +165,12 @@ Eigen::MatrixXd jointPosToWorldLinearJacobian(
 }
 
 //==============================================================================
-Eigen::MatrixXd jointVelToWorldSpatialJacobian(
+Eigen::MatrixXs jointVelToWorldSpatialJacobian(
     const std::shared_ptr<dynamics::Skeleton>& skel,
     const std::vector<dynamics::BodyNode*>& nodes)
 {
   int dofs = skel->getNumDofs();
-  Eigen::MatrixXd jac = Eigen::MatrixXd::Zero(nodes.size() * 6, dofs);
+  Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(nodes.size() * 6, dofs);
   for (int i = 0; i < nodes.size(); i++)
   {
     jac.block(i * 6, 0, 6, dofs) = skel->getWorldJacobian(
@@ -180,12 +180,12 @@ Eigen::MatrixXd jointVelToWorldSpatialJacobian(
 }
 
 //==============================================================================
-Eigen::MatrixXd jointVelToWorldLinearJacobian(
+Eigen::MatrixXs jointVelToWorldLinearJacobian(
     const std::shared_ptr<dynamics::Skeleton>& skel,
     const std::vector<dynamics::BodyNode*>& nodes)
 {
   int dofs = skel->getNumDofs();
-  Eigen::MatrixXd jac = Eigen::MatrixXd::Zero(nodes.size() * 3, dofs);
+  Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(nodes.size() * 3, dofs);
   for (int i = 0; i < nodes.size(); i++)
   {
     jac.block(i * 3, 0, 3, dofs)
@@ -197,25 +197,25 @@ Eigen::MatrixXd jointVelToWorldLinearJacobian(
 }
 
 //==============================================================================
-Eigen::VectorXd skelConvertJointSpaceToWorldSpace(
+Eigen::VectorXs skelConvertJointSpaceToWorldSpace(
     const std::shared_ptr<dynamics::Skeleton>& skel,
-    const Eigen::VectorXd& jointValues, /* These can be velocities or positions,
+    const Eigen::VectorXs& jointValues, /* These can be velocities or positions,
                                     depending on the value of `space` */
     const std::vector<dynamics::BodyNode*>& nodes,
     ConvertToSpace space)
 {
-  Eigen::VectorXd out;
+  Eigen::VectorXs out;
 
   if (space == ConvertToSpace::POS_LINEAR
       || space == ConvertToSpace::POS_SPATIAL
       || space == ConvertToSpace::COM_POS)
   {
-    Eigen::VectorXd oldPositions = skel->getPositions();
+    Eigen::VectorXs oldPositions = skel->getPositions();
     skel->setPositions(jointValues);
 
     if (space == ConvertToSpace::POS_SPATIAL)
     {
-      out = Eigen::VectorXd::Zero(nodes.size() * 6);
+      out = Eigen::VectorXs::Zero(nodes.size() * 6);
       for (std::size_t i = 0; i < nodes.size(); i++)
       {
         dynamics::BodyNode* node
@@ -227,7 +227,7 @@ Eigen::VectorXd skelConvertJointSpaceToWorldSpace(
     }
     else if (space == ConvertToSpace::POS_LINEAR)
     {
-      out = Eigen::VectorXd::Zero(nodes.size() * 3);
+      out = Eigen::VectorXs::Zero(nodes.size() * 3);
       for (std::size_t i = 0; i < nodes.size(); i++)
       {
         dynamics::BodyNode* node
@@ -248,8 +248,8 @@ Eigen::VectorXd skelConvertJointSpaceToWorldSpace(
       || space == ConvertToSpace::COM_VEL_LINEAR
       || space == ConvertToSpace::COM_VEL_SPATIAL)
   {
-    Eigen::MatrixXd jac = jointVelToWorldSpatialJacobian(skel, nodes);
-    Eigen::VectorXd spatialVel = jac * jointValues;
+    Eigen::MatrixXs jac = jointVelToWorldSpatialJacobian(skel, nodes);
+    Eigen::VectorXs spatialVel = jac * jointValues;
 
     if (space == ConvertToSpace::VEL_SPATIAL)
     {
@@ -257,7 +257,7 @@ Eigen::VectorXd skelConvertJointSpaceToWorldSpace(
     }
     else if (space == ConvertToSpace::VEL_LINEAR)
     {
-      out = Eigen::VectorXd::Zero(spatialVel.size() / 2);
+      out = Eigen::VectorXs::Zero(spatialVel.size() / 2);
       for (std::size_t i = 0; i < nodes.size(); i++)
       {
         out.segment(i * 3, 3) = spatialVel.segment((i * 6) + 3, 3);
@@ -265,8 +265,8 @@ Eigen::VectorXd skelConvertJointSpaceToWorldSpace(
     }
     else if (space == ConvertToSpace::COM_VEL_SPATIAL)
     {
-      out = Eigen::VectorXd::Zero(6);
-      double totalMass = 0.0;
+      out = Eigen::VectorXs::Zero(6);
+      s_t totalMass = 0.0;
       for (int i = 0; i < nodes.size(); i++)
       {
         out += nodes[i]->getMass() * spatialVel.segment(i * 6, 6);
@@ -276,8 +276,8 @@ Eigen::VectorXd skelConvertJointSpaceToWorldSpace(
     }
     else if (space == ConvertToSpace::COM_VEL_LINEAR)
     {
-      out = Eigen::VectorXd::Zero(3);
-      double totalMass = 0.0;
+      out = Eigen::VectorXs::Zero(3);
+      s_t totalMass = 0.0;
       for (int i = 0; i < nodes.size(); i++)
       {
         out += nodes[i]->getMass() * spatialVel.segment((i * 6) + 3, 3);
@@ -297,14 +297,14 @@ Eigen::VectorXd skelConvertJointSpaceToWorldSpace(
 }
 
 //==============================================================================
-Eigen::VectorXd skelBackpropWorldSpaceToJointSpace(
+Eigen::VectorXs skelBackpropWorldSpaceToJointSpace(
     const std::shared_ptr<dynamics::Skeleton>& skel,
-    const Eigen::VectorXd& bodySpace, /* This is the gradient in body space */
+    const Eigen::VectorXs& bodySpace, /* This is the gradient in body space */
     const std::vector<dynamics::BodyNode*>& nodes,
     ConvertToSpace space, /* This is the source space for our gradient */
     bool useIK)
 {
-  Eigen::MatrixXd jac;
+  Eigen::MatrixXs jac;
   if (space == ConvertToSpace::POS_LINEAR)
   {
     jac = jointPosToWorldLinearJacobian(skel, nodes);
@@ -343,7 +343,7 @@ Eigen::VectorXd skelBackpropWorldSpaceToJointSpace(
   // Short circuit if we're being asked to map through an empty matrix
   if (jac.size() == 0)
   {
-    return Eigen::VectorXd::Zero(0);
+    return Eigen::VectorXs::Zero(0);
   }
 
   if (useIK)
@@ -357,9 +357,9 @@ Eigen::VectorXd skelBackpropWorldSpaceToJointSpace(
 }
 
 //==============================================================================
-Eigen::MatrixXd convertJointSpaceToWorldSpace(
+Eigen::MatrixXs convertJointSpaceToWorldSpace(
     const std::shared_ptr<simulation::World>& world,
-    const Eigen::MatrixXd& in, /* These can be velocities or positions,
+    const Eigen::MatrixXs& in, /* These can be velocities or positions,
                                     depending on the value of `space` */
     const std::vector<dynamics::BodyNode*>& nodes,
     ConvertToSpace space,
@@ -393,7 +393,7 @@ Eigen::MatrixXd convertJointSpaceToWorldSpace(
   int rows = backprop ? world->getNumDofs()
                       : (isCOM ? skeletons.size() * data_size
                                : nodes.size() * data_size);
-  Eigen::MatrixXd out = Eigen::MatrixXd::Zero(rows, in.cols());
+  Eigen::MatrixXs out = Eigen::MatrixXs::Zero(rows, in.cols());
 
   for (int i = 0; i < skeletons.size(); i++)
   {
@@ -451,8 +451,8 @@ Eigen::MatrixXd convertJointSpaceToWorldSpace(
       {
         if (backprop)
         {
-          Eigen::VectorXd skelIn
-              = Eigen::VectorXd::Zero(skelNodes.size() * data_size);
+          Eigen::VectorXs skelIn
+              = Eigen::VectorXs::Zero(skelNodes.size() * data_size);
           for (int k = 0; k < skelNodes.size(); k++)
           {
             skelIn.segment(k * data_size, data_size)
@@ -464,7 +464,7 @@ Eigen::MatrixXd convertJointSpaceToWorldSpace(
         }
         else
         {
-          Eigen::VectorXd skelOut = skelConvertJointSpaceToWorldSpace(
+          Eigen::VectorXs skelOut = skelConvertJointSpaceToWorldSpace(
               skeletons[i], in.block(dofOffset, t, dofs, 1), skelNodes, space);
           for (int k = 0; k < skelNodes.size(); k++)
           {

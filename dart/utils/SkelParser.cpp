@@ -39,6 +39,7 @@
 #include <Eigen/Dense>
 #include <Eigen/StdVector>
 
+#include "dart/math/MathTypes.hpp"
 #include "dart/collision/CollisionObject.hpp"
 #include "dart/collision/dart/DARTCollisionDetector.hpp"
 #include "dart/common/Console.hpp"
@@ -95,7 +96,7 @@ using JointPropPtr = std::shared_ptr<dynamics::Joint::Properties>;
 struct SkelBodyNode
 {
   BodyPropPtr properties;
-  Eigen::Isometry3d initTransform;
+  Eigen::Isometry3s initTransform;
   std::vector<dynamics::Marker::BasicProperties> markers;
   std::string type;
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -104,10 +105,10 @@ struct SkelBodyNode
 struct SkelJoint
 {
   JointPropPtr properties;
-  Eigen::VectorXd position;
-  Eigen::VectorXd velocity;
-  Eigen::VectorXd acceleration;
-  Eigen::VectorXd force;
+  Eigen::VectorXs position;
+  Eigen::VectorXs velocity;
+  Eigen::VectorXs acceleration;
+  Eigen::VectorXs force;
   std::string parentName;
   std::string childName;
   std::string type;
@@ -141,13 +142,13 @@ dart::dynamics::SkeletonPtr readSkeleton(
 
 SkelBodyNode readBodyNode(
     tinyxml2::XMLElement* _bodyElement,
-    const Eigen::Isometry3d& _skeletonFrame,
+    const Eigen::Isometry3s& _skeletonFrame,
     const common::Uri& _baseUri,
     const common::ResourceRetrieverPtr& _retriever);
 
 SkelBodyNode readSoftBodyNode(
     tinyxml2::XMLElement* _softBodyNodeElement,
-    const Eigen::Isometry3d& _skeletonFrame,
+    const Eigen::Isometry3s& _skeletonFrame,
     const common::Uri& _baseUri,
     const common::ResourceRetrieverPtr& _retriever);
 
@@ -282,13 +283,13 @@ dynamics::SkeletonPtr readSkeleton(
 
 SkelBodyNode readBodyNode(
     tinyxml2::XMLElement* _bodyNodeElement,
-    const Eigen::Isometry3d& _skeletonFrame,
+    const Eigen::Isometry3s& _skeletonFrame,
     const common::Uri& _baseUri,
     const common::ResourceRetrieverPtr& _retriever);
 
 SkelBodyNode readSoftBodyNode(
     tinyxml2::XMLElement* _softBodyNodeElement,
-    const Eigen::Isometry3d& _skeletonFrame,
+    const Eigen::Isometry3s& _skeletonFrame,
     const common::Uri& _baseUri,
     const common::ResourceRetrieverPtr& _retriever);
 
@@ -310,7 +311,7 @@ void readJoint(
 
 void getDofAttributeIfItExists(
     const std::string& _attribute,
-    double* _value,
+    s_t* _value,
     const std::string& _element_type,
     const tinyxml2::XMLElement* _xmlElement,
     const std::string& _jointName,
@@ -321,9 +322,9 @@ void setDofLimitAttributes(
     const std::string& _element_type,
     const std::string& _jointName,
     std::size_t _index,
-    double* lower,
-    double* upper,
-    double* initial);
+    s_t* lower,
+    s_t* upper,
+    s_t* initial);
 
 template <typename PropertyType>
 void readAllDegreesOfFreedom(
@@ -526,7 +527,7 @@ dynamics::ShapeNode* readShapeNode(
   // Transformation
   if (hasElement(shapeNodeEle, "transformation"))
   {
-    Eigen::Isometry3d W = getValueIsometry3d(shapeNodeEle, "transformation");
+    Eigen::Isometry3s W = getValueIsometry3s(shapeNodeEle, "transformation");
     shapeNode->setRelativeTransform(W);
   }
 
@@ -552,15 +553,15 @@ void readVisualizationShapeNode(
   // color
   if (hasElement(vizShapeNodeEle, "color"))
   {
-    Eigen::VectorXd color = getValueVectorXd(vizShapeNodeEle, "color");
+    Eigen::VectorXs color = getValueVectorXs(vizShapeNodeEle, "color");
 
     if (color.size() == 3)
     {
-      visualAspect->setColor(static_cast<Eigen::Vector3d>(color));
+      visualAspect->setColor(static_cast<Eigen::Vector3s>(color));
     }
     else if (color.size() == 4)
     {
-      visualAspect->setColor(static_cast<Eigen::Vector4d>(color));
+      visualAspect->setColor(static_cast<Eigen::Vector4s>(color));
     }
     else
     {
@@ -635,7 +636,7 @@ void readAspects(
             continue;
 
           auto mass = bodyNode->getMass();
-          Eigen::Matrix3d Ic = shapeNode->getShape()->computeInertia(mass);
+          Eigen::Matrix3s Ic = shapeNode->getShape()->computeInertia(mass);
           auto inertia = bodyNode->getInertia();
           inertia.setMoment(Ic);
           bodyNode->setInertia(inertia);
@@ -720,7 +721,7 @@ simulation::WorldPtr readWorld(
     if (timeStepElement != nullptr)
     {
       std::string strTimeStep = timeStepElement->GetText();
-      double timeStep = toDouble(strTimeStep);
+      s_t timeStep = toDouble(strTimeStep);
       newWorld->setTimeStep(timeStep);
     }
 
@@ -730,7 +731,7 @@ simulation::WorldPtr readWorld(
     if (gravityElement != nullptr)
     {
       std::string strGravity = gravityElement->GetText();
-      Eigen::Vector3d gravity = toVector3d(strGravity);
+      Eigen::Vector3s gravity = toVector3s(strGravity);
       newWorld->setGravity(gravity);
     }
 
@@ -983,7 +984,7 @@ dynamics::SkeletonPtr readSkeleton(
   assert(_skeletonElement != nullptr);
 
   dynamics::SkeletonPtr newSkeleton = dynamics::Skeleton::create();
-  Eigen::Isometry3d skeletonFrame = Eigen::Isometry3d::Identity();
+  Eigen::Isometry3s skeletonFrame = Eigen::Isometry3s::Identity();
 
   //--------------------------------------------------------------------------
   // Name attribute
@@ -994,8 +995,8 @@ dynamics::SkeletonPtr readSkeleton(
   // transformation
   if (hasElement(_skeletonElement, "transformation"))
   {
-    Eigen::Isometry3d W
-        = getValueIsometry3d(_skeletonElement, "transformation");
+    Eigen::Isometry3s W
+        = getValueIsometry3s(_skeletonElement, "transformation");
     skeletonFrame = W;
   }
 
@@ -1098,14 +1099,14 @@ dynamics::SkeletonPtr readSkeleton(
 //==============================================================================
 SkelBodyNode readBodyNode(
     tinyxml2::XMLElement* _bodyNodeElement,
-    const Eigen::Isometry3d& _skeletonFrame,
+    const Eigen::Isometry3s& _skeletonFrame,
     const common::Uri& /*_baseUri*/,
     const common::ResourceRetrieverPtr& /*_retriever*/)
 {
   assert(_bodyNodeElement != nullptr);
 
   BodyPropPtr newBodyNode(new dynamics::BodyNode::Properties);
-  Eigen::Isometry3d initTransform = Eigen::Isometry3d::Identity();
+  Eigen::Isometry3s initTransform = Eigen::Isometry3s::Identity();
 
   // Name attribute
   newBodyNode->mName = getAttributeString(_bodyNodeElement, "name");
@@ -1128,8 +1129,8 @@ SkelBodyNode readBodyNode(
   // transformation
   if (hasElement(_bodyNodeElement, "transformation"))
   {
-    Eigen::Isometry3d W
-        = getValueIsometry3d(_bodyNodeElement, "transformation");
+    Eigen::Isometry3s W
+        = getValueIsometry3s(_bodyNodeElement, "transformation");
     initTransform = _skeletonFrame * W;
   }
   else
@@ -1145,7 +1146,7 @@ SkelBodyNode readBodyNode(
         = getElement(_bodyNodeElement, "inertia");
 
     // mass
-    double mass = getValueDouble(inertiaElement, "mass");
+    s_t mass = getValueDouble(inertiaElement, "mass");
     newBodyNode->mInertia.setMass(mass);
 
     // moment of inertia
@@ -1154,13 +1155,13 @@ SkelBodyNode readBodyNode(
       tinyxml2::XMLElement* moiElement
           = getElement(inertiaElement, "moment_of_inertia");
 
-      double ixx = getValueDouble(moiElement, "ixx");
-      double iyy = getValueDouble(moiElement, "iyy");
-      double izz = getValueDouble(moiElement, "izz");
+      s_t ixx = getValueDouble(moiElement, "ixx");
+      s_t iyy = getValueDouble(moiElement, "iyy");
+      s_t izz = getValueDouble(moiElement, "izz");
 
-      double ixy = getValueDouble(moiElement, "ixy");
-      double ixz = getValueDouble(moiElement, "ixz");
-      double iyz = getValueDouble(moiElement, "iyz");
+      s_t ixy = getValueDouble(moiElement, "ixy");
+      s_t ixz = getValueDouble(moiElement, "ixz");
+      s_t iyz = getValueDouble(moiElement, "iyz");
 
       newBodyNode->mInertia.setMoment(ixx, iyy, izz, ixy, ixz, iyz);
     }
@@ -1168,7 +1169,7 @@ SkelBodyNode readBodyNode(
     // offset
     if (hasElement(inertiaElement, "offset"))
     {
-      Eigen::Vector3d offset = getValueVector3d(inertiaElement, "offset");
+      Eigen::Vector3s offset = getValueVector3s(inertiaElement, "offset");
       newBodyNode->mInertia.setLocalCOM(offset);
     }
   }
@@ -1191,7 +1192,7 @@ SkelBodyNode readBodyNode(
 //==============================================================================
 SkelBodyNode readSoftBodyNode(
     tinyxml2::XMLElement* _softBodyNodeElement,
-    const Eigen::Isometry3d& _skeletonFrame,
+    const Eigen::Isometry3s& _skeletonFrame,
     const common::Uri& _baseUri,
     const common::ResourceRetrieverPtr& _retriever)
 {
@@ -1219,12 +1220,12 @@ SkelBodyNode readSoftBodyNode(
         = getElement(_softBodyNodeElement, "soft_shape");
 
     // mass
-    double totalMass = getValueDouble(softShapeEle, "total_mass");
+    s_t totalMass = getValueDouble(softShapeEle, "total_mass");
 
     // transformation
-    Eigen::Isometry3d T = Eigen::Isometry3d::Identity();
+    Eigen::Isometry3s T = Eigen::Isometry3s::Identity();
     if (hasElement(softShapeEle, "transformation"))
-      T = getValueIsometry3d(softShapeEle, "transformation");
+      T = getValueIsometry3s(softShapeEle, "transformation");
 
     // geometry
     tinyxml2::XMLElement* geometryEle = getElement(softShapeEle, "geometry");
@@ -1240,7 +1241,7 @@ SkelBodyNode readSoftBodyNode(
     else if (hasElement(geometryEle, "box"))
     {
       tinyxml2::XMLElement* boxEle = getElement(geometryEle, "box");
-      Eigen::Vector3d size = getValueVector3d(boxEle, "size");
+      Eigen::Vector3s size = getValueVector3s(boxEle, "size");
       Eigen::Vector3i frags = getValueVector3i(boxEle, "frags");
       newSoftBodyNode = dynamics::SoftBodyNodeHelper::makeBoxProperties(
           size, T, frags, totalMass);
@@ -1248,7 +1249,7 @@ SkelBodyNode readSoftBodyNode(
     else if (hasElement(geometryEle, "ellipsoid"))
     {
       tinyxml2::XMLElement* ellipsoidEle = getElement(geometryEle, "ellipsoid");
-      Eigen::Vector3d size = getValueVector3d(ellipsoidEle, "size");
+      Eigen::Vector3s size = getValueVector3s(ellipsoidEle, "size");
       const auto nSlices = getValueUInt(ellipsoidEle, "num_slices");
       const auto nStacks = getValueUInt(ellipsoidEle, "num_stacks");
       newSoftBodyNode = dynamics::SoftBodyNodeHelper::makeEllipsoidProperties(
@@ -1257,13 +1258,13 @@ SkelBodyNode readSoftBodyNode(
     else if (hasElement(geometryEle, "cylinder"))
     {
       tinyxml2::XMLElement* ellipsoidEle = getElement(geometryEle, "cylinder");
-      double radius = getValueDouble(ellipsoidEle, "radius");
-      double height = getValueDouble(ellipsoidEle, "height");
-      double nSlices = getValueDouble(ellipsoidEle, "num_slices");
-      double nStacks = getValueDouble(ellipsoidEle, "num_stacks");
-      double nRings = getValueDouble(ellipsoidEle, "num_rings");
+      s_t radius = getValueDouble(ellipsoidEle, "radius");
+      s_t height = getValueDouble(ellipsoidEle, "height");
+      s_t nSlices = getValueDouble(ellipsoidEle, "num_slices");
+      s_t nStacks = getValueDouble(ellipsoidEle, "num_stacks");
+      s_t nRings = getValueDouble(ellipsoidEle, "num_rings");
       newSoftBodyNode = dynamics::SoftBodyNodeHelper::makeCylinderProperties(
-          radius, height, nSlices, nStacks, nRings, totalMass);
+          radius, height, static_cast<std::size_t>(nSlices), static_cast<std::size_t>(nStacks), static_cast<std::size_t>(nRings), totalMass);
     }
     else
     {
@@ -1323,43 +1324,43 @@ dynamics::ShapePtr readShape(
   else if (hasElement(geometryEle, "box"))
   {
     tinyxml2::XMLElement* boxEle = getElement(geometryEle, "box");
-    Eigen::Vector3d size = getValueVector3d(boxEle, "size");
+    Eigen::Vector3s size = getValueVector3s(boxEle, "size");
     newShape = dynamics::ShapePtr(new dynamics::BoxShape(size));
   }
   else if (hasElement(geometryEle, "ellipsoid"))
   {
     tinyxml2::XMLElement* ellipsoidEle = getElement(geometryEle, "ellipsoid");
-    Eigen::Vector3d size = getValueVector3d(ellipsoidEle, "size");
+    Eigen::Vector3s size = getValueVector3s(ellipsoidEle, "size");
     newShape = dynamics::ShapePtr(new dynamics::EllipsoidShape(size));
   }
   else if (hasElement(geometryEle, "cylinder"))
   {
     tinyxml2::XMLElement* cylinderEle = getElement(geometryEle, "cylinder");
-    double radius = getValueDouble(cylinderEle, "radius");
-    double height = getValueDouble(cylinderEle, "height");
+    s_t radius = getValueDouble(cylinderEle, "radius");
+    s_t height = getValueDouble(cylinderEle, "height");
     newShape = dynamics::ShapePtr(new dynamics::CylinderShape(radius, height));
   }
   else if (hasElement(geometryEle, "capsule"))
   {
     tinyxml2::XMLElement* capsuleEle = getElement(geometryEle, "capsule");
-    double radius = getValueDouble(capsuleEle, "radius");
-    double height = getValueDouble(capsuleEle, "height");
+    s_t radius = getValueDouble(capsuleEle, "radius");
+    s_t height = getValueDouble(capsuleEle, "height");
     newShape = dynamics::ShapePtr(new dynamics::CapsuleShape(radius, height));
   }
   else if (hasElement(geometryEle, "cone"))
   {
     tinyxml2::XMLElement* coneEle = getElement(geometryEle, "cone");
-    double radius = getValueDouble(coneEle, "radius");
-    double height = getValueDouble(coneEle, "height");
+    s_t radius = getValueDouble(coneEle, "radius");
+    s_t height = getValueDouble(coneEle, "height");
     newShape = dynamics::ShapePtr(new dynamics::ConeShape(radius, height));
   }
   else if (hasElement(geometryEle, "plane"))
   {
     tinyxml2::XMLElement* planeEle = getElement(geometryEle, "plane");
-    Eigen::Vector3d normal = getValueVector3d(planeEle, "normal");
+    Eigen::Vector3s normal = getValueVector3s(planeEle, "normal");
     if (hasElement(planeEle, "offset"))
     {
-      double offset = getValueDouble(planeEle, "offset");
+      s_t offset = getValueDouble(planeEle, "offset");
       newShape = dynamics::ShapePtr(new dynamics::PlaneShape(normal, offset));
     }
     else if (hasElement(planeEle, "point"))
@@ -1367,7 +1368,7 @@ dynamics::ShapePtr readShape(
       dtwarn << "[readShape] <point> element of <plane> is "
              << "deprecated as of DART 4.3. Please use <offset> element "
              << "instead." << std::endl;
-      Eigen::Vector3d point = getValueVector3d(planeEle, "point");
+      Eigen::Vector3s point = getValueVector3s(planeEle, "point");
       newShape = dynamics::ShapePtr(new dynamics::PlaneShape(normal, point));
     }
     else
@@ -1386,9 +1387,9 @@ dynamics::ShapePtr readShape(
     dynamics::MultiSphereConvexHullShape::Spheres spheres;
     while (xmlSpheres.next())
     {
-      const double radius = getValueDouble(xmlSpheres.get(), "radius");
-      const Eigen::Vector3d position
-          = getValueVector3d(xmlSpheres.get(), "position");
+      const s_t radius = getValueDouble(xmlSpheres.get(), "radius");
+      const Eigen::Vector3s position
+          = getValueVector3s(xmlSpheres.get(), "position");
 
       spheres.emplace_back(radius, position);
     }
@@ -1400,7 +1401,7 @@ dynamics::ShapePtr readShape(
   {
     tinyxml2::XMLElement* meshEle = getElement(geometryEle, "mesh");
     std::string filename = getValueString(meshEle, "file_name");
-    Eigen::Vector3d scale = getValueVector3d(meshEle, "scale");
+    Eigen::Vector3s scale = getValueVector3s(meshEle, "scale");
 
     const std::string meshUri = common::Uri::getRelativeUri(baseUri, filename);
     const aiScene* model = dynamics::MeshShape::loadMesh(meshUri, retriever);
@@ -1433,9 +1434,9 @@ dynamics::Marker::BasicProperties readMarker(
   std::string name = getAttributeString(_markerElement, "name");
 
   // offset
-  Eigen::Vector3d offset = Eigen::Vector3d::Zero();
+  Eigen::Vector3s offset = Eigen::Vector3s::Zero();
   if (hasElement(_markerElement, "offset"))
-    offset = getValueVector3d(_markerElement, "offset");
+    offset = getValueVector3s(_markerElement, "offset");
 
   dynamics::Marker::BasicProperties newMarker;
   newMarker.mName = name;
@@ -1575,17 +1576,17 @@ void readJoint(
 
   //--------------------------------------------------------------------------
   // transformation
-  Eigen::Isometry3d parentWorld = Eigen::Isometry3d::Identity();
-  Eigen::Isometry3d childToJoint = Eigen::Isometry3d::Identity();
-  Eigen::Isometry3d childWorld = child->second.initTransform;
+  Eigen::Isometry3s parentWorld = Eigen::Isometry3s::Identity();
+  Eigen::Isometry3s childToJoint = Eigen::Isometry3s::Identity();
+  Eigen::Isometry3s childWorld = child->second.initTransform;
 
   if (parent != _bodyNodes.end())
     parentWorld = parent->second.initTransform;
 
   if (hasElement(_jointElement, "transformation"))
-    childToJoint = getValueIsometry3d(_jointElement, "transformation");
+    childToJoint = getValueIsometry3s(_jointElement, "transformation");
 
-  Eigen::Isometry3d parentToJoint
+  Eigen::Isometry3s parentToJoint
       = parentWorld.inverse() * childWorld * childToJoint;
 
   joint.properties->mT_ParentBodyToJoint = parentToJoint;
@@ -1628,19 +1629,21 @@ void readJoint(
 //==============================================================================
 void getDofAttributeIfItExists(
     const std::string& _attribute,
-    double* _value,
+    s_t* _value,
     const std::string& _element_type,
     const tinyxml2::XMLElement* _xmlElement,
     const std::string& _jointName,
     std::size_t _index)
 {
-  if (_xmlElement->QueryDoubleAttribute(_attribute.c_str(), _value)
+  double val;
+  if (_xmlElement->QueryDoubleAttribute(_attribute.c_str(), &val)
       == tinyxml2::XML_WRONG_ATTRIBUTE_TYPE)
   {
     dterr << "[getDofAttributeIfItExists] Invalid type for [" << _attribute
           << "] attribute of [" << _element_type << "] element in the ["
           << _index << "] dof of Joint [" << _jointName << "].\n";
   }
+  *_value = static_cast<s_t>(val);
 }
 
 //==============================================================================
@@ -1649,9 +1652,9 @@ void setDofLimitAttributes(
     const std::string& _element_type,
     const std::string& _jointName,
     std::size_t _index,
-    double* lower,
-    double* upper,
-    double* initial)
+    s_t* lower,
+    s_t* upper,
+    s_t* initial)
 {
   const tinyxml2::XMLElement* xmlElement
       = getElement(_dofElement, _element_type);
@@ -1672,26 +1675,26 @@ struct DofProxy
   std::size_t index;
   bool valid;
 
-  double* lowerPosition;
-  double* upperPosition;
-  double* initalPosition;
+  s_t* lowerPosition;
+  s_t* upperPosition;
+  s_t* initalPosition;
 
-  double* lowerVelocity;
-  double* upperVelocity;
-  double* initialVelocity;
+  s_t* lowerVelocity;
+  s_t* upperVelocity;
+  s_t* initialVelocity;
 
-  double* lowerAcceleration;
-  double* upperAcceleration;
-  double* initialAcceleration;
+  s_t* lowerAcceleration;
+  s_t* upperAcceleration;
+  s_t* initialAcceleration;
 
-  double* lowerForce;
-  double* upperForce;
-  double* initialForce;
+  s_t* lowerForce;
+  s_t* upperForce;
+  s_t* initialForce;
 
-  double* springStiffness;
-  double* restPosition;
-  double* dampingCoefficient;
-  double* friction;
+  s_t* springStiffness;
+  s_t* restPosition;
+  s_t* dampingCoefficient;
+  s_t* friction;
 
   bool* preserveName;
   std::string* name;
@@ -1930,7 +1933,7 @@ void readJointDynamicsAndLimit(
         dtwarn << "[SkelParser] <damping> tag is now an element under the "
                << "<dynamics> tag. Please see "
                << "(https://github.com/dartsim/dart/wiki/) for more details.\n";
-        double damping = getValueDouble(axisElement, "damping");
+        s_t damping = getValueDouble(axisElement, "damping");
         *proxy.dampingCoefficient = damping;
       }
 
@@ -1943,28 +1946,28 @@ void readJointDynamicsAndLimit(
         // damping
         if (hasElement(dynamicsElement, "damping"))
         {
-          double val = getValueDouble(dynamicsElement, "damping");
+          s_t val = getValueDouble(dynamicsElement, "damping");
           *proxy.dampingCoefficient = val;
         }
 
         // friction
         if (hasElement(dynamicsElement, "friction"))
         {
-          double val = getValueDouble(dynamicsElement, "friction");
+          s_t val = getValueDouble(dynamicsElement, "friction");
           *proxy.friction = val;
         }
 
         // spring_rest_position
         if (hasElement(dynamicsElement, "spring_rest_position"))
         {
-          double val = getValueDouble(dynamicsElement, "spring_rest_position");
+          s_t val = getValueDouble(dynamicsElement, "spring_rest_position");
           *proxy.restPosition = val;
         }
 
         // spring_stiffness
         if (hasElement(dynamicsElement, "spring_stiffness"))
         {
-          double val = getValueDouble(dynamicsElement, "spring_stiffness");
+          s_t val = getValueDouble(dynamicsElement, "spring_stiffness");
           *proxy.springStiffness = val;
         }
       }
@@ -1977,14 +1980,14 @@ void readJointDynamicsAndLimit(
         // lower
         if (hasElement(limitElement, "lower"))
         {
-          double lower = getValueDouble(limitElement, "lower");
+          s_t lower = getValueDouble(limitElement, "lower");
           *proxy.lowerPosition = lower;
         }
 
         // upper
         if (hasElement(limitElement, "upper"))
         {
-          double upper = getValueDouble(limitElement, "upper");
+          s_t upper = getValueDouble(limitElement, "upper");
           *proxy.upperPosition = upper;
         }
       }
@@ -2018,7 +2021,7 @@ JointPropPtr readRevoluteJoint(
     tinyxml2::XMLElement* axisElement = getElement(_jointElement, "axis");
 
     // xyz
-    Eigen::Vector3d xyz = getValueVector3d(axisElement, "xyz");
+    Eigen::Vector3s xyz = getValueVector3s(axisElement, "xyz");
     properties.mAxis = xyz;
   }
   else
@@ -2035,8 +2038,8 @@ JointPropPtr readRevoluteJoint(
   // init_pos
   if (hasElement(_jointElement, "init_pos"))
   {
-    double init_pos = getValueDouble(_jointElement, "init_pos");
-    Eigen::VectorXd ipos = Eigen::VectorXd(1);
+    s_t init_pos = getValueDouble(_jointElement, "init_pos");
+    Eigen::VectorXs ipos = Eigen::VectorXs(1);
     ipos << init_pos;
     _joint.position = ipos;
     properties.mInitialPositions[0] = ipos[0];
@@ -2046,8 +2049,8 @@ JointPropPtr readRevoluteJoint(
   // init_vel
   if (hasElement(_jointElement, "init_vel"))
   {
-    double init_vel = getValueDouble(_jointElement, "init_vel");
-    Eigen::VectorXd ivel = Eigen::VectorXd(1);
+    s_t init_vel = getValueDouble(_jointElement, "init_vel");
+    Eigen::VectorXs ivel = Eigen::VectorXs(1);
     ivel << init_vel;
     _joint.velocity = ivel;
     properties.mInitialVelocities[0] = ivel[0];
@@ -2076,7 +2079,7 @@ JointPropPtr readPrismaticJoint(
     tinyxml2::XMLElement* axisElement = getElement(_jointElement, "axis");
 
     // xyz
-    Eigen::Vector3d xyz = getValueVector3d(axisElement, "xyz");
+    Eigen::Vector3s xyz = getValueVector3s(axisElement, "xyz");
     properties.mAxis = xyz;
   }
   else
@@ -2093,8 +2096,8 @@ JointPropPtr readPrismaticJoint(
   // init_pos
   if (hasElement(_jointElement, "init_pos"))
   {
-    double init_pos = getValueDouble(_jointElement, "init_pos");
-    Eigen::VectorXd ipos = Eigen::VectorXd(1);
+    s_t init_pos = getValueDouble(_jointElement, "init_pos");
+    Eigen::VectorXs ipos = Eigen::VectorXs(1);
     ipos << init_pos;
     _joint.position = ipos;
     properties.mInitialPositions[0] = ipos[0];
@@ -2104,8 +2107,8 @@ JointPropPtr readPrismaticJoint(
   // init_vel
   if (hasElement(_jointElement, "init_vel"))
   {
-    double init_vel = getValueDouble(_jointElement, "init_vel");
-    Eigen::VectorXd ivel = Eigen::VectorXd(1);
+    s_t init_vel = getValueDouble(_jointElement, "init_vel");
+    Eigen::VectorXs ivel = Eigen::VectorXs(1);
     ivel << init_vel;
     _joint.velocity = ivel;
     properties.mInitialVelocities[0] = ivel[0];
@@ -2134,13 +2137,13 @@ JointPropPtr readScrewJoint(
     tinyxml2::XMLElement* axisElement = getElement(_jointElement, "axis");
 
     // xyz
-    Eigen::Vector3d xyz = getValueVector3d(axisElement, "xyz");
+    Eigen::Vector3s xyz = getValueVector3s(axisElement, "xyz");
     properties.mAxis = xyz;
 
     // pitch
     if (hasElement(axisElement, "pitch"))
     {
-      double pitch = getValueDouble(axisElement, "pitch");
+      s_t pitch = getValueDouble(axisElement, "pitch");
       properties.mPitch = pitch;
     }
   }
@@ -2158,8 +2161,8 @@ JointPropPtr readScrewJoint(
   // init_pos
   if (hasElement(_jointElement, "init_pos"))
   {
-    double init_pos = getValueDouble(_jointElement, "init_pos");
-    Eigen::VectorXd ipos = Eigen::VectorXd(1);
+    s_t init_pos = getValueDouble(_jointElement, "init_pos");
+    Eigen::VectorXs ipos = Eigen::VectorXs(1);
     ipos << init_pos;
     _joint.position = ipos;
     properties.mInitialPositions[0] = ipos[0];
@@ -2169,8 +2172,8 @@ JointPropPtr readScrewJoint(
   // init_vel
   if (hasElement(_jointElement, "init_vel"))
   {
-    double init_vel = getValueDouble(_jointElement, "init_vel");
-    Eigen::VectorXd ivel = Eigen::VectorXd(1);
+    s_t init_vel = getValueDouble(_jointElement, "init_vel");
+    Eigen::VectorXs ivel = Eigen::VectorXs(1);
     ivel << init_vel;
     _joint.velocity = ivel;
     properties.mInitialVelocities[0] = ivel[0];
@@ -2199,7 +2202,7 @@ JointPropPtr readUniversalJoint(
     tinyxml2::XMLElement* axisElement = getElement(_jointElement, "axis");
 
     // xyz
-    Eigen::Vector3d xyz = getValueVector3d(axisElement, "xyz");
+    Eigen::Vector3s xyz = getValueVector3s(axisElement, "xyz");
     properties.mAxis[0] = xyz;
   }
   else
@@ -2216,7 +2219,7 @@ JointPropPtr readUniversalJoint(
     tinyxml2::XMLElement* axis2Element = getElement(_jointElement, "axis2");
 
     // xyz
-    Eigen::Vector3d xyz = getValueVector3d(axis2Element, "xyz");
+    Eigen::Vector3s xyz = getValueVector3s(axis2Element, "xyz");
     properties.mAxis[1] = xyz;
   }
   else
@@ -2232,7 +2235,7 @@ JointPropPtr readUniversalJoint(
   // init_pos
   if (hasElement(_jointElement, "init_pos"))
   {
-    Eigen::Vector2d init_pos = getValueVector2d(_jointElement, "init_pos");
+    Eigen::Vector2s init_pos = getValueVector2s(_jointElement, "init_pos");
     _joint.position = init_pos;
     properties.mInitialPositions = init_pos;
   }
@@ -2241,7 +2244,7 @@ JointPropPtr readUniversalJoint(
   // init_vel
   if (hasElement(_jointElement, "init_vel"))
   {
-    Eigen::Vector2d init_vel = getValueVector2d(_jointElement, "init_vel");
+    Eigen::Vector2s init_vel = getValueVector2s(_jointElement, "init_vel");
     _joint.velocity = init_vel;
     properties.mInitialVelocities = init_vel;
   }
@@ -2265,7 +2268,7 @@ JointPropPtr readBallJoint(
   // init_pos
   if (hasElement(_jointElement, "init_pos"))
   {
-    Eigen::Vector3d init_pos = getValueVector3d(_jointElement, "init_pos");
+    Eigen::Vector3s init_pos = getValueVector3s(_jointElement, "init_pos");
     _joint.position = init_pos;
     properties.mInitialPositions = init_pos;
   }
@@ -2274,7 +2277,7 @@ JointPropPtr readBallJoint(
   // init_vel
   if (hasElement(_jointElement, "init_vel"))
   {
-    Eigen::Vector3d init_vel = getValueVector3d(_jointElement, "init_vel");
+    Eigen::Vector3s init_vel = getValueVector3s(_jointElement, "init_vel");
     _joint.velocity = init_vel;
     properties.mInitialVelocities = init_vel;
   }
@@ -2320,7 +2323,7 @@ JointPropPtr readEulerJoint(
   // init_pos
   if (hasElement(_jointElement, "init_pos"))
   {
-    Eigen::Vector3d init_pos = getValueVector3d(_jointElement, "init_pos");
+    Eigen::Vector3s init_pos = getValueVector3s(_jointElement, "init_pos");
     _joint.position = init_pos;
     properties.mInitialPositions = init_pos;
   }
@@ -2329,7 +2332,7 @@ JointPropPtr readEulerJoint(
   // init_vel
   if (hasElement(_jointElement, "init_vel"))
   {
-    Eigen::Vector3d init_vel = getValueVector3d(_jointElement, "init_vel");
+    Eigen::Vector3s init_vel = getValueVector3s(_jointElement, "init_vel");
     _joint.velocity = init_vel;
     properties.mInitialVelocities = init_vel;
   }
@@ -2357,7 +2360,7 @@ JointPropPtr readTranslationalJoint(
   // init_pos
   if (hasElement(_jointElement, "init_pos"))
   {
-    Eigen::Vector3d init_pos = getValueVector3d(_jointElement, "init_pos");
+    Eigen::Vector3s init_pos = getValueVector3s(_jointElement, "init_pos");
     _joint.position = init_pos;
     properties.mInitialPositions = init_pos;
   }
@@ -2366,7 +2369,7 @@ JointPropPtr readTranslationalJoint(
   // init_vel
   if (hasElement(_jointElement, "init_vel"))
   {
-    Eigen::Vector3d init_vel = getValueVector3d(_jointElement, "init_vel");
+    Eigen::Vector3s init_vel = getValueVector3s(_jointElement, "init_vel");
     _joint.velocity = init_vel;
     properties.mInitialVelocities = init_vel;
   }
@@ -2416,8 +2419,8 @@ JointPropPtr readTranslationalJoint2D(
           = getElement(planeElement, "translation_axis2");
 
       properties.setArbitraryPlane(
-          getValueVector3d(transAxis1Element, "xyz"),
-          getValueVector3d(transAxis2Element, "xyz"));
+          getValueVector3s(transAxis1Element, "xyz"),
+          getValueVector3s(transAxis2Element, "xyz"));
     }
     else
     {
@@ -2443,7 +2446,7 @@ JointPropPtr readTranslationalJoint2D(
   // init_pos
   if (hasElement(_jointElement, "init_pos"))
   {
-    Eigen::Vector2d init_pos = getValueVector2d(_jointElement, "init_pos");
+    Eigen::Vector2s init_pos = getValueVector2s(_jointElement, "init_pos");
     _joint.position = init_pos;
     properties.mInitialPositions = init_pos;
   }
@@ -2452,7 +2455,7 @@ JointPropPtr readTranslationalJoint2D(
   // init_vel
   if (hasElement(_jointElement, "init_vel"))
   {
-    Eigen::Vector2d init_vel = getValueVector2d(_jointElement, "init_vel");
+    Eigen::Vector2s init_vel = getValueVector2s(_jointElement, "init_vel");
     _joint.velocity = init_vel;
     properties.mInitialVelocities = init_vel;
   }
@@ -2500,12 +2503,12 @@ JointPropPtr readPlanarJoint(
       tinyxml2::XMLElement* transAxis1Element
           = getElement(planeElement, "translation_axis1");
 
-      properties.mTransAxis1 = getValueVector3d(transAxis1Element, "xyz");
+      properties.mTransAxis1 = getValueVector3s(transAxis1Element, "xyz");
 
       tinyxml2::XMLElement* transAxis2Element
           = getElement(planeElement, "translation_axis2");
 
-      properties.mTransAxis2 = getValueVector3d(transAxis2Element, "xyz");
+      properties.mTransAxis2 = getValueVector3s(transAxis2Element, "xyz");
     }
     else
     {
@@ -2529,7 +2532,7 @@ JointPropPtr readPlanarJoint(
   // init_pos
   if (hasElement(_jointElement, "init_pos"))
   {
-    Eigen::Vector3d init_pos = getValueVector3d(_jointElement, "init_pos");
+    Eigen::Vector3s init_pos = getValueVector3s(_jointElement, "init_pos");
     _joint.position = init_pos;
     properties.mInitialPositions = init_pos;
   }
@@ -2538,7 +2541,7 @@ JointPropPtr readPlanarJoint(
   // init_vel
   if (hasElement(_jointElement, "init_vel"))
   {
-    Eigen::Vector3d init_vel = getValueVector3d(_jointElement, "init_vel");
+    Eigen::Vector3s init_vel = getValueVector3s(_jointElement, "init_vel");
     _joint.velocity = init_vel;
     properties.mInitialVelocities = init_vel;
   }
@@ -2562,7 +2565,7 @@ JointPropPtr readFreeJoint(
   // init_pos
   if (hasElement(_jointElement, "init_pos"))
   {
-    Eigen::Vector6d init_pos = getValueVector6d(_jointElement, "init_pos");
+    Eigen::Vector6s init_pos = getValueVector6s(_jointElement, "init_pos");
     _joint.position = init_pos;
     properties.mInitialPositions = init_pos;
   }
@@ -2571,7 +2574,7 @@ JointPropPtr readFreeJoint(
   // init_vel
   if (hasElement(_jointElement, "init_vel"))
   {
-    Eigen::Vector6d init_vel = getValueVector6d(_jointElement, "init_vel");
+    Eigen::Vector6s init_vel = getValueVector6s(_jointElement, "init_vel");
     _joint.velocity = init_vel;
     properties.mInitialVelocities = init_vel;
   }

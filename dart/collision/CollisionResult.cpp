@@ -36,6 +36,7 @@
 #include "dart/dynamics/BodyNode.hpp"
 #include "dart/dynamics/ShapeFrame.hpp"
 #include "dart/dynamics/ShapeNode.hpp"
+#include "dart/math/MathTypes.hpp"
 
 namespace dart {
 namespace collision {
@@ -87,18 +88,18 @@ const Contact& CollisionResult::getContact(std::size_t index) const
 /// This sorts the list of contacts by the contact position dotted with some
 /// random direction. This makes it much easier to compare sets of
 /// CollisionResults.
-void CollisionResult::sortContacts(Eigen::Vector3d& randDirection)
+void CollisionResult::sortContacts(Eigen::Vector3s& randDirection)
 {
   std::sort(mContacts.begin(), mContacts.end(), [&](Contact& a, Contact& b) {
-    double dotA = a.point.dot(randDirection);
-    double dotB = b.point.dot(randDirection);
+    s_t dotA = a.point.dot(randDirection);
+    s_t dotB = b.point.dot(randDirection);
     if (dotA == dotB)
     {
       dotA = a.normal.dot(randDirection);
       dotB = b.normal.dot(randDirection);
       if (dotA == dotB)
       {
-        Eigen::Vector3d ortho1 = a.normal.cross(randDirection);
+        Eigen::Vector3s ortho1 = a.normal.cross(randDirection);
         dotA = a.point.dot(ortho1);
         dotB = b.point.dot(ortho1);
         if (dotA == dotB)
@@ -107,7 +108,7 @@ void CollisionResult::sortContacts(Eigen::Vector3d& randDirection)
           dotB = b.normal.dot(ortho1);
           if (dotA == dotB)
           {
-            Eigen::Vector3d ortho2 = randDirection.cross(ortho1);
+            Eigen::Vector3s ortho2 = randDirection.cross(ortho1);
             dotA = a.normal.dot(ortho2);
             dotB = b.normal.dot(ortho2);
           }

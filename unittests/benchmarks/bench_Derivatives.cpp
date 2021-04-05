@@ -27,22 +27,22 @@ using namespace performance;
 
 static void BM_Jacobian_Of_C_q_Numerical(benchmark::State& state)
 {
-  const double pi = constantsd::pi();
+  const s_t pi = constantsd::pi();
 
   // Lower and upper bound of configuration for system
-  double qLB = -0.25 * pi;
-  double qUB = 0.25 * pi;
-  double dqLB = -0.25 * pi;
-  double dqUB = 0.25 * pi;
-  double ddqLB = -0.25 * pi;
-  double ddqUB = 0.25 * pi;
+  s_t qLB = -0.25 * pi;
+  s_t qUB = 0.25 * pi;
+  s_t dqLB = -0.25 * pi;
+  s_t dqUB = 0.25 * pi;
+  s_t ddqLB = -0.25 * pi;
+  s_t ddqUB = 0.25 * pi;
 
-  common::Uri uri = "dart://sample/skel/test/double_pendulum.skel";
+  common::Uri uri = "dart://sample/skel/test/s_t_pendulum.skel";
 
   // World
   WorldPtr world = World::create();
   world = utils::SkelParser::readWorld(uri);
-  world->setGravity(Eigen::Vector3d(0, -9.81, 0));
+  world->setGravity(Eigen::Vector3s(0, -9.81, 0));
 
   while (state.KeepRunning())
   {
@@ -53,9 +53,9 @@ static void BM_Jacobian_Of_C_q_Numerical(benchmark::State& state)
       const int dof = static_cast<int>(skel->getNumDofs());
 
       // Generate a random state
-      VectorXd q = VectorXd::Zero(dof);
-      VectorXd dq = VectorXd::Zero(dof);
-      VectorXd ddq = VectorXd::Zero(dof);
+      VectorXs q = VectorXs::Zero(dof);
+      VectorXs dq = VectorXs::Zero(dof);
+      VectorXs ddq = VectorXs::Zero(dof);
 
       for (int k = 0; k < dof; ++k)
       {
@@ -67,7 +67,7 @@ static void BM_Jacobian_Of_C_q_Numerical(benchmark::State& state)
       skel->setVelocities(dq);
       skel->setAccelerations(ddq);
 
-      Eigen::MatrixXd dC_numerical
+      Eigen::MatrixXs dC_numerical
           = skel->finiteDifferenceJacobianOfC(neural::WithRespectTo::POSITION);
     }
   }
@@ -77,22 +77,22 @@ BENCHMARK(BM_Jacobian_Of_C_q_Numerical);
 
 static void BM_Jacobian_Of_C_q_Analytical(benchmark::State& state)
 {
-  const double pi = constantsd::pi();
+  const s_t pi = constantsd::pi();
 
   // Lower and upper bound of configuration for system
-  double qLB = -0.25 * pi;
-  double qUB = 0.25 * pi;
-  double dqLB = -0.25 * pi;
-  double dqUB = 0.25 * pi;
-  double ddqLB = -0.25 * pi;
-  double ddqUB = 0.25 * pi;
+  s_t qLB = -0.25 * pi;
+  s_t qUB = 0.25 * pi;
+  s_t dqLB = -0.25 * pi;
+  s_t dqUB = 0.25 * pi;
+  s_t ddqLB = -0.25 * pi;
+  s_t ddqUB = 0.25 * pi;
 
-  common::Uri uri = "dart://sample/skel/test/double_pendulum.skel";
+  common::Uri uri = "dart://sample/skel/test/s_t_pendulum.skel";
 
   // World
   WorldPtr world = World::create();
   world = utils::SkelParser::readWorld(uri);
-  world->setGravity(Eigen::Vector3d(0, -9.81, 0));
+  world->setGravity(Eigen::Vector3s(0, -9.81, 0));
 
   while (state.KeepRunning())
   {
@@ -103,9 +103,9 @@ static void BM_Jacobian_Of_C_q_Analytical(benchmark::State& state)
       const int dof = static_cast<int>(skel->getNumDofs());
 
       // Generate a random state
-      VectorXd q = VectorXd::Zero(dof);
-      VectorXd dq = VectorXd::Zero(dof);
-      VectorXd ddq = VectorXd::Zero(dof);
+      VectorXs q = VectorXs::Zero(dof);
+      VectorXs dq = VectorXs::Zero(dof);
+      VectorXs ddq = VectorXs::Zero(dof);
 
       for (int k = 0; k < dof; ++k)
       {
@@ -117,7 +117,7 @@ static void BM_Jacobian_Of_C_q_Analytical(benchmark::State& state)
       skel->setVelocities(dq);
       skel->setAccelerations(ddq);
 
-      Eigen::MatrixXd C_dq_analytic
+      Eigen::MatrixXs C_dq_analytic
           = skel->getJacobianOfC(neural::WithRespectTo::POSITION);
     }
   }
@@ -127,22 +127,22 @@ BENCHMARK(BM_Jacobian_Of_C_q_Analytical);
 
 static void BM_Jacobian_Of_C_dq_Numerical(benchmark::State& state)
 {
-  const double pi = constantsd::pi();
+  const s_t pi = constantsd::pi();
 
   // Lower and upper bound of configuration for system
-  double qLB = -0.25 * pi;
-  double qUB = 0.25 * pi;
-  double dqLB = -0.25 * pi;
-  double dqUB = 0.25 * pi;
-  double ddqLB = -0.25 * pi;
-  double ddqUB = 0.25 * pi;
+  s_t qLB = -0.25 * pi;
+  s_t qUB = 0.25 * pi;
+  s_t dqLB = -0.25 * pi;
+  s_t dqUB = 0.25 * pi;
+  s_t ddqLB = -0.25 * pi;
+  s_t ddqUB = 0.25 * pi;
 
-  common::Uri uri = "dart://sample/skel/test/double_pendulum.skel";
+  common::Uri uri = "dart://sample/skel/test/s_t_pendulum.skel";
 
   // World
   WorldPtr world = World::create();
   world = utils::SkelParser::readWorld(uri);
-  world->setGravity(Eigen::Vector3d(0, -9.81, 0));
+  world->setGravity(Eigen::Vector3s(0, -9.81, 0));
 
   while (state.KeepRunning())
   {
@@ -153,9 +153,9 @@ static void BM_Jacobian_Of_C_dq_Numerical(benchmark::State& state)
       const int dof = static_cast<int>(skel->getNumDofs());
 
       // Generate a random state
-      VectorXd q = VectorXd::Zero(dof);
-      VectorXd dq = VectorXd::Zero(dof);
-      VectorXd ddq = VectorXd::Zero(dof);
+      VectorXs q = VectorXs::Zero(dof);
+      VectorXs dq = VectorXs::Zero(dof);
+      VectorXs ddq = VectorXs::Zero(dof);
 
       for (int k = 0; k < dof; ++k)
       {
@@ -167,7 +167,7 @@ static void BM_Jacobian_Of_C_dq_Numerical(benchmark::State& state)
       skel->setVelocities(dq);
       skel->setAccelerations(ddq);
 
-      Eigen::MatrixXd dC_numerical
+      Eigen::MatrixXs dC_numerical
           = skel->finiteDifferenceJacobianOfC(neural::WithRespectTo::VELOCITY);
     }
   }
@@ -177,22 +177,22 @@ BENCHMARK(BM_Jacobian_Of_C_dq_Numerical);
 
 static void BM_Jacobian_Of_C_dq_Analytical(benchmark::State& state)
 {
-  const double pi = constantsd::pi();
+  const s_t pi = constantsd::pi();
 
   // Lower and upper bound of configuration for system
-  double qLB = -0.25 * pi;
-  double qUB = 0.25 * pi;
-  double dqLB = -0.25 * pi;
-  double dqUB = 0.25 * pi;
-  double ddqLB = -0.25 * pi;
-  double ddqUB = 0.25 * pi;
+  s_t qLB = -0.25 * pi;
+  s_t qUB = 0.25 * pi;
+  s_t dqLB = -0.25 * pi;
+  s_t dqUB = 0.25 * pi;
+  s_t ddqLB = -0.25 * pi;
+  s_t ddqUB = 0.25 * pi;
 
-  common::Uri uri = "dart://sample/skel/test/double_pendulum.skel";
+  common::Uri uri = "dart://sample/skel/test/s_t_pendulum.skel";
 
   // World
   WorldPtr world = World::create();
   world = utils::SkelParser::readWorld(uri);
-  world->setGravity(Eigen::Vector3d(0, -9.81, 0));
+  world->setGravity(Eigen::Vector3s(0, -9.81, 0));
 
   while (state.KeepRunning())
   {
@@ -203,9 +203,9 @@ static void BM_Jacobian_Of_C_dq_Analytical(benchmark::State& state)
       const int dof = static_cast<int>(skel->getNumDofs());
 
       // Generate a random state
-      VectorXd q = VectorXd::Zero(dof);
-      VectorXd dq = VectorXd::Zero(dof);
-      VectorXd ddq = VectorXd::Zero(dof);
+      VectorXs q = VectorXs::Zero(dof);
+      VectorXs dq = VectorXs::Zero(dof);
+      VectorXs ddq = VectorXs::Zero(dof);
 
       for (int k = 0; k < dof; ++k)
       {
@@ -217,7 +217,7 @@ static void BM_Jacobian_Of_C_dq_Analytical(benchmark::State& state)
       skel->setVelocities(dq);
       skel->setAccelerations(ddq);
 
-      Eigen::MatrixXd C_dq_analytic
+      Eigen::MatrixXs C_dq_analytic
           = skel->getJacobianOfC(neural::WithRespectTo::VELOCITY);
     }
   }
@@ -227,22 +227,22 @@ BENCHMARK(BM_Jacobian_Of_C_dq_Analytical);
 
 static void BM_Jacobian_Of_Minv_q_Numerical(benchmark::State& state)
 {
-  const double pi = constantsd::pi();
+  const s_t pi = constantsd::pi();
 
   // Lower and upper bound of configuration for system
-  double qLB = -0.25 * pi;
-  double qUB = 0.25 * pi;
-  double dqLB = -0.25 * pi;
-  double dqUB = 0.25 * pi;
-  double ddqLB = -0.25 * pi;
-  double ddqUB = 0.25 * pi;
+  s_t qLB = -0.25 * pi;
+  s_t qUB = 0.25 * pi;
+  s_t dqLB = -0.25 * pi;
+  s_t dqUB = 0.25 * pi;
+  s_t ddqLB = -0.25 * pi;
+  s_t ddqUB = 0.25 * pi;
 
-  common::Uri uri = "dart://sample/skel/test/double_pendulum.skel";
+  common::Uri uri = "dart://sample/skel/test/s_t_pendulum.skel";
 
   // World
   WorldPtr world = World::create();
   world = utils::SkelParser::readWorld(uri);
-  world->setGravity(Eigen::Vector3d(0, -9.81, 0));
+  world->setGravity(Eigen::Vector3s(0, -9.81, 0));
 
   while (state.KeepRunning())
   {
@@ -253,9 +253,9 @@ static void BM_Jacobian_Of_Minv_q_Numerical(benchmark::State& state)
       const int dof = static_cast<int>(skel->getNumDofs());
 
       // Generate a random state
-      VectorXd q = VectorXd::Zero(dof);
-      VectorXd dq = VectorXd::Zero(dof);
-      VectorXd ddq = VectorXd::Zero(dof);
+      VectorXs q = VectorXs::Zero(dof);
+      VectorXs dq = VectorXs::Zero(dof);
+      VectorXs ddq = VectorXs::Zero(dof);
 
       for (int k = 0; k < dof; ++k)
       {
@@ -269,8 +269,8 @@ static void BM_Jacobian_Of_Minv_q_Numerical(benchmark::State& state)
 
       for (auto j = 0; j < 100; ++j)
       {
-        Eigen::VectorXd x = Eigen::VectorXd::Random(dof);
-        Eigen::MatrixXd dC_numerical = skel->finiteDifferenceJacobianOfMinv(
+        Eigen::VectorXs x = Eigen::VectorXs::Random(dof);
+        Eigen::MatrixXs dC_numerical = skel->finiteDifferenceJacobianOfMinv(
             x, neural::WithRespectTo::POSITION);
       }
     }
@@ -281,22 +281,22 @@ BENCHMARK(BM_Jacobian_Of_Minv_q_Numerical);
 
 static void BM_Jacobian_Of_Minv_q_Analytical(benchmark::State& state)
 {
-  const double pi = constantsd::pi();
+  const s_t pi = constantsd::pi();
 
   // Lower and upper bound of configuration for system
-  double qLB = -0.25 * pi;
-  double qUB = 0.25 * pi;
-  double dqLB = -0.25 * pi;
-  double dqUB = 0.25 * pi;
-  double ddqLB = -0.25 * pi;
-  double ddqUB = 0.25 * pi;
+  s_t qLB = -0.25 * pi;
+  s_t qUB = 0.25 * pi;
+  s_t dqLB = -0.25 * pi;
+  s_t dqUB = 0.25 * pi;
+  s_t ddqLB = -0.25 * pi;
+  s_t ddqUB = 0.25 * pi;
 
-  common::Uri uri = "dart://sample/skel/test/double_pendulum.skel";
+  common::Uri uri = "dart://sample/skel/test/s_t_pendulum.skel";
 
   // World
   WorldPtr world = World::create();
   world = utils::SkelParser::readWorld(uri);
-  world->setGravity(Eigen::Vector3d(0, -9.81, 0));
+  world->setGravity(Eigen::Vector3s(0, -9.81, 0));
 
   while (state.KeepRunning())
   {
@@ -307,9 +307,9 @@ static void BM_Jacobian_Of_Minv_q_Analytical(benchmark::State& state)
       const int dof = static_cast<int>(skel->getNumDofs());
 
       // Generate a random state
-      VectorXd q = VectorXd::Zero(dof);
-      VectorXd dq = VectorXd::Zero(dof);
-      VectorXd ddq = VectorXd::Zero(dof);
+      VectorXs q = VectorXs::Zero(dof);
+      VectorXs dq = VectorXs::Zero(dof);
+      VectorXs ddq = VectorXs::Zero(dof);
 
       for (int k = 0; k < dof; ++k)
       {
@@ -323,8 +323,8 @@ static void BM_Jacobian_Of_Minv_q_Analytical(benchmark::State& state)
 
       for (auto j = 0; j < 100; ++j)
       {
-        Eigen::VectorXd x = Eigen::VectorXd::Random(dof);
-        Eigen::MatrixXd C_dq_analytic = skel->getJacobianOfMinv_Direct(
+        Eigen::VectorXs x = Eigen::VectorXs::Random(dof);
+        Eigen::MatrixXs C_dq_analytic = skel->getJacobianOfMinv_Direct(
             x, neural::WithRespectTo::POSITION);
       }
     }
@@ -335,22 +335,22 @@ BENCHMARK(BM_Jacobian_Of_Minv_q_Analytical);
 
 static void BM_Jacobian_Of_Minv_q_Analytical_ID(benchmark::State& state)
 {
-  const double pi = constantsd::pi();
+  const s_t pi = constantsd::pi();
 
   // Lower and upper bound of configuration for system
-  double qLB = -0.25 * pi;
-  double qUB = 0.25 * pi;
-  double dqLB = -0.25 * pi;
-  double dqUB = 0.25 * pi;
-  double ddqLB = -0.25 * pi;
-  double ddqUB = 0.25 * pi;
+  s_t qLB = -0.25 * pi;
+  s_t qUB = 0.25 * pi;
+  s_t dqLB = -0.25 * pi;
+  s_t dqUB = 0.25 * pi;
+  s_t ddqLB = -0.25 * pi;
+  s_t ddqUB = 0.25 * pi;
 
-  common::Uri uri = "dart://sample/skel/test/double_pendulum.skel";
+  common::Uri uri = "dart://sample/skel/test/s_t_pendulum.skel";
 
   // World
   WorldPtr world = World::create();
   world = utils::SkelParser::readWorld(uri);
-  world->setGravity(Eigen::Vector3d(0, -9.81, 0));
+  world->setGravity(Eigen::Vector3s(0, -9.81, 0));
 
   while (state.KeepRunning())
   {
@@ -361,9 +361,9 @@ static void BM_Jacobian_Of_Minv_q_Analytical_ID(benchmark::State& state)
       const int dof = static_cast<int>(skel->getNumDofs());
 
       // Generate a random state
-      VectorXd q = VectorXd::Zero(dof);
-      VectorXd dq = VectorXd::Zero(dof);
-      VectorXd ddq = VectorXd::Zero(dof);
+      VectorXs q = VectorXs::Zero(dof);
+      VectorXs dq = VectorXs::Zero(dof);
+      VectorXs ddq = VectorXs::Zero(dof);
 
       for (int k = 0; k < dof; ++k)
       {
@@ -377,8 +377,8 @@ static void BM_Jacobian_Of_Minv_q_Analytical_ID(benchmark::State& state)
 
       for (auto j = 0; j < 100; ++j)
       {
-        Eigen::VectorXd x = Eigen::VectorXd::Random(dof);
-        Eigen::MatrixXd C_dq_analytic
+        Eigen::VectorXs x = Eigen::VectorXs::Random(dof);
+        Eigen::MatrixXs C_dq_analytic
             = skel->getJacobianOfMinv_ID(x, neural::WithRespectTo::POSITION);
       }
     }

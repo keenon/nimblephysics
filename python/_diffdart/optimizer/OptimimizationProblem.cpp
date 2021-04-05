@@ -63,18 +63,18 @@ void OptimizationProblem(py::module& m)
       .def(
           "setInitialGuess",
           +[](dart::optimizer::Problem* self,
-              const Eigen::VectorXd& _initGuess) {
+              const Eigen::VectorXs& _initGuess) {
             self->setInitialGuess(_initGuess);
           },
           ::py::arg("initGuess"))
       .def(
           "getInitialGuess",
-          +[](dart::optimizer::Problem* self) -> const Eigen::VectorXd& {
+          +[](dart::optimizer::Problem* self) -> const Eigen::VectorXs& {
             return self->getInitialGuess();
           })
       .def(
           "addSeed",
-          +[](dart::optimizer::Problem* self, const Eigen::VectorXd& _seed) {
+          +[](dart::optimizer::Problem* self, const Eigen::VectorXs& _seed) {
             self->addSeed(_seed);
           },
           ::py::arg("seed"))
@@ -83,13 +83,13 @@ void OptimizationProblem(py::module& m)
           +[](dart::optimizer::Problem* self) { self->clearAllSeeds(); })
       .def(
           "setLowerBounds",
-          +[](dart::optimizer::Problem* self, const Eigen::VectorXd& _lb) {
+          +[](dart::optimizer::Problem* self, const Eigen::VectorXs& _lb) {
             self->setLowerBounds(_lb);
           },
           ::py::arg("lb"))
       .def(
           "setUpperBounds",
-          +[](dart::optimizer::Problem* self, const Eigen::VectorXd& _ub) {
+          +[](dart::optimizer::Problem* self, const Eigen::VectorXs& _ub) {
             self->setUpperBounds(_ub);
           },
           ::py::arg("ub"))
@@ -166,25 +166,25 @@ void OptimizationProblem(py::module& m)
           })
       .def(
           "setOptimumValue",
-          +[](dart::optimizer::Problem* self, double _val) {
+          +[](dart::optimizer::Problem* self, s_t _val) {
             self->setOptimumValue(_val);
           },
           ::py::arg("val"))
       .def(
           "getOptimumValue",
-          +[](const dart::optimizer::Problem* self) -> double {
+          +[](const dart::optimizer::Problem* self) -> s_t {
             return self->getOptimumValue();
           })
       .def(
           "setOptimalSolution",
           +[](dart::optimizer::Problem* self,
-              const Eigen::VectorXd& _optParam) {
+              const Eigen::VectorXs& _optParam) {
             self->setOptimalSolution(_optParam);
           },
           ::py::arg("optParam"))
       .def(
           "getOptimalSolution",
-          +[](dart::optimizer::Problem* self) -> const Eigen::VectorXd& {
+          +[](dart::optimizer::Problem* self) -> const Eigen::VectorXs& {
             return self->getOptimalSolution();
           });
 }

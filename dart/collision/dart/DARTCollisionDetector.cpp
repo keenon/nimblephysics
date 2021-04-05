@@ -56,7 +56,7 @@ bool checkPair(
     CollisionResult* result = nullptr);
 
 bool isClose(
-    const Eigen::Vector3d& pos1, const Eigen::Vector3d& pos2, double tol);
+    const Eigen::Vector3s& pos1, const Eigen::Vector3s& pos2, double tol);
 
 void postProcess(
     CollisionObject* o1,
@@ -351,7 +351,7 @@ bool checkPair(
 
 //==============================================================================
 bool isClose(
-    const Eigen::Vector3d& pos1, const Eigen::Vector3d& pos2, double tol)
+    const Eigen::Vector3s& pos1, const Eigen::Vector3s& pos2, double tol)
 {
   return (pos1 - pos2).norm() < tol;
 }

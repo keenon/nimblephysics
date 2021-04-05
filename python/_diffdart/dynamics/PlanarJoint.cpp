@@ -194,8 +194,8 @@ void PlanarJoint(py::module& m)
       .def(
           "setArbitraryPlane",
           +[](dart::dynamics::PlanarJoint* self,
-              const Eigen::Vector3d& _transAxis1,
-              const Eigen::Vector3d& _transAxis2) {
+              const Eigen::Vector3s& _transAxis1,
+              const Eigen::Vector3s& _transAxis2) {
             self->setArbitraryPlane(_transAxis1, _transAxis2);
           },
           ::py::arg("transAxis1"),
@@ -203,8 +203,8 @@ void PlanarJoint(py::module& m)
       .def(
           "setArbitraryPlane",
           +[](dart::dynamics::PlanarJoint* self,
-              const Eigen::Vector3d& _transAxis1,
-              const Eigen::Vector3d& _transAxis2,
+              const Eigen::Vector3s& _transAxis1,
+              const Eigen::Vector3s& _transAxis2,
               bool _renameDofs) {
             self->setArbitraryPlane(_transAxis1, _transAxis2, _renameDofs);
           },
@@ -220,27 +220,27 @@ void PlanarJoint(py::module& m)
       .def(
           "getRotationalAxis",
           +[](const dart::dynamics::PlanarJoint* self)
-              -> const Eigen::Vector3d& { return self->getRotationalAxis(); },
+              -> const Eigen::Vector3s& { return self->getRotationalAxis(); },
           ::py::return_value_policy::reference_internal)
       .def(
           "getTranslationalAxis1",
           +[](const dart::dynamics::PlanarJoint* self)
-              -> const Eigen::Vector3d& {
+              -> const Eigen::Vector3s& {
             return self->getTranslationalAxis1();
           },
           ::py::return_value_policy::reference_internal)
       .def(
           "getTranslationalAxis2",
           +[](const dart::dynamics::PlanarJoint* self)
-              -> const Eigen::Vector3d& {
+              -> const Eigen::Vector3s& {
             return self->getTranslationalAxis2();
           },
           ::py::return_value_policy::reference_internal)
       .def(
           "getRelativeJacobianStatic",
           +[](const dart::dynamics::PlanarJoint* self,
-              const Eigen::Vector3d& _positions)
-              -> Eigen::Matrix<double, 6, 3> {
+              const Eigen::Vector3s& _positions)
+              -> Eigen::Matrix<s_t, 6, 3> {
             return self->getRelativeJacobianStatic(_positions);
           },
           ::py::arg("positions"))

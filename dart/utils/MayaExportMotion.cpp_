@@ -131,9 +131,9 @@ namespace utils {
             bool wroteNode = false;
 
             if(rotException){
-                vector<Vector3d> eulerValues;
+                vector<Vector3s> eulerValues;
                 for(int fi=_first; fi<=_last; fi++){
-                    Matrix3d rotdofs = Matrix3d::Identity();
+                    Matrix3s rotdofs = Matrix3s::Identity();
                     for(int i=_b->getParentJoint()->getNumTransforms()-1; i>=0; i--){
                         Transformation *tf = _b->getParentJoint()->getTransform(i);
                         if(i<separateRots) break;
@@ -146,13 +146,13 @@ namespace utils {
                         if(tf->getType()==Transformation::T_ROTATEY) rotdofs = dart_math::eulerToMatrixY(vals[0])*(rotdofs);
                         if(tf->getType()==Transformation::T_ROTATEZ) rotdofs = dart_math::eulerToMatrixZ(vals[0])*(rotdofs);
                         if(tf->getType()==Transformation::T_ROTATEEXPMAP) {
-                            Vector3d exmap(vals[0],vals[1],vals[2]);
-                            Quaterniond quat = dart_math::expToQuat(exmap);
+                            Vector3s exmap(vals[0],vals[1],vals[2]);
+                            Quaternion_s quat = dart_math::expToQuat(exmap);
                             rotdofs = dart_math::quatToMatrix(quat)*(rotdofs);
                         }
                     }
                     // convert to euler angles
-                    Vector3d erot = dart_math::matrixToEuler(rotdofs, dart_math::XYZ);	// leave to radians
+                    Vector3s erot = dart_math::matrixToEuler(rotdofs, dart_math::XYZ);	// leave to radians
                     eulerValues.push_back(erot);
                 }
                 // write out the euler values
@@ -204,12 +204,12 @@ namespace utils {
                     wroteNode = true;
                     if(t->getType()==Transformation::T_ROTATEEXPMAP){
                         // ASSUME "xyz" ordering for dof values
-                        vector<Vector3d> eulerValues;
+                        vector<Vector3s> eulerValues;
                         for(int i=_first; i<=_last; i++){
-                            Vector3d exmap(mDofData->getDofAt(i, t->getDof(0)->getSkelIndex()), mDofData->getDofAt(i, t->getDof(1)->getSkelIndex()), mDofData->getDofAt(i, t->getDof(2)->getSkelIndex()));
-                            Quaterniond q = dart_math::expToQuat(exmap);
-                            Matrix3d rot = q.matrix();
-                            Vector3d angles = dart_math::matrixToEuler(rot, dart_math::XYZ);
+                            Vector3s exmap(mDofData->getDofAt(i, t->getDof(0)->getSkelIndex()), mDofData->getDofAt(i, t->getDof(1)->getSkelIndex()), mDofData->getDofAt(i, t->getDof(2)->getSkelIndex()));
+                            Quaternion_s q = dart_math::expToQuat(exmap);
+                            Matrix3s rot = q.matrix();
+                            Vector3s angles = dart_math::matrixToEuler(rot, dart_math::XYZ);
                             eulerValues.push_back(angles);
                         }
 
@@ -437,18 +437,18 @@ namespace utils {
             string bodyname = _nodesPrefix;
             bodyname += string(_b->getName());
 
-            vector<Vector3d> eulerAngles;
-            vector<Vector3d> transVals;
+            vector<Vector3s> eulerAngles;
+            vector<Vector3s> transVals;
             for(int fi=_first; fi<=_last; fi++){
                 _b->getSkel()->setPose(mDofData->getPoseAtFrame(fi),true,false);
                 Matrix4d Wl = _b->getLocalTransform();
-                Matrix3d Rl = Matrix3d::Zero();
-                Vector3d tl = Vector3d::Zero();
+                Matrix3s Rl = Matrix3s::Zero();
+                Vector3s tl = Vector3s::Zero();
                 for(int ii=0; ii<3; ii++){
                     for(int jj=0; jj<3; jj++) Rl(ii, jj) = Wl(ii, jj);
                     tl[ii]=Wl(ii, 3);
                 }
-                Vector3d ei = dart_math::matrixToEuler(Rl, MayaExportSkeleton::mRotOrder);
+                Vector3s ei = dart_math::matrixToEuler(Rl, MayaExportSkeleton::mRotOrder);
                 eulerAngles.push_back(ei);
                 transVals.push_back(tl);
             }

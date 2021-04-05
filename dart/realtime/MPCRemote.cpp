@@ -78,7 +78,7 @@ MPCRemote::MPCRemote(MPCLocal& local, int /* ignored */)
 
 /// This gets the force to apply to the world at this instant. If we haven't
 /// computed anything for this instant yet, this just returns 0s.
-Eigen::VectorXd MPCRemote::getForce(long now)
+Eigen::VectorXs MPCRemote::getForce(long now)
 {
   return mBuffer.getPlannedForce(now);
 }
@@ -94,7 +94,7 @@ long MPCRemote::getRemainingPlanBufferMillis()
 /// and inference. This resets the error in our model just assuming the world
 /// is exactly following our simulation.
 void MPCRemote::recordGroundTruthState(
-    long time, Eigen::VectorXd pos, Eigen::VectorXd vel, Eigen::VectorXd mass)
+    long time, Eigen::VectorXs pos, Eigen::VectorXs vel, Eigen::VectorXs mass)
 {
   // Context for the client. It could be used to convey extra information to
   // the server and/or tweak certain RPC behaviors.

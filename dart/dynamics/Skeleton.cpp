@@ -46,7 +46,6 @@
 #include "dart/dynamics/DegreeOfFreedom.hpp"
 #include "dart/dynamics/EndEffector.hpp"
 #include "dart/dynamics/FreeJoint.hpp"
-#include "dart/dynamics/InverseKinematics.hpp"
 #include "dart/dynamics/Joint.hpp"
 #include "dart/dynamics/Marker.hpp"
 #include "dart/dynamics/PointMass.hpp"
@@ -182,8 +181,8 @@ std::vector<Data> getAllMemberObjectData(const Owner* owner)
 SkeletonAspectProperties::SkeletonAspectProperties(
     const std::string& _name,
     bool _isMobile,
-    const Eigen::Vector3d& _gravity,
-    double _timeStep,
+    const Eigen::Vector3s& _gravity,
+    s_t _timeStep,
     bool _enabledSelfCollisionCheck,
     bool _enableAdjacentBodyCheck)
   : mName(_name),
@@ -306,11 +305,11 @@ BodyNodePropertiesVector getAllJointProperties(const Skeleton* skel)
 
 //==============================================================================
 Skeleton::Configuration::Configuration(
-    const Eigen::VectorXd& positions,
-    const Eigen::VectorXd& velocities,
-    const Eigen::VectorXd& accelerations,
-    const Eigen::VectorXd& forces,
-    const Eigen::VectorXd& commands)
+    const Eigen::VectorXs& positions,
+    const Eigen::VectorXs& velocities,
+    const Eigen::VectorXs& accelerations,
+    const Eigen::VectorXs& forces,
+    const Eigen::VectorXs& commands)
   : mPositions(positions),
     mVelocities(velocities),
     mAccelerations(accelerations),
@@ -335,11 +334,11 @@ Skeleton::Configuration::Configuration(
 //==============================================================================
 Skeleton::Configuration::Configuration(
     const std::vector<std::size_t>& indices,
-    const Eigen::VectorXd& positions,
-    const Eigen::VectorXd& velocities,
-    const Eigen::VectorXd& accelerations,
-    const Eigen::VectorXd& forces,
-    const Eigen::VectorXd& commands)
+    const Eigen::VectorXs& positions,
+    const Eigen::VectorXs& velocities,
+    const Eigen::VectorXs& accelerations,
+    const Eigen::VectorXs& forces,
+    const Eigen::VectorXs& commands)
   : mIndices(indices),
     mPositions(positions),
     mVelocities(velocities),
@@ -491,14 +490,6 @@ SkeletonPtr Skeleton::cloneSkeleton(const std::string& cloneName) const
     }
 
     BodyNode* newBody = getBodyNode(i)->clone(parentClone, joint, false);
-
-    // The IK module gets cloned by the Skeleton and not by the BodyNode,
-    // because IK modules rely on the Skeleton's structure and indexing. If the
-    // IK was cloned by the BodyNode into a Skeleton that has a different
-    // structure, then there is no guarantee that it will continue to work
-    // correctly.
-    if (getBodyNode(i)->getIK())
-      newBody->mIK = getBodyNode(i)->getIK()->clone(newBody);
 
     skelClone->registerBodyNode(newBody);
   }
@@ -813,7 +804,7 @@ bool Skeleton::isMobile() const
 }
 
 //==============================================================================
-void Skeleton::setTimeStep(double _timeStep)
+void Skeleton::setTimeStep(s_t _timeStep)
 {
   assert(_timeStep > 0.0);
   mAspectProperties.mTimeStep = _timeStep;
@@ -823,13 +814,13 @@ void Skeleton::setTimeStep(double _timeStep)
 }
 
 //==============================================================================
-double Skeleton::getTimeStep() const
+s_t Skeleton::getTimeStep() const
 {
   return mAspectProperties.mTimeStep;
 }
 
 //==============================================================================
-void Skeleton::setGravity(const Eigen::Vector3d& _gravity)
+void Skeleton::setGravity(const Eigen::Vector3s& _gravity)
 {
   mAspectProperties.mGravity = _gravity;
   SET_ALL_FLAGS(mGravityForces);
@@ -838,7 +829,7 @@ void Skeleton::setGravity(const Eigen::Vector3d& _gravity)
 }
 
 //==============================================================================
-const Eigen::Vector3d& Skeleton::getGravity() const
+const Eigen::Vector3s& Skeleton::getGravity() const
 {
   return mAspectProperties.mGravity;
 }
@@ -1566,40 +1557,6 @@ const Eigen::MatrixXi& Skeleton::getParentMap()
 }
 
 //==============================================================================
-const std::shared_ptr<WholeBodyIK>& Skeleton::getIK(bool _createIfNull)
-{
-  if (nullptr == mWholeBodyIK && _createIfNull)
-    createIK();
-
-  return mWholeBodyIK;
-}
-
-//==============================================================================
-const std::shared_ptr<WholeBodyIK>& Skeleton::getOrCreateIK()
-{
-  return getIK(true);
-}
-
-//==============================================================================
-std::shared_ptr<const WholeBodyIK> Skeleton::getIK() const
-{
-  return mWholeBodyIK;
-}
-
-//==============================================================================
-const std::shared_ptr<WholeBodyIK>& Skeleton::createIK()
-{
-  mWholeBodyIK = WholeBodyIK::create(mPtr.lock());
-  return mWholeBodyIK;
-}
-
-//==============================================================================
-void Skeleton::clearIK()
-{
-  mWholeBodyIK = nullptr;
-}
-
-//==============================================================================
 DART_BAKE_SPECIALIZED_NODE_SKEL_DEFINITIONS(Skeleton, Marker)
 
 //==============================================================================
@@ -1629,10 +1586,10 @@ void Skeleton::setGradientConstraintMatrices(
 }
 
 //==============================================================================
-Eigen::MatrixXd Skeleton::getJacobianOfC(neural::WithRespectTo* wrt)
+Eigen::MatrixXs Skeleton::getJacobianOfC(neural::WithRespectTo* wrt)
 {
   const int dofs = static_cast<int>(getNumDofs());
-  Eigen::MatrixXd DCg_Dp = Eigen::MatrixXd::Zero(dofs, dofs);
+  Eigen::MatrixXs DCg_Dp = Eigen::MatrixXs::Zero(dofs, dofs);
 
   if (wrt == neural::WithRespectTo::FORCE)
   {
@@ -1673,11 +1630,11 @@ Eigen::MatrixXd Skeleton::getJacobianOfC(neural::WithRespectTo* wrt)
 }
 
 //==============================================================================
-Eigen::MatrixXd Skeleton::getJacobianOfM(
-    const Eigen::VectorXd& x, neural::WithRespectTo* wrt)
+Eigen::MatrixXs Skeleton::getJacobianOfM(
+    const Eigen::VectorXs& x, neural::WithRespectTo* wrt)
 {
   const int dofs = static_cast<int>(getNumDofs());
-  Eigen::MatrixXd DM_Dq = Eigen::MatrixXd::Zero(dofs, dofs);
+  Eigen::MatrixXs DM_Dq = Eigen::MatrixXs::Zero(dofs, dofs);
 
   if (wrt == neural::WithRespectTo::VELOCITY
       || wrt == neural::WithRespectTo::FORCE)
@@ -1714,13 +1671,13 @@ Eigen::MatrixXd Skeleton::getJacobianOfM(
 }
 
 //==============================================================================
-Eigen::MatrixXd Skeleton::getJacobianOfID(
-    const Eigen::VectorXd& x, neural::WithRespectTo* wrt)
+Eigen::MatrixXs Skeleton::getJacobianOfID(
+    const Eigen::VectorXs& x, neural::WithRespectTo* wrt)
 {
   const auto old_ddq = getAccelerations();
   setAccelerations(x);
 
-  Eigen::MatrixXd DID_Dq = getJacobianOfM(x, wrt) + getJacobianOfC(wrt);
+  Eigen::MatrixXs DID_Dq = getJacobianOfM(x, wrt) + getJacobianOfC(wrt);
 
   setAccelerations(old_ddq);
 
@@ -1854,12 +1811,13 @@ void Skeleton::DiffMinv::print()
 
 //==============================================================================
 /// This gives the unconstrained Jacobian of M^{-1}f
-Eigen::MatrixXd Skeleton::getJacobianOfMinv(
-    const Eigen::VectorXd& f, neural::WithRespectTo* wrt)
+Eigen::MatrixXs Skeleton::getJacobianOfMinv(
+    const Eigen::VectorXs& f, neural::WithRespectTo* wrt)
 {
   return getJacobianOfMinv_ID(f, wrt);
-  // We no longer use the direct Jacobian, because it's both incorrect _and_ slower 
-  // than doing the inverse-dynamics approach, so probably not worth fixing.
+  // We no longer use the direct Jacobian, because it's both incorrect _and_
+  // slower than doing the inverse-dynamics approach, so probably not worth
+  // fixing.
   /*
   if (useID)
     return getJacobianOfMinv_ID(f, wrt);
@@ -1869,23 +1827,23 @@ Eigen::MatrixXd Skeleton::getJacobianOfMinv(
 }
 
 //==============================================================================
-Eigen::MatrixXd Skeleton::getJacobianOfMinv_ID(
-    const Eigen::VectorXd& f, neural::WithRespectTo* wrt)
+Eigen::MatrixXs Skeleton::getJacobianOfMinv_ID(
+    const Eigen::VectorXs& f, neural::WithRespectTo* wrt)
 {
   if (getNumDofs() == 0)
   {
-    return Eigen::MatrixXd::Zero(0, wrt->dim(this));
+    return Eigen::MatrixXs::Zero(0, wrt->dim(this));
   }
   if (wrt == neural::WithRespectTo::VELOCITY
       || wrt == neural::WithRespectTo::FORCE)
   {
     const int dofs = static_cast<int>(getNumDofs());
-    return Eigen::MatrixXd::Zero(dofs, dofs);
+    return Eigen::MatrixXs::Zero(dofs, dofs);
   }
   else if (wrt == neural::WithRespectTo::POSITION)
   {
-    const Eigen::MatrixXd& Minv = getInvMassMatrix();
-    const Eigen::MatrixXd& DMddq_Dq = getJacobianOfM(Minv * f, wrt);
+    const Eigen::MatrixXs& Minv = getInvMassMatrix();
+    const Eigen::MatrixXs& DMddq_Dq = getJacobianOfM(Minv * f, wrt);
     return -Minv * DMddq_Dq;
   }
   else
@@ -1895,14 +1853,17 @@ Eigen::MatrixXd Skeleton::getJacobianOfMinv_ID(
 }
 
 //==============================================================================
-Eigen::MatrixXd Skeleton::getJacobianOfMinv_Direct(
-    const Eigen::VectorXd& f, neural::WithRespectTo* wrt)
+Eigen::MatrixXs Skeleton::getJacobianOfMinv_Direct(
+    const Eigen::VectorXs& f, neural::WithRespectTo* wrt)
 {
   // TODO: explore correcting and debugging this method.
-  assert(false && "We should never be calling this method, it's not completely correct.");
+  assert(
+      false
+      && "We should never be calling this method, it's not completely "
+         "correct.");
 
   const int dofs = static_cast<int>(getNumDofs());
-  Eigen::MatrixXd DMinvX_Dp = Eigen::MatrixXd::Zero(dofs, dofs);
+  Eigen::MatrixXs DMinvX_Dp = Eigen::MatrixXs::Zero(dofs, dofs);
 
   if (wrt == neural::WithRespectTo::VELOCITY
       || wrt == neural::WithRespectTo::FORCE)
@@ -1917,7 +1878,7 @@ Eigen::MatrixXd Skeleton::getJacobianOfMinv_Direct(
     mDiffMinv.init(bodyNodes.size(), getNumDofs());
 #endif
 
-    const Eigen::VectorXd oldForces = getForces();
+    const Eigen::VectorXs oldForces = getForces();
     setForces(f);
 
     // Backward iteration
@@ -1938,12 +1899,12 @@ Eigen::MatrixXd Skeleton::getJacobianOfMinv_Direct(
     // Verification
     if (!bodyNodes.empty())
     {
-      const double EPS = 1e-7;
+      const s_t EPS = 1e-7;
       const size_t numDofs = getNumDofs();
-      Eigen::VectorXd start = getPositions();
+      Eigen::VectorXs start = getPositions();
       for (size_t i = 0; i < numDofs; ++i)
       {
-        Eigen::VectorXd tweaked = start;
+        Eigen::VectorXs tweaked = start;
         tweaked[static_cast<int>(i)] += EPS;
         setPositions(tweaked);
 
@@ -1956,10 +1917,10 @@ Eigen::MatrixXd Skeleton::getJacobianOfMinv_Direct(
           const math::Jacobian S = joint->getRelativeJacobian();
           bodyNode->updateInvMassMatrix();
           const math::Inertia& AI = bodyNode->getArticulatedInertia();
-          const Eigen::Vector6d& AB = bodyNode->mInvM_c;
-          const Eigen::VectorXd& alpha = joint->getAlpha();
-          const Eigen::Vector6d& beta = joint->computeBeta(AI, AB);
-          Eigen::MatrixXd psi = (S.transpose() * AI * S).inverse();
+          const Eigen::Vector6s& AB = bodyNode->mInvM_c;
+          const Eigen::VectorXs& alpha = joint->getAlpha();
+          const Eigen::Vector6s& beta = joint->computeBeta(AI, AB);
+          Eigen::MatrixXs psi = (S.transpose() * AI * S).inverse();
           node.derivs[i].AI = AI;
           node.derivs[i].AB = AB;
           node.derivs[i].alpha = alpha;
@@ -1980,10 +1941,10 @@ Eigen::MatrixXd Skeleton::getJacobianOfMinv_Direct(
           const math::Jacobian S = joint->getRelativeJacobian();
           bodyNode->updateInvMassMatrix();
           const math::Inertia& AI = bodyNode->getArticulatedInertia();
-          const Eigen::Vector6d& AB = bodyNode->mInvM_c;
-          const Eigen::VectorXd& alpha = joint->getAlpha();
-          const Eigen::Vector6d& beta = joint->computeBeta(AI, AB);
-          Eigen::MatrixXd psi = (S.transpose() * AI * S).inverse();
+          const Eigen::Vector6s& AB = bodyNode->mInvM_c;
+          const Eigen::VectorXs& alpha = joint->getAlpha();
+          const Eigen::Vector6s& beta = joint->computeBeta(AI, AB);
+          Eigen::MatrixXs psi = (S.transpose() * AI * S).inverse();
           node.derivs[i].AI = (node.derivs[i].AI - AI) / (2 * EPS);
           node.derivs[i].AB = (node.derivs[i].AB - AB) / (2 * EPS);
           node.derivs[i].alpha = (node.derivs[i].alpha - alpha) / (2 * EPS);
@@ -2008,7 +1969,7 @@ Eigen::MatrixXd Skeleton::getJacobianOfMinv_Direct(
 }
 
 //==============================================================================
-Eigen::MatrixXd Skeleton::getJacobianOfFD(neural::WithRespectTo* wrt)
+Eigen::MatrixXs Skeleton::getJacobianOfFD(neural::WithRespectTo* wrt)
 {
   const auto& tau = getForces();
   const auto& Cg = getCoriolisAndGravityForces();
@@ -2021,18 +1982,18 @@ Eigen::MatrixXd Skeleton::getJacobianOfFD(neural::WithRespectTo* wrt)
 }
 
 //==============================================================================
-Eigen::MatrixXd Skeleton::getUnconstrainedVelJacobianWrt(
-    double dt, neural::WithRespectTo* wrt)
+Eigen::MatrixXs Skeleton::getUnconstrainedVelJacobianWrt(
+    s_t dt, neural::WithRespectTo* wrt)
 {
-  Eigen::VectorXd tau = getForces();
-  Eigen::VectorXd C = getCoriolisAndGravityForces() - getExternalForces();
+  Eigen::VectorXs tau = getForces();
+  Eigen::VectorXs C = getCoriolisAndGravityForces() - getExternalForces();
 
-  Eigen::MatrixXd Minv = getInvMassMatrix();
-  Eigen::MatrixXd dC = getJacobianOfC(wrt);
+  Eigen::MatrixXs Minv = getInvMassMatrix();
+  Eigen::MatrixXs dC = getJacobianOfC(wrt);
 
   if (wrt == neural::WithRespectTo::POSITION)
   {
-    Eigen::MatrixXd dM = getJacobianOfMinv(dt * (tau - C), wrt);
+    Eigen::MatrixXs dM = getJacobianOfMinv(dt * (tau - C), wrt);
     return dM - Minv * dt * dC;
   }
   else
@@ -2042,7 +2003,7 @@ Eigen::MatrixXd Skeleton::getUnconstrainedVelJacobianWrt(
 }
 
 //==============================================================================
-Eigen::MatrixXd Skeleton::getVelCJacobian()
+Eigen::MatrixXs Skeleton::getVelCJacobian()
 {
   // TOOD(keenon): replace with the GEAR approach
   // return finiteDifferenceVelCJacobian();
@@ -2147,34 +2108,34 @@ void Skeleton::DiffC::print()
 #endif
 
 //==============================================================================
-Eigen::MatrixXd Skeleton::finiteDifferenceJacobianOfM(
-    const Eigen::VectorXd& x, neural::WithRespectTo* wrt, bool useRidders)
+Eigen::MatrixXs Skeleton::finiteDifferenceJacobianOfM(
+    const Eigen::VectorXs& x, neural::WithRespectTo* wrt, bool useRidders)
 {
   if (useRidders)
     return finiteDifferenceRiddersJacobianOfM(x, wrt);
 
   std::size_t n = getNumDofs();
   std::size_t m = wrt->dim(this);
-  Eigen::MatrixXd J = Eigen::MatrixXd::Zero(n, m);
-  Eigen::VectorXd start = wrt->get(this);
+  Eigen::MatrixXs J = Eigen::MatrixXs::Zero(n, m);
+  Eigen::VectorXs start = wrt->get(this);
 
   // Get baseline C(pos, vel)
-  Eigen::VectorXd baseline = getMassMatrix() * x;
+  Eigen::VectorXs baseline = getMassMatrix() * x;
 
-  double EPS = 5e-7;
+  s_t EPS = 5e-7;
 
   for (std::size_t i = 0; i < m; i++)
   {
-    Eigen::VectorXd tweaked = start;
+    Eigen::VectorXs tweaked = start;
     tweaked(i) += EPS;
     wrt->set(this, tweaked);
     mSkelCache.mDirty.mMassMatrix = true;
-    Eigen::VectorXd plus = getMassMatrix() * x;
+    Eigen::VectorXs plus = getMassMatrix() * x;
     tweaked = start;
     tweaked(i) -= EPS;
     wrt->set(this, tweaked);
     mSkelCache.mDirty.mMassMatrix = true;
-    Eigen::VectorXd minus = getMassMatrix() * x;
+    Eigen::VectorXs minus = getMassMatrix() * x;
 
     J.col(i) = (plus - minus) / (2 * EPS);
   }
@@ -2188,38 +2149,38 @@ Eigen::MatrixXd Skeleton::finiteDifferenceJacobianOfM(
 }
 
 //==============================================================================
-Eigen::MatrixXd Skeleton::finiteDifferenceRiddersJacobianOfM(
-    const Eigen::VectorXd& x, neural::WithRespectTo* wrt)
+Eigen::MatrixXs Skeleton::finiteDifferenceRiddersJacobianOfM(
+    const Eigen::VectorXs& x, neural::WithRespectTo* wrt)
 {
   std::size_t n = getNumDofs();
   std::size_t m = wrt->dim(this);
-  Eigen::MatrixXd J = Eigen::MatrixXd::Zero(n, m);
-  Eigen::VectorXd originalWrt = wrt->get(this);
+  Eigen::MatrixXs J = Eigen::MatrixXs::Zero(n, m);
+  Eigen::VectorXs originalWrt = wrt->get(this);
 
-  const double originalStepSize = 1e-3;
-  const double con = 1.4, con2 = (con * con);
-  const double safeThreshold = 2.0;
+  const s_t originalStepSize = 1e-3;
+  const s_t con = 1.4, con2 = (con * con);
+  const s_t safeThreshold = 2.0;
   const int tabSize = 10;
 
   for (std::size_t i = 0; i < m; i++)
   {
-    double stepSize = originalStepSize;
-    double bestError = std::numeric_limits<double>::max();
+    s_t stepSize = originalStepSize;
+    s_t bestError = std::numeric_limits<s_t>::max();
 
     // Neville tableau of finite difference results
-    std::array<std::array<Eigen::VectorXd, tabSize>, tabSize> tab;
+    std::array<std::array<Eigen::VectorXs, tabSize>, tabSize> tab;
 
-    Eigen::VectorXd perturbedPlus = Eigen::VectorXd(originalWrt);
+    Eigen::VectorXs perturbedPlus = Eigen::VectorXs(originalWrt);
     perturbedPlus(i) += stepSize;
     wrt->set(this, perturbedPlus);
     mSkelCache.mDirty.mMassMatrix = true;
-    Eigen::MatrixXd plus = getMassMatrix() * x;
+    Eigen::MatrixXs plus = getMassMatrix() * x;
 
-    Eigen::VectorXd perturbedMinus = Eigen::VectorXd(originalWrt);
+    Eigen::VectorXs perturbedMinus = Eigen::VectorXs(originalWrt);
     perturbedMinus(i) -= stepSize;
     wrt->set(this, perturbedMinus);
     mSkelCache.mDirty.mMassMatrix = true;
-    Eigen::MatrixXd minus = getMassMatrix() * x;
+    Eigen::MatrixXs minus = getMassMatrix() * x;
 
     tab[0][0] = (plus - minus) / (2 * stepSize);
 
@@ -2228,13 +2189,13 @@ Eigen::MatrixXd Skeleton::finiteDifferenceRiddersJacobianOfM(
     {
       stepSize /= con;
 
-      perturbedPlus = Eigen::VectorXd(originalWrt);
+      perturbedPlus = Eigen::VectorXs(originalWrt);
       perturbedPlus(i) += stepSize;
       wrt->set(this, perturbedPlus);
       mSkelCache.mDirty.mMassMatrix = true;
       plus = getMassMatrix() * x;
 
-      perturbedMinus = Eigen::VectorXd(originalWrt);
+      perturbedMinus = Eigen::VectorXs(originalWrt);
       perturbedMinus(i) -= stepSize;
       wrt->set(this, perturbedMinus);
       mSkelCache.mDirty.mMassMatrix = true;
@@ -2242,7 +2203,7 @@ Eigen::MatrixXd Skeleton::finiteDifferenceRiddersJacobianOfM(
 
       tab[0][iTab] = (plus - minus) / (2 * stepSize);
 
-      double fac = con2;
+      s_t fac = con2;
       // Compute extrapolations of increasing orders, requiring no new
       // evaluations
       for (int jTab = 1; jTab <= iTab; jTab++)
@@ -2250,7 +2211,7 @@ Eigen::MatrixXd Skeleton::finiteDifferenceRiddersJacobianOfM(
         tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
                           / (fac - 1.0);
         fac = con2 * fac;
-        double currError = std::max(
+        s_t currError = std::max(
             (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
             (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
                 .array()
@@ -2279,7 +2240,7 @@ Eigen::MatrixXd Skeleton::finiteDifferenceRiddersJacobianOfM(
 }
 
 //==============================================================================
-Eigen::MatrixXd Skeleton::finiteDifferenceJacobianOfC(
+Eigen::MatrixXs Skeleton::finiteDifferenceJacobianOfC(
     neural::WithRespectTo* wrt, bool useRidders)
 {
   if (useRidders)
@@ -2287,26 +2248,26 @@ Eigen::MatrixXd Skeleton::finiteDifferenceJacobianOfC(
 
   std::size_t n = getNumDofs();
   std::size_t m = wrt->dim(this);
-  Eigen::MatrixXd J = Eigen::MatrixXd::Zero(n, m);
-  Eigen::VectorXd start = wrt->get(this);
+  Eigen::MatrixXs J = Eigen::MatrixXs::Zero(n, m);
+  Eigen::VectorXs start = wrt->get(this);
 
   // Get baseline C(pos, vel)
-  Eigen::VectorXd baseline
+  Eigen::VectorXs baseline
       = getCoriolisAndGravityForces() - getExternalForces();
 
-  double EPS = 1e-7;
+  s_t EPS = 1e-7;
 
   for (std::size_t i = 0; i < m; i++)
   {
-    Eigen::VectorXd tweaked = start;
+    Eigen::VectorXs tweaked = start;
     tweaked(i) += EPS;
     wrt->set(this, tweaked);
-    Eigen::VectorXd perturbedPos
+    Eigen::VectorXs perturbedPos
         = getCoriolisAndGravityForces() - getExternalForces();
     tweaked = start;
     tweaked(i) -= EPS;
     wrt->set(this, tweaked);
-    Eigen::VectorXd perturbedNeg
+    Eigen::VectorXs perturbedNeg
         = getCoriolisAndGravityForces() - getExternalForces();
 
     J.col(i) = (perturbedPos - perturbedNeg) / (2 * EPS);
@@ -2319,33 +2280,34 @@ Eigen::MatrixXd Skeleton::finiteDifferenceJacobianOfC(
 }
 
 //==============================================================================
-Eigen::MatrixXd Skeleton::finiteDifferenceJacobianOfID(
-    const Eigen::VectorXd& f, neural::WithRespectTo* wrt, bool useRidders)
+Eigen::MatrixXs Skeleton::finiteDifferenceJacobianOfID(
+    const Eigen::VectorXs& f, neural::WithRespectTo* wrt, bool useRidders)
 {
-  if (useRidders) return finiteDifferenceRiddersJacobianOfID(f, wrt);
+  if (useRidders)
+    return finiteDifferenceRiddersJacobianOfID(f, wrt);
 
   std::size_t n = getNumDofs();
   std::size_t m = wrt->dim(this);
-  Eigen::MatrixXd J = Eigen::MatrixXd::Zero(n, m);
-  Eigen::VectorXd start = wrt->get(this);
+  Eigen::MatrixXs J = Eigen::MatrixXs::Zero(n, m);
+  Eigen::VectorXs start = wrt->get(this);
 
-  const Eigen::VectorXd old_ddq = getAccelerations();
+  const Eigen::VectorXs old_ddq = getAccelerations();
   setAccelerations(f);
 
-  double EPS = 5e-7;
+  s_t EPS = 5e-7;
 
   for (std::size_t i = 0; i < m; i++)
   {
-    Eigen::VectorXd tweaked = start;
+    Eigen::VectorXs tweaked = start;
     tweaked(i) += EPS;
     wrt->set(this, tweaked);
     computeInverseDynamics();
-    const Eigen::VectorXd plus = getForces();
+    const Eigen::VectorXs plus = getForces();
     tweaked = start;
     tweaked(i) -= EPS;
     wrt->set(this, tweaked);
     computeInverseDynamics();
-    const Eigen::VectorXd minus = getForces();
+    const Eigen::VectorXs minus = getForces();
 
     J.col(i) = (plus - minus) / (2 * EPS);
   }
@@ -2359,41 +2321,40 @@ Eigen::MatrixXd Skeleton::finiteDifferenceJacobianOfID(
 }
 
 //==============================================================================
-Eigen::MatrixXd Skeleton::finiteDifferenceRiddersJacobianOfID(
-    const Eigen::VectorXd& f,
-    neural::WithRespectTo* wrt)
+Eigen::MatrixXs Skeleton::finiteDifferenceRiddersJacobianOfID(
+    const Eigen::VectorXs& f, neural::WithRespectTo* wrt)
 {
   std::size_t n = getNumDofs();
   std::size_t m = wrt->dim(this);
-  Eigen::MatrixXd J = Eigen::MatrixXd::Zero(n, m);
-  Eigen::VectorXd originalWrt = wrt->get(this);
+  Eigen::MatrixXs J = Eigen::MatrixXs::Zero(n, m);
+  Eigen::VectorXs originalWrt = wrt->get(this);
 
-  const Eigen::VectorXd old_ddq = getAccelerations();
+  const Eigen::VectorXs old_ddq = getAccelerations();
   setAccelerations(f);
 
-  const double originalStepSize = 1e-3;
-  const double con = 1.4, con2 = (con * con);
-  const double safeThreshold = 2.0;
+  const s_t originalStepSize = 1e-3;
+  const s_t con = 1.4, con2 = (con * con);
+  const s_t safeThreshold = 2.0;
   const int tabSize = 10;
 
   for (std::size_t i = 0; i < m; i++)
   {
-    double stepSize = originalStepSize;
-    double bestError = std::numeric_limits<double>::max();
+    s_t stepSize = originalStepSize;
+    s_t bestError = std::numeric_limits<s_t>::max();
 
     // Neville tableau of finite difference results
-    std::array<std::array<Eigen::VectorXd, tabSize>, tabSize> tab;
+    std::array<std::array<Eigen::VectorXs, tabSize>, tabSize> tab;
 
-    Eigen::VectorXd perturbedPlus = Eigen::VectorXd(originalWrt);
+    Eigen::VectorXs perturbedPlus = Eigen::VectorXs(originalWrt);
     perturbedPlus(i) += stepSize;
     wrt->set(this, perturbedPlus);
     computeInverseDynamics();
-    Eigen::VectorXd plus = getForces();
-    Eigen::VectorXd perturbedMinus = Eigen::VectorXd(originalWrt);
+    Eigen::VectorXs plus = getForces();
+    Eigen::VectorXs perturbedMinus = Eigen::VectorXs(originalWrt);
     perturbedMinus(i) -= stepSize;
     wrt->set(this, perturbedMinus);
     computeInverseDynamics();
-    Eigen::VectorXd minus = getForces();
+    Eigen::VectorXs minus = getForces();
 
     tab[0][0] = (plus - minus) / (2 * stepSize);
 
@@ -2402,12 +2363,12 @@ Eigen::MatrixXd Skeleton::finiteDifferenceRiddersJacobianOfID(
     {
       stepSize /= con;
 
-      perturbedPlus = Eigen::VectorXd(originalWrt);
+      perturbedPlus = Eigen::VectorXs(originalWrt);
       perturbedPlus(i) += stepSize;
       wrt->set(this, perturbedPlus);
       computeInverseDynamics();
       plus = getForces();
-      perturbedMinus = Eigen::VectorXd(originalWrt);
+      perturbedMinus = Eigen::VectorXs(originalWrt);
       perturbedMinus(i) -= stepSize;
       wrt->set(this, perturbedMinus);
       computeInverseDynamics();
@@ -2415,7 +2376,7 @@ Eigen::MatrixXd Skeleton::finiteDifferenceRiddersJacobianOfID(
 
       tab[0][iTab] = (plus - minus) / (2 * stepSize);
 
-      double fac = con2;
+      s_t fac = con2;
       // Compute extrapolations of increasing orders, requiring no new
       // evaluations
       for (int jTab = 1; jTab <= iTab; jTab++)
@@ -2423,7 +2384,7 @@ Eigen::MatrixXd Skeleton::finiteDifferenceRiddersJacobianOfID(
         tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
                           / (fac - 1.0);
         fac = con2 * fac;
-        double currError = std::max(
+        s_t currError = std::max(
             (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
             (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
                 .array()
@@ -2450,36 +2411,36 @@ Eigen::MatrixXd Skeleton::finiteDifferenceRiddersJacobianOfID(
 }
 
 //==============================================================================
-Eigen::MatrixXd Skeleton::finiteDifferenceRiddersJacobianOfC(
+Eigen::MatrixXs Skeleton::finiteDifferenceRiddersJacobianOfC(
     neural::WithRespectTo* wrt)
 {
   std::size_t n = getNumDofs();
   std::size_t m = wrt->dim(this);
-  Eigen::MatrixXd J = Eigen::MatrixXd::Zero(n, m);
-  Eigen::VectorXd originalWrt = wrt->get(this);
+  Eigen::MatrixXs J = Eigen::MatrixXs::Zero(n, m);
+  Eigen::VectorXs originalWrt = wrt->get(this);
 
-  const double originalStepSize = 1e-3;
-  const double con = 1.4, con2 = (con * con);
-  const double safeThreshold = 2.0;
+  const s_t originalStepSize = 1e-3;
+  const s_t con = 1.4, con2 = (con * con);
+  const s_t safeThreshold = 2.0;
   const int tabSize = 10;
 
   for (std::size_t i = 0; i < m; i++)
   {
-    double stepSize = originalStepSize;
-    double bestError = std::numeric_limits<double>::max();
+    s_t stepSize = originalStepSize;
+    s_t bestError = std::numeric_limits<s_t>::max();
 
     // Neville tableau of finite difference results
-    std::array<std::array<Eigen::VectorXd, tabSize>, tabSize> tab;
+    std::array<std::array<Eigen::VectorXs, tabSize>, tabSize> tab;
 
-    Eigen::VectorXd perturbedPlus = Eigen::VectorXd(originalWrt);
+    Eigen::VectorXs perturbedPlus = Eigen::VectorXs(originalWrt);
     perturbedPlus(i) += stepSize;
     wrt->set(this, perturbedPlus);
-    Eigen::MatrixXd tauPlus
+    Eigen::MatrixXs tauPlus
         = getCoriolisAndGravityForces() - getExternalForces();
-    Eigen::VectorXd perturbedMinus = Eigen::VectorXd(originalWrt);
+    Eigen::VectorXs perturbedMinus = Eigen::VectorXs(originalWrt);
     perturbedMinus(i) -= stepSize;
     wrt->set(this, perturbedMinus);
-    Eigen::MatrixXd tauMinus
+    Eigen::MatrixXs tauMinus
         = getCoriolisAndGravityForces() - getExternalForces();
 
     tab[0][0] = (tauPlus - tauMinus) / (2 * stepSize);
@@ -2489,18 +2450,18 @@ Eigen::MatrixXd Skeleton::finiteDifferenceRiddersJacobianOfC(
     {
       stepSize /= con;
 
-      perturbedPlus = Eigen::VectorXd(originalWrt);
+      perturbedPlus = Eigen::VectorXs(originalWrt);
       perturbedPlus(i) += stepSize;
       wrt->set(this, perturbedPlus);
       tauPlus = getCoriolisAndGravityForces() - getExternalForces();
-      perturbedMinus = Eigen::VectorXd(originalWrt);
+      perturbedMinus = Eigen::VectorXs(originalWrt);
       perturbedMinus(i) -= stepSize;
       wrt->set(this, perturbedMinus);
       tauMinus = getCoriolisAndGravityForces() - getExternalForces();
 
       tab[0][iTab] = (tauPlus - tauMinus) / (2 * stepSize);
 
-      double fac = con2;
+      s_t fac = con2;
       // Compute extrapolations of increasing orders, requiring no new
       // evaluations
       for (int jTab = 1; jTab <= iTab; jTab++)
@@ -2508,7 +2469,7 @@ Eigen::MatrixXd Skeleton::finiteDifferenceRiddersJacobianOfC(
         tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
                           / (fac - 1.0);
         fac = con2 * fac;
-        double currError = std::max(
+        s_t currError = std::max(
             (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
             (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
                 .array()
@@ -2535,32 +2496,32 @@ Eigen::MatrixXd Skeleton::finiteDifferenceRiddersJacobianOfC(
 }
 
 //==============================================================================
-Eigen::MatrixXd Skeleton::finiteDifferenceJacobianOfMinv(
-    const Eigen::VectorXd& f, neural::WithRespectTo* wrt, bool useRidders)
+Eigen::MatrixXs Skeleton::finiteDifferenceJacobianOfMinv(
+    const Eigen::VectorXs& f, neural::WithRespectTo* wrt, bool useRidders)
 {
   if (useRidders)
     return finiteDifferenceRiddersJacobianOfMinv(f, wrt);
 
   std::size_t n = getNumDofs();
   std::size_t m = wrt->dim(this);
-  Eigen::MatrixXd J = Eigen::MatrixXd::Zero(n, m);
-  Eigen::VectorXd start = wrt->get(this);
+  Eigen::MatrixXs J = Eigen::MatrixXs::Zero(n, m);
+  Eigen::VectorXs start = wrt->get(this);
 
   // Get baseline C(pos, vel)
-  Eigen::VectorXd baseline = multiplyByImplicitInvMassMatrix(f);
+  Eigen::VectorXs baseline = multiplyByImplicitInvMassMatrix(f);
 
-  double EPS = 5e-7;
+  s_t EPS = 5e-7;
 
   for (std::size_t i = 0; i < m; i++)
   {
-    Eigen::VectorXd tweaked = start;
+    Eigen::VectorXs tweaked = start;
     tweaked(i) += EPS;
     wrt->set(this, tweaked);
-    Eigen::VectorXd plus = multiplyByImplicitInvMassMatrix(f);
+    Eigen::VectorXs plus = multiplyByImplicitInvMassMatrix(f);
     tweaked = start;
     tweaked(i) -= EPS;
     wrt->set(this, tweaked);
-    Eigen::VectorXd minus = multiplyByImplicitInvMassMatrix(f);
+    Eigen::VectorXs minus = multiplyByImplicitInvMassMatrix(f);
 
     J.col(i) = (plus - minus) / (2 * EPS);
   }
@@ -2572,35 +2533,35 @@ Eigen::MatrixXd Skeleton::finiteDifferenceJacobianOfMinv(
 }
 
 //==============================================================================
-Eigen::MatrixXd Skeleton::finiteDifferenceRiddersJacobianOfMinv(
-    Eigen::VectorXd f, neural::WithRespectTo* wrt)
+Eigen::MatrixXs Skeleton::finiteDifferenceRiddersJacobianOfMinv(
+    Eigen::VectorXs f, neural::WithRespectTo* wrt)
 {
   std::size_t n = getNumDofs();
   std::size_t m = wrt->dim(this);
-  Eigen::MatrixXd J = Eigen::MatrixXd::Zero(n, m);
-  Eigen::VectorXd originalWrt = wrt->get(this);
+  Eigen::MatrixXs J = Eigen::MatrixXs::Zero(n, m);
+  Eigen::VectorXs originalWrt = wrt->get(this);
 
-  const double originalStepSize = 1e-3;
-  const double con = 1.4, con2 = (con * con);
-  const double safeThreshold = 2.0;
+  const s_t originalStepSize = 1e-3;
+  const s_t con = 1.4, con2 = (con * con);
+  const s_t safeThreshold = 2.0;
   const int tabSize = 10;
 
   for (std::size_t i = 0; i < m; i++)
   {
-    double stepSize = originalStepSize;
-    double bestError = std::numeric_limits<double>::max();
+    s_t stepSize = originalStepSize;
+    s_t bestError = std::numeric_limits<s_t>::max();
 
     // Neville tableau of finite difference results
-    std::array<std::array<Eigen::VectorXd, tabSize>, tabSize> tab;
+    std::array<std::array<Eigen::VectorXs, tabSize>, tabSize> tab;
 
-    Eigen::VectorXd perturbedPlus = Eigen::VectorXd(originalWrt);
+    Eigen::VectorXs perturbedPlus = Eigen::VectorXs(originalWrt);
     perturbedPlus(i) += stepSize;
     wrt->set(this, perturbedPlus);
-    Eigen::MatrixXd MinvFPlus = multiplyByImplicitInvMassMatrix(f);
-    Eigen::VectorXd perturbedMinus = Eigen::VectorXd(originalWrt);
+    Eigen::MatrixXs MinvFPlus = multiplyByImplicitInvMassMatrix(f);
+    Eigen::VectorXs perturbedMinus = Eigen::VectorXs(originalWrt);
     perturbedMinus(i) -= stepSize;
     wrt->set(this, perturbedMinus);
-    Eigen::MatrixXd MinvFMinus = multiplyByImplicitInvMassMatrix(f);
+    Eigen::MatrixXs MinvFMinus = multiplyByImplicitInvMassMatrix(f);
 
     tab[0][0] = (MinvFPlus - MinvFMinus) / (2 * stepSize);
 
@@ -2609,18 +2570,18 @@ Eigen::MatrixXd Skeleton::finiteDifferenceRiddersJacobianOfMinv(
     {
       stepSize /= con;
 
-      perturbedPlus = Eigen::VectorXd(originalWrt);
+      perturbedPlus = Eigen::VectorXs(originalWrt);
       perturbedPlus(i) += stepSize;
       wrt->set(this, perturbedPlus);
       MinvFPlus = multiplyByImplicitInvMassMatrix(f);
-      perturbedMinus = Eigen::VectorXd(originalWrt);
+      perturbedMinus = Eigen::VectorXs(originalWrt);
       perturbedMinus(i) -= stepSize;
       wrt->set(this, perturbedMinus);
       MinvFMinus = multiplyByImplicitInvMassMatrix(f);
 
       tab[0][iTab] = (MinvFPlus - MinvFMinus) / (2 * stepSize);
 
-      double fac = con2;
+      s_t fac = con2;
       // Compute extrapolations of increasing orders, requiring no new
       // evaluations
       for (int jTab = 1; jTab <= iTab; jTab++)
@@ -2628,7 +2589,7 @@ Eigen::MatrixXd Skeleton::finiteDifferenceRiddersJacobianOfMinv(
         tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
                           / (fac - 1.0);
         fac = con2 * fac;
-        double currError = std::max(
+        s_t currError = std::max(
             (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
             (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
                 .array()
@@ -2655,15 +2616,15 @@ Eigen::MatrixXd Skeleton::finiteDifferenceRiddersJacobianOfMinv(
 }
 
 //==============================================================================
-Eigen::VectorXd Skeleton::getDynamicsForces()
+Eigen::VectorXs Skeleton::getDynamicsForces()
 {
   computeForwardDynamics();
   std::size_t n = getNumDofs();
-  Eigen::VectorXd forces = Eigen::VectorXd(n);
+  Eigen::VectorXs forces = Eigen::VectorXs(n);
   int cursor = 0;
   for (std::size_t i = 0; i < mSkelCache.mBodyNodes.size(); ++i)
   {
-    Eigen::VectorXd jointForces = mSkelCache.mBodyNodes[i]
+    Eigen::VectorXs jointForces = mSkelCache.mBodyNodes[i]
                                       ->getParentJoint()
                                       ->getRelativeJacobian()
                                       .transpose()
@@ -2675,30 +2636,30 @@ Eigen::VectorXd Skeleton::getDynamicsForces()
 }
 
 //==============================================================================
-Eigen::MatrixXd Skeleton::finiteDifferenceVelCJacobian(bool useRidders)
+Eigen::MatrixXs Skeleton::finiteDifferenceVelCJacobian(bool useRidders)
 {
   if (useRidders)
     return finiteDifferenceRiddersVelCJacobian();
 
   std::size_t n = getNumDofs();
-  Eigen::MatrixXd J = Eigen::MatrixXd::Zero(n, n);
-  Eigen::VectorXd vel = getVelocities();
+  Eigen::MatrixXs J = Eigen::MatrixXs::Zero(n, n);
+  Eigen::VectorXs vel = getVelocities();
 
   // Get baseline C(pos, vel)
-  Eigen::VectorXd baseline = getCoriolisAndGravityForces();
+  Eigen::VectorXs baseline = getCoriolisAndGravityForces();
 
-  double EPS = 1e-6;
+  s_t EPS = 1e-6;
 
   for (std::size_t i = 0; i < n; i++)
   {
-    Eigen::VectorXd tweakedVel = vel;
+    Eigen::VectorXs tweakedVel = vel;
     tweakedVel(i) += EPS;
     setVelocities(tweakedVel);
-    Eigen::VectorXd perturbedPos = getCoriolisAndGravityForces();
+    Eigen::VectorXs perturbedPos = getCoriolisAndGravityForces();
     tweakedVel = vel;
     tweakedVel(i) -= EPS;
     setVelocities(tweakedVel);
-    Eigen::VectorXd perturbedNeg = getCoriolisAndGravityForces();
+    Eigen::VectorXs perturbedNeg = getCoriolisAndGravityForces();
 
 #ifndef NDEBUG
     if (perturbedPos == perturbedNeg && perturbedPos != baseline)
@@ -2714,12 +2675,12 @@ Eigen::MatrixXd Skeleton::finiteDifferenceVelCJacobian(bool useRidders)
 
       DataCache& cache = mTreeCache[0];
       std::size_t dof = cache.mDofs.size();
-      Eigen::VectorXd mCg = Eigen::VectorXd::Zero(dof);
+      Eigen::VectorXs mCg = Eigen::VectorXs::Zero(dof);
       assert(static_cast<std::size_t>(mCg.size()) == dof);
 
       mCg.setZero();
 
-      std::vector<Eigen::Vector6d> posVecs;
+      std::vector<Eigen::Vector6s> posVecs;
 
       for (std::vector<BodyNode*>::const_iterator it = cache.mBodyNodes.begin();
            it != cache.mBodyNodes.end();
@@ -2733,8 +2694,8 @@ Eigen::MatrixXd Skeleton::finiteDifferenceVelCJacobian(bool useRidders)
            it != cache.mBodyNodes.rend();
            ++it)
       {
-        Eigen::Vector6d V = (*it)->getSpatialVelocity();
-        const Eigen::Matrix6d& mI
+        Eigen::Vector6s V = (*it)->getSpatialVelocity();
+        const Eigen::Matrix6s& mI
             = (*it)->mAspectProperties.mInertia.getSpatialTensor();
         posVecs.push_back(math::dad(V, mI * V));
         (*it)->aggregateCombinedVector(mCg, mAspectProperties.mGravity);
@@ -2746,12 +2707,12 @@ Eigen::MatrixXd Skeleton::finiteDifferenceVelCJacobian(bool useRidders)
       tweakedVel(i) -= EPS;
       setVelocities(tweakedVel);
 
-      Eigen::VectorXd mCg2 = Eigen::VectorXd::Zero(dof);
+      Eigen::VectorXs mCg2 = Eigen::VectorXs::Zero(dof);
       assert(static_cast<std::size_t>(mCg2.size()) == dof);
 
       mCg2.setZero();
 
-      std::vector<Eigen::Vector6d> negVecs;
+      std::vector<Eigen::Vector6s> negVecs;
 
       for (std::vector<BodyNode*>::const_iterator it = cache.mBodyNodes.begin();
            it != cache.mBodyNodes.end();
@@ -2765,8 +2726,8 @@ Eigen::MatrixXd Skeleton::finiteDifferenceVelCJacobian(bool useRidders)
            it != cache.mBodyNodes.rend();
            ++it)
       {
-        Eigen::Vector6d V = (*it)->getSpatialVelocity();
-        const Eigen::Matrix6d& mI
+        Eigen::Vector6s V = (*it)->getSpatialVelocity();
+        const Eigen::Matrix6s& mI
             = (*it)->mAspectProperties.mInertia.getSpatialTensor();
         negVecs.push_back(math::dad(V, mI * V));
         (*it)->aggregateCombinedVector(mCg2, mAspectProperties.mGravity);
@@ -2788,33 +2749,33 @@ Eigen::MatrixXd Skeleton::finiteDifferenceVelCJacobian(bool useRidders)
 }
 
 //==============================================================================
-Eigen::MatrixXd Skeleton::finiteDifferenceRiddersVelCJacobian()
+Eigen::MatrixXs Skeleton::finiteDifferenceRiddersVelCJacobian()
 {
   std::size_t n = getNumDofs();
-  Eigen::MatrixXd J = Eigen::MatrixXd::Zero(n, n);
-  Eigen::VectorXd vel = getVelocities();
+  Eigen::MatrixXs J = Eigen::MatrixXs::Zero(n, n);
+  Eigen::VectorXs vel = getVelocities();
 
-  const double originalStepSize = 1e-3;
-  const double con = 1.4, con2 = (con * con);
-  const double safeThreshold = 2.0;
+  const s_t originalStepSize = 1e-3;
+  const s_t con = 1.4, con2 = (con * con);
+  const s_t safeThreshold = 2.0;
   const int tabSize = 10;
 
   for (std::size_t i = 0; i < n; i++)
   {
-    double stepSize = originalStepSize;
-    double bestError = std::numeric_limits<double>::max();
+    s_t stepSize = originalStepSize;
+    s_t bestError = std::numeric_limits<s_t>::max();
 
     // Neville tableau of finite difference results
-    std::array<std::array<Eigen::VectorXd, tabSize>, tabSize> tab;
+    std::array<std::array<Eigen::VectorXs, tabSize>, tabSize> tab;
 
-    Eigen::VectorXd tweakedVel = vel;
+    Eigen::VectorXs tweakedVel = vel;
     tweakedVel(i) += stepSize;
     setVelocities(tweakedVel);
-    Eigen::VectorXd perturbedPos = getCoriolisAndGravityForces();
+    Eigen::VectorXs perturbedPos = getCoriolisAndGravityForces();
     tweakedVel = vel;
     tweakedVel(i) -= stepSize;
     setVelocities(tweakedVel);
-    Eigen::VectorXd perturbedNeg = getCoriolisAndGravityForces();
+    Eigen::VectorXs perturbedNeg = getCoriolisAndGravityForces();
 
     tab[0][0] = (perturbedPos - perturbedNeg) / (2 * stepSize);
 
@@ -2834,7 +2795,7 @@ Eigen::MatrixXd Skeleton::finiteDifferenceRiddersVelCJacobian()
 
       tab[0][iTab] = (perturbedPos - perturbedNeg) / (2 * stepSize);
 
-      double fac = con2;
+      s_t fac = con2;
       // Compute extrapolations of increasing orders, requiring no new
       // evaluations
       for (int jTab = 1; jTab <= iTab; jTab++)
@@ -2842,7 +2803,7 @@ Eigen::MatrixXd Skeleton::finiteDifferenceRiddersVelCJacobian()
         tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
                           / (fac - 1.0);
         fac = con2 * fac;
-        double currError = std::max(
+        s_t currError = std::max(
             (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
             (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
                 .array()
@@ -2871,30 +2832,31 @@ Eigen::MatrixXd Skeleton::finiteDifferenceRiddersVelCJacobian()
 }
 
 //==============================================================================
-Eigen::MatrixXd Skeleton::finiteDifferenceJacobianOfFD(
+Eigen::MatrixXs Skeleton::finiteDifferenceJacobianOfFD(
     neural::WithRespectTo* wrt, bool useRidders)
 {
-  if (useRidders) return finiteDifferenceRiddersJacobianOfFD(wrt);
+  if (useRidders)
+    return finiteDifferenceRiddersJacobianOfFD(wrt);
 
   std::size_t n = getNumDofs();
   std::size_t m = wrt->dim(this);
-  Eigen::MatrixXd J = Eigen::MatrixXd::Zero(n, m);
-  Eigen::VectorXd start = wrt->get(this);
+  Eigen::MatrixXs J = Eigen::MatrixXs::Zero(n, m);
+  Eigen::VectorXs start = wrt->get(this);
 
-  double EPS = 5e-7;
+  s_t EPS = 5e-7;
 
   for (std::size_t i = 0; i < m; i++)
   {
-    Eigen::VectorXd tweaked = start;
+    Eigen::VectorXs tweaked = start;
     tweaked(i) += EPS;
     wrt->set(this, tweaked);
     computeForwardDynamics();
-    Eigen::VectorXd plus = getAccelerations();
+    Eigen::VectorXs plus = getAccelerations();
     tweaked = start;
     tweaked(i) -= EPS;
     wrt->set(this, tweaked);
     computeForwardDynamics();
-    Eigen::VectorXd minus = getAccelerations();
+    Eigen::VectorXs minus = getAccelerations();
 
     J.col(i) = (plus - minus) / (2 * EPS);
   }
@@ -2906,37 +2868,37 @@ Eigen::MatrixXd Skeleton::finiteDifferenceJacobianOfFD(
 }
 
 //==============================================================================
-Eigen::MatrixXd Skeleton::finiteDifferenceRiddersJacobianOfFD(
+Eigen::MatrixXs Skeleton::finiteDifferenceRiddersJacobianOfFD(
     neural::WithRespectTo* wrt)
 {
   std::size_t n = getNumDofs();
   std::size_t m = wrt->dim(this);
-  Eigen::MatrixXd J = Eigen::MatrixXd::Zero(n, m);
-  Eigen::VectorXd start = wrt->get(this);
+  Eigen::MatrixXs J = Eigen::MatrixXs::Zero(n, m);
+  Eigen::VectorXs start = wrt->get(this);
 
-  const double originalStepSize = 1e-3;
-  const double con = 1.4, con2 = (con * con);
-  const double safeThreshold = 2.0;
+  const s_t originalStepSize = 1e-3;
+  const s_t con = 1.4, con2 = (con * con);
+  const s_t safeThreshold = 2.0;
   const int tabSize = 10;
 
   for (std::size_t i = 0; i < n; i++)
   {
-    double stepSize = originalStepSize;
-    double bestError = std::numeric_limits<double>::max();
+    s_t stepSize = originalStepSize;
+    s_t bestError = std::numeric_limits<s_t>::max();
 
     // Neville tableau of finite difference results
-    std::array<std::array<Eigen::VectorXd, tabSize>, tabSize> tab;
+    std::array<std::array<Eigen::VectorXs, tabSize>, tabSize> tab;
 
-    Eigen::VectorXd tweaked = start;
+    Eigen::VectorXs tweaked = start;
     tweaked(i) += stepSize;
     wrt->set(this, tweaked);
     computeForwardDynamics();
-    Eigen::VectorXd plus = getAccelerations();
+    Eigen::VectorXs plus = getAccelerations();
     tweaked = start;
     tweaked(i) -= stepSize;
     wrt->set(this, tweaked);
     computeForwardDynamics();
-    Eigen::VectorXd minus = getAccelerations();
+    Eigen::VectorXs minus = getAccelerations();
 
     tab[0][0] = (plus - minus) / (2 * stepSize);
 
@@ -2958,7 +2920,7 @@ Eigen::MatrixXd Skeleton::finiteDifferenceRiddersJacobianOfFD(
 
       tab[0][iTab] = (plus - minus) / (2 * stepSize);
 
-      double fac = con2;
+      s_t fac = con2;
       // Compute extrapolations of increasing orders, requiring no new
       // evaluations
       for (int jTab = 1; jTab <= iTab; jTab++)
@@ -2966,7 +2928,7 @@ Eigen::MatrixXd Skeleton::finiteDifferenceRiddersJacobianOfFD(
         tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
                           / (fac - 1.0);
         fac = con2 * fac;
-        double currError = std::max(
+        s_t currError = std::max(
             (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
             (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
                 .array()
@@ -2996,10 +2958,10 @@ Eigen::MatrixXd Skeleton::finiteDifferenceRiddersJacobianOfFD(
 }
 
 //==============================================================================
-Eigen::VectorXd Skeleton::getForceUpperLimits()
+Eigen::VectorXs Skeleton::getForceUpperLimits()
 {
   std::size_t n = getNumDofs();
-  Eigen::VectorXd limits(n);
+  Eigen::VectorXs limits(n);
   for (std::size_t i = 0; i < n; i++)
   {
     auto dof = getDof(i);
@@ -3009,10 +2971,10 @@ Eigen::VectorXd Skeleton::getForceUpperLimits()
 }
 
 //==============================================================================
-Eigen::VectorXd Skeleton::getForceLowerLimits()
+Eigen::VectorXs Skeleton::getForceLowerLimits()
 {
   std::size_t n = getNumDofs();
-  Eigen::VectorXd limits(n);
+  Eigen::VectorXs limits(n);
   for (std::size_t i = 0; i < n; i++)
   {
     auto dof = getDof(i);
@@ -3022,10 +2984,10 @@ Eigen::VectorXd Skeleton::getForceLowerLimits()
 }
 
 //==============================================================================
-Eigen::VectorXd Skeleton::getPositionUpperLimits()
+Eigen::VectorXs Skeleton::getPositionUpperLimits()
 {
   std::size_t n = getNumDofs();
-  Eigen::VectorXd limits(n);
+  Eigen::VectorXs limits(n);
   for (std::size_t i = 0; i < n; i++)
   {
     auto dof = getDof(i);
@@ -3035,10 +2997,10 @@ Eigen::VectorXd Skeleton::getPositionUpperLimits()
 }
 
 //==============================================================================
-Eigen::VectorXd Skeleton::getPositionLowerLimits()
+Eigen::VectorXs Skeleton::getPositionLowerLimits()
 {
   std::size_t n = getNumDofs();
-  Eigen::VectorXd limits(n);
+  Eigen::VectorXs limits(n);
   for (std::size_t i = 0; i < n; i++)
   {
     auto dof = getDof(i);
@@ -3048,10 +3010,10 @@ Eigen::VectorXd Skeleton::getPositionLowerLimits()
 }
 
 //==============================================================================
-Eigen::VectorXd Skeleton::getVelocityUpperLimits()
+Eigen::VectorXs Skeleton::getVelocityUpperLimits()
 {
   std::size_t n = getNumDofs();
-  Eigen::VectorXd limits(n);
+  Eigen::VectorXs limits(n);
   for (std::size_t i = 0; i < n; i++)
   {
     auto dof = getDof(i);
@@ -3061,10 +3023,10 @@ Eigen::VectorXd Skeleton::getVelocityUpperLimits()
 }
 
 //==============================================================================
-Eigen::VectorXd Skeleton::getVelocityLowerLimits()
+Eigen::VectorXs Skeleton::getVelocityLowerLimits()
 {
   std::size_t n = getNumDofs();
-  Eigen::VectorXd limits(n);
+  Eigen::VectorXs limits(n);
   for (std::size_t i = 0; i < n; i++)
   {
     auto dof = getDof(i);
@@ -3092,9 +3054,9 @@ std::size_t Skeleton::getLinkMassesDims()
 }
 
 //==============================================================================
-Eigen::VectorXd Skeleton::getLinkCOMs()
+Eigen::VectorXs Skeleton::getLinkCOMs()
 {
-  Eigen::VectorXd inertias = Eigen::VectorXd::Zero(getLinkCOMDims());
+  Eigen::VectorXs inertias = Eigen::VectorXs::Zero(getLinkCOMDims());
   std::size_t cursor = 0;
   for (std::size_t i = 0; i < getNumBodyNodes(); i++)
   {
@@ -3107,9 +3069,9 @@ Eigen::VectorXd Skeleton::getLinkCOMs()
 }
 
 //==============================================================================
-Eigen::VectorXd Skeleton::getLinkMOIs()
+Eigen::VectorXs Skeleton::getLinkMOIs()
 {
-  Eigen::VectorXd inertias = Eigen::VectorXd::Zero(getLinkMOIDims());
+  Eigen::VectorXs inertias = Eigen::VectorXs::Zero(getLinkMOIDims());
   std::size_t cursor = 0;
   for (std::size_t i = 0; i < getNumBodyNodes(); i++)
   {
@@ -3125,9 +3087,9 @@ Eigen::VectorXd Skeleton::getLinkMOIs()
 }
 
 //==============================================================================
-Eigen::VectorXd Skeleton::getLinkMasses()
+Eigen::VectorXs Skeleton::getLinkMasses()
 {
-  Eigen::VectorXd masses = Eigen::VectorXd::Zero(getLinkMassesDims());
+  Eigen::VectorXs masses = Eigen::VectorXs::Zero(getLinkMassesDims());
   for (std::size_t i = 0; i < getNumBodyNodes(); i++)
   {
     masses(i) = getBodyNode(i)->getMass();
@@ -3136,7 +3098,7 @@ Eigen::VectorXd Skeleton::getLinkMasses()
 }
 
 //==============================================================================
-void Skeleton::setForceUpperLimits(Eigen::VectorXd limits)
+void Skeleton::setForceUpperLimits(Eigen::VectorXs limits)
 {
   for (std::size_t i = 0; i < getNumDofs(); i++)
   {
@@ -3145,7 +3107,7 @@ void Skeleton::setForceUpperLimits(Eigen::VectorXd limits)
 }
 
 //==============================================================================
-void Skeleton::setForceLowerLimits(Eigen::VectorXd limits)
+void Skeleton::setForceLowerLimits(Eigen::VectorXs limits)
 {
   for (std::size_t i = 0; i < getNumDofs(); i++)
   {
@@ -3154,7 +3116,7 @@ void Skeleton::setForceLowerLimits(Eigen::VectorXd limits)
 }
 
 //==============================================================================
-void Skeleton::setPositionUpperLimits(Eigen::VectorXd limits)
+void Skeleton::setPositionUpperLimits(Eigen::VectorXs limits)
 {
   for (std::size_t i = 0; i < getNumDofs(); i++)
   {
@@ -3163,7 +3125,7 @@ void Skeleton::setPositionUpperLimits(Eigen::VectorXd limits)
 }
 
 //==============================================================================
-void Skeleton::setPositionLowerLimits(Eigen::VectorXd limits)
+void Skeleton::setPositionLowerLimits(Eigen::VectorXs limits)
 {
   for (std::size_t i = 0; i < getNumDofs(); i++)
   {
@@ -3172,7 +3134,7 @@ void Skeleton::setPositionLowerLimits(Eigen::VectorXd limits)
 }
 
 //==============================================================================
-void Skeleton::setVelocityUpperLimits(Eigen::VectorXd limits)
+void Skeleton::setVelocityUpperLimits(Eigen::VectorXs limits)
 {
   for (std::size_t i = 0; i < getNumDofs(); i++)
   {
@@ -3181,7 +3143,7 @@ void Skeleton::setVelocityUpperLimits(Eigen::VectorXd limits)
 }
 
 //==============================================================================
-void Skeleton::setVelocityLowerLimits(Eigen::VectorXd limits)
+void Skeleton::setVelocityLowerLimits(Eigen::VectorXs limits)
 {
   for (std::size_t i = 0; i < getNumDofs(); i++)
   {
@@ -3190,15 +3152,15 @@ void Skeleton::setVelocityLowerLimits(Eigen::VectorXd limits)
 }
 
 //==============================================================================
-void Skeleton::setLinkCOMs(Eigen::VectorXd coms)
+void Skeleton::setLinkCOMs(Eigen::VectorXs coms)
 {
   std::size_t cursor = 0;
   for (std::size_t i = 0; i < getNumBodyNodes(); i++)
   {
     const Inertia& inertia = getBodyNode(i)->getInertia();
-    double COM_X = coms(cursor++);
-    double COM_Y = coms(cursor++);
-    double COM_Z = coms(cursor++);
+    s_t COM_X = coms(cursor++);
+    s_t COM_Y = coms(cursor++);
+    s_t COM_Z = coms(cursor++);
     Inertia newInertia(
         inertia.MASS,
         COM_X,
@@ -3215,18 +3177,18 @@ void Skeleton::setLinkCOMs(Eigen::VectorXd coms)
 }
 
 //==============================================================================
-void Skeleton::setLinkMOIs(Eigen::VectorXd mois)
+void Skeleton::setLinkMOIs(Eigen::VectorXs mois)
 {
   std::size_t cursor = 0;
   for (std::size_t i = 0; i < getNumBodyNodes(); i++)
   {
     const Inertia& inertia = getBodyNode(i)->getInertia();
-    double I_XX = mois(cursor++);
-    double I_YY = mois(cursor++);
-    double I_ZZ = mois(cursor++);
-    double I_XY = mois(cursor++);
-    double I_XZ = mois(cursor++);
-    double I_YZ = mois(cursor++);
+    s_t I_XX = mois(cursor++);
+    s_t I_YY = mois(cursor++);
+    s_t I_ZZ = mois(cursor++);
+    s_t I_XY = mois(cursor++);
+    s_t I_XZ = mois(cursor++);
+    s_t I_YZ = mois(cursor++);
     Inertia newInertia(
         inertia.MASS,
         inertia.COM_X,
@@ -3243,7 +3205,7 @@ void Skeleton::setLinkMOIs(Eigen::VectorXd mois)
 }
 
 //==============================================================================
-void Skeleton::setLinkMasses(Eigen::VectorXd masses)
+void Skeleton::setLinkMasses(Eigen::VectorXs masses)
 {
   for (std::size_t i = 0; i < getNumBodyNodes(); i++)
   {
@@ -3252,7 +3214,7 @@ void Skeleton::setLinkMasses(Eigen::VectorXd masses)
 }
 
 //==============================================================================
-void Skeleton::integratePositions(double _dt)
+void Skeleton::integratePositions(s_t _dt)
 {
   for (std::size_t i = 0; i < mSkelCache.mBodyNodes.size(); ++i)
     mSkelCache.mBodyNodes[i]->getParentJoint()->integratePositions(_dt);
@@ -3265,10 +3227,10 @@ void Skeleton::integratePositions(double _dt)
 }
 
 //==============================================================================
-Eigen::VectorXd Skeleton::integratePositionsExplicit(
-    Eigen::VectorXd pos, Eigen::VectorXd vel, double dt)
+Eigen::VectorXs Skeleton::integratePositionsExplicit(
+    Eigen::VectorXs pos, Eigen::VectorXs vel, s_t dt)
 {
-  Eigen::VectorXd nextPos = Eigen::VectorXd::Zero(pos.size());
+  Eigen::VectorXs nextPos = Eigen::VectorXs::Zero(pos.size());
 
   int cursor = 0;
   for (std::size_t i = 0; i < mSkelCache.mBodyNodes.size(); ++i)
@@ -3284,10 +3246,10 @@ Eigen::VectorXd Skeleton::integratePositionsExplicit(
 }
 
 //==============================================================================
-Eigen::MatrixXd Skeleton::getPosPosJac(
-    Eigen::VectorXd pos, Eigen::VectorXd vel, double dt)
+Eigen::MatrixXs Skeleton::getPosPosJac(
+    Eigen::VectorXs pos, Eigen::VectorXs vel, s_t dt)
 {
-  Eigen::MatrixXd jac = Eigen::MatrixXd::Zero(pos.size(), pos.size());
+  Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(pos.size(), pos.size());
 
   int cursor = 0;
   for (std::size_t i = 0; i < mSkelCache.mBodyNodes.size(); ++i)
@@ -3303,10 +3265,10 @@ Eigen::MatrixXd Skeleton::getPosPosJac(
 }
 
 //==============================================================================
-Eigen::MatrixXd Skeleton::getVelPosJac(
-    Eigen::VectorXd pos, Eigen::VectorXd vel, double dt)
+Eigen::MatrixXs Skeleton::getVelPosJac(
+    Eigen::VectorXs pos, Eigen::VectorXs vel, s_t dt)
 {
-  Eigen::MatrixXd jac = Eigen::MatrixXd::Zero(pos.size(), pos.size());
+  Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(pos.size(), pos.size());
 
   int cursor = 0;
   for (std::size_t i = 0; i < mSkelCache.mBodyNodes.size(); ++i)
@@ -3322,7 +3284,7 @@ Eigen::MatrixXd Skeleton::getVelPosJac(
 }
 
 //==============================================================================
-void Skeleton::integrateVelocities(double _dt)
+void Skeleton::integrateVelocities(s_t _dt)
 {
   for (std::size_t i = 0; i < mSkelCache.mBodyNodes.size(); ++i)
     mSkelCache.mBodyNodes[i]->getParentJoint()->integrateVelocities(_dt);
@@ -3335,8 +3297,8 @@ void Skeleton::integrateVelocities(double _dt)
 }
 
 //==============================================================================
-Eigen::VectorXd Skeleton::getPositionDifferences(
-    const Eigen::VectorXd& _q2, const Eigen::VectorXd& _q1) const
+Eigen::VectorXs Skeleton::getPositionDifferences(
+    const Eigen::VectorXs& _q2, const Eigen::VectorXs& _q1) const
 {
   if (static_cast<std::size_t>(_q2.size()) != getNumDofs()
       || static_cast<std::size_t>(_q1.size()) != getNumDofs())
@@ -3344,10 +3306,10 @@ Eigen::VectorXd Skeleton::getPositionDifferences(
     dterr << "Skeleton::getPositionsDifference: q1's size[" << _q1.size()
           << "] or q2's size[" << _q2.size() << "is different with the dof ["
           << getNumDofs() << "]." << std::endl;
-    return Eigen::VectorXd::Zero(getNumDofs());
+    return Eigen::VectorXs::Zero(getNumDofs());
   }
 
-  Eigen::VectorXd dq(getNumDofs());
+  Eigen::VectorXs dq(getNumDofs());
 
   for (const auto& bodyNode : mSkelCache.mBodyNodes)
   {
@@ -3357,8 +3319,8 @@ Eigen::VectorXd Skeleton::getPositionDifferences(
     if (dof)
     {
       std::size_t index = joint->getDof(0)->getIndexInSkeleton();
-      const Eigen::VectorXd& q2Seg = _q2.segment(index, dof);
-      const Eigen::VectorXd& q1Seg = _q1.segment(index, dof);
+      const Eigen::VectorXs& q2Seg = _q2.segment(index, dof);
+      const Eigen::VectorXs& q1Seg = _q1.segment(index, dof);
       dq.segment(index, dof) = joint->getPositionDifferences(q2Seg, q1Seg);
     }
   }
@@ -3367,8 +3329,8 @@ Eigen::VectorXd Skeleton::getPositionDifferences(
 }
 
 //==============================================================================
-Eigen::VectorXd Skeleton::getVelocityDifferences(
-    const Eigen::VectorXd& _dq2, const Eigen::VectorXd& _dq1) const
+Eigen::VectorXs Skeleton::getVelocityDifferences(
+    const Eigen::VectorXs& _dq2, const Eigen::VectorXs& _dq1) const
 {
   if (static_cast<std::size_t>(_dq2.size()) != getNumDofs()
       || static_cast<std::size_t>(_dq1.size()) != getNumDofs())
@@ -3376,7 +3338,7 @@ Eigen::VectorXd Skeleton::getVelocityDifferences(
     dterr << "Skeleton::getPositionsDifference: dq1's size[" << _dq1.size()
           << "] or dq2's size[" << _dq2.size() << "is different with the dof ["
           << getNumDofs() << "]." << std::endl;
-    return Eigen::VectorXd::Zero(getNumDofs());
+    return Eigen::VectorXs::Zero(getNumDofs());
   }
 
   // All the tangent spaces of Joint's configuration spaces are vector spaces.
@@ -3471,7 +3433,8 @@ math::Jacobian Skeleton::getJacobian(const JacobianNode* _node) const
 }
 
 //==============================================================================
-math::Jacobian Skeleton::getJacobianInPositionSpace(const JacobianNode* _node) const
+math::Jacobian Skeleton::getJacobianInPositionSpace(
+    const JacobianNode* _node) const
 {
   return variadicGetJacobianInPositionSpace(this, _node);
 }
@@ -3485,7 +3448,7 @@ math::Jacobian Skeleton::getJacobian(
 
 //==============================================================================
 math::Jacobian Skeleton::getJacobian(
-    const JacobianNode* _node, const Eigen::Vector3d& _localOffset) const
+    const JacobianNode* _node, const Eigen::Vector3s& _localOffset) const
 {
   return variadicGetJacobian(this, _node, _localOffset);
 }
@@ -3493,7 +3456,7 @@ math::Jacobian Skeleton::getJacobian(
 //==============================================================================
 math::Jacobian Skeleton::getJacobian(
     const JacobianNode* _node,
-    const Eigen::Vector3d& _localOffset,
+    const Eigen::Vector3s& _localOffset,
     const Frame* _inCoordinatesOf) const
 {
   return variadicGetJacobian(this, _node, _localOffset, _inCoordinatesOf);
@@ -3526,7 +3489,7 @@ math::Jacobian Skeleton::getWorldPositionJacobian(
     return J;
 
   const BodyNode* bodyNode = static_cast<const BodyNode*>(_node);
-  Eigen::Vector3d originalRotation
+  Eigen::Vector3s originalRotation
       = math::logMap(bodyNode->getWorldTransform().linear());
 
   for (int i = 0; i < getNumDofs(); i++)
@@ -3551,7 +3514,7 @@ math::Jacobian Skeleton::getWorldPositionJacobian(
 
     if (isParent)
     {
-      Eigen::Vector6d screw
+      Eigen::Vector6s screw
           = joint->getWorldAxisScrewForPosition(dof->getIndexInJoint());
       screw.tail<3>()
           += screw.head<3>().cross(bodyNode->getWorldTransform().translation());
@@ -3575,7 +3538,7 @@ math::Jacobian Skeleton::getWorldJacobian(const JacobianNode* _node) const
 
 //==============================================================================
 math::Jacobian Skeleton::getWorldJacobian(
-    const JacobianNode* _node, const Eigen::Vector3d& _localOffset) const
+    const JacobianNode* _node, const Eigen::Vector3s& _localOffset) const
 {
   return variadicGetWorldJacobian(this, _node, _localOffset);
 }
@@ -3607,7 +3570,7 @@ math::LinearJacobian Skeleton::getLinearJacobian(
 //==============================================================================
 math::LinearJacobian Skeleton::getLinearJacobian(
     const JacobianNode* _node,
-    const Eigen::Vector3d& _localOffset,
+    const Eigen::Vector3s& _localOffset,
     const Frame* _inCoordinatesOf) const
 {
   return variadicGetLinearJacobian(this, _node, _localOffset, _inCoordinatesOf);
@@ -3670,7 +3633,7 @@ math::Jacobian Skeleton::getJacobianSpatialDeriv(
 
 //==============================================================================
 math::Jacobian Skeleton::getJacobianSpatialDeriv(
-    const JacobianNode* _node, const Eigen::Vector3d& _localOffset) const
+    const JacobianNode* _node, const Eigen::Vector3s& _localOffset) const
 {
   return variadicGetJacobianSpatialDeriv(this, _node, _localOffset);
 }
@@ -3678,7 +3641,7 @@ math::Jacobian Skeleton::getJacobianSpatialDeriv(
 //==============================================================================
 math::Jacobian Skeleton::getJacobianSpatialDeriv(
     const JacobianNode* _node,
-    const Eigen::Vector3d& _localOffset,
+    const Eigen::Vector3s& _localOffset,
     const Frame* _inCoordinatesOf) const
 {
   return variadicGetJacobianSpatialDeriv(
@@ -3719,7 +3682,7 @@ math::Jacobian Skeleton::getJacobianClassicDeriv(
 //==============================================================================
 math::Jacobian Skeleton::getJacobianClassicDeriv(
     const JacobianNode* _node,
-    const Eigen::Vector3d& _localOffset,
+    const Eigen::Vector3s& _localOffset,
     const Frame* _inCoordinatesOf) const
 {
   return variadicGetJacobianClassicDeriv(
@@ -3754,7 +3717,7 @@ math::LinearJacobian Skeleton::getLinearJacobianDeriv(
 //==============================================================================
 math::LinearJacobian Skeleton::getLinearJacobianDeriv(
     const JacobianNode* _node,
-    const Eigen::Vector3d& _localOffset,
+    const Eigen::Vector3s& _localOffset,
     const Frame* _inCoordinatesOf) const
 {
   return variadicGetLinearJacobianDeriv(
@@ -3788,13 +3751,13 @@ math::AngularJacobian Skeleton::getAngularJacobianDeriv(
 }
 
 //==============================================================================
-double Skeleton::getMass() const
+s_t Skeleton::getMass() const
 {
   return mTotalMass;
 }
 
 //==============================================================================
-const Eigen::MatrixXd& Skeleton::getMassMatrix(std::size_t _treeIdx) const
+const Eigen::MatrixXs& Skeleton::getMassMatrix(std::size_t _treeIdx) const
 {
   if (mTreeCache[_treeIdx].mDirty.mMassMatrix)
     updateMassMatrix(_treeIdx);
@@ -3802,7 +3765,7 @@ const Eigen::MatrixXd& Skeleton::getMassMatrix(std::size_t _treeIdx) const
 }
 
 //==============================================================================
-const Eigen::MatrixXd& Skeleton::getMassMatrix() const
+const Eigen::MatrixXs& Skeleton::getMassMatrix() const
 {
   if (mSkelCache.mDirty.mMassMatrix)
     updateMassMatrix();
@@ -3810,7 +3773,7 @@ const Eigen::MatrixXd& Skeleton::getMassMatrix() const
 }
 
 //==============================================================================
-const Eigen::MatrixXd& Skeleton::getAugMassMatrix(std::size_t _treeIdx) const
+const Eigen::MatrixXs& Skeleton::getAugMassMatrix(std::size_t _treeIdx) const
 {
   if (mTreeCache[_treeIdx].mDirty.mAugMassMatrix)
     updateAugMassMatrix(_treeIdx);
@@ -3819,7 +3782,7 @@ const Eigen::MatrixXd& Skeleton::getAugMassMatrix(std::size_t _treeIdx) const
 }
 
 //==============================================================================
-const Eigen::MatrixXd& Skeleton::getAugMassMatrix() const
+const Eigen::MatrixXs& Skeleton::getAugMassMatrix() const
 {
   if (mSkelCache.mDirty.mAugMassMatrix)
     updateAugMassMatrix();
@@ -3828,7 +3791,7 @@ const Eigen::MatrixXd& Skeleton::getAugMassMatrix() const
 }
 
 //==============================================================================
-const Eigen::MatrixXd& Skeleton::getInvMassMatrix(std::size_t _treeIdx) const
+const Eigen::MatrixXs& Skeleton::getInvMassMatrix(std::size_t _treeIdx) const
 {
   if (mTreeCache[_treeIdx].mDirty.mInvMassMatrix)
     updateInvMassMatrix(_treeIdx);
@@ -3837,7 +3800,7 @@ const Eigen::MatrixXd& Skeleton::getInvMassMatrix(std::size_t _treeIdx) const
 }
 
 //==============================================================================
-const Eigen::MatrixXd& Skeleton::getInvMassMatrix() const
+const Eigen::MatrixXs& Skeleton::getInvMassMatrix() const
 {
   if (mSkelCache.mDirty.mInvMassMatrix)
     updateInvMassMatrix();
@@ -3846,7 +3809,7 @@ const Eigen::MatrixXd& Skeleton::getInvMassMatrix() const
 }
 
 //==============================================================================
-const Eigen::MatrixXd& Skeleton::getInvAugMassMatrix(std::size_t _treeIdx) const
+const Eigen::MatrixXs& Skeleton::getInvAugMassMatrix(std::size_t _treeIdx) const
 {
   if (mTreeCache[_treeIdx].mDirty.mInvAugMassMatrix)
     updateInvAugMassMatrix(_treeIdx);
@@ -3855,7 +3818,7 @@ const Eigen::MatrixXd& Skeleton::getInvAugMassMatrix(std::size_t _treeIdx) const
 }
 
 //==============================================================================
-const Eigen::MatrixXd& Skeleton::getInvAugMassMatrix() const
+const Eigen::MatrixXs& Skeleton::getInvAugMassMatrix() const
 {
   if (mSkelCache.mDirty.mInvAugMassMatrix)
     updateInvAugMassMatrix();
@@ -3864,7 +3827,7 @@ const Eigen::MatrixXd& Skeleton::getInvAugMassMatrix() const
 }
 
 //==============================================================================
-Eigen::VectorXd Skeleton::multiplyByImplicitMassMatrix(Eigen::VectorXd x)
+Eigen::VectorXs Skeleton::multiplyByImplicitMassMatrix(Eigen::VectorXs x)
 {
   // The trick here is to treat x as delta acceleration, and measure delta force
   std::size_t dof = mSkelCache.mDofs.size();
@@ -3874,14 +3837,14 @@ Eigen::VectorXd Skeleton::multiplyByImplicitMassMatrix(Eigen::VectorXd x)
   }
 
   // Backup the original internal force
-  Eigen::VectorXd originalGenAcceleration = getAccelerations();
+  Eigen::VectorXs originalGenAcceleration = getAccelerations();
 
   // Set the acceleration the DOFs to x, which will allow us to compute M*x
   // through Featherstone
   setAccelerations(x);
 
   // We don't need to set this to 0 if the below is correct
-  Eigen::VectorXd finalResult = Eigen::VectorXd(dof);
+  Eigen::VectorXs finalResult = Eigen::VectorXs(dof);
 
   for (std::size_t tree = 0; tree < mTreeCache.size(); ++tree)
   {
@@ -3901,8 +3864,8 @@ Eigen::VectorXd Skeleton::multiplyByImplicitMassMatrix(Eigen::VectorXd x)
     }
 
     // Collect the result of (M * x) for this tree
-    Eigen::MatrixXd treeMulResult
-        = Eigen::MatrixXd::Zero(cache.mDofs.size(), 1);
+    Eigen::MatrixXs treeMulResult
+        = Eigen::MatrixXs::Zero(cache.mDofs.size(), 1);
     for (std::vector<BodyNode*>::const_reverse_iterator it
          = cache.mBodyNodes.rbegin();
          it != cache.mBodyNodes.rend();
@@ -3928,7 +3891,7 @@ Eigen::VectorXd Skeleton::multiplyByImplicitMassMatrix(Eigen::VectorXd x)
 }
 
 //==============================================================================
-Eigen::VectorXd Skeleton::multiplyByImplicitInvMassMatrix(Eigen::VectorXd x)
+Eigen::VectorXs Skeleton::multiplyByImplicitInvMassMatrix(Eigen::VectorXs x)
 {
   // The trick here is to treat x as delta force, and measure delta acceleration
 
@@ -3942,14 +3905,14 @@ Eigen::VectorXd Skeleton::multiplyByImplicitInvMassMatrix(Eigen::VectorXd x)
   }
 
   // Backup the origianl internal force
-  Eigen::VectorXd originalInternalForce = getForces();
+  Eigen::VectorXs originalInternalForce = getForces();
 
   // Set the forces on the DOFs to x, which will allow us to compute Minv*x
   // through Featherstone
   setForces(x);
 
   // We don't need to set this to 0 if the below is correct
-  Eigen::VectorXd finalResult = Eigen::VectorXd(dof);
+  Eigen::VectorXs finalResult = Eigen::VectorXs(dof);
 
   for (std::size_t tree = 0; tree < mTreeCache.size(); ++tree)
   {
@@ -3970,8 +3933,8 @@ Eigen::VectorXd Skeleton::multiplyByImplicitInvMassMatrix(Eigen::VectorXd x)
     }
 
     // Collect the result of (Minv * x) for this tree
-    Eigen::MatrixXd treeMulResult
-        = Eigen::MatrixXd::Zero(cache.mDofs.size(), 1);
+    Eigen::MatrixXs treeMulResult
+        = Eigen::MatrixXs::Zero(cache.mDofs.size(), 1);
     for (std::vector<BodyNode*>::const_iterator it = cache.mBodyNodes.begin();
          it != cache.mBodyNodes.end();
          ++it)
@@ -3996,7 +3959,7 @@ Eigen::VectorXd Skeleton::multiplyByImplicitInvMassMatrix(Eigen::VectorXd x)
 }
 
 //==============================================================================
-const Eigen::VectorXd& Skeleton::getCoriolisForces(std::size_t _treeIdx) const
+const Eigen::VectorXs& Skeleton::getCoriolisForces(std::size_t _treeIdx) const
 {
   if (mTreeCache[_treeIdx].mDirty.mCoriolisForces)
     updateCoriolisForces(_treeIdx);
@@ -4005,7 +3968,7 @@ const Eigen::VectorXd& Skeleton::getCoriolisForces(std::size_t _treeIdx) const
 }
 
 //==============================================================================
-const Eigen::VectorXd& Skeleton::getCoriolisForces() const
+const Eigen::VectorXs& Skeleton::getCoriolisForces() const
 {
   if (mSkelCache.mDirty.mCoriolisForces)
     updateCoriolisForces();
@@ -4014,7 +3977,7 @@ const Eigen::VectorXd& Skeleton::getCoriolisForces() const
 }
 
 //==============================================================================
-const Eigen::VectorXd& Skeleton::getGravityForces(std::size_t _treeIdx) const
+const Eigen::VectorXs& Skeleton::getGravityForces(std::size_t _treeIdx) const
 {
   if (mTreeCache[_treeIdx].mDirty.mGravityForces)
     updateGravityForces(_treeIdx);
@@ -4023,7 +3986,7 @@ const Eigen::VectorXd& Skeleton::getGravityForces(std::size_t _treeIdx) const
 }
 
 //==============================================================================
-const Eigen::VectorXd& Skeleton::getGravityForces() const
+const Eigen::VectorXs& Skeleton::getGravityForces() const
 {
   if (mSkelCache.mDirty.mGravityForces)
     updateGravityForces();
@@ -4032,7 +3995,7 @@ const Eigen::VectorXd& Skeleton::getGravityForces() const
 }
 
 //==============================================================================
-const Eigen::VectorXd& Skeleton::getCoriolisAndGravityForces(
+const Eigen::VectorXs& Skeleton::getCoriolisAndGravityForces(
     std::size_t _treeIdx) const
 {
   if (mTreeCache[_treeIdx].mDirty.mCoriolisAndGravityForces)
@@ -4042,7 +4005,7 @@ const Eigen::VectorXd& Skeleton::getCoriolisAndGravityForces(
 }
 
 //==============================================================================
-const Eigen::VectorXd& Skeleton::getCoriolisAndGravityForces() const
+const Eigen::VectorXs& Skeleton::getCoriolisAndGravityForces() const
 {
   if (mSkelCache.mDirty.mCoriolisAndGravityForces)
     updateCoriolisAndGravityForces();
@@ -4051,7 +4014,7 @@ const Eigen::VectorXd& Skeleton::getCoriolisAndGravityForces() const
 }
 
 //==============================================================================
-const Eigen::VectorXd& Skeleton::getExternalForces(std::size_t _treeIdx) const
+const Eigen::VectorXs& Skeleton::getExternalForces(std::size_t _treeIdx) const
 {
   if (mTreeCache[_treeIdx].mDirty.mExternalForces)
     updateExternalForces(_treeIdx);
@@ -4060,7 +4023,7 @@ const Eigen::VectorXd& Skeleton::getExternalForces(std::size_t _treeIdx) const
 }
 
 //==============================================================================
-const Eigen::VectorXd& Skeleton::getExternalForces() const
+const Eigen::VectorXs& Skeleton::getExternalForces() const
 {
   if (mSkelCache.mDirty.mExternalForces)
     updateExternalForces();
@@ -4069,19 +4032,19 @@ const Eigen::VectorXd& Skeleton::getExternalForces() const
 }
 
 //==============================================================================
-const Eigen::VectorXd& Skeleton::getConstraintForces(std::size_t _treeIdx) const
+const Eigen::VectorXs& Skeleton::getConstraintForces(std::size_t _treeIdx) const
 {
   return computeConstraintForces(mTreeCache[_treeIdx]);
 }
 
 //==============================================================================
-const Eigen::VectorXd& Skeleton::getConstraintForces() const
+const Eigen::VectorXs& Skeleton::getConstraintForces() const
 {
   return computeConstraintForces(mSkelCache);
 }
 
 //==============================================================================
-// const Eigen::VectorXd& Skeleton::getDampingForceVector() {
+// const Eigen::VectorXs& Skeleton::getDampingForceVector() {
 //  if (mIsDampingForceVectorDirty)
 //    updateDampingForceVector();
 //  return mFd;
@@ -4132,7 +4095,7 @@ void Skeleton::registerBodyNode(BodyNode* _newBodyNode)
       mSkelCache.mBodyNodes.begin(), mSkelCache.mBodyNodes.end(), _newBodyNode);
   if (repeat != mSkelCache.mBodyNodes.end())
   {
-    dterr << "[Skeleton::registerBodyNode] Attempting to double-register the "
+    dterr << "[Skeleton::registerBodyNode] Attempting to s_t-register the "
           << "BodyNode named [" << _newBodyNode->getName() << "] in the "
           << "Skeleton named [" << getName() << "]. Please report this as a "
           << "bug!\n";
@@ -4723,15 +4686,15 @@ void Skeleton::updateTotalMass()
 void Skeleton::updateCacheDimensions(Skeleton::DataCache& _cache)
 {
   std::size_t dof = _cache.mDofs.size();
-  _cache.mM = Eigen::MatrixXd::Zero(dof, dof);
-  _cache.mAugM = Eigen::MatrixXd::Zero(dof, dof);
-  _cache.mInvM = Eigen::MatrixXd::Zero(dof, dof);
-  _cache.mInvAugM = Eigen::MatrixXd::Zero(dof, dof);
-  _cache.mCvec = Eigen::VectorXd::Zero(dof);
-  _cache.mG = Eigen::VectorXd::Zero(dof);
-  _cache.mCg = Eigen::VectorXd::Zero(dof);
-  _cache.mFext = Eigen::VectorXd::Zero(dof);
-  _cache.mFc = Eigen::VectorXd::Zero(dof);
+  _cache.mM = Eigen::MatrixXs::Zero(dof, dof);
+  _cache.mAugM = Eigen::MatrixXs::Zero(dof, dof);
+  _cache.mInvM = Eigen::MatrixXs::Zero(dof, dof);
+  _cache.mInvAugM = Eigen::MatrixXs::Zero(dof, dof);
+  _cache.mCvec = Eigen::VectorXs::Zero(dof);
+  _cache.mG = Eigen::VectorXs::Zero(dof);
+  _cache.mCg = Eigen::VectorXs::Zero(dof);
+  _cache.mFext = Eigen::VectorXs::Zero(dof);
+  _cache.mFc = Eigen::VectorXs::Zero(dof);
 }
 
 //==============================================================================
@@ -4788,7 +4751,7 @@ void Skeleton::updateMassMatrix(std::size_t _treeIdx) const
   cache.mM.setZero();
 
   // Backup the original internal force
-  Eigen::VectorXd originalGenAcceleration = getAccelerations();
+  Eigen::VectorXs originalGenAcceleration = getAccelerations();
 
   // Clear out the accelerations of the dofs in this tree so that we can set
   // them to 1.0 one at a time to build up the mass matrix
@@ -4853,7 +4816,7 @@ void Skeleton::updateMassMatrix() const
 
   for (std::size_t tree = 0; tree < mTreeCache.size(); ++tree)
   {
-    const Eigen::MatrixXd& treeM = getMassMatrix(tree);
+    const Eigen::MatrixXs& treeM = getMassMatrix(tree);
     const std::vector<DegreeOfFreedom*>& treeDofs = mTreeCache[tree].mDofs;
     std::size_t nTreeDofs = treeDofs.size();
     for (std::size_t i = 0; i < nTreeDofs; ++i)
@@ -4888,7 +4851,7 @@ void Skeleton::updateAugMassMatrix(std::size_t _treeIdx) const
   cache.mAugM.setZero();
 
   // Backup the origianl internal force
-  Eigen::VectorXd originalGenAcceleration = getAccelerations();
+  Eigen::VectorXs originalGenAcceleration = getAccelerations();
 
   // Clear out the accelerations of the DOFs in this tree so that we can set
   // them to 1.0 one at a time to build up the augmented mass matrix
@@ -4954,7 +4917,7 @@ void Skeleton::updateAugMassMatrix() const
 
   for (std::size_t tree = 0; tree < mTreeCache.size(); ++tree)
   {
-    const Eigen::MatrixXd& treeAugM = getAugMassMatrix(tree);
+    const Eigen::MatrixXs& treeAugM = getAugMassMatrix(tree);
     const std::vector<DegreeOfFreedom*>& treeDofs = mTreeCache[tree].mDofs;
     std::size_t nTreeDofs = treeDofs.size();
     for (std::size_t i = 0; i < nTreeDofs; ++i)
@@ -4990,7 +4953,7 @@ void Skeleton::updateInvMassMatrix(std::size_t _treeIdx) const
   // cache.mInvM.setZero();
 
   // Backup the origianl internal force
-  Eigen::VectorXd originalInternalForce = getForces();
+  Eigen::VectorXs originalInternalForce = getForces();
 
   // Clear out the forces of the dofs in this tree so that we can set them to
   // 1.0 one at a time to build up the inverse mass matrix
@@ -5055,7 +5018,7 @@ void Skeleton::updateInvMassMatrix() const
 
   for (std::size_t tree = 0; tree < mTreeCache.size(); ++tree)
   {
-    const Eigen::MatrixXd& treeInvM = getInvMassMatrix(tree);
+    const Eigen::MatrixXs& treeInvM = getInvMassMatrix(tree);
     const std::vector<DegreeOfFreedom*>& treeDofs = mTreeCache[tree].mDofs;
     std::size_t nTreeDofs = treeDofs.size();
     for (std::size_t i = 0; i < nTreeDofs; ++i)
@@ -5091,7 +5054,7 @@ void Skeleton::updateInvAugMassMatrix(std::size_t _treeIdx) const
   // mInvM.setZero();
 
   // Backup the origianl internal force
-  Eigen::VectorXd originalInternalForce = getForces();
+  Eigen::VectorXs originalInternalForce = getForces();
 
   // Clear out the forces of the dofs in this tree so that we can set them to
   // 1.0 one at a time to build up the inverse augmented mass matrix
@@ -5158,7 +5121,7 @@ void Skeleton::updateInvAugMassMatrix() const
 
   for (std::size_t tree = 0; tree < mTreeCache.size(); ++tree)
   {
-    const Eigen::MatrixXd& treeInvAugM = getInvAugMassMatrix(tree);
+    const Eigen::MatrixXs& treeInvAugM = getInvAugMassMatrix(tree);
     const std::vector<DegreeOfFreedom*>& treeDofs = mTreeCache[tree].mDofs;
     std::size_t nTreeDofs = treeDofs.size();
     for (std::size_t i = 0; i < nTreeDofs; ++i)
@@ -5223,7 +5186,7 @@ void Skeleton::updateCoriolisForces() const
 
   for (std::size_t tree = 0; tree < mTreeCache.size(); ++tree)
   {
-    const Eigen::VectorXd& treeCvec = getCoriolisForces(tree);
+    const Eigen::VectorXs& treeCvec = getCoriolisForces(tree);
     const std::vector<DegreeOfFreedom*>& treeDofs = mTreeCache[tree].mDofs;
     std::size_t nTreeDofs = treeDofs.size();
     for (std::size_t i = 0; i < nTreeDofs; ++i)
@@ -5276,7 +5239,7 @@ void Skeleton::updateGravityForces() const
 
   for (std::size_t tree = 0; tree < mTreeCache.size(); ++tree)
   {
-    const Eigen::VectorXd& treeG = getGravityForces(tree);
+    const Eigen::VectorXs& treeG = getGravityForces(tree);
     std::vector<DegreeOfFreedom*>& treeDofs = mTreeCache[tree].mDofs;
     std::size_t nTreeDofs = treeDofs.size();
     for (std::size_t i = 0; i < nTreeDofs; ++i)
@@ -5336,7 +5299,7 @@ void Skeleton::updateCoriolisAndGravityForces() const
 
   for (std::size_t tree = 0; tree < mTreeCache.size(); ++tree)
   {
-    const Eigen::VectorXd& treeCg = getCoriolisAndGravityForces(tree);
+    const Eigen::VectorXs& treeCg = getCoriolisAndGravityForces(tree);
     const std::vector<DegreeOfFreedom*>& treeDofs = mTreeCache[tree].mDofs;
     std::size_t nTreeDofs = treeDofs.size();
     for (std::size_t i = 0; i < nTreeDofs; ++i)
@@ -5376,8 +5339,8 @@ void Skeleton::updateExternalForces(std::size_t _treeIdx) const
   //  for (std::vector<SoftBodyNode*>::iterator it = mSoftBodyNodes.begin();
   //       it != mSoftBodyNodes.end(); ++it)
   //  {
-  //    double kv = (*it)->getVertexSpringStiffness();
-  //    double ke = (*it)->getEdgeSpringStiffness();
+  //    s_t kv = (*it)->getVertexSpringStiffness();
+  //    s_t ke = (*it)->getEdgeSpringStiffness();
 
   //    for (int i = 0; i < (*it)->getNumPointMasses(); ++i)
   //    {
@@ -5385,7 +5348,7 @@ void Skeleton::updateExternalForces(std::size_t _treeIdx) const
   //      int nN = pm->getNumConnectedPointMasses();
 
   //      // Vertex restoring force
-  //      Eigen::Vector3d Fext = -(kv + nN * ke) * pm->getPositions()
+  //      Eigen::Vector3s Fext = -(kv + nN * ke) * pm->getPositions()
   //                             - (mTimeStep * (kv + nN*ke)) *
   //                             pm->getVelocities();
 
@@ -5421,7 +5384,7 @@ void Skeleton::updateExternalForces() const
 
   for (std::size_t tree = 0; tree < mTreeCache.size(); ++tree)
   {
-    const Eigen::VectorXd& treeFext = getExternalForces(tree);
+    const Eigen::VectorXs& treeFext = getExternalForces(tree);
     const std::vector<DegreeOfFreedom*>& treeDofs = mTreeCache[tree].mDofs;
     std::size_t nTreeDofs = treeDofs.size();
     for (std::size_t i = 0; i < nTreeDofs; ++i)
@@ -5435,7 +5398,7 @@ void Skeleton::updateExternalForces() const
 }
 
 //==============================================================================
-const Eigen::VectorXd& Skeleton::computeConstraintForces(DataCache& cache) const
+const Eigen::VectorXs& Skeleton::computeConstraintForces(DataCache& cache) const
 {
   const std::size_t dof = cache.mDofs.size();
   assert(static_cast<std::size_t>(cache.mFc.size()) == dof);
@@ -5465,16 +5428,16 @@ static void computeSupportPolygon(
     math::SupportPolygon& polygon,
     math::SupportGeometry& geometry,
     std::vector<std::size_t>& ee_indices,
-    Eigen::Vector3d& axis1,
-    Eigen::Vector3d& axis2,
-    Eigen::Vector2d& centroid,
+    Eigen::Vector3s& axis1,
+    Eigen::Vector3s& axis2,
+    Eigen::Vector2s& centroid,
     std::size_t treeIndex)
 {
   polygon.clear();
   geometry.clear();
   ee_indices.clear();
 
-  const Eigen::Vector3d& up = -skel->getGravity();
+  const Eigen::Vector3s& up = -skel->getGravity();
   if (up.norm() == 0.0)
   {
     dtwarn << "[computeSupportPolygon] Requesting support polygon of a "
@@ -5482,7 +5445,7 @@ static void computeSupportPolygon(
            << "set!\n";
     axis1.setZero();
     axis2.setZero();
-    centroid = Eigen::Vector2d::Constant(std::nan(""));
+    centroid = Eigen::Vector2s::Constant(std::nan(""));
     return;
   }
 
@@ -5495,7 +5458,7 @@ static void computeSupportPolygon(
         && (INVALID_INDEX == treeIndex || ee->getTreeIndex() == treeIndex))
     {
       const math::SupportGeometry& eeGeom = ee->getSupport()->getGeometry();
-      for (const Eigen::Vector3d& v : eeGeom)
+      for (const Eigen::Vector3s& v : eeGeom)
       {
         geometry.push_back(ee->getWorldTransform() * v);
         originalEE_map.push_back(ee->getIndexInSkeleton());
@@ -5503,9 +5466,9 @@ static void computeSupportPolygon(
     }
   }
 
-  axis1 = (up - Eigen::Vector3d::UnitX()).norm() > 1e-6
-              ? Eigen::Vector3d::UnitX()
-              : Eigen::Vector3d::UnitY();
+  axis1 = (up - Eigen::Vector3s::UnitX()).norm() > 1e-6
+              ? Eigen::Vector3s::UnitX()
+              : Eigen::Vector3s::UnitY();
 
   axis1 = axis1 - up.dot(axis1) * up / up.dot(up);
   axis1.normalize();
@@ -5522,7 +5485,7 @@ static void computeSupportPolygon(
   if (polygon.size() > 0)
     centroid = math::computeCentroidOfHull(polygon);
   else
-    centroid = Eigen::Vector2d::Constant(std::nan(""));
+    centroid = Eigen::Vector2s::Constant(std::nan(""));
 }
 
 //==============================================================================
@@ -5588,7 +5551,7 @@ const std::vector<std::size_t>& Skeleton::getSupportIndices(
 }
 
 //==============================================================================
-const std::pair<Eigen::Vector3d, Eigen::Vector3d>& Skeleton::getSupportAxes()
+const std::pair<Eigen::Vector3s, Eigen::Vector3s>& Skeleton::getSupportAxes()
     const
 {
   getSupportPolygon();
@@ -5596,7 +5559,7 @@ const std::pair<Eigen::Vector3d, Eigen::Vector3d>& Skeleton::getSupportAxes()
 }
 
 //==============================================================================
-const std::pair<Eigen::Vector3d, Eigen::Vector3d>& Skeleton::getSupportAxes(
+const std::pair<Eigen::Vector3s, Eigen::Vector3s>& Skeleton::getSupportAxes(
     std::size_t _treeIdx) const
 {
   getSupportPolygon(_treeIdx);
@@ -5604,14 +5567,14 @@ const std::pair<Eigen::Vector3d, Eigen::Vector3d>& Skeleton::getSupportAxes(
 }
 
 //==============================================================================
-const Eigen::Vector2d& Skeleton::getSupportCentroid() const
+const Eigen::Vector2s& Skeleton::getSupportCentroid() const
 {
   getSupportPolygon();
   return mSkelCache.mSupportCentroid;
 }
 
 //==============================================================================
-const Eigen::Vector2d& Skeleton::getSupportCentroid(std::size_t _treeIdx) const
+const Eigen::Vector2s& Skeleton::getSupportCentroid(std::size_t _treeIdx) const
 {
   getSupportPolygon(_treeIdx);
   return mTreeCache[_treeIdx].mSupportCentroid;
@@ -5784,7 +5747,7 @@ void Skeleton::updateBiasImpulse(BodyNode* _bodyNode)
   for (std::size_t i = 0; i < mSkelCache.mBodyNodes.size(); ++i)
     assert(
         mSkelCache.mBodyNodes[i]->mConstraintImpulse
-        == Eigen::Vector6d::Zero());
+        == Eigen::Vector6s::Zero());
 #endif
 
   // Prepare cache data
@@ -5798,7 +5761,7 @@ void Skeleton::updateBiasImpulse(BodyNode* _bodyNode)
 
 //==============================================================================
 void Skeleton::updateBiasImpulse(
-    BodyNode* _bodyNode, const Eigen::Vector6d& _imp)
+    BodyNode* _bodyNode, const Eigen::Vector6s& _imp)
 {
   if (nullptr == _bodyNode)
   {
@@ -5817,7 +5780,7 @@ void Skeleton::updateBiasImpulse(
   for (std::size_t i = 0; i < mSkelCache.mBodyNodes.size(); ++i)
     assert(
         mSkelCache.mBodyNodes[i]->mConstraintImpulse
-        == Eigen::Vector6d::Zero());
+        == Eigen::Vector6s::Zero());
 #endif
 
   // Set impulse of _bodyNode
@@ -5837,9 +5800,9 @@ void Skeleton::updateBiasImpulse(
 //==============================================================================
 void Skeleton::updateBiasImpulse(
     BodyNode* _bodyNode1,
-    const Eigen::Vector6d& _imp1,
+    const Eigen::Vector6s& _imp1,
     BodyNode* _bodyNode2,
-    const Eigen::Vector6d& _imp2)
+    const Eigen::Vector6s& _imp2)
 {
   // Assertions
   if (nullptr == _bodyNode1)
@@ -5867,7 +5830,7 @@ void Skeleton::updateBiasImpulse(
   for (std::size_t i = 0; i < mSkelCache.mBodyNodes.size(); ++i)
     assert(
         mSkelCache.mBodyNodes[i]->mConstraintImpulse
-        == Eigen::Vector6d::Zero());
+        == Eigen::Vector6s::Zero());
 #endif
 
   // Set impulse to _bodyNode
@@ -5892,7 +5855,7 @@ void Skeleton::updateBiasImpulse(
 void Skeleton::updateBiasImpulse(
     SoftBodyNode* _softBodyNode,
     PointMass* _pointMass,
-    const Eigen::Vector3d& _imp)
+    const Eigen::Vector3s& _imp)
 {
   // Assertions
   assert(_softBodyNode != nullptr);
@@ -5908,11 +5871,11 @@ void Skeleton::updateBiasImpulse(
   for (std::size_t i = 0; i < mSkelCache.mBodyNodes.size(); ++i)
     assert(
         mSkelCache.mBodyNodes[i]->mConstraintImpulse
-        == Eigen::Vector6d::Zero());
+        == Eigen::Vector6s::Zero());
 #endif
 
   // Set impulse to _bodyNode
-  Eigen::Vector3d oldConstraintImpulse = _pointMass->getConstraintImpulses();
+  Eigen::Vector3s oldConstraintImpulse = _pointMass->getConstraintImpulses();
   _pointMass->setConstraintImpulse(_imp, true);
 
   // Prepare cache data
@@ -5974,9 +5937,9 @@ void Skeleton::computeImpulseForwardDynamics()
 }
 
 //==============================================================================
-double Skeleton::computeKineticEnergy() const
+s_t Skeleton::computeKineticEnergy() const
 {
-  double KE = 0.0;
+  s_t KE = 0.0;
 
   for (auto* bodyNode : mSkelCache.mBodyNodes)
     KE += bodyNode->computeKineticEnergy();
@@ -5986,9 +5949,9 @@ double Skeleton::computeKineticEnergy() const
 }
 
 //==============================================================================
-double Skeleton::computePotentialEnergy() const
+s_t Skeleton::computePotentialEnergy() const
 {
-  double PE = 0.0;
+  s_t PE = 0.0;
 
   for (auto* bodyNode : mSkelCache.mBodyNodes)
   {
@@ -6021,9 +5984,9 @@ void Skeleton::clearCollidingBodies()
 }
 
 //==============================================================================
-Eigen::Vector3d Skeleton::getCOM(const Frame* _withRespectTo) const
+Eigen::Vector3s Skeleton::getCOM(const Frame* _withRespectTo) const
 {
-  Eigen::Vector3d com = Eigen::Vector3d::Zero();
+  Eigen::Vector3s com = Eigen::Vector3s::Zero();
 
   const std::size_t numBodies = getNumBodyNodes();
   for (std::size_t i = 0; i < numBodies; ++i)
@@ -6062,39 +6025,39 @@ PropertyType getCOMPropertyTemplate(
 }
 
 //==============================================================================
-Eigen::Vector6d Skeleton::getCOMSpatialVelocity(
+Eigen::Vector6s Skeleton::getCOMSpatialVelocity(
     const Frame* _relativeTo, const Frame* _inCoordinatesOf) const
 {
   return getCOMPropertyTemplate<
-      Eigen::Vector6d,
+      Eigen::Vector6s,
       &BodyNode::getCOMSpatialVelocity>(this, _relativeTo, _inCoordinatesOf);
 }
 
 //==============================================================================
-Eigen::Vector3d Skeleton::getCOMLinearVelocity(
+Eigen::Vector3s Skeleton::getCOMLinearVelocity(
     const Frame* _relativeTo, const Frame* _inCoordinatesOf) const
 {
   return getCOMPropertyTemplate<
-      Eigen::Vector3d,
+      Eigen::Vector3s,
       &BodyNode::getCOMLinearVelocity>(this, _relativeTo, _inCoordinatesOf);
 }
 
 //==============================================================================
-Eigen::Vector6d Skeleton::getCOMSpatialAcceleration(
+Eigen::Vector6s Skeleton::getCOMSpatialAcceleration(
     const Frame* _relativeTo, const Frame* _inCoordinatesOf) const
 {
   return getCOMPropertyTemplate<
-      Eigen::Vector6d,
+      Eigen::Vector6s,
       &BodyNode::getCOMSpatialAcceleration>(
       this, _relativeTo, _inCoordinatesOf);
 }
 
 //==============================================================================
-Eigen::Vector3d Skeleton::getCOMLinearAcceleration(
+Eigen::Vector3s Skeleton::getCOMLinearAcceleration(
     const Frame* _relativeTo, const Frame* _inCoordinatesOf) const
 {
   return getCOMPropertyTemplate<
-      Eigen::Vector3d,
+      Eigen::Vector3s,
       &BodyNode::getCOMLinearAcceleration>(this, _relativeTo, _inCoordinatesOf);
 }
 
@@ -6104,7 +6067,7 @@ Eigen::Vector3d Skeleton::getCOMLinearAcceleration(
 template <
     typename JacType, // JacType is the type of Jacobian we're computing
     JacType (TemplatedJacobianNode<BodyNode>::*getJacFn)(
-        const Eigen::Vector3d&, const Frame*) const>
+        const Eigen::Vector3s&, const Frame*) const>
 JacType getCOMJacobianTemplate(
     const Skeleton* _skel, const Frame* _inCoordinatesOf)
 {
@@ -6148,7 +6111,7 @@ math::Jacobian Skeleton::getCOMJacobian(const Frame* _inCoordinatesOf) const
 math::Jacobian Skeleton::getCOMPositionJacobian() const
 {
   math::Jacobian J = math::Jacobian::Zero(6, getNumDofs());
-  double totalMass = 0.0;
+  s_t totalMass = 0.0;
   for (const BodyNode* node : getBodyNodes())
   {
     totalMass += node->getMass();

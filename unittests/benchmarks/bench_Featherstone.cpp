@@ -46,7 +46,7 @@ static void BM_Cartpole_DART_Featherstone(benchmark::State& state)
 {
   SkeletonPtr cartpole = createCartpole();
 
-  double dt = 0.001;
+  s_t dt = 0.001;
   for (auto _ : state)
   {
     cartpole->computeForwardDynamics();
@@ -62,10 +62,10 @@ static void BM_Cartpole_Simple_Featherstone(benchmark::State& state)
   SimpleFeatherstone simple;
   simple.populateFromSkeleton(cartpole);
 
-  double* pos = (double*)malloc(simple.len() * sizeof(double));
-  double* vel = (double*)malloc(simple.len() * sizeof(double));
-  double* force = (double*)malloc(simple.len() * sizeof(double));
-  double* accel = (double*)malloc(simple.len() * sizeof(double));
+  s_t* pos = (s_t*)malloc(simple.len() * sizeof(s_t));
+  s_t* vel = (s_t*)malloc(simple.len() * sizeof(s_t));
+  s_t* force = (s_t*)malloc(simple.len() * sizeof(s_t));
+  s_t* accel = (s_t*)malloc(simple.len() * sizeof(s_t));
 
   for (int i = 0; i < simple.len(); i++)
   {
@@ -74,7 +74,7 @@ static void BM_Cartpole_Simple_Featherstone(benchmark::State& state)
     force[i] = cartpole->getForce(i);
   }
 
-  double dt = 0.001;
+  s_t dt = 0.001;
   for (auto _ : state)
   {
     simple.forwardDynamics(pos, vel, force, accel);
@@ -96,7 +96,7 @@ static void BM_20_Joint_DART_Featherstone(benchmark::State& state)
 {
   SkeletonPtr arm = createMultiarmRobot(20, 0.2);
 
-  double dt = 0.001;
+  s_t dt = 0.001;
   for (auto _ : state)
   {
     arm->computeForwardDynamics();
@@ -112,10 +112,10 @@ static void BM_20_Joint_Simple_Featherstone(benchmark::State& state)
   SimpleFeatherstone simple;
   simple.populateFromSkeleton(arm);
 
-  double* pos = (double*)malloc(simple.len() * sizeof(double));
-  double* vel = (double*)malloc(simple.len() * sizeof(double));
-  double* force = (double*)malloc(simple.len() * sizeof(double));
-  double* accel = (double*)malloc(simple.len() * sizeof(double));
+  s_t* pos = (s_t*)malloc(simple.len() * sizeof(s_t));
+  s_t* vel = (s_t*)malloc(simple.len() * sizeof(s_t));
+  s_t* force = (s_t*)malloc(simple.len() * sizeof(s_t));
+  s_t* accel = (s_t*)malloc(simple.len() * sizeof(s_t));
 
   for (int i = 0; i < simple.len(); i++)
   {
@@ -124,7 +124,7 @@ static void BM_20_Joint_Simple_Featherstone(benchmark::State& state)
     force[i] = arm->getForce(i);
   }
 
-  double dt = 0.001;
+  s_t dt = 0.001;
   for (auto _ : state)
   {
     simple.forwardDynamics(pos, vel, force, accel);

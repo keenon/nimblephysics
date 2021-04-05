@@ -96,10 +96,10 @@ public:
 
   /// This is a high-level command that creates a basis
   GUIWebsocketServer& renderBasis(
-      double scale = 10.0,
+      s_t scale = 10.0,
       const std::string& prefix = "basis",
-      const Eigen::Vector3d pos = Eigen::Vector3d::Zero(),
-      const Eigen::Vector3d euler = Eigen::Vector3d::Zero());
+      const Eigen::Vector3s pos = Eigen::Vector3s::Zero(),
+      const Eigen::Vector3s euler = Eigen::Vector3s::Zero());
 
   /// This is a high-level command that creates/updates all the shapes in a
   /// world by calling the lower-level commands
@@ -111,7 +111,7 @@ public:
   /// bunch of lines in the world, one per body
   GUIWebsocketServer& renderTrajectoryLines(
       std::shared_ptr<simulation::World> world,
-      Eigen::MatrixXd positions,
+      Eigen::MatrixXs positions,
       std::string prefix = "trajectory");
 
   /// This completely resets the web GUI, deleting all objects, UI elements,
@@ -121,53 +121,53 @@ public:
   /// This creates a box in the web GUI under a specified key
   GUIWebsocketServer& createBox(
       std::string key,
-      const Eigen::Vector3d& size,
-      const Eigen::Vector3d& pos,
-      const Eigen::Vector3d& euler,
-      const Eigen::Vector3d& color = Eigen::Vector3d(0.5, 0.5, 0.5),
+      const Eigen::Vector3s& size,
+      const Eigen::Vector3s& pos,
+      const Eigen::Vector3s& euler,
+      const Eigen::Vector3s& color = Eigen::Vector3s(0.5, 0.5, 0.5),
       bool castShadows = false,
       bool receiveShadows = false);
 
   /// This creates a sphere in the web GUI under a specified key
   GUIWebsocketServer& createSphere(
       std::string key,
-      double radius,
-      const Eigen::Vector3d& pos,
-      const Eigen::Vector3d& color = Eigen::Vector3d(0.5, 0.5, 0.5),
+      s_t radius,
+      const Eigen::Vector3s& pos,
+      const Eigen::Vector3s& color = Eigen::Vector3s(0.5, 0.5, 0.5),
       bool castShadows = false,
       bool receiveShadows = false);
 
   /// This creates a capsule in the web GUI under a specified key
   GUIWebsocketServer& createCapsule(
       std::string key,
-      double radius,
-      double height,
-      const Eigen::Vector3d& pos,
-      const Eigen::Vector3d& euler,
-      const Eigen::Vector3d& color = Eigen::Vector3d(0.5, 0.5, 0.5),
+      s_t radius,
+      s_t height,
+      const Eigen::Vector3s& pos,
+      const Eigen::Vector3s& euler,
+      const Eigen::Vector3s& color = Eigen::Vector3s(0.5, 0.5, 0.5),
       bool castShadows = false,
       bool receiveShadows = false);
 
   /// This creates a line in the web GUI under a specified key
   GUIWebsocketServer& createLine(
       std::string key,
-      const std::vector<Eigen::Vector3d>& points,
-      const Eigen::Vector3d& color = Eigen::Vector3d(1.0, 0.5, 0.5));
+      const std::vector<Eigen::Vector3s>& points,
+      const Eigen::Vector3s& color = Eigen::Vector3s(1.0, 0.5, 0.5));
 
   /// This creates a mesh in the web GUI under a specified key, using raw shape
   /// data
   GUIWebsocketServer& createMesh(
       std::string key,
-      const std::vector<Eigen::Vector3d>& vertices,
-      const std::vector<Eigen::Vector3d>& vertexNormals,
+      const std::vector<Eigen::Vector3s>& vertices,
+      const std::vector<Eigen::Vector3s>& vertexNormals,
       const std::vector<Eigen::Vector3i>& faces,
-      const std::vector<Eigen::Vector2d>& uv,
+      const std::vector<Eigen::Vector2s>& uv,
       const std::vector<std::string>& textures,
       const std::vector<int>& textureStartIndices,
-      const Eigen::Vector3d& pos,
-      const Eigen::Vector3d& euler,
-      const Eigen::Vector3d& scale = Eigen::Vector3d::Ones(),
-      const Eigen::Vector3d& color = Eigen::Vector3d(0.5, 0.5, 0.5),
+      const Eigen::Vector3s& pos,
+      const Eigen::Vector3s& euler,
+      const Eigen::Vector3s& scale = Eigen::Vector3s::Ones(),
+      const Eigen::Vector3s& color = Eigen::Vector3s(0.5, 0.5, 0.5),
       bool castShadows = false,
       bool receiveShadows = false);
 
@@ -177,10 +177,10 @@ public:
       const std::string& key,
       const aiScene* mesh,
       const std::string& meshPath,
-      const Eigen::Vector3d& pos,
-      const Eigen::Vector3d& euler,
-      const Eigen::Vector3d& scale = Eigen::Vector3d::Ones(),
-      const Eigen::Vector3d& color = Eigen::Vector3d(0.5, 0.5, 0.5),
+      const Eigen::Vector3s& pos,
+      const Eigen::Vector3s& euler,
+      const Eigen::Vector3s& scale = Eigen::Vector3s::Ones(),
+      const Eigen::Vector3s& color = Eigen::Vector3s(0.5, 0.5, 0.5),
       bool castShadows = false,
       bool receiveShadows = false);
 
@@ -189,10 +189,10 @@ public:
   GUIWebsocketServer& createMeshFromShape(
       const std::string& key,
       const std::shared_ptr<dynamics::MeshShape> mesh,
-      const Eigen::Vector3d& pos,
-      const Eigen::Vector3d& euler,
-      const Eigen::Vector3d& scale = Eigen::Vector3d::Ones(),
-      const Eigen::Vector3d& color = Eigen::Vector3d(0.5, 0.5, 0.5),
+      const Eigen::Vector3s& pos,
+      const Eigen::Vector3s& euler,
+      const Eigen::Vector3s& scale = Eigen::Vector3s::Ones(),
+      const Eigen::Vector3s& color = Eigen::Vector3s(0.5, 0.5, 0.5),
       bool castShadows = false,
       bool receiveShadows = false);
 
@@ -208,35 +208,35 @@ public:
   bool hasObject(const std::string& key);
 
   /// This returns the position of an object, if we've got it (and it's not
-  /// a line). Otherwise it returns Vector3d::Zero().
-  Eigen::Vector3d getObjectPosition(const std::string& key);
+  /// a line). Otherwise it returns Vector3s::Zero().
+  Eigen::Vector3s getObjectPosition(const std::string& key);
 
   /// This returns the rotation of an object, if we've got it (and it's not
-  /// a line or a sphere). Otherwise it returns Vector3d::Zero().
-  Eigen::Vector3d getObjectRotation(const std::string& key);
+  /// a line or a sphere). Otherwise it returns Vector3s::Zero().
+  Eigen::Vector3s getObjectRotation(const std::string& key);
 
   /// This returns the color of an object, if we've got it. Otherwise it
-  /// returns Vector3d::Zero().
-  Eigen::Vector3d getObjectColor(const std::string& key);
+  /// returns Vector3s::Zero().
+  Eigen::Vector3s getObjectColor(const std::string& key);
 
   /// This moves an object (e.g. box, sphere, line) to a specified position
   GUIWebsocketServer& setObjectPosition(
-      const std::string& key, const Eigen::Vector3d& pos);
+      const std::string& key, const Eigen::Vector3s& pos);
 
   /// This moves an object (e.g. box, sphere, line) to a specified
   /// orientation
   GUIWebsocketServer& setObjectRotation(
-      const std::string& key, const Eigen::Vector3d& euler);
+      const std::string& key, const Eigen::Vector3s& euler);
 
   /// This changes an object (e.g. box, sphere, line) color
   GUIWebsocketServer& setObjectColor(
-      const std::string& key, const Eigen::Vector3d& color);
+      const std::string& key, const Eigen::Vector3s& color);
 
   /// This enables mouse events on an object (if they're not already), and
   /// calls "listener" whenever the object is dragged with the desired drag
   /// coordinates
   GUIWebsocketServer& registerDragListener(
-      const std::string& key, std::function<void(Eigen::Vector3d)> listener);
+      const std::string& key, std::function<void(Eigen::Vector3s)> listener);
 
   /// This deletes an object by key
   GUIWebsocketServer& deleteObject(const std::string& key);
@@ -280,44 +280,44 @@ public:
       const std::string& key,
       const Eigen::Vector2i& fromTopLeft,
       const Eigen::Vector2i& size,
-      double min,
-      double max,
-      double value,
+      s_t min,
+      s_t max,
+      s_t value,
       bool onlyInts,
       bool horizontal,
-      std::function<void(double)> onChange);
+      std::function<void(s_t)> onChange);
 
   /// This changes the contents of text on the screen
-  GUIWebsocketServer& setSliderValue(const std::string& key, double value);
+  GUIWebsocketServer& setSliderValue(const std::string& key, s_t value);
 
   /// This changes the contents of text on the screen
-  GUIWebsocketServer& setSliderMin(const std::string& key, double min);
+  GUIWebsocketServer& setSliderMin(const std::string& key, s_t min);
 
   /// This changes the contents of text on the screen
-  GUIWebsocketServer& setSliderMax(const std::string& key, double max);
+  GUIWebsocketServer& setSliderMax(const std::string& key, s_t max);
 
   /// This creates a plot to display data on the GUI
   GUIWebsocketServer& createPlot(
       const std::string& key,
       const Eigen::Vector2i& fromTopLeft,
       const Eigen::Vector2i& size,
-      const std::vector<double>& xs,
-      double minX,
-      double maxX,
-      const std::vector<double>& ys,
-      double minY,
-      double maxY,
+      const std::vector<s_t>& xs,
+      s_t minX,
+      s_t maxX,
+      const std::vector<s_t>& ys,
+      s_t minY,
+      s_t maxY,
       const std::string& type);
 
   /// This changes the contents of a plot, along with its display limits
   GUIWebsocketServer& setPlotData(
       const std::string& key,
-      const std::vector<double>& xs,
-      double minX,
-      double maxX,
-      const std::vector<double>& ys,
-      double minY,
-      double maxY);
+      const std::vector<s_t>& xs,
+      s_t minX,
+      s_t maxX,
+      const std::vector<s_t>& ys,
+      s_t minY,
+      s_t maxY);
 
   /// This moves a UI element on the screen
   GUIWebsocketServer& setUIElementPosition(
@@ -357,7 +357,7 @@ protected:
   std::unordered_set<std::string> mKeysDown;
   std::unordered_map<
       std::string,
-      std::vector<std::function<void(Eigen::Vector3d)>>>
+      std::vector<std::function<void(Eigen::Vector3s)>>>
       mDragListeners;
   std::vector<std::function<void(Eigen::Vector2i)>> mScreenResizeListeners;
   // This is a list of all the objects with mouse interaction enabled
@@ -366,10 +366,10 @@ protected:
   struct Box
   {
     std::string key;
-    Eigen::Vector3d size;
-    Eigen::Vector3d pos;
-    Eigen::Vector3d euler;
-    Eigen::Vector3d color;
+    Eigen::Vector3s size;
+    Eigen::Vector3s pos;
+    Eigen::Vector3s euler;
+    Eigen::Vector3s color;
     bool castShadows;
     bool receiveShadows;
   };
@@ -377,9 +377,9 @@ protected:
   struct Sphere
   {
     std::string key;
-    double radius;
-    Eigen::Vector3d pos;
-    Eigen::Vector3d color;
+    s_t radius;
+    Eigen::Vector3s pos;
+    Eigen::Vector3s color;
     bool castShadows;
     bool receiveShadows;
   };
@@ -388,11 +388,11 @@ protected:
   struct Capsule
   {
     std::string key;
-    double radius;
-    double height;
-    Eigen::Vector3d pos;
-    Eigen::Vector3d euler;
-    Eigen::Vector3d color;
+    s_t radius;
+    s_t height;
+    Eigen::Vector3s pos;
+    Eigen::Vector3s euler;
+    Eigen::Vector3s color;
     bool castShadows;
     bool receiveShadows;
   };
@@ -400,24 +400,24 @@ protected:
   struct Line
   {
     std::string key;
-    std::vector<Eigen::Vector3d> points;
-    Eigen::Vector3d color;
+    std::vector<Eigen::Vector3s> points;
+    Eigen::Vector3s color;
   };
   std::unordered_map<std::string, Line> mLines;
 
   struct Mesh
   {
     std::string key;
-    std::vector<Eigen::Vector3d> vertices;
-    std::vector<Eigen::Vector3d> vertexNormals;
+    std::vector<Eigen::Vector3s> vertices;
+    std::vector<Eigen::Vector3s> vertexNormals;
     std::vector<Eigen::Vector3i> faces;
-    std::vector<Eigen::Vector2d> uv;
+    std::vector<Eigen::Vector2s> uv;
     std::vector<std::string> textures;
     std::vector<int> textureStartIndices;
-    Eigen::Vector3d pos;
-    Eigen::Vector3d euler;
-    Eigen::Vector3d scale;
-    Eigen::Vector3d color;
+    Eigen::Vector3s pos;
+    Eigen::Vector3s euler;
+    Eigen::Vector3s scale;
+    Eigen::Vector3s color;
     bool castShadows;
     bool receiveShadows;
   };
@@ -454,12 +454,12 @@ protected:
     std::string key;
     Eigen::Vector2i fromTopLeft;
     Eigen::Vector2i size;
-    double min;
-    double max;
-    double value;
+    s_t min;
+    s_t max;
+    s_t value;
     bool onlyInts;
     bool horizontal;
-    std::function<void(double)> onChange;
+    std::function<void(s_t)> onChange;
   };
   std::unordered_map<std::string, Slider> mSliders;
 
@@ -468,12 +468,12 @@ protected:
     std::string key;
     Eigen::Vector2i fromTopLeft;
     Eigen::Vector2i size;
-    std::vector<double> xs;
-    double minX;
-    double maxX;
-    std::vector<double> ys;
-    double minY;
-    double maxY;
+    std::vector<s_t> xs;
+    s_t minX;
+    s_t maxX;
+    std::vector<s_t> ys;
+    s_t minY;
+    s_t maxY;
     std::string type;
   };
   std::unordered_map<std::string, Plot> mPlots;

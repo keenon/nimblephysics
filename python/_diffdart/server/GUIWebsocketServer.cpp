@@ -83,10 +83,10 @@ void GUIWebsocketServer(py::module& m)
           "createBox",
           &dart::server::GUIWebsocketServer::createBox,
           ::py::arg("key"),
-          ::py::arg("size") = Eigen::Vector3d::Ones(),
-          ::py::arg("pos") = Eigen::Vector3d::Zero(),
-          ::py::arg("euler") = Eigen::Vector3d::Zero(),
-          ::py::arg("color") = Eigen::Vector3d::Ones() * 0.5,
+          ::py::arg("size") = Eigen::Vector3s::Ones(),
+          ::py::arg("pos") = Eigen::Vector3s::Zero(),
+          ::py::arg("euler") = Eigen::Vector3s::Zero(),
+          ::py::arg("color") = Eigen::Vector3s::Ones() * 0.5,
           ::py::arg("castShadows") = true,
           ::py::arg("receiveShadows") = false)
       .def(
@@ -94,8 +94,8 @@ void GUIWebsocketServer(py::module& m)
           &dart::server::GUIWebsocketServer::createSphere,
           ::py::arg("key"),
           ::py::arg("radius") = 0.5,
-          ::py::arg("pos") = Eigen::Vector3d::Zero(),
-          ::py::arg("color") = Eigen::Vector3d::Ones() * 0.5,
+          ::py::arg("pos") = Eigen::Vector3s::Zero(),
+          ::py::arg("color") = Eigen::Vector3s::Ones() * 0.5,
           ::py::arg("castShadows") = true,
           ::py::arg("receiveShadows") = false)
       .def(
@@ -103,16 +103,16 @@ void GUIWebsocketServer(py::module& m)
           &dart::server::GUIWebsocketServer::createLine,
           ::py::arg("key"),
           ::py::arg("points"),
-          ::py::arg("color") = Eigen::Vector3d::Ones() * 0.5)
+          ::py::arg("color") = Eigen::Vector3s::Ones() * 0.5)
       .def(
           "createMeshFromShape",
           &dart::server::GUIWebsocketServer::createMeshFromShape,
           ::py::arg("key"),
           ::py::arg("mesh"),
-          ::py::arg("pos") = Eigen::Vector3d::Zero(),
-          ::py::arg("euler") = Eigen::Vector3d::Zero(),
-          ::py::arg("scale") = Eigen::Vector3d::Ones(),
-          ::py::arg("color") = Eigen::Vector3d::Ones() * 0.5,
+          ::py::arg("pos") = Eigen::Vector3s::Zero(),
+          ::py::arg("euler") = Eigen::Vector3s::Zero(),
+          ::py::arg("scale") = Eigen::Vector3s::Ones(),
+          ::py::arg("color") = Eigen::Vector3s::Ones() * 0.5,
           ::py::arg("castShadows") = true,
           ::py::arg("receiveShadows") = false)
       .def(
@@ -254,8 +254,8 @@ void GUIWebsocketServer(py::module& m)
           &dart::server::GUIWebsocketServer::renderBasis,
           ::py::arg("scale") = 10.0,
           ::py::arg("prefix") = "basis",
-          ::py::arg("pos") = Eigen::Vector3d::Zero(),
-          ::py::arg("euler") = Eigen::Vector3d::Zero(),
+          ::py::arg("pos") = Eigen::Vector3s::Zero(),
+          ::py::arg("euler") = Eigen::Vector3s::Zero(),
           ::py::call_guard<py::gil_scoped_release>())
       .def(
           "renderSkeleton",

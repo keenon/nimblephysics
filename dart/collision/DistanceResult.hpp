@@ -35,11 +35,13 @@
 
 #include <Eigen/Dense>
 
+#include "dart/math/MathTypes.hpp"
+
 namespace dart {
 
 namespace dynamics {
 class ShapeFrame;
-} // namesapce dynamics
+} // namespace dynamics
 
 namespace collision {
 
@@ -90,7 +92,7 @@ struct DistanceResult
   ///
   /// The distance between the two nearest points is equal to
   /// unclampedMinDistance rather than minDistance.
-  Eigen::Vector3d nearestPoint1;
+  Eigen::Vector3s nearestPoint1;
 
   /// The nearest point on DistanceResult::shapeFrame2 expressed the world
   /// coordinates.
@@ -100,7 +102,7 @@ struct DistanceResult
   ///
   /// The distance between the two nearest points is equal to
   /// unclampedMinDistance rather than minDistance.
-  Eigen::Vector3d nearestPoint2;
+  Eigen::Vector3s nearestPoint2;
 
   /// Constructor
   DistanceResult();
@@ -117,7 +119,7 @@ struct DistanceResult
   bool isMinDistanceClamped() const;
 };
 
-}  // namespace collision
-}  // namespace dart
+} // namespace collision
+} // namespace dart
 
-#endif  // DART_COLLISION_DISTANCE_RESULT_HPP_
+#endif // DART_COLLISION_DISTANCE_RESULT_HPP_

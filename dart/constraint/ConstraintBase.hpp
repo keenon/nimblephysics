@@ -37,6 +37,7 @@
 #include <vector>
 
 #include "dart/dynamics/SmartPointer.hpp"
+#include "dart/math/MathTypes.hpp"
 
 namespace dart {
 
@@ -50,25 +51,25 @@ namespace constraint {
 struct ConstraintInfo
 {
   /// Impulse
-  double* x;
+  s_t* x;
 
   /// Lower bound of x
-  double* lo;
+  s_t* lo;
 
   /// Upper bound of x
-  double* hi;
+  s_t* hi;
 
   /// Bias term
-  double* b;
+  s_t* b;
 
   /// Slack variable
-  double* w;
+  s_t* w;
 
   /// Friction index
   int* findex;
 
   /// Inverse of time step
-  double invTimeStep;
+  s_t invTimeStep;
 };
 
 /// Constraint is a base class of concrete constraints classes
@@ -88,7 +89,7 @@ public:
   virtual void applyUnitImpulse(std::size_t index) = 0;
 
   /// Get velocity change due to the uint impulse
-  virtual void getVelocityChange(double* vel, bool withCfm) = 0;
+  virtual void getVelocityChange(s_t* vel, bool withCfm) = 0;
 
   /// Excite the constraint
   virtual void excite() = 0;
@@ -97,7 +98,7 @@ public:
   virtual void unexcite() = 0;
 
   /// Apply computed constraint impulse to constrained skeletons
-  virtual void applyImpulse(double* lambda) = 0;
+  virtual void applyImpulse(s_t* lambda) = 0;
 
   /// Return true if this constraint is active
   virtual bool isActive() const = 0;
@@ -107,12 +108,12 @@ public:
 
   /// Returns 0 if this constraint isn't bouncing, otherwise returns the
   /// coefficient of restitution
-  virtual double getCoefficientOfRestitution();
+  virtual s_t getCoefficientOfRestitution();
 
   /// Returns 0 if this constraint isn't using the "bouncing" hack to correct
   /// penetration. Otherwise, this returns the velocity being used by the
   /// penetration correction hack.
-  virtual double getPenetrationCorrectionVelocity();
+  virtual s_t getPenetrationCorrectionVelocity();
 
   ///
   virtual dynamics::SkeletonPtr getRootSkeleton() const = 0;

@@ -49,10 +49,10 @@ namespace detail {
 //==============================================================================
 struct PrismaticJointUniqueProperties
 {
-  Eigen::Vector3d mAxis;
+  Eigen::Vector3s mAxis;
 
   PrismaticJointUniqueProperties(
-      const Eigen::Vector3d& _axis = Eigen::Vector3d::UnitZ());
+      const Eigen::Vector3s& _axis = Eigen::Vector3s::UnitZ());
 
   virtual ~PrismaticJointUniqueProperties() = default;
 };

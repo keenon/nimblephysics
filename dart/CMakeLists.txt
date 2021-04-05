@@ -17,9 +17,6 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
 # lcpsolver
 # neural
 # trajectory
-# optimizer
-#   ipopt
-#   nlopt
 # dynamics
 # collision
 #   dart
@@ -30,37 +27,26 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
 # utils
 #   sdf
 #   urdf
-# gui
-#   osg
-#     render
 
 #===============================================================================
 # Targets - {dependency targets}, source directories, [external dependency libs]
 #===============================================================================
-# dart - common, math, integration, lcpsolver, optimizer, dynamics, collision,
+# dart - common, math, integration, lcpsolver, dynamics, collision,
 #        collision/dart, collision/fcl, constraint, simulation, [eigen3, libccd,
 #        fcl, assimp, boost]
-# dart-optimizer-ipopt - {dart}, optimizer/ipopt, [ipopt]
-# dart-optimizer-nlopt - {dart}, optimizer/nlopt, [nlopt]
 # dart-collision-bullet - {dart}, collision/bullet, [bullet]
 # dart-utils - {dart}, utils, utils/sdf, [tinyxml2]
 # dart-utils-urdf - {dart-utils}, utils/urdf, [urdfdom]
-# dart-gui - {dart}, gui, [opengl, glut]
-# dart-gui-osg - {dart-gui}, gui/osg, gui/osg/render, [openscenegraph]
 # dart-planning - {dart}, planning, [flann]
 
 #===============================================================================
 # Components - (dependency component), {dependency targets}
 #===============================================================================
 # dart - {dart}
-# optimizer-ipopt - (dart), {dart-optimizer-ipopt}
-# optimizer-nlopt - (dart), {dart-optimizer-nlopt}
 # collision-bullet - (dart), {dart-collision-bullet}
 # utils - (collision-bullet), {dart-utils}
 # utils-urdf - (utils), {dart-utils-urdf}
 # utils-amc - (utils), {dart-utils-amc}
-# gui - (utils), {dart-gui}
-# gui-osg - (gui), {dart-gui-osg}
 # planning - (dart), {dart-planning}
 
 # Component. This should be called before adding subdirectories.
@@ -83,13 +69,11 @@ add_subdirectory(trajectory)
 add_subdirectory(realtime)
 add_subdirectory(performance)
 add_subdirectory(server)
-add_subdirectory(optimizer)
 add_subdirectory(dynamics)
 add_subdirectory(collision)
 add_subdirectory(constraint)
 add_subdirectory(simulation)
 add_subdirectory(utils) # tinyxml2, bullet
-add_subdirectory(gui) # opengl, glut, bullet
 add_subdirectory(proto)
 
 set(DART_CONFIG_HPP_IN ${CMAKE_SOURCE_DIR}/dart/config.hpp.in)

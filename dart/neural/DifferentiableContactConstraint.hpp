@@ -63,10 +63,10 @@ enum DofContactType
 
 struct EdgeData
 {
-  Eigen::Vector3d edgeAPos;
-  Eigen::Vector3d edgeADir;
-  Eigen::Vector3d edgeBPos;
-  Eigen::Vector3d edgeBDir;
+  Eigen::Vector3s edgeAPos;
+  Eigen::Vector3s edgeADir;
+  Eigen::Vector3s edgeBPos;
+  Eigen::Vector3s edgeBDir;
 };
 
 class DifferentiableContactConstraint
@@ -76,21 +76,21 @@ public:
   DifferentiableContactConstraint(
       std::shared_ptr<constraint::ConstraintBase> constraint,
       int index,
-      double constraintForce);
+      s_t constraintForce);
 
-  Eigen::Vector3d getContactWorldPosition();
+  Eigen::Vector3s getContactWorldPosition();
 
   /// This returns the normal of the contact, pointing from A to B. This IS NOT
   /// NECESSARILY THE DIRECTION OF FORCE! If this contact constraint is a
   /// friction constraint, then this returns the normal of the contact, and
   /// getContactWorldForceDirection() returns the direction of the force.
-  Eigen::Vector3d getContactWorldNormal();
+  Eigen::Vector3s getContactWorldNormal();
 
-  Eigen::Vector3d getContactWorldForceDirection();
+  Eigen::Vector3s getContactWorldForceDirection();
 
   /// This computes the force, in world space exponential coordinates, that this
   /// contact generates
-  Eigen::Vector6d getWorldForce();
+  Eigen::Vector6s getWorldForce();
 
   /// This returns the nature of the contact, whether it's a face-vertex, or a
   /// vertex-face, or an edge-edge, or something else. This is relevant because
@@ -105,40 +105,40 @@ public:
 
   /// This analytically computes a column of the A_c matrix just for this
   /// skeleton.
-  Eigen::VectorXd getConstraintForces(std::shared_ptr<dynamics::Skeleton> skel);
+  Eigen::VectorXs getConstraintForces(std::shared_ptr<dynamics::Skeleton> skel);
 
   /// This analytically computes a column of the A_c matrix for this set of
   /// skeletons.
-  Eigen::VectorXd getConstraintForces(
+  Eigen::VectorXs getConstraintForces(
       simulation::World* world, std::vector<std::string> skelNames);
 
   /// This analytically computes a column of the A_c matrix, for this contact
   /// constraint, across the whole world by concatenating the result for each
   /// skeleton together into a single vector.
-  Eigen::VectorXd getConstraintForces(simulation::World* world);
+  Eigen::VectorXs getConstraintForces(simulation::World* world);
 
   /// Returns the gradient of the contact position with respect to the
   /// specified dof of this skeleton
-  Eigen::Vector3d getContactPositionGradient(dynamics::DegreeOfFreedom* dof);
+  Eigen::Vector3s getContactPositionGradient(dynamics::DegreeOfFreedom* dof);
 
   /// Returns the gradient of the contact normal with respect to the
   /// specified dof of this skeleton
-  Eigen::Vector3d getContactNormalGradient(dynamics::DegreeOfFreedom* dof);
+  Eigen::Vector3s getContactNormalGradient(dynamics::DegreeOfFreedom* dof);
 
   /// Returns the gradient of the contact force with respect to the
   /// specified dof of this skeleton
-  Eigen::Vector3d getContactForceGradient(dynamics::DegreeOfFreedom* dof);
+  Eigen::Vector3s getContactForceGradient(dynamics::DegreeOfFreedom* dof);
 
   /// Returns the gradient of the full 6d twist force
-  Eigen::Vector6d getContactWorldForceGradient(dynamics::DegreeOfFreedom* dof);
+  Eigen::Vector6s getContactWorldForceGradient(dynamics::DegreeOfFreedom* dof);
 
   /// Returns the gradient of the screw axis with respect to the rotate dof
-  Eigen::Vector6d getScrewAxisForPositionGradient(
+  Eigen::Vector6s getScrewAxisForPositionGradient(
       dynamics::DegreeOfFreedom* screwDof,
       dynamics::DegreeOfFreedom* rotateDof);
 
   /// Returns the gradient of the screw axis with respect to the rotate dof
-  Eigen::Vector6d getScrewAxisForForceGradient(
+  Eigen::Vector6s getScrewAxisForForceGradient(
       dynamics::DegreeOfFreedom* screwDof,
       dynamics::DegreeOfFreedom* rotateDof);
 
@@ -146,10 +146,10 @@ public:
   ///
   /// Unlike its sibling, getScrewAxisForForceGradient(), this allows passing
   /// in values that are otherwise repeatedly computed.
-  Eigen::Vector6d getScrewAxisForForceGradient_Optimized(
+  Eigen::Vector6s getScrewAxisForForceGradient_Optimized(
       dynamics::DegreeOfFreedom* screwDof,
       dynamics::DegreeOfFreedom* rotateDof,
-      const Eigen::Vector6d& axisWorldTwist);
+      const Eigen::Vector6s& axisWorldTwist);
 
   /// This is the analytical Jacobian for the contact position
   math::LinearJacobian getContactPositionJacobian(
@@ -182,35 +182,35 @@ public:
       std::shared_ptr<dynamics::Skeleton> skel);
 
   /// This gets the constraint force for a given DOF
-  double getConstraintForce(dynamics::DegreeOfFreedom* dof);
+  s_t getConstraintForce(dynamics::DegreeOfFreedom* dof);
 
   /// This gets the gradient of constraint force at this joint with respect to
   /// another joint
-  double getConstraintForceDerivative(
+  s_t getConstraintForceDerivative(
       dynamics::DegreeOfFreedom* dof, dynamics::DegreeOfFreedom* wrt);
 
   /// This returns an analytical Jacobian relating the skeletons that this
   /// contact touches.
-  const Eigen::MatrixXd& getConstraintForcesJacobian(
+  const Eigen::MatrixXs& getConstraintForcesJacobian(
       std::shared_ptr<simulation::World> world);
 
   /// This computes and returns the analytical Jacobian relating how changes in
   /// the positions of wrt's DOFs changes the constraint forces on skel.
-  Eigen::MatrixXd getConstraintForcesJacobian(
+  Eigen::MatrixXs getConstraintForcesJacobian(
       std::shared_ptr<dynamics::Skeleton> skel,
       std::shared_ptr<dynamics::Skeleton> wrt);
 
   /// This computes and returns the analytical Jacobian relating how changes in
   /// the positions of wrt's DOFs changes the constraint forces on all the
   /// skels.
-  Eigen::MatrixXd getConstraintForcesJacobian(
+  Eigen::MatrixXs getConstraintForcesJacobian(
       std::vector<std::shared_ptr<dynamics::Skeleton>> skels,
       std::shared_ptr<dynamics::Skeleton> wrt);
 
   /// This computes and returns the analytical Jacobian relating how changes in
   /// the positions of any of the DOFs changes the constraint forces on all the
   /// skels.
-  Eigen::MatrixXd getConstraintForcesJacobian(
+  Eigen::MatrixXs getConstraintForcesJacobian(
       std::shared_ptr<simulation::World> world,
       std::vector<std::shared_ptr<dynamics::Skeleton>> skels);
 
@@ -234,28 +234,28 @@ public:
       std::shared_ptr<simulation::World> world);
 
   /// This is the brute force version of getConstraintForcesJacobian()
-  Eigen::MatrixXd bruteForceConstraintForcesJacobian(
+  Eigen::MatrixXs bruteForceConstraintForcesJacobian(
       std::shared_ptr<simulation::World> world);
 
   /// Just for testing: This analytically estimates the way the contact position
   /// will change if we perturb the `dofIndex`'th DOF of `skel` by `eps`.
-  Eigen::Vector3d estimatePerturbedContactPosition(
-      std::shared_ptr<dynamics::Skeleton> skel, int dofIndex, double eps);
+  Eigen::Vector3s estimatePerturbedContactPosition(
+      std::shared_ptr<dynamics::Skeleton> skel, int dofIndex, s_t eps);
 
   /// Just for testing: This analytically estimates the way the contact normal
   /// will change if we perturb the `dofIndex`'th DOF of `skel` by `eps`.
-  Eigen::Vector3d estimatePerturbedContactNormal(
-      std::shared_ptr<dynamics::Skeleton> skel, int dofIndex, double eps);
+  Eigen::Vector3s estimatePerturbedContactNormal(
+      std::shared_ptr<dynamics::Skeleton> skel, int dofIndex, s_t eps);
 
   /// Just for testing: This analytically estimates the way the contact normal
   /// will change if we perturb the `dofIndex`'th DOF of `skel` by `eps`.
-  Eigen::Vector3d estimatePerturbedContactForceDirection(
-      std::shared_ptr<dynamics::Skeleton> skel, int dofIndex, double eps);
+  Eigen::Vector3s estimatePerturbedContactForceDirection(
+      std::shared_ptr<dynamics::Skeleton> skel, int dofIndex, s_t eps);
 
   /// Just for testing: This analytically estimates how edges will move under a
   /// perturbation
   EdgeData estimatePerturbedEdges(
-      std::shared_ptr<dynamics::Skeleton> skel, int dofIndex, double eps);
+      std::shared_ptr<dynamics::Skeleton> skel, int dofIndex, s_t eps);
 
   /// Just for testing: returns the edges, if this is an edge-edge collision,
   /// otherwise 0s
@@ -267,17 +267,17 @@ public:
 
   /// Just for testing: This analytically estimates how a screw axis will move
   /// when rotated by another screw.
-  Eigen::Vector6d estimatePerturbedScrewAxisForPosition(
+  Eigen::Vector6s estimatePerturbedScrewAxisForPosition(
       dynamics::DegreeOfFreedom* axis,
       dynamics::DegreeOfFreedom* rotate,
-      double eps);
+      s_t eps);
 
   /// Just for testing: This analytically estimates how a screw axis will move
   /// when rotated by another screw.
-  Eigen::Vector6d estimatePerturbedScrewAxisForForce(
+  Eigen::Vector6s estimatePerturbedScrewAxisForForce(
       dynamics::DegreeOfFreedom* axis,
       dynamics::DegreeOfFreedom* rotate,
-      double eps);
+      s_t eps);
 
   /// Just for testing: This lets the world record what index this
   /// constraint is at, so that we can recover the analagous constraint from
@@ -287,43 +287,43 @@ public:
   /// Just for testing: This runs a full timestep to get the way the contact
   /// position will change if we perturb the `dofIndex`'th DOF of `skel` by
   /// `eps`.
-  Eigen::Vector3d bruteForcePerturbedContactPosition(
+  Eigen::Vector3s bruteForcePerturbedContactPosition(
       std::shared_ptr<simulation::World> world,
       std::shared_ptr<dynamics::Skeleton> skel,
       int dofIndex,
-      double eps);
+      s_t eps);
 
   /// Just for testing: This runs a full timestep to get the way the contact
   /// normal will change if we perturb the `dofIndex`'th DOF of `skel` by
   /// `eps`.
-  Eigen::Vector3d bruteForcePerturbedContactNormal(
+  Eigen::Vector3s bruteForcePerturbedContactNormal(
       std::shared_ptr<simulation::World> world,
       std::shared_ptr<dynamics::Skeleton> skel,
       int dofIndex,
-      double eps);
+      s_t eps);
 
   /// Just for testing: This runs a full timestep to get the way the contact
   /// force direction will change if we perturb the `dofIndex`'th DOF of `skel`
   /// by `eps`.
-  Eigen::Vector3d bruteForcePerturbedContactForceDirection(
+  Eigen::Vector3s bruteForcePerturbedContactForceDirection(
       std::shared_ptr<simulation::World> world,
       std::shared_ptr<dynamics::Skeleton> skel,
       int dofIndex,
-      double eps);
+      s_t eps);
 
   /// Just for testing: This perturbs the world position of a skeleton to read a
   /// screw axis will move when rotated by another screw.
-  Eigen::Vector6d bruteForceScrewAxisForPosition(
+  Eigen::Vector6s bruteForceScrewAxisForPosition(
       dynamics::DegreeOfFreedom* axis,
       dynamics::DegreeOfFreedom* rotate,
-      double eps);
+      s_t eps);
 
   /// Just for testing: This perturbs the world position of a skeleton to read a
   /// screw axis will move when rotated by another screw.
-  Eigen::Vector6d bruteForceScrewAxisForForce(
+  Eigen::Vector6s bruteForceScrewAxisForForce(
       dynamics::DegreeOfFreedom* axis,
       dynamics::DegreeOfFreedom* rotate,
-      double eps);
+      s_t eps);
 
   /// Just for testing: This perturbs the world position of a skeleton  to read
   /// how edges will move.
@@ -331,30 +331,30 @@ public:
       std::shared_ptr<simulation::World> world,
       std::shared_ptr<dynamics::Skeleton> skel,
       int dofIndex,
-      double eps);
+      s_t eps);
 
   /// Return the index into the contact that this constraint represents. If it's
   /// >0, then this is a frictional constraint.
   int getIndexInConstraint();
 
   /// This returns the axis for the specified dof index
-  static Eigen::Vector6d getWorldScrewAxisForPosition(
+  static Eigen::Vector6s getWorldScrewAxisForPosition(
       std::shared_ptr<dynamics::Skeleton> skel, int dofIndex);
 
   /// This returns the axis for the specified dof index
-  static Eigen::Vector6d getWorldScrewAxisForPosition(
+  static Eigen::Vector6s getWorldScrewAxisForPosition(
       dynamics::DegreeOfFreedom* dof);
 
   /// This returns the axis for the specified dof index which, when dotted with
   /// force, calculates the torque on this joint. THIS IS NOT THE SAME AS
   /// getWorldScrewAxisForPosition(), because of FreeJoints and BallJoints.
-  static Eigen::Vector6d getWorldScrewAxisForForce(
+  static Eigen::Vector6s getWorldScrewAxisForForce(
       std::shared_ptr<dynamics::Skeleton> skel, int dofIndex);
 
   /// This returns the axis for the specified dof index which, when dotted with
   /// force, calculates the torque on this joint. THIS IS NOT THE SAME AS
   /// getWorldScrewAxisForPosition(), because of FreeJoints and BallJoints.
-  static Eigen::Vector6d getWorldScrewAxisForForce(
+  static Eigen::Vector6s getWorldScrewAxisForForce(
       dynamics::DegreeOfFreedom* dof);
 
   /// This returns the constraint that's at our same location in the snapshot.
@@ -366,7 +366,7 @@ public:
   /// This returns 1.0 by default, 0.0 if this constraint doesn't effect the
   /// specified DOF, and -1.0 if the constraint effects this dof negatively.
   /// Pretty much only public for testing
-  double getForceMultiple(dynamics::DegreeOfFreedom* dof);
+  s_t getForceMultiple(dynamics::DegreeOfFreedom* dof);
 
 public:
   /// Returns true if this dof moves this body node
@@ -385,11 +385,11 @@ protected:
   std::shared_ptr<constraint::ContactConstraint> mContactConstraint;
   std::shared_ptr<collision::Contact> mContact;
   std::vector<std::string> mSkeletons;
-  std::vector<Eigen::VectorXd> mSkeletonOriginalPositions;
-  double mConstraintForce;
+  std::vector<Eigen::VectorXs> mSkeletonOriginalPositions;
+  s_t mConstraintForce;
 
   bool mWorldConstraintJacCacheDirty;
-  Eigen::MatrixXd mWorldConstraintJacCache;
+  Eigen::MatrixXs mWorldConstraintJacCache;
 
   int mIndex;
 

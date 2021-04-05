@@ -44,11 +44,11 @@ class ConstrainedGroupGradientMatrices
 {
 public:
   ConstrainedGroupGradientMatrices(
-      constraint::ConstrainedGroup& group, double timeStep);
+      constraint::ConstrainedGroup& group, s_t timeStep);
 
   /// This is a constructor for test mocks
   ConstrainedGroupGradientMatrices(
-      int numDofs, int numConstraintDim, double timeStep);
+      int numDofs, int numConstraintDim, s_t timeStep);
 
   /// This gets called during the setup of the ConstrainedGroupGradientMatrices
   /// at each constraint. This must be called before constructMatrices(), and
@@ -58,7 +58,7 @@ public:
 
   /// This mocks registering a constaint. Useful for testing.
   void mockRegisterConstraint(
-      double restitutionCoeff, double penetrationHackVel);
+      s_t restitutionCoeff, s_t penetrationHackVel);
 
   /// This gets called during the setup of the ConstrainedGroupGradientMatrices
   /// at each constraint's dimension. It gets called _after_ the system has
@@ -77,27 +77,27 @@ public:
   /// exist yet. Returns true if successful, false otherwise.
   bool attemptFastSolveLCP(
       simulation::World* world,
-      Eigen::VectorXd& mX,
-      const Eigen::VectorXd& A,
-      const Eigen::VectorXd& mHi,
-      const Eigen::VectorXd& mLo,
-      const Eigen::VectorXd& mB,
-      const Eigen::VectorXd& mFIndex);
+      Eigen::VectorXs& mX,
+      const Eigen::VectorXs& A,
+      const Eigen::VectorXs& mHi,
+      const Eigen::VectorXs& mLo,
+      const Eigen::VectorXs& mB,
+      const Eigen::VectorXs& mFIndex);
 
   /// This mocks measuring a constraint impulse. Useful for testing.
-  void mockMeasureConstraintImpulse(Eigen::VectorXd massedImpulseTest);
+  void mockMeasureConstraintImpulse(Eigen::VectorXs massedImpulseTest);
 
   /// This gets called during the setup of the ConstrainedGroupGradientMatrices
   /// after the LCP has run, with the result from the LCP solver.
   void registerLCPResults(
-      Eigen::VectorXd mX,
-      Eigen::VectorXd hi,
-      Eigen::VectorXd lo,
+      Eigen::VectorXs mX,
+      Eigen::VectorXs hi,
+      Eigen::VectorXs lo,
       Eigen::VectorXi fIndex,
-      Eigen::VectorXd b,
-      Eigen::VectorXd aColNorms,
-      Eigen::MatrixXd A,
-      double constraintForceMixingConstant,
+      Eigen::VectorXs b,
+      Eigen::VectorXs aColNorms,
+      Eigen::MatrixXs A,
+      s_t constraintForceMixingConstant,
       bool deliberatelyIgnoreFriction);
 
   /// If possible (because A is rank-deficient), this changes mX to be the
@@ -109,11 +109,11 @@ public:
   /// this method returns true if it's found a valid solution, whether it
   /// changed anything or not, and false if the solution is invalid.
   bool opportunisticallyStandardizeResults(
-      simulation::World* world, Eigen::VectorXd& mX);
+      simulation::World* world, Eigen::VectorXs& mX);
 
   /// This returns true if the proposed mX is consistent with our recorded LCP
   /// construction
-  bool isSolutionValid(const Eigen::VectorXd& mX);
+  bool isSolutionValid(const Eigen::VectorXs& mX);
 
   /// This gets called by constructMatrices()
   void deduplicateConstraints();
@@ -130,119 +130,119 @@ public:
   /// backprop, you don't actually need this matrix, you can compute backprop
   /// directly. This is here if you want access to the full Jacobian for some
   /// reason.
-  Eigen::MatrixXd getVelVelJacobian(
+  Eigen::MatrixXs getVelVelJacobian(
       simulation::WorldPtr world, PerformanceLog* perfLog = nullptr);
 
   /// This computes and returns the whole pos-vel jacobian. For backprop, you
   /// don't actually need this matrix, you can compute backprop directly. This
   /// is here if you want access to the full Jacobian for some reason.
-  Eigen::MatrixXd getPosVelJacobian(
+  Eigen::MatrixXs getPosVelJacobian(
       simulation::WorldPtr world, PerformanceLog* perfLog = nullptr);
 
   /// This computes and returns the whole force-vel jacobian for this group. For
   /// backprop, you don't actually need this matrix, you can compute backprop
   /// directly. This is here if you want access to the full Jacobian for some
   /// reason.
-  Eigen::MatrixXd getForceVelJacobian(
+  Eigen::MatrixXs getForceVelJacobian(
       simulation::WorldPtr world, PerformanceLog* perfLog = nullptr);
 
   /// This computes and returns the whole pos-pos jacobian for this group. For
   /// backprop, you don't actually need this matrix, you can compute backprop
   /// directly. This is here if you want access to the full Jacobian for some
   /// reason.
-  Eigen::MatrixXd getPosPosJacobian(
+  Eigen::MatrixXs getPosPosJacobian(
       simulation::WorldPtr world, PerformanceLog* perfLog = nullptr);
 
   /// This computes and returns the whole vel-pos jacobian for this group. For
   /// backprop, you don't actually need this matrix, you can compute backprop
   /// directly. This is here if you want access to the full Jacobian for some
   /// reason.
-  Eigen::MatrixXd getVelPosJacobian(
+  Eigen::MatrixXs getVelPosJacobian(
       simulation::WorldPtr world, PerformanceLog* perfLog = nullptr);
 
   /// This returns the [dC(pos,vel)/dpos] for the group, a block diagonal
   /// concatenation of the skeleton [dC(pos,vel)/dpos] matrices.
-  Eigen::MatrixXd getPosCJacobian(simulation::WorldPtr world);
+  Eigen::MatrixXs getPosCJacobian(simulation::WorldPtr world);
 
   /// This returns the [dC(pos,vel)/dvel] for the group, a block diagonal
   /// concatenation of the skeleton [dC(pos,vel)/dvel] matrices.
-  Eigen::MatrixXd getVelCJacobian(simulation::WorldPtr world);
+  Eigen::MatrixXs getVelCJacobian(simulation::WorldPtr world);
 
   /// This returns the mass matrix for the group, a block diagonal
   /// concatenation of the skeleton mass matrices.
-  Eigen::MatrixXd getMassMatrix(simulation::WorldPtr world);
+  Eigen::MatrixXs getMassMatrix(simulation::WorldPtr world);
 
   /// This returns the inverse mass matrix for the group, a block diagonal
   /// concatenation of the skeleton inverse mass matrices.
-  Eigen::MatrixXd getInvMassMatrix(simulation::WorldPtr world);
+  Eigen::MatrixXs getInvMassMatrix(simulation::WorldPtr world);
 
   /// This returns the block diagonal matrix where each skeleton's joints
   /// integration scheme is reflected.
-  Eigen::MatrixXd getJointsPosPosJacobian(simulation::WorldPtr world);
+  Eigen::MatrixXs getJointsPosPosJacobian(simulation::WorldPtr world);
 
   /// This returns the block diagonal matrix where each skeleton's joints
   /// integration scheme is reflected.
-  Eigen::MatrixXd getJointsVelPosJacobian(simulation::WorldPtr world);
+  Eigen::MatrixXs getJointsVelPosJacobian(simulation::WorldPtr world);
 
   /// This computes and returns the component of the pos-pos and pos-vel
   /// jacobians due to bounce approximation. For backprop, you don't actually
   /// need this matrix, you can compute backprop directly. This is here if you
   /// want access to the full Jacobian for some reason.
-  Eigen::MatrixXd getBounceApproximationJacobian(PerformanceLog* perfLog);
+  Eigen::MatrixXs getBounceApproximationJacobian(PerformanceLog* perfLog);
 
   /// This computes and returns the whole pos-vel jacobian. For backprop, you
   /// don't actually need this matrix, you can compute backprop directly. This
   /// is here if you want access to the full Jacobian for some reason.
-  Eigen::MatrixXd getVelJacobianWrt(
+  Eigen::MatrixXs getVelJacobianWrt(
       simulation::WorldPtr world, WithRespectTo* wrt);
 
   /// This returns the jacobian of constraint force, holding everyhing constant
   /// except the value of WithRespectTo
-  Eigen::MatrixXd getJacobianOfConstraintForce(
+  Eigen::MatrixXs getJacobianOfConstraintForce(
       simulation::WorldPtr world, WithRespectTo* wrt);
 
   /// This returns the analytical expression for the Jacobian of Q*b, holding b
   /// constant, if there are some upper-bound indices
-  Eigen::MatrixXd dQ_WithUB(
+  Eigen::MatrixXs dQ_WithUB(
       simulation::WorldPtr world,
-      const Eigen::MatrixXd& Minv,
-      const Eigen::MatrixXd& A_c,
-      const Eigen::MatrixXd& E,
-      const Eigen::MatrixXd& A_c_ub_E,
-      Eigen::VectorXd rhs,
+      const Eigen::MatrixXs& Minv,
+      const Eigen::MatrixXs& A_c,
+      const Eigen::MatrixXs& E,
+      const Eigen::MatrixXs& A_c_ub_E,
+      Eigen::VectorXs rhs,
       WithRespectTo* wrt);
 
   /// This returns the analytical expression for the Jacobian of Q^T*b, holding
   /// b constant, if there are some upper-bound indices
-  Eigen::MatrixXd dQT_WithUB(
+  Eigen::MatrixXs dQT_WithUB(
       simulation::WorldPtr world,
-      const Eigen::MatrixXd& Minv,
-      const Eigen::MatrixXd& A_c,
-      const Eigen::MatrixXd& E,
-      const Eigen::MatrixXd& A_ub,
-      Eigen::VectorXd rhs,
+      const Eigen::MatrixXs& Minv,
+      const Eigen::MatrixXs& A_c,
+      const Eigen::MatrixXs& E,
+      const Eigen::MatrixXs& A_ub,
+      Eigen::VectorXs rhs,
       WithRespectTo* wrt);
 
   /// This returns the analytical expression for the Jacobian of Q*b, holding b
   /// constant, if there are no upper-bound indices
-  Eigen::MatrixXd dQ_WithoutUB(
+  Eigen::MatrixXs dQ_WithoutUB(
       simulation::WorldPtr world,
-      const Eigen::MatrixXd& Minv,
-      const Eigen::MatrixXd& A_c,
-      Eigen::VectorXd rhs,
+      const Eigen::MatrixXs& Minv,
+      const Eigen::MatrixXs& A_c,
+      Eigen::VectorXs rhs,
       WithRespectTo* wrt);
 
   /// This returns the vector of constants that get added to the diagonal of Q
   /// to guarantee that Q is full-rank
-  Eigen::VectorXd& getConstraintForceMixingDiagonal();
+  Eigen::VectorXs& getConstraintForceMixingDiagonal();
 
   /// This returns the jacobian of Q^{-1}b, holding b constant, with respect to
   /// wrt
-  Eigen::MatrixXd getJacobianOfLCPConstraintMatrixClampingSubset(
-      simulation::WorldPtr world, Eigen::VectorXd b, WithRespectTo* wrt);
+  Eigen::MatrixXs getJacobianOfLCPConstraintMatrixClampingSubset(
+      simulation::WorldPtr world, Eigen::VectorXs b, WithRespectTo* wrt);
 
   /// This returns the jacobian of b (from Q^{-1}b) with respect to wrt
-  Eigen::MatrixXd getJacobianOfLCPOffsetClampingSubset(
+  Eigen::MatrixXs getJacobianOfLCPOffsetClampingSubset(
       simulation::WorldPtr world, WithRespectTo* wrt);
 
   /// This returns the subset of the A matrix used by the original LCP for just
@@ -250,52 +250,52 @@ public:
   /// acceleration. It's a mass matrix, just in a weird frame.
   void computeLCPConstraintMatrixClampingSubset(
       simulation::WorldPtr world,
-      Eigen::MatrixXd& Q,
-      const Eigen::MatrixXd& A_c);
+      Eigen::MatrixXs& Q,
+      const Eigen::MatrixXs& A_c);
 
   /// This returns the subset of the b vector used by the original LCP for just
   /// the clamping constraints. It's just the relative velocity at the clamping
   /// contact points.
   void computeLCPOffsetClampingSubset(
       simulation::WorldPtr world,
-      Eigen::VectorXd& b,
-      const Eigen::MatrixXd& A_c);
+      Eigen::VectorXs& b,
+      const Eigen::MatrixXs& A_c);
 
   /// This computes and returns an estimate of the constraint impulses for the
   /// clamping constraints. This is based on a linear approximation of the
   /// constraint impulses.
-  Eigen::VectorXd estimateClampingConstraintImpulses(
-      simulation::WorldPtr world, const Eigen::MatrixXd& A_c);
+  Eigen::VectorXs estimateClampingConstraintImpulses(
+      simulation::WorldPtr world, const Eigen::MatrixXs& A_c);
 
   /// This returns the jacobian of M^{-1}(pos, inertia) * tau, holding
   /// everything constant except the value of WithRespectTo
-  Eigen::MatrixXd getJacobianOfMinv(
-      simulation::WorldPtr world, Eigen::VectorXd tau, WithRespectTo* wrt);
+  Eigen::MatrixXs getJacobianOfMinv(
+      simulation::WorldPtr world, Eigen::VectorXs tau, WithRespectTo* wrt);
 
   /// This returns the jacobian of C(pos, inertia, vel), holding everything
   /// constant except the value of WithRespectTo
-  Eigen::MatrixXd getJacobianOfC(
+  Eigen::MatrixXs getJacobianOfC(
       simulation::WorldPtr world, WithRespectTo* wrt);
 
   /// This computes the Jacobian of A_c*f0 with respect to position using
   /// impulse tests.
-  Eigen::MatrixXd getJacobianOfClampingConstraints(
-      simulation::WorldPtr world, Eigen::VectorXd f0);
+  Eigen::MatrixXs getJacobianOfClampingConstraints(
+      simulation::WorldPtr world, Eigen::VectorXs f0);
 
   /// This computes the Jacobian of A_c^T*v0 with respect to position using
   /// impulse tests.
-  Eigen::MatrixXd getJacobianOfClampingConstraintsTranspose(
-      simulation::WorldPtr world, Eigen::VectorXd v0);
+  Eigen::MatrixXs getJacobianOfClampingConstraintsTranspose(
+      simulation::WorldPtr world, Eigen::VectorXs v0);
 
   /// This computes the Jacobian of A_ub*E*f0 with respect to position using
   /// impulse tests.
-  Eigen::MatrixXd getJacobianOfUpperBoundConstraints(
-      simulation::WorldPtr world, Eigen::VectorXd f0);
+  Eigen::MatrixXs getJacobianOfUpperBoundConstraints(
+      simulation::WorldPtr world, Eigen::VectorXs f0);
 
   /// This computes the Jacobian of A_ub^T*E*v0 with respect to position using
   /// impulse tests.
-  Eigen::MatrixXd getJacobianOfUpperBoundConstraintsTranspose(
-      simulation::WorldPtr world, Eigen::VectorXd v0);
+  Eigen::MatrixXs getJacobianOfUpperBoundConstraintsTranspose(
+      simulation::WorldPtr world, Eigen::VectorXs v0);
 
   /// This computes the implicit backprop without forming intermediate
   /// Jacobians. It takes a LossGradient with the position and velocity vectors
@@ -312,85 +312,85 @@ public:
   /// out of the box-bounds encoded in the world for pos, vel, or force.
   void clipLossGradientsToBounds(
       simulation::WorldPtr world,
-      Eigen::VectorXd& lossWrtPos,
-      Eigen::VectorXd& lossWrtVel,
-      Eigen::VectorXd& lossWrtForce);
+      Eigen::VectorXs& lossWrtPos,
+      Eigen::VectorXs& lossWrtVel,
+      Eigen::VectorXs& lossWrtForce);
 
   /// This replaces x with the result of M*x in place, without explicitly
   /// forming M
-  Eigen::VectorXd implicitMultiplyByMassMatrix(
-      simulation::WorldPtr world, const Eigen::VectorXd& x);
+  Eigen::VectorXs implicitMultiplyByMassMatrix(
+      simulation::WorldPtr world, const Eigen::VectorXs& x);
 
   /// This replaces x with the result of Minv*x in place, without explicitly
   /// forming Minv
-  Eigen::VectorXd implicitMultiplyByInvMassMatrix(
-      simulation::WorldPtr world, const Eigen::VectorXd& x);
+  Eigen::VectorXs implicitMultiplyByInvMassMatrix(
+      simulation::WorldPtr world, const Eigen::VectorXs& x);
 
-  const Eigen::MatrixXd& getAllConstraintMatrix() const;
+  const Eigen::MatrixXs& getAllConstraintMatrix() const;
 
-  const Eigen::MatrixXd& getClampingConstraintMatrix() const;
+  const Eigen::MatrixXs& getClampingConstraintMatrix() const;
 
-  const Eigen::MatrixXd& getMassedClampingConstraintMatrix() const;
+  const Eigen::MatrixXs& getMassedClampingConstraintMatrix() const;
 
-  const Eigen::MatrixXd& getUpperBoundConstraintMatrix() const;
+  const Eigen::MatrixXs& getUpperBoundConstraintMatrix() const;
 
-  const Eigen::MatrixXd& getMassedUpperBoundConstraintMatrix() const;
+  const Eigen::MatrixXs& getMassedUpperBoundConstraintMatrix() const;
 
-  const Eigen::MatrixXd& getUpperBoundMappingMatrix() const;
+  const Eigen::MatrixXs& getUpperBoundMappingMatrix() const;
 
-  const Eigen::MatrixXd& getBouncingConstraintMatrix() const;
+  const Eigen::MatrixXs& getBouncingConstraintMatrix() const;
 
   /// These was the mX() vector used to construct this. Pretty much only here
   /// for testing.
-  const Eigen::VectorXd& getContactConstraintImpulses() const;
+  const Eigen::VectorXs& getContactConstraintImpulses() const;
 
   /// These was the fIndex() vector used to construct this. Pretty much only
   /// here for testing.
   const Eigen::VectorXi& getContactConstraintMappings() const;
 
   /// Returns the restitution coefficiennts at each clamping contact point.
-  const Eigen::VectorXd& getBounceDiagonals() const;
+  const Eigen::VectorXs& getBounceDiagonals() const;
 
   /// Returns the contact distances at each clamping contact point.
-  const Eigen::VectorXd& getRestitutionDiagonals() const;
+  const Eigen::VectorXs& getRestitutionDiagonals() const;
 
   /// Returns the penetration correction hack "bounce" (or 0 if the contact is
   /// not inter-penetrating or is actively bouncing) at each contact point.
-  const Eigen::VectorXd& getPenetrationCorrectionVelocities() const;
+  const Eigen::VectorXs& getPenetrationCorrectionVelocities() const;
 
   /// This is the subset of the A matrix from the original LCP that corresponds
   /// to clamping indices.
-  const Eigen::MatrixXd& getClampingAMatrix() const;
+  const Eigen::MatrixXs& getClampingAMatrix() const;
 
   /// Returns the constraint impulses along the clamping constraints
-  const Eigen::VectorXd& getClampingConstraintImpulses() const;
+  const Eigen::VectorXs& getClampingConstraintImpulses() const;
 
   /// Returns the relative velocities along the clamping constraints
-  const Eigen::VectorXd& getClampingConstraintRelativeVels() const;
+  const Eigen::VectorXs& getClampingConstraintRelativeVels() const;
 
   /// Returns the velocity change caused by the illegal impulses from the LCP
-  const Eigen::VectorXd& getVelocityDueToIllegalImpulses() const;
+  const Eigen::VectorXs& getVelocityDueToIllegalImpulses() const;
 
   /// Returns the torques applied pre-step
-  const Eigen::VectorXd& getPreStepTorques() const;
+  const Eigen::VectorXs& getPreStepTorques() const;
 
   /// Returns the velocity pre-step
-  const Eigen::VectorXd& getPreStepVelocity() const;
+  const Eigen::VectorXs& getPreStepVelocity() const;
 
   /// Returns the velocity pre-LCP
-  const Eigen::VectorXd& getPreLCPVelocity() const;
+  const Eigen::VectorXs& getPreLCPVelocity() const;
 
   /// Returns the M^{-1} matrix from pre-step
-  const Eigen::MatrixXd& getMinv() const;
+  const Eigen::MatrixXs& getMinv() const;
 
   /// Get the coriolis and gravity forces
-  const Eigen::VectorXd getCoriolisAndGravityAndExternalForces(
+  const Eigen::VectorXs getCoriolisAndGravityAndExternalForces(
       simulation::WorldPtr world) const;
 
   /// This is like `getClampingConstraintMatrix()` or
   /// `getUpperBoundConstraintMatrix()`, except that it returns all the columns
   /// instead of just a subset.
-  Eigen::MatrixXd getFullConstraintMatrix(simulation::World* world) const;
+  Eigen::MatrixXs getFullConstraintMatrix(simulation::World* world) const;
 
   std::size_t getNumDOFs() const;
 
@@ -413,34 +413,34 @@ public:
 
   /// This computes and returns the jacobian of M^{-1}(pos, inertia) * tau by
   /// finite differences. This is SUPER SLOW, and is only here for testing.
-  Eigen::MatrixXd finiteDifferenceJacobianOfMinv(
+  Eigen::MatrixXs finiteDifferenceJacobianOfMinv(
       simulation::WorldPtr world,
-      Eigen::VectorXd tau,
+      Eigen::VectorXs tau,
       WithRespectTo* wrt,
       bool useRidders = false);
 
   /// This computes and returns the jacobian of M^{-1}(pos, inertia) * tau by
   /// finite differences. This is SUPER SLOW, and is only here for testing.
-  Eigen::MatrixXd finiteDifferenceRiddersJacobianOfMinv(
-      simulation::WorldPtr world, Eigen::VectorXd tau, WithRespectTo* wrt);
+  Eigen::MatrixXs finiteDifferenceRiddersJacobianOfMinv(
+      simulation::WorldPtr world, Eigen::VectorXs tau, WithRespectTo* wrt);
 
   /// This computes and returns the jacobian of C(pos, inertia, vel) by finite
   /// differences. This is SUPER SLOW, and is only here for testing.
-  Eigen::MatrixXd finiteDifferenceJacobianOfC(
+  Eigen::MatrixXs finiteDifferenceJacobianOfC(
       simulation::WorldPtr world, WithRespectTo* wrt, bool useRidders = true);
 
   /// This computes and returns the jacobian of C(pos, inertia, vel) by finite
   /// differences. This is SUPER SLOW, and is only here for testing.
-  Eigen::MatrixXd finiteDifferenceRiddersJacobianOfC(
+  Eigen::MatrixXs finiteDifferenceRiddersJacobianOfC(
       simulation::WorldPtr world, WithRespectTo* wrt);
 
 private:
   std::size_t getWrtDim(simulation::WorldPtr world, WithRespectTo* wrt);
 
-  Eigen::VectorXd getWrt(simulation::WorldPtr world, WithRespectTo* wrt);
+  Eigen::VectorXs getWrt(simulation::WorldPtr world, WithRespectTo* wrt);
 
   void setWrt(
-      simulation::WorldPtr world, WithRespectTo* wrt, Eigen::VectorXd v);
+      simulation::WorldPtr world, WithRespectTo* wrt, Eigen::VectorXs v);
 
   /// Gets the skeletons associated with this constrained group in vector form
   std::vector<std::shared_ptr<dynamics::Skeleton>> getSkeletons(
@@ -455,10 +455,10 @@ public:
   /// which we only do if we were having problems because A is low rank.
   /// Applying CFM amounts to softening the contact constraints on this
   /// timestep.
-  double mConstraintForceMixingConstant;
+  s_t mConstraintForceMixingConstant;
 
   bool mConstraintForceMixingDiagonalDirty;
-  Eigen::VectorXd mConstraintForceMixingDiagonal;
+  Eigen::VectorXs mConstraintForceMixingDiagonal;
 
   /// This flag gets set if we needed to ignore the friction indices in order to
   /// solve the LCP. This can happen because boxed LCPs that we use to solve
@@ -467,66 +467,66 @@ public:
 
   /// Impulse test matrix for all the constraints (only initialized in debug
   /// mode)
-  Eigen::MatrixXd mAllConstraintMatrix;
+  Eigen::MatrixXs mAllConstraintMatrix;
 
   /// Impulse test matrix for the clamping constraints
-  Eigen::MatrixXd mClampingConstraintMatrix;
+  Eigen::MatrixXs mClampingConstraintMatrix;
 
   /// Massed impulse test matrix for the clamping constraints
-  Eigen::MatrixXd mMassedClampingConstraintMatrix;
+  Eigen::MatrixXs mMassedClampingConstraintMatrix;
 
   /// Impulse test matrix for the upper bound constraints
-  Eigen::MatrixXd mUpperBoundConstraintMatrix;
+  Eigen::MatrixXs mUpperBoundConstraintMatrix;
 
   /// Massed impulse test matrix for the upper bound constraints
-  Eigen::MatrixXd mMassedUpperBoundConstraintMatrix;
+  Eigen::MatrixXs mMassedUpperBoundConstraintMatrix;
 
   /// Mapping matrix for upper bound constraints
-  Eigen::MatrixXd mUpperBoundMappingMatrix;
+  Eigen::MatrixXs mUpperBoundMappingMatrix;
 
   /// Impulse test matrix for the bouncing constraints
-  Eigen::MatrixXd mBouncingConstraintMatrix;
+  Eigen::MatrixXs mBouncingConstraintMatrix;
 
   /// This is the vector of the coefficients on the diagonal of the bounce
   /// matrix. These are 1+restitutionCoeff[i]
-  Eigen::VectorXd mBounceDiagonals;
+  Eigen::VectorXs mBounceDiagonals;
 
   /// This is the vector of the coefficients sized for just the bounces.
-  Eigen::VectorXd mRestitutionDiagonals;
+  Eigen::VectorXs mRestitutionDiagonals;
 
   /// This is the vector of velocity changes due to any impulses from the LCP
   /// solver that are illegal (out of their legal bounds).
-  Eigen::VectorXd mVelocityDueToIllegalImpulses;
+  Eigen::VectorXs mVelocityDueToIllegalImpulses;
 
   /// This is the vector of constraint impulses for all the clamping
   /// constraints. It's key for computing Jacobians through quantities that
   /// change the mass matrix.
-  Eigen::VectorXd mClampingConstraintImpulses;
+  Eigen::VectorXs mClampingConstraintImpulses;
 
   /// This is just useful for testing the gradient computations
-  Eigen::VectorXd mClampingConstraintRelativeVels;
+  Eigen::VectorXs mClampingConstraintRelativeVels;
 
   /// This is just useful for testing the gradient computations
   Eigen::VectorXi mContactConstraintMappings;
 
   /// This is just useful for testing the gradient computations
-  Eigen::VectorXd mPenetrationCorrectionVelocitiesVec;
+  Eigen::VectorXs mPenetrationCorrectionVelocitiesVec;
 
   /// This is the subset of the A matrix from the original LCP that corresponds
   /// to clamping indices.
-  Eigen::MatrixXd mClampingAMatrix;
+  Eigen::MatrixXs mClampingAMatrix;
 
   /// This is the inverse mass matrix computed in the constuctor
-  Eigen::MatrixXd mMinv;
+  Eigen::MatrixXs mMinv;
 
   /// These are the torques being applied, computed in the constuctor
-  Eigen::VectorXd mPreStepTorques;
+  Eigen::VectorXs mPreStepTorques;
 
   /// These are the pre-step velocities, computed in the constuctor
-  Eigen::VectorXd mPreStepVelocities;
+  Eigen::VectorXs mPreStepVelocities;
 
   /// These are the pre-LCP velocities, computed in the constuctor
-  Eigen::VectorXd mPreLCPVelocities;
+  Eigen::VectorXs mPreLCPVelocities;
 
   /// These are the names of skeletons that are covered by this constraint group
   std::vector<std::string> mSkeletons;
@@ -543,7 +543,7 @@ public:
 
   /// This is the global timestep length. This is included here because it shows
   /// up as a constant in some of the matrices.
-  double mTimeStep;
+  s_t mTimeStep;
 
   /// This is the total DOFs for this ConstrainedGroup
   std::size_t mNumDOFs;
@@ -581,28 +581,28 @@ public:
 public:
   /// This holds the coefficient of restitution for each constraint on this
   /// group.
-  std::vector<double> mRestitutionCoeffs;
+  std::vector<s_t> mRestitutionCoeffs;
 
   /// This holds the penetration correction velocities for each constraint in
   /// this group.
-  std::vector<double> mPenetrationCorrectionVelocities;
+  std::vector<s_t> mPenetrationCorrectionVelocities;
 
   /// These are all the values from the original LCP
-  Eigen::VectorXd mX;
-  Eigen::VectorXd mHi;
-  Eigen::VectorXd mLo;
+  Eigen::VectorXs mX;
+  Eigen::VectorXs mHi;
+  Eigen::VectorXs mLo;
   Eigen::VectorXi mFIndex;
-  Eigen::VectorXd mB;
-  Eigen::VectorXd mAColNorms;
-  Eigen::MatrixXd mA;
+  Eigen::VectorXs mB;
+  Eigen::VectorXs mAColNorms;
+  Eigen::MatrixXs mA;
 
   /// These are values from our stabilization, for debugging
   // TODO: <remove>
-  Eigen::VectorXd mStabilizationPos;
-  Eigen::VectorXd mStabilizationVel;
+  Eigen::VectorXs mStabilizationPos;
+  Eigen::VectorXs mStabilizationVel;
   // TODO: </remove>
-  Eigen::MatrixXd mStabilizationQ;
-  Eigen::VectorXd mStabilizationB;
+  Eigen::MatrixXs mStabilizationQ;
+  Eigen::VectorXs mStabilizationB;
 
   /// This holds the outputs of the impulse tests we run to create the
   /// constraint matrices. We shuffle these vectors into the columns of
@@ -611,7 +611,7 @@ public:
   ///
   /// mImpulseTests[k] holds the k'th constraint's impulse test, which is
   /// a concatenated vector of the results for each skeleton in the group.
-  std::vector<Eigen::VectorXd> mMassedImpulseTests;
+  std::vector<Eigen::VectorXs> mMassedImpulseTests;
 };
 
 } // namespace neural

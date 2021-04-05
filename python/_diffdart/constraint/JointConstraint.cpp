@@ -51,48 +51,48 @@ void JointConstraint(py::module& m)
       std::shared_ptr<dart::constraint::JointConstraint>>(m, "JointConstraint")
       .def_static(
           "setErrorAllowance",
-          +[](double _allowance) {
+          +[](s_t _allowance) {
             dart::constraint::JointConstraint::setErrorAllowance(_allowance);
           },
           ::py::arg("allowance"))
       .def_static(
           "getErrorAllowance",
-          +[]() -> double {
+          +[]() -> s_t {
             return dart::constraint::JointConstraint::getErrorAllowance();
           })
       .def_static(
           "setErrorReductionParameter",
-          +[](double _erp) {
+          +[](s_t _erp) {
             dart::constraint::JointConstraint::setErrorReductionParameter(_erp);
           },
           ::py::arg("erp"))
       .def_static(
           "getErrorReductionParameter",
-          +[]() -> double {
+          +[]() -> s_t {
             return dart::constraint::JointConstraint::
                 getErrorReductionParameter();
           })
       .def_static(
           "setMaxErrorReductionVelocity",
-          +[](double _erv) {
+          +[](s_t _erv) {
             dart::constraint::JointConstraint::setMaxErrorReductionVelocity(
                 _erv);
           },
           ::py::arg("erv"))
       .def_static(
           "getMaxErrorReductionVelocity",
-          +[]() -> double {
+          +[]() -> s_t {
             return dart::constraint::JointConstraint::
                 getMaxErrorReductionVelocity();
           })
       .def_static(
           "setConstraintForceMixing",
-          +[](double _cfm) {
+          +[](s_t _cfm) {
             dart::constraint::JointConstraint::setConstraintForceMixing(_cfm);
           },
           ::py::arg("cfm"))
       .def_static(
-          "getConstraintForceMixing", +[]() -> double {
+          "getConstraintForceMixing", +[]() -> s_t {
             return dart::constraint::JointConstraint::
                 getConstraintForceMixing();
           });
@@ -103,14 +103,14 @@ void JointConstraint(py::module& m)
       std::shared_ptr<dart::constraint::BallJointConstraint>>(
       m, "BallJointConstraint")
       .def(
-          ::py::init<dart::dynamics::BodyNode*, const Eigen::Vector3d&>(),
+          ::py::init<dart::dynamics::BodyNode*, const Eigen::Vector3s&>(),
           ::py::arg("body"),
           ::py::arg("jointPos"))
       .def(
           ::py::init<
               dart::dynamics::BodyNode*,
               dart::dynamics::BodyNode*,
-              const Eigen::Vector3d&>(),
+              const Eigen::Vector3s&>(),
           ::py::arg("body1"),
           ::py::arg("body2"),
           ::py::arg("jointPos"));
@@ -128,7 +128,7 @@ void JointConstraint(py::module& m)
       .def(
           "setRelativeTransform",
           +[](dart::constraint::WeldJointConstraint* self,
-              const Eigen::Isometry3d& _tf) {
+              const Eigen::Isometry3s& _tf) {
             self->setRelativeTransform(_tf);
           },
           ::py::arg("tf"));

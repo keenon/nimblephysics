@@ -45,10 +45,10 @@
 namespace dart {
 namespace constraint {
 
-double JointConstraint::mErrorAllowance            = DART_ERROR_ALLOWANCE;
-double JointConstraint::mErrorReductionParameter   = DART_ERP;
-double JointConstraint::mMaxErrorReductionVelocity = DART_MAX_ERV;
-double JointConstraint::mConstraintForceMixing     = DART_CFM;
+s_t JointConstraint::mErrorAllowance            = DART_ERROR_ALLOWANCE;
+s_t JointConstraint::mErrorReductionParameter   = DART_ERP;
+s_t JointConstraint::mMaxErrorReductionVelocity = DART_MAX_ERV;
+s_t JointConstraint::mConstraintForceMixing     = DART_CFM;
 
 //==============================================================================
 JointConstraint::JointConstraint(dynamics::BodyNode* _body)
@@ -76,7 +76,7 @@ JointConstraint::~JointConstraint()
 }
 
 //==============================================================================
-void JointConstraint::setErrorAllowance(double _allowance)
+void JointConstraint::setErrorAllowance(s_t _allowance)
 {
   // Clamp error reduction parameter if it is out of the range
   if (_allowance < 0.0)
@@ -91,13 +91,13 @@ void JointConstraint::setErrorAllowance(double _allowance)
 }
 
 //==============================================================================
-double JointConstraint::getErrorAllowance()
+s_t JointConstraint::getErrorAllowance()
 {
   return mErrorAllowance;
 }
 
 //==============================================================================
-void JointConstraint::setErrorReductionParameter(double _erp)
+void JointConstraint::setErrorReductionParameter(s_t _erp)
 {
   // Clamp error reduction parameter if it is out of the range [0, 1]
   if (_erp < 0.0)
@@ -117,13 +117,13 @@ void JointConstraint::setErrorReductionParameter(double _erp)
 }
 
 //==============================================================================
-double JointConstraint::getErrorReductionParameter()
+s_t JointConstraint::getErrorReductionParameter()
 {
   return mErrorReductionParameter;
 }
 
 //==============================================================================
-void JointConstraint::setMaxErrorReductionVelocity(double _erv)
+void JointConstraint::setMaxErrorReductionVelocity(s_t _erv)
 {
   // Clamp maximum error reduction velocity if it is out of the range
   if (_erv < 0.0)
@@ -138,13 +138,13 @@ void JointConstraint::setMaxErrorReductionVelocity(double _erv)
 }
 
 //==============================================================================
-double JointConstraint::getMaxErrorReductionVelocity()
+s_t JointConstraint::getMaxErrorReductionVelocity()
 {
   return mMaxErrorReductionVelocity;
 }
 
 //==============================================================================
-void JointConstraint::setConstraintForceMixing(double _cfm)
+void JointConstraint::setConstraintForceMixing(s_t _cfm)
 {
   // Clamp constraint force mixing parameter if it is out of the range
   if (_cfm < 1e-9)
@@ -164,7 +164,7 @@ void JointConstraint::setConstraintForceMixing(double _cfm)
 }
 
 //==============================================================================
-double JointConstraint::getConstraintForceMixing()
+s_t JointConstraint::getConstraintForceMixing()
 {
   return mConstraintForceMixing;
 }

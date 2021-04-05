@@ -9,6 +9,8 @@
 #include <unordered_map>
 #include <vector>
 
+#include "dart/math/MathTypes.hpp"
+
 // Comment this out to disable performance logging in other parts of the code
 #define LOG_PERFORMANCE
 
@@ -34,7 +36,9 @@ public:
 
   int getNumRuns();
 
-  double getMeanRuntime();
+  s_t getMeanRuntime();
+
+  uint64_t getTotalRuntime();
 
   /// This will print the results in human readable format, which we can pipe to
   /// a file or to std::out
@@ -54,7 +58,7 @@ protected:
   void recursivePrettyPrint(
       int tabs,
       long parentTotalCycles,
-      double parentPercentage,
+      s_t parentPercentage,
       std::stringstream& stream);
 };
 

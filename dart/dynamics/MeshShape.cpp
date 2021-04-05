@@ -35,17 +35,17 @@
 #include <limits>
 #include <string>
 
-#include <assimp/Importer.hpp>
-#include <assimp/postprocess.h>
-#include <assimp/cimport.h>
-#include <assimp/Logger.hpp>
 #include <assimp/DefaultLogger.hpp>
+#include <assimp/Importer.hpp>
 #include <assimp/LogStream.hpp>
+#include <assimp/Logger.hpp>
+#include <assimp/cimport.h>
+#include <assimp/postprocess.h>
 
-#include "dart/config.hpp"
 #include "dart/common/Console.hpp"
 #include "dart/common/LocalResourceRetriever.hpp"
 #include "dart/common/Uri.hpp"
+#include "dart/config.hpp"
 #include "dart/dynamics/AssimpInputResourceAdaptor.hpp"
 #include "dart/dynamics/BoxShape.hpp"
 
@@ -67,44 +67,43 @@ aiScene::aiScene()
     mNumCameras(0),
     mCameras(nullptr)
 {
-
 }
 
 aiScene::~aiScene()
 {
   delete mRootNode;
 
-  if(mNumMeshes && mMeshes)
-    for(std::size_t a=0; a<mNumMeshes; ++a)
+  if (mNumMeshes && mMeshes)
+    for (std::size_t a = 0; a < mNumMeshes; ++a)
       delete mMeshes[a];
   delete[] mMeshes;
 
-  if(mNumMaterials && mMaterials)
-    for(std::size_t a=0; a<mNumMaterials; ++a)
+  if (mNumMaterials && mMaterials)
+    for (std::size_t a = 0; a < mNumMaterials; ++a)
       delete mMaterials[a];
   delete[] mMaterials;
 
-  if(mNumAnimations && mAnimations)
-    for(std::size_t a=0; a<mNumAnimations; ++a)
+  if (mNumAnimations && mAnimations)
+    for (std::size_t a = 0; a < mNumAnimations; ++a)
       delete mAnimations[a];
   delete[] mAnimations;
 
-  if(mNumTextures && mTextures)
-    for(std::size_t a=0; a<mNumTextures; ++a)
+  if (mNumTextures && mTextures)
+    for (std::size_t a = 0; a < mNumTextures; ++a)
       delete mTextures[a];
   delete[] mTextures;
 
-  if(mNumLights && mLights)
-    for(std::size_t a=0; a<mNumLights; ++a)
+  if (mNumLights && mLights)
+    for (std::size_t a = 0; a < mNumLights; ++a)
       delete mLights[a];
   delete[] mLights;
 
-  if(mNumCameras && mCameras)
-    for(std::size_t a=0; a<mNumCameras; ++a)
+  if (mNumCameras && mCameras)
+    for (std::size_t a = 0; a < mNumCameras; ++a)
       delete mCameras[a];
   delete[] mCameras;
 }
-#endif  // #if !(ASSIMP_AISCENE_CTOR_DTOR_DEFINED)
+#endif // #if !(ASSIMP_AISCENE_CTOR_DTOR_DEFINED)
 
 // We define our own constructor and destructor for aiMaterial, because it seems
 // to be missing from the standard assimp library (see #451)
@@ -114,40 +113,39 @@ aiMaterial::aiMaterial()
   mNumProperties = 0;
   mNumAllocated = 5;
   mProperties = new aiMaterialProperty*[5];
-  for(std::size_t i=0; i<5; ++i)
+  for (std::size_t i = 0; i < 5; ++i)
     mProperties[i] = nullptr;
 }
 
 aiMaterial::~aiMaterial()
 {
-  for(std::size_t i=0; i<mNumProperties; ++i)
+  for (std::size_t i = 0; i < mNumProperties; ++i)
     delete mProperties[i];
 
   delete[] mProperties;
 }
-#endif  // #if !(ASSIMP_AIMATERIAL_CTOR_DTOR_DEFINED)
+#endif // #if !(ASSIMP_AIMATERIAL_CTOR_DTOR_DEFINED)
 
 // Example stream
-class AssimpStream :
-        public Assimp::LogStream
+class AssimpStream : public Assimp::LogStream
 {
 public:
-        // Constructor
-        AssimpStream()
-        {
-                // empty
-        }
-        
-        // Destructor
-        ~AssimpStream()
-        {
-                // empty
-        }
-        // Write womethink using your own functionality
-        void write(const char* message)
-        {
-                ::printf("%s\n", message);
-        }
+  // Constructor
+  AssimpStream()
+  {
+    // empty
+  }
+
+  // Destructor
+  ~AssimpStream()
+  {
+    // empty
+  }
+  // Write womethink using your own functionality
+  void write(const char* message)
+  {
+    ::printf("%s\n", message);
+  }
 };
 
 namespace dart {
@@ -155,10 +153,10 @@ namespace dynamics {
 
 //==============================================================================
 MeshShape::MeshShape(
-    const Eigen::Vector3d& scale,
+    const Eigen::Vector3s& scale,
     const aiScene* mesh,
     const common::Uri& path,
-    common::ResourceRetrieverPtr resourceRetriever, 
+    common::ResourceRetrieverPtr resourceRetriever,
     bool dontFreeMesh)
   : Shape(MESH),
     mDisplayList(0),
@@ -174,7 +172,8 @@ MeshShape::MeshShape(
 //==============================================================================
 MeshShape::~MeshShape()
 {
-  if (mDontFreeMesh) return;
+  if (mDontFreeMesh)
+    return;
   aiReleaseImport(mMesh);
 }
 
@@ -229,17 +228,18 @@ common::ResourceRetrieverPtr MeshShape::getResourceRetriever()
 
 //==============================================================================
 void MeshShape::setMesh(
-  const aiScene* mesh, const std::string& path,
-  common::ResourceRetrieverPtr resourceRetriever)
+    const aiScene* mesh,
+    const std::string& path,
+    common::ResourceRetrieverPtr resourceRetriever)
 {
   setMesh(mesh, common::Uri(path), std::move(resourceRetriever));
 }
 
 //==============================================================================
 void MeshShape::setMesh(
-  const aiScene* mesh,
-  const common::Uri& uri,
-  common::ResourceRetrieverPtr resourceRetriever)
+    const aiScene* mesh,
+    const common::Uri& uri,
+    common::ResourceRetrieverPtr resourceRetriever)
 {
   mMesh = mesh;
 
@@ -264,7 +264,7 @@ void MeshShape::setMesh(
 }
 
 //==============================================================================
-void MeshShape::setScale(const Eigen::Vector3d& scale)
+void MeshShape::setScale(const Eigen::Vector3s& scale)
 {
   assert((scale.array() > 0.0).all());
 
@@ -276,7 +276,7 @@ void MeshShape::setScale(const Eigen::Vector3d& scale)
 }
 
 //==============================================================================
-const Eigen::Vector3d& MeshShape::getScale() const
+const Eigen::Vector3s& MeshShape::getScale() const
 {
   return mScale;
 }
@@ -330,7 +330,7 @@ void MeshShape::setDisplayList(int index)
 }
 
 //==============================================================================
-Eigen::Matrix3d MeshShape::computeInertia(double _mass) const
+Eigen::Matrix3s MeshShape::computeInertia(s_t _mass) const
 {
   // Use bounding box to represent the mesh
   return BoxShape::computeInertia(getBoundingBox().computeFullExtents(), _mass);
@@ -341,18 +341,18 @@ void MeshShape::updateBoundingBox() const
 {
   if (!mMesh)
   {
-    mBoundingBox.setMin(Eigen::Vector3d::Zero());
-    mBoundingBox.setMax(Eigen::Vector3d::Zero());
+    mBoundingBox.setMin(Eigen::Vector3s::Zero());
+    mBoundingBox.setMax(Eigen::Vector3s::Zero());
     mIsBoundingBoxDirty = false;
     return;
   }
 
-  double max_X = -std::numeric_limits<double>::infinity();
-  double max_Y = -std::numeric_limits<double>::infinity();
-  double max_Z = -std::numeric_limits<double>::infinity();
-  double min_X = std::numeric_limits<double>::infinity();
-  double min_Y = std::numeric_limits<double>::infinity();
-  double min_Z = std::numeric_limits<double>::infinity();
+  s_t max_X = -std::numeric_limits<s_t>::infinity();
+  s_t max_Y = -std::numeric_limits<s_t>::infinity();
+  s_t max_Z = -std::numeric_limits<s_t>::infinity();
+  s_t min_X = std::numeric_limits<s_t>::infinity();
+  s_t min_Y = std::numeric_limits<s_t>::infinity();
+  s_t min_Z = std::numeric_limits<s_t>::infinity();
 
   for (unsigned int i = 0; i < mMesh->mNumMeshes; i++)
   {
@@ -372,8 +372,10 @@ void MeshShape::updateBoundingBox() const
         min_Z = mMesh->mMeshes[i]->mVertices[j].z;
     }
   }
-  mBoundingBox.setMin(Eigen::Vector3d(min_X * mScale[0], min_Y * mScale[1], min_Z * mScale[2]));
-  mBoundingBox.setMax(Eigen::Vector3d(max_X * mScale[0], max_Y * mScale[1], max_Z * mScale[2]));
+  mBoundingBox.setMin(
+      Eigen::Vector3s(min_X * mScale[0], min_Y * mScale[1], min_Z * mScale[2]));
+  mBoundingBox.setMax(
+      Eigen::Vector3s(max_X * mScale[0], max_Y * mScale[1], max_Z * mScale[2]));
 
   mIsBoundingBoxDirty = false;
 }
@@ -381,21 +383,21 @@ void MeshShape::updateBoundingBox() const
 //==============================================================================
 void MeshShape::updateVolume() const
 {
-  const Eigen::Vector3d bounds = getBoundingBox().computeFullExtents();
+  const Eigen::Vector3s bounds = getBoundingBox().computeFullExtents();
   mVolume = bounds.x() * bounds.y() * bounds.z();
   mIsVolumeDirty = false;
 }
 
 //==============================================================================
-const aiScene* MeshShape::loadMesh(const std::string& _uri, const common::ResourceRetrieverPtr& retriever)
+const aiScene* MeshShape::loadMesh(
+    const std::string& _uri, const common::ResourceRetrieverPtr& retriever)
 {
   // Remove points and lines from the import.
   aiPropertyStore* propertyStore = aiCreatePropertyStore();
-  aiSetImportPropertyInteger(propertyStore,
-    AI_CONFIG_PP_SBP_REMOVE,
-      aiPrimitiveType_POINT
-    | aiPrimitiveType_LINE
-  );
+  aiSetImportPropertyInteger(
+      propertyStore,
+      AI_CONFIG_PP_SBP_REMOVE,
+      aiPrimitiveType_POINT | aiPrimitiveType_LINE);
 
   // Wrap ResourceRetriever in an IOSystem from Assimp's C++ API.  Then wrap
   // the IOSystem in an aiFileIO from Assimp's C API. Yes, this API is
@@ -404,37 +406,39 @@ const aiScene* MeshShape::loadMesh(const std::string& _uri, const common::Resour
   aiFileIO fileIO = createFileIO(&systemIO);
 
   /*
-  // Uncomment this code and the block below the aiImportFileExWithProperties() call to get full ASSIMP logging
-  // Create a logger instance 
+  // Uncomment this code and the block below the aiImportFileExWithProperties()
+  call to get full ASSIMP logging
+  // Create a logger instance
   Assimp::DefaultLogger::create("",Assimp::Logger::VERBOSE);
-  Assimp::DefaultLogger::get()->attachStream( new AssimpStream(), Assimp::Logger::ErrorSeverity::Debugging | Assimp::Logger::ErrorSeverity::Info | Assimp::Logger::ErrorSeverity::Warn | Assimp::Logger::ErrorSeverity::Err);
+  Assimp::DefaultLogger::get()->attachStream( new AssimpStream(),
+  Assimp::Logger::ErrorSeverity::Debugging | Assimp::Logger::ErrorSeverity::Info
+  | Assimp::Logger::ErrorSeverity::Warn | Assimp::Logger::ErrorSeverity::Err);
   */
 
   // Import the file.
   const aiScene* scene = aiImportFileExWithProperties(
-    _uri.c_str(), 
-      aiProcess_GenNormals
-    | aiProcess_Triangulate
-    | aiProcess_JoinIdenticalVertices
-    | aiProcess_SortByPType
-    | aiProcess_OptimizeMeshes
-    | aiProcess_ValidateDataStructure,
-    &fileIO,
-    propertyStore
-  );
+      _uri.c_str(),
+      aiProcess_GenNormals | aiProcess_Triangulate
+          | aiProcess_JoinIdenticalVertices | aiProcess_SortByPType
+          | aiProcess_OptimizeMeshes | aiProcess_ValidateDataStructure,
+      &fileIO,
+      propertyStore);
 
   /*
-  // Uncomment this code and the block above the aiImportFileExWithProperties() call to get full ASSIMP logging
+  // Uncomment this code and the block above the aiImportFileExWithProperties()
+  call to get full ASSIMP logging
   // Clean up the global logger, since we create it fresh with every call
   Assimp::DefaultLogger::kill();
   */
 
   // If succeeded, store the importer in the scene to keep it alive. This is
   // necessary because the importer owns the memory that it allocates.
-  if(!scene)
+  if (!scene)
   {
-    dtwarn << "[MeshShape::loadMesh] Failed loading mesh '" << _uri << "' with ASSIMP error '" << std::string(aiGetErrorString()) << "'.\n";
-    
+    dtwarn << "[MeshShape::loadMesh] Failed loading mesh '" << _uri
+           << "' with ASSIMP error '" << std::string(aiGetErrorString())
+           << "'.\n";
+
     aiReleasePropertyStore(propertyStore);
     return nullptr;
   }
@@ -446,19 +450,22 @@ const aiScene* MeshShape::loadMesh(const std::string& _uri, const common::Resour
   // into to figure out whether they are collada files.
   std::string extension;
   const std::size_t extensionIndex = _uri.find_last_of('.');
-  if(extensionIndex != std::string::npos)
+  if (extensionIndex != std::string::npos)
     extension = _uri.substr(extensionIndex);
 
-  std::transform(std::begin(extension), std::end(extension),
-                 std::begin(extension), ::tolower);
+  std::transform(
+      std::begin(extension),
+      std::end(extension),
+      std::begin(extension),
+      ::tolower);
 
-  if(extension == ".dae" || extension == ".zae")
+  if (extension == ".dae" || extension == ".zae")
     scene->mRootNode->mTransformation = aiMatrix4x4();
 
   // Finally, pre-transform the vertices. We can't do this as part of the
   // import process, because we may have changed mTransformation above.
   scene = aiApplyPostProcessing(scene, aiProcess_PreTransformVertices);
-  if(!scene)
+  if (!scene)
     dtwarn << "[MeshShape::loadMesh] Failed pre-transforming vertices.\n";
 
   aiReleasePropertyStore(propertyStore);
@@ -480,5 +487,5 @@ const aiScene* MeshShape::loadMesh(const std::string& filePath)
   return loadMesh("file://" + filePath, retriever);
 }
 
-}  // namespace dynamics
-}  // namespace dart
+} // namespace dynamics
+} // namespace dart

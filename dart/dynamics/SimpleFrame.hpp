@@ -57,7 +57,7 @@ public:
   /// Constructor
   explicit SimpleFrame(Frame* _refFrame = Frame::World(),
     const std::string& _name = "simple_frame",
-    const Eigen::Isometry3d& _relativeTransform = Eigen::Isometry3d::Identity());
+    const Eigen::Isometry3s& _relativeTransform = Eigen::Isometry3s::Identity());
 
   /// Copy constructor. Note that the parent frame of _otherFrame will not be
   /// copied as the reference frame for the newly created SimpleFrame.
@@ -98,42 +98,42 @@ public:
   /// store it, it will automatically be destroyed.
   std::shared_ptr<SimpleFrame> spawnChildSimpleFrame(
       const std::string& name = "SimpleFrame",
-      const Eigen::Isometry3d& relativeTransform
-          = Eigen::Isometry3d::Identity());
+      const Eigen::Isometry3s& relativeTransform
+          = Eigen::Isometry3s::Identity());
 
   //--------------------------------------------------------------------------
   // Transform
   //--------------------------------------------------------------------------
 
   /// Set the relative transform of this SimpleFrame
-  void setRelativeTransform(const Eigen::Isometry3d& _newRelTransform);
+  void setRelativeTransform(const Eigen::Isometry3s& _newRelTransform);
 
   /// Set the relative translation of this SimpleFrame
-  void setRelativeTranslation(const Eigen::Vector3d& _newTranslation);
+  void setRelativeTranslation(const Eigen::Vector3s& _newTranslation);
 
   /// Set the relative rotation of this SimpleFrame
-  void setRelativeRotation(const Eigen::Matrix3d& _newRotation);
+  void setRelativeRotation(const Eigen::Matrix3s& _newRotation);
 
   /// Set the transform of this SimpleFrame so that its transform with respect
   /// to Frame _withRespectTo is equal to _newTransform. Note that the parent
   /// Frame of this SimpleFrame will not be changed.
-  void setTransform(const Eigen::Isometry3d& _newTransform,
+  void setTransform(const Eigen::Isometry3s& _newTransform,
                     const Frame* _withRespectTo = Frame::World());
 
   /// Set the translation of this SimpleFrame so that its translation with
   /// respect to Frame _withRespectTo is equal to _newTranslation. Note that the
   /// parent Frame of this SimpleFrame will not be changed.
-  void setTranslation(const Eigen::Vector3d& _newTranslation,
+  void setTranslation(const Eigen::Vector3s& _newTranslation,
                       const Frame* _withRespectTo = Frame::World());
 
   /// Set the rotation of this SimpleFrame so that its rotation with respect
   /// to Frame _withRespectTo is equal to _newRotation. Note that the parent
   /// Frame of this SimpleFrame will not be changed.
-  void setRotation(const Eigen::Matrix3d& _newRotation,
+  void setRotation(const Eigen::Matrix3s& _newRotation,
                    const Frame* _withRespectTo = Frame::World());
 
   // Documentation inherited
-  const Eigen::Isometry3d& getRelativeTransform() const override;
+  const Eigen::Isometry3s& getRelativeTransform() const override;
 
   //--------------------------------------------------------------------------
   // Velocity
@@ -147,18 +147,18 @@ public:
   ///
   /// Use setClassicDerivatives to set the velocity according to classic
   /// relative linear and angular velocity values.
-  void setRelativeSpatialVelocity(const Eigen::Vector6d& _newSpatialVelocity);
+  void setRelativeSpatialVelocity(const Eigen::Vector6s& _newSpatialVelocity);
 
   /// Set the spatial velocity of this SimpleFrame relative to its parent Frame.
   /// Specify the coordinate Frame of _newSpatialVelocity.
   ///
   /// Use setClassicDerivatives to set the velocity according to classic
   /// relative linear and angular velocity values.
-  void setRelativeSpatialVelocity(const Eigen::Vector6d& _newSpatialVelocity,
+  void setRelativeSpatialVelocity(const Eigen::Vector6s& _newSpatialVelocity,
                                   const Frame* _inCoordinatesOf);
 
   // Documentation inherited
-  const Eigen::Vector6d& getRelativeSpatialVelocity() const override;
+  const Eigen::Vector6s& getRelativeSpatialVelocity() const override;
 
   //--------------------------------------------------------------------------
   // Acceleration
@@ -170,22 +170,22 @@ public:
   /// This is the most computationally efficient way of setting relative
   /// acceleration.
   void setRelativeSpatialAcceleration(
-      const Eigen::Vector6d& _newSpatialAcceleration);
+      const Eigen::Vector6s& _newSpatialAcceleration);
 
   /// Set the spatial acceleration of this SimpleFrame relative to its parent
   /// Frame. Specify the coordinate Frame of _newSpatialAcceleration.
   void setRelativeSpatialAcceleration(
-      const Eigen::Vector6d& _newSpatialAcceleration,
+      const Eigen::Vector6s& _newSpatialAcceleration,
       const Frame* _inCoordinatesOf);
 
   // Documentation inherited
-  const Eigen::Vector6d& getRelativeSpatialAcceleration() const override;
+  const Eigen::Vector6s& getRelativeSpatialAcceleration() const override;
 
   // Documentation inherited
-  const Eigen::Vector6d& getPrimaryRelativeAcceleration() const override;
+  const Eigen::Vector6s& getPrimaryRelativeAcceleration() const override;
 
   // Documentation inherited
-  const Eigen::Vector6d& getPartialAcceleration() const override;
+  const Eigen::Vector6s& getPartialAcceleration() const override;
 
   //--------------------------------------------------------------------------
   // Classic Method
@@ -205,10 +205,10 @@ public:
   ///
   /// These values are equivalent to the terms in the Newton-Euler
   void setClassicDerivatives(
-      const Eigen::Vector3d& _linearVelocity      = Eigen::Vector3d::Zero(),
-      const Eigen::Vector3d& _angularVelocity     = Eigen::Vector3d::Zero(),
-      const Eigen::Vector3d& _linearAcceleration  = Eigen::Vector3d::Zero(),
-      const Eigen::Vector3d& _angularAcceleration = Eigen::Vector3d::Zero());
+      const Eigen::Vector3s& _linearVelocity      = Eigen::Vector3s::Zero(),
+      const Eigen::Vector3s& _angularVelocity     = Eigen::Vector3s::Zero(),
+      const Eigen::Vector3s& _linearAcceleration  = Eigen::Vector3s::Zero(),
+      const Eigen::Vector3s& _angularAcceleration = Eigen::Vector3s::Zero());
 
 protected:
 
@@ -216,16 +216,16 @@ protected:
   std::string mName;
 
   /// Relative transform of the SimpleFrame
-  Eigen::Isometry3d mRelativeTf;
+  Eigen::Isometry3s mRelativeTf;
 
   /// Relative spatial velocity of the SimpleFrame
-  Eigen::Vector6d mRelativeVelocity;
+  Eigen::Vector6s mRelativeVelocity;
 
   /// Relative spatial acceleration of the SimpleFrame
-  Eigen::Vector6d mRelativeAcceleration;
+  Eigen::Vector6s mRelativeAcceleration;
 
   /// Partial Acceleration of this Frame
-  mutable Eigen::Vector6d mPartialAcceleration;
+  mutable Eigen::Vector6s mPartialAcceleration;
 
 public:
   // To get byte-aligned Eigen vectors

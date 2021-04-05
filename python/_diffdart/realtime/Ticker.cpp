@@ -14,7 +14,7 @@ void Ticker(py::module& m)
 {
   ::py::class_<dart::realtime::Ticker, std::shared_ptr<dart::realtime::Ticker>>(
       m, "Ticker")
-      .def(::py::init<double>(), ::py::arg("secondsPerTick"))
+      .def(::py::init<s_t>(), ::py::arg("secondsPerTick"))
       .def(
           "registerTickListener",
           +[](dart::realtime::Ticker* self,

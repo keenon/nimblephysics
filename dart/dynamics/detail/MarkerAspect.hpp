@@ -49,11 +49,11 @@ struct MarkerProperties
     SOFT
   };
 
-  Eigen::Vector4d mColor;
+  Eigen::Vector4s mColor;
   ConstraintType mType;
 
   MarkerProperties(
-      const Eigen::Vector4d& color = Color::White(1.0),
+      const Eigen::Vector4s& color = Color::White(1.0),
       ConstraintType type = NO);
 
   // To get byte-aligned Eigen vectors

@@ -37,6 +37,7 @@
 #include "dart/common/Uri.hpp"
 #include "dart/math/Constants.hpp"
 #include "dart/dynamics/Skeleton.hpp"
+#include "dart/math/MathTypes.hpp"
 
 namespace dart {
 namespace utils {
@@ -56,41 +57,41 @@ namespace VskParser
     /// each body node are determined by the relative transformation from a body
     /// node and its child body node. defaultEllipsoidSize is used for body
     /// nodes that don't have child body node.
-    Eigen::Vector3d defaultEllipsoidSize;
+    Eigen::Vector3s defaultEllipsoidSize;
 
     /// Ratio of shorter radii of each ellipsoid to the longest radius where
     /// the longest radius is the distance between a body and its child body
     /// node.
-    double thicknessRatio;
+    s_t thicknessRatio;
 
     /// Density of each ellipsoid that are used to compute mass.
-    double density;
+    s_t density;
 
     /// Lower limit of joint position
-    double jointPositionLowerLimit;
+    s_t jointPositionLowerLimit;
 
     /// Upper limit of joint position
-    double jointPositionUpperLimit;
+    s_t jointPositionUpperLimit;
 
     /// Joint damping coefficient
-    double jointDampingCoefficient;
+    s_t jointDampingCoefficient;
 
     /// Joint Coulomb friction
-    double jointFriction;
+    s_t jointFriction;
 
     /// Remove end BodyNodes with no Shape segment
     bool removeEndBodyNodes;
 
     /// Constructor
     Options(const common::ResourceRetrieverPtr& retrieverOrNullptr = nullptr,
-            const Eigen::Vector3d& defaultEllipsoidSize
-                = Eigen::Vector3d::Constant(0.05),
-            double thicknessRatio = 0.35,
-            double density = 1e+3,
-            double jointPositionLowerLimit = -math::constantsd::pi(),
-            double jointPositionUpperLimit = +math::constantsd::pi(),
-            double jointDampingCoefficient = 0.1,
-            double jointFriction = 0.0,
+            const Eigen::Vector3s& defaultEllipsoidSize
+                = Eigen::Vector3s::Constant(0.05),
+            s_t thicknessRatio = 0.35,
+            s_t density = 1e+3,
+            s_t jointPositionLowerLimit = -math::constantsd::pi(),
+            s_t jointPositionUpperLimit = +math::constantsd::pi(),
+            s_t jointDampingCoefficient = 0.1,
+            s_t jointFriction = 0.0,
             bool removeEndBodyNodes = false);
   };
 

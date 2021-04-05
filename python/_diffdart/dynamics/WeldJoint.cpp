@@ -66,13 +66,13 @@ void WeldJoint(py::module& m)
           ::py::arg("index"))
       .def(
           "setTransformFromParentBodyNode",
-          +[](dart::dynamics::WeldJoint* self, const Eigen::Isometry3d& _T) {
+          +[](dart::dynamics::WeldJoint* self, const Eigen::Isometry3s& _T) {
             self->setTransformFromParentBodyNode(_T);
           },
           ::py::arg("T"))
       .def(
           "setTransformFromChildBodyNode",
-          +[](dart::dynamics::WeldJoint* self, const Eigen::Isometry3d& _T) {
+          +[](dart::dynamics::WeldJoint* self, const Eigen::Isometry3s& _T) {
             self->setTransformFromChildBodyNode(_T);
           },
           ::py::arg("T"))

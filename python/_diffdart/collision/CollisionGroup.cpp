@@ -135,13 +135,13 @@ void CollisionGroup(py::module& m)
           ::py::arg("result"))
       .def(
           "distance",
-          +[](dart::collision::CollisionGroup* self) -> double {
+          +[](dart::collision::CollisionGroup* self) -> s_t {
             return self->distance();
           })
       .def(
           "distance",
           +[](dart::collision::CollisionGroup* self,
-              const dart::collision::DistanceOption& option) -> double {
+              const dart::collision::DistanceOption& option) -> s_t {
             return self->distance(option);
           },
           ::py::arg("option"))
@@ -149,7 +149,7 @@ void CollisionGroup(py::module& m)
           "distance",
           +[](dart::collision::CollisionGroup* self,
               const dart::collision::DistanceOption& option,
-              dart::collision::DistanceResult* result) -> double {
+              dart::collision::DistanceResult* result) -> s_t {
             return self->distance(option, result);
           },
           ::py::arg("option"),
@@ -157,8 +157,8 @@ void CollisionGroup(py::module& m)
       .def(
           "raycast",
           +[](dart::collision::CollisionGroup* self,
-              const Eigen::Vector3d& from,
-              const Eigen::Vector3d& to) -> bool {
+              const Eigen::Vector3s& from,
+              const Eigen::Vector3s& to) -> bool {
             return self->raycast(from, to);
           },
           ::py::arg("from"),
@@ -166,8 +166,8 @@ void CollisionGroup(py::module& m)
       .def(
           "raycast",
           +[](dart::collision::CollisionGroup* self,
-              const Eigen::Vector3d& from,
-              const Eigen::Vector3d& to,
+              const Eigen::Vector3s& from,
+              const Eigen::Vector3s& to,
               const dart::collision::RaycastOption& option) -> bool {
             return self->raycast(from, to, option);
           },
@@ -177,8 +177,8 @@ void CollisionGroup(py::module& m)
       .def(
           "raycast",
           +[](dart::collision::CollisionGroup* self,
-              const Eigen::Vector3d& from,
-              const Eigen::Vector3d& to,
+              const Eigen::Vector3s& from,
+              const Eigen::Vector3s& to,
               const dart::collision::RaycastOption& option,
               dart::collision::RaycastResult* result) -> bool {
             return self->raycast(from, to, option, result);

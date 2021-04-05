@@ -7,6 +7,7 @@
 #include <coin/IpSolveStatistics.hpp>
 #include <coin/IpTNLP.hpp>
 
+#include "dart/math/MathTypes.hpp"
 #include "dart/performance/PerformanceLog.hpp"
 #include "dart/realtime/Millis.hpp"
 #include "dart/trajectory/Solution.hpp"
@@ -113,12 +114,6 @@ bool IPOptShotWrapper::get_bounds_info(
       == mWrapped->getFlatProblemDim(mWrapped->mWorld));
   assert(static_cast<std::size_t>(m) == mWrapped->getConstraintDim());
 
-  // lower and upper bounds
-  Eigen::Map<Eigen::VectorXd> upperBounds(x_u, n);
-  mWrapped->getUpperBounds(mWrapped->mWorld, upperBounds, perflog);
-  Eigen::Map<Eigen::VectorXd> lowerBounds(x_l, n);
-  mWrapped->getLowerBounds(mWrapped->mWorld, lowerBounds, perflog);
-
   /*
   for (Ipopt::Index i = 0; i < n; i++)
   {
@@ -127,11 +122,40 @@ bool IPOptShotWrapper::get_bounds_info(
   }
   */
 
+#ifdef DART_USE_ARBITRARY_PRECISION
+  // lower and upper bounds
+  Eigen::VectorXs upperBoundsS = Eigen::VectorXs::Zero(n);
+  mWrapped->getUpperBounds(mWrapped->mWorld, upperBoundsS, perflog);
+  Eigen::Map<Eigen::VectorXd> upperBounds(x_u, n);
+  upperBounds = upperBounds.cast<double>();
+
+  Eigen::VectorXs lowerBoundsS = Eigen::VectorXs::Zero(n);
+  mWrapped->getLowerBounds(mWrapped->mWorld, lowerBoundsS, perflog);
+  Eigen::Map<Eigen::VectorXd> lowerBounds(x_l, n);
+  lowerBounds = lowerBoundsS.cast<double>();
+
+  // Add inequality constraint functions
+  Eigen::VectorXs constraintUpperBoundsS(n);
+  mWrapped->getConstraintUpperBounds(constraintUpperBoundsS, perflog);
+  Eigen::Map<Eigen::VectorXd> constraintUpperBounds(g_u, m);
+  constraintUpperBounds = constraintUpperBoundsS.cast<double>();
+
+  Eigen::VectorXs constraintLowerBoundsS(n);
+  mWrapped->getConstraintLowerBounds(constraintLowerBoundsS, perflog);
+  Eigen::Map<Eigen::VectorXd> constraintLowerBounds(g_l, m);
+  constraintLowerBounds = constraintLowerBoundsS.cast<double>();
+#else
+  // lower and upper bounds
+  Eigen::Map<Eigen::VectorXd> upperBounds(x_u, n);
+  mWrapped->getUpperBounds(mWrapped->mWorld, upperBounds, perflog);
+  Eigen::Map<Eigen::VectorXd> lowerBounds(x_l, n);
+  mWrapped->getLowerBounds(mWrapped->mWorld, lowerBounds, perflog);
   // Add inequality constraint functions
   Eigen::Map<Eigen::VectorXd> constraintUpperBounds(g_u, m);
   mWrapped->getConstraintUpperBounds(constraintUpperBounds, perflog);
   Eigen::Map<Eigen::VectorXd> constraintLowerBounds(g_l, m);
   mWrapped->getConstraintLowerBounds(constraintLowerBounds, perflog);
+#endif
 
 #ifdef LOG_PERFORMANCE_IPOPT
   if (perflog != nullptr)
@@ -167,7 +191,13 @@ bool IPOptShotWrapper::get_starting_point(
   if (init_x)
   {
     Eigen::Map<Eigen::VectorXd> x_vec(x, n);
+#ifdef DART_USE_ARBITRARY_PRECISION
+    Eigen::VectorXs x_vec_s = Eigen::VectorXs(n);
+    mWrapped->getInitialGuess(mWrapped->mWorld, x_vec_s, perflog);
+    x_vec = x_vec_s.cast<double>();
+#else
     mWrapped->getInitialGuess(mWrapped->mWorld, x_vec, perflog);
+#endif
   }
 
   // If init_z is true, this method must provide an initial value for the bound
@@ -229,9 +259,15 @@ bool IPOptShotWrapper::eval_f(
   if (_new_x && _n > 0)
   {
     Eigen::Map<const Eigen::VectorXd> flat(_x, _n);
+#ifdef DART_USE_ARBITRARY_PRECISION
+    Eigen::VectorXs flat_s = flat.cast<s_t>();
+    mWrapped->unflatten(mWrapped->mWorld, flat_s, perflog);
+#else
     mWrapped->unflatten(mWrapped->mWorld, flat, perflog);
+#endif
   }
-  _obj_value = mWrapped->getLoss(mWrapped->mWorld, perflog);
+  _obj_value
+      = static_cast<double>(mWrapped->getLoss(mWrapped->mWorld, perflog));
 
   if (mRecordFullDebugInfo)
   {
@@ -239,7 +275,12 @@ bool IPOptShotWrapper::eval_f(
     {
       std::cout << "  New X" << std::endl;
       Eigen::Map<const Eigen::VectorXd> flat(_x, _n);
+#ifdef DART_USE_ARBITRARY_PRECISION
+      Eigen::VectorXs flat_s = flat.cast<s_t>();
+      mRecord->registerX(flat_s);
+#else
       mRecord->registerX(flat);
+#endif
     }
     std::cout << "Loss eval " << mRecord->getLosses().size() << std::endl;
     mRecord->registerLoss(_obj_value);
@@ -278,10 +319,21 @@ bool IPOptShotWrapper::eval_grad_f(
   if (_new_x && _n > 0)
   {
     Eigen::Map<const Eigen::VectorXd> flat(_x, _n);
+#ifdef DART_USE_ARBITRARY_PRECISION
+    Eigen::VectorXs flat_s = flat.cast<s_t>();
+    mWrapped->unflatten(mWrapped->mWorld, flat_s, perflog);
+#else
     mWrapped->unflatten(mWrapped->mWorld, flat, perflog);
+#endif
   }
   Eigen::Map<Eigen::VectorXd> grad(_grad_f, _n);
+#ifdef DART_USE_ARBITRARY_PRECISION
+  Eigen::VectorXs grad_s(_n);
+  mWrapped->backpropGradient(mWrapped->mWorld, grad_s, perflog);
+  grad = grad_s.cast<double>();
+#else
   mWrapped->backpropGradient(mWrapped->mWorld, grad, perflog);
+#endif
 
   if (mRecordFullDebugInfo)
   {
@@ -289,11 +341,21 @@ bool IPOptShotWrapper::eval_grad_f(
     {
       std::cout << "  New X" << std::endl;
       Eigen::Map<const Eigen::VectorXd> flat(_x, _n);
+#ifdef DART_USE_ARBITRARY_PRECISION
+      Eigen::VectorXs flat_s = flat.cast<s_t>();
+      mRecord->registerX(flat_s);
+#else
       mRecord->registerX(flat);
+#endif
     }
     std::cout << "Gradient eval " << mRecord->getGradients().size()
               << std::endl;
+#ifdef DART_USE_ARBITRARY_PRECISION
+    Eigen::VectorXs grad_s = grad.cast<s_t>();
+    mRecord->registerGradient(grad_s);
+#else
     mRecord->registerGradient(grad);
+#endif
   }
 
 #ifdef LOG_PERFORMANCE_IPOPT
@@ -331,10 +393,21 @@ bool IPOptShotWrapper::eval_g(
   if (_new_x && _n > 0)
   {
     Eigen::Map<const Eigen::VectorXd> flat(_x, _n);
+#ifdef DART_USE_ARBITRARY_PRECISION
+    Eigen::VectorXs flat_s = flat.cast<s_t>();
+    mWrapped->unflatten(mWrapped->mWorld, flat_s, perflog);
+#else
     mWrapped->unflatten(mWrapped->mWorld, flat, perflog);
+#endif
   }
   Eigen::Map<Eigen::VectorXd> constraints(_g, _m);
+#ifdef DART_USE_ARBITRARY_PRECISION
+  Eigen::VectorXs constraints_s(_m);
+  mWrapped->computeConstraints(mWrapped->mWorld, constraints_s, perflog);
+  constraints = constraints_s.cast<double>();
+#else
   mWrapped->computeConstraints(mWrapped->mWorld, constraints, perflog);
+#endif
 
   if (mRecordFullDebugInfo)
   {
@@ -342,11 +415,21 @@ bool IPOptShotWrapper::eval_g(
     {
       std::cout << "  New X" << std::endl;
       Eigen::Map<const Eigen::VectorXd> flat(_x, _n);
+#ifdef DART_USE_ARBITRARY_PRECISION
+      Eigen::VectorXs flat_s = flat.cast<s_t>();
+      mRecord->registerX(flat_s);
+#else
       mRecord->registerX(flat);
+#endif
     }
     std::cout << "Constraint eval " << mRecord->getConstraintValues().size()
               << std::endl;
+#ifdef DART_USE_ARBITRARY_PRECISION
+    Eigen::VectorXs constraints_s = constraints.cast<s_t>();
+    mRecord->registerConstraintValues(constraints_s);
+#else
     mRecord->registerConstraintValues(constraints);
+#endif
   }
 
 #ifdef LOG_PERFORMANCE_IPOPT
@@ -420,10 +503,21 @@ bool IPOptShotWrapper::eval_jac_g(
     if (_new_x && _n > 0)
     {
       Eigen::Map<const Eigen::VectorXd> flat(_x, _n);
+#ifdef DART_USE_ARBITRARY_PRECISION
+      Eigen::VectorXs flat_s = flat.cast<s_t>();
+      mWrapped->unflatten(mWrapped->mWorld, flat_s, perflog);
+#else
       mWrapped->unflatten(mWrapped->mWorld, flat, perflog);
+#endif
     }
     Eigen::Map<Eigen::VectorXd> sparse(_values, _nnzj);
+#ifdef DART_USE_ARBITRARY_PRECISION
+    Eigen::VectorXs sparse_s(_nnzj);
+    mWrapped->getSparseJacobian(mWrapped->mWorld, sparse_s, perflog);
+    sparse = sparse_s.cast<double>();
+#else
     mWrapped->getSparseJacobian(mWrapped->mWorld, sparse, perflog);
+#endif
 
     if (mRecordFullDebugInfo)
     {
@@ -431,11 +525,21 @@ bool IPOptShotWrapper::eval_jac_g(
       {
         std::cout << "  New X" << std::endl;
         Eigen::Map<const Eigen::VectorXd> flat(_x, _n);
+#ifdef DART_USE_ARBITRARY_PRECISION
+        Eigen::VectorXs flat_s = flat.cast<s_t>();
+        mRecord->registerX(flat_s);
+#else
         mRecord->registerX(flat);
+#endif
       }
       std::cout << "Jac eval " << mRecord->getSparseJacobians().size()
                 << std::endl;
+#ifdef DART_USE_ARBITRARY_PRECISION
+      Eigen::VectorXs sparse_s = sparse.cast<s_t>();
+      mRecord->registerSparseJac(sparse_s);
+#else
       mRecord->registerSparseJac(sparse);
+#endif
     }
 
     /*
@@ -533,7 +637,12 @@ void IPOptShotWrapper::finalize_solution(
   {
     // std::cout << "Recovering best discovered state from iter " << mBestIter
     // << " with loss " << mBestFeasibleObjectiveValue << std::endl;
+#ifdef DART_USE_ARBITRARY_PRECISION
+    Eigen::VectorXs bestState_s = mBestFeasibleState.cast<s_t>();
+    mWrapped->unflatten(mWrapped->mWorld, bestState_s, perflog);
+#else
     mWrapped->unflatten(mWrapped->mWorld, mBestFeasibleState, perflog);
+#endif
   }
   /*
   const std::shared_ptr<Problem>& problem = mSolver->getProblem();
@@ -608,7 +717,13 @@ bool IPOptShotWrapper::intermediate_callback(
     mBestIter = iter;
     // Found new best feasible objective
     mBestFeasibleObjectiveValue = obj_value;
+#ifdef DART_USE_ARBITRARY_PRECISION
+    Eigen::VectorXs bestState_s(mBestFeasibleState.size());
+    mWrapped->flatten(mWrapped->mWorld, bestState_s, perflog);
+    mBestFeasibleState = bestState_s.cast<double>();
+#else
     mWrapped->flatten(mWrapped->mWorld, mBestFeasibleState, perflog);
+#endif
   }
 
   PerformanceLog* childPerflog = nullptr;
@@ -623,7 +738,11 @@ bool IPOptShotWrapper::intermediate_callback(
   bool allCallbacksReturnedTrue = true;
   for (auto& callback : mIntermediateCallbacks)
   {
-    if (!callback(mWrapped, iter, obj_value, inf_pr))
+    if (!callback(
+            mWrapped,
+            iter,
+            static_cast<s_t>(obj_value),
+            static_cast<s_t>(inf_pr)))
     {
       allCallbacksReturnedTrue = false;
     }
@@ -715,8 +834,7 @@ void IPOptShotWrapper::reset_iteration()
 /// step of optimization. If any callback returns false on a given step, then
 /// the optimizer will terminate early.
 void IPOptShotWrapper::registerIntermediateCallback(
-    std::function<bool(Problem* problem, int, double primal, double dual)>
-        callback)
+    std::function<bool(Problem* problem, int, s_t primal, s_t dual)> callback)
 {
   mIntermediateCallbacks.push_back(callback);
 }

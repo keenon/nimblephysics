@@ -98,25 +98,25 @@ public:
   const PointMassNotifier* getNotifier() const;
 
   /// \brief Get mass.
-  double getMass() const;
+  s_t getMass() const;
 
   /// \brief
-  void setVertexSpringStiffness(double _kv);
+  void setVertexSpringStiffness(s_t _kv);
 
   /// \brief
-  double getVertexSpringStiffness() const;
+  s_t getVertexSpringStiffness() const;
 
   /// \brief
-  void setEdgeSpringStiffness(double _ke);
+  void setEdgeSpringStiffness(s_t _ke);
 
   /// \brief
-  double getEdgeSpringStiffness() const;
+  s_t getEdgeSpringStiffness() const;
 
   /// \brief
-  void setDampingCoefficient(double _damp);
+  void setDampingCoefficient(s_t _damp);
 
   /// \brief
-  double getDampingCoefficient() const;
+  s_t getDampingCoefficient() const;
 
   /// \brief
   void removeAllPointMasses();
@@ -195,11 +195,11 @@ protected:
   void updatePartialAcceleration() const override;
 
   // Documentation inherited.
-  void updateArtInertia(double _timeStep) const override;
+  void updateArtInertia(s_t _timeStep) const override;
 
   // Documentation inherited.
-  void updateBiasForce(const Eigen::Vector3d& _gravity,
-                       double _timeStep) override;
+  void updateBiasForce(const Eigen::Vector3s& _gravity,
+                       s_t _timeStep) override;
 
   // Documentation inherited.
   void updateBiasImpulse() override;
@@ -215,7 +215,7 @@ protected:
 
   // Documentation inherited.
   void updateTransmittedForceID(
-      const Eigen::Vector3d& _gravity,
+      const Eigen::Vector3s& _gravity,
       bool _withExternalForces = false) override;
 
   // Documentation inherited.
@@ -225,12 +225,12 @@ protected:
   void updateTransmittedImpulse() override;
 
   // Documentation inherited.
-  void updateJointForceID(double _timeStep,
+  void updateJointForceID(s_t _timeStep,
                           bool _withDampingForces,
                           bool _withSpringForces) override;
 
   // Documentation inherited.
-  void updateJointForceFD(double _timeStep,
+  void updateJointForceFD(s_t _timeStep,
                           bool _withDampingForces,
                           bool _withSpringForces) override;
 
@@ -238,7 +238,7 @@ protected:
   void updateJointImpulseFD() override;
 
   // Documentation inherited.
-  void updateConstrainedTerms(double _timeStep) override;
+  void updateConstrainedTerms(s_t _timeStep) override;
 
   /// \}
 
@@ -250,11 +250,11 @@ protected:
   void updateMassMatrix() override;
 
   // Documentation inherited.
-  void aggregateMassMatrix(Eigen::MatrixXd& _MCol, std::size_t _col) override;
+  void aggregateMassMatrix(Eigen::MatrixXs& _MCol, std::size_t _col) override;
 
   // Documentation inherited.
-  void aggregateAugMassMatrix(Eigen::MatrixXd& _MCol, std::size_t _col,
-                              double _timeStep) override;
+  void aggregateAugMassMatrix(Eigen::MatrixXs& _MCol, std::size_t _col,
+                              s_t _timeStep) override;
 
   // Documentation inherited.
   void updateInvMassMatrix() override;
@@ -263,29 +263,29 @@ protected:
   void updateInvAugMassMatrix() override;
 
   // Documentation inherited.
-  void aggregateInvMassMatrix(Eigen::MatrixXd& _InvMCol, std::size_t _col) override;
+  void aggregateInvMassMatrix(Eigen::MatrixXs& _InvMCol, std::size_t _col) override;
 
   // Documentation inherited.
-  void aggregateInvAugMassMatrix(Eigen::MatrixXd& _InvMCol, std::size_t _col,
-                                 double _timeStep) override;
+  void aggregateInvAugMassMatrix(Eigen::MatrixXs& _InvMCol, std::size_t _col,
+                                 s_t _timeStep) override;
 
   // Documentation inherited.
   // TODO(JS): Not implemented yet.
-  void aggregateCoriolisForceVector(Eigen::VectorXd& _C) override;
+  void aggregateCoriolisForceVector(Eigen::VectorXs& _C) override;
 
   // Documentation inherited.
-  void aggregateGravityForceVector(Eigen::VectorXd& _g,
-                                   const Eigen::Vector3d& _gravity) override;
+  void aggregateGravityForceVector(Eigen::VectorXs& _g,
+                                   const Eigen::Vector3s& _gravity) override;
 
   // Documentation inherited.
   void updateCombinedVector() override;
 
   // Documentation inherited.
-  void aggregateCombinedVector(Eigen::VectorXd& _Cg,
-                               const Eigen::Vector3d& _gravity) override;
+  void aggregateCombinedVector(Eigen::VectorXs& _Cg,
+                               const Eigen::Vector3s& _gravity) override;
 
   // Documentation inherited.
-  void aggregateExternalForces(Eigen::VectorXd& _Fext) override;
+  void aggregateExternalForces(Eigen::VectorXs& _Fext) override;
 
   /// \}
 
@@ -316,11 +316,11 @@ protected:
 
 private:
   /// \brief
-  void _addPiToArtInertia(const Eigen::Vector3d& _p, double _Pi) const;
+  void _addPiToArtInertia(const Eigen::Vector3s& _p, s_t _Pi) const;
 
   /// \brief
-  void _addPiToArtInertiaImplicit(const Eigen::Vector3d& _p,
-                                  double _ImplicitPi) const;
+  void _addPiToArtInertiaImplicit(const Eigen::Vector3s& _p,
+                                  s_t _ImplicitPi) const;
 
   ///
   void updateInertiaWithPointMass();
@@ -333,35 +333,35 @@ public:
   /// Create a Properties struct for a box-shaped SoftBodyNode with 8
   /// PointMasses
   static SoftBodyNode::UniqueProperties makeBoxProperties(
-      const Eigen::Vector3d&   _size,
-      const Eigen::Isometry3d& _localTransform,
-      double                   _totalMass,
-      double                   _vertexStiffness = DART_DEFAULT_VERTEX_STIFFNESS,
-      double                   _edgeStiffness   = DART_DEFAULT_EDGE_STIFNESS,
-      double                   _dampingCoeff    = DART_DEFAULT_DAMPING_COEFF);
+      const Eigen::Vector3s&   _size,
+      const Eigen::Isometry3s& _localTransform,
+      s_t                   _totalMass,
+      s_t                   _vertexStiffness = DART_DEFAULT_VERTEX_STIFFNESS,
+      s_t                   _edgeStiffness   = DART_DEFAULT_EDGE_STIFNESS,
+      s_t                   _dampingCoeff    = DART_DEFAULT_DAMPING_COEFF);
 
   /// \brief
   /// This should be called before SoftBodyNode::init() is called
   static void setBox(SoftBodyNode*            _softBodyNode,
-      const Eigen::Vector3d&   _size,
-      const Eigen::Isometry3d& _localTransform,
-      double                   _totalMass,
-      double                   _vertexStiffness = DART_DEFAULT_VERTEX_STIFFNESS,
-      double                   _edgeStiffness   = DART_DEFAULT_EDGE_STIFNESS,
-      double                   _dampingCoeff    = DART_DEFAULT_DAMPING_COEFF);
+      const Eigen::Vector3s&   _size,
+      const Eigen::Isometry3s& _localTransform,
+      s_t                   _totalMass,
+      s_t                   _vertexStiffness = DART_DEFAULT_VERTEX_STIFFNESS,
+      s_t                   _edgeStiffness   = DART_DEFAULT_EDGE_STIFNESS,
+      s_t                   _dampingCoeff    = DART_DEFAULT_DAMPING_COEFF);
 
   /// Create a Properties struct for a box-shaped SoftBodyNode. Specify the
   /// number of vertices along each axis with _frags. Each component should be
   /// equal to or greater than 3. For example, [3 3 3] is allowed but [2 2 2] is
   /// not.
   static SoftBodyNode::UniqueProperties makeBoxProperties(
-      const Eigen::Vector3d&   _size,
-      const Eigen::Isometry3d& _localTransform,
+      const Eigen::Vector3s&   _size,
+      const Eigen::Isometry3s& _localTransform,
       const Eigen::Vector3i&   _frags,
-      double                   _totalMass,
-      double                   _vertexStiffness = DART_DEFAULT_VERTEX_STIFFNESS,
-      double                   _edgeStiffness   = DART_DEFAULT_EDGE_STIFNESS,
-      double                   _dampingCoeff    = DART_DEFAULT_DAMPING_COEFF);
+      s_t                   _totalMass,
+      s_t                   _vertexStiffness = DART_DEFAULT_VERTEX_STIFFNESS,
+      s_t                   _edgeStiffness   = DART_DEFAULT_EDGE_STIFNESS,
+      s_t                   _dampingCoeff    = DART_DEFAULT_DAMPING_COEFF);
 
   /// \brief
   /// This should be called before SoftBodyNode::init() is called
@@ -377,85 +377,85 @@ public:
   /// \param[in] _edgeStiffness
   /// \param[in] _dampingCoeff
   static void setBox(SoftBodyNode*            _softBodyNode,
-      const Eigen::Vector3d&   _size,
-      const Eigen::Isometry3d& _localTransform,
+      const Eigen::Vector3s&   _size,
+      const Eigen::Isometry3s& _localTransform,
       const Eigen::Vector3i&   _frags,
-      double                   _totalMass,
-      double                   _vertexStiffness = DART_DEFAULT_VERTEX_STIFFNESS,
-      double                   _edgeStiffness   = DART_DEFAULT_EDGE_STIFNESS,
-      double                   _dampingCoeff    = DART_DEFAULT_DAMPING_COEFF);
+      s_t                   _totalMass,
+      s_t                   _vertexStiffness = DART_DEFAULT_VERTEX_STIFFNESS,
+      s_t                   _edgeStiffness   = DART_DEFAULT_EDGE_STIFNESS,
+      s_t                   _dampingCoeff    = DART_DEFAULT_DAMPING_COEFF);
 
   /// Create a Properties struct for a SoftBodyNode with a single PointMass
   static SoftBodyNode::UniqueProperties makeSinglePointMassProperties(
-      double _totalMass,
-      double _vertexStiffness = DART_DEFAULT_VERTEX_STIFFNESS,
-      double _edgeStiffness   = DART_DEFAULT_EDGE_STIFNESS,
-      double _dampingCoeff    = DART_DEFAULT_DAMPING_COEFF);
+      s_t _totalMass,
+      s_t _vertexStiffness = DART_DEFAULT_VERTEX_STIFFNESS,
+      s_t _edgeStiffness   = DART_DEFAULT_EDGE_STIFNESS,
+      s_t _dampingCoeff    = DART_DEFAULT_DAMPING_COEFF);
 
   /// \brief
   /// This should be called before SoftBodyNode::init() is called
   static void setSinglePointMass(
       SoftBodyNode*          _softBodyNode,
-      double                 _totalMass,
-      double                 _vertexStiffness = DART_DEFAULT_VERTEX_STIFFNESS,
-      double                 _edgeStiffness   = DART_DEFAULT_EDGE_STIFNESS,
-      double                 _dampingCoeff    = DART_DEFAULT_DAMPING_COEFF);
+      s_t                 _totalMass,
+      s_t                 _vertexStiffness = DART_DEFAULT_VERTEX_STIFFNESS,
+      s_t                 _edgeStiffness   = DART_DEFAULT_EDGE_STIFNESS,
+      s_t                 _dampingCoeff    = DART_DEFAULT_DAMPING_COEFF);
 
   /// Create a Properties struct for an Sphere-shaped SoftBodyNode
   static SoftBodyNode::UniqueProperties makeSphereProperties(
-      double                 _radius,
+      s_t                 _radius,
       std::size_t            _nSlices,
       std::size_t            _nStacks,
-      double                 _totalMass,
-      double                 _vertexStiffness = DART_DEFAULT_VERTEX_STIFFNESS,
-      double                 _edgeStiffness   = DART_DEFAULT_EDGE_STIFNESS,
-      double                 _dampingCoeff    = DART_DEFAULT_DAMPING_COEFF);
+      s_t                 _totalMass,
+      s_t                 _vertexStiffness = DART_DEFAULT_VERTEX_STIFFNESS,
+      s_t                 _edgeStiffness   = DART_DEFAULT_EDGE_STIFNESS,
+      s_t                 _dampingCoeff    = DART_DEFAULT_DAMPING_COEFF);
 
   /// Create a Properties struct for an Ellipsoid-shaped SoftBodyNode
   static SoftBodyNode::UniqueProperties makeEllipsoidProperties(
-      const Eigen::Vector3d& _size,
+      const Eigen::Vector3s& _size,
       std::size_t                 _nSlices,
       std::size_t                 _nStacks,
-      double                 _totalMass,
-      double                 _vertexStiffness = DART_DEFAULT_VERTEX_STIFFNESS,
-      double                 _edgeStiffness   = DART_DEFAULT_EDGE_STIFNESS,
-      double                 _dampingCoeff    = DART_DEFAULT_DAMPING_COEFF);
+      s_t                 _totalMass,
+      s_t                 _vertexStiffness = DART_DEFAULT_VERTEX_STIFFNESS,
+      s_t                 _edgeStiffness   = DART_DEFAULT_EDGE_STIFNESS,
+      s_t                 _dampingCoeff    = DART_DEFAULT_DAMPING_COEFF);
 
   /// \brief
   /// This should be called before SoftBodyNode::init() is called
   static void setEllipsoid(SoftBodyNode*          _softBodyNode,
-      const Eigen::Vector3d& _size,
+      const Eigen::Vector3s& _size,
       std::size_t _nSlices,
       std::size_t _nStacks,
-      double                 _totalMass,
-      double                 _vertexStiffness = DART_DEFAULT_VERTEX_STIFFNESS,
-      double                 _edgeStiffness   = DART_DEFAULT_EDGE_STIFNESS,
-      double                 _dampingCoeff    = DART_DEFAULT_DAMPING_COEFF);
+      s_t                 _totalMass,
+      s_t                 _vertexStiffness = DART_DEFAULT_VERTEX_STIFFNESS,
+      s_t                 _edgeStiffness   = DART_DEFAULT_EDGE_STIFNESS,
+      s_t                 _dampingCoeff    = DART_DEFAULT_DAMPING_COEFF);
 
   /// Create a Properties struct for a cylinder-shaped SoftBodyNode
   static SoftBodyNode::UniqueProperties makeCylinderProperties(
-      double _radius,
-      double _height,
+      s_t _radius,
+      s_t _height,
       std::size_t _nSlices,
       std::size_t _nStacks,
       std::size_t _nRings,
-      double _totalMass,
-      double _vertexStiffness = DART_DEFAULT_VERTEX_STIFFNESS,
-      double _edgeStiffness   = DART_DEFAULT_EDGE_STIFNESS,
-      double _dampingCoeff    = DART_DEFAULT_DAMPING_COEFF);
+      s_t _totalMass,
+      s_t _vertexStiffness = DART_DEFAULT_VERTEX_STIFFNESS,
+      s_t _edgeStiffness   = DART_DEFAULT_EDGE_STIFNESS,
+      s_t _dampingCoeff    = DART_DEFAULT_DAMPING_COEFF);
 
   ///
   /// This should be called before SoftBodyNode::init() is called
   static void setCylinder(SoftBodyNode*          _softBodyNode,
-      double _radius,
-      double _height,
+      s_t _radius,
+      s_t _height,
       std::size_t _nSlices,
       std::size_t _nStacks,
       std::size_t _nRings,
-      double                 _totalMass,
-      double                 _vertexStiffness = DART_DEFAULT_VERTEX_STIFFNESS,
-      double                 _edgeStiffness   = DART_DEFAULT_EDGE_STIFNESS,
-      double                 _dampingCoeff    = DART_DEFAULT_DAMPING_COEFF);
+      s_t                 _totalMass,
+      s_t                 _vertexStiffness = DART_DEFAULT_VERTEX_STIFFNESS,
+      s_t                 _edgeStiffness   = DART_DEFAULT_EDGE_STIFNESS,
+      s_t                 _dampingCoeff    = DART_DEFAULT_DAMPING_COEFF);
 };
 
 }  // namespace dynamics

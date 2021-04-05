@@ -13,28 +13,28 @@ RealTimeControlBuffer::RealTimeControlBuffer(
     mNumSteps(steps),
     mMillisPerStep(millisPerStep),
     mActiveBuffer(UNINITIALIZED),
-    mBufA(Eigen::MatrixXd::Zero(forceDim, steps)),
-    mBufB(Eigen::MatrixXd::Zero(forceDim, steps)),
+    mBufA(Eigen::MatrixXs::Zero(forceDim, steps)),
+    mBufB(Eigen::MatrixXs::Zero(forceDim, steps)),
     mControlLog(ControlLog(forceDim, millisPerStep))
 {
 }
 
 /// Gets the force at a given timestep
-Eigen::VectorXd RealTimeControlBuffer::getPlannedForce(long time, bool dontLog)
+Eigen::VectorXs RealTimeControlBuffer::getPlannedForce(long time, bool dontLog)
 {
   if (mActiveBuffer == UNINITIALIZED)
   {
     // Unitialized, default to no force
-    return Eigen::VectorXd::Zero(mForceDim);
+    return Eigen::VectorXs::Zero(mForceDim);
   }
   int elapsed = time - mLastWroteBufferAt;
   if (elapsed < 0)
   {
     // Asking for some time in the past, default to no force
-    return Eigen::VectorXd::Zero(mForceDim);
+    return Eigen::VectorXs::Zero(mForceDim);
   }
 
-  int step = (int)floor((double)elapsed / mMillisPerStep);
+  int step = (int)floor((s_t)elapsed / mMillisPerStep);
   if (step < mNumSteps)
   {
     if (mActiveBuffer == BUF_A)
@@ -55,7 +55,7 @@ Eigen::VectorXd RealTimeControlBuffer::getPlannedForce(long time, bool dontLog)
   else
   {
     // std::cout << "WARNING: MPC isn't keeping up!" << std::endl;
-    Eigen::VectorXd oob = Eigen::VectorXd::Zero(mForceDim);
+    Eigen::VectorXs oob = Eigen::VectorXs::Zero(mForceDim);
     if (!dontLog)
       mControlLog.record(time, oob);
     return oob;
@@ -69,7 +69,7 @@ Eigen::VectorXd RealTimeControlBuffer::getPlannedForce(long time, bool dontLog)
 /// runs. It supports walking off the end of known future, and assumes 0
 /// forces in all extrapolation.
 void RealTimeControlBuffer::getPlannedForcesStartingAt(
-    long start, Eigen::Ref<Eigen::MatrixXd> forcesOut)
+    long start, Eigen::Ref<Eigen::MatrixXs> forcesOut)
 {
   if (mActiveBuffer == UNINITIALIZED)
   {
@@ -84,7 +84,7 @@ void RealTimeControlBuffer::getPlannedForcesStartingAt(
     forcesOut.setZero();
     return;
   }
-  int startStep = (int)floor((double)elapsed / mMillisPerStep);
+  int startStep = (int)floor((s_t)elapsed / mMillisPerStep);
   if (startStep < mNumSteps)
   {
     // Copy the appropriate block of our active buffer to the forcesOut block
@@ -113,12 +113,12 @@ void RealTimeControlBuffer::getPlannedForcesStartingAt(
 /// This swaps in a new buffer of forces. The assumption is that "startAt" is
 /// before "now", because we'll erase old data in this process.
 void RealTimeControlBuffer::setForcePlan(
-    long startAt, long now, Eigen::MatrixXd forces)
+    long startAt, long now, Eigen::MatrixXs forces)
 {
   if (startAt > now)
   {
     long padMillis = startAt - now;
-    int padSteps = (int)floor((double)padMillis / mMillisPerStep);
+    int padSteps = (int)floor((s_t)padMillis / mMillisPerStep);
     // If we're trying to set the force plan too far out in the future, this
     // whole exercise is a no-op
     if (padSteps >= mNumSteps)
@@ -127,7 +127,7 @@ void RealTimeControlBuffer::setForcePlan(
     }
     // Otherwise, we're going to copy part of the existing plan
     int currentStep
-        = (int)floor((double)(now - mLastWroteBufferAt) / mMillisPerStep);
+        = (int)floor((s_t)(now - mLastWroteBufferAt) / mMillisPerStep);
     int remainingSteps = mNumSteps - currentStep;
     mLastWroteBufferAt = now;
 
@@ -216,7 +216,7 @@ void RealTimeControlBuffer::estimateWorldStateAt(
         && "estimateWorldStateAt() cannot ask far a time before the earliest available observation.");
   }
   int stepsSinceObservation
-      = (int)floor((double)elapsedSinceObservation / mMillisPerStep);
+      = (int)floor((s_t)elapsedSinceObservation / mMillisPerStep);
   /*
   std::cout << "RealTimeControlBuffer time: " << time << std::endl;
   std::cout << "RealTimeControlBuffer obs.time: " << obs.time << std::endl;
@@ -268,7 +268,7 @@ void RealTimeControlBuffer::setMillisPerStep(int newMillisPerStep)
 /// probably has a nonlinear effect on runtime.
 void RealTimeControlBuffer::setNumSteps(int newNumSteps)
 {
-  Eigen::MatrixXd newBuf = Eigen::MatrixXd::Zero(mForceDim, newNumSteps);
+  Eigen::MatrixXs newBuf = Eigen::MatrixXs::Zero(mForceDim, newNumSteps);
 
   int minLen = newNumSteps;
   if (mNumSteps < minLen)
@@ -300,7 +300,7 @@ long RealTimeControlBuffer::getPlanBufferMillisAfter(long time)
 /// This is useful when we're replicating a log across a network boundary,
 /// which comes up in distributed MPC.
 void RealTimeControlBuffer::manuallyRecordObservedForce(
-    long time, Eigen::VectorXd observation)
+    long time, Eigen::VectorXs observation)
 {
   mControlLog.record(time, observation);
 }
@@ -308,9 +308,9 @@ void RealTimeControlBuffer::manuallyRecordObservedForce(
 /// This is a helper to rescale the timestep size of a buffer while leaving
 /// the data otherwise unchanged.
 void RealTimeControlBuffer::rescaleBuffer(
-    Eigen::MatrixXd& buf, int oldMillisPerStep, int newMillisPerStep)
+    Eigen::MatrixXs& buf, int oldMillisPerStep, int newMillisPerStep)
 {
-  Eigen::MatrixXd newBuf = Eigen::MatrixXd::Zero(buf.rows(), buf.cols());
+  Eigen::MatrixXs newBuf = Eigen::MatrixXs::Zero(buf.rows(), buf.cols());
 
   for (int i = mNumSteps - 1; i >= 0; i--)
   {
@@ -318,14 +318,16 @@ void RealTimeControlBuffer::rescaleBuffer(
     {
       // If we're increasing the step size, there's more than one old column per
       // new column, so map from old to new
-      int newCol = floor((double)(i * oldMillisPerStep) / newMillisPerStep);
+      int newCol = static_cast<int>(
+          floor(static_cast<s_t>(i * oldMillisPerStep) / newMillisPerStep));
       newBuf.col(newCol) = buf.col(i);
     }
     else
     {
       // If we're increasing the step size, there's more than one new column per
       // old column, so map from new to old
-      int oldCol = floor((double)(i * newMillisPerStep) / oldMillisPerStep);
+      int oldCol = static_cast<int>(
+          floor(static_cast<s_t>(i * newMillisPerStep) / oldMillisPerStep));
       newBuf.col(i) = buf.col(oldCol);
     }
   }

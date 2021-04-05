@@ -32,20 +32,20 @@ using namespace neural;
 
 void verifySkeleton(SkeletonPtr skel)
 {
-  skel->setGravity(Eigen::Vector3d::Zero());
+  skel->setGravity(Eigen::Vector3s::Zero());
 
   dynamics::SimpleFeatherstone simple;
   simple.populateFromSkeleton(skel);
-  double* pos = (double*)malloc(sizeof(double) * simple.len());
-  double* vel = (double*)malloc(sizeof(double) * simple.len());
-  double* force = (double*)malloc(sizeof(double) * simple.len());
-  double* accel = (double*)malloc(sizeof(double) * simple.len());
+  s_t* pos = (s_t*)malloc(sizeof(s_t) * simple.len());
+  s_t* vel = (s_t*)malloc(sizeof(s_t) * simple.len());
+  s_t* force = (s_t*)malloc(sizeof(s_t) * simple.len());
+  s_t* accel = (s_t*)malloc(sizeof(s_t) * simple.len());
 
   for (int j = 0; j < 10; j++)
   {
-    skel->setPositions(Eigen::VectorXd::Random(skel->getNumDofs()));
-    skel->setVelocities(Eigen::VectorXd::Random(skel->getNumDofs()));
-    skel->setForces(Eigen::VectorXd::Random(skel->getNumDofs()));
+    skel->setPositions(Eigen::VectorXs::Random(skel->getNumDofs()));
+    skel->setVelocities(Eigen::VectorXs::Random(skel->getNumDofs()));
+    skel->setForces(Eigen::VectorXs::Random(skel->getNumDofs()));
 
     for (int i = 0; i < simple.len(); i++)
     {
@@ -56,11 +56,11 @@ void verifySkeleton(SkeletonPtr skel)
 
     // make "accel" hold acceleration according to SimpleFeatherstone
     simple.forwardDynamics(pos, vel, force, accel);
-    Eigen::VectorXd simpleAccel
-        = Eigen::Map<Eigen::VectorXd>(accel, simple.len());
+    Eigen::VectorXs simpleAccel
+        = Eigen::Map<Eigen::VectorXs>(accel, simple.len());
     // get real acceleration
     skel->computeForwardDynamics();
-    Eigen::VectorXd realAccel = skel->getAccelerations();
+    Eigen::VectorXs realAccel = skel->getAccelerations();
 
     if (!equals(simpleAccel, realAccel))
     {
@@ -145,12 +145,12 @@ TEST(FEATHERSTONE, LINK_5)
 /*
 template <class ConfigSpaceT>
 void GenericJoint<ConfigSpaceT>::addChildArtInertiaImplicitToDynamic(
-    Eigen::Matrix6d& parentArtInertia,
-    const Eigen::Matrix6d& childArtInertia)
+    Eigen::Matrix6s& parentArtInertia,
+    const Eigen::Matrix6s& childArtInertia)
 {
   // Child body's articulated inertia
   JacobianMatrix AIS = childArtInertia * getRelativeJacobianStatic();
-  Eigen::Matrix6d PI = childArtInertia;
+  Eigen::Matrix6s PI = childArtInertia;
   PI.noalias() -= AIS * mInvProjArtInertiaImplicit * AIS.transpose();
   assert(!math::isNan(PI));
 
@@ -164,12 +164,12 @@ void GenericJoint<ConfigSpaceT>::addChildArtInertiaImplicitToDynamic(
 /*
 template <class ConfigSpaceT>
 void GenericJoint<ConfigSpaceT>::addChildArtInertiaToDynamic(
-    Eigen::Matrix6d& parentArtInertia,
-    const Eigen::Matrix6d& childArtInertia)
+    Eigen::Matrix6s& parentArtInertia,
+    const Eigen::Matrix6s& childArtInertia)
 {
   // Child body's articulated inertia
   JacobianMatrix AIS = childArtInertia * getRelativeJacobianStatic();
-  Eigen::Matrix6d PI = childArtInertia;
+  Eigen::Matrix6s PI = childArtInertia;
   PI.noalias() -= AIS * mInvProjArtInertia * AIS.transpose();
   assert(!math::isNan(PI));
 
@@ -183,7 +183,7 @@ void GenericJoint<ConfigSpaceT>::addChildArtInertiaToDynamic(
 /*
 template <class ConfigSpaceT>
 void GenericJoint<ConfigSpaceT>::updateInvProjArtInertiaDynamic(
-    const Eigen::Matrix6d& artInertia)
+    const Eigen::Matrix6s& artInertia)
 {
   // Projected articulated inertia
   const JacobianMatrix& Jacobian = getRelativeJacobianStatic();
@@ -200,8 +200,8 @@ void GenericJoint<ConfigSpaceT>::updateInvProjArtInertiaDynamic(
 /*
 template <class ConfigSpaceT>
 void GenericJoint<ConfigSpaceT>::updateInvProjArtInertiaImplicitDynamic(
-    const Eigen::Matrix6d& artInertia,
-    double timeStep)
+    const Eigen::Matrix6s& artInertia,
+    s_t timeStep)
 {
   // Projected articulated inertia
   const JacobianMatrix& Jacobian = getRelativeJacobianStatic();

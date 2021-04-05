@@ -50,12 +50,12 @@ std::string toString(unsigned int v);
 std::string toString(float v);
 std::string toString(double v);
 std::string toString(char v);
-std::string toString(const Eigen::Vector2d& v);
-std::string toString(const Eigen::Vector3d& v);
+std::string toString(const Eigen::Vector2s& v);
+std::string toString(const Eigen::Vector3s& v);
 std::string toString(const Eigen::Vector3i& v);
-std::string toString(const Eigen::Vector6d& v);
-std::string toString(const Eigen::VectorXd& v);
-std::string toString(const Eigen::Isometry3d& v);
+std::string toString(const Eigen::Vector6s& v);
+std::string toString(const Eigen::VectorXs& v);
+std::string toString(const Eigen::Isometry3s& v);
 
 bool              toBool      (const std::string& str);
 int               toInt       (const std::string& str);
@@ -63,14 +63,14 @@ unsigned int      toUInt      (const std::string& str);
 float             toFloat     (const std::string& str);
 double            toDouble    (const std::string& str);
 char              toChar      (const std::string& str);
-Eigen::Vector2d   toVector2d  (const std::string& str);
-Eigen::Vector3d   toVector3d  (const std::string& str);
+Eigen::Vector2s   toVector2s  (const std::string& str);
+Eigen::Vector3s   toVector3s  (const std::string& str);
 Eigen::Vector3i   toVector3i  (const std::string& str);
-Eigen::Vector6d   toVector6d  (const std::string& str);
-Eigen::VectorXd   toVectorXd  (const std::string& str);
+Eigen::Vector6s   toVector6s  (const std::string& str);
+Eigen::VectorXs   toVectorXs  (const std::string& str);
 // TODO: The definition of _str is not clear for transform (see: #250)
-Eigen::Isometry3d toIsometry3d(const std::string& str);
-Eigen::Isometry3d toIsometry3dWithExtrinsicRotation(const std::string& str);
+Eigen::Isometry3s toIsometry3s(const std::string& str);
+Eigen::Isometry3s toIsometry3sWithExtrinsicRotation(const std::string& str);
 
 std::string       getValueString    (const tinyxml2::XMLElement* parentElement, const std::string& name);
 bool              getValueBool      (const tinyxml2::XMLElement* parentElement, const std::string& name);
@@ -79,13 +79,13 @@ unsigned int      getValueUInt      (const tinyxml2::XMLElement* parentElement, 
 float             getValueFloat     (const tinyxml2::XMLElement* parentElement, const std::string& name);
 double            getValueDouble    (const tinyxml2::XMLElement* parentElement, const std::string& name);
 char              getValueChar      (const tinyxml2::XMLElement* parentElement, const std::string& name);
-Eigen::Vector2d   getValueVector2d  (const tinyxml2::XMLElement* parentElement, const std::string& name);
-Eigen::Vector3d   getValueVector3d  (const tinyxml2::XMLElement* parentElement, const std::string& name);
+Eigen::Vector2s   getValueVector2s  (const tinyxml2::XMLElement* parentElement, const std::string& name);
+Eigen::Vector3s   getValueVector3s  (const tinyxml2::XMLElement* parentElement, const std::string& name);
 Eigen::Vector3i   getValueVector3i  (const tinyxml2::XMLElement* parentElement, const std::string& name);
-Eigen::Vector6d   getValueVector6d  (const tinyxml2::XMLElement* parentElement, const std::string& name);
-Eigen::VectorXd   getValueVectorXd  (const tinyxml2::XMLElement* parentElement, const std::string& name);
-Eigen::Isometry3d getValueIsometry3d(const tinyxml2::XMLElement* parentElement, const std::string& name);
-Eigen::Isometry3d getValueIsometry3dWithExtrinsicRotation(const tinyxml2::XMLElement* parentElement, const std::string& name);
+Eigen::Vector6s   getValueVector6s  (const tinyxml2::XMLElement* parentElement, const std::string& name);
+Eigen::VectorXs   getValueVectorXs  (const tinyxml2::XMLElement* parentElement, const std::string& name);
+Eigen::Isometry3s getValueIsometry3s(const tinyxml2::XMLElement* parentElement, const std::string& name);
+Eigen::Isometry3s getValueIsometry3sWithExtrinsicRotation(const tinyxml2::XMLElement* parentElement, const std::string& name);
 
 void openXMLFile(tinyxml2::XMLDocument& doc,
                  const common::Uri& uri,
@@ -118,10 +118,10 @@ unsigned int    getAttributeUInt    (const tinyxml2::XMLElement* element, const 
 float           getAttributeFloat   (const tinyxml2::XMLElement* element, const std::string& attributeName);
 double          getAttributeDouble  (const tinyxml2::XMLElement* element, const std::string& attributeName);
 char            getAttributeChar    (const tinyxml2::XMLElement* element, const std::string& attributeName);
-Eigen::Vector2d getAttributeVector2d(const tinyxml2::XMLElement* element, const std::string& attributeName);
-Eigen::Vector3d getAttributeVector3d(const tinyxml2::XMLElement* element, const std::string& attributeName);
-Eigen::Vector6d getAttributeVector6d(const tinyxml2::XMLElement* element, const std::string& attributeName);
-Eigen::VectorXd getAttributeVectorXd(const tinyxml2::XMLElement* element, const std::string& attributeName);
+Eigen::Vector2s getAttributeVector2s(const tinyxml2::XMLElement* element, const std::string& attributeName);
+Eigen::Vector3s getAttributeVector3s(const tinyxml2::XMLElement* element, const std::string& attributeName);
+Eigen::Vector6s getAttributeVector6s(const tinyxml2::XMLElement* element, const std::string& attributeName);
+Eigen::VectorXs getAttributeVectorXs(const tinyxml2::XMLElement* element, const std::string& attributeName);
 
 /// TemplatedElementEnumerator is a convenience class to help visiting all the
 /// child elements of given parent element. This class is templated to cover

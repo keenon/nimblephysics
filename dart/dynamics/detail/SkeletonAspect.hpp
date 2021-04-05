@@ -61,10 +61,10 @@ struct SkeletonAspectProperties
   bool mIsMobile;
 
   /// Gravity vector.
-  Eigen::Vector3d mGravity;
+  Eigen::Vector3s mGravity;
 
   /// Time step for implicit joint damping force.
-  double mTimeStep;
+  s_t mTimeStep;
 
   /// True if self collision check is enabled. Use mEnabledAdjacentBodyCheck
   /// to disable collision checks between adjacent bodies.
@@ -79,8 +79,8 @@ struct SkeletonAspectProperties
   SkeletonAspectProperties(
       const std::string& _name = "Skeleton",
       bool _isMobile = true,
-      const Eigen::Vector3d& _gravity = Eigen::Vector3d(0.0, 0.0, -9.81),
-      double _timeStep = 0.001,
+      const Eigen::Vector3s& _gravity = Eigen::Vector3s(0.0, 0.0, -9.81),
+      s_t _timeStep = 0.001,
       bool _enabledSelfCollisionCheck = false,
       bool _enableAdjacentBodyCheck = false);
 

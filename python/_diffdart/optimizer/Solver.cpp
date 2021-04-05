@@ -49,13 +49,13 @@ void Solver(py::module& m)
           ::py::init<std::shared_ptr<dart::optimizer::Problem>>(),
           ::py::arg("problem"))
       .def(
-          ::py::init<std::shared_ptr<dart::optimizer::Problem>, double>(),
+          ::py::init<std::shared_ptr<dart::optimizer::Problem>, s_t>(),
           ::py::arg("problem"),
           ::py::arg("tolerance"))
       .def(
           ::py::init<
               std::shared_ptr<dart::optimizer::Problem>,
-              double,
+              s_t,
               std::size_t>(),
           ::py::arg("problem"),
           ::py::arg("tolerance"),
@@ -63,7 +63,7 @@ void Solver(py::module& m)
       .def(
           ::py::init<
               std::shared_ptr<dart::optimizer::Problem>,
-              double,
+              s_t,
               std::size_t,
               std::size_t>(),
           ::py::arg("problem"),
@@ -73,7 +73,7 @@ void Solver(py::module& m)
       .def(
           ::py::init<
               std::shared_ptr<dart::optimizer::Problem>,
-              double,
+              s_t,
               std::size_t,
               std::size_t,
               std::ostream*>(),
@@ -85,7 +85,7 @@ void Solver(py::module& m)
       .def(
           ::py::init<
               std::shared_ptr<dart::optimizer::Problem>,
-              double,
+              s_t,
               std::size_t,
               std::size_t,
               std::ostream*,
@@ -99,7 +99,7 @@ void Solver(py::module& m)
       .def(
           ::py::init<
               std::shared_ptr<dart::optimizer::Problem>,
-              double,
+              s_t,
               std::size_t,
               std::size_t,
               std::ostream*,
@@ -168,13 +168,13 @@ void Solver(py::module& m)
           })
       .def(
           "setTolerance",
-          +[](dart::optimizer::Solver* self, double _newTolerance) {
+          +[](dart::optimizer::Solver* self, s_t _newTolerance) {
             self->setTolerance(_newTolerance);
           },
           ::py::arg("newTolerance"))
       .def(
           "getTolerance",
-          +[](const dart::optimizer::Solver* self) -> double {
+          +[](const dart::optimizer::Solver* self) -> s_t {
             return self->getTolerance();
           })
       .def(

@@ -69,7 +69,7 @@ void ConstraintBase(py::module& m)
       .def(
           "getVelocityChange",
           +[](dart::constraint::ConstraintBase* self,
-              double* vel,
+              s_t* vel,
               bool withCfm) { self->getVelocityChange(vel, withCfm); },
           ::py::arg("vel"),
           ::py::arg("withCfm"))
@@ -81,7 +81,7 @@ void ConstraintBase(py::module& m)
           +[](dart::constraint::ConstraintBase* self) { self->unexcite(); })
       .def(
           "applyImpulse",
-          +[](dart::constraint::ConstraintBase* self, double* lambda) {
+          +[](dart::constraint::ConstraintBase* self, s_t* lambda) {
             self->applyImpulse(lambda);
           },
           ::py::arg("lambda"))

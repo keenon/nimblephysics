@@ -120,17 +120,17 @@ public:
   const math::BoundingBox& getBoundingBox() const;
 
   /// Computes the inertia.
-  virtual Eigen::Matrix3d computeInertia(double mass) const = 0;
+  virtual Eigen::Matrix3s computeInertia(s_t mass) const = 0;
 
-  Eigen::Matrix3d computeInertiaFromDensity(double density) const;
+  Eigen::Matrix3s computeInertiaFromDensity(s_t density) const;
 
-  Eigen::Matrix3d computeInertiaFromMass(double mass) const;
+  Eigen::Matrix3s computeInertiaFromMass(s_t mass) const;
 
   /// Returns volume of this shape.
   ///
   /// The volume will be automatically calculated by the sub-classes such as
   /// BoxShape, EllipsoidShape, CylinderShape, and MeshShape.
-  double getVolume() const;
+  s_t getVolume() const;
 
   /// \brief
   std::size_t getID() const;
@@ -163,17 +163,17 @@ public:
 
   /// Notify that the alpha of this shape has updated
   DART_DEPRECATED(6.2)
-  virtual void notifyAlphaUpdate(double alpha);
+  virtual void notifyAlphaUpdate(s_t alpha);
 
   /// Notify that the alpha of this shape has updated
-  virtual void notifyAlphaUpdated(double alpha);
+  virtual void notifyAlphaUpdated(s_t alpha);
 
   /// Notify that the color (rgba) of this shape has updated
   DART_DEPRECATED(6.2)
-  virtual void notifyColorUpdate(const Eigen::Vector4d& color);
+  virtual void notifyColorUpdate(const Eigen::Vector4s& color);
 
   /// Notify that the color (rgba) of this shape has updated
-  virtual void notifyColorUpdated(const Eigen::Vector4d& color);
+  virtual void notifyColorUpdated(const Eigen::Vector4s& color);
 
   /// Increment the version of this Shape and notify its subscribers
   std::size_t incrementVersion() override final;
@@ -192,7 +192,7 @@ protected:
   mutable bool mIsBoundingBoxDirty;
 
   /// Volume enclosed by the geometry.
-  mutable double mVolume;
+  mutable s_t mVolume;
 
   /// Whether volume needs update
   mutable bool mIsVolumeDirty;

@@ -88,7 +88,7 @@ using namespace server;
 using namespace realtime;
 
 std::shared_ptr<simulation::World> createWorld(
-    double target_x, double target_y, double target_z)
+    s_t target_x, s_t target_y, s_t target_z)
 {
   // Create a world
   std::shared_ptr<simulation::World> world = simulation::World::create();
@@ -96,7 +96,7 @@ std::shared_ptr<simulation::World> createWorld(
 
   // Set gravity of the world
   // world->setPenetrationCorrectionEnabled(false);
-  world->setGravity(Eigen::Vector3d(0.0, -9.81, 0.0));
+  world->setGravity(Eigen::Vector3s(0.0, -9.81, 0.0));
 
   std::shared_ptr<dynamics::Skeleton> atlas
       = dart::utils::UniversalLoader::loadSkeleton(
@@ -111,14 +111,14 @@ std::shared_ptr<simulation::World> createWorld(
   atlas->setPosition(0, -0.5 * dart::math::constantsd::pi());
   atlas->setPosition(4, -0.01);
 
-  Eigen::VectorXd forceLimits = Eigen::VectorXd::Ones(atlas->getNumDofs()) * 50;
+  Eigen::VectorXs forceLimits = Eigen::VectorXs::Ones(atlas->getNumDofs()) * 50;
   forceLimits.segment<6>(0).setZero();
   atlas->setForceUpperLimits(forceLimits);
   atlas->setForceLowerLimits(forceLimits * -1);
-  Eigen::VectorXd posLimits = Eigen::VectorXd::Ones(atlas->getNumDofs()) * 10;
+  Eigen::VectorXs posLimits = Eigen::VectorXs::Ones(atlas->getNumDofs()) * 10;
   atlas->setPositionUpperLimits(posLimits);
   atlas->setPositionLowerLimits(posLimits * -1);
-  Eigen::VectorXd velLimits = Eigen::VectorXd::Ones(atlas->getNumDofs()) * 20;
+  Eigen::VectorXs velLimits = Eigen::VectorXs::Ones(atlas->getNumDofs()) * 20;
   atlas->setVelocityUpperLimits(velLimits);
   atlas->setVelocityLowerLimits(velLimits * -1);
 
@@ -129,14 +129,14 @@ std::shared_ptr<simulation::World> createWorld(
       = target->createJointAndBodyNodePair<WeldJoint>(nullptr);
   WeldJoint* targetJoint = targetJointPair.first;
   BodyNode* targetBody = targetJointPair.second;
-  Eigen::Isometry3d targetOffset = Eigen::Isometry3d::Identity();
-  targetOffset.translation() = Eigen::Vector3d(target_x, target_y, target_z);
+  Eigen::Isometry3s targetOffset = Eigen::Isometry3s::Identity();
+  targetOffset.translation() = Eigen::Vector3s(target_x, target_y, target_z);
   targetJoint->setTransformFromParentBodyNode(targetOffset);
   std::shared_ptr<BoxShape> targetShape(
-      new BoxShape(Eigen::Vector3d(0.1, 0.1, 0.1)));
+      new BoxShape(Eigen::Vector3s(0.1, 0.1, 0.1)));
   ShapeNode* targetVisual
       = targetBody->createShapeNodeWith<VisualAspect>(targetShape);
-  targetVisual->getVisualAspect()->setColor(Eigen::Vector3d(0.8, 0.5, 0.5));
+  targetVisual->getVisualAspect()->setColor(Eigen::Vector3s(0.8, 0.5, 0.5));
   targetVisual->getVisualAspect()->setCastShadows(false);
 
   world->addSkeleton(target);
@@ -147,13 +147,13 @@ std::shared_ptr<simulation::World> createWorld(
 #ifdef TEST1
 TEST(ATLAS, BROKEN_1)
 {
-  double target_x = 0.5;
-  double target_y = 1.0;
-  double target_z = -1.0;
+  s_t target_x = 0.5;
+  s_t target_y = 1.0;
+  s_t target_z = -1.0;
   std::shared_ptr<simulation::World> world
       = createWorld(target_x, target_y, target_z);
 
-  Eigen::VectorXd brokenPos = Eigen::VectorXd::Zero(33);
+  Eigen::VectorXs brokenPos = Eigen::VectorXs::Zero(33);
   brokenPos << -1.571, -0.00288326, 0.00165361, 0.000259454, -0.0102512,
       1.84494e-05, 0.000848932, 0.00334193, 0.00028172, -0.000263459,
       0.000695572, 0.0150866, -0.00288076, -0.0202479, 0.000544379, 0.000227742,
@@ -161,19 +161,19 @@ TEST(ATLAS, BROKEN_1)
       -7.91484e-05, -0.0106369, 2.12794e-05, 0.0116945, 0.000591883,
       0.000231497, 0.00423308, -0.00163132, -0.000462828, 3.65345e-05,
       0.0220306;
-  Eigen::VectorXd brokenVel = Eigen::VectorXd::Zero(33);
+  Eigen::VectorXs brokenVel = Eigen::VectorXs::Zero(33);
   brokenVel << -0.0355665, -0.712732, -0.0197312, 0.0644581, -0.00523274,
       -0.0570926, 0.0472622, 0.825493, 0.0338969, -0.0882721, 0.183699, 0.17503,
       -0.649341, 0.0965665, 0.0195836, 0.0421524, 1.19344, -0.665203, 0.184475,
       -0.00623832, 10.9633, 0.0267205, 0.106822, -4.22165, -0.204534, 5.39066,
       0.0195849, 0.0421863, 1.07122, -0.443072, 0.0845663, -0.00623839, 2.65921;
-  Eigen::VectorXd brokenForce = Eigen::VectorXd::Zero(33);
+  Eigen::VectorXs brokenForce = Eigen::VectorXs::Zero(33);
   brokenForce << 0, 0, 0, 0, 0, 0, -7.44122, -1.70693, -5.2703, -2.6099,
       -5.7076, 0.985185, -6.3785, 0.372082, -9.87066, 7.78529, 0.081559,
       3.65908, 1.93437, -4.29761, -6.52332, -4.70401, 2.88616, -0.000431554,
       -3.0544, -4.1798, 2.00762, 7.96103, -8.62058, -5.69036, 7.01415, 4.63665,
       3.18185;
-  Eigen::VectorXd brokenLCPCache = Eigen::VectorXd::Zero(96);
+  Eigen::VectorXs brokenLCPCache = Eigen::VectorXs::Zero(96);
   brokenLCPCache << 0.0891057, -0.00904432, -0.0351203, 0.138667, -0.0574322,
       -0.0753322, 0.00241692, 0.00236652, -0.00056386, 0.000854223, 0.000815419,
       0.000623825, 0, 0, 0, 0.0304843, 0.0304843, 0.0304843, 0.0163738,
@@ -203,7 +203,7 @@ TEST(ATLAS, BROKEN_1)
   server.serve(8070);
   server.renderWorld(world);
 
-  Eigen::VectorXd animatePos = brokenPos;
+  Eigen::VectorXs animatePos = brokenPos;
   int i = 0;
   Ticker ticker(0.01);
   ticker.registerTickListener([&](long time) {
@@ -236,13 +236,13 @@ TEST(ATLAS, BROKEN_1)
 // failed verifyF_c() due to bugged getCoriolisAndGravityAndExternalForces()
 TEST(ATLAS, BROKEN_2)
 {
-  double target_x = 0.5;
-  double target_y = 1.0;
-  double target_z = -1.0;
+  s_t target_x = 0.5;
+  s_t target_y = 1.0;
+  s_t target_z = -1.0;
   std::shared_ptr<simulation::World> world
       = createWorld(target_x, target_y, target_z);
 
-  Eigen::VectorXd brokenPos = Eigen::VectorXd::Zero(33);
+  Eigen::VectorXs brokenPos = Eigen::VectorXs::Zero(33);
   brokenPos << -1.57102, -0.00298104, 0.00176851, 0.00027332, -0.0102446,
       2.25516e-05, 0.000838035, 0.00349415, 0.000302042, -0.000268057,
       0.000681061, 0.0150735, -0.00286418, -0.0202515, 0.000771647, 0.000250073,
@@ -250,20 +250,20 @@ TEST(ATLAS, BROKEN_2)
       -3.23823e-05, -6.50984e-05, -0.0106499, 4.97962e-06, 0.011691,
       0.000771647, 0.000250029, 0.00449108, -0.0019256, 0.00045803,
       -2.65981e-05, 0.0220327;
-  Eigen::VectorXd brokenVel = Eigen::VectorXd::Zero(33);
+  Eigen::VectorXs brokenVel = Eigen::VectorXs::Zero(33);
   brokenVel << -0.0355415, -0.712449, -0.0197237, 0.0644239, -0.00522888,
       -0.0571042, 0.0472592, 0.825169, 0.0338612, -0.0882515, 0.183756,
       0.175005, -0.649385, 0.0966408, 0.0195587, 0.042304, 1.19296, -0.664948,
       0.184412, -0.00625319, 10.9633, 0.0267056, 0.106785, -4.22162, -0.204477,
       5.3907, 0.0195588, 0.0422993, 1.07078, -0.442892, 0.0845375, -0.0062484,
       2.65919;
-  Eigen::VectorXd brokenForce = Eigen::VectorXd::Zero(33);
+  Eigen::VectorXs brokenForce = Eigen::VectorXs::Zero(33);
   brokenForce << 0, 0, 0, 0, 0, 0, -7.44122, -1.70693, -5.2703, -2.6099,
       -5.7076, 0.985185, -6.3785, 0.372082, -9.87066, 7.78529, 0.081559,
       3.65908, 1.93437, -4.29761, -6.52332, -4.70401, 2.88616, -0.000431554,
       -3.0544, -4.1798, 2.00762, 7.96103, -8.62058, -5.69036, 7.01415, 4.63665,
       3.18185;
-  Eigen::VectorXd brokenLCPCache = Eigen::VectorXd::Zero(96);
+  Eigen::VectorXs brokenLCPCache = Eigen::VectorXs::Zero(96);
   brokenLCPCache << 0.0644031, 0.0150676, -0.0296244, 0.158559, -0.00653536,
       0.0099797, 0, 0, 0, 0, 0, 0, 0.00463209, -0.00454052, 0.000261391,
       0.0248994, -0.0248994, 0.0248994, 0.044138, 0.0375062, 0.0407045,
@@ -296,7 +296,7 @@ TEST(ATLAS, BROKEN_2)
   server.serve(8080);
   server.renderWorld(world);
 
-  Eigen::VectorXd animatePos = brokenPos;
+  Eigen::VectorXs animatePos = brokenPos;
   int i = 0;
   Ticker ticker(0.01);
   ticker.registerTickListener([&](long) {
@@ -330,32 +330,32 @@ TEST(ATLAS, BROKEN_2)
 // fails areResultsStandardized() for LCP
 TEST(ATLAS, BROKEN_3)
 {
-  double target_x = 0.5;
-  double target_y = 1.0;
-  double target_z = -1.0;
+  s_t target_x = 0.5;
+  s_t target_y = 1.0;
+  s_t target_z = -1.0;
   std::shared_ptr<simulation::World> world
       = createWorld(target_x, target_y, target_z);
 
-  Eigen::VectorXd brokenPos = Eigen::VectorXd::Zero(33);
+  Eigen::VectorXs brokenPos = Eigen::VectorXs::Zero(33);
   brokenPos << -1.57098, -0.00244077, 0.00131736, 0.000214826, -0.0101934,
       1.85193e-05, 0.000759851, 0.00276811, 0.000261443, -0.00019732,
       0.000574608, 0.0133507, -0.00239568, -0.0184735, 0.000715009, 0.000210485,
       0.00419423, -0.00245556, 0.000653731, -2.188e-05, 0.0532566, -4.87561e-05,
       -0.000114901, -0.00672978, 8.71723e-05, 0.00632901, 0.000715009,
       0.00021045, 0.00353137, -0.00150703, 0.000368055, -2.18447e-05, 0.0189617;
-  Eigen::VectorXd brokenVel = Eigen::VectorXd::Zero(33);
+  Eigen::VectorXs brokenVel = Eigen::VectorXs::Zero(33);
   brokenVel << -0.0344442, -0.631138, -0.0567461, 0.058374, -0.00398089,
       -0.0513241, 0.0781846, 0.726033, 0.0405993, -0.0707367, 0.106453, 1.72279,
       -0.468507, -1.77798, 0.0566378, 0.0395876, 1.07904, -0.619651, 0.171733,
       -0.0047619, 11.3439, 0.0163738, 0.0498022, -3.92009, -0.0821927, 5.36199,
       0.0566378, 0.0395791, 0.959703, -0.418562, 0.0899755, -0.0047534, 3.07108;
-  Eigen::VectorXd brokenForce = Eigen::VectorXd::Zero(33);
+  Eigen::VectorXs brokenForce = Eigen::VectorXs::Zero(33);
   brokenForce << 0, 0, 0, 0, 0, 0, -2.87179, -0.392243, 1.37066, -6.96699,
       7.84975, -9.84715, -9.55796, 2.85221, 1.37246, -3.28473, 3.33182, 4.61692,
       -1.53041, -8.09531, -1.30448, 4.58172, -6.8179, -4.38499, -9.95055,
       -2.08851, -8.31803, 3.78765, -5.04101, 8.23899, -9.01072, -0.45285,
       -1.28571;
-  Eigen::VectorXd brokenLCPCache = Eigen::VectorXd::Zero(96);
+  Eigen::VectorXs brokenLCPCache = Eigen::VectorXs::Zero(96);
   brokenLCPCache << 0.0642214, 0.0642214, -0.0489385, 0.123966, -0.0680728,
       0.059233, 0.00893705, 0.000922174, 0.00279593, 0.00378316, 0.00295676,
       0.000770773, 0.0514538, -0.0456528, 0.000229659, 0.0334224, 0.0110034,
@@ -386,7 +386,7 @@ TEST(ATLAS, BROKEN_3)
   server.serve(8080);
   server.renderWorld(world);
 
-  Eigen::VectorXd animatePos = brokenPos;
+  Eigen::VectorXs animatePos = brokenPos;
   int i = 0;
   Ticker ticker(0.01);
   ticker.registerTickListener([&](long /* time */) {
@@ -418,21 +418,21 @@ TEST(ATLAS, BROKEN_3)
 #ifdef FULL_TEST
 TEST(ATLAS_EXAMPLE, FULL_TEST)
 {
-  double target_x = 0.5;
-  double target_y = 1.0;
-  double target_z = -1.0;
+  s_t target_x = 0.5;
+  s_t target_y = 1.0;
+  s_t target_z = -1.0;
   std::shared_ptr<simulation::World> world
       = createWorld(target_x, target_y, target_z);
   std::shared_ptr<dynamics::Skeleton> atlas = world->getSkeleton(0);
 
   trajectory::LossFn loss([target_x, target_y, target_z](
                               const trajectory::TrajectoryRollout* rollout) {
-    const Eigen::VectorXd lastPos = rollout->getPosesConst("ik").col(
+    const Eigen::VectorXs lastPos = rollout->getPosesConst("ik").col(
         rollout->getPosesConst("ik").cols() - 1);
 
-    double diffX = lastPos(0) - target_x;
-    double diffY = lastPos(1) - target_y;
-    double diffZ = lastPos(2) - target_z;
+    s_t diffX = lastPos(0) - target_x;
+    s_t diffY = lastPos(1) - target_y;
+    s_t diffZ = lastPos(2) - target_z;
 
     return diffX * diffX + diffY * diffY + diffZ * diffZ;
   });
@@ -454,19 +454,19 @@ TEST(ATLAS_EXAMPLE, FULL_TEST)
   server.serve(8070);
   server.renderWorld(world);
 
-  Eigen::VectorXd atlasPos = world->getPositions();
+  Eigen::VectorXs atlasPos = world->getPositions();
   /*
   for (int i = 0; i < 1000; i++)
   {
-    Eigen::VectorXd pos = ikMapping->getPositions(world);
-    Eigen::MatrixXd jac = ikMapping->getMappedPosToRealPosJac(world);
-    double diffX = pos(0) - target_x;
-    double diffY = pos(1) - target_y;
+    Eigen::VectorXs pos = ikMapping->getPositions(world);
+    Eigen::MatrixXs jac = ikMapping->getMappedPosToRealPosJac(world);
+    s_t diffX = pos(0) - target_x;
+    s_t diffY = pos(1) - target_y;
 
-    Eigen::Vector3d grad = Eigen::Vector3d(2.0 * diffX, 2.0 * diffY, 0.0);
-    double loss = diffX * diffX + diffY * diffY;
+    Eigen::Vector3s grad = Eigen::Vector3s(2.0 * diffX, 2.0 * diffY, 0.0);
+    s_t loss = diffX * diffX + diffY * diffY;
 
-    Eigen::VectorXd posDiff = jac * grad;
+    Eigen::VectorXs posDiff = jac * grad;
     atlasPos -= posDiff * 0.001;
     world->setPositions(atlasPos);
     server.renderWorld(world);
@@ -475,23 +475,23 @@ TEST(ATLAS_EXAMPLE, FULL_TEST)
 
   /*
   server.renderBasis(
-      10.0, "basis", Eigen::Vector3d::Zero(), Eigen::Vector3d::Zero());
+      10.0, "basis", Eigen::Vector3s::Zero(), Eigen::Vector3s::Zero());
       */
 
   /*
   Ticker ticker(0.1);
   ticker.registerTickListener([&](long time) {
-    Eigen::VectorXd pos = ikMapping->getPositions(world);
-    Eigen::MatrixXd jac = ikMapping->getMappedPosToRealPosJac(world);
-    double diffX = pos(0) - target_x;
-    double diffY = pos(1) - target_y;
-    double diffZ = pos(2) - target_z;
+    Eigen::VectorXs pos = ikMapping->getPositions(world);
+    Eigen::MatrixXs jac = ikMapping->getMappedPosToRealPosJac(world);
+    s_t diffX = pos(0) - target_x;
+    s_t diffY = pos(1) - target_y;
+    s_t diffZ = pos(2) - target_z;
 
-    Eigen::Vector3d grad
-        = Eigen::Vector3d(2.0 * diffX, 2.0 * diffY, 2.0 * diffZ);
-    double loss = diffX * diffX + diffY * diffY + diffZ * diffZ;
+    Eigen::Vector3s grad
+        = Eigen::Vector3s(2.0 * diffX, 2.0 * diffY, 2.0 * diffZ);
+    s_t loss = diffX * diffX + diffY * diffY + diffZ * diffZ;
 
-    Eigen::VectorXd posDiff = jac * grad;
+    Eigen::VectorXs posDiff = jac * grad;
     posDiff.segment(0, 6).setZero();
     atlasPos -= posDiff * 0.01;
     world->setPositions(atlasPos);
@@ -508,11 +508,11 @@ TEST(ATLAS_EXAMPLE, FULL_TEST)
   optimizer.setIterationLimit(500);
   optimizer.registerIntermediateCallback([&](trajectory::Problem* problem,
                                              int /* step */,
-                                             double /* primal */,
-                                             double /* dual */) {
-    const Eigen::MatrixXd poses
+                                             s_t /* primal */,
+                                             s_t /* dual */) {
+    const Eigen::MatrixXs poses
         = problem->getRolloutCache(world)->getPosesConst();
-    const Eigen::MatrixXd vels
+    const Eigen::MatrixXs vels
         = problem->getRolloutCache(world)->getVelsConst();
     std::cout << "Rendering trajectory lines" << std::endl;
     server.renderTrajectoryLines(world, poses);
@@ -525,9 +525,9 @@ TEST(ATLAS_EXAMPLE, FULL_TEST)
 
   /*
   int i = 0;
-  const Eigen::MatrixXd poses
+  const Eigen::MatrixXs poses
       = result->getStep(result->getNumSteps() - 1).rollout->getPosesConst();
-  const Eigen::MatrixXd vels
+  const Eigen::MatrixXs vels
       = result->getStep(result->getNumSteps() - 1).rollout->getVelsConst();
 
   server.renderTrajectoryLines(world, poses);

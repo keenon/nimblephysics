@@ -52,7 +52,7 @@ int main(int argc, char* argv[])
   assert(myWorld != nullptr);
 
   int dof = myWorld->getSkeleton(1)->getNumDofs();
-  Eigen::VectorXd initPose = Eigen::VectorXd::Zero(dof);
+  Eigen::VectorXs initPose = Eigen::VectorXs::Zero(dof);
   for (int i = 0; i < 3; i++)
     initPose[i] = dart::math::Random::uniform(-0.5, 0.5);
   myWorld->getSkeleton(1)->setPositions(initPose);

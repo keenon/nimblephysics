@@ -34,6 +34,7 @@
 #define DART_CONSTRAINT_PGSBOXEDLCPSOLVER_HPP_
 
 #include <vector>
+
 #include "dart/constraint/BoxedLcpSolver.hpp"
 
 namespace dart {
@@ -46,16 +47,16 @@ public:
   struct Option
   {
     int mMaxIteration;
-    double mDeltaXThreshold;
-    double mRelativeDeltaXTolerance;
-    double mEpsilonForDivision;
+    s_t mDeltaXThreshold;
+    s_t mRelativeDeltaXTolerance;
+    s_t mEpsilonForDivision;
     bool mRandomizeConstraintOrder;
 
     Option(
         int maxIteration = 30,
-        double deltaXTolerance = 1e-6,
-        double relativeDeltaXTolerance = 1e-3,
-        double epsilonForDivision = 1e-9,
+        s_t deltaXTolerance = 1e-6,
+        s_t relativeDeltaXTolerance = 1e-3,
+        s_t epsilonForDivision = 1e-9,
         bool randomizeConstraintOrder = false);
   };
 
@@ -68,18 +69,18 @@ public:
   // Documentation inherited.
   bool solve(
       int n,
-      double* A,
-      double* x,
-      double* b,
+      s_t* A,
+      s_t* x,
+      s_t* b,
       int nub,
-      double* lo,
-      double* hi,
+      s_t* lo,
+      s_t* hi,
       int* findex,
       bool earlyTermination) override;
 
 #ifndef NDEBUG
   // Documentation inherited.
-  bool canSolve(int n, const double* A) override;
+  bool canSolve(int n, const s_t* A) override;
 #endif
 
   /// Sets options
@@ -92,11 +93,11 @@ protected:
   Option mOption;
 
   mutable std::vector<int> mCacheOrder;
-  mutable std::vector<double> mCacheD;
-  mutable Eigen::VectorXd mCachedNormalizedA;
-  mutable Eigen::MatrixXd mCachedNormalizedB;
-  mutable Eigen::VectorXd mCacheZ;
-  mutable Eigen::VectorXd mCacheOldX;
+  mutable std::vector<s_t> mCacheD;
+  mutable Eigen::VectorXs mCachedNormalizedA;
+  mutable Eigen::MatrixXs mCachedNormalizedB;
+  mutable Eigen::VectorXs mCacheZ;
+  mutable Eigen::VectorXs mCacheOldX;
 };
 
 } // namespace constraint

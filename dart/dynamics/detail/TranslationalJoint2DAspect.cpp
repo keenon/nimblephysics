@@ -59,14 +59,14 @@ TranslationalJoint2DUniqueProperties::TranslationalJoint2DUniqueProperties(
 
 //==============================================================================
 TranslationalJoint2DUniqueProperties::TranslationalJoint2DUniqueProperties(
-    const Eigen::Matrix<double, 3, 2>& transAxes)
+    const Eigen::Matrix<s_t, 3, 2>& transAxes)
 {
   setArbitraryPlane(transAxes);
 }
 
 //==============================================================================
 TranslationalJoint2DUniqueProperties::TranslationalJoint2DUniqueProperties(
-    const Eigen::Vector3d& transAxis1, const Eigen::Vector3d& transAxis2)
+    const Eigen::Vector3s& transAxis1, const Eigen::Vector3s& transAxis2)
 {
   setArbitraryPlane(transAxis1, transAxis2);
 }
@@ -96,29 +96,29 @@ TranslationalJoint2DUniqueProperties::TranslationalJoint2DUniqueProperties(
 void TranslationalJoint2DUniqueProperties::setXYPlane()
 {
   mPlaneType = PlaneType::XY;
-  mTransAxes.col(0) = Eigen::Vector3d::UnitX();
-  mTransAxes.col(1) = Eigen::Vector3d::UnitY();
+  mTransAxes.col(0) = Eigen::Vector3s::UnitX();
+  mTransAxes.col(1) = Eigen::Vector3s::UnitY();
 }
 
 //==============================================================================
 void TranslationalJoint2DUniqueProperties::setYZPlane()
 {
   mPlaneType = PlaneType::YZ;
-  mTransAxes.col(0) = Eigen::Vector3d::UnitY();
-  mTransAxes.col(1) = Eigen::Vector3d::UnitZ();
+  mTransAxes.col(0) = Eigen::Vector3s::UnitY();
+  mTransAxes.col(1) = Eigen::Vector3s::UnitZ();
 }
 
 //==============================================================================
 void TranslationalJoint2DUniqueProperties::setZXPlane()
 {
   mPlaneType = PlaneType::ZX;
-  mTransAxes.col(0) = Eigen::Vector3d::UnitZ();
-  mTransAxes.col(1) = Eigen::Vector3d::UnitX();
+  mTransAxes.col(0) = Eigen::Vector3s::UnitZ();
+  mTransAxes.col(1) = Eigen::Vector3s::UnitX();
 }
 
 //==============================================================================
 void TranslationalJoint2DUniqueProperties::setArbitraryPlane(
-    const Eigen::Matrix<double, 3, 2>& transAxes)
+    const Eigen::Matrix<s_t, 3, 2>& transAxes)
 {
   // Set plane type as arbitrary plane
   mPlaneType = PlaneType::ARBITRARY;
@@ -127,16 +127,16 @@ void TranslationalJoint2DUniqueProperties::setArbitraryPlane(
   mTransAxes = transAxes.colwise().normalized();
 
   // Orthogonalize translational axes
-  const double dotProduct = mTransAxes.col(0).dot(mTransAxes.col(1));
-  assert(std::abs(dotProduct) < 1.0 - 1e-6);
-  if (std::abs(dotProduct) > 1e-6)
+  const s_t dotProduct = mTransAxes.col(0).dot(mTransAxes.col(1));
+  assert(abs(dotProduct) < 1.0 - 1e-6);
+  if (abs(dotProduct) > 1e-6)
     mTransAxes.col(1)
         = (mTransAxes.col(1) - dotProduct * mTransAxes.col(0)).normalized();
 }
 
 //==============================================================================
 void TranslationalJoint2DUniqueProperties::setArbitraryPlane(
-    const Eigen::Vector3d& transAxis1, const Eigen::Vector3d& transAxis2)
+    const Eigen::Vector3s& transAxis1, const Eigen::Vector3s& transAxis2)
 {
   // Set plane type as arbitrary plane
   mPlaneType = PlaneType::ARBITRARY;
@@ -148,29 +148,29 @@ void TranslationalJoint2DUniqueProperties::setArbitraryPlane(
   mTransAxes.col(1) = transAxis2.normalized();
 
   // Orthogonalize translational axes
-  const double dotProduct = mTransAxes.col(0).dot(mTransAxes.col(1));
-  assert(std::abs(dotProduct) < 1.0 - 1e-6);
-  if (std::abs(dotProduct) > 1e-6)
+  const s_t dotProduct = mTransAxes.col(0).dot(mTransAxes.col(1));
+  assert(abs(dotProduct) < 1.0 - 1e-6);
+  if (abs(dotProduct) > 1e-6)
     mTransAxes.col(1)
         = (mTransAxes.col(1) - dotProduct * mTransAxes.col(0)).normalized();
 }
 
 //==============================================================================
-const Eigen::Matrix<double, 3, 2>&
+const Eigen::Matrix<s_t, 3, 2>&
 TranslationalJoint2DUniqueProperties::getTranslationalAxes() const
 {
   return mTransAxes;
 }
 
 //==============================================================================
-Eigen::Vector3d TranslationalJoint2DUniqueProperties::getTranslationalAxis1()
+Eigen::Vector3s TranslationalJoint2DUniqueProperties::getTranslationalAxis1()
     const
 {
   return mTransAxes.col(0);
 }
 
 //==============================================================================
-Eigen::Vector3d TranslationalJoint2DUniqueProperties::getTranslationalAxis2()
+Eigen::Vector3s TranslationalJoint2DUniqueProperties::getTranslationalAxis2()
     const
 {
   return mTransAxes.col(1);

@@ -62,38 +62,38 @@ TEST(Random, CheckSyntaxValidity)
   unsigned long long maxull = 10ull;
   float minf = -3.0f;
   float maxf = 4.0f;
-  double mind = -5.0;
-  double maxd = 10.0;
-  long double minld = -5.0l;
-  long double maxld = 10.0l;
+  s_t mind = -5.0;
+  s_t maxd = 10.0;
+  long s_t minld = -5.0l;
+  long s_t maxld = 10.0l;
 
   Eigen::VectorXi minVecXi = Eigen::VectorXi::Constant(size, mini);
   Eigen::VectorXi maxVecXi = Eigen::VectorXi::Constant(size, maxi);
   Eigen::VectorXf minVecXf = Eigen::VectorXf::Constant(size, minf);
   Eigen::VectorXf maxVecXf = Eigen::VectorXf::Constant(size, maxf);
-  Eigen::VectorXd minVecXd = Eigen::VectorXd::Constant(size, mind);
-  Eigen::VectorXd maxVecXd = Eigen::VectorXd::Constant(size, maxd);
+  Eigen::VectorXs minVecXd = Eigen::VectorXs::Constant(size, mind);
+  Eigen::VectorXs maxVecXd = Eigen::VectorXs::Constant(size, maxd);
 
   Eigen::Vector3i minVec3i = Eigen::Vector3i::Constant(mini);
   Eigen::Vector3i maxVec3i = Eigen::Vector3i::Constant(maxi);
   Eigen::Vector3f minVec3f = Eigen::Vector3f::Constant(minf);
   Eigen::Vector3f maxVec3f = Eigen::Vector3f::Constant(maxf);
-  Eigen::Vector3d minVec3d = Eigen::Vector3d::Constant(mind);
-  Eigen::Vector3d maxVec3d = Eigen::Vector3d::Constant(maxd);
+  Eigen::Vector3s minVec3d = Eigen::Vector3s::Constant(mind);
+  Eigen::Vector3s maxVec3d = Eigen::Vector3s::Constant(maxd);
 
   Eigen::MatrixXi minMatXi = Eigen::MatrixXi::Constant(rows, cols, mini);
   Eigen::MatrixXi maxMatXi = Eigen::MatrixXi::Constant(rows, cols, maxi);
   Eigen::MatrixXf minMatXf = Eigen::MatrixXf::Constant(rows, cols, minf);
   Eigen::MatrixXf maxMatXf = Eigen::MatrixXf::Constant(rows, cols, maxf);
-  Eigen::MatrixXd minMatXd = Eigen::MatrixXd::Constant(rows, cols, mind);
-  Eigen::MatrixXd maxMatXd = Eigen::MatrixXd::Constant(rows, cols, maxd);
+  Eigen::MatrixXs minMatXd = Eigen::MatrixXs::Constant(rows, cols, mind);
+  Eigen::MatrixXs maxMatXd = Eigen::MatrixXs::Constant(rows, cols, maxd);
 
   Eigen::Matrix3i minMat3i = Eigen::Matrix3i::Constant(mini);
   Eigen::Matrix3i maxMat3i = Eigen::Matrix3i::Constant(maxi);
   Eigen::Matrix3f minMat3f = Eigen::Matrix3f::Constant(minf);
   Eigen::Matrix3f maxMat3f = Eigen::Matrix3f::Constant(maxf);
-  Eigen::Matrix3d minMat3d = Eigen::Matrix3d::Constant(mind);
-  Eigen::Matrix3d maxMat3d = Eigen::Matrix3d::Constant(maxd);
+  Eigen::Matrix3s minMat3d = Eigen::Matrix3s::Constant(mind);
+  Eigen::Matrix3s maxMat3d = Eigen::Matrix3s::Constant(maxd);
 
   // -- Create random vectors without template parameters.
   //
@@ -144,45 +144,45 @@ TEST(Random, CheckSyntaxValidity)
   Random::uniform<unsigned long>(minul, maxul);
   Random::uniform<unsigned long long>(minull, maxull);
   Random::uniform<float>(minf, maxf);
-  Random::uniform<double>(mind, maxd);
-  Random::uniform<long double>(minld, maxld);
+  Random::uniform<s_t>(mind, maxd);
+  Random::uniform<long s_t>(minld, maxld);
 
   // Create random vectors given scalar bounds
   Random::uniform<Eigen::VectorXi>(size, mini, maxi);
   Random::uniform<Eigen::VectorXf>(size, minf, maxf);
-  Random::uniform<Eigen::VectorXd>(size, mind, maxd);
+  Random::uniform<Eigen::VectorXs>(size, mind, maxd);
 
   // Create random vectors given dynamic size vector bounds
   Random::uniform<Eigen::VectorXi>(minVecXi, maxVecXi);
   Random::uniform<Eigen::VectorXf>(minVecXf, maxVecXf);
-  Random::uniform<Eigen::VectorXd>(minVecXd, maxVecXd);
+  Random::uniform<Eigen::VectorXs>(minVecXd, maxVecXd);
 
   // Create random vectors given fixed-size vector bounds
   Random::uniform<Eigen::Vector3i>(minVec3i, maxVec3i);
   Random::uniform<Eigen::Vector3f>(minVec3f, maxVec3f);
-  Random::uniform<Eigen::Vector3d>(minVec3d, maxVec3d);
+  Random::uniform<Eigen::Vector3s>(minVec3d, maxVec3d);
 
   // Create random vectors given scalar bounds
   Random::uniform<Eigen::MatrixXi>(rows, cols, mini, maxi);
   Random::uniform<Eigen::MatrixXf>(rows, cols, minf, maxf);
-  Random::uniform<Eigen::MatrixXd>(rows, cols, mind, maxd);
+  Random::uniform<Eigen::MatrixXs>(rows, cols, mind, maxd);
 
   // Create random matrices given dynamic size matrix bounds
   Random::uniform<Eigen::MatrixXi>(minMatXi, maxMatXi);
   Random::uniform<Eigen::MatrixXf>(minMatXf, maxMatXf);
-  Random::uniform<Eigen::MatrixXd>(minMatXd, maxMatXd);
+  Random::uniform<Eigen::MatrixXs>(minMatXd, maxMatXd);
 
   // Create random matrices given fixed-size matrix bounds
   Random::uniform<Eigen::Matrix3i>(minMat3i, maxMat3i);
   Random::uniform<Eigen::Matrix3f>(minMat3f, maxMat3f);
-  Random::uniform<Eigen::Matrix3d>(minMat3d, maxMat3d);
+  Random::uniform<Eigen::Matrix3s>(minMat3d, maxMat3d);
 }
 
 //==============================================================================
 TEST(Random, UniformScalar)
 {
-  double mind = -5.0;
-  double maxd = 10.0;
+  s_t mind = -5.0;
+  s_t maxd = 10.0;
 
   float minf = -3.0f;
   float maxf = 4.0f;
@@ -190,7 +190,7 @@ TEST(Random, UniformScalar)
   int mini = -5.0;
   int maxi = 10.0;
 
-  double uniformd = math::Random::uniform(mind, maxd);
+  s_t uniformd = math::Random::uniform(mind, maxd);
   EXPECT_GE(uniformd, mind);
   EXPECT_LE(uniformd, maxd);
 
@@ -248,8 +248,8 @@ TEST(Random, UniformClosedEnd)
 //==============================================================================
 TEST(Random, NormalScalar)
 {
-  double meand = 1.0;
-  double sigmad = 10.0;
+  s_t meand = 1.0;
+  s_t sigmad = 10.0;
 
   float meanf = -3.0f;
   float sigmaf = 4.0f;
@@ -269,8 +269,8 @@ TEST(Random, UniformVector)
 {
   const int vectorSize = 5;
 
-  Eigen::VectorXd mind = Eigen::VectorXd::Constant(vectorSize, -5.0);
-  Eigen::VectorXd maxd = Eigen::VectorXd::Constant(vectorSize, 10.0);
+  Eigen::VectorXs mind = Eigen::VectorXs::Constant(vectorSize, -5.0);
+  Eigen::VectorXs maxd = Eigen::VectorXs::Constant(vectorSize, 10.0);
 
   Eigen::VectorXf minf = Eigen::VectorXf::Constant(vectorSize, -3.0f);
   Eigen::VectorXf maxf = Eigen::VectorXf::Constant(vectorSize, 4.0f);
@@ -278,7 +278,7 @@ TEST(Random, UniformVector)
   Eigen::VectorXi mini = Eigen::VectorXi::Constant(vectorSize, -5);
   Eigen::VectorXi maxi = Eigen::VectorXi::Constant(vectorSize, 10);
 
-  Eigen::VectorXd uniformd = math::Random::uniform(mind, maxd);
+  Eigen::VectorXs uniformd = math::Random::uniform(mind, maxd);
   EXPECT_TRUE((uniformd.array() >= mind.array()).all());
   EXPECT_TRUE((uniformd.array() <= maxd.array()).all());
 

@@ -5,6 +5,7 @@
 #include <utility>
 
 #include <Eigen/Dense>
+#include "dart/math/MathTypes.hpp"
 
 namespace dart {
 
@@ -18,7 +19,7 @@ namespace amc {
 class AMCParser
 {
 public:
-  std::pair<std::shared_ptr<dynamics::Skeleton>, Eigen::MatrixXd> loadAMC(
+  std::pair<std::shared_ptr<dynamics::Skeleton>, Eigen::MatrixXs> loadAMC(
       const std::string& asfPath, const std::string& amcPath);
 };
 

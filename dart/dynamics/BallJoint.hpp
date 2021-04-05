@@ -80,20 +80,20 @@ public:
   /// between the parent BodyNode and the child BodyNode frames when applied to
   /// a BallJoint.
   template <typename RotationType>
-  static Eigen::Vector3d convertToPositions(const RotationType& _rotation)
+  static Eigen::Vector3s convertToPositions(const RotationType& _rotation)
   {
     return math::logMap(_rotation);
   }
 
   /// Convert a BallJoint-style position vector into a transform
-  static Eigen::Isometry3d convertToTransform(const Eigen::Vector3d& _positions);
+  static Eigen::Isometry3s convertToTransform(const Eigen::Vector3s& _positions);
 
   /// Convert a BallJoint-style position vector into a rotation matrix
-  static Eigen::Matrix3d convertToRotation(const Eigen::Vector3d& _positions);
+  static Eigen::Matrix3s convertToRotation(const Eigen::Vector3s& _positions);
 
   // Documentation inherited
-  Eigen::Matrix<double, 6, 3> getRelativeJacobianStatic(
-      const Eigen::Vector3d& _positions) const override;
+  Eigen::Matrix<s_t, 6, 3> getRelativeJacobianStatic(
+      const Eigen::Vector3s& _positions) const override;
 
   math::Jacobian getRelativeJacobianDeriv(std::size_t index) const override;
   math::Jacobian finiteDifferenceRelativeJacobianDeriv(std::size_t index) const;
@@ -105,40 +105,40 @@ public:
   math::Jacobian finiteDifferenceRelativeJacobianTimeDerivDeriv2(std::size_t index) const;
 
   // Documentation inherited
-  Eigen::Matrix<double, 6, 3> getRelativeJacobianInPositionSpaceStatic(
-      const Eigen::Vector3d& _positions) const override;
+  Eigen::Matrix<s_t, 6, 3> getRelativeJacobianInPositionSpaceStatic(
+      const Eigen::Vector3s& _positions) const override;
 
   // Documentation inherited
-  Eigen::Vector3d getPositionDifferencesStatic(
-      const Eigen::Vector3d& _q2, const Eigen::Vector3d& _q1) const override;
+  Eigen::Vector3s getPositionDifferencesStatic(
+      const Eigen::Vector3s& _q2, const Eigen::Vector3s& _q1) const override;
 
   /*
   // This gets the world axis screw at the current position, without moving the joint.
-  Eigen::Vector6d getWorldAxisScrewForPosition(int dof) const override;
+  Eigen::Vector6s getWorldAxisScrewForPosition(int dof) const override;
   */
 
   // This computes the world axis screw at a given position, without moving the joint.
-  Eigen::Vector6d getWorldAxisScrewAt(Eigen::Vector3d pos, int dof) const;
+  Eigen::Vector6s getWorldAxisScrewAt(Eigen::Vector3s pos, int dof) const;
 
   // This estimates the new world screw axis at `axisDof` when we perturbe `rotateDof` by `eps`
-  Eigen::Vector6d estimatePerturbedScrewAxisForPosition(
+  Eigen::Vector6s estimatePerturbedScrewAxisForPosition(
     int axisDof,
     int rotateDof,
-    double eps);
+    s_t eps);
 
   // This estimates the new world screw axis at `axisDof` when we perturbe `rotateDof` by `eps`
-  Eigen::Vector6d estimatePerturbedScrewAxisForForce(
+  Eigen::Vector6s estimatePerturbedScrewAxisForForce(
     int axisDof,
     int rotateDof,
-    double eps);
+    s_t eps);
 
   // Returns the gradient of the screw axis with respect to the rotate dof
-  Eigen::Vector6d getScrewAxisGradientForPosition(
+  Eigen::Vector6s getScrewAxisGradientForPosition(
     int axisDof,
     int rotateDof);
 
   // Returns the gradient of the screw axis with respect to the rotate dof
-  Eigen::Vector6d getScrewAxisGradientForForce(
+  Eigen::Vector6s getScrewAxisGradientForForce(
     int axisDof,
     int rotateDof);
 
@@ -153,27 +153,27 @@ protected:
   using Base::getRelativeJacobianStatic;
 
   // Documentation inherited
-  void integratePositions(double _dt) override;
+  void integratePositions(s_t _dt) override;
 
 #ifndef DART_USE_IDENTITY_JACOBIAN
   // Documentation inherited
-  void integrateVelocities(double dt) override;
+  void integrateVelocities(s_t dt) override;
 #endif
 
   // Documentation inherited
-  Eigen::VectorXd integratePositionsExplicit(const Eigen::VectorXd& pos, const Eigen::VectorXd& vel, double dt) override;
+  Eigen::VectorXs integratePositionsExplicit(const Eigen::VectorXs& pos, const Eigen::VectorXs& vel, s_t dt) override;
 
   /// Returns d/dpos of integratePositionsExplicit()
-  Eigen::MatrixXd getPosPosJacobian(const Eigen::VectorXd& pos, const Eigen::VectorXd& vel, double _dt) override;
+  Eigen::MatrixXs getPosPosJacobian(const Eigen::VectorXs& pos, const Eigen::VectorXs& vel, s_t _dt) override;
 
   /// Returns d/dvel of integratePositionsExplicit()
-  Eigen::MatrixXd getVelPosJacobian(const Eigen::VectorXd& pos, const Eigen::VectorXd& vel, double _dt) override;
+  Eigen::MatrixXs getVelPosJacobian(const Eigen::VectorXs& pos, const Eigen::VectorXs& vel, s_t _dt) override;
 
   /// Returns d/dpos of integratePositionsExplicit() by finite differencing
-  Eigen::MatrixXd finiteDifferencePosPosJacobian(const Eigen::VectorXd& pos, const Eigen::VectorXd& vel, double _dt);
+  Eigen::MatrixXs finiteDifferencePosPosJacobian(const Eigen::VectorXs& pos, const Eigen::VectorXs& vel, s_t _dt);
 
   /// Returns d/dvel of integratePositionsExplicit() by finite differencing
-  Eigen::MatrixXd finiteDifferenceVelPosJacobian(const Eigen::VectorXd& pos, const Eigen::VectorXd& vel, double _dt);
+  Eigen::MatrixXs finiteDifferenceVelPosJacobian(const Eigen::VectorXs& pos, const Eigen::VectorXs& vel, s_t _dt);
 
   // Documentation inherited
   void updateDegreeOfFreedomNames() override;
@@ -190,12 +190,12 @@ protected:
 protected:
 #ifdef DART_USE_IDENTITY_JACOBIAN
   /// Access mR, which is an auto-updating variable
-  const Eigen::Isometry3d& getR() const;
+  const Eigen::Isometry3s& getR() const;
 
   /// Rotation matrix dependent on the generalized coordinates
   ///
   /// Do not use directly! Use getR() to access this
-  mutable Eigen::Isometry3d mR;
+  mutable Eigen::Isometry3s mR;
 #endif
 public:
   // To get byte-aligned Eigen vectors

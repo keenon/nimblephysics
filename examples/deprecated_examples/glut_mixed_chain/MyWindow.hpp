@@ -63,13 +63,13 @@ public:
 
 private:
   /// \brief
-  Eigen::Vector3d mForceOnRigidBody;
+  Eigen::Vector3s mForceOnRigidBody;
 
   /// \brief Number of frames for applying external force
   int mImpulseDuration;
 
   /// \brief
-  Eigen::Vector3d mForceOnVertex;
+  Eigen::Vector3s mForceOnVertex;
 };
 
 #endif // EXAMPLES_TESTDROP_MYWINDOW_HPP_

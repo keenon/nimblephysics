@@ -41,43 +41,43 @@ int dart_skeleton_get_num_dofs(SkeletonId skel)
 
 //==============================================================================
 void dart_skeleton_set_positions(
-    SkeletonId skel, double* positions, int num_poisitions)
+    SkeletonId skel, s_t* positions, int num_poisitions)
 {
-  const Eigen::Map<Eigen::VectorXd> eigPositions(positions, num_poisitions);
+  const Eigen::Map<Eigen::VectorXs> eigPositions(positions, num_poisitions);
   CAST_SKELETON(skel)->setPositions(eigPositions);
 }
 
 //==============================================================================
-double* dart_skeleton_get_positions(SkeletonId skel)
+s_t* dart_skeleton_get_positions(SkeletonId skel)
 {
   return CAST_SKELETON(skel)->getPositions().data();
 }
 
 //==============================================================================
 void dart_skeleton_set_velocities(
-    SkeletonId skel, double* velocities, int num_velocities)
+    SkeletonId skel, s_t* velocities, int num_velocities)
 {
-  const Eigen::Map<Eigen::VectorXd> eigVelocities(velocities, num_velocities);
+  const Eigen::Map<Eigen::VectorXs> eigVelocities(velocities, num_velocities);
   CAST_SKELETON(skel)->setVelocities(eigVelocities);
 }
 
 //==============================================================================
-double* dart_skeleton_get_velocities(SkeletonId skel)
+s_t* dart_skeleton_get_velocities(SkeletonId skel)
 {
   return CAST_SKELETON(skel)->getVelocities().data();
 }
 
 //==============================================================================
 void dart_skeleton_set_accelerations(
-    SkeletonId skel, double* accelerations, int num_accelerations)
+    SkeletonId skel, s_t* accelerations, int num_accelerations)
 {
-  const Eigen::Map<Eigen::VectorXd> eigAccelerations(
+  const Eigen::Map<Eigen::VectorXs> eigAccelerations(
       accelerations, num_accelerations);
   CAST_SKELETON(skel)->setAccelerations(eigAccelerations);
 }
 
 //==============================================================================
-double* dart_skeleton_get_accelerations(SkeletonId skel)
+s_t* dart_skeleton_get_accelerations(SkeletonId skel)
 {
   return CAST_SKELETON(skel)->getAccelerations().data();
 }

@@ -52,13 +52,13 @@ TEST(InverseKinematics, SolveForFreeJoint)
 
   std::shared_ptr<InverseKinematics> ik = skel->getBodyNode(0)->getIK(true);
 
-  Eigen::Isometry3d tf(Eigen::Isometry3d::Identity());
-  tf.translation() = Eigen::Vector3d(0.0, 0.0, 0.8);
-  tf.rotate(Eigen::AngleAxisd(M_PI / 8, Eigen::Vector3d(0, 1, 0)));
+  Eigen::Isometry3s tf(Eigen::Isometry3s::Identity());
+  tf.translation() = Eigen::Vector3s(0.0, 0.0, 0.8);
+  tf.rotate(Eigen::AngleAxis_s(M_PI / 8, Eigen::Vector3s(0, 1, 0)));
   ik->getTarget()->setTransform(tf);
 
   ik->getErrorMethod().setBounds(
-      Eigen::Vector6d::Constant(-1e-8), Eigen::Vector6d::Constant(1e-8));
+      Eigen::Vector6s::Constant(-1e-8), Eigen::Vector6s::Constant(1e-8));
 
   ik->getSolver()->setNumMaxIterations(100);
 
@@ -79,7 +79,7 @@ TEST(InverseKinematics, SolveForFreeJoint)
 class FailingSolver : public optimizer::Solver
 {
 public:
-  FailingSolver(double constant) : mConstant(constant)
+  FailingSolver(s_t constant) : mConstant(constant)
   {
     // Do nothing
   }
@@ -97,8 +97,8 @@ public:
     }
 
     const auto dim = problem->getDimension();
-    const Eigen::VectorXd wrongSolution
-        = Eigen::VectorXd::Constant(static_cast<int>(dim), mConstant);
+    const Eigen::VectorXs wrongSolution
+        = Eigen::VectorXs::Constant(static_cast<int>(dim), mConstant);
     problem->setOptimalSolution(wrongSolution);
 
     return false;
@@ -115,7 +115,7 @@ public:
   }
 
 protected:
-  double mConstant;
+  s_t mConstant;
 };
 
 //==============================================================================
@@ -126,15 +126,15 @@ TEST(InverseKinematics, DoNotApplySolutionOnFailure)
 
   std::shared_ptr<InverseKinematics> ik = skel->getBodyNode(0)->getIK(true);
   ik->setSolver(std::make_shared<FailingSolver>(10));
-  ik->getTarget()->setTransform(Eigen::Isometry3d::Identity());
+  ik->getTarget()->setTransform(Eigen::Isometry3s::Identity());
 
   const auto dofs = static_cast<int>(skel->getNumDofs());
   skel->resetPositions();
 
   EXPECT_FALSE(ik->solveAndApply(false));
-  EXPECT_TRUE(equals(skel->getPositions(), Eigen::VectorXd::Zero(dofs).eval()));
+  EXPECT_TRUE(equals(skel->getPositions(), Eigen::VectorXs::Zero(dofs).eval()));
 
   EXPECT_FALSE(ik->solveAndApply(true));
   EXPECT_FALSE(
-      equals(skel->getPositions(), Eigen::VectorXd::Zero(dofs).eval()));
+      equals(skel->getPositions(), Eigen::VectorXs::Zero(dofs).eval()));
 }

@@ -68,43 +68,43 @@ void ShapeNode(py::module& m)
       .def(
           "setRelativeTransform",
           +[](dart::dynamics::ShapeNode* self,
-              const Eigen::Isometry3d& transform) {
+              const Eigen::Isometry3s& transform) {
             self->setRelativeTransform(transform);
           },
           ::py::arg("transform"))
       .def(
           "setRelativeRotation",
           +[](dart::dynamics::ShapeNode* self,
-              const Eigen::Matrix3d& rotation) {
+              const Eigen::Matrix3s& rotation) {
             self->setRelativeRotation(rotation);
           },
           ::py::arg("rotation"))
       .def(
           "getRelativeRotation",
-          +[](const dart::dynamics::ShapeNode* self) -> Eigen::Matrix3d {
+          +[](const dart::dynamics::ShapeNode* self) -> Eigen::Matrix3s {
             return self->getRelativeRotation();
           })
       .def(
           "setRelativeTranslation",
           +[](dart::dynamics::ShapeNode* self,
-              const Eigen::Vector3d& translation) {
+              const Eigen::Vector3s& translation) {
             self->setRelativeTranslation(translation);
           },
           ::py::arg("translation"))
       .def(
           "setOffset",
-          +[](dart::dynamics::ShapeNode* self, const Eigen::Vector3d& offset) {
+          +[](dart::dynamics::ShapeNode* self, const Eigen::Vector3s& offset) {
             self->setOffset(offset);
           },
           ::py::arg("offset"))
       .def(
           "getRelativeTranslation",
-          +[](const dart::dynamics::ShapeNode* self) -> Eigen::Vector3d {
+          +[](const dart::dynamics::ShapeNode* self) -> Eigen::Vector3s {
             return self->getRelativeTranslation();
           })
       .def(
           "getOffset",
-          +[](const dart::dynamics::ShapeNode* self) -> Eigen::Vector3d {
+          +[](const dart::dynamics::ShapeNode* self) -> Eigen::Vector3s {
             return self->getOffset();
           });
 }

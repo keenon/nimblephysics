@@ -6,6 +6,7 @@
 
 #include <Eigen/Dense>
 
+#include "dart/math/MathTypes.hpp"
 #include "dart/realtime/ControlLog.hpp"
 #include "dart/realtime/ObservationLog.hpp"
 
@@ -31,19 +32,19 @@ public:
   /// Gets the force at a given timestep. This HAS SIDE EFFECTS! We actually
   /// keep track of what forces were read, and assume that they're "immediately"
   /// applied to the real world after they're read.
-  Eigen::VectorXd getPlannedForce(long time, bool dontLog = false);
+  Eigen::VectorXs getPlannedForce(long time, bool dontLog = false);
 
   /// This gets planned forces starting at `start`, and continuing for the
   /// length of our buffer size `mSteps`. This is useful for initializing MPC
   /// runs. It supports walking off the end of known future, and assumes 0
   /// forces in all extrapolation.
   void getPlannedForcesStartingAt(
-      long start, Eigen::Ref<Eigen::MatrixXd> forcesOut);
+      long start, Eigen::Ref<Eigen::MatrixXs> forcesOut);
 
   /// This swaps in a new buffer of forces. If "startAt" is after "now", this
   /// will copy enough of the current buffer into our updated buffer to keep the
   /// current trajectory.
-  void setForcePlan(long startAt, long now, Eigen::MatrixXd forces);
+  void setForcePlan(long startAt, long now, Eigen::MatrixXs forces);
 
   /// This retrieves the state of the world at a given time, assuming that we've
   /// been applying forces from the buffer since the last state that we fully
@@ -67,7 +68,7 @@ public:
 
   /// This is useful when we're replicating a log across a network boundary,
   /// which comes up in distributed MPC.
-  void manuallyRecordObservedForce(long time, Eigen::VectorXd observation);
+  void manuallyRecordObservedForce(long time, Eigen::VectorXs observation);
 
 protected:
   int mForceDim;
@@ -77,16 +78,16 @@ protected:
   /// This is a helper to rescale the timestep size of a buffer while leaving
   /// the data otherwise unchanged.
   void rescaleBuffer(
-      Eigen::MatrixXd& buf, int oldMillisPerStep, int newMillisPerStep);
+      Eigen::MatrixXs& buf, int oldMillisPerStep, int newMillisPerStep);
 
   /// This controls which of our buffers is currently active
   BufferSwitchEnum mActiveBuffer;
 
   /// This is the A buffer of forces
-  Eigen::MatrixXd mBufA;
+  Eigen::MatrixXs mBufA;
 
   /// This is the B buffer of forces
-  Eigen::MatrixXd mBufB;
+  Eigen::MatrixXs mBufB;
 
   /// This is the time when the last buffer was written to
   long mLastWroteBufferAt;

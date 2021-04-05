@@ -64,10 +64,10 @@ public:
   VisualAspect(const VisualAspect&) = delete;
 
   /// Set RGBA color
-  void setRGBA(const Eigen::Vector4d& color);
+  void setRGBA(const Eigen::Vector4s& color);
 
-  DART_COMMON_GET_ASPECT_PROPERTY(Eigen::Vector4d, RGBA)
-  // const Eigen::Vector4d& getRGBA() const;
+  DART_COMMON_GET_ASPECT_PROPERTY(Eigen::Vector4s, RGBA)
+  // const Eigen::Vector4s& getRGBA() const;
 
   DART_COMMON_SET_GET_ASPECT_PROPERTY(bool, Hidden)
   // void setHidden(const bool& value);
@@ -83,26 +83,26 @@ public:
   void setReceiveShadows(const bool value);
   bool getReceiveShadows();
 
-  /// Identical to setRGB(const Eigen::Vector3d&)
-  void setColor(const Eigen::Vector3d& color);
+  /// Identical to setRGB(const Eigen::Vector3s&)
+  void setColor(const Eigen::Vector3s& color);
 
-  /// Identical to setRGBA(const Eigen::Vector4d&)
-  void setColor(const Eigen::Vector4d& color);
+  /// Identical to setRGBA(const Eigen::Vector4s&)
+  void setColor(const Eigen::Vector4s& color);
 
   /// Set RGB color components (leave alpha alone)
-  void setRGB(const Eigen::Vector3d& rgb);
+  void setRGB(const Eigen::Vector3s& rgb);
 
   /// Set the transparency of the Shape
-  void setAlpha(const double alpha);
+  void setAlpha(const s_t alpha);
 
   /// Get color
-  Eigen::Vector3d getColor() const;
+  Eigen::Vector3s getColor() const;
 
   /// Get RGB color components
-  Eigen::Vector3d getRGB() const;
+  Eigen::Vector3s getRGB() const;
 
   /// Get the transparency of the Shape
-  double getAlpha() const;
+  s_t getAlpha() const;
 
   /// Hide the ShapeNode
   void hide();
@@ -149,12 +149,12 @@ public:
 
   DynamicsAspect(const PropertiesData& properties = PropertiesData());
 
-  DART_COMMON_SET_GET_ASPECT_PROPERTY(double, FrictionCoeff)
-  // void setFrictionCoeff(const double& value);
-  // const double& getFrictionCoeff() const;
-  DART_COMMON_SET_GET_ASPECT_PROPERTY(double, RestitutionCoeff)
-  // void setRestitutionCoeff(const double& value);
-  // const double& getRestitutionCoeff() const;
+  DART_COMMON_SET_GET_ASPECT_PROPERTY(s_t, FrictionCoeff)
+  // void setFrictionCoeff(const s_t& value);
+  // const s_t& getFrictionCoeff() const;
+  DART_COMMON_SET_GET_ASPECT_PROPERTY(s_t, RestitutionCoeff)
+  // void setRestitutionCoeff(const s_t& value);
+  // const s_t& getRestitutionCoeff() const;
 };
 
 //==============================================================================
@@ -172,8 +172,8 @@ public:
 
   using RelativeTransformUpdatedSignal = common::Signal<void(
       const ShapeFrame* thisShapeFrame,
-      const Eigen::Isometry3d& oldTransform,
-      const Eigen::Isometry3d& newTransform)>;
+      const Eigen::Isometry3s& oldTransform,
+      const Eigen::Isometry3s& newTransform)>;
 
   using UniqueProperties = AspectProperties;
   using Properties = UniqueProperties;

@@ -182,22 +182,22 @@ void EulerJoint(py::module& m)
       .def(
           "convertToTransform",
           +[](const dart::dynamics::EulerJoint* self,
-              const Eigen::Vector3d& _positions) -> Eigen::Isometry3d {
+              const Eigen::Vector3s& _positions) -> Eigen::Isometry3s {
             return self->convertToTransform(_positions);
           },
           ::py::arg("positions"))
       .def(
           "convertToRotation",
           +[](const dart::dynamics::EulerJoint* self,
-              const Eigen::Vector3d& _positions) -> Eigen::Matrix3d {
+              const Eigen::Vector3s& _positions) -> Eigen::Matrix3s {
             return self->convertToRotation(_positions);
           },
           ::py::arg("positions"))
       .def(
           "getRelativeJacobianStatic",
           +[](const dart::dynamics::EulerJoint* self,
-              const Eigen::Vector3d& _positions)
-              -> Eigen::Matrix<double, 6, 3> {
+              const Eigen::Vector3s& _positions)
+              -> Eigen::Matrix<s_t, 6, 3> {
             return self->getRelativeJacobianStatic(_positions);
           },
           ::py::arg("positions"))
@@ -210,9 +210,9 @@ void EulerJoint(py::module& m)
           ::py::return_value_policy::reference_internal)
       .def_static(
           "convertToTransformOf",
-          +[](const Eigen::Vector3d& _positions,
+          +[](const Eigen::Vector3s& _positions,
               dart::dynamics::EulerJoint::AxisOrder _ordering)
-              -> Eigen::Isometry3d {
+              -> Eigen::Isometry3s {
             return dart::dynamics::EulerJoint::convertToTransform(
                 _positions, _ordering);
           },
@@ -220,9 +220,9 @@ void EulerJoint(py::module& m)
           ::py::arg("ordering"))
       .def_static(
           "convertToRotationOf",
-          +[](const Eigen::Vector3d& _positions,
+          +[](const Eigen::Vector3s& _positions,
               dart::dynamics::EulerJoint::AxisOrder _ordering)
-              -> Eigen::Matrix3d {
+              -> Eigen::Matrix3s {
             return dart::dynamics::EulerJoint::convertToRotation(
                 _positions, _ordering);
           },

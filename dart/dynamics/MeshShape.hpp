@@ -77,7 +77,7 @@ public:
   };
 
   /// Constructor.
-  MeshShape(const Eigen::Vector3d& scale,
+  MeshShape(const Eigen::Vector3s& scale,
     const aiScene* mesh,
     const common::Uri& uri = "",
     common::ResourceRetrieverPtr resourceRetriever = nullptr,
@@ -123,9 +123,9 @@ public:
 
   common::ResourceRetrieverPtr getResourceRetriever();
 
-  void setScale(const Eigen::Vector3d& scale);
+  void setScale(const Eigen::Vector3s& scale);
 
-  const Eigen::Vector3d& getScale() const;
+  const Eigen::Vector3s& getScale() const;
 
   /// Set how the color of this mesh should be determined
   void setColorMode(ColorMode mode);
@@ -161,7 +161,7 @@ public:
     const common::Uri& uri, const common::ResourceRetrieverPtr& retriever);
 
   // Documentation inherited.
-  Eigen::Matrix3d computeInertia(double mass) const override;
+  Eigen::Matrix3s computeInertia(s_t mass) const override;
 
 protected:
   // Documentation inherited.
@@ -185,7 +185,7 @@ protected:
   int mDisplayList;
 
   /// Scale
-  Eigen::Vector3d mScale;
+  Eigen::Vector3s mScale;
 
   /// Specifies how the color of this mesh should be determined
   ColorMode mColorMode;

@@ -76,16 +76,16 @@ void BallJoint(py::module& m)
       .def(
           "getRelativeJacobianStatic",
           +[](const dart::dynamics::BallJoint* self,
-              const Eigen::Vector3d& _positions)
-              -> Eigen::Matrix<double, 6, 3> {
+              const Eigen::Vector3s& _positions)
+              -> Eigen::Matrix<s_t, 6, 3> {
             return self->getRelativeJacobianStatic(_positions);
           },
           ::py::arg("positions"))
       .def(
           "getPositionDifferencesStatic",
           +[](const dart::dynamics::BallJoint* self,
-              const Eigen::Vector3d& _q2,
-              const Eigen::Vector3d& _q1) -> Eigen::Vector3d {
+              const Eigen::Vector3s& _q2,
+              const Eigen::Vector3s& _q1) -> Eigen::Vector3s {
             return self->getPositionDifferencesStatic(_q2, _q1);
           },
           ::py::arg("q2"),
@@ -98,13 +98,13 @@ void BallJoint(py::module& m)
           ::py::return_value_policy::reference_internal)
       .def_static(
           "convertToTransform",
-          +[](const Eigen::Vector3d& _positions) -> Eigen::Isometry3d {
+          +[](const Eigen::Vector3s& _positions) -> Eigen::Isometry3s {
             return dart::dynamics::BallJoint::convertToTransform(_positions);
           },
           ::py::arg("positions"))
       .def_static(
           "convertToRotation",
-          +[](const Eigen::Vector3d& _positions) -> Eigen::Matrix3d {
+          +[](const Eigen::Vector3s& _positions) -> Eigen::Matrix3s {
             return dart::dynamics::BallJoint::convertToRotation(_positions);
           },
           ::py::arg("positions"));

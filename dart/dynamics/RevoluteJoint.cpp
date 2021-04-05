@@ -119,7 +119,7 @@ const std::string& RevoluteJoint::getStaticType()
 }
 
 //==============================================================================
-void RevoluteJoint::setAxis(const Eigen::Vector3d& _axis)
+void RevoluteJoint::setAxis(const Eigen::Vector3s& _axis)
 {
   if(_axis == mAspectProperties.mAxis)
     return;
@@ -131,7 +131,7 @@ void RevoluteJoint::setAxis(const Eigen::Vector3d& _axis)
 }
 
 //==============================================================================
-const Eigen::Vector3d& RevoluteJoint::getAxis() const
+const Eigen::Vector3s& RevoluteJoint::getAxis() const
 {
   return mAspectProperties.mAxis;
 }
@@ -198,7 +198,7 @@ void RevoluteJoint::updateRelativeJacobian(bool _mandatory) const
 void RevoluteJoint::updateRelativeJacobianTimeDeriv() const
 {
   // Time derivative of revolute joint is always zero
-  assert(mJacobianDeriv == Eigen::Vector6d::Zero());
+  assert(mJacobianDeriv == Eigen::Vector6s::Zero());
 }
 
 }  // namespace dynamics

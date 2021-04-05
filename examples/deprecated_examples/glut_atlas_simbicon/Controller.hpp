@@ -55,7 +55,7 @@ public:
 
   /// \brief Called before every simulation time step in MyWindow class.
   /// Compute control force and apply it to Atlas robot
-  virtual void update(double _currentTime);
+  virtual void update(s_t _currentTime);
 
   /// \brief
   dart::dynamics::SkeletonPtr getAtlasRobot();
@@ -64,16 +64,16 @@ public:
   StateMachine* getCurrentState();
 
   /// \brief Change state to _stateMachine
-  void changeStateMachine(StateMachine* _stateMachine, double _currentTime);
+  void changeStateMachine(StateMachine* _stateMachine, s_t _currentTime);
 
   /// \brief Change state machine to a state machine whose names is _name
-  void changeStateMachine(const std::string& _name, double _currentTime);
+  void changeStateMachine(const std::string& _name, s_t _currentTime);
 
   /// \brief Change state machine to a state machine whose index is _idx
-  void changeStateMachine(std::size_t _idx, double _currentTime);
+  void changeStateMachine(std::size_t _idx, s_t _currentTime);
 
   /// \brief Keyboard control
-  void keyboard(unsigned char _key, int _x, int _y, double _currentTime);
+  void keyboard(unsigned char _key, int _x, int _y, s_t _currentTime);
 
   /// \brief Print debug information
   void printDebugInfo() const;

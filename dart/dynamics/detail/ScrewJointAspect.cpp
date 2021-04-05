@@ -38,7 +38,7 @@ namespace detail {
 
 //==============================================================================
 ScrewJointUniqueProperties::ScrewJointUniqueProperties(
-    const Eigen::Vector3d& _axis, double _pitch)
+    const Eigen::Vector3s& _axis, s_t _pitch)
   : mAxis(_axis.normalized()),
     mPitch(_pitch)
 {

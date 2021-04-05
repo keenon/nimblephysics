@@ -6,6 +6,8 @@
 
 #include <Eigen/Dense>
 
+#include "dart/math/MathTypes.hpp"
+
 namespace dart {
 
 namespace simulation {
@@ -28,124 +30,124 @@ public:
 
   virtual void setPositions(
       std::shared_ptr<simulation::World> world,
-      const Eigen::Ref<Eigen::VectorXd>& positions)
+      const Eigen::Ref<Eigen::VectorXs>& positions)
       = 0;
   virtual void setVelocities(
       std::shared_ptr<simulation::World> world,
-      const Eigen::Ref<Eigen::VectorXd>& velocities)
+      const Eigen::Ref<Eigen::VectorXs>& velocities)
       = 0;
   virtual void setForces(
       std::shared_ptr<simulation::World> world,
-      const Eigen::Ref<Eigen::VectorXd>& forces)
+      const Eigen::Ref<Eigen::VectorXs>& forces)
       = 0;
   virtual void setMasses(
       std::shared_ptr<simulation::World> world,
-      const Eigen::Ref<Eigen::VectorXd>& masses)
+      const Eigen::Ref<Eigen::VectorXs>& masses)
       = 0;
 
   virtual void getPositionsInPlace(
       std::shared_ptr<simulation::World> world,
-      /* OUT */ Eigen::Ref<Eigen::VectorXd> positions)
+      /* OUT */ Eigen::Ref<Eigen::VectorXs> positions)
       = 0;
   virtual void getVelocitiesInPlace(
       std::shared_ptr<simulation::World> world,
-      /* OUT */ Eigen::Ref<Eigen::VectorXd> velocities)
+      /* OUT */ Eigen::Ref<Eigen::VectorXs> velocities)
       = 0;
   virtual void getForcesInPlace(
       std::shared_ptr<simulation::World> world,
-      /* OUT */ Eigen::Ref<Eigen::VectorXd> forces)
+      /* OUT */ Eigen::Ref<Eigen::VectorXs> forces)
       = 0;
   virtual void getMassesInPlace(
       std::shared_ptr<simulation::World> world,
-      /* OUT */ Eigen::Ref<Eigen::VectorXd> masses)
+      /* OUT */ Eigen::Ref<Eigen::VectorXs> masses)
       = 0;
 
-  Eigen::VectorXd getPositions(std::shared_ptr<simulation::World> world);
-  Eigen::VectorXd getVelocities(std::shared_ptr<simulation::World> world);
-  Eigen::VectorXd getForces(std::shared_ptr<simulation::World> world);
-  Eigen::VectorXd getMasses(std::shared_ptr<simulation::World> world);
+  Eigen::VectorXs getPositions(std::shared_ptr<simulation::World> world);
+  Eigen::VectorXs getVelocities(std::shared_ptr<simulation::World> world);
+  Eigen::VectorXs getForces(std::shared_ptr<simulation::World> world);
+  Eigen::VectorXs getMasses(std::shared_ptr<simulation::World> world);
 
   /// This gets a Jacobian relating the changes in the outer positions (the
   /// "mapped" positions) to inner positions (the "real" positions)
-  virtual Eigen::MatrixXd getMappedPosToRealPosJac(
+  virtual Eigen::MatrixXs getMappedPosToRealPosJac(
       std::shared_ptr<simulation::World> world)
       = 0;
 
   /// This gets a Jacobian relating the changes in the inner positions (the
   /// "real" positions) to the corresponding outer positions (the "mapped"
   /// positions)
-  virtual Eigen::MatrixXd getRealPosToMappedPosJac(
+  virtual Eigen::MatrixXs getRealPosToMappedPosJac(
       std::shared_ptr<simulation::World> world)
       = 0;
 
   /// This gets a Jacobian relating the changes in the inner velocities (the
   /// "real" velocities) to the corresponding outer positions (the "mapped"
   /// positions)
-  virtual Eigen::MatrixXd getRealVelToMappedPosJac(
+  virtual Eigen::MatrixXs getRealVelToMappedPosJac(
       std::shared_ptr<simulation::World> world)
       = 0;
 
   /// This gets a Jacobian relating the changes in the outer velocity (the
   /// "mapped" velocity) to inner velocity (the "real" velocity)
-  virtual Eigen::MatrixXd getMappedVelToRealVelJac(
+  virtual Eigen::MatrixXs getMappedVelToRealVelJac(
       std::shared_ptr<simulation::World> world)
       = 0;
 
   /// This gets a Jacobian relating the changes in the inner velocity (the
   /// "real" velocity) to the corresponding outer velocity (the "mapped"
   /// velocity)
-  virtual Eigen::MatrixXd getRealVelToMappedVelJac(
+  virtual Eigen::MatrixXs getRealVelToMappedVelJac(
       std::shared_ptr<simulation::World> world)
       = 0;
 
   /// This gets a Jacobian relating the changes in the inner position (the
   /// "real" position) to the corresponding outer velocity (the "mapped"
   /// velocity)
-  virtual Eigen::MatrixXd getRealPosToMappedVelJac(
+  virtual Eigen::MatrixXs getRealPosToMappedVelJac(
       std::shared_ptr<simulation::World> world)
       = 0;
 
   /// This gets a Jacobian relating the changes in the outer force (the
   /// "mapped" force) to inner force (the "real" force)
-  virtual Eigen::MatrixXd getMappedForceToRealForceJac(
+  virtual Eigen::MatrixXs getMappedForceToRealForceJac(
       std::shared_ptr<simulation::World> world)
       = 0;
 
   /// This gets a Jacobian relating the changes in the inner force (the
   /// "real" force) to the corresponding outer force (the "mapped"
   /// force)
-  virtual Eigen::MatrixXd getRealForceToMappedForceJac(
+  virtual Eigen::MatrixXs getRealForceToMappedForceJac(
       std::shared_ptr<simulation::World> world)
       = 0;
 
   /// This gets a Jacobian relating the changes in the outer mass (the
   /// "mapped" mass) to inner mass (the "real" mass)
-  virtual Eigen::MatrixXd getMappedMassToRealMassJac(
+  virtual Eigen::MatrixXs getMappedMassToRealMassJac(
       std::shared_ptr<simulation::World> world)
       = 0;
 
   /// This gets a Jacobian relating the changes in the inner mass (the
   /// "real" mass) to the corresponding outer mass (the "mapped"
   /// mass)
-  virtual Eigen::MatrixXd getRealMassToMappedMassJac(
+  virtual Eigen::MatrixXs getRealMassToMappedMassJac(
       std::shared_ptr<simulation::World> world)
       = 0;
 
-  virtual Eigen::VectorXd getPositionLowerLimits(
+  virtual Eigen::VectorXs getPositionLowerLimits(
       std::shared_ptr<simulation::World> world);
-  virtual Eigen::VectorXd getPositionUpperLimits(
+  virtual Eigen::VectorXs getPositionUpperLimits(
       std::shared_ptr<simulation::World> world);
-  virtual Eigen::VectorXd getVelocityLowerLimits(
+  virtual Eigen::VectorXs getVelocityLowerLimits(
       std::shared_ptr<simulation::World> world);
-  virtual Eigen::VectorXd getVelocityUpperLimits(
+  virtual Eigen::VectorXs getVelocityUpperLimits(
       std::shared_ptr<simulation::World> world);
-  virtual Eigen::VectorXd getForceLowerLimits(
+  virtual Eigen::VectorXs getForceLowerLimits(
       std::shared_ptr<simulation::World> world);
-  virtual Eigen::VectorXd getForceUpperLimits(
+  virtual Eigen::VectorXs getForceUpperLimits(
       std::shared_ptr<simulation::World> world);
-  virtual Eigen::VectorXd getMassLowerLimits(
+  virtual Eigen::VectorXs getMassLowerLimits(
       std::shared_ptr<simulation::World> world);
-  virtual Eigen::VectorXd getMassUpperLimits(
+  virtual Eigen::VectorXs getMassUpperLimits(
       std::shared_ptr<simulation::World> world);
 };
 

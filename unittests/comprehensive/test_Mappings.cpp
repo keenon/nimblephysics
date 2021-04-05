@@ -66,15 +66,15 @@ void testWorldSpace(std::size_t numLinks)
 
   // World
   WorldPtr world = World::create();
-  world->setGravity(Eigen::Vector3d(0, -9.81, 0));
+  world->setGravity(Eigen::Vector3s(0, -9.81, 0));
 
   SkeletonPtr arm = Skeleton::create("arm");
 
   std::pair<WeldJoint*, BodyNode*> rootJointPair
       = arm->createJointAndBodyNodePair<WeldJoint>(nullptr);
-  Eigen::Isometry3d rootTransform = Eigen::Isometry3d::Identity();
+  Eigen::Isometry3s rootTransform = Eigen::Isometry3s::Identity();
   rootTransform.linear()
-      = eulerXYZToMatrix(Eigen::Vector3d(90.0 * 3.14159 / 180.0, 0, 0));
+      = eulerXYZToMatrix(Eigen::Vector3s(90.0 * 3.14159 / 180.0, 0, 0));
   rootJointPair.first->setTransformFromParentBodyNode(rootTransform);
 
   BodyNode* parent = rootJointPair.second;
@@ -90,16 +90,16 @@ void testWorldSpace(std::size_t numLinks)
             parent, jointProps, bodyProps);
     if (parent != nullptr)
     {
-      Eigen::Isometry3d armOffset = Eigen::Isometry3d::Identity();
-      armOffset.translation() = Eigen::Vector3d(0, 1.0, 0);
+      Eigen::Isometry3s armOffset = Eigen::Isometry3s::Identity();
+      armOffset.translation() = Eigen::Vector3s(0, 1.0, 0);
       jointPair.first->setTransformFromParentBodyNode(armOffset);
 
-      Eigen::Isometry3d bodyOffset = Eigen::Isometry3d::Identity();
-      bodyOffset.translation() = Eigen::Vector3d(0, -1.0, 0);
+      Eigen::Isometry3s bodyOffset = Eigen::Isometry3s::Identity();
+      bodyOffset.translation() = Eigen::Vector3s(0, -1.0, 0);
       jointPair.first->setTransformFromChildBodyNode(bodyOffset);
     }
     jointPair.second->setMass(1.0);
-    jointPair.first->setAxis(Eigen::Vector3d(1, 0, 0));
+    jointPair.first->setAxis(Eigen::Vector3s(1, 0, 0));
     parent = jointPair.second;
   }
 
@@ -137,32 +137,32 @@ void testSimple3Link()
 {
   // World
   WorldPtr world = World::create();
-  world->setGravity(Eigen::Vector3d(0, -9.81, 0));
+  world->setGravity(Eigen::Vector3s(0, -9.81, 0));
 
   SkeletonPtr arm = Skeleton::create("arm");
 
   std::pair<RevoluteJoint*, BodyNode*> zerothJointPair
       = arm->createJointAndBodyNodePair<RevoluteJoint>(nullptr);
-  zerothJointPair.first->setAxis(Eigen::Vector3d::UnitZ());
-  Eigen::Isometry3d zerothOffset = Eigen::Isometry3d::Identity();
-  zerothOffset.translation() = Eigen::Vector3d(0, 1.0, 0);
+  zerothJointPair.first->setAxis(Eigen::Vector3s::UnitZ());
+  Eigen::Isometry3s zerothOffset = Eigen::Isometry3s::Identity();
+  zerothOffset.translation() = Eigen::Vector3s(0, 1.0, 0);
   zerothJointPair.first->setTransformFromChildBodyNode(zerothOffset);
 
   std::pair<RevoluteJoint*, BodyNode*> firstJointPair
       = arm->createJointAndBodyNodePair<RevoluteJoint>(zerothJointPair.second);
-  firstJointPair.first->setAxis(Eigen::Vector3d::UnitZ());
-  Eigen::Isometry3d firstOffset = Eigen::Isometry3d::Identity();
-  firstOffset.translation() = Eigen::Vector3d(1.0, 0.0, 0);
+  firstJointPair.first->setAxis(Eigen::Vector3s::UnitZ());
+  Eigen::Isometry3s firstOffset = Eigen::Isometry3s::Identity();
+  firstOffset.translation() = Eigen::Vector3s(1.0, 0.0, 0);
   firstJointPair.first->setTransformFromChildBodyNode(firstOffset);
 
   std::pair<RevoluteJoint*, BodyNode*> secondJointPair
       = arm->createJointAndBodyNodePair<RevoluteJoint>(firstJointPair.second);
-  secondJointPair.first->setAxis(Eigen::Vector3d::UnitZ());
-  Eigen::Isometry3d secondOffset = Eigen::Isometry3d::Identity();
-  secondOffset.translation() = Eigen::Vector3d(0, -1.0, 0);
+  secondJointPair.first->setAxis(Eigen::Vector3s::UnitZ());
+  Eigen::Isometry3s secondOffset = Eigen::Isometry3s::Identity();
+  secondOffset.translation() = Eigen::Vector3s(0, -1.0, 0);
   secondJointPair.first->setTransformFromChildBodyNode(secondOffset);
 
-  Eigen::MatrixXd expectedJac = Eigen::MatrixXd::Zero(9, 3);
+  Eigen::MatrixXs expectedJac = Eigen::MatrixXs::Zero(9, 3);
   // clang-format off
   expectedJac <<
       /* Body 1 X */ 1, 0, 0, 
@@ -175,7 +175,7 @@ void testSimple3Link()
       /* Body 3 Y */ -1, -1, 0,
       /* Body 3 Z */ 0, 0, 0;
   // clang-format on
-  Eigen::MatrixXd analyticalJac
+  Eigen::MatrixXs analyticalJac
       = jointPosToWorldLinearJacobian(arm, arm->getBodyNodes());
 
   if (!equals(analyticalJac, expectedJac, 1e-5))
@@ -190,9 +190,9 @@ void testSimple3Link()
   world->addSkeleton(arm);
 
   EXPECT_TRUE(verifyLinearJacobian(
-      world, Eigen::Vector3d::Zero(), Eigen::Vector3d::Zero()));
+      world, Eigen::Vector3s::Zero(), Eigen::Vector3s::Zero()));
   EXPECT_TRUE(verifySpatialJacobian(
-      world, Eigen::Vector3d::Zero(), Eigen::Vector3d::Zero()));
+      world, Eigen::Vector3s::Zero(), Eigen::Vector3s::Zero()));
   EXPECT_TRUE(verifyIKMapping(world));
 }
 
@@ -207,7 +207,7 @@ void testWorldSpaceWithBoxes(int jointType)
 {
   // World
   WorldPtr world = World::create();
-  world->setGravity(Eigen::Vector3d(0, -9.81, 0));
+  world->setGravity(Eigen::Vector3s(0, -9.81, 0));
 
   SkeletonPtr boxes = Skeleton::create("boxes");
 
@@ -218,16 +218,16 @@ void testWorldSpaceWithBoxes(int jointType)
       = boxes->createJointAndBodyNodePair<WeldJoint>(nullptr);
   WeldJoint* rootJoint = rootJointPair.first;
   BodyNode* rootBody = rootJointPair.second;
-  Eigen::Isometry3d rootTransform = Eigen::Isometry3d::Identity();
+  Eigen::Isometry3s rootTransform = Eigen::Isometry3s::Identity();
   rootTransform.linear()
-      = eulerXYZToMatrix(Eigen::Vector3d(90.0 * M_PI / 180.0, 0, 0));
+      = eulerXYZToMatrix(Eigen::Vector3s(90.0 * M_PI / 180.0, 0, 0));
   rootJoint->setTransformFromParentBodyNode(rootTransform);
 
   // Then we add a box, on a free transform from the root. This is now a
   // different frame than the world, by 90 deg on the x axis.
 
-  Eigen::Isometry3d fromChild = Eigen::Isometry3d::Identity();
-  fromChild.translation() = Eigen::Vector3d::Ones();
+  Eigen::Isometry3s fromChild = Eigen::Isometry3s::Identity();
+  fromChild.translation() = Eigen::Vector3s::Ones();
   if (jointType == 0)
   {
     std::pair<TranslationalJoint*, BodyNode*> boxJointPair
@@ -246,7 +246,7 @@ void testWorldSpaceWithBoxes(int jointType)
         = boxes->createJointAndBodyNodePair<FreeJoint>(rootBody);
     boxJointPair.first->setTransformFromChildBodyNode(fromChild);
   }
-  boxes->setPositions(Eigen::VectorXd::Zero(boxes->getNumDofs()));
+  boxes->setPositions(Eigen::VectorXs::Zero(boxes->getNumDofs()));
 
   world->addSkeleton(boxes);
 

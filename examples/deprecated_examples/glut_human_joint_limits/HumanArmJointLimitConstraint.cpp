@@ -51,10 +51,10 @@ using namespace tiny_dnn;
 using namespace tiny_dnn::activation;
 using namespace tiny_dnn::layers;
 
-double HumanArmJointLimitConstraint::mErrorAllowance = DART_ERROR_ALLOWANCE;
-double HumanArmJointLimitConstraint::mErrorReductionParameter = DART_ERP;
-double HumanArmJointLimitConstraint::mMaxErrorReductionVelocity = DART_MAX_ERV;
-double HumanArmJointLimitConstraint::mConstraintForceMixing = DART_CFM;
+s_t HumanArmJointLimitConstraint::mErrorAllowance = DART_ERROR_ALLOWANCE;
+s_t HumanArmJointLimitConstraint::mErrorReductionParameter = DART_ERP;
+s_t HumanArmJointLimitConstraint::mMaxErrorReductionVelocity = DART_MAX_ERV;
+s_t HumanArmJointLimitConstraint::mConstraintForceMixing = DART_CFM;
 
 //==============================================================================
 HumanArmJointLimitConstraint::HumanArmJointLimitConstraint(
@@ -85,7 +85,7 @@ HumanArmJointLimitConstraint::HumanArmJointLimitConstraint(
 }
 
 //==============================================================================
-void HumanArmJointLimitConstraint::setErrorAllowance(double allowance)
+void HumanArmJointLimitConstraint::setErrorAllowance(s_t allowance)
 {
   // Clamp error reduction parameter if it is out of the range
   if (allowance < 0.0)
@@ -100,13 +100,13 @@ void HumanArmJointLimitConstraint::setErrorAllowance(double allowance)
 }
 
 //==============================================================================
-double HumanArmJointLimitConstraint::getErrorAllowance()
+s_t HumanArmJointLimitConstraint::getErrorAllowance()
 {
   return mErrorAllowance;
 }
 
 //==============================================================================
-void HumanArmJointLimitConstraint::setErrorReductionParameter(double erp)
+void HumanArmJointLimitConstraint::setErrorReductionParameter(s_t erp)
 {
   // Clamp error reduction parameter if it is out of the range [0, 1]
   if (erp < 0.0)
@@ -126,13 +126,13 @@ void HumanArmJointLimitConstraint::setErrorReductionParameter(double erp)
 }
 
 //==============================================================================
-double HumanArmJointLimitConstraint::getErrorReductionParameter()
+s_t HumanArmJointLimitConstraint::getErrorReductionParameter()
 {
   return mErrorReductionParameter;
 }
 
 //==============================================================================
-void HumanArmJointLimitConstraint::setMaxErrorReductionVelocity(double erv)
+void HumanArmJointLimitConstraint::setMaxErrorReductionVelocity(s_t erv)
 {
   // Clamp maximum error reduction velocity if it is out of the range
   if (erv < 0.0)
@@ -147,13 +147,13 @@ void HumanArmJointLimitConstraint::setMaxErrorReductionVelocity(double erv)
 }
 
 //==============================================================================
-double HumanArmJointLimitConstraint::getMaxErrorReductionVelocity()
+s_t HumanArmJointLimitConstraint::getMaxErrorReductionVelocity()
 {
   return mMaxErrorReductionVelocity;
 }
 
 //==============================================================================
-void HumanArmJointLimitConstraint::setConstraintForceMixing(double cfm)
+void HumanArmJointLimitConstraint::setConstraintForceMixing(s_t cfm)
 {
   // Clamp constraint force mixing parameter if it is out of the range
   if (cfm < 1e-9)
@@ -175,7 +175,7 @@ void HumanArmJointLimitConstraint::setConstraintForceMixing(double cfm)
 }
 
 //==============================================================================
-double HumanArmJointLimitConstraint::getConstraintForceMixing()
+s_t HumanArmJointLimitConstraint::getConstraintForceMixing()
 {
   return mConstraintForceMixing;
 }
@@ -183,15 +183,15 @@ double HumanArmJointLimitConstraint::getConstraintForceMixing()
 //==============================================================================
 void HumanArmJointLimitConstraint::update()
 {
-  double qz = mShldJoint->getPosition(0);
-  double qx = mShldJoint->getPosition(1);
-  double qy = mShldJoint->getPosition(2);
-  double qe = mElbowJoint->getPosition(0);
+  s_t qz = mShldJoint->getPosition(0);
+  s_t qx = mShldJoint->getPosition(1);
+  s_t qy = mShldJoint->getPosition(2);
+  s_t qe = mElbowJoint->getPosition(0);
 
-  double qz_d = mShldJoint->getVelocity(0);
-  double qx_d = mShldJoint->getVelocity(1);
-  double qy_d = mShldJoint->getVelocity(2);
-  double qe_d = mElbowJoint->getVelocity(0);
+  s_t qz_d = mShldJoint->getVelocity(0);
+  s_t qx_d = mShldJoint->getVelocity(1);
+  s_t qy_d = mShldJoint->getVelocity(2);
+  s_t qe_d = mElbowJoint->getVelocity(0);
 
   // if isMirror (right-arm), set up a mirrored euler joint for shoulder
   // i.e. pass the mirrored config to NN
@@ -201,12 +201,12 @@ void HumanArmJointLimitConstraint::update()
     qy = -qy;
   }
 
-  double qsin[6]
+  s_t qsin[6]
       = {cos(qz), sin(qz), cos(qx), sin(qx), cos(qy + 2 * M_PI / 3), cos(qe)};
   vec_t input;
   input.assign(qsin, qsin + 6);
   vec_t pred_vec = mNet.predict(input);
-  double C = *(pred_vec.begin());
+  s_t C = *(pred_vec.begin());
 
   mViolation = C - 0.5;
 
@@ -277,7 +277,7 @@ void HumanArmJointLimitConstraint::update()
 
     // TODO: Normalize grad seems unnecessary?
 
-    Eigen::Vector4d q_d;
+    Eigen::Vector4s q_d;
     q_d << qz_d, qx_d, qy_d, qe_d;
     mNegativeVel = -mJacobian.dot(q_d);
 
@@ -298,7 +298,7 @@ void HumanArmJointLimitConstraint::getInformation(
   assert(lcp->w[0] == 0.0);
   assert(lcp->findex[0] == -1);
 
-  double bouncingVel = -mViolation - mErrorAllowance;
+  s_t bouncingVel = -mViolation - mErrorAllowance;
   if (bouncingVel < 0.0)
   {
     bouncingVel = 0.0;
@@ -349,14 +349,14 @@ void HumanArmJointLimitConstraint::applyUnitImpulse(std::size_t index)
 
 //==============================================================================
 void HumanArmJointLimitConstraint::getVelocityChange(
-    double* delVel, bool withCfm)
+    s_t* delVel, bool withCfm)
 {
   assert(delVel != nullptr && "Null pointer is not allowed.");
   delVel[0] = 0.0;
 
   if (mShldJoint->getSkeleton()->isImpulseApplied())
   {
-    Eigen::Vector4d delq_d;
+    Eigen::Vector4s delq_d;
     for (std::size_t i = 0; i < 3; i++)
     {
       delq_d[i] = mShldJoint->getVelocityChange(i);
@@ -386,7 +386,7 @@ void HumanArmJointLimitConstraint::unexcite()
 }
 
 //==============================================================================
-void HumanArmJointLimitConstraint::applyImpulse(double* lambda)
+void HumanArmJointLimitConstraint::applyImpulse(s_t* lambda)
 {
   assert(isActive());
 

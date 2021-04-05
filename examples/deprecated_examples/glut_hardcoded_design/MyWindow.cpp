@@ -50,7 +50,7 @@ void MyWindow::draw()
 void MyWindow::keyboard(unsigned char _key, int _x, int _y)
 {
   static bool inverse = false;
-  static const double dDOF = 0.1;
+  static const s_t dDOF = 0.1;
   switch (_key)
   {
     case '-':
@@ -63,7 +63,7 @@ void MyWindow::keyboard(unsigned char _key, int _x, int _y)
     case '3':
     {
       std::size_t dofIdx = _key - 49;
-      Eigen::VectorXd pose = skel->getPositions();
+      Eigen::VectorXs pose = skel->getPositions();
       pose(dofIdx) = pose(dofIdx) + (inverse ? -dDOF : dDOF);
       skel->setPositions(pose);
       std::cout << "Updated pose DOF " << dofIdx << ": " << pose.transpose()

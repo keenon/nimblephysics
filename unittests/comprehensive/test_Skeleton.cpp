@@ -57,10 +57,10 @@ std::vector<common::Uri> getFileList()
   fileList.push_back(
       "dart://sample/skel/test/single_pendulum_euler_joint.skel");
   fileList.push_back("dart://sample/skel/test/single_pendulum_ball_joint.skel");
-  fileList.push_back("dart://sample/skel/test/double_pendulum.skel");
+  fileList.push_back("dart://sample/skel/test/s_t_pendulum.skel");
   fileList.push_back(
-      "dart://sample/skel/test/double_pendulum_euler_joint.skel");
-  fileList.push_back("dart://sample/skel/test/double_pendulum_ball_joint.skel");
+      "dart://sample/skel/test/s_t_pendulum_euler_joint.skel");
+  fileList.push_back("dart://sample/skel/test/s_t_pendulum_ball_joint.skel");
   fileList.push_back(
       "dart://sample/skel/test/serial_chain_revolute_joint.skel");
   fileList.push_back(
@@ -347,11 +347,11 @@ TEST(Skeleton, Persistence)
     {
       {
         SkeletonPtr skeleton = createThreeLinkRobot(
-            Eigen::Vector3d(1.0, 1.0, 1.0),
+            Eigen::Vector3s(1.0, 1.0, 1.0),
             DOF_X,
-            Eigen::Vector3d(1.0, 1.0, 1.0),
+            Eigen::Vector3s(1.0, 1.0, 1.0),
             DOF_Y,
-            Eigen::Vector3d(1.0, 1.0, 1.0),
+            Eigen::Vector3s(1.0, 1.0, 1.0),
             DOF_Z);
         weakSkelPtr = skeleton;
 
@@ -496,11 +496,11 @@ TEST(Skeleton, Persistence)
     }
 
     SkeletonPtr other_skeleton = createThreeLinkRobot(
-        Eigen::Vector3d(1.0, 1.0, 1.0),
+        Eigen::Vector3s(1.0, 1.0, 1.0),
         DOF_X,
-        Eigen::Vector3d(1.0, 1.0, 1.0),
+        Eigen::Vector3s(1.0, 1.0, 1.0),
         DOF_Y,
-        Eigen::Vector3d(1.0, 1.0, 1.0),
+        Eigen::Vector3s(1.0, 1.0, 1.0),
         DOF_Z);
     BodyNode* tail
         = other_skeleton->getBodyNode(other_skeleton->getNumBodyNodes() - 1);
@@ -808,24 +808,24 @@ TEST(Skeleton, ZeroDofJointConstraintForces)
 
   const auto numSkelDofs = skel->getNumDofs();
   for (auto& bodyNode : skel->getBodyNodes())
-    bodyNode->setConstraintImpulse(Eigen::Vector6d::Random());
+    bodyNode->setConstraintImpulse(Eigen::Vector6s::Random());
 
   // Make sure this does not cause seg-fault
-  Eigen::VectorXd constraintForces = skel->getConstraintForces();
+  Eigen::VectorXs constraintForces = skel->getConstraintForces();
   EXPECT_EQ(constraintForces.size(), static_cast<int>(numSkelDofs));
 }
 
 TEST(Skeleton, Configurations)
 {
   SkeletonPtr twoLink = createTwoLinkRobot(
-      Vector3d::Ones(), DOF_YAW, Vector3d::Ones(), DOF_ROLL);
+      Vector3s::Ones(), DOF_YAW, Vector3s::Ones(), DOF_ROLL);
 
   SkeletonPtr threeLink = createThreeLinkRobot(
-      Vector3d::Ones(),
+      Vector3s::Ones(),
       DOF_PITCH,
-      Vector3d::Ones(),
+      Vector3s::Ones(),
       DOF_ROLL,
-      Vector3d::Ones(),
+      Vector3s::Ones(),
       DOF_YAW);
 
   Skeleton::Configuration c2 = twoLink->getConfiguration();
@@ -853,11 +853,11 @@ TEST(Skeleton, LinearJacobianDerivOverload)
   // Regression test for #626: Make sure that getLinearJacobianDeriv's overload
   // is working appropriately.
   SkeletonPtr skeleton = createThreeLinkRobot(
-      Vector3d::Ones(),
+      Vector3s::Ones(),
       DOF_PITCH,
-      Vector3d::Ones(),
+      Vector3s::Ones(),
       DOF_ROLL,
-      Vector3d::Ones(),
+      Vector3s::Ones(),
       DOF_YAW);
 
   skeleton->getLinearJacobianDeriv(skeleton->getBodyNode(0));
@@ -872,7 +872,7 @@ TEST(Skeleton, Updating)
 
   // RevoluteJoint
   SkeletonPtr skeleton = createTwoLinkRobot(
-      Vector3d::Ones(), DOF_PITCH, Vector3d::Ones(), DOF_ROLL);
+      Vector3s::Ones(), DOF_PITCH, Vector3s::Ones(), DOF_ROLL);
 
   Joint* joint0 = skeleton->getJoint(0);
   Joint* joint1 = skeleton->getJoint(1);
@@ -886,7 +886,7 @@ TEST(Skeleton, Updating)
 
   // PrismaticJoint
   skeleton
-      = createTwoLinkRobot(Vector3d::Ones(), DOF_X, Vector3d::Ones(), DOF_Y);
+      = createTwoLinkRobot(Vector3s::Ones(), DOF_X, Vector3s::Ones(), DOF_Y);
   joint0 = skeleton->getJoint(0);
   joint1 = skeleton->getJoint(1);
 
@@ -899,11 +899,11 @@ TEST(Skeleton, Updating)
   skeleton = Skeleton::create();
   ScrewJoint* screw = skeleton->createJointAndBodyNodePair<ScrewJoint>().first;
 
-  screw->setAxis(Eigen::Vector3d::UnitX());
+  screw->setAxis(Eigen::Vector3s::UnitX());
   screw->setPitch(2);
 
   J0i = screw->getRelativeJacobian();
-  screw->setAxis(Eigen::Vector3d::UnitY());
+  screw->setAxis(Eigen::Vector3s::UnitY());
   J0f = screw->getRelativeJacobian();
   EXPECT_FALSE(equals(J0i, J0f));
 
@@ -913,21 +913,21 @@ TEST(Skeleton, Updating)
   EXPECT_FALSE(equals(J0i, J0f));
 
   // Regression test for Pull Request #731
-  const double originalMass = skeleton->getMass();
+  const s_t originalMass = skeleton->getMass();
   BodyNode* lastBn = skeleton->getBodyNode(skeleton->getNumBodyNodes() - 1);
-  const double removedMass = lastBn->getMass();
+  const s_t removedMass = lastBn->getMass();
   EXPECT_FALSE(removedMass == 0.0);
   lastBn->remove();
-  const double newMass = skeleton->getMass();
+  const s_t newMass = skeleton->getMass();
   EXPECT_FALSE(originalMass == newMass);
   EXPECT_TRUE(newMass == originalMass - removedMass);
 }
 
 bool verifyImplicitInvMassInstance(
-    SkeletonPtr skel, Eigen::MatrixXd Minv, Eigen::VectorXd x)
+    SkeletonPtr skel, Eigen::MatrixXs Minv, Eigen::VectorXs x)
 {
-  VectorXd implicitMinvX = skel->multiplyByImplicitInvMassMatrix(x);
-  VectorXd explicitMinvX = Minv * x;
+  VectorXs implicitMinvX = skel->multiplyByImplicitInvMassMatrix(x);
+  VectorXs explicitMinvX = Minv * x;
   if (!equals(explicitMinvX, implicitMinvX, 1e-7))
   {
     std::cout << "Minv: " << std::endl << Minv << std::endl;
@@ -940,10 +940,10 @@ bool verifyImplicitInvMassInstance(
 }
 
 bool verifyImplicitMassInstance(
-    SkeletonPtr skel, Eigen::MatrixXd M, Eigen::VectorXd x)
+    SkeletonPtr skel, Eigen::MatrixXs M, Eigen::VectorXs x)
 {
-  VectorXd implicitMX = skel->multiplyByImplicitMassMatrix(x);
-  VectorXd explicitMX = M * x;
+  VectorXs implicitMX = skel->multiplyByImplicitMassMatrix(x);
+  VectorXs explicitMX = M * x;
   if (!equals(explicitMX, implicitMX, 1e-7))
   {
     std::cout << "M: " << std::endl << M << std::endl;
@@ -957,10 +957,10 @@ bool verifyImplicitMassInstance(
 
 bool verifyImplicitMass(SkeletonPtr skel)
 {
-  Eigen::MatrixXd Minv = skel->getInvMassMatrix();
-  Eigen::MatrixXd M = skel->getMassMatrix();
+  Eigen::MatrixXs Minv = skel->getInvMassMatrix();
+  Eigen::MatrixXs M = skel->getMassMatrix();
 
-  VectorXd x = VectorXd::Zero(skel->getNumDofs());
+  VectorXs x = VectorXs::Zero(skel->getNumDofs());
 
   // Test a "1" in each dimension of the phase space separately
   for (std::size_t i = 0; i < skel->getNumDofs(); i++)
@@ -975,14 +975,14 @@ bool verifyImplicitMass(SkeletonPtr skel)
   }
 
   // Test all "0"s
-  x = VectorXd::Zero(skel->getNumDofs());
+  x = VectorXs::Zero(skel->getNumDofs());
   if (!verifyImplicitInvMassInstance(skel, Minv, x))
     return false;
   if (!verifyImplicitMassInstance(skel, M, x))
     return false;
 
   // Test all "1"s
-  x = VectorXd::Ones(skel->getNumDofs());
+  x = VectorXs::Ones(skel->getNumDofs());
   if (!verifyImplicitInvMassInstance(skel, Minv, x))
     return false;
   if (!verifyImplicitMassInstance(skel, M, x))
@@ -1001,8 +1001,8 @@ TEST(Skeleton, BoxImplicitMass)
   BodyNode* boxBody = pair.second;
 
   boxJoint->setXYPlane();
-  boxJoint->setTransformFromParentBodyNode(Eigen::Isometry3d::Identity());
-  boxJoint->setTransformFromChildBodyNode(Eigen::Isometry3d::Identity());
+  boxJoint->setTransformFromParentBodyNode(Eigen::Isometry3s::Identity());
+  boxJoint->setTransformFromChildBodyNode(Eigen::Isometry3s::Identity());
   boxBody->setMass(2);
 
   EXPECT_TRUE(verifyImplicitMass(box));
@@ -1011,18 +1011,18 @@ TEST(Skeleton, BoxImplicitMass)
 TEST(Skeleton, TwoLinkRobotImplicitMass)
 {
   SkeletonPtr twoLink = createTwoLinkRobot(
-      Vector3d::Ones(), DOF_YAW, Vector3d::Ones(), DOF_ROLL);
+      Vector3s::Ones(), DOF_YAW, Vector3s::Ones(), DOF_ROLL);
   EXPECT_TRUE(verifyImplicitMass(twoLink));
 }
 
 TEST(Skeleton, ThreeLinkRobotImplicitMass)
 {
   SkeletonPtr threeLink = createThreeLinkRobot(
-      Vector3d::Ones(),
+      Vector3s::Ones(),
       DOF_PITCH,
-      Vector3d::Ones(),
+      Vector3s::Ones(),
       DOF_ROLL,
-      Vector3d::Ones(),
+      Vector3s::Ones(),
       DOF_YAW);
   EXPECT_TRUE(verifyImplicitMass(threeLink));
 }
@@ -1030,11 +1030,11 @@ TEST(Skeleton, ThreeLinkRobotImplicitMass)
 TEST(Skeleton, MultiTreeRobotImplicitMass)
 {
   SkeletonPtr multiRootRobot = createThreeLinkRobot(
-      Vector3d::Ones(),
+      Vector3s::Ones(),
       DOF_PITCH,
-      Vector3d::Ones(),
+      Vector3s::Ones(),
       DOF_ROLL,
-      Vector3d::Ones(),
+      Vector3s::Ones(),
       DOF_YAW);
 
   // Create a box anchored to the world, which roots another tree
@@ -1045,8 +1045,8 @@ TEST(Skeleton, MultiTreeRobotImplicitMass)
   TranslationalJoint2D* boxJoint = pair.first;
   BodyNode* boxBody = pair.second;
   boxJoint->setXYPlane();
-  boxJoint->setTransformFromParentBodyNode(Eigen::Isometry3d::Identity());
-  boxJoint->setTransformFromChildBodyNode(Eigen::Isometry3d::Identity());
+  boxJoint->setTransformFromParentBodyNode(Eigen::Isometry3s::Identity());
+  boxJoint->setTransformFromChildBodyNode(Eigen::Isometry3s::Identity());
   boxBody->setMass(2);
 
   EXPECT_TRUE(verifyImplicitMass(multiRootRobot));

@@ -44,8 +44,8 @@ namespace constraint {
 WeldJointConstraint::WeldJointConstraint(dynamics::BodyNode* _body)
   : JointConstraint(_body),
     mRelativeTransform(_body->getTransform()),
-    mViolation(Eigen::Vector6d::Zero()),
-    mJacobian1(Eigen::Matrix6d::Identity()),
+    mViolation(Eigen::Vector6s::Zero()),
+    mJacobian1(Eigen::Matrix6s::Identity()),
     mAppliedImpulseIndex(0)
 {
   mDim = 6;
@@ -64,8 +64,8 @@ WeldJointConstraint::WeldJointConstraint(dynamics::BodyNode* _body1,
   : JointConstraint(_body1, _body2),
     mRelativeTransform(_body2->getTransform().inverse()
                        * _body1->getTransform()),
-    mViolation(Eigen::Vector6d::Zero()),
-    mJacobian1(Eigen::Matrix6d::Identity()),
+    mViolation(Eigen::Vector6s::Zero()),
+    mJacobian1(Eigen::Matrix6s::Identity()),
     mAppliedImpulseIndex(0)
 {
   // The bodies should be different bodies.
@@ -82,13 +82,13 @@ WeldJointConstraint::WeldJointConstraint(dynamics::BodyNode* _body1,
 }
 
 //==============================================================================
-void WeldJointConstraint::setRelativeTransform(const Eigen::Isometry3d& _tf)
+void WeldJointConstraint::setRelativeTransform(const Eigen::Isometry3s& _tf)
 {
   mRelativeTransform = _tf;
 }
 
 //==============================================================================
-const Eigen::Isometry3d& WeldJointConstraint::getRelativeTransform() const
+const Eigen::Isometry3s& WeldJointConstraint::getRelativeTransform() const
 {
   return mRelativeTransform;
 }
@@ -108,7 +108,7 @@ void WeldJointConstraint::update()
   // Update Jacobian for body2
   if (mBodyNode2)
   {
-    Eigen::Isometry3d T12 = mBodyNode1->getTransform().inverse()
+    Eigen::Isometry3s T12 = mBodyNode1->getTransform().inverse()
                             * mBodyNode2->getTransform();
     mJacobian2 = math::AdTJac(T12, mJacobian1);
   }
@@ -116,7 +116,7 @@ void WeldJointConstraint::update()
   // Update position constraint error
   if (mBodyNode2)
   {
-    const Eigen::Isometry3d& violationT
+    const Eigen::Isometry3s& violationT
         = mRelativeTransform.inverse()
           * mBodyNode2->getTransform().inverse()
           * mBodyNode1->getTransform();
@@ -125,7 +125,7 @@ void WeldJointConstraint::update()
   }
   else
   {
-    const Eigen::Isometry3d& violationT
+    const Eigen::Isometry3s& violationT
         = mRelativeTransform.inverse() * mBodyNode1->getTransform();
 
     mViolation = math::logMap(violationT);
@@ -172,7 +172,7 @@ void WeldJointConstraint::getInformation(ConstraintInfo* _lcp)
   _lcp->x[4] = mOldX[4];
   _lcp->x[5] = mOldX[5];
 
-  Eigen::Vector6d negativeVel = -mBodyNode1->getSpatialVelocity();
+  Eigen::Vector6s negativeVel = -mBodyNode1->getSpatialVelocity();
   if (mBodyNode2)
     negativeVel += mJacobian2 * mBodyNode2->getSpatialVelocity();
 
@@ -264,12 +264,12 @@ void WeldJointConstraint::applyUnitImpulse(std::size_t _index)
 }
 
 //==============================================================================
-void WeldJointConstraint::getVelocityChange(double* _vel, bool _withCfm)
+void WeldJointConstraint::getVelocityChange(s_t* _vel, bool _withCfm)
 {
   assert(_vel != nullptr && "Null pointer is not allowed.");
   assert(isActive());
 
-  Eigen::Vector6d velChange = Eigen::Vector6d::Zero();
+  Eigen::Vector6s velChange = Eigen::Vector6s::Zero();
   if (mBodyNode1->getSkeleton()->isImpulseApplied()
       && mBodyNode1->isReactive())
   {
@@ -322,7 +322,7 @@ void WeldJointConstraint::unexcite()
 }
 
 //==============================================================================
-void WeldJointConstraint::applyImpulse(double* _lambda)
+void WeldJointConstraint::applyImpulse(s_t* _lambda)
 {
   mOldX[0] = _lambda[0];
   mOldX[1] = _lambda[1];
@@ -331,7 +331,7 @@ void WeldJointConstraint::applyImpulse(double* _lambda)
   mOldX[4] = _lambda[4];
   mOldX[5] = _lambda[5];
 
-  Eigen::Vector6d imp;
+  Eigen::Vector6s imp;
   imp << _lambda[0],
          _lambda[1],
          _lambda[2],

@@ -24,101 +24,101 @@ public:
 
   void setPositions(
       std::shared_ptr<simulation::World> world,
-      const Eigen::Ref<Eigen::VectorXd>& positions) override;
+      const Eigen::Ref<Eigen::VectorXs>& positions) override;
   void setVelocities(
       std::shared_ptr<simulation::World> world,
-      const Eigen::Ref<Eigen::VectorXd>& velocities) override;
+      const Eigen::Ref<Eigen::VectorXs>& velocities) override;
   void setForces(
       std::shared_ptr<simulation::World> world,
-      const Eigen::Ref<Eigen::VectorXd>& forces) override;
+      const Eigen::Ref<Eigen::VectorXs>& forces) override;
   void setMasses(
       std::shared_ptr<simulation::World> world,
-      const Eigen::Ref<Eigen::VectorXd>& masses) override;
+      const Eigen::Ref<Eigen::VectorXs>& masses) override;
 
   void getPositionsInPlace(
       std::shared_ptr<simulation::World> world,
-      /* OUT */ Eigen::Ref<Eigen::VectorXd> positions) override;
+      /* OUT */ Eigen::Ref<Eigen::VectorXs> positions) override;
   void getVelocitiesInPlace(
       std::shared_ptr<simulation::World> world,
-      /* OUT */ Eigen::Ref<Eigen::VectorXd> velocities) override;
+      /* OUT */ Eigen::Ref<Eigen::VectorXs> velocities) override;
   void getForcesInPlace(
       std::shared_ptr<simulation::World> world,
-      /* OUT */ Eigen::Ref<Eigen::VectorXd> forces) override;
+      /* OUT */ Eigen::Ref<Eigen::VectorXs> forces) override;
   void getMassesInPlace(
       std::shared_ptr<simulation::World> world,
-      /* OUT */ Eigen::Ref<Eigen::VectorXd> masses) override;
+      /* OUT */ Eigen::Ref<Eigen::VectorXs> masses) override;
 
   /// This gets a Jacobian relating the changes in the outer positions (the
   /// "mapped" positions) to inner positions (the "real" positions)
-  Eigen::MatrixXd getMappedPosToRealPosJac(
+  Eigen::MatrixXs getMappedPosToRealPosJac(
       std::shared_ptr<simulation::World> world) override;
 
   /// This gets a Jacobian relating the changes in the inner positions (the
   /// "real" positions) to the corresponding outer positions (the "mapped"
   /// positions)
-  Eigen::MatrixXd getRealPosToMappedPosJac(
+  Eigen::MatrixXs getRealPosToMappedPosJac(
       std::shared_ptr<simulation::World> world) override;
 
   /// This gets a Jacobian relating the changes in the inner velocities (the
   /// "real" velocities) to the corresponding outer positions (the "mapped"
   /// positions)
-  Eigen::MatrixXd getRealVelToMappedPosJac(
+  Eigen::MatrixXs getRealVelToMappedPosJac(
       std::shared_ptr<simulation::World> world) override;
 
   /// This gets a Jacobian relating the changes in the outer velocity (the
   /// "mapped" velocity) to inner velocity (the "real" velocity)
-  Eigen::MatrixXd getMappedVelToRealVelJac(
+  Eigen::MatrixXs getMappedVelToRealVelJac(
       std::shared_ptr<simulation::World> world) override;
 
   /// This gets a Jacobian relating the changes in the inner velocity (the
   /// "real" velocity) to the corresponding outer velocity (the "mapped"
   /// velocity)
-  Eigen::MatrixXd getRealVelToMappedVelJac(
+  Eigen::MatrixXs getRealVelToMappedVelJac(
       std::shared_ptr<simulation::World> world) override;
 
   /// This gets a Jacobian relating the changes in the inner position (the
   /// "real" position) to the corresponding outer velocity (the "mapped"
   /// velocity)
-  Eigen::MatrixXd getRealPosToMappedVelJac(
+  Eigen::MatrixXs getRealPosToMappedVelJac(
       std::shared_ptr<simulation::World> world) override;
 
   /// This gets a Jacobian relating the changes in the outer force (the
   /// "mapped" force) to inner force (the "real" force)
-  Eigen::MatrixXd getMappedForceToRealForceJac(
+  Eigen::MatrixXs getMappedForceToRealForceJac(
       std::shared_ptr<simulation::World> world) override;
 
   /// This gets a Jacobian relating the changes in the inner force (the
   /// "real" force) to the corresponding outer force (the "mapped"
   /// force)
-  Eigen::MatrixXd getRealForceToMappedForceJac(
+  Eigen::MatrixXs getRealForceToMappedForceJac(
       std::shared_ptr<simulation::World> world) override;
 
   /// This gets a Jacobian relating the changes in the outer force (the
   /// "mapped" force) to inner force (the "real" force)
-  Eigen::MatrixXd getMappedMassToRealMassJac(
+  Eigen::MatrixXs getMappedMassToRealMassJac(
       std::shared_ptr<simulation::World> world) override;
 
   /// This gets a Jacobian relating the changes in the inner force (the
   /// "real" force) to the corresponding outer force (the "mapped"
   /// force)
-  Eigen::MatrixXd getRealMassToMappedMassJac(
+  Eigen::MatrixXs getRealMassToMappedMassJac(
       std::shared_ptr<simulation::World> world) override;
 
-  Eigen::VectorXd getPositionLowerLimits(
+  Eigen::VectorXs getPositionLowerLimits(
       std::shared_ptr<simulation::World> world) override;
-  Eigen::VectorXd getPositionUpperLimits(
+  Eigen::VectorXs getPositionUpperLimits(
       std::shared_ptr<simulation::World> world) override;
-  Eigen::VectorXd getVelocityLowerLimits(
+  Eigen::VectorXs getVelocityLowerLimits(
       std::shared_ptr<simulation::World> world) override;
-  Eigen::VectorXd getVelocityUpperLimits(
+  Eigen::VectorXs getVelocityUpperLimits(
       std::shared_ptr<simulation::World> world) override;
-  Eigen::VectorXd getForceLowerLimits(
+  Eigen::VectorXs getForceLowerLimits(
       std::shared_ptr<simulation::World> world) override;
-  Eigen::VectorXd getForceUpperLimits(
+  Eigen::VectorXs getForceUpperLimits(
       std::shared_ptr<simulation::World> world) override;
-  Eigen::VectorXd getMassLowerLimits(
+  Eigen::VectorXs getMassLowerLimits(
       std::shared_ptr<simulation::World> world) override;
-  Eigen::VectorXd getMassUpperLimits(
+  Eigen::VectorXs getMassUpperLimits(
       std::shared_ptr<simulation::World> world) override;
 
 protected:

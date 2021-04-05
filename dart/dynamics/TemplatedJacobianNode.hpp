@@ -57,16 +57,16 @@ public:
 
   // Documentation inherited
   math::Jacobian getJacobian(
-      const Eigen::Vector3d& _offset) const override final;
+      const Eigen::Vector3s& _offset) const override final;
 
   // Documentation inherited
   math::Jacobian getJacobian(
-      const Eigen::Vector3d& _offset,
+      const Eigen::Vector3s& _offset,
       const Frame* _inCoordinatesOf) const override final;
 
   // Documentation inherited
   math::Jacobian getWorldJacobian(
-      const Eigen::Vector3d& _offset) const override final;
+      const Eigen::Vector3s& _offset) const override final;
 
   // Documentation inherited
   math::LinearJacobian getLinearJacobian(
@@ -74,7 +74,7 @@ public:
 
   // Documentation inherited
   math::LinearJacobian getLinearJacobian(
-      const Eigen::Vector3d& _offset,
+      const Eigen::Vector3s& _offset,
       const Frame* _inCoordinatesOf = Frame::World()) const override final;
 
   // Documentation inherited
@@ -87,11 +87,11 @@ public:
 
   // Documentation inherited
   math::Jacobian getJacobianSpatialDeriv(
-      const Eigen::Vector3d& _offset) const override final;
+      const Eigen::Vector3s& _offset) const override final;
 
   // Documentation inherited
   math::Jacobian getJacobianSpatialDeriv(
-      const Eigen::Vector3d& _offset,
+      const Eigen::Vector3s& _offset,
       const Frame* _inCoordinatesOf) const override final;
 
   // Documentation inherited
@@ -100,7 +100,7 @@ public:
 
   // Documentation inherited
   math::Jacobian getJacobianClassicDeriv(
-      const Eigen::Vector3d& _offset,
+      const Eigen::Vector3s& _offset,
       const Frame* _inCoordinatesOf = Frame::World()) const override final;
 
   // Documentation inherited
@@ -109,7 +109,7 @@ public:
 
   // Documentation inherited
   math::LinearJacobian getLinearJacobianDeriv(
-      const Eigen::Vector3d& _offset,
+      const Eigen::Vector3s& _offset,
       const Frame* _inCoordinatesOf = Frame::World()) const override final;
 
   // Documentation inherited

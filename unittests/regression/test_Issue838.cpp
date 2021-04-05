@@ -30,31 +30,31 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <gtest/gtest.h>
 #include <TestHelpers.hpp>
 #include <dart/dart.hpp>
 #include <dart/utils/urdf/DartLoader.hpp>
+#include <gtest/gtest.h>
 
 //==============================================================================
 TEST(Issue838, MaterialParsing)
 {
   dart::utils::DartLoader loader;
-  dart::dynamics::SkeletonPtr skeleton =
-      loader.parseSkeleton("dart://sample/urdf/test/issue838.urdf");
+  dart::dynamics::SkeletonPtr skeleton
+      = loader.parseSkeleton("dart://sample/urdf/test/issue838.urdf");
   EXPECT_TRUE(nullptr != skeleton);
 
-  std::vector<Eigen::Vector4d> colors;
-  colors.push_back(Eigen::Vector4d(0.0, 0.0, 0.8, 1.0));
-  colors.push_back(Eigen::Vector4d(1.0, 0.0, 0.0, 1.0));
-  colors.push_back(Eigen::Vector4d(1.0, 1.0, 0.0, 1.0));
+  std::vector<Eigen::Vector4s> colors;
+  colors.push_back(Eigen::Vector4s(0.0, 0.0, 0.8, 1.0));
+  colors.push_back(Eigen::Vector4s(1.0, 0.0, 0.0, 1.0));
+  colors.push_back(Eigen::Vector4s(1.0, 1.0, 0.0, 1.0));
 
   EXPECT_EQ(colors.size(), skeleton->getNumBodyNodes());
 
-  for(size_t i=0; i < skeleton->getNumBodyNodes(); ++i)
+  for (size_t i = 0; i < skeleton->getNumBodyNodes(); ++i)
   {
-    const Eigen::Vector4d c = colors[i];
+    const Eigen::Vector4s c = colors[i];
     const dart::dynamics::BodyNode* bn = skeleton->getBodyNode(i);
-    for(size_t j=0; j < bn->getNumShapeNodes(); ++j)
+    for (size_t j = 0; j < bn->getNumShapeNodes(); ++j)
     {
       const dart::dynamics::ShapeNode* sn = bn->getShapeNode(j);
       EXPECT_TRUE(equals(sn->getVisualAspect()->getRGBA(), c));

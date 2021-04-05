@@ -47,7 +47,7 @@ TEST(Issue1231, NoContacts)
 {
   dart::simulation::WorldPtr world = dart::simulation::World::create();
 
-  double x = -0.25;
+  s_t x = -0.25;
   for (const std::string& name : {"1", "2"})
   {
     const auto skeleton = dart::dynamics::Skeleton::create(name);
@@ -57,14 +57,14 @@ TEST(Issue1231, NoContacts)
     auto joint = pair.first;
     auto bn = pair.second;
 
-    Eigen::Isometry3d tf = Eigen::Isometry3d::Identity();
-    tf.translation() = Eigen::Vector3d(x, x, x);
+    Eigen::Isometry3s tf = Eigen::Isometry3s::Identity();
+    tf.translation() = Eigen::Vector3s(x, x, x);
     joint->setTransform(tf);
     x += 0.5;
 
     bn->createShapeNodeWith<dart::dynamics::CollisionAspect>(
         std::make_shared<dart::dynamics::BoxShape>(
-            Eigen::Vector3d::Constant(1.0)));
+            Eigen::Vector3s::Constant(1.0)));
 
     world->addSkeleton(skeleton);
   }

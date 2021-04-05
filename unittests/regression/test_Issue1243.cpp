@@ -36,9 +36,9 @@
 #include <dart/dart.hpp>
 
 dart::dynamics::SkeletonPtr create_box(
-    const Eigen::Vector3d& dims,
-    double mass,
-    const Eigen::Vector4d& color,
+    const Eigen::Vector3s& dims,
+    s_t mass,
+    const Eigen::Vector4s& color,
     const std::string& box_name)
 {
   dart::dynamics::SkeletonPtr box_skel
@@ -69,8 +69,8 @@ dart::dynamics::SkeletonPtr create_box(
 
 dart::dynamics::SkeletonPtr create_floor()
 {
-  double floor_width = 10.;
-  double floor_height = 0.1;
+  s_t floor_width = 10.;
+  s_t floor_height = 0.1;
 
   dart::dynamics::SkeletonPtr floor_skel
       = dart::dynamics::Skeleton::create("floor");
@@ -83,7 +83,7 @@ dart::dynamics::SkeletonPtr create_floor()
 
   // Give the body a shape
   auto box = std::make_shared<dart::dynamics::BoxShape>(
-      Eigen::Vector3d(floor_width, floor_width, floor_height));
+      Eigen::Vector3s(floor_width, floor_width, floor_height));
   auto box_node = body->createShapeNodeWith<
       dart::dynamics::VisualAspect,
       dart::dynamics::CollisionAspect,
@@ -91,7 +91,7 @@ dart::dynamics::SkeletonPtr create_floor()
   box_node->getVisualAspect()->setColor(dart::Color::Gray());
 
   // Put the body into position
-  Eigen::Isometry3d tf(Eigen::Isometry3d::Identity());
+  Eigen::Isometry3s tf(Eigen::Isometry3s::Identity());
   tf.translation()[2] -= floor_height / 2.0;
   body->getParentJoint()->setTransformFromParentBodyNode(tf);
 
@@ -112,7 +112,7 @@ TEST(Issue1243, State)
   world->addSkeleton(floor_skel);
 
   dart::dynamics::Skeleton::State bookmark_state;
-  Eigen::Isometry3d bookmark_tf;
+  Eigen::Isometry3s bookmark_tf;
   for (size_t i = 0; i < 20; i++)
   {
     if (i == 10)
@@ -123,11 +123,11 @@ TEST(Issue1243, State)
     world->step();
   }
 
-  const Eigen::Isometry3d final_tf
+  const Eigen::Isometry3s final_tf
       = box_skel->getRootBodyNode()->getTransform();
 
   box_skel->setState(bookmark_state);
-  const Eigen::Isometry3d rewind_tf
+  const Eigen::Isometry3s rewind_tf
       = box_skel->getRootBodyNode()->getTransform();
 
   EXPECT_FALSE(equals(bookmark_tf, final_tf));

@@ -61,28 +61,28 @@ public:
   //----------------------------------------------------------------------------
 
   /// Set global error reduction parameter
-  static void setErrorAllowance(double _allowance);
+  static void setErrorAllowance(s_t _allowance);
 
   /// Get global error reduction parameter
-  static double getErrorAllowance();
+  static s_t getErrorAllowance();
 
   /// Set global error reduction parameter
-  static void setErrorReductionParameter(double _erp);
+  static void setErrorReductionParameter(s_t _erp);
 
   /// Get global error reduction parameter
-  static double getErrorReductionParameter();
+  static s_t getErrorReductionParameter();
 
   /// Set global error reduction parameter
-  static void setMaxErrorReductionVelocity(double _erv);
+  static void setMaxErrorReductionVelocity(s_t _erv);
 
   /// Get global error reduction parameter
-  static double getMaxErrorReductionVelocity();
+  static s_t getMaxErrorReductionVelocity();
 
   /// Set global constraint force mixing parameter
-  static void setConstraintForceMixing(double _cfm);
+  static void setConstraintForceMixing(s_t _cfm);
 
   /// Get global constraint force mixing parameter
-  static double getConstraintForceMixing();
+  static s_t getConstraintForceMixing();
 
   /// Get the first BodyNode that this constraint is associated with
   dynamics::BodyNode* getBodyNode1() const;
@@ -98,19 +98,19 @@ protected:
   dynamics::BodyNode* mBodyNode2;
 
   /// Global constraint error allowance
-  static double mErrorAllowance;
+  static s_t mErrorAllowance;
 
   /// Global constraint error redection parameter in the range of [0, 1]. The
   /// default is 0.01.
-  static double mErrorReductionParameter;
+  static s_t mErrorReductionParameter;
 
   /// Maximum error reduction velocity
-  static double mMaxErrorReductionVelocity;
+  static s_t mMaxErrorReductionVelocity;
 
   /// Global constraint force mixing parameter in the range of [1e-9, 1]. The
   /// default is 1e-5
   /// \sa http://www.ode.org/ode-latest-userguide.html#sec_3_8_0
-  static double mConstraintForceMixing;
+  static s_t mConstraintForceMixing;
 };
 
 } // namespace constraint

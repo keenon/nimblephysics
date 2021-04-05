@@ -52,10 +52,10 @@ public:
 
   void reset();
 
-  void pushForwardAtlas(double force = 500, int frames = 100);
-  void pushBackwardAtlas(double force = 500, int frames = 100);
-  void pushLeftAtlas(double force = 500, int frames = 100);
-  void pushRightAtlas(double force = 500, int frames = 100);
+  void pushForwardAtlas(s_t force = 500, int frames = 100);
+  void pushBackwardAtlas(s_t force = 500, int frames = 100);
+  void pushLeftAtlas(s_t force = 500, int frames = 100);
+  void pushRightAtlas(s_t force = 500, int frames = 100);
 
   void switchToNormalStrideWalking();
   void switchToShortStrideWalking();
@@ -66,7 +66,7 @@ public:
 
 protected:
   std::unique_ptr<Controller> mController;
-  Eigen::Vector3d mExternalForce;
+  Eigen::Vector3s mExternalForce;
   int mForceDuration;
 };
 
