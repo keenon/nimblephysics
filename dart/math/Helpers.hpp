@@ -344,7 +344,7 @@ namespace suffixes {
 
 #ifndef DART_USE_ARBITRARY_PRECISION
 //==============================================================================
-constexpr s_t operator"" _pi(long s_t x)
+constexpr s_t operator"" _pi(long double x)
 {
   return x * constants<s_t>::pi();
 }
@@ -356,7 +356,7 @@ constexpr s_t operator"" _pi(unsigned long long int x)
 }
 
 //==============================================================================
-constexpr s_t operator"" _rad(long s_t angle)
+constexpr s_t operator"" _rad(long double angle)
 {
   return angle;
 }
@@ -368,7 +368,7 @@ constexpr s_t operator"" _rad(unsigned long long int angle)
 }
 
 //==============================================================================
-constexpr s_t operator"" _deg(long s_t angle)
+constexpr s_t operator"" _deg(long double angle)
 {
   return toRadian(angle);
 }

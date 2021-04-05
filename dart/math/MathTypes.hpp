@@ -44,19 +44,19 @@
 
 #include "mpreal.h"
 
-#define DART_USE_ARBITRARY_PRECISION
+// #define DART_USE_ARBITRARY_PRECISION
 
 #ifdef DART_USE_ARBITRARY_PRECISION
 typedef mpfr::mpreal s_t;
 #else
-typedef s_t s_t;
-using abs = std::abs;
-using max = std::max;
-using floor = std::floor;
-using ceil = std::ceil;
-using isfinite = std::isfinite;
-using pow = std::pow;
-using isnan = std::isnan;
+typedef double s_t;
+using std::abs;
+using std::ceil;
+using std::floor;
+using std::isfinite;
+using std::isnan;
+using std::max;
+using std::pow;
 #endif
 
 //------------------------------------------------------------------------------

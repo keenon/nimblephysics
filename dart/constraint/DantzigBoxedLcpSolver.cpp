@@ -64,8 +64,8 @@ bool DantzigBoxedLcpSolver::solve(
 {
   try
   {
-    int nSkip = dPAD(n);
 #ifdef DART_USE_ARBITRARY_PRECISION
+    int nSkip = dPAD(n);
     double* A_d = new double[n * nSkip];
     double* x_d = new double[n];
     double* b_d = new double[n];
