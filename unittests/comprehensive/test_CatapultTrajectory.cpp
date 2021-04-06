@@ -42,7 +42,6 @@
 
 #include "dart/collision/CollisionObject.hpp"
 #include "dart/collision/Contact.hpp"
-#include "dart/collision/fcl/FCLCollisionDetector.hpp"
 #include "dart/constraint/BoxedLcpConstraintSolver.hpp"
 #include "dart/dynamics/BodyNode.hpp"
 #include "dart/dynamics/RevoluteJoint.hpp"

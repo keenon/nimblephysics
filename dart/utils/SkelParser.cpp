@@ -44,7 +44,6 @@
 #include "dart/collision/dart/DARTCollisionDetector.hpp"
 #include "dart/common/Console.hpp"
 #include "dart/config.hpp"
-// #include "dart/collision/fcl/FCLCollisionDetector.hpp"
 #include "dart/constraint/ConstraintSolver.hpp"
 #include "dart/dynamics/BallJoint.hpp"
 #include "dart/dynamics/BodyNode.hpp"
@@ -681,20 +680,6 @@ tinyxml2::XMLElement* checkFormatAndGetWorldElement(
 }
 
 //==============================================================================
-#ifdef HAVE_FCL
-static std::shared_ptr<collision::CollisionDetector>
-createFclMeshCollisionDetector()
-{
-  auto cd = collision::CollisionDetector::getFactory()->create("fcl");
-  auto fcl = std::static_pointer_cast<collision::FCLCollisionDetector>(cd);
-  fcl->setPrimitiveShapeType(collision::FCLCollisionDetector::MESH);
-  fcl->setContactPointComputationMethod(collision::FCLCollisionDetector::DART);
-
-  return fcl;
-}
-#endif
-
-//==============================================================================
 simulation::WorldPtr readWorld(
     tinyxml2::XMLElement* _worldElement,
     const common::Uri& _baseUri,
@@ -741,28 +726,6 @@ simulation::WorldPtr readWorld(
     if (hasElement(physicsElement, "collision_detector"))
     {
       const auto cdType = getValueString(physicsElement, "collision_detector");
-
-#ifdef HAVE_FCL
-      if (cdType == "fcl_mesh")
-      {
-        collision_detector = createFclMeshCollisionDetector();
-      }
-      else if (cdType == "fcl")
-      {
-        collision_detector
-            = collision::CollisionDetector::getFactory()->create("fcl");
-        auto cd = std::static_pointer_cast<collision::FCLCollisionDetector>(
-            collision_detector);
-        cd->setPrimitiveShapeType(collision::FCLCollisionDetector::PRIMITIVE);
-        cd->setContactPointComputationMethod(
-            collision::FCLCollisionDetector::DART);
-      }
-      else
-      {
-        collision_detector
-            = collision::CollisionDetector::getFactory()->create(cdType);
-      }
-#endif
 
       collision_detector
           = collision::CollisionDetector::getFactory()->create(cdType);

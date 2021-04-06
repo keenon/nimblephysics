@@ -39,7 +39,6 @@ namespace dart {
 namespace collision {
 
 DART_COMMON_DECLARE_SHARED_WEAK(CollisionDetector)
-DART_COMMON_DECLARE_SHARED_WEAK(FCLCollisionDetector)
 DART_COMMON_DECLARE_SHARED_WEAK(DARTCollisionDetector)
 
 DART_COMMON_DECLARE_SHARED_WEAK(CollisionObject)

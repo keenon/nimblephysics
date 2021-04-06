@@ -37,7 +37,6 @@
 #include "dart/collision/CollisionObject.hpp"
 #include "dart/collision/Contact.hpp"
 #include "dart/collision/dart/DARTCollisionDetector.hpp"
-#include "dart/collision/fcl/FCLCollisionDetector.hpp"
 #include "dart/common/Console.hpp"
 #include "dart/constraint/ConstrainedGroup.hpp"
 #include "dart/constraint/ContactConstraint.hpp"
@@ -74,16 +73,6 @@ ConstraintSolver::ConstraintSolver(s_t timeStep)
         0.03) // Default to clipping only after fairly deep penetration
 {
   assert(timeStep > 0.0);
-
-  /*
-  auto cd = std::static_pointer_cast<collision::FCLCollisionDetector>(
-      mCollisionDetector);
-
-  cd->setPrimitiveShapeType(collision::FCLCollisionDetector::MESH);
-  */
-  // TODO(JS): Consider using FCL's primitive shapes once FCL addresses
-  // incorrect contact point computation.
-  // (see: https://github.com/flexible-collision-library/fcl/issues/106)
 }
 
 //==============================================================================
@@ -100,15 +89,6 @@ ConstraintSolver::ConstraintSolver()
     mContactClippingDepth(
         0.03) // Default to clipping only after fairly deep penetration
 {
-  /*
-  auto cd = std::static_pointer_cast<collision::FCLCollisionDetector>(
-      mCollisionDetector);
-
-  cd->setPrimitiveShapeType(collision::FCLCollisionDetector::MESH);
-  */
-  // TODO(JS): Consider using FCL's primitive shapes once FCL addresses
-  // incorrect contact point computation.
-  // (see: https://github.com/flexible-collision-library/fcl/issues/106)
 }
 
 //==============================================================================

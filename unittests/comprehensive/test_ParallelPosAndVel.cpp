@@ -40,7 +40,6 @@
 #include <dart/utils/utils.hpp>
 #include <gtest/gtest.h>
 
-#include "dart/collision/fcl/FCLCollisionDetector.hpp"
 #include "dart/dynamics/Skeleton.hpp"
 #include "dart/realtime/Ticker.hpp"
 #include "dart/server/GUIWebsocketServer.hpp"

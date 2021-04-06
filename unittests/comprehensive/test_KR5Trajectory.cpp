@@ -42,7 +42,6 @@
 
 #include "dart/collision/CollisionObject.hpp"
 #include "dart/collision/Contact.hpp"
-#include "dart/collision/fcl/FCLCollisionDetector.hpp"
 #include "dart/constraint/BoxedLcpConstraintSolver.hpp"
 #include "dart/dynamics/BodyNode.hpp"
 #include "dart/dynamics/RevoluteJoint.hpp"
@@ -291,7 +290,7 @@ TEST(KR5_EXAMPLE, FULL_TEST)
 
     s_t ikPosLoss = diffX * diffX + diffY * diffY + diffZ * diffZ;
     s_t ikVelLoss = lastVel(0) * lastVel(0) + lastVel(1) * lastVel(1)
-                       + lastVel(2) * lastVel(2);
+                    + lastVel(2) * lastVel(2);
 
     s_t forcesLoss = 0.0;
     /*
