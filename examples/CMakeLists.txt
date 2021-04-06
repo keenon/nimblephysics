@@ -19,6 +19,3 @@ if(HAVE_OCTOMAP)
 endif()
 add_subdirectory(soft_bodies)
 add_subdirectory(tinkertoy)
-
-# Deprecated examples
-add_subdirectory(deprecated_examples)
