@@ -67,7 +67,7 @@ set(DART_MINOR_VERSION "9")
 set(DART_PATCH_VERSION "0")
 set(DART_VERSION "${DART_MAJOR_VERSION}.${DART_MINOR_VERSION}.${DART_PATCH_VERSION}")
 set(DART_PKG_DESC "Dynamic Animation and Robotics Toolkit.")
-set(DART_PKG_EXTERNAL_DEPS "eigen, ccd, fcl, assimp, boost")
+set(DART_PKG_EXTERNAL_DEPS "eigen, ccd, assimp, boost")
 
 #===============================================================================
 # Build options

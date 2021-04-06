@@ -350,21 +350,21 @@ constexpr s_t operator"" _pi(long double x)
 }
 
 //==============================================================================
-constexpr s_t operator"" _pi(unsigned long long int x)
+constexpr double operator"" _pi(unsigned long long int x)
 {
-  return operator"" _pi(static_cast<long s_t>(x));
+  return operator"" _pi(static_cast<long double>(x));
 }
 
 //==============================================================================
-constexpr s_t operator"" _rad(long double angle)
+constexpr double operator"" _rad(long double angle)
 {
   return angle;
 }
 
 //==============================================================================
-constexpr s_t operator"" _rad(unsigned long long int angle)
+constexpr double operator"" _rad(unsigned long long int angle)
 {
-  return operator"" _rad(static_cast<long s_t>(angle));
+  return operator"" _rad(static_cast<long double>(angle));
 }
 
 //==============================================================================
@@ -374,9 +374,9 @@ constexpr s_t operator"" _deg(long double angle)
 }
 
 //==============================================================================
-constexpr s_t operator"" _deg(unsigned long long int angle)
+constexpr double operator"" _deg(unsigned long long int angle)
 {
-  return operator"" _deg(static_cast<long s_t>(angle));
+  return operator"" _deg(static_cast<long double>(angle));
 }
 #endif
 

@@ -22,10 +22,6 @@ dart_check_required_package(EIGEN3 "eigen3")
 dart_find_package(ccd)
 dart_check_required_package(ccd "libccd")
 
-# FCL
-# dart_find_package(fcl)
-# dart_check_required_package(fcl "fcl")
-
 # ASSIMP
 dart_find_package(assimp)
 dart_check_required_package(assimp "assimp")

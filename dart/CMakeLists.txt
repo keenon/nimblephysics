@@ -119,7 +119,6 @@ target_link_libraries(dart
     ${PROJECT_NAME}-external-odelcpsolver
     Eigen3::Eigen
     ccd
-    fcl
     assimp
     Boost::boost
     Boost::system
