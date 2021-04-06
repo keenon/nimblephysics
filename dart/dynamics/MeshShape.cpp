@@ -172,6 +172,23 @@ MeshShape::MeshShape(
 }
 
 //==============================================================================
+MeshShape::MeshShape(
+    const Eigen::Vector3d& scale,
+    const std::string& path,
+    common::ResourceRetrieverPtr resourceRetriever, 
+    bool dontFreeMesh)
+  : Shape(MESH),
+    mDisplayList(0),
+    mColorMode(MATERIAL_COLOR),
+    mAlphaMode(BLEND),
+    mColorIndex(0),
+    mDontFreeMesh(dontFreeMesh)
+{
+  setMesh(loadMesh(path), path, std::move(resourceRetriever));
+  setScale(scale);
+}
+
+//==============================================================================
 MeshShape::~MeshShape()
 {
   if (mDontFreeMesh) return;

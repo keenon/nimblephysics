@@ -292,6 +292,20 @@ void Shape(py::module& m)
           ::py::arg("uri"),
           ::py::arg("resourceRetriever"))
       .def(
+          ::py::init<
+              const Eigen::Vector3d&,
+              const std::string>(),
+          ::py::arg("scale"),
+          ::py::arg("path"))
+      .def(
+          ::py::init<
+              const Eigen::Vector3d&,
+              const std::string,
+              dart::common::ResourceRetrieverPtr>(),
+          ::py::arg("scale"),
+          ::py::arg("path"),
+          ::py::arg("resourceRetriever"))
+      .def(
           "getType",
           +[](const dart::dynamics::MeshShape* self) -> const std::string& {
             return self->getType();
