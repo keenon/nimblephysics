@@ -83,6 +83,11 @@ public:
     common::ResourceRetrieverPtr resourceRetriever = nullptr,
     bool dontFreeMesh = false);
 
+  MeshShape(const Eigen::Vector3d& scale,
+    const std::string& path,
+    common::ResourceRetrieverPtr resourceRetriever = nullptr,
+    bool dontFreeMesh = false);
+
   /// Destructor.
   ~MeshShape() override;
 
