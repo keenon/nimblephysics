@@ -37,7 +37,6 @@
 #include <vector>
 
 #include <Eigen/Dense>
-#include <unsupported/Eigen/MPRealSupport>
 
 #include "dart/common/Deprecated.hpp"
 #include "dart/common/Memory.hpp"
@@ -46,6 +45,7 @@
 // CMakeLists.txt file.
 
 #ifdef DART_USE_ARBITRARY_PRECISION
+#include <unsupported/Eigen/MPRealSupport>
 #include "mpreal.h"
 typedef mpfr::mpreal s_t;
 #else
