@@ -37,7 +37,9 @@
 
 #include <Eigen/Core>
 
+#ifdef DART_USE_ARBITRARY_PRECISION
 #include "mpreal.h"
+#endif
 
 namespace dart {
 namespace math {

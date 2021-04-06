@@ -72,8 +72,11 @@
 #include "GradientTestUtils.hpp"
 #include "TestHelpers.hpp"
 #include "TrajectoryTestUtils.hpp"
-#include "mpreal.h"
 #include "stdio.h"
+
+#ifdef DART_USE_ARBITRARY_PRECISION
+#include "mpreal.h"
+#endif
 
 // #define ALL_TESTS
 
@@ -197,7 +200,9 @@ TEST(HALF_CHEETAH, CAPSULE_INTER_PENETRATION)
 TEST(HALF_CHEETAH, POS_VEL_ERRORS)
 {
   // set precision to 256 bits (double has only 53 bits)
+#ifdef DART_USE_ARBITRARY_PRECISION
   mpfr::mpreal::set_default_prec(256);
+#endif
 
   // Create a world
   std::shared_ptr<simulation::World> world
@@ -245,7 +250,9 @@ TEST(HALF_CHEETAH, POS_VEL_ERRORS)
 TEST(HALF_CHEETAH, POS_VEL_ERRORS_2)
 {
   // set precision to 256 bits (double has only 53 bits)
+#ifdef DART_USE_ARBITRARY_PRECISION
   mpfr::mpreal::set_default_prec(256);
+#endif
 
   // Create a world
   std::shared_ptr<simulation::World> world
@@ -293,7 +300,9 @@ TEST(HALF_CHEETAH, POS_VEL_ERRORS_2)
 TEST(HALF_CHEETAH, FULL_TEST)
 {
   // set precision to 256 bits (double has only 53 bits)
+#ifdef DART_USE_ARBITRARY_PRECISION
   mpfr::mpreal::set_default_prec(256);
+#endif
 
   // Create a world
   std::shared_ptr<simulation::World> world

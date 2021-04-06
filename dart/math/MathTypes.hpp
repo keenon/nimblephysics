@@ -42,11 +42,11 @@
 #include "dart/common/Deprecated.hpp"
 #include "dart/common/Memory.hpp"
 
-#include "mpreal.h"
-
-// #define DART_USE_ARBITRARY_PRECISION
+// You can turn on DART_USE_ARBITRARY_PRECISION as a variable in the root
+// CMakeLists.txt file.
 
 #ifdef DART_USE_ARBITRARY_PRECISION
+#include "mpreal.h"
 typedef mpfr::mpreal s_t;
 #else
 typedef double s_t;

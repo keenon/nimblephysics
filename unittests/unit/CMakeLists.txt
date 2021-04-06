@@ -19,7 +19,9 @@ dart_add_test("unit" test_PerformanceLog)
 dart_add_test("unit" test_RealtimeUtils)
 dart_add_test("unit" test_ScrewGeometry)
 dart_add_test("unit" test_JointJacobians)
+if(DART_USE_ARBITRARY_PRECISION)
 dart_add_test("unit" test_MPFR)
+endif()
 
 if(TARGET dart-utils)
 

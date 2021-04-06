@@ -337,6 +337,7 @@ struct UniformImpl<
   }
 };
 
+#ifdef DART_USE_ARBITRARY_PRECISION
 template <>
 struct UniformImpl<mpfr::mpreal>
 {
@@ -346,6 +347,7 @@ struct UniformImpl<mpfr::mpreal>
         static_cast<double>(min), static_cast<double>(max)));
   }
 };
+#endif
 
 //==============================================================================
 template <typename T>

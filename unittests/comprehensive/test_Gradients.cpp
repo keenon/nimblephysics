@@ -57,8 +57,11 @@
 
 #include "GradientTestUtils.hpp"
 #include "TestHelpers.hpp"
-#include "mpreal.h"
 #include "stdio.h"
+
+#ifdef DART_USE_ARBITRARY_PRECISION
+#include "mpreal.h"
+#endif
 
 #define ALL_TESTS
 
@@ -219,7 +222,9 @@ ground. The ground has configurable friction in this setup.
 void testBlockWithFrictionCoeff(s_t frictionCoeff, s_t mass)
 {
   // set precision to 256 bits (double has only 53 bits)
+#ifdef DART_USE_ARBITRARY_PRECISION
   mpfr::mpreal::set_default_prec(256);
+#endif
 
   // World
   WorldPtr world = World::create();
@@ -1547,7 +1552,9 @@ void testFreeBlockWithFrictionCoeff(
     s_t frictionCoeff, s_t mass, bool largeInitialVelocity)
 {
   // set precision to 256 bits (double has only 53 bits)
+#ifdef DART_USE_ARBITRARY_PRECISION
   mpfr::mpreal::set_default_prec(256);
+#endif
 
   // World
   WorldPtr world = World::create();

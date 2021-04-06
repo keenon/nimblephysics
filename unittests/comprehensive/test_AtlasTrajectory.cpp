@@ -236,7 +236,9 @@ TEST(ATLAS, BROKEN_1)
 TEST(ATLAS, BROKEN_2)
 {
   // set precision to 256 bits (double has only 53 bits)
+#ifdef DART_USE_ARBITRARY_PRECISION
   mpfr::mpreal::set_default_prec(256);
+#endif
 
   s_t target_x = 0.5;
   s_t target_y = 1.0;
@@ -333,7 +335,9 @@ TEST(ATLAS, BROKEN_2)
 TEST(ATLAS, BROKEN_3)
 {
   // set precision to 256 bits (double has only 53 bits)
+#ifdef DART_USE_ARBITRARY_PRECISION
   mpfr::mpreal::set_default_prec(256);
+#endif
 
   s_t target_x = 0.5;
   s_t target_y = 1.0;
@@ -426,7 +430,9 @@ TEST(ATLAS, BROKEN_3)
 TEST(ATLAS_EXAMPLE, FULL_TEST)
 {
   // set precision to 256 bits (double has only 53 bits)
+#ifdef DART_USE_ARBITRARY_PRECISION
   mpfr::mpreal::set_default_prec(256);
+#endif
 
   s_t target_x = 0.5;
   s_t target_y = 1.0;
