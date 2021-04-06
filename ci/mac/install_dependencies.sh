@@ -231,6 +231,7 @@ rm mpfr-4.1.0.tar.gz
 
 # Install MPIR - Arbitrary precision integer math
 brew install yasm m4
+brew install gcc
 curl http://mpir.org/mpir-3.0.0.tar.bz2 > mpir-3.0.0.tar.bz2
 tar -xf mpir-3.0.0.tar.bz2
 pushd mpir-3.0.0
