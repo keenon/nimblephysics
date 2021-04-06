@@ -181,9 +181,9 @@ TEST(World, Cloning)
   fileList.push_back("dart://sample/skel/test/single_pendulum.skel");
   fileList.push_back("dart://sample/skel/test/single_pendulum_euler_joint.skel");
   fileList.push_back("dart://sample/skel/test/single_pendulum_ball_joint.skel");
-  fileList.push_back("dart://sample/skel/test/s_t_pendulum.skel");
-  fileList.push_back("dart://sample/skel/test/s_t_pendulum_euler_joint.skel");
-  fileList.push_back("dart://sample/skel/test/s_t_pendulum_ball_joint.skel");
+  fileList.push_back("dart://sample/skel/test/double_pendulum.skel");
+  fileList.push_back("dart://sample/skel/test/double_pendulum_euler_joint.skel");
+  fileList.push_back("dart://sample/skel/test/double_pendulum_ball_joint.skel");
   fileList.push_back("dart://sample/skel/test/serial_chain_revolute_joint.skel");
   fileList.push_back("dart://sample/skel/test/serial_chain_eulerxyz_joint.skel");
   fileList.push_back("dart://sample/skel/test/serial_chain_ball_joint.skel");
@@ -264,9 +264,9 @@ TEST(World, ValidatingClones)
   fileList.push_back("dart://sample/skel/test/single_pendulum.skel");
   fileList.push_back("dart://sample/skel/test/single_pendulum_euler_joint.skel");
   fileList.push_back("dart://sample/skel/test/single_pendulum_ball_joint.skel");
-  fileList.push_back("dart://sample/skel/test/s_t_pendulum.skel");
-  fileList.push_back("dart://sample/skel/test/s_t_pendulum_euler_joint.skel");
-  fileList.push_back("dart://sample/skel/test/s_t_pendulum_ball_joint.skel");
+  fileList.push_back("dart://sample/skel/test/double_pendulum.skel");
+  fileList.push_back("dart://sample/skel/test/double_pendulum_euler_joint.skel");
+  fileList.push_back("dart://sample/skel/test/double_pendulum_ball_joint.skel");
   fileList.push_back("dart://sample/skel/test/serial_chain_revolute_joint.skel");
   fileList.push_back("dart://sample/skel/test/serial_chain_eulerxyz_joint.skel");
   fileList.push_back("dart://sample/skel/test/serial_chain_ball_joint.skel");

@@ -57,9 +57,9 @@ using namespace simulation;
 // #define ALL_TESTS
 
 /******************************************************************************/
-Eigen::Matrix4d toMatrixForm(const Eigen::Vector6s& v)
+Eigen::Matrix4s toMatrixForm(const Eigen::Vector6s& v)
 {
-  Eigen::Matrix4d result = Eigen::Matrix4d::Zero();
+  Eigen::Matrix4s result = Eigen::Matrix4s::Zero();
 
   result(0, 1) = -v(2);
   result(1, 0) = v(2);
@@ -76,7 +76,7 @@ Eigen::Matrix4d toMatrixForm(const Eigen::Vector6s& v)
 }
 
 /******************************************************************************/
-Eigen::Vector6s fromMatrixForm(const Eigen::Matrix4d& m)
+Eigen::Vector6s fromMatrixForm(const Eigen::Matrix4s& m)
 {
   Eigen::Vector6s ret;
   ret << m(2, 1), m(0, 2), m(1, 0), m(0, 3), m(1, 3), m(2, 3);
@@ -848,7 +848,7 @@ TEST(LIE_GROUP_OPERATORS, EXPONENTIAL_MAPPINGS)
   {
     Eigen::Vector6s s = Eigen::Vector6s::Random();
     Eigen::Isometry3s Exp_s = math::expMap(s);
-    Eigen::Matrix4d Exp_s_2 = Eigen::Matrix4d::Identity();
+    Eigen::Matrix4s Exp_s_2 = Eigen::Matrix4s::Identity();
 
     s_t theta = s.head<3>().norm();
     Eigen::Matrix3s R = Matrix3s::Zero();
@@ -884,7 +884,7 @@ TEST(LIE_GROUP_OPERATORS, EXPONENTIAL_MAPPINGS)
     Eigen::Vector6s s = Eigen::Vector6s::Random();
     s.tail<3>() = Eigen::Vector3s::Zero();
     Eigen::Isometry3s Exp_s = math::expAngular(s.head<3>());
-    Eigen::Matrix4d Exp_s_2 = Eigen::Matrix4d::Identity();
+    Eigen::Matrix4s Exp_s_2 = Eigen::Matrix4s::Identity();
 
     s_t theta = s.head<3>().norm();
     Eigen::Matrix3s R = Matrix3s::Zero();
@@ -919,8 +919,8 @@ TEST(LIE_GROUP_OPERATORS, EXPONENTIAL_MAPPINGS)
   {
     Eigen::Vector6s s = Eigen::Vector6s::Random();
     s.head<3>() = Eigen::Vector3s::Zero();
-    Eigen::Isometry3s Exp_s(Eigen::Translation3d(s.tail<3>()));
-    Eigen::Matrix4d Exp_s_2 = Eigen::Matrix4d::Identity();
+    Eigen::Isometry3s Exp_s(Eigen::Translation3s(s.tail<3>()));
+    Eigen::Matrix4s Exp_s_2 = Eigen::Matrix4s::Identity();
 
     s_t theta = s.head<3>().norm();
     Eigen::Matrix3s R = Matrix3s::Zero();
@@ -994,7 +994,7 @@ TEST(LIE_GROUP_OPERATORS, ADJOINT_MAPPINGS)
     Eigen::Vector6s AdTV = AdT(T, V);
 
     // Ad(T, V) = T * [V] * InvT
-    Eigen::Matrix4d T_V_InvT
+    Eigen::Matrix4s T_V_InvT
         = T.matrix() * toMatrixForm(V) * T.inverse().matrix();
     Eigen::Vector6s T_V_InvT_se3 = fromMatrixForm(T_V_InvT);
 

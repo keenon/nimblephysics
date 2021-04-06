@@ -8,7 +8,6 @@ dart_add_test("unit" test_Inertia)
 dart_add_test("unit" test_Lemke)
 dart_add_test("unit" test_LocalResourceRetriever)
 dart_add_test("unit" test_Math)
-dart_add_test("unit" test_Optimizer)
 dart_add_test("unit" test_Random)
 dart_add_test("unit" test_ScrewJoint)
 dart_add_test("unit" test_Signal)
@@ -21,14 +20,6 @@ dart_add_test("unit" test_RealtimeUtils)
 dart_add_test("unit" test_ScrewGeometry)
 dart_add_test("unit" test_JointJacobians)
 dart_add_test("unit" test_MPFR)
-
-if(TARGET dart-optimizer-ipopt)
-  target_link_libraries(test_Optimizer dart-optimizer-ipopt)
-endif()
-
-if(TARGET dart-optimizer-nlopt)
-  target_link_libraries(test_Optimizer dart-optimizer-nlopt)
-endif()
 
 if(TARGET dart-utils)
 

@@ -31,7 +31,9 @@
  */
 
 #include <tuple>
+
 #include <gtest/gtest.h>
+
 #include "dart/dart.hpp"
 
 using namespace dart;
@@ -48,27 +50,28 @@ TEST(ScrewJoint, ThreadPitch)
   auto bodyNode = pair.second;
 
   // Initial settings
-  screwJoint->setPosition(0, 0.0_pi);
+  screwJoint->setPosition(0, 0.0);
   const Eigen::Vector3s axis = screwJoint->getAxis();
   const Eigen::Vector3s pos0 = bodyNode->getTransform().translation();
 
   auto pitch = 0.1;
-  auto angle = 1.0_pi;
+  auto angle = math::constantsd::pi();
   screwJoint->setPitch(pitch);
   EXPECT_EQ(screwJoint->getPitch(), pitch);
   screwJoint->setPosition(0, angle);
   Eigen::Vector3s pos1 = bodyNode->getTransform().translation();
   Eigen::Vector3s diff = pos1 - pos0;
-  Eigen::Vector3s expectedDiff = axis*pitch*angle/2.0_pi;
+  Eigen::Vector3s expectedDiff
+      = axis * pitch * angle / math::constantsd::two_pi();
   EXPECT_TRUE(diff.isApprox(expectedDiff));
 
   pitch = 1.23;
-  angle = 4.5_pi;
+  angle = 4.5 * math::constantsd::pi();
   screwJoint->setPitch(pitch);
   EXPECT_EQ(screwJoint->getPitch(), pitch);
   screwJoint->setPosition(0, angle);
   pos1 = bodyNode->getTransform().translation();
   diff = pos1 - pos0;
-  expectedDiff = axis*pitch*angle/2.0_pi;
+  expectedDiff = axis * pitch * angle / math::constantsd::two_pi();
   EXPECT_TRUE(diff.isApprox(expectedDiff));
 }

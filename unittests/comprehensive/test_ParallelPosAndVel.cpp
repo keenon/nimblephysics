@@ -63,7 +63,7 @@ TEST(PARALLEL_POS_AND_VEL, s_t_PENDULUM)
 {
   // Create a world
   std::shared_ptr<simulation::World> world = dart::utils::SkelParser::readWorld(
-      "dart://sample/skel/inverted_s_t_pendulum.skel");
+      "dart://sample/skel/inverted_double_pendulum.skel");
   world->setPositions(Eigen::Vector3s(0, M_PI, 0));
   // TODO: if we set this to "true", then the model velocity explodes over time
   // with no input from us. This is a simple and obvious example of a bad
@@ -75,7 +75,7 @@ TEST(PARALLEL_POS_AND_VEL, s_t_PENDULUM)
     world->step();
   }
 
-  EXPECT_NEAR(world->getVelocities().norm(), 0, 1e-7);
+  EXPECT_NEAR(static_cast<double>(world->getVelocities().norm()), 0, 1e-7);
 
   /*
   // Uncomment this code to get a visualization server that you can perturb with

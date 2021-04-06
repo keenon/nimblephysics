@@ -52,7 +52,7 @@ TEST(SkelParser, DataStructure)
   int valInt = -3;
   unsigned int valUInt = 1;
   float valFloat = -3.140f;
-  s_t vals_t = 1.4576640;
+  double valDouble = 1.4576640;
   char valChar = 'd';
   Eigen::Vector2s valVector2s = Eigen::Vector2s::Random();
   Eigen::Vector3s valVector3s = Eigen::Vector3s::Random();
@@ -65,7 +65,7 @@ TEST(SkelParser, DataStructure)
   std::string strInt = toString(valInt);
   std::string strUInt = toString(valUInt);
   std::string strFloat = toString(valFloat);
-  std::string strs_t = toString(vals_t);
+  std::string strDouble = toString(valDouble);
   std::string strChar = toString(valChar);
   std::string strVector2s = toString(valVector2s);
   std::string strVector3s = toString(valVector3s);
@@ -78,7 +78,7 @@ TEST(SkelParser, DataStructure)
   EXPECT_EQ(valInt, toInt(strInt));
   EXPECT_EQ(valUInt, toUInt(strUInt));
   EXPECT_EQ(valFloat, toFloat(strFloat));
-  EXPECT_EQ(vals_t, tos_t(strs_t));
+  EXPECT_EQ(valDouble, toDouble(strDouble));
   EXPECT_EQ(valChar, toChar(strChar));
   EXPECT_TRUE(equals(valVector2s, toVector2s(strVector2s)));
   EXPECT_TRUE(equals(valVector3s, toVector3s(strVector3s)));

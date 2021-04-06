@@ -35,17 +35,10 @@
 #include <gtest/gtest.h>
 
 #include "dart/collision/collision.hpp"
-#include "dart/collision/fcl/fcl.hpp"
 #include "dart/common/common.hpp"
 #include "dart/config.hpp"
 #include "dart/dynamics/dynamics.hpp"
 #include "dart/math/math.hpp"
-#if HAVE_ODE
-#include "dart/collision/ode/ode.hpp"
-#endif
-#if HAVE_BULLET
-#include "dart/collision/bullet/bullet.hpp"
-#endif
 #include "dart/simulation/simulation.hpp"
 #include "dart/utils/utils.hpp"
 
@@ -64,253 +57,7 @@ using namespace utils;
 class Collision : public testing::Test
 {
 public:
-  void unrotatedTest(
-      dart::collision::fcl::CollisionGeometry* _coll1,
-      dart::collision::fcl::CollisionGeometry* _coll2,
-      s_t expectedContactPoint,
-      int _idxAxis);
-  void dropWithRotation(
-      dart::collision::fcl::CollisionGeometry* _object,
-      s_t EulerZ,
-      s_t EulerY,
-      s_t EulerX);
-  void printResult(const dart::collision::fcl::CollisionResult& _result);
 };
-
-void Collision::unrotatedTest(
-    dart::collision::fcl::CollisionGeometry* _coll1,
-    dart::collision::fcl::CollisionGeometry* _coll2,
-    s_t expectedContactPoint,
-    int _idxAxis)
-{
-  dart::collision::fcl::CollisionResult result;
-  dart::collision::fcl::CollisionRequest request;
-  request.enable_contact = true;
-  request.num_max_contacts = 100;
-
-  dart::collision::fcl::Vector3 position(0, 0, 0);
-
-  dart::collision::fcl::Transform3 coll1_transform;
-  dart::collision::fcl::Transform3 coll2_transform;
-
-  //==========================================================================
-  // Approaching test
-  //==========================================================================
-  result.clear();
-  s_t dpos = -0.001;
-  s_t pos = 10.0;
-
-  coll1_transform.setIdentity();
-  dart::collision::fcl::setTranslation(
-      coll1_transform, dart::collision::fcl::Vector3(0, 0, 0));
-  coll2_transform.setIdentity();
-
-  // Let's drop box2 until it collide with box1
-  do
-  {
-    position[_idxAxis] = pos;
-    dart::collision::fcl::setTranslation(coll2_transform, position);
-
-    ::fcl::collide(
-        _coll1, coll1_transform, _coll2, coll2_transform, request, result);
-
-    pos += dpos;
-  } while (result.numContacts() == 0);
-
-  //
-  if (_idxAxis == 0)
-    std::cout << "The object is collided when its x-axis position is: "
-              << (pos - dpos) << std::endl;
-  if (_idxAxis == 1)
-    std::cout << "The object is collided when its y-axis position is: "
-              << (pos - dpos) << std::endl;
-  if (_idxAxis == 2)
-    std::cout << "The object is collided when its z-axis position is: "
-              << (pos - dpos) << std::endl;
-
-  // printResult(result);
-
-  for (std::size_t i = 0; i < result.numContacts(); ++i)
-  {
-    EXPECT_GE(result.getContact(i).penetration_depth, 0.0);
-    //		EXPECT_NEAR(result.getContact(i).normal[_idxAxis], -1.0);
-    EXPECT_EQ(dart::collision::fcl::length(result.getContact(i).normal), 1.0);
-    EXPECT_NEAR(
-        result.getContact(i).pos[_idxAxis], expectedContactPoint, -dpos * 2.0);
-  }
-}
-
-void Collision::dropWithRotation(
-    dart::collision::fcl::CollisionGeometry* _object,
-    s_t EulerZ,
-    s_t EulerY,
-    s_t EulerX)
-{
-  // Collision test setting
-  dart::collision::fcl::CollisionResult result;
-  dart::collision::fcl::CollisionRequest request;
-  request.enable_contact = true;
-  request.num_max_contacts = 100;
-
-  // Ground like box setting
-  dart::collision::fcl::Box groundObject(100, 100, 0.1);
-  dart::collision::fcl::Transform3 groundTransf;
-  groundTransf.setIdentity();
-  dart::collision::fcl::Vector3 ground_position(0, 0, 0);
-  dart::collision::fcl::setTranslation(groundTransf, ground_position);
-
-  // Dropping object setting
-  dart::collision::fcl::Transform3 objectTransf;
-  dart::collision::fcl::Matrix3 rot;
-  dart::collision::fcl::setEulerZYX(rot, EulerZ, EulerY, EulerX);
-  dart::collision::fcl::setRotation(objectTransf, rot);
-  dart::collision::fcl::Vector3 dropping_position(0, 0, 0);
-  dart::collision::fcl::setTranslation(objectTransf, dropping_position);
-
-  //==========================================================================
-  // Dropping test in x, y, z aixs each.
-  //==========================================================================
-  for (int _idxAxis = 0; _idxAxis < 3; ++_idxAxis)
-  {
-    result.clear();
-
-    groundObject.side = dart::collision::fcl::Vector3(100, 100, 100);
-    groundObject.side[_idxAxis] = 0.1;
-    ground_position = dart::collision::fcl::Vector3(0, 0, 0);
-    ground_position[_idxAxis] = -0.05;
-    dart::collision::fcl::setTranslation(groundTransf, ground_position);
-
-    // Let's drop the object until it collide with ground
-    s_t posDelta = -0.0001;
-    s_t initPos = 10.0;
-    dropping_position = dart::collision::fcl::Vector3(0, 0, 0);
-    do
-    {
-      dropping_position[_idxAxis] = initPos;
-      dart::collision::fcl::setTranslation(objectTransf, dropping_position);
-
-      ::fcl::collide(
-          _object, objectTransf, &groundObject, groundTransf, request, result);
-
-      initPos += posDelta;
-    } while (result.numContacts() == 0);
-
-    std::cout << "Current position of the object: "
-              << dart::collision::fcl::getTranslation(objectTransf) << std::endl
-              << "Number of contacts: " << result.numContacts() << std::endl;
-
-    dart::collision::fcl::Transform3 objectTransfInv = objectTransf;
-    objectTransfInv.inverse();
-    for (std::size_t i = 0; i < result.numContacts(); ++i)
-    {
-      dart::collision::fcl::Vector3 posWorld = dart::collision::fcl::transform(
-          objectTransfInv, result.getContact(i).pos);
-      std::cout << "----- CONTACT " << i << " --------" << std::endl;
-      std::cout << "contact_points: " << result.getContact(i).pos << std::endl;
-      std::cout << "contact_points(w): " << posWorld << std::endl;
-      std::cout << "norm: "
-                << dart::collision::fcl::length(result.getContact(i).pos)
-                << std::endl;
-      std::cout << "penetration_depth: "
-                << result.getContact(i).penetration_depth << std::endl;
-      std::cout << "normal: " << result.getContact(i).normal << std::endl;
-    }
-
-    std::cout << std::endl;
-  }
-}
-
-void Collision::printResult(
-    const dart::collision::fcl::CollisionResult& _result)
-{
-  std::cout << "====== [ RESULT ] ======" << std::endl;
-  std::cout << "The number of contacts: " << _result.numContacts() << std::endl;
-
-  for (std::size_t i = 0; i < _result.numContacts(); ++i)
-  {
-    std::cout << "----- CONTACT " << i << " --------" << std::endl;
-    std::cout << "contact_points: " << _result.getContact(i).pos << std::endl;
-    std::cout << "penetration_depth: "
-              << _result.getContact(i).penetration_depth << std::endl;
-    std::cout << "normal: " << _result.getContact(i).normal << std::endl;
-    // std::cout << std::endl;
-  }
-  std::cout << std::endl;
-}
-
-#ifdef ALL_TESTS
-TEST_F(Collision, DROP)
-{
-  dtdbg << "Unrotated box\n";
-  dart::collision::fcl::Box box1(0.5, 0.5, 0.5);
-  dropWithRotation(&box1, 0, 0, 0);
-
-  dtdbg << "Rotated box\n";
-  dart::collision::fcl::Box box2(0.5, 0.5, 0.5);
-  dropWithRotation(
-      &box2,
-      dart::math::Random::uniform(-3.14, 3.14),
-      dart::math::Random::uniform(-3.14, 3.14),
-      dart::math::Random::uniform(-3.14, 3.14));
-
-  dropWithRotation(&box2, 0.0, 0.1, 0.0);
-}
-#endif
-
-#ifdef ALL_TESTS
-TEST_F(Collision, FCL_BOX_BOX)
-{
-  s_t EulerZ = 1;
-  s_t EulerY = 2;
-  s_t EulerX = 3;
-
-  // Collision test setting
-  dart::collision::fcl::CollisionResult result;
-  dart::collision::fcl::CollisionRequest request;
-  request.enable_contact = true;
-  request.num_max_contacts = 100;
-
-  // Ground like box setting
-  dart::collision::fcl::Box groundObject(100, 100, 0.1);
-  dart::collision::fcl::Transform3 groundTransf;
-  groundTransf.setIdentity();
-  dart::collision::fcl::Vector3 ground_position(0.0, 0.0, -0.05);
-  dart::collision::fcl::setTranslation(groundTransf, ground_position);
-
-  // Dropping box object setting
-  dart::collision::fcl::Box box(0.5, 0.5, 0.5);
-  dart::collision::fcl::Transform3 objectTransf;
-  dart::collision::fcl::Matrix3 rot;
-  dart::collision::fcl::setEulerZYX(rot, EulerZ, EulerY, EulerX);
-  dart::collision::fcl::setRotation(objectTransf, rot);
-  dart::collision::fcl::Vector3 dropping_position(0.0, 0.0, 5.0);
-  dart::collision::fcl::setTranslation(objectTransf, dropping_position);
-
-  // Let's drop the object until it collide with ground
-  do
-  {
-    dart::collision::fcl::setTranslation(objectTransf, dropping_position);
-
-    ::fcl::collide(
-        &box, objectTransf, &groundObject, groundTransf, request, result);
-
-    dropping_position[2] -= 0.00001;
-  } while (result.numContacts() == 0);
-
-  std::cout << "Current position of the object: "
-            << dart::collision::fcl::getTranslation(objectTransf) << std::endl
-            << "Number of contacts: " << result.numContacts() << std::endl;
-
-  for (std::size_t i = 0; i < result.numContacts(); ++i)
-  {
-    std::cout << "----- CONTACT " << i << " --------" << std::endl;
-    std::cout << "contact_points: " << result.getContact(i).pos << std::endl;
-    std::cout << "penetration_depth: " << result.getContact(i).penetration_depth
-              << std::endl;
-    std::cout << "normal: " << result.getContact(i).normal << std::endl;
-  }
-}
-#endif
 
 //==============================================================================
 void testSimpleFrames(const std::shared_ptr<CollisionDetector>& cd)
@@ -400,31 +147,6 @@ void testSimpleFrames(const std::shared_ptr<CollisionDetector>& cd)
 #ifdef ALL_TESTS
 TEST_F(Collision, SimpleFrames)
 {
-  auto fcl_mesh_dart = FCLCollisionDetector::create();
-  fcl_mesh_dart->setPrimitiveShapeType(FCLCollisionDetector::MESH);
-  fcl_mesh_dart->setContactPointComputationMethod(FCLCollisionDetector::DART);
-  testSimpleFrames(fcl_mesh_dart);
-
-  // auto fcl_prim_fcl = FCLCollisionDetector::create();
-  // fcl_prim_fcl->setPrimitiveShapeType(FCLCollisionDetector::MESH);
-  // fcl_prim_fcl->setContactPointComputationMethod(FCLCollisionDetector::FCL);
-  // testSimpleFrames(fcl_prim_fcl);
-
-  // auto fcl_mesh_fcl = FCLCollisionDetector::create();
-  // fcl_mesh_fcl->setPrimitiveShapeType(FCLCollisionDetector::PRIMITIVE);
-  // fcl_mesh_fcl->setContactPointComputationMethod(FCLCollisionDetector::DART);
-  // testSimpleFrames(fcl_mesh_fcl);
-
-  // auto fcl_mesh_fcl = FCLCollisionDetector::create();
-  // fcl_mesh_fcl->setPrimitiveShapeType(FCLCollisionDetector::PRIMITIVE);
-  // fcl_mesh_fcl->setContactPointComputationMethod(FCLCollisionDetector::FCL);
-  // testSimpleFrames(fcl_mesh_fcl);
-
-#if HAVE_BULLET
-  auto bullet = BulletCollisionDetector::create();
-  testSimpleFrames(bullet);
-#endif
-
   auto dart = DARTCollisionDetector::create();
   testSimpleFrames(dart);
 }
@@ -486,14 +208,6 @@ void testSphereSphere(
   else
     expectedNormal << 1, 0, 0;
   s_t tol2 = tol;
-  if (cd->getType() == FCLCollisionDetector::getStaticType()
-      && static_cast<FCLCollisionDetector*>(cd.get())->getPrimitiveShapeType()
-             == FCLCollisionDetector::MESH)
-  {
-    tol2 *= 1e+12;
-    // FCL returns less accurate contact normals for sphere-sphere since we're
-    // using sphere-like rough meshes instead of analytical sphere shapes.
-  }
   EXPECT_TRUE(contact.normal.isApprox(expectedNormal, tol2));
 
   //----------------------------------------------------------------------------
@@ -512,36 +226,6 @@ void testSphereSphere(
 #ifdef ALL_TESTS
 TEST_F(Collision, SphereSphere)
 {
-  auto fcl_mesh_dart = FCLCollisionDetector::create();
-  fcl_mesh_dart->setPrimitiveShapeType(FCLCollisionDetector::MESH);
-  fcl_mesh_dart->setContactPointComputationMethod(FCLCollisionDetector::DART);
-  testSphereSphere(fcl_mesh_dart);
-
-  // auto fcl_prim_fcl = FCLCollisionDetector::create();
-  // fcl_prim_fcl->setPrimitiveShapeType(FCLCollisionDetector::MESH);
-  // fcl_prim_fcl->setContactPointComputationMethod(FCLCollisionDetector::FCL);
-  // testSphereSphere(fcl_prim_fcl);
-
-  // auto fcl_mesh_fcl = FCLCollisionDetector::create();
-  // fcl_mesh_fcl->setPrimitiveShapeType(FCLCollisionDetector::PRIMITIVE);
-  // fcl_mesh_fcl->setContactPointComputationMethod(FCLCollisionDetector::DART);
-  // testSphereSphere(fcl_mesh_fcl);
-
-  // auto fcl_mesh_fcl = FCLCollisionDetector::create();
-  // fcl_mesh_fcl->setPrimitiveShapeType(FCLCollisionDetector::PRIMITIVE);
-  // fcl_mesh_fcl->setContactPointComputationMethod(FCLCollisionDetector::FCL);
-  // testSphereSphere(fcl_mesh_fcl);
-
-#if HAVE_ODE
-  auto ode = OdeCollisionDetector::create();
-  testSphereSphere(ode);
-#endif
-
-#if HAVE_BULLET
-  auto bullet = BulletCollisionDetector::create();
-  testSphereSphere(bullet);
-#endif
-
   auto dart = DARTCollisionDetector::create();
   testSphereSphere(dart);
 }
@@ -564,8 +248,7 @@ bool checkBoundingBox(
 }
 
 //==============================================================================
-void testBoxBox(
-    const std::shared_ptr<CollisionDetector>& cd, s_t tol = 1e-12)
+void testBoxBox(const std::shared_ptr<CollisionDetector>& cd, s_t tol = 1e-12)
 {
   auto simpleFrame1 = SimpleFrame::createShared(Frame::World());
   auto simpleFrame2 = SimpleFrame::createShared(Frame::World());
@@ -625,37 +308,6 @@ void testBoxBox(
 // #ifdef ALL_TESTS
 TEST_F(Collision, BoxBox)
 {
-  // TODO: uncomment this block
-  // auto fcl_mesh_dart = FCLCollisionDetector::create();
-  // fcl_mesh_dart->setPrimitiveShapeType(FCLCollisionDetector::MESH);
-  // fcl_mesh_dart->setContactPointComputationMethod(FCLCollisionDetector::DART);
-  // testBoxBox(fcl_mesh_dart);
-
-  // auto fcl_prim_fcl = FCLCollisionDetector::create();
-  // fcl_prim_fcl->setPrimitiveShapeType(FCLCollisionDetector::MESH);
-  // fcl_prim_fcl->setContactPointComputationMethod(FCLCollisionDetector::FCL);
-  // testBoxBox(fcl_prim_fcl);
-
-  // auto fcl_mesh_fcl = FCLCollisionDetector::create();
-  // fcl_mesh_fcl->setPrimitiveShapeType(FCLCollisionDetector::PRIMITIVE);
-  // fcl_mesh_fcl->setContactPointComputationMethod(FCLCollisionDetector::DART);
-  // testBoxBox(fcl_mesh_fcl);
-
-  // auto fcl_mesh_fcl = FCLCollisionDetector::create();
-  // fcl_mesh_fcl->setPrimitiveShapeType(FCLCollisionDetector::PRIMITIVE);
-  // fcl_mesh_fcl->setContactPointComputationMethod(FCLCollisionDetector::FCL);
-  // testBoxBox(fcl_mesh_fcl);
-
-#if HAVE_ODE
-  auto ode = OdeCollisionDetector::create();
-  testBoxBox(ode);
-#endif
-
-#if HAVE_BULLET
-  auto bullet = BulletCollisionDetector::create();
-  testBoxBox(bullet);
-#endif
-
   auto dart = DARTCollisionDetector::create();
   testBoxBox(dart);
 }
@@ -759,36 +411,6 @@ void testCylinderCylinder(const std::shared_ptr<CollisionDetector>& cd)
 #ifdef ALL_TESTS
 TEST_F(Collision, testCylinderCylinder)
 {
-  auto fcl_mesh_dart = FCLCollisionDetector::create();
-  fcl_mesh_dart->setPrimitiveShapeType(FCLCollisionDetector::MESH);
-  fcl_mesh_dart->setContactPointComputationMethod(FCLCollisionDetector::DART);
-  testCylinderCylinder(fcl_mesh_dart);
-
-  // auto fcl_prim_fcl = FCLCollisionDetector::create();
-  // fcl_prim_fcl->setPrimitiveShapeType(FCLCollisionDetector::MESH);
-  // fcl_prim_fcl->setContactPointComputationMethod(FCLCollisionDetector::FCL);
-  // testCylinderCylinder(fcl_prim_fcl);
-
-  // auto fcl_mesh_fcl = FCLCollisionDetector::create();
-  // fcl_mesh_fcl->setPrimitiveShapeType(FCLCollisionDetector::PRIMITIVE);
-  // fcl_mesh_fcl->setContactPointComputationMethod(FCLCollisionDetector::DART);
-  // testCylinderCylinder(fcl_mesh_fcl);
-
-  // auto fcl_mesh_fcl = FCLCollisionDetector::create();
-  // fcl_mesh_fcl->setPrimitiveShapeType(FCLCollisionDetector::PRIMITIVE);
-  // fcl_mesh_fcl->setContactPointComputationMethod(FCLCollisionDetector::FCL);
-  // testCylinderCylinder(fcl_mesh_fcl);
-
-#if HAVE_ODE
-  auto ode = OdeCollisionDetector::create();
-  testCylinderCylinder(ode);
-#endif
-
-#if HAVE_BULLET
-  auto bullet = BulletCollisionDetector::create();
-  testCylinderCylinder(bullet);
-#endif
-
   // auto dart = DARTCollisionDetector::create();
   // testCylinderCylinder(dart);
 }
@@ -832,36 +454,6 @@ void testCapsuleCapsule(const std::shared_ptr<CollisionDetector>& cd)
 #ifdef ALL_TESTS
 TEST_F(Collision, testCapsuleCapsule)
 {
-  // auto fcl_mesh_dart = FCLCollisionDetector::create();
-  // fcl_mesh_dart->setPrimitiveShapeType(FCLCollisionDetector::MESH);
-  // fcl_mesh_dart->setContactPointComputationMethod(FCLCollisionDetector::DART);
-  // testCapsuleCapsule(fcl_mesh_dart);
-
-  // auto fcl_prim_fcl = FCLCollisionDetector::create();
-  // fcl_prim_fcl->setPrimitiveShapeType(FCLCollisionDetector::MESH);
-  // fcl_prim_fcl->setContactPointComputationMethod(FCLCollisionDetector::FCL);
-  // testCapsuleCapsule(fcl_prim_fcl);
-
-  // auto fcl_mesh_fcl = FCLCollisionDetector::create();
-  // fcl_mesh_fcl->setPrimitiveShapeType(FCLCollisionDetector::PRIMITIVE);
-  // fcl_mesh_fcl->setContactPointComputationMethod(FCLCollisionDetector::DART);
-  // testCapsuleCapsule(fcl_mesh_fcl);
-
-  // auto fcl_mesh_fcl = FCLCollisionDetector::create();
-  // fcl_mesh_fcl->setPrimitiveShapeType(FCLCollisionDetector::PRIMITIVE);
-  // fcl_mesh_fcl->setContactPointComputationMethod(FCLCollisionDetector::FCL);
-  // testCapsuleCapsule(fcl_mesh_fcl);
-
-#if HAVE_ODE
-  auto ode = OdeCollisionDetector::create();
-  testCapsuleCapsule(ode);
-#endif
-
-#if HAVE_BULLET
-  auto bullet = BulletCollisionDetector::create();
-  testCapsuleCapsule(bullet);
-#endif
-
   // auto dart = DARTCollisionDetector::create();
   // testCapsuleCapsule(dart);
 }
@@ -1204,31 +796,6 @@ TEST_F(Collision, testHeightmapFlipY)
 #ifdef ALL_TESTS
 TEST_F(Collision, Options)
 {
-  auto fcl_mesh_dart = FCLCollisionDetector::create();
-  fcl_mesh_dart->setPrimitiveShapeType(FCLCollisionDetector::MESH);
-  fcl_mesh_dart->setContactPointComputationMethod(FCLCollisionDetector::DART);
-  testOptions(fcl_mesh_dart);
-
-  // auto fcl_prim_fcl = FCLCollisionDetector::create();
-  // fcl_prim_fcl->setPrimitiveShapeType(FCLCollisionDetector::MESH);
-  // fcl_prim_fcl->setContactPointComputationMethod(FCLCollisionDetector::FCL);
-  // testOptions(fcl_prim_fcl);
-
-  // auto fcl_mesh_fcl = FCLCollisionDetector::create();
-  // fcl_mesh_fcl->setPrimitiveShapeType(FCLCollisionDetector::PRIMITIVE);
-  // fcl_mesh_fcl->setContactPointComputationMethod(FCLCollisionDetector::DART);
-  // testOptions(fcl_mesh_fcl);
-
-  // auto fcl_mesh_fcl = FCLCollisionDetector::create();
-  // fcl_mesh_fcl->setPrimitiveShapeType(FCLCollisionDetector::PRIMITIVE);
-  // fcl_mesh_fcl->setContactPointComputationMethod(FCLCollisionDetector::FCL);
-  // testOptions(fcl_mesh_fcl);
-
-#if HAVE_BULLET
-  auto bullet = BulletCollisionDetector::create();
-  testOptions(bullet);
-#endif
-
   auto dart = DARTCollisionDetector::create();
   testOptions(dart);
 }
@@ -1308,31 +875,6 @@ void testFilter(const std::shared_ptr<CollisionDetector>& cd)
 #ifdef ALL_TESTS
 TEST_F(Collision, Filter)
 {
-  auto fcl_mesh_dart = FCLCollisionDetector::create();
-  fcl_mesh_dart->setPrimitiveShapeType(FCLCollisionDetector::MESH);
-  fcl_mesh_dart->setContactPointComputationMethod(FCLCollisionDetector::DART);
-  testFilter(fcl_mesh_dart);
-
-  // auto fcl_prim_fcl = FCLCollisionDetector::create();
-  // fcl_prim_fcl->setPrimitiveShapeType(FCLCollisionDetector::MESH);
-  // fcl_prim_fcl->setContactPointComputationMethod(FCLCollisionDetector::FCL);
-  // testFilter(fcl_prim_fcl);
-
-  // auto fcl_mesh_fcl = FCLCollisionDetector::create();
-  // fcl_mesh_fcl->setPrimitiveShapeType(FCLCollisionDetector::PRIMITIVE);
-  // fcl_mesh_fcl->setContactPointComputationMethod(FCLCollisionDetector::DART);
-  // testFilter(fcl_mesh_fcl);
-
-  // auto fcl_mesh_fcl = FCLCollisionDetector::create();
-  // fcl_mesh_fcl->setPrimitiveShapeType(FCLCollisionDetector::PRIMITIVE);
-  // fcl_mesh_fcl->setContactPointComputationMethod(FCLCollisionDetector::FCL);
-  // testFilter(fcl_mesh_fcl);
-
-#if HAVE_BULLET
-  auto bullet = BulletCollisionDetector::create();
-  testFilter(bullet);
-#endif
-
   auto dart = DARTCollisionDetector::create();
   testFilter(dart);
 }
@@ -1412,31 +954,6 @@ void testCreateCollisionGroups(const std::shared_ptr<CollisionDetector>& cd)
 #ifdef ALL_TESTS
 TEST_F(Collision, CreateCollisionGroupFromVariousObject)
 {
-  auto fcl_mesh_dart = FCLCollisionDetector::create();
-  fcl_mesh_dart->setPrimitiveShapeType(FCLCollisionDetector::MESH);
-  fcl_mesh_dart->setContactPointComputationMethod(FCLCollisionDetector::DART);
-  testCreateCollisionGroups(fcl_mesh_dart);
-
-  // auto fcl_prim_fcl = FCLCollisionDetector::create();
-  // fcl_prim_fcl->setPrimitiveShapeType(FCLCollisionDetector::MESH);
-  // fcl_prim_fcl->setContactPointComputationMethod(FCLCollisionDetector::FCL);
-  // testCreateCollisionGroups(fcl_prim_fcl);
-
-  // auto fcl_mesh_fcl = FCLCollisionDetector::create();
-  // fcl_mesh_fcl->setPrimitiveShapeType(FCLCollisionDetector::PRIMITIVE);
-  // fcl_mesh_fcl->setContactPointComputationMethod(FCLCollisionDetector::DART);
-  // testCreateCollisionGroups(fcl_mesh_fcl);
-
-  // auto fcl_mesh_fcl = FCLCollisionDetector::create();
-  // fcl_mesh_fcl->setPrimitiveShapeType(FCLCollisionDetector::PRIMITIVE);
-  // fcl_mesh_fcl->setContactPointComputationMethod(FCLCollisionDetector::FCL);
-  // testCreateCollisionGroups(fcl_mesh_fcl);
-
-#if HAVE_BULLET
-  auto bullet = BulletCollisionDetector::create();
-  testCreateCollisionGroups(bullet);
-#endif
-
   auto dart = DARTCollisionDetector::create();
   testCreateCollisionGroups(dart);
 }
@@ -1451,7 +968,7 @@ TEST_F(Collision, CollisionOfPrescribedJoints)
   // tracking the prescribed motion eventhough there are collision with other
   // objects.
 
-  const s_t tol = 1e-9;
+  const double tol = 1e-9;
   const s_t timeStep = 1e-3;
   const std::size_t numFrames = 5e+0; // 5 secs
 
@@ -1462,7 +979,10 @@ TEST_F(Collision, CollisionOfPrescribedJoints)
   EXPECT_TRUE(world != nullptr);
   // Gradients don't support prescribed joints
   world->getConstraintSolver()->setGradientEnabled(false);
-  EXPECT_NEAR(world->getTimeStep(), timeStep, tol);
+  EXPECT_NEAR(
+      static_cast<double>(world->getTimeStep()),
+      static_cast<double>(timeStep),
+      tol);
 
   SkeletonPtr skel1 = world->getSkeleton("skeleton 1");
   SkeletonPtr skel2 = world->getSkeleton("skeleton 2");
@@ -1500,12 +1020,12 @@ TEST_F(Collision, CollisionOfPrescribedJoints)
   {
     const s_t time = world->getTime();
 
-    joint1->setCommand(0, -0.5 * constantsd::pi() * std::cos(time));
-    joint2->setCommand(0, -0.5 * constantsd::pi() * std::cos(time));
-    joint3->setCommand(0, -0.5 * constantsd::pi() * std::cos(time));
-    joint4->setCommand(0, -0.5 * constantsd::pi() * std::cos(time));
-    joint5->setCommand(0, -0.5 * constantsd::pi() * std::sin(time));
-    joint6->setCommand(0, -0.5 * constantsd::pi() * std::sin(time)); // ignored
+    joint1->setCommand(0, -0.5 * constantsd::pi() * cos(time));
+    joint2->setCommand(0, -0.5 * constantsd::pi() * cos(time));
+    joint3->setCommand(0, -0.5 * constantsd::pi() * cos(time));
+    joint4->setCommand(0, -0.5 * constantsd::pi() * cos(time));
+    joint5->setCommand(0, -0.5 * constantsd::pi() * sin(time));
+    joint6->setCommand(0, -0.5 * constantsd::pi() * sin(time)); // ignored
 
     world->step(false);
 
@@ -1516,14 +1036,20 @@ TEST_F(Collision, CollisionOfPrescribedJoints)
     // Check if the motion prescribed joints are following the prescribed motion
     // eventhough there is a collision with other objects
     EXPECT_TRUE(joint4->isKinematic());
-    EXPECT_NEAR(joint4->getAcceleration(0), joint4->getCommand(0), tol);
+    EXPECT_NEAR(
+        static_cast<double>(joint4->getAcceleration(0)),
+        static_cast<double>(joint4->getCommand(0)),
+        tol);
     EXPECT_TRUE(joint5->isKinematic());
-    EXPECT_NEAR(joint5->getVelocity(0), joint5->getCommand(0), tol);
+    EXPECT_NEAR(
+        static_cast<double>(joint5->getVelocity(0)),
+        static_cast<double>(joint5->getCommand(0)),
+        tol);
 
     // The velocity and acceleration of locked joint always must be zero.
     EXPECT_TRUE(joint6->isKinematic());
-    EXPECT_NEAR(joint6->getVelocity(0), 0.0, tol);
-    EXPECT_NEAR(joint6->getAcceleration(0), 0.0, tol);
+    EXPECT_NEAR(static_cast<double>(joint6->getVelocity(0)), 0.0, tol);
+    EXPECT_NEAR(static_cast<double>(joint6->getAcceleration(0)), 0.0, tol);
   }
 }
 #endif
@@ -1532,7 +1058,6 @@ TEST_F(Collision, CollisionOfPrescribedJoints)
 #ifdef ALL_TESTS
 TEST_F(Collision, Factory)
 {
-  EXPECT_TRUE(collision::CollisionDetector::getFactory()->canCreate("fcl"));
   EXPECT_TRUE(collision::CollisionDetector::getFactory()->canCreate("dart"));
 
 #if HAVE_BULLET
@@ -1548,41 +1073,3 @@ TEST_F(Collision, Factory)
 #endif
 }
 #endif
-
-//==============================================================================
-#if HAVE_OCTOMAP && FCL_HAVE_OCTOMAP
-#ifdef ALL_TESTS
-TEST_F(Collision, VoxelGrid)
-{
-  auto simpleFrame1 = SimpleFrame::createShared(Frame::World());
-  auto simpleFrame2 = SimpleFrame::createShared(Frame::World());
-
-  auto shape1 = std::make_shared<VoxelGridShape>(0.01);
-  auto shape2 = std::make_shared<SphereShape>(0.001);
-
-  simpleFrame1->setShape(shape1);
-  simpleFrame2->setShape(shape2);
-
-  auto cd = FCLCollisionDetector::create();
-  auto group = cd->createCollisionGroup(simpleFrame1.get(), simpleFrame2.get());
-
-  EXPECT_EQ(group->getNumShapeFrames(), 2u);
-
-  collision::CollisionOption option;
-  option.enableContact = true;
-
-  collision::CollisionResult result;
-
-  result.clear();
-  simpleFrame2->setTranslation(Eigen::Vector3s(0.0, 0.0, 0.0));
-  EXPECT_FALSE(group->collide(option, &result));
-  EXPECT_TRUE(result.getNumContacts() == 0u);
-
-  result.clear();
-  shape1->updateOccupancy(Eigen::Vector3s(0.0, 0.0, 0.0), true);
-  simpleFrame2->setTranslation(Eigen::Vector3s(0.0, 0.0, 0.0));
-  EXPECT_TRUE(group->collide(option, &result));
-  EXPECT_TRUE(result.getNumContacts() >= 1u);
-}
-#endif
-#endif // HAVE_OCTOMAP && FCL_HAVE_OCTOMAP

@@ -3,7 +3,6 @@ dart_add_test("comprehensive" test_Common)
 dart_add_test("comprehensive" test_Concurrency)
 dart_add_test("comprehensive" test_Constraint)
 dart_add_test("comprehensive" test_Frames)
-dart_add_test("comprehensive" test_InverseKinematics)
 dart_add_test("comprehensive" test_NameManagement)
 dart_add_test("comprehensive" test_Mappings)
 dart_add_test("comprehensive" test_Trajectory)
@@ -27,11 +26,6 @@ dart_add_test("comprehensive" test_SaddlepointEscape)
 if(TARGET dart-optimizer-pagmo)
   dart_add_test("comprehensive" test_MultiObjectiveOptimization)
   target_link_libraries(test_MultiObjectiveOptimization dart-optimizer-pagmo)
-endif()
-
-dart_add_test("comprehensive" test_Distance)
-if(TARGET dart-collision-bullet)
-  target_link_libraries(test_Distance dart-collision-bullet)
 endif()
 
 dart_add_test("comprehensive" test_Raycast)
@@ -96,7 +90,6 @@ endif()
 
 dart_format_add(
   test_DifferentialDynamics.cpp
-  test_InverseKinematics.cpp
   test_MultiObjectiveOptimization.cpp
   test_Raycast.cpp
 )

@@ -37,6 +37,8 @@
 
 #include <Eigen/Core>
 
+#include "mpreal.h"
+
 namespace dart {
 namespace math {
 

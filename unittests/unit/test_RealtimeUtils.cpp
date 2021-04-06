@@ -133,11 +133,11 @@ TEST(REALTIME, CONTROL_LOG)
   log.record(0L, Eigen::VectorXs::Ones(dim) * 1);
   log.record(10L, Eigen::VectorXs::Ones(dim) * 2);
 
-  EXPECT_s_t_EQ(1.0, log.get(-3L)(0));
-  EXPECT_s_t_EQ(1.0, log.get(3L)(0));
-  EXPECT_s_t_EQ(1.0, log.get(7L)(0));
-  EXPECT_s_t_EQ(2.0, log.get(10L)(0));
-  EXPECT_s_t_EQ(2.0, log.get(24L)(0));
+  EXPECT_DOUBLE_EQ(1.0, static_cast<double>(log.get(-3L)(0)));
+  EXPECT_DOUBLE_EQ(1.0, static_cast<double>(log.get(3L)(0)));
+  EXPECT_DOUBLE_EQ(1.0, static_cast<double>(log.get(7L)(0)));
+  EXPECT_DOUBLE_EQ(2.0, static_cast<double>(log.get(10L)(0)));
+  EXPECT_DOUBLE_EQ(2.0, static_cast<double>(log.get(24L)(0)));
 }
 #endif
 
@@ -152,11 +152,11 @@ TEST(REALTIME, CONTROL_LOG_DISCARD_BEFORE)
   log.record(10L, Eigen::VectorXs::Ones(dim) * 2);
   log.discardBefore(5L);
 
-  EXPECT_s_t_EQ(3.0, log.get(-3L)(0));
-  EXPECT_s_t_EQ(3.0, log.get(3L)(0));
-  EXPECT_s_t_EQ(3.0, log.get(7L)(0));
-  EXPECT_s_t_EQ(2.0, log.get(24L)(0));
-  EXPECT_s_t_EQ(2.0, log.get(10L)(0));
+  EXPECT_DOUBLE_EQ(3.0, static_cast<double>(log.get(-3L)(0)));
+  EXPECT_DOUBLE_EQ(3.0, static_cast<double>(log.get(3L)(0)));
+  EXPECT_DOUBLE_EQ(3.0, static_cast<double>(log.get(7L)(0)));
+  EXPECT_DOUBLE_EQ(2.0, static_cast<double>(log.get(24L)(0)));
+  EXPECT_DOUBLE_EQ(2.0, static_cast<double>(log.get(10L)(0)));
 }
 #endif
 
@@ -176,11 +176,11 @@ TEST(REALTIME, CONTROL_LOG_DISCARD_BEFORE_OFF_TIMESTEP)
   // observed point correctly.
   log.record(14L, Eigen::VectorXs::Ones(dim) * 3);
 
-  EXPECT_s_t_EQ(3.0, log.get(-3L)(0));
-  EXPECT_s_t_EQ(3.0, log.get(3L)(0));
-  EXPECT_s_t_EQ(3.0, log.get(7L)(0));
-  EXPECT_s_t_EQ(3.0, log.get(24L)(0));
-  EXPECT_s_t_EQ(3.0, log.get(10L)(0));
+  EXPECT_DOUBLE_EQ(3.0, static_cast<double>(log.get(-3L)(0)));
+  EXPECT_DOUBLE_EQ(3.0, static_cast<double>(log.get(3L)(0)));
+  EXPECT_DOUBLE_EQ(3.0, static_cast<double>(log.get(7L)(0)));
+  EXPECT_DOUBLE_EQ(3.0, static_cast<double>(log.get(24L)(0)));
+  EXPECT_DOUBLE_EQ(3.0, static_cast<double>(log.get(10L)(0)));
 }
 #endif
 
@@ -190,10 +190,10 @@ TEST(REALTIME, CONTROL_LOG_GET_EMPTY)
   int dim = 2;
   int dt = 5;
   ControlLog log = ControlLog(dim, dt);
-  EXPECT_s_t_EQ(0.0, log.get(-3L)(0));
-  EXPECT_s_t_EQ(0.0, log.get(3L)(0));
-  EXPECT_s_t_EQ(0.0, log.get(7L)(0));
-  EXPECT_s_t_EQ(0.0, log.get(24L)(0));
+  EXPECT_DOUBLE_EQ(0.0, static_cast<double>(log.get(-3L)(0)));
+  EXPECT_DOUBLE_EQ(0.0, static_cast<double>(log.get(3L)(0)));
+  EXPECT_DOUBLE_EQ(0.0, static_cast<double>(log.get(7L)(0)));
+  EXPECT_DOUBLE_EQ(0.0, static_cast<double>(log.get(24L)(0)));
 }
 #endif
 
@@ -206,8 +206,8 @@ TEST(REALTIME, CONTROL_BUFFER)
   RealTimeControlBuffer buffer = RealTimeControlBuffer(forceDim, steps, dt);
 
   buffer.setForcePlan(0L, 0L, Eigen::MatrixXs::Ones(forceDim, steps) * 2);
-  EXPECT_s_t_EQ(buffer.getPlannedForce(25L)(0), 2.0);
-  EXPECT_s_t_EQ(buffer.getPlannedForce(49L)(0), 2.0);
+  EXPECT_DOUBLE_EQ(static_cast<double>(buffer.getPlannedForce(25L)(0)), 2.0);
+  EXPECT_DOUBLE_EQ(static_cast<double>(buffer.getPlannedForce(49L)(0)), 2.0);
 }
 #endif
 
@@ -221,7 +221,7 @@ TEST(REALTIME, CONTROL_BUFFER_OOB)
 
   buffer.setForcePlan(0L, 0L, Eigen::MatrixXs::Ones(forceDim, steps) * 2);
   // This reads off the end, should print a warning and return 0s
-  EXPECT_s_t_EQ(buffer.getPlannedForce(50L)(0), 0.0);
+  EXPECT_DOUBLE_EQ(static_cast<double>(buffer.getPlannedForce(50L)(0)), 0.0);
 }
 #endif
 
@@ -243,12 +243,12 @@ TEST(REALTIME, CONTROL_BUFFER_SCALE_DOWN)
   buffer.setNumSteps(5);
 
   // Read off the lower resolution, should now jump by whole numbers
-  EXPECT_s_t_EQ(buffer.getPlannedForce(0 * dt)(0), 0);
-  EXPECT_s_t_EQ(buffer.getPlannedForce(1 * dt)(0), 0);
-  EXPECT_s_t_EQ(buffer.getPlannedForce(2 * dt)(0), 2);
-  EXPECT_s_t_EQ(buffer.getPlannedForce(3 * dt)(0), 2);
-  EXPECT_s_t_EQ(buffer.getPlannedForce(4 * dt)(0), 4);
-  EXPECT_s_t_EQ(buffer.getPlannedForce(5 * dt)(0), 4);
+  EXPECT_DOUBLE_EQ(static_cast<double>(buffer.getPlannedForce(0 * dt)(0)), 0);
+  EXPECT_DOUBLE_EQ(static_cast<double>(buffer.getPlannedForce(1 * dt)(0)), 0);
+  EXPECT_DOUBLE_EQ(static_cast<double>(buffer.getPlannedForce(2 * dt)(0)), 2);
+  EXPECT_DOUBLE_EQ(static_cast<double>(buffer.getPlannedForce(3 * dt)(0)), 2);
+  EXPECT_DOUBLE_EQ(static_cast<double>(buffer.getPlannedForce(4 * dt)(0)), 4);
+  EXPECT_DOUBLE_EQ(static_cast<double>(buffer.getPlannedForce(5 * dt)(0)), 4);
 }
 #endif
 
@@ -269,19 +269,19 @@ TEST(REALTIME, CONTROL_BUFFER_SCALE_UP)
   buffer.setMillisPerStep(1);
 
   // Read off the lower resolution, should now jump by whole numbers
-  EXPECT_s_t_EQ(buffer.getPlannedForce(0)(0), 0);
-  EXPECT_s_t_EQ(buffer.getPlannedForce(1)(0), 0);
-  EXPECT_s_t_EQ(buffer.getPlannedForce(2)(0), 0);
-  EXPECT_s_t_EQ(buffer.getPlannedForce(3)(0), 0);
-  EXPECT_s_t_EQ(buffer.getPlannedForce(4)(0), 0);
-  EXPECT_s_t_EQ(buffer.getPlannedForce(5)(0), 1);
-  EXPECT_s_t_EQ(buffer.getPlannedForce(6)(0), 1);
-  EXPECT_s_t_EQ(buffer.getPlannedForce(7)(0), 1);
-  EXPECT_s_t_EQ(buffer.getPlannedForce(8)(0), 1);
-  EXPECT_s_t_EQ(buffer.getPlannedForce(9)(0), 1);
+  EXPECT_DOUBLE_EQ(static_cast<double>(buffer.getPlannedForce(0)(0)), 0);
+  EXPECT_DOUBLE_EQ(static_cast<double>(buffer.getPlannedForce(1)(0)), 0);
+  EXPECT_DOUBLE_EQ(static_cast<double>(buffer.getPlannedForce(2)(0)), 0);
+  EXPECT_DOUBLE_EQ(static_cast<double>(buffer.getPlannedForce(3)(0)), 0);
+  EXPECT_DOUBLE_EQ(static_cast<double>(buffer.getPlannedForce(4)(0)), 0);
+  EXPECT_DOUBLE_EQ(static_cast<double>(buffer.getPlannedForce(5)(0)), 1);
+  EXPECT_DOUBLE_EQ(static_cast<double>(buffer.getPlannedForce(6)(0)), 1);
+  EXPECT_DOUBLE_EQ(static_cast<double>(buffer.getPlannedForce(7)(0)), 1);
+  EXPECT_DOUBLE_EQ(static_cast<double>(buffer.getPlannedForce(8)(0)), 1);
+  EXPECT_DOUBLE_EQ(static_cast<double>(buffer.getPlannedForce(9)(0)), 1);
 
   // This is OOB, throws a warning and return 0
-  EXPECT_s_t_EQ(buffer.getPlannedForce(10)(0), 0);
+  EXPECT_DOUBLE_EQ(static_cast<double>(buffer.getPlannedForce(10)(0)), 0);
 }
 #endif
 
@@ -429,12 +429,12 @@ TEST(REALTIME, CONTROL_BUFFER_PLAN)
   // the beginning of the buffer should be the old plan
   for (int i = 0; i < 5; i++)
   {
-    EXPECT_s_t_EQ(plan.col(i).sum(), 6.0);
+    EXPECT_DOUBLE_EQ(static_cast<double>(plan.col(i).sum()), 6.0);
   }
   // the end of the buffer should be 0s
   for (int i = 5; i < 10; i++)
   {
-    EXPECT_s_t_EQ(plan.col(i).sum(), 0.0);
+    EXPECT_DOUBLE_EQ(static_cast<double>(plan.col(i).sum()), 0.0);
   }
 }
 #endif
@@ -483,7 +483,7 @@ TEST(REALTIME, CONTROL_BUFFER_ESTIMATE)
 
   int forceDim = world->getNumDofs();
   int steps = 100;
-  int dt = world->getTimeStep() * 1000;
+  int dt = static_cast<int>(world->getTimeStep() * 1000);
   RealTimeControlBuffer buffer = RealTimeControlBuffer(forceDim, steps, dt);
   ObservationLog log = ObservationLog(
       0L, world->getPositions(), world->getVelocities(), world->getMasses());

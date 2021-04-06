@@ -176,7 +176,7 @@ target_compile_definitions(dart PUBLIC -DDART_USE_IDENTITY_JACOBIAN)
 add_component_targets(${PROJECT_NAME} dart dart)
 add_component_dependencies(${PROJECT_NAME} dart external-odelcpsolver)
 add_component_dependency_packages(${PROJECT_NAME} dart
-  Eigen3 ccd fcl assimp Boost octomap
+  Eigen3 ccd assimp Boost
 )
 
 if(MSVC)

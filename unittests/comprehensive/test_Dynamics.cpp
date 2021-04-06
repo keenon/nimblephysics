@@ -128,9 +128,10 @@ void DynamicsTest::SetUp()
       "dart://sample/skel/test/single_pendulum_euler_joint.skel");
   fileList.push_back("dart://sample/skel/test/single_pendulum_ball_joint.skel");
   fileList.push_back("dart://sample/skel/test/single_rigid_body.skel");
-  fileList.push_back("dart://sample/skel/test/s_t_pendulum.skel");
-  fileList.push_back("dart://sample/skel/test/s_t_pendulum_euler_joint.skel");
-  fileList.push_back("dart://sample/skel/test/s_t_pendulum_ball_joint.skel");
+  fileList.push_back("dart://sample/skel/test/double_pendulum.skel");
+  fileList.push_back(
+      "dart://sample/skel/test/double_pendulum_euler_joint.skel");
+  fileList.push_back("dart://sample/skel/test/double_pendulum_ball_joint.skel");
   fileList.push_back(
       "dart://sample/skel/test/serial_chain_revolute_joint.skel");
   fileList.push_back(
@@ -928,9 +929,12 @@ void DynamicsTest::testJacobians(const common::Uri& uri)
       VectorXs ddq = VectorXs(dof);
       for (int k = 0; k < dof; ++k)
       {
-        q[k] = math::Random::uniform(qLB, qUB);
-        dq[k] = math::Random::uniform(dqLB, dqUB);
-        ddq[k] = math::Random::uniform(ddqLB, ddqUB);
+        q[k] = static_cast<s_t>(math::Random::uniform(
+            static_cast<double>(qLB), static_cast<double>(qUB)));
+        dq[k] = static_cast<s_t>(math::Random::uniform(
+            static_cast<double>(dqLB), static_cast<double>(dqUB)));
+        ddq[k] = static_cast<s_t>(math::Random::uniform(
+            static_cast<double>(ddqLB), static_cast<double>(ddqUB)));
       }
       skeleton->setPositions(q);
       skeleton->setVelocities(dq);
@@ -2189,7 +2193,10 @@ void DynamicsTest::testConstraintImpulse(const common::Uri& uri)
           if (constraintVector1(l) == 0.0)
             continue;
 
-          EXPECT_NEAR(constraintVector1(l), constraintVector2(index), 1e-6);
+          EXPECT_NEAR(
+              static_cast<double>(constraintVector1(l)),
+              static_cast<double>(constraintVector2(index)),
+              1e-6);
           index++;
         }
         assert(static_cast<std::size_t>(bodyJacobian.cols()) == index);
@@ -2344,7 +2351,7 @@ TEST_F(DynamicsTest, testFiniteDifference)
 //    //           pass EQUATIONS_OF_MOTION, are disabled.
 //    const auto uri = getList()[i];
 //    if (uri.toString() ==
-//    "dart://sample/skel/test/s_t_pendulum_euler_joint.skel"
+//    "dart://sample/skel/test/double_pendulum_euler_joint.skel"
 //        || uri.toString() == "dart://sample/skel/test/chainwhipa.skel"
 //        || uri.toString() ==
 //        "dart://sample/skel/test/serial_chain_eulerxyz_joint.skel"

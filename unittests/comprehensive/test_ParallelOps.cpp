@@ -394,7 +394,7 @@ TEST(TRAJECTORY, JUMP_WORM)
   s_t loss1 = shot.getLoss(world);
   s_t loss2 = shot2.getLoss(world);
 
-  EXPECT_s_t_EQ(loss1, loss2);
+  EXPECT_DOUBLE_EQ(static_cast<double>(loss1), static_cast<double>(loss2));
 
   std::vector<MappedBackpropSnapshotPtr> snapshots1 = shot.getSnapshots(world);
   std::vector<MappedBackpropSnapshotPtr> snapshots2 = shot2.getSnapshots(world);

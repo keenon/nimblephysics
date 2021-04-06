@@ -2009,6 +2009,7 @@ void ccdSupportCapsule(
   else
   {
     assert(false && "This should be impossible to read");
+    out.setZero();
   }
   _out->v[0] = static_cast<ccd_real_t>(out(0));
   _out->v[1] = static_cast<ccd_real_t>(out(1));

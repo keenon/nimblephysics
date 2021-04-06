@@ -87,7 +87,10 @@ void testContactWithKinematicJoint(
     // Need few steps to settle down
     if (i > 15)
     {
-      EXPECT_NEAR(bodyNode2->getLinearVelocity()[2], 0.1, tol);
+      EXPECT_NEAR(
+          static_cast<double>(bodyNode2->getLinearVelocity()[2]),
+          0.1,
+          static_cast<double>(tol));
     }
   }
 }

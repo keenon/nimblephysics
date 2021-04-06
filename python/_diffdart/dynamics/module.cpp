@@ -73,8 +73,6 @@ void Linkage(py::module& sm);
 void Chain(py::module& sm);
 void Skeleton(py::module& sm);
 
-void InverseKinematics(py::module& sm);
-
 void dart_dynamics(py::module& m)
 {
   auto sm = m.def_submodule("dynamics");
@@ -114,8 +112,6 @@ void dart_dynamics(py::module& m)
   Linkage(sm);
   Chain(sm);
   Skeleton(sm);
-
-  InverseKinematics(sm);
 }
 
 } // namespace python

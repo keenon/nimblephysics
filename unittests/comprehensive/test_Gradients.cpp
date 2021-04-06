@@ -218,7 +218,7 @@ ground. The ground has configurable friction in this setup.
 */
 void testBlockWithFrictionCoeff(s_t frictionCoeff, s_t mass)
 {
-  // set precision to 256 bits (s_t has only 53 bits)
+  // set precision to 256 bits (double has only 53 bits)
   mpfr::mpreal::set_default_prec(256);
 
   // World
@@ -1546,6 +1546,9 @@ ground. The ground has configurable friction in this setup.
 void testFreeBlockWithFrictionCoeff(
     s_t frictionCoeff, s_t mass, bool largeInitialVelocity)
 {
+  // set precision to 256 bits (double has only 53 bits)
+  mpfr::mpreal::set_default_prec(256);
+
   // World
   WorldPtr world = World::create();
   world->setGravity(Eigen::Vector3s::UnitY() * -9.81);

@@ -80,8 +80,8 @@ TEST(Issue892, LCPSolverShouldNotRetrunNanValues)
 
     if (i > 1100)
     {
-      auto angle1 = box1->getRootJoint()->getPosition(0);
-      auto angle2 = box2->getRootJoint()->getPosition(0);
+      double angle1 = static_cast<double>(box1->getRootJoint()->getPosition(0));
+      double angle2 = static_cast<double>(box2->getRootJoint()->getPosition(0));
 
       EXPECT_NEAR(angle1, -0.345858, 0.1);
       EXPECT_NEAR(angle2, +0.345858, 0.1);

@@ -86,28 +86,28 @@ rm -rf pybind11
 
 # Install FCL
 # Key note: this needs to happen before octomap
-git clone https://github.com/flexible-collision-library/fcl.git
-pushd fcl
-git checkout 0.3.4
-mkdir build
-pushd build
-cmake .. -DFCL_WITH_OCTOMAP=OFF -DBUILD_TESTING=OFF
-make install -j
-popd
-popd
-rm -rf fcl
+# git clone https://github.com/flexible-collision-library/fcl.git
+# pushd fcl
+# git checkout 0.3.4
+# mkdir build
+# pushd build
+# cmake .. -DFCL_WITH_OCTOMAP=OFF -DBUILD_TESTING=OFF
+# make install -j
+# popd
+# popd
+# rm -rf fcl
 
 # Install octomap
-git clone https://github.com/OctoMap/octomap.git
-pushd octomap
-git checkout v1.8.1
-mkdir build
-pushd build
-cmake ..
-make install -j
-popd
-popd
-rm -rf octomap
+# git clone https://github.com/OctoMap/octomap.git
+# pushd octomap
+# git checkout v1.8.1
+# mkdir build
+# pushd build
+# cmake ..
+# make install -j
+# popd
+# popd
+# rm -rf octomap
 
 # Install tinyxml2
 git clone https://github.com/leethomason/tinyxml2.git

@@ -77,15 +77,6 @@ target_link_libraries(_diffdart
     # dart-utils
     dart-utils-urdf
 )
-# if(TARGET dart-optimizer-nlopt)
-  # target_link_libraries(_diffdart PUBLIC dart-optimizer-nlopt)
-# endif()
-# if(TARGET dart-collision-bullet)
-  # target_link_libraries(_diffdart PUBLIC dart-collision-bullet)
-# endif()
-# if(TARGET dart-collision-ode)
-  # target_link_libraries(_diffdart PUBLIC dart-collision-ode)
-# endif()
 
 set_target_properties(_diffdart
   PROPERTIES

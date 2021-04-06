@@ -23,8 +23,8 @@ dart_find_package(ccd)
 dart_check_required_package(ccd "libccd")
 
 # FCL
-dart_find_package(fcl)
-dart_check_required_package(fcl "fcl")
+# dart_find_package(fcl)
+# dart_check_required_package(fcl "fcl")
 
 # ASSIMP
 dart_find_package(assimp)
@@ -109,42 +109,42 @@ dart_find_package(MPFR)
 dart_find_package(GMP)
 
 # octomap
-dart_find_package(octomap)
-if(MSVC)
-  # Supporting Octomap on Windows is disabled for the following issue:
-  # https://github.com/OctoMap/octomap/pull/213
-  message(WARNING "Octomap ${octomap_VERSION} is found, but Octomap "
-      "is not supported on Windows until "
-      "'https://github.com/OctoMap/octomap/pull/213' "
-      "is resolved.")
-  set(HAVE_OCTOMAP FALSE CACHE BOOL "Check if octomap found." FORCE)
-elseif(APPLE)
-  # Supporting Octomap on Windows is disabled for the following issue:
-  # https://github.com/OctoMap/octomap/pull/213
-  message(WARNING "Octomap ${octomap_VERSION} is found, but Octomap "
-      "is not supported on macOS until "
-      "'https://github.com/dartsim/dart/issues/1078' is resolved.")
-  set(HAVE_OCTOMAP FALSE CACHE BOOL "Check if octomap found." FORCE)
-else()
-  if(OCTOMAP_FOUND OR octomap_FOUND)
-    if(NOT DEFINED octomap_VERSION)
-      set(HAVE_OCTOMAP FALSE CACHE BOOL "Check if octomap found." FORCE)
-      message(STATUS "Looking for octomap - octomap_VERSION is not defined, "
-          "please install octomap with version information"
-      )
-    else()
-      set(HAVE_OCTOMAP TRUE CACHE BOOL "Check if octomap found." FORCE)
-      if(DART_VERBOSE)
-        message(STATUS "Looking for octomap - version ${octomap_VERSION} found")
-      endif()
-    endif()
-  else()
-    set(HAVE_OCTOMAP FALSE CACHE BOOL "Check if octomap found." FORCE)
-    message(STATUS "Looking for octomap - NOT found, to use VoxelGridShape, "
-        "please install octomap"
-    )
-  endif()
-endif()
+# dart_find_package(octomap)
+# if(MSVC)
+#   # Supporting Octomap on Windows is disabled for the following issue:
+#   # https://github.com/OctoMap/octomap/pull/213
+#   message(WARNING "Octomap ${octomap_VERSION} is found, but Octomap "
+#       "is not supported on Windows until "
+#       "'https://github.com/OctoMap/octomap/pull/213' "
+#       "is resolved.")
+#   set(HAVE_OCTOMAP FALSE CACHE BOOL "Check if octomap found." FORCE)
+# elseif(APPLE)
+#   # Supporting Octomap on Windows is disabled for the following issue:
+#   # https://github.com/OctoMap/octomap/pull/213
+#   message(WARNING "Octomap ${octomap_VERSION} is found, but Octomap "
+#       "is not supported on macOS until "
+#       "'https://github.com/dartsim/dart/issues/1078' is resolved.")
+#   set(HAVE_OCTOMAP FALSE CACHE BOOL "Check if octomap found." FORCE)
+# else()
+#   if(OCTOMAP_FOUND OR octomap_FOUND)
+#     if(NOT DEFINED octomap_VERSION)
+#       set(HAVE_OCTOMAP FALSE CACHE BOOL "Check if octomap found." FORCE)
+#       message(STATUS "Looking for octomap - octomap_VERSION is not defined, "
+#           "please install octomap with version information"
+#       )
+#     else()
+#       set(HAVE_OCTOMAP TRUE CACHE BOOL "Check if octomap found." FORCE)
+#       if(DART_VERBOSE)
+#         message(STATUS "Looking for octomap - version ${octomap_VERSION} found")
+#       endif()
+#     endif()
+#   else()
+#     set(HAVE_OCTOMAP FALSE CACHE BOOL "Check if octomap found." FORCE)
+#     message(STATUS "Looking for octomap - NOT found, to use VoxelGridShape, "
+#         "please install octomap"
+#     )
+#   endif()
+# endif()
 
 #--------------------
 # Misc. dependencies

@@ -30,8 +30,9 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <gtest/gtest.h>
 #include <dart/math/Random.hpp>
+#include <gtest/gtest.h>
+
 #include "TestHelpers.hpp"
 
 using namespace dart;
@@ -62,10 +63,10 @@ TEST(Random, CheckSyntaxValidity)
   unsigned long long maxull = 10ull;
   float minf = -3.0f;
   float maxf = 4.0f;
-  s_t mind = -5.0;
-  s_t maxd = 10.0;
-  long s_t minld = -5.0l;
-  long s_t maxld = 10.0l;
+  double mind = -5.0;
+  double maxd = 10.0;
+  long double minld = -5.0l;
+  long double maxld = 10.0l;
 
   Eigen::VectorXi minVecXi = Eigen::VectorXi::Constant(size, mini);
   Eigen::VectorXi maxVecXi = Eigen::VectorXi::Constant(size, maxi);
@@ -144,8 +145,8 @@ TEST(Random, CheckSyntaxValidity)
   Random::uniform<unsigned long>(minul, maxul);
   Random::uniform<unsigned long long>(minull, maxull);
   Random::uniform<float>(minf, maxf);
-  Random::uniform<s_t>(mind, maxd);
-  Random::uniform<long s_t>(minld, maxld);
+  Random::uniform<double>(mind, maxd);
+  Random::uniform<long double>(minld, maxld);
 
   // Create random vectors given scalar bounds
   Random::uniform<Eigen::VectorXi>(size, mini, maxi);
@@ -181,8 +182,8 @@ TEST(Random, CheckSyntaxValidity)
 //==============================================================================
 TEST(Random, UniformScalar)
 {
-  s_t mind = -5.0;
-  s_t maxd = 10.0;
+  double mind = -5.0;
+  double maxd = 10.0;
 
   float minf = -3.0f;
   float maxf = 4.0f;
@@ -190,7 +191,7 @@ TEST(Random, UniformScalar)
   int mini = -5.0;
   int maxi = 10.0;
 
-  s_t uniformd = math::Random::uniform(mind, maxd);
+  double uniformd = math::Random::uniform(mind, maxd);
   EXPECT_GE(uniformd, mind);
   EXPECT_LE(uniformd, maxd);
 
@@ -248,8 +249,8 @@ TEST(Random, UniformClosedEnd)
 //==============================================================================
 TEST(Random, NormalScalar)
 {
-  s_t meand = 1.0;
-  s_t sigmad = 10.0;
+  double meand = 1.0;
+  double sigmad = 10.0;
 
   float meanf = -3.0f;
   float sigmaf = 4.0f;

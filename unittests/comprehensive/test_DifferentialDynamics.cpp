@@ -71,7 +71,7 @@ protected:
 void DifferentialDynamics::SetUp()
 {
   // fileList.push_back("dart://sample/skel/test/single_pendulum_ball_joint.skel");
-  // fileList.push_back("dart://sample/skel/test/s_t_pendulum_ball_joint.skel");
+  // fileList.push_back("dart://sample/skel/test/double_pendulum_ball_joint.skel");
   // fileList.push_back("dart://sample/skel/test/single_rigid_body.skel");
   // Create a list of skel files to test with
   //  fileList.push_back("dart://sample/skel/test/chainwhipa.skel");
@@ -80,10 +80,10 @@ void DifferentialDynamics::SetUp()
       "dart://sample/skel/test/single_pendulum_euler_joint.skel");
   fileList.push_back("dart://sample/skel/test/single_pendulum_ball_joint.skel");
   fileList.push_back("dart://sample/skel/test/single_rigid_body.skel");
-  fileList.push_back("dart://sample/skel/test/s_t_pendulum.skel");
+  fileList.push_back("dart://sample/skel/test/double_pendulum.skel");
   fileList.push_back(
-      "dart://sample/skel/test/s_t_pendulum_euler_joint.skel");
-  fileList.push_back("dart://sample/skel/test/s_t_pendulum_ball_joint.skel");
+      "dart://sample/skel/test/double_pendulum_euler_joint.skel");
+  fileList.push_back("dart://sample/skel/test/double_pendulum_ball_joint.skel");
   fileList.push_back(
       "dart://sample/skel/test/serial_chain_revolute_joint.skel");
   //    fileList.push_back("dart://sample/skel/test/serial_chain_eulerxyz_joint.skel");
@@ -196,7 +196,7 @@ TEST_F(DifferentialDynamics, compareEquationsOfMotion)
     }
     else if (
         uri.toString()
-        == "dart://sample/skel/test/s_t_pendulum_ball_joint.skel")
+        == "dart://sample/skel/test/double_pendulum_ball_joint.skel")
     {
       abs_tol_invM = 2e-5;
       rel_tol_invM = 5e-3; // 0.5 %
@@ -260,7 +260,8 @@ TEST_F(DifferentialDynamics, compareEquationsOfMotion)
         skel->setVelocities(dq);
         skel->setAccelerations(ddq);
 
-        for (int i = 0; i < skel->getNumJoints(); i++) {
+        for (int i = 0; i < skel->getNumJoints(); i++)
+        {
           // Eigen::Isometry3s Tparent = Eigen::Isometry3s::Identity();
           // Tparent.translation()(2) = 1.0;
           // skel->getJoint(i)->setTransformFromParentBodyNode(Tparent);
@@ -348,11 +349,14 @@ TEST_F(DifferentialDynamics, compareEquationsOfMotion)
 
             cout << "[DEBUG] max(Diff): "
                  << (C_q_analytic - C_q_numerical).maxCoeff() << std::endl;
-            
-            for (int i = 0; i < skel->getNumBodyNodes(); i++) {
+
+            for (int i = 0; i < skel->getNumBodyNodes(); i++)
+            {
               std::cout << "Checking body node " << i << ":" << std::endl;
-              skel->getBodyNode(i)->debugJacobianOfCForward(neural::WithRespectTo::POSITION);
-              skel->getBodyNode(i)->debugJacobianOfCBackward(neural::WithRespectTo::POSITION);
+              skel->getBodyNode(i)->debugJacobianOfCForward(
+                  neural::WithRespectTo::POSITION);
+              skel->getBodyNode(i)->debugJacobianOfCBackward(
+                  neural::WithRespectTo::POSITION);
             }
 
             return;
@@ -492,7 +496,8 @@ TEST_F(DifferentialDynamics, compareEquationsOfMotion)
                 .isZero());
 
         /*
-        // TODO: uncomment this if we ever start using the Direct Minv Jacobian again
+        // TODO: uncomment this if we ever start using the Direct Minv Jacobian
+again
         // Test derivative of M^{-1}x w.r.t. position/velocity/acceleration
         {
           Eigen::VectorXs x = Eigen::VectorXs::Random(dof);
@@ -526,11 +531,13 @@ TEST_F(DifferentialDynamics, compareEquationsOfMotion)
             cout << "[DEBUG] max(Diff): "
                  << (DMinvX_Dq_analytic - DMinvX_Dq_numerical).maxCoeff()
                  << std::endl;
-            
+
             for (int i = 0; i < skel->getNumBodyNodes(); i++) {
               std::cout << "Checking body node " << i << ":" << std::endl;
-              skel->getBodyNode(i)->debugJacobianOfMinvXBackward(neural::WithRespectTo::POSITION, x);
-              skel->getBodyNode(i)->debugJacobianOfMinvXForward(neural::WithRespectTo::POSITION, x);
+              skel->getBodyNode(i)->debugJacobianOfMinvXBackward(neural::WithRespectTo::POSITION,
+x);
+              skel->getBodyNode(i)->debugJacobianOfMinvXForward(neural::WithRespectTo::POSITION,
+x);
             }
             // TODO
           }

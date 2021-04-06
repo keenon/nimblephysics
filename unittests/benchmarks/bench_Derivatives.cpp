@@ -37,7 +37,7 @@ static void BM_Jacobian_Of_C_q_Numerical(benchmark::State& state)
   s_t ddqLB = -0.25 * pi;
   s_t ddqUB = 0.25 * pi;
 
-  common::Uri uri = "dart://sample/skel/test/s_t_pendulum.skel";
+  common::Uri uri = "dart://sample/skel/test/double_pendulum.skel";
 
   // World
   WorldPtr world = World::create();
@@ -87,7 +87,7 @@ static void BM_Jacobian_Of_C_q_Analytical(benchmark::State& state)
   s_t ddqLB = -0.25 * pi;
   s_t ddqUB = 0.25 * pi;
 
-  common::Uri uri = "dart://sample/skel/test/s_t_pendulum.skel";
+  common::Uri uri = "dart://sample/skel/test/double_pendulum.skel";
 
   // World
   WorldPtr world = World::create();
@@ -137,7 +137,7 @@ static void BM_Jacobian_Of_C_dq_Numerical(benchmark::State& state)
   s_t ddqLB = -0.25 * pi;
   s_t ddqUB = 0.25 * pi;
 
-  common::Uri uri = "dart://sample/skel/test/s_t_pendulum.skel";
+  common::Uri uri = "dart://sample/skel/test/double_pendulum.skel";
 
   // World
   WorldPtr world = World::create();
@@ -187,7 +187,7 @@ static void BM_Jacobian_Of_C_dq_Analytical(benchmark::State& state)
   s_t ddqLB = -0.25 * pi;
   s_t ddqUB = 0.25 * pi;
 
-  common::Uri uri = "dart://sample/skel/test/s_t_pendulum.skel";
+  common::Uri uri = "dart://sample/skel/test/double_pendulum.skel";
 
   // World
   WorldPtr world = World::create();
@@ -237,7 +237,7 @@ static void BM_Jacobian_Of_Minv_q_Numerical(benchmark::State& state)
   s_t ddqLB = -0.25 * pi;
   s_t ddqUB = 0.25 * pi;
 
-  common::Uri uri = "dart://sample/skel/test/s_t_pendulum.skel";
+  common::Uri uri = "dart://sample/skel/test/double_pendulum.skel";
 
   // World
   WorldPtr world = World::create();
@@ -291,7 +291,7 @@ static void BM_Jacobian_Of_Minv_q_Analytical(benchmark::State& state)
   s_t ddqLB = -0.25 * pi;
   s_t ddqUB = 0.25 * pi;
 
-  common::Uri uri = "dart://sample/skel/test/s_t_pendulum.skel";
+  common::Uri uri = "dart://sample/skel/test/double_pendulum.skel";
 
   // World
   WorldPtr world = World::create();
@@ -345,7 +345,7 @@ static void BM_Jacobian_Of_Minv_q_Analytical_ID(benchmark::State& state)
   s_t ddqLB = -0.25 * pi;
   s_t ddqUB = 0.25 * pi;
 
-  common::Uri uri = "dart://sample/skel/test/s_t_pendulum.skel";
+  common::Uri uri = "dart://sample/skel/test/double_pendulum.skel";
 
   // World
   WorldPtr world = World::create();

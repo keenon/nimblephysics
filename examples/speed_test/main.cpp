@@ -178,9 +178,9 @@ std::vector<std::string> getSceneFiles()
   scenes.push_back("dart://sample/skel/test/single_pendulum.skel");
   scenes.push_back("dart://sample/skel/test/single_pendulum_euler_joint.skel");
   scenes.push_back("dart://sample/skel/test/single_pendulum_ball_joint.skel");
-  scenes.push_back("dart://sample/skel/test/s_t_pendulum.skel");
-  scenes.push_back("dart://sample/skel/test/s_t_pendulum_euler_joint.skel");
-  scenes.push_back("dart://sample/skel/test/s_t_pendulum_ball_joint.skel");
+  scenes.push_back("dart://sample/skel/test/double_pendulum.skel");
+  scenes.push_back("dart://sample/skel/test/double_pendulum_euler_joint.skel");
+  scenes.push_back("dart://sample/skel/test/double_pendulum_ball_joint.skel");
   scenes.push_back("dart://sample/skel/test/serial_chain_revolute_joint.skel");
   scenes.push_back("dart://sample/skel/test/serial_chain_eulerxyz_joint.skel");
   scenes.push_back("dart://sample/skel/test/serial_chain_ball_joint.skel");

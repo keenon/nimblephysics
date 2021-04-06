@@ -132,9 +132,14 @@ TEST(DARTCollide, BOX_SUPPORT_ROTATED_45_TRANSLATED)
 
   ccdSupportBox(&box, &dir, &out);
 
-  EXPECT_NEAR(out.v[0], boxTransform.translation()(0) + sqrt(0.5), 1e-8);
-  EXPECT_NEAR(out.v[1], boxTransform.translation()(1), 1e-8);
-  EXPECT_NEAR(out.v[2], boxTransform.translation()(2), 1e-8);
+  EXPECT_NEAR(
+      out.v[0],
+      static_cast<double>(boxTransform.translation()(0) + sqrt(0.5)),
+      1e-8);
+  EXPECT_NEAR(
+      out.v[1], static_cast<double>(boxTransform.translation()(1)), 1e-8);
+  EXPECT_NEAR(
+      out.v[2], static_cast<double>(boxTransform.translation()(2)), 1e-8);
 }
 #endif
 
@@ -213,7 +218,9 @@ void verifyBoxMeshResultsIdenticalToAnalytical(ccdBox* box1, ccdBox* box2)
     }
     EXPECT_TRUE(equals(meshContact.normal, analyticalContact.normal));
     EXPECT_NEAR(
-        meshContact.penetrationDepth, analyticalContact.penetrationDepth, 1e-8);
+        static_cast<double>(meshContact.penetrationDepth),
+        static_cast<double>(analyticalContact.penetrationDepth),
+        1e-8);
   }
 }
 
@@ -366,7 +373,9 @@ void verifyMeshAndBoxResultsIdentical(
     EXPECT_TRUE(equals(meshContact.normal, reverseAnalyticalBackwardsNormal));
 
     EXPECT_NEAR(
-        meshContact.penetrationDepth, analyticalContact.penetrationDepth, 1e-8);
+        static_cast<double>(meshContact.penetrationDepth),
+        static_cast<double>(analyticalContact.penetrationDepth),
+        1e-8);
   }
 }
 
@@ -597,8 +606,8 @@ TEST(DARTCollide, EDGE_EDGE_2D_COLLISION_TEST)
   // they do cross
   EXPECT_TRUE(hit);
   // at the origin
-  EXPECT_NEAR(0, out(0), 1e-8);
-  EXPECT_NEAR(0, out(1), 1e-8);
+  EXPECT_NEAR(0, static_cast<double>(out(0)), 1e-8);
+  EXPECT_NEAR(0, static_cast<double>(out(1)), 1e-8);
 }
 #endif
 
@@ -632,8 +641,8 @@ TEST(DARTCollide, EDGE_EDGE_2D_COLLISION_TEST_COLINEAR_OVERLAP)
   // they do cross
   EXPECT_TRUE(hit);
   // at the beginning of the overlap
-  EXPECT_NEAR(-0.1, out(0), 1e-8);
-  EXPECT_NEAR(0, out(1), 1e-8);
+  EXPECT_NEAR(-0.1, static_cast<double>(out(0)), 1e-8);
+  EXPECT_NEAR(0, static_cast<double>(out(1)), 1e-8);
 }
 #endif
 
@@ -761,9 +770,9 @@ TEST(DARTCollide, BOX_BOX_MESH_VERTEX_FACE_COLLISION)
 
   EXPECT_EQ(intersect, 0);
   Eigen::Vector3s expected = box1Transform.linear() * Eigen::Vector3s::UnitY();
-  EXPECT_NEAR(dir.v[0], expected(0), 1e-8);
-  EXPECT_NEAR(dir.v[1], expected(1), 1e-8);
-  EXPECT_NEAR(dir.v[2], expected(2), 1e-8);
+  EXPECT_NEAR(dir.v[0], static_cast<double>(expected(0)), 1e-8);
+  EXPECT_NEAR(dir.v[1], static_cast<double>(expected(1)), 1e-8);
+  EXPECT_NEAR(dir.v[2], static_cast<double>(expected(2)), 1e-8);
 
   std::vector<Eigen::Vector3s> pointsA
       = ccdPointsAtWitnessBox(&box1, &dir, false);
@@ -1337,9 +1346,9 @@ TEST(DARTCollide, MESH_RANDOM_SUPPORT_PLANES)
     Eigen::Vector3s dirVec = Eigen::Vector3s::Random();
 
     ccd_vec3_t dir;
-    dir.v[0] = dirVec(0);
-    dir.v[1] = dirVec(1);
-    dir.v[2] = dirVec(2);
+    dir.v[0] = static_cast<double>(dirVec(0));
+    dir.v[1] = static_cast<double>(dirVec(1));
+    dir.v[2] = static_cast<double>(dirVec(2));
 
     ccd_vec3_t outBox;
     ccd_vec3_t outMesh;
@@ -1471,9 +1480,9 @@ TEST(DARTCollide, MESH_WITNESS_POINTS_RANDOM)
     Eigen::Vector3s dirVec = Eigen::Vector3s::Random();
 
     ccd_vec3_t dir;
-    dir.v[0] = dirVec(0);
-    dir.v[1] = dirVec(1);
-    dir.v[2] = dirVec(2);
+    dir.v[0] = static_cast<double>(dirVec(0));
+    dir.v[1] = static_cast<double>(dirVec(1));
+    dir.v[2] = static_cast<double>(dirVec(2));
 
     // Start with the positive direction
 
@@ -1709,7 +1718,10 @@ TEST(DARTCollide, VERTEX_SPHERE_COLLISION)
   EXPECT_TRUE(equals(expectedNormal, contact.normal, 1e-9));
   Eigen::Vector3s expectedPoint = Eigen::Vector3s(0.5, 0.5, 0.5);
   EXPECT_TRUE(equals(expectedPoint, contact.point, 1e-9));
-  EXPECT_NEAR(contact.penetrationDepth, sqrt(3 * 0.01 * 0.01), 1e-8);
+  EXPECT_NEAR(
+      static_cast<double>(contact.penetrationDepth),
+      sqrt(3 * 0.01 * 0.01),
+      1e-8);
 }
 #endif
 
@@ -1795,7 +1807,10 @@ TEST(DARTCollide, EDGE_SPHERE_COLLISION)
   EXPECT_TRUE(equals(expectedNormal, contact.normal, 1e-9));
   Eigen::Vector3s expectedPoint = Eigen::Vector3s(0.5, 0.5, 0);
   EXPECT_TRUE(equals(expectedPoint, contact.point, 1e-9));
-  EXPECT_NEAR(contact.penetrationDepth, sqrt(2 * 0.01 * 0.01), 1e-8);
+  EXPECT_NEAR(
+      static_cast<double>(contact.penetrationDepth),
+      sqrt(2 * 0.01 * 0.01),
+      1e-8);
 }
 #endif
 
@@ -1880,7 +1895,7 @@ TEST(DARTCollide, FACE_SPHERE_COLLISION)
   EXPECT_TRUE(equals(expectedNormal, contact.normal, 1e-9));
   Eigen::Vector3s expectedPoint = Eigen::Vector3s(0.5 - 0.01, 0, 0);
   EXPECT_TRUE(equals(expectedPoint, contact.point, 1e-9));
-  EXPECT_NEAR(contact.penetrationDepth, 0.01, 1e-8);
+  EXPECT_NEAR(static_cast<double>(contact.penetrationDepth), 0.01, 1e-8);
 }
 #endif
 
@@ -1967,7 +1982,10 @@ TEST(DARTCollide, SPHERE_VERTEX_COLLISION)
   EXPECT_TRUE(equals(expectedNormal, contact.normal, 1e-9));
   Eigen::Vector3s expectedPoint = Eigen::Vector3s(0.5, 0.5, 0.5);
   EXPECT_TRUE(equals(expectedPoint, contact.point, 1e-9));
-  EXPECT_NEAR(contact.penetrationDepth, sqrt(3 * 0.01 * 0.01), 1e-8);
+  EXPECT_NEAR(
+      static_cast<double>(contact.penetrationDepth),
+      sqrt(3 * 0.01 * 0.01),
+      1e-8);
 }
 #endif
 
@@ -2053,7 +2071,10 @@ TEST(DARTCollide, SPHERE_EDGE_COLLISION)
   EXPECT_TRUE(equals(expectedNormal, contact.normal, 1e-9));
   Eigen::Vector3s expectedPoint = Eigen::Vector3s(0.5, 0.5, 0);
   EXPECT_TRUE(equals(expectedPoint, contact.point, 1e-9));
-  EXPECT_NEAR(contact.penetrationDepth, sqrt(2 * 0.01 * 0.01), 1e-8);
+  EXPECT_NEAR(
+      static_cast<double>(contact.penetrationDepth),
+      sqrt(2 * 0.01 * 0.01),
+      1e-8);
 }
 #endif
 
@@ -2138,7 +2159,7 @@ TEST(DARTCollide, SPHERE_FACE_COLLISION)
   EXPECT_TRUE(equals(expectedNormal, contact.normal, 1e-9));
   Eigen::Vector3s expectedPoint = Eigen::Vector3s(0.5 - 0.01, 0, 0);
   EXPECT_TRUE(equals(expectedPoint, contact.point, 1e-9));
-  EXPECT_NEAR(contact.penetrationDepth, 0.01, 1e-8);
+  EXPECT_NEAR(static_cast<double>(contact.penetrationDepth), 0.01, 1e-8);
 }
 #endif
 
@@ -2187,7 +2208,7 @@ TEST(DARTCollide, CAPSULE_CAPSULE_T_SHAPED_COLLISION)
   EXPECT_EQ(contact.type, PIPE_SPHERE);
   EXPECT_TRUE(equals(expectedPoint, contact.point, 1e-10));
   EXPECT_TRUE(equals(expectedNormal, contact.normal, 1e-10));
-  EXPECT_NEAR(contact.penetrationDepth, 0.01, 1e-10);
+  EXPECT_NEAR(static_cast<double>(contact.penetrationDepth), 0.01, 1e-10);
 
   // Check the results in the backwards direction
 
@@ -2219,7 +2240,7 @@ TEST(DARTCollide, CAPSULE_CAPSULE_T_SHAPED_COLLISION)
   EXPECT_EQ(contact.type, SPHERE_PIPE);
   EXPECT_TRUE(equals(expectedPoint, contact.point, 1e-10));
   EXPECT_TRUE(equals(expectedNormal, contact.normal, 1e-10));
-  EXPECT_NEAR(contact.penetrationDepth, 0.01, 1e-10);
+  EXPECT_NEAR(static_cast<double>(contact.penetrationDepth), 0.01, 1e-10);
 }
 #endif
 
@@ -2268,7 +2289,7 @@ TEST(DARTCollide, CAPSULE_CAPSULE_X_SHAPED_COLLISION)
   EXPECT_EQ(contact.type, PIPE_PIPE);
   EXPECT_TRUE(equals(expectedPoint, contact.point, 1e-10));
   EXPECT_TRUE(equals(expectedNormal, contact.normal, 1e-10));
-  EXPECT_NEAR(contact.penetrationDepth, 0.01, 1e-10);
+  EXPECT_NEAR(static_cast<double>(contact.penetrationDepth), 0.01, 1e-10);
 
   // Check the results in the backwards direction
 
@@ -2300,7 +2321,7 @@ TEST(DARTCollide, CAPSULE_CAPSULE_X_SHAPED_COLLISION)
   EXPECT_EQ(contact.type, PIPE_PIPE);
   EXPECT_TRUE(equals(expectedPoint, contact.point, 1e-10));
   EXPECT_TRUE(equals(expectedNormal, contact.normal, 1e-10));
-  EXPECT_NEAR(contact.penetrationDepth, 0.01, 1e-10);
+  EXPECT_NEAR(static_cast<double>(contact.penetrationDepth), 0.01, 1e-10);
 }
 #endif
 
@@ -2357,7 +2378,7 @@ TEST(DARTCollide, CAPSULE_CAPSULE_L_SHAPED_COLLISION)
     std::cout << "Real normal: " << std::endl << contact.normal << std::endl;
   }
   EXPECT_TRUE(equals(expectedNormal, contact.normal, 1e-10));
-  EXPECT_NEAR(contact.penetrationDepth, 0.01, 1e-10);
+  EXPECT_NEAR(static_cast<double>(contact.penetrationDepth), 0.01, 1e-10);
 
   // Check the results in the backwards direction
 
@@ -2395,7 +2416,7 @@ TEST(DARTCollide, CAPSULE_CAPSULE_L_SHAPED_COLLISION)
     std::cout << "Real normal: " << std::endl << contact.normal << std::endl;
   }
   EXPECT_TRUE(equals(expectedNormal, contact.normal, 1e-10));
-  EXPECT_NEAR(contact.penetrationDepth, 0.01, 1e-10);
+  EXPECT_NEAR(static_cast<double>(contact.penetrationDepth), 0.01, 1e-10);
 }
 #endif
 
@@ -2440,7 +2461,7 @@ TEST(DARTCollide, CAPSULE_SPHERE_END_COLLISION)
     std::cout << "Real normal: " << std::endl << contact.normal << std::endl;
   }
   EXPECT_TRUE(equals(expectedNormal, contact.normal, 1e-10));
-  EXPECT_NEAR(contact.penetrationDepth, 0.01, 1e-10);
+  EXPECT_NEAR(static_cast<double>(contact.penetrationDepth), 0.01, 1e-10);
 
   // Check the results in the backwards direction
 
@@ -2469,7 +2490,7 @@ TEST(DARTCollide, CAPSULE_SPHERE_END_COLLISION)
     std::cout << "Real normal: " << std::endl << contact.normal << std::endl;
   }
   EXPECT_TRUE(equals(expectedNormal, contact.normal, 1e-10));
-  EXPECT_NEAR(contact.penetrationDepth, 0.01, 1e-10);
+  EXPECT_NEAR(static_cast<double>(contact.penetrationDepth), 0.01, 1e-10);
 }
 #endif
 
@@ -2514,7 +2535,7 @@ TEST(DARTCollide, CAPSULE_SPHERE_SIDE_COLLISION)
     std::cout << "Real normal: " << std::endl << contact.normal << std::endl;
   }
   EXPECT_TRUE(equals(expectedNormal, contact.normal, 1e-10));
-  EXPECT_NEAR(contact.penetrationDepth, 0.01, 1e-10);
+  EXPECT_NEAR(static_cast<double>(contact.penetrationDepth), 0.01, 1e-10);
 
   // Check the results in the backwards direction
 
@@ -2543,7 +2564,7 @@ TEST(DARTCollide, CAPSULE_SPHERE_SIDE_COLLISION)
     std::cout << "Real normal: " << std::endl << contact.normal << std::endl;
   }
   EXPECT_TRUE(equals(expectedNormal, contact.normal, 1e-10));
-  EXPECT_NEAR(contact.penetrationDepth, 0.01, 1e-10);
+  EXPECT_NEAR(static_cast<double>(contact.penetrationDepth), 0.01, 1e-10);
 }
 #endif
 
@@ -2585,7 +2606,7 @@ TEST(DARTCollide, CAPSULE_BOX_AS_SPHERE_COLLISION)
     std::cout << "Real normal: " << std::endl << contact.normal << std::endl;
   }
   EXPECT_TRUE(equals(expectedNormal, contact.normal, 1e-10));
-  EXPECT_NEAR(contact.penetrationDepth, 0.01, 1e-10);
+  EXPECT_NEAR(static_cast<double>(contact.penetrationDepth), 0.01, 1e-10);
 
   // Check the results in the backwards direction
 
@@ -2614,7 +2635,7 @@ TEST(DARTCollide, CAPSULE_BOX_AS_SPHERE_COLLISION)
     std::cout << "Real normal: " << std::endl << contact.normal << std::endl;
   }
   EXPECT_TRUE(equals(expectedNormal, contact.normal, 1e-10));
-  EXPECT_NEAR(contact.penetrationDepth, 0.01, 1e-10);
+  EXPECT_NEAR(static_cast<double>(contact.penetrationDepth), 0.01, 1e-10);
 
   /*
   server::GUIWebsocketServer server;
@@ -2688,7 +2709,7 @@ TEST(DARTCollide, CAPSULE_MESH_AS_SPHERE_COLLISION)
     std::cout << "Real normal: " << std::endl << contact.normal << std::endl;
   }
   EXPECT_TRUE(equals(expectedNormal, contact.normal, 1e-10));
-  EXPECT_NEAR(contact.penetrationDepth, 0.01, 1e-10);
+  EXPECT_NEAR(static_cast<double>(contact.penetrationDepth), 0.01, 1e-10);
 
   // Check the results in the backwards direction
 
@@ -2717,7 +2738,7 @@ TEST(DARTCollide, CAPSULE_MESH_AS_SPHERE_COLLISION)
     std::cout << "Real normal: " << std::endl << contact.normal << std::endl;
   }
   EXPECT_TRUE(equals(expectedNormal, contact.normal, 1e-10));
-  EXPECT_NEAR(contact.penetrationDepth, 0.01, 1e-10);
+  EXPECT_NEAR(static_cast<double>(contact.penetrationDepth), 0.01, 1e-10);
 
   /*
   server::GUIWebsocketServer server;
@@ -2789,12 +2810,12 @@ TEST(DARTCollide, CAPSULE_BOX_PIPE_FACE_COLLISION)
     std::cout << "Actual point: " << std::endl << contact1.point << std::endl;
   }
   EXPECT_TRUE(equals(contact1.point, expectedPointA, 1e-10));
-  EXPECT_NEAR(contact1.penetrationDepth, 0.01, 1e-10);
+  EXPECT_NEAR(static_cast<double>(contact1.penetrationDepth), 0.01, 1e-10);
   Contact contact2 = result.getContact(1);
   EXPECT_EQ(contact2.type, SPHERE_BOX);
   EXPECT_TRUE(equals(contact2.normal, expectedNormal, 1e-10));
   EXPECT_TRUE(equals(contact2.point, expectedPointB, 1e-10));
-  EXPECT_NEAR(contact2.penetrationDepth, 0.01, 1e-10);
+  EXPECT_NEAR(static_cast<double>(contact2.penetrationDepth), 0.01, 1e-10);
 
   /////////////////////////////////////////////////////////
   // Try the reverse direction
@@ -2822,12 +2843,12 @@ TEST(DARTCollide, CAPSULE_BOX_PIPE_FACE_COLLISION)
     std::cout << "Actual point: " << std::endl << contact1.point << std::endl;
   }
   EXPECT_TRUE(equals(contact1.point, expectedPointA, 1e-10));
-  EXPECT_NEAR(contact1.penetrationDepth, 0.01, 1e-10);
+  EXPECT_NEAR(static_cast<double>(contact1.penetrationDepth), 0.01, 1e-10);
   contact2 = result.getContact(1);
   EXPECT_EQ(contact2.type, BOX_SPHERE);
   EXPECT_TRUE(equals(contact2.normal, expectedNormal, 1e-10));
   EXPECT_TRUE(equals(contact2.point, expectedPointB, 1e-10));
-  EXPECT_NEAR(contact2.penetrationDepth, 0.01, 1e-10);
+  EXPECT_NEAR(static_cast<double>(contact2.penetrationDepth), 0.01, 1e-10);
 }
 #endif
 
@@ -2869,12 +2890,12 @@ TEST(DARTCollide, CAPSULE_MESH_PIPE_FACE_COLLISION)
     std::cout << "Actual point: " << std::endl << contact1.point << std::endl;
   }
   EXPECT_TRUE(equals(contact1.point, expectedPointA, 1e-10));
-  EXPECT_NEAR(contact1.penetrationDepth, 0.01, 1e-10);
+  EXPECT_NEAR(static_cast<double>(contact1.penetrationDepth), 0.01, 1e-10);
   Contact contact2 = result.getContact(1);
   EXPECT_EQ(contact2.type, SPHERE_FACE);
   EXPECT_TRUE(equals(contact2.normal, expectedNormal, 1e-10));
   EXPECT_TRUE(equals(contact2.point, expectedPointB, 1e-10));
-  EXPECT_NEAR(contact2.penetrationDepth, 0.01, 1e-10);
+  EXPECT_NEAR(static_cast<double>(contact2.penetrationDepth), 0.01, 1e-10);
 
   /////////////////////////////////////////////////////////
   // Try the reverse direction
@@ -2902,12 +2923,12 @@ TEST(DARTCollide, CAPSULE_MESH_PIPE_FACE_COLLISION)
     std::cout << "Actual point: " << std::endl << contact1.point << std::endl;
   }
   EXPECT_TRUE(equals(contact1.point, expectedPointA, 1e-10));
-  EXPECT_NEAR(contact1.penetrationDepth, 0.01, 1e-10);
+  EXPECT_NEAR(static_cast<double>(contact1.penetrationDepth), 0.01, 1e-10);
   contact2 = result.getContact(1);
   EXPECT_EQ(contact2.type, FACE_SPHERE);
   EXPECT_TRUE(equals(contact2.normal, expectedNormal, 1e-10));
   EXPECT_TRUE(equals(contact2.point, expectedPointB, 1e-10));
-  EXPECT_NEAR(contact2.penetrationDepth, 0.01, 1e-10);
+  EXPECT_NEAR(static_cast<double>(contact2.penetrationDepth), 0.01, 1e-10);
 }
 #endif
 
@@ -2949,7 +2970,7 @@ TEST(DARTCollide, CAPSULE_BOX_SPHERE_AND_PIPE_EDGE_COLLISION)
     std::cout << "Actual point: " << std::endl << contact1.point << std::endl;
   }
   EXPECT_TRUE(equals(contact1.point, expectedPointA, 1e-10));
-  EXPECT_NEAR(contact1.penetrationDepth, 0.01, 1e-10);
+  EXPECT_NEAR(static_cast<double>(contact1.penetrationDepth), 0.01, 1e-10);
   Contact contact2 = result.getContact(1);
   EXPECT_EQ(contact2.type, PIPE_EDGE);
   EXPECT_TRUE(equals(contact2.normal, expectedNormal, 1e-10));
@@ -2959,7 +2980,7 @@ TEST(DARTCollide, CAPSULE_BOX_SPHERE_AND_PIPE_EDGE_COLLISION)
     std::cout << "Actual point: " << std::endl << contact2.point << std::endl;
   }
   EXPECT_TRUE(equals(contact2.point, expectedPointB, 1e-10));
-  EXPECT_NEAR(contact2.penetrationDepth, 0.01, 1e-10);
+  EXPECT_NEAR(static_cast<double>(contact2.penetrationDepth), 0.01, 1e-10);
 
   /////////////////////////////////////////////////////////
   // Try the reverse direction
@@ -2987,7 +3008,7 @@ TEST(DARTCollide, CAPSULE_BOX_SPHERE_AND_PIPE_EDGE_COLLISION)
     std::cout << "Actual point: " << std::endl << contact1.point << std::endl;
   }
   EXPECT_TRUE(equals(contact1.point, expectedPointA, 1e-10));
-  EXPECT_NEAR(contact1.penetrationDepth, 0.01, 1e-10);
+  EXPECT_NEAR(static_cast<double>(contact1.penetrationDepth), 0.01, 1e-10);
   contact2 = result.getContact(1);
   EXPECT_EQ(contact2.type, EDGE_PIPE);
   EXPECT_TRUE(equals(contact2.normal, expectedNormal, 1e-10));
@@ -2997,7 +3018,7 @@ TEST(DARTCollide, CAPSULE_BOX_SPHERE_AND_PIPE_EDGE_COLLISION)
     std::cout << "Actual point: " << std::endl << contact2.point << std::endl;
   }
   EXPECT_TRUE(equals(contact2.point, expectedPointB, 1e-10));
-  EXPECT_NEAR(contact2.penetrationDepth, 0.01, 1e-10);
+  EXPECT_NEAR(static_cast<double>(contact2.penetrationDepth), 0.01, 1e-10);
 }
 #endif
 
@@ -3040,7 +3061,7 @@ TEST(DARTCollide, CAPSULE_MESH_SPHERE_AND_PIPE_EDGE_COLLISION)
     std::cout << "Actual point: " << std::endl << contact1.point << std::endl;
   }
   EXPECT_TRUE(equals(contact1.point, expectedPointA, 1e-10));
-  EXPECT_NEAR(contact1.penetrationDepth, 0.01, 1e-10);
+  EXPECT_NEAR(static_cast<double>(contact1.penetrationDepth), 0.01, 1e-10);
   Contact contact2 = result.getContact(1);
   EXPECT_EQ(contact2.type, PIPE_EDGE);
   EXPECT_TRUE(equals(contact2.normal, expectedNormal, 1e-10));
@@ -3050,7 +3071,7 @@ TEST(DARTCollide, CAPSULE_MESH_SPHERE_AND_PIPE_EDGE_COLLISION)
     std::cout << "Actual point: " << std::endl << contact2.point << std::endl;
   }
   EXPECT_TRUE(equals(contact2.point, expectedPointB, 1e-10));
-  EXPECT_NEAR(contact2.penetrationDepth, 0.01, 1e-10);
+  EXPECT_NEAR(static_cast<double>(contact2.penetrationDepth), 0.01, 1e-10);
 
   /////////////////////////////////////////////////////////
   // Try the reverse direction
@@ -3078,7 +3099,7 @@ TEST(DARTCollide, CAPSULE_MESH_SPHERE_AND_PIPE_EDGE_COLLISION)
     std::cout << "Actual point: " << std::endl << contact1.point << std::endl;
   }
   EXPECT_TRUE(equals(contact1.point, expectedPointA, 1e-10));
-  EXPECT_NEAR(contact1.penetrationDepth, 0.01, 1e-10);
+  EXPECT_NEAR(static_cast<double>(contact1.penetrationDepth), 0.01, 1e-10);
   contact2 = result.getContact(1);
   EXPECT_EQ(contact2.type, EDGE_PIPE);
   EXPECT_TRUE(equals(contact2.normal, expectedNormal, 1e-10));
@@ -3088,7 +3109,7 @@ TEST(DARTCollide, CAPSULE_MESH_SPHERE_AND_PIPE_EDGE_COLLISION)
     std::cout << "Actual point: " << std::endl << contact2.point << std::endl;
   }
   EXPECT_TRUE(equals(contact2.point, expectedPointB, 1e-10));
-  EXPECT_NEAR(contact2.penetrationDepth, 0.01, 1e-10);
+  EXPECT_NEAR(static_cast<double>(contact2.penetrationDepth), 0.01, 1e-10);
 }
 #endif
 
@@ -3133,7 +3154,7 @@ TEST(DARTCollide, CAPSULE_BOX_PIPE_EDGE_COLLISION)
     std::cout << "Actual point: " << std::endl << contact1.point << std::endl;
   }
   EXPECT_TRUE(equals(contact1.point, expectedPoint, 1e-10));
-  EXPECT_NEAR(contact1.penetrationDepth, 0.01, 1e-10);
+  EXPECT_NEAR(static_cast<double>(contact1.penetrationDepth), 0.01, 1e-10);
 
   /////////////////////////////////////////////////////////
   // Try the reverse direction
@@ -3165,7 +3186,7 @@ TEST(DARTCollide, CAPSULE_BOX_PIPE_EDGE_COLLISION)
     std::cout << "Actual point: " << std::endl << contact1.point << std::endl;
   }
   EXPECT_TRUE(equals(contact1.point, expectedPoint, 1e-10));
-  EXPECT_NEAR(contact1.penetrationDepth, 0.01, 1e-10);
+  EXPECT_NEAR(static_cast<double>(contact1.penetrationDepth), 0.01, 1e-10);
 }
 #endif
 
@@ -3211,7 +3232,7 @@ TEST(DARTCollide, CAPSULE_MESH_PIPE_EDGE_COLLISION)
     std::cout << "Actual point: " << std::endl << contact1.point << std::endl;
   }
   EXPECT_TRUE(equals(contact1.point, expectedPoint, 1e-10));
-  EXPECT_NEAR(contact1.penetrationDepth, 0.01, 1e-10);
+  EXPECT_NEAR(static_cast<double>(contact1.penetrationDepth), 0.01, 1e-10);
 
   /////////////////////////////////////////////////////////
   // Try the reverse direction
@@ -3243,7 +3264,7 @@ TEST(DARTCollide, CAPSULE_MESH_PIPE_EDGE_COLLISION)
     std::cout << "Actual point: " << std::endl << contact1.point << std::endl;
   }
   EXPECT_TRUE(equals(contact1.point, expectedPoint, 1e-10));
-  EXPECT_NEAR(contact1.penetrationDepth, 0.01, 1e-10);
+  EXPECT_NEAR(static_cast<double>(contact1.penetrationDepth), 0.01, 1e-10);
 }
 #endif
 
@@ -3289,7 +3310,7 @@ TEST(DARTCollide, CAPSULE_BOX_PIPE_VERTEX_COLLISION)
     std::cout << "Actual point: " << std::endl << contact1.point << std::endl;
   }
   EXPECT_TRUE(equals(contact1.point, expectedPoint, 1e-10));
-  EXPECT_NEAR(contact1.penetrationDepth, 0.01, 1e-10);
+  EXPECT_NEAR(static_cast<double>(contact1.penetrationDepth), 0.01, 1e-10);
 
   /////////////////////////////////////////////////////////
   // Try the reverse direction
@@ -3321,7 +3342,7 @@ TEST(DARTCollide, CAPSULE_BOX_PIPE_VERTEX_COLLISION)
     std::cout << "Actual point: " << std::endl << contact1.point << std::endl;
   }
   EXPECT_TRUE(equals(contact1.point, expectedPoint, 1e-10));
-  EXPECT_NEAR(contact1.penetrationDepth, 0.01, 1e-10);
+  EXPECT_NEAR(static_cast<double>(contact1.penetrationDepth), 0.01, 1e-10);
 }
 #endif
 
@@ -3368,7 +3389,7 @@ TEST(DARTCollide, CAPSULE_MESH_PIPE_VERTEX_COLLISION)
     std::cout << "Actual point: " << std::endl << contact1.point << std::endl;
   }
   EXPECT_TRUE(equals(contact1.point, expectedPoint, 1e-10));
-  EXPECT_NEAR(contact1.penetrationDepth, 0.01, 1e-10);
+  EXPECT_NEAR(static_cast<double>(contact1.penetrationDepth), 0.01, 1e-10);
 
   /////////////////////////////////////////////////////////
   // Try the reverse direction
@@ -3400,7 +3421,7 @@ TEST(DARTCollide, CAPSULE_MESH_PIPE_VERTEX_COLLISION)
     std::cout << "Actual point: " << std::endl << contact1.point << std::endl;
   }
   EXPECT_TRUE(equals(contact1.point, expectedPoint, 1e-10));
-  EXPECT_NEAR(contact1.penetrationDepth, 0.01, 1e-10);
+  EXPECT_NEAR(static_cast<double>(contact1.penetrationDepth), 0.01, 1e-10);
 }
 #endif
 
@@ -3448,7 +3469,7 @@ TEST(DARTCollide, CAPSULE_BOX_PIPE_EDGE_PARALLEL_VERTEX_COLLISION)
     std::cout << "Actual point: " << std::endl << contact1.point << std::endl;
   }
   EXPECT_TRUE(equals(contact1.point, expectedPointA, 1e-10));
-  EXPECT_NEAR(contact1.penetrationDepth, 0.01, 1e-10);
+  EXPECT_NEAR(static_cast<double>(contact1.penetrationDepth), 0.01, 1e-10);
 
   Contact contact2 = result.getContact(1);
   EXPECT_EQ(contact2.type, PIPE_VERTEX);
@@ -3465,7 +3486,7 @@ TEST(DARTCollide, CAPSULE_BOX_PIPE_EDGE_PARALLEL_VERTEX_COLLISION)
     std::cout << "Actual point: " << std::endl << contact2.point << std::endl;
   }
   EXPECT_TRUE(equals(contact2.point, expectedPointB, 1e-10));
-  EXPECT_NEAR(contact2.penetrationDepth, 0.01, 1e-10);
+  EXPECT_NEAR(static_cast<double>(contact2.penetrationDepth), 0.01, 1e-10);
 
   /////////////////////////////////////////////////////////
   // Try the reverse direction
@@ -3499,7 +3520,7 @@ TEST(DARTCollide, CAPSULE_BOX_PIPE_EDGE_PARALLEL_VERTEX_COLLISION)
     std::cout << "Actual point: " << std::endl << contact1.point << std::endl;
   }
   EXPECT_TRUE(equals(contact1.point, expectedPointA, 1e-10));
-  EXPECT_NEAR(contact1.penetrationDepth, 0.01, 1e-10);
+  EXPECT_NEAR(static_cast<double>(contact1.penetrationDepth), 0.01, 1e-10);
 
   contact2 = result.getContact(1);
   EXPECT_EQ(contact2.type, VERTEX_PIPE);
@@ -3516,7 +3537,7 @@ TEST(DARTCollide, CAPSULE_BOX_PIPE_EDGE_PARALLEL_VERTEX_COLLISION)
     std::cout << "Actual point: " << std::endl << contact2.point << std::endl;
   }
   EXPECT_TRUE(equals(contact2.point, expectedPointB, 1e-10));
-  EXPECT_NEAR(contact2.penetrationDepth, 0.01, 1e-10);
+  EXPECT_NEAR(static_cast<double>(contact2.penetrationDepth), 0.01, 1e-10);
 }
 #endif
 
@@ -3565,7 +3586,7 @@ TEST(DARTCollide, CAPSULE_MESH_PIPE_EDGE_PARALLEL_VERTEX_COLLISION)
     std::cout << "Actual point: " << std::endl << contact1.point << std::endl;
   }
   EXPECT_TRUE(equals(contact1.point, expectedPointA, 1e-10));
-  EXPECT_NEAR(contact1.penetrationDepth, 0.01, 1e-10);
+  EXPECT_NEAR(static_cast<double>(contact1.penetrationDepth), 0.01, 1e-10);
 
   Contact contact2 = result.getContact(1);
   EXPECT_EQ(contact2.type, PIPE_VERTEX);
@@ -3582,7 +3603,7 @@ TEST(DARTCollide, CAPSULE_MESH_PIPE_EDGE_PARALLEL_VERTEX_COLLISION)
     std::cout << "Actual point: " << std::endl << contact2.point << std::endl;
   }
   EXPECT_TRUE(equals(contact2.point, expectedPointB, 1e-10));
-  EXPECT_NEAR(contact2.penetrationDepth, 0.01, 1e-10);
+  EXPECT_NEAR(static_cast<double>(contact2.penetrationDepth), 0.01, 1e-10);
 
   /////////////////////////////////////////////////////////
   // Try the reverse direction
@@ -3616,7 +3637,7 @@ TEST(DARTCollide, CAPSULE_MESH_PIPE_EDGE_PARALLEL_VERTEX_COLLISION)
     std::cout << "Actual point: " << std::endl << contact1.point << std::endl;
   }
   EXPECT_TRUE(equals(contact1.point, expectedPointA, 1e-10));
-  EXPECT_NEAR(contact1.penetrationDepth, 0.01, 1e-10);
+  EXPECT_NEAR(static_cast<double>(contact1.penetrationDepth), 0.01, 1e-10);
 
   contact2 = result.getContact(1);
   EXPECT_EQ(contact2.type, VERTEX_PIPE);
@@ -3633,7 +3654,7 @@ TEST(DARTCollide, CAPSULE_MESH_PIPE_EDGE_PARALLEL_VERTEX_COLLISION)
     std::cout << "Actual point: " << std::endl << contact2.point << std::endl;
   }
   EXPECT_TRUE(equals(contact2.point, expectedPointB, 1e-10));
-  EXPECT_NEAR(contact2.penetrationDepth, 0.01, 1e-10);
+  EXPECT_NEAR(static_cast<double>(contact2.penetrationDepth), 0.01, 1e-10);
 }
 #endif
 
@@ -3683,7 +3704,7 @@ TEST(DARTCollide, CAPSULE_BOX_PIPE_EDGE_PARALLEL_SPHERE_COLLISION)
     std::cout << "Actual point: " << std::endl << contact1.point << std::endl;
   }
   EXPECT_TRUE(equals(contact1.point, expectedPointA, 1e-10));
-  EXPECT_NEAR(contact1.penetrationDepth, 0.01, 1e-10);
+  EXPECT_NEAR(static_cast<double>(contact1.penetrationDepth), 0.01, 1e-10);
 
   Contact contact2 = result.getContact(1);
   EXPECT_EQ(contact2.type, SPHERE_EDGE);
@@ -3700,7 +3721,7 @@ TEST(DARTCollide, CAPSULE_BOX_PIPE_EDGE_PARALLEL_SPHERE_COLLISION)
     std::cout << "Actual point: " << std::endl << contact2.point << std::endl;
   }
   EXPECT_TRUE(equals(contact2.point, expectedPointB, 1e-10));
-  EXPECT_NEAR(contact2.penetrationDepth, 0.01, 1e-10);
+  EXPECT_NEAR(static_cast<double>(contact2.penetrationDepth), 0.01, 1e-10);
 
   /////////////////////////////////////////////////////////
   // Try the reverse direction
@@ -3734,7 +3755,7 @@ TEST(DARTCollide, CAPSULE_BOX_PIPE_EDGE_PARALLEL_SPHERE_COLLISION)
     std::cout << "Actual point: " << std::endl << contact1.point << std::endl;
   }
   EXPECT_TRUE(equals(contact1.point, expectedPointA, 1e-10));
-  EXPECT_NEAR(contact1.penetrationDepth, 0.01, 1e-10);
+  EXPECT_NEAR(static_cast<double>(contact1.penetrationDepth), 0.01, 1e-10);
 
   contact2 = result.getContact(1);
   EXPECT_EQ(contact2.type, EDGE_SPHERE);
@@ -3751,7 +3772,7 @@ TEST(DARTCollide, CAPSULE_BOX_PIPE_EDGE_PARALLEL_SPHERE_COLLISION)
     std::cout << "Actual point: " << std::endl << contact2.point << std::endl;
   }
   EXPECT_TRUE(equals(contact2.point, expectedPointB, 1e-10));
-  EXPECT_NEAR(contact2.penetrationDepth, 0.01, 1e-10);
+  EXPECT_NEAR(static_cast<double>(contact2.penetrationDepth), 0.01, 1e-10);
 
   /*
   server::GUIWebsocketServer server;
@@ -3833,7 +3854,7 @@ TEST(DARTCollide, CAPSULE_MESH_PIPE_EDGE_PARALLEL_SPHERE_COLLISION)
     std::cout << "Actual point: " << std::endl << contact1.point << std::endl;
   }
   EXPECT_TRUE(equals(contact1.point, expectedPointA, 1e-10));
-  EXPECT_NEAR(contact1.penetrationDepth, 0.01, 1e-10);
+  EXPECT_NEAR(static_cast<double>(contact1.penetrationDepth), 0.01, 1e-10);
 
   Contact contact2 = result.getContact(1);
   EXPECT_EQ(contact2.type, SPHERE_EDGE);
@@ -3850,7 +3871,7 @@ TEST(DARTCollide, CAPSULE_MESH_PIPE_EDGE_PARALLEL_SPHERE_COLLISION)
     std::cout << "Actual point: " << std::endl << contact2.point << std::endl;
   }
   EXPECT_TRUE(equals(contact2.point, expectedPointB, 1e-10));
-  EXPECT_NEAR(contact2.penetrationDepth, 0.01, 1e-10);
+  EXPECT_NEAR(static_cast<double>(contact2.penetrationDepth), 0.01, 1e-10);
 
   /////////////////////////////////////////////////////////
   // Try the reverse direction
@@ -3884,7 +3905,7 @@ TEST(DARTCollide, CAPSULE_MESH_PIPE_EDGE_PARALLEL_SPHERE_COLLISION)
     std::cout << "Actual point: " << std::endl << contact1.point << std::endl;
   }
   EXPECT_TRUE(equals(contact1.point, expectedPointA, 1e-10));
-  EXPECT_NEAR(contact1.penetrationDepth, 0.01, 1e-10);
+  EXPECT_NEAR(static_cast<double>(contact1.penetrationDepth), 0.01, 1e-10);
 
   contact2 = result.getContact(1);
   EXPECT_EQ(contact2.type, EDGE_SPHERE);
@@ -3901,7 +3922,7 @@ TEST(DARTCollide, CAPSULE_MESH_PIPE_EDGE_PARALLEL_SPHERE_COLLISION)
     std::cout << "Actual point: " << std::endl << contact2.point << std::endl;
   }
   EXPECT_TRUE(equals(contact2.point, expectedPointB, 1e-10));
-  EXPECT_NEAR(contact2.penetrationDepth, 0.01, 1e-10);
+  EXPECT_NEAR(static_cast<double>(contact2.penetrationDepth), 0.01, 1e-10);
 }
 #endif
 
@@ -4081,15 +4102,19 @@ TEST(DARTCollide, CAPSULE_CCD_SUPPORT_FN)
   ccd_vec3_t dirRaw;
   ccd_vec3_t outRaw;
 
-  Eigen::Map<Eigen::Vector3s> dir(dirRaw.v);
-  Eigen::Map<Eigen::Vector3s> out(outRaw.v);
-
   // Straight up
 
-  dir = Eigen::Vector3s::UnitZ();
+  Eigen::Vector3s dir = Eigen::Vector3s::UnitZ();
+  dirRaw.v[0] = static_cast<double>(dir(0));
+  dirRaw.v[1] = static_cast<double>(dir(1));
+  dirRaw.v[2] = static_cast<double>(dir(2));
 
   ccdSupportCapsule(&capsule, &dirRaw, &outRaw);
 
+  Eigen::Vector3s out = Eigen::Vector3s(
+      static_cast<s_t>(outRaw.v[0]),
+      static_cast<s_t>(outRaw.v[1]),
+      static_cast<s_t>(outRaw.v[2]));
   Eigen::Vector3s expectedOut
       = capsuleTransform
         * (Eigen::Vector3s::UnitZ() * (capsule.height / 2 + capsule.radius));
@@ -4103,9 +4128,16 @@ TEST(DARTCollide, CAPSULE_CCD_SUPPORT_FN)
   // Straight out
 
   dir = Eigen::Vector3s::UnitX();
+  dirRaw.v[0] = static_cast<double>(dir(0));
+  dirRaw.v[1] = static_cast<double>(dir(1));
+  dirRaw.v[2] = static_cast<double>(dir(2));
 
   ccdSupportCapsule(&capsule, &dirRaw, &outRaw);
 
+  out = Eigen::Vector3s(
+      static_cast<s_t>(outRaw.v[0]),
+      static_cast<s_t>(outRaw.v[1]),
+      static_cast<s_t>(outRaw.v[2]));
   expectedOut = capsuleTransform * (Eigen::Vector3s::UnitX() * capsule.radius);
   if (!out.isApprox(expectedOut, 1e-7))
   {

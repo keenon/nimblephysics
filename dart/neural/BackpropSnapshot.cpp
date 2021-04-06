@@ -2606,10 +2606,14 @@ Eigen::MatrixXs BackpropSnapshot::finiteDifferenceRiddersPosVelJacobian(
   world->setCachedLCPSolution(mPreStepLCPCache);
   world->step(false);
 
+#ifdef DART_USE_ARBITRARY_PRECISION
+  s_t originalStepSize = 5e-6;
+#else
   s_t originalStepSize = 5e-3;
+#endif
   const s_t con = 1.4, con2 = (con * con);
   const s_t safeThreshold = 2.0;
-  const int tabSize = 10;
+  const int tabSize = 15;
 
   for (std::size_t i = 0; i < world->getNumDofs(); i++)
   {

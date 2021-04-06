@@ -1635,15 +1635,20 @@ void getDofAttributeIfItExists(
     const std::string& _jointName,
     std::size_t _index)
 {
-  double val;
-  if (_xmlElement->QueryDoubleAttribute(_attribute.c_str(), &val)
-      == tinyxml2::XML_WRONG_ATTRIBUTE_TYPE)
+  double val = 0;
+  tinyxml2::XMLError error = _xmlElement->QueryDoubleAttribute(_attribute.c_str(), &val);
+  if (error == tinyxml2::XML_WRONG_ATTRIBUTE_TYPE)
   {
     dterr << "[getDofAttributeIfItExists] Invalid type for [" << _attribute
           << "] attribute of [" << _element_type << "] element in the ["
           << _index << "] dof of Joint [" << _jointName << "].\n";
   }
-  *_value = static_cast<s_t>(val);
+  else if (error == tinyxml2::XML_NO_ATTRIBUTE) {
+    // do nothing
+  }
+  else {
+    *_value = static_cast<s_t>(val);
+  }
 }
 
 //==============================================================================

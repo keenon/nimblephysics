@@ -102,7 +102,7 @@ void MyWindow::spawnCube(
 
   dart::dynamics::FreeJoint::Properties joint;
   joint.mName = "cube_joint";
-  joint.mT_ParentBodyToJoint = Eigen::Translation3d(_position);
+  joint.mT_ParentBodyToJoint = Eigen::Translation3s(_position);
 
   auto pair
       = newCubeSkeleton->createJointAndBodyNodePair<dart::dynamics::FreeJoint>(

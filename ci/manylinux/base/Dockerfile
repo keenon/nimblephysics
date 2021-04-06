@@ -255,7 +255,7 @@ RUN pushd benchmark && \
 RUN rm -rf benchmark
 
 # Install MPFR - Arbirtatry precision floating point math
-RUN apt-get install -y libgmp3-dev
+RUN yum install -y gmp-devel
 RUN curl https://www.mpfr.org/mpfr-current/mpfr-4.1.0.tar.gz > mpfr-4.1.0.tar.gz && \
     tar -zxf mpfr-4.1.0.tar.gz && \
     pushd mpfr-4.1.0 && \
@@ -267,7 +267,7 @@ RUN curl https://www.mpfr.org/mpfr-current/mpfr-4.1.0.tar.gz > mpfr-4.1.0.tar.gz
     rm mpfr-4.1.0.tar.gz
 
 # Install MPIR - Arbirtatry precision integer math
-RUN apt-get install -y yasm m4
+RUN yum install -y yasm m4
 RUN curl http://mpir.org/mpir-3.0.0.tar.bz2 > mpir-3.0.0.tar.bz2 && \
     tar -xf mpir-3.0.0.tar.bz2 && \
     pushd mpir-3.0.0 && \
@@ -282,7 +282,7 @@ RUN curl http://mpir.org/mpir-3.0.0.tar.bz2 > mpir-3.0.0.tar.bz2 && \
 RUN wget https://github.com/advanpix/mpreal/archive/refs/tags/mpfrc++-3.6.8.tar.gz
 RUN tar -xzf mpfrc++-3.6.8.tar.gz && \
     pushd mpreal-mpfrc-3.6.8 && \
-    sudo cp mpreal.h /usr/include/ && \
+    cp mpreal.h /usr/include/ && \
     popd && \
     rm -rf mpreal-mpfrc-3.6.8 && \
     rm mpfrc++-3.6.8.tar.gz

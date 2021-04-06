@@ -87,7 +87,7 @@ void testBasicInterface(const std::shared_ptr<CollisionDetector>& cd)
   rayHit = result.mRayHits[0];
   EXPECT_TRUE(equals(rayHit.mPoint, Eigen::Vector3s(-1, 0, 0)));
   EXPECT_TRUE(equals(rayHit.mNormal, Eigen::Vector3s(-1, 0, 0)));
-  EXPECT_s_t_EQ(rayHit.mFraction, 0.25);
+  EXPECT_DOUBLE_EQ(rayHit.mFraction, 0.25);
 
   result.clear();
   simpleFrame1->setTranslation(Eigen::Vector3s(0.0, 0.0, 0.0));
@@ -103,7 +103,7 @@ void testBasicInterface(const std::shared_ptr<CollisionDetector>& cd)
   rayHit = result.mRayHits[0];
   EXPECT_TRUE(equals(rayHit.mPoint, Eigen::Vector3s(1, 0, 0)));
   EXPECT_TRUE(equals(rayHit.mNormal, Eigen::Vector3s(1, 0, 0)));
-  EXPECT_s_t_EQ(rayHit.mFraction, 0.25);
+  EXPECT_DOUBLE_EQ(rayHit.mFraction, 0.25);
 
   result.clear();
   simpleFrame1->setTranslation(Eigen::Vector3s(1.0, 0.0, 0.0));
@@ -118,20 +118,12 @@ void testBasicInterface(const std::shared_ptr<CollisionDetector>& cd)
   rayHit = result.mRayHits[0];
   EXPECT_TRUE(equals(rayHit.mPoint, Eigen::Vector3s(0, 0, 0)));
   EXPECT_TRUE(equals(rayHit.mNormal, Eigen::Vector3s(-1, 0, 0)));
-  EXPECT_s_t_EQ(rayHit.mFraction, 0.5);
+  EXPECT_DOUBLE_EQ(rayHit.mFraction, 0.5);
 }
 
 //==============================================================================
 TEST(Distance, testBasicInterface)
 {
-  auto fcl = FCLCollisionDetector::create();
-  testBasicInterface(fcl);
-
-#if HAVE_BULLET
-  auto bullet = BulletCollisionDetector::create();
-  testBasicInterface(bullet);
-#endif
-
   auto dart = DARTCollisionDetector::create();
   testBasicInterface(dart);
 }
@@ -214,14 +206,6 @@ void testOptions(const std::shared_ptr<CollisionDetector>& cd)
 //==============================================================================
 TEST(Distance, testOptions)
 {
-  auto fcl = FCLCollisionDetector::create();
-  testOptions(fcl);
-
-#if HAVE_BULLET
-  auto bullet = BulletCollisionDetector::create();
-  testOptions(bullet);
-#endif
-
   auto dart = DARTCollisionDetector::create();
   testOptions(dart);
 }

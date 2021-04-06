@@ -79,8 +79,8 @@ TEST(SdfParser, ParsingSDFFiles)
   // Create a list of sdf files to test with where the sdf files contains World
   std::vector<std::string> worldFiles;
   worldFiles.push_back("dart://sample/sdf/benchmark.world");
-  worldFiles.push_back("dart://sample/sdf/s_t_pendulum.world");
-  worldFiles.push_back("dart://sample/sdf/s_t_pendulum_with_base.world");
+  worldFiles.push_back("dart://sample/sdf/double_pendulum.world");
+  worldFiles.push_back("dart://sample/sdf/double_pendulum_with_base.world");
   worldFiles.push_back("dart://sample/sdf/empty.world");
   worldFiles.push_back("dart://sample/sdf/ground.world");
   worldFiles.push_back("dart://sample/sdf/test/single_bodynode_skeleton.world");

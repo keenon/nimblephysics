@@ -236,6 +236,9 @@ TEST(ATLAS, BROKEN_1)
 // failed verifyF_c() due to bugged getCoriolisAndGravityAndExternalForces()
 TEST(ATLAS, BROKEN_2)
 {
+  // set precision to 256 bits (double has only 53 bits)
+  mpfr::mpreal::set_default_prec(256);
+
   s_t target_x = 0.5;
   s_t target_y = 1.0;
   s_t target_z = -1.0;
@@ -330,6 +333,9 @@ TEST(ATLAS, BROKEN_2)
 // fails areResultsStandardized() for LCP
 TEST(ATLAS, BROKEN_3)
 {
+  // set precision to 256 bits (double has only 53 bits)
+  mpfr::mpreal::set_default_prec(256);
+
   s_t target_x = 0.5;
   s_t target_y = 1.0;
   s_t target_z = -1.0;
@@ -382,6 +388,7 @@ TEST(ATLAS, BROKEN_3)
   // EXPECT_TRUE(verifyAnalyticalJacobians(world));
   // EXPECT_TRUE(verifyVelGradients(world, brokenVel));
 
+  /*
   GUIWebsocketServer server;
   server.serve(8080);
   server.renderWorld(world);
@@ -389,7 +396,7 @@ TEST(ATLAS, BROKEN_3)
   Eigen::VectorXs animatePos = brokenPos;
   int i = 0;
   Ticker ticker(0.01);
-  ticker.registerTickListener([&](long /* time */) {
+  ticker.registerTickListener([&](long) {
     world->setPositions(animatePos);
     animatePos += brokenVel * 0.001;
 
@@ -412,17 +419,22 @@ TEST(ATLAS, BROKEN_3)
   std::shared_ptr<neural::BackpropSnapshot> snapshot
       = neural::forwardPass(world, true);
   EXPECT_TRUE(snapshot->areResultsStandardized());
+  */
 }
 #endif // TEST3
 
 #ifdef FULL_TEST
 TEST(ATLAS_EXAMPLE, FULL_TEST)
 {
+  // set precision to 256 bits (double has only 53 bits)
+  mpfr::mpreal::set_default_prec(256);
+
   s_t target_x = 0.5;
   s_t target_y = 1.0;
   s_t target_z = -1.0;
   std::shared_ptr<simulation::World> world
       = createWorld(target_x, target_y, target_z);
+  world->setSlowDebugResultsAgainstFD(true);
   std::shared_ptr<dynamics::Skeleton> atlas = world->getSkeleton(0);
 
   trajectory::LossFn loss([target_x, target_y, target_z](
@@ -504,7 +516,7 @@ TEST(ATLAS_EXAMPLE, FULL_TEST)
   trajectory::IPOptOptimizer optimizer;
   optimizer.setLBFGSHistoryLength(5);
   optimizer.setTolerance(1e-4);
-  optimizer.setCheckDerivatives(true);
+  // optimizer.setCheckDerivatives(true);
   optimizer.setIterationLimit(500);
   optimizer.registerIntermediateCallback([&](trajectory::Problem* problem,
                                              int /* step */,

@@ -558,16 +558,6 @@ void Skeleton(py::module& m)
             return self->checkIndexingConsistency();
           })
       .def(
-          "getIK",
-          +[](const dart::dynamics::Skeleton* self)
-              -> std::shared_ptr<const dart::dynamics::WholeBodyIK> {
-            return self->getIK();
-          })
-      .def(
-          "clearIK",
-          +[](dart::dynamics::Skeleton* self)
-              -> void { return self->clearIK(); })
-      .def(
           "getNumMarkers",
           +[](const dart::dynamics::Skeleton* self) -> std::size_t {
             return self->getNumMarkers();

@@ -30,6 +30,7 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "dart/math/MathTypes.hpp"
 #include "dart/math/Random.hpp"
 
 //==============================================================================
@@ -333,6 +334,16 @@ struct UniformImpl<
   static T run(T min, T max)
   {
     return UniformScalarImpl<T>::run(min, max);
+  }
+};
+
+template <>
+struct UniformImpl<mpfr::mpreal>
+{
+  static mpfr::mpreal run(mpfr::mpreal min, mpfr::mpreal max)
+  {
+    return static_cast<mpfr::mpreal>(UniformScalarImpl<double>::run(
+        static_cast<double>(min), static_cast<double>(max)));
   }
 };
 

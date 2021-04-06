@@ -179,7 +179,7 @@ TEST_P(CollisionGroupsTest, BodyNodeSubscription)
   // be no collisions.
   EXPECT_FALSE(group->collide());
 
-  Eigen::Isometry3s tf{Eigen::Translation3d(0.5, 0.0, 0.0)};
+  Eigen::Isometry3s tf{Eigen::Translation3s(0.5, 0.0, 0.0)};
   pair_1a.first->setTransform(tf);
   pair_1a.first->setName("1a");
   pair_1a.second->setName("1a");

@@ -82,7 +82,7 @@ int main(int argc, char* argv[])
       new dart::dynamics::BoxShape(Eigen::Vector3s(0.3, 0.3, 1.0)));
 
   joint.mName = "LHR";
-  joint.mT_ParentBodyToJoint = Eigen::Translation3d(0.0, 0.0, 0.5);
+  joint.mT_ParentBodyToJoint = Eigen::Translation3s(0.0, 0.0, 0.5);
 
   // You can get the specific type of Joint Pointer instead of just a basic
   // Joint pointer
@@ -107,7 +107,7 @@ int main(int argc, char* argv[])
 
   joint.mName = "LHP";
   joint.mAxis = Eigen::Vector3s(0.0, 1.0, 0.0);
-  joint.mT_ParentBodyToJoint = Eigen::Translation3d(0.0, 0.0, 1.0);
+  joint.mT_ParentBodyToJoint = Eigen::Translation3s(0.0, 0.0, 1.0);
 
   // Or you can completely ignore the return value of this function
   std::pair<dart::dynamics::RevoluteJoint*, dart::dynamics::BodyNode*> pair2

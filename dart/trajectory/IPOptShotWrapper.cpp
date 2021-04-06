@@ -135,12 +135,12 @@ bool IPOptShotWrapper::get_bounds_info(
   lowerBounds = lowerBoundsS.cast<double>();
 
   // Add inequality constraint functions
-  Eigen::VectorXs constraintUpperBoundsS(n);
+  Eigen::VectorXs constraintUpperBoundsS(m);
   mWrapped->getConstraintUpperBounds(constraintUpperBoundsS, perflog);
   Eigen::Map<Eigen::VectorXd> constraintUpperBounds(g_u, m);
   constraintUpperBounds = constraintUpperBoundsS.cast<double>();
 
-  Eigen::VectorXs constraintLowerBoundsS(n);
+  Eigen::VectorXs constraintLowerBoundsS(m);
   mWrapped->getConstraintLowerBounds(constraintLowerBoundsS, perflog);
   Eigen::Map<Eigen::VectorXd> constraintLowerBounds(g_l, m);
   constraintLowerBounds = constraintLowerBoundsS.cast<double>();

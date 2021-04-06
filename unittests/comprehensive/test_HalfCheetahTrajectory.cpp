@@ -73,6 +73,7 @@
 #include "GradientTestUtils.hpp"
 #include "TestHelpers.hpp"
 #include "TrajectoryTestUtils.hpp"
+#include "mpreal.h"
 #include "stdio.h"
 
 // #define ALL_TESTS
@@ -196,6 +197,9 @@ TEST(HALF_CHEETAH, CAPSULE_INTER_PENETRATION)
 #ifdef ALL_TESTS
 TEST(HALF_CHEETAH, POS_VEL_ERRORS)
 {
+  // set precision to 256 bits (double has only 53 bits)
+  mpfr::mpreal::set_default_prec(256);
+
   // Create a world
   std::shared_ptr<simulation::World> world
       = dart::utils::UniversalLoader::loadWorld(
@@ -239,13 +243,64 @@ TEST(HALF_CHEETAH, POS_VEL_ERRORS)
 #endif
 
 #ifdef ALL_TESTS
-TEST(HALF_CHEETAH, FULL_TEST)
+TEST(HALF_CHEETAH, POS_VEL_ERRORS_2)
 {
+  // set precision to 256 bits (double has only 53 bits)
+  mpfr::mpreal::set_default_prec(256);
+
   // Create a world
   std::shared_ptr<simulation::World> world
       = dart::utils::UniversalLoader::loadWorld(
           "dart://sample/skel/half_cheetah.skel");
-  world->setSlowDebugResultsAgainstFD(true);
+  // world->setSlowDebugResultsAgainstFD(true);
+  Eigen::VectorXs brokenPos = Eigen::VectorXs::Zero(9);
+  brokenPos << -0.0442559, -0.204541, -0.00676443, -0.0591177, -0.0841678,
+      -0.360202, -0.224704, -0.102217, -0.0377656;
+  Eigen::VectorXs brokenVel = Eigen::VectorXs::Zero(9);
+  brokenVel << -0.119657, -0.571126, -0.0161144, -0.257376, -0.0404545,
+      -0.431694, -0.418564, -0.279473, -0.24886;
+  Eigen::VectorXs brokenForce = Eigen::VectorXs::Zero(9);
+  brokenForce << -0, -0, -0.257804, -0.352182, -0.114889, -0.0418478, -0.261154,
+      -0.208821, -0.0516623;
+  Eigen::VectorXs brokenLCPCache = Eigen::VectorXs::Zero(0);
+  world->setPositions(brokenPos);
+  world->setVelocities(brokenVel);
+  world->setExternalForces(brokenForce);
+  world->setCachedLCPSolution(brokenLCPCache);
+
+  // world->step();
+  // world->setPositions(brokenPos);
+
+  // EXPECT_TRUE(verifyAnalyticalA_ubJacobian(world));
+  // EXPECT_TRUE(verifyAnalyticalJacobians(world));
+  // EXPECT_TRUE(verifyF_c(world));
+
+  /*
+  GUIWebsocketServer server;
+  server.serve(8070);
+  server.renderWorld(world);
+  server.blockWhileServing();
+  */
+
+  EXPECT_TRUE(verifyAnalyticalJacobians(world));
+  EXPECT_TRUE(verifyVelGradients(world, brokenVel));
+  EXPECT_TRUE(verifyPosVelJacobian(world, brokenVel));
+  EXPECT_TRUE(verifyF_c(world));
+  EXPECT_TRUE(verifyIdentityMapping(world));
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(HALF_CHEETAH, FULL_TEST)
+{
+  // set precision to 256 bits (double has only 53 bits)
+  mpfr::mpreal::set_default_prec(256);
+
+  // Create a world
+  std::shared_ptr<simulation::World> world
+      = dart::utils::UniversalLoader::loadWorld(
+          "dart://sample/skel/half_cheetah.skel");
+  // world->setSlowDebugResultsAgainstFD(true);
 
   for (auto* dof : world->getDofs())
   {
@@ -303,7 +358,7 @@ TEST(HALF_CHEETAH, FULL_TEST)
   trajectory::IPOptOptimizer optimizer;
   optimizer.setLBFGSHistoryLength(5);
   optimizer.setTolerance(1e-4);
-  optimizer.setCheckDerivatives(true);
+  // optimizer.setCheckDerivatives(true);
   optimizer.setIterationLimit(500);
   optimizer.registerIntermediateCallback([&](trajectory::Problem* problem,
                                              int /* step */,

@@ -52,11 +52,13 @@ typedef mpfr::mpreal s_t;
 typedef double s_t;
 using std::abs;
 using std::ceil;
+using std::cos;
 using std::floor;
 using std::isfinite;
 using std::isnan;
 using std::max;
 using std::pow;
+using std::sin;
 #endif
 
 //------------------------------------------------------------------------------
@@ -81,6 +83,7 @@ typedef Matrix<s_t, 5, 5> Matrix5s;
 typedef Matrix<s_t, 6, 6> Matrix6s;
 typedef Transform<s_t, 2, Isometry> Isometry2s;
 typedef Transform<s_t, 3, Isometry> Isometry3s;
+typedef Transform<s_t, 3, Affine> Affine3s;
 typedef Quaternion<s_t> Quaternion_s;
 typedef AngleAxis<s_t> AngleAxis_s;
 typedef Translation<s_t, 3> Translation3s;
