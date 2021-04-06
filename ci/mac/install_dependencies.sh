@@ -224,10 +224,10 @@ install_name_tool -id /usr/local/lib/liburdfdom_model.dylib /usr/local/lib/libur
 install_name_tool -id /usr/local/lib/liburdfdom_world.dylib /usr/local/lib/liburdfdom_world.dylib
 install_name_tool -id /usr/local/lib/libconsole_bridge.dylib /usr/local/lib/libconsole_bridge.dylib
 install_name_tool -id /usr/local/lib/libtinyxml2.8.dylib /usr/local/lib/libtinyxml2.8.dylib
-install_name_tool -id /usr/local/lib/liboctomap.1.8.dylib /usr/local/lib/liboctomap.1.8.dylib
-install_name_tool -id /usr/local/lib/liboctomath.1.8.dylib /usr/local/lib/liboctomath.1.8.dylib
+# install_name_tool -id /usr/local/lib/liboctomap.1.8.dylib /usr/local/lib/liboctomap.1.8.dylib
+# install_name_tool -id /usr/local/lib/liboctomath.1.8.dylib /usr/local/lib/liboctomath.1.8.dylib
 install_name_tool -id /usr/local/lib/libccd.2.dylib /usr/local/lib/libccd.2.dylib
-install_name_tool -id /usr/local/lib/libfcl.dylib /usr/local/lib/libfcl.dylib
+# install_name_tool -id /usr/local/lib/libfcl.dylib /usr/local/lib/libfcl.dylib
 install_name_tool -id /usr/local/lib/libassimp.5.dylib /usr/local/lib/libassimp.5.dylib
 # We're not installing Open Scene Graph, so these aren't necessary
 # install_name_tool -id /usr/local/lib/libosg.161.dylib /usr/local/lib/libosg.161.dylib
