@@ -32,7 +32,7 @@ class DartLayer(torch.autograd.Function):
 
         world.setPositions(pos.detach().numpy())
         world.setVelocities(vel.detach().numpy())
-        world.setForces(torque.detach().numpy())
+        world.setExternalForces(torque.detach().numpy())
         backprop_snapshot: dart.neural.BackpropSnapshot = dart.neural.forwardPass(world)
         ctx.backprop_snapshot = backprop_snapshot
         ctx.world = world
