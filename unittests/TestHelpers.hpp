@@ -89,9 +89,12 @@ bool equals(
   {
     for (size_t j = 0; j < n1; j++)
     {
+      /*
       if (isnan(_expected(i, j)) ^ isnan(_actual(i, j)))
         return false;
       else if (fabs(_expected(i, j)) > 1)
+      */
+      if (fabs(_expected(i, j)) > 1)
       {
         // Test relative error for values that are larger than 1
         if (fabs((_expected(i, j) - _actual(i, j)) / _expected(i, j)) > tol)

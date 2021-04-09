@@ -30,7 +30,6 @@ class TrajectoryRollout
 public:
   virtual ~TrajectoryRollout();
 
-  virtual const std::string& getRepresentationMapping() const = 0;
   virtual const std::vector<std::string>& getMappings() const = 0;
 
   virtual Eigen::Ref<Eigen::MatrixXs> getPoses(
@@ -100,7 +99,6 @@ public:
       const std::unordered_map<std::string, std::shared_ptr<neural::Mapping>>
           mappings,
       int steps,
-      std::string representationMapping,
       int massDim,
       const std::unordered_map<std::string, Eigen::MatrixXs> metadata);
 
@@ -112,14 +110,12 @@ public:
 
   /// Raw constructor
   TrajectoryRolloutReal(
-      std::string representationMapping,
       const std::unordered_map<std::string, Eigen::MatrixXs> pos,
       const std::unordered_map<std::string, Eigen::MatrixXs> vel,
       const std::unordered_map<std::string, Eigen::MatrixXs> force,
       const Eigen::VectorXs mass,
       const std::unordered_map<std::string, Eigen::MatrixXs> metadata);
 
-  const std::string& getRepresentationMapping() const override;
   const std::vector<std::string>& getMappings() const override;
   Eigen::Ref<Eigen::MatrixXs> getPoses(
       const std::string& mapping = "identity") override;
@@ -148,7 +144,6 @@ protected:
   std::unordered_map<std::string, Eigen::MatrixXs> mForces;
   Eigen::VectorXs mMasses;
   std::unordered_map<std::string, Eigen::MatrixXs> mMetadata;
-  std::string mRepresentationMapping;
   std::vector<std::string> mMappings;
 };
 
@@ -158,7 +153,6 @@ public:
   /// Slice constructor
   TrajectoryRolloutRef(TrajectoryRollout* toSlice, int start, int len);
 
-  const std::string& getRepresentationMapping() const override;
   const std::vector<std::string>& getMappings() const override;
   Eigen::Ref<Eigen::MatrixXs> getPoses(
       const std::string& mapping = "identity") override;
@@ -194,7 +188,6 @@ public:
   TrajectoryRolloutConstRef(
       const TrajectoryRollout* toSlice, int start, int len);
 
-  const std::string& getRepresentationMapping() const override;
   const std::vector<std::string>& getMappings() const override;
   Eigen::Ref<Eigen::MatrixXs> getPoses(
       const std::string& mapping = "identity") override;

@@ -121,7 +121,6 @@ TEST(TRAJECTORY, UNCONSTRAINED_BOX)
   // Verify using the IK mapping as the representation
   std::shared_ptr<IKMapping> ikMap = std::make_shared<IKMapping>(world);
   ikMap->addLinearBodyNode(boxBody);
-  EXPECT_TRUE(verifyChangeRepresentationToIK(world, 10, 5, ikMap, true, true));
   EXPECT_TRUE(verifySingleShot(world, 40, 1e-7, false, ikMap));
   EXPECT_TRUE(verifyShotJacobian(world, 40, ikMap));
   EXPECT_TRUE(verifyMultiShotJacobian(world, 8, 2, ikMap));
@@ -156,7 +155,6 @@ TEST(TRAJECTORY, REVOLUTE_JOINT)
   // Verify using the IK mapping as the representation
   std::shared_ptr<IKMapping> ikMap = std::make_shared<IKMapping>(world);
   ikMap->addAngularBodyNode(armPair.second);
-  EXPECT_TRUE(verifyChangeRepresentationToIK(world, 10, 5, ikMap, true, true));
   EXPECT_TRUE(verifySingleShot(world, 40, 1e-7, false, ikMap));
   EXPECT_TRUE(verifyShotJacobian(world, 40, ikMap));
   EXPECT_TRUE(verifyMultiShotJacobian(world, 8, 2, ikMap));
@@ -200,7 +198,6 @@ TEST(TRAJECTORY, TWO_LINK)
   std::shared_ptr<IKMapping> ikMap = std::make_shared<IKMapping>(world);
   ikMap->addSpatialBodyNode(armPair.second);
   ikMap->addSpatialBodyNode(elbowPair.second);
-  EXPECT_TRUE(verifyChangeRepresentationToIK(world, 10, 5, ikMap, true, true));
   EXPECT_TRUE(verifyShotJacobian(world, 40, ikMap));
   EXPECT_TRUE(verifyMultiShotJacobian(world, 8, 2, ikMap));
 }
@@ -240,7 +237,6 @@ TEST(TRAJECTORY, PRISMATIC)
   // Verify using the IK mapping as the representation
   std::shared_ptr<IKMapping> ikMap = std::make_shared<IKMapping>(world);
   ikMap->addSpatialBodyNode(sledPair.second);
-  EXPECT_TRUE(verifyChangeRepresentationToIK(world, 10, 5, ikMap, true, true));
   EXPECT_TRUE(verifyShotJacobian(world, 40, ikMap));
   EXPECT_TRUE(verifyMultiShotJacobian(world, 8, 2, ikMap));
 }
@@ -353,7 +349,6 @@ TEST(TRAJECTORY, CARTPOLE)
   std::shared_ptr<IKMapping> ikMap = std::make_shared<IKMapping>(world);
   ikMap->addSpatialBodyNode(sledPair.second);
   ikMap->addSpatialBodyNode(armPair.second);
-  EXPECT_TRUE(verifyChangeRepresentationToIK(world, 10, 5, ikMap, true, true));
   // EXPECT_TRUE(verifyShotJacobian(world, 40, ikMap));
   // EXPECT_TRUE(verifyMultiShotJacobian(world, 8, 2, ikMap));
   */

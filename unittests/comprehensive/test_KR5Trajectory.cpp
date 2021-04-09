@@ -364,7 +364,6 @@ TEST(KR5_EXAMPLE, FULL_TEST)
 
   std::shared_ptr<trajectory::MultiShot> trajectory
       = std::make_shared<trajectory::MultiShot>(world, lossObj, 300, 10, false);
-  trajectory->switchRepresentationMapping(world, "identity");
   trajectory->addMapping("ik", ikMapping);
   // trajectory->setParallelOperationsEnabled(false);
   // int flatProblemDim = trajectory->getFlatProblemDim(world);

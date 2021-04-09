@@ -123,7 +123,6 @@ bool verifySingleShot(
     if (mapping != nullptr)
     {
       shot.addMapping("custom", mapping);
-      shot.switchRepresentationMapping(world, "custom");
     }
 
     s_t threshold = 1e-8;
@@ -243,7 +242,6 @@ bool verifyShotJacobian(
   if (mapping != nullptr)
   {
     shot.addMapping("custom", mapping);
-    shot.switchRepresentationMapping(world, "custom");
     stateSize = mapping->getPosDim() + mapping->getVelDim();
   }
 
@@ -319,7 +317,6 @@ bool verifyMultiShotJacobian(
   if (mapping != nullptr)
   {
     shot.addMapping("custom", mapping);
-    shot.switchRepresentationMapping(world, "custom");
   }
 
   int dim = shot.getFlatProblemDim(world);
@@ -452,7 +449,6 @@ bool verifySparseJacobian(
   if (mapping != nullptr)
   {
     shot.addMapping("custom", mapping);
-    shot.switchRepresentationMapping(world, "custom");
   }
   return verifySparseJacobian(world, shot);
 }
@@ -550,146 +546,6 @@ bool verifyMultiShotJacobianCustomConstraint(
     }
     return false;
   }
-  return true;
-}
-
-bool verifyChangeRepresentationToIK(
-    WorldPtr world,
-    int steps,
-    int shotLength,
-    std::shared_ptr<IKMapping> newRepresentation,
-    bool shouldBeLosslessInto,
-    bool shouldBeLosslessOut)
-{
-  LossFn lossFn = LossFn();
-  MultiShot shot(world, lossFn, steps, shotLength, true);
-
-  // Get the initial state
-  TrajectoryRolloutReal initialIdentityRollout = TrajectoryRolloutReal(&shot);
-  shot.getStates(world, &initialIdentityRollout, nullptr, true);
-
-  shot.addMapping("custom", newRepresentation);
-  // Switch to a mapped state, and get the problem state
-  shot.switchRepresentationMapping(world, "custom");
-
-  TrajectoryRolloutReal mappedRollout = TrajectoryRolloutReal(&shot);
-  shot.getStates(world, &mappedRollout, nullptr, true);
-
-  // Go back to identity maps
-  shot.switchRepresentationMapping(world, "identity");
-
-  TrajectoryRolloutReal recoveredIdentityRollout = TrajectoryRolloutReal(&shot);
-  shot.getStates(world, &recoveredIdentityRollout, nullptr, true);
-
-  s_t threshold = 1e-8;
-
-  if (shouldBeLosslessInto)
-  {
-    for (int i = 0; i < steps; i++)
-    {
-      world->setPositions(initialIdentityRollout.getPoses("identity").col(i));
-      world->setVelocities(initialIdentityRollout.getVels("identity").col(i));
-      world->setExternalForces(
-          initialIdentityRollout.getForces("identity").col(i));
-
-      Eigen::VectorXs manualMappedPos = newRepresentation->getPositions(world);
-      Eigen::VectorXs manualMappedVel = newRepresentation->getVelocities(world);
-      Eigen::VectorXs manualMappedForce = newRepresentation->getForces(world);
-      Eigen::VectorXs mappedPos = mappedRollout.getPoses("custom").col(i);
-      Eigen::VectorXs mappedVel = mappedRollout.getVels("custom").col(i);
-      Eigen::VectorXs mappedForce = mappedRollout.getForces("custom").col(i);
-
-      if (!equals(mappedPos, manualMappedPos, threshold)
-          || !equals(mappedVel, manualMappedVel, threshold)
-          || !equals(mappedForce, manualMappedForce, threshold))
-      {
-        std::cout << "verifyChangeRepresentationToIK() failed to be lossloss "
-                     "in the into mapping "
-                     "when shouldBeLosslessInto=true"
-                  << std::endl;
-        return false;
-      }
-    }
-  }
-
-  if (shouldBeLosslessOut)
-  {
-    for (int i = 0; i < steps; i++)
-    {
-      Eigen::VectorXs mappedPos = mappedRollout.getPoses("custom").col(i);
-      Eigen::VectorXs mappedVel = mappedRollout.getVels("custom").col(i);
-      Eigen::VectorXs mappedForce = mappedRollout.getForces("custom").col(i);
-      newRepresentation->setPositions(world, mappedPos);
-      newRepresentation->setVelocities(world, mappedVel);
-      newRepresentation->setForces(world, mappedForce);
-
-      Eigen::VectorXs recoveredPos
-          = recoveredIdentityRollout.getPoses("identity").col(i);
-      Eigen::VectorXs recoveredVel
-          = recoveredIdentityRollout.getVels("identity").col(i);
-      Eigen::VectorXs recoveredForce
-          = recoveredIdentityRollout.getForces("identity").col(i);
-      Eigen::VectorXs manualRecoveredPos = world->getPositions();
-      Eigen::VectorXs manualRecoveredVel = world->getVelocities();
-      Eigen::VectorXs manualRecoveredForce = world->getExternalForces();
-
-      if (!equals(recoveredPos, manualRecoveredPos, threshold)
-          || !equals(recoveredVel, manualRecoveredVel, threshold)
-          || !equals(recoveredForce, manualRecoveredForce, threshold))
-      {
-        std::cout << "verifyChangeRepresentationToIK() failed to be lossloss "
-                     "in the out mapping "
-                     "when shouldBeLosslessOut=true"
-                  << std::endl;
-        std::cout << "Step " << i << ":" << std::endl;
-        if (!equals(recoveredPos, manualRecoveredPos, threshold))
-        {
-          std::cout << "Recovered pos:" << std::endl
-                    << recoveredPos << std::endl;
-          std::cout << "Manually recovered pos:" << std::endl
-                    << manualRecoveredPos << std::endl;
-        }
-        if (!equals(recoveredVel, manualRecoveredVel, threshold))
-        {
-          std::cout << "Recovered vel:" << std::endl
-                    << recoveredVel << std::endl;
-          std::cout << "Manually recovered vel:" << std::endl
-                    << manualRecoveredVel << std::endl;
-        }
-        if (!equals(recoveredForce, manualRecoveredForce, threshold))
-        {
-          std::cout << "Recovered force:" << std::endl
-                    << recoveredForce << std::endl;
-          std::cout << "Manually recovered force:" << std::endl
-                    << manualRecoveredForce << std::endl;
-        }
-        return false;
-      }
-    }
-  }
-
-  if (shouldBeLosslessInto && shouldBeLosslessOut)
-  {
-    if (!equals(
-            initialIdentityRollout.getPoses("identity"),
-            recoveredIdentityRollout.getPoses("identity"),
-            threshold)
-        || !equals(
-            initialIdentityRollout.getVels("identity"),
-            recoveredIdentityRollout.getVels("identity"),
-            threshold)
-        || !equals(
-            initialIdentityRollout.getForces("identity"),
-            recoveredIdentityRollout.getForces("identity"),
-            threshold))
-    {
-      std::cout << "verifyChangeRepresentationToIK() failed to be lossloss "
-                   "when shouldBeLosslessInto=true and shouldBeLosslessOut=true"
-                << std::endl;
-      return false;
-    }
-  }
-
   return true;
 }
 

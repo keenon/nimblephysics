@@ -118,10 +118,6 @@ void MappedBackpropSnapshot(py::module& m)
       .def(
           "getPostStepVelocity",
           &dart::neural::MappedBackpropSnapshot::getPostStepVelocity,
-          ::py::arg("mapping"))
-      .def(
-          "getPostStepTorques",
-          &dart::neural::MappedBackpropSnapshot::getPostStepTorques,
           ::py::arg("mapping"));
 }
 

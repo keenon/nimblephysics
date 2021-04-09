@@ -3632,22 +3632,6 @@ Eigen::MatrixXs getTestComponentMappingIntoJac(
   throw std::runtime_error{"Execution should never reach this point"};
 }
 
-Eigen::MatrixXs getTestComponentMappingOutJac(
-    std::shared_ptr<Mapping> mapping,
-    WorldPtr world,
-    MappingTestComponent component)
-{
-  if (component == MappingTestComponent::POSITION)
-    return mapping->getMappedPosToRealPosJac(world);
-  else if (component == MappingTestComponent::VELOCITY)
-    return mapping->getMappedVelToRealVelJac(world);
-  else if (component == MappingTestComponent::FORCE)
-    return mapping->getMappedForceToRealForceJac(world);
-  else
-    assert(false && "Unrecognized component value in getTestComponent()");
-  throw std::runtime_error{"Execution should never reach this point"};
-}
-
 void setTestComponentMapping(
     std::shared_ptr<Mapping> mapping,
     WorldPtr world,
@@ -3780,66 +3764,6 @@ bool verifyMappingIntoJacobian(
   return true;
 }
 
-bool verifyMappingOutJacobian(
-    WorldPtr world,
-    std::shared_ptr<Mapping> mapping,
-    MappingTestComponent component)
-{
-  RestorableSnapshot snapshot(world);
-
-  int mappedDim = getTestComponentMappingDim(mapping, world, component);
-
-  // If we have tiny singular values, then this matrix won't perfectly invert,
-  // and we can skip this test.
-  Eigen::MatrixXs analyticalInto
-      = getTestComponentMappingIntoJac(mapping, world, component, component);
-  if (math::hasTinySingularValues(analyticalInto))
-    return true;
-
-  Eigen::MatrixXs analytical
-      = getTestComponentMappingOutJac(mapping, world, component);
-  Eigen::MatrixXs bruteForce
-      = Eigen::MatrixXs::Zero(world->getNumDofs(), mappedDim);
-
-  Eigen::VectorXs originalWorld = getTestComponentWorld(world, component);
-  Eigen::VectorXs originalMapped
-      = getTestComponentMapping(mapping, world, component);
-
-  const s_t EPS = 1e-5;
-  for (int i = 0; i < mappedDim; i++)
-  {
-    Eigen::VectorXs perturbedMapped = originalMapped;
-    perturbedMapped(i) += EPS;
-    setTestComponentMapping(mapping, world, component, perturbedMapped);
-    Eigen::VectorXs perturbedWorldPos = getTestComponentWorld(world, component);
-
-    perturbedMapped = originalMapped;
-    perturbedMapped(i) -= EPS;
-    setTestComponentMapping(mapping, world, component, perturbedMapped);
-    Eigen::VectorXs perturbedWorldNeg = getTestComponentWorld(world, component);
-
-    bruteForce.col(i) = (perturbedWorldPos - perturbedWorldNeg) / (2 * EPS);
-  }
-
-  // Out Jac brute-forcing is pretty innacurate, cause it relies on repeated
-  // IK with tiny differences, so we allow a larger tolerance here
-
-  if (!equals(bruteForce, analytical, 4e-6))
-  {
-    std::cout << "Got a bad Out Jac for " << getComponentName(component) << "!"
-              << std::endl;
-    std::cout << "Analytical: " << std::endl << analytical << std::endl;
-    std::cout << "Brute Force: " << std::endl << bruteForce << std::endl;
-    std::cout << "Diff (" << (analytical - bruteForce).minCoeff() << " to "
-              << (analytical - bruteForce).maxCoeff()
-              << "): " << (analytical - bruteForce) << std::endl;
-    return false;
-  }
-
-  snapshot.restore();
-  return true;
-}
-
 Eigen::MatrixXs getTimestepJacobian(
     WorldPtr world,
     std::shared_ptr<MappedBackpropSnapshot> snapshot,
@@ -3849,36 +3773,31 @@ Eigen::MatrixXs getTimestepJacobian(
   if (inComponent == MappingTestComponent::POSITION
       && outComponent == MappingTestComponent::POSITION)
   {
-    return snapshot->getPosPosJacobian(
-        world, snapshot->getRepresentation(), snapshot->getRepresentation());
+    return snapshot->getPosPosJacobian(world);
   }
   else if (
       inComponent == MappingTestComponent::POSITION
       && outComponent == MappingTestComponent::VELOCITY)
   {
-    return snapshot->getPosVelJacobian(
-        world, snapshot->getRepresentation(), snapshot->getRepresentation());
+    return snapshot->getPosVelJacobian(world);
   }
   else if (
       inComponent == MappingTestComponent::VELOCITY
       && outComponent == MappingTestComponent::POSITION)
   {
-    return snapshot->getVelPosJacobian(
-        world, snapshot->getRepresentation(), snapshot->getRepresentation());
+    return snapshot->getVelPosJacobian(world);
   }
   else if (
       inComponent == MappingTestComponent::VELOCITY
       && outComponent == MappingTestComponent::VELOCITY)
   {
-    return snapshot->getVelVelJacobian(
-        world, snapshot->getRepresentation(), snapshot->getRepresentation());
+    return snapshot->getVelVelJacobian(world);
   }
   else if (
       inComponent == MappingTestComponent::FORCE
       && outComponent == MappingTestComponent::VELOCITY)
   {
-    return snapshot->getForceVelJacobian(
-        world, snapshot->getRepresentation(), snapshot->getRepresentation());
+    return snapshot->getForceVelJacobian(world);
   }
   assert(false && "Unsupported combination of inComponent and outComponent in getTimestepJacobian()!");
   throw std::runtime_error{"Execution should never reach this point"};
@@ -3902,7 +3821,7 @@ bool verifyMappedStepJacobian(
   std::unordered_map<std::string, std::shared_ptr<Mapping>> mappings;
   mappings["identity"] = mapping;
   std::shared_ptr<MappedBackpropSnapshot> mappedSnapshot
-      = neural::mappedForwardPass(world, "identity", mappings, true);
+      = neural::mappedForwardPass(world, mappings, true);
 
   Eigen::MatrixXs analytical
       = getTimestepJacobian(world, mappedSnapshot, inComponent, outComponent);
@@ -3953,9 +3872,6 @@ bool verifyMappedStepJacobian(
 
     // Check the components of the analytical Jacobian are correct too
     snapshot.restore();
-    Eigen::MatrixXs outMap
-        = getTestComponentMappingOutJac(mapping, world, inComponent);
-    verifyMappingOutJacobian(world, mapping, inComponent);
     world->step();
     verifyMappingIntoJacobian(
         world, mapping, outComponent, MappingTestComponent::POSITION);
@@ -4001,12 +3917,6 @@ bool verifyMapping(WorldPtr world, std::shared_ptr<Mapping> mapping)
              mapping,
              MappingTestComponent::FORCE,
              MappingTestComponent::FORCE)
-         && verifyMappingOutJacobian(
-             world, mapping, MappingTestComponent::POSITION)
-         && verifyMappingOutJacobian(
-             world, mapping, MappingTestComponent::VELOCITY)
-         && verifyMappingOutJacobian(
-             world, mapping, MappingTestComponent::FORCE)
          && verifyMappedStepJacobian(
              world,
              mapping,
@@ -4072,7 +3982,7 @@ bool verifySpatialIKMapping(WorldPtr world)
   srand(42);
 
   // Shuffle the elements
-  std::random_shuffle(bodyNodes.begin(), bodyNodes.end());
+  // std::random_shuffle(bodyNodes.begin(), bodyNodes.end());
 
   std::shared_ptr<IKMapping> mapping = std::make_shared<IKMapping>(world);
   for (dynamics::BodyNode* node : bodyNodes)

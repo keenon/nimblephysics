@@ -124,7 +124,6 @@ std::string TrajectoryRollout::toJson(
 /// This writes us out to a protobuf
 void TrajectoryRollout::serialize(proto::TrajectoryRollout& proto) const
 {
-  proto.set_representationmapping(getRepresentationMapping());
   for (const std::string& mapping : getMappings())
   {
     proto::serializeMatrix(
@@ -147,7 +146,6 @@ void TrajectoryRollout::serialize(proto::TrajectoryRollout& proto) const
 TrajectoryRolloutReal TrajectoryRollout::deserialize(
     const proto::TrajectoryRollout& proto)
 {
-  std::string representationMapping = proto.representationmapping();
   std::unordered_map<std::string, Eigen::MatrixXs> pos;
   for (auto pair : proto.pos())
   {
@@ -170,8 +168,8 @@ TrajectoryRolloutReal TrajectoryRollout::deserialize(
     metadata[pair.first] = proto::deserializeMatrix(pair.second);
   }
 
-  TrajectoryRolloutReal recovered = TrajectoryRolloutReal(
-      representationMapping, pos, vel, force, mass, metadata);
+  TrajectoryRolloutReal recovered
+      = TrajectoryRolloutReal(pos, vel, force, mass, metadata);
   return recovered;
 }
 
@@ -213,7 +211,7 @@ TrajectoryRolloutReal TrajectoryRollout::fromForces(
   Eigen::VectorXs mass = world->getMasses();
   std::unordered_map<std::string, Eigen::MatrixXs> metadata;
 
-  return TrajectoryRolloutReal("identity", pos, vel, force, mass, metadata);
+  return TrajectoryRolloutReal(pos, vel, force, mass, metadata);
 }
 
 //==============================================================================
@@ -242,7 +240,7 @@ TrajectoryRolloutReal TrajectoryRollout::fromPoses(
   Eigen::VectorXs mass = world->getMasses();
   std::unordered_map<std::string, Eigen::MatrixXs> metadata;
 
-  return TrajectoryRolloutReal("identity", pos, vel, force, mass, metadata);
+  return TrajectoryRolloutReal(pos, vel, force, mass, metadata);
 }
 
 //==============================================================================
@@ -250,12 +248,10 @@ TrajectoryRolloutReal::TrajectoryRolloutReal(
     const std::unordered_map<std::string, std::shared_ptr<neural::Mapping>>
         mappings,
     int steps,
-    std::string representationMapping,
     int massDim,
     const std::unordered_map<std::string, Eigen::MatrixXs> metadata)
   : mMetadata(metadata)
 {
-  mRepresentationMapping = representationMapping;
   for (auto pair : mappings)
   {
     mPoses[pair.first] = Eigen::MatrixXs::Zero(pair.second->getPosDim(), steps);
@@ -272,7 +268,6 @@ TrajectoryRolloutReal::TrajectoryRolloutReal(Problem* shot)
   : TrajectoryRolloutReal(
       shot->getMappings(),
       shot->getNumSteps(),
-      shot->getRepresentationName(),
       shot->getMassDims(),
       shot->getMetadataMap())
 {
@@ -281,13 +276,12 @@ TrajectoryRolloutReal::TrajectoryRolloutReal(Problem* shot)
 //==============================================================================
 /// Raw constructor
 TrajectoryRolloutReal::TrajectoryRolloutReal(
-    std::string representationMapping,
     const std::unordered_map<std::string, Eigen::MatrixXs> pos,
     const std::unordered_map<std::string, Eigen::MatrixXs> vel,
     const std::unordered_map<std::string, Eigen::MatrixXs> force,
     const Eigen::VectorXs mass,
     const std::unordered_map<std::string, Eigen::MatrixXs> metadata)
-  : mMasses(mass), mRepresentationMapping(representationMapping)
+  : mMasses(mass)
 {
   for (auto pair : pos)
   {
@@ -306,12 +300,6 @@ TrajectoryRolloutReal::TrajectoryRolloutReal(
 }
 
 //==============================================================================
-const std::string& TrajectoryRolloutReal::getRepresentationMapping() const
-{
-  return mRepresentationMapping;
-}
-
-//==============================================================================
 const std::vector<std::string>& TrajectoryRolloutReal::getMappings() const
 {
   return mMappings;
@@ -321,7 +309,6 @@ const std::vector<std::string>& TrajectoryRolloutReal::getMappings() const
 /// Deep copy constructor
 TrajectoryRolloutReal::TrajectoryRolloutReal(const TrajectoryRollout* copy)
 {
-  mRepresentationMapping = copy->getRepresentationMapping();
   mMappings = copy->getMappings();
   for (std::string key : copy->getMappings())
   {
@@ -427,12 +414,6 @@ TrajectoryRolloutRef::TrajectoryRolloutRef(
 }
 
 //==============================================================================
-const std::string& TrajectoryRolloutRef::getRepresentationMapping() const
-{
-  return mToSlice->getRepresentationMapping();
-}
-
-//==============================================================================
 const std::vector<std::string>& TrajectoryRolloutRef::getMappings() const
 {
   return mToSlice->getMappings();
@@ -525,12 +506,6 @@ TrajectoryRolloutConstRef::TrajectoryRolloutConstRef(
     const TrajectoryRollout* toSlice, int start, int len)
   : mToSlice(toSlice), mStart(start), mLen(len)
 {
-}
-
-//==============================================================================
-const std::string& TrajectoryRolloutConstRef::getRepresentationMapping() const
-{
-  return mToSlice->getRepresentationMapping();
 }
 
 //==============================================================================

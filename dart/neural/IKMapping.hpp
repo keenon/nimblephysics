@@ -86,11 +86,6 @@ public:
       std::shared_ptr<simulation::World> world,
       /* OUT */ Eigen::Ref<Eigen::VectorXs> masses) override;
 
-  /// This gets a Jacobian relating the changes in the outer positions (the
-  /// "mapped" positions) to inner positions (the "real" positions)
-  Eigen::MatrixXs getMappedPosToRealPosJac(
-      std::shared_ptr<simulation::World> world) override;
-
   /// This gets a Jacobian relating the changes in the inner positions (the
   /// "real" positions) to the corresponding outer positions (the "mapped"
   /// positions)
@@ -101,11 +96,6 @@ public:
   /// "real" velocities) to the corresponding outer positions (the "mapped"
   /// positions)
   Eigen::MatrixXs getRealVelToMappedPosJac(
-      std::shared_ptr<simulation::World> world) override;
-
-  /// This gets a Jacobian relating the changes in the outer velocity (the
-  /// "mapped" velocity) to inner velocity (the "real" velocity)
-  Eigen::MatrixXs getMappedVelToRealVelJac(
       std::shared_ptr<simulation::World> world) override;
 
   /// This gets a Jacobian relating the changes in the inner velocity (the
@@ -120,20 +110,10 @@ public:
   Eigen::MatrixXs getRealPosToMappedVelJac(
       std::shared_ptr<simulation::World> world) override;
 
-  /// This gets a Jacobian relating the changes in the outer force (the
-  /// "mapped" force) to inner force (the "real" force)
-  Eigen::MatrixXs getMappedForceToRealForceJac(
-      std::shared_ptr<simulation::World> world) override;
-
   /// This gets a Jacobian relating the changes in the inner force (the
   /// "real" force) to the corresponding outer force (the "mapped"
   /// force)
   Eigen::MatrixXs getRealForceToMappedForceJac(
-      std::shared_ptr<simulation::World> world) override;
-
-  /// This gets a Jacobian relating the changes in the outer mass (the
-  /// "mapped" mass) to inner mass (the "real" mass)
-  Eigen::MatrixXs getMappedMassToRealMassJac(
       std::shared_ptr<simulation::World> world) override;
 
   /// This gets a Jacobian relating the changes in the inner mass (the

@@ -19,12 +19,10 @@ namespace neural {
 //==============================================================================
 MappedBackpropSnapshot::MappedBackpropSnapshot(
     std::shared_ptr<BackpropSnapshot> backpropSnapshot,
-    std::string representation,
     std::unordered_map<std::string, std::shared_ptr<Mapping>> mappings,
     std::unordered_map<std::string, PreStepMapping> preStepMappings,
     std::unordered_map<std::string, PostStepMapping> postStepMappings)
   : mBackpropSnapshot(backpropSnapshot),
-    mRepresentation(representation),
     mMappings(mappings),
     mPreStepMappings(preStepMappings),
     mPostStepMappings(postStepMappings)
@@ -40,138 +38,154 @@ const std::vector<std::string>& MappedBackpropSnapshot::getMappings()
 }
 
 //==============================================================================
-const std::string& MappedBackpropSnapshot::getRepresentation()
+const Eigen::MatrixXs& MappedBackpropSnapshot::getPosPosJacobian(
+    std::shared_ptr<simulation::World> world, PerformanceLog* perfLog)
 {
-  return mRepresentation;
+  return mBackpropSnapshot->getPosPosJacobian(world, perfLog);
 }
 
 //==============================================================================
-Eigen::MatrixXs MappedBackpropSnapshot::getPosPosJacobian(
+const Eigen::MatrixXs& MappedBackpropSnapshot::getPosVelJacobian(
+    std::shared_ptr<simulation::World> world, PerformanceLog* perfLog)
+{
+  return mBackpropSnapshot->getPosVelJacobian(world, perfLog);
+}
+
+//==============================================================================
+const Eigen::MatrixXs& MappedBackpropSnapshot::getVelPosJacobian(
+    std::shared_ptr<simulation::World> world, PerformanceLog* perfLog)
+{
+  return mBackpropSnapshot->getVelPosJacobian(world, perfLog);
+}
+
+//==============================================================================
+const Eigen::MatrixXs& MappedBackpropSnapshot::getVelVelJacobian(
+    std::shared_ptr<simulation::World> world, PerformanceLog* perfLog)
+{
+  return mBackpropSnapshot->getVelVelJacobian(world, perfLog);
+}
+
+//==============================================================================
+const Eigen::MatrixXs& MappedBackpropSnapshot::getForceVelJacobian(
+    std::shared_ptr<simulation::World> world, PerformanceLog* perfLog)
+{
+  return mBackpropSnapshot->getForceVelJacobian(world, perfLog);
+}
+
+//==============================================================================
+const Eigen::MatrixXs& MappedBackpropSnapshot::getMassVelJacobian(
+    std::shared_ptr<simulation::World> world, PerformanceLog* perfLog)
+{
+  return mBackpropSnapshot->getMassVelJacobian(world, perfLog);
+}
+
+//==============================================================================
+Eigen::MatrixXs MappedBackpropSnapshot::getPosMappedPosJacobian(
     std::shared_ptr<simulation::World> world,
-    const std::string& mapBefore,
     const std::string& mapAfter,
     PerformanceLog* perfLog)
 {
   Eigen::MatrixXs jac
       = mPostStepMappings[mapAfter].posInJacWrtPos
             * mBackpropSnapshot->getPosPosJacobian(world, perfLog)
-            * mPreStepMappings[mapBefore].posOutJac
         + mPostStepMappings[mapAfter].posInJacWrtVel
-              * mBackpropSnapshot->getPosVelJacobian(world, perfLog)
-              * mPreStepMappings[mapBefore].posOutJac;
+              * mBackpropSnapshot->getPosVelJacobian(world, perfLog);
   if (world->getSlowDebugResultsAgainstFD())
   {
-    Eigen::MatrixXs fd
-        = finiteDifferencePosPosJacobian(world, mapBefore, mapAfter, 1);
-    mBackpropSnapshot->equalsOrCrash(world, jac, fd, "Mapped pos-pos");
+    Eigen::MatrixXs fd = finiteDifferencePosPosJacobian(world, mapAfter, 1);
+    mBackpropSnapshot->equalsOrCrash(world, jac, fd, "pos->mapped pos");
   }
   return jac;
 }
 
 //==============================================================================
-Eigen::MatrixXs MappedBackpropSnapshot::getPosVelJacobian(
+Eigen::MatrixXs MappedBackpropSnapshot::getPosMappedVelJacobian(
     std::shared_ptr<simulation::World> world,
-    const std::string& mapBefore,
     const std::string& mapAfter,
     PerformanceLog* perfLog)
 {
   Eigen::MatrixXs jac
-      = mPostStepMappings[mapAfter].velInJacWrtVel
-            * mBackpropSnapshot->getPosVelJacobian(world, perfLog)
-            * mPreStepMappings[mapBefore].posOutJac
-        + mPostStepMappings[mapAfter].velInJacWrtPos
-              * mBackpropSnapshot->getPosPosJacobian(world, perfLog)
-              * mPreStepMappings[mapBefore].posOutJac;
+      = mPostStepMappings[mapAfter].velInJacWrtPos
+            * mBackpropSnapshot->getPosPosJacobian(world, perfLog)
+        + mPostStepMappings[mapAfter].velInJacWrtVel
+              * mBackpropSnapshot->getPosVelJacobian(world, perfLog);
   if (world->getSlowDebugResultsAgainstFD())
   {
-    Eigen::MatrixXs fd
-        = finiteDifferencePosVelJacobian(world, mapBefore, mapAfter);
-    mBackpropSnapshot->equalsOrCrash(world, jac, fd, "Mapped pos-vel");
+    Eigen::MatrixXs fd = finiteDifferencePosVelJacobian(world, mapAfter, 1);
+    mBackpropSnapshot->equalsOrCrash(world, jac, fd, "pos->mapped vel");
   }
   return jac;
 }
 
 //==============================================================================
-Eigen::MatrixXs MappedBackpropSnapshot::getVelPosJacobian(
+Eigen::MatrixXs MappedBackpropSnapshot::getVelMappedPosJacobian(
     std::shared_ptr<simulation::World> world,
-    const std::string& mapBefore,
     const std::string& mapAfter,
     PerformanceLog* perfLog)
 {
   Eigen::MatrixXs jac
       = mPostStepMappings[mapAfter].posInJacWrtPos
             * mBackpropSnapshot->getVelPosJacobian(world, perfLog)
-            * mPreStepMappings[mapBefore].velOutJac
         + mPostStepMappings[mapAfter].posInJacWrtVel
-              * mBackpropSnapshot->getVelVelJacobian(world, perfLog)
-              * mPreStepMappings[mapBefore].velOutJac;
+              * mBackpropSnapshot->getVelVelJacobian(world, perfLog);
   if (world->getSlowDebugResultsAgainstFD())
   {
-    Eigen::MatrixXs fd
-        = finiteDifferenceVelPosJacobian(world, mapBefore, mapAfter, 1);
-    mBackpropSnapshot->equalsOrCrash(world, jac, fd, "Mapped vel-pos");
+    Eigen::MatrixXs fd = finiteDifferenceVelPosJacobian(world, mapAfter, 1);
+    mBackpropSnapshot->equalsOrCrash(world, jac, fd, "vel->mapped pos");
   }
   return jac;
 }
 
 //==============================================================================
-Eigen::MatrixXs MappedBackpropSnapshot::getVelVelJacobian(
+Eigen::MatrixXs MappedBackpropSnapshot::getVelMappedVelJacobian(
     std::shared_ptr<simulation::World> world,
-    const std::string& mapBefore,
+    const std::string& mapAfter,
+    PerformanceLog* perfLog)
+{
+  Eigen::MatrixXs jac
+      = mPostStepMappings[mapAfter].velInJacWrtPos
+            * mBackpropSnapshot->getVelPosJacobian(world, perfLog)
+        + mPostStepMappings[mapAfter].velInJacWrtVel
+              * mBackpropSnapshot->getVelVelJacobian(world, perfLog);
+  if (world->getSlowDebugResultsAgainstFD())
+  {
+    Eigen::MatrixXs fd = finiteDifferenceVelVelJacobian(world, mapAfter, 1);
+    mBackpropSnapshot->equalsOrCrash(world, jac, fd, "vel->mapped vel");
+  }
+  return jac;
+}
+
+//==============================================================================
+Eigen::MatrixXs MappedBackpropSnapshot::getForceMappedVelJacobian(
+    std::shared_ptr<simulation::World> world,
     const std::string& mapAfter,
     PerformanceLog* perfLog)
 {
   Eigen::MatrixXs jac
       = mPostStepMappings[mapAfter].velInJacWrtVel
-            * mBackpropSnapshot->getVelVelJacobian(world, perfLog)
-            * mPreStepMappings[mapBefore].velOutJac
-        + mPostStepMappings[mapAfter].velInJacWrtPos
-              * mBackpropSnapshot->getVelPosJacobian(world, perfLog)
-              * mPreStepMappings[mapBefore].velOutJac;
+        * mBackpropSnapshot->getForceVelJacobian(world, perfLog);
   if (world->getSlowDebugResultsAgainstFD())
   {
-    Eigen::MatrixXs fd
-        = finiteDifferenceVelVelJacobian(world, mapBefore, mapAfter);
-    mBackpropSnapshot->equalsOrCrash(world, jac, fd, "Mapped vel-vel");
+    Eigen::MatrixXs fd = finiteDifferenceForceVelJacobian(world, mapAfter, 1);
+    mBackpropSnapshot->equalsOrCrash(world, jac, fd, "force->mapped vel");
   }
   return jac;
 }
 
 //==============================================================================
-Eigen::MatrixXs MappedBackpropSnapshot::getForceVelJacobian(
+Eigen::MatrixXs MappedBackpropSnapshot::getMassMappedVelJacobian(
     std::shared_ptr<simulation::World> world,
-    const std::string& mapBefore,
     const std::string& mapAfter,
     PerformanceLog* perfLog)
 {
   Eigen::MatrixXs jac = mPostStepMappings[mapAfter].velInJacWrtVel
-                        * mBackpropSnapshot->getForceVelJacobian(world, perfLog)
-                        * mPreStepMappings[mapBefore].forceOutJac;
+                        * mBackpropSnapshot->getMassVelJacobian(world, perfLog);
   if (world->getSlowDebugResultsAgainstFD())
   {
-    Eigen::MatrixXs fd
-        = finiteDifferenceForceVelJacobian(world, mapBefore, mapAfter);
-    mBackpropSnapshot->equalsOrCrash(world, jac, fd, "Mapped force-vel");
+    Eigen::MatrixXs fd = finiteDifferenceForceVelJacobian(world, mapAfter, 1);
+    mBackpropSnapshot->equalsOrCrash(world, jac, fd, "mass->mapped vel");
   }
   return jac;
-}
-
-//==============================================================================
-Eigen::MatrixXs MappedBackpropSnapshot::getMassVelJacobian(
-    std::shared_ptr<simulation::World> world,
-    const std::string& /* mapBefore */,
-    const std::string& mapAfter,
-    PerformanceLog* /* perfLog */)
-{
-  // No pre-step mapping necessary, because mass doesn't support mappings
-  int massDim = world->getMassDims();
-  if (massDim == 0)
-  {
-    int velDim = mPostStepMappings[mapAfter].velInJacWrtVel.rows();
-    return Eigen::MatrixXs::Zero(velDim, 0);
-  }
-  return mPostStepMappings[mapAfter].velInJacWrtVel
-         * mBackpropSnapshot->getMassVelJacobian(world);
 }
 
 //==============================================================================
@@ -256,26 +270,12 @@ void MappedBackpropSnapshot::backprop(
           + mPostStepMappings[pair.first].velInJacWrtVel.transpose()
                 * pair.second.lossWrtVelocity;
   }
-  LossGradient thisTimestepRealLoss;
   mBackpropSnapshot->backprop(
       world,
-      thisTimestepRealLoss,
+      thisTimestepLoss,
       nextTimestepRealLoss,
       thisLog,
       exploreAlternateStrategies);
-
-  thisTimestepLoss.lossWrtPosition
-      = mPreStepMappings[mRepresentation].posOutJac.transpose()
-        * thisTimestepRealLoss.lossWrtPosition;
-  thisTimestepLoss.lossWrtVelocity
-      = mPreStepMappings[mRepresentation].velOutJac.transpose()
-        * thisTimestepRealLoss.lossWrtVelocity;
-  thisTimestepLoss.lossWrtTorque
-      = mPreStepMappings[mRepresentation].forceOutJac.transpose()
-        * thisTimestepRealLoss.lossWrtTorque;
-  thisTimestepLoss.lossWrtMass
-      = mPreStepMappings[mRepresentation].massOutJac.transpose()
-        * thisTimestepRealLoss.lossWrtMass;
 
 #ifdef LOG_PERFORMANCE_MAPPED_BACKPROP_SNAPSHOT
   if (thisLog != nullptr)
@@ -342,36 +342,19 @@ const Eigen::VectorXs& MappedBackpropSnapshot::getPostStepVelocity(
 }
 
 //==============================================================================
-/// Returns a concatenated vector of all the joint torques that were applied
-/// during the forward pass, AFTER the timestep. This is necessarily identical
-/// to getPreStepTorques(), since the timestep doesn't change the applied
-/// forces.
-const Eigen::VectorXs& MappedBackpropSnapshot::getPostStepTorques(
-    const std::string& mapping)
-{
-  return getPreStepTorques(mapping);
-}
-
-//==============================================================================
 /// This computes and returns the whole vel-vel jacobian by finite
 /// differences. This is SUPER SLOW, and is only here for testing.
 Eigen::MatrixXs MappedBackpropSnapshot::finiteDifferenceVelVelJacobian(
-    simulation::WorldPtr world,
-    const std::string& mapBefore,
-    const std::string& mapAfter,
-    bool useRidders)
+    simulation::WorldPtr world, const std::string& mapAfter, bool useRidders)
 {
   if (useRidders)
   {
-    return finiteDifferenceRiddersVelVelJacobian(world, mapBefore, mapAfter);
+    return finiteDifferenceRiddersVelVelJacobian(world, mapAfter);
   }
   RestorableSnapshot snapshot(world);
 
-  int inDim = mMappings[mapBefore]->getVelDim();
+  int inDim = world->getNumDofs();
   int outDim = mMappings[mapAfter]->getVelDim();
-
-  // TODO: this needs to support non-identity mapIns
-  assert(mapBefore == "identity" && "Non-identity map ins are currently not supported by finite differencing");
 
   Eigen::MatrixXs J(outDim, inDim);
 
@@ -461,17 +444,12 @@ Eigen::MatrixXs MappedBackpropSnapshot::finiteDifferenceVelVelJacobian(
 /// This computes and returns the whole vel-vel jacobian by finite
 /// differences. This is SUPER SLOW, and is only here for testing.
 Eigen::MatrixXs MappedBackpropSnapshot::finiteDifferenceRiddersVelVelJacobian(
-    simulation::WorldPtr world,
-    const std::string& mapBefore,
-    const std::string& mapAfter)
+    simulation::WorldPtr world, const std::string& mapAfter)
 {
   RestorableSnapshot snapshot(world);
 
-  int inDim = mMappings[mapBefore]->getVelDim();
+  int inDim = world->getNumDofs();
   int outDim = mMappings[mapAfter]->getVelDim();
-
-  // TODO: this needs to support non-identity mapIns
-  assert(mapBefore == "identity" && "Non-identity map ins are currently not supported by finite differencing");
 
   Eigen::MatrixXs J(outDim, inDim);
 
@@ -651,23 +629,17 @@ Eigen::MatrixXs MappedBackpropSnapshot::finiteDifferenceRiddersVelVelJacobian(
 /// This computes and returns the whole pos-C(pos,vel) jacobian by finite
 /// differences. This is SUPER SUPER SLOW, and is only here for testing.
 Eigen::MatrixXs MappedBackpropSnapshot::finiteDifferencePosVelJacobian(
-    simulation::WorldPtr world,
-    const std::string& mapBefore,
-    const std::string& mapAfter,
-    bool useRidders)
+    simulation::WorldPtr world, const std::string& mapAfter, bool useRidders)
 {
   if (useRidders)
   {
-    return finiteDifferenceRiddersPosVelJacobian(world, mapBefore, mapAfter);
+    return finiteDifferenceRiddersPosVelJacobian(world, mapAfter);
   }
 
   RestorableSnapshot snapshot(world);
 
-  int inDim = mMappings[mapBefore]->getPosDim();
+  int inDim = world->getNumDofs();
   int outDim = mMappings[mapAfter]->getVelDim();
-
-  // TODO: this needs to support non-identity mapIns
-  assert(mapBefore == "identity" && "Non-identity map ins are currently not supported by finite differencing");
 
   Eigen::MatrixXs J(outDim, inDim);
 
@@ -759,17 +731,12 @@ Eigen::MatrixXs MappedBackpropSnapshot::finiteDifferencePosVelJacobian(
 /// This computes and returns the whole pos-C(pos,vel) jacobian by finite
 /// differences. This is SUPER SLOW, and is only here for testing.
 Eigen::MatrixXs MappedBackpropSnapshot::finiteDifferenceRiddersPosVelJacobian(
-    simulation::WorldPtr world,
-    const std::string& mapBefore,
-    const std::string& mapAfter)
+    simulation::WorldPtr world, const std::string& mapAfter)
 {
   RestorableSnapshot snapshot(world);
 
-  int inDim = mMappings[mapBefore]->getVelDim();
+  int inDim = world->getNumDofs();
   int outDim = mMappings[mapAfter]->getVelDim();
-
-  // TODO: this needs to support non-identity mapIns
-  assert(mapBefore == "identity" && "Non-identity map ins are currently not supported by finite differencing");
 
   Eigen::MatrixXs J(outDim, inDim);
 
@@ -949,24 +916,17 @@ Eigen::MatrixXs MappedBackpropSnapshot::finiteDifferenceRiddersPosVelJacobian(
 /// This computes and returns the whole force-vel jacobian by finite
 /// differences. This is SUPER SLOW, and is only here for testing.
 Eigen::MatrixXs MappedBackpropSnapshot::finiteDifferenceForceVelJacobian(
-    simulation::WorldPtr world,
-    const std::string& mapBefore,
-    const std::string& mapAfter,
-    bool useRidders)
+    simulation::WorldPtr world, const std::string& mapAfter, bool useRidders)
 {
   if (useRidders)
   {
-    return finiteDifferenceRiddersForceVelJacobian(world, mapBefore, mapAfter);
+    return finiteDifferenceRiddersForceVelJacobian(world, mapAfter);
   }
 
   RestorableSnapshot snapshot(world);
 
   int inDim = world->getNumDofs();
   int outDim = mMappings[mapAfter]->getVelDim();
-
-  // TODO: this needs to support non-identity mapIns
-  assert(mapBefore == "identity" && "Non-identity map ins are currently not supported by finite differencing");
-  _unused(mapBefore);
 
   Eigen::MatrixXs J(outDim, inDim);
 
@@ -1057,17 +1017,12 @@ Eigen::MatrixXs MappedBackpropSnapshot::finiteDifferenceForceVelJacobian(
 /// This computes and returns the whole force-vel jacobian by finite
 /// differences. This is SUPER SLOW, and is only here for testing.
 Eigen::MatrixXs MappedBackpropSnapshot::finiteDifferenceRiddersForceVelJacobian(
-    simulation::WorldPtr world,
-    const std::string& mapBefore,
-    const std::string& mapAfter)
+    simulation::WorldPtr world, const std::string& mapAfter)
 {
   RestorableSnapshot snapshot(world);
 
-  int inDim = mMappings[mapBefore]->getVelDim();
+  int inDim = world->getNumDofs();
   int outDim = mMappings[mapAfter]->getVelDim();
-
-  // TODO: this needs to support non-identity mapIns
-  assert(mapBefore == "identity" && "Non-identity map ins are currently not supported by finite differencing");
 
   Eigen::MatrixXs J(outDim, inDim);
 
@@ -1247,23 +1202,17 @@ Eigen::MatrixXs MappedBackpropSnapshot::finiteDifferenceRiddersForceVelJacobian(
 /// This computes a finite differenced Jacobian for pos_t->mapped_pos_{t+1}
 Eigen::MatrixXs MappedBackpropSnapshot::finiteDifferencePosPosJacobian(
     std::shared_ptr<simulation::World> world,
-    const std::string& mapBefore,
     const std::string& mapAfter,
     std::size_t subdivisions,
     bool useRidders)
 {
   if (useRidders)
   {
-    return finiteDifferenceRiddersPosPosJacobian(
-        world, mapBefore, mapAfter, subdivisions);
+    return finiteDifferenceRiddersPosPosJacobian(world, mapAfter, subdivisions);
   }
 
   int inDim = world->getNumDofs();
   int outDim = mMappings[mapAfter]->getPosDim();
-
-  // TODO: this needs to support non-identity mapIns
-  assert(mapBefore == "identity" && "Non-identity map ins are currently not supported by finite differencing");
-  _unused(mapBefore);
 
   RestorableSnapshot snapshot(world);
 
@@ -1328,16 +1277,11 @@ Eigen::MatrixXs MappedBackpropSnapshot::finiteDifferencePosPosJacobian(
 /// This computes a finite differenced Jacobian for pos_t->mapped_pos_{t+1}
 Eigen::MatrixXs MappedBackpropSnapshot::finiteDifferenceRiddersPosPosJacobian(
     std::shared_ptr<simulation::World> world,
-    const std::string& mapBefore,
     const std::string& mapAfter,
     std::size_t subdivisions)
 {
   int inDim = world->getNumDofs();
   int outDim = mMappings[mapAfter]->getPosDim();
-
-  // TODO: this needs to support non-identity mapIns
-  assert(mapBefore == "identity" && "Non-identity map ins are currently not supported by finite differencing");
-  _unused(mapBefore);
 
   RestorableSnapshot snapshot(world);
 
@@ -1466,23 +1410,17 @@ Eigen::MatrixXs MappedBackpropSnapshot::finiteDifferenceRiddersPosPosJacobian(
 /// differences. This is SUPER SUPER SLOW, and is only here for testing.
 Eigen::MatrixXs MappedBackpropSnapshot::finiteDifferenceVelPosJacobian(
     simulation::WorldPtr world,
-    const std::string& mapBefore,
     const std::string& mapAfter,
     std::size_t subdivisions,
     bool useRidders)
 {
   if (useRidders)
   {
-    return finiteDifferenceRiddersVelPosJacobian(
-        world, mapBefore, mapAfter, subdivisions);
+    return finiteDifferenceRiddersVelPosJacobian(world, mapAfter, subdivisions);
   }
 
   int inDim = world->getNumDofs();
   int outDim = mMappings[mapAfter]->getPosDim();
-
-  // TODO: this needs to support non-identity mapIns
-  assert(mapBefore == "identity" && "Non-identity map ins are currently not supported by finite differencing");
-  _unused(mapBefore);
 
   RestorableSnapshot snapshot(world);
 
@@ -1548,16 +1486,11 @@ Eigen::MatrixXs MappedBackpropSnapshot::finiteDifferenceVelPosJacobian(
 /// differences. This is SUPER SUPER SLOW, and is only here for testing.
 Eigen::MatrixXs MappedBackpropSnapshot::finiteDifferenceRiddersVelPosJacobian(
     std::shared_ptr<simulation::World> world,
-    const std::string& mapBefore,
     const std::string& mapAfter,
     std::size_t subdivisions)
 {
   int inDim = world->getNumDofs();
   int outDim = mMappings[mapAfter]->getPosDim();
-
-  // TODO: this needs to support non-identity mapIns
-  assert(mapBefore == "identity" && "Non-identity map ins are currently not supported by finite differencing");
-  _unused(mapBefore);
 
   RestorableSnapshot snapshot(world);
 

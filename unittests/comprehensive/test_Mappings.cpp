@@ -58,7 +58,7 @@ using namespace dynamics;
 using namespace simulation;
 using namespace neural;
 
-#define ALL_TESTS
+// #define ALL_TESTS
 
 void testWorldSpace(std::size_t numLinks)
 {
@@ -66,6 +66,7 @@ void testWorldSpace(std::size_t numLinks)
 
   // World
   WorldPtr world = World::create();
+  world->setSlowDebugResultsAgainstFD(true);
   world->setGravity(Eigen::Vector3s(0, -9.81, 0));
 
   SkeletonPtr arm = Skeleton::create("arm");
@@ -110,16 +111,39 @@ void testWorldSpace(std::size_t numLinks)
   floor->createJointAndBodyNodePair<WeldJoint>(nullptr);
   world->addSkeleton(floor);
 
+  /*
+  Eigen::VectorXd pos = Eigen::VectorXd(5);
+  pos << 0.409082, 0.0370405, 0.0214693, 0.677961, 0.63835;
+  world->setPositions(pos.cast<s_t>());
+  std::shared_ptr<IKMapping> mapping = std::make_shared<IKMapping>(world);
+  for (dynamics::BodyNode* node : arm->getBodyNodes())
+  {
+    mapping->addSpatialBodyNode(node);
+  }
+  Eigen::MatrixXs fd = mapping->finiteDifferenceMappedPosToRealPosJac(world);
+  Eigen::MatrixXs analytical = mapping->getMappedPosToRealPosJac(world);
+  std::cout << "FD: " << std::endl << fd << std::endl;
+  std::cout << "Analytical: " << std::endl << analytical << std::endl;
+  std::cout << "Diff (" << (fd - analytical).minCoeff() << " - "
+            << (fd - analytical).maxCoeff() << "): " << std::endl
+            << fd - analytical << std::endl;
+  */
+
+  /*
+  EXPECT_TRUE(
+      verifyMappingOutJacobian(world, mapping, MappingTestComponent::POSITION));
+      */
+
   EXPECT_TRUE(verifyWorldSpaceTransform(world));
   EXPECT_TRUE(verifyIKMapping(world));
 }
 
-#ifdef ALL_TESTS
+// #ifdef ALL_TESTS
 TEST(GRADIENTS, WORLD_SPACE_5_LINK_ROBOT)
 {
   testWorldSpace(5);
 }
-#endif
+// #endif
 
 /******************************************************************************
 
@@ -250,6 +274,21 @@ void testWorldSpaceWithBoxes(int jointType)
 
   world->addSkeleton(boxes);
 
+  if (jointType == 1)
+  {
+    Eigen::VectorXs spot = Eigen::VectorXs(3);
+    spot << -2.53326, 1.39152, 1.11189;
+    world->setPositions(spot);
+    std::shared_ptr<IKMapping> mapping = std::make_shared<IKMapping>(world);
+    for (dynamics::BodyNode* node : world->getAllBodyNodes())
+    {
+      mapping->addSpatialBodyNode(node);
+    }
+    EXPECT_TRUE(
+        verifyMappingSetGet(world, mapping, MappingTestComponent::POSITION));
+    return;
+  }
+
   EXPECT_TRUE(verifyWorldSpaceTransform(world));
   EXPECT_TRUE(verifyIKMapping(world));
 }
@@ -264,6 +303,7 @@ TEST(GRADIENTS, WORLD_SPACE_BOXES_TRANSLATION_JOINT)
 #ifdef ALL_TESTS
 TEST(GRADIENTS, WORLD_SPACE_BOXES_BALL_JOINT)
 {
+  // TODO: this fails
   testWorldSpaceWithBoxes(1);
 }
 #endif

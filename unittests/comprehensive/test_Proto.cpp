@@ -120,8 +120,8 @@ TEST(PROTO, SERIALIZE_ROLLOUT)
   metadata["2"] = Eigen::MatrixXs::Random(dofs, steps);
   metadata["3"] = Eigen::MatrixXs::Random(dofs, steps);
 
-  TrajectoryRolloutReal rollout = TrajectoryRolloutReal(
-      representationMapping, pos, vel, force, mass, metadata);
+  TrajectoryRolloutReal rollout
+      = TrajectoryRolloutReal(pos, vel, force, mass, metadata);
 
   proto::TrajectoryRollout proto;
   rollout.serialize(proto);
@@ -129,8 +129,6 @@ TEST(PROTO, SERIALIZE_ROLLOUT)
   TrajectoryRolloutReal recovered
       = trajectory::TrajectoryRollout::deserialize(proto);
 
-  EXPECT_EQ(
-      rollout.getRepresentationMapping(), recovered.getRepresentationMapping());
   EXPECT_TRUE(equals(rollout.getMassesConst(), recovered.getMassesConst()));
   EXPECT_TRUE(equals(
       rollout.getPosesConst("identity"),

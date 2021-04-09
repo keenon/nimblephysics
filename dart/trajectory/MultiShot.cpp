@@ -72,47 +72,6 @@ void MultiShot::setParallelOperationsEnabled(bool enabled)
 }
 
 //==============================================================================
-/// This sets the mapping we're using to store the representation of the Shot.
-/// WARNING: THIS IS A POTENTIALLY DESTRUCTIVE OPERATION! This will rewrite
-/// the internal representation of the Shot to use the new mapping, and if the
-/// new mapping is underspecified compared to the old mapping, you may lose
-/// information. It's not guaranteed that you'll get back the same trajectory
-/// if you switch to a different mapping, and then switch back.
-///
-/// This will affect the values you get back from getStates() - they'll now be
-/// returned in the view given by `mapping`. That's also the represenation
-/// that'll be passed to IPOPT, and updated on each gradient step. Therein
-/// lies the power of changing the representation mapping: There will almost
-/// certainly be mapped spaces that are easier to optimize in than native
-/// joint space, at least initially.
-void MultiShot::switchRepresentationMapping(
-    std::shared_ptr<simulation::World> world,
-    const std::string& mapping,
-    PerformanceLog* log)
-{
-  PerformanceLog* thisLog = nullptr;
-#ifdef LOG_PERFORMANCE_MULTI_SHOT
-  if (log != nullptr)
-  {
-    thisLog = log->startRun("MultiShot.switchRepresentationMapping");
-  }
-#endif
-
-  for (auto shot : mShots)
-  {
-    shot->switchRepresentationMapping(world, mapping, thisLog);
-  }
-  Problem::switchRepresentationMapping(world, mapping, thisLog);
-
-#ifdef LOG_PERFORMANCE_MULTI_SHOT
-  if (thisLog != nullptr)
-  {
-    thisLog->end();
-  }
-#endif
-}
-
-//==============================================================================
 /// This adds a mapping through which the loss function can interpret the
 /// output. We can have multiple loss mappings at the same time, and loss can
 /// use arbitrary combinations of multiple views, as long as it can provide
@@ -955,15 +914,15 @@ void MultiShot::getStates(
   }
 #endif
 
-  int posDim = getRepresentation()->getPosDim();
-  int velDim = getRepresentation()->getVelDim();
-  int forceDim = getRepresentation()->getForceDim();
-  assert(rollout->getPoses(mRepresentationMapping).cols() == mSteps);
-  assert(rollout->getPoses(mRepresentationMapping).rows() == posDim);
-  assert(rollout->getVels(mRepresentationMapping).cols() == mSteps);
-  assert(rollout->getVels(mRepresentationMapping).rows() == velDim);
-  assert(rollout->getForces(mRepresentationMapping).cols() == mSteps);
-  assert(rollout->getForces(mRepresentationMapping).rows() == forceDim);
+  int posDim = world->getNumDofs();
+  int velDim = world->getNumDofs();
+  int forceDim = world->getNumDofs();
+  assert(rollout->getPoses().cols() == mSteps);
+  assert(rollout->getPoses().rows() == posDim);
+  assert(rollout->getVels().cols() == mSteps);
+  assert(rollout->getVels().rows() == velDim);
+  assert(rollout->getForces().cols() == mSteps);
+  assert(rollout->getForces().rows() == forceDim);
   _unused(posDim);
   _unused(velDim);
   _unused(forceDim);
@@ -1006,14 +965,14 @@ void MultiShot::getStates(
   else
   {
     RestorableSnapshot snapshot(world);
-    getRepresentation()->setPositions(world, mShots[0]->mStartPos);
-    getRepresentation()->setVelocities(world, mShots[0]->mStartVel);
+    world->setPositions(mShots[0]->mStartPos);
+    world->setVelocities(mShots[0]->mStartVel);
     for (int i = 0; i < mShots.size(); i++)
     {
       for (int j = 0; j < mShots[i]->mSteps; j++)
       {
         Eigen::VectorXs forces = mShots[i]->mForces.col(j);
-        getRepresentation()->setForces(world, forces);
+        world->setExternalForces(forces);
         world->step();
         for (auto pair : mMappings)
         {

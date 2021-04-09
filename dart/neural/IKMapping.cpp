@@ -61,7 +61,7 @@ int IKMapping::getMassDim()
 }
 
 //==============================================================================
-// #define DART_NEURAL_LOG_IK_OUTPUT
+#define DART_NEURAL_LOG_IK_OUTPUT
 void IKMapping::setPositions(
     std::shared_ptr<simulation::World> world,
     const Eigen::Ref<Eigen::VectorXs>& positions)
@@ -73,15 +73,15 @@ void IKMapping::setPositions(
   // the requested positions are infeasible, in which case we'll just do a best
   // guess.
   s_t error = std::numeric_limits<s_t>::infinity();
-  s_t lr = 1.0;
-  for (int i = 0; i < 150; i++)
+  s_t lr = 0.05;
+  for (int i = 0; i < 100; i++)
   {
     Eigen::VectorXs diff = positions - getPositions(world);
     s_t newError = diff.squaredNorm();
     s_t errorChange = newError - error;
     error = newError;
 #ifdef DART_NEURAL_LOG_IK_OUTPUT
-    std::cout << "IK iteration " << i << " loss: " << error
+    std::cout << "IK iteration " << i << " lr: " << lr << " loss: " << error
               << " change: " << errorChange << std::endl;
 #endif
     if (error < 1e-21)
@@ -104,19 +104,21 @@ void IKMapping::setPositions(
 #endif
       break;
     }
-    Eigen::MatrixXs J = getPosJacobianInverse(world);
-    Eigen::VectorXs delta = J * diff; // math::dampedPInv(J, diff, 0.05);
-    s_t MAX = 100;
-    if (delta.norm() > MAX)
+    else
     {
-      delta.normalize();
-      delta *= MAX;
+      // Slowly grow LR while we're safely decreasing loss
+      lr *= 1.1;
     }
+
+    Eigen::MatrixXs J = getPosJacobian(world);
+    // Eigen::VectorXs delta
+    // = J.transpose() * diff; // math::dampedPInv(J, diff, 0.05);
+    Eigen::VectorXs delta = J.completeOrthogonalDecomposition().solve(diff);
 #ifdef DART_NEURAL_LOG_IK_OUTPUT
-    std::cout << "IK Diff: " << std::endl << diff << std::endl;
-    std::cout << "IK J: " << std::endl << J << std::endl;
-    std::cout << "IK Delta: " << std::endl << delta << std::endl;
-    std::cout << "J * IK Delta: " << std::endl << J * delta << std::endl;
+    // std::cout << "IK Diff: " << std::endl << diff << std::endl;
+    // std::cout << "IK J: " << std::endl << J << std::endl;
+    // std::cout << "IK Delta: " << std::endl << delta << std::endl;
+    // std::cout << "J * IK Delta: " << std::endl << J * delta << std::endl;
 #endif
     world->setPositions(world->getPositions() + (lr * delta));
   }
@@ -130,7 +132,7 @@ void IKMapping::setVelocities(
     std::shared_ptr<simulation::World> world,
     const Eigen::Ref<Eigen::VectorXs>& velocities)
 {
-  world->setVelocities(getMappedVelToRealVelJac(world) * velocities);
+  world->setVelocities(getVelJacobianInverse(world) * velocities);
 }
 
 //==============================================================================
@@ -138,7 +140,7 @@ void IKMapping::setForces(
     std::shared_ptr<simulation::World> world,
     const Eigen::Ref<Eigen::VectorXs>& forces)
 {
-  world->setExternalForces(getMappedForceToRealForceJac(world) * forces);
+  world->setExternalForces(getVelJacobianInverse(world) * forces);
 }
 
 //==============================================================================
@@ -261,22 +263,22 @@ void IKMapping::getMassesInPlace(
 }
 
 //==============================================================================
-/// This gets a Jacobian relating the changes in the outer positions (the
-/// "mapped" positions) to inner positions (the "real" positions)
-Eigen::MatrixXs IKMapping::getMappedPosToRealPosJac(
-    std::shared_ptr<simulation::World> world)
-{
-  return getPosJacobianInverse(world);
-}
-
-//==============================================================================
 /// This gets a Jacobian relating the changes in the inner positions (the
 /// "real" positions) to the corresponding outer positions (the "mapped"
 /// positions)
 Eigen::MatrixXs IKMapping::getRealPosToMappedPosJac(
     std::shared_ptr<simulation::World> world)
 {
-  return getPosJacobian(world);
+  Eigen::MatrixXs J = getPosJacobian(world);
+  if (world->getSlowDebugResultsAgainstFD())
+  {
+    equalsOrCrash(
+        J,
+        finiteDifferenceRealPosToMappedPosJac(world),
+        world,
+        "real pos - mapped pos");
+  }
+  return J;
 }
 
 //==============================================================================
@@ -286,16 +288,16 @@ Eigen::MatrixXs IKMapping::getRealPosToMappedPosJac(
 Eigen::MatrixXs IKMapping::getRealVelToMappedPosJac(
     std::shared_ptr<simulation::World> world)
 {
-  return Eigen::MatrixXs::Zero(getDim(), world->getNumDofs());
-}
-
-//==============================================================================
-/// This gets a Jacobian relating the changes in the outer velocity (the
-/// "mapped" velocity) to inner velocity (the "real" velocity)
-Eigen::MatrixXs IKMapping::getMappedVelToRealVelJac(
-    std::shared_ptr<simulation::World> world)
-{
-  return getVelJacobianInverse(world);
+  Eigen::MatrixXs J = Eigen::MatrixXs::Zero(getDim(), world->getNumDofs());
+  if (world->getSlowDebugResultsAgainstFD())
+  {
+    equalsOrCrash(
+        J,
+        finiteDifferenceRealVelToMappedPosJac(world),
+        world,
+        "real vel - mapped pos");
+  }
+  return J;
 }
 
 //==============================================================================
@@ -305,7 +307,16 @@ Eigen::MatrixXs IKMapping::getMappedVelToRealVelJac(
 Eigen::MatrixXs IKMapping::getRealVelToMappedVelJac(
     std::shared_ptr<simulation::World> world)
 {
-  return getVelJacobian(world);
+  Eigen::MatrixXs J = getVelJacobian(world);
+  if (world->getSlowDebugResultsAgainstFD())
+  {
+    equalsOrCrash(
+        J,
+        finiteDifferenceRealVelToMappedVelJac(world),
+        world,
+        "real vel - mapped vel");
+  }
+  return J;
 }
 
 //==============================================================================
@@ -317,16 +328,16 @@ Eigen::MatrixXs IKMapping::getRealPosToMappedVelJac(
 {
   // Original formula:
   // mappedVel = getJacobian(world) * velocities()
-  return getJacobianOfJacVelWrtPosition(world);
-}
-
-//==============================================================================
-/// This gets a Jacobian relating the changes in the outer force (the
-/// "mapped" force) to inner force (the "real" force)
-Eigen::MatrixXs IKMapping::getMappedForceToRealForceJac(
-    std::shared_ptr<simulation::World> world)
-{
-  return getVelJacobian(world).transpose();
+  Eigen::MatrixXs J = getJacobianOfJacVelWrtPosition(world);
+  if (world->getSlowDebugResultsAgainstFD())
+  {
+    equalsOrCrash(
+        J,
+        finiteDifferenceRealPosToMappedVelJac(world),
+        world,
+        "real pos - mapped vel");
+  }
+  return J;
 }
 
 //==============================================================================
@@ -337,15 +348,6 @@ Eigen::MatrixXs IKMapping::getRealForceToMappedForceJac(
     std::shared_ptr<simulation::World> world)
 {
   return getVelJacobianInverse(world).transpose();
-}
-
-//==============================================================================
-/// This gets a Jacobian relating the changes in the outer mass (the
-/// "mapped" mass) to inner mass (the "real" mass)
-Eigen::MatrixXs IKMapping::getMappedMassToRealMassJac(
-    std::shared_ptr<simulation::World> /* world */)
-{
-  return Eigen::MatrixXs::Identity(mMassDim, mMassDim);
 }
 
 //==============================================================================
@@ -428,10 +430,8 @@ Eigen::MatrixXs IKMapping::getPosJacobianInverse(
     std::shared_ptr<simulation::World> world)
 {
   Eigen::MatrixXs J = getPosJacobian(world);
-  return math::clippedSingularsPinv(J);
-  /*
+  // return math::clippedSingularsPinv(J);
   return J.completeOrthogonalDecomposition().pseudoInverse();
-  */
 }
 
 /// Computes a Jacobian that transforms changes in joint vel to changes in

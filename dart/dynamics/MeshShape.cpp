@@ -171,9 +171,9 @@ MeshShape::MeshShape(
 
 //==============================================================================
 MeshShape::MeshShape(
-    const Eigen::Vector3d& scale,
+    const Eigen::Vector3s& scale,
     const std::string& path,
-    common::ResourceRetrieverPtr resourceRetriever, 
+    common::ResourceRetrieverPtr resourceRetriever,
     bool dontFreeMesh)
   : Shape(MESH),
     mDisplayList(0),

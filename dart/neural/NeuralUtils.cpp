@@ -70,7 +70,6 @@ std::shared_ptr<BackpropSnapshot> forwardPass(
 /// to backpropagate gradients and compute Jacobians in the mapped space
 std::shared_ptr<MappedBackpropSnapshot> mappedForwardPass(
     std::shared_ptr<simulation::World> world,
-    std::string representation,
     std::unordered_map<std::string, std::shared_ptr<Mapping>> mappings,
     bool idempotent)
 {
@@ -129,7 +128,7 @@ std::shared_ptr<MappedBackpropSnapshot> mappedForwardPass(
     restorableSnapshot->restore();
 
   return std::make_shared<MappedBackpropSnapshot>(
-      snapshot, representation, mappings, preStepMappings, postStepMappings);
+      snapshot, mappings, preStepMappings, postStepMappings);
 }
 
 //==============================================================================

@@ -37,8 +37,8 @@
 
 #include <assimp/scene.h>
 
-#include "dart/dynamics/Shape.hpp"
 #include "dart/common/ResourceRetriever.hpp"
+#include "dart/dynamics/Shape.hpp"
 
 namespace dart {
 namespace dynamics {
@@ -77,16 +77,18 @@ public:
   };
 
   /// Constructor.
-  MeshShape(const Eigen::Vector3s& scale,
-    const aiScene* mesh,
-    const common::Uri& uri = "",
-    common::ResourceRetrieverPtr resourceRetriever = nullptr,
-    bool dontFreeMesh = false);
+  MeshShape(
+      const Eigen::Vector3s& scale,
+      const aiScene* mesh,
+      const common::Uri& uri = "",
+      common::ResourceRetrieverPtr resourceRetriever = nullptr,
+      bool dontFreeMesh = false);
 
-  MeshShape(const Eigen::Vector3d& scale,
-    const std::string& path,
-    common::ResourceRetrieverPtr resourceRetriever = nullptr,
-    bool dontFreeMesh = false);
+  MeshShape(
+      const Eigen::Vector3s& scale,
+      const std::string& path,
+      common::ResourceRetrieverPtr resourceRetriever = nullptr,
+      bool dontFreeMesh = false);
 
   /// Destructor.
   ~MeshShape() override;
@@ -106,14 +108,14 @@ public:
   virtual void update();
 
   void setMesh(
-    const aiScene* mesh,
-    const std::string& path = "",
-    common::ResourceRetrieverPtr resourceRetriever = nullptr);
+      const aiScene* mesh,
+      const std::string& path = "",
+      common::ResourceRetrieverPtr resourceRetriever = nullptr);
 
   void setMesh(
-    const aiScene* mesh,
-    const common::Uri& path,
-    common::ResourceRetrieverPtr resourceRetriever = nullptr);
+      const aiScene* mesh,
+      const common::Uri& path,
+      common::ResourceRetrieverPtr resourceRetriever = nullptr);
 
   /// Returns URI to the mesh as std::string; an empty string if unavailable.
   std::string getMeshUri() const;
@@ -160,10 +162,10 @@ public:
   static const aiScene* loadMesh(const std::string& filePath);
 
   static const aiScene* loadMesh(
-    const std::string& _uri, const common::ResourceRetrieverPtr& retriever);
+      const std::string& _uri, const common::ResourceRetrieverPtr& retriever);
 
   static const aiScene* loadMesh(
-    const common::Uri& uri, const common::ResourceRetrieverPtr& retriever);
+      const common::Uri& uri, const common::ResourceRetrieverPtr& retriever);
 
   // Documentation inherited.
   Eigen::Matrix3s computeInertia(s_t mass) const override;
@@ -201,11 +203,12 @@ protected:
   /// Specifies which color index should be used when mColorMode is COLOR_INDEX
   int mColorIndex;
 
-  /// If this is true, don't take ownership of the mMesh object and don't free it
+  /// If this is true, don't take ownership of the mMesh object and don't free
+  /// it
   bool mDontFreeMesh;
 };
 
-}  // namespace dynamics
-}  // namespace dart
+} // namespace dynamics
+} // namespace dart
 
-#endif  // DART_DYNAMICS_MESHSHAPE_HPP_
+#endif // DART_DYNAMICS_MESHSHAPE_HPP_

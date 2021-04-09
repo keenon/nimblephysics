@@ -28,8 +28,7 @@ Problem::Problem(
 {
   std::shared_ptr<neural::Mapping> identityMapping
       = std::make_shared<neural::IdentityMapping>(world);
-  mRepresentationMapping = "identity";
-  mMappings[mRepresentationMapping] = identityMapping;
+  mMappings["identity"] = identityMapping;
 }
 
 //==============================================================================
@@ -84,31 +83,6 @@ bool Problem::getExploreAlternateStrategies()
 }
 
 //==============================================================================
-/// This sets the mapping we're using to store the representation of the Shot.
-/// WARNING: THIS IS A POTENTIALLY DESTRUCTIVE OPERATION! This will rewrite
-/// the internal representation of the Shot to use the new mapping, and if the
-/// new mapping is underspecified compared to the old mapping, you may lose
-/// information. It's not guaranteed that you'll get back the same trajectory
-/// if you switch to a different mapping, and then switch back.
-///
-/// This will affect the values you get back from getStates() - they'll now be
-/// returned in the view given by `mapping`. That's also the represenation
-/// that'll be passed to IPOPT, and updated on each gradient step. Therein
-/// lies the power of changing the representation mapping: There will almost
-/// certainly be mapped spaces that are easier to optimize in than native
-/// joint space, at least initially.
-void Problem::switchRepresentationMapping(
-    std::shared_ptr<simulation::World> /* world */,
-    const std::string& mapping,
-    PerformanceLog* /* log */)
-{
-  // Reset the main representation mapping
-  mRepresentationMapping = mapping;
-  // Clear our cached trajectory
-  mRolloutCacheDirty = true;
-}
-
-//==============================================================================
 /// This adds a mapping through which the loss function can interpret the
 /// output. We can have multiple loss mappings at the same time, and loss can
 /// use arbitrary combinations of multiple views, as long as it can provide
@@ -157,20 +131,7 @@ void Problem::removeMapping(const std::string& key)
 /// mapping
 int Problem::getRepresentationStateSize() const
 {
-  return getRepresentation()->getPosDim() + getRepresentation()->getVelDim();
-}
-
-//==============================================================================
-const std::string& Problem::getRepresentationName() const
-{
-  return mRepresentationMapping;
-}
-
-//==============================================================================
-/// Returns the representation currently being used
-const std::shared_ptr<neural::Mapping> Problem::getRepresentation() const
-{
-  return mMappings.at(mRepresentationMapping);
+  return mWorld->getNumDofs() * 2;
 }
 
 //==============================================================================
@@ -1002,7 +963,7 @@ Eigen::VectorXi Problem::updateWithForces(
 
   for (int i = 0; i < mSteps; i++)
   {
-    mMappings[mRepresentationMapping]->setForces(world, forces.col(i));
+    world->setExternalForces(forces.col(i));
     for (std::string mapping : rollout->getMappings())
     {
       mMappings[mapping]->getPositionsInPlace(

@@ -104,15 +104,6 @@ void IdentityMapping::getMassesInPlace(
 }
 
 //==============================================================================
-/// This gets a Jacobian relating the changes in the outer positions (the
-/// "mapped" positions) to inner positions (the "real" positions)
-Eigen::MatrixXs IdentityMapping::getMappedPosToRealPosJac(
-    std::shared_ptr<simulation::World> /* world */)
-{
-  return Eigen::MatrixXs::Identity(mNumDofs, mNumDofs);
-}
-
-//==============================================================================
 /// This gets a Jacobian relating the changes in the inner positions (the
 /// "real" positions) to the corresponding outer positions (the "mapped"
 /// positions)
@@ -130,15 +121,6 @@ Eigen::MatrixXs IdentityMapping::getRealVelToMappedPosJac(
     std::shared_ptr<simulation::World> /* world */)
 {
   return Eigen::MatrixXs::Zero(mNumDofs, mNumDofs);
-}
-
-//==============================================================================
-/// This gets a Jacobian relating the changes in the outer velocity (the
-/// "mapped" velocity) to inner velocity (the "real" velocity)
-Eigen::MatrixXs IdentityMapping::getMappedVelToRealVelJac(
-    std::shared_ptr<simulation::World> /* world */)
-{
-  return Eigen::MatrixXs::Identity(mNumDofs, mNumDofs);
 }
 
 //==============================================================================
@@ -162,15 +144,6 @@ Eigen::MatrixXs IdentityMapping::getRealPosToMappedVelJac(
 }
 
 //==============================================================================
-/// This gets a Jacobian relating the changes in the outer force (the
-/// "mapped" force) to inner force (the "real" force)
-Eigen::MatrixXs IdentityMapping::getMappedForceToRealForceJac(
-    std::shared_ptr<simulation::World> /* world */)
-{
-  return Eigen::MatrixXs::Identity(mNumDofs, mNumDofs);
-}
-
-//==============================================================================
 /// This gets a Jacobian relating the changes in the inner force (the
 /// "real" force) to the corresponding outer force (the "mapped"
 /// force)
@@ -178,15 +151,6 @@ Eigen::MatrixXs IdentityMapping::getRealForceToMappedForceJac(
     std::shared_ptr<simulation::World> /* world */)
 {
   return Eigen::MatrixXs::Identity(mNumDofs, mNumDofs);
-}
-
-//==============================================================================
-/// This gets a Jacobian relating the changes in the outer force (the
-/// "mapped" force) to inner force (the "real" force)
-Eigen::MatrixXs IdentityMapping::getMappedMassToRealMassJac(
-    std::shared_ptr<simulation::World> /* world */)
-{
-  return Eigen::MatrixXs::Identity(mMassDim, mMassDim);
 }
 
 //==============================================================================
