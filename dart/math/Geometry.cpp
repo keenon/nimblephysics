@@ -580,6 +580,19 @@ Eigen::Vector3s expMapGradient(const Eigen::Vector3s& pos, int _qi)
 Eigen::Vector3s expMapNestedGradient(
     const Eigen::Vector3s& original, const Eigen::Vector3s& screw)
 {
+  return finiteDifferenceExpMapNestedGradient(original, screw);
+}
+
+Eigen::Vector3s finiteDifferenceExpMapNestedGradient(
+    const Eigen::Vector3s& original,
+    const Eigen::Vector3s& screw,
+    bool useRidders)
+{
+  if (useRidders)
+  {
+    return finiteDifferenceRiddersExpMapNestedGradient(original, screw);
+  }
+
   Eigen::MatrixXs R = expMapRot(original);
 
   s_t EPS = 1e-7;
@@ -587,6 +600,64 @@ Eigen::Vector3s expMapNestedGradient(
   Eigen::Vector3s minus = logMap(expMapRot(screw * -EPS) * R);
 
   return (plus - minus) / (2 * EPS);
+}
+
+Eigen::Vector3s finiteDifferenceRiddersExpMapNestedGradient(
+    const Eigen::Vector3s& original, const Eigen::Vector3s& screw)
+{
+  Eigen::MatrixXs R = expMapRot(original);
+  const s_t originalStepSize = 1e-3;
+  const s_t con = 1.4, con2 = (con * con);
+  const s_t safeThreshold = 2.0;
+  const int tabSize = 10;
+
+  s_t stepSize = originalStepSize;
+  s_t bestError = std::numeric_limits<s_t>::max();
+
+  Eigen::Vector3s res = Eigen::Vector3s::Zero();
+
+  // Neville tableau of finite difference results
+  std::array<std::array<Eigen::Vector3s, tabSize>, tabSize> tab;
+
+  Eigen::Vector3s plus = logMap(expMapRot(screw * stepSize) * R);
+  Eigen::Vector3s minus = logMap(expMapRot(screw * -stepSize) * R);
+  tab[0][0] = (plus - minus) / (2 * stepSize);
+
+  // Iterate over smaller and smaller step sizes
+  for (int iTab = 1; iTab < tabSize; iTab++)
+  {
+    stepSize /= con;
+
+    Eigen::Vector3s plus = logMap(expMapRot(screw * stepSize) * R);
+    Eigen::Vector3s minus = logMap(expMapRot(screw * -stepSize) * R);
+    tab[0][iTab] = (plus - minus) / (2 * stepSize);
+
+    s_t fac = con2;
+    // Compute extrapolations of increasing orders, requiring no new
+    // evaluations
+    for (int jTab = 1; jTab <= iTab; jTab++)
+    {
+      tab[jTab][iTab]
+          = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1]) / (fac - 1.0);
+      fac = con2 * fac;
+      s_t currError = std::max(
+          (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
+          (tab[jTab][iTab] - tab[jTab - 1][iTab - 1]).array().abs().maxCoeff());
+      if (currError < bestError)
+      {
+        bestError = currError;
+        res = tab[jTab][iTab];
+      }
+    }
+
+    // If higher order is worse by a significant factor, quit early.
+    if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
+        >= safeThreshold * bestError)
+    {
+      break;
+    }
+  }
+  return res;
 }
 
 // Vec3 AdInvTLinear(const SE3& T, const Vec3& v)

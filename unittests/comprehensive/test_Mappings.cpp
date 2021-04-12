@@ -58,7 +58,7 @@ using namespace dynamics;
 using namespace simulation;
 using namespace neural;
 
-// #define ALL_TESTS
+#define ALL_TESTS
 
 void testWorldSpace(std::size_t numLinks)
 {
@@ -134,6 +134,50 @@ void testWorldSpace(std::size_t numLinks)
       verifyMappingOutJacobian(world, mapping, MappingTestComponent::POSITION));
       */
 
+  /*
+  neural::RestorableSnapshot snapshot(world);
+
+  Eigen::VectorXs beforeTest = Eigen::VectorXs(5);
+  beforeTest << 10.9867, -21.8724, 21.2699, -9.20143, -2.60721;
+  world->setPositions(beforeTest);
+  Eigen::VectorXs target = Eigen::VectorXs(15);
+  target << 0.599473, 0.34901, 0.458494, 0.839453, 0.236467, 0.1625, 0.299349,
+      0.755842, 0.0914411, 0.199152, 0.168026, 0.946926, 0.291581, 0.0509882,
+      0.0922575;
+  std::shared_ptr<IKMapping> mapping = std::make_shared<IKMapping>(world);
+  mapping->addLinearBodyNode(arm->getBodyNode(2));
+  mapping->addAngularBodyNode(floor->getBodyNode(0));
+  mapping->addSpatialBodyNode(arm->getBodyNode(5));
+  mapping->addLinearBodyNode(arm->getBodyNode(4));
+  mapping->setPositions(world, target);
+
+  Eigen::VectorXs original = world->getPositions();
+  Eigen::VectorXs originalMapped = mapping->getPositions(world);
+  s_t originalLoss = (originalMapped - target).squaredNorm();
+  srand(42);
+  // Try a bunch of near neighbor perturbations
+  for (int j = 0; j < 2000; j++)
+  {
+    Eigen::VectorXs randomPerturbations
+        = Eigen::VectorXs::Random(world->getNumDofs()) * 0.001;
+
+    world->setPositions(original + randomPerturbations);
+    Eigen::VectorXs newMapped = mapping->getPositions(world);
+    s_t newLoss = (newMapped - target).squaredNorm();
+
+    if (newLoss < originalLoss)
+    {
+      std::cout << "Found near neighbor that's better than original IK "
+                   "solution"
+                << std::endl;
+      return;
+    }
+  }
+
+  snapshot.restore();
+  */
+
+  EXPECT_TRUE(verifyIKPositionJacobians(world));
   EXPECT_TRUE(verifyWorldSpaceTransform(world));
   EXPECT_TRUE(verifyIKMapping(world));
 }

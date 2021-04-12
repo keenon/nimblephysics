@@ -3531,6 +3531,123 @@ math::Jacobian Skeleton::getWorldPositionJacobian(
 }
 
 //==============================================================================
+math::Jacobian Skeleton::finiteDifferenceWorldPositionJacobian(
+    const JacobianNode* _node, bool useRidders)
+{
+  if (useRidders)
+  {
+    return finiteDifferenceRiddersWorldPositionJacobian(_node);
+  }
+  math::Jacobian J = math::Jacobian::Zero(6, getNumDofs());
+  s_t EPS = 1e-5;
+  for (int i = 0; i < getNumDofs(); i++)
+  {
+    s_t original = getPosition(i);
+    setPosition(i, original + EPS);
+    Eigen::Vector6s plus = Eigen::Vector6s::Zero();
+    plus.head<3>() = math::logMap(_node->getTransform().linear());
+    plus.tail<3>() = _node->getTransform().translation();
+    setPosition(i, original - EPS);
+    Eigen::Vector6s minus = Eigen::Vector6s::Zero();
+    minus.head<3>() = math::logMap(_node->getTransform().linear());
+    minus.tail<3>() = _node->getTransform().translation();
+    J.col(i) = (plus - minus) / (2 * EPS);
+    setPosition(i, original);
+  }
+  return J;
+}
+
+//==============================================================================
+math::Jacobian Skeleton::finiteDifferenceRiddersWorldPositionJacobian(
+    const JacobianNode* _node)
+{
+  std::size_t n = getNumDofs();
+  Eigen::MatrixXs J = math::Jacobian::Zero(6, n);
+
+  const s_t originalStepSize = 1e-3;
+  const s_t con = 1.4, con2 = (con * con);
+  const s_t safeThreshold = 2.0;
+  const int tabSize = 10;
+
+  for (std::size_t i = 0; i < n; i++)
+  {
+    s_t stepSize = originalStepSize;
+    s_t bestError = std::numeric_limits<s_t>::max();
+
+    // Neville tableau of finite difference results
+    std::array<std::array<Eigen::Vector6s, tabSize>, tabSize> tab;
+
+    s_t original = getPosition(i);
+
+    setPosition(i, original + stepSize);
+    Eigen::Vector6s plus = Eigen::Vector6s::Zero();
+    plus.head<3>() = math::logMap(_node->getTransform().linear());
+    plus.tail<3>() = _node->getTransform().translation();
+
+    setPosition(i, original - stepSize);
+    Eigen::Vector6s minus = Eigen::Vector6s::Zero();
+    minus.head<3>() = math::logMap(_node->getTransform().linear());
+    minus.tail<3>() = _node->getTransform().translation();
+
+    setPosition(i, original);
+
+    tab[0][0] = (plus - minus) / (2 * stepSize);
+
+    // Iterate over smaller and smaller step sizes
+    for (int iTab = 1; iTab < tabSize; iTab++)
+    {
+      stepSize /= con;
+
+      s_t original = getPosition(i);
+
+      setPosition(i, original + stepSize);
+      Eigen::Vector6s plus = Eigen::Vector6s::Zero();
+      plus.head<3>() = math::logMap(_node->getTransform().linear());
+      plus.tail<3>() = _node->getTransform().translation();
+
+      setPosition(i, original - stepSize);
+      Eigen::Vector6s minus = Eigen::Vector6s::Zero();
+      minus.head<3>() = math::logMap(_node->getTransform().linear());
+      minus.tail<3>() = _node->getTransform().translation();
+
+      setPosition(i, original);
+
+      tab[0][iTab] = (plus - minus) / (2 * stepSize);
+
+      s_t fac = con2;
+      // Compute extrapolations of increasing orders, requiring no new
+      // evaluations
+      for (int jTab = 1; jTab <= iTab; jTab++)
+      {
+        tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
+                          / (fac - 1.0);
+        fac = con2 * fac;
+        s_t currError = std::max(
+            (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
+            (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
+                .array()
+                .abs()
+                .maxCoeff());
+        if (currError < bestError)
+        {
+          bestError = currError;
+          J.col(i).noalias() = tab[jTab][iTab];
+        }
+      }
+
+      // If higher order is worse by a significant factor, quit early.
+      if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
+          >= safeThreshold * bestError)
+      {
+        break;
+      }
+    }
+  }
+
+  return J;
+}
+
+//==============================================================================
 math::Jacobian Skeleton::getWorldJacobian(const JacobianNode* _node) const
 {
   return variadicGetWorldJacobian(this, _node);

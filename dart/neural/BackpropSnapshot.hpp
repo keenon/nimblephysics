@@ -133,6 +133,9 @@ public:
   /// during the forward pass, AFTER the timestep.
   Eigen::VectorXs getPostStepTorques();
 
+  /// Returns the LCP's cached solution from before the step
+  const Eigen::VectorXs& getPreStepLCPCache();
+
   /////////////////////////////////////////////////////////////////////////////
   /// Just public for testing
   /////////////////////////////////////////////////////////////////////////////

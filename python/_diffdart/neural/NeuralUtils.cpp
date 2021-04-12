@@ -89,7 +89,6 @@ void NeuralUtils(py::module& m)
       "mappedForwardPass",
       &dart::neural::mappedForwardPass,
       ::py::arg("world"),
-      ::py::arg("representation") = "identity",
       ::py::arg("mappings"),
       ::py::arg("idempotent") = false);
   m.def(

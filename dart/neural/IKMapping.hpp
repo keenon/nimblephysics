@@ -43,6 +43,11 @@ class IKMapping : public Mapping
 public:
   IKMapping(std::shared_ptr<simulation::World> world);
 
+  /// When we called setPosition(), we need to run an IK solve. This
+  /// sets the limit on the number of iterations of our solver to run.
+  void setIKIterationLimit(int limit);
+  int getIKIterationLimit();
+
   /// This adds the spatial (6D) coordinates of a body node to the list,
   /// increasing Dim size by 6
   void addSpatialBodyNode(dynamics::BodyNode* node);
@@ -170,6 +175,7 @@ protected:
   std::vector<IKMappingEntry> mEntries;
 
   int mMassDim;
+  int mIKIterationLimit;
 };
 
 } // namespace neural

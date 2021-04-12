@@ -1451,6 +1451,13 @@ Eigen::VectorXs BackpropSnapshot::getPostStepTorques()
 }
 
 //==============================================================================
+/// Returns the LCP's cached solution from before the step
+const Eigen::VectorXs& BackpropSnapshot::getPreStepLCPCache()
+{
+  return mPreStepLCPCache;
+}
+
+//==============================================================================
 Eigen::MatrixXs BackpropSnapshot::getClampingConstraintMatrix(WorldPtr world)
 {
   return assembleMatrix(world, MatrixToAssemble::CLAMPING);

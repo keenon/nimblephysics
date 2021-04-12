@@ -1034,6 +1034,14 @@ public:
   math::Jacobian getWorldPositionJacobian(const JacobianNode* _node) const;
 
   // Documentation inherited
+  math::Jacobian finiteDifferenceWorldPositionJacobian(
+      const JacobianNode* _node, bool useRidders = true);
+
+  // Documentation inherited
+  math::Jacobian finiteDifferenceRiddersWorldPositionJacobian(
+      const JacobianNode* _node);
+
+  // Documentation inherited
   math::Jacobian getWorldJacobian(const JacobianNode* _node) const override;
 
   // Documentation inherited

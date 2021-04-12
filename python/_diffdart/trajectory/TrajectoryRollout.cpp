@@ -53,9 +53,6 @@ namespace python {
 void TrajectoryRollout(py::module& m)
 {
   ::py::class_<dart::trajectory::TrajectoryRollout>(m, "TrajectoryRollout")
-      .def(
-          "getRepresentationMapping",
-          &dart::trajectory::TrajectoryRollout::getRepresentationMapping)
       .def("getMappings", &dart::trajectory::TrajectoryRollout::getMappings)
       .def(
           "getPoses",

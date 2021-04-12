@@ -242,7 +242,6 @@ bool verifyShotJacobian(
   if (mapping != nullptr)
   {
     shot.addMapping("custom", mapping);
-    stateSize = mapping->getPosDim() + mapping->getVelDim();
   }
 
   int dim = shot.getFlatProblemDim(world);

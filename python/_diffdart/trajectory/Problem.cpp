@@ -249,12 +249,6 @@ void Problem(py::module& m)
           &dart::trajectory::Problem::getPinnedForce,
           ::py::arg("time"))
       .def(
-          "switchRepresentationMapping",
-          &dart::trajectory::Problem::switchRepresentationMapping,
-          ::py::arg("world"),
-          ::py::arg("representation"),
-          ::py::arg("perfLog") = nullptr)
-      .def(
           "addMapping",
           &dart::trajectory::Problem::addMapping,
           ::py::arg("key"),
@@ -275,9 +269,6 @@ void Problem(py::module& m)
       .def(
           "getRepresentationStateSize",
           &dart::trajectory::Problem::getRepresentationStateSize)
-      .def(
-          "getRepresentationName",
-          &dart::trajectory::Problem::getRepresentationName)
       .def(
           "getFlatProblemDim",
           &dart::trajectory::Problem::getFlatProblemDim,

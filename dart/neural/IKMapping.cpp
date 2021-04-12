@@ -14,8 +14,28 @@ namespace neural {
 
 //==============================================================================
 IKMapping::IKMapping(std::shared_ptr<simulation::World> world)
+  : mIKIterationLimit(100)
 {
   mMassDim = world->getMassDims();
+}
+
+//==============================================================================
+void IKMapping::setIKIterationLimit(int limit)
+{
+  if (limit == -1)
+  {
+    mIKIterationLimit = 100000;
+  }
+  else
+  {
+    mIKIterationLimit = limit;
+  }
+}
+
+//==============================================================================
+int IKMapping::getIKIterationLimit()
+{
+  return mIKIterationLimit;
 }
 
 //==============================================================================
@@ -61,7 +81,7 @@ int IKMapping::getMassDim()
 }
 
 //==============================================================================
-#define DART_NEURAL_LOG_IK_OUTPUT
+// #define DART_NEURAL_LOG_IK_OUTPUT
 void IKMapping::setPositions(
     std::shared_ptr<simulation::World> world,
     const Eigen::Ref<Eigen::VectorXs>& positions)
@@ -74,7 +94,8 @@ void IKMapping::setPositions(
   // guess.
   s_t error = std::numeric_limits<s_t>::infinity();
   s_t lr = 0.05;
-  for (int i = 0; i < 100; i++)
+  bool useTranspose = false;
+  for (int i = 0; i < mIKIterationLimit; i++)
   {
     Eigen::VectorXs diff = positions - getPositions(world);
     s_t newError = diff.squaredNorm();
@@ -109,11 +130,22 @@ void IKMapping::setPositions(
       // Slowly grow LR while we're safely decreasing loss
       lr *= 1.1;
     }
+    if (lr < 1e-4)
+    {
+      useTranspose = true;
+    }
 
     Eigen::MatrixXs J = getPosJacobian(world);
-    // Eigen::VectorXs delta
-    // = J.transpose() * diff; // math::dampedPInv(J, diff, 0.05);
-    Eigen::VectorXs delta = J.completeOrthogonalDecomposition().solve(diff);
+    Eigen::VectorXs delta;
+
+    if (useTranspose)
+    {
+      delta = J.transpose() * diff;
+    }
+    else
+    {
+      delta = J.completeOrthogonalDecomposition().solve(diff);
+    }
 #ifdef DART_NEURAL_LOG_IK_OUTPUT
     // std::cout << "IK Diff: " << std::endl << diff << std::endl;
     // std::cout << "IK J: " << std::endl << J << std::endl;
@@ -140,7 +172,7 @@ void IKMapping::setForces(
     std::shared_ptr<simulation::World> world,
     const Eigen::Ref<Eigen::VectorXs>& forces)
 {
-  world->setExternalForces(getVelJacobianInverse(world) * forces);
+  world->setExternalForces(getVelJacobian(world).transpose() * forces);
 }
 
 //==============================================================================
@@ -398,7 +430,6 @@ Eigen::MatrixXs IKMapping::getPosJacobian(
 
       if (entry.type == NODE_SPATIAL)
       {
-        skel->getWorldJacobian(node);
         jac.block(cursor, offset, 6, dofs)
             = skel->getWorldPositionJacobian(node);
         cursor += 6;

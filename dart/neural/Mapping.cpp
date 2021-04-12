@@ -202,12 +202,12 @@ Eigen::MatrixXs Mapping::finiteDifferenceRiddersRealPosToMappedPosJac(
       stepSize /= con;
 
       Eigen::VectorXs perturbed = originalWorld;
-      perturbed(i) += originalStepSize;
+      perturbed(i) += stepSize;
       world->setPositions(perturbed);
       Eigen::VectorXs perturbedWorldPos = getPositions(world);
 
       perturbed = originalWorld;
-      perturbed(i) -= originalStepSize;
+      perturbed(i) -= stepSize;
       world->setPositions(perturbed);
       Eigen::VectorXs perturbedWorldNeg = getPositions(world);
 
@@ -331,12 +331,12 @@ Eigen::MatrixXs Mapping::finiteDifferenceRiddersRealVelToMappedPosJac(
       stepSize /= con;
 
       Eigen::VectorXs perturbed = originalWorld;
-      perturbed(i) += originalStepSize;
+      perturbed(i) += stepSize;
       world->setVelocities(perturbed);
       Eigen::VectorXs perturbedWorldPos = getPositions(world);
 
       perturbed = originalWorld;
-      perturbed(i) -= originalStepSize;
+      perturbed(i) -= stepSize;
       world->setVelocities(perturbed);
       Eigen::VectorXs perturbedWorldNeg = getPositions(world);
 
@@ -460,12 +460,12 @@ Eigen::MatrixXs Mapping::finiteDifferenceRiddersRealVelToMappedVelJac(
       stepSize /= con;
 
       Eigen::VectorXs perturbed = originalWorld;
-      perturbed(i) += originalStepSize;
+      perturbed(i) += stepSize;
       world->setVelocities(perturbed);
       Eigen::VectorXs perturbedWorldPos = getVelocities(world);
 
       perturbed = originalWorld;
-      perturbed(i) -= originalStepSize;
+      perturbed(i) -= stepSize;
       world->setVelocities(perturbed);
       Eigen::VectorXs perturbedWorldNeg = getVelocities(world);
 
@@ -516,7 +516,7 @@ Eigen::MatrixXs Mapping::finiteDifferenceRealPosToMappedVelJac(
   RestorableSnapshot snapshot(world);
 
   Eigen::VectorXs originalWorld = world->getPositions();
-  Eigen::VectorXs originalMapped = getPositions(world);
+  Eigen::VectorXs originalMapped = getVelocities(world);
   int dofs = world->getNumDofs();
   int mappedDim = getPosDim();
 
@@ -589,12 +589,12 @@ Eigen::MatrixXs Mapping::finiteDifferenceRiddersRealPosToMappedVelJac(
       stepSize /= con;
 
       Eigen::VectorXs perturbed = originalWorld;
-      perturbed(i) += originalStepSize;
+      perturbed(i) += stepSize;
       world->setPositions(perturbed);
       Eigen::VectorXs perturbedWorldPos = getVelocities(world);
 
       perturbed = originalWorld;
-      perturbed(i) -= originalStepSize;
+      perturbed(i) -= stepSize;
       world->setPositions(perturbed);
       Eigen::VectorXs perturbedWorldNeg = getVelocities(world);
 

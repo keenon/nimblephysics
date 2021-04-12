@@ -89,13 +89,6 @@ void Mapping(py::module& m)
           ::py::arg("world"))
       .def("getForces", &dart::neural::Mapping::getForces, ::py::arg("world"))
       .def(
-          "getMappedPosToRealPosJac",
-          &dart::neural::Mapping::getMappedPosToRealPosJac,
-          ::py::arg("world"),
-          "This returns a Jacobian that transforms the rate of change of the "
-          "position in the mapped space to the rate of change of the position "
-          "in the 'real' space given by the world.")
-      .def(
           "getRealPosToMappedPosJac",
           &dart::neural::Mapping::getRealPosToMappedPosJac,
           ::py::arg("world"),
@@ -110,13 +103,6 @@ void Mapping(py::module& m)
           "position in the 'real' space given by the world to the rate of "
           "change of the velocity in mapped space.")
       .def(
-          "getMappedVelToRealVelJac",
-          &dart::neural::Mapping::getMappedVelToRealVelJac,
-          ::py::arg("world"),
-          "This returns a Jacobian that transforms the rate of change of the "
-          "velocity in the mapped space to the rate of change of the velocity "
-          "in the 'real' space given by the world.")
-      .def(
           "getRealVelToMappedVelJac",
           &dart::neural::Mapping::getRealVelToMappedVelJac,
           ::py::arg("world"),
@@ -130,13 +116,6 @@ void Mapping(py::module& m)
           "This returns a Jacobian that transforms the rate of change of the "
           "velocity in the 'real' space given by the world to the rate of "
           "change of the position in mapped space.")
-      .def(
-          "getMappedForceToRealForceJac",
-          &dart::neural::Mapping::getMappedForceToRealForceJac,
-          ::py::arg("world"),
-          "This returns a Jacobian that transforms the rate of change of the "
-          "force in the mapped space to the rate of change of the force "
-          "in the 'real' space given by the world.")
       .def(
           "getRealForceToMappedForceJac",
           &dart::neural::Mapping::getRealForceToMappedForceJac,

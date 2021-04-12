@@ -93,22 +93,38 @@ bool checkOutOfOrderBackprop(WorldPtr world)
 
   for (int i = 0; i < STEPS; i++)
   {
+    RestorableSnapshot snapshot(world1);
+    world1->setPositions(snapshots1[i]->getPreStepPosition());
+    world1->setVelocities(snapshots1[i]->getPreStepVelocity());
+    world1->setExternalForces(snapshots1[i]->getPreStepTorques());
+    world1->setCachedLCPSolution(snapshots1[i]->getPreStepLCPCache());
+
     snapshots1[i]->getPosPosJacobian(world1);
     snapshots1[i]->getVelPosJacobian(world1);
     snapshots1[i]->getPosVelJacobian(world1);
     snapshots1[i]->getForceVelJacobian(world1);
     snapshots1[i]->getVelVelJacobian(world1);
+
+    snapshot.restore();
   }
 
   // Run the second set backwards
 
   for (int i = STEPS - 1; i >= 0; i--)
   {
+    RestorableSnapshot snapshot(world2);
+    world2->setPositions(snapshots2[i]->getPreStepPosition());
+    world2->setVelocities(snapshots2[i]->getPreStepVelocity());
+    world2->setExternalForces(snapshots2[i]->getPreStepTorques());
+    world2->setCachedLCPSolution(snapshots2[i]->getPreStepLCPCache());
+
     snapshots2[i]->getPosPosJacobian(world2);
     snapshots2[i]->getVelPosJacobian(world2);
     snapshots2[i]->getPosVelJacobian(world2);
     snapshots2[i]->getForceVelJacobian(world2);
     snapshots2[i]->getVelVelJacobian(world2);
+
+    snapshot.restore();
   }
 
   ///////////////////////////////////////////////
@@ -117,6 +133,18 @@ bool checkOutOfOrderBackprop(WorldPtr world)
 
   for (int i = 0; i < STEPS; i++)
   {
+    RestorableSnapshot restorableSnapshot1(world1);
+    world1->setPositions(snapshots1[i]->getPreStepPosition());
+    world1->setVelocities(snapshots1[i]->getPreStepVelocity());
+    world1->setExternalForces(snapshots1[i]->getPreStepTorques());
+    world1->setCachedLCPSolution(snapshots1[i]->getPreStepLCPCache());
+
+    RestorableSnapshot restorableSnapshot2(world2);
+    world2->setPositions(snapshots2[i]->getPreStepPosition());
+    world2->setVelocities(snapshots2[i]->getPreStepVelocity());
+    world2->setExternalForces(snapshots2[i]->getPreStepTorques());
+    world2->setCachedLCPSolution(snapshots2[i]->getPreStepLCPCache());
+
     if (!equals(
             snapshots1[i]->getPosPosJacobian(world1),
             snapshots2[i]->getPosPosJacobian(world2),
@@ -157,6 +185,9 @@ bool checkOutOfOrderBackprop(WorldPtr world)
       std::cout << "Off on force-vel Jac at step " << i << std::endl;
       return false;
     }
+
+    restorableSnapshot1.restore();
+    restorableSnapshot2.restore();
   }
   return true;
 }
@@ -403,6 +434,19 @@ TEST(TRAJECTORY, JUMP_WORM)
   {
     BackpropSnapshotPtr b1 = snapshots1[i]->getUnderlyingSnapshot();
     BackpropSnapshotPtr b2 = snapshots2[i]->getUnderlyingSnapshot();
+
+    std::shared_ptr<simulation::World> world1 = world->clone();
+    world1->setPositions(snapshots1[i]->getPreStepPosition());
+    world1->setVelocities(snapshots1[i]->getPreStepVelocity());
+    world1->setExternalForces(snapshots1[i]->getPreStepTorques());
+    world1->setCachedLCPSolution(snapshots1[i]->getPreStepLCPCache());
+
+    std::shared_ptr<simulation::World> world2 = world->clone();
+    world2->setPositions(snapshots2[i]->getPreStepPosition());
+    world2->setVelocities(snapshots2[i]->getPreStepVelocity());
+    world2->setExternalForces(snapshots2[i]->getPreStepTorques());
+    world2->setCachedLCPSolution(snapshots2[i]->getPreStepLCPCache());
+
     if (!equals(b1->getPreStepPosition(), b2->getPreStepPosition(), 0.0))
     {
       std::cout << "Off on pre-step pos at step " << i << std::endl;
@@ -436,18 +480,18 @@ TEST(TRAJECTORY, JUMP_WORM)
                 << std::endl;
     }
     if (!equals(
-            b1->getPosPosJacobian(world), b2->getPosPosJacobian(world), 0.0))
+            b1->getPosPosJacobian(world1), b2->getPosPosJacobian(world2), 0.0))
     {
       std::cout << "Off on pos-pos Jac at step " << i << std::endl;
     }
     if (!equals(
-            b1->getVelPosJacobian(world), b2->getVelPosJacobian(world), 0.0))
+            b1->getVelPosJacobian(world1), b2->getVelPosJacobian(world2), 0.0))
     {
       std::cout << "Off on vel-pos Jac at step " << i << std::endl;
     }
     if (!equals(
-            snapshots1[i]->getUnderlyingSnapshot()->getPosVelJacobian(world),
-            snapshots2[i]->getUnderlyingSnapshot()->getPosVelJacobian(world),
+            snapshots1[i]->getUnderlyingSnapshot()->getPosVelJacobian(world1),
+            snapshots2[i]->getUnderlyingSnapshot()->getPosVelJacobian(world2),
             0.0))
     {
       std::cout << "Off on pos-vel Jac at step " << i << std::endl;
@@ -760,15 +804,15 @@ TEST(TRAJECTORY, JUMP_WORM)
       }
     }
     if (!equals(
-            snapshots1[i]->getUnderlyingSnapshot()->getVelVelJacobian(world),
-            snapshots2[i]->getUnderlyingSnapshot()->getVelVelJacobian(world),
+            snapshots1[i]->getUnderlyingSnapshot()->getVelVelJacobian(world1),
+            snapshots2[i]->getUnderlyingSnapshot()->getVelVelJacobian(world2),
             0.0))
     {
       std::cout << "Off on vel-vel Jac at step " << i << std::endl;
     }
     if (!equals(
-            snapshots1[i]->getUnderlyingSnapshot()->getForceVelJacobian(world),
-            snapshots2[i]->getUnderlyingSnapshot()->getForceVelJacobian(world),
+            snapshots1[i]->getUnderlyingSnapshot()->getForceVelJacobian(world1),
+            snapshots2[i]->getUnderlyingSnapshot()->getForceVelJacobian(world2),
             0.0))
     {
       std::cout << "Off on force-vel Jac at step " << i << std::endl;

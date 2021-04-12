@@ -241,6 +241,14 @@ Eigen::Vector3s expMapGradient(const Eigen::Vector3s& pos, int _qi);
 Eigen::Vector3s expMapNestedGradient(
     const Eigen::Vector3s& original, const Eigen::Vector3s& screw);
 
+Eigen::Vector3s finiteDifferenceExpMapNestedGradient(
+    const Eigen::Vector3s& original,
+    const Eigen::Vector3s& screw,
+    bool useRidders = true);
+
+Eigen::Vector3s finiteDifferenceRiddersExpMapNestedGradient(
+    const Eigen::Vector3s& original, const Eigen::Vector3s& screw);
+
 /// \brief Log mapping
 /// \note When @f$|Log(R)| = @pi@f$, Exp(LogR(R) = Exp(-Log(R)).
 /// The implementation returns only the positive one.
