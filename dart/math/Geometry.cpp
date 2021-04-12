@@ -38,6 +38,7 @@
 #include <iomanip>
 #include <iostream>
 #include <vector>
+#include <array>
 
 #include "dart/common/Console.hpp"
 #include "dart/math/Helpers.hpp"
