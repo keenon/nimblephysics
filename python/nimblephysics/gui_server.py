@@ -2,7 +2,7 @@ from http.server import HTTPServer, SimpleHTTPRequestHandler, ThreadingHTTPServe
 from http import HTTPStatus
 import os
 import pathlib
-import diffdart as dart
+import nimblephysics as nimble
 import random
 import typing
 import threading
@@ -36,9 +36,9 @@ def createRequestHandler():
     return LocalHTTPRequestHandler
 
 
-class DartGUI:
+class NimbleGUI:
     def __init__(self):
-        self.guiServer = dart.server.GUIWebsocketServer()
+        self.guiServer = nimble.server.GUIWebsocketServer()
 
     def serve(self, port):
         self.guiServer.serve(8070)
@@ -49,7 +49,7 @@ class DartGUI:
         t.daemon = True
         t.start()
 
-    def stateMachine(self) -> dart.server.GUIWebsocketServer:
+    def stateMachine(self) -> nimble.server.GUIWebsocketServer:
         return self.guiServer
 
     def stopServing(self):

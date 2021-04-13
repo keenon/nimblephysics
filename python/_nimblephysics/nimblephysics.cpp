@@ -53,9 +53,9 @@ void dart_performance(py::module& m);
 void dart_realtime(py::module& m);
 void dart_server(py::module& m);
 
-PYBIND11_MODULE(_diffdart, m)
+PYBIND11_MODULE(_nimblephysics, m)
 {
-  m.doc() = "diffdart: Python API of DiffDART";
+  m.doc() = "nimblephysics: Python API of Nimble";
 
   eigen_geometry(m);
 

@@ -1,11 +1,11 @@
-import diffdart as dart
+import nimblephysics as nimble
 import torch
 from typing import Tuple, Callable, List
 import numpy as np
 import math
 
 
-class DartMapPosition(torch.autograd.Function):
+class MapLayer(torch.autograd.Function):
     """
     This allows you to use an arbitrary mapping as a standalone PyTorch function
     """
@@ -17,12 +17,12 @@ class DartMapPosition(torch.autograd.Function):
         doesn't have any type annotations and otherwise mypy will complain, so here
         are the types:
 
-        world: dart.simulation.World
-        mapping: dart.neural.Mapping
+        world: nimble.simulation.World
+        mapping: nimble.neural.Mapping
         pos: torch.Tensor
         -> torch.Tensor
         """
-        m: dart.neural.Mapping = mapping
+        m: nimble.neural.Mapping = mapping
         world.setPositions(pos.detach().numpy())
         mappedPos = mapping.getPositions(world)
         ctx.into = m.getRealPosToMappedPosJac(world)
@@ -40,9 +40,9 @@ class DartMapPosition(torch.autograd.Function):
         )
 
 
-def dart_map_pos(
-        world: dart.simulation.World, map: dart.neural.Mapping, pos: torch.Tensor) -> torch.Tensor:
+def map(
+        world: nimble.simulation.World, map: nimble.neural.Mapping, pos: torch.Tensor) -> torch.Tensor:
     """
     This maps the positions into the mapping passed in, storing necessary info in order to do a backwards pass.
     """
-    return DartMapPosition.apply(world, map, pos)  # type: ignore
+    return MapLayer.apply(world, map, pos)  # type: ignore

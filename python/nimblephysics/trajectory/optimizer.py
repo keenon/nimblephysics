@@ -3,7 +3,7 @@ from diffdart import DartTorchLossFn, DartTorchTrajectoryRollout, DartGUI
 import numpy as np
 
 
-class GUITrajectoryTrainer:
+class NativeTrajectoryTrainer:
   def __init__(self, world: dart.simulation.World, problem: dart.trajectory.Problem,
                optimizer: dart.trajectory.IPOptOptimizer):
     self.world = world.clone()

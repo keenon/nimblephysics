@@ -1,4 +1,4 @@
-import diffdart_libs._diffdart as dart
+import nimblephysics_libs._nimblephysics as nimble
 import torch
 from typing import Tuple, Callable, List
 import numpy as np
@@ -10,7 +10,7 @@ class BackpropSnapshotPointer:
     self.backprop_snapshot = None
 
 
-class DartLayer(torch.autograd.Function):
+class TimestepLayer(torch.autograd.Function):
   """
   This implements a single, differentiable timestep of DART as a PyTorch layer
   """
@@ -22,7 +22,7 @@ class DartLayer(torch.autograd.Function):
     doesn't have any type annotations and otherwise mypy will complain, so here
     are the types:
 
-    world: dart.simulation.World
+    world: nimble.simulation.World
     pos: torch.Tensor
     vel: torch.Tensor
     torque: torch.Tensor
@@ -33,7 +33,7 @@ class DartLayer(torch.autograd.Function):
     world.setPositions(pos.detach().numpy())
     world.setVelocities(vel.detach().numpy())
     world.setControlForces(torque.detach().numpy())
-    backprop_snapshot: dart.neural.BackpropSnapshot = dart.neural.forwardPass(world)
+    backprop_snapshot: nimble.neural.BackpropSnapshot = nimble.neural.forwardPass(world)
     ctx.backprop_snapshot = backprop_snapshot
     ctx.world = world
 
@@ -49,16 +49,16 @@ class DartLayer(torch.autograd.Function):
     with respect to the output, and we need to compute the gradient of the loss
     with respect to the input.
     """
-    backprop_snapshot: dart.neural.BackpropSnapshot = ctx.backprop_snapshot
-    world: dart.simulation.World = ctx.world
+    backprop_snapshot: nimble.neural.BackpropSnapshot = ctx.backprop_snapshot
+    world: nimble.simulation.World = ctx.world
 
     # Set up the gradients for backprop
-    nextTimestepGrad: dart.neural.LossGradient = dart.neural.LossGradient()
+    nextTimestepGrad: nimble.neural.LossGradient = nimble.neural.LossGradient()
     nextTimestepGrad.lossWrtPosition = grad_pos.detach().numpy()
     nextTimestepGrad.lossWrtVelocity = grad_vel.detach().numpy()
 
     # Run backprop, writing values into thisTimestepGrad
-    thisTimestepGrad: dart.neural.LossGradient = dart.neural.LossGradient()
+    thisTimestepGrad: nimble.neural.LossGradient = nimble.neural.LossGradient()
     backprop_snapshot.backprop(world, thisTimestepGrad, nextTimestepGrad)
 
     """
@@ -86,11 +86,11 @@ class DartLayer(torch.autograd.Function):
     )
 
 
-def dart_layer(world: dart.simulation.World, pos: torch.Tensor, vel: torch.Tensor,
+def timestep(world: nimble.simulation.World, pos: torch.Tensor, vel: torch.Tensor,
                torque: torch.Tensor, pointer: BackpropSnapshotPointer = None) -> Tuple[torch.Tensor,
                                                                                        torch.Tensor]:
   """
   This does a forward pass on the `world` that gets passed in, storing information needed
   in order to do a backwards pass.
   """
-  return DartLayer.apply(world, pos, vel, torque, pointer)  # type: ignore
+  return TimestepLayer.apply(world, pos, vel, torque, pointer)  # type: ignore

@@ -11,7 +11,7 @@ endif()
 # )
 # if(NOT PythonInterp_FOUND)
 #   message(STATUS "DART_BUILD_DARTPY is ON, but failed to find PythonInterp. "
-#     "Disabling _diffdart."
+#     "Disabling _nimblephysics."
 #   )
 #   return()
 # endif()
@@ -19,7 +19,7 @@ endif()
 # find_package(PythonLibs ${DARTPY_PYTHON_VERSION} QUIET)
 # if(NOT PythonLibs_FOUND)
 #   message(STATUS "DART_BUILD_DARTPY is ON, but failed to find PythonLibs. "
-#     "Disabling _diffdart."
+#     "Disabling _nimblephysics."
 #   )
 #   return()
 # endif()
@@ -39,7 +39,7 @@ set(PYBIND11_PYTHON_VERSION ${DARTPY_PYTHON_VERSION})
 find_package(pybind11 2.2.0 QUIET)
 if(NOT pybind11_FOUND)
   message(STATUS "DART_BUILD_DARTPY is ON, but failed to find pybind11 >= "
-    "2.2.0. Disabling _diffdart."
+    "2.2.0. Disabling _nimblephysics."
   )
   return()
 endif()
@@ -47,23 +47,23 @@ endif()
 message(STATUS "PYTHON_INCLUDE_DIRS: ${PYTHON_INCLUDE_DIRS}")
 message(STATUS "pybind11_INCLUDE_DIRS: ${pybind11_INCLUDE_DIRS}")
 
-file(GLOB_RECURSE _diffdart_headers "*.h" "*.hpp")
-file(GLOB_RECURSE _diffdart_sources "*.cpp")
+file(GLOB_RECURSE _nimblephysics_headers "*.h" "*.hpp")
+file(GLOB_RECURSE _nimblephysics_sources "*.cpp")
 
 # Build a Python extension module:
 # pybind11_add_module(<name> [MODULE | SHARED] [EXCLUDE_FROM_ALL]
 #                     [NO_EXTRAS] [SYSTEM] [THIN_LTO] source1 [source2 ...])
 #
-pybind11_add_module(_diffdart
+pybind11_add_module(_nimblephysics
   MODULE
-  ${_diffdart_headers}
-  ${_diffdart_sources}
+  ${_nimblephysics_headers}
+  ${_nimblephysics_sources}
 )
 
 # Add C++14 support
-set_property(TARGET _diffdart PROPERTY CXX_STANDARD 14)
+set_property(TARGET _nimblephysics PROPERTY CXX_STANDARD 14)
 
-target_include_directories(_diffdart
+target_include_directories(_nimblephysics
   SYSTEM PUBLIC
     ${PYTHON_INCLUDE_DIRS}
     ${pybind11_INCLUDE_DIRS}
@@ -71,29 +71,29 @@ target_include_directories(_diffdart
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
-target_link_libraries(_diffdart
+target_link_libraries(_nimblephysics
   PUBLIC
     dart
     # dart-utils
     dart-utils-urdf
 )
 
-set_target_properties(_diffdart
+set_target_properties(_nimblephysics
   PROPERTIES
     PREFIX ""
     SUFFIX ".so"  # python uses '.so' extension even on macOS
     DEBUG_POSTFIX ""
 )
 
-# install(TARGETS _diffdart
+# install(TARGETS _nimblephysics
 #   LIBRARY DESTINATION "${PYTHON_SITE_PACKAGES}"
 # )
 
-list(REMOVE_ITEM _diffdart_headers
+list(REMOVE_ITEM _nimblephysics_headers
   ${CMAKE_CURRENT_LIST_DIR}/eigen_geometry_pybind.h
   ${CMAKE_CURRENT_LIST_DIR}/eigen_pybind.h
 )
-list(REMOVE_ITEM _diffdart_sources
+list(REMOVE_ITEM _nimblephysics_sources
   ${CMAKE_CURRENT_LIST_DIR}/eigen_geometry_pybind.cpp
 )
-dart_format_add(${_diffdart_headers} ${_diffdart_sources})
+dart_format_add(${_nimblephysics_headers} ${_nimblephysics_sources})

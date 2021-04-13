@@ -4,7 +4,7 @@ from typing import Dict, Callable
 import numpy as np
 
 
-class DartTorchTrajectoryRollout:
+class NativeTrajectoryRollout:
   def __init__(self, rollout: dart.trajectory.TrajectoryRollout):
     self.rollout = rollout
 
@@ -49,7 +49,7 @@ class DartTorchTrajectoryRollout:
       np.copyto(gradWrtRollout.getMasses(), massGrad.numpy())
 
 
-def DartTorchLossFn(fn: Callable[[DartTorchTrajectoryRollout], torch.Tensor]):
+def NativeLossFn(fn: Callable[[DartTorchTrajectoryRollout], torch.Tensor]):
   def loss(trajectory):
     dartTorchTrajectory = DartTorchTrajectoryRollout(trajectory)
     return fn(dartTorchTrajectory).item()

@@ -96,7 +96,7 @@ with open('VERSION.txt', 'r') as file:
 print("VERSION: "+VERSION)
 
 setup(
-    name='diffdart',
+    name='nimblephysics',
     version=VERSION,
     author='Keenon Werling',
     author_email='keenonwerling@gmail.com',
@@ -104,10 +104,10 @@ setup(
     long_description='',
     license='MIT',
     package_dir={'': 'python'},
-    packages=['diffdart'],
-    package_data={'diffdart': ['web_gui/*']},
-    ext_package='diffdart_libs',
-    ext_modules=[CMakeExtension('cmake_example', target='_diffdart')],
+    packages=['nimblephysics'],
+    package_data={'nimblephysics': ['web_gui/*']},
+    ext_package='nimblephysics_libs',
+    ext_modules=[CMakeExtension('cmake_example', target='_nimblephysics')],
     install_requires=[
         'torch',
         'numpy'
