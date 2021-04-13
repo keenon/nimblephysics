@@ -1,12 +1,12 @@
 # ![Stanford DiffDART](http://www.diffdart.org/assets/images/logos.svg)
 
-[![Build Status](https://dev.azure.com/keenonwerling/diffdart/_apis/build/status/keenon.diffdart?branchName=master)](https://dev.azure.com/keenonwerling/diffdart/_build/latest?definitionId=1&branchName=master)
+[![Build Status](https://dev.azure.com/keenonwerling/nimblephysics/_apis/build/status/keenon.nimblephysics?branchName=master)](https://dev.azure.com/keenonwerling/nimblephysics/_build/latest?definitionId=1&branchName=master)
 
-# Stanford DiffDART
+# Stanford Nimble
 
-`pip3 install diffdart`
+`pip3 install nimblephysics`
 
-** WARNING: PRE-ALPHA SOFTWARE! EXPECT BUGS! **
+** BETA SOFTWARE **
 
 Use physics as a non-linearity in your neural network! We've got a forward pass, which is a single physics timestep:
 
