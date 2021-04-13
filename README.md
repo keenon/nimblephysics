@@ -1,4 +1,4 @@
-# ![Stanford DiffDART](http://www.diffdart.org/assets/images/logos.svg)
+![Stanford Nimble Logo](https://nimblephysics.org/README/README_Splash.svg)
 
 [![Build Status](https://dev.azure.com/keenonwerling/nimblephysics/_apis/build/status/keenon.nimblephysics?branchName=master)](https://dev.azure.com/keenonwerling/nimblephysics/_build/latest?definitionId=1&branchName=master)
 
@@ -8,23 +8,23 @@
 
 ** BETA SOFTWARE **
 
-Use physics as a non-linearity in your neural network! We've got a forward pass, which is a single physics timestep:
+Use physics as a non-linearity in your neural network. A single timestep, `nimble.timestep(state, controls)`, is a valid PyTorch function.
 
-![Forward pass illustration](http://www.diffdart.org/assets/images/data-flow-fwd.svg)
+![Forward pass illustration](https://nimblephysics.org/README/README_DataFlow_Fwd.svg)
 
-And an analytical backwards pass, that works even through contact and friction!
+We support an analytical backwards pass, that works even through contact and friction.
 
-![Backpropagation illustration](http://www.diffdart.org/assets/images/data-flow-back.svg)
+![Backpropagation illustration](https://nimblephysics.org/README/README_DataFlow_Back.svg)
 
 It's as easy as:
 
 ```python
-from diffdart import dart_layer
+from nimble import timestep
 
 # Everything is a PyTorch Tensor, and this is differentiable!!
-next_positions, next_velocities = dart_layer(world, positions, velocities, forces)
+next_state = timestep(world, current_state, control_forces)
 ```
 
-This is a fork of the popular DART physics engine, with analytical gradients and a PyTorch binding.
+Nimble started life as a fork of the popular DART physics engine, with analytical gradients and a PyTorch binding. We've worked hard to maintain as much backwards compatability as we can, so many simulations that worked in DART should translate directly to Nimble.
 
 Check out our [website](http://www.diffdart.org) for more information.
