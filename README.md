@@ -1,6 +1,6 @@
 ![Stanford Nimble Logo](https://nimblephysics.org/README/README_Splash.svg)
 
-[![Build Status](https://dev.azure.com/keenonwerling/nimblephysics/_apis/build/status/keenon.nimblephysics?branchName=master)](https://dev.azure.com/keenonwerling/nimblephysics/_build/latest?definitionId=1&branchName=master)
+[![Build Status](https://dev.azure.com/keenonwerling/diffdart/_apis/build/status/keenon.nimblephysics?branchName=master)](https://dev.azure.com/keenonwerling/diffdart/_build/latest?definitionId=1&branchName=master)
 
 # Stanford Nimble
 
