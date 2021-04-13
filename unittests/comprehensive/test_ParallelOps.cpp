@@ -96,13 +96,13 @@ bool checkOutOfOrderBackprop(WorldPtr world)
     RestorableSnapshot snapshot(world1);
     world1->setPositions(snapshots1[i]->getPreStepPosition());
     world1->setVelocities(snapshots1[i]->getPreStepVelocity());
-    world1->setExternalForces(snapshots1[i]->getPreStepTorques());
+    world1->setControlForces(snapshots1[i]->getPreStepTorques());
     world1->setCachedLCPSolution(snapshots1[i]->getPreStepLCPCache());
 
     snapshots1[i]->getPosPosJacobian(world1);
     snapshots1[i]->getVelPosJacobian(world1);
     snapshots1[i]->getPosVelJacobian(world1);
-    snapshots1[i]->getForceVelJacobian(world1);
+    snapshots1[i]->getControlForceVelJacobian(world1);
     snapshots1[i]->getVelVelJacobian(world1);
 
     snapshot.restore();
@@ -115,13 +115,13 @@ bool checkOutOfOrderBackprop(WorldPtr world)
     RestorableSnapshot snapshot(world2);
     world2->setPositions(snapshots2[i]->getPreStepPosition());
     world2->setVelocities(snapshots2[i]->getPreStepVelocity());
-    world2->setExternalForces(snapshots2[i]->getPreStepTorques());
+    world2->setControlForces(snapshots2[i]->getPreStepTorques());
     world2->setCachedLCPSolution(snapshots2[i]->getPreStepLCPCache());
 
     snapshots2[i]->getPosPosJacobian(world2);
     snapshots2[i]->getVelPosJacobian(world2);
     snapshots2[i]->getPosVelJacobian(world2);
-    snapshots2[i]->getForceVelJacobian(world2);
+    snapshots2[i]->getControlForceVelJacobian(world2);
     snapshots2[i]->getVelVelJacobian(world2);
 
     snapshot.restore();
@@ -136,13 +136,13 @@ bool checkOutOfOrderBackprop(WorldPtr world)
     RestorableSnapshot restorableSnapshot1(world1);
     world1->setPositions(snapshots1[i]->getPreStepPosition());
     world1->setVelocities(snapshots1[i]->getPreStepVelocity());
-    world1->setExternalForces(snapshots1[i]->getPreStepTorques());
+    world1->setControlForces(snapshots1[i]->getPreStepTorques());
     world1->setCachedLCPSolution(snapshots1[i]->getPreStepLCPCache());
 
     RestorableSnapshot restorableSnapshot2(world2);
     world2->setPositions(snapshots2[i]->getPreStepPosition());
     world2->setVelocities(snapshots2[i]->getPreStepVelocity());
-    world2->setExternalForces(snapshots2[i]->getPreStepTorques());
+    world2->setControlForces(snapshots2[i]->getPreStepTorques());
     world2->setCachedLCPSolution(snapshots2[i]->getPreStepLCPCache());
 
     if (!equals(
@@ -178,8 +178,8 @@ bool checkOutOfOrderBackprop(WorldPtr world)
       return false;
     }
     if (!equals(
-            snapshots1[i]->getForceVelJacobian(world1),
-            snapshots2[i]->getForceVelJacobian(world2),
+            snapshots1[i]->getControlForceVelJacobian(world1),
+            snapshots2[i]->getControlForceVelJacobian(world2),
             0.0))
     {
       std::cout << "Off on force-vel Jac at step " << i << std::endl;
@@ -248,8 +248,8 @@ BodyNode* createTailSegment(BodyNode* parent, Eigen::Vector3s color)
   ShapeNode* poleShape
       = pole->createShapeNodeWith<VisualAspect, CollisionAspect>(shape);
   poleShape->getVisualAspect()->setColor(color);
-  poleJoint->setForceUpperLimit(0, 100.0);
-  poleJoint->setForceLowerLimit(0, -100.0);
+  poleJoint->setControlForceUpperLimit(0, 100.0);
+  poleJoint->setControlForceLowerLimit(0, -100.0);
   poleJoint->setVelocityUpperLimit(0, 100.0);
   poleJoint->setVelocityLowerLimit(0, -100.0);
   poleJoint->setPositionUpperLimit(0, 270 * 3.1415 / 180);
@@ -292,10 +292,10 @@ TEST(TRAJECTORY, JUMP_WORM)
       = root->createShapeNodeWith<VisualAspect, CollisionAspect>(shape);
   Eigen::Vector3s black = Eigen::Vector3s::Zero();
   rootVisual->getVisualAspect()->setColor(black);
-  rootJoint->setForceUpperLimit(0, 0);
-  rootJoint->setForceLowerLimit(0, 0);
-  rootJoint->setForceUpperLimit(1, 0);
-  rootJoint->setForceLowerLimit(1, 0);
+  rootJoint->setControlForceUpperLimit(0, 0);
+  rootJoint->setControlForceLowerLimit(0, 0);
+  rootJoint->setControlForceUpperLimit(1, 0);
+  rootJoint->setControlForceLowerLimit(1, 0);
   rootJoint->setVelocityUpperLimit(0, 1000.0);
   rootJoint->setVelocityLowerLimit(0, -1000.0);
   rootJoint->setVelocityUpperLimit(1, 1000.0);
@@ -347,7 +347,7 @@ TEST(TRAJECTORY, JUMP_WORM)
     const Eigen::Ref<const Eigen::MatrixXs> vels
         = rollout->getVelsConst("identity");
     const Eigen::Ref<const Eigen::MatrixXs> forces
-        = rollout->getForcesConst("identity");
+        = rollout->getControlForcesConst("identity");
 
     s_t maxPos = -1000;
     s_t minPos = 1000;
@@ -380,13 +380,13 @@ TEST(TRAJECTORY, JUMP_WORM)
            /* OUT */ TrajectoryRollout* gradWrtRollout) {
           gradWrtRollout->getPoses("identity").setZero();
           gradWrtRollout->getVels("identity").setZero();
-          gradWrtRollout->getForces("identity").setZero();
+          gradWrtRollout->getControlForces("identity").setZero();
           const Eigen::Ref<const Eigen::MatrixXs> poses
               = rollout->getPosesConst("identity");
           const Eigen::Ref<const Eigen::MatrixXs> vels
               = rollout->getVelsConst("identity");
           const Eigen::Ref<const Eigen::MatrixXs> forces
-              = rollout->getForcesConst("identity");
+              = rollout->getControlForcesConst("identity");
 
           gradWrtRollout->getPoses("identity")(1, poses.cols() - 1)
               = 2 * poses(1, poses.cols() - 1);
@@ -438,13 +438,13 @@ TEST(TRAJECTORY, JUMP_WORM)
     std::shared_ptr<simulation::World> world1 = world->clone();
     world1->setPositions(snapshots1[i]->getPreStepPosition());
     world1->setVelocities(snapshots1[i]->getPreStepVelocity());
-    world1->setExternalForces(snapshots1[i]->getPreStepTorques());
+    world1->setControlForces(snapshots1[i]->getPreStepTorques());
     world1->setCachedLCPSolution(snapshots1[i]->getPreStepLCPCache());
 
     std::shared_ptr<simulation::World> world2 = world->clone();
     world2->setPositions(snapshots2[i]->getPreStepPosition());
     world2->setVelocities(snapshots2[i]->getPreStepVelocity());
-    world2->setExternalForces(snapshots2[i]->getPreStepTorques());
+    world2->setControlForces(snapshots2[i]->getPreStepTorques());
     world2->setCachedLCPSolution(snapshots2[i]->getPreStepLCPCache());
 
     if (!equals(b1->getPreStepPosition(), b2->getPreStepPosition(), 0.0))
@@ -499,7 +499,7 @@ TEST(TRAJECTORY, JUMP_WORM)
       RestorableSnapshot snapshot(world);
       world->setPositions(b1->getPreStepPosition());
       world->setVelocities(b1->getPreStepVelocity());
-      world->setExternalForces(b1->getPreStepTorques());
+      world->setControlForces(b1->getPreStepTorques());
 
       Eigen::MatrixXs A_c1 = b1->getClampingConstraintMatrix(world);
       Eigen::MatrixXs A_ub1 = b1->getUpperBoundConstraintMatrix(world);
@@ -762,8 +762,8 @@ TEST(TRAJECTORY, JUMP_WORM)
                                 << wrt << " off" << std::endl;
                     }
 
-                    s_t multiple1 = con1[i]->getForceMultiple(dofs[row]);
-                    s_t multiple2 = con2[i]->getForceMultiple(dofs[row]);
+                    s_t multiple1 = con1[i]->getControlForceMultiple(dofs[row]);
+                    s_t multiple2 = con2[i]->getControlForceMultiple(dofs[row]);
 
                     if (multiple1 != multiple2)
                     {
@@ -811,8 +811,8 @@ TEST(TRAJECTORY, JUMP_WORM)
       std::cout << "Off on vel-vel Jac at step " << i << std::endl;
     }
     if (!equals(
-            snapshots1[i]->getUnderlyingSnapshot()->getForceVelJacobian(world1),
-            snapshots2[i]->getUnderlyingSnapshot()->getForceVelJacobian(world2),
+            snapshots1[i]->getUnderlyingSnapshot()->getControlForceVelJacobian(world1),
+            snapshots2[i]->getUnderlyingSnapshot()->getControlForceVelJacobian(world2),
             0.0))
     {
       std::cout << "Off on force-vel Jac at step " << i << std::endl;

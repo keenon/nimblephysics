@@ -652,75 +652,75 @@ void Joint(py::module& m)
             return self->getAccelerationUpperLimits();
           })
       .def(
-          "setForce",
+          "setControlForce",
           +[](dart::dynamics::Joint* self,
               std::size_t index,
-              s_t force) -> void { return self->setForce(index, force); },
+              s_t force) -> void { return self->setControlForce(index, force); },
           ::py::arg("index"),
           ::py::arg("force"))
       .def(
-          "getForce",
+          "getControlForce",
           +[](const dart::dynamics::Joint* self, std::size_t index) -> s_t {
-            return self->getForce(index);
+            return self->getControlForce(index);
           },
           ::py::arg("index"))
       .def(
-          "setForces",
+          "setControlForces",
           +[](dart::dynamics::Joint* self, const Eigen::VectorXs& forces)
-              -> void { return self->setForces(forces); },
+              -> void { return self->setControlForces(forces); },
           ::py::arg("forces"))
       .def(
-          "getForces",
+          "getControlForces",
           +[](const dart::dynamics::Joint* self) -> Eigen::VectorXs {
-            return self->getForces();
+            return self->getControlForces();
           })
       .def(
-          "resetForces",
+          "resetControlForces",
           +[](dart::dynamics::Joint* self)
-              -> void { return self->resetForces(); })
+              -> void { return self->resetControlForces(); })
       .def(
-          "setForceLowerLimit",
+          "setControlForceLowerLimit",
           +[](dart::dynamics::Joint* self, std::size_t index, s_t force)
-              -> void { return self->setForceLowerLimit(index, force); },
+              -> void { return self->setControlForceLowerLimit(index, force); },
           ::py::arg("index"),
           ::py::arg("force"))
       .def(
-          "getForceLowerLimit",
+          "getControlForceLowerLimit",
           +[](const dart::dynamics::Joint* self, std::size_t index) -> s_t {
-            return self->getForceLowerLimit(index);
+            return self->getControlForceLowerLimit(index);
           },
           ::py::arg("index"))
       .def(
-          "setForceLowerLimits",
+          "setControlForceLowerLimits",
           +[](dart::dynamics::Joint* self, const Eigen::VectorXs& lowerLimits)
-              -> void { return self->setForceLowerLimits(lowerLimits); },
+              -> void { return self->setControlForceLowerLimits(lowerLimits); },
           ::py::arg("lowerLimits"))
       .def(
-          "getForceLowerLimits",
+          "getControlForceLowerLimits",
           +[](const dart::dynamics::Joint* self) -> Eigen::VectorXs {
-            return self->getForceLowerLimits();
+            return self->getControlForceLowerLimits();
           })
       .def(
-          "setForceUpperLimit",
+          "setControlForceUpperLimit",
           +[](dart::dynamics::Joint* self, std::size_t index, s_t force)
-              -> void { return self->setForceUpperLimit(index, force); },
+              -> void { return self->setControlForceUpperLimit(index, force); },
           ::py::arg("index"),
           ::py::arg("force"))
       .def(
-          "getForceUpperLimit",
+          "getControlForceUpperLimit",
           +[](const dart::dynamics::Joint* self, std::size_t index) -> s_t {
-            return self->getForceUpperLimit(index);
+            return self->getControlForceUpperLimit(index);
           },
           ::py::arg("index"))
       .def(
-          "setForceUpperLimits",
+          "setControlForceUpperLimits",
           +[](dart::dynamics::Joint* self, const Eigen::VectorXs& upperLimits)
-              -> void { return self->setForceUpperLimits(upperLimits); },
+              -> void { return self->setControlForceUpperLimits(upperLimits); },
           ::py::arg("upperLimits"))
       .def(
-          "getForceUpperLimits",
+          "getControlForceUpperLimits",
           +[](const dart::dynamics::Joint* self) -> Eigen::VectorXs {
-            return self->getForceUpperLimits();
+            return self->getControlForceUpperLimits();
           })
       .def(
           "checkSanity",

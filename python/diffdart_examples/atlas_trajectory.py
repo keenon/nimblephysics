@@ -119,7 +119,7 @@ floorBody.getShapeNode(0).getVisualAspect().setCastShadows(False)
 def computeStabilizingForces():
   snapshot: dart.neural.BackpropSnapshot = dart.neural.forwardPass(world, idempotent=True)
 
-  forceVel = snapshot.getForceVelJacobian(world)
+  forceVel = snapshot.getControlForceVelJacobian(world)
   velPreStep = snapshot.getPreStepVelocity()
   velPostStep = snapshot.getPostStepVelocity()
   velDelta = velPostStep - velPreStep
@@ -138,12 +138,12 @@ def computeStabilizingForces():
   stabilizingControls = np.matmul(forceVelInv, -velDelta)
   # Check how much velocity we'd actually accumulate here
   inverted = np.matmul(forceVel, stabilizingControls)
-  atlas.setForces(stabilizingControls)
+  atlas.setControlForces(stabilizingControls)
 
 # forceLimits = np.ones([atlas.getNumDofs()]) * 500
 # forceLimits[0:6] = 0
-# atlas.setForceUpperLimits(forceLimits)
-# atlas.setForceLowerLimits(forceLimits * -1)
+# atlas.setControlForceUpperLimits(forceLimits)
+# atlas.setControlForceLowerLimits(forceLimits * -1)
 
 # goal = torch.tensor([0.0, 2.0, -0.2])
 # def loss(rollout: DartTorchTrajectoryRollout):

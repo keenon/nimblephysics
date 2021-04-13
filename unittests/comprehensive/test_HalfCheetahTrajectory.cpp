@@ -108,7 +108,7 @@ TEST(HALF_CHEETAH, NUMERICAL_INSTABILITY)
   Eigen::VectorXs brokenLCPCache = Eigen::VectorXs::Zero(0);
   world->setPositions(brokenPos);
   world->setVelocities(brokenVel);
-  world->setExternalForces(brokenForce);
+  world->setControlForces(brokenForce);
   world->setCachedLCPSolution(brokenLCPCache);
 
   EXPECT_TRUE(verifyAnalyticalJacobians(world));
@@ -140,7 +140,7 @@ TEST(HALF_CHEETAH, BROKEN_POINT)
   brokenLCPCache << 11.9108, 11.8521, 0;
   world->setPositions(brokenPos);
   world->setVelocities(brokenVel);
-  world->setExternalForces(brokenForce);
+  world->setControlForces(brokenForce);
   world->setCachedLCPSolution(brokenLCPCache);
 
   EXPECT_TRUE(verifyAnalyticalJacobians(world));
@@ -171,7 +171,7 @@ TEST(HALF_CHEETAH, CAPSULE_INTER_PENETRATION)
   Eigen::VectorXs brokenLCPCache = Eigen::VectorXs::Zero(0);
   world->setPositions(brokenPos);
   world->setVelocities(brokenVel);
-  world->setExternalForces(brokenForce);
+  world->setControlForces(brokenForce);
   world->setCachedLCPSolution(brokenLCPCache);
 
   // world->step();
@@ -221,7 +221,7 @@ TEST(HALF_CHEETAH, POS_VEL_ERRORS)
   Eigen::VectorXs brokenLCPCache = Eigen::VectorXs::Zero(0);
   world->setPositions(brokenPos);
   world->setVelocities(brokenVel);
-  world->setExternalForces(brokenForce);
+  world->setControlForces(brokenForce);
   world->setCachedLCPSolution(brokenLCPCache);
 
   // world->step();
@@ -271,7 +271,7 @@ TEST(HALF_CHEETAH, POS_VEL_ERRORS_2)
   Eigen::VectorXs brokenLCPCache = Eigen::VectorXs::Zero(0);
   world->setPositions(brokenPos);
   world->setVelocities(brokenVel);
-  world->setExternalForces(brokenForce);
+  world->setControlForces(brokenForce);
   world->setCachedLCPSolution(brokenLCPCache);
 
   // world->step();
@@ -319,8 +319,8 @@ TEST(HALF_CHEETAH, FULL_TEST)
       = Eigen::VectorXs::Ones(world->getNumDofs()) * 100;
   forceLimits(0) = 0;
   forceLimits(1) = 0;
-  world->setExternalForceUpperLimits(forceLimits);
-  world->setExternalForceLowerLimits(-1 * forceLimits);
+  world->setControlForceUpperLimits(forceLimits);
+  world->setControlForceLowerLimits(-1 * forceLimits);
 
   GUIWebsocketServer server;
   server.serve(8070);
@@ -417,8 +417,8 @@ TEST(HALF_CHEETAH, FULL_TEST)
   /*
   Eigen::VectorXs forceLimits = Eigen::VectorXs::Ones(atlas->getNumDofs()) * 30;
   forceLimits.segment<6>(0).setZero();
-  atlas->setForceUpperLimits(forceLimits);
-  atlas->setForceLowerLimits(forceLimits * -1);
+  atlas->setControlForceUpperLimits(forceLimits);
+  atlas->setControlForceLowerLimits(forceLimits * -1);
   Eigen::VectorXs posLimits = Eigen::VectorXs::Ones(atlas->getNumDofs()) * 200;
   atlas->setPositionUpperLimits(posLimits);
   atlas->setPositionLowerLimits(posLimits * -1);

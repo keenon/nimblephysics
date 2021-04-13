@@ -788,142 +788,142 @@ Eigen::VectorXs MetaSkeleton::getAccelerationUpperLimits(
 }
 
 //==============================================================================
-void MetaSkeleton::setForce(std::size_t _index, s_t _force)
+void MetaSkeleton::setControlForce(std::size_t _index, s_t _force)
 {
-  setValueFromIndex<&DegreeOfFreedom::setForce>(
-        this, _index, _force, "setForce");
+  setValueFromIndex<&DegreeOfFreedom::setControlForce>(
+        this, _index, _force, "setControlForce");
 }
 
 //==============================================================================
-s_t MetaSkeleton::getForce(std::size_t _index) const
+s_t MetaSkeleton::getControlForce(std::size_t _index) const
 {
-  return getValueFromIndex<&DegreeOfFreedom::getForce>(
-        this, _index, "getForce");
+  return getValueFromIndex<&DegreeOfFreedom::getControlForce>(
+        this, _index, "getControlForce");
 }
 
 //==============================================================================
-void MetaSkeleton::setForces(const Eigen::VectorXs& _forces)
+void MetaSkeleton::setControlForces(const Eigen::VectorXs& _forces)
 {
-  setAllValuesFromVector<&DegreeOfFreedom::setForce>(
-        this, _forces, "setForces", "_forces");
+  setAllValuesFromVector<&DegreeOfFreedom::setControlForce>(
+        this, _forces, "setControlForces", "_forces");
 }
 
 //==============================================================================
-void MetaSkeleton::setForces(const std::vector<std::size_t>& _indices,
+void MetaSkeleton::setControlForces(const std::vector<std::size_t>& _indices,
                          const Eigen::VectorXs& _forces)
 {
-  setValuesFromVector<&DegreeOfFreedom::setForce>(
-        this, _indices, _forces, "setForces", "_forces");
+  setValuesFromVector<&DegreeOfFreedom::setControlForce>(
+        this, _indices, _forces, "setControlForces", "_forces");
 }
 
 //==============================================================================
-Eigen::VectorXs MetaSkeleton::getForces() const
+Eigen::VectorXs MetaSkeleton::getControlForces() const
 {
-  return getValuesFromAllDofs<&DegreeOfFreedom::getForce>(
-        this, "getForces");
+  return getValuesFromAllDofs<&DegreeOfFreedom::getControlForce>(
+        this, "getControlForces");
 }
 
 //==============================================================================
-Eigen::VectorXs MetaSkeleton::getForces(const std::vector<std::size_t>& _indices) const
+Eigen::VectorXs MetaSkeleton::getControlForces(const std::vector<std::size_t>& _indices) const
 {
-  return getValuesFromVector<&DegreeOfFreedom::getForce>(
-        this, _indices, "getForces");
+  return getValuesFromVector<&DegreeOfFreedom::getControlForce>(
+        this, _indices, "getControlForces");
 }
 
 //==============================================================================
 void MetaSkeleton::resetGeneralizedForces()
 {
-  applyToAllDofs<&DegreeOfFreedom::resetForce>(this);
+  applyToAllDofs<&DegreeOfFreedom::resetControlForce>(this);
   // Note: This function used to clear the internal forces of SoftBodyNodes as
   // well. Now you should use clearInternalForces for that
 }
 
 //==============================================================================
-void MetaSkeleton::setForceLowerLimit(std::size_t _index, s_t _force)
+void MetaSkeleton::setControlForceLowerLimit(std::size_t _index, s_t _force)
 {
-  setValueFromIndex<&DegreeOfFreedom::setForceLowerLimit>(
-        this, _index, _force, "setForceLowerLimit");
+  setValueFromIndex<&DegreeOfFreedom::setControlForceLowerLimit>(
+        this, _index, _force, "setControlForceLowerLimit");
 }
 
 //==============================================================================
-void MetaSkeleton::setForceLowerLimits(const Eigen::VectorXs& forces)
+void MetaSkeleton::setControlForceLowerLimits(const Eigen::VectorXs& forces)
 {
-  setAllValuesFromVector<&DegreeOfFreedom::setForceLowerLimit>(
-        this, forces, "setForceLowerLimits", "forces");
+  setAllValuesFromVector<&DegreeOfFreedom::setControlForceLowerLimit>(
+        this, forces, "setControlForceLowerLimits", "forces");
 }
 
 //==============================================================================
-void MetaSkeleton::setForceLowerLimits(const std::vector<std::size_t>& indices,
+void MetaSkeleton::setControlForceLowerLimits(const std::vector<std::size_t>& indices,
                                        const Eigen::VectorXs& forces)
 {
-  setValuesFromVector<&DegreeOfFreedom::setForceLowerLimit>(
-        this, indices, forces, "setForceLowerLimits", "forces");
+  setValuesFromVector<&DegreeOfFreedom::setControlForceLowerLimit>(
+        this, indices, forces, "setControlForceLowerLimits", "forces");
 }
 
 //==============================================================================
-s_t MetaSkeleton::getForceLowerLimit(std::size_t _index) const
+s_t MetaSkeleton::getControlForceLowerLimit(std::size_t _index) const
 {
-  return getValueFromIndex<&DegreeOfFreedom::getForceLowerLimit>(
-        this, _index, "getForceLowerLimit");
+  return getValueFromIndex<&DegreeOfFreedom::getControlForceLowerLimit>(
+        this, _index, "getControlForceLowerLimit");
 }
 
 //==============================================================================
-Eigen::VectorXs MetaSkeleton::getForceLowerLimits() const
+Eigen::VectorXs MetaSkeleton::getControlForceLowerLimits() const
 {
-  return getValuesFromAllDofs<&DegreeOfFreedom::getForceLowerLimit>(
-        this, "getForceLowerLimits");
+  return getValuesFromAllDofs<&DegreeOfFreedom::getControlForceLowerLimit>(
+        this, "getControlForceLowerLimits");
 }
 
 //==============================================================================
-Eigen::VectorXs MetaSkeleton::getForceLowerLimits(
+Eigen::VectorXs MetaSkeleton::getControlForceLowerLimits(
     const std::vector<std::size_t>& indices) const
 {
-  return getValuesFromVector<&DegreeOfFreedom::getForceLowerLimit>(
-        this, indices, "getForceLowerLimits");
+  return getValuesFromVector<&DegreeOfFreedom::getControlForceLowerLimit>(
+        this, indices, "getControlForceLowerLimits");
 }
 
 //==============================================================================
-void MetaSkeleton::setForceUpperLimit(std::size_t _index, s_t _force)
+void MetaSkeleton::setControlForceUpperLimit(std::size_t _index, s_t _force)
 {
-  setValueFromIndex<&DegreeOfFreedom::setForceUpperLimit>(
-        this, _index, _force, "setForceUpperLimit");
+  setValueFromIndex<&DegreeOfFreedom::setControlForceUpperLimit>(
+        this, _index, _force, "setControlForceUpperLimit");
 }
 
 //==============================================================================
-void MetaSkeleton::setForceUpperLimits(const Eigen::VectorXs& forces)
+void MetaSkeleton::setControlForceUpperLimits(const Eigen::VectorXs& forces)
 {
-  setAllValuesFromVector<&DegreeOfFreedom::setForceUpperLimit>(
-        this, forces, "setForceUpperLimits", "forces");
+  setAllValuesFromVector<&DegreeOfFreedom::setControlForceUpperLimit>(
+        this, forces, "setControlForceUpperLimits", "forces");
 }
 
 //==============================================================================
-void MetaSkeleton::setForceUpperLimits(const std::vector<std::size_t>& indices,
+void MetaSkeleton::setControlForceUpperLimits(const std::vector<std::size_t>& indices,
                                        const Eigen::VectorXs& forces)
 {
-  setValuesFromVector<&DegreeOfFreedom::setForceUpperLimit>(
-        this, indices, forces, "setForceUpperLimits", "forces");
+  setValuesFromVector<&DegreeOfFreedom::setControlForceUpperLimit>(
+        this, indices, forces, "setControlForceUpperLimits", "forces");
 }
 
 //==============================================================================
-s_t MetaSkeleton::getForceUpperLimit(std::size_t _index) const
+s_t MetaSkeleton::getControlForceUpperLimit(std::size_t _index) const
 {
-  return getValueFromIndex<&DegreeOfFreedom::getForceUpperLimit>(
-        this, _index, "getForceUpperLimit");
+  return getValueFromIndex<&DegreeOfFreedom::getControlForceUpperLimit>(
+        this, _index, "getControlForceUpperLimit");
 }
 
 //==============================================================================
-Eigen::VectorXs MetaSkeleton::getForceUpperLimits() const
+Eigen::VectorXs MetaSkeleton::getControlForceUpperLimits() const
 {
-  return getValuesFromAllDofs<&DegreeOfFreedom::getForceUpperLimit>(
-        this, "getForceUpperLimits");
+  return getValuesFromAllDofs<&DegreeOfFreedom::getControlForceUpperLimit>(
+        this, "getControlForceUpperLimits");
 }
 
 //==============================================================================
-Eigen::VectorXs MetaSkeleton::getForceUpperLimits(
+Eigen::VectorXs MetaSkeleton::getControlForceUpperLimits(
     const std::vector<std::size_t>& indices) const
 {
-  return getValuesFromVector<&DegreeOfFreedom::getForceUpperLimit>(
-        this, indices, "getForceUpperLimits");
+  return getValuesFromVector<&DegreeOfFreedom::getControlForceUpperLimit>(
+        this, indices, "getControlForceUpperLimits");
 }
 
 //==============================================================================

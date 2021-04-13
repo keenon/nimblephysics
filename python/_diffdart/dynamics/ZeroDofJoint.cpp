@@ -440,77 +440,77 @@ void ZeroDofJoint(py::module& m)
             return self->getAccelerationUpperLimits();
           })
       .def(
-          "setForce",
+          "setControlForce",
           +[](dart::dynamics::ZeroDofJoint* self,
               std::size_t _index,
-              s_t _force) { self->setForce(_index, _force); },
+              s_t _force) { self->setControlForce(_index, _force); },
           ::py::arg("index"),
           ::py::arg("force"))
       .def(
-          "getForce",
+          "getControlForce",
           +[](const dart::dynamics::ZeroDofJoint* self,
-              std::size_t _index) -> s_t { return self->getForce(_index); },
+              std::size_t _index) -> s_t { return self->getControlForce(_index); },
           ::py::arg("index"))
       .def(
-          "setForces",
+          "setControlForces",
           +[](dart::dynamics::ZeroDofJoint* self,
-              const Eigen::VectorXs& _forces) { self->setForces(_forces); },
+              const Eigen::VectorXs& _forces) { self->setControlForces(_forces); },
           ::py::arg("forces"))
       .def(
-          "getForces",
+          "getControlForces",
           +[](const dart::dynamics::ZeroDofJoint* self) -> Eigen::VectorXs {
-            return self->getForces();
+            return self->getControlForces();
           })
       .def(
-          "resetForces",
-          +[](dart::dynamics::ZeroDofJoint* self) { self->resetForces(); })
+          "resetControlForces",
+          +[](dart::dynamics::ZeroDofJoint* self) { self->resetControlForces(); })
       .def(
-          "setForceLowerLimit",
+          "setControlForceLowerLimit",
           +[](dart::dynamics::ZeroDofJoint* self,
               std::size_t _index,
-              s_t _force) { self->setForceLowerLimit(_index, _force); },
+              s_t _force) { self->setControlForceLowerLimit(_index, _force); },
           ::py::arg("index"),
           ::py::arg("force"))
       .def(
-          "getForceLowerLimit",
+          "getControlForceLowerLimit",
           +[](const dart::dynamics::ZeroDofJoint* self, std::size_t _index)
-              -> s_t { return self->getForceLowerLimit(_index); },
+              -> s_t { return self->getControlForceLowerLimit(_index); },
           ::py::arg("index"))
       .def(
-          "setForceLowerLimits",
+          "setControlForceLowerLimits",
           +[](dart::dynamics::ZeroDofJoint* self,
               const Eigen::VectorXs& lowerLimits) {
-            self->setForceLowerLimits(lowerLimits);
+            self->setControlForceLowerLimits(lowerLimits);
           },
           ::py::arg("lowerLimits"))
       .def(
-          "getForceLowerLimits",
+          "getControlForceLowerLimits",
           +[](const dart::dynamics::ZeroDofJoint* self) -> Eigen::VectorXs {
-            return self->getForceLowerLimits();
+            return self->getControlForceLowerLimits();
           })
       .def(
-          "setForceUpperLimit",
+          "setControlForceUpperLimit",
           +[](dart::dynamics::ZeroDofJoint* self,
               std::size_t _index,
-              s_t _force) { self->setForceUpperLimit(_index, _force); },
+              s_t _force) { self->setControlForceUpperLimit(_index, _force); },
           ::py::arg("index"),
           ::py::arg("force"))
       .def(
-          "getForceUpperLimit",
+          "getControlForceUpperLimit",
           +[](const dart::dynamics::ZeroDofJoint* self, std::size_t _index)
-              -> s_t { return self->getForceUpperLimit(_index); },
+              -> s_t { return self->getControlForceUpperLimit(_index); },
           ::py::arg("index"))
       .def(
-          "setForceUpperLimits",
+          "setControlForceUpperLimits",
           +[](dart::dynamics::ZeroDofJoint* self,
               const Eigen::VectorXs& upperLimits) {
-            self->setForceUpperLimits(upperLimits);
+            self->setControlForceUpperLimits(upperLimits);
           },
           ::py::arg("upperLimits"))
       .def(
-          "getForceUpperLimits",
+          "getControlForceUpperLimits",
           +[](const dart::dynamics::ZeroDofJoint* self) -> Eigen::VectorXs {
-            return self->getForceUpperLimits();
+            return self->getControlForceUpperLimits();
           })
       .def(
           "setVelocityChange",

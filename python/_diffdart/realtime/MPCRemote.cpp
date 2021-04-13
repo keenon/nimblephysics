@@ -78,7 +78,7 @@ void MPCRemote(py::module& m)
           ::py::arg("pos"),
           ::py::arg("vel"),
           ::py::arg("mass"))
-      .def("getForce", &dart::realtime::MPCRemote::getForce, ::py::arg("now"))
+      .def("getControlForce", &dart::realtime::MPCRemote::getControlForce, ::py::arg("now"))
       .def(
           "start",
           &dart::realtime::MPCRemote::start,

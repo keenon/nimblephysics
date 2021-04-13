@@ -72,8 +72,8 @@ void BackpropSnapshot(py::module& m)
           ::py::arg("world"),
           ::py::arg("perfLog") = nullptr)
       .def(
-          "getForceVelJacobian",
-          &dart::neural::BackpropSnapshot::getForceVelJacobian,
+          "getControlForceVelJacobian",
+          &dart::neural::BackpropSnapshot::getControlForceVelJacobian,
           ::py::arg("world"),
           ::py::arg("perfLog") = nullptr)
       .def(

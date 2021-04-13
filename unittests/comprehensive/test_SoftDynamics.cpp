@@ -384,7 +384,7 @@ void SoftDynamicsTest::compareEquationsOfMotion(const std::string& _fileName)
 
       // Get C2, Coriolis force vector using inverse dynamics algorithm
       Vector3s oldGravity = softSkel->getGravity();
-      VectorXs oldTau = softSkel->getForces();
+      VectorXs oldTau = softSkel->getControlForces();
       VectorXs oldDdq = softSkel->getAccelerations();
       // TODO(JS): Save external forces of body nodes
       vector<s_t> oldKv(nSoftBodyNodes, 0.0);
@@ -411,19 +411,19 @@ void SoftDynamicsTest::compareEquationsOfMotion(const std::string& _fileName)
         sbn->setDampingCoefficient(0.0);
       }
 
-      EXPECT_TRUE(softSkel->getForces() == VectorXs::Zero(dof));
+      EXPECT_TRUE(softSkel->getControlForces() == VectorXs::Zero(dof));
       EXPECT_TRUE(softSkel->getExternalForces() == VectorXs::Zero(dof));
       EXPECT_TRUE(softSkel->getAccelerations() == VectorXs::Zero(dof));
 
       softSkel->setGravity(Vector3s::Zero());
       EXPECT_TRUE(softSkel->getGravity() == Vector3s::Zero());
       softSkel->computeInverseDynamics(false, false);
-      VectorXs C2 = softSkel->getForces();
+      VectorXs C2 = softSkel->getControlForces();
 
       softSkel->setGravity(oldGravity);
       EXPECT_TRUE(softSkel->getGravity() == oldGravity);
       softSkel->computeInverseDynamics(false, false);
-      VectorXs Cg2 = softSkel->getForces();
+      VectorXs Cg2 = softSkel->getControlForces();
 
       EXPECT_TRUE(equals(C, C2, 1e-6));
       if (!equals(C, C2, 1e-6))
@@ -439,7 +439,7 @@ void SoftDynamicsTest::compareEquationsOfMotion(const std::string& _fileName)
         cout << "Cg2:" << Cg2.transpose() << endl;
       }
 
-      softSkel->setForces(oldTau);
+      softSkel->setControlForces(oldTau);
       softSkel->setAccelerations(oldDdq);
       // TODO(JS): Restore external forces of body nodes
     }

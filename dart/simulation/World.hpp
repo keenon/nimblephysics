@@ -305,13 +305,13 @@ public:
 
   /// Sets the forces of all the skeletons in the world from a single
   /// concatenated state vector
-  void setExternalForces(Eigen::VectorXs torques);
+  void setControlForces(Eigen::VectorXs torques);
 
   // Sets the upper limits of all the joints from a single vector
-  void setExternalForceUpperLimits(Eigen::VectorXs limits);
+  void setControlForceUpperLimits(Eigen::VectorXs limits);
 
   // Sets the lower limits of all the joints from a single vector
-  void setExternalForceLowerLimits(Eigen::VectorXs limits);
+  void setControlForceLowerLimits(Eigen::VectorXs limits);
 
   // Sets the upper limits of all the joints from a single vector
   void setPositionUpperLimits(Eigen::VectorXs limits);

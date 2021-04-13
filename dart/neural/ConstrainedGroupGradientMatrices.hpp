@@ -143,7 +143,7 @@ public:
   /// backprop, you don't actually need this matrix, you can compute backprop
   /// directly. This is here if you want access to the full Jacobian for some
   /// reason.
-  Eigen::MatrixXs getForceVelJacobian(
+  Eigen::MatrixXs getControlForceVelJacobian(
       simulation::WorldPtr world, PerformanceLog* perfLog = nullptr);
 
   /// This computes and returns the whole pos-pos jacobian for this group. For

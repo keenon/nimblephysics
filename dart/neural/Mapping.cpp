@@ -110,7 +110,7 @@ void Mapping::equalsOrCrash(
 
     std::cout << "world->setPositions(brokenPos);" << std::endl;
     std::cout << "world->setVelocities(brokenVel);" << std::endl;
-    std::cout << "world->setExternalForces(brokenForce);" << std::endl;
+    std::cout << "world->setControlForces(brokenForce);" << std::endl;
     std::cout << "world->setCachedLCPSolution(brokenLCPCache);" << std::endl;
 
     std::cout << "--------------------" << std::endl;
@@ -651,10 +651,10 @@ Eigen::VectorXs Mapping::getVelocities(std::shared_ptr<simulation::World> world)
 }
 
 //==============================================================================
-Eigen::VectorXs Mapping::getForces(std::shared_ptr<simulation::World> world)
+Eigen::VectorXs Mapping::getControlForces(std::shared_ptr<simulation::World> world)
 {
-  Eigen::VectorXs forces = Eigen::VectorXs::Zero(getForceDim());
-  getForcesInPlace(world, forces);
+  Eigen::VectorXs forces = Eigen::VectorXs::Zero(getControlForceDim());
+  getControlForcesInPlace(world, forces);
   return forces;
 }
 
@@ -699,18 +699,18 @@ Eigen::VectorXs Mapping::getVelocityUpperLimits(
 }
 
 //==============================================================================
-Eigen::VectorXs Mapping::getForceLowerLimits(
+Eigen::VectorXs Mapping::getControlForceLowerLimits(
     std::shared_ptr<simulation::World> /* world */)
 {
-  return Eigen::VectorXs::Ones(getForceDim())
+  return Eigen::VectorXs::Ones(getControlForceDim())
          * -std::numeric_limits<s_t>::infinity();
 }
 
 //==============================================================================
-Eigen::VectorXs Mapping::getForceUpperLimits(
+Eigen::VectorXs Mapping::getControlForceUpperLimits(
     std::shared_ptr<simulation::World> /* world */)
 {
-  return Eigen::VectorXs::Ones(getForceDim())
+  return Eigen::VectorXs::Ones(getControlForceDim())
          * std::numeric_limits<s_t>::infinity();
 }
 

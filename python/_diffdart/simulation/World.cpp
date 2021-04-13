@@ -307,7 +307,7 @@ void World(py::module& m)
             return self->getMasses();
           })
       .def(
-          "getForceUpperLimits",
+          "getControlForceUpperLimits",
           +[](dart::simulation::World* self) -> Eigen::VectorXs {
             return self->getExternalForceUpperLimits();
           })
@@ -355,9 +355,9 @@ void World(py::module& m)
           +[](dart::simulation::World* self, Eigen::VectorXs velocities)
               -> void { self->setVelocities(velocities); })
       .def(
-          "setExternalForces",
+          "setControlForces",
           +[](dart::simulation::World* self, Eigen::VectorXs forces) -> void {
-            self->setExternalForces(forces);
+            self->setControlForces(forces);
           })
       .def(
           "setMasses",
@@ -365,14 +365,14 @@ void World(py::module& m)
             self->setMasses(forces);
           })
       .def(
-          "setExternalForcesUpperLimits",
+          "setControlForcesUpperLimits",
           +[](dart::simulation::World* self, Eigen::VectorXs limits) -> void {
-            self->setExternalForceUpperLimits(limits);
+            self->setControlForceUpperLimits(limits);
           })
       .def(
-          "setExternalForcesLowerLimits",
+          "setControlForcesLowerLimits",
           +[](dart::simulation::World* self, Eigen::VectorXs limits) -> void {
-            self->setExternalForceLowerLimits(limits);
+            self->setControlForceLowerLimits(limits);
           })
       .def(
           "setPositionUpperLimits",

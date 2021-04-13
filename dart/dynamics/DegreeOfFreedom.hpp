@@ -257,34 +257,34 @@ public:
   //----------------------------------------------------------------------------
 
   /// Set the generalized force of this DegreeOfFreedom
-  void setForce(s_t _force);
+  void setControlForce(s_t _force);
 
   /// Get the generalized force of this DegreeOfFreedom
-  s_t getForce() const;
+  s_t getControlForce() const;
 
   /// Set the generalized force of this DegreeOfFreedom to zero
-  void resetForce();
+  void resetControlForce();
 
   /// Set the generalized force limits of this DegreeOfFreedom
-  void setForceLimits(s_t _lowerLimit, s_t _upperLimit);
+  void setControlForceLimits(s_t _lowerLimit, s_t _upperLimit);
 
   /// Set the generalized force limits of this DegreeOfFreedom
-  void setForceLimits(const std::pair<s_t, s_t>& _limits);
+  void setControlForceLimits(const std::pair<s_t, s_t>& _limits);
 
   /// Get the generalized force limits of this DegreeOfFreedom
-  std::pair<s_t, s_t> getForceLimits() const;
+  std::pair<s_t, s_t> getControlForceLimits() const;
 
   /// Set the lower generalized force limit of this DegreeOfFreedom
-  void setForceLowerLimit(s_t _limit);
+  void setControlForceLowerLimit(s_t _limit);
 
   /// Get the lower generalized force limit of this DegreeOfFreedom
-  s_t getForceLowerLimit() const;
+  s_t getControlForceLowerLimit() const;
 
   /// Set the upper generalized force limit of this DegreeOfFreedom
-  void setForceUpperLimit(s_t _limit);
+  void setControlForceUpperLimit(s_t _limit);
 
   /// Get the upper generalized force limit of this DegreeOfFreedom
-  s_t getForceUpperLimit() const;
+  s_t getControlForceUpperLimit() const;
 
   /// \}
 

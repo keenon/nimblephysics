@@ -47,7 +47,7 @@ namespace python {
 
   virtual Eigen::Ref<Eigen::MatrixXs> getPoses(const std::string& mapping) = 0;
   virtual Eigen::Ref<Eigen::MatrixXs> getVels(const std::string& mapping) = 0;
-  virtual Eigen::Ref<Eigen::MatrixXs> getForces(const std::string& mapping) = 0;
+  virtual Eigen::Ref<Eigen::MatrixXs> getControlForces(const std::string& mapping) = 0;
   */
 
 void TrajectoryRollout(py::module& m)
@@ -63,8 +63,8 @@ void TrajectoryRollout(py::module& m)
           &dart::trajectory::TrajectoryRollout::getVels,
           ::py::arg("mapping") = "identity")
       .def(
-          "getForces",
-          &dart::trajectory::TrajectoryRollout::getForces,
+          "getControlForces",
+          &dart::trajectory::TrajectoryRollout::getControlForces,
           ::py::arg("mapping") = "identity")
       .def("getMasses", &dart::trajectory::TrajectoryRollout::getMasses)
       .def(

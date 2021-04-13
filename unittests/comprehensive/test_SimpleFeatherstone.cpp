@@ -45,13 +45,13 @@ void verifySkeleton(SkeletonPtr skel)
   {
     skel->setPositions(Eigen::VectorXs::Random(skel->getNumDofs()));
     skel->setVelocities(Eigen::VectorXs::Random(skel->getNumDofs()));
-    skel->setForces(Eigen::VectorXs::Random(skel->getNumDofs()));
+    skel->setControlForces(Eigen::VectorXs::Random(skel->getNumDofs()));
 
     for (int i = 0; i < simple.len(); i++)
     {
       pos[i] = skel->getPosition(i);
       vel[i] = skel->getVelocity(i);
-      force[i] = skel->getForce(i);
+      force[i] = skel->getControlForce(i);
     }
 
     // make "accel" hold acceleration according to SimpleFeatherstone

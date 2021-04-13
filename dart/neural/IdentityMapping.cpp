@@ -28,7 +28,7 @@ int IdentityMapping::getVelDim()
 }
 
 //==============================================================================
-int IdentityMapping::getForceDim()
+int IdentityMapping::getControlForceDim()
 {
   return mNumDofs;
 }
@@ -56,11 +56,11 @@ void IdentityMapping::setVelocities(
 }
 
 //==============================================================================
-void IdentityMapping::setForces(
+void IdentityMapping::setControlForces(
     std::shared_ptr<simulation::World> world,
     const Eigen::Ref<Eigen::VectorXs>& forces)
 {
-  world->setExternalForces(forces);
+  world->setControlForces(forces);
 }
 
 //==============================================================================
@@ -88,7 +88,7 @@ void IdentityMapping::getVelocitiesInPlace(
 }
 
 //==============================================================================
-void IdentityMapping::getForcesInPlace(
+void IdentityMapping::getControlForcesInPlace(
     std::shared_ptr<simulation::World> world,
     /* OUT */ Eigen::Ref<Eigen::VectorXs> forces)
 {
@@ -192,14 +192,14 @@ Eigen::VectorXs IdentityMapping::getVelocityUpperLimits(
 }
 
 //==============================================================================
-Eigen::VectorXs IdentityMapping::getForceLowerLimits(
+Eigen::VectorXs IdentityMapping::getControlForceLowerLimits(
     std::shared_ptr<simulation::World> world)
 {
   return world->getExternalForceLowerLimits();
 }
 
 //==============================================================================
-Eigen::VectorXs IdentityMapping::getForceUpperLimits(
+Eigen::VectorXs IdentityMapping::getControlForceUpperLimits(
     std::shared_ptr<simulation::World> world)
 {
   return world->getExternalForceUpperLimits();

@@ -588,14 +588,14 @@ void Skeleton(py::module& m)
               -> std::size_t { return self->getNumEndEffectors(treeIndex); },
           ::py::arg("treeIndex"))
       .def(
-          "getForceUpperLimits",
+          "getControlForceUpperLimits",
           +[](dart::dynamics::Skeleton* self) -> Eigen::VectorXs {
-            return self->getForceUpperLimits();
+            return self->getControlForceUpperLimits();
           })
       .def(
-          "getForceLowerLimits",
+          "getControlForceLowerLimits",
           +[](dart::dynamics::Skeleton* self) -> Eigen::VectorXs {
-            return self->getForceLowerLimits();
+            return self->getControlForceLowerLimits();
           })
       .def(
           "getPositionLowerLimits",
@@ -618,14 +618,14 @@ void Skeleton(py::module& m)
             return self->getVelocityUpperLimits();
           })
       .def(
-          "setForcesUpperLimits",
+          "setControlForcesUpperLimits",
           +[](dart::dynamics::Skeleton* self, Eigen::VectorXs limits) -> void {
-            self->setForceUpperLimits(limits);
+            self->setControlForceUpperLimits(limits);
           })
       .def(
-          "setForcesLowerLimits",
+          "setControlForcesLowerLimits",
           +[](dart::dynamics::Skeleton* self, Eigen::VectorXs limits) -> void {
-            self->setForceLowerLimits(limits);
+            self->setControlForceLowerLimits(limits);
           })
       .def(
           "setPositionUpperLimits",

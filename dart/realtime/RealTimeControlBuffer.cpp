@@ -112,7 +112,7 @@ void RealTimeControlBuffer::getPlannedForcesStartingAt(
 
 /// This swaps in a new buffer of forces. The assumption is that "startAt" is
 /// before "now", because we'll erase old data in this process.
-void RealTimeControlBuffer::setForcePlan(
+void RealTimeControlBuffer::setControlForcePlan(
     long startAt, long now, Eigen::MatrixXs forces)
 {
   if (startAt > now)
@@ -235,12 +235,12 @@ void RealTimeControlBuffer::estimateWorldStateAt(
     // In the future, project assuming planned forces
     if (at > mControlLog.last())
     {
-      world->setExternalForces(getPlannedForce(at, true));
+      world->setControlForces(getPlannedForce(at, true));
     }
     // In the past, project using known forces read from the buffer
     else
     {
-      world->setExternalForces(mControlLog.get(at));
+      world->setControlForces(mControlLog.get(at));
     }
     world->step();
   }

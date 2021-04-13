@@ -929,7 +929,7 @@ bool createJointAndNodePair(
   newJoint->setPositions(joint.position);
   newJoint->setVelocities(joint.velocity);
   newJoint->setAccelerations(joint.acceleration);
-  newJoint->setForces(joint.force);
+  newJoint->setControlForces(joint.force);
 
   dynamics::BodyNode* bn = pair.second;
   for (std::size_t i = 0; i < body.markers.size(); ++i)

@@ -60,8 +60,8 @@ BodyNode* createTailSegment(BodyNode* parent, Eigen::Vector3s color)
   ShapeNode* poleShape
       = pole->createShapeNodeWith<VisualAspect, CollisionAspect>(shape);
   poleShape->getVisualAspect()->setColor(color);
-  poleJoint->setForceUpperLimit(0, 100.0);
-  poleJoint->setForceLowerLimit(0, -100.0);
+  poleJoint->setControlForceUpperLimit(0, 100.0);
+  poleJoint->setControlForceLowerLimit(0, -100.0);
   poleJoint->setVelocityUpperLimit(0, 100.0);
   poleJoint->setVelocityLowerLimit(0, -100.0);
   poleJoint->setPositionUpperLimit(0, 270 * 3.1415 / 180);
@@ -102,10 +102,10 @@ std::shared_ptr<simulation::World> createWorld()
       = root->createShapeNodeWith<VisualAspect, CollisionAspect>(shape);
   Eigen::Vector3s black = Eigen::Vector3s::Zero();
   rootVisual->getVisualAspect()->setColor(black);
-  rootJoint->setForceUpperLimit(0, 0);
-  rootJoint->setForceLowerLimit(0, 0);
-  rootJoint->setForceUpperLimit(1, 0);
-  rootJoint->setForceLowerLimit(1, 0);
+  rootJoint->setControlForceUpperLimit(0, 0);
+  rootJoint->setControlForceLowerLimit(0, 0);
+  rootJoint->setControlForceUpperLimit(1, 0);
+  rootJoint->setControlForceLowerLimit(1, 0);
   rootJoint->setVelocityUpperLimit(0, 1000.0);
   rootJoint->setVelocityLowerLimit(0, -1000.0);
   rootJoint->setVelocityUpperLimit(1, 1000.0);

@@ -101,10 +101,10 @@ projectileVisual = projectileShape.createVisualAspect()
 projectileShape.createCollisionAspect()
 projectileVisual.setColor([0.7, 0.7, 0.7])
 projectileVisual.setCastShadows(False)
-projectileJoint.setForceUpperLimit(0, 0)
-projectileJoint.setForceLowerLimit(0, 0)
-projectileJoint.setForceUpperLimit(1, 0)
-projectileJoint.setForceLowerLimit(1, 0)
+projectileJoint.setControlForceUpperLimit(0, 0)
+projectileJoint.setControlForceLowerLimit(0, 0)
+projectileJoint.setControlForceUpperLimit(1, 0)
+projectileJoint.setControlForceLowerLimit(1, 0)
 projectileJoint.setVelocityUpperLimit(0, 1000.0)
 projectileJoint.setVelocityLowerLimit(0, -1000.0)
 projectileJoint.setVelocityUpperLimit(1, 1000.0)
@@ -129,8 +129,8 @@ def createTailSegment(parent, color):
     poleShape = pole.createShapeNode(dart.dynamics.BoxShape([.05, 0.25, .05]))
     poleVisual = poleShape.createVisualAspect()
     poleVisual.setColor(color)
-    poleJoint.setForceUpperLimit(0, 1000.0)
-    poleJoint.setForceLowerLimit(0, -1000.0)
+    poleJoint.setControlForceUpperLimit(0, 1000.0)
+    poleJoint.setControlForceLowerLimit(0, -1000.0)
     poleJoint.setVelocityUpperLimit(0, 10000.0)
     poleJoint.setVelocityLowerLimit(0, -10000.0)
 
@@ -233,8 +233,8 @@ BodyNode* createTailSegment(BodyNode* parent, Eigen::Vector3s color)
       poleShape = pole.createShapeNode(dart.dynamics.BoxShape([.05, 0.25, .05]))
       poleVisual = poleShape.createVisualAspect()
       poleVisual.setColor(color)
-      poleJoint.setForceUpperLimit(0, 1000.0)
-      poleJoint.setForceLowerLimit(0, -1000.0)
+      poleJoint.setControlForceUpperLimit(0, 1000.0)
+      poleJoint.setControlForceLowerLimit(0, -1000.0)
       poleJoint.setVelocityUpperLimit(0, 10000.0)
       poleJoint.setVelocityLowerLimit(0, -10000.0)
 
@@ -265,8 +265,8 @@ BodyNode* createTailSegment(BodyNode* parent, Eigen::Vector3s color)
   ShapeNode* poleShape
       = pole->createShapeNodeWith<VisualAspect, CollisionAspect>(shape);
   poleShape->getVisualAspect()->setColor(color);
-  poleJoint->setForceUpperLimit(0, 1000.0);
-  poleJoint->setForceLowerLimit(0, -1000.0);
+  poleJoint->setControlForceUpperLimit(0, 1000.0);
+  poleJoint->setControlForceLowerLimit(0, -1000.0);
   poleJoint->setVelocityUpperLimit(0, 10000.0);
   poleJoint->setVelocityLowerLimit(0, -10000.0);
 
@@ -311,10 +311,10 @@ std::shared_ptr<simulation::World> createWorld(s_t target_x, s_t target_y)
           projectileShape);
   projectileVisual->getVisualAspect()->setColor(Eigen::Vector3s(0.7, 0.7, 0.7));
   projectileVisual->getVisualAspect()->setCastShadows(false);
-  projectileJoint->setForceUpperLimit(0, 0);
-  projectileJoint->setForceLowerLimit(0, 0);
-  projectileJoint->setForceUpperLimit(1, 0);
-  projectileJoint->setForceLowerLimit(1, 0);
+  projectileJoint->setControlForceUpperLimit(0, 0);
+  projectileJoint->setControlForceLowerLimit(0, 0);
+  projectileJoint->setControlForceUpperLimit(1, 0);
+  projectileJoint->setControlForceLowerLimit(1, 0);
   projectileJoint->setVelocityUpperLimit(0, 1000.0);
   projectileJoint->setVelocityLowerLimit(0, -1000.0);
   projectileJoint->setVelocityUpperLimit(1, 1000.0);
@@ -410,7 +410,7 @@ TEST(CATAPULT_EXAMPLE, TESTS)
   brokenLCPCache << 0.079406, 0.0704275, 0, 0.079406, 0.0704275, 0;
   world->setPositions(brokenPos);
   world->setVelocities(brokenVel);
-  world->setExternalForces(brokenForce);
+  world->setControlForces(brokenForce);
   world->setCachedLCPSolution(brokenLCPCache);
 
   EXPECT_TRUE(verifyAnalyticalJacobians(world));
@@ -472,7 +472,7 @@ TEST(CATAPULT_EXAMPLE, BROKEN_POINT)
       0, 0, 0;
   world->setPositions(brokenPos);
   world->setVelocities(brokenVel);
-  world->setExternalForces(brokenForce);
+  world->setControlForces(brokenForce);
   world->setCachedLCPSolution(brokenLCPCache);
   */
   /*
@@ -486,7 +486,7 @@ TEST(CATAPULT_EXAMPLE, BROKEN_POINT)
   brokenLCPCache << 0.0491903, 0.00921924, 0, 0, 0, 0;
   world->setPositions(brokenPos);
   world->setVelocities(brokenVel);
-  world->setExternalForces(brokenForce);
+  world->setControlForces(brokenForce);
   world->setCachedLCPSolution(brokenLCPCache);
   */
   /*
@@ -504,7 +504,7 @@ TEST(CATAPULT_EXAMPLE, BROKEN_POINT)
   brokenLCPCache << 0.0245947, 0.00461058, 0, 0.0245947, 0.00461058, 0;
   world->setPositions(brokenPos);
   world->setVelocities(brokenVel);
-  world->setExternalForces(brokenForce);
+  world->setControlForces(brokenForce);
   world->setCachedLCPSolution(brokenLCPCache);
   */
 
@@ -522,7 +522,7 @@ TEST(CATAPULT_EXAMPLE, BROKEN_POINT)
   brokenLCPCache << 0, 0, 0, 0, 0, 0, 1.0778, 0.330749, 0, 1.0778, 0.330749, 0;
   world->setPositions(brokenPos);
   world->setVelocities(brokenVel);
-  world->setExternalForces(brokenForce);
+  world->setControlForces(brokenForce);
   world->setCachedLCPSolution(brokenLCPCache);
   */
 
@@ -541,7 +541,7 @@ TEST(CATAPULT_EXAMPLE, BROKEN_POINT)
       0, 0, 0, 0, 0;
   world->setPositions(brokenPos);
   world->setVelocities(brokenVel);
-  world->setExternalForces(brokenForce);
+  world->setControlForces(brokenForce);
   world->setCachedLCPSolution(brokenLCPCache);
 
   EXPECT_TRUE(verifyAnalyticalJacobians(world));
@@ -616,7 +616,7 @@ TEST(CATAPULT_EXAMPLE, FULL_TEST)
 
           gradWrtRollout->getPoses().setZero();
           gradWrtRollout->getVels().setZero();
-          gradWrtRollout->getForces().setZero();
+          gradWrtRollout->getControlForces().setZero();
           gradWrtRollout->getPoses()(0, lastCol) = 2 * diffX;
           gradWrtRollout->getPoses()(1, lastCol) = 2 * diffY;
 

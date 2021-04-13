@@ -35,7 +35,7 @@ public:
 
   /// This gets the force to apply to the world at this instant. If we haven't
   /// computed anything for this instant yet, this just returns 0s.
-  Eigen::VectorXs getForce(long now) override;
+  Eigen::VectorXs getControlForce(long now) override;
 
   /// This returns how many millis we have left until we've run out of plan.
   /// This can be a negative number, if we've run past our plan.

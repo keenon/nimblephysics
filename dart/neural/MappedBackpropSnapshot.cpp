@@ -66,10 +66,10 @@ const Eigen::MatrixXs& MappedBackpropSnapshot::getVelVelJacobian(
 }
 
 //==============================================================================
-const Eigen::MatrixXs& MappedBackpropSnapshot::getForceVelJacobian(
+const Eigen::MatrixXs& MappedBackpropSnapshot::getControlForceVelJacobian(
     std::shared_ptr<simulation::World> world, PerformanceLog* perfLog)
 {
-  return mBackpropSnapshot->getForceVelJacobian(world, perfLog);
+  return mBackpropSnapshot->getControlForceVelJacobian(world, perfLog);
 }
 
 //==============================================================================
@@ -156,14 +156,14 @@ Eigen::MatrixXs MappedBackpropSnapshot::getVelMappedVelJacobian(
 }
 
 //==============================================================================
-Eigen::MatrixXs MappedBackpropSnapshot::getForceMappedVelJacobian(
+Eigen::MatrixXs MappedBackpropSnapshot::getControlForceMappedVelJacobian(
     std::shared_ptr<simulation::World> world,
     const std::string& mapAfter,
     PerformanceLog* perfLog)
 {
   Eigen::MatrixXs jac
       = mPostStepMappings[mapAfter].velInJacWrtVel
-        * mBackpropSnapshot->getForceVelJacobian(world, perfLog);
+        * mBackpropSnapshot->getControlForceVelJacobian(world, perfLog);
   if (world->getSlowDebugResultsAgainstFD())
   {
     Eigen::MatrixXs fd = finiteDifferenceForceVelJacobian(world, mapAfter, 1);
@@ -215,7 +215,7 @@ void MappedBackpropSnapshot::backprop(
   thisTimestepLoss.lossWrtVelocity
       = Eigen::VectorXs::Zero(mMappings[mRepresentation]->getVelDim());
   thisTimestepLoss.lossWrtTorque
-      = Eigen::VectorXs::Zero(mMappings[mRepresentation]->getForceDim());
+      = Eigen::VectorXs::Zero(mMappings[mRepresentation]->getControlForceDim());
   thisTimestepLoss.lossWrtMass
       = Eigen::VectorXs::Zero(mMappings[mRepresentation]->getMassDim());
 
@@ -234,7 +234,7 @@ void MappedBackpropSnapshot::backprop(
     const Eigen::MatrixXs velVel
         = getVelVelJacobian(world, mRepresentation, mapAfter);
     const Eigen::MatrixXs forceVel
-        = getForceVelJacobian(world, mRepresentation, mapAfter);
+        = getControlForceVelJacobian(world, mRepresentation, mapAfter);
     const Eigen::MatrixXs massVel
         = getMassVelJacobian(world, mRepresentation, mapAfter);
 
@@ -363,7 +363,7 @@ Eigen::MatrixXs MappedBackpropSnapshot::finiteDifferenceVelVelJacobian(
 
   world->setPositions(mBackpropSnapshot->mPreStepPosition);
   world->setVelocities(mBackpropSnapshot->mPreStepVelocity);
-  world->setExternalForces(mBackpropSnapshot->mPreStepTorques);
+  world->setControlForces(mBackpropSnapshot->mPreStepTorques);
   world->setCachedLCPSolution(mBackpropSnapshot->mPreStepLCPCache);
   world->step(false);
 
@@ -383,7 +383,7 @@ Eigen::MatrixXs MappedBackpropSnapshot::finiteDifferenceVelVelJacobian(
       // Get predicted next vel
       snapshot.restore();
       world->setPositions(mBackpropSnapshot->mPreStepPosition);
-      world->setExternalForces(mBackpropSnapshot->mPreStepTorques);
+      world->setControlForces(mBackpropSnapshot->mPreStepTorques);
       world->setCachedLCPSolution(mBackpropSnapshot->mPreStepLCPCache);
       Eigen::VectorXs tweakedVel
           = Eigen::VectorXs(mBackpropSnapshot->mPreStepVelocity);
@@ -410,7 +410,7 @@ Eigen::MatrixXs MappedBackpropSnapshot::finiteDifferenceVelVelJacobian(
       // Get predicted next vel
       snapshot.restore();
       world->setPositions(mBackpropSnapshot->mPreStepPosition);
-      world->setExternalForces(mBackpropSnapshot->mPreStepTorques);
+      world->setControlForces(mBackpropSnapshot->mPreStepTorques);
       world->setCachedLCPSolution(mBackpropSnapshot->mPreStepLCPCache);
       Eigen::VectorXs tweakedVel
           = Eigen::VectorXs(mBackpropSnapshot->mPreStepVelocity);
@@ -458,7 +458,7 @@ Eigen::MatrixXs MappedBackpropSnapshot::finiteDifferenceRiddersVelVelJacobian(
 
   world->setPositions(mBackpropSnapshot->mPreStepPosition);
   world->setVelocities(mBackpropSnapshot->mPreStepVelocity);
-  world->setExternalForces(mBackpropSnapshot->mPreStepTorques);
+  world->setControlForces(mBackpropSnapshot->mPreStepTorques);
   world->setCachedLCPSolution(mBackpropSnapshot->mPreStepLCPCache);
   world->step(false);
 
@@ -489,7 +489,7 @@ Eigen::MatrixXs MappedBackpropSnapshot::finiteDifferenceRiddersVelVelJacobian(
       // Get predicted next vel
       snapshot.restore();
       world->setPositions(mBackpropSnapshot->mPreStepPosition);
-      world->setExternalForces(mBackpropSnapshot->mPreStepTorques);
+      world->setControlForces(mBackpropSnapshot->mPreStepTorques);
       world->setCachedLCPSolution(mBackpropSnapshot->mPreStepLCPCache);
       Eigen::VectorXs perturbedPlus
           = Eigen::VectorXs(mBackpropSnapshot->mPreStepVelocity);
@@ -510,7 +510,7 @@ Eigen::MatrixXs MappedBackpropSnapshot::finiteDifferenceRiddersVelVelJacobian(
 
       snapshot.restore();
       world->setPositions(mBackpropSnapshot->mPreStepPosition);
-      world->setExternalForces(mBackpropSnapshot->mPreStepTorques);
+      world->setControlForces(mBackpropSnapshot->mPreStepTorques);
       world->setCachedLCPSolution(mBackpropSnapshot->mPreStepLCPCache);
       Eigen::VectorXs perturbedMinus
           = Eigen::VectorXs(mBackpropSnapshot->mPreStepVelocity);
@@ -548,7 +548,7 @@ Eigen::MatrixXs MappedBackpropSnapshot::finiteDifferenceRiddersVelVelJacobian(
 
       snapshot.restore();
       world->setPositions(mBackpropSnapshot->mPreStepPosition);
-      world->setExternalForces(mBackpropSnapshot->mPreStepTorques);
+      world->setControlForces(mBackpropSnapshot->mPreStepTorques);
       world->setCachedLCPSolution(mBackpropSnapshot->mPreStepLCPCache);
       Eigen::VectorXs perturbedPlus
           = Eigen::VectorXs(mBackpropSnapshot->mPreStepVelocity);
@@ -569,7 +569,7 @@ Eigen::MatrixXs MappedBackpropSnapshot::finiteDifferenceRiddersVelVelJacobian(
 
       snapshot.restore();
       world->setPositions(mBackpropSnapshot->mPreStepPosition);
-      world->setExternalForces(mBackpropSnapshot->mPreStepTorques);
+      world->setControlForces(mBackpropSnapshot->mPreStepTorques);
       world->setCachedLCPSolution(mBackpropSnapshot->mPreStepLCPCache);
       Eigen::VectorXs perturbedMinus
           = Eigen::VectorXs(mBackpropSnapshot->mPreStepVelocity);
@@ -648,7 +648,7 @@ Eigen::MatrixXs MappedBackpropSnapshot::finiteDifferencePosVelJacobian(
 
   world->setPositions(mBackpropSnapshot->mPreStepPosition);
   world->setVelocities(mBackpropSnapshot->mPreStepVelocity);
-  world->setExternalForces(mBackpropSnapshot->mPreStepTorques);
+  world->setControlForces(mBackpropSnapshot->mPreStepTorques);
   world->setCachedLCPSolution(mBackpropSnapshot->mPreStepLCPCache);
   world->step(false);
 
@@ -668,7 +668,7 @@ Eigen::MatrixXs MappedBackpropSnapshot::finiteDifferencePosVelJacobian(
       // Get predicted next vel
       snapshot.restore();
       world->setVelocities(mBackpropSnapshot->mPreStepVelocity);
-      world->setExternalForces(mBackpropSnapshot->mPreStepTorques);
+      world->setControlForces(mBackpropSnapshot->mPreStepTorques);
       world->setCachedLCPSolution(mBackpropSnapshot->mPreStepLCPCache);
       Eigen::VectorXs tweakedPos
           = Eigen::VectorXs(mBackpropSnapshot->mPreStepPosition);
@@ -695,7 +695,7 @@ Eigen::MatrixXs MappedBackpropSnapshot::finiteDifferencePosVelJacobian(
       // Get predicted next vel
       snapshot.restore();
       world->setPositions(mBackpropSnapshot->mPreStepPosition);
-      world->setExternalForces(mBackpropSnapshot->mPreStepTorques);
+      world->setControlForces(mBackpropSnapshot->mPreStepTorques);
       world->setVelocities(mBackpropSnapshot->mPreStepVelocity);
       world->setCachedLCPSolution(mBackpropSnapshot->mPreStepLCPCache);
       Eigen::VectorXs tweakedPos
@@ -745,7 +745,7 @@ Eigen::MatrixXs MappedBackpropSnapshot::finiteDifferenceRiddersPosVelJacobian(
 
   world->setPositions(mBackpropSnapshot->mPreStepPosition);
   world->setVelocities(mBackpropSnapshot->mPreStepVelocity);
-  world->setExternalForces(mBackpropSnapshot->mPreStepTorques);
+  world->setControlForces(mBackpropSnapshot->mPreStepTorques);
   world->setCachedLCPSolution(mBackpropSnapshot->mPreStepLCPCache);
   world->step(false);
 
@@ -776,7 +776,7 @@ Eigen::MatrixXs MappedBackpropSnapshot::finiteDifferenceRiddersPosVelJacobian(
       // Get predicted next vel
       snapshot.restore();
       world->setVelocities(mBackpropSnapshot->mPreStepVelocity);
-      world->setExternalForces(mBackpropSnapshot->mPreStepTorques);
+      world->setControlForces(mBackpropSnapshot->mPreStepTorques);
       world->setCachedLCPSolution(mBackpropSnapshot->mPreStepLCPCache);
       Eigen::VectorXs perturbedPlus
           = Eigen::VectorXs(mBackpropSnapshot->mPreStepPosition);
@@ -797,7 +797,7 @@ Eigen::MatrixXs MappedBackpropSnapshot::finiteDifferenceRiddersPosVelJacobian(
 
       snapshot.restore();
       world->setVelocities(mBackpropSnapshot->mPreStepVelocity);
-      world->setExternalForces(mBackpropSnapshot->mPreStepTorques);
+      world->setControlForces(mBackpropSnapshot->mPreStepTorques);
       world->setCachedLCPSolution(mBackpropSnapshot->mPreStepLCPCache);
       Eigen::VectorXs perturbedMinus
           = Eigen::VectorXs(mBackpropSnapshot->mPreStepPosition);
@@ -835,7 +835,7 @@ Eigen::MatrixXs MappedBackpropSnapshot::finiteDifferenceRiddersPosVelJacobian(
 
       snapshot.restore();
       world->setVelocities(mBackpropSnapshot->mPreStepVelocity);
-      world->setExternalForces(mBackpropSnapshot->mPreStepTorques);
+      world->setControlForces(mBackpropSnapshot->mPreStepTorques);
       world->setCachedLCPSolution(mBackpropSnapshot->mPreStepLCPCache);
       Eigen::VectorXs perturbedPlus
           = Eigen::VectorXs(mBackpropSnapshot->mPreStepPosition);
@@ -856,7 +856,7 @@ Eigen::MatrixXs MappedBackpropSnapshot::finiteDifferenceRiddersPosVelJacobian(
 
       snapshot.restore();
       world->setVelocities(mBackpropSnapshot->mPreStepVelocity);
-      world->setExternalForces(mBackpropSnapshot->mPreStepTorques);
+      world->setControlForces(mBackpropSnapshot->mPreStepTorques);
       world->setCachedLCPSolution(mBackpropSnapshot->mPreStepLCPCache);
       Eigen::VectorXs perturbedMinus
           = Eigen::VectorXs(mBackpropSnapshot->mPreStepPosition);
@@ -935,7 +935,7 @@ Eigen::MatrixXs MappedBackpropSnapshot::finiteDifferenceForceVelJacobian(
 
   world->setPositions(mBackpropSnapshot->mPreStepPosition);
   world->setVelocities(mBackpropSnapshot->mPreStepVelocity);
-  world->setExternalForces(mBackpropSnapshot->mPreStepTorques);
+  world->setControlForces(mBackpropSnapshot->mPreStepTorques);
   world->setCachedLCPSolution(mBackpropSnapshot->mPreStepLCPCache);
   world->step(false);
 
@@ -960,7 +960,7 @@ Eigen::MatrixXs MappedBackpropSnapshot::finiteDifferenceForceVelJacobian(
       Eigen::VectorXs tweakedForces
           = Eigen::VectorXs(mBackpropSnapshot->mPreStepTorques);
       tweakedForces(i) += epsPos;
-      world->setExternalForces(tweakedForces);
+      world->setControlForces(tweakedForces);
 
       BackpropSnapshotPtr ptr = neural::forwardPass(world, false);
       if ((!mBackpropSnapshot->areResultsStandardized()
@@ -987,7 +987,7 @@ Eigen::MatrixXs MappedBackpropSnapshot::finiteDifferenceForceVelJacobian(
       Eigen::VectorXs tweakedForces
           = Eigen::VectorXs(mBackpropSnapshot->mPreStepTorques);
       tweakedForces(i) -= epsNeg;
-      world->setExternalForces(tweakedForces);
+      world->setControlForces(tweakedForces);
 
       BackpropSnapshotPtr ptr = neural::forwardPass(world, false);
       if ((!mBackpropSnapshot->areResultsStandardized()
@@ -1031,7 +1031,7 @@ Eigen::MatrixXs MappedBackpropSnapshot::finiteDifferenceRiddersForceVelJacobian(
 
   world->setPositions(mBackpropSnapshot->mPreStepPosition);
   world->setVelocities(mBackpropSnapshot->mPreStepVelocity);
-  world->setExternalForces(mBackpropSnapshot->mPreStepTorques);
+  world->setControlForces(mBackpropSnapshot->mPreStepTorques);
   world->setCachedLCPSolution(mBackpropSnapshot->mPreStepLCPCache);
   world->step(false);
 
@@ -1067,7 +1067,7 @@ Eigen::MatrixXs MappedBackpropSnapshot::finiteDifferenceRiddersForceVelJacobian(
       Eigen::VectorXs perturbedPlus
           = Eigen::VectorXs(mBackpropSnapshot->mPreStepTorques);
       perturbedPlus(i) += originalStepSize;
-      world->setExternalForces(perturbedPlus);
+      world->setControlForces(perturbedPlus);
       BackpropSnapshotPtr snapshotPlus = neural::forwardPass(world, false);
 
       if ((!mBackpropSnapshot->areResultsStandardized()
@@ -1088,7 +1088,7 @@ Eigen::MatrixXs MappedBackpropSnapshot::finiteDifferenceRiddersForceVelJacobian(
       Eigen::VectorXs perturbedMinus
           = Eigen::VectorXs(mBackpropSnapshot->mPreStepTorques);
       perturbedMinus(i) -= originalStepSize;
-      world->setExternalForces(perturbedMinus);
+      world->setControlForces(perturbedMinus);
       BackpropSnapshotPtr snapshotMinus = neural::forwardPass(world, false);
 
       if ((!mBackpropSnapshot->areResultsStandardized()
@@ -1126,7 +1126,7 @@ Eigen::MatrixXs MappedBackpropSnapshot::finiteDifferenceRiddersForceVelJacobian(
       Eigen::VectorXs perturbedPlus
           = Eigen::VectorXs(mBackpropSnapshot->mPreStepTorques);
       perturbedPlus(i) += stepSize;
-      world->setExternalForces(perturbedPlus);
+      world->setControlForces(perturbedPlus);
       BackpropSnapshotPtr snapshotPlus = neural::forwardPass(world, false);
       perturbedVelPlus = mMappings[mapAfter]->getVelocities(world);
       if (!((!mBackpropSnapshot->areResultsStandardized()
@@ -1147,7 +1147,7 @@ Eigen::MatrixXs MappedBackpropSnapshot::finiteDifferenceRiddersForceVelJacobian(
       Eigen::VectorXs perturbedMinus
           = Eigen::VectorXs(mBackpropSnapshot->mPreStepTorques);
       perturbedMinus(i) -= stepSize;
-      world->setExternalForces(perturbedMinus);
+      world->setControlForces(perturbedMinus);
       BackpropSnapshotPtr snapshotMinus = neural::forwardPass(world, false);
       perturbedVelMinus = mMappings[mapAfter]->getVelocities(world);
       if (!((!mBackpropSnapshot->areResultsStandardized()
@@ -1225,7 +1225,7 @@ Eigen::MatrixXs MappedBackpropSnapshot::finiteDifferencePosPosJacobian(
 
   world->setPositions(mBackpropSnapshot->mPreStepPosition);
   world->setVelocities(mBackpropSnapshot->mPreStepVelocity);
-  world->setExternalForces(mBackpropSnapshot->mPreStepTorques);
+  world->setControlForces(mBackpropSnapshot->mPreStepTorques);
   world->setCachedLCPSolution(mBackpropSnapshot->mPreStepLCPCache);
 
   for (std::size_t j = 0; j < subdivisions; j++)
@@ -1240,7 +1240,7 @@ Eigen::MatrixXs MappedBackpropSnapshot::finiteDifferencePosPosJacobian(
   {
     snapshot.restore();
     world->setVelocities(mBackpropSnapshot->mPreStepVelocity);
-    world->setExternalForces(mBackpropSnapshot->mPreStepTorques);
+    world->setControlForces(mBackpropSnapshot->mPreStepTorques);
     world->setCachedLCPSolution(mBackpropSnapshot->mPreStepLCPCache);
     Eigen::VectorXs tweakedPositions
         = Eigen::VectorXs(mBackpropSnapshot->mPreStepPosition);
@@ -1253,7 +1253,7 @@ Eigen::MatrixXs MappedBackpropSnapshot::finiteDifferencePosPosJacobian(
 
     snapshot.restore();
     world->setVelocities(mBackpropSnapshot->mPreStepVelocity);
-    world->setExternalForces(mBackpropSnapshot->mPreStepTorques);
+    world->setControlForces(mBackpropSnapshot->mPreStepTorques);
     world->setCachedLCPSolution(mBackpropSnapshot->mPreStepLCPCache);
     tweakedPositions = Eigen::VectorXs(mBackpropSnapshot->mPreStepPosition);
     tweakedPositions(i) -= EPSILON;
@@ -1294,7 +1294,7 @@ Eigen::MatrixXs MappedBackpropSnapshot::finiteDifferenceRiddersPosPosJacobian(
 
   world->setPositions(mBackpropSnapshot->mPreStepPosition);
   world->setVelocities(mBackpropSnapshot->mPreStepVelocity);
-  world->setExternalForces(mBackpropSnapshot->mPreStepTorques);
+  world->setControlForces(mBackpropSnapshot->mPreStepTorques);
   world->setCachedLCPSolution(mBackpropSnapshot->mPreStepLCPCache);
 
   for (std::size_t j = 0; j < subdivisions; j++)
@@ -1315,7 +1315,7 @@ Eigen::MatrixXs MappedBackpropSnapshot::finiteDifferenceRiddersPosPosJacobian(
 
     snapshot.restore();
     world->setVelocities(mBackpropSnapshot->mPreStepVelocity);
-    world->setExternalForces(mBackpropSnapshot->mPreStepTorques);
+    world->setControlForces(mBackpropSnapshot->mPreStepTorques);
     world->setCachedLCPSolution(mBackpropSnapshot->mPreStepLCPCache);
     Eigen::VectorXs tweakedPositions
         = Eigen::VectorXs(mBackpropSnapshot->mPreStepPosition);
@@ -1327,7 +1327,7 @@ Eigen::MatrixXs MappedBackpropSnapshot::finiteDifferenceRiddersPosPosJacobian(
 
     snapshot.restore();
     world->setVelocities(mBackpropSnapshot->mPreStepVelocity);
-    world->setExternalForces(mBackpropSnapshot->mPreStepTorques);
+    world->setControlForces(mBackpropSnapshot->mPreStepTorques);
     world->setCachedLCPSolution(mBackpropSnapshot->mPreStepLCPCache);
     tweakedPositions = Eigen::VectorXs(mBackpropSnapshot->mPreStepPosition);
     tweakedPositions(i) -= stepSize;
@@ -1345,7 +1345,7 @@ Eigen::MatrixXs MappedBackpropSnapshot::finiteDifferenceRiddersPosPosJacobian(
 
       snapshot.restore();
       world->setVelocities(mBackpropSnapshot->mPreStepVelocity);
-      world->setExternalForces(mBackpropSnapshot->mPreStepTorques);
+      world->setControlForces(mBackpropSnapshot->mPreStepTorques);
       world->setCachedLCPSolution(mBackpropSnapshot->mPreStepLCPCache);
       Eigen::VectorXs tweakedPositions
           = Eigen::VectorXs(mBackpropSnapshot->mPreStepPosition);
@@ -1357,7 +1357,7 @@ Eigen::MatrixXs MappedBackpropSnapshot::finiteDifferenceRiddersPosPosJacobian(
 
       snapshot.restore();
       world->setVelocities(mBackpropSnapshot->mPreStepVelocity);
-      world->setExternalForces(mBackpropSnapshot->mPreStepTorques);
+      world->setControlForces(mBackpropSnapshot->mPreStepTorques);
       world->setCachedLCPSolution(mBackpropSnapshot->mPreStepLCPCache);
       tweakedPositions = Eigen::VectorXs(mBackpropSnapshot->mPreStepPosition);
       tweakedPositions(i) -= stepSize;
@@ -1433,7 +1433,7 @@ Eigen::MatrixXs MappedBackpropSnapshot::finiteDifferenceVelPosJacobian(
 
   world->setPositions(mBackpropSnapshot->mPreStepPosition);
   world->setVelocities(mBackpropSnapshot->mPreStepVelocity);
-  world->setExternalForces(mBackpropSnapshot->mPreStepTorques);
+  world->setControlForces(mBackpropSnapshot->mPreStepTorques);
   world->setCachedLCPSolution(mBackpropSnapshot->mPreStepLCPCache);
 
   for (std::size_t j = 0; j < subdivisions; j++)
@@ -1448,7 +1448,7 @@ Eigen::MatrixXs MappedBackpropSnapshot::finiteDifferenceVelPosJacobian(
   {
     snapshot.restore();
     world->setPositions(mBackpropSnapshot->mPreStepPosition);
-    world->setExternalForces(mBackpropSnapshot->mPreStepTorques);
+    world->setControlForces(mBackpropSnapshot->mPreStepTorques);
     world->setCachedLCPSolution(mBackpropSnapshot->mPreStepLCPCache);
     Eigen::VectorXs tweakedVelocities
         = Eigen::VectorXs(mBackpropSnapshot->mPreStepVelocity);
@@ -1461,7 +1461,7 @@ Eigen::MatrixXs MappedBackpropSnapshot::finiteDifferenceVelPosJacobian(
 
     snapshot.restore();
     world->setPositions(mBackpropSnapshot->mPreStepPosition);
-    world->setExternalForces(mBackpropSnapshot->mPreStepTorques);
+    world->setControlForces(mBackpropSnapshot->mPreStepTorques);
     world->setCachedLCPSolution(mBackpropSnapshot->mPreStepLCPCache);
     tweakedVelocities = Eigen::VectorXs(mBackpropSnapshot->mPreStepVelocity);
     tweakedVelocities(i) -= EPSILON;
@@ -1503,7 +1503,7 @@ Eigen::MatrixXs MappedBackpropSnapshot::finiteDifferenceRiddersVelPosJacobian(
 
   world->setPositions(mBackpropSnapshot->mPreStepPosition);
   world->setVelocities(mBackpropSnapshot->mPreStepVelocity);
-  world->setExternalForces(mBackpropSnapshot->mPreStepTorques);
+  world->setControlForces(mBackpropSnapshot->mPreStepTorques);
   world->setCachedLCPSolution(mBackpropSnapshot->mPreStepLCPCache);
 
   for (std::size_t j = 0; j < subdivisions; j++)
@@ -1524,7 +1524,7 @@ Eigen::MatrixXs MappedBackpropSnapshot::finiteDifferenceRiddersVelPosJacobian(
 
     snapshot.restore();
     world->setPositions(mBackpropSnapshot->mPreStepPosition);
-    world->setExternalForces(mBackpropSnapshot->mPreStepTorques);
+    world->setControlForces(mBackpropSnapshot->mPreStepTorques);
     world->setCachedLCPSolution(mBackpropSnapshot->mPreStepLCPCache);
     Eigen::VectorXs tweakedVelocities
         = Eigen::VectorXs(mBackpropSnapshot->mPreStepVelocity);
@@ -1536,7 +1536,7 @@ Eigen::MatrixXs MappedBackpropSnapshot::finiteDifferenceRiddersVelPosJacobian(
 
     snapshot.restore();
     world->setPositions(mBackpropSnapshot->mPreStepPosition);
-    world->setExternalForces(mBackpropSnapshot->mPreStepTorques);
+    world->setControlForces(mBackpropSnapshot->mPreStepTorques);
     world->setCachedLCPSolution(mBackpropSnapshot->mPreStepLCPCache);
     tweakedVelocities = Eigen::VectorXs(mBackpropSnapshot->mPreStepVelocity);
     tweakedVelocities(i) -= stepSize;
@@ -1554,7 +1554,7 @@ Eigen::MatrixXs MappedBackpropSnapshot::finiteDifferenceRiddersVelPosJacobian(
 
       snapshot.restore();
       world->setPositions(mBackpropSnapshot->mPreStepPosition);
-      world->setExternalForces(mBackpropSnapshot->mPreStepTorques);
+      world->setControlForces(mBackpropSnapshot->mPreStepTorques);
       world->setCachedLCPSolution(mBackpropSnapshot->mPreStepLCPCache);
       Eigen::VectorXs tweakedVelocities
           = Eigen::VectorXs(mBackpropSnapshot->mPreStepVelocity);
@@ -1566,7 +1566,7 @@ Eigen::MatrixXs MappedBackpropSnapshot::finiteDifferenceRiddersVelPosJacobian(
 
       snapshot.restore();
       world->setPositions(mBackpropSnapshot->mPreStepPosition);
-      world->setExternalForces(mBackpropSnapshot->mPreStepTorques);
+      world->setControlForces(mBackpropSnapshot->mPreStepTorques);
       world->setCachedLCPSolution(mBackpropSnapshot->mPreStepLCPCache);
       tweakedVelocities = Eigen::VectorXs(mBackpropSnapshot->mPreStepVelocity);
       tweakedVelocities(i) -= stepSize;

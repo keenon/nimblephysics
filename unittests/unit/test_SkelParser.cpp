@@ -377,9 +377,9 @@ TEST(SkelParser, DofAttributes)
   EXPECT_EQ(joint2->getDof(0)->getAccelerationUpperLimit(), 3);
   EXPECT_EQ(joint2->getDof(0)->getAcceleration(), 0);
 
-  EXPECT_EQ(joint2->getDof(0)->getForceLowerLimit(), -4);
-  EXPECT_EQ(joint2->getDof(0)->getForceUpperLimit(), 4);
-  EXPECT_EQ(joint2->getDof(0)->getForce(), 0);
+  EXPECT_EQ(joint2->getDof(0)->getControlForceLowerLimit(), -4);
+  EXPECT_EQ(joint2->getDof(0)->getControlForceUpperLimit(), 4);
+  EXPECT_EQ(joint2->getDof(0)->getControlForce(), 0);
 
   // Test for mixture of old method and new method
   // Note: If there is a conflict, the data given in the dof element will win

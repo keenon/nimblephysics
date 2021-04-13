@@ -82,7 +82,7 @@ std::shared_ptr<LossFn> getMPCLoss()
                                      ) {
     gradWrtRollout->getPoses().setZero();
     gradWrtRollout->getVels().setZero();
-    gradWrtRollout->getForces().setZero();
+    gradWrtRollout->getControlForces().setZero();
     int steps = rollout->getPosesConst().cols();
     for (int i = 0; i < steps; i++)
     {
@@ -93,8 +93,8 @@ std::shared_ptr<LossFn> getMPCLoss()
     /*
     for (int i = 0; i < steps; i++)
     {
-      gradWrtRollout->getForces("identity").col(i)
-          = 2 * rollout->getForcesConst("identity").col(i);
+      gradWrtRollout->getControlForces("identity").col(i)
+          = 2 * rollout->getControlForcesConst("identity").col(i);
     }
     */
     s_t sum = 0.0;
@@ -132,7 +132,7 @@ std::shared_ptr<LossFn> getSSIDLoss()
                                      ) {
     gradWrtRollout->getPoses().setZero();
     gradWrtRollout->getVels().setZero();
-    gradWrtRollout->getForces().setZero();
+    gradWrtRollout->getControlForces().setZero();
     int steps = rollout->getPosesConst().cols();
 
     Eigen::MatrixXs sensorPositions = rollout->getMetadata("sensors");
@@ -188,15 +188,15 @@ TEST(REALTIME, CARTPOLE_MPC)
 
   world->addSkeleton(cartpole);
 
-  cartpole->setForceUpperLimit(0, 15);
-  cartpole->setForceLowerLimit(0, -15);
+  cartpole->setControlForceUpperLimit(0, 15);
+  cartpole->setControlForceLowerLimit(0, -15);
   cartpole->setVelocityUpperLimit(0, 1000);
   cartpole->setVelocityLowerLimit(0, -1000);
   cartpole->setPositionUpperLimit(0, 10);
   cartpole->setPositionLowerLimit(0, -10);
 
-  cartpole->setForceUpperLimit(1, 0);
-  cartpole->setForceLowerLimit(1, 0);
+  cartpole->setControlForceUpperLimit(1, 0);
+  cartpole->setControlForceLowerLimit(1, 0);
   cartpole->setVelocityUpperLimit(1, 1000);
   cartpole->setVelocityLowerLimit(1, -1000);
   cartpole->setPositionUpperLimit(1, 10);
@@ -242,7 +242,7 @@ TEST(REALTIME, CARTPOLE_MPC)
       ) {
         gradWrtRollout->getPoses().setZero();
         gradWrtRollout->getVels().setZero();
-        gradWrtRollout->getForces().setZero();
+        gradWrtRollout->getControlForces().setZero();
         int steps = rollout->getPosesConst().cols();
         for (int i = 0; i < steps; i++)
         {
@@ -255,8 +255,8 @@ TEST(REALTIME, CARTPOLE_MPC)
         /*
         for (int i = 0; i < steps; i++)
         {
-          gradWrtRollout->getForces("identity").col(i)
-              = 2 * rollout->getForcesConst("identity").col(i);
+          gradWrtRollout->getControlForces("identity").col(i)
+              = 2 * rollout->getControlForcesConst("identity").col(i);
         }
         */
         s_t sum = 0.0;
@@ -288,8 +288,8 @@ TEST(REALTIME, CARTPOLE_MPC)
   // MPCRemote mpcRemote = MPCRemote(mpcLocal);
   MPCLocal& mpcRemote = mpcLocal;
 
-  std::function<Eigen::VectorXs()> getForces = [&]() {
-    Eigen::VectorXs forces = mpcRemote.getForceNow();
+  std::function<Eigen::VectorXs()> getControlForces = [&]() {
+    Eigen::VectorXs forces = mpcRemote.getControlForceNow();
     // ssid.registerControlsNow(forces);
     return forces;
   };
@@ -332,14 +332,14 @@ TEST(REALTIME, CARTPOLE_MPC)
   Eigen::Vector3s originalColor = sledBodyVisual->getColor();
 
   ticker.registerTickListener([&](long now) {
-    realtimeUnderlyingWorld->setExternalForces(mpcRemote.getForce(now));
+    realtimeUnderlyingWorld->setControlForces(mpcRemote.getControlForce(now));
 
     if (server.getKeysDown().count("a"))
     {
       Eigen::VectorXs perturbedForces
           = realtimeUnderlyingWorld->getExternalForces();
       perturbedForces(0) = -15.0;
-      realtimeUnderlyingWorld->setExternalForces(perturbedForces);
+      realtimeUnderlyingWorld->setControlForces(perturbedForces);
       sledBodyVisual->setColor(Eigen::Vector3s(1, 0, 0));
     }
     else if (server.getKeysDown().count("e"))
@@ -347,7 +347,7 @@ TEST(REALTIME, CARTPOLE_MPC)
       Eigen::VectorXs perturbedForces
           = realtimeUnderlyingWorld->getExternalForces();
       perturbedForces(0) = 15.0;
-      realtimeUnderlyingWorld->setExternalForces(perturbedForces);
+      realtimeUnderlyingWorld->setControlForces(perturbedForces);
       sledBodyVisual->setColor(Eigen::Vector3s(0, 1, 0));
     }
     else
@@ -408,7 +408,7 @@ TEST(REALTIME, CARTPOLE_MPC)
   {
     // spin
     // cartpole->setPosition(0, 0.0);
-    // cartpole->setForces(Eigen::VectorXs::Zero(cartpole->getNumDofs()));
+    // cartpole->setControlForces(Eigen::VectorXs::Zero(cartpole->getNumDofs()));
     // cartpole->setPositions(Eigen::VectorXs::Zero(cartpole->getNumDofs()));
   }
 }
@@ -451,15 +451,15 @@ TEST(REALTIME, CARTPOLE_SSID)
 
   world->addSkeleton(cartpole);
 
-  cartpole->setForceUpperLimit(0, 15);
-  cartpole->setForceLowerLimit(0, -15);
+  cartpole->setControlForceUpperLimit(0, 15);
+  cartpole->setControlForceLowerLimit(0, -15);
   cartpole->setVelocityUpperLimit(0, 1000);
   cartpole->setVelocityLowerLimit(0, -1000);
   cartpole->setPositionUpperLimit(0, 10);
   cartpole->setPositionLowerLimit(0, -10);
 
-  cartpole->setForceUpperLimit(1, 0);
-  cartpole->setForceLowerLimit(1, 0);
+  cartpole->setControlForceUpperLimit(1, 0);
+  cartpole->setControlForceLowerLimit(1, 0);
   cartpole->setVelocityUpperLimit(1, 1000);
   cartpole->setVelocityLowerLimit(1, -1000);
   cartpole->setPositionUpperLimit(1, 10);
@@ -498,7 +498,7 @@ TEST(REALTIME, CARTPOLE_SSID)
   {
     long time = i * millisPerTimestep;
     Eigen::VectorXs forces = Eigen::VectorXs::Ones(world->getNumDofs());
-    world->setExternalForces(forces);
+    world->setControlForces(forces);
     world->step();
     ssid.registerControls(time, forces);
     ssid.registerSensors(time, world->getPositions());

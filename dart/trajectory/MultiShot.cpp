@@ -921,8 +921,8 @@ void MultiShot::getStates(
   assert(rollout->getPoses().rows() == posDim);
   assert(rollout->getVels().cols() == mSteps);
   assert(rollout->getVels().rows() == velDim);
-  assert(rollout->getForces().cols() == mSteps);
-  assert(rollout->getForces().rows() == forceDim);
+  assert(rollout->getControlForces().cols() == mSteps);
+  assert(rollout->getControlForces().rows() == forceDim);
   _unused(posDim);
   _unused(velDim);
   _unused(forceDim);
@@ -972,7 +972,7 @@ void MultiShot::getStates(
       for (int j = 0; j < mShots[i]->mSteps; j++)
       {
         Eigen::VectorXs forces = mShots[i]->mForces.col(j);
-        world->setExternalForces(forces);
+        world->setControlForces(forces);
         world->step();
         for (auto pair : mMappings)
         {
@@ -980,8 +980,8 @@ void MultiShot::getStates(
               = pair.second->getPositions(world);
           rollout->getVels(pair.first).col(cursor)
               = pair.second->getVelocities(world);
-          rollout->getForces(pair.first).col(cursor)
-              = pair.second->getForces(world);
+          rollout->getControlForces(pair.first).col(cursor)
+              = pair.second->getControlForces(world);
         }
         cursor++;
       }
@@ -1036,13 +1036,13 @@ void MultiShot::setStates(
 
 //==============================================================================
 /// This sets the forces in this trajectory from the passed in matrix
-void MultiShot::setForcesRaw(Eigen::MatrixXs forces, PerformanceLog* log)
+void MultiShot::setControlForcesRaw(Eigen::MatrixXs forces, PerformanceLog* log)
 {
   PerformanceLog* thisLog = nullptr;
 #ifdef LOG_PERFORMANCE_MULTI_SHOT
   if (log != nullptr)
   {
-    thisLog = log->startRun("MultiShot.setForcesRaw");
+    thisLog = log->startRun("MultiShot.setControlForcesRaw");
   }
 #endif
 
@@ -1050,7 +1050,7 @@ void MultiShot::setForcesRaw(Eigen::MatrixXs forces, PerformanceLog* log)
   for (int i = 0; i < mShots.size(); i++)
   {
     int len = mShots[i]->getNumSteps();
-    mShots[i]->setForcesRaw(
+    mShots[i]->setControlForcesRaw(
         forces.block(0, cursor, forces.rows(), len), thisLog);
     cursor += len;
   }
@@ -1100,13 +1100,13 @@ Eigen::VectorXi MultiShot::advanceSteps(
       for (int j = 0; j < steps; j++)
       {
         int t = cursor + j;
-        if (t < rollout->getForcesConst().cols())
+        if (t < rollout->getControlForcesConst().cols())
         {
-          world->setExternalForces(rollout->getForcesConst().col(t));
+          world->setControlForces(rollout->getControlForcesConst().col(t));
         }
         else
         {
-          world->setExternalForces(Eigen::VectorXs::Zero(world->getNumDofs()));
+          world->setControlForces(Eigen::VectorXs::Zero(world->getNumDofs()));
         }
         world->step();
       }

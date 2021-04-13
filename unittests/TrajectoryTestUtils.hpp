@@ -80,7 +80,7 @@ bool verifySingleStep(WorldPtr world, s_t EPS)
   Eigen::MatrixXs velVelAnalytical = ptr->getVelVelJacobian(world);
   Eigen::MatrixXs velVelFD = ptr->finiteDifferenceVelVelJacobian(world);
 
-  Eigen::MatrixXs forceVel = ptr->getForceVelJacobian(world);
+  Eigen::MatrixXs forceVel = ptr->getControlForceVelJacobian(world);
   Eigen::MatrixXs forceVelFD = ptr->finiteDifferenceForceVelJacobian(world);
 
   Eigen::MatrixXs velCJacobian = ptr->getVelCJacobian(world);
@@ -148,7 +148,7 @@ bool verifySingleShot(
                   ptrs[j]->finiteDifferenceVelVelJacobian(world),
                   threshold)
               || !equals(
-                  ptrs[j]->getForceVelJacobian(world),
+                  ptrs[j]->getControlForceVelJacobian(world),
                   ptrs[j]->finiteDifferenceForceVelJacobian(world),
                   threshold)))
       {
@@ -175,14 +175,14 @@ bool verifySingleShot(
             threshold,
             "vel-vel jac");
         debugMatrices(
-            ptrs[j]->getForceVelJacobian(world),
+            ptrs[j]->getControlForceVelJacobian(world),
             ptrs[j]->finiteDifferenceForceVelJacobian(world),
             threshold,
             "force-vel jac");
 
         world->setPositions(ptrs[j]->getPreStepPosition());
         world->setVelocities(ptrs[j]->getPreStepVelocity());
-        world->setExternalForces(ptrs[j]->getPreStepTorques());
+        world->setControlForces(ptrs[j]->getPreStepTorques());
         verifyVelGradients(world, ptrs[j]->getPreStepVelocity());
 
         return false;

@@ -1073,78 +1073,78 @@ namespace py = pybind11;
             self->resetAccelerations();                                        \
           })                                                                   \
       .def(                                                                    \
-          "setForce",                                                          \
+          "setControlForce",                                                          \
           +[](dart::dynamics::GenericJoint<space>* self,                       \
               std::size_t index,                                               \
-              s_t force) { self->setForce(index, force); },                 \
+              s_t force) { self->setControlForce(index, force); },                 \
           ::py::arg("index"),                                                  \
           ::py::arg("force"))                                                  \
       .def(                                                                    \
-          "getForce",                                                          \
+          "getControlForce",                                                          \
           +[](const dart::dynamics::GenericJoint<space>* self,                 \
-              std::size_t index) -> s_t { return self->getForce(index); },  \
+              std::size_t index) -> s_t { return self->getControlForce(index); },  \
           ::py::arg("index"))                                                  \
       .def(                                                                    \
-          "setForces",                                                         \
+          "setControlForces",                                                         \
           +[](dart::dynamics::GenericJoint<space>* self,                       \
-              const Eigen::VectorXs& forces) { self->setForces(forces); },     \
+              const Eigen::VectorXs& forces) { self->setControlForces(forces); },     \
           ::py::arg("forces"))                                                 \
       .def(                                                                    \
-          "getForces",                                                         \
+          "getControlForces",                                                         \
           +[](const dart::dynamics::GenericJoint<space>* self)                 \
-              -> Eigen::VectorXs { return self->getForces(); })                \
+              -> Eigen::VectorXs { return self->getControlForces(); })                \
       .def(                                                                    \
-          "setForceLowerLimit",                                                \
+          "setControlForceLowerLimit",                                                \
           +[](dart::dynamics::GenericJoint<space>* self,                       \
               size_t index,                                                    \
-              s_t force) { self->setForceLowerLimit(index, force); },       \
+              s_t force) { self->setControlForceLowerLimit(index, force); },       \
           ::py::arg("index"),                                                  \
           ::py::arg("force"))                                                  \
       .def(                                                                    \
-          "getForceLowerLimit",                                                \
+          "getControlForceLowerLimit",                                                \
           +[](const dart::dynamics::GenericJoint<space>* self,                 \
               std::size_t index) -> s_t {                                   \
-            return self->getForceLowerLimit(index);                            \
+            return self->getControlForceLowerLimit(index);                            \
           },                                                                   \
           ::py::arg("index"))                                                  \
       .def(                                                                    \
-          "setForceLowerLimits",                                               \
+          "setControlForceLowerLimits",                                               \
           +[](dart::dynamics::GenericJoint<space>* self,                       \
               const Eigen::VectorXs& lowerLimits) {                            \
-            self->setForceLowerLimits(lowerLimits);                            \
+            self->setControlForceLowerLimits(lowerLimits);                            \
           },                                                                   \
           ::py::arg("lowerLimits"))                                            \
       .def(                                                                    \
-          "getForceLowerLimits",                                               \
+          "getControlForceLowerLimits",                                               \
           +[](const dart::dynamics::GenericJoint<space>* self)                 \
-              -> Eigen::VectorXs { return self->getForceLowerLimits(); })      \
+              -> Eigen::VectorXs { return self->getControlForceLowerLimits(); })      \
       .def(                                                                    \
-          "setForceUpperLimit",                                                \
+          "setControlForceUpperLimit",                                                \
           +[](dart::dynamics::GenericJoint<space>* self,                       \
               size_t index,                                                    \
-              s_t force) { self->setForceUpperLimit(index, force); },       \
+              s_t force) { self->setControlForceUpperLimit(index, force); },       \
           ::py::arg("index"),                                                  \
           ::py::arg("force"))                                                  \
       .def(                                                                    \
-          "getForceUpperLimit",                                                \
+          "getControlForceUpperLimit",                                                \
           +[](const dart::dynamics::GenericJoint<space>* self, size_t index)   \
-              -> s_t { return self->getForceUpperLimit(index); },           \
+              -> s_t { return self->getControlForceUpperLimit(index); },           \
           ::py::arg("index"))                                                  \
       .def(                                                                    \
-          "setForceUpperLimits",                                               \
+          "setControlForceUpperLimits",                                               \
           +[](dart::dynamics::GenericJoint<space>* self,                       \
               const Eigen::VectorXs& upperLimits) {                            \
-            self->setForceUpperLimits(upperLimits);                            \
+            self->setControlForceUpperLimits(upperLimits);                            \
           },                                                                   \
           ::py::arg("upperLimits"))                                            \
       .def(                                                                    \
-          "getForceUpperLimits",                                               \
+          "getControlForceUpperLimits",                                               \
           +[](const dart::dynamics::GenericJoint<space>* self)                 \
-              -> Eigen::VectorXs { return self->getForceUpperLimits(); })      \
+              -> Eigen::VectorXs { return self->getControlForceUpperLimits(); })      \
       .def(                                                                    \
-          "resetForces",                                                       \
+          "resetControlForces",                                                       \
           +[](dart::dynamics::GenericJoint<space>*                             \
-                  self) { self->resetForces(); })                              \
+                  self) { self->resetControlForces(); })                              \
       .def(                                                                    \
           "setVelocityChange",                                                 \
           +[](dart::dynamics::GenericJoint<space>* self,                       \

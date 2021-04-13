@@ -112,8 +112,8 @@ std::shared_ptr<simulation::World> createWorld(
 
   Eigen::VectorXs forceLimits = Eigen::VectorXs::Ones(atlas->getNumDofs()) * 50;
   forceLimits.segment<6>(0).setZero();
-  atlas->setForceUpperLimits(forceLimits);
-  atlas->setForceLowerLimits(forceLimits * -1);
+  atlas->setControlForceUpperLimits(forceLimits);
+  atlas->setControlForceLowerLimits(forceLimits * -1);
   Eigen::VectorXs posLimits = Eigen::VectorXs::Ones(atlas->getNumDofs()) * 10;
   atlas->setPositionUpperLimits(posLimits);
   atlas->setPositionLowerLimits(posLimits * -1);
@@ -190,7 +190,7 @@ TEST(ATLAS, BROKEN_1)
       0.0253774, -0.0160258, 0.0132533, 0.00691794, 0.00652204, 0.000479448;
   world->setPositions(brokenPos);
   world->setVelocities(brokenVel);
-  world->setExternalForces(brokenForce);
+  world->setControlForces(brokenForce);
   world->setCachedLCPSolution(brokenLCPCache);
 
   EXPECT_TRUE(verifyAnalyticalJacobians(world));
@@ -286,7 +286,7 @@ TEST(ATLAS, BROKEN_2)
       0.00720889, 0.00616984, 0.000379624;
   world->setPositions(brokenPos);
   world->setVelocities(brokenVel);
-  world->setExternalForces(brokenForce);
+  world->setControlForces(brokenForce);
   world->setCachedLCPSolution(brokenLCPCache);
 
   // EXPECT_TRUE(verifyScratch(world, WithRespectTo::POSITION));
@@ -382,7 +382,7 @@ TEST(ATLAS, BROKEN_3)
       0.0528901, -0.0247297, -0.0528901, 0, 0, 0;
   world->setPositions(brokenPos);
   world->setVelocities(brokenVel);
-  world->setExternalForces(brokenForce);
+  world->setControlForces(brokenForce);
   world->setCachedLCPSolution(brokenLCPCache);
 
   // EXPECT_TRUE(verifyScratch(world, WithRespectTo::POSITION));

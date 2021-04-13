@@ -25,7 +25,7 @@ public:
 
   virtual int getPosDim() = 0;
   virtual int getVelDim() = 0;
-  virtual int getForceDim() = 0;
+  virtual int getControlForceDim() = 0;
   virtual int getMassDim() = 0;
 
   virtual void setPositions(
@@ -36,7 +36,7 @@ public:
       std::shared_ptr<simulation::World> world,
       const Eigen::Ref<Eigen::VectorXs>& velocities)
       = 0;
-  virtual void setForces(
+  virtual void setControlForces(
       std::shared_ptr<simulation::World> world,
       const Eigen::Ref<Eigen::VectorXs>& forces)
       = 0;
@@ -53,7 +53,7 @@ public:
       std::shared_ptr<simulation::World> world,
       /* OUT */ Eigen::Ref<Eigen::VectorXs> velocities)
       = 0;
-  virtual void getForcesInPlace(
+  virtual void getControlForcesInPlace(
       std::shared_ptr<simulation::World> world,
       /* OUT */ Eigen::Ref<Eigen::VectorXs> forces)
       = 0;
@@ -64,7 +64,7 @@ public:
 
   Eigen::VectorXs getPositions(std::shared_ptr<simulation::World> world);
   Eigen::VectorXs getVelocities(std::shared_ptr<simulation::World> world);
-  Eigen::VectorXs getForces(std::shared_ptr<simulation::World> world);
+  Eigen::VectorXs getControlForces(std::shared_ptr<simulation::World> world);
   Eigen::VectorXs getMasses(std::shared_ptr<simulation::World> world);
 
   /// Check if a Jacobian is equal
@@ -148,9 +148,9 @@ public:
       std::shared_ptr<simulation::World> world);
   virtual Eigen::VectorXs getVelocityUpperLimits(
       std::shared_ptr<simulation::World> world);
-  virtual Eigen::VectorXs getForceLowerLimits(
+  virtual Eigen::VectorXs getControlForceLowerLimits(
       std::shared_ptr<simulation::World> world);
-  virtual Eigen::VectorXs getForceUpperLimits(
+  virtual Eigen::VectorXs getControlForceUpperLimits(
       std::shared_ptr<simulation::World> world);
   virtual Eigen::VectorXs getMassLowerLimits(
       std::shared_ptr<simulation::World> world);

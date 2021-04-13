@@ -44,7 +44,7 @@ public:
   /// This swaps in a new buffer of forces. If "startAt" is after "now", this
   /// will copy enough of the current buffer into our updated buffer to keep the
   /// current trajectory.
-  void setForcePlan(long startAt, long now, Eigen::MatrixXs forces);
+  void setControlForcePlan(long startAt, long now, Eigen::MatrixXs forces);
 
   /// This retrieves the state of the world at a given time, assuming that we've
   /// been applying forces from the buffer since the last state that we fully

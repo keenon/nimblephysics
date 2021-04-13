@@ -249,7 +249,7 @@ Eigen::VectorXs DifferentiableContactConstraint::getConstraintForces(
   for (int i = 0; i < skel->getNumDofs(); i++)
   {
     auto dof = skel->getDof(i);
-    s_t multiple = getForceMultiple(dof);
+    s_t multiple = getControlForceMultiple(dof);
     if (multiple == 0)
     {
       taus(i) = 0.0;
@@ -1404,7 +1404,7 @@ math::Jacobian DifferentiableContactConstraint::getContactForceJacobian(
 s_t DifferentiableContactConstraint::getConstraintForce(
     dynamics::DegreeOfFreedom* dof)
 {
-  s_t multiple = getForceMultiple(dof);
+  s_t multiple = getControlForceMultiple(dof);
   Eigen::Vector6s worldForce = getWorldForce();
   Eigen::Vector6s worldTwist = getWorldScrewAxisForForce(dof);
   return worldTwist.dot(worldForce) * multiple;
@@ -1416,7 +1416,7 @@ s_t DifferentiableContactConstraint::getConstraintForce(
 s_t DifferentiableContactConstraint::getConstraintForceDerivative(
     dynamics::DegreeOfFreedom* dof, dynamics::DegreeOfFreedom* wrt)
 {
-  s_t multiple = getForceMultiple(dof);
+  s_t multiple = getControlForceMultiple(dof);
   Eigen::Vector6s worldForce = getWorldForce();
   Eigen::Vector6s gradientOfWorldForce = getContactWorldForceGradient(wrt);
   Eigen::Vector6s gradientOfWorldTwist = getScrewAxisForForceGradient(dof, wrt);
@@ -1448,7 +1448,7 @@ DifferentiableContactConstraint::getConstraintForcesJacobian(
     Eigen::MatrixXs slowJacCache = Eigen::MatrixXs::Zero(dim, dim);
     for (int row = 0; row < dim; row++)
     {
-      s_t multiple = getForceMultiple(dofs[row]);
+      s_t multiple = getControlForceMultiple(dofs[row]);
       if (multiple == 0.0)
         continue;
 
@@ -1482,7 +1482,7 @@ DifferentiableContactConstraint::getConstraintForcesJacobian(
     mWorldConstraintJacCache = Eigen::MatrixXs::Zero(dim, dim);
     for (int row = 0; row < dim; row++)
     {
-      s_t multiple = getForceMultiple(dofs[row]);
+      s_t multiple = getControlForceMultiple(dofs[row]);
       if (multiple == 0.0)
         continue;
 
@@ -1590,7 +1590,7 @@ Eigen::MatrixXs DifferentiableContactConstraint::getConstraintForcesJacobian(
   for (int row = 0; row < skel->getNumDofs(); row++)
   {
     Eigen::Vector6s axis = getWorldScrewAxisForForce(skel->getDof(row));
-    s_t multiple = getForceMultiple(skel->getDof(row));
+    s_t multiple = getControlForceMultiple(skel->getDof(row));
     if (multiple != 0)
     {
       for (int col = 0; col < wrt->getNumDofs(); col++)
@@ -1634,7 +1634,7 @@ Eigen::MatrixXs DifferentiableContactConstraint::getConstraintForcesJacobian(
   {
     for (int i = 0; i < skel->getNumDofs(); i++)
     {
-      s_t multiple = getForceMultiple(skel->getDof(i));
+      s_t multiple = getControlForceMultiple(skel->getDof(i));
       if (multiple != 0)
       {
         Eigen::Vector6s axis = getWorldScrewAxisForForce(skel->getDof(i));
@@ -2893,7 +2893,7 @@ int DifferentiableContactConstraint::getIndexInConstraint()
 //==============================================================================
 // This returns 1.0 by default, 0.0 if this constraint doesn't effect the
 // specified DOF, and -1.0 if the constraint effects this dof negatively.
-s_t DifferentiableContactConstraint::getForceMultiple(
+s_t DifferentiableContactConstraint::getControlForceMultiple(
     dynamics::DegreeOfFreedom* dof)
 {
   if (!mConstraint->isContactConstraint())

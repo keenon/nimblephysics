@@ -665,9 +665,9 @@ bool verifyVelVelJacobian(WorldPtr world, VectorXs proposedVelocities)
               << classicPtr->getJacobianOfC(world, WithRespectTo::VELOCITY)
               << std::endl;
     std::cout << "Brute force forceVelJacobian:" << std::endl
-              << classicPtr->getForceVelJacobian(world) << std::endl;
+              << classicPtr->getControlForceVelJacobian(world) << std::endl;
     std::cout << "Brute force forceVelJacobian * velCJacobian:" << std::endl
-              << classicPtr->getForceVelJacobian(world)
+              << classicPtr->getControlForceVelJacobian(world)
                      * classicPtr->getJacobianOfC(
                          world, WithRespectTo::VELOCITY)
               << std::endl;
@@ -1910,7 +1910,7 @@ bool verifyNextV(WorldPtr world)
     tweakedForce(i) -= EPSILON;
 
     // snapshot.restore();
-    world->setExternalForces(tweakedForce);
+    world->setControlForces(tweakedForce);
 
     VelocityTest perturbedTest = runVelocityTest(world);
 
@@ -2247,7 +2247,7 @@ bool verifyForceVelJacobian(WorldPtr world, VectorXs proposedVelocities)
               << std::endl;
   }
 
-  MatrixXs analytical = classicPtr->getForceVelJacobian(world);
+  MatrixXs analytical = classicPtr->getControlForceVelJacobian(world);
   MatrixXs bruteForce = classicPtr->finiteDifferenceForceVelJacobian(world);
 
   // Atlas runs at 1.5e-8 error
@@ -2442,7 +2442,7 @@ bool verifyConstraintGroupSubJacobians(
 
   world->setPositions(classicPtr->getPreStepPosition());
   world->setVelocities(classicPtr->getPreStepVelocity());
-  world->setExternalForces(classicPtr->getPreStepTorques());
+  world->setControlForces(classicPtr->getPreStepTorques());
 
   // Special case, there's only one constraint group
   if (classicPtr->mGradientMatrices.size() == 1)
@@ -2609,8 +2609,8 @@ bool verifyConstraintGroupSubJacobians(
       return false;
     }
 
-    Eigen::MatrixXs groupForceVel = group->getForceVelJacobian(world);
-    Eigen::MatrixXs worldForceVel = classicPtr->getForceVelJacobian(world);
+    Eigen::MatrixXs groupForceVel = group->getControlForceVelJacobian(world);
+    Eigen::MatrixXs worldForceVel = classicPtr->getControlForceVelJacobian(world);
     if (!equals(groupForceVel, worldForceVel, 0))
     {
       std::cout << "ConstrainedGroupGradientMatrices and BackpropSnapshotPtr "
@@ -2684,7 +2684,7 @@ bool verifyAnalyticalBackpropInstance(
   // f_t
   VectorXs lossWrtThisTorque =
       // f_t --> v_t+1
-      classicPtr->getForceVelJacobian(world).transpose()
+      classicPtr->getControlForceVelJacobian(world).transpose()
       * nextTimeStep.lossWrtVelocity;
 
   // Trim gradients to the box constraints
@@ -2879,12 +2879,12 @@ bool verifyAnalyticalBackpropInstance(
                 << std::endl;
       */
       std::cout << "2.5: (force-vel)^T * nextLossWrtVel:" << std::endl
-                << -classicPtr->getForceVelJacobian(world).transpose()
+                << -classicPtr->getControlForceVelJacobian(world).transpose()
                        * nextTimeStep.lossWrtVelocity
                 << std::endl;
       std::cout << "3: -((force-vel) * (vel-C))^T * nextLossWrtVel:"
                 << std::endl
-                << -(classicPtr->getForceVelJacobian(world)
+                << -(classicPtr->getControlForceVelJacobian(world)
                      * classicPtr->getJacobianOfC(
                          world, WithRespectTo::VELOCITY))
                            .transpose()
@@ -2915,7 +2915,7 @@ std::cout << "v_t --> p_t+1:" << std::endl
       std::cout << "Analytical: loss wrt torque at time t:" << std::endl
                 << thisTimeStep.lossWrtTorque << std::endl;
       std::cout << "(f_t --> v_t+1)^T:" << std::endl
-                << (classicPtr->getForceVelJacobian(world).transpose())
+                << (classicPtr->getControlForceVelJacobian(world).transpose())
                 << std::endl;
       std::cout << "MInv:" << std::endl
                 << classicPtr->getInvMassMatrix(world) << std::endl;
@@ -3022,7 +3022,7 @@ LossGradient computeBruteForceGradient(
     tweakedForce(i) += EPSILON;
 
     snapshot.restore();
-    world->setExternalForces(tweakedForce);
+    world->setControlForces(tweakedForce);
     for (std::size_t k = 0; k < timesteps; k++)
       world->step(true);
     grad.lossWrtTorque(i) = (loss(world) - defaultLoss) / EPSILON;
@@ -3568,7 +3568,7 @@ void setTestComponentWorld(
   else if (component == MappingTestComponent::VELOCITY)
     world->setVelocities(val);
   else if (component == MappingTestComponent::FORCE)
-    world->setExternalForces(val);
+    world->setControlForces(val);
   else
     assert(false && "Unrecognized component value in getTestComponent()");
 }
@@ -3583,7 +3583,7 @@ Eigen::VectorXs getTestComponentMapping(
   else if (component == MappingTestComponent::VELOCITY)
     return mapping->getVelocities(world);
   else if (component == MappingTestComponent::FORCE)
-    return mapping->getForces(world);
+    return mapping->getControlForces(world);
   else
     assert(false && "Unrecognized component value in getTestComponent()");
   throw std::runtime_error{"Execution should never reach this point"};
@@ -3599,7 +3599,7 @@ int getTestComponentMappingDim(
   else if (component == MappingTestComponent::VELOCITY)
     return mapping->getVelDim();
   else if (component == MappingTestComponent::FORCE)
-    return mapping->getForceDim();
+    return mapping->getControlForceDim();
   else
     assert(false && "Unrecognized component value in getTestComponent()");
   return 0;
@@ -3643,7 +3643,7 @@ void setTestComponentMapping(
   else if (component == MappingTestComponent::VELOCITY)
     mapping->setVelocities(world, val);
   else if (component == MappingTestComponent::FORCE)
-    mapping->setForces(world, val);
+    mapping->setControlForces(world, val);
   else
     assert(false && "Unrecognized component value in getTestComponent()");
 }
@@ -3824,7 +3824,7 @@ Eigen::MatrixXs getTimestepJacobian(
       inComponent == MappingTestComponent::FORCE
       && outComponent == MappingTestComponent::VELOCITY)
   {
-    return snapshot->getForceVelJacobian(world);
+    return snapshot->getControlForceVelJacobian(world);
   }
   assert(false && "Unsupported combination of inComponent and outComponent in getTimestepJacobian()!");
   throw std::runtime_error{"Execution should never reach this point"};
@@ -6160,7 +6160,7 @@ bool verifyNoMultistepIntereference(WorldPtr world, int steps)
 
   clean->setPositions(world->getPositions());
   clean->setVelocities(world->getVelocities());
-  clean->setExternalForces(world->getExternalForces());
+  clean->setControlForces(world->getExternalForces());
 
   BackpropSnapshotPtr dirtyPtr = neural::forwardPass(world);
   BackpropSnapshotPtr cleanPtr = neural::forwardPass(clean);
@@ -6329,7 +6329,7 @@ bool verifyTrajectory(
       = trajectory->getRolloutCache(world);
   Eigen::MatrixXs poses = rollout->getPosesConst();
   Eigen::MatrixXs vels = rollout->getVelsConst();
-  Eigen::MatrixXs forces = rollout->getForcesConst();
+  Eigen::MatrixXs forces = rollout->getControlForcesConst();
 
   for (int i = 0; i < poses.cols(); i++)
   {
@@ -6337,7 +6337,7 @@ bool verifyTrajectory(
               << "..." << std::endl;
     world->setPositions(poses.col(i));
     world->setVelocities(vels.col(i));
-    world->setExternalForces(forces.col(i));
+    world->setControlForces(forces.col(i));
 
     if (!verifyAnalyticalJacobians(world, true))
     {

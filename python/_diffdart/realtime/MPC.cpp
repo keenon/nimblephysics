@@ -64,8 +64,8 @@ void MPC(py::module& m)
           ::py::arg("pos"),
           ::py::arg("vel"),
           ::py::arg("mass"))
-      .def("getForce", &dart::realtime::MPC::getForce, ::py::arg("now"))
-      .def("getForceNow", &dart::realtime::MPC::getForceNow)
+      .def("getControlForce", &dart::realtime::MPC::getControlForce, ::py::arg("now"))
+      .def("getControlForceNow", &dart::realtime::MPC::getControlForceNow)
       .def(
           "start",
           &dart::realtime::MPC::start,

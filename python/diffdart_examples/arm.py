@@ -37,8 +37,8 @@ def main():
   """
 
   forceLimits = np.ones(world.getNumDofs()) * 150
-  world.setExternalForcesUpperLimits(forceLimits)
-  world.setExternalForcesLowerLimits(-1 * forceLimits)
+  world.setControlForcesUpperLimits(forceLimits)
+  world.setControlForcesLowerLimits(-1 * forceLimits)
 
   velLimits = np.ones(world.getNumDofs()) * 2
   world.setVelocityUpperLimits(velLimits)

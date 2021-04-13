@@ -281,13 +281,13 @@ public:
   void setForce(std::size_t _index, s_t _force);
 
   // Documentation inherited
-  s_t getForce(std::size_t _index);
+  s_t getControlForce(std::size_t _index);
 
   // Documentation inherited
   void setForces(const Eigen::Vector3s& _forces);
 
   // Documentation inherited
-  const Eigen::Vector3s& getForces() const;
+  const Eigen::Vector3s& getControlForces() const;
 
   // Documentation inherited
   void resetForces();

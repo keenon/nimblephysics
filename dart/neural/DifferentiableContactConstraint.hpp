@@ -366,7 +366,7 @@ public:
   /// This returns 1.0 by default, 0.0 if this constraint doesn't effect the
   /// specified DOF, and -1.0 if the constraint effects this dof negatively.
   /// Pretty much only public for testing
-  s_t getForceMultiple(dynamics::DegreeOfFreedom* dof);
+  s_t getControlForceMultiple(dynamics::DegreeOfFreedom* dof);
 
 public:
   /// Returns true if this dof moves this body node

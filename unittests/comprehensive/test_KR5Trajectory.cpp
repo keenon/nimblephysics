@@ -99,9 +99,9 @@ std::shared_ptr<simulation::World> createWorld(
   world->setPositionLowerLimits(
       Eigen::VectorXs::Ones(world->getNumDofs()) * -5);
 
-  world->setExternalForceUpperLimits(
+  world->setControlForceUpperLimits(
       Eigen::VectorXs::Ones(world->getNumDofs()) * 20);
-  world->setExternalForceLowerLimits(
+  world->setControlForceLowerLimits(
       Eigen::VectorXs::Ones(world->getNumDofs()) * -20);
 
   world->setVelocityUpperLimits(
@@ -154,7 +154,7 @@ TEST(KR5_EXAMPLE, BROKEN_POINT)
       0, 0, 0;
   world->setPositions(brokenPos);
   world->setVelocities(brokenVel);
-  world->setExternalForces(brokenForce);
+  world->setControlForces(brokenForce);
   world->setCachedLCPSolution(brokenLCPCache);
   */
   /*
@@ -168,7 +168,7 @@ TEST(KR5_EXAMPLE, BROKEN_POINT)
   brokenLCPCache << 0.0491903, 0.00921924, 0, 0, 0, 0;
   world->setPositions(brokenPos);
   world->setVelocities(brokenVel);
-  world->setExternalForces(brokenForce);
+  world->setControlForces(brokenForce);
   world->setCachedLCPSolution(brokenLCPCache);
   */
   /*
@@ -186,7 +186,7 @@ TEST(KR5_EXAMPLE, BROKEN_POINT)
   brokenLCPCache << 0.0245947, 0.00461058, 0, 0.0245947, 0.00461058, 0;
   world->setPositions(brokenPos);
   world->setVelocities(brokenVel);
-  world->setExternalForces(brokenForce);
+  world->setControlForces(brokenForce);
   world->setCachedLCPSolution(brokenLCPCache);
   */
 
@@ -204,7 +204,7 @@ TEST(KR5_EXAMPLE, BROKEN_POINT)
   brokenLCPCache << 0, 0, 0, 0, 0, 0, 1.0778, 0.330749, 0, 1.0778, 0.330749, 0;
   world->setPositions(brokenPos);
   world->setVelocities(brokenVel);
-  world->setExternalForces(brokenForce);
+  world->setControlForces(brokenForce);
   world->setCachedLCPSolution(brokenLCPCache);
   */
 
@@ -223,7 +223,7 @@ TEST(KR5_EXAMPLE, BROKEN_POINT)
       0, 0, 0, 0, 0;
   world->setPositions(brokenPos);
   world->setVelocities(brokenVel);
-  world->setExternalForces(brokenForce);
+  world->setControlForces(brokenForce);
   world->setCachedLCPSolution(brokenLCPCache);
 
   EXPECT_TRUE(verifyAnalyticalJacobians(world));
@@ -327,7 +327,7 @@ TEST(KR5_EXAMPLE, FULL_TEST)
           gradWrtRollout->getPoses("ik")(1, lastCol) = 2 * diffY;
           gradWrtRollout->getPoses("ik")(2, lastCol) = 2 * diffZ;
           gradWrtRollout->getVels("ik").setZero();
-          gradWrtRollout->getForces("ik").setZero();
+          gradWrtRollout->getControlForces("ik").setZero();
 
           s_t ikLoss = diffX * diffX + diffY * diffY + diffZ * diffZ;
 
@@ -335,7 +335,7 @@ TEST(KR5_EXAMPLE, FULL_TEST)
 
           gradWrtRollout->getPoses().setZero();
           gradWrtRollout->getVels().setZero();
-          gradWrtRollout->getForces().setZero();
+          gradWrtRollout->getControlForces().setZero();
 
           Eigen::MatrixXs forces = rollout->getVelsConst();
           s_t forcesLoss = 0.0;

@@ -313,7 +313,7 @@ Skeleton::Configuration::Configuration(
   : mPositions(positions),
     mVelocities(velocities),
     mAccelerations(accelerations),
-    mForces(forces),
+    mControlForces(forces),
     mCommands(commands)
 {
   std::size_t nonzero_size = INVALID_INDEX;
@@ -343,7 +343,7 @@ Skeleton::Configuration::Configuration(
     mPositions(positions),
     mVelocities(velocities),
     mAccelerations(accelerations),
-    mForces(forces),
+    mControlForces(forces),
     mCommands(commands)
 {
   std::size_t nonzero_size = indices.size();
@@ -371,7 +371,7 @@ bool Skeleton::Configuration::operator==(const Configuration& other) const
   RETURN_IF_CONFIG_VECTOR_IS_INEQ(mPositions);
   RETURN_IF_CONFIG_VECTOR_IS_INEQ(mVelocities);
   RETURN_IF_CONFIG_VECTOR_IS_INEQ(mAccelerations);
-  RETURN_IF_CONFIG_VECTOR_IS_INEQ(mForces);
+  RETURN_IF_CONFIG_VECTOR_IS_INEQ(mControlForces);
   RETURN_IF_CONFIG_VECTOR_IS_INEQ(mCommands);
 
   return true;
@@ -564,7 +564,7 @@ void Skeleton::setConfiguration(const Configuration& configuration)
   SET_CONFIG_VECTOR(Positions);
   SET_CONFIG_VECTOR(Velocities);
   SET_CONFIG_VECTOR(Accelerations);
-  SET_CONFIG_VECTOR(Forces);
+  SET_CONFIG_VECTOR(ControlForces);
   SET_CONFIG_VECTOR(Commands);
 }
 
@@ -596,7 +596,7 @@ Skeleton::Configuration Skeleton::getConfiguration(
     config.mAccelerations = getAccelerations(indices);
 
   if ((flags & CONFIG_FORCES) == CONFIG_FORCES)
-    config.mForces = getForces(indices);
+    config.mControlForces = getControlForces(indices);
 
   if ((flags & CONFIG_COMMANDS) == CONFIG_COMMANDS)
     config.mCommands = getCommands(indices);
@@ -1878,8 +1878,8 @@ Eigen::MatrixXs Skeleton::getJacobianOfMinv_Direct(
     mDiffMinv.init(bodyNodes.size(), getNumDofs());
 #endif
 
-    const Eigen::VectorXs oldForces = getForces();
-    setForces(f);
+    const Eigen::VectorXs oldForces = getControlForces();
+    setControlForces(f);
 
     // Backward iteration
     for (auto it = bodyNodes.rbegin(); it != bodyNodes.rend(); ++it)
@@ -1958,7 +1958,7 @@ Eigen::MatrixXs Skeleton::getJacobianOfMinv_Direct(
     //  mDiffMinv.print();
 #endif
 
-    setForces(oldForces);
+    setControlForces(oldForces);
 
     return DMinvX_Dp;
   }
@@ -1971,7 +1971,7 @@ Eigen::MatrixXs Skeleton::getJacobianOfMinv_Direct(
 //==============================================================================
 Eigen::MatrixXs Skeleton::getJacobianOfFD(neural::WithRespectTo* wrt)
 {
-  const auto& tau = getForces();
+  const auto& tau = getControlForces();
   const auto& Cg = getCoriolisAndGravityForces();
   const auto& Minv = getInvMassMatrix();
 
@@ -1985,7 +1985,7 @@ Eigen::MatrixXs Skeleton::getJacobianOfFD(neural::WithRespectTo* wrt)
 Eigen::MatrixXs Skeleton::getUnconstrainedVelJacobianWrt(
     s_t dt, neural::WithRespectTo* wrt)
 {
-  Eigen::VectorXs tau = getForces();
+  Eigen::VectorXs tau = getControlForces();
   Eigen::VectorXs C = getCoriolisAndGravityForces() - getExternalForces();
 
   Eigen::MatrixXs Minv = getInvMassMatrix();
@@ -2302,12 +2302,12 @@ Eigen::MatrixXs Skeleton::finiteDifferenceJacobianOfID(
     tweaked(i) += EPS;
     wrt->set(this, tweaked);
     computeInverseDynamics();
-    const Eigen::VectorXs plus = getForces();
+    const Eigen::VectorXs plus = getControlForces();
     tweaked = start;
     tweaked(i) -= EPS;
     wrt->set(this, tweaked);
     computeInverseDynamics();
-    const Eigen::VectorXs minus = getForces();
+    const Eigen::VectorXs minus = getControlForces();
 
     J.col(i) = (plus - minus) / (2 * EPS);
   }
@@ -2349,12 +2349,12 @@ Eigen::MatrixXs Skeleton::finiteDifferenceRiddersJacobianOfID(
     perturbedPlus(i) += stepSize;
     wrt->set(this, perturbedPlus);
     computeInverseDynamics();
-    Eigen::VectorXs plus = getForces();
+    Eigen::VectorXs plus = getControlForces();
     Eigen::VectorXs perturbedMinus = Eigen::VectorXs(originalWrt);
     perturbedMinus(i) -= stepSize;
     wrt->set(this, perturbedMinus);
     computeInverseDynamics();
-    Eigen::VectorXs minus = getForces();
+    Eigen::VectorXs minus = getControlForces();
 
     tab[0][0] = (plus - minus) / (2 * stepSize);
 
@@ -2367,12 +2367,12 @@ Eigen::MatrixXs Skeleton::finiteDifferenceRiddersJacobianOfID(
       perturbedPlus(i) += stepSize;
       wrt->set(this, perturbedPlus);
       computeInverseDynamics();
-      plus = getForces();
+      plus = getControlForces();
       perturbedMinus = Eigen::VectorXs(originalWrt);
       perturbedMinus(i) -= stepSize;
       wrt->set(this, perturbedMinus);
       computeInverseDynamics();
-      minus = getForces();
+      minus = getControlForces();
 
       tab[0][iTab] = (plus - minus) / (2 * stepSize);
 
@@ -2958,27 +2958,27 @@ Eigen::MatrixXs Skeleton::finiteDifferenceRiddersJacobianOfFD(
 }
 
 //==============================================================================
-Eigen::VectorXs Skeleton::getForceUpperLimits()
+Eigen::VectorXs Skeleton::getControlForceUpperLimits()
 {
   std::size_t n = getNumDofs();
   Eigen::VectorXs limits(n);
   for (std::size_t i = 0; i < n; i++)
   {
     auto dof = getDof(i);
-    limits[i] = dof->getForceUpperLimit();
+    limits[i] = dof->getControlForceUpperLimit();
   }
   return limits;
 }
 
 //==============================================================================
-Eigen::VectorXs Skeleton::getForceLowerLimits()
+Eigen::VectorXs Skeleton::getControlForceLowerLimits()
 {
   std::size_t n = getNumDofs();
   Eigen::VectorXs limits(n);
   for (std::size_t i = 0; i < n; i++)
   {
     auto dof = getDof(i);
-    limits[i] = dof->getForceLowerLimit();
+    limits[i] = dof->getControlForceLowerLimit();
   }
   return limits;
 }
@@ -3098,20 +3098,20 @@ Eigen::VectorXs Skeleton::getLinkMasses()
 }
 
 //==============================================================================
-void Skeleton::setForceUpperLimits(Eigen::VectorXs limits)
+void Skeleton::setControlForceUpperLimits(Eigen::VectorXs limits)
 {
   for (std::size_t i = 0; i < getNumDofs(); i++)
   {
-    getDof(i)->setForceUpperLimit(limits[i]);
+    getDof(i)->setControlForceUpperLimit(limits[i]);
   }
 }
 
 //==============================================================================
-void Skeleton::setForceLowerLimits(Eigen::VectorXs limits)
+void Skeleton::setControlForceLowerLimits(Eigen::VectorXs limits)
 {
   for (std::size_t i = 0; i < getNumDofs(); i++)
   {
-    getDof(i)->setForceLowerLimit(limits[i]);
+    getDof(i)->setControlForceLowerLimit(limits[i]);
   }
 }
 
@@ -4022,11 +4022,11 @@ Eigen::VectorXs Skeleton::multiplyByImplicitInvMassMatrix(Eigen::VectorXs x)
   }
 
   // Backup the origianl internal force
-  Eigen::VectorXs originalInternalForce = getForces();
+  Eigen::VectorXs originalInternalForce = getControlForces();
 
   // Set the forces on the DOFs to x, which will allow us to compute Minv*x
   // through Featherstone
-  setForces(x);
+  setControlForces(x);
 
   // We don't need to set this to 0 if the below is correct
   Eigen::VectorXs finalResult = Eigen::VectorXs(dof);
@@ -4070,7 +4070,7 @@ Eigen::VectorXs Skeleton::multiplyByImplicitInvMassMatrix(Eigen::VectorXs x)
   }
 
   // Restore the original internal force
-  const_cast<Skeleton*>(this)->setForces(originalInternalForce);
+  const_cast<Skeleton*>(this)->setControlForces(originalInternalForce);
 
   return finalResult;
 }
@@ -5070,17 +5070,17 @@ void Skeleton::updateInvMassMatrix(std::size_t _treeIdx) const
   // cache.mInvM.setZero();
 
   // Backup the origianl internal force
-  Eigen::VectorXs originalInternalForce = getForces();
+  Eigen::VectorXs originalInternalForce = getControlForces();
 
   // Clear out the forces of the dofs in this tree so that we can set them to
   // 1.0 one at a time to build up the inverse mass matrix
   for (std::size_t i = 0; i < dof; ++i)
-    cache.mDofs[i]->setForce(0.0);
+    cache.mDofs[i]->setControlForce(0.0);
 
   for (std::size_t j = 0; j < dof; ++j)
   {
     // Set the force of this DOF to 1.0 while all the rest are 0.0
-    cache.mDofs[j]->setForce(1.0);
+    cache.mDofs[j]->setControlForce(1.0);
 
     // Prepare cache data
     for (std::vector<BodyNode*>::const_reverse_iterator it
@@ -5108,12 +5108,12 @@ void Skeleton::updateInvMassMatrix(std::size_t _treeIdx) const
     }
 
     // Set the force of this DOF back to 0.0
-    cache.mDofs[j]->setForce(0.0);
+    cache.mDofs[j]->setControlForce(0.0);
   }
   cache.mInvM.triangularView<Eigen::StrictlyLower>() = cache.mInvM.transpose();
 
   // Restore the original internal force
-  const_cast<Skeleton*>(this)->setForces(originalInternalForce);
+  const_cast<Skeleton*>(this)->setControlForces(originalInternalForce);
 
   cache.mDirty.mInvMassMatrix = false;
 }
@@ -5171,17 +5171,17 @@ void Skeleton::updateInvAugMassMatrix(std::size_t _treeIdx) const
   // mInvM.setZero();
 
   // Backup the origianl internal force
-  Eigen::VectorXs originalInternalForce = getForces();
+  Eigen::VectorXs originalInternalForce = getControlForces();
 
   // Clear out the forces of the dofs in this tree so that we can set them to
   // 1.0 one at a time to build up the inverse augmented mass matrix
   for (std::size_t i = 0; i < dof; ++i)
-    cache.mDofs[i]->setForce(0.0);
+    cache.mDofs[i]->setControlForce(0.0);
 
   for (std::size_t j = 0; j < dof; ++j)
   {
     // Set the force of this DOF to 1.0 while all the rest are 0.0
-    cache.mDofs[j]->setForce(1.0);
+    cache.mDofs[j]->setControlForce(1.0);
 
     // Prepare cache data
     for (std::vector<BodyNode*>::const_reverse_iterator it
@@ -5210,13 +5210,13 @@ void Skeleton::updateInvAugMassMatrix(std::size_t _treeIdx) const
     }
 
     // Set the force of this DOF back to 0.0
-    cache.mDofs[j]->setForce(0.0);
+    cache.mDofs[j]->setControlForce(0.0);
   }
   cache.mInvAugM.triangularView<Eigen::StrictlyLower>()
       = cache.mInvAugM.transpose();
 
   // Restore the original internal force
-  const_cast<Skeleton*>(this)->setForces(originalInternalForce);
+  const_cast<Skeleton*>(this)->setControlForces(originalInternalForce);
 
   cache.mDirty.mInvAugMassMatrix = false;
 }

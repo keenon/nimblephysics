@@ -193,8 +193,8 @@ TEST(SADDLEPOINTS, UNCONTROLLED_BALL_ON_PADDLE)
       new SphereShape(0.5));
   ballBody->createShapeNodeWith<VisualAspect, CollisionAspect>(sphereShape);
   ballBody->setFrictionCoeff(0.0);
-  ballJoint->setForceUpperLimit(0, 0.0);
-  ballJoint->setForceLowerLimit(0, 0.0);
+  ballJoint->setControlForceUpperLimit(0, 0.0);
+  ballJoint->setControlForceLowerLimit(0, 0.0);
 
   world->addSkeleton(ball);
 
@@ -283,8 +283,8 @@ TEST(SADDLEPOINTS, BALL_ON_FIXED_GROUND_TRAJECTORY)
   ballBody->createShapeNodeWith<VisualAspect, CollisionAspect>(sphereShape);
   ballBody->setFrictionCoeff(0.0);
 
-  ballJoint->setForceLowerLimit(0, -10);
-  ballJoint->setForceUpperLimit(0, 10);
+  ballJoint->setControlForceLowerLimit(0, -10);
+  ballJoint->setControlForceUpperLimit(0, 10);
 
   world->addSkeleton(ball);
 
@@ -334,7 +334,7 @@ TEST(SADDLEPOINTS, BALL_ON_FIXED_GROUND_TRAJECTORY)
                                      ) {
     gradWrtRollout->getPoses().setZero();
     gradWrtRollout->getVels().setZero();
-    gradWrtRollout->getForces().setZero();
+    gradWrtRollout->getControlForces().setZero();
 
     int steps = rollout->getPosesConst().cols();
     s_t lastPos = rollout->getPosesConst()(0, steps - 1);
@@ -355,7 +355,7 @@ TEST(SADDLEPOINTS, BALL_ON_FIXED_GROUND_TRAJECTORY)
   optimizer.setIterationLimit(500);
 
   std::shared_ptr<Solution> solution = optimizer.optimize(&trajectory);
-  std::cout << "Found forces: " << trajectory.getRolloutCache(world)->getForcesConst() << std::endl;
+  std::cout << "Found forces: " << trajectory.getRolloutCache(world)->getControlForcesConst() << std::endl;
   std::cout << "Found vels: " << trajectory.getRolloutCache(world)->getVelsConst() << std::endl;
   std::cout << "Found poses: " << trajectory.getRolloutCache(world)->getPosesConst() << std::endl;
 

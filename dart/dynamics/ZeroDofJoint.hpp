@@ -281,43 +281,43 @@ public:
   //----------------------------------------------------------------------------
 
   // Documentation inherited
-  void setForce(std::size_t _index, s_t _force) override;
+  void setControlForce(std::size_t _index, s_t _force) override;
 
   // Documentation inherited
-  s_t getForce(std::size_t _index) const override;
+  s_t getControlForce(std::size_t _index) const override;
 
   // Documentation inherited
-  void setForces(const Eigen::VectorXs& _forces) override;
+  void setControlForces(const Eigen::VectorXs& _forces) override;
 
   // Documentation inherited
-  Eigen::VectorXs getForces() const override;
+  Eigen::VectorXs getControlForces() const override;
 
   // Documentation inherited
-  void resetForces() override;
+  void resetControlForces() override;
 
   // Documentation inherited
-  void setForceLowerLimit(std::size_t _index, s_t _force) override;
+  void setControlForceLowerLimit(std::size_t _index, s_t _force) override;
 
   // Documentation inherited
-  s_t getForceLowerLimit(std::size_t _index) const override;
+  s_t getControlForceLowerLimit(std::size_t _index) const override;
 
   // Documentation inherited
-  void setForceLowerLimits(const Eigen::VectorXs& lowerLimits) override;
+  void setControlForceLowerLimits(const Eigen::VectorXs& lowerLimits) override;
 
   // Documentation inherited
-  Eigen::VectorXs getForceLowerLimits() const override;
+  Eigen::VectorXs getControlForceLowerLimits() const override;
 
   // Documentation inherited
-  void setForceUpperLimit(std::size_t _index, s_t _force) override;
+  void setControlForceUpperLimit(std::size_t _index, s_t _force) override;
 
   // Documentation inherited
-  s_t getForceUpperLimit(std::size_t _index) const override;
+  s_t getControlForceUpperLimit(std::size_t _index) const override;
 
   // Documentation inherited
-  void setForceUpperLimits(const Eigen::VectorXs& upperLimits) override;
+  void setControlForceUpperLimits(const Eigen::VectorXs& upperLimits) override;
 
   // Documentation inherited
-  Eigen::VectorXs getForceUpperLimits() const override;
+  Eigen::VectorXs getControlForceUpperLimits() const override;
 
   //----------------------------------------------------------------------------
   // Velocity change

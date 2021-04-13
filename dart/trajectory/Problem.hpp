@@ -200,7 +200,7 @@ public:
   /// This sets the forces in this trajectory from the passed in matrix. This
   /// doesn't update the knot points, or change the starting position. If you'd
   /// like to do that, use `updateWithForces()` instead.
-  virtual void setForcesRaw(
+  virtual void setControlForcesRaw(
       Eigen::MatrixXs forces, PerformanceLog* log = nullptr)
       = 0;
 

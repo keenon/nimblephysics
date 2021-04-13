@@ -471,65 +471,65 @@ public:
   //----------------------------------------------------------------------------
 
   /// Set the force of a single generalized coordinate
-  void setForce(std::size_t _index, s_t _force);
+  void setControlForce(std::size_t _index, s_t _force);
 
   /// Get the force of a single generalized coordinate
-  s_t getForce(std::size_t _index) const;
+  s_t getControlForce(std::size_t _index) const;
 
   /// Set the forces of all generalized coordinates
-  void setForces(const Eigen::VectorXs& _forces);
+  void setControlForces(const Eigen::VectorXs& _forces);
 
   /// Set the forces of a subset of the generalized coordinates
-  void setForces(const std::vector<std::size_t>& _index,
+  void setControlForces(const std::vector<std::size_t>& _index,
                  const Eigen::VectorXs& _forces);
 
   /// Get the forces for all generalized coordinates
-  Eigen::VectorXs getForces() const;
+  Eigen::VectorXs getControlForces() const;
 
   /// Get the forces for a subset of the generalized coordinates
-  Eigen::VectorXs getForces(const std::vector<std::size_t>& _indices) const;
+  Eigen::VectorXs getControlForces(const std::vector<std::size_t>& _indices) const;
 
   /// Set all forces of the generalized coordinates to zero
   void resetGeneralizedForces();
 
   /// Set the lower limit of a generalized coordinate's force
-  void setForceLowerLimit(std::size_t _index, s_t _force);
+  void setControlForceLowerLimit(std::size_t _index, s_t _force);
 
   /// Set the lower limits for all generalized coordinates's force
-  void setForceLowerLimits(const Eigen::VectorXs& forces);
+  void setControlForceLowerLimits(const Eigen::VectorXs& forces);
 
   /// Set the lower limits for a subset of the generalized coordinates's force
-  void setForceLowerLimits(const std::vector<std::size_t>& indices,
+  void setControlForceLowerLimits(const std::vector<std::size_t>& indices,
                            const Eigen::VectorXs& forces);
 
   /// Get the lower limit of a generalized coordinate's force
-  s_t getForceLowerLimit(std::size_t _index) const;
+  s_t getControlForceLowerLimit(std::size_t _index) const;
 
   /// Get the lower limits for all generalized coordinates's force
-  Eigen::VectorXs getForceLowerLimits() const;
+  Eigen::VectorXs getControlForceLowerLimits() const;
 
   /// Get the lower limits for a subset of the generalized coordinates's force
-  Eigen::VectorXs getForceLowerLimits(
+  Eigen::VectorXs getControlForceLowerLimits(
       const std::vector<std::size_t>& indices) const;
 
   /// Set the upper limit of a generalized coordinate's force
-  void setForceUpperLimit(std::size_t _index, s_t _force);
+  void setControlForceUpperLimit(std::size_t _index, s_t _force);
 
   /// Set the upperlimits for all generalized coordinates's force
-  void setForceUpperLimits(const Eigen::VectorXs& forces);
+  void setControlForceUpperLimits(const Eigen::VectorXs& forces);
 
   /// Set the upper limits for a subset of the generalized coordinates's force
-  void setForceUpperLimits(const std::vector<std::size_t>& indices,
+  void setControlForceUpperLimits(const std::vector<std::size_t>& indices,
                            const Eigen::VectorXs& forces);
 
   /// Get the upper limit of a generalized coordinate's force
-  s_t getForceUpperLimit(std::size_t _index) const;
+  s_t getControlForceUpperLimit(std::size_t _index) const;
 
   /// Get the upper limits for all generalized coordinates's force
-  Eigen::VectorXs getForceUpperLimits() const;
+  Eigen::VectorXs getControlForceUpperLimits() const;
 
   /// Get the upper limits for a subset of the generalized coordinates's force
-  Eigen::VectorXs getForceUpperLimits(
+  Eigen::VectorXs getControlForceUpperLimits(
       const std::vector<std::size_t>& indices) const;
 
   /// \}

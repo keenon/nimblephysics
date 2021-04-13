@@ -331,64 +331,64 @@ s_t DegreeOfFreedom::getAccelerationUpperLimit() const
 }
 
 //==============================================================================
-void DegreeOfFreedom::setForce(s_t _force)
+void DegreeOfFreedom::setControlForce(s_t _force)
 {
-  mJoint->setForce(mIndexInJoint, _force);
+  mJoint->setControlForce(mIndexInJoint, _force);
 }
 
 //==============================================================================
-s_t DegreeOfFreedom::getForce() const
+s_t DegreeOfFreedom::getControlForce() const
 {
-  return mJoint->getForce(mIndexInJoint);
+  return mJoint->getControlForce(mIndexInJoint);
 }
 
 //==============================================================================
-void DegreeOfFreedom::resetForce()
+void DegreeOfFreedom::resetControlForce()
 {
-  setForce(0.0);
+  setControlForce(0.0);
 }
 
 //==============================================================================
-void DegreeOfFreedom::setForceLimits(s_t _lowerLimit, s_t _upperLimit)
+void DegreeOfFreedom::setControlForceLimits(s_t _lowerLimit, s_t _upperLimit)
 {
-  setForceLowerLimit(_lowerLimit);
-  setForceUpperLimit(_upperLimit);
+  setControlForceLowerLimit(_lowerLimit);
+  setControlForceUpperLimit(_upperLimit);
 }
 
 //==============================================================================
-void DegreeOfFreedom::setForceLimits(const std::pair<s_t, s_t> &_limits)
+void DegreeOfFreedom::setControlForceLimits(const std::pair<s_t, s_t> &_limits)
 {
-  setForceLimits(_limits.first, _limits.second);
+  setControlForceLimits(_limits.first, _limits.second);
 }
 
 //==============================================================================
-std::pair<s_t,s_t> DegreeOfFreedom::getForceLimits() const
+std::pair<s_t,s_t> DegreeOfFreedom::getControlForceLimits() const
 {
-  return std::pair<s_t,s_t>(getForceLowerLimit(), getForceUpperLimit());
+  return std::pair<s_t,s_t>(getControlForceLowerLimit(), getControlForceUpperLimit());
 }
 
 //==============================================================================
-void DegreeOfFreedom::setForceLowerLimit(s_t _limit)
+void DegreeOfFreedom::setControlForceLowerLimit(s_t _limit)
 {
-  mJoint->setForceLowerLimit(mIndexInJoint, _limit);
+  mJoint->setControlForceLowerLimit(mIndexInJoint, _limit);
 }
 
 //==============================================================================
-s_t DegreeOfFreedom::getForceLowerLimit() const
+s_t DegreeOfFreedom::getControlForceLowerLimit() const
 {
-  return mJoint->getForceLowerLimit(mIndexInJoint);
+  return mJoint->getControlForceLowerLimit(mIndexInJoint);
 }
 
 //==============================================================================
-void DegreeOfFreedom::setForceUpperLimit(s_t _limit)
+void DegreeOfFreedom::setControlForceUpperLimit(s_t _limit)
 {
-  mJoint->setForceUpperLimit(mIndexInJoint, _limit);
+  mJoint->setControlForceUpperLimit(mIndexInJoint, _limit);
 }
 
 //==============================================================================
-s_t DegreeOfFreedom::getForceUpperLimit() const
+s_t DegreeOfFreedom::getControlForceUpperLimit() const
 {
-  return mJoint->getForceUpperLimit(mIndexInJoint);
+  return mJoint->getControlForceUpperLimit(mIndexInJoint);
 }
 
 //==============================================================================

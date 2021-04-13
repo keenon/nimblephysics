@@ -23,10 +23,10 @@ def main():
   rootVisual = rootShape.createVisualAspect()
   rootShape.createCollisionAspect()
   rootVisual.setColor([0.7, 0.7, 0.7])
-  rootJoint.setForceUpperLimit(0, 0)
-  rootJoint.setForceLowerLimit(0, 0)
-  rootJoint.setForceUpperLimit(1, 0)
-  rootJoint.setForceLowerLimit(1, 0)
+  rootJoint.setControlForceUpperLimit(0, 0)
+  rootJoint.setControlForceLowerLimit(0, 0)
+  rootJoint.setControlForceUpperLimit(1, 0)
+  rootJoint.setControlForceLowerLimit(1, 0)
   rootJoint.setVelocityUpperLimit(0, 1000.0)
   rootJoint.setVelocityLowerLimit(0, -1000.0)
   rootJoint.setVelocityUpperLimit(1, 1000.0)
@@ -38,8 +38,8 @@ def main():
     poleShape = pole.createShapeNode(dart.dynamics.BoxShape([.05, 0.25, .05]))
     poleVisual = poleShape.createVisualAspect()
     poleVisual.setColor(color)
-    poleJoint.setForceUpperLimit(0, 1000.0)
-    poleJoint.setForceLowerLimit(0, -1000.0)
+    poleJoint.setControlForceUpperLimit(0, 1000.0)
+    poleJoint.setControlForceLowerLimit(0, -1000.0)
     poleJoint.setVelocityUpperLimit(0, 10000.0)
     poleJoint.setVelocityLowerLimit(0, -10000.0)
 
@@ -122,16 +122,16 @@ def main():
   originalColor = rootVisual.getColor()
 
   def onTick(now):
-    world.setExternalForces(mpc.getForce(now))
+    world.setControlForces(mpc.getControlForce(now))
     if "a" in gui.stateMachine().getKeysDown():
       perturbedForces = world.getExternalForces()
       perturbedForces[0] = -15.0
-      world.setExternalForces(perturbedForces)
+      world.setControlForces(perturbedForces)
       rootVisual.setColor([1, 0, 0])
     elif "e" in gui.stateMachine().getKeysDown():
       perturbedForces = world.getExternalForces()
       perturbedForces[0] = 15.0
-      world.setExternalForces(perturbedForces)
+      world.setControlForces(perturbedForces)
       rootVisual.setColor([0, 1, 0])
     else:
       rootVisual.setColor(originalColor)

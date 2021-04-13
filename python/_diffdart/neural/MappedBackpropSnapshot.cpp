@@ -60,8 +60,8 @@ void MappedBackpropSnapshot(py::module& m)
           ::py::arg("world"),
           ::py::arg("perfLog") = nullptr)
       .def(
-          "getForceVelJacobian",
-          &dart::neural::MappedBackpropSnapshot::getForceVelJacobian,
+          "getControlForceVelJacobian",
+          &dart::neural::MappedBackpropSnapshot::getControlForceVelJacobian,
           ::py::arg("world"),
           ::py::arg("perfLog") = nullptr)
       .def(
@@ -91,8 +91,8 @@ void MappedBackpropSnapshot(py::module& m)
           ::py::arg("mapAfter") = "identity",
           ::py::arg("perfLog") = nullptr)
       .def(
-          "getForceMappedVelJacobian",
-          &dart::neural::MappedBackpropSnapshot::getForceMappedVelJacobian,
+          "getControlForceMappedVelJacobian",
+          &dart::neural::MappedBackpropSnapshot::getControlForceMappedVelJacobian,
           ::py::arg("world"),
           ::py::arg("mapAfter") = "identity",
           ::py::arg("perfLog") = nullptr)

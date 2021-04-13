@@ -205,7 +205,7 @@ TEST(REALTIME, CONTROL_BUFFER)
   int dt = 5;
   RealTimeControlBuffer buffer = RealTimeControlBuffer(forceDim, steps, dt);
 
-  buffer.setForcePlan(0L, 0L, Eigen::MatrixXs::Ones(forceDim, steps) * 2);
+  buffer.setControlForcePlan(0L, 0L, Eigen::MatrixXs::Ones(forceDim, steps) * 2);
   EXPECT_DOUBLE_EQ(static_cast<double>(buffer.getPlannedForce(25L)(0)), 2.0);
   EXPECT_DOUBLE_EQ(static_cast<double>(buffer.getPlannedForce(49L)(0)), 2.0);
 }
@@ -219,7 +219,7 @@ TEST(REALTIME, CONTROL_BUFFER_OOB)
   int dt = 5;
   RealTimeControlBuffer buffer = RealTimeControlBuffer(forceDim, steps, dt);
 
-  buffer.setForcePlan(0L, 0L, Eigen::MatrixXs::Ones(forceDim, steps) * 2);
+  buffer.setControlForcePlan(0L, 0L, Eigen::MatrixXs::Ones(forceDim, steps) * 2);
   // This reads off the end, should print a warning and return 0s
   EXPECT_DOUBLE_EQ(static_cast<double>(buffer.getPlannedForce(50L)(0)), 0.0);
 }
@@ -238,7 +238,7 @@ TEST(REALTIME, CONTROL_BUFFER_SCALE_DOWN)
   {
     plan.col(i) *= i;
   }
-  buffer.setForcePlan(0L, 0L, plan);
+  buffer.setControlForcePlan(0L, 0L, plan);
   buffer.setMillisPerStep(10);
   buffer.setNumSteps(5);
 
@@ -265,7 +265,7 @@ TEST(REALTIME, CONTROL_BUFFER_SCALE_UP)
   {
     plan.col(i) *= i;
   }
-  buffer.setForcePlan(0L, 0L, plan);
+  buffer.setControlForcePlan(0L, 0L, plan);
   buffer.setMillisPerStep(1);
 
   // Read off the lower resolution, should now jump by whole numbers
@@ -298,14 +298,14 @@ TEST(REALTIME, CONTROL_BUFFER_MIX)
   {
     plan.col(i) *= i;
   }
-  buffer.setForcePlan(0L, 0L, plan);
+  buffer.setControlForcePlan(0L, 0L, plan);
 
   Eigen::MatrixXs plan2 = Eigen::MatrixXs::Ones(forceDim, steps) * 2;
   for (int i = 0; i < steps; i++)
   {
     plan2.col(i) *= i;
   }
-  buffer.setForcePlan(25L, 0L, plan2);
+  buffer.setControlForcePlan(25L, 0L, plan2);
 
   Eigen::MatrixXs planOut = Eigen::MatrixXs::Random(forceDim, steps);
   buffer.getPlannedForcesStartingAt(0L, planOut);
@@ -342,14 +342,14 @@ TEST(REALTIME, CONTROL_BUFFER_GAP)
   {
     plan.col(i) *= i;
   }
-  buffer.setForcePlan(0L, 0L, plan);
+  buffer.setControlForcePlan(0L, 0L, plan);
 
   Eigen::MatrixXs plan2 = Eigen::MatrixXs::Ones(forceDim, steps) * 2;
   for (int i = 0; i < steps; i++)
   {
     plan2.col(i) *= i;
   }
-  buffer.setForcePlan(12 * dt, 8 * dt, plan2);
+  buffer.setControlForcePlan(12 * dt, 8 * dt, plan2);
 
   Eigen::MatrixXs planOut = Eigen::MatrixXs::Random(forceDim, steps);
   buffer.getPlannedForcesStartingAt(8 * dt, planOut);
@@ -390,7 +390,7 @@ TEST(REALTIME, CONTROL_BUFFER_MERGE_OOB)
   {
     plan.col(i) *= i;
   }
-  buffer.setForcePlan(0L, 0L, plan);
+  buffer.setControlForcePlan(0L, 0L, plan);
 
   Eigen::MatrixXs plan2 = Eigen::MatrixXs::Ones(forceDim, steps) * 2;
   for (int i = 0; i < steps; i++)
@@ -399,7 +399,7 @@ TEST(REALTIME, CONTROL_BUFFER_MERGE_OOB)
   }
 
   // This is out of bounds, so should be discarded
-  buffer.setForcePlan(12 * dt, 0L, plan2);
+  buffer.setControlForcePlan(12 * dt, 0L, plan2);
 
   Eigen::MatrixXs planOut = Eigen::MatrixXs::Random(forceDim, steps);
   buffer.getPlannedForcesStartingAt(0L, planOut);
@@ -421,7 +421,7 @@ TEST(REALTIME, CONTROL_BUFFER_PLAN)
   int dt = 5;
   RealTimeControlBuffer buffer = RealTimeControlBuffer(forceDim, steps, dt);
 
-  buffer.setForcePlan(0L, 0L, Eigen::MatrixXs::Ones(forceDim, steps) * 2);
+  buffer.setControlForcePlan(0L, 0L, Eigen::MatrixXs::Ones(forceDim, steps) * 2);
 
   Eigen::MatrixXs plan = Eigen::MatrixXs::Random(forceDim, steps);
   buffer.getPlannedForcesStartingAt(25L, plan);
@@ -488,7 +488,7 @@ TEST(REALTIME, CONTROL_BUFFER_ESTIMATE)
   ObservationLog log = ObservationLog(
       0L, world->getPositions(), world->getVelocities(), world->getMasses());
 
-  buffer.setForcePlan(0L, 0L, Eigen::MatrixXs::Ones(forceDim, steps) * 2);
+  buffer.setControlForcePlan(0L, 0L, Eigen::MatrixXs::Ones(forceDim, steps) * 2);
 
   log.observe(
       0L,
@@ -502,7 +502,7 @@ TEST(REALTIME, CONTROL_BUFFER_ESTIMATE)
 
   for (int i = 0; i < steps; i++)
   {
-    world->setExternalForces(buffer.getPlannedForce(i * dt));
+    world->setControlForces(buffer.getPlannedForce(i * dt));
     world->step();
   }
   Eigen::VectorXs truePos = world->getPositions();

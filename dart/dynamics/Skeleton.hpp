@@ -128,7 +128,7 @@ public:
     Eigen::VectorXs mAccelerations;
 
     /// Joint forces
-    Eigen::VectorXs mForces;
+    Eigen::VectorXs mControlForces;
 
     /// Joint commands
     Eigen::VectorXs mCommands;
@@ -742,11 +742,11 @@ public:
 
   // This gives the vector of force upper limits for all the DOFs in this
   // skeleton
-  Eigen::VectorXs getForceUpperLimits();
+  Eigen::VectorXs getControlForceUpperLimits();
 
   // This gives the vector of force lower limits for all the DOFs in this
   // skeleton
-  Eigen::VectorXs getForceLowerLimits();
+  Eigen::VectorXs getControlForceLowerLimits();
 
   // This gives the vector of position upper limits for all the DOFs in this
   // skeleton
@@ -786,10 +786,10 @@ public:
   Eigen::VectorXs getLinkMasses();
 
   // Sets the upper limits of all the joints from a single vector
-  void setForceUpperLimits(Eigen::VectorXs limits);
+  void setControlForceUpperLimits(Eigen::VectorXs limits);
 
   // Sets the lower limits of all the joints from a single vector
-  void setForceLowerLimits(Eigen::VectorXs limits);
+  void setControlForceLowerLimits(Eigen::VectorXs limits);
 
   // Sets the upper limits of all the joints from a single vector
   void setPositionUpperLimits(Eigen::VectorXs limits);

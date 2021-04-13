@@ -40,7 +40,7 @@ struct PreStepMapping
   {
     pos = mapping->getPositions(world);
     vel = mapping->getVelocities(world);
-    force = mapping->getForces(world);
+    force = mapping->getControlForces(world);
     mass = mapping->getMasses(world);
   }
 
@@ -98,7 +98,7 @@ public:
   const Eigen::MatrixXs& getVelVelJacobian(
       std::shared_ptr<simulation::World> world,
       PerformanceLog* perfLog = nullptr);
-  const Eigen::MatrixXs& getForceVelJacobian(
+  const Eigen::MatrixXs& getControlForceVelJacobian(
       std::shared_ptr<simulation::World> world,
       PerformanceLog* perfLog = nullptr);
   const Eigen::MatrixXs& getMassVelJacobian(
@@ -121,7 +121,7 @@ public:
       std::shared_ptr<simulation::World> world,
       const std::string& mapAfter,
       PerformanceLog* perfLog = nullptr);
-  Eigen::MatrixXs getForceMappedVelJacobian(
+  Eigen::MatrixXs getControlForceMappedVelJacobian(
       std::shared_ptr<simulation::World> world,
       const std::string& mapAfter,
       PerformanceLog* perfLog = nullptr);

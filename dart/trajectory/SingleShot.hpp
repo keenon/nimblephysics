@@ -130,7 +130,7 @@ public:
       PerformanceLog* log = nullptr) override;
 
   /// This sets the forces in this trajectory from the passed in matrix
-  void setForcesRaw(
+  void setControlForcesRaw(
       Eigen::MatrixXs forces, PerformanceLog* log = nullptr) override;
 
   /// This moves the trajectory forward in time, setting the starting point to

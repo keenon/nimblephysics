@@ -359,43 +359,43 @@ public:
   //----------------------------------------------------------------------------
 
   // Documentation inherited
-  void setForce(std::size_t index, s_t force) override;
+  void setControlForce(std::size_t index, s_t force) override;
 
   // Documentation inherited
-  s_t getForce(std::size_t index) const override;
+  s_t getControlForce(std::size_t index) const override;
 
   // Documentation inherited
-  void setForces(const Eigen::VectorXs& forces) override;
+  void setControlForces(const Eigen::VectorXs& forces) override;
 
   // Documentation inherited
-  Eigen::VectorXs getForces() const override;
+  Eigen::VectorXs getControlForces() const override;
 
   // Documentation inherited
-  void setForceLowerLimit(size_t index, s_t force) override;
+  void setControlForceLowerLimit(size_t index, s_t force) override;
 
   // Documentation inherited
-  s_t getForceLowerLimit(std::size_t index) const override;
+  s_t getControlForceLowerLimit(std::size_t index) const override;
 
   // Documentation inherited
-  void setForceLowerLimits(const Eigen::VectorXs& lowerLimits) override;
+  void setControlForceLowerLimits(const Eigen::VectorXs& lowerLimits) override;
 
   // Documentation inherited
-  Eigen::VectorXs getForceLowerLimits() const override;
+  Eigen::VectorXs getControlForceLowerLimits() const override;
 
   // Documentation inherited
-  void setForceUpperLimit(size_t index, s_t force) override;
+  void setControlForceUpperLimit(size_t index, s_t force) override;
 
   // Documentation inherited
-  s_t getForceUpperLimit(size_t index) const override;
+  s_t getControlForceUpperLimit(size_t index) const override;
 
   // Documentation inherited
-  void setForceUpperLimits(const Eigen::VectorXs& upperLimits) override;
+  void setControlForceUpperLimits(const Eigen::VectorXs& upperLimits) override;
 
   // Documentation inherited
-  Eigen::VectorXs getForceUpperLimits() const override;
+  Eigen::VectorXs getControlForceUpperLimits() const override;
 
   // Documentation inherited
-  void resetForces() override;
+  void resetControlForces() override;
 
   /// \}
 

@@ -19,7 +19,7 @@ public:
 
   int getPosDim() override;
   int getVelDim() override;
-  int getForceDim() override;
+  int getControlForceDim() override;
   int getMassDim() override;
 
   void setPositions(
@@ -28,7 +28,7 @@ public:
   void setVelocities(
       std::shared_ptr<simulation::World> world,
       const Eigen::Ref<Eigen::VectorXs>& velocities) override;
-  void setForces(
+  void setControlForces(
       std::shared_ptr<simulation::World> world,
       const Eigen::Ref<Eigen::VectorXs>& forces) override;
   void setMasses(
@@ -41,7 +41,7 @@ public:
   void getVelocitiesInPlace(
       std::shared_ptr<simulation::World> world,
       /* OUT */ Eigen::Ref<Eigen::VectorXs> velocities) override;
-  void getForcesInPlace(
+  void getControlForcesInPlace(
       std::shared_ptr<simulation::World> world,
       /* OUT */ Eigen::Ref<Eigen::VectorXs> forces) override;
   void getMassesInPlace(
@@ -92,9 +92,9 @@ public:
       std::shared_ptr<simulation::World> world) override;
   Eigen::VectorXs getVelocityUpperLimits(
       std::shared_ptr<simulation::World> world) override;
-  Eigen::VectorXs getForceLowerLimits(
+  Eigen::VectorXs getControlForceLowerLimits(
       std::shared_ptr<simulation::World> world) override;
-  Eigen::VectorXs getForceUpperLimits(
+  Eigen::VectorXs getControlForceUpperLimits(
       std::shared_ptr<simulation::World> world) override;
   Eigen::VectorXs getMassLowerLimits(
       std::shared_ptr<simulation::World> world) override;

@@ -143,12 +143,12 @@ TEST(PROTO, SERIALIZE_ROLLOUT)
   EXPECT_TRUE(equals(
       rollout.getVelsConst("mapped"), recovered.getVelsConst("mapped"), 0.0));
   EXPECT_TRUE(equals(
-      rollout.getForcesConst("identity"),
-      recovered.getForcesConst("identity"),
+      rollout.getControlForcesConst("identity"),
+      recovered.getControlForcesConst("identity"),
       0.0));
   EXPECT_TRUE(equals(
-      rollout.getForcesConst("mapped"),
-      recovered.getForcesConst("mapped"),
+      rollout.getControlForcesConst("mapped"),
+      recovered.getControlForcesConst("mapped"),
       0.0));
   EXPECT_TRUE(
       equals(rollout.getMetadata("1"), recovered.getMetadata("1"), 0.0));

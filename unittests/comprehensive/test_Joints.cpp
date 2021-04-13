@@ -445,9 +445,9 @@ TEST_F(JOINTS, COMMAND_LIMIT)
     joint->setActuatorType(Joint::FORCE);
     EXPECT_EQ(joint->getActuatorType(), Joint::FORCE);
     testCommandLimits<
-        &Joint::setForce,
-        &Joint::setForceLowerLimit,
-        &Joint::setForceUpperLimit>(joint);
+        &Joint::setControlForce,
+        &Joint::setControlForceLowerLimit,
+        &Joint::setControlForceUpperLimit>(joint);
 
     joint->setActuatorType(Joint::ACCELERATION);
     EXPECT_EQ(joint->getActuatorType(), Joint::ACCELERATION);
@@ -509,8 +509,8 @@ TEST_F(JOINTS, POSITION_LIMIT)
   // Two seconds with positive control forces
   for (int i = 0; i < nSteps; i++)
   {
-    joint0->setForce(0, 0.1);
-    joint1->setForce(0, 0.1);
+    joint0->setControlForce(0, 0.1);
+    joint1->setControlForce(0, 0.1);
     myWorld->step();
 
     s_t jointPos0 = joint0->getPosition(0);
@@ -526,8 +526,8 @@ TEST_F(JOINTS, POSITION_LIMIT)
   // Two more seconds with negative control forces
   for (int i = 0; i < nSteps; i++)
   {
-    joint0->setForce(0, -0.1);
-    joint1->setForce(0, -0.1);
+    joint0->setControlForce(0, -0.1);
+    joint1->setControlForce(0, -0.1);
     myWorld->step();
 
     s_t jointPos0 = joint0->getPosition(0);
@@ -600,16 +600,16 @@ TEST_F(JOINTS, JOINT_LIMITS)
   EXPECT_EQ(joint0->getAccelerationLowerLimits(), -limits);
   EXPECT_EQ(joint0->getAccelerationUpperLimits(), limits);
 
-  joint0->setForceLowerLimit(0, -limit);
-  joint0->setForceUpperLimit(0, limit);
+  joint0->setControlForceLowerLimit(0, -limit);
+  joint0->setControlForceUpperLimit(0, limit);
   EXPECT_EQ(
-      joint0->getForceLowerLimits(), Eigen::VectorXs::Constant(1, -limit));
-  EXPECT_EQ(joint0->getForceUpperLimits(), Eigen::VectorXs::Constant(1, limit));
+      joint0->getControlForceLowerLimits(), Eigen::VectorXs::Constant(1, -limit));
+  EXPECT_EQ(joint0->getControlForceUpperLimits(), Eigen::VectorXs::Constant(1, limit));
 
-  joint0->setForceLowerLimits(-limits);
-  joint0->setForceUpperLimits(limits);
-  EXPECT_EQ(joint0->getForceLowerLimits(), -limits);
-  EXPECT_EQ(joint0->getForceUpperLimits(), limits);
+  joint0->setControlForceLowerLimits(-limits);
+  joint0->setControlForceUpperLimits(limits);
+  EXPECT_EQ(joint0->getControlForceLowerLimits(), -limits);
+  EXPECT_EQ(joint0->getControlForceUpperLimits(), limits);
 }
 #endif
 
@@ -657,8 +657,8 @@ void testJointCoulombFrictionForce(s_t _timeStep)
   // Two seconds with lower control forces than the friction
   for (int i = 0; i < nSteps; i++)
   {
-    joint0->setForce(0, +4.9);
-    joint1->setForce(0, +4.9);
+    joint0->setControlForce(0, +4.9);
+    joint1->setControlForce(0, +4.9);
     myWorld->step();
 
     s_t jointVel0 = joint0->getVelocity(0);
@@ -677,8 +677,8 @@ void testJointCoulombFrictionForce(s_t _timeStep)
   // Another two seconds with lower control forces than the friction forces
   for (int i = 0; i < nSteps; i++)
   {
-    joint0->setForce(0, -4.9);
-    joint1->setForce(0, -4.9);
+    joint0->setControlForce(0, -4.9);
+    joint1->setControlForce(0, -4.9);
     myWorld->step();
 
     s_t jointVel0 = joint0->getVelocity(0);
@@ -697,8 +697,8 @@ void testJointCoulombFrictionForce(s_t _timeStep)
   // Another two seconds with higher control forces than the friction forces
   for (int i = 0; i < nSteps; i++)
   {
-    joint0->setForce(0, 10.0);
-    joint1->setForce(0, 10.0);
+    joint0->setControlForce(0, 10.0);
+    joint1->setControlForce(0, 10.0);
     myWorld->step();
 
     s_t jointVel0 = joint0->getVelocity(0);
@@ -729,8 +729,8 @@ void testJointCoulombFrictionForce(s_t _timeStep)
   // and expect the joints to stop
   for (int i = 0; i < nSteps; i++)
   {
-    joint0->setForce(0, 4.9);
-    joint1->setForce(0, 4.9);
+    joint0->setControlForce(0, 4.9);
+    joint1->setControlForce(0, 4.9);
     myWorld->step();
 
     s_t jointVel0 = joint0->getVelocity(0);
@@ -858,31 +858,31 @@ void testServoMotor()
     joints[i] = pendulums[i]->getJoint(0);
   }
 
-  joints[0]->setForceUpperLimit(0, sufficient_force);
-  joints[0]->setForceLowerLimit(0, -sufficient_force);
+  joints[0]->setControlForceUpperLimit(0, sufficient_force);
+  joints[0]->setControlForceLowerLimit(0, -sufficient_force);
 
-  joints[1]->setForceUpperLimit(0, sufficient_force);
-  joints[1]->setForceLowerLimit(0, -sufficient_force);
+  joints[1]->setControlForceUpperLimit(0, sufficient_force);
+  joints[1]->setControlForceLowerLimit(0, -sufficient_force);
 
-  joints[2]->setForceUpperLimit(0, insufficient_force);
-  joints[2]->setForceLowerLimit(0, -insufficient_force);
+  joints[2]->setControlForceUpperLimit(0, insufficient_force);
+  joints[2]->setControlForceLowerLimit(0, -insufficient_force);
 
-  joints[3]->setForceUpperLimit(0, sufficient_force);
-  joints[3]->setForceLowerLimit(0, -sufficient_force);
+  joints[3]->setControlForceUpperLimit(0, sufficient_force);
+  joints[3]->setControlForceLowerLimit(0, -sufficient_force);
   joints[3]->setPositionUpperLimit(0, posUpperLimit);
   joints[3]->setPositionLowerLimit(0, posLowerLimit);
 
-  joints[4]->setForceUpperLimit(0, constantsd::inf());
-  joints[4]->setForceLowerLimit(0, -constantsd::inf());
+  joints[4]->setControlForceUpperLimit(0, constantsd::inf());
+  joints[4]->setControlForceLowerLimit(0, -constantsd::inf());
   joints[4]->setPositionUpperLimit(0, posUpperLimit);
   joints[4]->setPositionLowerLimit(0, posLowerLimit);
 
-  joints[5]->setForceUpperLimit(0, sufficient_force);
-  joints[5]->setForceLowerLimit(0, -sufficient_force);
+  joints[5]->setControlForceUpperLimit(0, sufficient_force);
+  joints[5]->setControlForceLowerLimit(0, -sufficient_force);
   joints[5]->setCoulombFriction(0, constantsd::inf());
 
-  joints[6]->setForceUpperLimit(0, constantsd::inf());
-  joints[6]->setForceLowerLimit(0, -constantsd::inf());
+  joints[6]->setControlForceUpperLimit(0, constantsd::inf());
+  joints[6]->setControlForceLowerLimit(0, -constantsd::inf());
   joints[6]->setCoulombFriction(0, constantsd::inf());
 
   for (auto pendulum : pendulums)
@@ -1011,11 +1011,11 @@ void testMimicJoint()
     joints[i] = joint;
   }
 
-  joints[0]->setForceUpperLimit(0, sufficient_force);
-  joints[0]->setForceLowerLimit(0, -sufficient_force);
+  joints[0]->setControlForceUpperLimit(0, sufficient_force);
+  joints[0]->setControlForceLowerLimit(0, -sufficient_force);
 
-  joints[1]->setForceUpperLimit(0, sufficient_force);
-  joints[1]->setForceLowerLimit(0, -sufficient_force);
+  joints[1]->setControlForceUpperLimit(0, sufficient_force);
+  joints[1]->setControlForceLowerLimit(0, -sufficient_force);
 
   // Second joint mimics the first one
   joints[1]->setActuatorType(Joint::MIMIC);
@@ -1140,8 +1140,8 @@ TEST_F(JOINTS, JOINT_COULOMB_FRICTION_AND_POSITION_LIMIT)
   // than the friction forces
   for (int i = 0; i < nSteps; i++)
   {
-    joint0->setForce(0, 100.0);
-    joint1->setForce(0, 100.0);
+    joint0->setControlForce(0, 100.0);
+    joint1->setControlForce(0, 100.0);
     myWorld->step();
 
     s_t jointPos0 = joint0->getPosition(0);
@@ -1164,8 +1164,8 @@ TEST_F(JOINTS, JOINT_COULOMB_FRICTION_AND_POSITION_LIMIT)
   // forces than the friction forces
   for (int i = 0; i < nSteps; i++)
   {
-    joint0->setForce(0, -100.0);
-    joint1->setForce(0, -100.0);
+    joint0->setControlForce(0, -100.0);
+    joint1->setControlForce(0, -100.0);
     myWorld->step();
 
     s_t jointPos0 = joint0->getPosition(0);

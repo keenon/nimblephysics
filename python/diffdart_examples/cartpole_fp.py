@@ -5,7 +5,7 @@ import random
 import math
 import time
 import diffdart as dart
-from diffdart import DartTorchLossFn, DartTorchTrajectoryRollout
+from diffdart import DartTorchLossFn, DartTorchTrajectoryRollout, dart_layer
 
 
 def main():
@@ -45,29 +45,24 @@ def main():
   # Make simulations and backprop run faster by using a bigger timestep
   world.setTimeStep(world.getTimeStep()*10)
 
-  def loss(rollout: DartTorchTrajectoryRollout):
-    posLoss = rollout.getPoses('identity')[:, -1].square().sum()
-    velLoss = rollout.getVels('identity')[:, -1].square().sum()
-    return posLoss + velLoss
-  dartLoss: dart.trajectory.LossFn = DartTorchLossFn(loss)
+  first_pos: torch.Tensor = torch.tensor(world.getPositions(), requires_grad=True)
+  first_pos.data[1] = 0.1
+  first_vel: torch.Tensor = torch.tensor(world.getVelocities(), requires_grad=True)
+  torque: torch.Tensor = torch.tensor(world.getExternalForces(), requires_grad=True)
 
-  world.setPositions([1, 1])
+  for _ in range(50):
+    pos = first_pos
+    vel = first_vel
+    for i in range(100):
+      next_pos, next_vel = dart_layer(world, pos, vel, torque)
+      pos = next_pos
+      vel = next_vel
 
-  trajectory = dart.trajectory.MultiShot(world, dartLoss, 500, 50, False)
-
-  optimizer = dart.trajectory.IPOptOptimizer()
-  optimizer.setLBFGSHistoryLength(5)
-  optimizer.setTolerance(1e-6)
-  optimizer.setCheckDerivatives(False)
-  optimizer.setIterationLimit(500)
-  result = optimizer.optimize(trajectory)
-
-  json = result.toJson(world)
-  text_file = open("cartpole.txt", "w")
-  n = text_file.write(json)
-  text_file.close()
-
-  dart.dart_serve_web_gui(json)
+    loss = pos.norm() + vel.norm()
+    print('loss: '+str(loss))
+    loss.backward()
+    first_pos.data.sub_(first_pos.grad * 0.0001)
+    first_vel.data.sub_(first_vel.grad * 0.0001)
 
 
 if __name__ == "__main__":

@@ -215,7 +215,7 @@ TEST(REALTIME, GUI_SERVER)
   {
     // spin
     // cartpole->setPosition(0, 0.0);
-    // cartpole->setForces(Eigen::VectorXs::Zero(cartpole->getNumDofs()));
+    // cartpole->setControlForces(Eigen::VectorXs::Zero(cartpole->getNumDofs()));
     // cartpole->setPositions(Eigen::VectorXs::Zero(cartpole->getNumDofs()));
   }
 }

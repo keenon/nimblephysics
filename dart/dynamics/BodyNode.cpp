@@ -1866,7 +1866,7 @@ void BodyNode::clearExternalForces()
 //==============================================================================
 void BodyNode::clearInternalForces()
 {
-  mParentJoint->resetForces();
+  mParentJoint->resetControlForces();
 }
 
 //==============================================================================
@@ -4745,8 +4745,8 @@ void BodyNode::debugJacobianOfMinvXBackward(
     neural::WithRespectTo* wrt, Eigen::VectorXs x)
 {
   auto skel = getSkeleton();
-  const Eigen::VectorXs oldForces = skel->getForces();
-  skel->setForces(x);
+  const Eigen::VectorXs oldForces = skel->getControlForces();
+  skel->setControlForces(x);
 
   const s_t threshold = 5e-10;
 
@@ -4781,7 +4781,7 @@ void BodyNode::debugJacobianOfMinvXBackward(
               << mInvM_Dbeta_Dq - mInvM_DAB_Dq_fd << std::endl;
   }
 
-  skel->setForces(oldForces);
+  skel->setControlForces(oldForces);
 }
 
 //==============================================================================

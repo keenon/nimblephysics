@@ -88,15 +88,15 @@ TEST(PARALLEL_POS_AND_VEL, s_t_PENDULUM)
   ticker.registerTickListener([&](long time) {
     if (server.isKeyDown("a"))
     {
-      world->setExternalForces(Eigen::Vector3s(-1, 0, 0));
+      world->setControlForces(Eigen::Vector3s(-1, 0, 0));
     }
     else if (server.isKeyDown("e"))
     {
-      world->setExternalForces(Eigen::Vector3s(1, 0, 0));
+      world->setControlForces(Eigen::Vector3s(1, 0, 0));
     }
     else
     {
-      world->setExternalForces(Eigen::Vector3s(0, 0, 0));
+      world->setControlForces(Eigen::Vector3s(0, 0, 0));
     }
     world->step();
     server.renderWorld(world);

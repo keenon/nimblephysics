@@ -108,7 +108,7 @@ std::shared_ptr<trajectory::Problem> MPCLocal::getProblem()
 
 /// This gets the force to apply to the world at this instant. If we haven't
 /// computed anything for this instant yet, this just returns 0s.
-Eigen::VectorXs MPCLocal::getForce(long now)
+Eigen::VectorXs MPCLocal::getControlForce(long now)
 {
   return mBuffer.getPlannedForce(now);
 }
@@ -238,10 +238,10 @@ void MPCLocal::optimizePlan(long startTime)
 
     mLastOptimizedTime = startTime;
 
-    mBuffer.setForcePlan(
+    mBuffer.setControlForcePlan(
         startTime,
         timeSinceEpochMillis(),
-        mProblem->getRolloutCache(worldClone)->getForcesConst());
+        mProblem->getRolloutCache(worldClone)->getControlForcesConst());
 
     log->end();
 
@@ -280,13 +280,13 @@ void MPCLocal::optimizePlan(long startTime)
 
     mSolution->reoptimize();
 
-    // std::cout << "MPCLocal::optimizePlan() mBuffer.setForcePlan()" <<
+    // std::cout << "MPCLocal::optimizePlan() mBuffer.setControlForcePlan()" <<
     // std::endl;
 
-    mBuffer.setForcePlan(
+    mBuffer.setControlForcePlan(
         startTime,
         timeSinceEpochMillis(),
-        mProblem->getRolloutCache(worldClone)->getForcesConst());
+        mProblem->getRolloutCache(worldClone)->getControlForcesConst());
 
     long computeDurationWallTime
         = timeSinceEpochMillis() - startComputeWallTime;

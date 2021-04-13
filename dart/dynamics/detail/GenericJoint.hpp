@@ -116,7 +116,7 @@ void GenericJoint<ConfigSpaceT>::setAspectState(const AspectState& state)
   setPositionsStatic(state.mPositions);
   setVelocitiesStatic(state.mVelocities);
   setAccelerationsStatic(state.mAccelerations);
-  setForces(state.mForces);
+  setControlForces(state.mForces);
 }
 
 //==============================================================================
@@ -135,8 +135,8 @@ void GenericJoint<ConfigSpaceT>::setAspectProperties(
     setInitialVelocity(i, properties.mInitialVelocities[i]);
     setAccelerationLowerLimit(i, properties.mAccelerationLowerLimits[i]);
     setAccelerationUpperLimit(i, properties.mAccelerationUpperLimits[i]);
-    setForceLowerLimit(i, properties.mForceLowerLimits[i]);
-    setForceUpperLimit(i, properties.mForceUpperLimits[i]);
+    setControlForceLowerLimit(i, properties.mForceLowerLimits[i]);
+    setControlForceUpperLimit(i, properties.mForceUpperLimits[i]);
     setSpringStiffness(i, properties.mSpringStiffnesses[i]);
     setRestPosition(i, properties.mRestPositions[i]);
     setDampingCoefficient(i, properties.mDampingCoefficients[i]);
@@ -1170,11 +1170,11 @@ void GenericJoint<ConfigSpaceT>::resetAccelerations()
 
 //==============================================================================
 template <class ConfigSpaceT>
-void GenericJoint<ConfigSpaceT>::setForce(size_t index, s_t force)
+void GenericJoint<ConfigSpaceT>::setControlForce(size_t index, s_t force)
 {
   if (index >= getNumDofs())
   {
-    GenericJoint_REPORT_OUT_OF_RANGE(setForce, index);
+    GenericJoint_REPORT_OUT_OF_RANGE(setControlForce, index);
     return;
   }
 
@@ -1186,11 +1186,11 @@ void GenericJoint<ConfigSpaceT>::setForce(size_t index, s_t force)
 
 //==============================================================================
 template <class ConfigSpaceT>
-s_t GenericJoint<ConfigSpaceT>::getForce(size_t index) const
+s_t GenericJoint<ConfigSpaceT>::getControlForce(size_t index) const
 {
   if (index >= getNumDofs())
   {
-    GenericJoint_REPORT_OUT_OF_RANGE(getForce, index);
+    GenericJoint_REPORT_OUT_OF_RANGE(getControlForce, index);
     return 0.0;
   }
 
@@ -1199,11 +1199,11 @@ s_t GenericJoint<ConfigSpaceT>::getForce(size_t index) const
 
 //==============================================================================
 template <class ConfigSpaceT>
-void GenericJoint<ConfigSpaceT>::setForces(const Eigen::VectorXs& forces)
+void GenericJoint<ConfigSpaceT>::setControlForces(const Eigen::VectorXs& forces)
 {
   if (static_cast<size_t>(forces.size()) != getNumDofs())
   {
-    GenericJoint_REPORT_DIM_MISMATCH(setForces, forces);
+    GenericJoint_REPORT_DIM_MISMATCH(setControlForces, forces);
     return;
   }
 
@@ -1215,18 +1215,18 @@ void GenericJoint<ConfigSpaceT>::setForces(const Eigen::VectorXs& forces)
 
 //==============================================================================
 template <class ConfigSpaceT>
-Eigen::VectorXs GenericJoint<ConfigSpaceT>::getForces() const
+Eigen::VectorXs GenericJoint<ConfigSpaceT>::getControlForces() const
 {
   return this->mAspectState.mForces;
 }
 
 //==============================================================================
 template <class ConfigSpaceT>
-void GenericJoint<ConfigSpaceT>::setForceLowerLimit(size_t index, s_t force)
+void GenericJoint<ConfigSpaceT>::setControlForceLowerLimit(size_t index, s_t force)
 {
   if (index >= getNumDofs())
   {
-    GenericJoint_REPORT_OUT_OF_RANGE(setForceLowerLimit, index);
+    GenericJoint_REPORT_OUT_OF_RANGE(setControlForceLowerLimit, index);
     return;
   }
 
@@ -1235,11 +1235,11 @@ void GenericJoint<ConfigSpaceT>::setForceLowerLimit(size_t index, s_t force)
 
 //==============================================================================
 template <class ConfigSpaceT>
-s_t GenericJoint<ConfigSpaceT>::getForceLowerLimit(size_t index) const
+s_t GenericJoint<ConfigSpaceT>::getControlForceLowerLimit(size_t index) const
 {
   if (index >= getNumDofs())
   {
-    GenericJoint_REPORT_OUT_OF_RANGE(getForceLowerLimit, index);
+    GenericJoint_REPORT_OUT_OF_RANGE(getControlForceLowerLimit, index);
     return 0.0;
   }
 
@@ -1248,12 +1248,12 @@ s_t GenericJoint<ConfigSpaceT>::getForceLowerLimit(size_t index) const
 
 //==============================================================================
 template <class ConfigSpaceT>
-void GenericJoint<ConfigSpaceT>::setForceLowerLimits(
+void GenericJoint<ConfigSpaceT>::setControlForceLowerLimits(
     const Eigen::VectorXs& lowerLimits)
 {
   if (static_cast<size_t>(lowerLimits.size()) != getNumDofs())
   {
-    GenericJoint_REPORT_DIM_MISMATCH(setForceLowerLimits, lowerLimits);
+    GenericJoint_REPORT_DIM_MISMATCH(setControlForceLowerLimits, lowerLimits);
     return;
   }
 
@@ -1262,18 +1262,18 @@ void GenericJoint<ConfigSpaceT>::setForceLowerLimits(
 
 //==============================================================================
 template <class ConfigSpaceT>
-Eigen::VectorXs GenericJoint<ConfigSpaceT>::getForceLowerLimits() const
+Eigen::VectorXs GenericJoint<ConfigSpaceT>::getControlForceLowerLimits() const
 {
   return Base::mAspectProperties.mForceLowerLimits;
 }
 
 //==============================================================================
 template <class ConfigSpaceT>
-void GenericJoint<ConfigSpaceT>::setForceUpperLimit(size_t index, s_t force)
+void GenericJoint<ConfigSpaceT>::setControlForceUpperLimit(size_t index, s_t force)
 {
   if (index >= getNumDofs())
   {
-    GenericJoint_REPORT_OUT_OF_RANGE(setForceUpperLimit, index);
+    GenericJoint_REPORT_OUT_OF_RANGE(setControlForceUpperLimit, index);
     return;
   }
 
@@ -1282,11 +1282,11 @@ void GenericJoint<ConfigSpaceT>::setForceUpperLimit(size_t index, s_t force)
 
 //==============================================================================
 template <class ConfigSpaceT>
-s_t GenericJoint<ConfigSpaceT>::getForceUpperLimit(size_t index) const
+s_t GenericJoint<ConfigSpaceT>::getControlForceUpperLimit(size_t index) const
 {
   if (index >= getNumDofs())
   {
-    GenericJoint_REPORT_OUT_OF_RANGE(getForceUpperLimit, index);
+    GenericJoint_REPORT_OUT_OF_RANGE(getControlForceUpperLimit, index);
     return 0.0;
   }
 
@@ -1295,12 +1295,12 @@ s_t GenericJoint<ConfigSpaceT>::getForceUpperLimit(size_t index) const
 
 //==============================================================================
 template <class ConfigSpaceT>
-void GenericJoint<ConfigSpaceT>::setForceUpperLimits(
+void GenericJoint<ConfigSpaceT>::setControlForceUpperLimits(
     const Eigen::VectorXs& upperLimits)
 {
   if (static_cast<size_t>(upperLimits.size()) != getNumDofs())
   {
-    GenericJoint_REPORT_DIM_MISMATCH(setForceUpperLimits, upperLimits);
+    GenericJoint_REPORT_DIM_MISMATCH(setControlForceUpperLimits, upperLimits);
     return;
   }
 
@@ -1309,14 +1309,14 @@ void GenericJoint<ConfigSpaceT>::setForceUpperLimits(
 
 //==============================================================================
 template <class ConfigSpaceT>
-Eigen::VectorXs GenericJoint<ConfigSpaceT>::getForceUpperLimits() const
+Eigen::VectorXs GenericJoint<ConfigSpaceT>::getControlForceUpperLimits() const
 {
   return Base::mAspectProperties.mForceUpperLimits;
 }
 
 //==============================================================================
 template <class ConfigSpaceT>
-void GenericJoint<ConfigSpaceT>::resetForces()
+void GenericJoint<ConfigSpaceT>::resetControlForces()
 {
   this->mAspectState.mForces.setZero();
 

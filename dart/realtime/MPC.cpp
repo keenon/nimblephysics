@@ -5,10 +5,10 @@
 namespace dart {
 namespace realtime {
 
-/// This calls getForce() with the current system clock as the time parameter
-Eigen::VectorXs MPC::getForceNow()
+/// This calls getControlForce() with the current system clock as the time parameter
+Eigen::VectorXs MPC::getControlForceNow()
 {
-  return getForce(timeSinceEpochMillis());
+  return getControlForce(timeSinceEpochMillis());
 }
 
 /// This calls recordGroundTruthState() with the current system clock as the

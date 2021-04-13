@@ -439,7 +439,7 @@ void PointMass::setForce(std::size_t _index, s_t _force)
 }
 
 //==============================================================================
-s_t PointMass::getForce(std::size_t _index)
+s_t PointMass::getControlForce(std::size_t _index)
 {
   assert(_index < 3);
 
@@ -453,7 +453,7 @@ void PointMass::setForces(const Vector3s& _forces)
 }
 
 //==============================================================================
-const Vector3s& PointMass::getForces() const
+const Vector3s& PointMass::getControlForces() const
 {
   return getState().mForces;
 }

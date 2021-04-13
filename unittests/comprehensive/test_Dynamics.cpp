@@ -1698,7 +1698,7 @@ void DynamicsTest::compareEquationsOfMotion(const common::Uri& uri)
 
       // Get C2, Coriolis force vector using inverse dynamics algorithm
       Vector3s oldGravity = skel->getGravity();
-      VectorXs oldTau = skel->getForces();
+      VectorXs oldTau = skel->getControlForces();
       VectorXs oldDdq = skel->getAccelerations();
       // TODO(JS): Save external forces of body nodes
 
@@ -1706,19 +1706,19 @@ void DynamicsTest::compareEquationsOfMotion(const common::Uri& uri)
       skel->clearExternalForces();
       skel->setAccelerations(VectorXs::Zero(dof));
 
-      EXPECT_TRUE(skel->getForces() == VectorXs::Zero(dof));
+      EXPECT_TRUE(skel->getControlForces() == VectorXs::Zero(dof));
       EXPECT_TRUE(skel->getExternalForces() == VectorXs::Zero(dof));
       EXPECT_TRUE(skel->getAccelerations() == VectorXs::Zero(dof));
 
       skel->setGravity(Vector3s::Zero());
       EXPECT_TRUE(skel->getGravity() == Vector3s::Zero());
       skel->computeInverseDynamics(false, false);
-      VectorXs C2 = skel->getForces();
+      VectorXs C2 = skel->getControlForces();
 
       skel->setGravity(oldGravity);
       EXPECT_TRUE(skel->getGravity() == oldGravity);
       skel->computeInverseDynamics(false, false);
-      VectorXs Cg2 = skel->getForces();
+      VectorXs Cg2 = skel->getControlForces();
 
       EXPECT_TRUE(equals(C, C2, 1e-6));
       if (!equals(C, C2, 1e-6))
@@ -1736,7 +1736,7 @@ void DynamicsTest::compareEquationsOfMotion(const common::Uri& uri)
         failure = true;
       }
 
-      skel->setForces(oldTau);
+      skel->setControlForces(oldTau);
       skel->setAccelerations(oldDdq);
       // TODO(JS): Restore external forces of body nodes
 
@@ -2480,9 +2480,9 @@ TEST_F(DynamicsTest, testFiniteDifference)
 
 //    world->step(false);
 
-//    forces.row(i) = skel->getForces();
+//    forces.row(i) = skel->getControlForces();
 
-//    EXPECT_NEAR(command(i,0), skel->getForce(0),        tol);
+//    EXPECT_NEAR(command(i,0), skel->getControlForce(0),        tol);
 //    EXPECT_NEAR(command(i,1), skel->getAcceleration(1), tol);
 //    EXPECT_NEAR(command(i,2), skel->getVelocity(2),     tol);
 //    EXPECT_NEAR(command(i,3), skel->getAcceleration(3), tol);
@@ -2515,7 +2515,7 @@ TEST_F(DynamicsTest, testFiniteDifference)
 
 //    world->step(false);
 
-//    output(i,0) = skel->getJoint(0)->getForce(0);
+//    output(i,0) = skel->getJoint(0)->getControlForce(0);
 //    output(i,1) = skel->getJoint(1)->getAcceleration(0);
 //    output(i,2) = skel->getJoint(2)->getVelocity(0);
 //    output(i,3) = skel->getJoint(3)->getAcceleration(0);

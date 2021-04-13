@@ -406,10 +406,10 @@ void SingleShot::backpropJacobianOfFinalState(
 
     world->setPositions(ptr->getPreStepPosition());
     world->setVelocities(ptr->getPreStepVelocity());
-    world->setExternalForces(ptr->getPreStepTorques());
+    world->setControlForces(ptr->getPreStepTorques());
     world->setCachedLCPSolution(ptr->getPreStepLCPCache());
 
-    const Eigen::MatrixXs& forceVel = ptr->getForceVelJacobian(world, thisLog);
+    const Eigen::MatrixXs& forceVel = ptr->getControlForceVelJacobian(world, thisLog);
     const Eigen::MatrixXs& posPos = ptr->getPosPosJacobian(world, thisLog);
     const Eigen::MatrixXs& posVel = ptr->getPosVelJacobian(world, thisLog);
     const Eigen::MatrixXs& velPos = ptr->getVelPosJacobian(world, thisLog);
@@ -579,7 +579,7 @@ void SingleShot::backpropGradientWrt(
 
       // Both these values are currently ignored
       mappedGrad.lossWrtTorque
-          = gradWrtRollout->getForcesConst(pair.first).col(i);
+          = gradWrtRollout->getControlForcesConst(pair.first).col(i);
       mappedGrad.lossWrtMass = gradWrtRollout->getMassesConst();
 
       mappedLosses[pair.first] = mappedGrad;
@@ -609,7 +609,7 @@ void SingleShot::backpropGradientWrt(
       cursorDynamic -= posDim;
       gradDynamic.segment(cursorDynamic, posDim) = thisTimestep.lossWrtPosition;
     }
-    thisTimestep.lossWrtTorque += gradWrtRollout->getForcesConst().col(i);
+    thisTimestep.lossWrtTorque += gradWrtRollout->getControlForcesConst().col(i);
 
     nextTimestep = thisTimestep;
   }
@@ -655,7 +655,7 @@ std::vector<MappedBackpropSnapshotPtr> SingleShot::getSnapshots(
 
     for (int i = 0; i < mSteps; i++)
     {
-      world->setExternalForces(mForces.col(i));
+      world->setControlForces(mForces.col(i));
       mSnapshotsCache.push_back(mappedForwardPass(world, mMappings));
     }
 
@@ -703,13 +703,13 @@ void SingleShot::getStates(
     assert(rollout->getPoses(key).rows() == mMappings[key]->getPosDim());
     assert(rollout->getVels(key).cols() == mSteps);
     assert(rollout->getVels(key).rows() == mMappings[key]->getVelDim());
-    assert(rollout->getForces(key).cols() == mSteps);
-    assert(rollout->getForces(key).rows() == mMappings[key]->getForceDim());
+    assert(rollout->getControlForces(key).cols() == mSteps);
+    assert(rollout->getControlForces(key).rows() == mMappings[key]->getControlForceDim());
     for (int i = 0; i < mSteps; i++)
     {
       rollout->getPoses(key).col(i) = snapshots[i]->getPostStepPosition(key);
       rollout->getVels(key).col(i) = snapshots[i]->getPostStepVelocity(key);
-      rollout->getForces(key).col(i) = snapshots[i]->getPreStepTorques(key);
+      rollout->getControlForces(key).col(i) = snapshots[i]->getPreStepTorques(key);
     }
   }
   assert(rollout->getMasses().size() == world->getMassDims());
@@ -744,7 +744,7 @@ void SingleShot::setStates(
 
   mStartPos = rollout->getPosesConst().col(0);
   mStartVel = rollout->getVelsConst().col(0);
-  mForces = rollout->getForcesConst();
+  mForces = rollout->getControlForcesConst();
   world->setMasses(rollout->getMassesConst());
 
 #ifdef LOG_PERFORMANCE_SINGLE_SHOT
@@ -757,13 +757,14 @@ void SingleShot::setStates(
 
 //==============================================================================
 /// This sets the forces in this trajectory from the passed in matrix
-void SingleShot::setForcesRaw(Eigen::MatrixXs forces, PerformanceLog* log)
+void SingleShot::setControlForcesRaw(
+    Eigen::MatrixXs forces, PerformanceLog* log)
 {
   PerformanceLog* thisLog = nullptr;
 #ifdef LOG_PERFORMANCE_SINGLE_SHOT
   if (log != nullptr)
   {
-    thisLog = log->startRun("SingleShot.setForcesRaw");
+    thisLog = log->startRun("SingleShot.setControlForcesRaw");
   }
 #endif
 
@@ -972,10 +973,10 @@ TimestepJacobians SingleShot::backpropStartStateJacobians(
     {
       world->setPositions(ptr->getPreStepPosition());
       world->setVelocities(ptr->getPreStepVelocity());
-      world->setExternalForces(ptr->getPreStepTorques());
+      world->setControlForces(ptr->getPreStepTorques());
       world->setCachedLCPSolution(ptr->getPreStepLCPCache());
 
-      const Eigen::MatrixXs& forceVel = ptr->getForceVelJacobian(world);
+      const Eigen::MatrixXs& forceVel = ptr->getControlForceVelJacobian(world);
       const Eigen::MatrixXs& posPos = ptr->getPosPosJacobian(world);
       const Eigen::MatrixXs& posVel = ptr->getPosVelJacobian(world);
       const Eigen::MatrixXs& velPos = ptr->getVelPosJacobian(world);
@@ -1022,7 +1023,7 @@ TimestepJacobians SingleShot::finiteDifferenceStartStateJacobians(
   world->setVelocities(mStartVel);
   for (int i = 0; i < mSteps; i++)
   {
-    world->setExternalForces(mForces.col(i));
+    world->setControlForces(mForces.col(i));
     world->step();
   }
 
@@ -1047,7 +1048,7 @@ TimestepJacobians SingleShot::finiteDifferenceStartStateJacobians(
     world->setVelocities(mStartVel);
     for (int i = 0; i < mSteps; i++)
     {
-      world->setExternalForces(mForces.col(i));
+      world->setControlForces(mForces.col(i));
       world->step();
     }
 
@@ -1060,7 +1061,7 @@ TimestepJacobians SingleShot::finiteDifferenceStartStateJacobians(
     world->setVelocities(mStartVel);
     for (int i = 0; i < mSteps; i++)
     {
-      world->setExternalForces(mForces.col(i));
+      world->setControlForces(mForces.col(i));
       world->step();
     }
 
@@ -1083,7 +1084,7 @@ TimestepJacobians SingleShot::finiteDifferenceStartStateJacobians(
     world->setVelocities(perturbedStartVel);
     for (int i = 0; i < mSteps; i++)
     {
-      world->setExternalForces(mForces.col(i));
+      world->setControlForces(mForces.col(i));
       world->step();
     }
 
@@ -1096,7 +1097,7 @@ TimestepJacobians SingleShot::finiteDifferenceStartStateJacobians(
     world->setVelocities(perturbedStartVel);
     for (int i = 0; i < mSteps; i++)
     {
-      world->setExternalForces(mForces.col(i));
+      world->setControlForces(mForces.col(i));
       world->step();
     }
 
@@ -1120,7 +1121,7 @@ TimestepJacobians SingleShot::finiteDifferenceStartStateJacobians(
     for (int i = 0; i < mSteps; i++)
     {
       Eigen::VectorXs force = i == 0 ? perturbedStartForce : mForces.col(i);
-      world->setExternalForces(force);
+      world->setControlForces(force);
       world->step();
     }
 
@@ -1134,7 +1135,7 @@ TimestepJacobians SingleShot::finiteDifferenceStartStateJacobians(
     for (int i = 0; i < mSteps; i++)
     {
       Eigen::VectorXs force = i == 0 ? perturbedStartForce : mForces.col(i);
-      world->setExternalForces(force);
+      world->setControlForces(force);
       world->step();
     }
 

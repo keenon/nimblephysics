@@ -38,7 +38,7 @@ public:
   virtual Eigen::Ref<Eigen::MatrixXs> getVels(
       const std::string& mapping = "identity")
       = 0;
-  virtual Eigen::Ref<Eigen::MatrixXs> getForces(
+  virtual Eigen::Ref<Eigen::MatrixXs> getControlForces(
       const std::string& mapping = "identity")
       = 0;
   virtual Eigen::Ref<Eigen::VectorXs> getMasses() = 0;
@@ -47,7 +47,7 @@ public:
       const std::string& mapping = "identity") const = 0;
   virtual const Eigen::Ref<const Eigen::MatrixXs> getVelsConst(
       const std::string& mapping = "identity") const = 0;
-  virtual const Eigen::Ref<const Eigen::MatrixXs> getForcesConst(
+  virtual const Eigen::Ref<const Eigen::MatrixXs> getControlForcesConst(
       const std::string& mapping = "identity") const = 0;
   virtual const Eigen::Ref<const Eigen::VectorXs> getMassesConst() const = 0;
 
@@ -121,14 +121,14 @@ public:
       const std::string& mapping = "identity") override;
   Eigen::Ref<Eigen::MatrixXs> getVels(
       const std::string& mapping = "identity") override;
-  Eigen::Ref<Eigen::MatrixXs> getForces(
+  Eigen::Ref<Eigen::MatrixXs> getControlForces(
       const std::string& mapping = "identity") override;
   Eigen::Ref<Eigen::VectorXs> getMasses() override;
   const Eigen::Ref<const Eigen::MatrixXs> getPosesConst(
       const std::string& mapping = "identity") const override;
   const Eigen::Ref<const Eigen::MatrixXs> getVelsConst(
       const std::string& mapping = "identity") const override;
-  const Eigen::Ref<const Eigen::MatrixXs> getForcesConst(
+  const Eigen::Ref<const Eigen::MatrixXs> getControlForcesConst(
       const std::string& mapping = "identity") const override;
   const Eigen::Ref<const Eigen::VectorXs> getMassesConst() const override;
 
@@ -158,14 +158,14 @@ public:
       const std::string& mapping = "identity") override;
   Eigen::Ref<Eigen::MatrixXs> getVels(
       const std::string& mapping = "identity") override;
-  Eigen::Ref<Eigen::MatrixXs> getForces(
+  Eigen::Ref<Eigen::MatrixXs> getControlForces(
       const std::string& mapping = "identity") override;
   Eigen::Ref<Eigen::VectorXs> getMasses() override;
   const Eigen::Ref<const Eigen::MatrixXs> getPosesConst(
       const std::string& mapping = "identity") const override;
   const Eigen::Ref<const Eigen::MatrixXs> getVelsConst(
       const std::string& mapping = "identity") const override;
-  const Eigen::Ref<const Eigen::MatrixXs> getForcesConst(
+  const Eigen::Ref<const Eigen::MatrixXs> getControlForcesConst(
       const std::string& mapping = "identity") const override;
   const Eigen::Ref<const Eigen::VectorXs> getMassesConst() const override;
 
@@ -193,14 +193,14 @@ public:
       const std::string& mapping = "identity") override;
   Eigen::Ref<Eigen::MatrixXs> getVels(
       const std::string& mapping = "identity") override;
-  Eigen::Ref<Eigen::MatrixXs> getForces(
+  Eigen::Ref<Eigen::MatrixXs> getControlForces(
       const std::string& mapping = "identity") override;
   Eigen::Ref<Eigen::VectorXs> getMasses() override;
   const Eigen::Ref<const Eigen::MatrixXs> getPosesConst(
       const std::string& mapping = "identity") const override;
   const Eigen::Ref<const Eigen::MatrixXs> getVelsConst(
       const std::string& mapping = "identity") const override;
-  const Eigen::Ref<const Eigen::MatrixXs> getForcesConst(
+  const Eigen::Ref<const Eigen::MatrixXs> getControlForcesConst(
       const std::string& mapping = "identity") const override;
   const Eigen::Ref<const Eigen::VectorXs> getMassesConst() const override;
 

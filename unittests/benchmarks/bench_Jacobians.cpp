@@ -73,15 +73,15 @@ static void BM_Cartpole_Jacobians(benchmark::State& state)
 
   world->addSkeleton(cartpole);
 
-  cartpole->setForceUpperLimit(0, 0);
-  cartpole->setForceLowerLimit(0, 0);
+  cartpole->setControlForceUpperLimit(0, 0);
+  cartpole->setControlForceLowerLimit(0, 0);
   cartpole->setVelocityUpperLimit(0, 1000);
   cartpole->setVelocityLowerLimit(0, -1000);
   cartpole->setPositionUpperLimit(0, 10);
   cartpole->setPositionLowerLimit(0, -10);
 
-  cartpole->setForceLowerLimit(1, -1000);
-  cartpole->setForceUpperLimit(1, 1000);
+  cartpole->setControlForceLowerLimit(1, -1000);
+  cartpole->setControlForceUpperLimit(1, 1000);
   cartpole->setVelocityUpperLimit(1, 1000);
   cartpole->setVelocityLowerLimit(1, -1000);
   cartpole->setPositionUpperLimit(1, 10);
@@ -98,7 +98,7 @@ static void BM_Cartpole_Jacobians(benchmark::State& state)
     Eigen::VectorXs lastPos = rollout->getPosesConst("identity").col(steps - 1);
     return rollout->getVelsConst("identity").col(steps - 1).squaredNorm()
            + lastPos.squaredNorm()
-           + rollout->getForcesConst("identity").squaredNorm();
+           + rollout->getControlForcesConst("identity").squaredNorm();
   };
 
   TrajectoryLossFnAndGrad lossGrad = [](const TrajectoryRollout* rollout,
@@ -106,7 +106,7 @@ static void BM_Cartpole_Jacobians(benchmark::State& state)
                                      ) {
     gradWrtRollout->getPoses("identity").setZero();
     gradWrtRollout->getVels("identity").setZero();
-    gradWrtRollout->getForces("identity").setZero();
+    gradWrtRollout->getControlForces("identity").setZero();
     int steps = rollout->getPosesConst("identity").cols();
     gradWrtRollout->getPoses("identity").col(steps - 1)
         = 2 * rollout->getPosesConst("identity").col(steps - 1);
@@ -114,13 +114,13 @@ static void BM_Cartpole_Jacobians(benchmark::State& state)
         = 2 * rollout->getVelsConst("identity").col(steps - 1);
     for (int i = 0; i < steps; i++)
     {
-      gradWrtRollout->getForces("identity").col(i)
-          = 2 * rollout->getForcesConst("identity").col(i);
+      gradWrtRollout->getControlForces("identity").col(i)
+          = 2 * rollout->getControlForcesConst("identity").col(i);
     }
     Eigen::VectorXs lastPos = rollout->getPosesConst("identity").col(steps - 1);
     return rollout->getVelsConst("identity").col(steps - 1).squaredNorm()
            + lastPos.squaredNorm()
-           + rollout->getForcesConst("identity").squaredNorm();
+           + rollout->getControlForcesConst("identity").squaredNorm();
   };
 
   LossFn lossFn(loss);
@@ -134,7 +134,7 @@ static void BM_Cartpole_Jacobians(benchmark::State& state)
     snapshot->getPosVelJacobian(world);
     snapshot->getVelVelJacobian(world);
     snapshot->getVelPosJacobian(world);
-    snapshot->getForceVelJacobian(world);
+    snapshot->getControlForceVelJacobian(world);
   }
 }
 // Register the function as a benchmark
@@ -153,8 +153,8 @@ BodyNode* createTailSegment(BodyNode* parent, Eigen::Vector3s color)
   ShapeNode* poleShape
       = pole->createShapeNodeWith<VisualAspect, CollisionAspect>(shape);
   poleShape->getVisualAspect()->setColor(color);
-  poleJoint->setForceUpperLimit(0, 100.0);
-  poleJoint->setForceLowerLimit(0, -100.0);
+  poleJoint->setControlForceUpperLimit(0, 100.0);
+  poleJoint->setControlForceLowerLimit(0, -100.0);
   poleJoint->setVelocityUpperLimit(0, 100.0);
   poleJoint->setVelocityLowerLimit(0, -100.0);
   poleJoint->setPositionUpperLimit(0, 270 * 3.1415 / 180);
@@ -197,10 +197,10 @@ WorldPtr createJumpwormWorld()
       = root->createShapeNodeWith<VisualAspect, CollisionAspect>(shape);
   Eigen::Vector3s black = Eigen::Vector3s::Zero();
   rootVisual->getVisualAspect()->setColor(black);
-  rootJoint->setForceUpperLimit(0, 0);
-  rootJoint->setForceLowerLimit(0, 0);
-  rootJoint->setForceUpperLimit(1, 0);
-  rootJoint->setForceLowerLimit(1, 0);
+  rootJoint->setControlForceUpperLimit(0, 0);
+  rootJoint->setControlForceLowerLimit(0, 0);
+  rootJoint->setControlForceUpperLimit(1, 0);
+  rootJoint->setControlForceLowerLimit(1, 0);
   rootJoint->setVelocityUpperLimit(0, 1000.0);
   rootJoint->setVelocityLowerLimit(0, -1000.0);
   rootJoint->setVelocityUpperLimit(1, 1000.0);
@@ -262,7 +262,7 @@ static void BM_Jumpworm(benchmark::State& state)
     snapshot->getPosVelJacobian(world);
     snapshot->getVelVelJacobian(world);
     snapshot->getVelPosJacobian(world);
-    snapshot->getForceVelJacobian(world);
+    snapshot->getControlForceVelJacobian(world);
   }
 };
 // Register the function as a benchmark
@@ -317,7 +317,7 @@ static void BM_Atlas(benchmark::State& state)
     snapshot->getPosVelJacobian(world);
     snapshot->getVelVelJacobian(world);
     snapshot->getVelPosJacobian(world);
-    snapshot->getForceVelJacobian(world);
+    snapshot->getControlForceVelJacobian(world);
   }
 };
 // Register the function as a benchmark

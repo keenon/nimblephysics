@@ -463,43 +463,43 @@ public:
   //----------------------------------------------------------------------------
 
   /// Set the force of a single generalized coordinate
-  virtual void setForce(std::size_t _index, s_t _force) = 0;
+  virtual void setControlForce(std::size_t _index, s_t _force) = 0;
 
   /// Get the force of a single generalized coordinate
-  virtual s_t getForce(std::size_t _index) const = 0;
+  virtual s_t getControlForce(std::size_t _index) const = 0;
 
   /// Set the forces of all generalized coordinates in this Joint
-  virtual void setForces(const Eigen::VectorXs& _forces) = 0;
+  virtual void setControlForces(const Eigen::VectorXs& _forces) = 0;
 
   /// Get the forces of all generalized coordinates in this Joint
-  virtual Eigen::VectorXs getForces() const = 0;
+  virtual Eigen::VectorXs getControlForces() const = 0;
 
   /// Set the forces of all generalized coordinates in this Joint to zero
-  virtual void resetForces() = 0;
+  virtual void resetControlForces() = 0;
 
   /// Set lower limit for force
-  virtual void setForceLowerLimit(std::size_t _index, s_t _force) = 0;
+  virtual void setControlForceLowerLimit(std::size_t _index, s_t _force) = 0;
 
   /// Get lower limit for force
-  virtual s_t getForceLowerLimit(std::size_t _index) const = 0;
+  virtual s_t getControlForceLowerLimit(std::size_t _index) const = 0;
 
   /// Set the force upper limits of all the generalized coordinates.
-  virtual void setForceLowerLimits(const Eigen::VectorXs& lowerLimits) = 0;
+  virtual void setControlForceLowerLimits(const Eigen::VectorXs& lowerLimits) = 0;
 
   /// Get the force upper limits of all the generalized coordinates.
-  virtual Eigen::VectorXs getForceLowerLimits() const = 0;
+  virtual Eigen::VectorXs getControlForceLowerLimits() const = 0;
 
   /// Set upper limit for force
-  virtual void setForceUpperLimit(std::size_t _index, s_t _force) = 0;
+  virtual void setControlForceUpperLimit(std::size_t _index, s_t _force) = 0;
 
   /// Get upper limit for force
-  virtual s_t getForceUpperLimit(std::size_t _index) const = 0;
+  virtual s_t getControlForceUpperLimit(std::size_t _index) const = 0;
 
   /// Set the force upper limits of all the generalized coordinates.
-  virtual void setForceUpperLimits(const Eigen::VectorXs& upperLimits) = 0;
+  virtual void setControlForceUpperLimits(const Eigen::VectorXs& upperLimits) = 0;
 
   /// Get the force upper limits of all the generalized coordinates.
-  virtual Eigen::VectorXs getForceUpperLimits() const = 0;
+  virtual Eigen::VectorXs getControlForceUpperLimits() const = 0;
 
   /// \}
 

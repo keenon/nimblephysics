@@ -71,7 +71,7 @@ public:
   /// This computes and returns the whole force-vel jacobian. For backprop, you
   /// don't actually need this matrix, you can compute backprop directly. This
   /// is here if you want access to the full Jacobian for some reason.
-  const Eigen::MatrixXs& getForceVelJacobian(
+  const Eigen::MatrixXs& getControlForceVelJacobian(
       simulation::WorldPtr world, PerformanceLog* perfLog = nullptr);
 
   /// This computes and returns the whole mass-vel jacobian. For backprop, you

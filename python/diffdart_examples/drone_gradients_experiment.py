@@ -26,8 +26,8 @@ def optimizeDrone(
   droneShape.createCollisionAspect()
   droneBody.setFrictionCoeff(0.0)
 
-  droneRail.setForceUpperLimit(0, 10)
-  droneRail.setForceLowerLimit(0, -10)
+  droneRail.setControlForceUpperLimit(0, 10)
+  droneRail.setControlForceLowerLimit(0, -10)
 
   world.addSkeleton(drone)
 
@@ -51,7 +51,7 @@ def optimizeDrone(
     last_pos = pos[0, -1]
     # vel = rollout.getVels()
     # last_vel = pos[0, -1]
-    # force_loss = rollout.getForces().square().sum() / (10 * rollout.getForces().size()[1])
+    # force_loss = rollout.getControlForces().square().sum() / (10 * rollout.getControlForces().size()[1])
     return torch.square(goal - last_pos)  # + 0.1 * torch.square(last_vel)
   dartLoss: dart.trajectory.LossFn = DartTorchLossFn(loss)
 

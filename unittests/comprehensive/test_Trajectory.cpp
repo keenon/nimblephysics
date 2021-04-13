@@ -273,15 +273,15 @@ TEST(TRAJECTORY, CARTPOLE)
 
   world->addSkeleton(cartpole);
 
-  cartpole->setForceUpperLimit(0, 0);
-  cartpole->setForceLowerLimit(0, 0);
+  cartpole->setControlForceUpperLimit(0, 0);
+  cartpole->setControlForceLowerLimit(0, 0);
   cartpole->setVelocityUpperLimit(0, 1000);
   cartpole->setVelocityLowerLimit(0, -1000);
   cartpole->setPositionUpperLimit(0, 10);
   cartpole->setPositionLowerLimit(0, -10);
 
-  cartpole->setForceLowerLimit(1, -1000);
-  cartpole->setForceUpperLimit(1, 1000);
+  cartpole->setControlForceLowerLimit(1, -1000);
+  cartpole->setControlForceUpperLimit(1, 1000);
   cartpole->setVelocityUpperLimit(1, 1000);
   cartpole->setVelocityLowerLimit(1, -1000);
   cartpole->setPositionUpperLimit(1, 10);
@@ -297,7 +297,7 @@ TEST(TRAJECTORY, CARTPOLE)
     Eigen::VectorXs lastPos = rollout->getPosesConst("identity").col(steps - 1);
     return rollout->getVelsConst("identity").col(steps - 1).squaredNorm()
            + lastPos.squaredNorm()
-           + rollout->getForcesConst("identity").squaredNorm();
+           + rollout->getControlForcesConst("identity").squaredNorm();
   };
 
   TrajectoryLossFnAndGrad lossGrad = [](const TrajectoryRollout* rollout,
@@ -305,7 +305,7 @@ TEST(TRAJECTORY, CARTPOLE)
                                      ) {
     gradWrtRollout->getPoses("identity").setZero();
     gradWrtRollout->getVels("identity").setZero();
-    gradWrtRollout->getForces("identity").setZero();
+    gradWrtRollout->getControlForces("identity").setZero();
     int steps = rollout->getPosesConst("identity").cols();
     gradWrtRollout->getPoses("identity").col(steps - 1)
         = 2 * rollout->getPosesConst("identity").col(steps - 1);
@@ -313,13 +313,13 @@ TEST(TRAJECTORY, CARTPOLE)
         = 2 * rollout->getVelsConst("identity").col(steps - 1);
     for (int i = 0; i < steps; i++)
     {
-      gradWrtRollout->getForces("identity").col(i)
-          = 2 * rollout->getForcesConst("identity").col(i);
+      gradWrtRollout->getControlForces("identity").col(i)
+          = 2 * rollout->getControlForcesConst("identity").col(i);
     }
     Eigen::VectorXs lastPos = rollout->getPosesConst("identity").col(steps - 1);
     return rollout->getVelsConst("identity").col(steps - 1).squaredNorm()
            + lastPos.squaredNorm()
-           + rollout->getForcesConst("identity").squaredNorm();
+           + rollout->getControlForcesConst("identity").squaredNorm();
   };
 
   // TODO(keenon):URGENT:fixme
@@ -368,8 +368,8 @@ BodyNode* createTailSegment(BodyNode* parent, Eigen::Vector3s color)
   ShapeNode* poleShape
       = pole->createShapeNodeWith<VisualAspect, CollisionAspect>(shape);
   poleShape->getVisualAspect()->setColor(color);
-  poleJoint->setForceUpperLimit(0, 100.0);
-  poleJoint->setForceLowerLimit(0, -100.0);
+  poleJoint->setControlForceUpperLimit(0, 100.0);
+  poleJoint->setControlForceLowerLimit(0, -100.0);
   poleJoint->setVelocityUpperLimit(0, 100.0);
   poleJoint->setVelocityLowerLimit(0, -100.0);
   poleJoint->setPositionUpperLimit(0, 270 * 3.1415 / 180);
@@ -415,8 +415,8 @@ TEST(TRAJECTORY, TUNE_SIMPLE_MASS)
       new BoxShape(Eigen::Vector3s(0.05, 0.25, 0.05)));
   // ShapeNode* poleShape =
   pole->createShapeNodeWith<VisualAspect, CollisionAspect>(shape);
-  poleJoint->setForceUpperLimit(0, 100.0);
-  poleJoint->setForceLowerLimit(0, -100.0);
+  poleJoint->setControlForceUpperLimit(0, 100.0);
+  poleJoint->setControlForceLowerLimit(0, -100.0);
   poleJoint->setVelocityUpperLimit(0, 100.0);
   poleJoint->setVelocityLowerLimit(0, -100.0);
   poleJoint->setPositionUpperLimit(0, 270 * 3.1415 / 180);
@@ -890,7 +890,7 @@ TEST(TRAJECTORY, RECOVER_MASS)
   Eigen::VectorXs originalPoses = Eigen::VectorXs::Zero(STEPS);
   for (int i = 0; i < STEPS; i++)
   {
-    world->setExternalForces(knownForce);
+    world->setControlForces(knownForce);
     world->step();
     originalPoses(i) = world->getPositions()[0];
   }
@@ -959,7 +959,7 @@ TEST(TRAJECTORY, RECOVER_MASS)
     std::cout << "Original: " << std::endl
               << originalPoses.transpose() << std::endl;
     std::cout << "Forces: " << std::endl
-              << withKnots.getForces("identity") << std::endl;
+              << withKnots.getControlForces("identity") << std::endl;
     std::cout << "Positions: " << std::endl
               << withKnots.getPoses("identity") << std::endl;
 
@@ -993,8 +993,8 @@ TEST(TRAJECTORY, CONSTRAINED_CYCLE)
       new BoxShape(Eigen::Vector3s(0.05, 0.25, 0.05)));
   // ShapeNode* poleShape =
   pole->createShapeNodeWith<VisualAspect, CollisionAspect>(shape);
-  poleJoint->setForceUpperLimit(0, 100.0);
-  poleJoint->setForceLowerLimit(0, -100.0);
+  poleJoint->setControlForceUpperLimit(0, 100.0);
+  poleJoint->setControlForceLowerLimit(0, -100.0);
   poleJoint->setVelocityUpperLimit(0, 100.0);
   poleJoint->setVelocityLowerLimit(0, -100.0);
   poleJoint->setPositionUpperLimit(0, 270 * 3.1415 / 180);
@@ -1132,10 +1132,10 @@ TEST(TRAJECTORY, JUMP_WORM)
       = root->createShapeNodeWith<VisualAspect, CollisionAspect>(shape);
   Eigen::Vector3s black = Eigen::Vector3s::Zero();
   rootVisual->getVisualAspect()->setColor(black);
-  rootJoint->setForceUpperLimit(0, 0);
-  rootJoint->setForceLowerLimit(0, 0);
-  rootJoint->setForceUpperLimit(1, 0);
-  rootJoint->setForceLowerLimit(1, 0);
+  rootJoint->setControlForceUpperLimit(0, 0);
+  rootJoint->setControlForceLowerLimit(0, 0);
+  rootJoint->setControlForceUpperLimit(1, 0);
+  rootJoint->setControlForceLowerLimit(1, 0);
   rootJoint->setVelocityUpperLimit(0, 1000.0);
   rootJoint->setVelocityLowerLimit(0, -1000.0);
   rootJoint->setVelocityUpperLimit(1, 1000.0);
@@ -1187,7 +1187,7 @@ TEST(TRAJECTORY, JUMP_WORM)
     const Eigen::Ref<const Eigen::MatrixXs> vels
         = rollout->getVelsConst("identity");
     const Eigen::Ref<const Eigen::MatrixXs> forces
-        = rollout->getForcesConst("identity");
+        = rollout->getControlForcesConst("identity");
 
     s_t maxPos = -1000;
     s_t minPos = 1000;
@@ -1220,13 +1220,13 @@ TEST(TRAJECTORY, JUMP_WORM)
                                      ) {
     gradWrtRollout->getPoses("identity").setZero();
     gradWrtRollout->getVels("identity").setZero();
-    gradWrtRollout->getForces("identity").setZero();
+    gradWrtRollout->getControlForces("identity").setZero();
     const Eigen::Ref<const Eigen::MatrixXs> poses
         = rollout->getPosesConst("identity");
     const Eigen::Ref<const Eigen::MatrixXs> vels
         = rollout->getVelsConst("identity");
     const Eigen::Ref<const Eigen::MatrixXs> forces
-        = rollout->getForcesConst("identity");
+        = rollout->getControlForcesConst("identity");
 
     gradWrtRollout->getPoses("identity")(1, poses.cols() - 1)
         = 2 * poses(1, poses.cols() - 1);
@@ -1288,10 +1288,10 @@ TEST(TRAJECTORY, REOPTIMIZATION)
       = root->createShapeNodeWith<VisualAspect, CollisionAspect>(shape);
   Eigen::Vector3s black = Eigen::Vector3s::Zero();
   rootVisual->getVisualAspect()->setColor(black);
-  rootJoint->setForceUpperLimit(0, 0);
-  rootJoint->setForceLowerLimit(0, 0);
-  rootJoint->setForceUpperLimit(1, 0);
-  rootJoint->setForceLowerLimit(1, 0);
+  rootJoint->setControlForceUpperLimit(0, 0);
+  rootJoint->setControlForceLowerLimit(0, 0);
+  rootJoint->setControlForceUpperLimit(1, 0);
+  rootJoint->setControlForceLowerLimit(1, 0);
   rootJoint->setVelocityUpperLimit(0, 1000.0);
   rootJoint->setVelocityLowerLimit(0, -1000.0);
   rootJoint->setVelocityUpperLimit(1, 1000.0);
@@ -1343,7 +1343,7 @@ TEST(TRAJECTORY, REOPTIMIZATION)
     const Eigen::Ref<const Eigen::MatrixXs> vels
         = rollout->getVelsConst("identity");
     const Eigen::Ref<const Eigen::MatrixXs> forces
-        = rollout->getForcesConst("identity");
+        = rollout->getControlForcesConst("identity");
 
     s_t maxPos = -1000;
     s_t minPos = 1000;
@@ -1376,13 +1376,13 @@ TEST(TRAJECTORY, REOPTIMIZATION)
                                      ) {
     gradWrtRollout->getPoses("identity").setZero();
     gradWrtRollout->getVels("identity").setZero();
-    gradWrtRollout->getForces("identity").setZero();
+    gradWrtRollout->getControlForces("identity").setZero();
     const Eigen::Ref<const Eigen::MatrixXs> poses
         = rollout->getPosesConst("identity");
     const Eigen::Ref<const Eigen::MatrixXs> vels
         = rollout->getVelsConst("identity");
     const Eigen::Ref<const Eigen::MatrixXs> forces
-        = rollout->getForcesConst("identity");
+        = rollout->getControlForcesConst("identity");
 
     gradWrtRollout->getPoses("identity")(1, poses.cols() - 1)
         = 2 * poses(1, poses.cols() - 1);

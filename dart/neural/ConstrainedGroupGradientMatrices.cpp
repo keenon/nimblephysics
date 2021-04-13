@@ -74,7 +74,7 @@ ConstrainedGroupGradientMatrices::ConstrainedGroupGradientMatrices(
   {
     int dofs = skel->getNumDofs();
     mMinv.block(cursor, cursor, dofs, dofs) = skel->getInvMassMatrix();
-    mPreStepTorques.segment(cursor, dofs) = skel->getForces();
+    mPreStepTorques.segment(cursor, dofs) = skel->getControlForces();
     mPreLCPVelocities.segment(cursor, dofs) = skel->getVelocities();
     mPreStepVelocities.segment(cursor, dofs)
         = skel->getVelocities() - (timeStep * skel->getAccelerations());
@@ -867,7 +867,7 @@ void ConstrainedGroupGradientMatrices::constructMatrices(
 }
 
 //==============================================================================
-Eigen::MatrixXs ConstrainedGroupGradientMatrices::getForceVelJacobian(
+Eigen::MatrixXs ConstrainedGroupGradientMatrices::getControlForceVelJacobian(
     simulation::WorldPtr world, PerformanceLog* perfLog)
 {
   PerformanceLog* thisLog = nullptr;
@@ -875,7 +875,7 @@ Eigen::MatrixXs ConstrainedGroupGradientMatrices::getForceVelJacobian(
   if (perfLog != nullptr)
   {
     thisLog = perfLog->startRun(
-        "ConstrainedGroupGradientMatrices.getForceVelJacobian");
+        "ConstrainedGroupGradientMatrices.getControlForceVelJacobian");
   }
 #endif
 
@@ -925,7 +925,7 @@ Eigen::MatrixXs ConstrainedGroupGradientMatrices::getVelVelJacobian(
   if (A_c.size() == 0)
   {
     jac = Eigen::MatrixXs::Identity(mNumDOFs, mNumDOFs)
-          - getForceVelJacobian(world) * getVelCJacobian(world);
+          - getControlForceVelJacobian(world) * getVelCJacobian(world);
   }
   else
   {
@@ -1772,7 +1772,7 @@ void ConstrainedGroupGradientMatrices::backprop(
 {
   // First, we compute the correct gradients through backprop
 
-  Eigen::MatrixXs forceVelJacobian = getForceVelJacobian(world);
+  Eigen::MatrixXs forceVelJacobian = getControlForceVelJacobian(world);
   // p_t+1 <-- v_t
   Eigen::MatrixXs posVelJacobian = getPosVelJacobian(world);
   // v_t+1 <-- v_t
@@ -1850,7 +1850,7 @@ void ConstrainedGroupGradientMatrices::backprop(
     }
     constructMatrices(world.get(), overrideClasses);
 
-    Eigen::MatrixXs stratForceVelJacobian = getForceVelJacobian(world);
+    Eigen::MatrixXs stratForceVelJacobian = getControlForceVelJacobian(world);
     // p_t+1 <-- v_t
     Eigen::MatrixXs stratPosVelJacobian = getPosVelJacobian(world);
     // v_t+1 <-- v_t
@@ -1992,12 +1992,12 @@ void ConstrainedGroupGradientMatrices::clipLossGradientsToBounds(
 
       // Clip force gradients
 
-      if ((skel->getForce(j) == skel->getForceLowerLimit(j))
+      if ((skel->getControlForce(j) == skel->getControlForceLowerLimit(j))
           && (lossWrtForce(cursor) > 0))
       {
         lossWrtForce(cursor) = 0;
       }
-      if ((skel->getForce(j) == skel->getForceUpperLimit(j))
+      if ((skel->getControlForce(j) == skel->getControlForceUpperLimit(j))
           && (lossWrtForce(cursor) < 0))
       {
         lossWrtForce(cursor) = 0;

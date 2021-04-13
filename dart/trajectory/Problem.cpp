@@ -963,15 +963,15 @@ Eigen::VectorXi Problem::updateWithForces(
 
   for (int i = 0; i < mSteps; i++)
   {
-    world->setExternalForces(forces.col(i));
+    world->setControlForces(forces.col(i));
     for (std::string mapping : rollout->getMappings())
     {
       mMappings[mapping]->getPositionsInPlace(
           world, rollout->getPoses(mapping).col(i));
       mMappings[mapping]->getVelocitiesInPlace(
           world, rollout->getVels(mapping).col(i));
-      mMappings[mapping]->getForcesInPlace(
-          world, rollout->getForces(mapping).col(i));
+      mMappings[mapping]->getControlForcesInPlace(
+          world, rollout->getControlForces(mapping).col(i));
     }
     world->step();
   }

@@ -59,11 +59,11 @@ void Mapping(py::module& m)
           "be the length of the getVelocities() vector, and the length of the "
           "vector expected by setVelocities().")
       .def(
-          "getForceDim",
-          &dart::neural::Mapping::getForceDim,
+          "getControlForceDim",
+          &dart::neural::Mapping::getControlForceDim,
           "Gets the dimension of the Force space in this mapping. This will "
-          "be the length of the getForces() vector, and the length of the "
-          "vector expected by setForces().")
+          "be the length of the getControlForces() vector, and the length of the "
+          "vector expected by setControlForces().")
       .def(
           "setPositions",
           &dart::neural::Mapping::setPositions,
@@ -75,8 +75,8 @@ void Mapping(py::module& m)
           ::py::arg("world"),
           ::py::arg("velocities"))
       .def(
-          "setForces",
-          &dart::neural::Mapping::setForces,
+          "setControlForces",
+          &dart::neural::Mapping::setControlForces,
           ::py::arg("world"),
           ::py::arg("forces"))
       .def(
@@ -87,7 +87,7 @@ void Mapping(py::module& m)
           "getVelocities",
           &dart::neural::Mapping::getVelocities,
           ::py::arg("world"))
-      .def("getForces", &dart::neural::Mapping::getForces, ::py::arg("world"))
+      .def("getControlForces", &dart::neural::Mapping::getControlForces, ::py::arg("world"))
       .def(
           "getRealPosToMappedPosJac",
           &dart::neural::Mapping::getRealPosToMappedPosJac,
@@ -140,12 +140,12 @@ void Mapping(py::module& m)
           &dart::neural::Mapping::getVelocityUpperLimits,
           ::py::arg("world"))
       .def(
-          "getForceLowerLimits",
-          &dart::neural::Mapping::getForceLowerLimits,
+          "getControlForceLowerLimits",
+          &dart::neural::Mapping::getControlForceLowerLimits,
           ::py::arg("world"))
       .def(
-          "getForceUpperLimits",
-          &dart::neural::Mapping::getForceUpperLimits,
+          "getControlForceUpperLimits",
+          &dart::neural::Mapping::getControlForceUpperLimits,
           ::py::arg("world"));
 }
 

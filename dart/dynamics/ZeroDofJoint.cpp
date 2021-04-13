@@ -478,79 +478,79 @@ Eigen::VectorXs ZeroDofJoint::getAccelerationUpperLimits() const
 }
 
 //==============================================================================
-void ZeroDofJoint::setForce(std::size_t /*_index*/, s_t /*_force*/)
+void ZeroDofJoint::setControlForce(std::size_t /*_index*/, s_t /*_force*/)
 {
   // Do nothing
 }
 
 //==============================================================================
-s_t ZeroDofJoint::getForce(std::size_t /*_index*/) const
+s_t ZeroDofJoint::getControlForce(std::size_t /*_index*/) const
 {
   return 0.0;
 }
 
 //==============================================================================
-void ZeroDofJoint::setForces(const Eigen::VectorXs& /*_forces*/)
+void ZeroDofJoint::setControlForces(const Eigen::VectorXs& /*_forces*/)
 {
   // Do nothing
 }
 
 //==============================================================================
-Eigen::VectorXs ZeroDofJoint::getForces() const
+Eigen::VectorXs ZeroDofJoint::getControlForces() const
 {
   return Eigen::Matrix<s_t, 0, 1>();
 }
 
 //==============================================================================
-void ZeroDofJoint::resetForces()
+void ZeroDofJoint::resetControlForces()
 {
   // Do nothing
 }
 
 //==============================================================================
-void ZeroDofJoint::setForceLowerLimit(std::size_t /*_index*/, s_t /*_force*/)
+void ZeroDofJoint::setControlForceLowerLimit(std::size_t /*_index*/, s_t /*_force*/)
 {
   // Do nothing
 }
 
 //==============================================================================
-s_t ZeroDofJoint::getForceLowerLimit(std::size_t /*_index*/) const
+s_t ZeroDofJoint::getControlForceLowerLimit(std::size_t /*_index*/) const
 {
   return 0.0;
 }
 
 //==============================================================================
-void ZeroDofJoint::setForceLowerLimits(const Eigen::VectorXs& /*lowerLimits*/)
+void ZeroDofJoint::setControlForceLowerLimits(const Eigen::VectorXs& /*lowerLimits*/)
 {
   // Do nothing
 }
 
 //==============================================================================
-Eigen::VectorXs ZeroDofJoint::getForceLowerLimits() const
+Eigen::VectorXs ZeroDofJoint::getControlForceLowerLimits() const
 {
   return Eigen::VectorXs::Zero(0);
 }
 
 //==============================================================================
-void ZeroDofJoint::setForceUpperLimit(std::size_t /*_index*/, s_t /*_force*/)
+void ZeroDofJoint::setControlForceUpperLimit(std::size_t /*_index*/, s_t /*_force*/)
 {
   // Do nothing
 }
 
 //==============================================================================
-s_t ZeroDofJoint::getForceUpperLimit(std::size_t /*_index*/) const
+s_t ZeroDofJoint::getControlForceUpperLimit(std::size_t /*_index*/) const
 {
   return 0.0;
 }
 
 //==============================================================================
-void ZeroDofJoint::setForceUpperLimits(const Eigen::VectorXs& /*upperLimits*/)
+void ZeroDofJoint::setControlForceUpperLimits(const Eigen::VectorXs& /*upperLimits*/)
 {
   // Do nothing
 }
 
 //==============================================================================
-Eigen::VectorXs ZeroDofJoint::getForceUpperLimits() const
+Eigen::VectorXs ZeroDofJoint::getControlForceUpperLimits() const
 {
   return Eigen::VectorXs::Zero(0);
 }

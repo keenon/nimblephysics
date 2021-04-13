@@ -78,7 +78,7 @@ MPCRemote::MPCRemote(MPCLocal& local, int /* ignored */)
 
 /// This gets the force to apply to the world at this instant. If we haven't
 /// computed anything for this instant yet, this just returns 0s.
-Eigen::VectorXs MPCRemote::getForce(long now)
+Eigen::VectorXs MPCRemote::getControlForce(long now)
 {
   return mBuffer.getPlannedForce(now);
 }
@@ -164,8 +164,8 @@ void MPCRemote::start()
       trajectory::TrajectoryRolloutReal rollout
           = trajectory::TrajectoryRollout::deserialize(reply.rollout());
 
-      mBuffer.setForcePlan(
-          reply.starttime(), timeSinceEpochMillis(), rollout.getForcesConst());
+      mBuffer.setControlForcePlan(
+          reply.starttime(), timeSinceEpochMillis(), rollout.getControlForcesConst());
 
       for (auto listener : mReplannedListeners)
       {

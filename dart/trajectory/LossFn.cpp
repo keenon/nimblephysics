@@ -144,19 +144,19 @@ s_t LossFn::getLossAndGradient(
               = (lossVel - lossNeg) / (2 * EPS);
         }
       }
-      for (int row = 0; row < rolloutCopy.getForces(key).rows(); row++)
+      for (int row = 0; row < rolloutCopy.getControlForces(key).rows(); row++)
       {
-        for (int col = 0; col < rolloutCopy.getForces(key).cols(); col++)
+        for (int col = 0; col < rolloutCopy.getControlForces(key).cols(); col++)
         {
-          rolloutCopy.getForces(key)(row, col) += EPS;
+          rolloutCopy.getControlForces(key)(row, col) += EPS;
           s_t lossForce = mLoss.value()(&rolloutCopy);
-          rolloutCopy.getForces(key)(row, col) -= EPS;
+          rolloutCopy.getControlForces(key)(row, col) -= EPS;
 
-          rolloutCopy.getForces(key)(row, col) -= EPS;
+          rolloutCopy.getControlForces(key)(row, col) -= EPS;
           s_t lossNeg = mLoss.value()(&rolloutCopy);
-          rolloutCopy.getForces(key)(row, col) += EPS;
+          rolloutCopy.getControlForces(key)(row, col) += EPS;
 
-          gradWrtRollout->getForces(key)(row, col)
+          gradWrtRollout->getControlForces(key)(row, col)
               = (lossForce - lossNeg) / (2 * EPS);
         }
       }
@@ -171,7 +171,7 @@ s_t LossFn::getLossAndGradient(
     {
       gradWrtRollout->getPoses(key).setZero();
       gradWrtRollout->getVels(key).setZero();
-      gradWrtRollout->getForces(key).setZero();
+      gradWrtRollout->getControlForces(key).setZero();
     }
     loss = 0.0;
   }

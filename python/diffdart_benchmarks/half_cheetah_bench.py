@@ -18,8 +18,8 @@ def main():
 
   forceLimits = np.ones([cheetah.getNumDofs()]) * 500
   forceLimits[0:1] = 0
-  cheetah.setForceUpperLimits(forceLimits)
-  cheetah.setForceLowerLimits(forceLimits * -1)
+  cheetah.setControlForceUpperLimits(forceLimits)
+  cheetah.setControlForceLowerLimits(forceLimits * -1)
 
   # Do a benchmark
   cheetah.setPosition(2, 0.03)

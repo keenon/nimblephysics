@@ -139,19 +139,19 @@ Eigen::VectorXs WithRespectToForce::get(simulation::World* world)
 /// This returns this WRT from the world as a vector
 Eigen::VectorXs WithRespectToForce::get(dynamics::Skeleton* skel)
 {
-  return skel->getForces();
+  return skel->getControlForces();
 }
 
 /// This sets the world's state based on our WRT
 void WithRespectToForce::set(simulation::World* world, Eigen::VectorXs value)
 {
-  world->setExternalForces(value);
+  world->setControlForces(value);
 }
 
 /// This sets the world's state based on our WRT
 void WithRespectToForce::set(dynamics::Skeleton* skel, Eigen::VectorXs value)
 {
-  skel->setForces(value);
+  skel->setControlForces(value);
 }
 
 /// This gives the dimensions of the WRT

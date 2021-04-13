@@ -71,7 +71,7 @@ static void BM_Cartpole_Simple_Featherstone(benchmark::State& state)
   {
     pos[i] = cartpole->getPosition(i);
     vel[i] = cartpole->getVelocity(i);
-    force[i] = cartpole->getForce(i);
+    force[i] = cartpole->getControlForce(i);
   }
 
   s_t dt = 0.001;
@@ -121,7 +121,7 @@ static void BM_20_Joint_Simple_Featherstone(benchmark::State& state)
   {
     pos[i] = arm->getPosition(i);
     vel[i] = arm->getVelocity(i);
-    force[i] = arm->getForce(i);
+    force[i] = arm->getControlForce(i);
   }
 
   s_t dt = 0.001;

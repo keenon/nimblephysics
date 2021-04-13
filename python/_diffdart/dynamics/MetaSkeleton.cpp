@@ -665,41 +665,41 @@ void MetaSkeleton(py::module& m)
           },
           ::py::arg("indices"))
       .def(
-          "setForce",
+          "setControlForce",
           +[](dart::dynamics::MetaSkeleton* self,
               std::size_t _index,
-              s_t _force) { self->setForce(_index, _force); },
+              s_t _force) { self->setControlForce(_index, _force); },
           ::py::arg("index"),
           ::py::arg("force"))
       .def(
-          "getForce",
+          "getControlForce",
           +[](const dart::dynamics::MetaSkeleton* self,
-              std::size_t _index) -> s_t { return self->getForce(_index); },
+              std::size_t _index) -> s_t { return self->getControlForce(_index); },
           ::py::arg("index"))
       .def(
-          "setForces",
+          "setControlForces",
           +[](dart::dynamics::MetaSkeleton* self,
-              const Eigen::VectorXs& _forces) { self->setForces(_forces); },
+              const Eigen::VectorXs& _forces) { self->setControlForces(_forces); },
           ::py::arg("forces"))
       .def(
-          "setForces",
+          "setControlForces",
           +[](dart::dynamics::MetaSkeleton* self,
               const std::vector<std::size_t>& _index,
               const Eigen::VectorXs& _forces) {
-            self->setForces(_index, _forces);
+            self->setControlForces(_index, _forces);
           },
           ::py::arg("index"),
           ::py::arg("forces"))
       .def(
-          "getForces",
+          "getControlForces",
           +[](const dart::dynamics::MetaSkeleton* self) -> Eigen::VectorXs {
-            return self->getForces();
+            return self->getControlForces();
           })
       .def(
-          "getForces",
+          "getControlForces",
           +[](const dart::dynamics::MetaSkeleton* self,
               const std::vector<std::size_t>& _indices) -> Eigen::VectorXs {
-            return self->getForces(_indices);
+            return self->getControlForces(_indices);
           },
           ::py::arg("indices"))
       .def(
@@ -707,83 +707,83 @@ void MetaSkeleton(py::module& m)
           +[](dart::dynamics::MetaSkeleton*
                   self) { self->resetGeneralizedForces(); })
       .def(
-          "setForceLowerLimit",
+          "setControlForceLowerLimit",
           +[](dart::dynamics::MetaSkeleton* self,
               std::size_t _index,
-              s_t _force) { self->setForceLowerLimit(_index, _force); },
+              s_t _force) { self->setControlForceLowerLimit(_index, _force); },
           ::py::arg("index"),
           ::py::arg("force"))
       .def(
-          "setForceLowerLimits",
+          "setControlForceLowerLimits",
           +[](dart::dynamics::MetaSkeleton* self,
               const Eigen::VectorXs& forces) {
-            self->setForceLowerLimits(forces);
+            self->setControlForceLowerLimits(forces);
           },
           ::py::arg("forces"))
       .def(
-          "setForceLowerLimits",
+          "setControlForceLowerLimits",
           +[](dart::dynamics::MetaSkeleton* self,
               const std::vector<std::size_t>& indices,
               const Eigen::VectorXs& forces) {
-            self->setForceLowerLimits(indices, forces);
+            self->setControlForceLowerLimits(indices, forces);
           },
           ::py::arg("indices"),
           ::py::arg("forces"))
       .def(
-          "getForceLowerLimit",
+          "getControlForceLowerLimit",
           +[](const dart::dynamics::MetaSkeleton* self, std::size_t _index)
-              -> s_t { return self->getForceLowerLimit(_index); },
+              -> s_t { return self->getControlForceLowerLimit(_index); },
           ::py::arg("index"))
       .def(
-          "getForceLowerLimits",
+          "getControlForceLowerLimits",
           +[](const dart::dynamics::MetaSkeleton* self) -> Eigen::VectorXs {
-            return self->getForceLowerLimits();
+            return self->getControlForceLowerLimits();
           })
       .def(
-          "getForceLowerLimits",
+          "getControlForceLowerLimits",
           +[](const dart::dynamics::MetaSkeleton* self,
               const std::vector<std::size_t>& indices) -> Eigen::VectorXs {
-            return self->getForceLowerLimits(indices);
+            return self->getControlForceLowerLimits(indices);
           },
           ::py::arg("indices"))
       .def(
-          "setForceUpperLimit",
+          "setControlForceUpperLimit",
           +[](dart::dynamics::MetaSkeleton* self,
               std::size_t _index,
-              s_t _force) { self->setForceUpperLimit(_index, _force); },
+              s_t _force) { self->setControlForceUpperLimit(_index, _force); },
           ::py::arg("index"),
           ::py::arg("force"))
       .def(
-          "setForceUpperLimits",
+          "setControlForceUpperLimits",
           +[](dart::dynamics::MetaSkeleton* self,
               const Eigen::VectorXs& forces) {
-            self->setForceUpperLimits(forces);
+            self->setControlForceUpperLimits(forces);
           },
           ::py::arg("forces"))
       .def(
-          "setForceUpperLimits",
+          "setControlForceUpperLimits",
           +[](dart::dynamics::MetaSkeleton* self,
               const std::vector<std::size_t>& indices,
               const Eigen::VectorXs& forces) {
-            self->setForceUpperLimits(indices, forces);
+            self->setControlForceUpperLimits(indices, forces);
           },
           ::py::arg("indices"),
           ::py::arg("forces"))
       .def(
-          "getForceUpperLimit",
+          "getControlForceUpperLimit",
           +[](const dart::dynamics::MetaSkeleton* self, std::size_t _index)
-              -> s_t { return self->getForceUpperLimit(_index); },
+              -> s_t { return self->getControlForceUpperLimit(_index); },
           ::py::arg("index"))
       .def(
-          "getForceUpperLimits",
+          "getControlForceUpperLimits",
           +[](const dart::dynamics::MetaSkeleton* self) -> Eigen::VectorXs {
-            return self->getForceUpperLimits();
+            return self->getControlForceUpperLimits();
           })
       .def(
-          "getForceUpperLimits",
+          "getControlForceUpperLimits",
           +[](const dart::dynamics::MetaSkeleton* self,
               const std::vector<std::size_t>& indices) -> Eigen::VectorXs {
-            return self->getForceUpperLimits(indices);
+            return self->getControlForceUpperLimits(indices);
           },
           ::py::arg("indices"))
       .def(

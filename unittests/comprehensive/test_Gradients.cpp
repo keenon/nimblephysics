@@ -374,8 +374,8 @@ void testSphereStack()
   bodyB->createShapeNodeWith<VisualAspect, CollisionAspect>(sphereShape);
   bodyB->setFrictionCoeff(0.0);
 
-  sphereB->setForceUpperLimit(0, 0.0);
-  sphereB->setForceLowerLimit(0, 0.0);
+  sphereB->setControlForceUpperLimit(0, 0.0);
+  sphereB->setControlForceLowerLimit(0, 0.0);
   sphereB->setPosition(0, 1.0 - CONTACT_MARGIN);
 
   world->addSkeleton(sphereB);
@@ -392,7 +392,7 @@ void testSphereStack()
   /*
   std::shared_ptr<neural::BackpropSnapshot> snapshot =
   neural::forwardPass(world, true); Eigen::MatrixXs forceVel =
-  snapshot->getForceVelJacobian(world); std::cout << "force-vel" << std::endl <<
+  snapshot->getControlForceVelJacobian(world); std::cout << "force-vel" << std::endl <<
   forceVel << std::endl; Eigen::MatrixXs velVel =
   snapshot->getVelVelJacobian(world); std::cout << "vel-vel" << std::endl <<
   velVel << std::endl; Eigen::MatrixXs A_c =
@@ -1364,8 +1364,8 @@ BodyNode* createTailSegment(BodyNode* parent, Eigen::Vector3s color)
   ShapeNode* poleShape
       = pole->createShapeNodeWith<VisualAspect, CollisionAspect>(shape);
   poleShape->getVisualAspect()->setColor(color);
-  poleJoint->setForceUpperLimit(0, 100.0);
-  poleJoint->setForceLowerLimit(0, -100.0);
+  poleJoint->setControlForceUpperLimit(0, 100.0);
+  poleJoint->setControlForceLowerLimit(0, -100.0);
   poleJoint->setVelocityUpperLimit(0, 10000.0);
   poleJoint->setVelocityLowerLimit(0, -10000.0);
 
@@ -1410,10 +1410,10 @@ void testJumpWorm(bool offGround, bool interpenetration)
       = root->createShapeNodeWith<VisualAspect, CollisionAspect>(shape);
   Eigen::Vector3s black = Eigen::Vector3s::Zero();
   rootVisual->getVisualAspect()->setColor(black);
-  rootJoint->setForceUpperLimit(0, 0);
-  rootJoint->setForceLowerLimit(0, 0);
-  rootJoint->setForceUpperLimit(1, 0);
-  rootJoint->setForceLowerLimit(1, 0);
+  rootJoint->setControlForceUpperLimit(0, 0);
+  rootJoint->setControlForceLowerLimit(0, 0);
+  rootJoint->setControlForceUpperLimit(1, 0);
+  rootJoint->setControlForceLowerLimit(1, 0);
   rootJoint->setVelocityUpperLimit(0, 1000.0);
   rootJoint->setVelocityLowerLimit(0, -1000.0);
   rootJoint->setVelocityUpperLimit(1, 1000.0);
@@ -1478,7 +1478,7 @@ void testJumpWorm(bool offGround, bool interpenetration)
     brokenForce << 0, 0, 0.00564396, -0.0037863, -0.00587224;
     world->setPositions(brokenPos);
     world->setVelocities(brokenVel);
-    world->setForces(brokenForce);
+    world->setControlForces(brokenForce);
     */
   }
 

@@ -249,7 +249,7 @@ TEST(World, Cloning)
         EXPECT_TRUE( equals(skel->getPositions(), clone->getPositions(), 0));
         EXPECT_TRUE( equals(skel->getVelocities(), clone->getVelocities(), 0));
         EXPECT_TRUE( equals(skel->getAccelerations(), clone->getAccelerations(), 0));
-        EXPECT_TRUE( equals(skel->getForces(), clone->getForces(), 0));
+        EXPECT_TRUE( equals(skel->getControlForces(), clone->getControlForces(), 0));
       }
     }
   }

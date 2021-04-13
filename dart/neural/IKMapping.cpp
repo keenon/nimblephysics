@@ -69,7 +69,7 @@ int IKMapping::getVelDim()
 }
 
 //==============================================================================
-int IKMapping::getForceDim()
+int IKMapping::getControlForceDim()
 {
   return getDim();
 }
@@ -168,11 +168,11 @@ void IKMapping::setVelocities(
 }
 
 //==============================================================================
-void IKMapping::setForces(
+void IKMapping::setControlForces(
     std::shared_ptr<simulation::World> world,
     const Eigen::Ref<Eigen::VectorXs>& forces)
 {
-  world->setExternalForces(getVelJacobian(world).transpose() * forces);
+  world->setControlForces(getVelJacobian(world).transpose() * forces);
 }
 
 //==============================================================================
@@ -277,11 +277,11 @@ void IKMapping::getVelocitiesInPlace(
 }
 
 //==============================================================================
-void IKMapping::getForcesInPlace(
+void IKMapping::getControlForcesInPlace(
     std::shared_ptr<simulation::World> world,
     /* OUT */ Eigen::Ref<Eigen::VectorXs> forces)
 {
-  assert(forces.size() == getForceDim());
+  assert(forces.size() == getControlForceDim());
   forces = getRealForceToMappedForceJac(world) * world->getExternalForces();
 }
 
@@ -595,18 +595,18 @@ Eigen::VectorXs IKMapping::getVelocityUpperLimits(
 }
 
 //==============================================================================
-Eigen::VectorXs IKMapping::getForceLowerLimits(
+Eigen::VectorXs IKMapping::getControlForceLowerLimits(
     std::shared_ptr<simulation::World> /* world */)
 {
-  return Eigen::VectorXs::Ones(getForceDim())
+  return Eigen::VectorXs::Ones(getControlForceDim())
          * -std::numeric_limits<s_t>::infinity();
 }
 
 //==============================================================================
-Eigen::VectorXs IKMapping::getForceUpperLimits(
+Eigen::VectorXs IKMapping::getControlForceUpperLimits(
     std::shared_ptr<simulation::World> /* world */)
 {
-  return Eigen::VectorXs::Ones(getForceDim())
+  return Eigen::VectorXs::Ones(getControlForceDim())
          * std::numeric_limits<s_t>::infinity();
 }
 

@@ -129,8 +129,8 @@ void ServoMotorConstraint::update()
       // redundancy.
 
       // Note that we are computing impulse not force
-      mUpperBound[i] = mJoint->getForceUpperLimit(i) * timeStep;
-      mLowerBound[i] = mJoint->getForceLowerLimit(i) * timeStep;
+      mUpperBound[i] = mJoint->getControlForceUpperLimit(i) * timeStep;
+      mLowerBound[i] = mJoint->getControlForceLowerLimit(i) * timeStep;
 
       if (mActive[i])
       {

@@ -345,60 +345,60 @@ void DegreeOfFreedom(py::module& m)
             return self->getAccelerationUpperLimit();
           })
       .def(
-          "setForce",
+          "setControlForce",
           +[](dart::dynamics::DegreeOfFreedom* self, s_t _force) {
-            self->setForce(_force);
+            self->setControlForce(_force);
           },
           ::py::arg("force"))
       .def(
-          "getForce",
+          "getControlForce",
           +[](const dart::dynamics::DegreeOfFreedom* self) -> s_t {
-            return self->getForce();
+            return self->getControlForce();
           })
       .def(
-          "resetForce",
-          +[](dart::dynamics::DegreeOfFreedom* self) { self->resetForce(); })
+          "resetControlForce",
+          +[](dart::dynamics::DegreeOfFreedom* self) { self->resetControlForce(); })
       .def(
-          "setForceLimits",
+          "setControlForceLimits",
           +[](dart::dynamics::DegreeOfFreedom* self,
               s_t _lowerLimit,
               s_t _upperLimit) {
-            self->setForceLimits(_lowerLimit, _upperLimit);
+            self->setControlForceLimits(_lowerLimit, _upperLimit);
           },
           ::py::arg("lowerLimit"),
           ::py::arg("upperLimit"))
       .def(
-          "setForceLimits",
+          "setControlForceLimits",
           +[](dart::dynamics::DegreeOfFreedom* self,
               const std::pair<s_t, s_t>& _limits) {
-            self->setForceLimits(_limits);
+            self->setControlForceLimits(_limits);
           },
           ::py::arg("limits"))
       .def(
-          "getForceLimits",
+          "getControlForceLimits",
           +[](const dart::dynamics::DegreeOfFreedom* self)
-              -> std::pair<s_t, s_t> { return self->getForceLimits(); })
+              -> std::pair<s_t, s_t> { return self->getControlForceLimits(); })
       .def(
-          "setForceLowerLimit",
+          "setControlForceLowerLimit",
           +[](dart::dynamics::DegreeOfFreedom* self, s_t _limit) {
-            self->setForceLowerLimit(_limit);
+            self->setControlForceLowerLimit(_limit);
           },
           ::py::arg("limit"))
       .def(
-          "getForceLowerLimit",
+          "getControlForceLowerLimit",
           +[](const dart::dynamics::DegreeOfFreedom* self) -> s_t {
-            return self->getForceLowerLimit();
+            return self->getControlForceLowerLimit();
           })
       .def(
-          "setForceUpperLimit",
+          "setControlForceUpperLimit",
           +[](dart::dynamics::DegreeOfFreedom* self, s_t _limit) {
-            self->setForceUpperLimit(_limit);
+            self->setControlForceUpperLimit(_limit);
           },
           ::py::arg("limit"))
       .def(
-          "getForceUpperLimit",
+          "getControlForceUpperLimit",
           +[](const dart::dynamics::DegreeOfFreedom* self) -> s_t {
-            return self->getForceUpperLimit();
+            return self->getControlForceUpperLimit();
           })
       .def(
           "setVelocityChange",
