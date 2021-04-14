@@ -1,0 +1,134 @@
+@import url('https://fonts.googleapis.com/css2?family=Open+Sans&family=Roboto+Mono&family=Advent+Pro:wght@400;700&display=swap');
+
+.header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 70px;
+  background-color: black;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: stretch;
+  font-family: 'Open Sans', sans-serif;
+  color: #ccc;
+}
+
+.header-logo {
+  margin-left: 20px;
+  width: 35px;
+}
+
+.header-links {
+  text-align: right;
+  flex: 1 1 auto;
+  padding-right: 20px;
+}
+
+.header-links a[href] {
+  margin-right: 20px;
+}
+
+.bg-dropshadow {
+  position: fixed;
+  top: 70px;
+  left: 0;
+  width: 100vw;
+  height: calc(100vh - 70px);
+  background-color: #333333 !important;
+  box-shadow: 0px 40px 70px 20px rgb(0 0 0 / 50%) inset;
+}
+
+@media only screen and (max-width: 500px) {
+  .bg-dropshadow {
+    top: 50px;
+    height: calc(100vh - 50px);
+  }
+}
+
+.hero {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+}
+
+.hero-logo {
+  width: 150px;
+}
+
+.hero-title {
+  font-size: 65px;
+  font-family: 'Advent Pro', sans-serif;
+  color: whitesmoke;
+  position: relative;
+}
+
+.hero-title-beta {
+  font-size: 20px;
+  font-family: 'Advent Pro', sans-serif;
+  position: absolute;
+  top: -0px;
+  right: -10px;
+  color: orange;
+}
+
+.hero-code {
+  margin-top: 10px;
+  background-color: black;
+  padding: 8px 20px;
+  border-radius: 5px;
+  font-family: 'Roboto Mono', monospace;
+  font-size: 17px;
+  color: whitesmoke;
+}
+
+.hero-github {
+  margin-top: 20px;
+  margin-bottom: 40px;
+}
+
+.hero-text {
+  text-align: center;
+  margin-top: 10px;
+  padding: 0 10px;
+  max-width: 500px;
+  font-family: 'Open Sans', sans-serif;
+  color: #ccc;
+}
+
+a[href] {
+  text-decoration: none;
+  color: #eee;
+  cursor: pointer;
+}
+
+a[href]:hover {
+  text-decoration: none;
+  color: white;
+}
+
+a[href].hero-docs-button {
+  margin-top: 20px;
+  padding: 15px 30px;
+  text-decoration: none;
+  font-family: 'Open Sans', sans-serif;
+  border: 1px solid rgb(223,223,223);
+  color: rgb(17,17,17);
+  background-color: rgb(230,230,230);
+  border-radius: 4px;
+  line-height: 24px;
+  text-align: center;
+  font-size: 16px;
+  transition: 0.2s background-color ease-out;
+}
+
+a[href].hero-docs-button:hover {
+  background-color: rgb(255,255,255);
+  color: rgb(17,17,17);
+}
+
+.github-button {
+  display: none;
+}
