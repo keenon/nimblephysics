@@ -99,6 +99,12 @@ public:
   const Eigen::MatrixXs& getBounceApproximationJacobian(
       simulation::WorldPtr world, PerformanceLog* perfLog = nullptr);
 
+  /// This returns the Jacobian for state_t -> state_{t+1}.
+  Eigen::MatrixXs getStateJacobian(simulation::WorldPtr world);
+
+  /// This returns the Jacobian for action_t -> state_{t+1}.
+  Eigen::MatrixXs getActionJacobian(simulation::WorldPtr world);
+
   /// Returns a concatenated vector of all the Skeletons' position()'s in the
   /// World, in order in which the Skeletons appear in the World's
   /// getSkeleton(i) returns them, BEFORE the timestep.

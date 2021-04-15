@@ -444,7 +444,7 @@ void World(py::module& m)
       .def("getStateSize", &dart::simulation::World::getStateSize)
       .def("setState", &dart::simulation::World::setState, ::py::arg("state"))
       .def("getState", &dart::simulation::World::getState)
-      .def("getActionSize", &dart::simulation::World::getStateSize)
+      .def("getActionSize", &dart::simulation::World::getActionSize)
       .def(
           "setAction", &dart::simulation::World::setAction, ::py::arg("action"))
       .def("getAction", &dart::simulation::World::getAction)

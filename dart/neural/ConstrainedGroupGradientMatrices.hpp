@@ -384,7 +384,7 @@ public:
   const Eigen::MatrixXs& getMinv() const;
 
   /// Get the coriolis and gravity forces
-  const Eigen::VectorXs getCoriolisAndGravityAndControlForces(
+  const Eigen::VectorXs getCoriolisAndGravityAndExternalForces(
       simulation::WorldPtr world) const;
 
   /// This is like `getClampingConstraintMatrix()` or

@@ -787,7 +787,7 @@ Eigen::VectorXs BackpropSnapshot::getAnalyticalNextV(
 
   Eigen::MatrixXs Minv = world->getInvMassMatrix();
   Eigen::VectorXs tau = world->getControlForces();
-  Eigen::VectorXs C = world->getCoriolisAndGravityAndControlForces();
+  Eigen::VectorXs C = world->getCoriolisAndGravityAndExternalForces();
   s_t dt = world->getTimeStep();
   Eigen::VectorXs f_c = estimateClampingConstraintImpulses(world, A_c, A_ub, E);
 
@@ -820,7 +820,7 @@ Eigen::MatrixXs BackpropSnapshot::getScratchAnalytical(
   Eigen::MatrixXs A_c_ub_E = A_c + A_ub * E;
 
   Eigen::VectorXs tau = world->getControlForces();
-  Eigen::VectorXs C = world->getCoriolisAndGravityAndControlForces();
+  Eigen::VectorXs C = world->getCoriolisAndGravityAndExternalForces();
   Eigen::VectorXs f_c = getClampingConstraintImpulses();
   s_t dt = world->getTimeStep();
 
@@ -876,7 +876,7 @@ Eigen::VectorXs BackpropSnapshot::scratch(simulation::WorldPtr world)
   Eigen::VectorXs f_c = Q.completeOrthogonalDecomposition().solve(b);
 
   Eigen::VectorXs tau = world->getControlForces();
-  Eigen::VectorXs C = world->getCoriolisAndGravityAndControlForces();
+  Eigen::VectorXs C = world->getCoriolisAndGravityAndExternalForces();
   s_t dt = world->getTimeStep();
 
   Eigen::VectorXs nextV
@@ -1054,7 +1054,7 @@ Eigen::MatrixXs BackpropSnapshot::getVelJacobianWrt(
   Eigen::MatrixXs A_c_ub_E = A_c + A_ub * E;
 
   Eigen::VectorXs tau = world->getControlForces();
-  Eigen::VectorXs C = world->getCoriolisAndGravityAndControlForces();
+  Eigen::VectorXs C = world->getCoriolisAndGravityAndExternalForces();
   Eigen::VectorXs f_c = getClampingConstraintImpulses();
   s_t dt = world->getTimeStep();
 
@@ -1124,7 +1124,7 @@ Eigen::MatrixXs BackpropSnapshot::getVelJacobianWrt(
   world->setCachedLCPSolution(mPreStepLCPCache);
 
   Eigen::VectorXs tau = world->getControlForces();
-  Eigen::VectorXs C = world->getCoriolisAndGravityAndControlForces();
+  Eigen::VectorXs C = world->getCoriolisAndGravityAndExternalForces();
   Eigen::MatrixXs dM = getJacobianOfMinv(world, tau - C, wrt);
   Eigen::MatrixXs Minv = world->getInvMassMatrix();
   Eigen::MatrixXs dC = getJacobianOfC(world, wrt);
@@ -1268,6 +1268,40 @@ const Eigen::MatrixXs& BackpropSnapshot::getBounceApproximationJacobian(
   }
 #endif
   return mCachedBounceApproximation;
+}
+
+//==============================================================================
+/// This returns the Jacobian for state_t -> state_{t+1}.
+Eigen::MatrixXs BackpropSnapshot::getStateJacobian(simulation::WorldPtr world)
+{
+  // TODO: this method is untested, but is identical to the _tested_ method
+  // World::getStateJacobian(). We should really test this anyways.
+  int dofs = world->getNumDofs();
+  Eigen::MatrixXs stateJac = Eigen::MatrixXs::Zero(2 * dofs, 2 * dofs);
+  stateJac.block(0, 0, dofs, dofs) = getPosPosJacobian(world);
+  stateJac.block(dofs, 0, dofs, dofs) = getPosVelJacobian(world);
+  stateJac.block(0, dofs, dofs, dofs) = getVelPosJacobian(world);
+  stateJac.block(dofs, dofs, dofs, dofs) = getVelVelJacobian(world);
+  return stateJac;
+}
+
+//==============================================================================
+/// This returns the Jacobian for action_t -> state_{t+1}.
+Eigen::MatrixXs BackpropSnapshot::getActionJacobian(simulation::WorldPtr world)
+{
+  // TODO: this method is untested, but is identical to the _tested_ method
+  // World::getActionJacobian(). We should really test this anyways.
+  int dofs = world->getNumDofs();
+  const Eigen::MatrixXs& forceVelJac = getControlForceVelJacobian(world);
+
+  std::vector<int> actionSpace = world->getActionSpace();
+  int actionDim = world->getActionSize();
+  Eigen::MatrixXs actionJac = Eigen::MatrixXs::Zero(2 * dofs, actionDim);
+  for (int i = 0; i < actionDim; i++)
+  {
+    actionJac.block(dofs, i, dofs, 1) = forceVelJac.col(actionSpace[i]);
+  }
+  return actionJac;
 }
 
 //==============================================================================
@@ -1791,7 +1825,7 @@ void BackpropSnapshot::diagnoseSubJacobianErrors(
   Eigen::MatrixXs A_c_ub_E = A_c + A_ub * E;
 
   Eigen::VectorXs tau = world->getControlForces();
-  Eigen::VectorXs C = world->getCoriolisAndGravityAndControlForces();
+  Eigen::VectorXs C = world->getCoriolisAndGravityAndExternalForces();
   Eigen::VectorXs f_c = getClampingConstraintImpulses();
   s_t dt = world->getTimeStep();
 
@@ -4794,7 +4828,7 @@ Eigen::MatrixXs BackpropSnapshot::getJacobianOfLCPOffsetClampingSubset(
     return getBounceDiagonals().asDiagonal() * -A_c.transpose() * dt * Minv;
   }
 
-  Eigen::VectorXs C = world->getCoriolisAndGravityAndControlForces();
+  Eigen::VectorXs C = world->getCoriolisAndGravityAndExternalForces();
   Eigen::VectorXs f = getPreStepTorques() - C;
   Eigen::MatrixXs dMinv_f = getJacobianOfMinv(world, f, wrt);
   Eigen::VectorXs v_f = getPreConstraintVelocity();
@@ -5244,7 +5278,7 @@ void BackpropSnapshot::computeLCPOffsetClampingSubset(
             * implicitMultiplyByInvMassMatrix(
                 world,
                 world->getControlForces()
-                    - world->getCoriolisAndGravityAndControlForces()))));
+                    - world->getCoriolisAndGravityAndExternalForces()))));
 }
 
 //==============================================================================
@@ -7027,7 +7061,7 @@ Eigen::MatrixXs BackpropSnapshot::finiteDifferenceJacobianOfC(
   std::size_t innerDim = wrt->dim(world.get());
 
   // These are predicted contact forces at the clamping contacts
-  Eigen::VectorXs original = world->getCoriolisAndGravityAndControlForces();
+  Eigen::VectorXs original = world->getCoriolisAndGravityAndExternalForces();
 
   Eigen::MatrixXs result = Eigen::MatrixXs::Zero(original.size(), innerDim);
 
@@ -7040,11 +7074,11 @@ Eigen::MatrixXs BackpropSnapshot::finiteDifferenceJacobianOfC(
     Eigen::VectorXs perturbed = before;
     perturbed(i) += EPS;
     wrt->set(world.get(), perturbed);
-    Eigen::MatrixXs tauPos = world->getCoriolisAndGravityAndControlForces();
+    Eigen::MatrixXs tauPos = world->getCoriolisAndGravityAndExternalForces();
     perturbed = before;
     perturbed(i) -= EPS;
     wrt->set(world.get(), perturbed);
-    Eigen::MatrixXs tauNeg = world->getCoriolisAndGravityAndControlForces();
+    Eigen::MatrixXs tauNeg = world->getCoriolisAndGravityAndExternalForces();
     Eigen::VectorXs diff = tauPos - tauNeg;
     result.col(i) = diff / (2 * EPS);
   }
@@ -7066,7 +7100,7 @@ Eigen::MatrixXs BackpropSnapshot::finiteDifferenceRiddersJacobianOfC(
   std::size_t innerDim = wrt->dim(world.get());
 
   // These are predicted contact forces at the clamping contacts
-  Eigen::VectorXs original = world->getCoriolisAndGravityAndControlForces();
+  Eigen::VectorXs original = world->getCoriolisAndGravityAndExternalForces();
 
   Eigen::MatrixXs J = Eigen::MatrixXs::Zero(original.size(), innerDim);
 
@@ -7088,11 +7122,11 @@ Eigen::MatrixXs BackpropSnapshot::finiteDifferenceRiddersJacobianOfC(
     Eigen::VectorXs perturbedPlus = Eigen::VectorXs(originalWrt);
     perturbedPlus(i) += stepSize;
     wrt->set(world.get(), perturbedPlus);
-    Eigen::MatrixXs tauPlus = world->getCoriolisAndGravityAndControlForces();
+    Eigen::MatrixXs tauPlus = world->getCoriolisAndGravityAndExternalForces();
     Eigen::VectorXs perturbedMinus = Eigen::VectorXs(originalWrt);
     perturbedMinus(i) -= stepSize;
     wrt->set(world.get(), perturbedMinus);
-    Eigen::MatrixXs tauMinus = world->getCoriolisAndGravityAndControlForces();
+    Eigen::MatrixXs tauMinus = world->getCoriolisAndGravityAndExternalForces();
 
     tab[0][0] = (tauPlus - tauMinus) / (2 * stepSize);
 
@@ -7104,11 +7138,11 @@ Eigen::MatrixXs BackpropSnapshot::finiteDifferenceRiddersJacobianOfC(
       perturbedPlus = Eigen::VectorXs(originalWrt);
       perturbedPlus(i) += stepSize;
       wrt->set(world.get(), perturbedPlus);
-      tauPlus = world->getCoriolisAndGravityAndControlForces();
+      tauPlus = world->getCoriolisAndGravityAndExternalForces();
       perturbedMinus = Eigen::VectorXs(originalWrt);
       perturbedMinus(i) -= stepSize;
       wrt->set(world.get(), perturbedMinus);
-      tauMinus = world->getCoriolisAndGravityAndControlForces();
+      tauMinus = world->getCoriolisAndGravityAndExternalForces();
 
       tab[0][iTab] = (tauPlus - tauMinus) / (2 * stepSize);
 
@@ -7164,7 +7198,7 @@ Eigen::MatrixXs BackpropSnapshot::finiteDifferenceJacobianOfMinvC(
 
   // These are predicted contact forces at the clamping contacts
   Eigen::VectorXs original = implicitMultiplyByInvMassMatrix(
-      world, mPreStepTorques - world->getCoriolisAndGravityAndControlForces());
+      world, mPreStepTorques - world->getCoriolisAndGravityAndExternalForces());
 
   Eigen::MatrixXs result = Eigen::MatrixXs::Zero(original.size(), innerDim);
 
@@ -7179,13 +7213,13 @@ Eigen::MatrixXs BackpropSnapshot::finiteDifferenceJacobianOfMinvC(
     wrt->set(world.get(), perturbed);
     Eigen::MatrixXs tauPos = implicitMultiplyByInvMassMatrix(
         world,
-        mPreStepTorques - world->getCoriolisAndGravityAndControlForces());
+        mPreStepTorques - world->getCoriolisAndGravityAndExternalForces());
     perturbed = before;
     perturbed(i) -= EPS;
     wrt->set(world.get(), perturbed);
     Eigen::MatrixXs tauNeg = implicitMultiplyByInvMassMatrix(
         world,
-        mPreStepTorques - world->getCoriolisAndGravityAndControlForces());
+        mPreStepTorques - world->getCoriolisAndGravityAndExternalForces());
     Eigen::VectorXs diff = tauPos - tauNeg;
     result.col(i) = diff / (2 * EPS);
   }
@@ -7208,7 +7242,7 @@ Eigen::MatrixXs BackpropSnapshot::finiteDifferenceRiddersJacobianOfMinvC(
   std::size_t innerDim = wrt->dim(world.get());
 
   Eigen::VectorXs original = implicitMultiplyByInvMassMatrix(
-      world, mPreStepTorques - world->getCoriolisAndGravityAndControlForces());
+      world, mPreStepTorques - world->getCoriolisAndGravityAndExternalForces());
 
   Eigen::MatrixXs J = Eigen::MatrixXs::Zero(original.size(), innerDim);
 
@@ -7232,13 +7266,13 @@ Eigen::MatrixXs BackpropSnapshot::finiteDifferenceRiddersJacobianOfMinvC(
     wrt->set(world.get(), perturbedPlus);
     Eigen::MatrixXs MinvCPlus = implicitMultiplyByInvMassMatrix(
         world,
-        mPreStepTorques - world->getCoriolisAndGravityAndControlForces());
+        mPreStepTorques - world->getCoriolisAndGravityAndExternalForces());
     Eigen::VectorXs perturbedMinus = Eigen::VectorXs(originalWrt);
     perturbedMinus(i) -= stepSize;
     wrt->set(world.get(), perturbedMinus);
     Eigen::MatrixXs MinvCMinus = implicitMultiplyByInvMassMatrix(
         world,
-        mPreStepTorques - world->getCoriolisAndGravityAndControlForces());
+        mPreStepTorques - world->getCoriolisAndGravityAndExternalForces());
 
     tab[0][0] = (MinvCPlus - MinvCMinus) / (2 * stepSize);
 
@@ -7252,13 +7286,13 @@ Eigen::MatrixXs BackpropSnapshot::finiteDifferenceRiddersJacobianOfMinvC(
       wrt->set(world.get(), perturbedPlus);
       MinvCPlus = implicitMultiplyByInvMassMatrix(
           world,
-          mPreStepTorques - world->getCoriolisAndGravityAndControlForces());
+          mPreStepTorques - world->getCoriolisAndGravityAndExternalForces());
       perturbedMinus = Eigen::VectorXs(originalWrt);
       perturbedMinus(i) -= stepSize;
       wrt->set(world.get(), perturbedMinus);
       MinvCMinus = implicitMultiplyByInvMassMatrix(
           world,
-          mPreStepTorques - world->getCoriolisAndGravityAndControlForces());
+          mPreStepTorques - world->getCoriolisAndGravityAndExternalForces());
 
       tab[0][iTab] = (MinvCPlus - MinvCMinus) / (2 * stepSize);
 

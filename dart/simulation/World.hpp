@@ -335,7 +335,7 @@ public:
   Eigen::VectorXs getCoriolisAndGravityForces();
 
   /// This gives the C(pos, vel) vector for all the skeletons in the world
-  Eigen::VectorXs getCoriolisAndGravityAndControlForces();
+  Eigen::VectorXs getCoriolisAndGravityAndExternalForces();
 
   /// This constructs a mass matrix for the whole world, by creating a
   /// block-diagonal concatenation of each skeleton's mass matrix.

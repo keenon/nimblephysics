@@ -232,7 +232,7 @@ TEST(ATLAS, BROKEN_1)
 #endif // TEST1
 
 #ifdef TEST2
-// failed verifyF_c() due to bugged getCoriolisAndGravityAndControlForces()
+// failed verifyF_c() due to bugged getCoriolisAndGravityAndExternalForces()
 TEST(ATLAS, BROKEN_2)
 {
   // set precision to 256 bits (double has only 53 bits)

@@ -1333,7 +1333,7 @@ Eigen::VectorXs World::getCoriolisAndGravityForces()
 }
 
 //==============================================================================
-Eigen::VectorXs World::getCoriolisAndGravityAndControlForces()
+Eigen::VectorXs World::getCoriolisAndGravityAndExternalForces()
 {
   Eigen::VectorXs result = Eigen::VectorXs::Zero(getNumDofs());
   std::size_t cursor = 0;
@@ -1342,7 +1342,7 @@ Eigen::VectorXs World::getCoriolisAndGravityAndControlForces()
     std::shared_ptr<dynamics::Skeleton> skel = getSkeleton(i);
     std::size_t dofs = skel->getNumDofs();
     result.segment(cursor, dofs)
-        = skel->getCoriolisAndGravityForces() - skel->getControlForces();
+        = skel->getCoriolisAndGravityForces() - skel->getExternalForces();
     cursor += dofs;
   }
   return result;
