@@ -55,6 +55,16 @@ void NeuralUtils(py::module& m)
       .def_readwrite(
           "lossWrtTorque", &dart::neural::LossGradient::lossWrtTorque);
 
+  ::py::class_<dart::neural::LossGradientHighLevelAPI>(m, "LossGradient")
+      .def(::py::init<>())
+      .def_readwrite(
+          "lossWrtState", &dart::neural::LossGradientHighLevelAPI::lossWrtState)
+      .def_readwrite(
+          "lossWrtAction",
+          &dart::neural::LossGradientHighLevelAPI::lossWrtAction)
+      .def_readwrite(
+          "lossWrtMass", &dart::neural::LossGradientHighLevelAPI::lossWrtMass);
+
   ::py::class_<dart::neural::KnotJacobian>(m, "KnotJacobian")
       .def(::py::init<>())
       .def_readwrite(
