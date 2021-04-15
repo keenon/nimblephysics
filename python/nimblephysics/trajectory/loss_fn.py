@@ -1,11 +1,11 @@
 import torch
-import diffdart_libs._diffdart as dart
+import nimblephysics_libs._nimblephysics as nimble
 from typing import Dict, Callable
 import numpy as np
 
 
 class NativeTrajectoryRollout:
-  def __init__(self, rollout: dart.trajectory.TrajectoryRollout):
+  def __init__(self, rollout: nimble.trajectory.TrajectoryRollout):
     self.rollout = rollout
 
     self.posTensors: Dict[str, torch.Tensor] = {}
@@ -33,7 +33,7 @@ class NativeTrajectoryRollout:
   def getMasses(self) -> torch.Tensor:
     return self.massTensor
 
-  def fill_gradients(self, gradWrtRollout: dart.trajectory.TrajectoryRollout):
+  def fill_gradients(self, gradWrtRollout: nimble.trajectory.TrajectoryRollout):
     for mapping in gradWrtRollout.getMappings():
       posGrad = self.getPoses(mapping).grad
       if posGrad is not None:
@@ -49,16 +49,16 @@ class NativeTrajectoryRollout:
       np.copyto(gradWrtRollout.getMasses(), massGrad.numpy())
 
 
-def NativeLossFn(fn: Callable[[DartTorchTrajectoryRollout], torch.Tensor]):
+def NativeLossFn(fn: Callable[[NativeTrajectoryRollout], torch.Tensor]):
   def loss(trajectory):
-    dartTorchTrajectory = DartTorchTrajectoryRollout(trajectory)
-    return fn(dartTorchTrajectory).item()
+    nimbleTorchTrajectory = NativeTrajectoryRollout(trajectory)
+    return fn(nimbleTorchTrajectory).item()
 
   def gradAndLoss(trajectory, gradWrtTrajectory):
-    dartTorchTrajectory = DartTorchTrajectoryRollout(trajectory)
-    loss = fn(dartTorchTrajectory)
+    nimbleTorchTrajectory = NativeTrajectoryRollout(trajectory)
+    loss = fn(nimbleTorchTrajectory)
     loss.backward()
-    dartTorchTrajectory.fill_gradients(gradWrtTrajectory)
+    nimbleTorchTrajectory.fill_gradients(gradWrtTrajectory)
     return loss.item()
 
-  return dart.trajectory.LossFn(loss, gradAndLoss)
+  return nimble.trajectory.LossFn(loss, gradAndLoss)

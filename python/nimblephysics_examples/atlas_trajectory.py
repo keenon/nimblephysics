@@ -4,10 +4,10 @@ import torch.nn.functional as F
 import random
 import math
 import time
-import diffdart as dart
+import nimblephysics as nimble
 import os
 from typing import Dict
-from diffdart import DartTorchLossFn, DartTorchTrajectoryRollout, DartGUI, GUITrajectoryTrainer
+from nimblephysics import NativeLossFn, NativeTrajectoryRollout, NativeTrajectoryTrainer
 
 
 def get_bodies(world):
@@ -102,22 +102,22 @@ warrior1_pose = np.array([
 ])
 
 
-world = dart.simulation.World()
+world = nimble.simulation.World()
 world.setGravity([0, -9.81, 0])
 # world.setSlowDebugResultsAgainstFD(True)
 
 # Set up skeleton
-atlas: dart.dynamics.Skeleton = world.loadSkeleton('../../data/sdf/atlas/atlas_v3_no_head.urdf')
+atlas: nimble.dynamics.Skeleton = world.loadSkeleton('../../data/sdf/atlas/atlas_v3_no_head.urdf')
 atlas.setPosition(0, -0.5 * 3.14159)
 
-ground: dart.dynamics.Skeleton = world.loadSkeleton('../../data/sdf/atlas/ground.urdf')
-floorBody: dart.dynamics.BodyNode = ground.getBodyNode(0)
+ground: nimble.dynamics.Skeleton = world.loadSkeleton('../../data/sdf/atlas/ground.urdf')
+floorBody: nimble.dynamics.BodyNode = ground.getBodyNode(0)
 floorBody.getShapeNode(0).getVisualAspect().setColor([248./255., 248./255., 248./255.])
 floorBody.getShapeNode(0).getVisualAspect().setCastShadows(False)
 
 
 def computeStabilizingForces():
-  snapshot: dart.neural.BackpropSnapshot = dart.neural.forwardPass(world, idempotent=True)
+  snapshot: nimble.neural.BackpropSnapshot = nimble.neural.forwardPass(world, idempotent=True)
 
   forceVel = snapshot.getControlForceVelJacobian(world)
   velPreStep = snapshot.getPreStepVelocity()
@@ -151,12 +151,12 @@ def computeStabilizingForces():
 #   last_pos = pos[:, -1]
 #   return torch.sum(torch.square(last_pos - goal))
 
-# dartLoss: dart.trajectory.LossFn = DartTorchLossFn(loss)
+# nimbleLoss: nimble.trajectory.LossFn = DartTorchLossFn(loss)
 
-# trajectory = dart.trajectory.MultiShot(world, dartLoss, 400, 20, False)
+# trajectory = nimble.trajectory.MultiShot(world, nimbleLoss, 400, 20, False)
 
-# ikMap: dart.neural.IKMapping = dart.neural.IKMapping(world)
-# handNode: dart.dynamics.BodyNode = atlas.getBodyNode("l_hand")
+# ikMap: nimble.neural.IKMapping = nimble.neural.IKMapping(world)
+# handNode: nimble.dynamics.BodyNode = atlas.getBodyNode("l_hand")
 # ikMap.addLinearBodyNode(handNode)
 # trajectory.addMapping('ik', ikMap)
 # trajectory.setParallelOperationsEnabled(True)
@@ -166,7 +166,7 @@ world.setPositions(warrior2_pose)
 goal = torch.tensor(world.getPositions())
 
 
-def loss(rollout: DartTorchTrajectoryRollout):
+def loss(rollout: NativeTrajectoryRollout):
   pos = rollout.getPoses('identity')  # dofs x num_steps
   vel = rollout.getVels('identity')  # dofs x num_steps
   last_pos = pos[:, -1]
@@ -175,21 +175,21 @@ def loss(rollout: DartTorchTrajectoryRollout):
   return torch.sum(torch.square(last_pos - goal)) + torch.sum(torch.square(last_vel))
 
 
-dartLoss: dart.trajectory.LossFn = DartTorchLossFn(loss)
+nimbleLoss: nimble.trajectory.LossFn = NativeLossFn(loss)
 
-trajectory = dart.trajectory.SingleShot(world, dartLoss, 1, False)
-optimizer = dart.trajectory.SGDOptimizer()
+trajectory = nimble.trajectory.SingleShot(world, nimbleLoss, 1, False)
+optimizer = nimble.trajectory.SGDOptimizer()
 optimizer.optimize(trajectory)
 
 
 world.setPositions(warrior1_pose)
 world.setPositions(warrior2_pose)
 
-gui = DartGUI()
+gui = NimbleGUI()
 gui.serve(8080)
 gui.stateMachine().renderWorld(world, "world")
 
-ticker = dart.realtime.Ticker(world.getTimeStep() / 10)
+ticker = nimble.realtime.Ticker(world.getTimeStep() / 10)
 
 computeStabilizingForces()
 
@@ -211,7 +211,7 @@ gui.stateMachine().registerConnectionListener(onConnect)
 gui.stateMachine().blockWhileServing()
 
 
-# optimizer = dart.trajectory.IPOptOptimizer()
+# optimizer = nimble.trajectory.IPOptOptimizer()
 # optimizer.setLBFGSHistoryLength(3)
 # optimizer.setTolerance(1e-5)
 # optimizer.setCheckDerivatives(False)

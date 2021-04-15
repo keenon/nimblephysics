@@ -461,6 +461,8 @@ void World(py::module& m)
           "addDofToActionSpace",
           &dart::simulation::World::addDofToActionSpace,
           ::py::arg("dofIndex"))
+      .def("getStateJacobian", &dart::simulation::World::getStateJacobian)
+      .def("getActionJacobian", &dart::simulation::World::getActionJacobian)
       .def_readonly("onNameChanged", &dart::simulation::World::onNameChanged);
 }
 

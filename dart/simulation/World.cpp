@@ -1556,10 +1556,17 @@ void World::addDofToActionSpace(int index)
 /// necessary
 std::shared_ptr<neural::BackpropSnapshot> World::getCachedBackpropSnapshot()
 {
-  if (mCachedSnapshotPtr == nullptr || mCachedSnapshotPos != getPositions()
+  int dofs = getNumDofs();
+  if (mCachedSnapshotPtr == nullptr || mCachedSnapshotPos.size() != dofs
+      || mCachedSnapshotVel.size() != dofs
+      || mCachedSnapshotForce.size() != dofs
+      || mCachedSnapshotPos != getPositions()
       || mCachedSnapshotVel != getVelocities()
       || mCachedSnapshotForce != getControlForces())
   {
+    mCachedSnapshotPos = getPositions();
+    mCachedSnapshotVel = getVelocities();
+    mCachedSnapshotForce = getControlForces();
     mCachedSnapshotPtr = neural::forwardPass(shared_from_this(), true);
   }
   return mCachedSnapshotPtr;
