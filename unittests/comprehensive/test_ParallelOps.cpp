@@ -516,8 +516,8 @@ TEST(TRAJECTORY, JUMP_WORM)
         std::cout << "   A_c_ub_E off" << std::endl;
       }
 
-      Eigen::VectorXs tau = world->getExternalForces();
-      Eigen::VectorXs C = world->getCoriolisAndGravityAndExternalForces();
+      Eigen::VectorXs tau = world->getControlForces();
+      Eigen::VectorXs C = world->getCoriolisAndGravityAndControlForces();
       Eigen::VectorXs f_c1 = b1->getClampingConstraintImpulses();
       Eigen::VectorXs f_c2 = b2->getClampingConstraintImpulses();
       s_t dt = world->getTimeStep();
@@ -619,8 +619,8 @@ TEST(TRAJECTORY, JUMP_WORM)
             std::cout << "         dC off" << std::endl;
           }
 
-          Eigen::VectorXs C1 = world->getCoriolisAndGravityAndExternalForces();
-          Eigen::VectorXs C2 = world->getCoriolisAndGravityAndExternalForces();
+          Eigen::VectorXs C1 = world->getCoriolisAndGravityAndControlForces();
+          Eigen::VectorXs C2 = world->getCoriolisAndGravityAndControlForces();
           if (!equals(C1, C2, 0.0))
           {
             std::cout << "         C off" << std::endl;
@@ -811,8 +811,10 @@ TEST(TRAJECTORY, JUMP_WORM)
       std::cout << "Off on vel-vel Jac at step " << i << std::endl;
     }
     if (!equals(
-            snapshots1[i]->getUnderlyingSnapshot()->getControlForceVelJacobian(world1),
-            snapshots2[i]->getUnderlyingSnapshot()->getControlForceVelJacobian(world2),
+            snapshots1[i]->getUnderlyingSnapshot()->getControlForceVelJacobian(
+                world1),
+            snapshots2[i]->getUnderlyingSnapshot()->getControlForceVelJacobian(
+                world2),
             0.0))
     {
       std::cout << "Off on force-vel Jac at step " << i << std::endl;

@@ -297,9 +297,9 @@ void World(py::module& m)
             return self->getVelocities();
           })
       .def(
-          "getExternalForces",
+          "getControlForces",
           +[](dart::simulation::World* self) -> Eigen::VectorXs {
-            return self->getExternalForces();
+            return self->getControlForces();
           })
       .def(
           "getMasses",
@@ -309,12 +309,12 @@ void World(py::module& m)
       .def(
           "getControlForceUpperLimits",
           +[](dart::simulation::World* self) -> Eigen::VectorXs {
-            return self->getExternalForceUpperLimits();
+            return self->getControlForceUpperLimits();
           })
       .def(
-          "getExternalForceLowerLimits",
+          "getControlForceLowerLimits",
           +[](dart::simulation::World* self) -> Eigen::VectorXs {
-            return self->getExternalForceLowerLimits();
+            return self->getControlForceLowerLimits();
           })
       .def(
           "getPositionLowerLimits",
@@ -441,6 +441,26 @@ void World(py::module& m)
       .def(
           "setSlowDebugResultsAgainstFD",
           &dart::simulation::World::setSlowDebugResultsAgainstFD)
+      .def("getStateSize", &dart::simulation::World::getStateSize)
+      .def("setState", &dart::simulation::World::setState, ::py::arg("state"))
+      .def("getState", &dart::simulation::World::getState)
+      .def("getActionSize", &dart::simulation::World::getStateSize)
+      .def(
+          "setAction", &dart::simulation::World::setAction, ::py::arg("action"))
+      .def("getAction", &dart::simulation::World::getAction)
+      .def(
+          "setActionSpace",
+          &dart::simulation::World::setActionSpace,
+          ::py::arg("actionSpaceMapping"))
+      .def("getActionSpace", &dart::simulation::World::getActionSpace)
+      .def(
+          "removeDofFromActionSpace",
+          &dart::simulation::World::removeDofFromActionSpace,
+          ::py::arg("dofIndex"))
+      .def(
+          "addDofToActionSpace",
+          &dart::simulation::World::addDofToActionSpace,
+          ::py::arg("dofIndex"))
       .def_readonly("onNameChanged", &dart::simulation::World::onNameChanged);
 }
 

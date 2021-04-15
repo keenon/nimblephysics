@@ -225,7 +225,7 @@ void SingleShot::getUpperBounds(
     cursorDynamic = posDim + velDim;
   }
   int forceDim = world->getNumDofs();
-  Eigen::VectorXs forceUpperLimits = world->getExternalForceUpperLimits();
+  Eigen::VectorXs forceUpperLimits = world->getControlForceUpperLimits();
   assert(forceDim == forceUpperLimits.size());
   for (int i = 0; i < mSteps; i++)
   {
@@ -284,7 +284,7 @@ void SingleShot::getLowerBounds(
     cursorDynamic = posDim + velDim;
   }
   int forceDim = world->getNumDofs();
-  Eigen::VectorXs forceLowerLimits = world->getExternalForceLowerLimits();
+  Eigen::VectorXs forceLowerLimits = world->getControlForceLowerLimits();
   assert(forceDim == forceLowerLimits.size());
   for (int i = 0; i < mSteps; i++)
   {

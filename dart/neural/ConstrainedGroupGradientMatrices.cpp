@@ -1214,7 +1214,7 @@ Eigen::MatrixXs ConstrainedGroupGradientMatrices::getVelJacobianWrt(
   Eigen::MatrixXs A_c_ub_E = A_c + A_ub * E;
 
   Eigen::VectorXs tau = mPreStepTorques;
-  Eigen::VectorXs C = getCoriolisAndGravityAndExternalForces(world);
+  Eigen::VectorXs C = getCoriolisAndGravityAndControlForces(world);
   const Eigen::VectorXs& f_c = getClampingConstraintImpulses();
   s_t dt = world->getTimeStep();
 
@@ -1520,7 +1520,7 @@ ConstrainedGroupGradientMatrices::getJacobianOfLCPOffsetClampingSubset(
     return getBounceDiagonals().asDiagonal() * -A_c.transpose() * dt * Minv;
   }
 
-  Eigen::VectorXs C = getCoriolisAndGravityAndExternalForces(world);
+  Eigen::VectorXs C = getCoriolisAndGravityAndControlForces(world);
   Eigen::VectorXs f = getPreStepTorques() - C;
   Eigen::MatrixXs dMinv_f = getJacobianOfMinv(world, f, wrt);
   Eigen::VectorXs v_f = mPreLCPVelocities;
@@ -1567,8 +1567,8 @@ void ConstrainedGroupGradientMatrices::computeLCPOffsetClampingSubset(
          + (world->getTimeStep()
             * implicitMultiplyByInvMassMatrix(
                 world,
-                world->getExternalForces()
-                    - world->getCoriolisAndGravityAndExternalForces())));
+                world->getControlForces()
+                    - world->getCoriolisAndGravityAndControlForces())));
 }
 
 //==============================================================================
@@ -2208,7 +2208,7 @@ const Eigen::MatrixXs& ConstrainedGroupGradientMatrices::getMinv() const
 //==============================================================================
 /// Get the coriolis and gravity forces
 const Eigen::VectorXs
-ConstrainedGroupGradientMatrices::getCoriolisAndGravityAndExternalForces(
+ConstrainedGroupGradientMatrices::getCoriolisAndGravityAndControlForces(
     simulation::WorldPtr world) const
 {
   Eigen::VectorXs result = Eigen::VectorXs::Zero(mNumDOFs);
@@ -2218,7 +2218,7 @@ ConstrainedGroupGradientMatrices::getCoriolisAndGravityAndExternalForces(
     std::shared_ptr<dynamics::Skeleton> skel = world->getSkeleton(skelName);
     int dofs = skel->getNumDofs();
     result.segment(cursor, dofs)
-        = skel->getCoriolisAndGravityForces() - skel->getExternalForces();
+        = skel->getCoriolisAndGravityForces() - skel->getControlForces();
     cursor += dofs;
   }
   return result;
@@ -2383,7 +2383,7 @@ Eigen::MatrixXs ConstrainedGroupGradientMatrices::finiteDifferenceJacobianOfC(
   std::size_t innerDim = getWrtDim(world, wrt);
 
   // These are predicted contact forces at the clamping contacts
-  Eigen::VectorXs original = getCoriolisAndGravityAndExternalForces(world);
+  Eigen::VectorXs original = getCoriolisAndGravityAndControlForces(world);
 
   Eigen::MatrixXs result = Eigen::MatrixXs::Zero(original.size(), innerDim);
 
@@ -2396,11 +2396,11 @@ Eigen::MatrixXs ConstrainedGroupGradientMatrices::finiteDifferenceJacobianOfC(
     Eigen::VectorXs perturbed = before;
     perturbed(i) += EPS;
     setWrt(world, wrt, perturbed);
-    Eigen::MatrixXs tauPos = getCoriolisAndGravityAndExternalForces(world);
+    Eigen::MatrixXs tauPos = getCoriolisAndGravityAndControlForces(world);
     perturbed = before;
     perturbed(i) -= EPS;
     setWrt(world, wrt, perturbed);
-    Eigen::MatrixXs tauNeg = getCoriolisAndGravityAndExternalForces(world);
+    Eigen::MatrixXs tauNeg = getCoriolisAndGravityAndControlForces(world);
     Eigen::VectorXs diff = tauPos - tauNeg;
     result.col(i) = diff / (2 * EPS);
   }
@@ -2420,7 +2420,7 @@ ConstrainedGroupGradientMatrices::finiteDifferenceRiddersJacobianOfC(
   std::size_t innerDim = getWrtDim(world, wrt);
 
   // These are predicted contact forces at the clamping contacts
-  Eigen::VectorXs original = getCoriolisAndGravityAndExternalForces(world);
+  Eigen::VectorXs original = getCoriolisAndGravityAndControlForces(world);
 
   Eigen::MatrixXs J = Eigen::MatrixXs::Zero(original.size(), innerDim);
 
@@ -2442,11 +2442,11 @@ ConstrainedGroupGradientMatrices::finiteDifferenceRiddersJacobianOfC(
     Eigen::VectorXs perturbedPlus = Eigen::VectorXs(originalWrt);
     perturbedPlus(i) += stepSize;
     setWrt(world, wrt, perturbedPlus);
-    Eigen::MatrixXs tauPlus = getCoriolisAndGravityAndExternalForces(world);
+    Eigen::MatrixXs tauPlus = getCoriolisAndGravityAndControlForces(world);
     Eigen::VectorXs perturbedMinus = Eigen::VectorXs(originalWrt);
     perturbedMinus(i) -= stepSize;
     setWrt(world, wrt, perturbedMinus);
-    Eigen::MatrixXs tauMinus = getCoriolisAndGravityAndExternalForces(world);
+    Eigen::MatrixXs tauMinus = getCoriolisAndGravityAndControlForces(world);
 
     tab[0][0] = (tauPlus - tauMinus) / (2 * stepSize);
 
@@ -2458,11 +2458,11 @@ ConstrainedGroupGradientMatrices::finiteDifferenceRiddersJacobianOfC(
       perturbedPlus = Eigen::VectorXs(originalWrt);
       perturbedPlus(i) += stepSize;
       setWrt(world, wrt, perturbedPlus);
-      tauPlus = getCoriolisAndGravityAndExternalForces(world);
+      tauPlus = getCoriolisAndGravityAndControlForces(world);
       perturbedMinus = Eigen::VectorXs(originalWrt);
       perturbedMinus(i) -= stepSize;
       setWrt(world, wrt, perturbedMinus);
-      tauMinus = getCoriolisAndGravityAndExternalForces(world);
+      tauMinus = getCoriolisAndGravityAndControlForces(world);
 
       tab[0][iTab] = (tauPlus - tauMinus) / (2 * stepSize);
 

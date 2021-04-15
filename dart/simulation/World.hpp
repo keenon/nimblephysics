@@ -78,14 +78,16 @@ class CollisionResult;
 
 namespace neural {
 class WithRespectToMass;
-}
+class BackpropSnapshot;
+} // namespace neural
 
 namespace simulation {
 
 DART_COMMON_DECLARE_SHARED_WEAK(World)
 
 /// class World
-class World : public virtual common::Subject
+class World : public virtual common::Subject,
+              public std::enable_shared_from_this<World>
 {
 public:
   using NameChangedSignal = common::Signal<void(
@@ -241,7 +243,7 @@ public:
 
   /// Gets the torques of all the skeletons in the world concatenated together
   /// as a single vector
-  Eigen::VectorXs getExternalForces();
+  Eigen::VectorXs getControlForces();
 
   /// Gets the masses of all the nodes in the world concatenated together as a
   /// single vector
@@ -249,11 +251,11 @@ public:
 
   // This gives the vector of force upper limits for all the DOFs in this
   // world
-  Eigen::VectorXs getExternalForceUpperLimits();
+  Eigen::VectorXs getControlForceUpperLimits();
 
   // This gives the vector of force lower limits for all the DOFs in this
   // world
-  Eigen::VectorXs getExternalForceLowerLimits();
+  Eigen::VectorXs getControlForceLowerLimits();
 
   // This gives the vector of position upper limits for all the DOFs in this
   // world
@@ -333,7 +335,7 @@ public:
   Eigen::VectorXs getCoriolisAndGravityForces();
 
   /// This gives the C(pos, vel) vector for all the skeletons in the world
-  Eigen::VectorXs getCoriolisAndGravityAndExternalForces();
+  Eigen::VectorXs getCoriolisAndGravityAndControlForces();
 
   /// This constructs a mass matrix for the whole world, by creating a
   /// block-diagonal concatenation of each skeleton's mass matrix.
@@ -342,6 +344,60 @@ public:
   /// This constructs an inverse mass matrix for the whole world, by creating a
   /// block-diagonal concatenation of each skeleton's inverse mass matrix.
   Eigen::MatrixXs getInvMassMatrix();
+
+  //--------------------------------------------------------------------------
+  // High Level ("Reinforcement Learning style") API
+  //
+  // This allows high-level algorithms to think of the physics engine in terms
+  // of "states" and "actions", which are familiar terms to RL people.
+  //
+  // It also provides an intelligent API to efficiently construct Jacobians for
+  // state_t -> state_{t+1} (`getStateJacobian()`) and action_t -> state_{t+1}
+  // (`getActionJacobian()`).
+  //--------------------------------------------------------------------------
+
+  // The state is [pos, vel] concatenated, so this return 2*getNumDofs()
+  int getStateSize();
+  // This takes a single state vector and calls setPositions() and
+  // setVelocities() on the head and tail, respectively
+  void setState(Eigen::VectorXs state);
+  // This return the concatenation of [pos, vel]
+  Eigen::VectorXs getState();
+
+  // The action dim is given by the size of the action mapping. This defaults to
+  // a 1-1 map onto control forces, but can be configured to be just a subset of
+  // the control forces, if there are several DOFs that are uncontrolled.
+  int getActionSize();
+  // This sets the control forces, using the action mapping to decide how to map
+  // the passed in vector to control forces. Unmapped control forces are set to
+  // 0.
+  void setAction(Eigen::VectorXs action);
+  // This reads the control forces and runs them through the action mapping to
+  // construct a vector for the currently set action.
+  Eigen::VectorXs getAction();
+
+  // This sets the mapping that will be used for the action. Each index of
+  // `mapping` is an integer corresponding to an index in the control forces
+  // vector
+  void setActionSpace(std::vector<int> mapping);
+  // This returns the action mapping set by `setActionMapping()`. Each index of
+  // the returned mapping is an integer corresponding to an index in the control
+  // forces vector.
+  std::vector<int> getActionSpace();
+  // This is a shorthand method to remove a DOF from the action vector. No-op if
+  // the dof is already not in the action vector.
+  void removeDofFromActionSpace(int index);
+  // This is a shorthand method to add a DOF from the action vector, at the end
+  // of the mapping space. No-op if the dof is already in the action vector.
+  void addDofToActionSpace(int index);
+
+  // This returns the Jacobian for state_t -> state_{t+1}.
+  Eigen::MatrixXs getStateJacobian();
+  // This returns the Jacobian for action_t -> state_{t+1}.
+  Eigen::MatrixXs getActionJacobian();
+
+  Eigen::MatrixXs finiteDifferenceStateJacobian();
+  Eigen::MatrixXs finiteDifferenceActionJacobian();
 
   //--------------------------------------------------------------------------
   // Collision checking
@@ -633,6 +689,20 @@ protected:
   //--------------------------------------------------------------------------
 
   std::shared_ptr<neural::WithRespectToMass> mWrtMass;
+
+  //--------------------------------------------------------------------------
+  // High-level RL-style API
+  //--------------------------------------------------------------------------
+  std::vector<int> mActionSpace;
+
+  /// This gets a backprop snapshot for the current state, (re)computing if
+  /// necessary
+  std::shared_ptr<neural::BackpropSnapshot> getCachedBackpropSnapshot();
+
+  std::shared_ptr<neural::BackpropSnapshot> mCachedSnapshotPtr;
+  Eigen::VectorXs mCachedSnapshotPos;
+  Eigen::VectorXs mCachedSnapshotVel;
+  Eigen::VectorXs mCachedSnapshotForce;
 
 public:
   //--------------------------------------------------------------------------

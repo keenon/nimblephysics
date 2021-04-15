@@ -92,7 +92,7 @@ void IdentityMapping::getControlForcesInPlace(
     std::shared_ptr<simulation::World> world,
     /* OUT */ Eigen::Ref<Eigen::VectorXs> forces)
 {
-  forces = world->getExternalForces();
+  forces = world->getControlForces();
 }
 
 //==============================================================================
@@ -195,14 +195,14 @@ Eigen::VectorXs IdentityMapping::getVelocityUpperLimits(
 Eigen::VectorXs IdentityMapping::getControlForceLowerLimits(
     std::shared_ptr<simulation::World> world)
 {
-  return world->getExternalForceLowerLimits();
+  return world->getControlForceLowerLimits();
 }
 
 //==============================================================================
 Eigen::VectorXs IdentityMapping::getControlForceUpperLimits(
     std::shared_ptr<simulation::World> world)
 {
-  return world->getExternalForceUpperLimits();
+  return world->getControlForceUpperLimits();
 }
 
 //==============================================================================

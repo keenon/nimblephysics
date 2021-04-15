@@ -282,7 +282,7 @@ void IKMapping::getControlForcesInPlace(
     /* OUT */ Eigen::Ref<Eigen::VectorXs> forces)
 {
   assert(forces.size() == getControlForceDim());
-  forces = getRealForceToMappedForceJac(world) * world->getExternalForces();
+  forces = getRealForceToMappedForceJac(world) * world->getControlForces();
 }
 
 //==============================================================================

@@ -38,6 +38,7 @@
 
 #include "dart/simulation/World.hpp"
 
+#include <algorithm>
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -50,7 +51,10 @@
 #include "dart/dynamics/BoxShape.hpp"
 #include "dart/dynamics/DegreeOfFreedom.hpp"
 #include "dart/dynamics/Skeleton.hpp"
+#include "dart/neural/BackpropSnapshot.hpp"
 #include "dart/neural/ConstrainedGroupGradientMatrices.hpp"
+#include "dart/neural/NeuralUtils.hpp"
+#include "dart/neural/RestorableSnapshot.hpp"
 #include "dart/neural/WithRespectToMass.hpp"
 #include "dart/server/RawJsonUtils.hpp"
 
@@ -151,6 +155,9 @@ WorldPtr World::clone() const
     if (parent_candidate)
       worldClone->getSimpleFrame(i)->setParentFrame(parent_candidate.get());
   }
+
+  // Ensure that the action mapping for the RL-style API is preserved
+  worldClone->setActionSpace(mActionSpace);
 
   return worldClone;
 }
@@ -751,6 +758,11 @@ std::string World::addSkeleton(
   _skeleton->setGravity(mGravity);
 
   mIndices.push_back(mIndices.back() + _skeleton->getNumDofs());
+  // Add all this skeletons DOFs to the RL "action space" mapping by default
+  for (int i = 0; i < _skeleton->getNumDofs(); i++)
+  {
+    mActionSpace.push_back(mDofs + i);
+  }
   mDofs += _skeleton->getNumDofs();
   mConstraintSolver->addSkeleton(_skeleton);
 
@@ -1063,7 +1075,7 @@ Eigen::VectorXs World::getAccelerations()
 }
 
 //==============================================================================
-Eigen::VectorXs World::getExternalForces()
+Eigen::VectorXs World::getControlForces()
 {
   Eigen::VectorXs forces = Eigen::VectorXs(mDofs);
   std::size_t cursor = 0;
@@ -1077,7 +1089,7 @@ Eigen::VectorXs World::getExternalForces()
 }
 
 //==============================================================================
-Eigen::VectorXs World::getExternalForceUpperLimits()
+Eigen::VectorXs World::getControlForceUpperLimits()
 {
   Eigen::VectorXs limits = Eigen::VectorXs(mDofs);
   std::size_t cursor = 0;
@@ -1091,7 +1103,7 @@ Eigen::VectorXs World::getExternalForceUpperLimits()
 }
 
 //==============================================================================
-Eigen::VectorXs World::getExternalForceLowerLimits()
+Eigen::VectorXs World::getControlForceLowerLimits()
 {
   Eigen::VectorXs limits = Eigen::VectorXs(mDofs);
   std::size_t cursor = 0;
@@ -1321,7 +1333,7 @@ Eigen::VectorXs World::getCoriolisAndGravityForces()
 }
 
 //==============================================================================
-Eigen::VectorXs World::getCoriolisAndGravityAndExternalForces()
+Eigen::VectorXs World::getCoriolisAndGravityAndControlForces()
 {
   Eigen::VectorXs result = Eigen::VectorXs::Zero(getNumDofs());
   std::size_t cursor = 0;
@@ -1330,7 +1342,7 @@ Eigen::VectorXs World::getCoriolisAndGravityAndExternalForces()
     std::shared_ptr<dynamics::Skeleton> skel = getSkeleton(i);
     std::size_t dofs = skel->getNumDofs();
     result.segment(cursor, dofs)
-        = skel->getCoriolisAndGravityForces() - skel->getExternalForces();
+        = skel->getCoriolisAndGravityForces() - skel->getControlForces();
     cursor += dofs;
   }
   return result;
@@ -1364,6 +1376,303 @@ Eigen::MatrixXs World::getInvMassMatrix()
     cursor += dofs;
   }
   return invMassMatrix;
+}
+
+//==============================================================================
+// The state is [pos, vel] concatenated, so this return 2*getNumDofs()
+int World::getStateSize()
+{
+  return 2 * getNumDofs();
+}
+
+//==============================================================================
+// This takes a single state vector and calls setPositions() and setVelocities()
+// on the head and tail, respectively
+void World::setState(Eigen::VectorXs state)
+{
+  int dofs = getNumDofs();
+  if (state.size() != 2 * dofs)
+  {
+    std::cerr << "World::setState() called with a vector of incorrect size ("
+              << state.size() << ") instead of getStateSize() ("
+              << getStateSize() << "). Ignoring call." << std::endl;
+    return;
+  }
+  setPositions(state.head(dofs));
+  setVelocities(state.tail(dofs));
+}
+
+//==============================================================================
+// This return the concatenation of [pos, vel]
+Eigen::VectorXs World::getState()
+{
+  int dofs = getNumDofs();
+  Eigen::VectorXs state = Eigen::VectorXs::Zero(dofs * 2);
+  state.head(dofs) = getPositions();
+  state.tail(dofs) = getVelocities();
+  return state;
+}
+
+//==============================================================================
+// The action dim is given by the size of the action mapping. This defaults to a
+// 1-1 map onto control forces, but can be configured to be just a subset of the
+// control forces, if there are several DOFs that are uncontrolled.
+int World::getActionSize()
+{
+  return mActionSpace.size();
+}
+
+//==============================================================================
+// This sets the control forces, using the action mapping to decide how to map
+// the passed in vector to control forces. Unmapped control forces are set to 0.
+void World::setAction(Eigen::VectorXs action)
+{
+  if (action.size() != mActionSpace.size())
+  {
+    std::cerr << "World::setAction() got an action vector of incorrect size. "
+                 "Expected "
+              << mActionSpace.size() << " but got " << action.size()
+              << ". Ignoring call." << std::endl;
+    return;
+  }
+  Eigen::VectorXs forces = Eigen::VectorXs::Zero(getNumDofs());
+  for (int i = 0; i < mActionSpace.size(); i++)
+  {
+    int mapping = mActionSpace[i];
+    if (mapping < 0 || mapping >= forces.size())
+    {
+      std::cerr << "World::setAction() discovered out-of-bounds action "
+                   "mapping. Index "
+                << i << " -> " << mapping << ", out of bounds of [0,"
+                << forces.size() << "). Ignoring call." << std::endl;
+      return;
+    }
+    forces(mapping) = action(i);
+  }
+  setControlForces(forces);
+}
+
+//==============================================================================
+// This reads the control forces and runs them through the action mapping to
+// construct a vector for the currently set action.
+Eigen::VectorXs World::getAction()
+{
+  Eigen::VectorXs action = Eigen::VectorXs::Zero(mActionSpace.size());
+  Eigen::VectorXs forces = getControlForces();
+  for (int i = 0; i < mActionSpace.size(); i++)
+  {
+    int mapping = mActionSpace[i];
+    if (mapping < 0 || mapping >= forces.size())
+    {
+      std::cerr << "World::getAction() discovered out-of-bounds action "
+                   "mapping. Index "
+                << i << " -> " << mapping << ", out of bounds of [0,"
+                << forces.size() << "). Returning 0s from call." << std::endl;
+      return action;
+    }
+    action(i) = forces(mapping);
+  }
+  return action;
+}
+
+//==============================================================================
+// This sets the mapping that will be used for the action. Each index of
+// `mapping` is an integer corresponding to an index in the control forces
+// vector
+void World::setActionSpace(std::vector<int> mapping)
+{
+  int dofs = getNumDofs();
+  for (int i = 0; i < mapping.size(); i++)
+  {
+    int m = mapping[i];
+    if (m < 0 || m >= dofs)
+    {
+      std::cerr << "World::setActionMapping() discovered out-of-bounds action "
+                   "mapping. Index "
+                << i << " -> " << m << ", out of bounds of [0," << dofs
+                << "). Ignoring call." << std::endl;
+      return;
+    }
+    for (int j = 0; j < mapping.size(); j++)
+    {
+      if (j == i)
+        continue;
+      if (mapping[i] == mapping[j])
+      {
+        std::cerr << "World::setActionMapping() discovered duplicate action "
+                     "mapping. Index "
+                  << i << " -> " << mapping[i] << ", but we also get index "
+                  << j << " -> " << mapping[j] << ". Ignoring call."
+                  << std::endl;
+        return;
+      }
+    }
+  }
+  mActionSpace = mapping;
+}
+
+//==============================================================================
+// This returns the action mapping set by `setActionMapping()`. Each index of
+// the returned mapping is an integer corresponding to an index in the control
+// forces vector.
+std::vector<int> World::getActionSpace()
+{
+  return mActionSpace;
+}
+
+//==============================================================================
+// This is a shorthand method to remove a DOF from the action vector. No-op if
+// the dof is already not in the action vector.
+void World::removeDofFromActionSpace(int index)
+{
+  mActionSpace.erase(
+      std::remove(mActionSpace.begin(), mActionSpace.end(), index),
+      mActionSpace.end());
+}
+
+//==============================================================================
+// This is a shorthand method to add a DOF from the action vector, at the end of
+// the mapping space. No-op if the dof is already in the action vector.
+void World::addDofToActionSpace(int index)
+{
+  int dofs = getNumDofs();
+  if (index < 0 || index >= dofs)
+  {
+    std::cerr << "World::addDofToActionSpace() attempting to add out-of-bounds "
+                 "action mapping. Attempting to add "
+              << index << ", out of bounds of [0," << dofs
+              << "). Ignoring call." << std::endl;
+    return;
+  }
+  if (std::find(mActionSpace.begin(), mActionSpace.end(), index)
+      == mActionSpace.end())
+  {
+    mActionSpace.push_back(index);
+  }
+}
+
+//==============================================================================
+/// This gets a backprop snapshot for the current state, (re)computing if
+/// necessary
+std::shared_ptr<neural::BackpropSnapshot> World::getCachedBackpropSnapshot()
+{
+  if (mCachedSnapshotPtr == nullptr || mCachedSnapshotPos != getPositions()
+      || mCachedSnapshotVel != getVelocities()
+      || mCachedSnapshotForce != getControlForces())
+  {
+    mCachedSnapshotPtr = neural::forwardPass(shared_from_this(), true);
+  }
+  return mCachedSnapshotPtr;
+}
+
+//==============================================================================
+// This returns the Jacobian for state_t -> state_{t+1}.
+Eigen::MatrixXs World::getStateJacobian()
+{
+  std::shared_ptr<neural::BackpropSnapshot> snapshot
+      = getCachedBackpropSnapshot();
+  int dofs = getNumDofs();
+  Eigen::MatrixXs stateJac = Eigen::MatrixXs::Zero(2 * dofs, 2 * dofs);
+  WorldPtr sharedThis = shared_from_this();
+  stateJac.block(0, 0, dofs, dofs) = snapshot->getPosPosJacobian(sharedThis);
+  stateJac.block(dofs, 0, dofs, dofs) = snapshot->getPosVelJacobian(sharedThis);
+  stateJac.block(0, dofs, dofs, dofs) = snapshot->getVelPosJacobian(sharedThis);
+  stateJac.block(dofs, dofs, dofs, dofs)
+      = snapshot->getVelVelJacobian(sharedThis);
+  return stateJac;
+}
+
+//==============================================================================
+// This returns the Jacobian for action_t -> state_{t+1}.
+Eigen::MatrixXs World::getActionJacobian()
+{
+  std::shared_ptr<neural::BackpropSnapshot> snapshot
+      = getCachedBackpropSnapshot();
+  int dofs = getNumDofs();
+  WorldPtr sharedThis = shared_from_this();
+  const Eigen::MatrixXs& forceVelJac
+      = snapshot->getControlForceVelJacobian(sharedThis);
+
+  int actionDim = mActionSpace.size();
+  Eigen::MatrixXs actionJac = Eigen::MatrixXs::Zero(2 * dofs, actionDim);
+  for (int i = 0; i < actionDim; i++)
+  {
+    actionJac.block(dofs, i, dofs, 1) = forceVelJac.col(mActionSpace[i]);
+  }
+  return actionJac;
+}
+
+//==============================================================================
+Eigen::MatrixXs World::finiteDifferenceStateJacobian()
+{
+  WorldPtr sharedThis = shared_from_this();
+  neural::RestorableSnapshot snapshot(sharedThis);
+
+  int stateDim = getStateSize();
+  Eigen::VectorXs originalState = getState();
+  Eigen::MatrixXs stateJac = Eigen::MatrixXs::Zero(stateDim, stateDim);
+
+  s_t EPS = 1e-6;
+
+  for (int i = 0; i < stateDim; i++)
+  {
+    Eigen::VectorXs perturbedState = originalState;
+    perturbedState(i) += EPS;
+    setState(perturbedState);
+    step(false);
+    Eigen::VectorXs statePos = getState();
+    snapshot.restore();
+
+    perturbedState = originalState;
+    perturbedState(i) -= EPS;
+    setState(perturbedState);
+    step(false);
+    Eigen::VectorXs stateNeg = getState();
+    snapshot.restore();
+
+    stateJac.col(i) = (statePos - stateNeg) / (2 * EPS);
+  }
+
+  snapshot.restore();
+
+  return stateJac;
+}
+
+//==============================================================================
+Eigen::MatrixXs World::finiteDifferenceActionJacobian()
+{
+  WorldPtr sharedThis = shared_from_this();
+  neural::RestorableSnapshot snapshot(sharedThis);
+
+  int dofs = getNumDofs();
+  int actionDim = mActionSpace.size();
+  Eigen::VectorXs originalAction = getAction();
+  Eigen::MatrixXs actionJac = Eigen::MatrixXs::Zero(2 * dofs, actionDim);
+
+  s_t EPS = 1e-6;
+
+  for (int i = 0; i < actionDim; i++)
+  {
+    Eigen::VectorXs perturbedAction = originalAction;
+    perturbedAction(i) += EPS;
+    setAction(perturbedAction);
+    step(false);
+    Eigen::VectorXs statePos = getState();
+    snapshot.restore();
+
+    perturbedAction = originalAction;
+    perturbedAction(i) -= EPS;
+    setAction(perturbedAction);
+    step(false);
+    Eigen::VectorXs stateNeg = getState();
+    snapshot.restore();
+
+    actionJac.col(i) = (statePos - stateNeg) / (2 * EPS);
+  }
+
+  snapshot.restore();
+
+  return actionJac;
 }
 
 //==============================================================================

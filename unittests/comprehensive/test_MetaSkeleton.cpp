@@ -177,8 +177,8 @@ TEST(MetaSkeleton, Referential)
         const Eigen::VectorXs& skelCg = skeleton->getCoriolisAndGravityForces();
         const Eigen::VectorXs& treeCg = tree->getCoriolisAndGravityForces();
 
-        const Eigen::VectorXs& skelFext = skeleton->getExternalForces();
-        const Eigen::VectorXs& treeFext = tree->getExternalForces();
+        const Eigen::VectorXs& skelFext = skeleton->getControlForces();
+        const Eigen::VectorXs& treeFext = tree->getControlForces();
 
         const Eigen::VectorXs& skelFc = skeleton->getConstraintForces();
         const Eigen::VectorXs& treeFc = tree->getConstraintForces();

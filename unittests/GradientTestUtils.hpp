@@ -1809,11 +1809,11 @@ VelocityTest runVelocityTest(WorldPtr world)
   Eigen::MatrixXs A_ub = classicPtr->getUpperBoundConstraintMatrix(world);
   Eigen::MatrixXs E = classicPtr->getUpperBoundMappingMatrix();
   Eigen::MatrixXs A_c_ub_E = A_c + A_ub * E;
-  Eigen::VectorXs tau = world->getExternalForces();
+  Eigen::VectorXs tau = world->getControlForces();
   s_t dt = world->getTimeStep();
 
   Eigen::MatrixXs Minv = world->getInvMassMatrix();
-  Eigen::VectorXs C = world->getCoriolisAndGravityAndExternalForces();
+  Eigen::VectorXs C = world->getCoriolisAndGravityAndControlForces();
   Eigen::VectorXs f_c
       = classicPtr->estimateClampingConstraintImpulses(world, A_c, A_ub, E);
 
@@ -1900,7 +1900,7 @@ bool verifyNextV(WorldPtr world)
 
   // VelocityTest originalTest = runVelocityTest(world);
 
-  Eigen::VectorXs forces = world->getExternalForces();
+  Eigen::VectorXs forces = world->getControlForces();
 
   const s_t EPSILON = 1e-6;
 
@@ -1991,7 +1991,7 @@ bool verifyScratch(WorldPtr world, WithRespectTo* wrt)
   {
     std::cout << "Velocity not preserved!" << std::endl;
   }
-  if (!equals(world->getExternalForces(), classicPtr->getPreStepTorques()))
+  if (!equals(world->getControlForces(), classicPtr->getPreStepTorques()))
   {
     std::cout << "Force not preserved!" << std::endl;
   }
@@ -2499,7 +2499,7 @@ bool verifyConstraintGroupSubJacobians(
       Eigen::MatrixXs groupA_c_ub_E = groupA_c + groupA_ub * groupE;
       Eigen::VectorXs groupTau = group->mPreStepTorques;
       Eigen::VectorXs groupC
-          = group->getCoriolisAndGravityAndExternalForces(world);
+          = group->getCoriolisAndGravityAndControlForces(world);
       const Eigen::VectorXs& groupF_c = group->getClampingConstraintImpulses();
       s_t dt = world->getTimeStep();
       Eigen::MatrixXs group_dM = group->getJacobianOfMinv(
@@ -2514,7 +2514,7 @@ bool verifyConstraintGroupSubJacobians(
       const Eigen::MatrixXs& worldE = classicPtr->getUpperBoundMappingMatrix();
       Eigen::MatrixXs worldA_c_ub_E = worldA_c + worldA_ub * worldE;
       Eigen::VectorXs worldTau = classicPtr->getPreStepTorques();
-      Eigen::VectorXs worldC = world->getCoriolisAndGravityAndExternalForces();
+      Eigen::VectorXs worldC = world->getCoriolisAndGravityAndControlForces();
       const Eigen::VectorXs& worldF_c
           = classicPtr->getClampingConstraintImpulses();
       Eigen::MatrixXs world_dM = classicPtr->getJacobianOfMinv(
@@ -2610,7 +2610,8 @@ bool verifyConstraintGroupSubJacobians(
     }
 
     Eigen::MatrixXs groupForceVel = group->getControlForceVelJacobian(world);
-    Eigen::MatrixXs worldForceVel = classicPtr->getControlForceVelJacobian(world);
+    Eigen::MatrixXs worldForceVel
+        = classicPtr->getControlForceVelJacobian(world);
     if (!equals(groupForceVel, worldForceVel, 0))
     {
       std::cout << "ConstrainedGroupGradientMatrices and BackpropSnapshotPtr "
@@ -2695,9 +2696,9 @@ bool verifyAnalyticalBackpropInstance(
   Eigen::VectorXs vels = world->getVelocities();
   Eigen::VectorXs velUpperLimits = world->getVelocityUpperLimits();
   Eigen::VectorXs velLowerLimits = world->getVelocityLowerLimits();
-  Eigen::VectorXs forces = world->getExternalForces();
-  Eigen::VectorXs forceUpperLimits = world->getExternalForceUpperLimits();
-  Eigen::VectorXs forceLowerLimits = world->getExternalForceLowerLimits();
+  Eigen::VectorXs forces = world->getControlForces();
+  Eigen::VectorXs forceUpperLimits = world->getControlForceUpperLimits();
+  Eigen::VectorXs forceLowerLimits = world->getControlForceLowerLimits();
   for (int i = 0; i < world->getNumDofs(); i++)
   {
     // Clip position gradients
@@ -2994,7 +2995,7 @@ LossGradient computeBruteForceGradient(
 
   Eigen::VectorXs originalPos = world->getPositions();
   Eigen::VectorXs originalVel = world->getVelocities();
-  Eigen::VectorXs originalForce = world->getExternalForces();
+  Eigen::VectorXs originalForce = world->getControlForces();
 
   s_t EPSILON = 1e-7;
 
@@ -3554,7 +3555,7 @@ Eigen::VectorXs getTestComponentWorld(
   else if (component == MappingTestComponent::VELOCITY)
     return world->getVelocities();
   else if (component == MappingTestComponent::FORCE)
-    return world->getExternalForces();
+    return world->getControlForces();
   else
     assert(false && "Unrecognized component value in getTestComponent()");
   throw std::runtime_error{"Execution should never reach this point"};
@@ -6160,7 +6161,7 @@ bool verifyNoMultistepIntereference(WorldPtr world, int steps)
 
   clean->setPositions(world->getPositions());
   clean->setVelocities(world->getVelocities());
-  clean->setControlForces(world->getExternalForces());
+  clean->setControlForces(world->getControlForces());
 
   BackpropSnapshotPtr dirtyPtr = neural::forwardPass(world);
   BackpropSnapshotPtr cleanPtr = neural::forwardPass(clean);

@@ -197,7 +197,7 @@ TrajectoryRolloutReal TrajectoryRollout::fromForces(
     world->step();
     posMatrix.col(i) = world->getPositions();
     velMatrix.col(i) = world->getVelocities();
-    forceMatrix.col(i) = world->getExternalForces();
+    forceMatrix.col(i) = world->getControlForces();
   }
 
   snapshot.restore();

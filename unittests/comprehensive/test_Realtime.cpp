@@ -337,7 +337,7 @@ TEST(REALTIME, CARTPOLE_MPC)
     if (server.getKeysDown().count("a"))
     {
       Eigen::VectorXs perturbedForces
-          = realtimeUnderlyingWorld->getExternalForces();
+          = realtimeUnderlyingWorld->getControlForces();
       perturbedForces(0) = -15.0;
       realtimeUnderlyingWorld->setControlForces(perturbedForces);
       sledBodyVisual->setColor(Eigen::Vector3s(1, 0, 0));
@@ -345,7 +345,7 @@ TEST(REALTIME, CARTPOLE_MPC)
     else if (server.getKeysDown().count("e"))
     {
       Eigen::VectorXs perturbedForces
-          = realtimeUnderlyingWorld->getExternalForces();
+          = realtimeUnderlyingWorld->getControlForces();
       perturbedForces(0) = 15.0;
       realtimeUnderlyingWorld->setControlForces(perturbedForces);
       sledBodyVisual->setColor(Eigen::Vector3s(0, 1, 0));

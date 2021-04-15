@@ -1707,7 +1707,7 @@ void DynamicsTest::compareEquationsOfMotion(const common::Uri& uri)
       skel->setAccelerations(VectorXs::Zero(dof));
 
       EXPECT_TRUE(skel->getControlForces() == VectorXs::Zero(dof));
-      EXPECT_TRUE(skel->getExternalForces() == VectorXs::Zero(dof));
+      EXPECT_TRUE(skel->getControlForces() == VectorXs::Zero(dof));
       EXPECT_TRUE(skel->getAccelerations() == VectorXs::Zero(dof));
 
       skel->setGravity(Vector3s::Zero());

@@ -74,7 +74,7 @@ void Mapping::equalsOrCrash(
     std::cout << "Eigen::VectorXs brokenForce = Eigen::VectorXs::Zero("
               << mNumDOFs << ");" << std::endl;
     std::cout << "brokenForce <<" << std::endl;
-    Eigen::VectorXs force = world->getExternalForces();
+    Eigen::VectorXs force = world->getControlForces();
     for (int i = 0; i < mNumDOFs; i++)
     {
       std::cout << "  " << force(i);

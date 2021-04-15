@@ -35,7 +35,7 @@ std::shared_ptr<BackpropSnapshot> forwardPass(
   // Record the current input vector
   Eigen::VectorXs preStepPosition = world->getPositions();
   Eigen::VectorXs preStepVelocity = world->getVelocities();
-  Eigen::VectorXs preStepTorques = world->getExternalForces();
+  Eigen::VectorXs preStepTorques = world->getControlForces();
   Eigen::VectorXs preStepLCPCache = world->getCachedLCPSolution();
 
   // Set the gradient mode we're going to use to calculate gradients
@@ -82,7 +82,7 @@ std::shared_ptr<MappedBackpropSnapshot> mappedForwardPass(
   // Record the current input vector in mapped space
   Eigen::VectorXs preStepPosition = world->getPositions();
   Eigen::VectorXs preStepVelocity = world->getVelocities();
-  Eigen::VectorXs preStepTorques = world->getExternalForces();
+  Eigen::VectorXs preStepTorques = world->getControlForces();
   Eigen::VectorXs preStepLCPCache = world->getCachedLCPSolution();
 
   // Record the Jacobians for mapping out from mapped space to world space
