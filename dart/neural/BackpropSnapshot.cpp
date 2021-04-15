@@ -376,6 +376,49 @@ void BackpropSnapshot::backprop(
 }
 
 //==============================================================================
+/// This computes backprop in the high-level RL API's space, use `state` and
+/// `action` as the primitives we're taking gradients wrt to.
+LossGradientHighLevelAPI BackpropSnapshot::backpropState(
+    simulation::WorldPtr world,
+    const Eigen::VectorXs& nextTimestepStateLossGrad,
+    PerformanceLog* perfLog,
+    bool exploreAlternateStrategies)
+{
+  LossGradient thisTimestepLoss;
+  LossGradient nextTimestepLoss;
+  int dofs = world->getNumDofs();
+  nextTimestepLoss.lossWrtPosition = nextTimestepStateLossGrad.head(dofs);
+  nextTimestepLoss.lossWrtVelocity = nextTimestepStateLossGrad.tail(dofs);
+  backprop(
+      world,
+      thisTimestepLoss,
+      nextTimestepLoss,
+      perfLog,
+      exploreAlternateStrategies);
+
+  LossGradientHighLevelAPI grad;
+  grad.lossWrtState = Eigen::VectorXs(dofs * 2);
+  grad.lossWrtState.head(dofs) = thisTimestepLoss.lossWrtPosition;
+  grad.lossWrtState.tail(dofs) = thisTimestepLoss.lossWrtVelocity;
+  grad.lossWrtAction = Eigen::VectorXs::Zero(world->getActionSize());
+  std::vector<int> actionMapping = world->getActionSpace();
+  for (int i = 0; i < actionMapping.size(); i++)
+  {
+    if (actionMapping[i] < 0 || actionMapping[i] >= dofs)
+    {
+      std::cerr << "neural::BackpropSnapshot::backpropState() discovered an "
+                   "out-of-bounds element in the action state mapping. Element "
+                << i << " -> " << actionMapping[i] << " is out of bounds [0,"
+                << dofs << "). Ignoring." << std::endl;
+      continue;
+    }
+    grad.lossWrtAction(i) = thisTimestepLoss.lossWrtTorque(actionMapping[i]);
+  }
+  grad.lossWrtMass = Eigen::VectorXs::Zero(0);
+  return grad;
+}
+
+//==============================================================================
 /// This zeros out any components of the gradient that would want to push us
 /// out of the box-bounds encoded in the world for pos, vel, or force.
 void BackpropSnapshot::clipLossGradientsToBounds(

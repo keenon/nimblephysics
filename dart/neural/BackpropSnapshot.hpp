@@ -48,6 +48,14 @@ public:
       PerformanceLog* perfLog = nullptr,
       bool exploreAlternateStrategies = false);
 
+  /// This computes backprop in the high-level RL API's space, use `state` and
+  /// `action` as the primitives we're taking gradients wrt to.
+  LossGradientHighLevelAPI backpropState(
+      simulation::WorldPtr world,
+      const Eigen::VectorXs& nextTimestepStateLossGrad,
+      PerformanceLog* perfLog = nullptr,
+      bool exploreAlternateStrategies = false);
+
   /// This zeros out any components of the gradient that would want to push us
   /// out of the box-bounds encoded in the world for pos, vel, or force.
   void clipLossGradientsToBounds(

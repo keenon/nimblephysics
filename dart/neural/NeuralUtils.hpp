@@ -29,6 +29,13 @@ struct LossGradient
   Eigen::VectorXs lossWrtMass;
 };
 
+struct LossGradientHighLevelAPI
+{
+  Eigen::VectorXs lossWrtState;
+  Eigen::VectorXs lossWrtAction;
+  Eigen::VectorXs lossWrtMass;
+};
+
 // We don't issue a full import here, because we want this file to be safe to
 // import from anywhere else in DART
 class ConstrainedGroupGradientMatrices;

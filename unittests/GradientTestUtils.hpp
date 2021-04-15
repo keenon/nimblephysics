@@ -2645,6 +2645,8 @@ bool verifyAnalyticalBackpropInstance(
 
   LossGradient thisTimeStep;
   classicPtr->backprop(world, thisTimeStep, nextTimeStep);
+  LossGradientHighLevelAPI thisTimestepHighLevel
+      = classicPtr->backpropState(world, phaseSpace);
 
   RestorableSnapshot snapshot(world);
 
@@ -2733,6 +2735,47 @@ bool verifyAnalyticalBackpropInstance(
     {
       lossWrtThisTorque(i) = 0;
     }
+  }
+
+  Eigen::VectorXs stateLossFromAnalytical = Eigen::VectorXs::Zero(
+      thisTimeStep.lossWrtPosition.size()
+      + thisTimeStep.lossWrtVelocity.size());
+  stateLossFromAnalytical.head(thisTimeStep.lossWrtPosition.size())
+      = thisTimeStep.lossWrtPosition;
+  stateLossFromAnalytical.tail(thisTimeStep.lossWrtVelocity.size())
+      = thisTimeStep.lossWrtVelocity;
+  if (!equals(
+          stateLossFromAnalytical, thisTimestepHighLevel.lossWrtState, 1e-10))
+  {
+    std::cout
+        << "backpropState() result disagrees with backprop() on state grad!"
+        << std::endl;
+    std::cout << "backprop() version:" << std::endl
+              << stateLossFromAnalytical << std::endl;
+    std::cout << "backpropState() version:" << std::endl
+              << thisTimestepHighLevel.lossWrtState << std::endl;
+    std::cout << "diff:" << std::endl
+              << stateLossFromAnalytical - thisTimestepHighLevel.lossWrtState
+              << std::endl;
+    return false;
+  }
+  if (!equals(
+          thisTimeStep.lossWrtTorque,
+          thisTimestepHighLevel.lossWrtAction,
+          1e-10))
+  {
+    std::cout
+        << "backpropState() result disagrees with backprop() on action grad!"
+        << std::endl;
+    std::cout << "backprop() version:" << std::endl
+              << thisTimeStep.lossWrtTorque << std::endl;
+    std::cout << "backpropState() version:" << std::endl
+              << thisTimestepHighLevel.lossWrtAction << std::endl;
+    std::cout << "diff:" << std::endl
+              << thisTimeStep.lossWrtTorque
+                     - thisTimestepHighLevel.lossWrtAction
+              << std::endl;
+    return false;
   }
 
   if (!equals(lossWrtThisPosition, thisTimeStep.lossWrtPosition, 1e-5)
