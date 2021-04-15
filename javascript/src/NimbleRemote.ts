@@ -1,4 +1,4 @@
-import DARTView from "./DARTView";
+import NimbleView from "./NimbleView";
 
 type CreateBoxCommand = {
   type: "create_box";
@@ -224,10 +224,10 @@ type Command =
 
 class DARTRemote {
   url: string;
-  view: DARTView;
+  view: NimbleView;
   socket: WebSocket | null;
 
-  constructor(url: string, view: DARTView) {
+  constructor(url: string, view: NimbleView) {
     this.url = url;
     this.view = view;
 

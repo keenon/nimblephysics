@@ -47,7 +47,7 @@ def main():
 
   num_timesteps = 100
 
-  action_size = world.getNumDofs()
+  action_size = world.getActionSize()
   print('action size: '+str(action_size))
   learning_rate = 0.01
 
@@ -62,8 +62,6 @@ def main():
     state: torch.Tensor = first_state
     states = [state]
     for i in range(num_timesteps):
-      world.getStateJacobian()
-      world.getActionJacobian()
       state = nimble.timestep(world, state, actions[i])
       states.append(state)
     gui.loopStates(states)

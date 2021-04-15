@@ -749,10 +749,14 @@ GUIWebsocketServer& GUIWebsocketServer::renderSkeleton(
 /// This is a high-level command that renders a given trajectory as a bunch of
 /// lines in the world, one per body
 GUIWebsocketServer& GUIWebsocketServer::renderTrajectoryLines(
-    std::shared_ptr<simulation::World> world,
+    std::shared_ptr<simulation::World> originalWorld,
     Eigen::MatrixXs positions,
     std::string prefix)
 {
+  // Just clone the world, to avoid contention for the world, since this method
+  // can spend a long time setting the world into different states.
+  std::shared_ptr<simulation::World> world = originalWorld->clone();
+
   const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
 
   assert(positions.rows() == world->getNumDofs());

@@ -129,7 +129,7 @@ class DARTView {
     /// Random GUI stuff
 
     const title = document.createElement("div");
-    title.innerHTML = "DiffDART Visualizer - v" + VERSION_NUM;
+    title.innerHTML = "Nimble Visualizer - v" + VERSION_NUM;
     title.className = "GUI_title";
     this.uiContainer.appendChild(title);
     this.setConnected(startConnected);
