@@ -44,7 +44,7 @@ def main():
 
   state: torch.Tensor = torch.randn((world.getStateSize()), requires_grad=True)
 
-  learning_rate = 0.01
+  learning_rate = 0.03
 
   while True:
     hand_pos: torch.Tensor = nimble.map_to_pos(world, ikMap, state)
@@ -54,7 +54,7 @@ def main():
       state -= learning_rate * state.grad
       state.grad = None
     gui.nativeAPI().renderWorld(world, "world")
-    time.sleep(0.002)
+    time.sleep(0.01)
 
   gui.blockWhileServing()
 
