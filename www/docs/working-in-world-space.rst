@@ -8,7 +8,7 @@ For example, you might want to know the :code:`(X,Y,Z)` coordinates of the gripp
 
 We've built a tool to help you with this! It's called :code:`nimble.neural.IKMapping`.
 
-If you're impatient, you can download an example :download:`using IKMapping on the KR5 robot <./_static/robots/half_cheetah.skel>` and figure out how to use :code:`IKMapping` from context. If you prefer reading a full explanation, read on :)
+If you're impatient, you can download an example :download:`using IKMapping on the KR5 robot <./_static/robots/IK_example.zip>` and figure out how to use :code:`IKMapping` from context. If you prefer reading a full explanation, read on :)
 
 As a recap from :ref:`Worlds`, remember that we specify ordinary position and velocity in joint space. For example:
 
@@ -55,4 +55,4 @@ To recap, to map joint-space into world-space, follow three steps:
 3. Call :code:`nimble.map_to_pos(world, mapping, state)` to map (in a PyTorch friendly way) a state vector :code:`state` to a vector of world space positions.
    Alternatively, you can call :code:`nimble.map_to_vel(world, mapping, state)` to get the velocities in world space for your mappings.
 
-You can download a working example of :download:`using IKMapping on the KR5 robot <./_static/robots/half_cheetah.skel>` and play around with it.
+You can download a working example of :download:`using IKMapping on the KR5 robot <./_static/robots/IK_example.zip>` and play around with it.

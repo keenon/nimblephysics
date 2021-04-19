@@ -14,9 +14,9 @@ def main():
   world.setGravity([0, -9.81, 0])
   # Set up the 2D cartpole
   arm: nimble.dynamics.Skeleton = world.loadSkeleton(os.path.join(
-      os.path.dirname(__file__), "KR5.urdf"))
+      os.path.dirname(__file__), "./KR5.urdf"))
   ground: nimble.dynamics.Skeleton = world.loadSkeleton(os.path.join(
-      os.path.dirname(__file__), "ground.urdf"))
+      os.path.dirname(__file__), "./ground.urdf"))
   floorBody: nimble.dynamics.BodyNode = ground.getBodyNode(0)
   floorBody.getShapeNode(0).getVisualAspect().setCastShadows(False)
   ticker = nimble.realtime.Ticker(world.getTimeStep())

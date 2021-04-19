@@ -17,7 +17,7 @@ As a first example, we'll use the :download:`KR5 Robot <./_static/robots/KR5.zip
 
   world: nimble.simulation.World = nimble.simulation.World()
   arm: nimble.dynamics.Skeleton = world.loadSkeleton(os.path.join(
-      os.path.dirname(__file__), "KR5.urdf"))
+      os.path.dirname(__file__), "./KR5.urdf"))
 
   # Your code here
 
