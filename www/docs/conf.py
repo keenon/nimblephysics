@@ -40,7 +40,7 @@ release = '0.4.0'
 # ones.
 extensions = [
     'sphinx.ext.coverage',
-    'sphinx.ext.mathjax',
+    'sphinx.ext.imgmath',
     'sphinx_rtd_theme'
 ]
 
@@ -90,7 +90,7 @@ html_favicon = '_static/favicon.ico'
 # documentation.
 #
 html_theme_options = {
-  'logo_only': True,
+    'logo_only': True,
 }
 
 # Add any paths that contain custom static files (such as style sheets) here,
