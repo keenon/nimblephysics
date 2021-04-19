@@ -98,7 +98,7 @@ void SGDOptimizer(py::module& m)
               {
                 if (e.matches(PyExc_KeyboardInterrupt))
                 {
-                  std::cout << "DiffDART caught a keyboard interrupt in a "
+                  std::cout << "Nimble caught a keyboard interrupt in a "
                                "callback from "
                                "registerIntermediateCallback(). Exiting "
                                "with code 0."
@@ -108,7 +108,7 @@ void SGDOptimizer(py::module& m)
                 else
                 {
                   std::cout
-                      << "DiffDART caught an exception calling "
+                      << "Nimble caught an exception calling "
                          "callback from registerIntermediateCallback():"
                       << std::endl
                       << std::string(e.what()) << std::endl;

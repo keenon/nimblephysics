@@ -129,7 +129,7 @@ simulation::WorldPtr readWorld(
     tinyxml2::XMLElement* _worldElement,
     const common::Uri& _baseUri,
     const common::ResourceRetrieverPtr& _retriever,
-    // By default DiffDART clears out springs and damping, because our
+    // By default Nimble clears out springs and damping, because our
     // Jacobians don't support them. TODO: remove me when springs and damping
     // support is added
     bool allowSpringsAndDamping = false);
@@ -684,7 +684,7 @@ simulation::WorldPtr readWorld(
     tinyxml2::XMLElement* _worldElement,
     const common::Uri& _baseUri,
     const common::ResourceRetrieverPtr& _retriever, 
-    // By default DiffDART clears out springs and damping, because our
+    // By default Nimble clears out springs and damping, because our
     // Jacobians don't support them. TODO: remove me when springs and damping
     // support is added
     bool allowSpringsAndDamping)

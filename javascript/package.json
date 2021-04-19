@@ -1,7 +1,7 @@
 {
   "name": "diffdart-visualizer",
   "version": "0.0.1",
-  "description": "A WebGL-based visualizer for DiffDART trajectories",
+  "description": "A WebGL-based visualizer for Nimble trajectories",
   "entry": {
     "index": "index.js",
     "embedded": "embedded.js"

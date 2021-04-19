@@ -247,11 +247,11 @@ void World::step(bool _resetCommand)
       skel->setImpulseApplied(false);
     }
 
-    // <DiffDART>: This is the original way integration happened, right after
+    // <Nimble>: This is the original way integration happened, right after
     // velocity updates
     if (!mParallelVelocityAndPositionUpdates)
       skel->integratePositions(mTimeStep);
-    // </DiffDART>
+    // </Nimble>
 
     if (_resetCommand)
     {
@@ -261,7 +261,7 @@ void World::step(bool _resetCommand)
     }
   }
 
-  // <DiffDART>: This is an easier way to compute gradients for. We update p_t+1
+  // <Nimble>: This is an easier way to compute gradients for. We update p_t+1
   // using v_t, instead of v_t+1
   if (mParallelVelocityAndPositionUpdates)
   {
@@ -276,7 +276,7 @@ void World::step(bool _resetCommand)
       cursor += dofs;
     }
   }
-  // </DiffDART>: Integrate positions before velocity changes, instead of after
+  // </Nimble>: Integrate positions before velocity changes, instead of after
 
   mTime += mTimeStep;
   mFrame++;
@@ -686,7 +686,7 @@ std::size_t World::getNumSkeletons() const
 //==============================================================================
 std::string World::addSkeleton(
     const dynamics::SkeletonPtr& _skeleton,
-    // By default DiffDART clears out springs and damping, because our
+    // By default Nimble clears out springs and damping, because our
     // Jacobians don't support them. TODO: remove me when springs and damping
     // support is added
     bool allowSpringsAndDamping)
@@ -713,7 +713,7 @@ std::string World::addSkeleton(
           dtwarn << "[World::addSkeleton] Attempting to add a Skeleton \""
                  << _skeleton->getName() << "\" to "
                  << "the world with non-zero spring stiffness! This version of "
-                    "DiffDART doesn't support spring stiffness. It will be "
+                    "Nimble doesn't support spring stiffness. It will be "
                     "automatically set to zero.\n";
         }
       }
@@ -727,7 +727,7 @@ std::string World::addSkeleton(
               << "[World::addSkeleton] Attempting to add a Skeleton \""
               << _skeleton->getName() << "\" to "
               << "the world with non-zero damping coefficient! This version of "
-                 "DiffDART doesn't support damping coefficients. It will be "
+                 "Nimble doesn't support damping coefficients. It will be "
                  "automatically set to zero.\n";
         }
       }

@@ -164,7 +164,7 @@ public:
   /// Add a skeleton to this world
   std::string addSkeleton(
       const dynamics::SkeletonPtr& _skeleton,
-      // By default DiffDART clears out springs and damping, because our
+      // By default Nimble clears out springs and damping, because our
       // Jacobians don't support them. TODO: remove me when springs and damping
       // support is added
       bool allowSpringsAndDamping = false);

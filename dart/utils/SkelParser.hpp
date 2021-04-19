@@ -48,7 +48,7 @@ namespace SkelParser {
   simulation::WorldPtr readWorld(
     const common::Uri& uri,
     const common::ResourceRetrieverPtr& retriever = nullptr,
-    // By default DiffDART clears out springs and damping, because our
+    // By default Nimble clears out springs and damping, because our
     // Jacobians don't support them. TODO: remove me when springs and damping
     // support is added
     bool allowSpringsAndDamping = false);
@@ -58,7 +58,7 @@ namespace SkelParser {
     const std::string& xmlString,
     const common::Uri& baseUri = "",
     const common::ResourceRetrieverPtr& retriever = nullptr,
-    // By default DiffDART clears out springs and damping, because our
+    // By default Nimble clears out springs and damping, because our
     // Jacobians don't support them. TODO: remove me when springs and damping
     // support is added
     bool allowSpringsAndDamping = false);

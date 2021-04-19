@@ -32,7 +32,7 @@ void Ticker(py::module& m)
                       if (e.matches(PyExc_KeyboardInterrupt))
                       {
                         std::cout
-                            << "DiffDART caught a keyboard interrupt in a "
+                            << "Nimble caught a keyboard interrupt in a "
                                "callback from registerTickListener(). Exiting "
                                "with code 0."
                             << std::endl;
@@ -40,7 +40,7 @@ void Ticker(py::module& m)
                       }
                       else
                       {
-                        std::cout << "DiffDART caught an exception calling "
+                        std::cout << "Nimble caught an exception calling "
                                      "callback from registerTickListener():"
                                   << std::endl
                                   << std::string(e.what()) << std::endl;
