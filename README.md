@@ -8,6 +8,8 @@
 
 ** BETA SOFTWARE **
 
+[Read our docs!](http://www.nimblephysics.org/docs)
+
 Use physics as a non-linearity in your neural network. A single timestep, `nimble.timestep(state, controls)`, is a valid PyTorch function.
 
 ![Forward pass illustration](https://nimblephysics.org/README/README_DataFlow_Fwd.svg)
@@ -27,4 +29,4 @@ next_state = timestep(world, current_state, control_forces)
 
 Nimble started life as a fork of the popular DART physics engine, with analytical gradients and a PyTorch binding. We've worked hard to maintain as much backwards compatability as we can, so many simulations that worked in DART should translate directly to Nimble.
 
-Check out our [website](http://www.diffdart.org) for more information.
+Check out our [website](http://www.nimblephysics.org) for more information.
