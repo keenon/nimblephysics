@@ -8,7 +8,7 @@
 
 ** BETA SOFTWARE **
 
-[Read our docs!](http://www.nimblephysics.org/docs)
+[Read our docs](http://www.nimblephysics.org/docs) and [the paper](https://arxiv.org/abs/2103.16021).
 
 Use physics as a non-linearity in your neural network. A single timestep, `nimble.timestep(state, controls)`, is a valid PyTorch function.
 
