@@ -303,6 +303,17 @@ void Problem(py::module& m)
           &dart::trajectory::Problem::setStates,
           ::py::arg("world"),
           ::py::arg("rollout"),
+          ::py::arg("perfLog") = nullptr)
+      .def(
+          "setControlForcesRaw",
+          &dart::trajectory::Problem::setControlForcesRaw,
+          ::py::arg("forces"),
+          ::py::arg("perfLog") = nullptr)
+      .def(
+          "updateWithForces",
+          &dart::trajectory::Problem::updateWithForces,
+          ::py::arg("world"),
+          ::py::arg("forces"),
           ::py::arg("perfLog") = nullptr);
   /*
 .def(
