@@ -395,13 +395,23 @@ void World(py::module& m)
             self->setVelocityLowerLimits(limits);
           })
       .def(
-          "getMassMatrix",
+          "getCoriolisAndGravityForces",
           +[](dart::simulation::World* self) -> Eigen::VectorXs {
+            return self->getCoriolisAndGravityForces();
+          })
+      .def(
+          "getCoriolisAndGravityAndExternalForces",
+          +[](dart::simulation::World* self) -> Eigen::VectorXs {
+            return self->getCoriolisAndGravityAndExternalForces();
+          })
+      .def(
+          "getMassMatrix",
+          +[](dart::simulation::World* self) -> Eigen::MatrixXs {
             return self->getMassMatrix();
           })
       .def(
           "getInvMassMatrix",
-          +[](dart::simulation::World* self) -> Eigen::VectorXs {
+          +[](dart::simulation::World* self) -> Eigen::MatrixXs {
             return self->getInvMassMatrix();
           })
       .def(
