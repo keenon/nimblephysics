@@ -32,4 +32,4 @@ RUN cd nimblephysics && \
     cat setup.py && \
     ${PYTHON} setup.py sdist bdist_wheel && \
     ${PYTHON} -m auditwheel repair dist/nimblephysics-${VERSION}-${PYTHON_VERSION}-linux_x86_64.whl
-RUN mv /nimblephysics/wheelhouse/nimblephysics-${VERSION}-${PYTHON_VERSION}-manylinux2014_x86_64.whl /wheelhouse
+RUN mv /nimblephysics/wheelhouse/nimblephysics-${VERSION}-${PYTHON_VERSION}-manylinux2_17_x86_64.whl /wheelhouse
