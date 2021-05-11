@@ -9,5 +9,5 @@ echo "Build image ID $IMAGE_ID"
 CONTAINER_ID=$(docker create $IMAGE_ID)
 echo "Started container ID $CONTAINER_ID"
 mkdir -p ../../../wheelhouse
-docker cp $CONTAINER_ID:/wheelhouse/nimblephysics-${VERSION}-cp39-cp39-manylinux2_17_x86_64.whl ../../../wheelhouse
+docker cp $CONTAINER_ID:/wheelhouse/nimblephysics-${VERSION}-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl ../../../wheelhouse
 docker rm -v $CONTAINER_ID
