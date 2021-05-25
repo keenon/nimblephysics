@@ -239,8 +239,8 @@ install_name_tool -id /usr/local/lib/libassimp.5.dylib /usr/local/lib/libassimp.
 # install_name_tool -id /usr/local/lib/libOpenThreads.21.dylib /usr/local/lib/libOpenThreads.21.dylib
 
 # Fix "icu4c" installed by Brew
-ICU4C_MAJOR_VERSION="68"
-ICU4C_FULL_VERSION="68.2"
+ICU4C_MAJOR_VERSION="69"
+ICU4C_FULL_VERSION="69.1"
 pushd /usr/local/Cellar/icu4c/${ICU4C_FULL_VERSION}/lib/
 sudo install_name_tool -change "@loader_path/libicuuc.${ICU4C_MAJOR_VERSION}.dylib" "@loader_path/libicuuc.${ICU4C_FULL_VERSION}.dylib" libicui18n.${ICU4C_FULL_VERSION}.dylib
 sudo install_name_tool -change "@loader_path/libicudata.${ICU4C_MAJOR_VERSION}.dylib" "@loader_path/libicudata.${ICU4C_FULL_VERSION}.dylib" libicui18n.${ICU4C_FULL_VERSION}.dylib
