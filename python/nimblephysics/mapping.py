@@ -87,7 +87,7 @@ class MapToVelLayer(torch.autograd.Function):
     return (
         None,
         None,
-        lossWrtVelocity,
+        lossWrtState,
     )
 
 
