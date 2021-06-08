@@ -414,7 +414,7 @@ LossGradientHighLevelAPI BackpropSnapshot::backpropState(
     }
     grad.lossWrtAction(i) = thisTimestepLoss.lossWrtTorque(actionMapping[i]);
   }
-  grad.lossWrtMass = Eigen::VectorXs::Zero(0);
+  grad.lossWrtMass = thisTimestepLoss.lossWrtMass;
   return grad;
 }
 
