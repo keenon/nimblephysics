@@ -236,7 +236,7 @@ RUN pushd grpc && \
     cmake -DgRPC_INSTALL=ON \
           -DgRPC_BUILD_TESTS=OFF \
           ../.. && \
-    make -j && \
+    make -j3 && \
     make install && \
     popd && \
     popd

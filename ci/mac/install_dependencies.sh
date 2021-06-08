@@ -111,6 +111,7 @@ rm -rf pybind11
 
 # Install tinyxml2
 git clone https://github.com/leethomason/tinyxml2.git
+git checkout 8.0.0
 pushd tinyxml2
 mkdir build
 pushd build
