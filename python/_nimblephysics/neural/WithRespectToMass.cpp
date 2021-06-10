@@ -67,6 +67,12 @@ void WithRespectToMass(py::module& m)
       .value(
           "INERTIA_FULL", dart::neural::WrtMassBodyNodeEntryType::INERTIA_FULL)
       .export_values();
+  ::py::class_<dart::neural::WrtMassBodyNodyEntry>(
+      m, "WrtMassBodyNodyEntry")
+      .def(::py::init<
+            const std::string &, dart::neural::WrtMassBodyNodeEntryType>())
+      .def_readwrite("linkName", &dart::neural::WrtMassBodyNodyEntry::linkName)
+      .def_readwrite("type", &dart::neural::WrtMassBodyNodyEntry::type);
 }
 
 } // namespace python
