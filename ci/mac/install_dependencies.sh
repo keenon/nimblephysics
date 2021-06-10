@@ -58,7 +58,7 @@ git clone https://github.com/coin-or-tools/ThirdParty-Mumps.git
 pushd ThirdParty-Mumps
 ./get.Mumps
 ./configure
-make -j
+make # Don't build mumps in parallel, that seems to have a race-condition on the Azure CI Mac's?
 make install
 popd
 rm -rf ThirdParty-Mumps
