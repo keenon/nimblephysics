@@ -4,10 +4,9 @@ import torch.nn.functional as F
 import random
 import math
 import time
-import diffdart as dart
+import nimblephysics as dart
 import os
 from typing import Dict
-from diffdart import DartTorchLossFn, DartTorchTrajectoryRollout, DartGUI, GUITrajectoryTrainer
 
 
 def main():
@@ -25,14 +24,7 @@ def main():
   floorBody.getShapeNode(0).getVisualAspect().setCastShadows(False)
 
   snapshot: dart.neural.BackpropSnapshot = dart.neural.forwardPass(world)
-  snapshot.benchmarkJacobians(world, 100)
-
-  """
-  gui = DartGUI()
-  gui.stateMachine().renderWorld(world)
-  gui.serve(8080)
-  gui.stateMachine().blockWhileServing()
-  """
+  snapshot.benchmarkJacobians(world, 2)
 
 
 if __name__ == "__main__":

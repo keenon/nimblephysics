@@ -1,11 +1,5 @@
 import numpy as np
-import torch
-import torch.nn.functional as F
-import random
-import math
-import time
-import diffdart as dart
-from diffdart import DartTorchLossFn, DartTorchTrajectoryRollout, DartGUI
+import nimblephysics as dart
 
 
 def main():

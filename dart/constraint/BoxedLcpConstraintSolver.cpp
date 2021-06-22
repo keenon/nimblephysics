@@ -78,9 +78,11 @@ BoxedLcpConstraintSolver::BoxedLcpConstraintSolver(
 {
   // Set the PGS options to be more accurate and tolerant than usual, to try
   // really hard to avoid returning no solution.
+  /*
   PgsBoxedLcpSolver* solver
       = static_cast<PgsBoxedLcpSolver*>(mSecondaryBoxedLcpSolver.get());
   solver->setOption(PgsBoxedLcpSolver::Option(10000, 1e-10, 1e-8, 1e-8, false));
+  */
 }
 
 //==============================================================================
