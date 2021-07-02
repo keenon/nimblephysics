@@ -43,6 +43,9 @@ if(TARGET dart-utils)
   dart_add_test("unit" test_SkelParser)
   target_link_libraries(test_SkelParser dart-utils)
 
+  dart_add_test("unit" test_OpenSimParser)
+  target_link_libraries(test_OpenSimParser dart-utils)
+
   dart_add_test("unit" test_VskParser)
   target_link_libraries(test_VskParser dart-utils)
 
