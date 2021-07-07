@@ -1221,6 +1221,15 @@ void BodyNode::setExtForce(
 }
 
 //==============================================================================
+/// Set the 6vec wrench directly
+void BodyNode::setExtWrench(const Eigen::Vector6s& wrench)
+{
+  mAspectState.mFext = wrench;
+
+  SKEL_SET_FLAGS(mExternalForces);
+}
+
+//==============================================================================
 void BodyNode::addExtTorque(const Eigen::Vector3s& _torque, bool _isLocal)
 {
   if (_isLocal)

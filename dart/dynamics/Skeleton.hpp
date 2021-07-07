@@ -853,6 +853,64 @@ public:
       const Eigen::VectorXs& _dq2, const Eigen::VectorXs& _dq1) const;
 
   //----------------------------------------------------------------------------
+  // Inverse Dynamics for Contacts
+  //----------------------------------------------------------------------------
+
+  struct ContactInverseDynamicsResult
+  {
+    dynamics::Skeleton* skel;
+    dynamics::BodyNode* contactBody;
+    Eigen::Vector6s contactWrench;
+    Eigen::VectorXs jointTorques;
+
+    // These are the setup of the inverse dynamics problem
+    Eigen::VectorXs pos;
+    Eigen::VectorXs vel;
+    Eigen::VectorXs nextVel;
+
+    /// This computes how much the actual dynamics we get when we apply this
+    /// solution differ from the goal solution.
+    s_t sumError();
+  };
+
+  /// This solves the inverse dynamics problem to figure out what forces we
+  /// would need to apply (in our _current state_) in order to get the desired
+  /// next velocity. This includes arbitrary forces and moments at the
+  /// `contactBody`, which can be post-processed down to individual contact
+  /// results.
+  ContactInverseDynamicsResult getContactInverseDynamics(
+      const Eigen::VectorXs& nextVel, dynamics::BodyNode* contactBody);
+
+  struct MultipleContactInverseDynamicsResult
+  {
+    dynamics::Skeleton* skel;
+    std::vector<dynamics::BodyNode*> contactBodies;
+    std::vector<Eigen::Vector6s> contactWrenches;
+    Eigen::VectorXs jointTorques;
+
+    // These are the setup of the inverse dynamics problem
+    Eigen::VectorXs pos;
+    Eigen::VectorXs vel;
+    Eigen::VectorXs nextVel;
+
+    /// This computes how much the actual dynamics we get when we apply this
+    /// solution differ from the goal solution.
+    s_t sumError();
+  };
+
+  /// If you pass in multiple simultaneous contacts, with guesses about the
+  /// contact wrenches for each body, this method will find the least-squares
+  /// closest solution for contact wrenches on each body that will satisfying
+  /// the next velocity constraint. This is intended to be useful for EM loops
+  /// for learning rich contact models. Without initial guesses, the solution is
+  /// not unique, so in order to use this method to get useful inverse dynamics
+  /// you'll need good initial guesses.
+  MultipleContactInverseDynamicsResult getMultipleContactInverseDynamics(
+      const Eigen::VectorXs& nextVel,
+      std::vector<dynamics::BodyNode*> bodies,
+      std::vector<Eigen::Vector6s> bodyWrenchGuesses);
+
+  //----------------------------------------------------------------------------
   /// \{ \name Support Polygon
   //----------------------------------------------------------------------------
 
