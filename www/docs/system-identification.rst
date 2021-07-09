@@ -103,5 +103,5 @@ To automatically compute and set inertia from the shape of colliders, all you ne
 
   massOfBox = 1.0
   centerOfMass = [0.0, 0.0, 0.0]
-  momentOfInertia = boxShape.computeInertia(massOfBox)
+  momentOfInertia = boxShape.getShape().computeInertia(massOfBox)
   boxBody.setInertia(nimble.dynamics.Inertia(massOfBox, centerOfMass, momentOfInertia))
