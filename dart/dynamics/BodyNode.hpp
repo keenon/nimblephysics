@@ -740,6 +740,9 @@ public:
       bool _isForceLocal = false,
       bool _isOffsetLocal = true);
 
+  /// Set the 6vec wrench directly
+  void setExtWrench(const Eigen::Vector6s& wrench);
+
   /// Set Applying linear Cartesian forces to this node.
   void setExtForce(
       const Eigen::Vector3s& _force,

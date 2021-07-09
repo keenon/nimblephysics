@@ -3346,6 +3346,232 @@ Eigen::VectorXs Skeleton::getVelocityDifferences(
 }
 
 //==============================================================================
+/// This quantifies how much error the inverse dynamics result ended up with.
+s_t Skeleton::ContactInverseDynamicsResult::sumError()
+{
+  Eigen::VectorXs oldPos = skel->getPositions();
+  Eigen::VectorXs oldVel = skel->getVelocities();
+  Eigen::VectorXs oldControl = skel->getControlForces();
+  Eigen::Vector6s oldExtForce = contactBody->getExternalForceLocal();
+
+  // Set to the initial conditions of the problem
+  skel->setPositions(pos);
+  skel->setVelocities(vel);
+  contactBody->setExtWrench(contactWrench);
+  skel->setControlForces(jointTorques);
+
+  // Compute one timestep
+  skel->computeForwardDynamics();
+  skel->integrateVelocities(skel->getTimeStep());
+  Eigen::VectorXs realNextVel = skel->getVelocities();
+
+  /*
+  Eigen::MatrixXs velCompare = Eigen::MatrixXs::Zero(realNextVel.size(), 2);
+  velCompare.col(0) = realNextVel;
+  velCompare.col(1) = nextVel;
+  std::cout << "real next vel - next vel (" << (realNextVel - nextVel).norm()
+            << "): " << std::endl
+            << velCompare << std::endl;
+  */
+
+  // Compute the error
+  s_t error = (realNextVel - nextVel).norm();
+
+  // Reset to old forces
+  skel->setPositions(oldPos);
+  skel->setVelocities(oldVel);
+  skel->setControlForces(oldControl);
+  contactBody->setExtWrench(oldExtForce);
+
+  return error;
+}
+
+//==============================================================================
+/// This solves the inverse dynamics problem to figure out what forces we
+/// would need to apply (in our _current state_) in order to get the desired
+/// next velocity. This includes arbitrary forces and moments at the
+/// `contactBody`, which can be post-processed down to individual contact
+/// results.
+Skeleton::ContactInverseDynamicsResult Skeleton::getContactInverseDynamics(
+    const Eigen::VectorXs& nextVel, dynamics::BodyNode* contactBody)
+{
+  ContactInverseDynamicsResult result;
+  result.skel = this;
+  result.contactBody = contactBody;
+  result.pos = getPositions();
+  result.vel = getVelocities();
+  result.nextVel = nextVel;
+
+  const dynamics::Joint* joint = getRootJoint();
+  const dynamics::FreeJoint* freeJoint
+      = dynamic_cast<const dynamics::FreeJoint*>(joint);
+  if (freeJoint == nullptr)
+  {
+    std::cout
+        << "Error: Skeleton::getContactInverseDynamics() assumes that the root "
+           "joint of the skeleton is a FreeJoint. Since it's not a FreeJoint, "
+           "this function won't work and we're returning zeros."
+        << std::endl;
+    result.contactWrench.setZero();
+    result.jointTorques = Eigen::VectorXs::Zero(getNumDofs());
+    return result;
+  }
+
+  // This is the Jacobian in local body space. We're going to end up applying
+  // our contact force in local body space, so this works out.
+  math::Jacobian jac = getJacobian(contactBody);
+  Eigen::Matrix6s jacBlock = jac.block<6, 6>(0, 0).transpose();
+
+  Eigen::VectorXs massTorques = multiplyByImplicitMassMatrix(
+      (nextVel - getVelocities()) / getTimeStep());
+
+  Eigen::VectorXs coriolisAndGravity
+      = getCoriolisAndGravityForces() - getExternalForces();
+
+  Eigen::Vector6s rootTorque
+      = massTorques.head<6>() + coriolisAndGravity.head<6>();
+  result.contactWrench
+      = jacBlock.completeOrthogonalDecomposition().solve(rootTorque);
+  Eigen::VectorXs contactTorques = jac.transpose() * result.contactWrench;
+  result.jointTorques = massTorques + coriolisAndGravity - contactTorques;
+  result.jointTorques.head<6>().setZero();
+
+  return result;
+}
+
+//==============================================================================
+/// This quantifies how much error the inverse dynamics result ended up with.
+s_t Skeleton::MultipleContactInverseDynamicsResult::sumError()
+{
+  Eigen::VectorXs oldPos = skel->getPositions();
+  Eigen::VectorXs oldVel = skel->getVelocities();
+  Eigen::VectorXs oldControl = skel->getControlForces();
+  std::vector<Eigen::Vector6s> oldExtForces;
+  for (int i = 0; i < contactBodies.size(); i++)
+  {
+    oldExtForces.push_back(contactBodies[i]->getExternalForceLocal());
+  }
+
+  // Set to the initial conditions of the problem
+  skel->setPositions(pos);
+  skel->setVelocities(vel);
+  for (int i = 0; i < contactBodies.size(); i++)
+  {
+    /*
+    std::cout << "Contact wrench " << i << ": " << contactWrenches[i]
+              << std::endl;
+    */
+    contactBodies[i]->setExtWrench(contactWrenches[i]);
+  }
+  // std::cout << "Control torques: " << jointTorques << std::endl;
+  skel->setControlForces(jointTorques);
+
+  // Compute one timestep
+  skel->computeForwardDynamics();
+  skel->integrateVelocities(skel->getTimeStep());
+  Eigen::VectorXs realNextVel = skel->getVelocities();
+
+  /*
+  Eigen::MatrixXs velCompare = Eigen::MatrixXs::Zero(realNextVel.size(), 2);
+  velCompare.col(0) = realNextVel;
+  velCompare.col(1) = nextVel;
+  std::cout << "real next vel - next vel (" << (realNextVel - nextVel).norm()
+            << "): " << std::endl
+            << velCompare << std::endl;
+  */
+
+  // Compute the error
+  s_t error = (realNextVel - nextVel).norm();
+
+  // Reset to old forces
+  skel->setPositions(oldPos);
+  skel->setVelocities(oldVel);
+  skel->setControlForces(oldControl);
+  for (int i = 0; i < contactBodies.size(); i++)
+  {
+    contactBodies[i]->setExtWrench(oldExtForces[i]);
+  }
+
+  return error;
+}
+
+//==============================================================================
+/// If you pass in multiple simultaneous contacts, with guesses about the
+/// contact wrenches for each body, this method will find the least-squares
+/// closest solution for contact wrenches on each body that will satisfying
+/// the next velocity constraint. This is intended to be useful for EM loops
+/// for learning rich contact models. Without initial guesses, the solution is
+/// not unique, so in order to use this method to get useful inverse dynamics
+/// you'll need good initial guesses.
+Skeleton::MultipleContactInverseDynamicsResult
+Skeleton::getMultipleContactInverseDynamics(
+    const Eigen::VectorXs& nextVel,
+    std::vector<dynamics::BodyNode*> bodies,
+    std::vector<Eigen::Vector6s> bodyWrenchGuesses)
+{
+  MultipleContactInverseDynamicsResult result;
+  result.skel = this;
+  result.contactBodies = bodies;
+  result.pos = getPositions();
+  result.vel = getVelocities();
+  result.nextVel = nextVel;
+
+  const dynamics::Joint* joint = getRootJoint();
+  const dynamics::FreeJoint* freeJoint
+      = dynamic_cast<const dynamics::FreeJoint*>(joint);
+  if (freeJoint == nullptr)
+  {
+    std::cout
+        << "Error: Skeleton::getContactInverseDynamics() assumes that the root "
+           "joint of the skeleton is a FreeJoint. Since it's not a FreeJoint, "
+           "this function won't work and we're returning zeros."
+        << std::endl;
+    result.contactWrenches = std::vector<Eigen::Vector6s>();
+    for (int i = 0; i < bodies.size(); i++)
+      result.contactWrenches.push_back(Eigen::Vector6s::Zero());
+    result.jointTorques = Eigen::VectorXs::Zero(getNumDofs());
+    return result;
+  }
+
+  // This is the Jacobian in local body space. We're going to end up applying
+  // our contact force in local body space, so this works out.
+  Eigen::MatrixXs jacs = Eigen::MatrixXs::Zero(6 * bodies.size(), getNumDofs());
+  Eigen::VectorXs forces = Eigen::VectorXs::Zero(6 * bodies.size());
+  assert(bodies.size() == bodyWrenchGuesses.size());
+
+  for (int i = 0; i < bodies.size(); i++)
+  {
+    forces.segment(6 * i, 6) = bodyWrenchGuesses[i];
+    jacs.block(6 * i, 0, 6, getNumDofs()) = getJacobian(bodies[i]);
+  }
+  Eigen::MatrixXs jacBlock = jacs.block(0, 0, 6 * bodies.size(), 6).transpose();
+
+  Eigen::VectorXs massTorques = multiplyByImplicitMassMatrix(
+      (nextVel - getVelocities()) / getTimeStep());
+
+  Eigen::VectorXs coriolisAndGravity
+      = getCoriolisAndGravityForces() - getExternalForces();
+
+  Eigen::Vector6s rootTorque
+      = massTorques.head<6>() + coriolisAndGravity.head<6>();
+  Eigen::VectorXs correctedForces
+      = jacBlock.completeOrthogonalDecomposition().solve(
+            rootTorque - jacBlock * forces)
+        + forces;
+  result.contactWrenches = std::vector<Eigen::Vector6s>();
+  for (int i = 0; i < bodies.size(); i++)
+  {
+    result.contactWrenches.push_back(Eigen::Vector6s::Zero());
+    result.contactWrenches[i] = correctedForces.segment(i * 6, 6);
+  }
+  Eigen::VectorXs contactTorques = jacs.transpose() * correctedForces;
+  result.jointTorques = massTorques + coriolisAndGravity - contactTorques;
+  result.jointTorques.head<6>().setZero();
+
+  return result;
+}
+
+//==============================================================================
 static bool isValidBodyNode(
     const Skeleton* _skeleton,
     const JacobianNode* _node,

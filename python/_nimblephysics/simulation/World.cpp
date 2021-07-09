@@ -445,6 +445,13 @@ void World(py::module& m)
           ::py::arg("useFDOverride"))
       .def("getUseFDOverride", &dart::simulation::World::getUseFDOverride)
       .def(
+          "getCachedLCPSolution",
+          &dart::simulation::World::getCachedLCPSolution)
+      .def(
+          "setCachedLCPSolution",
+          &dart::simulation::World::setCachedLCPSolution,
+          ::py::arg("cachedLCPSolution"))
+      .def(
           "setSlowDebugResultsAgainstFD",
           &dart::simulation::World::setSlowDebugResultsAgainstFD,
           ::py::arg("setSlowDebugResultsAgainstFD"))
