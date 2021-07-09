@@ -15,6 +15,10 @@ if(TARGET dart-utils-urdf)
 
   dart_add_test("regression" test_Issue1231)
 
+  dart_add_test("regression" test_YifengFDIssue)
+  target_link_libraries(test_YifengFDIssue dart-utils)
+  target_link_libraries(test_YifengFDIssue dart-utils-urdf)
+
 endif()
 
 if(TARGET dart-collision-bullet)

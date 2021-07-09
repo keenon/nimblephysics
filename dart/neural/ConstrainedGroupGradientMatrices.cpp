@@ -247,6 +247,25 @@ bool ConstrainedGroupGradientMatrices::opportunisticallyStandardizeResults(
 #ifndef NDEBUG
     // Sanity check
     Eigen::MatrixXs diff = Q - realQ;
+    Eigen::VectorXs diagonal = getConstraintForceMixingDiagonal();
+
+    // TODO(keenon): <remove>
+    // This is more analysis to check during breaks on the below asserts, when
+    // debugging
+    Eigen::MatrixXs Minv = getInvMassMatrix(world);
+    Eigen::MatrixXs M = getMassMatrix(world);
+    Eigen::MatrixXs otherMinv
+        = M.completeOrthogonalDecomposition().pseudoInverse();
+    Eigen::MatrixXs manualI = M * otherMinv;
+    Eigen::MatrixXs analyticalI = M * mMinv;
+    Eigen::MatrixXs analyticalI2 = M * Minv;
+    Eigen::MatrixXs diff2 = mMinv - otherMinv;
+    Eigen::MatrixXs diff3 = mMinv - Minv;
+
+    Eigen::MatrixXs Q2 = A_c.transpose() * otherMinv * A_c_ub_E;
+    Eigen::MatrixXs diff4 = Q2 - realQ;
+    // TODO(keenon): </remove>
+
     assert(abs(diff.maxCoeff()) < 1e-11);
     assert(abs(diff.minCoeff()) < 1e-11);
 #endif
@@ -880,7 +899,7 @@ Eigen::MatrixXs ConstrainedGroupGradientMatrices::getControlForceVelJacobian(
 #endif
 
   const Eigen::MatrixXs& A_c = getClampingConstraintMatrix();
-  Eigen::MatrixXs Minv = getInvMassMatrix(world);
+  Eigen::MatrixXs Minv = getInvMassMatrix(world.get());
 
   Eigen::MatrixXs jac;
 
@@ -1052,7 +1071,7 @@ Eigen::MatrixXs ConstrainedGroupGradientMatrices::getVelCJacobian(
 }
 
 //==============================================================================
-Eigen::MatrixXs ConstrainedGroupGradientMatrices::getMassMatrix(WorldPtr world)
+Eigen::MatrixXs ConstrainedGroupGradientMatrices::getMassMatrix(World* world)
 {
   Eigen::MatrixXs massMatrix = Eigen::MatrixXs::Zero(mNumDOFs, mNumDOFs);
   massMatrix.setZero();
@@ -1068,8 +1087,7 @@ Eigen::MatrixXs ConstrainedGroupGradientMatrices::getMassMatrix(WorldPtr world)
 }
 
 //==============================================================================
-Eigen::MatrixXs ConstrainedGroupGradientMatrices::getInvMassMatrix(
-    WorldPtr world)
+Eigen::MatrixXs ConstrainedGroupGradientMatrices::getInvMassMatrix(World* world)
 {
   Eigen::MatrixXs invMassMatrix = Eigen::MatrixXs::Zero(mNumDOFs, mNumDOFs);
   invMassMatrix.setZero();
@@ -1221,7 +1239,7 @@ Eigen::MatrixXs ConstrainedGroupGradientMatrices::getVelJacobianWrt(
   Eigen::MatrixXs dM
       = getJacobianOfMinv(world, dt * (tau - C) + A_c_ub_E * f_c, wrt);
 
-  Eigen::MatrixXs Minv = getInvMassMatrix(world);
+  Eigen::MatrixXs Minv = getInvMassMatrix(world.get());
 
   Eigen::MatrixXs dF_c = getJacobianOfConstraintForce(world, wrt);
 
@@ -1266,7 +1284,7 @@ Eigen::MatrixXs ConstrainedGroupGradientMatrices::getJacobianOfConstraintForce(
   const Eigen::MatrixXs& A_ub = getUpperBoundConstraintMatrix();
   const Eigen::MatrixXs& E = getUpperBoundMappingMatrix();
 
-  Eigen::MatrixXs Minv = getInvMassMatrix(world);
+  Eigen::MatrixXs Minv = getInvMassMatrix(world.get());
   Eigen::MatrixXs A_c_ub_E = A_c + A_ub * E;
   Eigen::MatrixXs Q = A_c.transpose() * Minv * A_c_ub_E;
   Q.diagonal() += getConstraintForceMixingDiagonal();
@@ -1380,7 +1398,7 @@ Eigen::MatrixXs ConstrainedGroupGradientMatrices::
   const Eigen::MatrixXs& E = getUpperBoundMappingMatrix();
   Eigen::MatrixXs A_c_ub_E = A_c + A_ub * E;
 
-  Eigen::MatrixXs Minv = getInvMassMatrix(world);
+  Eigen::MatrixXs Minv = getInvMassMatrix(world.get());
   Eigen::MatrixXs Q = A_c.transpose() * Minv * (A_c + A_ub * E);
   Q.diagonal() += getConstraintForceMixingDiagonal();
   Eigen::CompleteOrthogonalDecomposition<Eigen::MatrixXs> Qfactored
@@ -1507,7 +1525,7 @@ ConstrainedGroupGradientMatrices::getJacobianOfLCPOffsetClampingSubset(
     simulation::WorldPtr world, WithRespectTo* wrt)
 {
   s_t dt = world->getTimeStep();
-  Eigen::MatrixXs Minv = getInvMassMatrix(world);
+  Eigen::MatrixXs Minv = getInvMassMatrix(world.get());
   const Eigen::MatrixXs& A_c = getClampingConstraintMatrix();
   Eigen::MatrixXs dC = getJacobianOfC(world, wrt);
   if (wrt == WithRespectTo::VELOCITY)

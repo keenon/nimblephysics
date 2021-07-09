@@ -57,8 +57,7 @@ public:
       const std::shared_ptr<constraint::ConstraintBase>& constraint);
 
   /// This mocks registering a constaint. Useful for testing.
-  void mockRegisterConstraint(
-      s_t restitutionCoeff, s_t penetrationHackVel);
+  void mockRegisterConstraint(s_t restitutionCoeff, s_t penetrationHackVel);
 
   /// This gets called during the setup of the ConstrainedGroupGradientMatrices
   /// at each constraint's dimension. It gets called _after_ the system has
@@ -170,11 +169,11 @@ public:
 
   /// This returns the mass matrix for the group, a block diagonal
   /// concatenation of the skeleton mass matrices.
-  Eigen::MatrixXs getMassMatrix(simulation::WorldPtr world);
+  Eigen::MatrixXs getMassMatrix(simulation::World* world);
 
   /// This returns the inverse mass matrix for the group, a block diagonal
   /// concatenation of the skeleton inverse mass matrices.
-  Eigen::MatrixXs getInvMassMatrix(simulation::WorldPtr world);
+  Eigen::MatrixXs getInvMassMatrix(simulation::World* world);
 
   /// This returns the block diagonal matrix where each skeleton's joints
   /// integration scheme is reflected.
