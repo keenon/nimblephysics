@@ -30,90 +30,26 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <dart/dynamics/Inertia.hpp>
 #include <pybind11/pybind11.h>
+
+#include "eigen_geometry_pybind.h"
+#include "eigen_pybind.h"
 
 namespace py = pybind11;
 
 namespace dart {
 namespace python {
 
-void Shape(py::module& sm);
-
-void Entity(py::module& sm);
-void Frame(py::module& sm);
-void ShapeFrame(py::module& sm);
-void SimpleFrame(py::module& sm);
-
-void Node(py::module& sm);
-void JacobianNode(py::module& sm);
-void ShapeNode(py::module& sm);
-
-void DegreeOfFreedom(py::module& sm);
-
-void BodyNode(py::module& sm);
-void Inertia(py::module& sm);
-
-void Joint(py::module& sm);
-void ZeroDofJoint(py::module& sm);
-void WeldJoint(py::module& sm);
-void GenericJoint(py::module& sm);
-void RevoluteJoint(py::module& sm);
-void PrismaticJoint(py::module& sm);
-void ScrewJoint(py::module& sm);
-void UniversalJoint(py::module& sm);
-void TranslationalJoint2D(py::module& sm);
-void PlanarJoint(py::module& sm);
-void EulerJoint(py::module& sm);
-void BallJoint(py::module& sm);
-void TranslationalJoint(py::module& sm);
-void FreeJoint(py::module& sm);
-
-void MetaSkeleton(py::module& sm);
-void ReferentialSkeleton(py::module& sm);
-void Linkage(py::module& sm);
-void Chain(py::module& sm);
-void Skeleton(py::module& sm);
-
-void dart_dynamics(py::module& m)
+void Inertia(py::module& m)
 {
-  auto sm = m.def_submodule("dynamics");
-
-  Shape(sm);
-
-  Entity(sm);
-  Frame(sm);
-  ShapeFrame(sm);
-  SimpleFrame(sm);
-
-  Node(sm);
-  JacobianNode(sm);
-  ShapeNode(sm);
-
-  DegreeOfFreedom(sm);
-
-  BodyNode(sm);
-  Inertia(sm);
-
-  Joint(sm);
-  ZeroDofJoint(sm);
-  WeldJoint(sm);
-  GenericJoint(sm);
-  RevoluteJoint(sm);
-  PrismaticJoint(sm);
-  ScrewJoint(sm);
-  UniversalJoint(sm);
-  TranslationalJoint2D(sm);
-  PlanarJoint(sm);
-  EulerJoint(sm);
-  BallJoint(sm);
-  TranslationalJoint(sm);
-  FreeJoint(sm);
-
-  MetaSkeleton(sm);
-  ReferentialSkeleton(sm);
-  Linkage(sm);
-  Chain(sm);
-  Skeleton(sm);
+  ::py::class_<dart::dynamics::Inertia>(m, "Inertia")
+      .def(::py::init<const Eigen::Matrix6s&>(), ::py::arg("inertiaMatrix"))
+      .def(
+          ::py::init<double, Eigen::Vector3s, const Eigen::Matrix3s&>(),
+          ::py::arg("mass"),
+          ::py::arg("centerOfMass"),
+          ::py::arg("momentOfInertia"));
 }
 
 } // namespace python
