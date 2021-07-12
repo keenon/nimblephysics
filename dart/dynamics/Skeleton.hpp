@@ -902,9 +902,12 @@ public:
   /// contact wrenches for each body, this method will find the least-squares
   /// closest solution for contact wrenches on each body that will satisfying
   /// the next velocity constraint. This is intended to be useful for EM loops
-  /// for learning rich contact models. Without initial guesses, the solution is
-  /// not unique, so in order to use this method to get useful inverse dynamics
-  /// you'll need good initial guesses.
+  /// for learning rich contact models.
+  ///
+  /// Without initial guesses (pass in an empty array for guesses), the solution
+  /// is not unique, so in order to use this method to get useful inverse
+  /// dynamics we use a heuristic: we find the inverse dynamics that minimizes
+  /// the joint torques.
   MultipleContactInverseDynamicsResult getMultipleContactInverseDynamics(
       const Eigen::VectorXs& nextVel,
       std::vector<dynamics::BodyNode*> bodies,
