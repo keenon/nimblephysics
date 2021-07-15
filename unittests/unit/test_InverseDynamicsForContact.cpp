@@ -130,6 +130,114 @@ TEST(INV_DYN_FOR_CONTACT, TEST_MULTI_CONTACT_NO_GUESS)
 }
 
 //==============================================================================
+TEST(INV_DYN_FOR_CONTACT, TEST_MULTI_CONTACT_MULTI_TIMESTEP)
+{
+  // set precision to 256 bits (double has only 53 bits)
+#ifdef DART_USE_ARBITRARY_PRECISION
+  mpfr::mpreal::set_default_prec(256);
+#endif
+
+  std::shared_ptr<simulation::World> world = simulation::World::create();
+  std::shared_ptr<dynamics::Skeleton> skel = UniversalLoader::loadSkeleton(
+      world.get(), "dart://sample/sdf/atlas/atlas_v3_no_head.sdf");
+
+  int numTimesteps = 5;
+
+  Eigen::MatrixXs pos
+      = Eigen::MatrixXs::Random(skel->getNumDofs(), numTimesteps);
+  for (int i = 1; i < pos.cols(); i++)
+  {
+    pos.col(i)
+        = pos.col(i - 1) + Eigen::VectorXs::Random(skel->getNumDofs()) * 0.001;
+  }
+
+  std::vector<dynamics::BodyNode*> nodes;
+  std::vector<Eigen::Vector6s> wrenchGuesses;
+  nodes.push_back(skel->getBodyNode("l_foot"));
+  wrenchGuesses.push_back(Eigen::Vector6s::Zero());
+  nodes.push_back(skel->getBodyNode("r_foot"));
+  wrenchGuesses.push_back(Eigen::Vector6s::Zero());
+
+  // This is just to be able to compare the torque values against, and be sure
+  // we're minimizing them
+  Skeleton::MultipleContactInverseDynamicsOverTimeResult resultOverTime
+      = skel->getMultipleContactInverseDynamicsOverTime(pos, nodes, 1.0, 1.0);
+
+  s_t error = resultOverTime.sumError();
+  EXPECT_LE(error, 1e-11);
+
+  // This is just to be able to compare the torque values against, and be sure
+  // we're minimizing them
+  Skeleton::MultipleContactInverseDynamicsOverTimeResult
+      resultOverTimeMoreSmoothing
+      = skel->getMultipleContactInverseDynamicsOverTime(pos, nodes, 10.0, 1.0);
+
+  std::cout << "Smoothness @ 1: " << resultOverTime.computeSmoothnessLoss()
+            << std::endl;
+  std::cout << "Smoothness @ 10: "
+            << resultOverTimeMoreSmoothing.computeSmoothnessLoss() << std::endl;
+
+  EXPECT_LE(
+      resultOverTimeMoreSmoothing.computeSmoothnessLoss(),
+      resultOverTime.computeSmoothnessLoss());
+}
+
+//==============================================================================
+TEST(INV_DYN_FOR_CONTACT, TEST_MULTI_CONTACT_MULTI_TIMESTEP_PREV_FORCE)
+{
+  // set precision to 256 bits (double has only 53 bits)
+#ifdef DART_USE_ARBITRARY_PRECISION
+  mpfr::mpreal::set_default_prec(256);
+#endif
+
+  std::shared_ptr<simulation::World> world = simulation::World::create();
+  std::shared_ptr<dynamics::Skeleton> skel = UniversalLoader::loadSkeleton(
+      world.get(), "dart://sample/sdf/atlas/atlas_v3_no_head.sdf");
+
+  int numTimesteps = 5;
+
+  Eigen::MatrixXs pos
+      = Eigen::MatrixXs::Random(skel->getNumDofs(), numTimesteps);
+  for (int i = 1; i < pos.cols(); i++)
+  {
+    pos.col(i)
+        = pos.col(i - 1) + Eigen::VectorXs::Random(skel->getNumDofs()) * 0.001;
+  }
+
+  std::vector<dynamics::BodyNode*> nodes;
+  std::vector<Eigen::Vector6s> wrenchGuesses;
+  nodes.push_back(skel->getBodyNode("l_foot"));
+  wrenchGuesses.push_back(Eigen::Vector6s::Random());
+  nodes.push_back(skel->getBodyNode("r_foot"));
+  wrenchGuesses.push_back(Eigen::Vector6s::Random());
+
+  // This is just to be able to compare the torque values against, and be sure
+  // we're minimizing them
+  Skeleton::MultipleContactInverseDynamicsOverTimeResult resultOverTime
+      = skel->getMultipleContactInverseDynamicsOverTime(
+          pos, nodes, 1.0, 1.0, wrenchGuesses, 1.0);
+
+  s_t error = resultOverTime.sumError();
+  EXPECT_LE(error, 1e-11);
+
+  // This is just to be able to compare the torque values against, and be sure
+  // we're minimizing them
+  Skeleton::MultipleContactInverseDynamicsOverTimeResult
+      resultOverTimeMoreSmoothing
+      = skel->getMultipleContactInverseDynamicsOverTime(
+          pos, nodes, 1.0, 1.0, wrenchGuesses, 10.0);
+
+  std::cout << "Prev force loss @ 1: " << resultOverTime.computePrevForceLoss()
+            << std::endl;
+  std::cout << "Prev force loss @ 10: "
+            << resultOverTimeMoreSmoothing.computePrevForceLoss() << std::endl;
+
+  EXPECT_LE(
+      resultOverTimeMoreSmoothing.computePrevForceLoss(),
+      resultOverTime.computePrevForceLoss());
+}
+
+//==============================================================================
 TEST(INV_DYN_FOR_CONTACT, EXPLORE_RECOVER_CENTER_OF_PRESSURE)
 {
   Eigen::Vector3s f = Eigen::Vector3s(1.0, 0.0, 1.0);
