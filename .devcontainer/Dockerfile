@@ -20,6 +20,7 @@ RUN git clone https://github.com/PlatformLab/PerfUtils.git && \
 # Re-Install tinyxml2 - Just like PerfUtils, this needs to be built on each machine individually, since otherwise it can be incompatible
 RUN git clone https://github.com/leethomason/tinyxml2.git && \
     pushd tinyxml2 && \
+    sed -i '20iset(CMAKE_POSITION_INDEPENDENT_CODE ON)' CMakeLists.txt && \
     mkdir build && \
     pushd build && \
     cmake .. && \
