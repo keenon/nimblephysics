@@ -95,6 +95,13 @@ void Geometry(py::module& m)
       ::py::arg("S"));
 
   m.def(
+      "logMap",
+      +[](const Eigen::Matrix3s& _S) -> Eigen::Vector3s {
+        return dart::math::logMap(_S);
+      },
+      ::py::arg("S"));
+
+  m.def(
       "expMapJac",
       +[](const Eigen::Vector3s& _expmap) -> Eigen::Matrix3s {
         return dart::math::expMapJac(_expmap);
