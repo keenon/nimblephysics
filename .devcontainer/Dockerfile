@@ -6,6 +6,7 @@ RUN git clone https://github.com/PlatformLab/PerfUtils.git && \
     sed -i 's/3.11/3.6.1/g' CMakeLists.txt && \
     sed -i '94,$d' CMakeLists.txt && \
     sed -i '30,33d' CMakeLists.txt && \
+    sed -i '2iset(CMAKE_POSITION_INDEPENDENT_CODE ON)' CMakeLists.txt && \
     sed -i '36i\ \ \ \ CXX_STANDARD 11' CMakeLists.txt && \
     sed -i '36i\ \ \ \ CXX_STANDARD_REQUIRED YES' CMakeLists.txt && \
     sed -i '36i\ \ \ \ CXX_EXTENSIONS NO' CMakeLists.txt && \
