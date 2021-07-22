@@ -733,12 +733,18 @@ void SoftBodyNode::updateBiasForce(
   for (const auto& childBodyNode : mChildBodyNodes)
   {
     Joint* childJoint = childBodyNode->getParentJoint();
-
+    /*
     childJoint->addChildBiasForceTo(
         mBiasForce,
         childBodyNode->getArticulatedInertiaImplicit(),
         childBodyNode->mBiasForce,
         childBodyNode->getPartialAcceleration());
+    */
+    childJoint->addChildBiasForceTo(
+        mBiasForce,
+        childBodyNode->getArticulatedInertia(),
+        childBodyNode->mBiasForce,
+        childBodyNode->getPartialAcceleration()); 
   }
 
   //
@@ -754,8 +760,13 @@ void SoftBodyNode::updateBiasForce(
 
   // Update parent joint's total force with implicit joint damping and spring
   // forces
+  /*
   mParentJoint->updateTotalForce(
       getArticulatedInertiaImplicit() * getPartialAcceleration() + mBiasForce,
+      _timeStep);
+  */
+  mParentJoint->updateTotalForce(
+      getArticulatedInertia() * getPartialAcceleration() + mBiasForce,
       _timeStep);
 }
 

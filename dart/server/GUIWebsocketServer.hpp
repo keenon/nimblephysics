@@ -18,6 +18,7 @@
 #include <assimp/cimport.h>
 #include <assimp/postprocess.h>
 
+#include "dart/dynamics/BodyNode.hpp"
 #include "dart/dynamics/MeshShape.hpp"
 #include "dart/server/WebsocketServer.hpp"
 
@@ -113,6 +114,18 @@ public:
       std::shared_ptr<simulation::World> world,
       Eigen::MatrixXs positions,
       std::string prefix = "trajectory");
+
+  /// This is a high-level command that renders a wrench on a body node
+  GUIWebsocketServer& renderBodyWrench(
+      const dynamics::BodyNode* body,
+      Eigen::Vector6s wrench,
+      s_t scaleFactor = 0.1,
+      std::string prefix = "wrench");
+
+  /// This is a high-level command that removes the lines rendering a wrench on
+  /// a body node
+  GUIWebsocketServer& clearBodyWrench(
+      const dynamics::BodyNode* body, std::string prefix = "wrench");
 
   /// This completely resets the web GUI, deleting all objects, UI elements,
   /// and listeners

@@ -176,6 +176,9 @@ public:
   /// concatenation of the skeleton inverse mass matrices.
   Eigen::MatrixXs getInvMassMatrix(simulation::WorldPtr world);
 
+  /// This result the diagonal matrix where damping of each joint has been considered
+  Eigen::MatrixXs getDampingDiagonal(simulation::WorldPtr world);
+
   /// This returns the block diagonal matrix where each skeleton's joints
   /// integration scheme is reflected.
   Eigen::MatrixXs getJointsPosPosJacobian(simulation::WorldPtr world);

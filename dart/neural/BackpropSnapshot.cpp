@@ -673,18 +673,22 @@ const Eigen::MatrixXs& BackpropSnapshot::getVelVelJacobian(
     }
     else
     {
+      Eigen::MatrixXs ddamp = getDampingDiagonal(world);
+      Eigen::MatrixXs Minv = getInvMassMatrix(world);
+      s_t dt = world->getTimeStep();
       Eigen::MatrixXs A_c = getClampingConstraintMatrix(world);
 
       // If there are no clamping constraints, then vel-vel is just the identity
       if (A_c.size() == 0)
       {
         mCachedVelVel
-            = Eigen::MatrixXs::Identity(mNumDOFs, mNumDOFs)
-              - getControlForceVelJacobian(world) * getVelCJacobian(world);
+            = Eigen::MatrixXs::Identity(mNumDOFs, mNumDOFs) - dt*Minv*ddamp
+              - dt*Minv* getVelCJacobian(world);
       }
       else
       {
-        mCachedVelVel = getVelJacobianWrt(world, WithRespectTo::VELOCITY);
+        mCachedVelVel = getVelJacobianWrt(world, WithRespectTo::VELOCITY) - dt*Minv*ddamp;
+        
 
         /*
         Eigen::MatrixXs A_ub = getUpperBoundConstraintMatrix(world);
@@ -1100,9 +1104,10 @@ Eigen::MatrixXs BackpropSnapshot::getVelJacobianWrt(
   Eigen::VectorXs C = world->getCoriolisAndGravityAndExternalForces();
   Eigen::VectorXs f_c = getClampingConstraintImpulses();
   s_t dt = world->getTimeStep();
-
+  Eigen::MatrixXs ddamp = getDampingDiagonal(world);
+  Eigen::VectorXs v_t = world->getVelocities();
   Eigen::MatrixXs dM
-      = getJacobianOfMinv(world, dt * (tau - C) + A_c_ub_E * f_c, wrt);
+      = getJacobianOfMinv(world, dt * (tau - C - ddamp*v_t) + A_c_ub_E * f_c, wrt);
 
   Eigen::MatrixXs Minv = world->getInvMassMatrix();
 
@@ -1623,6 +1628,19 @@ Eigen::MatrixXs BackpropSnapshot::getInvMassMatrix(
       world,
       BackpropSnapshot::BlockDiagonalMatrixToAssemble::INV_MASS,
       forFiniteDifferencing);
+}
+
+Eigen::MatrixXs BackpropSnapshot::getDampingDiagonal(
+  WorldPtr world
+)
+{
+  Eigen::MatrixXs result = Eigen::MatrixXs::Zero(mNumDOFs,mNumDOFs);
+  std::vector<dynamics::DegreeOfFreedom*> dofs = world->getDofs();
+  for (int i=0;i<mNumDOFs;i++)
+  {
+    result(i,i) = dofs[i]->getDampingCoefficient();
+  }
+  return result;
 }
 
 //==============================================================================
@@ -2324,7 +2342,7 @@ Eigen::MatrixXs BackpropSnapshot::finiteDifferenceVelVelJacobian(
 
   Eigen::VectorXs originalVel = world->getVelocities();
 
-  s_t EPSILON = 1e-7;
+  s_t EPSILON = 1e-9;
   for (std::size_t i = 0; i < world->getNumDofs(); i++)
   {
     snapshot.restore();
@@ -4857,13 +4875,14 @@ Eigen::MatrixXs BackpropSnapshot::getJacobianOfLCPOffsetClampingSubset(
   Eigen::MatrixXs Minv = getInvMassMatrix(world);
   Eigen::MatrixXs A_c = getClampingConstraintMatrix(world);
   Eigen::MatrixXs dC = getJacobianOfC(world, wrt);
+  Eigen::MatrixXs ddamp = getDampingDiagonal(world);
   if (wrt == WithRespectTo::VELOCITY)
   {
     // snapshot.restore();
     return getBounceDiagonals().asDiagonal() * -A_c.transpose()
            * (Eigen::MatrixXs::Identity(
                   world->getNumDofs(), world->getNumDofs())
-              - dt * Minv * dC);
+              - dt * Minv * dC - dt*Minv*ddamp);
   }
   else if (wrt == WithRespectTo::FORCE)
   {
@@ -4873,9 +4892,10 @@ Eigen::MatrixXs BackpropSnapshot::getJacobianOfLCPOffsetClampingSubset(
 
   Eigen::VectorXs C = world->getCoriolisAndGravityAndExternalForces();
   Eigen::VectorXs f = getPreStepTorques() - C;
-  Eigen::MatrixXs dMinv_f = getJacobianOfMinv(world, f, wrt);
   Eigen::VectorXs v_f = getPreConstraintVelocity();
-
+  Eigen::VectorXs v_t = getPreStepVelocity();
+  f = f - ddamp*v_t;
+  Eigen::MatrixXs dMinv_f = getJacobianOfMinv(world, f, wrt);
   if (wrt == WithRespectTo::POSITION)
   {
     Eigen::MatrixXs dA_c_f
@@ -5314,6 +5334,12 @@ void BackpropSnapshot::computeLCPOffsetClampingSubset(
   b = -A_c.transpose()
       * (getPreConstraintVelocity() + getVelocityDueToIllegalImpulses());
   */
+  int nDofs = world->getNumDofs();
+  Eigen::MatrixXs damp = Eigen::MatrixXs::Zero(nDofs,nDofs);
+  for (int i=0;i<nDofs;i++)
+  {
+    damp(i,i) = world->getDofs()[i]->getDampingCoefficient();
+  }
   b = -getBounceDiagonals().cwiseProduct(
       A_c.transpose()
       * (world->getVelocities()
@@ -5321,7 +5347,8 @@ void BackpropSnapshot::computeLCPOffsetClampingSubset(
             * implicitMultiplyByInvMassMatrix(
                 world,
                 world->getControlForces()
-                    - world->getCoriolisAndGravityAndExternalForces()))));
+                    - world->getCoriolisAndGravityAndExternalForces()
+                    - damp*world->getVelocities()))));
 }
 
 //==============================================================================

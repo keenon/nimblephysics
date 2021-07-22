@@ -3536,12 +3536,10 @@ Skeleton::getMultipleContactInverseDynamics(
   // This is the Jacobian in local body space. We're going to end up applying
   // our contact force in local body space, so this works out.
   Eigen::MatrixXs jacs = Eigen::MatrixXs::Zero(6 * bodies.size(), getNumDofs());
-  Eigen::VectorXs forces = Eigen::VectorXs::Zero(6 * bodies.size());
-  assert(bodies.size() == bodyWrenchGuesses.size());
+  assert(bodies.size() > 0);
 
   for (int i = 0; i < bodies.size(); i++)
   {
-    forces.segment(6 * i, 6) = bodyWrenchGuesses[i];
     jacs.block(6 * i, 0, 6, getNumDofs()) = getJacobian(bodies[i]);
   }
   Eigen::MatrixXs jacBlock = jacs.block(0, 0, 6 * bodies.size(), 6).transpose();
@@ -3554,10 +3552,59 @@ Skeleton::getMultipleContactInverseDynamics(
 
   Eigen::Vector6s rootTorque
       = massTorques.head<6>() + coriolisAndGravity.head<6>();
-  Eigen::VectorXs correctedForces
-      = jacBlock.completeOrthogonalDecomposition().solve(
-            rootTorque - jacBlock * forces)
-        + forces;
+
+  Eigen::VectorXs correctedForces = Eigen::VectorXs::Zero(6 * bodies.size());
+
+  // If no guesses are passed in to us, we'll do our best to construct something
+  // sensible using the heuristic that we'd like a guess that minimizes the
+  // torques required at the bodies. That amounts to minimizing the moment arm
+  // between each body and its center of pressure. We can construct and solve a
+  // linearly constrained QP in closed form.
+  if (bodyWrenchGuesses.size() == 0)
+  {
+    // We want to take a minimum of torques.
+    int n = 6 * bodies.size();
+    int m = 6;
+
+    // Create a diagonal weight matrix for our QP.
+    s_t eps = 0.01;
+    Eigen::MatrixXs B = Eigen::MatrixXs::Identity(n, n);
+    for (int i = 0; i < bodies.size(); i++)
+    {
+      B(i * 6 + 3, i * 6 + 3) = eps;
+      B(i * 6 + 4, i * 6 + 4) = eps;
+      B(i * 6 + 5, i * 6 + 5) = eps;
+    }
+
+    // Create the KKT matrix for our QP
+    Eigen::MatrixXs KKT = Eigen::MatrixXs::Zero(n + m, n + m);
+    KKT.block(0, 0, n, n) = B;
+    KKT.block(n, 0, m, n) = jacBlock;
+    KKT.block(0, n, n, m) = jacBlock.transpose();
+
+    Eigen::VectorXs KKTeq = Eigen::VectorXs::Zero(n + m);
+    KKTeq.segment(n, m) = rootTorque;
+
+    Eigen::VectorXs KKTSolution
+        = KKT.completeOrthogonalDecomposition().solve(KKTeq);
+
+    // Read the forces off of the solution to the KKT conditions
+    correctedForces = KKTSolution.segment(0, n);
+  }
+  // If we were handed guesses, just find the least-squares nearest values for
+  // contact force that still satisfy inverse dynamics.
+  else
+  {
+    Eigen::VectorXs forces = Eigen::VectorXs::Zero(6 * bodies.size());
+    for (int i = 0; i < bodies.size(); i++)
+    {
+      forces.segment(6 * i, 6) = bodyWrenchGuesses[i];
+    }
+    correctedForces = jacBlock.completeOrthogonalDecomposition().solve(
+                          rootTorque - jacBlock * forces)
+                      + forces;
+  }
+
   result.contactWrenches = std::vector<Eigen::Vector6s>();
   for (int i = 0; i < bodies.size(); i++)
   {
