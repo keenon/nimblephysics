@@ -818,12 +818,27 @@ GUIWebsocketServer& GUIWebsocketServer::renderBodyWrench(
 
   Eigen::Isometry3s T = body->getWorldTransform();
 
+  Eigen::Vector3s tau = wrench.head<3>();
+  Eigen::Vector3s f = wrench.tail<3>();
+  Eigen::Matrix3s skew = math::makeSkewSymmetric(f);
+
+  Eigen::Vector3s residual = f.dot(tau) * (f / f.squaredNorm());
+  Eigen::Vector3s r = -skew.completeOrthogonalDecomposition().solve(tau);
+
+  Eigen::Vector3s recoveredTau = r.cross(f) + residual;
+  Eigen::Vector3s diff = tau - recoveredTau;
+  if (diff.squaredNorm() > 1e-8)
+  {
+    std::cout << "Error in renderBodyWrench()! Got diff: " << diff.squaredNorm()
+              << std::endl;
+  }
+
   std::vector<Eigen::Vector3s> torqueLine;
-  torqueLine.push_back(T.translation());
-  torqueLine.push_back(T * (wrench.head<3>() * scaleFactor));
+  torqueLine.push_back(T * (r * scaleFactor));
+  torqueLine.push_back(T * ((r + residual) * scaleFactor));
   std::vector<Eigen::Vector3s> forceLine;
-  forceLine.push_back(T.translation());
-  forceLine.push_back(T * (wrench.tail<3>() * scaleFactor));
+  forceLine.push_back(T * (r * scaleFactor));
+  forceLine.push_back(T * ((r + f) * scaleFactor));
 
   bool oldAutoflush = mAutoflush;
   mAutoflush = false;

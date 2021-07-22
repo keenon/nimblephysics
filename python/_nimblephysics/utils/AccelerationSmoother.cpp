@@ -30,6 +30,8 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <dart/utils/AccelerationSmoother.hpp>
+#include <pybind11/eigen.h>
 #include <pybind11/pybind11.h>
 
 namespace py = pybind11;
@@ -37,19 +39,18 @@ namespace py = pybind11;
 namespace dart {
 namespace python {
 
-void DartLoader(py::module& sm);
-void SkelParser(py::module& sm);
-void UniversalLoader(py::module& sm);
-void AccelerationSmoother(py::module& sm);
-
-void dart_utils(py::module& m)
+void AccelerationSmoother(py::module& m)
 {
-  auto sm = m.def_submodule("utils");
-
-  DartLoader(sm);
-  SkelParser(sm);
-  UniversalLoader(sm);
-  AccelerationSmoother(sm);
+  ::py::class_<dart::utils::AccelerationSmoother>(m, "AccelerationSmoother")
+      .def(::py::init<int, s_t>(), ::py::arg("timesteps"), ::py::arg("alpha"))
+      .def(
+          "smooth",
+          &dart::utils::AccelerationSmoother::smooth,
+          ::py::arg("series"))
+      .def(
+          "debugTimeSeries",
+          &dart::utils::AccelerationSmoother::debugTimeSeries,
+          ::py::arg("series"));
 }
 
 } // namespace python

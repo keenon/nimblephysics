@@ -3496,6 +3496,19 @@ s_t Skeleton::MultipleContactInverseDynamicsResult::sumError()
 }
 
 //==============================================================================
+/// This computes the difference between the guess and the closest valid
+/// solution
+s_t Skeleton::MultipleContactInverseDynamicsResult::computeGuessLoss()
+{
+  s_t loss = 0.0;
+  for (int i = 0; i < contactBodies.size(); i++)
+  {
+    loss += (contactWrenchGuesses[i] - contactWrenches[i]).squaredNorm();
+  }
+  return loss;
+}
+
+//==============================================================================
 /// If you pass in multiple simultaneous contacts, with guesses about the
 /// contact wrenches for each body, this method will find the least-squares
 /// closest solution for contact wrenches on each body that will satisfying
@@ -3585,8 +3598,7 @@ Skeleton::getMultipleContactInverseDynamics(
     Eigen::VectorXs KKTeq = Eigen::VectorXs::Zero(n + m);
     KKTeq.segment(n, m) = rootTorque;
 
-    Eigen::VectorXs KKTSolution
-        = KKT.completeOrthogonalDecomposition().solve(KKTeq);
+    Eigen::VectorXs KKTSolution = KKT.householderQr().solve(KKTeq);
 
     // Read the forces off of the solution to the KKT conditions
     correctedForces = KKTSolution.segment(0, n);
@@ -3595,6 +3607,8 @@ Skeleton::getMultipleContactInverseDynamics(
   // contact force that still satisfy inverse dynamics.
   else
   {
+    result.contactWrenchGuesses = bodyWrenchGuesses;
+
     Eigen::VectorXs forces = Eigen::VectorXs::Zero(6 * bodies.size());
     for (int i = 0; i < bodies.size(); i++)
     {
@@ -3615,6 +3629,234 @@ Skeleton::getMultipleContactInverseDynamics(
   result.jointTorques = massTorques + coriolisAndGravity - contactTorques;
   result.jointTorques.head<6>().setZero();
 
+  return result;
+}
+
+//==============================================================================
+/// This computes how much the actual dynamics we get when we apply this
+/// solution differ from the goal solution.
+s_t Skeleton::MultipleContactInverseDynamicsOverTimeResult::sumError()
+{
+  Eigen::VectorXs oldPos = skel->getPositions();
+  Eigen::VectorXs oldVel = skel->getVelocities();
+  Eigen::VectorXs oldControl = skel->getControlForces();
+  std::vector<Eigen::Vector6s> oldExtForces;
+  for (int i = 0; i < contactBodies.size(); i++)
+  {
+    oldExtForces.push_back(contactBodies[i]->getExternalForceLocal());
+  }
+
+  s_t error = 0.0;
+  for (int i = 0; i < timesteps; i++)
+  {
+    // Set to the initial conditions of the problem
+    skel->setPositions(positions.col(i));
+    skel->setVelocities(velocities.col(i));
+    for (int j = 0; j < contactBodies.size(); j++)
+    {
+      contactBodies[j]->setExtWrench(contactWrenches[i][j]);
+    }
+    skel->setControlForces(jointTorques.col(i));
+
+    // Compute one timestep
+    skel->computeForwardDynamics();
+    skel->integrateVelocities(skel->getTimeStep());
+    Eigen::VectorXs realNextVel = skel->getVelocities();
+
+    // Compute the error
+    error += (realNextVel - nextVelocities.col(i)).norm();
+  }
+
+  // Reset to old forces
+  skel->setPositions(oldPos);
+  skel->setVelocities(oldVel);
+  skel->setControlForces(oldControl);
+  for (int i = 0; i < contactBodies.size(); i++)
+  {
+    contactBodies[i]->setExtWrench(oldExtForces[i]);
+  }
+
+  return error;
+}
+
+//==============================================================================
+s_t Skeleton::MultipleContactInverseDynamicsOverTimeResult::
+    computeSmoothnessLoss()
+{
+  s_t loss = 0.0;
+  for (int i = 1; i < timesteps; i++)
+  {
+    for (int j = 0; j < contactBodies.size(); j++)
+    {
+      loss += (contactWrenches[i][j] - contactWrenches[i - 1][j]).squaredNorm();
+    }
+  }
+
+  return loss;
+}
+
+//==============================================================================
+s_t Skeleton::MultipleContactInverseDynamicsOverTimeResult::
+    computePrevForceLoss()
+{
+  s_t loss = 0.0;
+  for (int j = 0; j < contactBodies.size(); j++)
+  {
+    loss += (contactWrenches[0][j] - prevContactForces[j]).squaredNorm();
+  }
+  return loss;
+}
+
+//==============================================================================
+/// This sets up and solves a QP that tracks multiple contacts over a
+/// time-series of positions. This has two blending factors to control the
+/// solution, a `smoothingWeight` and a `minTorqueWeight`. Increasing the
+/// smoothing weight will prioritize a smoother (less time varying) set of
+/// contact forces. Increasing the minimize torques weight will prioritize
+/// solutions at each timestep that minimize the torque-component of the
+/// contact forces at each body.
+///
+/// This will not provide a contact solution at the last two timesteps passed
+/// in, because it cannot compute a velocity and acceleration at those
+/// timesteps.
+Skeleton::MultipleContactInverseDynamicsOverTimeResult
+Skeleton::getMultipleContactInverseDynamicsOverTime(
+    const Eigen::MatrixXs& positions,
+    std::vector<dynamics::BodyNode*> bodies,
+    s_t smoothingWeight,
+    s_t minTorqueWeight,
+    std::vector<Eigen::Vector6s> prevContactForces,
+    s_t prevContactWeight)
+{
+  MultipleContactInverseDynamicsOverTimeResult result;
+  result.skel = this;
+  result.contactBodies = bodies;
+
+  Eigen::VectorXs oldPos = getPositions();
+  Eigen::VectorXs oldVel = getVelocities();
+  Eigen::VectorXs oldControl = getControlForces();
+
+  int fDim = 6 * bodies.size();
+  int dofs = getNumDofs();
+
+  int timesteps = positions.cols() - 2;
+  result.timesteps = timesteps;
+  Eigen::MatrixXs B = Eigen::MatrixXs::Zero(fDim * timesteps, fDim * timesteps);
+  Eigen::MatrixXs A = Eigen::MatrixXs::Zero(6 * timesteps, fDim * timesteps);
+  Eigen::VectorXs c = Eigen::VectorXs::Zero(6 * timesteps);
+
+  result.positions = Eigen::MatrixXs::Zero(dofs, timesteps);
+  result.velocities = Eigen::MatrixXs::Zero(dofs, timesteps);
+  result.nextVelocities = Eigen::MatrixXs::Zero(dofs, timesteps);
+  result.jointTorques = Eigen::MatrixXs::Zero(dofs, timesteps);
+
+  std::vector<Eigen::MatrixXs> timestepJacs;
+  std::vector<Eigen::VectorXs> timestepJointTorques;
+
+  Eigen::MatrixXs torqueStamp = Eigen::MatrixXs::Identity(fDim, fDim);
+  s_t eps = 0.01;
+  for (int j = 0; j < bodies.size(); j++)
+  {
+    torqueStamp(j * 6 + 3, j * 6 + 3) = eps;
+    torqueStamp(j * 6 + 4, j * 6 + 4) = eps;
+    torqueStamp(j * 6 + 5, j * 6 + 5) = eps;
+  }
+
+  B.block(0, 0, fDim, fDim)
+      += prevContactWeight * Eigen::MatrixXs::Identity(fDim, fDim);
+  for (int i = 0; i < timesteps; i++)
+  {
+    B.block(fDim * i, fDim * i, fDim, fDim) += minTorqueWeight * torqueStamp;
+    if (i + 1 < timesteps)
+    {
+      B.block(fDim * i, fDim * i, fDim, fDim)
+          += smoothingWeight * Eigen::MatrixXs::Identity(fDim, fDim);
+      B.block(fDim * (i + 1), fDim * i, fDim, fDim)
+          -= smoothingWeight * Eigen::MatrixXs::Identity(fDim, fDim);
+      B.block(fDim * i, fDim * (i + 1), fDim, fDim)
+          -= smoothingWeight * Eigen::MatrixXs::Identity(fDim, fDim);
+      B.block(fDim * (i + 1), fDim * (i + 1), fDim, fDim)
+          += smoothingWeight * Eigen::MatrixXs::Identity(fDim, fDim);
+    }
+
+    Eigen::VectorXs vel
+        = (positions.col(i + 1) - positions.col(i)) / getTimeStep();
+    Eigen::VectorXs nextVel
+        = (positions.col(i + 2) - positions.col(i + 1)) / getTimeStep();
+    Eigen::VectorXs accel = (nextVel - vel) / getTimeStep();
+
+    result.positions.col(i) = positions.col(i);
+    result.velocities.col(i) = vel;
+    result.nextVelocities.col(i) = nextVel;
+
+    setPositions(positions.col(i));
+    setVelocities(vel);
+
+    // This is the Jacobian in local body space. We're going to end up applying
+    // our contact force in local body space, so this works out.
+    Eigen::MatrixXs jacs = Eigen::MatrixXs::Zero(fDim, getNumDofs());
+    assert(bodies.size() > 0);
+
+    for (int i = 0; i < bodies.size(); i++)
+    {
+      jacs.block(6 * i, 0, 6, getNumDofs()) = getJacobian(bodies[i]);
+    }
+    timestepJacs.push_back(jacs);
+
+    A.block(6 * i, fDim * i, 6, fDim) = jacs.block(0, 0, fDim, 6).transpose();
+
+    Eigen::VectorXs jointTorques
+        = (multiplyByImplicitMassMatrix(accel) + getCoriolisAndGravityForces()
+           - getExternalForces());
+    timestepJointTorques.push_back(jointTorques);
+    c.segment<6>(6 * i) = jointTorques.head<6>();
+  }
+
+  // We now have B, b, A, and c, so build the KKT matrix
+
+  Eigen::MatrixXs kktMatrix
+      = Eigen::MatrixXs::Zero(B.rows() + A.rows(), B.rows() + A.rows());
+  kktMatrix.block(0, 0, B.rows(), B.cols()) = B;
+  kktMatrix.block(B.rows(), 0, A.rows(), A.cols()) = A;
+  kktMatrix.block(0, B.cols(), A.cols(), A.rows()) = A.transpose();
+  Eigen::VectorXs kktVector
+      = Eigen::VectorXs::Zero(fDim * timesteps + c.size());
+  if (prevContactWeight > 0)
+  {
+    result.prevContactForces = prevContactForces;
+    assert(prevContactForces.size() == bodies.size());
+    for (int i = 0; i < bodies.size(); i++)
+    {
+      kktVector.segment<6>(i * 6)
+          = -2 * prevContactWeight * prevContactForces[i];
+    }
+  }
+  kktVector.segment(fDim * timesteps, c.size()) = c;
+
+  // Now factor and solve:
+
+  Eigen::VectorXs kktSolution = kktMatrix.householderQr().solve(kktVector);
+
+  // And we can read the solution off of the result:
+  for (int i = 0; i < timesteps; i++)
+  {
+    std::vector<Eigen::Vector6s> timestepContactWrenches;
+    for (int j = 0; j < bodies.size(); j++)
+    {
+      timestepContactWrenches.push_back(
+          kktSolution.segment<6>(i * fDim + j * 6));
+    }
+    result.contactWrenches.push_back(timestepContactWrenches);
+
+    Eigen::VectorXs contactTorques
+        = timestepJacs[i].transpose() * kktSolution.segment(i * fDim, fDim);
+    result.jointTorques.col(i) = timestepJointTorques[i] - contactTorques;
+    result.jointTorques.col(i).head<6>().setZero();
+  }
+
+  setPositions(oldPos);
+  setVelocities(oldVel);
+  setControlForces(oldControl);
   return result;
 }
 
