@@ -70,6 +70,7 @@ ConstrainedGroupGradientMatrices::ConstrainedGroupGradientMatrices(
   mPreStepTorques = Eigen::VectorXs::Zero(mNumDOFs);
   mPreStepVelocities = Eigen::VectorXs::Zero(mNumDOFs);
   mPreLCPVelocities = Eigen::VectorXs::Zero(mNumDOFs);
+  mPreStepPositions = Eigen::VectorXs::Zero(mNumDOFs);
   int cursor = 0;
   for (auto skel : skeletons)
   {
@@ -79,6 +80,8 @@ ConstrainedGroupGradientMatrices::ConstrainedGroupGradientMatrices(
     mPreLCPVelocities.segment(cursor, dofs) = skel->getVelocities();
     mPreStepVelocities.segment(cursor, dofs)
         = skel->getVelocities() - (timeStep * skel->getAccelerations());
+    mPreStepPositions.segment(cursor,dofs)
+        = skel->getPositions() - (timeStep * (skel->getVelocities()-(timeStep*skel->getAccelerations())));
     cursor += dofs;
   }
 }
@@ -925,16 +928,18 @@ Eigen::MatrixXs ConstrainedGroupGradientMatrices::getVelVelJacobian(
   // If there are no clamping constraints, then vel-vel is just the identity
   Eigen::VectorXs ddamp = getDampingVector(world);
   Eigen::MatrixXs Minv = getInvMassMatrix(world);
+  Eigen::VectorXs spring_stiffs = getSpringStiffVector(world);
   s_t dt = world->getTimeStep();
   if (A_c.size() == 0)
   {
     jac = Eigen::MatrixXs::Identity(mNumDOFs, mNumDOFs)
           - getControlForceVelJacobian(world) * getVelCJacobian(world)
-          - dt*Minv*ddamp.asDiagonal();
+          - dt*Minv*(ddamp.asDiagonal()+dt*spring_stiffs.asDiagonal());
   }
   else
   {
-    jac = getVelJacobianWrt(world, WithRespectTo::VELOCITY) -dt*Minv*ddamp.asDiagonal();
+    jac = getVelJacobianWrt(world, WithRespectTo::VELOCITY) 
+          - dt*Minv*(ddamp.asDiagonal()+dt*spring_stiffs.asDiagonal());
   }
 
 #ifdef LOG_PERFORMANCE_CONSTRAINED_GROUP
@@ -1110,6 +1115,46 @@ Eigen::VectorXs ConstrainedGroupGradientMatrices::getDampingVector(
   return result;
 }
 
+Eigen::VectorXs ConstrainedGroupGradientMatrices::getSpringStiffVector(
+  WorldPtr world
+)
+{
+  Eigen::VectorXs result = Eigen::VectorXs::Zero(mNumDOFs);
+  std::size_t cursor = 0;
+  for (std::size_t i=0;i<nSkeletons.size();i++)
+  {
+    SkeletonPtr skel = world->getSkeleton(mSkeleton[i]);
+    std::vector<dynamics::DegreeOfFreedom*> skeldofs = skel->getDofs();
+    std::size_t nDofs = skel->getNumDofs();
+    for (int j=0;j<nDofs;j++)
+    {
+      result(cursor) = skeldofs[j]->getSpringStiffness();
+      cursor ++;
+    }
+    return result;
+  }
+}
+
+Eigen::VectorXs ConstrainedGroupGradientMatrices::getRestPositions(
+  WorldPtr world
+)
+{
+  Eigen::VectorXs result = Eigen::VectorXs::Zero(mNumDOFs);
+  std::size_t cursor = 0;
+  for (std::size_t i=0;i<nSkeletons.size();i++)
+  {
+    SkeletonPtr skel = world->getSkeleton(mSkeleton[i]);
+    std::vector<dynamics::DegreeOfFreedom*> skeldofs = skel->getDofs();
+    std::size_t nDofs = skel->getNumDofs();
+    for (int j=0;j<nDofs;j++)
+    {
+      result(cursor) = skeldofs[j]->getRestPosition();
+      cursor ++;
+    }
+    return result;
+  }
+}
+
 //==============================================================================
 Eigen::MatrixXs ConstrainedGroupGradientMatrices::getJointsPosPosJacobian(
     simulation::WorldPtr world)
@@ -1243,21 +1288,15 @@ Eigen::MatrixXs ConstrainedGroupGradientMatrices::getVelJacobianWrt(
   const Eigen::VectorXs& f_c = getClampingConstraintImpulses();
   s_t dt = world->getTimeStep();
   Eigen::VectorXs ddamp = getDampingVector(world);
-  Eigen::VectorXs v_t = Eigen::VectorXs::Zero(dofs);
-  int cursor = 0;
-  for(std::size_t i=0;i<mSkeletons.size();i++)
-  {
-    SkeletonPtr skel = world->getSkeleton(mSkeletons[i]);
-    std::vector<dynamics::DegreeOfFreedom*> skeldofs = skel->getDofs();
-    std::size_t nDofs = skel->getNumDofs();
-    for (int j=0;j<nDofs;j++)
-    {
-      v_t(cursor) = skeldofs[j]->getVelocity();
-      cursor ++;
-    }
-  }
+  Eigen::VectorXs v_t = mPreStepVelocities;
+  Eigen::VectorXs p_t = mPreStepPositions;
+  Eigen::VectorXs spring_stiffs = getSpringStiffVector(world);
+  Eigen::VectorXs p_rest = getRestPositions(world);
+  Eigen::VectorXs spring_forces = spring_forces.asDiagonal()*(p_t - p_rest + dt*v_t);
+  Eigen::VectorXs damping_forces = ddamp.asDiagonal()*v_t;
+
   Eigen::MatrixXs dM
-      = getJacobianOfMinv(world, dt * (tau - C - ddamp.asDiagonal()*v_t) + A_c_ub_E * f_c, wrt);
+      = getJacobianOfMinv(world, dt * (tau - C - damping_forces - spring_forces) + A_c_ub_E * f_c, wrt);
 
   Eigen::MatrixXs Minv = getInvMassMatrix(world);
 
@@ -1281,7 +1320,7 @@ Eigen::MatrixXs ConstrainedGroupGradientMatrices::getVelJacobianWrt(
   {
     Eigen::MatrixXs dA_c = getJacobianOfClampingConstraints(world, f_c);
     Eigen::MatrixXs dA_ubE = getJacobianOfUpperBoundConstraints(world, E * f_c);
-    return dM + Minv * (A_c_ub_E * dF_c + dA_c + dA_ubE - dt * dC);
+    return dM + Minv * (A_c_ub_E * dF_c + dA_c + dA_ubE - dt * dC - dt*spring_stiffs);
   }
   else
   {
@@ -1548,12 +1587,13 @@ ConstrainedGroupGradientMatrices::getJacobianOfLCPOffsetClampingSubset(
   Eigen::MatrixXs Minv = getInvMassMatrix(world);
   const Eigen::MatrixXs& A_c = getClampingConstraintMatrix();
   Eigen::MatrixXs dC = getJacobianOfC(world, wrt);
+  Eigen::MatrixXs spring_stiffs = getSpringStiffVector(world).asDiagonal();
   if (wrt == WithRespectTo::VELOCITY)
   {
     Eigen::MatrixXs ddamp = getDampingVector(world).asDiagonal();
     return getBounceDiagonals().asDiagonal() * -A_c.transpose()
            * (Eigen::MatrixXs::Identity(mNumDOFs, mNumDOFs)
-           - dt*Minv*(dC+ddamp));
+           - dt*Minv*(dC+ddamp+dt*spring_stiffs));
   }
   else if (wrt == WithRespectTo::FORCE)
   {
@@ -1564,8 +1604,12 @@ ConstrainedGroupGradientMatrices::getJacobianOfLCPOffsetClampingSubset(
   Eigen::VectorXs f = getPreStepTorques() - C;
   Eigen::VectorXs v_f = mPreLCPVelocities;
   Eigen::VectorXs v_t = mPreStepVelocities;
+  Eigen::VectorXs p_t = mPreStepPositions;
   Eigen::MatrixXs ddamp = getDampingVector(world).asDiagonal();
-  f = f - ddamp*v_t;
+  Eigen::MatrixXs p_rest = getRestPositions(world);
+  Eigen::VectorXs spring_forces = spring_stiffs*(p_t - p_rest + dt*v_t);
+  Eigen::VectorXs damping_force = ddamp*v_t;
+  f = f - damping_forces - spring_forces;
   Eigen::MatrixXs dMinv_f = getJacobianOfMinv(world, f, wrt);
 
   if (wrt == WithRespectTo::POSITION)
@@ -1574,7 +1618,7 @@ ConstrainedGroupGradientMatrices::getJacobianOfLCPOffsetClampingSubset(
         = getJacobianOfClampingConstraintsTranspose(world, v_f);
 
     return getBounceDiagonals().asDiagonal()
-           * -(dA_c_f + A_c.transpose() * dt * (dMinv_f - Minv * dC));
+           * -(dA_c_f + A_c.transpose() * dt * (dMinv_f - Minv * dC - Minv*spring_stiffs));
   }
   else
   {

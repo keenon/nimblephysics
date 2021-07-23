@@ -1801,6 +1801,7 @@ VelocityTest runVelocityTest(WorldPtr world)
   snapshot.restore();
 
   Eigen::VectorXs preStepVelocity = world->getVelocities();
+  Eigen::VectorXs preStepPosition = world->getPositions();
 
   Eigen::VectorXs realNextVel = classicPtr->getPostStepVelocity();
   Eigen::VectorXs realNextVelDeltaVFromF = realNextVel - realNextVelPreSolve;
@@ -1811,13 +1812,12 @@ VelocityTest runVelocityTest(WorldPtr world)
   Eigen::MatrixXs A_c_ub_E = A_c + A_ub * E;
   Eigen::VectorXs tau = world->getControlForces();
   int nDofs = world->getNumDofs();
-  Eigen::VectorXs damping = Eigen::VectorXs::Zero(nDofs);
-  std::vector<dynamics::DegreeOfFreedom*> dofs = world->getDofs();
-  for (int i=0;i<nDofs;i++)
-  {
-    damping(i) = dofs[i]->getDampingCoefficient();
-  }
+  Eigen::VectorXs damping = classicPtr->getDampingVector(world).asDiagonal();
+  Eigen::VectorXs spring_stiffs = classicPtr->getSpringStiffVector(world);
+  Eigen::VectorXs p_rest = classicPtr->getRestPositions(world);
   s_t dt = world->getTimeStep();
+  Eigen::VectorXs damping_force = damping.asDiagonal()*preStepVelocity;
+  Eigen::VectorXs spring_force = spring_stiffs.asDiagonal()*(preStepPosition - p_rest + preStepVelocity*dt);
 
   Eigen::MatrixXs Minv = world->getInvMassMatrix();
   Eigen::VectorXs C = world->getCoriolisAndGravityAndExternalForces();
@@ -1852,7 +1852,7 @@ VelocityTest runVelocityTest(WorldPtr world)
 
   Eigen::VectorXs realImpulses = classicPtr->getClampingConstraintImpulses();
 
-  Eigen::VectorXs preSolveV = preStepVelocity + dt * Minv * (tau - C - damping.asDiagonal()*preStepVelocity);
+  Eigen::VectorXs preSolveV = preStepVelocity + dt * Minv * (tau - C - damping_force - spring_force);
 
   Eigen::VectorXs f_cDeltaV;
   if (A_c.cols() == 0)

@@ -192,6 +192,12 @@ public:
   /// This return the diagonal matrix representing Coefficients of damping
   Eigen::VectorXs getDampingVector(simulation::WorldPtr world);
 
+  /// This return the diagonal matrix(vector) representing spring stiffness
+  Eigen::VectorXs getSpringStiffVector(simulation::WorldPtr world);
+
+  /// This returns the rest position vector of each degree of freedom
+  Eigen::VectorXs getRestPositions(simulation::WorldPtr world);
+
   /// This is the subset of the A matrix from the original LCP that corresponds
   /// to clamping indices.
   Eigen::MatrixXs getClampingAMatrix();
