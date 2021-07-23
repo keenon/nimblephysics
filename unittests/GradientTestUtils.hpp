@@ -1811,11 +1811,11 @@ VelocityTest runVelocityTest(WorldPtr world)
   Eigen::MatrixXs A_c_ub_E = A_c + A_ub * E;
   Eigen::VectorXs tau = world->getControlForces();
   int nDofs = world->getNumDofs();
-  Eigen::MatrixXs damping = Eigen::MatrixXs::Zero(nDofs,nDofs);
+  Eigen::VectorXs damping = Eigen::VectorXs::Zero(nDofs);
   std::vector<dynamics::DegreeOfFreedom*> dofs = world->getDofs();
   for (int i=0;i<nDofs;i++)
   {
-    damping(i,i) = dofs[i]->getDampingCoefficient();
+    damping(i) = dofs[i]->getDampingCoefficient();
   }
   s_t dt = world->getTimeStep();
 
@@ -1852,8 +1852,7 @@ VelocityTest runVelocityTest(WorldPtr world)
 
   Eigen::VectorXs realImpulses = classicPtr->getClampingConstraintImpulses();
 
-  Eigen::VectorXs preSolveV = preStepVelocity + dt * Minv * (tau - C - damping*preStepVelocity);
-  //std::cout<<"Analytical Accelerations:"<<dt*Minv*(tau - C -damping*preStepVelocity)<<std::endl;
+  Eigen::VectorXs preSolveV = preStepVelocity + dt * Minv * (tau - C - damping.asDiagonal()*preStepVelocity);
 
   Eigen::VectorXs f_cDeltaV;
   if (A_c.cols() == 0)

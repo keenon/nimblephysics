@@ -673,7 +673,7 @@ const Eigen::MatrixXs& BackpropSnapshot::getVelVelJacobian(
     }
     else
     {
-      Eigen::MatrixXs ddamp = getDampingDiagonal(world);
+      Eigen::VectorXs ddamp = getDampingVector(world);
       Eigen::MatrixXs Minv = getInvMassMatrix(world);
       s_t dt = world->getTimeStep();
       Eigen::MatrixXs A_c = getClampingConstraintMatrix(world);
@@ -682,12 +682,12 @@ const Eigen::MatrixXs& BackpropSnapshot::getVelVelJacobian(
       if (A_c.size() == 0)
       {
         mCachedVelVel
-            = Eigen::MatrixXs::Identity(mNumDOFs, mNumDOFs) - dt*Minv*ddamp
+            = Eigen::MatrixXs::Identity(mNumDOFs, mNumDOFs) - dt*Minv*ddamp.asDiagonal()
               - dt*Minv* getVelCJacobian(world);
       }
       else
       {
-        mCachedVelVel = getVelJacobianWrt(world, WithRespectTo::VELOCITY) - dt*Minv*ddamp;
+        mCachedVelVel = getVelJacobianWrt(world, WithRespectTo::VELOCITY) - dt*Minv*ddamp.asDiagonal();
         
 
         /*
@@ -1104,10 +1104,10 @@ Eigen::MatrixXs BackpropSnapshot::getVelJacobianWrt(
   Eigen::VectorXs C = world->getCoriolisAndGravityAndExternalForces();
   Eigen::VectorXs f_c = getClampingConstraintImpulses();
   s_t dt = world->getTimeStep();
-  Eigen::MatrixXs ddamp = getDampingDiagonal(world);
+  Eigen::VectorXs ddamp = getDampingVector(world);
   Eigen::VectorXs v_t = world->getVelocities();
   Eigen::MatrixXs dM
-      = getJacobianOfMinv(world, dt * (tau - C - ddamp*v_t) + A_c_ub_E * f_c, wrt);
+      = getJacobianOfMinv(world, dt * (tau - C - ddamp.asDiagonal()*v_t) + A_c_ub_E * f_c, wrt);
 
   Eigen::MatrixXs Minv = world->getInvMassMatrix();
 
@@ -1630,15 +1630,15 @@ Eigen::MatrixXs BackpropSnapshot::getInvMassMatrix(
       forFiniteDifferencing);
 }
 
-Eigen::MatrixXs BackpropSnapshot::getDampingDiagonal(
+Eigen::VectorXs BackpropSnapshot::getDampingVector(
   WorldPtr world
 )
 {
-  Eigen::MatrixXs result = Eigen::MatrixXs::Zero(mNumDOFs,mNumDOFs);
+  Eigen::VectorXs result = Eigen::VectorXs::Zero(mNumDOFs);
   std::vector<dynamics::DegreeOfFreedom*> dofs = world->getDofs();
   for (int i=0;i<mNumDOFs;i++)
   {
-    result(i,i) = dofs[i]->getDampingCoefficient();
+    result(i) = dofs[i]->getDampingCoefficient();
   }
   return result;
 }
@@ -2342,7 +2342,7 @@ Eigen::MatrixXs BackpropSnapshot::finiteDifferenceVelVelJacobian(
 
   Eigen::VectorXs originalVel = world->getVelocities();
 
-  s_t EPSILON = 1e-9;
+  s_t EPSILON = 1e-7;
   for (std::size_t i = 0; i < world->getNumDofs(); i++)
   {
     snapshot.restore();
@@ -4875,14 +4875,14 @@ Eigen::MatrixXs BackpropSnapshot::getJacobianOfLCPOffsetClampingSubset(
   Eigen::MatrixXs Minv = getInvMassMatrix(world);
   Eigen::MatrixXs A_c = getClampingConstraintMatrix(world);
   Eigen::MatrixXs dC = getJacobianOfC(world, wrt);
-  Eigen::MatrixXs ddamp = getDampingDiagonal(world);
+  Eigen::MatrixXs ddamp = getDampingVector(world).asDiagonal();
   if (wrt == WithRespectTo::VELOCITY)
   {
     // snapshot.restore();
     return getBounceDiagonals().asDiagonal() * -A_c.transpose()
            * (Eigen::MatrixXs::Identity(
                   world->getNumDofs(), world->getNumDofs())
-              - dt * Minv * dC - dt*Minv*ddamp);
+              - dt * Minv * (dC+ddamp));
   }
   else if (wrt == WithRespectTo::FORCE)
   {

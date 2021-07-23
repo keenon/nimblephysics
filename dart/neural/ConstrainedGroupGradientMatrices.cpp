@@ -923,18 +923,18 @@ Eigen::MatrixXs ConstrainedGroupGradientMatrices::getVelVelJacobian(
   Eigen::MatrixXs jac;
 
   // If there are no clamping constraints, then vel-vel is just the identity
-  Eigen::MatrixXs ddamp = getDampingDiagonal(world);
+  Eigen::VectorXs ddamp = getDampingVector(world);
   Eigen::MatrixXs Minv = getInvMassMatrix(world);
   s_t dt = world->getTimeStep();
   if (A_c.size() == 0)
   {
     jac = Eigen::MatrixXs::Identity(mNumDOFs, mNumDOFs)
           - getControlForceVelJacobian(world) * getVelCJacobian(world)
-          - dt*Minv*ddamp;
+          - dt*Minv*ddamp.asDiagonal();
   }
   else
   {
-    jac = getVelJacobianWrt(world, WithRespectTo::VELOCITY) -dt*Minv*ddamp;
+    jac = getVelJacobianWrt(world, WithRespectTo::VELOCITY) -dt*Minv*ddamp.asDiagonal();
   }
 
 #ifdef LOG_PERFORMANCE_CONSTRAINED_GROUP
@@ -1090,11 +1090,11 @@ Eigen::MatrixXs ConstrainedGroupGradientMatrices::getInvMassMatrix(
   return invMassMatrix;
 }
 
-Eigen::MatrixXs ConstrainedGroupGradientMatrices::getDampingDiagonal(
+Eigen::VectorXs ConstrainedGroupGradientMatrices::getDampingVector(
   WorldPtr world
 )
 {
-  Eigen::MatrixXs result = Eigen::MatrixXs::Zero(mNumDOFs,mNumDOFs);
+  Eigen::VectorXs result = Eigen::VectorXs::Zero(mNumDOFs);
   std::size_t cursor = 0;
   for(std::size_t i=0;i<mSkeletons.size();i++)
   {
@@ -1103,7 +1103,7 @@ Eigen::MatrixXs ConstrainedGroupGradientMatrices::getDampingDiagonal(
     std::size_t nDofs = skel->getNumDofs();
     for (int j=0;j<nDofs;j++)
     {
-      result(cursor,cursor) = skeldofs[j]->getDampingCoefficient();
+      result(cursor) = skeldofs[j]->getDampingCoefficient();
       cursor ++;
     }
   }
@@ -1242,7 +1242,7 @@ Eigen::MatrixXs ConstrainedGroupGradientMatrices::getVelJacobianWrt(
   Eigen::VectorXs C = getCoriolisAndGravityAndExternalForces(world);
   const Eigen::VectorXs& f_c = getClampingConstraintImpulses();
   s_t dt = world->getTimeStep();
-  Eigen::MatrixXs ddamp = getDampingDiagonal(world);
+  Eigen::VectorXs ddamp = getDampingVector(world);
   Eigen::VectorXs v_t = Eigen::VectorXs::Zero(dofs);
   int cursor = 0;
   for(std::size_t i=0;i<mSkeletons.size();i++)
@@ -1257,7 +1257,7 @@ Eigen::MatrixXs ConstrainedGroupGradientMatrices::getVelJacobianWrt(
     }
   }
   Eigen::MatrixXs dM
-      = getJacobianOfMinv(world, dt * (tau - C - ddamp*v_t) + A_c_ub_E * f_c, wrt);
+      = getJacobianOfMinv(world, dt * (tau - C - ddamp.asDiagonal()*v_t) + A_c_ub_E * f_c, wrt);
 
   Eigen::MatrixXs Minv = getInvMassMatrix(world);
 
@@ -1550,10 +1550,10 @@ ConstrainedGroupGradientMatrices::getJacobianOfLCPOffsetClampingSubset(
   Eigen::MatrixXs dC = getJacobianOfC(world, wrt);
   if (wrt == WithRespectTo::VELOCITY)
   {
-    Eigen::MatrixXs ddamp = getDampingDiagonal(world);
+    Eigen::MatrixXs ddamp = getDampingVector(world).asDiagonal();
     return getBounceDiagonals().asDiagonal() * -A_c.transpose()
-           * (Eigen::MatrixXs::Identity(mNumDOFs, mNumDOFs) - dt * Minv * dC
-           - dt*Minv*ddamp);
+           * (Eigen::MatrixXs::Identity(mNumDOFs, mNumDOFs)
+           - dt*Minv*(dC+ddamp));
   }
   else if (wrt == WithRespectTo::FORCE)
   {
@@ -1564,7 +1564,7 @@ ConstrainedGroupGradientMatrices::getJacobianOfLCPOffsetClampingSubset(
   Eigen::VectorXs f = getPreStepTorques() - C;
   Eigen::VectorXs v_f = mPreLCPVelocities;
   Eigen::VectorXs v_t = mPreStepVelocities;
-  Eigen::MatrixXs ddamp = getDampingDiagonal(world);
+  Eigen::MatrixXs ddamp = getDampingVector(world).asDiagonal();
   f = f - ddamp*v_t;
   Eigen::MatrixXs dMinv_f = getJacobianOfMinv(world, f, wrt);
 

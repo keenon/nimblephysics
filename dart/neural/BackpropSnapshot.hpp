@@ -190,7 +190,7 @@ public:
       simulation::WorldPtr world, bool forFiniteDifferencing = false);
 
   /// This return the diagonal matrix representing Jacobian of damping
-  Eigen::MatrixXs getDampingDiagonal(simulation::WorldPtr world);
+  Eigen::VectorXs getDampingVector(simulation::WorldPtr world);
 
   /// This is the subset of the A matrix from the original LCP that corresponds
   /// to clamping indices.
