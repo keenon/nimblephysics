@@ -238,7 +238,8 @@ install_name_tool -id /usr/local/lib/libassimp.5.dylib /usr/local/lib/libassimp.
 # install_name_tool -id /usr/local/lib/libosgDB.161.dylib /usr/local/lib/libosgDB.161.dylib
 # install_name_tool -id /usr/local/lib/libosgShadow.161.dylib /usr/local/lib/libosgShadow.161.dylib
 # install_name_tool -id /usr/local/lib/libOpenThreads.21.dylib /usr/local/lib/libOpenThreads.21.dylib
-install_name_tool -id /usr/lib/liblzma.5.dylib /usr/lib/liblzma.5.dylib
+sudo install_name_tool -id /usr/lib/liblzma.5.dylib /usr/lib/liblzma.5.dylib
+# sudo install_name_tool -id /usr/lib/libcompression.dylib /usr/lib/libcompression.dylib
 
 # Fix "icu4c" installed by Brew
 ICU4C_MAJOR_VERSION="69"
