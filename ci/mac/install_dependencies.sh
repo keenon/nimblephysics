@@ -244,11 +244,6 @@ install_name_tool -id /usr/local/lib/libassimp.5.dylib /usr/local/lib/libassimp.
 # sudo install_name_tool -id /usr/lib/libcompression.dylib /usr/lib/libcompression.dylib
 # brew install xz zlib bzip2
 
-# Replace liblzma with a hard copy of the library, instead of a link
-LZMA_PATH=$(readlink /usr/lib/liblzma.5.dylib)
-sudo rm /usr/lib/liblzma.5.dylib
-sudo cp ${LZMA_PATH} /usr/lib/liblzma.5.dylib
-
 # Fix "icu4c" installed by Brew
 ICU4C_MAJOR_VERSION="69"
 ICU4C_FULL_VERSION="69.1"
@@ -278,6 +273,19 @@ sudo mv /usr/local/lib/libTIFF.dylib /usr/local/lib/libTIFF.old.dylib
 ln -s /System/Library/Frameworks/ApplicationServices.framework/Versions/A/Frameworks/ImageIO.framework/Versions/A/Resources/libTIFF.dylib /usr/local/lib/libTIFF.lib
 sudo mv /usr/local/lib/libPng.dylib /usr/local/lib/libPng.old.dylib
 ln -s /System/Library/Frameworks/ApplicationServices.framework/Versions/A/Frameworks/ImageIO.framework/Versions/A/Resources/libPng.dylib /usr/local/lib/libPng.lib
+
+
+# Replace liblzma with a hard copy of the library, instead of a link
+echo "Attempting to read LZMA links"
+LZMA_PATH=$(readlink /usr/lib/liblzma.dylib)
+LZMA_5_PATH=$(readlink /usr/lib/liblzma.5.dylib)
+echo "LZMA_PATH=$LZMA_PATH"
+echo "LZMA_5_PATH=$LZMA_5_PATH"
+sudo mv /usr/local/lib/liblzma.5.dylib /usr/local/lib/liblzma.5.old.dylib
+echo "Attempting to add symbolic links"
+ln -s $LZMA_PATH /usr/local/lib/liblzma.dylib
+ln -s $LZMA_5_PATH /usr/local/lib/liblzma.5.dylib
+echo "Symbolic links complete"
 
 # Install our build tools
 python -m pip install pytest delocate
