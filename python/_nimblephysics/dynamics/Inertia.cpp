@@ -30,39 +30,26 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <Eigen/Dense>
-#include <pybind11/eigen.h>
+#include <dart/dynamics/Inertia.hpp>
 #include <pybind11/pybind11.h>
-#include <pybind11/stl.h>
+
+#include "eigen_geometry_pybind.h"
+#include "eigen_pybind.h"
 
 namespace py = pybind11;
 
 namespace dart {
 namespace python {
 
-void NeuralUtils(py::module& sm);
-void Mapping(py::module& sm);
-void IKMapping(py::module& sm);
-void IdentityMapping(py::module& sm);
-void BackpropSnapshot(py::module& sm);
-void MappedBackpropSnapshot(py::module& sm);
-void WithRespectToMass(py::module& sm);
-
-void dart_neural(py::module& m)
+void Inertia(py::module& m)
 {
-  auto sm = m.def_submodule("neural");
-
-  sm.doc()
-      = "This provides gradients to DART, with an eye on embedding DART as a "
-        "non-linearity in neural networks.";
-
-  NeuralUtils(sm);
-  Mapping(sm);
-  IKMapping(sm);
-  IdentityMapping(sm);
-  BackpropSnapshot(sm);
-  MappedBackpropSnapshot(sm);
-  WithRespectToMass(sm);
+  ::py::class_<dart::dynamics::Inertia>(m, "Inertia")
+      .def(::py::init<const Eigen::Matrix6s&>(), ::py::arg("inertiaMatrix"))
+      .def(
+          ::py::init<double, Eigen::Vector3s, const Eigen::Matrix3s&>(),
+          ::py::arg("mass"),
+          ::py::arg("centerOfMass"),
+          ::py::arg("momentOfInertia"));
 }
 
 } // namespace python

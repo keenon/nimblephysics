@@ -807,6 +807,66 @@ GUIWebsocketServer& GUIWebsocketServer::renderTrajectoryLines(
   return *this;
 }
 
+/// This is a high-level command that renders a wrench on a body node
+GUIWebsocketServer& GUIWebsocketServer::renderBodyWrench(
+    const dynamics::BodyNode* body,
+    Eigen::Vector6s wrench,
+    s_t scaleFactor,
+    std::string prefix)
+{
+  const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
+
+  Eigen::Isometry3s T = body->getWorldTransform();
+
+  Eigen::Vector3s tau = wrench.head<3>();
+  Eigen::Vector3s f = wrench.tail<3>();
+  Eigen::Matrix3s skew = math::makeSkewSymmetric(f);
+
+  Eigen::Vector3s residual = f.dot(tau) * (f / f.squaredNorm());
+  Eigen::Vector3s r = -skew.completeOrthogonalDecomposition().solve(tau);
+
+  Eigen::Vector3s recoveredTau = r.cross(f) + residual;
+  Eigen::Vector3s diff = tau - recoveredTau;
+  if (diff.squaredNorm() > 1e-8)
+  {
+    std::cout << "Error in renderBodyWrench()! Got diff: " << diff.squaredNorm()
+              << std::endl;
+  }
+
+  std::vector<Eigen::Vector3s> torqueLine;
+  torqueLine.push_back(T * (r * scaleFactor));
+  torqueLine.push_back(T * ((r + residual) * scaleFactor));
+  std::vector<Eigen::Vector3s> forceLine;
+  forceLine.push_back(T * (r * scaleFactor));
+  forceLine.push_back(T * ((r + f) * scaleFactor));
+
+  bool oldAutoflush = mAutoflush;
+  mAutoflush = false;
+
+  createLine(
+      prefix + "_" + body->getName() + "_torque",
+      torqueLine,
+      Eigen::Vector3s(0.8, 0.8, 0.8));
+  createLine(
+      prefix + "_" + body->getName() + "_force",
+      forceLine,
+      Eigen::Vector3s(1.0, 0.0, 0.0));
+
+  flush();
+  mAutoflush = oldAutoflush;
+  return *this;
+}
+
+/// This is a high-level command that removes the lines rendering a wrench on
+/// a body node
+GUIWebsocketServer& GUIWebsocketServer::clearBodyWrench(
+    const dynamics::BodyNode* body, std::string prefix)
+{
+  deleteObject(prefix + "_" + body->getName() + "_torque");
+  deleteObject(prefix + "_" + body->getName() + "_force");
+  return *this;
+}
+
 /// This completely resets the web GUI, deleting all objects, UI elements, and
 /// listeners
 GUIWebsocketServer& GUIWebsocketServer::clear()

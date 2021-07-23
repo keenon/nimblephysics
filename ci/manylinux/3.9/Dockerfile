@@ -1,4 +1,4 @@
-FROM keenon/diffdart:base
+FROM keenon/nimble_ci:base
 
 # This is allowed to be empty string, but if it's not it must be prefixed by
 ARG VERSION

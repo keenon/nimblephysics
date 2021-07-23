@@ -116,6 +116,120 @@ namespace python {
 
 void Skeleton(py::module& m)
 {
+  ::py::class_<dart::dynamics::Skeleton::ContactInverseDynamicsResult>(
+      m, "ContactInverseDynamicsResult")
+      .def(::py::init<>())
+      .def_readwrite(
+          "skel", &dynamics::Skeleton::ContactInverseDynamicsResult::skel)
+      .def_readwrite(
+          "contactBody",
+          &dynamics::Skeleton::ContactInverseDynamicsResult::contactBody)
+      .def_readwrite(
+          "contactWrench",
+          &dynamics::Skeleton::ContactInverseDynamicsResult::contactWrench)
+      .def_readwrite(
+          "jointTorques",
+          &dynamics::Skeleton::ContactInverseDynamicsResult::jointTorques)
+      .def_readwrite(
+          "pos", &dynamics::Skeleton::ContactInverseDynamicsResult::pos)
+      .def_readwrite(
+          "vel", &dynamics::Skeleton::ContactInverseDynamicsResult::vel)
+      .def_readwrite(
+          "nextVel", &dynamics::Skeleton::ContactInverseDynamicsResult::nextVel)
+      .def(
+          "sumError",
+          &dynamics::Skeleton::ContactInverseDynamicsResult::sumError);
+
+  ::py::class_<dart::dynamics::Skeleton::MultipleContactInverseDynamicsResult>(
+      m, "MultipleContactInverseDynamicsResult")
+      .def(::py::init<>())
+      .def_readwrite(
+          "skel",
+          &dynamics::Skeleton::MultipleContactInverseDynamicsResult::skel)
+      .def_readwrite(
+          "contactBodies",
+          &dynamics::Skeleton::MultipleContactInverseDynamicsResult::
+              contactBodies)
+      .def_readwrite(
+          "contactWrenches",
+          &dynamics::Skeleton::MultipleContactInverseDynamicsResult::
+              contactWrenches)
+      .def_readwrite(
+          "contactWrenchGuesses",
+          &dynamics::Skeleton::MultipleContactInverseDynamicsResult::
+              contactWrenchGuesses)
+      .def_readwrite(
+          "jointTorques",
+          &dynamics::Skeleton::MultipleContactInverseDynamicsResult::
+              jointTorques)
+      .def_readwrite(
+          "pos", &dynamics::Skeleton::MultipleContactInverseDynamicsResult::pos)
+      .def_readwrite(
+          "vel", &dynamics::Skeleton::MultipleContactInverseDynamicsResult::vel)
+      .def_readwrite(
+          "nextVel",
+          &dynamics::Skeleton::MultipleContactInverseDynamicsResult::nextVel)
+      .def(
+          "sumError",
+          &dynamics::Skeleton::MultipleContactInverseDynamicsResult::sumError)
+      .def(
+          "computeGuessLoss",
+          &dynamics::Skeleton::MultipleContactInverseDynamicsResult::
+              computeGuessLoss);
+
+  ::py::class_<
+      dart::dynamics::Skeleton::MultipleContactInverseDynamicsOverTimeResult>(
+      m, "MultipleContactInverseDynamicsOverTimeResult")
+      .def(::py::init<>())
+      .def_readwrite(
+          "skel",
+          &dynamics::Skeleton::MultipleContactInverseDynamicsOverTimeResult::
+              skel)
+      .def_readwrite(
+          "timesteps",
+          &dynamics::Skeleton::MultipleContactInverseDynamicsOverTimeResult::
+              timesteps)
+      .def_readwrite(
+          "contactBodies",
+          &dynamics::Skeleton::MultipleContactInverseDynamicsOverTimeResult::
+              contactBodies)
+      .def_readwrite(
+          "contactWrenches",
+          &dynamics::Skeleton::MultipleContactInverseDynamicsOverTimeResult::
+              contactWrenches)
+      .def_readwrite(
+          "jointTorques",
+          &dynamics::Skeleton::MultipleContactInverseDynamicsOverTimeResult::
+              jointTorques)
+      .def_readwrite(
+          "positions",
+          &dynamics::Skeleton::MultipleContactInverseDynamicsOverTimeResult::
+              positions)
+      .def_readwrite(
+          "velocities",
+          &dynamics::Skeleton::MultipleContactInverseDynamicsOverTimeResult::
+              velocities)
+      .def_readwrite(
+          "nextVelocities",
+          &dynamics::Skeleton::MultipleContactInverseDynamicsOverTimeResult::
+              nextVelocities)
+      .def_readwrite(
+          "prevContactForces",
+          &dynamics::Skeleton::MultipleContactInverseDynamicsOverTimeResult::
+              prevContactForces)
+      .def(
+          "sumError",
+          &dynamics::Skeleton::MultipleContactInverseDynamicsOverTimeResult::
+              sumError)
+      .def(
+          "computePrevForceLoss",
+          &dynamics::Skeleton::MultipleContactInverseDynamicsOverTimeResult::
+              computePrevForceLoss)
+      .def(
+          "computeSmoothnessLoss",
+          &dynamics::Skeleton::MultipleContactInverseDynamicsOverTimeResult::
+              computeSmoothnessLoss);
+
   ::py::class_<
       dart::dynamics::Skeleton,
       dart::dynamics::MetaSkeleton,
@@ -677,6 +791,26 @@ void Skeleton(py::module& m)
           },
           ::py::arg("dq2"),
           ::py::arg("dq1"))
+      .def(
+          "getContactInverseDynamics",
+          &dart::dynamics::Skeleton::getContactInverseDynamics,
+          ::py::arg("nextVel"),
+          ::py::arg("contactBody"))
+      .def(
+          "getMultipleContactInverseDynamics",
+          &dart::dynamics::Skeleton::getMultipleContactInverseDynamics,
+          ::py::arg("nextVel"),
+          ::py::arg("contactBodies"),
+          ::py::arg("bodyWrenchGuesses") = std::vector<Eigen::Vector6s>())
+      .def(
+          "getMultipleContactInverseDynamicsOverTime",
+          &dart::dynamics::Skeleton::getMultipleContactInverseDynamicsOverTime,
+          ::py::arg("positions"),
+          ::py::arg("contactBodies"),
+          ::py::arg("smoothingWeight"),
+          ::py::arg("minTorqueWeight"),
+          ::py::arg("prevContactForces") = std::vector<Eigen::Vector6s>(),
+          ::py::arg("prevContactWeight") = 0.0)
       .def(
           "getSupportVersion",
           +[](const dart::dynamics::Skeleton* self) -> std::size_t {

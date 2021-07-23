@@ -18,4 +18,5 @@ This documentation was written for Nimble :code:`v0.4.3`, and may or may not wor
   understanding-worlds
   backprop-through-physics
   working-in-world-space
+  system-identification
   accessing-raw-jacobians

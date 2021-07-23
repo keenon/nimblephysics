@@ -853,6 +853,123 @@ public:
       const Eigen::VectorXs& _dq2, const Eigen::VectorXs& _dq1) const;
 
   //----------------------------------------------------------------------------
+  // Inverse Dynamics for Contacts
+  //----------------------------------------------------------------------------
+
+  struct ContactInverseDynamicsResult
+  {
+    dynamics::Skeleton* skel;
+    dynamics::BodyNode* contactBody;
+    Eigen::Vector6s contactWrench;
+    Eigen::VectorXs jointTorques;
+
+    // These are the setup of the inverse dynamics problem
+    Eigen::VectorXs pos;
+    Eigen::VectorXs vel;
+    Eigen::VectorXs nextVel;
+
+    /// This computes how much the actual dynamics we get when we apply this
+    /// solution differ from the goal solution.
+    s_t sumError();
+  };
+
+  /// This solves the inverse dynamics problem to figure out what forces we
+  /// would need to apply (in our _current state_) in order to get the desired
+  /// next velocity. This includes arbitrary forces and moments at the
+  /// `contactBody`, which can be post-processed down to individual contact
+  /// results.
+  ContactInverseDynamicsResult getContactInverseDynamics(
+      const Eigen::VectorXs& nextVel, dynamics::BodyNode* contactBody);
+
+  struct MultipleContactInverseDynamicsResult
+  {
+    dynamics::Skeleton* skel;
+    std::vector<dynamics::BodyNode*> contactBodies;
+    std::vector<Eigen::Vector6s> contactWrenches;
+    std::vector<Eigen::Vector6s> contactWrenchGuesses;
+    Eigen::VectorXs jointTorques;
+
+    // These are the setup of the inverse dynamics problem
+    Eigen::VectorXs pos;
+    Eigen::VectorXs vel;
+    Eigen::VectorXs nextVel;
+
+    /// This computes how much the actual dynamics we get when we apply this
+    /// solution differ from the goal solution.
+    s_t sumError();
+
+    /// This computes the difference between the guess and the closest valid
+    /// solution
+    s_t computeGuessLoss();
+  };
+
+  /// If you pass in multiple simultaneous contacts, with guesses about the
+  /// contact wrenches for each body, this method will find the least-squares
+  /// closest solution for contact wrenches on each body that will satisfying
+  /// the next velocity constraint. This is intended to be useful for EM loops
+  /// for learning rich contact models.
+  ///
+  /// Without initial guesses (pass in an empty array for guesses), the solution
+  /// is not unique, so in order to use this method to get useful inverse
+  /// dynamics we use a heuristic: we find the inverse dynamics that minimizes
+  /// the joint torques.
+  MultipleContactInverseDynamicsResult getMultipleContactInverseDynamics(
+      const Eigen::VectorXs& nextVel,
+      std::vector<dynamics::BodyNode*> bodies,
+      std::vector<Eigen::Vector6s> bodyWrenchGuesses);
+
+  struct MultipleContactInverseDynamicsOverTimeResult
+  {
+    dynamics::Skeleton* skel;
+    std::vector<dynamics::BodyNode*> contactBodies;
+
+    int timesteps;
+
+    // One entry / column per timestep
+    std::vector<std::vector<Eigen::Vector6s>> contactWrenches;
+    Eigen::MatrixXs jointTorques;
+
+    // One column per timestep
+    Eigen::MatrixXs positions;
+    Eigen::MatrixXs velocities;
+    Eigen::MatrixXs nextVelocities;
+
+    // Problem setup
+    std::vector<Eigen::Vector6s> prevContactForces;
+
+    /// This computes how much the actual dynamics we get when we apply this
+    /// solution differ from the goal solution.
+    s_t sumError();
+
+    /// This computes the (unweighted) smoothness loss for this problem
+    s_t computeSmoothnessLoss();
+
+    /// This computes the (unweighted) prev force loss for this problem
+    s_t computePrevForceLoss();
+  };
+
+  /// This sets up and solves a QP that tracks multiple contacts over a
+  /// time-series of positions. This has two blending factors to control the
+  /// solution, a `smoothingWeight` and a `minTorqueWeight`. Increasing the
+  /// smoothing weight will prioritize a smoother (less time varying) set of
+  /// contact forces. Increasing the minimize torques weight will prioritize
+  /// solutions at each timestep that minimize the torque-component of the
+  /// contact forces at each body.
+  ///
+  /// This will not provide a contact solution at the last two timesteps passed
+  /// in, because it cannot compute a velocity and acceleration at those
+  /// timesteps.
+  MultipleContactInverseDynamicsOverTimeResult
+  getMultipleContactInverseDynamicsOverTime(
+      const Eigen::MatrixXs& positions,
+      std::vector<dynamics::BodyNode*> bodies,
+      s_t smoothingWeight,
+      s_t minTorqueWeight,
+      std::vector<Eigen::Vector6s> prevContactForces
+      = std::vector<Eigen::Vector6s>(),
+      s_t prevContactWeight = 0.0);
+
+  //----------------------------------------------------------------------------
   /// \{ \name Support Polygon
   //----------------------------------------------------------------------------
 

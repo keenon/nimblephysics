@@ -1,6 +1,6 @@
 import nimblephysics_libs._nimblephysics as nimble
 import torch
-from typing import Tuple, Callable, List
+from typing import Tuple, Callable, List, Optional
 import numpy as np
 import math
 
@@ -16,7 +16,7 @@ class TimestepLayer(torch.autograd.Function):
   """
 
   @staticmethod
-  def forward(ctx, world, state, action):
+  def forward(ctx, world, state, action, mass):
     """
     We can't put type annotations on this declaration, because the supertype
     doesn't have any type annotations and otherwise mypy will complain, so here
@@ -30,6 +30,9 @@ class TimestepLayer(torch.autograd.Function):
 
     world.setState(state.detach().numpy())
     world.setAction(action.detach().numpy())
+    ctx.use_mass = mass is not None
+    if ctx.use_mass:
+      world.setMasses(mass.detach().numpy())
     backprop_snapshot: nimble.neural.BackpropSnapshot = nimble.neural.forwardPass(world)
     ctx.backprop_snapshot = backprop_snapshot
     ctx.world = world
@@ -48,17 +51,19 @@ class TimestepLayer(torch.autograd.Function):
 
     grads: nimble.neural.LossGradientHighLevelAPI = backprop_snapshot.backpropState(
         world, grad_state.detach().numpy())
-
+    
     return (
         None,
         torch.tensor(grads.lossWrtState, dtype=torch.float64),
-        torch.tensor(grads.lossWrtAction, dtype=torch.float64)
+        torch.tensor(grads.lossWrtAction, dtype=torch.float64),
+        torch.tensor(grads.lossWrtMass, dtype=torch.float64) if ctx.use_mass else None
     )
 
 
-def timestep(world: nimble.simulation.World, state: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
+def timestep(world: nimble.simulation.World, state: torch.Tensor, 
+    action: torch.Tensor, mass: Optional[torch.Tensor] = None) -> torch.Tensor:
   """
   This does a forward pass on the `world` that gets passed in, storing information needed
   in order to do a backwards pass.
   """
-  return TimestepLayer.apply(world, state, action)  # type: ignore
+  return TimestepLayer.apply(world, state, action, mass)  # type: ignore

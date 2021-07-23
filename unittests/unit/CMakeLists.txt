@@ -25,6 +25,9 @@ endif()
 
 if(TARGET dart-utils)
 
+  dart_add_test("unit" test_AccelerationSmoother)
+  target_link_libraries(test_AccelerationSmoother dart-utils)
+
   dart_add_test("unit" test_CompositeResourceRetriever)
   target_link_libraries(test_CompositeResourceRetriever dart-utils)
 
@@ -73,6 +76,10 @@ if(TARGET dart-utils-urdf)
   dart_add_test("unit" test_RL_API)
   target_link_libraries(test_RL_API dart-utils)
   target_link_libraries(test_RL_API dart-utils-urdf)
+
+  dart_add_test("unit" test_InverseDynamicsForContact)
+  target_link_libraries(test_InverseDynamicsForContact dart-utils)
+  target_link_libraries(test_InverseDynamicsForContact dart-utils-urdf)
 endif()
 
 if(TARGET dart-planning)

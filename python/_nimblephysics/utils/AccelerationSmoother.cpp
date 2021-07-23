@@ -30,39 +30,27 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <Eigen/Dense>
+#include <dart/utils/AccelerationSmoother.hpp>
 #include <pybind11/eigen.h>
 #include <pybind11/pybind11.h>
-#include <pybind11/stl.h>
 
 namespace py = pybind11;
 
 namespace dart {
 namespace python {
 
-void NeuralUtils(py::module& sm);
-void Mapping(py::module& sm);
-void IKMapping(py::module& sm);
-void IdentityMapping(py::module& sm);
-void BackpropSnapshot(py::module& sm);
-void MappedBackpropSnapshot(py::module& sm);
-void WithRespectToMass(py::module& sm);
-
-void dart_neural(py::module& m)
+void AccelerationSmoother(py::module& m)
 {
-  auto sm = m.def_submodule("neural");
-
-  sm.doc()
-      = "This provides gradients to DART, with an eye on embedding DART as a "
-        "non-linearity in neural networks.";
-
-  NeuralUtils(sm);
-  Mapping(sm);
-  IKMapping(sm);
-  IdentityMapping(sm);
-  BackpropSnapshot(sm);
-  MappedBackpropSnapshot(sm);
-  WithRespectToMass(sm);
+  ::py::class_<dart::utils::AccelerationSmoother>(m, "AccelerationSmoother")
+      .def(::py::init<int, s_t>(), ::py::arg("timesteps"), ::py::arg("alpha"))
+      .def(
+          "smooth",
+          &dart::utils::AccelerationSmoother::smooth,
+          ::py::arg("series"))
+      .def(
+          "debugTimeSeries",
+          &dart::utils::AccelerationSmoother::debugTimeSeries,
+          ::py::arg("series"));
 }
 
 } // namespace python
