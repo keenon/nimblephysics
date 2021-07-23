@@ -189,7 +189,7 @@ public:
   Eigen::MatrixXs getInvMassMatrix(
       simulation::WorldPtr world, bool forFiniteDifferencing = false);
 
-  /// This return the diagonal matrix representing Jacobian of damping
+  /// This return the diagonal matrix representing Coefficients of damping
   Eigen::VectorXs getDampingVector(simulation::WorldPtr world);
 
   /// This is the subset of the A matrix from the original LCP that corresponds
