@@ -242,7 +242,12 @@ install_name_tool -id /usr/local/lib/libassimp.5.dylib /usr/local/lib/libassimp.
 # Different attempts to fix the liblzma linking issue
 # sudo install_name_tool -id /usr/lib/liblzma.5.dylib /usr/lib/liblzma.5.dylib
 # sudo install_name_tool -id /usr/lib/libcompression.dylib /usr/lib/libcompression.dylib
-brew install xz zlib bzip2
+# brew install xz zlib bzip2
+
+# Replace liblzma with a hard copy of the library, instead of a link
+LZMA_PATH=$(readlink /usr/lib/liblzma.5.dylib)
+sudo rm /usr/lib/liblzma.5.dylib
+sudo cp ${LZMA_PATH} /usr/lib/liblzma.5.dylib
 
 # Fix "icu4c" installed by Brew
 ICU4C_MAJOR_VERSION="69"
