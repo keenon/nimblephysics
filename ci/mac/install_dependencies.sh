@@ -278,6 +278,7 @@ ln -s /System/Library/Frameworks/ApplicationServices.framework/Versions/A/Framew
 # Replace liblzma with a hard copy of the library, instead of a link
 echo "Attempting to read LZMA links"
 readlink /usr/lib/liblzma.dylib
+readlink /usr/lib/liblzma.5.dylib
 LZMA_PATH=$(readlink /usr/lib/liblzma.dylib)
 LZMA_5_PATH=$(readlink /usr/lib/liblzma.5.dylib)
 echo "LZMA_PATH=$LZMA_PATH"
