@@ -35,6 +35,11 @@ stages:
               versionSpec: "3.6"
               architecture: "x64"
           - script: ci/mac/install_dependencies.sh
+          # Try to generate a graphviz file to help debug
+          - script: ci/generate_graphviz.sh
+          - task: PublishBuildArtifacts@1
+            inputs: { pathtoPublish: "build_viz/viz.dot" }
+          # </graphviz>
           - bash: |
               cd ci/mac
               ./build_wheels.sh
@@ -51,6 +56,11 @@ stages:
               versionSpec: "3.7"
               architecture: "x64"
           - script: ci/mac/install_dependencies.sh
+          # Try to generate a graphviz file to help debug
+          - script: ci/generate_graphviz.sh
+          - task: PublishBuildArtifacts@1
+            inputs: { pathtoPublish: "build_viz/viz.dot" }
+          # </graphviz>
           - bash: |
               cd ci/mac
               ./build_wheels.sh
@@ -67,6 +77,11 @@ stages:
               versionSpec: "3.8"
               architecture: "x64"
           - script: ci/mac/install_dependencies.sh
+          # Try to generate a graphviz file to help debug
+          - script: ci/generate_graphviz.sh
+          - task: PublishBuildArtifacts@1
+            inputs: { pathtoPublish: "build_viz/viz.dot" }
+          # </graphviz>
           - bash: |
               cd ci/mac
               ./build_wheels.sh

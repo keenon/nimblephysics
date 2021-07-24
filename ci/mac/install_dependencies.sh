@@ -31,6 +31,7 @@ cp /usr/local/opt/openssl@1.1/lib/pkgconfig/*.pc /usr/local/lib/pkgconfig/
 # Install CCD
 git clone https://github.com/danfis/libccd.git
 pushd libccd
+git checkout v2.1
 mkdir build
 pushd build
 cmake .. -DENABLE_DOUBLE_PRECISION=ON
@@ -42,6 +43,7 @@ rm -rf libccd
 # Install ASSIMP
 git clone https://github.com/assimp/assimp.git
 pushd assimp
+git checkout v5.0.1
 mkdir build
 pushd build
 cmake ..
@@ -66,7 +68,7 @@ rm -rf ThirdParty-Mumps
 # Install IPOPT
 git clone https://github.com/coin-or/Ipopt.git
 pushd Ipopt
-./configure --with-mumps
+./configure --with-mumps --disable-java
 make -j
 make install
 popd
@@ -276,18 +278,18 @@ ln -s /System/Library/Frameworks/ApplicationServices.framework/Versions/A/Framew
 
 
 # Replace liblzma with a hard copy of the library, instead of a link
-echo "Attempting to read LZMA links"
-readlink /usr/lib/liblzma.dylib
-readlink /usr/lib/liblzma.5.dylib
-LZMA_PATH=$(readlink /usr/lib/liblzma.dylib)
-LZMA_5_PATH=$(readlink /usr/lib/liblzma.5.dylib)
-echo "LZMA_PATH=$LZMA_PATH"
-echo "LZMA_5_PATH=$LZMA_5_PATH"
-sudo mv /usr/local/lib/liblzma.5.dylib /usr/local/lib/liblzma.5.old.dylib
-echo "Attempting to add symbolic links"
-ln -s $LZMA_PATH /usr/local/lib/liblzma.dylib
-ln -s $LZMA_5_PATH /usr/local/lib/liblzma.5.dylib
-echo "Symbolic links complete"
+# echo "Attempting to read LZMA links"
+# readlink /usr/lib/liblzma.dylib
+# readlink /usr/lib/liblzma.5.dylib
+# LZMA_PATH=$(readlink /usr/lib/liblzma.dylib)
+# LZMA_5_PATH=$(readlink /usr/lib/liblzma.5.dylib)
+# echo "LZMA_PATH=$LZMA_PATH"
+# echo "LZMA_5_PATH=$LZMA_5_PATH"
+# sudo mv /usr/local/lib/liblzma.5.dylib /usr/local/lib/liblzma.5.old.dylib
+# echo "Attempting to add symbolic links"
+# ln -s $LZMA_PATH /usr/local/lib/liblzma.dylib
+# ln -s $LZMA_5_PATH /usr/local/lib/liblzma.5.dylib
+# echo "Symbolic links complete"
 
 # Install our build tools
 python -m pip install pytest delocate
