@@ -2,26 +2,6 @@
 # Ref: https://docs.microsoft.com/en-us/azure/devops/pipelines
 
 stages:
-  - stage: Test
-    jobs:
-      - job: linux_test
-        pool: { vmImage: "Ubuntu-16.04" }
-        steps:
-          - bash: |
-              cd ci/manylinux/tests
-              ./run_tests.sh
-          - task: PublishTestResults@2
-            inputs: {
-                testResultsFormat: "cTest",
-                testResultsFiles: "Testing/**/Test.xml",
-                searchFolder: "$(System.DefaultWorkingDirectory)", # Optional
-                #mergeTestResults: false # Optional
-                #testRunTitle: # Optional
-                #buildPlatform: # Optional
-                #buildConfiguration: # Optional
-                #publishRunAttachments: true # Optional
-                failTaskOnFailedTests: true, # Optional
-              }
   - stage: Mac
     jobs:
       - job: macos_36
@@ -36,7 +16,7 @@ stages:
               architecture: "x64"
           - script: ci/mac/install_dependencies.sh
           # Try to generate a graphviz file to help debug
-          - script: ci/generate_graphviz.sh
+          - script: ci/mac/generate_graphviz.sh
           - task: PublishBuildArtifacts@1
             inputs: { pathtoPublish: "build_viz/viz.dot" }
           # </graphviz>
@@ -57,7 +37,7 @@ stages:
               architecture: "x64"
           - script: ci/mac/install_dependencies.sh
           # Try to generate a graphviz file to help debug
-          - script: ci/generate_graphviz.sh
+          - script: ci/mac/generate_graphviz.sh
           - task: PublishBuildArtifacts@1
             inputs: { pathtoPublish: "build_viz/viz.dot" }
           # </graphviz>
@@ -78,7 +58,7 @@ stages:
               architecture: "x64"
           - script: ci/mac/install_dependencies.sh
           # Try to generate a graphviz file to help debug
-          - script: ci/generate_graphviz.sh
+          - script: ci/mac/generate_graphviz.sh
           - task: PublishBuildArtifacts@1
             inputs: { pathtoPublish: "build_viz/viz.dot" }
           # </graphviz>
@@ -87,6 +67,26 @@ stages:
               ./build_wheels.sh
           - task: PublishBuildArtifacts@1
             inputs: { pathtoPublish: "wheelhouse" }
+  - stage: Test
+    jobs:
+      - job: linux_test
+        pool: { vmImage: "Ubuntu-16.04" }
+        steps:
+          - bash: |
+              cd ci/manylinux/tests
+              ./run_tests.sh
+          - task: PublishTestResults@2
+            inputs: {
+                testResultsFormat: "cTest",
+                testResultsFiles: "Testing/**/Test.xml",
+                searchFolder: "$(System.DefaultWorkingDirectory)", # Optional
+                #mergeTestResults: false # Optional
+                #testRunTitle: # Optional
+                #buildPlatform: # Optional
+                #buildConfiguration: # Optional
+                #publishRunAttachments: true # Optional
+                failTaskOnFailedTests: true, # Optional
+              }
   - stage: Linux
     jobs:
       - job: linux_36
