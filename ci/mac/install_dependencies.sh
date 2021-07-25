@@ -190,7 +190,8 @@ PROTOBUF_VERSION="3.14.0"
 # popd
 # rm -rf protobuf-${PROTOBUF_VERSION}
 
-brew install zlib
+# brew install zlib
+brew install xz zlib bzip2
 
 # Install grpc
 git clone --recurse-submodules -b v1.33.2 https://github.com/grpc/grpc
