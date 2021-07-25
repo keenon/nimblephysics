@@ -16,7 +16,9 @@ stages:
               architecture: "x64"
           - script: ci/mac/install_dependencies.sh
           # Try to generate a graphviz file to help debug
-          - script: ci/mac/generate_graphviz.sh
+          - bash: |
+              cd ci/mac
+              ./generate_graphviz.sh
           - task: PublishBuildArtifacts@1
             inputs: { pathtoPublish: "build_viz/viz.dot" }
           # </graphviz>
@@ -37,7 +39,9 @@ stages:
               architecture: "x64"
           - script: ci/mac/install_dependencies.sh
           # Try to generate a graphviz file to help debug
-          - script: ci/mac/generate_graphviz.sh
+          - bash: |
+              cd ci/mac
+              ./generate_graphviz.sh
           - task: PublishBuildArtifacts@1
             inputs: { pathtoPublish: "build_viz/viz.dot" }
           # </graphviz>
@@ -58,7 +62,9 @@ stages:
               architecture: "x64"
           - script: ci/mac/install_dependencies.sh
           # Try to generate a graphviz file to help debug
-          - script: ci/mac/generate_graphviz.sh
+          - bash: |
+              cd ci/mac
+              ./generate_graphviz.sh
           - task: PublishBuildArtifacts@1
             inputs: { pathtoPublish: "build_viz/viz.dot" }
           # </graphviz>
