@@ -46,6 +46,7 @@
 
 #ifdef DART_USE_ARBITRARY_PRECISION
 #include <unsupported/Eigen/MPRealSupport>
+
 #include "mpreal.h"
 typedef mpfr::mpreal s_t;
 #else
@@ -154,5 +155,25 @@ using Jacobian = Eigen::Matrix<s_t, 6, Eigen::Dynamic>;
 
 } // namespace math
 } // namespace dart
+
+// Some macros lifted from OpenSim's SimmMacros.h, to make it easier to bring
+// code into Nimble
+#define TINY_NUMBER 0.0000001
+#define ROUNDOFF_ERROR 0.0000000000002
+
+#ifndef MAX
+#define MAX(a, b) ((a) >= (b) ? (a) : (b))
+#endif
+
+#ifndef MIN
+#define MIN(a, b) ((a) <= (b) ? (a) : (b))
+#endif
+
+#define DABS(a) ((a) > (double)0.0 ? (a) : (-(a)))
+#define DSIGN(a) ((a) >= 0.0 ? (1) : (-1))
+#define SQR(x) ((x) * (x))
+#define EQUAL_WITHIN_ERROR(a, b) (DABS(((a) - (b))) <= ROUNDOFF_ERROR)
+#define NOT_EQUAL_WITHIN_ERROR(a, b) (DABS(((a) - (b))) > ROUNDOFF_ERROR)
+#define EQUAL_WITHIN_TOLERANCE(a, b, c) (DABS(((a) - (b))) <= (c))
 
 #endif // DART_MATH_MATHTYPES_HPP_
