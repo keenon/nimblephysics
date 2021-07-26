@@ -51,6 +51,7 @@ void ShapeNode(py::module& sm);
 void DegreeOfFreedom(py::module& sm);
 
 void BodyNode(py::module& sm);
+void Inertia(py::module& sm);
 
 void Joint(py::module& sm);
 void ZeroDofJoint(py::module& sm);
@@ -91,6 +92,7 @@ void dart_dynamics(py::module& m)
   DegreeOfFreedom(sm);
 
   BodyNode(sm);
+  Inertia(sm);
 
   Joint(sm);
   ZeroDofJoint(sm);

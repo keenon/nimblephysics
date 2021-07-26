@@ -30,7 +30,8 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <dart/config.hpp>
+#include <dart/utils/AccelerationSmoother.hpp>
+#include <pybind11/eigen.h>
 #include <pybind11/pybind11.h>
 
 namespace py = pybind11;
@@ -38,41 +39,18 @@ namespace py = pybind11;
 namespace dart {
 namespace python {
 
-void eigen_geometry(py::module& m);
-
-void dart_common(py::module& m);
-void dart_math(py::module& m);
-void dart_dynamics(py::module& m);
-void dart_collision(py::module& m);
-void dart_constraint(py::module& m);
-void dart_simulation(py::module& m);
-void dart_utils(py::module& m);
-void dart_neural(py::module& m);
-void dart_trajectory(py::module& m);
-void dart_performance(py::module& m);
-void dart_realtime(py::module& m);
-void dart_server(py::module& m);
-void dart_biomechanics(py::module& m);
-
-PYBIND11_MODULE(_nimblephysics, m)
+void AccelerationSmoother(py::module& m)
 {
-  m.doc() = "nimblephysics: Python API of Nimble";
-
-  eigen_geometry(m);
-
-  dart_common(m);
-  dart_math(m);
-  dart_dynamics(m);
-  dart_collision(m);
-  dart_constraint(m);
-  dart_simulation(m);
-  dart_utils(m);
-  dart_neural(m);
-  dart_trajectory(m);
-  dart_performance(m);
-  dart_realtime(m);
-  dart_server(m);
-  dart_biomechanics(m);
+  ::py::class_<dart::utils::AccelerationSmoother>(m, "AccelerationSmoother")
+      .def(::py::init<int, s_t>(), ::py::arg("timesteps"), ::py::arg("alpha"))
+      .def(
+          "smooth",
+          &dart::utils::AccelerationSmoother::smooth,
+          ::py::arg("series"))
+      .def(
+          "debugTimeSeries",
+          &dart::utils::AccelerationSmoother::debugTimeSeries,
+          ::py::arg("series"));
 }
 
 } // namespace python

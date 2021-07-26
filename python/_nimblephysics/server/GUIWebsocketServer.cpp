@@ -271,6 +271,27 @@ void GUIWebsocketServer(py::module& m)
           ::py::arg("prefix") = "trajectory",
           ::py::call_guard<py::gil_scoped_release>())
       .def(
+          "renderBodyWrench",
+          &dart::server::GUIWebsocketServer::renderBodyWrench,
+          ::py::arg("body"),
+          ::py::arg("wrench"),
+          ::py::arg("scaleFactor") = 0.1,
+          ::py::arg("prefix") = "wrench",
+          ::py::call_guard<py::gil_scoped_release>())
+      .def(
+          "renderMovingBodyNodeVertices",
+          &dart::server::GUIWebsocketServer::renderMovingBodyNodeVertices,
+          ::py::arg("body"),
+          ::py::arg("scaleFactor") = 0.1,
+          ::py::arg("prefix") = "vert-vel",
+          ::py::call_guard<py::gil_scoped_release>())
+      .def(
+          "clearBodyWrench",
+          &dart::server::GUIWebsocketServer::clearBodyWrench,
+          ::py::arg("body"),
+          ::py::arg("prefix") = "wrench",
+          ::py::call_guard<py::gil_scoped_release>())
+      .def(
           "registerConnectionListener",
           &dart::server::GUIWebsocketServer::registerConnectionListener,
           ::py::arg("listener"))

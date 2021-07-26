@@ -464,6 +464,12 @@ void GUIWebsocketServer::setAutoflush(bool autoflush)
   mAutoflush = autoflush;
 }
 
+/// This tells us whether or not to automatically flush after each command
+bool GUIWebsocketServer::getAutoflush()
+{
+  return mAutoflush;
+}
+
 /// This sends the current list of commands to the web GUI
 void GUIWebsocketServer::flush()
 {
@@ -804,6 +810,93 @@ GUIWebsocketServer& GUIWebsocketServer::renderTrajectoryLines(
 
   flush();
   mAutoflush = oldAutoflush;
+  return *this;
+}
+
+/// This is a high-level command that renders a wrench on a body node
+GUIWebsocketServer& GUIWebsocketServer::renderBodyWrench(
+    const dynamics::BodyNode* body,
+    Eigen::Vector6s wrench,
+    s_t scaleFactor,
+    std::string prefix)
+{
+  const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
+
+  Eigen::Isometry3s T = body->getWorldTransform();
+
+  Eigen::Vector3s tau = wrench.head<3>();
+  Eigen::Vector3s f = wrench.tail<3>();
+  Eigen::Matrix3s skew = math::makeSkewSymmetric(f);
+
+  Eigen::Vector3s residual = f.dot(tau) * (f / f.squaredNorm());
+  Eigen::Vector3s r = -skew.completeOrthogonalDecomposition().solve(tau);
+
+  Eigen::Vector3s recoveredTau = r.cross(f) + residual;
+  Eigen::Vector3s diff = tau - recoveredTau;
+  if (diff.squaredNorm() > 1e-8)
+  {
+    std::cout << "Error in renderBodyWrench()! Got diff: " << diff.squaredNorm()
+              << std::endl;
+  }
+
+  std::vector<Eigen::Vector3s> torqueLine;
+  torqueLine.push_back(T * (r * scaleFactor));
+  torqueLine.push_back(T * ((r + residual) * scaleFactor));
+  std::vector<Eigen::Vector3s> forceLine;
+  forceLine.push_back(T * (r * scaleFactor));
+  forceLine.push_back(T * ((r + f) * scaleFactor));
+
+  bool oldAutoflush = mAutoflush;
+  mAutoflush = false;
+
+  createLine(
+      prefix + "_" + body->getName() + "_torque",
+      torqueLine,
+      Eigen::Vector3s(0.8, 0.8, 0.8));
+  createLine(
+      prefix + "_" + body->getName() + "_force",
+      forceLine,
+      Eigen::Vector3s(1.0, 0.0, 0.0));
+
+  flush();
+  mAutoflush = oldAutoflush;
+  return *this;
+}
+
+/// This renders little velocity lines starting at every vertex in the passed
+/// in body
+GUIWebsocketServer& GUIWebsocketServer::renderMovingBodyNodeVertices(
+    const dynamics::BodyNode* body, s_t scaleFactor, std::string prefix)
+{
+  std::vector<dynamics::BodyNode::MovingVertex> verts
+      = body->getMovingVerticesInWorldSpace();
+
+  bool oldAutoflush = mAutoflush;
+  mAutoflush = false;
+
+  for (int i = 0; i < verts.size(); i++)
+  {
+    std::vector<Eigen::Vector3s> line;
+    line.push_back(verts[i].pos);
+    line.push_back(verts[i].pos + verts[i].vel * scaleFactor);
+    createLine(
+        prefix + "_" + body->getName() + "_" + std::to_string(i),
+        line,
+        Eigen::Vector3s(1.0, 0.0, 0.0));
+  }
+
+  flush();
+  mAutoflush = oldAutoflush;
+  return *this;
+}
+
+/// This is a high-level command that removes the lines rendering a wrench on
+/// a body node
+GUIWebsocketServer& GUIWebsocketServer::clearBodyWrench(
+    const dynamics::BodyNode* body, std::string prefix)
+{
+  deleteObject(prefix + "_" + body->getName() + "_torque");
+  deleteObject(prefix + "_" + body->getName() + "_force");
   return *this;
 }
 

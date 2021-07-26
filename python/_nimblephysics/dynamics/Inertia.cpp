@@ -30,49 +30,26 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <dart/config.hpp>
+#include <dart/dynamics/Inertia.hpp>
 #include <pybind11/pybind11.h>
+
+#include "eigen_geometry_pybind.h"
+#include "eigen_pybind.h"
 
 namespace py = pybind11;
 
 namespace dart {
 namespace python {
 
-void eigen_geometry(py::module& m);
-
-void dart_common(py::module& m);
-void dart_math(py::module& m);
-void dart_dynamics(py::module& m);
-void dart_collision(py::module& m);
-void dart_constraint(py::module& m);
-void dart_simulation(py::module& m);
-void dart_utils(py::module& m);
-void dart_neural(py::module& m);
-void dart_trajectory(py::module& m);
-void dart_performance(py::module& m);
-void dart_realtime(py::module& m);
-void dart_server(py::module& m);
-void dart_biomechanics(py::module& m);
-
-PYBIND11_MODULE(_nimblephysics, m)
+void Inertia(py::module& m)
 {
-  m.doc() = "nimblephysics: Python API of Nimble";
-
-  eigen_geometry(m);
-
-  dart_common(m);
-  dart_math(m);
-  dart_dynamics(m);
-  dart_collision(m);
-  dart_constraint(m);
-  dart_simulation(m);
-  dart_utils(m);
-  dart_neural(m);
-  dart_trajectory(m);
-  dart_performance(m);
-  dart_realtime(m);
-  dart_server(m);
-  dart_biomechanics(m);
+  ::py::class_<dart::dynamics::Inertia>(m, "Inertia")
+      .def(::py::init<const Eigen::Matrix6s&>(), ::py::arg("inertiaMatrix"))
+      .def(
+          ::py::init<double, Eigen::Vector3s, const Eigen::Matrix3s&>(),
+          ::py::arg("mass"),
+          ::py::arg("centerOfMass"),
+          ::py::arg("momentOfInertia"));
 }
 
 } // namespace python
