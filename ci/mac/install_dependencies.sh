@@ -78,6 +78,7 @@ ln -s /usr/local/include/coin-or /usr/local/include/coin
 # Install pybind11
 git clone https://github.com/pybind/pybind11.git
 pushd pybind11
+git checkout v2.7.0
 mkdir build
 pushd build
 cmake .. -DPYTHON_EXECUTABLE:FILEPATH=$(which python3)
