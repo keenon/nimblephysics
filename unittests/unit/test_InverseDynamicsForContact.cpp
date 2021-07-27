@@ -130,8 +130,6 @@ TEST(INV_DYN_FOR_CONTACT, TEST_MULTI_CONTACT_NO_GUESS)
 }
 
 //==============================================================================
-<<<<<<< HEAD
-=======
 TEST(INV_DYN_FOR_CONTACT, TEST_MULTI_CONTACT_MULTI_TIMESTEP)
 {
   // set precision to 256 bits (double has only 53 bits)
@@ -240,7 +238,6 @@ TEST(INV_DYN_FOR_CONTACT, TEST_MULTI_CONTACT_MULTI_TIMESTEP_PREV_FORCE)
 }
 
 //==============================================================================
->>>>>>> 1405a09db6cc8c5503e409023431e0c3dd8c4003
 TEST(INV_DYN_FOR_CONTACT, EXPLORE_RECOVER_CENTER_OF_PRESSURE)
 {
   Eigen::Vector3s f = Eigen::Vector3s(1.0, 0.0, 1.0);

@@ -185,6 +185,11 @@ public:
   /// This result the diagonal matrix(vector) where rest position of spring lives
   Eigen::VectorXs getRestPositions(simulation::WorldPtr world);
 
+  /// This result is the current velocity of dofs involved in current group
+  Eigen::VectorXs getVelocities(simulation::WorldPtr world);
+
+  /// This result is the current position of dofs involved in current group
+  Eigen::VectorXs getPositions(simulation::WorldPtr world);
   /// This returns the block diagonal matrix where each skeleton's joints
   /// integration scheme is reflected.
   Eigen::MatrixXs getJointsPosPosJacobian(simulation::WorldPtr world);

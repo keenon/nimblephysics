@@ -934,12 +934,12 @@ Eigen::MatrixXs ConstrainedGroupGradientMatrices::getVelVelJacobian(
   {
     jac = Eigen::MatrixXs::Identity(mNumDOFs, mNumDOFs)
           - getControlForceVelJacobian(world) * getVelCJacobian(world)
-          - dt*Minv*(ddamp.asDiagonal()+dt*spring_stiffs.asDiagonal());
+          - dt*Minv*ddamp.asDiagonal()-dt*dt*Minv*spring_stiffs.asDiagonal();
   }
   else
   {
     jac = getVelJacobianWrt(world, WithRespectTo::VELOCITY) 
-          - dt*Minv*(ddamp.asDiagonal()+dt*spring_stiffs.asDiagonal());
+          - dt*Minv*ddamp.asDiagonal()-dt*dt*Minv*spring_stiffs.asDiagonal();
   }
 
 #ifdef LOG_PERFORMANCE_CONSTRAINED_GROUP
@@ -1121,9 +1121,9 @@ Eigen::VectorXs ConstrainedGroupGradientMatrices::getSpringStiffVector(
 {
   Eigen::VectorXs result = Eigen::VectorXs::Zero(mNumDOFs);
   std::size_t cursor = 0;
-  for (std::size_t i=0;i<nSkeletons.size();i++)
+  for (std::size_t i=0;i<mSkeletons.size();i++)
   {
-    SkeletonPtr skel = world->getSkeleton(mSkeleton[i]);
+    SkeletonPtr skel = world->getSkeleton(mSkeletons[i]);
     std::vector<dynamics::DegreeOfFreedom*> skeldofs = skel->getDofs();
     std::size_t nDofs = skel->getNumDofs();
     for (int j=0;j<nDofs;j++)
@@ -1131,8 +1131,8 @@ Eigen::VectorXs ConstrainedGroupGradientMatrices::getSpringStiffVector(
       result(cursor) = skeldofs[j]->getSpringStiffness();
       cursor ++;
     }
-    return result;
   }
+  return result;
 }
 
 Eigen::VectorXs ConstrainedGroupGradientMatrices::getRestPositions(
@@ -1141,9 +1141,9 @@ Eigen::VectorXs ConstrainedGroupGradientMatrices::getRestPositions(
 {
   Eigen::VectorXs result = Eigen::VectorXs::Zero(mNumDOFs);
   std::size_t cursor = 0;
-  for (std::size_t i=0;i<nSkeletons.size();i++)
+  for (std::size_t i=0;i<mSkeletons.size();i++)
   {
-    SkeletonPtr skel = world->getSkeleton(mSkeleton[i]);
+    SkeletonPtr skel = world->getSkeleton(mSkeletons[i]);
     std::vector<dynamics::DegreeOfFreedom*> skeldofs = skel->getDofs();
     std::size_t nDofs = skel->getNumDofs();
     for (int j=0;j<nDofs;j++)
@@ -1151,8 +1151,48 @@ Eigen::VectorXs ConstrainedGroupGradientMatrices::getRestPositions(
       result(cursor) = skeldofs[j]->getRestPosition();
       cursor ++;
     }
-    return result;
   }
+  return result;
+}
+
+Eigen::VectorXs ConstrainedGroupGradientMatrices::getPositions(
+  WorldPtr world
+)
+{
+  Eigen::VectorXs p = Eigen::VectorXs::Zero(mNumDOFs);
+  std::size_t cursor = 0;
+  for(std::size_t i=0; i<mSkeletons.size();i++)
+  {
+    SkeletonPtr skel = world->getSkeleton(mSkeletons[i]);
+    std::vector<dynamics::DegreeOfFreedom*> skeldofs = skel->getDofs();
+    std::size_t nDofs = skel->getNumDofs();
+    for (int j=0;j<nDofs;j++)
+    {
+      p(cursor) = skeldofs[j]->getPosition();
+      cursor ++;
+    }
+  }
+  return p;
+}
+
+Eigen::VectorXs ConstrainedGroupGradientMatrices::getVelocities(
+  WorldPtr world
+)
+{
+  Eigen::VectorXs v = Eigen::VectorXs::Zero(mNumDOFs);
+  std::size_t cursor = 0;
+  for(std::size_t i=0; i<mSkeletons.size();i++)
+  {
+    SkeletonPtr skel = world->getSkeleton(mSkeletons[i]);
+    std::vector<dynamics::DegreeOfFreedom*> skeldofs = skel->getDofs();
+    std::size_t nDofs = skel->getNumDofs();
+    for (int j=0;j<nDofs;j++)
+    {
+      v(cursor) = skeldofs[j]->getVelocity();
+      cursor ++;
+    }
+  }
+  return v;
 }
 
 //==============================================================================
@@ -1288,11 +1328,11 @@ Eigen::MatrixXs ConstrainedGroupGradientMatrices::getVelJacobianWrt(
   const Eigen::VectorXs& f_c = getClampingConstraintImpulses();
   s_t dt = world->getTimeStep();
   Eigen::VectorXs ddamp = getDampingVector(world);
-  Eigen::VectorXs v_t = mPreStepVelocities;
-  Eigen::VectorXs p_t = mPreStepPositions;
+  Eigen::VectorXs v_t = getVelocities(world);
+  Eigen::VectorXs p_t = getPositions(world);
   Eigen::VectorXs spring_stiffs = getSpringStiffVector(world);
   Eigen::VectorXs p_rest = getRestPositions(world);
-  Eigen::VectorXs spring_forces = spring_forces.asDiagonal()*(p_t - p_rest + dt*v_t);
+  Eigen::VectorXs spring_forces = spring_stiffs.asDiagonal()*(p_t - p_rest + dt*v_t);
   Eigen::VectorXs damping_forces = ddamp.asDiagonal()*v_t;
 
   Eigen::MatrixXs dM
@@ -1320,7 +1360,7 @@ Eigen::MatrixXs ConstrainedGroupGradientMatrices::getVelJacobianWrt(
   {
     Eigen::MatrixXs dA_c = getJacobianOfClampingConstraints(world, f_c);
     Eigen::MatrixXs dA_ubE = getJacobianOfUpperBoundConstraints(world, E * f_c);
-    return dM + Minv * (A_c_ub_E * dF_c + dA_c + dA_ubE - dt * dC - dt*spring_stiffs);
+    return dM + Minv * (A_c_ub_E * dF_c + dA_c + dA_ubE - dt * dC) - Minv*dt*spring_stiffs.asDiagonal();
   }
   else
   {
@@ -1603,13 +1643,14 @@ ConstrainedGroupGradientMatrices::getJacobianOfLCPOffsetClampingSubset(
   Eigen::VectorXs C = getCoriolisAndGravityAndExternalForces(world);
   Eigen::VectorXs f = getPreStepTorques() - C;
   Eigen::VectorXs v_f = mPreLCPVelocities;
-  Eigen::VectorXs v_t = mPreStepVelocities;
-  Eigen::VectorXs p_t = mPreStepPositions;
+  Eigen::VectorXs v_t = getVelocities(world);
+  Eigen::VectorXs p_t = getPositions(world);
+  
   Eigen::MatrixXs ddamp = getDampingVector(world).asDiagonal();
   Eigen::MatrixXs p_rest = getRestPositions(world);
-  Eigen::VectorXs spring_forces = spring_stiffs*(p_t - p_rest + dt*v_t);
+  Eigen::VectorXs spring_force = spring_stiffs*(p_t - p_rest + dt*v_t);
   Eigen::VectorXs damping_force = ddamp*v_t;
-  f = f - damping_forces - spring_forces;
+  f = f - damping_force - spring_force;
   Eigen::MatrixXs dMinv_f = getJacobianOfMinv(world, f, wrt);
 
   if (wrt == WithRespectTo::POSITION)
@@ -1650,19 +1691,28 @@ void ConstrainedGroupGradientMatrices::computeLCPOffsetClampingSubset(
     simulation::WorldPtr world, Eigen::VectorXs& b, const Eigen::MatrixXs& A_c)
 {
   int nDofs = world->getNumDofs();
+  s_t dt = world->getTimeStep();
+  std::vector<dynamics::DegreeOfFreedom*> dofs = world->getDofs();
   Eigen::MatrixXs damp = Eigen::MatrixXs::Zero(nDofs,nDofs);
+  Eigen::MatrixXs spring_stiffs = Eigen::MatrixXs::Zero(nDofs,nDofs);
+  Eigen::VectorXs p_rest = Eigen::VectorXs::Zero(nDofs);
+  Eigen::VectorXs p_t = world->getPositions();
+  Eigen::VectorXs v_t = world->getVelocities();
   for (int i=0;i<nDofs;i++)
   {
-    damp(i,i) = world->getDofs()[i]->getDampingCoefficient();
+    damp(i,i) = dofs[i]->getDampingCoefficient();
+    spring_stiffs(i,i) = dofs[i]->getSpringStiffness();
+    p_rest(i) = dofs[i]->getRestPosition();
   }
-  //std::cout<<"Damping Matrix: \n"<<damp<<std::endl;
+  Eigen::VectorXs damping_force = damp*v_t;
+  Eigen::VectorXs spring_force = spring_stiffs*(p_t-p_rest+dt*v_t);
   b = -A_c.transpose()
-      * (world->getVelocities()
-         + (world->getTimeStep()
+      * (v_t
+         + (dt
             * implicitMultiplyByInvMassMatrix(
                 world,
                 world->getControlForces()
-                    - world->getCoriolisAndGravityAndExternalForces() - damp*world->getVelocities())));
+                    - world->getCoriolisAndGravityAndExternalForces() - damping_force - spring_force)));
 }
 
 //==============================================================================

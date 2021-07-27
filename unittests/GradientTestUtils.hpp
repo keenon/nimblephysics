@@ -1456,6 +1456,7 @@ bool verifyF_c(WorldPtr world)
       return false;
     }
 
+    
     Eigen::MatrixXs bruteForceEstimatedJac
         = classicPtr->finiteDifferenceJacobianOfEstimatedConstraintForce(
             world, WithRespectTo::POSITION);
@@ -1528,7 +1529,7 @@ bool verifyF_c(WorldPtr world)
       }
       return false;
     }
-
+    
     bruteForceJacB
         = classicPtr->finiteDifferenceJacobianOfLCPOffsetClampingSubset(
             world, WithRespectTo::VELOCITY);
@@ -1573,6 +1574,7 @@ bool verifyF_c(WorldPtr world)
       return false;
     }
 
+    
     bruteForceEstimatedJac
         = classicPtr->finiteDifferenceJacobianOfEstimatedConstraintForce(
             world, WithRespectTo::VELOCITY);
@@ -1624,7 +1626,7 @@ bool verifyF_c(WorldPtr world)
       }
       return false;
     }
-
+    
     bruteForceJacB
         = classicPtr->finiteDifferenceJacobianOfLCPOffsetClampingSubset(
             world, WithRespectTo::FORCE);
@@ -1668,7 +1670,7 @@ bool verifyF_c(WorldPtr world)
                 << std::endl;
       return false;
     }
-
+    
     bruteForceEstimatedJac
         = classicPtr->finiteDifferenceJacobianOfEstimatedConstraintForce(
             world, WithRespectTo::FORCE);
@@ -1720,6 +1722,7 @@ bool verifyF_c(WorldPtr world)
       }
       return false;
     }
+    
   }
 
   snapshot.restore();
@@ -1811,13 +1814,12 @@ VelocityTest runVelocityTest(WorldPtr world)
   Eigen::MatrixXs E = classicPtr->getUpperBoundMappingMatrix();
   Eigen::MatrixXs A_c_ub_E = A_c + A_ub * E;
   Eigen::VectorXs tau = world->getControlForces();
-  int nDofs = world->getNumDofs();
-  Eigen::VectorXs damping = classicPtr->getDampingVector(world).asDiagonal();
-  Eigen::VectorXs spring_stiffs = classicPtr->getSpringStiffVector(world);
+  Eigen::MatrixXs damping = classicPtr->getDampingVector(world).asDiagonal();
+  Eigen::MatrixXs spring_stiffs = classicPtr->getSpringStiffVector(world).asDiagonal();
   Eigen::VectorXs p_rest = classicPtr->getRestPositions(world);
   s_t dt = world->getTimeStep();
-  Eigen::VectorXs damping_force = damping.asDiagonal()*preStepVelocity;
-  Eigen::VectorXs spring_force = spring_stiffs.asDiagonal()*(preStepPosition - p_rest + preStepVelocity*dt);
+  Eigen::VectorXs damping_force = damping*preStepVelocity;
+  Eigen::VectorXs spring_force = spring_stiffs*(preStepPosition - p_rest + preStepVelocity*dt);
 
   Eigen::MatrixXs Minv = world->getInvMassMatrix();
   Eigen::VectorXs C = world->getCoriolisAndGravityAndExternalForces();
@@ -2371,7 +2373,8 @@ bool verifyVelGradients(WorldPtr world, VectorXs worldVel)
       // && verifyJacobianOfProjectionIntoClampsMatrix(world, worldVel,
       // POSITION)
       && verifyRecoveredLCPConstraints(world, worldVel)
-      //&& verifyPerturbedF_c(world) && verifyF_c(world)
+      && verifyPerturbedF_c(world) 
+      && verifyF_c(world)
       && verifyForceVelJacobian(world, worldVel)
       && verifyVelVelJacobian(world, worldVel)
       && verifyFeatherstoneJacobians(world)

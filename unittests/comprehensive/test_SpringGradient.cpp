@@ -122,7 +122,7 @@ void testBlockWithFrictionCoeff(s_t frictionCoeff, s_t mass)
   boxJoint->setSpringStiffness(0,1);
   boxJoint->setSpringStiffness(1,2);
   boxJoint->setRestPosition(0,0.2);
-  boxJoint->setRestPosotion(1,0,1);
+  boxJoint->setRestPosition(1,0.1);
 
 
   std::shared_ptr<BoxShape> boxShape(
@@ -318,7 +318,7 @@ void testRotateBlockPosGradients(s_t frictionCoeff, s_t spring_stiff)
   boxJoint->setTransformFromParentBodyNode(Eigen::Isometry3s::Identity());
   //boxJoint->setTransformFromChildBodyNode(Eigen::Isometry3s::Identity());
   boxJoint->setSpringStiffness(0,spring_stiff);
-  boxJoiut->setRestPosition(0,0.2);
+  boxJoint->setRestPosition(0,0.2);
 
   std::shared_ptr<BoxShape> boxShape(
       new BoxShape(Eigen::Vector3s(1.0, 1.0, 1.0)));
@@ -671,11 +671,8 @@ void testFreeBlockWithFrictionCoeff(
   boxJoint->setSpringStiffness(2,1);
   boxJoint->setRestPosition(2,1);
   boxJoint->setSpringStiffness(3,1);
-  boxJoint->setRestPosition(3,1);
   boxJoint->setSpringStiffness(4,1);
-  boxJoint->setRestPosition(4,1);
   boxJoint->setSpringStiffness(5,1);
-  boxJoint->setRestPosition(5,1);
   std::shared_ptr<BoxShape> boxShape(
       new BoxShape(Eigen::Vector3s(1.0, 1.0, 1.0)));
   boxBody->createShapeNodeWith<VisualAspect, CollisionAspect>(boxShape);
