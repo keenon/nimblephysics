@@ -45,6 +45,7 @@
 #include <dart/dynamics/TranslationalJoint2D.hpp>
 #include <dart/dynamics/UniversalJoint.hpp>
 #include <dart/dynamics/WeldJoint.hpp>
+#include <pybind11/functional.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
@@ -809,8 +810,12 @@ void Skeleton(py::module& m)
           ::py::arg("contactBodies"),
           ::py::arg("smoothingWeight"),
           ::py::arg("minTorqueWeight"),
+          ::py::arg(
+              "velocityPenalty"), // Having a default arg lambda seems to break
+                                  // pybind11? = [](double) { return 0.0; },
           ::py::arg("prevContactForces") = std::vector<Eigen::Vector6s>(),
-          ::py::arg("prevContactWeight") = 0.0)
+          ::py::arg("prevContactWeight") = 0.0,
+          ::py::arg("magnitudeCosts") = dart::dynamics::Skeleton::EMPTY)
       .def(
           "getSupportVersion",
           +[](const dart::dynamics::Skeleton* self) -> std::size_t {
