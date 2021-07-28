@@ -1021,7 +1021,7 @@ void testMimicJoint()
   joints[1]->setActuatorType(Joint::MIMIC);
   joints[1]->setMimicJoint(joints[0], 1., 0.);
 
-  world->addSkeleton(pendulum, true);
+  world->addSkeleton(pendulum);
   // We need to use implicit integration here to keep the results stable enough
   // for the numerical tolerances to be satisfied.
   world->setParallelVelocityAndPositionUpdates(false);
