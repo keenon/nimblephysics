@@ -320,9 +320,11 @@ s_t SimmSpline::calcDerivative(int order, s_t x) const
   int n = _x.size();
   s_t aX = x;
   int aDerivOrder = order;
-  assert(
-      (aDerivOrder == 1 || aDerivOrder == 2)
-      && "SimmSpline::calcDerivative(): derivative order must be 1 or 2.");
+
+  // We assume all higher order derivatives are 0, because each spline segment
+  // is only order 2
+  if (order > 2)
+    return 0;
 
   /* Check if the abscissa is out of range of the function. If it is,
    * then use the slope of the function at the appropriate end point to

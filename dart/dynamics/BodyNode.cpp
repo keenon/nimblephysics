@@ -2683,8 +2683,9 @@ void BodyNode::computeJacobianOfMForward(neural::WithRespectTo* wrt)
 
       const Jacobian DS_Dq
           = mParentJoint->getRelativeJacobianDeriv(dof->getIndexInJoint());
-      const Jacobian DdS_Dq = mParentJoint->getRelativeJacobianTimeDerivDeriv(
-          dof->getIndexInJoint());
+      const Jacobian DdS_Dq
+          = mParentJoint->getRelativeJacobianTimeDerivDerivWrtPosition(
+              dof->getIndexInJoint());
 
       if (mParentBodyNode)
       {
@@ -2860,8 +2861,9 @@ void BodyNode::computeJacobianOfCForward(neural::WithRespectTo* wrt)
 
         const Jacobian DS_Dq
             = mParentJoint->getRelativeJacobianDeriv(dof->getIndexInJoint());
-        const Jacobian DdS_Dq = mParentJoint->getRelativeJacobianTimeDerivDeriv(
-            dof->getIndexInJoint());
+        const Jacobian DdS_Dq
+            = mParentJoint->getRelativeJacobianTimeDerivDerivWrtPosition(
+                dof->getIndexInJoint());
 
         if (mParentBodyNode)
         {
@@ -2913,10 +2915,11 @@ void BodyNode::computeJacobianOfCForward(neural::WithRespectTo* wrt)
       {
         const Jacobian DS_Dq
             = mParentJoint->getRelativeJacobianDeriv(dof->getIndexInJoint());
-        const Jacobian DdS_Dq = mParentJoint->getRelativeJacobianTimeDerivDeriv(
-            dof->getIndexInJoint());
+        const Jacobian DdS_Dq
+            = mParentJoint->getRelativeJacobianTimeDerivDerivWrtPosition(
+                dof->getIndexInJoint());
         const Jacobian DdS_Ddq
-            = mParentJoint->getRelativeJacobianTimeDerivDeriv2(
+            = mParentJoint->getRelativeJacobianTimeDerivDerivWrtVelocity(
                 dof->getIndexInJoint());
 
         const int dofIndexInJoint = static_cast<int>(dof->getIndexInJoint());

@@ -34,6 +34,7 @@
 
 #include <Eigen/Dense>
 
+#include "dart/math/CustomFunction.hpp"
 #include "dart/math/MathTypes.hpp"
 
 //=============================================================================
@@ -52,7 +53,7 @@ namespace math {
  * @author Peter Loan
  * @version 1.0
  */
-class SimmSpline
+class SimmSpline : public CustomFunction
 {
   //=============================================================================
   // MEMBER VARIABLES
@@ -110,8 +111,8 @@ public:
   //--------------------------------------------------------------------------
   // EVALUATION
   //--------------------------------------------------------------------------
-  s_t calcValue(s_t x) const;
-  s_t calcDerivative(int order, s_t x) const;
+  s_t calcValue(s_t x) const override;
+  s_t calcDerivative(int order, s_t x) const override;
   int getArgumentSize() const;
   int getMaxDerivativeOrder() const;
 

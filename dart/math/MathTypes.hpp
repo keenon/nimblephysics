@@ -72,6 +72,7 @@ using Matrix6s = Matrix<s_t, 6, 6>;
 
 typedef Matrix<s_t, Dynamic, Dynamic> MatrixXs;
 typedef Matrix<s_t, Dynamic, 1> VectorXs;
+typedef Matrix<s_t, 1, 1> Vector1s;
 typedef Matrix<s_t, 2, 1> Vector2s;
 typedef Matrix<s_t, 3, 1> Vector3s;
 typedef Matrix<s_t, 4, 1> Vector4s;

@@ -1222,7 +1222,8 @@ Eigen::VectorXs GenericJoint<ConfigSpaceT>::getControlForces() const
 
 //==============================================================================
 template <class ConfigSpaceT>
-void GenericJoint<ConfigSpaceT>::setControlForceLowerLimit(size_t index, s_t force)
+void GenericJoint<ConfigSpaceT>::setControlForceLowerLimit(
+    size_t index, s_t force)
 {
   if (index >= getNumDofs())
   {
@@ -1269,7 +1270,8 @@ Eigen::VectorXs GenericJoint<ConfigSpaceT>::getControlForceLowerLimits() const
 
 //==============================================================================
 template <class ConfigSpaceT>
-void GenericJoint<ConfigSpaceT>::setControlForceUpperLimit(size_t index, s_t force)
+void GenericJoint<ConfigSpaceT>::setControlForceUpperLimit(
+    size_t index, s_t force)
 {
   if (index >= getNumDofs())
   {
@@ -1963,7 +1965,8 @@ void GenericJoint<ConfigSpaceT>::computeJacobianOfMinvX_A(
       const Jacobian DS_Dq
           = this->getRelativeJacobianDeriv(dof->getIndexInJoint());
       const Jacobian DdS_Dq
-          = this->getRelativeJacobianTimeDerivDeriv(dof->getIndexInJoint());
+          = this->getRelativeJacobianTimeDerivDerivWrtPosition(
+              dof->getIndexInJoint());
 
       const Matrix tmp0 = DS_Dq.transpose() * AIS;
       Dpsi_Dq = -psi * (S.transpose() * DAI_Dq[i] * S + tmp0 + tmp0.transpose())
@@ -2071,7 +2074,8 @@ Eigen::MatrixXs GenericJoint<ConfigSpaceT>::computeJacobianOfMinvX_B(
       const Jacobian DS_Dq
           = this->getRelativeJacobianDeriv(dof->getIndexInJoint());
       const Jacobian DdS_Dq
-          = this->getRelativeJacobianTimeDerivDeriv(dof->getIndexInJoint());
+          = this->getRelativeJacobianTimeDerivDerivWrtPosition(
+              dof->getIndexInJoint());
 
       if (parentBody)
       {

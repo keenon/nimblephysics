@@ -665,7 +665,7 @@ math::Jacobian FreeJoint::finiteDifferenceRelativeJacobianDeriv(
 }
 
 //==============================================================================
-math::Jacobian FreeJoint::getRelativeJacobianTimeDerivDeriv(
+math::Jacobian FreeJoint::getRelativeJacobianTimeDerivDerivWrtPosition(
     std::size_t index) const
 {
 #ifdef DART_USE_IDENTITY_JACOBIAN
@@ -725,7 +725,7 @@ math::Jacobian FreeJoint::finiteDifferenceRelativeJacobianTimeDerivDeriv(
 }
 
 //==============================================================================
-math::Jacobian FreeJoint::getRelativeJacobianTimeDerivDeriv2(
+math::Jacobian FreeJoint::getRelativeJacobianTimeDerivDerivWrtVelocity(
     std::size_t index) const
 {
 #ifdef DART_USE_IDENTITY_JACOBIAN

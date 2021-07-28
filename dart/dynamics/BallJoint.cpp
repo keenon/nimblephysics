@@ -34,9 +34,9 @@
 
 #include <string>
 
-#include "dart/math/Helpers.hpp"
-#include "dart/math/Geometry.hpp"
 #include "dart/dynamics/DegreeOfFreedom.hpp"
+#include "dart/math/Geometry.hpp"
+#include "dart/math/Helpers.hpp"
 
 namespace dart {
 namespace dynamics {
@@ -70,8 +70,8 @@ const std::string& BallJoint::getStaticType()
 //==============================================================================
 bool BallJoint::isCyclic(std::size_t _index) const
 {
-  return _index < 3
-      && !hasPositionLimit(0) && !hasPositionLimit(1) && !hasPositionLimit(2);
+  return _index < 3 && !hasPositionLimit(0) && !hasPositionLimit(1)
+         && !hasPositionLimit(2);
 }
 
 //==============================================================================
@@ -96,8 +96,7 @@ Eigen::Matrix3s BallJoint::convertToRotation(const Eigen::Vector3s& _positions)
 //==============================================================================
 BallJoint::BallJoint(const Properties& properties)
 #ifdef DART_USE_IDENTITY_JACOBIAN
-  : Base(properties),
-    mR(Eigen::Isometry3s::Identity())
+  : Base(properties), mR(Eigen::Isometry3s::Identity())
 #else
   : Base::Properties(properties)
 #endif
@@ -141,7 +140,7 @@ Eigen::Matrix<s_t, 6, 3> BallJoint::getRelativeJacobianStatic(
 math::Jacobian BallJoint::getRelativeJacobianDeriv(std::size_t index) const
 {
 #ifdef DART_USE_IDENTITY_JACOBIAN
-  //return finiteDifferenceRelativeJacobianDeriv(index);
+  // return finiteDifferenceRelativeJacobianDeriv(index);
   (void)index;
   return Eigen::Matrix<s_t, 6, 3>::Zero();
 #else
@@ -164,7 +163,8 @@ math::Jacobian BallJoint::getRelativeJacobianDeriv(std::size_t index) const
 }
 
 //==============================================================================
-math::Jacobian BallJoint::finiteDifferenceRelativeJacobianDeriv(std::size_t index) const
+math::Jacobian BallJoint::finiteDifferenceRelativeJacobianDeriv(
+    std::size_t index) const
 {
   const auto& q = getPositionsStatic();
 
@@ -184,10 +184,11 @@ math::Jacobian BallJoint::finiteDifferenceRelativeJacobianDeriv(std::size_t inde
 }
 
 //==============================================================================
-math::Jacobian BallJoint::getRelativeJacobianTimeDerivDeriv(std::size_t index) const
+math::Jacobian BallJoint::getRelativeJacobianTimeDerivDerivWrtPosition(
+    std::size_t index) const
 {
 #ifdef DART_USE_IDENTITY_JACOBIAN
-  //return finiteDifferenceRelativeJacobianTimeDerivDeriv(index);
+  // return finiteDifferenceRelativeJacobianTimeDerivDeriv(index);
   (void)index;
   return Eigen::Matrix<s_t, 6, 3>::Zero();
 #else
@@ -209,7 +210,8 @@ math::Jacobian BallJoint::getRelativeJacobianTimeDerivDeriv(std::size_t index) c
 }
 
 //==============================================================================
-math::Jacobian BallJoint::finiteDifferenceRelativeJacobianTimeDerivDeriv(std::size_t index) const
+math::Jacobian BallJoint::finiteDifferenceRelativeJacobianTimeDerivDeriv(
+    std::size_t index) const
 {
   const auto& q = getPositionsStatic();
 
@@ -229,7 +231,8 @@ math::Jacobian BallJoint::finiteDifferenceRelativeJacobianTimeDerivDeriv(std::si
 }
 
 //==============================================================================
-math::Jacobian BallJoint::getRelativeJacobianTimeDerivDeriv2(std::size_t index) const
+math::Jacobian BallJoint::getRelativeJacobianTimeDerivDerivWrtVelocity(
+    std::size_t index) const
 {
 #ifdef DART_USE_IDENTITY_JACOBIAN
   // return finiteDifferenceRelativeJacobianTimeDerivDeriv2(index);
@@ -254,7 +257,8 @@ math::Jacobian BallJoint::getRelativeJacobianTimeDerivDeriv2(std::size_t index) 
 }
 
 //==============================================================================
-math::Jacobian BallJoint::finiteDifferenceRelativeJacobianTimeDerivDeriv2(std::size_t index) const
+math::Jacobian BallJoint::finiteDifferenceRelativeJacobianTimeDerivDeriv2(
+    std::size_t index) const
 {
   const auto& dq = getVelocitiesStatic();
 
@@ -275,10 +279,10 @@ math::Jacobian BallJoint::finiteDifferenceRelativeJacobianTimeDerivDeriv2(std::s
 
 //==============================================================================
 Eigen::Matrix<s_t, 6, 3> BallJoint::getRelativeJacobianInPositionSpaceStatic(
-    const Eigen::Vector3s& _positions) const {
+    const Eigen::Vector3s& _positions) const
+{
   Eigen::Matrix<s_t, 6, 3> J;
-  J.topLeftCorner<3, 3>().noalias()
-      = math::expMapJac(_positions).transpose();
+  J.topLeftCorner<3, 3>().noalias() = math::expMapJac(_positions).transpose();
   J.bottomLeftCorner<3, 3>().setZero();
   return math::AdTJacFixed(Joint::mAspectProperties.mT_ChildBodyToJoint, J);
 }
@@ -326,12 +330,12 @@ void BallJoint::integrateVelocities(s_t dt)
 
 //==============================================================================
 Eigen::VectorXs BallJoint::integratePositionsExplicit(
-    const Eigen::VectorXs& pos, const Eigen::VectorXs& vel, s_t dt) {
+    const Eigen::VectorXs& pos, const Eigen::VectorXs& vel, s_t dt)
+{
 #ifdef DART_USE_IDENTITY_JACOBIAN
   const auto& q = pos;
   const auto& dq = vel;
-  Eigen::Matrix3s Rnext
-      = convertToRotation(q) * convertToRotation(dq * dt);
+  Eigen::Matrix3s Rnext = convertToRotation(q) * convertToRotation(dq * dt);
 #else
   const auto& q = pos;
   const auto& dq = vel;
@@ -344,14 +348,16 @@ Eigen::VectorXs BallJoint::integratePositionsExplicit(
 
 //==============================================================================
 Eigen::MatrixXs BallJoint::getPosPosJacobian(
-    const Eigen::VectorXs& pos, const Eigen::VectorXs& vel, s_t _dt) {
+    const Eigen::VectorXs& pos, const Eigen::VectorXs& vel, s_t _dt)
+{
   // TODO
   return finiteDifferencePosPosJacobian(pos, vel, _dt);
 }
 
 //==============================================================================
 Eigen::MatrixXs BallJoint::getVelPosJacobian(
-    const Eigen::VectorXs& pos, const Eigen::VectorXs& vel, s_t _dt) {
+    const Eigen::VectorXs& pos, const Eigen::VectorXs& vel, s_t _dt)
+{
   // TODO
   return finiteDifferenceVelPosJacobian(pos, vel, _dt);
 }
@@ -363,7 +369,8 @@ Eigen::MatrixXs BallJoint::finiteDifferencePosPosJacobian(
 {
   Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(3, 3);
   s_t EPS = 1e-6;
-  for (int i = 0; i < 3; i++) {
+  for (int i = 0; i < 3; i++)
+  {
     Eigen::VectorXs perturbed = pos;
     perturbed(i) += EPS;
     Eigen::VectorXs plus = integratePositionsExplicit(perturbed, vel, dt);
@@ -384,7 +391,8 @@ Eigen::MatrixXs BallJoint::finiteDifferenceVelPosJacobian(
 {
   Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(3, 3);
   s_t EPS = 1e-7;
-  for (int i = 0; i < 3; i++) {
+  for (int i = 0; i < 3; i++)
+  {
     Eigen::VectorXs perturbed = vel;
     perturbed(i) += EPS;
     Eigen::VectorXs plus = integratePositionsExplicit(pos, perturbed, dt);
@@ -401,11 +409,11 @@ Eigen::MatrixXs BallJoint::finiteDifferenceVelPosJacobian(
 //==============================================================================
 void BallJoint::updateDegreeOfFreedomNames()
 {
-  if(!mDofs[0]->isNamePreserved())
+  if (!mDofs[0]->isNamePreserved())
     mDofs[0]->setName(Joint::mAspectProperties.mName + "_x", false);
-  if(!mDofs[1]->isNamePreserved())
+  if (!mDofs[1]->isNamePreserved())
     mDofs[1]->setName(Joint::mAspectProperties.mName + "_y", false);
-  if(!mDofs[2]->isNamePreserved())
+  if (!mDofs[2]->isNamePreserved())
     mDofs[2]->setName(Joint::mAspectProperties.mName + "_z", false);
 }
 
@@ -416,13 +424,13 @@ void BallJoint::updateRelativeTransform() const
   mR.linear() = convertToRotation(getPositionsStatic());
 
   mT = Joint::mAspectProperties.mT_ParentBodyToJoint * mR
-      * Joint::mAspectProperties.mT_ChildBodyToJoint.inverse();
+       * Joint::mAspectProperties.mT_ChildBodyToJoint.inverse();
 #else
   Eigen::Isometry3s R = Eigen::Isometry3s::Identity();
   R.linear() = convertToRotation(getPositionsStatic());
 
   mT = Joint::mAspectProperties.mT_ParentBodyToJoint * R
-      * Joint::mAspectProperties.mT_ChildBodyToJoint.inverse();
+       * Joint::mAspectProperties.mT_ChildBodyToJoint.inverse();
 #endif
 
   assert(math::verifyTransform(mT));
@@ -434,8 +442,8 @@ void BallJoint::updateRelativeJacobian(bool _mandatory) const
 #ifdef DART_USE_IDENTITY_JACOBIAN
   if (_mandatory)
   {
-    mJacobian = math::getAdTMatrix(
-          Joint::mAspectProperties.mT_ChildBodyToJoint).leftCols<3>();
+    mJacobian = math::getAdTMatrix(Joint::mAspectProperties.mT_ChildBodyToJoint)
+                    .leftCols<3>();
   }
 #else
   (void)_mandatory;
@@ -470,29 +478,32 @@ Eigen::Vector6s BallJoint::getWorldAxisScrewForPosition(int dof) const
 */
 
 //==============================================================================
-// This computes the world axis screw at a given position, without moving the joint.
+// This computes the world axis screw at a given position, without moving the
+// joint.
 //
-// We do this relative to the parent body, rather than the child body, because in
-// moving the joint we also move the child body.
-Eigen::Vector6s BallJoint::getWorldAxisScrewAt(Eigen::Vector3s pos, int dof) const
+// We do this relative to the parent body, rather than the child body, because
+// in moving the joint we also move the child body.
+Eigen::Vector6s BallJoint::getWorldAxisScrewAt(
+    Eigen::Vector3s pos, int dof) const
 {
   Eigen::Vector6s grad = Eigen::Vector6s::Zero();
   grad.head<3>() = math::expMapJac(pos).col(dof);
-  Eigen::Vector6s parentTwist = math::AdT(Joint::mAspectProperties.mT_ParentBodyToJoint, grad);
+  Eigen::Vector6s parentTwist
+      = math::AdT(Joint::mAspectProperties.mT_ParentBodyToJoint, grad);
 
   Eigen::Isometry3s parentTransform = Eigen::Isometry3s::Identity();
-  if (getParentBodyNode() != nullptr) {
+  if (getParentBodyNode() != nullptr)
+  {
     parentTransform = getParentBodyNode()->getWorldTransform();
   }
   return math::AdT(parentTransform, parentTwist);
 }
 
 //==============================================================================
-// This estimates the new world screw axis at `axisDof` when we perturbe `rotateDof` by `eps`
+// This estimates the new world screw axis at `axisDof` when we perturbe
+// `rotateDof` by `eps`
 Eigen::Vector6s BallJoint::estimatePerturbedScrewAxisForPosition(
-  int axisDof,
-  int rotateDof,
-  s_t eps)
+    int axisDof, int rotateDof, s_t eps)
 {
   Eigen::Vector3s pos = getPositionsStatic();
   pos(rotateDof) += eps;
@@ -500,65 +511,71 @@ Eigen::Vector6s BallJoint::estimatePerturbedScrewAxisForPosition(
 }
 
 //==============================================================================
-// This estimates the new world screw axis at `axisDof` when we perturbe `rotateDof` by `eps`
+// This estimates the new world screw axis at `axisDof` when we perturbe
+// `rotateDof` by `eps`
 Eigen::Vector6s BallJoint::estimatePerturbedScrewAxisForForce(
-  int axisDof,
-  int rotateDof,
-  s_t eps)
+    int axisDof, int rotateDof, s_t eps)
 {
   Eigen::Vector3s pos = getPositionsStatic();
   pos(rotateDof) += eps;
 
   Eigen::Isometry3s parentTransform = Eigen::Isometry3s::Identity();
-  if (getParentBodyNode() != nullptr) {
+  if (getParentBodyNode() != nullptr)
+  {
     parentTransform = getParentBodyNode()->getWorldTransform();
   }
   return math::AdT(
-    parentTransform * Joint::mAspectProperties.mT_ParentBodyToJoint * convertToTransform(pos)
-        * Joint::mAspectProperties.mT_ChildBodyToJoint.inverse(), getRelativeJacobian(pos).col(axisDof));
+      parentTransform * Joint::mAspectProperties.mT_ParentBodyToJoint
+          * convertToTransform(pos)
+          * Joint::mAspectProperties.mT_ChildBodyToJoint.inverse(),
+      getRelativeJacobian(pos).col(axisDof));
 }
 
 //==============================================================================
 // Returns the gradient of the screw axis with respect to the rotate dof
 Eigen::Vector6s BallJoint::getScrewAxisGradientForPosition(
-  int axisDof,
-  int rotateDof)
+    int axisDof, int rotateDof)
 {
   s_t EPS = 1e-7;
-  Eigen::Vector6s pos = estimatePerturbedScrewAxisForPosition(axisDof, rotateDof, EPS);
-  Eigen::Vector6s neg = estimatePerturbedScrewAxisForPosition(axisDof, rotateDof, -EPS);
+  Eigen::Vector6s pos
+      = estimatePerturbedScrewAxisForPosition(axisDof, rotateDof, EPS);
+  Eigen::Vector6s neg
+      = estimatePerturbedScrewAxisForPosition(axisDof, rotateDof, -EPS);
   return (pos - neg) / (2 * EPS);
 }
 
 //==============================================================================
 // Returns the gradient of the screw axis with respect to the rotate dof
 Eigen::Vector6s BallJoint::getScrewAxisGradientForForce(
-  int axisDof,
-  int rotateDof)
+    int axisDof, int rotateDof)
 {
   // getRelativeJacobian() is constant wrt position
   // toRotate is also constant wrt position
   // Eigen::Vector6s toRotate = Eigen::Vector6s::Unit(axisDof);
-  Eigen::Vector6s toRotate = math::AdT(Joint::mAspectProperties.mT_ChildBodyToJoint.inverse(), getRelativeJacobian().col(axisDof));
+  Eigen::Vector6s toRotate = math::AdT(
+      Joint::mAspectProperties.mT_ChildBodyToJoint.inverse(),
+      getRelativeJacobian().col(axisDof));
   Eigen::Vector6s grad = Eigen::Vector6s::Zero();
   Eigen::Matrix3s rotate = math::expMapRot(getPositionsStatic());
-  Eigen::Vector3s screwAxis = math::expMapJac(getPositionsStatic()).row(rotateDof);
+  Eigen::Vector3s screwAxis
+      = math::expMapJac(getPositionsStatic()).row(rotateDof);
   grad.head<3>() = rotate * screwAxis.cross(toRotate.head<3>());
   grad.tail<3>() = rotate * screwAxis.cross(toRotate.tail<3>());
 
   Eigen::Isometry3s parentTransform = Eigen::Isometry3s::Identity();
-  if (getParentBodyNode() != nullptr) {
+  if (getParentBodyNode() != nullptr)
+  {
     parentTransform = getParentBodyNode()->getWorldTransform();
   }
   return math::AdT(
-    parentTransform * Joint::mAspectProperties.mT_ParentBodyToJoint, grad);
+      parentTransform * Joint::mAspectProperties.mT_ParentBodyToJoint, grad);
 }
 
 #ifdef DART_USE_IDENTITY_JACOBIAN
 //==============================================================================
 const Eigen::Isometry3s& BallJoint::getR() const
 {
-  if(mNeedTransformUpdate)
+  if (mNeedTransformUpdate)
   {
     updateRelativeTransform();
     mNeedTransformUpdate = false;
@@ -568,5 +585,5 @@ const Eigen::Isometry3s& BallJoint::getR() const
 }
 #endif
 
-}  // namespace dynamics
-}  // namespace dart
+} // namespace dynamics
+} // namespace dart

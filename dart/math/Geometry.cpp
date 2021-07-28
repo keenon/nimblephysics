@@ -33,12 +33,12 @@
 #include "dart/math/Geometry.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cassert>
 #include <cmath>
 #include <iomanip>
 #include <iostream>
 #include <vector>
-#include <array>
 
 #include "dart/common/Console.hpp"
 #include "dart/math/Helpers.hpp"
@@ -1431,6 +1431,285 @@ Eigen::Matrix3s eulerXYZToMatrix(const Eigen::Vector3s& _angle)
   ret(2, 2) = cx * cy;
 
   return ret;
+}
+
+/// This gives the gradient of an XYZ rotation matrix with respect to the
+/// specific index (0, 1, or 2)
+Eigen::Matrix3s eulerXYZToMatrixGrad(const Eigen::Vector3s& _angle, int index)
+{
+  // Original
+  // +-           -+   +-                                        -+
+  // | r00 r01 r02 |   |  cy*cz           -cy*sz            sy    |
+  // | r10 r11 r12 | = |  cz*sx*sy+cx*sz   cx*cz-sx*sy*sz  -cy*sx |
+  // | r20 r21 r22 |   | -cx*cz*sy+sx*sz   cz*sx+cx*sy*sz   cx*cy |
+  // +-           -+   +-                                        -+
+
+  Eigen::Matrix3s ret;
+
+  s_t cx = cos(_angle[0]);
+  s_t sx = sin(_angle[0]);
+  s_t cy = cos(_angle[1]);
+  s_t sy = sin(_angle[1]);
+  s_t cz = cos(_angle[2]);
+  s_t sz = sin(_angle[2]);
+
+  // dx
+  //
+  // +-           -+   +-                                        -+
+  // | r00 r01 r02 |   |  0                0                0      |
+  // | r10 r11 r12 | = |  cx*cz*sy-sx*sz   -sx*cz-cx*sy*sz  -cy*cx |
+  // | r20 r21 r22 |   |  sx*cz*sy+cx*sz   cz*cx-sx*sy*sz   -sx*cy |
+  // +-           -+   +-                                        -+
+
+  if (index == 0)
+  {
+    ret(0, 0) = 0;
+    ret(1, 0) = (-sx) * sz + cz * (cx)*sy;
+    ret(2, 0) = cx * sz + sx * cz * sy;
+
+    ret(0, 1) = 0;
+    ret(1, 1) = -sx * cz - cx * sy * sz;
+    ret(2, 1) = cz * cx - sx * sy * sz;
+
+    ret(0, 2) = 0;
+    ret(1, 2) = -cy * cx;
+    ret(2, 2) = -sx * cy;
+  }
+  if (index == 1)
+  {
+    ret(0, 0) = (-sy) * cz;
+    ret(1, 0) = cz * sx * (cy);
+    ret(2, 0) = -cx * cz * (cy);
+
+    ret(0, 1) = -(-sy) * sz;
+    ret(1, 1) = -sx * (cy)*sz;
+    ret(2, 1) = cx * (cy)*sz;
+
+    ret(0, 2) = (cy);
+    ret(1, 2) = -(-sy) * sx;
+    ret(2, 2) = cx * (-sy);
+  }
+  if (index == 2)
+  {
+    ret(0, 0) = cy * (-sz);
+    ret(1, 0) = cx * (cz) + (-sz) * sx * sy;
+    ret(2, 0) = sx * (cz)-cx * (-sz) * sy;
+
+    ret(0, 1) = -cy * (cz);
+    ret(1, 1) = cx * (-sz) - sx * sy * (cz);
+    ret(2, 1) = (-sz) * sx + cx * sy * (cz);
+
+    ret(0, 2) = 0;
+    ret(1, 2) = 0;
+    ret(2, 2) = 0;
+  }
+
+  return ret;
+}
+
+/// This gives the gradient of an XYZ rotation matrix with respect to the
+/// specific index (0, 1, or 2)
+Eigen::Matrix3s eulerXYZToMatrixFiniteDifference(
+    const Eigen::Vector3s& _angle, int index)
+{
+  const s_t EPS = 1e-8;
+
+  Eigen::Vector3s perturbed = _angle;
+  perturbed(index) += EPS;
+  Eigen::Matrix3s plus = eulerXYZToMatrix(perturbed);
+
+  perturbed = _angle;
+  perturbed(index) -= EPS;
+  Eigen::Matrix3s minus = eulerXYZToMatrix(perturbed);
+
+  return (plus - minus) / (2 * EPS);
+}
+
+/// This gives the gradient of eulerXYZToMatrixGrad(_angle, firstIndex) with
+/// respect to secondIndex.
+Eigen::Matrix3s eulerXYZToMatrixSecondGrad(
+    const Eigen::Vector3s& _angle, int firstIndex, int secondIndex)
+{
+  // Original
+  // +-           -+   +-                                        -+
+  // | r00 r01 r02 |   |  cy*cz           -cy*sz            sy    |
+  // | r10 r11 r12 | = |  cz*sx*sy+cx*sz   cx*cz-sx*sy*sz  -cy*sx |
+  // | r20 r21 r22 |   | -cx*cz*sy+sx*sz   cz*sx+cx*sy*sz   cx*cy |
+  // +-           -+   +-                                        -+
+  (void)secondIndex;
+
+  Eigen::Matrix3s ret;
+
+  s_t cx = cos(_angle[0]);
+  s_t sx = sin(_angle[0]);
+  s_t cy = cos(_angle[1]);
+  s_t sy = sin(_angle[1]);
+  s_t cz = cos(_angle[2]);
+  s_t sz = sin(_angle[2]);
+
+  // dx
+  //
+  // +-           -+   +-                                        -+
+  // | r00 r01 r02 |   |  0                0                0      |
+  // | r10 r11 r12 | = |  cx*cz*sy-sx*sz   -sx*cz-cx*sy*sz  -cy*cx |
+  // | r20 r21 r22 |   |  sx*cz*sy+cx*sz   cz*cx-sx*sy*sz   -sx*cy |
+  // +-           -+   +-                                        -+
+
+  if (firstIndex == 0)
+  {
+    if (secondIndex == 0)
+    {
+      ret(0, 0) = 0;
+      ret(1, 0) = (-cx) * sz + cz * (-sx) * sy;
+      ret(2, 0) = (-sx) * sz + (cx)*cz * sy;
+
+      ret(0, 1) = 0;
+      ret(1, 1) = -(cx)*cz - (-sx) * sy * sz;
+      ret(2, 1) = cz * (-sx) - (cx)*sy * sz;
+
+      ret(0, 2) = 0;
+      ret(1, 2) = -cy * (-sx);
+      ret(2, 2) = -(cx)*cy;
+    }
+    else if (secondIndex == 1)
+    {
+      ret(0, 0) = 0;
+      ret(1, 0) = cz * (cx) * (cy);
+      ret(2, 0) = sx * cz * (cy);
+
+      ret(0, 1) = 0;
+      ret(1, 1) = -cx * (cy)*sz;
+      ret(2, 1) = -sx * (cy)*sz;
+
+      ret(0, 2) = 0;
+      ret(1, 2) = -(-sy) * cx;
+      ret(2, 2) = -sx * (-sy);
+    }
+    else if (secondIndex == 2)
+    {
+      ret(0, 0) = 0;
+      ret(1, 0) = (-sx) * (cz) + (-sz) * (cx)*sy;
+      ret(2, 0) = cx * (cz) + sx * (-sz) * sy;
+
+      ret(0, 1) = 0;
+      ret(1, 1) = -sx * (-sz) - cx * sy * (cz);
+      ret(2, 1) = (-sz) * cx - sx * sy * (cz);
+
+      ret(0, 2) = 0;
+      ret(1, 2) = 0;
+      ret(2, 2) = 0;
+    }
+  }
+  if (firstIndex == 1)
+  {
+    if (secondIndex == 0)
+    {
+      ret(0, 0) = 0;
+      ret(1, 0) = cz * (cx) * (cy);
+      ret(2, 0) = -(-sx) * cz * (cy);
+
+      ret(0, 1) = 0;
+      ret(1, 1) = -(cx) * (cy)*sz;
+      ret(2, 1) = (-sx) * (cy)*sz;
+
+      ret(0, 2) = 0;
+      ret(1, 2) = -(-sy) * (cx);
+      ret(2, 2) = (-sx) * (-sy);
+    }
+    else if (secondIndex == 1)
+    {
+      ret(0, 0) = (-(cy)) * cz;
+      ret(1, 0) = cz * sx * ((-sy));
+      ret(2, 0) = -cx * cz * ((-sy));
+
+      ret(0, 1) = -(-(cy)) * sz;
+      ret(1, 1) = -sx * ((-sy)) * sz;
+      ret(2, 1) = cx * ((-sy)) * sz;
+
+      ret(0, 2) = ((-sy));
+      ret(1, 2) = -(-(cy)) * sx;
+      ret(2, 2) = cx * (-(cy));
+    }
+    else if (secondIndex == 2)
+    {
+      ret(0, 0) = (-sy) * (-sz);
+      ret(1, 0) = (-sz) * sx * (cy);
+      ret(2, 0) = -cx * (-sz) * (cy);
+
+      ret(0, 1) = -(-sy) * (cz);
+      ret(1, 1) = -sx * (cy) * (cz);
+      ret(2, 1) = cx * (cy) * (cz);
+
+      ret(0, 2) = 0;
+      ret(1, 2) = 0;
+      ret(2, 2) = 0;
+    }
+  }
+  if (firstIndex == 2)
+  {
+    if (secondIndex == 0)
+    {
+      ret(0, 0) = 0;
+      ret(1, 0) = (-sx) * (cz) + (-sz) * (cx)*sy;
+      ret(2, 0) = (cx) * (cz) - (-sx) * (-sz) * sy;
+
+      ret(0, 1) = 0;
+      ret(1, 1) = (-sx) * (-sz) - (cx)*sy * (cz);
+      ret(2, 1) = (-sz) * (cx) + (-sx) * sy * (cz);
+
+      ret(0, 2) = 0;
+      ret(1, 2) = 0;
+      ret(2, 2) = 0;
+    }
+    else if (secondIndex == 1)
+    {
+      ret(0, 0) = (-sy) * (-sz);
+      ret(1, 0) = (-sz) * sx * (cy);
+      ret(2, 0) = -cx * (-sz) * (cy);
+
+      ret(0, 1) = -(-sy) * (cz);
+      ret(1, 1) = -sx * (cy) * (cz);
+      ret(2, 1) = cx * (cy) * (cz);
+
+      ret(0, 2) = 0;
+      ret(1, 2) = 0;
+      ret(2, 2) = 0;
+    }
+    else if (secondIndex == 2)
+    {
+      ret(0, 0) = cy * (-(cz));
+      ret(1, 0) = cx * ((-sz)) + (-(cz)) * sx * sy;
+      ret(2, 0) = sx * ((-sz)) - cx * (-(cz)) * sy;
+
+      ret(0, 1) = -cy * ((-sz));
+      ret(1, 1) = cx * (-(cz)) - sx * sy * ((-sz));
+      ret(2, 1) = (-(cz)) * sx + cx * sy * ((-sz));
+
+      ret(0, 2) = 0;
+      ret(1, 2) = 0;
+      ret(2, 2) = 0;
+    }
+  }
+
+  return ret;
+}
+
+/// This gives the gradient of eulerXYZToMatrixGrad(_angle, firstIndex) with
+/// respect to secondIndex.
+Eigen::Matrix3s eulerXYZToMatrixSecondFiniteDifference(
+    const Eigen::Vector3s& _angle, int firstIndex, int secondIndex)
+{
+  const s_t EPS = 1e-8;
+
+  Eigen::Vector3s perturbed = _angle;
+  perturbed(secondIndex) += EPS;
+  Eigen::Matrix3s plus = eulerXYZToMatrixGrad(perturbed, firstIndex);
+
+  perturbed = _angle;
+  perturbed(secondIndex) -= EPS;
+  Eigen::Matrix3s minus = eulerXYZToMatrixGrad(perturbed, firstIndex);
+
+  return (plus - minus) / (2 * EPS);
 }
 
 Eigen::Matrix3s eulerXZXToMatrix(const Eigen::Vector3s& _angle)

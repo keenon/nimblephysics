@@ -484,7 +484,8 @@ public:
   virtual s_t getControlForceLowerLimit(std::size_t _index) const = 0;
 
   /// Set the force upper limits of all the generalized coordinates.
-  virtual void setControlForceLowerLimits(const Eigen::VectorXs& lowerLimits) = 0;
+  virtual void setControlForceLowerLimits(const Eigen::VectorXs& lowerLimits)
+      = 0;
 
   /// Get the force upper limits of all the generalized coordinates.
   virtual Eigen::VectorXs getControlForceLowerLimits() const = 0;
@@ -496,7 +497,8 @@ public:
   virtual s_t getControlForceUpperLimit(std::size_t _index) const = 0;
 
   /// Set the force upper limits of all the generalized coordinates.
-  virtual void setControlForceUpperLimits(const Eigen::VectorXs& upperLimits) = 0;
+  virtual void setControlForceUpperLimits(const Eigen::VectorXs& upperLimits)
+      = 0;
 
   /// Get the force upper limits of all the generalized coordinates.
   virtual Eigen::VectorXs getControlForceUpperLimits() const = 0;
@@ -694,7 +696,7 @@ public:
 
   // TODO(JS): Rename and add documentation
   /// Computes derivative of time derivative of Jacobian w.r.t. position.
-  virtual math::Jacobian getRelativeJacobianTimeDerivDeriv(
+  virtual math::Jacobian getRelativeJacobianTimeDerivDerivWrtPosition(
       std::size_t /*index*/) const
   {
     // TODO(JS): Remove
@@ -703,7 +705,7 @@ public:
 
   // TODO(JS): Rename and add documentation
   /// Computes derivative of time derivative of Jacobian w.r.t. velocity.
-  virtual math::Jacobian getRelativeJacobianTimeDerivDeriv2(
+  virtual math::Jacobian getRelativeJacobianTimeDerivDerivWrtVelocity(
       std::size_t /*index*/) const
   {
     // TODO(JS): Remove

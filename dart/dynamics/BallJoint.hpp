@@ -44,7 +44,6 @@ namespace dynamics {
 class BallJoint : public GenericJoint<math::SO3Space>
 {
 public:
-
   friend class Skeleton;
 
   using Base = GenericJoint<math::SO3Space>;
@@ -76,9 +75,9 @@ public:
   /// Convert a rotation into a 3D vector that can be used to set the positions
   /// of a BallJoint. The positions returned by this function will result in a
   /// relative transform of
-  /// getTransformFromParentBodyNode() * _rotation * getTransformFromChildBodyNode().inverse()
-  /// between the parent BodyNode and the child BodyNode frames when applied to
-  /// a BallJoint.
+  /// getTransformFromParentBodyNode() * _rotation *
+  /// getTransformFromChildBodyNode().inverse() between the parent BodyNode and
+  /// the child BodyNode frames when applied to a BallJoint.
   template <typename RotationType>
   static Eigen::Vector3s convertToPositions(const RotationType& _rotation)
   {
@@ -86,7 +85,8 @@ public:
   }
 
   /// Convert a BallJoint-style position vector into a transform
-  static Eigen::Isometry3s convertToTransform(const Eigen::Vector3s& _positions);
+  static Eigen::Isometry3s convertToTransform(
+      const Eigen::Vector3s& _positions);
 
   /// Convert a BallJoint-style position vector into a rotation matrix
   static Eigen::Matrix3s convertToRotation(const Eigen::Vector3s& _positions);
@@ -98,11 +98,15 @@ public:
   math::Jacobian getRelativeJacobianDeriv(std::size_t index) const override;
   math::Jacobian finiteDifferenceRelativeJacobianDeriv(std::size_t index) const;
 
-  math::Jacobian getRelativeJacobianTimeDerivDeriv(std::size_t index) const override;
-  math::Jacobian finiteDifferenceRelativeJacobianTimeDerivDeriv(std::size_t index) const;
+  math::Jacobian getRelativeJacobianTimeDerivDerivWrtPosition(
+      std::size_t index) const override;
+  math::Jacobian finiteDifferenceRelativeJacobianTimeDerivDeriv(
+      std::size_t index) const;
 
-  math::Jacobian getRelativeJacobianTimeDerivDeriv2(std::size_t index) const override;
-  math::Jacobian finiteDifferenceRelativeJacobianTimeDerivDeriv2(std::size_t index) const;
+  math::Jacobian getRelativeJacobianTimeDerivDerivWrtVelocity(
+      std::size_t index) const override;
+  math::Jacobian finiteDifferenceRelativeJacobianTimeDerivDeriv2(
+      std::size_t index) const;
 
   // Documentation inherited
   Eigen::Matrix<s_t, 6, 3> getRelativeJacobianInPositionSpaceStatic(
@@ -113,37 +117,31 @@ public:
       const Eigen::Vector3s& _q2, const Eigen::Vector3s& _q1) const override;
 
   /*
-  // This gets the world axis screw at the current position, without moving the joint.
-  Eigen::Vector6s getWorldAxisScrewForPosition(int dof) const override;
+  // This gets the world axis screw at the current position, without moving the
+  joint. Eigen::Vector6s getWorldAxisScrewForPosition(int dof) const override;
   */
 
-  // This computes the world axis screw at a given position, without moving the joint.
+  // This computes the world axis screw at a given position, without moving the
+  // joint.
   Eigen::Vector6s getWorldAxisScrewAt(Eigen::Vector3s pos, int dof) const;
 
-  // This estimates the new world screw axis at `axisDof` when we perturbe `rotateDof` by `eps`
+  // This estimates the new world screw axis at `axisDof` when we perturbe
+  // `rotateDof` by `eps`
   Eigen::Vector6s estimatePerturbedScrewAxisForPosition(
-    int axisDof,
-    int rotateDof,
-    s_t eps);
+      int axisDof, int rotateDof, s_t eps);
 
-  // This estimates the new world screw axis at `axisDof` when we perturbe `rotateDof` by `eps`
+  // This estimates the new world screw axis at `axisDof` when we perturbe
+  // `rotateDof` by `eps`
   Eigen::Vector6s estimatePerturbedScrewAxisForForce(
-    int axisDof,
-    int rotateDof,
-    s_t eps);
+      int axisDof, int rotateDof, s_t eps);
 
   // Returns the gradient of the screw axis with respect to the rotate dof
-  Eigen::Vector6s getScrewAxisGradientForPosition(
-    int axisDof,
-    int rotateDof);
+  Eigen::Vector6s getScrewAxisGradientForPosition(int axisDof, int rotateDof);
 
   // Returns the gradient of the screw axis with respect to the rotate dof
-  Eigen::Vector6s getScrewAxisGradientForForce(
-    int axisDof,
-    int rotateDof);
+  Eigen::Vector6s getScrewAxisGradientForForce(int axisDof, int rotateDof);
 
 protected:
-
   /// Constructor called by Skeleton class
   BallJoint(const Properties& properties);
 
@@ -161,19 +159,24 @@ protected:
 #endif
 
   // Documentation inherited
-  Eigen::VectorXs integratePositionsExplicit(const Eigen::VectorXs& pos, const Eigen::VectorXs& vel, s_t dt) override;
+  Eigen::VectorXs integratePositionsExplicit(
+      const Eigen::VectorXs& pos, const Eigen::VectorXs& vel, s_t dt) override;
 
   /// Returns d/dpos of integratePositionsExplicit()
-  Eigen::MatrixXs getPosPosJacobian(const Eigen::VectorXs& pos, const Eigen::VectorXs& vel, s_t _dt) override;
+  Eigen::MatrixXs getPosPosJacobian(
+      const Eigen::VectorXs& pos, const Eigen::VectorXs& vel, s_t _dt) override;
 
   /// Returns d/dvel of integratePositionsExplicit()
-  Eigen::MatrixXs getVelPosJacobian(const Eigen::VectorXs& pos, const Eigen::VectorXs& vel, s_t _dt) override;
+  Eigen::MatrixXs getVelPosJacobian(
+      const Eigen::VectorXs& pos, const Eigen::VectorXs& vel, s_t _dt) override;
 
   /// Returns d/dpos of integratePositionsExplicit() by finite differencing
-  Eigen::MatrixXs finiteDifferencePosPosJacobian(const Eigen::VectorXs& pos, const Eigen::VectorXs& vel, s_t _dt);
+  Eigen::MatrixXs finiteDifferencePosPosJacobian(
+      const Eigen::VectorXs& pos, const Eigen::VectorXs& vel, s_t _dt);
 
   /// Returns d/dvel of integratePositionsExplicit() by finite differencing
-  Eigen::MatrixXs finiteDifferenceVelPosJacobian(const Eigen::VectorXs& pos, const Eigen::VectorXs& vel, s_t _dt);
+  Eigen::MatrixXs finiteDifferenceVelPosJacobian(
+      const Eigen::VectorXs& pos, const Eigen::VectorXs& vel, s_t _dt);
 
   // Documentation inherited
   void updateDegreeOfFreedomNames() override;
@@ -202,8 +205,7 @@ public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
 
-}  // namespace dynamics
-}  // namespace dart
+} // namespace dynamics
+} // namespace dart
 
-#endif  // DART_DYNAMICS_BALLJOINT_HPP_
-
+#endif // DART_DYNAMICS_BALLJOINT_HPP_
