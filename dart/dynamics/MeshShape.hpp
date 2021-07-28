@@ -34,7 +34,6 @@
 #define DART_DYNAMICS_MESHSHAPE_HPP_
 
 #include <string>
-#include <vector>
 
 #include <assimp/scene.h>
 
@@ -101,8 +100,6 @@ public:
   static const std::string& getStaticType();
 
   const aiScene* getMesh() const;
-
-  std::vector<Eigen::Vector3s> getVertices() const;
 
   /// Updates positions of the vertices or the elements. By default, this does
   /// nothing; you must extend the MeshShape class and implement your own

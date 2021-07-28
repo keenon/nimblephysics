@@ -128,11 +128,7 @@ using JointToIndex = std::map<std::string, std::size_t>;
 simulation::WorldPtr readWorld(
     tinyxml2::XMLElement* _worldElement,
     const common::Uri& _baseUri,
-    const common::ResourceRetrieverPtr& _retriever,
-    // By default Nimble clears out springs and damping, because our
-    // Jacobians don't support them. TODO: remove me when springs and damping
-    // support is added
-    bool allowSpringsAndDamping = false);
+    const common::ResourceRetrieverPtr& _retriever);
 
 dart::dynamics::SkeletonPtr readSkeleton(
     tinyxml2::XMLElement* _skeletonElement,
@@ -404,7 +400,7 @@ common::ResourceRetrieverPtr getRetriever(
 
 //==============================================================================
 simulation::WorldPtr SkelParser::readWorld(
-    const common::Uri& _uri, const common::ResourceRetrieverPtr& _retriever, bool allowSpringsAndDamping)
+    const common::Uri& _uri, const common::ResourceRetrieverPtr& _retriever)
 {
   const common::ResourceRetrieverPtr retriever = getRetriever(_retriever);
 
@@ -430,15 +426,14 @@ simulation::WorldPtr SkelParser::readWorld(
     return nullptr;
   }
 
-  return ::dart::utils::readWorld(worldElement, _uri, retriever, allowSpringsAndDamping);
+  return ::dart::utils::readWorld(worldElement, _uri, retriever);
 }
 
 //==============================================================================
 simulation::WorldPtr SkelParser::readWorldXML(
     const std::string& _xmlString,
     const common::Uri& _baseUri,
-    const common::ResourceRetrieverPtr& _retriever,
-    bool allowSpringsAndDamping)
+    const common::ResourceRetrieverPtr& _retriever)
 {
   const common::ResourceRetrieverPtr retriever = getRetriever(_retriever);
 
@@ -456,7 +451,7 @@ simulation::WorldPtr SkelParser::readWorldXML(
     return nullptr;
   }
 
-  return ::dart::utils::readWorld(worldElement, _baseUri, retriever, allowSpringsAndDamping);
+  return ::dart::utils::readWorld(worldElement, _baseUri, retriever);
 }
 
 //==============================================================================
@@ -683,11 +678,7 @@ tinyxml2::XMLElement* checkFormatAndGetWorldElement(
 simulation::WorldPtr readWorld(
     tinyxml2::XMLElement* _worldElement,
     const common::Uri& _baseUri,
-    const common::ResourceRetrieverPtr& _retriever, 
-    // By default Nimble clears out springs and damping, because our
-    // Jacobians don't support them. TODO: remove me when springs and damping
-    // support is added
-    bool allowSpringsAndDamping)
+    const common::ResourceRetrieverPtr& _retriever)
 {
   assert(_worldElement != nullptr);
 
@@ -752,7 +743,7 @@ simulation::WorldPtr readWorld(
     dynamics::SkeletonPtr newSkeleton = ::dart::utils::readSkeleton(
         SkeletonElements.get(), _baseUri, _retriever);
 
-    newWorld->addSkeleton(newSkeleton, allowSpringsAndDamping);
+    newWorld->addSkeleton(newSkeleton);
   }
 
   return newWorld;

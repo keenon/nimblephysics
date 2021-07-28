@@ -135,7 +135,7 @@ void testBlockWithFrictionCoeff(s_t frictionCoeff, s_t mass)
   // Prevent the mass matrix from being Identity
   boxBody->setMass(mass);
 
-  world->addSkeleton(box,true);
+  world->addSkeleton(box);
 
   ///////////////////////////////////////////////
   // Create the floor
@@ -158,7 +158,7 @@ void testBlockWithFrictionCoeff(s_t frictionCoeff, s_t mass)
   floorBody->createShapeNodeWith<VisualAspect, CollisionAspect>(floorShape);
   floorBody->setFrictionCoeff(frictionCoeff);
 
-  world->addSkeleton(floor,true);  
+  world->addSkeleton(floor);  
 
 
   ///////////////////////////////////////////////
@@ -260,7 +260,7 @@ void testFreeBlockPosGradients(s_t frictionCoeff, s_t spring_stiff_x,s_t spring_
   // Set the 1th dof index to -1.0
   box->setVelocity(1, -1.0);
 
-  world->addSkeleton(box,true);
+  world->addSkeleton(box);
 
   ///////////////////////////////////////////////
   // Run the tests
@@ -332,7 +332,7 @@ void testRotateBlockPosGradients(s_t frictionCoeff, s_t spring_stiff)
   // Set the 1th dof index to -1.0
   box->setVelocity(0, -1.0);
 
-  world->addSkeleton(box,true);
+  world->addSkeleton(box);
 
   ///////////////////////////////////////////////
   // Run the tests
@@ -440,7 +440,7 @@ void testRobotArm(
   parent->setFrictionCoeff(1);
 
   arm->setPositions(Eigen::VectorXs::Ones(arm->getNumDofs()) * rotationRadians);
-  world->addSkeleton(arm,true);
+  world->addSkeleton(arm);
 
   Eigen::Isometry3s worldTransform = parent->getWorldTransform();
   Eigen::Matrix3s rotation
@@ -569,7 +569,7 @@ void testRobotArmNoContact(
   parent->setFrictionCoeff(1);
 
   arm->setPositions(Eigen::VectorXs::Ones(arm->getNumDofs()) * rotationRadians);
-  world->addSkeleton(arm,true);
+  world->addSkeleton(arm);
 
   Eigen::Isometry3s worldTransform = parent->getWorldTransform();
   Eigen::Matrix3s rotation
@@ -687,7 +687,7 @@ void testFreeBlockWithFrictionCoeff(
   // Add a force driving the box down into the floor, and to the left
   boxBody->addExtForce(Eigen::Vector3s(1, -1, 0));
 
-  world->addSkeleton(box,true);
+  world->addSkeleton(box);
 
   ///////////////////////////////////////////////
   // Create the floor

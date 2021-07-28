@@ -75,7 +75,6 @@ add_subdirectory(constraint)
 add_subdirectory(simulation)
 add_subdirectory(utils) # tinyxml2, bullet
 add_subdirectory(proto)
-add_subdirectory(biomechanics)
 
 set(DART_CONFIG_HPP_IN ${CMAKE_SOURCE_DIR}/dart/config.hpp.in)
 set(DART_CONFIG_HPP_OUT ${CMAKE_BINARY_DIR}/dart/config.hpp)

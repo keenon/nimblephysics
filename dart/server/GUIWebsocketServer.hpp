@@ -84,9 +84,6 @@ public:
   /// This tells us whether or not to automatically flush after each command
   void setAutoflush(bool autoflush);
 
-  /// This tells us whether or not to automatically flush after each command
-  bool getAutoflush();
-
   /// This sends the current list of commands to the web GUI
   void flush();
 
@@ -124,13 +121,6 @@ public:
       Eigen::Vector6s wrench,
       s_t scaleFactor = 0.1,
       std::string prefix = "wrench");
-
-  /// This renders little velocity lines starting at every vertex in the passed
-  /// in body
-  GUIWebsocketServer& renderMovingBodyNodeVertices(
-      const dynamics::BodyNode* body,
-      s_t scaleFactor = 0.1,
-      std::string prefix = "vert-vel");
 
   /// This is a high-level command that removes the lines rendering a wrench on
   /// a body node

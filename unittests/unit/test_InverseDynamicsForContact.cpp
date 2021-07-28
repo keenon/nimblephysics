@@ -13,10 +13,7 @@ using namespace dynamics;
 using namespace simulation;
 using namespace utils;
 
-// #define ALL_TESTS
-
 //==============================================================================
-#ifdef ALL_TESTS
 TEST(INV_DYN_FOR_CONTACT, TEST_SINGLE_CONTACT)
 {
   // set precision to 256 bits (double has only 53 bits)
@@ -42,10 +39,8 @@ TEST(INV_DYN_FOR_CONTACT, TEST_SINGLE_CONTACT)
   s_t error = result.sumError();
   EXPECT_TRUE(error < 1e-11);
 }
-#endif
 
 //==============================================================================
-#ifdef ALL_TESTS
 TEST(INV_DYN_FOR_CONTACT, TEST_MULTI_CONTACT_WITH_GUESS)
 {
   // set precision to 256 bits (double has only 53 bits)
@@ -63,7 +58,7 @@ TEST(INV_DYN_FOR_CONTACT, TEST_MULTI_CONTACT_WITH_GUESS)
       = vel
         + Eigen::VectorXs::Random(skel->getNumDofs()) * world->getTimeStep();
 
-  std::vector<const dynamics::BodyNode*> nodes;
+  std::vector<dynamics::BodyNode*> nodes;
   std::vector<Eigen::Vector6s> wrenchGuesses;
   nodes.push_back(skel->getBodyNode("l_foot"));
   wrenchGuesses.push_back(Eigen::Vector6s::Zero());
@@ -78,10 +73,8 @@ TEST(INV_DYN_FOR_CONTACT, TEST_MULTI_CONTACT_WITH_GUESS)
   s_t error = result.sumError();
   EXPECT_TRUE(error < 1e-11);
 }
-#endif
 
 //==============================================================================
-#ifdef ALL_TESTS
 TEST(INV_DYN_FOR_CONTACT, TEST_MULTI_CONTACT_NO_GUESS)
 {
   // set precision to 256 bits (double has only 53 bits)
@@ -99,7 +92,7 @@ TEST(INV_DYN_FOR_CONTACT, TEST_MULTI_CONTACT_NO_GUESS)
       = vel
         + Eigen::VectorXs::Random(skel->getNumDofs()) * world->getTimeStep();
 
-  std::vector<const dynamics::BodyNode*> nodes;
+  std::vector<dynamics::BodyNode*> nodes;
   std::vector<Eigen::Vector6s> wrenchGuesses;
   nodes.push_back(skel->getBodyNode("l_foot"));
   wrenchGuesses.push_back(Eigen::Vector6s::Zero());
@@ -135,10 +128,8 @@ TEST(INV_DYN_FOR_CONTACT, TEST_MULTI_CONTACT_NO_GUESS)
     */
   }
 }
-#endif
 
 //==============================================================================
-#ifdef ALL_TESTS
 TEST(INV_DYN_FOR_CONTACT, TEST_MULTI_CONTACT_MULTI_TIMESTEP)
 {
   // set precision to 256 bits (double has only 53 bits)
@@ -160,7 +151,7 @@ TEST(INV_DYN_FOR_CONTACT, TEST_MULTI_CONTACT_MULTI_TIMESTEP)
         = pos.col(i - 1) + Eigen::VectorXs::Random(skel->getNumDofs()) * 0.001;
   }
 
-  std::vector<const dynamics::BodyNode*> nodes;
+  std::vector<dynamics::BodyNode*> nodes;
   std::vector<Eigen::Vector6s> wrenchGuesses;
   nodes.push_back(skel->getBodyNode("l_foot"));
   wrenchGuesses.push_back(Eigen::Vector6s::Zero());
@@ -190,10 +181,8 @@ TEST(INV_DYN_FOR_CONTACT, TEST_MULTI_CONTACT_MULTI_TIMESTEP)
       resultOverTimeMoreSmoothing.computeSmoothnessLoss(),
       resultOverTime.computeSmoothnessLoss());
 }
-#endif
 
 //==============================================================================
-// #ifdef ALL_TESTS
 TEST(INV_DYN_FOR_CONTACT, TEST_MULTI_CONTACT_MULTI_TIMESTEP_PREV_FORCE)
 {
   // set precision to 256 bits (double has only 53 bits)
@@ -215,57 +204,28 @@ TEST(INV_DYN_FOR_CONTACT, TEST_MULTI_CONTACT_MULTI_TIMESTEP_PREV_FORCE)
         = pos.col(i - 1) + Eigen::VectorXs::Random(skel->getNumDofs()) * 0.001;
   }
 
-  Eigen::VectorXs firstVel
-      = skel->getPositionDifferences(pos.col(1), pos.col(0))
-        / skel->getTimeStep();
-  Eigen::VectorXs secondVel
-      = skel->getPositionDifferences(pos.col(2), pos.col(1))
-        / skel->getTimeStep();
-  skel->setPositions(pos.col(0));
-  skel->setVelocities(firstVel);
-  auto singleFootResult
-      = skel->getContactInverseDynamics(secondVel, skel->getBodyNode("r_foot"));
-  EXPECT_LE(singleFootResult.sumError(), 1e-11);
-
-  std::vector<const dynamics::BodyNode*> nodes;
-  std::vector<Eigen::Vector6s> prevTimestepWrenches;
+  std::vector<dynamics::BodyNode*> nodes;
+  std::vector<Eigen::Vector6s> wrenchGuesses;
   nodes.push_back(skel->getBodyNode("l_foot"));
-  prevTimestepWrenches.push_back(Eigen::Vector6s::Zero());
+  wrenchGuesses.push_back(Eigen::Vector6s::Random());
   nodes.push_back(skel->getBodyNode("r_foot"));
-  prevTimestepWrenches.push_back(singleFootResult.contactWrench);
+  wrenchGuesses.push_back(Eigen::Vector6s::Random());
 
   // This is just to be able to compare the torque values against, and be sure
   // we're minimizing them
   Skeleton::MultipleContactInverseDynamicsOverTimeResult resultOverTime
       = skel->getMultipleContactInverseDynamicsOverTime(
-          pos,
-          nodes,
-          0.001,
-          0.0,
-          [](s_t) { return 0.0; },
-          prevTimestepWrenches,
-          100.0);
+          pos, nodes, 1.0, 1.0, wrenchGuesses, 1.0);
 
   s_t error = resultOverTime.sumError();
-  EXPECT_LE(error, 1e-10);
+  EXPECT_LE(error, 1e-11);
 
-  // This is satisfiable, so if it's the main goal by a factor of 100000, we
-  // should hit it pretty close
-  EXPECT_LE(resultOverTime.computePrevForceLoss(), 1e-4);
-
-  /*
   // This is just to be able to compare the torque values against, and be sure
   // we're minimizing them
   Skeleton::MultipleContactInverseDynamicsOverTimeResult
       resultOverTimeMoreSmoothing
       = skel->getMultipleContactInverseDynamicsOverTime(
-          pos,
-          nodes,
-          0.0,
-          0.0,
-          [](s_t) { return 0.0; },
-          prevTimestepWrenches,
-          100.0);
+          pos, nodes, 1.0, 1.0, wrenchGuesses, 10.0);
 
   std::cout << "Prev force loss @ 1: " << resultOverTime.computePrevForceLoss()
             << std::endl;
@@ -275,12 +235,9 @@ TEST(INV_DYN_FOR_CONTACT, TEST_MULTI_CONTACT_MULTI_TIMESTEP_PREV_FORCE)
   EXPECT_LE(
       resultOverTimeMoreSmoothing.computePrevForceLoss(),
       resultOverTime.computePrevForceLoss());
-  */
 }
-// #endif
 
 //==============================================================================
-#ifdef ALL_TESTS
 TEST(INV_DYN_FOR_CONTACT, EXPLORE_RECOVER_CENTER_OF_PRESSURE)
 {
   Eigen::Vector3s f = Eigen::Vector3s(1.0, 0.0, 1.0);
@@ -315,4 +272,3 @@ TEST(INV_DYN_FOR_CONTACT, EXPLORE_RECOVER_CENTER_OF_PRESSURE)
 
   std::cout << "error 3: " << error3 << std::endl;
 }
-#endif

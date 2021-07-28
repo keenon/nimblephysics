@@ -43,7 +43,6 @@
 #include "dart/dynamics/EndEffector.hpp"
 #include "dart/dynamics/Joint.hpp"
 #include "dart/dynamics/Marker.hpp"
-#include "dart/dynamics/MeshShape.hpp"
 #include "dart/dynamics/Shape.hpp"
 #include "dart/dynamics/Skeleton.hpp"
 #include "dart/dynamics/SoftBodyNode.hpp"
@@ -939,60 +938,6 @@ void BodyNode::removeAllShapeNodes()
   auto shapeNodes = getShapeNodes();
   for (auto shapeNode : shapeNodes)
     shapeNode->remove();
-}
-
-//==============================================================================
-/// This gets all the vertices from any mesh colliders, in local space
-std::vector<Eigen::Vector3s> BodyNode::getLocalVertices() const
-{
-  std::vector<Eigen::Vector3s> verts;
-  for (int k = 0; k < getNumShapeNodes(); k++)
-  {
-    if (getShapeNode(k)->getShape()->getType()
-        == dynamics::MeshShape::getStaticType())
-    {
-      const dynamics::MeshShape* meshShape
-          = dynamic_cast<const dynamics::MeshShape*>(
-              getShapeNode(k)->getShape().get());
-      std::vector<Eigen::Vector3s> meshVerts = meshShape->getVertices();
-      verts.insert(verts.end(), meshVerts.begin(), meshVerts.end());
-    }
-  }
-  return verts;
-}
-
-//==============================================================================
-BodyNode::MovingVertex::MovingVertex(
-    Eigen::Vector3s pos,
-    Eigen::Vector3s vel,
-    Eigen::Vector3s accel,
-    const BodyNode* bodyNode,
-    int timestep)
-  : pos(pos), vel(vel), accel(accel), bodyNode(bodyNode), timestep(timestep)
-{
-}
-
-//==============================================================================
-/// This is useful for doing contact inference. You can get all the vertices
-/// on all of the moving bodies, translated into world space.
-std::vector<BodyNode::MovingVertex> BodyNode::getMovingVerticesInWorldSpace(
-    int timestep) const
-{
-  std::vector<BodyNode::MovingVertex> movingVertices;
-  std::vector<Eigen::Vector3s> vertices = getLocalVertices();
-
-  for (int i = 0; i < vertices.size(); i++)
-  {
-    Eigen::Vector3s vert = vertices[i];
-    Eigen::Vector3s worldPos = getWorldTransform() * vert;
-    Eigen::Vector3s worldVel
-        = getLinearVelocity(vert, Frame::World(), Frame::World());
-    Eigen::Vector3s worldAccel
-        = getLinearAcceleration(vert, Frame::World(), Frame::World());
-    movingVertices.emplace_back(worldPos, worldVel, worldAccel, this, timestep);
-  }
-
-  return movingVertices;
 }
 
 //==============================================================================
