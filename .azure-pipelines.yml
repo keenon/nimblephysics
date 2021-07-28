@@ -5,7 +5,7 @@ stages:
   - stage: Test
     jobs:
       - job: linux_test
-        pool: { vmImage: "Ubuntu-16.04" }
+        pool: { vmImage: "ubuntu-latest" }
         steps:
           - bash: |
               cd ci/manylinux/tests
@@ -67,6 +67,13 @@ stages:
               versionSpec: "3.8"
               architecture: "x64"
           - script: ci/mac/install_dependencies.sh
+          # Try to generate a graphviz file to help debug
+          - bash: |
+              cd ci/mac
+              ./generate_graphviz.sh
+          - task: PublishBuildArtifacts@1
+            inputs: { pathtoPublish: "build_viz/viz.dot" }
+          # </graphviz>
           - bash: |
               cd ci/mac
               ./build_wheels.sh
@@ -75,7 +82,7 @@ stages:
   - stage: Linux
     jobs:
       - job: linux_36
-        pool: { vmImage: "Ubuntu-16.04" }
+        pool: { vmImage: "ubuntu-latest" }
         steps:
           - bash: |
               cd ci/manylinux/3.6
@@ -84,7 +91,7 @@ stages:
             inputs: { pathtoPublish: "wheelhouse" }
 
       - job: linux_37
-        pool: { vmImage: "Ubuntu-16.04" }
+        pool: { vmImage: "ubuntu-latest" }
         steps:
           - bash: |
               cd ci/manylinux/3.7
@@ -93,7 +100,7 @@ stages:
             inputs: { pathtoPublish: "wheelhouse" }
 
       - job: linux_38
-        pool: { vmImage: "Ubuntu-16.04" }
+        pool: { vmImage: "ubuntu-latest" }
         steps:
           - bash: |
               cd ci/manylinux/3.8
@@ -102,7 +109,7 @@ stages:
             inputs: { pathtoPublish: "wheelhouse" }
 
       - job: linux_39
-        pool: { vmImage: "Ubuntu-16.04" }
+        pool: { vmImage: "ubuntu-latest" }
         steps:
           - bash: |
               cd ci/manylinux/3.9

@@ -27,7 +27,7 @@ python setup.py sdist bdist_wheel
 pushd dist
 WHEEL_NAME=$(ls *.whl)
 echo "WHEEL_NAME=${WHEEL_NAME}"
-DYLD_LIBRARY_PATH="$DYLD_LIBRARY_PATH:/usr/local/lib" delocate-wheel -w ../wheelhouse -v ${WHEEL_NAME}
+DYLD_LIBRARY_PATH="$DYLD_LIBRARY_PATH:/usr/local/lib" delocate-wheel -w ../wheelhouse -v --dylibs-only ${WHEEL_NAME}
 popd
 
 # Replace the ABI tag with a more general version

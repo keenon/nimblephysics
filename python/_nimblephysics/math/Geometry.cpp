@@ -30,6 +30,8 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <iostream>
+
 #include <dart/math/Geometry.hpp>
 #include <pybind11/pybind11.h>
 
@@ -99,6 +101,75 @@ void Geometry(py::module& m)
       +[](const Eigen::Matrix3s& _S) -> Eigen::Vector3s {
         return dart::math::logMap(_S);
       },
+      ::py::arg("S"));
+
+  m.def(
+      "AdR",
+      +[](const Eigen::Matrix3s& R,
+          const Eigen::Vector6s& S) -> Eigen::Vector6s {
+        Eigen::Isometry3s T = Eigen::Isometry3s::Identity();
+        T.linear() = R;
+        return dart::math::AdR(T, S);
+      },
+      ::py::arg("R"),
+      ::py::arg("S"));
+
+  m.def(
+      "AdT",
+      +[](const Eigen::Matrix3s& R,
+          const Eigen::Vector3s& p,
+          const Eigen::Vector6s& S) -> Eigen::Vector6s {
+        Eigen::Isometry3s T = Eigen::Isometry3s::Identity();
+        T.linear() = R;
+        T.translation() = p;
+        // std::cout << "T: " << std::endl << T.matrix() << std::endl;
+        // std::cout << "S: " << std::endl << S << std::endl;
+        Eigen::Vector6s result = dart::math::AdT(T, S);
+        // std::cout << "AdT(T,S): " << std::endl << result << std::endl;
+        return result;
+      },
+      ::py::arg("R"),
+      ::py::arg("p"),
+      ::py::arg("S"));
+
+  m.def(
+      "rightMultiplyInFreeJointSpace",
+      +[](const Eigen::Matrix3s& R,
+          const Eigen::Vector3s& p,
+          const Eigen::Vector6s& S) -> Eigen::Vector6s {
+        Eigen::Isometry3s q = dart::math::expMapDart(S);
+        Eigen::Isometry3s T = Eigen::Isometry3s::Identity();
+        T.linear() = R;
+        T.translation() = p;
+
+        Eigen::Isometry3s result = q * T;
+        Eigen::Vector6s vec;
+        vec.head<3>() = dart::math::logMap(result.linear());
+        vec.tail<3>() = result.translation();
+        return vec;
+      },
+      ::py::arg("R"),
+      ::py::arg("p"),
+      ::py::arg("S"));
+
+  m.def(
+      "leftMultiplyInFreeJointSpace",
+      +[](const Eigen::Matrix3s& R,
+          const Eigen::Vector3s& p,
+          const Eigen::Vector6s& S) -> Eigen::Vector6s {
+        Eigen::Isometry3s q = dart::math::expMapDart(S);
+        Eigen::Isometry3s T = Eigen::Isometry3s::Identity();
+        T.linear() = R;
+        T.translation() = p;
+
+        Eigen::Isometry3s result = T * q;
+        Eigen::Vector6s vec;
+        vec.head<3>() = dart::math::logMap(result.linear());
+        vec.tail<3>() = result.translation();
+        return vec;
+      },
+      ::py::arg("R"),
+      ::py::arg("p"),
       ::py::arg("S"));
 
   m.def(

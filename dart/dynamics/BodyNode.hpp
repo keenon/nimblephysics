@@ -595,6 +595,34 @@ public:
   template <class Aspect>
   void removeAllShapeNodesWith();
 
+  /// This gets all the vertices from any mesh colliders, in local space
+  std::vector<Eigen::Vector3s> getLocalVertices() const;
+
+  struct MovingVertex
+  {
+    // In world space
+    Eigen::Vector3s pos;
+    Eigen::Vector3s vel;
+    Eigen::Vector3s accel;
+    // This is a useful pointer back to the body that this came from
+    const BodyNode* bodyNode;
+    // This helps keep track of time with these vertices, and is option.
+    // Defaults to -1
+    int timestep;
+
+    MovingVertex(
+        Eigen::Vector3s pos,
+        Eigen::Vector3s vel,
+        Eigen::Vector3s accel,
+        const BodyNode* bodyNode,
+        int timestep = -1);
+  };
+
+  /// This gets all the vertices (and their velocities) from any mesh colliders,
+  /// in world space
+  std::vector<MovingVertex> getMovingVerticesInWorldSpace(
+      int timestep = -1) const;
+
   DART_BAKE_SPECIALIZED_NODE_DECLARATIONS(EndEffector)
 
   /// Create an EndEffector attached to this BodyNode. Pass an

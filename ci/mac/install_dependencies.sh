@@ -31,6 +31,7 @@ cp /usr/local/opt/openssl@1.1/lib/pkgconfig/*.pc /usr/local/lib/pkgconfig/
 # Install CCD
 git clone https://github.com/danfis/libccd.git
 pushd libccd
+git checkout v2.1
 mkdir build
 pushd build
 cmake .. -DENABLE_DOUBLE_PRECISION=ON
@@ -42,6 +43,7 @@ rm -rf libccd
 # Install ASSIMP
 git clone https://github.com/assimp/assimp.git
 pushd assimp
+git checkout v5.0.1
 mkdir build
 pushd build
 cmake ..
@@ -66,7 +68,7 @@ rm -rf ThirdParty-Mumps
 # Install IPOPT
 git clone https://github.com/coin-or/Ipopt.git
 pushd Ipopt
-./configure --with-mumps
+./configure --with-mumps --disable-java
 make -j
 make install
 popd
@@ -76,6 +78,7 @@ ln -s /usr/local/include/coin-or /usr/local/include/coin
 # Install pybind11
 git clone https://github.com/pybind/pybind11.git
 pushd pybind11
+git checkout v2.7.0
 mkdir build
 pushd build
 cmake .. -DPYTHON_EXECUTABLE:FILEPATH=$(which python3)
@@ -188,6 +191,9 @@ PROTOBUF_VERSION="3.14.0"
 # popd
 # rm -rf protobuf-${PROTOBUF_VERSION}
 
+# brew install zlib
+# brew install xz zlib bzip2
+
 # Install grpc
 git clone --recurse-submodules -b v1.33.2 https://github.com/grpc/grpc
 pushd grpc
@@ -242,7 +248,7 @@ install_name_tool -id /usr/local/lib/libassimp.5.dylib /usr/local/lib/libassimp.
 # Different attempts to fix the liblzma linking issue
 # sudo install_name_tool -id /usr/lib/liblzma.5.dylib /usr/lib/liblzma.5.dylib
 # sudo install_name_tool -id /usr/lib/libcompression.dylib /usr/lib/libcompression.dylib
-brew install xz
+# brew install xz zlib bzip2
 
 # Fix "icu4c" installed by Brew
 ICU4C_MAJOR_VERSION="69"
@@ -273,6 +279,21 @@ sudo mv /usr/local/lib/libTIFF.dylib /usr/local/lib/libTIFF.old.dylib
 ln -s /System/Library/Frameworks/ApplicationServices.framework/Versions/A/Frameworks/ImageIO.framework/Versions/A/Resources/libTIFF.dylib /usr/local/lib/libTIFF.lib
 sudo mv /usr/local/lib/libPng.dylib /usr/local/lib/libPng.old.dylib
 ln -s /System/Library/Frameworks/ApplicationServices.framework/Versions/A/Frameworks/ImageIO.framework/Versions/A/Resources/libPng.dylib /usr/local/lib/libPng.lib
+
+
+# Replace liblzma with a hard copy of the library, instead of a link
+# echo "Attempting to read LZMA links"
+# readlink /usr/lib/liblzma.dylib
+# readlink /usr/lib/liblzma.5.dylib
+# LZMA_PATH=$(readlink /usr/lib/liblzma.dylib)
+# LZMA_5_PATH=$(readlink /usr/lib/liblzma.5.dylib)
+# echo "LZMA_PATH=$LZMA_PATH"
+# echo "LZMA_5_PATH=$LZMA_5_PATH"
+# sudo mv /usr/local/lib/liblzma.5.dylib /usr/local/lib/liblzma.5.old.dylib
+# echo "Attempting to add symbolic links"
+# ln -s $LZMA_PATH /usr/local/lib/liblzma.dylib
+# ln -s $LZMA_5_PATH /usr/local/lib/liblzma.5.dylib
+# echo "Symbolic links complete"
 
 # Install our build tools
 python -m pip install pytest delocate
