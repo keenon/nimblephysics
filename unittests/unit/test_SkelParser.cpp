@@ -194,7 +194,7 @@ TEST(SkelParser, PlanarJoint)
   using namespace utils;
 
   WorldPtr world = SkelParser::readWorld(
-      "dart://sample/skel/test/planar_joint.skel", nullptr, true);
+      "dart://sample/skel/test/planar_joint.skel", nullptr);
   EXPECT_TRUE(world != nullptr);
 
   SkeletonPtr skel1 = world->getSkeleton("skeleton1");
@@ -416,8 +416,7 @@ TEST(SkelParser, JointDynamicsElements)
 {
   WorldPtr world = SkelParser::readWorld(
       "dart://sample/skel/test/joint_dynamics_elements_test.skel",
-      nullptr,
-      true);
+      nullptr);
   EXPECT_TRUE(world != nullptr);
 
   SkeletonPtr skel1 = world->getSkeleton("skeleton 1");
