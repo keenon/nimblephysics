@@ -2013,15 +2013,14 @@ Eigen::MatrixXs Skeleton::getUnconstrainedVelJacobianWrt(
     s_t dt, neural::WithRespectTo* wrt)
 {
   Eigen::VectorXs tau = getControlForces();
-  Eigen::VectorXs C = getCoriolisAndGravityForces() - getExternalForces() 
-                      + getDampingForce() + getSpringForce();
+  Eigen::VectorXs C = getCoriolisAndGravityForces() - getExternalForces();
 
   Eigen::MatrixXs Minv = getInvMassMatrix();
   Eigen::MatrixXs dC = getJacobianOfC(wrt);
 
   if (wrt == neural::WithRespectTo::POSITION)
   {
-    Eigen::MatrixXs dM = getJacobianOfMinv(dt * (tau - C), wrt);
+    Eigen::MatrixXs dM = getJacobianOfMinv(dt * (tau - C - getDampingForce()-getSpringForce()), wrt);
     return dM - Minv * dt * dC;
   }
   else
@@ -2281,8 +2280,7 @@ Eigen::MatrixXs Skeleton::finiteDifferenceJacobianOfC(
 
   // Get baseline C(pos, vel)
   Eigen::VectorXs baseline
-      = getCoriolisAndGravityForces() - getExternalForces() 
-        + getDampingForce() + getSpringForce();
+      = getCoriolisAndGravityForces() - getExternalForces();
 
   s_t EPS = 1e-7;
 
@@ -2292,14 +2290,12 @@ Eigen::MatrixXs Skeleton::finiteDifferenceJacobianOfC(
     tweaked(i) += EPS;
     wrt->set(this, tweaked);
     Eigen::VectorXs perturbedPos
-        = getCoriolisAndGravityForces() - getExternalForces()
-          + getDampingForce() + getSpringForce();
+        = getCoriolisAndGravityForces() - getExternalForces();
     tweaked = start;
     tweaked(i) -= EPS;
     wrt->set(this, tweaked);
     Eigen::VectorXs perturbedNeg
-        = getCoriolisAndGravityForces() - getExternalForces()
-          + getDampingForce() + getSpringForce();
+        = getCoriolisAndGravityForces() - getExternalForces();
 
     J.col(i) = (perturbedPos - perturbedNeg) / (2 * EPS);
   }
@@ -2467,14 +2463,12 @@ Eigen::MatrixXs Skeleton::finiteDifferenceRiddersJacobianOfC(
     perturbedPlus(i) += stepSize;
     wrt->set(this, perturbedPlus);
     Eigen::MatrixXs tauPlus
-        = getCoriolisAndGravityForces() - getExternalForces()
-          + getDampingForce() + getSpringForce();
+        = getCoriolisAndGravityForces() - getExternalForces();
     Eigen::VectorXs perturbedMinus = Eigen::VectorXs(originalWrt);
     perturbedMinus(i) -= stepSize;
     wrt->set(this, perturbedMinus);
     Eigen::MatrixXs tauMinus
-        = getCoriolisAndGravityForces() - getExternalForces()
-          + getDampingForce() + getSpringForce();
+        = getCoriolisAndGravityForces() - getExternalForces();
 
     tab[0][0] = (tauPlus - tauMinus) / (2 * stepSize);
 
@@ -2486,13 +2480,11 @@ Eigen::MatrixXs Skeleton::finiteDifferenceRiddersJacobianOfC(
       perturbedPlus = Eigen::VectorXs(originalWrt);
       perturbedPlus(i) += stepSize;
       wrt->set(this, perturbedPlus);
-      tauPlus = getCoriolisAndGravityForces() - getExternalForces()
-                + getDampingForce() + getSpringForce();
+      tauPlus = getCoriolisAndGravityForces() - getExternalForces();
       perturbedMinus = Eigen::VectorXs(originalWrt);
       perturbedMinus(i) -= stepSize;
       wrt->set(this, perturbedMinus);
-      tauMinus = getCoriolisAndGravityForces() - getExternalForces()
-                 + getDampingForce() + getSpringForce();
+      tauMinus = getCoriolisAndGravityForces() - getExternalForces();
 
       tab[0][iTab] = (tauPlus - tauMinus) / (2 * stepSize);
 
