@@ -208,6 +208,23 @@ const std::string& MeshShape::getStaticType()
 }
 
 //==============================================================================
+std::vector<Eigen::Vector3s> MeshShape::getVertices() const
+{
+  std::vector<Eigen::Vector3s> vertices;
+  const aiScene* scene = getMesh();
+  for (int s = 0; s < scene->mNumMeshes; s++)
+  {
+    const aiMesh* mesh = scene->mMeshes[s];
+    for (int v = 0; v < mesh->mNumVertices; v++)
+    {
+      aiVector3D vec = mesh->mVertices[v];
+      vertices.emplace_back(vec.x, vec.y, vec.z);
+    }
+  }
+  return vertices;
+}
+
+//==============================================================================
 const aiScene* MeshShape::getMesh() const
 {
   return mMesh;

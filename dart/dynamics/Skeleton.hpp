@@ -33,6 +33,7 @@
 #ifndef DART_DYNAMICS_SKELETON_HPP_
 #define DART_DYNAMICS_SKELETON_HPP_
 
+#include <functional>
 #include <memory>
 #include <mutex>
 
@@ -47,6 +48,7 @@
 #include "dart/dynamics/SpecializedNodeManager.hpp"
 #include "dart/dynamics/detail/BodyNodeAspect.hpp"
 #include "dart/dynamics/detail/SkeletonAspect.hpp"
+#include "dart/math/MathTypes.hpp"
 #include "dart/neural/WithRespectTo.hpp"
 
 namespace dart {
@@ -64,6 +66,8 @@ class Skeleton : public virtual common::VersionCounter,
                  public detail::SkeletonAspectBase
 {
 public:
+  static Eigen::Matrix<s_t, Eigen::Dynamic, Eigen::Dynamic> EMPTY;
+
   // Some of non-virtual functions of MetaSkeleton are hidden because of the
   // functions of the same name in this class. We expose those functions as
   // follows.
@@ -863,7 +867,7 @@ public:
   struct ContactInverseDynamicsResult
   {
     dynamics::Skeleton* skel;
-    dynamics::BodyNode* contactBody;
+    const dynamics::BodyNode* contactBody;
     Eigen::Vector6s contactWrench;
     Eigen::VectorXs jointTorques;
 
@@ -883,12 +887,12 @@ public:
   /// `contactBody`, which can be post-processed down to individual contact
   /// results.
   ContactInverseDynamicsResult getContactInverseDynamics(
-      const Eigen::VectorXs& nextVel, dynamics::BodyNode* contactBody);
+      const Eigen::VectorXs& nextVel, const dynamics::BodyNode* contactBody);
 
   struct MultipleContactInverseDynamicsResult
   {
     dynamics::Skeleton* skel;
-    std::vector<dynamics::BodyNode*> contactBodies;
+    std::vector<const dynamics::BodyNode*> contactBodies;
     std::vector<Eigen::Vector6s> contactWrenches;
     std::vector<Eigen::Vector6s> contactWrenchGuesses;
     Eigen::VectorXs jointTorques;
@@ -919,13 +923,13 @@ public:
   /// the joint torques.
   MultipleContactInverseDynamicsResult getMultipleContactInverseDynamics(
       const Eigen::VectorXs& nextVel,
-      std::vector<dynamics::BodyNode*> bodies,
+      std::vector<const dynamics::BodyNode*> bodies,
       std::vector<Eigen::Vector6s> bodyWrenchGuesses);
 
   struct MultipleContactInverseDynamicsOverTimeResult
   {
     dynamics::Skeleton* skel;
-    std::vector<dynamics::BodyNode*> contactBodies;
+    std::vector<const dynamics::BodyNode*> contactBodies;
 
     int timesteps;
 
@@ -966,12 +970,20 @@ public:
   MultipleContactInverseDynamicsOverTimeResult
   getMultipleContactInverseDynamicsOverTime(
       const Eigen::MatrixXs& positions,
-      std::vector<dynamics::BodyNode*> bodies,
+      std::vector<const dynamics::BodyNode*> bodies,
+      // This allows us to penalize non-smooth GRFs
       s_t smoothingWeight,
+      // This allows us to penalize large torques in our GRFs
       s_t minTorqueWeight,
+      // This allows us to penalize GRFs on rapidly moving bodies
+      std::function<s_t(s_t)> velocityPenalty = [](s_t) { return 0.0; },
+      // This allows us to specify exactly what we want the initial forces to be
       std::vector<Eigen::Vector6s> prevContactForces
       = std::vector<Eigen::Vector6s>(),
-      s_t prevContactWeight = 0.0);
+      s_t prevContactWeight = 0.0,
+      // This allows us to specify how we'd like to penalize magnitudes of
+      // different contact forces frame-by-frame
+      Eigen::MatrixXs magnitudeCosts = EMPTY);
 
   //----------------------------------------------------------------------------
   /// \{ \name Support Polygon

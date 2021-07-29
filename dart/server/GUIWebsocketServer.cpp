@@ -290,7 +290,6 @@ void GUIWebsocketServer::serve(int port)
   /*
   // The signal set is used to register termination notifications
   mSignalSet = new asio::signal_set(mServerEventLoop, SIGINT, SIGTERM);
-
   // register the handle_stop callback
   mSignalSet->async_wait([&](asio::error_code const& error, int signal_number) {
     if (error == asio::error::operation_aborted)
@@ -462,6 +461,12 @@ bool GUIWebsocketServer::isKeyDown(const std::string& key) const
 void GUIWebsocketServer::setAutoflush(bool autoflush)
 {
   mAutoflush = autoflush;
+}
+
+/// This tells us whether or not to automatically flush after each command
+bool GUIWebsocketServer::getAutoflush()
+{
+  return mAutoflush;
 }
 
 /// This sends the current list of commands to the web GUI
@@ -851,6 +856,33 @@ GUIWebsocketServer& GUIWebsocketServer::renderBodyWrench(
       prefix + "_" + body->getName() + "_force",
       forceLine,
       Eigen::Vector3s(1.0, 0.0, 0.0));
+
+  flush();
+  mAutoflush = oldAutoflush;
+  return *this;
+}
+
+/// This renders little velocity lines starting at every vertex in the passed
+/// in body
+GUIWebsocketServer& GUIWebsocketServer::renderMovingBodyNodeVertices(
+    const dynamics::BodyNode* body, s_t scaleFactor, std::string prefix)
+{
+  std::vector<dynamics::BodyNode::MovingVertex> verts
+      = body->getMovingVerticesInWorldSpace();
+
+  bool oldAutoflush = mAutoflush;
+  mAutoflush = false;
+
+  for (int i = 0; i < verts.size(); i++)
+  {
+    std::vector<Eigen::Vector3s> line;
+    line.push_back(verts[i].pos);
+    line.push_back(verts[i].pos + verts[i].vel * scaleFactor);
+    createLine(
+        prefix + "_" + body->getName() + "_" + std::to_string(i),
+        line,
+        Eigen::Vector3s(1.0, 0.0, 0.0));
+  }
 
   flush();
   mAutoflush = oldAutoflush;
