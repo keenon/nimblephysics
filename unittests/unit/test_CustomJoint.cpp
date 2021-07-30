@@ -244,29 +244,6 @@ TEST(CustomJoint, Construct)
       return;
     }
 
-    // Directly verify updateRelativeJacobianTimeDeriv()
-
-    Eigen::Matrix6s dJ
-        = custom->getSpatialJacobianTimeDerivStatic(skelAPos, skelAVel);
-    Eigen::Matrix6s dJ_fd
-        = custom->finiteDifferenceSpatialJacobianTimeDerivStatic(
-            skelAPos, skelAVel);
-    if (!equals(dJ, dJ_fd, 1e-7))
-    {
-      std::cout << "Testing euler positions: " << eulerPos << std::endl;
-      std::cout << "Testing euler velocities: " << eulerVel << std::endl;
-      std::cout << "Testing euler acc: " << eulerAcc << std::endl;
-      std::cout << "Testing trans positions: " << transPos << std::endl;
-      std::cout << "Testing trans velocities: " << transVel << std::endl;
-      std::cout << "Testing trans acc: " << transAcc << std::endl;
-
-      std::cout << "Analytical dJ: " << std::endl << dJ << std::endl;
-      std::cout << "FD dJ: " << std::endl << dJ_fd << std::endl;
-      std::cout << "Diff: " << std::endl << dJ - dJ_fd << std::endl;
-      EXPECT_TRUE(equals(dJ, dJ_fd, 1e-7));
-      return;
-    }
-
     // Indirectly verify updateRelativeJacobianTimeDeriv()
 
     Eigen::Vector6s accA = bodyA->getSpatialAcceleration();
@@ -309,50 +286,6 @@ TEST(CustomJoint, Construct)
         std::cout << "FD d_J: " << std::endl << dpos_J_fd << std::endl;
         std::cout << "Diff: " << std::endl << dpos_J - dpos_J_fd << std::endl;
         EXPECT_TRUE(equals(dpos_J, dpos_J_fd, 1e-7));
-        return;
-      }
-
-      Eigen::Matrix6s dpos_dJ = custom->getSpatialJacobianTimeDerivDerivWrtPos(
-          skelAPos, skelAVel, j);
-      Eigen::Matrix6s dpos_dJ_fd
-          = custom->finiteDifferenceSpatialJacobianTimeDerivDerivWrtPos(
-              skelAPos, skelAVel, j);
-      if (!equals(dpos_dJ, dpos_dJ_fd, 1e-7))
-      {
-        std::cout << "Testing euler positions: " << eulerPos << std::endl;
-        std::cout << "Testing euler velocities: " << eulerVel << std::endl;
-        std::cout << "Testing euler acc: " << eulerAcc << std::endl;
-        std::cout << "Testing trans positions: " << transPos << std::endl;
-        std::cout << "Testing trans velocities: " << transVel << std::endl;
-        std::cout << "Testing trans acc: " << transAcc << std::endl;
-
-        std::cout << "Wrt position: " << j << std::endl;
-        std::cout << "Analytical d_dJ: " << std::endl << dpos_dJ << std::endl;
-        std::cout << "FD d_dJ: " << std::endl << dpos_dJ_fd << std::endl;
-        std::cout << "Diff: " << std::endl << dpos_dJ - dpos_dJ_fd << std::endl;
-        EXPECT_TRUE(equals(dpos_dJ, dpos_dJ_fd, 1e-7));
-        return;
-      }
-
-      Eigen::Matrix6s dvel_dJ
-          = custom->getSpatialJacobianTimeDerivDerivWrtVel(skelAPos, j);
-      Eigen::Matrix6s dvel_dJ_fd
-          = custom->finiteDifferenceSpatialJacobianTimeDerivDerivWrtVel(
-              skelAPos, skelAVel, j);
-      if (!equals(dvel_dJ, dvel_dJ_fd, 1e-7))
-      {
-        std::cout << "Testing euler positions: " << eulerPos << std::endl;
-        std::cout << "Testing euler velocities: " << eulerVel << std::endl;
-        std::cout << "Testing euler acc: " << eulerAcc << std::endl;
-        std::cout << "Testing trans positions: " << transPos << std::endl;
-        std::cout << "Testing trans velocities: " << transVel << std::endl;
-        std::cout << "Testing trans acc: " << transAcc << std::endl;
-
-        std::cout << "Wrt velocity: " << j << std::endl;
-        std::cout << "Analytical d_dJ: " << std::endl << dvel_dJ << std::endl;
-        std::cout << "FD d_dJ: " << std::endl << dvel_dJ_fd << std::endl;
-        std::cout << "Diff: " << std::endl << dvel_dJ - dvel_dJ_fd << std::endl;
-        EXPECT_TRUE(equals(dvel_dJ, dvel_dJ_fd, 1e-7));
         return;
       }
     }

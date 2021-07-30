@@ -138,9 +138,6 @@ public:
   JacobianMatrix getRelativeJacobianStatic(
       const Eigen::Vector1s& position) const override;
 
-  Eigen::Matrix6s getSpatialJacobianStatic(
-      const Eigen::Vector6s& positions) const;
-
   Eigen::Matrix6s getSpatialJacobianStaticDerivWrtInput(s_t pos) const;
 
   Eigen::Matrix6s finiteDifferenceSpatialJacobianStaticDerivWrtInput(
@@ -158,25 +155,7 @@ public:
 
   void updateRelativeJacobian(bool) const override;
 
-  Eigen::Matrix6s getSpatialJacobianTimeDerivStatic(
-      const Eigen::Vector6s& positions,
-      const Eigen::Vector6s& velocities) const;
-
-  Eigen::Matrix6s finiteDifferenceSpatialJacobianTimeDerivStatic(
-      const Eigen::Vector6s& positions,
-      const Eigen::Vector6s& velocities) const;
-
   void updateRelativeJacobianTimeDeriv() const override;
-
-  Eigen::Matrix6s getSpatialJacobianTimeDerivDerivWrtPos(
-      const Eigen::Vector6s& positions,
-      const Eigen::Vector6s& velocities,
-      std::size_t index) const;
-
-  Eigen::Matrix6s finiteDifferenceSpatialJacobianTimeDerivDerivWrtPos(
-      const Eigen::Vector6s& positions,
-      const Eigen::Vector6s& velocities,
-      std::size_t index) const;
 
   Eigen::Matrix6s getSpatialJacobianTimeDerivDerivWrtInputPos(
       s_t pos, s_t vel) const;
@@ -195,14 +174,6 @@ public:
 
   math::Jacobian finiteDifferenceRelativeJacobianTimeDerivDerivWrtPosition(
       std::size_t index);
-
-  Eigen::Matrix6s getSpatialJacobianTimeDerivDerivWrtVel(
-      const Eigen::Vector6s& positions, std::size_t index) const;
-
-  Eigen::Matrix6s finiteDifferenceSpatialJacobianTimeDerivDerivWrtVel(
-      const Eigen::Vector6s& positions,
-      const Eigen::Vector6s& velocities,
-      std::size_t index) const;
 
   /// Computes derivative of time derivative of Jacobian w.r.t. velocity.
   math::Jacobian getRelativeJacobianTimeDerivDerivWrtVelocity(
