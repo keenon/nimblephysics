@@ -68,6 +68,10 @@ public:
   /// renmaed according to the axis order.
   void setAxisOrder(EulerJoint::AxisOrder _order, bool _renameDofs = true);
 
+  /// This takes a vector of 1's and -1's to indicate which entries to flip, if
+  /// any
+  void setFlipAxisMap(Eigen::Vector3s map);
+
   /// Return the axis order
   EulerJoint::AxisOrder getAxisOrder() const;
 
@@ -157,6 +161,7 @@ public:
 
 protected:
   EulerJoint::AxisOrder mAxisOrder;
+  Eigen::Vector3s mFlipAxisMap;
 };
 
 }; // namespace dynamics

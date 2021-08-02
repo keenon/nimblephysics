@@ -43,6 +43,18 @@ void EulerFreeJoint::setAxisOrder(
   {
     updateDegreeOfFreedomNames();
   }
+
+  Joint::notifyPositionUpdated();
+  updateRelativeJacobian(true);
+  Joint::incrementVersion();
+}
+
+//==============================================================================
+/// This takes a vector of 1's and -1's to indicate which entries to flip, if
+/// any
+void EulerFreeJoint::setFlipAxisMap(Eigen::Vector3s map)
+{
+  mFlipAxisMap = map;
 }
 
 //==============================================================================
@@ -195,7 +207,7 @@ Eigen::Matrix6s EulerFreeJoint::computeRelativeJacobianStaticDerivWrtPos(
 {
   assert(
       axisOrder == EulerJoint::AxisOrder::XYZ
-      && "Only XYZ AxisOrder is currently supported in the EulerFreeJoint");
+      && "Only XYZ AxisOrder is currently supported in the EulerFreeJoint computeRelativeJacobianStaticDerivWrtPos");
 
   if (index < 3)
   {

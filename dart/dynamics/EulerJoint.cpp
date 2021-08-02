@@ -136,10 +136,21 @@ EulerJoint::AxisOrder EulerJoint::getAxisOrder() const
 }
 
 //==============================================================================
-Eigen::Isometry3s EulerJoint::convertToTransform(
-    const Eigen::Vector3s& _positions, AxisOrder _ordering)
+/// This takes a vector of 1's and -1's to indicate which entries to flip, if
+/// any
+void EulerJoint::setFlipAxisMap(Eigen::Vector3s map)
 {
-  return Eigen::Isometry3s(convertToRotation(_positions, _ordering));
+  mFlipAxisMap = map;
+}
+
+//==============================================================================
+Eigen::Isometry3s EulerJoint::convertToTransform(
+    const Eigen::Vector3s& _positions,
+    AxisOrder _ordering,
+    Eigen::Vector3s _flipAxisMap)
+{
+  return Eigen::Isometry3s(
+      convertToRotation(_positions, _ordering, _flipAxisMap));
 }
 
 //==============================================================================
@@ -151,14 +162,20 @@ Eigen::Isometry3s EulerJoint::convertToTransform(
 
 //==============================================================================
 Eigen::Matrix3s EulerJoint::convertToRotation(
-    const Eigen::Vector3s& _positions, AxisOrder _ordering)
+    const Eigen::Vector3s& _positions,
+    AxisOrder _ordering,
+    Eigen::Vector3s _flipAxisMap)
 {
   switch (_ordering)
   {
     case AxisOrder::XYZ:
-      return math::eulerXYZToMatrix(_positions);
+      return math::eulerXYZToMatrix(_positions.cwiseProduct(_flipAxisMap));
     case AxisOrder::ZYX:
-      return math::eulerZYXToMatrix(_positions);
+      return math::eulerZYXToMatrix(_positions.cwiseProduct(_flipAxisMap));
+    case AxisOrder::ZXY:
+      return math::eulerZXYToMatrix(_positions.cwiseProduct(_flipAxisMap));
+    case AxisOrder::XZY:
+      return math::eulerXZYToMatrix(_positions.cwiseProduct(_flipAxisMap));
     default: {
       dterr << "[EulerJoint::convertToRotation] Invalid AxisOrder specified ("
             << static_cast<int>(_ordering) << ")\n";
@@ -171,7 +188,7 @@ Eigen::Matrix3s EulerJoint::convertToRotation(
 Eigen::Matrix3s EulerJoint::convertToRotation(
     const Eigen::Vector3s& _positions) const
 {
-  return convertToRotation(_positions, getAxisOrder());
+  return convertToRotation(_positions, getAxisOrder(), mFlipAxisMap);
 }
 
 //==============================================================================
@@ -247,7 +264,7 @@ Eigen::Matrix<s_t, 6, 3> EulerJoint::computeRelativeJacobianStatic(
       break;
     }
     default: {
-      dterr << "Undefined Euler axis order\n";
+      dterr << "Undefined Euler axis order in computeRelativeJacobianStatic\n";
       break;
     }
   }
@@ -401,7 +418,7 @@ math::Jacobian EulerJoint::computeRelativeJacobianDeriv(
       break;
     }
     default: {
-      dterr << "Undefined Euler axis order\n";
+      dterr << "Undefined Euler axis order in computeRelativeJacobianDeriv\n";
       break;
     }
   }
@@ -523,7 +540,8 @@ math::Jacobian EulerJoint::computeRelativeJacobianTimeDerivDeriv(
       break;
     }
     default: {
-      dterr << "Undefined Euler axis order\n";
+      dterr << "Undefined Euler axis order in "
+               "computeRelativeJacobianTimeDerivDeriv\n";
       break;
     }
   }
@@ -659,7 +677,8 @@ math::Jacobian EulerJoint::computeRelativeJacobianTimeDerivDeriv2(
       break;
     }
     default: {
-      dterr << "Undefined Euler axis order\n";
+      dterr << "Undefined Euler axis order in "
+               "computeRelativeJacobianTimeDerivDeriv2\n";
       break;
     }
   }
@@ -684,7 +703,7 @@ math::Jacobian EulerJoint::getRelativeJacobianTimeDerivDerivWrtVelocity(
 
 //==============================================================================
 EulerJoint::EulerJoint(const Properties& properties)
-  : detail::EulerJointBase(properties)
+  : detail::EulerJointBase(properties), mFlipAxisMap(Eigen::Vector3s::Ones())
 {
   // Inherited Aspects must be created in the final joint class in reverse order
   // or else we get pure virtual function calls
@@ -714,6 +733,16 @@ void EulerJoint::updateDegreeOfFreedomNames()
       affixes.push_back("_x");
       affixes.push_back("_y");
       affixes.push_back("_z");
+      break;
+    case AxisOrder::XZY:
+      affixes.push_back("_x");
+      affixes.push_back("_z");
+      affixes.push_back("_y");
+      break;
+    case AxisOrder::ZXY:
+      affixes.push_back("_z");
+      affixes.push_back("_x");
+      affixes.push_back("_y");
       break;
     default:
       dterr << "Unsupported axis order in EulerJoint named '"
@@ -812,7 +841,8 @@ Eigen::Matrix<s_t, 6, 3> EulerJoint::computeRelativeJacobianTimeDerivStatic(
       break;
     }
     default: {
-      dterr << "Undefined Euler axis order\n";
+      dterr << "Undefined Euler axis order in "
+               "computeRelativeJacobianTimeDerivStatic\n";
       break;
     }
   }

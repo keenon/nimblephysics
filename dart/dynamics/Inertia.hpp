@@ -43,31 +43,46 @@ namespace dynamics {
 class Inertia
 {
 public:
-
   /// Enumeration for minimal inertia parameters
-  enum Param {
+  enum Param
+  {
 
     // Overall mass
     MASS = 0,
 
     // Center of mass components
-    COM_X, COM_Y, COM_Z,
+    COM_X,
+    COM_Y,
+    COM_Z,
 
     // Moment of inertia components
-    I_XX, I_YY, I_ZZ,
-    I_XY, I_XZ, I_YZ
+    I_XX,
+    I_YY,
+    I_ZZ,
+    I_XY,
+    I_XZ,
+    I_YZ
 
   };
 
-  Inertia(s_t _mass=1, const Eigen::Vector3s& _com = Eigen::Vector3s::Zero(),
-          const Eigen::Matrix3s& _momentOfInertia = Eigen::Matrix3s::Identity());
+  Inertia(
+      s_t _mass = 1,
+      const Eigen::Vector3s& _com = Eigen::Vector3s::Zero(),
+      const Eigen::Matrix3s& _momentOfInertia = Eigen::Matrix3s::Identity());
 
   Inertia(const Eigen::Matrix6s& _spatialInertiaTensor);
 
-  Inertia(s_t _mass,
-          s_t _comX, s_t _comY, s_t _comZ,
-          s_t _Ixx, s_t _Iyy, s_t _Izz,
-          s_t _Ixy, s_t _Ixz, s_t _Iyz);
+  Inertia(
+      s_t _mass,
+      s_t _comX,
+      s_t _comY,
+      s_t _comZ,
+      s_t _Ixx,
+      s_t _Iyy,
+      s_t _Izz,
+      s_t _Ixy,
+      s_t _Ixz,
+      s_t _Iyz);
 
   /// Set an inertial parameter
   void setParameter(Param _param, s_t _value);
@@ -93,8 +108,7 @@ public:
   void setMoment(const Eigen::Matrix3s& _moment);
 
   /// Set the moment of inertia (about the center of mass)
-  void setMoment(s_t _Ixx, s_t _Iyy, s_t _Izz,
-                 s_t _Ixy, s_t _Ixz, s_t _Iyz);
+  void setMoment(s_t _Ixx, s_t _Iyy, s_t _Izz, s_t _Ixy, s_t _Ixz, s_t _Iyz);
 
   /// Get the moment of inertia
   Eigen::Matrix3s getMoment() const;
@@ -106,24 +120,24 @@ public:
   const Eigen::Matrix6s& getSpatialTensor() const;
 
   /// Returns true iff _moment is a physically valid moment of inertia
-  static bool verifyMoment(const Eigen::Matrix3s& _moment,
-                           bool _printWarnings = true,
-                           s_t _tolerance = 1e-8);
+  static bool verifyMoment(
+      const Eigen::Matrix3s& _moment,
+      bool _printWarnings = true,
+      s_t _tolerance = 1e-8);
 
   /// Returns true iff _spatial is a physically valid spatial inertia tensor
-  static bool verifySpatialTensor(const Eigen::Matrix6s& _spatial,
-                                  bool _printWarnings = true,
-                                  s_t _tolerance = 1e-8);
+  static bool verifySpatialTensor(
+      const Eigen::Matrix6s& _spatial,
+      bool _printWarnings = true,
+      s_t _tolerance = 1e-8);
 
   /// Returns true iff this Inertia object is physically valid
-  bool verify(bool _printWarnings = true,
-              s_t _tolerance = 1e-8) const;
+  bool verify(bool _printWarnings = true, s_t _tolerance = 1e-8) const;
 
   /// Check for equality
   bool operator==(const Inertia& other) const;
 
 protected:
-
   /// Compute the spatial tensor based on the inertial parameters
   void computeSpatialTensor();
 
@@ -137,7 +151,7 @@ protected:
   Eigen::Vector3s mCenterOfMass;
 
   /// The six parameters of the moment of inertia located at the center of mass
-  std::array<s_t,6> mMoment;
+  std::array<s_t, 6> mMoment;
 
   /// Cache for generalized spatial inertia of the Body
   Eigen::Matrix6s mSpatialTensor;

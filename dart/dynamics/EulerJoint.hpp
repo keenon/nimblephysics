@@ -94,6 +94,10 @@ public:
   /// Return the axis order
   AxisOrder getAxisOrder() const;
 
+  /// This takes a vector of 1's and -1's to indicate which entries to flip, if
+  /// any
+  void setFlipAxisMap(Eigen::Vector3s map);
+
   /// Convert a rotation into a 3D vector that can be used to set the positions
   /// of an EulerJoint with the specified AxisOrder. The positions returned by
   /// this function will result in a relative transform of
@@ -103,7 +107,9 @@ public:
   /// axis ordering.
   template <typename RotationType>
   static Eigen::Vector3s convertToPositions(
-      const RotationType& _rotation, AxisOrder _ordering)
+      const RotationType& _rotation,
+      AxisOrder _ordering,
+      Eigen::Vector3s _flipAxisMap = Eigen::Vector3s::Ones())
   {
     switch (_ordering)
     {
@@ -111,6 +117,10 @@ public:
         return math::matrixToEulerXYZ(_rotation);
       case AxisOrder::ZYX:
         return math::matrixToEulerZYX(_rotation);
+      case AxisOrder::ZXY:
+        return math::matrixToEulerZXY(_rotation);
+      case AxisOrder::XZY:
+        return math::matrixToEulerXZY(_rotation);
       default:
         dtwarn << "[EulerJoint::convertToPositions] Unsupported AxisOrder ("
                << static_cast<int>(_ordering) << "), returning a zero vector\n";
@@ -124,12 +134,14 @@ public:
   template <typename RotationType>
   Eigen::Vector3s convertToPositions(const RotationType& _rotation) const
   {
-    return convertToPositions(_rotation, getAxisOrder());
+    return convertToPositions(_rotation, getAxisOrder(), mFlipAxisMap);
   }
 
   /// Convert a set of Euler angle positions into a transform
   static Eigen::Isometry3s convertToTransform(
-      const Eigen::Vector3s& _positions, AxisOrder _ordering);
+      const Eigen::Vector3s& _positions,
+      AxisOrder _ordering,
+      Eigen::Vector3s _flipAxisMap = Eigen::Vector3s::Ones());
 
   /// This is a version of EulerJoint::convertToRotation(const Eigen::Vector3s&,
   /// AxisOrder) which will use the AxisOrder belonging to the joint instance
@@ -138,7 +150,9 @@ public:
 
   /// Convert a set of Euler angle positions into a rotation matrix
   static Eigen::Matrix3s convertToRotation(
-      const Eigen::Vector3s& _positions, AxisOrder _ordering);
+      const Eigen::Vector3s& _positions,
+      AxisOrder _ordering,
+      Eigen::Vector3s _flipAxisMap = Eigen::Vector3s::Ones());
 
   Eigen::Matrix3s convertToRotation(const Eigen::Vector3s& _positions) const;
 
@@ -189,6 +203,10 @@ public:
       std::size_t index) const override;
 
 protected:
+  /// This contains 1's and -1's to indicate whether we should flip a given
+  /// input axis.
+  Eigen::Vector3s mFlipAxisMap;
+
   /// Constructor called by Skeleton class
   EulerJoint(const Properties& properties);
 

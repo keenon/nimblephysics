@@ -264,32 +264,6 @@ TEST(CustomJoint, Construct)
       return;
     }
 
-    // Test all the spatial (6-dof euler + translation) derivatives of Jacobians
-    for (int j = 0; j < 6; j++)
-    {
-      Eigen::Matrix6s dpos_J
-          = custom->getSpatialJacobianStaticDerivWrtPos(skelAPos, j);
-      Eigen::Matrix6s dpos_J_fd
-          = custom->finiteDifferenceSpatialJacobianStaticDerivWrtPos(
-              skelAPos, j);
-      if (!equals(dpos_J, dpos_J_fd, 1e-7))
-      {
-        std::cout << "Testing euler positions: " << eulerPos << std::endl;
-        std::cout << "Testing euler velocities: " << eulerVel << std::endl;
-        std::cout << "Testing euler acc: " << eulerAcc << std::endl;
-        std::cout << "Testing trans positions: " << transPos << std::endl;
-        std::cout << "Testing trans velocities: " << transVel << std::endl;
-        std::cout << "Testing trans acc: " << transAcc << std::endl;
-
-        std::cout << "Wrt position: " << j << std::endl;
-        std::cout << "Analytical d_J: " << std::endl << dpos_J << std::endl;
-        std::cout << "FD d_J: " << std::endl << dpos_J_fd << std::endl;
-        std::cout << "Diff: " << std::endl << dpos_J - dpos_J_fd << std::endl;
-        EXPECT_TRUE(equals(dpos_J, dpos_J_fd, 1e-7));
-        return;
-      }
-    }
-
     Eigen::Matrix6s dsJ = custom->getSpatialJacobianStaticDerivWrtInput(0);
     Eigen::Matrix6s dsJ_fd
         = custom->finiteDifferenceSpatialJacobianStaticDerivWrtInput(0);

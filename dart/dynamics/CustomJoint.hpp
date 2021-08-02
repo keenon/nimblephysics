@@ -37,6 +37,7 @@
 #include <string>
 #include <vector>
 
+#include "dart/dynamics/EulerJoint.hpp"
 #include "dart/dynamics/GenericJoint.hpp"
 #include "dart/math/CustomFunction.hpp"
 #include "dart/math/SimmSpline.hpp"
@@ -128,6 +129,19 @@ public:
 
   bool isCyclic(std::size_t) const override;
 
+  /// Set the axis order
+  /// \param[in] _order Axis order
+  /// \param[in] _renameDofs If true, the names of dofs in this joint will be
+  /// renmaed according to the axis order.
+  void setAxisOrder(EulerJoint::AxisOrder _order, bool _renameDofs = true);
+
+  /// Return the axis order
+  EulerJoint::AxisOrder getAxisOrder() const;
+
+  /// This takes a vector of 1's and -1's to indicate which entries to flip, if
+  /// any
+  void setFlipAxisMap(Eigen::Vector3s map);
+
   dart::dynamics::Joint* clone() const override;
 
   void updateDegreeOfFreedomNames() override;
@@ -142,12 +156,6 @@ public:
 
   Eigen::Matrix6s finiteDifferenceSpatialJacobianStaticDerivWrtInput(
       s_t pos) const;
-
-  Eigen::Matrix6s getSpatialJacobianStaticDerivWrtPos(
-      const Eigen::Vector6s& positions, std::size_t index) const;
-
-  Eigen::Matrix6s finiteDifferenceSpatialJacobianStaticDerivWrtPos(
-      const Eigen::Vector6s& positions, std::size_t index) const;
 
   math::Jacobian getRelativeJacobianDeriv(std::size_t index) const override;
 
@@ -192,6 +200,12 @@ public:
   Eigen::Vector6s scratchAnalytical();
 
 protected:
+  dynamics::EulerJoint::AxisOrder mAxisOrder;
+
+  /// This contains 1's and -1's to indicate whether we should flip a given
+  /// input axis.
+  Eigen::Vector3s mFlipAxisMap;
+
   // There should be 6 of these, one for each axis of the wrapped Euler joint
   std::vector<std::shared_ptr<math::CustomFunction>> mFunctions;
 };
