@@ -134,6 +134,8 @@ dynamics::EulerJoint::AxisOrder getAxisOrder(
     return dynamics::EulerJoint::AxisOrder::XZY;
   }
   assert(false);
+  // don't break the build when building as prod
+  return dynamics::EulerJoint::AxisOrder::XYZ;
 }
 
 Eigen::Vector3s getAxisFlips(std::vector<Eigen::Vector3s> axisList)
@@ -507,6 +509,7 @@ dynamics::SkeletonPtr OpenSimParser::readOsim40(
                 = getAxisOrder(eulerAxisOrder);
             dynamics::EulerJoint::AxisOrder transOrder
                 = getAxisOrder(transformAxisOrder);
+            (void)transOrder;
             assert(transOrder = dynamics::EulerJoint::AxisOrder::XYZ);
 
             Eigen::Vector3s flips = getAxisFlips(eulerAxisOrder);
