@@ -16,6 +16,7 @@ TEST(OpenSimParser, RAJAGOPAL)
 {
   std::shared_ptr<dynamics::Skeleton> skel = OpenSimParser::readSkeleton(
       "dart://sample/osim/FullBodyModel-4.0/Rajagopal2015.osim");
+  (void)skel;
 
   // Uncomment this for local testing
   /*
