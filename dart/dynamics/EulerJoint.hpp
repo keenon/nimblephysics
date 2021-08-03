@@ -114,13 +114,13 @@ public:
     switch (_ordering)
     {
       case AxisOrder::XYZ:
-        return math::matrixToEulerXYZ(_rotation.cwiseProduct(_flipAxisMap));
+        return math::matrixToEulerXYZ(_rotation).cwiseProduct(_flipAxisMap);
       case AxisOrder::ZYX:
-        return math::matrixToEulerZYX(_rotation.cwiseProduct(_flipAxisMap));
+        return math::matrixToEulerZYX(_rotation).cwiseProduct(_flipAxisMap);
       case AxisOrder::ZXY:
-        return math::matrixToEulerZXY(_rotation.cwiseProduct(_flipAxisMap));
+        return math::matrixToEulerZXY(_rotation).cwiseProduct(_flipAxisMap);
       case AxisOrder::XZY:
-        return math::matrixToEulerXZY(_rotation.cwiseProduct(_flipAxisMap));
+        return math::matrixToEulerXZY(_rotation).cwiseProduct(_flipAxisMap);
       default:
         dtwarn << "[EulerJoint::convertToPositions] Unsupported AxisOrder ("
                << static_cast<int>(_ordering) << "), returning a zero vector\n";
