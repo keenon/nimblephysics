@@ -217,8 +217,9 @@ Eigen::Matrix6s EulerFreeJoint::computeRelativeJacobianStaticDerivWrtPos(
     spatialJac.block<3, 3>(3, 3)
         = childBodyToJoint.linear()
           * math::eulerXYZToMatrixGrad(euler, index).transpose(); // R^T
-    spatialJac.block<6, 3>(0, 0) = EulerJoint::computeRelativeJacobianDeriv(
-        index, euler, axisOrder, childBodyToJoint);
+    spatialJac.block<6, 3>(0, 0)
+        = EulerJoint::computeRelativeJacobianDerivWrtPos(
+            index, euler, axisOrder, childBodyToJoint);
 
     return spatialJac;
   }
@@ -307,8 +308,9 @@ Eigen::Matrix6s EulerFreeJoint::computeRelativeJacobianTimeDerivDerivWrtPos(
     Eigen::Vector3s eulerVel = velocities.head<3>();
 
     Eigen::Matrix6s d_dJ = Eigen::Matrix6s::Zero();
-    d_dJ.block<6, 3>(0, 0) = EulerJoint::computeRelativeJacobianTimeDerivDeriv(
-        index, euler, eulerVel, axisOrder, childBodyToJoint);
+    d_dJ.block<6, 3>(0, 0)
+        = EulerJoint::computeRelativeJacobianTimeDerivDerivWrtPos(
+            index, euler, eulerVel, axisOrder, childBodyToJoint);
 
     for (int i = 0; i < 3; i++)
     {
@@ -361,8 +363,9 @@ Eigen::Matrix6s EulerFreeJoint::computeRelativeJacobianTimeDerivDerivWrtVel(
     Eigen::Vector3s euler = positions.head<3>();
 
     Eigen::Matrix6s d_dJ = Eigen::Matrix6s::Zero();
-    d_dJ.block<6, 3>(0, 0) = EulerJoint::computeRelativeJacobianTimeDerivDeriv2(
-        index, euler, axisOrder, childBodyToJoint);
+    d_dJ.block<6, 3>(0, 0)
+        = EulerJoint::computeRelativeJacobianTimeDerivDerivWrtVel(
+            index, euler, axisOrder, childBodyToJoint);
 
     d_dJ.block<3, 3>(3, 3)
         = childBodyToJoint.linear()

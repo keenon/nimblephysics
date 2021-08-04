@@ -234,7 +234,7 @@ Eigen::Matrix<s_t, 6, 3> EulerJoint::computeRelativeJacobianStatic(
 
 #ifndef NDEBUG
       if (abs(_positions[1]) == math::constantsd::pi() * 0.5)
-        std::cout << "Singular configuration in ZYX-euler joint. ("
+        std::cout << "Singular configuration in XYZ-euler joint. ("
                   << _positions[0] << ", " << _positions[1] << ", "
                   << _positions[2] << ")" << std::endl;
 #endif
@@ -257,6 +257,52 @@ Eigen::Matrix<s_t, 6, 3> EulerJoint::computeRelativeJacobianStatic(
 #ifndef NDEBUG
       if (abs(_positions[1]) == math::constantsd::pi() * 0.5)
         std::cout << "Singular configuration in ZYX-euler joint. ("
+                  << _positions[0] << ", " << _positions[1] << ", "
+                  << _positions[2] << ")" << std::endl;
+#endif
+
+      break;
+    }
+
+    case EulerJoint::AxisOrder::XZY: {
+      //------------------------------------------------------------------------
+      // S = [ c1*c2,  -s2,   0
+      //         -s1,    0,   1
+      //       c1*s2,   c2,   0
+      //           0,    0,   0
+      //           0,    0,   0
+      //           0,    0,   0 ];
+      //------------------------------------------------------------------------
+      J0 << c1 * c2, -s1, c1 * s2, 0.0, 0.0, 0.0;
+      J1 << -s2, 0, c2, 0.0, 0.0, 0.0;
+      J2 << 0.0, 1.0, 0.0, 0.0, 0.0, 0.0;
+
+#ifndef NDEBUG
+      if (abs(_positions[1]) == math::constantsd::pi() * 0.5)
+        std::cout << "Singular configuration in XZY-euler joint. ("
+                  << _positions[0] << ", " << _positions[1] << ", "
+                  << _positions[2] << ")" << std::endl;
+#endif
+
+      break;
+    }
+
+    case EulerJoint::AxisOrder::ZXY: {
+      //------------------------------------------------------------------------
+      // S = [-c1*s2,   c2,   0
+      //          s1,    0,   1
+      //       c1*c2,   s2,   0
+      //           0,    0,   0
+      //           0,    0,   0
+      //           0,    0,   0 ];
+      //------------------------------------------------------------------------
+      J0 << -c1 * s2, s1, c1 * c2, 0.0, 0.0, 0.0;
+      J1 << c2, 0, s2, 0.0, 0.0, 0.0;
+      J2 << 0.0, 1.0, 0.0, 0.0, 0.0, 0.0;
+
+#ifndef NDEBUG
+      if (abs(_positions[1]) == math::constantsd::pi() * 0.5)
+        std::cout << "Singular configuration in ZXY-euler joint. ("
                   << _positions[0] << ", " << _positions[1] << ", "
                   << _positions[2] << ")" << std::endl;
 #endif
@@ -303,7 +349,7 @@ Eigen::Matrix<s_t, 6, 3> EulerJoint::getRelativeJacobianStatic(
 }
 
 //==============================================================================
-math::Jacobian EulerJoint::computeRelativeJacobianDeriv(
+math::Jacobian EulerJoint::computeRelativeJacobianDerivWrtPos(
     std::size_t index,
     const Eigen::Vector3s& positions,
     EulerJoint::AxisOrder axisOrder,
@@ -417,8 +463,100 @@ math::Jacobian EulerJoint::computeRelativeJacobianDeriv(
 
       break;
     }
+    case EulerJoint::AxisOrder::XZY: {
+      //------------------------------------------------------------------------
+      // S = [ c1*c2,  -s2,   0
+      //         -s1,    0,   1
+      //       c1*s2,   c2,   0
+      //           0,    0,   0
+      //           0,    0,   0
+      //           0,    0,   0 ];
+      //------------------------------------------------------------------------
+
+      if (index == 0)
+      {
+        // DS/Dq0 = 0;
+      }
+      else if (index == 1)
+      {
+        // DS/Dq1 = [-s1*c2,  0,   0
+        //              -c1,  0,   0
+        //           -s1*s2,  0,   0
+        //                0,  0,   0
+        //                0,  0,   0
+        //                0,  0,   0 ];
+
+        DJ_Dq(0, 0) = -s1 * c2;
+        DJ_Dq(1, 0) = -c1;
+        DJ_Dq(2, 0) = -s1 * s2;
+      }
+      else if (index == 2)
+      {
+        // DS/Dq2 = [-c1*s2,  -c2,   0
+        //                0,    0,   0
+        //            c1*c2,  -s2,   0
+        //                0,    0,   0
+        //                0,    0,   0
+        //                0,    0,   0 ];
+
+        DJ_Dq(0, 0) = -c1 * s2;
+        DJ_Dq(2, 0) = c1 * c2;
+
+        DJ_Dq(0, 1) = -c2;
+        DJ_Dq(2, 1) = -s2;
+      }
+
+      break;
+    }
+
+    case EulerJoint::AxisOrder::ZXY: {
+      //------------------------------------------------------------------------
+      // S = [-c1*s2,   c2,   0
+      //          s1,    0,   1
+      //       c1*c2,   s2,   0
+      //           0,    0,   0
+      //           0,    0,   0
+      //           0,    0,   0 ];
+      //------------------------------------------------------------------------
+
+      if (index == 0)
+      {
+        // DS/Dq0 = 0;
+      }
+      else if (index == 1)
+      {
+        // DS/Dq1 = [ s1*s2,  0,   0
+        //               c1,  0,   0
+        //           -s1*c2,  0,   0
+        //                0,  0,   0
+        //                0,  0,   0
+        //                0,  0,   0 ];
+
+        DJ_Dq(0, 0) = s1 * s2;
+        DJ_Dq(1, 0) = c1;
+        DJ_Dq(2, 0) = -s1 * c2;
+      }
+      else if (index == 2)
+      {
+        // DS/Dq2 = [-c1*c2,  -s2,   0
+        //                0,    0,   0
+        //           -c1*s2,   c2,   0
+        //                0,    0,   0
+        //                0,    0,   0
+        //                0,    0,   0 ];
+
+        DJ_Dq(0, 0) = -c1 * c2;
+        DJ_Dq(2, 0) = -c1 * s2;
+
+        DJ_Dq(0, 1) = -s2;
+        DJ_Dq(2, 1) = c2;
+      }
+
+      break;
+    }
     default: {
-      dterr << "Undefined Euler axis order in computeRelativeJacobianDeriv\n";
+      dterr << "Undefined Euler axis order in "
+               "computeRelativeJacobianDerivWrtPos\n";
       break;
     }
   }
@@ -431,9 +569,32 @@ math::Jacobian EulerJoint::computeRelativeJacobianDeriv(
 }
 
 //==============================================================================
+Eigen::Matrix<s_t, 6, 3>
+EulerJoint::finiteDifferenceRelativeJacobianStaticDerivWrtPos(
+    const Eigen::Vector3s& positions,
+    std::size_t index,
+    EulerJoint::AxisOrder axisOrder,
+    Eigen::Isometry3s childBodyToJoint)
+{
+  // This is wrt position
+  const s_t EPS = 1e-7;
+  Eigen::Vector3s perturbedPlus
+      = positions + (EPS * Eigen::Vector3s::Unit(index));
+  Eigen::Vector3s perturbedMinus
+      = positions - (EPS * Eigen::Vector3s::Unit(index));
+
+  Eigen::Matrix<s_t, 6, 3> plus = computeRelativeJacobianStatic(
+      perturbedPlus, axisOrder, childBodyToJoint);
+  Eigen::Matrix<s_t, 6, 3> minus = computeRelativeJacobianStatic(
+      perturbedMinus, axisOrder, childBodyToJoint);
+
+  return (plus - minus) / (2 * EPS);
+}
+
+//==============================================================================
 math::Jacobian EulerJoint::getRelativeJacobianDeriv(std::size_t index) const
 {
-  return computeRelativeJacobianDeriv(
+  return computeRelativeJacobianDerivWrtPos(
       index,
       getPositionsStatic(),
       getAxisOrder(),
@@ -441,7 +602,7 @@ math::Jacobian EulerJoint::getRelativeJacobianDeriv(std::size_t index) const
 }
 
 //==============================================================================
-math::Jacobian EulerJoint::computeRelativeJacobianTimeDerivDeriv(
+math::Jacobian EulerJoint::computeRelativeJacobianTimeDerivDerivWrtPos(
     std::size_t index,
     const Eigen::Vector3s& positions,
     const Eigen::Vector3s& velocities,
@@ -539,9 +700,100 @@ math::Jacobian EulerJoint::computeRelativeJacobianTimeDerivDeriv(
       }
       break;
     }
+    case EulerJoint::AxisOrder::XZY: {
+      //------------------------------------------------------------------------
+      // dS = [ -(c2 * s1*dq1) -(c1 * s2*dq2),   -c2*dq2,   0
+      //                              -c1*dq1,    0,        0
+      //        (c1 * c2*dq2) - (s2 * s1*dq1),   -s2*dq2,   0
+      //           0,    0,   0
+      //           0,    0,   0
+      //           0,    0,   0 ];
+      //------------------------------------------------------------------------
+
+      if (index == 0)
+      {
+        // DdS/Dq0 = 0;
+      }
+      else if (index == 1)
+      {
+        //------------------------------------------------------------------------
+        // dS = [ -(c2 * c1*dq1) +(s1 * s2*dq2),    0,   0
+        //                               s1*dq1,    0,   0
+        //        -(s1 * c2*dq2) -(s2 * c1*dq1),    0,   0
+        //           0,    0,   0
+        //           0,    0,   0
+        //           0,    0,   0 ];
+        //------------------------------------------------------------------------
+        DdJ_Dq(0, 0) = -(c2 * c1 * dq1) + (s1 * s2 * dq2);
+        DdJ_Dq(1, 0) = s1 * dq1;
+        DdJ_Dq(2, 0) = -(s1 * c2 * dq2) - (s2 * c1 * dq1);
+      }
+      else if (index == 2)
+      {
+        //------------------------------------------------------------------------
+        // dS = [ (s2 * s1*dq1) -(c1 * c2*dq2),   s2*dq2,   0
+        //                                   0,        0,   0
+        //        (c1 * -s2*dq2) - (c2 * s1*dq1), -c2*dq2,  0
+        //           0,    0,   0
+        //           0,    0,   0
+        //           0,    0,   0 ];
+        //------------------------------------------------------------------------
+        DdJ_Dq(0, 0) = (s2 * s1 * dq1) - (c1 * c2 * dq2);
+        DdJ_Dq(0, 1) = s2 * dq2;
+        DdJ_Dq(2, 0) = -(c1 * s2 * dq2) - (c2 * s1 * dq1);
+        DdJ_Dq(2, 1) = -c2 * dq2;
+      }
+      break;
+    }
+
+    case EulerJoint::AxisOrder::ZXY: {
+      //------------------------------------------------------------------------
+      // dS = [(s1*s2*dq1) - (c1*c2*dq2),  -s2*dq2,   0
+      //                          c1*dq1,        0,   0
+      //      -(s1*c2*dq1) - (c1*s2*dq2),   c2*dq2,   0
+      //           0,    0,   0
+      //           0,    0,   0
+      //           0,    0,   0 ];
+      //------------------------------------------------------------------------
+
+      if (index == 0)
+      {
+        // DdS/Dq0 = 0;
+      }
+      else if (index == 1)
+      {
+        //------------------------------------------------------------------------
+        // dS = [(c1*s2*dq1) + (s1*c2*dq2),        0,   0
+        //                         -s1*dq1,        0,   0
+        //      -(c1*c2*dq1) + (s1*s2*dq2),        0,   0
+        //           0,    0,   0
+        //           0,    0,   0
+        //           0,    0,   0 ];
+        //------------------------------------------------------------------------
+        DdJ_Dq(0, 0) = (c1 * s2 * dq1) + (s1 * c2 * dq2);
+        DdJ_Dq(1, 0) = -s1 * dq1;
+        DdJ_Dq(2, 0) = -(c1 * c2 * dq1) + (s2 * s1 * dq2);
+      }
+      else if (index == 2)
+      {
+        //------------------------------------------------------------------------
+        // dS = [(s1*c2*dq1) + (c1*s2*dq2),  -c2*dq2,   0
+        //                               0,        0,   0
+        //       (s1*s2*dq1) - (c1*c2*dq2),  -s2*dq2,   0
+        //           0,    0,   0
+        //           0,    0,   0
+        //           0,    0,   0 ];
+        //------------------------------------------------------------------------
+        DdJ_Dq(0, 0) = (s1 * c2 * dq1) + (c1 * s2 * dq2);
+        DdJ_Dq(0, 1) = -c2 * dq2;
+        DdJ_Dq(2, 0) = (s1 * s2 * dq1) - (c1 * c2 * dq2);
+        DdJ_Dq(2, 1) = -s2 * dq2;
+      }
+      break;
+    }
     default: {
       dterr << "Undefined Euler axis order in "
-               "computeRelativeJacobianTimeDerivDeriv\n";
+               "computeRelativeJacobianTimeDerivDerivWrtPos\n";
       break;
     }
   }
@@ -554,11 +806,35 @@ math::Jacobian EulerJoint::computeRelativeJacobianTimeDerivDeriv(
 }
 
 //==============================================================================
+Eigen::Matrix<s_t, 6, 3>
+EulerJoint::finiteDifferenceRelativeJacobianTimeDerivDerivWrtPos(
+    const Eigen::Vector3s& positions,
+    const Eigen::Vector3s& velocities,
+    std::size_t index,
+    EulerJoint::AxisOrder axisOrder,
+    Eigen::Isometry3s childBodyToJoint)
+{
+  // This is wrt position
+  const s_t EPS = 1e-8;
+  Eigen::Vector3s perturbedPlus
+      = positions + (EPS * Eigen::Vector3s::Unit(index));
+  Eigen::Vector3s perturbedMinus
+      = positions - (EPS * Eigen::Vector3s::Unit(index));
+
+  Eigen::Matrix<s_t, 6, 3> plus = computeRelativeJacobianTimeDerivStatic(
+      perturbedPlus, velocities, axisOrder, childBodyToJoint);
+  Eigen::Matrix<s_t, 6, 3> minus = computeRelativeJacobianTimeDerivStatic(
+      perturbedMinus, velocities, axisOrder, childBodyToJoint);
+
+  return (plus - minus) / (2 * EPS);
+}
+
+//==============================================================================
 math::Jacobian EulerJoint::getRelativeJacobianTimeDerivDerivWrtPosition(
     std::size_t index) const
 {
   assert(index < 3);
-  return computeRelativeJacobianTimeDerivDeriv(
+  return computeRelativeJacobianTimeDerivDerivWrtPos(
       index,
       getPositionsStatic(),
       getVelocitiesStatic(),
@@ -567,7 +843,7 @@ math::Jacobian EulerJoint::getRelativeJacobianTimeDerivDerivWrtPosition(
 }
 
 //==============================================================================
-math::Jacobian EulerJoint::computeRelativeJacobianTimeDerivDeriv2(
+math::Jacobian EulerJoint::computeRelativeJacobianTimeDerivDerivWrtVel(
     std::size_t index,
     const Eigen::Vector3s& positions,
     EulerJoint::AxisOrder axisOrder,
@@ -676,9 +952,100 @@ math::Jacobian EulerJoint::computeRelativeJacobianTimeDerivDeriv2(
       }
       break;
     }
+    case EulerJoint::AxisOrder::XZY: {
+      //------------------------------------------------------------------------
+      // dS = [ -(c2 * s1*dq1) -(c1 * s2*dq2),   -c2*dq2,   0
+      //                              -c1*dq1,    0,        0
+      //        (c1 * c2*dq2) - (s2 * s1*dq1),   -s2*dq2,   0
+      //           0,    0,   0
+      //           0,    0,   0
+      //           0,    0,   0 ];
+      //------------------------------------------------------------------------
+
+      if (index == 0)
+      {
+        // DdS/Dq0 = 0;
+      }
+      else if (index == 1)
+      {
+        //------------------------------------------------------------------------
+        // dS = [ -(c2 * s1),   0,   0
+        //               -c1,   0,   0
+        //        -(s2 * s1),   0,   0
+        //           0,    0,   0
+        //           0,    0,   0
+        //           0,    0,   0 ];
+        //------------------------------------------------------------------------
+        DdJ_Ddq(0, 0) = -(c2 * s1);
+        DdJ_Ddq(1, 0) = -c1;
+        DdJ_Ddq(2, 0) = -(s2 * s1);
+      }
+      else if (index == 2)
+      {
+        //------------------------------------------------------------------------
+        // dS = [ -(c1 * s2), -c2,   0
+        //                                   0,        0,   0
+        //        (c1 * c2),  -s2,  0
+        //           0,    0,   0
+        //           0,    0,   0
+        //           0,    0,   0 ];
+        //------------------------------------------------------------------------
+        DdJ_Ddq(0, 0) = -(c1 * s2);
+        DdJ_Ddq(0, 1) = -c2;
+        DdJ_Ddq(2, 0) = (c1 * c2);
+        DdJ_Ddq(2, 1) = -s2;
+      }
+      break;
+    }
+
+    case EulerJoint::AxisOrder::ZXY: {
+      //------------------------------------------------------------------------
+      // dS = [(s1*s2*dq1) - (c1*c2*dq2),  -s2*dq2,   0
+      //                          c1*dq1,        0,   0
+      //      -(s1*c2*dq1) - (c1*s2*dq2),   c2*dq2,   0
+      //           0,    0,   0
+      //           0,    0,   0
+      //           0,    0,   0 ];
+      //------------------------------------------------------------------------
+
+      if (index == 0)
+      {
+        // DdS/Dq0 = 0;
+      }
+      else if (index == 1)
+      {
+        //------------------------------------------------------------------------
+        // dS = [(s1*s2),  0,   0
+        //            c1,  0,   0
+        //      -(s1*c2),  0,   0
+        //           0,    0,   0
+        //           0,    0,   0
+        //           0,    0,   0 ];
+        //------------------------------------------------------------------------
+        DdJ_Ddq(0, 0) = (s1 * s2);
+        DdJ_Ddq(1, 0) = c1;
+        DdJ_Ddq(2, 0) = -(s1 * c2);
+      }
+      else if (index == 2)
+      {
+        //------------------------------------------------------------------------
+        // dS = [- (c1*c2),  -s2,   0
+        //               0,    0,   0
+        //       - (c1*s2),   c2,   0
+        //           0,    0,   0
+        //           0,    0,   0
+        //           0,    0,   0 ];
+        //------------------------------------------------------------------------
+        DdJ_Ddq(0, 0) = -(c1 * c2);
+        DdJ_Ddq(0, 1) = -s2;
+        DdJ_Ddq(2, 0) = -(c1 * s2);
+        DdJ_Ddq(2, 1) = c2;
+      }
+      break;
+    }
     default: {
       dterr << "Undefined Euler axis order in "
-               "computeRelativeJacobianTimeDerivDeriv2\n";
+               "computeRelativeJacobianTimeDerivDerivWrtVel\n";
       break;
     }
   }
@@ -691,10 +1058,34 @@ math::Jacobian EulerJoint::computeRelativeJacobianTimeDerivDeriv2(
 }
 
 //==============================================================================
+Eigen::Matrix<s_t, 6, 3>
+EulerJoint::finiteDifferenceRelativeJacobianTimeDerivDerivWrtVel(
+    const Eigen::Vector3s& positions,
+    const Eigen::Vector3s& velocities,
+    std::size_t index,
+    EulerJoint::AxisOrder axisOrder,
+    Eigen::Isometry3s childBodyToJoint)
+{
+  // This is wrt position
+  const s_t EPS = 1e-8;
+  Eigen::Vector3s perturbedPlus
+      = velocities + (EPS * Eigen::Vector3s::Unit(index));
+  Eigen::Vector3s perturbedMinus
+      = velocities - (EPS * Eigen::Vector3s::Unit(index));
+
+  Eigen::Matrix<s_t, 6, 3> plus = computeRelativeJacobianTimeDerivStatic(
+      positions, perturbedPlus, axisOrder, childBodyToJoint);
+  Eigen::Matrix<s_t, 6, 3> minus = computeRelativeJacobianTimeDerivStatic(
+      positions, perturbedMinus, axisOrder, childBodyToJoint);
+
+  return (plus - minus) / (2 * EPS);
+}
+
+//==============================================================================
 math::Jacobian EulerJoint::getRelativeJacobianTimeDerivDerivWrtVelocity(
     std::size_t index) const
 {
-  return computeRelativeJacobianTimeDerivDeriv2(
+  return computeRelativeJacobianTimeDerivDerivWrtVel(
       index,
       getPositionsStatic(),
       getAxisOrder(),
@@ -705,8 +1096,8 @@ math::Jacobian EulerJoint::getRelativeJacobianTimeDerivDerivWrtVelocity(
 EulerJoint::EulerJoint(const Properties& properties)
   : detail::EulerJointBase(properties), mFlipAxisMap(Eigen::Vector3s::Ones())
 {
-  // Inherited Aspects must be created in the final joint class in reverse order
-  // or else we get pure virtual function calls
+  // Inherited Aspects must be created in the final joint class in reverse
+  // order or else we get pure virtual function calls
   createEulerJointAspect(properties);
   createGenericJointAspect(properties);
   createJointAspect(properties);
@@ -811,6 +1202,14 @@ Eigen::Matrix<s_t, 6, 3> EulerJoint::computeRelativeJacobianTimeDerivStatic(
   {
     case EulerJoint::AxisOrder::XYZ: {
       //------------------------------------------------------------------------
+      // S = [    c1*c2, s2,  0
+      //       -(c1*s2), c2,  0
+      //             s1,  0,  1
+      //              0,  0,  0
+      //              0,  0,  0
+      //              0,  0,  0 ];
+      //------------------------------------------------------------------------
+      //------------------------------------------------------------------------
       // dS = [  -(dq1*c2*s1) - dq2*c1*s2,    dq2*c2,  0
       //         -(dq2*c1*c2) + dq1*s1*s2, -(dq2*s2),  0
       //                           dq1*c1,         0,  0
@@ -827,6 +1226,14 @@ Eigen::Matrix<s_t, 6, 3> EulerJoint::computeRelativeJacobianTimeDerivStatic(
     }
     case EulerJoint::AxisOrder::ZYX: {
       //------------------------------------------------------------------------
+      // S = [   -s1,    0,   1
+      //       s2*c1,   c2,   0
+      //       c1*c2,  -s2,   0
+      //           0,    0,   0
+      //           0,    0,   0
+      //           0,    0,   0 ];
+      //------------------------------------------------------------------------
+      //------------------------------------------------------------------------
       // dS = [               -c1*dq1,        0,   0
       //          c2*c1*dq2-s2*s1*dq1,  -s2*dq2,   0
       //         -s1*c2*dq1-c1*s2*dq2,  -c2*dq2,   0
@@ -837,6 +1244,53 @@ Eigen::Matrix<s_t, 6, 3> EulerJoint::computeRelativeJacobianTimeDerivStatic(
       dJ0 << -c1 * dq1, c2 * c1 * dq2 - s2 * s1 * dq1,
           -s1 * c2 * dq1 - c1 * s2 * dq2, 0.0, 0.0, 0.0;
       dJ1 << 0.0, -s2 * dq2, -c2 * dq2, 0.0, 0.0, 0.0;
+      dJ2.setZero();
+      break;
+    }
+    case EulerJoint::AxisOrder::XZY: {
+      //------------------------------------------------------------------------
+      // S = [ c1*c2,  -s2,   0
+      //         -s1,    0,   1
+      //       c1*s2,   c2,   0
+      //           0,    0,   0
+      //           0,    0,   0
+      //           0,    0,   0 ];
+      //------------------------------------------------------------------------
+      //------------------------------------------------------------------------
+      // dS = [ -(c2 * s1*dq1) -(c1 * s2*dq2),   -c2*dq2,   0
+      //                              -c1*dq1,    0,        0
+      //        (c1 * c2*dq2) - (s2 * s1*dq1),   -s2*dq2,   0
+      //           0,    0,   0
+      //           0,    0,   0
+      //           0,    0,   0 ];
+      //------------------------------------------------------------------------
+      dJ0 << -(c2 * s1 * dq1) - (c1 * s2 * dq2), -c1 * dq1,
+          (c1 * c2 * dq2) - (s2 * s1 * dq1), 0.0, 0.0, 0.0;
+      dJ1 << -c2 * dq2, 0, -s2 * dq2, 0.0, 0.0, 0.0;
+      dJ2.setZero();
+      break;
+    }
+
+    case EulerJoint::AxisOrder::ZXY: {
+      //------------------------------------------------------------------------
+      // S = [-c1*s2,   c2,   0
+      //          s1,    0,   1
+      //       c1*c2,   s2,   0
+      //           0,    0,   0
+      //           0,    0,   0
+      //           0,    0,   0 ];
+      //------------------------------------------------------------------------
+      //------------------------------------------------------------------------
+      // dS = [(s1*s2*dq1) - (c1*c2*dq2),  -s2*dq2,   0
+      //                          c1*dq1,        0,   0
+      //      -(s1*c2*dq1) - (c1*s2*dq2),   c2*dq2,   0
+      //           0,    0,   0
+      //           0,    0,   0
+      //           0,    0,   0 ];
+      //------------------------------------------------------------------------
+      dJ0 << (s1 * s2 * dq1) - (c1 * c2 * dq2), c1 * dq1,
+          -(s1 * c2 * dq1) - (c1 * s2 * dq2), 0.0, 0.0, 0.0;
+      dJ1 << -s2 * dq2, 0, c2 * dq2, 0.0, 0.0, 0.0;
       dJ2.setZero();
       break;
     }
@@ -853,6 +1307,25 @@ Eigen::Matrix<s_t, 6, 3> EulerJoint::computeRelativeJacobianTimeDerivStatic(
 
   assert(!math::isNan(dJ));
   return dJ;
+}
+
+//==============================================================================
+Eigen::Matrix<s_t, 6, 3>
+EulerJoint::finiteDifferenceRelativeJacobianTimeDerivStatic(
+    const Eigen::Vector3s& positions,
+    const Eigen::Vector3s& velocities,
+    EulerJoint::AxisOrder axisOrder,
+    Eigen::Isometry3s childBodyToJoint)
+{
+  const s_t EPS = 1e-8;
+  Eigen::Vector3s perturbedPlus = positions + (EPS * velocities);
+  Eigen::Vector3s perturbedMinus = positions - (EPS * velocities);
+
+  Eigen::Matrix<s_t, 6, 3> plus = computeRelativeJacobianStatic(
+      perturbedPlus, axisOrder, childBodyToJoint);
+  Eigen::Matrix<s_t, 6, 3> minus = computeRelativeJacobianStatic(
+      perturbedMinus, axisOrder, childBodyToJoint);
+  return (plus - minus) / (2 * EPS);
 }
 
 //==============================================================================

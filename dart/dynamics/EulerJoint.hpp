@@ -175,27 +175,57 @@ public:
       EulerJoint::AxisOrder axisOrder,
       Eigen::Isometry3s childBodyToJoint);
 
-  static math::Jacobian computeRelativeJacobianDeriv(
+  static Eigen::Matrix<s_t, 6, 3>
+  finiteDifferenceRelativeJacobianTimeDerivStatic(
+      const Eigen::Vector3s& positions,
+      const Eigen::Vector3s& velocities,
+      EulerJoint::AxisOrder axisOrder,
+      Eigen::Isometry3s childBodyToJoint);
+
+  static math::Jacobian computeRelativeJacobianDerivWrtPos(
       std::size_t index,
       const Eigen::Vector3s& positions,
       EulerJoint::AxisOrder axisOrder,
       Eigen::Isometry3s childBodyToJoint);
 
+  static Eigen::Matrix<s_t, 6, 3>
+  finiteDifferenceRelativeJacobianStaticDerivWrtPos(
+      const Eigen::Vector3s& positions,
+      std::size_t index,
+      EulerJoint::AxisOrder axisOrder,
+      Eigen::Isometry3s childBodyToJoint);
+
   math::Jacobian getRelativeJacobianDeriv(std::size_t index) const override;
 
-  static math::Jacobian computeRelativeJacobianTimeDerivDeriv(
+  static math::Jacobian computeRelativeJacobianTimeDerivDerivWrtPos(
       std::size_t index,
       const Eigen::Vector3s& positions,
       const Eigen::Vector3s& velocities,
       EulerJoint::AxisOrder axisOrder,
       Eigen::Isometry3s childBodyToJoint);
 
+  static Eigen::Matrix<s_t, 6, 3>
+  finiteDifferenceRelativeJacobianTimeDerivDerivWrtPos(
+      const Eigen::Vector3s& positions,
+      const Eigen::Vector3s& velocities,
+      std::size_t index,
+      EulerJoint::AxisOrder axisOrder,
+      Eigen::Isometry3s childBodyToJoint);
+
   math::Jacobian getRelativeJacobianTimeDerivDerivWrtPosition(
       std::size_t index) const override;
 
-  static math::Jacobian computeRelativeJacobianTimeDerivDeriv2(
+  static math::Jacobian computeRelativeJacobianTimeDerivDerivWrtVel(
       std::size_t index,
       const Eigen::Vector3s& positions,
+      EulerJoint::AxisOrder axisOrder,
+      Eigen::Isometry3s childBodyToJoint);
+
+  static Eigen::Matrix<s_t, 6, 3>
+  finiteDifferenceRelativeJacobianTimeDerivDerivWrtVel(
+      const Eigen::Vector3s& positions,
+      const Eigen::Vector3s& velocities,
+      std::size_t index,
       EulerJoint::AxisOrder axisOrder,
       Eigen::Isometry3s childBodyToJoint);
 
