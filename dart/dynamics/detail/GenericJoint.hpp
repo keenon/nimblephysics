@@ -2366,7 +2366,7 @@ void GenericJoint<ConfigSpaceT>::addChildBiasForceToDynamic(
       = childBiasForce
         + childArtInertia
               * (childPartialAcc
-                 + getRelativeJacobianStatic() * getInvProjArtInertiaImplicit()
+                 + getRelativeJacobianStatic() * getInvProjArtInertia()
                        * mTotalForce);
 
   //    Eigen::Vector6s beta
@@ -2620,12 +2620,20 @@ void GenericJoint<ConfigSpaceT>::updateAccelerationDynamic(
     const Eigen::Matrix6s& artInertia, const Eigen::Vector6s& spatialAcc)
 {
   //
+  /*
   setAccelerationsStatic(
       getInvProjArtInertiaImplicit()
       * (mTotalForce
          - getRelativeJacobianStatic().transpose() * artInertia
                * math::AdInvT(this->getRelativeTransform(), spatialAcc)));
-
+  */
+  setAccelerationsStatic(
+      getInvProjArtInertia()
+      * (mTotalForce
+         - getRelativeJacobianStatic().transpose() * artInertia
+               * math::AdInvT(this->getRelativeTransform(), spatialAcc)));
+  //std::cout<<"Projection Factor: \n"<<getInvProjArtInertia()<<std::endl;
+  //std::cout<<"TotalForce: \n"<<mTotalForce<<std::endl;
   // Verification
   assert(!math::isNan(getAccelerationsStatic()));
 }

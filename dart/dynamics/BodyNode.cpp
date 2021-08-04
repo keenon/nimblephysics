@@ -1775,7 +1775,7 @@ void BodyNode::updateBiasForce(const Eigen::Vector3s& _gravity, s_t _timeStep)
 
     childJoint->addChildBiasForceTo(
         mBiasForce,
-        childBodyNode->getArticulatedInertiaImplicit(),
+        childBodyNode->getArticulatedInertia(),
         childBodyNode->mBiasForce,
         childBodyNode->getPartialAcceleration());
   }
@@ -1786,7 +1786,7 @@ void BodyNode::updateBiasForce(const Eigen::Vector3s& _gravity, s_t _timeStep)
   // Update parent joint's total force with implicit joint damping and spring
   // forces
   mParentJoint->updateTotalForce(
-      getArticulatedInertiaImplicit() * getPartialAcceleration() + mBiasForce,
+      getArticulatedInertia() * getPartialAcceleration() + mBiasForce,
       _timeStep);
 }
 
@@ -1818,7 +1818,7 @@ void BodyNode::updateBiasImpulse()
 void BodyNode::updateTransmittedForceFD()
 {
   mF = mBiasForce;
-  mF.noalias() += getArticulatedInertiaImplicit() * getSpatialAcceleration();
+  mF.noalias() += getArticulatedInertia() * getSpatialAcceleration();
 
   assert(!math::isNan(mF));
 }
@@ -1838,15 +1838,24 @@ void BodyNode::updateAccelerationFD()
   if (mParentBodyNode)
   {
     // Update joint acceleration
+    /*
     mParentJoint->updateAcceleration(
         getArticulatedInertiaImplicit(),
+        mParentBodyNode->getSpatialAcceleration());
+    */
+    mParentJoint->updateAcceleration(
+        getArticulatedInertia(),
         mParentBodyNode->getSpatialAcceleration());
   }
   else
   {
     // Update joint acceleration
+    /*
     mParentJoint->updateAcceleration(
         getArticulatedInertiaImplicit(), Eigen::Vector6s::Zero());
+    */
+    mParentJoint->updateAcceleration(
+        getArticulatedInertia(), Eigen::Vector6s::Zero());
   }
 
   // Verify the spatial acceleration of this body

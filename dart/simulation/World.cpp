@@ -685,54 +685,14 @@ std::size_t World::getNumSkeletons() const
 
 //==============================================================================
 std::string World::addSkeleton(
-    const dynamics::SkeletonPtr& _skeleton,
-    // By default Nimble clears out springs and damping, because our
-    // Jacobians don't support them. TODO: remove me when springs and damping
-    // support is added
-    bool allowSpringsAndDamping)
+    const dynamics::SkeletonPtr& _skeleton
+    )
 {
   if (nullptr == _skeleton)
   {
     dtwarn << "[World::addSkeleton] Attempting to add a nullptr Skeleton to "
            << "the world!\n";
     return "";
-  }
-
-  // TODO(keenon): Add support for springs and damping coefficients
-  if (!allowSpringsAndDamping)
-  {
-    bool warnedSpringStiffness = false;
-    bool warnedDampingCoefficient = false;
-    for (auto* dof : _skeleton->getDofs())
-    {
-      if (dof->getSpringStiffness() != 0)
-      {
-        if (!warnedSpringStiffness)
-        {
-          warnedSpringStiffness = true;
-          dtwarn << "[World::addSkeleton] Attempting to add a Skeleton \""
-                 << _skeleton->getName() << "\" to "
-                 << "the world with non-zero spring stiffness! This version of "
-                    "Nimble doesn't support spring stiffness. It will be "
-                    "automatically set to zero.\n";
-        }
-      }
-      dof->setSpringStiffness(0);
-      if (dof->getDampingCoefficient() != 0)
-      {
-        if (!warnedDampingCoefficient)
-        {
-          warnedDampingCoefficient = true;
-          dtwarn
-              << "[World::addSkeleton] Attempting to add a Skeleton \""
-              << _skeleton->getName() << "\" to "
-              << "the world with non-zero damping coefficient! This version of "
-                 "Nimble doesn't support damping coefficients. It will be "
-                 "automatically set to zero.\n";
-        }
-      }
-      dof->setDampingCoefficient(0);
-    }
   }
 
   // If mSkeletons already has _skeleton, then we do nothing.

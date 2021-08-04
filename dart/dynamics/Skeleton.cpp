@@ -1971,16 +1971,43 @@ Eigen::MatrixXs Skeleton::getJacobianOfMinv_Direct(
 }
 
 //==============================================================================
+Eigen::MatrixXs Skeleton::getJacobianOfDampSpring(neural::WithRespectTo* wrt)
+{
+  s_t dt = getTimeStep();
+  size_t nDofs = getNumDofs();
+  Eigen::MatrixXs damp_coeff = getDampingCoeffVector().asDiagonal();
+  Eigen::MatrixXs spring_stiff = getSpringStiffVector().asDiagonal();
+  if(wrt==neural::WithRespectTo::VELOCITY)
+  {
+    Eigen::MatrixXs jacobian = damp_coeff + dt*spring_stiff;
+    return jacobian;
+  }
+  else if(wrt==neural::WithRespectTo::POSITION)
+  {
+    Eigen::MatrixXs jacobian = spring_stiff;
+    return jacobian;
+  }
+  else
+  {
+    Eigen::MatrixXs jacobian = Eigen::MatrixXs::Zero(nDofs,nDofs);
+    return jacobian;
+  }
+}
+
+//==============================================================================
 Eigen::MatrixXs Skeleton::getJacobianOfFD(neural::WithRespectTo* wrt)
 {
   const auto& tau = getControlForces();
   const auto& Cg = getCoriolisAndGravityForces();
   const auto& Minv = getInvMassMatrix();
+  const auto& spring_force = getSpringForce();
+  const auto& damping_force = getDampingForce();
 
-  const auto& DMinv_Dp = getJacobianOfMinv(tau - Cg, wrt);
+  const auto& DMinv_Dp = getJacobianOfMinv(tau - Cg - damping_force - spring_force, wrt);
   const auto& DC_Dp = getJacobianOfC(wrt);
+  const auto& D_damp_spring = getJacobianOfDampSpring(wrt);
 
-  return DMinv_Dp - Minv * DC_Dp;
+  return DMinv_Dp - Minv * DC_Dp - Minv*D_damp_spring;
 }
 
 //==============================================================================
@@ -1995,7 +2022,7 @@ Eigen::MatrixXs Skeleton::getUnconstrainedVelJacobianWrt(
 
   if (wrt == neural::WithRespectTo::POSITION)
   {
-    Eigen::MatrixXs dM = getJacobianOfMinv(dt * (tau - C), wrt);
+    Eigen::MatrixXs dM = getJacobianOfMinv(dt * (tau - C - getDampingForce()-getSpringForce()), wrt);
     return dM - Minv * dt * dC;
   }
   else
@@ -3429,7 +3456,8 @@ Skeleton::ContactInverseDynamicsResult Skeleton::getContactInverseDynamics(
   Eigen::VectorXs massTorques = multiplyByImplicitMassMatrix(accel);
 
   Eigen::VectorXs coriolisAndGravity
-      = getCoriolisAndGravityForces() - getExternalForces();
+      = getCoriolisAndGravityForces() - getExternalForces() 
+        + getDampingForce() + getSpringForce();
 
   Eigen::Vector6s rootTorque
       = massTorques.head<6>() + coriolisAndGravity.head<6>();
@@ -3493,8 +3521,7 @@ s_t Skeleton::MultipleContactInverseDynamicsResult::sumError()
   skel->setControlForces(oldControl);
   for (int i = 0; i < contactBodies.size(); i++)
   {
-    const_cast<dynamics::BodyNode*>(contactBodies[i])
-        ->setExtWrench(oldExtForces[i]);
+    const_cast<dynamics::BodyNode*>(contactBodies[i])->setExtWrench(oldExtForces[i]);
   }
 
   return error;
@@ -3566,7 +3593,8 @@ Skeleton::getMultipleContactInverseDynamics(
       (nextVel - getVelocities()) / getTimeStep());
 
   Eigen::VectorXs coriolisAndGravity
-      = getCoriolisAndGravityForces() - getExternalForces();
+      = getCoriolisAndGravityForces() - getExternalForces() 
+        + getDampingForce()+getSpringForce();
 
   Eigen::Vector6s rootTorque
       = massTorques.head<6>() + coriolisAndGravity.head<6>();
@@ -3805,7 +3833,6 @@ Skeleton::getMultipleContactInverseDynamicsOverTime(
       B.block(fDim * (i + 1), fDim * (i + 1), fDim, fDim)
           += smoothingWeight * Eigen::MatrixXs::Identity(fDim, fDim);
     }
-
     if (magnitudeCosts.rows() == bodies.size())
     {
       for (int j = 0; j < bodies.size(); j++)
@@ -3815,11 +3842,12 @@ Skeleton::getMultipleContactInverseDynamicsOverTime(
       }
     }
 
+
     Eigen::VectorXs vel
         = getPositionDifferences(positions.col(i + 1), positions.col(i))
           / getTimeStep();
     Eigen::VectorXs nextVel
-        = getPositionDifferences(positions.col(i + 2), positions.col(i + 1))
+         = getPositionDifferences(positions.col(i + 2), positions.col(i + 1))
           / getTimeStep();
     Eigen::VectorXs accel
         = getVelocityDifferences(nextVel, vel) / getTimeStep();
@@ -3858,7 +3886,7 @@ Skeleton::getMultipleContactInverseDynamicsOverTime(
 
     Eigen::VectorXs jointTorques
         = (multiplyByImplicitMassMatrix(accel) + getCoriolisAndGravityForces()
-           - getExternalForces());
+           - getExternalForces() + getDampingForce() + getSpringForce());
     timestepJointTorques.push_back(jointTorques);
     c.segment<6>(6 * i) = jointTorques.head<6>();
   }
@@ -4703,7 +4731,62 @@ const Eigen::VectorXs& Skeleton::getExternalForces() const
 
   return mSkelCache.mFext;
 }
+//==============================================================================
+Eigen::VectorXs Skeleton::getDampingCoeffVector()
+{
+  std::vector<dynamics::DegreeOfFreedom*> dofs = getDofs();
+  size_t nDofs = getNumDofs();
+  Eigen::VectorXs damp_coeffs = Eigen::VectorXs::Zero(nDofs);
+  for(int i=0;i<nDofs;i++)
+  {
+    damp_coeffs(i) = dofs[i]->getDampingCoefficient();
+  }
+  return damp_coeffs;
+}
 
+Eigen::VectorXs Skeleton::getDampingForce()
+{
+  Eigen::VectorXs velocities = getVelocities();
+  Eigen::VectorXs damp_coeffs = getDampingCoeffVector();
+  Eigen::VectorXs damp_force = damp_coeffs.asDiagonal()*velocities;
+  return damp_force;
+}
+
+//==============================================================================
+Eigen::VectorXs Skeleton::getSpringStiffVector()
+{
+  std::vector<dynamics::DegreeOfFreedom*> dofs = getDofs();
+  size_t nDofs = getNumDofs();
+  Eigen::VectorXs spring_stiffs = Eigen::VectorXs::Zero(nDofs);
+  for(int i=0;i<nDofs;i++)
+  {
+    spring_stiffs(i) = dofs[i]->getSpringStiffness();
+  }
+  return spring_stiffs;
+}
+
+Eigen::VectorXs Skeleton::getRestPositions()
+{
+  std::vector<dynamics::DegreeOfFreedom*> dofs = getDofs();
+  size_t nDofs = getNumDofs();
+  Eigen::VectorXs rest_pose = Eigen::VectorXs::Zero(nDofs);
+  for (int i=0;i<nDofs;i++)
+  {
+    rest_pose(i) = dofs[i]->getRestPosition(); 
+  }
+  return rest_pose;
+}
+
+Eigen::VectorXs Skeleton::getSpringForce()
+{
+  Eigen::VectorXs spring_stiffs = getSpringStiffVector();
+  Eigen::VectorXs rest_pose = getRestPositions();
+  Eigen::VectorXs velocities = getVelocities();
+  Eigen::VectorXs pose = getPositions();
+  s_t dt = getTimeStep();
+  Eigen::VectorXs spring_force = spring_stiffs.asDiagonal()*(pose-rest_pose+dt*velocities);
+  return spring_force;
+}
 //==============================================================================
 const Eigen::VectorXs& Skeleton::getConstraintForces(std::size_t _treeIdx) const
 {

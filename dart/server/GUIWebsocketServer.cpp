@@ -290,7 +290,6 @@ void GUIWebsocketServer::serve(int port)
   /*
   // The signal set is used to register termination notifications
   mSignalSet = new asio::signal_set(mServerEventLoop, SIGINT, SIGTERM);
-
   // register the handle_stop callback
   mSignalSet->async_wait([&](asio::error_code const& error, int signal_number) {
     if (error == asio::error::operation_aborted)

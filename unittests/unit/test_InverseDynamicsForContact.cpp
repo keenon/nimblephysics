@@ -266,12 +266,10 @@ TEST(INV_DYN_FOR_CONTACT, TEST_MULTI_CONTACT_MULTI_TIMESTEP_PREV_FORCE)
           [](s_t) { return 0.0; },
           prevTimestepWrenches,
           100.0);
-
   std::cout << "Prev force loss @ 1: " << resultOverTime.computePrevForceLoss()
             << std::endl;
   std::cout << "Prev force loss @ 10: "
             << resultOverTimeMoreSmoothing.computePrevForceLoss() << std::endl;
-
   EXPECT_LE(
       resultOverTimeMoreSmoothing.computePrevForceLoss(),
       resultOverTime.computePrevForceLoss());

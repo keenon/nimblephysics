@@ -678,6 +678,10 @@ public:
   /// @warning SLOW: Only for testing
   Eigen::MatrixXs getJacobianOfFD(neural::WithRespectTo* wrt);
 
+  /// This gives the jacobian of damping and spring forces
+  /// @warning SLOW: Only for testing
+  Eigen::MatrixXs getJacobianOfDampSpring(neural::WithRespectTo* wrt);
+
   /// VERY SLOW: Only for testing. This computes the unconstrained Jacobian
   /// giving the difference in M(pos) for finite changes
   Eigen::MatrixXs finiteDifferenceJacobianOfM(
@@ -1312,9 +1316,21 @@ public:
 
   // Documentation inherited
   const Eigen::VectorXs& getExternalForces() const override;
+  
+  // Get damping coefficients
+  Eigen::VectorXs getDampingCoeffVector();
+  
+  // Get damping force of the skeleton.
+  Eigen::VectorXs getDampingForce();
 
-  /// Get damping force of the skeleton.
-  //  const Eigen::VectorXs& getDampingForceVector();
+  //Get spring coefficients
+  Eigen::VectorXs getSpringStiffVector();
+
+  //Get rest positions
+  Eigen::VectorXs getRestPositions();
+
+  //Get Spring Forces
+  Eigen::VectorXs getSpringForce(); 
 
   /// Get constraint force vector for a tree
   const Eigen::VectorXs& getConstraintForces(std::size_t _treeIdx) const;

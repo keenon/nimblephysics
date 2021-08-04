@@ -673,18 +673,25 @@ const Eigen::MatrixXs& BackpropSnapshot::getVelVelJacobian(
     }
     else
     {
+      Eigen::VectorXs ddamp = getDampingVector(world);
+      Eigen::VectorXs spring_stiffs = getSpringStiffVector(world);
+      Eigen::MatrixXs Minv = getInvMassMatrix(world);
+      s_t dt = world->getTimeStep();
       Eigen::MatrixXs A_c = getClampingConstraintMatrix(world);
 
       // If there are no clamping constraints, then vel-vel is just the identity
       if (A_c.size() == 0)
       {
         mCachedVelVel
-            = Eigen::MatrixXs::Identity(mNumDOFs, mNumDOFs)
-              - getControlForceVelJacobian(world) * getVelCJacobian(world);
+            = Eigen::MatrixXs::Identity(mNumDOFs, mNumDOFs) 
+            - dt*Minv*ddamp.asDiagonal() - dt*dt*Minv*spring_stiffs.asDiagonal()
+              - dt*Minv* getVelCJacobian(world);
       }
       else
       {
-        mCachedVelVel = getVelJacobianWrt(world, WithRespectTo::VELOCITY);
+        mCachedVelVel = getVelJacobianWrt(world, WithRespectTo::VELOCITY) 
+        - dt*Minv*ddamp.asDiagonal() - dt*dt*Minv*spring_stiffs.asDiagonal();
+        
 
         /*
         Eigen::MatrixXs A_ub = getUpperBoundConstraintMatrix(world);
@@ -1100,9 +1107,15 @@ Eigen::MatrixXs BackpropSnapshot::getVelJacobianWrt(
   Eigen::VectorXs C = world->getCoriolisAndGravityAndExternalForces();
   Eigen::VectorXs f_c = getClampingConstraintImpulses();
   s_t dt = world->getTimeStep();
-
+  Eigen::VectorXs ddamp = getDampingVector(world);
+  Eigen::VectorXs spring_stiffs = getSpringStiffVector(world);
+  Eigen::VectorXs p_rest = getRestPositions(world);
+  Eigen::VectorXs v_t = world->getVelocities();
+  Eigen::VectorXs p_t = world->getPositions();
+  Eigen::VectorXs spring_force = spring_stiffs.asDiagonal()*(p_t-p_rest+dt*v_t);
+  Eigen::VectorXs damping_force = ddamp.asDiagonal()*v_t;
   Eigen::MatrixXs dM
-      = getJacobianOfMinv(world, dt * (tau - C) + A_c_ub_E * f_c, wrt);
+      = getJacobianOfMinv(world, dt * (tau - C - damping_force - spring_force) + A_c_ub_E * f_c, wrt);
 
   Eigen::MatrixXs Minv = world->getInvMassMatrix();
 
@@ -1145,7 +1158,7 @@ Eigen::MatrixXs BackpropSnapshot::getVelJacobianWrt(
     Eigen::MatrixXs dA_c = getJacobianOfClampingConstraints(world, f_c);
     Eigen::MatrixXs dA_ubE = getJacobianOfUpperBoundConstraints(world, E * f_c);
     // snapshot.restore();
-    return dM + Minv * (A_c_ub_E * dF_c + dA_c + dA_ubE - dt * dC);
+    return dM + Minv * (A_c_ub_E * dF_c + dA_c + dA_ubE - dt * dC) - Minv*dt*spring_stiffs.asDiagonal();
   }
   else
   {
@@ -1625,6 +1638,44 @@ Eigen::MatrixXs BackpropSnapshot::getInvMassMatrix(
       forFiniteDifferencing);
 }
 
+Eigen::VectorXs BackpropSnapshot::getDampingVector(
+  WorldPtr world
+)
+{
+  Eigen::VectorXs result = Eigen::VectorXs::Zero(mNumDOFs);
+  std::vector<dynamics::DegreeOfFreedom*> dofs = world->getDofs();
+  for (int i=0;i<mNumDOFs;i++)
+  {
+    result(i) = dofs[i]->getDampingCoefficient();
+  }
+  return result;
+}
+
+Eigen::VectorXs BackpropSnapshot::getSpringStiffVector(
+  WorldPtr world
+)
+{
+  Eigen::VectorXs result = Eigen::VectorXs::Zero(mNumDOFs);
+  std::vector<dynamics::DegreeOfFreedom*> dofs = world->getDofs();
+  for (int i=0;i<mNumDOFs;i++)
+  {
+    result(i) = dofs[i]->getSpringStiffness();
+  }
+  return result;
+}
+
+Eigen::VectorXs BackpropSnapshot::getRestPositions(
+  WorldPtr world
+)
+{
+  Eigen::VectorXs result = Eigen::VectorXs::Zero(mNumDOFs);
+  std::vector<dynamics::DegreeOfFreedom*> dofs = world->getDofs();
+  for (int i=0;i<mNumDOFs;i++)
+  {
+    result(i) = dofs[i]->getRestPosition();
+  }
+  return result;
+}
 //==============================================================================
 Eigen::MatrixXs BackpropSnapshot::getClampingAMatrix()
 {
@@ -4857,13 +4908,16 @@ Eigen::MatrixXs BackpropSnapshot::getJacobianOfLCPOffsetClampingSubset(
   Eigen::MatrixXs Minv = getInvMassMatrix(world);
   Eigen::MatrixXs A_c = getClampingConstraintMatrix(world);
   Eigen::MatrixXs dC = getJacobianOfC(world, wrt);
+  Eigen::MatrixXs ddamp = getDampingVector(world).asDiagonal();
+  Eigen::MatrixXs spring_stiffs = getSpringStiffVector(world).asDiagonal();
+  Eigen::VectorXs p_rest = getRestPositions(world);
   if (wrt == WithRespectTo::VELOCITY)
   {
     // snapshot.restore();
     return getBounceDiagonals().asDiagonal() * -A_c.transpose()
            * (Eigen::MatrixXs::Identity(
                   world->getNumDofs(), world->getNumDofs())
-              - dt * Minv * dC);
+              - dt * Minv * (dC+ddamp+dt*spring_stiffs));
   }
   else if (wrt == WithRespectTo::FORCE)
   {
@@ -4873,9 +4927,13 @@ Eigen::MatrixXs BackpropSnapshot::getJacobianOfLCPOffsetClampingSubset(
 
   Eigen::VectorXs C = world->getCoriolisAndGravityAndExternalForces();
   Eigen::VectorXs f = getPreStepTorques() - C;
-  Eigen::MatrixXs dMinv_f = getJacobianOfMinv(world, f, wrt);
   Eigen::VectorXs v_f = getPreConstraintVelocity();
-
+  Eigen::VectorXs v_t = world->getVelocities();
+  Eigen::VectorXs p_t = world->getPositions();
+  Eigen::VectorXs spring_force = spring_stiffs*(p_t - p_rest+dt*v_t);
+  Eigen::VectorXs damping_force = ddamp*v_t;
+  f = f - damping_force - spring_force;
+  Eigen::MatrixXs dMinv_f = getJacobianOfMinv(world, f, wrt);
   if (wrt == WithRespectTo::POSITION)
   {
     Eigen::MatrixXs dA_c_f
@@ -4883,7 +4941,7 @@ Eigen::MatrixXs BackpropSnapshot::getJacobianOfLCPOffsetClampingSubset(
 
     // snapshot.restore();
     return getBounceDiagonals().asDiagonal()
-           * -(dA_c_f + A_c.transpose() * dt * (dMinv_f - Minv * dC));
+           * -(dA_c_f + A_c.transpose() * dt * (dMinv_f - Minv * dC - Minv*spring_stiffs));
   }
   else
   {
@@ -5314,14 +5372,23 @@ void BackpropSnapshot::computeLCPOffsetClampingSubset(
   b = -A_c.transpose()
       * (getPreConstraintVelocity() + getVelocityDueToIllegalImpulses());
   */
+  s_t dt = world->getTimeStep();
+  Eigen::MatrixXs damp = getDampingVector(world).asDiagonal();
+  Eigen::MatrixXs spring_stiffs = getSpringStiffVector(world).asDiagonal();
+  Eigen::VectorXs p_t = world->getPositions();
+  Eigen::VectorXs v_t = world->getVelocities();
+  Eigen::VectorXs p_rest = getRestPositions(world);
+  Eigen::VectorXs damping_force = damp*world->getVelocities();
+  Eigen::VectorXs spring_force = spring_stiffs*(p_t-p_rest+dt*v_t);
   b = -getBounceDiagonals().cwiseProduct(
       A_c.transpose()
-      * (world->getVelocities()
-         + (world->getTimeStep()
+      * (v_t
+         + (dt
             * implicitMultiplyByInvMassMatrix(
                 world,
                 world->getControlForces()
-                    - world->getCoriolisAndGravityAndExternalForces()))));
+                    - world->getCoriolisAndGravityAndExternalForces()
+                    - damping_force - spring_force))));
 }
 
 //==============================================================================

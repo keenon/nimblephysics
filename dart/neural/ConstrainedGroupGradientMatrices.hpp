@@ -176,6 +176,20 @@ public:
   /// concatenation of the skeleton inverse mass matrices.
   Eigen::MatrixXs getInvMassMatrix(simulation::WorldPtr world);
 
+  /// This result the diagonal matrix where damping of each joint has been considered
+  Eigen::VectorXs getDampingVector(simulation::WorldPtr world);
+
+  /// This result the diagonal matrix(vector) where spring stiffness of each joint has been considered
+  Eigen::VectorXs getSpringStiffVector(simulation::WorldPtr world);
+
+  /// This result the diagonal matrix(vector) where rest position of spring lives
+  Eigen::VectorXs getRestPositions(simulation::WorldPtr world);
+
+  /// This result is the current velocity of dofs involved in current group
+  Eigen::VectorXs getVelocities(simulation::WorldPtr world);
+
+  /// This result is the current position of dofs involved in current group
+  Eigen::VectorXs getPositions(simulation::WorldPtr world);
   /// This returns the block diagonal matrix where each skeleton's joints
   /// integration scheme is reflected.
   Eigen::MatrixXs getJointsPosPosJacobian(simulation::WorldPtr world);
@@ -524,6 +538,9 @@ public:
 
   /// These are the pre-step velocities, computed in the constuctor
   Eigen::VectorXs mPreStepVelocities;
+
+  /// These are the pre-step positions, computed in the constructor
+  Eigen::VectorXs mPreStepPositions;
 
   /// These are the pre-LCP velocities, computed in the constuctor
   Eigen::VectorXs mPreLCPVelocities;
