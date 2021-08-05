@@ -62,6 +62,168 @@ TEST(Geometry, EULER_XYZ_SECOND_GRAD)
 }
 
 //==============================================================================
+TEST(Geometry, EULER_XZY_GRAD)
+{
+  for (int i = 0; i < 10; i++)
+  {
+    Eigen::Vector3s rand = Eigen::Vector3s::Random();
+
+    for (int j = 0; j < 3; j++)
+    {
+      Eigen::MatrixXs grad = math::eulerXZYToMatrixGrad(rand, j);
+      Eigen::MatrixXs fd = math::eulerXZYToMatrixFiniteDifference(rand, j);
+      if (!equals(grad, fd, 1e-7))
+      {
+        std::cout << "Euler XZY Grad[" << j << "]: " << std::endl
+                  << grad << std::endl;
+        std::cout << "Euler XZY FD[" << j << "]: " << std::endl
+                  << fd << std::endl;
+        std::cout << "Diff: " << std::endl << grad - fd << std::endl;
+        EXPECT_TRUE(equals(grad, fd, 1e-7));
+        return;
+      }
+    }
+  }
+}
+
+//==============================================================================
+TEST(Geometry, EULER_XZY_SECOND_GRAD)
+{
+  for (int i = 0; i < 10; i++)
+  {
+    Eigen::Vector3s rand = Eigen::Vector3s::Random();
+
+    for (int j = 0; j < 3; j++)
+    {
+      for (int k = 0; k < 3; k++)
+      {
+        Eigen::MatrixXs grad = math::eulerXZYToMatrixSecondGrad(rand, j, k);
+        Eigen::MatrixXs fd
+            = math::eulerXZYToMatrixSecondFiniteDifference(rand, j, k);
+        if (!equals(grad, fd, 1e-7))
+        {
+          std::cout << "Euler XZY Grad[" << j << "," << k << "]: " << std::endl
+                    << grad << std::endl;
+          std::cout << "Euler XZY FD[" << j << "," << k << "]: " << std::endl
+                    << fd << std::endl;
+          std::cout << "Diff: " << std::endl << grad - fd << std::endl;
+          EXPECT_TRUE(equals(grad, fd, 1e-7));
+          return;
+        }
+      }
+    }
+  }
+}
+
+//==============================================================================
+TEST(Geometry, EULER_ZYX_GRAD)
+{
+  for (int i = 0; i < 10; i++)
+  {
+    Eigen::Vector3s rand = Eigen::Vector3s::Random();
+
+    for (int j = 0; j < 3; j++)
+    {
+      Eigen::MatrixXs grad = math::eulerZYXToMatrixGrad(rand, j);
+      Eigen::MatrixXs fd = math::eulerZYXToMatrixFiniteDifference(rand, j);
+      if (!equals(grad, fd, 1e-7))
+      {
+        std::cout << "Euler ZYX Grad[" << j << "]: " << std::endl
+                  << grad << std::endl;
+        std::cout << "Euler ZYX FD[" << j << "]: " << std::endl
+                  << fd << std::endl;
+        std::cout << "Diff: " << std::endl << grad - fd << std::endl;
+        EXPECT_TRUE(equals(grad, fd, 1e-7));
+        return;
+      }
+    }
+  }
+}
+
+//==============================================================================
+TEST(Geometry, EULER_ZYX_SECOND_GRAD)
+{
+  for (int i = 0; i < 10; i++)
+  {
+    Eigen::Vector3s rand = Eigen::Vector3s::Random();
+
+    for (int j = 0; j < 3; j++)
+    {
+      for (int k = 0; k < 3; k++)
+      {
+        Eigen::MatrixXs grad = math::eulerZYXToMatrixSecondGrad(rand, j, k);
+        Eigen::MatrixXs fd
+            = math::eulerZYXToMatrixSecondFiniteDifference(rand, j, k);
+        if (!equals(grad, fd, 1e-7))
+        {
+          std::cout << "Euler ZYX Grad[" << j << "," << k << "]: " << std::endl
+                    << grad << std::endl;
+          std::cout << "Euler ZYX FD[" << j << "," << k << "]: " << std::endl
+                    << fd << std::endl;
+          std::cout << "Diff: " << std::endl << grad - fd << std::endl;
+          EXPECT_TRUE(equals(grad, fd, 1e-7));
+          return;
+        }
+      }
+    }
+  }
+}
+
+//==============================================================================
+TEST(Geometry, EULER_ZXY_GRAD)
+{
+  for (int i = 0; i < 10; i++)
+  {
+    Eigen::Vector3s rand = Eigen::Vector3s::Random();
+
+    for (int j = 0; j < 3; j++)
+    {
+      Eigen::MatrixXs grad = math::eulerZXYToMatrixGrad(rand, j);
+      Eigen::MatrixXs fd = math::eulerZXYToMatrixFiniteDifference(rand, j);
+      if (!equals(grad, fd, 1e-7))
+      {
+        std::cout << "Euler ZXY Grad[" << j << "]: " << std::endl
+                  << grad << std::endl;
+        std::cout << "Euler ZXY FD[" << j << "]: " << std::endl
+                  << fd << std::endl;
+        std::cout << "Diff: " << std::endl << grad - fd << std::endl;
+        EXPECT_TRUE(equals(grad, fd, 1e-7));
+        return;
+      }
+    }
+  }
+}
+
+//==============================================================================
+TEST(Geometry, EULER_ZXY_SECOND_GRAD)
+{
+  for (int i = 0; i < 10; i++)
+  {
+    Eigen::Vector3s rand = Eigen::Vector3s::Random();
+
+    for (int j = 0; j < 3; j++)
+    {
+      for (int k = 0; k < 3; k++)
+      {
+        Eigen::MatrixXs grad = math::eulerZXYToMatrixSecondGrad(rand, j, k);
+        Eigen::MatrixXs fd
+            = math::eulerZXYToMatrixSecondFiniteDifference(rand, j, k);
+        if (!equals(grad, fd, 1e-7))
+        {
+          std::cout << "Euler ZXY Grad[" << j << "," << k << "]: " << std::endl
+                    << grad << std::endl;
+          std::cout << "Euler ZXY FD[" << j << "," << k << "]: " << std::endl
+                    << fd << std::endl;
+          std::cout << "Diff: " << std::endl << grad - fd << std::endl;
+          EXPECT_TRUE(equals(grad, fd, 1e-7));
+          return;
+        }
+      }
+    }
+  }
+}
+
+//==============================================================================
 TEST(EulerFreeJoint, Construct)
 {
   // Create single-body skeleton with a screw joint

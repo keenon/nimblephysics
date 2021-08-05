@@ -106,6 +106,25 @@ Eigen::Matrix3s eulerXZXToMatrix(const Eigen::Vector3s& _angle);
 /// equivalent to RotX(angle(0)) * RotZ(angle(1)) * RotY(angle(2)).
 Eigen::Matrix3s eulerXZYToMatrix(const Eigen::Vector3s& _angle);
 
+/// This gives the gradient of an XZY rotation matrix with respect to the
+/// specific index (0, 1, or 2)
+Eigen::Matrix3s eulerXZYToMatrixGrad(const Eigen::Vector3s& _angle, int index);
+
+/// This gives the gradient of an XZY rotation matrix with respect to the
+/// specific index (0, 1, or 2)
+Eigen::Matrix3s eulerXZYToMatrixFiniteDifference(
+    const Eigen::Vector3s& _angle, int index);
+
+/// This gives the gradient of eulerXZYToMatrixGrad(_angle, firstIndex) with
+/// respect to secondIndex.
+Eigen::Matrix3s eulerXZYToMatrixSecondGrad(
+    const Eigen::Vector3s& _angle, int firstIndex, int secondIndex);
+
+/// This gives the gradient of eulerXZYToMatrixGrad(_angle, firstIndex) with
+/// respect to secondIndex.
+Eigen::Matrix3s eulerXZYToMatrixSecondFiniteDifference(
+    const Eigen::Vector3s& _angle, int firstIndex, int secondIndex);
+
 /// \brief Given EulerYXY angles, return a 3x3 rotation matrix, which is
 /// equivalent to RotY(angle(0)) * RotX(angle(1)) * RotY(angle(2)).
 Eigen::Matrix3s eulerYXYToMatrix(const Eigen::Vector3s& _angle);
@@ -126,10 +145,48 @@ Eigen::Matrix3s eulerYZYToMatrix(const Eigen::Vector3s& _angle);
 /// equivalent to RotZ(angle(0)) * RotX(angle(1)) * RotY(angle(2)).
 Eigen::Matrix3s eulerZXYToMatrix(const Eigen::Vector3s& _angle);
 
+/// This gives the gradient of an ZXY rotation matrix with respect to the
+/// specific index (0, 1, or 2)
+Eigen::Matrix3s eulerZXYToMatrixGrad(const Eigen::Vector3s& _angle, int index);
+
+/// This gives the gradient of an ZXY rotation matrix with respect to the
+/// specific index (0, 1, or 2)
+Eigen::Matrix3s eulerZXYToMatrixFiniteDifference(
+    const Eigen::Vector3s& _angle, int index);
+
+/// This gives the gradient of eulerXZYToMatrixGrad(_angle, firstIndex) with
+/// respect to secondIndex.
+Eigen::Matrix3s eulerZXYToMatrixSecondGrad(
+    const Eigen::Vector3s& _angle, int firstIndex, int secondIndex);
+
+/// This gives the gradient of eulerXZYToMatrixGrad(_angle, firstIndex) with
+/// respect to secondIndex.
+Eigen::Matrix3s eulerZXYToMatrixSecondFiniteDifference(
+    const Eigen::Vector3s& _angle, int firstIndex, int secondIndex);
+
 /// \brief Given EulerZYX angles, return a 3x3 rotation matrix, which is
 /// equivalent to RotZ(angle(0)) * RotY(angle(1)) * RotX(angle(2)).
 /// singularity : angle[1] = -+ 0.5*PI
 Eigen::Matrix3s eulerZYXToMatrix(const Eigen::Vector3s& _angle);
+
+/// This gives the gradient of an XYZ rotation matrix with respect to the
+/// specific index (0, 1, or 2)
+Eigen::Matrix3s eulerZYXToMatrixGrad(const Eigen::Vector3s& _angle, int index);
+
+/// This gives the gradient of an XYZ rotation matrix with respect to the
+/// specific index (0, 1, or 2)
+Eigen::Matrix3s eulerZYXToMatrixFiniteDifference(
+    const Eigen::Vector3s& _angle, int index);
+
+/// This gives the gradient of eulerXZYToMatrixGrad(_angle, firstIndex) with
+/// respect to secondIndex.
+Eigen::Matrix3s eulerZYXToMatrixSecondGrad(
+    const Eigen::Vector3s& _angle, int firstIndex, int secondIndex);
+
+/// This gives the gradient of eulerXZYToMatrixGrad(_angle, firstIndex) with
+/// respect to secondIndex.
+Eigen::Matrix3s eulerZYXToMatrixSecondFiniteDifference(
+    const Eigen::Vector3s& _angle, int firstIndex, int secondIndex);
 
 /// \brief Given EulerZXZ angles, return a 3x3 rotation matrix, which is
 /// equivalent to RotZ(angle(0)) * RotX(angle(1)) * RotZ(angle(2)).
