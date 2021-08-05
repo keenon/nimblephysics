@@ -510,7 +510,7 @@ dynamics::SkeletonPtr OpenSimParser::readOsim40(
             dynamics::EulerJoint::AxisOrder transOrder
                 = getAxisOrder(transformAxisOrder);
             (void)transOrder;
-            assert(transOrder = dynamics::EulerJoint::AxisOrder::XYZ);
+            assert(transOrder == dynamics::EulerJoint::AxisOrder::XYZ);
 
             Eigen::Vector3s flips = getAxisFlips(eulerAxisOrder);
 
