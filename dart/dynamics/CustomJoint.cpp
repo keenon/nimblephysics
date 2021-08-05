@@ -285,6 +285,12 @@ void CustomJoint::setFlipAxisMap(Eigen::Vector3s map)
 }
 
 //==============================================================================
+Eigen::Vector3s CustomJoint::getFlipAxisMap()
+{
+  return mFlipAxisMap;
+}
+
+//==============================================================================
 dart::dynamics::Joint* CustomJoint::clone() const
 {
   CustomJoint* joint = new CustomJoint(this->getJointProperties());
@@ -326,6 +332,7 @@ Eigen::Matrix6s CustomJoint::getSpatialJacobianStaticDerivWrtInput(
              positions,
              i,
              mAxisOrder,
+             mFlipAxisMap,
              Joint::mAspectProperties.mT_ChildBodyToJoint)
          * grad(i);
   }
@@ -341,10 +348,12 @@ Eigen::Matrix6s CustomJoint::finiteDifferenceSpatialJacobianStaticDerivWrtInput(
   Eigen::Matrix6s plus = EulerFreeJoint::computeRelativeJacobianStatic(
       getCustomFunctionPositions(pos + EPS),
       mAxisOrder,
+      mFlipAxisMap,
       Joint::mAspectProperties.mT_ChildBodyToJoint);
   Eigen::Matrix6s minus = EulerFreeJoint::computeRelativeJacobianStatic(
       getCustomFunctionPositions(pos - EPS),
       mAxisOrder,
+      mFlipAxisMap,
       Joint::mAspectProperties.mT_ChildBodyToJoint);
 
   return (plus - minus) / (2 * EPS);
@@ -364,6 +373,7 @@ math::Jacobian CustomJoint::getRelativeJacobianDeriv(std::size_t index) const
          + EulerFreeJoint::computeRelativeJacobianStatic(
                getCustomFunctionPositions(pos),
                mAxisOrder,
+              mFlipAxisMap,
                Joint::mAspectProperties.mT_ChildBodyToJoint)
                * secondGrad;
 }
@@ -400,6 +410,7 @@ Eigen::Vector6s CustomJoint::getRelativeJacobianStatic(
   return EulerFreeJoint::computeRelativeJacobianStatic(
              getCustomFunctionPositions(pos),
              mAxisOrder,
+             mFlipAxisMap,
              Joint::mAspectProperties.mT_ChildBodyToJoint)
          * getCustomFunctionGradientAt(pos);
 }
@@ -422,11 +433,13 @@ void CustomJoint::updateRelativeJacobianTimeDeriv() const
                        positions,
                        velocities,
                        mAxisOrder,
+                       mFlipAxisMap,
                        Joint::mAspectProperties.mT_ChildBodyToJoint)
                        * velocities
                    + EulerFreeJoint::computeRelativeJacobianStatic(
                          positions,
                          mAxisOrder,
+                         mFlipAxisMap,
                          Joint::mAspectProperties.mT_ChildBodyToJoint)
                          * getCustomFunctionAccelerations(pos, vel, 0.0);
 }
@@ -448,12 +461,14 @@ Eigen::Matrix6s CustomJoint::getSpatialJacobianTimeDerivDerivWrtInputPos(
              velocities,
              i,
              mAxisOrder,
+             mFlipAxisMap,
              Joint::mAspectProperties.mT_ChildBodyToJoint)
          * posGrad(i);
     J += EulerFreeJoint::computeRelativeJacobianTimeDerivDerivWrtVel(
              positions,
              i,
              mAxisOrder,
+             mFlipAxisMap,
              Joint::mAspectProperties.mT_ChildBodyToJoint)
          * velGrad(i);
   }
@@ -472,12 +487,14 @@ CustomJoint::finiteDifferenceSpatialJacobianTimeDerivDerivWrtInputPos(
       getCustomFunctionPositions(pos + EPS),
       getCustomFunctionVelocities(pos + EPS, vel),
       mAxisOrder,
+      mFlipAxisMap,
       Joint::mAspectProperties.mT_ChildBodyToJoint);
   Eigen::Matrix6s minus
       = EulerFreeJoint::computeRelativeJacobianTimeDerivStatic(
           getCustomFunctionPositions(pos - EPS),
           getCustomFunctionVelocities(pos - EPS, vel),
           mAxisOrder,
+          mFlipAxisMap,
           Joint::mAspectProperties.mT_ChildBodyToJoint);
 
   return (plus - minus) / (2 * EPS);
@@ -496,6 +513,7 @@ Eigen::Matrix6s CustomJoint::getSpatialJacobianTimeDerivDerivWrtInputVel(
              positions,
              i,
              mAxisOrder,
+             mFlipAxisMap,
              Joint::mAspectProperties.mT_ChildBodyToJoint)
          * grad(i);
   }
@@ -514,12 +532,14 @@ CustomJoint::finiteDifferenceSpatialJacobianTimeDerivDerivWrtInputVel(
       getCustomFunctionPositions(pos),
       getCustomFunctionVelocities(pos, vel + EPS),
       mAxisOrder,
+      mFlipAxisMap,
       Joint::mAspectProperties.mT_ChildBodyToJoint);
   Eigen::Matrix6s minus
       = EulerFreeJoint::computeRelativeJacobianTimeDerivStatic(
           getCustomFunctionPositions(pos),
           getCustomFunctionVelocities(pos, vel - EPS),
           mAxisOrder,
+          mFlipAxisMap,
           Joint::mAspectProperties.mT_ChildBodyToJoint);
 
   return (plus - minus) / (2 * EPS);
@@ -563,12 +583,13 @@ math::Jacobian CustomJoint::getRelativeJacobianTimeDerivDerivWrtPosition(
             positions,
             velocities,
             mAxisOrder,
+            mFlipAxisMap,
             Joint::mAspectProperties.mT_ChildBodyToJoint)
             * getCustomFunctionVelocitiesDerivativeWrtPos(pos, vel)
       + getSpatialJacobianStaticDerivWrtInput(pos)
             * getCustomFunctionAccelerations(pos, vel, 0.0)
       + EulerFreeJoint::computeRelativeJacobianStatic(
-            positions, mAxisOrder, Joint::mAspectProperties.mT_ChildBodyToJoint)
+            positions, mAxisOrder, mFlipAxisMap, Joint::mAspectProperties.mT_ChildBodyToJoint)
             * getCustomFunctionAccelerationsDerivativeWrtPos(pos, vel, 0.0);
   return J;
 }
@@ -584,6 +605,7 @@ Eigen::Vector6s CustomJoint::scratch()
              positions,
              velocities,
              mAxisOrder,
+             mFlipAxisMap,
              Joint::mAspectProperties.mT_ChildBodyToJoint)
          * velocities;
 }
@@ -621,6 +643,7 @@ Eigen::Vector6s CustomJoint::scratchAnalytical()
                positions,
                velocities,
                mAxisOrder,
+               mFlipAxisMap,
                Joint::mAspectProperties.mT_ChildBodyToJoint)
                * getCustomFunctionVelocitiesDerivativeWrtPos(pos, vel);
 }
@@ -688,10 +711,11 @@ math::Jacobian CustomJoint::getRelativeJacobianTimeDerivDerivWrtVelocity(
             positions,
             velocities,
             mAxisOrder,
+            mFlipAxisMap,
             Joint::mAspectProperties.mT_ChildBodyToJoint)
             * getCustomFunctionGradientAt(pos)
       + EulerFreeJoint::computeRelativeJacobianStatic(
-            positions, mAxisOrder, Joint::mAspectProperties.mT_ChildBodyToJoint)
+            positions, mAxisOrder, mFlipAxisMap, Joint::mAspectProperties.mT_ChildBodyToJoint)
             * getCustomFunctionAccelerationsDerivativeWrtVel(pos);
   return J;
 }

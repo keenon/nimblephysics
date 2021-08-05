@@ -72,6 +72,8 @@ public:
   /// any
   void setFlipAxisMap(Eigen::Vector3s map);
 
+  Eigen::Vector3s getFlipAxisMap() const;
+
   /// Return the axis order
   EulerJoint::AxisOrder getAxisOrder() const;
 
@@ -106,58 +108,67 @@ public:
   static Eigen::Matrix6s computeRelativeJacobianStatic(
       const Eigen::Vector6s& positions,
       EulerJoint::AxisOrder axisOrder,
-      Eigen::Isometry3s childBodyToJoint);
+      const Eigen::Vector3s& flipAxisMap,
+      const Eigen::Isometry3s& childBodyToJoint);
 
   static Eigen::Matrix6s computeRelativeJacobianStaticDerivWrtPos(
       const Eigen::Vector6s& positions,
       std::size_t index,
       EulerJoint::AxisOrder axisOrder,
-      Eigen::Isometry3s childBodyToJoint);
+      const Eigen::Vector3s& flipAxisMap,
+      const Eigen::Isometry3s& childBodyToJoint);
 
   static Eigen::Matrix6s finiteDifferenceRelativeJacobianStaticDerivWrtPos(
       const Eigen::Vector6s& positions,
       std::size_t index,
       EulerJoint::AxisOrder axisOrder,
-      Eigen::Isometry3s childBodyToJoint);
+      const Eigen::Vector3s& flipAxisMap,
+      const Eigen::Isometry3s& childBodyToJoint);
 
   static Eigen::Matrix6s computeRelativeJacobianTimeDerivStatic(
       const Eigen::Vector6s& positions,
       const Eigen::Vector6s& velocities,
       EulerJoint::AxisOrder axisOrder,
-      Eigen::Isometry3s childBodyToJoint);
+      const Eigen::Vector3s& flipAxisMap,
+      const Eigen::Isometry3s& childBodyToJoint);
 
   static Eigen::Matrix6s finiteDifferenceRelativeJacobianTimeDerivStatic(
       const Eigen::Vector6s& positions,
       const Eigen::Vector6s& velocities,
       EulerJoint::AxisOrder axisOrder,
-      Eigen::Isometry3s childBodyToJoint);
+      const Eigen::Vector3s& flipAxisMap,
+      const Eigen::Isometry3s& childBodyToJoint);
 
   static Eigen::Matrix6s computeRelativeJacobianTimeDerivDerivWrtPos(
       const Eigen::Vector6s& positions,
       const Eigen::Vector6s& velocities,
       std::size_t index,
       EulerJoint::AxisOrder axisOrder,
-      Eigen::Isometry3s childBodyToJoint);
+      const Eigen::Vector3s& flipAxisMap,
+      const Eigen::Isometry3s& childBodyToJoint);
 
   static Eigen::Matrix6s finiteDifferenceRelativeJacobianTimeDerivDerivWrtPos(
       const Eigen::Vector6s& positions,
       const Eigen::Vector6s& velocities,
       std::size_t index,
       EulerJoint::AxisOrder axisOrder,
-      Eigen::Isometry3s childBodyToJoint);
+      const Eigen::Vector3s& flipAxisMap,
+      const Eigen::Isometry3s& childBodyToJoint);
 
   static Eigen::Matrix6s computeRelativeJacobianTimeDerivDerivWrtVel(
       const Eigen::Vector6s& positions,
       std::size_t index,
       EulerJoint::AxisOrder axisOrder,
-      Eigen::Isometry3s childBodyToJoint);
+      const Eigen::Vector3s& flipAxisMap,
+      const Eigen::Isometry3s& childBodyToJoint);
 
   static Eigen::Matrix6s finiteDifferenceRelativeJacobianTimeDerivDerivWrtVel(
       const Eigen::Vector6s& positions,
       const Eigen::Vector6s& velocities,
       std::size_t index,
       EulerJoint::AxisOrder axisOrder,
-      Eigen::Isometry3s childBodyToJoint);
+      const Eigen::Vector3s& flipAxisMap,
+      const Eigen::Isometry3s& childBodyToJoint);
 
 protected:
   EulerJoint::AxisOrder mAxisOrder;

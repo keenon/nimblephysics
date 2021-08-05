@@ -58,6 +58,12 @@ void EulerFreeJoint::setFlipAxisMap(Eigen::Vector3s map)
 }
 
 //==============================================================================
+Eigen::Vector3s EulerFreeJoint::getFlipAxisMap() const
+{
+  return mFlipAxisMap;
+}
+
+//==============================================================================
 /// Return the axis order
 EulerJoint::AxisOrder EulerFreeJoint::getAxisOrder() const
 {
@@ -120,7 +126,7 @@ void EulerFreeJoint::updateDegreeOfFreedomNames()
 void EulerFreeJoint::updateRelativeTransform() const
 {
   Eigen::Isometry3s T = EulerJoint::convertToTransform(
-      getPositionsStatic().head<3>(), getAxisOrder());
+      getPositionsStatic().head<3>(), getAxisOrder(), getFlipAxisMap());
   T.translation() = getPositionsStatic().tail<3>();
 
   mT = Joint::mAspectProperties.mT_ParentBodyToJoint * T
@@ -133,7 +139,7 @@ Eigen::Matrix6s EulerFreeJoint::getRelativeJacobianStatic(
     const Eigen::Vector6s& positions) const
 {
   return computeRelativeJacobianStatic(
-      positions, getAxisOrder(), Joint::mAspectProperties.mT_ChildBodyToJoint);
+      positions, getAxisOrder(), getFlipAxisMap(), Joint::mAspectProperties.mT_ChildBodyToJoint);
 }
 
 //==============================================================================
@@ -143,6 +149,7 @@ math::Jacobian EulerFreeJoint::getRelativeJacobianDeriv(std::size_t index) const
       getPositionsStatic(),
       index,
       getAxisOrder(),
+      getFlipAxisMap(),
       Joint::mAspectProperties.mT_ChildBodyToJoint);
 }
 
@@ -152,6 +159,7 @@ void EulerFreeJoint::updateRelativeJacobian(bool) const
   mJacobian = computeRelativeJacobianStatic(
       getPositionsStatic(),
       getAxisOrder(),
+      getFlipAxisMap(),
       Joint::mAspectProperties.mT_ChildBodyToJoint);
 }
 
@@ -162,6 +170,7 @@ void EulerFreeJoint::updateRelativeJacobianTimeDeriv() const
       getPositionsStatic(),
       getVelocitiesStatic(),
       getAxisOrder(),
+      getFlipAxisMap(),
       Joint::mAspectProperties.mT_ChildBodyToJoint);
 }
 
@@ -175,6 +184,7 @@ math::Jacobian EulerFreeJoint::getRelativeJacobianTimeDerivDerivWrtPosition(
       getVelocitiesStatic(),
       index,
       getAxisOrder(),
+      getFlipAxisMap(),
       Joint::mAspectProperties.mT_ChildBodyToJoint);
 }
 
@@ -187,6 +197,7 @@ math::Jacobian EulerFreeJoint::getRelativeJacobianTimeDerivDerivWrtVelocity(
       getPositionsStatic(),
       index,
       getAxisOrder(),
+      getFlipAxisMap(),
       Joint::mAspectProperties.mT_ChildBodyToJoint);
 }
 
@@ -194,16 +205,17 @@ math::Jacobian EulerFreeJoint::getRelativeJacobianTimeDerivDerivWrtVelocity(
 Eigen::Matrix6s EulerFreeJoint::computeRelativeJacobianStatic(
     const Eigen::Vector6s& positions,
     EulerJoint::AxisOrder axisOrder,
-    Eigen::Isometry3s childBodyToJoint)
+    const Eigen::Vector3s& flipAxisMap,
+    const Eigen::Isometry3s& childBodyToJoint)
 {
   Eigen::Vector3s euler = positions.head<3>();
-  Eigen::Isometry3s T = EulerJoint::convertToTransform(euler, axisOrder)
+  Eigen::Isometry3s T = EulerJoint::convertToTransform(euler, axisOrder, flipAxisMap)
                         * childBodyToJoint.inverse();
 
   Eigen::Matrix6s spatialJac = Eigen::Matrix6s::Identity();
   spatialJac.block<3, 3>(3, 3) = T.linear().transpose(); // R^T
   spatialJac.block<6, 3>(0, 0) = EulerJoint::computeRelativeJacobianStatic(
-      euler, axisOrder, childBodyToJoint);
+      euler, axisOrder, flipAxisMap, childBodyToJoint);
 
   return spatialJac;
 }
@@ -213,7 +225,8 @@ Eigen::Matrix6s EulerFreeJoint::computeRelativeJacobianStaticDerivWrtPos(
     const Eigen::Vector6s& positions,
     std::size_t index,
     EulerJoint::AxisOrder axisOrder,
-    Eigen::Isometry3s childBodyToJoint)
+    const Eigen::Vector3s& flipAxisMap,
+    const Eigen::Isometry3s& childBodyToJoint)
 {
   if (index < 3)
   {
@@ -224,29 +237,29 @@ Eigen::Matrix6s EulerFreeJoint::computeRelativeJacobianStaticDerivWrtPos(
     {
       spatialJac.block<3, 3>(3, 3)
           = childBodyToJoint.linear()
-            * math::eulerXYZToMatrixGrad(euler, index).transpose(); // R^T
+            * math::eulerXYZToMatrixGrad(euler.cwiseProduct(flipAxisMap), index).transpose() * flipAxisMap(index); // R^T
     }
     if (axisOrder == EulerJoint::AxisOrder::XZY)
     {
       spatialJac.block<3, 3>(3, 3)
           = childBodyToJoint.linear()
-            * math::eulerXZYToMatrixGrad(euler, index).transpose(); // R^T
+            * math::eulerXZYToMatrixGrad(euler.cwiseProduct(flipAxisMap), index).transpose() * flipAxisMap(index); // R^T
     }
     if (axisOrder == EulerJoint::AxisOrder::ZYX)
     {
       spatialJac.block<3, 3>(3, 3)
           = childBodyToJoint.linear()
-            * math::eulerZYXToMatrixGrad(euler, index).transpose(); // R^T
+            * math::eulerZYXToMatrixGrad(euler.cwiseProduct(flipAxisMap), index).transpose() * flipAxisMap(index); // R^T
     }
     if (axisOrder == EulerJoint::AxisOrder::ZXY)
     {
       spatialJac.block<3, 3>(3, 3)
           = childBodyToJoint.linear()
-            * math::eulerZXYToMatrixGrad(euler, index).transpose(); // R^T
+            * math::eulerZXYToMatrixGrad(euler.cwiseProduct(flipAxisMap), index).transpose() * flipAxisMap(index); // R^T
     }
     spatialJac.block<6, 3>(0, 0)
         = EulerJoint::computeRelativeJacobianDerivWrtPos(
-            index, euler, axisOrder, childBodyToJoint);
+            index, euler, axisOrder, flipAxisMap, childBodyToJoint);
 
     return spatialJac;
   }
@@ -262,7 +275,8 @@ EulerFreeJoint::finiteDifferenceRelativeJacobianStaticDerivWrtPos(
     const Eigen::Vector6s& positions,
     std::size_t index,
     EulerJoint::AxisOrder axisOrder,
-    Eigen::Isometry3s childBodyToJoint)
+    const Eigen::Vector3s& flipAxisMap,
+    const Eigen::Isometry3s& childBodyToJoint)
 {
   // This is wrt position
   const s_t EPS = 1e-7;
@@ -272,9 +286,9 @@ EulerFreeJoint::finiteDifferenceRelativeJacobianStaticDerivWrtPos(
       = positions - (EPS * Eigen::Vector6s::Unit(index));
 
   Eigen::Matrix6s plus = computeRelativeJacobianStatic(
-      perturbedPlus, axisOrder, childBodyToJoint);
+      perturbedPlus, axisOrder, flipAxisMap, childBodyToJoint);
   Eigen::Matrix6s minus = computeRelativeJacobianStatic(
-      perturbedMinus, axisOrder, childBodyToJoint);
+      perturbedMinus, axisOrder, flipAxisMap, childBodyToJoint);
 
   return (plus - minus) / (2 * EPS);
 }
@@ -284,7 +298,8 @@ Eigen::Matrix6s EulerFreeJoint::computeRelativeJacobianTimeDerivStatic(
     const Eigen::Vector6s& positions,
     const Eigen::Vector6s& velocities,
     EulerJoint::AxisOrder axisOrder,
-    Eigen::Isometry3s childBodyToJoint)
+    const Eigen::Vector3s& flipAxisMap,
+    const Eigen::Isometry3s& childBodyToJoint)
 {
   Eigen::Vector3s euler = positions.head<3>();
   Eigen::Vector3s eulerVel = velocities.head<3>();
@@ -292,7 +307,7 @@ Eigen::Matrix6s EulerFreeJoint::computeRelativeJacobianTimeDerivStatic(
   Eigen::Matrix6s spatialJacDeriv = Eigen::Matrix6s::Zero();
   spatialJacDeriv.block<6, 3>(0, 0)
       = EulerJoint::computeRelativeJacobianTimeDerivStatic(
-          euler, eulerVel, axisOrder, childBodyToJoint);
+          euler, eulerVel, axisOrder, flipAxisMap, childBodyToJoint);
 
   if (axisOrder == EulerJoint::AxisOrder::XYZ)
   {
@@ -300,7 +315,7 @@ Eigen::Matrix6s EulerFreeJoint::computeRelativeJacobianTimeDerivStatic(
     {
       spatialJacDeriv.block<3, 3>(3, 3)
           += childBodyToJoint.linear()
-             * math::eulerXYZToMatrixGrad(euler, i).transpose() * eulerVel(i);
+             * math::eulerXYZToMatrixGrad(euler.cwiseProduct(flipAxisMap), i).transpose() * eulerVel(i) * flipAxisMap(i);
     }
   }
   else if (axisOrder == EulerJoint::AxisOrder::XZY)
@@ -309,7 +324,7 @@ Eigen::Matrix6s EulerFreeJoint::computeRelativeJacobianTimeDerivStatic(
     {
       spatialJacDeriv.block<3, 3>(3, 3)
           += childBodyToJoint.linear()
-             * math::eulerXZYToMatrixGrad(euler, i).transpose() * eulerVel(i);
+             * math::eulerXZYToMatrixGrad(euler.cwiseProduct(flipAxisMap), i).transpose() * eulerVel(i) * flipAxisMap(i);
     }
   }
   else if (axisOrder == EulerJoint::AxisOrder::ZXY)
@@ -318,7 +333,7 @@ Eigen::Matrix6s EulerFreeJoint::computeRelativeJacobianTimeDerivStatic(
     {
       spatialJacDeriv.block<3, 3>(3, 3)
           += childBodyToJoint.linear()
-             * math::eulerZXYToMatrixGrad(euler, i).transpose() * eulerVel(i);
+             * math::eulerZXYToMatrixGrad(euler.cwiseProduct(flipAxisMap), i).transpose() * eulerVel(i) * flipAxisMap(i);
     }
   }
   else if (axisOrder == EulerJoint::AxisOrder::ZYX)
@@ -327,7 +342,7 @@ Eigen::Matrix6s EulerFreeJoint::computeRelativeJacobianTimeDerivStatic(
     {
       spatialJacDeriv.block<3, 3>(3, 3)
           += childBodyToJoint.linear()
-             * math::eulerZYXToMatrixGrad(euler, i).transpose() * eulerVel(i);
+             * math::eulerZYXToMatrixGrad(euler.cwiseProduct(flipAxisMap), i).transpose() * eulerVel(i) * flipAxisMap(i);
     }
   }
   return spatialJacDeriv;
@@ -338,16 +353,17 @@ Eigen::Matrix6s EulerFreeJoint::finiteDifferenceRelativeJacobianTimeDerivStatic(
     const Eigen::Vector6s& positions,
     const Eigen::Vector6s& velocities,
     EulerJoint::AxisOrder axisOrder,
-    Eigen::Isometry3s childBodyToJoint)
+    const Eigen::Vector3s& flipAxisMap,
+    const Eigen::Isometry3s& childBodyToJoint)
 {
   const s_t EPS = 1e-8;
   Eigen::Vector6s perturbedPlus = positions + (EPS * velocities);
   Eigen::Vector6s perturbedMinus = positions - (EPS * velocities);
 
   Eigen::Matrix6s plus = computeRelativeJacobianStatic(
-      perturbedPlus, axisOrder, childBodyToJoint);
+      perturbedPlus, axisOrder, flipAxisMap, childBodyToJoint);
   Eigen::Matrix6s minus = computeRelativeJacobianStatic(
-      perturbedMinus, axisOrder, childBodyToJoint);
+      perturbedMinus, axisOrder, flipAxisMap, childBodyToJoint);
   return (plus - minus) / (2 * EPS);
 }
 
@@ -357,7 +373,8 @@ Eigen::Matrix6s EulerFreeJoint::computeRelativeJacobianTimeDerivDerivWrtPos(
     const Eigen::Vector6s& velocities,
     std::size_t index,
     EulerJoint::AxisOrder axisOrder,
-    Eigen::Isometry3s childBodyToJoint)
+    const Eigen::Vector3s& flipAxisMap,
+    const Eigen::Isometry3s& childBodyToJoint)
 {
   if (index < 3)
   {
@@ -367,7 +384,7 @@ Eigen::Matrix6s EulerFreeJoint::computeRelativeJacobianTimeDerivDerivWrtPos(
     Eigen::Matrix6s d_dJ = Eigen::Matrix6s::Zero();
     d_dJ.block<6, 3>(0, 0)
         = EulerJoint::computeRelativeJacobianTimeDerivDerivWrtPos(
-            index, euler, eulerVel, axisOrder, childBodyToJoint);
+            index, euler, eulerVel, axisOrder, flipAxisMap, childBodyToJoint);
 
     if (axisOrder == EulerJoint::AxisOrder::XYZ)
     {
@@ -375,8 +392,8 @@ Eigen::Matrix6s EulerFreeJoint::computeRelativeJacobianTimeDerivDerivWrtPos(
       {
         d_dJ.block<3, 3>(3, 3)
             += childBodyToJoint.linear()
-               * math::eulerXYZToMatrixSecondGrad(euler, i, index).transpose()
-               * eulerVel(i);
+               * math::eulerXYZToMatrixSecondGrad(euler.cwiseProduct(flipAxisMap), i, index).transpose()
+               * eulerVel(i) * flipAxisMap(i);
       }
     }
     else if (axisOrder == EulerJoint::AxisOrder::XZY)
@@ -385,8 +402,8 @@ Eigen::Matrix6s EulerFreeJoint::computeRelativeJacobianTimeDerivDerivWrtPos(
       {
         d_dJ.block<3, 3>(3, 3)
             += childBodyToJoint.linear()
-               * math::eulerXZYToMatrixSecondGrad(euler, i, index).transpose()
-               * eulerVel(i);
+               * math::eulerXZYToMatrixSecondGrad(euler.cwiseProduct(flipAxisMap), i, index).transpose()
+               * eulerVel(i) * flipAxisMap(i);
       }
     }
     else if (axisOrder == EulerJoint::AxisOrder::ZXY)
@@ -395,8 +412,8 @@ Eigen::Matrix6s EulerFreeJoint::computeRelativeJacobianTimeDerivDerivWrtPos(
       {
         d_dJ.block<3, 3>(3, 3)
             += childBodyToJoint.linear()
-               * math::eulerZXYToMatrixSecondGrad(euler, i, index).transpose()
-               * eulerVel(i);
+               * math::eulerZXYToMatrixSecondGrad(euler.cwiseProduct(flipAxisMap), i, index).transpose()
+               * eulerVel(i) * flipAxisMap(i);
       }
     }
     else if (axisOrder == EulerJoint::AxisOrder::ZYX)
@@ -405,10 +422,11 @@ Eigen::Matrix6s EulerFreeJoint::computeRelativeJacobianTimeDerivDerivWrtPos(
       {
         d_dJ.block<3, 3>(3, 3)
             += childBodyToJoint.linear()
-               * math::eulerZYXToMatrixSecondGrad(euler, i, index).transpose()
-               * eulerVel(i);
+               * math::eulerZYXToMatrixSecondGrad(euler.cwiseProduct(flipAxisMap), i, index).transpose()
+               * eulerVel(i) * flipAxisMap(i);
       }
     }
+    d_dJ.block<3, 3>(3, 3) *= flipAxisMap(index);
     return d_dJ;
   }
   else
@@ -424,7 +442,8 @@ EulerFreeJoint::finiteDifferenceRelativeJacobianTimeDerivDerivWrtPos(
     const Eigen::Vector6s& velocities,
     std::size_t index,
     EulerJoint::AxisOrder axisOrder,
-    Eigen::Isometry3s childBodyToJoint)
+    const Eigen::Vector3s& flipAxisMap,
+    const Eigen::Isometry3s& childBodyToJoint)
 {
   // This is wrt position
   const s_t EPS = 1e-8;
@@ -434,9 +453,9 @@ EulerFreeJoint::finiteDifferenceRelativeJacobianTimeDerivDerivWrtPos(
       = positions - (EPS * Eigen::Vector6s::Unit(index));
 
   Eigen::Matrix6s plus = computeRelativeJacobianTimeDerivStatic(
-      perturbedPlus, velocities, axisOrder, childBodyToJoint);
+      perturbedPlus, velocities, axisOrder, flipAxisMap, childBodyToJoint);
   Eigen::Matrix6s minus = computeRelativeJacobianTimeDerivStatic(
-      perturbedMinus, velocities, axisOrder, childBodyToJoint);
+      perturbedMinus, velocities, axisOrder, flipAxisMap, childBodyToJoint);
 
   return (plus - minus) / (2 * EPS);
 }
@@ -446,7 +465,8 @@ Eigen::Matrix6s EulerFreeJoint::computeRelativeJacobianTimeDerivDerivWrtVel(
     const Eigen::Vector6s& positions,
     std::size_t index,
     EulerJoint::AxisOrder axisOrder,
-    Eigen::Isometry3s childBodyToJoint)
+    const Eigen::Vector3s& flipAxisMap,
+    const Eigen::Isometry3s& childBodyToJoint)
 {
   if (index < 3)
   {
@@ -455,31 +475,31 @@ Eigen::Matrix6s EulerFreeJoint::computeRelativeJacobianTimeDerivDerivWrtVel(
     Eigen::Matrix6s d_dJ = Eigen::Matrix6s::Zero();
     d_dJ.block<6, 3>(0, 0)
         = EulerJoint::computeRelativeJacobianTimeDerivDerivWrtVel(
-            index, euler, axisOrder, childBodyToJoint);
+            index, euler, axisOrder, flipAxisMap, childBodyToJoint);
 
     if (axisOrder == EulerJoint::AxisOrder::XYZ)
     {
       d_dJ.block<3, 3>(3, 3)
           = childBodyToJoint.linear()
-            * math::eulerXYZToMatrixGrad(euler, index).transpose();
+            * math::eulerXYZToMatrixGrad(euler.cwiseProduct(flipAxisMap), index).transpose() * flipAxisMap(index);
     }
     else if (axisOrder == EulerJoint::AxisOrder::XZY)
     {
       d_dJ.block<3, 3>(3, 3)
           = childBodyToJoint.linear()
-            * math::eulerXZYToMatrixGrad(euler, index).transpose();
+            * math::eulerXZYToMatrixGrad(euler.cwiseProduct(flipAxisMap), index).transpose() * flipAxisMap(index);
     }
     else if (axisOrder == EulerJoint::AxisOrder::ZXY)
     {
       d_dJ.block<3, 3>(3, 3)
           = childBodyToJoint.linear()
-            * math::eulerZXYToMatrixGrad(euler, index).transpose();
+            * math::eulerZXYToMatrixGrad(euler.cwiseProduct(flipAxisMap), index).transpose() * flipAxisMap(index);
     }
     else if (axisOrder == EulerJoint::AxisOrder::ZYX)
     {
       d_dJ.block<3, 3>(3, 3)
           = childBodyToJoint.linear()
-            * math::eulerZYXToMatrixGrad(euler, index).transpose();
+            * math::eulerZYXToMatrixGrad(euler.cwiseProduct(flipAxisMap), index).transpose() * flipAxisMap(index);
     }
     return d_dJ;
   }
@@ -496,7 +516,8 @@ EulerFreeJoint::finiteDifferenceRelativeJacobianTimeDerivDerivWrtVel(
     const Eigen::Vector6s& velocities,
     std::size_t index,
     EulerJoint::AxisOrder axisOrder,
-    Eigen::Isometry3s childBodyToJoint)
+    const Eigen::Vector3s& flipAxisMap,
+    const Eigen::Isometry3s& childBodyToJoint)
 {
   // This is wrt position
   const s_t EPS = 1e-8;
@@ -506,9 +527,9 @@ EulerFreeJoint::finiteDifferenceRelativeJacobianTimeDerivDerivWrtVel(
       = velocities - (EPS * Eigen::Vector6s::Unit(index));
 
   Eigen::Matrix6s plus = computeRelativeJacobianTimeDerivStatic(
-      positions, perturbedPlus, axisOrder, childBodyToJoint);
+      positions, perturbedPlus, axisOrder, flipAxisMap, childBodyToJoint);
   Eigen::Matrix6s minus = computeRelativeJacobianTimeDerivStatic(
-      positions, perturbedMinus, axisOrder, childBodyToJoint);
+      positions, perturbedMinus, axisOrder, flipAxisMap, childBodyToJoint);
 
   return (plus - minus) / (2 * EPS);
 }

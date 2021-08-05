@@ -144,6 +144,12 @@ void EulerJoint::setFlipAxisMap(Eigen::Vector3s map)
 }
 
 //==============================================================================
+Eigen::Vector3s EulerJoint::getFlipAxisMap() const
+{
+  return mFlipAxisMap;
+}
+
+//==============================================================================
 Eigen::Isometry3s EulerJoint::convertToTransform(
     const Eigen::Vector3s& _positions,
     AxisOrder _ordering,
@@ -157,14 +163,14 @@ Eigen::Isometry3s EulerJoint::convertToTransform(
 Eigen::Isometry3s EulerJoint::convertToTransform(
     const Eigen::Vector3s& _positions) const
 {
-  return convertToTransform(_positions, getAxisOrder());
+  return convertToTransform(_positions, getAxisOrder(), getFlipAxisMap());
 }
 
 //==============================================================================
 Eigen::Matrix3s EulerJoint::convertToRotation(
     const Eigen::Vector3s& _positions,
     AxisOrder _ordering,
-    Eigen::Vector3s _flipAxisMap)
+    const Eigen::Vector3s& _flipAxisMap)
 {
   switch (_ordering)
   {
@@ -188,7 +194,7 @@ Eigen::Matrix3s EulerJoint::convertToRotation(
 Eigen::Matrix3s EulerJoint::convertToRotation(
     const Eigen::Vector3s& _positions) const
 {
-  return convertToRotation(_positions, getAxisOrder(), mFlipAxisMap);
+  return convertToRotation(_positions, getAxisOrder(), getFlipAxisMap());
 }
 
 //==============================================================================
@@ -197,13 +203,15 @@ Eigen::Matrix3s EulerJoint::convertToRotation(
 Eigen::Matrix<s_t, 6, 3> EulerJoint::computeRelativeJacobianStatic(
     const Eigen::Vector3s& _positions,
     EulerJoint::AxisOrder axisOrder,
-    Eigen::Isometry3s childBodyToJoint)
+    const Eigen::Vector3s& flipAxisMap,
+    const Eigen::Isometry3s& childBodyToJoint)
 {
+  (void)flipAxisMap;
   Eigen::Matrix<s_t, 6, 3> J;
 
   // s_t q0 = _positions[0];
-  const s_t q1 = _positions[1];
-  const s_t q2 = _positions[2];
+  const s_t q1 = _positions[1] * flipAxisMap(1);
+  const s_t q2 = _positions[2] * flipAxisMap(2);
 
   // s_t c0 = cos(q0);
   s_t c1 = cos(q1);
@@ -315,9 +323,9 @@ Eigen::Matrix<s_t, 6, 3> EulerJoint::computeRelativeJacobianStatic(
     }
   }
 
-  J.col(0) = math::AdT(childBodyToJoint, J0);
-  J.col(1) = math::AdT(childBodyToJoint, J1);
-  J.col(2) = math::AdT(childBodyToJoint, J2);
+  J.col(0) = math::AdT(childBodyToJoint, J0) * flipAxisMap(0);
+  J.col(1) = math::AdT(childBodyToJoint, J1) * flipAxisMap(1);
+  J.col(2) = math::AdT(childBodyToJoint, J2) * flipAxisMap(2);
 
   assert(!math::isNan(J));
 
@@ -345,7 +353,7 @@ Eigen::Matrix<s_t, 6, 3> EulerJoint::getRelativeJacobianStatic(
     const Eigen::Vector3s& _positions) const
 {
   return computeRelativeJacobianStatic(
-      _positions, getAxisOrder(), Joint::mAspectProperties.mT_ChildBodyToJoint);
+      _positions, getAxisOrder(), getFlipAxisMap(), Joint::mAspectProperties.mT_ChildBodyToJoint);
 }
 
 //==============================================================================
@@ -353,16 +361,18 @@ math::Jacobian EulerJoint::computeRelativeJacobianDerivWrtPos(
     std::size_t index,
     const Eigen::Vector3s& positions,
     EulerJoint::AxisOrder axisOrder,
-    Eigen::Isometry3s childBodyToJoint)
+    const Eigen::Vector3s& flipAxisMap,
+    const Eigen::Isometry3s& childBodyToJoint)
 {
+  (void)flipAxisMap;
   assert(index < 3);
 
   Eigen::Matrix<s_t, 6, 3> DJ_Dq = Eigen::Matrix<s_t, 6, 3>::Zero();
 
   const Eigen::Vector3s& q = positions;
 
-  const s_t q1 = q[1];
-  const s_t q2 = q[2];
+  const s_t q1 = q[1] * flipAxisMap(1);
+  const s_t q2 = q[2] * flipAxisMap(2);
 
   // s_t c0 = cos(q0);
   const s_t c1 = cos(q1);
@@ -400,6 +410,8 @@ math::Jacobian EulerJoint::computeRelativeJacobianDerivWrtPos(
         DJ_Dq(0, 0) = -s1 * c2;
         DJ_Dq(1, 0) = s1 * s2;
         DJ_Dq(2, 0) = c1;
+
+        DJ_Dq *= flipAxisMap(1);
       }
       else if (index == 2)
       {
@@ -415,6 +427,8 @@ math::Jacobian EulerJoint::computeRelativeJacobianDerivWrtPos(
 
         DJ_Dq(0, 1) = c2;
         DJ_Dq(1, 1) = -s2;
+
+        DJ_Dq *= flipAxisMap(2);
       }
       break;
     }
@@ -444,6 +458,8 @@ math::Jacobian EulerJoint::computeRelativeJacobianDerivWrtPos(
         DJ_Dq(0, 0) = -c1;
         DJ_Dq(1, 0) = -s1 * s2;
         DJ_Dq(2, 0) = -s1 * c2;
+
+        DJ_Dq *= flipAxisMap(1);
       }
       else if (index == 2)
       {
@@ -459,6 +475,8 @@ math::Jacobian EulerJoint::computeRelativeJacobianDerivWrtPos(
 
         DJ_Dq(1, 1) = -s2;
         DJ_Dq(2, 1) = -c2;
+
+        DJ_Dq *= flipAxisMap(2);
       }
 
       break;
@@ -489,6 +507,8 @@ math::Jacobian EulerJoint::computeRelativeJacobianDerivWrtPos(
         DJ_Dq(0, 0) = -s1 * c2;
         DJ_Dq(1, 0) = -c1;
         DJ_Dq(2, 0) = -s1 * s2;
+
+        DJ_Dq *= flipAxisMap(1);
       }
       else if (index == 2)
       {
@@ -504,6 +524,8 @@ math::Jacobian EulerJoint::computeRelativeJacobianDerivWrtPos(
 
         DJ_Dq(0, 1) = -c2;
         DJ_Dq(2, 1) = -s2;
+
+        DJ_Dq *= flipAxisMap(2);
       }
 
       break;
@@ -535,6 +557,8 @@ math::Jacobian EulerJoint::computeRelativeJacobianDerivWrtPos(
         DJ_Dq(0, 0) = s1 * s2;
         DJ_Dq(1, 0) = c1;
         DJ_Dq(2, 0) = -s1 * c2;
+
+        DJ_Dq *= flipAxisMap(1);
       }
       else if (index == 2)
       {
@@ -550,6 +574,8 @@ math::Jacobian EulerJoint::computeRelativeJacobianDerivWrtPos(
 
         DJ_Dq(0, 1) = -s2;
         DJ_Dq(2, 1) = c2;
+
+        DJ_Dq *= flipAxisMap(2);
       }
 
       break;
@@ -562,6 +588,9 @@ math::Jacobian EulerJoint::computeRelativeJacobianDerivWrtPos(
   }
 
   DJ_Dq = math::AdTJac(childBodyToJoint, DJ_Dq);
+  DJ_Dq.col(0) *= flipAxisMap(0);
+  DJ_Dq.col(1) *= flipAxisMap(1);
+  DJ_Dq.col(2) *= flipAxisMap(2);
 
   assert(!math::isNan(DJ_Dq));
 
@@ -574,7 +603,8 @@ EulerJoint::finiteDifferenceRelativeJacobianStaticDerivWrtPos(
     const Eigen::Vector3s& positions,
     std::size_t index,
     EulerJoint::AxisOrder axisOrder,
-    Eigen::Isometry3s childBodyToJoint)
+    const Eigen::Vector3s& flipAxisMap,
+    const Eigen::Isometry3s& childBodyToJoint)
 {
   // This is wrt position
   const s_t EPS = 1e-7;
@@ -584,9 +614,9 @@ EulerJoint::finiteDifferenceRelativeJacobianStaticDerivWrtPos(
       = positions - (EPS * Eigen::Vector3s::Unit(index));
 
   Eigen::Matrix<s_t, 6, 3> plus = computeRelativeJacobianStatic(
-      perturbedPlus, axisOrder, childBodyToJoint);
+      perturbedPlus, axisOrder, flipAxisMap, childBodyToJoint);
   Eigen::Matrix<s_t, 6, 3> minus = computeRelativeJacobianStatic(
-      perturbedMinus, axisOrder, childBodyToJoint);
+      perturbedMinus, axisOrder, flipAxisMap, childBodyToJoint);
 
   return (plus - minus) / (2 * EPS);
 }
@@ -598,6 +628,7 @@ math::Jacobian EulerJoint::getRelativeJacobianDeriv(std::size_t index) const
       index,
       getPositionsStatic(),
       getAxisOrder(),
+      getFlipAxisMap(),
       Joint::mAspectProperties.mT_ChildBodyToJoint);
 }
 
@@ -607,20 +638,22 @@ math::Jacobian EulerJoint::computeRelativeJacobianTimeDerivDerivWrtPos(
     const Eigen::Vector3s& positions,
     const Eigen::Vector3s& velocities,
     EulerJoint::AxisOrder axisOrder,
-    Eigen::Isometry3s childBodyToJoint)
+    const Eigen::Vector3s& flipAxisMap,
+    const Eigen::Isometry3s& childBodyToJoint)
 {
+  (void)flipAxisMap;
   assert(index < 3);
 
   Eigen::Matrix<s_t, 6, 3> DdJ_Dq = Eigen::Matrix<s_t, 6, 3>::Zero();
 
   const Eigen::Vector3s& q = positions;
-  const s_t q1 = q[1];
-  const s_t q2 = q[2];
+  const s_t q1 = q[1] * flipAxisMap(1);
+  const s_t q2 = q[2] * flipAxisMap(2);
 
   // s_t dq0 = mVelocities[0];
   const Eigen::Vector3s& dq = velocities;
-  const s_t dq1 = dq[1];
-  const s_t dq2 = dq[2];
+  const s_t dq1 = dq[1] * flipAxisMap(1);
+  const s_t dq2 = dq[2] * flipAxisMap(2);
 
   const s_t c1 = cos(q1);
   const s_t c2 = cos(q2);
@@ -647,6 +680,8 @@ math::Jacobian EulerJoint::computeRelativeJacobianTimeDerivDerivWrtPos(
         DdJ_Dq(0, 0) = -c1 * c2 * dq1 + s1 * s2 * dq2;
         DdJ_Dq(1, 0) = c1 * s2 * dq1 + s1 * c2 * dq2;
         DdJ_Dq(2, 0) = -s1 * dq1;
+
+        DdJ_Dq *= flipAxisMap(1);
       }
       else if (index == 2)
       {
@@ -662,6 +697,8 @@ math::Jacobian EulerJoint::computeRelativeJacobianTimeDerivDerivWrtPos(
 
         DdJ_Dq(0, 1) = -s2 * dq2;
         DdJ_Dq(1, 1) = -c2 * dq2;
+
+        DdJ_Dq *= flipAxisMap(2);
       }
       break;
     }
@@ -682,6 +719,8 @@ math::Jacobian EulerJoint::computeRelativeJacobianTimeDerivDerivWrtPos(
         DdJ_Dq(0, 0) = s1 * dq1;
         DdJ_Dq(1, 0) = -c1 * s2 * dq1 - s1 * c2 * dq2;
         DdJ_Dq(2, 0) = -c1 * c2 * dq1 + s1 * s2 * dq2;
+
+        DdJ_Dq *= flipAxisMap(1);
       }
       else if (index == 2)
       {
@@ -697,6 +736,8 @@ math::Jacobian EulerJoint::computeRelativeJacobianTimeDerivDerivWrtPos(
 
         DdJ_Dq(1, 1) = -c2 * dq2;
         DdJ_Dq(2, 1) = s2 * dq2;
+
+        DdJ_Dq *= flipAxisMap(2);
       }
       break;
     }
@@ -727,6 +768,8 @@ math::Jacobian EulerJoint::computeRelativeJacobianTimeDerivDerivWrtPos(
         DdJ_Dq(0, 0) = -(c2 * c1 * dq1) + (s1 * s2 * dq2);
         DdJ_Dq(1, 0) = s1 * dq1;
         DdJ_Dq(2, 0) = -(s1 * c2 * dq2) - (s2 * c1 * dq1);
+
+        DdJ_Dq *= flipAxisMap(1);
       }
       else if (index == 2)
       {
@@ -742,6 +785,8 @@ math::Jacobian EulerJoint::computeRelativeJacobianTimeDerivDerivWrtPos(
         DdJ_Dq(0, 1) = s2 * dq2;
         DdJ_Dq(2, 0) = -(c1 * s2 * dq2) - (c2 * s1 * dq1);
         DdJ_Dq(2, 1) = -c2 * dq2;
+
+        DdJ_Dq *= flipAxisMap(2);
       }
       break;
     }
@@ -773,6 +818,8 @@ math::Jacobian EulerJoint::computeRelativeJacobianTimeDerivDerivWrtPos(
         DdJ_Dq(0, 0) = (c1 * s2 * dq1) + (s1 * c2 * dq2);
         DdJ_Dq(1, 0) = -s1 * dq1;
         DdJ_Dq(2, 0) = -(c1 * c2 * dq1) + (s2 * s1 * dq2);
+
+        DdJ_Dq *= flipAxisMap(1);
       }
       else if (index == 2)
       {
@@ -788,6 +835,8 @@ math::Jacobian EulerJoint::computeRelativeJacobianTimeDerivDerivWrtPos(
         DdJ_Dq(0, 1) = -c2 * dq2;
         DdJ_Dq(2, 0) = (s1 * s2 * dq1) - (c1 * c2 * dq2);
         DdJ_Dq(2, 1) = -s2 * dq2;
+
+        DdJ_Dq *= flipAxisMap(2);
       }
       break;
     }
@@ -799,6 +848,9 @@ math::Jacobian EulerJoint::computeRelativeJacobianTimeDerivDerivWrtPos(
   }
 
   DdJ_Dq = math::AdTJac(childBodyToJoint, DdJ_Dq);
+  DdJ_Dq.col(0) *= flipAxisMap(0);
+  DdJ_Dq.col(1) *= flipAxisMap(1);
+  DdJ_Dq.col(2) *= flipAxisMap(2);
 
   assert(!math::isNan(DdJ_Dq));
 
@@ -812,7 +864,8 @@ EulerJoint::finiteDifferenceRelativeJacobianTimeDerivDerivWrtPos(
     const Eigen::Vector3s& velocities,
     std::size_t index,
     EulerJoint::AxisOrder axisOrder,
-    Eigen::Isometry3s childBodyToJoint)
+    const Eigen::Vector3s& flipAxisMap,
+    const Eigen::Isometry3s& childBodyToJoint)
 {
   // This is wrt position
   const s_t EPS = 1e-8;
@@ -822,9 +875,9 @@ EulerJoint::finiteDifferenceRelativeJacobianTimeDerivDerivWrtPos(
       = positions - (EPS * Eigen::Vector3s::Unit(index));
 
   Eigen::Matrix<s_t, 6, 3> plus = computeRelativeJacobianTimeDerivStatic(
-      perturbedPlus, velocities, axisOrder, childBodyToJoint);
+      perturbedPlus, velocities, axisOrder, flipAxisMap, childBodyToJoint);
   Eigen::Matrix<s_t, 6, 3> minus = computeRelativeJacobianTimeDerivStatic(
-      perturbedMinus, velocities, axisOrder, childBodyToJoint);
+      perturbedMinus, velocities, axisOrder, flipAxisMap, childBodyToJoint);
 
   return (plus - minus) / (2 * EPS);
 }
@@ -839,6 +892,7 @@ math::Jacobian EulerJoint::getRelativeJacobianTimeDerivDerivWrtPosition(
       getPositionsStatic(),
       getVelocitiesStatic(),
       getAxisOrder(),
+      getFlipAxisMap(),
       Joint::mAspectProperties.mT_ChildBodyToJoint);
 }
 
@@ -847,15 +901,17 @@ math::Jacobian EulerJoint::computeRelativeJacobianTimeDerivDerivWrtVel(
     std::size_t index,
     const Eigen::Vector3s& positions,
     EulerJoint::AxisOrder axisOrder,
-    Eigen::Isometry3s childBodyToJoint)
+    const Eigen::Vector3s& flipAxisMap,
+    const Eigen::Isometry3s& childBodyToJoint)
 {
+  (void)flipAxisMap;
   assert(index < 3);
 
   Eigen::Matrix<s_t, 6, 3> DdJ_Ddq = Eigen::Matrix<s_t, 6, 3>::Zero();
 
   const Eigen::Vector3s& q = positions;
-  const s_t q1 = q[1];
-  const s_t q2 = q[2];
+  const s_t q1 = q[1] * flipAxisMap(1);
+  const s_t q2 = q[2] * flipAxisMap(2);
 
   const s_t c1 = cos(q1);
   const s_t c2 = cos(q2);
@@ -891,6 +947,8 @@ math::Jacobian EulerJoint::computeRelativeJacobianTimeDerivDerivWrtVel(
         DdJ_Ddq(0, 0) = -s1 * c2;
         DdJ_Ddq(1, 0) = s1 * s2;
         DdJ_Ddq(2, 0) = c1;
+
+        DdJ_Ddq *= flipAxisMap(1);
       }
       else if (index == 2)
       {
@@ -906,6 +964,8 @@ math::Jacobian EulerJoint::computeRelativeJacobianTimeDerivDerivWrtVel(
 
         DdJ_Ddq(0, 1) = c2;
         DdJ_Ddq(1, 1) = -s2;
+
+        DdJ_Ddq *= flipAxisMap(2);
       }
       break;
     }
@@ -934,6 +994,8 @@ math::Jacobian EulerJoint::computeRelativeJacobianTimeDerivDerivWrtVel(
         DdJ_Ddq(0, 0) = -c1;
         DdJ_Ddq(1, 0) = -s1 * s2;
         DdJ_Ddq(2, 0) = -s1 * c2;
+
+        DdJ_Ddq *= flipAxisMap(1);
       }
       else if (index == 2)
       {
@@ -949,6 +1011,8 @@ math::Jacobian EulerJoint::computeRelativeJacobianTimeDerivDerivWrtVel(
 
         DdJ_Ddq(1, 1) = -s2;
         DdJ_Ddq(2, 1) = -c2;
+
+        DdJ_Ddq *= flipAxisMap(2);
       }
       break;
     }
@@ -979,6 +1043,8 @@ math::Jacobian EulerJoint::computeRelativeJacobianTimeDerivDerivWrtVel(
         DdJ_Ddq(0, 0) = -(c2 * s1);
         DdJ_Ddq(1, 0) = -c1;
         DdJ_Ddq(2, 0) = -(s2 * s1);
+
+        DdJ_Ddq *= flipAxisMap(1);
       }
       else if (index == 2)
       {
@@ -994,6 +1060,8 @@ math::Jacobian EulerJoint::computeRelativeJacobianTimeDerivDerivWrtVel(
         DdJ_Ddq(0, 1) = -c2;
         DdJ_Ddq(2, 0) = (c1 * c2);
         DdJ_Ddq(2, 1) = -s2;
+
+        DdJ_Ddq *= flipAxisMap(2);
       }
       break;
     }
@@ -1025,6 +1093,8 @@ math::Jacobian EulerJoint::computeRelativeJacobianTimeDerivDerivWrtVel(
         DdJ_Ddq(0, 0) = (s1 * s2);
         DdJ_Ddq(1, 0) = c1;
         DdJ_Ddq(2, 0) = -(s1 * c2);
+
+        DdJ_Ddq *= flipAxisMap(1);
       }
       else if (index == 2)
       {
@@ -1040,6 +1110,8 @@ math::Jacobian EulerJoint::computeRelativeJacobianTimeDerivDerivWrtVel(
         DdJ_Ddq(0, 1) = -s2;
         DdJ_Ddq(2, 0) = -(c1 * s2);
         DdJ_Ddq(2, 1) = c2;
+
+        DdJ_Ddq *= flipAxisMap(2);
       }
       break;
     }
@@ -1051,6 +1123,9 @@ math::Jacobian EulerJoint::computeRelativeJacobianTimeDerivDerivWrtVel(
   }
 
   DdJ_Ddq = math::AdTJac(childBodyToJoint, DdJ_Ddq);
+  DdJ_Ddq.col(0) *= flipAxisMap(0);
+  DdJ_Ddq.col(1) *= flipAxisMap(1);
+  DdJ_Ddq.col(2) *= flipAxisMap(2);
 
   assert(!math::isNan(DdJ_Ddq));
 
@@ -1064,7 +1139,8 @@ EulerJoint::finiteDifferenceRelativeJacobianTimeDerivDerivWrtVel(
     const Eigen::Vector3s& velocities,
     std::size_t index,
     EulerJoint::AxisOrder axisOrder,
-    Eigen::Isometry3s childBodyToJoint)
+    const Eigen::Vector3s& flipAxisMap,
+    const Eigen::Isometry3s& childBodyToJoint)
 {
   // This is wrt position
   const s_t EPS = 1e-8;
@@ -1074,9 +1150,9 @@ EulerJoint::finiteDifferenceRelativeJacobianTimeDerivDerivWrtVel(
       = velocities - (EPS * Eigen::Vector3s::Unit(index));
 
   Eigen::Matrix<s_t, 6, 3> plus = computeRelativeJacobianTimeDerivStatic(
-      positions, perturbedPlus, axisOrder, childBodyToJoint);
+      positions, perturbedPlus, axisOrder, flipAxisMap, childBodyToJoint);
   Eigen::Matrix<s_t, 6, 3> minus = computeRelativeJacobianTimeDerivStatic(
-      positions, perturbedMinus, axisOrder, childBodyToJoint);
+      positions, perturbedMinus, axisOrder, flipAxisMap, childBodyToJoint);
 
   return (plus - minus) / (2 * EPS);
 }
@@ -1089,6 +1165,7 @@ math::Jacobian EulerJoint::getRelativeJacobianTimeDerivDerivWrtVelocity(
       index,
       getPositionsStatic(),
       getAxisOrder(),
+      getFlipAxisMap(),
       Joint::mAspectProperties.mT_ChildBodyToJoint);
 }
 
@@ -1174,17 +1251,19 @@ Eigen::Matrix<s_t, 6, 3> EulerJoint::computeRelativeJacobianTimeDerivStatic(
     const Eigen::Vector3s& positions,
     const Eigen::Vector3s& velocities,
     EulerJoint::AxisOrder axisOrder,
-    Eigen::Isometry3s childBodyToJoint)
+    const Eigen::Vector3s& flipAxisMap,
+    const Eigen::Isometry3s& childBodyToJoint)
 {
+  (void)flipAxisMap;
   Eigen::Matrix<s_t, 6, 3> dJ;
 
   // s_t q0 = mPositions[0];
-  s_t q1 = positions[1];
-  s_t q2 = positions[2];
+  s_t q1 = positions[1] * flipAxisMap(1);
+  s_t q2 = positions[2] * flipAxisMap(2);
 
   // s_t dq0 = mVelocities[0];
-  s_t dq1 = velocities[1];
-  s_t dq2 = velocities[2];
+  s_t dq1 = velocities[1] * flipAxisMap(1);
+  s_t dq2 = velocities[2] * flipAxisMap(2);
 
   // s_t c0 = cos(q0);
   s_t c1 = cos(q1);
@@ -1301,9 +1380,9 @@ Eigen::Matrix<s_t, 6, 3> EulerJoint::computeRelativeJacobianTimeDerivStatic(
     }
   }
 
-  dJ.col(0) = math::AdT(childBodyToJoint, dJ0);
-  dJ.col(1) = math::AdT(childBodyToJoint, dJ1);
-  dJ.col(2) = math::AdT(childBodyToJoint, dJ2);
+  dJ.col(0) = math::AdT(childBodyToJoint, dJ0) * flipAxisMap(0);
+  dJ.col(1) = math::AdT(childBodyToJoint, dJ1) * flipAxisMap(1);
+  dJ.col(2) = math::AdT(childBodyToJoint, dJ2) * flipAxisMap(2);
 
   assert(!math::isNan(dJ));
   return dJ;
@@ -1315,16 +1394,17 @@ EulerJoint::finiteDifferenceRelativeJacobianTimeDerivStatic(
     const Eigen::Vector3s& positions,
     const Eigen::Vector3s& velocities,
     EulerJoint::AxisOrder axisOrder,
-    Eigen::Isometry3s childBodyToJoint)
+    const Eigen::Vector3s& flipAxisMap,
+    const Eigen::Isometry3s& childBodyToJoint)
 {
   const s_t EPS = 1e-8;
   Eigen::Vector3s perturbedPlus = positions + (EPS * velocities);
   Eigen::Vector3s perturbedMinus = positions - (EPS * velocities);
 
   Eigen::Matrix<s_t, 6, 3> plus = computeRelativeJacobianStatic(
-      perturbedPlus, axisOrder, childBodyToJoint);
+      perturbedPlus, axisOrder, flipAxisMap, childBodyToJoint);
   Eigen::Matrix<s_t, 6, 3> minus = computeRelativeJacobianStatic(
-      perturbedMinus, axisOrder, childBodyToJoint);
+      perturbedMinus, axisOrder, flipAxisMap, childBodyToJoint);
   return (plus - minus) / (2 * EPS);
 }
 
@@ -1335,6 +1415,7 @@ void EulerJoint::updateRelativeJacobianTimeDeriv() const
       getPositionsStatic(),
       getVelocitiesStatic(),
       getAxisOrder(),
+      getFlipAxisMap(),
       Joint::mAspectProperties.mT_ChildBodyToJoint);
 }
 

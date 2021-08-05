@@ -151,7 +151,7 @@ std::shared_ptr<LossFn> getSSIDLoss()
   return std::make_shared<LossFn>(loss, lossGrad);
 }
 
-#ifdef ALL_TESTS
+// #ifdef ALL_TESTS
 TEST(REALTIME, CARTPOLE_MPC)
 {
   ////////////////////////////////////////////////////////////
@@ -218,7 +218,7 @@ TEST(REALTIME, CARTPOLE_MPC)
   // 300 timesteps
   int millisPerTimestep = world->getTimeStep() * 1000;
   int planningHorizonMillis = 300 * millisPerTimestep;
-  int advanceSteps = 70;
+  // int advanceSteps = 70;
 
   s_t goalX = 1.0;
 
@@ -303,7 +303,7 @@ TEST(REALTIME, CARTPOLE_MPC)
                                  Eigen::VectorXs pos,
                                  Eigen::VectorXs vel,
                                  Eigen::VectorXs mass,
-                                 long duration) {
+                                 long /* duration */) {
     mpcRemote.recordGroundTruthState(time, pos, vel, mass);
     world->setMasses(mass);
   });
@@ -380,9 +380,9 @@ TEST(REALTIME, CARTPOLE_MPC)
   });
 
   mpcRemote.registerReplanningListener(
-      [&](long time,
+      [&](long /* time */,
           const trajectory::TrajectoryRollout* rollout,
-          long duration) {
+          long /* duration */) {
         server.renderTrajectoryLines(world, rollout->getPosesConst());
         // realtimeWorld.registerTiming("replanning", duration, "ms");
       });
@@ -404,6 +404,8 @@ TEST(REALTIME, CARTPOLE_MPC)
   server.registerShutdownListener([&]() { mpcRemote.stop(); });
 
   server.serve(8070);
+  server.blockWhileServing();
+  /*
   while (server.isServing())
   {
     // spin
@@ -411,8 +413,9 @@ TEST(REALTIME, CARTPOLE_MPC)
     // cartpole->setControlForces(Eigen::VectorXs::Zero(cartpole->getNumDofs()));
     // cartpole->setPositions(Eigen::VectorXs::Zero(cartpole->getNumDofs()));
   }
+  */
 }
-#endif
+// #endif
 
 #ifdef ALL_TESTS
 TEST(REALTIME, CARTPOLE_SSID)
@@ -489,7 +492,7 @@ TEST(REALTIME, CARTPOLE_SSID)
   // 300 timesteps
   int millisPerTimestep = world->getTimeStep() * 1000;
   int inferenceHistoryMillis = 5 * millisPerTimestep;
-  int advanceSteps = 70;
+  // int advanceSteps = 70;
 
   SSID ssid = SSID(world, lossFn, inferenceHistoryMillis, world->getNumDofs());
 
@@ -505,7 +508,7 @@ TEST(REALTIME, CARTPOLE_SSID)
   }
   armPair.second->setMass(1.0);
 
-  ssid.setInitialPosEstimator([](Eigen::MatrixXs sensors, long timestamp) {
+  ssid.setInitialPosEstimator([](Eigen::MatrixXs sensors, long /* timestamp */) {
     // Use the first column of sensor data as an approximate starting point
     return sensors.col(0);
   });
