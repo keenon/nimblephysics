@@ -87,6 +87,16 @@ void EulerFreeJoint::updateDegreeOfFreedomNames()
       affixes.push_back("_rot_y");
       affixes.push_back("_rot_z");
       break;
+    case EulerJoint::AxisOrder::XZY:
+      affixes.push_back("_rot_x");
+      affixes.push_back("_rot_z");
+      affixes.push_back("_rot_y");
+      break;
+    case EulerJoint::AxisOrder::ZXY:
+      affixes.push_back("_rot_z");
+      affixes.push_back("_rot_x");
+      affixes.push_back("_rot_y");
+      break;
     default:
       dterr << "Unsupported axis order in EulerFreeJoint named '"
             << Joint::mAspectProperties.mName << "' ("
@@ -205,18 +215,35 @@ Eigen::Matrix6s EulerFreeJoint::computeRelativeJacobianStaticDerivWrtPos(
     EulerJoint::AxisOrder axisOrder,
     Eigen::Isometry3s childBodyToJoint)
 {
-  assert(
-      axisOrder == EulerJoint::AxisOrder::XYZ
-      && "Only XYZ AxisOrder is currently supported in the EulerFreeJoint computeRelativeJacobianStaticDerivWrtPos");
-
   if (index < 3)
   {
     Eigen::Vector3s euler = positions.head<3>();
 
     Eigen::Matrix6s spatialJac = Eigen::Matrix6s::Identity();
-    spatialJac.block<3, 3>(3, 3)
-        = childBodyToJoint.linear()
-          * math::eulerXYZToMatrixGrad(euler, index).transpose(); // R^T
+    if (axisOrder == EulerJoint::AxisOrder::XYZ)
+    {
+      spatialJac.block<3, 3>(3, 3)
+          = childBodyToJoint.linear()
+            * math::eulerXYZToMatrixGrad(euler, index).transpose(); // R^T
+    }
+    if (axisOrder == EulerJoint::AxisOrder::XZY)
+    {
+      spatialJac.block<3, 3>(3, 3)
+          = childBodyToJoint.linear()
+            * math::eulerXZYToMatrixGrad(euler, index).transpose(); // R^T
+    }
+    if (axisOrder == EulerJoint::AxisOrder::ZYX)
+    {
+      spatialJac.block<3, 3>(3, 3)
+          = childBodyToJoint.linear()
+            * math::eulerZYXToMatrixGrad(euler, index).transpose(); // R^T
+    }
+    if (axisOrder == EulerJoint::AxisOrder::ZXY)
+    {
+      spatialJac.block<3, 3>(3, 3)
+          = childBodyToJoint.linear()
+            * math::eulerZXYToMatrixGrad(euler, index).transpose(); // R^T
+    }
     spatialJac.block<6, 3>(0, 0)
         = EulerJoint::computeRelativeJacobianDerivWrtPos(
             index, euler, axisOrder, childBodyToJoint);
@@ -267,11 +294,41 @@ Eigen::Matrix6s EulerFreeJoint::computeRelativeJacobianTimeDerivStatic(
       = EulerJoint::computeRelativeJacobianTimeDerivStatic(
           euler, eulerVel, axisOrder, childBodyToJoint);
 
-  for (int i = 0; i < 3; i++)
+  if (axisOrder == EulerJoint::AxisOrder::XYZ)
   {
-    spatialJacDeriv.block<3, 3>(3, 3)
-        += childBodyToJoint.linear()
-           * math::eulerXYZToMatrixGrad(euler, i).transpose() * eulerVel(i);
+    for (int i = 0; i < 3; i++)
+    {
+      spatialJacDeriv.block<3, 3>(3, 3)
+          += childBodyToJoint.linear()
+             * math::eulerXYZToMatrixGrad(euler, i).transpose() * eulerVel(i);
+    }
+  }
+  else if (axisOrder == EulerJoint::AxisOrder::XZY)
+  {
+    for (int i = 0; i < 3; i++)
+    {
+      spatialJacDeriv.block<3, 3>(3, 3)
+          += childBodyToJoint.linear()
+             * math::eulerXZYToMatrixGrad(euler, i).transpose() * eulerVel(i);
+    }
+  }
+  else if (axisOrder == EulerJoint::AxisOrder::ZXY)
+  {
+    for (int i = 0; i < 3; i++)
+    {
+      spatialJacDeriv.block<3, 3>(3, 3)
+          += childBodyToJoint.linear()
+             * math::eulerZXYToMatrixGrad(euler, i).transpose() * eulerVel(i);
+    }
+  }
+  else if (axisOrder == EulerJoint::AxisOrder::ZYX)
+  {
+    for (int i = 0; i < 3; i++)
+    {
+      spatialJacDeriv.block<3, 3>(3, 3)
+          += childBodyToJoint.linear()
+             * math::eulerZYXToMatrixGrad(euler, i).transpose() * eulerVel(i);
+    }
   }
   return spatialJacDeriv;
 }
@@ -312,12 +369,45 @@ Eigen::Matrix6s EulerFreeJoint::computeRelativeJacobianTimeDerivDerivWrtPos(
         = EulerJoint::computeRelativeJacobianTimeDerivDerivWrtPos(
             index, euler, eulerVel, axisOrder, childBodyToJoint);
 
-    for (int i = 0; i < 3; i++)
+    if (axisOrder == EulerJoint::AxisOrder::XYZ)
     {
-      d_dJ.block<3, 3>(3, 3)
-          += childBodyToJoint.linear()
-             * math::eulerXYZToMatrixSecondGrad(euler, i, index).transpose()
-             * eulerVel(i);
+      for (int i = 0; i < 3; i++)
+      {
+        d_dJ.block<3, 3>(3, 3)
+            += childBodyToJoint.linear()
+               * math::eulerXYZToMatrixSecondGrad(euler, i, index).transpose()
+               * eulerVel(i);
+      }
+    }
+    else if (axisOrder == EulerJoint::AxisOrder::XZY)
+    {
+      for (int i = 0; i < 3; i++)
+      {
+        d_dJ.block<3, 3>(3, 3)
+            += childBodyToJoint.linear()
+               * math::eulerXZYToMatrixSecondGrad(euler, i, index).transpose()
+               * eulerVel(i);
+      }
+    }
+    else if (axisOrder == EulerJoint::AxisOrder::ZXY)
+    {
+      for (int i = 0; i < 3; i++)
+      {
+        d_dJ.block<3, 3>(3, 3)
+            += childBodyToJoint.linear()
+               * math::eulerZXYToMatrixSecondGrad(euler, i, index).transpose()
+               * eulerVel(i);
+      }
+    }
+    else if (axisOrder == EulerJoint::AxisOrder::ZYX)
+    {
+      for (int i = 0; i < 3; i++)
+      {
+        d_dJ.block<3, 3>(3, 3)
+            += childBodyToJoint.linear()
+               * math::eulerZYXToMatrixSecondGrad(euler, i, index).transpose()
+               * eulerVel(i);
+      }
     }
     return d_dJ;
   }
@@ -367,9 +457,30 @@ Eigen::Matrix6s EulerFreeJoint::computeRelativeJacobianTimeDerivDerivWrtVel(
         = EulerJoint::computeRelativeJacobianTimeDerivDerivWrtVel(
             index, euler, axisOrder, childBodyToJoint);
 
-    d_dJ.block<3, 3>(3, 3)
-        = childBodyToJoint.linear()
-          * math::eulerXYZToMatrixGrad(euler, index).transpose();
+    if (axisOrder == EulerJoint::AxisOrder::XYZ)
+    {
+      d_dJ.block<3, 3>(3, 3)
+          = childBodyToJoint.linear()
+            * math::eulerXYZToMatrixGrad(euler, index).transpose();
+    }
+    else if (axisOrder == EulerJoint::AxisOrder::XZY)
+    {
+      d_dJ.block<3, 3>(3, 3)
+          = childBodyToJoint.linear()
+            * math::eulerXZYToMatrixGrad(euler, index).transpose();
+    }
+    else if (axisOrder == EulerJoint::AxisOrder::ZXY)
+    {
+      d_dJ.block<3, 3>(3, 3)
+          = childBodyToJoint.linear()
+            * math::eulerZXYToMatrixGrad(euler, index).transpose();
+    }
+    else if (axisOrder == EulerJoint::AxisOrder::ZYX)
+    {
+      d_dJ.block<3, 3>(3, 3)
+          = childBodyToJoint.linear()
+            * math::eulerZYXToMatrixGrad(euler, index).transpose();
+    }
     return d_dJ;
   }
   else
