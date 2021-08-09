@@ -139,7 +139,10 @@ Eigen::Matrix6s EulerFreeJoint::getRelativeJacobianStatic(
     const Eigen::Vector6s& positions) const
 {
   return computeRelativeJacobianStatic(
-      positions, getAxisOrder(), getFlipAxisMap(), Joint::mAspectProperties.mT_ChildBodyToJoint);
+      positions,
+      getAxisOrder(),
+      getFlipAxisMap(),
+      Joint::mAspectProperties.mT_ChildBodyToJoint);
 }
 
 //==============================================================================
@@ -209,8 +212,9 @@ Eigen::Matrix6s EulerFreeJoint::computeRelativeJacobianStatic(
     const Eigen::Isometry3s& childBodyToJoint)
 {
   Eigen::Vector3s euler = positions.head<3>();
-  Eigen::Isometry3s T = EulerJoint::convertToTransform(euler, axisOrder, flipAxisMap)
-                        * childBodyToJoint.inverse();
+  Eigen::Isometry3s T
+      = EulerJoint::convertToTransform(euler, axisOrder, flipAxisMap)
+        * childBodyToJoint.inverse();
 
   Eigen::Matrix6s spatialJac = Eigen::Matrix6s::Identity();
   spatialJac.block<3, 3>(3, 3) = T.linear().transpose(); // R^T
@@ -237,25 +241,33 @@ Eigen::Matrix6s EulerFreeJoint::computeRelativeJacobianStaticDerivWrtPos(
     {
       spatialJac.block<3, 3>(3, 3)
           = childBodyToJoint.linear()
-            * math::eulerXYZToMatrixGrad(euler.cwiseProduct(flipAxisMap), index).transpose() * flipAxisMap(index); // R^T
+            * math::eulerXYZToMatrixGrad(euler.cwiseProduct(flipAxisMap), index)
+                  .transpose()
+            * flipAxisMap(index); // R^T
     }
     if (axisOrder == EulerJoint::AxisOrder::XZY)
     {
       spatialJac.block<3, 3>(3, 3)
           = childBodyToJoint.linear()
-            * math::eulerXZYToMatrixGrad(euler.cwiseProduct(flipAxisMap), index).transpose() * flipAxisMap(index); // R^T
+            * math::eulerXZYToMatrixGrad(euler.cwiseProduct(flipAxisMap), index)
+                  .transpose()
+            * flipAxisMap(index); // R^T
     }
     if (axisOrder == EulerJoint::AxisOrder::ZYX)
     {
       spatialJac.block<3, 3>(3, 3)
           = childBodyToJoint.linear()
-            * math::eulerZYXToMatrixGrad(euler.cwiseProduct(flipAxisMap), index).transpose() * flipAxisMap(index); // R^T
+            * math::eulerZYXToMatrixGrad(euler.cwiseProduct(flipAxisMap), index)
+                  .transpose()
+            * flipAxisMap(index); // R^T
     }
     if (axisOrder == EulerJoint::AxisOrder::ZXY)
     {
       spatialJac.block<3, 3>(3, 3)
           = childBodyToJoint.linear()
-            * math::eulerZXYToMatrixGrad(euler.cwiseProduct(flipAxisMap), index).transpose() * flipAxisMap(index); // R^T
+            * math::eulerZXYToMatrixGrad(euler.cwiseProduct(flipAxisMap), index)
+                  .transpose()
+            * flipAxisMap(index); // R^T
     }
     spatialJac.block<6, 3>(0, 0)
         = EulerJoint::computeRelativeJacobianDerivWrtPos(
@@ -276,8 +288,14 @@ EulerFreeJoint::finiteDifferenceRelativeJacobianStaticDerivWrtPos(
     std::size_t index,
     EulerJoint::AxisOrder axisOrder,
     const Eigen::Vector3s& flipAxisMap,
-    const Eigen::Isometry3s& childBodyToJoint)
+    const Eigen::Isometry3s& childBodyToJoint,
+    bool useRidders)
 {
+  if (useRidders)
+  {
+    return finiteDifferenceRiddersRelativeJacobianStaticDerivWrtPos(
+        positions, index, axisOrder, flipAxisMap, childBodyToJoint);
+  }
   // This is wrt position
   const s_t EPS = 1e-7;
   Eigen::Vector6s perturbedPlus
@@ -291,6 +309,87 @@ EulerFreeJoint::finiteDifferenceRelativeJacobianStaticDerivWrtPos(
       perturbedMinus, axisOrder, flipAxisMap, childBodyToJoint);
 
   return (plus - minus) / (2 * EPS);
+}
+
+//==============================================================================
+Eigen::Matrix6s
+EulerFreeJoint::finiteDifferenceRiddersRelativeJacobianStaticDerivWrtPos(
+    const Eigen::Vector6s& positions,
+    std::size_t index,
+    EulerJoint::AxisOrder axisOrder,
+    const Eigen::Vector3s& flipAxisMap,
+    const Eigen::Isometry3s& childBodyToJoint)
+{
+  const s_t originalStepSize = 1e-3;
+  const s_t con = 1.4, con2 = (con * con);
+  const s_t safeThreshold = 2.0;
+  const int tabSize = 10;
+
+  s_t stepSize = originalStepSize;
+  s_t bestError = std::numeric_limits<s_t>::max();
+
+  // Neville tableau of finite difference results
+  std::array<std::array<Eigen::Matrix6s, tabSize>, tabSize> tab;
+
+  Eigen::Matrix6s plus = computeRelativeJacobianStatic(
+      positions + (stepSize * Eigen::Vector6s::Unit(index)),
+      axisOrder,
+      flipAxisMap,
+      childBodyToJoint);
+  Eigen::Matrix6s minus = computeRelativeJacobianStatic(
+      positions - (stepSize * Eigen::Vector6s::Unit(index)),
+      axisOrder,
+      flipAxisMap,
+      childBodyToJoint);
+
+  tab[0][0] = (plus - minus) / (2 * stepSize);
+  Eigen::Matrix6s jac = (plus - minus) / (2 * stepSize);
+
+  // Iterate over smaller and smaller step sizes
+  for (int iTab = 1; iTab < tabSize; iTab++)
+  {
+    stepSize /= con;
+
+    Eigen::Matrix6s plus = computeRelativeJacobianStatic(
+        positions + (stepSize * Eigen::Vector6s::Unit(index)),
+        axisOrder,
+        flipAxisMap,
+        childBodyToJoint);
+    Eigen::Matrix6s minus = computeRelativeJacobianStatic(
+        positions - (stepSize * Eigen::Vector6s::Unit(index)),
+        axisOrder,
+        flipAxisMap,
+        childBodyToJoint);
+
+    tab[0][iTab] = (plus - minus) / (2 * stepSize);
+
+    s_t fac = con2;
+    // Compute extrapolations of increasing orders, requiring no new
+    // evaluations
+    for (int jTab = 1; jTab <= iTab; jTab++)
+    {
+      tab[jTab][iTab]
+          = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1]) / (fac - 1.0);
+      fac = con2 * fac;
+      s_t currError = max(
+          (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
+          (tab[jTab][iTab] - tab[jTab - 1][iTab - 1]).array().abs().maxCoeff());
+      if (currError < bestError)
+      {
+        bestError = currError;
+        jac.noalias() = tab[jTab][iTab];
+      }
+    }
+
+    // If higher order is worse by a significant factor, quit early.
+    if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
+        >= safeThreshold * bestError)
+    {
+      break;
+    }
+  }
+
+  return jac;
 }
 
 //==============================================================================
@@ -315,7 +414,9 @@ Eigen::Matrix6s EulerFreeJoint::computeRelativeJacobianTimeDerivStatic(
     {
       spatialJacDeriv.block<3, 3>(3, 3)
           += childBodyToJoint.linear()
-             * math::eulerXYZToMatrixGrad(euler.cwiseProduct(flipAxisMap), i).transpose() * eulerVel(i) * flipAxisMap(i);
+             * math::eulerXYZToMatrixGrad(euler.cwiseProduct(flipAxisMap), i)
+                   .transpose()
+             * eulerVel(i) * flipAxisMap(i);
     }
   }
   else if (axisOrder == EulerJoint::AxisOrder::XZY)
@@ -324,7 +425,9 @@ Eigen::Matrix6s EulerFreeJoint::computeRelativeJacobianTimeDerivStatic(
     {
       spatialJacDeriv.block<3, 3>(3, 3)
           += childBodyToJoint.linear()
-             * math::eulerXZYToMatrixGrad(euler.cwiseProduct(flipAxisMap), i).transpose() * eulerVel(i) * flipAxisMap(i);
+             * math::eulerXZYToMatrixGrad(euler.cwiseProduct(flipAxisMap), i)
+                   .transpose()
+             * eulerVel(i) * flipAxisMap(i);
     }
   }
   else if (axisOrder == EulerJoint::AxisOrder::ZXY)
@@ -333,7 +436,9 @@ Eigen::Matrix6s EulerFreeJoint::computeRelativeJacobianTimeDerivStatic(
     {
       spatialJacDeriv.block<3, 3>(3, 3)
           += childBodyToJoint.linear()
-             * math::eulerZXYToMatrixGrad(euler.cwiseProduct(flipAxisMap), i).transpose() * eulerVel(i) * flipAxisMap(i);
+             * math::eulerZXYToMatrixGrad(euler.cwiseProduct(flipAxisMap), i)
+                   .transpose()
+             * eulerVel(i) * flipAxisMap(i);
     }
   }
   else if (axisOrder == EulerJoint::AxisOrder::ZYX)
@@ -342,7 +447,9 @@ Eigen::Matrix6s EulerFreeJoint::computeRelativeJacobianTimeDerivStatic(
     {
       spatialJacDeriv.block<3, 3>(3, 3)
           += childBodyToJoint.linear()
-             * math::eulerZYXToMatrixGrad(euler.cwiseProduct(flipAxisMap), i).transpose() * eulerVel(i) * flipAxisMap(i);
+             * math::eulerZYXToMatrixGrad(euler.cwiseProduct(flipAxisMap), i)
+                   .transpose()
+             * eulerVel(i) * flipAxisMap(i);
     }
   }
   return spatialJacDeriv;
@@ -354,8 +461,14 @@ Eigen::Matrix6s EulerFreeJoint::finiteDifferenceRelativeJacobianTimeDerivStatic(
     const Eigen::Vector6s& velocities,
     EulerJoint::AxisOrder axisOrder,
     const Eigen::Vector3s& flipAxisMap,
-    const Eigen::Isometry3s& childBodyToJoint)
+    const Eigen::Isometry3s& childBodyToJoint,
+    bool useRidders)
 {
+  if (useRidders)
+  {
+    return finiteDifferenceRiddersRelativeJacobianTimeDerivStatic(
+        positions, velocities, axisOrder, flipAxisMap, childBodyToJoint);
+  }
   const s_t EPS = 1e-8;
   Eigen::Vector6s perturbedPlus = positions + (EPS * velocities);
   Eigen::Vector6s perturbedMinus = positions - (EPS * velocities);
@@ -365,6 +478,87 @@ Eigen::Matrix6s EulerFreeJoint::finiteDifferenceRelativeJacobianTimeDerivStatic(
   Eigen::Matrix6s minus = computeRelativeJacobianStatic(
       perturbedMinus, axisOrder, flipAxisMap, childBodyToJoint);
   return (plus - minus) / (2 * EPS);
+}
+
+//==============================================================================
+Eigen::Matrix6s
+EulerFreeJoint::finiteDifferenceRiddersRelativeJacobianTimeDerivStatic(
+    const Eigen::Vector6s& positions,
+    const Eigen::Vector6s& velocities,
+    EulerJoint::AxisOrder axisOrder,
+    const Eigen::Vector3s& flipAxisMap,
+    const Eigen::Isometry3s& childBodyToJoint)
+{
+  const s_t originalStepSize = 1e-3;
+  const s_t con = 1.4, con2 = (con * con);
+  const s_t safeThreshold = 2.0;
+  const int tabSize = 10;
+
+  s_t stepSize = originalStepSize;
+  s_t bestError = std::numeric_limits<s_t>::max();
+
+  // Neville tableau of finite difference results
+  std::array<std::array<Eigen::Matrix6s, tabSize>, tabSize> tab;
+
+  Eigen::Matrix6s plus = computeRelativeJacobianStatic(
+      positions + (stepSize * velocities),
+      axisOrder,
+      flipAxisMap,
+      childBodyToJoint);
+  Eigen::Matrix6s minus = computeRelativeJacobianStatic(
+      positions - (stepSize * velocities),
+      axisOrder,
+      flipAxisMap,
+      childBodyToJoint);
+
+  tab[0][0] = (plus - minus) / (2 * stepSize);
+  Eigen::Matrix6s jac = (plus - minus) / (2 * stepSize);
+
+  // Iterate over smaller and smaller step sizes
+  for (int iTab = 1; iTab < tabSize; iTab++)
+  {
+    stepSize /= con;
+
+    Eigen::Matrix6s plus = computeRelativeJacobianStatic(
+        positions + (stepSize * velocities),
+        axisOrder,
+        flipAxisMap,
+        childBodyToJoint);
+    Eigen::Matrix6s minus = computeRelativeJacobianStatic(
+        positions - (stepSize * velocities),
+        axisOrder,
+        flipAxisMap,
+        childBodyToJoint);
+
+    tab[0][iTab] = (plus - minus) / (2 * stepSize);
+
+    s_t fac = con2;
+    // Compute extrapolations of increasing orders, requiring no new
+    // evaluations
+    for (int jTab = 1; jTab <= iTab; jTab++)
+    {
+      tab[jTab][iTab]
+          = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1]) / (fac - 1.0);
+      fac = con2 * fac;
+      s_t currError = max(
+          (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
+          (tab[jTab][iTab] - tab[jTab - 1][iTab - 1]).array().abs().maxCoeff());
+      if (currError < bestError)
+      {
+        bestError = currError;
+        jac.noalias() = tab[jTab][iTab];
+      }
+    }
+
+    // If higher order is worse by a significant factor, quit early.
+    if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
+        >= safeThreshold * bestError)
+    {
+      break;
+    }
+  }
+
+  return jac;
 }
 
 //==============================================================================
@@ -392,7 +586,9 @@ Eigen::Matrix6s EulerFreeJoint::computeRelativeJacobianTimeDerivDerivWrtPos(
       {
         d_dJ.block<3, 3>(3, 3)
             += childBodyToJoint.linear()
-               * math::eulerXYZToMatrixSecondGrad(euler.cwiseProduct(flipAxisMap), i, index).transpose()
+               * math::eulerXYZToMatrixSecondGrad(
+                     euler.cwiseProduct(flipAxisMap), i, index)
+                     .transpose()
                * eulerVel(i) * flipAxisMap(i);
       }
     }
@@ -402,7 +598,9 @@ Eigen::Matrix6s EulerFreeJoint::computeRelativeJacobianTimeDerivDerivWrtPos(
       {
         d_dJ.block<3, 3>(3, 3)
             += childBodyToJoint.linear()
-               * math::eulerXZYToMatrixSecondGrad(euler.cwiseProduct(flipAxisMap), i, index).transpose()
+               * math::eulerXZYToMatrixSecondGrad(
+                     euler.cwiseProduct(flipAxisMap), i, index)
+                     .transpose()
                * eulerVel(i) * flipAxisMap(i);
       }
     }
@@ -412,7 +610,9 @@ Eigen::Matrix6s EulerFreeJoint::computeRelativeJacobianTimeDerivDerivWrtPos(
       {
         d_dJ.block<3, 3>(3, 3)
             += childBodyToJoint.linear()
-               * math::eulerZXYToMatrixSecondGrad(euler.cwiseProduct(flipAxisMap), i, index).transpose()
+               * math::eulerZXYToMatrixSecondGrad(
+                     euler.cwiseProduct(flipAxisMap), i, index)
+                     .transpose()
                * eulerVel(i) * flipAxisMap(i);
       }
     }
@@ -422,7 +622,9 @@ Eigen::Matrix6s EulerFreeJoint::computeRelativeJacobianTimeDerivDerivWrtPos(
       {
         d_dJ.block<3, 3>(3, 3)
             += childBodyToJoint.linear()
-               * math::eulerZYXToMatrixSecondGrad(euler.cwiseProduct(flipAxisMap), i, index).transpose()
+               * math::eulerZYXToMatrixSecondGrad(
+                     euler.cwiseProduct(flipAxisMap), i, index)
+                     .transpose()
                * eulerVel(i) * flipAxisMap(i);
       }
     }
@@ -443,8 +645,14 @@ EulerFreeJoint::finiteDifferenceRelativeJacobianTimeDerivDerivWrtPos(
     std::size_t index,
     EulerJoint::AxisOrder axisOrder,
     const Eigen::Vector3s& flipAxisMap,
-    const Eigen::Isometry3s& childBodyToJoint)
+    const Eigen::Isometry3s& childBodyToJoint,
+    bool useRidders)
 {
+  if (useRidders)
+  {
+    return finiteDifferenceRiddersRelativeJacobianTimeDerivDerivWrtPos(
+        positions, velocities, index, axisOrder, flipAxisMap, childBodyToJoint);
+  }
   // This is wrt position
   const s_t EPS = 1e-8;
   Eigen::Vector6s perturbedPlus
@@ -458,6 +666,92 @@ EulerFreeJoint::finiteDifferenceRelativeJacobianTimeDerivDerivWrtPos(
       perturbedMinus, velocities, axisOrder, flipAxisMap, childBodyToJoint);
 
   return (plus - minus) / (2 * EPS);
+}
+
+//==============================================================================
+Eigen::Matrix6s
+EulerFreeJoint::finiteDifferenceRiddersRelativeJacobianTimeDerivDerivWrtPos(
+    const Eigen::Vector6s& positions,
+    const Eigen::Vector6s& velocities,
+    std::size_t index,
+    EulerJoint::AxisOrder axisOrder,
+    const Eigen::Vector3s& flipAxisMap,
+    const Eigen::Isometry3s& childBodyToJoint)
+{
+  const s_t originalStepSize = 1e-3;
+  const s_t con = 1.4, con2 = (con * con);
+  const s_t safeThreshold = 2.0;
+  const int tabSize = 10;
+
+  s_t stepSize = originalStepSize;
+  s_t bestError = std::numeric_limits<s_t>::max();
+
+  // Neville tableau of finite difference results
+  std::array<std::array<Eigen::Matrix6s, tabSize>, tabSize> tab;
+
+  Eigen::Matrix6s plus = computeRelativeJacobianTimeDerivStatic(
+      positions + (stepSize * Eigen::Vector6s::Unit(index)),
+      velocities,
+      axisOrder,
+      flipAxisMap,
+      childBodyToJoint);
+  Eigen::Matrix6s minus = computeRelativeJacobianTimeDerivStatic(
+      positions - (stepSize * Eigen::Vector6s::Unit(index)),
+      velocities,
+      axisOrder,
+      flipAxisMap,
+      childBodyToJoint);
+
+  tab[0][0] = (plus - minus) / (2 * stepSize);
+  Eigen::Matrix6s jac = (plus - minus) / (2 * stepSize);
+
+  // Iterate over smaller and smaller step sizes
+  for (int iTab = 1; iTab < tabSize; iTab++)
+  {
+    stepSize /= con;
+
+    Eigen::Matrix6s plus = computeRelativeJacobianTimeDerivStatic(
+        positions + (stepSize * Eigen::Vector6s::Unit(index)),
+        velocities,
+        axisOrder,
+        flipAxisMap,
+        childBodyToJoint);
+    Eigen::Matrix6s minus = computeRelativeJacobianTimeDerivStatic(
+        positions - (stepSize * Eigen::Vector6s::Unit(index)),
+        velocities,
+        axisOrder,
+        flipAxisMap,
+        childBodyToJoint);
+
+    tab[0][iTab] = (plus - minus) / (2 * stepSize);
+
+    s_t fac = con2;
+    // Compute extrapolations of increasing orders, requiring no new
+    // evaluations
+    for (int jTab = 1; jTab <= iTab; jTab++)
+    {
+      tab[jTab][iTab]
+          = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1]) / (fac - 1.0);
+      fac = con2 * fac;
+      s_t currError = max(
+          (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
+          (tab[jTab][iTab] - tab[jTab - 1][iTab - 1]).array().abs().maxCoeff());
+      if (currError < bestError)
+      {
+        bestError = currError;
+        jac.noalias() = tab[jTab][iTab];
+      }
+    }
+
+    // If higher order is worse by a significant factor, quit early.
+    if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
+        >= safeThreshold * bestError)
+    {
+      break;
+    }
+  }
+
+  return jac;
 }
 
 //==============================================================================
@@ -481,25 +775,33 @@ Eigen::Matrix6s EulerFreeJoint::computeRelativeJacobianTimeDerivDerivWrtVel(
     {
       d_dJ.block<3, 3>(3, 3)
           = childBodyToJoint.linear()
-            * math::eulerXYZToMatrixGrad(euler.cwiseProduct(flipAxisMap), index).transpose() * flipAxisMap(index);
+            * math::eulerXYZToMatrixGrad(euler.cwiseProduct(flipAxisMap), index)
+                  .transpose()
+            * flipAxisMap(index);
     }
     else if (axisOrder == EulerJoint::AxisOrder::XZY)
     {
       d_dJ.block<3, 3>(3, 3)
           = childBodyToJoint.linear()
-            * math::eulerXZYToMatrixGrad(euler.cwiseProduct(flipAxisMap), index).transpose() * flipAxisMap(index);
+            * math::eulerXZYToMatrixGrad(euler.cwiseProduct(flipAxisMap), index)
+                  .transpose()
+            * flipAxisMap(index);
     }
     else if (axisOrder == EulerJoint::AxisOrder::ZXY)
     {
       d_dJ.block<3, 3>(3, 3)
           = childBodyToJoint.linear()
-            * math::eulerZXYToMatrixGrad(euler.cwiseProduct(flipAxisMap), index).transpose() * flipAxisMap(index);
+            * math::eulerZXYToMatrixGrad(euler.cwiseProduct(flipAxisMap), index)
+                  .transpose()
+            * flipAxisMap(index);
     }
     else if (axisOrder == EulerJoint::AxisOrder::ZYX)
     {
       d_dJ.block<3, 3>(3, 3)
           = childBodyToJoint.linear()
-            * math::eulerZYXToMatrixGrad(euler.cwiseProduct(flipAxisMap), index).transpose() * flipAxisMap(index);
+            * math::eulerZYXToMatrixGrad(euler.cwiseProduct(flipAxisMap), index)
+                  .transpose()
+            * flipAxisMap(index);
     }
     return d_dJ;
   }
@@ -517,8 +819,14 @@ EulerFreeJoint::finiteDifferenceRelativeJacobianTimeDerivDerivWrtVel(
     std::size_t index,
     EulerJoint::AxisOrder axisOrder,
     const Eigen::Vector3s& flipAxisMap,
-    const Eigen::Isometry3s& childBodyToJoint)
+    const Eigen::Isometry3s& childBodyToJoint,
+    bool useRidders)
 {
+  if (useRidders)
+  {
+    return finiteDifferenceRiddersRelativeJacobianTimeDerivDerivWrtVel(
+        positions, velocities, index, axisOrder, flipAxisMap, childBodyToJoint);
+  }
   // This is wrt position
   const s_t EPS = 1e-8;
   Eigen::Vector6s perturbedPlus
@@ -532,6 +840,92 @@ EulerFreeJoint::finiteDifferenceRelativeJacobianTimeDerivDerivWrtVel(
       positions, perturbedMinus, axisOrder, flipAxisMap, childBodyToJoint);
 
   return (plus - minus) / (2 * EPS);
+}
+
+//==============================================================================
+Eigen::Matrix6s
+EulerFreeJoint::finiteDifferenceRiddersRelativeJacobianTimeDerivDerivWrtVel(
+    const Eigen::Vector6s& positions,
+    const Eigen::Vector6s& velocities,
+    std::size_t index,
+    EulerJoint::AxisOrder axisOrder,
+    const Eigen::Vector3s& flipAxisMap,
+    const Eigen::Isometry3s& childBodyToJoint)
+{
+  const s_t originalStepSize = 1e-3;
+  const s_t con = 1.4, con2 = (con * con);
+  const s_t safeThreshold = 2.0;
+  const int tabSize = 10;
+
+  s_t stepSize = originalStepSize;
+  s_t bestError = std::numeric_limits<s_t>::max();
+
+  // Neville tableau of finite difference results
+  std::array<std::array<Eigen::Matrix6s, tabSize>, tabSize> tab;
+
+  Eigen::Matrix6s plus = computeRelativeJacobianTimeDerivStatic(
+      positions,
+      velocities + (stepSize * Eigen::Vector6s::Unit(index)),
+      axisOrder,
+      flipAxisMap,
+      childBodyToJoint);
+  Eigen::Matrix6s minus = computeRelativeJacobianTimeDerivStatic(
+      positions,
+      velocities - (stepSize * Eigen::Vector6s::Unit(index)),
+      axisOrder,
+      flipAxisMap,
+      childBodyToJoint);
+
+  tab[0][0] = (plus - minus) / (2 * stepSize);
+  Eigen::Matrix6s jac = (plus - minus) / (2 * stepSize);
+
+  // Iterate over smaller and smaller step sizes
+  for (int iTab = 1; iTab < tabSize; iTab++)
+  {
+    stepSize /= con;
+
+    Eigen::Matrix6s plus = computeRelativeJacobianTimeDerivStatic(
+        positions,
+        velocities + (stepSize * Eigen::Vector6s::Unit(index)),
+        axisOrder,
+        flipAxisMap,
+        childBodyToJoint);
+    Eigen::Matrix6s minus = computeRelativeJacobianTimeDerivStatic(
+        positions,
+        velocities - (stepSize * Eigen::Vector6s::Unit(index)),
+        axisOrder,
+        flipAxisMap,
+        childBodyToJoint);
+
+    tab[0][iTab] = (plus - minus) / (2 * stepSize);
+
+    s_t fac = con2;
+    // Compute extrapolations of increasing orders, requiring no new
+    // evaluations
+    for (int jTab = 1; jTab <= iTab; jTab++)
+    {
+      tab[jTab][iTab]
+          = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1]) / (fac - 1.0);
+      fac = con2 * fac;
+      s_t currError = max(
+          (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
+          (tab[jTab][iTab] - tab[jTab - 1][iTab - 1]).array().abs().maxCoeff());
+      if (currError < bestError)
+      {
+        bestError = currError;
+        jac.noalias() = tab[jTab][iTab];
+      }
+    }
+
+    // If higher order is worse by a significant factor, quit early.
+    if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
+        >= safeThreshold * bestError)
+    {
+      break;
+    }
+  }
+
+  return jac;
 }
 
 } // namespace dynamics

@@ -1844,8 +1844,7 @@ void BodyNode::updateAccelerationFD()
         mParentBodyNode->getSpatialAcceleration());
     */
     mParentJoint->updateAcceleration(
-        getArticulatedInertia(),
-        mParentBodyNode->getSpatialAcceleration());
+        getArticulatedInertia(), mParentBodyNode->getSpatialAcceleration());
   }
   else
   {
@@ -3438,20 +3437,26 @@ void BodyNode::debugJacobianOfCBackward(neural::WithRespectTo* wrt)
   Eigen::MatrixXs mCg_g_p_fd = finiteDifferenceJacobianOfGravityForce(wrt);
   if (((mCg_g_p_fd - mCg_g_p).cwiseAbs().array() > threshold).any())
   {
-    std::cout << "mCg_g_p disagrees on body node " << getIndexInSkeleton() << " named \"" << getName() << "\""
+    std::cout << "mCg_g_p disagrees on body node " << getIndexInSkeleton()
+              << " named \"" << getName() << "\""
               << "! " << std::endl;
     std::cout << "Analytical:" << std::endl << mCg_g_p << std::endl;
     std::cout << "Brute Force:" << std::endl << mCg_g_p_fd << std::endl;
-    std::cout << "Diff (" << (mCg_g_p - mCg_g_p_fd).minCoeff() << "," << (mCg_g_p - mCg_g_p_fd).maxCoeff() << "):" << std::endl << mCg_g_p - mCg_g_p_fd << std::endl;
+    std::cout << "Diff (" << (mCg_g_p - mCg_g_p_fd).minCoeff() << ","
+              << (mCg_g_p - mCg_g_p_fd).maxCoeff() << "):" << std::endl
+              << mCg_g_p - mCg_g_p_fd << std::endl;
   }
   Eigen::MatrixXs mCg_F_p_fd = finiteDifferenceJacobianOfBodyForce(wrt);
   if (((mCg_F_p_fd - mCg_F_p).cwiseAbs().array() > threshold).any())
   {
-    std::cout << "mCg_F_p disagrees on body node " << getIndexInSkeleton() << " named \"" << getName() << "\""
+    std::cout << "mCg_F_p disagrees on body node " << getIndexInSkeleton()
+              << " named \"" << getName() << "\""
               << "! num children = " << mChildBodyNodes.size() << std::endl;
     std::cout << "Analytical:" << std::endl << mCg_F_p << std::endl;
     std::cout << "Brute Force:" << std::endl << mCg_F_p_fd << std::endl;
-    std::cout << "Diff (" << (mCg_F_p - mCg_F_p_fd).minCoeff() << "," << (mCg_F_p - mCg_F_p_fd).maxCoeff() << "):" << std::endl << mCg_F_p - mCg_F_p_fd << std::endl;
+    std::cout << "Diff (" << (mCg_F_p - mCg_F_p_fd).minCoeff() << ","
+              << (mCg_F_p - mCg_F_p_fd).maxCoeff() << "):" << std::endl
+              << mCg_F_p - mCg_F_p_fd << std::endl;
   }
   Eigen::MatrixXs mCg_V_ad_IV_p_fd
       = finiteDifferenceJacobianOfBodyForceAdVIV(wrt);
@@ -4180,7 +4185,7 @@ Eigen::MatrixXs BodyNode::finiteDifferenceRiddersJacobianOfBodyForceIdV(
 //==============================================================================
 /// This checks the intermediate analytical results of
 /// computeJacobianOfMForward() against the finite differencing equivalents.
-void BodyNode::debugJacobianOfMForward(
+bool BodyNode::debugJacobianOfMForward(
     neural::WithRespectTo* wrt, Eigen::VectorXs x)
 {
   auto skel = getSkeleton();
@@ -4204,13 +4209,16 @@ void BodyNode::debugJacobianOfMForward(
   if (((mMddq_dV_p_fd - mMddq_dV_p).cwiseAbs().array() > threshold).any())
   {
     std::cout << "mMddq_dV_p disagrees on body node " << getIndexInSkeleton()
-              << "! " << std::endl;
+              << " \"" << getName() << "\"! " << std::endl;
     std::cout << "Analytical:" << std::endl << mMddq_dV_p << std::endl;
     std::cout << "Brute Force:" << std::endl << mMddq_dV_p_fd << std::endl;
-    std::cout << "Diff:" << std::endl
+    std::cout << "Diff (" << (mMddq_dV_p - mMddq_dV_p_fd).minCoeff() << ", "
+              << (mMddq_dV_p - mMddq_dV_p_fd).maxCoeff() << "):" << std::endl
               << mMddq_dV_p - mMddq_dV_p_fd << std::endl;
+    return false;
   }
   getSkeleton()->setAccelerations(oldAccel);
+  return true;
 }
 
 //==============================================================================
@@ -4384,7 +4392,7 @@ BodyNode::finiteDifferenceRiddersJacobianOfMassSpatialAcceleration(
 //==============================================================================
 /// This checks the intermediate analytical results of
 /// computeJacobianOfMForward() against the finite differencing equivalents.
-void BodyNode::debugJacobianOfMBackward(
+bool BodyNode::debugJacobianOfMBackward(
     neural::WithRespectTo* wrt, Eigen::VectorXs x, Eigen::MatrixXs dM)
 {
   auto skel = getSkeleton();
@@ -4410,7 +4418,10 @@ void BodyNode::debugJacobianOfMBackward(
               << "! " << std::endl;
     std::cout << "Analytical:" << std::endl << mMddq_F_p << std::endl;
     std::cout << "Brute Force:" << std::endl << mMddq_F_p_fd << std::endl;
-    std::cout << "Diff:" << std::endl << mMddq_F_p - mMddq_F_p_fd << std::endl;
+    std::cout << "Diff (" << (mMddq_F_p - mMddq_F_p_fd).minCoeff() << ","
+              << (mMddq_F_p - mMddq_F_p_fd).maxCoeff() << "):" << std::endl
+              << mMddq_F_p - mMddq_F_p_fd << std::endl;
+    return false;
   }
 
   int parentDofs = mParentJoint->getNumDofs();
@@ -4435,13 +4446,17 @@ void BodyNode::debugJacobianOfMBackward(
                 << "! " << std::endl;
       std::cout << "Analytical:" << std::endl << analytical << std::endl;
       std::cout << "Brute Force:" << std::endl << correct << std::endl;
-      std::cout << "Diff:" << std::endl << analytical - correct << std::endl;
+      std::cout << "Diff (" << (correct - analytical).minCoeff() << ","
+                << (correct - analytical).maxCoeff() << "):" << std::endl
+                << analytical - correct << std::endl;
       std::cout << "S:" << std::endl << S << std::endl;
       std::cout << "mMddq_F_p:" << std::endl << mMddq_F_p << std::endl;
+      return false;
     }
   }
 
   getSkeleton()->setAccelerations(oldAccel);
+  return true;
 }
 
 //==============================================================================

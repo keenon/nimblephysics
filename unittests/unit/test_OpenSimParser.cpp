@@ -5,8 +5,8 @@
 #include "dart/realtime/Ticker.hpp"
 #include "dart/server/GUIWebsocketServer.hpp"
 
-#include "TestHelpers.hpp"
 #include "GradientTestUtils.hpp"
+#include "TestHelpers.hpp"
 
 using namespace dart;
 using namespace biomechanics;

@@ -9,23 +9,21 @@ using namespace dart;
 // #define ALL_TESTS
 
 //==============================================================================
-bool verifyCustomJoint(CustomJoint* custom, s_t TEST_THRESHOLD) {
+bool verifyCustomJoint(CustomJoint* custom, s_t TEST_THRESHOLD)
+{
   s_t pos = custom->getPosition(0);
   s_t vel = custom->getVelocity(0);
 
-  Eigen::Vector6s customP_dp
-      = custom->getCustomFunctionGradientAt(pos);
+  Eigen::Vector6s customP_dp = custom->getCustomFunctionGradientAt(pos);
   Eigen::Vector6s customP_dp_fd
-      = custom->finiteDifferenceCustomFunctionGradientAt(
-          pos);
-  if (!equals(customP_dp, customP_dp_fd, TEST_THRESHOLD))
+      = custom->finiteDifferenceCustomFunctionGradientAt(pos);
+  if (!equals(customP_dp, customP_dp_fd, 1e-12))
   {
     std::cout << "Custom dP/dx: " << std::endl << customP_dp << std::endl;
-    std::cout << "FD Custom dP/dx: " << std::endl
-              << customP_dp_fd << std::endl;
+    std::cout << "FD Custom dP/dx: " << std::endl << customP_dp_fd << std::endl;
     std::cout << "Diff: " << std::endl
               << customP_dp - customP_dp_fd << std::endl;
-    EXPECT_TRUE(equals(customP_dp, customP_dp_fd, TEST_THRESHOLD));
+    EXPECT_TRUE(equals(customP_dp, customP_dp_fd, 1e-12));
     return false;
   }
 
@@ -37,8 +35,7 @@ bool verifyCustomJoint(CustomJoint* custom, s_t TEST_THRESHOLD) {
   if (!equals(customV_dp, customV_dp_fd, TEST_THRESHOLD))
   {
     std::cout << "Custom dV/dp: " << std::endl << customV_dp << std::endl;
-    std::cout << "FD Custom dV/dp: " << std::endl
-              << customV_dp_fd << std::endl;
+    std::cout << "FD Custom dV/dp: " << std::endl << customV_dp_fd << std::endl;
     std::cout << "Diff: " << std::endl
               << customV_dp - customV_dp_fd << std::endl;
     EXPECT_TRUE(equals(customV_dp, customV_dp_fd, TEST_THRESHOLD));
@@ -77,13 +74,45 @@ bool verifyCustomJoint(CustomJoint* custom, s_t TEST_THRESHOLD) {
     return false;
   }
 
-  Eigen::Matrix6s dsJ = custom->getSpatialJacobianStaticDerivWrtInput(0);
+  Eigen::Matrix6s dsJ = custom->getSpatialJacobianStaticDerivWrtInput(pos);
   Eigen::Matrix6s dsJ_fd
-      = custom->finiteDifferenceSpatialJacobianStaticDerivWrtInput(0);
+      = custom->finiteDifferenceSpatialJacobianStaticDerivWrtInput(pos);
 
   if (!equals(dsJ, dsJ_fd, TEST_THRESHOLD))
   {
+
     std::cout << "getSpatialJacobianDerivWrtInput(): " << std::endl;
+
+    ////////////////////////////
+    /*
+
+    std::cout << "Gradient: " << std::endl
+              << custom->getCustomFunctionGradientAt(pos) << std::endl;
+    std::cout << "Gradient Diff: " << std::endl
+              << custom->finiteDifferenceCustomFunctionGradientAt(pos)
+                     - custom->getCustomFunctionGradientAt(pos)
+              << std::endl;
+    Eigen::Vector6s positions = custom->getCustomFunctionPositions(pos);
+    Eigen::Matrix6s jac
+        = EulerFreeJoint::computeRelativeJacobianStaticDerivWrtPos(
+            positions,
+            1,
+            custom->getAxisOrder(),
+            custom->getFlipAxisMap(),
+            custom->getTransformFromChildBodyNode());
+    Eigen::Matrix6s jacFD
+        = EulerFreeJoint::finiteDifferenceRelativeJacobianStaticDerivWrtPos(
+            positions,
+            1,
+            custom->getAxisOrder(),
+            custom->getFlipAxisMap(),
+            custom->getTransformFromChildBodyNode());
+    std::cout << "Jac: " << std::endl << jac << std::endl;
+    std::cout << "Jac Diff: " << std::endl << jac - jacFD << std::endl;
+
+    */
+    ////////////////////////////
+
     std::cout << "Analytical dsJ: " << std::endl << dsJ << std::endl;
     std::cout << "FD dsJ: " << std::endl << dsJ_fd << std::endl;
     std::cout << "Diff: " << std::endl << dsJ - dsJ_fd << std::endl;
@@ -117,8 +146,7 @@ bool verifyCustomJoint(CustomJoint* custom, s_t TEST_THRESHOLD) {
   {
     std::cout << "getRelativeJacobianTimeDerivDerivWrtPosition(): "
               << std::endl;
-    std::cout << "Analytical dj dt dp: " << std::endl
-              << dj_dt_dp << std::endl;
+    std::cout << "Analytical dj dt dp: " << std::endl << dj_dt_dp << std::endl;
     std::cout << "FD dj dt dp: " << std::endl << dj_dt_dp_fd << std::endl;
     std::cout << "Diff: " << std::endl << dj_dt_dp - dj_dt_dp_fd << std::endl;
     EXPECT_TRUE(equals(dj_dt_dp, dj_dt_dp_fd, TEST_THRESHOLD));
@@ -134,8 +162,7 @@ bool verifyCustomJoint(CustomJoint* custom, s_t TEST_THRESHOLD) {
   {
     std::cout << "getRelativeJacobianTimeDerivDerivWrtVelocity(): "
               << std::endl;
-    std::cout << "Analytical dj dt dv: " << std::endl
-              << dj_dt_dv << std::endl;
+    std::cout << "Analytical dj dt dv: " << std::endl << dj_dt_dv << std::endl;
     std::cout << "FD dj dt dv: " << std::endl << dj_dt_dv_fd << std::endl;
     std::cout << "Diff: " << std::endl << dj_dt_dv - dj_dt_dv_fd << std::endl;
     EXPECT_TRUE(equals(dj_dt_dv, dj_dt_dv_fd, TEST_THRESHOLD));
@@ -147,10 +174,10 @@ bool verifyCustomJoint(CustomJoint* custom, s_t TEST_THRESHOLD) {
   ////////////////////////////////////////////////////////////////////////////////
 
   Eigen::Matrix6s j3
-      = custom->getSpatialJacobianTimeDerivDerivWrtInputPos(0.0, 1.0);
+      = custom->getSpatialJacobianTimeDerivDerivWrtInputPos(pos, vel);
   Eigen::Matrix6s j3_fd
       = custom->finiteDifferenceSpatialJacobianTimeDerivDerivWrtInputPos(
-          0.0, 1.0);
+          pos, vel);
   if (!equals(j3, j3_fd, TEST_THRESHOLD))
   {
     std::cout << "getSpatialJacobianTimeDerivDerivWrtInput(): " << std::endl;
@@ -161,15 +188,13 @@ bool verifyCustomJoint(CustomJoint* custom, s_t TEST_THRESHOLD) {
     return false;
   }
 
-  Eigen::Matrix6s j4
-      = custom->getSpatialJacobianTimeDerivDerivWrtInputVel(0.0);
+  Eigen::Matrix6s j4 = custom->getSpatialJacobianTimeDerivDerivWrtInputVel(pos);
   Eigen::Matrix6s j4_fd
       = custom->finiteDifferenceSpatialJacobianTimeDerivDerivWrtInputVel(
-          0.0, 1.0);
+          pos, vel);
   if (!equals(j4, j4_fd, TEST_THRESHOLD))
   {
-    std::cout << "getSpatialJacobianTimeDerivDerivWrtInputVel(): "
-              << std::endl;
+    std::cout << "getSpatialJacobianTimeDerivDerivWrtInputVel(): " << std::endl;
     std::cout << "Analytical dj dt dx: " << std::endl << j4 << std::endl;
     std::cout << "FD dj dt dx: " << std::endl << j4_fd << std::endl;
     std::cout << "Diff: " << std::endl << j4 - j4_fd << std::endl;
@@ -227,7 +252,8 @@ TEST(CustomJoint, Construct)
   flips.push_back(Eigen::Vector3s(1.0, 1.0, -1.0));
   flips.push_back(Eigen::Vector3s::Ones() * -1);
 
-  for (Eigen::Vector3s& flip : flips) {
+  for (Eigen::Vector3s& flip : flips)
+  {
     std::cout << "Testing flip " << flip << std::endl;
     custom->setFlipAxisMap(flip);
     euler->setFlipAxisMap(flip);
@@ -284,8 +310,8 @@ TEST(CustomJoint, Construct)
 
       EXPECT_TRUE(
           equals(custom->getCustomFunctionPositions(0.0), skelAPos, 1e-12));
-      EXPECT_TRUE(
-          equals(custom->getCustomFunctionVelocities(0.0, 1.0), skelAVel, 1e-12));
+      EXPECT_TRUE(equals(
+          custom->getCustomFunctionVelocities(0.0, 1.0), skelAVel, 1e-12));
 
       Eigen::Vector6s customAcc
           = custom->getCustomFunctionAccelerations(0.0, 1.0, 0.0);
@@ -360,7 +386,10 @@ TEST(CustomJoint, Construct)
         return;
       }
 
-      if (!verifyCustomJoint(custom, TEST_THRESHOLD)) {return;}
+      if (!verifyCustomJoint(custom, TEST_THRESHOLD))
+      {
+        return;
+      }
     }
   }
 }
@@ -372,8 +401,9 @@ TEST(CustomJoint, OpenSim_Knee)
   CustomJoint::Properties props;
   CustomJoint joint(props);
   joint.setAxisOrder(EulerJoint::AxisOrder::XZY);
-  std::shared_ptr<math::LinearFunction> linear = std::make_shared<math::LinearFunction>(1.0, 0.0);
-  joint.setCustomFunction(0, linear);
+  std::shared_ptr<math::LinearFunction> linear
+      = std::make_shared<math::LinearFunction>(1.0, 0.0);
+  // joint.setCustomFunction(0, linear);
 
   std::vector<s_t> rotZ_x;
   rotZ_x.push_back(0);
@@ -403,7 +433,9 @@ TEST(CustomJoint, OpenSim_Knee)
   rotZ_y.push_back(0.00443314);
   rotZ_y.push_back(-0.00050475);
   rotZ_y.push_back(-0.0016782);
-  std::shared_ptr<math::SimmSpline> rotZ = std::make_shared<math::SimmSpline>(rotZ_x, rotZ_y);
+  std::shared_ptr<math::SimmSpline> rotZ
+      = std::make_shared<math::SimmSpline>(rotZ_x, rotZ_y);
+  (void)rotZ;
   joint.setCustomFunction(1, rotZ);
 
   std::vector<s_t> rotY_x;
@@ -436,100 +468,130 @@ TEST(CustomJoint, OpenSim_Knee)
   rotY_y.push_back(0.262788);
   rotY_y.push_back(0.261654);
 
-  std::shared_ptr<math::SimmSpline> rotY = std::make_shared<math::SimmSpline>(rotY_x, rotY_y);
+  std::shared_ptr<math::SimmSpline> rotY
+      = std::make_shared<math::SimmSpline>(rotY_x, rotY_y);
   (void)rotY;
-  joint.setCustomFunction(2, rotY);
+  // joint.setCustomFunction(2, rotY);
 
-  std::shared_ptr<math::LinearFunction> zero = std::make_shared<math::LinearFunction>(0.0, 0.0);
-  joint.setCustomFunction(5, zero);
+  std::shared_ptr<math::ConstantFunction> zero
+      = std::make_shared<math::ConstantFunction>(0.0);
+  (void)zero;
+  // joint.setCustomFunction(5, zero);
   /*
-							<SpatialTransform>
-								<!--3 Axes for rotations are listed first.-->
-								<TransformAxis name="rotation1">
-									<!--Names of the coordinates that serve as the independent variables         of the transform function.-->
-									<coordinates>knee_angle_r</coordinates>
-									<!--Rotation or translation axis for the transform.-->
-									<axis>1 0 0</axis>
-									<!--Transform function of the generalized coordinates used to        represent the amount of transformation along a specified axis.-->
-									<function>
-										<LinearFunction>
-											<coefficients> 1 0</coefficients>
-										</LinearFunction>
-									</function>
-								</TransformAxis>
-								<TransformAxis name="rotation2">
-									<!--Names of the coordinates that serve as the independent variables         of the transform function.-->
-									<coordinates>knee_angle_r</coordinates>
-									<!--Rotation or translation axis for the transform.-->
-									<axis>0 0 1</axis>
-									<!--Transform function of the generalized coordinates used to        represent the amount of transformation along a specified axis.-->
-									<function>
-										<SimmSpline>
-											<x> 0 0.174533 0.349066 0.523599 0.698132 0.872665 1.0472 1.22173 1.39626 1.5708 1.74533 1.91986 2.0944</x>
-											<y> 0 0.0126809 0.0226969 0.0296054 0.0332049 0.0335354 0.0308779 0.0257548 0.0189295 0.011407 0.00443314 -0.00050475 -0.0016782</y>
-										</SimmSpline>
-									</function>
-								</TransformAxis>
-								<TransformAxis name="rotation3">
-									<!--Names of the coordinates that serve as the independent variables         of the transform function.-->
-									<coordinates>knee_angle_r</coordinates>
-									<!--Rotation or translation axis for the transform.-->
-									<axis>0 1 0</axis>
-									<!--Transform function of the generalized coordinates used to        represent the amount of transformation along a specified axis.-->
-									<function>
-										<SimmSpline>
-											<x> 0 0.174533 0.349066 0.523599 0.698132 0.872665 1.0472 1.22173 1.39626 1.5708 1.74533 1.91986 2.0944</x>
-											<y> 0 0.059461 0.109399 0.150618 0.18392 0.210107 0.229983 0.24435 0.254012 0.25977 0.262428 0.262788 0.261654</y>
-										</SimmSpline>
-									</function>
-								</TransformAxis>
-								<!--3 Axes for translations are listed next.-->
-								<TransformAxis name="translation1">
-									<!--Names of the coordinates that serve as the independent variables         of the transform function.-->
-									<coordinates>knee_angle_r</coordinates>
-									<!--Rotation or translation axis for the transform.-->
-									<axis>0 1 0</axis>
-									<!--Transform function of the generalized coordinates used to        represent the amount of transformation along a specified axis.-->
-									<function>
-										<SimmSpline>
-											<x> 0 0.174533 0.349066 0.523599 0.698132 0.872665 1.0472 1.22173 1.39626 1.5708 1.74533 1.91986 2.0944</x>
-											<y> 0 0.000479 0.000835 0.001086 0.001251 0.001346 0.001391 0.001403 0.0014 0.0014 0.001421 0.001481 0.001599</y>
-										</SimmSpline>
-									</function>
-								</TransformAxis>
-								<TransformAxis name="translation2">
-									<!--Names of the coordinates that serve as the independent variables         of the transform function.-->
-									<coordinates>knee_angle_r</coordinates>
-									<!--Rotation or translation axis for the transform.-->
-									<axis>0 0 1</axis>
-									<!--Transform function of the generalized coordinates used to        represent the amount of transformation along a specified axis.-->
-									<function>
-										<SimmSpline>
-											<x> 0 0.174533 0.349066 0.523599 0.698132 0.872665 1.0472 1.22173 1.39626 1.5708 1.74533 1.91986 2.0944</x>
-											<y> 0 0.000988 0.001899 0.002734 0.003492 0.004173 0.004777 0.005305 0.005756 0.00613 0.006427 0.006648 0.006792</y>
-										</SimmSpline>
-									</function>
-								</TransformAxis>
-								<TransformAxis name="translation3">
-									<!--Names of the coordinates that serve as the independent variables         of the transform function.-->
-									<coordinates></coordinates>
-									<!--Rotation or translation axis for the transform.-->
-									<axis>1 0 0</axis>
-									<!--Transform function of the generalized coordinates used to        represent the amount of transformation along a specified axis.-->
-									<function>
-										<Constant>
-											<value>0</value>
-										</Constant>
-									</function>
-								</TransformAxis>
-							</SpatialTransform>
+              <SpatialTransform>
+                <!--3 Axes for rotations are listed first.-->
+                <TransformAxis name="rotation1">
+                  <!--Names of the coordinates that serve as the independent
+     variables         of the transform function.-->
+                  <coordinates>knee_angle_r</coordinates>
+                  <!--Rotation or translation axis for the transform.-->
+                  <axis>1 0 0</axis>
+                  <!--Transform function of the generalized coordinates used to
+     represent the amount of transformation along a specified axis.-->
+                  <function>
+                    <LinearFunction>
+                      <coefficients> 1 0</coefficients>
+                    </LinearFunction>
+                  </function>
+                </TransformAxis>
+                <TransformAxis name="rotation2">
+                  <!--Names of the coordinates that serve as the independent
+     variables         of the transform function.-->
+                  <coordinates>knee_angle_r</coordinates>
+                  <!--Rotation or translation axis for the transform.-->
+                  <axis>0 0 1</axis>
+                  <!--Transform function of the generalized coordinates used to
+     represent the amount of transformation along a specified axis.-->
+                  <function>
+                    <SimmSpline>
+                      <x> 0 0.174533 0.349066 0.523599 0.698132
+     0.872665 1.0472 1.22173 1.39626 1.5708 1.74533 1.91986 2.0944</x> <y> 0
+     0.0126809 0.0226969 0.0296054 0.0332049 0.0335354 0.0308779 0.0257548
+     0.0189295 0.011407 0.00443314 -0.00050475 -0.0016782</y>
+                    </SimmSpline>
+                  </function>
+                </TransformAxis>
+                <TransformAxis name="rotation3">
+                  <!--Names of the coordinates that serve as the independent
+     variables         of the transform function.-->
+                  <coordinates>knee_angle_r</coordinates>
+                  <!--Rotation or translation axis for the transform.-->
+                  <axis>0 1 0</axis>
+                  <!--Transform function of the generalized coordinates used to
+     represent the amount of transformation along a specified axis.-->
+                  <function>
+                    <SimmSpline>
+                      <x> 0 0.174533 0.349066 0.523599 0.698132
+     0.872665 1.0472 1.22173 1.39626 1.5708 1.74533 1.91986 2.0944</x> <y> 0
+     0.059461 0.109399 0.150618 0.18392 0.210107 0.229983 0.24435 0.254012
+     0.25977 0.262428 0.262788 0.261654</y>
+                    </SimmSpline>
+                  </function>
+                </TransformAxis>
+                <!--3 Axes for translations are listed next.-->
+                <TransformAxis name="translation1">
+                  <!--Names of the coordinates that serve as the independent
+     variables         of the transform function.-->
+                  <coordinates>knee_angle_r</coordinates>
+                  <!--Rotation or translation axis for the transform.-->
+                  <axis>0 1 0</axis>
+                  <!--Transform function of the generalized coordinates used to
+     represent the amount of transformation along a specified axis.-->
+                  <function>
+                    <SimmSpline>
+                      <x> 0 0.174533 0.349066 0.523599 0.698132
+     0.872665 1.0472 1.22173 1.39626 1.5708 1.74533 1.91986 2.0944</x> <y> 0
+     0.000479 0.000835 0.001086 0.001251 0.001346 0.001391 0.001403 0.0014
+     0.0014 0.001421 0.001481 0.001599</y>
+                    </SimmSpline>
+                  </function>
+                </TransformAxis>
+                <TransformAxis name="translation2">
+                  <!--Names of the coordinates that serve as the independent
+     variables         of the transform function.-->
+                  <coordinates>knee_angle_r</coordinates>
+                  <!--Rotation or translation axis for the transform.-->
+                  <axis>0 0 1</axis>
+                  <!--Transform function of the generalized coordinates used to
+     represent the amount of transformation along a specified axis.-->
+                  <function>
+                    <SimmSpline>
+                      <x> 0 0.174533 0.349066 0.523599 0.698132
+     0.872665 1.0472 1.22173 1.39626 1.5708 1.74533 1.91986 2.0944</x> <y> 0
+     0.000988 0.001899 0.002734 0.003492 0.004173 0.004777 0.005305 0.005756
+     0.00613 0.006427 0.006648 0.006792</y>
+                    </SimmSpline>
+                  </function>
+                </TransformAxis>
+                <TransformAxis name="translation3">
+                  <!--Names of the coordinates that serve as the independent
+     variables         of the transform function.--> <coordinates></coordinates>
+                  <!--Rotation or translation axis for the transform.-->
+                  <axis>1 0 0</axis>
+                  <!--Transform function of the generalized coordinates used to
+     represent the amount of transformation along a specified axis.-->
+                  <function>
+                    <Constant>
+                      <value>0</value>
+                    </Constant>
+                  </function>
+                </TransformAxis>
+              </SpatialTransform>
   */
-  for (int i = 0; i < 10; i++) {
+  for (int i = 0; i < 10; i++)
+  {
+    /*
     joint.setPositions(Eigen::Vector1s::Random());
     joint.setVelocities(Eigen::Vector1s::Random());
-    // joint.setPosition(0, 0.396927);
-    // joint.setVelocity(0, 0.535337);
-    std::cout << "Testing (" << joint.getPosition(0) << "," << joint.getVelocity(0) << ")" << std::endl;
-    if (!verifyCustomJoint(&joint, 1e-9)) { return; }
+    */
+
+    joint.setPosition(0, 0.0);
+    joint.setVelocity(0, 1.0);
+    std::cout << "Testing (" << joint.getPosition(0) << ","
+              << joint.getVelocity(0) << ")" << std::endl;
+    if (!verifyCustomJoint(&joint, 1e-9))
+    {
+      return;
+    }
   }
 }

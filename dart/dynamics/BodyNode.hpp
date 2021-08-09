@@ -1166,7 +1166,7 @@ public:
       neural::WithRespectTo* wrt);
   /// This checks the intermediate analytical results of
   /// computeJacobianOfMForward() against the finite differencing equivalents.
-  void debugJacobianOfMForward(neural::WithRespectTo* wrt, Eigen::VectorXs x);
+  bool debugJacobianOfMForward(neural::WithRespectTo* wrt, Eigen::VectorXs x);
   /// This computes the Jacobian of the dV (mM_dV) as it's computed in the M
   /// computation
   Eigen::MatrixXs finiteDifferenceJacobianOfMassSpatialAcceleration(
@@ -1177,7 +1177,7 @@ public:
       neural::WithRespectTo* wrt);
   /// This checks the intermediate analytical results of
   /// computeJacobianOfMBackward() against the finite differencing equivalents.
-  void debugJacobianOfMBackward(
+  bool debugJacobianOfMBackward(
       neural::WithRespectTo* wrt, Eigen::VectorXs x, Eigen::MatrixXs dM);
   /// This computes the Jacobian of the F (mM_F) as it's computed in the M
   /// computation

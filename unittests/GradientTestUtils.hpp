@@ -2188,14 +2188,18 @@ bool verifyFeatherstoneJacobians(WorldPtr world)
     Eigen::VectorXs x = Eigen::VectorXs::Random(skel->getNumDofs());
     for (int j = 0; j < skel->getNumBodyNodes(); j++)
     {
-      skel->getBodyNode(j)->debugJacobianOfMForward(WithRespectTo::POSITION, x);
+      bool success = skel->getBodyNode(j)->debugJacobianOfMForward(WithRespectTo::POSITION, x);
+      EXPECT_TRUE(success);
+      if (!success) return false;
     }
     Eigen::MatrixXs MinvX
         = skel->finiteDifferenceJacobianOfM(x, WithRespectTo::POSITION);
     for (int j = skel->getNumBodyNodes() - 1; j >= 0; j--)
     {
-      skel->getBodyNode(j)->debugJacobianOfMBackward(
+      bool success = skel->getBodyNode(j)->debugJacobianOfMBackward(
           WithRespectTo::POSITION, x, MinvX);
+      EXPECT_TRUE(success);
+      if (!success) return false;
     }
   }
   return true;

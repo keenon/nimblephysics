@@ -267,7 +267,10 @@ TEST(EulerFreeJoint, Construct)
   flips.push_back(Eigen::Vector3s(1.0, 1.0, -1.0));
   flips.push_back(Eigen::Vector3s::Ones() * -1);
 
-  for (Eigen::Vector3s& flip : flips) {
+  s_t THRESHOLD = 1e-9;
+
+  for (Eigen::Vector3s& flip : flips)
+  {
     std::cout << "Testing flip " << flip << std::endl;
     for (EulerJoint::AxisOrder& order : orders)
     {
@@ -341,7 +344,7 @@ TEST(EulerFreeJoint, Construct)
 
         Eigen::Matrix4s posA = bodyA->getWorldTransform().matrix();
         Eigen::Matrix4s posB = bodyB->getWorldTransform().matrix();
-        if (!equals(posA, posB, 1e-8))
+        if (!equals(posA, posB, THRESHOLD))
         {
           std::cout << "Testing euler positions: " << eulerPos << std::endl;
           std::cout << "Testing euler velocities: " << eulerVel << std::endl;
@@ -351,7 +354,7 @@ TEST(EulerFreeJoint, Construct)
           std::cout << "Pos A: " << std::endl << posA << std::endl;
           std::cout << "Pos B: " << std::endl << posB << std::endl;
           std::cout << "Diff: " << std::endl << posA - posB << std::endl;
-          EXPECT_TRUE(equals(posA, posB, 1e-8));
+          EXPECT_TRUE(equals(posA, posB, THRESHOLD));
           return;
         }
 
@@ -359,7 +362,7 @@ TEST(EulerFreeJoint, Construct)
 
         Eigen::Vector6s velA = bodyA->getSpatialVelocity();
         Eigen::Vector6s velB = bodyB->getSpatialVelocity();
-        if (!equals(velA, velB, 1e-8))
+        if (!equals(velA, velB, THRESHOLD))
         {
           std::cout << "Testing euler positions: " << eulerPos << std::endl;
           std::cout << "Testing euler velocities: " << eulerVel << std::endl;
@@ -369,7 +372,7 @@ TEST(EulerFreeJoint, Construct)
           std::cout << "Vel A: " << std::endl << velA << std::endl;
           std::cout << "Vel B: " << std::endl << velB << std::endl;
           std::cout << "Diff: " << std::endl << velA - velB << std::endl;
-          EXPECT_TRUE(equals(velA, velB, 1e-8));
+          EXPECT_TRUE(equals(velA, velB, THRESHOLD));
           return;
         }
 
@@ -381,7 +384,7 @@ TEST(EulerFreeJoint, Construct)
         Eigen::Matrix6s dJ_fd
             = EulerFreeJoint::finiteDifferenceRelativeJacobianTimeDerivStatic(
                 skelAPos, skelAVel, order, flip, childToEuler);
-        if (!equals(dJ, dJ_fd, 1e-7))
+        if (!equals(dJ, dJ_fd, THRESHOLD))
         {
           std::cout << "Testing euler positions: " << eulerPos << std::endl;
           std::cout << "Testing euler velocities: " << eulerVel << std::endl;
@@ -393,7 +396,7 @@ TEST(EulerFreeJoint, Construct)
           std::cout << "Analytical dJ: " << std::endl << dJ << std::endl;
           std::cout << "FD dJ: " << std::endl << dJ_fd << std::endl;
           std::cout << "Diff: " << std::endl << dJ - dJ_fd << std::endl;
-          EXPECT_TRUE(equals(dJ, dJ_fd, 1e-7));
+          EXPECT_TRUE(equals(dJ, dJ_fd, THRESHOLD));
           return;
         }
 
@@ -401,7 +404,7 @@ TEST(EulerFreeJoint, Construct)
 
         Eigen::Vector6s accA = bodyA->getSpatialAcceleration();
         Eigen::Vector6s accB = bodyB->getSpatialAcceleration();
-        if (!equals(accA, accB, 1e-8))
+        if (!equals(accA, accB, THRESHOLD))
         {
           std::cout << "Testing euler positions: " << eulerPos << std::endl;
           std::cout << "Testing euler velocities: " << eulerVel << std::endl;
@@ -413,7 +416,7 @@ TEST(EulerFreeJoint, Construct)
           std::cout << "Acc A: " << std::endl << accA << std::endl;
           std::cout << "Acc B: " << std::endl << accB << std::endl;
           std::cout << "Diff: " << std::endl << accA - accB << std::endl;
-          EXPECT_TRUE(equals(accA, accB, 1e-8));
+          EXPECT_TRUE(equals(accA, accB, THRESHOLD));
           return;
         }
 
@@ -424,10 +427,10 @@ TEST(EulerFreeJoint, Construct)
           Eigen::Matrix6s dpos_J
               = EulerFreeJoint::computeRelativeJacobianStaticDerivWrtPos(
                   skelAPos, j, order, flip, childToEuler);
-          Eigen::Matrix6s dpos_J_fd
-              = EulerFreeJoint::finiteDifferenceRelativeJacobianStaticDerivWrtPos(
+          Eigen::Matrix6s dpos_J_fd = EulerFreeJoint::
+              finiteDifferenceRelativeJacobianStaticDerivWrtPos(
                   skelAPos, j, order, flip, childToEuler);
-          if (!equals(dpos_J, dpos_J_fd, 1e-7))
+          if (!equals(dpos_J, dpos_J_fd, THRESHOLD))
           {
             std::cout << "Testing euler positions: " << eulerPos << std::endl;
             std::cout << "Testing euler velocities: " << eulerVel << std::endl;
@@ -439,8 +442,9 @@ TEST(EulerFreeJoint, Construct)
             std::cout << "Wrt position: " << j << std::endl;
             std::cout << "Analytical d_J: " << std::endl << dpos_J << std::endl;
             std::cout << "FD d_J: " << std::endl << dpos_J_fd << std::endl;
-            std::cout << "Diff: " << std::endl << dpos_J - dpos_J_fd << std::endl;
-            EXPECT_TRUE(equals(dpos_J, dpos_J_fd, 1e-7));
+            std::cout << "Diff: " << std::endl
+                      << dpos_J - dpos_J_fd << std::endl;
+            EXPECT_TRUE(equals(dpos_J, dpos_J_fd, THRESHOLD));
             return;
           }
 
@@ -450,7 +454,7 @@ TEST(EulerFreeJoint, Construct)
           Eigen::Matrix6s dpos_dJ_fd = EulerFreeJoint::
               finiteDifferenceRelativeJacobianTimeDerivDerivWrtPos(
                   skelAPos, skelAVel, j, order, flip, childToEuler);
-          if (!equals(dpos_dJ, dpos_dJ_fd, 1e-7))
+          if (!equals(dpos_dJ, dpos_dJ_fd, THRESHOLD))
           {
             std::cout << "Testing euler positions: " << eulerPos << std::endl;
             std::cout << "Testing euler velocities: " << eulerVel << std::endl;
@@ -460,11 +464,12 @@ TEST(EulerFreeJoint, Construct)
             std::cout << "Testing trans acc: " << transAcc << std::endl;
 
             std::cout << "Wrt position: " << j << std::endl;
-            std::cout << "Analytical d_dJ: " << std::endl << dpos_dJ << std::endl;
+            std::cout << "Analytical d_dJ: " << std::endl
+                      << dpos_dJ << std::endl;
             std::cout << "FD d_dJ: " << std::endl << dpos_dJ_fd << std::endl;
             std::cout << "Diff: " << std::endl
                       << dpos_dJ - dpos_dJ_fd << std::endl;
-            EXPECT_TRUE(equals(dpos_dJ, dpos_dJ_fd, 1e-7));
+            EXPECT_TRUE(equals(dpos_dJ, dpos_dJ_fd, THRESHOLD));
             return;
           }
 
@@ -474,7 +479,7 @@ TEST(EulerFreeJoint, Construct)
           Eigen::Matrix6s dvel_dJ_fd = EulerFreeJoint::
               finiteDifferenceRelativeJacobianTimeDerivDerivWrtVel(
                   skelAPos, skelAVel, j, order, flip, childToEuler);
-          if (!equals(dvel_dJ, dvel_dJ_fd, 1e-7))
+          if (!equals(dvel_dJ, dvel_dJ_fd, THRESHOLD))
           {
             std::cout << "Testing euler positions: " << eulerPos << std::endl;
             std::cout << "Testing euler velocities: " << eulerVel << std::endl;
@@ -484,11 +489,12 @@ TEST(EulerFreeJoint, Construct)
             std::cout << "Testing trans acc: " << transAcc << std::endl;
 
             std::cout << "Wrt velocity: " << j << std::endl;
-            std::cout << "Analytical dvel_dJ: " << std::endl << dvel_dJ << std::endl;
+            std::cout << "Analytical dvel_dJ: " << std::endl
+                      << dvel_dJ << std::endl;
             std::cout << "FD dvel_dJ: " << std::endl << dvel_dJ_fd << std::endl;
             std::cout << "Diff: " << std::endl
                       << dvel_dJ - dvel_dJ_fd << std::endl;
-            EXPECT_TRUE(equals(dvel_dJ, dvel_dJ_fd, 1e-7));
+            EXPECT_TRUE(equals(dvel_dJ, dvel_dJ_fd, THRESHOLD));
             return;
           }
         }

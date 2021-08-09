@@ -264,19 +264,12 @@ s_t SimmSpline::calcValue(s_t x) const
    * and the coordinate is still out of range, deal with it quietly.
    */
 
+  /*
   if (aX < _x[0])
     return _y[0] + (aX - _x[0]) * _b[0];
   else if (aX > _x[n - 1])
     return _y[n - 1] + (aX - _x[n - 1]) * _b[n - 1];
-
-  /* Check to see if the abscissa is close to one of the end points
-   * (the binary search method doesn't work well if you are at one of the
-   * end points.
-   */
-  if (EQUAL_WITHIN_ERROR(aX, _x[0]))
-    return _y[0];
-  else if (EQUAL_WITHIN_ERROR(aX, _x[n - 1]))
-    return _y[n - 1];
+  */
 
   if (n < 3)
   {
@@ -288,18 +281,29 @@ s_t SimmSpline::calcValue(s_t x) const
   }
   else
   {
-    /* Do a binary search to find which two points the abscissa is between. */
-    i = 0;
-    j = n;
-    while (1)
+    /* Check to see if the abscissa is close to one of the end points
+     * (the binary search method doesn't work well if you are at one of the
+     * end points.
+     */
+    if (EQUAL_WITHIN_ERROR(aX, _x[0]) || aX < _x[0])
+      k = 0;
+    else if (EQUAL_WITHIN_ERROR(aX, _x[n - 1]) || aX > _x[n - 1])
+      k = n - 1;
+    else
     {
-      k = (i + j) / 2;
-      if (aX < _x[k])
-        j = k;
-      else if (aX > _x[k + 1])
-        i = k;
-      else
-        break;
+      /* Do a binary search to find which two points the abscissa is between. */
+      i = 0;
+      j = n;
+      while (1)
+      {
+        k = (i + j) / 2;
+        if (aX < _x[k])
+          j = k;
+        else if (aX > _x[k + 1])
+          i = k;
+        else
+          break;
+      }
     }
   }
 
@@ -336,6 +340,7 @@ s_t SimmSpline::calcDerivative(int order, s_t x) const
    * and the coordinate is still out of range, deal with it quietly.
    */
 
+  /*
   if (aX < _x[0])
   {
     if (aDerivOrder == 1)
@@ -350,25 +355,36 @@ s_t SimmSpline::calcDerivative(int order, s_t x) const
     else
       return 0;
   }
+  */
 
   /* Check to see if the abscissa is close to one of the end points
    * (the binary search method doesn't work well if you are at one of the
    * end points.
    */
+  /*
   if (EQUAL_WITHIN_ERROR(aX, _x[0]))
   {
     if (aDerivOrder == 1)
       return _b[0];
-    else
+    else if (aDerivOrder == 2)
       return 2.0 * _c[0];
+    else if (aDerivOrder == 3)
+      return 6.0 * _d[0];
+    else
+      return 0.0;
   }
   else if (EQUAL_WITHIN_ERROR(aX, _x[n - 1]))
   {
     if (aDerivOrder == 1)
       return _b[n - 1];
-    else
+    else if (aDerivOrder == 2)
       return 2.0 * _c[n - 1];
+    else if (aDerivOrder == 3)
+      return 6.0 * _d[0];
+    else
+      return 0.0;
   }
+  */
 
   if (n < 3)
   {
@@ -380,18 +396,29 @@ s_t SimmSpline::calcDerivative(int order, s_t x) const
   }
   else
   {
-    /* Do a binary search to find which two points the abscissa is between. */
-    i = 0;
-    j = n;
-    while (1)
+    if (EQUAL_WITHIN_ERROR(aX, _x[0]) || aX < _x[0])
     {
-      k = (i + j) / 2;
-      if (aX < _x[k])
-        j = k;
-      else if (aX > _x[k + 1])
-        i = k;
-      else
-        break;
+      k = 0;
+    }
+    else if (EQUAL_WITHIN_ERROR(aX, _x[n - 1]) || aX > _x[n - 1])
+    {
+      k = n - 1;
+    }
+    else
+    {
+      /* Do a binary search to find which two points the abscissa is between. */
+      i = 0;
+      j = n;
+      while (1)
+      {
+        k = (i + j) / 2;
+        if (aX < _x[k])
+          j = k;
+        else if (aX > _x[k + 1])
+          i = k;
+        else
+          break;
+      }
     }
   }
 
@@ -405,8 +432,74 @@ s_t SimmSpline::calcDerivative(int order, s_t x) const
 
   else if (aDerivOrder == 3)
     return 6.0 * _d[k];
-  
-  else return 0.0;
+
+  else
+    return 0.0;
+}
+
+s_t SimmSpline::finiteDifferenceFirstDerivative(s_t x, bool useRiddders)
+{
+  if (useRiddders)
+  {
+    return finiteDifferenceRiddersFirstDerivative(x);
+  }
+
+  const s_t EPS = 1e-7;
+  return (calcValue(x + EPS) - calcValue(x - EPS)) / (2 * EPS);
+}
+
+s_t SimmSpline::finiteDifferenceRiddersFirstDerivative(s_t x)
+{
+  const s_t originalStepSize = 1e-3;
+  const s_t con = 1.4, con2 = (con * con);
+  const s_t safeThreshold = 2.0;
+  const int tabSize = 10;
+
+  s_t stepSize = originalStepSize;
+  s_t bestError = std::numeric_limits<s_t>::max();
+
+  // Neville tableau of finite difference results
+  std::array<std::array<s_t, tabSize>, tabSize> tab;
+
+  tab[0][0]
+      = (calcValue(x + stepSize) - calcValue(x - stepSize)) / (2 * stepSize);
+  s_t dx = tab[0][0];
+
+  // Iterate over smaller and smaller step sizes
+  for (int iTab = 1; iTab < tabSize; iTab++)
+  {
+    stepSize /= con;
+
+    tab[0][iTab]
+        = (calcValue(x + stepSize) - calcValue(x - stepSize)) / (2 * stepSize);
+
+    s_t fac = con2;
+    // Compute extrapolations of increasing orders, requiring no new
+    // evaluations
+    for (int jTab = 1; jTab <= iTab; jTab++)
+    {
+      tab[jTab][iTab]
+          = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1]) / (fac - 1.0);
+      fac = con2 * fac;
+      s_t currError = max(
+          std::abs(tab[jTab][iTab] - tab[jTab - 1][iTab]),
+          std::abs(tab[jTab][iTab] - tab[jTab - 1][iTab - 1]));
+      if (currError < bestError)
+      {
+        bestError = currError;
+        dx = tab[jTab][iTab];
+      }
+    }
+
+    // If higher order is worse by a significant factor, quit early.
+    if (std::abs(tab[iTab][iTab] - tab[iTab - 1][iTab - 1])
+        >= safeThreshold * bestError)
+    {
+      break;
+    }
+  }
+
+  return dx;
 }
 
 int SimmSpline::getArgumentSize() const
