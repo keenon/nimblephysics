@@ -3438,20 +3438,20 @@ void BodyNode::debugJacobianOfCBackward(neural::WithRespectTo* wrt)
   Eigen::MatrixXs mCg_g_p_fd = finiteDifferenceJacobianOfGravityForce(wrt);
   if (((mCg_g_p_fd - mCg_g_p).cwiseAbs().array() > threshold).any())
   {
-    std::cout << "mCg_g_p disagrees on body node " << getIndexInSkeleton()
+    std::cout << "mCg_g_p disagrees on body node " << getIndexInSkeleton() << " named \"" << getName() << "\""
               << "! " << std::endl;
     std::cout << "Analytical:" << std::endl << mCg_g_p << std::endl;
     std::cout << "Brute Force:" << std::endl << mCg_g_p_fd << std::endl;
-    std::cout << "Diff:" << std::endl << mCg_g_p - mCg_g_p_fd << std::endl;
+    std::cout << "Diff (" << (mCg_g_p - mCg_g_p_fd).minCoeff() << "," << (mCg_g_p - mCg_g_p_fd).maxCoeff() << "):" << std::endl << mCg_g_p - mCg_g_p_fd << std::endl;
   }
   Eigen::MatrixXs mCg_F_p_fd = finiteDifferenceJacobianOfBodyForce(wrt);
   if (((mCg_F_p_fd - mCg_F_p).cwiseAbs().array() > threshold).any())
   {
-    std::cout << "mCg_F_p disagrees on body node " << getIndexInSkeleton()
+    std::cout << "mCg_F_p disagrees on body node " << getIndexInSkeleton() << " named \"" << getName() << "\""
               << "! num children = " << mChildBodyNodes.size() << std::endl;
     std::cout << "Analytical:" << std::endl << mCg_F_p << std::endl;
     std::cout << "Brute Force:" << std::endl << mCg_F_p_fd << std::endl;
-    std::cout << "Diff:" << std::endl << mCg_F_p - mCg_F_p_fd << std::endl;
+    std::cout << "Diff (" << (mCg_F_p - mCg_F_p_fd).minCoeff() << "," << (mCg_F_p - mCg_F_p_fd).maxCoeff() << "):" << std::endl << mCg_F_p - mCg_F_p_fd << std::endl;
   }
   Eigen::MatrixXs mCg_V_ad_IV_p_fd
       = finiteDifferenceJacobianOfBodyForceAdVIV(wrt);

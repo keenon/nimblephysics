@@ -79,7 +79,7 @@ public:
   //--------------------------------------------------------------------------
   // CONSTRUCTION
   //--------------------------------------------------------------------------
-  SimmSpline(std::vector<s_t> x, std::vector<double> y);
+  SimmSpline(std::vector<s_t> x, std::vector<s_t> y);
 
 private:
   void setNull();

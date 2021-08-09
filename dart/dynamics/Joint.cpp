@@ -525,11 +525,11 @@ void Joint::debugRelativeJacobianInPositionSpace()
   const s_t threshold = 1e-9;
   if (((bruteForce - analytical).cwiseAbs().array() > threshold).any())
   {
-    std::cout << "Relative Jacobian (in position space) disagrees on joint"
-              << "!" << std::endl;
+    std::cout << "Relative Jacobian (in position space) disagrees on joint \"" << getName()
+              << "\" of type \"" << getType() << "\"!" << std::endl;
     std::cout << "Analytical:" << std::endl << analytical << std::endl;
     std::cout << "Brute Force:" << std::endl << bruteForce << std::endl;
-    std::cout << "Diff:" << std::endl << analytical - bruteForce << std::endl;
+    std::cout << "Diff (" << (analytical - bruteForce).minCoeff() << "," << (analytical - bruteForce).maxCoeff() << "):" << std::endl << analytical - bruteForce << std::endl;
   }
 }
 

@@ -64,7 +64,7 @@ std::vector<const dynamics::BodyNode*> LilypadSolver::getContactBodies()
 
       if (cell.groundLowerBound < vertHeight
           && cell.groundUpperBound > vertHeight
-          && std::abs(verticalVel) < mVerticalVelThreshold
+          && ((verticalVel > 0 && verticalVel < mVerticalVelThreshold) || (verticalVel < 0 && -verticalVel < mVerticalVelThreshold))
           && lateralVel < mLateralVelThreshold)
       {
         bodies.push_back(body);
@@ -129,7 +129,7 @@ void LilypadSolver::process(Eigen::MatrixXs poses, int startTime)
             = vert.vel - mGroundNormal * verticalVel;
         s_t lateralVel = lateralVelVector.norm();
         s_t verticalAccel = vert.accel.dot(mGroundNormal);
-        if (std::abs(verticalVel) > mVerticalVelThreshold
+        if ((verticalVel > 0 && verticalVel > mVerticalVelThreshold) || (verticalVel < 0 && -verticalVel > mVerticalVelThreshold)
             || lateralVel > mLateralVelThreshold
             || verticalAccel < mVerticalAccelerationThreshold)
         {

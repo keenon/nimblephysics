@@ -67,6 +67,7 @@ _ccd_inline int ccdIsZero(s_t val)
   return CCD_FABS(val) < CCD_EPS;
 }
 
+/*
 _ccd_inline int ccdEq(s_t _a, s_t _b)
 {
   s_t ab;
@@ -87,6 +88,7 @@ _ccd_inline int ccdEq(s_t _a, s_t _b)
     return ab < CCD_EPS * a;
   }
 }
+*/
 
 _ccd_inline int ccdSign(s_t val)
 {

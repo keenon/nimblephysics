@@ -66,6 +66,9 @@ public:
   /// epsilon change in x, how does each custom function change?
   Eigen::Vector6s getCustomFunctionGradientAt(s_t x) const;
 
+  Eigen::Vector6s finiteDifferenceCustomFunctionGradientAt(
+      s_t x) const;
+
   /// This gets the array of 2nd order derivatives at x
   Eigen::Vector6s getCustomFunctionSecondGradientAt(s_t x) const;
 
@@ -157,11 +160,16 @@ public:
   Eigen::Matrix6s getSpatialJacobianStaticDerivWrtInput(s_t pos) const;
 
   Eigen::Matrix6s finiteDifferenceSpatialJacobianStaticDerivWrtInput(
+      s_t pos, bool useRidders = true) const;
+
+  Eigen::Matrix6s finiteDifferenceRiddersSpatialJacobianStaticDerivWrtInput(
       s_t pos) const;
 
   math::Jacobian getRelativeJacobianDeriv(std::size_t index) const override;
 
-  math::Jacobian finiteDifferenceRelativeJacobianDeriv(std::size_t index);
+  math::Jacobian finiteDifferenceRelativeJacobianDeriv(std::size_t index, bool useRidders = true);
+
+  math::Jacobian finiteDifferenceRiddersRelativeJacobianDeriv(std::size_t index);
 
   void updateRelativeJacobian(bool) const override;
 
@@ -171,11 +179,17 @@ public:
       s_t pos, s_t vel) const;
 
   Eigen::Matrix6s finiteDifferenceSpatialJacobianTimeDerivDerivWrtInputPos(
+      s_t pos, s_t vel, bool useRidders = true) const;
+
+  Eigen::Matrix6s finiteDifferenceRiddersSpatialJacobianTimeDerivDerivWrtInputPos(
       s_t pos, s_t vel) const;
 
   Eigen::Matrix6s getSpatialJacobianTimeDerivDerivWrtInputVel(s_t pos) const;
 
   Eigen::Matrix6s finiteDifferenceSpatialJacobianTimeDerivDerivWrtInputVel(
+      s_t pos, s_t vel, bool useRidders = true) const;
+
+  Eigen::Matrix6s finiteDifferenceRiddersSpatialJacobianTimeDerivDerivWrtInputVel(
       s_t pos, s_t vel) const;
 
   /// Computes derivative of time derivative of Jacobian w.r.t. position.
@@ -183,6 +197,9 @@ public:
       std::size_t index) const override;
 
   math::Jacobian finiteDifferenceRelativeJacobianTimeDerivDerivWrtPosition(
+      std::size_t index, bool useRidders = true);
+
+  math::Jacobian finiteDifferenceRiddersRelativeJacobianTimeDerivDerivWrtPosition(
       std::size_t index);
 
   /// Computes derivative of time derivative of Jacobian w.r.t. velocity.
@@ -190,6 +207,9 @@ public:
       std::size_t index) const override;
 
   math::Jacobian finiteDifferenceRelativeJacobianTimeDerivDerivWrtVelocity(
+      std::size_t index, bool useRidders = true);
+
+  math::Jacobian finiteDifferenceRiddersRelativeJacobianTimeDerivDerivWrtVelocity(
       std::size_t index);
 
   ///////////////////////////////////////////////////////////////////////////

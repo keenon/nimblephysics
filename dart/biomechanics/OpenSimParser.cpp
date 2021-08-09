@@ -271,7 +271,7 @@ dynamics::SkeletonPtr OpenSimParser::readOsim40(
   while (bodyCursor)
   {
     std::string name(bodyCursor->Attribute("name"));
-    std::cout << name << std::endl;
+    // std::cout << name << std::endl;
 
     if (name == "ground")
     {
@@ -311,8 +311,10 @@ dynamics::SkeletonPtr OpenSimParser::readOsim40(
         inertia_xy,
         inertia_xz,
         inertia_yz);
+    /*
     std::cout << "Inertia tensor: " << std::endl
               << inertia.getSpatialTensor() << std::endl;
+    */
 
     dynamics::BodyNode* childBody = nullptr;
 
@@ -648,8 +650,8 @@ dynamics::SkeletonPtr OpenSimParser::readOsim40(
               if (locked)
               {
                 // TODO: Just replace with a Weld joint
-                dof->setVelocityUpperLimit(0);
-                dof->setVelocityLowerLimit(0);
+                // dof->setVelocityUpperLimit(0);
+                // dof->setVelocityLowerLimit(0);
               }
               if (clamped)
               {

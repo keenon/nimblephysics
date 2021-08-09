@@ -41,7 +41,7 @@ using namespace std;
 //=============================================================================
 
 /// Construct and fit a spline
-SimmSpline::SimmSpline(std::vector<s_t> x, std::vector<double> y) : _x(x), _y(y)
+SimmSpline::SimmSpline(std::vector<s_t> x, std::vector<s_t> y) : _x(x), _y(y)
 {
   // FIT THE SPLINE
   calcCoefficients();
@@ -322,8 +322,8 @@ s_t SimmSpline::calcDerivative(int order, s_t x) const
   int aDerivOrder = order;
 
   // We assume all higher order derivatives are 0, because each spline segment
-  // is only order 2
-  if (order > 2)
+  // is only order 3
+  if (order > 3)
     return 0;
 
   /* Check if the abscissa is out of range of the function. If it is,
@@ -400,8 +400,13 @@ s_t SimmSpline::calcDerivative(int order, s_t x) const
   if (aDerivOrder == 1)
     return (_b[k] + dx * (2.0 * _c[k] + 3.0 * dx * _d[k]));
 
-  else
+  else if (aDerivOrder == 2)
     return (2.0 * _c[k] + 6.0 * dx * _d[k]);
+
+  else if (aDerivOrder == 3)
+    return 6.0 * _d[k];
+  
+  else return 0.0;
 }
 
 int SimmSpline::getArgumentSize() const

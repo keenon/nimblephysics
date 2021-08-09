@@ -6,6 +6,7 @@
 #include "dart/server/GUIWebsocketServer.hpp"
 
 #include "TestHelpers.hpp"
+#include "GradientTestUtils.hpp"
 
 using namespace dart;
 using namespace biomechanics;
@@ -17,6 +18,9 @@ TEST(OpenSimParser, RAJAGOPAL)
   std::shared_ptr<dynamics::Skeleton> skel = OpenSimParser::readSkeleton(
       "dart://sample/osim/FullBodyModel-4.0/Rajagopal2015.osim");
   (void)skel;
+  std::shared_ptr<simulation::World> world = simulation::World::create();
+  world->addSkeleton(skel);
+  // verifyFeatherstoneJacobians(world);
 
   // Uncomment this for local testing
   /*
