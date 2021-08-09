@@ -76,6 +76,13 @@ enum PinToFace
   FACE_B = 2
 };
 
+enum SmoothNormWRT
+{
+    POINT_1 = 0,
+    POINT_2 = 1,
+    POINT_3 = 2,
+};
+
 int collideBoxBox(
     CollisionObject* o1,
     CollisionObject* o2,
@@ -444,6 +451,39 @@ s_t angle2D(const Eigen::Vector2s& from, const Eigen::Vector2s& to);
 // This implements the "2D cross product" as redefined here:
 // https://stackoverflow.com/a/565282/13177487
 inline s_t crossProduct2D(const Eigen::Vector2s& v, const Eigen::Vector2s& w);
+
+// This check whether 3D point p lay in the triangle abc
+// If true return 0 , if false return -1
+int pointInTriangle(Eigen::Vector3s a, Eigen::Vector3s b, Eigen::Vector3s c, Eigen::Vector3s p);
+
+// This compute the area of triangle from three vertex point based on Helen formula
+s_t computeArea(Eigen::Vector3s a, Eigen::Vector3s b, Eigen::Vector3s c);
+
+// This compute the perimeter of triangle from three vertices
+s_t computePerimeter(Eigen::Vector3s a, Eigen:: Vector3s b, Eigen::Vector3s c);
+
+// This compute the interpolation result of some vector field at point p
+Eigen::VectorXs barycentricInterpolate(
+    std::vector<Eigen::VectorXs>& vectors,
+    std::vector<Eigen::Vector3s>& positions,
+    Eigen::Vector3s p
+);
+
+// This compute derivative of norms of former point
+Eigen::Vector3s computeJacobianOfNormFormer(Eigen::Vector3s former, Eigen::Vector3s latter);
+
+// This compute derivative of norms of latter point
+Eigen::Vector3s computeJacobianOfNormLatter(Eigen::Vector3s former, Eigen::Vector3s latter);
+
+// This compute derivative of perimeter point wrt to edges
+Eigen::Vector3s computeJacobianOfPerimeter(Eigen::Vector3s p1, Eigen::Vector3s p2, 
+                                           Eigen::Vector3s p3, SmoothNormWRT wrt);
+
+// This compute derivative of area wrt edges
+Eigen::Vector3s computeJacobianOfArea(Eigen::Vector3s p1, Eigen::Vector3s p2,
+                                      Eigen::Vector3s p3, SmoothNormWRT wrt);
+
+
 
 /// This returns true if the two line segments defined by (p0,p1) and (q0,q1)
 /// intersect. If they do intersect, this writes the intersection point to

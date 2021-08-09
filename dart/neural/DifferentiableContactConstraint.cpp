@@ -1060,8 +1060,9 @@ Eigen::Vector3s DifferentiableContactConstraint::getContactNormalGradient(
       return -normGrad;
     }
   }
+  // TODO: Eric Chen: Implement Gradient For vertex face contact
 
-  // Default case
+  // Default case For Vertex Face Contact
   return Eigen::Vector3s::Zero();
 }
 

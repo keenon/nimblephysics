@@ -3817,6 +3817,180 @@ s_t angle2D(const Eigen::Vector2s& from, const Eigen::Vector2s& to)
   return atan2(to(1) - from(1), to(0) - from(0));
 }
 
+// This Check whether point p's projection on abc triangle lays on interior of shape or not
+// This is a lightweight implementation for triangle special case
+int pointInTriangle(
+  Eigen::Vector3s a,
+  Eigen::Vector3s b,
+  Eigen::Vector3s c,
+  Eigen::Vector3s p
+  )
+{
+  Eigen::Vector3s e1 = b - a;
+  Eigen::Vector3s e2 = c - b;
+  Eigen::Vector3s e3 = a - c;
+  Eigen::Vector3s norm = e1.cross(e2);
+  if((e1.cross(p-a)).dot(norm)>0||(e2.cross(p-b)).dot(norm)>0||(e3.cross(p-c)).dot(norm)>0)
+  {
+    return 0;
+  }
+  else
+  {
+    return -1;
+  }
+}
+
+s_t computeArea(Eigen::Vector3s a, Eigen::Vector3s b, Eigen::Vector3s c)
+{
+  s_t e1 = (a-b).norm();
+  s_t e2 = (b-c).norm();
+  s_t e3 = (c-a).norm();
+  // Compute perimeter of the triangle
+  s_t p = (e1+e2+e3)/2;
+  s_t area = sqrt(p*(p-e1)*(p-e2)*(p-e3));
+  return area;
+}
+
+s_t computePerimeter(Eigen::Vector3s a, Eigen::Vector3s b, Eigen::Vector3s c)
+{
+  s_t e1 = (a-b).norm();
+  s_t e2 = (b-c).norm();
+  s_t e3 = (c-a).norm();
+
+  // Compute perimeter of the triangle
+  s_t p = e1+e2+e3;
+  return p;
+}
+
+// Interpolate three vector based on the coordinate
+Eigen::VectorXs barycentricInterpolate(
+  std::vector<Eigen::VectorXs>& vectors,
+  std::vector<Eigen::Vector3s>& positions,
+  Eigen::Vector3s p
+)
+{
+  assert(vectors.size()==3);
+  assert(positions.size()==3);
+  Eigen::Vector3s a = position[0];
+  Eigen::Vector3s b = position[1];
+  Eigen::Vector3s c = position[2];
+  Eigen::VectorXs va = vectors[0];
+  Eigen::VectorXs vb = vectors[1];
+  Eigen::VectorXs vc = vectors[2];
+  assert(pointInTriangle(a,b,c,p)==0);
+  s_t A = computeArea(a,b,c);
+  s_t Aa = computeArea(p,b,c);
+  s_t Ab = computeArea(p,a,c);
+  s_t Ac = computeArea(p,a,b);
+  Eigen::VectorXs result = 1/A*(Aa*va+Ab*vb+Ac*vc);
+  return result;
+}
+
+s_t computeJacobianOfNormFormer(Eigen::Vector3s former, Eigen::Vector3s latter)
+{
+  Eigen::Vector3s jac = Eigen::Vector3s::Zero(3);
+  jac(0) = 2*(former(0) - latter(0));
+  jac(1) = 2*(former(1) - latter(1));
+  jac(2) = 2*(former(2) - latter(2));
+  jac = jac*(1/(2*(former-latter).norm()));
+  return jac;
+}
+
+s_t computeJacobianOfNormFormer(Eigen::Vector3s former, Eigen::Vector3s latter)
+{
+  Eigen::Vector3s jac = Eigen::Vector3s::Zero(3);
+  jac(0) = 2*(latter(0) - former(0));
+  jac(1) = 2*(latter(1) - former(1));
+  jac(2) = 2*(latter(2) - former(2));
+  jac = jac*(1/(2*(former-latter).norm()));
+  return jac;
+}
+
+s_t computeJacobianOfPerimeter(
+  Eigen::Vector3s e1,
+  Eigen::Vector3s e2,
+  Eigen::Vector3s e3,
+  SmoothNormWRT wrt
+  )
+{
+  Eigen::Vector3s jac;
+  if(wrt == SmoothNormWRT::POINT_1)
+  {
+    jac = computeJacobianOfFormer(p1, p2) + computeJacobianOfLatter(p3,p1);
+  }
+  else if(wrt == SmoothNormWRT::POINT_2)
+  {
+    jac = computeJacobianOfLatter(p1, p2) + computeJacobianOfFormer(p2, p3);
+  }
+  else
+  {
+    jac = computeJacobianOfLatter(p2, p3) + computeJacobianOfFormer(p3, p1);
+  }
+  return jac;
+}
+
+Eigen::Vector3s computeJacobianOfArea(
+  Eigen::Vector3s p1,
+  Eigen::Vector3s p2,
+  Eigen::Vector3s p3,
+  SmoothNormWRT wrt
+  )
+{
+  Eigen::Vector3s jac;
+  s_t area = computeArea(p1,p2,p3);
+  s_t half_p = 0.5*computePerimeter(p1,p2,p3);
+  Eigen::Vector3s half_dP = 0.5*computeJacobianOfPerimeter(p1,p2,p3,wrt);
+  if(wrt == SmoothNormWRT::POINT_1)
+  {
+    jac = half_dP*(half_p-(p1-p2).norm())*(half_p-(p2-p3).norm())*(half_p-(p3-p1).norm())
+          + (half_dP-computeJacobianOfFormer(p1,p2))*half_p*(half_p-(p2-p3).norm())*(half_p-(p3-p1).norm())
+          + half_dP*half_p*(half_p-(p1-p2).norm())*(half_p-(p3-p1).norm())
+          + (half_dP-computeJacobianOfLatter(p3,p1))*half_p*(half_p-(p1-p2).norm())*(half_p-(p2-p3).norm());
+  }
+  else if(wrt == SmoothNormWRT::POINT_2)
+  {
+    jac = half_dP*(half_p-(p1-p2).norm())*(half_p-(p2-p3).norm())*(half_p-(p3-p1).norm())
+          + (half_dP-computeJacobianOfLatter(p1,p2))*half_p*(half_p-(p2-p3).norm())*(half_p-(p3-p1).norm())
+          + (half_dP-computeJacobianOfFormer(p2,p3))*half_p*(half_p-(p1-p2).norm())*(half_p-(p3-p1).norm())
+          + half_dP*half_p*(half_p-(p1-p2).norm())*(half_p-(p2-p3).norm());
+  }
+  else
+  {
+    jac = half_dP*(half_p-(p1-p2).norm())*(half_p-(p2-p3).norm())*(half_p-(p3-p1).norm())
+          + half_dP*half_p*(half_p-(p2-p3).norm())*(half_p-(p3-p1).norm())
+          + (half_dP-computeJacobianOfLatter(p2,p3))*half_p*(half_p-(p1-p2).norm())*(half_p-(p3-p1).norm())
+          + (half_dP-computeJacobianOfFormer(p3,p1))*half_p*(half_p-(p1-p2).norm())*(half_p-(p2-p3).norm());
+  }
+  jac = jac*(1/2*(area));
+  return jac;
+}
+
+// Compute Jacobian Matrix of barycentric interpolation wrt p
+Eigen::MatrixXs computeJacobianOfBaryInterpWrtP(
+    std::vector<Eigen::VectorXs>& vectors,
+    std::vector<Eigen::Vector3s>& positions,
+    Eigen::Vector3s p
+)
+{
+  assert(vectors.size()==3);
+  assert(positions.size()==3);
+  Eigen::Vector3s a = positions[0];
+  Eigen::Vector3s b = positions[1];
+  Eigen::Vector3s c = positions[2];
+  Eigen::VectorXs va = vectors[0];
+  Eigen::VectorXs vb = vectors[1];
+  Eigen::VectorXs vc = vectors[2];
+  Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(3,va.rows());
+  Eigen::Vector3s jac_a = computeJacobianOfArea(p,b,c,SmoothNormWRT::POINT_1);
+  Eigen::Vector3s jac_b = computeJacobianOfArea(p,a,c,SmoothNormWRT::POINT_2);
+  Eigen::Vector3s jac_c = computeJacobianOfArea(p,a,b,SmoothNormWRT::POINT_3);
+  for(int i=0;i<va.rows();i++)
+  {
+    jac.col(i) = va(i)*jac_a + vb(i)*jac_b + vc(i)*jac_c;
+  }
+  return jac;
+}
+
 // Returns 1 if the lines intersect, otherwise 0. In addition, if the lines
 // intersect the intersection point may be stored in the floats i(0) and i(1).
 //
