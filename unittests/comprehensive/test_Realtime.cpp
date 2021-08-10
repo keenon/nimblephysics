@@ -151,7 +151,7 @@ std::shared_ptr<LossFn> getSSIDLoss()
   return std::make_shared<LossFn>(loss, lossGrad);
 }
 
-// #ifdef ALL_TESTS
+#ifdef ALL_TESTS
 TEST(REALTIME, CARTPOLE_MPC)
 {
   ////////////////////////////////////////////////////////////
@@ -410,12 +410,13 @@ TEST(REALTIME, CARTPOLE_MPC)
   {
     // spin
     // cartpole->setPosition(0, 0.0);
-    // cartpole->setControlForces(Eigen::VectorXs::Zero(cartpole->getNumDofs()));
+    //
+  cartpole->setControlForces(Eigen::VectorXs::Zero(cartpole->getNumDofs()));
     // cartpole->setPositions(Eigen::VectorXs::Zero(cartpole->getNumDofs()));
   }
   */
 }
-// #endif
+#endif
 
 #ifdef ALL_TESTS
 TEST(REALTIME, CARTPOLE_SSID)
@@ -508,10 +509,11 @@ TEST(REALTIME, CARTPOLE_SSID)
   }
   armPair.second->setMass(1.0);
 
-  ssid.setInitialPosEstimator([](Eigen::MatrixXs sensors, long /* timestamp */) {
-    // Use the first column of sensor data as an approximate starting point
-    return sensors.col(0);
-  });
+  ssid.setInitialPosEstimator(
+      [](Eigen::MatrixXs sensors, long /* timestamp */) {
+        // Use the first column of sensor data as an approximate starting point
+        return sensors.col(0);
+      });
 
   ssid.runInference(30 * millisPerTimestep);
 
