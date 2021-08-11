@@ -27,6 +27,7 @@
  * -------------------------------------------------------------------------- */
 
 #include "dart/math/SimmSpline.hpp"
+#include <array>
 
 using namespace dart;
 using namespace math;
