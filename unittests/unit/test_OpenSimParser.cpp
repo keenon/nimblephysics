@@ -20,7 +20,7 @@ TEST(OpenSimParser, RAJAGOPAL)
   (void)skel;
   std::shared_ptr<simulation::World> world = simulation::World::create();
   world->addSkeleton(skel);
-  // verifyFeatherstoneJacobians(world);
+  verifyFeatherstoneJacobians(world);
 
   // Uncomment this for local testing
   /*

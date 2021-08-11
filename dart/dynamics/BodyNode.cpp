@@ -4433,11 +4433,27 @@ bool BodyNode::debugJacobianOfMBackward(
         = static_cast<int>(mParentJoint->getDof(0)->getIndexInSkeleton());
     Eigen::MatrixXs correct = dM.block(iStart, 0, parentDofs, dM.cols());
 
+    /*
+    dMddq.block(iStart, jStart, jointNumDofs, 1)
+        = S.transpose() * mMddq_F_p.col(i); // m x 1
+
+    if (mParentJoint->hasDof(dof))
+    {
+      const Jacobian DS_Dq
+          = mParentJoint->getRelativeJacobianDeriv(dof->getIndexInJoint());
+
+      dMddq.block(iStart, jStart, jointNumDofs, 1)
+          += DS_Dq.transpose() * mMddq_F;
+    }
+    */
+
     Eigen::MatrixXs analytical = S.transpose() * mMddq_F_p; // m x 1
     for (int i = 0; i < parentDofs; i++)
     {
       const Eigen::MatrixXs& DS_Dq = mParentJoint->getRelativeJacobianDeriv(i);
-      analytical.col(i) += DS_Dq.transpose() * mMddq_F;
+      int offset = mParentJoint->getDof(i)->getIndexInSkeleton();
+      // Rightmost columns of the block correspond to parent DOFs
+      analytical.col(offset) += DS_Dq.transpose() * mMddq_F;
     }
 
     if (((correct - analytical).cwiseAbs().array() > threshold).any())
@@ -4451,6 +4467,17 @@ bool BodyNode::debugJacobianOfMBackward(
                 << analytical - correct << std::endl;
       std::cout << "S:" << std::endl << S << std::endl;
       std::cout << "mMddq_F_p:" << std::endl << mMddq_F_p << std::endl;
+      std::cout << "S.T * mMddq_F_p:" << std::endl
+                << S.transpose() * mMddq_F_p << std::endl;
+
+      for (int i = 0; i < parentDofs; i++)
+      {
+        const Eigen::MatrixXs& DS_Dq
+            = mParentJoint->getRelativeJacobianDeriv(i);
+        std::cout << "DS_Dq[" << i << "]: " << std::endl << DS_Dq << std::endl;
+        std::cout << "DS_Dq[" << i << "].T * mMddq_F: " << std::endl
+                  << DS_Dq.transpose() * mMddq_F << std::endl;
+      }
       return false;
     }
   }
