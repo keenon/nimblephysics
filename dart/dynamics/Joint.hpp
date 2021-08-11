@@ -694,7 +694,6 @@ public:
   /// the parent BodyNode expressed in the child BodyNode frame
   virtual const math::Jacobian getRelativeJacobianTimeDeriv() const = 0;
 
-  // TODO(JS): Rename and add documentation
   /// Computes derivative of time derivative of Jacobian w.r.t. position.
   virtual math::Jacobian getRelativeJacobianTimeDerivDerivWrtPosition(
       std::size_t /*index*/) const
@@ -703,7 +702,6 @@ public:
     return math::Jacobian::Zero(6, getNumDofs());
   }
 
-  // TODO(JS): Rename and add documentation
   /// Computes derivative of time derivative of Jacobian w.r.t. velocity.
   virtual math::Jacobian getRelativeJacobianTimeDerivDerivWrtVelocity(
       std::size_t /*index*/) const

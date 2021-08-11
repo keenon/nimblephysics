@@ -4415,7 +4415,7 @@ bool BodyNode::debugJacobianOfMBackward(
   if (((mMddq_F_p_fd - mMddq_F_p).cwiseAbs().array() > threshold).any())
   {
     std::cout << "mMddq_F_p disagrees on body node " << getIndexInSkeleton()
-              << "! " << std::endl;
+              << " \"" << getName() << "\"! " << std::endl;
     std::cout << "Analytical:" << std::endl << mMddq_F_p << std::endl;
     std::cout << "Brute Force:" << std::endl << mMddq_F_p_fd << std::endl;
     std::cout << "Diff (" << (mMddq_F_p - mMddq_F_p_fd).minCoeff() << ","
@@ -4443,7 +4443,7 @@ bool BodyNode::debugJacobianOfMBackward(
     if (((correct - analytical).cwiseAbs().array() > threshold).any())
     {
       std::cout << "mMddq disagrees on body node " << getIndexInSkeleton()
-                << "! " << std::endl;
+                << " \"" << getName() << "\"! " << std::endl;
       std::cout << "Analytical:" << std::endl << analytical << std::endl;
       std::cout << "Brute Force:" << std::endl << correct << std::endl;
       std::cout << "Diff (" << (correct - analytical).minCoeff() << ","

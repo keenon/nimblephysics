@@ -42,7 +42,6 @@ namespace dynamics {
 class UniversalJoint : public detail::UniversalJointBase
 {
 public:
-
   friend class Skeleton;
   using UniqueProperties = detail::UniversalJointUniqueProperties;
   using Properties = detail::UniversalJointProperties;
@@ -101,8 +100,63 @@ public:
   Eigen::Matrix<s_t, 6, 2> getRelativeJacobianStatic(
       const Eigen::Vector2s& _positions) const override;
 
-protected:
+  Eigen::Matrix<s_t, 6, 2> getRelativeJacobianTimeDerivStatic(
+      const Eigen::Vector2s& _positions,
+      const Eigen::Vector2s& _velocities) const;
 
+  math::Jacobian getRelativeJacobianDeriv(size_t index) const override;
+
+  math::Jacobian getRelativeJacobianTimeDerivDerivWrtPosition(
+      size_t index) const override;
+
+  math::Jacobian getRelativeJacobianTimeDerivDerivWrtVelocity(
+      size_t index) const override;
+
+  Eigen::Matrix<s_t, 6, 2> finiteDifferenceRelativeJacobianTimeDerivStatic(
+      const Eigen::Vector2s& positions,
+      const Eigen::Vector2s& velocities,
+      bool useRidders = true) const;
+
+  Eigen::Matrix<s_t, 6, 2>
+  finiteDifferenceRiddersRelativeJacobianTimeDerivStatic(
+      const Eigen::Vector2s& positions,
+      const Eigen::Vector2s& velocities) const;
+
+  Eigen::Matrix<s_t, 6, 2> finiteDifferenceRelativeJacobianDerivWrtPos(
+      const Eigen::Vector2s& positions,
+      int index,
+      bool useRidders = true) const;
+
+  Eigen::Matrix<s_t, 6, 2> finiteDifferenceRiddersRelativeJacobianDerivWrtPos(
+      const Eigen::Vector2s& positions, int index) const;
+
+  Eigen::Matrix<s_t, 6, 2>
+  finiteDifferenceRelativeJacobianTimeDerivDerivWrtPosition(
+      const Eigen::Vector2s& positions,
+      const Eigen::Vector2s& velocities,
+      int index,
+      bool useRidders = true) const;
+
+  Eigen::Matrix<s_t, 6, 2>
+  finiteDifferenceRiddersRelativeJacobianTimeDerivDerivWrtPosition(
+      const Eigen::Vector2s& positions,
+      const Eigen::Vector2s& velocities,
+      int index) const;
+
+  Eigen::Matrix<s_t, 6, 2>
+  finiteDifferenceRelativeJacobianTimeDerivDerivWrtVelocity(
+      const Eigen::Vector2s& positions,
+      const Eigen::Vector2s& velocities,
+      int index,
+      bool useRidders = true) const;
+
+  Eigen::Matrix<s_t, 6, 2>
+  finiteDifferenceRiddersRelativeJacobianTimeDerivDerivWrtVelocity(
+      const Eigen::Vector2s& positions,
+      const Eigen::Vector2s& velocities,
+      int index) const;
+
+protected:
   /// Constructor called by Skeleton class
   UniversalJoint(const Properties& properties);
 
@@ -118,13 +172,13 @@ protected:
   void updateRelativeTransform() const override;
 
   // Documentation inherited
-  void updateRelativeJacobian(bool =true) const override;
+  void updateRelativeJacobian(bool = true) const override;
 
   // Documentation inherited
   void updateRelativeJacobianTimeDeriv() const override;
 };
 
-}  // namespace dynamics
-}  // namespace dart
+} // namespace dynamics
+} // namespace dart
 
-#endif  // DART_DYNAMICS_UNIVERSALJOINT_HPP_
+#endif // DART_DYNAMICS_UNIVERSALJOINT_HPP_
