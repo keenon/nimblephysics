@@ -217,6 +217,92 @@ public:
   /// This returns the skeletons that this contact constraint interacts with.
   const std::vector<std::shared_ptr<dynamics::Skeleton>>& getSkeletons();
 
+  ////////////////////////////////////////////////////////////////////////////////////
+  // Compute Jacobian of Barycentric interpolation
+  ////////////////////////////////////////////////////////////////////////////////////
+
+  // This compute derivative of norms of former point
+  Eigen::Vector3s computeJacobianOfNormFormer(Eigen::Vector3s former, Eigen::Vector3s latter);
+
+  // This compute derivative of norms of latter point
+  Eigen::Vector3s computeJacobianOfNormLatter(Eigen::Vector3s former, Eigen::Vector3s latter);
+  
+  // This compute derivative of perimeter point wrt to edges
+  Eigen::Vector3s computeJacobianOfPerimeter(Eigen::Vector3s p1, Eigen::Vector3s p2, 
+                                          Eigen::Vector3s p3, SmoothNormWRT wrt);
+
+  // This compute derivative of area wrt edges
+  Eigen::Vector3s computeJacobianOfArea(Eigen::Vector3s p1, Eigen::Vector3s p2,
+                                      Eigen::Vector3s p3, SmoothNormWRT wrt);
+
+  // This compute jacobian of interpolated vector wrt p
+  Eigen::MatrixXs computeJacobianOfBaryInterpWrtP(
+      std::vector<Eigen::VectorXs>& vectors,
+      std::vector<Eigen::Vector3s>& positions,
+      Eigen::Vector3s p
+  );
+
+  ////////////////////////////////////////////////////////////////////////////////////
+  // Compute Jacobian of Inverse Squared Distance interpolation
+  ////////////////////////////////////////////////////////////////////////////////////
+  Eigen::Vector3s computeJacobianOfSqrNormFormer(Eigen::Vector3s former, Eigen::Vector3s latter);
+
+  Eigen::Vector3s computeJacobianOfSqrNormLatter(Eigen::Vector3s former, Eigen::Vector3s latter);
+
+  s_t computeNormMul(
+      std::vector<Eigen::Vector3s> points,
+      Eigen::Vector3s point,
+      int index);
+
+  std::vector<Eigen::Vector3s> getMaskedPoints(
+      std::vector<Eigen::Vector3s> points,
+      int index);
+
+  s_t computeDenominator(
+      std::vector<Eigen::Vector3s> points,
+      Eigen::Vector3s point);
+
+  Eigen::Vector3s computeJacobianOfVecSqrNormMulWrtP(
+      std::vector<Eigen::Vector3s> points,
+      Eigen::Vector3s point);
+
+  Eigen::Vector3s computeJacobianOfVecSqrNormMulWrtI(
+      std::vector<Eigen::Vector3s> points,
+      Eigen::Vector3s point,
+      int index);
+
+  // Here expect the points are all points
+  Eigen::Vector3s computeJacobianOfDenominatorWrtP(
+      std::vector<Eigen::Vector3s> points,
+      Eigen::Vector3s point);
+
+  Eigen::Vector3s computeJacobianOfDenominatorWrtI(
+      std::vector<Eigen::Vector3s> points,
+      Eigen::Vector3s point,
+      int index);
+
+  Eigen::Vector3s computeJacobianOfISDWeightWrtP(
+      std::vector<Eigen::Vector3s> points,
+      Eigen::Vector3s point,
+      int index);
+
+  Eigen::Vector3s computeJacobianOfISDWeightWrtI(
+      std::vector<Eigen::Vector3s> points,
+      Eigen::Vector3s point,
+      int i,
+      int index);
+
+  Eigen::MatrixXs computeJacobianOfISDInterpWrtP(
+      std::vector<Eigen::VectorXs> vectors,
+      std::vector<Eigen::Vector3s> points,
+      Eigen::Vector3s point);
+
+  Eigen::MatrixXs computeJacobianOfISDInterpWrtI(
+      std::vector<Eigen::VectorXs> vectors,
+      std::vector<Eigen::Vector3s> points,
+      Eigen::Vector3s point,
+      int index);
+
   /////////////////////////////////////////////////////////////////////////////////////
   // Testing
   /////////////////////////////////////////////////////////////////////////////////////

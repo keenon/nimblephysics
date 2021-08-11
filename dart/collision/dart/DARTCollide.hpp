@@ -462,28 +462,33 @@ s_t computeArea(Eigen::Vector3s a, Eigen::Vector3s b, Eigen::Vector3s c);
 // This compute the perimeter of triangle from three vertices
 s_t computePerimeter(Eigen::Vector3s a, Eigen:: Vector3s b, Eigen::Vector3s c);
 
+// This compute the multiplication of all vectors norm
+s_t computeVectorSqrNormMul(std::vector<Eigen::Vector3s> vectors);
+
+// This compute the weight of inverse squared distance interpolation of a point
+std::vector<std::vector<Eigen::Vector3s>> computeISDSubcomponent(
+    std::vector<Eigen::Vector3s> points,
+    Eigen::Vector3s point,
+    int index);
+
+s_t computeDenominator(std::vector<std::vector<Eigen::Vector3s>> sub_components);
+
+s_t computeISDWeight(
+    std::vector<std::vector<Eigen::Vector3s>> sub_components,
+    Eigen::Vector3s point,
+    int index);
+
+Eigen::VectorXs ISDInterpolate(
+  std::vector<Eigen::VectorXs> vectors,
+  std::vector<Eigen::Vector3s> positions,
+  Eigen::Vector3s p
+);
 // This compute the interpolation result of some vector field at point p
 Eigen::VectorXs barycentricInterpolate(
     std::vector<Eigen::VectorXs>& vectors,
     std::vector<Eigen::Vector3s>& positions,
     Eigen::Vector3s p
 );
-
-// This compute derivative of norms of former point
-Eigen::Vector3s computeJacobianOfNormFormer(Eigen::Vector3s former, Eigen::Vector3s latter);
-
-// This compute derivative of norms of latter point
-Eigen::Vector3s computeJacobianOfNormLatter(Eigen::Vector3s former, Eigen::Vector3s latter);
-
-// This compute derivative of perimeter point wrt to edges
-Eigen::Vector3s computeJacobianOfPerimeter(Eigen::Vector3s p1, Eigen::Vector3s p2, 
-                                           Eigen::Vector3s p3, SmoothNormWRT wrt);
-
-// This compute derivative of area wrt edges
-Eigen::Vector3s computeJacobianOfArea(Eigen::Vector3s p1, Eigen::Vector3s p2,
-                                      Eigen::Vector3s p3, SmoothNormWRT wrt);
-
-
 
 /// This returns true if the two line segments defined by (p0,p1) and (q0,q1)
 /// intersect. If they do intersect, this writes the intersection point to
