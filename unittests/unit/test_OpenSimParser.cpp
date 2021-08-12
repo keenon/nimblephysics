@@ -20,8 +20,9 @@ TEST(OpenSimParser, RAJAGOPAL)
   (void)skel;
   std::shared_ptr<simulation::World> world = simulation::World::create();
   world->addSkeleton(skel);
-  // verifyFeatherstoneJacobians(world);
+  verifyFeatherstoneJacobians(world);
 
+  /*
   // Uncomment this for local testing
   GUIWebsocketServer server;
   server.serve(8070);
@@ -44,4 +45,5 @@ TEST(OpenSimParser, RAJAGOPAL)
   server.registerConnectionListener([&]() { ticker.start(); });
 
   server.blockWhileServing();
+  */
 }
