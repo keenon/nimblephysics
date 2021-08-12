@@ -188,7 +188,7 @@ void buildJoint(dynamics::SkeletonPtr /*skel*/, OpenSimJointXML* joint)
 }
 
 //==============================================================================
-dynamics::SkeletonPtr OpenSimParser::readSkeleton(
+dynamics::SkeletonPtr OpenSimParser::parseOsim(
     const common::Uri& uri, const common::ResourceRetrieverPtr& nullOrRetriever)
 {
   const common::ResourceRetrieverPtr retriever

@@ -160,6 +160,11 @@ void EulerJoint(py::module& m)
               std::size_t _index) -> bool { return self->isCyclic(_index); },
           ::py::arg("index"))
       .def(
+          "setFlipAxisMap",
+          &dart::dynamics::EulerJoint::setFlipAxisMap,
+          ::py::arg("flipMap"))
+      .def("getFlipAxisMap", &dart::dynamics::EulerJoint::getFlipAxisMap)
+      .def(
           "setAxisOrder",
           +[](dart::dynamics::EulerJoint* self,
               dart::dynamics::EulerJoint::AxisOrder _order) {
@@ -196,8 +201,7 @@ void EulerJoint(py::module& m)
       .def(
           "getRelativeJacobianStatic",
           +[](const dart::dynamics::EulerJoint* self,
-              const Eigen::Vector3s& _positions)
-              -> Eigen::Matrix<s_t, 6, 3> {
+              const Eigen::Vector3s& _positions) -> Eigen::Matrix<s_t, 6, 3> {
             return self->getRelativeJacobianStatic(_positions);
           },
           ::py::arg("positions"))
@@ -211,23 +215,27 @@ void EulerJoint(py::module& m)
       .def_static(
           "convertToTransformOf",
           +[](const Eigen::Vector3s& _positions,
-              dart::dynamics::EulerJoint::AxisOrder _ordering)
-              -> Eigen::Isometry3s {
+              dart::dynamics::EulerJoint::AxisOrder _ordering,
+              const Eigen::Vector3s& flipAxisMap
+              = Eigen::Vector3s::Ones()) -> Eigen::Isometry3s {
             return dart::dynamics::EulerJoint::convertToTransform(
-                _positions, _ordering);
+                _positions, _ordering, flipAxisMap);
           },
           ::py::arg("positions"),
-          ::py::arg("ordering"))
+          ::py::arg("ordering"),
+          ::py::arg("flipAxisMap") = Eigen::Vector3s::Ones())
       .def_static(
           "convertToRotationOf",
           +[](const Eigen::Vector3s& _positions,
-              dart::dynamics::EulerJoint::AxisOrder _ordering)
-              -> Eigen::Matrix3s {
+              dart::dynamics::EulerJoint::AxisOrder _ordering,
+              const Eigen::Vector3s& flipAxisMap
+              = Eigen::Vector3s::Ones()) -> Eigen::Matrix3s {
             return dart::dynamics::EulerJoint::convertToRotation(
-                _positions, _ordering);
+                _positions, _ordering, flipAxisMap);
           },
           ::py::arg("positions"),
-          ::py::arg("ordering"));
+          ::py::arg("ordering"),
+          ::py::arg("flipAxisMap") = Eigen::Vector3s::Ones());
 }
 
 } // namespace python

@@ -30,6 +30,12 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <memory>
+
+#include <dart/biomechanics/OpenSimParser.hpp>
+#include <dart/dynamics/MeshShape.hpp>
+#include <dart/dynamics/Skeleton.hpp>
+#include <dart/simulation/World.hpp>
 #include <pybind11/pybind11.h>
 
 namespace py = pybind11;
@@ -37,87 +43,15 @@ namespace py = pybind11;
 namespace dart {
 namespace python {
 
-void Shape(py::module& sm);
-
-void Entity(py::module& sm);
-void Frame(py::module& sm);
-void ShapeFrame(py::module& sm);
-void SimpleFrame(py::module& sm);
-
-void Node(py::module& sm);
-void JacobianNode(py::module& sm);
-void ShapeNode(py::module& sm);
-
-void DegreeOfFreedom(py::module& sm);
-
-void BodyNode(py::module& sm);
-void Inertia(py::module& sm);
-
-void Joint(py::module& sm);
-void ZeroDofJoint(py::module& sm);
-void WeldJoint(py::module& sm);
-void GenericJoint(py::module& sm);
-void RevoluteJoint(py::module& sm);
-void PrismaticJoint(py::module& sm);
-void ScrewJoint(py::module& sm);
-void UniversalJoint(py::module& sm);
-void TranslationalJoint2D(py::module& sm);
-void PlanarJoint(py::module& sm);
-void EulerJoint(py::module& sm);
-void EulerFreeJoint(py::module& sm);
-void CustomJoint(py::module& sm);
-void BallJoint(py::module& sm);
-void TranslationalJoint(py::module& sm);
-void FreeJoint(py::module& sm);
-
-void MetaSkeleton(py::module& sm);
-void ReferentialSkeleton(py::module& sm);
-void Linkage(py::module& sm);
-void Chain(py::module& sm);
-void Skeleton(py::module& sm);
-
-void dart_dynamics(py::module& m)
+void OpenSimParser(py::module& m)
 {
-  auto sm = m.def_submodule("dynamics");
-
-  Shape(sm);
-
-  Entity(sm);
-  Frame(sm);
-  ShapeFrame(sm);
-  SimpleFrame(sm);
-
-  Node(sm);
-  JacobianNode(sm);
-  ShapeNode(sm);
-
-  DegreeOfFreedom(sm);
-
-  BodyNode(sm);
-  Inertia(sm);
-
-  Joint(sm);
-  ZeroDofJoint(sm);
-  WeldJoint(sm);
-  GenericJoint(sm);
-  RevoluteJoint(sm);
-  PrismaticJoint(sm);
-  ScrewJoint(sm);
-  UniversalJoint(sm);
-  TranslationalJoint2D(sm);
-  PlanarJoint(sm);
-  EulerJoint(sm);
-  EulerFreeJoint(sm);
-  CustomJoint(sm);
-  BallJoint(sm);
-  TranslationalJoint(sm);
-  FreeJoint(sm);
-
-  MetaSkeleton(sm);
-  ReferentialSkeleton(sm);
-  Linkage(sm);
-  Chain(sm);
-  Skeleton(sm);
+  auto sm = m.def_submodule("OpenSimParser");
+  sm.def(
+      "parseOsim",
+      +[](const std::string& path) {
+        return dart::biomechanics::OpenSimParser::parseOsim(path);
+      },
+      ::py::arg("path"));
 }
 
 } // namespace python

@@ -18,7 +18,7 @@ class OpenSimParser
 {
 public:
   /// Read Skeleton from osim file
-  static dynamics::SkeletonPtr readSkeleton(
+  static dynamics::SkeletonPtr parseOsim(
       const common::Uri& uri,
       const common::ResourceRetrieverPtr& retriever = nullptr);
 
