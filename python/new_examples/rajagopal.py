@@ -15,4 +15,24 @@ world.addSkeleton(skel)
 
 gui = nimble.NimbleGUI(world)
 gui.serve(8080)
+gui.nativeAPI().renderWorld(world)
+
+# Animate the knees back and forth
+ticker: nimble.realtime.Ticker = nimble.realtime.Ticker(world.getTimeStep() * 10)
+
+
+def onTick(now):
+  progress = (now % 2000) / 2000.0
+  skel.getDof("knee_angle_r").setPosition(
+      progress * skel.getDof("knee_angle_r").getPositionUpperLimit())
+  skel.getDof("knee_angle_l").setPosition(
+      progress * skel.getDof("knee_angle_l").getPositionUpperLimit())
+  gui.nativeAPI().renderWorld(world)
+
+
+ticker.registerTickListener(onTick)
+ticker.start()
+
+# Don't immediately exit
+
 gui.blockWhileServing()
