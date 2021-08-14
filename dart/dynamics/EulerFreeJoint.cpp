@@ -9,7 +9,9 @@ namespace dart {
 namespace dynamics {
 
 EulerFreeJoint::EulerFreeJoint(const Properties& props)
-  : GenericJoint(props), mAxisOrder(dynamics::EulerJoint::AxisOrder::XYZ){};
+  : GenericJoint(props),
+    mAxisOrder(dynamics::EulerJoint::AxisOrder::XYZ),
+    mFlipAxisMap(Eigen::Vector3s::Ones()){};
 
 //==============================================================================
 const std::string& EulerFreeJoint::getType() const

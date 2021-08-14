@@ -823,6 +823,57 @@ public:
   // skeleton concatenated into a flat vector.
   void setLinkMasses(Eigen::VectorXs masses);
 
+  // This returns a vector of all the link scales for all the links in the
+  // skeleton concatenated into a flat vector
+  Eigen::VectorXs getLinkScales();
+
+  // Sets all the link scales for the skeleton, from a flat vector
+  void setLinkScales(Eigen::VectorXs scales);
+
+  // This sets all the positions of the joints to within their limit range, if
+  // they're currently outside it.
+  void clampPositionsToLimits();
+
+  //----------------------------------------------------------------------------
+  // IK for retargetting (especially between similar but not identical human
+  // skeletons)
+  //----------------------------------------------------------------------------
+
+  /// This returns the concatenated 3-vectors for world positions of each joint
+  /// in 3D world space, for the registered source joints.
+  Eigen::VectorXs getJointWorldPositions(
+      const std::vector<const dynamics::Joint*>& joints) const;
+
+  /// This returns the Jacobian relating changes in source skeleton joint
+  /// positions to changes in source joint world positions.
+  Eigen::MatrixXs getJointWorldPositionsJacobianWrtJointPositions(
+      const std::vector<const dynamics::Joint*>& joints) const;
+
+  /// This returns the Jacobian relating changes in source skeleton joint
+  /// positions to changes in source joint world positions.
+  Eigen::MatrixXs finiteDifferenceJointWorldPositionsJacobianWrtJointPositions(
+      const std::vector<const dynamics::Joint*>& joints);
+
+  /// This returns the Jacobian relating changes in source skeleton body scales
+  /// to changes in source joint world positions.
+  Eigen::MatrixXs getJointWorldPositionsJacobianWrtBodyScales(
+      const std::vector<const dynamics::Joint*>& joints);
+
+  /// This returns the Jacobian relating changes in source skeleton body scales
+  /// to changes in source joint world positions.
+  Eigen::MatrixXs finiteDifferenceJointWorldPositionsJacobianWrtBodyScales(
+      const std::vector<const dynamics::Joint*>& joints);
+
+  /// This runs IK, attempting to fit the world positions of the passed in
+  /// joints to the vector of (concatenated) target positions. This can
+  /// optionally also rescale the skeleton.
+  void fitJointsToWorldPositions(
+      const std::vector<const dynamics::Joint*>& joints,
+      Eigen::VectorXs targetPositions,
+      bool scaleBodies = false,
+      int ikIterationLimit = 100,
+      bool logOutput = false);
+
   //----------------------------------------------------------------------------
   // Integration and finite difference
   //----------------------------------------------------------------------------
@@ -1316,21 +1367,21 @@ public:
 
   // Documentation inherited
   const Eigen::VectorXs& getExternalForces() const override;
-  
+
   // Get damping coefficients
   Eigen::VectorXs getDampingCoeffVector();
-  
+
   // Get damping force of the skeleton.
   Eigen::VectorXs getDampingForce();
 
-  //Get spring coefficients
+  // Get spring coefficients
   Eigen::VectorXs getSpringStiffVector();
 
-  //Get rest positions
+  // Get rest positions
   Eigen::VectorXs getRestPositions();
 
-  //Get Spring Forces
-  Eigen::VectorXs getSpringForce(); 
+  // Get Spring Forces
+  Eigen::VectorXs getSpringForce();
 
   /// Get constraint force vector for a tree
   const Eigen::VectorXs& getConstraintForces(std::size_t _treeIdx) const;

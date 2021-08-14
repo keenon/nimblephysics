@@ -350,6 +350,7 @@ dynamics::SkeletonPtr OpenSimParser::readOsim40(
 
       if (jointDetail != nullptr)
       {
+        std::string jointName(jointDetail->Attribute("name"));
         // Get shared properties across all joint types
         std::string parentName = std::string(
             jointDetail->FirstChildElement("parent_body")->GetText());
@@ -605,7 +606,8 @@ dynamics::SkeletonPtr OpenSimParser::readOsim40(
           joint = universalJoint;
         }
         assert(childBody != nullptr);
-        joint->setName(name);
+        joint->setName(jointName);
+        std::cout << jointName << std::endl;
         joint->setTransformFromChildBodyNode(transformFromChild);
         joint->setTransformFromParentBodyNode(transformFromParent);
         childBody->setName(name);

@@ -191,6 +191,18 @@ public:
   /// Get transformation from child body node to this joint
   const Eigen::Isometry3s& getTransformFromChildBodyNode() const;
 
+  /// Set the scale of the child body
+  void setChildScale(s_t scale);
+
+  /// Set the scale of the parent body
+  void setParentScale(s_t scale);
+
+  /// Get the scale of the child body
+  s_t getChildScale() const;
+
+  /// Get the scale of the parent body
+  s_t getParentScale() const;
+
   /// Set to enforce joint position limit
   ///
   /// The joint position limit is valid when the actutor type is one of
@@ -1132,6 +1144,28 @@ protected:
 protected:
   /// Child BodyNode pointer that this Joint belongs to
   BodyNode* mChildBodyNode;
+
+  /// This holds the relative scale we're applying to the offsets of the parent
+  /// transform. Do not use directly! Use setParentScale() and getParentScale()
+  /// instead
+  s_t mParentScale;
+
+  /// This holds the original translation from the parent, so that we can
+  /// reconstruct exactly what the translation is as we change the scale of
+  /// objects. This avoids numerical issues with roundoff during scaling messing
+  /// with finite differencing.
+  Eigen::Vector3s mOriginalParentTranslation;
+
+  /// This holds the relative scale we're applying to the offsets of the child
+  /// transform. Do not use directly! Use setChildScale() and getChildScale()
+  /// instead
+  s_t mChildScale;
+
+  /// This holds the original translation from the child, so that we can
+  /// reconstruct exactly what the translation is as we change the scale of
+  /// objects. This avoids numerical issues with roundoff during scaling messing
+  /// with finite differencing.
+  Eigen::Vector3s mOriginalChildTranslation;
 
   /// Relative transformation of the child BodyNode relative to the parent
   /// BodyNode expressed in the child BodyNode frame

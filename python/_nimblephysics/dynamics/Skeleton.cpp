@@ -752,6 +752,36 @@ void Skeleton(py::module& m)
           +[](dart::dynamics::Skeleton* self, Eigen::VectorXs limits) -> void {
             self->setPositionLowerLimits(limits);
           })
+      .def("getLinkScales", &dart::dynamics::Skeleton::getLinkScales)
+      .def(
+          "setLinkScales",
+          &dart::dynamics::Skeleton::setLinkScales,
+          ::py::arg("scales"))
+      .def(
+          "clampPositionsToLimits",
+          &dart::dynamics::Skeleton::clampPositionsToLimits)
+      .def(
+          "getJointWorldPositions",
+          &dart::dynamics::Skeleton::getJointWorldPositions,
+          ::py::arg("joints"))
+      .def(
+          "getJointWorldPositionsJacobianWrtJointPositions",
+          &dart::dynamics::Skeleton::
+              getJointWorldPositionsJacobianWrtJointPositions,
+          ::py::arg("joints"))
+      .def(
+          "getJointWorldPositionsJacobianWrtBodyScales",
+          &dart::dynamics::Skeleton::
+              getJointWorldPositionsJacobianWrtBodyScales,
+          ::py::arg("joints"))
+      .def(
+          "fitJointsToWorldPositions",
+          &dart::dynamics::Skeleton::fitJointsToWorldPositions,
+          ::py::arg("joints"),
+          ::py::arg("targetPositions"),
+          ::py::arg("scaleBodies") = false,
+          ::py::arg("ikIterationLimit") = 100,
+          ::py::arg("logOutput") = false)
       .def(
           "setVelocityUpperLimits",
           +[](dart::dynamics::Skeleton* self, Eigen::VectorXs limits) -> void {

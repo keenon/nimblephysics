@@ -31,6 +31,9 @@
  */
 
 #include <Eigen/Dense>
+#include <dart/biomechanics/SkeletonConverter.hpp>
+#include <dart/dynamics/BodyNode.hpp>
+#include <dart/dynamics/Skeleton.hpp>
 #include <pybind11/eigen.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -40,23 +43,46 @@ namespace py = pybind11;
 namespace dart {
 namespace python {
 
-void LilypadSolver(py::module& sm);
-void BatchGaitInverseDynamics(py::module& sm);
-void OpenSimParser(py::module& sm);
-void SkeletonConverter(py::module& sm);
-
-void dart_biomechanics(py::module& m)
+void SkeletonConverter(py::module& m)
 {
-  auto sm = m.def_submodule("biomechanics");
-
-  sm.doc()
-      = "This provides biomechanics utilities in Nimble, including inverse "
-        "dynamics and (eventually) mocap support and muscle estimation.";
-
-  LilypadSolver(sm);
-  BatchGaitInverseDynamics(sm);
-  OpenSimParser(sm);
-  SkeletonConverter(sm);
+  ::py::class_<
+      dart::biomechanics::SkeletonConverter,
+      std::shared_ptr<dart::biomechanics::SkeletonConverter>>(
+      m, "SkeletonConverter")
+      .def(
+          ::py::init<
+              std::shared_ptr<dynamics::Skeleton>,
+              std::shared_ptr<dynamics::Skeleton>>(),
+          ::py::arg("source"),
+          ::py::arg("target"))
+      .def(
+          "getContactBodies",
+          &dart::biomechanics::SkeletonConverter::linkJoints,
+          ::py::arg("sourceJoint"),
+          ::py::arg("targetJoint"))
+      .def(
+          "rescaleAndPrepTarget",
+          &dart::biomechanics::SkeletonConverter::rescaleAndPrepTarget)
+      .def(
+          "convertMotion",
+          &dart::biomechanics::SkeletonConverter::convertMotion,
+          ::py::arg("targetMotion"))
+      .def(
+          "getSourceJointWorldPositions",
+          &dart::biomechanics::SkeletonConverter::getSourceJointWorldPositions)
+      .def(
+          "getTargetJointWorldPositions",
+          &dart::biomechanics::SkeletonConverter::getTargetJointWorldPositions)
+      .def(
+          "debugToGUI",
+          &dart::biomechanics::SkeletonConverter::debugToGUI,
+          ::py::arg("gui"))
+      .def(
+          "getSourceJoints",
+          &dart::biomechanics::SkeletonConverter::getSourceJoints)
+      .def(
+          "getTargetJoints",
+          &dart::biomechanics::SkeletonConverter::getTargetJoints);
 }
 
 } // namespace python

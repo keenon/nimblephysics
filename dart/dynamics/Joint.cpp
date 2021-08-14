@@ -525,11 +525,14 @@ void Joint::debugRelativeJacobianInPositionSpace()
   const s_t threshold = 1e-9;
   if (((bruteForce - analytical).cwiseAbs().array() > threshold).any())
   {
-    std::cout << "Relative Jacobian (in position space) disagrees on joint \"" << getName()
-              << "\" of type \"" << getType() << "\"!" << std::endl;
+    std::cout << "Relative Jacobian (in position space) disagrees on joint \""
+              << getName() << "\" of type \"" << getType() << "\"!"
+              << std::endl;
     std::cout << "Analytical:" << std::endl << analytical << std::endl;
     std::cout << "Brute Force:" << std::endl << bruteForce << std::endl;
-    std::cout << "Diff (" << (analytical - bruteForce).minCoeff() << "," << (analytical - bruteForce).maxCoeff() << "):" << std::endl << analytical - bruteForce << std::endl;
+    std::cout << "Diff (" << (analytical - bruteForce).minCoeff() << ","
+              << (analytical - bruteForce).maxCoeff() << "):" << std::endl
+              << analytical - bruteForce << std::endl;
   }
 }
 
@@ -641,6 +644,8 @@ void Joint::setTransformFromParentBodyNode(const Eigen::Isometry3s& _T)
 {
   assert(math::verifyTransform(_T));
   mAspectProperties.mT_ParentBodyToJoint = _T;
+  mParentScale = 1.0;
+  mOriginalParentTranslation = _T.translation();
   notifyPositionUpdated();
 }
 
@@ -649,6 +654,8 @@ void Joint::setTransformFromChildBodyNode(const Eigen::Isometry3s& _T)
 {
   assert(math::verifyTransform(_T));
   mAspectProperties.mT_ChildBodyToJoint = _T;
+  mChildScale = 1.0;
+  mOriginalChildTranslation = _T.translation();
   updateRelativeJacobian();
   notifyPositionUpdated();
 }
@@ -666,9 +673,46 @@ const Eigen::Isometry3s& Joint::getTransformFromChildBodyNode() const
 }
 
 //==============================================================================
+/// Set the scale of the child body
+void Joint::setChildScale(s_t scale)
+{
+  mChildScale = scale;
+  mAspectProperties.mT_ChildBodyToJoint.translation()
+      = mOriginalChildTranslation * scale;
+  updateRelativeJacobian();
+  notifyPositionUpdated();
+}
+
+//==============================================================================
+/// Set the scale of the parent body
+void Joint::setParentScale(s_t scale)
+{
+  mParentScale = scale;
+  mAspectProperties.mT_ParentBodyToJoint.translation()
+      = mOriginalParentTranslation * scale;
+  notifyPositionUpdated();
+}
+
+//==============================================================================
+/// Get the scale of the child body
+s_t Joint::getChildScale() const
+{
+  return mChildScale;
+}
+
+//==============================================================================
+/// Get the scale of the parent body
+s_t Joint::getParentScale() const
+{
+  return mParentScale;
+}
+
+//==============================================================================
 Joint::Joint()
   : mChildBodyNode(nullptr),
     mT(Eigen::Isometry3s::Identity()),
+    mParentScale(1.0),
+    mChildScale(1.0),
     mSpatialVelocity(Eigen::Vector6s::Zero()),
     mSpatialAcceleration(Eigen::Vector6s::Zero()),
     mPrimaryAcceleration(Eigen::Vector6s::Zero()),
