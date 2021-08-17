@@ -81,7 +81,8 @@ void LilypadSolver(py::module& m)
       .def(
           "debugToGUI",
           &dart::biomechanics::LilypadSolver::debugToGUI,
-          ::py::arg("gui"))
+          ::py::arg("gui"),
+          ::py::call_guard<py::gil_scoped_release>())
       .def("clear", &dart::biomechanics::LilypadSolver::clear);
 }
 

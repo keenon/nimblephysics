@@ -777,10 +777,13 @@ void Skeleton(py::module& m)
       .def(
           "fitJointsToWorldPositions",
           &dart::dynamics::Skeleton::fitJointsToWorldPositions,
-          ::py::arg("joints"),
+          ::py::arg("positionJoints"),
           ::py::arg("targetPositions"),
+          ::py::arg("angleJoints"),
+          ::py::arg("targetAngles"),
           ::py::arg("scaleBodies") = false,
           ::py::arg("ikIterationLimit") = 100,
+          ::py::arg("lineSearch") = false,
           ::py::arg("logOutput") = false)
       .def(
           "setVelocityUpperLimits",

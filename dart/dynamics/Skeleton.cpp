@@ -45,6 +45,7 @@
 #include "dart/dynamics/BodyNode.hpp"
 #include "dart/dynamics/DegreeOfFreedom.hpp"
 #include "dart/dynamics/EndEffector.hpp"
+#include "dart/dynamics/EulerFreeJoint.hpp"
 #include "dart/dynamics/FreeJoint.hpp"
 #include "dart/dynamics/Joint.hpp"
 #include "dart/dynamics/Marker.hpp"
@@ -3304,6 +3305,21 @@ Eigen::VectorXs Skeleton::getJointWorldPositions(
 }
 
 //==============================================================================
+/// This returns the concatenated 3-vectors for world angle of each joint's
+/// child space in 3D world space, for the registered joints.
+Eigen::VectorXs Skeleton::getJointWorldAngles(
+    const std::vector<const dynamics::Joint*>& joints) const
+{
+  Eigen::VectorXs sourceAngles = Eigen::VectorXs::Zero(joints.size() * 3);
+  for (int i = 0; i < joints.size(); i++)
+  {
+    sourceAngles.segment<3>(i * 3) = math::logMap(
+        joints[i]->getChildBodyNode()->getWorldTransform().linear());
+  }
+  return sourceAngles;
+}
+
+//==============================================================================
 /// This returns the Jacobian relating changes in source skeleton joint
 /// positions to changes in source joint world positions.
 Eigen::MatrixXs Skeleton::getJointWorldPositionsJacobianWrtJointPositions(
@@ -3345,6 +3361,55 @@ Skeleton::finiteDifferenceJointWorldPositionsJacobianWrtJointPositions(
     perturbed(i) -= EPS;
     setPositions(perturbed);
     Eigen::VectorXs minus = getJointWorldPositions(joints);
+
+    jac.col(i) = (plus - minus) / (2 * EPS);
+  }
+  setPositions(originalPos);
+
+  return jac;
+}
+
+//==============================================================================
+/// This returns the Jacobian relating changes in source skeleton joint
+/// positions to changes in source joint world positions.
+Eigen::MatrixXs Skeleton::getJointWorldPositionsJacobianWrtJointChildAngles(
+    const std::vector<const dynamics::Joint*>& joints) const
+{
+  Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(joints.size() * 3, getNumDofs());
+
+  for (int i = 0; i < joints.size(); i++)
+  {
+    math::Jacobian bodyJac
+        = getWorldPositionJacobian(joints[i]->getChildBodyNode());
+    jac.block(3 * i, 0, 3, bodyJac.cols())
+        = bodyJac.block(0, 0, 3, bodyJac.cols());
+  }
+
+  return jac;
+}
+
+//==============================================================================
+/// This returns the Jacobian relating changes in source skeleton joint
+/// positions to changes in source joint world positions.
+Eigen::MatrixXs
+Skeleton::finiteDifferenceJointWorldPositionsJacobianWrtJointChildAngles(
+    const std::vector<const dynamics::Joint*>& joints)
+{
+  Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(joints.size() * 3, getNumDofs());
+
+  Eigen::VectorXs originalPos = getPositions();
+  const double EPS = 1e-7;
+  for (int i = 0; i < getNumDofs(); i++)
+  {
+    Eigen::VectorXs perturbed = originalPos;
+    perturbed(i) += EPS;
+    setPositions(perturbed);
+    Eigen::VectorXs plus = getJointWorldAngles(joints);
+
+    perturbed = originalPos;
+    perturbed(i) -= EPS;
+    setPositions(perturbed);
+    Eigen::VectorXs minus = getJointWorldAngles(joints);
 
     jac.col(i) = (plus - minus) / (2 * EPS);
   }
@@ -3437,11 +3502,14 @@ Skeleton::finiteDifferenceJointWorldPositionsJacobianWrtBodyScales(
 /// joints to the vector of (concatenated) target positions. This can
 /// optionally also rescale the skeleton.
 #define DART_SKEL_LOG_IK_OUTPUT
-void Skeleton::fitJointsToWorldPositions(
-    const std::vector<const dynamics::Joint*>& joints,
+s_t Skeleton::fitJointsToWorldPositions(
+    const std::vector<const dynamics::Joint*>& positionJoints,
     Eigen::VectorXs targetPositions,
+    const std::vector<const dynamics::Joint*>& angleJoints,
+    Eigen::VectorXs targetAngles,
     bool scaleBodies,
     int ikIterationLimit,
+    bool lineSearch,
     bool logOutput)
 {
   // Run simple IK to try to get as close as possible. Completely possible that
@@ -3450,65 +3518,53 @@ void Skeleton::fitJointsToWorldPositions(
   s_t error = std::numeric_limits<s_t>::infinity();
   s_t lr = 0.05;
   bool useTranspose = false;
+
   for (int i = 0; i < ikIterationLimit; i++)
   {
-    Eigen::VectorXs diff = targetPositions - getJointWorldPositions(joints);
-    s_t newError = diff.squaredNorm();
-    s_t errorChange = newError - error;
-    error = newError;
+    /////////////////////////////////////////////////////////////////////////////
+    // Get an initial error
+    /////////////////////////////////////////////////////////////////////////////
 
-    if (logOutput)
-    {
-      std::cout << "IK iteration " << i << " lr: " << lr << " loss: " << error
-                << " change: " << errorChange << std::endl;
-    }
+    Eigen::VectorXs posDiff
+        = targetPositions - getJointWorldPositions(positionJoints);
+    Eigen::VectorXs angleDiff = targetAngles - getJointWorldAngles(angleJoints);
+    Eigen::VectorXs diff = Eigen::VectorXs(posDiff.size() + angleDiff.size());
+    diff.segment(0, posDiff.size()) = posDiff;
+    diff.segment(0, angleDiff.size()) = angleDiff;
 
-    if (error < 1e-21)
-    {
-      if (logOutput)
-      {
-        std::cout << "Terminating IK search after " << i
-                  << " iterations with loss: " << error << std::endl;
-      }
-      break;
-    }
-    if (errorChange > 0)
-    {
-      lr *= 0.5;
-    }
-    else if (errorChange > -1e-22)
-    {
-      if (logOutput)
-      {
-        std::cout << "Terminating IK search after " << i
-                  << " iterations with optimal loss: " << error << std::endl;
-      }
-      break;
-    }
-    else
-    {
-      // Slowly grow LR while we're safely decreasing loss
-      lr *= 1.1;
-    }
-    if (lr < 1e-4)
-    {
-      useTranspose = true;
-    }
+    s_t initialError = posDiff.squaredNorm() + angleDiff.squaredNorm();
+
+    /////////////////////////////////////////////////////////////////////////////
+    // Do the actual IK update
+    /////////////////////////////////////////////////////////////////////////////
+
+    Eigen::VectorXs originalPos = getPositions();
+    Eigen::VectorXs originalScale = getLinkScales();
 
     Eigen::MatrixXs J;
     if (scaleBodies)
     {
       Eigen::MatrixXs Jpos
-          = getJointWorldPositionsJacobianWrtJointPositions(joints);
+          = getJointWorldPositionsJacobianWrtJointPositions(positionJoints);
+      Eigen::MatrixXs Jangle
+          = getJointWorldPositionsJacobianWrtJointChildAngles(angleJoints);
       Eigen::MatrixXs Jscale
-          = getJointWorldPositionsJacobianWrtBodyScales(joints);
-      J = Eigen::MatrixXs::Zero(Jpos.rows(), Jpos.cols() + Jscale.cols());
+          = getJointWorldPositionsJacobianWrtBodyScales(positionJoints);
+      J = Eigen::MatrixXs::Zero(
+          Jpos.rows() + Jangle.rows(), Jpos.cols() + Jscale.cols());
       J.block(0, 0, Jpos.rows(), Jpos.cols()) = Jpos;
+      J.block(Jpos.rows(), 0, Jangle.rows(), Jangle.cols()) = Jangle;
       J.block(0, Jpos.cols(), Jscale.rows(), Jscale.cols()) = Jscale;
     }
     else
     {
-      J = getJointWorldPositionsJacobianWrtJointPositions(joints);
+      Eigen::MatrixXs Jpos
+          = getJointWorldPositionsJacobianWrtJointPositions(positionJoints);
+      Eigen::MatrixXs Jangle
+          = getJointWorldPositionsJacobianWrtJointChildAngles(angleJoints);
+      J = Eigen::MatrixXs::Zero(Jpos.rows() + Jangle.rows(), Jpos.cols());
+      J.block(0, 0, Jpos.rows(), Jpos.cols()) = Jpos;
+      J.block(Jpos.rows(), 0, Jangle.rows(), Jangle.cols()) = Jangle;
     }
     Eigen::VectorXs delta;
 
@@ -3548,11 +3604,78 @@ void Skeleton::fitJointsToWorldPositions(
       }
       setLinkScales(newScales);
     }
+
+    /////////////////////////////////////////////////////////////////////////////
+    // Evaluate how well we did
+    /////////////////////////////////////////////////////////////////////////////
+
+    Eigen::VectorXs posDiffAfter
+        = targetPositions - getJointWorldPositions(positionJoints);
+    Eigen::VectorXs angleDiffAfter
+        = targetAngles - getJointWorldAngles(angleJoints);
+    Eigen::VectorXs diffAfter
+        = Eigen::VectorXs(posDiff.size() + angleDiff.size());
+    diffAfter.segment(0, posDiffAfter.size()) = posDiffAfter;
+    diffAfter.segment(0, angleDiffAfter.size()) = angleDiffAfter;
+
+    s_t newError = posDiffAfter.squaredNorm() + angleDiffAfter.squaredNorm();
+
+    s_t errorChange = newError - initialError;
+
+    if (logOutput)
+    {
+      std::cout << "IK iteration " << i << " lr: " << lr
+                << " loss: " << newError << " change: " << errorChange
+                << std::endl;
+    }
+
+    if (newError < 1e-21)
+    {
+      if (logOutput)
+      {
+        std::cout << "Terminating IK search after " << i
+                  << " iterations with loss: " << newError << std::endl;
+      }
+      break;
+    }
+    if (errorChange > 0)
+    {
+      lr *= 0.5;
+      if (lr < 1e-4)
+      {
+        useTranspose = true;
+      }
+      if (lineSearch)
+      {
+        setPositions(originalPos);
+        if (scaleBodies)
+        {
+          setLinkScales(originalScale);
+        }
+      }
+    }
+    else if (errorChange > -1e-22 && i > 0)
+    {
+      if (logOutput)
+      {
+        std::cout << "Terminating IK search after " << i
+                  << " iterations with optimal loss: " << newError << std::endl;
+      }
+      break;
+    }
+    else
+    {
+      // Slowly grow LR while we're safely decreasing loss
+      lr *= 1.1;
+    }
+
+    error = newError;
   }
   if (logOutput)
   {
     std::cout << "Finished IK search with loss: " << error << std::endl;
   }
+  return error;
 }
 
 //==============================================================================
@@ -3747,12 +3870,14 @@ Skeleton::ContactInverseDynamicsResult Skeleton::getContactInverseDynamics(
   const dynamics::Joint* joint = getRootJoint();
   const dynamics::FreeJoint* freeJoint
       = dynamic_cast<const dynamics::FreeJoint*>(joint);
-  if (freeJoint == nullptr)
+  const dynamics::EulerFreeJoint* eulerFreeJoint
+      = dynamic_cast<const dynamics::EulerFreeJoint*>(joint);
+  if (freeJoint == nullptr && eulerFreeJoint == nullptr)
   {
     std::cout
         << "Error: Skeleton::getContactInverseDynamics() assumes that the root "
-           "joint of the skeleton is a FreeJoint. Since it's not a FreeJoint, "
-           "this function won't work and we're returning zeros."
+           "joint of the skeleton is a FreeJoint or an EulerFreeJoint. Since "
+           "it's neither, this function won't work and we're returning zeros."
         << std::endl;
     result.contactWrench.setZero();
     result.jointTorques = Eigen::VectorXs::Zero(getNumDofs());
@@ -3878,12 +4003,14 @@ Skeleton::getMultipleContactInverseDynamics(
   const dynamics::Joint* joint = getRootJoint();
   const dynamics::FreeJoint* freeJoint
       = dynamic_cast<const dynamics::FreeJoint*>(joint);
-  if (freeJoint == nullptr)
+  const dynamics::EulerFreeJoint* eulerFreeJoint
+      = dynamic_cast<const dynamics::EulerFreeJoint*>(joint);
+  if (freeJoint == nullptr && eulerFreeJoint == nullptr)
   {
     std::cout
         << "Error: Skeleton::getContactInverseDynamics() assumes that the root "
-           "joint of the skeleton is a FreeJoint. Since it's not a FreeJoint, "
-           "this function won't work and we're returning zeros."
+           "joint of the skeleton is a FreeJoint or an EulerFreeJoint. Since "
+           "it's neither, this function won't work and we're returning zeros."
         << std::endl;
     result.contactWrenches = std::vector<Eigen::Vector6s>();
     for (int i = 0; i < bodies.size(); i++)

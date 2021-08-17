@@ -840,8 +840,13 @@ public:
   //----------------------------------------------------------------------------
 
   /// This returns the concatenated 3-vectors for world positions of each joint
-  /// in 3D world space, for the registered source joints.
+  /// in 3D world space, for the registered joints.
   Eigen::VectorXs getJointWorldPositions(
+      const std::vector<const dynamics::Joint*>& joints) const;
+
+  /// This returns the concatenated 3-vectors for world angle of each joint's
+  /// child space in 3D world space, for the registered joints.
+  Eigen::VectorXs getJointWorldAngles(
       const std::vector<const dynamics::Joint*>& joints) const;
 
   /// This returns the Jacobian relating changes in source skeleton joint
@@ -852,6 +857,17 @@ public:
   /// This returns the Jacobian relating changes in source skeleton joint
   /// positions to changes in source joint world positions.
   Eigen::MatrixXs finiteDifferenceJointWorldPositionsJacobianWrtJointPositions(
+      const std::vector<const dynamics::Joint*>& joints);
+
+  /// This returns the Jacobian relating changes in source skeleton joint
+  /// positions to changes in source joint world positions.
+  Eigen::MatrixXs getJointWorldPositionsJacobianWrtJointChildAngles(
+      const std::vector<const dynamics::Joint*>& joints) const;
+
+  /// This returns the Jacobian relating changes in source skeleton joint
+  /// positions to changes in source joint world positions.
+  Eigen::MatrixXs
+  finiteDifferenceJointWorldPositionsJacobianWrtJointChildAngles(
       const std::vector<const dynamics::Joint*>& joints);
 
   /// This returns the Jacobian relating changes in source skeleton body scales
@@ -867,11 +883,14 @@ public:
   /// This runs IK, attempting to fit the world positions of the passed in
   /// joints to the vector of (concatenated) target positions. This can
   /// optionally also rescale the skeleton.
-  void fitJointsToWorldPositions(
-      const std::vector<const dynamics::Joint*>& joints,
+  s_t fitJointsToWorldPositions(
+      const std::vector<const dynamics::Joint*>& positionJoints,
       Eigen::VectorXs targetPositions,
+      const std::vector<const dynamics::Joint*>& angleJoints,
+      Eigen::VectorXs targetAngles,
       bool scaleBodies = false,
       int ikIterationLimit = 100,
+      bool lineSearch = false,
       bool logOutput = false);
 
   //----------------------------------------------------------------------------

@@ -56,7 +56,7 @@ void SkeletonConverter(py::module& m)
           ::py::arg("source"),
           ::py::arg("target"))
       .def(
-          "getContactBodies",
+          "linkJoints",
           &dart::biomechanics::SkeletonConverter::linkJoints,
           ::py::arg("sourceJoint"),
           ::py::arg("targetJoint"))
@@ -64,9 +64,17 @@ void SkeletonConverter(py::module& m)
           "rescaleAndPrepTarget",
           &dart::biomechanics::SkeletonConverter::rescaleAndPrepTarget)
       .def(
+          "fitTarget",
+          &dart::biomechanics::SkeletonConverter::fitTarget,
+          ::py::arg("maxFitSteps") = -1,
+          ::py::arg("convergenceThreshold") = 1e-7)
+      .def(
           "convertMotion",
           &dart::biomechanics::SkeletonConverter::convertMotion,
-          ::py::arg("targetMotion"))
+          ::py::arg("targetMotion"),
+          ::py::arg("logProgress") = true,
+          ::py::arg("maxFitStepsPerTimestep") = -1,
+          ::py::arg("convergenceThreshold") = 1e-7)
       .def(
           "getSourceJointWorldPositions",
           &dart::biomechanics::SkeletonConverter::getSourceJointWorldPositions)
@@ -76,7 +84,8 @@ void SkeletonConverter(py::module& m)
       .def(
           "debugToGUI",
           &dart::biomechanics::SkeletonConverter::debugToGUI,
-          ::py::arg("gui"))
+          ::py::arg("gui"),
+          ::py::call_guard<py::gil_scoped_release>())
       .def(
           "getSourceJoints",
           &dart::biomechanics::SkeletonConverter::getSourceJoints)

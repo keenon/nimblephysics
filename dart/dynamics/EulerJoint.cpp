@@ -341,6 +341,8 @@ Eigen::Matrix<s_t, 6, 3> EulerJoint::computeRelativeJacobianStatic(
               << std::endl;
     std::cout << "rank is (" << luJTJ.rank() << ")." << std::endl;
     std::cout << "det is (" << luJTJ.determinant() << ")." << std::endl;
+    std::cout << "J is:" << std::endl << J << std::endl;
+    std::cout << "pos is:" << std::endl << _positions << std::endl;
     //        std::cout << "mS: \n" << mS << std::endl;
   }
 #endif
@@ -353,7 +355,10 @@ Eigen::Matrix<s_t, 6, 3> EulerJoint::getRelativeJacobianStatic(
     const Eigen::Vector3s& _positions) const
 {
   return computeRelativeJacobianStatic(
-      _positions, getAxisOrder(), getFlipAxisMap(), Joint::mAspectProperties.mT_ChildBodyToJoint);
+      _positions,
+      getAxisOrder(),
+      getFlipAxisMap(),
+      Joint::mAspectProperties.mT_ChildBodyToJoint);
 }
 
 //==============================================================================

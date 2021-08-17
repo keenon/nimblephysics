@@ -93,12 +93,14 @@ void BatchGaitInverseDynamics(py::module& m)
       .def(
           "debugLilypadToGUI",
           &dart::biomechanics::BatchGaitInverseDynamics::debugLilypadToGUI,
-          ::py::arg("gui"))
+          ::py::arg("gui"),
+          ::py::call_guard<py::gil_scoped_release>())
       .def(
           "debugTimestepToGUI",
           &dart::biomechanics::BatchGaitInverseDynamics::debugTimestepToGUI,
           ::py::arg("gui"),
-          ::py::arg("timesteps"));
+          ::py::arg("timesteps"),
+          ::py::call_guard<py::gil_scoped_release>());
 }
 
 } // namespace python
