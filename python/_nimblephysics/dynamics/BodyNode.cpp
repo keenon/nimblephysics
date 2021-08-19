@@ -578,6 +578,18 @@ void BodyNode(py::module& m)
             self->setCollidable(_isCollidable);
           },
           ::py::arg("isCollidable"))
+      .def("setScale", &dart::dynamics::BodyNode::setScale, ::py::arg("scale"))
+      .def("getScale", &dart::dynamics::BodyNode::getScale)
+      .def(
+          "setScaleLowerBound",
+          &dart::dynamics::BodyNode::setScaleLowerBound,
+          ::py::arg("scale"))
+      .def("getScaleLowerBound", &dart::dynamics::BodyNode::getScaleLowerBound)
+      .def(
+          "setScaleUpperBound",
+          &dart::dynamics::BodyNode::setScaleUpperBound,
+          ::py::arg("scale"))
+      .def("getScaleUpperBound", &dart::dynamics::BodyNode::getScaleUpperBound)
       .def(
           "setMass",
           +[](dart::dynamics::BodyNode* self,
@@ -589,10 +601,9 @@ void BodyNode(py::module& m)
               -> s_t { return self->getMass(); })
       .def(
           "setMomentOfInertia",
-          +[](dart::dynamics::BodyNode* self,
-              s_t _Ixx,
-              s_t _Iyy,
-              s_t _Izz) { self->setMomentOfInertia(_Ixx, _Iyy, _Izz); },
+          +[](dart::dynamics::BodyNode* self, s_t _Ixx, s_t _Iyy, s_t _Izz) {
+            self->setMomentOfInertia(_Ixx, _Iyy, _Izz);
+          },
           ::py::arg("Ixx"),
           ::py::arg("Iyy"),
           ::py::arg("Izz"))
@@ -602,9 +613,7 @@ void BodyNode(py::module& m)
               s_t _Ixx,
               s_t _Iyy,
               s_t _Izz,
-              s_t _Ixy) {
-            self->setMomentOfInertia(_Ixx, _Iyy, _Izz, _Ixy);
-          },
+              s_t _Ixy) { self->setMomentOfInertia(_Ixx, _Iyy, _Izz, _Ixy); },
           ::py::arg("Ixx"),
           ::py::arg("Iyy"),
           ::py::arg("Izz"),
@@ -767,15 +776,13 @@ void BodyNode(py::module& m)
           ::py::arg("inCoordinatesOf"))
       .def(
           "setFrictionCoeff",
-          +[](dart::dynamics::BodyNode* self, s_t _coeff) {
-            self->setFrictionCoeff(_coeff);
-          },
+          +[](dart::dynamics::BodyNode* self,
+              s_t _coeff) { self->setFrictionCoeff(_coeff); },
           ::py::arg("coeff"))
       .def(
           "getFrictionCoeff",
-          +[](const dart::dynamics::BodyNode* self) -> s_t {
-            return self->getFrictionCoeff();
-          })
+          +[](const dart::dynamics::BodyNode* self)
+              -> s_t { return self->getFrictionCoeff(); })
       .def(
           "setRestitutionCoeff",
           +[](dart::dynamics::BodyNode* self, s_t _coeff) {
