@@ -336,6 +336,12 @@ struct ccdCapsule
   const Eigen::Isometry3s* transform;
 };
 
+struct ccdMeshIndex
+{
+    std::vector<std::vector<int>> indexs;
+    std::vector<Eigen::Vector3s> points;
+};
+
 // We also need to define "support" functions that will find the furthest point
 // in the object along the direction "_dir", and return it in "_vec" for each
 // type of object.
@@ -355,6 +361,8 @@ void ccdCenterSphere(const void* _obj, ccd_vec3_t* _center);
 void ccdCenterMesh(const void* _obj, ccd_vec3_t* _center);
 void ccdCenterCapsule(const void* _obj, ccd_vec3_t* _center);
 
+std::vector<Eigen::Vector3s> getVertexNormals(
+    ccdMesh mesh, std::vector<std::vector<int>> indexs);
 // In order to differentiate between different types of contact, we need to be
 // able to get all the vertices that are within some small epsilon of being on
 // the "witness" plane returned by ccd.
@@ -362,6 +370,9 @@ void ccdCenterCapsule(const void* _obj, ccd_vec3_t* _center);
 std::vector<Eigen::Vector3s> ccdPointsAtWitnessBox(
     ccdBox* box, ccd_vec3_t* dir, bool neg);
 std::vector<Eigen::Vector3s> ccdPointsAtWitnessMesh(
+    ccdMesh* mesh, ccd_vec3_t* dir, bool neg);
+
+ccdMeshIndex ccdPointsAtWitnessMeshIndex(
     ccdMesh* mesh, ccd_vec3_t* dir, bool neg);
 
 /// This is responsible for creating and annotating all the contact objects with
@@ -372,7 +383,9 @@ int createMeshMeshContacts(
     CollisionResult& result,
     ccd_vec3_t* dir,
     const std::vector<Eigen::Vector3s>& pointsAWitness,
-    const std::vector<Eigen::Vector3s>& pointsBWitness);
+    const std::vector<Eigen::Vector3s>& pointsBWitness,
+    const std::vector<Eigen::Vector3s>& vertexNormalsA,
+    const std::vector<Eigen::Vector3s>& vertexNormalsB);
 
 /// This is responsible for creating and annotating all the contact objects with
 /// all the metadata we need in order to get accurate gradients.

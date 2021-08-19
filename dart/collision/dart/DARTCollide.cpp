@@ -2052,6 +2052,25 @@ void ccdCenterCapsule(const void* _obj, ccd_vec3_t* _center)
   _center->v[2] = static_cast<ccd_real_t>(capsule->transform->translation()(2));
 }
 
+std::vector<Eigen::Vector3s> getVertexNormals(
+  ccdMesh mesh, std::vector<std::vector<int>> indexs)
+{
+  std::vector<Eigen::Vector3s> vertexNormals;
+  for(int i=0;i<mesh.mesh->mNumMeshes; i++)
+  {
+    aiMesh* m = mesh.mesh->mMeshes[i];
+    for(int k=0;k<indexs[i].size();k++)
+    {
+      Eigen::Vector3s normal = Eigen::Vector3s::Zero(3);
+      normal(0) = m->mNormals[indexs[i][k]].x;
+      normal(1) = m->mNormals[indexs[i][k]].y;
+      normal(2) = m->mNormals[indexs[i][k]].z;
+      vertexNormals.push_back(normal);
+    }
+  }
+  return vertexNormals;
+}
+
 /// Find all the vertices within epsilon of lying on the witness plane
 std::vector<Eigen::Vector3s> ccdPointsAtWitnessBox(
     ccdBox* box, ccd_vec3_t* _dir, bool neg)
@@ -2191,6 +2210,91 @@ std::vector<Eigen::Vector3s> ccdPointsAtWitnessMesh(
   }
 
   return points;
+}
+
+
+/// ccdPointsAtWitnessMesh that return index
+ccdMeshIndex ccdPointsAtWitnessMeshIndex(
+  ccdMesh* mesh, ccd_vec3_t* _dir, bool neg)
+{
+  Eigen::Vector3s dir;
+  dir(0) = static_cast<s_t>(_dir->v[0]);
+  dir(1) = static_cast<s_t>(_dir->v[1]);
+  dir(2) = static_cast<s_t>(_dir->v[2]);
+
+  // apply rotation on direction vector
+  Eigen::Vector3s localDir = mesh->transform->linear().transpose() * dir;
+  localDir(0) /= (*mesh->scale)(0);
+  localDir(1) /= (*mesh->scale)(1);
+  localDir(2) /= (*mesh->scale)(2);
+
+  ccdMeshIndex meshindex;
+
+  s_t maxDot = (neg ? 1 : -1) * std::numeric_limits<s_t>::infinity();
+
+  // 1. Find the max dot
+  for (int i = 0; i < mesh->mesh->mNumMeshes; i++)
+  {
+    aiMesh* m = mesh->mesh->mMeshes[i];
+    for (int k = 0; k < m->mNumVertices; k++)
+    {
+      s_t dot = m->mVertices[k].x * localDir(0) * (*mesh->scale)(0)
+                    * (*mesh->scale)(0)
+                + m->mVertices[k].y * localDir(1) * (*mesh->scale)(1)
+                      * (*mesh->scale)(1)
+                + m->mVertices[k].z * localDir(2) * (*mesh->scale)(2)
+                      * (*mesh->scale)(2);
+      if (((dot > maxDot) && !neg) || ((dot < maxDot) && neg))
+      {
+        maxDot = dot;
+      }
+    }
+  }
+
+  // 2. Use the max dot to find vertices at the contact plane
+  for (int i = 0; i < mesh->mesh->mNumMeshes; i++)
+  {
+    aiMesh* m = mesh->mesh->mMeshes[i];
+    std::vector<int> id_current;
+    for (int k = 0; k < m->mNumVertices; k++)
+    {
+      s_t dot = m->mVertices[k].x * localDir(0) * (*mesh->scale)(0)
+                    * (*mesh->scale)(0)
+                + m->mVertices[k].y * localDir(1) * (*mesh->scale)(1)
+                      * (*mesh->scale)(1)
+                + m->mVertices[k].z * localDir(2) * (*mesh->scale)(2)
+                      * (*mesh->scale)(2);
+      // If we're on the witness plane with our "maxDot" vector, then add us to
+      // the list
+      if (abs(dot - maxDot) < DART_COLLISION_WITNESS_PLANE_DEPTH)
+      {
+        Eigen::Vector3s proposedPoint
+            = *(mesh->transform)
+              * Eigen::Vector3s(
+                  m->mVertices[k].x * (*mesh->scale)(0),
+                  m->mVertices[k].y * (*mesh->scale)(1),
+                  m->mVertices[k].z * (*mesh->scale)(2));
+        // It's possible for meshes to contain duplicate vertices, so filter
+        // those out
+        bool foundDuplicate = false;
+        for (int i = 0; i < points.size(); i++)
+        {
+          if ((points[i] - proposedPoint).squaredNorm() < 1e-6)
+          {
+            foundDuplicate = true;
+            break;
+          }
+        }
+        if (!foundDuplicate)
+        {
+          meshindex.points.push_back(proposedPoint);
+          id_current.push_back(k);
+        }
+      }
+    }
+    meshindex.indexs.push_back(id_current);
+  }
+  return meshindex;
 }
 
 /// This is a helper for creating contacts between a pair of faces, or face-edge
@@ -2506,7 +2610,9 @@ int createMeshMeshContacts(
     CollisionResult& result,
     ccd_vec3_t* dir,
     const std::vector<Eigen::Vector3s>& pointsAWitness,
-    const std::vector<Eigen::Vector3s>& pointsBWitness)
+    const std::vector<Eigen::Vector3s>& pointsBWitness,
+    const std::vector<Eigen::Vector3s>& vertexNormalsA,
+    const std::vector<Eigen::Vector3s>& vertexNormalsB)
 {
   if (pointsAWitness.size() == 0 && pointsBWitness.size() == 0)
   {
@@ -2548,14 +2654,22 @@ int createMeshMeshContacts(
     Contact contact;
     contact.collisionObject1 = o1;
     contact.collisionObject2 = o2;
-    contact.point = pointsAWitness[0];
+    contact.point = pointsAWitnessSorted[0];
+    contact.facePoints = pointsBWitnessSorted;
+    contact.vertexNormals = vertexNormalsB;
 
     // All the pointsBWitness vectors are co-planar, so we choose the closest
     // [0], [1] and [2] to cross to get a precise normal
+    /*
     Eigen::Vector3s normal
         = (pointsBWitnessSorted[0] - pointsBWitnessSorted[1])
               .cross(pointsBWitnessSorted[1] - pointsBWitnessSorted[2])
               .normalized();
+    */
+    // Using interpolation to compute contactnorm sign may need to inverted
+    Eigen::Vector3s normal = ISDInterpolate(vertexNormalsB,
+                                            pointsBWitnessSorted,
+                                            pointsAWitnessSorted[0]);
 
     // Ensure that the normal is in the opposite direction as `dir`, so we're
     // still pointing from B to A.
@@ -2583,14 +2697,21 @@ int createMeshMeshContacts(
     Contact contact;
     contact.collisionObject1 = o1;
     contact.collisionObject2 = o2;
-    contact.point = pointsBWitness[0];
+    contact.point = pointsBWitnessSorted[0];
+    contact.facePoints = pointsAWitnessSorted;
+    contact.vertexNormals = vertexNormalsA;
 
     // All the pointsAWitness vectors are co-planar, so we choose the closest
     // [0], [1], and [2] to cross to get a precise normal
+    /*
     Eigen::Vector3s normal
         = (pointsAWitnessSorted[0] - pointsAWitnessSorted[1])
               .cross(pointsAWitnessSorted[1] - pointsAWitnessSorted[2])
               .normalized();
+    */
+    Eigen::Vector3s normal = ISDInterpolate(vertexNormalsA,
+                                            pointsAWitnessSorted,
+                                            pointsBWitnessSorted[0]);
 
     // Ensure that the normal is in the opposite direction as `dir`, so we're
     // still pointing from B to A.
@@ -4341,12 +4462,16 @@ int collideMeshMesh(
     return 0;
   if (intersect == 0)
   {
-    std::vector<Eigen::Vector3s> pointsA
-        = ccdPointsAtWitnessMesh(&mesh1, &dir, false);
-    std::vector<Eigen::Vector3s> pointsB
-        = ccdPointsAtWitnessMesh(&mesh2, &dir, true);
+    ccdMeshIndex meshindexA
+        = ccdPointsAtWitnessMeshIndex(&mesh1, &dir, false);
+    ccdMeshIndex meshindexB
+        = ccdPointsAtWitnessMeshIndex(&mesh2, &dir, true);
 
-    return createMeshMeshContacts(o1, o2, result, &dir, pointsA, pointsB);
+    // Need to get the vector normal of refered vectors
+    std::vector<Eigen::Vector3s> vertexNormalsA = getVertexNormals(mesh1, meshindexA.indexs);
+    std::vector<Eigen::Vector3s> vertexNormalsB = getVertexNormals(mesh2, meshindexB.indexs);
+
+    return createMeshMeshContacts(o1, o2, result, &dir, meshindexA.points, meshindexB.points,vertexNormalsA,vertexNormalsB);
   }
   return 0;
 }

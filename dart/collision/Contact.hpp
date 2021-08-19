@@ -215,6 +215,12 @@ struct Contact
   /// of the B sphere.
   s_t radiusB;
 
+  /// This contains all witness points on the face of a face vertex or vertex face contact
+  std::vector<Eigen::Vector3s> facePoints;
+
+  /// This contains all vertex norm of contact points on the face vertex or vertex face contact
+  std::vector<Eigen::Vector3s> vertexNormals;
+
   /// Returns the epsilon to be used for determination of zero-length normal.
   constexpr static double getNormalEpsilon();
 

@@ -680,7 +680,7 @@ Eigen::Vector3s DifferentiableContactConstraint::getContactNormalGradient(
     totalGrad -= totalGrad.dot(normal) * normal;
     return totalGrad;
   }
-  else if (type == FACE || type == SELF_COLLISION || type == FACE_TO_SPHERE)
+  else if (type == SELF_COLLISION || type == FACE_TO_SPHERE)
   {
     return math::gradientWrtThetaPureRotation(worldTwist.head<3>(), normal, 0);
   }
@@ -1061,7 +1061,26 @@ Eigen::Vector3s DifferentiableContactConstraint::getContactNormalGradient(
     }
   }
   // TODO: Eric Chen: Implement Gradient For vertex face contact
-
+  else if (type == VERTEX)
+  {
+    // Compute Jacobian of Vertex provider
+    std::vector<Eigen::Vector3s> points = mContact->facePoints;
+    std::vector<Eigen::Vector3s> vertex_norms = mContact->vertexNormals;
+    Eigen::Vector3s point = mContact->point;
+    Eigen::MatrixXs Dnorm_dpoint = computeJacobianOfISDInterpWrtP(vertex_norms, points,point);
+    Eigen::Vector3s posGrad = Dnorm_dpoint*math::gradientWrtTheta(worldTwist,point,0.0);
+    return posGrad;
+  }
+  else if (type == FACE)
+  {
+    // Compute Jacobian of Face Provider
+    std::vector<Eigen::Vector3s> points = mContact->facePoints;
+    std::vector<Eigen::Vector3s> vertex_norms = mContact->vertexNormals;
+    Eigen::Vector3s point = mContact->point;
+    Eigen::MatrixXs Dnorm_face = computeJacobianOfISDInterpWrtFace(vertor_norms,points,point);
+    Eigen::Vector3s posGrad = Dnorm_dface*computeJacobianOfFaceWrtTheta(points,worldTwist);
+    return posGrad;
+  }
   // Default case For Vertex Face Contact
   return Eigen::Vector3s::Zero();
 }
@@ -1999,6 +2018,31 @@ Eigen::MatrixXs computeJacobianOfISDInterpWrtI(
   for(int i=0;i<vectors.size();i++)
   {
     jac += vectors[i]*computeJacobianOfISDWeightWrtI(points,point,i,index).transpose();
+  }
+  return jac;
+}
+
+Eigen::MatrixXs computeJacobianOfISDInterpWrtFace(
+  std::vector<Eigen::VectorXs> vectors,
+  std::vector<Eigen::Vector3s> points,
+  Eigen::Vector3s point)
+{
+  Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(vectors[0].size(),3*vectors.size());
+  for(int i=0;i<vectors.size();i++)
+  {
+    jac.block(0,i*3,vectors[0].size(),3) = computeJacobianOfISDInterpWrtI(vectors,points,point,i);
+  }
+  return jac;
+}
+
+Eigen::VectorXs computeJacobianOfFaceWrtTheta(
+  std::vector<Eigen::Vector3s> points,
+  Eigen::Vector6s worldTwist)
+{
+  Eigen::VectorXs jac = Eigen::VectorXs::Zero(points.size()*3);
+  for(int i=0;i<points.size();i++)
+  {
+    jac.segment(i,3) = math::gradientWrtTheta(worldTwist, points, 0.0);
   }
   return jac;
 }

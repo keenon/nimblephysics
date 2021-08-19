@@ -303,6 +303,15 @@ public:
       Eigen::Vector3s point,
       int index);
 
+  Eigen::MatrixXs computeJacobianOfISDInterpWrtFace(
+      std::vector<Eigen::VectorXs> vectors,
+      std::vector<Eigen::VectorXs> points,
+      Eigen::Vector3s point);
+
+  Eigen::VectorXs computeJacobianOfFaceWrtTheta(
+      std::vector<Eigen::Vector3s> points,
+      Eigen::Vector6s worldTwist);
+
   /////////////////////////////////////////////////////////////////////////////////////
   // Testing
   /////////////////////////////////////////////////////////////////////////////////////
