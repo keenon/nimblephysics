@@ -14,7 +14,7 @@
 #include "GradientTestUtils.hpp"
 #include "TestHelpers.hpp"
 
-// #define ALL_TESTS
+#define ALL_TESTS
 
 using namespace dart;
 using namespace biomechanics;
@@ -181,119 +181,8 @@ Parents:
   return skel;
 }
 
-/*
-Eigen::VectorXs originalPos = Eigen::VectorXs(37);
-originalPos << -0.0359295,
--1.02968,
-1.51584,
-1.22753,
-0.848632,
-0.296419,
-0.960441,
--0.0517612,
--0.696987,
-0.334791,
-0.224439,
-0.349066,
-0.0702492,
-1.56196,
-0.136896,
-0.413461,
-0.541744,
-0.069056,
--0.0169871,
-0.153583,
-1.31678,
-0.0304888,
-0.0545916,
--0.395601,
--0.113049,
-1.5708,
-0,
-0,
-0.0842056,
--0.212051,
--0.586747,
--0.157119,
--0.566219,
-0.586258,
-1.5708,
-0.0651074,
--0.246306;
-Eigen::VectorXs targetPos = Eigen::VectorXs(69);
-targetPos << 0.00691438,
-3.00543,
-0.248381,
-1.21846,
-0.936188,
-0.373096,
--0.330733,
--0.0641177,
-0.0171745,
-0.221141,
--0.0747513,
-0.0135706,
-0.301125,
-0.111222,
-0.0290149,
-0.350494,
-0.0271063,
--0.0961933,
-0.199713,
-0.12509,
-0.0392563,
-0.00241085,
--0.0178114,
-0.00551967,
--0.121972,
-0.156309,
--0.00531085,
--0.318662,
--0.0243452,
-0.0107559,
-0.0849869,
-0.0208487,
--0.0171355,
-0,
-0,
-0,
-0,
-0,
-0,
-0.0363008,
-0.102775,
--0.0170745,
-0.0412949,
-0.0554488,
--0.496387,
-0.0653812,
-0.0477812,
-0.491221,
-0.261686,
-0.000216491,
--0.0438005,
-0.110739,
--0.157067,
--0.97183,
-0.173904,
-0.190508,
-0.921755,
-0.132264,
--0.487179,
-0.171333,
--0.0410132,
-0.339415,
--0.164047,
--0.120093,
--0.066295,
--0.0631069,
--0.104498,
-0.0559579,
-0.082662;
-*/
-
 #ifdef ALL_TESTS
-TEST(SkeletonConverter, BROKEN_IK_TIMESTEP)
+TEST(SkeletonConverter, BROKEN_IK_TIMESTEP_BACKWARD)
 {
   std::shared_ptr<dynamics::Skeleton> amass = getAmassSkeleton();
   (void)amass;
@@ -357,13 +246,13 @@ TEST(SkeletonConverter, BROKEN_IK_TIMESTEP)
   amass->setPositions(targetPos);
   osim->setPositions(originalPos);
 
-  s_t error = converter.fitTarget(1000, 0.007);
+  s_t error = converter.fitTargetToSource();
   EXPECT_LE(error, 0.007);
 }
 #endif
 
 #ifdef ALL_TESTS
-TEST(SkeletonConverter, BROKEN_IK_TIMESTEP_2)
+TEST(SkeletonConverter, BROKEN_IK_TIMESTEP_2_BACKWARDS)
 {
   std::shared_ptr<dynamics::Skeleton> amass = getAmassSkeleton();
   (void)amass;
@@ -426,7 +315,7 @@ TEST(SkeletonConverter, BROKEN_IK_TIMESTEP_2)
   amass->setPositions(targetPos);
   osim->setPositions(originalPos);
 
-  s_t error = converter.fitTarget(1000, 0.007);
+  s_t error = converter.fitTargetToSource();
   EXPECT_LE(error, 0.007);
 
   /*
@@ -455,9 +344,9 @@ TEST(SkeletonConverter, BROKEN_IK_TIMESTEP_2)
     converter.debugToGUI(server);
   });
   server->registerConnectionListener([&]() { ticker.start(); });
-  */
 
   server->blockWhileServing();
+  */
 }
 #endif
 
@@ -525,7 +414,7 @@ TEST(SkeletonConverter, BROKEN_IK_TIMESTEP_3)
   amass->setPositions(targetPos);
   osim->setPositions(originalPos);
 
-  s_t error = converter.fitTarget(500, 0.007);
+  s_t error = converter.fitSourceToTarget();
   EXPECT_LE(error, 0.04);
 
   /*
@@ -663,7 +552,7 @@ TEST(SkeletonConverter, BROKEN_IK_TIMESTEP_3_BACKWARDS)
   amass->setPositions(targetPos);
   osim->setPositions(originalPos);
 
-  s_t error = converter.fitSource(1000, 0.007);
+  s_t error = converter.fitTargetToSource();
   EXPECT_LE(error, 0.007);
 
   /*
@@ -1013,7 +902,7 @@ TEST(SkeletonConverter, IK_JACOBIANS_BALL_JOINTS)
 }
 #endif
 
-// #ifdef ALL_TESTS
+#ifdef ALL_TESTS
 TEST(SkeletonConverter, RAJAGOPAL)
 {
   std::shared_ptr<dynamics::Skeleton> amass = getAmassSkeleton();
@@ -1083,12 +972,13 @@ TEST(SkeletonConverter, RAJAGOPAL)
       poses(j, i) = trajectory[i][j];
     }
   }
-  Eigen::MatrixXs shorterPoses = poses.block(0, 0, poses.rows(), 1000);
+  Eigen::MatrixXs shorterPoses = poses.block(0, 0, poses.rows(), 20);
   poses = shorterPoses;
 
   Eigen::MatrixXs convertedPoses
       = converter.convertMotion(poses, true, 400, 0.005);
 
+  /*
   // Uncomment this for local testing
   std::shared_ptr<server::GUIWebsocketServer> server
       = std::make_shared<server::GUIWebsocketServer>();
@@ -1100,7 +990,7 @@ TEST(SkeletonConverter, RAJAGOPAL)
   Ticker ticker = Ticker(0.01);
 
   int cursor = 0;
-  ticker.registerTickListener([&](long /*now*/) {
+  ticker.registerTickListener([&](long) {
     amass->setPositions(poses.col(cursor % poses.cols()));
     server->renderSkeleton(amass);
     osim->setPositions(convertedPoses.col(cursor % convertedPoses.cols()));
@@ -1112,5 +1002,6 @@ TEST(SkeletonConverter, RAJAGOPAL)
   server->registerConnectionListener([&]() { ticker.start(); });
 
   server->blockWhileServing();
+  */
 }
-// #endif
+#endif

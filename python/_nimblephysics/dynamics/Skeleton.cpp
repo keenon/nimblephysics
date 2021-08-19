@@ -780,8 +780,10 @@ void Skeleton(py::module& m)
           ::py::arg("positionJoints"),
           ::py::arg("targetPositions"),
           ::py::arg("scaleBodies") = false,
-          ::py::arg("ikIterationLimit") = 100,
-          ::py::arg("lineSearch") = false,
+          ::py::arg("convergenceThreshold") = 1e-7,
+          ::py::arg("maxStepCount") = 100,
+          ::py::arg("leastSquaresDamping") = 0.01,
+          ::py::arg("lineSearch") = true,
           ::py::arg("logOutput") = false)
       .def(
           "fitMarkersToWorldPositions",
@@ -789,8 +791,10 @@ void Skeleton(py::module& m)
           ::py::arg("markers"),
           ::py::arg("targetPositions"),
           ::py::arg("markeWeights"),
-          ::py::arg("ikIterationLimit") = 100,
-          ::py::arg("lineSearch") = false,
+          ::py::arg("convergenceThreshold") = 1e-7,
+          ::py::arg("maxStepCount") = 100,
+          ::py::arg("leastSquaresDamping") = 0.01,
+          ::py::arg("lineSearch") = true,
           ::py::arg("logOutput") = false)
       .def(
           "setVelocityUpperLimits",

@@ -26,22 +26,47 @@ public:
       const dynamics::Joint* sourceJoint, const dynamics::Joint* targetJoint);
 
   /// This will do its best to map the target onto the source skeleton
-  void rescaleAndPrepTarget(s_t weightFakeMarkers = 0.1);
+  void rescaleAndPrepTarget(
+      int addFakeMarkers = 3,
+      s_t weightFakeMarkers = 0.1,
+      // IK options - default to a fairly close fit since we only do this once
+      // and this will effect all downstream steps
+      s_t convergenceThreshold = 1e-15,
+      int maxStepCount = 1000,
+      s_t leastSquaresDamping = 0.01,
+      bool lineSearch = true,
+      bool logOutput = false);
 
   /// This will try to get the source skeleton configured to match the target as
   /// closely as possible
-  s_t fitTarget(int maxFitSteps = 500, s_t convergenceThreshold = 1e-7);
+  s_t fitSourceToTarget(
+      s_t convergenceThreshold = 1e-7,
+      int maxStepCount = 100,
+      s_t leastSquaresDamping = 0.01,
+      bool lineSearch = true,
+      bool logOutput = false);
 
   /// This will try to get the target skeleton configured to match the source as
-  /// closely as possible
-  s_t fitSource(int maxFitSteps = 500, s_t convergenceThreshold = 1e-7);
+  /// closely as possible. This is mostly just here for debugging, in general
+  /// there isn't much point to trying to fit the target skeleton back to the
+  /// source.
+  s_t fitTargetToSource(
+      s_t convergenceThreshold = 1e-7,
+      int maxStepCount = 100,
+      s_t leastSquaresDamping = 0.01,
+      bool lineSearch = true,
+      bool logOutput = false);
 
   /// This converts a motion from the target skeleton to the source skeleton
   Eigen::MatrixXs convertMotion(
       Eigen::MatrixXs targetMotion,
       bool logProgress = true,
-      int maxFitStepsPerTimestep = 500,
-      s_t convergenceThreshold = 1e-7);
+      // IK Options
+      s_t convergenceThreshold = 1e-7,
+      int maxStepCount = 100,
+      s_t leastSquaresDamping = 0.01,
+      bool lineSearch = true,
+      bool logIKOutput = false);
 
   /// This returns the concatenated 3-vectors for world positions of each joint
   /// in 3D world space, for the registered target joints.

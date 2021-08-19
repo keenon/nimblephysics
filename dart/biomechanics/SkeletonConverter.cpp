@@ -71,10 +71,39 @@ Eigen::VectorXs SkeletonConverter::getTargetMarkerWorldPositions()
 
 //==============================================================================
 /// This will do its best to map the target onto the source skeleton
-void SkeletonConverter::rescaleAndPrepTarget(s_t weightFakeMarkers)
+void SkeletonConverter::rescaleAndPrepTarget(
+    int addFakeMarkers,
+    s_t weightFakeMarkers,
+    ////// IK options
+    s_t convergenceThreshold,
+    int maxStepCount,
+    s_t leastSquaresDamping,
+    bool lineSearch,
+    bool logOutput)
 {
+  if (addFakeMarkers < 0)
+  {
+    std::cout
+        << "rescaleAndPrepTarget() expects addFakeMarkers between 0 and 3. Got "
+        << addFakeMarkers << ", so clamping to 0" << std::endl;
+    addFakeMarkers = 0;
+  }
+  if (addFakeMarkers > 3)
+  {
+    std::cout
+        << "rescaleAndPrepTarget() expects addFakeMarkers between 0 and 3. Got "
+        << addFakeMarkers << ", so clamping to 3" << std::endl;
+    addFakeMarkers = 3;
+  }
   mSourceSkeleton->fitJointsToWorldPositions(
-      mSourceJoints, getTargetJointWorldPositions(), true, 500, true, false);
+      mSourceJoints,
+      getTargetJointWorldPositions(),
+      true,
+      convergenceThreshold,
+      maxStepCount,
+      leastSquaresDamping,
+      lineSearch,
+      logOutput);
   for (int i = 0; i < mSourceSkeleton->getNumBodyNodes(); i++)
   {
     mSourceSkeletonBallJoints->getBodyNode(i)->setScale(
@@ -108,7 +137,7 @@ void SkeletonConverter::rescaleAndPrepTarget(s_t weightFakeMarkers)
     const dynamics::BodyNode* sourceBody = mSourceJoints[i]->getChildBodyNode();
     const dynamics::BodyNode* sourceBodyWithBalls
         = mSourceJointsWithBalls[i]->getChildBodyNode();
-    for (int j = 0; j < 4; j++)
+    for (int j = 0; j <= addFakeMarkers; j++)
     {
       /*
       // Define the unit vectors in the source body space
@@ -201,27 +230,13 @@ void SkeletonConverter::rescaleAndPrepTarget(s_t weightFakeMarkers)
 //==============================================================================
 /// This will try to get the source skeleton configured to match the target as
 /// closely as possible
-s_t SkeletonConverter::fitTarget(int maxFitSteps, s_t convergenceThreshold)
+s_t SkeletonConverter::fitSourceToTarget(
+    s_t convergenceThreshold,
+    int maxStepCount,
+    s_t leastSquaresDamping,
+    bool lineSearch,
+    bool logOutput)
 {
-  bool log = false;
-  (void)convergenceThreshold;
-  /*
-  s_t error = mSourceSkeleton->fitJointsToWorldPositions(
-      mSourceJoints,
-      getTargetJointWorldPositions(),
-      false,
-      maxFitSteps,
-      true,
-      log);
-  error = mSourceSkeleton->fitMarkersToWorldPositions(
-      mSourceMarkers,
-      getTargetMarkerWorldPositions(),
-      mMarkerWeights,
-      maxFitSteps,
-      true,
-      log);
-  */
-
   // We can do this gradient descent in a
   // gimbal-lock-free version of the skeleton, and then convert back when we're
   // done. This might jump around in joint space, but it's more robust.
@@ -233,9 +248,11 @@ s_t SkeletonConverter::fitTarget(int maxFitSteps, s_t convergenceThreshold)
       mSourceMarkersBallJoints,
       getTargetMarkerWorldPositions(),
       mMarkerWeights,
-      maxFitSteps,
-      true,
-      log);
+      convergenceThreshold,
+      maxStepCount,
+      leastSquaresDamping,
+      lineSearch,
+      logOutput);
   mSourceSkeleton->setPositions(mSourceSkeleton->convertPositionsFromBallSpace(
       mSourceSkeletonBallJoints->getPositions()));
   return error;
@@ -244,16 +261,22 @@ s_t SkeletonConverter::fitTarget(int maxFitSteps, s_t convergenceThreshold)
 //==============================================================================
 /// This will try to get the target skeleton configured to match the source as
 /// closely as possible
-s_t SkeletonConverter::fitSource(int maxFitSteps, s_t convergenceThreshold)
+s_t SkeletonConverter::fitTargetToSource(
+    s_t convergenceThreshold,
+    int maxStepCount,
+    s_t leastSquaresDamping,
+    bool lineSearch,
+    bool logOutput)
 {
-  (void)convergenceThreshold;
   s_t error = mTargetSkeleton->fitMarkersToWorldPositions(
       mTargetMarkers,
       getSourceMarkerWorldPositions(),
       mMarkerWeights,
-      maxFitSteps,
-      true,
-      true);
+      convergenceThreshold,
+      maxStepCount,
+      leastSquaresDamping,
+      lineSearch,
+      logOutput);
   return error;
 }
 
@@ -262,8 +285,12 @@ s_t SkeletonConverter::fitSource(int maxFitSteps, s_t convergenceThreshold)
 Eigen::MatrixXs SkeletonConverter::convertMotion(
     Eigen::MatrixXs targetMotion,
     bool logProgress,
-    int maxFitStepsPerTimestep,
-    s_t convergenceThreshold)
+    ////// IK options
+    s_t convergenceThreshold,
+    int maxStepCount,
+    s_t leastSquaresDamping,
+    bool lineSearch,
+    bool logOutput)
 {
   std::cout << "Converting " << targetMotion.cols() << " timesteps..."
             << std::endl;
@@ -277,7 +304,12 @@ Eigen::MatrixXs SkeletonConverter::convertMotion(
   // Take a few hundred iterations of IK to get a really good fit on the first
   // frame
   mTargetSkeleton->setPositions(targetMotion.col(0));
-  fitTarget(maxFitStepsPerTimestep, convergenceThreshold);
+  fitSourceToTarget(
+      convergenceThreshold,
+      maxStepCount,
+      leastSquaresDamping,
+      lineSearch,
+      logOutput);
 
   for (int i = 0; i < targetMotion.cols(); i++)
   {
@@ -289,7 +321,12 @@ Eigen::MatrixXs SkeletonConverter::convertMotion(
     // IK
     mTargetSkeleton->setPositions(targetMotion.col(i));
     Eigen::VectorXs originalPos = mSourceSkeleton->getPositions();
-    s_t bestError = fitTarget(maxFitStepsPerTimestep, convergenceThreshold);
+    s_t bestError = fitSourceToTarget(
+        convergenceThreshold,
+        maxStepCount,
+        leastSquaresDamping,
+        lineSearch,
+        logOutput);
     if (bestError > 0.1)
     {
       std::cout << "ERROR: Had a terrible fit! Got a best error " << bestError

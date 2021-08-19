@@ -55,6 +55,7 @@
 #include "dart/dynamics/SoftBodyNode.hpp"
 #include "dart/math/Geometry.hpp"
 #include "dart/math/Helpers.hpp"
+#include "dart/math/IKSolver.hpp"
 #include "dart/math/MathTypes.hpp"
 #include "dart/neural/ConstrainedGroupGradientMatrices.hpp"
 
@@ -3787,152 +3788,90 @@ s_t Skeleton::fitJointsToWorldPositions(
     const std::vector<const dynamics::Joint*>& positionJoints,
     Eigen::VectorXs targetPositions,
     bool scaleBodies,
-    int ikIterationLimit,
+    s_t convergenceThreshold,
+    int maxStepCount,
+    s_t leastSquaresDamping,
     bool lineSearch,
     bool logOutput)
 {
-  // Run simple IK to try to get as close as possible. Completely possible that
-  // the requested positions are infeasible, in which case we'll just do a best
-  // guess.
-  s_t error = std::numeric_limits<s_t>::infinity();
-  s_t lr = 0.05;
-  bool useTranspose = false;
-
-  for (int i = 0; i < ikIterationLimit; i++)
+  if (scaleBodies)
   {
-    /////////////////////////////////////////////////////////////////////////////
-    // Get an initial error
-    /////////////////////////////////////////////////////////////////////////////
+    Eigen::VectorXs initialPos
+        = Eigen::VectorXs::Zero(getNumDofs() + getNumBodyNodes());
+    initialPos.segment(0, getNumDofs()) = getPositions();
+    initialPos.segment(getNumDofs(), getNumBodyNodes()) = getLinkScales();
 
-    Eigen::VectorXs diff
-        = targetPositions - getJointWorldPositions(positionJoints);
-    s_t initialError = diff.squaredNorm();
+    return math::solveIK(
+        initialPos,
+        positionJoints.size() * 3,
+        [this](/* in*/ const Eigen::VectorXs pos) {
+          // Set positions
+          setPositions(pos.segment(0, getNumDofs()));
+          clampPositionsToLimits();
 
-    /////////////////////////////////////////////////////////////////////////////
-    // Do the actual IK update
-    /////////////////////////////////////////////////////////////////////////////
+          // Set scales
+          Eigen::VectorXs newScales
+              = pos.segment(getNumDofs(), getNumBodyNodes());
+          for (int i = 0; i < getNumBodyNodes(); i++)
+          {
+            if (newScales(i) > getBodyNode(i)->getScaleUpperBound())
+            {
+              newScales(i) = getBodyNode(i)->getScaleUpperBound();
+            }
+            if (newScales(i) < getBodyNode(i)->getScaleLowerBound())
+            {
+              newScales(i) = getBodyNode(i)->getScaleLowerBound();
+            }
+          }
+          setLinkScales(newScales);
 
-    Eigen::VectorXs originalPos = getPositions();
-    Eigen::VectorXs originalScale = getLinkScales();
-
-    Eigen::MatrixXs J;
-    if (scaleBodies)
-    {
-      Eigen::MatrixXs Jpos
-          = getJointWorldPositionsJacobianWrtJointPositions(positionJoints);
-      Eigen::MatrixXs Jscale
-          = getJointWorldPositionsJacobianWrtBodyScales(positionJoints);
-      J = Eigen::MatrixXs::Zero(Jpos.rows(), Jpos.cols() + Jscale.cols());
-      J.block(0, 0, Jpos.rows(), Jpos.cols()) = Jpos;
-      J.block(0, Jpos.cols(), Jscale.rows(), Jscale.cols()) = Jscale;
-    }
-    else
-    {
-      J = getJointWorldPositionsJacobianWrtJointPositions(positionJoints);
-    }
-    Eigen::VectorXs delta;
-
-    if (useTranspose)
-    {
-      delta = J.transpose() * diff;
-    }
-    else
-    {
-      delta = J.completeOrthogonalDecomposition().solve(diff);
-    }
-#ifdef DART_SKEL_LOG_IK_OUTPUT
-    // std::cout << "IK Diff: " << std::endl << diff << std::endl;
-    // std::cout << "IK J: " << std::endl << J << std::endl;
-    // std::cout << "IK Delta: " << std::endl << delta << std::endl;
-    // std::cout << "J * IK Delta: " << std::endl << J * delta << std::endl;
-#endif
-    Eigen::VectorXs deltaPos = delta.segment(0, getNumDofs());
-    setPositions(getPositions() + (lr * deltaPos));
-    clampPositionsToLimits();
-
-    if (scaleBodies)
-    {
-      Eigen::VectorXs newScales
-          = getLinkScales()
-            + (lr * delta.segment(getNumDofs(), getNumBodyNodes()));
-      for (int i = 0; i < getNumBodyNodes(); i++)
-      {
-        if (newScales(i) > getBodyNode(i)->getScaleUpperBound())
-        {
-          newScales(i) = getBodyNode(i)->getScaleUpperBound();
-        }
-        if (newScales(i) < getBodyNode(i)->getScaleLowerBound())
-        {
-          newScales(i) = getBodyNode(i)->getScaleLowerBound();
-        }
-      }
-      setLinkScales(newScales);
-    }
-
-    /////////////////////////////////////////////////////////////////////////////
-    // Evaluate how well we did
-    /////////////////////////////////////////////////////////////////////////////
-
-    Eigen::VectorXs diffAfter
-        = targetPositions - getJointWorldPositions(positionJoints);
-    s_t newError = diffAfter.squaredNorm();
-
-    s_t errorChange = newError - initialError;
-
-    if (logOutput)
-    {
-      std::cout << "IK iteration " << i << " lr: " << lr
-                << " loss: " << newError << " change: " << errorChange
-                << std::endl;
-    }
-
-    if (newError < 1e-21)
-    {
-      if (logOutput)
-      {
-        std::cout << "Terminating IK search after " << i
-                  << " iterations with loss: " << newError << std::endl;
-      }
-      break;
-    }
-    if (errorChange > 0)
-    {
-      lr *= 0.5;
-      if (lr < 1e-4)
-      {
-        useTranspose = true;
-      }
-      if (lineSearch)
-      {
-        setPositions(originalPos);
-        if (scaleBodies)
-        {
-          setLinkScales(originalScale);
-        }
-      }
-    }
-    else if (errorChange > -1e-22 && i > 0)
-    {
-      if (logOutput)
-      {
-        std::cout << "Terminating IK search after " << i
-                  << " iterations with optimal loss: " << newError << std::endl;
-      }
-      break;
-    }
-    else
-    {
-      // Slowly grow LR while we're safely decreasing loss
-      lr *= 1.1;
-    }
-
-    error = newError;
+          // Return the clamped position
+          Eigen::VectorXs clampedPos = Eigen::VectorXs::Zero(pos.size());
+          clampedPos.segment(0, getNumDofs()) = getPositions();
+          clampedPos.segment(getNumDofs(), getNumBodyNodes()) = newScales;
+          return clampedPos;
+        },
+        [this, targetPositions, positionJoints](
+            /*out*/ Eigen::VectorXs& diff,
+            /*out*/ Eigen::MatrixXs& jac) {
+          diff = targetPositions - getJointWorldPositions(positionJoints);
+          assert(jac.cols() == getNumDofs() + getNumBodyNodes());
+          assert(jac.rows() == positionJoints.size() * 3);
+          jac.setZero();
+          jac.block(0, 0, positionJoints.size() * 3, getNumDofs())
+              = getJointWorldPositionsJacobianWrtJointPositions(positionJoints);
+          jac.block(
+              0, getNumDofs(), positionJoints.size() * 3, getNumBodyNodes())
+              = getJointWorldPositionsJacobianWrtBodyScales(positionJoints);
+        },
+        convergenceThreshold,
+        maxStepCount,
+        leastSquaresDamping,
+        lineSearch,
+        logOutput);
   }
-  if (logOutput)
+  else
   {
-    std::cout << "Finished IK search with loss: " << error << std::endl;
+    return math::solveIK(
+        getPositions(),
+        positionJoints.size() * 3,
+        [this](/* in*/ Eigen::VectorXs pos) {
+          setPositions(pos);
+          clampPositionsToLimits();
+          return getPositions();
+        },
+        [this, targetPositions, positionJoints](
+            /*out*/ Eigen::VectorXs& diff,
+            /*out*/ Eigen::MatrixXs& jac) {
+          diff = targetPositions - getJointWorldPositions(positionJoints);
+          jac = getJointWorldPositionsJacobianWrtJointPositions(positionJoints);
+        },
+        convergenceThreshold,
+        maxStepCount,
+        leastSquaresDamping,
+        lineSearch,
+        logOutput);
   }
-  return error;
 }
 
 //==============================================================================
@@ -3943,134 +3882,35 @@ s_t Skeleton::fitMarkersToWorldPositions(
         markers,
     Eigen::VectorXs targetPositions,
     Eigen::VectorXs markerWeights,
-    int ikIterationLimit,
+    s_t convergenceThreshold,
+    int maxStepCount,
+    s_t leastSquaresDamping,
     bool lineSearch,
     bool logOutput)
 {
-  // Run simple IK to try to get as close as possible. Completely possible that
-  // the requested positions are infeasible, in which case we'll just do a best
-  // guess.
-  s_t error = std::numeric_limits<s_t>::infinity();
-  s_t lr = 0.05;
-  bool useTranspose = false;
-
-  for (int i = 0; i < ikIterationLimit; i++)
-  {
-    /////////////////////////////////////////////////////////////////////////////
-    // Get an initial error
-    /////////////////////////////////////////////////////////////////////////////
-
-    Eigen::VectorXs diff = targetPositions - getMarkerWorldPositions(markers);
-    for (int j = 0; j < markerWeights.size(); j++)
-    {
-      diff.segment<3>(j * 3) *= markerWeights(j);
-    }
-    s_t initialError = diff.squaredNorm();
-
-    /////////////////////////////////////////////////////////////////////////////
-    // Do the actual IK update
-    /////////////////////////////////////////////////////////////////////////////
-
-    Eigen::VectorXs originalPos = getPositions();
-    Eigen::VectorXs originalScale = getLinkScales();
-
-    Eigen::MatrixXs J
-        = getMarkerWorldPositionsJacobianWrtJointPositions(markers);
-    Eigen::VectorXs delta;
-
-    if (useTranspose)
-    {
-      delta = J.transpose() * diff;
-    }
-    else
-    {
-      delta = J.completeOrthogonalDecomposition().solve(diff);
-    }
-#ifdef DART_SKEL_LOG_IK_OUTPUT
-    // std::cout << "IK Diff: " << std::endl << diff << std::endl;
-    // std::cout << "IK J: " << std::endl << J << std::endl;
-    // std::cout << "IK Delta: " << std::endl << delta << std::endl;
-    // std::cout << "J * IK Delta: " << std::endl << J * delta << std::endl;
-#endif
-    Eigen::VectorXs deltaPos = delta.segment(0, getNumDofs());
-    setPositions(getPositions() + (lr * deltaPos));
-    clampPositionsToLimits();
-
-    /////////////////////////////////////////////////////////////////////////////
-    // Evaluate how well we did
-    /////////////////////////////////////////////////////////////////////////////
-
-    Eigen::VectorXs diffAfter
-        = targetPositions - getMarkerWorldPositions(markers);
-    for (int j = 0; j < markerWeights.size(); j++)
-    {
-      diffAfter.segment<3>(j * 3) *= markerWeights(j);
-    }
-    s_t newError = diffAfter.squaredNorm();
-
-    s_t errorChange = newError - initialError;
-
-    if (logOutput)
-    {
-      std::cout << "IK iteration " << i << " lr: " << lr
-                << " loss: " << newError << " change: " << errorChange
-                << std::endl;
-    }
-
-    if (newError < 1e-21)
-    {
-      if (logOutput)
-      {
-        std::cout << "Terminating IK search after " << i
-                  << " iterations with loss: " << newError << std::endl;
-      }
-      break;
-    }
-    if (errorChange > 0)
-    {
-      lr *= 0.5;
-      if (lr < 1e-4)
-      {
-        useTranspose = true;
-      }
-      if (lineSearch)
-      {
-        setPositions(originalPos);
-      }
-      if (lr < 1e-10)
-      {
-        if (logOutput)
+  return math::solveIK(
+      getPositions(),
+      markers.size() * 3,
+      [this](/* in*/ Eigen::VectorXs pos) {
+        setPositions(pos);
+        clampPositionsToLimits();
+        return getPositions();
+      },
+      [this, targetPositions, markers, markerWeights](
+          /*out*/ Eigen::VectorXs& diff,
+          /*out*/ Eigen::MatrixXs& jac) {
+        diff = targetPositions - getMarkerWorldPositions(markers);
+        for (int j = 0; j < markerWeights.size(); j++)
         {
-          std::cout
-              << "Terminating IK search after " << i
-              << " iterations because learning rate is vanishing, with loss: "
-              << newError << std::endl;
+          diff.segment<3>(j * 3) *= markerWeights(j);
         }
-        break;
-      }
-    }
-    else if (errorChange > -1e-22 && i > 0)
-    {
-      if (logOutput)
-      {
-        std::cout << "Terminating IK search after " << i
-                  << " iterations with optimal loss: " << newError << std::endl;
-      }
-      break;
-    }
-    else
-    {
-      // Slowly grow LR while we're safely decreasing loss
-      lr *= 1.1;
-    }
-
-    error = newError;
-  }
-  if (logOutput)
-  {
-    std::cout << "Finished IK search with loss: " << error << std::endl;
-  }
-  return error;
+        jac = getMarkerWorldPositionsJacobianWrtJointPositions(markers);
+      },
+      convergenceThreshold,
+      maxStepCount,
+      leastSquaresDamping,
+      lineSearch,
+      logOutput);
 }
 
 //==============================================================================

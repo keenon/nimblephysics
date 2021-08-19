@@ -930,8 +930,10 @@ public:
       const std::vector<const dynamics::Joint*>& positionJoints,
       Eigen::VectorXs targetPositions,
       bool scaleBodies = false,
-      int ikIterationLimit = 100,
-      bool lineSearch = false,
+      s_t convergenceThreshold = 1e-7,
+      int maxStepCount = 100,
+      s_t leastSquaresDamping = 0.01,
+      bool lineSearch = true,
       bool logOutput = false);
 
   /// This runs IK, attempting to fit the world positions of the passed in
@@ -941,8 +943,10 @@ public:
           markers,
       Eigen::VectorXs targetPositions,
       Eigen::VectorXs markerWeights,
-      int ikIterationLimit = 100,
-      bool lineSearch = false,
+      s_t convergenceThreshold = 1e-7,
+      int maxStepCount = 100,
+      s_t leastSquaresDamping = 0.01,
+      bool lineSearch = true,
       bool logOutput = false);
 
   //----------------------------------------------------------------------------

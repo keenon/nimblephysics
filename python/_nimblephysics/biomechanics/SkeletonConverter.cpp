@@ -63,19 +63,39 @@ void SkeletonConverter(py::module& m)
       .def(
           "rescaleAndPrepTarget",
           &dart::biomechanics::SkeletonConverter::rescaleAndPrepTarget,
-          ::py::arg("weightFakeMarkers") = 0.1)
+          ::py::arg("addFakeMarkers") = 3,
+          ::py::arg("weightFakeMarkers") = 0.1,
+          ::py::arg("convergenceThreshold") = 1e-15,
+          ::py::arg("maxStepCount") = 1000,
+          ::py::arg("leastSquaresDamping") = 0.01,
+          ::py::arg("lineSearch") = true,
+          ::py::arg("logOutput") = false)
       .def(
-          "fitTarget",
-          &dart::biomechanics::SkeletonConverter::fitTarget,
-          ::py::arg("maxFitSteps") = -1,
-          ::py::arg("convergenceThreshold") = 1e-7)
+          "fitSourceToTarget",
+          &dart::biomechanics::SkeletonConverter::fitSourceToTarget,
+          ::py::arg("convergenceThreshold") = 1e-7,
+          ::py::arg("maxStepCount") = 100,
+          ::py::arg("leastSquaresDamping") = 0.01,
+          ::py::arg("lineSearch") = true,
+          ::py::arg("logOutput") = false)
+      .def(
+          "fitTargetToSource",
+          &dart::biomechanics::SkeletonConverter::fitTargetToSource,
+          ::py::arg("convergenceThreshold") = 1e-7,
+          ::py::arg("maxStepCount") = 100,
+          ::py::arg("leastSquaresDamping") = 0.01,
+          ::py::arg("lineSearch") = true,
+          ::py::arg("logOutput") = false)
       .def(
           "convertMotion",
           &dart::biomechanics::SkeletonConverter::convertMotion,
           ::py::arg("targetMotion"),
           ::py::arg("logProgress") = true,
-          ::py::arg("maxFitStepsPerTimestep") = -1,
-          ::py::arg("convergenceThreshold") = 1e-7)
+          ::py::arg("convergenceThreshold") = 1e-7,
+          ::py::arg("maxStepCount") = 100,
+          ::py::arg("leastSquaresDamping") = 0.01,
+          ::py::arg("lineSearch") = true,
+          ::py::arg("logIKOutput") = false)
       .def(
           "getSourceJointWorldPositions",
           &dart::biomechanics::SkeletonConverter::getSourceJointWorldPositions)
