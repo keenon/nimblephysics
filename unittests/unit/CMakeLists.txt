@@ -58,6 +58,9 @@ if(TARGET dart-utils)
   dart_add_test("unit" test_SkeletonConverter)
   target_link_libraries(test_SkeletonConverter dart-utils)
 
+  dart_add_test("unit" test_SkeletonToBallJoints)
+  target_link_libraries(test_SkeletonToBallJoints dart-utils)
+
   dart_add_test("unit" test_VskParser)
   target_link_libraries(test_VskParser dart-utils)
 

@@ -307,7 +307,7 @@ TEST(SkeletonConverter, BROKEN_IK_TIMESTEP)
   osim->setPosition(4, -0.2);
   osim->setPosition(5, 1.0);
 
-  osim->getBodyNode("tibia_l")->setScale(1.2);
+  // osim->getBodyNode("tibia_l")->setScale(1.2);
 
   biomechanics::SkeletonConverter converter(osim, amass);
   converter.linkJoints(
@@ -357,12 +357,12 @@ TEST(SkeletonConverter, BROKEN_IK_TIMESTEP)
   amass->setPositions(targetPos);
   osim->setPositions(originalPos);
 
-  s_t error = converter.fitTarget(-1, 0.005);
-  EXPECT_LE(error, 0.005);
+  s_t error = converter.fitTarget(1000, 0.007);
+  EXPECT_LE(error, 0.007);
 }
 #endif
 
-// #ifdef ALL_TESTS
+#ifdef ALL_TESTS
 TEST(SkeletonConverter, BROKEN_IK_TIMESTEP_2)
 {
   std::shared_ptr<dynamics::Skeleton> amass = getAmassSkeleton();
@@ -377,7 +377,7 @@ TEST(SkeletonConverter, BROKEN_IK_TIMESTEP_2)
   osim->setPosition(4, -0.2);
   osim->setPosition(5, 1.0);
 
-  osim->getBodyNode("tibia_l")->setScale(1.2);
+  // osim->getBodyNode("tibia_l")->setScale(1.2);
 
   biomechanics::SkeletonConverter converter(osim, amass);
   converter.linkJoints(
@@ -426,13 +426,280 @@ TEST(SkeletonConverter, BROKEN_IK_TIMESTEP_2)
   amass->setPositions(targetPos);
   osim->setPositions(originalPos);
 
-  s_t error = converter.fitTarget(-1, 0.005);
-  EXPECT_LE(error, 0.005);
+  s_t error = converter.fitTarget(1000, 0.007);
+  EXPECT_LE(error, 0.007);
+
+  /*
+  // Uncomment this for local testing
+  std::shared_ptr<server::GUIWebsocketServer> server
+      = std::make_shared<server::GUIWebsocketServer>();
+  server->serve(8070);
+  server->renderSkeleton(osim);
+  server->renderSkeleton(amass);
+  converter.debugToGUI(server);
+  */
+
+  /*
+  Ticker ticker = Ticker(0.01);
+
+  Eigen::VectorXs originalPoses = amass->getPositions();
+  Eigen::VectorXs dir = Eigen::VectorXs::Zero(originalPoses.size());
+  dir(0) = 1.0;
+
+  int cursor = 0;
+  ticker.registerTickListener([&](long) {
+    s_t percentage = (cursor % 300) / 300.0;
+    amass->setPositions(originalPoses + (dir * percentage));
+    cursor++;
+    server->renderSkeleton(amass);
+    converter.debugToGUI(server);
+  });
+  server->registerConnectionListener([&]() { ticker.start(); });
+  */
+
+  server->blockWhileServing();
 }
-// #endif
+#endif
 
 #ifdef ALL_TESTS
-TEST(SkeletonConverter, RAJAGOPAL)
+TEST(SkeletonConverter, BROKEN_IK_TIMESTEP_3)
+{
+  std::shared_ptr<dynamics::Skeleton> amass = getAmassSkeleton();
+  (void)amass;
+  std::shared_ptr<dynamics::Skeleton> osim = OpenSimParser::parseOsim(
+      "dart://sample/osim/FullBodyModel-4.0/Rajagopal2015.osim");
+  (void)osim;
+  std::shared_ptr<simulation::World> world = simulation::World::create();
+  world->addSkeleton(amass);
+  world->addSkeleton(osim);
+  osim->setPosition(2, -3.14159 / 2);
+  osim->setPosition(4, -0.2);
+  osim->setPosition(5, 1.0);
+
+  // osim->getBodyNode("tibia_l")->setScale(1.2);
+
+  biomechanics::SkeletonConverter converter(osim, amass);
+  converter.linkJoints(
+      osim->getJoint("radius_hand_l"), amass->getJoint("wrist_l"));
+  converter.linkJoints(
+      osim->getJoint("radius_hand_r"), amass->getJoint("wrist_r"));
+  converter.linkJoints(osim->getJoint("ankle_l"), amass->getJoint("ankle_l"));
+  converter.linkJoints(osim->getJoint("ankle_r"), amass->getJoint("ankle_r"));
+  converter.linkJoints(osim->getJoint("mtp_l"), amass->getJoint("foot_l"));
+  converter.linkJoints(osim->getJoint("mtp_r"), amass->getJoint("foot_r"));
+  converter.linkJoints(
+      osim->getJoint("walker_knee_l"), amass->getJoint("knee_l"));
+  converter.linkJoints(
+      osim->getJoint("walker_knee_r"), amass->getJoint("knee_r"));
+  converter.linkJoints(
+      osim->getJoint("acromial_l"), amass->getJoint("shoulder_l"));
+  converter.linkJoints(
+      osim->getJoint("acromial_r"), amass->getJoint("shoulder_r"));
+  converter.linkJoints(osim->getJoint("elbow_l"), amass->getJoint("elbow_l"));
+  converter.linkJoints(osim->getJoint("elbow_r"), amass->getJoint("elbow_r"));
+  converter.linkJoints(osim->getJoint("hip_l"), amass->getJoint("hip_l"));
+  converter.linkJoints(osim->getJoint("hip_r"), amass->getJoint("hip_r"));
+
+  converter.rescaleAndPrepTarget();
+
+  Eigen::VectorXs originalPos = Eigen::VectorXs(37);
+  originalPos << 0.125196, -0.673426, 1.5708, 1.21413, 0.896998, -2.02844,
+      0.96277, -0.0341737, 0.0246824, 0.487444, 0.0486875, 0.218931, 0.111236,
+      0.671807, 0.199839, 0.698132, 0.379528, 0.362468, -0.349066, 0.417028,
+      0.728555, 0.286016, 0.878604, -0.250346, -0.0735501, 1.33275, 0, 0,
+      0.0551332, -0.010835, -0.147373, -0.165898, 0.719413, 0.181223, 0.396864,
+      0.119402, -0.436332;
+  Eigen::VectorXs targetPos = Eigen::VectorXs(69);
+  targetPos << -0.0399809, -2.30025, -0.10902, 1.24218, 0.968038, -1.97432,
+      -0.0380443, -0.0142858, -0.0141425, 0.0364421, -0.0764619, -0.0284387,
+      0.253522, 0.0318227, 0.0384648, 0.328847, -0.0982696, -0.0553856,
+      0.274149, -0.0415078, 0.0342907, -0.0155455, -0.00628508, 0.0295129,
+      -0.247807, 0.171843, 0.0989596, -0.228714, -0.101418, 0.0405931,
+      0.0634431, -0.000466875, 0.0167761, 0, 0, 0, 0, 0, 0, 0.100058, 0.175939,
+      -0.0651374, 0.0711339, 0.0799847, -0.443631, 0.0715081, 0.0338863,
+      0.487193, 0.277674, 0.116316, -0.134004, 0.0959314, -0.183305, -1.02101,
+      0.149845, 0.211967, 0.928609, 0.186417, -0.59239, 0.194414, -0.0741347,
+      0.30476, -0.194849, -0.150907, -0.0635031, -0.0668592, -0.0883991,
+      0.0374933, 0.0712554;
+
+  amass->setPositions(targetPos);
+  osim->setPositions(originalPos);
+
+  s_t error = converter.fitTarget(500, 0.007);
+  EXPECT_LE(error, 0.04);
+
+  /*
+  // Uncomment this for local testing
+  std::shared_ptr<server::GUIWebsocketServer> server
+      = std::make_shared<server::GUIWebsocketServer>();
+  server->serve(8070);
+  server->renderSkeleton(osim);
+  server->renderSkeleton(amass);
+  converter.debugToGUI(server);
+  server->blockWhileServing();
+  */
+
+  /*
+  Ticker ticker = Ticker(0.01);
+
+  Eigen::VectorXs originalPoses = amass->getPositions();
+  Eigen::VectorXs dir = Eigen::VectorXs::Zero(originalPoses.size());
+  dir(0) = 1.0;
+
+  int cursor = 0;
+  ticker.registerTickListener([&](long) {
+    s_t percentage = (cursor % 300) / 300.0;
+    amass->setPositions(originalPoses + (dir * percentage));
+    cursor++;
+    server->renderSkeleton(amass);
+    converter.debugToGUI(server);
+  });
+  server->registerConnectionListener([&]() { ticker.start(); });
+
+  server->blockWhileServing();
+  */
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(SkeletonConverter, AMASS_JACOBIANS)
+{
+  std::shared_ptr<dynamics::Skeleton> amass = getAmassSkeleton();
+  Eigen::VectorXs originalPos = Eigen::VectorXs(69);
+  originalPos << -0.054788, -2.25757, -0.0674997, 1.17553, 1.0668, -2.13555,
+      -0.0380443, -0.0142858, -0.0141425, 0.0364421, -0.0764619, -0.0284387,
+      0.256586, 0.078043, 0.0609322, 0.328847, -0.0982696, -0.0553856, 0.274149,
+      -0.0415078, 0.0342907, 0.0166395, 0.0388948, 0.0451218, -0.247807,
+      0.171843, 0.0989596, -0.228714, -0.101418, 0.0405931, 0.107025, 0.0447657,
+      0.0272507, 0, 0, 0, 0, 0, 0, 0.100058, 0.175939, -0.0651374, 0.11465,
+      0.135857, -0.439604, 0.0715081, 0.0338863, 0.487193, 0.277674, 0.116316,
+      -0.134004, 0.0938483, -0.122667, -1.02972, 0.149845, 0.211967, 0.928609,
+      0.188508, -0.577917, 0.198142, -0.0741347, 0.30476, -0.194849, -0.14481,
+      -0.0808033, -0.05125, -0.0883991, 0.0374933, 0.0712554;
+  amass->setPositions(originalPos);
+
+  std::vector<const dynamics::Joint*> joints;
+  joints.push_back(amass->getJoint("wrist_l"));
+
+  // Check the joint position Jacobian is accurate
+  const s_t THRESHOLD = 1e-7;
+  Eigen::MatrixXs posJac
+      = amass->getJointWorldPositionsJacobianWrtJointPositions(joints);
+  Eigen::MatrixXs posJac_fd
+      = amass->finiteDifferenceJointWorldPositionsJacobianWrtJointPositions(
+          joints);
+  if (!equals(posJac, posJac_fd, THRESHOLD))
+  {
+    std::cout << "Analytical pos J: " << std::endl << posJac << std::endl;
+    std::cout << "FD pos J: " << std::endl << posJac_fd << std::endl;
+    std::cout << "Diff: " << std::endl << posJac - posJac_fd << std::endl;
+    EXPECT_TRUE(equals(posJac, posJac_fd, THRESHOLD));
+    return;
+  }
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(SkeletonConverter, BROKEN_IK_TIMESTEP_3_BACKWARDS)
+{
+  std::shared_ptr<dynamics::Skeleton> amass = getAmassSkeleton();
+  (void)amass;
+  std::shared_ptr<dynamics::Skeleton> osim = OpenSimParser::parseOsim(
+      "dart://sample/osim/FullBodyModel-4.0/Rajagopal2015.osim");
+  (void)osim;
+  std::shared_ptr<simulation::World> world = simulation::World::create();
+  world->addSkeleton(amass);
+  world->addSkeleton(osim);
+  osim->setPosition(2, -3.14159 / 2);
+  osim->setPosition(4, -0.2);
+  osim->setPosition(5, 1.0);
+
+  // osim->getBodyNode("tibia_l")->setScale(1.2);
+
+  biomechanics::SkeletonConverter converter(osim, amass);
+  converter.linkJoints(
+      osim->getJoint("radius_hand_l"), amass->getJoint("wrist_l"));
+  converter.linkJoints(
+      osim->getJoint("radius_hand_r"), amass->getJoint("wrist_r"));
+  converter.linkJoints(osim->getJoint("ankle_l"), amass->getJoint("ankle_l"));
+  converter.linkJoints(osim->getJoint("ankle_r"), amass->getJoint("ankle_r"));
+  converter.linkJoints(osim->getJoint("mtp_l"), amass->getJoint("foot_l"));
+  converter.linkJoints(osim->getJoint("mtp_r"), amass->getJoint("foot_r"));
+  converter.linkJoints(
+      osim->getJoint("walker_knee_l"), amass->getJoint("knee_l"));
+  converter.linkJoints(
+      osim->getJoint("walker_knee_r"), amass->getJoint("knee_r"));
+  converter.linkJoints(
+      osim->getJoint("acromial_l"), amass->getJoint("shoulder_l"));
+  converter.linkJoints(
+      osim->getJoint("acromial_r"), amass->getJoint("shoulder_r"));
+  converter.linkJoints(osim->getJoint("elbow_l"), amass->getJoint("elbow_l"));
+  converter.linkJoints(osim->getJoint("elbow_r"), amass->getJoint("elbow_r"));
+  converter.linkJoints(osim->getJoint("hip_l"), amass->getJoint("hip_l"));
+  converter.linkJoints(osim->getJoint("hip_r"), amass->getJoint("hip_r"));
+
+  converter.rescaleAndPrepTarget();
+
+  Eigen::VectorXs originalPos = Eigen::VectorXs(37);
+  originalPos << 0.125196, -0.673426, 1.5708, 1.21413, 0.896998, -2.02844,
+      0.96277, -0.0341737, 0.0246824, 0.487444, 0.0486875, 0.218931, 0.111236,
+      0.671807, 0.199839, 0.698132, 0.379528, 0.362468, -0.349066, 0.417028,
+      0.728555, 0.286016, 0.878604, -0.250346, -0.0735501, 1.33275, 0, 0,
+      0.0551332, -0.010835, -0.147373, -0.165898, 0.719413, 0.181223, 0.396864,
+      0.119402, -0.436332;
+  Eigen::VectorXs targetPos = Eigen::VectorXs(69);
+  targetPos << -0.0399809, -2.30025, -0.10902, 1.24218, 0.968038, -1.97432,
+      -0.0380443, -0.0142858, -0.0141425, 0.0364421, -0.0764619, -0.0284387,
+      0.253522, 0.0318227, 0.0384648, 0.328847, -0.0982696, -0.0553856,
+      0.274149, -0.0415078, 0.0342907, -0.0155455, -0.00628508, 0.0295129,
+      -0.247807, 0.171843, 0.0989596, -0.228714, -0.101418, 0.0405931,
+      0.0634431, -0.000466875, 0.0167761, 0, 0, 0, 0, 0, 0, 0.100058, 0.175939,
+      -0.0651374, 0.0711339, 0.0799847, -0.443631, 0.0715081, 0.0338863,
+      0.487193, 0.277674, 0.116316, -0.134004, 0.0959314, -0.183305, -1.02101,
+      0.149845, 0.211967, 0.928609, 0.186417, -0.59239, 0.194414, -0.0741347,
+      0.30476, -0.194849, -0.150907, -0.0635031, -0.0668592, -0.0883991,
+      0.0374933, 0.0712554;
+
+  amass->setPositions(targetPos);
+  osim->setPositions(originalPos);
+
+  s_t error = converter.fitSource(1000, 0.007);
+  EXPECT_LE(error, 0.007);
+
+  /*
+  // Uncomment this for local testing
+  std::shared_ptr<server::GUIWebsocketServer> server
+      = std::make_shared<server::GUIWebsocketServer>();
+  server->serve(8070);
+  server->renderSkeleton(osim);
+  server->renderSkeleton(amass);
+  converter.debugToGUI(server);
+  */
+
+  /*
+  Ticker ticker = Ticker(0.01);
+
+  Eigen::VectorXs originalPoses = amass->getPositions();
+  Eigen::VectorXs dir = Eigen::VectorXs::Zero(originalPoses.size());
+  dir(0) = 1.0;
+
+  int cursor = 0;
+  ticker.registerTickListener([&](long) {
+    s_t percentage = (cursor % 300) / 300.0;
+    amass->setPositions(originalPoses + (dir * percentage));
+    cursor++;
+    server->renderSkeleton(amass);
+    converter.debugToGUI(server);
+  });
+  server->registerConnectionListener([&]() { ticker.start(); });
+
+  server->blockWhileServing();
+  */
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(SkeletonConverter, IK_JACOBIANS)
 {
   std::shared_ptr<dynamics::Skeleton> amass = getAmassSkeleton();
   (void)amass;
@@ -563,20 +830,229 @@ TEST(SkeletonConverter, RAJAGOPAL)
     return;
   }
 
+  std::shared_ptr<simulation::World> world2 = simulation::World::create();
+  world2->addSkeleton(osim);
+  if (!verifyIKPositionJacobians(world))
+    return;
+
   converter.rescaleAndPrepTarget();
 
-  Eigen::VectorXs targetAngles = converter.getTargetJointWorldAngles();
-  Eigen::VectorXs sourceAngles = converter.getSourceJointWorldAngles();
-  if (!equals(targetAngles, sourceAngles, 1e-10))
+  // Check the marker Jacobian is accurate
+  Eigen::MatrixXs markerJac
+      = osim->getMarkerWorldPositionsJacobianWrtJointPositions(
+          converter.getSourceMarkers());
+  Eigen::MatrixXs markerJac_fd
+      = osim->finiteDifferenceMarkerWorldPositionsJacobianWrtJointPositions(
+          converter.getSourceMarkers());
+  if (!equals(markerJac, markerJac_fd, THRESHOLD))
   {
-    std::cout << "Target angles (corrected): " << std::endl
-              << targetAngles << std::endl;
-    std::cout << "Source angles: " << std::endl << sourceAngles << std::endl;
-    std::cout << "Diff: " << std::endl
-              << sourceAngles - targetAngles << std::endl;
-    EXPECT_TRUE(equals(targetAngles, sourceAngles, 1e-10));
+    for (auto pair : converter.getSourceMarkers())
+    {
+      std::cout << "Pair [" << pair.first->getName() << ",(" << pair.second(0)
+                << "," << pair.second(1) << "," << pair.second(2) << ")]"
+                << std::endl;
+    }
+    std::cout << "Analytical marker J: " << std::endl << markerJac << std::endl;
+    std::cout << "FD marker J: " << std::endl << markerJac_fd << std::endl;
+    Eigen::MatrixXs diff = markerJac - markerJac_fd;
+    std::cout << "Diff: " << std::endl << diff << std::endl;
+    int cursor = 0;
+    for (int i = 0; i < osim->getNumJoints(); i++)
+    {
+      dynamics::Joint* joint = osim->getJoint(i);
+      Eigen::MatrixXs jacBlock
+          = markerJac.block(0, cursor, diff.rows(), joint->getNumDofs());
+      Eigen::MatrixXs fdBlock
+          = markerJac_fd.block(0, cursor, diff.rows(), joint->getNumDofs());
+      Eigen::MatrixXs diffBlock
+          = diff.block(0, cursor, diff.rows(), joint->getNumDofs());
+      if (diffBlock.norm() > 1e-8)
+      {
+        std::cout << "Joint \"" << joint->getName() << "\"";
+        for (auto pair : converter.getSourceMarkers())
+        {
+          std::cout << "Pair [" << pair.first->getName() << ",("
+                    << pair.second(0) << "," << pair.second(1) << ","
+                    << pair.second(2) << ")]" << std::endl;
+        }
+        std::cout << "Jac:" << std::endl
+                  << jacBlock << std::endl
+                  << "FD:" << std::endl
+                  << fdBlock << std::endl
+                  << "Diff:" << std::endl
+                  << diffBlock << std::endl;
+      }
+      cursor += joint->getNumDofs();
+    }
+    EXPECT_TRUE(equals(markerJac, markerJac_fd, THRESHOLD));
     return;
   }
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(SkeletonConverter, IK_JACOBIANS_BALL_JOINTS)
+{
+  std::shared_ptr<dynamics::Skeleton> osim = OpenSimParser::parseOsim(
+      "dart://sample/osim/FullBodyModel-4.0/Rajagopal2015.osim");
+  osim->setPosition(2, -3.14159 / 2);
+  osim->setPosition(4, -0.2);
+  osim->setPosition(5, 1.0);
+  osim->getBodyNode("tibia_l")->setScale(1.2);
+  std::shared_ptr<dynamics::Skeleton> osimBallJoints
+      = osim->convertSkeletonToBallJoints();
+
+  std::vector<const dynamics::Joint*> joints;
+  joints.push_back(osimBallJoints->getJoint("radius_hand_l"));
+  joints.push_back(osimBallJoints->getJoint("radius_hand_r"));
+  joints.push_back(osimBallJoints->getJoint("ankle_l"));
+  joints.push_back(osimBallJoints->getJoint("ankle_r"));
+  joints.push_back(osimBallJoints->getJoint("mtp_l"));
+  joints.push_back(osimBallJoints->getJoint("mtp_r"));
+  joints.push_back(osimBallJoints->getJoint("walker_knee_l"));
+  joints.push_back(osimBallJoints->getJoint("walker_knee_r"));
+  joints.push_back(osimBallJoints->getJoint("acromial_l"));
+  joints.push_back(osimBallJoints->getJoint("acromial_r"));
+  joints.push_back(osimBallJoints->getJoint("elbow_l"));
+  joints.push_back(osimBallJoints->getJoint("elbow_r"));
+  joints.push_back(osimBallJoints->getJoint("hip_l"));
+  joints.push_back(osimBallJoints->getJoint("hip_r"));
+
+  // Check the joint position Jacobian is accurate
+  const s_t THRESHOLD = 1e-7;
+  Eigen::MatrixXs posJac
+      = osimBallJoints->getJointWorldPositionsJacobianWrtJointPositions(joints);
+  Eigen::MatrixXs posJac_fd
+      = osimBallJoints
+            ->finiteDifferenceJointWorldPositionsJacobianWrtJointPositions(
+                joints);
+  if (!equals(posJac, posJac_fd, THRESHOLD))
+  {
+    std::cout << "Analytical pos J: " << std::endl << posJac << std::endl;
+    std::cout << "FD pos J: " << std::endl << posJac_fd << std::endl;
+    std::cout << "Diff: " << std::endl << posJac - posJac_fd << std::endl;
+    EXPECT_TRUE(equals(posJac, posJac_fd, THRESHOLD));
+    return;
+  }
+
+  // Check the joint angle Jacobian is accurate
+  Eigen::MatrixXs angleJac
+      = osimBallJoints->getJointWorldPositionsJacobianWrtJointChildAngles(
+          joints);
+  Eigen::MatrixXs angleJac_fd
+      = osimBallJoints
+            ->finiteDifferenceJointWorldPositionsJacobianWrtJointChildAngles(
+                joints);
+  if (!equals(angleJac, angleJac_fd, THRESHOLD))
+  {
+    std::cout << "Analytical angle J: " << std::endl << angleJac << std::endl;
+    std::cout << "FD angle J: " << std::endl << angleJac_fd << std::endl;
+    std::cout << "Diff: " << std::endl << angleJac - angleJac_fd << std::endl;
+    EXPECT_TRUE(equals(angleJac, angleJac_fd, THRESHOLD));
+    return;
+  }
+
+  // Check the body scale Jacobian is accurate
+  Eigen::MatrixXs scaleJac
+      = osimBallJoints->getJointWorldPositionsJacobianWrtBodyScales(joints);
+  Eigen::MatrixXs scaleJac_fd
+      = osimBallJoints
+            ->finiteDifferenceJointWorldPositionsJacobianWrtBodyScales(joints);
+  if (!equals(scaleJac, scaleJac_fd, THRESHOLD))
+  {
+    for (int i = 0; i < scaleJac.cols(); i++)
+    {
+      for (int j = 0; j < scaleJac.rows() / 3; j++)
+      {
+        Eigen::Vector3s dpos_dscale = scaleJac.block(j * 3, i, 3, 1);
+        Eigen::Vector3s dpos_dscale_fd = scaleJac_fd.block(j * 3, i, 3, 1);
+        if (!equals(dpos_dscale, dpos_dscale_fd, THRESHOLD))
+        {
+          const dynamics::BodyNode* errorBody = osim->getBodyNode(i);
+          Eigen::Matrix3s R = errorBody->getWorldTransform().linear();
+          Eigen::Vector3s bodyToParentLocal
+              = errorBody->getParentJoint()
+                    ->getTransformFromChildBodyNode()
+                    .translation();
+          Eigen::Vector3s bodyToParentWorld = R * bodyToParentLocal;
+          Eigen::Vector3s bodyToChildLocal
+              = errorBody->getChildJoint(0)
+                    ->getTransformFromParentBodyNode()
+                    .translation();
+          Eigen::Vector3s bodyToChildWorld = R * bodyToChildLocal;
+
+          std::cout << "Error on scale body \"" << errorBody->getName()
+                    << "\" -> joint position \"" << joints[j]->getName() << "\""
+                    << std::endl;
+          std::cout << "Analytical scale J: " << std::endl
+                    << dpos_dscale << std::endl;
+          std::cout << "FD scale J: " << std::endl
+                    << dpos_dscale_fd << std::endl;
+          std::cout << "Diff: " << std::endl
+                    << dpos_dscale - dpos_dscale_fd << std::endl;
+          std::cout << "Diff ./ analytical: " << std::endl
+                    << (dpos_dscale - dpos_dscale_fd).cwiseQuotient(dpos_dscale)
+                    << std::endl;
+
+          std::cout << "body->parent local: " << std::endl
+                    << bodyToParentLocal << std::endl;
+          std::cout << "body->parent world: " << std::endl
+                    << bodyToParentWorld << std::endl;
+          std::cout << "body->child local: " << std::endl
+                    << bodyToChildLocal << std::endl;
+          std::cout << "body->child world: " << std::endl
+                    << bodyToChildWorld << std::endl;
+
+          EXPECT_TRUE(equals(dpos_dscale, dpos_dscale_fd, THRESHOLD));
+        }
+      }
+    }
+    EXPECT_TRUE(equals(scaleJac, scaleJac_fd, THRESHOLD));
+    return;
+  }
+}
+#endif
+
+// #ifdef ALL_TESTS
+TEST(SkeletonConverter, RAJAGOPAL)
+{
+  std::shared_ptr<dynamics::Skeleton> amass = getAmassSkeleton();
+  (void)amass;
+  std::shared_ptr<dynamics::Skeleton> osim = OpenSimParser::parseOsim(
+      "dart://sample/osim/FullBodyModel-4.0/Rajagopal2015.osim");
+  (void)osim;
+  std::shared_ptr<simulation::World> world = simulation::World::create();
+  world->addSkeleton(amass);
+  world->addSkeleton(osim);
+  osim->setPosition(2, -3.14159 / 2);
+  osim->setPosition(4, -0.2);
+  osim->setPosition(5, 1.0);
+
+  // osim->getBodyNode("tibia_l")->setScale(1.2);
+
+  biomechanics::SkeletonConverter converter(osim, amass);
+  converter.linkJoints(
+      osim->getJoint("radius_hand_l"), amass->getJoint("wrist_l"));
+  converter.linkJoints(
+      osim->getJoint("radius_hand_r"), amass->getJoint("wrist_r"));
+  converter.linkJoints(osim->getJoint("ankle_l"), amass->getJoint("ankle_l"));
+  converter.linkJoints(osim->getJoint("ankle_r"), amass->getJoint("ankle_r"));
+  converter.linkJoints(osim->getJoint("mtp_l"), amass->getJoint("foot_l"));
+  converter.linkJoints(osim->getJoint("mtp_r"), amass->getJoint("foot_r"));
+  converter.linkJoints(
+      osim->getJoint("walker_knee_l"), amass->getJoint("knee_l"));
+  converter.linkJoints(
+      osim->getJoint("walker_knee_r"), amass->getJoint("knee_r"));
+  converter.linkJoints(
+      osim->getJoint("acromial_l"), amass->getJoint("shoulder_l"));
+  converter.linkJoints(
+      osim->getJoint("acromial_r"), amass->getJoint("shoulder_r"));
+  converter.linkJoints(osim->getJoint("elbow_l"), amass->getJoint("elbow_l"));
+  converter.linkJoints(osim->getJoint("elbow_r"), amass->getJoint("elbow_r"));
+  converter.linkJoints(osim->getJoint("hip_l"), amass->getJoint("hip_l"));
+  converter.linkJoints(osim->getJoint("hip_r"), amass->getJoint("hip_r"));
+
+  converter.rescaleAndPrepTarget();
 
   auto retriever = utils::DartResourceRetriever::create();
   common::ResourcePtr ptr
@@ -607,8 +1083,11 @@ TEST(SkeletonConverter, RAJAGOPAL)
       poses(j, i) = trajectory[i][j];
     }
   }
+  Eigen::MatrixXs shorterPoses = poses.block(0, 0, poses.rows(), 1000);
+  poses = shorterPoses;
 
-  converter.convertMotion(poses, true, -1, 0.005);
+  Eigen::MatrixXs convertedPoses
+      = converter.convertMotion(poses, true, 400, 0.005);
 
   // Uncomment this for local testing
   std::shared_ptr<server::GUIWebsocketServer> server
@@ -623,11 +1102,15 @@ TEST(SkeletonConverter, RAJAGOPAL)
   int cursor = 0;
   ticker.registerTickListener([&](long /*now*/) {
     amass->setPositions(poses.col(cursor % poses.cols()));
-    cursor++;
     server->renderSkeleton(amass);
+    osim->setPositions(convertedPoses.col(cursor % convertedPoses.cols()));
+    server->renderSkeleton(osim);
+    converter.debugToGUI(server);
+
+    cursor++;
   });
   server->registerConnectionListener([&]() { ticker.start(); });
 
   server->blockWhileServing();
 }
-#endif
+// #endif

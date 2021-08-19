@@ -76,6 +76,8 @@ EulerJoint::AxisOrder EulerFreeJoint::getAxisOrder() const
 dart::dynamics::Joint* EulerFreeJoint::clone() const
 {
   EulerFreeJoint* joint = new EulerFreeJoint(this->getJointProperties());
+  joint->setName(getName());
+  joint->copyTransformsFrom(this);
   return joint;
 }
 

@@ -70,6 +70,10 @@ JointProperties::JointProperties(
   : mName(_name),
     mT_ParentBodyToJoint(_T_ParentBodyToJoint),
     mT_ChildBodyToJoint(_T_ChildBodyToJoint),
+    mParentScale(1.0),
+    mChildScale(1.0),
+    mOriginalParentTranslation(_T_ParentBodyToJoint.translation()),
+    mOriginalChildTranslation(_T_ChildBodyToJoint.translation()),
     mIsPositionLimitEnforced(_isPositionLimitEnforced),
     mActuatorType(_actuatorType),
     mMimicJoint(_mimicJoint),
@@ -116,7 +120,13 @@ void Joint::setAspectProperties(const AspectProperties& properties)
 {
   setName(properties.mName);
   setTransformFromParentBodyNode(properties.mT_ParentBodyToJoint);
+  mAspectProperties.mParentScale = properties.mParentScale;
+  mAspectProperties.mOriginalParentTranslation
+      = properties.mOriginalParentTranslation;
   setTransformFromChildBodyNode(properties.mT_ChildBodyToJoint);
+  mAspectProperties.mChildScale = properties.mChildScale;
+  mAspectProperties.mOriginalChildTranslation
+      = properties.mOriginalChildTranslation;
   setPositionLimitEnforced(properties.mIsPositionLimitEnforced);
   setActuatorType(properties.mActuatorType);
   setMimicJoint(
@@ -644,8 +654,8 @@ void Joint::setTransformFromParentBodyNode(const Eigen::Isometry3s& _T)
 {
   assert(math::verifyTransform(_T));
   mAspectProperties.mT_ParentBodyToJoint = _T;
-  mParentScale = 1.0;
-  mOriginalParentTranslation = _T.translation();
+  mAspectProperties.mParentScale = 1.0;
+  mAspectProperties.mOriginalParentTranslation = _T.translation();
   notifyPositionUpdated();
 }
 
@@ -654,8 +664,8 @@ void Joint::setTransformFromChildBodyNode(const Eigen::Isometry3s& _T)
 {
   assert(math::verifyTransform(_T));
   mAspectProperties.mT_ChildBodyToJoint = _T;
-  mChildScale = 1.0;
-  mOriginalChildTranslation = _T.translation();
+  mAspectProperties.mChildScale = 1.0;
+  mAspectProperties.mOriginalChildTranslation = _T.translation();
   updateRelativeJacobian();
   notifyPositionUpdated();
 }
@@ -673,12 +683,29 @@ const Eigen::Isometry3s& Joint::getTransformFromChildBodyNode() const
 }
 
 //==============================================================================
+/// Copy the transfromFromParentNode and transfromFromChildNode, and their
+/// scales, from another joint
+void Joint::copyTransformsFrom(const dynamics::Joint* other)
+{
+  mAspectProperties.mChildScale = other->mAspectProperties.mChildScale;
+  mAspectProperties.mT_ChildBodyToJoint
+      = other->mAspectProperties.mT_ChildBodyToJoint;
+  mAspectProperties.mOriginalChildTranslation
+      = other->mAspectProperties.mOriginalChildTranslation;
+  mAspectProperties.mParentScale = other->mAspectProperties.mParentScale;
+  mAspectProperties.mT_ParentBodyToJoint
+      = other->mAspectProperties.mT_ParentBodyToJoint;
+  mAspectProperties.mOriginalParentTranslation
+      = other->mAspectProperties.mOriginalParentTranslation;
+}
+
+//==============================================================================
 /// Set the scale of the child body
 void Joint::setChildScale(s_t scale)
 {
-  mChildScale = scale;
+  mAspectProperties.mChildScale = scale;
   mAspectProperties.mT_ChildBodyToJoint.translation()
-      = mOriginalChildTranslation * scale;
+      = mAspectProperties.mOriginalChildTranslation * scale;
   updateRelativeJacobian();
   notifyPositionUpdated();
 }
@@ -687,9 +714,9 @@ void Joint::setChildScale(s_t scale)
 /// Set the scale of the parent body
 void Joint::setParentScale(s_t scale)
 {
-  mParentScale = scale;
+  mAspectProperties.mParentScale = scale;
   mAspectProperties.mT_ParentBodyToJoint.translation()
-      = mOriginalParentTranslation * scale;
+      = mAspectProperties.mOriginalParentTranslation * scale;
   notifyPositionUpdated();
 }
 
@@ -697,22 +724,20 @@ void Joint::setParentScale(s_t scale)
 /// Get the scale of the child body
 s_t Joint::getChildScale() const
 {
-  return mChildScale;
+  return mAspectProperties.mChildScale;
 }
 
 //==============================================================================
 /// Get the scale of the parent body
 s_t Joint::getParentScale() const
 {
-  return mParentScale;
+  return mAspectProperties.mParentScale;
 }
 
 //==============================================================================
 Joint::Joint()
   : mChildBodyNode(nullptr),
     mT(Eigen::Isometry3s::Identity()),
-    mParentScale(1.0),
-    mChildScale(1.0),
     mSpatialVelocity(Eigen::Vector6s::Zero()),
     mSpatialAcceleration(Eigen::Vector6s::Zero()),
     mPrimaryAcceleration(Eigen::Vector6s::Zero()),

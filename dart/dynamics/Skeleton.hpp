@@ -835,6 +835,31 @@ public:
   void clampPositionsToLimits();
 
   //----------------------------------------------------------------------------
+  // Converting EulerJoints->BallJoints and EulerFreeJoints->FreeJoints
+  //
+  // This allows us to do computations like IK in a gimbal-lock-free space.
+  //----------------------------------------------------------------------------
+
+  // This creates a fresh skeleton, which is a copy of this one EXCEPT that
+  // EulerJoints are BallJoints, and EulerFreeJoints are FreeJoints. This means
+  // the configuration spaces are different, so you need to use
+  // `convertPositionsToBallSpace()` and `convertPositionsFromBallSpace()` to
+  // transform positions to and from the new skeleton's configuration.
+  std::shared_ptr<dynamics::Skeleton> convertSkeletonToBallJoints();
+
+  // This converts the position vector from Euler space to Ball space for any
+  // joints that need to be converted. This needs to be called on a skeleton
+  // with EulerJoints and/or EulerFreeJoints or it will just return the passed
+  // in vector unchanged.
+  Eigen::VectorXs convertPositionsToBallSpace(Eigen::VectorXs pos);
+
+  // This converts the position vector from Ball space to Euler space for any
+  // joints that need to be converted. This needs to be called on a skeleton
+  // with EulerJoints and/or EulerFreeJoints or it will just return the passed
+  // in vector unchanged.
+  Eigen::VectorXs convertPositionsFromBallSpace(Eigen::VectorXs pos);
+
+  //----------------------------------------------------------------------------
   // IK for retargetting (especially between similar but not identical human
   // skeletons)
   //----------------------------------------------------------------------------
@@ -880,15 +905,42 @@ public:
   Eigen::MatrixXs finiteDifferenceJointWorldPositionsJacobianWrtBodyScales(
       const std::vector<const dynamics::Joint*>& joints);
 
+  /// These are a set of bodies, and offsets in local body space where markers
+  /// are mounted on the body
+  Eigen::VectorXs getMarkerWorldPositions(
+      const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+          markers);
+
+  /// This returns the Jacobian relating changes in source skeleton joint
+  /// positions to changes in source joint world positions.
+  Eigen::MatrixXs getMarkerWorldPositionsJacobianWrtJointPositions(
+      const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+          markers) const;
+
+  /// This returns the Jacobian relating changes in source skeleton joint
+  /// positions to changes in source joint world positions.
+  Eigen::MatrixXs finiteDifferenceMarkerWorldPositionsJacobianWrtJointPositions(
+      const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+          markers);
+
   /// This runs IK, attempting to fit the world positions of the passed in
   /// joints to the vector of (concatenated) target positions. This can
   /// optionally also rescale the skeleton.
   s_t fitJointsToWorldPositions(
       const std::vector<const dynamics::Joint*>& positionJoints,
       Eigen::VectorXs targetPositions,
-      const std::vector<const dynamics::Joint*>& angleJoints,
-      Eigen::VectorXs targetAngles,
       bool scaleBodies = false,
+      int ikIterationLimit = 100,
+      bool lineSearch = false,
+      bool logOutput = false);
+
+  /// This runs IK, attempting to fit the world positions of the passed in
+  /// markers to the vector of (concatenated) target positions.
+  s_t fitMarkersToWorldPositions(
+      const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+          markers,
+      Eigen::VectorXs targetPositions,
+      Eigen::VectorXs markerWeights,
       int ikIterationLimit = 100,
       bool lineSearch = false,
       bool logOutput = false);
@@ -1236,13 +1288,18 @@ public:
   // Documentation inherited
   math::Jacobian getWorldPositionJacobian(const JacobianNode* _node) const;
 
+  math::Jacobian getWorldPositionJacobian(
+      const JacobianNode* _node, const Eigen::Vector3s& _localOffset) const;
+
   // Documentation inherited
   math::Jacobian finiteDifferenceWorldPositionJacobian(
-      const JacobianNode* _node, bool useRidders = true);
+      const JacobianNode* _node,
+      const Eigen::Vector3s& _localOffset,
+      bool useRidders = true);
 
   // Documentation inherited
   math::Jacobian finiteDifferenceRiddersWorldPositionJacobian(
-      const JacobianNode* _node);
+      const JacobianNode* _node, const Eigen::Vector3s& _localOffset);
 
   // Documentation inherited
   math::Jacobian getWorldJacobian(const JacobianNode* _node) const override;

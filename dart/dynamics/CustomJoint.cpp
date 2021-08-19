@@ -368,7 +368,7 @@ void CustomJoint::setFlipAxisMap(Eigen::Vector3s map)
 }
 
 //==============================================================================
-Eigen::Vector3s CustomJoint::getFlipAxisMap()
+Eigen::Vector3s CustomJoint::getFlipAxisMap() const
 {
   return mFlipAxisMap;
 }
@@ -378,6 +378,10 @@ dart::dynamics::Joint* CustomJoint::clone() const
 {
   CustomJoint* joint = new CustomJoint(this->getJointProperties());
   joint->mFunctions = mFunctions;
+  joint->copyTransformsFrom(this);
+  joint->setFlipAxisMap(getFlipAxisMap());
+  joint->setAxisOrder(getAxisOrder());
+  joint->setName(getName());
   return joint;
 }
 

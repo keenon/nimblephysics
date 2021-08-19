@@ -26,34 +26,38 @@ public:
       const dynamics::Joint* sourceJoint, const dynamics::Joint* targetJoint);
 
   /// This will do its best to map the target onto the source skeleton
-  void rescaleAndPrepTarget();
+  void rescaleAndPrepTarget(s_t weightFakeMarkers = 0.1);
 
   /// This will try to get the source skeleton configured to match the target as
   /// closely as possible
-  s_t fitTarget(int maxFitSteps = -1, s_t convergenceThreshold = 1e-7);
+  s_t fitTarget(int maxFitSteps = 500, s_t convergenceThreshold = 1e-7);
+
+  /// This will try to get the target skeleton configured to match the source as
+  /// closely as possible
+  s_t fitSource(int maxFitSteps = 500, s_t convergenceThreshold = 1e-7);
 
   /// This converts a motion from the target skeleton to the source skeleton
   Eigen::MatrixXs convertMotion(
       Eigen::MatrixXs targetMotion,
       bool logProgress = true,
-      int maxFitStepsPerTimestep = -1,
+      int maxFitStepsPerTimestep = 500,
       s_t convergenceThreshold = 1e-7);
 
   /// This returns the concatenated 3-vectors for world positions of each joint
   /// in 3D world space, for the registered target joints.
   Eigen::VectorXs getSourceJointWorldPositions();
 
-  /// This returns the concatenated 3-vectors for world positions of each joint
-  /// in 3D world space, for the registered target joints.
-  Eigen::VectorXs getSourceJointWorldAngles();
+  /// This returns the concatenated 3-vectors for world positions of each "fake"
+  /// marker in 3D world space, for the registered target joints.
+  Eigen::VectorXs getSourceMarkerWorldPositions();
 
-  /// This returns the concatenated 3-vectors for world positions of each joint
+  /// This returns the concatenated 3-vectors for world positions of each marker
   /// in 3D world space, for the registered target joints.
   Eigen::VectorXs getTargetJointWorldPositions();
 
-  /// This returns the concatenated 3-vectors for world angles of each joint
-  /// in 3D world space, for the registered target joints.
-  Eigen::VectorXs getTargetJointWorldAngles(bool adjusted = true);
+  /// This returns the concatenated 3-vectors for world positions of each "fake"
+  /// marker in 3D world space, for the registered target joints.
+  Eigen::VectorXs getTargetMarkerWorldPositions();
 
   /// This will display the state of the linkages between the two skeletons into
   /// the provided GUI.
@@ -61,16 +65,30 @@ public:
 
   const std::vector<const dynamics::Joint*>& getSourceJoints() const;
 
+  const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+  getSourceMarkers() const;
+
   const std::vector<const dynamics::Joint*>& getTargetJoints() const;
+
+  const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+  getTargetMarkers() const;
 
 protected:
   dynamics::SkeletonPtr mSourceSkeleton;
+  dynamics::SkeletonPtr mSourceSkeletonBallJoints;
   dynamics::SkeletonPtr mTargetSkeleton;
 
   std::vector<const dynamics::Joint*> mSourceJoints;
+  std::vector<const dynamics::Joint*> mSourceJointsWithBalls;
   std::vector<const dynamics::Joint*> mTargetJoints;
 
-  std::vector<Eigen::Matrix3s> mAngleOffsets;
+  std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>
+      mSourceMarkers;
+  std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>
+      mSourceMarkersBallJoints;
+  std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>
+      mTargetMarkers;
+  Eigen::VectorXs mMarkerWeights;
 }; // namespace OpenSimParser
 
 } // namespace biomechanics

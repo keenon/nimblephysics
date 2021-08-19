@@ -779,9 +779,16 @@ void Skeleton(py::module& m)
           &dart::dynamics::Skeleton::fitJointsToWorldPositions,
           ::py::arg("positionJoints"),
           ::py::arg("targetPositions"),
-          ::py::arg("angleJoints"),
-          ::py::arg("targetAngles"),
           ::py::arg("scaleBodies") = false,
+          ::py::arg("ikIterationLimit") = 100,
+          ::py::arg("lineSearch") = false,
+          ::py::arg("logOutput") = false)
+      .def(
+          "fitMarkersToWorldPositions",
+          &dart::dynamics::Skeleton::fitMarkersToWorldPositions,
+          ::py::arg("markers"),
+          ::py::arg("targetPositions"),
+          ::py::arg("markeWeights"),
           ::py::arg("ikIterationLimit") = 100,
           ::py::arg("lineSearch") = false,
           ::py::arg("logOutput") = false)

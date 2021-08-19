@@ -1488,6 +1488,9 @@ BodyNode* BodyNode::clone(
 {
   BodyNode* clonedBn
       = new BodyNode(_parentBodyNode, _parentJoint, getBodyNodeProperties());
+  clonedBn->mScale = mScale;
+  clonedBn->mScaleLowerBound = mScaleLowerBound;
+  clonedBn->mScaleUpperBound = mScaleUpperBound;
 
   clonedBn->matchAspects(this);
 

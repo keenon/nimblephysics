@@ -1456,7 +1456,6 @@ bool verifyF_c(WorldPtr world)
       return false;
     }
 
-    
     Eigen::MatrixXs bruteForceEstimatedJac
         = classicPtr->finiteDifferenceJacobianOfEstimatedConstraintForce(
             world, WithRespectTo::POSITION);
@@ -1529,7 +1528,7 @@ bool verifyF_c(WorldPtr world)
       }
       return false;
     }
-    
+
     bruteForceJacB
         = classicPtr->finiteDifferenceJacobianOfLCPOffsetClampingSubset(
             world, WithRespectTo::VELOCITY);
@@ -1574,7 +1573,6 @@ bool verifyF_c(WorldPtr world)
       return false;
     }
 
-    
     bruteForceEstimatedJac
         = classicPtr->finiteDifferenceJacobianOfEstimatedConstraintForce(
             world, WithRespectTo::VELOCITY);
@@ -1626,7 +1624,7 @@ bool verifyF_c(WorldPtr world)
       }
       return false;
     }
-    
+
     bruteForceJacB
         = classicPtr->finiteDifferenceJacobianOfLCPOffsetClampingSubset(
             world, WithRespectTo::FORCE);
@@ -1670,7 +1668,7 @@ bool verifyF_c(WorldPtr world)
                 << std::endl;
       return false;
     }
-    
+
     bruteForceEstimatedJac
         = classicPtr->finiteDifferenceJacobianOfEstimatedConstraintForce(
             world, WithRespectTo::FORCE);
@@ -1722,7 +1720,6 @@ bool verifyF_c(WorldPtr world)
       }
       return false;
     }
-    
   }
 
   snapshot.restore();
@@ -1815,11 +1812,13 @@ VelocityTest runVelocityTest(WorldPtr world)
   Eigen::MatrixXs A_c_ub_E = A_c + A_ub * E;
   Eigen::VectorXs tau = world->getControlForces();
   Eigen::MatrixXs damping = classicPtr->getDampingVector(world).asDiagonal();
-  Eigen::MatrixXs spring_stiffs = classicPtr->getSpringStiffVector(world).asDiagonal();
+  Eigen::MatrixXs spring_stiffs
+      = classicPtr->getSpringStiffVector(world).asDiagonal();
   Eigen::VectorXs p_rest = classicPtr->getRestPositions(world);
   s_t dt = world->getTimeStep();
-  Eigen::VectorXs damping_force = damping*preStepVelocity;
-  Eigen::VectorXs spring_force = spring_stiffs*(preStepPosition - p_rest + preStepVelocity*dt);
+  Eigen::VectorXs damping_force = damping * preStepVelocity;
+  Eigen::VectorXs spring_force
+      = spring_stiffs * (preStepPosition - p_rest + preStepVelocity * dt);
 
   Eigen::MatrixXs Minv = world->getInvMassMatrix();
   Eigen::VectorXs C = world->getCoriolisAndGravityAndExternalForces();
@@ -1854,7 +1853,8 @@ VelocityTest runVelocityTest(WorldPtr world)
 
   Eigen::VectorXs realImpulses = classicPtr->getClampingConstraintImpulses();
 
-  Eigen::VectorXs preSolveV = preStepVelocity + dt * Minv * (tau - C - damping_force - spring_force);
+  Eigen::VectorXs preSolveV
+      = preStepVelocity + dt * Minv * (tau - C - damping_force - spring_force);
 
   Eigen::VectorXs f_cDeltaV;
   if (A_c.cols() == 0)
@@ -2188,9 +2188,11 @@ bool verifyFeatherstoneJacobians(WorldPtr world)
     Eigen::VectorXs x = Eigen::VectorXs::Random(skel->getNumDofs());
     for (int j = 0; j < skel->getNumBodyNodes(); j++)
     {
-      bool success = skel->getBodyNode(j)->debugJacobianOfMForward(WithRespectTo::POSITION, x);
+      bool success = skel->getBodyNode(j)->debugJacobianOfMForward(
+          WithRespectTo::POSITION, x);
       EXPECT_TRUE(success);
-      if (!success) return false;
+      if (!success)
+        return false;
     }
     Eigen::MatrixXs MinvX
         = skel->finiteDifferenceJacobianOfM(x, WithRespectTo::POSITION);
@@ -2199,7 +2201,8 @@ bool verifyFeatherstoneJacobians(WorldPtr world)
       bool success = skel->getBodyNode(j)->debugJacobianOfMBackward(
           WithRespectTo::POSITION, x, MinvX);
       EXPECT_TRUE(success);
-      if (!success) return false;
+      if (!success)
+        return false;
     }
   }
   return true;
@@ -2377,13 +2380,11 @@ bool verifyVelGradients(WorldPtr world, VectorXs worldVel)
       // && verifyJacobianOfProjectionIntoClampsMatrix(world, worldVel,
       // POSITION)
       && verifyRecoveredLCPConstraints(world, worldVel)
-      && verifyPerturbedF_c(world) 
-      && verifyF_c(world)
+      && verifyPerturbedF_c(world) && verifyF_c(world)
       && verifyForceVelJacobian(world, worldVel)
       && verifyVelVelJacobian(world, worldVel)
       && verifyFeatherstoneJacobians(world)
-      && verifyPosVelJacobian(world, worldVel) 
-      && verifyNextV(world));
+      && verifyPosVelJacobian(world, worldVel) && verifyNextV(world));
 }
 
 bool verifyPosPosJacobianApproximation(
@@ -6101,21 +6102,34 @@ bool verifyIKPositionJacobians(WorldPtr world)
     for (int j = 0; j < skel->getNumBodyNodes(); j++)
     {
       BodyNode* body = skel->getBodyNode(j);
-      math::Jacobian analytical = skel->getWorldPositionJacobian(body);
-      math::Jacobian bruteForce
-          = skel->finiteDifferenceWorldPositionJacobian(body);
-
-      if (!equals(bruteForce, analytical, 1e-8))
+      for (int k = 0; k < 10; k++)
       {
-        std::cout << "World jac for skeleton \"" << skel->getName()
-                  << "\" body " << j << " " << std::endl
-                  << "Brute force jac col: " << std::endl
-                  << bruteForce << std::endl
-                  << "Analytical jac col: " << std::endl
-                  << analytical << std::endl
-                  << "Diff: " << std::endl
-                  << (bruteForce - analytical) << std::endl;
-        return false;
+        Eigen::Vector3s offset = Eigen::Vector3s::Random();
+        if (k == 0)
+          offset.setZero();
+        else if (0 < k && k <= 3)
+        {
+          offset = Eigen::Vector3s::Unit(k - 1);
+        }
+        math::Jacobian analytical
+            = skel->getWorldPositionJacobian(body, offset);
+        math::Jacobian bruteForce
+            = skel->finiteDifferenceWorldPositionJacobian(body, offset);
+
+        if (!equals(bruteForce, analytical, 1e-8))
+        {
+          std::cout << "World jac for skeleton \"" << skel->getName()
+                    << "\" body " << j << " " << std::endl
+                    << "Offset: " << std::endl
+                    << offset << std::endl
+                    << "Brute force jac col: " << std::endl
+                    << bruteForce << std::endl
+                    << "Analytical jac col: " << std::endl
+                    << analytical << std::endl
+                    << "Diff: " << std::endl
+                    << (bruteForce - analytical) << std::endl;
+          return false;
+        }
       }
     }
   }

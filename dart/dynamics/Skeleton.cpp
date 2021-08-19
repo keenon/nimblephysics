@@ -3285,6 +3285,220 @@ void Skeleton::clampPositionsToLimits()
       dof->setPosition(dof->getPositionLowerLimit());
     }
   }
+
+  for (int i = 0; i < getNumJoints(); i++)
+  {
+    // Wrap all the exponential coordinates around to a minimum set
+    if (getJoint(i)->getType() == FreeJoint::getStaticType())
+    {
+      Eigen::Vector6s pos = getJoint(i)->getPositions();
+      pos.head<3>() = math::logMap(math::expMapRot(pos.head<3>()));
+      getJoint(i)->setPositions(pos);
+    }
+    if (getJoint(i)->getType() == BallJoint::getStaticType())
+    {
+      Eigen::Vector3s pos = getJoint(i)->getPositions();
+      pos = math::logMap(math::expMapRot(pos));
+      getJoint(i)->setPositions(pos);
+    }
+  }
+}
+
+//==============================================================================
+// This creates a fresh skeleton, which is a copy of this one EXCEPT that
+// EulerJoints are BallJoints, and EulerFreeJoints are FreeJoints. This means
+// the configuration spaces are different, so you need to use
+// `convertPositionsToBallSpace()` and `convertPositionsFromBallSpace()` to
+// transform positions to and from the new skeleton's configuration.
+std::shared_ptr<dynamics::Skeleton> Skeleton::convertSkeletonToBallJoints()
+{
+  std::shared_ptr<dynamics::Skeleton> copy = dynamics::Skeleton::create();
+
+  for (int i = 0; i < getNumJoints(); i++)
+  {
+    dynamics::Joint* joint = getJoint(i);
+    dynamics::BodyNode* body = joint->getChildBodyNode();
+    dynamics::BodyNode* parent
+        = joint->getParentBodyNode() == nullptr
+              ? nullptr
+              : copy->getBodyNode(joint->getParentBodyNode()->getName());
+
+    if (joint->getType() == EulerFreeJoint::getStaticType())
+    {
+      dynamics::FreeJoint::Properties props;
+      props.mName = joint->getName();
+      auto pair = cloneBodyNodeTree<dynamics::FreeJoint>(
+          body, copy, parent, props, false);
+      pair.first->copyTransformsFrom(joint);
+    }
+    else if (joint->getType() == EulerJoint::getStaticType())
+    {
+      dynamics::BallJoint::Properties props;
+      props.mName = joint->getName();
+      auto pair = cloneBodyNodeTree<dynamics::BallJoint>(
+          body, copy, parent, props, false);
+      pair.first->copyTransformsFrom(joint);
+    }
+    else
+    {
+      // Copy nodes to the new tree
+      auto pair = cloneBodyNodeTree(nullptr, body, copy, parent, false);
+      (void)pair;
+      assert(
+          pair.first->getParentScale()
+          == body->getParentJoint()->getParentScale());
+      assert(
+          pair.first->getChildScale()
+          == body->getParentJoint()->getChildScale());
+    }
+  }
+
+  // Verify the memory structure of the copy is correct
+
+#ifndef NDEBUG
+  assert(copy->getNumBodyNodes() == getNumBodyNodes());
+  for (int i = 0; i < copy->getNumBodyNodes(); i++)
+  {
+    dynamics::BodyNode* body = copy->getBodyNode(i);
+    assert(body != getBodyNode(i));
+    if (i > 0)
+    {
+      dynamics::Joint* parentJoint = body->getParentJoint();
+      assert(parentJoint != nullptr);
+    }
+  }
+  assert(copy->getNumJoints() == getNumJoints());
+  for (int i = 0; i < copy->getNumJoints(); i++)
+  {
+    dynamics::Joint* joint = copy->getJoint(i);
+    assert(joint != nullptr);
+    assert(joint != getJoint(i));
+    assert(joint->getName() == getJoint(i)->getName());
+    assert(
+        joint->getTransformFromChildBodyNode().matrix()
+        == getJoint(i)->getTransformFromChildBodyNode().matrix());
+    assert(
+        joint->getTransformFromParentBodyNode().matrix()
+        == getJoint(i)->getTransformFromParentBodyNode().matrix());
+  }
+#endif
+
+  return copy;
+}
+
+//==============================================================================
+// This converts the position vector from Euler space to Ball space for any
+// joints that need to be converted. This needs to be called on a skeleton
+// with EulerJoints and/or EulerFreeJoints or it will just return the passed
+// in vector unchanged.
+Eigen::VectorXs Skeleton::convertPositionsToBallSpace(Eigen::VectorXs pos)
+{
+  Eigen::VectorXs translated = pos;
+  int cursor = 0;
+  for (int i = 0; i < getNumJoints(); i++)
+  {
+    dynamics::Joint* joint = getJoint(i);
+    if (joint->getType() == EulerFreeJoint::getStaticType())
+    {
+      dynamics::EulerFreeJoint* eulerFreeJoint
+          = static_cast<dynamics::EulerFreeJoint*>(joint);
+      Eigen::Isometry3s T = EulerJoint::convertToTransform(
+          translated.segment<3>(cursor),
+          eulerFreeJoint->getAxisOrder(),
+          eulerFreeJoint->getFlipAxisMap());
+      translated.segment<3>(cursor) = math::logMap(T.linear());
+    }
+    else if (joint->getType() == EulerJoint::getStaticType())
+    {
+      dynamics::EulerJoint* eulerJoint
+          = static_cast<dynamics::EulerJoint*>(joint);
+      Eigen::Isometry3s T = EulerJoint::convertToTransform(
+          translated.segment<3>(cursor),
+          eulerJoint->getAxisOrder(),
+          eulerJoint->getFlipAxisMap());
+      translated.segment<3>(cursor) = math::logMap(T.linear());
+    }
+    cursor += joint->getNumDofs();
+  }
+  assert(cursor == translated.size());
+  return translated;
+}
+
+//==============================================================================
+// This converts the position vector from Ball space to Euler space for any
+// joints that need to be converted. This needs to be called on a skeleton
+// with EulerJoints and/or EulerFreeJoints or it will just return the passed
+// in vector unchanged.
+Eigen::VectorXs Skeleton::convertPositionsFromBallSpace(Eigen::VectorXs pos)
+{
+  Eigen::VectorXs translated = pos;
+  int cursor = 0;
+  for (int i = 0; i < getNumJoints(); i++)
+  {
+    dynamics::Joint* joint = getJoint(i);
+    if (joint->getType() == EulerFreeJoint::getStaticType())
+    {
+      dynamics::EulerFreeJoint* eulerFreeJoint
+          = static_cast<dynamics::EulerFreeJoint*>(joint);
+      Eigen::Matrix3s R = math::expMapRot(translated.segment<3>(cursor));
+      if (eulerFreeJoint->getAxisOrder() == EulerJoint::AxisOrder::XYZ)
+      {
+        translated.segment<3>(cursor) = math::matrixToEulerXYZ(R).cwiseProduct(
+            eulerFreeJoint->getFlipAxisMap());
+      }
+      else if (eulerFreeJoint->getAxisOrder() == EulerJoint::AxisOrder::XZY)
+      {
+        translated.segment<3>(cursor) = math::matrixToEulerXZY(R).cwiseProduct(
+            eulerFreeJoint->getFlipAxisMap());
+      }
+      else if (eulerFreeJoint->getAxisOrder() == EulerJoint::AxisOrder::ZXY)
+      {
+        translated.segment<3>(cursor) = math::matrixToEulerZXY(R).cwiseProduct(
+            eulerFreeJoint->getFlipAxisMap());
+      }
+      else if (eulerFreeJoint->getAxisOrder() == EulerJoint::AxisOrder::ZYX)
+      {
+        translated.segment<3>(cursor) = math::matrixToEulerZYX(R).cwiseProduct(
+            eulerFreeJoint->getFlipAxisMap());
+      }
+      else
+      {
+        assert(false && "Unsupported AxisOrder when decoding EulerFreeJoint");
+      }
+    }
+    else if (joint->getType() == EulerJoint::getStaticType())
+    {
+      dynamics::EulerJoint* eulerJoint
+          = static_cast<dynamics::EulerJoint*>(joint);
+      Eigen::Matrix3s R = math::expMapRot(translated.segment<3>(cursor));
+      if (eulerJoint->getAxisOrder() == EulerJoint::AxisOrder::XYZ)
+      {
+        translated.segment<3>(cursor) = math::matrixToEulerXYZ(R).cwiseProduct(
+            eulerJoint->getFlipAxisMap());
+      }
+      else if (eulerJoint->getAxisOrder() == EulerJoint::AxisOrder::XZY)
+      {
+        translated.segment<3>(cursor) = math::matrixToEulerXZY(R).cwiseProduct(
+            eulerJoint->getFlipAxisMap());
+      }
+      else if (eulerJoint->getAxisOrder() == EulerJoint::AxisOrder::ZXY)
+      {
+        translated.segment<3>(cursor) = math::matrixToEulerZXY(R).cwiseProduct(
+            eulerJoint->getFlipAxisMap());
+      }
+      else if (eulerJoint->getAxisOrder() == EulerJoint::AxisOrder::ZYX)
+      {
+        translated.segment<3>(cursor) = math::matrixToEulerZYX(R).cwiseProduct(
+            eulerJoint->getFlipAxisMap());
+      }
+      else
+      {
+        assert(false && "Unsupported AxisOrder when decoding EulerJoint");
+      }
+    }
+    cursor += joint->getNumDofs();
+  }
+  return translated;
 }
 
 //==============================================================================
@@ -3329,7 +3543,7 @@ Eigen::MatrixXs Skeleton::getJointWorldPositionsJacobianWrtJointPositions(
 
   for (int i = 0; i < joints.size(); i++)
   {
-    math::Jacobian bodyJac = getWorldJacobian(
+    math::Jacobian bodyJac = getWorldPositionJacobian(
         joints[i]->getChildBodyNode(),
         joints[i]->getTransformFromChildBodyNode().translation());
     jac.block(3 * i, 0, 3, bodyJac.cols() - 1)
@@ -3498,6 +3712,73 @@ Skeleton::finiteDifferenceJointWorldPositionsJacobianWrtBodyScales(
 }
 
 //==============================================================================
+/// These are a set of bodies, and offsets in local body space where markers
+/// are mounted on the body
+Eigen::VectorXs Skeleton::getMarkerWorldPositions(
+    const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+        markers)
+{
+  Eigen::VectorXs positions = Eigen::VectorXs::Zero(markers.size() * 3);
+  for (int i = 0; i < markers.size(); i++)
+  {
+    positions.segment<3>(i * 3)
+        = markers[i].first->getWorldTransform() * markers[i].second;
+  }
+  return positions;
+}
+
+//==============================================================================
+/// This returns the Jacobian relating changes in source skeleton joint
+/// positions to changes in source joint world positions.
+Eigen::MatrixXs Skeleton::getMarkerWorldPositionsJacobianWrtJointPositions(
+    const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+        markers) const
+{
+  Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(markers.size() * 3, getNumDofs());
+
+  for (int i = 0; i < markers.size(); i++)
+  {
+    math::Jacobian bodyJac
+        = getWorldPositionJacobian(markers[i].first, markers[i].second);
+    jac.block(3 * i, 0, 3, bodyJac.cols())
+        = bodyJac.block(3, 0, 3, bodyJac.cols());
+  }
+
+  return jac;
+}
+
+//==============================================================================
+/// This returns the Jacobian relating changes in source skeleton joint
+/// positions to changes in source joint world positions.
+Eigen::MatrixXs
+Skeleton::finiteDifferenceMarkerWorldPositionsJacobianWrtJointPositions(
+    const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+        markers)
+{
+  Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(markers.size() * 3, getNumDofs());
+
+  Eigen::VectorXs originalPos = getPositions();
+  const double EPS = 1e-7;
+  for (int i = 0; i < getNumDofs(); i++)
+  {
+    Eigen::VectorXs perturbed = originalPos;
+    perturbed(i) += EPS;
+    setPositions(perturbed);
+    Eigen::VectorXs plus = getMarkerWorldPositions(markers);
+
+    perturbed = originalPos;
+    perturbed(i) -= EPS;
+    setPositions(perturbed);
+    Eigen::VectorXs minus = getMarkerWorldPositions(markers);
+
+    jac.col(i) = (plus - minus) / (2 * EPS);
+  }
+  setPositions(originalPos);
+
+  return jac;
+}
+
+//==============================================================================
 /// This runs IK, attempting to fit the world positions of the passed in
 /// joints to the vector of (concatenated) target positions. This can
 /// optionally also rescale the skeleton.
@@ -3505,8 +3786,6 @@ Skeleton::finiteDifferenceJointWorldPositionsJacobianWrtBodyScales(
 s_t Skeleton::fitJointsToWorldPositions(
     const std::vector<const dynamics::Joint*>& positionJoints,
     Eigen::VectorXs targetPositions,
-    const std::vector<const dynamics::Joint*>& angleJoints,
-    Eigen::VectorXs targetAngles,
     bool scaleBodies,
     int ikIterationLimit,
     bool lineSearch,
@@ -3525,14 +3804,9 @@ s_t Skeleton::fitJointsToWorldPositions(
     // Get an initial error
     /////////////////////////////////////////////////////////////////////////////
 
-    Eigen::VectorXs posDiff
+    Eigen::VectorXs diff
         = targetPositions - getJointWorldPositions(positionJoints);
-    Eigen::VectorXs angleDiff = targetAngles - getJointWorldAngles(angleJoints);
-    Eigen::VectorXs diff = Eigen::VectorXs(posDiff.size() + angleDiff.size());
-    diff.segment(0, posDiff.size()) = posDiff;
-    diff.segment(0, angleDiff.size()) = angleDiff;
-
-    s_t initialError = posDiff.squaredNorm() + angleDiff.squaredNorm();
+    s_t initialError = diff.squaredNorm();
 
     /////////////////////////////////////////////////////////////////////////////
     // Do the actual IK update
@@ -3546,25 +3820,15 @@ s_t Skeleton::fitJointsToWorldPositions(
     {
       Eigen::MatrixXs Jpos
           = getJointWorldPositionsJacobianWrtJointPositions(positionJoints);
-      Eigen::MatrixXs Jangle
-          = getJointWorldPositionsJacobianWrtJointChildAngles(angleJoints);
       Eigen::MatrixXs Jscale
           = getJointWorldPositionsJacobianWrtBodyScales(positionJoints);
-      J = Eigen::MatrixXs::Zero(
-          Jpos.rows() + Jangle.rows(), Jpos.cols() + Jscale.cols());
+      J = Eigen::MatrixXs::Zero(Jpos.rows(), Jpos.cols() + Jscale.cols());
       J.block(0, 0, Jpos.rows(), Jpos.cols()) = Jpos;
-      J.block(Jpos.rows(), 0, Jangle.rows(), Jangle.cols()) = Jangle;
       J.block(0, Jpos.cols(), Jscale.rows(), Jscale.cols()) = Jscale;
     }
     else
     {
-      Eigen::MatrixXs Jpos
-          = getJointWorldPositionsJacobianWrtJointPositions(positionJoints);
-      Eigen::MatrixXs Jangle
-          = getJointWorldPositionsJacobianWrtJointChildAngles(angleJoints);
-      J = Eigen::MatrixXs::Zero(Jpos.rows() + Jangle.rows(), Jpos.cols());
-      J.block(0, 0, Jpos.rows(), Jpos.cols()) = Jpos;
-      J.block(Jpos.rows(), 0, Jangle.rows(), Jangle.cols()) = Jangle;
+      J = getJointWorldPositionsJacobianWrtJointPositions(positionJoints);
     }
     Eigen::VectorXs delta;
 
@@ -3609,16 +3873,9 @@ s_t Skeleton::fitJointsToWorldPositions(
     // Evaluate how well we did
     /////////////////////////////////////////////////////////////////////////////
 
-    Eigen::VectorXs posDiffAfter
-        = targetPositions - getJointWorldPositions(positionJoints);
-    Eigen::VectorXs angleDiffAfter
-        = targetAngles - getJointWorldAngles(angleJoints);
     Eigen::VectorXs diffAfter
-        = Eigen::VectorXs(posDiff.size() + angleDiff.size());
-    diffAfter.segment(0, posDiffAfter.size()) = posDiffAfter;
-    diffAfter.segment(0, angleDiffAfter.size()) = angleDiffAfter;
-
-    s_t newError = posDiffAfter.squaredNorm() + angleDiffAfter.squaredNorm();
+        = targetPositions - getJointWorldPositions(positionJoints);
+    s_t newError = diffAfter.squaredNorm();
 
     s_t errorChange = newError - initialError;
 
@@ -3652,6 +3909,144 @@ s_t Skeleton::fitJointsToWorldPositions(
         {
           setLinkScales(originalScale);
         }
+      }
+    }
+    else if (errorChange > -1e-22 && i > 0)
+    {
+      if (logOutput)
+      {
+        std::cout << "Terminating IK search after " << i
+                  << " iterations with optimal loss: " << newError << std::endl;
+      }
+      break;
+    }
+    else
+    {
+      // Slowly grow LR while we're safely decreasing loss
+      lr *= 1.1;
+    }
+
+    error = newError;
+  }
+  if (logOutput)
+  {
+    std::cout << "Finished IK search with loss: " << error << std::endl;
+  }
+  return error;
+}
+
+//==============================================================================
+/// This runs IK, attempting to fit the world positions of the passed in
+/// markers to the vector of (concatenated) target positions.
+s_t Skeleton::fitMarkersToWorldPositions(
+    const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+        markers,
+    Eigen::VectorXs targetPositions,
+    Eigen::VectorXs markerWeights,
+    int ikIterationLimit,
+    bool lineSearch,
+    bool logOutput)
+{
+  // Run simple IK to try to get as close as possible. Completely possible that
+  // the requested positions are infeasible, in which case we'll just do a best
+  // guess.
+  s_t error = std::numeric_limits<s_t>::infinity();
+  s_t lr = 0.05;
+  bool useTranspose = false;
+
+  for (int i = 0; i < ikIterationLimit; i++)
+  {
+    /////////////////////////////////////////////////////////////////////////////
+    // Get an initial error
+    /////////////////////////////////////////////////////////////////////////////
+
+    Eigen::VectorXs diff = targetPositions - getMarkerWorldPositions(markers);
+    for (int j = 0; j < markerWeights.size(); j++)
+    {
+      diff.segment<3>(j * 3) *= markerWeights(j);
+    }
+    s_t initialError = diff.squaredNorm();
+
+    /////////////////////////////////////////////////////////////////////////////
+    // Do the actual IK update
+    /////////////////////////////////////////////////////////////////////////////
+
+    Eigen::VectorXs originalPos = getPositions();
+    Eigen::VectorXs originalScale = getLinkScales();
+
+    Eigen::MatrixXs J
+        = getMarkerWorldPositionsJacobianWrtJointPositions(markers);
+    Eigen::VectorXs delta;
+
+    if (useTranspose)
+    {
+      delta = J.transpose() * diff;
+    }
+    else
+    {
+      delta = J.completeOrthogonalDecomposition().solve(diff);
+    }
+#ifdef DART_SKEL_LOG_IK_OUTPUT
+    // std::cout << "IK Diff: " << std::endl << diff << std::endl;
+    // std::cout << "IK J: " << std::endl << J << std::endl;
+    // std::cout << "IK Delta: " << std::endl << delta << std::endl;
+    // std::cout << "J * IK Delta: " << std::endl << J * delta << std::endl;
+#endif
+    Eigen::VectorXs deltaPos = delta.segment(0, getNumDofs());
+    setPositions(getPositions() + (lr * deltaPos));
+    clampPositionsToLimits();
+
+    /////////////////////////////////////////////////////////////////////////////
+    // Evaluate how well we did
+    /////////////////////////////////////////////////////////////////////////////
+
+    Eigen::VectorXs diffAfter
+        = targetPositions - getMarkerWorldPositions(markers);
+    for (int j = 0; j < markerWeights.size(); j++)
+    {
+      diffAfter.segment<3>(j * 3) *= markerWeights(j);
+    }
+    s_t newError = diffAfter.squaredNorm();
+
+    s_t errorChange = newError - initialError;
+
+    if (logOutput)
+    {
+      std::cout << "IK iteration " << i << " lr: " << lr
+                << " loss: " << newError << " change: " << errorChange
+                << std::endl;
+    }
+
+    if (newError < 1e-21)
+    {
+      if (logOutput)
+      {
+        std::cout << "Terminating IK search after " << i
+                  << " iterations with loss: " << newError << std::endl;
+      }
+      break;
+    }
+    if (errorChange > 0)
+    {
+      lr *= 0.5;
+      if (lr < 1e-4)
+      {
+        useTranspose = true;
+      }
+      if (lineSearch)
+      {
+        setPositions(originalPos);
+      }
+      if (lr < 1e-10)
+      {
+        if (logOutput)
+        {
+          std::cout
+              << "Terminating IK search after " << i
+              << " iterations because learning rate is vanishing, with loss: "
+              << newError << std::endl;
+        }
+        break;
       }
     }
     else if (errorChange > -1e-22 && i > 0)
@@ -4507,6 +4902,13 @@ math::Jacobian variadicGetWorldJacobian(
 math::Jacobian Skeleton::getWorldPositionJacobian(
     const JacobianNode* _node) const
 {
+  return getWorldPositionJacobian(_node, Eigen::Vector3s::Zero());
+}
+
+//==============================================================================
+math::Jacobian Skeleton::getWorldPositionJacobian(
+    const JacobianNode* _node, const Eigen::Vector3s& _localOffset) const
+{
   math::Jacobian J = math::Jacobian::Zero(6, getNumDofs());
 
   if (!isValidBodyNode(this, _node, "getWorldJacobian"))
@@ -4540,12 +4942,13 @@ math::Jacobian Skeleton::getWorldPositionJacobian(
     {
       Eigen::Vector6s screw
           = joint->getWorldAxisScrewForPosition(dof->getIndexInJoint());
-      screw.tail<3>()
-          += screw.head<3>().cross(bodyNode->getWorldTransform().translation());
+      screw.tail<3>() += screw.head<3>().cross(
+          bodyNode->getWorldTransform() * _localOffset);
       // This is key so we get an actual gradient of the angle (as a screw),
       // rather than just a screw representing a rotation.
       screw.head<3>()
           = math::expMapNestedGradient(originalRotation, screw.head<3>());
+
       J.col(i) = screw;
     }
     // else leave J.col(i) as zeros
@@ -4556,11 +4959,13 @@ math::Jacobian Skeleton::getWorldPositionJacobian(
 
 //==============================================================================
 math::Jacobian Skeleton::finiteDifferenceWorldPositionJacobian(
-    const JacobianNode* _node, bool useRidders)
+    const JacobianNode* _node,
+    const Eigen::Vector3s& _localOffset,
+    bool useRidders)
 {
   if (useRidders)
   {
-    return finiteDifferenceRiddersWorldPositionJacobian(_node);
+    return finiteDifferenceRiddersWorldPositionJacobian(_node, _localOffset);
   }
   math::Jacobian J = math::Jacobian::Zero(6, getNumDofs());
   s_t EPS = 1e-5;
@@ -4569,12 +4974,12 @@ math::Jacobian Skeleton::finiteDifferenceWorldPositionJacobian(
     s_t original = getPosition(i);
     setPosition(i, original + EPS);
     Eigen::Vector6s plus = Eigen::Vector6s::Zero();
-    plus.head<3>() = math::logMap(_node->getTransform().linear());
-    plus.tail<3>() = _node->getTransform().translation();
+    plus.head<3>() = math::logMap(_node->getWorldTransform().linear());
+    plus.tail<3>() = _node->getWorldTransform() * _localOffset;
     setPosition(i, original - EPS);
     Eigen::Vector6s minus = Eigen::Vector6s::Zero();
-    minus.head<3>() = math::logMap(_node->getTransform().linear());
-    minus.tail<3>() = _node->getTransform().translation();
+    minus.head<3>() = math::logMap(_node->getWorldTransform().linear());
+    minus.tail<3>() = _node->getWorldTransform() * _localOffset;
     J.col(i) = (plus - minus) / (2 * EPS);
     setPosition(i, original);
   }
@@ -4583,7 +4988,7 @@ math::Jacobian Skeleton::finiteDifferenceWorldPositionJacobian(
 
 //==============================================================================
 math::Jacobian Skeleton::finiteDifferenceRiddersWorldPositionJacobian(
-    const JacobianNode* _node)
+    const JacobianNode* _node, const Eigen::Vector3s& _localOffset)
 {
   std::size_t n = getNumDofs();
   Eigen::MatrixXs J = math::Jacobian::Zero(6, n);
@@ -4605,13 +5010,13 @@ math::Jacobian Skeleton::finiteDifferenceRiddersWorldPositionJacobian(
 
     setPosition(i, original + stepSize);
     Eigen::Vector6s plus = Eigen::Vector6s::Zero();
-    plus.head<3>() = math::logMap(_node->getTransform().linear());
-    plus.tail<3>() = _node->getTransform().translation();
+    plus.head<3>() = math::logMap(_node->getWorldTransform().linear());
+    plus.tail<3>() = _node->getWorldTransform() * _localOffset;
 
     setPosition(i, original - stepSize);
     Eigen::Vector6s minus = Eigen::Vector6s::Zero();
-    minus.head<3>() = math::logMap(_node->getTransform().linear());
-    minus.tail<3>() = _node->getTransform().translation();
+    minus.head<3>() = math::logMap(_node->getWorldTransform().linear());
+    minus.tail<3>() = _node->getWorldTransform() * _localOffset;
 
     setPosition(i, original);
 
@@ -4626,13 +5031,13 @@ math::Jacobian Skeleton::finiteDifferenceRiddersWorldPositionJacobian(
 
       setPosition(i, original + stepSize);
       Eigen::Vector6s plus = Eigen::Vector6s::Zero();
-      plus.head<3>() = math::logMap(_node->getTransform().linear());
-      plus.tail<3>() = _node->getTransform().translation();
+      plus.head<3>() = math::logMap(_node->getWorldTransform().linear());
+      plus.tail<3>() = _node->getWorldTransform() * _localOffset;
 
       setPosition(i, original - stepSize);
       Eigen::Vector6s minus = Eigen::Vector6s::Zero();
-      minus.head<3>() = math::logMap(_node->getTransform().linear());
-      minus.tail<3>() = _node->getTransform().translation();
+      minus.head<3>() = math::logMap(_node->getWorldTransform().linear());
+      minus.tail<3>() = _node->getWorldTransform() * _localOffset;
 
       setPosition(i, original);
 
@@ -5795,9 +6200,16 @@ std::pair<Joint*, BodyNode*> Skeleton::cloneBodyNodeTree(
     // If this is the root of the tree, and the user has requested a change in
     // its parent Joint, use the specified parent Joint instead of created a
     // clone
-    Joint* joint = (i == 0 && _parentJoint != nullptr)
-                       ? _parentJoint
-                       : original->getParentJoint()->clone();
+    Joint* joint;
+    if (i == 0 && _parentJoint != nullptr)
+    {
+      joint = _parentJoint;
+    }
+    else
+    {
+      joint = original->getParentJoint()->clone();
+      joint->copyTransformsFrom(original->getParentJoint());
+    }
 
     BodyNode* newParent
         = i == 0 ? _parentNode

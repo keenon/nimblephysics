@@ -147,7 +147,7 @@ public:
   /// any
   void setFlipAxisMap(Eigen::Vector3s map);
 
-  Eigen::Vector3s getFlipAxisMap();
+  Eigen::Vector3s getFlipAxisMap() const;
 
   dart::dynamics::Joint* clone() const override;
 
