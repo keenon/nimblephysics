@@ -94,7 +94,7 @@ void IKMapping::setPositions(
   math::solveIK(
       Eigen::VectorXs::Zero(world->getNumDofs()),
       positions.size(),
-      [this, world](Eigen::VectorXs pos) {
+      [world](Eigen::VectorXs pos) {
         world->setPositions(pos);
         world->clampPositionsToLimits();
         return world->getPositions();
