@@ -3306,6 +3306,201 @@ void Skeleton::clampPositionsToLimits()
 }
 
 //==============================================================================
+const std::vector<std::vector<dynamics::BodyNode*>>&
+Skeleton::getBodyScaleGroups() const
+{
+  return mBodyScaleGroups;
+}
+
+//==============================================================================
+const std::vector<dynamics::BodyNode*>& Skeleton::getBodyScaleGroup(
+    int index) const
+{
+  return mBodyScaleGroups[index];
+}
+
+//==============================================================================
+/// This creates scale groups for any body nodes that may've been added since
+/// we last interacted with the body scale group APIs
+void Skeleton::ensureBodyScaleGroups()
+{
+  if (mBodyScaleGroups.size() == 0)
+  {
+    // Add scale groups, one per body
+    mBodyScaleGroups.reserve(getNumBodyNodes());
+    for (int i = 0; i < getNumBodyNodes(); i++)
+    {
+      std::vector<dynamics::BodyNode*> singleGroup;
+      singleGroup.push_back(getBodyNode(i));
+      mBodyScaleGroups.push_back(singleGroup);
+    }
+  }
+}
+
+//==============================================================================
+/// This returns the index of the group that this body node corresponds to
+int Skeleton::getScaleGroupIndex(dynamics::BodyNode* bodyNode)
+{
+  ensureBodyScaleGroups();
+  for (int i = 0; i < mBodyScaleGroups.size(); i++)
+  {
+    for (int j = 0; j < mBodyScaleGroups[i].size(); j++)
+    {
+      if (mBodyScaleGroups[i][j]->getName() == bodyNode->getName())
+        return i;
+    }
+  }
+  return -1;
+}
+
+//==============================================================================
+/// This takes two scale groups and merges their contents into a single group.
+/// After this operation, there is one fewer scale group.
+void Skeleton::mergeScaleGroups(dynamics::BodyNode* a, dynamics::BodyNode* b)
+{
+  mergeScaleGroupsByIndex(getScaleGroupIndex(a), getScaleGroupIndex(b));
+}
+
+//==============================================================================
+/// This gets the scale upper bound for the first body in a group, by index
+s_t Skeleton::getScaleGroupUpperBound(int groupIndex)
+{
+  return mBodyScaleGroups[groupIndex][0]->getScaleUpperBound();
+}
+
+//==============================================================================
+/// This gets the scale lower bound for the first body in a group, by index
+s_t Skeleton::getScaleGroupLowerBound(int groupIndex)
+{
+  return mBodyScaleGroups[groupIndex][0]->getScaleLowerBound();
+}
+
+//==============================================================================
+/// This takes two scale groups and merges their contents into a single group.
+/// After this operation, there is one fewer scale group.
+void Skeleton::mergeScaleGroupsByIndex(int a, int b)
+{
+  // This is a no-op if both groups are already the same
+  if (a == b)
+    return;
+  assert(a != -1);
+  assert(b != -1);
+
+  ensureBodyScaleGroups();
+  std::vector<dynamics::BodyNode*>& groupA = mBodyScaleGroups[a];
+  std::vector<dynamics::BodyNode*>& groupB = mBodyScaleGroups[b];
+  // Remove the element further back in the array
+  if (a > b)
+  {
+    // Transfer all elems from A to B
+    for (dynamics::BodyNode*& node : groupA)
+      groupB.push_back(node);
+    // Then erase A
+    mBodyScaleGroups.erase(mBodyScaleGroups.begin() + a);
+  }
+  else
+  {
+    // Transfer all elems from B to A
+    for (dynamics::BodyNode*& node : groupB)
+      groupA.push_back(node);
+    // Then erase B
+    mBodyScaleGroups.erase(mBodyScaleGroups.begin() + b);
+  }
+}
+
+//==============================================================================
+/// This returns the number of scaling groups (groups with an equal-scale
+/// constraint) that there are in the model.
+int Skeleton::getNumScaleGroups()
+{
+  ensureBodyScaleGroups();
+  return mBodyScaleGroups.size();
+}
+
+//==============================================================================
+/// This sets the scales of all the body nodes according to their group
+/// membership. The `scale` vector is expected to be the same size as the
+/// number of groups.
+void Skeleton::setGroupScales(Eigen::VectorXs scale)
+{
+  ensureBodyScaleGroups();
+  for (int i = 0; i < scale.size(); i++)
+  {
+    for (dynamics::BodyNode* node : mBodyScaleGroups[i])
+    {
+      node->setScale(scale(i));
+    }
+  }
+}
+
+//==============================================================================
+/// This gets the scales of the first body in each scale group.
+Eigen::VectorXs Skeleton::getGroupScales()
+{
+  ensureBodyScaleGroups();
+  Eigen::VectorXs groups = Eigen::VectorXs::Zero(getNumScaleGroups());
+  for (int i = 0; i < mBodyScaleGroups.size(); i++)
+  {
+    assert(mBodyScaleGroups[i].size() > 0);
+    groups(i) = mBodyScaleGroups[i][0]->getScale();
+  }
+  return groups;
+}
+
+//==============================================================================
+/// This returns the Jacobian of the joint positions wrt the scales of the
+/// groups
+Eigen::MatrixXs Skeleton::getJointWorldPositionsJacobianWrtGroupScales(
+    const std::vector<const dynamics::Joint*>& joints)
+{
+  Eigen::MatrixXs individualBodiesJac
+      = getJointWorldPositionsJacobianWrtBodyScales(joints);
+  Eigen::MatrixXs J
+      = Eigen::MatrixXs::Zero(individualBodiesJac.rows(), getNumScaleGroups());
+  for (int i = 0; i < mBodyScaleGroups.size(); i++)
+  {
+    for (dynamics::BodyNode* node : mBodyScaleGroups[i])
+    {
+      J.col(i) += individualBodiesJac.col(node->getIndexInSkeleton());
+    }
+  }
+  return J;
+}
+
+//==============================================================================
+/// This returns the Jacobian of the joint positions wrt the scales of the
+/// groups
+Eigen::MatrixXs
+Skeleton::finiteDifferenceJointWorldPositionsJacobianWrtGroupScales(
+    const std::vector<const dynamics::Joint*>& joints)
+{
+  Eigen::MatrixXs jac
+      = Eigen::MatrixXs::Zero(joints.size() * 3, getNumScaleGroups());
+
+  Eigen::VectorXs original = getGroupScales();
+
+  const double EPS = 1e-7;
+  for (int i = 0; i < getNumScaleGroups(); i++)
+  {
+    Eigen::VectorXs perturbed = original;
+    perturbed(i) += EPS;
+    setGroupScales(perturbed);
+    Eigen::VectorXs plus = getJointWorldPositions(joints);
+
+    perturbed = original;
+    perturbed(i) -= EPS;
+    setGroupScales(perturbed);
+    Eigen::VectorXs minus = getJointWorldPositions(joints);
+
+    jac.col(i) = (plus - minus) / (2 * EPS);
+  }
+
+  setGroupScales(original);
+
+  return jac;
+}
+
+//==============================================================================
 // This creates a fresh skeleton, which is a copy of this one EXCEPT that
 // EulerJoints are BallJoints, and EulerFreeJoints are FreeJoints. This means
 // the configuration spaces are different, so you need to use
@@ -3797,9 +3992,9 @@ s_t Skeleton::fitJointsToWorldPositions(
   if (scaleBodies)
   {
     Eigen::VectorXs initialPos
-        = Eigen::VectorXs::Zero(getNumDofs() + getNumBodyNodes());
+        = Eigen::VectorXs::Zero(getNumDofs() + getNumScaleGroups());
     initialPos.segment(0, getNumDofs()) = getPositions();
-    initialPos.segment(getNumDofs(), getNumBodyNodes()) = getLinkScales();
+    initialPos.segment(getNumDofs(), getNumScaleGroups()) = getGroupScales();
 
     return math::solveIK(
         initialPos,
@@ -3811,38 +4006,38 @@ s_t Skeleton::fitJointsToWorldPositions(
 
           // Set scales
           Eigen::VectorXs newScales
-              = pos.segment(getNumDofs(), getNumBodyNodes());
-          for (int i = 0; i < getNumBodyNodes(); i++)
+              = pos.segment(getNumDofs(), getNumScaleGroups());
+          for (int i = 0; i < getNumScaleGroups(); i++)
           {
-            if (newScales(i) > getBodyNode(i)->getScaleUpperBound())
+            if (newScales(i) > getScaleGroupUpperBound(i))
             {
-              newScales(i) = getBodyNode(i)->getScaleUpperBound();
+              newScales(i) = getScaleGroupUpperBound(i);
             }
-            if (newScales(i) < getBodyNode(i)->getScaleLowerBound())
+            if (newScales(i) < getScaleGroupLowerBound(i))
             {
-              newScales(i) = getBodyNode(i)->getScaleLowerBound();
+              newScales(i) = getScaleGroupLowerBound(i);
             }
           }
-          setLinkScales(newScales);
+          setGroupScales(newScales);
 
           // Return the clamped position
           Eigen::VectorXs clampedPos = Eigen::VectorXs::Zero(pos.size());
           clampedPos.segment(0, getNumDofs()) = getPositions();
-          clampedPos.segment(getNumDofs(), getNumBodyNodes()) = newScales;
+          clampedPos.segment(getNumDofs(), getNumScaleGroups()) = newScales;
           return clampedPos;
         },
         [this, targetPositions, positionJoints](
             /*out*/ Eigen::VectorXs& diff,
             /*out*/ Eigen::MatrixXs& jac) {
           diff = targetPositions - getJointWorldPositions(positionJoints);
-          assert(jac.cols() == getNumDofs() + getNumBodyNodes());
+          assert(jac.cols() == getNumDofs() + getNumScaleGroups());
           assert(jac.rows() == positionJoints.size() * 3);
           jac.setZero();
           jac.block(0, 0, positionJoints.size() * 3, getNumDofs())
               = getJointWorldPositionsJacobianWrtJointPositions(positionJoints);
           jac.block(
-              0, getNumDofs(), positionJoints.size() * 3, getNumBodyNodes())
-              = getJointWorldPositionsJacobianWrtBodyScales(positionJoints);
+              0, getNumDofs(), positionJoints.size() * 3, getNumScaleGroups())
+              = getJointWorldPositionsJacobianWrtGroupScales(positionJoints);
         },
         convergenceThreshold,
         maxStepCount,

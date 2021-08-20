@@ -588,6 +588,92 @@ TEST(SkeletonConverter, BROKEN_IK_TIMESTEP_3_BACKWARDS)
 #endif
 
 #ifdef ALL_TESTS
+TEST(SkeletonConverter, SCALE_EQUALITY_CONSTRAINTS)
+{
+  std::shared_ptr<dynamics::Skeleton> osim = OpenSimParser::parseOsim(
+      "dart://sample/osim/FullBodyModel-4.0/Rajagopal2015.osim");
+  osim->setPosition(2, -3.14159 / 2);
+  osim->setPosition(4, -0.2);
+  osim->setPosition(5, 1.0);
+
+  osim->mergeScaleGroups(
+      osim->getBodyNode("tibia_l"), osim->getBodyNode("tibia_r"));
+  osim->mergeScaleGroups(
+      osim->getBodyNode("radius_l"), osim->getBodyNode("radius_r"));
+  osim->mergeScaleGroups(
+      osim->getBodyNode("ulna_l"), osim->getBodyNode("ulna_r"));
+  EXPECT_EQ(osim->getNumScaleGroups(), osim->getNumBodyNodes() - 3);
+  EXPECT_EQ(
+      osim->getScaleGroupIndex(osim->getBodyNode("tibia_l")),
+      osim->getScaleGroupIndex(osim->getBodyNode("tibia_r")));
+  EXPECT_EQ(
+      osim->getScaleGroupIndex(osim->getBodyNode("radius_l")),
+      osim->getScaleGroupIndex(osim->getBodyNode("radius_r")));
+  EXPECT_EQ(
+      osim->getScaleGroupIndex(osim->getBodyNode("ulna_l")),
+      osim->getScaleGroupIndex(osim->getBodyNode("ulna_r")));
+
+  std::vector<const dynamics::Joint*> joints;
+  joints.push_back(osim->getJoint("radius_hand_l"));
+  joints.push_back(osim->getJoint("radius_hand_r"));
+  joints.push_back(osim->getJoint("ankle_l"));
+  joints.push_back(osim->getJoint("ankle_r"));
+  joints.push_back(osim->getJoint("mtp_l"));
+  joints.push_back(osim->getJoint("mtp_r"));
+  joints.push_back(osim->getJoint("walker_knee_l"));
+  joints.push_back(osim->getJoint("walker_knee_r"));
+  joints.push_back(osim->getJoint("acromial_l"));
+  joints.push_back(osim->getJoint("acromial_r"));
+  joints.push_back(osim->getJoint("elbow_l"));
+  joints.push_back(osim->getJoint("elbow_r"));
+  joints.push_back(osim->getJoint("hip_l"));
+  joints.push_back(osim->getJoint("hip_r"));
+
+  // Check the joint position Jacobian is accurate
+  const s_t THRESHOLD = 1e-7;
+
+  // Check the body scale Jacobian is accurate
+  Eigen::MatrixXs scaleJac
+      = osim->getJointWorldPositionsJacobianWrtGroupScales(joints);
+  EXPECT_EQ(scaleJac.cols(), osim->getNumScaleGroups());
+  Eigen::MatrixXs scaleJac_fd
+      = osim->finiteDifferenceJointWorldPositionsJacobianWrtGroupScales(joints);
+  if (!equals(scaleJac, scaleJac_fd, THRESHOLD))
+  {
+    for (int i = 0; i < scaleJac.cols(); i++)
+    {
+      for (int j = 0; j < scaleJac.rows() / 3; j++)
+      {
+        Eigen::Vector3s dpos_dscale = scaleJac.block(j * 3, i, 3, 1);
+        Eigen::Vector3s dpos_dscale_fd = scaleJac_fd.block(j * 3, i, 3, 1);
+        if (!equals(dpos_dscale, dpos_dscale_fd, THRESHOLD))
+        {
+          const std::vector<dynamics::BodyNode*>& group
+              = osim->getBodyScaleGroup(i);
+
+          std::cout << "Error on scale group " << i << ":";
+          for (auto node : group)
+          {
+            std::cout << "\"" << node->getName() << "\", ";
+          }
+          std::cout << " -> joint position \"" << joints[j]->getName() << "\""
+                    << std::endl;
+          std::cout << "Analytical scale J: " << std::endl
+                    << dpos_dscale << std::endl;
+          std::cout << "FD scale J: " << std::endl
+                    << dpos_dscale_fd << std::endl;
+          std::cout << "Diff: " << std::endl
+                    << dpos_dscale - dpos_dscale_fd << std::endl;
+        }
+      }
+    }
+    EXPECT_TRUE(equals(scaleJac, scaleJac_fd, THRESHOLD));
+    return;
+  }
+}
+#endif
+
+#ifdef ALL_TESTS
 TEST(SkeletonConverter, IK_JACOBIANS)
 {
   std::shared_ptr<dynamics::Skeleton> amass = getAmassSkeleton();
@@ -917,6 +1003,19 @@ TEST(SkeletonConverter, RAJAGOPAL)
   osim->setPosition(4, -0.2);
   osim->setPosition(5, 1.0);
 
+  osim->mergeScaleGroups(
+      osim->getBodyNode("tibia_l"), osim->getBodyNode("tibia_r"));
+  osim->mergeScaleGroups(
+      osim->getBodyNode("radius_l"), osim->getBodyNode("radius_r"));
+  osim->mergeScaleGroups(
+      osim->getBodyNode("ulna_l"), osim->getBodyNode("ulna_r"));
+  osim->mergeScaleGroups(
+      osim->getBodyNode("calcn_l"), osim->getBodyNode("calcn_r"));
+  osim->mergeScaleGroups(
+      osim->getBodyNode("humerus_l"), osim->getBodyNode("humerus_r"));
+  osim->mergeScaleGroups(
+      osim->getBodyNode("femur_l"), osim->getBodyNode("femur_r"));
+
   // osim->getBodyNode("tibia_l")->setScale(1.2);
 
   biomechanics::SkeletonConverter converter(osim, amass);
@@ -942,6 +1041,30 @@ TEST(SkeletonConverter, RAJAGOPAL)
   converter.linkJoints(osim->getJoint("hip_r"), amass->getJoint("hip_r"));
 
   converter.rescaleAndPrepTarget();
+
+  for (int i = 0; i < osim->getNumBodyNodes(); i++)
+  {
+    dynamics::BodyNode* body = osim->getBodyNode(i);
+    std::cout << body->getName() << ": " << body->getScale() << std::endl;
+  }
+  EXPECT_EQ(
+      osim->getBodyNode("tibia_l")->getScale(),
+      osim->getBodyNode("tibia_r")->getScale());
+  EXPECT_EQ(
+      osim->getBodyNode("radius_l")->getScale(),
+      osim->getBodyNode("radius_r")->getScale());
+  EXPECT_EQ(
+      osim->getBodyNode("ulna_l")->getScale(),
+      osim->getBodyNode("ulna_r")->getScale());
+  EXPECT_EQ(
+      osim->getBodyNode("calcn_l")->getScale(),
+      osim->getBodyNode("calcn_r")->getScale());
+  EXPECT_EQ(
+      osim->getBodyNode("humerus_l")->getScale(),
+      osim->getBodyNode("humerus_r")->getScale());
+  EXPECT_EQ(
+      osim->getBodyNode("femur_l")->getScale(),
+      osim->getBodyNode("femur_r")->getScale());
 
   auto retriever = utils::DartResourceRetriever::create();
   common::ResourcePtr ptr
@@ -975,8 +1098,7 @@ TEST(SkeletonConverter, RAJAGOPAL)
   Eigen::MatrixXs shorterPoses = poses.block(0, 0, poses.rows(), 20);
   poses = shorterPoses;
 
-  Eigen::MatrixXs convertedPoses
-      = converter.convertMotion(poses, true, 400, 0.005);
+  Eigen::MatrixXs convertedPoses = converter.convertMotion(poses);
 
   /*
   // Uncomment this for local testing

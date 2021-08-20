@@ -835,6 +835,58 @@ public:
   void clampPositionsToLimits();
 
   //----------------------------------------------------------------------------
+  // Constraining links to have the same scale
+  //----------------------------------------------------------------------------
+
+  const std::vector<std::vector<dynamics::BodyNode*>>& getBodyScaleGroups()
+      const;
+
+  const std::vector<dynamics::BodyNode*>& getBodyScaleGroup(int index) const;
+
+  /// This creates scale groups for any body nodes that may've been added since
+  /// we last interacted with the body scale group APIs
+  void ensureBodyScaleGroups();
+
+  /// This returns the index of the group that this body node corresponds to
+  int getScaleGroupIndex(dynamics::BodyNode* bodyNode);
+
+  /// This takes two scale groups and merges their contents into a single group.
+  /// After this operation, there is one fewer scale group.
+  void mergeScaleGroups(dynamics::BodyNode* a, dynamics::BodyNode* b);
+
+  /// This gets the scale upper bound for the first body in a group, by index
+  s_t getScaleGroupUpperBound(int groupIndex);
+
+  /// This gets the scale lower bound for the first body in a group, by index
+  s_t getScaleGroupLowerBound(int groupIndex);
+
+  /// This takes two scale groups and merges their contents into a single group.
+  /// After this operation, there is one fewer scale group.
+  void mergeScaleGroupsByIndex(int a, int b);
+
+  /// This returns the number of scaling groups (groups with an equal-scale
+  /// constraint) that there are in the model.
+  int getNumScaleGroups();
+
+  /// This sets the scales of all the body nodes according to their group
+  /// membership. The `scale` vector is expected to be the same size as the
+  /// number of groups.
+  void setGroupScales(Eigen::VectorXs scale);
+
+  /// This gets the scales of the first body in each scale group.
+  Eigen::VectorXs getGroupScales();
+
+  /// This returns the Jacobian of the joint positions wrt the scales of the
+  /// groups
+  Eigen::MatrixXs getJointWorldPositionsJacobianWrtGroupScales(
+      const std::vector<const dynamics::Joint*>& joints);
+
+  /// This returns the Jacobian of the joint positions wrt the scales of the
+  /// groups
+  Eigen::MatrixXs finiteDifferenceJointWorldPositionsJacobianWrtGroupScales(
+      const std::vector<const dynamics::Joint*>& joints);
+
+  //----------------------------------------------------------------------------
   // Converting EulerJoints->BallJoints and EulerFreeJoints->FreeJoints
   //
   // This allows us to do computations like IK in a gimbal-lock-free space.
@@ -1769,6 +1821,9 @@ protected:
 
   /// NameManager for tracking SoftBodyNodes
   dart::common::NameManager<SoftBodyNode*> mNameMgrForSoftBodyNodes;
+
+  /// The groups that constrain the scales of body nodes to be equal
+  std::vector<std::vector<dynamics::BodyNode*>> mBodyScaleGroups;
 
   struct DirtyFlags
   {

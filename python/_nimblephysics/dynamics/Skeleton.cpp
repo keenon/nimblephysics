@@ -760,6 +760,44 @@ void Skeleton(py::module& m)
       .def(
           "clampPositionsToLimits",
           &dart::dynamics::Skeleton::clampPositionsToLimits)
+      .def("getBodyScaleGroups", &dart::dynamics::Skeleton::getBodyScaleGroups)
+      .def(
+          "getBodyScaleGroup",
+          &dart::dynamics::Skeleton::getBodyScaleGroup,
+          ::py::arg("index"))
+      .def(
+          "getScaleGroupLowerBound",
+          &dart::dynamics::Skeleton::getScaleGroupLowerBound,
+          ::py::arg("index"))
+      .def(
+          "getScaleGroupUpperBound",
+          &dart::dynamics::Skeleton::getScaleGroupUpperBound,
+          ::py::arg("index"))
+      .def(
+          "getScaleGroupIndex",
+          &dart::dynamics::Skeleton::getScaleGroupIndex,
+          ::py::arg("bodyNode"))
+      .def(
+          "mergeScaleGroups",
+          &dart::dynamics::Skeleton::mergeScaleGroups,
+          ::py::arg("bodyNodeA"),
+          ::py::arg("bodyNodeB"))
+      .def(
+          "mergeScaleGroupsByIndex",
+          &dart::dynamics::Skeleton::mergeScaleGroupsByIndex,
+          ::py::arg("groupA"),
+          ::py::arg("groupB"))
+      .def("getNumScaleGroups", &dart::dynamics::Skeleton::getNumScaleGroups)
+      .def(
+          "setGroupScales",
+          &dart::dynamics::Skeleton::setGroupScales,
+          ::py::arg("scales"))
+      .def("getGroupScales", &dart::dynamics::Skeleton::getGroupScales)
+      .def(
+          "getJointWorldPositionsJacobianWrtGroupScales",
+          &dart::dynamics::Skeleton::
+              getJointWorldPositionsJacobianWrtGroupScales,
+          ::py::arg("joints"))
       .def(
           "getJointWorldPositions",
           &dart::dynamics::Skeleton::getJointWorldPositions,
