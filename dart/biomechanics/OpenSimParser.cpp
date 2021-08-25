@@ -217,24 +217,27 @@ dynamics::SkeletonPtr OpenSimParser::parseOsim(
           << "] does not contain <OpenSimDocument> as the root element.\n";
     return nullptr;
   }
-  return readOsim40(uri, docElement, retriever);
-  /*
-  int docVersion = docElement->IntAttribute("Version", 0);
-  if (docVersion == 30000)
+  tinyxml2::XMLElement* modelElement = docElement->FirstChildElement("Model");
+  if (modelElement == nullptr)
   {
-    return readOsim30(uri, docElement, retriever);
+    dterr << "OpenSim file[" << uri.toString()
+          << "] does not contain <Model> as the child of the root "
+             "<OpenSimDocument> element.\n";
+    return nullptr;
   }
-  else if (docVersion == 40000)
+  tinyxml2::XMLElement* jointSet = modelElement->FirstChildElement("JointSet");
+
+  if (jointSet != nullptr)
   {
+    // This is the older format, where JointSet specifies the joints separately
+    // from the body hierarchy
+    return readOsim30(uri, docElement, retriever);
   }
   else
   {
-    dterr << "OpenSim file[" << uri.toString()
-          << "] self-reports unsupported version <" << docVersion
-          << ">, supported versions are 30000 and 40000.\n";
-    return nullptr;
+    // This is the newer format, where Joints are specified as childen of Bodies
+    return readOsim40(uri, docElement, retriever);
   }
-  */
 }
 
 //==============================================================================
@@ -777,7 +780,7 @@ dynamics::SkeletonPtr OpenSimParser::readOsim30(
     bodyLookupMap["/bodyset/" + name].xml = bodyCursor;
     bodyLookupMap["/bodyset/" + name].parent = nullptr;
     bodyLookupMap["/bodyset/" + name].children.clear();
-    bodyLookupMap["/bodyset/" + name].name = "/bodyset/" + name;
+    bodyLookupMap["/bodyset/" + name].name = name;
 
     double mass = atof(bodyCursor->FirstChildElement("mass")->GetText());
     std::cout << "Mass: " << mass << std::endl;
@@ -941,6 +944,9 @@ dynamics::SkeletonPtr OpenSimParser::readOsim30(
   dynamics::SkeletonPtr skel = dynamics::Skeleton::create();
   root->parentBody = nullptr;
   buildJoint(skel, root);
+
+  std::cout << "Num dofs: " << skel->getNumDofs() << std::endl;
+  std::cout << "Num bodies: " << skel->getNumBodyNodes() << std::endl;
 
   return skel;
 }
