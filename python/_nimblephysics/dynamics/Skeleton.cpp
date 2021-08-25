@@ -875,6 +875,10 @@ void Skeleton(py::module& m)
           ::py::arg("dq2"),
           ::py::arg("dq1"))
       .def(
+          "getInverseDynamics",
+          &dart::dynamics::Skeleton::getInverseDynamics,
+          ::py::arg("nextVel"))
+      .def(
           "getContactInverseDynamics",
           &dart::dynamics::Skeleton::getContactInverseDynamics,
           ::py::arg("nextVel"),

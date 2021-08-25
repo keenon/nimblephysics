@@ -4282,6 +4282,20 @@ s_t Skeleton::ContactInverseDynamicsResult::sumError()
 }
 
 //==============================================================================
+/// This solves a simple inverse dynamics problem to get forces we need to
+/// apply to arrive at "nextVel" at the next timestep.
+Eigen::VectorXs Skeleton::getInverseDynamics(const Eigen::VectorXs& nextVel)
+{
+  Eigen::VectorXs accel
+      = getVelocityDifferences(nextVel, getVelocities()) / getTimeStep();
+  Eigen::VectorXs massTorques = multiplyByImplicitMassMatrix(accel);
+  Eigen::VectorXs coriolisAndGravity = getCoriolisAndGravityForces()
+                                       - getExternalForces() + getDampingForce()
+                                       + getSpringForce();
+  return massTorques + coriolisAndGravity;
+}
+
+//==============================================================================
 /// This solves the inverse dynamics problem to figure out what forces we
 /// would need to apply (in our _current state_) in order to get the desired
 /// next velocity. This includes arbitrary forces and moments at the

@@ -1042,6 +1042,10 @@ public:
   // Inverse Dynamics for Contacts
   //----------------------------------------------------------------------------
 
+  /// This solves a simple inverse dynamics problem to get forces we need to
+  /// apply to arrive at "nextVel" at the next timestep.
+  Eigen::VectorXs getInverseDynamics(const Eigen::VectorXs& nextVel);
+
   struct ContactInverseDynamicsResult
   {
     dynamics::Skeleton* skel;
