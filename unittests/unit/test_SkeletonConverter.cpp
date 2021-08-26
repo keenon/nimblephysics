@@ -187,7 +187,7 @@ TEST(SkeletonConverter, BROKEN_IK_TIMESTEP_BACKWARD)
   std::shared_ptr<dynamics::Skeleton> amass = getAmassSkeleton();
   (void)amass;
   std::shared_ptr<dynamics::Skeleton> osim = OpenSimParser::parseOsim(
-      "dart://sample/osim/FullBodyModel-4.0/Rajagopal2015.osim");
+      "dart://sample/osim/Rajagopal2015/Rajagopal2015.osim");
   (void)osim;
   std::shared_ptr<simulation::World> world = simulation::World::create();
   world->addSkeleton(amass);
@@ -257,7 +257,7 @@ TEST(SkeletonConverter, BROKEN_IK_TIMESTEP_2_BACKWARDS)
   std::shared_ptr<dynamics::Skeleton> amass = getAmassSkeleton();
   (void)amass;
   std::shared_ptr<dynamics::Skeleton> osim = OpenSimParser::parseOsim(
-      "dart://sample/osim/FullBodyModel-4.0/Rajagopal2015.osim");
+      "dart://sample/osim/Rajagopal2015/Rajagopal2015.osim");
   (void)osim;
   std::shared_ptr<simulation::World> world = simulation::World::create();
   world->addSkeleton(amass);
@@ -356,7 +356,7 @@ TEST(SkeletonConverter, BROKEN_IK_TIMESTEP_3)
   std::shared_ptr<dynamics::Skeleton> amass = getAmassSkeleton();
   (void)amass;
   std::shared_ptr<dynamics::Skeleton> osim = OpenSimParser::parseOsim(
-      "dart://sample/osim/FullBodyModel-4.0/Rajagopal2015.osim");
+      "dart://sample/osim/Rajagopal2015/Rajagopal2015.osim");
   (void)osim;
   std::shared_ptr<simulation::World> world = simulation::World::create();
   world->addSkeleton(amass);
@@ -494,7 +494,7 @@ TEST(SkeletonConverter, BROKEN_IK_TIMESTEP_3_BACKWARDS)
   std::shared_ptr<dynamics::Skeleton> amass = getAmassSkeleton();
   (void)amass;
   std::shared_ptr<dynamics::Skeleton> osim = OpenSimParser::parseOsim(
-      "dart://sample/osim/FullBodyModel-4.0/Rajagopal2015.osim");
+      "dart://sample/osim/Rajagopal2015/Rajagopal2015.osim");
   (void)osim;
   std::shared_ptr<simulation::World> world = simulation::World::create();
   world->addSkeleton(amass);
@@ -591,7 +591,7 @@ TEST(SkeletonConverter, BROKEN_IK_TIMESTEP_3_BACKWARDS)
 TEST(SkeletonConverter, SCALE_EQUALITY_CONSTRAINTS)
 {
   std::shared_ptr<dynamics::Skeleton> osim = OpenSimParser::parseOsim(
-      "dart://sample/osim/FullBodyModel-4.0/Rajagopal2015.osim");
+      "dart://sample/osim/Rajagopal2015/Rajagopal2015.osim");
   osim->setPosition(2, -3.14159 / 2);
   osim->setPosition(4, -0.2);
   osim->setPosition(5, 1.0);
@@ -679,7 +679,7 @@ TEST(SkeletonConverter, IK_JACOBIANS)
   std::shared_ptr<dynamics::Skeleton> amass = getAmassSkeleton();
   (void)amass;
   std::shared_ptr<dynamics::Skeleton> osim = OpenSimParser::parseOsim(
-      "dart://sample/osim/FullBodyModel-4.0/Rajagopal2015.osim");
+      "dart://sample/osim/Rajagopal2015/Rajagopal2015.osim");
   (void)osim;
   std::shared_ptr<simulation::World> world = simulation::World::create();
   world->addSkeleton(amass);
@@ -869,7 +869,7 @@ TEST(SkeletonConverter, IK_JACOBIANS)
 TEST(SkeletonConverter, IK_JACOBIANS_BALL_JOINTS)
 {
   std::shared_ptr<dynamics::Skeleton> osim = OpenSimParser::parseOsim(
-      "dart://sample/osim/FullBodyModel-4.0/Rajagopal2015.osim");
+      "dart://sample/osim/Rajagopal2015/Rajagopal2015.osim");
   osim->setPosition(2, -3.14159 / 2);
   osim->setPosition(4, -0.2);
   osim->setPosition(5, 1.0);
@@ -994,7 +994,7 @@ TEST(SkeletonConverter, RAJAGOPAL)
   std::shared_ptr<dynamics::Skeleton> amass = getAmassSkeleton();
   (void)amass;
   std::shared_ptr<dynamics::Skeleton> osim = OpenSimParser::parseOsim(
-      "dart://sample/osim/FullBodyModel-4.0/Rajagopal2015.osim");
+      "dart://sample/osim/Rajagopal2015/Rajagopal2015.osim");
   (void)osim;
   std::shared_ptr<simulation::World> world = simulation::World::create();
   world->addSkeleton(amass);
