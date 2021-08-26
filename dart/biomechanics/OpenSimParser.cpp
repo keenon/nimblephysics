@@ -11,6 +11,7 @@
 #include "dart/dynamics/MeshShape.hpp"
 #include "dart/dynamics/RevoluteJoint.hpp"
 #include "dart/dynamics/UniversalJoint.hpp"
+#include "dart/dynamics/WeldJoint.hpp"
 #include "dart/math/ConstantFunction.hpp"
 #include "dart/math/CustomFunction.hpp"
 #include "dart/math/LinearFunction.hpp"
@@ -159,34 +160,6 @@ Eigen::Vector3s getAxisFlips(std::vector<Eigen::Vector3s> axisList)
   return vec;
 }
 
-struct OpenSimBodyXML;
-
-struct OpenSimJointXML
-{
-  string name;
-  OpenSimBodyXML* parent;
-  OpenSimBodyXML* child;
-  Eigen::Isometry3s fromParent;
-  Eigen::Isometry3s fromChild;
-  tinyxml2::XMLElement* xml;
-  dynamics::BodyNode* parentBody;
-};
-
-struct OpenSimBodyXML
-{
-  string name;
-  OpenSimJointXML* parent;
-  std::vector<OpenSimJointXML*> children;
-  tinyxml2::XMLElement* xml;
-};
-
-//==============================================================================
-void buildJoint(dynamics::SkeletonPtr /*skel*/, OpenSimJointXML* joint)
-{
-  // TODO: actually construct the joint
-  std::cout << "Building joint: " << joint->name << std::endl;
-}
-
 //==============================================================================
 dynamics::SkeletonPtr OpenSimParser::parseOsim(
     const common::Uri& uri, const common::ResourceRetrieverPtr& nullOrRetriever)
@@ -241,6 +214,545 @@ dynamics::SkeletonPtr OpenSimParser::parseOsim(
 }
 
 //==============================================================================
+std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
+    dynamics::SkeletonPtr skel,
+    dynamics::BodyNode* parentBody,
+    tinyxml2::XMLElement* bodyCursor,
+    tinyxml2::XMLElement* jointDetail,
+    Eigen::Isometry3s transformFromParent,
+    Eigen::Isometry3s transformFromChild,
+    const common::Uri& uri,
+    const common::ResourceRetrieverPtr& retriever)
+{
+  std::string bodyName(bodyCursor->Attribute("name"));
+  dynamics::BodyNode::Properties bodyProps;
+  bodyProps.mName = bodyName;
+
+  dynamics::BodyNode* childBody = nullptr;
+  std::string jointName(jointDetail->Attribute("name"));
+
+  dynamics::Joint* joint = nullptr;
+  std::string jointType(jointDetail->Name());
+
+  // Build custom joints
+  if (jointType == "CustomJoint")
+  {
+    tinyxml2::XMLElement* spatialTransform
+        = jointDetail->FirstChildElement("SpatialTransform");
+    tinyxml2::XMLElement* transformAxisCursor
+        = spatialTransform->FirstChildElement("TransformAxis");
+
+    std::vector<std::shared_ptr<math::CustomFunction>> customFunctions;
+    std::vector<Eigen::Vector3s> eulerAxisOrder;
+    std::vector<Eigen::Vector3s> transformAxisOrder;
+
+    int dofIndex = 0;
+    /// If all linear, then we're just a EulerFreeJoint
+    bool allLinear = true;
+    /// If first 1 is linear, last 5 are constant, then we're just a
+    /// RevoluteJoint
+    bool first1Linear = true;
+    /// If first 3 are linear, last 3 are constant, then we're just an
+    /// EulerJoint
+    bool first3Linear = true;
+    /// If any are splines, we need a full blown CustomJoint
+    bool anySpline = false;
+    /// If all 6 DOFs are fixed at 0, then we're just a WeldJoint
+    bool allLocked = true;
+    while (transformAxisCursor)
+    {
+      Eigen::Vector3s axis
+          = readVec3(transformAxisCursor->FirstChildElement("axis"));
+      if (dofIndex < 3)
+        eulerAxisOrder.push_back(axis);
+      else
+        transformAxisOrder.push_back(axis);
+
+      tinyxml2::XMLElement* function
+          = transformAxisCursor->FirstChildElement("function");
+      // On v3 files, there is no "function" wrapper tag
+      if (function == nullptr)
+      {
+        function = transformAxisCursor;
+      }
+
+      tinyxml2::XMLElement* linearFunction
+          = function->FirstChildElement("LinearFunction");
+      tinyxml2::XMLElement* simmSpline
+          = function->FirstChildElement("SimmSpline");
+      // This only exists in v4 files
+      tinyxml2::XMLElement* constant = function->FirstChildElement("Constant");
+      // This only exists in v3 files
+      tinyxml2::XMLElement* multiplier
+          = function->FirstChildElement("MultiplierFunction");
+      if (multiplier != nullptr)
+      {
+        tinyxml2::XMLElement* childFunction
+            = multiplier->FirstChildElement("function");
+        assert(childFunction != nullptr);
+        if (childFunction != nullptr)
+        {
+          constant = childFunction->FirstChildElement("Constant");
+          simmSpline = childFunction->FirstChildElement("SimmSpline");
+          linearFunction = childFunction->FirstChildElement("LinearFunction");
+          assert(constant || simmSpline || linearFunction);
+        }
+      }
+
+      if (constant != nullptr)
+      {
+        allLinear = false;
+        if (dofIndex == 0)
+        {
+          first1Linear = false;
+        }
+        if (dofIndex < 3)
+        {
+          first3Linear = false;
+        }
+
+        double value = atof(constant->FirstChildElement("value")->GetText());
+        if (value != 0)
+        {
+          allLocked = false;
+        }
+        customFunctions.push_back(
+            std::make_shared<math::ConstantFunction>(value));
+      }
+      else if (linearFunction != nullptr)
+      {
+        allLocked = false;
+        Eigen::Vector2s coeffs
+            = readVec2(linearFunction->FirstChildElement("coefficients"));
+        // Example coeffs for linear: 1 0
+        customFunctions.push_back(
+            std::make_shared<math::LinearFunction>(coeffs(0), coeffs(1)));
+      }
+      else if (simmSpline != nullptr)
+      {
+        anySpline = true;
+        allLocked = false;
+        if (dofIndex == 0)
+        {
+          first1Linear = false;
+        }
+        if (dofIndex < 3)
+        {
+          first3Linear = false;
+        }
+
+        std::vector<s_t> x = readVecX(simmSpline->FirstChildElement("x"));
+        std::vector<s_t> y = readVecX(simmSpline->FirstChildElement("y"));
+        customFunctions.push_back(std::make_shared<math::SimmSpline>(x, y));
+      }
+      else
+      {
+        assert(false && "Unrecognized function type");
+      }
+
+      dofIndex++;
+      transformAxisCursor
+          = transformAxisCursor->NextSiblingElement("TransformAxis");
+    }
+
+    if (allLocked)
+    {
+      dynamics::WeldJoint::Properties props;
+      props.mName = jointName;
+      auto pair
+          = parentBody->createChildJointAndBodyNodePair<dynamics::WeldJoint>(
+              props, bodyProps);
+      joint = pair.first;
+      childBody = pair.second;
+      std::cout << "WARNING! Creating a WeldJoint as an intermediate "
+                   "(non-root) joint, there is a known bug that will cause "
+                   "dynamics to be wrong. This is only useful for kinematics."
+                << std::endl;
+    }
+    else if (anySpline)
+    {
+      dynamics::CustomJoint* customJoint = nullptr;
+      // Create a CustomJoint
+      dynamics::CustomJoint::Properties props;
+      props.mName = jointName;
+      if (parentBody == nullptr)
+      {
+        auto pair = skel->createJointAndBodyNodePair<dynamics::CustomJoint>(
+            nullptr, props, bodyProps);
+        customJoint = pair.first;
+        childBody = pair.second;
+      }
+      else
+      {
+        auto pair
+            = parentBody
+                  ->createChildJointAndBodyNodePair<dynamics::CustomJoint>(
+                      props, bodyProps);
+        customJoint = pair.first;
+        childBody = pair.second;
+      }
+
+      assert(customFunctions.size() == 6);
+
+      dynamics::EulerJoint::AxisOrder axisOrder = getAxisOrder(eulerAxisOrder);
+      Eigen::Vector3s flips = getAxisFlips(eulerAxisOrder);
+      customJoint->setAxisOrder(axisOrder);
+      customJoint->setFlipAxisMap(flips);
+
+      for (int i = 0; i < customFunctions.size(); i++)
+      {
+        if (i < 3)
+        {
+          customJoint->setCustomFunction(i, customFunctions[i]);
+        }
+        else
+        {
+          // Map to the appropriate slot based on the axis
+          Eigen::Vector3s axis = transformAxisOrder[i - 3];
+          if (axis == Eigen::Vector3s::UnitX())
+          {
+            customJoint->setCustomFunction(3, customFunctions[i]);
+          }
+          else if (axis == Eigen::Vector3s::UnitY())
+          {
+            customJoint->setCustomFunction(4, customFunctions[i]);
+          }
+          else if (axis == Eigen::Vector3s::UnitZ())
+          {
+            customJoint->setCustomFunction(5, customFunctions[i]);
+          }
+          else
+          {
+            assert(false);
+          }
+        }
+      }
+      joint = customJoint;
+    }
+    else if (allLinear)
+    {
+      dynamics::EulerJoint::AxisOrder axisOrder = getAxisOrder(eulerAxisOrder);
+      dynamics::EulerJoint::AxisOrder transOrder
+          = getAxisOrder(transformAxisOrder);
+      (void)transOrder;
+      assert(transOrder == dynamics::EulerJoint::AxisOrder::XYZ);
+
+      Eigen::Vector3s flips = getAxisFlips(eulerAxisOrder);
+
+      // Create a EulerFreeJoint
+      dynamics::EulerFreeJoint* eulerFreeJoint = nullptr;
+      dynamics::EulerFreeJoint::Properties props;
+      props.mName = jointName;
+      if (parentBody == nullptr)
+      {
+        auto pair = skel->createJointAndBodyNodePair<dynamics::EulerFreeJoint>(
+            nullptr, props, bodyProps);
+        eulerFreeJoint = pair.first;
+        childBody = pair.second;
+      }
+      else
+      {
+        auto pair
+            = parentBody
+                  ->createChildJointAndBodyNodePair<dynamics::EulerFreeJoint>(
+                      props, bodyProps);
+        eulerFreeJoint = pair.first;
+        childBody = pair.second;
+      }
+      eulerFreeJoint->setAxisOrder(axisOrder);
+      eulerFreeJoint->setFlipAxisMap(flips);
+      joint = eulerFreeJoint;
+    }
+    else if (first3Linear)
+    {
+      dynamics::EulerJoint::AxisOrder axisOrder = getAxisOrder(eulerAxisOrder);
+      Eigen::Vector3s flips = getAxisFlips(eulerAxisOrder);
+      // assert(!flips[0] && !flips[1] && !flips[2]);
+
+      // Create an EulerJoint
+      dynamics::EulerJoint* eulerJoint = nullptr;
+      dynamics::EulerJoint::Properties props;
+      props.mName = jointName;
+      if (parentBody == nullptr)
+      {
+        auto pair = skel->createJointAndBodyNodePair<dynamics::EulerJoint>(
+            nullptr, props, bodyProps);
+        eulerJoint = pair.first;
+        childBody = pair.second;
+      }
+      else
+      {
+        auto pair
+            = parentBody->createChildJointAndBodyNodePair<dynamics::EulerJoint>(
+                props, bodyProps);
+        eulerJoint = pair.first;
+        childBody = pair.second;
+      }
+      eulerJoint->setFlipAxisMap(flips);
+      eulerJoint->setAxisOrder(axisOrder);
+      joint = eulerJoint;
+    }
+    else if (first1Linear)
+    {
+      Eigen::Vector3s axis = eulerAxisOrder[0];
+
+      // Create a RevoluteJoint
+      dynamics::RevoluteJoint* revoluteJoint = nullptr;
+      dynamics::RevoluteJoint::Properties props;
+      props.mName = jointName;
+      if (parentBody == nullptr)
+      {
+        auto pair = skel->createJointAndBodyNodePair<dynamics::RevoluteJoint>(
+            nullptr, props, bodyProps);
+        revoluteJoint = pair.first;
+        childBody = pair.second;
+      }
+      else
+      {
+        auto pair
+            = parentBody
+                  ->createChildJointAndBodyNodePair<dynamics::RevoluteJoint>(
+                      props, bodyProps);
+        revoluteJoint = pair.first;
+        childBody = pair.second;
+      }
+      revoluteJoint->setAxis(axis);
+      joint = revoluteJoint;
+    }
+    else
+    {
+      assert(false);
+    }
+  }
+  if (jointType == "PinJoint")
+  {
+    // Create a RevoluteJoint
+    dynamics::RevoluteJoint* revoluteJoint = nullptr;
+    dynamics::RevoluteJoint::Properties props;
+    props.mName = jointName;
+    if (parentBody == nullptr)
+    {
+      auto pair = skel->createJointAndBodyNodePair<dynamics::RevoluteJoint>(
+          nullptr, props, bodyProps);
+      revoluteJoint = pair.first;
+      childBody = pair.second;
+    }
+    else
+    {
+      auto pair
+          = parentBody
+                ->createChildJointAndBodyNodePair<dynamics::RevoluteJoint>(
+                    props, bodyProps);
+      revoluteJoint = pair.first;
+      childBody = pair.second;
+    }
+    joint = revoluteJoint;
+  }
+  if (jointType == "UniversalJoint")
+  {
+    // Create a UniversalJoint
+    dynamics::UniversalJoint* universalJoint = nullptr;
+    dynamics::UniversalJoint::Properties props;
+    props.mName = jointName;
+    if (parentBody == nullptr)
+    {
+      auto pair = skel->createJointAndBodyNodePair<dynamics::UniversalJoint>(
+          nullptr, props, bodyProps);
+      universalJoint = pair.first;
+      childBody = pair.second;
+    }
+    else
+    {
+      auto pair
+          = parentBody
+                ->createChildJointAndBodyNodePair<dynamics::UniversalJoint>(
+                    props, bodyProps);
+      universalJoint = pair.first;
+      childBody = pair.second;
+    }
+    joint = universalJoint;
+  }
+  assert(childBody != nullptr);
+  joint->setName(jointName);
+  // std::cout << jointName << std::endl;
+  joint->setTransformFromChildBodyNode(transformFromChild);
+  joint->setTransformFromParentBodyNode(transformFromParent);
+
+  // Rename the DOFs for each joint
+
+  tinyxml2::XMLElement* coordinateCursor = nullptr;
+  // This is how the coordinate set is specified in OpenSim v4 files
+  tinyxml2::XMLElement* coordinateSet
+      = jointDetail->FirstChildElement("CoordinateSet");
+  if (coordinateSet)
+  {
+    tinyxml2::XMLElement* objects = coordinateSet->FirstChildElement("objects");
+    if (objects)
+    {
+      coordinateCursor = objects->FirstChildElement("Coordinate");
+    }
+  }
+  // This is how the coordinate set is specified in OpenSim v3 files
+  if (coordinateCursor == nullptr)
+  {
+    coordinateSet = jointDetail->FirstChildElement("coordinates");
+    coordinateCursor = coordinateSet->FirstChildElement("Coordinate");
+  }
+  // Iterate through the coordinates
+  int i = 0;
+  while (coordinateCursor)
+  {
+    std::string dofName(coordinateCursor->Attribute("name"));
+    double defaultValue
+        = atof(coordinateCursor->FirstChildElement("default_value")->GetText());
+    double defaultSpeedValue = atof(
+        coordinateCursor->FirstChildElement("default_speed_value")->GetText());
+    Eigen::Vector2s range
+        = readVec2(coordinateCursor->FirstChildElement("range"));
+    bool locked
+        = std::string(coordinateCursor->FirstChildElement("locked")->GetText())
+          == "true";
+    bool clamped
+        = std::string(coordinateCursor->FirstChildElement("clamped")->GetText())
+          == "true";
+
+    dynamics::DegreeOfFreedom* dof = joint->getDof(i);
+    dof->setName(dofName);
+    dof->setPosition(defaultValue);
+    dof->setVelocity(defaultSpeedValue);
+    if (locked)
+    {
+      // TODO: Just replace with a Weld joint
+      // dof->setVelocityUpperLimit(0);
+      // dof->setVelocityLowerLimit(0);
+    }
+    if (clamped)
+    {
+      dof->setPositionLowerLimit(range(0));
+      dof->setPositionUpperLimit(range(1));
+    }
+
+    i++;
+    coordinateCursor = coordinateCursor->NextSiblingElement("Coordinate");
+  }
+
+  // OpenSim v4 files specify visible geometry this way
+  tinyxml2::XMLElement* visibleObject
+      = bodyCursor->FirstChildElement("VisibleObject");
+  if (visibleObject && childBody != nullptr)
+  {
+    tinyxml2::XMLElement* geometrySet
+        = visibleObject->FirstChildElement("GeometrySet");
+    if (geometrySet)
+    {
+      tinyxml2::XMLElement* objects = geometrySet->FirstChildElement("objects");
+      if (objects)
+      {
+        tinyxml2::XMLElement* displayGeometryCursor
+            = objects->FirstChildElement("DisplayGeometry");
+        while (displayGeometryCursor)
+        {
+          std::string mesh_file(
+              displayGeometryCursor->FirstChildElement("geometry_file")
+                  ->GetText());
+          Eigen::Vector3s colors
+              = readVec3(displayGeometryCursor->FirstChildElement("color"))
+                * 0.7;
+          Eigen::Vector6s transformVec
+              = readVec6(displayGeometryCursor->FirstChildElement("transform"));
+          Eigen::Isometry3s transform = Eigen::Isometry3s::Identity();
+          transform.linear() = math::eulerXYZToMatrix(transformVec.head<3>());
+          transform.translation() = transformVec.tail<3>();
+          Eigen::Vector3s scale = readVec3(
+              displayGeometryCursor->FirstChildElement("scale_factors"));
+          double opacity = atof(
+              displayGeometryCursor->FirstChildElement("opacity")->GetText());
+
+          common::Uri meshUri = common::Uri::createFromRelativeUri(
+              uri, "./Geometry/" + mesh_file + ".ply");
+          std::shared_ptr<dynamics::MeshShape> meshShape
+              = std::make_shared<dynamics::MeshShape>(
+                  scale,
+                  dynamics::MeshShape::loadMesh(meshUri, retriever),
+                  meshUri,
+                  retriever);
+
+          dynamics::ShapeNode* meshShapeNode
+              = childBody->createShapeNodeWith<dynamics::VisualAspect>(
+                  meshShape);
+          meshShapeNode->setRelativeTransform(transform);
+
+          dynamics::VisualAspect* meshVisualAspect
+              = meshShapeNode->getVisualAspect();
+          meshVisualAspect->setColor(colors);
+          meshVisualAspect->setAlpha(opacity);
+
+          displayGeometryCursor
+              = displayGeometryCursor->NextSiblingElement("DisplayGeometry");
+        }
+      }
+    }
+  }
+  // OpenSim v3 files specify visible geometry this way
+  tinyxml2::XMLElement* attachedGeometry
+      = bodyCursor->FirstChildElement("attached_geometry");
+  if (attachedGeometry && childBody != nullptr)
+  {
+    tinyxml2::XMLElement* meshCursor
+        = attachedGeometry->FirstChildElement("Mesh");
+    while (meshCursor)
+    {
+      std::string mesh_file(
+          meshCursor->FirstChildElement("mesh_file")->GetText());
+      Eigen::Vector3s scale
+          = readVec3(meshCursor->FirstChildElement("scale_factors"));
+
+      common::Uri meshUri = common::Uri::createFromRelativeUri(
+          uri, "./Geometry/" + mesh_file + ".ply");
+      std::shared_ptr<dynamics::MeshShape> meshShape
+          = std::make_shared<dynamics::MeshShape>(
+              scale,
+              dynamics::MeshShape::loadMesh(meshUri, retriever),
+              meshUri,
+              retriever);
+
+      dynamics::ShapeNode* meshShapeNode
+          = childBody->createShapeNodeWith<dynamics::VisualAspect>(meshShape);
+
+      /*
+      Eigen::Vector6s transformVec
+          = readVec6(displayGeometryCursor->FirstChildElement("transform"));
+      Eigen::Isometry3s transform = Eigen::Isometry3s::Identity();
+      transform.linear() = math::eulerXYZToMatrix(transformVec.head<3>());
+      transform.translation() = transformVec.tail<3>();
+      meshShapeNode->setRelativeTransform(transform);
+      */
+
+      dynamics::VisualAspect* meshVisualAspect
+          = meshShapeNode->getVisualAspect();
+
+      tinyxml2::XMLElement* appearance
+          = meshCursor->FirstChildElement("Appearance");
+      if (appearance != nullptr)
+      {
+        Eigen::Vector3s colors
+            = readVec3(appearance->FirstChildElement("color")) * 0.7;
+        double opacity
+            = atof(appearance->FirstChildElement("opacity")->GetText());
+        meshVisualAspect->setColor(colors);
+        meshVisualAspect->setAlpha(opacity);
+      }
+
+      meshCursor = meshCursor->NextSiblingElement("Mesh");
+    }
+  }
+
+  assert(childBody != nullptr);
+
+  return std::pair<dynamics::Joint*, dynamics::BodyNode*>(joint, childBody);
+}
+
+//==============================================================================
 dynamics::SkeletonPtr OpenSimParser::readOsim40(
     const common::Uri& uri,
     tinyxml2::XMLElement* docElement,
@@ -288,40 +800,10 @@ dynamics::SkeletonPtr OpenSimParser::readOsim40(
       continue;
     }
 
-    double mass = atof(bodyCursor->FirstChildElement("mass")->GetText());
-    Eigen::Vector3s massCenter
-        = readVec3(bodyCursor->FirstChildElement("mass_center"));
-    double inertia_xx
-        = atof(bodyCursor->FirstChildElement("inertia_xx")->GetText());
-    double inertia_yy
-        = atof(bodyCursor->FirstChildElement("inertia_yy")->GetText());
-    double inertia_zz
-        = atof(bodyCursor->FirstChildElement("inertia_zz")->GetText());
-    double inertia_xy
-        = atof(bodyCursor->FirstChildElement("inertia_xy")->GetText());
-    double inertia_xz
-        = atof(bodyCursor->FirstChildElement("inertia_xz")->GetText());
-    double inertia_yz
-        = atof(bodyCursor->FirstChildElement("inertia_yz")->GetText());
-    dynamics::Inertia inertia(
-        mass,
-        massCenter(0),
-        massCenter(1),
-        massCenter(2),
-        inertia_xx,
-        inertia_yy,
-        inertia_zz,
-        inertia_xy,
-        inertia_xz,
-        inertia_yz);
-    /*
-    std::cout << "Inertia tensor: " << std::endl
-              << inertia.getSpatialTensor() << std::endl;
-    */
-
-    dynamics::BodyNode* childBody = nullptr;
-
     tinyxml2::XMLElement* joint = bodyCursor->FirstChildElement("Joint");
+
+    dynamics::BodyNode* childBody;
+
     if (joint)
     {
       // WeldJoint
@@ -353,10 +835,11 @@ dynamics::SkeletonPtr OpenSimParser::readOsim40(
 
       if (jointDetail != nullptr)
       {
-        std::string jointName(jointDetail->Attribute("name"));
-        // Get shared properties across all joint types
         std::string parentName = std::string(
             jointDetail->FirstChildElement("parent_body")->GetText());
+        dynamics::BodyNode* parentBody = bodyLookupMap[parentName];
+        assert(parentName == "ground" || parentBody != nullptr);
+        // Get shared properties across all joint types
         Eigen::Vector3s locationInParent
             = readVec3(jointDetail->FirstChildElement("location_in_parent"));
         Eigen::Vector3s orientationInParent
@@ -376,368 +859,133 @@ dynamics::SkeletonPtr OpenSimParser::readOsim40(
             = math::eulerXYZToMatrix(orientationInChild);
         transformFromChild.translation() = locationInChild;
 
-        dynamics::Joint* joint = nullptr;
-        dynamics::BodyNode* parentBody = bodyLookupMap[parentName];
-        assert(parentName == "ground" || parentBody != nullptr);
-
-        // Build custom joints
-        if (customJoint != nullptr)
-        {
-          tinyxml2::XMLElement* spatialTransform
-              = jointDetail->FirstChildElement("SpatialTransform");
-          tinyxml2::XMLElement* transformAxisCursor
-              = spatialTransform->FirstChildElement("TransformAxis");
-
-          std::vector<std::shared_ptr<math::CustomFunction>> customFunctions;
-          std::vector<Eigen::Vector3s> eulerAxisOrder;
-          std::vector<Eigen::Vector3s> transformAxisOrder;
-
-          int dofIndex = 0;
-          /// If all linear, then we're just a EulerFreeJoint
-          bool allLinear = true;
-          /// If first 3 are linear, last 3 are constant, then we're just an
-          /// EulerJoint
-          bool first3Linear = true;
-          /// If any are splines, we need a full blown CustomJoint
-          bool anySpline = false;
-          while (transformAxisCursor)
-          {
-            Eigen::Vector3s axis
-                = readVec3(transformAxisCursor->FirstChildElement("axis"));
-            if (dofIndex < 3)
-              eulerAxisOrder.push_back(axis);
-            else
-              transformAxisOrder.push_back(axis);
-
-            tinyxml2::XMLElement* function
-                = transformAxisCursor->FirstChildElement("function");
-            tinyxml2::XMLElement* linearFunction
-                = function->FirstChildElement("LinearFunction");
-            tinyxml2::XMLElement* constant
-                = function->FirstChildElement("Constant");
-            if (constant != nullptr)
-            {
-              allLinear = false;
-              if (dofIndex < 3)
-              {
-                first3Linear = false;
-              }
-
-              double value
-                  = atof(constant->FirstChildElement("value")->GetText());
-              customFunctions.push_back(
-                  std::make_shared<math::ConstantFunction>(value));
-            }
-            if (linearFunction != nullptr)
-            {
-              Eigen::Vector2s coeffs
-                  = readVec2(linearFunction->FirstChildElement("coefficients"));
-              // Example coeffs for linear: 1 0
-              customFunctions.push_back(
-                  std::make_shared<math::LinearFunction>(coeffs(0), coeffs(1)));
-            }
-            tinyxml2::XMLElement* simmSpline
-                = function->FirstChildElement("SimmSpline");
-            if (simmSpline != nullptr)
-            {
-              anySpline = true;
-              std::vector<s_t> x = readVecX(simmSpline->FirstChildElement("x"));
-              std::vector<s_t> y = readVecX(simmSpline->FirstChildElement("y"));
-              customFunctions.push_back(
-                  std::make_shared<math::SimmSpline>(x, y));
-            }
-
-            dofIndex++;
-            transformAxisCursor
-                = transformAxisCursor->NextSiblingElement("TransformAxis");
-          }
-
-          if (anySpline)
-          {
-            dynamics::CustomJoint* customJoint = nullptr;
-            // Create a CustomJoint
-            if (parentBody == nullptr)
-            {
-              auto pair
-                  = skel->createJointAndBodyNodePair<dynamics::CustomJoint>();
-              customJoint = pair.first;
-              childBody = pair.second;
-            }
-            else
-            {
-              auto pair = parentBody->createChildJointAndBodyNodePair<
-                  dynamics::CustomJoint>();
-              customJoint = pair.first;
-              childBody = pair.second;
-            }
-
-            assert(customFunctions.size() == 6);
-
-            dynamics::EulerJoint::AxisOrder axisOrder
-                = getAxisOrder(eulerAxisOrder);
-            Eigen::Vector3s flips = getAxisFlips(eulerAxisOrder);
-            customJoint->setAxisOrder(axisOrder);
-            customJoint->setFlipAxisMap(flips);
-
-            for (int i = 0; i < customFunctions.size(); i++)
-            {
-              if (i < 3)
-              {
-                customJoint->setCustomFunction(i, customFunctions[i]);
-              }
-              else
-              {
-                // Map to the appropriate slot based on the axis
-                Eigen::Vector3s axis = transformAxisOrder[i - 3];
-                if (axis == Eigen::Vector3s::UnitX())
-                {
-                  customJoint->setCustomFunction(3, customFunctions[i]);
-                }
-                else if (axis == Eigen::Vector3s::UnitY())
-                {
-                  customJoint->setCustomFunction(4, customFunctions[i]);
-                }
-                else if (axis == Eigen::Vector3s::UnitZ())
-                {
-                  customJoint->setCustomFunction(5, customFunctions[i]);
-                }
-                else
-                {
-                  assert(false);
-                }
-              }
-            }
-            joint = customJoint;
-          }
-          else if (allLinear)
-          {
-            dynamics::EulerJoint::AxisOrder axisOrder
-                = getAxisOrder(eulerAxisOrder);
-            dynamics::EulerJoint::AxisOrder transOrder
-                = getAxisOrder(transformAxisOrder);
-            (void)transOrder;
-            assert(transOrder == dynamics::EulerJoint::AxisOrder::XYZ);
-
-            Eigen::Vector3s flips = getAxisFlips(eulerAxisOrder);
-
-            // Create a EulerFreeJoint
-            dynamics::EulerFreeJoint* eulerFreeJoint = nullptr;
-            if (parentBody == nullptr)
-            {
-              auto pair = skel->createJointAndBodyNodePair<
-                  dynamics::EulerFreeJoint>();
-              eulerFreeJoint = pair.first;
-              childBody = pair.second;
-            }
-            else
-            {
-              auto pair = parentBody->createChildJointAndBodyNodePair<
-                  dynamics::EulerFreeJoint>();
-              eulerFreeJoint = pair.first;
-              childBody = pair.second;
-            }
-            eulerFreeJoint->setAxisOrder(axisOrder);
-            eulerFreeJoint->setFlipAxisMap(flips);
-            joint = eulerFreeJoint;
-          }
-          else if (first3Linear)
-          {
-            dynamics::EulerJoint::AxisOrder axisOrder
-                = getAxisOrder(eulerAxisOrder);
-            Eigen::Vector3s flips = getAxisFlips(eulerAxisOrder);
-            // assert(!flips[0] && !flips[1] && !flips[2]);
-
-            // Create an EulerJoint
-            dynamics::EulerJoint* eulerJoint = nullptr;
-            if (parentBody == nullptr)
-            {
-              auto pair
-                  = skel->createJointAndBodyNodePair<dynamics::EulerJoint>();
-              eulerJoint = pair.first;
-              childBody = pair.second;
-            }
-            else
-            {
-              auto pair = parentBody->createChildJointAndBodyNodePair<
-                  dynamics::EulerJoint>();
-              eulerJoint = pair.first;
-              childBody = pair.second;
-            }
-            eulerJoint->setFlipAxisMap(flips);
-            eulerJoint->setAxisOrder(axisOrder);
-            joint = eulerJoint;
-          }
-        }
-        if (pinJoint != nullptr)
-        {
-          // Create a RevoluteJoint
-          dynamics::RevoluteJoint* revoluteJoint = nullptr;
-          if (parentBody == nullptr)
-          {
-            auto pair
-                = skel->createJointAndBodyNodePair<dynamics::RevoluteJoint>();
-            revoluteJoint = pair.first;
-            childBody = pair.second;
-          }
-          else
-          {
-            auto pair = parentBody->createChildJointAndBodyNodePair<
-                dynamics::RevoluteJoint>();
-            revoluteJoint = pair.first;
-            childBody = pair.second;
-          }
-          joint = revoluteJoint;
-        }
-        if (universalJoint != nullptr)
-        {
-          // Create a UniversalJoint
-          dynamics::UniversalJoint* universalJoint = nullptr;
-          if (parentBody == nullptr)
-          {
-            auto pair
-                = skel->createJointAndBodyNodePair<dynamics::UniversalJoint>();
-            universalJoint = pair.first;
-            childBody = pair.second;
-          }
-          else
-          {
-            auto pair = parentBody->createChildJointAndBodyNodePair<
-                dynamics::UniversalJoint>();
-            universalJoint = pair.first;
-            childBody = pair.second;
-          }
-          joint = universalJoint;
-        }
-        assert(childBody != nullptr);
-        joint->setName(jointName);
-        std::cout << jointName << std::endl;
-        joint->setTransformFromChildBodyNode(transformFromChild);
-        joint->setTransformFromParentBodyNode(transformFromParent);
-        childBody->setName(name);
-        bodyLookupMap[name] = childBody;
-
-        // Rename the DOFs for each joint
-        tinyxml2::XMLElement* coordinateSet
-            = jointDetail->FirstChildElement("CoordinateSet");
-        if (coordinateSet)
-        {
-          tinyxml2::XMLElement* objects
-              = coordinateSet->FirstChildElement("objects");
-          if (objects)
-          {
-            tinyxml2::XMLElement* coordinateCursor
-                = objects->FirstChildElement("Coordinate");
-            int i = 0;
-            while (coordinateCursor)
-            {
-              std::string dofName(coordinateCursor->Attribute("name"));
-              double defaultValue
-                  = atof(coordinateCursor->FirstChildElement("default_value")
-                             ->GetText());
-              double defaultSpeedValue = atof(
-                  coordinateCursor->FirstChildElement("default_speed_value")
-                      ->GetText());
-              Eigen::Vector2s range
-                  = readVec2(coordinateCursor->FirstChildElement("range"));
-              bool locked
-                  = std::string(coordinateCursor->FirstChildElement("locked")
-                                    ->GetText())
-                    == "true";
-              bool clamped
-                  = std::string(coordinateCursor->FirstChildElement("clamped")
-                                    ->GetText())
-                    == "true";
-
-              dynamics::DegreeOfFreedom* dof = joint->getDof(i);
-              dof->setName(dofName);
-              dof->setPosition(defaultValue);
-              dof->setVelocity(defaultSpeedValue);
-              if (locked)
-              {
-                // TODO: Just replace with a Weld joint
-                // dof->setVelocityUpperLimit(0);
-                // dof->setVelocityLowerLimit(0);
-              }
-              if (clamped)
-              {
-                dof->setPositionLowerLimit(range(0));
-                dof->setPositionUpperLimit(range(1));
-              }
-
-              i++;
-              coordinateCursor
-                  = coordinateCursor->NextSiblingElement("Coordinate");
-            }
-          }
-        }
+        auto pair = createJoint(
+            skel,
+            parentBody,
+            bodyCursor,
+            jointDetail,
+            transformFromParent,
+            transformFromChild,
+            uri,
+            retriever);
+        childBody = pair.second;
       }
     }
+    double mass = atof(bodyCursor->FirstChildElement("mass")->GetText());
+    Eigen::Vector3s massCenter
+        = readVec3(bodyCursor->FirstChildElement("mass_center"));
+    double inertia_xx
+        = atof(bodyCursor->FirstChildElement("inertia_xx")->GetText());
+    double inertia_yy
+        = atof(bodyCursor->FirstChildElement("inertia_yy")->GetText());
+    double inertia_zz
+        = atof(bodyCursor->FirstChildElement("inertia_zz")->GetText());
+    double inertia_xy
+        = atof(bodyCursor->FirstChildElement("inertia_xy")->GetText());
+    double inertia_xz
+        = atof(bodyCursor->FirstChildElement("inertia_xz")->GetText());
+    double inertia_yz
+        = atof(bodyCursor->FirstChildElement("inertia_yz")->GetText());
+    dynamics::Inertia inertia(
+        mass,
+        massCenter(0),
+        massCenter(1),
+        massCenter(2),
+        inertia_xx,
+        inertia_yy,
+        inertia_zz,
+        inertia_xy,
+        inertia_xz,
+        inertia_yz);
+    childBody->setInertia(inertia);
 
-    tinyxml2::XMLElement* visibleObject
-        = bodyCursor->FirstChildElement("VisibleObject");
-    if (visibleObject && childBody != nullptr)
-    {
-      tinyxml2::XMLElement* geometrySet
-          = visibleObject->FirstChildElement("GeometrySet");
-      if (geometrySet)
-      {
-        tinyxml2::XMLElement* objects
-            = geometrySet->FirstChildElement("objects");
-        if (objects)
-        {
-          tinyxml2::XMLElement* displayGeometryCursor
-              = objects->FirstChildElement("DisplayGeometry");
-          while (displayGeometryCursor)
-          {
-            std::string mesh_file(
-                displayGeometryCursor->FirstChildElement("geometry_file")
-                    ->GetText());
-            Eigen::Vector3s colors
-                = readVec3(displayGeometryCursor->FirstChildElement("color"))
-                  * 0.7;
-            Eigen::Vector6s transformVec = readVec6(
-                displayGeometryCursor->FirstChildElement("transform"));
-            Eigen::Isometry3s transform = Eigen::Isometry3s::Identity();
-            transform.linear() = math::eulerXYZToMatrix(transformVec.head<3>());
-            transform.translation() = transformVec.tail<3>();
-            Eigen::Vector3s scale = readVec3(
-                displayGeometryCursor->FirstChildElement("scale_factors"));
-            double opacity = atof(
-                displayGeometryCursor->FirstChildElement("opacity")->GetText());
-
-            common::Uri meshUri = common::Uri::createFromRelativeUri(
-                uri, "./Geometry/" + mesh_file + ".ply");
-            std::shared_ptr<dynamics::MeshShape> meshShape
-                = std::make_shared<dynamics::MeshShape>(
-                    scale,
-                    dynamics::MeshShape::loadMesh(meshUri, retriever),
-                    meshUri,
-                    retriever);
-
-            dynamics::ShapeNode* meshShapeNode
-                = childBody->createShapeNodeWith<dynamics::VisualAspect>(
-                    meshShape);
-            meshShapeNode->setRelativeTransform(transform);
-
-            dynamics::VisualAspect* meshVisualAspect
-                = meshShapeNode->getVisualAspect();
-            meshVisualAspect->setColor(colors);
-            meshVisualAspect->setAlpha(opacity);
-
-            displayGeometryCursor
-                = displayGeometryCursor->NextSiblingElement("DisplayGeometry");
-          }
-        }
-      }
-    }
+    childBody->setName(name);
+    bodyLookupMap[name] = childBody;
 
     bodyCursor = bodyCursor->NextSiblingElement();
   }
 
+  /*
   std::cout << "Num dofs: " << skel->getNumDofs() << std::endl;
   std::cout << "Num bodies: " << skel->getNumBodyNodes() << std::endl;
+  */
 
   return skel;
+}
+
+struct OpenSimBodyXML;
+
+struct OpenSimJointXML
+{
+  string name;
+  string type;
+  OpenSimBodyXML* parent;
+  OpenSimBodyXML* child;
+  Eigen::Isometry3s fromParent;
+  Eigen::Isometry3s fromChild;
+  tinyxml2::XMLElement* xml;
+  dynamics::BodyNode* parentBody;
+};
+
+struct OpenSimBodyXML
+{
+  string name;
+  OpenSimJointXML* parent;
+  std::vector<OpenSimJointXML*> children;
+  tinyxml2::XMLElement* xml;
+};
+
+//==============================================================================
+void recursiveCreateJoint(
+    dynamics::SkeletonPtr skel,
+    dynamics::BodyNode* parentBody,
+    OpenSimJointXML* joint,
+    const common::Uri& uri,
+    const common::ResourceRetrieverPtr& retriever)
+{
+  (void)skel;
+  (void)parentBody;
+  (void)joint;
+
+  // std::cout << "Building joint: " << joint->name << std::endl;
+
+  tinyxml2::XMLElement* jointNode = joint->xml;
+  tinyxml2::XMLElement* bodyNode = joint->child->xml;
+
+  auto pair = createJoint(
+      skel,
+      parentBody,
+      bodyNode,
+      jointNode,
+      joint->fromParent,
+      joint->fromChild,
+      uri,
+      retriever);
+
+  dynamics::BodyNode* childBody = pair.second;
+
+  double mass = atof(bodyNode->FirstChildElement("mass")->GetText());
+  Eigen::Vector3s massCenter
+      = readVec3(bodyNode->FirstChildElement("mass_center"));
+  Eigen::Vector6s inertia = readVec6(bodyNode->FirstChildElement("inertia"));
+  dynamics::Inertia inertiaObj(
+      mass,
+      massCenter(0),
+      massCenter(1),
+      massCenter(2),
+      inertia(0),
+      inertia(1),
+      inertia(2),
+      inertia(3),
+      inertia(4),
+      inertia(5));
+  childBody->setInertia(inertiaObj);
+
+  // Recurse to the next layer
+  for (OpenSimJointXML* grandChildJoint : joint->child->children)
+  {
+    recursiveCreateJoint(skel, childBody, grandChildJoint, uri, retriever);
+  }
 }
 
 //==============================================================================
@@ -775,37 +1023,12 @@ dynamics::SkeletonPtr OpenSimParser::readOsim30(
   while (bodyCursor)
   {
     std::string name(bodyCursor->Attribute("name"));
-    std::cout << name << std::endl;
+    // std::cout << name << std::endl;
 
     bodyLookupMap["/bodyset/" + name].xml = bodyCursor;
     bodyLookupMap["/bodyset/" + name].parent = nullptr;
     bodyLookupMap["/bodyset/" + name].children.clear();
     bodyLookupMap["/bodyset/" + name].name = name;
-
-    double mass = atof(bodyCursor->FirstChildElement("mass")->GetText());
-    std::cout << "Mass: " << mass << std::endl;
-    Eigen::Vector3s massCenter
-        = readVec3(bodyCursor->FirstChildElement("mass_center"));
-    std::cout << "Mass Center: " << massCenter << std::endl;
-    Eigen::Vector6s inertia
-        = readVec6(bodyCursor->FirstChildElement("inertia"));
-    std::cout << "Inertia: " << inertia << std::endl;
-
-    tinyxml2::XMLElement* attachedGeometry
-        = bodyCursor->FirstChildElement("attached_geometry");
-    if (attachedGeometry)
-    {
-      tinyxml2::XMLElement* meshCursor
-          = attachedGeometry->FirstChildElement("Mesh");
-      while (meshCursor)
-      {
-        std::string mesh_file(
-            meshCursor->FirstChildElement("mesh_file")->GetText());
-        std::cout << "\t" << mesh_file << std::endl;
-
-        meshCursor = meshCursor->NextSiblingElement("Mesh");
-      }
-    }
 
     bodyCursor = bodyCursor->NextSiblingElement();
   }
@@ -855,7 +1078,6 @@ dynamics::SkeletonPtr OpenSimParser::readOsim30(
       else if (name == child_offset_frame)
       {
         childName = parent_body;
-        // TODO: do we want T.inverse() here?
         fromChild = T;
       }
 
@@ -864,6 +1086,7 @@ dynamics::SkeletonPtr OpenSimParser::readOsim30(
 
     OpenSimJointXML& joint = jointLookupMap[name];
     joint.name = name;
+    joint.type = type;
     joint.fromParent = fromParent;
     joint.fromChild = fromChild;
     joint.xml = jointCursor;
@@ -884,42 +1107,6 @@ dynamics::SkeletonPtr OpenSimParser::readOsim30(
     joint.child = &bodyLookupMap[childName];
     bodyLookupMap[childName].parent = &joint;
 
-    if (type == "CustomJoint")
-    {
-      tinyxml2::XMLElement* coordinates
-          = jointCursor->FirstChildElement("coordinates");
-      tinyxml2::XMLElement* coordinatesCursor
-          = coordinates->FirstChildElement("Coordinate");
-      int numDofs = 0;
-      while (coordinatesCursor)
-      {
-        numDofs++;
-        coordinatesCursor = coordinatesCursor->NextSiblingElement();
-      }
-
-      coordinatesCursor = coordinates->FirstChildElement("Coordinate");
-      while (coordinatesCursor)
-      {
-        // std::string name(coordinatesCursor->Attribute("name"));
-        // s_t default_value =
-        // static_cast<s_t>(atof(coordinatesCursor->FirstChildElement("default_value")->GetText()));
-        // bool clamped =
-        // std::string(coordinatesCursor->FirstChildElement("clamped")->GetText())
-        // == "true"; bool locked =
-        // std::string(coordinatesCursor->FirstChildElement("locked")->GetText())
-        // == "true"; Eigen::Vector2s bounds =
-        // readVec2(coordinatesCursor->FirstChildElement("range")); std::cout <<
-        // "\t" << name << " - " << default_value << " - " << clamped << " - "
-        // << locked << "-" << bounds << std::endl;
-        coordinatesCursor = coordinatesCursor->NextSiblingElement();
-      }
-    }
-    else if (type == "PinJoint")
-    {
-    }
-    else if (type == "UniversalJoint")
-    {
-    }
     jointCursor = jointCursor->NextSiblingElement();
   }
 
@@ -943,10 +1130,12 @@ dynamics::SkeletonPtr OpenSimParser::readOsim30(
 
   dynamics::SkeletonPtr skel = dynamics::Skeleton::create();
   root->parentBody = nullptr;
-  buildJoint(skel, root);
+  recursiveCreateJoint(skel, nullptr, root, uri, retriever);
 
+  /*
   std::cout << "Num dofs: " << skel->getNumDofs() << std::endl;
   std::cout << "Num bodies: " << skel->getNumBodyNodes() << std::endl;
+  */
 
   return skel;
 }
