@@ -802,7 +802,7 @@ dynamics::SkeletonPtr OpenSimParser::readOsim40(
 
     tinyxml2::XMLElement* joint = bodyCursor->FirstChildElement("Joint");
 
-    dynamics::BodyNode* childBody;
+    dynamics::BodyNode* childBody = nullptr;
 
     if (joint)
     {
