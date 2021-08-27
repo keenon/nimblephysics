@@ -161,7 +161,7 @@ Eigen::Vector3s getAxisFlips(std::vector<Eigen::Vector3s> axisList)
 }
 
 //==============================================================================
-dynamics::SkeletonPtr OpenSimParser::parseOsim(
+OpenSimFile OpenSimParser::parseOsim(
     const common::Uri& uri, const common::ResourceRetrieverPtr& nullOrRetriever)
 {
   const common::ResourceRetrieverPtr retriever
@@ -753,7 +753,7 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
 }
 
 //==============================================================================
-dynamics::SkeletonPtr OpenSimParser::readOsim40(
+OpenSimFile OpenSimParser::readOsim40(
     const common::Uri& uri,
     tinyxml2::XMLElement* docElement,
     const common::ResourceRetrieverPtr& retriever)
@@ -764,7 +764,9 @@ dynamics::SkeletonPtr OpenSimParser::readOsim40(
     dterr << "OpenSim file[" << uri.toString()
           << "] does not contain <Model> as the child of the root "
              "<OpenSimDocument> element.\n";
-    return nullptr;
+    OpenSimFile file;
+    file.skeleton = nullptr;
+    return file;
   }
 
   tinyxml2::XMLElement* bodySet = modelElement->FirstChildElement("BodySet");
@@ -773,7 +775,9 @@ dynamics::SkeletonPtr OpenSimParser::readOsim40(
   {
     dterr << "OpenSim file[" << uri.toString()
           << "] missing <BodySet> group.\n";
-    return nullptr;
+    OpenSimFile file;
+    file.skeleton = nullptr;
+    return file;
   }
 
   //--------------------------------------------------------------------------
@@ -910,7 +914,9 @@ dynamics::SkeletonPtr OpenSimParser::readOsim40(
   std::cout << "Num bodies: " << skel->getNumBodyNodes() << std::endl;
   */
 
-  return skel;
+  OpenSimFile file;
+  file.skeleton = skel;
+  return file;
 }
 
 struct OpenSimBodyXML;
@@ -989,7 +995,7 @@ void recursiveCreateJoint(
 }
 
 //==============================================================================
-dynamics::SkeletonPtr OpenSimParser::readOsim30(
+OpenSimFile OpenSimParser::readOsim30(
     const common::Uri& uri,
     tinyxml2::XMLElement* docElement,
     const common::ResourceRetrieverPtr& retriever)
@@ -1001,7 +1007,9 @@ dynamics::SkeletonPtr OpenSimParser::readOsim30(
     dterr << "OpenSim file[" << uri.toString()
           << "] does not contain <Model> as the child of the root "
              "<OpenSimDocument> element.\n";
-    return nullptr;
+    OpenSimFile file;
+    file.skeleton = nullptr;
+    return file;
   }
 
   tinyxml2::XMLElement* bodySet = modelElement->FirstChildElement("BodySet");
@@ -1137,7 +1145,9 @@ dynamics::SkeletonPtr OpenSimParser::readOsim30(
   std::cout << "Num bodies: " << skel->getNumBodyNodes() << std::endl;
   */
 
-  return skel;
+  OpenSimFile file;
+  file.skeleton = skel;
+  return file;
 }
 
 }; // namespace biomechanics

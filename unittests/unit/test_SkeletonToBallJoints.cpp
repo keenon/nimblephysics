@@ -24,7 +24,7 @@ using namespace realtime;
 TEST(SkeletonConverter, CONVERT_OSIM)
 {
   std::shared_ptr<dynamics::Skeleton> osim = OpenSimParser::parseOsim(
-      "dart://sample/osim/Rajagopal2015/Rajagopal2015.osim");
+      "dart://sample/osim/Rajagopal2015/Rajagopal2015.osim").skeleton;
   osim->getBodyNode("tibia_l")->setScale(1.2);
   std::shared_ptr<dynamics::Skeleton> converted
       = osim->convertSkeletonToBallJoints();

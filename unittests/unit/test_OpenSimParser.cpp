@@ -18,8 +18,9 @@ using namespace realtime;
 #ifdef ALL_TESTS
 TEST(OpenSimParser, RAJAGOPAL_v3)
 {
-  std::shared_ptr<dynamics::Skeleton> skel = OpenSimParser::parseOsim(
+  OpenSimFile file = OpenSimParser::parseOsim(
       "dart://sample/osim/Rajagopal2015_v3_scaled/Rajagopal_scaled.osim");
+  std::shared_ptr<dynamics::Skeleton> skel = file.skeleton;
   (void)skel;
   EXPECT_TRUE(skel->getNumDofs() > 0);
   std::shared_ptr<simulation::World> world = simulation::World::create();
