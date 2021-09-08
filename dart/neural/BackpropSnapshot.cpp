@@ -8,6 +8,7 @@
 #include "dart/dynamics/DegreeOfFreedom.hpp"
 #include "dart/dynamics/Skeleton.hpp"
 #include "dart/math/Geometry.hpp"
+#include "dart/math/FiniteDifference.hpp"
 #include "dart/neural/ConstrainedGroupGradientMatrices.hpp"
 #include "dart/neural/DifferentiableContactConstraint.hpp"
 #include "dart/neural/RestorableSnapshot.hpp"
@@ -940,11 +941,7 @@ Eigen::VectorXs BackpropSnapshot::scratch(simulation::WorldPtr world)
 Eigen::MatrixXs BackpropSnapshot::getScratchFiniteDifference(
     simulation::WorldPtr world, WithRespectTo* wrt, bool useRidders)
 {
-  if (useRidders)
-    return getScratchFiniteDifferenceRidders(world, wrt);
-
   RestorableSnapshot snapshot(world);
-
   bool oldGradientEnabled = world->getConstraintSolver()->getGradientEnabled();
   bool oldPenetrationCorrectionEnabled
       = world->getPenetrationCorrectionEnabled();
@@ -955,130 +952,28 @@ Eigen::MatrixXs BackpropSnapshot::getScratchFiniteDifference(
   world->setVelocities(mPreStepVelocity);
   world->setControlForces(mPreStepTorques);
   world->setCachedLCPSolution(mPreStepLCPCache);
-
+  Eigen::VectorXs originalWrt = wrt->get(world.get());
   Eigen::VectorXs original = scratch(world);
+  Eigen::MatrixXs result(original.size(), wrt->dim(world.get()));
 
-  int worldDim = wrt->dim(world.get());
-  Eigen::MatrixXs J = Eigen::MatrixXs::Zero(original.size(), worldDim);
-
-  Eigen::VectorXs preStepWrt = wrt->get(world.get());
-
-  s_t EPSILON = 1e-6;
-  for (std::size_t i = 0; i < worldDim; i++)
-  {
-    Eigen::VectorXs tweakedWrt = preStepWrt;
-    tweakedWrt(i) += EPSILON;
-    wrt->set(world.get(), tweakedWrt);
-    Eigen::VectorXs perturbedPos = scratch(world);
-
-    tweakedWrt = preStepWrt;
-    tweakedWrt(i) -= EPSILON;
-    wrt->set(world.get(), tweakedWrt);
-    Eigen::VectorXs perturbedNeg = scratch(world);
-
-    Eigen::VectorXs change = (perturbedPos - perturbedNeg) / (2 * EPSILON);
-    J.col(i).noalias() = change;
-  }
-
+  s_t eps = useRidders ? 1e-3 : 1e-6;
+  finiteDifference(
+    [&](/* in*/ s_t eps,
+        /* in*/ int dof,
+        /*out*/ Eigen::VectorXs& perturbed) {
+      Eigen::VectorXs tweakedWrt = originalWrt;
+      tweakedWrt(dof) += eps;
+      wrt->set(world.get(), tweakedWrt);
+      perturbed = scratch(world);
+      return true;
+    },
+    result,
+    eps,
+    useRidders);
   snapshot.restore();
   world->getConstraintSolver()->setGradientEnabled(oldGradientEnabled);
   world->setPenetrationCorrectionEnabled(oldPenetrationCorrectionEnabled);
-
-  return J;
-}
-
-Eigen::MatrixXs BackpropSnapshot::getScratchFiniteDifferenceRidders(
-    simulation::WorldPtr world, WithRespectTo* wrt)
-{
-  RestorableSnapshot snapshot(world);
-
-  bool oldGradientEnabled = world->getConstraintSolver()->getGradientEnabled();
-  bool oldPenetrationCorrectionEnabled
-      = world->getPenetrationCorrectionEnabled();
-  world->getConstraintSolver()->setGradientEnabled(false);
-  world->setPenetrationCorrectionEnabled(false);
-
-  const s_t originalStepSize = 1e-3;
-  const s_t con = 1.4, con2 = (con * con);
-  const s_t safeThreshold = 2.0;
-  const int tabSize = 10;
-
-  Eigen::VectorXs original = scratch(world);
-
-  int worldDim = wrt->dim(world.get());
-  Eigen::MatrixXs J = Eigen::MatrixXs::Zero(original.size(), worldDim);
-
-  for (std::size_t i = 0; i < worldDim; i++)
-  {
-    s_t stepSize = originalStepSize;
-    s_t bestError = std::numeric_limits<s_t>::max();
-
-    // Neville tableau of finite difference results
-    std::array<std::array<Eigen::VectorXs, tabSize>, tabSize> tab;
-
-    Eigen::VectorXs perturbed = original;
-    perturbed(i) += stepSize;
-    wrt->set(world.get(), perturbed);
-    Eigen::VectorXs perturbedPlus = scratch(world);
-
-    perturbed = original;
-    perturbed(i) -= stepSize;
-    wrt->set(world.get(), perturbed);
-    Eigen::VectorXs perturbedMinus = scratch(world);
-
-    tab[0][0] = (perturbedPlus - perturbedMinus) / (2 * stepSize);
-
-    // Iterate over smaller and smaller step sizes
-    for (int iTab = 1; iTab < tabSize; iTab++)
-    {
-      stepSize /= con;
-
-      perturbed = original;
-      perturbed(i) += stepSize;
-      wrt->set(world.get(), perturbed);
-      perturbedPlus = scratch(world);
-      perturbed = original;
-      perturbed(i) -= stepSize;
-      wrt->set(world.get(), perturbed);
-      perturbedMinus = scratch(world);
-
-      tab[0][iTab] = (perturbedPlus - perturbedMinus) / (2 * stepSize);
-
-      s_t fac = con2;
-      // Compute extrapolations of increasing orders, requiring no new
-      // evaluations
-      for (int jTab = 1; jTab <= iTab; jTab++)
-      {
-        tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
-                          / (fac - 1.0);
-        fac = con2 * fac;
-        s_t currError = max(
-            (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
-            (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
-                .array()
-                .abs()
-                .maxCoeff());
-        if (currError < bestError)
-        {
-          bestError = currError;
-          J.col(i).noalias() = tab[jTab][iTab];
-        }
-      }
-
-      // If higher order is worse by a significant factor, quit early.
-      if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
-          >= safeThreshold * bestError)
-      {
-        break;
-      }
-    }
-  }
-
-  snapshot.restore();
-  world->getConstraintSolver()->setGradientEnabled(oldGradientEnabled);
-  world->setPenetrationCorrectionEnabled(oldPenetrationCorrectionEnabled);
-
-  return J;
+  return result;
 }
 
 //==============================================================================
@@ -2357,1390 +2252,248 @@ void BackpropSnapshot::benchmarkJacobians(
 Eigen::MatrixXs BackpropSnapshot::finiteDifferenceVelVelJacobian(
     WorldPtr world, bool useRidders)
 {
-  if (useRidders)
-    return finiteDifferenceRiddersVelVelJacobian(world);
-
   RestorableSnapshot snapshot(world);
-
-  Eigen::MatrixXs J(mNumDOFs, mNumDOFs);
-
   bool oldGradientEnabled = world->getConstraintSolver()->getGradientEnabled();
   world->getConstraintSolver()->setGradientEnabled(true);
 
-  world->setPositions(mPreStepPosition);
-  world->setVelocities(mPreStepVelocity);
-  world->setControlForces(mPreStepTorques);
-  world->setCachedLCPSolution(mPreStepLCPCache);
-  world->step(false);
-
-  Eigen::VectorXs originalVel = world->getVelocities();
-
-  s_t EPSILON = 1e-7;
-  for (std::size_t i = 0; i < world->getNumDofs(); i++)
+  Eigen::MatrixXs result(mNumDOFs, mNumDOFs);
+  s_t eps = useRidders ? 1e-4 : 1e-7;
+  try
   {
+    finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        world->setPositions(mPreStepPosition);
+        world->setControlForces(mPreStepTorques);
+        world->setCachedLCPSolution(mPreStepLCPCache);
+        Eigen::VectorXs tweakedVel = Eigen::VectorXs(mPreStepVelocity);
+        tweakedVel(dof) += eps;
+        world->setVelocities(tweakedVel);
+        BackpropSnapshotPtr snapshot = neural::forwardPass(world, true);
+        perturbed = snapshot->getPostStepVelocity();
+        return (!areResultsStandardized() || snapshot->areResultsStandardized())
+              && snapshot->getNumClamping() == getNumClamping()
+              && snapshot->getNumUpperBound() == getNumUpperBound();
+      },
+      result,
+      eps,
+      useRidders);
     snapshot.restore();
-
-    Eigen::VectorXs velPos = world->getVelocities();
-    Eigen::VectorXs velNeg = world->getVelocities();
-
-    s_t epsPos = EPSILON;
-    while (true)
-    {
-      world->setPositions(mPreStepPosition);
-      world->setControlForces(mPreStepTorques);
-      world->setCachedLCPSolution(mPreStepLCPCache);
-      Eigen::VectorXs tweakedVel = Eigen::VectorXs(mPreStepVelocity);
-      tweakedVel(i) += epsPos;
-      world->setVelocities(tweakedVel);
-      std::shared_ptr<neural::BackpropSnapshot> snapshot
-          = neural::forwardPass(world, true);
-
-      if ((!areResultsStandardized() || snapshot->areResultsStandardized())
-          && snapshot->getNumClamping() == getNumClamping()
-          && snapshot->getNumUpperBound() == getNumUpperBound())
-      {
-        velPos = snapshot->getPostStepVelocity();
-        break;
-      }
-      epsPos *= 0.5;
-
-      assert(abs(epsPos) > 1e-20);
-    }
-
-    s_t epsNeg = EPSILON;
-    while (true)
-    {
-      world->setPositions(mPreStepPosition);
-      world->setControlForces(mPreStepTorques);
-      world->setCachedLCPSolution(mPreStepLCPCache);
-      Eigen::VectorXs tweakedVel = Eigen::VectorXs(mPreStepVelocity);
-      tweakedVel(i) -= epsNeg;
-      world->setVelocities(tweakedVel);
-      std::shared_ptr<neural::BackpropSnapshot> snapshot
-          = neural::forwardPass(world, true);
-
-      if ((!areResultsStandardized() || snapshot->areResultsStandardized())
-          && snapshot->getNumClamping() == getNumClamping()
-          && snapshot->getNumUpperBound() == getNumUpperBound())
-      {
-        velNeg = snapshot->getPostStepVelocity();
-        break;
-      }
-      epsNeg *= 0.5;
-
-      assert(abs(epsNeg) > 1e-20);
-    }
-
-    Eigen::VectorXs velChange = (velPos - velNeg) / (epsPos + epsNeg);
-
-    // TODO: remove me
-    /*
-#ifndef NDEBUG
-    Eigen::VectorXs identityCol = Eigen::VectorXs::Zero(velChange.size());
-    identityCol(i) = 1.0;
-    // Sanity check
-    if ((velChange - identityCol).squaredNorm() > 1e-10)
-    {
-      // Something is screwy here, let's investigate
-      dynamics::DegreeOfFreedom* dof = world->getDofs()[i];
-      std::cout << "Error on perturbing joint vel: " << dof->getName()
-                << std::endl;
-
-      snapshot.restore();
-      world->setPositions(mPreStepPosition);
-      world->setControlForces(mPreStepTorques);
-      world->setCachedLCPSolution(mPreStepLCPCache);
-      tweakedVel = Eigen::VectorXs::Zero(mPreStepVelocity);
-      tweakedVel(i) -= EPSILON;
-      world->setVelocities(tweakedVel);
-      // Opportunity to put a breakpoint here
-      world->step(false);
-    }
-#endif
-    */
-    // TODO: </remove>
-
-    J.col(i).noalias() = velChange;
+    world->getConstraintSolver()->setGradientEnabled(oldGradientEnabled);
+    return result;
   }
-
-  snapshot.restore();
-  world->getConstraintSolver()->setGradientEnabled(oldGradientEnabled);
-
-  return J;
-}
-
-//==============================================================================
-Eigen::MatrixXs BackpropSnapshot::finiteDifferenceRiddersVelVelJacobian(
-    WorldPtr world)
-{
-  RestorableSnapshot snapshot(world);
-
-  Eigen::MatrixXs J(mNumDOFs, mNumDOFs);
-
-  bool oldGradientEnabled = world->getConstraintSolver()->getGradientEnabled();
-  world->getConstraintSolver()->setGradientEnabled(true);
-
-  world->setPositions(mPreStepPosition);
-  world->setVelocities(mPreStepVelocity);
-  world->setControlForces(mPreStepTorques);
-  world->setCachedLCPSolution(mPreStepLCPCache);
-  world->step(false);
-
-  s_t originalStepSize = 1e-4;
-  const s_t con = 1.4, con2 = (con * con);
-  const s_t safeThreshold = 2.0;
-  const int tabSize = 10;
-
-  for (std::size_t i = 0; i < world->getNumDofs(); i++)
+  catch(const std::exception& e)
   {
-    // Neville tableau of finite difference results
-    std::array<std::array<Eigen::VectorXs, tabSize>, tabSize> tab;
-
-    snapshot.restore();
-
-    Eigen::VectorXs velPlus;
-    Eigen::VectorXs velMinus;
-
-    // Find largest original step size which doesn't change numClamping
-    while (true)
-    {
-      world->setPositions(mPreStepPosition);
-      world->setControlForces(mPreStepTorques);
-      world->setCachedLCPSolution(mPreStepLCPCache);
-      Eigen::VectorXs perturbedPlus = Eigen::VectorXs(mPreStepVelocity);
-      perturbedPlus(i) += originalStepSize;
-      world->setVelocities(perturbedPlus);
-      std::shared_ptr<neural::BackpropSnapshot> snapshotPlus
-          = neural::forwardPass(world, true);
-      world->setPositions(mPreStepPosition);
-      world->setControlForces(mPreStepTorques);
-      world->setCachedLCPSolution(mPreStepLCPCache);
-      Eigen::VectorXs perturbedMinus = Eigen::VectorXs(mPreStepVelocity);
-      perturbedMinus(i) -= originalStepSize;
-      world->setVelocities(perturbedMinus);
-      std::shared_ptr<neural::BackpropSnapshot> snapshotMinus
-          = neural::forwardPass(world, true);
-
-      if ((!areResultsStandardized() || snapshotPlus->areResultsStandardized())
-          && snapshotPlus->getNumClamping() == getNumClamping()
-          && snapshotPlus->getNumUpperBound() == getNumUpperBound()
-          && (!areResultsStandardized()
-              || snapshotMinus->areResultsStandardized())
-          && snapshotMinus->getNumClamping() == getNumClamping()
-          && snapshotMinus->getNumUpperBound() == getNumUpperBound())
-      {
-        velPlus = snapshotPlus->getPostStepVelocity();
-        velMinus = snapshotMinus->getPostStepVelocity();
-        break;
-      }
-      originalStepSize *= 0.5;
-
-      assert(abs(originalStepSize) > 1e-20);
-    }
-    tab[0][0] = (velPlus - velMinus) / (2 * originalStepSize);
-
-    s_t stepSize = originalStepSize;
-    s_t bestError = std::numeric_limits<s_t>::max();
-
-    // Iterate over smaller and smaller step sizes
-    for (int iTab = 1; iTab < tabSize; iTab++)
-    {
-      stepSize /= con;
-
-      world->setPositions(mPreStepPosition);
-      world->setControlForces(mPreStepTorques);
-      world->setCachedLCPSolution(mPreStepLCPCache);
-      Eigen::VectorXs perturbedPlus = Eigen::VectorXs(mPreStepVelocity);
-      perturbedPlus(i) += stepSize;
-      world->setVelocities(perturbedPlus);
-      std::shared_ptr<neural::BackpropSnapshot> snapshotPlus
-          = neural::forwardPass(world, true);
-      velPlus = snapshotPlus->getPostStepVelocity();
-      if (!((!areResultsStandardized()
-             || snapshotPlus->areResultsStandardized())
-            && snapshotPlus->getNumClamping() == getNumClamping()
-            && snapshotPlus->getNumUpperBound() == getNumUpperBound()))
-      {
-        assert(false && "Lowering EPS in finiteDifferenceRiddersVelVelJacobian() "
-                      "caused numClamping() or numUpperBound() to change.");
-      }
-      world->setPositions(mPreStepPosition);
-      world->setControlForces(mPreStepTorques);
-      world->setCachedLCPSolution(mPreStepLCPCache);
-      Eigen::VectorXs perturbedMinus = Eigen::VectorXs(mPreStepVelocity);
-      perturbedMinus(i) -= stepSize;
-      world->setVelocities(perturbedMinus);
-      std::shared_ptr<neural::BackpropSnapshot> snapshotMinus
-          = neural::forwardPass(world, true);
-      velMinus = snapshotMinus->getPostStepVelocity();
-      if (!((!areResultsStandardized()
-             || snapshotMinus->areResultsStandardized())
-            && snapshotMinus->getNumClamping() == getNumClamping()
-            && snapshotMinus->getNumUpperBound() == getNumUpperBound()))
-      {
-        assert(false && "Lowering EPS in finiteDifferenceRiddersVelVelJacobian() "
-                      "caused numClamping() or numUpperBound() to change.");
-      }
-
-      tab[0][iTab] = (velPlus - velMinus) / (2 * stepSize);
-
-      s_t fac = con2;
-      // Compute extrapolations of increasing orders, requiring no new
-      // evaluations
-      for (int jTab = 1; jTab <= iTab; jTab++)
-      {
-        tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
-                          / (fac - 1.0);
-        fac = con2 * fac;
-        s_t currError = max(
-            (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
-            (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
-                .array()
-                .abs()
-                .maxCoeff());
-        if (currError < bestError)
-        {
-          bestError = currError;
-          J.col(i).noalias() = tab[jTab][iTab];
-        }
-      }
-
-      // If higher order is worse by a significant factor, quit early.
-      if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
-          >= safeThreshold * bestError)
-      {
-        break;
-      }
-    }
+    std::cout << "Error in finiteDifferenceVelVelJacobian(): " 
+        << e.what() << std::endl;
+    printReplicationInstructions(world);
+    throw e;
   }
-
-  snapshot.restore();
-  world->getConstraintSolver()->setGradientEnabled(oldGradientEnabled);
-
-  return J;
 }
 
 //==============================================================================
 Eigen::MatrixXs BackpropSnapshot::finiteDifferencePosVelJacobian(
     simulation::WorldPtr world, bool useRidders)
 {
-  if (useRidders)
-    return finiteDifferenceRiddersPosVelJacobian(world);
-
   RestorableSnapshot snapshot(world);
-
-  Eigen::MatrixXs J(mNumDOFs, mNumDOFs);
-
   bool oldGradientEnabled = world->getConstraintSolver()->getGradientEnabled();
   world->getConstraintSolver()->setGradientEnabled(true);
   bool oldPenetrationCorrectionEnabled
       = world->getPenetrationCorrectionEnabled();
   world->setPenetrationCorrectionEnabled(false);
 
-  world->setPositions(mPreStepPosition);
-  world->setVelocities(mPreStepVelocity);
-  world->setControlForces(mPreStepTorques);
-  world->setCachedLCPSolution(mPreStepLCPCache);
-
-  world->step(false);
-
-  Eigen::VectorXs originalVel = world->getVelocities();
-
-  s_t EPSILON = 1e-7;
-  for (std::size_t i = 0; i < world->getNumDofs(); i++)
-  {
-    snapshot.restore();
-
-    Eigen::VectorXs perturbedVelPos = world->getVelocities();
-    Eigen::VectorXs perturbedVelNeg = world->getVelocities();
-
-    s_t epsPos = EPSILON;
-    while (true)
-    {
-      // Get predicted next vel
-      world->setControlForces(mPreStepTorques);
-      world->setCachedLCPSolution(mPreStepLCPCache);
-      world->setVelocities(mPreStepVelocity);
-      Eigen::VectorXs tweakedPos = Eigen::VectorXs(mPreStepPosition);
-      tweakedPos(i) += epsPos;
-      world->setPositions(tweakedPos);
-
-      BackpropSnapshotPtr ptr = neural::forwardPass(world, true);
-      if ((!areResultsStandardized() || ptr->areResultsStandardized())
-          && ptr->getNumClamping() == getNumClamping()
-          && ptr->getNumUpperBound() == getNumUpperBound())
-      {
-        perturbedVelPos = ptr->getPostStepVelocity();
-        break;
-      }
-      epsPos *= 0.5;
-
-      if (abs(epsPos) <= 1e-20)
-      {
-        std::cout << "Found a non-differentiabe point in getting pos-vel Jac:"
-                  << std::endl;
-        printReplicationInstructions(world);
-      }
-      assert(abs(epsPos) > 1e-20);
-    }
-
-    s_t epsNeg = EPSILON;
-    while (true)
-    {
-      // Get predicted next vel
-      world->setControlForces(mPreStepTorques);
-      world->setCachedLCPSolution(mPreStepLCPCache);
-      world->setVelocities(mPreStepVelocity);
-      Eigen::VectorXs tweakedPos = Eigen::VectorXs(mPreStepPosition);
-      tweakedPos(i) -= epsNeg;
-      world->setPositions(tweakedPos);
-
-      BackpropSnapshotPtr ptr = neural::forwardPass(world, true);
-      if ((!areResultsStandardized() || ptr->areResultsStandardized())
-          && ptr->getNumClamping() == getNumClamping()
-          && ptr->getNumUpperBound() == getNumUpperBound())
-      {
-        perturbedVelNeg = ptr->getPostStepVelocity();
-        break;
-      }
-      epsNeg *= 0.5;
-
-      if (abs(epsNeg) <= 1e-20)
-      {
-        std::cout << "Found a non-differentiabe point in getting pos-vel Jac:"
-                  << std::endl;
-        printReplicationInstructions(world);
-      }
-      assert(abs(epsNeg) > 1e-20);
-    }
-
-    J.col(i).noalias()
-        = (perturbedVelPos - perturbedVelNeg) / (epsPos + epsNeg);
-  }
-
-  snapshot.restore();
-  world->getConstraintSolver()->setGradientEnabled(oldGradientEnabled);
-  world->setPenetrationCorrectionEnabled(oldPenetrationCorrectionEnabled);
-
-  return J;
-}
-
-//==============================================================================
-Eigen::MatrixXs BackpropSnapshot::finiteDifferenceRiddersPosVelJacobian(
-    simulation::WorldPtr world)
-{
-  RestorableSnapshot snapshot(world);
-
-  Eigen::MatrixXs J(mNumDOFs, mNumDOFs);
-
-  bool oldGradientEnabled = world->getConstraintSolver()->getGradientEnabled();
-  world->getConstraintSolver()->setGradientEnabled(true);
-  bool oldPenetrationCorrectionEnabled
-      = world->getPenetrationCorrectionEnabled();
-  world->setPenetrationCorrectionEnabled(false);
-
-  world->setPositions(mPreStepPosition);
-  world->setVelocities(mPreStepVelocity);
-  world->setControlForces(mPreStepTorques);
-  world->setCachedLCPSolution(mPreStepLCPCache);
-  world->step(false);
-
+  Eigen::MatrixXs result(mNumDOFs, mNumDOFs);
 #ifdef DART_USE_ARBITRARY_PRECISION
-  s_t originalStepSize = 5e-6;
+  s_t eps = useRidders ? 5e-6 : 1e-7;
 #else
-  s_t originalStepSize = 5e-3;
+  s_t eps = useRidders ? 5e-3 : 1e-7;
 #endif
-  const s_t con = 1.4, con2 = (con * con);
-  const s_t safeThreshold = 2.0;
-  const int tabSize = 15;
-
-  for (std::size_t i = 0; i < world->getNumDofs(); i++)
+  try
   {
-    // Neville tableau of finite difference results
-    std::array<std::array<Eigen::VectorXs, tabSize>, tabSize> tab;
-
+    finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        world->setControlForces(mPreStepTorques);
+        world->setCachedLCPSolution(mPreStepLCPCache);
+        world->setVelocities(mPreStepVelocity);
+        Eigen::VectorXs tweakedPos = Eigen::VectorXs(mPreStepPosition);
+        tweakedPos(dof) += eps;
+        world->setPositions(tweakedPos);
+        BackpropSnapshotPtr snapshot = neural::forwardPass(world, true);
+        perturbed = snapshot->getPostStepVelocity();
+        return (!areResultsStandardized() || snapshot->areResultsStandardized())
+              && snapshot->getNumContacts() == getNumContacts()
+              && snapshot->getNumClamping() == getNumClamping()
+              && snapshot->getNumUpperBound() == getNumUpperBound();
+      },
+      result,
+      eps,
+      useRidders);
     snapshot.restore();
-
-    Eigen::VectorXs velPlus;
-    Eigen::VectorXs velMinus;
-
-    // Find largest original step size which doesn't change numClamping
-    while (true)
-    {
-      world->setControlForces(mPreStepTorques);
-      world->setCachedLCPSolution(mPreStepLCPCache);
-      world->setVelocities(mPreStepVelocity);
-      Eigen::VectorXs perturbedPlus = Eigen::VectorXs(mPreStepPosition);
-      perturbedPlus(i) += originalStepSize;
-      world->setPositions(perturbedPlus);
-      std::shared_ptr<neural::BackpropSnapshot> snapshotPlus
-          = neural::forwardPass(world, true);
-      world->setControlForces(mPreStepTorques);
-      world->setCachedLCPSolution(mPreStepLCPCache);
-      world->setVelocities(mPreStepVelocity);
-      Eigen::VectorXs perturbedMinus = Eigen::VectorXs(mPreStepPosition);
-      perturbedMinus(i) -= originalStepSize;
-      world->setPositions(perturbedMinus);
-      std::shared_ptr<neural::BackpropSnapshot> snapshotMinus
-          = neural::forwardPass(world, true);
-
-      if ((!areResultsStandardized() || snapshotPlus->areResultsStandardized())
-          && snapshotPlus->getNumContacts() == getNumContacts()
-          && snapshotPlus->getNumClamping() == getNumClamping()
-          && snapshotPlus->getNumUpperBound() == getNumUpperBound()
-          && (!areResultsStandardized()
-              || snapshotMinus->areResultsStandardized())
-          && snapshotMinus->getNumContacts() == getNumContacts()
-          && snapshotMinus->getNumClamping() == getNumClamping()
-          && snapshotMinus->getNumUpperBound() == getNumUpperBound())
-      {
-        velPlus = snapshotPlus->getPostStepVelocity();
-        velMinus = snapshotMinus->getPostStepVelocity();
-        break;
-      }
-      originalStepSize *= 0.5;
-
-      if (abs(originalStepSize) <= 1e-20)
-      {
-        std::cout << "Found a non-differentiabe point in getting pos-vel Jac:"
-                  << std::endl;
-        printReplicationInstructions(world);
-      }
-      assert(abs(originalStepSize) > 1e-20);
-    }
-
-    tab[0][0] = (velPlus - velMinus) / (2 * originalStepSize);
-
-    s_t stepSize = originalStepSize;
-    s_t bestError = std::numeric_limits<s_t>::max();
-
-    // Iterate over smaller and smaller step sizes
-    for (int iTab = 1; iTab < tabSize; iTab++)
-    {
-      stepSize /= con;
-
-      world->setControlForces(mPreStepTorques);
-      world->setCachedLCPSolution(mPreStepLCPCache);
-      world->setVelocities(mPreStepVelocity);
-      Eigen::VectorXs perturbedPlus = Eigen::VectorXs(mPreStepPosition);
-      perturbedPlus(i) += stepSize;
-      world->setPositions(perturbedPlus);
-      std::shared_ptr<neural::BackpropSnapshot> snapshotPlus
-          = neural::forwardPass(world, true);
-      velPlus = snapshotPlus->getPostStepVelocity();
-      if (!((!areResultsStandardized()
-             || snapshotPlus->areResultsStandardized())
-            && snapshotPlus->getNumContacts() == getNumContacts()
-            && snapshotPlus->getNumClamping() == getNumClamping()
-            && snapshotPlus->getNumUpperBound() == getNumUpperBound()))
-      {
-        assert(false && "Lowering EPS in finiteDifferenceRiddersPosVelJacobian() "
-                      "caused numClamping() or numUpperBound() to change.");
-      }
-      world->setControlForces(mPreStepTorques);
-      world->setCachedLCPSolution(mPreStepLCPCache);
-      world->setVelocities(mPreStepVelocity);
-      Eigen::VectorXs perturbedMinus = Eigen::VectorXs(mPreStepPosition);
-      perturbedMinus(i) -= stepSize;
-      world->setPositions(perturbedMinus);
-      std::shared_ptr<neural::BackpropSnapshot> snapshotMinus
-          = neural::forwardPass(world, true);
-      velMinus = snapshotMinus->getPostStepVelocity();
-      if (!((!areResultsStandardized()
-             || snapshotMinus->areResultsStandardized())
-            && snapshotMinus->getNumClamping() == getNumClamping()
-            && snapshotMinus->getNumUpperBound() == getNumUpperBound()))
-      {
-        assert(false && "Lowering EPS in finiteDifferenceRiddersPosVelJacobian() "
-                      "caused numClamping() or numUpperBound() to change.");
-      }
-
-      tab[0][iTab] = (velPlus - velMinus) / (2 * stepSize);
-
-      s_t fac = con2;
-      // Compute extrapolations of increasing orders, requiring no new
-      // evaluations
-      for (int jTab = 1; jTab <= iTab; jTab++)
-      {
-        tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
-                          / (fac - 1.0);
-        fac = con2 * fac;
-        s_t currError = max(
-            (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
-            (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
-                .array()
-                .abs()
-                .maxCoeff());
-        if (currError < bestError)
-        {
-          bestError = currError;
-          J.col(i).noalias() = tab[jTab][iTab];
-        }
-      }
-
-      // If higher order is worse by a significant factor, quit early.
-      if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
-          >= safeThreshold * bestError)
-      {
-        break;
-      }
-    }
+    world->getConstraintSolver()->setGradientEnabled(oldGradientEnabled);
+    world->setPenetrationCorrectionEnabled(oldPenetrationCorrectionEnabled);
+    return result;
   }
-
-  snapshot.restore();
-  world->getConstraintSolver()->setGradientEnabled(oldGradientEnabled);
-  world->setPenetrationCorrectionEnabled(oldPenetrationCorrectionEnabled);
-
-  return J;
+  catch(const std::exception& e)
+  {
+    std::cout << "Error in finiteDifferencePosVelJacobian(): " 
+        << e.what() << std::endl;
+    printReplicationInstructions(world);
+    throw e;
+  }
 }
 
 //==============================================================================
 Eigen::MatrixXs BackpropSnapshot::finiteDifferenceForceVelJacobian(
     WorldPtr world, bool useRidders)
 {
-  if (useRidders)
-    return finiteDifferenceRiddersForceVelJacobian(world);
-
   RestorableSnapshot snapshot(world);
-
-  Eigen::MatrixXs J(mNumDOFs, mNumDOFs);
-
   bool oldGradientEnabled = world->getConstraintSolver()->getGradientEnabled();
   world->getConstraintSolver()->setGradientEnabled(true);
 
-  world->setPositions(mPreStepPosition);
-  world->setVelocities(mPreStepVelocity);
-  world->setControlForces(mPreStepTorques);
-  world->setCachedLCPSolution(mPreStepLCPCache);
-  world->step(false);
-
-  Eigen::VectorXs originalForces = world->getControlForces();
-  Eigen::VectorXs originalVel = world->getVelocities();
-
-  s_t EPSILON = 1e-7;
-  for (std::size_t i = 0; i < world->getNumDofs(); i++)
+  Eigen::MatrixXs result(mNumDOFs, mNumDOFs);
+  s_t eps = useRidders ? 1e-4 : 1e-7;
+  try
   {
+    finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        world->setPositions(mPreStepPosition);
+        world->setVelocities(mPreStepVelocity);
+        world->setCachedLCPSolution(mPreStepLCPCache);
+        Eigen::VectorXs tweakedForces = Eigen::VectorXs(mPreStepTorques);
+        tweakedForces(dof) += eps;
+        world->setControlForces(tweakedForces);
+        BackpropSnapshotPtr snapshot = neural::forwardPass(world, true);
+        perturbed = snapshot->getPostStepVelocity();
+        return (!areResultsStandardized() || snapshot->areResultsStandardized())
+              && snapshot->getNumClamping() == getNumClamping()
+              && snapshot->getNumUpperBound() == getNumUpperBound();
+      },
+      result,
+      eps,
+      useRidders);
     snapshot.restore();
-
-    Eigen::VectorXs perturbedVelPos = world->getVelocities();
-    Eigen::VectorXs perturbedVelNeg = world->getVelocities();
-
-    s_t epsPos = EPSILON;
-    while (true)
-    {
-      // Get predicted next vel
-      world->setPositions(mPreStepPosition);
-      world->setVelocities(mPreStepVelocity);
-      world->setCachedLCPSolution(mPreStepLCPCache);
-      Eigen::VectorXs tweakedForces = Eigen::VectorXs(mPreStepTorques);
-      tweakedForces(i) += epsPos;
-      world->setControlForces(tweakedForces);
-
-      BackpropSnapshotPtr ptr = neural::forwardPass(world, true);
-      if ((!areResultsStandardized() || ptr->areResultsStandardized())
-          && ptr->getNumClamping() == getNumClamping()
-          && ptr->getNumUpperBound() == getNumUpperBound())
-      {
-        perturbedVelPos = ptr->getPostStepVelocity();
-        break;
-      }
-      epsPos *= 0.5;
-
-      assert(abs(epsPos) > 1e-20);
-    }
-
-    s_t epsNeg = EPSILON;
-    while (true)
-    {
-      // Get predicted next vel
-      world->setPositions(mPreStepPosition);
-      world->setVelocities(mPreStepVelocity);
-      world->setCachedLCPSolution(mPreStepLCPCache);
-      Eigen::VectorXs tweakedForces = Eigen::VectorXs(mPreStepTorques);
-      tweakedForces(i) -= epsNeg;
-      world->setControlForces(tweakedForces);
-
-      BackpropSnapshotPtr ptr = neural::forwardPass(world, true);
-      if ((!areResultsStandardized() || ptr->areResultsStandardized())
-          && ptr->getNumClamping() == getNumClamping()
-          && ptr->getNumUpperBound() == getNumUpperBound())
-      {
-        perturbedVelNeg = ptr->getPostStepVelocity();
-        break;
-      }
-      epsNeg *= 0.5;
-
-      assert(abs(epsNeg) > 1e-20);
-    }
-
-    J.col(i).noalias()
-        = (perturbedVelPos - perturbedVelNeg) / (epsPos + epsNeg);
+    world->getConstraintSolver()->setGradientEnabled(oldGradientEnabled);
+    return result;
   }
-
-  /*
-  s_t EPSILON = 1e-7;
-  for (std::size_t i = 0; i < world->getNumDofs(); i++)
+  catch(const std::exception& e)
   {
-    snapshot.restore();
-
-    world->setPositions(mPreStepPosition);
-    world->setVelocities(mPreStepVelocity);
-    Eigen::VectorXs tweakedForcesPos = Eigen::VectorXs::Zero(originalForces);
-    tweakedForcesPos(i) += EPSILON;
-    world->setControlForces(tweakedForcesPos);
-    world->step(false);
-    Eigen::VectorXs velPos = world->getVelocities();
-
-    world->setPositions(mPreStepPosition);
-    world->setVelocities(mPreStepVelocity);
-    Eigen::VectorXs tweakedForcesNeg = Eigen::VectorXs::Zero(originalForces);
-    tweakedForcesNeg(i) -= EPSILON;
-    world->setControlForces(tweakedForcesNeg);
-    world->step(false);
-    Eigen::VectorXs velNeg = world->getVelocities();
-
-    Eigen::VectorXs velChange = (velPos - velNeg) / (2 * EPSILON);
-    J.col(i).noalias() = velChange;
+    std::cout << "Error in finiteDifferenceForceVelJacobian(): "
+        << e.what() << std::endl;
+    printReplicationInstructions(world);
+    throw e;
   }
-  */
-
-  snapshot.restore();
-  world->getConstraintSolver()->setGradientEnabled(oldGradientEnabled);
-
-  return J;
-}
-
-//==============================================================================
-Eigen::MatrixXs BackpropSnapshot::finiteDifferenceRiddersForceVelJacobian(
-    WorldPtr world)
-{
-  RestorableSnapshot snapshot(world);
-
-  Eigen::MatrixXs J(mNumDOFs, mNumDOFs);
-
-  bool oldGradientEnabled = world->getConstraintSolver()->getGradientEnabled();
-  world->getConstraintSolver()->setGradientEnabled(true);
-
-  world->setPositions(mPreStepPosition);
-  world->setVelocities(mPreStepVelocity);
-  world->setControlForces(mPreStepTorques);
-  world->setCachedLCPSolution(mPreStepLCPCache);
-  world->step(false);
-
-  s_t originalStepSize = 1e-4;
-  const s_t con = 1.4, con2 = (con * con);
-  const s_t safeThreshold = 2.0;
-  const int tabSize = 10;
-
-  for (std::size_t i = 0; i < world->getNumDofs(); i++)
-  {
-    // Neville tableau of finite difference results
-    std::array<std::array<Eigen::VectorXs, tabSize>, tabSize> tab;
-
-    snapshot.restore();
-
-    Eigen::VectorXs velPlus;
-    Eigen::VectorXs velMinus;
-
-    // Find largest original step size which doesn't change numClamping
-    while (true)
-    {
-      world->setPositions(mPreStepPosition);
-      world->setVelocities(mPreStepVelocity);
-      world->setCachedLCPSolution(mPreStepLCPCache);
-      Eigen::VectorXs perturbedPlus = Eigen::VectorXs(mPreStepTorques);
-      perturbedPlus(i) += originalStepSize;
-      world->setControlForces(perturbedPlus);
-      std::shared_ptr<neural::BackpropSnapshot> snapshotPlus
-          = neural::forwardPass(world, true);
-      world->setPositions(mPreStepPosition);
-      world->setVelocities(mPreStepVelocity);
-      world->setCachedLCPSolution(mPreStepLCPCache);
-      Eigen::VectorXs perturbedMinus = Eigen::VectorXs(mPreStepTorques);
-      perturbedMinus(i) -= originalStepSize;
-      world->setControlForces(perturbedMinus);
-      std::shared_ptr<neural::BackpropSnapshot> snapshotMinus
-          = neural::forwardPass(world, true);
-
-      if ((!areResultsStandardized() || snapshotPlus->areResultsStandardized())
-          && snapshotPlus->getNumClamping() == getNumClamping()
-          && snapshotPlus->getNumUpperBound() == getNumUpperBound()
-          && (!areResultsStandardized()
-              || snapshotMinus->areResultsStandardized())
-          && snapshotMinus->getNumClamping() == getNumClamping()
-          && snapshotMinus->getNumUpperBound() == getNumUpperBound())
-      {
-        velPlus = snapshotPlus->getPostStepVelocity();
-        velMinus = snapshotMinus->getPostStepVelocity();
-        break;
-      }
-      originalStepSize *= 0.5;
-
-      assert(abs(originalStepSize) > 1e-20);
-    }
-    tab[0][0] = (velPlus - velMinus) / (2 * originalStepSize);
-
-    s_t stepSize = originalStepSize;
-    s_t bestError = std::numeric_limits<s_t>::max();
-
-    // Iterate over smaller and smaller step sizes
-    for (int iTab = 1; iTab < tabSize; iTab++)
-    {
-      stepSize /= con;
-
-      world->setPositions(mPreStepPosition);
-      world->setVelocities(mPreStepVelocity);
-      world->setCachedLCPSolution(mPreStepLCPCache);
-      Eigen::VectorXs perturbedPlus = Eigen::VectorXs(mPreStepTorques);
-      perturbedPlus(i) += stepSize;
-      world->setControlForces(perturbedPlus);
-      std::shared_ptr<neural::BackpropSnapshot> snapshotPlus
-          = neural::forwardPass(world, true);
-      velPlus = snapshotPlus->getPostStepVelocity();
-      if (!((!areResultsStandardized()
-             || snapshotPlus->areResultsStandardized())
-            && snapshotPlus->getNumClamping() == getNumClamping()
-            && snapshotPlus->getNumUpperBound() == getNumUpperBound()))
-      {
-        assert(false && "Lowering EPS in finiteDifferenceRiddersForceVelJacobian() "
-                      "caused numClamping() or numUpperBound() to change.");
-      }
-      world->setPositions(mPreStepPosition);
-      world->setVelocities(mPreStepVelocity);
-      world->setCachedLCPSolution(mPreStepLCPCache);
-      Eigen::VectorXs perturbedMinus = Eigen::VectorXs(mPreStepTorques);
-      perturbedMinus(i) -= stepSize;
-      world->setControlForces(perturbedMinus);
-      std::shared_ptr<neural::BackpropSnapshot> snapshotMinus
-          = neural::forwardPass(world, true);
-      velMinus = snapshotMinus->getPostStepVelocity();
-      if (!((!areResultsStandardized()
-             || snapshotMinus->areResultsStandardized())
-            && snapshotMinus->getNumClamping() == getNumClamping()
-            && snapshotMinus->getNumUpperBound() == getNumUpperBound()))
-      {
-        assert(false && "Lowering EPS in finiteDifferenceRiddersForceVelJacobian() "
-                      "caused numClamping() or numUpperBound() to change.");
-      }
-
-      tab[0][iTab] = (velPlus - velMinus) / (2 * stepSize);
-
-      s_t fac = con2;
-      // Compute extrapolations of increasing orders, requiring no new
-      // evaluations
-      for (int jTab = 1; jTab <= iTab; jTab++)
-      {
-        tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
-                          / (fac - 1.0);
-        fac = con2 * fac;
-        s_t currError = max(
-            (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
-            (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
-                .array()
-                .abs()
-                .maxCoeff());
-        if (currError < bestError)
-        {
-          bestError = currError;
-          J.col(i).noalias() = tab[jTab][iTab];
-        }
-      }
-
-      // If higher order is worse by a significant factor, quit early.
-      if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
-          >= safeThreshold * bestError)
-      {
-        break;
-      }
-    }
-  }
-
-  snapshot.restore();
-  world->getConstraintSolver()->setGradientEnabled(oldGradientEnabled);
-
-  return J;
 }
 
 //==============================================================================
 Eigen::MatrixXs BackpropSnapshot::finiteDifferenceMassVelJacobian(
     simulation::WorldPtr world, bool useRidders)
 {
-  if (useRidders)
-    return finiteDifferenceRiddersMassVelJacobian(world);
-
   RestorableSnapshot snapshot(world);
-
   bool oldGradientEnabled = world->getConstraintSolver()->getGradientEnabled();
   // world->getConstraintSolver()->setGradientEnabled(false);
 
-  world->setPositions(mPreStepPosition);
-  world->setVelocities(mPreStepVelocity);
-  world->setControlForces(mPreStepTorques);
-  world->setCachedLCPSolution(mPreStepLCPCache);
-  world->step(false);
-
   Eigen::VectorXs originalMass = world->getWrtMass()->get(world.get());
-  Eigen::VectorXs originalVel = world->getVelocities();
+  Eigen::MatrixXs result(mNumDOFs, originalMass.size());
 
-  Eigen::MatrixXs J(mNumDOFs, originalMass.size());
-
-  s_t EPSILON = 1e-7;
-  for (std::size_t i = 0; i < originalMass.size(); i++)
-  {
-    snapshot.restore();
-
-    world->setPositions(mPreStepPosition);
-    world->setVelocities(mPreStepVelocity);
-    Eigen::VectorXs tweakedMass = Eigen::VectorXs(originalMass);
-    tweakedMass(i) += EPSILON;
-    world->getWrtMass()->set(world.get(), tweakedMass);
-
-    world->step(false);
-
-    Eigen::VectorXs velChange
-        = (world->getVelocities() - originalVel) / EPSILON;
-    J.col(i).noalias() = velChange;
-  }
-
-  snapshot.restore();
-  world->getConstraintSolver()->setGradientEnabled(oldGradientEnabled);
-
-  return J;
-}
-
-//==============================================================================
-Eigen::MatrixXs BackpropSnapshot::finiteDifferenceRiddersMassVelJacobian(
-    simulation::WorldPtr world)
-{
-  RestorableSnapshot snapshot(world);
-
-  bool oldGradientEnabled = world->getConstraintSolver()->getGradientEnabled();
-  // world->getConstraintSolver()->setGradientEnabled(false);
-
-  world->setPositions(mPreStepPosition);
-  world->setVelocities(mPreStepVelocity);
-  world->setControlForces(mPreStepTorques);
-  world->setCachedLCPSolution(mPreStepLCPCache);
-  world->step(false);
-
-  const s_t originalStepSize = 1e-3;
-  const s_t con = 1.4, con2 = (con * con);
-  const s_t safeThreshold = 2.0;
-  const int tabSize = 10;
-
-  Eigen::VectorXs originalMass = world->getWrtMass()->get(world.get());
-  Eigen::VectorXs velPlus;
-  Eigen::VectorXs velMinus;
-
-  Eigen::MatrixXs J(mNumDOFs, originalMass.size());
-
-  for (std::size_t i = 0; i < originalMass.size(); i++)
-  {
-    s_t stepSize = originalStepSize;
-    s_t bestError = std::numeric_limits<s_t>::max();
-
-    // Neville tableau of finite difference results
-    std::array<std::array<Eigen::VectorXs, tabSize>, tabSize> tab;
-
-    snapshot.restore();
-
-    world->setPositions(mPreStepPosition);
-    world->setVelocities(mPreStepVelocity);
-    Eigen::VectorXs perturbedPlus = Eigen::VectorXs(originalMass);
-    perturbedPlus(i) += stepSize;
-    world->getWrtMass()->set(world.get(), perturbedPlus);
-    std::shared_ptr<neural::BackpropSnapshot> snapshotPlus
-        = neural::forwardPass(world, true);
-    velPlus = snapshotPlus->getPostStepVelocity();
-    world->setPositions(mPreStepPosition);
-    world->setVelocities(mPreStepVelocity);
-    Eigen::VectorXs perturbedMinus = Eigen::VectorXs(originalMass);
-    perturbedMinus(i) -= stepSize;
-    world->getWrtMass()->set(world.get(), perturbedMinus);
-    std::shared_ptr<neural::BackpropSnapshot> snapshotMinus
-        = neural::forwardPass(world, true);
-    velMinus = snapshotMinus->getPostStepVelocity();
-
-    tab[0][0] = (velPlus - velMinus) / (2 * stepSize);
-
-    // Iterate over smaller and smaller step sizes
-    for (int iTab = 1; iTab < tabSize; iTab++)
-    {
-      stepSize /= con;
-
+  s_t eps = useRidders ? 1e-3 : 1e-7;
+  finiteDifference(
+    [&](/* in*/ s_t eps,
+        /* in*/ int dof,
+        /*out*/ Eigen::VectorXs& perturbed) {
       world->setPositions(mPreStepPosition);
       world->setVelocities(mPreStepVelocity);
-      perturbedPlus = Eigen::VectorXs(originalMass);
-      perturbedPlus(i) += stepSize;
-      world->getWrtMass()->set(world.get(), perturbedPlus);
-      std::shared_ptr<neural::BackpropSnapshot> snapshotPlus
-          = neural::forwardPass(world, true);
-      velPlus = snapshotPlus->getPostStepVelocity();
-      world->setPositions(mPreStepPosition);
-      world->setVelocities(mPreStepVelocity);
-      perturbedMinus = Eigen::VectorXs(originalMass);
-      perturbedMinus(i) -= stepSize;
-      world->getWrtMass()->set(world.get(), perturbedMinus);
-      std::shared_ptr<neural::BackpropSnapshot> snapshotMinus
-          = neural::forwardPass(world, true);
-      velMinus = snapshotMinus->getPostStepVelocity();
-
-      tab[0][iTab] = (velPlus - velMinus) / (2 * stepSize);
-
-      s_t fac = con2;
-      // Compute extrapolations of increasing orders, requiring no new
-      // evaluations
-      for (int jTab = 1; jTab <= iTab; jTab++)
-      {
-        tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
-                          / (fac - 1.0);
-        fac = con2 * fac;
-        s_t currError = max(
-            (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
-            (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
-                .array()
-                .abs()
-                .maxCoeff());
-        if (currError < bestError)
-        {
-          bestError = currError;
-          J.col(i).noalias() = tab[jTab][iTab];
-        }
-      }
-
-      // If higher order is worse by a significant factor, quit early.
-      if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
-          >= safeThreshold * bestError)
-      {
-        break;
-      }
-    }
-  }
-
+      Eigen::VectorXs tweakedMass = Eigen::VectorXs(originalMass);
+      tweakedMass(dof) += eps;
+      world->getWrtMass()->set(world.get(), tweakedMass);
+      BackpropSnapshotPtr snapshot = neural::forwardPass(world, true);
+      perturbed = snapshot->getPostStepVelocity();
+      return true;
+    },
+    result,
+    eps,
+    useRidders);
   snapshot.restore();
   world->getConstraintSolver()->setGradientEnabled(oldGradientEnabled);
-
-  return J;
+  return result;
 }
 
 //==============================================================================
 Eigen::MatrixXs BackpropSnapshot::finiteDifferencePosPosJacobian(
     WorldPtr world, std::size_t subdivisions, bool useRidders)
 {
-  if (useRidders)
-    return finiteDifferenceRiddersPosPosJacobian(world, subdivisions);
-
   RestorableSnapshot snapshot(world);
-
-  s_t oldTimestep = world->getTimeStep();
-  world->setTimeStep(oldTimestep / subdivisions);
   bool oldGradientEnabled = world->getConstraintSolver()->getGradientEnabled();
   world->getConstraintSolver()->setGradientEnabled(true);
 
-  Eigen::MatrixXs J(mNumDOFs, mNumDOFs);
-
-  world->setPositions(mPreStepPosition);
-  world->setVelocities(mPreStepVelocity);
-  world->setControlForces(mPreStepTorques);
-  world->setCachedLCPSolution(mPreStepLCPCache);
-
-  for (std::size_t j = 0; j < subdivisions; j++)
-    world->step(false);
-
-  Eigen::VectorXs originalPosition = world->getPositions();
-
-  if (subdivisions == 1)
-  {
-    s_t EPSILON = 1e-6;
-    for (std::size_t i = 0; i < world->getNumDofs(); i++)
-    {
-      snapshot.restore();
-
-      world->setVelocities(mPreStepVelocity);
-      world->setControlForces(mPreStepTorques);
-      world->setCachedLCPSolution(mPreStepLCPCache);
-
-      Eigen::VectorXs tweakedPositions = mPreStepPosition;
-      tweakedPositions(i) += EPSILON;
-      world->setPositions(tweakedPositions);
-      world->step(false);
-      Eigen::VectorXs posChange = world->getPositions();
-
-      world->setVelocities(mPreStepVelocity);
-      world->setControlForces(mPreStepTorques);
-      world->setCachedLCPSolution(mPreStepLCPCache);
-
-      tweakedPositions = mPreStepPosition;
-      tweakedPositions(i) -= EPSILON;
-      world->setPositions(tweakedPositions);
-      world->step(false);
-      Eigen::VectorXs negChange = world->getPositions();
-
-      J.col(i).noalias() = (posChange - negChange) / (2 * EPSILON);
-    }
-  }
-  else
-  {
-    // IMPORTANT: EPSILON must be larger than the distance traveled in a single
-    // subdivided timestep. Ideally much larger.
-    s_t EPSILON = 1e-2 / subdivisions;
-    for (std::size_t i = 0; i < world->getNumDofs(); i++)
-    {
-      snapshot.restore();
-
-      world->setVelocities(mPreStepVelocity);
-      world->setControlForces(mPreStepTorques);
-      world->setCachedLCPSolution(mPreStepLCPCache);
-
-      Eigen::VectorXs tweakedPositions = Eigen::VectorXs(mPreStepPosition);
-      tweakedPositions(i) += EPSILON;
-      world->setPositions(tweakedPositions);
-
-      for (std::size_t j = 0; j < subdivisions; j++)
-        world->step(false);
-
-      Eigen::VectorXs posChange
-          = (world->getPositions() - originalPosition) / EPSILON;
-      J.col(i).noalias() = posChange;
-    }
-  }
-
-  world->setTimeStep(oldTimestep);
-  world->getConstraintSolver()->setGradientEnabled(oldGradientEnabled);
-  snapshot.restore();
-
-  return J;
-}
-
-//==============================================================================
-Eigen::MatrixXs BackpropSnapshot::finiteDifferenceRiddersPosPosJacobian(
-    WorldPtr world, std::size_t subdivisions)
-{
-  RestorableSnapshot snapshot(world);
-
+  Eigen::MatrixXs result(mNumDOFs, mNumDOFs);
+  s_t eps = useRidders ? 1e-3 / subdivisions : 
+      ((subdivisions > 1) ? (1e-2 / subdivisions) : 1e-6);
   s_t oldTimestep = world->getTimeStep();
   world->setTimeStep(oldTimestep / subdivisions);
-  bool oldGradientEnabled = world->getConstraintSolver()->getGradientEnabled();
-  world->getConstraintSolver()->setGradientEnabled(true);
-
-  Eigen::MatrixXs J(mNumDOFs, mNumDOFs);
-
-  world->setPositions(mPreStepPosition);
-  world->setVelocities(mPreStepVelocity);
-  world->setControlForces(mPreStepTorques);
-  world->setCachedLCPSolution(mPreStepLCPCache);
-
-  for (std::size_t j = 0; j < subdivisions; j++)
-    world->step(false);
-
-  const s_t originalStepSize = 1e-3 / subdivisions;
-  const s_t con = 1.4, con2 = (con * con);
-  const s_t safeThreshold = 2.0;
-  const int tabSize = 10;
-
-  for (std::size_t i = 0; i < world->getNumDofs(); i++)
-  {
-    s_t stepSize = originalStepSize;
-    s_t bestError = std::numeric_limits<s_t>::max();
-
-    // Neville tableau of finite difference results
-    std::array<std::array<Eigen::VectorXs, tabSize>, tabSize> tab;
-
-    snapshot.restore();
-
-    world->setVelocities(mPreStepVelocity);
-    world->setControlForces(mPreStepTorques);
-    world->setCachedLCPSolution(mPreStepLCPCache);
-    Eigen::VectorXs perturbedPlus = Eigen::VectorXs(mPreStepPosition);
-    perturbedPlus(i) += stepSize;
-    world->setPositions(perturbedPlus);
-    for (std::size_t j = 0; j < subdivisions; j++)
-      world->step(false);
-    Eigen::VectorXs posPlus = world->getPositions();
-
-    world->setVelocities(mPreStepVelocity);
-    world->setControlForces(mPreStepTorques);
-    world->setCachedLCPSolution(mPreStepLCPCache);
-    Eigen::VectorXs perturbedMinus = Eigen::VectorXs(mPreStepPosition);
-    perturbedMinus(i) -= stepSize;
-    world->setPositions(perturbedMinus);
-    for (std::size_t j = 0; j < subdivisions; j++)
-      world->step(false);
-    Eigen::VectorXs posMinus = world->getPositions();
-
-    tab[0][0] = (posPlus - posMinus) / (2 * stepSize);
-
-    // Iterate over smaller and smaller step sizes
-    for (int iTab = 1; iTab < tabSize; iTab++)
-    {
-      stepSize /= con;
-
+  finiteDifference(
+    [&](/* in*/ s_t eps,
+        /* in*/ int dof,
+        /*out*/ Eigen::VectorXs& perturbed) {
       world->setVelocities(mPreStepVelocity);
       world->setControlForces(mPreStepTorques);
       world->setCachedLCPSolution(mPreStepLCPCache);
-      perturbedPlus = Eigen::VectorXs(mPreStepPosition);
-      perturbedPlus(i) += stepSize;
-      world->setPositions(perturbedPlus);
+      Eigen::VectorXs tweakedPos = Eigen::VectorXs(mPreStepPosition);
+      tweakedPos(dof) += eps;
+      world->setPositions(tweakedPos);
       for (std::size_t j = 0; j < subdivisions; j++)
         world->step(false);
-      posPlus = world->getPositions();
-
-      world->setVelocities(mPreStepVelocity);
-      world->setControlForces(mPreStepTorques);
-      world->setCachedLCPSolution(mPreStepLCPCache);
-      perturbedMinus = Eigen::VectorXs(mPreStepPosition);
-      perturbedMinus(i) -= stepSize;
-      world->setPositions(perturbedMinus);
-      for (std::size_t j = 0; j < subdivisions; j++)
-        world->step(false);
-      posMinus = world->getPositions();
-
-      tab[0][iTab] = (posPlus - posMinus) / (2 * stepSize);
-
-      s_t fac = con2;
-      // Compute extrapolations of increasing orders, requiring no new
-      // evaluations
-      for (int jTab = 1; jTab <= iTab; jTab++)
-      {
-        tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
-                          / (fac - 1.0);
-        fac = con2 * fac;
-        s_t currError = max(
-            (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
-            (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
-                .array()
-                .abs()
-                .maxCoeff());
-        if (currError < bestError)
-        {
-          bestError = currError;
-          J.col(i).noalias() = tab[jTab][iTab];
-        }
-      }
-
-      // If higher order is worse by a significant factor, quit early.
-      if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
-          >= safeThreshold * bestError)
-      {
-        break;
-      }
-    }
-  }
-
+      perturbed = world->getPositions();
+      return true;
+    },
+    result,
+    eps,
+    useRidders);
   world->setTimeStep(oldTimestep);
   world->getConstraintSolver()->setGradientEnabled(oldGradientEnabled);
   snapshot.restore();
-
-  return J;
+  return result;
 }
 
 //==============================================================================
 Eigen::MatrixXs BackpropSnapshot::finiteDifferenceVelPosJacobian(
     WorldPtr world, std::size_t subdivisions, bool useRidders)
 {
-  if (useRidders)
-    return finiteDifferenceRiddersVelPosJacobian(world, subdivisions);
-
   RestorableSnapshot snapshot(world);
-
-  s_t oldTimestep = world->getTimeStep();
-  world->setTimeStep(oldTimestep / subdivisions);
   bool oldGradientEnabled = world->getConstraintSolver()->getGradientEnabled();
   // world->getConstraintSolver()->setGradientEnabled(false);
 
-  Eigen::MatrixXs J(mNumDOFs, mNumDOFs);
-
-  world->setPositions(mPreStepPosition);
-  world->setVelocities(mPreStepVelocity);
-  world->setControlForces(mPreStepTorques);
-  world->setCachedLCPSolution(mPreStepLCPCache);
-
-  for (std::size_t j = 0; j < subdivisions; j++)
-    world->step(false);
-
-  Eigen::VectorXs originalPosition = world->getPositions();
-
-  if (subdivisions == 1)
-  {
-    s_t EPSILON = 1e-6;
-    for (std::size_t i = 0; i < world->getNumDofs(); i++)
-    {
-      snapshot.restore();
-
-      world->setPositions(mPreStepPosition);
-      world->setControlForces(mPreStepTorques);
-      world->setCachedLCPSolution(mPreStepLCPCache);
-
-      Eigen::VectorXs tweakedVelocity = mPreStepVelocity;
-      tweakedVelocity(i) += EPSILON;
-      world->setVelocities(tweakedVelocity);
-      world->step(false);
-      Eigen::VectorXs posChange = world->getPositions();
-
-      world->setPositions(mPreStepPosition);
-      world->setControlForces(mPreStepTorques);
-      world->setCachedLCPSolution(mPreStepLCPCache);
-
-      tweakedVelocity = mPreStepVelocity;
-      tweakedVelocity(i) -= EPSILON;
-      world->setVelocities(tweakedVelocity);
-      world->step(false);
-      Eigen::VectorXs negChange = world->getPositions();
-
-      J.col(i).noalias() = (posChange - negChange) / (2 * EPSILON);
-    }
-  }
-  else
-  {
-    s_t EPSILON = 1e-3 / subdivisions;
-    for (std::size_t i = 0; i < world->getNumDofs(); i++)
-    {
-      snapshot.restore();
-
-      world->setPositions(mPreStepPosition);
-      world->setControlForces(mPreStepTorques);
-      world->setCachedLCPSolution(mPreStepLCPCache);
-
-      Eigen::VectorXs tweakedVelocity = Eigen::VectorXs(mPreStepVelocity);
-      tweakedVelocity(i) += EPSILON;
-      world->setVelocities(tweakedVelocity);
-
-      for (std::size_t j = 0; j < subdivisions; j++)
-        world->step(false);
-
-      Eigen::VectorXs posChange
-          = (world->getPositions() - originalPosition) / EPSILON;
-      J.col(i).noalias() = posChange;
-    }
-  }
-
-  world->setTimeStep(oldTimestep);
-  world->getConstraintSolver()->setGradientEnabled(oldGradientEnabled);
-  snapshot.restore();
-
-  return J;
-}
-
-//==============================================================================
-Eigen::MatrixXs BackpropSnapshot::finiteDifferenceRiddersVelPosJacobian(
-    WorldPtr world, std::size_t subdivisions)
-{
-  RestorableSnapshot snapshot(world);
-
+  Eigen::MatrixXs result(mNumDOFs, mNumDOFs);
+  s_t eps = useRidders ? 1e-3 / subdivisions : 
+      ((subdivisions > 1) ? (1e-2 / subdivisions) : 1e-6);
   s_t oldTimestep = world->getTimeStep();
   world->setTimeStep(oldTimestep / subdivisions);
-  bool oldGradientEnabled = world->getConstraintSolver()->getGradientEnabled();
-  // world->getConstraintSolver()->setGradientEnabled(false);
-
-  Eigen::MatrixXs J(mNumDOFs, mNumDOFs);
-
-  world->setPositions(mPreStepPosition);
-  world->setVelocities(mPreStepVelocity);
-  world->setControlForces(mPreStepTorques);
-  world->setCachedLCPSolution(mPreStepLCPCache);
-
-  for (std::size_t j = 0; j < subdivisions; j++)
-    world->step(false);
-
-  const s_t originalStepSize = 1e-3 / subdivisions;
-  const s_t con = 1.4, con2 = (con * con);
-  const s_t safeThreshold = 2.0;
-  const int tabSize = 10;
-
-  for (std::size_t i = 0; i < world->getNumDofs(); i++)
-  {
-    s_t stepSize = originalStepSize;
-    s_t bestError = std::numeric_limits<s_t>::max();
-
-    // Neville tableau of finite difference results
-    std::array<std::array<Eigen::VectorXs, tabSize>, tabSize> tab;
-
-    snapshot.restore();
-
-    world->setPositions(mPreStepPosition);
-    world->setControlForces(mPreStepTorques);
-    world->setCachedLCPSolution(mPreStepLCPCache);
-    Eigen::VectorXs perturbedPlus = Eigen::VectorXs(mPreStepVelocity);
-    perturbedPlus(i) += stepSize;
-    world->setVelocities(perturbedPlus);
-    for (std::size_t j = 0; j < subdivisions; j++)
-      world->step(false);
-    Eigen::VectorXs posPlus = world->getPositions();
-
-    world->setPositions(mPreStepPosition);
-    world->setControlForces(mPreStepTorques);
-    world->setCachedLCPSolution(mPreStepLCPCache);
-    Eigen::VectorXs perturbedMinus = Eigen::VectorXs(mPreStepVelocity);
-    perturbedMinus(i) -= stepSize;
-    world->setVelocities(perturbedMinus);
-    for (std::size_t j = 0; j < subdivisions; j++)
-      world->step(false);
-    Eigen::VectorXs posMinus = world->getPositions();
-
-    tab[0][0] = (posPlus - posMinus) / (2 * stepSize);
-
-    // Iterate over smaller and smaller step sizes
-    for (int iTab = 1; iTab < tabSize; iTab++)
-    {
-      stepSize /= con;
-
+  finiteDifference(
+    [&](/* in*/ s_t eps,
+        /* in*/ int dof,
+        /*out*/ Eigen::VectorXs& perturbed) {
       world->setPositions(mPreStepPosition);
       world->setControlForces(mPreStepTorques);
       world->setCachedLCPSolution(mPreStepLCPCache);
-      perturbedPlus = Eigen::VectorXs(mPreStepVelocity);
-      perturbedPlus(i) += stepSize;
-      world->setVelocities(perturbedPlus);
+      Eigen::VectorXs tweakedVel = Eigen::VectorXs(mPreStepVelocity);
+      tweakedVel(dof) += eps;
+      world->setVelocities(tweakedVel);
       for (std::size_t j = 0; j < subdivisions; j++)
         world->step(false);
-      posPlus = world->getPositions();
-
-      world->setPositions(mPreStepPosition);
-      world->setControlForces(mPreStepTorques);
-      world->setCachedLCPSolution(mPreStepLCPCache);
-      perturbedMinus = Eigen::VectorXs(mPreStepVelocity);
-      perturbedMinus(i) -= stepSize;
-      world->setVelocities(perturbedMinus);
-      for (std::size_t j = 0; j < subdivisions; j++)
-        world->step(false);
-      posMinus = world->getPositions();
-
-      tab[0][iTab] = (posPlus - posMinus) / (2 * stepSize);
-
-      s_t fac = con2;
-      // Compute extrapolations of increasing orders, requiring no new
-      // evaluations
-      for (int jTab = 1; jTab <= iTab; jTab++)
-      {
-        tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
-                          / (fac - 1.0);
-        fac = con2 * fac;
-        s_t currError = max(
-            (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
-            (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
-                .array()
-                .abs()
-                .maxCoeff());
-        if (currError < bestError)
-        {
-          bestError = currError;
-          J.col(i).noalias() = tab[jTab][iTab];
-        }
-      }
-
-      // If higher order is worse by a significant factor, quit early.
-      if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
-          >= safeThreshold * bestError)
-      {
-        break;
-      }
-    }
-  }
-
+      perturbed = world->getPositions();
+      return true;
+    },
+    result,
+    eps,
+    useRidders);
   world->setTimeStep(oldTimestep);
   world->getConstraintSolver()->setGradientEnabled(oldGradientEnabled);
   snapshot.restore();
-
-  return J;
+  return result;
 }
 
 //==============================================================================
@@ -3749,160 +2502,35 @@ Eigen::MatrixXs BackpropSnapshot::finiteDifferenceRiddersVelPosJacobian(
 Eigen::MatrixXs BackpropSnapshot::finiteDifferenceVelJacobianWrt(
     simulation::WorldPtr world, WithRespectTo* wrt, bool useRidders)
 {
-  if (useRidders)
-    return finiteDifferenceRiddersVelJacobianWrt(world, wrt);
-
   RestorableSnapshot snapshot(world);
-
-  int wrtDim = wrt->dim(world.get());
-  Eigen::MatrixXs J(mNumDOFs, wrtDim);
-
   bool oldGradientEnabled = world->getConstraintSolver()->getGradientEnabled();
   // world->getConstraintSolver()->setGradientEnabled(false);
-
-  Eigen::VectorXs originalWrt = wrt->get(world.get());
 
   world->setPositions(mPreStepPosition);
   world->setVelocities(mPreStepVelocity);
   world->setControlForces(mPreStepTorques);
   world->setCachedLCPSolution(mPreStepLCPCache);
-  world->step(false);
-
-  Eigen::VectorXs originalVel = world->getVelocities();
-
-  s_t EPSILON = 1e-7;
-  for (std::size_t i = 0; i < wrtDim; i++)
-  {
-    snapshot.restore();
-
-    world->setPositions(mPreStepPosition);
-    world->setVelocities(mPreStepVelocity);
-    Eigen::VectorXs tweakedWrt = Eigen::VectorXs(originalWrt);
-    tweakedWrt(i) += EPSILON;
-    wrt->set(world.get(), tweakedWrt);
-
-    world->step(false);
-
-    Eigen::VectorXs velChange
-        = (world->getVelocities() - originalVel) / EPSILON;
-    J.col(i).noalias() = velChange;
-  }
-
-  snapshot.restore();
-  world->getConstraintSolver()->setGradientEnabled(oldGradientEnabled);
-
-  return J;
-}
-
-//==============================================================================
-/// This computes and returns the whole wrt-vel jacobian by Ridders
-/// extrapolated finite differences. This is SUPER SUPER SLOW,
-/// and is only here for testing.
-Eigen::MatrixXs BackpropSnapshot::finiteDifferenceRiddersVelJacobianWrt(
-    simulation::WorldPtr world, WithRespectTo* wrt)
-{
-  RestorableSnapshot snapshot(world);
-
-  int wrtDim = wrt->dim(world.get());
-  Eigen::MatrixXs J(mNumDOFs, wrtDim);
-
-  bool oldGradientEnabled = world->getConstraintSolver()->getGradientEnabled();
-  // world->getConstraintSolver()->setGradientEnabled(false);
-
-  const s_t originalStepSize = 1e-3;
-  const s_t con = 1.4, con2 = (con * con);
-  const s_t safeThreshold = 2.0;
-  const int tabSize = 10;
-
   Eigen::VectorXs originalWrt = wrt->get(world.get());
+  Eigen::MatrixXs result(mNumDOFs, wrt->dim(world.get()));
 
-  world->setPositions(mPreStepPosition);
-  world->setVelocities(mPreStepVelocity);
-  world->setControlForces(mPreStepTorques);
-  world->setCachedLCPSolution(mPreStepLCPCache);
-  world->step(false);
-
-  for (std::size_t i = 0; i < wrtDim; i++)
-  {
-    s_t stepSize = originalStepSize;
-    s_t bestError = std::numeric_limits<s_t>::max();
-
-    // Neville tableau of finite difference results
-    std::array<std::array<Eigen::VectorXs, tabSize>, tabSize> tab;
-
-    snapshot.restore();
-
-    Eigen::VectorXs perturbedPlus = Eigen::VectorXs(originalWrt);
-    perturbedPlus(i) += stepSize;
-    wrt->set(world.get(), perturbedPlus);
-    std::shared_ptr<neural::BackpropSnapshot> snapshotPlus
-        = neural::forwardPass(world, true);
-    Eigen::VectorXs velPlus = snapshotPlus->getPostStepVelocity();
-
-    Eigen::VectorXs perturbedMinus = Eigen::VectorXs(originalWrt);
-    perturbedMinus(i) -= stepSize;
-    wrt->set(world.get(), perturbedMinus);
-    std::shared_ptr<neural::BackpropSnapshot> snapshotMinus
-        = neural::forwardPass(world, true);
-    Eigen::VectorXs velMinus = snapshotMinus->getPostStepVelocity();
-
-    tab[0][0] = (velPlus - velMinus) / (2 * stepSize);
-
-    // Iterate over smaller and smaller step sizes
-    for (int iTab = 1; iTab < tabSize; iTab++)
-    {
-      stepSize /= con;
-
-      perturbedPlus = Eigen::VectorXs(originalWrt);
-      perturbedPlus(i) += stepSize;
-      wrt->set(world.get(), perturbedPlus);
-      std::shared_ptr<neural::BackpropSnapshot> snapshotPlus
-          = neural::forwardPass(world, true);
-      velPlus = snapshotPlus->getPostStepVelocity();
-
-      perturbedMinus = Eigen::VectorXs(originalWrt);
-      perturbedMinus(i) -= stepSize;
-      wrt->set(world.get(), perturbedMinus);
-      std::shared_ptr<neural::BackpropSnapshot> snapshotMinus
-          = neural::forwardPass(world, true);
-      velMinus = snapshotMinus->getPostStepVelocity();
-
-      tab[0][iTab] = (velPlus - velMinus) / (2 * stepSize);
-
-      s_t fac = con2;
-      // Compute extrapolations of increasing orders, requiring no new
-      // evaluations
-      for (int jTab = 1; jTab <= iTab; jTab++)
-      {
-        tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
-                          / (fac - 1.0);
-        fac = con2 * fac;
-        s_t currError = max(
-            (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
-            (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
-                .array()
-                .abs()
-                .maxCoeff());
-        if (currError < bestError)
-        {
-          bestError = currError;
-          J.col(i).noalias() = tab[jTab][iTab];
-        }
-      }
-
-      // If higher order is worse by a significant factor, quit early.
-      if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
-          >= safeThreshold * bestError)
-      {
-        break;
-      }
-    }
-  }
-
+  s_t eps = useRidders ? 1e-3 : 1e-7;
+  finiteDifference(
+    [&](/* in*/ s_t eps,
+        /* in*/ int dof,
+        /*out*/ Eigen::VectorXs& perturbed) {
+      Eigen::VectorXs tweakedWrt = Eigen::VectorXs(originalWrt);
+      tweakedWrt(dof) += eps;
+      wrt->set(world.get(), tweakedWrt);
+      BackpropSnapshotPtr snapshot = neural::forwardPass(world, true);
+      perturbed = snapshot->getPostStepVelocity();
+      return true;
+    },
+    result,
+    eps,
+    useRidders);
   snapshot.restore();
   world->getConstraintSolver()->setGradientEnabled(oldGradientEnabled);
-
-  return J;
+  return result;
 }
 
 //==============================================================================
@@ -3911,185 +2539,35 @@ Eigen::MatrixXs BackpropSnapshot::finiteDifferenceRiddersVelJacobianWrt(
 Eigen::MatrixXs BackpropSnapshot::finiteDifferencePosJacobianWrt(
     simulation::WorldPtr world, WithRespectTo* wrt, bool useRidders)
 {
-  if (useRidders)
-    return finiteDifferenceRiddersPosJacobianWrt(world, wrt);
-
   RestorableSnapshot snapshot(world);
-
-  int wrtDim = wrt->dim(world.get());
-  Eigen::MatrixXs J(mNumDOFs, wrtDim);
-
   bool oldGradientEnabled = world->getConstraintSolver()->getGradientEnabled();
   // world->getConstraintSolver()->setGradientEnabled(false);
-
-  Eigen::VectorXs originalWrt = wrt->get(world.get());
 
   world->setPositions(mPreStepPosition);
   world->setVelocities(mPreStepVelocity);
   world->setControlForces(mPreStepTorques);
   world->setCachedLCPSolution(mPreStepLCPCache);
-  world->step(false);
-
-  Eigen::VectorXs originalPos = world->getPositions();
-
-  s_t EPSILON = 1e-6;
-  for (std::size_t i = 0; i < wrtDim; i++)
-  {
-    snapshot.restore();
-    world->setPositions(mPreStepPosition);
-    world->setVelocities(mPreStepVelocity);
-    world->setControlForces(mPreStepTorques);
-    world->setCachedLCPSolution(mPreStepLCPCache);
-    Eigen::VectorXs tweakedWrt = Eigen::VectorXs(originalWrt);
-    tweakedWrt(i) += EPSILON;
-    wrt->set(world.get(), tweakedWrt);
-    world->step(false);
-    Eigen::VectorXs pos = world->getPositions();
-
-    snapshot.restore();
-    world->setPositions(mPreStepPosition);
-    world->setVelocities(mPreStepVelocity);
-    world->setControlForces(mPreStepTorques);
-    world->setCachedLCPSolution(mPreStepLCPCache);
-    tweakedWrt = Eigen::VectorXs(originalWrt);
-    tweakedWrt(i) -= EPSILON;
-    wrt->set(world.get(), tweakedWrt);
-    world->step(false);
-    Eigen::VectorXs neg = world->getPositions();
-
-    Eigen::VectorXs posChange = (pos - neg) / (2 * EPSILON);
-    J.col(i).noalias() = posChange;
-  }
-
-  snapshot.restore();
-  world->getConstraintSolver()->setGradientEnabled(oldGradientEnabled);
-
-  return J;
-}
-
-//==============================================================================
-/// This computes and returns the whole wrt-pos jacobian by Ridders
-/// extrapolated finite differences. This is SUPER SUPER SLOW,
-/// and is only here for testing.
-Eigen::MatrixXs BackpropSnapshot::finiteDifferenceRiddersPosJacobianWrt(
-    simulation::WorldPtr world, WithRespectTo* wrt)
-{
-  RestorableSnapshot snapshot(world);
-
-  int wrtDim = wrt->dim(world.get());
-  Eigen::MatrixXs J(mNumDOFs, wrtDim);
-
-  bool oldGradientEnabled = world->getConstraintSolver()->getGradientEnabled();
-  // world->getConstraintSolver()->setGradientEnabled(false);
-
-  const s_t originalStepSize = 1e-3;
-  const s_t con = 1.4, con2 = (con * con);
-  const s_t safeThreshold = 2.0;
-  const int tabSize = 10;
-
   Eigen::VectorXs originalWrt = wrt->get(world.get());
+  Eigen::MatrixXs result(mNumDOFs, wrt->dim(world.get()));
 
-  world->setPositions(mPreStepPosition);
-  world->setVelocities(mPreStepVelocity);
-  world->setControlForces(mPreStepTorques);
-  world->setCachedLCPSolution(mPreStepLCPCache);
-  world->step(false);
-
-  for (std::size_t i = 0; i < wrtDim; i++)
-  {
-    s_t stepSize = originalStepSize;
-    s_t bestError = std::numeric_limits<s_t>::max();
-
-    // Neville tableau of finite difference results
-    std::array<std::array<Eigen::VectorXs, tabSize>, tabSize> tab;
-
-    snapshot.restore();
-
-    world->setPositions(mPreStepPosition);
-    world->setVelocities(mPreStepVelocity);
-    world->setControlForces(mPreStepTorques);
-    world->setCachedLCPSolution(mPreStepLCPCache);
-    Eigen::VectorXs perturbedPlus = Eigen::VectorXs(originalWrt);
-    perturbedPlus(i) += stepSize;
-    wrt->set(world.get(), perturbedPlus);
-    std::shared_ptr<neural::BackpropSnapshot> snapshotPlus
-        = neural::forwardPass(world, true);
-    Eigen::VectorXs posPlus = snapshotPlus->getPostStepPosition();
-    world->setPositions(mPreStepPosition);
-    world->setVelocities(mPreStepVelocity);
-    world->setControlForces(mPreStepTorques);
-    world->setCachedLCPSolution(mPreStepLCPCache);
-    Eigen::VectorXs perturbedMinus = Eigen::VectorXs(originalWrt);
-    perturbedMinus(i) -= stepSize;
-    wrt->set(world.get(), perturbedMinus);
-    std::shared_ptr<neural::BackpropSnapshot> snapshotMinus
-        = neural::forwardPass(world, true);
-    Eigen::VectorXs posMinus = snapshotMinus->getPostStepPosition();
-
-    tab[0][0] = (posPlus - posMinus) / (2 * stepSize);
-
-    // Iterate over smaller and smaller step sizes
-    for (int iTab = 1; iTab < tabSize; iTab++)
-    {
-      stepSize /= con;
-
-      world->setPositions(mPreStepPosition);
-      world->setVelocities(mPreStepVelocity);
-      world->setControlForces(mPreStepTorques);
-      world->setCachedLCPSolution(mPreStepLCPCache);
-      perturbedPlus = Eigen::VectorXs(originalWrt);
-      perturbedPlus(i) += stepSize;
-      wrt->set(world.get(), perturbedPlus);
-      std::shared_ptr<neural::BackpropSnapshot> snapshotPlus
-          = neural::forwardPass(world, true);
-      posPlus = snapshotPlus->getPostStepPosition();
-      world->setPositions(mPreStepPosition);
-      world->setVelocities(mPreStepVelocity);
-      world->setControlForces(mPreStepTorques);
-      world->setCachedLCPSolution(mPreStepLCPCache);
-      perturbedMinus = Eigen::VectorXs(originalWrt);
-      perturbedMinus(i) -= stepSize;
-      wrt->set(world.get(), perturbedMinus);
-      std::shared_ptr<neural::BackpropSnapshot> snapshotMinus
-          = neural::forwardPass(world, true);
-      posMinus = snapshotMinus->getPostStepPosition();
-
-      tab[0][0] = (posPlus - posMinus) / (2 * stepSize);
-
-      s_t fac = con2;
-      // Compute extrapolations of increasing orders, requiring no new
-      // evaluations
-      for (int jTab = 1; jTab <= iTab; jTab++)
-      {
-        tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
-                          / (fac - 1.0);
-        fac = con2 * fac;
-        s_t currError = max(
-            (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
-            (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
-                .array()
-                .abs()
-                .maxCoeff());
-        if (currError < bestError)
-        {
-          bestError = currError;
-          J.col(i).noalias() = tab[jTab][iTab];
-        }
-      }
-
-      // If higher order is worse by a significant factor, quit early.
-      if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
-          >= safeThreshold * bestError)
-      {
-        break;
-      }
-    }
-  }
-
+  s_t eps = useRidders ? 1e-3 : 1e-6;
+  finiteDifference(
+    [&](/* in*/ s_t eps,
+        /* in*/ int dof,
+        /*out*/ Eigen::VectorXs& perturbed) {
+      Eigen::VectorXs tweakedWrt = Eigen::VectorXs(originalWrt);
+      tweakedWrt(dof) += eps;
+      wrt->set(world.get(), tweakedWrt);
+      BackpropSnapshotPtr snapshot = neural::forwardPass(world, true);
+      perturbed = snapshot->getPostStepPosition();
+      return true;
+    },
+    result,
+    eps,
+    useRidders);
   snapshot.restore();
   world->getConstraintSolver()->setGradientEnabled(oldGradientEnabled);
-
-  return J;
+  return result;
 }
 
 /*
@@ -4347,179 +2825,38 @@ Eigen::MatrixXs BackpropSnapshot::finiteDifferenceJacobianOfQb(
     WithRespectTo* wrt,
     bool useRidders)
 {
-  if (useRidders)
-  {
-    return finiteDifferenceRiddersJacobianOfQb(world, b, wrt);
-  }
-
-  int wrtDim = wrt->dim(world.get());
-  Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(mNumClamping, wrtDim);
-  if (wrt != WithRespectTo::POSITION)
-  {
-    return jac;
-  }
-
   RestorableSnapshot snapshot(world);
   world->setPositions(mPreStepPosition);
   world->setVelocities(mPreStepVelocity);
   world->setControlForces(mPreStepTorques);
   world->setCachedLCPSolution(mPreStepLCPCache);
+  Eigen::VectorXs originalWrt = wrt->get(world.get());
+  Eigen::MatrixXs result(mNumClamping, wrt->dim(world.get()));
 
-  const s_t EPS = 1e-6;
-  Eigen::VectorXs original = wrt->get(world.get());
-  for (int i = 0; i < wrtDim; i++)
-  {
-    Eigen::VectorXs perturbed = original;
-    perturbed(i) += EPS;
-    wrt->set(world.get(), perturbed);
-
-    Eigen::MatrixXs A_c
-        = estimateClampingConstraintMatrixAt(world, world->getPositions());
-    Eigen::MatrixXs A_ub
-        = estimateUpperBoundConstraintMatrixAt(world, world->getPositions());
-    Eigen::MatrixXs E = getUpperBoundMappingMatrix();
-    Eigen::MatrixXs Q
-        = A_c.transpose() * world->getInvMassMatrix() * (A_c + A_ub * E);
-    Q.diagonal() += getConstraintForceMixingDiagonal();
-
-    Eigen::VectorXs bPlus = Q * b;
-
-    perturbed = original;
-    perturbed(i) -= EPS;
-    wrt->set(world.get(), perturbed);
-
-    A_c = estimateClampingConstraintMatrixAt(world, world->getPositions());
-    A_ub = estimateUpperBoundConstraintMatrixAt(world, world->getPositions());
-    E = getUpperBoundMappingMatrix();
-    Q = A_c.transpose() * world->getInvMassMatrix() * (A_c + A_ub * E);
-    Q.diagonal() += getConstraintForceMixingDiagonal();
-
-    Eigen::VectorXs bMinus = Q * b;
-
-    jac.col(i) = (bPlus - bMinus) / (2 * EPS);
-  }
-  wrt->set(world.get(), original);
-
-  snapshot.restore();
-  return jac;
-}
-
-//==============================================================================
-Eigen::MatrixXs BackpropSnapshot::finiteDifferenceRiddersJacobianOfQb(
-    simulation::WorldPtr world, Eigen::VectorXs b, WithRespectTo* wrt)
-{
-  int wrtDim = wrt->dim(world.get());
-  Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(mNumClamping, wrtDim);
-  if (wrt != WithRespectTo::POSITION)
-  {
-    return jac;
-  }
-
-  RestorableSnapshot snapshot(world);
-  world->setPositions(mPreStepPosition);
-  world->setVelocities(mPreStepVelocity);
-  world->setControlForces(mPreStepTorques);
-  world->setCachedLCPSolution(mPreStepLCPCache);
-
-  const s_t originalStepSize = 1e-3;
-  const s_t con = 1.4, con2 = (con * con);
-  const s_t safeThreshold = 2.0;
-  const int tabSize = 14;
-
-  Eigen::VectorXs original = wrt->get(world.get());
-
-  for (int i = 0; i < wrtDim; i++)
-  {
-    s_t stepSize = originalStepSize;
-    s_t bestError = std::numeric_limits<s_t>::max();
-
-    // Neville tableau of finite difference results
-    std::array<std::array<Eigen::VectorXs, tabSize>, tabSize> tab;
-
-    Eigen::VectorXs perturbed = original;
-    perturbed(i) += stepSize;
-    wrt->set(world.get(), perturbed);
-    Eigen::MatrixXs A_c
-        = estimateClampingConstraintMatrixAt(world, world->getPositions());
-    Eigen::MatrixXs A_ub
-        = estimateUpperBoundConstraintMatrixAt(world, world->getPositions());
-    Eigen::MatrixXs E = getUpperBoundMappingMatrix();
-    Eigen::MatrixXs Q
-        = A_c.transpose() * world->getInvMassMatrix() * (A_c + A_ub * E);
-    Q.diagonal() += getConstraintForceMixingDiagonal();
-    Eigen::VectorXs QbPlus = Q * b;
-    perturbed = original;
-    perturbed(i) -= stepSize;
-    wrt->set(world.get(), perturbed);
-    A_c = estimateClampingConstraintMatrixAt(world, world->getPositions());
-    A_ub = estimateUpperBoundConstraintMatrixAt(world, world->getPositions());
-    E = getUpperBoundMappingMatrix();
-    Q = A_c.transpose() * world->getInvMassMatrix() * (A_c + A_ub * E);
-    Q.diagonal() += getConstraintForceMixingDiagonal();
-    Eigen::VectorXs QbMinus = Q * b;
-
-    tab[0][0] = (QbPlus - QbMinus) / (2 * stepSize);
-
-    // Iterate over smaller and smaller step sizes
-    for (int iTab = 1; iTab < tabSize; iTab++)
-    {
-      stepSize /= con;
-
-      perturbed = original;
-      perturbed(i) += stepSize;
-      wrt->set(world.get(), perturbed);
-      A_c = estimateClampingConstraintMatrixAt(world, world->getPositions());
-      A_ub = estimateUpperBoundConstraintMatrixAt(world, world->getPositions());
-      E = getUpperBoundMappingMatrix();
-      Q = A_c.transpose() * world->getInvMassMatrix() * (A_c + A_ub * E);
+  s_t eps = useRidders ? 1e-3 : 1e-6;
+  finiteDifference(
+    [&](/* in*/ s_t eps,
+        /* in*/ int dof,
+        /*out*/ Eigen::VectorXs& perturbed) {
+      Eigen::VectorXs tweakedWrt = originalWrt;
+      tweakedWrt(dof) += eps;
+      wrt->set(world.get(), tweakedWrt);
+      Eigen::MatrixXs A_c
+          = estimateClampingConstraintMatrixAt(world, world->getPositions());
+      Eigen::MatrixXs A_ub
+          = estimateUpperBoundConstraintMatrixAt(world, world->getPositions());
+      Eigen::MatrixXs E = getUpperBoundMappingMatrix();
+      Eigen::MatrixXs Q
+          = A_c.transpose() * world->getInvMassMatrix() * (A_c + A_ub * E);
       Q.diagonal() += getConstraintForceMixingDiagonal();
-      QbPlus = Q * b;
-      perturbed = original;
-      perturbed(i) -= stepSize;
-      wrt->set(world.get(), perturbed);
-      A_c = estimateClampingConstraintMatrixAt(world, world->getPositions());
-      A_ub = estimateUpperBoundConstraintMatrixAt(world, world->getPositions());
-      E = getUpperBoundMappingMatrix();
-      Q = A_c.transpose() * world->getInvMassMatrix() * (A_c + A_ub * E);
-      Q.diagonal() += getConstraintForceMixingDiagonal();
-      QbMinus = Q * b;
-
-      tab[0][iTab] = (QbPlus - QbMinus) / (2 * stepSize);
-
-      s_t fac = con2;
-      // Compute extrapolations of increasing orders, requiring no new
-      // evaluations
-      for (int jTab = 1; jTab <= iTab; jTab++)
-      {
-        tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
-                          / (fac - 1.0);
-        fac = con2 * fac;
-        s_t currError = max(
-            (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
-            (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
-                .array()
-                .abs()
-                .maxCoeff());
-        if (currError < bestError)
-        {
-          bestError = currError;
-          jac.col(i) = tab[jTab][iTab];
-        }
-      }
-
-      // If higher order is worse by a significant factor, quit early.
-      if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
-          >= safeThreshold * bestError)
-      {
-        break;
-      }
-    }
-  }
-
-  wrt->set(world.get(), original);
+      perturbed = Q * b;
+      return true;
+    },
+    result,
+    eps,
+    useRidders);
   snapshot.restore();
-
-  return jac;
+  return result;
 }
 
 //==============================================================================
@@ -4694,201 +3031,38 @@ BackpropSnapshot::finiteDifferenceJacobianOfLCPConstraintMatrixClampingSubset(
     WithRespectTo* wrt,
     bool useRidders)
 {
-  if (useRidders)
-  {
-    return finiteDifferenceRiddersJacobianOfLCPConstraintMatrixClampingSubset(
-        world, b, wrt);
-  }
-
-  int wrtDim = wrt->dim(world.get());
-  Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(mNumClamping, wrtDim);
-  if (wrt != WithRespectTo::POSITION)
-  {
-    return jac;
-  }
-
   RestorableSnapshot snapshot(world);
   world->setPositions(mPreStepPosition);
   world->setVelocities(mPreStepVelocity);
   world->setControlForces(mPreStepTorques);
   world->setCachedLCPSolution(mPreStepLCPCache);
+  Eigen::VectorXs originalWrt = wrt->get(world.get());
+  Eigen::MatrixXs result(mNumClamping, wrt->dim(world.get()));
 
-  const s_t EPS = 1e-6;
-  Eigen::VectorXs original = wrt->get(world.get());
-  for (int i = 0; i < wrtDim; i++)
-  {
-    Eigen::VectorXs perturbed = original;
-    perturbed(i) += EPS;
-    wrt->set(world.get(), perturbed);
-
-    Eigen::MatrixXs A_c
-        = estimateClampingConstraintMatrixAt(world, world->getPositions());
-    Eigen::MatrixXs A_ub
-        = estimateUpperBoundConstraintMatrixAt(world, world->getPositions());
-    Eigen::MatrixXs E = getUpperBoundMappingMatrix();
-    Eigen::MatrixXs Q
-        = A_c.transpose() * world->getInvMassMatrix() * (A_c + A_ub * E);
-    Q.diagonal() += getConstraintForceMixingDiagonal();
-
-    /*
-    std::cout << "+" << i << ": " << A_c.cols() << " :: " << mNumClamping
-              << std::endl;
-              */
-
-    Eigen::VectorXs bPlus = Q.completeOrthogonalDecomposition().solve(b);
-
-    perturbed = original;
-    perturbed(i) -= EPS;
-    wrt->set(world.get(), perturbed);
-
-    A_c = estimateClampingConstraintMatrixAt(world, world->getPositions());
-    A_ub = estimateUpperBoundConstraintMatrixAt(world, world->getPositions());
-    E = getUpperBoundMappingMatrix();
-    Q = A_c.transpose() * world->getInvMassMatrix() * (A_c + A_ub * E);
-    Q.diagonal() += getConstraintForceMixingDiagonal();
-
-    /*
-    std::cout << "-" << i << ": " << A_c.cols() << " :: " << mNumClamping
-              << std::endl;
-              */
-
-    Eigen::VectorXs bMinus = Q.completeOrthogonalDecomposition().solve(b);
-
-    jac.col(i) = (bPlus - bMinus) / (2 * EPS);
-  }
-  wrt->set(world.get(), original);
-
-  snapshot.restore();
-  return jac;
-}
-
-//==============================================================================
-/// This returns the jacobian of Q^{-1}b, holding b constant, with respect to
-/// wrt, by Ridders extrapolated finite differencing
-Eigen::MatrixXs BackpropSnapshot::
-    finiteDifferenceRiddersJacobianOfLCPConstraintMatrixClampingSubset(
-        simulation::WorldPtr world, Eigen::VectorXs b, WithRespectTo* wrt)
-{
-  int wrtDim = wrt->dim(world.get());
-  Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(mNumClamping, wrtDim);
-  if (wrt != WithRespectTo::POSITION)
-  {
-    return jac;
-  }
-
-  RestorableSnapshot snapshot(world);
-  world->setPositions(mPreStepPosition);
-  world->setVelocities(mPreStepVelocity);
-  world->setControlForces(mPreStepTorques);
-  world->setCachedLCPSolution(mPreStepLCPCache);
-
-  const s_t originalStepSize = 1e-2;
-  const s_t con = 1.4, con2 = (con * con);
-  const s_t safeThreshold = 2.0;
-  const int tabSize = 10;
-
-  Eigen::VectorXs original = wrt->get(world.get());
-
-  for (int i = 0; i < wrtDim; i++)
-  {
-    s_t stepSize = originalStepSize;
-    s_t bestError = std::numeric_limits<s_t>::max();
-
-    // Neville tableau of finite difference results
-    std::array<std::array<Eigen::VectorXs, tabSize>, tabSize> tab;
-
-    Eigen::VectorXs perturbed = original;
-    perturbed(i) += stepSize;
-    wrt->set(world.get(), perturbed);
-    Eigen::MatrixXs A_c
-        = estimateClampingConstraintMatrixAt(world, world->getPositions());
-    Eigen::MatrixXs A_ub
-        = estimateUpperBoundConstraintMatrixAt(world, world->getPositions());
-    Eigen::MatrixXs E = getUpperBoundMappingMatrix();
-    Eigen::MatrixXs Q
-        = A_c.transpose() * world->getInvMassMatrix() * (A_c + A_ub * E);
-    Q.diagonal() += getConstraintForceMixingDiagonal();
-    // std::cout << "+" << i << ": " << A_c.cols() << " :: " <<
-    //   mNumClamping << std::endl;
-    Eigen::VectorXs QinvBPlus = Q.completeOrthogonalDecomposition().solve(b);
-    perturbed = original;
-    perturbed(i) -= stepSize;
-    wrt->set(world.get(), perturbed);
-    A_c = estimateClampingConstraintMatrixAt(world, world->getPositions());
-    A_ub = estimateUpperBoundConstraintMatrixAt(world, world->getPositions());
-    E = getUpperBoundMappingMatrix();
-    Q = A_c.transpose() * world->getInvMassMatrix() * (A_c + A_ub * E);
-    Q.diagonal() += getConstraintForceMixingDiagonal();
-    // std::cout << "+" << i << ": " << A_c.cols() << " :: " <<
-    //   mNumClamping << std::endl;
-    Eigen::VectorXs QinvBMinus = Q.completeOrthogonalDecomposition().solve(b);
-
-    tab[0][0] = (QinvBPlus - QinvBMinus) / (2 * stepSize);
-
-    // Iterate over smaller and smaller step sizes
-    for (int iTab = 1; iTab < tabSize; iTab++)
-    {
-      stepSize /= con;
-
-      perturbed = original;
-      perturbed(i) += stepSize;
-      wrt->set(world.get(), perturbed);
-      A_c = estimateClampingConstraintMatrixAt(world, world->getPositions());
-      A_ub = estimateUpperBoundConstraintMatrixAt(world, world->getPositions());
-      E = getUpperBoundMappingMatrix();
-      Q = A_c.transpose() * world->getInvMassMatrix() * (A_c + A_ub * E);
+  s_t eps = useRidders ? 1e-2 : 1e-6;
+  finiteDifference(
+    [&](/* in*/ s_t eps,
+        /* in*/ int dof,
+        /*out*/ Eigen::VectorXs& perturbed) {
+      Eigen::VectorXs tweakedWrt = originalWrt;
+      tweakedWrt(dof) += eps;
+      wrt->set(world.get(), tweakedWrt);
+      Eigen::MatrixXs A_c
+          = estimateClampingConstraintMatrixAt(world, world->getPositions());
+      Eigen::MatrixXs A_ub
+          = estimateUpperBoundConstraintMatrixAt(world, world->getPositions());
+      Eigen::MatrixXs E = getUpperBoundMappingMatrix();
+      Eigen::MatrixXs Q
+          = A_c.transpose() * world->getInvMassMatrix() * (A_c + A_ub * E);
       Q.diagonal() += getConstraintForceMixingDiagonal();
-      // std::cout << "+" << i << ": " << A_c.cols() << " :: " << mNumClamping
-      // << std::endl;
-      QinvBPlus = Q.completeOrthogonalDecomposition().solve(b);
-      perturbed = original;
-      perturbed(i) -= stepSize;
-      wrt->set(world.get(), perturbed);
-      A_c = estimateClampingConstraintMatrixAt(world, world->getPositions());
-      A_ub = estimateUpperBoundConstraintMatrixAt(world, world->getPositions());
-      E = getUpperBoundMappingMatrix();
-      Q = A_c.transpose() * world->getInvMassMatrix() * (A_c + A_ub * E);
-      Q.diagonal() += getConstraintForceMixingDiagonal();
-      // std::cout << "+" << i << ": " << A_c.cols() << " :: " << mNumClamping
-      // << std::endl;
-      QinvBMinus = Q.completeOrthogonalDecomposition().solve(b);
-
-      tab[0][iTab] = (QinvBPlus - QinvBMinus) / (2 * stepSize);
-
-      s_t fac = con2;
-      // Compute extrapolations of increasing orders, requiring no new
-      // evaluations
-      for (int jTab = 1; jTab <= iTab; jTab++)
-      {
-        tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
-                          / (fac - 1.0);
-        fac = con2 * fac;
-        s_t currError = max(
-            (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
-            (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
-                .array()
-                .abs()
-                .maxCoeff());
-        if (currError < bestError)
-        {
-          bestError = currError;
-          jac.col(i) = tab[jTab][iTab];
-        }
-      }
-
-      // If higher order is worse by a significant factor, quit early.
-      if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
-          >= safeThreshold * bestError)
-      {
-        break;
-      }
-    }
-  }
-
-  wrt->set(world.get(), original);
+      perturbed = Q.completeOrthogonalDecomposition().solve(b);
+      return true;
+    },
+    result,
+    eps,
+    useRidders);
   snapshot.restore();
-
-  return jac;
+  return result;
 }
 
 //==============================================================================
@@ -4958,192 +3132,31 @@ Eigen::MatrixXs
 BackpropSnapshot::finiteDifferenceJacobianOfLCPOffsetClampingSubset(
     simulation::WorldPtr world, WithRespectTo* wrt, bool useRidders)
 {
-  if (useRidders)
-  {
-    return finiteDifferenceRiddersJacobianOfLCPOffsetClampingSubset(world, wrt);
-  }
-
   RestorableSnapshot snapshot(world);
   world->setPositions(mPreStepPosition);
   world->setVelocities(mPreStepVelocity);
   world->setControlForces(mPreStepTorques);
   world->setCachedLCPSolution(mPreStepLCPCache);
+  Eigen::VectorXs originalWrt = wrt->get(world.get());
+  Eigen::MatrixXs result(mNumClamping, wrt->dim(world.get()));
 
-  int wrtDim = wrt->dim(world.get());
-  Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(mNumClamping, wrtDim);
-
-  const s_t EPS = 1e-7;
-  Eigen::VectorXs original = wrt->get(world.get());
-  for (int i = 0; i < wrtDim; i++)
-  {
-    Eigen::VectorXs bPlus;
-    Eigen::VectorXs bMinus;
-
-    s_t epsPos = EPS;
-    while (true)
-    {
-      Eigen::VectorXs perturbed = original;
-      perturbed(i) += epsPos;
-      wrt->set(world.get(), perturbed);
-
-      BackpropSnapshotPtr posSnapshot = neural::forwardPass(world, true);
-      bPlus = posSnapshot->getClampingConstraintRelativeVels();
-      if (bPlus.size() == mNumClamping)
-      {
-        break;
-      }
-
-      epsPos *= 0.5;
-      assert(epsPos > 1e-25);
-    }
-
-    s_t epsNeg = EPS;
-    while (true)
-    {
-      Eigen::VectorXs perturbed = original;
-      perturbed(i) -= epsNeg;
-      wrt->set(world.get(), perturbed);
-
-      BackpropSnapshotPtr negSnapshot = neural::forwardPass(world, true);
-      bMinus = negSnapshot->getClampingConstraintRelativeVels();
-      if (bMinus.size() == mNumClamping)
-      {
-        break;
-      }
-
-      epsNeg *= 0.5;
-      assert(epsNeg > 1e-25);
-    }
-
-    jac.col(i) = (bPlus - bMinus) / (epsPos + epsNeg);
-  }
-  wrt->set(world.get(), original);
-
+  s_t eps = useRidders ? 1e-4 : 1e-7;
+  finiteDifference(
+    [&](/* in*/ s_t eps,
+        /* in*/ int dof,
+        /*out*/ Eigen::VectorXs& perturbed) {
+      Eigen::VectorXs tweakedWrt = originalWrt;
+      tweakedWrt(dof) += eps;
+      wrt->set(world.get(), tweakedWrt);
+      BackpropSnapshotPtr snapshot = neural::forwardPass(world, true);
+      perturbed = snapshot->getClampingConstraintRelativeVels();
+      return perturbed.size() == mNumClamping;
+    },
+    result,
+    eps,
+    useRidders);
   snapshot.restore();
-  return jac;
-}
-
-//==============================================================================
-/// This returns the jacobian of b (from Q^{-1}b) with respect to wrt, by
-/// Ridders extrapolated finite differencing
-Eigen::MatrixXs
-BackpropSnapshot::finiteDifferenceRiddersJacobianOfLCPOffsetClampingSubset(
-    simulation::WorldPtr world, WithRespectTo* wrt)
-{
-  RestorableSnapshot snapshot(world);
-  world->setPositions(mPreStepPosition);
-  world->setVelocities(mPreStepVelocity);
-  world->setControlForces(mPreStepTorques);
-  world->setCachedLCPSolution(mPreStepLCPCache);
-
-  int wrtDim = wrt->dim(world.get());
-  Eigen::MatrixXs J = Eigen::MatrixXs::Zero(mNumClamping, wrtDim);
-
-  s_t originalStepSize = 1e-4;
-  const s_t con = 1.4, con2 = (con * con);
-  const s_t safeThreshold = 2.0;
-  const int tabSize = 10;
-
-  Eigen::VectorXs original = wrt->get(world.get());
-  for (int i = 0; i < wrtDim; i++)
-  {
-    Eigen::VectorXs bPlus;
-    Eigen::VectorXs bMinus;
-
-    // Neville tableau of finite difference results
-    std::array<std::array<Eigen::VectorXs, tabSize>, tabSize> tab;
-
-    // Find largest original step size which doesn't change numClamping
-    while (true)
-    {
-      Eigen::VectorXs perturbedPlus = Eigen::VectorXs(original);
-      perturbedPlus(i) += originalStepSize;
-      wrt->set(world.get(), perturbedPlus);
-      BackpropSnapshotPtr snapshotPlus = neural::forwardPass(world, true);
-      bPlus = snapshotPlus->getClampingConstraintRelativeVels();
-      Eigen::VectorXs perturbedMinus = Eigen::VectorXs(original);
-      perturbedMinus(i) -= originalStepSize;
-      wrt->set(world.get(), perturbedMinus);
-      BackpropSnapshotPtr snapshotMinus = neural::forwardPass(world, true);
-      bMinus = snapshotMinus->getClampingConstraintRelativeVels();
-
-      if (bPlus.size() == mNumClamping && bMinus.size() == mNumClamping)
-      {
-        break;
-      }
-      originalStepSize *= 0.5;
-
-      assert(abs(originalStepSize) > 1e-25);
-    }
-    tab[0][0] = (bPlus - bMinus) / (2 * originalStepSize);
-
-    s_t stepSize = originalStepSize;
-    s_t bestError = std::numeric_limits<s_t>::max();
-
-    // Iterate over smaller and smaller step sizes
-    for (int iTab = 1; iTab < tabSize; iTab++)
-    {
-      stepSize /= con;
-
-      Eigen::VectorXs perturbedPlus = Eigen::VectorXs(original);
-      perturbedPlus(i) += stepSize;
-      wrt->set(world.get(), perturbedPlus);
-      BackpropSnapshotPtr snapshotPlus = neural::forwardPass(world, true);
-      bPlus = snapshotPlus->getClampingConstraintRelativeVels();
-      if (!(bPlus.size() == mNumClamping))
-      {
-        assert(false && 
-  "Lowering EPS in finiteDifferenceRiddersJacobianOfLCPOffsetClampingSubset() "
-  "caused bPlus.size() to change.");
-      }
-      Eigen::VectorXs perturbedMinus = Eigen::VectorXs(original);
-      perturbedMinus(i) -= stepSize;
-      wrt->set(world.get(), perturbedMinus);
-      BackpropSnapshotPtr snapshotMinus = neural::forwardPass(world, true);
-      bMinus = snapshotMinus->getClampingConstraintRelativeVels();
-      if (!(bMinus.size() == mNumClamping))
-      {
-        assert(false && 
-  "Lowering EPS in finiteDifferenceRiddersJacobianOfLCPOffsetClampingSubset() "
-  "caused bPlus.size() to change.");
-      }
-
-      tab[0][iTab] = (bPlus - bMinus) / (2 * stepSize);
-
-      s_t fac = con2;
-      // Compute extrapolations of increasing orders, requiring no new
-      // evaluations
-      for (int jTab = 1; jTab <= iTab; jTab++)
-      {
-        tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
-                          / (fac - 1.0);
-        fac = con2 * fac;
-        s_t currError = max(
-            (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
-            (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
-                .array()
-                .abs()
-                .maxCoeff());
-        if (currError < bestError)
-        {
-          bestError = currError;
-          J.col(i).noalias() = tab[jTab][iTab];
-        }
-      }
-
-      // If higher order is worse by a significant factor, quit early.
-      if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
-          >= safeThreshold * bestError)
-      {
-        break;
-      }
-    }
-  }
-
-  wrt->set(world.get(), original);
-
-  snapshot.restore();
-  return J;
+  return result;
 }
 
 //==============================================================================
@@ -5153,172 +3166,34 @@ Eigen::MatrixXs
 BackpropSnapshot::finiteDifferenceJacobianOfLCPEstimatedOffsetClampingSubset(
     simulation::WorldPtr world, WithRespectTo* wrt, bool useRidders)
 {
-  if (useRidders)
-  {
-    return finiteDifferenceRiddersJacobianOfLCPEstimatedOffsetClampingSubset(
-        world, wrt);
-  }
-
-  int wrtDim = wrt->dim(world.get());
-  Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(mNumClamping, wrtDim);
-  Eigen::MatrixXs A_c = getClampingConstraintMatrix(world);
-
   RestorableSnapshot snapshot(world);
   world->setPositions(mPreStepPosition);
   world->setVelocities(mPreStepVelocity);
   world->setControlForces(mPreStepTorques);
   world->setCachedLCPSolution(mPreStepLCPCache);
-
-  const s_t EPS = 1e-8;
-  Eigen::VectorXs original = wrt->get(world.get());
-  for (int i = 0; i < wrtDim; i++)
-  {
-    Eigen::VectorXs perturbed = original;
-    perturbed(i) += EPS;
-    wrt->set(world.get(), perturbed);
-
-    if (wrt == WithRespectTo::POSITION)
-    {
-      A_c = estimateClampingConstraintMatrixAt(world, world->getPositions());
-    }
-    Eigen::VectorXs bPlus = Eigen::VectorXs::Zero(mNumClamping);
-    computeLCPOffsetClampingSubset(world, bPlus, A_c);
-
-    perturbed = original;
-    perturbed(i) -= EPS;
-    wrt->set(world.get(), perturbed);
-
-    if (wrt == WithRespectTo::POSITION)
-    {
-      A_c = estimateClampingConstraintMatrixAt(world, world->getPositions());
-    }
-    Eigen::VectorXs bMinus = Eigen::VectorXs::Zero(mNumClamping);
-    computeLCPOffsetClampingSubset(world, bMinus, A_c);
-
-    jac.col(i) = (bPlus - bMinus) / (2 * EPS);
-  }
-  wrt->set(world.get(), original);
-
-  snapshot.restore();
-
-  return jac;
-}
-
-//==============================================================================
-/// This returns the jacobian of b (from Q^{-1}b) with respect to wrt, by
-/// Ridders extrapolated finite differencing
-Eigen::MatrixXs BackpropSnapshot::
-    finiteDifferenceRiddersJacobianOfLCPEstimatedOffsetClampingSubset(
-        simulation::WorldPtr world, WithRespectTo* wrt)
-{
-  int wrtDim = wrt->dim(world.get());
-  Eigen::MatrixXs J = Eigen::MatrixXs::Zero(mNumClamping, wrtDim);
+  Eigen::VectorXs originalWrt = wrt->get(world.get());
   Eigen::MatrixXs A_c = getClampingConstraintMatrix(world);
+  Eigen::MatrixXs result(mNumClamping, wrt->dim(world.get()));
 
-  RestorableSnapshot snapshot(world);
-  world->setPositions(mPreStepPosition);
-  world->setVelocities(mPreStepVelocity);
-  world->setControlForces(mPreStepTorques);
-  world->setCachedLCPSolution(mPreStepLCPCache);
-
-  const s_t originalStepSize = 1e-3;
-  const s_t con = 1.4, con2 = (con * con);
-  const s_t safeThreshold = 2.0;
-  const int tabSize = 10;
-
-  Eigen::VectorXs original = wrt->get(world.get());
-  for (int i = 0; i < wrtDim; i++)
-  {
-    s_t stepSize = originalStepSize;
-    s_t bestError = std::numeric_limits<s_t>::max();
-
-    // Neville tableau of finite difference results
-    std::array<std::array<Eigen::VectorXs, tabSize>, tabSize> tab;
-
-    Eigen::VectorXs perturbedPlus = Eigen::VectorXs(original);
-    perturbedPlus(i) += stepSize;
-    wrt->set(world.get(), perturbedPlus);
-    if (wrt == WithRespectTo::POSITION)
-    {
-      A_c = estimateClampingConstraintMatrixAt(world, world->getPositions());
-    }
-    Eigen::VectorXs bPlus = Eigen::VectorXs::Zero(mNumClamping);
-    computeLCPOffsetClampingSubset(world, bPlus, A_c);
-
-    Eigen::VectorXs perturbedMinus = Eigen::VectorXs(original);
-    perturbedMinus(i) -= stepSize;
-    wrt->set(world.get(), perturbedMinus);
-    if (wrt == WithRespectTo::POSITION)
-    {
-      A_c = estimateClampingConstraintMatrixAt(world, world->getPositions());
-    }
-    Eigen::VectorXs bMinus = Eigen::VectorXs::Zero(mNumClamping);
-    computeLCPOffsetClampingSubset(world, bMinus, A_c);
-
-    tab[0][0] = (bPlus - bMinus) / (2 * stepSize);
-
-    // Iterate over smaller and smaller step sizes
-    for (int iTab = 1; iTab < tabSize; iTab++)
-    {
-      stepSize /= con;
-
-      perturbedPlus = Eigen::VectorXs(original);
-      perturbedPlus(i) += stepSize;
-      wrt->set(world.get(), perturbedPlus);
+  s_t eps = useRidders ? 1e-3 : 1e-8;
+  finiteDifference(
+    [&](/* in*/ s_t eps,
+        /* in*/ int dof,
+        /*out*/ Eigen::VectorXs& perturbed) {
+      Eigen::VectorXs tweakedWrt = originalWrt;
+      tweakedWrt(dof) += eps;
+      wrt->set(world.get(), tweakedWrt);
       if (wrt == WithRespectTo::POSITION)
-      {
         A_c = estimateClampingConstraintMatrixAt(world, world->getPositions());
-      }
-      bPlus = Eigen::VectorXs::Zero(mNumClamping);
-      computeLCPOffsetClampingSubset(world, bPlus, A_c);
-
-      perturbedMinus = Eigen::VectorXs(original);
-      perturbedMinus(i) -= stepSize;
-      wrt->set(world.get(), perturbedMinus);
-      if (wrt == WithRespectTo::POSITION)
-      {
-        A_c = estimateClampingConstraintMatrixAt(world, world->getPositions());
-      }
-      bMinus = Eigen::VectorXs::Zero(mNumClamping);
-      computeLCPOffsetClampingSubset(world, bMinus, A_c);
-
-      tab[0][iTab] = (bPlus - bMinus) / (2 * stepSize);
-
-      s_t fac = con2;
-      // Compute extrapolations of increasing orders, requiring no new
-      // evaluations
-      for (int jTab = 1; jTab <= iTab; jTab++)
-      {
-        tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
-                          / (fac - 1.0);
-        fac = con2 * fac;
-        s_t currError = max(
-            (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
-            (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
-                .array()
-                .abs()
-                .maxCoeff());
-        if (currError < bestError)
-        {
-          bestError = currError;
-          J.col(i).noalias() = tab[jTab][iTab];
-        }
-      }
-
-      // If higher order is worse by a significant factor, quit early.
-      if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
-          >= safeThreshold * bestError)
-      {
-        break;
-      }
-    }
-  }
-
-  wrt->set(world.get(), original);
-
+      perturbed = Eigen::VectorXs::Zero(mNumClamping);
+      computeLCPOffsetClampingSubset(world, perturbed, A_c);
+      return true;
+    },
+    result,
+    eps,
+    useRidders);
   snapshot.restore();
-
-  return J;
+  return result;
 }
 
 //==============================================================================
@@ -5854,348 +3729,46 @@ Eigen::MatrixXs BackpropSnapshot::getJacobianOfUpperBoundConstraintsTranspose(
 Eigen::MatrixXs BackpropSnapshot::finiteDifferenceJacobianOfClampingConstraints(
     simulation::WorldPtr world, Eigen::VectorXs f0, bool useRidders)
 {
-  if (useRidders)
-    return finiteDifferenceRiddersJacobianOfClampingConstraints(world, f0);
-
   RestorableSnapshot snapshot(world);
-
   world->setPositions(mPreStepPosition);
   world->setVelocities(mPreStepVelocity);
   world->setControlForces(mPreStepTorques);
   world->setCachedLCPSolution(mPreStepLCPCache);
-
   Eigen::VectorXs original = getClampingConstraintMatrix(world) * f0;
-  Eigen::MatrixXs originalA_c = getClampingConstraintMatrix(world);
+  Eigen::MatrixXs result(original.size(), mNumDOFs);
 
-  Eigen::MatrixXs result = Eigen::MatrixXs::Zero(original.size(), mNumDOFs);
-
-  const s_t EPS = 5e-7;
-
-  for (std::size_t i = 0; i < mNumDOFs; i++)
+  s_t eps = useRidders ? 1e-4 : 5e-7;
+  try
   {
-    s_t posEPS = EPS;
-    Eigen::VectorXs perturbedResultPos = Eigen::VectorXs::Zero(0);
-    // Keep scaling down the EPS until it no longer results in a different
-    // number of columns
-    for (int j = 0; j < 40; j++)
-    {
-      snapshot.restore();
-      Eigen::VectorXs perturbed = mPreStepPosition;
-      perturbed(i) += posEPS;
-      world->setPositions(perturbed);
-      world->setVelocities(mPreStepVelocity);
-      world->setControlForces(mPreStepTorques);
-      world->setCachedLCPSolution(mPreStepLCPCache);
-
-      BackpropSnapshotPtr ptr = neural::forwardPass(world, true);
-      Eigen::MatrixXs perturbedA_c = ptr->getClampingConstraintMatrix(world);
-      if (perturbedA_c.cols() == f0.size())
-      {
-        perturbedResultPos = perturbedA_c * f0;
-        s_t squaredNorm = (original - perturbedResultPos).squaredNorm();
-        if (squaredNorm < 100 * posEPS)
-        {
-          break;
-        }
-        else
-        {
-          std::cout << "Result diff at " << posEPS << std::endl
-                    << (original - perturbedResultPos) << std::endl;
-          std::cout << "A_c original at " << posEPS << std::endl
-                    << originalA_c << std::endl;
-          std::cout << "A_c diff at " << posEPS << std::endl
-                    << (originalA_c - perturbedA_c) << std::endl;
-          assert(false && "Encountered too large a jump in finiteDifferenceJacobianOfClampingConstraints()");
-        }
-      }
-      posEPS /= 2;
-    }
-
-    s_t negEPS = EPS;
-    Eigen::VectorXs perturbedResultNeg = Eigen::VectorXs::Zero(0);
-    // Keep scaling down the EPS until it no longer results in a different
-    // number of columns
-    for (int j = 0; j < 40; j++)
-    {
-      snapshot.restore();
-      Eigen::VectorXs perturbed = mPreStepPosition;
-      perturbed(i) -= negEPS;
-      world->setPositions(perturbed);
-      world->setVelocities(mPreStepVelocity);
-      world->setControlForces(mPreStepTorques);
-      world->setCachedLCPSolution(mPreStepLCPCache);
-
-      BackpropSnapshotPtr ptr = neural::forwardPass(world, true);
-      Eigen::MatrixXs perturbedA_c = ptr->getClampingConstraintMatrix(world);
-      if (perturbedA_c.cols() == f0.size())
-      {
-        perturbedResultNeg = perturbedA_c * f0;
-        s_t squaredNorm = (original - perturbedResultNeg).squaredNorm();
-        if (squaredNorm < 100 * negEPS)
-        {
-          break;
-        }
-        else
-        {
-          std::cout << "Result diff at -" << negEPS << std::endl
-                    << (original - perturbedResultNeg) << std::endl;
-          std::cout << "A_c original at -" << negEPS << std::endl
-                    << originalA_c << std::endl;
-          std::cout << "A_c diff at -" << negEPS << std::endl
-                    << (originalA_c - perturbedA_c) << std::endl;
-          assert(false && "Encountered too large a jump in finiteDifferenceJacobianOfClampingConstraints()");
-        }
-      }
-      negEPS /= 2;
-    }
-
-    /*
-    std::cout << "i=" << i << " -> (" << posEPS << "," << negEPS << ")"
-              << std::endl;
-    */
-    result.col(i)
-        = (perturbedResultPos - perturbedResultNeg) / (posEPS + negEPS);
-  }
-
-  snapshot.restore();
-
-  return result;
-}
-
-//==============================================================================
-/// This computes the finite difference Jacobian of A_c*f0 with respect to
-/// position by Ridders extrapolated finite differences
-Eigen::MatrixXs
-BackpropSnapshot::finiteDifferenceRiddersJacobianOfClampingConstraints(
-    simulation::WorldPtr world, Eigen::VectorXs f0)
-{
-  RestorableSnapshot snapshot(world);
-
-  world->setPositions(mPreStepPosition);
-  world->setVelocities(mPreStepVelocity);
-  world->setControlForces(mPreStepTorques);
-  world->setCachedLCPSolution(mPreStepLCPCache);
-
-  Eigen::VectorXs original = getClampingConstraintMatrix(world) * f0;
-
-  Eigen::MatrixXs J = Eigen::MatrixXs::Zero(original.size(), mNumDOFs);
-
-  s_t originalStepSize = 1e-4;
-  const s_t con = 1.4, con2 = (con * con);
-  const s_t safeThreshold = 2.0;
-  const int tabSize = 10;
-
-  for (std::size_t i = 0; i < mNumDOFs; i++)
-  {
-    // Neville tableau of finite difference results
-    std::array<std::array<Eigen::VectorXs, tabSize>, tabSize> tab;
-
+    finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweakedPos = mPreStepPosition;
+        tweakedPos(dof) += eps;
+        world->setPositions(tweakedPos);
+        BackpropSnapshotPtr snapshot = neural::forwardPass(world, true);
+        Eigen::MatrixXs perturbedA_c = snapshot->getClampingConstraintMatrix(world);
+        // don't attempt to multipy if they aren't the same dim, invalid
+        if (perturbedA_c.cols() != f0.size())
+          return false;
+        perturbed = perturbedA_c * f0;
+        // we require that the perturbed result is not too far away from original
+        return (original - perturbed).squaredNorm() < 100 * abs(eps);
+      },
+      result,
+      eps,
+      useRidders);
     snapshot.restore();
-
-    Eigen::VectorXs A_c_f0Plus;
-    Eigen::VectorXs A_c_f0Minus;
-
-    // Find largest original step size which doesn't change numClamping
-    while (true)
-    {
-      Eigen::VectorXs perturbedPlus = Eigen::VectorXs(mPreStepPosition);
-      perturbedPlus(i) += originalStepSize;
-      world->setPositions(perturbedPlus);
-      BackpropSnapshotPtr snapshotPlus = neural::forwardPass(world, true);
-      Eigen::MatrixXs A_cPlus
-          = snapshotPlus->getClampingConstraintMatrix(world);
-
-      Eigen::VectorXs perturbedMinus = mPreStepPosition;
-      perturbedMinus(i) -= originalStepSize;
-      world->setPositions(perturbedMinus);
-      BackpropSnapshotPtr snapshotMinus = neural::forwardPass(world, true);
-      Eigen::MatrixXs A_cMinus
-          = snapshotMinus->getClampingConstraintMatrix(world);
-
-      if (A_cPlus.cols() == f0.size() && A_cMinus.cols() == f0.size())
-      {
-        A_c_f0Plus = A_cPlus * f0;
-        s_t squaredNormPlus = (original - A_c_f0Plus).squaredNorm();
-        A_c_f0Minus = A_cMinus * f0;
-        s_t squaredNormMinus = (original - A_c_f0Minus).squaredNorm();
-        if (squaredNormPlus < 100 * originalStepSize
-            && squaredNormMinus < 100 * originalStepSize)
-        {
-          break;
-        }
-        else
-        {
-          assert(false && "Encountered too large a jump in "
-                 "finiteDifferenceRiddersJacobianOfClampingConstraints()");
-        }
-      }
-      originalStepSize *= 0.5;
-
-      assert(abs(originalStepSize) > 1e-20);
-    }
-    tab[0][0] = (A_c_f0Plus - A_c_f0Minus) / (2 * originalStepSize);
-
-    s_t stepSize = originalStepSize;
-    s_t bestError = std::numeric_limits<s_t>::max();
-
-    // Iterate over smaller and smaller step sizes
-    for (int iTab = 1; iTab < tabSize; iTab++)
-    {
-      stepSize /= con;
-
-      Eigen::VectorXs perturbedPlus = Eigen::VectorXs(mPreStepPosition);
-      perturbedPlus(i) += stepSize;
-      world->setPositions(perturbedPlus);
-      BackpropSnapshotPtr snapshotPlus = neural::forwardPass(world, true);
-      Eigen::MatrixXs A_cPlus
-          = snapshotPlus->getClampingConstraintMatrix(world);
-
-      Eigen::VectorXs perturbedMinus = mPreStepPosition;
-      perturbedMinus(i) -= stepSize;
-      world->setPositions(perturbedMinus);
-      BackpropSnapshotPtr snapshotMinus = neural::forwardPass(world, true);
-      Eigen::MatrixXs A_cMinus
-          = snapshotMinus->getClampingConstraintMatrix(world);
-
-      if (!(A_cPlus.cols() == f0.size() && A_cMinus.cols() == f0.size()))
-      {
-        /*
-        neural::forwardPass(world, true);
-        std::vector<std::shared_ptr<DifferentiableContactConstraint>>
-            originalConstraints = getDifferentiableConstraints();
-        for (int k = 0; k < originalConstraints.size(); k++)
-        {
-          std::shared_ptr<DifferentiableContactConstraint> constraint
-              = originalConstraints[k];
-          std::cout << "Original Constraint " << k << " type "
-                    << constraint->getContactType() << "\npos:\n"
-                    << constraint->getContactWorldPosition() << "\nnormal:\n"
-                    << constraint->getContactWorldNormal() << std::endl;
-        }
-        std::vector<std::shared_ptr<DifferentiableContactConstraint>>
-            plusConstraints = snapshotPlus->getDifferentiableConstraints();
-        for (int k = 0; k < plusConstraints.size(); k++)
-        {
-          std::shared_ptr<DifferentiableContactConstraint> constraint
-              = plusConstraints[k];
-          std::cout << "Plus Constraint " << k << " type "
-                    << constraint->getContactType() << "\npos:\n"
-                    << constraint->getContactWorldPosition() << "\nnormal:\n"
-                    << constraint->getContactWorldNormal() << std::endl;
-        }
-        std::vector<std::shared_ptr<DifferentiableContactConstraint>>
-            minusConstraints = snapshotMinus->getDifferentiableConstraints();
-        for (int k = 0; k < minusConstraints.size(); k++)
-        {
-          std::shared_ptr<DifferentiableContactConstraint> constraint
-              = minusConstraints[k];
-          std::cout << "Minus Constraint " << k << " type "
-                    << constraint->getContactType() << "\npos:\n"
-                    << constraint->getContactWorldPosition() << "\nnormal:\n"
-                    << constraint->getContactWorldNormal() << std::endl;
-        }
-        */
-        assert(false && 
-        "Lowering EPS in finiteDifferenceRiddersJacobianOfClampingConstraints()"
-          "caused A_c.cols() to change.");
-      }
-      A_c_f0Plus = A_cPlus * f0;
-      A_c_f0Minus = A_cMinus * f0;
-      /*
-      if (i == 0 && abs(A_c_f0Minus(2) - original(2)) > stepSize)
-      {
-        std::cout << "Error of " << A_c_f0Minus(2) - original(2)
-                  << " on [0] -= " << stepSize << std::endl;
-      }
-      if (i == 0 && abs(A_c_f0Plus(2) - original(2)) > stepSize)
-      {
-        std::cout << "*********" << std::endl;
-        std::cout << "Error of " << A_c_f0Plus(2) - original(2)
-                  << " on [0] += " << stepSize << std::endl;
-        for (int k = 0; k < f0.size(); k++)
-        {
-          std::shared_ptr<DifferentiableContactConstraint> originalConstraint
-              = getDifferentiableConstraints()[k];
-          Eigen::Vector3s posGrad
-              = originalConstraint->getContactPositionGradient(
-                  world->getDofs()[0]);
-          Eigen::Vector3s dirGrad
-              = originalConstraint->getContactNormalGradient(
-                  world->getDofs()[0]);
-          collision::Contact& originalContact
-              = originalConstraint->getContact();
-          std::shared_ptr<DifferentiableContactConstraint> constraint
-              = snapshotPlus->getDifferentiableConstraints()[k];
-          collision::Contact& contact = constraint->getContact();
-          // constraint->getContactWorldForceDirection()
-          std::cout << "Contact: " << k << ", type: " << contact.type
-                    << std::endl;
-          if (contact.type != collision::ContactType::PIPE_EDGE)
-          {
-            std::cout << "Pos grad: " << posGrad << std::endl;
-            std::cout << "Dir grad: " << dirGrad << std::endl;
-            if (originalContact.type != contact.type)
-            {
-              std::cout << "Original type: " << originalContact.type
-                        << std::endl;
-              std::cout << "New type: " << contact.type << std::endl;
-            }
-            if (originalContact.point != contact.point)
-            {
-              std::cout << "Original pt: " << originalContact.point
-                        << std::endl;
-              std::cout << "New pt: " << contact.point << std::endl;
-              std::cout << "Diff: " << contact.point - originalContact.point
-                        << std::endl;
-            }
-            if (originalContact.normal != contact.normal)
-            {
-              std::cout << "Original normal: " << originalContact.normal
-                        << std::endl;
-              std::cout << "New normal: " << contact.normal << std::endl;
-              std::cout << "Diff: " << contact.normal - originalContact.normal
-                        << std::endl;
-            }
-          }
-        }
-      }
-      */
-
-      tab[0][iTab] = (A_c_f0Plus - A_c_f0Minus) / (2 * stepSize);
-
-      s_t fac = con2;
-      // Compute extrapolations of increasing orders, requiring no new
-      // evaluations
-      for (int jTab = 1; jTab <= iTab; jTab++)
-      {
-        tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
-                          / (fac - 1.0);
-        fac = con2 * fac;
-        s_t currError = max(
-            (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
-            (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
-                .array()
-                .abs()
-                .maxCoeff());
-        if (currError < bestError)
-        {
-          bestError = currError;
-          J.col(i).noalias() = tab[jTab][iTab];
-        }
-      }
-
-      // If higher order is worse by a significant factor, quit early.
-      if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
-          >= safeThreshold * bestError)
-      {
-        break;
-      }
-    }
+    return result;
   }
-
-  snapshot.restore();
-
-  return J;
+  catch(const std::exception& e)
+  {
+    std::cout << "Error in finiteDifferenceJacobianOfClampingConstraints(): " 
+        << e.what() << std::endl;
+    printReplicationInstructions(world);
+    throw e;
+  }
 }
 
 //==============================================================================
@@ -6206,221 +3779,32 @@ Eigen::MatrixXs
 BackpropSnapshot::finiteDifferenceJacobianOfClampingConstraintsTranspose(
     simulation::WorldPtr world, Eigen::VectorXs v0, bool useRidders)
 {
-  if (useRidders)
-  {
-    return finiteDifferenceRiddersJacobianOfClampingConstraintsTranspose(
-        world, v0);
-  }
-
   RestorableSnapshot snapshot(world);
-
   world->setPositions(mPreStepPosition);
   world->setVelocities(mPreStepVelocity);
   world->setControlForces(mPreStepTorques);
   world->setCachedLCPSolution(mPreStepLCPCache);
-
   Eigen::VectorXs original
       = getClampingConstraintMatrix(world).transpose() * v0;
+  Eigen::MatrixXs result(original.size(), mNumDOFs);
 
-  Eigen::MatrixXs result = Eigen::MatrixXs::Zero(original.size(), mNumDOFs);
-
-  const s_t EPS = 5e-7;
-
-  for (std::size_t i = 0; i < mNumDOFs; i++)
-  {
-    s_t posEPS = EPS;
-    Eigen::VectorXs perturbedResultPos;
-
-    // Keep scaling down the EPS until it no longer results in a different
-    // number of columns
-    for (int j = 0; j < 10; j++)
-    {
-      snapshot.restore();
-      Eigen::VectorXs perturbed = mPreStepPosition;
-      perturbed(i) += posEPS;
-      world->setPositions(perturbed);
-      world->setVelocities(mPreStepVelocity);
-      world->setControlForces(mPreStepTorques);
-      world->setCachedLCPSolution(mPreStepLCPCache);
-
-      BackpropSnapshotPtr ptr = neural::forwardPass(world, true);
-      perturbedResultPos
-          = ptr->getClampingConstraintMatrix(world).transpose() * v0;
-      if (perturbedResultPos.size() == original.size())
-      {
-        break;
-      }
-      posEPS /= 2;
-    }
-
-    s_t negEPS = EPS;
-    Eigen::VectorXs perturbedResultNeg;
-
-    // Keep scaling down the EPS until it no longer results in a different
-    // number of columns
-    for (int j = 0; j < 10; j++)
-    {
-      snapshot.restore();
-      Eigen::VectorXs perturbed = mPreStepPosition;
-      perturbed(i) -= negEPS;
-      world->setPositions(perturbed);
-      world->setVelocities(mPreStepVelocity);
-      world->setControlForces(mPreStepTorques);
-      world->setCachedLCPSolution(mPreStepLCPCache);
-
-      BackpropSnapshotPtr ptr = neural::forwardPass(world, true);
-      perturbedResultNeg
-          = ptr->getClampingConstraintMatrix(world).transpose() * v0;
-      if (perturbedResultNeg.size() == original.size())
-      {
-        break;
-      }
-      negEPS /= 2;
-    }
-
-    result.col(i)
-        = (perturbedResultPos - perturbedResultNeg) / (posEPS + negEPS);
-  }
-
+  s_t eps = useRidders ? 1e-4 : 5e-7;
+  finiteDifference(
+    [&](/* in*/ s_t eps,
+        /* in*/ int dof,
+        /*out*/ Eigen::VectorXs& perturbed) {
+      Eigen::VectorXs tweakedPos = mPreStepPosition;
+      tweakedPos(dof) += eps;
+      world->setPositions(tweakedPos);
+      BackpropSnapshotPtr snapshot = neural::forwardPass(world, true);
+      perturbed = snapshot->getClampingConstraintMatrix(world).transpose() * v0;
+      return perturbed.size() == original.size();
+    },
+    result,
+    eps,
+    useRidders);
   snapshot.restore();
-
   return result;
-}
-
-//==============================================================================
-/// This computes the finite difference Jacobian of A_c^T*v0 with respect to
-/// position. This is AS SLOW AS FINITE DIFFERENCING THE WHOLE ENGINE, which
-/// is way too slow to use in practice.
-Eigen::MatrixXs
-BackpropSnapshot::finiteDifferenceRiddersJacobianOfClampingConstraintsTranspose(
-    simulation::WorldPtr world, Eigen::VectorXs v0)
-{
-  RestorableSnapshot snapshot(world);
-
-  world->setPositions(mPreStepPosition);
-  world->setVelocities(mPreStepVelocity);
-  world->setControlForces(mPreStepTorques);
-  world->setCachedLCPSolution(mPreStepLCPCache);
-
-  Eigen::MatrixXs test = getClampingConstraintMatrix(world);
-  Eigen::VectorXs original
-      = getClampingConstraintMatrix(world).transpose() * v0;
-
-  Eigen::MatrixXs J = Eigen::MatrixXs::Zero(original.size(), mNumDOFs);
-
-  if (original.size() == 0)
-  {
-    return J;
-  }
-
-  s_t originalStepSize = 1e-4;
-  const s_t con = 1.4, con2 = (con * con);
-  const s_t safeThreshold = 2.0;
-  const int tabSize = 10;
-
-  for (std::size_t i = 0; i < mNumDOFs; i++)
-  {
-    // Neville tableau of finite difference results
-    std::array<std::array<Eigen::VectorXs, tabSize>, tabSize> tab;
-
-    snapshot.restore();
-
-    Eigen::VectorXs A_c_T_v0Plus;
-    Eigen::VectorXs A_c_T_v0Minus;
-
-    // Find largest original step size which doesn't change numClamping
-    while (true)
-    {
-      Eigen::VectorXs perturbedPlus = Eigen::VectorXs(mPreStepPosition);
-      perturbedPlus(i) += originalStepSize;
-      world->setPositions(perturbedPlus);
-      BackpropSnapshotPtr snapshotPlus = neural::forwardPass(world, true);
-      A_c_T_v0Plus
-          = snapshotPlus->getClampingConstraintMatrix(world).transpose() * v0;
-
-      Eigen::VectorXs perturbedMinus = Eigen::VectorXs(mPreStepPosition);
-      perturbedMinus(i) -= originalStepSize;
-      world->setPositions(perturbedMinus);
-      BackpropSnapshotPtr snapshotMinus = neural::forwardPass(world, true);
-      A_c_T_v0Minus
-          = snapshotMinus->getClampingConstraintMatrix(world).transpose() * v0;
-
-      if (A_c_T_v0Plus.size() == original.size()
-          && A_c_T_v0Minus.size() == original.size())
-      {
-        break;
-      }
-      originalStepSize *= 0.5;
-
-      assert(abs(originalStepSize) > 1e-20);
-    }
-    tab[0][0] = (A_c_T_v0Plus - A_c_T_v0Minus) / (2 * originalStepSize);
-
-    s_t stepSize = originalStepSize;
-    s_t bestError = std::numeric_limits<s_t>::max();
-
-    // Iterate over smaller and smaller step sizes
-    for (int iTab = 1; iTab < tabSize; iTab++)
-    {
-      stepSize /= con;
-
-      Eigen::VectorXs perturbedPlus = Eigen::VectorXs(mPreStepPosition);
-      perturbedPlus(i) += stepSize;
-      world->setPositions(perturbedPlus);
-      BackpropSnapshotPtr snapshotPlus = neural::forwardPass(world, true);
-      Eigen::MatrixXs A_c_T_v0Plus
-          = snapshotPlus->getClampingConstraintMatrix(world).transpose() * v0;
-
-      Eigen::VectorXs perturbedMinus = Eigen::VectorXs(mPreStepPosition);
-      perturbedMinus(i) -= stepSize;
-      world->setPositions(perturbedMinus);
-      BackpropSnapshotPtr snapshotMinus = neural::forwardPass(world, true);
-      Eigen::MatrixXs A_c_T_v0Minus
-          = snapshotMinus->getClampingConstraintMatrix(world).transpose() * v0;
-
-      if (!(A_c_T_v0Plus.size() == original.size()
-            && A_c_T_v0Minus.size() == original.size()))
-      {
-        assert(false && 
-    "Lowering EPS in finiteDifferenceRiddersJacobianOfClampingConstraintsTranspose()"
-    "caused A_c_T_v0.size() to change.");
-      }
-
-      tab[0][iTab] = (A_c_T_v0Plus - A_c_T_v0Minus) / (2 * stepSize);
-
-      s_t fac = con2;
-      // Compute extrapolations of increasing orders, requiring no new
-      // evaluations
-      for (int jTab = 1; jTab <= iTab; jTab++)
-      {
-        tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
-                          / (fac - 1.0);
-        fac = con2 * fac;
-        s_t currError = max(
-            (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
-            (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
-                .array()
-                .abs()
-                .maxCoeff());
-        if (currError < bestError)
-        {
-          bestError = currError;
-          J.col(i).noalias() = tab[jTab][iTab];
-        }
-      }
-
-      // If higher order is worse by a significant factor, quit early.
-      if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
-          >= safeThreshold * bestError)
-      {
-        break;
-      }
-    }
-  }
-
-  snapshot.restore();
-
-  return J;
 }
 
 /// This computes the finite difference Jacobian of A_ub*E*f0 with respect to
@@ -6430,210 +3814,48 @@ Eigen::MatrixXs
 BackpropSnapshot::finiteDifferenceJacobianOfUpperBoundConstraints(
     simulation::WorldPtr world, Eigen::VectorXs f0, bool useRidders)
 {
-  if (useRidders)
-  {
-    return finiteDifferenceRiddersJacobianOfUpperBoundConstraints(world, f0);
-  }
-
   if (mNumUpperBound == 0)
-  {
     return Eigen::MatrixXs::Zero(mNumDOFs, mNumDOFs);
-  }
 
   RestorableSnapshot snapshot(world);
-
   world->setPositions(mPreStepPosition);
   world->setVelocities(mPreStepVelocity);
   world->setControlForces(mPreStepTorques);
   world->setCachedLCPSolution(mPreStepLCPCache);
-
-  Eigen::MatrixXs A_ub = getUpperBoundConstraintMatrix(world);
-  /*
-  Eigen::MatrixXs E = getUpperBoundMappingMatrix();
-  std::cout << "A_ub size: " << A_ub.rows() << "x" << A_ub.cols() << std::endl;
-  std::cout << "E size: " << E.rows() << "x" << E.cols() << std::endl;
-  std::cout << "f0 size: " << f0.size() << std::endl;
-  */
-
-  Eigen::VectorXs original = A_ub * f0;
-
-  Eigen::MatrixXs result = Eigen::MatrixXs::Zero(original.size(), mNumDOFs);
-
-  const s_t EPS = 1e-7;
-
-  for (std::size_t i = 0; i < mNumDOFs; i++)
-  {
-    snapshot.restore();
-    Eigen::VectorXs perturbed = mPreStepPosition;
-    perturbed(i) += EPS;
-    world->setPositions(perturbed);
-    world->setVelocities(mPreStepVelocity);
-    world->setControlForces(mPreStepTorques);
-    world->setCachedLCPSolution(mPreStepLCPCache);
-
-    BackpropSnapshotPtr ptr = neural::forwardPass(world, true);
-    Eigen::VectorXs perturbedResultPos
-        = ptr->getUpperBoundConstraintMatrix(world) * f0;
-
-    perturbed = mPreStepPosition;
-    perturbed(i) -= EPS;
-    world->setPositions(perturbed);
-    world->setVelocities(mPreStepVelocity);
-    world->setControlForces(mPreStepTorques);
-    world->setCachedLCPSolution(mPreStepLCPCache);
-
-    ptr = neural::forwardPass(world, true);
-    Eigen::VectorXs perturbedResultNeg
-        = ptr->getUpperBoundConstraintMatrix(world) * f0;
-
-    result.col(i) = (perturbedResultPos - perturbedResultNeg) / (2 * EPS);
-  }
-
-  snapshot.restore();
-
-  return result;
-}
-
-/// This computes the finite difference Jacobian of A_ub*E*f0 with respect to
-/// position. This is AS SLOW AS FINITE DIFFERENCING THE WHOLE ENGINE, which
-/// is way too slow to use in practice. Uses Ridders method.
-Eigen::MatrixXs
-BackpropSnapshot::finiteDifferenceRiddersJacobianOfUpperBoundConstraints(
-    simulation::WorldPtr world, Eigen::VectorXs f0)
-{
-  if (mNumUpperBound == 0)
-  {
-    return Eigen::MatrixXs::Zero(mNumDOFs, mNumDOFs);
-  }
-
-  RestorableSnapshot snapshot(world);
-
-  world->setPositions(mPreStepPosition);
-  world->setVelocities(mPreStepVelocity);
-  world->setControlForces(mPreStepTorques);
-  world->setCachedLCPSolution(mPreStepLCPCache);
-
   Eigen::MatrixXs originalA_ub = getUpperBoundConstraintMatrix(world);
   Eigen::VectorXs original = originalA_ub * f0;
+  Eigen::MatrixXs result(original.size(), mNumDOFs);
 
-  Eigen::MatrixXs J = Eigen::MatrixXs::Zero(original.size(), mNumDOFs);
-
-  s_t originalStepSize = 1e-3;
-  const s_t con = 1.4, con2 = (con * con);
-  const s_t safeThreshold = 2.0;
-  const int tabSize = 10;
-
-  for (std::size_t i = 0; i < mNumDOFs; i++)
+  s_t eps = useRidders ? 1e-3 : 1e-7;
+  try
   {
-    // Neville tableau of finite difference results
-    std::array<std::array<Eigen::VectorXs, tabSize>, tabSize> tab;
-
+    finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweakedPos = mPreStepPosition;
+        tweakedPos(dof) += eps;
+        world->setPositions(tweakedPos);
+        BackpropSnapshotPtr snapshot = neural::forwardPass(world, true);
+        Eigen::MatrixXs A_ub = snapshot->getUpperBoundConstraintMatrix(world);
+        if (A_ub.size() != originalA_ub.size())
+          return false;
+        perturbed = A_ub * f0;
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
     snapshot.restore();
-
-    Eigen::VectorXs A_ub_f0Plus;
-    Eigen::VectorXs A_ub_f0Minus;
-
-    // Find largest original step size which doesn't change numUpperBound
-    while (true)
-    {
-      Eigen::VectorXs perturbedPlus = Eigen::VectorXs(mPreStepPosition);
-      perturbedPlus(i) += originalStepSize;
-      world->setPositions(perturbedPlus);
-      BackpropSnapshotPtr snapshotPlus = neural::forwardPass(world, true);
-      Eigen::MatrixXs A_ubPlus
-          = snapshotPlus->getUpperBoundConstraintMatrix(world);
-
-      Eigen::VectorXs perturbedMinus = Eigen::VectorXs(mPreStepPosition);
-      perturbedMinus(i) -= originalStepSize;
-      world->setPositions(perturbedMinus);
-      BackpropSnapshotPtr snapshotMinus = neural::forwardPass(world, true);
-      Eigen::MatrixXs A_ubMinus
-          = snapshotMinus->getUpperBoundConstraintMatrix(world);
-
-      if (A_ubPlus.size() == originalA_ub.size()
-          && A_ubMinus.size() == originalA_ub.size())
-      {
-        A_ub_f0Plus = A_ubPlus * f0;
-        A_ub_f0Minus = A_ubMinus * f0;
-        break;
-      }
-      originalStepSize *= 0.5;
-
-      assert(abs(originalStepSize) > 1e-20);
-    }
-    tab[0][0] = (A_ub_f0Plus - A_ub_f0Minus) / (2 * originalStepSize);
-
-    s_t stepSize = originalStepSize;
-    s_t bestError = std::numeric_limits<s_t>::max();
-
-    // Iterate over smaller and smaller step sizes
-    for (int iTab = 1; iTab < tabSize; iTab++)
-    {
-      stepSize /= con;
-
-      Eigen::VectorXs perturbedPlus = Eigen::VectorXs(mPreStepPosition);
-      perturbedPlus(i) += stepSize;
-      world->setPositions(perturbedPlus);
-      BackpropSnapshotPtr snapshotPlus = neural::forwardPass(world, true);
-      Eigen::MatrixXs A_ubPlus
-          = snapshotPlus->getUpperBoundConstraintMatrix(world);
-      if (!(A_ubPlus.size() == originalA_ub.size()))
-      {
-        assert(false && 
-  "Lowering EPS in finiteDifferenceRiddersJacobianOfUpperBoundConstraints() "
-  "caused A_ub.size() to change.");
-      }
-      A_ub_f0Plus = A_ubPlus * f0;
-
-      Eigen::VectorXs perturbedMinus = Eigen::VectorXs(mPreStepPosition);
-      perturbedMinus(i) -= stepSize;
-      world->setPositions(perturbedMinus);
-      BackpropSnapshotPtr snapshotMinus = neural::forwardPass(world, true);
-      Eigen::MatrixXs A_ubMinus
-          = snapshotMinus->getUpperBoundConstraintMatrix(world);
-      if (!(A_ubMinus.size() == originalA_ub.size()))
-      {
-        assert(false && 
-  "Lowering EPS in finiteDifferenceRiddersJacobianOfUpperBoundConstraints() "
-  "caused A_ub.size() to change.");
-      }
-      A_ub_f0Minus = A_ubMinus * f0;
-
-      tab[0][iTab] = (A_ub_f0Plus - A_ub_f0Minus) / (2 * stepSize);
-
-      s_t fac = con2;
-      // Compute extrapolations of increasing orders, requiring no new
-      // evaluations
-      for (int jTab = 1; jTab <= iTab; jTab++)
-      {
-        tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
-                          / (fac - 1.0);
-        fac = con2 * fac;
-        s_t currError = max(
-            (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
-            (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
-                .array()
-                .abs()
-                .maxCoeff());
-        if (currError < bestError)
-        {
-          bestError = currError;
-          J.col(i).noalias() = tab[jTab][iTab];
-        }
-      }
-
-      // If higher order is worse by a significant factor, quit early.
-      if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
-          >= safeThreshold * bestError)
-      {
-        break;
-      }
-    }
+    return result;
   }
-
-  snapshot.restore();
-
-  return J;
+  catch(const std::exception& e)
+  {
+    std::cout << "Error in finiteDifferenceJacobianOfUpperBoundConstraints: "
+        << e.what() << std::endl;
+    printReplicationInstructions(world);
+    throw e;
+  }
 }
 
 //==============================================================================
@@ -6646,219 +3868,46 @@ BackpropSnapshot::finiteDifferenceJacobianOfProjectionIntoClampsMatrix(
     WithRespectTo* wrt,
     bool useRidders)
 {
-  if (useRidders)
-  {
-    return finiteDifferenceRiddersJacobianOfProjectionIntoClampsMatrix(
-        world, v, wrt);
-  }
-
   RestorableSnapshot snapshot(world);
-
-  std::size_t innerDim = wrt->dim(world.get());
-
-  Eigen::VectorXs before = wrt->get(world.get());
-
-  // These are predicted contact forces at the clamping contacts
-  Eigen::VectorXs original = getProjectionIntoClampsMatrix(world, true) * v;
-
-  Eigen::MatrixXs originalP_c = getProjectionIntoClampsMatrix(world, true);
-
-  std::vector<std::shared_ptr<DifferentiableContactConstraint>> constraints
-      = getDifferentiableConstraints();
-
-  Eigen::MatrixXs result = Eigen::MatrixXs::Zero(original.size(), innerDim);
-
-  const s_t EPS = 1e-5;
-
-  for (std::size_t i = 0; i < innerDim; i++)
-  {
-    Eigen::VectorXs perturbed = before;
-    s_t posEps = EPS;
-
-    Eigen::VectorXs newPlus;
-    Eigen::VectorXs newMinus;
-
-    while (true)
-    {
-      perturbed = before;
-      perturbed(i) += posEps;
-      wrt->set(world.get(), perturbed);
-
-      BackpropSnapshotPtr plusBackptr = neural::forwardPass(world, true);
-      Eigen::MatrixXs newP_c
-          = plusBackptr->getProjectionIntoClampsMatrix(world);
-      if (newP_c.rows() == originalP_c.rows())
-      {
-        newPlus = newP_c * v;
-        break;
-      }
-      posEps *= 0.5;
-    }
-
-    perturbed = before;
-    s_t negEps = EPS;
-    while (true)
-    {
-      perturbed = before;
-      perturbed(i) -= negEps;
-      wrt->set(world.get(), perturbed);
-
-      BackpropSnapshotPtr negBackptr = neural::forwardPass(world, true);
-
-      Eigen::MatrixXs newP_c = getProjectionIntoClampsMatrix(world, true);
-      if (newP_c.rows() == originalP_c.rows())
-      {
-        newMinus = newP_c * v;
-        break;
-      }
-      negEps *= 0.5;
-    }
-
-    Eigen::VectorXs diff = newPlus - newMinus;
-    result.col(i) = diff / (posEps + negEps);
-  }
-
-  wrt->set(world.get(), before);
-  snapshot.restore();
-
-  return result;
-}
-
-//==============================================================================
-/// This computes and returns the jacobian of P_c * v by Ridders extrapolated
-/// finite differences. This is SUPER SLOW, and is only here for testing.
-Eigen::MatrixXs
-BackpropSnapshot::finiteDifferenceRiddersJacobianOfProjectionIntoClampsMatrix(
-    simulation::WorldPtr world, Eigen::VectorXs v, WithRespectTo* wrt)
-{
-  RestorableSnapshot snapshot(world);
-
-  std::size_t innerDim = wrt->dim(world.get());
-
+  world->setPositions(mPreStepPosition);
+  world->setVelocities(mPreStepVelocity);
+  world->setControlForces(mPreStepTorques);
+  world->setCachedLCPSolution(mPreStepLCPCache);
   Eigen::VectorXs originalWrt = wrt->get(world.get());
-
-  // These are predicted contact forces at the clamping contacts
-  Eigen::VectorXs originalP_c_v
-      = getProjectionIntoClampsMatrix(world, true) * v;
   Eigen::MatrixXs originalP_c = getProjectionIntoClampsMatrix(world, true);
+  Eigen::VectorXs originalP_c_v = originalP_c * v;
+  Eigen::MatrixXs result(originalP_c_v.size(), wrt->dim(world.get()));
 
-  Eigen::MatrixXs J = Eigen::MatrixXs::Zero(originalP_c_v.size(), innerDim);
-
-  s_t originalStepSize = 1e-3;
-  const s_t con = 1.4, con2 = (con * con);
-  const s_t safeThreshold = 2.0;
-  const int tabSize = 10;
-
-  for (std::size_t i = 0; i < innerDim; i++)
+  s_t eps = useRidders ? 1e-3 : 1e-5;
+  try
   {
-    // Neville tableau of finite difference results
-    std::array<std::array<Eigen::VectorXs, tabSize>, tabSize> tab;
-
-    Eigen::VectorXs P_c_vPlus;
-    Eigen::VectorXs P_c_vMinus;
-
-    // Find largest original step size which doesn't change numClamping
-    while (true)
-    {
-      Eigen::VectorXs perturbedPlus = Eigen::VectorXs(originalWrt);
-      perturbedPlus(i) += originalStepSize;
-      wrt->set(world.get(), perturbedPlus);
-      BackpropSnapshotPtr snapshotPlus = neural::forwardPass(world, true);
-      Eigen::MatrixXs P_cPlus
-          = snapshotPlus->getProjectionIntoClampsMatrix(world);
-
-      Eigen::VectorXs perturbedMinus = Eigen::VectorXs(originalWrt);
-      perturbedMinus(i) -= originalStepSize;
-      wrt->set(world.get(), perturbedMinus);
-      BackpropSnapshotPtr snapshotMinus = neural::forwardPass(world, true);
-      Eigen::MatrixXs P_cMinus
-          = snapshotMinus->getProjectionIntoClampsMatrix(world);
-      if (P_cPlus.rows() == originalP_c.rows()
-          && P_cMinus.rows() == originalP_c.rows())
-      {
-        P_c_vPlus = P_cPlus * v;
-        P_c_vMinus = P_cMinus * v;
-        break;
-      }
-      originalStepSize *= 0.5;
-
-      assert(abs(originalStepSize) > 1e-20);
-    }
-
-    tab[0][0] = (P_c_vPlus - P_c_vMinus) / (2 * originalStepSize);
-
-    s_t stepSize = originalStepSize;
-    s_t bestError = std::numeric_limits<s_t>::max();
-
-    // Iterate over smaller and smaller step sizes
-    for (int iTab = 1; iTab < tabSize; iTab++)
-    {
-      stepSize /= con;
-
-      Eigen::VectorXs perturbedPlus = Eigen::VectorXs(originalWrt);
-      perturbedPlus(i) += stepSize;
-      wrt->set(world.get(), perturbedPlus);
-      BackpropSnapshotPtr snapshotPlus = neural::forwardPass(world, true);
-      Eigen::MatrixXs P_cPlus
-          = snapshotPlus->getProjectionIntoClampsMatrix(world);
-      if (!(P_cPlus.rows() == originalP_c.rows()))
-      {
-        assert(false && 
-  "Lowering EPS in finiteDifferenceRiddersJacobianOfProjectionIntoClampsMatrix() "
-  "caused P_c.rows() to change.");
-      }
-      P_c_vPlus = P_cPlus * v;
-
-      Eigen::VectorXs perturbedMinus = Eigen::VectorXs(originalWrt);
-      perturbedMinus(i) -= stepSize;
-      wrt->set(world.get(), perturbedMinus);
-      BackpropSnapshotPtr snapshotMinus = neural::forwardPass(world, true);
-      Eigen::MatrixXs P_cMinus
-          = snapshotMinus->getProjectionIntoClampsMatrix(world);
-      if (!(P_cMinus.rows() == originalP_c.rows()))
-      {
-        assert(false && 
-  "Lowering EPS in finiteDifferenceRiddersJacobianOfProjectionIntoClampsMatrix() "
-  "caused P_c.rows() to change.");
-      }
-      P_c_vMinus = P_cMinus * v;
-
-      tab[0][iTab] = (P_c_vPlus - P_c_vMinus) / (2 * stepSize);
-
-      s_t fac = con2;
-      // Compute extrapolations of increasing orders, requiring no new
-      // evaluations
-      for (int jTab = 1; jTab <= iTab; jTab++)
-      {
-        tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
-                          / (fac - 1.0);
-        fac = con2 * fac;
-        s_t currError = max(
-            (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
-            (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
-                .array()
-                .abs()
-                .maxCoeff());
-        if (currError < bestError)
-        {
-          bestError = currError;
-          J.col(i).noalias() = tab[jTab][iTab];
-        }
-      }
-
-      // If higher order is worse by a significant factor, quit early.
-      if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
-          >= safeThreshold * bestError)
-      {
-        break;
-      }
-    }
+    finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweakedWrt = originalWrt;
+        tweakedWrt(dof) += eps;
+        wrt->set(world.get(), tweakedWrt);
+        BackpropSnapshotPtr snapshot = neural::forwardPass(world, true);
+        Eigen::MatrixXs P_c = snapshot->getProjectionIntoClampsMatrix(world);
+        if (P_c.rows() != originalP_c.rows())
+          return false;
+        perturbed = P_c * v;
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+    snapshot.restore();
+    return result;
   }
-
-  wrt->set(world.get(), originalWrt);
-  snapshot.restore();
-
-  return J;
+  catch(const std::exception& e)
+  {
+    std::cout << "Error in finiteDifferenceJacobianOfProjectionIntoClamps"
+        "Matrix: " << e.what() << std::endl;
+    printReplicationInstructions(world);
+    throw e;
+  }
 }
 
 //==============================================================================
@@ -6870,133 +3919,31 @@ Eigen::MatrixXs BackpropSnapshot::finiteDifferenceJacobianOfMinv(
     WithRespectTo* wrt,
     bool useRidders)
 {
-  if (useRidders)
-    return finiteDifferenceRiddersJacobianOfMinv(world, tau, wrt);
-
   RestorableSnapshot snapshot(world);
-
-  std::size_t innerDim = wrt->dim(world.get());
-
-  // These are predicted contact forces at the clamping contacts
-  Eigen::VectorXs original = implicitMultiplyByInvMassMatrix(world, tau);
-
-  Eigen::MatrixXs result = Eigen::MatrixXs::Zero(original.size(), innerDim);
-
-  Eigen::VectorXs before = wrt->get(world.get());
-
-  const s_t EPS = 5e-7;
-
-  for (std::size_t i = 0; i < innerDim; i++)
-  {
-    Eigen::VectorXs perturbed = before;
-    perturbed(i) += EPS;
-    wrt->set(world.get(), perturbed);
-    Eigen::MatrixXs newVPlus = implicitMultiplyByInvMassMatrix(world, tau);
-    perturbed = before;
-    perturbed(i) -= EPS;
-    wrt->set(world.get(), perturbed);
-    Eigen::MatrixXs newVMinus = implicitMultiplyByInvMassMatrix(world, tau);
-    Eigen::VectorXs diff = newVPlus - newVMinus;
-    result.col(i) = diff / (2 * EPS);
-  }
-
-  wrt->set(world.get(), before);
-  snapshot.restore();
-
-  return result;
-}
-
-//==============================================================================
-/// This computes and returns the jacobian of M^{-1}(pos, inertia) * tau by
-/// Ridders extrapolated finite differences.
-Eigen::MatrixXs BackpropSnapshot::finiteDifferenceRiddersJacobianOfMinv(
-    simulation::WorldPtr world, Eigen::VectorXs tau, WithRespectTo* wrt)
-{
-  RestorableSnapshot snapshot(world);
-
-  std::size_t innerDim = wrt->dim(world.get());
-
-  // These are predicted contact forces at the clamping contacts
-  Eigen::VectorXs original = implicitMultiplyByInvMassMatrix(world, tau);
-
-  Eigen::MatrixXs J = Eigen::MatrixXs::Zero(original.size(), innerDim);
-
+  world->setPositions(mPreStepPosition);
+  world->setVelocities(mPreStepVelocity);
+  world->setControlForces(mPreStepTorques);
+  world->setCachedLCPSolution(mPreStepLCPCache);
   Eigen::VectorXs originalWrt = wrt->get(world.get());
+  Eigen::VectorXs original = implicitMultiplyByInvMassMatrix(world, tau);
+  Eigen::MatrixXs result(original.size(), wrt->dim(world.get()));
 
-  const s_t originalStepSize = 1e-3;
-  const s_t con = 1.4, con2 = (con * con);
-  const s_t safeThreshold = 2.0;
-  const int tabSize = 10;
-
-  for (std::size_t i = 0; i < innerDim; i++)
-  {
-    s_t stepSize = originalStepSize;
-    s_t bestError = std::numeric_limits<s_t>::max();
-
-    // Neville tableau of finite difference results
-    std::array<std::array<Eigen::VectorXs, tabSize>, tabSize> tab;
-
-    Eigen::VectorXs perturbedPlus = Eigen::VectorXs(originalWrt);
-    perturbedPlus(i) += stepSize;
-    wrt->set(world.get(), perturbedPlus);
-    Eigen::MatrixXs MinvTauPlus = implicitMultiplyByInvMassMatrix(world, tau);
-    Eigen::VectorXs perturbedMinus = Eigen::VectorXs(originalWrt);
-    perturbedMinus(i) -= stepSize;
-    wrt->set(world.get(), perturbedMinus);
-    Eigen::MatrixXs MinvTauMinus = implicitMultiplyByInvMassMatrix(world, tau);
-
-    tab[0][0] = (MinvTauPlus - MinvTauMinus) / (2 * stepSize);
-
-    // Iterate over smaller and smaller step sizes
-    for (int iTab = 1; iTab < tabSize; iTab++)
-    {
-      stepSize /= con;
-
-      perturbedPlus = Eigen::VectorXs(originalWrt);
-      perturbedPlus(i) += stepSize;
-      wrt->set(world.get(), perturbedPlus);
-      MinvTauPlus = implicitMultiplyByInvMassMatrix(world, tau);
-      perturbedMinus = Eigen::VectorXs(originalWrt);
-      perturbedMinus(i) -= stepSize;
-      wrt->set(world.get(), perturbedMinus);
-      MinvTauMinus = implicitMultiplyByInvMassMatrix(world, tau);
-
-      tab[0][iTab] = (MinvTauPlus - MinvTauMinus) / (2 * stepSize);
-
-      s_t fac = con2;
-      // Compute extrapolations of increasing orders, requiring no new
-      // evaluations
-      for (int jTab = 1; jTab <= iTab; jTab++)
-      {
-        tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
-                          / (fac - 1.0);
-        fac = con2 * fac;
-        s_t currError = max(
-            (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
-            (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
-                .array()
-                .abs()
-                .maxCoeff());
-        if (currError < bestError)
-        {
-          bestError = currError;
-          J.col(i).noalias() = tab[jTab][iTab];
-        }
-      }
-
-      // If higher order is worse by a significant factor, quit early.
-      if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
-          >= safeThreshold * bestError)
-      {
-        break;
-      }
-    }
-  }
-
-  wrt->set(world.get(), originalWrt);
+  s_t eps = useRidders ? 1e-3 : 5e-7;
+  finiteDifference(
+    [&](/* in*/ s_t eps,
+        /* in*/ int dof,
+        /*out*/ Eigen::VectorXs& perturbed) {
+      Eigen::VectorXs tweakedWrt = originalWrt;
+      tweakedWrt(dof) += eps;
+      wrt->set(world.get(), tweakedWrt);
+      perturbed = implicitMultiplyByInvMassMatrix(world, tau);
+      return true;
+    },
+    result,
+    eps,
+    useRidders);
   snapshot.restore();
-
-  return J;
+  return result;
 }
 
 //==============================================================================
@@ -7031,130 +3978,30 @@ Eigen::MatrixXs BackpropSnapshot::finiteDifferenceJacobianOfM(
     WithRespectTo* wrt,
     bool useRidders)
 {
-  if (useRidders)
-    return finiteDifferenceRiddersJacobianOfM(world, v, wrt);
-
   RestorableSnapshot snapshot(world);
-
-  std::size_t wrtDim = wrt->dim(world.get());
-
-  Eigen::MatrixXs result = Eigen::MatrixXs::Zero(world->getNumDofs(), wrtDim);
-
-  Eigen::VectorXs before = wrt->get(world.get());
-
-  const s_t EPS = 5e-7;
-
-  for (std::size_t i = 0; i < wrtDim; i++)
-  {
-    Eigen::VectorXs perturbed = before;
-    perturbed(i) += EPS;
-    wrt->set(world.get(), perturbed);
-    Eigen::MatrixXs newVPlus = world->getMassMatrix() * v;
-    perturbed = before;
-    perturbed(i) -= EPS;
-    wrt->set(world.get(), perturbed);
-    Eigen::MatrixXs newVMinus = world->getMassMatrix() * v;
-    Eigen::VectorXs diff = newVPlus - newVMinus;
-    result.col(i) = diff / (2 * EPS);
-  }
-
-  wrt->set(world.get(), before);
-  snapshot.restore();
-
-  return result;
-}
-
-//==============================================================================
-/// This computes and returns the jacobian of M(pos, inertia) * v by
-/// Ridders extrapolated finite differences. This is SUPER SLOW, and is
-/// only here for testing.
-Eigen::MatrixXs BackpropSnapshot::finiteDifferenceRiddersJacobianOfM(
-    simulation::WorldPtr world, Eigen::VectorXs v, WithRespectTo* wrt)
-{
-  RestorableSnapshot snapshot(world);
-
-  std::size_t wrtDim = wrt->dim(world.get());
-
-  // These are predicted contact forces at the clamping contacts
-  Eigen::MatrixXs J = Eigen::MatrixXs::Zero(world->getNumDofs(), wrtDim);
-
+  world->setPositions(mPreStepPosition);
+  world->setVelocities(mPreStepVelocity);
+  world->setControlForces(mPreStepTorques);
+  world->setCachedLCPSolution(mPreStepLCPCache);
   Eigen::VectorXs originalWrt = wrt->get(world.get());
+  Eigen::MatrixXs result(mNumDOFs, wrt->dim(world.get()));
 
-  const s_t originalStepSize = 1e-3;
-  const s_t con = 1.4, con2 = (con * con);
-  const s_t safeThreshold = 2.0;
-  const int tabSize = 10;
-
-  for (std::size_t i = 0; i < wrtDim; i++)
-  {
-    s_t stepSize = originalStepSize;
-    s_t bestError = std::numeric_limits<s_t>::max();
-
-    // Neville tableau of finite difference results
-    std::array<std::array<Eigen::VectorXs, tabSize>, tabSize> tab;
-
-    Eigen::VectorXs perturbedPlus = Eigen::VectorXs(originalWrt);
-    perturbedPlus(i) += stepSize;
-    wrt->set(world.get(), perturbedPlus);
-    Eigen::MatrixXs plus = world->getMassMatrix() * v;
-
-    Eigen::VectorXs perturbedMinus = Eigen::VectorXs(originalWrt);
-    perturbedMinus(i) -= stepSize;
-    wrt->set(world.get(), perturbedMinus);
-    Eigen::MatrixXs minus = world->getMassMatrix() * v;
-
-    tab[0][0] = (plus - minus) / (2 * stepSize);
-
-    // Iterate over smaller and smaller step sizes
-    for (int iTab = 1; iTab < tabSize; iTab++)
-    {
-      stepSize /= con;
-
-      perturbedPlus = Eigen::VectorXs(originalWrt);
-      perturbedPlus(i) += stepSize;
-      wrt->set(world.get(), perturbedPlus);
-      plus = world->getMassMatrix() * v;
-      perturbedMinus = Eigen::VectorXs(originalWrt);
-      perturbedMinus(i) -= stepSize;
-      wrt->set(world.get(), perturbedMinus);
-      minus = world->getMassMatrix() * v;
-
-      tab[0][iTab] = (plus - minus) / (2 * stepSize);
-
-      s_t fac = con2;
-      // Compute extrapolations of increasing orders, requiring no new
-      // evaluations
-      for (int jTab = 1; jTab <= iTab; jTab++)
-      {
-        tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
-                          / (fac - 1.0);
-        fac = con2 * fac;
-        s_t currError = max(
-            (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
-            (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
-                .array()
-                .abs()
-                .maxCoeff());
-        if (currError < bestError)
-        {
-          bestError = currError;
-          J.col(i).noalias() = tab[jTab][iTab];
-        }
-      }
-
-      // If higher order is worse by a significant factor, quit early.
-      if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
-          >= safeThreshold * bestError)
-      {
-        break;
-      }
-    }
-  }
-
-  wrt->set(world.get(), originalWrt);
+  s_t eps = useRidders ? 1e-3 : 5e-7;
+  finiteDifference(
+    [&](/* in*/ s_t eps,
+        /* in*/ int dof,
+        /*out*/ Eigen::VectorXs& perturbed) {
+      Eigen::VectorXs tweakedWrt = originalWrt;
+      tweakedWrt(dof) += eps;
+      wrt->set(world.get(), tweakedWrt);
+      perturbed = world->getMassMatrix() * v;
+      return true;
+    },
+    result,
+    eps,
+    useRidders);
   snapshot.restore();
-
-  return J;
+  return result;
 }
 
 //==============================================================================
@@ -7163,133 +4010,31 @@ Eigen::MatrixXs BackpropSnapshot::finiteDifferenceRiddersJacobianOfM(
 Eigen::MatrixXs BackpropSnapshot::finiteDifferenceJacobianOfC(
     simulation::WorldPtr world, WithRespectTo* wrt, bool useRidders)
 {
-  if (useRidders)
-    return finiteDifferenceRiddersJacobianOfC(world, wrt);
-
   RestorableSnapshot snapshot(world);
-
-  std::size_t innerDim = wrt->dim(world.get());
-
-  // These are predicted contact forces at the clamping contacts
-  Eigen::VectorXs original = world->getCoriolisAndGravityAndExternalForces();
-
-  Eigen::MatrixXs result = Eigen::MatrixXs::Zero(original.size(), innerDim);
-
-  Eigen::VectorXs before = wrt->get(world.get());
-
-  const s_t EPS = 1e-7;
-
-  for (std::size_t i = 0; i < innerDim; i++)
-  {
-    Eigen::VectorXs perturbed = before;
-    perturbed(i) += EPS;
-    wrt->set(world.get(), perturbed);
-    Eigen::MatrixXs tauPos = world->getCoriolisAndGravityAndExternalForces();
-    perturbed = before;
-    perturbed(i) -= EPS;
-    wrt->set(world.get(), perturbed);
-    Eigen::MatrixXs tauNeg = world->getCoriolisAndGravityAndExternalForces();
-    Eigen::VectorXs diff = tauPos - tauNeg;
-    result.col(i) = diff / (2 * EPS);
-  }
-
-  wrt->set(world.get(), before);
-  snapshot.restore();
-
-  return result;
-}
-
-//==============================================================================
-/// This computes and returns the jacobian of C(pos, inertia, vel) by
-/// Ridders extrapolated finite differences.
-Eigen::MatrixXs BackpropSnapshot::finiteDifferenceRiddersJacobianOfC(
-    simulation::WorldPtr world, WithRespectTo* wrt)
-{
-  RestorableSnapshot snapshot(world);
-
-  std::size_t innerDim = wrt->dim(world.get());
-
-  // These are predicted contact forces at the clamping contacts
-  Eigen::VectorXs original = world->getCoriolisAndGravityAndExternalForces();
-
-  Eigen::MatrixXs J = Eigen::MatrixXs::Zero(original.size(), innerDim);
-
+  world->setPositions(mPreStepPosition);
+  world->setVelocities(mPreStepVelocity);
+  world->setControlForces(mPreStepTorques);
+  world->setCachedLCPSolution(mPreStepLCPCache);
   Eigen::VectorXs originalWrt = wrt->get(world.get());
+  Eigen::VectorXs original = world->getCoriolisAndGravityAndExternalForces();
+  Eigen::MatrixXs result(original.size(), wrt->dim(world.get()));
 
-  const s_t originalStepSize = 1e-3;
-  const s_t con = 1.4, con2 = (con * con);
-  const s_t safeThreshold = 2.0;
-  const int tabSize = 10;
-
-  for (std::size_t i = 0; i < innerDim; i++)
-  {
-    s_t stepSize = originalStepSize;
-    s_t bestError = std::numeric_limits<s_t>::max();
-
-    // Neville tableau of finite difference results
-    std::array<std::array<Eigen::VectorXs, tabSize>, tabSize> tab;
-
-    Eigen::VectorXs perturbedPlus = Eigen::VectorXs(originalWrt);
-    perturbedPlus(i) += stepSize;
-    wrt->set(world.get(), perturbedPlus);
-    Eigen::MatrixXs tauPlus = world->getCoriolisAndGravityAndExternalForces();
-    Eigen::VectorXs perturbedMinus = Eigen::VectorXs(originalWrt);
-    perturbedMinus(i) -= stepSize;
-    wrt->set(world.get(), perturbedMinus);
-    Eigen::MatrixXs tauMinus = world->getCoriolisAndGravityAndExternalForces();
-
-    tab[0][0] = (tauPlus - tauMinus) / (2 * stepSize);
-
-    // Iterate over smaller and smaller step sizes
-    for (int iTab = 1; iTab < tabSize; iTab++)
-    {
-      stepSize /= con;
-
-      perturbedPlus = Eigen::VectorXs(originalWrt);
-      perturbedPlus(i) += stepSize;
-      wrt->set(world.get(), perturbedPlus);
-      tauPlus = world->getCoriolisAndGravityAndExternalForces();
-      perturbedMinus = Eigen::VectorXs(originalWrt);
-      perturbedMinus(i) -= stepSize;
-      wrt->set(world.get(), perturbedMinus);
-      tauMinus = world->getCoriolisAndGravityAndExternalForces();
-
-      tab[0][iTab] = (tauPlus - tauMinus) / (2 * stepSize);
-
-      s_t fac = con2;
-      // Compute extrapolations of increasing orders, requiring no new
-      // evaluations
-      for (int jTab = 1; jTab <= iTab; jTab++)
-      {
-        tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
-                          / (fac - 1.0);
-        fac = con2 * fac;
-        s_t currError = max(
-            (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
-            (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
-                .array()
-                .abs()
-                .maxCoeff());
-        if (currError < bestError)
-        {
-          bestError = currError;
-          J.col(i).noalias() = tab[jTab][iTab];
-        }
-      }
-
-      // If higher order is worse by a significant factor, quit early.
-      if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
-          >= safeThreshold * bestError)
-      {
-        break;
-      }
-    }
-  }
-
-  wrt->set(world.get(), originalWrt);
+  s_t eps = useRidders ? 1e-3 : 5e-7;
+  finiteDifference(
+    [&](/* in*/ s_t eps,
+        /* in*/ int dof,
+        /*out*/ Eigen::VectorXs& perturbed) {
+      Eigen::VectorXs tweakedWrt = originalWrt;
+      tweakedWrt(dof) += eps;
+      wrt->set(world.get(), tweakedWrt);
+      perturbed = world->getCoriolisAndGravityAndExternalForces();
+      return true;
+    },
+    result,
+    eps,
+    useRidders);
   snapshot.restore();
-
-  return J;
+  return result;
 }
 
 //==============================================================================
@@ -7299,526 +4044,90 @@ Eigen::MatrixXs BackpropSnapshot::finiteDifferenceRiddersJacobianOfC(
 Eigen::MatrixXs BackpropSnapshot::finiteDifferenceJacobianOfMinvC(
     simulation::WorldPtr world, WithRespectTo* wrt, bool useRidders)
 {
-  if (useRidders)
-    return finiteDifferenceRiddersJacobianOfMinvC(world, wrt);
-
   RestorableSnapshot snapshot(world);
-
-  std::size_t innerDim = wrt->dim(world.get());
-
-  // These are predicted contact forces at the clamping contacts
-  Eigen::VectorXs original = implicitMultiplyByInvMassMatrix(
-      world, mPreStepTorques - world->getCoriolisAndGravityAndExternalForces());
-
-  Eigen::MatrixXs result = Eigen::MatrixXs::Zero(original.size(), innerDim);
-
-  Eigen::VectorXs before = wrt->get(world.get());
-
-  const s_t EPS = 1e-7;
-
-  for (std::size_t i = 0; i < innerDim; i++)
-  {
-    Eigen::VectorXs perturbed = before;
-    perturbed(i) += EPS;
-    wrt->set(world.get(), perturbed);
-    Eigen::MatrixXs tauPos = implicitMultiplyByInvMassMatrix(
-        world,
-        mPreStepTorques - world->getCoriolisAndGravityAndExternalForces());
-    perturbed = before;
-    perturbed(i) -= EPS;
-    wrt->set(world.get(), perturbed);
-    Eigen::MatrixXs tauNeg = implicitMultiplyByInvMassMatrix(
-        world,
-        mPreStepTorques - world->getCoriolisAndGravityAndExternalForces());
-    Eigen::VectorXs diff = tauPos - tauNeg;
-    result.col(i) = diff / (2 * EPS);
-  }
-
-  wrt->set(world.get(), before);
-  snapshot.restore();
-
-  return result;
-}
-
-//==============================================================================
-/// This computes and returns the jacobian of M^{-1}(pos, inertia) * C(pos,
-/// inertia, vel) by Ridders extrapolated finite differences. This is SUPER
-/// SLOW, and is only here for testing.
-Eigen::MatrixXs BackpropSnapshot::finiteDifferenceRiddersJacobianOfMinvC(
-    simulation::WorldPtr world, WithRespectTo* wrt)
-{
-  RestorableSnapshot snapshot(world);
-
-  std::size_t innerDim = wrt->dim(world.get());
-
-  Eigen::VectorXs original = implicitMultiplyByInvMassMatrix(
-      world, mPreStepTorques - world->getCoriolisAndGravityAndExternalForces());
-
-  Eigen::MatrixXs J = Eigen::MatrixXs::Zero(original.size(), innerDim);
-
+  world->setPositions(mPreStepPosition);
+  world->setVelocities(mPreStepVelocity);
+  world->setControlForces(mPreStepTorques);
+  world->setCachedLCPSolution(mPreStepLCPCache);
   Eigen::VectorXs originalWrt = wrt->get(world.get());
+  Eigen::VectorXs original = implicitMultiplyByInvMassMatrix(
+      world, mPreStepTorques - world->getCoriolisAndGravityAndExternalForces());
+  Eigen::MatrixXs result(original.size(), wrt->dim(world.get()));
 
-  const s_t originalStepSize = 1e-3;
-  const s_t con = 1.4, con2 = (con * con);
-  const s_t safeThreshold = 2.0;
-  const int tabSize = 10;
-
-  for (std::size_t i = 0; i < innerDim; i++)
-  {
-    s_t stepSize = originalStepSize;
-    s_t bestError = std::numeric_limits<s_t>::max();
-
-    // Neville tableau of finite difference results
-    std::array<std::array<Eigen::VectorXs, tabSize>, tabSize> tab;
-
-    Eigen::VectorXs perturbedPlus = Eigen::VectorXs(originalWrt);
-    perturbedPlus(i) += stepSize;
-    wrt->set(world.get(), perturbedPlus);
-    Eigen::MatrixXs MinvCPlus = implicitMultiplyByInvMassMatrix(
-        world,
-        mPreStepTorques - world->getCoriolisAndGravityAndExternalForces());
-    Eigen::VectorXs perturbedMinus = Eigen::VectorXs(originalWrt);
-    perturbedMinus(i) -= stepSize;
-    wrt->set(world.get(), perturbedMinus);
-    Eigen::MatrixXs MinvCMinus = implicitMultiplyByInvMassMatrix(
-        world,
-        mPreStepTorques - world->getCoriolisAndGravityAndExternalForces());
-
-    tab[0][0] = (MinvCPlus - MinvCMinus) / (2 * stepSize);
-
-    // Iterate over smaller and smaller step sizes
-    for (int iTab = 1; iTab < tabSize; iTab++)
-    {
-      stepSize /= con;
-
-      perturbedPlus = Eigen::VectorXs(originalWrt);
-      perturbedPlus(i) += stepSize;
-      wrt->set(world.get(), perturbedPlus);
-      MinvCPlus = implicitMultiplyByInvMassMatrix(
+  s_t eps = useRidders ? 1e-3 : 5e-7;
+  finiteDifference(
+    [&](/* in*/ s_t eps,
+        /* in*/ int dof,
+        /*out*/ Eigen::VectorXs& perturbed) {
+      Eigen::VectorXs tweakedWrt = originalWrt;
+      tweakedWrt(dof) += eps;
+      wrt->set(world.get(), tweakedWrt);
+      perturbed = implicitMultiplyByInvMassMatrix(
           world,
           mPreStepTorques - world->getCoriolisAndGravityAndExternalForces());
-      perturbedMinus = Eigen::VectorXs(originalWrt);
-      perturbedMinus(i) -= stepSize;
-      wrt->set(world.get(), perturbedMinus);
-      MinvCMinus = implicitMultiplyByInvMassMatrix(
-          world,
-          mPreStepTorques - world->getCoriolisAndGravityAndExternalForces());
-
-      tab[0][iTab] = (MinvCPlus - MinvCMinus) / (2 * stepSize);
-
-      s_t fac = con2;
-      // Compute extrapolations of increasing orders, requiring no new
-      // evaluations
-      for (int jTab = 1; jTab <= iTab; jTab++)
-      {
-        tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
-                          / (fac - 1.0);
-        fac = con2 * fac;
-        s_t currError = max(
-            (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
-            (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
-                .array()
-                .abs()
-                .maxCoeff());
-        if (currError < bestError)
-        {
-          bestError = currError;
-          J.col(i).noalias() = tab[jTab][iTab];
-        }
-      }
-
-      // If higher order is worse by a significant factor, quit early.
-      if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
-          >= safeThreshold * bestError)
-      {
-        break;
-      }
-    }
-  }
-
-  wrt->set(world.get(), originalWrt);
+      return true;
+    },
+    result,
+    eps,
+    useRidders);
   snapshot.restore();
-
-  return J;
+  return result;
 }
 
 //==============================================================================
 Eigen::MatrixXs BackpropSnapshot::finiteDifferenceJacobianOfConstraintForce(
     simulation::WorldPtr world, WithRespectTo* wrt, bool useRidders)
 {
-  if (useRidders)
-  {
-    return finiteDifferenceRiddersJacobianOfConstraintForce(world, wrt);
-  }
-
   RestorableSnapshot snapshot(world);
+  bool oldPenetrationCorrection = world->getPenetrationCorrectionEnabled();
+  world->setPenetrationCorrectionEnabled(false);
+
   world->setPositions(mPreStepPosition);
   world->setVelocities(mPreStepVelocity);
   world->setControlForces(mPreStepTorques);
   world->setCachedLCPSolution(mPreStepLCPCache);
-
-  bool oldPenetrationCorrection = world->getPenetrationCorrectionEnabled();
-  world->setPenetrationCorrectionEnabled(false);
-
-  BackpropSnapshotPtr originalPtr = neural::forwardPass(world, true);
-  Eigen::VectorXs f0 = originalPtr->getClampingConstraintImpulses();
-  assert(f0.size() == mNumClamping);
-  assert(originalPtr->getNumUpperBound() == mNumUpperBound);
-  assert(originalPtr->areResultsStandardized());
-
-  std::size_t innerDim = wrt->dim(world.get());
-
-  Eigen::VectorXs before = wrt->get(world.get());
-
-  Eigen::MatrixXs result = Eigen::MatrixXs::Zero(f0.size(), innerDim);
-
-  const s_t EPS = 1e-7;
-
-  for (std::size_t i = 0; i < innerDim; i++)
-  {
-    Eigen::VectorXs fPlus;
-    Eigen::VectorXs fMinus;
-
-    Eigen::VectorXs perturbed = before;
-    s_t epsPos = EPS;
-    while (true)
-    {
-      perturbed = before;
-      perturbed(i) += epsPos;
-      wrt->set(world.get(), perturbed);
-      BackpropSnapshotPtr perturbedPtr = neural::forwardPass(world, true);
-      if (perturbedPtr->getNumClamping() == f0.size()
-          && perturbedPtr->getNumUpperBound() == originalPtr->getNumUpperBound()
-          && (!areResultsStandardized()
-              || perturbedPtr->areResultsStandardized())
-          && perturbedPtr->getNumContacts() == originalPtr->getNumContacts()
-          && perturbedPtr->getConstraintForceMixingDiagonal()(0)
-                 == originalPtr->getConstraintForceMixingDiagonal()(0))
-      {
-        fPlus = perturbedPtr->getClampingConstraintImpulses();
-        break;
-      }
-      else
-      {
-        std::cout << "Perturb[" << i << "] += " << epsPos << " failed"
-                  << std::endl;
-        std::cout << "Original num contacts: " << originalPtr->getNumContacts()
-                  << std::endl;
-        std::cout << "Original num clamping: " << originalPtr->getNumClamping()
-                  << std::endl;
-        std::cout << "Original num upper bounded: "
-                  << originalPtr->getNumUpperBound() << std::endl;
-        std::cout << "Original LCP standardized: "
-                  << originalPtr->areResultsStandardized() << std::endl;
-        std::cout << "Perturbed num contacts: "
-                  << perturbedPtr->getContactConstraintImpulses().size()
-                  << std::endl;
-        std::cout << "Perturbed num clamping: "
-                  << perturbedPtr->getNumClamping() << std::endl;
-        std::cout << "Perturbed num upper bounded: "
-                  << perturbedPtr->getNumUpperBound() << std::endl;
-        std::cout << "Perturbed LCP standardized: "
-                  << perturbedPtr->areResultsStandardized() << std::endl;
-      }
-      epsPos *= 0.5;
-      assert(epsPos > 1e-30);
-    }
-
-    s_t epsNeg = EPS;
-    while (true)
-    {
-      perturbed = before;
-      perturbed(i) -= epsNeg;
-      wrt->set(world.get(), perturbed);
-      BackpropSnapshotPtr perturbedPtr = neural::forwardPass(world, true);
-      if (perturbedPtr->getNumClamping() == f0.size()
-          && perturbedPtr->getNumUpperBound() == originalPtr->getNumUpperBound()
-          && perturbedPtr->getNumContacts() == originalPtr->getNumContacts()
-          && (!areResultsStandardized()
-              || perturbedPtr->areResultsStandardized())
-          && perturbedPtr->getConstraintForceMixingDiagonal()(0)
-                 == originalPtr->getConstraintForceMixingDiagonal()(0))
-      {
-        fMinus = perturbedPtr->getClampingConstraintImpulses();
-        break;
-      }
-      else
-      {
-        std::cout << "Perturb[" << i << "] -= " << epsNeg << " failed"
-                  << std::endl;
-        std::cout << "Original num contacts: "
-                  << originalPtr->getContactConstraintImpulses().size()
-                  << std::endl;
-        std::cout << "Original num clamping: " << originalPtr->getNumClamping()
-                  << std::endl;
-        std::cout << "Original num upper bounded: "
-                  << originalPtr->getNumUpperBound() << std::endl;
-        std::cout << "Original LCP standardized: "
-                  << originalPtr->areResultsStandardized() << std::endl;
-        std::cout << "Perturbed num contacts: "
-                  << perturbedPtr->getContactConstraintImpulses().size()
-                  << std::endl;
-        std::cout << "Perturbed num clamping: "
-                  << perturbedPtr->getNumClamping() << std::endl;
-        std::cout << "Perturbed num upper bounded: "
-                  << perturbedPtr->getNumUpperBound() << std::endl;
-        std::cout << "Perturbed LCP standardized: "
-                  << perturbedPtr->areResultsStandardized() << std::endl;
-      }
-      epsNeg *= 0.5;
-      assert(epsNeg > 1e-30);
-    }
-    Eigen::VectorXs diff = fPlus - fMinus;
-
-    if (abs(epsPos) < 1e-11 || abs(epsNeg) < 1e-11)
-    {
-      std::cout << "WARNING: finiteDifferenceJacobianOfConstraintForce() had "
-                   "to use dangerously small EPS to get a sample with the same "
-                   "number of clamping contacts. Perturb["
-                << i << "]: eps_pos=" << epsPos << ", eps_neg=" << epsNeg
-                << std::endl;
-    }
-
-    result.col(i) = diff / (epsPos + epsNeg);
-  }
-
-  wrt->set(world.get(), before);
-  world->setPenetrationCorrectionEnabled(oldPenetrationCorrection);
-
-  snapshot.restore();
-  return result;
-}
-
-//==============================================================================
-Eigen::MatrixXs
-BackpropSnapshot::finiteDifferenceRiddersJacobianOfConstraintForce(
-    simulation::WorldPtr world, WithRespectTo* wrt)
-{
-  RestorableSnapshot snapshot(world);
-  world->setPositions(mPreStepPosition);
-  world->setVelocities(mPreStepVelocity);
-  world->setControlForces(mPreStepTorques);
-  world->setCachedLCPSolution(mPreStepLCPCache);
-
-  bool oldPenetrationCorrection = world->getPenetrationCorrectionEnabled();
-  world->setPenetrationCorrectionEnabled(false);
-
-  BackpropSnapshotPtr originalPtr = neural::forwardPass(world, true);
-  Eigen::VectorXs f0 = originalPtr->getClampingConstraintImpulses();
-  assert(f0.size() == mNumClamping);
-  assert(originalPtr->getNumUpperBound() == mNumUpperBound);
-  assert(originalPtr->areResultsStandardized());
-
-  std::size_t innerDim = wrt->dim(world.get());
-
   Eigen::VectorXs originalWrt = wrt->get(world.get());
+  BackpropSnapshotPtr originalSnapshot = neural::forwardPass(world, true);
+  Eigen::VectorXs f0 = originalSnapshot->getClampingConstraintImpulses();
+  assert(f0.size() == mNumClamping);
+  assert(originalSnapshot->getNumUpperBound() == mNumUpperBound);
+  assert(originalSnapshot->areResultsStandardized());
+  Eigen::MatrixXs result(f0.size(), wrt->dim(world.get()));
 
-  Eigen::MatrixXs J = Eigen::MatrixXs::Zero(f0.size(), innerDim);
-
-  s_t originalStepSize = 1e-2;
-  const s_t con = 1.4, con2 = (con * con);
-  const s_t safeThreshold = 2.0;
-  const int tabSize = 15;
-
-  for (std::size_t i = 0; i < innerDim; i++)
+  s_t eps = useRidders ? 1e-2 : 1e-7;
+  try
   {
-    // Neville tableau of finite difference results
-    std::array<std::array<Eigen::VectorXs, tabSize>, tabSize> tab;
-
-    Eigen::VectorXs fPlus;
-    Eigen::VectorXs fMinus;
-
-    Eigen::VectorXs perturbed = originalWrt;
-
-    // Find largest original step size which doesn't change
-    // numClamping/numUpperBound
-    while (true)
-    {
-      Eigen::VectorXs perturbedPlus = Eigen::VectorXs(originalWrt);
-      perturbedPlus(i) += originalStepSize;
-      wrt->set(world.get(), perturbedPlus);
-      BackpropSnapshotPtr snapshotPlus = neural::forwardPass(world, true);
-      Eigen::VectorXs perturbedMinus = Eigen::VectorXs(originalWrt);
-      perturbedMinus(i) -= originalStepSize;
-      wrt->set(world.get(), perturbedMinus);
-      BackpropSnapshotPtr snapshotMinus = neural::forwardPass(world, true);
-      if (snapshotPlus->getNumClamping() == f0.size()
-          && snapshotPlus->getNumUpperBound() == originalPtr->getNumUpperBound()
-          && snapshotPlus->getNumContacts() == originalPtr->getNumContacts()
-          && snapshotPlus->getConstraintForceMixingDiagonal()(0)
-                 == originalPtr->getConstraintForceMixingDiagonal()(0)
+    finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweakedWrt = originalWrt;
+        tweakedWrt(dof) += eps;
+        wrt->set(world.get(), tweakedWrt);
+        BackpropSnapshotPtr snapshot = neural::forwardPass(world, true);
+        perturbed = snapshot->getClampingConstraintImpulses();
+        return snapshot->getNumClamping() == f0.size()
+          && snapshot->getNumUpperBound() == originalSnapshot->getNumUpperBound()
           && (!areResultsStandardized()
-              || snapshotPlus->areResultsStandardized())
-          && snapshotMinus->getNumClamping() == f0.size()
-          && snapshotMinus->getNumUpperBound()
-                 == originalPtr->getNumUpperBound()
-          && snapshotMinus->getNumContacts() == originalPtr->getNumContacts()
-          && snapshotMinus->getConstraintForceMixingDiagonal()(0)
-                 == originalPtr->getConstraintForceMixingDiagonal()(0)
-          && (!areResultsStandardized()
-              || snapshotMinus->areResultsStandardized()))
-      {
-        fPlus = snapshotPlus->getClampingConstraintImpulses();
-        fMinus = snapshotMinus->getClampingConstraintImpulses();
-        break;
-      }
-      originalStepSize *= 0.5;
-
-      assert(abs(originalStepSize) > 1e-20);
-    }
-    if (abs(originalStepSize) < 1e-11)
-    {
-      std::cout << "WARNING: finiteDifferenceRiddersJacobianOfConstraintForce()"
-                   " had to use dangerously small EPS to get a sample with the"
-                   " same number of clamping contacts. Perturb["
-                << i << "]: originalStepSize=" << originalStepSize << std::endl;
-    }
-
-    tab[0][0] = (fPlus - fMinus) / (2 * originalStepSize);
-
-    s_t stepSize = originalStepSize;
-    s_t bestError = std::numeric_limits<s_t>::max();
-
-    // Iterate over smaller and smaller step sizes
-    for (int iTab = 1; iTab < tabSize; iTab++)
-    {
-      stepSize /= con;
-
-      Eigen::VectorXs perturbedPlus = Eigen::VectorXs(originalWrt);
-      perturbedPlus(i) += stepSize;
-      wrt->set(world.get(), perturbedPlus);
-      BackpropSnapshotPtr snapshotPlus = neural::forwardPass(world, true);
-      fPlus = snapshotPlus->getClampingConstraintImpulses();
-
-      if (!(snapshotPlus->getNumClamping() == f0.size()
-            && snapshotPlus->getNumUpperBound()
-                   == originalPtr->getNumUpperBound()
-            && snapshotPlus->getNumContacts() == originalPtr->getNumContacts()
-            && snapshotPlus->getConstraintForceMixingDiagonal()(0)
-                   == originalPtr->getConstraintForceMixingDiagonal()(0)
-            && (!areResultsStandardized()
-                || snapshotPlus->areResultsStandardized())))
-      {
-        assert(false && 
-        "Lowering EPS in finiteDifferenceRiddersJacobianOfConstraintForce "
-        "caused numClamping() or numUpperBound() to change.");
-      }
-      Eigen::VectorXs perturbedMinus = Eigen::VectorXs(originalWrt);
-      perturbedMinus(i) -= stepSize;
-      wrt->set(world.get(), perturbedMinus);
-      BackpropSnapshotPtr snapshotMinus = neural::forwardPass(world, true);
-      fMinus = snapshotMinus->getClampingConstraintImpulses();
-      if (!(snapshotMinus->getNumClamping() == f0.size()
-            && snapshotMinus->getNumUpperBound()
-                   == originalPtr->getNumUpperBound()
-            && snapshotMinus->getNumContacts() == originalPtr->getNumContacts()
-            && snapshotMinus->getConstraintForceMixingDiagonal()(0)
-                   == originalPtr->getConstraintForceMixingDiagonal()(0)
-            && (!areResultsStandardized()
-                || snapshotMinus->areResultsStandardized())))
-      {
-        assert(false && 
-        "Lowering EPS in finiteDifferenceRiddersJacobianOfConstraintForce "
-        "caused numClamping() or numUpperBound() to change.");
-      }
-
-      /*
-      #ifndef NDEBUG
-      if (i == 1)
-      {
-        if (abs(fPlus(0) - f0(0)) > 1e-12)
-        {
-          std::cout << "Constraint force changed by " << fPlus(0) - f0(0)
-                    << " with positive y-axis bump of " << stepSize << "!"
-                    << std::endl;
-        }
-        else
-        {
-          std::cout
-              << "Constraint force not changed with positive y-axis bump of "
-              << stepSize << "!" << std::endl;
-        }
-        if (abs(fMinus(0) - f0(0)) > 1e-12)
-        {
-          std::cout << "Constraint force changed by " << fMinus(0) - f0(0)
-                    << " with negative y-axis bump of " << stepSize << "!"
-                    << std::endl;
-          std::shared_ptr<DifferentiableContactConstraint> originalConstraint
-              = originalPtr->getDifferentiableConstraints()[0];
-          collision::Contact& originalContact
-              = originalConstraint->getContact();
-          std::shared_ptr<DifferentiableContactConstraint> constraint
-              = snapshotMinus->getDifferentiableConstraints()[0];
-          collision::Contact& contact = constraint->getContact();
-          // constraint->getContactWorldForceDirection()
-          if (originalContact.type != contact.type)
-          {
-            std::cout << "Original type: " << originalContact.type << std::endl;
-            std::cout << "New type: " << contact.type << std::endl;
-          }
-          if (originalContact.point != contact.point)
-          {
-            std::cout << "Original pt: " << originalContact.point << std::endl;
-            std::cout << "New pt: " << contact.point << std::endl;
-            std::cout << "Diff: " << contact.point - originalContact.point
-                      << std::endl;
-          }
-          if (originalContact.normal != contact.normal)
-          {
-            std::cout << "Original normal: " << originalContact.normal
-                      << std::endl;
-            std::cout << "New normal: " << contact.normal << std::endl;
-            std::cout << "Diff: " << contact.normal - originalContact.normal
-                      << std::endl;
-          }
-        }
-        else
-        {
-          std::cout
-              << "Constraint force not changed with negative y-axis bump of "
-              << stepSize << "!" << std::endl;
-        }
-      }
-      #endif
-      */
-
-      tab[0][iTab] = (fPlus - fMinus) / (2 * stepSize);
-
-      s_t fac = con2;
-      // Compute extrapolations of increasing orders, requiring no new
-      // evaluations
-      for (int jTab = 1; jTab <= iTab; jTab++)
-      {
-        tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
-                          / (fac - 1.0);
-        fac = con2 * fac;
-        s_t currError = max(
-            (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
-            (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
-                .array()
-                .abs()
-                .maxCoeff());
-        if (currError < bestError)
-        {
-          bestError = currError;
-          J.col(i).noalias() = tab[jTab][iTab];
-        }
-      }
-
-      // If higher order is worse by a significant factor, quit early.
-      if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
-          >= safeThreshold * bestError)
-      {
-        break;
-      }
-    }
+              || snapshot->areResultsStandardized())
+          && snapshot->getNumContacts() == originalSnapshot->getNumContacts()
+          && snapshot->getConstraintForceMixingDiagonal()(0)
+                 == originalSnapshot->getConstraintForceMixingDiagonal()(0);
+      },
+      result,
+      eps,
+      useRidders);
+    snapshot.restore();
+    world->setPenetrationCorrectionEnabled(oldPenetrationCorrection);
+    return result;
   }
-
-  wrt->set(world.get(), originalWrt);
-  world->setPenetrationCorrectionEnabled(oldPenetrationCorrection);
-
-  snapshot.restore();
-  return J;
+  catch(const std::exception& e)
+  {
+    std::cout << "Error in finiteDifferenceJacobianOfConstraintForce: " 
+        << e.what() << std::endl;
+    printReplicationInstructions(world);
+    throw e;
+  }
 }
 
 //==============================================================================
@@ -7829,176 +4138,40 @@ Eigen::MatrixXs
 BackpropSnapshot::finiteDifferenceJacobianOfEstimatedConstraintForce(
     simulation::WorldPtr world, WithRespectTo* wrt, bool useRidders)
 {
-  if (useRidders)
-  {
-    return finiteDifferenceRiddersJacobianOfEstimatedConstraintForce(
-        world, wrt);
-  }
-
   RestorableSnapshot snapshot(world);
-
-  Eigen::MatrixXs A_c = getClampingConstraintMatrix(world);
-  Eigen::MatrixXs A_ub = getUpperBoundConstraintMatrix(world);
-  Eigen::MatrixXs E = getUpperBoundMappingMatrix();
-
-  int wrtDim = wrt->dim(world.get());
-  Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(mNumClamping, wrtDim);
-
-  const s_t EPS = 1e-7;
-  Eigen::VectorXs original = wrt->get(world.get());
-  for (int i = 0; i < wrtDim; i++)
-  {
-    Eigen::VectorXs perturbed = original;
-    perturbed(i) += EPS;
-    wrt->set(world.get(), perturbed);
-
-    if (wrt == WithRespectTo::POSITION)
-    {
-      A_c = estimateClampingConstraintMatrixAt(world, world->getPositions());
-      A_ub = estimateUpperBoundConstraintMatrixAt(world, world->getPositions());
-    }
-
-    Eigen::VectorXs fPlus
-        = estimateClampingConstraintImpulses(world, A_c, A_ub, E);
-
-    perturbed = original;
-    perturbed(i) -= EPS;
-    wrt->set(world.get(), perturbed);
-
-    if (wrt == WithRespectTo::POSITION)
-    {
-      A_c = estimateClampingConstraintMatrixAt(world, world->getPositions());
-      A_ub = estimateUpperBoundConstraintMatrixAt(world, world->getPositions());
-    }
-
-    Eigen::VectorXs fMinus
-        = estimateClampingConstraintImpulses(world, A_c, A_ub, E);
-
-    jac.col(i) = (fPlus - fMinus) / (2 * EPS);
-  }
-  wrt->set(world.get(), original);
-  snapshot.restore();
-
-  return jac;
-}
-
-//==============================================================================
-/// This returns the jacobian of estimated constraint force, without actually
-/// running forward passes, holding everyhing constant except the value of
-/// WithRespectTo. Uses Ridders method.
-Eigen::MatrixXs
-BackpropSnapshot::finiteDifferenceRiddersJacobianOfEstimatedConstraintForce(
-    simulation::WorldPtr world, WithRespectTo* wrt)
-{
-  RestorableSnapshot snapshot(world);
-
-  Eigen::MatrixXs A_c = getClampingConstraintMatrix(world);
-  Eigen::MatrixXs A_ub = getUpperBoundConstraintMatrix(world);
-  Eigen::MatrixXs E = getUpperBoundMappingMatrix();
-
-  int wrtDim = wrt->dim(world.get());
-  Eigen::MatrixXs J = Eigen::MatrixXs::Zero(mNumClamping, wrtDim);
-
-  const s_t originalStepSize = 1e-3;
-  const s_t con = 1.4, con2 = (con * con);
-  const s_t safeThreshold = 2.0;
-  const int tabSize = 10;
-
+  world->setPositions(mPreStepPosition);
+  world->setVelocities(mPreStepVelocity);
+  world->setControlForces(mPreStepTorques);
+  world->setCachedLCPSolution(mPreStepLCPCache);
   Eigen::VectorXs originalWrt = wrt->get(world.get());
-  for (int i = 0; i < wrtDim; i++)
-  {
-    s_t stepSize = originalStepSize;
-    s_t bestError = std::numeric_limits<s_t>::max();
+  Eigen::MatrixXs A_c = getClampingConstraintMatrix(world);
+  Eigen::MatrixXs A_ub = getUpperBoundConstraintMatrix(world);
+  Eigen::MatrixXs E = getUpperBoundMappingMatrix();
+  Eigen::MatrixXs result(mNumClamping, wrt->dim(world.get()));
 
-    // Neville tableau of finite difference results
-    std::array<std::array<Eigen::VectorXs, tabSize>, tabSize> tab;
-
-    Eigen::VectorXs perturbedPlus = Eigen::VectorXs(originalWrt);
-    perturbedPlus(i) += stepSize;
-    wrt->set(world.get(), perturbedPlus);
-    if (wrt == WithRespectTo::POSITION)
-    {
-      A_c = estimateClampingConstraintMatrixAt(world, world->getPositions());
-      A_ub = estimateUpperBoundConstraintMatrixAt(world, world->getPositions());
-    }
-    Eigen::VectorXs fPlus
-        = estimateClampingConstraintImpulses(world, A_c, A_ub, E);
-
-    Eigen::VectorXs perturbedMinus = Eigen::VectorXs(originalWrt);
-    perturbedMinus(i) -= stepSize;
-    wrt->set(world.get(), perturbedMinus);
-    if (wrt == WithRespectTo::POSITION)
-    {
-      A_c = estimateClampingConstraintMatrixAt(world, world->getPositions());
-      A_ub = estimateUpperBoundConstraintMatrixAt(world, world->getPositions());
-    }
-    Eigen::VectorXs fMinus
-        = estimateClampingConstraintImpulses(world, A_c, A_ub, E);
-
-    tab[0][0] = (fPlus - fMinus) / (2 * stepSize);
-
-    // Iterate over smaller and smaller step sizes
-    for (int iTab = 1; iTab < tabSize; iTab++)
-    {
-      stepSize /= con;
-
-      perturbedPlus = Eigen::VectorXs(originalWrt);
-      perturbedPlus(i) += stepSize;
-      wrt->set(world.get(), perturbedPlus);
+  s_t eps = useRidders ? 1e-3 : 1e-7;
+  finiteDifference(
+    [&](/* in*/ s_t eps,
+        /* in*/ int dof,
+        /*out*/ Eigen::VectorXs& perturbed) {
+      Eigen::VectorXs tweakedWrt = originalWrt;
+      tweakedWrt(dof) += eps;
+      wrt->set(world.get(), tweakedWrt);
       if (wrt == WithRespectTo::POSITION)
       {
-        A_c = estimateClampingConstraintMatrixAt(world, world->getPositions());
-        A_ub = estimateUpperBoundConstraintMatrixAt(
-            world, world->getPositions());
+        A_c = 
+          estimateClampingConstraintMatrixAt(world, world->getPositions());
+        A_ub = 
+          estimateUpperBoundConstraintMatrixAt(world, world->getPositions());
       }
-      fPlus = estimateClampingConstraintImpulses(world, A_c, A_ub, E);
-
-      perturbedMinus = Eigen::VectorXs(originalWrt);
-      perturbedMinus(i) -= stepSize;
-      wrt->set(world.get(), perturbedMinus);
-      if (wrt == WithRespectTo::POSITION)
-      {
-        A_c = estimateClampingConstraintMatrixAt(world, world->getPositions());
-        A_ub = estimateUpperBoundConstraintMatrixAt(
-            world, world->getPositions());
-      }
-      fMinus = estimateClampingConstraintImpulses(world, A_c, A_ub, E);
-
-      tab[0][iTab] = (fPlus - fMinus) / (2 * stepSize);
-
-      s_t fac = con2;
-      // Compute extrapolations of increasing orders, requiring no new
-      // evaluations
-      for (int jTab = 1; jTab <= iTab; jTab++)
-      {
-        tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
-                          / (fac - 1.0);
-        fac = con2 * fac;
-        s_t currError = max(
-            (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
-            (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
-                .array()
-                .abs()
-                .maxCoeff());
-        if (currError < bestError)
-        {
-          bestError = currError;
-          J.col(i).noalias() = tab[jTab][iTab];
-        }
-      }
-
-      // If higher order is worse by a significant factor, quit early.
-      if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
-          >= safeThreshold * bestError)
-      {
-        break;
-      }
-    }
-  }
-  wrt->set(world.get(), originalWrt);
+      perturbed = estimateClampingConstraintImpulses(world, A_c, A_ub, E);
+      return true;
+    },
+    result,
+    eps,
+    useRidders);
   snapshot.restore();
-
-  return J;
+  return result;
 }
 
 //==============================================================================

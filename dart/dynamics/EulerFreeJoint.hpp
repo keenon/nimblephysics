@@ -125,13 +125,6 @@ public:
       const Eigen::Vector3s& flipAxisMap,
       const Eigen::Isometry3s& childBodyToJoint, bool useRidders = true);
 
-  static Eigen::Matrix6s finiteDifferenceRiddersRelativeJacobianStaticDerivWrtPos(
-      const Eigen::Vector6s& positions,
-      std::size_t index,
-      EulerJoint::AxisOrder axisOrder,
-      const Eigen::Vector3s& flipAxisMap,
-      const Eigen::Isometry3s& childBodyToJoint);
-
   static Eigen::Matrix6s computeRelativeJacobianTimeDerivStatic(
       const Eigen::Vector6s& positions,
       const Eigen::Vector6s& velocities,
@@ -146,13 +139,6 @@ public:
       const Eigen::Vector3s& flipAxisMap,
       const Eigen::Isometry3s& childBodyToJoint,
       bool useRidders = true);
-
-  static Eigen::Matrix6s finiteDifferenceRiddersRelativeJacobianTimeDerivStatic(
-      const Eigen::Vector6s& positions,
-      const Eigen::Vector6s& velocities,
-      EulerJoint::AxisOrder axisOrder,
-      const Eigen::Vector3s& flipAxisMap,
-      const Eigen::Isometry3s& childBodyToJoint);
 
   static Eigen::Matrix6s computeRelativeJacobianTimeDerivDerivWrtPos(
       const Eigen::Vector6s& positions,
@@ -171,15 +157,6 @@ public:
       const Eigen::Isometry3s& childBodyToJoint,
       bool useRidders = true);
 
-  static Eigen::Matrix6s
-  finiteDifferenceRiddersRelativeJacobianTimeDerivDerivWrtPos(
-      const Eigen::Vector6s& positions,
-      const Eigen::Vector6s& velocities,
-      std::size_t index,
-      EulerJoint::AxisOrder axisOrder,
-      const Eigen::Vector3s& flipAxisMap,
-      const Eigen::Isometry3s& childBodyToJoint);
-
   static Eigen::Matrix6s computeRelativeJacobianTimeDerivDerivWrtVel(
       const Eigen::Vector6s& positions,
       std::size_t index,
@@ -196,14 +173,6 @@ public:
       const Eigen::Isometry3s& childBodyToJoint,
       bool useRidders = true);
 
-  static Eigen::Matrix6s
-  finiteDifferenceRiddersRelativeJacobianTimeDerivDerivWrtVel(
-      const Eigen::Vector6s& positions,
-      const Eigen::Vector6s& velocities,
-      std::size_t index,
-      EulerJoint::AxisOrder axisOrder,
-      const Eigen::Vector3s& flipAxisMap,
-      const Eigen::Isometry3s& childBodyToJoint);
 
 protected:
   EulerJoint::AxisOrder mAxisOrder;

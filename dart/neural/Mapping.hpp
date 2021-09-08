@@ -84,9 +84,6 @@ public:
   Eigen::MatrixXs finiteDifferenceRealPosToMappedPosJac(
       std::shared_ptr<simulation::World> world, bool useRidders = true);
 
-  Eigen::MatrixXs finiteDifferenceRiddersRealPosToMappedPosJac(
-      std::shared_ptr<simulation::World> world);
-
   /// This gets a Jacobian relating the changes in the inner velocities (the
   /// "real" velocities) to the corresponding outer positions (the "mapped"
   /// positions)
@@ -96,9 +93,6 @@ public:
 
   Eigen::MatrixXs finiteDifferenceRealVelToMappedPosJac(
       std::shared_ptr<simulation::World> world, bool useRidders = true);
-
-  Eigen::MatrixXs finiteDifferenceRiddersRealVelToMappedPosJac(
-      std::shared_ptr<simulation::World> world);
 
   /// This gets a Jacobian relating the changes in the inner velocity (the
   /// "real" velocity) to the corresponding outer velocity (the "mapped"
@@ -110,9 +104,6 @@ public:
   Eigen::MatrixXs finiteDifferenceRealVelToMappedVelJac(
       std::shared_ptr<simulation::World> world, bool useRidders = true);
 
-  Eigen::MatrixXs finiteDifferenceRiddersRealVelToMappedVelJac(
-      std::shared_ptr<simulation::World> world);
-
   /// This gets a Jacobian relating the changes in the inner position (the
   /// "real" position) to the corresponding outer velocity (the "mapped"
   /// velocity)
@@ -122,9 +113,6 @@ public:
 
   Eigen::MatrixXs finiteDifferenceRealPosToMappedVelJac(
       std::shared_ptr<simulation::World> world, bool useRidders = true);
-
-  Eigen::MatrixXs finiteDifferenceRiddersRealPosToMappedVelJac(
-      std::shared_ptr<simulation::World> world);
 
   /// This gets a Jacobian relating the changes in the inner force (the
   /// "real" force) to the corresponding outer force (the "mapped"

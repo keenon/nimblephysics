@@ -42,6 +42,7 @@
 
 #include "dart/common/Console.hpp"
 #include "dart/math/Helpers.hpp"
+#include "dart/math/FiniteDifference.hpp"
 
 #define DART_EPSILON 1e-6
 
@@ -653,76 +654,22 @@ Eigen::Vector3s finiteDifferenceExpMapNestedGradient(
     const Eigen::Vector3s& screw,
     bool useRidders)
 {
-  if (useRidders)
-  {
-    return finiteDifferenceRiddersExpMapNestedGradient(original, screw);
-  }
-
+  std::cout << "expmapnestedgradient" << std::endl;
   Eigen::MatrixXs R = expMapRot(original);
+  Eigen::Vector3s result;
 
-  s_t EPS = 1e-7;
-  Eigen::Vector3s plus = logMap(expMapRot(screw * EPS) * R);
-  Eigen::Vector3s minus = logMap(expMapRot(screw * -EPS) * R);
+  s_t eps = useRidders ? 1e-3 : 1e-7;
+  math::finiteDifference<Eigen::Vector3s>(
+    [&](/* in*/ s_t eps,
+        /*out*/ Eigen::Vector3s& perturbed) {
+      perturbed = logMap(expMapRot(screw * eps) * R);
+      return true;
+    },
+    result,
+    eps,
+    useRidders);
 
-  return (plus - minus) / (2 * EPS);
-}
-
-Eigen::Vector3s finiteDifferenceRiddersExpMapNestedGradient(
-    const Eigen::Vector3s& original, const Eigen::Vector3s& screw)
-{
-  Eigen::MatrixXs R = expMapRot(original);
-  const s_t originalStepSize = 1e-3;
-  const s_t con = 1.4, con2 = (con * con);
-  const s_t safeThreshold = 2.0;
-  const int tabSize = 10;
-
-  s_t stepSize = originalStepSize;
-  s_t bestError = std::numeric_limits<s_t>::max();
-
-  Eigen::Vector3s res = Eigen::Vector3s::Zero();
-
-  // Neville tableau of finite difference results
-  std::array<std::array<Eigen::Vector3s, tabSize>, tabSize> tab;
-
-  Eigen::Vector3s plus = logMap(expMapRot(screw * stepSize) * R);
-  Eigen::Vector3s minus = logMap(expMapRot(screw * -stepSize) * R);
-  tab[0][0] = (plus - minus) / (2 * stepSize);
-
-  // Iterate over smaller and smaller step sizes
-  for (int iTab = 1; iTab < tabSize; iTab++)
-  {
-    stepSize /= con;
-
-    Eigen::Vector3s plus = logMap(expMapRot(screw * stepSize) * R);
-    Eigen::Vector3s minus = logMap(expMapRot(screw * -stepSize) * R);
-    tab[0][iTab] = (plus - minus) / (2 * stepSize);
-
-    s_t fac = con2;
-    // Compute extrapolations of increasing orders, requiring no new
-    // evaluations
-    for (int jTab = 1; jTab <= iTab; jTab++)
-    {
-      tab[jTab][iTab]
-          = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1]) / (fac - 1.0);
-      fac = con2 * fac;
-      s_t currError = std::max(
-          (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
-          (tab[jTab][iTab] - tab[jTab - 1][iTab - 1]).array().abs().maxCoeff());
-      if (currError < bestError)
-      {
-        bestError = currError;
-        res = tab[jTab][iTab];
-      }
-    }
-
-    // If higher order is worse by a significant factor, quit early.
-    if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
-        >= safeThreshold * bestError)
-    {
-      break;
-    }
-  }
-  return res;
+  return result;
 }
 
 // Vec3 AdInvTLinear(const SE3& T, const Vec3& v)
@@ -1576,17 +1523,23 @@ Eigen::Matrix3s eulerXYZToMatrixGrad(const Eigen::Vector3s& _angle, int index)
 Eigen::Matrix3s eulerXYZToMatrixFiniteDifference(
     const Eigen::Vector3s& _angle, int index)
 {
-  const s_t EPS = 1e-8;
+  Eigen::Matrix3s result;
 
-  Eigen::Vector3s perturbed = _angle;
-  perturbed(index) += EPS;
-  Eigen::Matrix3s plus = eulerXYZToMatrix(perturbed);
+  bool useRidders = false;
+  s_t eps = 1e-8;
+  math::finiteDifference<Eigen::Matrix3s>(
+    [&](/* in*/ s_t eps,
+        /*out*/ Eigen::Matrix3s& perturbed) {
+      Eigen::Vector3s tweaked = _angle;
+      tweaked(index) += eps;
+      perturbed = eulerXYZToMatrix(tweaked);
+      return true;
+    },
+    result,
+    eps,
+    useRidders);
 
-  perturbed = _angle;
-  perturbed(index) -= EPS;
-  Eigen::Matrix3s minus = eulerXYZToMatrix(perturbed);
-
-  return (plus - minus) / (2 * EPS);
+  return result;
 }
 
 /// This gives the gradient of eulerXYZToMatrixGrad(_angle, firstIndex) with
@@ -1763,17 +1716,23 @@ Eigen::Matrix3s eulerXYZToMatrixSecondGrad(
 Eigen::Matrix3s eulerXYZToMatrixSecondFiniteDifference(
     const Eigen::Vector3s& _angle, int firstIndex, int secondIndex)
 {
-  const s_t EPS = 1e-8;
+  Eigen::Matrix3s result;
 
-  Eigen::Vector3s perturbed = _angle;
-  perturbed(secondIndex) += EPS;
-  Eigen::Matrix3s plus = eulerXYZToMatrixGrad(perturbed, firstIndex);
+  bool useRidders = false;
+  s_t eps = 1e-8;
+  math::finiteDifference<Eigen::Matrix3s>(
+    [&](/* in*/ s_t eps,
+        /*out*/ Eigen::Matrix3s& perturbed) {
+      Eigen::Vector3s tweaked = _angle;
+      tweaked(secondIndex) += eps;
+      perturbed = eulerXYZToMatrixGrad(tweaked, firstIndex);
+      return true;
+    },
+    result,
+    eps,
+    useRidders);
 
-  perturbed = _angle;
-  perturbed(secondIndex) -= EPS;
-  Eigen::Matrix3s minus = eulerXYZToMatrixGrad(perturbed, firstIndex);
-
-  return (plus - minus) / (2 * EPS);
+  return result;
 }
 
 Eigen::Matrix3s eulerXZXToMatrix(const Eigen::Vector3s& _angle)
@@ -1911,17 +1870,23 @@ Eigen::Matrix3s eulerXZYToMatrixGrad(const Eigen::Vector3s& _angle, int index)
 Eigen::Matrix3s eulerXZYToMatrixFiniteDifference(
     const Eigen::Vector3s& _angle, int index)
 {
-  const s_t EPS = 1e-8;
+  Eigen::Matrix3s result;
 
-  Eigen::Vector3s perturbed = _angle;
-  perturbed(index) += EPS;
-  Eigen::Matrix3s plus = eulerXZYToMatrix(perturbed);
+  bool useRidders = false;
+  s_t eps = 1e-8;
+  math::finiteDifference<Eigen::Matrix3s>(
+    [&](/* in*/ s_t eps,
+        /*out*/ Eigen::Matrix3s& perturbed) {
+      Eigen::Vector3s tweaked = _angle;
+      tweaked(index) += eps;
+      perturbed = eulerXZYToMatrix(tweaked);
+      return true;
+    },
+    result,
+    eps,
+    useRidders);
 
-  perturbed = _angle;
-  perturbed(index) -= EPS;
-  Eigen::Matrix3s minus = eulerXZYToMatrix(perturbed);
-
-  return (plus - minus) / (2 * EPS);
+  return result;
 }
 
 /// This gives the gradient of eulerXZYToMatrixGrad(_angle, firstIndex) with
@@ -2098,17 +2063,23 @@ Eigen::Matrix3s eulerXZYToMatrixSecondGrad(
 Eigen::Matrix3s eulerXZYToMatrixSecondFiniteDifference(
     const Eigen::Vector3s& _angle, int firstIndex, int secondIndex)
 {
-  const s_t EPS = 1e-8;
+  Eigen::Matrix3s result;
 
-  Eigen::Vector3s perturbed = _angle;
-  perturbed(secondIndex) += EPS;
-  Eigen::Matrix3s plus = eulerXZYToMatrixGrad(perturbed, firstIndex);
+  bool useRidders = false;
+  s_t eps = 1e-8;
+  math::finiteDifference<Eigen::Matrix3s>(
+    [&](/* in*/ s_t eps,
+        /*out*/ Eigen::Matrix3s& perturbed) {
+      Eigen::Vector3s tweaked = _angle;
+      tweaked(secondIndex) += eps;
+      perturbed = eulerXZYToMatrixGrad(tweaked, firstIndex);
+      return true;
+    },
+    result,
+    eps,
+    useRidders);
 
-  perturbed = _angle;
-  perturbed(secondIndex) -= EPS;
-  Eigen::Matrix3s minus = eulerXZYToMatrixGrad(perturbed, firstIndex);
-
-  return (plus - minus) / (2 * EPS);
+  return result;
 }
 
 Eigen::Matrix3s eulerYXYToMatrix(const Eigen::Vector3s& _angle)
@@ -2338,17 +2309,23 @@ Eigen::Matrix3s eulerZXYToMatrixGrad(const Eigen::Vector3s& _angle, int index)
 Eigen::Matrix3s eulerZXYToMatrixFiniteDifference(
     const Eigen::Vector3s& _angle, int index)
 {
-  const s_t EPS = 1e-8;
+  Eigen::Matrix3s result;
 
-  Eigen::Vector3s perturbed = _angle;
-  perturbed(index) += EPS;
-  Eigen::Matrix3s plus = eulerZXYToMatrix(perturbed);
+  bool useRidders = false;
+  s_t eps = 1e-8;
+  math::finiteDifference<Eigen::Matrix3s>(
+    [&](/* in*/ s_t eps,
+        /*out*/ Eigen::Matrix3s& perturbed) {
+      Eigen::Vector3s tweaked = _angle;
+      tweaked(index) += eps;
+      perturbed = eulerZXYToMatrix(tweaked);
+      return true;
+    },
+    result,
+    eps,
+    useRidders);
 
-  perturbed = _angle;
-  perturbed(index) -= EPS;
-  Eigen::Matrix3s minus = eulerZXYToMatrix(perturbed);
-
-  return (plus - minus) / (2 * EPS);
+  return result;
 }
 
 /// This gives the gradient of eulerXZYToMatrixGrad(_angle, firstIndex) with
@@ -2525,17 +2502,23 @@ Eigen::Matrix3s eulerZXYToMatrixSecondGrad(
 Eigen::Matrix3s eulerZXYToMatrixSecondFiniteDifference(
     const Eigen::Vector3s& _angle, int firstIndex, int secondIndex)
 {
-  const s_t EPS = 1e-8;
+  Eigen::Matrix3s result;
 
-  Eigen::Vector3s perturbed = _angle;
-  perturbed(secondIndex) += EPS;
-  Eigen::Matrix3s plus = eulerZXYToMatrixGrad(perturbed, firstIndex);
+  bool useRidders = false;
+  s_t eps = 1e-8;
+  math::finiteDifference<Eigen::Matrix3s>(
+    [&](/* in*/ s_t eps,
+        /*out*/ Eigen::Matrix3s& perturbed) {
+      Eigen::Vector3s tweaked = _angle;
+      tweaked(secondIndex) += eps;
+      perturbed = eulerZXYToMatrixGrad(tweaked, firstIndex);
+      return true;
+    },
+    result,
+    eps,
+    useRidders);
 
-  perturbed = _angle;
-  perturbed(secondIndex) -= EPS;
-  Eigen::Matrix3s minus = eulerZXYToMatrixGrad(perturbed, firstIndex);
-
-  return (plus - minus) / (2 * EPS);
+  return result;
 }
 
 Eigen::Matrix3s eulerZYXToMatrix(const Eigen::Vector3s& _angle)
@@ -2641,17 +2624,23 @@ Eigen::Matrix3s eulerZYXToMatrixGrad(const Eigen::Vector3s& _angle, int index)
 Eigen::Matrix3s eulerZYXToMatrixFiniteDifference(
     const Eigen::Vector3s& _angle, int index)
 {
-  const s_t EPS = 1e-8;
+  Eigen::Matrix3s result;
 
-  Eigen::Vector3s perturbed = _angle;
-  perturbed(index) += EPS;
-  Eigen::Matrix3s plus = eulerZYXToMatrix(perturbed);
+  bool useRidders = false;
+  s_t eps = 1e-8;
+  math::finiteDifference<Eigen::Matrix3s>(
+    [&](/* in*/ s_t eps,
+        /*out*/ Eigen::Matrix3s& perturbed) {
+      Eigen::Vector3s tweaked = _angle;
+      tweaked(index) += eps;
+      perturbed = eulerZYXToMatrix(tweaked);
+      return true;
+    },
+    result,
+    eps,
+    useRidders);
 
-  perturbed = _angle;
-  perturbed(index) -= EPS;
-  Eigen::Matrix3s minus = eulerZYXToMatrix(perturbed);
-
-  return (plus - minus) / (2 * EPS);
+  return result;
 }
 
 /// This gives the gradient of eulerXZYToMatrixGrad(_angle, firstIndex) with
@@ -2820,17 +2809,23 @@ Eigen::Matrix3s eulerZYXToMatrixSecondGrad(
 Eigen::Matrix3s eulerZYXToMatrixSecondFiniteDifference(
     const Eigen::Vector3s& _angle, int firstIndex, int secondIndex)
 {
-  const s_t EPS = 1e-8;
+  Eigen::Matrix3s result;
 
-  Eigen::Vector3s perturbed = _angle;
-  perturbed(secondIndex) += EPS;
-  Eigen::Matrix3s plus = eulerZYXToMatrixGrad(perturbed, firstIndex);
+  bool useRidders = false;
+  s_t eps = 1e-8;
+  math::finiteDifference<Eigen::Matrix3s>(
+    [&](/* in*/ s_t eps,
+        /*out*/ Eigen::Matrix3s& perturbed) {
+      Eigen::Vector3s tweaked = _angle;
+      tweaked(secondIndex) += eps;
+      perturbed = eulerZYXToMatrixGrad(tweaked, firstIndex);
+      return true;
+    },
+    result,
+    eps,
+    useRidders);
 
-  perturbed = _angle;
-  perturbed(secondIndex) -= EPS;
-  Eigen::Matrix3s minus = eulerZYXToMatrixGrad(perturbed, firstIndex);
-
-  return (plus - minus) / (2 * EPS);
+  return result;
 }
 
 Eigen::Matrix3s eulerZXZToMatrix(const Eigen::Vector3s& _angle)
