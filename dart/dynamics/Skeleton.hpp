@@ -886,6 +886,18 @@ public:
   Eigen::MatrixXs finiteDifferenceJointWorldPositionsJacobianWrtGroupScales(
       const std::vector<const dynamics::Joint*>& joints);
 
+  /// This returns the Jacobian relating changes in body scales to changes in
+  /// marker world positions.
+  Eigen::MatrixXs getMarkerWorldPositionsJacobianWrtGroupScales(
+      const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+          markers);
+
+  /// This returns the Jacobian relating changes in body scales to changes in
+  /// marker world positions.
+  Eigen::MatrixXs finiteDifferenceMarkerWorldPositionsJacobianWrtGroupScales(
+      const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+          markers);
+
   //----------------------------------------------------------------------------
   // Converting EulerJoints->BallJoints and EulerFreeJoints->FreeJoints
   //
@@ -963,15 +975,39 @@ public:
       const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
           markers);
 
-  /// This returns the Jacobian relating changes in source skeleton joint
-  /// positions to changes in source joint world positions.
+  /// This returns the Jacobian relating changes in joint
+  /// positions to changes in marker world positions.
   Eigen::MatrixXs getMarkerWorldPositionsJacobianWrtJointPositions(
       const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
           markers) const;
 
-  /// This returns the Jacobian relating changes in source skeleton joint
-  /// positions to changes in source joint world positions.
+  /// This returns the Jacobian relating changes in joint
+  /// positions to changes in marker world positions.
   Eigen::MatrixXs finiteDifferenceMarkerWorldPositionsJacobianWrtJointPositions(
+      const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+          markers);
+
+  /// This returns the Jacobian relating changes in body scales to changes in
+  /// marker world positions.
+  Eigen::MatrixXs getMarkerWorldPositionsJacobianWrtBodyScales(
+      const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+          markers);
+
+  /// This returns the Jacobian relating changes in body scales to changes in
+  /// marker world positions.
+  Eigen::MatrixXs finiteDifferenceMarkerWorldPositionsJacobianWrtBodyScales(
+      const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+          markers);
+
+  /// This returns the Jacobian relating changes in marker offsets to changes in
+  /// marker world positions.
+  Eigen::MatrixXs getMarkerWorldPositionsJacobianWrtMarkerOffsets(
+      const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+          markers) const;
+
+  /// This returns the Jacobian relating changes in marker offsets to changes in
+  /// marker world positions.
+  Eigen::MatrixXs finiteDifferenceMarkerWorldPositionsJacobianWrtMarkerOffsets(
       const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
           markers);
 

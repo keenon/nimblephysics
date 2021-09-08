@@ -4071,6 +4071,152 @@ bool verifyIdentityMapping(WorldPtr world)
   return verifyMapping(world, mapping);
 }
 
+bool verifySkeletonMarkerJacobians(SkeletonPtr skel, std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>> markers)
+{
+  const s_t THRESHOLD = 1e-7;
+
+  // Check the marker Jacobian is accurate
+  Eigen::MatrixXs posJac
+      = skel->getMarkerWorldPositionsJacobianWrtJointPositions(markers);
+  Eigen::MatrixXs posJac_fd
+      = skel->finiteDifferenceMarkerWorldPositionsJacobianWrtJointPositions(
+          markers);
+  if (!equals(posJac, posJac_fd, THRESHOLD))
+  {
+    for (auto pair : markers)
+    {
+      std::cout << "Pair [" << pair.first->getName() << ",(" << pair.second(0)
+                << "," << pair.second(1) << "," << pair.second(2) << ")]"
+                << std::endl;
+    }
+    std::cout << "Analytical pos J: " << std::endl << posJac << std::endl;
+    std::cout << "FD pos J: " << std::endl << posJac_fd << std::endl;
+    Eigen::MatrixXs diff = posJac - posJac_fd;
+    std::cout << "Diff: " << std::endl << diff << std::endl;
+    int cursor = 0;
+    for (int i = 0; i < skel->getNumJoints(); i++)
+    {
+      dynamics::Joint* joint = skel->getJoint(i);
+      Eigen::MatrixXs jacBlock
+          = posJac.block(0, cursor, diff.rows(), joint->getNumDofs());
+      Eigen::MatrixXs fdBlock
+          = posJac_fd.block(0, cursor, diff.rows(), joint->getNumDofs());
+      Eigen::MatrixXs diffBlock
+          = diff.block(0, cursor, diff.rows(), joint->getNumDofs());
+      if (diffBlock.norm() > 1e-8)
+      {
+        std::cout << "Joint \"" << joint->getName() << "\"" << std::endl;
+        for (auto pair : markers)
+        {
+          std::cout << "Pair [" << pair.first->getName() << ",("
+                    << pair.second(0) << "," << pair.second(1) << ","
+                    << pair.second(2) << ")]" << std::endl;
+        }
+        std::cout << "Jac:" << std::endl
+                  << jacBlock << std::endl
+                  << "FD:" << std::endl
+                  << fdBlock << std::endl
+                  << "Diff:" << std::endl
+                  << diffBlock << std::endl;
+      }
+      cursor += joint->getNumDofs();
+    }
+    EXPECT_TRUE(equals(posJac, posJac_fd, THRESHOLD));
+    return false;
+  }
+
+  Eigen::MatrixXs markersJac
+      = skel->getMarkerWorldPositionsJacobianWrtMarkerOffsets(markers);
+  Eigen::MatrixXs markersJac_fd
+      = skel->finiteDifferenceMarkerWorldPositionsJacobianWrtMarkerOffsets(
+          markers);
+  if (!equals(markersJac, markersJac_fd, THRESHOLD))
+  {
+    for (auto pair : markers)
+    {
+      std::cout << "Pair [" << pair.first->getName() << ",(" << pair.second(0)
+                << "," << pair.second(1) << "," << pair.second(2) << ")]"
+                << std::endl;
+    }
+    std::cout << "Analytical markers J: " << std::endl
+              << markersJac << std::endl;
+    std::cout << "FD markers J: " << std::endl << markersJac_fd << std::endl;
+    Eigen::MatrixXs diff = markersJac - markersJac_fd;
+    std::cout << "Diff: " << std::endl << diff << std::endl;
+    for (int i = 0; i < markers.size(); i++)
+    {
+      Eigen::MatrixXs jacBlock = markersJac.block(i * 3, i * 3, 3, 3);
+      Eigen::MatrixXs fdBlock = markersJac_fd.block(i * 3, i * 3, 3, 3);
+      Eigen::MatrixXs diffBlock = diff.block(i * 3, i * 3, 3, 3);
+      if (diffBlock.norm() > 1e-8)
+      {
+        std::cout << "Marker " << i << std::endl;
+        for (auto pair : markers)
+        {
+          std::cout << "Pair [" << pair.first->getName() << ",("
+                    << pair.second(0) << "," << pair.second(1) << ","
+                    << pair.second(2) << ")]" << std::endl;
+        }
+        std::cout << "Jac:" << std::endl
+                  << jacBlock << std::endl
+                  << "FD:" << std::endl
+                  << fdBlock << std::endl
+                  << "Diff:" << std::endl
+                  << diffBlock << std::endl;
+      }
+    }
+    EXPECT_TRUE(equals(markersJac, markersJac_fd, THRESHOLD));
+    return false;
+  }
+
+  Eigen::MatrixXs scaleJac
+      = skel->getMarkerWorldPositionsJacobianWrtBodyScales(markers);
+  Eigen::MatrixXs scaleJac_fd
+      = skel->finiteDifferenceMarkerWorldPositionsJacobianWrtBodyScales(
+          markers);
+  if (!equals(scaleJac, scaleJac_fd, THRESHOLD))
+  {
+    for (auto pair : markers)
+    {
+      std::cout << "Pair [" << pair.first->getName() << ",(" << pair.second(0)
+                << "," << pair.second(1) << "," << pair.second(2) << ")]"
+                << std::endl;
+    }
+    std::cout << "Analytical scale J: " << std::endl << scaleJac << std::endl;
+    std::cout << "FD scale J: " << std::endl << scaleJac_fd << std::endl;
+    Eigen::MatrixXs diff = scaleJac - scaleJac_fd;
+    std::cout << "Diff: " << std::endl << diff << std::endl;
+    int cursor = 0;
+    for (int i = 0; i < skel->getNumBodyNodes(); i++)
+    {
+      dynamics::BodyNode* body = skel->getBodyNode(i);
+      Eigen::MatrixXs jacBlock = scaleJac.block(0, cursor, diff.rows(), 1);
+      Eigen::MatrixXs fdBlock = scaleJac_fd.block(0, cursor, diff.rows(), 1);
+      Eigen::MatrixXs diffBlock = diff.block(0, cursor, diff.rows(), 1);
+      if (diffBlock.norm() > 1e-8)
+      {
+        std::cout << "Body Scale \"" << body->getName() << "\"" << std::endl;
+        for (auto pair : markers)
+        {
+          std::cout << "Pair [" << pair.first->getName() << ",("
+                    << pair.second(0) << "," << pair.second(1) << ","
+                    << pair.second(2) << ")]" << std::endl;
+        }
+        std::cout << "Jac:" << std::endl
+                  << jacBlock << std::endl
+                  << "FD:" << std::endl
+                  << fdBlock << std::endl
+                  << "Diff:" << std::endl
+                  << diffBlock << std::endl;
+      }
+      cursor += 1;
+    }
+    EXPECT_TRUE(equals(scaleJac, scaleJac_fd, THRESHOLD));
+    return false;
+  }
+  return true;
+}
+
 bool verifyClosestIKPosition(WorldPtr world, Eigen::VectorXs position)
 {
   RestorableSnapshot snapshot(world);

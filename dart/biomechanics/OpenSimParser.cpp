@@ -167,6 +167,9 @@ OpenSimFile OpenSimParser::parseOsim(
   const common::ResourceRetrieverPtr retriever
       = ensureRetriever(nullOrRetriever);
 
+  OpenSimFile null_file;
+  null_file.skeleton = nullptr;
+
   //--------------------------------------------------------------------------
   // Load xml and create Document
   tinyxml2::XMLDocument osimFile;
@@ -178,7 +181,7 @@ OpenSimFile OpenSimParser::parseOsim(
   {
     std::cout << "LoadFile [" << uri.toString() << "] Fails: " << e.what()
               << std::endl;
-    return nullptr;
+    return null_file;
   }
 
   //--------------------------------------------------------------------------
@@ -188,7 +191,7 @@ OpenSimFile OpenSimParser::parseOsim(
   {
     dterr << "OpenSim file[" << uri.toString()
           << "] does not contain <OpenSimDocument> as the root element.\n";
-    return nullptr;
+    return null_file;
   }
   tinyxml2::XMLElement* modelElement = docElement->FirstChildElement("Model");
   if (modelElement == nullptr)
@@ -196,7 +199,7 @@ OpenSimFile OpenSimParser::parseOsim(
     dterr << "OpenSim file[" << uri.toString()
           << "] does not contain <Model> as the child of the root "
              "<OpenSimDocument> element.\n";
-    return nullptr;
+    return null_file;
   }
   tinyxml2::XMLElement* jointSet = modelElement->FirstChildElement("JointSet");
 
@@ -1000,6 +1003,9 @@ OpenSimFile OpenSimParser::readOsim30(
     tinyxml2::XMLElement* docElement,
     const common::ResourceRetrieverPtr& retriever)
 {
+  OpenSimFile null_file;
+  null_file.skeleton = nullptr;
+
   (void)retriever;
   tinyxml2::XMLElement* modelElement = docElement->FirstChildElement("Model");
   if (modelElement == nullptr)
@@ -1007,9 +1013,7 @@ OpenSimFile OpenSimParser::readOsim30(
     dterr << "OpenSim file[" << uri.toString()
           << "] does not contain <Model> as the child of the root "
              "<OpenSimDocument> element.\n";
-    OpenSimFile file;
-    file.skeleton = nullptr;
-    return file;
+    return null_file;
   }
 
   tinyxml2::XMLElement* bodySet = modelElement->FirstChildElement("BodySet");
@@ -1019,7 +1023,7 @@ OpenSimFile OpenSimParser::readOsim30(
   {
     dterr << "OpenSim file[" << uri.toString()
           << "] missing <BodySet> or <JointSet> groups.\n";
-    return nullptr;
+    return null_file;
   }
 
   //--------------------------------------------------------------------------

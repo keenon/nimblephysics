@@ -3501,6 +3501,61 @@ Skeleton::finiteDifferenceJointWorldPositionsJacobianWrtGroupScales(
 }
 
 //==============================================================================
+/// This returns the Jacobian relating changes in body scales to changes in
+/// marker world positions.
+Eigen::MatrixXs Skeleton::getMarkerWorldPositionsJacobianWrtGroupScales(
+    const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+        markers)
+{
+  Eigen::MatrixXs individualBodiesJac
+      = getMarkerWorldPositionsJacobianWrtBodyScales(markers);
+  Eigen::MatrixXs J
+      = Eigen::MatrixXs::Zero(individualBodiesJac.rows(), getNumScaleGroups());
+  for (int i = 0; i < mBodyScaleGroups.size(); i++)
+  {
+    for (dynamics::BodyNode* node : mBodyScaleGroups[i])
+    {
+      J.col(i) += individualBodiesJac.col(node->getIndexInSkeleton());
+    }
+  }
+  return J;
+}
+
+//==============================================================================
+/// This returns the Jacobian relating changes in body scales to changes in
+/// marker world positions.
+Eigen::MatrixXs
+Skeleton::finiteDifferenceMarkerWorldPositionsJacobianWrtGroupScales(
+    const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+        markers)
+{
+  Eigen::MatrixXs jac
+      = Eigen::MatrixXs::Zero(markers.size() * 3, getNumScaleGroups());
+
+  Eigen::VectorXs original = getGroupScales();
+
+  const double EPS = 1e-7;
+  for (int i = 0; i < getNumScaleGroups(); i++)
+  {
+    Eigen::VectorXs perturbed = original;
+    perturbed(i) += EPS;
+    setGroupScales(perturbed);
+    Eigen::VectorXs plus = getMarkerWorldPositions(markers);
+
+    perturbed = original;
+    perturbed(i) -= EPS;
+    setGroupScales(perturbed);
+    Eigen::VectorXs minus = getMarkerWorldPositions(markers);
+
+    jac.col(i) = (plus - minus) / (2 * EPS);
+  }
+
+  setGroupScales(original);
+
+  return jac;
+}
+
+//==============================================================================
 // This creates a fresh skeleton, which is a copy of this one EXCEPT that
 // EulerJoints are BallJoints, and EulerFreeJoints are FreeJoints. This means
 // the configuration spaces are different, so you need to use
@@ -3970,6 +4025,142 @@ Skeleton::finiteDifferenceMarkerWorldPositionsJacobianWrtJointPositions(
     jac.col(i) = (plus - minus) / (2 * EPS);
   }
   setPositions(originalPos);
+
+  return jac;
+}
+
+//==============================================================================
+/// This returns the Jacobian relating changes in body scales to changes in
+/// marker world positions.
+Eigen::MatrixXs Skeleton::getMarkerWorldPositionsJacobianWrtBodyScales(
+    const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+        markers)
+{
+  Eigen::MatrixXs jac
+      = Eigen::MatrixXs::Zero(markers.size() * 3, getNumBodyNodes());
+
+  const Eigen::MatrixXi& parentMap = getParentMap();
+  // Scaling a body will cause the joint offsets to scale, which will move the
+  // downstream joint positions by those vectors
+  for (int i = 0; i < getNumBodyNodes(); i++)
+  {
+    dynamics::BodyNode* bodyNode = getBodyNode(i);
+    Eigen::Matrix3s R = bodyNode->getWorldTransform().linear();
+
+    Eigen::Vector3s parentOffset = bodyNode->getParentJoint()
+                                       ->getTransformFromChildBodyNode()
+                                       .translation();
+
+    Eigen::Vector3s worldParentOffset = -R * parentOffset;
+
+    for (int j = 0; j < markers.size(); j++)
+    {
+      int sourceJointDof
+          = markers[j].first->getParentJoint()->getDof(0)->getIndexInSkeleton();
+      for (int k = 0; k < bodyNode->getNumChildJoints(); k++)
+      {
+        dynamics::Joint* childJoint = bodyNode->getChildJoint(k);
+        if (childJoint == markers[j].first->getParentJoint()
+            || parentMap(
+                childJoint->getDof(0)->getIndexInSkeleton(), sourceJointDof))
+        {
+          // This is the child joint
+
+          Eigen::Vector3s childOffset
+              = childJoint->getTransformFromParentBodyNode().translation();
+          Eigen::Vector3s worldChildOffset = R * childOffset;
+          jac.block(j * 3, i, 3, 1)
+              = (worldParentOffset + worldChildOffset) / bodyNode->getScale();
+
+          break;
+        }
+      }
+    }
+  }
+
+  return jac;
+}
+
+//==============================================================================
+/// This returns the Jacobian relating changes in body scales to changes in
+/// marker world positions.
+Eigen::MatrixXs
+Skeleton::finiteDifferenceMarkerWorldPositionsJacobianWrtBodyScales(
+    const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+        markers)
+{
+  Eigen::MatrixXs jac
+      = Eigen::MatrixXs::Zero(markers.size() * 3, getNumBodyNodes());
+
+  const double EPS = 1e-7;
+  for (int i = 0; i < getNumBodyNodes(); i++)
+  {
+    s_t originalScale = getBodyNode(i)->getScale();
+
+    getBodyNode(i)->setScale(originalScale + EPS);
+    Eigen::VectorXs plus = getMarkerWorldPositions(markers);
+
+    getBodyNode(i)->setScale(originalScale - EPS);
+    Eigen::VectorXs minus = getMarkerWorldPositions(markers);
+
+    getBodyNode(i)->setScale(originalScale);
+
+    jac.col(i) = (plus - minus) / (2 * EPS);
+  }
+
+  return jac;
+}
+
+//==============================================================================
+/// This returns the Jacobian relating changes in marker offsets to changes in
+/// marker world positions.
+Eigen::MatrixXs Skeleton::getMarkerWorldPositionsJacobianWrtMarkerOffsets(
+    const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+        markers) const
+{
+  Eigen::MatrixXs jac
+      = Eigen::MatrixXs::Zero(markers.size() * 3, markers.size() * 3);
+
+  for (int i = 0; i < markers.size(); i++)
+  {
+    jac.block<3, 3>(i * 3, i * 3)
+        = markers[i].first->getWorldTransform().linear();
+  }
+
+  return jac;
+}
+
+//==============================================================================
+/// This returns the Jacobian relating changes in marker offsets to changes in
+/// marker world positions.
+Eigen::MatrixXs
+Skeleton::finiteDifferenceMarkerWorldPositionsJacobianWrtMarkerOffsets(
+    const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+        markers)
+{
+  Eigen::MatrixXs jac
+      = Eigen::MatrixXs::Zero(markers.size() * 3, markers.size() * 3);
+
+  const double EPS = 1e-7;
+  for (int i = 0; i < markers.size(); i++)
+  {
+    for (int j = 0; j < 3; j++)
+    {
+      std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>
+          perturbedMarkers;
+      for (auto pair : markers)
+      {
+        perturbedMarkers.emplace_back(pair.first, pair.second);
+      }
+      perturbedMarkers[i].second(j) = markers[i].second(j) + EPS;
+      Eigen::VectorXs plus = getMarkerWorldPositions(perturbedMarkers);
+
+      perturbedMarkers[i].second(j) = markers[i].second(j) - EPS;
+      Eigen::VectorXs minus = getMarkerWorldPositions(perturbedMarkers);
+
+      jac.col(i * 3 + j) = (plus - minus) / (2 * EPS);
+    }
+  }
 
   return jac;
 }
