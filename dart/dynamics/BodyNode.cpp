@@ -481,33 +481,35 @@ void BodyNode::setCollidable(bool _isCollidable)
 /// Re-scales the body node. The original scale of the BodyNode is 1.0, when
 /// it's created/loaded from a file. Subsequent scalings can change that
 /// value.
-void BodyNode::setScale(s_t newScale)
+void BodyNode::setScale(Eigen::Vector3s newScale)
 {
-  if (newScale < mScaleLowerBound)
+  for (int i = 0; i < 3; i++)
   {
-    std::cout << "BodyNode refusing to setScale(" << newScale << ") because "
-              << newScale << " is less than the scale lower bound ("
-              << mScaleLowerBound << "). Clamping to lower bound." << std::endl;
-    newScale = mScaleLowerBound;
-  }
-  if (newScale > mScaleUpperBound)
-  {
-    std::cout << "BodyNode refusing to setScale(" << newScale << ") because "
-              << newScale << " is greater than the scale upper bound ("
-              << mScaleUpperBound << "). Clamping to upper bound." << std::endl;
-    newScale = mScaleUpperBound;
+    if (newScale(i) < mScaleLowerBound(i))
+    {
+      std::cout << "BodyNode refusing to setScale(" << newScale(i)
+                << ", axis=" << i << ") because " << newScale(i)
+                << " is less than the scale lower bound ("
+                << mScaleLowerBound(i) << "). Clamping to lower bound."
+                << std::endl;
+      newScale(i) = mScaleLowerBound(i);
+    }
+    if (newScale(i) > mScaleUpperBound(i))
+    {
+      std::cout << "BodyNode refusing to setScale(" << newScale
+                << ", axis=" << i << ") because " << newScale
+                << " is greater than the scale upper bound ("
+                << mScaleUpperBound << "). Clamping to upper bound."
+                << std::endl;
+      newScale(i) = mScaleUpperBound(i);
+    }
   }
 
-  s_t ratio = newScale / mScale;
+  Eigen::Vector3s ratio = newScale.cwiseQuotient(mScale);
 
   // Rescale inertia, COM, mass
   Inertia inertia = getInertia();
-  inertia.setMass(inertia.getMass() * ratio);
-  inertia.setLocalCOM(inertia.getLocalCOM() * ratio);
-  Eigen::Matrix3s scaledMoment
-      = inertia.getMoment() * ratio
-        * ratio; // The MOI is an integral of m*r*r, so needs to be scaled twice
-  inertia.setMoment(scaledMoment);
+  inertia.rescale(ratio);
   setInertia(inertia);
 
   // Rescale distance to parent joint
@@ -525,29 +527,44 @@ void BodyNode::setScale(s_t newScale)
   for (int i = 0; i < getNumShapeNodes(); i++)
   {
     ShapeNode* shapeNode = getShapeNode(i);
-    shapeNode->setOffset(shapeNode->getOffset() * ratio);
+    shapeNode->setOffset(shapeNode->getOffset().cwiseProduct(ratio));
 
     ShapePtr shapePtr = shapeNode->getShape();
     if (shapePtr->getType() == MeshShape::getStaticType())
     {
       MeshShape* mesh = static_cast<MeshShape*>(shapePtr.get());
-      mesh->setScale(mesh->getScale() * ratio);
+      mesh->setScale(mesh->getScale().cwiseProduct(ratio));
     }
     else if (shapePtr->getType() == BoxShape::getStaticType())
     {
       BoxShape* box = static_cast<BoxShape*>(shapePtr.get());
-      box->setSize(box->getSize() * ratio);
+      box->setSize(box->getSize().cwiseProduct(ratio));
     }
     else if (shapePtr->getType() == SphereShape::getStaticType())
     {
+      if (ratio(0) != ratio(1) || ratio(1) != ratio(2))
+      {
+        std::cout << "WARNING: BodyNode attempting to setScale(" << newScale
+                  << ") but we're scaling an attached sphere shape, which "
+                     "can't skew. Scaling by X-axis, arbitrarily."
+                  << std::endl;
+      }
       SphereShape* sphere = static_cast<SphereShape*>(shapePtr.get());
-      sphere->setRadius(sphere->getRadius() * ratio);
+      sphere->setRadius(sphere->getRadius() * ratio(0));
     }
     else if (shapePtr->getType() == CapsuleShape::getStaticType())
     {
+      if (ratio(0) != ratio(2))
+      {
+        std::cout << "WARNING: BodyNode attempting to setScale(" << newScale
+                  << ") but we're scaling an attached capsule shape, which "
+                     "can't skew by a different X and Z. Scaling radius by "
+                     "X-axis, height by Y-axis."
+                  << std::endl;
+      }
       CapsuleShape* capsule = static_cast<CapsuleShape*>(shapePtr.get());
-      capsule->setRadius(capsule->getRadius() * ratio);
-      capsule->setHeight(capsule->getHeight() * ratio);
+      capsule->setRadius(capsule->getRadius() * ratio(0));
+      capsule->setHeight(capsule->getHeight() * ratio(1));
     }
   }
 
@@ -556,31 +573,31 @@ void BodyNode::setScale(s_t newScale)
 
 //==============================================================================
 /// Returns the scale of the body node.
-s_t BodyNode::getScale()
+Eigen::Vector3s BodyNode::getScale() const
 {
   return mScale;
 }
 
 //==============================================================================
-void BodyNode::setScaleLowerBound(s_t lowerBound)
+void BodyNode::setScaleLowerBound(Eigen::Vector3s lowerBound)
 {
   mScaleLowerBound = lowerBound;
 }
 
 //==============================================================================
-s_t BodyNode::getScaleLowerBound()
+Eigen::Vector3s BodyNode::getScaleLowerBound() const
 {
   return mScaleLowerBound;
 }
 
 //==============================================================================
-void BodyNode::setScaleUpperBound(s_t upperBound)
+void BodyNode::setScaleUpperBound(Eigen::Vector3s upperBound)
 {
   mScaleUpperBound = upperBound;
 }
 
 //==============================================================================
-s_t BodyNode::getScaleUpperBound()
+Eigen::Vector3s BodyNode::getScaleUpperBound() const
 {
   return mScaleUpperBound;
 }
@@ -1431,9 +1448,9 @@ BodyNode::BodyNode(
     mIsColliding(false),
     mParentJoint(_parentJoint),
     mParentBodyNode(nullptr),
-    mScale(1.0),
-    mScaleLowerBound(0.5),
-    mScaleUpperBound(1.5),
+    mScale(Eigen::Vector3s::Ones()),
+    mScaleLowerBound(Eigen::Vector3s::Ones() * 0.5),
+    mScaleUpperBound(Eigen::Vector3s::Ones() * 1.5),
     mPartialAcceleration(Eigen::Vector6s::Zero()),
     mIsPartialAccelerationDirty(true),
     mF(Eigen::Vector6s::Zero()),

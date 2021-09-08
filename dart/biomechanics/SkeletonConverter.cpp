@@ -184,10 +184,11 @@ void SkeletonConverter::rescaleAndPrepTarget(
       cursor++;
       mTargetMarkers.push_back(
           std::pair<const dynamics::BodyNode*, Eigen::Vector3s>(
-              targetBody, targetOffset));
-      Eigen::Vector3s sourceOffset = sourceBody->getWorldTransform().inverse()
-                                     * targetBody->getWorldTransform()
-                                     * targetOffset;
+              targetBody, targetOffset.cwiseQuotient(targetBody->getScale())));
+      Eigen::Vector3s sourceOffset
+          = (sourceBody->getWorldTransform().inverse()
+             * targetBody->getWorldTransform() * targetOffset)
+                .cwiseQuotient(sourceBody->getScale());
       // Always align the joints to each other directly, without offset
       if (j == 0)
         sourceOffset.setZero();

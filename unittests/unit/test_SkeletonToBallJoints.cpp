@@ -23,9 +23,11 @@ using namespace realtime;
 
 TEST(SkeletonConverter, CONVERT_OSIM)
 {
-  std::shared_ptr<dynamics::Skeleton> osim = OpenSimParser::parseOsim(
-      "dart://sample/osim/Rajagopal2015/Rajagopal2015.osim").skeleton;
-  osim->getBodyNode("tibia_l")->setScale(1.2);
+  std::shared_ptr<dynamics::Skeleton> osim
+      = OpenSimParser::parseOsim(
+            "dart://sample/osim/Rajagopal2015/Rajagopal2015.osim")
+            .skeleton;
+  osim->getBodyNode("tibia_l")->setScale(Eigen::Vector3s::Ones() * 1.2);
   std::shared_ptr<dynamics::Skeleton> converted
       = osim->convertSkeletonToBallJoints();
 
@@ -39,8 +41,8 @@ TEST(SkeletonConverter, CONVERT_OSIM)
       osim->getBodyNode("tibia_l")->getChildJoint(0)->getParentScale()
       == converted->getBodyNode("tibia_l")->getChildJoint(0)->getParentScale());
 
-  osim->getBodyNode("tibia_l")->setScale(1.4);
-  converted->getBodyNode("tibia_l")->setScale(1.4);
+  osim->getBodyNode("tibia_l")->setScale(Eigen::Vector3s::Ones() * 1.4);
+  converted->getBodyNode("tibia_l")->setScale(Eigen::Vector3s::Ones() * 1.4);
 
 #ifndef NDEBUG
   assert(osim->getNumJoints() == converted->getNumJoints());

@@ -186,8 +186,10 @@ TEST(SkeletonConverter, BROKEN_IK_TIMESTEP_BACKWARD)
 {
   std::shared_ptr<dynamics::Skeleton> amass = getAmassSkeleton();
   (void)amass;
-  std::shared_ptr<dynamics::Skeleton> osim = OpenSimParser::parseOsim(
-      "dart://sample/osim/Rajagopal2015/Rajagopal2015.osim").skeleton;
+  std::shared_ptr<dynamics::Skeleton> osim
+      = OpenSimParser::parseOsim(
+            "dart://sample/osim/Rajagopal2015/Rajagopal2015.osim")
+            .skeleton;
   (void)osim;
   std::shared_ptr<simulation::World> world = simulation::World::create();
   world->addSkeleton(amass);
@@ -196,7 +198,7 @@ TEST(SkeletonConverter, BROKEN_IK_TIMESTEP_BACKWARD)
   osim->setPosition(4, -0.2);
   osim->setPosition(5, 1.0);
 
-  // osim->getBodyNode("tibia_l")->setScale(1.2);
+  // osim->getBodyNode("tibia_l")->setScale(Eigen::Vector3s::Ones() * 1.2);
 
   biomechanics::SkeletonConverter converter(osim, amass);
   converter.linkJoints(
@@ -256,8 +258,10 @@ TEST(SkeletonConverter, BROKEN_IK_TIMESTEP_2_BACKWARDS)
 {
   std::shared_ptr<dynamics::Skeleton> amass = getAmassSkeleton();
   (void)amass;
-  std::shared_ptr<dynamics::Skeleton> osim = OpenSimParser::parseOsim(
-      "dart://sample/osim/Rajagopal2015/Rajagopal2015.osim").skeleton;
+  std::shared_ptr<dynamics::Skeleton> osim
+      = OpenSimParser::parseOsim(
+            "dart://sample/osim/Rajagopal2015/Rajagopal2015.osim")
+            .skeleton;
   (void)osim;
   std::shared_ptr<simulation::World> world = simulation::World::create();
   world->addSkeleton(amass);
@@ -266,7 +270,7 @@ TEST(SkeletonConverter, BROKEN_IK_TIMESTEP_2_BACKWARDS)
   osim->setPosition(4, -0.2);
   osim->setPosition(5, 1.0);
 
-  // osim->getBodyNode("tibia_l")->setScale(1.2);
+  // osim->getBodyNode("tibia_l")->setScale(Eigen::Vector3s::Ones() * 1.2);
 
   biomechanics::SkeletonConverter converter(osim, amass);
   converter.linkJoints(
@@ -355,8 +359,10 @@ TEST(SkeletonConverter, BROKEN_IK_TIMESTEP_3)
 {
   std::shared_ptr<dynamics::Skeleton> amass = getAmassSkeleton();
   (void)amass;
-  std::shared_ptr<dynamics::Skeleton> osim = OpenSimParser::parseOsim(
-      "dart://sample/osim/Rajagopal2015/Rajagopal2015.osim").skeleton;
+  std::shared_ptr<dynamics::Skeleton> osim
+      = OpenSimParser::parseOsim(
+            "dart://sample/osim/Rajagopal2015/Rajagopal2015.osim")
+            .skeleton;
   (void)osim;
   std::shared_ptr<simulation::World> world = simulation::World::create();
   world->addSkeleton(amass);
@@ -365,7 +371,7 @@ TEST(SkeletonConverter, BROKEN_IK_TIMESTEP_3)
   osim->setPosition(4, -0.2);
   osim->setPosition(5, 1.0);
 
-  // osim->getBodyNode("tibia_l")->setScale(1.2);
+  // osim->getBodyNode("tibia_l")->setScale(Eigen::Vector3s::Ones() * 1.2);
 
   biomechanics::SkeletonConverter converter(osim, amass);
   converter.linkJoints(
@@ -493,8 +499,10 @@ TEST(SkeletonConverter, BROKEN_IK_TIMESTEP_3_BACKWARDS)
 {
   std::shared_ptr<dynamics::Skeleton> amass = getAmassSkeleton();
   (void)amass;
-  std::shared_ptr<dynamics::Skeleton> osim = OpenSimParser::parseOsim(
-      "dart://sample/osim/Rajagopal2015/Rajagopal2015.osim").skeleton;
+  std::shared_ptr<dynamics::Skeleton> osim
+      = OpenSimParser::parseOsim(
+            "dart://sample/osim/Rajagopal2015/Rajagopal2015.osim")
+            .skeleton;
   (void)osim;
   std::shared_ptr<simulation::World> world = simulation::World::create();
   world->addSkeleton(amass);
@@ -503,7 +511,7 @@ TEST(SkeletonConverter, BROKEN_IK_TIMESTEP_3_BACKWARDS)
   osim->setPosition(4, -0.2);
   osim->setPosition(5, 1.0);
 
-  // osim->getBodyNode("tibia_l")->setScale(1.2);
+  // osim->getBodyNode("tibia_l")->setScale(Eigen::Vector3s::Ones() * 1.2);
 
   biomechanics::SkeletonConverter converter(osim, amass);
   converter.linkJoints(
@@ -590,8 +598,10 @@ TEST(SkeletonConverter, BROKEN_IK_TIMESTEP_3_BACKWARDS)
 #ifdef ALL_TESTS
 TEST(SkeletonConverter, SCALE_EQUALITY_CONSTRAINTS)
 {
-  std::shared_ptr<dynamics::Skeleton> osim = OpenSimParser::parseOsim(
-      "dart://sample/osim/Rajagopal2015/Rajagopal2015.osim").skeleton;
+  std::shared_ptr<dynamics::Skeleton> osim
+      = OpenSimParser::parseOsim(
+            "dart://sample/osim/Rajagopal2015/Rajagopal2015.osim")
+            .skeleton;
   osim->setPosition(2, -3.14159 / 2);
   osim->setPosition(4, -0.2);
   osim->setPosition(5, 1.0);
@@ -635,7 +645,7 @@ TEST(SkeletonConverter, SCALE_EQUALITY_CONSTRAINTS)
   // Check the body scale Jacobian is accurate
   Eigen::MatrixXs scaleJac
       = osim->getJointWorldPositionsJacobianWrtGroupScales(joints);
-  EXPECT_EQ(scaleJac.cols(), osim->getNumScaleGroups());
+  EXPECT_EQ(scaleJac.cols(), osim->getNumScaleGroups() * 3);
   Eigen::MatrixXs scaleJac_fd
       = osim->finiteDifferenceJointWorldPositionsJacobianWrtGroupScales(joints);
   if (!equals(scaleJac, scaleJac_fd, THRESHOLD))
@@ -678,8 +688,10 @@ TEST(SkeletonConverter, IK_JACOBIANS)
 {
   std::shared_ptr<dynamics::Skeleton> amass = getAmassSkeleton();
   (void)amass;
-  std::shared_ptr<dynamics::Skeleton> osim = OpenSimParser::parseOsim(
-      "dart://sample/osim/Rajagopal2015/Rajagopal2015.osim").skeleton;
+  std::shared_ptr<dynamics::Skeleton> osim
+      = OpenSimParser::parseOsim(
+            "dart://sample/osim/Rajagopal2015/Rajagopal2015.osim")
+            .skeleton;
   (void)osim;
   std::shared_ptr<simulation::World> world = simulation::World::create();
   world->addSkeleton(amass);
@@ -688,7 +700,7 @@ TEST(SkeletonConverter, IK_JACOBIANS)
   osim->setPosition(4, -0.2);
   osim->setPosition(5, 1.0);
 
-  osim->getBodyNode("tibia_l")->setScale(1.2);
+  osim->getBodyNode("tibia_l")->setScale(Eigen::Vector3s::Ones() * 1.2);
 
   biomechanics::SkeletonConverter converter(osim, amass);
   converter.linkJoints(
@@ -868,12 +880,14 @@ TEST(SkeletonConverter, IK_JACOBIANS)
 #ifdef ALL_TESTS
 TEST(SkeletonConverter, IK_JACOBIANS_BALL_JOINTS)
 {
-  std::shared_ptr<dynamics::Skeleton> osim = OpenSimParser::parseOsim(
-      "dart://sample/osim/Rajagopal2015/Rajagopal2015.osim").skeleton;
+  std::shared_ptr<dynamics::Skeleton> osim
+      = OpenSimParser::parseOsim(
+            "dart://sample/osim/Rajagopal2015/Rajagopal2015.osim")
+            .skeleton;
   osim->setPosition(2, -3.14159 / 2);
   osim->setPosition(4, -0.2);
   osim->setPosition(5, 1.0);
-  osim->getBodyNode("tibia_l")->setScale(1.2);
+  osim->getBodyNode("tibia_l")->setScale(Eigen::Vector3s::Ones() * 1.2);
   std::shared_ptr<dynamics::Skeleton> osimBallJoints
       = osim->convertSkeletonToBallJoints();
 
@@ -993,8 +1007,10 @@ TEST(SkeletonConverter, RAJAGOPAL)
 {
   std::shared_ptr<dynamics::Skeleton> amass = getAmassSkeleton();
   (void)amass;
-  std::shared_ptr<dynamics::Skeleton> osim = OpenSimParser::parseOsim(
-      "dart://sample/osim/Rajagopal2015/Rajagopal2015.osim").skeleton;
+  std::shared_ptr<dynamics::Skeleton> osim
+      = OpenSimParser::parseOsim(
+            "dart://sample/osim/Rajagopal2015/Rajagopal2015.osim")
+            .skeleton;
   (void)osim;
   std::shared_ptr<simulation::World> world = simulation::World::create();
   world->addSkeleton(amass);
@@ -1016,7 +1032,7 @@ TEST(SkeletonConverter, RAJAGOPAL)
   osim->mergeScaleGroups(
       osim->getBodyNode("femur_l"), osim->getBodyNode("femur_r"));
 
-  // osim->getBodyNode("tibia_l")->setScale(1.2);
+  // osim->getBodyNode("tibia_l")->setScale(Eigen::Vector3s::Ones() * 1.2);
 
   biomechanics::SkeletonConverter converter(osim, amass);
   converter.linkJoints(

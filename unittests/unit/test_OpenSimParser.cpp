@@ -55,8 +55,9 @@ TEST(OpenSimParser, RAJAGOPAL_v3)
 #ifdef ALL_TESTS
 TEST(OpenSimParser, RAJAGOPAL_v4)
 {
-  std::shared_ptr<dynamics::Skeleton> skel = OpenSimParser::parseOsim(
+  OpenSimFile file = OpenSimParser::parseOsim(
       "dart://sample/osim/Rajagopal2015/Rajagopal2015.osim");
+  std::shared_ptr<dynamics::Skeleton> skel = file.skeleton;
   (void)skel;
   EXPECT_TRUE(skel->getNumDofs() > 0);
   std::shared_ptr<simulation::World> world = simulation::World::create();
@@ -93,8 +94,9 @@ TEST(OpenSimParser, RAJAGOPAL_v4)
 #ifdef ALL_TESTS
 TEST(OpenSimParser, DELP_1990)
 {
-  std::shared_ptr<dynamics::Skeleton> skel
+  OpenSimFile file
       = OpenSimParser::parseOsim("dart://sample/osim/NoArms_v3/Delp1990.osim");
+  std::shared_ptr<dynamics::Skeleton> skel = file.skeleton;
   (void)skel;
   EXPECT_TRUE(skel->getNumDofs() > 0);
   std::shared_ptr<simulation::World> world = simulation::World::create();

@@ -35,7 +35,7 @@ TEST(SkeletonConverter, IK_JACOBIANS)
   osim->setPosition(4, -0.2);
   osim->setPosition(5, 1.0);
 
-  osim->getBodyNode("tibia_l")->setScale(1.2);
+  osim->getBodyNode("tibia_l")->setScale(Eigen::Vector3s::Ones() * 1.2);
 
   std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>> markers;
   markers.push_back(
@@ -57,7 +57,7 @@ TEST(SkeletonConverter, IK_JACOBIANS_BALL_JOINTS)
   osim->setPosition(2, -3.14159 / 2);
   osim->setPosition(4, -0.2);
   osim->setPosition(5, 1.0);
-  osim->getBodyNode("tibia_l")->setScale(1.2);
+  osim->getBodyNode("tibia_l")->setScale(Eigen::Vector3s::Ones() * 1.2);
   std::shared_ptr<dynamics::Skeleton> osimBallJoints
       = osim->convertSkeletonToBallJoints();
 

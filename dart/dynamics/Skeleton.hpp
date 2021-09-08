@@ -855,10 +855,10 @@ public:
   void mergeScaleGroups(dynamics::BodyNode* a, dynamics::BodyNode* b);
 
   /// This gets the scale upper bound for the first body in a group, by index
-  s_t getScaleGroupUpperBound(int groupIndex);
+  Eigen::Vector3s getScaleGroupUpperBound(int groupIndex);
 
   /// This gets the scale lower bound for the first body in a group, by index
-  s_t getScaleGroupLowerBound(int groupIndex);
+  Eigen::Vector3s getScaleGroupLowerBound(int groupIndex);
 
   /// This takes two scale groups and merges their contents into a single group.
   /// After this operation, there is one fewer scale group.

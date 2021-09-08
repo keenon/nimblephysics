@@ -70,8 +70,8 @@ JointProperties::JointProperties(
   : mName(_name),
     mT_ParentBodyToJoint(_T_ParentBodyToJoint),
     mT_ChildBodyToJoint(_T_ChildBodyToJoint),
-    mParentScale(1.0),
-    mChildScale(1.0),
+    mParentScale(Eigen::Vector3s::Ones()),
+    mChildScale(Eigen::Vector3s::Ones()),
     mOriginalParentTranslation(_T_ParentBodyToJoint.translation()),
     mOriginalChildTranslation(_T_ChildBodyToJoint.translation()),
     mIsPositionLimitEnforced(_isPositionLimitEnforced),
@@ -654,7 +654,7 @@ void Joint::setTransformFromParentBodyNode(const Eigen::Isometry3s& _T)
 {
   assert(math::verifyTransform(_T));
   mAspectProperties.mT_ParentBodyToJoint = _T;
-  mAspectProperties.mParentScale = 1.0;
+  mAspectProperties.mParentScale = Eigen::Vector3s::Ones();
   mAspectProperties.mOriginalParentTranslation = _T.translation();
   notifyPositionUpdated();
 }
@@ -664,7 +664,7 @@ void Joint::setTransformFromChildBodyNode(const Eigen::Isometry3s& _T)
 {
   assert(math::verifyTransform(_T));
   mAspectProperties.mT_ChildBodyToJoint = _T;
-  mAspectProperties.mChildScale = 1.0;
+  mAspectProperties.mChildScale = Eigen::Vector3s::Ones();
   mAspectProperties.mOriginalChildTranslation = _T.translation();
   updateRelativeJacobian();
   notifyPositionUpdated();
@@ -701,35 +701,35 @@ void Joint::copyTransformsFrom(const dynamics::Joint* other)
 
 //==============================================================================
 /// Set the scale of the child body
-void Joint::setChildScale(s_t scale)
+void Joint::setChildScale(Eigen::Vector3s scale)
 {
   mAspectProperties.mChildScale = scale;
   mAspectProperties.mT_ChildBodyToJoint.translation()
-      = mAspectProperties.mOriginalChildTranslation * scale;
+      = mAspectProperties.mOriginalChildTranslation.cwiseProduct(scale);
   updateRelativeJacobian();
   notifyPositionUpdated();
 }
 
 //==============================================================================
 /// Set the scale of the parent body
-void Joint::setParentScale(s_t scale)
+void Joint::setParentScale(Eigen::Vector3s scale)
 {
   mAspectProperties.mParentScale = scale;
   mAspectProperties.mT_ParentBodyToJoint.translation()
-      = mAspectProperties.mOriginalParentTranslation * scale;
+      = mAspectProperties.mOriginalParentTranslation.cwiseProduct(scale);
   notifyPositionUpdated();
 }
 
 //==============================================================================
 /// Get the scale of the child body
-s_t Joint::getChildScale() const
+Eigen::Vector3s Joint::getChildScale() const
 {
   return mAspectProperties.mChildScale;
 }
 
 //==============================================================================
 /// Get the scale of the parent body
-s_t Joint::getParentScale() const
+Eigen::Vector3s Joint::getParentScale() const
 {
   return mAspectProperties.mParentScale;
 }

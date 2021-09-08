@@ -175,15 +175,15 @@ public:
   /// Re-scales the body node. The original scale of the BodyNode is 1.0, when
   /// it's created/loaded from a file. Subsequent scalings can change that
   /// value.
-  void setScale(s_t newScale);
+  void setScale(Eigen::Vector3s newScale);
 
   /// Returns the scale of the body node.
-  s_t getScale();
+  Eigen::Vector3s getScale() const;
 
-  void setScaleLowerBound(s_t lowerBound);
-  s_t getScaleLowerBound();
-  void setScaleUpperBound(s_t upperBound);
-  s_t getScaleUpperBound();
+  void setScaleLowerBound(Eigen::Vector3s lowerBound);
+  Eigen::Vector3s getScaleLowerBound() const;
+  void setScaleUpperBound(Eigen::Vector3s upperBound);
+  Eigen::Vector3s getScaleUpperBound() const;
 
   /// Set the mass of the bodynode
   void setMass(s_t mass);
@@ -1273,10 +1273,10 @@ public:
 
   /// This holds on to the relative scaling of this body node. This defaults
   /// to 1.0 when a body is created, but can be updated by calls to setScale().
-  s_t mScale;
+  Eigen::Vector3s mScale;
 
-  s_t mScaleLowerBound;
-  s_t mScaleUpperBound;
+  Eigen::Vector3s mScaleLowerBound;
+  Eigen::Vector3s mScaleUpperBound;
 
   //--------------------------------------------------------------------------
   // Dynamical Properties

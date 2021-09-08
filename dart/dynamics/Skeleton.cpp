@@ -3251,10 +3251,10 @@ void Skeleton::setLinkMasses(Eigen::VectorXs masses)
 // skeleton concatenated into a flat vector
 Eigen::VectorXs Skeleton::getLinkScales()
 {
-  Eigen::VectorXs scales = Eigen::VectorXs::Zero(getNumBodyNodes());
+  Eigen::VectorXs scales = Eigen::VectorXs::Zero(getNumBodyNodes() * 3);
   for (int i = 0; i < getNumBodyNodes(); i++)
   {
-    scales(i) = getBodyNode(i)->getScale();
+    scales.segment<3>(i * 3) = getBodyNode(i)->getScale();
   }
   return scales;
 }
@@ -3265,7 +3265,7 @@ void Skeleton::setLinkScales(Eigen::VectorXs scales)
 {
   for (int i = 0; i < getNumBodyNodes(); i++)
   {
-    getBodyNode(i)->setScale(scales(i));
+    getBodyNode(i)->setScale(scales.segment<3>(i * 3));
   }
 }
 
@@ -3363,14 +3363,14 @@ void Skeleton::mergeScaleGroups(dynamics::BodyNode* a, dynamics::BodyNode* b)
 
 //==============================================================================
 /// This gets the scale upper bound for the first body in a group, by index
-s_t Skeleton::getScaleGroupUpperBound(int groupIndex)
+Eigen::Vector3s Skeleton::getScaleGroupUpperBound(int groupIndex)
 {
   return mBodyScaleGroups[groupIndex][0]->getScaleUpperBound();
 }
 
 //==============================================================================
 /// This gets the scale lower bound for the first body in a group, by index
-s_t Skeleton::getScaleGroupLowerBound(int groupIndex)
+Eigen::Vector3s Skeleton::getScaleGroupLowerBound(int groupIndex)
 {
   return mBodyScaleGroups[groupIndex][0]->getScaleLowerBound();
 }
@@ -3419,16 +3419,17 @@ int Skeleton::getNumScaleGroups()
 
 //==============================================================================
 /// This sets the scales of all the body nodes according to their group
-/// membership. The `scale` vector is expected to be the same size as the
+/// membership. The `scale` vector is expected to be 3 times the size of the
 /// number of groups.
 void Skeleton::setGroupScales(Eigen::VectorXs scale)
 {
   ensureBodyScaleGroups();
-  for (int i = 0; i < scale.size(); i++)
+  assert(mBodyScaleGroups.size() * 3 == scale.size());
+  for (int i = 0; i < mBodyScaleGroups.size(); i++)
   {
     for (dynamics::BodyNode* node : mBodyScaleGroups[i])
     {
-      node->setScale(scale(i));
+      node->setScale(scale.segment<3>(i * 3));
     }
   }
 }
@@ -3438,11 +3439,11 @@ void Skeleton::setGroupScales(Eigen::VectorXs scale)
 Eigen::VectorXs Skeleton::getGroupScales()
 {
   ensureBodyScaleGroups();
-  Eigen::VectorXs groups = Eigen::VectorXs::Zero(getNumScaleGroups());
+  Eigen::VectorXs groups = Eigen::VectorXs::Zero(getNumScaleGroups() * 3);
   for (int i = 0; i < mBodyScaleGroups.size(); i++)
   {
     assert(mBodyScaleGroups[i].size() > 0);
-    groups(i) = mBodyScaleGroups[i][0]->getScale();
+    groups.segment<3>(i * 3) = mBodyScaleGroups[i][0]->getScale();
   }
   return groups;
 }
@@ -3455,13 +3456,14 @@ Eigen::MatrixXs Skeleton::getJointWorldPositionsJacobianWrtGroupScales(
 {
   Eigen::MatrixXs individualBodiesJac
       = getJointWorldPositionsJacobianWrtBodyScales(joints);
-  Eigen::MatrixXs J
-      = Eigen::MatrixXs::Zero(individualBodiesJac.rows(), getNumScaleGroups());
+  Eigen::MatrixXs J = Eigen::MatrixXs::Zero(
+      individualBodiesJac.rows(), getNumScaleGroups() * 3);
   for (int i = 0; i < mBodyScaleGroups.size(); i++)
   {
     for (dynamics::BodyNode* node : mBodyScaleGroups[i])
     {
-      J.col(i) += individualBodiesJac.col(node->getIndexInSkeleton());
+      J.block(0, i * 3, J.rows(), 3) += individualBodiesJac.block(
+          0, node->getIndexInSkeleton() * 3, J.rows(), 3);
     }
   }
   return J;
@@ -3475,12 +3477,12 @@ Skeleton::finiteDifferenceJointWorldPositionsJacobianWrtGroupScales(
     const std::vector<const dynamics::Joint*>& joints)
 {
   Eigen::MatrixXs jac
-      = Eigen::MatrixXs::Zero(joints.size() * 3, getNumScaleGroups());
+      = Eigen::MatrixXs::Zero(joints.size() * 3, getNumScaleGroups() * 3);
 
   Eigen::VectorXs original = getGroupScales();
 
   const double EPS = 1e-7;
-  for (int i = 0; i < getNumScaleGroups(); i++)
+  for (int i = 0; i < getNumScaleGroups() * 3; i++)
   {
     Eigen::VectorXs perturbed = original;
     perturbed(i) += EPS;
@@ -3509,13 +3511,14 @@ Eigen::MatrixXs Skeleton::getMarkerWorldPositionsJacobianWrtGroupScales(
 {
   Eigen::MatrixXs individualBodiesJac
       = getMarkerWorldPositionsJacobianWrtBodyScales(markers);
-  Eigen::MatrixXs J
-      = Eigen::MatrixXs::Zero(individualBodiesJac.rows(), getNumScaleGroups());
+  Eigen::MatrixXs J = Eigen::MatrixXs::Zero(
+      individualBodiesJac.rows(), getNumScaleGroups() * 3);
   for (int i = 0; i < mBodyScaleGroups.size(); i++)
   {
     for (dynamics::BodyNode* node : mBodyScaleGroups[i])
     {
-      J.col(i) += individualBodiesJac.col(node->getIndexInSkeleton());
+      J.block(0, i * 3, J.rows(), 3) += individualBodiesJac.block(
+          0, node->getIndexInSkeleton() * 3, J.rows(), 3);
     }
   }
   return J;
@@ -3530,12 +3533,12 @@ Skeleton::finiteDifferenceMarkerWorldPositionsJacobianWrtGroupScales(
         markers)
 {
   Eigen::MatrixXs jac
-      = Eigen::MatrixXs::Zero(markers.size() * 3, getNumScaleGroups());
+      = Eigen::MatrixXs::Zero(markers.size() * 3, getNumScaleGroups() * 3);
 
   Eigen::VectorXs original = getGroupScales();
 
   const double EPS = 1e-7;
-  for (int i = 0; i < getNumScaleGroups(); i++)
+  for (int i = 0; i < getNumScaleGroups() * 3; i++)
   {
     Eigen::VectorXs perturbed = original;
     perturbed(i) += EPS;
@@ -3890,7 +3893,7 @@ Eigen::MatrixXs Skeleton::getJointWorldPositionsJacobianWrtBodyScales(
     const std::vector<const dynamics::Joint*>& joints)
 {
   Eigen::MatrixXs jac
-      = Eigen::MatrixXs::Zero(joints.size() * 3, getNumBodyNodes());
+      = Eigen::MatrixXs::Zero(joints.size() * 3, getNumBodyNodes() * 3);
 
   const Eigen::MatrixXi& parentMap = getParentMap();
   // Scaling a body will cause the joint offsets to scale, which will move the
@@ -3904,27 +3907,33 @@ Eigen::MatrixXs Skeleton::getJointWorldPositionsJacobianWrtBodyScales(
                                        ->getTransformFromChildBodyNode()
                                        .translation();
 
-    Eigen::Vector3s worldParentOffset = -R * parentOffset;
-
-    for (int j = 0; j < joints.size(); j++)
+    for (int axis = 0; axis < 3; axis++)
     {
-      int sourceJointDof = joints[j]->getDof(0)->getIndexInSkeleton();
-      for (int k = 0; k < bodyNode->getNumChildJoints(); k++)
+      Eigen::Vector3s worldParentOffset = -R.col(axis) * parentOffset(axis);
+
+      for (int j = 0; j < joints.size(); j++)
       {
-        dynamics::Joint* childJoint = bodyNode->getChildJoint(k);
-        if (childJoint == joints[j]
-            || parentMap(
-                childJoint->getDof(0)->getIndexInSkeleton(), sourceJointDof))
+        int sourceJointDof = joints[j]->getDof(0)->getIndexInSkeleton();
+        for (int k = 0; k < bodyNode->getNumChildJoints(); k++)
         {
-          // This is the child joint
+          dynamics::Joint* childJoint = bodyNode->getChildJoint(k);
+          if (childJoint == joints[j]
+              || parentMap(
+                  childJoint->getDof(0)->getIndexInSkeleton(), sourceJointDof))
+          {
+            // This is the child joint
 
-          Eigen::Vector3s childOffset
-              = childJoint->getTransformFromParentBodyNode().translation();
-          Eigen::Vector3s worldChildOffset = R * childOffset;
-          jac.block(j * 3, i, 3, 1)
-              = (worldParentOffset + worldChildOffset) / bodyNode->getScale();
+            Eigen::Vector3s childOffset
+                = Eigen::Vector3s::Unit(axis)
+                  * childJoint->getTransformFromParentBodyNode().translation()(
+                      axis);
+            Eigen::Vector3s worldChildOffset = R * childOffset;
+            jac.block(j * 3, i * 3 + axis, 3, 1)
+                = (worldParentOffset + worldChildOffset)
+                  / bodyNode->getScale()(axis);
 
-          break;
+            break;
+          }
         }
       }
     }
@@ -3941,22 +3950,28 @@ Skeleton::finiteDifferenceJointWorldPositionsJacobianWrtBodyScales(
     const std::vector<const dynamics::Joint*>& joints)
 {
   Eigen::MatrixXs jac
-      = Eigen::MatrixXs::Zero(joints.size() * 3, getNumBodyNodes());
+      = Eigen::MatrixXs::Zero(joints.size() * 3, getNumBodyNodes() * 3);
 
   const double EPS = 1e-7;
   for (int i = 0; i < getNumBodyNodes(); i++)
   {
-    s_t originalScale = getBodyNode(i)->getScale();
+    Eigen::Vector3s originalScale = getBodyNode(i)->getScale();
+    for (int axis = 0; axis < 3; axis++)
+    {
+      Eigen::Vector3s perturbed = originalScale;
+      perturbed(axis) += EPS;
+      getBodyNode(i)->setScale(perturbed);
+      Eigen::VectorXs plus = getJointWorldPositions(joints);
 
-    getBodyNode(i)->setScale(originalScale + EPS);
-    Eigen::VectorXs plus = getJointWorldPositions(joints);
+      perturbed = originalScale;
+      perturbed(axis) -= EPS;
+      getBodyNode(i)->setScale(perturbed);
+      Eigen::VectorXs minus = getJointWorldPositions(joints);
 
-    getBodyNode(i)->setScale(originalScale - EPS);
-    Eigen::VectorXs minus = getJointWorldPositions(joints);
+      getBodyNode(i)->setScale(originalScale);
 
-    getBodyNode(i)->setScale(originalScale);
-
-    jac.col(i) = (plus - minus) / (2 * EPS);
+      jac.col(i * 3 + axis) = (plus - minus) / (2 * EPS);
+    }
   }
 
   return jac;
@@ -3973,7 +3988,8 @@ Eigen::VectorXs Skeleton::getMarkerWorldPositions(
   for (int i = 0; i < markers.size(); i++)
   {
     positions.segment<3>(i * 3)
-        = markers[i].first->getWorldTransform() * markers[i].second;
+        = markers[i].first->getWorldTransform()
+          * markers[i].first->getScale().cwiseProduct(markers[i].second);
   }
   return positions;
 }
@@ -3989,8 +4005,9 @@ Eigen::MatrixXs Skeleton::getMarkerWorldPositionsJacobianWrtJointPositions(
 
   for (int i = 0; i < markers.size(); i++)
   {
-    math::Jacobian bodyJac
-        = getWorldPositionJacobian(markers[i].first, markers[i].second);
+    math::Jacobian bodyJac = getWorldPositionJacobian(
+        markers[i].first,
+        markers[i].first->getScale().cwiseProduct(markers[i].second));
     jac.block(3 * i, 0, 3, bodyJac.cols())
         = bodyJac.block(3, 0, 3, bodyJac.cols());
   }
@@ -4037,7 +4054,7 @@ Eigen::MatrixXs Skeleton::getMarkerWorldPositionsJacobianWrtBodyScales(
         markers)
 {
   Eigen::MatrixXs jac
-      = Eigen::MatrixXs::Zero(markers.size() * 3, getNumBodyNodes());
+      = Eigen::MatrixXs::Zero(markers.size() * 3, getNumBodyNodes() * 3);
 
   const Eigen::MatrixXi& parentMap = getParentMap();
   // Scaling a body will cause the joint offsets to scale, which will move the
@@ -4051,28 +4068,52 @@ Eigen::MatrixXs Skeleton::getMarkerWorldPositionsJacobianWrtBodyScales(
                                        ->getTransformFromChildBodyNode()
                                        .translation();
 
-    Eigen::Vector3s worldParentOffset = -R * parentOffset;
-
-    for (int j = 0; j < markers.size(); j++)
+    // Each body can scale along 3 distinct axis
+    for (int axis = 0; axis < 3; axis++)
     {
-      int sourceJointDof
-          = markers[j].first->getParentJoint()->getDof(0)->getIndexInSkeleton();
-      for (int k = 0; k < bodyNode->getNumChildJoints(); k++)
+      Eigen::Vector3s worldParentOffset = -R.col(axis) * parentOffset(axis);
+
+      // Now begin iterating rows, for each marker
+      for (int j = 0; j < markers.size(); j++)
       {
-        dynamics::Joint* childJoint = bodyNode->getChildJoint(k);
-        if (childJoint == markers[j].first->getParentJoint()
-            || parentMap(
-                childJoint->getDof(0)->getIndexInSkeleton(), sourceJointDof))
+        int sourceJointDof = markers[j]
+                                 .first->getParentJoint()
+                                 ->getDof(0)
+                                 ->getIndexInSkeleton();
+
+        // If this marker is directly attached to the body node we're scaling,
+        // we need to account for that
+        if (markers[j].first == bodyNode)
         {
-          // This is the child joint
+          jac.block(j * 3, i * 3 + axis, 3, 1)
+              = R.col(axis) * markers[j].second(axis)
+                + (worldParentOffset / bodyNode->getScale()(axis));
+        }
+        else
+        {
+          // Check if this marker is a child of the body we're scaling
+          for (int k = 0; k < bodyNode->getNumChildJoints(); k++)
+          {
+            dynamics::Joint* childJoint = bodyNode->getChildJoint(k);
+            if (childJoint == markers[j].first->getParentJoint()
+                || parentMap(
+                    childJoint->getDof(0)->getIndexInSkeleton(),
+                    sourceJointDof))
+            {
+              // This is the child joint
+              Eigen::Vector3s childOffset
+                  = Eigen::Vector3s::Unit(axis)
+                    * childJoint->getTransformFromParentBodyNode()
+                          .translation()(axis);
 
-          Eigen::Vector3s childOffset
-              = childJoint->getTransformFromParentBodyNode().translation();
-          Eigen::Vector3s worldChildOffset = R * childOffset;
-          jac.block(j * 3, i, 3, 1)
-              = (worldParentOffset + worldChildOffset) / bodyNode->getScale();
+              Eigen::Vector3s worldChildOffset = R * childOffset;
+              jac.block(j * 3, i * 3 + axis, 3, 1)
+                  = (worldParentOffset + worldChildOffset)
+                    / bodyNode->getScale()(axis);
 
-          break;
+              break;
+            }
+          }
         }
       }
     }
@@ -4090,22 +4131,30 @@ Skeleton::finiteDifferenceMarkerWorldPositionsJacobianWrtBodyScales(
         markers)
 {
   Eigen::MatrixXs jac
-      = Eigen::MatrixXs::Zero(markers.size() * 3, getNumBodyNodes());
+      = Eigen::MatrixXs::Zero(markers.size() * 3, getNumBodyNodes() * 3);
 
   const double EPS = 1e-7;
   for (int i = 0; i < getNumBodyNodes(); i++)
   {
-    s_t originalScale = getBodyNode(i)->getScale();
+    Eigen::Vector3s originalScale = getBodyNode(i)->getScale();
 
-    getBodyNode(i)->setScale(originalScale + EPS);
-    Eigen::VectorXs plus = getMarkerWorldPositions(markers);
+    for (int axis = 0; axis < 3; axis++)
+    {
+      Eigen::Vector3s perturbed = originalScale;
 
-    getBodyNode(i)->setScale(originalScale - EPS);
-    Eigen::VectorXs minus = getMarkerWorldPositions(markers);
+      perturbed(axis) += EPS;
+      getBodyNode(i)->setScale(perturbed);
+      Eigen::VectorXs plus = getMarkerWorldPositions(markers);
 
-    getBodyNode(i)->setScale(originalScale);
+      perturbed = originalScale;
+      perturbed(axis) -= EPS;
+      getBodyNode(i)->setScale(perturbed);
+      Eigen::VectorXs minus = getMarkerWorldPositions(markers);
 
-    jac.col(i) = (plus - minus) / (2 * EPS);
+      getBodyNode(i)->setScale(originalScale);
+
+      jac.col(i * 3 + axis) = (plus - minus) / (2 * EPS);
+    }
   }
 
   return jac;
@@ -4183,9 +4232,10 @@ s_t Skeleton::fitJointsToWorldPositions(
   if (scaleBodies)
   {
     Eigen::VectorXs initialPos
-        = Eigen::VectorXs::Zero(getNumDofs() + getNumScaleGroups());
+        = Eigen::VectorXs::Zero(getNumDofs() + getNumScaleGroups() * 3);
     initialPos.segment(0, getNumDofs()) = getPositions();
-    initialPos.segment(getNumDofs(), getNumScaleGroups()) = getGroupScales();
+    initialPos.segment(getNumDofs(), getNumScaleGroups() * 3)
+        = getGroupScales();
 
     return math::solveIK(
         initialPos,
@@ -4197,16 +4247,19 @@ s_t Skeleton::fitJointsToWorldPositions(
 
           // Set scales
           Eigen::VectorXs newScales
-              = pos.segment(getNumDofs(), getNumScaleGroups());
+              = pos.segment(getNumDofs(), getNumScaleGroups() * 3);
           for (int i = 0; i < getNumScaleGroups(); i++)
           {
-            if (newScales(i) > getScaleGroupUpperBound(i))
+            for (int axis = 0; axis < 3; axis++)
             {
-              newScales(i) = getScaleGroupUpperBound(i);
-            }
-            if (newScales(i) < getScaleGroupLowerBound(i))
-            {
-              newScales(i) = getScaleGroupLowerBound(i);
+              if (newScales(i * 3 + axis) > getScaleGroupUpperBound(i)(axis))
+              {
+                newScales(i * 3 + axis) = getScaleGroupUpperBound(i)(axis);
+              }
+              if (newScales(i * 3 + axis) < getScaleGroupLowerBound(i)(axis))
+              {
+                newScales(i * 3 + axis) = getScaleGroupLowerBound(i)(axis);
+              }
             }
           }
           setGroupScales(newScales);
@@ -4214,20 +4267,23 @@ s_t Skeleton::fitJointsToWorldPositions(
           // Return the clamped position
           Eigen::VectorXs clampedPos = Eigen::VectorXs::Zero(pos.size());
           clampedPos.segment(0, getNumDofs()) = getPositions();
-          clampedPos.segment(getNumDofs(), getNumScaleGroups()) = newScales;
+          clampedPos.segment(getNumDofs(), getNumScaleGroups() * 3) = newScales;
           return clampedPos;
         },
         [this, targetPositions, positionJoints](
             /*out*/ Eigen::VectorXs& diff,
             /*out*/ Eigen::MatrixXs& jac) {
           diff = targetPositions - getJointWorldPositions(positionJoints);
-          assert(jac.cols() == getNumDofs() + getNumScaleGroups());
+          assert(jac.cols() == getNumDofs() + getNumScaleGroups() * 3);
           assert(jac.rows() == positionJoints.size() * 3);
           jac.setZero();
           jac.block(0, 0, positionJoints.size() * 3, getNumDofs())
               = getJointWorldPositionsJacobianWrtJointPositions(positionJoints);
           jac.block(
-              0, getNumDofs(), positionJoints.size() * 3, getNumScaleGroups())
+              0,
+              getNumDofs(),
+              positionJoints.size() * 3,
+              getNumScaleGroups() * 3)
               = getJointWorldPositionsJacobianWrtGroupScales(positionJoints);
         },
         convergenceThreshold,

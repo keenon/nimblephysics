@@ -196,16 +196,16 @@ public:
   void copyTransformsFrom(const dynamics::Joint* other);
 
   /// Set the scale of the child body
-  void setChildScale(s_t scale);
+  void setChildScale(Eigen::Vector3s scale);
 
   /// Set the scale of the parent body
-  void setParentScale(s_t scale);
+  void setParentScale(Eigen::Vector3s scale);
 
   /// Get the scale of the child body
-  s_t getChildScale() const;
+  Eigen::Vector3s getChildScale() const;
 
   /// Get the scale of the parent body
-  s_t getParentScale() const;
+  Eigen::Vector3s getParentScale() const;
 
   /// Set to enforce joint position limit
   ///

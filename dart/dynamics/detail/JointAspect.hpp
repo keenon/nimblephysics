@@ -124,7 +124,7 @@ struct JointProperties
   /// This holds the relative scale we're applying to the offsets of the parent
   /// transform. Do not use directly! Use setParentScale() and getParentScale()
   /// instead
-  s_t mParentScale;
+  Eigen::Vector3s mParentScale;
 
   /// This holds the original translation from the parent, so that we can
   /// reconstruct exactly what the translation is as we change the scale of
@@ -135,7 +135,7 @@ struct JointProperties
   /// This holds the relative scale we're applying to the offsets of the child
   /// transform. Do not use directly! Use setChildScale() and getChildScale()
   /// instead
-  s_t mChildScale;
+  Eigen::Vector3s mChildScale;
 
   /// This holds the original translation from the child, so that we can
   /// reconstruct exactly what the translation is as we change the scale of

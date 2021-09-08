@@ -137,6 +137,9 @@ public:
   /// Check for equality
   bool operator==(const Inertia& other) const;
 
+  /// This rescales the object by "ratio" in each of the specified axis
+  void rescale(Eigen::Vector3s ratio);
+
 protected:
   /// Compute the spatial tensor based on the inertial parameters
   void computeSpatialTensor();
