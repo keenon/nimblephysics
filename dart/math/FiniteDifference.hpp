@@ -22,7 +22,7 @@ void finiteDifference(
         /* in*/ s_t eps,
         /* in*/ int dof,
         /*out*/ Eigen::VectorXs& perturbed)> getPerturbed,
-    Eigen::MatrixXs &result,
+    Eigen::MatrixXs& result,
     s_t eps = 1e-7,
     bool useRidders = false);
 
@@ -37,7 +37,7 @@ void finiteDifference(
         /* in*/ s_t eps,
         /* in*/ int dof,
         /*out*/ s_t& perturbed)> getPerturbed,
-    T &result,
+    T& result,
     s_t eps = 1e-7,
     bool useRidders = false);
 
@@ -49,7 +49,7 @@ void finiteDifference(
     std::function<bool(
         /* in*/ s_t eps,
         /*out*/ T& perturbed)> getPerturbed,
-    T &result,
+    T& result,
     s_t eps = 1e-7,
     bool useRidders = false);
 
@@ -59,11 +59,11 @@ void finiteDifference(
     std::function<bool(
         /* in*/ s_t eps,
         /*out*/ s_t& perturbed)> getPerturbed,
-    s_t &result,
+    s_t& result,
     s_t eps = 1e-7,
     bool useRidders = false);
 
-struct non_differentiable_point_exception: public std::exception
+struct non_differentiable_point_exception : public std::exception
 {
   const char* what() const throw()
   {
@@ -71,7 +71,7 @@ struct non_differentiable_point_exception: public std::exception
   }
 };
 
-struct ridders_invalid_state_exception: public std::exception
+struct ridders_invalid_state_exception : public std::exception
 {
   const char* what() const throw()
   {
@@ -79,7 +79,7 @@ struct ridders_invalid_state_exception: public std::exception
   }
 };
 
-}
+} // namespace math
 } // namespace dart
 
 #endif

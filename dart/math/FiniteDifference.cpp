@@ -1,14 +1,13 @@
 #include "dart/math/FiniteDifference.hpp"
 
 #include <array>
-#include <iostream>
 #include <exception>
+#include <iostream>
 
 using namespace dart;
 
 namespace dart {
 namespace math {
-
 
 //==============================================================================
 void centralDifference(
@@ -16,7 +15,7 @@ void centralDifference(
         /* in*/ s_t eps,
         /* in*/ int dof,
         /*out*/ Eigen::VectorXs& perturbed)> getPerturbed,
-    Eigen::MatrixXs &result,
+    Eigen::MatrixXs& result,
     s_t eps)
 {
   if (result.size() == 0)
@@ -59,7 +58,7 @@ void centralDifference(
         /* in*/ s_t eps,
         /* in*/ int dof,
         /*out*/ s_t& perturbed)> getPerturbed,
-    T &result,
+    T& result,
     s_t eps)
 {
   if (result.size() == 0)
@@ -100,7 +99,7 @@ void centralDifference(
     std::function<bool(
         /* in*/ s_t eps,
         /*out*/ T& perturbed)> getPerturbed,
-    T &result,
+    T& result,
     s_t eps)
 {
   if (result.size() == 0)
@@ -136,7 +135,7 @@ void centralDifference(
     std::function<bool(
         /* in*/ s_t eps,
         /*out*/ s_t& perturbed)> getPerturbed,
-    s_t &result,
+    s_t& result,
     s_t eps)
 {
   s_t epsPos = eps;
@@ -170,12 +169,12 @@ void riddersMethod(
         /* in*/ s_t eps,
         /* in*/ int dof,
         /*out*/ Eigen::VectorXs& perturbed)> getPerturbed,
-    Eigen::MatrixXs &result,
+    Eigen::MatrixXs& result,
     s_t eps)
 {
   if (result.size() == 0)
     return;
-  
+
   s_t originalStepSize = eps;
   const s_t con = 1.4, con2 = (con * con);
   const s_t safeThreshold = 2.0;
@@ -210,7 +209,7 @@ void riddersMethod(
       stepSize /= con;
 
       if (!getPerturbed(stepSize, dof, perturbedPlus)
-           || !getPerturbed(-stepSize, dof, perturbedMinus))
+          || !getPerturbed(-stepSize, dof, perturbedMinus))
       {
         throw ridders_invalid_state_exception();
       }
@@ -257,12 +256,12 @@ void riddersMethod(
         /* in*/ s_t eps,
         /* in*/ int dof,
         /*out*/ s_t& perturbed)> getPerturbed,
-    T &result,
+    T& result,
     s_t eps)
 {
   if (result.size() == 0)
     return;
-  
+
   s_t originalStepSize = eps;
   const s_t con = 1.4, con2 = (con * con);
   const s_t safeThreshold = 2.0;
@@ -297,7 +296,7 @@ void riddersMethod(
       stepSize /= con;
 
       if (!getPerturbed(stepSize, dof, perturbedPlus)
-           || !getPerturbed(-stepSize, dof, perturbedMinus))
+          || !getPerturbed(-stepSize, dof, perturbedMinus))
       {
         throw ridders_invalid_state_exception();
       }
@@ -340,12 +339,12 @@ void riddersMethod(
     std::function<bool(
         /* in*/ s_t eps,
         /*out*/ T& perturbed)> getPerturbed,
-    T &result,
+    T& result,
     s_t eps)
 {
   if (result.size() == 0)
     return;
-  
+
   s_t originalStepSize = eps;
   const s_t con = 1.4, con2 = (con * con);
   const s_t safeThreshold = 2.0;
@@ -358,7 +357,7 @@ void riddersMethod(
   // For Ridders we want the pos and neg epsilons to be the same.
   T perturbedPlus, perturbedMinus;
   while (!getPerturbed(originalStepSize, perturbedPlus)
-          || !getPerturbed(-originalStepSize, perturbedMinus))
+         || !getPerturbed(-originalStepSize, perturbedMinus))
   {
     originalStepSize *= 0.5;
     if (abs(originalStepSize) <= 1e-20)
@@ -377,7 +376,7 @@ void riddersMethod(
     stepSize /= con;
 
     if (!getPerturbed(stepSize, perturbedPlus)
-          || !getPerturbed(-stepSize, perturbedMinus))
+        || !getPerturbed(-stepSize, perturbedMinus))
     {
       throw ridders_invalid_state_exception();
     }
@@ -389,15 +388,12 @@ void riddersMethod(
     // evaluations
     for (int jTab = 1; jTab <= iTab; jTab++)
     {
-      tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
-                        / (fac - 1.0);
+      tab[jTab][iTab]
+          = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1]) / (fac - 1.0);
       fac = con2 * fac;
       s_t currError = max(
           (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
-          (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
-              .array()
-              .abs()
-              .maxCoeff());
+          (tab[jTab][iTab] - tab[jTab - 1][iTab - 1]).array().abs().maxCoeff());
       if (currError < bestError)
       {
         bestError = currError;
@@ -421,7 +417,7 @@ void riddersMethod(
     std::function<bool(
         /* in*/ s_t eps,
         /*out*/ s_t& perturbed)> getPerturbed,
-    s_t &result,
+    s_t& result,
     s_t eps)
 {
   s_t originalStepSize = eps;
@@ -436,7 +432,7 @@ void riddersMethod(
   // For Ridders we want the pos and neg epsilons to be the same.
   s_t perturbedPlus, perturbedMinus;
   while (!getPerturbed(originalStepSize, perturbedPlus)
-          || !getPerturbed(-originalStepSize, perturbedMinus))
+         || !getPerturbed(-originalStepSize, perturbedMinus))
   {
     originalStepSize *= 0.5;
     if (abs(originalStepSize) <= 1e-20)
@@ -455,7 +451,7 @@ void riddersMethod(
     stepSize /= con;
 
     if (!getPerturbed(stepSize, perturbedPlus)
-          || !getPerturbed(-stepSize, perturbedMinus))
+        || !getPerturbed(-stepSize, perturbedMinus))
     {
       throw ridders_invalid_state_exception();
     }
@@ -467,8 +463,8 @@ void riddersMethod(
     // evaluations
     for (int jTab = 1; jTab <= iTab; jTab++)
     {
-      tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
-                        / (fac - 1.0);
+      tab[jTab][iTab]
+          = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1]) / (fac - 1.0);
       fac = con2 * fac;
       s_t currError = max(
           (tab[jTab][iTab] - tab[jTab - 1][iTab]),
@@ -497,7 +493,7 @@ void finiteDifference(
         /* in*/ s_t eps,
         /* in*/ int dof,
         /*out*/ Eigen::VectorXs& perturbed)> getPerturbed,
-    Eigen::MatrixXs &result,
+    Eigen::MatrixXs& result,
     s_t eps,
     bool useRidders)
 {
@@ -520,7 +516,7 @@ void finiteDifference(
         /* in*/ s_t eps,
         /* in*/ int dof,
         /*out*/ s_t& perturbed)> getPerturbed,
-    T &result,
+    T& result,
     s_t eps,
     bool useRidders)
 {
@@ -542,7 +538,7 @@ void finiteDifference(
     std::function<bool(
         /* in*/ s_t eps,
         /*out*/ T& perturbed)> getPerturbed,
-    T &result,
+    T& result,
     s_t eps,
     bool useRidders)
 {
@@ -563,7 +559,7 @@ void finiteDifference(
     std::function<bool(
         /* in*/ s_t eps,
         /*out*/ s_t& perturbed)> getPerturbed,
-    s_t &result,
+    s_t& result,
     s_t eps,
     bool useRidders)
 {
@@ -588,8 +584,10 @@ template void finiteDifference<Eigen::Matrix6s>(
 template void finiteDifference<Eigen::Matrix3s>(
     std::function<bool(s_t, Eigen::Matrix3s&)>, Eigen::Matrix3s&, s_t, bool);
 template void finiteDifference<Eigen::Matrix<s_t, 6, 2>>(
-    std::function<bool(s_t, Eigen::Matrix<s_t, 6, 2>&)>, 
-    Eigen::Matrix<s_t, 6, 2>&, s_t, bool);
+    std::function<bool(s_t, Eigen::Matrix<s_t, 6, 2>&)>,
+    Eigen::Matrix<s_t, 6, 2>&,
+    s_t,
+    bool);
 template void finiteDifference<Eigen::VectorXs>(
     std::function<bool(s_t, Eigen::VectorXs&)>, Eigen::VectorXs&, s_t, bool);
 template void finiteDifference<Eigen::Vector6s>(
@@ -600,7 +598,7 @@ template void finiteDifference<math::Jacobian>(
     std::function<bool(s_t, math::Jacobian&)>, math::Jacobian&, s_t, bool);
 
 template void finiteDifference<Eigen::VectorXs>(
-    std::function<bool(s_t, int, s_t&)>, Eigen::VectorXs&, s_t, bool);  
+    std::function<bool(s_t, int, s_t&)>, Eigen::VectorXs&, s_t, bool);
 template void finiteDifference<Eigen::Vector6s>(
     std::function<bool(s_t, int, s_t&)>, Eigen::Vector6s&, s_t, bool);
 
