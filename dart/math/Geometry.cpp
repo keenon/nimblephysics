@@ -654,7 +654,6 @@ Eigen::Vector3s finiteDifferenceExpMapNestedGradient(
     const Eigen::Vector3s& screw,
     bool useRidders)
 {
-  std::cout << "expmapnestedgradient" << std::endl;
   Eigen::MatrixXs R = expMapRot(original);
   Eigen::Vector3s result;
 

@@ -2528,6 +2528,7 @@ Eigen::MatrixXs BackpropSnapshot::finiteDifferenceVelJacobianWrt(
     result,
     eps,
     useRidders);
+  wrt->set(world.get(), originalWrt);
   snapshot.restore();
   world->getConstraintSolver()->setGradientEnabled(oldGradientEnabled);
   return result;
@@ -2565,6 +2566,7 @@ Eigen::MatrixXs BackpropSnapshot::finiteDifferencePosJacobianWrt(
     result,
     eps,
     useRidders);
+  wrt->set(world.get(), originalWrt);
   snapshot.restore();
   world->getConstraintSolver()->setGradientEnabled(oldGradientEnabled);
   return result;
@@ -2855,6 +2857,7 @@ Eigen::MatrixXs BackpropSnapshot::finiteDifferenceJacobianOfQb(
     result,
     eps,
     useRidders);
+  wrt->set(world.get(), originalWrt);
   snapshot.restore();
   return result;
 }
@@ -3061,6 +3064,7 @@ BackpropSnapshot::finiteDifferenceJacobianOfLCPConstraintMatrixClampingSubset(
     result,
     eps,
     useRidders);
+  wrt->set(world.get(), originalWrt);
   snapshot.restore();
   return result;
 }
@@ -3155,6 +3159,7 @@ BackpropSnapshot::finiteDifferenceJacobianOfLCPOffsetClampingSubset(
     result,
     eps,
     useRidders);
+  wrt->set(world.get(), originalWrt);
   snapshot.restore();
   return result;
 }
@@ -3192,6 +3197,7 @@ BackpropSnapshot::finiteDifferenceJacobianOfLCPEstimatedOffsetClampingSubset(
     result,
     eps,
     useRidders);
+  wrt->set(world.get(), originalWrt);
   snapshot.restore();
   return result;
 }
@@ -3898,6 +3904,7 @@ BackpropSnapshot::finiteDifferenceJacobianOfProjectionIntoClampsMatrix(
       result,
       eps,
       useRidders);
+    wrt->set(world.get(), originalWrt);
     snapshot.restore();
     return result;
   }
@@ -3942,6 +3949,7 @@ Eigen::MatrixXs BackpropSnapshot::finiteDifferenceJacobianOfMinv(
     result,
     eps,
     useRidders);
+  wrt->set(world.get(), originalWrt);
   snapshot.restore();
   return result;
 }
@@ -4000,6 +4008,7 @@ Eigen::MatrixXs BackpropSnapshot::finiteDifferenceJacobianOfM(
     result,
     eps,
     useRidders);
+  wrt->set(world.get(), originalWrt);
   snapshot.restore();
   return result;
 }
@@ -4033,6 +4042,7 @@ Eigen::MatrixXs BackpropSnapshot::finiteDifferenceJacobianOfC(
     result,
     eps,
     useRidders);
+  wrt->set(world.get(), originalWrt);
   snapshot.restore();
   return result;
 }
@@ -4070,6 +4080,7 @@ Eigen::MatrixXs BackpropSnapshot::finiteDifferenceJacobianOfMinvC(
     result,
     eps,
     useRidders);
+  wrt->set(world.get(), originalWrt);
   snapshot.restore();
   return result;
 }
@@ -4117,6 +4128,7 @@ Eigen::MatrixXs BackpropSnapshot::finiteDifferenceJacobianOfConstraintForce(
       result,
       eps,
       useRidders);
+    wrt->set(world.get(), originalWrt);
     snapshot.restore();
     world->setPenetrationCorrectionEnabled(oldPenetrationCorrection);
     return result;
@@ -4170,6 +4182,7 @@ BackpropSnapshot::finiteDifferenceJacobianOfEstimatedConstraintForce(
     result,
     eps,
     useRidders);
+  wrt->set(world.get(), originalWrt);
   snapshot.restore();
   return result;
 }
