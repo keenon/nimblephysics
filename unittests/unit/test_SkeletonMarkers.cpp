@@ -52,6 +52,13 @@ TEST(SkeletonConverter, IK_JACOBIANS)
       std::make_pair(osim->getBodyNode("ulna_r"), Eigen::Vector3s::Random()));
 
   EXPECT_TRUE(verifySkeletonMarkerJacobians(osim, markers));
+
+  // Try some non-zero joint configurations
+  for (int i = 0; i < 3; i++)
+  {
+    osim->setPositions(Eigen::VectorXs::Random(osim->getNumDofs()));
+    EXPECT_TRUE(verifySkeletonMarkerJacobians(osim, markers));
+  }
 }
 #endif
 
@@ -84,5 +91,13 @@ TEST(SkeletonConverter, IK_JACOBIANS_BALL_JOINTS)
       osimBallJoints->getBodyNode("ulna_r"), Eigen::Vector3s::Random()));
 
   EXPECT_TRUE(verifySkeletonMarkerJacobians(osimBallJoints, markers));
+
+  // Try some non-zero joint configurations
+  for (int i = 0; i < 3; i++)
+  {
+    osimBallJoints->setPositions(
+        Eigen::VectorXs::Random(osimBallJoints->getNumDofs()));
+    EXPECT_TRUE(verifySkeletonMarkerJacobians(osimBallJoints, markers));
+  }
 }
 #endif
