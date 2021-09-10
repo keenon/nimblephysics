@@ -1097,6 +1097,38 @@ public:
           markers,
       Eigen::VectorXs leftMultiply);
 
+  /// This gets the derivative of the Jacobian of the markers wrt joint
+  /// positions, with respect to a single marker offset
+  Eigen::MatrixXs
+  getMarkerWorldPositionsDerivativeOfJacobianWrtJointsWrtMarkerOffsets(
+      const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+          markers,
+      int marker,
+      int axis,
+      const Eigen::MatrixXs& markerWrtMarkerJac);
+
+  /// This gets the derivative of the Jacobian of the markers wrt joint
+  /// positions, with respect to a single marker offset
+  Eigen::MatrixXs
+  finiteDifferenceMarkerWorldPositionsDerivativeOfJacobianWrtJointsWrtMarkerOffsets(
+      const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+          markers,
+      int marker,
+      int axis);
+
+  /// This gets the Jacobian of leftMultiply.transpose()*J with respect to marker offsets
+  Eigen::MatrixXs getMarkerWorldPositionsSecondJacobianWrtJointWrtMarkerOffsets(
+      const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+          markers,
+      Eigen::VectorXs leftMultiply);
+
+  /// This gets the Jacobian of leftMultiply.transpose()*J with respect to marker offsets
+  Eigen::MatrixXs
+  finiteDifferenceMarkerWorldPositionsSecondJacobianWrtJointWrtMarkerOffsets(
+      const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+          markers,
+      Eigen::VectorXs leftMultiply);
+
   /// This runs IK, attempting to fit the world positions of the passed in
   /// joints to the vector of (concatenated) target positions. This can
   /// optionally also rescale the skeleton.

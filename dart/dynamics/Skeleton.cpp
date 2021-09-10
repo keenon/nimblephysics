@@ -4519,11 +4519,6 @@ Skeleton::getMarkerWorldPositionsDerivativeOfJacobianWrtJointsWrtBodyScale(
     int axis,
     const Eigen::MatrixXs& markerWrtScaleJac)
 {
-  (void)markers;
-  (void)index;
-  (void)axis;
-  (void)markerWrtScaleJac;
-
   dynamics::BodyNode* scaleBody = getBodyNode(index);
   dynamics::Joint* scaleJoint = scaleBody->getParentJoint();
   int scaleJointDof = scaleJoint->getDof(0)->getIndexInSkeleton();
@@ -4671,6 +4666,163 @@ Eigen::MatrixXs Skeleton::
             * getMarkerWorldPositionsJacobianWrtJointPositions(markers);
 
       getBodyNode(i)->setScale(originalScale);
+
+      result.col(i * 3 + axis) = (plus - minus) / (2 * EPS);
+    }
+  }
+
+  return result;
+}
+
+//==============================================================================
+/// This gets the derivative of the Jacobian of the markers wrt joint
+/// positions, with respect to a single marker offset
+Eigen::MatrixXs
+Skeleton::getMarkerWorldPositionsDerivativeOfJacobianWrtJointsWrtMarkerOffsets(
+    const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+        markers,
+    int marker,
+    int axis,
+    const Eigen::MatrixXs& markerWrtMarkerJac)
+{
+  int markerGradCol = marker * 3 + axis;
+  Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(markers.size() * 3, getNumDofs());
+
+  Eigen::VectorXs worldMarkers = getMarkerWorldPositions(markers);
+  const Eigen::MatrixXi& parentMap = getParentMap();
+
+  for (int j = 0; j < getNumDofs(); j++)
+  {
+    const dynamics::Joint* parentJoint = getDof(j)->getJoint();
+    Eigen::Vector6s screw = parentJoint->getWorldAxisScrewForPosition(
+        getDof(j)->getIndexInJoint());
+    int parentJointDof = j;
+    for (int i = 0; i < markers.size(); i++)
+    {
+      const dynamics::Joint* sourceJoint = markers[i].first->getParentJoint();
+      int sourceJointDof = sourceJoint->getDof(0)->getIndexInSkeleton();
+
+      /// getParentMap(i,j) == 1: Dof[i] is a parent of Dof[j]
+      /// getParentMap(i,j) == 0: Dof[i] is NOT a parent of Dof[j]
+      if (parentMap(parentJointDof, sourceJointDof) == 1
+          || sourceJoint == parentJoint)
+      {
+        Eigen::Vector3s markerGrad
+            = markerWrtMarkerJac.block<3, 1>(i * 3, markerGradCol);
+        jac.block<3, 1>(i * 3, j) = math::gradientWrtThetaPureRotation(
+            screw.head<3>(), markerGrad, 0.0);
+      }
+    }
+  }
+
+  return jac;
+}
+
+//==============================================================================
+/// This gets the derivative of the Jacobian of the markers wrt joint
+/// positions, with respect to a single marker offset
+Eigen::MatrixXs Skeleton::
+    finiteDifferenceMarkerWorldPositionsDerivativeOfJacobianWrtJointsWrtMarkerOffsets(
+        const std::vector<
+            std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>& markers,
+        int marker,
+        int axis)
+{
+  const s_t EPS = 1e-7;
+
+  std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>
+      markersCopy;
+  for (auto marker : markers)
+    markersCopy.push_back(
+        std::make_pair<const dynamics::BodyNode*, Eigen::Vector3s>(
+            &(*marker.first), Eigen::Vector3s(marker.second)));
+
+  s_t originalOffset = markersCopy[marker].second(axis);
+
+  markersCopy[marker].second(axis) = originalOffset + EPS;
+  Eigen::MatrixXs plus
+      = getMarkerWorldPositionsJacobianWrtJointPositions(markersCopy);
+
+  markersCopy[marker].second(axis) = originalOffset - EPS;
+  Eigen::MatrixXs minus
+      = getMarkerWorldPositionsJacobianWrtJointPositions(markersCopy);
+
+  return (plus - minus) / (2 * EPS);
+}
+
+//==============================================================================
+/// This gets the Jacobian of leftMultiply.transpose()*J with respect to marker
+/// offsets
+Eigen::MatrixXs
+Skeleton::getMarkerWorldPositionsSecondJacobianWrtJointWrtMarkerOffsets(
+    const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+        markers,
+    Eigen::VectorXs leftMultiply)
+{
+  Eigen::MatrixXs result
+      = Eigen::MatrixXs::Zero(getNumDofs(), markers.size() * 3);
+
+  // The left multiply means we're taking a weighted combination of rows, to get
+  // a single row. That's our new vector. Then we're treating that vector as a
+  // column vector, and building a Jacobian of how that vector changes as we
+  // change body scales.
+
+  Eigen::MatrixXs markerJac
+      = getMarkerWorldPositionsJacobianWrtMarkerOffsets(markers);
+
+  for (int marker = 0; marker < markers.size(); marker++)
+  {
+    for (int axis = 0; axis < 3; axis++)
+    {
+      result.col(marker * 3 + axis)
+          = getMarkerWorldPositionsDerivativeOfJacobianWrtJointsWrtMarkerOffsets(
+                markers, marker, axis, markerJac)
+                .transpose()
+            * leftMultiply;
+    }
+  }
+
+  return result;
+}
+
+//==============================================================================
+/// This gets the Jacobian of leftMultiply.transpose()*J with respect to marker
+/// offsets
+Eigen::MatrixXs Skeleton::
+    finiteDifferenceMarkerWorldPositionsSecondJacobianWrtJointWrtMarkerOffsets(
+        const std::vector<
+            std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>& markers,
+        Eigen::VectorXs leftMultiply)
+{
+  std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>
+      markersCopy;
+  for (auto marker : markers)
+    markersCopy.push_back(
+        std::make_pair<const dynamics::BodyNode*, Eigen::Vector3s>(
+            &(*marker.first), Eigen::Vector3s(marker.second)));
+
+  Eigen::MatrixXs result
+      = Eigen::MatrixXs::Zero(getNumDofs(), markers.size() * 3);
+
+  const s_t EPS = 1e-7;
+
+  for (int i = 0; i < markers.size(); i++)
+  {
+    for (int axis = 0; axis < 3; axis++)
+    {
+      s_t originalOffset = markersCopy[i].second(axis);
+
+      markersCopy[i].second(axis) = originalOffset + EPS;
+      Eigen::VectorXs plus
+          = leftMultiply.transpose()
+            * getMarkerWorldPositionsJacobianWrtJointPositions(markersCopy);
+
+      markersCopy[i].second(axis) = originalOffset - EPS;
+      Eigen::VectorXs minus
+          = leftMultiply.transpose()
+            * getMarkerWorldPositionsJacobianWrtJointPositions(markersCopy);
+
+      markersCopy[i].second(axis) = originalOffset;
 
       result.col(i * 3 + axis) = (plus - minus) / (2 * EPS);
     }

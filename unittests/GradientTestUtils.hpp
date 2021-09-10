@@ -4468,6 +4468,99 @@ bool verifySkeletonMarkerJacobians(
     }
   }
 
+  // Check 2nd order Jacobians wrt the marker offsets
+
+  for (int j = 0; j < markers.size(); j++)
+  {
+    for (int axis = 0; axis < 3; axis++)
+    {
+      Eigen::MatrixXs posJacWrtMarkerJac
+          = skel->getMarkerWorldPositionsDerivativeOfJacobianWrtJointsWrtMarkerOffsets(
+              markers, j, axis, markersJac);
+      Eigen::MatrixXs posJacWrtMarkerJac_fd
+          = skel->finiteDifferenceMarkerWorldPositionsDerivativeOfJacobianWrtJointsWrtMarkerOffsets(
+              markers, j, axis);
+      if (!equals(posJacWrtMarkerJac, posJacWrtMarkerJac_fd, THRESHOLD))
+      {
+        std::cout << "Error on jac of (jac of markers wrt joint position) wrt "
+                     "marker "
+                  << j << " axis " << axis << std::endl;
+        Eigen::MatrixXs diff = posJacWrtMarkerJac - posJacWrtMarkerJac_fd;
+        int cursor = 0;
+        for (int i = 0; i < skel->getNumJoints(); i++)
+        {
+          dynamics::Joint* joint = skel->getJoint(i);
+          Eigen::MatrixXs jacBlock = posJacWrtMarkerJac.block(
+              0, cursor, diff.rows(), joint->getNumDofs());
+          Eigen::MatrixXs fdBlock = posJacWrtMarkerJac_fd.block(
+              0, cursor, diff.rows(), joint->getNumDofs());
+          Eigen::MatrixXs diffBlock
+              = diff.block(0, cursor, diff.rows(), joint->getNumDofs());
+          if (diffBlock.norm() > 1e-8)
+          {
+            for (int k = 0; k < markers.size(); k++)
+            {
+              auto pair = markers[k];
+              Eigen::MatrixXs markerJacBlock
+                  = jacBlock.block(k * 3, 0, 3, jacBlock.cols());
+              Eigen::MatrixXs markerFdBlock
+                  = fdBlock.block(k * 3, 0, 3, fdBlock.cols());
+              Eigen::MatrixXs markerDiff
+                  = diffBlock.block(k * 3, 0, 3, diffBlock.cols());
+              if (markerDiff.norm() > 1e-8)
+              {
+                const Eigen::MatrixXi& parentMap = skel->getParentMap();
+                dynamics::BodyNode* scaleBody = skel->getBodyNode(j);
+                dynamics::Joint* scaleJoint = scaleBody->getParentJoint();
+                int scaleJointDof = scaleJoint->getDof(0)->getIndexInSkeleton();
+                const dynamics::Joint* sourceJoint
+                    = markers[k].first->getParentJoint();
+                int sourceJointDof
+                    = sourceJoint->getDof(0)->getIndexInSkeleton();
+                const dynamics::Joint* parentJoint = joint;
+                int parentJointDof
+                    = parentJoint->getDof(0)->getIndexInSkeleton();
+                bool isScalingBodyParentOfMarker
+                    = (parentMap(scaleJointDof, sourceJointDof) == 1
+                       || scaleBody == markers[i].first);
+                bool isScalingBodyParentOfAxisJoint
+                    = parentMap(scaleJointDof, parentJointDof) == 1;
+
+                std::cout << "{ Joint \"" << joint->getName()
+                          << "\" moving Marker [" << pair.first->getName()
+                          << ",(" << pair.second(0) << "," << pair.second(1)
+                          << "," << pair.second(2) << ")] }"
+                          << " grad wrt marker [" << j << "] on axis=[" << axis
+                          << "]" << std::endl;
+                std::cout << "Is scaling body parent of axis joint? parentMap["
+                          << scaleJointDof << ", " << parentJointDof
+                          << "]: " << parentMap(scaleJointDof, parentJointDof)
+                          << std::endl;
+                std::cout
+                    << "Is scaling body parent of source joint? parentMap["
+                    << scaleJointDof << ", " << sourceJointDof
+                    << "]: " << parentMap(scaleJointDof, sourceJointDof)
+                    << std::endl;
+                std::cout << "isScalingBodyParentOfMarker: "
+                          << isScalingBodyParentOfMarker << std::endl;
+                std::cout << "isScalingBodyParentOfAxisJoint: "
+                          << isScalingBodyParentOfAxisJoint << std::endl;
+                std::cout << "Marker Jac:" << std::endl
+                          << markerJacBlock << std::endl
+                          << "Marker FD:" << std::endl
+                          << markerFdBlock << std::endl
+                          << "Marker Diff:" << std::endl
+                          << markerDiff << std::endl;
+              }
+            }
+          }
+          cursor += joint->getNumDofs();
+        }
+        return false;
+      }
+    }
+  }
+
   Eigen::VectorXs leftMultiply = Eigen::VectorXs::Random(markers.size() * 3);
 
   Eigen::MatrixXs posJacWrtPosJac
@@ -4505,6 +4598,25 @@ bool verifySkeletonMarkerJacobians(
               << posJacWrtScaleJac_fd << std::endl
               << "Diff:" << std::endl
               << posJacWrtScaleJac - posJacWrtScaleJac_fd << std::endl;
+    return false;
+  }
+
+  Eigen::MatrixXs posJacWrtMarkerJac
+      = skel->getMarkerWorldPositionsSecondJacobianWrtJointWrtMarkerOffsets(
+          markers, leftMultiply);
+  Eigen::MatrixXs posJacWrtMarkerJac_fd
+      = skel->finiteDifferenceMarkerWorldPositionsSecondJacobianWrtJointWrtMarkerOffsets(
+          markers, leftMultiply);
+
+  if (!equals(posJacWrtMarkerJac, posJacWrtMarkerJac_fd, THRESHOLD))
+  {
+    std::cout << "Error on J^T*leftMultiply jac wrt marker offsets" << std::endl
+              << "Analytical:" << std::endl
+              << posJacWrtMarkerJac << std::endl
+              << "FD:" << std::endl
+              << posJacWrtMarkerJac_fd << std::endl
+              << "Diff:" << std::endl
+              << posJacWrtMarkerJac - posJacWrtMarkerJac_fd << std::endl;
     return false;
   }
 
