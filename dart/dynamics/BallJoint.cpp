@@ -536,12 +536,19 @@ Eigen::Vector6s BallJoint::estimatePerturbedScrewAxisForForce(
 Eigen::Vector6s BallJoint::getScrewAxisGradientForPosition(
     int axisDof, int rotateDof)
 {
-  s_t EPS = 1e-7;
-  Eigen::Vector6s pos
-      = estimatePerturbedScrewAxisForPosition(axisDof, rotateDof, EPS);
-  Eigen::Vector6s neg
-      = estimatePerturbedScrewAxisForPosition(axisDof, rotateDof, -EPS);
-  return (pos - neg) / (2 * EPS);
+  if (axisDof < 3 && rotateDof < 3)
+  {
+    s_t EPS = 1e-7;
+    Eigen::Vector6s pos
+        = estimatePerturbedScrewAxisForPosition(axisDof, rotateDof, EPS);
+    Eigen::Vector6s neg
+        = estimatePerturbedScrewAxisForPosition(axisDof, rotateDof, -EPS);
+    return (pos - neg) / (2 * EPS);
+  }
+  else
+  {
+    return Eigen::Vector6s::Zero();
+  }
 }
 
 //==============================================================================

@@ -43,6 +43,7 @@
 #include "dart/common/StlHelpers.hpp"
 #include "dart/dynamics/BallJoint.hpp"
 #include "dart/dynamics/BodyNode.hpp"
+#include "dart/dynamics/CustomJoint.hpp"
 #include "dart/dynamics/DegreeOfFreedom.hpp"
 #include "dart/dynamics/EndEffector.hpp"
 #include "dart/dynamics/EulerFreeJoint.hpp"
@@ -4174,6 +4175,9 @@ Eigen::MatrixXs Skeleton::getMarkerWorldPositionsJacobianWrtMarkerOffsets(
   {
     jac.block<3, 3>(i * 3, i * 3)
         = markers[i].first->getWorldTransform().linear();
+    jac.block<3, 1>(i * 3, i * 3) *= markers[i].first->getScale()(0);
+    jac.block<3, 1>(i * 3, i * 3 + 1) *= markers[i].first->getScale()(1);
+    jac.block<3, 1>(i * 3, i * 3 + 2) *= markers[i].first->getScale()(2);
   }
 
   return jac;
@@ -4212,6 +4216,285 @@ Skeleton::finiteDifferenceMarkerWorldPositionsJacobianWrtMarkerOffsets(
   }
 
   return jac;
+}
+
+//==============================================================================
+/// This gets the gradient of the ||f(q) - x|| function with respect to q
+Eigen::VectorXs Skeleton::getMarkerWorldPositionDiffToGoalGradientWrtJointPos(
+    const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+        markers,
+    Eigen::VectorXs goal)
+{
+  Eigen::VectorXs worldPos = getMarkerWorldPositions(markers);
+  Eigen::VectorXs diff = worldPos - goal;
+  Eigen::MatrixXs J = getMarkerWorldPositionsJacobianWrtJointPositions(markers);
+  return 2 * J.transpose() * diff;
+}
+
+//==============================================================================
+/// This gets the gradient of the ||f(q) - x|| function with respect to q
+Eigen::VectorXs
+Skeleton::finiteDifferenceMarkerWorldPositionDiffToGoalGradientWrtJointPos(
+    const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+        markers,
+    Eigen::VectorXs goal)
+{
+  Eigen::VectorXs result = Eigen::VectorXs::Zero(getNumDofs());
+
+  const s_t EPS = 1e-7;
+  Eigen::VectorXs originalPos = getPositions();
+
+  for (int i = 0; i < getNumDofs(); i++)
+  {
+    Eigen::VectorXs perturbed = originalPos;
+    perturbed(i) += EPS;
+    setPositions(perturbed);
+
+    s_t plus = (getMarkerWorldPositions(markers) - goal).squaredNorm();
+
+    perturbed = originalPos;
+    perturbed(i) -= EPS;
+    setPositions(perturbed);
+
+    s_t minus = (getMarkerWorldPositions(markers) - goal).squaredNorm();
+
+    result(i) = (plus - minus) / (2 * EPS);
+  }
+
+  setPositions(originalPos);
+
+  return result;
+}
+
+//==============================================================================
+/// This should be equivalent to
+/// `getMarkerWorldPositionsJacobianWrtJointPositions`, just slower. This is
+/// here so there's a simple non-recursive formula for the Jacobian to take
+/// derivatives against.
+Eigen::MatrixXs
+Skeleton::getScrewsMarkerWorldPositionsJacobianWrtJointPositions(
+    const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+        markers)
+{
+  Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(markers.size() * 3, getNumDofs());
+
+  Eigen::VectorXs worldMarkers = getMarkerWorldPositions(markers);
+  const Eigen::MatrixXi& parentMap = getParentMap();
+
+  for (int j = 0; j < getNumDofs(); j++)
+  {
+    const dynamics::Joint* parentJoint = getDof(j)->getJoint();
+    Eigen::Vector6s screw = parentJoint->getWorldAxisScrewForPosition(
+        getDof(j)->getIndexInJoint());
+    int parentJointDof = j;
+    for (int i = 0; i < markers.size(); i++)
+    {
+      const dynamics::Joint* sourceJoint = markers[i].first->getParentJoint();
+      int sourceJointDof = sourceJoint->getDof(0)->getIndexInSkeleton();
+
+      /// getParentMap(i,j) == 1: Dof[i] is a parent of Dof[j]
+      /// getParentMap(i,j) == 0: Dof[i] is NOT a parent of Dof[j]
+      if (parentMap(parentJointDof, sourceJointDof) == 1
+          || sourceJoint == parentJoint)
+      {
+        jac.block<3, 1>(i * 3, j) = math::gradientWrtTheta(
+            screw, worldMarkers.segment<3>(i * 3), 0.0);
+      }
+    }
+  }
+
+  return jac;
+}
+
+//==============================================================================
+/// This gets the derivative of the Jacobian of the markers wrt joint
+/// positions, with respect to a single joint index
+Eigen::MatrixXs
+Skeleton::getMarkerWorldPositionsDerivativeOfJacobianWrtJointsWrtJoints(
+    const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+        markers,
+    int index)
+{
+  Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(markers.size() * 3, getNumDofs());
+
+  Eigen::VectorXs worldMarkers = getMarkerWorldPositions(markers);
+  const Eigen::MatrixXi& parentMap = getParentMap();
+
+  // Differentiating the whole mess wrt this joint
+  dynamics::Joint* rootJoint = getDof(index)->getJoint();
+  Eigen::Vector6s rootScrew = rootJoint->getWorldAxisScrewForPosition(
+      getDof(index)->getIndexInJoint());
+  int rootJointDof = index;
+
+  for (int j = 0; j < getNumDofs(); j++)
+  {
+    dynamics::Joint* parentJoint = getDof(j)->getJoint();
+    Eigen::Vector6s screw = parentJoint->getWorldAxisScrewForPosition(
+        getDof(j)->getIndexInJoint());
+    int parentJointDof = j;
+    for (int i = 0; i < markers.size(); i++)
+    {
+      const dynamics::Joint* sourceJoint = markers[i].first->getParentJoint();
+      int sourceJointDof = sourceJoint->getDof(0)->getIndexInSkeleton();
+
+      /// getParentMap(i,j) == 1: Dof[i] is a parent of Dof[j]
+      /// getParentMap(i,j) == 0: Dof[i] is NOT a parent of Dof[j]
+      if (parentMap(parentJointDof, sourceJointDof) == 1
+          || sourceJoint == parentJoint)
+      {
+        // The original value in this cell is the following
+
+        /*
+        jac.block<3, 1>(i * 3, j) = math::gradientWrtTheta(
+            screw, worldMarkers.segment<3>(i * 3), 0.0);
+        */
+
+        // There's a special case if the root is the parent of both the DOF for this column of the Jac, _and_ of the marker. That means that all we're doing is rotating (and translating, but that's irrelevant) the joint-marker system. So all we need is the gradient of the rotation.
+        if (parentMap(rootJointDof, parentJointDof) == 1)
+        {
+          Eigen::Vector3s originalJac = math::gradientWrtTheta(
+            screw, worldMarkers.segment<3>(i * 3), 0.0);
+          jac.block<3, 1>(i * 3, j) = math::gradientWrtThetaPureRotation(rootScrew.head<3>(), originalJac, 0);
+        }
+        else 
+        {
+          // We'll use the sum-product rule, so we need to individually
+          // differentiate both terms (`screw` and `markerPos`) wrt the root
+          // joint's theta term.
+
+          // Make `screwGrad` hold the gradient of the screw with respect to
+          // root
+
+          Eigen::Vector6s screwGrad = Eigen::Vector6s::Zero();
+
+          if (rootJoint == parentJoint)
+          {
+            int axisIndex = getDof(j)->getIndexInJoint();
+            int rotateIndex = getDof(index)->getIndexInJoint();
+            screwGrad = parentJoint->getScrewAxisGradientForPosition(
+                axisIndex, rotateIndex);
+          }
+          else {
+            // Otherwise rotating the root joint doesn't effect parentJoint's screw
+            screwGrad.setZero();
+          }
+
+          // `screwGrad` now holds the gradient of the screw with respect to
+          // root.
+
+          // Now we need the marker position's gradient wrt the root axis
+
+          Eigen::Vector3s markerGradWrtRoot = Eigen::Vector3s::Zero();
+
+          if (parentMap(rootJointDof, sourceJointDof) == 1
+              || (rootJoint == sourceJoint))
+          {
+            markerGradWrtRoot = math::gradientWrtTheta(
+                rootScrew, worldMarkers.segment<3>(i * 3), 0.0);
+          }
+
+          // Now we just need to apply the product rule to get the final
+          // result
+
+          Eigen::Vector3s partA = math::gradientWrtTheta(
+              screwGrad, worldMarkers.segment<3>(i * 3), 0.0);
+          Eigen::Vector3s partB = math::gradientWrtThetaPureRotation(
+              screw.head<3>(), markerGradWrtRoot, 0.0);
+
+          jac.block<3, 1>(i * 3, j) = partA + partB;
+        }
+      }
+    }
+  }
+
+  return jac;
+}
+
+//==============================================================================
+/// This gets the derivative of the Jacobian of the markers wrt joint
+/// positions, with respect to a single joint index
+Eigen::MatrixXs Skeleton::
+    finiteDifferenceMarkerWorldPositionsDerivativeOfJacobianWrtJointsWrtJoints(
+        const std::vector<
+            std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>& markers,
+        int index)
+{
+  s_t originalPos = getPosition(index);
+  const s_t EPS = 1e-7;
+
+  setPosition(index, originalPos + EPS);
+  Eigen::MatrixXs plus
+      = getMarkerWorldPositionsJacobianWrtJointPositions(markers);
+
+  setPosition(index, originalPos - EPS);
+  Eigen::MatrixXs minus
+      = getMarkerWorldPositionsJacobianWrtJointPositions(markers);
+
+  setPosition(index, originalPos);
+  return (plus - minus) / (2 * EPS);
+}
+
+//==============================================================================
+/// This gets the Jacobian of J.transpose()*leftMultiply with respect to joint
+/// positions, holding leftMultiply constant
+Eigen::MatrixXs
+Skeleton::getMarkerWorldPositionsSecondJacobianWrtJointWrtJointPositions(
+    const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+        markers,
+    Eigen::VectorXs leftMultiply)
+{
+  Eigen::MatrixXs result = Eigen::MatrixXs::Zero(getNumDofs(), getNumDofs());
+
+  // The left multiply means we're taking a weighted combination of rows, to get
+  // a single row. That's our new vector. Then we're treating that vector as a
+  // column vector, and building a Jacobian of how that vector changes as we
+  // change joint positions.
+
+  for (int col = 0; col < getNumDofs(); col++) {
+    result.col(col) = getMarkerWorldPositionsDerivativeOfJacobianWrtJointsWrtJoints(markers, col).transpose() * leftMultiply;
+  }
+
+  return result;
+}
+
+//==============================================================================
+/// This gets the Jacobian of J.transpose()*leftMultiply with respect to joint
+/// positions, holding leftMultiply constant
+Eigen::MatrixXs Skeleton::
+    finiteDifferenceMarkerWorldPositionsSecondJacobianWrtJointWrtJointPositions(
+        const std::vector<
+            std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>& markers,
+        Eigen::VectorXs leftMultiply)
+{
+  Eigen::MatrixXs result = Eigen::MatrixXs::Zero(getNumDofs(), getNumDofs());
+
+  const s_t EPS = 1e-7;
+  Eigen::VectorXs originalPos = getPositions();
+
+  for (int i = 0; i < getNumDofs(); i++)
+  {
+    Eigen::VectorXs perturbed = originalPos;
+    perturbed(i) += EPS;
+    setPositions(perturbed);
+
+    Eigen::VectorXs plus
+        = leftMultiply.transpose()
+          * getMarkerWorldPositionsJacobianWrtJointPositions(markers);
+
+    perturbed = originalPos;
+    perturbed(i) -= EPS;
+    setPositions(perturbed);
+
+    Eigen::VectorXs minus
+        = leftMultiply.transpose()
+          * getMarkerWorldPositionsJacobianWrtJointPositions(markers);
+
+    result.col(i) = (plus - minus) / (2 * EPS);
+  }
+
+  setPositions(originalPos);
+
+  return result;
 }
 
 //==============================================================================

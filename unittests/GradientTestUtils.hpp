@@ -4071,7 +4071,9 @@ bool verifyIdentityMapping(WorldPtr world)
   return verifyMapping(world, mapping);
 }
 
-bool verifySkeletonMarkerJacobians(SkeletonPtr skel, std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>> markers)
+bool verifySkeletonMarkerJacobians(
+    SkeletonPtr skel,
+    std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>> markers)
 {
   const s_t THRESHOLD = 1e-7;
 
@@ -4122,6 +4124,51 @@ bool verifySkeletonMarkerJacobians(SkeletonPtr skel, std::vector<std::pair<const
       cursor += joint->getNumDofs();
     }
     EXPECT_TRUE(equals(posJac, posJac_fd, THRESHOLD));
+    return false;
+  }
+  Eigen::MatrixXs posJac_screws
+      = skel->getScrewsMarkerWorldPositionsJacobianWrtJointPositions(markers);
+  if (!equals(posJac, posJac_screws, THRESHOLD))
+  {
+    for (auto pair : markers)
+    {
+      std::cout << "Pair [" << pair.first->getName() << ",(" << pair.second(0)
+                << "," << pair.second(1) << "," << pair.second(2) << ")]"
+                << std::endl;
+    }
+    std::cout << "Analytical pos J: " << std::endl << posJac << std::endl;
+    std::cout << "Screws pos J: " << std::endl << posJac_screws << std::endl;
+    Eigen::MatrixXs diff = posJac - posJac_screws;
+    std::cout << "Diff: " << std::endl << diff << std::endl;
+    int cursor = 0;
+    for (int i = 0; i < skel->getNumJoints(); i++)
+    {
+      dynamics::Joint* joint = skel->getJoint(i);
+      Eigen::MatrixXs jacBlock
+          = posJac.block(0, cursor, diff.rows(), joint->getNumDofs());
+      Eigen::MatrixXs screwsBlock
+          = posJac_screws.block(0, cursor, diff.rows(), joint->getNumDofs());
+      Eigen::MatrixXs diffBlock
+          = diff.block(0, cursor, diff.rows(), joint->getNumDofs());
+      if (diffBlock.norm() > 1e-8)
+      {
+        std::cout << "Joint \"" << joint->getName() << "\"" << std::endl;
+        for (auto pair : markers)
+        {
+          std::cout << "Pair [" << pair.first->getName() << ",("
+                    << pair.second(0) << "," << pair.second(1) << ","
+                    << pair.second(2) << ")]" << std::endl;
+        }
+        std::cout << "Jac:" << std::endl
+                  << jacBlock << std::endl
+                  << "Screws:" << std::endl
+                  << screwsBlock << std::endl
+                  << "Diff:" << std::endl
+                  << diffBlock << std::endl;
+      }
+      cursor += joint->getNumDofs();
+    }
+    EXPECT_TRUE(equals(posJac, posJac_screws, THRESHOLD));
     return false;
   }
 
@@ -4214,6 +4261,139 @@ bool verifySkeletonMarkerJacobians(SkeletonPtr skel, std::vector<std::pair<const
     EXPECT_TRUE(equals(scaleJac, scaleJac_fd, THRESHOLD));
     return false;
   }
+
+  Eigen::VectorXs target = Eigen::VectorXs::Random(markers.size() * 3);
+
+  Eigen::VectorXs diffGrad
+      = skel->getMarkerWorldPositionDiffToGoalGradientWrtJointPos(
+          markers, target);
+  Eigen::VectorXs diffGrad_fd
+      = skel->finiteDifferenceMarkerWorldPositionDiffToGoalGradientWrtJointPos(
+          markers, target);
+
+  if (!equals(diffGrad, diffGrad_fd, THRESHOLD))
+  {
+    std::cout << "Error on marker diff ||f(q) - x|| grad" << std::endl
+              << "Grad:" << std::endl
+              << diffGrad << std::endl
+              << "FD:" << std::endl
+              << diffGrad_fd << std::endl
+              << "Diff:" << std::endl
+              << diffGrad - diffGrad_fd << std::endl;
+    return false;
+  }
+
+  for (int j = 0; j < skel->getNumDofs(); j++)
+  {
+    Eigen::MatrixXs posJacWrtPosJac
+        = skel->getMarkerWorldPositionsDerivativeOfJacobianWrtJointsWrtJoints(
+            markers, j);
+    Eigen::MatrixXs posJacWrtPosJac_fd
+        = skel->finiteDifferenceMarkerWorldPositionsDerivativeOfJacobianWrtJointsWrtJoints(
+            markers, j);
+
+    if (!equals(posJacWrtPosJac, posJacWrtPosJac_fd, THRESHOLD))
+    {
+      /*
+      for (auto pair : markers)
+      {
+        std::cout << "Pair [" << pair.first->getName() << ",(" << pair.second(0)
+                  << "," << pair.second(1) << "," << pair.second(2) << ")]"
+                  << std::endl;
+      }
+      std::cout << "Analytical pos J derive wrt joint " << i << ": "
+                << std::endl
+                << posJacWrtPosJac << std::endl;
+      std::cout << "FD pos J derive wrt joint " << i << ": " << std::endl
+                << posJacWrtPosJac_fd << std::endl;
+      */
+      Eigen::MatrixXs diff = posJacWrtPosJac - posJacWrtPosJac_fd;
+      // std::cout << "Diff: " << std::endl << diff << std::endl;
+      int cursor = 0;
+      for (int i = 0; i < skel->getNumJoints(); i++)
+      {
+        dynamics::Joint* joint = skel->getJoint(i);
+        Eigen::MatrixXs jacBlock = posJacWrtPosJac.block(
+            0, cursor, diff.rows(), joint->getNumDofs());
+        Eigen::MatrixXs fdBlock = posJacWrtPosJac_fd.block(
+            0, cursor, diff.rows(), joint->getNumDofs());
+        Eigen::MatrixXs diffBlock
+            = diff.block(0, cursor, diff.rows(), joint->getNumDofs());
+        if (diffBlock.norm() > 1e-8)
+        {
+          for (int k = 0; k < markers.size(); k++)
+          {
+            auto pair = markers[k];
+            Eigen::MatrixXs markerJacBlock
+                = jacBlock.block(k * 3, 0, 3, jacBlock.cols());
+            Eigen::MatrixXs markerFdBlock
+                = fdBlock.block(k * 3, 0, 3, fdBlock.cols());
+            Eigen::MatrixXs markerDiff
+                = diffBlock.block(k * 3, 0, 3, diffBlock.cols());
+            if (markerDiff.norm() > 1e-8)
+            {
+              const Eigen::MatrixXi& parentMap = skel->getParentMap();
+              int rootJointDof = j;
+              const dynamics::Joint* sourceJoint
+                  = markers[k].first->getParentJoint();
+              int sourceJointDof = sourceJoint->getDof(0)->getIndexInSkeleton();
+              const dynamics::Joint* parentJoint = joint;
+              int parentJointDof = parentJoint->getDof(0)->getIndexInSkeleton();
+
+              std::cout << "{ Joint \"" << joint->getName()
+                        << "\" moving Marker [" << pair.first->getName() << ",("
+                        << pair.second(0) << "," << pair.second(1) << ","
+                        << pair.second(2) << ")] }"
+                        << " grad wrt Root Joint \""
+                        << skel->getDof(j)->getJoint()->getName() << "\"["
+                        << skel->getDof(j)->getIndexInJoint() << "]"
+                        << std::endl;
+              std::cout << "Is root parent of axis joint? parentMap["
+                        << rootJointDof << ", " << parentJointDof
+                        << "]: " << parentMap(rootJointDof, parentJointDof)
+                        << std::endl;
+              std::cout << "Is root parent of source joint? parentMap["
+                        << rootJointDof << ", " << sourceJointDof
+                        << "]: " << parentMap(rootJointDof, sourceJointDof)
+                        << std::endl;
+              std::cout << "Marker Jac:" << std::endl
+                        << markerJacBlock << std::endl
+                        << "Marker FD:" << std::endl
+                        << markerFdBlock << std::endl
+                        << "Marker Diff:" << std::endl
+                        << markerDiff << std::endl;
+            }
+          }
+        }
+        cursor += joint->getNumDofs();
+      }
+      EXPECT_TRUE(equals(posJacWrtPosJac, posJacWrtPosJac_fd, THRESHOLD));
+      return false;
+    }
+  }
+
+  Eigen::VectorXs leftMultiply = Eigen::VectorXs::Random(markers.size() * 3);
+
+  Eigen::MatrixXs posJacWrtPosJac
+      = skel->getMarkerWorldPositionsSecondJacobianWrtJointWrtJointPositions(
+          markers, leftMultiply);
+  Eigen::MatrixXs posJacWrtPosJac_fd
+      =
+  skel->finiteDifferenceMarkerWorldPositionsSecondJacobianWrtJointWrtJointPositions(
+          markers, leftMultiply);
+
+  if (!equals(posJacWrtPosJac, posJacWrtPosJac_fd, THRESHOLD))
+  {
+    std::cout << "Error on J^T*leftMultiply jac wrt joint position" << std::endl
+              << "Analytical:" << std::endl
+              << posJacWrtPosJac << std::endl
+              << "FD:" << std::endl
+              << posJacWrtPosJac_fd << std::endl
+              << "Diff:" << std::endl
+              << posJacWrtPosJac - posJacWrtPosJac_fd << std::endl;
+    return false;
+  }
+
   return true;
 }
 

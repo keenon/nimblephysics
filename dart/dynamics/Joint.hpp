@@ -782,6 +782,24 @@ public:
   /// child body spatial velocities by the returned screw.
   virtual Eigen::Vector6s getWorldAxisScrewForVelocity(int dof) const;
 
+  // Returns the gradient of the screw axis with respect to the rotate dof
+  virtual Eigen::Vector6s getScrewAxisGradientForPosition(
+      int axisDof, int rotateDof);
+
+  // Returns the gradient of the screw axis with respect to the rotate dof
+  virtual Eigen::Vector6s getScrewAxisGradientForForce(
+      int axisDof, int rotateDof);
+
+  /// This uses finite differencing to compute the gradient of the screw axis on
+  /// `axisDof` as we rotate `rotateDof`.
+  Eigen::Vector6s finiteDifferenceScrewAxisGradientForPosition(
+      int axisDof, int rotateDof);
+
+  /// This uses finite differencing to compute the gradient of the screw axis on
+  /// `axisDof` as we rotate `rotateDof`.
+  Eigen::Vector6s finiteDifferenceScrewAxisGradientForForce(
+      int axisDof, int rotateDof);
+
   /// Get constraint wrench expressed in body node frame
   virtual Eigen::Vector6s getBodyConstraintWrench() const = 0;
   // TODO: Need more informative name.

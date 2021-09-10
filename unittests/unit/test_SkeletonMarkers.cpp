@@ -35,13 +35,21 @@ TEST(SkeletonConverter, IK_JACOBIANS)
   osim->setPosition(4, -0.2);
   osim->setPosition(5, 1.0);
 
-  osim->getBodyNode("tibia_l")->setScale(Eigen::Vector3s::Ones() * 1.2);
+  osim->getBodyNode("tibia_l")->setScale(Eigen::Vector3s(1.1, 1.2, 1.3));
 
   std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>> markers;
   markers.push_back(
       std::make_pair(osim->getBodyNode("radius_l"), Eigen::Vector3s::Random()));
   markers.push_back(
       std::make_pair(osim->getBodyNode("radius_r"), Eigen::Vector3s::Random()));
+  markers.push_back(
+      std::make_pair(osim->getBodyNode("tibia_l"), Eigen::Vector3s::Random()));
+  markers.push_back(
+      std::make_pair(osim->getBodyNode("tibia_r"), Eigen::Vector3s::Random()));
+  markers.push_back(
+      std::make_pair(osim->getBodyNode("ulna_l"), Eigen::Vector3s::Random()));
+  markers.push_back(
+      std::make_pair(osim->getBodyNode("ulna_r"), Eigen::Vector3s::Random()));
 
   EXPECT_TRUE(verifySkeletonMarkerJacobians(osim, markers));
 }
@@ -57,7 +65,7 @@ TEST(SkeletonConverter, IK_JACOBIANS_BALL_JOINTS)
   osim->setPosition(2, -3.14159 / 2);
   osim->setPosition(4, -0.2);
   osim->setPosition(5, 1.0);
-  osim->getBodyNode("tibia_l")->setScale(Eigen::Vector3s::Ones() * 1.2);
+  osim->getBodyNode("tibia_l")->setScale(Eigen::Vector3s(1.1, 1.2, 1.3));
   std::shared_ptr<dynamics::Skeleton> osimBallJoints
       = osim->convertSkeletonToBallJoints();
 
@@ -66,6 +74,14 @@ TEST(SkeletonConverter, IK_JACOBIANS_BALL_JOINTS)
       osimBallJoints->getBodyNode("radius_l"), Eigen::Vector3s::Random()));
   markers.push_back(std::make_pair(
       osimBallJoints->getBodyNode("radius_r"), Eigen::Vector3s::Random()));
+  markers.push_back(std::make_pair(
+      osimBallJoints->getBodyNode("tibia_l"), Eigen::Vector3s::Random()));
+  markers.push_back(std::make_pair(
+      osimBallJoints->getBodyNode("tibia_r"), Eigen::Vector3s::Random()));
+  markers.push_back(std::make_pair(
+      osimBallJoints->getBodyNode("ulna_l"), Eigen::Vector3s::Random()));
+  markers.push_back(std::make_pair(
+      osimBallJoints->getBodyNode("ulna_r"), Eigen::Vector3s::Random()));
 
   EXPECT_TRUE(verifySkeletonMarkerJacobians(osimBallJoints, markers));
 }

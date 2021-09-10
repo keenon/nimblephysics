@@ -1011,6 +1011,58 @@ public:
       const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
           markers);
 
+  /// This gets the gradient of the ||f(q) - x|| function with respect to q
+  Eigen::VectorXs getMarkerWorldPositionDiffToGoalGradientWrtJointPos(
+      const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+          markers,
+      Eigen::VectorXs goal);
+
+  /// This gets the gradient of the ||f(q) - x|| function with respect to q
+  Eigen::VectorXs
+  finiteDifferenceMarkerWorldPositionDiffToGoalGradientWrtJointPos(
+      const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+          markers,
+      Eigen::VectorXs goal);
+
+  /// This should be equivalent to
+  /// `getMarkerWorldPositionsJacobianWrtJointPositions`, just slower. This is
+  /// here so there's a simple non-recursive formula for the Jacobian to take
+  /// derivatives against.
+  Eigen::MatrixXs getScrewsMarkerWorldPositionsJacobianWrtJointPositions(
+      const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+          markers);
+
+  /// This gets the derivative of the Jacobian of the markers wrt joint
+  /// positions, with respect to a single joint index
+  Eigen::MatrixXs getMarkerWorldPositionsDerivativeOfJacobianWrtJointsWrtJoints(
+      const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+          markers,
+      int index);
+
+  /// This gets the derivative of the Jacobian of the markers wrt joint
+  /// positions, with respect to a single joint index
+  Eigen::MatrixXs
+  finiteDifferenceMarkerWorldPositionsDerivativeOfJacobianWrtJointsWrtJoints(
+      const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+          markers,
+      int index);
+
+  /// This gets the Jacobian of leftMultiply.transpose()*J with respect to joint
+  /// positions
+  Eigen::MatrixXs
+  getMarkerWorldPositionsSecondJacobianWrtJointWrtJointPositions(
+      const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+          markers,
+      Eigen::VectorXs leftMultiply);
+
+  /// This gets the Jacobian of leftMultiply.transpose()*J with respect to joint
+  /// positions
+  Eigen::MatrixXs
+  finiteDifferenceMarkerWorldPositionsSecondJacobianWrtJointWrtJointPositions(
+      const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+          markers,
+      Eigen::VectorXs leftMultiply);
+
   /// This runs IK, attempting to fit the world positions of the passed in
   /// joints to the vector of (concatenated) target positions. This can
   /// optionally also rescale the skeleton.

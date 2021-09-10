@@ -879,8 +879,6 @@ Eigen::Vector3s gradientWrtTheta(
   s_t normW = w.norm();
   if (normW > DART_EPSILON)
   {
-    // TODO: this isn't true with FreeJoint and BallJoint. Is that a problem?
-    // assert(abs(normW - 1) < 1e-7);
     const s_t cos_t = cos(theta);
     const s_t sin_t = sin(theta);
     const Eigen::Vector3s wp = w.cross(point);

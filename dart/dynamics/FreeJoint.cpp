@@ -1171,12 +1171,19 @@ Eigen::Vector6s FreeJoint::estimatePerturbedScrewAxisForForce(
 Eigen::Vector6s FreeJoint::getScrewAxisGradientForPosition(
     int axisDof, int rotateDof)
 {
-  s_t EPS = 5e-9;
-  Eigen::Vector6s pos
-      = estimatePerturbedScrewAxisForPosition(axisDof, rotateDof, EPS);
-  Eigen::Vector6s neg
-      = estimatePerturbedScrewAxisForPosition(axisDof, rotateDof, -EPS);
-  return (pos - neg) / (2 * EPS);
+  if (axisDof < 3)
+  {
+    s_t EPS = 5e-9;
+    Eigen::Vector6s pos
+        = estimatePerturbedScrewAxisForPosition(axisDof, rotateDof, EPS);
+    Eigen::Vector6s neg
+        = estimatePerturbedScrewAxisForPosition(axisDof, rotateDof, -EPS);
+    return (pos - neg) / (2 * EPS);
+  }
+  else
+  {
+    return Eigen::Vector6s::Zero();
+  }
 }
 
 //==============================================================================

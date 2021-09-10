@@ -564,6 +564,67 @@ Eigen::Vector6s Joint::getWorldAxisScrewForVelocity(int dof) const
 }
 
 //==============================================================================
+// Returns the gradient of the screw axis with respect to the rotate dof
+Eigen::Vector6s Joint::getScrewAxisGradientForPosition(
+    int axisDof, int rotateDof)
+{
+  // Defaults to Finite Differencing - this is slow, but at least it's
+  // approximately correct. Child joints should override with a faster
+  // implementation.
+  return finiteDifferenceScrewAxisGradientForPosition(axisDof, rotateDof);
+}
+
+//==============================================================================
+// Returns the gradient of the screw axis with respect to the rotate dof
+Eigen::Vector6s Joint::getScrewAxisGradientForForce(int axisDof, int rotateDof)
+{
+  // Defaults to Finite Differencing - this is slow, but at least it's
+  // approximately correct. Child joints should override with a faster
+  // implementation.
+  return finiteDifferenceScrewAxisGradientForForce(axisDof, rotateDof);
+}
+
+//==============================================================================
+/// This uses finite differencing to compute the gradient of the screw axis on
+/// `axisDof` as we rotate `rotateDof`.
+Eigen::Vector6s Joint::finiteDifferenceScrewAxisGradientForPosition(
+    int axisDof, int rotateDof)
+{
+  const s_t EPS = 1e-7;
+  s_t original = getPosition(rotateDof);
+
+  setPosition(rotateDof, original + EPS);
+  Eigen::Vector6s plus = getWorldAxisScrewForPosition(axisDof);
+
+  setPosition(rotateDof, original - EPS);
+  Eigen::Vector6s minus = getWorldAxisScrewForPosition(axisDof);
+
+  setPosition(rotateDof, original);
+
+  return (plus - minus) / (2 * EPS);
+}
+
+//==============================================================================
+/// This uses finite differencing to compute the gradient of the screw axis on
+/// `axisDof` as we rotate `rotateDof`.
+Eigen::Vector6s Joint::finiteDifferenceScrewAxisGradientForForce(
+    int axisDof, int rotateDof)
+{
+  const s_t EPS = 1e-7;
+  s_t original = getPosition(rotateDof);
+
+  setPosition(rotateDof, original + EPS);
+  Eigen::Vector6s plus = getWorldAxisScrewForVelocity(axisDof);
+
+  setPosition(rotateDof, original - EPS);
+  Eigen::Vector6s minus = getWorldAxisScrewForVelocity(axisDof);
+
+  setPosition(rotateDof, original);
+
+  return (plus - minus) / (2 * EPS);
+}
+
+//==============================================================================
 void Joint::setPositionLimitEnforced(bool _isPositionLimitEnforced)
 {
   mAspectProperties.mIsPositionLimitEnforced = _isPositionLimitEnforced;
