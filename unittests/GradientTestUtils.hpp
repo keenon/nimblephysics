@@ -4262,6 +4262,24 @@ bool verifySkeletonMarkerJacobians(
     return false;
   }
 
+  Eigen::MatrixXs groupScaleJac
+      = skel->getMarkerWorldPositionsJacobianWrtGroupScales(markers);
+  Eigen::MatrixXs groupScaleJac_fd
+      = skel->finiteDifferenceMarkerWorldPositionsJacobianWrtGroupScales(
+          markers);
+  if (!equals(groupScaleJac, groupScaleJac_fd, THRESHOLD))
+  {
+    EXPECT_TRUE(equals(groupScaleJac, groupScaleJac_fd, THRESHOLD));
+    std::cout << "Error on Jac of markers wrt group scale" << std::endl
+              << "Jac:" << std::endl
+              << groupScaleJac << std::endl
+              << "FD:" << std::endl
+              << groupScaleJac_fd << std::endl
+              << "Diff:" << std::endl
+              << groupScaleJac - groupScaleJac_fd << std::endl;
+    return false;
+  }
+
   Eigen::VectorXs target = Eigen::VectorXs::Random(markers.size() * 3);
 
   Eigen::VectorXs diffGrad
@@ -4598,6 +4616,27 @@ bool verifySkeletonMarkerJacobians(
               << posJacWrtScaleJac_fd << std::endl
               << "Diff:" << std::endl
               << posJacWrtScaleJac - posJacWrtScaleJac_fd << std::endl;
+    return false;
+  }
+
+  Eigen::MatrixXs posJacWrtGroupScaleJac
+      = skel->getMarkerWorldPositionsSecondJacobianWrtJointWrtGroupScales(
+          markers, leftMultiply);
+  Eigen::MatrixXs posJacWrtGroupScaleJac_fd
+      = skel->finiteDifferenceMarkerWorldPositionsSecondJacobianWrtJointWrtGroupScales(
+          markers, leftMultiply);
+  if (!equals(posJacWrtGroupScaleJac, posJacWrtGroupScaleJac_fd, THRESHOLD))
+  {
+    EXPECT_TRUE(
+        equals(posJacWrtGroupScaleJac, posJacWrtGroupScaleJac_fd, THRESHOLD));
+    std::cout << "Error on J^T*leftMultiply jac wrt group scale" << std::endl
+              << "Jac:" << std::endl
+              << posJacWrtGroupScaleJac << std::endl
+              << "FD:" << std::endl
+              << posJacWrtGroupScaleJac_fd << std::endl
+              << "Diff:" << std::endl
+              << posJacWrtGroupScaleJac - posJacWrtGroupScaleJac_fd
+              << std::endl;
     return false;
   }
 

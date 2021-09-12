@@ -3560,6 +3560,71 @@ Skeleton::finiteDifferenceMarkerWorldPositionsJacobianWrtGroupScales(
 }
 
 //==============================================================================
+/// This gets the Jacobian of leftMultiply.transpose()*J with respect to group
+/// scales
+Eigen::MatrixXs
+Skeleton::getMarkerWorldPositionsSecondJacobianWrtJointWrtGroupScales(
+    const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+        markers,
+    Eigen::VectorXs leftMultiply)
+{
+  Eigen::MatrixXs individualBodiesJac
+      = getMarkerWorldPositionsSecondJacobianWrtJointWrtBodyScale(
+          markers, leftMultiply);
+  Eigen::MatrixXs J = Eigen::MatrixXs::Zero(
+      individualBodiesJac.rows(), getNumScaleGroups() * 3);
+  for (int i = 0; i < mBodyScaleGroups.size(); i++)
+  {
+    for (dynamics::BodyNode* node : mBodyScaleGroups[i])
+    {
+      J.block(0, i * 3, J.rows(), 3) += individualBodiesJac.block(
+          0, node->getIndexInSkeleton() * 3, J.rows(), 3);
+    }
+  }
+  return J;
+}
+
+//==============================================================================
+/// This gets the Jacobian of leftMultiply.transpose()*J with respect to group
+/// scales
+Eigen::MatrixXs Skeleton::
+    finiteDifferenceMarkerWorldPositionsSecondJacobianWrtJointWrtGroupScales(
+        const std::vector<
+            std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>& markers,
+        Eigen::VectorXs leftMultiply)
+{
+  Eigen::MatrixXs result
+      = Eigen::MatrixXs::Zero(getNumDofs(), getNumScaleGroups() * 3);
+
+  const s_t EPS = 1e-7;
+
+  Eigen::VectorXs original = getGroupScales();
+  for (int i = 0; i < getNumScaleGroups() * 3; i++)
+  {
+    Eigen::VectorXs perturbed = original;
+    perturbed(i) += EPS;
+    setGroupScales(perturbed);
+
+    Eigen::VectorXs plus
+        = leftMultiply.transpose()
+          * getMarkerWorldPositionsJacobianWrtJointPositions(markers);
+
+    perturbed = original;
+    perturbed(i) -= EPS;
+    setGroupScales(perturbed);
+    Eigen::VectorXs minus
+        = leftMultiply.transpose()
+          * getMarkerWorldPositionsJacobianWrtJointPositions(markers);
+
+    result.col(i) = (plus - minus) / (2 * EPS);
+  }
+
+  setGroupScales(original);
+
+  return result;
+}
+
+//==============================================================================
 // This creates a fresh skeleton, which is a copy of this one EXCEPT that
 // EulerJoints are BallJoints, and EulerFreeJoints are FreeJoints. This means
 // the configuration spaces are different, so you need to use

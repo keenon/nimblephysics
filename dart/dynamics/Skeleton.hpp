@@ -898,6 +898,21 @@ public:
       const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
           markers);
 
+  /// This gets the Jacobian of leftMultiply.transpose()*J with respect to group
+  /// scales
+  Eigen::MatrixXs getMarkerWorldPositionsSecondJacobianWrtJointWrtGroupScales(
+      const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+          markers,
+      Eigen::VectorXs leftMultiply);
+
+  /// This gets the Jacobian of leftMultiply.transpose()*J with respect to group
+  /// scales
+  Eigen::MatrixXs
+  finiteDifferenceMarkerWorldPositionsSecondJacobianWrtJointWrtGroupScales(
+      const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+          markers,
+      Eigen::VectorXs leftMultiply);
+
   //----------------------------------------------------------------------------
   // Converting EulerJoints->BallJoints and EulerFreeJoints->FreeJoints
   //
@@ -1116,13 +1131,15 @@ public:
       int marker,
       int axis);
 
-  /// This gets the Jacobian of leftMultiply.transpose()*J with respect to marker offsets
+  /// This gets the Jacobian of leftMultiply.transpose()*J with respect to
+  /// marker offsets
   Eigen::MatrixXs getMarkerWorldPositionsSecondJacobianWrtJointWrtMarkerOffsets(
       const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
           markers,
       Eigen::VectorXs leftMultiply);
 
-  /// This gets the Jacobian of leftMultiply.transpose()*J with respect to marker offsets
+  /// This gets the Jacobian of leftMultiply.transpose()*J with respect to
+  /// marker offsets
   Eigen::MatrixXs
   finiteDifferenceMarkerWorldPositionsSecondJacobianWrtJointWrtMarkerOffsets(
       const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
