@@ -75,6 +75,9 @@ if(TARGET dart-utils)
 
   dart_add_test("unit" test_AMCParser)
   target_link_libraries(test_AMCParser dart-utils)
+
+  dart_add_test("unit" test_C3D)
+  target_link_libraries(test_C3D dart-utils)
 endif()
 
 if(TARGET dart-utils-urdf)
