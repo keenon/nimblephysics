@@ -67,6 +67,9 @@ if(TARGET dart-utils)
   dart_add_test("unit" test_MarkerFitter)
   target_link_libraries(test_MarkerFitter dart-utils)
 
+  dart_add_test("unit" test_Scaling)
+  target_link_libraries(test_Scaling dart-utils)
+
   dart_add_test("unit" test_VskParser)
   target_link_libraries(test_VskParser dart-utils)
 

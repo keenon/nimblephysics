@@ -2670,6 +2670,55 @@ Eigen::VectorXs Skeleton::getDynamicsForces()
 }
 
 //==============================================================================
+/// This gets a random pose that's valid within joint limits
+Eigen::VectorXs Skeleton::getRandomPose()
+{
+  Eigen::VectorXs pose = Eigen::VectorXs::Random(getNumDofs());
+  for (int i = 0; i < getNumDofs(); i++)
+  {
+    s_t upperLimit = getDof(i)->getPositionUpperLimit();
+    if (upperLimit == std::numeric_limits<s_t>::infinity())
+    {
+      upperLimit = 5.0;
+    }
+    s_t lowerLimit = getDof(i)->getPositionLowerLimit();
+    if (lowerLimit == -1 * std::numeric_limits<s_t>::infinity())
+    {
+      lowerLimit = -5.0;
+    }
+    s_t withinBounds
+        = (((pose(i) + 1.0) / 2.0) * (upperLimit - lowerLimit)) + lowerLimit;
+    pose(i) = withinBounds;
+  }
+  /*
+  for (int i = 0; i < getNumJoints(); i++)
+  {
+    if (getJoint(i)->getType() == FreeJoint::getStaticType())
+    {
+      // TODO: random generate a decent SO3 rotation
+      pose.segment<3>(getJoint(i)->getDof(0)->getIndexInSkeleton()).setZero();
+    }
+    if (getJoint(i)->getType() == BallJoint::getStaticType())
+    {
+      // TODO: random generate a decent SO3 rotation
+      pose.segment<3>(getJoint(i)->getDof(0)->getIndexInSkeleton()).setZero();
+    }
+  }
+  */
+
+#ifndef NDEBUG
+  Eigen::VectorXs oldPose = getPositions();
+  setPositions(pose);
+  clampPositionsToLimits();
+  Eigen::VectorXs clampedPos = getPositions();
+  assert(clampedPos == pose);
+  setPositions(oldPose);
+#endif
+
+  return pose;
+}
+
+//==============================================================================
 Eigen::MatrixXs Skeleton::finiteDifferenceVelCJacobian(bool useRidders)
 {
   if (useRidders)
@@ -3366,14 +3415,30 @@ void Skeleton::mergeScaleGroups(dynamics::BodyNode* a, dynamics::BodyNode* b)
 /// This gets the scale upper bound for the first body in a group, by index
 Eigen::Vector3s Skeleton::getScaleGroupUpperBound(int groupIndex)
 {
-  return mBodyScaleGroups[groupIndex][0]->getScaleUpperBound();
+  Eigen::Vector3s result
+      = mBodyScaleGroups[groupIndex][0]->getScaleUpperBound();
+  for (int i = 0; i < mBodyScaleGroups[groupIndex].size(); i++)
+  {
+    Eigen::Vector3s localBound
+        = mBodyScaleGroups[groupIndex][i]->getScaleUpperBound();
+    result = result.cwiseMin(localBound);
+  }
+  return result;
 }
 
 //==============================================================================
 /// This gets the scale lower bound for the first body in a group, by index
 Eigen::Vector3s Skeleton::getScaleGroupLowerBound(int groupIndex)
 {
-  return mBodyScaleGroups[groupIndex][0]->getScaleLowerBound();
+  Eigen::Vector3s result
+      = mBodyScaleGroups[groupIndex][0]->getScaleLowerBound();
+  for (int i = 0; i < mBodyScaleGroups[groupIndex].size(); i++)
+  {
+    Eigen::Vector3s localBound
+        = mBodyScaleGroups[groupIndex][i]->getScaleLowerBound();
+    result = result.cwiseMax(localBound);
+  }
+  return result;
 }
 
 //==============================================================================
@@ -3785,6 +3850,12 @@ Eigen::VectorXs Skeleton::convertPositionsFromBallSpace(Eigen::VectorXs pos)
       {
         assert(false && "Unsupported AxisOrder when decoding EulerFreeJoint");
       }
+      // Do our best to pick an equivalent set of EulerAngles that's within
+      // joint bounds, if one exists
+      translated.segment<3>(cursor) = math::attemptToClampEulerAnglesToBounds(
+          translated.segment<3>(cursor),
+          eulerFreeJoint->getPositionUpperLimits().head<3>(),
+          eulerFreeJoint->getPositionLowerLimits().head<3>());
     }
     else if (joint->getType() == EulerJoint::getStaticType())
     {
@@ -3815,6 +3886,12 @@ Eigen::VectorXs Skeleton::convertPositionsFromBallSpace(Eigen::VectorXs pos)
       {
         assert(false && "Unsupported AxisOrder when decoding EulerJoint");
       }
+      // Do our best to pick an equivalent set of EulerAngles that's within
+      // joint bounds, if one exists
+      translated.segment<3>(cursor) = math::attemptToClampEulerAnglesToBounds(
+          translated.segment<3>(cursor),
+          eulerJoint->getPositionUpperLimits(),
+          eulerJoint->getPositionLowerLimits());
     }
     cursor += joint->getNumDofs();
   }
@@ -4905,11 +4982,7 @@ s_t Skeleton::fitJointsToWorldPositions(
     const std::vector<const dynamics::Joint*>& positionJoints,
     Eigen::VectorXs targetPositions,
     bool scaleBodies,
-    s_t convergenceThreshold,
-    int maxStepCount,
-    s_t leastSquaresDamping,
-    bool lineSearch,
-    bool logOutput)
+    math::IKConfig config)
 {
   if (scaleBodies)
   {
@@ -4922,10 +4995,13 @@ s_t Skeleton::fitJointsToWorldPositions(
     return math::solveIK(
         initialPos,
         positionJoints.size() * 3,
-        [this](/* in*/ const Eigen::VectorXs pos) {
+        [this](/* in*/ const Eigen::VectorXs pos, bool clamp) {
           // Set positions
           setPositions(pos.segment(0, getNumDofs()));
-          clampPositionsToLimits();
+          if (clamp)
+          {
+            clampPositionsToLimits();
+          }
 
           // Set scales
           Eigen::VectorXs newScales
@@ -4968,21 +5044,25 @@ s_t Skeleton::fitJointsToWorldPositions(
               getNumScaleGroups() * 3)
               = getJointWorldPositionsJacobianWrtGroupScales(positionJoints);
         },
-        convergenceThreshold,
-        maxStepCount,
-        leastSquaresDamping,
-        lineSearch,
-        logOutput);
+        [this](Eigen::VectorXs& val) {
+          val.segment(0, getNumDofs()) = getRandomPose();
+          val.segment(getNumDofs(), getNumScaleGroups() * 3).setConstant(1.0);
+        },
+        config);
   }
   else
   {
     return math::solveIK(
         getPositions(),
         positionJoints.size() * 3,
-        [this](/* in*/ Eigen::VectorXs pos) {
+        [this](/* in*/ Eigen::VectorXs pos, bool clamp) {
           setPositions(pos);
-          clampPositionsToLimits();
-          return getPositions();
+          if (clamp)
+          {
+            clampPositionsToLimits();
+            return getPositions();
+          }
+          return pos;
         },
         [this, targetPositions, positionJoints](
             /*out*/ Eigen::VectorXs& diff,
@@ -4990,11 +5070,8 @@ s_t Skeleton::fitJointsToWorldPositions(
           diff = targetPositions - getJointWorldPositions(positionJoints);
           jac = getJointWorldPositionsJacobianWrtJointPositions(positionJoints);
         },
-        convergenceThreshold,
-        maxStepCount,
-        leastSquaresDamping,
-        lineSearch,
-        logOutput);
+        [this](Eigen::VectorXs& val) { val = getRandomPose(); },
+        config);
   }
 }
 
@@ -5006,35 +5083,99 @@ s_t Skeleton::fitMarkersToWorldPositions(
         markers,
     Eigen::VectorXs targetPositions,
     Eigen::VectorXs markerWeights,
-    s_t convergenceThreshold,
-    int maxStepCount,
-    s_t leastSquaresDamping,
-    bool lineSearch,
-    bool logOutput)
+    bool scaleBodies,
+    math::IKConfig config)
 {
-  return math::solveIK(
-      getPositions(),
-      markers.size() * 3,
-      [this](/* in*/ Eigen::VectorXs pos) {
-        setPositions(pos);
-        clampPositionsToLimits();
-        return getPositions();
-      },
-      [this, targetPositions, markers, markerWeights](
-          /*out*/ Eigen::VectorXs& diff,
-          /*out*/ Eigen::MatrixXs& jac) {
-        diff = targetPositions - getMarkerWorldPositions(markers);
-        for (int j = 0; j < markerWeights.size(); j++)
-        {
-          diff.segment<3>(j * 3) *= markerWeights(j);
-        }
-        jac = getMarkerWorldPositionsJacobianWrtJointPositions(markers);
-      },
-      convergenceThreshold,
-      maxStepCount,
-      leastSquaresDamping,
-      lineSearch,
-      logOutput);
+  if (scaleBodies)
+  {
+    Eigen::VectorXs initialPos
+        = Eigen::VectorXs::Zero(getNumDofs() + getNumScaleGroups() * 3);
+    initialPos.segment(0, getNumDofs()) = getPositions();
+    initialPos.segment(getNumDofs(), getNumScaleGroups() * 3)
+        = getGroupScales();
+
+    return math::solveIK(
+        initialPos,
+        markers.size() * 3,
+        [this](/* in*/ const Eigen::VectorXs pos, bool clamp) {
+          // Set positions
+          setPositions(pos.segment(0, getNumDofs()));
+          if (clamp)
+          {
+            clampPositionsToLimits();
+          }
+
+          // Set scales
+          Eigen::VectorXs newScales
+              = pos.segment(getNumDofs(), getNumScaleGroups() * 3);
+          for (int i = 0; i < getNumScaleGroups(); i++)
+          {
+            for (int axis = 0; axis < 3; axis++)
+            {
+              if (newScales(i * 3 + axis) > getScaleGroupUpperBound(i)(axis))
+              {
+                newScales(i * 3 + axis) = getScaleGroupUpperBound(i)(axis);
+              }
+              if (newScales(i * 3 + axis) < getScaleGroupLowerBound(i)(axis))
+              {
+                newScales(i * 3 + axis) = getScaleGroupLowerBound(i)(axis);
+              }
+            }
+          }
+          setGroupScales(newScales);
+
+          // Return the clamped position
+          Eigen::VectorXs clampedPos = Eigen::VectorXs::Zero(pos.size());
+          clampedPos.segment(0, getNumDofs()) = getPositions();
+          clampedPos.segment(getNumDofs(), getNumScaleGroups() * 3) = newScales;
+          return clampedPos;
+        },
+        [this, targetPositions, markers](
+            /*out*/ Eigen::VectorXs& diff,
+            /*out*/ Eigen::MatrixXs& jac) {
+          diff = targetPositions - getMarkerWorldPositions(markers);
+          assert(jac.cols() == getNumDofs() + getNumScaleGroups() * 3);
+          assert(jac.rows() == markers.size() * 3);
+          jac.setZero();
+          jac.block(0, 0, markers.size() * 3, getNumDofs())
+              = getMarkerWorldPositionsJacobianWrtJointPositions(markers);
+          jac.block(
+              0, getNumDofs(), markers.size() * 3, getNumScaleGroups() * 3)
+              = getMarkerWorldPositionsJacobianWrtGroupScales(markers);
+        },
+        [this](Eigen::VectorXs& val) {
+          val.segment(0, getNumDofs()) = getRandomPose();
+          val.segment(getNumDofs(), getNumScaleGroups() * 3).setConstant(1.0);
+        },
+        config);
+  }
+  else
+  {
+    return math::solveIK(
+        getPositions(),
+        markers.size() * 3,
+        [this](/* in*/ Eigen::VectorXs pos, bool clamp) {
+          setPositions(pos);
+          if (clamp)
+          {
+            clampPositionsToLimits();
+            return getPositions();
+          }
+          return pos;
+        },
+        [this, targetPositions, markers, markerWeights](
+            /*out*/ Eigen::VectorXs& diff,
+            /*out*/ Eigen::MatrixXs& jac) {
+          diff = targetPositions - getMarkerWorldPositions(markers);
+          for (int j = 0; j < markerWeights.size(); j++)
+          {
+            diff.segment<3>(j * 3) *= markerWeights(j);
+          }
+          jac = getMarkerWorldPositionsJacobianWrtJointPositions(markers);
+        },
+        [this](Eigen::VectorXs& val) { val = getRandomPose(); },
+        config);
+  }
 }
 
 //==============================================================================

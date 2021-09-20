@@ -1429,6 +1429,73 @@ Eigen::Vector6s dAdInvR(const Eigen::Isometry3s& _T, const Eigen::Vector6s& _F)
 //     return ret;
 // }
 
+/// Best effort attempt to find an equivalent set of euler angles that fits
+/// within bounds
+Eigen::Vector3s attemptToClampEulerAnglesToBounds(
+    const Eigen::Vector3s& angle,
+    const Eigen::Vector3s& upperBounds,
+    const Eigen::Vector3s& lowerBounds)
+{
+  Eigen::Vector3s clampedAngle = angle;
+  bool allClamped = true;
+  for (int i = 0; i < 3; i++)
+  {
+    while (clampedAngle(i) > upperBounds(i))
+    {
+      clampedAngle(i) -= M_PI * 2;
+    }
+    while (clampedAngle(i) < lowerBounds(i))
+    {
+      clampedAngle(i) += M_PI * 2;
+    }
+    // Check if we successfully got this index in-bounds
+    if ((clampedAngle(i) > upperBounds(i)) || (clampedAngle(i) < lowerBounds(i)))
+    {
+      allClamped = false;
+      break;
+    }
+  }
+  // If we succeeded, return our attempt
+  if (allClamped)
+  {
+    return clampedAngle;
+  }
+
+  // Try the equivalent strategy, where we flip the first axis, then recover
+  // with 2nd and 3nd rotations
+  clampedAngle
+      = Eigen::Vector3s(M_PI + angle(0), M_PI - angle(1), M_PI + angle(2));
+
+  // Try to clamp all the angles in the alternate formulation too
+  allClamped = true;
+  for (int i = 0; i < 3; i++)
+  {
+    while (clampedAngle(i) > upperBounds(i))
+    {
+      clampedAngle(i) -= M_PI * 2;
+    }
+    while (clampedAngle(i) < lowerBounds(i))
+    {
+      clampedAngle(i) += M_PI * 2;
+    }
+    // Check if we successfully got this index in-bounds
+    if (clampedAngle(i) > upperBounds(i) || clampedAngle(i) < lowerBounds(i))
+    {
+      allClamped = false;
+      break;
+    }
+  }
+  // If we succeeded, return our attempt
+  if (allClamped)
+  {
+    return clampedAngle;
+  }
+
+  // If we still weren't able to clamp this, the angle probably isn't reachable
+  // from the given bounds.
+  return angle;
+}
+
 // Reference:
 // http://www.geometrictools.com/LibMathematics/Algebra/Wm5Matrix3.inl
 Eigen::Matrix3s eulerXYXToMatrix(const Eigen::Vector3s& _angle)

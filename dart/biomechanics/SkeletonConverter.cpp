@@ -99,11 +99,12 @@ void SkeletonConverter::rescaleAndPrepTarget(
       mSourceJoints,
       getTargetJointWorldPositions(),
       true,
-      convergenceThreshold,
-      maxStepCount,
-      leastSquaresDamping,
-      lineSearch,
-      logOutput);
+      math::IKConfig()
+          .setConvergenceThreshold(convergenceThreshold)
+          .setMaxStepCount(maxStepCount)
+          .setLeastSquaresDamping(leastSquaresDamping)
+          .setLineSearch(lineSearch)
+          .setLogOutput(logOutput));
   for (int i = 0; i < mSourceSkeleton->getNumBodyNodes(); i++)
   {
     mSourceSkeletonBallJoints->getBodyNode(i)->setScale(
@@ -249,11 +250,14 @@ s_t SkeletonConverter::fitSourceToTarget(
       mSourceMarkersBallJoints,
       getTargetMarkerWorldPositions(),
       mMarkerWeights,
-      convergenceThreshold,
-      maxStepCount,
-      leastSquaresDamping,
-      lineSearch,
-      logOutput);
+      false,
+      math::IKConfig()
+          .setConvergenceThreshold(convergenceThreshold)
+          .setMaxStepCount(maxStepCount)
+          .setLeastSquaresDamping(leastSquaresDamping)
+          .setLineSearch(lineSearch)
+          .setMaxRestarts(1)
+          .setLogOutput(logOutput));
   mSourceSkeleton->setPositions(mSourceSkeleton->convertPositionsFromBallSpace(
       mSourceSkeletonBallJoints->getPositions()));
   return error;
@@ -273,11 +277,14 @@ s_t SkeletonConverter::fitTargetToSource(
       mTargetMarkers,
       getSourceMarkerWorldPositions(),
       mMarkerWeights,
-      convergenceThreshold,
-      maxStepCount,
-      leastSquaresDamping,
-      lineSearch,
-      logOutput);
+      false,
+      math::IKConfig()
+          .setConvergenceThreshold(convergenceThreshold)
+          .setMaxStepCount(maxStepCount)
+          .setLeastSquaresDamping(leastSquaresDamping)
+          .setLineSearch(lineSearch)
+          .setMaxRestarts(1)
+          .setLogOutput(logOutput));
   return error;
 }
 
@@ -388,9 +395,12 @@ Eigen::MatrixXs SkeletonConverter::convertMotion(
           mSourceJoints,
           getTargetJointWorldPositions(),
           false,
-          100,
-          true,
-          true);
+          math::IKConfig()
+              .setConvergenceThreshold(convergenceThreshold)
+              .setMaxStepCount(maxStepCount)
+              .setLeastSquaresDamping(leastSquaresDamping)
+              .setLineSearch(lineSearch)
+              .setLogOutput(logOutput));
 
       return sourceMotion;
     }

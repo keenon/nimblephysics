@@ -85,6 +85,12 @@ type SetObjectColorCommand = {
   color: number[];
 };
 
+type SetObjectScaleCommand = {
+  type: "set_object_scale";
+  key: string;
+  scale: number[];
+};
+
 type EnableMouseInteractionCommand = {
   type: "enable_mouse";
   key: string;
@@ -205,6 +211,7 @@ type Command =
   | SetObjectPosCommand
   | SetObjectRotationCommand
   | SetObjectColorCommand
+  | SetObjectScaleCommand
   | DeleteObjectCommand
   | EnableMouseInteractionCommand
   | DisableMouseInteractionCommand
@@ -324,6 +331,8 @@ class DARTRemote {
       this.view.setObjectRotation(command.key, command.euler);
     } else if (command.type === "set_object_color") {
       this.view.setObjectColor(command.key, command.color);
+    } else if (command.type === "set_object_scale") {
+      this.view.setObjectScale(command.key, command.scale);
     } else if (command.type === "enable_mouse") {
       this.view.enableMouseInteraction(command.key);
     } else if (command.type === "disable_mouse") {

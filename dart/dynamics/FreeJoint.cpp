@@ -801,7 +801,7 @@ Eigen::Matrix6s FreeJoint::getRelativeJacobianInPositionSpaceStatic(
       = math::AdTJacFixed(Joint::mAspectProperties.mT_ChildBodyToJoint, J);
 
 #ifndef NDEBUG
-  const s_t threshold = 1e-10;
+  const s_t threshold = 1e-5;
   Eigen::Matrix6s fd = const_cast<FreeJoint*>(this)
                            ->finiteDifferenceRelativeJacobianInPositionSpace();
   if (((fd - result).cwiseAbs().array() > threshold).any())

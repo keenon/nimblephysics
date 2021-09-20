@@ -71,6 +71,14 @@ Eigen::Matrix3s quatSecondDeriv(
     const Eigen::Quaternion_s& _q, int _el1, int _el2);
 
 //------------------------------------------------------------------------------
+/// Best effort attempt to find an equivalent set of euler angles that fits
+/// within bounds
+Eigen::Vector3s attemptToClampEulerAnglesToBounds(
+    const Eigen::Vector3s& angle,
+    const Eigen::Vector3s& upperBounds,
+    const Eigen::Vector3s& lowerBounds);
+
+//------------------------------------------------------------------------------
 /// \brief Given Euler XYX angles, return a 3x3 rotation matrix, which is
 /// equivalent to RotX(angle(0)) * RotY(angle(1)) * RotX(angle(2)).
 Eigen::Matrix3s eulerXYXToMatrix(const Eigen::Vector3s& _angle);

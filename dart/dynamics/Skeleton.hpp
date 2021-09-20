@@ -48,6 +48,7 @@
 #include "dart/dynamics/SpecializedNodeManager.hpp"
 #include "dart/dynamics/detail/BodyNodeAspect.hpp"
 #include "dart/dynamics/detail/SkeletonAspect.hpp"
+#include "dart/math/IKSolver.hpp"
 #include "dart/math/MathTypes.hpp"
 #include "dart/neural/WithRespectTo.hpp"
 
@@ -745,6 +746,13 @@ public:
   Eigen::VectorXs getDynamicsForces();
 
   //----------------------------------------------------------------------------
+  // Randomness
+  //----------------------------------------------------------------------------
+
+  /// This gets a random pose that's valid within joint limits
+  Eigen::VectorXs getRandomPose();
+
+  //----------------------------------------------------------------------------
   // Trajectory optimization
   //----------------------------------------------------------------------------
 
@@ -1153,11 +1161,7 @@ public:
       const std::vector<const dynamics::Joint*>& positionJoints,
       Eigen::VectorXs targetPositions,
       bool scaleBodies = false,
-      s_t convergenceThreshold = 1e-7,
-      int maxStepCount = 100,
-      s_t leastSquaresDamping = 0.01,
-      bool lineSearch = true,
-      bool logOutput = false);
+      math::IKConfig config = math::IKConfig());
 
   /// This runs IK, attempting to fit the world positions of the passed in
   /// markers to the vector of (concatenated) target positions.
@@ -1166,11 +1170,8 @@ public:
           markers,
       Eigen::VectorXs targetPositions,
       Eigen::VectorXs markerWeights,
-      s_t convergenceThreshold = 1e-7,
-      int maxStepCount = 100,
-      s_t leastSquaresDamping = 0.01,
-      bool lineSearch = true,
-      bool logOutput = false);
+      bool scaleBodies = false,
+      math::IKConfig config = math::IKConfig());
 
   //----------------------------------------------------------------------------
   // Integration and finite difference

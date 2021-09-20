@@ -3756,7 +3756,7 @@ bool verifyMappingSetGet(
           = getTestComponentMapping(mapping, world, component);
       s_t newLoss = (newMapped - target).squaredNorm();
 
-      if (newLoss < originalLoss)
+      if (newLoss + 1e-6 < originalLoss)
       {
         std::cout << "Found near neighbor that's better than original IK "
                      "solution for "
@@ -4700,7 +4700,8 @@ bool verifyClosestIKPosition(WorldPtr world, Eigen::VectorXs position)
       Eigen::VectorXs newMapped = mapping.getPositions(world);
       s_t newLoss = (newMapped - targetPos).squaredNorm();
 
-      if (newLoss < originalLoss)
+      // Give it a bit of buffer, since IK is not exact
+      if (newLoss + 1e-6 < originalLoss)
       {
         std::cout << "Found near neighbor that's better than original IK "
                      "position solution!"
@@ -4757,7 +4758,7 @@ bool verifyClosestIKVelocity(WorldPtr world, Eigen::VectorXs velocity)
       world->setVelocities(velocity + randomPerturbations);
       s_t newLoss = (mapping.getVelocities(world) - targetVel).squaredNorm();
 
-      if (newLoss < originalLoss)
+      if (newLoss + 1e-6 < originalLoss)
       {
         std::cout << "Found near neighbor that's better than original IK "
                      "velocity solution!"

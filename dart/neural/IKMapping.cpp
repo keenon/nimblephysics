@@ -94,17 +94,25 @@ void IKMapping::setPositions(
   math::solveIK(
       Eigen::VectorXs::Zero(world->getNumDofs()),
       positions.size(),
-      [world](Eigen::VectorXs pos) {
+      [world](Eigen::VectorXs pos, bool clamp) {
         world->setPositions(pos);
-        world->clampPositionsToLimits();
-        return world->getPositions();
+        if (clamp)
+        {
+          world->clampPositionsToLimits();
+          return world->getPositions();
+        }
+        return pos;
       },
       [this, world, positions](Eigen::VectorXs& diff, Eigen::MatrixXs& J) {
         diff = positions - getPositions(world);
         J = getPosJacobian(world);
       },
-      1e-12,
-      1000);
+      [this](Eigen::VectorXs& pos) {
+        // Don't random restart here
+        (void)pos;
+        assert(false);
+      },
+      math::IKConfig().setMaxStepCount(500).setMaxRestarts(1));
 }
 
 //==============================================================================

@@ -64,7 +64,8 @@ class DARTView {
     this.dragListeners = [];
 
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0xf8f8f8);
+    // this.scene.background = new THREE.Color(0xf8f8f8);
+    this.scene.background = new THREE.Color(0xffffff);
 
     const light = new THREE.DirectionalLight();
     light.castShadow = true;
@@ -204,9 +205,9 @@ class DARTView {
       color: new THREE.Color(color[0], color[1], color[2]),
     });
     const geometry = new THREE.BoxBufferGeometry(
-      size[0] * SCALE_FACTOR,
-      size[1] * SCALE_FACTOR,
-      size[2] * SCALE_FACTOR
+      SCALE_FACTOR,
+      SCALE_FACTOR,
+      SCALE_FACTOR
     );
     const mesh = new THREE.Mesh(geometry, material);
     mesh.position.x = pos[0] * SCALE_FACTOR;
@@ -217,6 +218,7 @@ class DARTView {
     mesh.rotation.z = euler[2];
     mesh.castShadow = castShadows;
     mesh.receiveShadow = receiveShadows;
+    mesh.scale.set(size[0], size[1], size[2]);
 
     this.objects.set(key, mesh);
     this.keys.set(mesh, key);
@@ -245,7 +247,7 @@ class DARTView {
     });
     const NUM_SPHERE_SEGMENTS = 18;
     const geometry = new THREE.SphereBufferGeometry(
-      radius * SCALE_FACTOR,
+      SCALE_FACTOR,
       NUM_SPHERE_SEGMENTS,
       NUM_SPHERE_SEGMENTS
     );
@@ -255,6 +257,7 @@ class DARTView {
     mesh.position.z = pos[2] * SCALE_FACTOR;
     mesh.castShadow = castShadows;
     mesh.receiveShadow = receiveShadows;
+    mesh.scale.set(radius, radius, radius);
 
     this.objects.set(key, mesh);
     this.keys.set(mesh, key);
@@ -403,9 +406,9 @@ class DARTView {
         let vertexIndex = faces[i][j];
         meshPoints.push(
           new THREE.Vector3(
-            vertices[vertexIndex][0] * SCALE_FACTOR * scale[0],
-            vertices[vertexIndex][1] * SCALE_FACTOR * scale[1],
-            vertices[vertexIndex][2] * SCALE_FACTOR * scale[2]
+            vertices[vertexIndex][0] * SCALE_FACTOR,
+            vertices[vertexIndex][1] * SCALE_FACTOR,
+            vertices[vertexIndex][2] * SCALE_FACTOR
           )
         );
         if (uv != null && uv.length > vertexIndex) {
@@ -446,6 +449,7 @@ class DARTView {
     mesh.rotation.z = euler[2];
     mesh.castShadow = castShadows;
     mesh.receiveShadow = receiveShadows;
+    mesh.scale.set(scale[0], scale[1], scale[2]);
 
     this.objects.set(key, mesh);
     this.keys.set(mesh, key);
@@ -482,16 +486,14 @@ class DARTView {
   };
 
   /**
-   * Changes the color of an object
+   * Changes the scale of an object
    *
    * Must call render() to see results!
    */
-  setObjectColor = (key: string, color: number[]) => {
+  setObjectScale = (key: string, scale: number[]) => {
     const obj = this.objects.get(key);
     if (obj) {
-      (obj as any).material.color.r = color[0];
-      (obj as any).material.color.g = color[1];
-      (obj as any).material.color.b = color[2];
+      (obj as any).scale.set(scale[0], scale[1], scale[2]);
     }
   };
 
