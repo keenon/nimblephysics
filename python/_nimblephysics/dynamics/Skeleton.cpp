@@ -814,7 +814,26 @@ void Skeleton(py::module& m)
           ::py::arg("joints"))
       .def(
           "fitJointsToWorldPositions",
-          &dart::dynamics::Skeleton::fitJointsToWorldPositions,
+          +[](dart::dynamics::Skeleton* self,
+              const std::vector<const dynamics::Joint*>& positionJoints,
+              Eigen::VectorXs targetPositions,
+              bool scaleBodies,
+              double convergenceThreshold,
+              int maxStepCount,
+              double leastSquaresDamping,
+              bool lineSearch,
+              bool logOutput) -> double {
+            return self->fitJointsToWorldPositions(
+                positionJoints,
+                targetPositions,
+                scaleBodies,
+                math::IKConfig()
+                    .setConvergenceThreshold(convergenceThreshold)
+                    .setMaxStepCount(maxStepCount)
+                    .setLeastSquaresDamping(leastSquaresDamping)
+                    .setLineSearch(lineSearch)
+                    .setLogOutput(logOutput));
+          },
           ::py::arg("positionJoints"),
           ::py::arg("targetPositions"),
           ::py::arg("scaleBodies") = false,
@@ -825,10 +844,34 @@ void Skeleton(py::module& m)
           ::py::arg("logOutput") = false)
       .def(
           "fitMarkersToWorldPositions",
-          &dart::dynamics::Skeleton::fitMarkersToWorldPositions,
+          +[](dart::dynamics::Skeleton* self,
+              const std::vector<
+                  std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+                  markers,
+              Eigen::VectorXs targetPositions,
+              Eigen::VectorXs markerWeights,
+              bool scaleBodies,
+              double convergenceThreshold,
+              int maxStepCount,
+              double leastSquaresDamping,
+              bool lineSearch,
+              bool logOutput) -> double {
+            return self->fitMarkersToWorldPositions(
+                markers,
+                targetPositions,
+                markerWeights,
+                scaleBodies,
+                math::IKConfig()
+                    .setConvergenceThreshold(convergenceThreshold)
+                    .setMaxStepCount(maxStepCount)
+                    .setLeastSquaresDamping(leastSquaresDamping)
+                    .setLineSearch(lineSearch)
+                    .setLogOutput(logOutput));
+          },
           ::py::arg("markers"),
           ::py::arg("targetPositions"),
-          ::py::arg("markeWeights"),
+          ::py::arg("markerWeights"),
+          ::py::arg("scaleBodies") = false,
           ::py::arg("convergenceThreshold") = 1e-7,
           ::py::arg("maxStepCount") = 100,
           ::py::arg("leastSquaresDamping") = 0.01,

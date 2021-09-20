@@ -31,6 +31,9 @@
  */
 
 #include <Eigen/Dense>
+#include <dart/biomechanics/MarkerFitter.hpp>
+#include <dart/dynamics/BodyNode.hpp>
+#include <dart/dynamics/Skeleton.hpp>
 #include <pybind11/eigen.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -40,25 +43,36 @@ namespace py = pybind11;
 namespace dart {
 namespace python {
 
-void LilypadSolver(py::module& sm);
-void BatchGaitInverseDynamics(py::module& sm);
-void OpenSimParser(py::module& sm);
-void SkeletonConverter(py::module& sm);
-void MarkerFitter(py::module& sm);
-
-void dart_biomechanics(py::module& m)
+void MarkerFitter(py::module& m)
 {
-  auto sm = m.def_submodule("biomechanics");
+  ::py::class_<
+      dart::biomechanics::MarkerFitResult,
+      std::shared_ptr<dart::biomechanics::MarkerFitResult>>(
+      m, "MarkerFitResult")
+      .def_readwrite("success", &dart::biomechanics::MarkerFitResult::success)
+      .def_readwrite(
+          "groupScales", &dart::biomechanics::MarkerFitResult::groupScales)
+      .def_readwrite(
+          "markerOffsets", &dart::biomechanics::MarkerFitResult::markerOffsets)
+      .def_readwrite("poses", &dart::biomechanics::MarkerFitResult::poses)
+      .def_readwrite(
+          "adjustedMarkers",
+          &dart::biomechanics::MarkerFitResult::adjustedMarkers);
 
-  sm.doc()
-      = "This provides biomechanics utilities in Nimble, including inverse "
-        "dynamics and (eventually) mocap support and muscle estimation.";
-
-  LilypadSolver(sm);
-  BatchGaitInverseDynamics(sm);
-  OpenSimParser(sm);
-  SkeletonConverter(sm);
-  MarkerFitter(sm);
+  ::py::class_<
+      dart::biomechanics::MarkerFitter,
+      std::shared_ptr<dart::biomechanics::MarkerFitter>>(m, "MarkerFitter")
+      .def(
+          ::py::init<
+              std::shared_ptr<dynamics::Skeleton>,
+              std::vector<
+                  std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>>(),
+          ::py::arg("skeleton"),
+          ::py::arg("markers"))
+      .def(
+          "optimize",
+          &dart::biomechanics::MarkerFitter::optimize,
+          ::py::arg("markerObservations"));
 }
 
 } // namespace python
